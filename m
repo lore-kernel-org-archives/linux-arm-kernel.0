@@ -1,211 +1,340 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 16 Jan 2017 10:52:43 +0530
-Subject: [PATCH 12/37] PCI: dwc: Create a new config symbol to enable pci
- dwc host
-In-Reply-To: <3d34f9c4-7ec4-ac2b-ea7f-18d239dfa554@synopsys.com>
-References: <1484216786-17292-1-git-send-email-kishon@ti.com>
- <1484216786-17292-13-git-send-email-kishon@ti.com>
- <3d34f9c4-7ec4-ac2b-ea7f-18d239dfa554@synopsys.com>
-Message-ID: <587C58A3.7080600@ti.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 16 Jan 2017 13:45:56 +0800
+Subject: [PATCH v2 2/7] clk: sunxi-ng: Implement factors offsets
+In-Reply-To: <2cec4b406a220763208125cde184aee01b27e7e8.1484035021.git-series.maxime.ripard@free-electrons.com>
+References: <cover.8762813dc78858261716126c700983d4aee00458.1484035021.git-series.maxime.ripard@free-electrons.com>
+ <2cec4b406a220763208125cde184aee01b27e7e8.1484035021.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v66cjf0k8RvSCMXA6TjhDEj7dacyfwnkxpgnf7LL_JVF3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joao,
+On Tue, Jan 10, 2017 at 3:57 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The factors we've seen so far all had an offset of one. However, on the
+> earlier Allwinner SoCs, some factors could have no offset at all, meaning
+> that the value computed to reach the rate we want to use was the one we had
+> to program in the registers.
+>
+> Implement an additional field for the factors that can have such an offset
+> (linears, not based on a power of two) to specify that offset.
+>
+> This offset is not linked to the extremums that can be specified in those
+> structures too. The minimum and maximum are representing the range of
+> values we can use to try to compute the best rate. The offset comes later
+> on when we want to set the best value in the registers.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/clk/sunxi-ng/ccu_div.h  | 10 +++++++++-
+>  drivers/clk/sunxi-ng/ccu_mp.c   | 10 +++++++---
+>  drivers/clk/sunxi-ng/ccu_mult.c |  4 ++--
+>  drivers/clk/sunxi-ng/ccu_mult.h | 20 ++++++++++++++------
+>  drivers/clk/sunxi-ng/ccu_nk.c   | 14 ++++++++++----
+>  drivers/clk/sunxi-ng/ccu_nkm.c  | 18 +++++++++++++-----
+>  drivers/clk/sunxi-ng/ccu_nkmp.c | 17 +++++++++++++----
+>  drivers/clk/sunxi-ng/ccu_nm.c   | 13 ++++++++++---
+>  8 files changed, 78 insertions(+), 28 deletions(-)
+>
+> diff --git a/drivers/clk/sunxi-ng/ccu_div.h b/drivers/clk/sunxi-ng/ccu_div.h
+> index 06540f7cf41c..08d074451204 100644
+> --- a/drivers/clk/sunxi-ng/ccu_div.h
+> +++ b/drivers/clk/sunxi-ng/ccu_div.h
+> @@ -41,6 +41,7 @@ struct ccu_div_internal {
+>         u8                      width;
+>
+>         u32                     max;
+> +       u32                     offset;
+>
+>         u32                     flags;
+>
+> @@ -58,20 +59,27 @@ struct ccu_div_internal {
+>  #define _SUNXI_CCU_DIV_TABLE(_shift, _width, _table)                   \
+>         _SUNXI_CCU_DIV_TABLE_FLAGS(_shift, _width, _table, 0)
+>
+> -#define _SUNXI_CCU_DIV_MAX_FLAGS(_shift, _width, _max, _flags) \
+> +#define _SUNXI_CCU_DIV_OFFSET_MAX_FLAGS(_shift, _width, _off, _max, _flags) \
+>         {                                                               \
+>                 .shift  = _shift,                                       \
+>                 .width  = _width,                                       \
+>                 .flags  = _flags,                                       \
+>                 .max    = _max,                                         \
+> +               .offset = _off,                                         \
+>         }
+>
+> +#define _SUNXI_CCU_DIV_MAX_FLAGS(_shift, _width, _max, _flags)         \
+> +       _SUNXI_CCU_DIV_OFFSET_MAX_FLAGS(_shift, _width, 1, _max, _flags)
+> +
+>  #define _SUNXI_CCU_DIV_FLAGS(_shift, _width, _flags)                   \
+>         _SUNXI_CCU_DIV_MAX_FLAGS(_shift, _width, 0, _flags)
+>
+>  #define _SUNXI_CCU_DIV_MAX(_shift, _width, _max)                       \
+>         _SUNXI_CCU_DIV_MAX_FLAGS(_shift, _width, _max, 0)
+>
+> +#define _SUNXI_CCU_DIV_OFFSET(_shift, _width, _offset)                 \
+> +       _SUNXI_CCU_DIV_OFFSET_MAX_FLAGS(_shift, _width, _offset, 0, 0)
+> +
+>  #define _SUNXI_CCU_DIV(_shift, _width)                                 \
+>         _SUNXI_CCU_DIV_FLAGS(_shift, _width, 0)
+>
+> diff --git a/drivers/clk/sunxi-ng/ccu_mp.c b/drivers/clk/sunxi-ng/ccu_mp.c
+> index ebb1b31568a5..22c2ca7a2a22 100644
+> --- a/drivers/clk/sunxi-ng/ccu_mp.c
+> +++ b/drivers/clk/sunxi-ng/ccu_mp.c
+> @@ -89,11 +89,14 @@ static unsigned long ccu_mp_recalc_rate(struct clk_hw *hw,
+>
+>         m = reg >> cmp->m.shift;
+>         m &= (1 << cmp->m.width) - 1;
+> +       m += cmp->m.offset;
+> +       if (!m)
+> +               m++;
+>
+>         p = reg >> cmp->p.shift;
+>         p &= (1 << cmp->p.width) - 1;
+>
+> -       return (parent_rate >> p) / (m + 1);
+> +       return (parent_rate >> p) / m;
+>  }
+>
+>  static int ccu_mp_determine_rate(struct clk_hw *hw,
+> @@ -124,9 +127,10 @@ static int ccu_mp_set_rate(struct clk_hw *hw, unsigned long rate,
+>         reg = readl(cmp->common.base + cmp->common.reg);
+>         reg &= ~GENMASK(cmp->m.width + cmp->m.shift - 1, cmp->m.shift);
+>         reg &= ~GENMASK(cmp->p.width + cmp->p.shift - 1, cmp->p.shift);
+> +       reg |= (m - cmp->m.offset) << cmp->m.shift;
+> +       reg |= ilog2(p) << cmp->p.shift;
+>
+> -       writel(reg | (ilog2(p) << cmp->p.shift) | ((m - 1) << cmp->m.shift),
+> -              cmp->common.base + cmp->common.reg);
+> +       writel(reg, cmp->common.base + cmp->common.reg);
+>
+>         spin_unlock_irqrestore(cmp->common.lock, flags);
+>
+> diff --git a/drivers/clk/sunxi-ng/ccu_mult.c b/drivers/clk/sunxi-ng/ccu_mult.c
+> index 826302464650..bf5e11c803f9 100644
+> --- a/drivers/clk/sunxi-ng/ccu_mult.c
+> +++ b/drivers/clk/sunxi-ng/ccu_mult.c
+> @@ -85,7 +85,7 @@ static unsigned long ccu_mult_recalc_rate(struct clk_hw *hw,
+>         ccu_mux_helper_adjust_parent_for_prediv(&cm->common, &cm->mux, -1,
+>                                                 &parent_rate);
+>
+> -       return parent_rate * (val + 1);
+> +       return parent_rate * (val + cm->mult.offset);
+>  }
+>
+>  static int ccu_mult_determine_rate(struct clk_hw *hw,
+> @@ -122,7 +122,7 @@ static int ccu_mult_set_rate(struct clk_hw *hw, unsigned long rate,
+>         reg = readl(cm->common.base + cm->common.reg);
+>         reg &= ~GENMASK(cm->mult.width + cm->mult.shift - 1, cm->mult.shift);
+>
+> -       writel(reg | ((_cm.mult - 1) << cm->mult.shift),
+> +       writel(reg | ((_cm.mult - cm->mult.offset) << cm->mult.shift),
 
-On Friday 13 January 2017 11:20 PM, Joao Pinto wrote:
-> Hi Kishon,
-> 
-> ?s 10:26 AM de 1/12/2017, Kishon Vijay Abraham I escreveu:
->> Now that pci designware host has a separate file, create a new
->> config symbol to select the host only driver. This is in preparation
->> to enable endpoint support to designware driver.
->>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>  drivers/pci/dwc/Kconfig           |   26 +++++++++++++++-----------
->>  drivers/pci/dwc/Makefile          |    3 ++-
->>  drivers/pci/dwc/pcie-designware.h |   29 +++++++++++++++++++++++++----
->>  3 files changed, 42 insertions(+), 16 deletions(-)
->>
-> 
-> You are already working in a base where dwc/ already exists. I know you made a
-> rename / re-structure patch for pci, but I think it was not yet accepted, right?
-> I don't see it in any of Bjorn' dev branches.
+Nit, might be worth splitting out the "or" to a separate line.
 
-He said he'll merge that a little later.
+>                cm->common.base + cm->common.reg);
+>
+>         spin_unlock_irqrestore(cm->common.lock, flags);
+> diff --git a/drivers/clk/sunxi-ng/ccu_mult.h b/drivers/clk/sunxi-ng/ccu_mult.h
+> index bd2e38b5a32a..84839641dfdf 100644
+> --- a/drivers/clk/sunxi-ng/ccu_mult.h
+> +++ b/drivers/clk/sunxi-ng/ccu_mult.h
+> @@ -6,20 +6,28 @@
+>  #include "ccu_mux.h"
+>
+>  struct ccu_mult_internal {
+> +       u8      offset;
+>         u8      shift;
+>         u8      width;
+>         u8      min;
+>  };
+>
+> -#define _SUNXI_CCU_MULT_MIN(_shift, _width, _min)      \
+> -       {                                               \
+> -               .shift  = _shift,                       \
+> -               .width  = _width,                       \
+> -               .min    = _min,                         \
+> +#define _SUNXI_CCU_MULT_OFFSET_MIN(_shift, _width, _offset, _min)      \
+> +       {                                                               \
+> +               .min    = _min,                                         \
+> +               .offset = _offset,                                      \
+> +               .shift  = _shift,                                       \
+> +               .width  = _width,                                       \
+>         }
+>
+> +#define _SUNXI_CCU_MULT_MIN(_shift, _width, _min)      \
+> +       _SUNXI_CCU_MULT_OFFSET_MIN(_shift, _width, 1, _min)
+> +
+> +#define _SUNXI_CCU_MULT_OFFSET(_shift, _width, _offset)        \
+> +       _SUNXI_CCU_MULT_OFFSET_MIN(_shift, _width, _offset, 1)
+> +
+>  #define _SUNXI_CCU_MULT(_shift, _width)                \
+> -       _SUNXI_CCU_MULT_MIN(_shift, _width, 1)
+> +       _SUNXI_CCU_MULT_OFFSET_MIN(_shift, _width, 1, 1)
+>
+>  struct ccu_mult {
+>         u32                     enable;
+> diff --git a/drivers/clk/sunxi-ng/ccu_nk.c b/drivers/clk/sunxi-ng/ccu_nk.c
+> index eaf0fdf78d2b..90117d3ead8c 100644
+> --- a/drivers/clk/sunxi-ng/ccu_nk.c
+> +++ b/drivers/clk/sunxi-ng/ccu_nk.c
+> @@ -76,12 +76,17 @@ static unsigned long ccu_nk_recalc_rate(struct clk_hw *hw,
+>
+>         n = reg >> nk->n.shift;
+>         n &= (1 << nk->n.width) - 1;
+> +       n += nk->n.offset;
+> +       if (!n)
+> +               n++;
+>
+>         k = reg >> nk->k.shift;
+>         k &= (1 << nk->k.width) - 1;
+> +       k += nk->k.offset;
+> +       if (!k)
+> +               k++;
+>
+> -       rate = parent_rate * (n + 1) * (k + 1);
+> -
+> +       rate = parent_rate * n * k;
+>         if (nk->common.features & CCU_FEATURE_FIXED_POSTDIV)
+>                 rate /= nk->fixed_post_div;
+>
+> @@ -135,8 +140,9 @@ static int ccu_nk_set_rate(struct clk_hw *hw, unsigned long rate,
+>         reg &= ~GENMASK(nk->n.width + nk->n.shift - 1, nk->n.shift);
+>         reg &= ~GENMASK(nk->k.width + nk->k.shift - 1, nk->k.shift);
+>
+> -       writel(reg | ((_nk.k - 1) << nk->k.shift) | ((_nk.n - 1) << nk->n.shift),
+> -              nk->common.base + nk->common.reg);
+> +       reg |= (_nk.k - nk->k.offset) << nk->k.shift;
+> +       reg |= (_nk.n - nk->n.offset) << nk->n.shift;
+> +       writel(reg, nk->common.base + nk->common.reg);
+>
+>         spin_unlock_irqrestore(nk->common.lock, flags);
+>
+> diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
+> index 9b840a47a94d..3caaf9d603e2 100644
+> --- a/drivers/clk/sunxi-ng/ccu_nkm.c
+> +++ b/drivers/clk/sunxi-ng/ccu_nkm.c
+> @@ -82,14 +82,23 @@ static unsigned long ccu_nkm_recalc_rate(struct clk_hw *hw,
+>
+>         n = reg >> nkm->n.shift;
+>         n &= (1 << nkm->n.width) - 1;
+> +       n += nkm->n.offset;
+> +       if (!n)
+> +               n++;
+>
+>         k = reg >> nkm->k.shift;
+>         k &= (1 << nkm->k.width) - 1;
+> +       k += nkm->k.offset;
+> +       if (!k)
+> +               k++;
+>
+>         m = reg >> nkm->m.shift;
+>         m &= (1 << nkm->m.width) - 1;
+> +       m += nkm->m.offset;
+> +       if (!m)
+> +               m++;
+>
+> -       return parent_rate * (n + 1) * (k + 1) / (m + 1);
+> +       return parent_rate * n  * k / m;
+>  }
+>
+>  static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
+> @@ -145,10 +154,9 @@ static int ccu_nkm_set_rate(struct clk_hw *hw, unsigned long rate,
+>         reg &= ~GENMASK(nkm->k.width + nkm->k.shift - 1, nkm->k.shift);
+>         reg &= ~GENMASK(nkm->m.width + nkm->m.shift - 1, nkm->m.shift);
+>
+> -       reg |= (_nkm.n - 1) << nkm->n.shift;
+> -       reg |= (_nkm.k - 1) << nkm->k.shift;
+> -       reg |= (_nkm.m - 1) << nkm->m.shift;
+> -
+> +       reg |= (_nkm.n - nkm->n.offset) << nkm->n.shift;
+> +       reg |= (_nkm.k - nkm->k.offset) << nkm->k.shift;
+> +       reg |= (_nkm.m - nkm->m.offset) << nkm->m.shift;
+>         writel(reg, nkm->common.base + nkm->common.reg);
+>
+>         spin_unlock_irqrestore(nkm->common.lock, flags);
+> diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.c b/drivers/clk/sunxi-ng/ccu_nkmp.c
+> index 684c42da3ebb..da2bba02b845 100644
+> --- a/drivers/clk/sunxi-ng/ccu_nkmp.c
+> +++ b/drivers/clk/sunxi-ng/ccu_nkmp.c
+> @@ -88,17 +88,26 @@ static unsigned long ccu_nkmp_recalc_rate(struct clk_hw *hw,
+>
+>         n = reg >> nkmp->n.shift;
+>         n &= (1 << nkmp->n.width) - 1;
+> +       n += nkmp->n.offset;
+> +       if (!n)
+> +               n++;
+>
+>         k = reg >> nkmp->k.shift;
+>         k &= (1 << nkmp->k.width) - 1;
+> +       k += nkmp->k.offset;
+> +       if (!k)
+> +               k++;
+>
+>         m = reg >> nkmp->m.shift;
+>         m &= (1 << nkmp->m.width) - 1;
+> +       m += nkmp->m.offset;
+> +       if (!m)
+> +               m++;
+>
+>         p = reg >> nkmp->p.shift;
+>         p &= (1 << nkmp->p.width) - 1;
+>
+> -       return (parent_rate * (n + 1) * (k + 1) >> p) / (m + 1);
+> +       return parent_rate * n * k >> p / m;
+>  }
+>
+>  static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
+> @@ -148,9 +157,9 @@ static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
+>         reg &= ~GENMASK(nkmp->m.width + nkmp->m.shift - 1, nkmp->m.shift);
+>         reg &= ~GENMASK(nkmp->p.width + nkmp->p.shift - 1, nkmp->p.shift);
+>
+> -       reg |= (_nkmp.n - 1) << nkmp->n.shift;
+> -       reg |= (_nkmp.k - 1) << nkmp->k.shift;
+> -       reg |= (_nkmp.m - 1) << nkmp->m.shift;
+> +       reg |= (_nkmp.n - nkmp->n.offset) << nkmp->n.shift;
+> +       reg |= (_nkmp.k - nkmp->k.offset) << nkmp->k.shift;
+> +       reg |= (_nkmp.m - nkmp->m.offset) << nkmp->m.shift;
+>         reg |= ilog2(_nkmp.p) << nkmp->p.shift;
+>
+>         writel(reg, nkmp->common.base + nkmp->common.reg);
+> diff --git a/drivers/clk/sunxi-ng/ccu_nm.c b/drivers/clk/sunxi-ng/ccu_nm.c
+> index c9f3b6c982f0..158d74e0215f 100644
+> --- a/drivers/clk/sunxi-ng/ccu_nm.c
+> +++ b/drivers/clk/sunxi-ng/ccu_nm.c
+> @@ -80,11 +80,17 @@ static unsigned long ccu_nm_recalc_rate(struct clk_hw *hw,
+>
+>         n = reg >> nm->n.shift;
+>         n &= (1 << nm->n.width) - 1;
+> +       n += nm->n.offset;
+> +       if (!n)
+> +               n++;
+>
+>         m = reg >> nm->m.shift;
+>         m &= (1 << nm->m.width) - 1;
+> +       m += nm->m.offset;
+> +       if (!m)
+> +               m++;
+>
+> -       return parent_rate * (n + 1) / (m + 1);
+> +       return parent_rate * n / m;
+>  }
+>
+>  static long ccu_nm_round_rate(struct clk_hw *hw, unsigned long rate,
+> @@ -129,8 +135,9 @@ static int ccu_nm_set_rate(struct clk_hw *hw, unsigned long rate,
+>         reg &= ~GENMASK(nm->n.width + nm->n.shift - 1, nm->n.shift);
+>         reg &= ~GENMASK(nm->m.width + nm->m.shift - 1, nm->m.shift);
+>
+> -       writel(reg | ((_nm.m - 1) << nm->m.shift) | ((_nm.n - 1) << nm->n.shift),
+> -              nm->common.base + nm->common.reg);
+> +       reg |= (_nm.n - nm->n.offset) << nm->n.shift;
+> +       reg |= (_nm.m - nm->m.offset) << nm->m.shift;
+> +       writel(reg, nm->common.base + nm->common.reg);
+>
+>         spin_unlock_irqrestore(nm->common.lock, flags);
+>
+> --
+> git-series 0.8.11
 
-Thanks
-Kishon
+Otherwise,
 
-> 
-> Thanks.
-> 
->> diff --git a/drivers/pci/dwc/Kconfig b/drivers/pci/dwc/Kconfig
->> index 8b08519..d0bdfb5 100644
->> --- a/drivers/pci/dwc/Kconfig
->> +++ b/drivers/pci/dwc/Kconfig
->> @@ -3,13 +3,17 @@ menu "DesignWare PCI Core Support"
->>  
->>  config PCIE_DW
->>  	bool
->> +
->> +config PCIE_DW_HOST
->> +        bool
->>  	depends on PCI_MSI_IRQ_DOMAIN
->> +        select PCIE_DW
->>  
->>  config PCI_DRA7XX
->>  	bool "TI DRA7xx PCIe controller"
->>  	depends on OF && HAS_IOMEM && TI_PIPE3
->>  	depends on PCI_MSI_IRQ_DOMAIN
->> -	select PCIE_DW
->> +	select PCIE_DW_HOST
->>  	help
->>  	 Enables support for the PCIe controller in the DRA7xx SoC.  There
->>  	 are two instances of PCIe controller in DRA7xx.  This controller can
->> @@ -18,7 +22,7 @@ config PCI_DRA7XX
->>  config PCIE_DW_PLAT
->>  	bool "Platform bus based DesignWare PCIe Controller"
->>  	depends on PCI_MSI_IRQ_DOMAIN
->> -	select PCIE_DW
->> +	select PCIE_DW_HOST
->>  	---help---
->>  	 This selects the DesignWare PCIe controller support. Select this if
->>  	 you have a PCIe controller on Platform bus.
->> @@ -32,21 +36,21 @@ config PCI_EXYNOS
->>  	depends on SOC_EXYNOS5440 || COMPILE_TEST
->>  	depends on PCI_MSI_IRQ_DOMAIN
->>  	select PCIEPORTBUS
->> -	select PCIE_DW
->> +	select PCIE_DW_HOST
->>  
->>  config PCI_IMX6
->>  	bool "Freescale i.MX6 PCIe controller"
->>  	depends on SOC_IMX6Q || COMPILE_TEST
->>  	depends on PCI_MSI_IRQ_DOMAIN
->>  	select PCIEPORTBUS
->> -	select PCIE_DW
->> +	select PCIE_DW_HOST
->>  
->>  config PCIE_SPEAR13XX
->>  	bool "STMicroelectronics SPEAr PCIe controller"
->>  	depends on ARCH_SPEAR13XX || COMPILE_TEST
->>  	depends on PCI_MSI_IRQ_DOMAIN
->>  	select PCIEPORTBUS
->> -	select PCIE_DW
->> +	select PCIE_DW_HOST
->>  	help
->>  	  Say Y here if you want PCIe support on SPEAr13XX SoCs.
->>  
->> @@ -55,7 +59,7 @@ config PCI_KEYSTONE
->>  	depends on ARCH_KEYSTONE || COMPILE_TEST
->>  	depends on PCI_MSI_IRQ_DOMAIN
->>  	select PCIEPORTBUS
->> -	select PCIE_DW
->> +	select PCIE_DW_HOST
->>  	help
->>  	  Say Y here if you want to enable PCI controller support on Keystone
->>  	  SoCs. The PCI controller on Keystone is based on Designware hardware
->> @@ -67,7 +71,7 @@ config PCI_LAYERSCAPE
->>  	depends on OF && (ARM || ARCH_LAYERSCAPE || COMPILE_TEST)
->>  	depends on PCI_MSI_IRQ_DOMAIN
->>  	select MFD_SYSCON
->> -	select PCIE_DW
->> +	select PCIE_DW_HOST
->>  	help
->>  	  Say Y here if you want PCIe controller support on Layerscape SoCs.
->>  
->> @@ -76,7 +80,7 @@ config PCI_HISI
->>  	bool "HiSilicon Hip05 and Hip06 SoCs PCIe controllers"
->>  	depends on PCI_MSI_IRQ_DOMAIN
->>  	select PCIEPORTBUS
->> -	select PCIE_DW
->> +	select PCIE_DW_HOST
->>  	help
->>  	  Say Y here if you want PCIe controller support on HiSilicon
->>  	  Hip05 and Hip06 SoCs
->> @@ -86,7 +90,7 @@ config PCIE_QCOM
->>  	depends on (ARCH_QCOM || COMPILE_TEST) && OF
->>  	depends on PCI_MSI_IRQ_DOMAIN
->>  	select PCIEPORTBUS
->> -	select PCIE_DW
->> +	select PCIE_DW_HOST
->>  	help
->>  	  Say Y here to enable PCIe controller support on Qualcomm SoCs. The
->>  	  PCIe controller uses the Designware core plus Qualcomm-specific
->> @@ -97,7 +101,7 @@ config PCIE_ARMADA_8K
->>  	depends on ARCH_MVEBU || COMPILE_TEST
->>  	depends on PCI_MSI_IRQ_DOMAIN
->>  	select PCIEPORTBUS
->> -	select PCIE_DW
->> +	select PCIE_DW_HOST
->>  	help
->>  	  Say Y here if you want to enable PCIe controller support on
->>  	  Armada-8K SoCs. The PCIe controller on Armada-8K is based on
->> @@ -109,7 +113,7 @@ config PCIE_ARTPEC6
->>  	depends on MACH_ARTPEC6 || COMPILE_TEST
->>  	depends on PCI_MSI_IRQ_DOMAIN
->>  	select PCIEPORTBUS
->> -	select PCIE_DW
->> +	select PCIE_DW_HOST
->>  	help
->>  	  Say Y here to enable PCIe controller support on Axis ARTPEC-6
->>  	  SoCs.  This PCIe controller uses the DesignWare core.
->> diff --git a/drivers/pci/dwc/Makefile b/drivers/pci/dwc/Makefile
->> index 3b57e55..a2df13c 100644
->> --- a/drivers/pci/dwc/Makefile
->> +++ b/drivers/pci/dwc/Makefile
->> @@ -1,4 +1,5 @@
->> -obj-$(CONFIG_PCIE_DW) += pcie-designware.o pcie-designware-host.o
->> +obj-$(CONFIG_PCIE_DW) += pcie-designware.o
->> +obj-$(CONFIG_PCIE_DW_HOST) += pcie-designware-host.o
->>  obj-$(CONFIG_PCIE_DW_PLAT) += pcie-designware-plat.o
->>  obj-$(CONFIG_PCI_DRA7XX) += pci-dra7xx.o
->>  obj-$(CONFIG_PCI_EXYNOS) += pci-exynos.o
->> diff --git a/drivers/pci/dwc/pcie-designware.h b/drivers/pci/dwc/pcie-designware.h
->> index 808d17b..8f3dcb2 100644
->> --- a/drivers/pci/dwc/pcie-designware.h
->> +++ b/drivers/pci/dwc/pcie-designware.h
->> @@ -162,10 +162,6 @@ struct dw_pcie {
->>  
->>  int dw_pcie_read(void __iomem *addr, int size, u32 *val);
->>  int dw_pcie_write(void __iomem *addr, int size, u32 val);
->> -irqreturn_t dw_handle_msi_irq(struct pcie_port *pp);
->> -void dw_pcie_msi_init(struct pcie_port *pp);
->> -void dw_pcie_setup_rc(struct pcie_port *pp);
->> -int dw_pcie_host_init(struct pcie_port *pp);
->>  
->>  u32 dw_pcie_readl_dbi(struct dw_pcie *pci, u32 reg);
->>  void dw_pcie_writel_dbi(struct dw_pcie *pci, u32 reg, u32 val);
->> @@ -175,4 +171,29 @@ void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index,
->>  			       int type, u64 cpu_addr, u64 pci_addr,
->>  			       u32 size);
->>  void dw_pcie_setup(struct dw_pcie *pci);
->> +
->> +#ifdef CONFIG_PCIE_DW_HOST
->> +irqreturn_t dw_handle_msi_irq(struct pcie_port *pp);
->> +void dw_pcie_msi_init(struct pcie_port *pp);
->> +void dw_pcie_setup_rc(struct pcie_port *pp);
->> +int dw_pcie_host_init(struct pcie_port *pp);
->> +#else
->> +static inline irqreturn_t dw_handle_msi_irq(struct pcie_port *pp)
->> +{
->> +	return IRQ_NONE;
->> +}
->> +
->> +static inline void dw_pcie_msi_init(struct pcie_port *pp)
->> +{
->> +}
->> +
->> +static inline void dw_pcie_setup_rc(struct pcie_port *pp)
->> +{
->> +}
->> +
->> +static inline int dw_pcie_host_init(struct pcie_port *pp)
->> +{
->> +	return 0;
->> +}
->> +#endif
->>  #endif /* _PCIE_DESIGNWARE_H */
->>
-> 
+Acked-by: Chen-Yu Tsai <wens@csie.org>
