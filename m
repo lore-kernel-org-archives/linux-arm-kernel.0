@@ -1,23 +1,21 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Mon, 16 Jan 2017 13:40:41 +0000
-Subject: [PATCH 8/8] efi: Add EFI_SECURE_BOOT bit [ver #6]
-In-Reply-To: <7979.1484148564@warthog.procyon.org.uk>
-References: <20170111145138.GB29649@codeblueprint.co.uk>
- <148120020832.5854.5448601415491330495.stgit@warthog.procyon.org.uk>
- <148120026820.5854.13036556358308461345.stgit@warthog.procyon.org.uk>
- <7979.1484148564@warthog.procyon.org.uk>
-Message-ID: <20170116134041.GA27351@codeblueprint.co.uk>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Mon, 16 Jan 2017 13:40:57 +0000
+Subject: [PATCH] arm64: defconfig: disable CONFIG_DEVMEM
+In-Reply-To: <20170115124254.GF25883@bivouac.eciton.net>
+References: <20170113113734.16524-1-leif.lindholm@linaro.org>
+ <20170113114801.GD3253@arm.com>
+ <20170115124254.GF25883@bivouac.eciton.net>
+Message-ID: <20170116134057.GH25883@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 11 Jan, at 03:29:24PM, David Howells wrote:
-> Matt Fleming <matt@codeblueprint.co.uk> wrote:
-> 
-> > Before we add more efi.flags bits I'd like this series to include the
-> > patch that makes use of EFI_SECURE_BOOT. Alternatively, you move this
-> > last patch to a new series.
-> 
-> Are you willing to take the kernel lock-down patches also?
+On Sun, Jan 15, 2017 at 12:42:54PM +0000, Leif Lindholm wrote:
+> On a side note, comparing the resulting configs, there is a
+> semi-broken config dependency in lib/Kconfig.debug, meaning
+> CONFIG_*STRICT_DEVMEM get set even if CONFIG_DEVMEM is not. 
+> But I'll send that out as a separate patch.
 
-I'm happy to take them through the EFI tree provided that they've been
-Reviewed/Ack-ed by the security folks.
+Ah - never mind, that one has already been fixed upstream for 4.10rc.
+
+/
+    Leif
