@@ -1,56 +1,96 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Mon, 16 Jan 2017 19:53:46 +0200
-Subject: [PATCH 1/2] spi: pxa2xx: Prepare for edge-triggered interrupts
-In-Reply-To: <7cb06bc7-bcb6-a212-8241-20ad4b2a4a90@siemens.com>
-References: <cover.1484557560.git.jan.kiszka@siemens.com>
- <6fe26505e67790b27eed28fd7451b51e70b7e8ba.1484557560.git.jan.kiszka@siemens.com>
- <1484558690.2133.132.camel@linux.intel.com>
- <7cb06bc7-bcb6-a212-8241-20ad4b2a4a90@siemens.com>
-Message-ID: <CAHp75VfAiZZaU8VzUjwvaCMnAVapp46KoRz8yD8aG2BanBnRyA@mail.gmail.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 16 Jan 2017 18:00:00 +0000
+Subject: [PATCH] coresight: STM: Balance enable/disable
+Message-ID: <1484589600-21397-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2017 at 1:18 PM, Jan Kiszka <jan.kiszka@siemens.com> wrote:
-> On 2017-01-16 10:24, Andy Shevchenko wrote:
->> On Mon, 2017-01-16 at 10:05 +0100, Jan Kiszka wrote:
->>> When using the a device with edge-triggered interrupts, such as MSIs,
->>> the interrupt handler has to ensure that there is a point in time
->>> during
->>> its execution where all interrupts sources are silent so that a new
->>> event can trigger a new interrupt again.
->>>
->>> This is achieved here by looping over SSSR evaluation. We need to take
->>> into account that SSCR1 may be changed by the transfer handler, thus
->>> we
->>> need to redo the mask calculation, at least regarding the volatile
->>> interrupt enable bit (TIE).
->>
->> Could you split this to two patches, one just move the code under
->> question to a helper function (no functional change), the other does
->> what you state in commit message here?
->
-> IMHO, factoring out some helper called from the loop in ssp_int won't be
-> a natural split due to the large number of local variables being shared
-> here. But maybe I'm not seeing the design you have in mind, so please
-> propose a useful helper function signature.
+The stm is automatically enabled when an application sets the policy
+via ->link() call back by using coresight_enable(), which keeps the
+refcount of the current users of the STM. However, the unlink() callback
+issues stm_disable() directly, which leaves the STM turned off, without
+the coresight layer knowing about it. This prevents any further uses
+of the STM hardware as the coresight layer still thinks the STM is
+turned on and doesn't enable the hardware when required. Even manually
+enabling the STM via sysfs can't really enable the hw.
 
-At least everything starting from if (!...) {} can be a helper with
-only one parameter. Something like:
+e.g,
 
-static int handle_bad_msg(struct driver_data *drv_data)
-{
-  if (...)
-    return 0;
+ $ echo 1 > $CS_DEVS/$ETR/enable_sink
+ $ mkdir -p $CONFIG_FS/stp-policy/$source.0/stm_test/
+ $ echo 32768 65535 > $CONFIG_FS/stp-policy/$source.0/stm_test/channels
+ $ echo 64 > $CS_DEVS/$source/traceid
+ $ ./stm_app
+ Sending 64000 byte blocks of pattern 0 at 0us intervals
+ Success to map channel(32768~32783) to 0xffffa95fa000
+ Sending on channel 32768
+ $ dd if=/dev/$ETR of=~/trace.bin.1
+ 597+1 records in
+ 597+1 records out
+ 305920 bytes (306 kB) copied, 0.399952 s, 765 kB/s
+ $ ./stm_app
+ Sending 64000 byte blocks of pattern 0 at 0us intervals
+ Success to map channel(32768~32783) to 0xffff7e9e2000
+ Sending on channel 32768
+ $ dd if=/dev/$ETR of=~/trace.bin.2
+ 0+0 records in
+ 0+0 records out
+ 0 bytes (0 B) copied, 0.0232083 s, 0.0 kB/s
 
-  ...handle it...
-  return 1;
-}
+ Note that we don't get any data from the ETR for the second session.
 
-Let's start from above.
+ Also dmesg shows :
 
-P.S. Btw, you totally missed SPI list/maintainers. And you are using
-wrong Jarkko's address.
+ [   77.520458] coresight-tmc 20800000.etr: TMC-ETR enabled
+ [   77.537097] coresight-replicator etr_replicator at 20890000: REPLICATOR enabled
+ [   77.558828] coresight-replicator main_replicator at 208a0000: REPLICATOR enabled
+ [   77.581068] coresight-funnel 208c0000.main_funnel: FUNNEL inport 0 enabled
+ [   77.602217] coresight-tmc 20840000.etf: TMC-ETF enabled
+ [   77.618422] coresight-stm 20860000.stm: STM tracing enabled
+ [  139.554252] coresight-stm 20860000.stm: STM tracing disabled
+  # End of first tracing session
+ [  146.351135] coresight-tmc 20800000.etr: TMC read start
+ [  146.514486] coresight-tmc 20800000.etr: TMC read end
+  # Note that the STM is not turned on via stm_generic_link()->coresight_enable()
+  # and hence none of the components are turned on.
+ [  152.479080] coresight-tmc 20800000.etr: TMC read start
+ [  152.542632] coresight-tmc 20800000.etr: TMC read end
 
+This patch fixes the problem by balancing the unlink operation by using
+the coresight_disable(), keeping the coresight layer in sync with the
+hardware state and thus allowing normal usage of the STM component.
+
+Fixes: commit 237483aa5cf43 ("coresight: stm: adding driver for CoreSight STM component")
+Cc: Pratik Patel <pratikp@codeaurora.org>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: stable at vger.kernel.org # 4.7+
+Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Reviewed-by: Chunyan Zhang <zhang.chunyan@linaro.org>
+Reported-by: Robert Walker <robert.walker@arm.com>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+
+Greg,
+
+Without this patch, the coresight STM IP can only be used for one tracing
+session per boot, seriously limiting its usability.
+
+---
+ drivers/hwtracing/coresight/coresight-stm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
+index e4c55c5..93fc26f 100644
+--- a/drivers/hwtracing/coresight/coresight-stm.c
++++ b/drivers/hwtracing/coresight/coresight-stm.c
+@@ -356,7 +356,7 @@ static void stm_generic_unlink(struct stm_data *stm_data,
+ 	if (!drvdata || !drvdata->csdev)
+ 		return;
+ 
+-	stm_disable(drvdata->csdev, NULL);
++	coresight_disable(drvdata->csdev);
+ }
+ 
+ static phys_addr_t
 -- 
-With Best Regards,
-Andy Shevchenko
+2.7.4
