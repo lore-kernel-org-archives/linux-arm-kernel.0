@@ -1,98 +1,75 @@
-From: dhowells@redhat.com (David Howells)
-Date: Mon, 16 Jan 2017 15:39:18 +0000
-Subject: [PATCH 5/8] efi: Get the secure boot status [ver #6]
-In-Reply-To: <20170116144954.GB27351@codeblueprint.co.uk>
-References: <20170116144954.GB27351@codeblueprint.co.uk>
- <20170111143304.GA29649@codeblueprint.co.uk>
- <148120020832.5854.5448601415491330495.stgit@warthog.procyon.org.uk>
- <148120024570.5854.10638278395097394138.stgit@warthog.procyon.org.uk>
- <7948.1484148443@warthog.procyon.org.uk>
-Message-ID: <794.1484581158@warthog.procyon.org.uk>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 16 Jan 2017 16:39:59 +0100
+Subject: [PATCH] rtc: sun6i: Switch to the external oscillator
+In-Reply-To: <20170116152148.27439-1-maxime.ripard@free-electrons.com>
+References: <20170116152148.27439-1-maxime.ripard@free-electrons.com>
+Message-ID: <20170116153959.7qhahevikxzai664@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Matt Fleming <matt@codeblueprint.co.uk> wrote:
-
-> On Wed, 11 Jan, at 03:27:23PM, David Howells wrote:
-> > Matt Fleming <matt@codeblueprint.co.uk> wrote:
-> > 
-> > > > +	movb	$0, BP_secure_boot(%rsi)
-> > > >  #ifdef CONFIG_EFI_STUB
-> > > >  	/*
-> > > >  	 * The entry point for the PE/COFF executable is efi_pe_entry, so
-> > > 
-> > > Is clearing ::secure_boot really necessary? Any code path that goes
-> > > via efi_main() will set it correctly and all other code paths should
-> > > get it cleared in sanitize_boot_params(), no?
-> > 
-> > No.
-> > 
-> > The boot_params->secure_boot parameter exists whether or not efi_main() is
-> > traversed (ie. if EFI isn't enabled or CONFIG_EFI_STUB=n) and, if not cleared,
-> > is of uncertain value.
-> >
-> > Further, sanitize_boot_params() has to be modified by this patch so as not to
-> > clobber the secure_boot flag.
+On 16/01/2017 at 16:21:48 +0100, Maxime Ripard wrote :
+> The RTC is clocked from either an internal, imprecise, oscillator or an
+> external one, which is usually much more accurate.
 > 
-> Any new parameters that boot loaders do not know about should be
-> cleared to zero by default in the boot loader because boot_params
-> itself should be zero'd when allocated.
-
-Do you mean the boot loader or the boot wrapper?  If the loader, that is
-outside my control - and given the purpose of the value, I'm not sure I
-want to rely on that.
-
-> There are two cases to consider:
+> The difference perceived between the time elapsed and the time reported by
+> the RTC is in a 10% scale, which prevents the RTC from being useful at all.
 > 
->  1) boot_params is not zero'd
->  2) boot_params is zero'd
+> Fortunately, the external oscillator is reported to be mandatory in the
+> Allwinner datasheet, so we can just switch to it.
 > 
-> 1) This is a broken boot loader implementation that violates the x86
-> boot specification and I would never expect ->secure_boot to have a
-> valid value.
 
-If there's a boot specification that must be complied with, why does
-sanitize_boot_params() even exist?  Why does the comment on it say:
+Still, I'm wondering whether the external clock should be taken.
 
- * Deal with bootloaders which fail to initialize unknown fields in
- * boot_params to zero.  The list fields in this list are taken from
- * analysis of kexec-tools; if other broken bootloaders initialize a
- * different set of fields we will need to figure out how to disambiguate.
+We've had issues with at91 and tegra where this external clock was
+suddenly able to be stopped, breaking the RTC because the CCF was not
+aware the RTC was using it.
 
-> It should not be special-cased in sanitize_boot_params(), it should be
-> zero'd.
+See:
+http://patchwork.ozlabs.org/patch/502459/
+http://patchwork.ozlabs.org/patch/714517/
 
-Sigh.  sanitize_boot_params() is part of the problem.  The startup sequence
-goes something like this:
+Your reply can be that you don't care now and this has a low probability
+and you'll handle the case when it happens and that will be fine.
 
- (0) We enter the boot wrapper.
+> Cc: stable at vger.kernel.org
+> Fixes: 9765d2d94309 ("rtc: sun6i: Add sun6i RTC driver")
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/rtc/rtc-sun6i.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/drivers/rtc/rtc-sun6i.c b/drivers/rtc/rtc-sun6i.c
+> index c169a2cd4727..dee524cfa13b 100644
+> --- a/drivers/rtc/rtc-sun6i.c
+> +++ b/drivers/rtc/rtc-sun6i.c
+> @@ -37,9 +37,11 @@
+>  
+>  /* Control register */
+>  #define SUN6I_LOSC_CTRL				0x0000
+> +#define SUN6I_LOSC_CTRL_KEY			(0x16aa << 16)
+>  #define SUN6I_LOSC_CTRL_ALM_DHMS_ACC		BIT(9)
+>  #define SUN6I_LOSC_CTRL_RTC_HMS_ACC		BIT(8)
+>  #define SUN6I_LOSC_CTRL_RTC_YMD_ACC		BIT(7)
+> +#define SUN6I_LOSC_CTRL_EXT_OSC			BIT(0)
+>  #define SUN6I_LOSC_CTRL_ACC_MASK		GENMASK(9, 7)
+>  
+>  /* RTC */
+> @@ -404,6 +406,10 @@ static int sun6i_rtc_probe(struct platform_device *pdev)
+>  	/* disable alarm wakeup */
+>  	writel(0, chip->base + SUN6I_ALARM_CONFIG);
+>  
+> +	/* switch to the external, more precise, oscillator */
+> +	writel(SUN6I_LOSC_CTRL_KEY | SUN6I_LOSC_CTRL_EXT_OSC,
+> +	       chip->base + SUN6I_LOSC_CTRL);
+> +
+>  	chip->rtc = rtc_device_register("rtc-sun6i", &pdev->dev,
+>  					&sun6i_rtc_ops, THIS_MODULE);
+>  	if (IS_ERR(chip->rtc)) {
+> -- 
+> 2.11.0
+> 
 
- (1) We clear the secure-boot status value [my patch adds this].
-
- (2) The boot wrapper *may* invoke efi_main() - which will determine the
-     secure-boot status.
-
- (3) The boot wrapper calls extract_kernel() to decompress the kernel.
-
- (4) extract_kernel() calls sanitize_boot_params() which would otherwise clear
-     the secure-boot flag.
-
- (5) The boot wrapper jumps into the main kernel image, which now does not see
-     the secure boot status value we calculated.
-
-So, no, sanitize_boot_params() must *not* zero the value unless we change the
-call point for s_b_p().
-
-> 2) In this case ->secure_boot should be zero unless modified inside of
-> efi_main().
-
-I have no idea whether this is guaranteed or not.
-
-> Did you hit the scenario where ->secure_boot has a garbage value while
-> developing these patches? I wouldn't expect to see it in practice.
-
-I haven't actually checked what the value was before I cleared it.  But, I've
-found that security people get seriously paranoid about assuming things to be
-implicitly so;-).
-
-David
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
