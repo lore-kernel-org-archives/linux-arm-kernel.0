@@ -1,39 +1,61 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 16 Jan 2017 11:44:22 +0000
-Subject: [PATCH] PCI: mvebu: change delay after reset to the PCIe spec
- mandated 100ms
-In-Reply-To: <20170116111142.6866-1-l.stach@pengutronix.de>
-References: <20170116111142.6866-1-l.stach@pengutronix.de>
-Message-ID: <20170116114422.GA25924@io.lakedaemon.net>
+From: agraf@suse.de (Alexander Graf)
+Date: Mon, 16 Jan 2017 12:46:33 +0100
+Subject: [PATCH] arm64: Fix swiotlb fallback allocation
+Message-ID: <1484567193-71258-1-git-send-email-agraf@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lucas,
+Commit b67a8b29df introduced logic to skip swiotlb allocation when all memory
+is DMA accessible anyway.
 
-On Mon, Jan 16, 2017 at 12:11:42PM +0100, Lucas Stach wrote:
-> The current default of 20ms cause some devices, which are slow to initialize,
-> to not show up during the bus scanning. Change this to the PCIe spec mandated
-> 100ms and document this in the DT binding.
-> 
-> From PCIe base spec rev 3.0, chapter "6.6.1. Conventional Reset":
-> 
-> "To allow components to perform internal initialization, system software must
-> wait a specified minimum period following the end of a Conventional Reset of
-> one or more devices before it is permitted to issue Configuration Requests to
-> those devices.
-> 
-> With a Downstream Port that does not support Link speeds greater than
-> 5.0 GT/s, software must wait a minimum of 100 ms before sending a
-> Configuration Request to the device immediately below that Port."
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
->  Documentation/devicetree/bindings/pci/mvebu-pci.txt | 3 ++-
->  drivers/pci/host/pci-mvebu.c                        | 2 +-
->  2 files changed, 3 insertions(+), 2 deletions(-)
+While this is a great idea, __dma_alloc still calls swiotlb code unconditionally
+to allocate memory when there is no CMA memory available. The swiotlb code is
+called to ensure that we at least try get_free_pages().
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+Without initialization, swiotlb allocation code tries to access io_tlb_list
+which is NULL. That results in a stack trace like this:
 
-thx,
+  Unable to handle kernel NULL pointer dereference at virtual address 00000000
+  [...]
+  [<ffff00000845b908>] swiotlb_tbl_map_single+0xd0/0x2b0
+  [<ffff00000845be94>] swiotlb_alloc_coherent+0x10c/0x198
+  [<ffff000008099dc0>] __dma_alloc+0x68/0x1a8
+  [<ffff000000a1b410>] drm_gem_cma_create+0x98/0x108 [drm]
+  [<ffff000000abcaac>] drm_fbdev_cma_create_with_funcs+0xbc/0x368 [drm_kms_helper]
+  [<ffff000000abcd84>] drm_fbdev_cma_create+0x2c/0x40 [drm_kms_helper]
+  [<ffff000000abc040>] drm_fb_helper_initial_config+0x238/0x410 [drm_kms_helper]
+  [<ffff000000abce88>] drm_fbdev_cma_init_with_funcs+0x98/0x160 [drm_kms_helper]
+  [<ffff000000abcf90>] drm_fbdev_cma_init+0x40/0x58 [drm_kms_helper]
+  [<ffff000000b47980>] vc4_kms_load+0x90/0xf0 [vc4]
+  [<ffff000000b46a94>] vc4_drm_bind+0xec/0x168 [vc4]
+  [...]
 
-Jason.
+Thankfully swiotlb code just learned how to not do allocations with the FORCE_NO
+option. This patch configures the swiotlb code to use that if we decide not to
+initialize the swiotlb framework.
+
+Fixes: b67a8b29df ("arm64: mm: only initialize swiotlb when necessary")
+Signed-off-by: Alexander Graf <agraf@suse.de>
+CC: Catalin Marinas <catalin.marinas@arm.com>
+CC: Jisheng Zhang <jszhang@marvell.com>
+CC: Geert Uytterhoeven <geert+renesas@glider.be>
+CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+---
+ arch/arm64/mm/init.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 716d122..380ebe7 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -404,6 +404,8 @@ void __init mem_init(void)
+ 	if (swiotlb_force == SWIOTLB_FORCE ||
+ 	    max_pfn > (arm64_dma_phys_limit >> PAGE_SHIFT))
+ 		swiotlb_init(1);
++	else
++		swiotlb_force = SWIOTLB_NO_FORCE;
+ 
+ 	set_max_mapnr(pfn_to_page(max_pfn) - mem_map);
+ 
+-- 
+1.8.5.6
