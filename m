@@ -1,56 +1,75 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 16 Jan 2017 17:56:59 +0100
-Subject: [PATCH v3 9/13] arm64: allwinner: a64: Add MMC pinctrl nodes
+Date: Mon, 16 Jan 2017 17:56:55 +0100
+Subject: [PATCH v3 5/13] mmc: sunxi: Mask DATA0 when updating the clock
 In-Reply-To: <cover.a06ce1672d7a72ee7f9bbca46fdd223edd6b2313.1484585798.git-series.maxime.ripard@free-electrons.com>
 References: <cover.a06ce1672d7a72ee7f9bbca46fdd223edd6b2313.1484585798.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <dad93c772cf4d0410ec389152863b4e6ac7dd38f.1484585798.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <c36c2e2289ff3268d4a57b265f23725d882a23ed.1484585798.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A64 only has a single set of pins for each MMC controller. Since we
-already have boards that require all of them, let's add them to the DTSI.
+The A64 MMC controllers need DATA0 to be masked while updating the clock,
+otherwise any subsequent command will result in a timeout.
 
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 25 ++++++++++++++++++++-
- 1 file changed, 25 insertions(+), 0 deletions(-)
+ drivers/mmc/host/sunxi-mmc.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 143e9706438f..8e149498e096 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -205,6 +205,31 @@
- 				function = "i2c1";
- 			};
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index 51d6388a194e..6bbe61397b7c 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -101,6 +101,7 @@
+ 	(SDXC_SOFT_RESET | SDXC_FIFO_RESET | SDXC_DMA_RESET)
  
-+			mmc0_pins: mmc0-pins {
-+				pins = "PF0", "PF1", "PF2", "PF3",
-+				       "PF4", "PF5";
-+				function = "mmc0";
-+				drive-strength = <30>;
-+				bias-pull-up;
-+			};
+ /* clock control bits */
++#define SDXC_MASK_DATA0			BIT(31)
+ #define SDXC_CARD_CLOCK_ON		BIT(16)
+ #define SDXC_LOW_POWER_ON		BIT(17)
+ 
+@@ -254,6 +255,9 @@ struct sunxi_mmc_cfg {
+ 	/* does the IP block support autocalibration? */
+ 	bool can_calibrate;
+ 
++	/* Does DATA0 needs to be masked while the clock is updated */
++	bool mask_data0;
 +
-+			mmc1_pins: mmc1-pins {
-+				pins = "PG0", "PG1", "PG2", "PG3",
-+				       "PG4", "PG5";
-+				function = "mmc1";
-+				drive-strength = <30>;
-+				bias-pull-up;
-+			};
+ 	bool needs_new_timings;
+ };
+ 
+@@ -657,10 +661,12 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
+ 	u32 rval;
+ 
+ 	rval = mmc_readl(host, REG_CLKCR);
+-	rval &= ~(SDXC_CARD_CLOCK_ON | SDXC_LOW_POWER_ON);
++	rval &= ~(SDXC_CARD_CLOCK_ON | SDXC_LOW_POWER_ON | SDXC_MASK_DATA0);
+ 
+ 	if (oclk_en)
+ 		rval |= SDXC_CARD_CLOCK_ON;
++	if (host->cfg->mask_data0)
++		rval |= SDXC_MASK_DATA0;
+ 
+ 	mmc_writel(host, REG_CLKCR, rval);
+ 
+@@ -680,6 +686,11 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
+ 		return -EIO;
+ 	}
+ 
++	if (host->cfg->mask_data0) {
++		rval = mmc_readl(host, REG_CLKCR);
++		mmc_writel(host, REG_CLKCR, rval & ~SDXC_MASK_DATA0);
++	}
 +
-+			mmc2_pins: mmc2-pins {
-+				pins = "PC1", "PC5", "PC6", "PC8", "PC9",
-+				       "PC10","PC11", "PC12", "PC13",
-+				       "PC14", "PC15", "PC16";
-+				function = "mmc2";
-+				drive-strength = <30>;
-+				bias-pull-up;
-+			};
-+
- 			uart0_pins_a: uart0 at 0 {
- 				pins = "PB8", "PB9";
- 				function = "uart0";
+ 	return 0;
+ }
+ 
+@@ -1081,6 +1092,7 @@ static const struct sunxi_mmc_cfg sun50i_a64_cfg = {
+ 	.idma_des_size_bits = 16,
+ 	.clk_delays = NULL,
+ 	.can_calibrate = true,
++	.mask_data0 = true,
+ 	.needs_new_timings = true,
+ };
+ 
 -- 
 git-series 0.8.11
