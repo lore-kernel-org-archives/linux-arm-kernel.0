@@ -1,242 +1,61 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Mon, 16 Jan 2017 13:15:27 -0800
-Subject: [PATCH v3 17/24] media: imx: Add CSI subdev driver
-In-Reply-To: <1484578988.8415.160.camel@pengutronix.de>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-18-git-send-email-steve_longerbeam@mentor.com>
- <1484578988.8415.160.camel@pengutronix.de>
-Message-ID: <fa368f78-42f6-6f2f-0761-1f775eb5d707@gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 16 Jan 2017 22:15:40 +0100
+Subject: Nokia N900: mixers changed between 4.9 and 4.10-rc3, no longer
+ can use in-call speaker
+In-Reply-To: <201701150100.54214@pali>
+References: <20170112181826.GA28290@amd> <201701121934.19810@pali>
+ <20170114225614.GA25321@amd> <201701150100.54214@pali>
+Message-ID: <20170116211540.GA19736@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi!
+
+> > So regression seems to be between v4.9 and v4.10. Any ideas?
+> 
+> Interesting... seems there are no sound relevant changes after v4.9.
+> 
+> Looks like there are only three commits after v4.9 for sound/soc which 
+> are built for Nokia N900:
+
+I'm at ce38207f161513ee3d2bd3860489f07ebe65bc78, which is already
+broken, and first broken commit by Linus.
+
+> e411b0b5eb9b65257a050eac333d181d6e00e2c6
+
+Can't revert that easily.
+
+> e7aa450fe17890e59db7d3c2d8eff5b6b41fc531
+
+This can be reverted. Lets try. Did not help.
+
+> 63c3194b82530bd71fd49db84eb7ab656b8d404a
+
+Commit older than this one fails, IIRC.
+
+> Maybe something not related to sound/soc could broke it?
+
+Its definitely caused by something merged here:
+
+commit ce38207f161513ee3d2bd3860489f07ebe65bc78
+Merge: a9042de 995c6a7
+Author: Linus Torvalds <torvalds@linux-foundation.org>
+Date:   Wed Dec 14 11:14:28 2016 -0800
+
+So it should be easy to find out..
+
+Best regards,
+								Pavel
 
 
-On 01/16/2017 07:03 AM, Philipp Zabel wrote:
-> On Fri, 2017-01-06 at 18:11 -0800, Steve Longerbeam wrote:
->> This is a media entity subdevice for the i.MX Camera
->> Serial Interface module.
-> s/Serial/Sensor/
 
-done.
-
->> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
->> ---
->>   drivers/staging/media/imx/Kconfig   |  13 +
->>   drivers/staging/media/imx/Makefile  |   2 +
->>   drivers/staging/media/imx/imx-csi.c | 644 ++++++++++++++++++++++++++++++++++++
->>   3 files changed, 659 insertions(+)
->>   create mode 100644 drivers/staging/media/imx/imx-csi.c
->>
->> diff --git a/drivers/staging/media/imx/Kconfig b/drivers/staging/media/imx/Kconfig
->> index bfde58d..ce2d2c8 100644
->> --- a/drivers/staging/media/imx/Kconfig
->> +++ b/drivers/staging/media/imx/Kconfig
->> @@ -6,3 +6,16 @@ config VIDEO_IMX_MEDIA
->>   	  Say yes here to enable support for video4linux media controller
->>   	  driver for the i.MX5/6 SOC.
->>   
->> +if VIDEO_IMX_MEDIA
->> +menu "i.MX5/6 Media Sub devices"
->> +
->> +config VIDEO_IMX_CAMERA
-> s/CAMERA/CSI/ ?
-
-done.
-
->> +	tristate "i.MX5/6 Camera driver"
-> i.MX5/6 Camera Sensor Interface driver
-
-done.
-
->
->> +
->> +struct csi_priv {
->> +	struct device *dev;
->> +	struct ipu_soc *ipu;
->> +	struct imx_media_dev *md;
->> +	struct v4l2_subdev sd;
->> +	struct media_pad pad[CSI_NUM_PADS];
->> +	struct v4l2_mbus_framefmt format_mbus[CSI_NUM_PADS];
->> +	struct v4l2_mbus_config sensor_mbus_cfg;
->> +	struct v4l2_rect crop;
->> +	struct ipu_csi *csi;
->> +	int csi_id;
->> +	int input_pad;
->> +	int output_pad;
->> +	bool power_on;  /* power is on */
->> +	bool stream_on; /* streaming is on */
->> +
->> +	/* the sink for the captured frames */
->> +	struct v4l2_subdev *sink_sd;
->> +	enum ipu_csi_dest dest;
->> +	struct v4l2_subdev *src_sd;
-> src_sd is not used except that its presence marks an enabled input link.
-> -> could be changed to bool.
-
-For now I prefer to keep it a pointer to the src/sink subdevs.
-At some point the CSI may have some reason to know the
-identity of the source.
-
->
->> +	struct v4l2_ctrl_handler ctrl_hdlr;
->> +	struct imx_media_fim *fim;
->> +
->> +	/* the attached sensor at stream on */
->> +	struct imx_media_subdev *sensor;
->> +};
->> +
->> +static inline struct csi_priv *sd_to_dev(struct v4l2_subdev *sdev)
->> +{
->> +	return container_of(sdev, struct csi_priv, sd);
->> +}
->> +
->> +/* Update the CSI whole sensor and active windows */
->> +static int csi_setup(struct csi_priv *priv)
->> +{
->> +	struct v4l2_mbus_framefmt infmt;
->> +
->> +	ipu_csi_set_window(priv->csi, &priv->crop);
->> +
->> +	/*
->> +	 * the ipu-csi doesn't understand ALTERNATE, but it only
->> +	 * needs to know whether the stream is interlaced, so set
->> +	 * to INTERLACED if infmt field is ALTERNATE.
->> +	 */
->> +	infmt = priv->format_mbus[priv->input_pad];
->> +	if (infmt.field == V4L2_FIELD_ALTERNATE)
->> +		infmt.field = V4L2_FIELD_INTERLACED;
-> That should be SEQ_TB/BT depending on video standard.
-
-fixed.
-
->> +
->> +static int csi_s_stream(struct v4l2_subdev *sd, int enable)
->> +{
->> +	struct csi_priv *priv = v4l2_get_subdevdata(sd);
->> +	int ret = 0;
->> +
->> +	if (!priv->src_sd || !priv->sink_sd)
->> +		return -EPIPE;
->> +
->> +	v4l2_info(sd, "stream %s\n", enable ? "ON" : "OFF");
-> These could be silenced a bit.
-
-yeah, I think it is time for that. I've silenced all the
-v4l2_info()'s for stream on/off, power on/off, as well
-as some others.
-
->
->> +static int csi_s_power(struct v4l2_subdev *sd, int on)
->> +{
->> +	struct csi_priv *priv = v4l2_get_subdevdata(sd);
->> +	int ret = 0;
->> +
->> +	v4l2_info(sd, "power %s\n", on ? "ON" : "OFF");
->> +
->> +	if (priv->fim && on != priv->power_on)
->> +		ret = imx_media_fim_set_power(priv->fim, on);
->> +
->> +	if (!ret)
->> +		priv->power_on = on;
->> +	return ret;
->> +}
-> Is this called multiple times? I'd expect a poweron during open and a
-> poweroff during close, so no need for priv->power_on.
-
-It is actually called multiple times. The s_power subdev callbacks are
-made every time there is a new link established, in the imx-media core's
-link_notify(), in order to re-establish power to the active subdevs in the
-new pipeline.
-
-This might change after I look into using v4l2_pipeline_pm_use().
-
->
->> +static int csi_link_setup(struct media_entity *entity,
->> +			  const struct media_pad *local,
->> +			  const struct media_pad *remote, u32 flags)
->> +{
->> +	struct v4l2_subdev *sd = media_entity_to_v4l2_subdev(entity);
->> +	struct csi_priv *priv = v4l2_get_subdevdata(sd);
->> +	struct v4l2_subdev *remote_sd;
->> +
->> +	dev_dbg(priv->dev, "link setup %s -> %s", remote->entity->name,
->> +		local->entity->name);
->> +
->> +	remote_sd = media_entity_to_v4l2_subdev(remote->entity);
->> +
->> +	if (local->flags & MEDIA_PAD_FL_SINK) {
->> +		if (flags & MEDIA_LNK_FL_ENABLED) {
->> +			if (priv->src_sd)
->> +				return -EBUSY;
->> +			priv->src_sd = remote_sd;
->> +		} else {
->> +			priv->src_sd = NULL;
->> +		}
->> +
->> +		return 0;
->> +	}
->> +
->> +	if (flags & MEDIA_LNK_FL_ENABLED) {
->> +		if (priv->sink_sd)
->> +			return -EBUSY;
->> +		priv->sink_sd = remote_sd;
->> +	} else {
->> +		priv->sink_sd = NULL;
->> +		return 0;
->> +	}
->> +
->> +	/* set CSI destination */
->> +	switch (remote_sd->grp_id) {
->> +	case IMX_MEDIA_GRP_ID_SMFC0:
->> +	case IMX_MEDIA_GRP_ID_SMFC1:
->> +	case IMX_MEDIA_GRP_ID_SMFC2:
->> +	case IMX_MEDIA_GRP_ID_SMFC3:
-> With removal of the SMFC entities, CSI0 could be fixed to SMFC0 and CSI1
-> to the SMFC2 channel.
-
-right, I'll do that.
-
->
-> [...]
->> +static int csi_set_fmt(struct v4l2_subdev *sd,
->> +		       struct v4l2_subdev_pad_config *cfg,
->> +		       struct v4l2_subdev_format *sdformat)
->> +{
->> +	struct csi_priv *priv = v4l2_get_subdevdata(sd);
->> +	struct v4l2_mbus_framefmt *infmt, *outfmt;
->> +	struct v4l2_rect crop;
->> +	int ret;
->> +
->> +	if (sdformat->pad >= CSI_NUM_PADS)
->> +		return -EINVAL;
->> +
->> +	if (priv->stream_on)
->> +		return -EBUSY;
->> +
->> +	infmt = &priv->format_mbus[priv->input_pad];
->> +	outfmt = &priv->format_mbus[priv->output_pad];
->> +
->> +	if (sdformat->pad == priv->output_pad) {
->> +		sdformat->format.code = infmt->code;
->> +		sdformat->format.field = infmt->field;
->> +		crop.left = priv->crop.left;
->> +		crop.top = priv->crop.top;
->> +		crop.width = sdformat->format.width;
->> +		crop.height = sdformat->format.height;
->> +		ret = csi_try_crop(priv, &crop);
->> +		if (ret)
->> +			return ret;
->> +		sdformat->format.width = crop.width;
->> +		sdformat->format.height = crop.height;
->> +	}
->> +
->> +	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY) {
-> Should there be some limitations on the format here?
-
-done, I've added call to v4l_bound_align_image(), passing
-it the min/max frame sizes. CSI's sensor/active frame size
-register fields are 12 bits, so max is 4096 for both width and
-height.
-
-
-Steve
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170116/a8bf5045/attachment-0001.sig>
