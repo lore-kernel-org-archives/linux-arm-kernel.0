@@ -1,84 +1,63 @@
-From: megous@megous.com (=?UTF-8?Q?Ond=c5=99ej_Jirman?=)
-Date: Mon, 16 Jan 2017 23:57:46 +0100
-Subject: [linux-sunxi] [PATCH 1/4] phy: sun4i-usb: support PHY0 on H3 in
- MUSB mode
-In-Reply-To: <20170116191449.50397-2-icenowy@aosc.xyz>
-References: <20170116191449.50397-1-icenowy@aosc.xyz>
- <20170116191449.50397-2-icenowy@aosc.xyz>
-Message-ID: <bcef274f-8342-bb6d-c086-4472596d8b73@megous.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Tue, 17 Jan 2017 00:26:46 +0100
+Subject: [PATCH v3 0/2] ARM: at91: properly handle LPDDR poweroff
+In-Reply-To: <20161025093759.20913-1-alexandre.belloni@free-electrons.com>
+References: <20161025093759.20913-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20170116232646.ivoh5dhr56j4ihgp@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne 16.1.2017 v 20:14 Icenowy Zheng napsal(a):
-> The PHY0 on H3 can be wired either to MUSB controller or OHCI/EHCI
-> controller.
-> 
-> The original driver wired it to OHCI/EHCI controller; however, as the
-> code to use PHY0 as OHCI/EHCI is missing, it makes the PHY fully
-> unusable.
-> 
-> Rename the register (according to its function and the name in BSP
-> driver), and remove the code which wires the PHY0 to OHCI/EHCI, as MUSB
-> can support both peripheral and host mode (although the host mode of
-> MUSB is buggy).
-> 
-> The register that is renamed is now unused, as its initial value is just
-> MUSB mode. However, when OHCI/EHCI mode support is added, the register
-> can be used again.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> ---
->  drivers/phy/phy-sun4i-usb.c | 25 +++++++++----------------
->  1 file changed, 9 insertions(+), 16 deletions(-)
-> 
-> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-> index bf28a0fdd569..6b193a635c6b 100644
-> --- a/drivers/phy/phy-sun4i-usb.c
-> +++ b/drivers/phy/phy-sun4i-usb.c
-> @@ -49,7 +49,7 @@
->  #define REG_PHYBIST			0x08
->  #define REG_PHYTUNE			0x0c
->  #define REG_PHYCTL_A33			0x10
-> -#define REG_PHY_UNK_H3			0x20
-> +#define REG_PHY_OTGCTL			0x20
+Hi Alexandre,
 
-You have added REG_PHY_OTGCTL, but it is not used below.
-
-regards,
-  o.
-
->  #define REG_PMU_UNK1			0x10
->  
-> @@ -269,23 +269,16 @@ static int sun4i_usb_phy_init(struct phy *_phy)
->  		writel(val & ~2, phy->pmu + REG_PMU_UNK1);
->  	}
->  
-> -	if (data->cfg->type == sun8i_h3_phy) {
-> -		if (phy->index == 0) {
-> -			val = readl(data->base + REG_PHY_UNK_H3);
-> -			writel(val & ~1, data->base + REG_PHY_UNK_H3);
-> -		}
-> -	} else {
-> -		/* Enable USB 45 Ohm resistor calibration */
-> -		if (phy->index == 0)
-> -			sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
-> +	/* Enable USB 45 Ohm resistor calibration */
-> +	if (phy->index == 0)
-> +		sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
->  
-> -		/* Adjust PHY's magnitude and rate */
-> -		sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
-> +	/* Adjust PHY's magnitude and rate */
-> +	sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
->  
-> -		/* Disconnect threshold adjustment */
-> -		sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
-> -				    data->cfg->disc_thresh, 2);
-> -	}
-> +	/* Disconnect threshold adjustment */
-> +	sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
-> +			    data->cfg->disc_thresh, 2);
->  
->  	sun4i_usb_phy_passby(phy, 1);
->  
+On Tue, Oct 25, 2016 at 11:37:57AM +0200, Alexandre Belloni wrote:
+> This patch set improves LPDDR support on SoCs using the Atmel MPDDR controller.
 > 
+> LPDDR memories can only handle up to 400 uncontrolled power offs in their
+> life. The proper power off sequence has to be applied before shutting down the
+> SoC.
+> 
+> I'm not too happy with the code duplication but this is a design choice
+> that has been made before because both shutdown controllers are really
+> different apart from the shutdown itself.
+> 
+> I guess it is still better than slowly killing the LPDDR.
+
+Sorry, I totally forgot about this one. I queued it into my for-next
+branch using an immutable topic branch, in case you need the patch
+against the arm include to also go through arm-soc. Feel free to use
+or ignore it:
+
+The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+
+  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/sre/linux-power-supply.git tags/ib-psy-arm-at91-4.11
+
+for you to fetch changes up to 0b0408745e7ff24757cbfd571d69026c0ddb803c:
+
+  power: reset: at91-poweroff: timely shutdown LPDDR memories (2017-01-16 23:21:33 +0100)
+
+----------------------------------------------------------------
+immutable branch between ARM at91 and power-supply for v4.11
+----------------------------------------------------------------
+
+Alexandre Belloni (2):
+      ARM: at91: define LPDDR types
+      power: reset: at91-poweroff: timely shutdown LPDDR memories
+
+ drivers/power/reset/Kconfig              |  2 +-
+ drivers/power/reset/at91-poweroff.c      | 54 +++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ drivers/power/reset/at91-sama5d2_shdwc.c | 49 ++++++++++++++++++++++++++++++++++++++++++++++++-
+ include/soc/at91/at91sam9_ddrsdr.h       |  3 +++
+ 4 files changed, 105 insertions(+), 3 deletions(-)
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170117/b06d0fb1/attachment.sig>
