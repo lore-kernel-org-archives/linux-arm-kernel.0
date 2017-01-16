@@ -1,64 +1,48 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 16 Jan 2017 13:55:23 +0100
-Subject: [PATCH v3 06/24] ARM: dts: imx6-sabrelite: add OV5642 and
- OV5640 camera sensors
-In-Reply-To: <1bb64209-7c58-fe10-3db9-c5b8103eda90@gmail.com>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-7-git-send-email-steve_longerbeam@mentor.com>
- <1484309021.31475.29.camel@pengutronix.de>
- <1bb64209-7c58-fe10-3db9-c5b8103eda90@gmail.com>
-Message-ID: <1484571323.8415.98.camel@pengutronix.de>
+From: steve.capper@arm.com (Steve Capper)
+Date: Mon, 16 Jan 2017 12:57:24 +0000
+Subject: [Question] A question about arm64 pte
+In-Reply-To: <6b7a9bd2-37af-40cd-b723-9e648fbbc7c8@huawei.com>
+References: <d284f510-f025-db84-f21e-a5b167d4bcd2@huawei.com>
+ <20170116115606.GA6832@e104818-lin.cambridge.arm.com>
+ <6b7a9bd2-37af-40cd-b723-9e648fbbc7c8@huawei.com>
+Message-ID: <20170116125724.GA16265@e103986-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-01-13 at 15:04 -0800, Steve Longerbeam wrote:
->
-> On 01/13/2017 04:03 AM, Philipp Zabel wrote:
-> > Am Freitag, den 06.01.2017, 18:11 -0800 schrieb Steve Longerbeam:
-> >> Enables the OV5642 parallel-bus sensor, and the OV5640 MIPI CSI-2 sensor.
-> >> Both hang off the same i2c2 bus, so they require different (and non-
-> >> default) i2c slave addresses.
-> >>
-> >> The OV5642 connects to the parallel-bus mux input port on ipu1_csi0_mux.
-> >>
-> >> The OV5640 connects to the input port on the MIPI CSI-2 receiver on
-> >> mipi_csi. It is set to transmit over MIPI virtual channel 1.
-> >>
-> >> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
-> >> ---
-> >>   arch/arm/boot/dts/imx6dl-sabrelite.dts   |   5 ++
-> >>   arch/arm/boot/dts/imx6q-sabrelite.dts    |   6 ++
-> >>   arch/arm/boot/dts/imx6qdl-sabrelite.dtsi | 118 +++++++++++++++++++++++++++++++
-> >>   3 files changed, 129 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/imx6dl-sabrelite.dts b/arch/arm/boot/dts/imx6dl-sabrelite.dts
-> >> index 0f06ca5..fec2524 100644
-> >> --- a/arch/arm/boot/dts/imx6dl-sabrelite.dts
-> >> +++ b/arch/arm/boot/dts/imx6dl-sabrelite.dts
-[...]
-> >> @@ -299,6 +326,52 @@
-> >>   	pinctrl-names = "default";
-> >>   	pinctrl-0 = <&pinctrl_i2c2>;
-> >>   	status = "okay";
-> >> +
-> >> +	ov5640: camera at 40 {
-> >> +		compatible = "ovti,ov5640";
-> >> +		pinctrl-names = "default";
-> >> +		pinctrl-0 = <&pinctrl_ov5640>;
-> >> +		clocks = <&mipi_xclk>;
-> >> +		clock-names = "xclk";
-> >> +		reg = <0x40>;
-> >> +		xclk = <22000000>;
-> > This is superfluous, you can use clk_get_rate on mipi_xclk.
+On Mon, Jan 16, 2017 at 08:39:56PM +0800, Yisheng Xie wrote:
+> hi Catalin,
+> Thank you so much for you reply.
 > 
-> This property is actually there to tell the driver what to set the
-> rate to, with clk_set_rate(). So you are saying it would be better
-> to set the rate in the device tree and the driver should only
-> retrieve the rate?
+> On 2017/1/16 19:56, Catalin Marinas wrote:
+> > On Mon, Jan 16, 2017 at 06:08:47PM +0800, Yisheng Xie wrote:
+> >> I have question about arm64 pte.
+> > 
+> > I assume the context is ARMv8.0 (without hardware DBM support).
+> 
+> Yes.
+> > 
+> >> For arm64, PTE_WRITE?== PTE_DBM? is to mark whether the page is writable,
+> >> and PTE_DIRTY is to mark whether the page is dirty.
+> >> However, PTE_RDONLY is only cleared when both PTE_WRITE and PTE_DIRTY are set.
+> > 
+> > That's what set_pte_at() does.
+> > 
+> 
+> So if we mmap a memory region use /dev/mem like:
+>    fildes = open("/dev/mem", O_RDWR | O_CREAT, 0777);
+>    addr = mmap(NULL, LEN, PROT_READ | PROT_WRITE, MAP_SHARED, fildes, offset);
+> 
+> The PTE_RDONLY will be set? Right ?
+> However?when use memset to write the region it still works well, and the bit PTE_RDONLY is also cleared.
+> Is there anywhere clear the PTE_RDONLY before write that page ?
+> 
 
-Yes. Given that this is a reference clock input that is constant on a
-given board and never changes during runtime, I think this is the
-correct way. The clock will be fixed rate on most boards, I assume.
+Hi Yisheng,
+Out of interest, why is /dev/mem being accessed directly from userspace?
 
-regards
-Philipp
+The case above will have subtley different logic (mmap_mem will affect
+how things are actually mapped); which I'm trying to understand...
+
+Cheers,
+-- 
+Steve
