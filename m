@@ -1,33 +1,38 @@
 From: zyw@rock-chips.com (Chris Zhong)
-Date: Mon, 16 Jan 2017 18:08:24 +0800
-Subject: [PATCH v2 04/11] dt-bindings: add power domain node for
- dw-mipi-rockchip
+Date: Mon, 16 Jan 2017 18:08:31 +0800
+Subject: [PATCH v2 11/11] drm/rockchip/dsi: fix insufficient bandwidth of some
+ panel
 In-Reply-To: <1484561311-494-1-git-send-email-zyw@rock-chips.com>
 References: <1484561311-494-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1484561311-494-5-git-send-email-zyw@rock-chips.com>
+Message-ID: <1484561311-494-12-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Set the lanes bps to 1 / 0.9 times of pclk, the margin is not enough
+for some panel, it will cause the screen display is not normal, so
+increases the badnwidth to 1 / 0.8.
+
 Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-Acked-by: Rob Herring <robh@kernel.org>
+
 ---
 
- .../devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt      | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
-index 0f82568..188f6f7 100644
---- a/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
-+++ b/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
-@@ -15,6 +15,9 @@ Required properties:
- - ports: contain a port node with endpoint definitions as defined in [2].
-   For vopb,set the reg = <0> and set the reg = <1> for vopl.
+diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+index 9dfa73d..5a973fe 100644
+--- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
++++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+@@ -501,8 +501,8 @@ static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi)
  
-+Optional properties:
-+- power-domains: a phandle to mipi dsi power domain node.
-+
- [1] Documentation/devicetree/bindings/clock/clock-bindings.txt
- [2] Documentation/devicetree/bindings/media/video-interfaces.txt
- 
+ 	mpclk = DIV_ROUND_UP(dsi->mode->clock, MSEC_PER_SEC);
+ 	if (mpclk) {
+-		/* take 1 / 0.9, since mbps must big than bandwidth of RGB */
+-		tmp = mpclk * (bpp / dsi->lanes) * 10 / 9;
++		/* take 1 / 0.8, since mbps must big than bandwidth of RGB */
++		tmp = mpclk * (bpp / dsi->lanes) * 10 / 8;
+ 		if (tmp < max_mbps)
+ 			target_mbps = tmp;
+ 		else
 -- 
 2.6.3
