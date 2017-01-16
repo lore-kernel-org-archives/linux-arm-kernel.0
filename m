@@ -1,127 +1,121 @@
-From: jerry.huang@nxp.com (Jerry Huang)
-Date: Mon, 16 Jan 2017 08:15:00 +0000
-Subject: [PATCH v3 2/3] USB3/DWC3: Add property "snps,
- incr-burst-type-adjustment" for INCR burst type
-References: <1482139554-13618-1-git-send-email-jerry.huang@nxp.com>
- <1482139554-13618-2-git-send-email-jerry.huang@nxp.com>
- <20161222184514.hfd4g7ifrz5cv627@rob-hp-laptop>
- <DB5PR0401MB1813E210B2ADE1C9493F7768FE950@DB5PR0401MB1813.eurprd04.prod.outlook.com>
- <CAL_JsqJuifiSQAt-6FgtYYSukAnjzOLuTGEsO-Spn5LxkU-iwQ@mail.gmail.com>
-Message-ID: <DB5PR0401MB18132BB4CDE32EEA8F479E55FE7D0@DB5PR0401MB1813.eurprd04.prod.outlook.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Mon, 16 Jan 2017 17:25:07 +0900
+Subject: [PATCH v29 9/9] Documentation: dt: chosen properties for arm64
+ kdump
+In-Reply-To: <20170113111756.GC26120@leverpostej>
+References: <20161228043347.27358-1-takahiro.akashi@linaro.org>
+ <20161228043734.27535-1-takahiro.akashi@linaro.org>
+ <20170112153944.GB12249@leverpostej>
+ <20170113091339.GK20972@linaro.org>
+ <20170113111756.GC26120@leverpostej>
+Message-ID: <20170116082505.GL20972@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Jerry Huang
-> Sent: Wednesday, January 04, 2017 10:25 AM
-> To: 'Rob Herring' <robh@kernel.org>
-> Cc: balbi at kernel.org; mark.rutland at arm.com; catalin.marinas at arm.com;
-> will.deacon at arm.com; linux at armlinux.org.uk; devicetree at vger.kernel.org;
-> linux-usb at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: RE: [PATCH v3 2/3] USB3/DWC3: Add property "snps, incr-burst-
-> type-adjustment" for INCR burst type
+On Fri, Jan 13, 2017 at 11:17:56AM +0000, Mark Rutland wrote:
+> On Fri, Jan 13, 2017 at 06:13:49PM +0900, AKASHI Takahiro wrote:
+> > On Thu, Jan 12, 2017 at 03:39:45PM +0000, Mark Rutland wrote:
+> > > On Wed, Dec 28, 2016 at 01:37:34PM +0900, AKASHI Takahiro wrote:
+> > > > +linux,crashkernel-base
+> > > > +linux,crashkernel-size
+> > > > +----------------------
+> > > > +
+> > > > +These properties (currently used on PowerPC and arm64) indicates
+> > > > +the base address and the size, respectively, of the reserved memory
+> > > > +range for crash dump kernel.
+> > > 
+> > > From this description, it's not clear to me what the (expected)
+> > > consumers of this property are, nor what is expected to provide it.
+> > > 
+> > > In previous rounds of review, I had assumed that this was used to
+> > > describe a preference to the first kernel as to what region of memory
+> > > should be used for a subsequent kdump kernel. Looking around, I'm not
+> > > sure if I was correct in that assessment.
+> > > 
+> > > I see that arch/powerpc seems to consume this property to configure
+> > > crashk_res, but it also rewrites it based on crashk_res, presumably for
+> > > the benefit of userspace. It's not clear to me how on powerpc the kdump
+> > > kernel knows its memory range -- is more DT modification done in the
+> > > kernel and/or userspace?
+> > 
+> > I don't believe that powerpc will rewrite the property any way.
+> > As far as I know from *the source code*, powerpc kernel retrieves
+> > the memory range for crash dump kernel from a kernel command line, i.e.
+> > crashkernel=, and then exposes it through DT to userspace (assuming
+> > kexec-tools).
 > 
-> Hi, Rob,
+> The rewriting I describe is in export_crashk_values() in
+> arch/powerpc/kernel/machine_kexec.c, where the code deletes existing the
+> properties, and adds new ones, to the DT exposed to userspace.
 > 
-> > -----Original Message-----
-> > From: Rob Herring [mailto:robh at kernel.org]
-> > Sent: Wednesday, January 04, 2017 5:24 AM
-> > To: Jerry Huang <jerry.huang@nxp.com>
-> > Cc: balbi at kernel.org; mark.rutland at arm.com; catalin.marinas at arm.com;
-> > will.deacon at arm.com; linux at armlinux.org.uk;
-> > devicetree at vger.kernel.org; linux-usb at vger.kernel.org;
-> > linux-kernel at vger.kernel.org; linux-arm- kernel at lists.infradead.org
-> > Subject: Re: [PATCH v3 2/3] USB3/DWC3: Add property "snps, incr-burst-
-> > type-adjustment" for INCR burst type
-> >
-> > On Thu, Dec 22, 2016 at 8:52 PM, Jerry Huang <jerry.huang@nxp.com>
-> wrote:
-> > > Hi, Rob,
-> > >> -----Original Message-----
-> > >> From: Rob Herring [mailto:robh at kernel.org]
-> > >> Sent: Friday, December 23, 2016 2:45 AM
-> > >> To: Jerry Huang <jerry.huang@nxp.com>
-> > >> Cc: balbi at kernel.org; mark.rutland at arm.com;
-> > >> catalin.marinas at arm.com; will.deacon at arm.com;
-> > >> linux at armlinux.org.uk; devicetree at vger.kernel.org;
-> > >> linux-usb at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> > >> kernel at lists.infradead.org
-> > >> Subject: Re: [PATCH v3 2/3] USB3/DWC3: Add property "snps,
-> > >> incr-burst- type-adjustment" for INCR burst type
-> > >>
-> > >> On Mon, Dec 19, 2016 at 05:25:53PM +0800, Changming Huang wrote:
-> > >> > New property "snps,incr-burst-type-adjustment = <x>, <y>" for
-> > >> > USB3.0
-> > >> DWC3.
-> > >> > Field "x": 1/0 - undefined length INCR burst type enable or not;
-> > >> > Field
-> > >> > "y": INCR4/INCR8/INCR16/INCR32/INCR64/INCR128/INCR256 burst
-> type.
-> > >> >
-> > >> > While enabling undefined length INCR burst type and INCR16 burst
-> > >> > type, get better write performance on NXP Layerscape platform:
-> > >> > around 3% improvement (from 364MB/s to 375MB/s).
-> > >> >
-> > >> > Signed-off-by: Changming Huang <jerry.huang@nxp.com>
-> > >> > ---
-> > >> > Changes in v3:
-> > >> >   - add new property for INCR burst in usb node.
-> > >> >
-> > >> >  Documentation/devicetree/bindings/usb/dwc3.txt |    5 +++++
-> > >> >  arch/arm/boot/dts/ls1021a.dtsi                 |    1 +
-> > >> >  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi |    3 +++
-> > >> >  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi |    2 ++
-> > >> >  4 files changed, 11 insertions(+)
-> > >> >
-> > >> > diff --git a/Documentation/devicetree/bindings/usb/dwc3.txt
-> > >> > b/Documentation/devicetree/bindings/usb/dwc3.txt
-> > >> > index e3e6983..8c405a3 100644
-> > >> > --- a/Documentation/devicetree/bindings/usb/dwc3.txt
-> > >> > +++ b/Documentation/devicetree/bindings/usb/dwc3.txt
-> > >> > @@ -55,6 +55,10 @@ Optional properties:
-> > >> >     fladj_30mhz_sdbnd signal is invalid or incorrect.
-> > >> >
-> > >> >   - <DEPRECATED> tx-fifo-resize: determines if the FIFO *has* to
-> > >> > be
-> > >> reallocated.
-> > >> > + - snps,incr-burst-type-adjustment: Value for INCR burst type of
-> > >> GSBUSCFG0
-> > >> > +   register, undefined length INCR burst type enable and INCRx type.
-> > >> > +   First field is for undefined length INCR burst type enable or not.
-> > >> > +   Second field is for largest INCRx type enabled.
-> > >>
-> > >> Why do you need the first field? Is the 2nd field used if the 1st is 0?
-> > >> If not, then just use the presence of the property to enable or not.
-> > > The first field is one switch.
-> > > When it is 1, means undefined length INCR burst type enabled, we can
-> > > use
-> > any length less than or equal to the largest-enabled burst length of
-> > INCR4/8/16/32/64/128/256.
-> > > When it is zero, means INCRx burst mode enabled, we can use one
-> > > fixed
-> > burst length of 1/4/8/16/32/64/128/256 byte.
-> > > So, the 2nd field is used if the 1st is 0, we need to select one
-> > > largest burst
-> > length the USB controller can support.
-> > > If we don't want to change the value of this register (use the
-> > > default value),
-> > we don't need to add this property to usb node.
-> >
-> > Just make this a single value with 0 meaning INCR and 4/8/16/etc being
-> INCRx.
-> Maybe, I didn't describe it clearly.
-> According to DWC3 spec, the value "0" of field INCRBrstEna means INCRx
-> burst mode, 1 means INCR burst mode.
-> Regardless of the value of INCRBrstEna [bit0], we need to modify the other
-> field bit[1,2,3,4,5,6,7] to one INCR burst type  for the platform supported.
-> Ad you mentioned, if we just use a single value with 0 meaning INCR and
-> 4/8/16/etc being INCRx.
-> I understand totally that when it is none-zero, we can use it for INCR burst
-> mode.
-> Then, when it is 0, how to select the INCRx value?
+> So I think we're just quibbling over the definition of "rewrite".
+
+Gotcha
+
+> > > arm64 we should either ensure that /proc/iomem is consistently usable
+> > > (and have userspace consistently use it), or we should expose a new file
+> > > specifically to expose this information.
+> > 
+> > The thing that I had in my mind when adding this property is that
+> > /proc/iomem would be obsolete in the future, then we should have
+> > an alternative in hand.
 > 
-> So, I think we still need two vaue to specify INCRBrstEna and INCRx burst
-> type.
-Hi, Balbi, 
-It seems there is no feedback for my comment, so these patches can be accepted?
+> Ok.
+> 
+> My disagreement is with using the DT as a channel to convey information
+> from the kernel to userspace.
+> 
+> I'm more than happy for a new file or other mechanism to express this
+> information. For example, we could add
+> /sys/kernel/kexec_crash_{base,size} or similar.
+
+It may make sense because /sys/kernel/kexec_crash_size already exists,
+so why not kexec_crash_base?
+My concern, however, is that this kind of interface might prevent us from
+allowing multiple regions to be reserved for crash dump kernel in the future.
+(There is an assumption that we have only one region at least on arm64 though.)
+
+Thanks,
+-Takahiro AKASHI
+
+> 
+> > > Further, I do not think we need this property. It makes more sense to me
+> > > for the preference of a a region to be described to the *first* kernel
+> > > using the command line consistently.
+> > > 
+> > > So I think we should drop this property, and not use it on arm64. Please
+> > > document this as powerpc only.
+> > 
+> > OK, but if we drop the property from arm64 code, we have no reason
+> > to leave its description in this patch.
+> > (In fact, there are a few more (undocumented) properties that only ppc
+> > uses for kdump.)
+> 
+> I'm happy to drop it, then.
+> 
+> > > > +linux,usable-memory-range
+> > > > +-------------------------
+> > > > +
+> > > > +This property (currently used only on arm64) holds the memory range,
+> > > > +the base address and the size, which can be used as system ram on
+> > > > +the *current* kernel. Note that, if this property is present, any memory
+> > > > +regions under "memory" nodes in DT blob or ones marked as "conventional
+> > > > +memory" in EFI memory map should be ignored.
+> > > 
+> > > Could you please replace this with:
+> > > 
+> > >   This property (arm64 only) holds a base address and size, describing a
+> > >   limited region in which memory may be considered available for use by
+> > >   the kernel. Memory outside of this range is not available for use.
+> > >   
+> > >   This property describes a limitation: memory within this range is only
+> > >   valid when also described through another mechanism that the kernel
+> > >   would otherwise use to determine available memory (e.g. memory nodes
+> > >   or the EFI memory map). Valid memory may be sparse within the range.
+> > 
+> > Sure.
+> 
+> Cheers!
+> 
+> Thanks,
+> Mark.
