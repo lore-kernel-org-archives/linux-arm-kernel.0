@@ -1,61 +1,67 @@
 From: yannick.fertre@st.com (Yannick Fertre)
-Date: Mon, 16 Jan 2017 14:29:02 +0100
-Subject: [PATCH v1 5/7] ARM: dts: stm32f429: Add ltdc support
+Date: Mon, 16 Jan 2017 14:29:01 +0100
+Subject: [PATCH v1 4/7] drm/panel: simple: Add support for Ampire
+ AM-480272H3TMQW-T01H
 In-Reply-To: <1484573344-11609-1-git-send-email-yannick.fertre@st.com>
 References: <1484573344-11609-1-git-send-email-yannick.fertre@st.com>
-Message-ID: <1484573344-11609-6-git-send-email-yannick.fertre@st.com>
+Message-ID: <1484573344-11609-5-git-send-email-yannick.fertre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add LTDC (Lcd-tft Display Controller) support.
+Add simple-panel support for the Ampire AM-480272H3TMQW-T01H,
+which is a 4.3" WQVGA panel.
 
 Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
 ---
- arch/arm/boot/dts/stm32f429.dtsi | 25 ++++++++++++++++++++++++-
- 1 file changed, 24 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/panel/panel-simple.c | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index 336ee4f..fc43415 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -185,7 +185,7 @@
- 			interrupts = <1>, <2>, <3>, <6>, <7>, <8>, <9>, <10>, <23>, <40>, <41>, <42>, <62>, <76>;
- 		};
+diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
+index 06aaf79..ee5d2ff 100644
+--- a/drivers/gpu/drm/panel/panel-simple.c
++++ b/drivers/gpu/drm/panel/panel-simple.c
+@@ -386,6 +386,32 @@ static void panel_simple_shutdown(struct device *dev)
+ 	panel_simple_disable(&panel->base);
+ }
  
--		pin-controller {
-+		pinctrl: pin-controller {
- 			#address-cells = <1>;
- 			#size-cells = <1>;
- 			compatible = "st,stm32f429-pinctrl";
-@@ -404,6 +404,29 @@
- 			interrupts = <80>;
- 			clocks = <&rcc 0 38>;
- 		};
++static const struct drm_display_mode ampire_am_480272h3tmqw_t01h_mode = {
++	.clock = 9000,
++	.hdisplay = 480,
++	.hsync_start = 480 + 2,
++	.hsync_end = 480 + 2 + 41,
++	.htotal = 480 + 2 + 41 + 2,
++	.vdisplay = 272,
++	.vsync_start = 272 + 2,
++	.vsync_end = 272 + 2 + 10,
++	.vtotal = 272 + 2 + 10 + 2,
++	.vrefresh = 60,
++	.flags = DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC,
++};
 +
-+		st-display-subsystem {
-+			compatible = "st,display-subsystem";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+			dma-ranges;
++static const struct panel_desc ampire_am_480272h3tmqw_t01h = {
++	.modes = &ampire_am_480272h3tmqw_t01h_mode,
++	.num_modes = 1,
++	.bpc = 8,
 +
-+			ltdc_host: stm32-ltdc at 40016800 {
-+				compatible = "st,ltdc";
-+				reg = <0x40016800 0x200>;
-+				interrupts = <88>, <89>;
-+				resets = <&rcc 314>;
-+				clocks = <&rcc 1 8>;
-+				clock-names = "clk-lcd";
-+				status = "disabled";
++	.size = {
++		.width = 105,
++		.height = 67,
++	},
++	.bus_format = MEDIA_BUS_FMT_RGB888_1X24,
++};
 +
-+				port {
-+					ltdc_out_rgb: endpoint {
-+					};
-+				};
-+			};
-+		};
- 	};
- };
+ static const struct drm_display_mode ampire_am800480r3tmqwa1h_mode = {
+ 	.clock = 33333,
+ 	.hdisplay = 800,
+@@ -1715,6 +1741,9 @@ static void panel_simple_shutdown(struct device *dev)
  
+ static const struct of_device_id platform_of_match[] = {
+ 	{
++		.compatible = "ampire,am-480272h3tmqw-t01h",
++		.data = &ampire_am_480272h3tmqw_t01h,
++	}, {
+ 		.compatible = "ampire,am800480r3tmqwa1h",
+ 		.data = &ampire_am800480r3tmqwa1h,
+ 	}, {
 -- 
 1.9.1
