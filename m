@@ -1,75 +1,176 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Mon, 16 Jan 2017 13:19:25 +0200
-Subject: [PATCH] usb: gadget: udc: atmel: used managed kasprintf
-In-Reply-To: <20170116111128.ft2b5aa63y2qe35p@piout.net>
-References: <20161201102656.29041-1-alexandre.belloni@free-electrons.com>
- <063D6719AE5E284EB5DD2968C1650D6DB0232C0D@AcuExch.aculab.com>
- <20161202161921.ace5rolitlxjhr6i@piout.net>
- <063D6719AE5E284EB5DD2968C1650D6DB023508B@AcuExch.aculab.com>
- <87eg03nvuv.fsf@linux.intel.com> <20170116111128.ft2b5aa63y2qe35p@piout.net>
-Message-ID: <87bmv7mev6.fsf@linux.intel.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 16 Jan 2017 11:25:56 +0000
+Subject: [PATCH v7 09/15] ACPI: platform-msi: retrieve dev id from IORT
+In-Reply-To: <5879A8F3.7030303@huawei.com>
+References: <1484147199-4267-1-git-send-email-hanjun.guo@linaro.org>
+ <1484147199-4267-10-git-send-email-hanjun.guo@linaro.org>
+ <20170113121144.GE20837@red-moon> <5879A8F3.7030303@huawei.com>
+Message-ID: <20170116112556.GA23703@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, Jan 14, 2017 at 12:28:35PM +0800, Hanjun Guo wrote:
+> Hi Lorenzo,
+> 
+> On 2017/1/13 20:11, Lorenzo Pieralisi wrote:
+> > On Wed, Jan 11, 2017 at 11:06:33PM +0800, Hanjun Guo wrote:
+> >> For devices connecting to ITS, it needs dev id to identify itself, and
+> >> this dev id is represented in the IORT table in named component node
+> >> [1] for platform devices, so in this patch we will scan the IORT to
+> >> retrieve device's dev id.
+> >>
+> >> For named components we know that there are always two steps
+> >> involved (second optional):
+> >>
+> >> (1) Retrieve the initial id (this may well provide the final mapping)
+> >> (2) Map the id (optional if (1) represents the map type we need), this
+> >>     is needed for use cases such as NC (named component) -> SMMU -> ITS
+> >>     mappings.
+> >>
+> >> we have API iort_node_get_id() for step (1) above and
+> >> iort_node_map_rid() for step (2), so create a wrapper
+> >> iort_node_map_platform_id() to retrieve the dev id.
+> >>
+> >> [1]: https://static.docs.arm.com/den0049/b/DEN0049B_IO_Remapping_Table.pdf
+> > This patch should be split and IORT changes should be squashed with
+> > patch 10.
+> 
+> If split the changes for IORT and its platform msi, API introduced in IORT will
+> not be used in a single patch, seems violate the suggestion of "new introduced API
+> needs to be used in the same patch", did I miss something?
 
-Hi,
+Yes, I would introduce iort_node_map_platform_id() and in the same
+patch update current iort_node_get_id() users (ie iort_iommu_configure())
+to it. No functional change intended.
 
-Alexandre Belloni <alexandre.belloni@free-electrons.com> writes:
->> David Laight <David.Laight@ACULAB.COM> writes:
->> > From: Alexandre Belloni
->> >> Sent: 02 December 2016 16:19
->> >> On 02/12/2016 at 15:59:57 +0000, David Laight wrote :
->> >> > From: Alexandre Belloni
->> >> > > Sent: 01 December 2016 10:27
->> >> > > Use devm_kasprintf instead of simple kasprintf to free the allocated memory
->> >> > > when needed.
->> >> >
->> >> > s/when needed/when the device is freed/
->> >> >
->> >> > > Suggested-by: Peter Rosin <peda@axentia.se>
->> >> > > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->> >> > > ---
->> >> > >  drivers/usb/gadget/udc/atmel_usba_udc.c | 3 ++-
->> >> > >  1 file changed, 2 insertions(+), 1 deletion(-)
->> >> > >
->> >> > > diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
->> >> > > index 45bc997d0711..aec72fe8273c 100644
->> >> > > --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
->> >> > > +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
->> >> > > @@ -1978,7 +1978,8 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
->> >> > >  			dev_err(&pdev->dev, "of_probe: name error(%d)\n", ret);
->> >> > >  			goto err;
->> >> > >  		}
->> >> > > -		ep->ep.name = kasprintf(GFP_KERNEL, "ep%d", ep->index);
->> >> > > +		ep->ep.name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "ep%d",
->> >> > > +					     ep->index);
->> >> >
->> >> > Acually why bother mallocing such a small string at all.
->> >> > The maximum length is 12 bytes even if 'index' are unrestricted.
->> >> >
->> >> 
->> >> IIRC, using statically allocated string is failing somewhere is the USB
->> >> core but I don't remember all the details.
->> >
->> > I can't imagine that changing ep->ep.name from 'char *' to 'char [12]' would
->> > make any difference.
->> 
->> the actual name is managed by the UDC. Meaning, ep->ep.name should be a
->> pointer, but it could very well just point to ep->name which would be
->> char [12].
->> 
->
-> Yeah, I sent a patch that did just that.
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-January/478602.html
+Then in subsequent patches you can retrieve the ITS device id for
+platform devices through it.
 
-it's in my fixes now :-)
+Code is in your series, you just have to reshuffle it slightly.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170116/8307cc5b/attachment.sig>
+> >> Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >> Suggested-by: Tomasz Nowicki <tn@semihalf.com>
+> >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> >> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >> Cc: Sinan Kaya <okaya@codeaurora.org>
+> >> Cc: Tomasz Nowicki <tn@semihalf.com>
+> >> Cc: Thomas Gleixner <tglx@linutronix.de>
+> >> ---
+> >>  drivers/acpi/arm64/iort.c                     | 56 +++++++++++++++++++++++++++
+> >>  drivers/irqchip/irq-gic-v3-its-platform-msi.c |  4 +-
+> >>  include/linux/acpi_iort.h                     |  8 ++++
+> >>  3 files changed, 67 insertions(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+> >> index 069a690..95fd20b 100644
+> >> --- a/drivers/acpi/arm64/iort.c
+> >> +++ b/drivers/acpi/arm64/iort.c
+> >> @@ -30,6 +30,7 @@
+> >>  #define IORT_MSI_TYPE		(1 << ACPI_IORT_NODE_ITS_GROUP)
+> >>  #define IORT_IOMMU_TYPE		((1 << ACPI_IORT_NODE_SMMU) |	\
+> >>  				(1 << ACPI_IORT_NODE_SMMU_V3))
+> >> +#define IORT_TYPE_ANY		(IORT_MSI_TYPE | IORT_IOMMU_TYPE)
+> >>  
+> >>  struct iort_its_msi_chip {
+> >>  	struct list_head	list;
+> >> @@ -406,6 +407,34 @@ static struct acpi_iort_node *iort_node_map_id(struct acpi_iort_node *node,
+> >>  	return NULL;
+> >>  }
+> >>  
+> >> +static
+> >> +struct acpi_iort_node *iort_node_map_platform_id(struct acpi_iort_node *node,
+> >> +						 u32 *id_out, u8 type_mask,
+> >> +						 int index)
+> >> +{
+> >> +	struct acpi_iort_node *parent;
+> >> +	u32 id;
+> >> +
+> >> +	/* step 1: retrieve the initial dev id */
+> >> +	parent = iort_node_get_id(node, &id, IORT_TYPE_ANY, index);
+> >> +	if (!parent)
+> >> +		return NULL;
+> >> +
+> >> +	/*
+> >> +	 * optional step 2: map the initial dev id if its parent is not
+> >> +	 * the target type we wanted, map it again for the use cases such
+> >> +	 * as NC (named component) -> SMMU -> ITS. If the type is matched,
+> >> +	 * return the parent pointer directly.
+> >> +	 */
+> >> +	if (!(IORT_TYPE_MASK(parent->type) & type_mask))
+> >> +		parent = iort_node_map_id(parent, id, id_out, type_mask);
+> >> +	else
+> >> +		if (id_out)
+> > Remove this pointer check.
+> 
+> This was added because of NULL pointer reference, I passed NULL for id_out because I
+> only want to get its parent node, I think we have four options:
+> 
+>  - Introduce a new API to get the parent only from the scratch, but it will duplicate the code
+>     a lot;
+> 
+>  - Don't check the id_out in iort_node_map_platform_id(), and introduce a wrapper and pass the
+>    dummy id for iort_node_map_platform_id() :
+> static
+> struct acpi_iort_node *iort_node_get_platform_parent{struct device *dev, u8 type_mask}
+> {
+>         struct acpi_iort_node *node, *parent = NULL;
+>         int i;
+>         u32 dummy_id;
+> 
+>         node = iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
+>                               iort_match_node_callback, dev);
+> 
+>         if (!node)
+>                 return NULL;
+> 
+>         for (i = 0; i < node->mapping_count; i++) {
+>                 /* we just want to get the parent node */
+>                 parent = iort_node_map_platform_id(node, &dummy_id,
+>                                                    IORT_MSI_TYPE, i);
+>                 if (parent)
+>                         break;
+>         }
+> 
+>         return parent;
+> }
+> 
+>  - Similar solution as above but don't introduce wrapper, just use dummy_id if
+>    iort_node_map_platform_id() is called;
+> 
+> - Use the solution I proposed in this patch.
+> 
+> Please share you suggestion on this :)
+
+I see. I would like to change the IORT mapping API functions to always pass
+in an argument:
+
+struct iort_idmap {
+	struct acpi_iort_node *parent;
+	u32 id;
+};
+
+and return an int, because current functions (eg iort_node_map_rid())
+return a parent IORT node but also the mapped id as a value-result
+and that's not easy to follow (also Sinan raised this point which I
+think it is fair).
+
+I think we'd better postpone this change to next cycle, so you can
+leave the pointer check:
+
+if (id_out)
+
+I will clean this up later, basically what we would end up doing to just
+retrieve the parent pointer would be the IORT equivalent of what we have
+in DT:
+
+of_parse_phandle()
+  -> __of_parse_phandle_with_args() #we call it with cell_count == 0
+
+
+at the end of the day it is just to make code easier to follow, since it
+is functions internal to IORT compilation unit it is ok for now to leave
+it as-is.
+
+Thanks,
+Lorenzo
