@@ -1,38 +1,54 @@
-From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Mon, 16 Jan 2017 20:39:56 +0800
-Subject: [Question] A question about arm64 pte
-In-Reply-To: <20170116115606.GA6832@e104818-lin.cambridge.arm.com>
-References: <d284f510-f025-db84-f21e-a5b167d4bcd2@huawei.com>
- <20170116115606.GA6832@e104818-lin.cambridge.arm.com>
-Message-ID: <6b7a9bd2-37af-40cd-b723-9e648fbbc7c8@huawei.com>
+From: john@metanate.com (John Keeping)
+Date: Mon, 16 Jan 2017 12:44:53 +0000
+Subject: [PATCH v2 11/11] drm/rockchip/dsi: fix insufficient bandwidth
+ of some panel
+In-Reply-To: <1484561311-494-12-git-send-email-zyw@rock-chips.com>
+References: <1484561311-494-1-git-send-email-zyw@rock-chips.com>
+ <1484561311-494-12-git-send-email-zyw@rock-chips.com>
+Message-ID: <20170116124453.2154def9.john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Catalin,
-Thank you so much for you reply.
+On Mon, 16 Jan 2017 18:08:31 +0800, Chris Zhong wrote:
 
-On 2017/1/16 19:56, Catalin Marinas wrote:
-> On Mon, Jan 16, 2017 at 06:08:47PM +0800, Yisheng Xie wrote:
->> I have question about arm64 pte.
+> Set the lanes bps to 1 / 0.9 times of pclk, the margin is not enough
+> for some panel, it will cause the screen display is not normal, so
+> increases the badnwidth to 1 / 0.8.
 > 
-> I assume the context is ARMv8.0 (without hardware DBM support).
-
-Yes.
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
 > 
->> For arm64, PTE_WRITE?== PTE_DBM? is to mark whether the page is writable,
->> and PTE_DIRTY is to mark whether the page is dirty.
->> However, PTE_RDONLY is only cleared when both PTE_WRITE and PTE_DIRTY are set.
+> ---
 > 
-> That's what set_pte_at() does.
+>  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
+> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> index 9dfa73d..5a973fe 100644
+> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> @@ -501,8 +501,8 @@ static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi)
+>  
+>  	mpclk = DIV_ROUND_UP(dsi->mode->clock, MSEC_PER_SEC);
+>  	if (mpclk) {
+> -		/* take 1 / 0.9, since mbps must big than bandwidth of RGB */
+> -		tmp = mpclk * (bpp / dsi->lanes) * 10 / 9;
+> +		/* take 1 / 0.8, since mbps must big than bandwidth of RGB */
+> +		tmp = mpclk * (bpp / dsi->lanes) * 10 / 8;
 
-So if we mmap a memory region use /dev/mem like:
-   fildes = open("/dev/mem", O_RDWR | O_CREAT, 0777);
-   addr = mmap(NULL, LEN, PROT_READ | PROT_WRITE, MAP_SHARED, fildes, offset);
+This and patch 9 are just hacking around the underlying problem in order
+to make particular panels work.  I'm pretty sure the actual issue is the
+use of hardcoded values when configuring the PHY, since the PHY
+parameters are specified in clock cycles but the MIPI spec requires
+absolute time durations.
 
-The PTE_RDONLY will be set? Right ?
-However?when use memset to write the region it still works well, and the bit PTE_RDONLY is also cleared.
-Is there anywhere clear the PTE_RDONLY before write that page ?
+I posted a series addressing this a while ago, although I screwed up
+sending it so some patches were included twice and since no one
+expressed any interest I didn't post a cleaned up version.
 
-Thanks
-Yisheng Xie
+The relevant patch is here:
+
+https://patchwork.kernel.org/patch/9340193/
+
+>  		if (tmp < max_mbps)
+>  			target_mbps = tmp;
+>  		else
