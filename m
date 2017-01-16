@@ -1,102 +1,195 @@
-From: peter.senna@collabora.com (Peter Senna Tschudin)
-Date: Mon, 16 Jan 2017 09:37:11 +0100
-Subject: [PATCH V7 1/4] Documentation/devicetree/bindings: b850v3_lvds_dp
-In-Reply-To: <6276161.johxDync2u@avalon>
-References: <74f0-58704480-5-27259840@173563636>
- <6276161.johxDync2u@avalon>
-Message-ID: <20170116083711.GA18775@collabora.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 16 Jan 2017 09:40:32 +0100
+Subject: [PATCH v1 2/2] arm: dts: mt2701: add nor flash node
+In-Reply-To: <e7fa1542-f0e2-0e45-23b3-25d6491ae40d@gmail.com>
+References: <1484291609-20195-1-git-send-email-guochun.mao@mediatek.com>
+ <1484291609-20195-3-git-send-email-guochun.mao@mediatek.com>
+ <20170113151747.6bc85245@bbrezillon>
+ <d7b866ad-5b2f-62d3-3aa3-6fa42803d625@gmail.com>
+ <b850b751-1d8d-0053-cf1f-d5314542e5c3@gmail.com>
+ <20170113172825.75d545a3@bbrezillon>
+ <86c997be-f500-eaa1-3ba5-d21cff6223b7@gmail.com>
+ <20170113175628.1793f433@bbrezillon>
+ <0fafcd8d-cf99-de6b-728f-5e3637810b68@gmail.com>
+ <20170114092958.022f2fc8@bbrezillon>
+ <e7fa1542-f0e2-0e45-23b3-25d6491ae40d@gmail.com>
+Message-ID: <20170116094032.6f471f11@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 11:04:58PM +0200, Laurent Pinchart wrote:
-> Hi Peter,
+On Sun, 15 Jan 2017 01:23:48 +0100
+Marek Vasut <marek.vasut@gmail.com> wrote:
 
-Laurent!
-
-> 
-> On Saturday 07 Jan 2017 01:29:52 Peter Senna Tschudin wrote:
-> > On 04 January, 2017 21:39 CET, Rob Herring wrote:
-> > > On Tue, Jan 3, 2017 at 5:34 PM, Peter Senna Tschudin wrote:
-> > >> On 03 January, 2017 23:51 CET, Rob Herring <robh@kernel.org> wrote:
-> > >>> On Sun, Jan 01, 2017 at 09:24:29PM +0100, Peter Senna Tschudin wrote:
-> > >>>> Devicetree bindings documentation for the GE B850v3 LVDS/DP++
-> > >>>> display bridge.
-> > >>>> 
-> > >>>> Cc: Martyn Welch <martyn.welch@collabora.co.uk>
-> > >>>> Cc: Martin Donnelly <martin.donnelly@ge.com>
-> > >>>> Cc: Javier Martinez Canillas <javier@dowhile0.org>
-> > >>>> Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> > >>>> Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> > >>>> Cc: Rob Herring <robh@kernel.org>
-> > >>>> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> > >>>> Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
-> > >>>> ---
-> > >>>> There was an Acked-by from Rob Herring <robh@kernel.org> for V6, but
-> > >>>> I changed the bindings to use i2c_new_secondary_device() so I
-> > >>>> removed it from the commit message.
-> > >>>> 
-> > >>>>  .../devicetree/bindings/ge/b850v3-lvds-dp.txt      | 39 ++++++++++++++
-> > >>> Generally, bindings are not organized by vendor. Put in
-> > >>> bindings/display/bridge/... instead.
-> > >> 
-> > >> Will change that.
-> > >> 
-> > >>>>  1 file changed, 39 insertions(+)
-> > >>>>  create mode 100644
-> > >>>>  Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
-> > >>>> 
-> > >>>> diff --git a/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
-> > >>>> b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt new file
-> > >>>> mode 100644
-> > >>>> index 0000000..1bc6ebf
-> > >>>> --- /dev/null
-> > >>>> +++ b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
-> > >>>> @@ -0,0 +1,39 @@
-> > >>>> +Driver for GE B850v3 LVDS/DP++ display bridge
-> > >>>> +
-> > >>>> +Required properties:
-> > >>>> +  - compatible : should be "ge,b850v3-lvds-dp".
-> > >>> 
-> > >>> Isn't '-lvds-dp' redundant? The part# should be enough.
-> > >> 
-> > >> b850v3 is the name of the product, this is why the proposed name. What
-> > >> about, b850v3-dp2 dp2 indicating the second DP output?
-> > >
-> > > Humm, b850v3 is the board name? This node should be the name of the bridge
-> > > chip.
-> >
-> > From the cover letter:
+> On 01/14/2017 09:29 AM, Boris Brezillon wrote:
+> > On Fri, 13 Jan 2017 18:33:40 +0100
+> > Marek Vasut <marek.vasut@gmail.com> wrote:
+> >   
+> >> On 01/13/2017 05:56 PM, Boris Brezillon wrote:  
+> >>> On Fri, 13 Jan 2017 17:44:12 +0100
+> >>> Marek Vasut <marek.vasut@gmail.com> wrote:
+> >>>     
+> >>>> On 01/13/2017 05:28 PM, Boris Brezillon wrote:    
+> >>>>> On Fri, 13 Jan 2017 17:13:55 +0100
+> >>>>> Marek Vasut <marek.vasut@gmail.com> wrote:
+> >>>>>       
+> >>>>>> On 01/13/2017 04:12 PM, Matthias Brugger wrote:      
+> >>>>>>>
+> >>>>>>>
+> >>>>>>> On 13/01/17 15:17, Boris Brezillon wrote:        
+> >>>>>>>> On Fri, 13 Jan 2017 15:13:29 +0800
+> >>>>>>>> Guochun Mao <guochun.mao@mediatek.com> wrote:
+> >>>>>>>>        
+> >>>>>>>>> Add Mediatek nor flash node.
+> >>>>>>>>>
+> >>>>>>>>> Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
+> >>>>>>>>> ---
+> >>>>>>>>>  arch/arm/boot/dts/mt2701-evb.dts |   25 +++++++++++++++++++++++++
+> >>>>>>>>>  arch/arm/boot/dts/mt2701.dtsi    |   12 ++++++++++++
+> >>>>>>>>>  2 files changed, 37 insertions(+)
+> >>>>>>>>>
+> >>>>>>>>> diff --git a/arch/arm/boot/dts/mt2701-evb.dts
+> >>>>>>>>> b/arch/arm/boot/dts/mt2701-evb.dts
+> >>>>>>>>> index 082ca88..85e5ae8 100644
+> >>>>>>>>> --- a/arch/arm/boot/dts/mt2701-evb.dts
+> >>>>>>>>> +++ b/arch/arm/boot/dts/mt2701-evb.dts
+> >>>>>>>>> @@ -24,6 +24,31 @@
+> >>>>>>>>>      };
+> >>>>>>>>>  };
+> >>>>>>>>>
+> >>>>>>>>> +&nor_flash {
+> >>>>>>>>> +    pinctrl-names = "default";
+> >>>>>>>>> +    pinctrl-0 = <&nor_pins_default>;
+> >>>>>>>>> +    status = "okay";
+> >>>>>>>>> +    flash at 0 {
+> >>>>>>>>> +        compatible = "jedec,spi-nor";
+> >>>>>>>>> +        reg = <0>;
+> >>>>>>>>> +    };
+> >>>>>>>>> +};
+> >>>>>>>>> +
+> >>>>>>>>> +&pio {
+> >>>>>>>>> +    nor_pins_default: nor {
+> >>>>>>>>> +        pins1 {
+> >>>>>>>>> +            pinmux = <MT2701_PIN_240_EXT_XCS__FUNC_EXT_XCS>,
+> >>>>>>>>> +                 <MT2701_PIN_241_EXT_SCK__FUNC_EXT_SCK>,
+> >>>>>>>>> +                 <MT2701_PIN_239_EXT_SDIO0__FUNC_EXT_SDIO0>,
+> >>>>>>>>> +                 <MT2701_PIN_238_EXT_SDIO1__FUNC_EXT_SDIO1>,
+> >>>>>>>>> +                 <MT2701_PIN_237_EXT_SDIO2__FUNC_EXT_SDIO2>,
+> >>>>>>>>> +                 <MT2701_PIN_236_EXT_SDIO3__FUNC_EXT_SDIO3>;
+> >>>>>>>>> +            drive-strength = <MTK_DRIVE_4mA>;
+> >>>>>>>>> +            bias-pull-up;
+> >>>>>>>>> +        };
+> >>>>>>>>> +    };
+> >>>>>>>>> +};
+> >>>>>>>>> +
+> >>>>>>>>>  &uart0 {
+> >>>>>>>>>      status = "okay";
+> >>>>>>>>>  };
+> >>>>>>>>> diff --git a/arch/arm/boot/dts/mt2701.dtsi
+> >>>>>>>>> b/arch/arm/boot/dts/mt2701.dtsi
+> >>>>>>>>> index bdf8954..1eefce4 100644
+> >>>>>>>>> --- a/arch/arm/boot/dts/mt2701.dtsi
+> >>>>>>>>> +++ b/arch/arm/boot/dts/mt2701.dtsi
+> >>>>>>>>> @@ -227,6 +227,18 @@
+> >>>>>>>>>          status = "disabled";
+> >>>>>>>>>      };
+> >>>>>>>>>
+> >>>>>>>>> +    nor_flash: spi at 11014000 {
+> >>>>>>>>> +        compatible = "mediatek,mt2701-nor",
+> >>>>>>>>> +                 "mediatek,mt8173-nor";        
+> >>>>>>>>
+> >>>>>>>> Why define both here? Is "mediatek,mt8173-nor" really providing a
+> >>>>>>>> subset of the features supported by "mediatek,mt2701-nor"?
+> >>>>>>>>        
+> >>>>>>>
+> >>>>>>> I think even if the ip block is the same, we should provide both
+> >>>>>>> bindings, just in case in the future we find out that mt2701 has some
+> >>>>>>> hidden bug, feature or bug-feature. This way even if we update the
+> >>>>>>> driver, we stay compatible with older device tree blobs in the wild.
+> >>>>>>>
+> >>>>>>> We can drop the mt2701-nor in the bindings definition if you want.       
+> >>>>>
+> >>>>> Oh, sorry, I misunderstood. What I meant is that if you want to
+> >>>>> list/support all possible compatibles, maybe you should just put one
+> >>>>> compatible in your DT and patch your driver (+ binding doc) to define
+> >>>>> all of them.      
+> >>>>
+> >>>> Uh, what ? I lost you here :-)  
 > > 
-> > -- // --
-> > There are two physical bridges on the video signal pipeline: a STDP4028(LVDS
-> > to DP) and a STDP2690(DP to DP++).  The hardware and firmware made it
-> > complicated for this binding to comprise two device tree nodes, as the
-> > design goal is to configure both bridges based on the LVDS signal, which
-> > leave the driver powerless to control the video processing pipeline. The
-> > two bridges behaves as a single bridge, and the driver is only needed for
-> > telling the host about EDID / HPD, and for giving the host powers to ack
-> > interrupts. The video signal pipeline is as follows:
+> > I mean adding a new entry in the mtk_nor_of_ids table (in
+> > mtk-quadspi.c) so that the mediatek,mt2701-nor compatible string can be
+> > matched directly, and you won't need to define 2 compatible strings in
+> > your device tree.  
+> 
+> But then you grow the table in the driver, is that what we want if we
+> can avoid that ?
+
+The space you save by not growing the mtk_nor_of_ids table is lost in
+your dtbs, so I'm not sure the size argument is relevant here. Also,
+note that distros are shipping a lot of dtbs, and you're likely to have
+several boards based on the mt2701 SoC, so, for this specific use case,
+it's better to make the in-driver of-id table grow than specifying 2
+compatibles in the DT. But as I said, I'm not sure we should rely on
+this argument to decide which approach to choose (we're talking about a
+few bytes here).
+
+> 
+> >>>>    
+> >>>>>> This exactly. We should have a DT compat in the form:
+> >>>>>> compatible = "vendor,<soc>-block", "vendor,<oldest-compat-soc>-block";
+> >>>>>> Then if we find a problem in the future, we can match on the
+> >>>>>> "vendor,<soc>-block" and still support the old DTs.      
+> >>>>>
+> >>>>> Not sure it's only in term of whose IP appeared first. My understanding
+> >>>>> is that it's a way to provide inheritance. For example:
+> >>>>>
+> >>>>> 	"<soc-vendor>,<ip-version>", "<ip-vendor>,<ip-version>";
+> >>>>>
+> >>>>> or
+> >>>>>
+> >>>>> 	"<soc-vendor>,<full-featured-ip-version>","<soc-vendor>,<basic-feature-ip-version>";
+> >>>>>
+> >>>>> BTW, which one is the oldest between mt8173 and mt2701? :-)      
+> >>>>
+> >>>> And that's another thing and I agree with you, but I don't think that's
+> >>>> what we're discussing in this thread. But (!), OT, I think we should
+> >>>> codify the rules in Documentation/ . This discussion came up multiple
+> >>>> times recently.
+> >>>>
+> >>>> And my question still stands, what do we put into the DT here, IMO
+> >>>> compatible = "mediatek,mt2701-nor", "mediatek,mt8173-nor";    
+> >>>
+> >>> I'd say
+> >>>
+> >>> 	compatible = "mediatek,mt8173-nor";
+> >>>
+> >>> because both compatible are referring to very specific IP version. It's
+> >>> not the same as    
+> >>
+> >> But then you don't have the ability to handle a block in this particular
+> >> SoC in case there's a bug found in it in the future,
+> >> so IMO it should be:
+> >>
+> >> compatible = "mediatek,mt2701-nor", "mediatek,mt8173-nor";  
 > > 
-> >   Host -> LVDS|--(STDP4028)--|DP -> DP|--(STDP2690)--|DP++ -> Video output
-> > -- // --
+> > Sorry again, I meant
+> > 
+> > 	compatible = "mediatek,mt2701-nor";
+> >   
+> >>  
+> >>> 	compatible = "mediatek,mt8173-nor", "mediatek,mt81xx-nor";    
+> >>
+> >> This doesn't look right, since here we add two new compatibles ...  
+> > 
+> > That was just an example to describe how compatible inheritance works
+> > (at least that's my understanding of it), it does not apply to this
+> > particular use case.  
 > 
-> You forgot to prefix your patch series with [HACK] ;-)
+> Well this is OK I guess, but then you can also use "mediatek,mt8173-nor"
+> as the oldest supported compatible and be done with it, no ? It looks a
+> bit crappy though, I admit that ...
 > 
-> How about fixing the issues that make the two DT nodes solution difficult ? 
-> What are they ?
 
-The Firmware and the hardware design. Both bridges, with stock firmware,
-are fully capable of providig EDID information and handling interrupts.
-But on this specific design, with this specific firmware, I need to read
-EDID from one bridge, and handle interrupts on the other. Back when I
-was starting the development I could not come up with a proper way to
-split EDID and interrupts between two bridges in a way that would result
-in a fully functional connector. Did I miss something?
+Let's stop bikeshedding and wait for DT maintainers feedback
+before taking a decision ;-).
 
-
-> 
-> -- 
-> Regards,
-> 
-> Laurent Pinchart
-> 
+Rob, Mark, any opinion?
