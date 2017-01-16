@@ -1,58 +1,80 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 16 Jan 2017 12:11:42 +0100
-Subject: [PATCH] PCI: mvebu: change delay after reset to the PCIe spec
- mandated 100ms
-Message-ID: <20170116111142.6866-1-l.stach@pengutronix.de>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 16 Jan 2017 12:14:03 +0100
+Subject: USB: OHCI: high softirq load
+In-Reply-To: <d49db4ac-fbeb-23ce-d48c-bd087c314328@overkiz.com>
+References: <bd83e3b2-b329-3635-2917-0ffe61d3535f@overkiz.com>
+ <20170116100220.0b00658e@bbrezillon>
+ <ad8a54c3-c83d-109f-5cc5-7e77e9deff12@overkiz.com>
+ <d49db4ac-fbeb-23ce-d48c-bd087c314328@overkiz.com>
+Message-ID: <20170116121403.4a3a7b17@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current default of 20ms cause some devices, which are slow to initialize,
-to not show up during the bus scanning. Change this to the PCIe spec mandated
-100ms and document this in the DT binding.
+On Mon, 16 Jan 2017 11:54:23 +0100
+Antoine Aubert <a.aubert@overkiz.com> wrote:
 
->From PCIe base spec rev 3.0, chapter "6.6.1. Conventional Reset":
+> Also, I made a big misunderstanding
+> 
+> With EHCI + OHCI = high level of softirq (USB2.0)
 
-"To allow components to perform internal initialization, system software must
-wait a specified minimum period following the end of a Conventional Reset of
-one or more devices before it is permitted to issue Configuration Requests to
-those devices.
+Well, the number of irqs and softirqs are likely to be related (you
+usually trigger a softirq after you received an hardirq).
 
-With a Downstream Port that does not support Link speeds greater than
-5.0 GT/s, software must wait a minimum of 100 ms before sending a
-Configuration Request to the device immediately below that Port."
+> 
+> OHCI only = normal level
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
- Documentation/devicetree/bindings/pci/mvebu-pci.txt | 3 ++-
- drivers/pci/host/pci-mvebu.c                        | 2 +-
- 2 files changed, 3 insertions(+), 2 deletions(-)
+What about EHCI only? And what happens if you only plug 1 device?
+Please share the content of /proc/interrupts (and everything you think
+is relevant) for each of these cases.
 
-diff --git a/Documentation/devicetree/bindings/pci/mvebu-pci.txt b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-index 08c716b2c6b6..2de6f65ecfb1 100644
---- a/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-+++ b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
-@@ -78,7 +78,8 @@ and the following optional properties:
-   multiple lanes. If this property is not found, we assume that the
-   value is 0.
- - reset-gpios: optional gpio to PERST#
--- reset-delay-us: delay in us to wait after reset de-assertion
-+- reset-delay-us: delay in us to wait after reset de-assertion, if not
-+  specified will default to 100ms, as required by the PCIe specification.
- 
- Example:
- 
-diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-index 45a89d969700..0c9dd47ce74d 100644
---- a/drivers/pci/host/pci-mvebu.c
-+++ b/drivers/pci/host/pci-mvebu.c
-@@ -1162,7 +1162,7 @@ static int mvebu_pcie_powerup(struct mvebu_pcie_port *port)
- 		return ret;
- 
- 	if (port->reset_gpio) {
--		u32 reset_udelay = 20000;
-+		u32 reset_udelay = 100000;
- 
- 		of_property_read_u32(port->dn, "reset-delay-us",
- 				     &reset_udelay);
--- 
-2.11.0
+> 
+> Le 16/01/2017 ? 11:31, Antoine Aubert a ?crit :
+> > Thx for your answer Boris
+> >
+> > Le 16/01/2017 ? 10:02, Boris Brezillon a ?crit :  
+> >> Hi Antoine,
+> >>
+> >> On Mon, 16 Jan 2017 08:45:58 +0100
+> >> Antoine Aubert <a.aubert@overkiz.com> wrote:
+> >>  
+> >>> Hi,
+> >>>
+> >>> Im working on a AT91SAM9G25cu board
+> >>> (arch/arm/boot/dts/at91-kizboxmini.dts). We use linux-4.1.31, and when
+> >>> OHCI is enabled, I got some wired effects.  
+> >> Can you test on a more recent kernel (4.9 or 4.10-rc4)?  
+> > I'll give a try, just need little time ;)  
+> >>> eg with 3 FTDI pluged, interrupts: more than 3.5k/s, cpu softirq > 24%,
+> >>> loadavg > 0.5  
+> >> Can you check which interrupt is triggered (cat /proc/interrupts),  
+> > cat /proc/interrupts
+> >            CPU0      
+> >  16:       2286  atmel-aic   1 Level     pmc, at91_tick, at91_rtc, ttyS0
+> >  17:          0       PMC  17 Level     main_rc_osc
+> >  18:          0       PMC   0 Level     main_osc
+> >  19:          0       PMC  16 Level     mainck
+> >  20:          0       PMC   1 Level     clk-plla
+> >  21:          0       PMC   6 Level     clk-utmi
+> >  22:          0       PMC   3 Level     clk-master
+> >  23:     945527  atmel-aic  17 Level     tc_clkevt
+> >  24:      21815  atmel-aic  20 Level     at_hdmac
+> >  25:          0  atmel-aic  21 Level     at_hdmac
+> >  30:     120299  atmel-aic  24 Level     eth0
+> >  31:   22783651  atmel-aic  22 Level     ehci_hcd:usb1, ohci_hcd:usb2
+> >  99:          0      GPIO  16 Edge      PB_RST
+> > 100:          0      GPIO  17 Edge      PB_PROG
+> > Err:          0
+> >  
+> >>  and
+> >> enable debug messages in drivers/usb/host/ohci-at91.c?  
+
+Actually, I was asking for debug messages. You can enable them
+dynamically with dynamic printk [1].
+BTW, please use pastebin (or any other alternative) to share these
+information.
+
+Thanks,
+
+Boris
+
+[1]http://lxr.free-electrons.com/source/Documentation/dynamic-debug-howto.txt
