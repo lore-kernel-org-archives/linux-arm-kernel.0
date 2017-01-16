@@ -1,176 +1,254 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 16 Jan 2017 11:25:56 +0000
-Subject: [PATCH v7 09/15] ACPI: platform-msi: retrieve dev id from IORT
-In-Reply-To: <5879A8F3.7030303@huawei.com>
-References: <1484147199-4267-1-git-send-email-hanjun.guo@linaro.org>
- <1484147199-4267-10-git-send-email-hanjun.guo@linaro.org>
- <20170113121144.GE20837@red-moon> <5879A8F3.7030303@huawei.com>
-Message-ID: <20170116112556.GA23703@red-moon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 16 Jan 2017 11:25:37 +0000
+Subject: [RFC PATCH v2 03/10] arm64: KVM: Save/restore the host SPE state
+ when entering/leaving a VM
+In-Reply-To: <1484323429-15231-4-git-send-email-will.deacon@arm.com>
+References: <1484323429-15231-1-git-send-email-will.deacon@arm.com>
+ <1484323429-15231-4-git-send-email-will.deacon@arm.com>
+Message-ID: <61308f80-3bcd-6bff-2c87-dccb58a0a84c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 14, 2017 at 12:28:35PM +0800, Hanjun Guo wrote:
-> Hi Lorenzo,
+Hi Will,
+
+On 13/01/17 16:03, Will Deacon wrote:
+> The SPE buffer is virtually addressed, using the page tables of the CPU
+> MMU. Unusually, this means that the EL0/1 page table may be live whilst
+> we're executing at EL2 on non-VHE configurations. When VHE is in use,
+> we can use the same property to profile the guest behind its back.
 > 
-> On 2017/1/13 20:11, Lorenzo Pieralisi wrote:
-> > On Wed, Jan 11, 2017 at 11:06:33PM +0800, Hanjun Guo wrote:
-> >> For devices connecting to ITS, it needs dev id to identify itself, and
-> >> this dev id is represented in the IORT table in named component node
-> >> [1] for platform devices, so in this patch we will scan the IORT to
-> >> retrieve device's dev id.
-> >>
-> >> For named components we know that there are always two steps
-> >> involved (second optional):
-> >>
-> >> (1) Retrieve the initial id (this may well provide the final mapping)
-> >> (2) Map the id (optional if (1) represents the map type we need), this
-> >>     is needed for use cases such as NC (named component) -> SMMU -> ITS
-> >>     mappings.
-> >>
-> >> we have API iort_node_get_id() for step (1) above and
-> >> iort_node_map_rid() for step (2), so create a wrapper
-> >> iort_node_map_platform_id() to retrieve the dev id.
-> >>
-> >> [1]: https://static.docs.arm.com/den0049/b/DEN0049B_IO_Remapping_Table.pdf
-> > This patch should be split and IORT changes should be squashed with
-> > patch 10.
+> This patch adds the relevant disabling and flushing code to KVM so that
+> the host can make use of SPE without corrupting guest memory, and any
+> attempts by a guest to use SPE will result in a trap.
 > 
-> If split the changes for IORT and its platform msi, API introduced in IORT will
-> not be used in a single patch, seems violate the suggestion of "new introduced API
-> needs to be used in the same patch", did I miss something?
-
-Yes, I would introduce iort_node_map_platform_id() and in the same
-patch update current iort_node_get_id() users (ie iort_iommu_configure())
-to it. No functional change intended.
-
-Then in subsequent patches you can retrieve the ITS device id for
-platform devices through it.
-
-Code is in your series, you just have to reshuffle it slightly.
-
-> >> Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >> Suggested-by: Tomasz Nowicki <tn@semihalf.com>
-> >> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> >> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> >> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> >> Cc: Sinan Kaya <okaya@codeaurora.org>
-> >> Cc: Tomasz Nowicki <tn@semihalf.com>
-> >> Cc: Thomas Gleixner <tglx@linutronix.de>
-> >> ---
-> >>  drivers/acpi/arm64/iort.c                     | 56 +++++++++++++++++++++++++++
-> >>  drivers/irqchip/irq-gic-v3-its-platform-msi.c |  4 +-
-> >>  include/linux/acpi_iort.h                     |  8 ++++
-> >>  3 files changed, 67 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-> >> index 069a690..95fd20b 100644
-> >> --- a/drivers/acpi/arm64/iort.c
-> >> +++ b/drivers/acpi/arm64/iort.c
-> >> @@ -30,6 +30,7 @@
-> >>  #define IORT_MSI_TYPE		(1 << ACPI_IORT_NODE_ITS_GROUP)
-> >>  #define IORT_IOMMU_TYPE		((1 << ACPI_IORT_NODE_SMMU) |	\
-> >>  				(1 << ACPI_IORT_NODE_SMMU_V3))
-> >> +#define IORT_TYPE_ANY		(IORT_MSI_TYPE | IORT_IOMMU_TYPE)
-> >>  
-> >>  struct iort_its_msi_chip {
-> >>  	struct list_head	list;
-> >> @@ -406,6 +407,34 @@ static struct acpi_iort_node *iort_node_map_id(struct acpi_iort_node *node,
-> >>  	return NULL;
-> >>  }
-> >>  
-> >> +static
-> >> +struct acpi_iort_node *iort_node_map_platform_id(struct acpi_iort_node *node,
-> >> +						 u32 *id_out, u8 type_mask,
-> >> +						 int index)
-> >> +{
-> >> +	struct acpi_iort_node *parent;
-> >> +	u32 id;
-> >> +
-> >> +	/* step 1: retrieve the initial dev id */
-> >> +	parent = iort_node_get_id(node, &id, IORT_TYPE_ANY, index);
-> >> +	if (!parent)
-> >> +		return NULL;
-> >> +
-> >> +	/*
-> >> +	 * optional step 2: map the initial dev id if its parent is not
-> >> +	 * the target type we wanted, map it again for the use cases such
-> >> +	 * as NC (named component) -> SMMU -> ITS. If the type is matched,
-> >> +	 * return the parent pointer directly.
-> >> +	 */
-> >> +	if (!(IORT_TYPE_MASK(parent->type) & type_mask))
-> >> +		parent = iort_node_map_id(parent, id, id_out, type_mask);
-> >> +	else
-> >> +		if (id_out)
-> > Remove this pointer check.
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Alex Benn?e <alex.bennee@linaro.org>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/include/asm/kvm_arm.h  |  3 ++
+>  arch/arm64/include/asm/kvm_host.h |  7 ++++-
+>  arch/arm64/kvm/debug.c            |  6 ++++
+>  arch/arm64/kvm/hyp/debug-sr.c     | 66 +++++++++++++++++++++++++++++++++++++--
+>  arch/arm64/kvm/hyp/switch.c       | 13 +++++++-
+>  5 files changed, 91 insertions(+), 4 deletions(-)
 > 
-> This was added because of NULL pointer reference, I passed NULL for id_out because I
-> only want to get its parent node, I think we have four options:
-> 
->  - Introduce a new API to get the parent only from the scratch, but it will duplicate the code
->     a lot;
-> 
->  - Don't check the id_out in iort_node_map_platform_id(), and introduce a wrapper and pass the
->    dummy id for iort_node_map_platform_id() :
-> static
-> struct acpi_iort_node *iort_node_get_platform_parent{struct device *dev, u8 type_mask}
-> {
->         struct acpi_iort_node *node, *parent = NULL;
->         int i;
->         u32 dummy_id;
-> 
->         node = iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
->                               iort_match_node_callback, dev);
-> 
->         if (!node)
->                 return NULL;
-> 
->         for (i = 0; i < node->mapping_count; i++) {
->                 /* we just want to get the parent node */
->                 parent = iort_node_map_platform_id(node, &dummy_id,
->                                                    IORT_MSI_TYPE, i);
->                 if (parent)
->                         break;
->         }
-> 
->         return parent;
-> }
-> 
->  - Similar solution as above but don't introduce wrapper, just use dummy_id if
->    iort_node_map_platform_id() is called;
-> 
-> - Use the solution I proposed in this patch.
-> 
-> Please share you suggestion on this :)
+> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+> index 2a2752b5b6aa..6e99978e83bd 100644
+> --- a/arch/arm64/include/asm/kvm_arm.h
+> +++ b/arch/arm64/include/asm/kvm_arm.h
+> @@ -188,6 +188,9 @@
+>  #define CPTR_EL2_DEFAULT	0x000033ff
+>  
+>  /* Hyp Debug Configuration Register bits */
+> +#define MDCR_EL2_TPMS		(1 << 14)
+> +#define MDCR_EL2_E2PB_MASK	(UL(0x3))
+> +#define MDCR_EL2_E2PB_SHIFT	(UL(12))
+>  #define MDCR_EL2_TDRA		(1 << 11)
+>  #define MDCR_EL2_TDOSA		(1 << 10)
+>  #define MDCR_EL2_TDA		(1 << 9)
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index e5050388e062..443b387021f2 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -229,7 +229,12 @@ struct kvm_vcpu_arch {
+>  
+>  	/* Pointer to host CPU context */
+>  	kvm_cpu_context_t *host_cpu_context;
+> -	struct kvm_guest_debug_arch host_debug_state;
+> +	struct {
+> +		/* {Break,watch}point registers */
+> +		struct kvm_guest_debug_arch regs;
+> +		/* Statistical profiling extension */
+> +		u64 pmscr_el1;
+> +	} host_debug_state;
+>  
+>  	/* VGIC state */
+>  	struct vgic_cpu vgic_cpu;
+> diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
+> index 47e5f0feaee8..dbadfaf850a7 100644
+> --- a/arch/arm64/kvm/debug.c
+> +++ b/arch/arm64/kvm/debug.c
+> @@ -95,6 +95,7 @@ void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu)
+>   *  - Performance monitors (MDCR_EL2_TPM/MDCR_EL2_TPMCR)
+>   *  - Debug ROM Address (MDCR_EL2_TDRA)
+>   *  - OS related registers (MDCR_EL2_TDOSA)
+> + *  - Statistical profiler (MDCR_EL2_TPMS/MDCR_EL2_E2PB)
+>   *
+>   * Additionally, KVM only traps guest accesses to the debug registers if
+>   * the guest is not actively using them (see the KVM_ARM64_DEBUG_DIRTY
+> @@ -110,8 +111,13 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
+>  
+>  	trace_kvm_arm_setup_debug(vcpu, vcpu->guest_debug);
+>  
+> +	/*
+> +	 * This also clears MDCR_EL2_E2PB_MASK to disable guest access
+> +	 * to the profiling buffer.
+> +	 */
+>  	vcpu->arch.mdcr_el2 = __this_cpu_read(mdcr_el2) & MDCR_EL2_HPMN_MASK;
+>  	vcpu->arch.mdcr_el2 |= (MDCR_EL2_TPM |
+> +				MDCR_EL2_TPMS |
 
-I see. I would like to change the IORT mapping API functions to always pass
-in an argument:
+This is RES0 on CPUs that do not implement SPE. Can we make this
+conditional on SPE being available?
 
-struct iort_idmap {
-	struct acpi_iort_node *parent;
-	u32 id;
-};
+>  				MDCR_EL2_TPMCR |
+>  				MDCR_EL2_TDRA |
+>  				MDCR_EL2_TDOSA);
+> diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
+> index 4ba5c9095d03..f5154ed3da6c 100644
+> --- a/arch/arm64/kvm/hyp/debug-sr.c
+> +++ b/arch/arm64/kvm/hyp/debug-sr.c
+> @@ -65,6 +65,66 @@
+>  	default:	write_debug(ptr[0], reg, 0);			\
+>  	}
+>  
+> +#define PMSCR_EL1		sys_reg(3, 0, 9, 9, 0)
+> +
+> +#define PMBLIMITR_EL1		sys_reg(3, 0, 9, 10, 0)
+> +#define PMBLIMITR_EL1_E		BIT(0)
+> +
+> +#define PMBIDR_EL1		sys_reg(3, 0, 9, 10, 7)
+> +#define PMBIDR_EL1_P		BIT(4)
+> +
+> +#define psb_csync()		asm volatile("hint #17")
 
-and return an int, because current functions (eg iort_node_map_rid())
-return a parent IORT node but also the mapped id as a value-result
-and that's not easy to follow (also Sinan raised this point which I
-think it is fair).
+Cute... ;-)
 
-I think we'd better postpone this change to next cycle, so you can
-leave the pointer check:
+> +
+> +static void __hyp_text __debug_save_spe_vhe(u64 *pmscr_el1)
+> +{
+> +	/* The vcpu can run. but it can't hide. */
+> +}
+> +
+> +static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
+> +{
+> +	u64 reg;
+> +
+> +	/* SPE present on this CPU? */
+> +	if (!cpuid_feature_extract_unsigned_field(read_sysreg(id_aa64dfr0_el1),
+> +						  ID_AA64DFR0_PMSVER_SHIFT))
+> +		return;
+> +
+> +	/* Yes; is it owned by EL3? */
+> +	reg = read_sysreg_s(PMBIDR_EL1);
+> +	if (reg & PMBIDR_EL1_P)
+> +		return;
+> +
+> +	/* No; is the host actually using the thing? */
+> +	reg = read_sysreg_s(PMBLIMITR_EL1);
+> +	if (!(reg & PMBLIMITR_EL1_E))
+> +		return;
+> +
+> +	/* Yes; save the control register and disable data generation */
+> +	*pmscr_el1 = read_sysreg_s(PMSCR_EL1);
+> +	write_sysreg_s(0, PMSCR_EL1);
+> +	isb();
+> +
+> +	/* Now drain all buffered data to memory */
+> +	psb_csync();
+> +	dsb(nsh);
 
-if (id_out)
+So let's hope that nobody will build a non-VHE, SPE capable system.
+Because this feels like hitting the brakes each time we enter the guest
+(if SPE is in use, that is...).
 
-I will clean this up later, basically what we would end up doing to just
-retrieve the parent pointer would be the IORT equivalent of what we have
-in DT:
+> +}
+> +
+> +static hyp_alternate_select(__debug_save_spe,
+> +			    __debug_save_spe_nvhe, __debug_save_spe_vhe,
+> +			    ARM64_HAS_VIRT_HOST_EXTN);
+> +
+> +static void __hyp_text __debug_restore_spe(u64 pmscr_el1)
+> +{
+> +	if (!pmscr_el1)
+> +		return;
+> +
+> +	/* The host page table is installed, but not yet synchronised */
+> +	isb();
 
-of_parse_phandle()
-  -> __of_parse_phandle_with_args() #we call it with cell_count == 0
+I believe you can avoid that on VHE (host page tables haven't changed).
+Also, if you now depend on the debug restore being run after the rest of
+the sysregs, please add a comment in switch.c::__kvm_vcpu_run so that we
+remember about that dependency.
 
+> +
+> +	/* Re-enable data generation */
+> +	write_sysreg_s(pmscr_el1, PMSCR_EL1);
 
-at the end of the day it is just to make code easier to follow, since it
-is functions internal to IORT compilation unit it is ok for now to leave
-it as-is.
+Same thing here, as we never disabled SPE the first place on VHE (and
+we're probably only writing zeroes there).
+
+> +}
+> +
+>  void __hyp_text __debug_save_state(struct kvm_vcpu *vcpu,
+>  				   struct kvm_guest_debug_arch *dbg,
+>  				   struct kvm_cpu_context *ctxt)
+> @@ -118,13 +178,15 @@ void __hyp_text __debug_cond_save_host_state(struct kvm_vcpu *vcpu)
+>  	    (vcpu->arch.ctxt.sys_regs[MDSCR_EL1] & DBG_MDSCR_MDE))
+>  		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
+>  
+> -	__debug_save_state(vcpu, &vcpu->arch.host_debug_state,
+> +	__debug_save_state(vcpu, &vcpu->arch.host_debug_state.regs,
+>  			   kern_hyp_va(vcpu->arch.host_cpu_context));
+> +	__debug_save_spe()(&vcpu->arch.host_debug_state.pmscr_el1);
+>  }
+>  
+>  void __hyp_text __debug_cond_restore_host_state(struct kvm_vcpu *vcpu)
+>  {
+> -	__debug_restore_state(vcpu, &vcpu->arch.host_debug_state,
+> +	__debug_restore_spe(vcpu->arch.host_debug_state.pmscr_el1);
+> +	__debug_restore_state(vcpu, &vcpu->arch.host_debug_state.regs,
+>  			      kern_hyp_va(vcpu->arch.host_cpu_context));
+>  
+>  	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 75e83dd40d43..1ee5b06d81e5 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -103,7 +103,13 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+>  static void __hyp_text __deactivate_traps_vhe(void)
+>  {
+>  	extern char vectors[];	/* kernel exception vectors */
+> +	u64 mdcr_el2 = read_sysreg(mdcr_el2);
+>  
+> +	mdcr_el2 &= MDCR_EL2_HPMN_MASK |
+> +		    MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT |
+> +		    MDCR_EL2_TPMS;
+> +
+> +	write_sysreg(mdcr_el2, mdcr_el2);
+>  	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
+>  	write_sysreg(CPACR_EL1_FPEN, cpacr_el1);
+>  	write_sysreg(vectors, vbar_el1);
+> @@ -111,6 +117,12 @@ static void __hyp_text __deactivate_traps_vhe(void)
+>  
+>  static void __hyp_text __deactivate_traps_nvhe(void)
+>  {
+> +	u64 mdcr_el2 = read_sysreg(mdcr_el2);
+> +
+> +	mdcr_el2 &= MDCR_EL2_HPMN_MASK;
+> +	mdcr_el2 |= MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT;
+
+Same remark as above. I'm not completely confident writing new bits to
+registers that do not necessarily implement the feature.
+
+> +
+> +	write_sysreg(mdcr_el2, mdcr_el2);
+>  	write_sysreg(HCR_RW, hcr_el2);
+>  	write_sysreg(CPTR_EL2_DEFAULT, cptr_el2);
+>  }
+> @@ -132,7 +144,6 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
+>  
+>  	__deactivate_traps_arch()();
+>  	write_sysreg(0, hstr_el2);
+> -	write_sysreg(read_sysreg(mdcr_el2) & MDCR_EL2_HPMN_MASK, mdcr_el2);
+>  	write_sysreg(0, pmuserenr_el0);
+>  }
+>  
+> 
 
 Thanks,
-Lorenzo
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
