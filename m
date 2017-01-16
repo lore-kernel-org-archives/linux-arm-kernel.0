@@ -1,40 +1,43 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 16 Jan 2017 21:26:05 +0900
-Subject: [PATCH v3 2/4] PM / devfreq: exynos-ppmu: Show the registred device
- for ppmu device
-In-Reply-To: <1484569567-29810-1-git-send-email-cw00.choi@samsung.com>
-References: <1484569567-29810-1-git-send-email-cw00.choi@samsung.com>
- <CGME20170116122609epcas5p37255926620af7c0db7373bb8d08a756c@epcas5p3.samsung.com>
-Message-ID: <1484569567-29810-3-git-send-email-cw00.choi@samsung.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Mon, 16 Jan 2017 13:28:07 +0100
+Subject: [PATCH 04/10] sata: hardreset: retry if phys link is down
+In-Reply-To: <20170115231049.GC14446@mtj.duckdns.org>
+References: <1484311084-31547-1-git-send-email-bgolaszewski@baylibre.com>
+ <1484311084-31547-5-git-send-email-bgolaszewski@baylibre.com>
+ <20170115231049.GC14446@mtj.duckdns.org>
+Message-ID: <CAMpxmJUxSmNwGn+gEDZN0njnbMhmG4=1Oc1p56O7KiToBjp_FQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch just adds the simple log to show the PPMU device's registration
-during the kernel booting.
+2017-01-16 0:10 GMT+01:00 Tejun Heo <tj@kernel.org>:
+> Hello,
+>
+> On Fri, Jan 13, 2017 at 01:37:58PM +0100, Bartosz Golaszewski wrote:
+>> The sata core driver already retries to resume the link because some
+>> controllers ignore writes to the SControl register.
+>>
+>> We have a use case with the da850 SATA controller where at PLL0
+>> frequency of 456MHz (needed to properly service the LCD controller)
+>> the chip becomes unstable and the hardreset operation is ignored the
+>> first time 50% of times.
+>>
+>> Retrying just the resume operation doesn't work - we need to issue
+>> the phy/wake reset again to make it work.
+>>
+>> If ata_phys_link_offline() returns true in sata_link_hardreset(),
+>> retry a couple times before really giving up.
+>
+> I think it'd be better to implement the driver specific implementation
+> rather than changing the behavior for everybody.
+>
+> Thanks.
+>
 
-Cc: Kukjin Kim <kgene@kernel.org>
-Cc: Krzysztof Kozlowski <krzk@kernel.org>
-Cc: Javier Martinez Canillas <javier@osg.samsung.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-samsung-soc at vger.kernel.org
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
----
- drivers/devfreq/event/exynos-ppmu.c | 3 +++
- 1 file changed, 3 insertions(+)
+For v2 I created a new ahci-locally exported function:
+ahci_do_hardreset() that allows to retrieve the online state of the
+link and used it in the da850-specific hardreset implementation.
 
-diff --git a/drivers/devfreq/event/exynos-ppmu.c b/drivers/devfreq/event/exynos-ppmu.c
-index fb3706faf5bd..9b7350935b73 100644
---- a/drivers/devfreq/event/exynos-ppmu.c
-+++ b/drivers/devfreq/event/exynos-ppmu.c
-@@ -643,6 +643,9 @@ static int exynos_ppmu_probe(struct platform_device *pdev)
- 				"failed to add devfreq-event device\n");
- 			return PTR_ERR(edev[i]);
- 		}
-+
-+		pr_info("exynos-ppmu: new PPMU device registered %s (%s)\n",
-+			dev_name(&pdev->dev), desc[i].name);
- 	}
- 
- 	clk_prepare_enable(info->ppmu.clk);
--- 
-1.9.1
+Hope that'll be good.
+
+Thanks,
+Bartosz Golaszewski
