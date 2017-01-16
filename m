@@ -1,205 +1,95 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Mon, 16 Jan 2017 17:09:13 +0100
-Subject: [PATCH v1 2/2] arm: dts: mt2701: add nor flash node
-In-Reply-To: <20170116094032.6f471f11@bbrezillon>
-References: <1484291609-20195-1-git-send-email-guochun.mao@mediatek.com>
- <1484291609-20195-3-git-send-email-guochun.mao@mediatek.com>
- <20170113151747.6bc85245@bbrezillon>
- <d7b866ad-5b2f-62d3-3aa3-6fa42803d625@gmail.com>
- <b850b751-1d8d-0053-cf1f-d5314542e5c3@gmail.com>
- <20170113172825.75d545a3@bbrezillon>
- <86c997be-f500-eaa1-3ba5-d21cff6223b7@gmail.com>
- <20170113175628.1793f433@bbrezillon>
- <0fafcd8d-cf99-de6b-728f-5e3637810b68@gmail.com>
- <20170114092958.022f2fc8@bbrezillon>
- <e7fa1542-f0e2-0e45-23b3-25d6491ae40d@gmail.com>
- <20170116094032.6f471f11@bbrezillon>
-Message-ID: <e01fba49-2478-5abe-0b47-6b5c322ada9c@gmail.com>
+From: a.aubert@overkiz.com (Antoine Aubert)
+Date: Mon, 16 Jan 2017 17:11:12 +0100
+Subject: USB: OHCI: high softirq load
+In-Reply-To: <20170116144717.GC19736@localhost>
+References: <bd83e3b2-b329-3635-2917-0ffe61d3535f@overkiz.com>
+ <20170116100220.0b00658e@bbrezillon>
+ <ad8a54c3-c83d-109f-5cc5-7e77e9deff12@overkiz.com>
+ <d49db4ac-fbeb-23ce-d48c-bd087c314328@overkiz.com>
+ <20170116121403.4a3a7b17@bbrezillon> <20170116144717.GC19736@localhost>
+Message-ID: <42608a66-d92d-e145-65ee-af6ef44e8a7d@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/16/2017 09:40 AM, Boris Brezillon wrote:
-> On Sun, 15 Jan 2017 01:23:48 +0100
-> Marek Vasut <marek.vasut@gmail.com> wrote:
-> 
->> On 01/14/2017 09:29 AM, Boris Brezillon wrote:
->>> On Fri, 13 Jan 2017 18:33:40 +0100
->>> Marek Vasut <marek.vasut@gmail.com> wrote:
->>>   
->>>> On 01/13/2017 05:56 PM, Boris Brezillon wrote:  
->>>>> On Fri, 13 Jan 2017 17:44:12 +0100
->>>>> Marek Vasut <marek.vasut@gmail.com> wrote:
->>>>>     
->>>>>> On 01/13/2017 05:28 PM, Boris Brezillon wrote:    
->>>>>>> On Fri, 13 Jan 2017 17:13:55 +0100
->>>>>>> Marek Vasut <marek.vasut@gmail.com> wrote:
->>>>>>>       
->>>>>>>> On 01/13/2017 04:12 PM, Matthias Brugger wrote:      
->>>>>>>>>
->>>>>>>>>
->>>>>>>>> On 13/01/17 15:17, Boris Brezillon wrote:        
->>>>>>>>>> On Fri, 13 Jan 2017 15:13:29 +0800
->>>>>>>>>> Guochun Mao <guochun.mao@mediatek.com> wrote:
->>>>>>>>>>        
->>>>>>>>>>> Add Mediatek nor flash node.
->>>>>>>>>>>
->>>>>>>>>>> Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
->>>>>>>>>>> ---
->>>>>>>>>>>  arch/arm/boot/dts/mt2701-evb.dts |   25 +++++++++++++++++++++++++
->>>>>>>>>>>  arch/arm/boot/dts/mt2701.dtsi    |   12 ++++++++++++
->>>>>>>>>>>  2 files changed, 37 insertions(+)
->>>>>>>>>>>
->>>>>>>>>>> diff --git a/arch/arm/boot/dts/mt2701-evb.dts
->>>>>>>>>>> b/arch/arm/boot/dts/mt2701-evb.dts
->>>>>>>>>>> index 082ca88..85e5ae8 100644
->>>>>>>>>>> --- a/arch/arm/boot/dts/mt2701-evb.dts
->>>>>>>>>>> +++ b/arch/arm/boot/dts/mt2701-evb.dts
->>>>>>>>>>> @@ -24,6 +24,31 @@
->>>>>>>>>>>      };
->>>>>>>>>>>  };
->>>>>>>>>>>
->>>>>>>>>>> +&nor_flash {
->>>>>>>>>>> +    pinctrl-names = "default";
->>>>>>>>>>> +    pinctrl-0 = <&nor_pins_default>;
->>>>>>>>>>> +    status = "okay";
->>>>>>>>>>> +    flash at 0 {
->>>>>>>>>>> +        compatible = "jedec,spi-nor";
->>>>>>>>>>> +        reg = <0>;
->>>>>>>>>>> +    };
->>>>>>>>>>> +};
->>>>>>>>>>> +
->>>>>>>>>>> +&pio {
->>>>>>>>>>> +    nor_pins_default: nor {
->>>>>>>>>>> +        pins1 {
->>>>>>>>>>> +            pinmux = <MT2701_PIN_240_EXT_XCS__FUNC_EXT_XCS>,
->>>>>>>>>>> +                 <MT2701_PIN_241_EXT_SCK__FUNC_EXT_SCK>,
->>>>>>>>>>> +                 <MT2701_PIN_239_EXT_SDIO0__FUNC_EXT_SDIO0>,
->>>>>>>>>>> +                 <MT2701_PIN_238_EXT_SDIO1__FUNC_EXT_SDIO1>,
->>>>>>>>>>> +                 <MT2701_PIN_237_EXT_SDIO2__FUNC_EXT_SDIO2>,
->>>>>>>>>>> +                 <MT2701_PIN_236_EXT_SDIO3__FUNC_EXT_SDIO3>;
->>>>>>>>>>> +            drive-strength = <MTK_DRIVE_4mA>;
->>>>>>>>>>> +            bias-pull-up;
->>>>>>>>>>> +        };
->>>>>>>>>>> +    };
->>>>>>>>>>> +};
->>>>>>>>>>> +
->>>>>>>>>>>  &uart0 {
->>>>>>>>>>>      status = "okay";
->>>>>>>>>>>  };
->>>>>>>>>>> diff --git a/arch/arm/boot/dts/mt2701.dtsi
->>>>>>>>>>> b/arch/arm/boot/dts/mt2701.dtsi
->>>>>>>>>>> index bdf8954..1eefce4 100644
->>>>>>>>>>> --- a/arch/arm/boot/dts/mt2701.dtsi
->>>>>>>>>>> +++ b/arch/arm/boot/dts/mt2701.dtsi
->>>>>>>>>>> @@ -227,6 +227,18 @@
->>>>>>>>>>>          status = "disabled";
->>>>>>>>>>>      };
->>>>>>>>>>>
->>>>>>>>>>> +    nor_flash: spi at 11014000 {
->>>>>>>>>>> +        compatible = "mediatek,mt2701-nor",
->>>>>>>>>>> +                 "mediatek,mt8173-nor";        
->>>>>>>>>>
->>>>>>>>>> Why define both here? Is "mediatek,mt8173-nor" really providing a
->>>>>>>>>> subset of the features supported by "mediatek,mt2701-nor"?
->>>>>>>>>>        
->>>>>>>>>
->>>>>>>>> I think even if the ip block is the same, we should provide both
->>>>>>>>> bindings, just in case in the future we find out that mt2701 has some
->>>>>>>>> hidden bug, feature or bug-feature. This way even if we update the
->>>>>>>>> driver, we stay compatible with older device tree blobs in the wild.
->>>>>>>>>
->>>>>>>>> We can drop the mt2701-nor in the bindings definition if you want.       
->>>>>>>
->>>>>>> Oh, sorry, I misunderstood. What I meant is that if you want to
->>>>>>> list/support all possible compatibles, maybe you should just put one
->>>>>>> compatible in your DT and patch your driver (+ binding doc) to define
->>>>>>> all of them.      
->>>>>>
->>>>>> Uh, what ? I lost you here :-)  
+Thanks Johan, you save my day.
+
+Indeed, soft irq coming from ftdi_sio updates, with very high rate.
+(dyndbg='file drivers/usb/* +p')
+
+reducing latency timer = reducing sofirq.
+
+Problem solved.
+
+Antoine Aubert
+a.aubert at overkiz.com
+
+Le 16/01/2017 ? 15:47, Johan Hovold a ?crit :
+> [ +CC: linux-usb ]
+>
+> On Mon, Jan 16, 2017 at 12:14:03PM +0100, Boris Brezillon wrote:
+>> On Mon, 16 Jan 2017 11:54:23 +0100
+>> Antoine Aubert <a.aubert@overkiz.com> wrote:
+>>
+>>> Also, I made a big misunderstanding
 >>>
->>> I mean adding a new entry in the mtk_nor_of_ids table (in
->>> mtk-quadspi.c) so that the mediatek,mt2701-nor compatible string can be
->>> matched directly, and you won't need to define 2 compatible strings in
->>> your device tree.  
+>>> With EHCI + OHCI = high level of softirq (USB2.0)
+>> Well, the number of irqs and softirqs are likely to be related (you
+>> usually trigger a softirq after you received an hardirq).
 >>
->> But then you grow the table in the driver, is that what we want if we
->> can avoid that ?
-> 
-> The space you save by not growing the mtk_nor_of_ids table is lost in
-> your dtbs, so I'm not sure the size argument is relevant here. Also,
-> note that distros are shipping a lot of dtbs, and you're likely to have
-> several boards based on the mt2701 SoC, so, for this specific use case,
-> it's better to make the in-driver of-id table grow than specifying 2
-> compatibles in the DT. But as I said, I'm not sure we should rely on
-> this argument to decide which approach to choose (we're talking about a
-> few bytes here).
-> 
+>>> OHCI only = normal level
+>> What about EHCI only? And what happens if you only plug 1 device?
+>> Please share the content of /proc/interrupts (and everything you think
+>> is relevant) for each of these cases.
 >>
->>>>>>    
->>>>>>>> This exactly. We should have a DT compat in the form:
->>>>>>>> compatible = "vendor,<soc>-block", "vendor,<oldest-compat-soc>-block";
->>>>>>>> Then if we find a problem in the future, we can match on the
->>>>>>>> "vendor,<soc>-block" and still support the old DTs.      
->>>>>>>
->>>>>>> Not sure it's only in term of whose IP appeared first. My understanding
->>>>>>> is that it's a way to provide inheritance. For example:
->>>>>>>
->>>>>>> 	"<soc-vendor>,<ip-version>", "<ip-vendor>,<ip-version>";
->>>>>>>
->>>>>>> or
->>>>>>>
->>>>>>> 	"<soc-vendor>,<full-featured-ip-version>","<soc-vendor>,<basic-feature-ip-version>";
->>>>>>>
->>>>>>> BTW, which one is the oldest between mt8173 and mt2701? :-)      
->>>>>>
->>>>>> And that's another thing and I agree with you, but I don't think that's
->>>>>> what we're discussing in this thread. But (!), OT, I think we should
->>>>>> codify the rules in Documentation/ . This discussion came up multiple
->>>>>> times recently.
->>>>>>
->>>>>> And my question still stands, what do we put into the DT here, IMO
->>>>>> compatible = "mediatek,mt2701-nor", "mediatek,mt8173-nor";    
->>>>>
->>>>> I'd say
->>>>>
->>>>> 	compatible = "mediatek,mt8173-nor";
->>>>>
->>>>> because both compatible are referring to very specific IP version. It's
->>>>> not the same as    
+>>> Le 16/01/2017 ? 11:31, Antoine Aubert a ?crit :
+>>>> Thx for your answer Boris
 >>>>
->>>> But then you don't have the ability to handle a block in this particular
->>>> SoC in case there's a bug found in it in the future,
->>>> so IMO it should be:
->>>>
->>>> compatible = "mediatek,mt2701-nor", "mediatek,mt8173-nor";  
->>>
->>> Sorry again, I meant
->>>
->>> 	compatible = "mediatek,mt2701-nor";
->>>   
->>>>  
->>>>> 	compatible = "mediatek,mt8173-nor", "mediatek,mt81xx-nor";    
->>>>
->>>> This doesn't look right, since here we add two new compatibles ...  
->>>
->>> That was just an example to describe how compatible inheritance works
->>> (at least that's my understanding of it), it does not apply to this
->>> particular use case.  
->>
->> Well this is OK I guess, but then you can also use "mediatek,mt8173-nor"
->> as the oldest supported compatible and be done with it, no ? It looks a
->> bit crappy though, I admit that ...
->>
-> 
-> Let's stop bikeshedding and wait for DT maintainers feedback
-> before taking a decision ;-).
-
-+1 :)
-
-> Rob, Mark, any opinion?
-> 
-
-
--- 
-Best regards,
-Marek Vasut
+>>>> Le 16/01/2017 ? 10:02, Boris Brezillon a ?crit :  
+>>>>> Hi Antoine,
+>>>>>
+>>>>> On Mon, 16 Jan 2017 08:45:58 +0100
+>>>>> Antoine Aubert <a.aubert@overkiz.com> wrote:
+>>>>>  
+>>>>>> Hi,
+>>>>>>
+>>>>>> Im working on a AT91SAM9G25cu board
+>>>>>> (arch/arm/boot/dts/at91-kizboxmini.dts). We use linux-4.1.31, and when
+>>>>>> OHCI is enabled, I got some wired effects.  
+>>>>> Can you test on a more recent kernel (4.9 or 4.10-rc4)?  
+>>>> I'll give a try, just need little time ;)  
+>>>>>> eg with 3 FTDI pluged, interrupts: more than 3.5k/s, cpu softirq > 24%,
+>>>>>> loadavg > 0.5  
+>>>>> Can you check which interrupt is triggered (cat /proc/interrupts),  
+>>>> cat /proc/interrupts
+>>>>            CPU0      
+>>>>  16:       2286  atmel-aic   1 Level     pmc, at91_tick, at91_rtc, ttyS0
+>>>>  17:          0       PMC  17 Level     main_rc_osc
+>>>>  18:          0       PMC   0 Level     main_osc
+>>>>  19:          0       PMC  16 Level     mainck
+>>>>  20:          0       PMC   1 Level     clk-plla
+>>>>  21:          0       PMC   6 Level     clk-utmi
+>>>>  22:          0       PMC   3 Level     clk-master
+>>>>  23:     945527  atmel-aic  17 Level     tc_clkevt
+>>>>  24:      21815  atmel-aic  20 Level     at_hdmac
+>>>>  25:          0  atmel-aic  21 Level     at_hdmac
+>>>>  30:     120299  atmel-aic  24 Level     eth0
+>>>>  31:   22783651  atmel-aic  22 Level     ehci_hcd:usb1, ohci_hcd:usb2
+>>>>  99:          0      GPIO  16 Edge      PB_RST
+>>>> 100:          0      GPIO  17 Edge      PB_PROG
+>>>> Err:          0
+> Note that the ftdi driver uses a low-latency setting by default which
+> implies that the device sends a status update every millisecond. Hence,
+> the 1k interrupts per second (per device) while the port is open is
+> expected.
+>
+> You can disable the low-latency behaviour using setserial:
+>
+> 	setserial /dev/ttyUSB0 ^low_latency
+>
+> and see the number of interrupts drop to 1/16th. This can then be
+> reduced further by changing the latency_timer from its
+> (non-low-latency) default of 16 ms, for example:
+>
+> 	echo 64 >/sys/bus/usb-serial/devices/ttyUSB0/latency_timer
+>
+> Johan
