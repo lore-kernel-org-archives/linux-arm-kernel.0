@@ -1,44 +1,63 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 16 Jan 2017 17:56:52 +0100
-Subject: [PATCH v3 2/13] mmc: sunxi: Gate the clock when rate is 0
-In-Reply-To: <cover.a06ce1672d7a72ee7f9bbca46fdd223edd6b2313.1484585798.git-series.maxime.ripard@free-electrons.com>
-References: <cover.a06ce1672d7a72ee7f9bbca46fdd223edd6b2313.1484585798.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <1f006fd86d1d9ad5eab0c0c9e435003055466a54.1484585798.git-series.maxime.ripard@free-electrons.com>
+Date: Mon, 16 Jan 2017 17:56:50 +0100
+Subject: [PATCH v3 0/13] arm64: allwinner: a64: Enable MMC support
+Message-ID: <cover.a06ce1672d7a72ee7f9bbca46fdd223edd6b2313.1484585798.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MMC core assumes that the code will gate the clock when the bus
-frequency is set to 0, which we've been ignoring so far.
+Hi,
 
-Handle that.
+Here is a new attempt at getting the MMC controllers running, following the
+work done by Andre.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/mmc/host/sunxi-mmc.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+This has been tested on a board with one SDIO device (a Marvell WiFi chip)
+and a Kingston eMMC with 1.8V IOs.
 
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index ab4324e6eb74..019f95e8e7c5 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -765,6 +765,9 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 	if (ret)
- 		return ret;
- 
-+	if (!ios->clock)
-+		return 0;
-+
- 	/* 8 bit DDR requires a higher module clock */
- 	if (ios->timing == MMC_TIMING_MMC_DDR52 &&
- 	    ios->bus_width == MMC_BUS_WIDTH_8)
-@@ -882,7 +885,7 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 	mmc_writel(host, REG_GCTRL, rval);
- 
- 	/* set up clock */
--	if (ios->clock && ios->power_mode) {
-+	if (ios->power_mode) {
- 		host->ferror = sunxi_mmc_clk_set_rate(host, ios);
- 		/* Android code had a usleep_range(50000, 55000); here */
- 	}
+For SDIO, the HS DDR mode works just fine. That serie also enables the
+SDR104 mode to work on the devices that are capable of this.
+
+For the eMMC, HS200 with the voltage switch works. HS400 doesn't at the
+moment, but since it's significantly more complex, and at the same time
+Allwinner recommends to limit its frequency to 100MHz, this doesn't have
+any benefits. If there's any at some point, this can be added later.
+
+Let me know what you think,
+Maxime
+
+Changes from v2:
+  - Enabled SDR104, limited the frequency to 150MHz. 200MHz was too high.
+  - Added more fixes to the gating and frequency rate change sequence
+  - Added one more patch to mask DATA0 when updating the clock that was
+    needed to get SDR104 to run
+  - Added the patches to enable it on a few boards done by Andre
+  - Amended the comments as suggested by Andre.
+  - Added some tags
+
+Andre Przywara (4):
+  arm64: allwinner: a64: Add MMC nodes
+  arm64: allwinner: pine64: add MMC support
+  arm64: allwinner: a64: add UART1 pin nodes
+  arm64: allwinner: add BananaPi-M64 support
+
+Maxime Ripard (9):
+  mmc: sunxi: Fix clock frequency change sequence
+  mmc: sunxi: Gate the clock when rate is 0
+  mmc: sunxi: Always set signal delay to 0 for A64
+  mmc: sunxi: Enable the new timings for the A64 MMC controllers
+  mmc: sunxi: Mask DATA0 when updating the clock
+  mmc: sunxi: Add EMMC (MMC2) controller compatible
+  mmc: sunxi: Add more debug messages
+  arm64: allwinner: a64: Add MMC pinctrl nodes
+  arm64: allwinner: a64: Increase the MMC max frequency
+
+ arch/arm64/boot/dts/allwinner/Makefile                    |   1 +-
+ arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 120 +++++++-
+ arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts       |  20 +-
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi             |  77 ++++-
+ drivers/mmc/host/sunxi-mmc.c                              | 101 +++---
+ 5 files changed, 278 insertions(+), 41 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+
+base-commit: bc34c1af0a280e27eafe3f86b9ad87fe0c9ea715
 -- 
 git-series 0.8.11
