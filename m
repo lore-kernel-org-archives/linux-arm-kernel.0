@@ -1,165 +1,101 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Mon, 16 Jan 2017 13:14:06 -0700
-Subject: [PATCH V7 10/10] arm/arm64: KVM: add guest SEA support
-In-Reply-To: <98ed774f-fcc1-e10d-05ef-ebea52e916d2@arm.com>
-References: <1484244924-24786-1-git-send-email-tbaicar@codeaurora.org>
- <1484244924-24786-11-git-send-email-tbaicar@codeaurora.org>
- <98ed774f-fcc1-e10d-05ef-ebea52e916d2@arm.com>
-Message-ID: <3175d58f-1820-32c1-acf7-1f591619a21f@codeaurora.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 16 Jan 2017 22:30:49 +0200
+Subject: [PATCH v1 1/7] dt-bindings: display: add STM32 LTDC driver
+In-Reply-To: <1484573344-11609-2-git-send-email-yannick.fertre@st.com>
+References: <1484573344-11609-1-git-send-email-yannick.fertre@st.com>
+ <1484573344-11609-2-git-send-email-yannick.fertre@st.com>
+Message-ID: <2080174.sm3cyM9MmB@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Marc,
+Hi Yannick,
 
+Thank you for the patch.
 
-On 1/16/2017 4:58 AM, Marc Zyngier wrote:
-> Hi Tyler,
->
-> On 12/01/17 18:15, Tyler Baicar wrote:
->> Currently external aborts are unsupported by the guest abort
->> handling. Add handling for SEAs so that the host kernel reports
->> SEAs which occur in the guest kernel.
->>
->> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
->> ---
->>   arch/arm/include/asm/kvm_arm.h       |  1 +
->>   arch/arm/include/asm/system_misc.h   |  5 +++++
->>   arch/arm/kvm/mmu.c                   | 18 ++++++++++++++++--
->>   arch/arm64/include/asm/kvm_arm.h     |  1 +
->>   arch/arm64/include/asm/system_misc.h |  2 ++
->>   arch/arm64/mm/fault.c                | 13 +++++++++++++
->>   6 files changed, 38 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
->> index e22089f..33a77509 100644
->> --- a/arch/arm/include/asm/kvm_arm.h
->> +++ b/arch/arm/include/asm/kvm_arm.h
->> @@ -187,6 +187,7 @@
->>   #define FSC_FAULT	(0x04)
->>   #define FSC_ACCESS	(0x08)
->>   #define FSC_PERM	(0x0c)
->> +#define FSC_EXTABT	(0x10)
->>   
->>   /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
->>   #define HPFAR_MASK	(~0xf)
->> diff --git a/arch/arm/include/asm/system_misc.h b/arch/arm/include/asm/system_misc.h
->> index a3d61ad..ea45d94 100644
->> --- a/arch/arm/include/asm/system_misc.h
->> +++ b/arch/arm/include/asm/system_misc.h
->> @@ -24,4 +24,9 @@ extern unsigned int user_debug;
->>   
->>   #endif /* !__ASSEMBLY__ */
->>   
->> +static inline int handle_guest_sea(unsigned long addr, unsigned int esr)
->> +{
->> +	return -1;
->> +}
->> +
->>   #endif /* __ASM_ARM_SYSTEM_MISC_H */
->> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
->> index e9a5c0e..1152966 100644
->> --- a/arch/arm/kvm/mmu.c
->> +++ b/arch/arm/kvm/mmu.c
->> @@ -29,6 +29,7 @@
->>   #include <asm/kvm_asm.h>
->>   #include <asm/kvm_emulate.h>
->>   #include <asm/virt.h>
->> +#include <asm/system_misc.h>
->>   
->>   #include "trace.h"
->>   
->> @@ -1441,8 +1442,21 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
->>   
->>   	/* Check the stage-2 fault is trans. fault or write fault */
->>   	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
->> -	if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
->> -	    fault_status != FSC_ACCESS) {
->> +
->> +	/* The host kernel will handle the synchronous external abort. There
->> +	 * is no need to pass the error into the guest.
->> +	 */
->> +	if (fault_status == FSC_EXTABT) {
->> +		if(handle_guest_sea((unsigned long)fault_ipa,
->> +				    kvm_vcpu_get_hsr(vcpu))) {
->> +			kvm_err("Failed to handle guest SEA, FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
->> +				kvm_vcpu_trap_get_class(vcpu),
->> +				(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
->> +				(unsigned long)kvm_vcpu_get_hsr(vcpu));
-> So there's one thing I don't like here, which is that we just gave the
-> guest a very nice way to pollute the host's kernel log with spurious
-> messages. So I'd rather make it silent, or at the very least rate limited.
-Before this patch, if a guest exits with FSC_EXTABT, then the below 
-print for
-"Unsupported FSC..." would happen. So this print isn't really adding any 
-noise
-that isn't already there. Also, this print would only happen if 
-handle_guest_sea
-fails. If you still think this print should be removed then I will 
-remove it though.
->> +			return -EFAULT;
->> +		}
->> +	} else if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
->> +		   fault_status != FSC_ACCESS) {
->>   		kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
->>   			kvm_vcpu_trap_get_class(vcpu),
->>   			(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
->> diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
->> index 4b5c977..be0efb6 100644
->> --- a/arch/arm64/include/asm/kvm_arm.h
->> +++ b/arch/arm64/include/asm/kvm_arm.h
->> @@ -201,6 +201,7 @@
->>   #define FSC_FAULT	ESR_ELx_FSC_FAULT
->>   #define FSC_ACCESS	ESR_ELx_FSC_ACCESS
->>   #define FSC_PERM	ESR_ELx_FSC_PERM
->> +#define FSC_EXTABT	ESR_ELx_FSC_EXTABT
->>   
->>   /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
->>   #define HPFAR_MASK	(~UL(0xf))
->> diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
->> index e7f3440..27816cb 100644
->> --- a/arch/arm64/include/asm/system_misc.h
->> +++ b/arch/arm64/include/asm/system_misc.h
->> @@ -77,4 +77,6 @@ extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
->>   int register_sea_notifier(struct notifier_block *nb);
->>   void unregister_sea_notifier(struct notifier_block *nb);
->>   
->> +int handle_guest_sea(unsigned long addr, unsigned int esr);
->> +
->>   #endif	/* __ASM_SYSTEM_MISC_H */
->> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
->> index 81039c7..fa8d4d7 100644
->> --- a/arch/arm64/mm/fault.c
->> +++ b/arch/arm64/mm/fault.c
->> @@ -597,6 +597,19 @@ static const char *fault_name(unsigned int esr)
->>   }
->>   
->>   /*
->> + * Handle Synchronous External Aborts that occur in a guest kernel.
->> + */
->> +int handle_guest_sea(unsigned long addr, unsigned int esr)
->> +{
->> +	atomic_notifier_call_chain(&sea_handler_chain, 0, NULL);
->> +
->> +	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
->> +		fault_name(esr), esr, addr);
-> Same here.
-I will remove this print.
->> +
->> +	return 0;
->> +}
->> +
->> +/*
->>    * Dispatch a data abort to the relevant handler.
->>    */
->>   asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
->>
-> Thanks,
->
-> 	M.
-Thanks,
-Tyler
+On Monday 16 Jan 2017 14:28:58 Yannick Fertre wrote:
+> Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
+> ---
+>  .../devicetree/bindings/display/st,ltdc.txt        | 57 ++++++++++++++++++
+>  1 file changed, 57 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/st,ltdc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/display/st,ltdc.txt
+> b/Documentation/devicetree/bindings/display/st,ltdc.txt new file mode
+> 100644
+> index 0000000..20e89da
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/st,ltdc.txt
+> @@ -0,0 +1,57 @@
+> +* STMicroelectronics STM32 lcd-tft display controller
+> +
+> +- st-display-subsystem: Master device for DRM sub-components
+> +  This device must be the parent of all the sub-components and is
+> responsible
+> +  of bind them.
+
+Why do you need this ? At a quick glance the ltdc node should be enough.
+
+> +  Required properties:
+> +  - compatible: "st,display-subsystem"
+> +  - ranges: to allow probing of subdevices
+> +
+> +- ltdc_host: lcd-tft display controller host
+> +  must be a sub-node of st-display-subsystem
+> +  Required properties:
+> +  - compatible: "st,ltdc"
+> +  - reg: Physical base address of the IP registers and length of memory
+> mapped region.
+> +  - clocks: from common clock binding: handle hardware IP needed clocks,
+> the
+> +    number of clocks may depend of the SoC type.
+> +    See ../clocks/clock-bindings.txt for details.
+> +  - clock-names: names of the clocks listed in clocks property in the same
+> +    order.
+
+You need to define the required/optional clocks with their names here. If they 
+vary depending on the SoC, the DT bindings document need to list them for each 
+SoC.
+
+> +  - resets: resets to be used by the device
+> +    See ../reset/reset.txt for details.
+> +  - reset-names: names of the resets listed in resets property in the same
+> +    order.
+> +  Required nodes:
+> +    - Video port for RGB output.
+> +
+> +Example:
+> +
+> +/ {
+> +	...
+> +	soc {
+> +	...
+> +		st-display-subsystem {
+> +			compatible = "st,display-subsystem";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
+> +			dma-ranges;
+> +
+> +			ltdc_host: stm32-ltdc at 40016800 {
+> +				compatible = "st,ltdc";
+> +				reg = <0x40016800 0x200>;
+> +				interrupts = <88>, <89>;
+> +				resets = <&rcc 314>;
+> +				clocks = <&rcc 1 8>;
+> +				clock-names = "clk-lcd";
+> +				status = "disabled";
+> +
+> +				port {
+> +					ltdc_out_rgb: endpoint {
+> +					};
+> +				};
+> +			};
+> +		};
+> +	...
+> +	};
+> +};
 
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Regards,
+
+Laurent Pinchart
