@@ -1,31 +1,37 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 16 Jan 2017 11:34:05 -0200
-Subject: [PATCH 1/3] watchdog: imx2: Only i.MX35 and later have a WMCR
- register
-In-Reply-To: <20170109095039.11979-2-u.kleine-koenig@pengutronix.de>
-References: <20170109095039.11979-1-u.kleine-koenig@pengutronix.de>
- <20170109095039.11979-2-u.kleine-koenig@pengutronix.de>
-Message-ID: <CAOMZO5BH+B5dxNGC-2bNZe-PCqcmOXd=xenmd-pfLKncDp--gg@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 16 Jan 2017 13:34:44 +0000
+Subject: [RFC PATCH 07/10] arm64/sve: Add vector length inheritance control
+In-Reply-To: <20170116122755.GH28060@E107787-LIN>
+References: <1484220369-23970-1-git-send-email-Dave.Martin@arm.com>
+ <1484220369-23970-8-git-send-email-Dave.Martin@arm.com>
+ <20170116122755.GH28060@E107787-LIN>
+Message-ID: <20170116133443.GP3699@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
+On Mon, Jan 16, 2017 at 12:27:55PM +0000, Yao Qi wrote:
+> On 17-01-12 11:26:06, Dave Martin wrote:
+> > Currently the vector length is inherited across both fork() and
+> > exec().
+> > 
+> > Inheritance across fork() is desirable both for creating a copy of
+> > a process (traditional fork) or creating a thread (where we want
+> > all threads to share the same VL by default).
+> > 
+> > Inheritance across exec() is less desirable, because of the ABI
+> > impact of large vector lengths on the size of the signal frame --
+> > when running a new binary, there is no guarantee that the new
+> > binary is compatible with these ABI changes.
+> > 
+> > This flag makes the vector length non-inherited by default.
+> 
+> Can we make vector length inherited across fork but non-inherited
+> across exec by default?
 
-On Mon, Jan 9, 2017 at 7:50 AM, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> Commit 5fe65ce7ccbb ("watchdog: imx2_wdt: Disable power down counter on
-> boot") introduced a write to the WMCR register that doesn't exist on
-> i.MX21, i.MX27 and i.MX31 and so makes the SoC hang during probe.
->
-> So teach the driver to differentiate between these two types. Note that
-> this effectively undoes commit 5fe65ce7ccbb for machines using dt until
-> their dtb is updated accordingly. This is critical iff the bootloader
-> doesn't disable the power down counter and the #WDOG signal actually
-> does something to the machine.
->
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+That is the behaviour: I always inherit across fork/clone, since
+you are still running the same binary after those.
 
-Is it possible for you to try this series and let us know if it fixes
-the mx31 watchdog issue?
+I could word the commit message a bit more clearly here.
 
-Thanks
+Cheers
+---Dave 
