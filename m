@@ -1,75 +1,71 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 16 Jan 2017 17:56:55 +0100
-Subject: [PATCH v3 5/13] mmc: sunxi: Mask DATA0 when updating the clock
+Date: Mon, 16 Jan 2017 17:57:01 +0100
+Subject: [PATCH v3 11/13] arm64: allwinner: pine64: add MMC support
 In-Reply-To: <cover.a06ce1672d7a72ee7f9bbca46fdd223edd6b2313.1484585798.git-series.maxime.ripard@free-electrons.com>
 References: <cover.a06ce1672d7a72ee7f9bbca46fdd223edd6b2313.1484585798.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <c36c2e2289ff3268d4a57b265f23725d882a23ed.1484585798.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <42711bdf28d26d68f5ac6cc47d3f03d76a8ecff6.1484585798.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A64 MMC controllers need DATA0 to be masked while updating the clock,
-otherwise any subsequent command will result in a timeout.
+From: Andre Przywara <andre.przywara@arm.com>
 
+All Pine64 boards connect an micro-SD card slot to the first MMC
+controller.
+Enable the respective DT node and specify the (always-on) regulator
+and card-detect pin.
+As a micro-SD slot does not feature a write-protect switch, we disable
+this feature.
+
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/mmc/host/sunxi-mmc.c | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 20 ++++++++++++++-
+ 1 file changed, 20 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index 51d6388a194e..6bbe61397b7c 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -101,6 +101,7 @@
- 	(SDXC_SOFT_RESET | SDXC_FIFO_RESET | SDXC_DMA_RESET)
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+index cf9105179bcb..c680ed385da3 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+@@ -44,6 +44,8 @@
  
- /* clock control bits */
-+#define SDXC_MASK_DATA0			BIT(31)
- #define SDXC_CARD_CLOCK_ON		BIT(16)
- #define SDXC_LOW_POWER_ON		BIT(17)
+ #include "sun50i-a64.dtsi"
  
-@@ -254,6 +255,9 @@ struct sunxi_mmc_cfg {
- 	/* does the IP block support autocalibration? */
- 	bool can_calibrate;
- 
-+	/* Does DATA0 needs to be masked while the clock is updated */
-+	bool mask_data0;
++#include <dt-bindings/gpio/gpio.h>
 +
- 	bool needs_new_timings;
+ / {
+ 	model = "Pine64";
+ 	compatible = "pine64,pine64", "allwinner,sun50i-a64";
+@@ -55,6 +57,13 @@
+ 	chosen {
+ 		stdout-path = "serial0:115200n8";
+ 	};
++
++	reg_vcc3v3: vcc3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
  };
  
-@@ -657,10 +661,12 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
- 	u32 rval;
- 
- 	rval = mmc_readl(host, REG_CLKCR);
--	rval &= ~(SDXC_CARD_CLOCK_ON | SDXC_LOW_POWER_ON);
-+	rval &= ~(SDXC_CARD_CLOCK_ON | SDXC_LOW_POWER_ON | SDXC_MASK_DATA0);
- 
- 	if (oclk_en)
- 		rval |= SDXC_CARD_CLOCK_ON;
-+	if (host->cfg->mask_data0)
-+		rval |= SDXC_MASK_DATA0;
- 
- 	mmc_writel(host, REG_CLKCR, rval);
- 
-@@ -680,6 +686,11 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
- 		return -EIO;
- 	}
- 
-+	if (host->cfg->mask_data0) {
-+		rval = mmc_readl(host, REG_CLKCR);
-+		mmc_writel(host, REG_CLKCR, rval & ~SDXC_MASK_DATA0);
-+	}
-+
- 	return 0;
- }
- 
-@@ -1081,6 +1092,7 @@ static const struct sunxi_mmc_cfg sun50i_a64_cfg = {
- 	.idma_des_size_bits = 16,
- 	.clk_delays = NULL,
- 	.can_calibrate = true,
-+	.mask_data0 = true,
- 	.needs_new_timings = true,
+ &ehci1 {
+@@ -71,6 +80,17 @@
+ 	bias-pull-up;
  };
  
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins>;
++	vmmc-supply = <&reg_vcc3v3>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
++	cd-inverted;
++	disable-wp;
++	bus-width = <4>;
++	status = "okay";
++};
++
+ &ohci1 {
+ 	status = "okay";
+ };
 -- 
 git-series 0.8.11
