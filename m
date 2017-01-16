@@ -1,87 +1,100 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 16 Jan 2017 10:50:23 -0700
-Subject: [PATCH] coresight: STM: Balance enable/disable
-In-Reply-To: <c59476a6-f2c8-6b00-ca46-d2d2379d44c9@arm.com>
-References: <1484047315-14407-1-git-send-email-suzuki.poulose@arm.com>
- <CANLsYkyO-anR4V411tHFkNBPNy0Vk3DCympLScP9ZC=uJ-UX9g@mail.gmail.com>
- <c59476a6-f2c8-6b00-ca46-d2d2379d44c9@arm.com>
-Message-ID: <CANLsYkwrHiiuH8GLBxV+3cGZn2gkkhAW-Dj8h0xY+ay8HaLgPQ@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 16 Jan 2017 17:50:26 +0000
+Subject: [PATCH v19 06/15] clocksource/drivers/arm_arch_timer: Rework
+ counter frequency detection.
+In-Reply-To: <20161221064603.11830-7-fu.wei@linaro.org>
+References: <20161221064603.11830-1-fu.wei@linaro.org>
+ <20161221064603.11830-7-fu.wei@linaro.org>
+Message-ID: <20170116175025.GJ5908@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 January 2017 at 10:11, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
-> On 13/01/17 16:48, Mathieu Poirier wrote:
->>
->> On 10 January 2017 at 04:21, Suzuki K Poulose <suzuki.poulose@arm.com>
->> wrote:
->>>
->>> The stm is automatically enabled when an application sets the policy
->>> via ->link() call back by using coresight_enable(), which keeps the
->>> refcount of the current users of the STM. However, the unlink() callback
->>> issues stm_disable() directly, which leaves the STM turned off, without
->>> the coresight layer knowing about it. This prevents any further uses
->>> of the STM hardware as the coresight layer still thinks the STM is
->>> turned on and doesn't issue an stm_enable(). Even manually enabling
->>> the STM via sysfs can't really enable the hw.
->>>
-> ...
->>>
->>>
->>> This patch balances the unlink operation by using the
->>> coresight_disable(),
->>> keeping the coresight layer in sync with the hardware state.
->>>
->>> Fixes: commit 237483aa5cf43 ("coresight: stm: adding driver for CoreSight
->>> STM component")
->>> Cc: Pratik Patel <pratikp@codeaurora.org>
->>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->>> Cc: Chunyan Zhang <zhang.chunyan@linaro.org>
->>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->>> Cc: stable at vger.kernel.org # 4.7+
->>> Reported-by: Robert Walker <robert.walker@arm.com>
->>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->>> ---
->>>  drivers/hwtracing/coresight/coresight-stm.c | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/drivers/hwtracing/coresight/coresight-stm.c
->>> b/drivers/hwtracing/coresight/coresight-stm.c
->>> index 3524452..57b7330 100644
->>> --- a/drivers/hwtracing/coresight/coresight-stm.c
->>> +++ b/drivers/hwtracing/coresight/coresight-stm.c
->>> @@ -356,7 +356,7 @@ static void stm_generic_unlink(struct stm_data
->>> *stm_data,
->>>         if (!drvdata || !drvdata->csdev)
->>>                 return;
->>>
->>> -       stm_disable(drvdata->csdev, NULL);
->>> +       coresight_disable(drvdata->csdev);
->>>  }
->>>
->>>  static phys_addr_t
->>
->>
->> Applied - thanks,
->
->
-> Mathieu, Greg,
->
-> I think this should go into 4.10 (either way, as fix in this cycle or via
-> stable after the release). I think
-> it would be easier if it goes in as fix during one of these rc cycle.
->
-> Please let me know your thoughts.
+On Wed, Dec 21, 2016 at 02:45:54PM +0800, fu.wei at linaro.org wrote:
+> From: Fu Wei <fu.wei@linaro.org>
+> 
+> Currently, the counter frequency detection call(arch_timer_detect_rate)
+> combines all the ways to get counter frequency: device-tree property,
+> system coprocessor register, MMIO timer. But in the most of use cases,
+> we don't need all the ways to try:
+> For example, reading device-tree property will be needed only when
+> system boot with device-tree, getting frequency from MMIO timer register
+> will beneeded only when we init MMIO timer.
+> 
+> This patch separates paths to determine frequency:
+> Separate out device-tree code, keep them in device-tree init function.
 
-I'm good with squeezing this patch in the 4.10 cycle.  From here I
-suppose the easiest for Greg is for you to send another patch with
-Chunyan's Reviewed-by and my ack.
+Splitting these out makes sense to me.
 
->
-> Suzuki
->
->> Mathieu
->>
->>> --
->>> 2.7.4
->>>
->
+> Separate out the MMIO frequency and the sysreg frequency detection call,
+> and use the appropriate one for the counter.
+
+> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+> Tested-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
+> ---
+>  drivers/clocksource/arm_arch_timer.c | 49 +++++++++++++++++++++++-------------
+>  1 file changed, 31 insertions(+), 18 deletions(-)
+> 
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index c7b4482..9a1f138 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -488,27 +488,31 @@ static int arch_timer_starting_cpu(unsigned int cpu)
+>  	return 0;
+>  }
+>  
+> -static void
+> -arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
+> +static void arch_timer_detect_rate(void)
+>  {
+> -	/* Who has more than one independent system counter? */
+> -	if (arch_timer_rate)
+> -		return;
+> +	/*
+> +	 * Try to get the timer frequency from
+> +	 * cntfrq_el0(system coprocessor register).
+> +	 */
+> +	if (!arch_timer_rate)
+> +		arch_timer_rate = arch_timer_get_cntfrq();
+> +
+> +	/* Check the timer frequency. */
+> +	if (!arch_timer_rate)
+> +		pr_warn("frequency not available\n");
+> +}
+>  
+> +static void arch_timer_mem_detect_rate(void __iomem *cntbase)
+> +{
+>  	/*
+> -	 * Try to determine the frequency from the device tree or CNTFRQ,
+> -	 * if ACPI is enabled, get the frequency from CNTFRQ ONLY.
+> +	 * Try to determine the frequency from
+> +	 * CNTFRQ in memory-mapped timer.
+>  	 */
+> -	if (!acpi_disabled ||
+> -	    of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
+> -		if (cntbase)
+> -			arch_timer_rate = readl_relaxed(cntbase + CNTFRQ);
+> -		else
+> -			arch_timer_rate = arch_timer_get_cntfrq();
+> -	}
+> +	if (!arch_timer_rate)
+> +		arch_timer_rate = readl_relaxed(cntbase + CNTFRQ);
+>  
+>  	/* Check the timer frequency. */
+> -	if (arch_timer_rate == 0)
+> +	if (!arch_timer_rate)
+>  		pr_warn("frequency not available\n");
+>  }
+
+There's a subtle change in behaviour here. Previously for ACPI we'd only
+ever use the sysreg CNTFRQ value for arch_timer_rate, whereas now we
+might use the MMIO timer rate. Maybe that's not a big deal, but I will
+need to think.
+
+Generally, the logic to determine the rate is fairly gnarly regardless.
+
+It would be nice if we could split the MMIO and sysreg rates entirely,
+and kill the implicit relationship between the two, or at least make one
+canonical and warn if the two differ.
+
+Thanks,
+Mark.
