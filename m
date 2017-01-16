@@ -1,37 +1,80 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 16 Jan 2017 13:34:44 +0000
-Subject: [RFC PATCH 07/10] arm64/sve: Add vector length inheritance control
-In-Reply-To: <20170116122755.GH28060@E107787-LIN>
-References: <1484220369-23970-1-git-send-email-Dave.Martin@arm.com>
- <1484220369-23970-8-git-send-email-Dave.Martin@arm.com>
- <20170116122755.GH28060@E107787-LIN>
-Message-ID: <20170116133443.GP3699@e103592.cambridge.arm.com>
+From: Joao.Pinto@synopsys.com (Joao Pinto)
+Date: Mon, 16 Jan 2017 13:38:07 +0000
+Subject: [PATCH 11/37] PCI: dwc: Split pcie-designware.c into host and
+ core files
+In-Reply-To: <587CAEBD.1010803@ti.com>
+References: <1484216786-17292-1-git-send-email-kishon@ti.com>
+ <1484216786-17292-12-git-send-email-kishon@ti.com>
+ <4a89fb45-af84-d660-5ef0-12227b141cda@synopsys.com> <587C586C.6070003@ti.com>
+ <0a16c862-312f-655e-3d66-bdb0c1f78584@synopsys.com> <587CAEBD.1010803@ti.com>
+Message-ID: <018295b9-00a1-1164-8af1-a01924fa931e@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2017 at 12:27:55PM +0000, Yao Qi wrote:
-> On 17-01-12 11:26:06, Dave Martin wrote:
-> > Currently the vector length is inherited across both fork() and
-> > exec().
-> > 
-> > Inheritance across fork() is desirable both for creating a copy of
-> > a process (traditional fork) or creating a thread (where we want
-> > all threads to share the same VL by default).
-> > 
-> > Inheritance across exec() is less desirable, because of the ABI
-> > impact of large vector lengths on the size of the signal frame --
-> > when running a new binary, there is no guarantee that the new
-> > binary is compatible with these ABI changes.
-> > 
-> > This flag makes the vector length non-inherited by default.
+?s 11:30 AM de 1/16/2017, Kishon Vijay Abraham I escreveu:
+> Hi Joao,
 > 
-> Can we make vector length inherited across fork but non-inherited
-> across exec by default?
+> On Monday 16 January 2017 03:57 PM, Joao Pinto wrote:
+>>
+>> Hi,
+>>
+>> ?s 5:21 AM de 1/16/2017, Kishon Vijay Abraham I escreveu:
+>>> Hi Joao,
+>>>
+>>> On Friday 13 January 2017 10:19 PM, Joao Pinto wrote:
+>>>> ?s 10:26 AM de 1/12/2017, Kishon Vijay Abraham I escreveu:
+>>>>> Split pcie-designware.c into pcie-designware-host.c that contains
+>>>>> the host specific parts of the driver and pcie-designware.c that
+>>>>> contains the parts used by both host driver and endpoint driver.
+>>>>>
+>>>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>>>> ---
+>>>>>  drivers/pci/dwc/Makefile               |    2 +-
+>>>>>  drivers/pci/dwc/pcie-designware-host.c |  619 ++++++++++++++++++++++++++++++++
+>>>>>  drivers/pci/dwc/pcie-designware.c      |  613 +------------------------------
+>>>>>  drivers/pci/dwc/pcie-designware.h      |    8 +
+>>>>>  4 files changed, 634 insertions(+), 608 deletions(-)
+>>>>>  create mode 100644 drivers/pci/dwc/pcie-designware-host.c
+>>>>>
+>>>>> diff --git a/drivers/pci/dwc/Makefile b/drivers/pci/dwc/Makefile
+>>>>> index 7d27c14..3b57e55 100644
+>>>>> --- a/drivers/pci/dwc/Makefile
+>>>>> +++ b/drivers/pci/dwc/Makefile
+>>>>> @@ -1,4 +1,4 @@
+>>>>
+>>>> (snip...)
+>>>>
+>>>>> -static void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index,
+>>>>> -				      int type, u64 cpu_addr, u64 pci_addr,
+>>>>> -				      u32 size)
+>>>>> +void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index, int type,
+>>>>> +			       u64 cpu_addr, u64 pci_addr, u32 size)
+>>>>>  {
+>>>>>  	u32 retries, val;
+>>>>>  
+>>>>> @@ -186,220 +151,6 @@ static void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index,
+>>>>>  	dev_err(pci->dev, "iATU is not being enabled\n");
+>>>>>  }
+>>>>
+>>>> Kishon, iATU only makes sense in The Root Complex (host), so it should be inside
+>>>> the pcie-designware-host.
+>>>
+>>> That is not true. Outbound ATU should be programmed to access host side buffers
+>>> and inbound ATU should be programmed for the host to access EP mem space.
+>>
+>> Sorry, I was not clear enough. What I was trying to suggest is, since the ATU
+>> programming is done by the host, wouldn't be better to include it in the
+>> pcie-designware-host? It is just an architectural detail.
+> 
+> ATU programming is required in EP mode. See "[PATCH 24/37] PCI: dwc:
+> designware: Add EP mode support" in this patch series.
+> 
+> Anything that's required by both EP mode and RC mode, I've placed in
+> pcie-designware.c
 
-That is the behaviour: I always inherit across fork/clone, since
-you are still running the same binary after those.
+Agreed!
 
-I could word the commit message a bit more clearly here.
-
-Cheers
----Dave 
+> 
+> Thanks
+> Kishon
+> 
