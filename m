@@ -1,52 +1,55 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 16 Jan 2017 17:56:51 +0100
-Subject: [PATCH v3 1/13] mmc: sunxi: Fix clock frequency change sequence
+Date: Mon, 16 Jan 2017 17:56:54 +0100
+Subject: [PATCH v3 4/13] mmc: sunxi: Enable the new timings for the A64 MMC
+ controllers
 In-Reply-To: <cover.a06ce1672d7a72ee7f9bbca46fdd223edd6b2313.1484585798.git-series.maxime.ripard@free-electrons.com>
 References: <cover.a06ce1672d7a72ee7f9bbca46fdd223edd6b2313.1484585798.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <6f6b511bce9df86ee43486653ac55df0d135f198.1484585798.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <b8621ba45fe2f2d8ba70f11bf141998fe98a9962.1484585798.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MMC and SD specifications documents that the clock frequency should
-only be changed once gated.
+The A64 MMC controllers need to set a "new timings" bit when a new rate is
+set.
 
-The current code first modifies the parent clock, gates it and then
-modifies the internal divider. This means that since the parent clock rate
-might be changed, the bus clock might be changed as well before it is
-gated, which breaks the specification.
-
-Move the gating before the parent rate modification.
+The actual meaning of that bit is not clear yet, but not setting it leads
+to some corner-case issues, like the CMD53 failing, which is used to
+implement SDIO packet aggregation.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/mmc/host/sunxi-mmc.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/mmc/host/sunxi-mmc.c | 6 ++++++
+ 1 file changed, 6 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index b1d1303389a7..ab4324e6eb74 100644
+index b9c8a62bc212..51d6388a194e 100644
 --- a/drivers/mmc/host/sunxi-mmc.c
 +++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -761,6 +761,10 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 	u32 rval, clock = ios->clock;
- 	int ret;
+@@ -253,6 +253,8 @@ struct sunxi_mmc_cfg {
  
-+	ret = sunxi_mmc_oclk_onoff(host, 0);
-+	if (ret)
-+		return ret;
+ 	/* does the IP block support autocalibration? */
+ 	bool can_calibrate;
 +
- 	/* 8 bit DDR requires a higher module clock */
- 	if (ios->timing == MMC_TIMING_MMC_DDR52 &&
- 	    ios->bus_width == MMC_BUS_WIDTH_8)
-@@ -783,10 +787,6 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 		return ret;
- 	}
++	bool needs_new_timings;
+ };
  
--	ret = sunxi_mmc_oclk_onoff(host, 0);
--	if (ret)
--		return ret;
--
- 	/* clear internal divider */
- 	rval = mmc_readl(host, REG_CLKCR);
- 	rval &= ~0xff;
+ struct sunxi_mmc_host {
+@@ -779,6 +781,9 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+ 	}
+ 	mmc_writel(host, REG_CLKCR, rval);
+ 
++	if (host->cfg->needs_new_timings)
++		mmc_writel(host, REG_SD_NTSR, SDXC_2X_TIMING_MODE);
++
+ 	ret = sunxi_mmc_clk_set_phase(host, ios, rate);
+ 	if (ret)
+ 		return ret;
+@@ -1076,6 +1081,7 @@ static const struct sunxi_mmc_cfg sun50i_a64_cfg = {
+ 	.idma_des_size_bits = 16,
+ 	.clk_delays = NULL,
+ 	.can_calibrate = true,
++	.needs_new_timings = true,
+ };
+ 
+ static const struct of_device_id sunxi_mmc_of_match[] = {
 -- 
 git-series 0.8.11
