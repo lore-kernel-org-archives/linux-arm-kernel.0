@@ -1,135 +1,88 @@
-From: jan.kiszka@siemens.com (Jan Kiszka)
-Date: Mon, 16 Jan 2017 20:46:05 +0100
-Subject: [PATCH v2 2/3] spi: pxa2xx: Prepare for edge-triggered interrupts
-In-Reply-To: <1484593637.2133.152.camel@linux.intel.com>
-References: <cover.1484592296.git.jan.kiszka@siemens.com>
- <7b15a0910a3ad861fd32161c72559bafa7b71e29.1484592296.git.jan.kiszka@siemens.com>
- <1484593637.2133.152.camel@linux.intel.com>
-Message-ID: <7fd7a8eb-4302-523b-08dd-f2a28b845a5e@siemens.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 16 Jan 2017 21:48:39 +0200
+Subject: [PATCH 01/12] soc: samsung: pmu: Use common device name to let
+ others to find it easily
+In-Reply-To: <1484549107-5957-2-git-send-email-m.szyprowski@samsung.com>
+References: <1484549107-5957-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170116064523eucas1p18a55f951566df5ddd978364486154931@eucas1p1.samsung.com>
+ <1484549107-5957-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20170116194839.m2ot7m6yovze764v@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-01-16 20:07, Andy Shevchenko wrote:
-> On Mon, 2017-01-16 at 19:44 +0100, Jan Kiszka wrote:
->> When using the a device with edge-triggered interrupts, such as MSIs,
->> the interrupt handler has to ensure that there is a point in time
->> during
->> its execution where all interrupts sources are silent so that a new
->> event can trigger a new interrupt again.
->>
->> This is achieved here by looping over SSSR evaluation. We need to take
->> into account that SSCR1 may be changed by the transfer handler, thus
->> we
->> need to redo the mask calculation, at least regarding the volatile
->> interrupt enable bit (TIE).
->>
+On Mon, Jan 16, 2017 at 07:44:56AM +0100, Marek Szyprowski wrote:
+> This patch always set device name to "exynos-pmu" to let other drivers to
+> find PMU device easily. This is done mainly to get regmap to access PMU
+> registers from other drivers. This way it can be avoided to add phandle to
+> the PMU node to almost all drivers in the SoC just to get a regmap access
+> in the drivers. PMU is something like a SoC wide service, so there is no
+> point modeling it as hardware dependency for all devices in device tree.
 > 
-> So, more comments/questions below.
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  drivers/soc/samsung/exynos-pmu.c       |  1 +
+>  include/linux/soc/samsung/exynos-pmu.h | 19 +++++++++++++++++++
+>  2 files changed, 20 insertions(+)
 > 
->>  
->>  	sccr1_reg = pxa2xx_spi_read(drv_data, SSCR1);
->>  
->> -	/* Ignore possible writes if we don't need to write */
->> -	if (!(sccr1_reg & SSCR1_TIE))
->> -		mask &= ~SSSR_TFS;
->> -
->>  	/* Ignore RX timeout interrupt if it is disabled */
->>  	if (!(sccr1_reg & SSCR1_TINTE))
->>  		mask &= ~SSSR_TINT;
->>  
->> -	if (!(status & mask))
->> -		return IRQ_NONE;
->> +	while (1) {
+> diff --git a/drivers/soc/samsung/exynos-pmu.c b/drivers/soc/samsung/exynos-pmu.c
+> index 0acdfd82e751..63bb471845cb 100644
+> --- a/drivers/soc/samsung/exynos-pmu.c
+> +++ b/drivers/soc/samsung/exynos-pmu.c
+> @@ -120,6 +120,7 @@ static int exynos_pmu_probe(struct platform_device *pdev)
+>  		pmu_context->pmu_data->pmu_init();
+>  
+>  	platform_set_drvdata(pdev, pmu_context);
+> +	dev_set_name(dev, EXYNOS_PMU_DEV_NAME);
+>  
+>  	dev_dbg(dev, "Exynos PMU Driver probe done\n");
+>  	return 0;
+> diff --git a/include/linux/soc/samsung/exynos-pmu.h b/include/linux/soc/samsung/exynos-pmu.h
+> index e2e9de1acc5b..90d9205805ea 100644
+> --- a/include/linux/soc/samsung/exynos-pmu.h
+> +++ b/include/linux/soc/samsung/exynos-pmu.h
+> @@ -12,6 +12,10 @@
+>  #ifndef __LINUX_SOC_EXYNOS_PMU_H
+>  #define __LINUX_SOC_EXYNOS_PMU_H
+>  
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regmap.h>
+> +
+>  enum sys_powerdown {
+>  	SYS_AFTR,
+>  	SYS_LPA,
+> @@ -21,4 +25,19 @@ enum sys_powerdown {
+>  
+>  extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
+>  
+> +#define EXYNOS_PMU_DEV_NAME "exynos-pmu"
+
+The define is not used outside so it should not be defined in header.
+You need it only for the code below (see next comment).
+
+> +
+> +static inline struct regmap *exynos_get_pmu_regs(void)
+> +{
+> +	struct device *dev = bus_find_device_by_name(&platform_bus_type, NULL,
+> +						     EXYNOS_PMU_DEV_NAME);
+> +	if (dev) {
+> +		struct regmap *regs = syscon_node_to_regmap(dev->of_node);
+> +		put_device(dev);
+> +		if (!IS_ERR(regs))
+> +			return regs;
+> +	}
+> +	return NULL;
+> +}
+
+Any particular reason why definion of this is in header? This rather
+looks like candidate for EXPORTED_SYMBOL defined in .c (plus Kconfig
+dependency).
+
+Best regards,
+Krzysztof
+
+> +
+>  #endif /* __LINUX_SOC_EXYNOS_PMU_H */
+> -- 
+> 1.9.1
 > 
-> Can we switch to do-while and move previous block here?
-
-Don't see how this would help (without duplicating more code).
-
-> Btw, can TINTE
-> bit be set again during a loop?
-
-Nope, it's statically set, at least so far.
-
-What we could do is simply restarting ssp_int
-
-> 
->> +		/* Ignore possible writes if we don't need to write
->> */
->> +		if (!(sccr1_reg & SSCR1_TIE))
->> +			mask &= ~SSSR_TFS;
->>  
->> -	if (!drv_data->master->cur_msg) {
->> -		handle_bad_msg(drv_data);
->> -		/* Never fail */
->> -		return IRQ_HANDLED;
->> -	}
->> +		if (!(status & mask))
->> +			return ret;
->> +
->> +		if (!drv_data->master->cur_msg) {
->> +			handle_bad_msg(drv_data);
->> +			/* Never fail */
->> +			return IRQ_HANDLED;
->> +		}
->> +
-> 
->> +		ret |= drv_data->transfer_handler(drv_data);
-> 
-> So, we might call handler several times. This needs to be commented in
-> the code why you do so.
-
-I can move the commit log into the code.
-
-> 
->>  
->> -	return drv_data->transfer_handler(drv_data);
->> +		status = pxa2xx_spi_read(drv_data, SSSR);
-> 
-> Would it be possible to get all 1:s from the register
-> (something/autosuspend just powered off it by timeout?) ?
-> 
-
-Not sure if that can happen, but I guess it would be simpler and more
-readable to simply do this instead:
-
-	while (1) {
-		/*
-		 * If the device is not yet in RPM suspended state and we get an
-		 * interrupt that is meant for another device, check if status
-		 * bits are all set to one. That means that the device is
-		 * already powered off.
-		 */
-		status = pxa2xx_spi_read(drv_data, SSSR);
-		if (status == ~0)
-			return ret;
-
-		sccr1_reg = pxa2xx_spi_read(drv_data, SSCR1);
-
-		/* Ignore RX timeout interrupt if it is disabled */
-		if (!(sccr1_reg & SSCR1_TINTE))
-			mask &= ~SSSR_TINT;
-
-		/* Ignore possible writes if we don't need to write */
-		if (!(sccr1_reg & SSCR1_TIE))
-			mask &= ~SSSR_TFS;
-
-		if (!(status & mask))
-			return ret;
-
-		if (!drv_data->master->cur_msg) {
-			handle_bad_msg(drv_data);
-			/* Never fail */
-			return IRQ_HANDLED;
-		}
-
-		ret |= drv_data->transfer_handler(drv_data);
-	}
-
-
-i.e. preserve the current structure, just add the loop.
-
-Jan
-
--- 
-Siemens AG, Corporate Technology, CT RDA ITP SES-DE
-Corporate Competence Center Embedded Linux
