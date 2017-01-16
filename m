@@ -1,62 +1,93 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 16 Jan 2017 10:40:28 +0000
-Subject: [PATCH v2 2/2] vring: Force use of DMA API for ARM-based systems
-In-Reply-To: <20170113201933-mutt-send-email-mst@kernel.org>
-References: <85015f1653eb7e36f992708362b75d1f4391b783.1484070340.git.robin.murphy@arm.com>
- <4833e705fb6841fbfdbee3b1a21a7bc917292410.1484070340.git.robin.murphy@arm.com>
- <20170111013046-mutt-send-email-mst@kernel.org>
- <20170111100139.GC12388@arm.com>
- <20170112232931-mutt-send-email-mst@kernel.org>
- <20170113092522.GB22538@arm.com>
- <20170113183222-mutt-send-email-mst@kernel.org>
- <20170113172154.GL3253@arm.com>
- <20170113201933-mutt-send-email-mst@kernel.org>
-Message-ID: <20170116104028.GA1510@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 16 Jan 2017 10:40:43 +0000
+Subject: [PATCH v3 1/2] of: base: add support to find the level of the last
+ cache
+Message-ID: <1484563244-14743-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2017 at 08:23:35PM +0200, Michael S. Tsirkin wrote:
-> On Fri, Jan 13, 2017 at 05:21:54PM +0000, Will Deacon wrote:
-> > On Fri, Jan 13, 2017 at 06:46:32PM +0200, Michael S. Tsirkin wrote:
-> > > On Fri, Jan 13, 2017 at 09:25:22AM +0000, Will Deacon wrote:
-> > > > On Fri, Jan 13, 2017 at 12:12:56AM +0200, Michael S. Tsirkin wrote:
-> > > > > I'd rather people didn't use SMMU with legacy devices.
-> > > > 
-> > > > I'm afraid we've been doing that for two years and the model already
-> > > > exists in a mature state, being actively used for development and
-> > > > validation by ARM and our partners. One of the big things its used for
-> > > > is to develop SMMU and GIC (our interrupt controller) code with PCI, so
-> > > > dropping the SMMU from the picture isn't an option.
-> > > 
-> > > Oh so this fixes a regression?  This is something I didn't realize.
-> > 
-> > Yes, thanks. The regression came about because we implemented SMMU-backed
-> > DMA ops and only then was it apparent that the virtio stuff was bypassing
-> > even with translation enabled (because it wasn't using the DMA API).
-> 
-> Could you point out a commit ID?
+It is useful to have helper function just to get the number of cache
+levels for a given logical cpu. We can obtain the same by just checking
+the level at which the last cache is present. This patch adds support
+to find the level of the last cache for a given cpu.
 
-There has been a fair amount of work in this area recently, but you're
-probably after something like 876945dbf649 ("arm64: Hook up IOMMU dma_ops")
-as the culprit, which is the point at which we started to swizzle DMA
-ops for devices upstream of an SMMU automatically.
+It will be used on ARM64 platform where the device tree provides the
+information for the additional non-architected/transparent/external
+last level caches that are not integrated with the processors.
 
-> > > A "Fixes:" tag can't hurt here.  I then wonder
-> > > might DMA ops ever use a DMA address which isn't a physical address
-> > > from QEMU point of view? If that happens, this hack breaks
-> > > because in legacy mode QEMU still uses the GPA.
-> > 
-> > If QEMU doesn't advertise an SMMU, then it will work fine with the GPA,
-> > because we won't swizzle the DMA ops for the master device. If QEMU does
-> > advertise an SMMU, then we'll allocate DMA addresses to fit within the
-> > the intersection of the SMMU aperture and device's DMA mask.
-> 
-> 
-> Right but doesn't just poking from qemu into phys addresses work
-> anymore? It used to ...
+Cc: Mark Rutland <mark.rutland@arm.com>
+Suggested-by: Rob Herring <robh+dt@kernel.org>
+Acked-by: Rob Herring <robh+dt@kernel.org>
+Tested-by: Tan Xiaojun <tanxiaojun@huawei.com>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ drivers/of/base.c  | 26 ++++++++++++++++++++++++++
+ include/linux/of.h |  1 +
+ 2 files changed, 27 insertions(+)
 
-Provided that there's no SMMU, then it will continue to work. and my
-understanding (from talking to Peter Maydell) is that qemu doesn't model
-an SMMU for ARM-based machines.
+v2->v3:
+	- Dropped unnecessary pointer check
+	- Added Rob's Ack and Tan's Tested-by tags
 
-Will
+v1->v2:
+	- Moved to using "cache-level" in the last level cache instead
+	  of counting through all the nodes as suggested by Rob
+
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index d4bea3c797d6..a30f541f0825 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -25,6 +25,7 @@
+ #include <linux/cpu.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
++#include <linux/of_device.h>
+ #include <linux/of_graph.h>
+ #include <linux/spinlock.h>
+ #include <linux/slab.h>
+@@ -2268,6 +2269,31 @@ struct device_node *of_find_next_cache_node(const struct device_node *np)
+ }
+
+ /**
++ * of_find_last_cache_level - Find the level at which the last cache is
++ * 		present for the given logical cpu
++ *
++ * @cpu: cpu number(logical index) for which the last cache level is needed
++ *
++ * Returns the the level at which the last cache is present. It is exactly
++ * same as  the total number of cache levels for the given logical cpu.
++ */
++int of_find_last_cache_level(unsigned int cpu)
++{
++	int cache_level = 0;
++	struct device_node *prev = NULL, *np = of_cpu_device_node_get(cpu);
++
++	while (np) {
++		prev = np;
++		of_node_put(np);
++		np = of_find_next_cache_node(np);
++	}
++
++	of_property_read_u32(prev, "cache-level", &cache_level);
++
++	return cache_level;
++}
++
++/**
+  * of_graph_parse_endpoint() - parse common endpoint node properties
+  * @node: pointer to endpoint device_node
+  * @endpoint: pointer to the OF endpoint data structure
+diff --git a/include/linux/of.h b/include/linux/of.h
+index d72f01009297..21e6323de0f3 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -280,6 +280,7 @@ extern struct device_node *of_get_child_by_name(const struct device_node *node,
+
+ /* cache lookup */
+ extern struct device_node *of_find_next_cache_node(const struct device_node *);
++extern int of_find_last_cache_level(unsigned int cpu);
+ extern struct device_node *of_find_node_with_property(
+ 	struct device_node *from, const char *prop_name);
+
+--
+2.7.4
