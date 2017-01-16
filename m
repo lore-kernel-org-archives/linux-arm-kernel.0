@@ -1,132 +1,75 @@
-From: jan.kiszka@siemens.com (Jan Kiszka)
-Date: Mon, 16 Jan 2017 12:18:10 +0100
-Subject: [PATCH 1/2] spi: pxa2xx: Prepare for edge-triggered interrupts
-In-Reply-To: <1484558690.2133.132.camel@linux.intel.com>
-References: <cover.1484557560.git.jan.kiszka@siemens.com>
- <6fe26505e67790b27eed28fd7451b51e70b7e8ba.1484557560.git.jan.kiszka@siemens.com>
- <1484558690.2133.132.camel@linux.intel.com>
-Message-ID: <7cb06bc7-bcb6-a212-8241-20ad4b2a4a90@siemens.com>
+From: balbi@kernel.org (Felipe Balbi)
+Date: Mon, 16 Jan 2017 13:19:25 +0200
+Subject: [PATCH] usb: gadget: udc: atmel: used managed kasprintf
+In-Reply-To: <20170116111128.ft2b5aa63y2qe35p@piout.net>
+References: <20161201102656.29041-1-alexandre.belloni@free-electrons.com>
+ <063D6719AE5E284EB5DD2968C1650D6DB0232C0D@AcuExch.aculab.com>
+ <20161202161921.ace5rolitlxjhr6i@piout.net>
+ <063D6719AE5E284EB5DD2968C1650D6DB023508B@AcuExch.aculab.com>
+ <87eg03nvuv.fsf@linux.intel.com> <20170116111128.ft2b5aa63y2qe35p@piout.net>
+Message-ID: <87bmv7mev6.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-01-16 10:24, Andy Shevchenko wrote:
-> On Mon, 2017-01-16 at 10:05 +0100, Jan Kiszka wrote:
->> When using the a device with edge-triggered interrupts, such as MSIs,
->> the interrupt handler has to ensure that there is a point in time
->> during
->> its execution where all interrupts sources are silent so that a new
->> event can trigger a new interrupt again.
->>
->> This is achieved here by looping over SSSR evaluation. We need to take
->> into account that SSCR1 may be changed by the transfer handler, thus
->> we
->> need to redo the mask calculation, at least regarding the volatile
->> interrupt enable bit (TIE).
-> 
-> Could you split this to two patches, one just move the code under
-> question to a helper function (no functional change), the other does
-> what you state in commit message here?
 
-IMHO, factoring out some helper called from the loop in ssp_int won't be
-a natural split due to the large number of local variables being shared
-here. But maybe I'm not seeing the design you have in mind, so please
-propose a useful helper function signature.
+Hi,
 
-Thanks,
-Jan
+Alexandre Belloni <alexandre.belloni@free-electrons.com> writes:
+>> David Laight <David.Laight@ACULAB.COM> writes:
+>> > From: Alexandre Belloni
+>> >> Sent: 02 December 2016 16:19
+>> >> On 02/12/2016 at 15:59:57 +0000, David Laight wrote :
+>> >> > From: Alexandre Belloni
+>> >> > > Sent: 01 December 2016 10:27
+>> >> > > Use devm_kasprintf instead of simple kasprintf to free the allocated memory
+>> >> > > when needed.
+>> >> >
+>> >> > s/when needed/when the device is freed/
+>> >> >
+>> >> > > Suggested-by: Peter Rosin <peda@axentia.se>
+>> >> > > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>> >> > > ---
+>> >> > >  drivers/usb/gadget/udc/atmel_usba_udc.c | 3 ++-
+>> >> > >  1 file changed, 2 insertions(+), 1 deletion(-)
+>> >> > >
+>> >> > > diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+>> >> > > index 45bc997d0711..aec72fe8273c 100644
+>> >> > > --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
+>> >> > > +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+>> >> > > @@ -1978,7 +1978,8 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
+>> >> > >  			dev_err(&pdev->dev, "of_probe: name error(%d)\n", ret);
+>> >> > >  			goto err;
+>> >> > >  		}
+>> >> > > -		ep->ep.name = kasprintf(GFP_KERNEL, "ep%d", ep->index);
+>> >> > > +		ep->ep.name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "ep%d",
+>> >> > > +					     ep->index);
+>> >> >
+>> >> > Acually why bother mallocing such a small string at all.
+>> >> > The maximum length is 12 bytes even if 'index' are unrestricted.
+>> >> >
+>> >> 
+>> >> IIRC, using statically allocated string is failing somewhere is the USB
+>> >> core but I don't remember all the details.
+>> >
+>> > I can't imagine that changing ep->ep.name from 'char *' to 'char [12]' would
+>> > make any difference.
+>> 
+>> the actual name is managed by the UDC. Meaning, ep->ep.name should be a
+>> pointer, but it could very well just point to ep->name which would be
+>> char [12].
+>> 
+>
+> Yeah, I sent a patch that did just that.
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-January/478602.html
 
-> 
->>
->> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
->> ---
->>  drivers/spi/spi-pxa2xx.c | 50 +++++++++++++++++++++++++++----------
->> -----------
->>  1 file changed, 28 insertions(+), 22 deletions(-)
->>
->> diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
->> index dd7b5b4..24bf549 100644
->> --- a/drivers/spi/spi-pxa2xx.c
->> +++ b/drivers/spi/spi-pxa2xx.c
->> @@ -737,6 +737,7 @@ static irqreturn_t ssp_int(int irq, void *dev_id)
->>  	struct driver_data *drv_data = dev_id;
->>  	u32 sccr1_reg;
->>  	u32 mask = drv_data->mask_sr;
->> +	irqreturn_t ret = IRQ_NONE;
->>  	u32 status;
->>  
->>  	/*
->> @@ -760,37 +761,42 @@ static irqreturn_t ssp_int(int irq, void
->> *dev_id)
->>  
->>  	sccr1_reg = pxa2xx_spi_read(drv_data, SSCR1);
->>  
->> -	/* Ignore possible writes if we don't need to write */
->> -	if (!(sccr1_reg & SSCR1_TIE))
->> -		mask &= ~SSSR_TFS;
->> -
->>  	/* Ignore RX timeout interrupt if it is disabled */
->>  	if (!(sccr1_reg & SSCR1_TINTE))
->>  		mask &= ~SSSR_TINT;
->>  
->> -	if (!(status & mask))
->> -		return IRQ_NONE;
->> +	while (1) {
->> +		/* Ignore possible writes if we don't need to write
->> */
->> +		if (!(sccr1_reg & SSCR1_TIE))
->> +			mask &= ~SSSR_TFS;
->>  
->> -	if (!drv_data->master->cur_msg) {
->> +		if (!(status & mask))
->> +			return ret;
->>  
->> -		pxa2xx_spi_write(drv_data, SSCR0,
->> -				 pxa2xx_spi_read(drv_data, SSCR0)
->> -				 & ~SSCR0_SSE);
->> -		pxa2xx_spi_write(drv_data, SSCR1,
->> -				 pxa2xx_spi_read(drv_data, SSCR1)
->> -				 & ~drv_data->int_cr1);
->> -		if (!pxa25x_ssp_comp(drv_data))
->> -			pxa2xx_spi_write(drv_data, SSTO, 0);
->> -		write_SSSR_CS(drv_data, drv_data->clear_sr);
->> +		if (!drv_data->master->cur_msg) {
->>  
->> -		dev_err(&drv_data->pdev->dev,
->> -			"bad message state in interrupt handler\n");
->> +			pxa2xx_spi_write(drv_data, SSCR0,
->> +					 pxa2xx_spi_read(drv_data,
->> SSCR0)
->> +					 & ~SSCR0_SSE);
->> +			pxa2xx_spi_write(drv_data, SSCR1,
->> +					 pxa2xx_spi_read(drv_data,
->> SSCR1)
->> +					 & ~drv_data->int_cr1);
->> +			if (!pxa25x_ssp_comp(drv_data))
->> +				pxa2xx_spi_write(drv_data, SSTO, 0);
->> +			write_SSSR_CS(drv_data, drv_data->clear_sr);
->>  
->> -		/* Never fail */
->> -		return IRQ_HANDLED;
->> -	}
->> +			dev_err(&drv_data->pdev->dev,
->> +				"bad message state in interrupt
->> handler\n");
->>  
->> -	return drv_data->transfer_handler(drv_data);
->> +			/* Never fail */
->> +			return IRQ_HANDLED;
->> +		}
->> +
->> +		ret |= drv_data->transfer_handler(drv_data);
->> +
->> +		status = pxa2xx_spi_read(drv_data, SSSR);
->> +		sccr1_reg = pxa2xx_spi_read(drv_data, SSCR1);
->> +	}
->>  }
->>  
->>  /*
-> 
+it's in my fixes now :-)
 
 -- 
-Siemens AG, Corporate Technology, CT RDA ITP SES-DE
-Corporate Competence Center Embedded Linux
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170116/8307cc5b/attachment.sig>
