@@ -1,73 +1,116 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 16 Jan 2017 17:31:24 +0100
-Subject: [linux-sunxi] [PATCH 1/2] drivers: pinctrl: add driver for
- Allwinner H5 SoC
-In-Reply-To: <38fe3491-457a-f0c5-54fb-9defdcd45045@arm.com>
-References: <20161223125001.1176-1-icenowy@aosc.xyz>
- <1280f095-ab03-93f8-14d2-99d13ba1ce55@arm.com>
- <CACRpkdYQhfid3VRcaj=7as_+Zg=pX3Svp9FJ_W_Ft8nVuoZqKQ@mail.gmail.com>
- <20170105224210.wfinfucbpkkd44om@lukather>
- <38fe3491-457a-f0c5-54fb-9defdcd45045@arm.com>
-Message-ID: <20170116163124.c5gusyd3j3goivnf@lukather>
+Date: Mon, 16 Jan 2017 17:43:00 +0100
+Subject: [linux-sunxi] [PATCH] clk: sunxi-ng: fix PLL_CPUX adjusting on H3
+In-Reply-To: <557330d0-2dcd-2211-8538-51c4d6b68834@megous.com>
+References: <20161125002852.18097-1-megous@megous.com>
+ <0985b1ec-ba95-1505-cc59-adec4b88238f@megous.com>
+ <20170109095946.6esbfx6pafega5cd@lukather>
+ <557330d0-2dcd-2211-8538-51c4d6b68834@megous.com>
+Message-ID: <20170116164300.j2zvjkxr7c5h5hyo@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 09, 2017 at 12:16:00AM +0000, Andr? Przywara wrote:
-> On 05/01/17 22:42, Maxime Ripard wrote:
-> > On Fri, Dec 30, 2016 at 01:55:44PM +0100, Linus Walleij wrote:
-> >> On Mon, Dec 26, 2016 at 3:33 PM, Andr? Przywara <andre.przywara@arm.com> wrote:
+Hi Ondrej,
+
+Sorry for the late reply,
+
+On Mon, Jan 09, 2017 at 03:50:42PM +0100, Ond?ej Jirman wrote:
+> Dne 9.1.2017 v 10:59 Maxime Ripard napsal(a):
+> > On Sat, Jan 07, 2017 at 04:49:18PM +0100, Ond?ej Jirman wrote:
+> >> Maxime,
 > >>
-> >>> So while this patch technically looks correct, I was wondering if we
-> >>> should really explore the possibility of making the whole of sunxi
-> >>> pinctrl DT controlled.
-> >>> I brought this up a while ago, but people weren't overly enthusiastic
-> >>> about it, though their argument weren't really convincing to me[1].
+> >> Dne 25.11.2016 v 01:28 megous at megous.com napsal(a):
+> >>> From: Ondrej Jirman <megous@megous.com>
 > >>>
-> >>> So:
-> >>> As this "driver" here is basically a table linking GPIO bit settings
-> >>> (the actual mux value) to names and every pin we care about needs to be
-> >>> enumerated in the DT anyway, why not just add something like:
-> >>> allwinner,pinmux = <4>;
-> >>> to each pin(group) in the DT and get rid of this "driver" file here
-> >>> entirely?
+> >>> When adjusting PLL_CPUX on H3, the PLL is temporarily driven
+> >>> too high, and the system becomes unstable (oopses or hangs).
+> >>>
+> >>> Add a notifier to avoid this situation by temporarily switching
+> >>> to a known stable 24 MHz oscillator.
 > >>
-> >> I'm open to that if you can use pinctrl-single which is in the kernel
-> >> for this purpose only, and is used with both OMAPs and HiSilicon.
+> >> I have done more thorough testing on H3 and this approach with switching
+> >> to 24MHz oscillator does not work. Motivation being that my Orange Pi
+> >> One still gets lockups even with this patch under certain circumstances.
+> >>
+> >> So I have created a small test program for CPUS (additional OpenRISC CPU
+> >> on the SoC) which randomly changes PLL_CPUX settings while main CPU is
+> >> running a loop that sends messages to CPUS via msgbox.
+> >>
+> >> Assumption being that while CPUS is successfully receiving messages via
+> >> msgbox, the main CPU didn't lock up, yet.
+> >>
+> >> With this I am able to quickly and thoroughly test various PLL_CPUX
+> >> change and factor selection algorithms.
+> >>
+> >> Results are that bypassing CPUX clock by switching to 24 MHz oscillator
+> >> does not work at all. Main CPU locks up in about 1 second into the test.
+> >> Don't ask me why.
 > > 
-> > I'm not open to that, and I'm getting tired of discussing it over and
-> > over again. Andre, if you want to be convinced again, please read the
-> > last discussion we had on this topic.
+> > You mean that you are changing the frequency behind Linux' back? That
+> > won't work. There's more to cpufreq than just changing the frequency,
+> > but also adusting the number of loops per jiffy for the new frequency
+> > for example. I don't really expect that setup to work even on a
+> > perfectly stable system. CPUFreq *has* to be involved, otherwise, that
+> > alone might introduce bugs, and you cannot draw any conclusions
+> > anymore.
 > 
-> As I said: It didn't convince me back then. And frankly we didn't really
-> discuss it back then, I just refrained from entering a discussion
-> against _two_ maintainers at this time, since my capacity on this kind
-> of email threads is really very limited - especially for something that
-> is a hobby to me.
+> No, this has nothing to do with linux. I'm not running linux for this
+> test. I'm running a small program on CPUS (Open RISC CPU) on the SoC
+> loaded using FEL from USB.
+> 
+> The main cpu is just pushing messages into msgbox in a loop, so that
+> CPUS can determine that the main CPU is still running ok and give
+> feedback to me over UART. Not even DRAM is involved. The programs are
+> running from SRAM.
+> 
+> This is the most direct test of PLL change stability that can be done on
+> this SoC regardless of the OS. Not even CPU voltage switching is
+> involved. I just set the maximum voltage and fiddle with CPU_PLL
+> frequencies randomly, while waiting for the main CPU to lock up.
 
-This is also (mostly) a hobby to me, which is exactly why I prefer to
-work on something actually useful, rather than just discussing this
-over and over again. Just like I don't want (myself, or anyone,
-really, since we're all in the same boat) to have to maintain two
-separate pinctrl drivers.
+Ok.
 
-We're having a documented, simple, pinctrl binding, using the generic
-bindings now (that almost everyone else is using now, or is very close
-to), and we can leverage as much documentation and code from that. Why
-would we want to create and maintain a new driver with a new binding,
-that will need to be documented again, learned by everyone, and will
-lead only to confusion across the people who just want to have their
-board supported?
+> It does lock up quickly with mainline ccu_nkmp_find_best algorithm
+> for finding factors.
+> 
+> Even with linux kernel, it breaks. It's just more difficult to hit the
+> right conditions. I got oops only right after boot when running cpuburn
+> to trigger thermal_zone issued OPP change, if I first run some cpupower
+> commands. That's why I wrote this program to stress test various CPU_PLL
+> change/factor selection algorithms independently of everything else, to
+> get more predictable and quicker testing results.
 
-And imagine the kind of mess we would be in if everyone getting a bit
-involved in the support of one platform at one point wanted to trash
-one big part of its infrastructure and start all over again because he
-likes it better this way.
+Understood. Do you have the code available somewhere?
 
-I'm sorry, but this is also our jobs as maintainers to prevent all
-these kind of issues, and to maintain consistency. Switching to one
-binding to another breaks that consistency on many level, both in
-pinctrl and in the platform support itself. So sorry, but that's not
-going to happen.
+> >> What works is selecting NKMP factors so that M is always 1 and P is
+> >> anything other than /1 only for frequencies under 288MHz. As mandated by
+> >> the H3 datasheet. Mainline ccu_nkmp_find_best doesn't respect these
+> >> conditions. With that I can change CPUX frequencies randomly 20x a
+> >> second so far indefinitely without the main CPU ever locking up.
+> >>
+> >> Please drop or revert this patch. It is not a correct approach to the
+> >> problem. I'd suggest dropping the entire clock notifier mechanism, too,
+> >> unless it can be proven to work reliably.
+> > 
+> > It has been proven to work reliably on a number of other SoCs.
+> 
+> Unless it was stress tested like this with randomy changed settings, I
+> doubt you can call it reliable. It may just be very hard to hit the
+> issue on linux with particular OPP/thermal zone configuration. That's
+> because the issue is dependent on before and after NKMP values. People
+> may have just been lucky so far.
+
+Yes, or maybe we just have OPPs that just don't trigger a low enough P
+factor.
+
+There's no rush anyway, the H3 cpufreq support is not enabled at the
+moment, so that code basically does nothing for the moment.
+
+What's your current plan to fix that? I guess the easiest (and most
+likely to be reusable) would be to allow for clock tables, instead of
+using the generic approach. We might have some other clocks (like
+audio or video) that would need such a precise tuning in the future
+too.
 
 Maxime
 
@@ -81,4 +124,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170116/e4bf707c/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170116/94186f7d/attachment.sig>
