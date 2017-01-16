@@ -1,77 +1,42 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 16 Jan 2017 18:40:43 +0100
-Subject: [PATCH] rtc: sun6i: Switch to the external oscillator
-In-Reply-To: <20170116161349.5btadrfmqbxhrb2c@lukather>
-References: <20170116152148.27439-1-maxime.ripard@free-electrons.com>
- <20170116153959.7qhahevikxzai664@piout.net>
- <20170116161349.5btadrfmqbxhrb2c@lukather>
-Message-ID: <20170116174043.hgqbnmdnsfbnxl3m@piout.net>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Tue, 17 Jan 2017 01:43:50 +0800
+Subject: [PATCH v2 0/4] Add support for Allwinner V3s SoC
+Message-ID: <20170116174354.34593-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/01/2017 at 17:13:49 +0100, Maxime Ripard wrote :
-> On Mon, Jan 16, 2017 at 04:39:59PM +0100, Alexandre Belloni wrote:
-> > On 16/01/2017 at 16:21:48 +0100, Maxime Ripard wrote :
-> > > The RTC is clocked from either an internal, imprecise, oscillator or an
-> > > external one, which is usually much more accurate.
-> > > 
-> > > The difference perceived between the time elapsed and the time reported by
-> > > the RTC is in a 10% scale, which prevents the RTC from being useful at all.
-> > > 
-> > > Fortunately, the external oscillator is reported to be mandatory in the
-> > > Allwinner datasheet, so we can just switch to it.
-> > > 
-> > 
-> > Still, I'm wondering whether the external clock should be taken.
-> > 
-> > We've had issues with at91 and tegra where this external clock was
-> > suddenly able to be stopped, breaking the RTC because the CCF was not
-> > aware the RTC was using it.
-> 
-> That's a very good point...
-> 
-> > See:
-> > http://patchwork.ozlabs.org/patch/502459/
-> > http://patchwork.ozlabs.org/patch/714517/
-> > 
-> > Your reply can be that you don't care now and this has a low probability
-> > and you'll handle the case when it happens and that will be fine.
-> 
-> This is a bit more complicated for us.
-> 
-> The internal oscillator is running at 667kHz, with a 30% accuracy. The
-> external oscillator is supposed to run at 32768Hz, with a maximum
-> tolerance of 50ppm.
-> 
-> The RTC has an internal mux, between the internal and external
-> oscillators. If the internal is picked, a (variable) divider of 20 is
-> applied by default.
-> 
-> The output of that mux is also one of the parent of many of our clocks
-> in our main clock unit (for example the CPU one), so we need to have
-> that parenthood relationship expressed. I guess we could rework the
-> driver to first register the clock through the early clock probing
-> stuff, and then have the rest of the RTC to probe.
-> 
-> However, we also need to do so while remaining backward compatible
-> from a DT point of view.
-> 
-> I guess we could:
->   - Add the two oscillators to the DTSI, with their proper accuracy
->   - Put them both as parent clocks of the RTC node
->   - Split the clock part and the RTC part in the driver, and have the
->     clock part, if there is a clocks property in the node (which
->     covers the backward case), register the mux, and pick the clock
->     with the best accuracy. We don't change anything at the RTC level.
->   - Change the parent clock of the CCU for the RTC.
-> 
-> That would work for you?
+Allwinner produced a single-core Cortex-A7 SoC, V3s, with integrated 64MiB DDR2
+DRAM, and in LQFP package. With such a package, it has been easier for hackers
+to DIY a board (no BGA needed, and no DRAM wiring needed).
 
-That would definitively be better. If the 667kHz oscillator is not an
-input to any other IP, you may as well register it directly from the
-driver instead of representing it as a node.
+Add support for this SoC, as well as one board with it (Lichee Pi Zero).
+
+Pinctrl driver have already been merged when v1. It's now removed in the patchset.
+
+Icenowy Zheng (4):
+  arm: sunxi: add support for V3s SoC
+  clk: sunxi-ng: add support for V3s CCU
+  ARM: dts: sunxi: add dtsi file for V3s SoC
+  ARM: dts: sunxi: add support for Lichee Pi Zero board
+
+ Documentation/arm/sunxi/README                |   4 +
+ arch/arm/boot/dts/Makefile                    |   3 +-
+ arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts |  73 ++++
+ arch/arm/boot/dts/sun8i-v3s.dtsi              | 285 +++++++++++++
+ arch/arm/mach-sunxi/sunxi.c                   |   1 +
+ drivers/clk/sunxi-ng/Kconfig                  |  11 +
+ drivers/clk/sunxi-ng/Makefile                 |   1 +
+ drivers/clk/sunxi-ng/ccu-sun8i-v3s.c          | 590 ++++++++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu-sun8i-v3s.h          |  63 +++
+ include/dt-bindings/clock/sun8i-v3s-ccu.h     | 107 +++++
+ include/dt-bindings/reset/sun8i-v3s-ccu.h     |  78 ++++
+ 11 files changed, 1215 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
+ create mode 100644 arch/arm/boot/dts/sun8i-v3s.dtsi
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-v3s.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-v3s.h
+ create mode 100644 include/dt-bindings/clock/sun8i-v3s-ccu.h
+ create mode 100644 include/dt-bindings/reset/sun8i-v3s-ccu.h
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.11.0
