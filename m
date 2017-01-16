@@ -1,52 +1,82 @@
-From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
-Date: Mon, 16 Jan 2017 18:04:24 +0530
-Subject: [PATCH RFC 2/2] ARM: nommu: remap exception base address to RAM
-In-Reply-To: <83be771e-b432-0950-202b-afb09f125865@arm.com>
-References: <20161211131028.3019-1-afzal.mohd.ma@gmail.com>
- <20161211131255.3221-1-afzal.mohd.ma@gmail.com>
- <20161213100226.GW14217@n2100.armlinux.org.uk>
- <20170107171339.GA5044@afzalpc> <20170115114750.GA5456@afzalpc>
- <83be771e-b432-0950-202b-afb09f125865@arm.com>
-Message-ID: <20170116123424.GA6330@afzalpc>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 16 Jan 2017 21:36:57 +0900
+Subject: [PATCH v3 1/6] usb: dwc3: omap: Replace the extcon API
+In-Reply-To: <1484570222-30522-1-git-send-email-cw00.choi@samsung.com>
+References: <1484570222-30522-1-git-send-email-cw00.choi@samsung.com>
+ <CGME20170116123713epcas1p1ebe3e43a7a3cf20c0981966842a3992f@epcas1p1.samsung.com>
+Message-ID: <1484570222-30522-2-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch uses the resource-managed extcon API for extcon_register_notifier()
+and replaces the deprecated extcon API as following:
+- extcon_get_cable_state_() -> extcon_get_state()
 
-On Mon, Jan 16, 2017 at 09:53:41AM +0000, Vladimir Murzin wrote:
-> On 15/01/17 11:47, Afzal Mohammed wrote:
+Cc: linux-omap at vger.kernel.org
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+Acked-by: Felipe Balbi <felipe.balbi@linux.intel.com>
+---
+ drivers/usb/dwc3/dwc3-omap.c | 20 +++++++-------------
+ 1 file changed, 7 insertions(+), 13 deletions(-)
 
-> > mpu_setup_region() in arch/arm/mm/nommu.c that takes care of
-> > MPU_RAM_REGION only. And that seems to be a kind of redundant as it is
-> > also done in asm at __setup_mpu(). Git blames asm & C to consecutive
-> > commits, that makes me a little shaky about the conclusion on it being
-> > redundant.
-> 
-> It is not redundant. MPU setup is done it two steps. The first step done in
-> asm to enable caches, there only kernel image is covered; the second step takes
-> care on the whole RAM given via dt or "mem=" parameter.
-
-Okay, thanks for the details.
-
-> > Thinking of invoking mpu_setup() from secondary_start_kernel() in
-> > arch/arm/kernel/smp.c, with mpu_setup() being slightly modified to
-> > avoid storing region details again when invoked by secondary cpu's.
-> 
-> I have wip patches on reworking MPU setup code. The idea is to start using
-> mpu_rgn_info[] actively, so asm part for secondariness would just sync-up
-> content of that array. Additionally, it seems that we can reuse free MPU slots
-> to cover memory which is discarded due to MPU alignment restrictions... 
-> 
-> > Vladimir, once changes are done after a revisit, i would need your
-> > help to test on Cortex-R.
-> 
-> I'm more than happy to help, but currently I have limited bandwidth, so if it
-> can wait till the next dev cycle I'd try to make MPU rework finished by that
-> time.
-
-Okay, please feel free to do MPU rework the way you were planning, you
-know more details & have the platform to achieve it with much higher
-efficiency than me.
-
-Regards
-afzal
+diff --git a/drivers/usb/dwc3/dwc3-omap.c b/drivers/usb/dwc3/dwc3-omap.c
+index eb1b9cb3f9d1..2092e46b1380 100644
+--- a/drivers/usb/dwc3/dwc3-omap.c
++++ b/drivers/usb/dwc3/dwc3-omap.c
+@@ -426,20 +426,20 @@ static int dwc3_omap_extcon_register(struct dwc3_omap *omap)
+ 		}
+ 
+ 		omap->vbus_nb.notifier_call = dwc3_omap_vbus_notifier;
+-		ret = extcon_register_notifier(edev, EXTCON_USB,
+-						&omap->vbus_nb);
++		ret = devm_extcon_register_notifier(omap->dev, edev,
++						EXTCON_USB, &omap->vbus_nb);
+ 		if (ret < 0)
+ 			dev_vdbg(omap->dev, "failed to register notifier for USB\n");
+ 
+ 		omap->id_nb.notifier_call = dwc3_omap_id_notifier;
+-		ret = extcon_register_notifier(edev, EXTCON_USB_HOST,
+-						&omap->id_nb);
++		ret = devm_extcon_register_notifier(omap->dev, edev,
++						EXTCON_USB_HOST, &omap->id_nb);
+ 		if (ret < 0)
+ 			dev_vdbg(omap->dev, "failed to register notifier for USB-HOST\n");
+ 
+-		if (extcon_get_cable_state_(edev, EXTCON_USB) == true)
++		if (extcon_get_state(edev, EXTCON_USB) == true)
+ 			dwc3_omap_set_mailbox(omap, OMAP_DWC3_VBUS_VALID);
+-		if (extcon_get_cable_state_(edev, EXTCON_USB_HOST) == true)
++		if (extcon_get_state(edev, EXTCON_USB_HOST) == true)
+ 			dwc3_omap_set_mailbox(omap, OMAP_DWC3_ID_GROUND);
+ 
+ 		omap->edev = edev;
+@@ -528,17 +528,13 @@ static int dwc3_omap_probe(struct platform_device *pdev)
+ 	ret = of_platform_populate(node, NULL, NULL, dev);
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "failed to create dwc3 core\n");
+-		goto err2;
++		goto err1;
+ 	}
+ 
+ 	dwc3_omap_enable_irqs(omap);
+ 	enable_irq(omap->irq);
+ 	return 0;
+ 
+-err2:
+-	extcon_unregister_notifier(omap->edev, EXTCON_USB, &omap->vbus_nb);
+-	extcon_unregister_notifier(omap->edev, EXTCON_USB_HOST, &omap->id_nb);
+-
+ err1:
+ 	pm_runtime_put_sync(dev);
+ 	pm_runtime_disable(dev);
+@@ -550,8 +546,6 @@ static int dwc3_omap_remove(struct platform_device *pdev)
+ {
+ 	struct dwc3_omap	*omap = platform_get_drvdata(pdev);
+ 
+-	extcon_unregister_notifier(omap->edev, EXTCON_USB, &omap->vbus_nb);
+-	extcon_unregister_notifier(omap->edev, EXTCON_USB_HOST, &omap->id_nb);
+ 	dwc3_omap_disable_irqs(omap);
+ 	disable_irq(omap->irq);
+ 	of_platform_depopulate(omap->dev);
+-- 
+1.9.1
