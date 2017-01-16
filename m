@@ -1,55 +1,38 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Jan 2017 14:11:58 +0000
-Subject: [PATCH 2/3] KVM: arm64: Access CNTHCTL_EL2 bit fields correctly
- on VHE systems
-In-Reply-To: <61f7dbf1-e20d-e9e4-950c-6a224619cf31@arm.com>
-References: <1484307093-29153-1-git-send-email-marc.zyngier@arm.com>
- <1484307093-29153-3-git-send-email-marc.zyngier@arm.com>
- <20170113123612.GA31994@cbox> <d496020c-a097-ffd5-adb7-7edb7c1a214e@arm.com>
- <e0d1473f-0cf9-a801-585b-4385bc5b35ab@arm.com>
- <61f7dbf1-e20d-e9e4-950c-6a224619cf31@arm.com>
-Message-ID: <c82f705e-c32a-15b1-92f6-d7694f91fe0e@arm.com>
+Date: Mon, 16 Jan 2017 14:14:35 +0000
+Subject: [PATCH V9 0/3] irqchip: qcom: Add IRQ combiner driver
+In-Reply-To: <266105963441d1cdddeaf40c4b78c239@codeaurora.org>
+References: <1481753438-3905-1-git-send-email-agustinv@codeaurora.org>
+ <16e3b40407e8072dd5b15bf7e65afb18@codeaurora.org>
+ <CAJZ5v0h_v-iER5Fffdoczj4CAhetGYqOfJOhdO561_kNCnsEFg@mail.gmail.com>
+ <266105963441d1cdddeaf40c4b78c239@codeaurora.org>
+Message-ID: <8587b5ab-59b1-feb7-09d9-7ade6d433a4c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/01/17 13:30, Marc Zyngier wrote:
-> On 13/01/17 14:56, Suzuki K Poulose wrote:
->> On 13/01/17 13:30, Marc Zyngier wrote:
->>> [+ Suzuki, who wrote the whole cpus_have_const_cap thing]
->>>
+On 16/01/17 14:07, Agustin Vega-Frias wrote:
+> Hi Rafael,
 > 
-> [...]
+> On 2017-01-03 16:56, Rafael J. Wysocki wrote:
+>> On Tue, Jan 3, 2017 at 4:19 PM, Agustin Vega-Frias
+>> <agustinv@codeaurora.org> wrote:
+>>> Hi,
+>>>
+>>> Is there any more feedback on this beyond Lorenzo's suggestion to drop
+>>> the conditional check on the first patch?
+>>> How can we move forward on this series?
+>>
+>> Essentially, I need to convince myself that patches [1-2/3] are fine
+>> which hasn't happened yet.
 > 
->>> But maybe we should have have some stronger guarantees that we'll
->>> always get things inlined, and that the "const" side is enforced:
->>
->> Agreed.
->>
->>>
->>> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
->>> index b4989df..4710469 100644
->>> --- a/arch/arm64/include/asm/cpufeature.h
->>> +++ b/arch/arm64/include/asm/cpufeature.h
->>> @@ -105,10 +105,11 @@ static inline bool cpu_have_feature(unsigned int num)
->>>  }
->>>
->>>  /* System capability check for constant caps */
->>> -static inline bool cpus_have_const_cap(int num)
->>> +static __always_inline bool cpus_have_const_cap(int num)
->>
->> I think we should have the above change and make it inline always.
->>
->>>  {
->>> -	if (num >= ARM64_NCAPS)
->>> -		return false;
->>> +	BUILD_BUG_ON(!__builtin_constant_p(num));
->>
->> This is not needed, as the compilation would fail if num is not a constant with
->> static key code.
+> Pinging again. Do you have any questions that might help with your
+> review? I have some minor changes I have to make to the driver itself
+> (patch 3) and I'd like to submit any changes you might want along with
+> those.
 
-I also just checked this, and it doesn't fail if the compiler doesn't
-directly supports jump labels (we then fallback to the static key being
-a standard memory access).
+I'd like to add that these two initial patches are now a prerequisite
+for Hanjun's series, so it'd be good to have an idea of where we're
+going on that front.
 
 Thanks,
 
