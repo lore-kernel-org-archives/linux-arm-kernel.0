@@ -1,49 +1,31 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 16 Jan 2017 13:32:31 +0000
-Subject: [RFC PATCH 08/10] arm64/sve: ptrace: Wire up vector length
- control and reporting
-In-Reply-To: <20170116122038.GG28060@E107787-LIN>
-References: <1484220369-23970-1-git-send-email-Dave.Martin@arm.com>
- <1484220369-23970-9-git-send-email-Dave.Martin@arm.com>
- <20170116122038.GG28060@E107787-LIN>
-Message-ID: <20170116133231.GO3699@e103592.cambridge.arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 16 Jan 2017 11:34:05 -0200
+Subject: [PATCH 1/3] watchdog: imx2: Only i.MX35 and later have a WMCR
+ register
+In-Reply-To: <20170109095039.11979-2-u.kleine-koenig@pengutronix.de>
+References: <20170109095039.11979-1-u.kleine-koenig@pengutronix.de>
+ <20170109095039.11979-2-u.kleine-koenig@pengutronix.de>
+Message-ID: <CAOMZO5BH+B5dxNGC-2bNZe-PCqcmOXd=xenmd-pfLKncDp--gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2017 at 12:20:38PM +0000, Yao Qi wrote:
-> On 17-01-12 11:26:07, Dave Martin wrote:
-> > This patch adds support for manipulating a task's vector length at
-> > runtime via ptrace.
-> > 
-> 
-> I hope kernel doesn't provide such interface to ptracer to change vector
-> length.
+Hi Magnus,
 
-It does, with this patch, beacuse...
+On Mon, Jan 9, 2017 at 7:50 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> Commit 5fe65ce7ccbb ("watchdog: imx2_wdt: Disable power down counter on
+> boot") introduced a write to the WMCR register that doesn't exist on
+> i.MX21, i.MX27 and i.MX31 and so makes the SoC hang during probe.
+>
+> So teach the driver to differentiate between these two types. Note that
+> this effectively undoes commit 5fe65ce7ccbb for machines using dt until
+> their dtb is updated accordingly. This is critical iff the bootloader
+> doesn't disable the power down counter and the #WDOG signal actually
+> does something to the machine.
+>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-> The vector length is sort of a read-only property of thread/process/
-> program to debugger, unless we really have a clear requirement to modify
-> vector length in debugging.  I may miss something because I haven't debug
-> SVE code yet.
+Is it possible for you to try this series and let us know if it fixes
+the mx31 watchdog issue?
 
-...the vector length is no longer read-only for the task, thanks to
-the new prctls().
-
-This does add complexity, but I figured that any programmer's model
-state that the thread can modify for itself should be modifiable by the
-debugger, if for no other reason than the user may want to experiment to
-see what happens.  Without a ptrace interface, it would be necessary
-to inject a prctl() call into the target, which is possible but awkward.
-
-gdb must already re-detect the vector length on stop, since the target
-could have called the prctl() in the meantime.
-
-Access via ptrace also allows things like trapping on exec, fork or
-clone and changing the vector length for the new process or thread
-before it starts to run.  I'm guessing here, but such a scenario seems
-legitimate (?)
-
-[...]
-
-Cheers
----Dave
+Thanks
