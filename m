@@ -1,137 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 16 Jan 2017 11:53:10 +0000
-Subject: [PATCH V7 04/10] arm64: exception: handle Synchronous External
- Abort
-In-Reply-To: <1484244924-24786-5-git-send-email-tbaicar@codeaurora.org>
-References: <1484244924-24786-1-git-send-email-tbaicar@codeaurora.org>
- <1484244924-24786-5-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <20170116115309.GE1510@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 16 Jan 2017 11:56:07 +0000
+Subject: [Question] A question about arm64 pte
+In-Reply-To: <d284f510-f025-db84-f21e-a5b167d4bcd2@huawei.com>
+References: <d284f510-f025-db84-f21e-a5b167d4bcd2@huawei.com>
+Message-ID: <20170116115606.GA6832@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2017 at 11:15:18AM -0700, Tyler Baicar wrote:
-> SEA exceptions are often caused by an uncorrected hardware
-> error, and are handled when data abort and instruction abort
-> exception classes have specific values for their Fault Status
-> Code.
-> When SEA occurs, before killing the process, go through
-> the handlers registered in the notification list.
-> Update fault_info[] with specific SEA faults so that the
-> new SEA handler is used.
-> 
-> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
-> ---
->  arch/arm64/include/asm/system_misc.h | 13 ++++++++
->  arch/arm64/mm/fault.c                | 58 +++++++++++++++++++++++++++++-------
->  2 files changed, 61 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
-> index 57f110b..e7f3440 100644
-> --- a/arch/arm64/include/asm/system_misc.h
-> +++ b/arch/arm64/include/asm/system_misc.h
-> @@ -64,4 +64,17 @@ extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
->  
->  #endif	/* __ASSEMBLY__ */
->  
-> +/*
-> + * The functions below are used to register and unregister callbacks
-> + * that are to be invoked when a Synchronous External Abort (SEA)
-> + * occurs. An SEA is raised by certain fault status codes that have
-> + * either data or instruction abort as the exception class, and
-> + * callbacks may be registered to parse or handle such hardware errors.
-> + *
-> + * Registered callbacks are run in an interrupt/atomic context. They
-> + * are not allowed to block or sleep.
-> + */
-> +int register_sea_notifier(struct notifier_block *nb);
-> +void unregister_sea_notifier(struct notifier_block *nb);
+On Mon, Jan 16, 2017 at 06:08:47PM +0800, Yisheng Xie wrote:
+> I have question about arm64 pte.
 
-I still don't understand why you need notifiers for this. You register
-precisely one hook in the series.
+I assume the context is ARMv8.0 (without hardware DBM support).
 
->  #endif	/* __ASM_SYSTEM_MISC_H */
-> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> index 05d2bd7..81039c7 100644
-> --- a/arch/arm64/mm/fault.c
-> +++ b/arch/arm64/mm/fault.c
-> @@ -39,6 +39,22 @@
->  #include <asm/pgtable.h>
->  #include <asm/tlbflush.h>
->  
-> +/*
-> + * GHES SEA handler code may register a notifier call here to
-> + * handle HW error record passed from platform.
-> + */
-> +static ATOMIC_NOTIFIER_HEAD(sea_handler_chain);
-> +
-> +int register_sea_notifier(struct notifier_block *nb)
-> +{
-> +	return atomic_notifier_chain_register(&sea_handler_chain, nb);
-> +}
-> +
-> +void unregister_sea_notifier(struct notifier_block *nb)
-> +{
-> +	atomic_notifier_chain_unregister(&sea_handler_chain, nb);
-> +}
-> +
->  static const char *fault_name(unsigned int esr);
->  
->  #ifdef CONFIG_KPROBES
-> @@ -480,6 +496,28 @@ static int do_bad(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->  	return 1;
->  }
->  
-> +/*
-> + * This abort handler deals with Synchronous External Abort.
-> + * It calls notifiers, and then returns "fault".
-> + */
-> +static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
-> +{
-> +	struct siginfo info;
-> +
-> +	atomic_notifier_call_chain(&sea_handler_chain, 0, NULL);
-> +
-> +	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
-> +		 fault_name(esr), esr, addr);
-> +
-> +	info.si_signo = SIGBUS;
-> +	info.si_errno = 0;
-> +	info.si_code  = 0;
-> +	info.si_addr  = (void __user *)addr;
-> +	arm64_notify_die("", regs, &info, esr);
-> +
-> +	return 0;
-> +}
-> +
->  static const struct fault_info {
->  	int	(*fn)(unsigned long addr, unsigned int esr, struct pt_regs *regs);
->  	int	sig;
-> @@ -502,22 +540,22 @@ static const struct fault_info {
->  	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 1 permission fault"	},
->  	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 2 permission fault"	},
->  	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 3 permission fault"	},
-> -	{ do_bad,		SIGBUS,  0,		"synchronous external abort"	},
-> +	{ do_sea,		SIGBUS,  0,		"synchronous external abort"	},
->  	{ do_bad,		SIGBUS,  0,		"unknown 17"			},
->  	{ do_bad,		SIGBUS,  0,		"unknown 18"			},
->  	{ do_bad,		SIGBUS,  0,		"unknown 19"			},
-> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
-> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
-> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
-> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
-> -	{ do_bad,		SIGBUS,  0,		"synchronous parity error"	},
-> +	{ do_sea,		SIGBUS,  0,		"level 0 SEA (translation table walk)"	},
-> +	{ do_sea,		SIGBUS,  0,		"level 1 SEA (translation table walk)"	},
-> +	{ do_sea,		SIGBUS,  0,		"level 2 SEA (translation table walk)"	},
-> +	{ do_sea,		SIGBUS,  0,		"level 3 SEA (translation table walk)"	},
+> For arm64, PTE_WRITE?== PTE_DBM? is to mark whether the page is writable,
+> and PTE_DIRTY is to mark whether the page is dirty.
+> However, PTE_RDONLY is only cleared when both PTE_WRITE and PTE_DIRTY are set.
 
-Perhaps I wasn't clear enough in my previous review, but please expand the
-acronym for strings and comments.
+That's what set_pte_at() does.
 
-> +	{ do_sea,		SIGBUS,  0,		"synchronous parity or ECC err" },
+> Is that means that the page is still writable when PTE_RDONLY is set with PTE_WRITE?
 
-s/err/error/
+No. On ARMv8.0, PTE_WRITE is a software only bit while PTE_RDONLY
+describes the actual hardware permission. If set_pte_at() does not clear
+the PTE_RDONLY bit (PTE_DIRTY not set), the page is read-only even
+though PTE_WRITE may be set.
 
-Will
+> But in ARM Architecture Reference Manual for ARMv8,
+> when PTE_RDONLY is set(AP[2:1] = 0b1x), Acess from EL1 is Ready only?
+
+Yes.
+
+> so what is the really means of the PTE_RDONLY?
+
+Read-only. On ARMv8.0, PTE_WRITE is irrelevant from a hardware
+perspective.
+
+-- 
+Catalin
