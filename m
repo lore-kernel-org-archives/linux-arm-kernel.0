@@ -1,74 +1,35 @@
 From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 16 Jan 2017 21:36:59 +0900
-Subject: [PATCH v3 3/6] usb: phy: omap-otg: Replace the extcon API
+Date: Mon, 16 Jan 2017 21:37:02 +0900
+Subject: [PATCH v3 6/6] usb: renesas_usbhs: Replace the deprecated extcon API
 In-Reply-To: <1484570222-30522-1-git-send-email-cw00.choi@samsung.com>
 References: <1484570222-30522-1-git-send-email-cw00.choi@samsung.com>
- <CGME20170116123713epcas1p12ccac45604795c862e272534be38788e@epcas1p1.samsung.com>
-Message-ID: <1484570222-30522-4-git-send-email-cw00.choi@samsung.com>
+ <CGME20170116123714epcas1p1cba810e4e99c9736682c025a274a99ea@epcas1p1.samsung.com>
+Message-ID: <1484570222-30522-7-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch uses the resource-managed extcon API for extcon_register_notifier()
-and replaces the deprecated extcon API as following:
+This patch replaces the deprecated extcon API as following:
 - extcon_get_cable_state_() -> extcon_get_state()
 
-Cc: linux-omap at vger.kernel.org
 Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 Acked-by: Felipe Balbi <felipe.balbi@linux.intel.com>
+Acked-by: Yoshihiro Shimoda <yoshihiro.shimoda.uh@renesas.com>
 ---
- drivers/usb/phy/phy-omap-otg.c | 24 ++++++------------------
- 1 file changed, 6 insertions(+), 18 deletions(-)
+ drivers/usb/renesas_usbhs/common.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/usb/phy/phy-omap-otg.c b/drivers/usb/phy/phy-omap-otg.c
-index 6523af4f8f93..800d1d90753d 100644
---- a/drivers/usb/phy/phy-omap-otg.c
-+++ b/drivers/usb/phy/phy-omap-otg.c
-@@ -118,19 +118,19 @@ static int omap_otg_probe(struct platform_device *pdev)
- 	otg_dev->id_nb.notifier_call = omap_otg_id_notifier;
- 	otg_dev->vbus_nb.notifier_call = omap_otg_vbus_notifier;
+diff --git a/drivers/usb/renesas_usbhs/common.c b/drivers/usb/renesas_usbhs/common.c
+index 012a37aa3e0d..623c51300393 100644
+--- a/drivers/usb/renesas_usbhs/common.c
++++ b/drivers/usb/renesas_usbhs/common.c
+@@ -389,7 +389,7 @@ static void usbhsc_hotplug(struct usbhs_priv *priv)
  
--	ret = extcon_register_notifier(extcon, EXTCON_USB_HOST, &otg_dev->id_nb);
-+	ret = devm_extcon_register_notifier(&pdev->dev, extcon,
-+					EXTCON_USB_HOST, &otg_dev->id_nb);
- 	if (ret)
- 		return ret;
- 
--	ret = extcon_register_notifier(extcon, EXTCON_USB, &otg_dev->vbus_nb);
-+	ret = devm_extcon_register_notifier(&pdev->dev, extcon,
-+					EXTCON_USB, &otg_dev->vbus_nb);
- 	if (ret) {
--		extcon_unregister_notifier(extcon, EXTCON_USB_HOST,
--					&otg_dev->id_nb);
- 		return ret;
- 	}
- 
--	otg_dev->id = extcon_get_cable_state_(extcon, EXTCON_USB_HOST);
--	otg_dev->vbus = extcon_get_cable_state_(extcon, EXTCON_USB);
-+	otg_dev->id = extcon_get_state(extcon, EXTCON_USB_HOST);
-+	otg_dev->vbus = extcon_get_state(extcon, EXTCON_USB);
- 	omap_otg_set_mode(otg_dev);
- 
- 	rev = readl(otg_dev->base);
-@@ -145,20 +145,8 @@ static int omap_otg_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static int omap_otg_remove(struct platform_device *pdev)
--{
--	struct otg_device *otg_dev = platform_get_drvdata(pdev);
--	struct extcon_dev *edev = otg_dev->extcon;
--
--	extcon_unregister_notifier(edev, EXTCON_USB_HOST, &otg_dev->id_nb);
--	extcon_unregister_notifier(edev, EXTCON_USB, &otg_dev->vbus_nb);
--
--	return 0;
--}
--
- static struct platform_driver omap_otg_driver = {
- 	.probe		= omap_otg_probe,
--	.remove		= omap_otg_remove,
- 	.driver		= {
- 		.name	= "omap_otg",
- 	},
+ 	if (enable && !mod) {
+ 		if (priv->edev) {
+-			cable = extcon_get_cable_state_(priv->edev, EXTCON_USB_HOST);
++			cable = extcon_get_state(priv->edev, EXTCON_USB_HOST);
+ 			if ((cable > 0 && id != USBHS_HOST) ||
+ 			    (!cable && id != USBHS_GADGET)) {
+ 				dev_info(&pdev->dev,
 -- 
 1.9.1
