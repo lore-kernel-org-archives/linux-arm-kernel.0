@@ -1,170 +1,75 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 16 Jan 2017 18:29:00 +0000
-Subject: [BUG] linux-next cannot compile in AES crypto code of ARM
-In-Reply-To: <534751484590587@web17h.yandex.ru>
-References: <534751484590587@web17h.yandex.ru>
-Message-ID: <65230bb3-d3bf-ff6e-1bcb-c37ee4515c4e@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 16 Jan 2017 18:30:32 +0000
+Subject: [PATCH v19 10/15] clocksource/drivers/arm_arch_timer: Refactor
+ the timer init code to prepare for GTDT
+In-Reply-To: <20161221064603.11830-11-fu.wei@linaro.org>
+References: <20161221064603.11830-1-fu.wei@linaro.org>
+ <20161221064603.11830-11-fu.wei@linaro.org>
+Message-ID: <20170116183032.GL5908@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/01/17 18:16, Icenowy Zheng wrote:
-> I'm trying build linux-next for Allwinner H3 (ARMv7 SoC).
+On Wed, Dec 21, 2016 at 02:45:58PM +0800, fu.wei at linaro.org wrote:
+> From: Fu Wei <fu.wei@linaro.org>
 > 
-> My compiler is GCC 6.2.0.
+> The patch refactor original memory-mapped timer init code:
+>     (1) Refactor "arch_timer_mem_init", make it become a common code for
+>         memory-mapped timer init.
+>     (2) Add a new function "arch_timer_mem_of_init" for DT init.
 
-The patch to fix this[1] is already in Linux-next; alternatively you
-could also go back to an older binutils (without ARMv8-M support) to
-avoid it for the time being.
+As a general note, please write proper commit messages, describing what
+the problem is, and why we are making the changes. These bullet points
+don't add anything to what can be derived from a glance at the code.
 
-Robin.
+For this patch, you can use:
 
-[1]:https://www.mail-archive.com/linux-crypto at vger.kernel.org/msg23076.html
+  clocksource: arm_arch_timer: refactor MMIO timer probing
 
-> 
-> When building, I got following error:
-> ```
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S: Assembler messages:
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:21: Error: selected processor does not support `tt .req ip' in ARM mode
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `movw tt,#:lower16:crypto_ft_tab'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `movt tt,#:upper16:crypto_ft_tab'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r8,[tt,r8,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r9,[tt,r9,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r10,[tt,r10,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r11,[tt,r11,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r10,[tt,r10,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r11,[tt,r11,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r5,[tt,r5,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r6,[tt,r6,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r4,[tt,r4,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r5,[tt,r5,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r6,[tt,r6,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r7,[tt,r7,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r6,[tt,r6,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r7,[tt,r7,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r9,[tt,r9,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r10,[tt,r10,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r8,[tt,r8,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r9,[tt,r9,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r10,[tt,r10,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r11,[tt,r11,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r10,[tt,r10,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r11,[tt,r11,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r5,[tt,r5,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r6,[tt,r6,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `movwls tt,#:lower16:crypto_fl_tab'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `movtls tt,#:upper16:crypto_fl_tab'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r4,[tt,r4,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r5,[tt,r5,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r6,[tt,r6,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r7,[tt,r7,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r6,[tt,r6,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r7,[tt,r7,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r9,[tt,r9,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r10,[tt,r10,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `movw tt,#:lower16:crypto_it_tab'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `movt tt,#:upper16:crypto_it_tab'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r8,[tt,r8,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r9,[tt,r9,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r10,[tt,r10,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r11,[tt,r11,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r10,[tt,r10,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r11,[tt,r11,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r5,[tt,r5,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r4,[tt,r4,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r4,[tt,r4,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r5,[tt,r5,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r6,[tt,r6,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r7,[tt,r7,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r6,[tt,r6,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r7,[tt,r7,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r9,[tt,r9,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r8,[tt,r8,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r8,[tt,r8,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r9,[tt,r9,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r10,[tt,r10,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r11,[tt,r11,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r10,[tt,r10,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r11,[tt,r11,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r5,[tt,r5,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r4,[tt,r4,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `movwls tt,#:lower16:crypto_il_tab'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `movtls tt,#:upper16:crypto_il_tab'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r4,[tt,r4,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r5,[tt,r5,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r6,[tt,r6,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r7,[tt,r7,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r6,[tt,r6,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r7,[tt,r7,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r9,[tt,r9,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
-> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r8,[tt,r8,lsl#2]'
-> ```
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+  Currently the code to probe MMIO architected timers mixes DT parsing
+  with actual poking of hardware. This makes the code harder than
+  necessary to understand, and makes it difficult to add support for
+  probing via ACPI.
+
+  This patch factors all the DT-specific logic out of
+  arch_timer_mem_init(), into a new function, arch_timer_mem_of_init().
+  The former pokes the hardware and determines the suitablility of
+  frames based on a datastructure populated by the latter.
+
+  This cleanly separates the two and will make it possible to add
+  probing using the ACPI GTDT in subsequent patches.
+
+[...]
+
+> +	for_each_available_child_of_node(np, frame_node) {
+> +		int n;
+> +		struct arch_timer_mem_frame *frame = &timer_mem->frame[i];
+> +
+> +		if (of_property_read_u32(frame_node, "frame-number", &n)) {
+> +			pr_err("Missing frame-number\n");
+> +			of_node_put(frame_node);
+> +			goto out;
+> +		}
+> +		frame->frame_nr = n;
+> +
+> +		if (of_address_to_resource(frame_node, 0, &res)) {
+> +			of_node_put(frame_node);
+> +			goto out;
+> +		}
+> +		frame->cntbase = res.start;
+> +		frame->size = resource_size(&res);
+> +
+> +		frame->virt_irq = irq_of_parse_and_map(frame_node,
+> +						       ARCH_TIMER_VIRT_SPI);
+> +		frame->phys_irq = irq_of_parse_and_map(frame_node,
+> +						       ARCH_TIMER_PHYS_SPI);
+>  
+> -	if (!arch_timer_needs_of_probing())
+> +		if (++i >= ARCH_TIMER_MEM_MAX_FRAMES)
+> +			break;
+> +	}
+
+It would be good if we could warn upon seeing more than
+ARCH_TIMER_MEM_MAX_FRAMES children, since that's obviously an error.
+
+Thanks,
+Mark.
