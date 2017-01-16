@@ -1,49 +1,53 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 16 Jan 2017 18:10:00 +0900
-Subject: [PATCH v2 0/2] phy: Replace the deprecated extcon API
-In-Reply-To: <58749873.4070302@samsung.com>
-References: <CGME20161230041136epcas5p4e0229714cd00961e5d3cb5ef9923b7aa@epcas5p4.samsung.com>
- <1483071089-8362-1-git-send-email-cw00.choi@samsung.com>
- <58749873.4070302@samsung.com>
-Message-ID: <587C8DE8.5050106@samsung.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 16 Jan 2017 14:39:25 +0530
+Subject: [PATCH v2 2/2] phy: sun4i-usb: Replace the deprecated extcon API
+In-Reply-To: <1483071089-8362-3-git-send-email-cw00.choi@samsung.com>
+References: <1483071089-8362-1-git-send-email-cw00.choi@samsung.com>
+ <CGME20161230041136epcas5p4719845a9e04914e91dd6dac1a5d257ef@epcas5p4.samsung.com>
+ <1483071089-8362-3-git-send-email-cw00.choi@samsung.com>
+Message-ID: <587C8DC5.5040001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
 
-On 2017? 01? 10? 17:16, Chanwoo Choi wrote:
-> Hi Kishon,
+
+On Friday 30 December 2016 09:41 AM, Chanwoo Choi wrote:
+> This patch replaces the deprecated extcon API as following:
+> - extcon_set_cable_state_() -> extcon_set_state_sync()
 > 
-> Could you review these patches or pick up them if there is no any comment?
+> Cc: Kishon Vijay Abraham I <kishon@ti.com>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
 
-If there are no comments, could you apply these patches?
+merged both the patches in this series.
 
+Thanks
+Kishon
+> ---
+>  drivers/phy/phy-sun4i-usb.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> On 2016? 12? 30? 13:11, Chanwoo Choi wrote:
->> This patches just replace the deprecated extcon API without any change
->> of extcon operation and use the resource-managed function for
->> extcon_register_notifier().
->>
->> The new extcon API instead of deprecated API.
->> - extcon_set_cable_state_() -> extcon_set_state_sync();
->> - extcon_get_cable_state_() -> extcon_get_state();
->>
->> Changes from v1:
->> - Rebase these patches based on v4.10-rc1.
->> - Drop the usb/power-supply/chipidea patches.
->>
->> Chanwoo Choi (2):
->>   phy: rcar-gen3-usb2: Replace the deprecated extcon API
->>   phy: sun4i-usb: Replace the deprecated extcon API
->>
->>  drivers/phy/phy-rcar-gen3-usb2.c | 8 ++++----
->>  drivers/phy/phy-sun4i-usb.c      | 4 ++--
->>  2 files changed, 6 insertions(+), 6 deletions(-)
->>
+> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+> index bf28a0fdd569..eae171e18043 100644
+> --- a/drivers/phy/phy-sun4i-usb.c
+> +++ b/drivers/phy/phy-sun4i-usb.c
+> @@ -534,7 +534,7 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+>  	mutex_unlock(&phy0->mutex);
+>  
+>  	if (id_notify) {
+> -		extcon_set_cable_state_(data->extcon, EXTCON_USB_HOST,
+> +		extcon_set_state_sync(data->extcon, EXTCON_USB_HOST,
+>  					!id_det);
+>  		/* When leaving host mode force end the session here */
+>  		if (force_session_end && id_det == 1) {
+> @@ -547,7 +547,7 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+>  	}
+>  
+>  	if (vbus_notify)
+> -		extcon_set_cable_state_(data->extcon, EXTCON_USB, vbus_det);
+> +		extcon_set_state_sync(data->extcon, EXTCON_USB, vbus_det);
+>  
+>  	if (sun4i_usb_phy0_poll(data))
+>  		queue_delayed_work(system_wq, &data->detect, POLL_TIME);
 > 
-
-
--- 
-Best Regards,
-Chanwoo Choi
-S/W Center, Samsung Electronics
