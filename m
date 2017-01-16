@@ -1,36 +1,62 @@
-From: qiyaoltc@gmail.com (Yao Qi)
-Date: Mon, 16 Jan 2017 11:34:39 +0000
-Subject: [RFC PATCH 06/10] arm64/sve: Disallow VL setting for individual
- threads by default
-In-Reply-To: <1484220369-23970-7-git-send-email-Dave.Martin@arm.com>
-References: <1484220369-23970-1-git-send-email-Dave.Martin@arm.com>
- <1484220369-23970-7-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20170116113439.GF28060@E107787-LIN>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 16 Jan 2017 11:38:04 +0000
+Subject: [PATCH v7 15/15] irqchip: mbigen: Add ACPI support
+In-Reply-To: <58799376.6040302@huawei.com>
+References: <1484147199-4267-1-git-send-email-hanjun.guo@linaro.org>
+ <1484147199-4267-16-git-send-email-hanjun.guo@linaro.org>
+ <20170113102104.GB20837@red-moon> <58799376.6040302@huawei.com>
+Message-ID: <20170116113804.GB23703@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17-01-12 11:26:05, Dave Martin wrote:
-> General-purpose code in userspace is not expected to work correctly
-> if multiple threads are allowed to run concurrently with different
-> vector lengths in a single process.
+On Sat, Jan 14, 2017 at 10:56:54AM +0800, Hanjun Guo wrote:
+> Hi Lorenzo,
 > 
-> This patch adds an explicit flag PR_SVE_SET_VL_THREAD to request
-> this behaviour.  Without the flag, vector length setting is
-> permitted only for a single-threaded process (which matches the
-> expected usage model of setting the vector length at process
-> startup).
+> On 2017/1/13 18:21, Lorenzo Pieralisi wrote:
+> > On Wed, Jan 11, 2017 at 11:06:39PM +0800, Hanjun Guo wrote:
+> >> With the preparation of platform msi support and interrupt producer
+> >> in DSDT, we can add mbigen ACPI support now.
+> >>
+> >> We are using _PRS methd to indicate number of irq pins instead
+> >> of num_pins in DT to avoid _DSD usage in this case.
+> >>
+> >> For mbi-gen,
+> >>     Device(MBI0) {
+> >>           Name(_HID, "HISI0152")
+> >>           Name(_UID, Zero)
+> >>           Name(_CRS, ResourceTemplate() {
+> >>                   Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
+> >>           })
+> >>
+> >>           Name (_PRS, ResourceTemplate() {
+> >> 		  Interrupt(ResourceProducer,...) {12,14,....}
+> > I still do not understand why you are using _PRS for this, I think
+> > the MBIgen configuration is static and if it is so the Interrupt
+> > resource should be part of the _CRS unless there is something I am
+> > missing here.
+> 
+> Sorry for not clear in the commit message. MBIgen is an interrupt producer
+> which produces irq resource to devices connecting to it, and MBIgen itself
+> don't consume wired interrupts.
 
-Hi Dave,
-PR_SVE_SET_VL_THREAD can be arch-independent, IMO, because prctl
-needs a scope.  Looks some of them are system-wide, some of them are
-about threads within the same process (like, PR_MPX_ENABLE_MANAGEMENT).
-IOW, PR_SVE_SET_VL_THREAD can be general flag, to indicate the scope
-of each new ptrcl command is per-thread.
+That's why you mark it as ResourceProducer, but that's not a reason to
+put it in the _PRS instead of _CRS.
 
-I happen to see PR_SET_FP_MODE in man pages, which is about setting
-FP register modes in runtime.  It is a little similar to setting VL in
-this patch.  However the doc doesn't mention the effect or the scope
-of this command.
+IIUC _PRS is there to provide a way to define the possible resource
+settings of a _configurable_ device (ie programmable) so that the actual
+resource value you would programme with a call to its _SRS is sane (ie
+the OS has a way, through the _PRS, to detect what possible resource
+settings are available for the device).
 
--- 
-Yao (??)
+I think Rafael has more insights into how the _PRS is used on x86
+systems so I would ask his point of view here before merrily merging
+this code.
+
+> Also devices connecting MBIgen may not consume all the interrupts produced
+> by MBIgen, for example, MBIgen may produce 128 interrupts but only half of
+> them are currently used, so _PRS here means "provide interrupt resources
+> may consumed by devices connecting to it".
+
+See above.
+
+Lorenzo
