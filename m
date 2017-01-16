@@ -1,42 +1,42 @@
-From: christopher.lee.bostic@gmail.com (christopher.lee.bostic at gmail.com)
-Date: Mon, 16 Jan 2017 15:23:36 -0600
-Subject: [PATCH v3 02/18] drivers/fsi: Add device & driver definitions
-Message-ID: <1484601816-98188-1-git-send-email-christopher.lee.bostic@gmail.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Mon, 16 Jan 2017 23:48:40 +0200
+Subject: [PATCH 2/3] dts: teach newer i.MX machines to have the i.MX35
+ type watchdog
+In-Reply-To: <20170116204337.j67oeknraas7ryib@pengutronix.de>
+References: <20170109095039.11979-1-u.kleine-koenig@pengutronix.de>
+ <20170109095039.11979-3-u.kleine-koenig@pengutronix.de>
+ <CAOMZO5CjkW1SdSAcSOj8Uws-xjoh=iZ1Ey9dwBdOdBzQLS6h8w@mail.gmail.com>
+ <20170116204337.j67oeknraas7ryib@pengutronix.de>
+Message-ID: <0586b2cd-6cbb-2e8a-9cd6-d7220708931d@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeremy Kerr <jk@ozlabs.org>
+On 01/16/2017 10:43 PM, Uwe Kleine-K?nig wrote:
+> On Mon, Jan 16, 2017 at 04:35:26PM -0200, Fabio Estevam wrote:
+>> On Mon, Jan 9, 2017 at 7:50 AM, Uwe Kleine-K?nig
+>> <u.kleine-koenig@pengutronix.de> wrote:
+>>> Only i.MX35 and newer feature a WMCR register that should be written to. Older
+>>> SoCs hang when this address is written.
+>>>
+>>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>>
+>> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+>>
+>> Only a minor nit: Subject could: ARM: dts: imx: teach...
+> 
+> Ack. To reference the commit id of the first patch in the third I can
+> prepare a branch to pull. There I'd fix the Subject. Shawn, is this OK?
+> 
 
-Add structs for fsi devices & drivers, and struct device conversion
-functions.
+This is too early for changes, which are not reviewed by Linux watchdog masters.
 
-Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
-Signed-off-by: Chris Bostic <cbostic@us.ibm.com>
----
- include/linux/fsi.h | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+As I emphasized multiple times in our discussions your series is organized
+improperly, it has interdependencies between DTS and driver, it lacks
+atomicity feature of a proper fix, in the middle it breaks backward compatibility
+with old DTB, all that makes it impossible to send an atomic fix for linux-stable,
+some of the changes are captured from mine ones without preserving the authorship
+or even a reported-by credit.
 
-diff --git a/include/linux/fsi.h b/include/linux/fsi.h
-index 47aa181..f73886a 100644
---- a/include/linux/fsi.h
-+++ b/include/linux/fsi.h
-@@ -17,6 +17,17 @@
- 
- #include <linux/device.h>
- 
-+struct fsi_device {
-+	struct device dev;
-+};
-+
-+struct fsi_driver {
-+	struct device_driver drv;
-+};
-+
-+#define to_fsi_dev(devp) container_of(devp, struct fsi_device, dev)
-+#define to_fsi_drv(drvp) container_of(drvp, struct fsi_driver, drv)
-+
- extern struct bus_type fsi_bus_type;
- 
- #endif /* LINUX_FSI_H */
--- 
-1.8.2.2
+--
+With best wishes,
+Vladimir
