@@ -1,67 +1,93 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Mon, 16 Jan 2017 11:13:16 +0100
-Subject: [PATCH 03/10] devicetree: bindings: add bindings for ahci-da850
-In-Reply-To: <35ff358d-9b17-b2be-38d8-6a51cdddc1a1@lechnology.com>
-References: <1484311084-31547-1-git-send-email-bgolaszewski@baylibre.com>
- <1484311084-31547-4-git-send-email-bgolaszewski@baylibre.com>
- <35ff358d-9b17-b2be-38d8-6a51cdddc1a1@lechnology.com>
-Message-ID: <CAMpxmJUau9BgAOhacPvcA=NwyE6-yEfDgPdcCZ_JCuNH-amJSA@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 16 Jan 2017 11:18:04 +0100
+Subject: [PATCH v2 0/4] Amlogic Meson SAR ADC support
+In-Reply-To: <20170115224221.15510-1-martin.blumenstingl@googlemail.com>
+References: <20170111174334.24343-1-martin.blumenstingl@googlemail.com>
+ <20170115224221.15510-1-martin.blumenstingl@googlemail.com>
+Message-ID: <d00b365e-0e12-5679-c295-6c38850cc2b9@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-01-13 20:25 GMT+01:00 David Lechner <david@lechnology.com>:
-> On 01/13/2017 06:37 AM, Bartosz Golaszewski wrote:
->>
->> Add DT bindings for the TI DA850 AHCI SATA controller.
->>
->> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->> ---
->>  .../devicetree/bindings/ata/ahci-da850.txt          | 21
->> +++++++++++++++++++++
->>  1 file changed, 21 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/ata/ahci-da850.txt
->>
->> diff --git a/Documentation/devicetree/bindings/ata/ahci-da850.txt
->> b/Documentation/devicetree/bindings/ata/ahci-da850.txt
->> new file mode 100644
->> index 0000000..d07c241
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/ata/ahci-da850.txt
->> @@ -0,0 +1,21 @@
->> +Device tree binding for the TI DA850 AHCI SATA Controller
->> +---------------------------------------------------------
->> +
->> +Required properties:
->> +  - compatible: must be "ti,da850-ahci"
->> +  - reg: physical base addresses and sizes of the controller's register
->> areas
->> +  - interrupts: interrupt specifier (refer to the interrupt binding)
->> +
->> +Optional properties:
->> +  - clocks: clock specifier (refer to the common clock binding)
->> +  - da850,clk_multiplier: the multiplier for the reference clock needed
->> +                          for 1.5GHz PLL output
->
->
-> A clock multiplier property seems redundant if you are specifying a clock.
-> It should be possible to get the rate from the clock to determine which
-> multiplier is needed.
->
+On 01/15/2017 11:42 PM, Martin Blumenstingl wrote:
+> This series add support for the SAR ADC on Amlogic Meson GXBB, GXL and
+> GXM SoCs.
+> The hardware on GXBB provides 10-bit ADC results, while GXL and GXM are
+> providing 12-bit results. Support for older SoCs (Meson8b and Meson8)
+> can be added with little effort, most of which is testing I guess (I
+> don't have any pre-GXBB hardware so I can't say).
+> 
+> A new set of clocks had to be added to the GXBB clock controller (used
+> by the GXBB/GXL/GXM SoCs) which are required to get the ADC working.
+> 
+> The ADC itself can sample multiple channels at the same time and allows
+> capturing multiple samples (which can be used for filtering/averaging).
+> The ADC results are stored inside a FIFO register. More details on what
+> the driver supports (or doesn't) can be found in the description of
+> patch #3.
+> 
+> The code is based on the public S805 (Meson8b) and S905 (GXBB)
+> datasheets, as well as by reading (various versions of) the vendor
+> driver and by inspecting the registers on the vendor kernels of my
+> testing-hardware.
+> 
+> Typical use-cases for the ADC on the Meson GX SoCs are:
+> - adc-keys ("ADC attached resistor ladder buttons")
+> - SoC temperature measurement (not supported by this driver yet as
+>   the system firmware does this already and provides the values via the
+>   SCPI protocol)
+> - "version-strapping" (different resistor values are used to indicate
+>   the board-revision)
+> - and of course typical ADC measurements
+> 
+> Thanks to Heiner Kallweit, Jonathan Cameron and Lars-Peter Clausen for
+> reviewing this series and providing valuable input!
+> 
+> Changes since v1 (all changes are for patch #3, except where noted):
+> - fix IRQ number in meson-gx.dtsi (thanks to Heiner Kallweit for
+>   providing the correct value), affects patch #4
+> - move the most used members of meson_saradc_priv to the beginning
+> - remove unused struct member "completion" from meson_saradc_priv
+> - use devm_kasprintf() instead of snprintf() + devm_kstrdup()
+> - initialize indio_dev->dev.parent earlier in meson_saradc_probe()
+> - moved meson_saradc_clear_fifo() logic to a separate function
+> - add comment why a do ... while loop is required in
+>   meson_saradc_wait_busy_clear()
+> - remove SAR_ADC_NUM_CHANNELS and SAR_ADC_VALUE_MASK macros (each of them
+>   was only used once and it's an unneeded level of abstraction)
+> - fixed multiline comment syntax violations
+> - dropped unneeded log messages during initialization
+> - set iio_dev name to "meson-gxbb-saradc" or "meson-gxl-saradc"
+> - use "indio_dev->dev.parent" in all kernel log calls (dev_warn/err/etc)
+>   to make it show the OF node name (instead of the iio device name)
+> - introduce struct meson_saradc_data to hold platform-specific
+>   information (such as resolution in bits and the iio_dev name)
+> 
+> 
+> Martin Blumenstingl (4):
+>   Documentation: dt-bindings: add the Amlogic Meson SAR ADC
+>     documentation
+>   clk: gxbb: add the SAR ADC clocks and expose them
+>   iio: adc: add a driver for the SAR ADC found in Amlogic Meson SoCs
+>   ARM64: dts: meson: meson-gx: add the SAR ADC
+> 
+>  .../bindings/iio/adc/amlogic,meson-saradc.txt      |  31 +
+>  arch/arm64/boot/dts/amlogic/meson-gx.dtsi          |   8 +
+>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |  10 +
+>  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         |  10 +
+>  drivers/clk/meson/gxbb.c                           |  48 ++
+>  drivers/clk/meson/gxbb.h                           |   9 +-
+>  drivers/iio/adc/Kconfig                            |  12 +
+>  drivers/iio/adc/Makefile                           |   1 +
+>  drivers/iio/adc/meson_saradc.c                     | 893 +++++++++++++++++++++
+>  include/dt-bindings/clock/gxbb-clkc.h              |   4 +
+>  10 files changed, 1023 insertions(+), 3 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/iio/adc/amlogic,meson-saradc.txt
+>  create mode 100644 drivers/iio/adc/meson_saradc.c
+> 
 
-I probably should have named it differently. This is not a multiplier
-of a clock derived from PLL0 or PLL1. Instead it's a value set by
-writing to the Port PHY Control Register (MPY bits) of the SATA
-controller that configures the multiplier for the external low-jitter
-clock. On the lcdk the signals (REFCLKP, REFCLKN) are provided by
-CDCM61001 (SATA OSCILLATOR component on the schematics).
+Good work martin !
 
-I'll find a better name and comment the property accordingly.
+Tested on the P200 board with the resistor ladderred key matrix, patch will be posted shortly.
 
-FYI: the da850 platform does not use the common clock framework, so I
-don't specify the clock property on the sata node in the device tree.
-Instead I add the clock lookup entry in patch [01/10]. This is
-transparent for AHCI which can get the clock as usual by calling
-clk_get() in ahci_platform_get_resources().
-
-Thanks,
-Bartosz Golaszewski
+For all the serie :
+Tested-by: Neil Armstrong <narmstrong@baylibre.com>
