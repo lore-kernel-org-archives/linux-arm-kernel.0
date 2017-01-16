@@ -1,81 +1,62 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 16 Jan 2017 11:39:53 +0100
-Subject: [PATCH v4] ARM64: dts: meson-gx: Add reserved memory zone and
- usable memory range
-In-Reply-To: <d3a00788-c3c1-4b10-90bf-2a8bc6a138f8@suse.de>
-References: <1484129414-23325-1-git-send-email-narmstrong@baylibre.com>
- <m21sw66828.fsf@baylibre.com> <d3a00788-c3c1-4b10-90bf-2a8bc6a138f8@suse.de>
-Message-ID: <7fcb8d94-840a-de2c-f43b-9123ccc65514@baylibre.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 16 Jan 2017 10:40:28 +0000
+Subject: [PATCH v2 2/2] vring: Force use of DMA API for ARM-based systems
+In-Reply-To: <20170113201933-mutt-send-email-mst@kernel.org>
+References: <85015f1653eb7e36f992708362b75d1f4391b783.1484070340.git.robin.murphy@arm.com>
+ <4833e705fb6841fbfdbee3b1a21a7bc917292410.1484070340.git.robin.murphy@arm.com>
+ <20170111013046-mutt-send-email-mst@kernel.org>
+ <20170111100139.GC12388@arm.com>
+ <20170112232931-mutt-send-email-mst@kernel.org>
+ <20170113092522.GB22538@arm.com>
+ <20170113183222-mutt-send-email-mst@kernel.org>
+ <20170113172154.GL3253@arm.com>
+ <20170113201933-mutt-send-email-mst@kernel.org>
+Message-ID: <20170116104028.GA1510@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/2017 03:43 PM, Andreas F?rber wrote:
-> Am 13.01.2017 um 21:03 schrieb Kevin Hilman:
->> Neil Armstrong <narmstrong@baylibre.com> writes:
->>
->>> The Amlogic Meson GXBB/GXL/GXM secure monitor uses part of the memory space,
->>> this patch adds this reserved zone and redefines the usable memory range.
->>>
->>> The memory node is also moved from the dtsi files into the proper dts files
->>> to handle variants memory sizes.
->>>
->>> This patch also fixes the memory sizes for the following platforms :
->>> - gxl-s905x-p212 : 1GiB instead of 2GiB, a proper 2GiB dts should be pushed
->>> - gxm-s912-q201 : 1GiB instead of 2GiB, a proper 2GiB dts should be pushed
->>> - gxl-s905d-p231 : 1GiB instead of 2GiB, a proper 2GiB dts should be pushed
->>> - gxl-nexbox-a95x : 1GiB instead of 2GiB, a proper 2GiB dts should be pushed
->>>
->>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->>
->> Queued for v4.10-rc.
+On Fri, Jan 13, 2017 at 08:23:35PM +0200, Michael S. Tsirkin wrote:
+> On Fri, Jan 13, 2017 at 05:21:54PM +0000, Will Deacon wrote:
+> > On Fri, Jan 13, 2017 at 06:46:32PM +0200, Michael S. Tsirkin wrote:
+> > > On Fri, Jan 13, 2017 at 09:25:22AM +0000, Will Deacon wrote:
+> > > > On Fri, Jan 13, 2017 at 12:12:56AM +0200, Michael S. Tsirkin wrote:
+> > > > > I'd rather people didn't use SMMU with legacy devices.
+> > > > 
+> > > > I'm afraid we've been doing that for two years and the model already
+> > > > exists in a mature state, being actively used for development and
+> > > > validation by ARM and our partners. One of the big things its used for
+> > > > is to develop SMMU and GIC (our interrupt controller) code with PCI, so
+> > > > dropping the SMMU from the picture isn't an option.
+> > > 
+> > > Oh so this fixes a regression?  This is something I didn't realize.
+> > 
+> > Yes, thanks. The regression came about because we implemented SMMU-backed
+> > DMA ops and only then was it apparent that the virtio stuff was bypassing
+> > even with translation enabled (because it wasn't using the DMA API).
 > 
-> What is the motivation for this change? I have a local U-Boot patch to
-> detect the amount of memory available as done downstream, but U-Boot
-> only updates the reg property that you seem to be abandoning here...
+> Could you point out a commit ID?
+
+There has been a fair amount of work in this area recently, but you're
+probably after something like 876945dbf649 ("arm64: Hook up IOMMU dma_ops")
+as the culprit, which is the point at which we started to swizzle DMA
+ops for devices upstream of an SMMU automatically.
+
+> > > A "Fixes:" tag can't hurt here.  I then wonder
+> > > might DMA ops ever use a DMA address which isn't a physical address
+> > > from QEMU point of view? If that happens, this hack breaks
+> > > because in legacy mode QEMU still uses the GPA.
+> > 
+> > If QEMU doesn't advertise an SMMU, then it will work fine with the GPA,
+> > because we won't swizzle the DMA ops for the master device. If QEMU does
+> > advertise an SMMU, then we'll allocate DMA addresses to fit within the
+> > the intersection of the SMMU aperture and device's DMA mask.
 > 
-> So for devices that come in multiple RAM configurations - like R-Box Pro
-> - this would require separate .dts files now! This looks very wrong to
-> me, especially since I am not aware of other platforms doing the same.
-> Instead, there's memory reservations for top and bottom done in U-Boot
-> for reg, plus reserved-memory nodes for anything in the middle.
 > 
-> Another thing to consider is that uEFI boot (bootefi) handles memory
-> reservation differently yet again, on the bootloader level. I have had
-> that working fine on Odroid-C2 and Vega S95.
-> 
-> So if there's no bug this is fixing (none mentioned in commit message) I
-> strongly object to this patch.
-> 
-> Regards,
-> Andreas
-> 
+> Right but doesn't just poking from qemu into phys addresses work
+> anymore? It used to ...
 
-Hi Andreas,
+Provided that there's no SMMU, then it will continue to work. and my
+understanding (from talking to Peter Maydell) is that qemu doesn't model
+an SMMU for ARM-based machines.
 
-Like I replied of my RFT patch :
-I really disagree about relying on any work or properties added by any bootloader here, Amlogic SoCs has
-a lot of u-boot versions in the field, and the Odroid-C2 is part of this.
-
-Even if Odroid-c2 is in mainline U-Boot or not, the mainline Linux kernel should work using
-any U-boot version even with the one provided by Amlogic on their openlinux distribution channel.
-
-Handling multiple RAM configuration is another story, and the Arm-Soc and DT maintainers should give us
-their advices.
-
-Actually there is a severe bug fixed here that cause a huge crash if such memory is not reserved while
-running stock u-boot version on various shipped products and Amlogic's own development boards.
-
-The bug is easily triggered by running :
-# stress --vm 4 --vm-bytes 128M --timeout 10s &
-[   46.937975] Bad mode in Error handler detected on CPU1, code 0xbf000000 -- SError
-...
-[   47.058536] Internal error: Attempting to execute userspace memory: 8600000f [#3] PREEMPT SMP
-...
-
-Note this is a fix targeted for 4.10 to make the system stable and various users reported some severe
-crash now the system has more drivers and read-world use-cases are running on Amlogic SoCs.
-
-Please feel free to push whatever changes that makes this memory reservation more coherent for 4.11,
-and respect the behavior of already shipped u-boot version and mainline U-Boot, UEFI, whatever...
-
-Neil
+Will
