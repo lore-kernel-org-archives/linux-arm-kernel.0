@@ -1,81 +1,193 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Mon, 16 Jan 2017 16:27:28 +0200
-Subject: [PATCH v2 2/2] vring: Force use of DMA API for ARM-based systems
-In-Reply-To: <20170116142103.GF1510@arm.com>
-References: <20170111013046-mutt-send-email-mst@kernel.org>
- <20170111100139.GC12388@arm.com>
- <20170112232931-mutt-send-email-mst@kernel.org>
- <20170113092522.GB22538@arm.com>
- <20170113183222-mutt-send-email-mst@kernel.org>
- <20170113172154.GL3253@arm.com>
- <20170113201933-mutt-send-email-mst@kernel.org>
- <20170116104028.GA1510@arm.com>
- <20170116161639-mutt-send-email-mst@kernel.org>
- <20170116142103.GF1510@arm.com>
-Message-ID: <20170116162225-mutt-send-email-mst@kernel.org>
+From: jun.nie@linaro.org (Jun Nie)
+Date: Mon, 16 Jan 2017 22:28:41 +0800
+Subject: [PATCH v2 3/3] reset: zx2967: add reset controller driver for
+ ZTE's zx2967 family
+In-Reply-To: <1484564194-18530-3-git-send-email-baoyou.xie@linaro.org>
+References: <1484564194-18530-1-git-send-email-baoyou.xie@linaro.org>
+ <1484564194-18530-3-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <95ebb6fd-540b-f6d5-e039-2cd718ff35d8@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2017 at 02:21:03PM +0000, Will Deacon wrote:
-> On Mon, Jan 16, 2017 at 04:18:03PM +0200, Michael S. Tsirkin wrote:
-> > On Mon, Jan 16, 2017 at 10:40:28AM +0000, Will Deacon wrote:
-> > > On Fri, Jan 13, 2017 at 08:23:35PM +0200, Michael S. Tsirkin wrote:
-> > > > On Fri, Jan 13, 2017 at 05:21:54PM +0000, Will Deacon wrote:
-> > > > > On Fri, Jan 13, 2017 at 06:46:32PM +0200, Michael S. Tsirkin wrote:
-> > > > > > On Fri, Jan 13, 2017 at 09:25:22AM +0000, Will Deacon wrote:
-> > > > > > > On Fri, Jan 13, 2017 at 12:12:56AM +0200, Michael S. Tsirkin wrote:
-> > > > > > > > I'd rather people didn't use SMMU with legacy devices.
-> > > > > > > 
-> > > > > > > I'm afraid we've been doing that for two years and the model already
-> > > > > > > exists in a mature state, being actively used for development and
-> > > > > > > validation by ARM and our partners. One of the big things its used for
-> > > > > > > is to develop SMMU and GIC (our interrupt controller) code with PCI, so
-> > > > > > > dropping the SMMU from the picture isn't an option.
-> > > > > > 
-> > > > > > Oh so this fixes a regression?  This is something I didn't realize.
-> > > > > 
-> > > > > Yes, thanks. The regression came about because we implemented SMMU-backed
-> > > > > DMA ops and only then was it apparent that the virtio stuff was bypassing
-> > > > > even with translation enabled (because it wasn't using the DMA API).
-> > > > 
-> > > > Could you point out a commit ID?
-> > > 
-> > > There has been a fair amount of work in this area recently, but you're
-> > > probably after something like 876945dbf649 ("arm64: Hook up IOMMU dma_ops")
-> > > as the culprit, which is the point at which we started to swizzle DMA
-> > > ops for devices upstream of an SMMU automatically.
-> > > 
-> > > > > > A "Fixes:" tag can't hurt here.  I then wonder
-> > > > > > might DMA ops ever use a DMA address which isn't a physical address
-> > > > > > from QEMU point of view? If that happens, this hack breaks
-> > > > > > because in legacy mode QEMU still uses the GPA.
-> > > > > 
-> > > > > If QEMU doesn't advertise an SMMU, then it will work fine with the GPA,
-> > > > > because we won't swizzle the DMA ops for the master device. If QEMU does
-> > > > > advertise an SMMU, then we'll allocate DMA addresses to fit within the
-> > > > > the intersection of the SMMU aperture and device's DMA mask.
-> > > > 
-> > > > 
-> > > > Right but doesn't just poking from qemu into phys addresses work
-> > > > anymore? It used to ...
-> > > 
-> > > Provided that there's no SMMU, then it will continue to work. and my
-> > > understanding (from talking to Peter Maydell) is that qemu doesn't model
-> > > an SMMU for ARM-based machines.
-> > > 
-> > 
-> > So how come people report failures due to presence of SMMU?
-> > Using some other hypervisor?
-> 
-> The failures are reported on the ARM fastmodel (a complete system
-> emulation that runs on an x86 box), where an SMMU *is* present
-> downstream of the virtio-pci masters. There's no qemu involved there.
-> 
-> Will
+On 2017?01?16? 18:56, Baoyou Xie wrote:
+> This patch adds reset controller driver for ZTE's zx2967 family.
+>
+> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+> ---
+>  drivers/reset/Kconfig        |   6 +++
+>  drivers/reset/Makefile       |   1 +
+>  drivers/reset/reset-zx2967.c | 125 +++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 132 insertions(+)
+>  create mode 100644 drivers/reset/reset-zx2967.c
+>
+> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
+> index 172dc96..f4cdfe9 100644
+> --- a/drivers/reset/Kconfig
+> +++ b/drivers/reset/Kconfig
+> @@ -86,6 +86,12 @@ config RESET_UNIPHIER
+>  	  Say Y if you want to control reset signals provided by System Control
+>  	  block, Media I/O block, Peripheral Block.
+>
+> +config RESET_ZX2967
+> +	bool "ZTE ZX2967 Reset Driver"
+> +	depends on ARCH_ZX || COMPILE_TEST
+> +	help
+> +	  This enables the reset controller driver for ZTE's zx2967 family.
+> +
+>  config RESET_ZYNQ
+>  	bool "ZYNQ Reset Driver" if COMPILE_TEST
+>  	default ARCH_ZYNQ
+> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+> index 13b346e..2cd3f6c 100644
+> --- a/drivers/reset/Makefile
+> +++ b/drivers/reset/Makefile
+> @@ -13,4 +13,5 @@ obj-$(CONFIG_RESET_STM32) += reset-stm32.o
+>  obj-$(CONFIG_RESET_SUNXI) += reset-sunxi.o
+>  obj-$(CONFIG_TI_SYSCON_RESET) += reset-ti-syscon.o
+>  obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
+> +obj-$(CONFIG_RESET_ZX2967) += reset-zx2967.o
+>  obj-$(CONFIG_RESET_ZYNQ) += reset-zynq.o
+> diff --git a/drivers/reset/reset-zx2967.c b/drivers/reset/reset-zx2967.c
+> new file mode 100644
+> index 0000000..bc95261
+> --- /dev/null
+> +++ b/drivers/reset/reset-zx2967.c
+> @@ -0,0 +1,125 @@
+> +/*
+> + * ZTE's zx2967 family reset controller driver
+> + *
+> + * Copyright (C) 2017 ZTE Ltd.
+> + *
+> + * Author: Baoyou Xie <baoyou.xie@linaro.org>
+> + *
+> + * License terms: GNU General Public License (GPL) version 2
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/of_address.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/reset-controller.h>
+> +
+> +struct zx2967_reset {
+> +	void __iomem			*reg_base;
+> +	spinlock_t			lock;
+> +	struct reset_controller_dev	rcdev;
+> +};
+> +
+> +static int zx2967_reset_act(struct reset_controller_dev *rcdev,
+> +			    unsigned long id, bool assert)
+> +{
+> +	struct zx2967_reset *reset = NULL;
+> +	u32 bank = id / 32;
+> +	u32 offset = id % 32;
+> +	u32 reg;
+> +	unsigned long flags;
+> +
+> +	reset = container_of(rcdev, struct zx2967_reset, rcdev);
+> +
+> +	spin_lock_irqsave(&reset->lock, flags);
+> +
+> +	reg = readl(reset->reg_base + (bank * 4));
 
-I see. And this hypervisor actually coded up looking up
-translations in the SMMU unconditionally for legacy devices,
-and this worked as long as guest didn't touch the SMMU?
+readl_relaxed is recommended.
 
--- 
-MST
+> +	if (assert)
+> +		reg &= ~BIT(offset);
+> +	else
+> +		reg |= BIT(offset);
+> +	writel(reg, reset->reg_base + (bank * 4));
+
+writel_relaxed is recommended.
+
+> +
+> +	spin_unlock_irqrestore(&reset->lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+> +static int zx2967_reset_assert(struct reset_controller_dev *rcdev,
+> +			       unsigned long id)
+> +{
+> +	return zx2967_reset_act(rcdev, id, true);
+> +}
+> +
+> +static int zx2967_reset_deassert(struct reset_controller_dev *rcdev,
+> +				 unsigned long id)
+> +{
+> +	return zx2967_reset_act(rcdev, id, false);
+> +}
+> +
+> +static struct reset_control_ops zx2967_reset_ops = {
+> +	.assert		= zx2967_reset_assert,
+> +	.deassert	= zx2967_reset_deassert,
+> +};
+> +
+> +static int zx2967_reset_probe(struct platform_device *pdev)
+> +{
+> +	struct zx2967_reset *reset;
+> +	struct resource *res;
+> +
+> +	reset = devm_kzalloc(&pdev->dev, sizeof(*reset), GFP_KERNEL);
+> +	if (!reset)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	reset->reg_base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(reset->reg_base))
+> +		return PTR_ERR(reset->reg_base);
+> +
+> +	spin_lock_init(&reset->lock);
+> +
+> +	reset->rcdev.owner = THIS_MODULE;
+> +	reset->rcdev.nr_resets = resource_size(res) * 8;
+> +	reset->rcdev.ops = &zx2967_reset_ops;
+> +	reset->rcdev.of_node = pdev->dev.of_node;
+> +
+> +	dev_info(&pdev->dev, "reset controller cnt:%d",
+> +		  reset->rcdev.nr_resets);
+> +
+> +	return devm_reset_controller_register(&pdev->dev, &reset->rcdev);
+> +}
+> +
+> +static int zx2967_reset_remove(struct platform_device *pdev)
+> +{
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id zx2967_reset_dt_ids[] = {
+> +	 { .compatible = "zte,zx296718-reset", },
+> +	 {},
+> +};
+> +MODULE_DEVICE_TABLE(of, zx2967_reset_dt_ids);
+> +
+> +static struct platform_driver zx2967_reset_driver = {
+> +	.probe	= zx2967_reset_probe,
+> +	.remove	= zx2967_reset_remove,
+> +	.driver = {
+> +		.name		= "zx2967-reset",
+> +		.of_match_table	= zx2967_reset_dt_ids,
+> +	},
+> +};
+
+This line can replace all below code if you do not have any other 
+dependency in earlier stage.
+
+builtin_platform_driver(zx2967_reset_driver);
+
+> +
+> +static int __init zx2967_reset_init(void)
+> +{
+> +	return platform_driver_register(&zx2967_reset_driver);
+> +}
+> +arch_initcall(zx2967_reset_init);
+> +
+> +static void __exit zx2967_reset_exit(void)
+> +{
+> +	platform_driver_unregister(&zx2967_reset_driver);
+> +}
+> +module_exit(zx2967_reset_exit);
+> +
+> +MODULE_AUTHOR("Baoyou Xie <baoyou.xie@linaro.org>");
+> +MODULE_DESCRIPTION("ZTE zx2967 Reset Controller Driver");
+> +MODULE_LICENSE("GPL");
+>
