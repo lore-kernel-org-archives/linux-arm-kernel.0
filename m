@@ -1,43 +1,44 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 16 Jan 2017 15:38:48 +0100
-Subject: [PATCH v2 2/3] MAINTAINERS: add zx2967 reset controller driver
- to ARM ZTE architecture
-In-Reply-To: <1484564194-18530-2-git-send-email-baoyou.xie@linaro.org>
-References: <1484564194-18530-1-git-send-email-baoyou.xie@linaro.org>
- <1484564194-18530-2-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <1484577528.8415.147.camel@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 16 Jan 2017 14:39:18 +0000
+Subject: [Question] A question about arm64 pte
+In-Reply-To: <20170116143601.GB6832@e104818-lin.cambridge.arm.com>
+References: <d284f510-f025-db84-f21e-a5b167d4bcd2@huawei.com>
+ <20170116115606.GA6832@e104818-lin.cambridge.arm.com>
+ <6b7a9bd2-37af-40cd-b723-9e648fbbc7c8@huawei.com>
+ <20170116143601.GB6832@e104818-lin.cambridge.arm.com>
+Message-ID: <20170116143918.GC6832@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-01-16 at 18:56 +0800, Baoyou Xie wrote:
-> Add the zx2967 reset controller driver as maintained by ARM ZTE
-> architecture maintainers, as they're parts of the core IP.
+On Mon, Jan 16, 2017 at 02:36:02PM +0000, Catalin Marinas wrote:
+> On Mon, Jan 16, 2017 at 08:39:56PM +0800, Yisheng Xie wrote:
+> > On 2017/1/16 19:56, Catalin Marinas wrote:
+> > > On Mon, Jan 16, 2017 at 06:08:47PM +0800, Yisheng Xie wrote:
+> > >> I have question about arm64 pte.
+> > > 
+> > > I assume the context is ARMv8.0 (without hardware DBM support).
+> > 
+> > Yes.
+> > > 
+> > >> For arm64, PTE_WRITE?== PTE_DBM? is to mark whether the page is writable,
+> > >> and PTE_DIRTY is to mark whether the page is dirty.
+> > >> However, PTE_RDONLY is only cleared when both PTE_WRITE and PTE_DIRTY are set.
+> > > 
+> > > That's what set_pte_at() does.
+> > > 
+> > 
+> > So if we mmap a memory region use /dev/mem like:
+> >    fildes = open("/dev/mem", O_RDWR | O_CREAT, 0777);
+> >    addr = mmap(NULL, LEN, PROT_READ | PROT_WRITE, MAP_SHARED, fildes, offset);
+> > 
+> > The PTE_RDONLY will be set? Right ?
 > 
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
-> ---
->  MAINTAINERS | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 2793808..08f8155 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1980,10 +1980,12 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->  S:	Maintained
->  F:	arch/arm/mach-zx/
->  F:	drivers/clk/zte/
-> +F:	drivers/reset/reset-zx2967.c
->  F:	drivers/soc/zte/
->  F:	drivers/thermal/zx*
->  F:	Documentation/devicetree/bindings/arm/zte.txt
->  F:	Documentation/devicetree/bindings/clock/zx296702-clk.txt
-> +F:	Documentation/devicetree/bindings/reset/zte,zx2967-reset.txt
->  F:	Documentation/devicetree/bindings/soc/zte/
->  F:	Documentation/devicetree/bindings/thermal/zx*
->  F:	include/dt-bindings/soc/zx*.h
+> Possibly, I haven't checked mmap_mem(). However, that's what you would
+> get with an anonymous mmap() as well.
 
-This patch doesn't apply on top of reset/next. I can rebase it, but it
-will cause a trivial merge conflict with the soc/thermal additions.
+A correction on anonymous mmap(): the original page links to a zeroed
+page, so when dirtying it you also get a new copy, so slightly different
+code path from handle_pte_fault().
 
-regards
-Philipp
+-- 
+Catalin
