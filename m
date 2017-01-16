@@ -1,148 +1,172 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 16 Jan 2017 07:45:04 +0100
-Subject: [PATCH 09/12] pinctrl: samsung: Add infrastructure for pin-bank
- retention control
+Date: Mon, 16 Jan 2017 07:45:07 +0100
+Subject: [PATCH 12/12] pinctrl: samsung: Replace syscore ops with standard
+ platform device pm_ops
 In-Reply-To: <1484549107-5957-1-git-send-email-m.szyprowski@samsung.com>
 References: <1484549107-5957-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170116064527eucas1p1f0f78e9420e7d9d60d94b6e7381caeb1@eucas1p1.samsung.com>
-Message-ID: <1484549107-5957-10-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170116064529eucas1p15b04f901b17dfa2b02fd04745cbe3f17@eucas1p1.samsung.com>
+Message-ID: <1484549107-5957-13-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Pad retention control after suspend/resume cycle should be done from pin
-controller driver instead of PMU (power management unit) driver to avoid
-possible ordering and logical dependencies. Till now it worked fine only
-because PMU driver registered its sys_ops after pin controller.
-
-This patch adds infrastructure to handle pad retention during pin control
-driver resume.
+Once the dependency on PMU driver (for pad retention control) has been
+removed, there is no reason to use syscore_ops based suspend/resume.
+This patch replaces it with standard platform device pm_ops based solution.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- drivers/pinctrl/samsung/pinctrl-samsung.c | 12 ++++++---
- drivers/pinctrl/samsung/pinctrl-samsung.h | 42 +++++++++++++++++++++++++++++++
- 2 files changed, 51 insertions(+), 3 deletions(-)
+ drivers/pinctrl/samsung/pinctrl-samsung.c | 72 ++++++-------------------------
+ 1 file changed, 13 insertions(+), 59 deletions(-)
 
 diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
-index 86f23842f681..95a84086a2e9 100644
+index 95a84086a2e9..48acf5908b84 100644
 --- a/drivers/pinctrl/samsung/pinctrl-samsung.c
 +++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
-@@ -1075,6 +1075,9 @@ static int samsung_pinctrl_probe(struct platform_device *pdev)
- 		ctrl->eint_gpio_init(drvdata);
- 	if (ctrl->eint_wkup_init)
- 		ctrl->eint_wkup_init(drvdata);
-+	if (ctrl->retention_data && ctrl->retention_data->init)
-+		drvdata->retention_ctrl = ctrl->retention_data->init(drvdata,
-+							  ctrl->retention_data);
+@@ -29,7 +29,6 @@
+ #include <linux/irqdomain.h>
+ #include <linux/of_device.h>
+ #include <linux/spinlock.h>
+-#include <linux/syscore_ops.h>
+ 
+ #include "../core.h"
+ #include "pinctrl-samsung.h"
+@@ -49,9 +48,6 @@
+ 	{ "samsung,pin-val", PINCFG_TYPE_DAT },
+ };
+ 
+-/* Global list of devices (struct samsung_pinctrl_drv_data) */
+-static LIST_HEAD(drvdata_list);
+-
+ static unsigned int pin_base;
+ 
+ static int samsung_get_group_count(struct pinctrl_dev *pctldev)
+@@ -1081,22 +1077,18 @@ static int samsung_pinctrl_probe(struct platform_device *pdev)
  
  	platform_set_drvdata(pdev, drvdata);
  
-@@ -1127,15 +1130,15 @@ static void samsung_pinctrl_suspend_dev(
+-	/* Add to the global list */
+-	list_add_tail(&drvdata->node, &drvdata_list);
+-
+ 	return 0;
+ }
  
- 	if (drvdata->suspend)
- 		drvdata->suspend(drvdata);
-+	if (drvdata->retention_ctrl && drvdata->retention_ctrl->on)
-+		drvdata->retention_ctrl->on(drvdata);
-+
+ #ifdef CONFIG_PM
+-
+ /**
+- * samsung_pinctrl_suspend_dev - save pinctrl state for suspend for a device
++ * samsung_pinctrl_suspend - save pinctrl state for suspend
+  *
+  * Save data for all banks handled by this device.
+  */
+-static void samsung_pinctrl_suspend_dev(
+-	struct samsung_pinctrl_drv_data *drvdata)
++static int samsung_pinctrl_suspend(struct device *dev)
+ {
++	struct samsung_pinctrl_drv_data *drvdata = dev_get_drvdata(dev);
+ 	int i;
+ 
+ 	for (i = 0; i < drvdata->nr_banks; i++) {
+@@ -1133,15 +1125,17 @@ static void samsung_pinctrl_suspend_dev(
+ 	if (drvdata->retention_ctrl && drvdata->retention_ctrl->on)
+ 		drvdata->retention_ctrl->on(drvdata);
+ 
++	return 0;
  }
  
  /**
-  * samsung_pinctrl_resume_dev - restore pinctrl state from suspend for a device
+- * samsung_pinctrl_resume_dev - restore pinctrl state from suspend for a device
++ * samsung_pinctrl_resume - restore pinctrl state from suspend
   *
   * Restore one of the banks that was saved during suspend.
-- *
-- * We don't bother doing anything complicated to avoid glitching lines since
-- * we're called before pad retention is turned off.
   */
- static void samsung_pinctrl_resume_dev(struct samsung_pinctrl_drv_data *drvdata)
+-static void samsung_pinctrl_resume_dev(struct samsung_pinctrl_drv_data *drvdata)
++static int samsung_pinctrl_resume(struct device *dev)
  {
-@@ -1174,6 +1177,9 @@ static void samsung_pinctrl_resume_dev(struct samsung_pinctrl_drv_data *drvdata)
- 			if (widths[type])
- 				writel(bank->pm_save[type], reg + offs[type]);
- 	}
-+
-+	if (drvdata->retention_ctrl && drvdata->retention_ctrl->off)
-+		drvdata->retention_ctrl->off(drvdata);
++	struct samsung_pinctrl_drv_data *drvdata = dev_get_drvdata(dev);
+ 	int i;
+ 
+ 	if (drvdata->resume)
+@@ -1180,48 +1174,10 @@ static void samsung_pinctrl_resume_dev(struct samsung_pinctrl_drv_data *drvdata)
+ 
+ 	if (drvdata->retention_ctrl && drvdata->retention_ctrl->off)
+ 		drvdata->retention_ctrl->off(drvdata);
+-}
+-
+-/**
+- * samsung_pinctrl_suspend - save pinctrl state for suspend
+- *
+- * Save data for all banks across all devices.
+- */
+-static int samsung_pinctrl_suspend(void)
+-{
+-	struct samsung_pinctrl_drv_data *drvdata;
+-
+-	list_for_each_entry(drvdata, &drvdata_list, node) {
+-		samsung_pinctrl_suspend_dev(drvdata);
+-	}
+-
+ 	return 0;
  }
+-
+-/**
+- * samsung_pinctrl_resume - restore pinctrl state for suspend
+- *
+- * Restore data for all banks across all devices.
+- */
+-static void samsung_pinctrl_resume(void)
+-{
+-	struct samsung_pinctrl_drv_data *drvdata;
+-
+-	list_for_each_entry_reverse(drvdata, &drvdata_list, node) {
+-		samsung_pinctrl_resume_dev(drvdata);
+-	}
+-}
+-
+-#else
+-#define samsung_pinctrl_suspend		NULL
+-#define samsung_pinctrl_resume		NULL
+ #endif
  
- /**
-diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.h b/drivers/pinctrl/samsung/pinctrl-samsung.h
-index 6f7ce7539a00..6079142422f8 100644
---- a/drivers/pinctrl/samsung/pinctrl-samsung.h
-+++ b/drivers/pinctrl/samsung/pinctrl-samsung.h
-@@ -185,10 +185,48 @@ struct samsung_pin_bank {
+-static struct syscore_ops samsung_pinctrl_syscore_ops = {
+-	.suspend	= samsung_pinctrl_suspend,
+-	.resume		= samsung_pinctrl_resume,
+-};
+-
+ static const struct of_device_id samsung_pinctrl_dt_match[] = {
+ #ifdef CONFIG_PINCTRL_EXYNOS
+ 	{ .compatible = "samsung,exynos3250-pinctrl",
+@@ -1263,25 +1219,23 @@ static void samsung_pinctrl_resume(void)
  };
+ MODULE_DEVICE_TABLE(of, samsung_pinctrl_dt_match);
  
- /**
-+ * struct samsung_retention_data: runtime pin-bank retention control data.
-+ * @regs: array of PMU registers to control pad retention.
-+ * @nr_regs: number of registers in @regs array.
-+ * @value: value to store to registers to turn off retention.
-+ * @refcnt: atomic counter if retention control affects more than one bank.
-+ * @priv: retention control code private data
-+ * @on: platform specific callback to enter retention mode.
-+ * @off: platform specific callback to exit retention mode.
-+ **/
-+struct samsung_retention_ctrl {
-+	const u32	*regs;
-+	int		nr_regs;
-+	u32		value;
-+	atomic_t	*refcnt;
-+	void		*priv;
-+	void		(*on)(struct samsung_pinctrl_drv_data *);
-+	void		(*off)(struct samsung_pinctrl_drv_data *);
++static const struct dev_pm_ops samsung_pinctrl_pm_ops = {
++	SET_LATE_SYSTEM_SLEEP_PM_OPS(samsung_pinctrl_suspend,
++				     samsung_pinctrl_resume)
 +};
 +
-+/**
-+ * struct samsung_retention_data: represent a pin-bank retention control data.
-+ * @regs: array of PMU registers to control pad retention.
-+ * @nr_regs: number of registers in @regs array.
-+ * @value: value to store to registers to turn off retention.
-+ * @refcnt: atomic counter if retention control affects more than one bank.
-+ * @init: platform specific callback to initialize retention control.
-+ **/
-+struct samsung_retention_data {
-+	const u32	*regs;
-+	int		nr_regs;
-+	u32		value;
-+	atomic_t	*refcnt;
-+	struct samsung_retention_ctrl *(*init)(struct samsung_pinctrl_drv_data *,
-+					const struct samsung_retention_data *);
-+};
-+
-+/**
-  * struct samsung_pin_ctrl: represent a pin controller.
-  * @pin_banks: list of pin banks included in this controller.
-  * @nr_banks: number of pin banks.
-  * @nr_ext_resources: number of the extra base address for pin banks.
-+ * @retention_data: configuration data for retention control.
-  * @eint_gpio_init: platform specific callback to setup the external gpio
-  *	interrupts for the controller.
-  * @eint_wkup_init: platform specific callback to setup the external wakeup
-@@ -198,6 +236,7 @@ struct samsung_pin_ctrl {
- 	const struct samsung_pin_bank_data *pin_banks;
- 	u32		nr_banks;
- 	int		nr_ext_resources;
-+	const struct samsung_retention_data *retention_data;
- 
- 	int		(*eint_gpio_init)(struct samsung_pinctrl_drv_data *);
- 	int		(*eint_wkup_init)(struct samsung_pinctrl_drv_data *);
-@@ -219,6 +258,7 @@ struct samsung_pin_ctrl {
-  * @nr_function: number of such pin functions.
-  * @pin_base: starting system wide pin number.
-  * @nr_pins: number of pins supported by the controller.
-+ * @retention_ctrl: retention control runtime data.
-  */
- struct samsung_pinctrl_drv_data {
- 	struct list_head		node;
-@@ -238,6 +278,8 @@ struct samsung_pinctrl_drv_data {
- 	unsigned int			pin_base;
- 	unsigned int			nr_pins;
- 
-+	const struct samsung_retention_ctrl *retention_ctrl;
-+
- 	void (*suspend)(struct samsung_pinctrl_drv_data *);
- 	void (*resume)(struct samsung_pinctrl_drv_data *);
+ static struct platform_driver samsung_pinctrl_driver = {
+ 	.probe		= samsung_pinctrl_probe,
+ 	.driver = {
+ 		.name	= "samsung-pinctrl",
+ 		.of_match_table = samsung_pinctrl_dt_match,
+ 		.suppress_bind_attrs = true,
++		.pm = &samsung_pinctrl_pm_ops,
+ 	},
  };
+ 
+ static int __init samsung_pinctrl_drv_register(void)
+ {
+-	/*
+-	 * Register syscore ops for save/restore of registers across suspend.
+-	 * It's important to ensure that this driver is running at an earlier
+-	 * initcall level than any arch-specific init calls that install syscore
+-	 * ops that turn off pad retention (like exynos_pm_resume).
+-	 */
+-	register_syscore_ops(&samsung_pinctrl_syscore_ops);
+-
+ 	return platform_driver_register(&samsung_pinctrl_driver);
+ }
+ postcore_initcall(samsung_pinctrl_drv_register);
 -- 
 1.9.1
