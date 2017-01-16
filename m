@@ -1,86 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 16 Jan 2017 14:34:08 +0000
-Subject: [PATCH v2 2/2] vring: Force use of DMA API for ARM-based systems
-In-Reply-To: <20170116162225-mutt-send-email-mst@kernel.org>
-References: <20170111100139.GC12388@arm.com>
- <20170112232931-mutt-send-email-mst@kernel.org>
- <20170113092522.GB22538@arm.com>
- <20170113183222-mutt-send-email-mst@kernel.org>
- <20170113172154.GL3253@arm.com>
- <20170113201933-mutt-send-email-mst@kernel.org>
- <20170116104028.GA1510@arm.com>
- <20170116161639-mutt-send-email-mst@kernel.org>
- <20170116142103.GF1510@arm.com>
- <20170116162225-mutt-send-email-mst@kernel.org>
-Message-ID: <20170116143408.GG1510@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 16 Jan 2017 14:36:02 +0000
+Subject: [Question] A question about arm64 pte
+In-Reply-To: <6b7a9bd2-37af-40cd-b723-9e648fbbc7c8@huawei.com>
+References: <d284f510-f025-db84-f21e-a5b167d4bcd2@huawei.com>
+ <20170116115606.GA6832@e104818-lin.cambridge.arm.com>
+ <6b7a9bd2-37af-40cd-b723-9e648fbbc7c8@huawei.com>
+Message-ID: <20170116143601.GB6832@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2017 at 04:27:28PM +0200, Michael S. Tsirkin wrote:
-> On Mon, Jan 16, 2017 at 02:21:03PM +0000, Will Deacon wrote:
-> > On Mon, Jan 16, 2017 at 04:18:03PM +0200, Michael S. Tsirkin wrote:
-> > > On Mon, Jan 16, 2017 at 10:40:28AM +0000, Will Deacon wrote:
-> > > > On Fri, Jan 13, 2017 at 08:23:35PM +0200, Michael S. Tsirkin wrote:
-> > > > > On Fri, Jan 13, 2017 at 05:21:54PM +0000, Will Deacon wrote:
-> > > > > > On Fri, Jan 13, 2017 at 06:46:32PM +0200, Michael S. Tsirkin wrote:
-> > > > > > > On Fri, Jan 13, 2017 at 09:25:22AM +0000, Will Deacon wrote:
-> > > > > > > > On Fri, Jan 13, 2017 at 12:12:56AM +0200, Michael S. Tsirkin wrote:
-> > > > > > > > > I'd rather people didn't use SMMU with legacy devices.
-> > > > > > > > 
-> > > > > > > > I'm afraid we've been doing that for two years and the model already
-> > > > > > > > exists in a mature state, being actively used for development and
-> > > > > > > > validation by ARM and our partners. One of the big things its used for
-> > > > > > > > is to develop SMMU and GIC (our interrupt controller) code with PCI, so
-> > > > > > > > dropping the SMMU from the picture isn't an option.
-> > > > > > > 
-> > > > > > > Oh so this fixes a regression?  This is something I didn't realize.
-> > > > > > 
-> > > > > > Yes, thanks. The regression came about because we implemented SMMU-backed
-> > > > > > DMA ops and only then was it apparent that the virtio stuff was bypassing
-> > > > > > even with translation enabled (because it wasn't using the DMA API).
-> > > > > 
-> > > > > Could you point out a commit ID?
-> > > > 
-> > > > There has been a fair amount of work in this area recently, but you're
-> > > > probably after something like 876945dbf649 ("arm64: Hook up IOMMU dma_ops")
-> > > > as the culprit, which is the point at which we started to swizzle DMA
-> > > > ops for devices upstream of an SMMU automatically.
-> > > > 
-> > > > > > > A "Fixes:" tag can't hurt here.  I then wonder
-> > > > > > > might DMA ops ever use a DMA address which isn't a physical address
-> > > > > > > from QEMU point of view? If that happens, this hack breaks
-> > > > > > > because in legacy mode QEMU still uses the GPA.
-> > > > > > 
-> > > > > > If QEMU doesn't advertise an SMMU, then it will work fine with the GPA,
-> > > > > > because we won't swizzle the DMA ops for the master device. If QEMU does
-> > > > > > advertise an SMMU, then we'll allocate DMA addresses to fit within the
-> > > > > > the intersection of the SMMU aperture and device's DMA mask.
-> > > > > 
-> > > > > 
-> > > > > Right but doesn't just poking from qemu into phys addresses work
-> > > > > anymore? It used to ...
-> > > > 
-> > > > Provided that there's no SMMU, then it will continue to work. and my
-> > > > understanding (from talking to Peter Maydell) is that qemu doesn't model
-> > > > an SMMU for ARM-based machines.
-> > > > 
-> > > 
-> > > So how come people report failures due to presence of SMMU?
-> > > Using some other hypervisor?
+On Mon, Jan 16, 2017 at 08:39:56PM +0800, Yisheng Xie wrote:
+> On 2017/1/16 19:56, Catalin Marinas wrote:
+> > On Mon, Jan 16, 2017 at 06:08:47PM +0800, Yisheng Xie wrote:
+> >> I have question about arm64 pte.
 > > 
-> > The failures are reported on the ARM fastmodel (a complete system
-> > emulation that runs on an x86 box), where an SMMU *is* present
-> > downstream of the virtio-pci masters. There's no qemu involved there.
+> > I assume the context is ARMv8.0 (without hardware DBM support).
+> 
+> Yes.
 > > 
-> I see. And this hypervisor actually coded up looking up
-> translations in the SMMU unconditionally for legacy devices,
-> and this worked as long as guest didn't touch the SMMU?
+> >> For arm64, PTE_WRITE?== PTE_DBM? is to mark whether the page is writable,
+> >> and PTE_DIRTY is to mark whether the page is dirty.
+> >> However, PTE_RDONLY is only cleared when both PTE_WRITE and PTE_DIRTY are set.
+> > 
+> > That's what set_pte_at() does.
+> > 
+> 
+> So if we mmap a memory region use /dev/mem like:
+>    fildes = open("/dev/mem", O_RDWR | O_CREAT, 0777);
+>    addr = mmap(NULL, LEN, PROT_READ | PROT_WRITE, MAP_SHARED, fildes, offset);
+> 
+> The PTE_RDONLY will be set? Right ?
 
-Well, the fastmodel isn't a hypervisor really. It's a full system emulation,
-so it's better to think of it like a piece of hardware. For example, you
-could run KVM on the fastmodel. But yes, when Linux didn't swizzle the
-DMA ops to point at the SMMU, then everything defaults to bypass (because
-that's the default behaviour of the SMMU driver -- this is configurable
-on the command line) which is why things used to work.
+Possibly, I haven't checked mmap_mem(). However, that's what you would
+get with an anonymous mmap() as well.
 
-Will
+> However?when use memset to write the region it still works well, and
+> the bit PTE_RDONLY is also cleared. Is there anywhere clear the
+> PTE_RDONLY before write that page ?
+
+See handle_pte_fault(). On the first access to a writable+clean page
+(PTE_WRITE set, PTE_RDONLY set, PTE_DIRTY cleared), the kernel traps it
+and, if pte_write() is true (your case), it calls pte_mkdirty(). The
+subsequently called ptep_set_access_flags() function would clear
+PTE_RDONLY, giving you a writable mapping.
+
+-- 
+Catalin
