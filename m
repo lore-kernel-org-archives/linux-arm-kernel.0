@@ -1,101 +1,95 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 16 Jan 2017 22:30:49 +0200
-Subject: [PATCH v1 1/7] dt-bindings: display: add STM32 LTDC driver
-In-Reply-To: <1484573344-11609-2-git-send-email-yannick.fertre@st.com>
-References: <1484573344-11609-1-git-send-email-yannick.fertre@st.com>
- <1484573344-11609-2-git-send-email-yannick.fertre@st.com>
-Message-ID: <2080174.sm3cyM9MmB@avalon>
+From: mbrugger@suse.com (Matthias Brugger)
+Date: Mon, 16 Jan 2017 20:27:38 +0100
+Subject: [PATCH v7 06/15] irqchip: gicv3-its: platform-msi: refactor
+ its_pmsi_init() to prepare for ACPI
+In-Reply-To: <1484147199-4267-7-git-send-email-hanjun.guo@linaro.org>
+References: <1484147199-4267-1-git-send-email-hanjun.guo@linaro.org>
+ <1484147199-4267-7-git-send-email-hanjun.guo@linaro.org>
+Message-ID: <d8474597-40e4-3cde-9326-ec8e6bf728ba@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yannick,
 
-Thank you for the patch.
 
-On Monday 16 Jan 2017 14:28:58 Yannick Fertre wrote:
-> Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
+On 11/01/17 16:06, Hanjun Guo wrote:
+> Introduce its_pmsi_init_one() to refactor the code to isolate
+> ACPI&DT common code to prepare for ACPI later.
+>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Tomasz Nowicki <tn@semihalf.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
 > ---
->  .../devicetree/bindings/display/st,ltdc.txt        | 57 ++++++++++++++++++
->  1 file changed, 57 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/st,ltdc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/display/st,ltdc.txt
-> b/Documentation/devicetree/bindings/display/st,ltdc.txt new file mode
-> 100644
-> index 0000000..20e89da
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/st,ltdc.txt
-> @@ -0,0 +1,57 @@
-> +* STMicroelectronics STM32 lcd-tft display controller
-> +
-> +- st-display-subsystem: Master device for DRM sub-components
-> +  This device must be the parent of all the sub-components and is
-> responsible
-> +  of bind them.
+>  drivers/irqchip/irq-gic-v3-its-platform-msi.c | 45 ++++++++++++++++-----------
+>  1 file changed, 27 insertions(+), 18 deletions(-)
+>
 
-Why do you need this ? At a quick glance the ltdc node should be enough.
+Reviewed-by: Matthias Brugger <mbrugger@suse.com>
 
-> +  Required properties:
-> +  - compatible: "st,display-subsystem"
-> +  - ranges: to allow probing of subdevices
+> diff --git a/drivers/irqchip/irq-gic-v3-its-platform-msi.c b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
+> index 3c94278..3d9efd1 100644
+> --- a/drivers/irqchip/irq-gic-v3-its-platform-msi.c
+> +++ b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
+> @@ -82,34 +82,43 @@ static int its_pmsi_prepare(struct irq_domain *domain, struct device *dev,
+>  	{},
+>  };
+>
+> -static int __init its_pmsi_init(void)
+> +static int __init its_pmsi_init_one(struct fwnode_handle *fwnode,
+> +				const char *name)
+>  {
+> -	struct device_node *np;
+>  	struct irq_domain *parent;
+>
+> +	parent = irq_find_matching_fwnode(fwnode, DOMAIN_BUS_NEXUS);
+> +	if (!parent || !msi_get_domain_info(parent)) {
+> +		pr_err("%s: unable to locate ITS domain\n", name);
+> +		return -ENXIO;
+> +	}
 > +
-> +- ltdc_host: lcd-tft display controller host
-> +  must be a sub-node of st-display-subsystem
-> +  Required properties:
-> +  - compatible: "st,ltdc"
-> +  - reg: Physical base address of the IP registers and length of memory
-> mapped region.
-> +  - clocks: from common clock binding: handle hardware IP needed clocks,
-> the
-> +    number of clocks may depend of the SoC type.
-> +    See ../clocks/clock-bindings.txt for details.
-> +  - clock-names: names of the clocks listed in clocks property in the same
-> +    order.
-
-You need to define the required/optional clocks with their names here. If they 
-vary depending on the SoC, the DT bindings document need to list them for each 
-SoC.
-
-> +  - resets: resets to be used by the device
-> +    See ../reset/reset.txt for details.
-> +  - reset-names: names of the resets listed in resets property in the same
-> +    order.
-> +  Required nodes:
-> +    - Video port for RGB output.
+> +	if (!platform_msi_create_irq_domain(fwnode, &its_pmsi_domain_info,
+> +					    parent)) {
+> +		pr_err("%s: unable to create platform domain\n", name);
+> +		return -ENXIO;
+> +	}
 > +
-> +Example:
+> +	pr_info("Platform MSI: %s domain created\n", name);
+> +	return 0;
+> +}
 > +
-> +/ {
-> +	...
-> +	soc {
-> +	...
-> +		st-display-subsystem {
-> +			compatible = "st,display-subsystem";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-> +			dma-ranges;
+> +static void __init its_pmsi_of_init(void)
+> +{
+> +	struct device_node *np;
 > +
-> +			ltdc_host: stm32-ltdc at 40016800 {
-> +				compatible = "st,ltdc";
-> +				reg = <0x40016800 0x200>;
-> +				interrupts = <88>, <89>;
-> +				resets = <&rcc 314>;
-> +				clocks = <&rcc 1 8>;
-> +				clock-names = "clk-lcd";
-> +				status = "disabled";
-> +
-> +				port {
-> +					ltdc_out_rgb: endpoint {
-> +					};
-> +				};
-> +			};
-> +		};
-> +	...
-> +	};
-> +};
-
--- 
-Regards,
-
-Laurent Pinchart
+>  	for (np = of_find_matching_node(NULL, its_device_id); np;
+>  	     np = of_find_matching_node(np, its_device_id)) {
+>  		if (!of_property_read_bool(np, "msi-controller"))
+>  			continue;
+>
+> -		parent = irq_find_matching_host(np, DOMAIN_BUS_NEXUS);
+> -		if (!parent || !msi_get_domain_info(parent)) {
+> -			pr_err("%s: unable to locate ITS domain\n",
+> -			       np->full_name);
+> -			continue;
+> -		}
+> -
+> -		if (!platform_msi_create_irq_domain(of_node_to_fwnode(np),
+> -						    &its_pmsi_domain_info,
+> -						    parent)) {
+> -			pr_err("%s: unable to create platform domain\n",
+> -			       np->full_name);
+> -			continue;
+> -		}
+> -
+> -		pr_info("Platform MSI: %s domain created\n", np->full_name);
+> +		its_pmsi_init_one(of_node_to_fwnode(np), np->full_name);
+>  	}
+> +}
+>
+> +static int __init its_pmsi_init(void)
+> +{
+> +	its_pmsi_of_init();
+>  	return 0;
+>  }
+>  early_initcall(its_pmsi_init);
+>
