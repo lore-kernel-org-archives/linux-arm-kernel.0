@@ -1,92 +1,61 @@
 From: yannick.fertre@st.com (Yannick Fertre)
-Date: Mon, 16 Jan 2017 14:29:03 +0100
-Subject: [PATCH v1 6/7] ARM: dts: stm32429i-eval: Enable ltdc & simple panel
- on Eval board
+Date: Mon, 16 Jan 2017 14:29:02 +0100
+Subject: [PATCH v1 5/7] ARM: dts: stm32f429: Add ltdc support
 In-Reply-To: <1484573344-11609-1-git-send-email-yannick.fertre@st.com>
 References: <1484573344-11609-1-git-send-email-yannick.fertre@st.com>
-Message-ID: <1484573344-11609-7-git-send-email-yannick.fertre@st.com>
+Message-ID: <1484573344-11609-6-git-send-email-yannick.fertre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable ltdc & enable am-480272h3tmqw-t01h panel.
+Add LTDC (Lcd-tft Display Controller) support.
 
 Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
 ---
- arch/arm/boot/dts/stm32429i-eval.dts | 58 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 58 insertions(+)
+ arch/arm/boot/dts/stm32f429.dtsi | 25 ++++++++++++++++++++++++-
+ 1 file changed, 24 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/stm32429i-eval.dts b/arch/arm/boot/dts/stm32429i-eval.dts
-index 2de6487..f987ca5 100644
---- a/arch/arm/boot/dts/stm32429i-eval.dts
-+++ b/arch/arm/boot/dts/stm32429i-eval.dts
-@@ -88,6 +88,52 @@
- 		clocks = <&rcc 0 30>;
- 		clock-names = "main_clk";
- 	};
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index 336ee4f..fc43415 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -185,7 +185,7 @@
+ 			interrupts = <1>, <2>, <3>, <6>, <7>, <8>, <9>, <10>, <23>, <40>, <41>, <42>, <62>, <76>;
+ 		};
+ 
+-		pin-controller {
++		pinctrl: pin-controller {
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
+ 			compatible = "st,stm32f429-pinctrl";
+@@ -404,6 +404,29 @@
+ 			interrupts = <80>;
+ 			clocks = <&rcc 0 38>;
+ 		};
 +
-+	panel_rgb: panel-rgb {
-+		compatible = "ampire,am-480272h3tmqw-t01h";
-+		status = "okay";
-+		port {
-+			panel_in_rgb: endpoint {
-+				remote-endpoint = <&ltdc_out_rgb>;
++		st-display-subsystem {
++			compatible = "st,display-subsystem";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++			dma-ranges;
++
++			ltdc_host: stm32-ltdc at 40016800 {
++				compatible = "st,ltdc";
++				reg = <0x40016800 0x200>;
++				interrupts = <88>, <89>;
++				resets = <&rcc 314>;
++				clocks = <&rcc 1 8>;
++				clock-names = "clk-lcd";
++				status = "disabled";
++
++				port {
++					ltdc_out_rgb: endpoint {
++					};
++				};
 +			};
 +		};
-+	};
-+};
-+
-+&pinctrl {
-+	pinctrl_ltdc: ltdc at 0 {
-+		pins {
-+			pinmux = <STM32F429_PI12_FUNC_LCD_HSYNC>,
-+				 <STM32F429_PI13_FUNC_LCD_VSYNC>,
-+				 <STM32F429_PI14_FUNC_LCD_CLK>,
-+				 <STM32F429_PI15_FUNC_LCD_R0>,
-+				 <STM32F429_PJ0_FUNC_LCD_R1>,
-+				 <STM32F429_PJ1_FUNC_LCD_R2>,
-+				 <STM32F429_PJ2_FUNC_LCD_R3>,
-+				 <STM32F429_PJ3_FUNC_LCD_R4>,
-+				 <STM32F429_PJ4_FUNC_LCD_R5>,
-+				 <STM32F429_PJ5_FUNC_LCD_R6>,
-+				 <STM32F429_PJ6_FUNC_LCD_R7>,
-+				 <STM32F429_PJ7_FUNC_LCD_G0>,
-+				 <STM32F429_PJ8_FUNC_LCD_G1>,
-+				 <STM32F429_PJ9_FUNC_LCD_G2>,
-+				 <STM32F429_PJ10_FUNC_LCD_G3>,
-+				 <STM32F429_PJ11_FUNC_LCD_G4>,
-+				 <STM32F429_PJ12_FUNC_LCD_B0>,
-+				 <STM32F429_PJ13_FUNC_LCD_B1>,
-+				 <STM32F429_PJ14_FUNC_LCD_B2>,
-+				 <STM32F429_PJ15_FUNC_LCD_B3>,
-+				 <STM32F429_PK0_FUNC_LCD_G5>,
-+				 <STM32F429_PK1_FUNC_LCD_G6>,
-+				 <STM32F429_PK2_FUNC_LCD_G7>,
-+				 <STM32F429_PK3_FUNC_LCD_B4>,
-+				 <STM32F429_PK4_FUNC_LCD_B5>,
-+				 <STM32F429_PK5_FUNC_LCD_B6>,
-+				 <STM32F429_PK6_FUNC_LCD_B7>,
-+				 <STM32F429_PK7_FUNC_LCD_DE>;
-+			slew-rate = <2>;
-+		};
-+	};
+ 	};
  };
  
- &clk_hse {
-@@ -123,3 +169,15 @@
- 	pinctrl-names = "default";
- 	status = "okay";
- };
-+
-+&ltdc_host{
-+	status = "okay";
-+	pinctrl-0 = <&pinctrl_ltdc>;
-+	pinctrl-names = "default";
-+
-+	port {
-+		ltdc_out_rgb: endpoint {
-+			remote-endpoint = <&panel_in_rgb>;
-+		};
-+	};
-+};
 -- 
 1.9.1
