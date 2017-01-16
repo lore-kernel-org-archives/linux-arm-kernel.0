@@ -1,61 +1,53 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 Jan 2017 16:22:18 +0000
-Subject: [PATCH] Replacement for Arm initrd memblock reserve and free
- inconsistency.
-In-Reply-To: <592F4D3D062D79449F140027567F70E8FE081234@exchmbx03>
-References: <592F4D3D062D79449F140027567F70E8FE080A79@exchmbx03>
- <20161110174645.GB1041@n2100.armlinux.org.uk>
- <592F4D3D062D79449F140027567F70E8FE0810D3@exchmbx03>
- <20161116234741.GE1041@n2100.armlinux.org.uk>
- <592F4D3D062D79449F140027567F70E8FE081234@exchmbx03>
-Message-ID: <20170116162218.GA27312@n2100.armlinux.org.uk>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 16 Jan 2017 16:31:23 +0000
+Subject: [RFC PATCH 08/10] arm64/sve: ptrace: Wire up vector length
+ control and reporting
+In-Reply-To: <a7261d6b-0074-7345-d380-ef0dd335dd56@redhat.com>
+References: <1484220369-23970-1-git-send-email-Dave.Martin@arm.com>
+ <1484220369-23970-9-git-send-email-Dave.Martin@arm.com>
+ <20170116122038.GG28060@E107787-LIN>
+ <20170116133231.GO3699@e103592.cambridge.arm.com>
+ <20170116151156.GI28060@E107787-LIN>
+ <a7261d6b-0074-7345-d380-ef0dd335dd56@redhat.com>
+Message-ID: <20170116163123.GQ3699@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 17, 2016 at 10:41:19AM +0000, william.helsby at stfc.ac.uk wrote:
-> My understanding of your proposed patch is that it rounds the area to be reserved for the initrd image to page
-> boundaries. It then checks that this rounding does not grow the initrd to overlap other areas.
+On Mon, Jan 16, 2017 at 03:47:55PM +0000, Pedro Alves wrote:
+> On 01/16/2017 03:11 PM, Yao Qi wrote:
+> > 
+> >> > 
+> >> > gdb must already re-detect the vector length on stop, since the target
+> >> > could have called the prctl() in the meantime.
+> > Yes, gdb assumes the vector length may be changed, so it re-detects on
+> > every stop, but I don't see the need for gdb to change the vector length.
+> > 
 > 
-> If it does not overlap, all is well. The kernel will not kmalloc anything within the partial pages 
-> at the beginning and end of the initrd image. When the initrd image is freed, complete pages are 
-> released and there is no wasted memory.
-> However, if it does overlap other regions, it disables the initrd image and the kernel panics with no root file system.
+> Do we need to consider inferior function calls here?
+> 
+> Say the program is stopped in code that assumes "vector length N", and
+> the user does "print some_function_that_assumes_some_other_vector_length ()".
+> 
+> Is that a use case we need to cover?
+> 
+> If so, to make it work correctly, the debugger needs to be able to change the
+> vector length to the length assumed by that called function, and then
+> restore it back after the call completes (or is aborted).
+> 
+> I have no idea whether the debugger will be able to figure
+> out a function's assumed vector length from debug info or some such.
 
-As best I can do when replying to this... (due to the stupidly long lines)...
+I think the proposed ptrace interface can support this -- i.e., it
+should provide everything needed to save off the VL and register state,
+switch VL, do something else, then restore the VL and state (if not,
+that's a bug).
 
-Yes, that's what will happen.  The kernel memory allocator deals with
-things on a per-page basis, and that's not going to change.  If someone
-wants to place objects on a non-page aligned basis into memory, then
-they're intentionally making life hard for the kernel.
+My current position is that determining what vector length is
+required by what function or binary is a 100% userspace problem, though.
 
-You talk about kmalloc() above, but kmalloc() is not really relevant
-here - kmalloc() should be thought as a sub-page memory allocator (even
-though it's capable of larger allocations.)  It sources its memory from
-page_alloc(), which not surprisingly deals with page-sized objects, and
-those are either "in-use" or "free".  There's no finer granularity there.
+ELF/DWARF could have annotations about this, though it wouldn't
+necessarily be per-function -- you might require a whole image to be
+built for the same vector length (if any).
 
-So, if you have a page partially in-use, as far as the kernel's normal
-allocators are concerned, the whole page is in use.
-
-Boot time is slightly different until the normal allocators are
-initialised - we have memblock, which doesn't really know about stuff
-like pages.  It only knows about ranges of addresses.  However, during
-initialisation, when memblock hands over to the normal allocators, any
-page that is partially reserved is treated as wholely reserved because
-- as I say above - the normal allocators can't deal with that level of
-information.
-
-Rounding the initrd up/down when reserving it in memblock is the right
-thing to do to ensure that when memory is requested from memblock,
-memblock doesn't allocate the overlapping pages - because we want to
-free that memory later.
-
-So, I don't think your idea of trying to cover all the cases of part-used
-pages is really worth it - and the boot loader has to understand that the
-kernel operates on a page-basis, and expects objects to be aligned to the
-size of a page.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Cheers
+---Dave
