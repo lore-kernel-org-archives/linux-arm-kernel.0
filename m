@@ -1,58 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 16 Jan 2017 10:59:04 +0000
-Subject: [RFC PATCH v2 10/10] dt-bindings: Document devicetree binding
- for ARM SPE
-In-Reply-To: <20170113184352.GE2472@leverpostej>
-References: <1484323429-15231-1-git-send-email-will.deacon@arm.com>
- <1484323429-15231-11-git-send-email-will.deacon@arm.com>
- <20170113184352.GE2472@leverpostej>
-Message-ID: <20170116105904.GB1510@arm.com>
+From: baoyou.xie@linaro.org (Baoyou Xie)
+Date: Mon, 16 Jan 2017 18:56:32 +0800
+Subject: [PATCH v2 1/3] dt: bindings: add documentation for zx2967 family
+ reset controller
+Message-ID: <1484564194-18530-1-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2017 at 06:43:52PM +0000, Mark Rutland wrote:
-> On Fri, Jan 13, 2017 at 04:03:49PM +0000, Will Deacon wrote:
-> > This patch documents the devicetree binding in use for ARM SPE.
-> > 
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> > Cc: Rob Herring <robh@kernel.org>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  Documentation/devicetree/bindings/arm/spe-pmu.txt | 20 ++++++++++++++++++++
-> >  1 file changed, 20 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/arm/spe-pmu.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/spe-pmu.txt b/Documentation/devicetree/bindings/arm/spe-pmu.txt
-> > new file mode 100644
-> > index 000000000000..d6540b491af4
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/arm/spe-pmu.txt
-> > @@ -0,0 +1,20 @@
-> > +* ARMv8.2 Statistical Profiling Extension (SPE) Performance Monitor Units (PMU)
-> > +
-> > +ARMv8.2 introduces the optional Statistical Profiling Extension for collecting
-> > +performance sample data using an in-memory trace buffer.
-> > +
-> > +** SPE Required properties:
-> > +
-> > +- compatible : should be one of:
-> > +	       "arm,arm-spe-pmu-v1"
-> 
-> The second "arm" here doesn't seem to add much. Should that be "armv8.2"
-> instead?
+This patch adds dt-binding documentation for zx2967 family
+reset controller.
 
-I don't think armv8.2 is particularly helpful, because that effectively ties
-together the SPE version and the architecture version, which I don't think
-is strictly required. The reason I added it was so that you could describe
-a partner implementation as something like:
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+Reviewed-by: Shawn Guo <shawnguo@kernel.org>
+---
+ .../devicetree/bindings/reset/zte,zx2967-reset.txt   | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/zte,zx2967-reset.txt
 
-  acme,arm-spe-pmu-v1
-
-and know that it was acme's implementation of an ARM architectural feature.
-
-If I drop the second "arm", I was worried that it might conflict with other
-namespaces (e.g. acme's signal-processing-element's power-management-unit).
-
-What do you reckon?
-
-Will
+diff --git a/Documentation/devicetree/bindings/reset/zte,zx2967-reset.txt b/Documentation/devicetree/bindings/reset/zte,zx2967-reset.txt
+new file mode 100644
+index 0000000..b015508
+--- /dev/null
++++ b/Documentation/devicetree/bindings/reset/zte,zx2967-reset.txt
+@@ -0,0 +1,20 @@
++ZTE zx2967 SoCs Reset Controller
++=======================================
++
++Please also refer to reset.txt in this directory for common reset
++controller binding usage.
++
++Required properties:
++- compatible: should be one of the following.
++	* zte,zx296718-reset
++- reg: physical base address of the controller and length of memory mapped
++	region.
++- #reset-cells: must be 1.
++
++example:
++
++	reset: reset-controller at 1461060 {
++		compatible = "zte,zx296718-reset";
++		reg = <0x01461060 0x8>;
++		#reset-cells = <1>;
++	};
+-- 
+2.7.4
