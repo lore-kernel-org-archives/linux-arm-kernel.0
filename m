@@ -1,98 +1,106 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Mon, 16 Jan 2017 08:54:46 +0800
-Subject: [PATCH v18 00/15] acpi, clocksource: add GTDT driver and GTDT
- support in arm_arch_timer
-In-Reply-To: <CADyBb7vF0v2DwXA8fNUOTQcqriJK1Hp57_G8DKi0WO9FnvrB5w@mail.gmail.com>
-References: <20161208173319.6618-1-fu.wei@linaro.org>
- <20170113192920.GF2472@leverpostej>
- <CADyBb7vF0v2DwXA8fNUOTQcqriJK1Hp57_G8DKi0WO9FnvrB5w@mail.gmail.com>
-Message-ID: <CADyBb7ugz_YpxKQUsJbF1vdjm_Nzyh2mH8TZMPqj1cSHGSPCFw@mail.gmail.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Mon, 16 Jan 2017 09:09:36 +0800
+Subject: [PATCH v11 02/12] drm/mediatek: add helpers for coverting from
+ the generic components
+In-Reply-To: <1484117473-46644-3-git-send-email-yt.shen@mediatek.com>
+References: <1484117473-46644-1-git-send-email-yt.shen@mediatek.com>
+ <1484117473-46644-3-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1484528976.11503.1.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Wed, 2017-01-11 at 14:51 +0800, YT Shen wrote:
+> define helpers for converting from 'mtk_ddp_comp' to 'mtk_disp_ovl'
+> define helpers for converting from 'mtk_ddp_comp' to 'mtk_disp_rdma'
+> 
+> Signed-off-by: YT Shen <yt.shen@mediatek.com>
 
-On 14 January 2017 at 19:34, Fu Wei <fu.wei@linaro.org> wrote:
-> Hi Mark,
->
-> On 14 January 2017 at 03:29, Mark Rutland <mark.rutland@arm.com> wrote:
->> Hi,
->>
->> On Fri, Dec 09, 2016 at 01:33:04AM +0800, fu.wei at linaro.org wrote:
->>> From: Fu Wei <fu.wei@linaro.org>
->>>
->>> This patchset:
->>>     (1)Preparation for adding GTDT support in arm_arch_timer:
->>>         1. Move some enums and marcos to header file;
->>>         2. Add a new enum for spi type;
->>>         3. Improve printk relevant code;
->>>         4. Rename some enums and defines;
->>>         5. Rework PPI determination;
->>>         6. Rework counter frequency detection;
->>>         7. Refactor arch_timer_needs_probing, move it into DT init call
->>>         8. Introduce some new structs and refactor the MMIO timer init code
->>>         for reusing some common code.
->>>
->>>     (2)Introduce ACPI GTDT parser: drivers/acpi/arm64/acpi_gtdt.c
->>>     Parse all kinds of timer in GTDT table of ACPI:arch timer,
->>>     memory-mapped timer and SBSA Generic Watchdog timer.
->>>     This driver can help to simplify all the relevant timer drivers,
->>>     and separate all the ACPI GTDT knowledge from them.
->>>
->>>     (3)Simplify ACPI code for arm_arch_timer
->>>
->>>     (4)Add GTDT support for ARM memory-mapped timer.
->>>
->>> This patchset has been tested on the following platforms with ACPI enabled:
->>>     (1)ARM Foundation v8 model
->>
->> Once v4.10-rc4 comes out this weekend, could you please rebase and
->> repost this?
->
-> Yes, of course.
->
-> I have rebased v19 to the latest v4.10-rc3-e96f8f1, it dosen't need
-> any modification.
-> I will rebase it every day, and will repost it if it need any  modification.
->
-> But for now, V19 works well with the master branch of upstream kernel.
-> Do I need to re-post it even if it doesn't need any improvement or
-> modification? :-)
+Acked-by CK Hu <ck.hu@mediatek.com>
 
-I just fetched the latest mainline kernel, and rebase v19 on the top
-of 4.10-rc4.
-I have double checked it, V19 works well with  4.10-rc4.
-For rebasing,  it doesn't need any modification.
-
-So please help me to review V19, I will improve it ASAP according to
-your suggestion.
-
-Many thanks!
-
->
->>
->> Marc and I will be happy to take a look then.
->
-> Great thanks for your help!
->
->>
->> Thanks,
->> Mark.
->
->
->
-> --
-> Best regards,
->
-> Fu Wei
-> Software Engineer
-> Red Hat
-
-
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+> ---
+>  drivers/gpu/drm/mediatek/mtk_disp_ovl.c  | 15 +++++++++------
+>  drivers/gpu/drm/mediatek/mtk_disp_rdma.c | 15 +++++++++------
+>  2 files changed, 18 insertions(+), 12 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+> index c703102..ce2759f 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+> @@ -57,6 +57,11 @@ struct mtk_disp_ovl {
+>  	struct drm_crtc			*crtc;
+>  };
+>  
+> +static inline struct mtk_disp_ovl *comp_to_ovl(struct mtk_ddp_comp *comp)
+> +{
+> +	return container_of(comp, struct mtk_disp_ovl, ddp_comp);
+> +}
+> +
+>  static irqreturn_t mtk_disp_ovl_irq_handler(int irq, void *dev_id)
+>  {
+>  	struct mtk_disp_ovl *priv = dev_id;
+> @@ -76,20 +81,18 @@ static irqreturn_t mtk_disp_ovl_irq_handler(int irq, void *dev_id)
+>  static void mtk_ovl_enable_vblank(struct mtk_ddp_comp *comp,
+>  				  struct drm_crtc *crtc)
+>  {
+> -	struct mtk_disp_ovl *priv = container_of(comp, struct mtk_disp_ovl,
+> -						 ddp_comp);
+> +	struct mtk_disp_ovl *ovl = comp_to_ovl(comp);
+>  
+> -	priv->crtc = crtc;
+> +	ovl->crtc = crtc;
+>  	writel(0x0, comp->regs + DISP_REG_OVL_INTSTA);
+>  	writel_relaxed(OVL_FME_CPL_INT, comp->regs + DISP_REG_OVL_INTEN);
+>  }
+>  
+>  static void mtk_ovl_disable_vblank(struct mtk_ddp_comp *comp)
+>  {
+> -	struct mtk_disp_ovl *priv = container_of(comp, struct mtk_disp_ovl,
+> -						 ddp_comp);
+> +	struct mtk_disp_ovl *ovl = comp_to_ovl(comp);
+>  
+> -	priv->crtc = NULL;
+> +	ovl->crtc = NULL;
+>  	writel_relaxed(0x0, comp->regs + DISP_REG_OVL_INTEN);
+>  }
+>  
+> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+> index 0df05f9..21eff6f 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+> @@ -49,6 +49,11 @@ struct mtk_disp_rdma {
+>  	struct drm_crtc			*crtc;
+>  };
+>  
+> +static inline struct mtk_disp_rdma *comp_to_rdma(struct mtk_ddp_comp *comp)
+> +{
+> +	return container_of(comp, struct mtk_disp_rdma, ddp_comp);
+> +}
+> +
+>  static irqreturn_t mtk_disp_rdma_irq_handler(int irq, void *dev_id)
+>  {
+>  	struct mtk_disp_rdma *priv = dev_id;
+> @@ -77,20 +82,18 @@ static void rdma_update_bits(struct mtk_ddp_comp *comp, unsigned int reg,
+>  static void mtk_rdma_enable_vblank(struct mtk_ddp_comp *comp,
+>  				   struct drm_crtc *crtc)
+>  {
+> -	struct mtk_disp_rdma *priv = container_of(comp, struct mtk_disp_rdma,
+> -						  ddp_comp);
+> +	struct mtk_disp_rdma *rdma = comp_to_rdma(comp);
+>  
+> -	priv->crtc = crtc;
+> +	rdma->crtc = crtc;
+>  	rdma_update_bits(comp, DISP_REG_RDMA_INT_ENABLE, RDMA_FRAME_END_INT,
+>  			 RDMA_FRAME_END_INT);
+>  }
+>  
+>  static void mtk_rdma_disable_vblank(struct mtk_ddp_comp *comp)
+>  {
+> -	struct mtk_disp_rdma *priv = container_of(comp, struct mtk_disp_rdma,
+> -						  ddp_comp);
+> +	struct mtk_disp_rdma *rdma = comp_to_rdma(comp);
+>  
+> -	priv->crtc = NULL;
+> +	rdma->crtc = NULL;
+>  	rdma_update_bits(comp, DISP_REG_RDMA_INT_ENABLE, RDMA_FRAME_END_INT, 0);
+>  }
+>  
