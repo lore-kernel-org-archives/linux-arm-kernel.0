@@ -1,66 +1,49 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Mon, 16 Jan 2017 10:07:46 +0100
-Subject: [PATCH v8 00/18] KVM PCIe/MSI passthrough on ARM/ARM64 and IOVA
- reserved regions
-In-Reply-To: <e1e6d9cf-5fb8-e118-3a47-4c6be77c21a3@semihalf.com>
-References: <1484127714-3263-1-git-send-email-eric.auger@redhat.com>
- <e1e6d9cf-5fb8-e118-3a47-4c6be77c21a3@semihalf.com>
-Message-ID: <ecc19922-b0a6-bc7a-dc5e-389849acc1ea@redhat.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 16 Jan 2017 18:10:00 +0900
+Subject: [PATCH v2 0/2] phy: Replace the deprecated extcon API
+In-Reply-To: <58749873.4070302@samsung.com>
+References: <CGME20161230041136epcas5p4e0229714cd00961e5d3cb5ef9923b7aa@epcas5p4.samsung.com>
+ <1483071089-8362-1-git-send-email-cw00.choi@samsung.com>
+ <58749873.4070302@samsung.com>
+Message-ID: <587C8DE8.5050106@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+Hi Kishon,
 
-On 13/01/2017 14:59, Tomasz Nowicki wrote:
-> Hello Eric,
+On 2017? 01? 10? 17:16, Chanwoo Choi wrote:
+> Hi Kishon,
 > 
-> On 11.01.2017 10:41, Eric Auger wrote:
->> Following LPC discussions, we now report reserved regions through
->> the iommu-group sysfs reserved_regions attribute file.
->>
->> Reserved regions are populated through the IOMMU get_resv_region
->> callback (former get_dm_regions), now implemented by amd-iommu,
->> intel-iommu and arm-smmu:
->> - the intel-iommu reports the [0xfee00000 - 0xfeefffff] MSI window
->>   as a reserved region and RMRR regions as direct-mapped regions.
->> - the amd-iommu reports device direct mapped regions, the MSI region
->>   and HT regions.
->> - the arm-smmu reports the MSI window (arbitrarily located at
->>   0x8000000 and 1MB large).
->>
->> Unsafe interrupt assignment is tested by enumerating all MSI irq
->> domains and checking MSI remapping is supported in the above hierarchy.
->> This check is done in case we detect the iommu translates MSI
->> (an IOMMU_RESV_MSI window exists). Otherwise the IRQ remapping
->> capability is checked at IOMMU level. Obviously this is a defensive
->> IRQ safety assessment: Assuming there are several MSI controllers
->> in the system and at least one does not implement IRQ remapping,
->> the assignment will be considered as unsafe (even if this controller
->> is not acessible from the assigned devices).
->>
->> The series first patch stems from Robin's branch:
->> http://linux-arm.org/git?p=linux-rm.git;a=shortlog;h=refs/heads/iommu/misc
->>
->>
->> Best Regards
->>
->> Eric
->>
->> Git: complete series available at
->> https://github.com/eauger/linux/tree/v4.10-rc3-reserved-v8
-> 
-> I tested the series on ThunderX with internal 10G VNIC and Intel IXGBE
-> NIC. Please feel free to add my:
-> Tested-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
-Many thanks!
+> Could you review these patches or pick up them if there is no any comment?
 
-Eric
+If there are no comments, could you apply these patches?
+
 > 
-> Thanks,
-> Tomasz
+> On 2016? 12? 30? 13:11, Chanwoo Choi wrote:
+>> This patches just replace the deprecated extcon API without any change
+>> of extcon operation and use the resource-managed function for
+>> extcon_register_notifier().
+>>
+>> The new extcon API instead of deprecated API.
+>> - extcon_set_cable_state_() -> extcon_set_state_sync();
+>> - extcon_get_cable_state_() -> extcon_get_state();
+>>
+>> Changes from v1:
+>> - Rebase these patches based on v4.10-rc1.
+>> - Drop the usb/power-supply/chipidea patches.
+>>
+>> Chanwoo Choi (2):
+>>   phy: rcar-gen3-usb2: Replace the deprecated extcon API
+>>   phy: sun4i-usb: Replace the deprecated extcon API
+>>
+>>  drivers/phy/phy-rcar-gen3-usb2.c | 8 ++++----
+>>  drivers/phy/phy-sun4i-usb.c      | 4 ++--
+>>  2 files changed, 6 insertions(+), 6 deletions(-)
+>>
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+-- 
+Best Regards,
+Chanwoo Choi
+S/W Center, Samsung Electronics
