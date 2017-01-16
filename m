@@ -1,96 +1,50 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 16 Jan 2017 18:00:00 +0000
-Subject: [PATCH] coresight: STM: Balance enable/disable
-Message-ID: <1484589600-21397-1-git-send-email-suzuki.poulose@arm.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Tue, 17 Jan 2017 02:01:13 +0800
+Subject: [PATCH v2 1/4] arm: sunxi: add support for V3s SoC
+Message-ID: <20170116180116.36729-2-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The stm is automatically enabled when an application sets the policy
-via ->link() call back by using coresight_enable(), which keeps the
-refcount of the current users of the STM. However, the unlink() callback
-issues stm_disable() directly, which leaves the STM turned off, without
-the coresight layer knowing about it. This prevents any further uses
-of the STM hardware as the coresight layer still thinks the STM is
-turned on and doesn't enable the hardware when required. Even manually
-enabling the STM via sysfs can't really enable the hw.
+Allwinner V3s is a low-end single-core Cortex-A7 SoC, with 64MB
+integrated DRAM, and several peripherals.
 
-e.g,
-
- $ echo 1 > $CS_DEVS/$ETR/enable_sink
- $ mkdir -p $CONFIG_FS/stp-policy/$source.0/stm_test/
- $ echo 32768 65535 > $CONFIG_FS/stp-policy/$source.0/stm_test/channels
- $ echo 64 > $CS_DEVS/$source/traceid
- $ ./stm_app
- Sending 64000 byte blocks of pattern 0 at 0us intervals
- Success to map channel(32768~32783) to 0xffffa95fa000
- Sending on channel 32768
- $ dd if=/dev/$ETR of=~/trace.bin.1
- 597+1 records in
- 597+1 records out
- 305920 bytes (306 kB) copied, 0.399952 s, 765 kB/s
- $ ./stm_app
- Sending 64000 byte blocks of pattern 0 at 0us intervals
- Success to map channel(32768~32783) to 0xffff7e9e2000
- Sending on channel 32768
- $ dd if=/dev/$ETR of=~/trace.bin.2
- 0+0 records in
- 0+0 records out
- 0 bytes (0 B) copied, 0.0232083 s, 0.0 kB/s
-
- Note that we don't get any data from the ETR for the second session.
-
- Also dmesg shows :
-
- [   77.520458] coresight-tmc 20800000.etr: TMC-ETR enabled
- [   77.537097] coresight-replicator etr_replicator at 20890000: REPLICATOR enabled
- [   77.558828] coresight-replicator main_replicator at 208a0000: REPLICATOR enabled
- [   77.581068] coresight-funnel 208c0000.main_funnel: FUNNEL inport 0 enabled
- [   77.602217] coresight-tmc 20840000.etf: TMC-ETF enabled
- [   77.618422] coresight-stm 20860000.stm: STM tracing enabled
- [  139.554252] coresight-stm 20860000.stm: STM tracing disabled
-  # End of first tracing session
- [  146.351135] coresight-tmc 20800000.etr: TMC read start
- [  146.514486] coresight-tmc 20800000.etr: TMC read end
-  # Note that the STM is not turned on via stm_generic_link()->coresight_enable()
-  # and hence none of the components are turned on.
- [  152.479080] coresight-tmc 20800000.etr: TMC read start
- [  152.542632] coresight-tmc 20800000.etr: TMC read end
-
-This patch fixes the problem by balancing the unlink operation by using
-the coresight_disable(), keeping the coresight layer in sync with the
-hardware state and thus allowing normal usage of the STM component.
-
-Fixes: commit 237483aa5cf43 ("coresight: stm: adding driver for CoreSight STM component")
-Cc: Pratik Patel <pratikp@codeaurora.org>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: stable at vger.kernel.org # 4.7+
-Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Reviewed-by: Chunyan Zhang <zhang.chunyan@linaro.org>
-Reported-by: Robert Walker <robert.walker@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
+Changes in v2:
+- Used linux-sunxi.org wiki hosted address of V3s datasheet.
 
-Greg,
+Note: the V3s datasheet contains its user manual.
 
-Without this patch, the coresight STM IP can only be used for one tracing
-session per boot, seriously limiting its usability.
+ Documentation/arm/sunxi/README | 4 ++++
+ arch/arm/mach-sunxi/sunxi.c    | 1 +
+ 2 files changed, 5 insertions(+)
 
----
- drivers/hwtracing/coresight/coresight-stm.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/hwtracing/coresight/coresight-stm.c b/drivers/hwtracing/coresight/coresight-stm.c
-index e4c55c5..93fc26f 100644
---- a/drivers/hwtracing/coresight/coresight-stm.c
-+++ b/drivers/hwtracing/coresight/coresight-stm.c
-@@ -356,7 +356,7 @@ static void stm_generic_unlink(struct stm_data *stm_data,
- 	if (!drvdata || !drvdata->csdev)
- 		return;
+diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
+index cd0243302bc1..a455b305c62c 100644
+--- a/Documentation/arm/sunxi/README
++++ b/Documentation/arm/sunxi/README
+@@ -67,6 +67,10 @@ SunXi family
+         + Datasheet
+           http://dl.linux-sunxi.org/H3/Allwinner_H3_Datasheet_V1.0.pdf
  
--	stm_disable(drvdata->csdev, NULL);
-+	coresight_disable(drvdata->csdev);
- }
++      - Allwinner V3s (sun8i)
++        + Datasheet
++          http://linux-sunxi.org/File:Allwinner_V3s_Datasheet_V1.0.pdf
++
+     * Quad ARM Cortex-A15, Quad ARM Cortex-A7 based SoCs
+       - Allwinner A80
+         + Datasheet
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index 2e2bde271205..f246bfc6cfe4 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -64,6 +64,7 @@ static const char * const sun8i_board_dt_compat[] = {
+ 	"allwinner,sun8i-a33",
+ 	"allwinner,sun8i-a83t",
+ 	"allwinner,sun8i-h3",
++	"allwinner,sun8i-v3s",
+ 	NULL,
+ };
  
- static phys_addr_t
 -- 
-2.7.4
+2.11.0
