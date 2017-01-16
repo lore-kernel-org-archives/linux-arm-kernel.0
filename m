@@ -1,78 +1,98 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Mon, 16 Jan 2017 01:47:19 +0100
-Subject: [PATCH 3/4] ARM64: dts: meson-gx-p23x-q20x: enable the Bluetooth
- module
-In-Reply-To: <20170115223255.10350-4-martin.blumenstingl@googlemail.com>
-References: <20170115223255.10350-1-martin.blumenstingl@googlemail.com>
- <20170115223255.10350-4-martin.blumenstingl@googlemail.com>
-Message-ID: <042e2824-0772-cf27-ffa5-4c3b2af7c92b@suse.de>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Mon, 16 Jan 2017 08:54:46 +0800
+Subject: [PATCH v18 00/15] acpi, clocksource: add GTDT driver and GTDT
+ support in arm_arch_timer
+In-Reply-To: <CADyBb7vF0v2DwXA8fNUOTQcqriJK1Hp57_G8DKi0WO9FnvrB5w@mail.gmail.com>
+References: <20161208173319.6618-1-fu.wei@linaro.org>
+ <20170113192920.GF2472@leverpostej>
+ <CADyBb7vF0v2DwXA8fNUOTQcqriJK1Hp57_G8DKi0WO9FnvrB5w@mail.gmail.com>
+Message-ID: <CADyBb7ugz_YpxKQUsJbF1vdjm_Nzyh2mH8TZMPqj1cSHGSPCFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 15.01.2017 um 23:32 schrieb Martin Blumenstingl:
-> This takes the Bluetooth module out of reset (the reset line is
-> connected to GPIOX_17) and enables uart_A which is used to configure the
-> module.
-> This is identical for all boards which inherit meson-gx-p23x-q20x:
-> - GXL S905D P230
-> - GXL S905D P231
-> - GXM S912 Q200
-> - GXM S912 Q201
-> 
-> To get the HCI interface up one has to install bluez-utils and run:
-> hciattach -s115200 /dev/ttyAML1 bcm43xx 2000000 flow -
-> 
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> ---
->  arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi | 12 +++++++++++-
->  1 file changed, 11 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-> index 7a078bef04cd..7db779048091 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-> @@ -48,6 +48,7 @@
->  / {
->  	aliases {
->  		serial0 = &uart_AO;
-> +		serial1 = &uart_A;
->  	};
->  
->  	chosen {
-> @@ -94,12 +95,21 @@
->  
->  	sdio_pwrseq: sdio-pwrseq {
->  		compatible = "mmc-pwrseq-simple";
-> -		reset-gpios = <&gpio GPIOX_6 GPIO_ACTIVE_LOW>;
-> +		reset-gpios = <&gpio GPIOX_6 GPIO_ACTIVE_LOW>,
-> +			      <&gpio GPIOX_17 GPIO_ACTIVE_LOW>;
->  		clocks = <&wifi32k>;
->  		clock-names = "ext_clock";
->  	};
->  };
->  
-> +/* This is connected to the Bluetooth module of the wifi/BT combo chip: */
-> +&uart_A {
-> +	status = "okay";
-> +	pinctrl-0 = <&uart_a_pins &uart_a_cts_rts_pins>;
+Hi Mark,
 
-Nit: <&uart_a_pins>, <&uart_a_cts_rts_pins> please, like you've done for
-reset-gpios above.
+On 14 January 2017 at 19:34, Fu Wei <fu.wei@linaro.org> wrote:
+> Hi Mark,
+>
+> On 14 January 2017 at 03:29, Mark Rutland <mark.rutland@arm.com> wrote:
+>> Hi,
+>>
+>> On Fri, Dec 09, 2016 at 01:33:04AM +0800, fu.wei at linaro.org wrote:
+>>> From: Fu Wei <fu.wei@linaro.org>
+>>>
+>>> This patchset:
+>>>     (1)Preparation for adding GTDT support in arm_arch_timer:
+>>>         1. Move some enums and marcos to header file;
+>>>         2. Add a new enum for spi type;
+>>>         3. Improve printk relevant code;
+>>>         4. Rename some enums and defines;
+>>>         5. Rework PPI determination;
+>>>         6. Rework counter frequency detection;
+>>>         7. Refactor arch_timer_needs_probing, move it into DT init call
+>>>         8. Introduce some new structs and refactor the MMIO timer init code
+>>>         for reusing some common code.
+>>>
+>>>     (2)Introduce ACPI GTDT parser: drivers/acpi/arm64/acpi_gtdt.c
+>>>     Parse all kinds of timer in GTDT table of ACPI:arch timer,
+>>>     memory-mapped timer and SBSA Generic Watchdog timer.
+>>>     This driver can help to simplify all the relevant timer drivers,
+>>>     and separate all the ACPI GTDT knowledge from them.
+>>>
+>>>     (3)Simplify ACPI code for arm_arch_timer
+>>>
+>>>     (4)Add GTDT support for ARM memory-mapped timer.
+>>>
+>>> This patchset has been tested on the following platforms with ACPI enabled:
+>>>     (1)ARM Foundation v8 model
+>>
+>> Once v4.10-rc4 comes out this weekend, could you please rebase and
+>> repost this?
+>
+> Yes, of course.
+>
+> I have rebased v19 to the latest v4.10-rc3-e96f8f1, it dosen't need
+> any modification.
+> I will rebase it every day, and will repost it if it need any  modification.
+>
+> But for now, V19 works well with the master branch of upstream kernel.
+> Do I need to re-post it even if it doesn't need any improvement or
+> modification? :-)
 
-Regards,
-Andreas
+I just fetched the latest mainline kernel, and rebase v19 on the top
+of 4.10-rc4.
+I have double checked it, V19 works well with  4.10-rc4.
+For rebasing,  it doesn't need any modification.
 
-> +	pinctrl-names = "default";
-> +	uart-has-rtscts;
-> +};
-> +
->  /* This UART is brought out to the DB9 connector */
->  &uart_AO {
->  	status = "okay";
-> 
+So please help me to review V19, I will improve it ASAP according to
+your suggestion.
+
+Many thanks!
+
+>
+>>
+>> Marc and I will be happy to take a look then.
+>
+> Great thanks for your help!
+>
+>>
+>> Thanks,
+>> Mark.
+>
+>
+>
+> --
+> Best regards,
+>
+> Fu Wei
+> Software Engineer
+> Red Hat
+
 
 
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
