@@ -1,80 +1,52 @@
 From: yannick.fertre@st.com (Yannick Fertre)
-Date: Mon, 16 Jan 2017 14:28:58 +0100
-Subject: [PATCH v1 1/7] dt-bindings: display: add STM32 LTDC driver
-In-Reply-To: <1484573344-11609-1-git-send-email-yannick.fertre@st.com>
-References: <1484573344-11609-1-git-send-email-yannick.fertre@st.com>
-Message-ID: <1484573344-11609-2-git-send-email-yannick.fertre@st.com>
+Date: Mon, 16 Jan 2017 14:28:57 +0100
+Subject: [PATCH v1 0/7] DRM: add LTDC support for STM32F4
+Message-ID: <1484573344-11609-1-git-send-email-yannick.fertre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
----
- .../devicetree/bindings/display/st,ltdc.txt        | 57 ++++++++++++++++++++++
- 1 file changed, 57 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/st,ltdc.txt
+The purpose of this set of patches is to add a new driver for stm32f429.
+This driver was developed and tested on evaluation board stm32429i.
 
-diff --git a/Documentation/devicetree/bindings/display/st,ltdc.txt b/Documentation/devicetree/bindings/display/st,ltdc.txt
-new file mode 100644
-index 0000000..20e89da
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/st,ltdc.txt
-@@ -0,0 +1,57 @@
-+* STMicroelectronics STM32 lcd-tft display controller
-+
-+- st-display-subsystem: Master device for DRM sub-components
-+  This device must be the parent of all the sub-components and is responsible
-+  of bind them.
-+  Required properties:
-+  - compatible: "st,display-subsystem"
-+  - ranges: to allow probing of subdevices
-+
-+- ltdc_host: lcd-tft display controller host
-+  must be a sub-node of st-display-subsystem
-+  Required properties:
-+  - compatible: "st,ltdc"
-+  - reg: Physical base address of the IP registers and length of memory mapped region.
-+  - clocks: from common clock binding: handle hardware IP needed clocks, the
-+    number of clocks may depend of the SoC type.
-+    See ../clocks/clock-bindings.txt for details.
-+  - clock-names: names of the clocks listed in clocks property in the same
-+    order.
-+  - resets: resets to be used by the device
-+    See ../reset/reset.txt for details.
-+  - reset-names: names of the resets listed in resets property in the same
-+    order.
-+  Required nodes:
-+    - Video port for RGB output.
-+
-+Example:
-+
-+/ {
-+	...
-+	soc {
-+	...
-+		st-display-subsystem {
-+			compatible = "st,display-subsystem";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+			dma-ranges;
-+
-+			ltdc_host: stm32-ltdc at 40016800 {
-+				compatible = "st,ltdc";
-+				reg = <0x40016800 0x200>;
-+				interrupts = <88>, <89>;
-+				resets = <&rcc 314>;
-+				clocks = <&rcc 1 8>;
-+				clock-names = "clk-lcd";
-+				status = "disabled";
-+
-+				port {
-+					ltdc_out_rgb: endpoint {
-+					};
-+				};
-+			};
-+		};
-+	...
-+	};
-+};
+Stm32f4 is a MCU platform which don't have MMU so the last patches developed
+by Benjamin Gaignard regarding "DRM: allow to use mmuless devices"
+are necessary.
+
+The board stm429i embeds a Ampire AM-480272H3TMQW-T01H screen.
+A new simple panel am-480272h3tmqw-t01h have been added to support it.
+
+Yannick Fertre (7):
+  dt-bindings: display: add STM32 LTDC driver
+  drm/st: Add STM32 LTDC driver
+  dt-bindings: Add Ampire AM-480272H3TMQW-T01H panel
+  drm/panel: simple: Add support for Ampire AM-480272H3TMQW-T01H
+  ARM: dts: stm32f429: Add ltdc support
+  ARM: dts: stm32429i-eval: Enable ltdc & simple panel on Eval board
+  ARM: configs: Add STM32 LTDC support in STM32 defconfig
+
+ .../display/panel/ampire,am-480272h3tmqw-t01h.txt  |    7 +
+ .../devicetree/bindings/display/st,ltdc.txt        |   57 +
+ arch/arm/boot/dts/stm32429i-eval.dts               |   58 +
+ arch/arm/boot/dts/stm32f429.dtsi                   |   25 +-
+ arch/arm/configs/stm32_defconfig                   |    5 +
+ drivers/gpu/drm/Kconfig                            |    2 +
+ drivers/gpu/drm/Makefile                           |    1 +
+ drivers/gpu/drm/panel/panel-simple.c               |   29 +
+ drivers/gpu/drm/st/Kconfig                         |   14 +
+ drivers/gpu/drm/st/Makefile                        |    7 +
+ drivers/gpu/drm/st/drv.c                           |  279 ++++
+ drivers/gpu/drm/st/drv.h                           |   25 +
+ drivers/gpu/drm/st/ltdc.c                          | 1438 ++++++++++++++++++++
+ drivers/gpu/drm/st/ltdc.h                          |   20 +
+ 14 files changed, 1966 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
+ create mode 100644 Documentation/devicetree/bindings/display/st,ltdc.txt
+ create mode 100644 drivers/gpu/drm/st/Kconfig
+ create mode 100644 drivers/gpu/drm/st/Makefile
+ create mode 100644 drivers/gpu/drm/st/drv.c
+ create mode 100644 drivers/gpu/drm/st/drv.h
+ create mode 100644 drivers/gpu/drm/st/ltdc.c
+ create mode 100644 drivers/gpu/drm/st/ltdc.h
+
 -- 
 1.9.1
