@@ -1,39 +1,66 @@
-From: palves@redhat.com (Pedro Alves)
-Date: Mon, 16 Jan 2017 15:47:55 +0000
-Subject: [RFC PATCH 08/10] arm64/sve: ptrace: Wire up vector length
- control and reporting
-In-Reply-To: <20170116151156.GI28060@E107787-LIN>
-References: <1484220369-23970-1-git-send-email-Dave.Martin@arm.com>
- <1484220369-23970-9-git-send-email-Dave.Martin@arm.com>
- <20170116122038.GG28060@E107787-LIN>
- <20170116133231.GO3699@e103592.cambridge.arm.com>
- <20170116151156.GI28060@E107787-LIN>
-Message-ID: <a7261d6b-0074-7345-d380-ef0dd335dd56@redhat.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Mon, 16 Jan 2017 16:49:29 +0100
+Subject: [GIT PULL] STM32 DT changes for v4.11 #1
+Message-ID: <e36f6aca-120c-b2a5-52da-06e12e5cfb9f@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/16/2017 03:11 PM, Yao Qi wrote:
-> 
->> > 
->> > gdb must already re-detect the vector length on stop, since the target
->> > could have called the prctl() in the meantime.
-> Yes, gdb assumes the vector length may be changed, so it re-detects on
-> every stop, but I don't see the need for gdb to change the vector length.
-> 
+Hi Olof, Arnd and Kevin,
 
-Do we need to consider inferior function calls here?
+Please consider this first round of STM32 DT updates for v4.11:
 
-Say the program is stopped in code that assumes "vector length N", and
-the user does "print some_function_that_assumes_some_other_vector_length ()".
+The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 
-Is that a use case we need to cover?
+   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
 
-If so, to make it work correctly, the debugger needs to be able to change the
-vector length to the length assumed by that called function, and then
-restore it back after the call completes (or is aborted).
+are available in the git repository at:
 
-I have no idea whether the debugger will be able to figure
-out a function's assumed vector length from debug info or some such.
+   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git 
+tags/stm32-dt-for-v4.11-1
 
-Thanks,
-Pedro Alves
+for you to fetch changes up to d99c66406a846748e26989759caa7e966c1804dd:
+
+   ARM: dts: stm32: enable RTC on stm32429i-eval (2017-01-16 14:38:14 +0100)
+
+----------------------------------------------------------------
+STM32 DT updates for v4.11, round 1.
+
+Highlights:
+----------
+
+  - ADD RTC support on STM32F429 MCU
+  - Enable RTC on STM32F469and STM32F429 boards
+  - ADD ADC support on STM32F429 MCU
+  - Enable ADC on STM32F429 Eval board
+  - Add I2S external clock
+  - Fix memory size for STM32F429 Disco
+
+Note:
+-----
+First patch "clk: stm32f4: Update DT bindings documentation")
+has already been merged in clock tree.
+
+----------------------------------------------------------------
+Amelie Delaunay (5):
+       ARM: dts: stm32: set HSE_RTC clock frequency to 1 MHz on stm32f429
+       ARM: dts: stm32: Add RTC support for STM32F429 MCU
+       ARM: dts: stm32: enable RTC on stm32f429-disco
+       ARM: dts: stm32: enable RTC on stm32f469-disco
+       ARM: dts: stm32: enable RTC on stm32429i-eval
+
+Bruno Herrera (1):
+       ARM: dts: stm32: Fix memory size from 8MB to 16MB on 
+stm32f469-disco board
+
+Bruno Meirelles Herrera (1):
+       ARM: dts: stm32: Add missing USART3 pin config to stm32f469-disco 
+board
+
+Fabrice GASNIER (2):
+       ARM: dts: stm32: Add ADC support to stm32f429
+       ARM: dts: stm32: enable ADC on stm32f429i-eval board
+
+Gabriel Fernandez (3):
+       clk: stm32f4: Update DT bindings documentation
+       ARM: dts: stm32: Add external I2S clock on stm32f429 MCU
+       ARM: dts: stm32: Include auxiliary stm32fx clock definition
