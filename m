@@ -1,151 +1,243 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Mon, 16 Jan 2017 13:09:22 -0700
-Subject: [PATCH V7 04/10] arm64: exception: handle Synchronous External
- Abort
-In-Reply-To: <20170116115309.GE1510@arm.com>
-References: <1484244924-24786-1-git-send-email-tbaicar@codeaurora.org>
- <1484244924-24786-5-git-send-email-tbaicar@codeaurora.org>
- <20170116115309.GE1510@arm.com>
-Message-ID: <0ca6c70e-6033-4cca-8833-15cb8573a939@codeaurora.org>
+From: christopher.spinrath@rwth-aachen.de (Christopher Spinrath)
+Date: Mon, 16 Jan 2017 21:12:19 +0100
+Subject: [PATCH] ARM: dts: imx6q-utilite-pro: enable 2nd display pipeline
+In-Reply-To: <27256207f2d84b1ca4b7dfc41a413fcc@rwthex-s2-a.rwth-ad.de>
+References: <ec9676f344eb4786a28a3c7b969f0e94@rwthex-s1-b.rwth-ad.de>
+ <27256207f2d84b1ca4b7dfc41a413fcc@rwthex-s2-a.rwth-ad.de>
+Message-ID: <6c25c25f-7811-10fe-2824-e813e88ec8f7@rwth-aachen.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Will,
+Hi Philipp,
 
+ping? It would be very nice if you comment on this patch before it's too 
+late for v4.11 (which is soon, I think).
 
-On 1/16/2017 4:53 AM, Will Deacon wrote:
-> On Thu, Jan 12, 2017 at 11:15:18AM -0700, Tyler Baicar wrote:
->> SEA exceptions are often caused by an uncorrected hardware
->> error, and are handled when data abort and instruction abort
->> exception classes have specific values for their Fault Status
->> Code.
->> When SEA occurs, before killing the process, go through
->> the handlers registered in the notification list.
->> Update fault_info[] with specific SEA faults so that the
->> new SEA handler is used.
+Cheers,
+Christopher
+
+On 12/30/2016 03:27 PM, Shawn Guo wrote:
+> On Fri, Dec 02, 2016 at 03:37:22PM +0100, christopher.spinrath at rwth-aachen.de wrote:
+>> From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
 >>
->> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
->> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
->> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
->> ---
->>   arch/arm64/include/asm/system_misc.h | 13 ++++++++
->>   arch/arm64/mm/fault.c                | 58 +++++++++++++++++++++++++++++-------
->>   2 files changed, 61 insertions(+), 10 deletions(-)
+>> Apart from the already enabled Designware HDMI port, the Utilite Pro
+>> has a second display pipeline which has the following shape:
 >>
->> diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
->> index 57f110b..e7f3440 100644
->> --- a/arch/arm64/include/asm/system_misc.h
->> +++ b/arch/arm64/include/asm/system_misc.h
->> @@ -64,4 +64,17 @@ extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
->>   
->>   #endif	/* __ASSEMBLY__ */
->>   
->> +/*
->> + * The functions below are used to register and unregister callbacks
->> + * that are to be invoked when a Synchronous External Abort (SEA)
->> + * occurs. An SEA is raised by certain fault status codes that have
->> + * either data or instruction abort as the exception class, and
->> + * callbacks may be registered to parse or handle such hardware errors.
->> + *
->> + * Registered callbacks are run in an interrupt/atomic context. They
->> + * are not allowed to block or sleep.
->> + */
->> +int register_sea_notifier(struct notifier_block *nb);
->> +void unregister_sea_notifier(struct notifier_block *nb);
-> I still don't understand why you need notifiers for this. You register
-> precisely one hook in the series.
-I didn't see a response to my last comment on the previous series so I 
-just left it in for this series.
-The notifier usage is consistent with the GHES code for SCI errors which 
-are also only used a single
-time in the code. If you think making the call directly is a better 
-option I will remove the notifiers.
->>   #endif	/* __ASM_SYSTEM_MISC_H */
->> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
->> index 05d2bd7..81039c7 100644
->> --- a/arch/arm64/mm/fault.c
->> +++ b/arch/arm64/mm/fault.c
->> @@ -39,6 +39,22 @@
->>   #include <asm/pgtable.h>
->>   #include <asm/tlbflush.h>
->>   
->> +/*
->> + * GHES SEA handler code may register a notifier call here to
->> + * handle HW error record passed from platform.
->> + */
->> +static ATOMIC_NOTIFIER_HEAD(sea_handler_chain);
->> +
->> +int register_sea_notifier(struct notifier_block *nb)
->> +{
->> +	return atomic_notifier_chain_register(&sea_handler_chain, nb);
->> +}
->> +
->> +void unregister_sea_notifier(struct notifier_block *nb)
->> +{
->> +	atomic_notifier_chain_unregister(&sea_handler_chain, nb);
->> +}
->> +
->>   static const char *fault_name(unsigned int esr);
->>   
->>   #ifdef CONFIG_KPROBES
->> @@ -480,6 +496,28 @@ static int do_bad(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->>   	return 1;
->>   }
->>   
->> +/*
->> + * This abort handler deals with Synchronous External Abort.
->> + * It calls notifiers, and then returns "fault".
->> + */
->> +static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->> +{
->> +	struct siginfo info;
->> +
->> +	atomic_notifier_call_chain(&sea_handler_chain, 0, NULL);
->> +
->> +	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
->> +		 fault_name(esr), esr, addr);
->> +
->> +	info.si_signo = SIGBUS;
->> +	info.si_errno = 0;
->> +	info.si_code  = 0;
->> +	info.si_addr  = (void __user *)addr;
->> +	arm64_notify_die("", regs, &info, esr);
->> +
->> +	return 0;
->> +}
->> +
->>   static const struct fault_info {
->>   	int	(*fn)(unsigned long addr, unsigned int esr, struct pt_regs *regs);
->>   	int	sig;
->> @@ -502,22 +540,22 @@ static const struct fault_info {
->>   	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 1 permission fault"	},
->>   	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 2 permission fault"	},
->>   	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 3 permission fault"	},
->> -	{ do_bad,		SIGBUS,  0,		"synchronous external abort"	},
->> +	{ do_sea,		SIGBUS,  0,		"synchronous external abort"	},
->>   	{ do_bad,		SIGBUS,  0,		"unknown 17"			},
->>   	{ do_bad,		SIGBUS,  0,		"unknown 18"			},
->>   	{ do_bad,		SIGBUS,  0,		"unknown 19"			},
->> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
->> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
->> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
->> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
->> -	{ do_bad,		SIGBUS,  0,		"synchronous parity error"	},
->> +	{ do_sea,		SIGBUS,  0,		"level 0 SEA (translation table walk)"	},
->> +	{ do_sea,		SIGBUS,  0,		"level 1 SEA (translation table walk)"	},
->> +	{ do_sea,		SIGBUS,  0,		"level 2 SEA (translation table walk)"	},
->> +	{ do_sea,		SIGBUS,  0,		"level 3 SEA (translation table walk)"	},
-> Perhaps I wasn't clear enough in my previous review, but please expand the
-> acronym for strings and comments.
-Sorry, I will expand these.
->> +	{ do_sea,		SIGBUS,  0,		"synchronous parity or ECC err" },
-> s/err/error/
+>>   IPU1 DI0 --> Parallel display --> tfp410 rgb24 to DVI encoder
+>>                                 --> HDMI connector.
+>> Enable support for it.
+>>
+>> In addition, since this pipeline is hardwired to IPU1, sever the link
+>> between IPU1 and the SoC-internal Designware HDMI encoder forcing the
+>> latter to be connected to IPU2 instead of IPU1. Otherwise, it is not
+>> possible to drive both displays at high resolution due to the bandwidth
+>> limitations of a single IPU.
+>>
+>> Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
 >
-> Will
-Thanks,
-Tyler
-
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+> @Philipp, can you help review the changes?
+>
+>> ---
+>>
+>> Hi all,
+>>
+>> the removal of the link between IPU1 and the Designware HDMI encoder is the
+>> result of a discussion I had with Philipp Zabel:
+>>
+>>   https://lists.freedesktop.org/archives/dri-devel/2016-November/125399.html .
+>>
+>> Altough it is not possible to connect anything else to IPU1 on the Utilite, this
+>> approach has at least one disadvantage: if the resolution is low enough such
+>> that a single IPU can handle both displays then muxing both displays to IPU1
+>> would reduce the power consumption.
+>>
+>> However, IMHO omitting the link IPU1 <--> DW HDMI is still the preferrable
+>> solution since I'm not aware of any OS/driver that is capable of switching IPUs
+>> or can handle the bandwidth limitation in a sane way. In particular, Linux is
+>> unusable when both displays are supposed to be driven at high resolution and
+>> both muxing options for the DW HDMI are available (this is not a userspace
+>> issue; the system becomes almost unresponsive as soon as the kernel sets the
+>> initial resolution).
+>>
+>> Cheers,
+>> Christopher
+>>
+>> P.S.: this patch depends on the tfp410 bridge driver which has recently been
+>> merged into drm-next.
+>
+> v4.10-rc1 has the driver, so the dependency is gone now, I guess.
+>
+>>
+>>  arch/arm/boot/dts/imx6q-utilite-pro.dts | 115 ++++++++++++++++++++++++++++++++
+>>  1 file changed, 115 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/imx6q-utilite-pro.dts b/arch/arm/boot/dts/imx6q-utilite-pro.dts
+>> index 2200994..69bdd82 100644
+>> --- a/arch/arm/boot/dts/imx6q-utilite-pro.dts
+>> +++ b/arch/arm/boot/dts/imx6q-utilite-pro.dts
+>> @@ -59,6 +59,33 @@
+>>  		rtc1 = &snvs_rtc;
+>>  	};
+>>
+>> +	encoder {
+>> +		compatible = "ti,tfp410";
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +
+>> +		ports {
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +
+>> +			port at 0 {
+>> +				reg = <0>;
+>> +
+>> +				tfp410_in: endpoint {
+>> +					remote-endpoint = <&parallel_display_out>;
+>> +				};
+>> +			};
+>> +
+>> +			port at 1 {
+>> +				reg = <1>;
+>> +
+>> +				tfp410_out: endpoint {
+>> +					remote-endpoint = <&hdmi_connector_in>;
+>> +				};
+>> +			};
+>> +		};
+>> +	};
+>> +
+>>  	gpio-keys {
+>>  		compatible = "gpio-keys";
+>>  		pinctrl-names = "default";
+>> @@ -72,6 +99,19 @@
+>>  		};
+>>  	};
+>>
+>> +	hdmi-connector {
+>> +		compatible = "hdmi-connector";
+>> +
+>
+> The newline is unnecessary.
+>
+>> +		type = "a";
+>> +		ddc-i2c-bus = <&i2c_dvi_ddc>;
+>> +
+>> +		port {
+>> +			hdmi_connector_in: endpoint {
+>> +				remote-endpoint = <&tfp410_out>;
+>> +			};
+>> +		};
+>> +	};
+>> +
+>>  	i2cmux {
+>>  		compatible = "i2c-mux-gpio";
+>>  		pinctrl-names = "default";
+>> @@ -105,8 +145,46 @@
+>>  			#size-cells = <0>;
+>>  		};
+>>  	};
+>> +
+>> +	parallel-display {
+>> +		compatible = "fsl,imx-parallel-display";
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <&pinctrl_ipu1>;
+>> +
+>
+> Ditto
+>
+> I can fix them up if I get a Reviewed-by tag from Philipp on this
+> version.
+>
+> Shawn
+>
+>> +		interface-pix-fmt = "rgb24";
+>> +
+>> +		port at 0 {
+>> +			reg = <0>;
+>> +
+>> +			parallel_display_in: endpoint {
+>> +				remote-endpoint = <&ipu1_di0_disp0>;
+>> +			};
+>> +		};
+>> +
+>> +		port at 1 {
+>> +			reg = <1>;
+>> +
+>> +			parallel_display_out: endpoint {
+>> +				remote-endpoint = <&tfp410_in>;
+>> +			};
+>> +		};
+>> +	};
+>>  };
+>>
+>> +/*
+>> + * A single IPU is not able to drive both display interfaces available on the
+>> + * Utilite Pro at high resolution due to its bandwidth limitation. Since the
+>> + * tfp410 encoder is wired up to IPU1, sever the link between IPU1 and the
+>> + * SoC-internal Designware HDMI encoder forcing the latter to be connected to
+>> + * IPU2 instead of IPU1.
+>> + */
+>> +/delete-node/&ipu1_di0_hdmi;
+>> +/delete-node/&hdmi_mux_0;
+>> +/delete-node/&ipu1_di1_hdmi;
+>> +/delete-node/&hdmi_mux_1;
+>> +
+>>  &hdmi {
+>>  	ddc-i2c-bus = <&i2c2>;
+>>  	status = "okay";
+>> @@ -151,6 +229,39 @@
+>>  		>;
+>>  	};
+>>
+>> +	pinctrl_ipu1: ipu1grp {
+>> +		fsl,pins = <
+>> +			MX6QDL_PAD_DI0_DISP_CLK__IPU1_DI0_DISP_CLK 0x38
+>> +			MX6QDL_PAD_DI0_PIN15__IPU1_DI0_PIN15       0x38
+>> +			MX6QDL_PAD_DI0_PIN2__IPU1_DI0_PIN02        0x38
+>> +			MX6QDL_PAD_DI0_PIN3__IPU1_DI0_PIN03        0x38
+>> +			MX6QDL_PAD_DISP0_DAT0__IPU1_DISP0_DATA00   0x38
+>> +			MX6QDL_PAD_DISP0_DAT1__IPU1_DISP0_DATA01   0x38
+>> +			MX6QDL_PAD_DISP0_DAT2__IPU1_DISP0_DATA02   0x38
+>> +			MX6QDL_PAD_DISP0_DAT3__IPU1_DISP0_DATA03   0x38
+>> +			MX6QDL_PAD_DISP0_DAT4__IPU1_DISP0_DATA04   0x38
+>> +			MX6QDL_PAD_DISP0_DAT5__IPU1_DISP0_DATA05   0x38
+>> +			MX6QDL_PAD_DISP0_DAT6__IPU1_DISP0_DATA06   0x38
+>> +			MX6QDL_PAD_DISP0_DAT7__IPU1_DISP0_DATA07   0x38
+>> +			MX6QDL_PAD_DISP0_DAT8__IPU1_DISP0_DATA08   0x38
+>> +			MX6QDL_PAD_DISP0_DAT9__IPU1_DISP0_DATA09   0x38
+>> +			MX6QDL_PAD_DISP0_DAT10__IPU1_DISP0_DATA10  0x38
+>> +			MX6QDL_PAD_DISP0_DAT11__IPU1_DISP0_DATA11  0x38
+>> +			MX6QDL_PAD_DISP0_DAT12__IPU1_DISP0_DATA12  0x38
+>> +			MX6QDL_PAD_DISP0_DAT13__IPU1_DISP0_DATA13  0x38
+>> +			MX6QDL_PAD_DISP0_DAT14__IPU1_DISP0_DATA14  0x38
+>> +			MX6QDL_PAD_DISP0_DAT15__IPU1_DISP0_DATA15  0x38
+>> +			MX6QDL_PAD_DISP0_DAT16__IPU1_DISP0_DATA16  0x38
+>> +			MX6QDL_PAD_DISP0_DAT17__IPU1_DISP0_DATA17  0x38
+>> +			MX6QDL_PAD_DISP0_DAT18__IPU1_DISP0_DATA18  0x38
+>> +			MX6QDL_PAD_DISP0_DAT19__IPU1_DISP0_DATA19  0x38
+>> +			MX6QDL_PAD_DISP0_DAT20__IPU1_DISP0_DATA20  0x38
+>> +			MX6QDL_PAD_DISP0_DAT21__IPU1_DISP0_DATA21  0x38
+>> +			MX6QDL_PAD_DISP0_DAT22__IPU1_DISP0_DATA22  0x38
+>> +			MX6QDL_PAD_DISP0_DAT23__IPU1_DISP0_DATA23  0x38
+>> +		>;
+>> +	};
+>> +
+>>  	pinctrl_uart2: uart2grp {
+>>  		fsl,pins = <
+>>  			MX6QDL_PAD_GPIO_7__UART2_TX_DATA 0x1b0b1
+>> @@ -194,6 +305,10 @@
+>>  	};
+>>  };
+>>
+>> +&ipu1_di0_disp0 {
+>> +	remote-endpoint = <&parallel_display_in>;
+>> +};
+>> +
+>>  &pcie {
+>>  	pcie at 0,0 {
+>>  		reg = <0x000000 0 0 0 0>;
+>> --
+>> 2.10.2
+>>
