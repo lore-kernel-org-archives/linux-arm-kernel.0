@@ -1,70 +1,61 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Mon, 16 Jan 2017 16:18:03 +0200
-Subject: [PATCH v2 2/2] vring: Force use of DMA API for ARM-based systems
-In-Reply-To: <20170116104028.GA1510@arm.com>
-References: <85015f1653eb7e36f992708362b75d1f4391b783.1484070340.git.robin.murphy@arm.com>
- <4833e705fb6841fbfdbee3b1a21a7bc917292410.1484070340.git.robin.murphy@arm.com>
- <20170111013046-mutt-send-email-mst@kernel.org>
- <20170111100139.GC12388@arm.com>
- <20170112232931-mutt-send-email-mst@kernel.org>
- <20170113092522.GB22538@arm.com>
- <20170113183222-mutt-send-email-mst@kernel.org>
- <20170113172154.GL3253@arm.com>
- <20170113201933-mutt-send-email-mst@kernel.org>
- <20170116104028.GA1510@arm.com>
-Message-ID: <20170116161639-mutt-send-email-mst@kernel.org>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 16 Jan 2017 14:19:45 +0000
+Subject: [PATCH 2/3] KVM: arm64: Access CNTHCTL_EL2 bit fields correctly
+ on VHE systems
+In-Reply-To: <c82f705e-c32a-15b1-92f6-d7694f91fe0e@arm.com>
+References: <1484307093-29153-1-git-send-email-marc.zyngier@arm.com>
+ <1484307093-29153-3-git-send-email-marc.zyngier@arm.com>
+ <20170113123612.GA31994@cbox> <d496020c-a097-ffd5-adb7-7edb7c1a214e@arm.com>
+ <e0d1473f-0cf9-a801-585b-4385bc5b35ab@arm.com>
+ <61f7dbf1-e20d-e9e4-950c-6a224619cf31@arm.com>
+ <c82f705e-c32a-15b1-92f6-d7694f91fe0e@arm.com>
+Message-ID: <bab6015b-00f1-6e6a-29ee-9b35c626f692@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2017 at 10:40:28AM +0000, Will Deacon wrote:
-> On Fri, Jan 13, 2017 at 08:23:35PM +0200, Michael S. Tsirkin wrote:
-> > On Fri, Jan 13, 2017 at 05:21:54PM +0000, Will Deacon wrote:
-> > > On Fri, Jan 13, 2017 at 06:46:32PM +0200, Michael S. Tsirkin wrote:
-> > > > On Fri, Jan 13, 2017 at 09:25:22AM +0000, Will Deacon wrote:
-> > > > > On Fri, Jan 13, 2017 at 12:12:56AM +0200, Michael S. Tsirkin wrote:
-> > > > > > I'd rather people didn't use SMMU with legacy devices.
-> > > > > 
-> > > > > I'm afraid we've been doing that for two years and the model already
-> > > > > exists in a mature state, being actively used for development and
-> > > > > validation by ARM and our partners. One of the big things its used for
-> > > > > is to develop SMMU and GIC (our interrupt controller) code with PCI, so
-> > > > > dropping the SMMU from the picture isn't an option.
-> > > > 
-> > > > Oh so this fixes a regression?  This is something I didn't realize.
-> > > 
-> > > Yes, thanks. The regression came about because we implemented SMMU-backed
-> > > DMA ops and only then was it apparent that the virtio stuff was bypassing
-> > > even with translation enabled (because it wasn't using the DMA API).
-> > 
-> > Could you point out a commit ID?
-> 
-> There has been a fair amount of work in this area recently, but you're
-> probably after something like 876945dbf649 ("arm64: Hook up IOMMU dma_ops")
-> as the culprit, which is the point at which we started to swizzle DMA
-> ops for devices upstream of an SMMU automatically.
-> 
-> > > > A "Fixes:" tag can't hurt here.  I then wonder
-> > > > might DMA ops ever use a DMA address which isn't a physical address
-> > > > from QEMU point of view? If that happens, this hack breaks
-> > > > because in legacy mode QEMU still uses the GPA.
-> > > 
-> > > If QEMU doesn't advertise an SMMU, then it will work fine with the GPA,
-> > > because we won't swizzle the DMA ops for the master device. If QEMU does
-> > > advertise an SMMU, then we'll allocate DMA addresses to fit within the
-> > > the intersection of the SMMU aperture and device's DMA mask.
-> > 
-> > 
-> > Right but doesn't just poking from qemu into phys addresses work
-> > anymore? It used to ...
-> 
-> Provided that there's no SMMU, then it will continue to work. and my
-> understanding (from talking to Peter Maydell) is that qemu doesn't model
-> an SMMU for ARM-based machines.
-> 
-> Will
+On 16/01/17 14:11, Marc Zyngier wrote:
+> On 16/01/17 13:30, Marc Zyngier wrote:
+>> On 13/01/17 14:56, Suzuki K Poulose wrote:
+>>> On 13/01/17 13:30, Marc Zyngier wrote:
+>>>> [+ Suzuki, who wrote the whole cpus_have_const_cap thing]
+>>>>
+>>
+>> [...]
+>>
+>>>> But maybe we should have have some stronger guarantees that we'll
+>>>> always get things inlined, and that the "const" side is enforced:
+>>>
+>>> Agreed.
+>>>
+>>>>
+>>>> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+>>>> index b4989df..4710469 100644
+>>>> --- a/arch/arm64/include/asm/cpufeature.h
+>>>> +++ b/arch/arm64/include/asm/cpufeature.h
+>>>> @@ -105,10 +105,11 @@ static inline bool cpu_have_feature(unsigned int num)
+>>>>  }
+>>>>
+>>>>  /* System capability check for constant caps */
+>>>> -static inline bool cpus_have_const_cap(int num)
+>>>> +static __always_inline bool cpus_have_const_cap(int num)
+>>>
+>>> I think we should have the above change and make it inline always.
+>>>
+>>>>  {
+>>>> -	if (num >= ARM64_NCAPS)
+>>>> -		return false;
+>>>> +	BUILD_BUG_ON(!__builtin_constant_p(num));
+>>>
+>>> This is not needed, as the compilation would fail if num is not a constant with
+>>> static key code.
+>
+> I also just checked this, and it doesn't fail if the compiler doesn't
+> directly supports jump labels (we then fallback to the static key being
+> a standard memory access).
 
-So how come people report failures due to presence of SMMU?
-Using some other hypervisor?
+Ah, I missed that part of the story. Sorry about that. Please go ahead with the
+changes. I had a similar check in my first version and was dropped later with a
+similar review comment. We hadn't considered older tool chain.
 
--- 
-MST
+
+Suzuki
