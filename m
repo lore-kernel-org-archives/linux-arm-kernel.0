@@ -1,51 +1,68 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 16 Jan 2017 16:22:06 +0000
-Subject: [GIT PULL] arm64: dts: juno: updates for v4.11
-Message-ID: <dbfa1905-d937-7d02-7bbb-5f1a127896cf@arm.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Mon, 16 Jan 2017 16:15:36 +0000
+Subject: [RFC PATCH] arm64: defconfig: enable SMMUv3 config
+In-Reply-To: <3026029.1QgHzGBYeh@wuerfel>
+References: <1483962646-33767-1-git-send-email-wangzhou1@hisilicon.com>
+ <20170112094729.c2a5tjzsnyubtmte@localhost> <5878F3DA.3090005@hisilicon.com>
+ <3026029.1QgHzGBYeh@wuerfel>
+Message-ID: <587CF1A8.8020508@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC Team,
+Hi Arnd,
 
-Please pull !
+On 2017/1/13 16:58, Arnd Bergmann wrote:
+> On Friday, January 13, 2017 3:35:54 PM CET Wei Xu wrote:
+>> On 2017/1/12 9:47, Catalin Marinas wrote:
+>>> On Thu, Jan 12, 2017 at 08:36:12AM +0800, Zhou Wang wrote:
+>>>> On 2017/1/9 19:50, Zhou Wang wrote:
+>>>>> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
+>>>>> ---
+>>>>>  arch/arm64/configs/defconfig | 1 +
+>>>>>  1 file changed, 1 insertion(+)
+>>>>>
+>>>>> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+>>>>> index 869dded..3520c50 100644
+>>>>> --- a/arch/arm64/configs/defconfig
+>>>>> +++ b/arch/arm64/configs/defconfig
+>>>>> @@ -440,6 +440,7 @@ CONFIG_PLATFORM_MHU=y
+>>>>>  CONFIG_BCM2835_MBOX=y
+>>>>>  CONFIG_HI6220_MBOX=y
+>>>>>  CONFIG_ARM_SMMU=y
+>>>>> +CONFIG_ARM_SMMU_V3=y
+>>>>>  CONFIG_RASPBERRYPI_POWER=y
+>>>>>  CONFIG_QCOM_SMEM=y
+>>>>>  CONFIG_QCOM_SMD=y
+>>>>
+>>>> I just happened to find there is no SMMUv3 config in arm64 defconfig.
+>>>>
+>>>> Maybe we should add it in defconfig or I miss something.
+>>>
+>>
+>> Hi Arnd,
+>>
+>>> It looks fine to me but it's usually the arm-soc guys picking the
+>>> defconfig patches.
+>>>
+>>
+>> It is fine to me.
+>> Is it OK for me to pick up this or will you directly pick up this?
+>> Thanks!
+> 
+> Either way works for me. I usually recommend platform maintainers
+> picking up patches and then sending them on to arm at kernel.org,
+> as that gets our attention quicker. A patch that gets sent with
+> me personally on Cc might get lost in the email.
 
-Regards,
-Sudeep
+In this case I will pick up it.
+Thanks!
 
-The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+Best Regards,
+Wei
 
-  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
-tags/juno-updates-4.11
-
-for you to fetch changes up to ea2dcf9ac3254c964cddd67a032cb3b691fa47ce:
-
-  arm64: dts: juno: add missing CoreSight STM component (2017-01-12
-17:26:49 +0000)
-
-----------------------------------------------------------------
-ARMv8 Vexpress/Juno DT updates for v4.11
-
-1. Addition of Coresight support on Juno R1 and R2 variants
-
-2. Addition of STM(System Trace Macrocell) support on all Juno variants
-
-----------------------------------------------------------------
-Mike Leach (2):
-      arm64: dts: juno: fix CoreSight support for Juno r1/r2 variants
-      arm64: dts: juno: add missing CoreSight STM component
-
-Sudeep Holla (1):
-      arm64: dts: juno: refactor CoreSight support on Juno r0
-
- arch/arm64/boot/dts/arm/juno-base.dtsi    | 31 +++++++---
- arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi | 98
-+++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/arm/juno-r1.dts       | 13 ++++
- arch/arm64/boot/dts/arm/juno-r2.dts       | 13 ++++
- arch/arm64/boot/dts/arm/juno.dts          | 24 ++++++++
- 5 files changed, 171 insertions(+), 8 deletions(-)
- create mode 100644 arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+> 
+> 	Arnd
+> 
+> 
+> .
+> 
