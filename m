@@ -1,49 +1,40 @@
-From: amelie.delaunay@st.com (Amelie Delaunay)
-Date: Mon, 16 Jan 2017 09:57:38 +0100
-Subject: [PATCH] rtc: stm32: use 0 instead of ~PWR_CR_DBP in regmap_update_bits
-Message-ID: <1484557058-21601-1-git-send-email-amelie.delaunay@st.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 16 Jan 2017 10:02:20 +0100
+Subject: USB: OHCI: high softirq load
+In-Reply-To: <bd83e3b2-b329-3635-2917-0ffe61d3535f@overkiz.com>
+References: <bd83e3b2-b329-3635-2917-0ffe61d3535f@overkiz.com>
+Message-ID: <20170116100220.0b00658e@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using the ~ operator on a BIT() constant results in a large 'unsigned long'
-constant that won't fit into an 'unsigned int' function argument on 64-bit
-architectures, resulting in a harmless build warning in x86 allmodconfig:
+Hi Antoine,
 
-drivers/rtc/rtc-stm32.c: In function 'stm32_rtc_probe':
-drivers/rtc/rtc-stm32.c:651:51: error: large integer implicitly truncated to unsigned type [-Werror=overflow]
-  regmap_update_bits(rtc->dbp, PWR_CR, PWR_CR_DBP, ~PWR_CR_DBP);
+On Mon, 16 Jan 2017 08:45:58 +0100
+Antoine Aubert <a.aubert@overkiz.com> wrote:
 
-As PWR_CR_DBP mask prevents other bits to be cleared, replace all
-~PWR_CR_DBP by 0.
+> Hi,
+> 
+> Im working on a AT91SAM9G25cu board
+> (arch/arm/boot/dts/at91-kizboxmini.dts). We use linux-4.1.31, and when
+> OHCI is enabled, I got some wired effects.
 
-Fixes: 4e64350f42e2 ("rtc: add STM32 RTC driver")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
----
- drivers/rtc/rtc-stm32.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Can you test on a more recent kernel (4.9 or 4.10-rc4)?
 
-diff --git a/drivers/rtc/rtc-stm32.c b/drivers/rtc/rtc-stm32.c
-index 8c599f5..03c97c1 100644
---- a/drivers/rtc/rtc-stm32.c
-+++ b/drivers/rtc/rtc-stm32.c
-@@ -648,7 +648,7 @@ static int stm32_rtc_probe(struct platform_device *pdev)
- err:
- 	clk_disable_unprepare(rtc->ck_rtc);
- 
--	regmap_update_bits(rtc->dbp, PWR_CR, PWR_CR_DBP, ~PWR_CR_DBP);
-+	regmap_update_bits(rtc->dbp, PWR_CR, PWR_CR_DBP, 0);
- 
- 	device_init_wakeup(&pdev->dev, false);
- 
-@@ -670,7 +670,7 @@ static int stm32_rtc_remove(struct platform_device *pdev)
- 	clk_disable_unprepare(rtc->ck_rtc);
- 
- 	/* Enable backup domain write protection */
--	regmap_update_bits(rtc->dbp, PWR_CR, PWR_CR_DBP, ~PWR_CR_DBP);
-+	regmap_update_bits(rtc->dbp, PWR_CR, PWR_CR_DBP, 0);
- 
- 	device_init_wakeup(&pdev->dev, false);
- 
--- 
-1.9.1
+> 
+> eg with 3 FTDI pluged, interrupts: more than 3.5k/s, cpu softirq > 24%,
+> loadavg > 0.5
+
+Can you check which interrupt is triggered (cat /proc/interrupts), and
+enable debug messages in drivers/usb/host/ohci-at91.c?
+
+Thanks,
+
+Boris
+
+> 
+> This issue disappear when disabling OHCI and use EHCI only.
+> 
+> What are the usual causes, and where to begin with ?
+> 
+> Thanks in advance,
+> 
