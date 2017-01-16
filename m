@@ -1,121 +1,102 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 16 Jan 2017 17:25:07 +0900
-Subject: [PATCH v29 9/9] Documentation: dt: chosen properties for arm64
- kdump
-In-Reply-To: <20170113111756.GC26120@leverpostej>
-References: <20161228043347.27358-1-takahiro.akashi@linaro.org>
- <20161228043734.27535-1-takahiro.akashi@linaro.org>
- <20170112153944.GB12249@leverpostej>
- <20170113091339.GK20972@linaro.org>
- <20170113111756.GC26120@leverpostej>
-Message-ID: <20170116082505.GL20972@linaro.org>
+From: peter.senna@collabora.com (Peter Senna Tschudin)
+Date: Mon, 16 Jan 2017 09:37:11 +0100
+Subject: [PATCH V7 1/4] Documentation/devicetree/bindings: b850v3_lvds_dp
+In-Reply-To: <6276161.johxDync2u@avalon>
+References: <74f0-58704480-5-27259840@173563636>
+ <6276161.johxDync2u@avalon>
+Message-ID: <20170116083711.GA18775@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2017 at 11:17:56AM +0000, Mark Rutland wrote:
-> On Fri, Jan 13, 2017 at 06:13:49PM +0900, AKASHI Takahiro wrote:
-> > On Thu, Jan 12, 2017 at 03:39:45PM +0000, Mark Rutland wrote:
-> > > On Wed, Dec 28, 2016 at 01:37:34PM +0900, AKASHI Takahiro wrote:
-> > > > +linux,crashkernel-base
-> > > > +linux,crashkernel-size
-> > > > +----------------------
-> > > > +
-> > > > +These properties (currently used on PowerPC and arm64) indicates
-> > > > +the base address and the size, respectively, of the reserved memory
-> > > > +range for crash dump kernel.
-> > > 
-> > > From this description, it's not clear to me what the (expected)
-> > > consumers of this property are, nor what is expected to provide it.
-> > > 
-> > > In previous rounds of review, I had assumed that this was used to
-> > > describe a preference to the first kernel as to what region of memory
-> > > should be used for a subsequent kdump kernel. Looking around, I'm not
-> > > sure if I was correct in that assessment.
-> > > 
-> > > I see that arch/powerpc seems to consume this property to configure
-> > > crashk_res, but it also rewrites it based on crashk_res, presumably for
-> > > the benefit of userspace. It's not clear to me how on powerpc the kdump
-> > > kernel knows its memory range -- is more DT modification done in the
-> > > kernel and/or userspace?
+On Tue, Jan 10, 2017 at 11:04:58PM +0200, Laurent Pinchart wrote:
+> Hi Peter,
+
+Laurent!
+
+> 
+> On Saturday 07 Jan 2017 01:29:52 Peter Senna Tschudin wrote:
+> > On 04 January, 2017 21:39 CET, Rob Herring wrote:
+> > > On Tue, Jan 3, 2017 at 5:34 PM, Peter Senna Tschudin wrote:
+> > >> On 03 January, 2017 23:51 CET, Rob Herring <robh@kernel.org> wrote:
+> > >>> On Sun, Jan 01, 2017 at 09:24:29PM +0100, Peter Senna Tschudin wrote:
+> > >>>> Devicetree bindings documentation for the GE B850v3 LVDS/DP++
+> > >>>> display bridge.
+> > >>>> 
+> > >>>> Cc: Martyn Welch <martyn.welch@collabora.co.uk>
+> > >>>> Cc: Martin Donnelly <martin.donnelly@ge.com>
+> > >>>> Cc: Javier Martinez Canillas <javier@dowhile0.org>
+> > >>>> Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> > >>>> Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> > >>>> Cc: Rob Herring <robh@kernel.org>
+> > >>>> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> > >>>> Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
+> > >>>> ---
+> > >>>> There was an Acked-by from Rob Herring <robh@kernel.org> for V6, but
+> > >>>> I changed the bindings to use i2c_new_secondary_device() so I
+> > >>>> removed it from the commit message.
+> > >>>> 
+> > >>>>  .../devicetree/bindings/ge/b850v3-lvds-dp.txt      | 39 ++++++++++++++
+> > >>> Generally, bindings are not organized by vendor. Put in
+> > >>> bindings/display/bridge/... instead.
+> > >> 
+> > >> Will change that.
+> > >> 
+> > >>>>  1 file changed, 39 insertions(+)
+> > >>>>  create mode 100644
+> > >>>>  Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
+> > >>>> 
+> > >>>> diff --git a/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
+> > >>>> b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt new file
+> > >>>> mode 100644
+> > >>>> index 0000000..1bc6ebf
+> > >>>> --- /dev/null
+> > >>>> +++ b/Documentation/devicetree/bindings/ge/b850v3-lvds-dp.txt
+> > >>>> @@ -0,0 +1,39 @@
+> > >>>> +Driver for GE B850v3 LVDS/DP++ display bridge
+> > >>>> +
+> > >>>> +Required properties:
+> > >>>> +  - compatible : should be "ge,b850v3-lvds-dp".
+> > >>> 
+> > >>> Isn't '-lvds-dp' redundant? The part# should be enough.
+> > >> 
+> > >> b850v3 is the name of the product, this is why the proposed name. What
+> > >> about, b850v3-dp2 dp2 indicating the second DP output?
+> > >
+> > > Humm, b850v3 is the board name? This node should be the name of the bridge
+> > > chip.
+> >
+> > From the cover letter:
 > > 
-> > I don't believe that powerpc will rewrite the property any way.
-> > As far as I know from *the source code*, powerpc kernel retrieves
-> > the memory range for crash dump kernel from a kernel command line, i.e.
-> > crashkernel=, and then exposes it through DT to userspace (assuming
-> > kexec-tools).
-> 
-> The rewriting I describe is in export_crashk_values() in
-> arch/powerpc/kernel/machine_kexec.c, where the code deletes existing the
-> properties, and adds new ones, to the DT exposed to userspace.
-> 
-> So I think we're just quibbling over the definition of "rewrite".
-
-Gotcha
-
-> > > arm64 we should either ensure that /proc/iomem is consistently usable
-> > > (and have userspace consistently use it), or we should expose a new file
-> > > specifically to expose this information.
+> > -- // --
+> > There are two physical bridges on the video signal pipeline: a STDP4028(LVDS
+> > to DP) and a STDP2690(DP to DP++).  The hardware and firmware made it
+> > complicated for this binding to comprise two device tree nodes, as the
+> > design goal is to configure both bridges based on the LVDS signal, which
+> > leave the driver powerless to control the video processing pipeline. The
+> > two bridges behaves as a single bridge, and the driver is only needed for
+> > telling the host about EDID / HPD, and for giving the host powers to ack
+> > interrupts. The video signal pipeline is as follows:
 > > 
-> > The thing that I had in my mind when adding this property is that
-> > /proc/iomem would be obsolete in the future, then we should have
-> > an alternative in hand.
+> >   Host -> LVDS|--(STDP4028)--|DP -> DP|--(STDP2690)--|DP++ -> Video output
+> > -- // --
 > 
-> Ok.
+> You forgot to prefix your patch series with [HACK] ;-)
 > 
-> My disagreement is with using the DT as a channel to convey information
-> from the kernel to userspace.
-> 
-> I'm more than happy for a new file or other mechanism to express this
-> information. For example, we could add
-> /sys/kernel/kexec_crash_{base,size} or similar.
+> How about fixing the issues that make the two DT nodes solution difficult ? 
+> What are they ?
 
-It may make sense because /sys/kernel/kexec_crash_size already exists,
-so why not kexec_crash_base?
-My concern, however, is that this kind of interface might prevent us from
-allowing multiple regions to be reserved for crash dump kernel in the future.
-(There is an assumption that we have only one region at least on arm64 though.)
+The Firmware and the hardware design. Both bridges, with stock firmware,
+are fully capable of providig EDID information and handling interrupts.
+But on this specific design, with this specific firmware, I need to read
+EDID from one bridge, and handle interrupts on the other. Back when I
+was starting the development I could not come up with a proper way to
+split EDID and interrupts between two bridges in a way that would result
+in a fully functional connector. Did I miss something?
 
-Thanks,
--Takahiro AKASHI
 
 > 
-> > > Further, I do not think we need this property. It makes more sense to me
-> > > for the preference of a a region to be described to the *first* kernel
-> > > using the command line consistently.
-> > > 
-> > > So I think we should drop this property, and not use it on arm64. Please
-> > > document this as powerpc only.
-> > 
-> > OK, but if we drop the property from arm64 code, we have no reason
-> > to leave its description in this patch.
-> > (In fact, there are a few more (undocumented) properties that only ppc
-> > uses for kdump.)
+> -- 
+> Regards,
 > 
-> I'm happy to drop it, then.
+> Laurent Pinchart
 > 
-> > > > +linux,usable-memory-range
-> > > > +-------------------------
-> > > > +
-> > > > +This property (currently used only on arm64) holds the memory range,
-> > > > +the base address and the size, which can be used as system ram on
-> > > > +the *current* kernel. Note that, if this property is present, any memory
-> > > > +regions under "memory" nodes in DT blob or ones marked as "conventional
-> > > > +memory" in EFI memory map should be ignored.
-> > > 
-> > > Could you please replace this with:
-> > > 
-> > >   This property (arm64 only) holds a base address and size, describing a
-> > >   limited region in which memory may be considered available for use by
-> > >   the kernel. Memory outside of this range is not available for use.
-> > >   
-> > >   This property describes a limitation: memory within this range is only
-> > >   valid when also described through another mechanism that the kernel
-> > >   would otherwise use to determine available memory (e.g. memory nodes
-> > >   or the EFI memory map). Valid memory may be sparse within the range.
-> > 
-> > Sure.
-> 
-> Cheers!
-> 
-> Thanks,
-> Mark.
