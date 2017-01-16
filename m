@@ -1,193 +1,59 @@
-From: jun.nie@linaro.org (Jun Nie)
-Date: Mon, 16 Jan 2017 22:28:41 +0800
-Subject: [PATCH v2 3/3] reset: zx2967: add reset controller driver for
- ZTE's zx2967 family
-In-Reply-To: <1484564194-18530-3-git-send-email-baoyou.xie@linaro.org>
-References: <1484564194-18530-1-git-send-email-baoyou.xie@linaro.org>
- <1484564194-18530-3-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <95ebb6fd-540b-f6d5-e039-2cd718ff35d8@linaro.org>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Mon, 16 Jan 2017 15:30:35 +0100
+Subject: [PATCH 03/10] devicetree: bindings: add bindings for ahci-da850
+In-Reply-To: <d8406f53-b97d-ca9a-f7d1-94ce5b7064f7@ti.com>
+References: <1484311084-31547-1-git-send-email-bgolaszewski@baylibre.com>
+ <1484311084-31547-4-git-send-email-bgolaszewski@baylibre.com>
+ <35ff358d-9b17-b2be-38d8-6a51cdddc1a1@lechnology.com>
+ <CAMpxmJUau9BgAOhacPvcA=NwyE6-yEfDgPdcCZ_JCuNH-amJSA@mail.gmail.com>
+ <d8406f53-b97d-ca9a-f7d1-94ce5b7064f7@ti.com>
+Message-ID: <CAMpxmJW9ns-aG=4zYHcV5-2b_TdmJ7q+Ap1jdyoxstZjWYRL2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017?01?16? 18:56, Baoyou Xie wrote:
-> This patch adds reset controller driver for ZTE's zx2967 family.
+2017-01-16 13:45 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
+> On Monday 16 January 2017 03:43 PM, Bartosz Golaszewski wrote:
+>> 2017-01-13 20:25 GMT+01:00 David Lechner <david@lechnology.com>:
+>>>
+>>> A clock multiplier property seems redundant if you are specifying a clock.
+>>> It should be possible to get the rate from the clock to determine which
+>>> multiplier is needed.
+>>>
+>>
+>> I probably should have named it differently. This is not a multiplier
+>> of a clock derived from PLL0 or PLL1. Instead it's a value set by
+>> writing to the Port PHY Control Register (MPY bits) of the SATA
+>> controller that configures the multiplier for the external low-jitter
+>> clock. On the lcdk the signals (REFCLKP, REFCLKN) are provided by
+>> CDCM61001 (SATA OSCILLATOR component on the schematics).
+>>
+>> I'll find a better name and comment the property accordingly.
+>>
+>> FYI: the da850 platform does not use the common clock framework, so I
+>> don't specify the clock property on the sata node in the device tree.
+>> Instead I add the clock lookup entry in patch [01/10]. This is
+>> transparent for AHCI which can get the clock as usual by calling
+>> clk_get() in ahci_platform_get_resources().
 >
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
-> ---
->  drivers/reset/Kconfig        |   6 +++
->  drivers/reset/Makefile       |   1 +
->  drivers/reset/reset-zx2967.c | 125 +++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 132 insertions(+)
->  create mode 100644 drivers/reset/reset-zx2967.c
+> I think David's point is that the SATA_REFCLK needs to be modeled as a
+> actual clock input to the IP. You should be able to get the rate using
+> clk_get_rate() and make the MPY bits calculation depending on the
+> incoming rate.
 >
-> diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-> index 172dc96..f4cdfe9 100644
-> --- a/drivers/reset/Kconfig
-> +++ b/drivers/reset/Kconfig
-> @@ -86,6 +86,12 @@ config RESET_UNIPHIER
->  	  Say Y if you want to control reset signals provided by System Control
->  	  block, Media I/O block, Peripheral Block.
+> You should be able to model the clock even when not using common clock
+> framework.
 >
-> +config RESET_ZX2967
-> +	bool "ZTE ZX2967 Reset Driver"
-> +	depends on ARCH_ZX || COMPILE_TEST
-> +	help
-> +	  This enables the reset controller driver for ZTE's zx2967 family.
-> +
->  config RESET_ZYNQ
->  	bool "ZYNQ Reset Driver" if COMPILE_TEST
->  	default ARCH_ZYNQ
-> diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-> index 13b346e..2cd3f6c 100644
-> --- a/drivers/reset/Makefile
-> +++ b/drivers/reset/Makefile
-> @@ -13,4 +13,5 @@ obj-$(CONFIG_RESET_STM32) += reset-stm32.o
->  obj-$(CONFIG_RESET_SUNXI) += reset-sunxi.o
->  obj-$(CONFIG_TI_SYSCON_RESET) += reset-ti-syscon.o
->  obj-$(CONFIG_RESET_UNIPHIER) += reset-uniphier.o
-> +obj-$(CONFIG_RESET_ZX2967) += reset-zx2967.o
->  obj-$(CONFIG_RESET_ZYNQ) += reset-zynq.o
-> diff --git a/drivers/reset/reset-zx2967.c b/drivers/reset/reset-zx2967.c
-> new file mode 100644
-> index 0000000..bc95261
-> --- /dev/null
-> +++ b/drivers/reset/reset-zx2967.c
-> @@ -0,0 +1,125 @@
-> +/*
-> + * ZTE's zx2967 family reset controller driver
-> + *
-> + * Copyright (C) 2017 ZTE Ltd.
-> + *
-> + * Author: Baoyou Xie <baoyou.xie@linaro.org>
-> + *
-> + * License terms: GNU General Public License (GPL) version 2
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/of_address.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/reset-controller.h>
-> +
-> +struct zx2967_reset {
-> +	void __iomem			*reg_base;
-> +	spinlock_t			lock;
-> +	struct reset_controller_dev	rcdev;
-> +};
-> +
-> +static int zx2967_reset_act(struct reset_controller_dev *rcdev,
-> +			    unsigned long id, bool assert)
-> +{
-> +	struct zx2967_reset *reset = NULL;
-> +	u32 bank = id / 32;
-> +	u32 offset = id % 32;
-> +	u32 reg;
-> +	unsigned long flags;
-> +
-> +	reset = container_of(rcdev, struct zx2967_reset, rcdev);
-> +
-> +	spin_lock_irqsave(&reset->lock, flags);
-> +
-> +	reg = readl(reset->reg_base + (bank * 4));
-
-readl_relaxed is recommended.
-
-> +	if (assert)
-> +		reg &= ~BIT(offset);
-> +	else
-> +		reg |= BIT(offset);
-> +	writel(reg, reset->reg_base + (bank * 4));
-
-writel_relaxed is recommended.
-
-> +
-> +	spin_unlock_irqrestore(&reset->lock, flags);
-> +
-> +	return 0;
-> +}
-> +
-> +static int zx2967_reset_assert(struct reset_controller_dev *rcdev,
-> +			       unsigned long id)
-> +{
-> +	return zx2967_reset_act(rcdev, id, true);
-> +}
-> +
-> +static int zx2967_reset_deassert(struct reset_controller_dev *rcdev,
-> +				 unsigned long id)
-> +{
-> +	return zx2967_reset_act(rcdev, id, false);
-> +}
-> +
-> +static struct reset_control_ops zx2967_reset_ops = {
-> +	.assert		= zx2967_reset_assert,
-> +	.deassert	= zx2967_reset_deassert,
-> +};
-> +
-> +static int zx2967_reset_probe(struct platform_device *pdev)
-> +{
-> +	struct zx2967_reset *reset;
-> +	struct resource *res;
-> +
-> +	reset = devm_kzalloc(&pdev->dev, sizeof(*reset), GFP_KERNEL);
-> +	if (!reset)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	reset->reg_base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(reset->reg_base))
-> +		return PTR_ERR(reset->reg_base);
-> +
-> +	spin_lock_init(&reset->lock);
-> +
-> +	reset->rcdev.owner = THIS_MODULE;
-> +	reset->rcdev.nr_resets = resource_size(res) * 8;
-> +	reset->rcdev.ops = &zx2967_reset_ops;
-> +	reset->rcdev.of_node = pdev->dev.of_node;
-> +
-> +	dev_info(&pdev->dev, "reset controller cnt:%d",
-> +		  reset->rcdev.nr_resets);
-> +
-> +	return devm_reset_controller_register(&pdev->dev, &reset->rcdev);
-> +}
-> +
-> +static int zx2967_reset_remove(struct platform_device *pdev)
-> +{
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id zx2967_reset_dt_ids[] = {
-> +	 { .compatible = "zte,zx296718-reset", },
-> +	 {},
-> +};
-> +MODULE_DEVICE_TABLE(of, zx2967_reset_dt_ids);
-> +
-> +static struct platform_driver zx2967_reset_driver = {
-> +	.probe	= zx2967_reset_probe,
-> +	.remove	= zx2967_reset_remove,
-> +	.driver = {
-> +		.name		= "zx2967-reset",
-> +		.of_match_table	= zx2967_reset_dt_ids,
-> +	},
-> +};
-
-This line can replace all below code if you do not have any other 
-dependency in earlier stage.
-
-builtin_platform_driver(zx2967_reset_driver);
-
-> +
-> +static int __init zx2967_reset_init(void)
-> +{
-> +	return platform_driver_register(&zx2967_reset_driver);
-> +}
-> +arch_initcall(zx2967_reset_init);
-> +
-> +static void __exit zx2967_reset_exit(void)
-> +{
-> +	platform_driver_unregister(&zx2967_reset_driver);
-> +}
-> +module_exit(zx2967_reset_exit);
-> +
-> +MODULE_AUTHOR("Baoyou Xie <baoyou.xie@linaro.org>");
-> +MODULE_DESCRIPTION("ZTE zx2967 Reset Controller Driver");
-> +MODULE_LICENSE("GPL");
+> DA850 AHCI does not use a con_id at the moment (it assumes a single
+> clock), and that needs to change.
 >
+
+It's true that once davinci gets ported (is this planned?) to using
+the common clock framework, we could just create a fixed-clock node in
+da850-lcdk for the SATA oscillator, so the new property is redundant.
+
+What I don't get is how should I model a clock that is not
+configurable and is board-specific? Is hard-coding the relevant rate
+in da850.c with a huge FIXME the right way?
+
+Thanks,
+Bartosz Golaszewski
