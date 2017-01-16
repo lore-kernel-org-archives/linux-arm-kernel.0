@@ -1,73 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 16 Jan 2017 14:21:03 +0000
-Subject: [PATCH v2 2/2] vring: Force use of DMA API for ARM-based systems
-In-Reply-To: <20170116161639-mutt-send-email-mst@kernel.org>
-References: <4833e705fb6841fbfdbee3b1a21a7bc917292410.1484070340.git.robin.murphy@arm.com>
- <20170111013046-mutt-send-email-mst@kernel.org>
- <20170111100139.GC12388@arm.com>
- <20170112232931-mutt-send-email-mst@kernel.org>
- <20170113092522.GB22538@arm.com>
- <20170113183222-mutt-send-email-mst@kernel.org>
- <20170113172154.GL3253@arm.com>
- <20170113201933-mutt-send-email-mst@kernel.org>
- <20170116104028.GA1510@arm.com>
- <20170116161639-mutt-send-email-mst@kernel.org>
-Message-ID: <20170116142103.GF1510@arm.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Mon, 16 Jan 2017 15:24:59 +0100
+Subject: [GIT PULL] Amlogic fixes for v4.10-rc4
+In-Reply-To: <m2inpi6d09.fsf@baylibre.com>
+References: <m2inpi6d09.fsf@baylibre.com>
+Message-ID: <c781a080-455f-bba2-1bfb-cdd39343842b@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2017 at 04:18:03PM +0200, Michael S. Tsirkin wrote:
-> On Mon, Jan 16, 2017 at 10:40:28AM +0000, Will Deacon wrote:
-> > On Fri, Jan 13, 2017 at 08:23:35PM +0200, Michael S. Tsirkin wrote:
-> > > On Fri, Jan 13, 2017 at 05:21:54PM +0000, Will Deacon wrote:
-> > > > On Fri, Jan 13, 2017 at 06:46:32PM +0200, Michael S. Tsirkin wrote:
-> > > > > On Fri, Jan 13, 2017 at 09:25:22AM +0000, Will Deacon wrote:
-> > > > > > On Fri, Jan 13, 2017 at 12:12:56AM +0200, Michael S. Tsirkin wrote:
-> > > > > > > I'd rather people didn't use SMMU with legacy devices.
-> > > > > > 
-> > > > > > I'm afraid we've been doing that for two years and the model already
-> > > > > > exists in a mature state, being actively used for development and
-> > > > > > validation by ARM and our partners. One of the big things its used for
-> > > > > > is to develop SMMU and GIC (our interrupt controller) code with PCI, so
-> > > > > > dropping the SMMU from the picture isn't an option.
-> > > > > 
-> > > > > Oh so this fixes a regression?  This is something I didn't realize.
-> > > > 
-> > > > Yes, thanks. The regression came about because we implemented SMMU-backed
-> > > > DMA ops and only then was it apparent that the virtio stuff was bypassing
-> > > > even with translation enabled (because it wasn't using the DMA API).
-> > > 
-> > > Could you point out a commit ID?
-> > 
-> > There has been a fair amount of work in this area recently, but you're
-> > probably after something like 876945dbf649 ("arm64: Hook up IOMMU dma_ops")
-> > as the culprit, which is the point at which we started to swizzle DMA
-> > ops for devices upstream of an SMMU automatically.
-> > 
-> > > > > A "Fixes:" tag can't hurt here.  I then wonder
-> > > > > might DMA ops ever use a DMA address which isn't a physical address
-> > > > > from QEMU point of view? If that happens, this hack breaks
-> > > > > because in legacy mode QEMU still uses the GPA.
-> > > > 
-> > > > If QEMU doesn't advertise an SMMU, then it will work fine with the GPA,
-> > > > because we won't swizzle the DMA ops for the master device. If QEMU does
-> > > > advertise an SMMU, then we'll allocate DMA addresses to fit within the
-> > > > the intersection of the SMMU aperture and device's DMA mask.
-> > > 
-> > > 
-> > > Right but doesn't just poking from qemu into phys addresses work
-> > > anymore? It used to ...
-> > 
-> > Provided that there's no SMMU, then it will continue to work. and my
-> > understanding (from talking to Peter Maydell) is that qemu doesn't model
-> > an SMMU for ARM-based machines.
-> > 
+Am 13.01.2017 um 19:17 schrieb Kevin Hilman:
+> ----------------------------------------------------------------
+> Amlogic fixes for v4.10-rc4
+> - odroid-c2: disable DVFS to avoid crashes due to broken SCPI
+> - fix misc. crashes by adding known reserved memory regions
 > 
-> So how come people report failures due to presence of SMMU?
-> Using some other hypervisor?
+> ----------------------------------------------------------------
+> Neil Armstrong (2):
+>       ARM64: dts: meson-gxbb-odroidc2: Disable SCPI DVFS
 
-The failures are reported on the ARM fastmodel (a complete system
-emulation that runs on an x86 box), where an SMMU *is* present
-downstream of the virtio-pci masters. There's no qemu involved there.
+>       ARM64: dts: meson-gx: Add reserved memory zone and usable memory range
 
-Will
+Objection against the latter patch introducing widespread usage of
+hardcoded linux,usable-memory properties - please review closely before
+considering to merge.
+
+Thanks,
+Andreas
+
+> 
+>  arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi       |  5 -----
+>  arch/arm64/boot/dts/amlogic/meson-gx.dtsi                 | 12 ++++++++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts    |  6 +++++-
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts       | 10 +++++++++-
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts           |  9 +++++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts           |  9 +++++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi          |  5 -----
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts  |  6 +++++-
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts   |  6 +++++-
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts |  6 +++++-
+>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi               |  2 +-
+>  arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts     |  6 +++++-
+>  arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts      |  9 +++++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p231.dts      |  9 +++++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts      |  6 +++++-
+>  arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts       |  6 +++++-
+>  arch/arm64/boot/dts/amlogic/meson-gxm-s912-q200.dts       |  9 +++++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxm-s912-q201.dts       |  9 +++++++++
+>  18 files changed, 111 insertions(+), 19 deletions(-)
+> 
+> _______________________________________________
+> linux-amlogic mailing list
+> linux-amlogic at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-amlogic
+> 
+
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
