@@ -1,62 +1,21 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 16 Jan 2017 11:35:02 +0530
-Subject: [PATCH 36/37] ARM: DRA7: clockdomain: Change the CLKTRCTRL of
- CM_PCIE_CLKSTCTRL to SW_WKUP
-In-Reply-To: <20170113171537.GZ2630@atomide.com>
-References: <1484216786-17292-1-git-send-email-kishon@ti.com>
- <1484216786-17292-37-git-send-email-kishon@ti.com>
- <20170113171537.GZ2630@atomide.com>
-Message-ID: <587C628E.7070804@ti.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 16 Jan 2017 14:15:26 +0800
+Subject: [PATCH v2 4/7] clk: sunxi-ng: Add clocks and resets indices for
+ sun5i
+In-Reply-To: <b58205e51f84da9a59ca617906b4524d7e976f58.1484035021.git-series.maxime.ripard@free-electrons.com>
+References: <cover.8762813dc78858261716126c700983d4aee00458.1484035021.git-series.maxime.ripard@free-electrons.com>
+ <b58205e51f84da9a59ca617906b4524d7e976f58.1484035021.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v67k8CCE9Lb-uWp-7eKpuc0b_1m+kq67gz5aCkoVDDH50A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hi,
 
-On Friday 13 January 2017 10:45 PM, Tony Lindgren wrote:
-> * Kishon Vijay Abraham I <kishon@ti.com> [170112 02:35]:
->> The PCIe programming sequence in TRM suggests CLKSTCTRL of PCIe should
->> be set to SW_WKUP. There are no issues when CLKSTCTRL is set to HW_AUTO
->> in RC mode. However in EP mode, the host system is not able to access the
->> MEMSPACE and setting the CLKSTCTRL to SW_WKUP fixes it.
-> 
-> I guess ideally in the long run we would set this dynamically based on
-> the selected mode, right?
+On Tue, Jan 10, 2017 at 3:57 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The SoCs part of the sun5i family share the DTs, so we need consistant
+> indices in order to still share the DTs.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-The programming sequence mentioned in the TRM w.r.t clock programming is same
-for both host mode or device mode. Though we never faced any issues in host
-mode when HW_AUTO is set, it's better to follow TRM recommended settings IMHO.
-
-Thanks
-Kishon
-
-> 
-> Regards,
-> 
-> Tony
-> 
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->> ---
->>  arch/arm/mach-omap2/clockdomains7xx_data.c |    2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-omap2/clockdomains7xx_data.c b/arch/arm/mach-omap2/clockdomains7xx_data.c
->> index 6c67965..67ebff8 100644
->> --- a/arch/arm/mach-omap2/clockdomains7xx_data.c
->> +++ b/arch/arm/mach-omap2/clockdomains7xx_data.c
->> @@ -524,7 +524,7 @@
->>  	.dep_bit	  = DRA7XX_PCIE_STATDEP_SHIFT,
->>  	.wkdep_srcs	  = pcie_wkup_sleep_deps,
->>  	.sleepdep_srcs	  = pcie_wkup_sleep_deps,
->> -	.flags		  = CLKDM_CAN_HWSUP_SWSUP,
->> +	.flags		  = CLKDM_CAN_SWSUP,
->>  };
->>  
->>  static struct clockdomain atl_7xx_clkdm = {
->> -- 
->> 1.7.9.5
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
