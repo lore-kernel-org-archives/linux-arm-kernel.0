@@ -1,122 +1,151 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 16 Jan 2017 12:01:02 -0800
-Subject: [PATCH net-next v3 06/10] net: dsa: Migrate to device_find_class()
-In-Reply-To: <20170115191632.GD5643@lunn.ch>
-References: <20170114214713.28109-1-f.fainelli@gmail.com>
- <20170114214713.28109-7-f.fainelli@gmail.com>
- <20170115110628.GF26374@kroah.com>
- <fc247aeb-a8d6-5ba9-c26d-cb057a5ac34d@gmail.com>
- <20170115173949.GA19268@kroah.com>
- <a9ea1f45-b9a5-d840-68e0-9bf9bc7a6598@gmail.com>
- <20170115191632.GD5643@lunn.ch>
-Message-ID: <912e6143-c67a-d909-2a6c-939de79efc5d@gmail.com>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Mon, 16 Jan 2017 13:09:22 -0700
+Subject: [PATCH V7 04/10] arm64: exception: handle Synchronous External
+ Abort
+In-Reply-To: <20170116115309.GE1510@arm.com>
+References: <1484244924-24786-1-git-send-email-tbaicar@codeaurora.org>
+ <1484244924-24786-5-git-send-email-tbaicar@codeaurora.org>
+ <20170116115309.GE1510@arm.com>
+Message-ID: <0ca6c70e-6033-4cca-8833-15cb8573a939@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/15/2017 11:16 AM, Andrew Lunn wrote:
->>> What exactly is the relationship between these devices (a ascii-art tree
->>> or sysfs tree output might be nice) so I can try to understand what is
->>> going on here.
-> 
-> Hi Greg, Florian
-> 
-> A few diagrams and trees which might help understand what is going on.
-> 
-> The first diagram comes from the 2008 patch which added all this code:
-> 
->             +-----------+       +-----------+
->             |           | RGMII |           |
->             |           +-------+           +------ 1000baseT MDI ("WAN")
->             |           |       |  6-port   +------ 1000baseT MDI ("LAN1")
->             |    CPU    |       |  ethernet +------ 1000baseT MDI ("LAN2")
->             |           |MIImgmt|  switch   +------ 1000baseT MDI ("LAN3")
->             |           +-------+  w/5 PHYs +------ 1000baseT MDI ("LAN4")
->             |           |       |           |
->             +-----------+       +-----------+
-> 
-> We have an ethernet switch and a host CPU. The switch is connected to
-> the CPU in two different ways. RGMII allows us to get Ethernet frames
-> from the CPU into the switch. MIImgmt, is the management bus normally
-> used for Ethernet PHYs, but Marvell switches also use it for Managing
-> switches.
-> 
-> The diagram above is the simplest setup. You can have multiple
-> Ethernet switches, connected together via switch ports. Each switch
-> has its own MIImgmt connect to the CPU, but there is only one RGMII
-> link.
-> 
-> When this code was designed back in 2008, it was decided to represent
-> this is a platform device, and it has a platform_data, which i have
-> slightly edited to keep it simple:
-> 
-> struct dsa_platform_data {
->         /*
->          * Reference to a Linux network interface that connects
->          * to the root switch chip of the tree.
->          */
->         struct device   *netdev;
-> 
->         /*
->          * Info structs describing each of the switch chips
->          * connected via this network interface.
->          */
->         int             nr_chips;
->         struct dsa_chip_data    *chip;
-> };
-> 
-> This netdev is the CPU side of the RGMII interface.
-> 
-> Each switch has a dsa_chip_data, again edited:
-> 
-> struct dsa_chip_data {
->         /*
->          * How to access the switch configuration registers.
->          */
->         struct device   *host_dev;
->         int             sw_addr;
-> ...
-> }
-> 
-> The host_dev is the CPU side of the MIImgmt, and we have the address
-> the switch is using on the bus.
-> 
-> During probe of this platform device, we need to get from the
-> struct device *netdev to a struct net_device *dev.
-> 
-> So the code looks in the device net class to find the device
-> 
-> |   |   |   |-- f1074000.ethernet
-> |   |   |   |   |-- deferred_probe
-> |   |   |   |   |-- driver -> ../../../../../bus/platform/drivers/mvneta
-> |   |   |   |   |-- driver_override
-> |   |   |   |   |-- modalias
-> |   |   |   |   |-- net
-> |   |   |   |   |   `-- eth1
-> |   |   |   |   |       |-- addr_assign_type
-> |   |   |   |   |       |-- address
-> |   |   |   |   |       |-- addr_len
-> |   |   |   |   |       |-- broadcast
-> |   |   |   |   |       |-- carrier
-> |   |   |   |   |       |-- carrier_changes
-> |   |   |   |   |       |-- deferred_probe
-> |   |   |   |   |       |-- device -> ../../../f1074000.ethernet
-> 
-> and then use container_of() to get the net_device.
-> 
-> Similarly, the code needs to get from struct device *host_dev to a struct mii_bus *.
-> 
-> |   |   |   |-- f1072004.mdio
-> |   |   |   |   |-- deferred_probe
-> |   |   |   |   |-- driver -> ../../../../../bus/platform/drivers/orion-mdio
-> |   |   |   |   |-- driver_override
-> |   |   |   |   |-- mdio_bus
-> |   |   |   |   |   `-- f1072004.mdio-mi
-> |   |   |   |   |       |-- deferred_probe
-> |   |   |   |   |       |-- device -> ../../../f1072004.mdio
-> 
+Hello Will,
 
-Thanks Andrew! Greg, does that make it clearer how these devices
-references are used, do you still think the way this is done is wrong,
-too cautious, or valid?
+
+On 1/16/2017 4:53 AM, Will Deacon wrote:
+> On Thu, Jan 12, 2017 at 11:15:18AM -0700, Tyler Baicar wrote:
+>> SEA exceptions are often caused by an uncorrected hardware
+>> error, and are handled when data abort and instruction abort
+>> exception classes have specific values for their Fault Status
+>> Code.
+>> When SEA occurs, before killing the process, go through
+>> the handlers registered in the notification list.
+>> Update fault_info[] with specific SEA faults so that the
+>> new SEA handler is used.
+>>
+>> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+>> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+>> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
+>> ---
+>>   arch/arm64/include/asm/system_misc.h | 13 ++++++++
+>>   arch/arm64/mm/fault.c                | 58 +++++++++++++++++++++++++++++-------
+>>   2 files changed, 61 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
+>> index 57f110b..e7f3440 100644
+>> --- a/arch/arm64/include/asm/system_misc.h
+>> +++ b/arch/arm64/include/asm/system_misc.h
+>> @@ -64,4 +64,17 @@ extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+>>   
+>>   #endif	/* __ASSEMBLY__ */
+>>   
+>> +/*
+>> + * The functions below are used to register and unregister callbacks
+>> + * that are to be invoked when a Synchronous External Abort (SEA)
+>> + * occurs. An SEA is raised by certain fault status codes that have
+>> + * either data or instruction abort as the exception class, and
+>> + * callbacks may be registered to parse or handle such hardware errors.
+>> + *
+>> + * Registered callbacks are run in an interrupt/atomic context. They
+>> + * are not allowed to block or sleep.
+>> + */
+>> +int register_sea_notifier(struct notifier_block *nb);
+>> +void unregister_sea_notifier(struct notifier_block *nb);
+> I still don't understand why you need notifiers for this. You register
+> precisely one hook in the series.
+I didn't see a response to my last comment on the previous series so I 
+just left it in for this series.
+The notifier usage is consistent with the GHES code for SCI errors which 
+are also only used a single
+time in the code. If you think making the call directly is a better 
+option I will remove the notifiers.
+>>   #endif	/* __ASM_SYSTEM_MISC_H */
+>> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+>> index 05d2bd7..81039c7 100644
+>> --- a/arch/arm64/mm/fault.c
+>> +++ b/arch/arm64/mm/fault.c
+>> @@ -39,6 +39,22 @@
+>>   #include <asm/pgtable.h>
+>>   #include <asm/tlbflush.h>
+>>   
+>> +/*
+>> + * GHES SEA handler code may register a notifier call here to
+>> + * handle HW error record passed from platform.
+>> + */
+>> +static ATOMIC_NOTIFIER_HEAD(sea_handler_chain);
+>> +
+>> +int register_sea_notifier(struct notifier_block *nb)
+>> +{
+>> +	return atomic_notifier_chain_register(&sea_handler_chain, nb);
+>> +}
+>> +
+>> +void unregister_sea_notifier(struct notifier_block *nb)
+>> +{
+>> +	atomic_notifier_chain_unregister(&sea_handler_chain, nb);
+>> +}
+>> +
+>>   static const char *fault_name(unsigned int esr);
+>>   
+>>   #ifdef CONFIG_KPROBES
+>> @@ -480,6 +496,28 @@ static int do_bad(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>>   	return 1;
+>>   }
+>>   
+>> +/*
+>> + * This abort handler deals with Synchronous External Abort.
+>> + * It calls notifiers, and then returns "fault".
+>> + */
+>> +static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>> +{
+>> +	struct siginfo info;
+>> +
+>> +	atomic_notifier_call_chain(&sea_handler_chain, 0, NULL);
+>> +
+>> +	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
+>> +		 fault_name(esr), esr, addr);
+>> +
+>> +	info.si_signo = SIGBUS;
+>> +	info.si_errno = 0;
+>> +	info.si_code  = 0;
+>> +	info.si_addr  = (void __user *)addr;
+>> +	arm64_notify_die("", regs, &info, esr);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>>   static const struct fault_info {
+>>   	int	(*fn)(unsigned long addr, unsigned int esr, struct pt_regs *regs);
+>>   	int	sig;
+>> @@ -502,22 +540,22 @@ static const struct fault_info {
+>>   	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 1 permission fault"	},
+>>   	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 2 permission fault"	},
+>>   	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 3 permission fault"	},
+>> -	{ do_bad,		SIGBUS,  0,		"synchronous external abort"	},
+>> +	{ do_sea,		SIGBUS,  0,		"synchronous external abort"	},
+>>   	{ do_bad,		SIGBUS,  0,		"unknown 17"			},
+>>   	{ do_bad,		SIGBUS,  0,		"unknown 18"			},
+>>   	{ do_bad,		SIGBUS,  0,		"unknown 19"			},
+>> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
+>> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
+>> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
+>> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
+>> -	{ do_bad,		SIGBUS,  0,		"synchronous parity error"	},
+>> +	{ do_sea,		SIGBUS,  0,		"level 0 SEA (translation table walk)"	},
+>> +	{ do_sea,		SIGBUS,  0,		"level 1 SEA (translation table walk)"	},
+>> +	{ do_sea,		SIGBUS,  0,		"level 2 SEA (translation table walk)"	},
+>> +	{ do_sea,		SIGBUS,  0,		"level 3 SEA (translation table walk)"	},
+> Perhaps I wasn't clear enough in my previous review, but please expand the
+> acronym for strings and comments.
+Sorry, I will expand these.
+>> +	{ do_sea,		SIGBUS,  0,		"synchronous parity or ECC err" },
+> s/err/error/
+>
+> Will
+Thanks,
+Tyler
+
 -- 
-Florian
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
