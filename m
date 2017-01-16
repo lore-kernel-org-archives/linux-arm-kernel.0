@@ -1,51 +1,33 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 16 Jan 2017 07:44:57 +0100
-Subject: [PATCH 02/12] soc: samsung: pmu: Use of_device_get_match_data helper
+Date: Mon, 16 Jan 2017 07:44:59 +0100
+Subject: [PATCH 04/12] pinctrl: samsung: Document Exynos3250 SoC support
 In-Reply-To: <1484549107-5957-1-git-send-email-m.szyprowski@samsung.com>
 References: <1484549107-5957-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170116064524eucas1p1fb1b3d080298b895d95bed106879255e@eucas1p1.samsung.com>
-Message-ID: <1484549107-5957-3-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170116064525eucas1p123df65dedceef6e3efe255e9a2ec6d07@eucas1p1.samsung.com>
+Message-ID: <1484549107-5957-5-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace custom code with generic helper to retrieve driver data.
+Add missing compatible id for Exynos3250 SoC to device tree docs.
+Exynos pin control driver supports it since commit d97f5b9804bfcdc1
+("pinctrl: exynos: Add driver data for Exynos3250").
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/soc/samsung/exynos-pmu.c | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
+ Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/soc/samsung/exynos-pmu.c b/drivers/soc/samsung/exynos-pmu.c
-index 63bb471845cb..0f4b4fce9d90 100644
---- a/drivers/soc/samsung/exynos-pmu.c
-+++ b/drivers/soc/samsung/exynos-pmu.c
-@@ -11,6 +11,7 @@
- 
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <linux/delay.h>
- 
-@@ -94,7 +95,6 @@ void exynos_sys_powerdown_conf(enum sys_powerdown mode)
- 
- static int exynos_pmu_probe(struct platform_device *pdev)
- {
--	const struct of_device_id *match;
- 	struct device *dev = &pdev->dev;
- 	struct resource *res;
- 
-@@ -111,10 +111,7 @@ static int exynos_pmu_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
- 	pmu_context->dev = dev;
--
--	match = of_match_node(exynos_pmu_of_device_ids, dev->of_node);
--
--	pmu_context->pmu_data = match->data;
-+	pmu_context->pmu_data = of_device_get_match_data(dev);
- 
- 	if (pmu_context->pmu_data->pmu_init)
- 		pmu_context->pmu_data->pmu_init();
+diff --git a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+index 1baf19eecabf..5e00a21de2bf 100644
+--- a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+@@ -13,6 +13,7 @@ Required Properties:
+   - "samsung,s3c2450-pinctrl": for S3C2450-compatible pin-controller,
+   - "samsung,s3c64xx-pinctrl": for S3C64xx-compatible pin-controller,
+   - "samsung,s5pv210-pinctrl": for S5PV210-compatible pin-controller,
++  - "samsung,exynos3250-pinctrl": for Exynos3250 compatible pin-controller.
+   - "samsung,exynos4210-pinctrl": for Exynos4210 compatible pin-controller.
+   - "samsung,exynos4x12-pinctrl": for Exynos4x12 compatible pin-controller.
+   - "samsung,exynos5250-pinctrl": for Exynos5250 compatible pin-controller.
 -- 
 1.9.1
