@@ -1,91 +1,34 @@
-From: Joao.Pinto@synopsys.com (Joao Pinto)
-Date: Mon, 16 Jan 2017 10:23:10 +0000
-Subject: [PATCH 09/37] PCI: dwc: designware: Parse *num-lanes* property in
- dw_pcie_setup_rc
-In-Reply-To: <587C57FD.7050601@ti.com>
-References: <1484216786-17292-1-git-send-email-kishon@ti.com>
- <1484216786-17292-10-git-send-email-kishon@ti.com>
- <c3c55af3-29d1-dc59-3ae4-9a4132c99092@synopsys.com> <587C57FD.7050601@ti.com>
-Message-ID: <3f9d931f-a57f-2ea7-b821-ea9846ad0aa4@synopsys.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Mon, 16 Jan 2017 11:17:22 +0100
+Subject: [PATCH 06/10] sata: ahci_da850: implement a softreset quirk
+In-Reply-To: <20170115231208.GD14446@mtj.duckdns.org>
+References: <1484311084-31547-1-git-send-email-bgolaszewski@baylibre.com>
+ <1484311084-31547-7-git-send-email-bgolaszewski@baylibre.com>
+ <20170115231208.GD14446@mtj.duckdns.org>
+Message-ID: <CAMpxmJWR6KkRyTtSSa56LKjX5=9U4R3ZvxXcrmkvw9uMissg1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2017-01-16 0:12 GMT+01:00 Tejun Heo <tj@kernel.org>:
+> On Fri, Jan 13, 2017 at 01:38:00PM +0100, Bartosz Golaszewski wrote:
+>> +static int ahci_da850_softreset(struct ata_link *link,
+>> +                             unsigned int *class, unsigned long deadline)
+>> +{
+>> +     int pmp, ret;
+>> +
+>> +     pmp = sata_srst_pmp(link);
+>> +
+>> +     ret = ahci_do_softreset(link, class, pmp, deadline, ahci_check_ready);
+>> +     if (pmp && ret == -EBUSY)
+>> +             return ahci_do_softreset(link, class, 0,
+>> +                                      deadline, ahci_check_ready);
+>> +
+>> +     return ret;
+>> +}
+>
+> Please add some comments explaining what's going on.
 
-Hi,
-
-?s 5:19 AM de 1/16/2017, Kishon Vijay Abraham I escreveu:
-> Hi,
-> 
-> On Friday 13 January 2017 10:43 PM, Joao Pinto wrote:
->> Hi,
->>
->> ?s 10:25 AM de 1/12/2017, Kishon Vijay Abraham I escreveu:
->>> *num-lanes* dt property is parsed in dw_pcie_host_init. However
->>> *num-lanes* property is applicable to both root complex mode and
->>> endpoint mode. As a first step, move the parsing of this property
->>> outside dw_pcie_host_init. This is in preparation for splitting
->>> pcie-designware.c to pcie-designware.c and pcie-designware-host.c
->>>
->>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>> ---
->>>  drivers/pci/dwc/pcie-designware.c |   18 +++++++++++-------
->>>  drivers/pci/dwc/pcie-designware.h |    1 -
->>>  2 files changed, 11 insertions(+), 8 deletions(-)
->>>
->>> diff --git a/drivers/pci/dwc/pcie-designware.c b/drivers/pci/dwc/pcie-designware.c
->>> index 00a0fdc..89cdb6b 100644
->>> --- a/drivers/pci/dwc/pcie-designware.c
->>> +++ b/drivers/pci/dwc/pcie-designware.c
->>> @@ -551,10 +551,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
->>>  		}
->>>  	}
->>>  
->>> -	ret = of_property_read_u32(np, "num-lanes", &pci->lanes);
->>> -	if (ret)
->>> -		pci->lanes = 0;
->>> -
->>>  	ret = of_property_read_u32(np, "num-viewport", &pci->num_viewport);
->>>  	if (ret)
->>>  		pci->num_viewport = 2;
->>> @@ -751,18 +747,26 @@ static int dw_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
->>>  
->>>  void dw_pcie_setup_rc(struct pcie_port *pp)
->>>  {
->>> +	int ret;
->>> +	u32 lanes;
->>>  	u32 val;
->>>  	struct dw_pcie *pci = to_dw_pcie_from_pp(pp);
->>> +	struct device *dev = pci->dev;
->>> +	struct device_node *np = dev->of_node;
->>>  
->>>  	/* get iATU unroll support */
->>>  	pci->iatu_unroll_enabled = dw_pcie_iatu_unroll_enabled(pci);
->>>  	dev_dbg(pci->dev, "iATU unroll: %s\n",
->>>  		pci->iatu_unroll_enabled ? "enabled" : "disabled");
->>>  
->>> +	ret = of_property_read_u32(np, "num-lanes", &lanes);
->>> +	if (ret)
->>> +		lanes = 0;
->>
->> You moved from host_init to root complex setup function, which in my opinion did
->> not improve (in this scope).
->>
->> I suggest that instead of making so much intermediary patches, which is nice to
->> understand your development sequence, but hard to review. Wouldn't be better to
->> condense some of the patches? We would have a cloear vision of the final product :)
-> 
-> I thought the other way. If squashing patches is easier to review, I'll do it.
-
-I understand. To break it in small pieces is good to understand clearly what is
-done and how was done, but I would break too much. That's a personal opinion of
-course, lets see what others say :).
+Sure, I'll add some explanation in v2.
 
 Thanks,
-Joao
-
-> 
-> Btw, thanks for reviewing.
-> 
-> Cheers
-> Kishon
-> 
+Bartosz Golaszewski
