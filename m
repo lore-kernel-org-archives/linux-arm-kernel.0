@@ -1,48 +1,54 @@
-From: mike.looijmans@topic.nl (Mike Looijmans)
-Date: Mon, 16 Jan 2017 15:49:38 +0100
-Subject: [PATCH v2] i2c: i2c-cadence: Initialize configuration before probing
- devices
-Message-ID: <1484578178-3165-1-git-send-email-mike.looijmans@topic.nl>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Mon, 16 Jan 2017 14:49:54 +0000
+Subject: [PATCH 5/8] efi: Get the secure boot status [ver #6]
+In-Reply-To: <7948.1484148443@warthog.procyon.org.uk>
+References: <20170111143304.GA29649@codeblueprint.co.uk>
+ <148120020832.5854.5448601415491330495.stgit@warthog.procyon.org.uk>
+ <148120024570.5854.10638278395097394138.stgit@warthog.procyon.org.uk>
+ <7948.1484148443@warthog.procyon.org.uk>
+Message-ID: <20170116144954.GB27351@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The cadence I2C driver calls cdns_i2c_writereg(..) to setup a workaround
-in the controller, but did so after calling i2c_add_adapter() which starts
-probing devices on the bus. Change the order so that the configuration is
-completely finished before using the adapter.
+(Cc'ing Peter A. and Peter J. for boot params discussion)
 
-Signed-off-by: Mike Looijmans <mike.looijmans@topic.nl>
----
-v2: Only move the initialization to before i2c_add_adapter, don't change the
-    logging output.
- drivers/i2c/busses/i2c-cadence.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+On Wed, 11 Jan, at 03:27:23PM, David Howells wrote:
+> Matt Fleming <matt@codeblueprint.co.uk> wrote:
+> 
+> > > +	movb	$0, BP_secure_boot(%rsi)
+> > >  #ifdef CONFIG_EFI_STUB
+> > >  	/*
+> > >  	 * The entry point for the PE/COFF executable is efi_pe_entry, so
+> > 
+> > Is clearing ::secure_boot really necessary? Any code path that goes
+> > via efi_main() will set it correctly and all other code paths should
+> > get it cleared in sanitize_boot_params(), no?
+> 
+> No.
+> 
+> The boot_params->secure_boot parameter exists whether or not efi_main() is
+> traversed (ie. if EFI isn't enabled or CONFIG_EFI_STUB=n) and, if not cleared,
+> is of uncertain value.
+>
+> Further, sanitize_boot_params() has to be modified by this patch so as not to
+> clobber the secure_boot flag.
 
-diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
-index 6869712..45d6771 100644
---- a/drivers/i2c/busses/i2c-cadence.c
-+++ b/drivers/i2c/busses/i2c-cadence.c
-@@ -962,10 +962,6 @@ static int cdns_i2c_probe(struct platform_device *pdev)
- 		goto err_clk_dis;
- 	}
- 
--	ret = i2c_add_adapter(&id->adap);
--	if (ret < 0)
--		goto err_clk_dis;
--
- 	/*
- 	 * Cadence I2C controller has a bug wherein it generates
- 	 * invalid read transaction after HW timeout in master receiver mode.
-@@ -975,6 +971,10 @@ static int cdns_i2c_probe(struct platform_device *pdev)
- 	 */
- 	cdns_i2c_writereg(CDNS_I2C_TIMEOUT_MAX, CDNS_I2C_TIME_OUT_OFFSET);
- 
-+	ret = i2c_add_adapter(&id->adap);
-+	if (ret < 0)
-+		goto err_clk_dis;
-+
- 	dev_info(&pdev->dev, "%u kHz mmio %08lx irq %d\n",
- 		 id->i2c_clk / 1000, (unsigned long)r_mem->start, id->irq);
- 
--- 
-1.9.1
+Any new parameters that boot loaders do not know about should be
+cleared to zero by default in the boot loader because boot_params
+itself should be zero'd when allocated.
+
+There are two cases to consider:
+
+ 1) boot_params is not zero'd
+ 2) boot_params is zero'd
+
+1) This is a broken boot loader implementation that violates the x86
+boot specification and I would never expect ->secure_boot to have a
+valid value. It should not be special-cased in sanitize_boot_params(),
+it should be zero'd.
+
+2) In this case ->secure_boot should be zero unless modified inside of
+efi_main().
+
+Did you hit the scenario where ->secure_boot has a garbage value while
+developing these patches? I wouldn't expect to see it in practice.
