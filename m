@@ -1,57 +1,135 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 16 Jan 2017 21:37:00 +0200
-Subject: [PATCH 09/12] pinctrl: samsung: Add infrastructure for pin-bank
- retention control
-In-Reply-To: <1484549107-5957-10-git-send-email-m.szyprowski@samsung.com>
-References: <1484549107-5957-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170116064527eucas1p1f0f78e9420e7d9d60d94b6e7381caeb1@eucas1p1.samsung.com>
- <1484549107-5957-10-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20170116193700.23ouybo6dhkhrs25@kozik-lap>
+From: jan.kiszka@siemens.com (Jan Kiszka)
+Date: Mon, 16 Jan 2017 20:46:05 +0100
+Subject: [PATCH v2 2/3] spi: pxa2xx: Prepare for edge-triggered interrupts
+In-Reply-To: <1484593637.2133.152.camel@linux.intel.com>
+References: <cover.1484592296.git.jan.kiszka@siemens.com>
+ <7b15a0910a3ad861fd32161c72559bafa7b71e29.1484592296.git.jan.kiszka@siemens.com>
+ <1484593637.2133.152.camel@linux.intel.com>
+Message-ID: <7fd7a8eb-4302-523b-08dd-f2a28b845a5e@siemens.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2017 at 07:45:04AM +0100, Marek Szyprowski wrote:
-> Pad retention control after suspend/resume cycle should be done from pin
-> controller driver instead of PMU (power management unit) driver to avoid
-> possible ordering and logical dependencies. Till now it worked fine only
-> because PMU driver registered its sys_ops after pin controller.
+On 2017-01-16 20:07, Andy Shevchenko wrote:
+> On Mon, 2017-01-16 at 19:44 +0100, Jan Kiszka wrote:
+>> When using the a device with edge-triggered interrupts, such as MSIs,
+>> the interrupt handler has to ensure that there is a point in time
+>> during
+>> its execution where all interrupts sources are silent so that a new
+>> event can trigger a new interrupt again.
+>>
+>> This is achieved here by looping over SSSR evaluation. We need to take
+>> into account that SSCR1 may be changed by the transfer handler, thus
+>> we
+>> need to redo the mask calculation, at least regarding the volatile
+>> interrupt enable bit (TIE).
+>>
 > 
-> This patch adds infrastructure to handle pad retention during pin control
-> driver resume.
+> So, more comments/questions below.
 > 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  drivers/pinctrl/samsung/pinctrl-samsung.c | 12 ++++++---
->  drivers/pinctrl/samsung/pinctrl-samsung.h | 42 +++++++++++++++++++++++++++++++
->  2 files changed, 51 insertions(+), 3 deletions(-)
+>>  
+>>  	sccr1_reg = pxa2xx_spi_read(drv_data, SSCR1);
+>>  
+>> -	/* Ignore possible writes if we don't need to write */
+>> -	if (!(sccr1_reg & SSCR1_TIE))
+>> -		mask &= ~SSSR_TFS;
+>> -
+>>  	/* Ignore RX timeout interrupt if it is disabled */
+>>  	if (!(sccr1_reg & SSCR1_TINTE))
+>>  		mask &= ~SSSR_TINT;
+>>  
+>> -	if (!(status & mask))
+>> -		return IRQ_NONE;
+>> +	while (1) {
 > 
-> diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
-> index 86f23842f681..95a84086a2e9 100644
-> --- a/drivers/pinctrl/samsung/pinctrl-samsung.c
-> +++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
-> @@ -1075,6 +1075,9 @@ static int samsung_pinctrl_probe(struct platform_device *pdev)
->  		ctrl->eint_gpio_init(drvdata);
->  	if (ctrl->eint_wkup_init)
->  		ctrl->eint_wkup_init(drvdata);
-> +	if (ctrl->retention_data && ctrl->retention_data->init)
-> +		drvdata->retention_ctrl = ctrl->retention_data->init(drvdata,
-> +							  ctrl->retention_data);
->  
->  	platform_set_drvdata(pdev, drvdata);
->  
-> @@ -1127,15 +1130,15 @@ static void samsung_pinctrl_suspend_dev(
->  
->  	if (drvdata->suspend)
->  		drvdata->suspend(drvdata);
-> +	if (drvdata->retention_ctrl && drvdata->retention_ctrl->on)
-> +		drvdata->retention_ctrl->on(drvdata);
-> +
+> Can we switch to do-while and move previous block here?
 
-This new line is not needed (checkpatch might complain... either in
-normal mode or in strict). Beside that, thanks for splitting the
-patch for interface from the implementation:
+Don't see how this would help (without duplicating more code).
 
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Btw, can TINTE
+> bit be set again during a loop?
 
-Best regards,
-Krzysztof
+Nope, it's statically set, at least so far.
+
+What we could do is simply restarting ssp_int
+
+> 
+>> +		/* Ignore possible writes if we don't need to write
+>> */
+>> +		if (!(sccr1_reg & SSCR1_TIE))
+>> +			mask &= ~SSSR_TFS;
+>>  
+>> -	if (!drv_data->master->cur_msg) {
+>> -		handle_bad_msg(drv_data);
+>> -		/* Never fail */
+>> -		return IRQ_HANDLED;
+>> -	}
+>> +		if (!(status & mask))
+>> +			return ret;
+>> +
+>> +		if (!drv_data->master->cur_msg) {
+>> +			handle_bad_msg(drv_data);
+>> +			/* Never fail */
+>> +			return IRQ_HANDLED;
+>> +		}
+>> +
+> 
+>> +		ret |= drv_data->transfer_handler(drv_data);
+> 
+> So, we might call handler several times. This needs to be commented in
+> the code why you do so.
+
+I can move the commit log into the code.
+
+> 
+>>  
+>> -	return drv_data->transfer_handler(drv_data);
+>> +		status = pxa2xx_spi_read(drv_data, SSSR);
+> 
+> Would it be possible to get all 1:s from the register
+> (something/autosuspend just powered off it by timeout?) ?
+> 
+
+Not sure if that can happen, but I guess it would be simpler and more
+readable to simply do this instead:
+
+	while (1) {
+		/*
+		 * If the device is not yet in RPM suspended state and we get an
+		 * interrupt that is meant for another device, check if status
+		 * bits are all set to one. That means that the device is
+		 * already powered off.
+		 */
+		status = pxa2xx_spi_read(drv_data, SSSR);
+		if (status == ~0)
+			return ret;
+
+		sccr1_reg = pxa2xx_spi_read(drv_data, SSCR1);
+
+		/* Ignore RX timeout interrupt if it is disabled */
+		if (!(sccr1_reg & SSCR1_TINTE))
+			mask &= ~SSSR_TINT;
+
+		/* Ignore possible writes if we don't need to write */
+		if (!(sccr1_reg & SSCR1_TIE))
+			mask &= ~SSSR_TFS;
+
+		if (!(status & mask))
+			return ret;
+
+		if (!drv_data->master->cur_msg) {
+			handle_bad_msg(drv_data);
+			/* Never fail */
+			return IRQ_HANDLED;
+		}
+
+		ret |= drv_data->transfer_handler(drv_data);
+	}
+
+
+i.e. preserve the current structure, just add the loop.
+
+Jan
+
+-- 
+Siemens AG, Corporate Technology, CT RDA ITP SES-DE
+Corporate Competence Center Embedded Linux
