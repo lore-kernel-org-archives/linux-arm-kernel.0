@@ -1,52 +1,38 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 16 Jan 2017 14:36:02 +0530
-Subject: [PATCH v2 3/3] phy: rockchip-inno-usb2: Set EXTCON_USB when
- EXTCON_CHG_USB_SDP was set
-In-Reply-To: <23666cc1a5ff123ece5bdbb9821d1eab280d0927.1482307697.git.baolin.wang@linaro.org>
-References: <7b9836ce2ca34118a2acd1ea113605a5f13b4439.1482307697.git.baolin.wang@linaro.org>
- <23666cc1a5ff123ece5bdbb9821d1eab280d0927.1482307697.git.baolin.wang@linaro.org>
-Message-ID: <587C8CFA.2000304@ti.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 16 Jan 2017 10:06:37 +0100 (CET)
+Subject: [RFC PATCH v2 05/10] genirq: export irq_get_percpu_devid_partition
+ to modules
+In-Reply-To: <1484323429-15231-6-git-send-email-will.deacon@arm.com>
+References: <1484323429-15231-1-git-send-email-will.deacon@arm.com>
+ <1484323429-15231-6-git-send-email-will.deacon@arm.com>
+Message-ID: <alpine.DEB.2.20.1701161006240.3877@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 13 Jan 2017, Will Deacon wrote:
 
-
-On Wednesday 21 December 2016 01:42 PM, Baolin Wang wrote:
-> According to the documentation, we should set the EXTCON_USB when
-> one SDP charger connector was reported.
+> Any modular driver using cluster-affine PPIs needs to be able to call
+> irq_get_percpu_devid_partition so that it can enable the IRQ on the
+> correct subset of CPUs.
 > 
-> Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
-> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
-
-merged, thanks!
-
--Kishon
-> ---
-> Changes since v1:
->  - Change extcon_set_cable_state_() to extcon_set_state_sync().
->  - Add reviewed tag by Chanwoo Choi.
-> ---
->  drivers/phy/phy-rockchip-inno-usb2.c |    7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
+> This patch exports the symbol so that it can be called from within a
+> module.
 > 
-> diff --git a/drivers/phy/phy-rockchip-inno-usb2.c b/drivers/phy/phy-rockchip-inno-usb2.c
-> index 2f99ec9..4ea95c2 100644
-> --- a/drivers/phy/phy-rockchip-inno-usb2.c
-> +++ b/drivers/phy/phy-rockchip-inno-usb2.c
-> @@ -595,9 +595,14 @@ static void rockchip_usb2phy_otg_sm_work(struct work_struct *work)
->  		if (rport->vbus_attached != vbus_attach) {
->  			rport->vbus_attached = vbus_attach;
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  kernel/irq/irqdesc.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/kernel/irq/irqdesc.c b/kernel/irq/irqdesc.c
+> index 00bb0aeea1d0..1e6ae73eae59 100644
+> --- a/kernel/irq/irqdesc.c
+> +++ b/kernel/irq/irqdesc.c
+> @@ -856,6 +856,7 @@ int irq_get_percpu_devid_partition(unsigned int irq, struct cpumask *affinity)
 >  
-> -			if (notify_charger && rphy->edev)
-> +			if (notify_charger && rphy->edev) {
->  				extcon_set_cable_state_(rphy->edev,
->  							cable, vbus_attach);
-> +				if (cable == EXTCON_CHG_USB_SDP)
-> +					extcon_set_state_sync(rphy->edev,
-> +							      EXTCON_USB,
-> +							      vbus_attach);
-> +			}
->  		}
->  		break;
->  	case OTG_STATE_B_PERIPHERAL:
-> 
+>  	return 0;
+>  }
+> +EXPORT_SYMBOL_GPL(irq_get_percpu_devid_partition);
+
+Acked-by: Thomas Gleixner <tglx@linutronix.de>
