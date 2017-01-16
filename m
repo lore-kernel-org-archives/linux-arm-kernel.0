@@ -1,127 +1,178 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 16 Jan 2017 17:43:00 +0100
-Subject: [linux-sunxi] [PATCH] clk: sunxi-ng: fix PLL_CPUX adjusting on H3
-In-Reply-To: <557330d0-2dcd-2211-8538-51c4d6b68834@megous.com>
-References: <20161125002852.18097-1-megous@megous.com>
- <0985b1ec-ba95-1505-cc59-adec4b88238f@megous.com>
- <20170109095946.6esbfx6pafega5cd@lukather>
- <557330d0-2dcd-2211-8538-51c4d6b68834@megous.com>
-Message-ID: <20170116164300.j2zvjkxr7c5h5hyo@lukather>
+From: mbenes@suse.cz (Miroslav Benes)
+Date: Mon, 16 Jan 2017 17:47:20 +0100 (CET)
+Subject: [PATCH 1/7] arm: Add livepatch arch specific code
+In-Reply-To: <1481043967-15602-2-git-send-email-abelvesa@linux.com>
+References: <1481043967-15602-1-git-send-email-abelvesa@linux.com>
+ <1481043967-15602-2-git-send-email-abelvesa@linux.com>
+Message-ID: <alpine.LSU.2.20.1701161733531.17768@pobox.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ondrej,
+On Tue, 6 Dec 2016, Abel Vesa wrote:
 
-Sorry for the late reply,
-
-On Mon, Jan 09, 2017 at 03:50:42PM +0100, Ond?ej Jirman wrote:
-> Dne 9.1.2017 v 10:59 Maxime Ripard napsal(a):
-> > On Sat, Jan 07, 2017 at 04:49:18PM +0100, Ond?ej Jirman wrote:
-> >> Maxime,
-> >>
-> >> Dne 25.11.2016 v 01:28 megous at megous.com napsal(a):
-> >>> From: Ondrej Jirman <megous@megous.com>
-> >>>
-> >>> When adjusting PLL_CPUX on H3, the PLL is temporarily driven
-> >>> too high, and the system becomes unstable (oopses or hangs).
-> >>>
-> >>> Add a notifier to avoid this situation by temporarily switching
-> >>> to a known stable 24 MHz oscillator.
-> >>
-> >> I have done more thorough testing on H3 and this approach with switching
-> >> to 24MHz oscillator does not work. Motivation being that my Orange Pi
-> >> One still gets lockups even with this patch under certain circumstances.
-> >>
-> >> So I have created a small test program for CPUS (additional OpenRISC CPU
-> >> on the SoC) which randomly changes PLL_CPUX settings while main CPU is
-> >> running a loop that sends messages to CPUS via msgbox.
-> >>
-> >> Assumption being that while CPUS is successfully receiving messages via
-> >> msgbox, the main CPU didn't lock up, yet.
-> >>
-> >> With this I am able to quickly and thoroughly test various PLL_CPUX
-> >> change and factor selection algorithms.
-> >>
-> >> Results are that bypassing CPUX clock by switching to 24 MHz oscillator
-> >> does not work at all. Main CPU locks up in about 1 second into the test.
-> >> Don't ask me why.
-> > 
-> > You mean that you are changing the frequency behind Linux' back? That
-> > won't work. There's more to cpufreq than just changing the frequency,
-> > but also adusting the number of loops per jiffy for the new frequency
-> > for example. I don't really expect that setup to work even on a
-> > perfectly stable system. CPUFreq *has* to be involved, otherwise, that
-> > alone might introduce bugs, and you cannot draw any conclusions
-> > anymore.
+> klp_get_ftrace_location is used by ftrace to get the entry for a
+> specific function from the mcount list. klp_arch_set_pc is used
+> to set the pc from the regs passed as an argument to the
+> ftrace_ops_no_ops function to the starting address of the patched
+> function. klp_write_module_reloc is not doing anything at this
+> moment.
 > 
-> No, this has nothing to do with linux. I'm not running linux for this
-> test. I'm running a small program on CPUS (Open RISC CPU) on the SoC
-> loaded using FEL from USB.
+> Signed-off-by: Abel Vesa <abelvesa@linux.com>
+> ---
+>  MAINTAINERS                      |  3 +++
+>  arch/arm/include/asm/livepatch.h | 46 ++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/kernel/livepatch.c      | 43 +++++++++++++++++++++++++++++++++++++
+>  3 files changed, 92 insertions(+)
+>  create mode 100644 arch/arm/include/asm/livepatch.h
+>  create mode 100644 arch/arm/kernel/livepatch.c
 > 
-> The main cpu is just pushing messages into msgbox in a loop, so that
-> CPUS can determine that the main CPU is still running ok and give
-> feedback to me over UART. Not even DRAM is involved. The programs are
-> running from SRAM.
-> 
-> This is the most direct test of PLL change stability that can be done on
-> this SoC regardless of the OS. Not even CPU voltage switching is
-> involved. I just set the maximum voltage and fiddle with CPU_PLL
-> frequencies randomly, while waiting for the main CPU to lock up.
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index bd182a1..d43b790 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -7466,12 +7466,15 @@ M:	Josh Poimboeuf <jpoimboe@redhat.com>
+>  M:	Jessica Yu <jeyu@redhat.com>
+>  M:	Jiri Kosina <jikos@kernel.org>
+>  M:	Miroslav Benes <mbenes@suse.cz>
+> +M:	Abel Vesa <abelvesa@linux.com>
+>  R:	Petr Mladek <pmladek@suse.com>
+>  S:	Maintained
+>  F:	kernel/livepatch/
+>  F:	include/linux/livepatch.h
+>  F:	arch/x86/include/asm/livepatch.h
+>  F:	arch/x86/kernel/livepatch.c
+> +F:	arch/arm/include/asm/livepatch.h
+> +F:	arch/arm/kernel/livepatch.c
+>  F:	Documentation/livepatch/
+>  F:	Documentation/ABI/testing/sysfs-kernel-livepatch
+>  F:	samples/livepatch/
 
-Ok.
+Thanks for the offer but I think we manage quite well ;)
 
-> It does lock up quickly with mainline ccu_nkmp_find_best algorithm
-> for finding factors.
-> 
-> Even with linux kernel, it breaks. It's just more difficult to hit the
-> right conditions. I got oops only right after boot when running cpuburn
-> to trigger thermal_zone issued OPP change, if I first run some cpupower
-> commands. That's why I wrote this program to stress test various CPU_PLL
-> change/factor selection algorithms independently of everything else, to
-> get more predictable and quicker testing results.
+> diff --git a/arch/arm/include/asm/livepatch.h b/arch/arm/include/asm/livepatch.h
+> new file mode 100644
+> index 0000000..d4e3ff0
+> --- /dev/null
+> +++ b/arch/arm/include/asm/livepatch.h
+> @@ -0,0 +1,46 @@
+> +/*
+> + * livepatch.h - arm specific Kernel Live Patching Core
+> + *
+> + * Copyright (C) 2016 Abel Vesa <abelvesa@linux.com>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * as published by the Free Software Foundation; either version 2
+> + * of the License, or (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#ifndef _ASM_ARM_LIVEPATCH_H
+> +#define _ASM_ARM_LIVEPATCH_H
+> +
+> +#include <asm/setup.h>
+> +#include <linux/module.h>
+> +#include <linux/ftrace.h>
+> +
+> +static inline int klp_check_compiler_support(void)
+> +{
+> +	return 0;
+> +}
+> +
+> +int klp_write_module_reloc(struct module *mod, unsigned long type,
+> +			   unsigned long loc, unsigned long value);
 
-Understood. Do you have the code available somewhere?
+This is not needed. See below.
 
-> >> What works is selecting NKMP factors so that M is always 1 and P is
-> >> anything other than /1 only for frequencies under 288MHz. As mandated by
-> >> the H3 datasheet. Mainline ccu_nkmp_find_best doesn't respect these
-> >> conditions. With that I can change CPUX frequencies randomly 20x a
-> >> second so far indefinitely without the main CPU ever locking up.
-> >>
-> >> Please drop or revert this patch. It is not a correct approach to the
-> >> problem. I'd suggest dropping the entire clock notifier mechanism, too,
-> >> unless it can be proven to work reliably.
-> > 
-> > It has been proven to work reliably on a number of other SoCs.
-> 
-> Unless it was stress tested like this with randomy changed settings, I
-> doubt you can call it reliable. It may just be very hard to hit the
-> issue on linux with particular OPP/thermal zone configuration. That's
-> because the issue is dependent on before and after NKMP values. People
-> may have just been lucky so far.
+> +
+> +static inline void klp_arch_set_pc(struct pt_regs *regs, unsigned long ip)
+> +{
+> +	regs->uregs[15] = ip;
+> +}
+> +
+> +#define klp_get_ftrace_location klp_get_ftrace_location
+> +static inline unsigned long klp_get_ftrace_location(unsigned long faddr)
+> +{
+> +	return ftrace_location_range(faddr, faddr + 24);
 
-Yes, or maybe we just have OPPs that just don't trigger a low enough P
-factor.
+Comment here about +24 would be great. See similar in powerpc header file.
 
-There's no rush anyway, the H3 cpufreq support is not enabled at the
-moment, so that code basically does nothing for the moment.
+> +}
+> +
+> +#endif /* _ASM_ARM_LIVEPATCH_H */
+> diff --git a/arch/arm/kernel/livepatch.c b/arch/arm/kernel/livepatch.c
+> new file mode 100644
+> index 0000000..0656cd6
+> --- /dev/null
+> +++ b/arch/arm/kernel/livepatch.c
+> @@ -0,0 +1,43 @@
+> +/*
+> + * livepatch.c - arm specific Kernel Live Patching Core
+> + *
+> + * Copyright (C) 2016 Abel Vesa <abelvesa@linux.com>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * as published by the Free Software Foundation; either version 2
+> + * of the License, or (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/module.h>
+> +#include <linux/uaccess.h>
+> +#include <linux/ftrace.h>
+> +#include <asm/elf.h>
+> +#include <asm/livepatch.h>
+> +#include <asm/insn.h>
+> +#include <asm/ftrace.h>
+> +
+> +/**
+> + * klp_write_module_reloc() - write a relocation in a module
+> + * @mod:	module in which the section to be modified is found
+> + * @type:	ELF relocation type (see asm/elf.h)
+> + * @loc:	address that the relocation should be written to
+> + * @value:	relocation value (sym address + addend)
+> + *
+> + * This function writes a relocation to the specified location for
+> + * a particular module.
+> + */
+> +int klp_write_module_reloc(struct module *mod, unsigned long type,
+> +			   unsigned long loc, unsigned long value)
+> +{
+> +	/* Not implemented yet */
+> +	return 0;
+> +}
 
-What's your current plan to fix that? I guess the easiest (and most
-likely to be reusable) would be to allow for clock tables, instead of
-using the generic approach. We might have some other clocks (like
-audio or video) that would need such a precise tuning in the future
-too.
+This whole file is not needed. Livepatching uses kernel's internal 
+apply_relocate_add() for dealing with relocations. The only thing you need 
+to do is to make sure that all needed arch-specific info is preserved 
+during a module loading. Specifically mod_arch_specific structure needs to 
+be examined in this respect.
 
-Maxime
+See commit f31e0960f395 ("module: s390: keep mod_arch_specific for 
+livepatch modules") for s390 case.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170116/94186f7d/attachment.sig>
+But apply_relocate_add() is not implemented on arm yet. I guess it would 
+nice to have it... otherwise we could get to an unpleasant situation. 
+Livepatch module can rely on its livepatching relocations (that is, there 
+are some). apply_relocate_add() returns 0 on arm, so everything seems to 
+be nice and then boom some time later.
+
+The question is what happens with normal modules. There are no SHT_RELA 
+records probably.
+
+Miroslav
