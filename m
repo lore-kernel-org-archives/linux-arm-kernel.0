@@ -1,67 +1,67 @@
-From: Joao.Pinto@synopsys.com (Joao Pinto)
-Date: Mon, 16 Jan 2017 10:27:58 +0000
-Subject: [PATCH 11/37] PCI: dwc: Split pcie-designware.c into host and
- core files
-In-Reply-To: <587C586C.6070003@ti.com>
-References: <1484216786-17292-1-git-send-email-kishon@ti.com>
- <1484216786-17292-12-git-send-email-kishon@ti.com>
- <4a89fb45-af84-d660-5ef0-12227b141cda@synopsys.com> <587C586C.6070003@ti.com>
-Message-ID: <0a16c862-312f-655e-3d66-bdb0c1f78584@synopsys.com>
+From: balbi@kernel.org (Felipe Balbi)
+Date: Mon, 16 Jan 2017 12:27:04 +0200
+Subject: [PATCH] usb: gadget: udc: atmel: used managed kasprintf
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6DB023508B@AcuExch.aculab.com>
+References: <20161201102656.29041-1-alexandre.belloni@free-electrons.com>
+ <063D6719AE5E284EB5DD2968C1650D6DB0232C0D@AcuExch.aculab.com>
+ <20161202161921.ace5rolitlxjhr6i@piout.net>
+ <063D6719AE5E284EB5DD2968C1650D6DB023508B@AcuExch.aculab.com>
+Message-ID: <87eg03nvuv.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Hi,
 
-?s 5:21 AM de 1/16/2017, Kishon Vijay Abraham I escreveu:
-> Hi Joao,
-> 
-> On Friday 13 January 2017 10:19 PM, Joao Pinto wrote:
->> ?s 10:26 AM de 1/12/2017, Kishon Vijay Abraham I escreveu:
->>> Split pcie-designware.c into pcie-designware-host.c that contains
->>> the host specific parts of the driver and pcie-designware.c that
->>> contains the parts used by both host driver and endpoint driver.
->>>
->>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>> ---
->>>  drivers/pci/dwc/Makefile               |    2 +-
->>>  drivers/pci/dwc/pcie-designware-host.c |  619 ++++++++++++++++++++++++++++++++
->>>  drivers/pci/dwc/pcie-designware.c      |  613 +------------------------------
->>>  drivers/pci/dwc/pcie-designware.h      |    8 +
->>>  4 files changed, 634 insertions(+), 608 deletions(-)
->>>  create mode 100644 drivers/pci/dwc/pcie-designware-host.c
->>>
->>> diff --git a/drivers/pci/dwc/Makefile b/drivers/pci/dwc/Makefile
->>> index 7d27c14..3b57e55 100644
->>> --- a/drivers/pci/dwc/Makefile
->>> +++ b/drivers/pci/dwc/Makefile
->>> @@ -1,4 +1,4 @@
->>
->> (snip...)
->>
->>> -static void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index,
->>> -				      int type, u64 cpu_addr, u64 pci_addr,
->>> -				      u32 size)
->>> +void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index, int type,
->>> +			       u64 cpu_addr, u64 pci_addr, u32 size)
->>>  {
->>>  	u32 retries, val;
->>>  
->>> @@ -186,220 +151,6 @@ static void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index,
->>>  	dev_err(pci->dev, "iATU is not being enabled\n");
->>>  }
->>
->> Kishon, iATU only makes sense in The Root Complex (host), so it should be inside
->> the pcie-designware-host.
-> 
-> That is not true. Outbound ATU should be programmed to access host side buffers
-> and inbound ATU should be programmed for the host to access EP mem space.
+David Laight <David.Laight@ACULAB.COM> writes:
+> From: Alexandre Belloni
+>> Sent: 02 December 2016 16:19
+>> On 02/12/2016 at 15:59:57 +0000, David Laight wrote :
+>> > From: Alexandre Belloni
+>> > > Sent: 01 December 2016 10:27
+>> > > Use devm_kasprintf instead of simple kasprintf to free the allocated memory
+>> > > when needed.
+>> >
+>> > s/when needed/when the device is freed/
+>> >
+>> > > Suggested-by: Peter Rosin <peda@axentia.se>
+>> > > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>> > > ---
+>> > >  drivers/usb/gadget/udc/atmel_usba_udc.c | 3 ++-
+>> > >  1 file changed, 2 insertions(+), 1 deletion(-)
+>> > >
+>> > > diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+>> > > index 45bc997d0711..aec72fe8273c 100644
+>> > > --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
+>> > > +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+>> > > @@ -1978,7 +1978,8 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
+>> > >  			dev_err(&pdev->dev, "of_probe: name error(%d)\n", ret);
+>> > >  			goto err;
+>> > >  		}
+>> > > -		ep->ep.name = kasprintf(GFP_KERNEL, "ep%d", ep->index);
+>> > > +		ep->ep.name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "ep%d",
+>> > > +					     ep->index);
+>> >
+>> > Acually why bother mallocing such a small string at all.
+>> > The maximum length is 12 bytes even if 'index' are unrestricted.
+>> >
+>> 
+>> IIRC, using statically allocated string is failing somewhere is the USB
+>> core but I don't remember all the details.
+>
+> I can't imagine that changing ep->ep.name from 'char *' to 'char [12]' would
+> make any difference.
 
-Sorry, I was not clear enough. What I was trying to suggest is, since the ATU
-programming is done by the host, wouldn't be better to include it in the
-pcie-designware-host? It is just an architectural detail.
+the actual name is managed by the UDC. Meaning, ep->ep.name should be a
+pointer, but it could very well just point to ep->name which would be
+char [12].
 
-> 
-> Thanks
-> Kishon
-> 
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170116/9893a195/attachment.sig>
