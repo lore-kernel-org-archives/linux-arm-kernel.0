@@ -1,75 +1,36 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 16 Jan 2017 17:00:05 +0530
-Subject: [PATCH 11/37] PCI: dwc: Split pcie-designware.c into host and
- core files
-In-Reply-To: <0a16c862-312f-655e-3d66-bdb0c1f78584@synopsys.com>
-References: <1484216786-17292-1-git-send-email-kishon@ti.com>
- <1484216786-17292-12-git-send-email-kishon@ti.com>
- <4a89fb45-af84-d660-5ef0-12227b141cda@synopsys.com> <587C586C.6070003@ti.com>
- <0a16c862-312f-655e-3d66-bdb0c1f78584@synopsys.com>
-Message-ID: <587CAEBD.1010803@ti.com>
+From: qiyaoltc@gmail.com (Yao Qi)
+Date: Mon, 16 Jan 2017 11:34:39 +0000
+Subject: [RFC PATCH 06/10] arm64/sve: Disallow VL setting for individual
+ threads by default
+In-Reply-To: <1484220369-23970-7-git-send-email-Dave.Martin@arm.com>
+References: <1484220369-23970-1-git-send-email-Dave.Martin@arm.com>
+ <1484220369-23970-7-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20170116113439.GF28060@E107787-LIN>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joao,
-
-On Monday 16 January 2017 03:57 PM, Joao Pinto wrote:
+On 17-01-12 11:26:05, Dave Martin wrote:
+> General-purpose code in userspace is not expected to work correctly
+> if multiple threads are allowed to run concurrently with different
+> vector lengths in a single process.
 > 
-> Hi,
-> 
-> ?s 5:21 AM de 1/16/2017, Kishon Vijay Abraham I escreveu:
->> Hi Joao,
->>
->> On Friday 13 January 2017 10:19 PM, Joao Pinto wrote:
->>> ?s 10:26 AM de 1/12/2017, Kishon Vijay Abraham I escreveu:
->>>> Split pcie-designware.c into pcie-designware-host.c that contains
->>>> the host specific parts of the driver and pcie-designware.c that
->>>> contains the parts used by both host driver and endpoint driver.
->>>>
->>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->>>> ---
->>>>  drivers/pci/dwc/Makefile               |    2 +-
->>>>  drivers/pci/dwc/pcie-designware-host.c |  619 ++++++++++++++++++++++++++++++++
->>>>  drivers/pci/dwc/pcie-designware.c      |  613 +------------------------------
->>>>  drivers/pci/dwc/pcie-designware.h      |    8 +
->>>>  4 files changed, 634 insertions(+), 608 deletions(-)
->>>>  create mode 100644 drivers/pci/dwc/pcie-designware-host.c
->>>>
->>>> diff --git a/drivers/pci/dwc/Makefile b/drivers/pci/dwc/Makefile
->>>> index 7d27c14..3b57e55 100644
->>>> --- a/drivers/pci/dwc/Makefile
->>>> +++ b/drivers/pci/dwc/Makefile
->>>> @@ -1,4 +1,4 @@
->>>
->>> (snip...)
->>>
->>>> -static void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index,
->>>> -				      int type, u64 cpu_addr, u64 pci_addr,
->>>> -				      u32 size)
->>>> +void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index, int type,
->>>> +			       u64 cpu_addr, u64 pci_addr, u32 size)
->>>>  {
->>>>  	u32 retries, val;
->>>>  
->>>> @@ -186,220 +151,6 @@ static void dw_pcie_prog_outbound_atu(struct dw_pcie *pci, int index,
->>>>  	dev_err(pci->dev, "iATU is not being enabled\n");
->>>>  }
->>>
->>> Kishon, iATU only makes sense in The Root Complex (host), so it should be inside
->>> the pcie-designware-host.
->>
->> That is not true. Outbound ATU should be programmed to access host side buffers
->> and inbound ATU should be programmed for the host to access EP mem space.
-> 
-> Sorry, I was not clear enough. What I was trying to suggest is, since the ATU
-> programming is done by the host, wouldn't be better to include it in the
-> pcie-designware-host? It is just an architectural detail.
+> This patch adds an explicit flag PR_SVE_SET_VL_THREAD to request
+> this behaviour.  Without the flag, vector length setting is
+> permitted only for a single-threaded process (which matches the
+> expected usage model of setting the vector length at process
+> startup).
 
-ATU programming is required in EP mode. See "[PATCH 24/37] PCI: dwc:
-designware: Add EP mode support" in this patch series.
+Hi Dave,
+PR_SVE_SET_VL_THREAD can be arch-independent, IMO, because prctl
+needs a scope.  Looks some of them are system-wide, some of them are
+about threads within the same process (like, PR_MPX_ENABLE_MANAGEMENT).
+IOW, PR_SVE_SET_VL_THREAD can be general flag, to indicate the scope
+of each new ptrcl command is per-thread.
 
-Anything that's required by both EP mode and RC mode, I've placed in
-pcie-designware.c
+I happen to see PR_SET_FP_MODE in man pages, which is about setting
+FP register modes in runtime.  It is a little similar to setting VL in
+this patch.  However the doc doesn't mention the effect or the scope
+of this command.
 
-Thanks
-Kishon
+-- 
+Yao (??)
