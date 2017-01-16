@@ -1,39 +1,43 @@
 From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 16 Jan 2017 15:39:22 +0100
-Subject: [PATCHv3 RESEND 1/8] ARM: dts: stm32: set HSE_RTC clock frequency
- to 1 MHz on stm32f429
-In-Reply-To: <1484573388-590-1-git-send-email-amelie.delaunay@st.com>
+Date: Mon, 16 Jan 2017 15:39:43 +0100
+Subject: [PATCHv3 RESEND 5/8] ARM: dts: stm32: enable RTC on
+ stm32f429-disco
+In-Reply-To: <1484573388-590-3-git-send-email-amelie.delaunay@st.com>
 References: <1484573388-590-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <52199299-524a-631a-d076-080c03433674@st.com>
+ <1484573388-590-3-git-send-email-amelie.delaunay@st.com>
+Message-ID: <000f554f-7904-abd4-b7fb-c7983ef5c176@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Am?lie,
+
 
 On 01/16/2017 02:29 PM, Amelie Delaunay wrote:
-> This patch set HSE_RTC clock frequency to 1 MHz, as the clock supplied to
-> the RTC must be 1 MHz.
+> This patch enables RTC on stm32f429-disco with LSI as clock source because
+> X2 crystal for LSE is not fitted by default.
 >
 > Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 > ---
->  arch/arm/boot/dts/stm32f429.dtsi | 2 ++
->  1 file changed, 2 insertions(+)
+>  arch/arm/boot/dts/stm32f429-disco.dts | 6 ++++++
+>  1 file changed, 6 insertions(+)
 >
-> diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-> index e9324a3..557c1f4 100644
-> --- a/arch/arm/boot/dts/stm32f429.dtsi
-> +++ b/arch/arm/boot/dts/stm32f429.dtsi
-> @@ -433,6 +433,8 @@
->  			reg = <0x40023800 0x400>;
->  			clocks = <&clk_hse>, <&clk_i2s_ckin>;
->  			st,syscfg = <&pwrcfg>;
-> +			assigned-clocks = <&rcc 1 CLK_HSE_RTC>;
-> +			assigned-clock-rates = <1000000>;
->  		};
+> diff --git a/arch/arm/boot/dts/stm32f429-disco.dts b/arch/arm/boot/dts/stm32f429-disco.dts
+> index 7d0415e..9222b9f 100644
+> --- a/arch/arm/boot/dts/stm32f429-disco.dts
+> +++ b/arch/arm/boot/dts/stm32f429-disco.dts
+> @@ -94,6 +94,12 @@
+>  	clock-frequency = <8000000>;
+>  };
 >
->  		dma1: dma-controller at 40026000 {
+> +&rtc {
+> +	assigned-clocks = <&rcc 1 CLK_RTC>;
+> +	assigned-clock-parents = <&rcc 1 CLK_LSI>;
+> +	status = "okay";
+> +};
+> +
+>  &usart1 {
+>  	pinctrl-0 = <&usart1_pins_a>;
+>  	pinctrl-names = "default";
 >
-
 Applied on stm32-dt-for-v4.11
 
 Thanks
