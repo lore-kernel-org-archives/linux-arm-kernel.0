@@ -1,66 +1,40 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 16 Jan 2017 12:23:40 +0000
-Subject: [RFC PATCH 06/10] arm64/sve: Disallow VL setting for individual
- threads by default
-In-Reply-To: <20170116113439.GF28060@E107787-LIN>
-References: <1484220369-23970-1-git-send-email-Dave.Martin@arm.com>
- <1484220369-23970-7-git-send-email-Dave.Martin@arm.com>
- <20170116113439.GF28060@E107787-LIN>
-Message-ID: <20170116122337.GN3699@e103592.cambridge.arm.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 16 Jan 2017 21:26:05 +0900
+Subject: [PATCH v3 2/4] PM / devfreq: exynos-ppmu: Show the registred device
+ for ppmu device
+In-Reply-To: <1484569567-29810-1-git-send-email-cw00.choi@samsung.com>
+References: <1484569567-29810-1-git-send-email-cw00.choi@samsung.com>
+ <CGME20170116122609epcas5p37255926620af7c0db7373bb8d08a756c@epcas5p3.samsung.com>
+Message-ID: <1484569567-29810-3-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2017 at 11:34:39AM +0000, Yao Qi wrote:
-> On 17-01-12 11:26:05, Dave Martin wrote:
-> > General-purpose code in userspace is not expected to work correctly
-> > if multiple threads are allowed to run concurrently with different
-> > vector lengths in a single process.
-> > 
-> > This patch adds an explicit flag PR_SVE_SET_VL_THREAD to request
-> > this behaviour.  Without the flag, vector length setting is
-> > permitted only for a single-threaded process (which matches the
-> > expected usage model of setting the vector length at process
-> > startup).
+This patch just adds the simple log to show the PPMU device's registration
+during the kernel booting.
 
-To be clear, PR_SVE_SET_VL_THREAD is not persistent, it just overrides
-the default one-thread-per-process restriction for this prctl call.
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Krzysztof Kozlowski <krzk@kernel.org>
+Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-samsung-soc at vger.kernel.org
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+---
+ drivers/devfreq/event/exynos-ppmu.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-The idea is that if someone writes some code to set the VL and then
-moves the code to a multithreaded environment, by default it will stop
-working.  This is a hint that some actual work is likely needed to
-port their code to work with multiple threads.
-
-> Hi Dave,
-> PR_SVE_SET_VL_THREAD can be arch-independent, IMO, because prctl
-> needs a scope.  Looks some of them are system-wide, some of them are
-> about threads within the same process (like, PR_MPX_ENABLE_MANAGEMENT).
-> IOW, PR_SVE_SET_VL_THREAD can be general flag, to indicate the scope
-> of each new ptrcl command is per-thread.
-
-This can't be backported to the existing prctls because that would
-change their behaviour.   Rather, what each prctl applies (thread or
-process) is part of the definition of that particular prctl.
-
-Since there are no other prctl() calls that can apply per-thread or
-per-process, or that differ only in this regard, is seems a bit esoteric
-to try to apply this concept across all prctls... ?
-
-Which prctl()s are system-wide?  I didn't see any, but I may have missed
-something.
-
-> I happen to see PR_SET_FP_MODE in man pages, which is about setting
-> FP register modes in runtime.  It is a little similar to setting VL in
-> this patch.  However the doc doesn't mention the effect or the scope
-> of this command.
-
-The various FP/SIMD twiddling prctls() all seem to be arch-specific.
-PR_SET_FP_MODE only exists for mips.
-
-Unless the semantics are really the same, I'm not too keen on an arm64
-prctl with the same name.
-
-Putting "ARM64" in the name of the new prctls might be clearer, but
-nobody seemed to care so far...
-
-Cheers
----Dave
+diff --git a/drivers/devfreq/event/exynos-ppmu.c b/drivers/devfreq/event/exynos-ppmu.c
+index fb3706faf5bd..9b7350935b73 100644
+--- a/drivers/devfreq/event/exynos-ppmu.c
++++ b/drivers/devfreq/event/exynos-ppmu.c
+@@ -643,6 +643,9 @@ static int exynos_ppmu_probe(struct platform_device *pdev)
+ 				"failed to add devfreq-event device\n");
+ 			return PTR_ERR(edev[i]);
+ 		}
++
++		pr_info("exynos-ppmu: new PPMU device registered %s (%s)\n",
++			dev_name(&pdev->dev), desc[i].name);
+ 	}
+ 
+ 	clk_prepare_enable(info->ppmu.clk);
+-- 
+1.9.1
