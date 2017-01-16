@@ -1,42 +1,87 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue, 17 Jan 2017 01:43:50 +0800
-Subject: [PATCH v2 0/4] Add support for Allwinner V3s SoC
-Message-ID: <20170116174354.34593-1-icenowy@aosc.xyz>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 16 Jan 2017 10:50:23 -0700
+Subject: [PATCH] coresight: STM: Balance enable/disable
+In-Reply-To: <c59476a6-f2c8-6b00-ca46-d2d2379d44c9@arm.com>
+References: <1484047315-14407-1-git-send-email-suzuki.poulose@arm.com>
+ <CANLsYkyO-anR4V411tHFkNBPNy0Vk3DCympLScP9ZC=uJ-UX9g@mail.gmail.com>
+ <c59476a6-f2c8-6b00-ca46-d2d2379d44c9@arm.com>
+Message-ID: <CANLsYkwrHiiuH8GLBxV+3cGZn2gkkhAW-Dj8h0xY+ay8HaLgPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Allwinner produced a single-core Cortex-A7 SoC, V3s, with integrated 64MiB DDR2
-DRAM, and in LQFP package. With such a package, it has been easier for hackers
-to DIY a board (no BGA needed, and no DRAM wiring needed).
+On 13 January 2017 at 10:11, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+> On 13/01/17 16:48, Mathieu Poirier wrote:
+>>
+>> On 10 January 2017 at 04:21, Suzuki K Poulose <suzuki.poulose@arm.com>
+>> wrote:
+>>>
+>>> The stm is automatically enabled when an application sets the policy
+>>> via ->link() call back by using coresight_enable(), which keeps the
+>>> refcount of the current users of the STM. However, the unlink() callback
+>>> issues stm_disable() directly, which leaves the STM turned off, without
+>>> the coresight layer knowing about it. This prevents any further uses
+>>> of the STM hardware as the coresight layer still thinks the STM is
+>>> turned on and doesn't issue an stm_enable(). Even manually enabling
+>>> the STM via sysfs can't really enable the hw.
+>>>
+> ...
+>>>
+>>>
+>>> This patch balances the unlink operation by using the
+>>> coresight_disable(),
+>>> keeping the coresight layer in sync with the hardware state.
+>>>
+>>> Fixes: commit 237483aa5cf43 ("coresight: stm: adding driver for CoreSight
+>>> STM component")
+>>> Cc: Pratik Patel <pratikp@codeaurora.org>
+>>> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>> Cc: Chunyan Zhang <zhang.chunyan@linaro.org>
+>>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>>> Cc: stable at vger.kernel.org # 4.7+
+>>> Reported-by: Robert Walker <robert.walker@arm.com>
+>>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>>> ---
+>>>  drivers/hwtracing/coresight/coresight-stm.c | 2 +-
+>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/hwtracing/coresight/coresight-stm.c
+>>> b/drivers/hwtracing/coresight/coresight-stm.c
+>>> index 3524452..57b7330 100644
+>>> --- a/drivers/hwtracing/coresight/coresight-stm.c
+>>> +++ b/drivers/hwtracing/coresight/coresight-stm.c
+>>> @@ -356,7 +356,7 @@ static void stm_generic_unlink(struct stm_data
+>>> *stm_data,
+>>>         if (!drvdata || !drvdata->csdev)
+>>>                 return;
+>>>
+>>> -       stm_disable(drvdata->csdev, NULL);
+>>> +       coresight_disable(drvdata->csdev);
+>>>  }
+>>>
+>>>  static phys_addr_t
+>>
+>>
+>> Applied - thanks,
+>
+>
+> Mathieu, Greg,
+>
+> I think this should go into 4.10 (either way, as fix in this cycle or via
+> stable after the release). I think
+> it would be easier if it goes in as fix during one of these rc cycle.
+>
+> Please let me know your thoughts.
 
-Add support for this SoC, as well as one board with it (Lichee Pi Zero).
+I'm good with squeezing this patch in the 4.10 cycle.  From here I
+suppose the easiest for Greg is for you to send another patch with
+Chunyan's Reviewed-by and my ack.
 
-Pinctrl driver have already been merged when v1. It's now removed in the patchset.
-
-Icenowy Zheng (4):
-  arm: sunxi: add support for V3s SoC
-  clk: sunxi-ng: add support for V3s CCU
-  ARM: dts: sunxi: add dtsi file for V3s SoC
-  ARM: dts: sunxi: add support for Lichee Pi Zero board
-
- Documentation/arm/sunxi/README                |   4 +
- arch/arm/boot/dts/Makefile                    |   3 +-
- arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts |  73 ++++
- arch/arm/boot/dts/sun8i-v3s.dtsi              | 285 +++++++++++++
- arch/arm/mach-sunxi/sunxi.c                   |   1 +
- drivers/clk/sunxi-ng/Kconfig                  |  11 +
- drivers/clk/sunxi-ng/Makefile                 |   1 +
- drivers/clk/sunxi-ng/ccu-sun8i-v3s.c          | 590 ++++++++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu-sun8i-v3s.h          |  63 +++
- include/dt-bindings/clock/sun8i-v3s-ccu.h     | 107 +++++
- include/dt-bindings/reset/sun8i-v3s-ccu.h     |  78 ++++
- 11 files changed, 1215 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
- create mode 100644 arch/arm/boot/dts/sun8i-v3s.dtsi
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-v3s.c
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-v3s.h
- create mode 100644 include/dt-bindings/clock/sun8i-v3s-ccu.h
- create mode 100644 include/dt-bindings/reset/sun8i-v3s-ccu.h
-
--- 
-2.11.0
+>
+> Suzuki
+>
+>> Mathieu
+>>
+>>> --
+>>> 2.7.4
+>>>
+>
