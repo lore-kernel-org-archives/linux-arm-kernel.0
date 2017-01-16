@@ -1,51 +1,81 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Mon, 16 Jan 2017 09:26:36 -0500
-Subject: [PATCH v3 2/5] arm64: Work around Falkor erratum 1003
-In-Reply-To: <20170111184555.GF29247@leverpostej>
-References: <20170111144118.17062-1-cov@codeaurora.org>
- <20170111144118.17062-2-cov@codeaurora.org>
- <20170111180627.GG20288@e104818-lin.cambridge.arm.com>
- <20170111183339.GC29247@leverpostej>
- <5da456f8-fcc5-b6e2-d58b-01a671da595b@codeaurora.org>
- <20170111183738.GD29247@leverpostej>
- <2069d58c-0b81-dad4-511f-05e7d002eb34@codeaurora.org>
- <20170111184555.GF29247@leverpostej>
-Message-ID: <44a23442-7d9a-3493-c56f-3bab7c4be30d@codeaurora.org>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Mon, 16 Jan 2017 16:27:28 +0200
+Subject: [PATCH v2 2/2] vring: Force use of DMA API for ARM-based systems
+In-Reply-To: <20170116142103.GF1510@arm.com>
+References: <20170111013046-mutt-send-email-mst@kernel.org>
+ <20170111100139.GC12388@arm.com>
+ <20170112232931-mutt-send-email-mst@kernel.org>
+ <20170113092522.GB22538@arm.com>
+ <20170113183222-mutt-send-email-mst@kernel.org>
+ <20170113172154.GL3253@arm.com>
+ <20170113201933-mutt-send-email-mst@kernel.org>
+ <20170116104028.GA1510@arm.com>
+ <20170116161639-mutt-send-email-mst@kernel.org>
+ <20170116142103.GF1510@arm.com>
+Message-ID: <20170116162225-mutt-send-email-mst@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On 01/11/2017 01:45 PM, Mark Rutland wrote:
-> On Wed, Jan 11, 2017 at 12:40:42PM -0600, Timur Tabi wrote:
->> On 01/11/2017 12:37 PM, Mark Rutland wrote:
->>> The name, as it is, is perfectly descriptive.
->>>
->>> Let's not sacrifice legibility over a non-issue.
->>
->> I don't want to kick a dead horse or anything, but changing it to
->> QCOM_FLKR_ERRATUM_1003 would eliminate all the spacing problems
->> without sacrificing anything.
+On Mon, Jan 16, 2017 at 02:21:03PM +0000, Will Deacon wrote:
+> On Mon, Jan 16, 2017 at 04:18:03PM +0200, Michael S. Tsirkin wrote:
+> > On Mon, Jan 16, 2017 at 10:40:28AM +0000, Will Deacon wrote:
+> > > On Fri, Jan 13, 2017 at 08:23:35PM +0200, Michael S. Tsirkin wrote:
+> > > > On Fri, Jan 13, 2017 at 05:21:54PM +0000, Will Deacon wrote:
+> > > > > On Fri, Jan 13, 2017 at 06:46:32PM +0200, Michael S. Tsirkin wrote:
+> > > > > > On Fri, Jan 13, 2017 at 09:25:22AM +0000, Will Deacon wrote:
+> > > > > > > On Fri, Jan 13, 2017 at 12:12:56AM +0200, Michael S. Tsirkin wrote:
+> > > > > > > > I'd rather people didn't use SMMU with legacy devices.
+> > > > > > > 
+> > > > > > > I'm afraid we've been doing that for two years and the model already
+> > > > > > > exists in a mature state, being actively used for development and
+> > > > > > > validation by ARM and our partners. One of the big things its used for
+> > > > > > > is to develop SMMU and GIC (our interrupt controller) code with PCI, so
+> > > > > > > dropping the SMMU from the picture isn't an option.
+> > > > > > 
+> > > > > > Oh so this fixes a regression?  This is something I didn't realize.
+> > > > > 
+> > > > > Yes, thanks. The regression came about because we implemented SMMU-backed
+> > > > > DMA ops and only then was it apparent that the virtio stuff was bypassing
+> > > > > even with translation enabled (because it wasn't using the DMA API).
+> > > > 
+> > > > Could you point out a commit ID?
+> > > 
+> > > There has been a fair amount of work in this area recently, but you're
+> > > probably after something like 876945dbf649 ("arm64: Hook up IOMMU dma_ops")
+> > > as the culprit, which is the point at which we started to swizzle DMA
+> > > ops for devices upstream of an SMMU automatically.
+> > > 
+> > > > > > A "Fixes:" tag can't hurt here.  I then wonder
+> > > > > > might DMA ops ever use a DMA address which isn't a physical address
+> > > > > > from QEMU point of view? If that happens, this hack breaks
+> > > > > > because in legacy mode QEMU still uses the GPA.
+> > > > > 
+> > > > > If QEMU doesn't advertise an SMMU, then it will work fine with the GPA,
+> > > > > because we won't swizzle the DMA ops for the master device. If QEMU does
+> > > > > advertise an SMMU, then we'll allocate DMA addresses to fit within the
+> > > > > the intersection of the SMMU aperture and device's DMA mask.
+> > > > 
+> > > > 
+> > > > Right but doesn't just poking from qemu into phys addresses work
+> > > > anymore? It used to ...
+> > > 
+> > > Provided that there's no SMMU, then it will continue to work. and my
+> > > understanding (from talking to Peter Maydell) is that qemu doesn't model
+> > > an SMMU for ARM-based machines.
+> > > 
+> > 
+> > So how come people report failures due to presence of SMMU?
+> > Using some other hypervisor?
 > 
-> The CPU is called "Falkor", not "FLKR", and we're not coming up with an
-> ACPI table name...
+> The failures are reported on the ARM fastmodel (a complete system
+> emulation that runs on an x86 box), where an SMMU *is* present
+> downstream of the virtio-pci masters. There's no qemu involved there.
 > 
-> The ARM Ltd. erratum numbers are global to all parts, so we don't
-> include the part name. Is the 1003 erratum number specific to Falkor?
->
-> If it's global, you could use QCOM_ERRATUM_1003 instead.
+> Will
 
-E1003 is specific to Falkor, and hopefully just its first major revision.
-Qualcomm Technology's first/previous generation ARMv8 custom
-microarchitecture used errata numbers below 1000. I am not aware of
-global coordination in the numbering, unfortunately.
-
-> Otherwise, QCOM_FALKOR_ERRATUM_1003 is preferable.
-
-Thanks,
-Cov
+I see. And this hypervisor actually coded up looking up
+translations in the SMMU unconditionally for legacy devices,
+and this worked as long as guest didn't touch the SMMU?
 
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
-Aurora Forum, a Linux Foundation Collaborative Project.
+MST
