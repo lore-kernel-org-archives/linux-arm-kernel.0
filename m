@@ -1,198 +1,36 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 16 Jan 2017 13:58:18 +0800
-Subject: [PATCH v2 3/7] clk: sunxi-ng: Implement multiplier maximum
-In-Reply-To: <ab8ef79d63fc09c3eaa556d299832ec06e9869cf.1484035021.git-series.maxime.ripard@free-electrons.com>
-References: <cover.8762813dc78858261716126c700983d4aee00458.1484035021.git-series.maxime.ripard@free-electrons.com>
- <ab8ef79d63fc09c3eaa556d299832ec06e9869cf.1484035021.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v65K8zQvHbhwZ6b6VhO6egXVQN4agHQ1JT8rkHzNsAEUtw@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 16 Jan 2017 11:31:23 +0530
+Subject: [PATCH 16/37] PCI: endpoint: Introduce configfs entry for
+ configuring EP functions
+In-Reply-To: <20170113180602.GA30346@infradead.org>
+References: <1484216786-17292-1-git-send-email-kishon@ti.com>
+ <1484216786-17292-17-git-send-email-kishon@ti.com>
+ <20170113180602.GA30346@infradead.org>
+Message-ID: <587C61B3.3070107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 3:57 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/clk/sunxi-ng/ccu_mult.c |  4 ++--
->  drivers/clk/sunxi-ng/ccu_mult.h | 10 ++++++----
->  drivers/clk/sunxi-ng/ccu_nk.c   |  8 ++++----
->  drivers/clk/sunxi-ng/ccu_nkm.c  |  8 ++++----
->  drivers/clk/sunxi-ng/ccu_nkmp.c |  8 ++++----
->  drivers/clk/sunxi-ng/ccu_nm.c   |  4 ++--
->  6 files changed, 22 insertions(+), 20 deletions(-)
->
-> diff --git a/drivers/clk/sunxi-ng/ccu_mult.c b/drivers/clk/sunxi-ng/ccu_mult.c
-> index bf5e11c803f9..fccfe1e1961a 100644
-> --- a/drivers/clk/sunxi-ng/ccu_mult.c
-> +++ b/drivers/clk/sunxi-ng/ccu_mult.c
-> @@ -41,7 +41,7 @@ static unsigned long ccu_mult_round_rate(struct ccu_mux_internal *mux,
->         struct _ccu_mult _cm;
->
->         _cm.min = 1;
-> -       _cm.max = 1 << cm->mult.width;
-> +       _cm.max = cm->mult.max ?: 1 << cm->mult.width;
+Hi Christoph,
 
-Should you also factor in the offset when providing the default
-value for max? Otherwise you might end up with a value that is
-actually not progammable?
+On Friday 13 January 2017 11:36 PM, Christoph Hellwig wrote:
+> Hi Kishon,
+> 
+> a couple comments on the configfs layout based on my experiments with
+> your previous drop to implement a NVMe device using it.
 
-Say if offset is 1, then max would be 1 << width.
-But if offset is 0, then max would have to be (1 << width) - 1,
-as (1 << width) is not valid.
+Thanks for trying it out!
+> 
+> I don't think most of these configfs files should be present here, as
+> they are properties of the implemented PCIe devices.  E.g. for my
+> NVMe device they will be sort of hardcoded most of the time, as they
+> would be for other devices that would always have a fixed vendor/device/
+> class ID, cacheline size, etc.
 
-ChenYu
+Actually not all devices have hardcoded headers. E.g the platform I'm using
+doesn't have hardcoded headers and it can be configured based on the function
+the user would like to use. If the devices are hardcoded, then using configfs
+can be skipped altogether. In such cases, APIs like pci_epf_create() can
+directly be used by the drivers instead of going via configfs.
 
->         ccu_mult_find_best(parent_rate, rate, &_cm);
->
->         return parent_rate * _cm.mult;
-> @@ -114,7 +114,7 @@ static int ccu_mult_set_rate(struct clk_hw *hw, unsigned long rate,
->                                                 &parent_rate);
->
->         _cm.min = cm->mult.min;
-> -       _cm.max = 1 << cm->mult.width;
-> +       _cm.max = cm->mult.max ?: 1 << cm->mult.width;
->         ccu_mult_find_best(parent_rate, rate, &_cm);
->
->         spin_lock_irqsave(cm->common.lock, flags);
-> diff --git a/drivers/clk/sunxi-ng/ccu_mult.h b/drivers/clk/sunxi-ng/ccu_mult.h
-> index 84839641dfdf..524acddfcb2e 100644
-> --- a/drivers/clk/sunxi-ng/ccu_mult.h
-> +++ b/drivers/clk/sunxi-ng/ccu_mult.h
-> @@ -10,24 +10,26 @@ struct ccu_mult_internal {
->         u8      shift;
->         u8      width;
->         u8      min;
-> +       u8      max;
->  };
->
-> -#define _SUNXI_CCU_MULT_OFFSET_MIN(_shift, _width, _offset, _min)      \
-> +#define _SUNXI_CCU_MULT_OFFSET_MIN_MAX(_shift, _width, _offset, _min, _max) \
->         {                                                               \
->                 .min    = _min,                                         \
-> +               .max    = _max,                                         \
->                 .offset = _offset,                                      \
->                 .shift  = _shift,                                       \
->                 .width  = _width,                                       \
->         }
->
->  #define _SUNXI_CCU_MULT_MIN(_shift, _width, _min)      \
-> -       _SUNXI_CCU_MULT_OFFSET_MIN(_shift, _width, 1, _min)
-> +       _SUNXI_CCU_MULT_OFFSET_MIN_MAX(_shift, _width, 1, _min, 0)
->
->  #define _SUNXI_CCU_MULT_OFFSET(_shift, _width, _offset)        \
-> -       _SUNXI_CCU_MULT_OFFSET_MIN(_shift, _width, _offset, 1)
-> +       _SUNXI_CCU_MULT_OFFSET_MIN_MAX(_shift, _width, _offset, 1, 0)
->
->  #define _SUNXI_CCU_MULT(_shift, _width)                \
-> -       _SUNXI_CCU_MULT_OFFSET_MIN(_shift, _width, 1, 1)
-> +       _SUNXI_CCU_MULT_OFFSET_MIN_MAX(_shift, _width, 1, 1, 0)
->
->  struct ccu_mult {
->         u32                     enable;
-> diff --git a/drivers/clk/sunxi-ng/ccu_nk.c b/drivers/clk/sunxi-ng/ccu_nk.c
-> index 90117d3ead8c..b9e9b8a9d1b4 100644
-> --- a/drivers/clk/sunxi-ng/ccu_nk.c
-> +++ b/drivers/clk/sunxi-ng/ccu_nk.c
-> @@ -103,9 +103,9 @@ static long ccu_nk_round_rate(struct clk_hw *hw, unsigned long rate,
->                 rate *= nk->fixed_post_div;
->
->         _nk.min_n = nk->n.min;
-> -       _nk.max_n = 1 << nk->n.width;
-> +       _nk.max_n = nk->n.max ?: 1 << nk->n.width;
->         _nk.min_k = nk->k.min;
-> -       _nk.max_k = 1 << nk->k.width;
-> +       _nk.max_k = nk->k.max ?: 1 << nk->k.width;
->
->         ccu_nk_find_best(*parent_rate, rate, &_nk);
->         rate = *parent_rate * _nk.n * _nk.k;
-> @@ -128,9 +128,9 @@ static int ccu_nk_set_rate(struct clk_hw *hw, unsigned long rate,
->                 rate = rate * nk->fixed_post_div;
->
->         _nk.min_n = nk->n.min;
-> -       _nk.max_n = 1 << nk->n.width;
-> +       _nk.max_n = nk->n.max ?: 1 << nk->n.width;
->         _nk.min_k = nk->k.min;
-> -       _nk.max_k = 1 << nk->k.width;
-> +       _nk.max_k = nk->k.max ?: 1 << nk->k.width;
->
->         ccu_nk_find_best(parent_rate, rate, &_nk);
->
-> diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
-> index 3caaf9d603e2..71f81e95a061 100644
-> --- a/drivers/clk/sunxi-ng/ccu_nkm.c
-> +++ b/drivers/clk/sunxi-ng/ccu_nkm.c
-> @@ -110,9 +110,9 @@ static unsigned long ccu_nkm_round_rate(struct ccu_mux_internal *mux,
->         struct _ccu_nkm _nkm;
->
->         _nkm.min_n = nkm->n.min;
-> -       _nkm.max_n = 1 << nkm->n.width;
-> +       _nkm.max_n = nkm->n.max ?: 1 << nkm->n.width;
->         _nkm.min_k = nkm->k.min;
-> -       _nkm.max_k = 1 << nkm->k.width;
-> +       _nkm.max_k = nkm->k.max ?: 1 << nkm->k.width;
->         _nkm.min_m = 1;
->         _nkm.max_m = nkm->m.max ?: 1 << nkm->m.width;
->
-> @@ -139,9 +139,9 @@ static int ccu_nkm_set_rate(struct clk_hw *hw, unsigned long rate,
->         u32 reg;
->
->         _nkm.min_n = nkm->n.min;
-> -       _nkm.max_n = 1 << nkm->n.width;
-> +       _nkm.max_n = nkm->n.max ?: 1 << nkm->n.width;
->         _nkm.min_k = nkm->k.min;
-> -       _nkm.max_k = 1 << nkm->k.width;
-> +       _nkm.max_k = nkm->k.max ?: 1 << nkm->k.width;
->         _nkm.min_m = 1;
->         _nkm.max_m = nkm->m.max ?: 1 << nkm->m.width;
->
-> diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.c b/drivers/clk/sunxi-ng/ccu_nkmp.c
-> index da2bba02b845..a2b40a000157 100644
-> --- a/drivers/clk/sunxi-ng/ccu_nkmp.c
-> +++ b/drivers/clk/sunxi-ng/ccu_nkmp.c
-> @@ -117,9 +117,9 @@ static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
->         struct _ccu_nkmp _nkmp;
->
->         _nkmp.min_n = nkmp->n.min;
-> -       _nkmp.max_n = 1 << nkmp->n.width;
-> +       _nkmp.max_n = nkmp->n.max ?: 1 << nkmp->n.width;
->         _nkmp.min_k = nkmp->k.min;
-> -       _nkmp.max_k = 1 << nkmp->k.width;
-> +       _nkmp.max_k = nkmp->k.max ?: 1 << nkmp->k.width;
->         _nkmp.min_m = 1;
->         _nkmp.max_m = nkmp->m.max ?: 1 << nkmp->m.width;
->         _nkmp.min_p = 1;
-> @@ -139,9 +139,9 @@ static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
->         u32 reg;
->
->         _nkmp.min_n = 1;
-> -       _nkmp.max_n = 1 << nkmp->n.width;
-> +       _nkmp.max_n = nkmp->n.max ?: 1 << nkmp->n.width;
->         _nkmp.min_k = 1;
-> -       _nkmp.max_k = 1 << nkmp->k.width;
-> +       _nkmp.max_k = nkmp->k.max ?: 1 << nkmp->k.width;
->         _nkmp.min_m = 1;
->         _nkmp.max_m = nkmp->m.max ?: 1 << nkmp->m.width;
->         _nkmp.min_p = 1;
-> diff --git a/drivers/clk/sunxi-ng/ccu_nm.c b/drivers/clk/sunxi-ng/ccu_nm.c
-> index 158d74e0215f..af71b1909cd9 100644
-> --- a/drivers/clk/sunxi-ng/ccu_nm.c
-> +++ b/drivers/clk/sunxi-ng/ccu_nm.c
-> @@ -100,7 +100,7 @@ static long ccu_nm_round_rate(struct clk_hw *hw, unsigned long rate,
->         struct _ccu_nm _nm;
->
->         _nm.min_n = nm->n.min;
-> -       _nm.max_n = 1 << nm->n.width;
-> +       _nm.max_n = nm->n.max ?: 1 << nm->n.width;
->         _nm.min_m = 1;
->         _nm.max_m = nm->m.max ?: 1 << nm->m.width;
->
-> @@ -123,7 +123,7 @@ static int ccu_nm_set_rate(struct clk_hw *hw, unsigned long rate,
->                 ccu_frac_helper_disable(&nm->common, &nm->frac);
->
->         _nm.min_n = 1;
-> -       _nm.max_n = 1 << nm->n.width;
-> +       _nm.max_n = nm->n.max ?: 1 << nm->n.width;
->         _nm.min_m = 1;
->         _nm.max_m = nm->m.max ?: 1 << nm->m.width;
->
-> --
-> git-series 0.8.11
+Thanks
+Kishon
