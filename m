@@ -1,66 +1,23 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Mon, 16 Jan 2017 16:49:29 +0100
-Subject: [GIT PULL] STM32 DT changes for v4.11 #1
-Message-ID: <e36f6aca-120c-b2a5-52da-06e12e5cfb9f@st.com>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Mon, 16 Jan 2017 07:51:10 -0800
+Subject: [PATCH 16/37] PCI: endpoint: Introduce configfs entry for
+ configuring EP functions
+In-Reply-To: <587C61B3.3070107@ti.com>
+References: <1484216786-17292-1-git-send-email-kishon@ti.com>
+ <1484216786-17292-17-git-send-email-kishon@ti.com>
+ <20170113180602.GA30346@infradead.org> <587C61B3.3070107@ti.com>
+Message-ID: <20170116155110.GA13495@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd and Kevin,
+On Mon, Jan 16, 2017 at 11:31:23AM +0530, Kishon Vijay Abraham I wrote:
+> Actually not all devices have hardcoded headers. E.g the platform I'm using
+> doesn't have hardcoded headers and it can be configured based on the function
+> the user would like to use. If the devices are hardcoded, then using configfs
+> can be skipped altogether. In such cases, APIs like pci_epf_create() can
+> directly be used by the drivers instead of going via configfs.
 
-Please consider this first round of STM32 DT updates for v4.11:
-
-The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
-
-   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
-
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git 
-tags/stm32-dt-for-v4.11-1
-
-for you to fetch changes up to d99c66406a846748e26989759caa7e966c1804dd:
-
-   ARM: dts: stm32: enable RTC on stm32429i-eval (2017-01-16 14:38:14 +0100)
-
-----------------------------------------------------------------
-STM32 DT updates for v4.11, round 1.
-
-Highlights:
-----------
-
-  - ADD RTC support on STM32F429 MCU
-  - Enable RTC on STM32F469and STM32F429 boards
-  - ADD ADC support on STM32F429 MCU
-  - Enable ADC on STM32F429 Eval board
-  - Add I2S external clock
-  - Fix memory size for STM32F429 Disco
-
-Note:
------
-First patch "clk: stm32f4: Update DT bindings documentation")
-has already been merged in clock tree.
-
-----------------------------------------------------------------
-Amelie Delaunay (5):
-       ARM: dts: stm32: set HSE_RTC clock frequency to 1 MHz on stm32f429
-       ARM: dts: stm32: Add RTC support for STM32F429 MCU
-       ARM: dts: stm32: enable RTC on stm32f429-disco
-       ARM: dts: stm32: enable RTC on stm32f469-disco
-       ARM: dts: stm32: enable RTC on stm32429i-eval
-
-Bruno Herrera (1):
-       ARM: dts: stm32: Fix memory size from 8MB to 16MB on 
-stm32f469-disco board
-
-Bruno Meirelles Herrera (1):
-       ARM: dts: stm32: Add missing USART3 pin config to stm32f469-disco 
-board
-
-Fabrice GASNIER (2):
-       ARM: dts: stm32: Add ADC support to stm32f429
-       ARM: dts: stm32: enable ADC on stm32f429i-eval board
-
-Gabriel Fernandez (3):
-       clk: stm32f4: Update DT bindings documentation
-       ARM: dts: stm32: Add external I2S clock on stm32f429 MCU
-       ARM: dts: stm32: Include auxiliary stm32fx clock definition
+That's exactly what I meant - the IDs need to be set by the driver for
+the implemented PCI device, and it's not up to the gadget core to configur
+e them, it's up to the implementation of the PCIe device which PCI it
+exposes.
