@@ -1,120 +1,119 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Mon, 16 Jan 2017 18:08:32 +0100
-Subject: [PATCH v2 net-next 2/2] net: mvneta: add BQL support
-In-Reply-To: <1484586512-16412-1-git-send-email-mw@semihalf.com>
-References: <1484586512-16412-1-git-send-email-mw@semihalf.com>
-Message-ID: <1484586512-16412-3-git-send-email-mw@semihalf.com>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Mon, 16 Jan 2017 09:13:39 -0800
+Subject: [PATCH v3 01/24] [media] dt-bindings: Add bindings for i.MX media
+ driver
+In-Reply-To: <1484568579.8415.91.camel@pengutronix.de>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <1483755102-24785-2-git-send-email-steve_longerbeam@mentor.com>
+ <1484308551.31475.23.camel@pengutronix.de>
+ <e609fd03-a546-330c-ec89-de1844d1b46f@gmail.com>
+ <1484568579.8415.91.camel@pengutronix.de>
+Message-ID: <3fbe85f8-ddc2-2299-ac9d-47d07485c162@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tests showed that when whole bandwidth is consumed, the latency for
-various kind of traffic can reach high values. With saturated
-link (e.g. with iperf from target to host) simple ping could take
-significant amount of time. BQL proved to improve this situation
-when implemented in mvneta driver. Measurements of ping latency
-for 3 link speeds:
-Speed | Latency w/o BQL | Latency with BQL
-10    |      7-14 ms    |     3.5 ms
-100   |      2-12 ms    |     0.6 ms
-1000  |   often timeout |   up to 2ms
 
-Decreasing latency as above result in sligt performance cost - 4kpps
-(-1.4%) when pushing 64B packets via two bridged interfaces of Armada 38x.
-For 1500B packets in the same setup, the mpstat tool showed +8% of
-CPU occupation (default affinity, second CPU idle). Even though this
-cost seems reasonable to take, considering other improvements.
 
-This commit adds byte queue limit mechanism for the mvneta driver.
+On 01/16/2017 04:09 AM, Philipp Zabel wrote:
+> On Fri, 2017-01-13 at 11:03 -0800, Steve Longerbeam wrote:
+>> On 01/13/2017 03:55 AM, Philipp Zabel wrote:
+>>> Am Freitag, den 06.01.2017, 18:11 -0800 schrieb Steve Longerbeam:
+>>>> Add bindings documentation for the i.MX media driver.
+>>>>
+>>>> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+>>>> ---
+>>>>    Documentation/devicetree/bindings/media/imx.txt | 57 +++++++++++++++++++++++++
+>>>>    1 file changed, 57 insertions(+)
+>>>>    create mode 100644 Documentation/devicetree/bindings/media/imx.txt
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/media/imx.txt b/Documentation/devicetree/bindings/media/imx.txt
+>>>> new file mode 100644
+>>>> index 0000000..254b64a
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/media/imx.txt
+>>>> @@ -0,0 +1,57 @@
+>>>> +Freescale i.MX Media Video Devices
+>>>> +
+>>>> +Video Media Controller node
+>>>> +---------------------------
+>>>> +
+>>>> +This is the parent media controller node for video capture support.
+>>>> +
+>>>> +Required properties:
+>>>> +- compatible : "fsl,imx-media";
+>>> Would you be opposed to calling this "capture-subsystem" instead of
+>>> "imx-media"? We already use "fsl,imx-display-subsystem" and
+>>> "fsl,imx-gpu-subsystem" for the display and GPU compound devices.
+>> sure. Some pie-in-the-sky day when DRM and media are unified,
+>> there could be a single device that handles them all,
+> Indeed :)
+>
+>>   but for now
+>> I'm fine with "fsl,capture-subsystem".
+> Actually, I meant fsl,imx-capture-subsystem.
 
-Signed-off-by: Marcin Wojtas <mw@semihalf.com>
----
- drivers/net/ethernet/marvell/mvneta.c | 22 +++++++++++++++++++---
- 1 file changed, 19 insertions(+), 3 deletions(-)
+right, I caught my error and that is the name chosen.
 
-diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-index 9624537..6dcc951 100644
---- a/drivers/net/ethernet/marvell/mvneta.c
-+++ b/drivers/net/ethernet/marvell/mvneta.c
-@@ -1759,8 +1759,10 @@ static struct mvneta_tx_queue *mvneta_tx_done_policy(struct mvneta_port *pp,
- 
- /* Free tx queue skbuffs */
- static void mvneta_txq_bufs_free(struct mvneta_port *pp,
--				 struct mvneta_tx_queue *txq, int num)
-+				 struct mvneta_tx_queue *txq, int num,
-+				 struct netdev_queue *nq)
- {
-+	unsigned int bytes_compl = 0, pkts_compl = 0;
- 	int i;
- 
- 	for (i = 0; i < num; i++) {
-@@ -1768,6 +1770,11 @@ static void mvneta_txq_bufs_free(struct mvneta_port *pp,
- 			txq->txq_get_index;
- 		struct sk_buff *skb = txq->tx_skb[txq->txq_get_index];
- 
-+		if (skb) {
-+			bytes_compl += skb->len;
-+			pkts_compl++;
-+		}
-+
- 		mvneta_txq_inc_get(txq);
- 
- 		if (!IS_TSO_HEADER(txq, tx_desc->buf_phys_addr))
-@@ -1778,6 +1785,8 @@ static void mvneta_txq_bufs_free(struct mvneta_port *pp,
- 			continue;
- 		dev_kfree_skb_any(skb);
- 	}
-+
-+	netdev_tx_completed_queue(nq, pkts_compl, bytes_compl);
- }
- 
- /* Handle end of transmission */
-@@ -1791,7 +1800,7 @@ static void mvneta_txq_done(struct mvneta_port *pp,
- 	if (!tx_done)
- 		return;
- 
--	mvneta_txq_bufs_free(pp, txq, tx_done);
-+	mvneta_txq_bufs_free(pp, txq, tx_done, nq);
- 
- 	txq->count -= tx_done;
- 
-@@ -2401,6 +2410,8 @@ static int mvneta_tx(struct sk_buff *skb, struct net_device *dev)
- 		struct mvneta_pcpu_stats *stats = this_cpu_ptr(pp->stats);
- 		struct netdev_queue *nq = netdev_get_tx_queue(dev, txq_id);
- 
-+		netdev_tx_sent_queue(nq, len);
-+
- 		txq->count += frags;
- 		if (txq->count >= txq->tx_stop_threshold)
- 			netif_tx_stop_queue(nq);
-@@ -2429,9 +2440,10 @@ static void mvneta_txq_done_force(struct mvneta_port *pp,
- 				  struct mvneta_tx_queue *txq)
- 
- {
-+	struct netdev_queue *nq = netdev_get_tx_queue(pp->dev, txq->id);
- 	int tx_done = txq->count;
- 
--	mvneta_txq_bufs_free(pp, txq, tx_done);
-+	mvneta_txq_bufs_free(pp, txq, tx_done, nq);
- 
- 	/* reset txq */
- 	txq->count = 0;
-@@ -2957,6 +2969,8 @@ static int mvneta_txq_init(struct mvneta_port *pp,
- static void mvneta_txq_deinit(struct mvneta_port *pp,
- 			      struct mvneta_tx_queue *txq)
- {
-+	struct netdev_queue *nq = netdev_get_tx_queue(pp->dev, txq->id);
-+
- 	kfree(txq->tx_skb);
- 
- 	if (txq->tso_hdrs)
-@@ -2968,6 +2982,8 @@ static void mvneta_txq_deinit(struct mvneta_port *pp,
- 				  txq->size * MVNETA_DESC_ALIGNED_SIZE,
- 				  txq->descs, txq->descs_phys);
- 
-+	netdev_tx_reset_queue(nq);
-+
- 	txq->descs             = NULL;
- 	txq->last_desc         = 0;
- 	txq->next_desc_to_proc = 0;
--- 
-1.8.3.1
+>   fsl,imx-media-subsystem
+> would be fine, too. Either way, I'll be happy if it looks similar to the
+> other two.
+>
+> [...]
+>>> This is a clever method to get better frame timestamps. Too bad about
+>>> the routing requirements. Can this be used on Nitrogen6X?
+>> Absolutely, this support just needs use of the input-capture channels in the
+>> imx GPT. I still need to submit the patch to the imx-gpt driver that adds an
+>> input capture API, so at this point fsl,input-capture-channel has no effect,
+>> but it does work (tested on SabreAuto).
+> Nice.
+>
+> [...]
+>>>> +Required properties:
+>>>> +- compatible	: "fsl,imx6-mipi-csi2";
+>>> I think this should get an additional "snps,dw-mipi-csi2" compatible,
+>>> since the only i.MX6 specific part is the bolted-on IPU2CSI gasket.
+>> right, minus the gasket it's a Synopsys core. I'll add that compatible flag.
+>> Or should wait until the day this subdev is exported for general use, after
+>> pulling out the gasket specifics?
+> It can be added right away.
+
+ok, I will add.
+
+Steve
+
+>
+>>>> +- reg           : physical base address and length of the register set;
+>>>> +- clocks	: the MIPI CSI-2 receiver requires three clocks: hsi_tx
+>>>> +                  (the DPHY clock), video_27m, and eim_sel;
+>>> Note that hsi_tx is incorrectly named. CCGR3[CG8] just happens to be the
+>>> shared gate bit that gates the HSI clocks as well as the MIPI
+>>> "ac_clk_125m", "cfg_clk", "ips_clk", and "pll_refclk" inputs to the mipi
+>>> csi-2 core, but we are missing shared gate clocks in the clock tree for
+>>> these.
+>> Yes, so many clocks for the MIPI core. Why so many? I would think
+>> there would need to be at most three: a clock for the MIPI CSI-2 core
+>> and HSI core, and a clock for the D-PHY (oh and maybe a clock for an
+>> M-PHY if there is one). I have no clue what all these other clocks are.
+>> But anyway, a single gating bit, CCGR3[CG8], seems to enable them all.
+> I would imagine the CSI-2 core has a high-speed clock input from the
+> D-PHY for serial input, an APB clock for register access (ips_clk), and
+> a pixel clock input for the parallel output (pixel_clk), at least.
+> The D-PHY will have a PLL reference input (pll_refclk?) and probably its
+> own register clock (cfg_clk?).
+>
+> I've looked at the MIPI DSI chapter, and it looks like ac_clk_125m is
+> used for DSI only.
+>
+>>> Both cfg_clk and pll_refclk are sourced from video_27m, so "cfg" ->
+>>> video_27m seems fine.
+>>> But I don't get "dphy".
+>> I presume it's the clock for the D-PHY.
+>>
+>>>    Which input clock would that correspond to?
+>>> "pll_refclk?"
+>> the mux at CDCDR says it comes from PLL3_120M, or PLL2_PFD2.
+> I think that makes sense.
+>
+> regards
+> Philipp
+>
