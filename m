@@ -1,38 +1,66 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 16 Jan 2017 10:06:37 +0100 (CET)
-Subject: [RFC PATCH v2 05/10] genirq: export irq_get_percpu_devid_partition
- to modules
-In-Reply-To: <1484323429-15231-6-git-send-email-will.deacon@arm.com>
-References: <1484323429-15231-1-git-send-email-will.deacon@arm.com>
- <1484323429-15231-6-git-send-email-will.deacon@arm.com>
-Message-ID: <alpine.DEB.2.20.1701161006240.3877@nanos>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Mon, 16 Jan 2017 10:07:46 +0100
+Subject: [PATCH v8 00/18] KVM PCIe/MSI passthrough on ARM/ARM64 and IOVA
+ reserved regions
+In-Reply-To: <e1e6d9cf-5fb8-e118-3a47-4c6be77c21a3@semihalf.com>
+References: <1484127714-3263-1-git-send-email-eric.auger@redhat.com>
+ <e1e6d9cf-5fb8-e118-3a47-4c6be77c21a3@semihalf.com>
+Message-ID: <ecc19922-b0a6-bc7a-dc5e-389849acc1ea@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 Jan 2017, Will Deacon wrote:
+Hi Tomasz,
 
-> Any modular driver using cluster-affine PPIs needs to be able to call
-> irq_get_percpu_devid_partition so that it can enable the IRQ on the
-> correct subset of CPUs.
+On 13/01/2017 14:59, Tomasz Nowicki wrote:
+> Hello Eric,
 > 
-> This patch exports the symbol so that it can be called from within a
-> module.
+> On 11.01.2017 10:41, Eric Auger wrote:
+>> Following LPC discussions, we now report reserved regions through
+>> the iommu-group sysfs reserved_regions attribute file.
+>>
+>> Reserved regions are populated through the IOMMU get_resv_region
+>> callback (former get_dm_regions), now implemented by amd-iommu,
+>> intel-iommu and arm-smmu:
+>> - the intel-iommu reports the [0xfee00000 - 0xfeefffff] MSI window
+>>   as a reserved region and RMRR regions as direct-mapped regions.
+>> - the amd-iommu reports device direct mapped regions, the MSI region
+>>   and HT regions.
+>> - the arm-smmu reports the MSI window (arbitrarily located at
+>>   0x8000000 and 1MB large).
+>>
+>> Unsafe interrupt assignment is tested by enumerating all MSI irq
+>> domains and checking MSI remapping is supported in the above hierarchy.
+>> This check is done in case we detect the iommu translates MSI
+>> (an IOMMU_RESV_MSI window exists). Otherwise the IRQ remapping
+>> capability is checked at IOMMU level. Obviously this is a defensive
+>> IRQ safety assessment: Assuming there are several MSI controllers
+>> in the system and at least one does not implement IRQ remapping,
+>> the assignment will be considered as unsafe (even if this controller
+>> is not acessible from the assigned devices).
+>>
+>> The series first patch stems from Robin's branch:
+>> http://linux-arm.org/git?p=linux-rm.git;a=shortlog;h=refs/heads/iommu/misc
+>>
+>>
+>> Best Regards
+>>
+>> Eric
+>>
+>> Git: complete series available at
+>> https://github.com/eauger/linux/tree/v4.10-rc3-reserved-v8
 > 
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  kernel/irq/irqdesc.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/kernel/irq/irqdesc.c b/kernel/irq/irqdesc.c
-> index 00bb0aeea1d0..1e6ae73eae59 100644
-> --- a/kernel/irq/irqdesc.c
-> +++ b/kernel/irq/irqdesc.c
-> @@ -856,6 +856,7 @@ int irq_get_percpu_devid_partition(unsigned int irq, struct cpumask *affinity)
->  
->  	return 0;
->  }
-> +EXPORT_SYMBOL_GPL(irq_get_percpu_devid_partition);
+> I tested the series on ThunderX with internal 10G VNIC and Intel IXGBE
+> NIC. Please feel free to add my:
+> Tested-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
+Many thanks!
 
-Acked-by: Thomas Gleixner <tglx@linutronix.de>
+Eric
+> 
+> Thanks,
+> Tomasz
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
