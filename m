@@ -1,118 +1,84 @@
-From: florian.fainelli@broadcom.com (Florian Fainelli)
-Date: Mon, 16 Jan 2017 14:47:18 -0800
-Subject: [PATCH] PCI: iproc: fix kernel crash if dev->of_node not defined
-In-Reply-To: <CAK3bHNVQ9Rbuwf1i54h7uLLdkUvyGibmfJpD6zRjt1gYiQD7Hw@mail.gmail.com>
-References: <1484266817-6725-1-git-send-email-aospan@netup.ru>
- <6891f43f-25e7-1411-800e-97e6788f2f27@gmail.com>
- <e5301de6-9a6c-7deb-4ff7-ccd462c4381e@broadcom.com>
- <6cfba8af-1e9b-cb43-4898-61d6fb8f12ca@broadcom.com>
- <CAK3bHNVQ9Rbuwf1i54h7uLLdkUvyGibmfJpD6zRjt1gYiQD7Hw@mail.gmail.com>
-Message-ID: <c5080024-d58c-7b7d-1602-36b2d4511bef@broadcom.com>
+From: megous@megous.com (=?UTF-8?Q?Ond=c5=99ej_Jirman?=)
+Date: Mon, 16 Jan 2017 23:57:46 +0100
+Subject: [linux-sunxi] [PATCH 1/4] phy: sun4i-usb: support PHY0 on H3 in
+ MUSB mode
+In-Reply-To: <20170116191449.50397-2-icenowy@aosc.xyz>
+References: <20170116191449.50397-1-icenowy@aosc.xyz>
+ <20170116191449.50397-2-icenowy@aosc.xyz>
+Message-ID: <bcef274f-8342-bb6d-c086-4472596d8b73@megous.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Rafal,
+Dne 16.1.2017 v 20:14 Icenowy Zheng napsal(a):
+> The PHY0 on H3 can be wired either to MUSB controller or OHCI/EHCI
+> controller.
+> 
+> The original driver wired it to OHCI/EHCI controller; however, as the
+> code to use PHY0 as OHCI/EHCI is missing, it makes the PHY fully
+> unusable.
+> 
+> Rename the register (according to its function and the name in BSP
+> driver), and remove the code which wires the PHY0 to OHCI/EHCI, as MUSB
+> can support both peripheral and host mode (although the host mode of
+> MUSB is buggy).
+> 
+> The register that is renamed is now unused, as its initial value is just
+> MUSB mode. However, when OHCI/EHCI mode support is added, the register
+> can be used again.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> ---
+>  drivers/phy/phy-sun4i-usb.c | 25 +++++++++----------------
+>  1 file changed, 9 insertions(+), 16 deletions(-)
+> 
+> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+> index bf28a0fdd569..6b193a635c6b 100644
+> --- a/drivers/phy/phy-sun4i-usb.c
+> +++ b/drivers/phy/phy-sun4i-usb.c
+> @@ -49,7 +49,7 @@
+>  #define REG_PHYBIST			0x08
+>  #define REG_PHYTUNE			0x0c
+>  #define REG_PHYCTL_A33			0x10
+> -#define REG_PHY_UNK_H3			0x20
+> +#define REG_PHY_OTGCTL			0x20
 
-On 01/12/2017 08:55 PM, Abylay Ospan wrote:
-> Hi Florian,
-> 
->> Still, upstream Linux support for Northstar is Device Tree, and BCMA bus
->> should fill in of_nodes accordingly, if not, that's a bug that must be
->> fixed at the BCMA layer.
-> 
-> yes, this is a source of the problem. Devices allocated in
-> 'bcma_bus_scan' but of_node doesn't assigned.
-> Is some code missing in drivers/bcma/ which should assign of_node ?
+You have added REG_PHY_OTGCTL, but it is not used below.
 
-bcma_of_fill_device() is responsible for assigning the core of_node
-pointer based on the core discovered. It sounds like we may have to add
-an entry under the "axi" bus node for the PCIe RC, very much like these
-ones already exist:
+regards,
+  o.
 
-              gmac0: ethernet at 24000 {
-                        reg = <0x24000 0x800>;
-                };
-
-                gmac1: ethernet at 25000 {
-                        reg = <0x25000 0x800>;
-                };
-
-                gmac2: ethernet at 26000 {
-                        reg = <0x26000 0x800>;
-                };
-
-                gmac3: ethernet at 27000 {
-                        reg = <0x27000 0x800>;
-                };
-
-Without that, you indeed do not have a proper linkage between the BCMA
-discovered device and its of_node pointer.
-
-Can you give it a spin?
-
+>  #define REG_PMU_UNK1			0x10
+>  
+> @@ -269,23 +269,16 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+>  		writel(val & ~2, phy->pmu + REG_PMU_UNK1);
+>  	}
+>  
+> -	if (data->cfg->type == sun8i_h3_phy) {
+> -		if (phy->index == 0) {
+> -			val = readl(data->base + REG_PHY_UNK_H3);
+> -			writel(val & ~1, data->base + REG_PHY_UNK_H3);
+> -		}
+> -	} else {
+> -		/* Enable USB 45 Ohm resistor calibration */
+> -		if (phy->index == 0)
+> -			sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
+> +	/* Enable USB 45 Ohm resistor calibration */
+> +	if (phy->index == 0)
+> +		sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
+>  
+> -		/* Adjust PHY's magnitude and rate */
+> -		sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
+> +	/* Adjust PHY's magnitude and rate */
+> +	sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
+>  
+> -		/* Disconnect threshold adjustment */
+> -		sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
+> -				    data->cfg->disc_thresh, 2);
+> -	}
+> +	/* Disconnect threshold adjustment */
+> +	sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
+> +			    data->cfg->disc_thresh, 2);
+>  
+>  	sun4i_usb_phy_passby(phy, 1);
+>  
 > 
-> I can suggest following "hacky" patch for this (works for me):
-> 
-> Author: Abylay Ospan <aospan@netup.ru>
-> Date:   Fri Jan 13 07:24:13 2017 +0300
-> 
->     bcma: force assign 'of_node' for devices on the bus
-> 
->     prevent other code to fail if no 'of_node' defined
-> 
->     Signed-off-by: Abylay Ospan <aospan@netup.ru>
-> 
-> diff --git a/drivers/bcma/main.c b/drivers/bcma/main.c
-> index 2c1798e..4fe1c92 100644
-> --- a/drivers/bcma/main.c
-> +++ b/drivers/bcma/main.c
-> @@ -301,6 +301,11 @@ void bcma_init_bus(struct bcma_bus *bus)
->  static void bcma_register_core(struct bcma_bus *bus, struct bcma_device *core)
->  {
->         int err;
-> +       struct device * dev;
-> +
-> +       dev = bcma_bus_get_host_dev(bus);
-> +       if (dev && !core->dev.of_node)
-> +               core->dev.of_node = dev->of_node;
-> 
-> 
-> if it's ok I will send this patch in separate email.
-> 
->>
->>>
->>>>
->>>>>
->>>>> Signed-off-by: Abylay Ospan <aospan@netup.ru>
->>>>> ---
->>>>>  drivers/pci/host/pcie-iproc.c | 3 +++
->>>>>  1 file changed, 3 insertions(+)
->>>>>
->>>>> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
->>>>> index 3ebc025..f2836a9 100644
->>>>> --- a/drivers/pci/host/pcie-iproc.c
->>>>> +++ b/drivers/pci/host/pcie-iproc.c
->>>>> @@ -952,6 +952,9 @@ static int pci_dma_range_parser_init(struct of_pci_range_parser *parser,
->>>>>     const int na = 3, ns = 2;
->>>>>     int rlen;
->>>>>
->>>>> +   if (!node)
->>>>> +           return -ENOENT;
->>>>> +
->>>>>     parser->node = node;
->>>>>     parser->pna = of_n_addr_cells(node);
->>>>>     parser->np = parser->pna + na + ns;
->>>>>
->>>>
->>>>
->>
->>
->> --
->> Florian
-> 
-> 
-> 
-
-
--- 
-Florian
