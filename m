@@ -1,62 +1,39 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 16 Jan 2017 11:38:04 +0000
-Subject: [PATCH v7 15/15] irqchip: mbigen: Add ACPI support
-In-Reply-To: <58799376.6040302@huawei.com>
-References: <1484147199-4267-1-git-send-email-hanjun.guo@linaro.org>
- <1484147199-4267-16-git-send-email-hanjun.guo@linaro.org>
- <20170113102104.GB20837@red-moon> <58799376.6040302@huawei.com>
-Message-ID: <20170116113804.GB23703@red-moon>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 16 Jan 2017 11:44:22 +0000
+Subject: [PATCH] PCI: mvebu: change delay after reset to the PCIe spec
+ mandated 100ms
+In-Reply-To: <20170116111142.6866-1-l.stach@pengutronix.de>
+References: <20170116111142.6866-1-l.stach@pengutronix.de>
+Message-ID: <20170116114422.GA25924@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 14, 2017 at 10:56:54AM +0800, Hanjun Guo wrote:
-> Hi Lorenzo,
+Hi Lucas,
+
+On Mon, Jan 16, 2017 at 12:11:42PM +0100, Lucas Stach wrote:
+> The current default of 20ms cause some devices, which are slow to initialize,
+> to not show up during the bus scanning. Change this to the PCIe spec mandated
+> 100ms and document this in the DT binding.
 > 
-> On 2017/1/13 18:21, Lorenzo Pieralisi wrote:
-> > On Wed, Jan 11, 2017 at 11:06:39PM +0800, Hanjun Guo wrote:
-> >> With the preparation of platform msi support and interrupt producer
-> >> in DSDT, we can add mbigen ACPI support now.
-> >>
-> >> We are using _PRS methd to indicate number of irq pins instead
-> >> of num_pins in DT to avoid _DSD usage in this case.
-> >>
-> >> For mbi-gen,
-> >>     Device(MBI0) {
-> >>           Name(_HID, "HISI0152")
-> >>           Name(_UID, Zero)
-> >>           Name(_CRS, ResourceTemplate() {
-> >>                   Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
-> >>           })
-> >>
-> >>           Name (_PRS, ResourceTemplate() {
-> >> 		  Interrupt(ResourceProducer,...) {12,14,....}
-> > I still do not understand why you are using _PRS for this, I think
-> > the MBIgen configuration is static and if it is so the Interrupt
-> > resource should be part of the _CRS unless there is something I am
-> > missing here.
+> From PCIe base spec rev 3.0, chapter "6.6.1. Conventional Reset":
 > 
-> Sorry for not clear in the commit message. MBIgen is an interrupt producer
-> which produces irq resource to devices connecting to it, and MBIgen itself
-> don't consume wired interrupts.
+> "To allow components to perform internal initialization, system software must
+> wait a specified minimum period following the end of a Conventional Reset of
+> one or more devices before it is permitted to issue Configuration Requests to
+> those devices.
+> 
+> With a Downstream Port that does not support Link speeds greater than
+> 5.0 GT/s, software must wait a minimum of 100 ms before sending a
+> Configuration Request to the device immediately below that Port."
+> 
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  Documentation/devicetree/bindings/pci/mvebu-pci.txt | 3 ++-
+>  drivers/pci/host/pci-mvebu.c                        | 2 +-
+>  2 files changed, 3 insertions(+), 2 deletions(-)
 
-That's why you mark it as ResourceProducer, but that's not a reason to
-put it in the _PRS instead of _CRS.
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-IIUC _PRS is there to provide a way to define the possible resource
-settings of a _configurable_ device (ie programmable) so that the actual
-resource value you would programme with a call to its _SRS is sane (ie
-the OS has a way, through the _PRS, to detect what possible resource
-settings are available for the device).
+thx,
 
-I think Rafael has more insights into how the _PRS is used on x86
-systems so I would ask his point of view here before merrily merging
-this code.
-
-> Also devices connecting MBIgen may not consume all the interrupts produced
-> by MBIgen, for example, MBIgen may produce 128 interrupts but only half of
-> them are currently used, so _PRS here means "provide interrupt resources
-> may consumed by devices connecting to it".
-
-See above.
-
-Lorenzo
+Jason.
