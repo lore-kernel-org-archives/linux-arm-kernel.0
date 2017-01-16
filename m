@@ -1,60 +1,179 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Mon, 16 Jan 2017 21:04:23 +0800
-Subject: [PATCH v7 0/4] arm64: arch_timer: Add workaround for
- hisilicon-161601 erratum
-In-Reply-To: <63e1f4de-f5e8-6a19-2f8f-61b198f6369f@arm.com>
-References: <1483772858-10380-1-git-send-email-dingtianhong@huawei.com>
- <6c33e4e9-6472-4738-aea2-55dcaab3a94f@huawei.com>
- <ff9c81c2-90ef-a5c2-6f0b-c6cf5d0d11a9@arm.com>
- <06fd3327-f451-bc0d-b80c-4200bc9fadaa@huawei.com>
- <e0aa52a6-8dc7-65d6-6a3a-c753b6c9538e@huawei.com>
- <63e1f4de-f5e8-6a19-2f8f-61b198f6369f@arm.com>
-Message-ID: <21e5386a-b7d0-8c8e-3d7c-22b6be9c02f9@huawei.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Mon, 16 Jan 2017 21:21:04 +0800
+Subject: [PATCH v7 09/15] ACPI: platform-msi: retrieve dev id from IORT
+In-Reply-To: <20170116112556.GA23703@red-moon>
+References: <1484147199-4267-1-git-send-email-hanjun.guo@linaro.org>
+ <1484147199-4267-10-git-send-email-hanjun.guo@linaro.org>
+ <20170113121144.GE20837@red-moon> <5879A8F3.7030303@huawei.com>
+ <20170116112556.GA23703@red-moon>
+Message-ID: <587CC8C0.3040602@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2017/1/16 19:29, Marc Zyngier wrote:
-> On 16/01/17 10:37, Ding Tianhong wrote:
+On 2017/1/16 19:25, Lorenzo Pieralisi wrote:
+> On Sat, Jan 14, 2017 at 12:28:35PM +0800, Hanjun Guo wrote:
+>> Hi Lorenzo,
 >>
->>
->> On 2017/1/12 21:24, Ding Tianhong wrote:
->>>
->>> On 2017/1/12 17:11, Marc Zyngier wrote:
->>>> On 12/01/17 04:23, Ding Tianhong wrote:
->>>>> Hi Marc:
->>>>>
->>>>> How about this v7, if any suggestions very grateful.
+>> On 2017/1/13 20:11, Lorenzo Pieralisi wrote:
+>>> On Wed, Jan 11, 2017 at 11:06:33PM +0800, Hanjun Guo wrote:
+>>>> For devices connecting to ITS, it needs dev id to identify itself, and
+>>>> this dev id is represented in the IORT table in named component node
+>>>> [1] for platform devices, so in this patch we will scan the IORT to
+>>>> retrieve device's dev id.
 >>>>
->>>> It's been less than 5 days since you posted this. I'll get to it once I
->>>> finish reviewing all the other patches that are sitting in the queue
->>>> right before yours.
+>>>> For named components we know that there are always two steps
+>>>> involved (second optional):
 >>>>
->>>
->>> Ok and sorry for the noisy.
->>>
+>>>> (1) Retrieve the initial id (this may well provide the final mapping)
+>>>> (2) Map the id (optional if (1) represents the map type we need), this
+>>>>     is needed for use cases such as NC (named component) -> SMMU -> ITS
+>>>>     mappings.
+>>>>
+>>>> we have API iort_node_get_id() for step (1) above and
+>>>> iort_node_map_rid() for step (2), so create a wrapper
+>>>> iort_node_map_platform_id() to retrieve the dev id.
+>>>>
+>>>> [1]: https://static.docs.arm.com/den0049/b/DEN0049B_IO_Remapping_Table.pdf
+>>> This patch should be split and IORT changes should be squashed with
+>>> patch 10.
+>> If split the changes for IORT and its platform msi, API introduced in IORT will
+>> not be used in a single patch, seems violate the suggestion of "new introduced API
+>> needs to be used in the same patch", did I miss something?
+> Yes, I would introduce iort_node_map_platform_id() and in the same
+> patch update current iort_node_get_id() users (ie iort_iommu_configure())
+> to it. No functional change intended.
+>
+> Then in subsequent patches you can retrieve the ITS device id for
+> platform devices through it.
+
+Good point, I will update the patch set.
+
+>
+> Code is in your series, you just have to reshuffle it slightly.
+>
+>>>> Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>>> Suggested-by: Tomasz Nowicki <tn@semihalf.com>
+>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>>> Cc: Sinan Kaya <okaya@codeaurora.org>
+>>>> Cc: Tomasz Nowicki <tn@semihalf.com>
+>>>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>>>> ---
+>>>>  drivers/acpi/arm64/iort.c                     | 56 +++++++++++++++++++++++++++
+>>>>  drivers/irqchip/irq-gic-v3-its-platform-msi.c |  4 +-
+>>>>  include/linux/acpi_iort.h                     |  8 ++++
+>>>>  3 files changed, 67 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+>>>> index 069a690..95fd20b 100644
+>>>> --- a/drivers/acpi/arm64/iort.c
+>>>> +++ b/drivers/acpi/arm64/iort.c
+>>>> @@ -30,6 +30,7 @@
+>>>>  #define IORT_MSI_TYPE		(1 << ACPI_IORT_NODE_ITS_GROUP)
+>>>>  #define IORT_IOMMU_TYPE		((1 << ACPI_IORT_NODE_SMMU) |	\
+>>>>  				(1 << ACPI_IORT_NODE_SMMU_V3))
+>>>> +#define IORT_TYPE_ANY		(IORT_MSI_TYPE | IORT_IOMMU_TYPE)
+>>>>  
+>>>>  struct iort_its_msi_chip {
+>>>>  	struct list_head	list;
+>>>> @@ -406,6 +407,34 @@ static struct acpi_iort_node *iort_node_map_id(struct acpi_iort_node *node,
+>>>>  	return NULL;
+>>>>  }
+>>>>  
+>>>> +static
+>>>> +struct acpi_iort_node *iort_node_map_platform_id(struct acpi_iort_node *node,
+>>>> +						 u32 *id_out, u8 type_mask,
+>>>> +						 int index)
+>>>> +{
+>>>> +	struct acpi_iort_node *parent;
+>>>> +	u32 id;
+>>>> +
+>>>> +	/* step 1: retrieve the initial dev id */
+>>>> +	parent = iort_node_get_id(node, &id, IORT_TYPE_ANY, index);
+>>>> +	if (!parent)
+>>>> +		return NULL;
+>>>> +
+>>>> +	/*
+>>>> +	 * optional step 2: map the initial dev id if its parent is not
+>>>> +	 * the target type we wanted, map it again for the use cases such
+>>>> +	 * as NC (named component) -> SMMU -> ITS. If the type is matched,
+>>>> +	 * return the parent pointer directly.
+>>>> +	 */
+>>>> +	if (!(IORT_TYPE_MASK(parent->type) & type_mask))
+>>>> +		parent = iort_node_map_id(parent, id, id_out, type_mask);
+>>>> +	else
+>>>> +		if (id_out)
+>>> Remove this pointer check.
+>> This was added because of NULL pointer reference, I passed NULL for id_out because I
+>> only want to get its parent node, I think we have four options:
 >>
->> Hi Marc?
+>>  - Introduce a new API to get the parent only from the scratch, but it will duplicate the code
+>>     a lot;
 >>
->> After discussion with the chip developer, we decide to update the erratum id for this bug, so I will resend a new version
->> about this, if you has start to review this v7 patch set, I think I could wait until you have finished yet. :)
-> 
-> This has to be a stable erratum ID, and it won't be changed once the
-> workaround is merged (all you'll be able to do is to add new IDs where
-> the same fix is applicable). So please post the revised series, and make
-> sure that this is the *final* ID update.
-> 
+>>  - Don't check the id_out in iort_node_map_platform_id(), and introduce a wrapper and pass the
+>>    dummy id for iort_node_map_platform_id() :
+>> static
+>> struct acpi_iort_node *iort_node_get_platform_parent{struct device *dev, u8 type_mask}
+>> {
+>>         struct acpi_iort_node *node, *parent = NULL;
+>>         int i;
+>>         u32 dummy_id;
+>>
+>>         node = iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
+>>                               iort_match_node_callback, dev);
+>>
+>>         if (!node)
+>>                 return NULL;
+>>
+>>         for (i = 0; i < node->mapping_count; i++) {
+>>                 /* we just want to get the parent node */
+>>                 parent = iort_node_map_platform_id(node, &dummy_id,
+>>                                                    IORT_MSI_TYPE, i);
+>>                 if (parent)
+>>                         break;
+>>         }
+>>
+>>         return parent;
+>> }
+>>
+>>  - Similar solution as above but don't introduce wrapper, just use dummy_id if
+>>    iort_node_map_platform_id() is called;
+>>
+>> - Use the solution I proposed in this patch.
+>>
+>> Please share you suggestion on this :)
+> I see. I would like to change the IORT mapping API functions to always pass
+> in an argument:
+>
+> struct iort_idmap {
+> 	struct acpi_iort_node *parent;
+> 	u32 id;
+> };
+>
+> and return an int, because current functions (eg iort_node_map_rid())
+> return a parent IORT node but also the mapped id as a value-result
+> and that's not easy to follow (also Sinan raised this point which I
+> think it is fair).
+>
+> I think we'd better postpone this change to next cycle, so you can
+> leave the pointer check:
+>
+> if (id_out)
+>
+> I will clean this up later, basically what we would end up doing to just
+> retrieve the parent pointer would be the IORT equivalent of what we have
+> in DT:
+>
+> of_parse_phandle()
+>   -> __of_parse_phandle_with_args() #we call it with cell_count == 0
+>
+>
+> at the end of the day it is just to make code easier to follow, since it
+> is functions internal to IORT compilation unit it is ok for now to leave
+> it as-is.
+>
 
-Yes?the *final* ID will be the stable ID and could be record in CPU erratum doc which could be get from Hisilicon webpage.
-The final format for erratum ID is just like:
-<Errata-Prefix><SeriesFlag><ModuleID><SerialNum>
-Errata-Prefix=1610, SeriesFlag=1, ModuleID=0x, SerialNum=01.
+OK, thank you very for the review.
 
-Thanks
-Ding
-
-> Thanks,
-> 
-> 	M.
-> 
+Hanjun
