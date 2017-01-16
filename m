@@ -1,151 +1,54 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 16 Jan 2017 09:53:41 +0000
-Subject: [PATCH RFC 2/2] ARM: nommu: remap exception base address to RAM
-In-Reply-To: <20170115114750.GA5456@afzalpc>
-References: <20161211131028.3019-1-afzal.mohd.ma@gmail.com>
- <20161211131255.3221-1-afzal.mohd.ma@gmail.com>
- <20161213100226.GW14217@n2100.armlinux.org.uk>
- <20170107171339.GA5044@afzalpc> <20170115114750.GA5456@afzalpc>
-Message-ID: <83be771e-b432-0950-202b-afb09f125865@arm.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 16 Jan 2017 10:57:31 +0100
+Subject: [PATCH v1 1/3] dt: bindings: add documentation for zx2967
+ family reset controller
+In-Reply-To: <1484377530-30635-1-git-send-email-baoyou.xie@linaro.org>
+References: <1484377530-30635-1-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <1484560651.8415.14.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 15/01/17 11:47, Afzal Mohammed wrote:
-> Hi,
+On Sat, 2017-01-14 at 15:05 +0800, Baoyou Xie wrote:
+> This patch adds dt-binding documentation for zx2967 family
+> reset controller.
 > 
-> On Sat, Jan 07, 2017 at 10:43:39PM +0530, Afzal Mohammed wrote:
->> On Tue, Dec 13, 2016 at 10:02:26AM +0000, Russell King - ARM Linux wrote:
+> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+> ---
+>  .../devicetree/bindings/reset/zte,zx2967-reset.txt   | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/reset/zte,zx2967-reset.txt
 > 
->>> Also, if the region setup for the vectors was moved as well, it would
->>> then be possible to check the ID registers to determine whether this
->>> is supported, and make the decision where to locate the vectors base
->>> more dynamically.
->>
->> This would affect Cortex-R's, which is a bit concerning due to lack of
->> those platforms with me, let me try to get it right.
-> 
-> QEMU too doesn't seem to provide a Cortex-R target
-> 
->> Seems translating __setup_mpu() altogether to C
-> 
-> afaics, a kind of C translation is already present as
-> mpu_setup_region() in arch/arm/mm/nommu.c that takes care of
-> MPU_RAM_REGION only. And that seems to be a kind of redundant as it is
-> also done in asm at __setup_mpu(). Git blames asm & C to consecutive
-> commits, that makes me a little shaky about the conclusion on it being
-> redundant.
-> 
+> diff --git a/Documentation/devicetree/bindings/reset/zte,zx2967-reset.txt b/Documentation/devicetree/bindings/reset/zte,zx2967-reset.txt
+> new file mode 100644
+> index 0000000..22d590e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/reset/zte,zx2967-reset.txt
+> @@ -0,0 +1,20 @@
+> +ZTE zx2967 SoCs Reset Controller
+> +=======================================
+> +
+> +Please also refer to reset.txt in this directory for common reset
+> +controller binding usage.
+> +
+> +Required properties:
+> +- compatible: should be one of the following.
+> +	* zte,zx296718-reset
+> +- reg: physical base address of the controller and length of memory mapped
+> +	region.
+> +- #reset-cells: must be 1.
+> +
+> +example:
+> +
+> +	toprst: reset at 1461060 {
 
-It is not redundant. MPU setup is done it two steps. The first step done in
-asm to enable caches, there only kernel image is covered; the second step takes
-care on the whole RAM given via dt or "mem=" parameter.
+That node should be named reset-controller.
 
-I think other regions are kept there to avoid C side dancing in case of SMP.
+> +		compatible = "zte,zx296718-reset";
+> +		reg = <0x01461060 0x8>;
+> +		#reset-cells = <1>;
+> +	};
 
->> & installing at a later, but suitable place might be better.
-> 
-> But looks like enabling MPU can't be moved to C & that would
-> necessitate keeping at least some portion of__setu_mpu() in asm.
-> 
-> Instead, moving region setup only for vectors to C as Russell
-> suggested at first would have to be done.
-> 
-> A kind of diff at the end is in my mind, with additional changes to
-> handle the similar during secondary cpu bringup too.
-> 
-> Thinking of invoking mpu_setup() from secondary_start_kernel() in
-> arch/arm/kernel/smp.c, with mpu_setup() being slightly modified to
-> avoid storing region details again when invoked by secondary cpu's.
-
-I have wip patches on reworking MPU setup code. The idea is to start using
-mpu_rgn_info[] actively, so asm part for secondariness would just sync-up
-content of that array. Additionally, it seems that we can reuse free MPU slots
-to cover memory which is discarded due to MPU alignment restrictions... 
-
-> 
-> Vladimir, once changes are done after a revisit, i would need your
-> help to test on Cortex-R.
-
-I'm more than happy to help, but currently I have limited bandwidth, so if it
-can wait till the next dev cycle I'd try to make MPU rework finished by that
-time.
-
-> 
-> As an aside, wasn't aware of the fact that Cortex-R supports SMP
-> Linux, had thought that, of !MMU one's, only Blackfin & J2 had it.
-> 
-> 
->> Also !MMU Kernel could boot on 3 ARM v7-A platforms - AM335x Beagle
->> Bone (A8), AM437x IDK (A9) & Vybrid VF610 (on A5 core, note that it
->> has M4 core too)
-> 
-> Talking about Cortex-M, AMx3's too have it, to be specific M3, but
-> they are not Linux-able unlike the one in VF610.
-> 
-
-Thanks!
-
-Vladimir
-
-> Regards
-> afzal
-> 
-> --->8---
-> 
-> diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-> index e0565d73e49e..f8ac79b6136d 100644
-> --- a/arch/arm/kernel/head-nommu.S
-> +++ b/arch/arm/kernel/head-nommu.S
-> @@ -249,20 +249,6 @@ ENTRY(__setup_mpu)
->  	setup_region r0, r5, r6, MPU_INSTR_SIDE @ 0x0, BG region, enabled
->  2:	isb
->  
-> -	/* Vectors region */
-> -	set_region_nr r0, #MPU_VECTORS_REGION
-> -	isb
-> -	/* Shared, inaccessible to PL0, rw PL1 */
-> -	mov	r0, #CONFIG_VECTORS_BASE	@ Cover from VECTORS_BASE
-> -	ldr	r5,=(MPU_AP_PL1RW_PL0NA | MPU_RGN_NORMAL)
-> -	/* Writing N to bits 5:1 (RSR_SZ) --> region size 2^N+1 */
-> -	mov	r6, #(((2 * PAGE_SHIFT - 1) << MPU_RSR_SZ) | 1 << MPU_RSR_EN)
-> -
-> -	setup_region r0, r5, r6, MPU_DATA_SIDE	@ VECTORS_BASE, PL0 NA, enabled
-> -	beq	3f				@ Memory-map not unified
-> -	setup_region r0, r5, r6, MPU_INSTR_SIDE	@ VECTORS_BASE, PL0 NA, enabled
-> -3:	isb
-> -
->  	/* Enable the MPU */
->  	mrc	p15, 0, r0, c1, c0, 0		@ Read SCTLR
->  	bic     r0, r0, #CR_BR			@ Disable the 'default mem-map'
-> diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
-> index e82056df0635..7fe8906322d5 100644
-> --- a/arch/arm/mm/nommu.c
-> +++ b/arch/arm/mm/nommu.c
-> @@ -269,12 +269,19 @@ void __init mpu_setup(void)
->  					ilog2(memblock.memory.regions[0].size),
->  					MPU_AP_PL1RW_PL0RW | MPU_RGN_NORMAL);
->  	if (region_err) {
-> -		panic("MPU region initialization failure! %d", region_err);
-> +		panic("MPU RAM region initialization failure! %d", region_err);
->  	} else {
-> -		pr_info("Using ARMv7 PMSA Compliant MPU. "
-> -			 "Region independence: %s, Max regions: %d\n",
-> -			mpu_iside_independent() ? "Yes" : "No",
-> -			mpu_max_regions());
-> +		region_err = mpu_setup_region(MPU_VECTORS_REGION, vectors_base,
-> +					ilog2(memblock.memory.regions[0].size),
-> +					MPU_AP_PL1RW_PL0NA | MPU_RGN_NORMAL);
-> +		if (region_err) {
-> +			panic("MPU VECTOR region initialization failure! %d",
-> +			      region_err);
-> +		} else {
-> +			pr_info("Using ARMv7 PMSA Compliant MPU. "
-> +				"Region independence: %s, Max regions: %d\n",
-> +				mpu_iside_independent() ? "Yes" : "No",
-> +				mpu_max_regions());
->  	}
->  }
->  #else
-> 
+regards
+Philipp
