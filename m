@@ -1,61 +1,170 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 16 Jan 2017 18:28:38 +0000
-Subject: [PATCH v12 6/7] arm64: pmu: Detect and enable multiple PMUs in
- an ACPI system
-In-Reply-To: <1484068672-15852-7-git-send-email-jeremy.linton@arm.com>
-References: <1484068672-15852-1-git-send-email-jeremy.linton@arm.com>
- <1484068672-15852-7-git-send-email-jeremy.linton@arm.com>
-Message-ID: <20170116182838.GA1843@red-moon>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 16 Jan 2017 18:29:00 +0000
+Subject: [BUG] linux-next cannot compile in AES crypto code of ARM
+In-Reply-To: <534751484590587@web17h.yandex.ru>
+References: <534751484590587@web17h.yandex.ru>
+Message-ID: <65230bb3-d3bf-ff6e-1bcb-c37ee4515c4e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 11:17:51AM -0600, Jeremy Linton wrote:
-
-[...]
-
-> +static int __init pmu_acpi_init(void)
-> +{
-> +	struct pmu_types *pmu, *safe_temp;
-> +	bool unused_madt_entries;
-> +	LIST_HEAD(pmus);
-> +
-> +	if (acpi_disabled)
-> +		return 0;
-> +
-> +	unused_madt_entries = arm_pmu_acpi_determine_cpu_types(&pmus);
-
-IIUC (and that's an if) unused_madt_entries is a "buffer" that you add
-to all platform devices you manage to create through midr matching to
-make sure there are enough resource entries when/if a cpu of the
-respective type is onlined.
-
-If that's the case unused_madt_entries can't be a bool.
-
-Second question I have is what happens if cpus that aren't online
-have an midr that differs from all the entries parsed at init time
-(ie those you created a platform device for), that's certainly
-a pesky corner case though.
-
-Thanks,
-Lorenzo
-
-> +
-> +	list_for_each_entry_safe(pmu, safe_temp, &pmus, list) {
-> +		pmu->cpu_count += unused_madt_entries;
-> +		pmu_acpi_register(pmu);
-> +
-> +		list_del(&pmu->list);
-> +		kfree(pmu);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +arch_initcall(pmu_acpi_init);
-> -- 
-> 2.5.5
+On 16/01/17 18:16, Icenowy Zheng wrote:
+> I'm trying build linux-next for Allwinner H3 (ARMv7 SoC).
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> My compiler is GCC 6.2.0.
+
+The patch to fix this[1] is already in Linux-next; alternatively you
+could also go back to an older binutils (without ARMv8-M support) to
+avoid it for the time being.
+
+Robin.
+
+[1]:https://www.mail-archive.com/linux-crypto at vger.kernel.org/msg23076.html
+
+> 
+> When building, I got following error:
+> ```
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S: Assembler messages:
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:21: Error: selected processor does not support `tt .req ip' in ARM mode
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `movw tt,#:lower16:crypto_ft_tab'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `movt tt,#:upper16:crypto_ft_tab'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r8,[tt,r8,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r9,[tt,r9,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r10,[tt,r10,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r11,[tt,r11,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r10,[tt,r10,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r11,[tt,r11,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r5,[tt,r5,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r6,[tt,r6,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r4,[tt,r4,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r5,[tt,r5,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r6,[tt,r6,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r7,[tt,r7,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r6,[tt,r6,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r7,[tt,r7,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r9,[tt,r9,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r10,[tt,r10,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r8,[tt,r8,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r9,[tt,r9,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r10,[tt,r10,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r11,[tt,r11,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r10,[tt,r10,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r11,[tt,r11,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r5,[tt,r5,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r6,[tt,r6,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `movwls tt,#:lower16:crypto_fl_tab'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `movtls tt,#:upper16:crypto_fl_tab'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r4,[tt,r4,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r5,[tt,r5,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r6,[tt,r6,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r7,[tt,r7,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r6,[tt,r6,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r7,[tt,r7,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r9,[tt,r9,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:174: Error: ARM register expected -- `ldr r10,[tt,r10,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `movw tt,#:lower16:crypto_it_tab'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `movt tt,#:upper16:crypto_it_tab'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r8,[tt,r8,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r9,[tt,r9,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r10,[tt,r10,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r11,[tt,r11,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r10,[tt,r10,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r11,[tt,r11,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r5,[tt,r5,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r4,[tt,r4,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r4,[tt,r4,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r5,[tt,r5,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r6,[tt,r6,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r7,[tt,r7,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r6,[tt,r6,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r7,[tt,r7,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r9,[tt,r9,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r8,[tt,r8,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r8,[tt,r8,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r9,[tt,r9,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r10,[tt,r10,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r11,[tt,r11,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r10,[tt,r10,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r11,[tt,r11,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r5,[tt,r5,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r4,[tt,r4,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `movwls tt,#:lower16:crypto_il_tab'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `movtls tt,#:upper16:crypto_il_tab'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r4,[tt,r4,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r5,[tt,r5,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r6,[tt,r6,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r7,[tt,r7,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r6,[tt,r6,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r7,[tt,r7,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t1,[tt,t1,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t2,[tt,t2,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r9,[tt,r9,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr t0,[tt,t0,lsl#2]'
+> /home/icenowy/git-repos/linux/arch/arm/crypto/aes-cipher-core.S:178: Error: ARM register expected -- `ldr r8,[tt,r8,lsl#2]'
+> ```
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
