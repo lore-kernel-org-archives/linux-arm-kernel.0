@@ -1,81 +1,51 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 16 Jan 2017 17:13:49 +0100
-Subject: [PATCH] rtc: sun6i: Switch to the external oscillator
-In-Reply-To: <20170116153959.7qhahevikxzai664@piout.net>
-References: <20170116152148.27439-1-maxime.ripard@free-electrons.com>
- <20170116153959.7qhahevikxzai664@piout.net>
-Message-ID: <20170116161349.5btadrfmqbxhrb2c@lukather>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 16 Jan 2017 16:22:06 +0000
+Subject: [GIT PULL] arm64: dts: juno: updates for v4.11
+Message-ID: <dbfa1905-d937-7d02-7bbb-5f1a127896cf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi ARM SoC Team,
 
-On Mon, Jan 16, 2017 at 04:39:59PM +0100, Alexandre Belloni wrote:
-> On 16/01/2017 at 16:21:48 +0100, Maxime Ripard wrote :
-> > The RTC is clocked from either an internal, imprecise, oscillator or an
-> > external one, which is usually much more accurate.
-> > 
-> > The difference perceived between the time elapsed and the time reported by
-> > the RTC is in a 10% scale, which prevents the RTC from being useful at all.
-> > 
-> > Fortunately, the external oscillator is reported to be mandatory in the
-> > Allwinner datasheet, so we can just switch to it.
-> > 
-> 
-> Still, I'm wondering whether the external clock should be taken.
-> 
-> We've had issues with at91 and tegra where this external clock was
-> suddenly able to be stopped, breaking the RTC because the CCF was not
-> aware the RTC was using it.
+Please pull !
 
-That's a very good point...
+Regards,
+Sudeep
 
-> See:
-> http://patchwork.ozlabs.org/patch/502459/
-> http://patchwork.ozlabs.org/patch/714517/
-> 
-> Your reply can be that you don't care now and this has a low probability
-> and you'll handle the case when it happens and that will be fine.
+The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 
-This is a bit more complicated for us.
+  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
 
-The internal oscillator is running at 667kHz, with a 30% accuracy. The
-external oscillator is supposed to run at 32768Hz, with a maximum
-tolerance of 50ppm.
+are available in the git repository at:
 
-The RTC has an internal mux, between the internal and external
-oscillators. If the internal is picked, a (variable) divider of 20 is
-applied by default.
+  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
+tags/juno-updates-4.11
 
-The output of that mux is also one of the parent of many of our clocks
-in our main clock unit (for example the CPU one), so we need to have
-that parenthood relationship expressed. I guess we could rework the
-driver to first register the clock through the early clock probing
-stuff, and then have the rest of the RTC to probe.
+for you to fetch changes up to ea2dcf9ac3254c964cddd67a032cb3b691fa47ce:
 
-However, we also need to do so while remaining backward compatible
-from a DT point of view.
+  arm64: dts: juno: add missing CoreSight STM component (2017-01-12
+17:26:49 +0000)
 
-I guess we could:
-  - Add the two oscillators to the DTSI, with their proper accuracy
-  - Put them both as parent clocks of the RTC node
-  - Split the clock part and the RTC part in the driver, and have the
-    clock part, if there is a clocks property in the node (which
-    covers the backward case), register the mux, and pick the clock
-    with the best accuracy. We don't change anything at the RTC level.
-  - Change the parent clock of the CCU for the RTC.
+----------------------------------------------------------------
+ARMv8 Vexpress/Juno DT updates for v4.11
 
-That would work for you?
-Maxime
+1. Addition of Coresight support on Juno R1 and R2 variants
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170116/75818342/attachment.sig>
+2. Addition of STM(System Trace Macrocell) support on all Juno variants
+
+----------------------------------------------------------------
+Mike Leach (2):
+      arm64: dts: juno: fix CoreSight support for Juno r1/r2 variants
+      arm64: dts: juno: add missing CoreSight STM component
+
+Sudeep Holla (1):
+      arm64: dts: juno: refactor CoreSight support on Juno r0
+
+ arch/arm64/boot/dts/arm/juno-base.dtsi    | 31 +++++++---
+ arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi | 98
++++++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/arm/juno-r1.dts       | 13 ++++
+ arch/arm64/boot/dts/arm/juno-r2.dts       | 13 ++++
+ arch/arm64/boot/dts/arm/juno.dts          | 24 ++++++++
+ 5 files changed, 171 insertions(+), 8 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
