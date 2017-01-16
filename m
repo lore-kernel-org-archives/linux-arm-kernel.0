@@ -1,42 +1,38 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Mon, 16 Jan 2017 23:48:40 +0200
-Subject: [PATCH 2/3] dts: teach newer i.MX machines to have the i.MX35
- type watchdog
-In-Reply-To: <20170116204337.j67oeknraas7ryib@pengutronix.de>
-References: <20170109095039.11979-1-u.kleine-koenig@pengutronix.de>
- <20170109095039.11979-3-u.kleine-koenig@pengutronix.de>
- <CAOMZO5CjkW1SdSAcSOj8Uws-xjoh=iZ1Ey9dwBdOdBzQLS6h8w@mail.gmail.com>
- <20170116204337.j67oeknraas7ryib@pengutronix.de>
-Message-ID: <0586b2cd-6cbb-2e8a-9cd6-d7220708931d@mleia.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Mon, 16 Jan 2017 22:49:47 +0100
+Subject: [PATCH v5 0/2] qcom OTG regulator support
+In-Reply-To: <CAJOFmgySF7T1N6PDiw2rsQ+n68_k7n_M0TzXZe4S7PxTHmRapA@mail.gmail.com>
+References: <20161018004251.28733-1-stephen.boyd@linaro.org>
+ <CAJOFmgySF7T1N6PDiw2rsQ+n68_k7n_M0TzXZe4S7PxTHmRapA@mail.gmail.com>
+Message-ID: <20170116214947.wpk7mmjrvfzgbgrq@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/16/2017 10:43 PM, Uwe Kleine-K?nig wrote:
-> On Mon, Jan 16, 2017 at 04:35:26PM -0200, Fabio Estevam wrote:
->> On Mon, Jan 9, 2017 at 7:50 AM, Uwe Kleine-K?nig
->> <u.kleine-koenig@pengutronix.de> wrote:
->>> Only i.MX35 and newer feature a WMCR register that should be written to. Older
->>> SoCs hang when this address is written.
->>>
->>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->>
->> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
->>
->> Only a minor nit: Subject could: ARM: dts: imx: teach...
+Hi Stephen,
+
+On Wed, Dec 28, 2016 at 02:06:18PM -0800, Stephen Boyd wrote:
+> On Mon, Oct 17, 2016 at 5:42 PM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
+> > This is a resend/resurrection of Tim's patches to add support
+> > for the OTG regulator on some of qcom's PMICs[1]. I've made
+> > some minor modifications to the driver to make it work, but
+> > otherwise it works fine with my USB otg testing. Changes
+> > are noted in a maintainer tag.
+> >
+> > Tim, did you want to me to fix the name? I pulled these from patchwork
+> > and it seems you sent it as "Bird, Tim" which may have not been
+> > intentional.
+> >
 > 
-> Ack. To reference the commit id of the first patch in the third I can
-> prepare a branch to pull. There I'd fix the Subject. Shawn, is this OK?
-> 
+> Can this be picked up for v4.11? Tim hasn't responded so I assume it's
+> fine with the name.
 
-This is too early for changes, which are not reviewed by Linux watchdog masters.
+Yes, sorry for the delay. I just queued it.
 
-As I emphasized multiple times in our discussions your series is organized
-improperly, it has interdependencies between DTS and driver, it lacks
-atomicity feature of a proper fix, in the middle it breaks backward compatibility
-with old DTB, all that makes it impossible to send an atomic fix for linux-stable,
-some of the changes are captured from mine ones without preserving the authorship
-or even a reported-by credit.
-
---
-With best wishes,
-Vladimir
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170116/46db8ef7/attachment.sig>
