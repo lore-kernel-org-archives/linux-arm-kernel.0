@@ -1,44 +1,49 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Mon, 16 Jan 2017 09:15:15 -0800
-Subject: [PATCH v3 06/24] ARM: dts: imx6-sabrelite: add OV5642 and OV5640
- camera sensors
-In-Reply-To: <1484571323.8415.98.camel@pengutronix.de>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-7-git-send-email-steve_longerbeam@mentor.com>
- <1484309021.31475.29.camel@pengutronix.de>
- <1bb64209-7c58-fe10-3db9-c5b8103eda90@gmail.com>
- <1484571323.8415.98.camel@pengutronix.de>
-Message-ID: <83a5f605-2bdb-76a1-28c8-620e829226f3@gmail.com>
+From: lilja.magnus@gmail.com (Magnus Lilja)
+Date: Mon, 16 Jan 2017 18:27:58 +0100
+Subject: [PATCH 0/3] watchdog: imx2: handle WMCR only being available on
+ i.MX35 and later
+In-Reply-To: <20170109095039.11979-1-u.kleine-koenig@pengutronix.de>
+References: <20170109095039.11979-1-u.kleine-koenig@pengutronix.de>
+Message-ID: <CAM=E1R62LWEpGFsfgV_DRg8sqK7V1RvdwZGWiXTLgSMUMETRWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
-On 01/16/2017 04:55 AM, Philipp Zabel wrote:
-> On Fri, 2017-01-13 at 15:04 -0800, Steve Longerbeam wrote:
+On 9 January 2017 at 10:50, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
+> Hello,
 >
->>>> @@ -299,6 +326,52 @@
->>>>    	pinctrl-names = "default";
->>>>    	pinctrl-0 = <&pinctrl_i2c2>;
->>>>    	status = "okay";
->>>> +
->>>> +	ov5640: camera at 40 {
->>>> +		compatible = "ovti,ov5640";
->>>> +		pinctrl-names = "default";
->>>> +		pinctrl-0 = <&pinctrl_ov5640>;
->>>> +		clocks = <&mipi_xclk>;
->>>> +		clock-names = "xclk";
->>>> +		reg = <0x40>;
->>>> +		xclk = <22000000>;
->>> This is superfluous, you can use clk_get_rate on mipi_xclk.
->> This property is actually there to tell the driver what to set the
->> rate to, with clk_set_rate(). So you are saying it would be better
->> to set the rate in the device tree and the driver should only
->> retrieve the rate?
-> Yes. Given that this is a reference clock input that is constant on a
-> given board and never changes during runtime, I think this is the
-> correct way. The clock will be fixed rate on most boards, I assume.
+> this is my approach to fix the issue reported by Vladimir Zapolskiy.
+>
 
-Ok, that makes sense, I'll make that change.
+...
 
-Steve
+> Best regards
+> Uwe
+>
+> Uwe Kleine-K?nig (3):
+>   watchdog: imx2: Only i.MX35 and later have a WMCR register
+>   dts: teach newer i.MX machines to have the i.MX35 type watchdog
+>   watchdog: imx2: add compatibility for new i.MX35 type watchdog
+>
+>  .../devicetree/bindings/watchdog/fsl-imx-wdt.txt   |  2 +-
+>  arch/arm/boot/dts/imx25.dtsi                       |  2 +-
+>  arch/arm/boot/dts/imx35.dtsi                       |  2 +-
+>  arch/arm/boot/dts/imx50.dtsi                       |  2 +-
+>  arch/arm/boot/dts/imx51.dtsi                       |  2 +-
+>  arch/arm/boot/dts/imx53.dtsi                       |  2 +-
+>  arch/arm/boot/dts/imx6qdl.dtsi                     |  2 +-
+>  arch/arm/boot/dts/imx6sl.dtsi                      |  4 +-
+>  arch/arm/boot/dts/imx6sx.dtsi                      |  6 +-
+>  arch/arm/boot/dts/imx6ul.dtsi                      |  4 +-
+>  arch/arm/boot/dts/imx7s.dtsi                       |  8 +-
+>  arch/arm/boot/dts/vfxxx.dtsi                       |  2 +-
+>  arch/arm/mach-imx/devices/devices-common.h         |  1 +
+>  arch/arm/mach-imx/devices/platform-imx2-wdt.c      | 13 +--
+>  drivers/watchdog/imx2_wdt.c                        | 97 ++++++++++++++++++++--
+>  15 files changed, 116 insertions(+), 33 deletions(-)
+
+Tested on i.MX31 PDK board.
+
+Tested-by: Magnus Lilja <lilja.magnus@gmail.com>
