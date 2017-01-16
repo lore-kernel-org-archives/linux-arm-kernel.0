@@ -1,43 +1,38 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Mon, 16 Jan 2017 13:28:07 +0100
-Subject: [PATCH 04/10] sata: hardreset: retry if phys link is down
-In-Reply-To: <20170115231049.GC14446@mtj.duckdns.org>
-References: <1484311084-31547-1-git-send-email-bgolaszewski@baylibre.com>
- <1484311084-31547-5-git-send-email-bgolaszewski@baylibre.com>
- <20170115231049.GC14446@mtj.duckdns.org>
-Message-ID: <CAMpxmJUxSmNwGn+gEDZN0njnbMhmG4=1Oc1p56O7KiToBjp_FQ@mail.gmail.com>
+From: qiyaoltc@gmail.com (Yao Qi)
+Date: Mon, 16 Jan 2017 12:27:55 +0000
+Subject: [RFC PATCH 07/10] arm64/sve: Add vector length inheritance control
+In-Reply-To: <1484220369-23970-8-git-send-email-Dave.Martin@arm.com>
+References: <1484220369-23970-1-git-send-email-Dave.Martin@arm.com>
+ <1484220369-23970-8-git-send-email-Dave.Martin@arm.com>
+Message-ID: <20170116122755.GH28060@E107787-LIN>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-01-16 0:10 GMT+01:00 Tejun Heo <tj@kernel.org>:
-> Hello,
->
-> On Fri, Jan 13, 2017 at 01:37:58PM +0100, Bartosz Golaszewski wrote:
->> The sata core driver already retries to resume the link because some
->> controllers ignore writes to the SControl register.
->>
->> We have a use case with the da850 SATA controller where at PLL0
->> frequency of 456MHz (needed to properly service the LCD controller)
->> the chip becomes unstable and the hardreset operation is ignored the
->> first time 50% of times.
->>
->> Retrying just the resume operation doesn't work - we need to issue
->> the phy/wake reset again to make it work.
->>
->> If ata_phys_link_offline() returns true in sata_link_hardreset(),
->> retry a couple times before really giving up.
->
-> I think it'd be better to implement the driver specific implementation
-> rather than changing the behavior for everybody.
->
-> Thanks.
->
+On 17-01-12 11:26:06, Dave Martin wrote:
+> Currently the vector length is inherited across both fork() and
+> exec().
+> 
+> Inheritance across fork() is desirable both for creating a copy of
+> a process (traditional fork) or creating a thread (where we want
+> all threads to share the same VL by default).
+> 
+> Inheritance across exec() is less desirable, because of the ABI
+> impact of large vector lengths on the size of the signal frame --
+> when running a new binary, there is no guarantee that the new
+> binary is compatible with these ABI changes.
+> 
+> This flag makes the vector length non-inherited by default.
 
-For v2 I created a new ahci-locally exported function:
-ahci_do_hardreset() that allows to retrieve the online state of the
-link and used it in the da850-specific hardreset implementation.
+Can we make vector length inherited across fork but non-inherited
+across exec by default?
 
-Hope that'll be good.
+> Instead, the vector length is reset to a system default value,
+> unless the THREAD_VL_INHERIT flag has been set for the thread.
+> 
+> THREAD_VL_INHERIT is currently sticky: i.e., if set, it gets
+> inherited too.  This behaviour may be refined in future if it is
+> not flexible enough.
+> 
 
-Thanks,
-Bartosz Golaszewski
+-- 
+Yao (??)
