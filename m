@@ -1,40 +1,57 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Mon, 16 Jan 2017 20:34:13 +0100
-Subject: [PATCH 0/4] ARM: dts: mt7623: Add initial Geek Force support
-In-Reply-To: <0bd6567e-1c5b-0ff6-d044-57d25e1a40d2@phrozen.org>
-References: <20170108133100.10428-1-afaerber@suse.de>
- <91f5ec74-1aa1-f2ad-24e9-14267cbe8498@phrozen.org>
- <d6bd3783-d124-9871-d3b4-93e366517895@suse.de>
- <3fecb422-8185-7ee0-c203-2bfdc4fd1393@phrozen.org>
- <0bd6567e-1c5b-0ff6-d044-57d25e1a40d2@phrozen.org>
-Message-ID: <741fcf69-2fac-04b2-65bf-85f1d0af097a@suse.de>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 16 Jan 2017 21:37:00 +0200
+Subject: [PATCH 09/12] pinctrl: samsung: Add infrastructure for pin-bank
+ retention control
+In-Reply-To: <1484549107-5957-10-git-send-email-m.szyprowski@samsung.com>
+References: <1484549107-5957-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170116064527eucas1p1f0f78e9420e7d9d60d94b6e7381caeb1@eucas1p1.samsung.com>
+ <1484549107-5957-10-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20170116193700.23ouybo6dhkhrs25@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi John,
-
-Am 12.01.2017 um 09:23 schrieb John Crispin:
-> had a look last night why the ethernet dtsi was not added and it
-> obviously was not added as we were waiting for the clk-mt2701 to be
-> merged. the ethernet dtsi will have phandles pointing at the clk nodes
-> which did not exist at the time. same is true for the PWM code.
+On Mon, Jan 16, 2017 at 07:45:04AM +0100, Marek Szyprowski wrote:
+> Pad retention control after suspend/resume cycle should be done from pin
+> controller driver instead of PMU (power management unit) driver to avoid
+> possible ordering and logical dependencies. Till now it worked fine only
+> because PMU driver registered its sys_ops after pin controller.
 > 
-> i sat down last night and worked out what pending patches i still have
-> for mt7623 and out of the ~80 required to get v4.4 working i only need
-> around 10 for v4.10-rc1.
+> This patch adds infrastructure to handle pad retention during pin control
+> driver resume.
 > 
-> i started to rebase these patches last night and will have time to test
-> them tomorrow or early next week. as the pwrap node alone is around 200
-> lines of devicetree we need to figure out a way to add this to the dts
-> files without duplicating it. i'll try to post a series early next week
-> that we can then discuss and rebase your geekboard patches on.
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  drivers/pinctrl/samsung/pinctrl-samsung.c | 12 ++++++---
+>  drivers/pinctrl/samsung/pinctrl-samsung.h | 42 +++++++++++++++++++++++++++++++
+>  2 files changed, 51 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
+> index 86f23842f681..95a84086a2e9 100644
+> --- a/drivers/pinctrl/samsung/pinctrl-samsung.c
+> +++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
+> @@ -1075,6 +1075,9 @@ static int samsung_pinctrl_probe(struct platform_device *pdev)
+>  		ctrl->eint_gpio_init(drvdata);
+>  	if (ctrl->eint_wkup_init)
+>  		ctrl->eint_wkup_init(drvdata);
+> +	if (ctrl->retention_data && ctrl->retention_data->init)
+> +		drvdata->retention_ctrl = ctrl->retention_data->init(drvdata,
+> +							  ctrl->retention_data);
+>  
+>  	platform_set_drvdata(pdev, drvdata);
+>  
+> @@ -1127,15 +1130,15 @@ static void samsung_pinctrl_suspend_dev(
+>  
+>  	if (drvdata->suspend)
+>  		drvdata->suspend(drvdata);
+> +	if (drvdata->retention_ctrl && drvdata->retention_ctrl->on)
+> +		drvdata->retention_ctrl->on(drvdata);
+> +
 
-Sounds like a plan. Many thanks!
+This new line is not needed (checkpatch might complain... either in
+normal mode or in strict). Beside that, thanks for splitting the
+patch for interface from the implementation:
 
-Regards,
-Andreas
+Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Best regards,
+Krzysztof
