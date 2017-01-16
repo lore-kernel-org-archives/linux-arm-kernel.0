@@ -1,38 +1,67 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Mon, 16 Jan 2017 18:08:31 +0800
-Subject: [PATCH v2 11/11] drm/rockchip/dsi: fix insufficient bandwidth of some
- panel
-In-Reply-To: <1484561311-494-1-git-send-email-zyw@rock-chips.com>
-References: <1484561311-494-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1484561311-494-12-git-send-email-zyw@rock-chips.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Mon, 16 Jan 2017 11:13:16 +0100
+Subject: [PATCH 03/10] devicetree: bindings: add bindings for ahci-da850
+In-Reply-To: <35ff358d-9b17-b2be-38d8-6a51cdddc1a1@lechnology.com>
+References: <1484311084-31547-1-git-send-email-bgolaszewski@baylibre.com>
+ <1484311084-31547-4-git-send-email-bgolaszewski@baylibre.com>
+ <35ff358d-9b17-b2be-38d8-6a51cdddc1a1@lechnology.com>
+Message-ID: <CAMpxmJUau9BgAOhacPvcA=NwyE6-yEfDgPdcCZ_JCuNH-amJSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set the lanes bps to 1 / 0.9 times of pclk, the margin is not enough
-for some panel, it will cause the screen display is not normal, so
-increases the badnwidth to 1 / 0.8.
+2017-01-13 20:25 GMT+01:00 David Lechner <david@lechnology.com>:
+> On 01/13/2017 06:37 AM, Bartosz Golaszewski wrote:
+>>
+>> Add DT bindings for the TI DA850 AHCI SATA controller.
+>>
+>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>> ---
+>>  .../devicetree/bindings/ata/ahci-da850.txt          | 21
+>> +++++++++++++++++++++
+>>  1 file changed, 21 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/ata/ahci-da850.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/ata/ahci-da850.txt
+>> b/Documentation/devicetree/bindings/ata/ahci-da850.txt
+>> new file mode 100644
+>> index 0000000..d07c241
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/ata/ahci-da850.txt
+>> @@ -0,0 +1,21 @@
+>> +Device tree binding for the TI DA850 AHCI SATA Controller
+>> +---------------------------------------------------------
+>> +
+>> +Required properties:
+>> +  - compatible: must be "ti,da850-ahci"
+>> +  - reg: physical base addresses and sizes of the controller's register
+>> areas
+>> +  - interrupts: interrupt specifier (refer to the interrupt binding)
+>> +
+>> +Optional properties:
+>> +  - clocks: clock specifier (refer to the common clock binding)
+>> +  - da850,clk_multiplier: the multiplier for the reference clock needed
+>> +                          for 1.5GHz PLL output
+>
+>
+> A clock multiplier property seems redundant if you are specifying a clock.
+> It should be possible to get the rate from the clock to determine which
+> multiplier is needed.
+>
 
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+I probably should have named it differently. This is not a multiplier
+of a clock derived from PLL0 or PLL1. Instead it's a value set by
+writing to the Port PHY Control Register (MPY bits) of the SATA
+controller that configures the multiplier for the external low-jitter
+clock. On the lcdk the signals (REFCLKP, REFCLKN) are provided by
+CDCM61001 (SATA OSCILLATOR component on the schematics).
 
----
+I'll find a better name and comment the property accordingly.
 
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+FYI: the da850 platform does not use the common clock framework, so I
+don't specify the clock property on the sata node in the device tree.
+Instead I add the clock lookup entry in patch [01/10]. This is
+transparent for AHCI which can get the clock as usual by calling
+clk_get() in ahci_platform_get_resources().
 
-diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 9dfa73d..5a973fe 100644
---- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-+++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -501,8 +501,8 @@ static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi)
- 
- 	mpclk = DIV_ROUND_UP(dsi->mode->clock, MSEC_PER_SEC);
- 	if (mpclk) {
--		/* take 1 / 0.9, since mbps must big than bandwidth of RGB */
--		tmp = mpclk * (bpp / dsi->lanes) * 10 / 9;
-+		/* take 1 / 0.8, since mbps must big than bandwidth of RGB */
-+		tmp = mpclk * (bpp / dsi->lanes) * 10 / 8;
- 		if (tmp < max_mbps)
- 			target_mbps = tmp;
- 		else
--- 
-2.6.3
+Thanks,
+Bartosz Golaszewski
