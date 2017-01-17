@@ -1,43 +1,172 @@
-From: ping.bai@nxp.com (Jacky Bai)
-Date: Tue, 17 Jan 2017 06:35:25 +0000
-Subject: [PATCH v2 05/12] Document: dt: binding: imx: update pinctrl doc
- for imx6sll
-In-Reply-To: <CACRpkda1a4+yOrzBnKs6J84PS0StwQ68gHxDub_u7i5ofU9s7w@mail.gmail.com>
-References: <1482832070-22668-1-git-send-email-ping.bai@nxp.com>
- <1482832070-22668-6-git-send-email-ping.bai@nxp.com>
- <CACRpkdYUME8K+JusA0ORRKqxyBuhDdyei8eg7UZbHidKw9=bQw@mail.gmail.com>
- <AM3PR04MB5304992095753B761E66A9A87640@AM3PR04MB530.eurprd04.prod.outlook.com>
- <CACRpkdYTpEHyzBY-mA4YUsj=xt46Pibka3-4VHwUXosfgbgp1Q@mail.gmail.com>
- <AM3PR04MB530A88C5C0E7C6AD2C59B9E87790@AM3PR04MB530.eurprd04.prod.outlook.com>
- <CACRpkda1a4+yOrzBnKs6J84PS0StwQ68gHxDub_u7i5ofU9s7w@mail.gmail.com>
-Message-ID: <AM3PR04MB530F532D867C08824DADDC9877C0@AM3PR04MB530.eurprd04.prod.outlook.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 16 Jan 2017 22:58:36 -0800
+Subject: [PATCH v3 2/3] arm64: dts: juno: fix CoreSight support for Juno
+ r1/r2 variants
+In-Reply-To: <1484234410-7670-3-git-send-email-sudeep.holla@arm.com>
+References: <1484234410-7670-1-git-send-email-sudeep.holla@arm.com>
+ <1484234410-7670-3-git-send-email-sudeep.holla@arm.com>
+Message-ID: <CAOesGMj_23cehRP0ftdM_+Wvuj3tUWi5T5+w5z5v62zfkLu9+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: Re: [PATCH v2 05/12] Document: dt: binding: imx: update pinctrl doc
-> for imx6sll
-> 
-> On Thu, Jan 12, 2017 at 3:57 AM, Jacky Bai <ping.bai@nxp.com> wrote:
-> 
-> > Another thing is that we can use a pins-tool program developed by NXP
-> > to  generate the pinctrl configuration code that can be used directly
-> > in dts. This tiny program can avoid pin function conflict. As on i.MX,
-> > there are so may pins, each pin can be used for up 8  function.
-> > Configuring the pins is a time-consuming work.  This tools is very useful for
-> customer to generate the dts code.
-> 
-> I understand, but every silicon vendor has such a tool, all are different,
-> proprietary and unfriendly to programmers and open source developers, who
-> need to understand how the hardware is working without magic tools and
-> secret data sheets to fix bugs.
-> 
-> For the people working with maintaining the code it is paramount that DTS files
-> are self-descriptive.
-> 
+Hi,
 
-OK.  Thanks for your comments.  Adding generic-pinconf in imx pinctrl needs some time
-to finish and the legacy method still need be here even if generic-pinconf is added. 
-Do you plan to pick this legacy binding patch for now?
+On Thu, Jan 12, 2017 at 7:20 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> From: Mike Leach <mike.leach@linaro.org>
+>
+> The CoreSight support added for Juno is valid for only Juno r0.
+> The Juno r1 and r2 variants have additional components and alternative
+> connection routes between trace source and sinks.
+>
+> This patch builds on top of the existing r0 support and extends it to
+> Juno r1/r2 variants.
+>
+> Signed-off-by: Mike Leach <mike.leach@linaro.org>
+> [sudeep.holla at arm.com: minor changelog update and reorganising the common
+>         coresight components back into juno-base.dtsi to avoid duplication]
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi | 102 ++++++++++++++++++++++++++++++
+>  arch/arm64/boot/dts/arm/juno-r1.dts       |   9 +++
+>  arch/arm64/boot/dts/arm/juno-r2.dts       |   9 +++
+>  3 files changed, 120 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+>
+> diff --git a/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+> new file mode 100644
+> index 000000000000..89fcef366ff9
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+> @@ -0,0 +1,102 @@
+> +       csys1_funnel at 20130000 {
+> +               compatible = "arm,coresight-funnel", "arm,primecell";
+> +               reg = <0 0x20130000 0 0x1000>;
+> +
+> +               clocks = <&soc_smc50mhz>;
+> +               clock-names = "apb_pclk";
+> +               power-domains = <&scpi_devpd 0>;
+> +               ports {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +
+> +                       /* input port */
+> +                       port at 0 {
+> +                               reg = <0>;
+> +                               csys1_funnel_out_port: endpoint {
+> +                                       remote-endpoint =
+> +                                               <&etf1_in_port>;
+> +                               };
+> +                       };
+> +
+> +                       /* output port */
+> +                       port at 1 {
+> +                               reg = <0>;
+> +                               csys1_funnel_in_port0: endpoint {
+> +                                       slave-mode;
+> +                               };
+> +                       };
+> +
+> +               };
+> +       };
+> +
+> +       etf1 at 20140000 {
 
-> Yours,
-> Linus Walleij
+The concept behind device-tree is that you name the nodes based on the
+type of device they are. "i2c", "ethernet", etc. Not "eth0", "i2c3",
+and so on.
+
+So, this should probably be something else than "etf1", and the
+etf->etf0 rename you did somewhere else shouldn't be made either.
+
+csys1_funnel should probably/maybe be named something more generic as well.
+
+
+
+> +               compatible = "arm,coresight-tmc", "arm,primecell";
+> +               reg = <0 0x20140000 0 0x1000>;
+> +
+> +               clocks = <&soc_smc50mhz>;
+> +               clock-names = "apb_pclk";
+> +               power-domains = <&scpi_devpd 0>;
+> +               ports {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +
+> +                       /* input port */
+> +                       port at 0 {
+> +                               reg = <0>;
+> +                               etf1_in_port: endpoint {
+> +                                       slave-mode;
+> +                                       remote-endpoint =
+> +                                               <&csys1_funnel_out_port>;
+> +                               };
+> +                       };
+> +
+> +                       /* output port */
+> +                       port at 1 {
+> +                               reg = <0>;
+> +                               etf1_out_port: endpoint {
+> +                                       remote-endpoint =
+> +                                               <&csys2_funnel_in_port1>;
+> +                               };
+> +                       };
+> +               };
+> +       };
+> +
+> +       csys2_funnel at 20150000 {
+> +               compatible = "arm,coresight-funnel", "arm,primecell";
+> +               reg = <0 0x20150000 0 0x1000>;
+> +
+> +               clocks = <&soc_smc50mhz>;
+> +               clock-names = "apb_pclk";
+> +               power-domains = <&scpi_devpd 0>;
+> +               ports {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +
+> +                       /* output port */
+> +                       port at 0 {
+> +                               reg = <0>;
+> +                               csys2_funnel_out_port: endpoint {
+> +                                       remote-endpoint =
+> +                                               <&replicator_in_port0>;
+> +                               };
+> +                       };
+> +
+> +                       /* input ports */
+> +                       port at 1 {
+> +                               reg = <0>;
+> +                               csys2_funnel_in_port0: endpoint {
+> +                                       slave-mode;
+> +                                       remote-endpoint = <&etf0_out_port>;
+> +                               };
+> +                       };
+> +
+> +                       port at 2 {
+> +                               reg = <1>;
+> +                               csys2_funnel_in_port1: endpoint {
+> +                                       slave-mode;
+> +                                       remote-endpoint = <&etf1_out_port>;
+> +                               };
+> +                       };
+> +
+> +               };
+> +       };
+> diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
+> index eec37feee8fc..d4b85d9d343e 100644
+> --- a/arch/arm64/boot/dts/arm/juno-r1.dts
+> +++ b/arch/arm64/boot/dts/arm/juno-r1.dts
+> @@ -178,6 +178,7 @@
+>         };
+>
+>         #include "juno-base.dtsi"
+> +       #include "juno-cs-r1r2.dtsi"
+
+Please don't nest dtsi inside a structure like this. We normally let
+them stand by themselves at the top of the file instead.
+
+(yes, please fix for juno-base too).
+
+
+
+-Olof
