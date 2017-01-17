@@ -1,53 +1,60 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Tue, 17 Jan 2017 04:35:10 +0100
-Subject: [PATCH 1/2] ARM64: dts: meson-gxm: Add R-Box Pro
-In-Reply-To: <20170117030611.23827-2-afaerber@suse.de>
-References: <20170117030611.23827-1-afaerber@suse.de>
- <20170117030611.23827-2-afaerber@suse.de>
-Message-ID: <63fbfc68-917f-68b2-9e7d-e1834e2841d3@suse.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 17 Jan 2017 14:36:50 +1100
+Subject: [PATCH v1 2/2] arm: dts: mt2701: add nor flash node
+In-Reply-To: <20170116094032.6f471f11@bbrezillon>
+References: <1484291609-20195-1-git-send-email-guochun.mao@mediatek.com>
+ <1484291609-20195-3-git-send-email-guochun.mao@mediatek.com>
+ <20170113151747.6bc85245@bbrezillon>
+ <d7b866ad-5b2f-62d3-3aa3-6fa42803d625@gmail.com>
+ <b850b751-1d8d-0053-cf1f-d5314542e5c3@gmail.com>
+ <20170113172825.75d545a3@bbrezillon>
+ <86c997be-f500-eaa1-3ba5-d21cff6223b7@gmail.com>
+ <20170113175628.1793f433@bbrezillon>
+ <0fafcd8d-cf99-de6b-728f-5e3637810b68@gmail.com>
+ <20170114092958.022f2fc8@bbrezillon>
+ <e7fa1542-f0e2-0e45-23b3-25d6491ae40d@gmail.com>
+ <20170116094032.6f471f11@bbrezillon>
+Message-ID: <20170117143650.5db87148@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 17.01.2017 um 04:06 schrieb Andreas F?rber:
-> +	leds {
-> +		compatible = "gpio-leds";
-> +
-> +		blue {
-> +			label = "rbox-pro:blue:on";
-> +			gpios = <&gpio_ao GPIOAO_9 GPIO_ACTIVE_HIGH>;
-> +			default-state = "on";
-> +		};
-> +
-> +		red {
-> +			label = "rbox-pro:red:standby";
-> +			gpios = <&gpio GPIODV_28 GPIO_ACTIVE_HIGH>;
-> +			default-state = "off";
-> +			retain-state-suspended;
-> +			panic-indicator;
-> +		};
-> +	};
+Hello,
 
-The original property names for these two were led and red. If anyone
-has better label names than the above, please speak up. Ditto for
-vega-s95. On the odroidc2 it's called alive but uses heartbeat there.
+(Side note: you guys should learn about stripping irrelevant parts of
+an e-mail when replying!)
 
-The vendor device tree had a third "mcu" GPIO in the sysled node,
-GPIOAO_6, which leads to immediate power-off. I tried using
-"gpio-poweroff" to configure this pin, but that driver fails to
-initialize because some pm callback is already registered - I assume
-from psci, which apparently succeeds to power-off the system, too. For
-comparison, the S905 based Vega S95 Telos has no such mcu property. Any
-thoughts?
+On Mon, 16 Jan 2017 09:40:32 +0100, Boris Brezillon wrote:
 
-Also, any ideas how best to switch from blue to red for suspend? Add
-pinctrl properties above? systemd service doing echo from userspace? I
-assume in Android the Amlogic sysled driver handles all that logic -
-didn't find any suspend equivalent to gpio-poweroff.
+> > Well this is OK I guess, but then you can also use "mediatek,mt8173-nor"
+> > as the oldest supported compatible and be done with it, no ? It looks a
+> > bit crappy though, I admit that ...
+> 
+> Let's stop bikeshedding and wait for DT maintainers feedback
+> before taking a decision ;-).
+> 
+> Rob, Mark, any opinion?
 
-Regards,
-Andreas
+I agree that a clarification would be good. There are really two
+options:
 
+ 1. Have two compatible strings in the DT, the one that matches the
+    exact SoC where the IP is found (first compatible string) and the
+    one that matches some other SoC where the same IP is found (second
+    compatible string). Originally, Linux only supports the second
+    compatible string in its device driver, but if it happens that a
+    difference is found between two IPs that we thought were the same,
+    we can add support for the first compatible string in the driver,
+    with a slightly different behavior.
+
+ 2. Have a single compatible string in the DT, matching the exact SoC
+    where the IP is found. This involves adding immediately this
+    compatible string in the corresponding driver.
+
+I've not really been able to figure out which of the two options is the
+most future-proof/appropriate.
+
+Thomas
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
