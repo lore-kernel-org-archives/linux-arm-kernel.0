@@ -1,38 +1,31 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Wed, 18 Jan 2017 00:06:07 +0100
-Subject: [PATCH 1/2] ARM64: dts: meson-gxm: Add R-Box Pro
-In-Reply-To: <20170117030611.23827-2-afaerber@suse.de>
-References: <20170117030611.23827-1-afaerber@suse.de>
- <20170117030611.23827-2-afaerber@suse.de>
-Message-ID: <3005a457-b7cf-393b-42ff-4149e080321c@suse.de>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 17 Jan 2017 15:07:12 -0800
+Subject: [PATCH] ARM: smp: Remove CPU: shutdown notice
+Message-ID: <20170117230714.6799-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 17.01.2017 um 04:06 schrieb Andreas F?rber:
-> diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
-> index 0d7bfbf7d922..66bc809a5eae 100644
-> --- a/arch/arm64/boot/dts/amlogic/Makefile
-> +++ b/arch/arm64/boot/dts/amlogic/Makefile
-> @@ -12,6 +12,7 @@ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-nexbox-a95x.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-s912-q200.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-s912-q201.dtb
->  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-nexbox-a1.dtb
+This message is not particularly informative, and is not paired with an
+identical message when a CPU is brought online. Finally, it slows the
+CPU hotplug path down, thus allowing less CPU hotplug operations per
+second. Just remove it.
 
-What is the logic behind meson-gxm-s912-q201 vs. meson-gxm-nexbox-a1?
-Should it be renamed to include -s912 for consistency?
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ arch/arm/kernel/smp.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-> +dtb-$(CONFIG_ARCH_MESON) += meson-gxm-rbox-pro.dtb
-
-Should this new board use meson-gxm-s912-?
-
->  
->  always		:= $(dtb-y)
->  subdir-y	:= $(dts-dirs)
-
-Regards,
-Andreas
-
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 7dd14e8395e6..b3e02751ab64 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -251,7 +251,6 @@ void __cpu_die(unsigned int cpu)
+ 		pr_err("CPU%u: cpu didn't die\n", cpu);
+ 		return;
+ 	}
+-	pr_notice("CPU%u: shutdown\n", cpu);
+ 
+ 	/*
+ 	 * platform_cpu_kill() is generally expected to do the powering off
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+2.9.3
