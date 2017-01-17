@@ -1,119 +1,56 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 17 Jan 2017 15:22:37 +0000
-Subject: [PATCH 10/10] crypto: arm64/aes - replace scalar fallback with plain
- NEON fallback
-In-Reply-To: <1484666557-31458-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1484666557-31458-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1484666557-31458-11-git-send-email-ard.biesheuvel@linaro.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 17 Jan 2017 15:25:49 +0000
+Subject: CONFIG_PCIEASPM breaks PCIe on Marvell Armada 385 machine
+In-Reply-To: <20170117151444.GE22776@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170111194942.q5rdma2es6hkmxfe@perseus.defre.kleine-koenig.org>
+ <20170117151444.GE22776@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20170117152548.GB27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new bitsliced NEON implementation of AES uses a fallback in two
-places: CBC encryption (which is strictly sequential, whereas this
-driver can only operate efficiently on 8 blocks at a time), and the
-XTS tweak generation, which involves encrypting a single AES block
-with a different key schedule.
+On Tue, Jan 17, 2017 at 09:14:44AM -0600, Bjorn Helgaas wrote:
+> On Wed, Jan 11, 2017 at 08:49:46PM +0100, Uwe Kleine-K?nig wrote:
+> > Hello,
+> > 
+> > on an Marvell Armada 385 based machine (Turris Omnia) with 4.9 the
+> > ath10k driver fails to bind to the matching hardware if CONFIG_PCIEASPM
+> > is enabled:
+> > 
+> > # dmesg | grep ath
+> > [    7.207770] ath10k_pci 0000:02:00.0: Refused to change power state, currently in D3
+> > [    7.237955] ath10k_pci 0000:02:00.0: failed to wake up device : -110
+> > [    7.238146] ath10k_pci: probe of 0000:02:00.0 failed with error -110
+> > 
+> > if however PCIEASPM is off, the driver probes correctly and the ath10k
+> > adapter works fine.
+> > 
+> > I wonder if someone has an idea what needs to be done to fix this
+> > problem. (OK, I could disable PCIEASPM, but I'd like to have a solution
+> > for a distribution kernel where I think PCIEASPM=y is sensible in
+> > general.)
+> 
+> Can somebody confirm that this system (Marvell Armada 385-based Turris
+> Omnia) does actually support ASPM in hardware?
 
-The plain (i.e., non-bitsliced) NEON code is more suitable as a fallback,
-given that it is faster than scalar on low end cores (which is what
-the NEON implementations target, since high end cores have dedicated
-instructions for AES), and shows similar behavior in terms of D-cache
-footprint and sensitivity to cache timing attacks. So switch the fallback
-handling to the plain NEON driver.
+What sort of "hardware" are you referring to?
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/crypto/Kconfig           |  2 +-
- arch/arm64/crypto/aes-neonbs-glue.c | 38 ++++++++++++++------
- 2 files changed, 29 insertions(+), 11 deletions(-)
+>From my reading of the specs, ASPM doesn't require any external hardware.
+It's all done inside the PCIe root hub and PCIe device.
 
-diff --git a/arch/arm64/crypto/Kconfig b/arch/arm64/crypto/Kconfig
-index 5de75c3dcbd4..bed7feddfeed 100644
---- a/arch/arm64/crypto/Kconfig
-+++ b/arch/arm64/crypto/Kconfig
-@@ -86,7 +86,7 @@ config CRYPTO_AES_ARM64_BS
- 	tristate "AES in ECB/CBC/CTR/XTS modes using bit-sliced NEON algorithm"
- 	depends on KERNEL_MODE_NEON
- 	select CRYPTO_BLKCIPHER
--	select CRYPTO_AES_ARM64
-+	select CRYPTO_AES_ARM64_NEON_BLK
- 	select CRYPTO_SIMD
- 
- endif
-diff --git a/arch/arm64/crypto/aes-neonbs-glue.c b/arch/arm64/crypto/aes-neonbs-glue.c
-index 323dd76ae5f0..863e436ecf89 100644
---- a/arch/arm64/crypto/aes-neonbs-glue.c
-+++ b/arch/arm64/crypto/aes-neonbs-glue.c
-@@ -10,7 +10,6 @@
- 
- #include <asm/neon.h>
- #include <crypto/aes.h>
--#include <crypto/cbc.h>
- #include <crypto/internal/simd.h>
- #include <crypto/internal/skcipher.h>
- #include <crypto/xts.h>
-@@ -42,7 +41,12 @@ asmlinkage void aesbs_xts_encrypt(u8 out[], u8 const in[], u8 const rk[],
- asmlinkage void aesbs_xts_decrypt(u8 out[], u8 const in[], u8 const rk[],
- 				  int rounds, int blocks, u8 iv[]);
- 
--asmlinkage void __aes_arm64_encrypt(u32 *rk, u8 *out, const u8 *in, int rounds);
-+/* borrowed from aes-neon-blk.ko */
-+asmlinkage void neon_aes_ecb_encrypt(u8 out[], u8 const in[], u32 const rk[],
-+				     int rounds, int blocks, int first);
-+asmlinkage void neon_aes_cbc_encrypt(u8 out[], u8 const in[], u32 const rk[],
-+				     int rounds, int blocks, u8 iv[],
-+				     int first);
- 
- struct aesbs_ctx {
- 	u8	rk[13 * (8 * AES_BLOCK_SIZE) + 32];
-@@ -140,16 +144,28 @@ static int aesbs_cbc_setkey(struct crypto_skcipher *tfm, const u8 *in_key,
- 	return 0;
- }
- 
--static void cbc_encrypt_one(struct crypto_skcipher *tfm, const u8 *src, u8 *dst)
-+static int cbc_encrypt(struct skcipher_request *req)
- {
-+	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
- 	struct aesbs_cbc_ctx *ctx = crypto_skcipher_ctx(tfm);
-+	struct skcipher_walk walk;
-+	int err, first = 1;
- 
--	__aes_arm64_encrypt(ctx->enc, dst, src, ctx->key.rounds);
--}
-+	err = skcipher_walk_virt(&walk, req, true);
- 
--static int cbc_encrypt(struct skcipher_request *req)
--{
--	return crypto_cbc_encrypt_walk(req, cbc_encrypt_one);
-+	kernel_neon_begin();
-+	while (walk.nbytes >= AES_BLOCK_SIZE) {
-+		unsigned int blocks = walk.nbytes / AES_BLOCK_SIZE;
-+
-+		/* fall back to the non-bitsliced NEON implementation */
-+		neon_aes_cbc_encrypt(walk.dst.virt.addr, walk.src.virt.addr,
-+				     ctx->enc, ctx->key.rounds, blocks, walk.iv,
-+				     first);
-+		err = skcipher_walk_done(&walk, walk.nbytes % AES_BLOCK_SIZE);
-+		first = 0;
-+	}
-+	kernel_neon_end();
-+	return err;
- }
- 
- static int cbc_decrypt(struct skcipher_request *req)
-@@ -254,9 +270,11 @@ static int __xts_crypt(struct skcipher_request *req,
- 
- 	err = skcipher_walk_virt(&walk, req, true);
- 
--	__aes_arm64_encrypt(ctx->twkey, walk.iv, walk.iv, ctx->key.rounds);
--
- 	kernel_neon_begin();
-+
-+	neon_aes_ecb_encrypt(walk.iv, walk.iv, ctx->twkey,
-+			     ctx->key.rounds, 1, 1);
-+
- 	while (walk.nbytes >= AES_BLOCK_SIZE) {
- 		unsigned int blocks = walk.nbytes / AES_BLOCK_SIZE;
- 
+The PCIe spec specifically prohibits cutting power supplies and clocks to
+PCIe devices during L0s and L1, with the exception that the PCIe clock may
+be stopped in L1 if CLKREQ# is deasserted.  CLKREQ# handling generally
+requires GPIO usage, and as there's no support for that, there's no support
+for stopping the PCIe clock in L1.  We do the correct thing there,
+preventing the PCI_EXP_LNKCTL_CLKREQ_EN bit being set.
+
+That all said, it would probably be a good idea to throw some printk()
+debugging into mvebu_sw_pci_bridge_write() and mvebu_sw_pci_bridge_read()
+so we can see what's going on at that level, and maybe also some debug
+in mvebu_pcie_hw_wr_conf() and mvebu_pcie_hw_rd_conf() so we can see
+what's happening at the PCIe device too.
+
 -- 
-2.7.4
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
