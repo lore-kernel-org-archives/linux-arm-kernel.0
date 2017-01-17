@@ -1,135 +1,188 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 17 Jan 2017 12:15:11 +0000
-Subject: [PATCH v4 2/4] arm64: dts: juno: refactor CoreSight support on Juno r0
+Date: Tue, 17 Jan 2017 12:15:12 +0000
+Subject: [PATCH v4 3/4] arm64: dts: juno: add CoreSight support for Juno r1/r2
+ variants
 In-Reply-To: <1484655313-9025-1-git-send-email-sudeep.holla@arm.com>
 References: <1484655313-9025-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1484655313-9025-3-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1484655313-9025-4-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the Coresight components are supported only on Juno r0
-variant. In preparation to add support to Juno r1/r2 variants, this
-patch refactors the existing coresight device nodes so that r1/r2
-support can be added easily.
+From: Mike Leach <mike.leach@linaro.org>
 
-It also cleans up some of the device node names which were previously
-named so as they were confused as the labels rather than the node names.
+The CoreSight support added for Juno is valid for only Juno r0.
+The Juno r1 and r2 variants have additional components and alternative
+connection routes between trace source and sinks.
 
-Reviewed-and-Tested-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+This patch builds on top of the existing r0 support and extends it to
+Juno r1/r2 variants.
+
+Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Mike Leach <mike.leach@linaro.org>
+[sudeep.holla at arm.com: minor changelog update and major reorganisation of
+	the common coresight components back into juno-base.dtsi to avoid
+	duplication, also renamed funnel node names]
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- arch/arm64/boot/dts/arm/juno-base.dtsi | 20 ++++++++++----------
- arch/arm64/boot/dts/arm/juno.dts       |  8 ++++++++
- 2 files changed, 18 insertions(+), 10 deletions(-)
+ arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi | 100 ++++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/arm/juno-r1.dts       |   9 +++
+ arch/arm64/boot/dts/arm/juno-r2.dts       |   9 +++
+ 3 files changed, 118 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
 
-diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-index 580afaee978f..faedf357db3b 100644
---- a/arch/arm64/boot/dts/arm/juno-base.dtsi
-+++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-@@ -86,7 +86,7 @@
- 	 * The actual size is just 4K though 64K is reserved. Access to the
- 	 * unmapped reserved region results in a DECERR response.
- 	 */
--	etf at 20010000 {
-+	etf at 20010000 { /* ETF 0 */
- 		compatible = "arm,coresight-tmc", "arm,primecell";
- 		reg = <0 0x20010000 0 0x1000>;
-
-@@ -100,7 +100,7 @@
- 			/* input port */
- 			port at 0 {
- 				reg = <0>;
--				etf_in_port: endpoint {
-+				etf0_in_port: endpoint {
- 					slave-mode;
- 					remote-endpoint = <&main_funnel_out_port>;
- 				};
-@@ -109,8 +109,7 @@
- 			/* output port */
- 			port at 1 {
- 				reg = <0>;
--				etf_out_port: endpoint {
--					remote-endpoint = <&replicator_in_port0>;
-+				etf0_out_port: endpoint {
- 				};
- 			};
- 		};
-@@ -131,7 +130,8 @@
- 		};
- 	};
-
--	main-funnel at 20040000 {
-+	/* main funnel on Juno r0, cssys0 funnel on Juno r1/r2 as per TRM*/
-+	main_funnel: funnel at 20040000 {
- 		compatible = "arm,coresight-funnel", "arm,primecell";
- 		reg = <0 0x20040000 0 0x1000>;
-
-@@ -142,13 +142,15 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-
+diff --git a/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+new file mode 100644
+index 000000000000..563463ed28c7
+--- /dev/null
++++ b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+@@ -0,0 +1,100 @@
++/ {
++	funnel at 20130000 { /* cssys2 */
++		compatible = "arm,coresight-funnel", "arm,primecell";
++		reg = <0 0x20130000 0 0x1000>;
++
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		power-domains = <&scpi_devpd 0>;
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
 +			/* output port */
- 			port at 0 {
- 				reg = <0>;
- 				main_funnel_out_port: endpoint {
--					remote-endpoint = <&etf_in_port>;
-+					remote-endpoint = <&etf0_in_port>;
- 				};
- 			};
-
++			port at 0 {
++				reg = <0>;
++				csys1_funnel_out_port: endpoint {
++					remote-endpoint = <&etf1_in_port>;
++				};
++			};
++
++			/* input port */
++			port at 1 {
++				reg = <0>;
++				csys1_funnel_in_port0: endpoint {
++					slave-mode;
++				};
++			};
++
++		};
++	};
++
++	etf at 20140000 { /* ETF 1 */
++		compatible = "arm,coresight-tmc", "arm,primecell";
++		reg = <0 0x20140000 0 0x1000>;
++
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		power-domains = <&scpi_devpd 0>;
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			/* input port */
++			port at 0 {
++				reg = <0>;
++				etf1_in_port: endpoint {
++					slave-mode;
++					remote-endpoint = <&csys1_funnel_out_port>;
++				};
++			};
++
++			/* output port */
++			port at 1 {
++				reg = <0>;
++				etf1_out_port: endpoint {
++					remote-endpoint = <&csys2_funnel_in_port1>;
++				};
++			};
++		};
++	};
++
++	funnel at 20150000 { /* cssys2 */
++		compatible = "arm,coresight-funnel", "arm,primecell";
++		reg = <0 0x20150000 0 0x1000>;
++
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		power-domains = <&scpi_devpd 0>;
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			/* output port */
++			port at 0 {
++				reg = <0>;
++				csys2_funnel_out_port: endpoint {
++					remote-endpoint = <&replicator_in_port0>;
++				};
++			};
++
 +			/* input ports */
- 			port at 1 {
- 				reg = <0>;
- 				main_funnel_in_port0: endpoint {
-@@ -164,7 +166,6 @@
- 					remote-endpoint = <&cluster1_funnel_out_port>;
- 				};
- 			};
--
- 		};
- 	};
++			port at 1 {
++				reg = <0>;
++				csys2_funnel_in_port0: endpoint {
++					slave-mode;
++					remote-endpoint = <&etf0_out_port>;
++				};
++			};
++
++			port at 2 {
++				reg = <1>;
++				csys2_funnel_in_port1: endpoint {
++					slave-mode;
++					remote-endpoint = <&etf1_out_port>;
++				};
++			};
++
++		};
++	};
++};
+diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
+index b883a8afb6f4..aef138aa5765 100644
+--- a/arch/arm64/boot/dts/arm/juno-r1.dts
++++ b/arch/arm64/boot/dts/arm/juno-r1.dts
+@@ -10,6 +10,7 @@
 
-@@ -198,7 +199,7 @@
- 		};
- 	};
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include "juno-base.dtsi"
++#include "juno-cs-r1r2.dtsi"
 
--	cluster0-funnel at 220c0000 {
-+	funnel at 220c0000 { /* cluster0 funnel */
- 		compatible = "arm,coresight-funnel", "arm,primecell";
- 		reg = <0 0x220c0000 0 0x1000>;
-
-@@ -262,7 +263,7 @@
- 		};
- 	};
-
--	cluster1-funnel at 230c0000 {
-+	funnel at 230c0000 { /* cluster1 funnel */
- 		compatible = "arm,coresight-funnel", "arm,primecell";
- 		reg = <0 0x230c0000 0 0x1000>;
-
-@@ -385,7 +386,6 @@
- 				reg = <0>;
- 				replicator_in_port0: endpoint {
- 					slave-mode;
--					remote-endpoint = <&etf_out_port>;
- 				};
- 			};
- 		};
-diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
-index 9967c808a92d..66fa4388d181 100644
---- a/arch/arm64/boot/dts/arm/juno.dts
-+++ b/arch/arm64/boot/dts/arm/juno.dts
-@@ -202,3 +202,11 @@
- &etm5 {
- 	cpu = <&A53_3>;
+ / {
+ 	model = "ARM Juno development board (r1)";
+@@ -226,3 +227,11 @@
+ &gpu1_thermal_zone {
+ 	status = "okay";
  };
 +
 +&etf0_out_port {
-+	remote-endpoint = <&replicator_in_port0>;
++	remote-endpoint = <&csys2_funnel_in_port0>;
 +};
 +
 +&replicator_in_port0 {
-+	remote-endpoint = <&etf0_out_port>;
++	remote-endpoint = <&csys2_funnel_out_port>;
++};
+diff --git a/arch/arm64/boot/dts/arm/juno-r2.dts b/arch/arm64/boot/dts/arm/juno-r2.dts
+index cfd8150bf30a..827da7c92607 100644
+--- a/arch/arm64/boot/dts/arm/juno-r2.dts
++++ b/arch/arm64/boot/dts/arm/juno-r2.dts
+@@ -10,6 +10,7 @@
+
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include "juno-base.dtsi"
++#include "juno-cs-r1r2.dtsi"
+
+ / {
+ 	model = "ARM Juno development board (r2)";
+@@ -226,3 +227,11 @@
+ &gpu1_thermal_zone {
+ 	status = "okay";
+ };
++
++&etf0_out_port {
++	remote-endpoint = <&csys2_funnel_in_port0>;
++};
++
++&replicator_in_port0 {
++	remote-endpoint = <&csys2_funnel_out_port>;
 +};
 --
 2.7.4
