@@ -1,94 +1,96 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Tue, 17 Jan 2017 14:50:03 -0600
-Subject: [PATCH v13 0/7] Enable PMUs in ACPI systems
-Message-ID: <1484686210-7211-1-git-send-email-jeremy.linton@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 17 Jan 2017 21:50:03 +0100
+Subject: [PATCH 1/2] dt-bindings: gpu: Add Mali Utgard bindings
+In-Reply-To: <CAJKOXPe5AWTK+NuVpiObzjEG+CFWB5_AeYncNkbkSXRr+4RQUQ@mail.gmail.com>
+References: <20170116132424.7038-1-maxime.ripard@free-electrons.com>
+ <20170116184906.r62di7xiil5lae33@kozik-lap>
+ <20170117093813.mxp2hgoxbgske6ru@lukather>
+ <4f5b8608-af6c-3ef5-aaf0-e7e034d006cd@baylibre.com>
+ <CAJKOXPe5AWTK+NuVpiObzjEG+CFWB5_AeYncNkbkSXRr+4RQUQ@mail.gmail.com>
+Message-ID: <20170117205003.5vrwo4gnsdse2isk@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch expands and reworks the patches published by Mark Salter
-in order to clean up a few of the previous review comments, as well as
-add support for newer CPUs and big/little configurations.
+On Tue, Jan 17, 2017 at 01:33:57PM +0200, Krzysztof Kozlowski wrote:
+> On Tue, Jan 17, 2017 at 12:22 PM, Neil Armstrong
+> <narmstrong@baylibre.com> wrote:
+> > On 01/17/2017 10:38 AM, Maxime Ripard wrote:
+> >> Hi,
+> >>
+> >> On Mon, Jan 16, 2017 at 08:49:06PM +0200, Krzysztof Kozlowski wrote:
+> >>> On Mon, Jan 16, 2017 at 02:24:23PM +0100, Maxime Ripard wrote:
+> >>>> The ARM Mali Utgard GPU family is embedded into a number of SoCs from
+> >>>> Allwinner, Amlogic, Mediatek or Rockchip.
+> >>>>
+> >>>> Add a binding for the GPU of that family.
+> >>>>
+> >>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> >>>> ---
+> >>>>  .../devicetree/bindings/gpu/arm,mali-utgard.txt    | 76 ++++++++++++++++++++++
+> >>>>  1 file changed, 76 insertions(+)
+> >>>>  create mode 100644 Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
+> >>>
+> >>> Do you have a driver in kernel which will implement these bindings?
+> >>
+> >> No, but we have bindings for out-of-tree drivers already.
+> >>
+> >>> Defining them for out-of-tree driver does not bring any benefits
+> >>> (3rd party driver will not respect them anyway).
+> >>
+> >> You could see it the other way around too. The out-of-tree drivers
+> >> don't respect it at the moment because there's no binding to respect.
+> >>
+> >> And at least for us, we definitely plan on doing that.
+> >>
+> >> Maxime
+> >
+> > Hi Maxime, Krzysztof,
+> >
+> > We hope this will be accepted so it will solve the same issue we have on Amlogic SoCs
+> > and all the other mali powered SoCs.
+> 
+> It will be helpful also for other SoCs using Mali 400 (e.g.
+> Exynos3250, Exynos4412).
 
-v13:
-- Correct int/bool conversion bug in pmu_acpi_init()
+Yep, hence why you were in Cc :)
 
-v12:
-- Rebase to 4.10
-- Removed lock in the hotplug path.
+> > Having mainline bindings will forcre out-of-tree driver to respect those bindings
+> > and remove a dts out-of-tree patch aswell.
+> 
+> I would argue here over the word "force". Having bindings defined here
+> does not force anyone into anything. The out-of-tree can do whatever
+> they want. It is a wish from kernel side - it might be respected but
+> it might not.
 
-v11:
-- Add is_smp() check to read_specific_cpuid() for arch/arm. Update
-  c_show() and various routines in arm_pmu_acpi() to use the macro.
-- Moved the duplicate "generic" pmu detection code into its own
-  patch and hoist it into arm_pmu_device_probe() so it works
-  for DT based systems as well.
+Well, that statement can be made for each line of the kernel itself,
+nothing forces you to use the code as is, or to make any kind of
+modifications, including to its ABI. You just have an incentive to
+respect the various frameworks and ABI because it's the path of least
+resistance and all the tools, libraries and applications already know
+how to use those interfaces.
 
-v10:
-- Rebase to 4.9
-- Rework the arm_perf_start_cpu changes to support the 4.9 hotplug
-  changes.
-- Remove the call to acpi_register_gsi() from the cpu online code path.
-  Instead the GSI's are registered during the initcall. This changes
-  the error handling a bit because we now try to clean up the
-  previously registered GSIs in a couple important places. This
-  was also a result of the rebase.
-- Dropped the MIDR partnumber usage, its no longer necessary to
-  differentiate by only the partnum, so this helps to clarify the code
-  a bit. 
-- Shuffle some code around and rename a few variables.
-- Added a few comments to hopefully clarify some questions people have
-  previously had about unused MADT entries, skipping processing cores
-  with MIDR=0, etc.
+But that's just it, an incentive, that anyone is free or not to comply
+to.
 
-v9:
-- Add/cleanup an additional hotplug patch I've had sitting around. This
-  patch brings the ACPI PMU mostly on par with the DT functionality with
-  respect to having CPUs offline during boot. This should help clarify
-  some of the code structuring.
-- Cleanup the list of PMU types early if we fail to allocate memory for an
-  additional pmu type.
+> Just to be sure - I am not opposed against. Some time ago I wanted
+> Mali400 to be upstreamed but with current policy about user-space side
+> it is not possible.
 
-v8:
-- Rebase to 4.8rc4
-- Assorted minor comment/hunk placement/etc tweaks per Punit Agrawal
+While I would also very much like to see the kernel driver upstreamed,
+this is unreasonable at this point. But this patch is here only to add
+a binding to it, so that the out-of-tree drivers can comply to it, and
+this is something we already have done.
 
-v7:
-- Rebase to 4.8rc3
-- Remove cpu affinity sysfs entry. While providing a CPU mask for
-  ARMv8 PMU's is really helpful in big/little environments, reworking
-  the PMU code to support the cpumask attribute for !arm64 PMUs is out
-  of the scope of this patch set.
-- Fix CPU miscount problem where an alloc failure followed by successfully
-  allocating the structure can result in under counting the CPUs associated
-  with the PMU. This bug was created in v6 with the conversion to a linked
-  list.
--  Remove initial platform device creation code by Mark Salter, and re-squash
-   multiple platform device creation code together with helper routines.
-   Other minor tweakage.
-
-Jeremy Linton (6):
-  arm64: Rename the common MADT parse routine
-  arm: arm64: Add routine to determine cpuid of other cpus
-  arm: arm64: pmu: Assign platform PMU CPU affinity
-  arm64: pmu: Detect multiple generic PMUs and append counter
-  arm64: pmu: Detect and enable multiple PMUs in an ACPI system
-  arm: pmu: Add PMU definitions for cores not initially online
-
-Mark Salter (1):
-  arm64: pmu: Cache PMU interrupt numbers from MADT parse
-
- arch/arm/include/asm/cputype.h   |   4 +
- arch/arm/kernel/setup.c          |   2 +-
- arch/arm64/include/asm/cputype.h |   3 +
- arch/arm64/kernel/perf_event.c   |   2 +-
- arch/arm64/kernel/smp.c          |  18 ++-
- drivers/perf/Kconfig             |   4 +
- drivers/perf/Makefile            |   1 +
- drivers/perf/arm_pmu.c           | 103 +++++++++++++--
- drivers/perf/arm_pmu_acpi.c      | 271 +++++++++++++++++++++++++++++++++++++++
- include/linux/perf/arm_pmu.h     |  12 ++
- 10 files changed, 400 insertions(+), 20 deletions(-)
- create mode 100644 drivers/perf/arm_pmu_acpi.c
+Maxime
 
 -- 
-2.5.5
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170117/9e0c63ec/attachment-0001.sig>
