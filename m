@@ -1,128 +1,69 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
 Date: Tue, 17 Jan 2017 09:21:27 +0100
-Subject: [PATCH v4] ARM64: dts: meson-gx: Add reserved memory zone and
- usable memory range
-In-Reply-To: <CAOesGMhYfhrd-hy=N-FYDEPmumR0=QNzn5xTLxFuKG7apo5qiw@mail.gmail.com>
-References: <1484129414-23325-1-git-send-email-narmstrong@baylibre.com>
- <m21sw66828.fsf@baylibre.com> <d3a00788-c3c1-4b10-90bf-2a8bc6a138f8@suse.de>
- <7fcb8d94-840a-de2c-f43b-9123ccc65514@baylibre.com>
- <CAOesGMhYfhrd-hy=N-FYDEPmumR0=QNzn5xTLxFuKG7apo5qiw@mail.gmail.com>
-Message-ID: <ecb5ff50-f5d5-ffe6-0732-faf5e51906f8@baylibre.com>
+Subject: [PATCH v1] ARM: dts: imx: add fsl, imx35-wdt compatible to all
+ relevant watchdog nodes
+In-Reply-To: <20170117012336.6891-1-vz@mleia.com>
+References: <20170117012336.6891-1-vz@mleia.com>
+Message-ID: <20170117082127.7kfxtvqg6t4a4ncc@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/17/2017 07:07 AM, Olof Johansson wrote:
-> On Mon, Jan 16, 2017 at 2:39 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
->> On 01/15/2017 03:43 PM, Andreas F?rber wrote:
->>> Am 13.01.2017 um 21:03 schrieb Kevin Hilman:
->>>> Neil Armstrong <narmstrong@baylibre.com> writes:
->>>>
->>>>> The Amlogic Meson GXBB/GXL/GXM secure monitor uses part of the memory space,
->>>>> this patch adds this reserved zone and redefines the usable memory range.
->>>>>
->>>>> The memory node is also moved from the dtsi files into the proper dts files
->>>>> to handle variants memory sizes.
->>>>>
->>>>> This patch also fixes the memory sizes for the following platforms :
->>>>> - gxl-s905x-p212 : 1GiB instead of 2GiB, a proper 2GiB dts should be pushed
->>>>> - gxm-s912-q201 : 1GiB instead of 2GiB, a proper 2GiB dts should be pushed
->>>>> - gxl-s905d-p231 : 1GiB instead of 2GiB, a proper 2GiB dts should be pushed
->>>>> - gxl-nexbox-a95x : 1GiB instead of 2GiB, a proper 2GiB dts should be pushed
->>>>>
->>>>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->>>>
->>>> Queued for v4.10-rc.
->>>
->>> What is the motivation for this change? I have a local U-Boot patch to
->>> detect the amount of memory available as done downstream, but U-Boot
->>> only updates the reg property that you seem to be abandoning here...
->>>
->>> So for devices that come in multiple RAM configurations - like R-Box Pro
->>> - this would require separate .dts files now! This looks very wrong to
->>> me, especially since I am not aware of other platforms doing the same.
->>> Instead, there's memory reservations for top and bottom done in U-Boot
->>> for reg, plus reserved-memory nodes for anything in the middle.
->>>
->>> Another thing to consider is that uEFI boot (bootefi) handles memory
->>> reservation differently yet again, on the bootloader level. I have had
->>> that working fine on Odroid-C2 and Vega S95.
->>>
->>> So if there's no bug this is fixing (none mentioned in commit message) I
->>> strongly object to this patch.
->>>
->>> Regards,
->>> Andreas
->>>
->>
->> Hi Andreas,
->>
->> Like I replied of my RFT patch :
->> I really disagree about relying on any work or properties added by any bootloader here, Amlogic SoCs has
->> a lot of u-boot versions in the field, and the Odroid-C2 is part of this.
->>
->> Even if Odroid-c2 is in mainline U-Boot or not, the mainline Linux kernel should work using
->> any U-boot version even with the one provided by Amlogic on their openlinux distribution channel.
->>
->> Handling multiple RAM configuration is another story, and the Arm-Soc and DT maintainers should give us
->> their advices.
+On Tue, Jan 17, 2017 at 03:23:36AM +0200, Vladimir Zapolskiy wrote:
+> Watchdog device controller found on all modern SoCs from i.MX series
+> and firstly introduced in i.MX35 is not one in one compatible with the
+> watchdog controllers on i.MX21, i.MX27 and i.MX31, the latter
+> controlles don't have WICR (and pretimeout notification support) and
+> WMCR registers. To get benefit from the more advanced watchdog device
+> and to avoid operations over non-existing registers on legacy SoCs add
+> fsl,imx35-wdt compatible to descriptions of all i.MX35 compatible
+> watchdog controllers.
 > 
-> Is there a way to detect what firmware is running and marking off
-> memory from early kernel init instead? That'll take care of the
-> concerns about memory size variance as well.
+> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+> ---
+> RFC change is found at https://patchwork.kernel.org/patch/9350007
 > 
->> Actually there is a severe bug fixed here that cause a huge crash if such memory is not reserved while
->> running stock u-boot version on various shipped products and Amlogic's own development boards.
->>
->> The bug is easily triggered by running :
->> # stress --vm 4 --vm-bytes 128M --timeout 10s &
->> [   46.937975] Bad mode in Error handler detected on CPU1, code 0xbf000000 -- SError
->> ...
->> [   47.058536] Internal error: Attempting to execute userspace memory: 8600000f [#3] PREEMPT SMP
->> ...
->>
->> Note this is a fix targeted for 4.10 to make the system stable and various users reported some severe
->> crash now the system has more drivers and read-world use-cases are running on Amlogic SoCs.
->>
->> Please feel free to push whatever changes that makes this memory reservation more coherent for 4.11,
->> and respect the behavior of already shipped u-boot version and mainline U-Boot, UEFI, whatever...
+> Changes from RFC to v1:
+> * added the same change to devicetree bindings documentation, thanks
+>   to Baruch Siach for review,
+> * replaced a new shared compatible derived from i.MX25 with an earlier
+>   from i.MX35 SoC one, thanks to Uwe Kleine-K?nig for review.
 > 
-> Technically we're not in regression territory here, since the platform
-> is obviously still in bringup and these aren't bugs that have been
-> introduced in this release. So I think we can take a little while to
-> sort out if there's a solution that, even if not ideal, at least is on
-> the path towards the proper fix and not away from it -- which this
-> seems to be.
-> 
-> 
-> -Olof
-> 
+> Compatible "fsl,imx21-wdt" is preserved as a generic one, because
+> interface to a watchdog controller on i.MX35 is a superset of the
+> interface to a i.MX21 watchdog controller.
 
-Hi Olof, Andreas,
+One could argue here, but apart from the discussion if this is correct
+or not, choosing this way has the upside that teaching the driver after
+this change about the i.MX35 type doesn't make the machines based on the
+newer type suffer from a breakage for one commit.
 
-As I finally understand, the real issue here is the usage of the "linux,useable-memory" property that
-overrides the reg property that is changed by the bootloader to provide the "real" memory size.
+>  Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt |  2 +-
 
-As I understand the mainline U-Boot does it right, and it's a good news, and it seems uEFI need to provide
-some specialized memory range aswell, but the vendor U-Boot versions only provide the full memory range here.
-It seems obvious that whatever range is provided by u-boot, the first 16MiB should be reserved.
+When I created my patch set for this breakage I wondered if the
+documentation should point out which are the unique types.
 
-The stress-ng package provides this "stress" command and is used to force the kernel to map more memory
-zones, but I also got the issue while running a fully fledged Desktop Environment thanks to the
-recently merged DRM driver.
-You may not be able to trigger the issue since it seems Amlogic reduces this reserved size on GXL/GXM :
-https://github.com/khadas/linux/commit/698df2c6cfbb0d1a9359743208e83517b31da6ce
-But it should be confirmed.
+>  arch/arm/boot/dts/imx25.dtsi                               |  3 ++-
+>  arch/arm/boot/dts/imx50.dtsi                               |  3 ++-
+>  arch/arm/boot/dts/imx51.dtsi                               |  6 ++++--
+>  arch/arm/boot/dts/imx53.dtsi                               |  6 ++++--
+>  arch/arm/boot/dts/imx6qdl.dtsi                             |  6 ++++--
+>  arch/arm/boot/dts/imx6sl.dtsi                              |  6 ++++--
+>  arch/arm/boot/dts/imx6sx.dtsi                              |  9 ++++++---
+>  arch/arm/boot/dts/imx6ul.dtsi                              |  6 ++++--
+>  arch/arm/boot/dts/imx7s.dtsi                               | 12 ++++++++----
+>  arch/arm/boot/dts/ls1021a.dtsi                             |  2 +-
+>  arch/arm/boot/dts/vfxxx.dtsi                               |  3 ++-
 
-Kevin asked me initially to handle this "start of ddr" reserved zone via a reserved-memory entry, but
-at that time it seemed a better idea to use "linux,useable-memory", but I recon it may be an error.
+The imx21 type is also used in
 
-I will push a v5 with a supplementary reserved-memory entry and will postpone the boards memory size
-fixup for a future DTS cleanup.
+	arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
+	arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
 
-Andreas, is this ok for you ?
+What about these?
 
-This issue exists since forever on mainline linux, and even 4.9 has it.
-Olof, How could a similar fix go in 4.9 stable ?
+Best regards
+Uwe
 
-Thanks,
-Neil
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
