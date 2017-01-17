@@ -1,60 +1,99 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 17 Jan 2017 14:36:50 +1100
-Subject: [PATCH v1 2/2] arm: dts: mt2701: add nor flash node
-In-Reply-To: <20170116094032.6f471f11@bbrezillon>
-References: <1484291609-20195-1-git-send-email-guochun.mao@mediatek.com>
- <1484291609-20195-3-git-send-email-guochun.mao@mediatek.com>
- <20170113151747.6bc85245@bbrezillon>
- <d7b866ad-5b2f-62d3-3aa3-6fa42803d625@gmail.com>
- <b850b751-1d8d-0053-cf1f-d5314542e5c3@gmail.com>
- <20170113172825.75d545a3@bbrezillon>
- <86c997be-f500-eaa1-3ba5-d21cff6223b7@gmail.com>
- <20170113175628.1793f433@bbrezillon>
- <0fafcd8d-cf99-de6b-728f-5e3637810b68@gmail.com>
- <20170114092958.022f2fc8@bbrezillon>
- <e7fa1542-f0e2-0e45-23b3-25d6491ae40d@gmail.com>
- <20170116094032.6f471f11@bbrezillon>
-Message-ID: <20170117143650.5db87148@free-electrons.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Tue, 17 Jan 2017 04:46:01 +0100
+Subject: [PATCH 17/22] power: supply: add battery driver for AXP20X and
+ AXP22X PMICs
+In-Reply-To: <20170102163723.7939-18-quentin.schulz@free-electrons.com>
+References: <20170102163723.7939-1-quentin.schulz@free-electrons.com>
+ <20170102163723.7939-18-quentin.schulz@free-electrons.com>
+Message-ID: <20170117034601.wevqblqiwrerpmal@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Quentin,
 
-(Side note: you guys should learn about stripping irrelevant parts of
-an e-mail when replying!)
+Just a couple of small things in this patch.
 
-On Mon, 16 Jan 2017 09:40:32 +0100, Boris Brezillon wrote:
+On Mon, Jan 02, 2017 at 05:37:17PM +0100, Quentin Schulz wrote:
+> [...]
+> +	case POWER_SUPPLY_PROP_CURRENT_NOW:
+> +		ret = regmap_read(axp20x_batt->regmap, AXP20X_PWR_INPUT_STATUS,
+> +				  &reg);
+> +		if (ret)
+> +			return ret;
+> +
+> +		if (reg & AXP20X_PWR_STATUS_BAT_CHARGING)
+> +			chan = axp20x_batt->batt_chrg_i;
+> +		else
+> +			chan = axp20x_batt->batt_dischrg_i;
+> +
+> +		ret = iio_read_channel_processed(chan, &val->intval);
+> +		if (ret)
+> +			return ret;
+> +
+> +		/*
+> +		 * IIO framework gives mV but Power Supply framework gives ?V.
+> +		 */
 
-> > Well this is OK I guess, but then you can also use "mediatek,mt8173-nor"
-> > as the oldest supported compatible and be done with it, no ? It looks a
-> > bit crappy though, I admit that ...
-> 
-> Let's stop bikeshedding and wait for DT maintainers feedback
-> before taking a decision ;-).
-> 
-> Rob, Mark, any opinion?
+Nit: Volt -> Ampere
 
-I agree that a clarification would be good. There are really two
-options:
+> +		val->intval *= 1000;
+> +		break;
+>
+> [...]
+>
+> +static int axp20x_power_probe(struct platform_device *pdev)
+> +{
+> +	struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
+> +	struct axp20x_batt_ps *axp20x_batt;
+> +	struct power_supply_config psy_cfg = {};
+> +
+> +	axp20x_batt = devm_kzalloc(&pdev->dev, sizeof(*axp20x_batt),
+> +				   GFP_KERNEL);
+> +	if (!axp20x_batt)
+> +		return -ENOMEM;
+> +
+> +	axp20x_batt->batt_v = devm_iio_channel_get(&pdev->dev, "batt_v");
+> +	if (IS_ERR(axp20x_batt->batt_v)) {
+> +		if (PTR_ERR(axp20x_batt->batt_v) == -ENODEV)
+> +			return -EPROBE_DEFER;
+> +		return PTR_ERR(axp20x_batt->batt_v);
+> +	}
+> +
+> +	axp20x_batt->batt_chrg_i = devm_iio_channel_get(&pdev->dev,
+> +							"batt_chrg_i");
+> +	if (IS_ERR(axp20x_batt->batt_chrg_i)) {
+> +		if (PTR_ERR(axp20x_batt->batt_chrg_i) == -ENODEV)
+> +			return -EPROBE_DEFER;
+> +		return PTR_ERR(axp20x_batt->batt_chrg_i);
+> +	}
+> +
+> +	axp20x_batt->batt_dischrg_i = devm_iio_channel_get(&pdev->dev,
+> +							   "batt_dischrg_i");
+> +	if (IS_ERR(axp20x_batt->batt_dischrg_i)) {
+> +		if (PTR_ERR(axp20x_batt->batt_dischrg_i) == -ENODEV)
+> +			return -EPROBE_DEFER;
+> +		return PTR_ERR(axp20x_batt->batt_dischrg_i);
+> +	}
+> +
+> +	axp20x_batt->regmap = axp20x->regmap;
+> +	platform_set_drvdata(pdev, axp20x_batt);
 
- 1. Have two compatible strings in the DT, the one that matches the
-    exact SoC where the IP is found (first compatible string) and the
-    one that matches some other SoC where the same IP is found (second
-    compatible string). Originally, Linux only supports the second
-    compatible string in its device driver, but if it happens that a
-    difference is found between two IPs that we thought were the same,
-    we can add support for the first compatible string in the driver,
-    with a slightly different behavior.
+Please use drv_get_regmap(pdev->dev.parent, NULL) instead (and drop
+axp20x).
 
- 2. Have a single compatible string in the DT, matching the exact SoC
-    where the IP is found. This involves adding immediately this
-    compatible string in the corresponding driver.
+> +	psy_cfg.drv_data = axp20x_batt;
+> +	psy_cfg.of_node = pdev->dev.of_node;
+> +
+> +	axp20x_batt->axp_id = (int)of_device_get_match_data(&pdev->dev);
 
-I've not really been able to figure out which of the two options is the
-most future-proof/appropriate.
+use (uintptr_t) to avoid compiler warnings on systems with sizeof
+int != sizeof ptr.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170117/a8f71c66/attachment.sig>
