@@ -1,134 +1,135 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 17 Jan 2017 12:15:10 +0000
-Subject: [PATCH v4 1/4] arm64: dts: juno: remove dtsi nesting inside tree
- structure
+Date: Tue, 17 Jan 2017 12:15:11 +0000
+Subject: [PATCH v4 2/4] arm64: dts: juno: refactor CoreSight support on Juno r0
 In-Reply-To: <1484655313-9025-1-git-send-email-sudeep.holla@arm.com>
 References: <1484655313-9025-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1484655313-9025-2-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1484655313-9025-3-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently juno-clock.dtsi and juno-base.dtsi are nested badly inside
-the device tree structure. It's generally good practice to ensure that
-individual dtsi stand by themselves at the top of the file.
+Currently the Coresight components are supported only on Juno r0
+variant. In preparation to add support to Juno r1/r2 variants, this
+patch refactors the existing coresight device nodes so that r1/r2
+support can be added easily.
 
-This patch removes the nesting of the above mentioned dtsi files and
-makes them independent.
+It also cleans up some of the device node names which were previously
+named so as they were confused as the labels rather than the node names.
 
+Reviewed-and-Tested-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- arch/arm64/boot/dts/arm/juno-base.dtsi   | 6 ++++--
- arch/arm64/boot/dts/arm/juno-clocks.dtsi | 3 ++-
- arch/arm64/boot/dts/arm/juno-r1.dts      | 3 +--
- arch/arm64/boot/dts/arm/juno-r2.dts      | 3 +--
- arch/arm64/boot/dts/arm/juno.dts         | 3 +--
- 5 files changed, 9 insertions(+), 9 deletions(-)
+ arch/arm64/boot/dts/arm/juno-base.dtsi | 20 ++++++++++----------
+ arch/arm64/boot/dts/arm/juno.dts       |  8 ++++++++
+ 2 files changed, 18 insertions(+), 10 deletions(-)
 
 diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-index 7d832247d0db..580afaee978f 100644
+index 580afaee978f..faedf357db3b 100644
 --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
 +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-@@ -1,3 +1,6 @@
-+#include "juno-clocks.dtsi"
-+
-+/ {
- 	/*
- 	 *  Devices shared by all Juno boards
+@@ -86,7 +86,7 @@
+ 	 * The actual size is just 4K though 64K is reserved. Access to the
+ 	 * unmapped reserved region results in a DECERR response.
  	 */
-@@ -507,8 +510,6 @@
+-	etf at 20010000 {
++	etf at 20010000 { /* ETF 0 */
+ 		compatible = "arm,coresight-tmc", "arm,primecell";
+ 		reg = <0 0x20010000 0 0x1000>;
+
+@@ -100,7 +100,7 @@
+ 			/* input port */
+ 			port at 0 {
+ 				reg = <0>;
+-				etf_in_port: endpoint {
++				etf0_in_port: endpoint {
+ 					slave-mode;
+ 					remote-endpoint = <&main_funnel_out_port>;
+ 				};
+@@ -109,8 +109,7 @@
+ 			/* output port */
+ 			port at 1 {
+ 				reg = <0>;
+-				etf_out_port: endpoint {
+-					remote-endpoint = <&replicator_in_port0>;
++				etf0_out_port: endpoint {
+ 				};
+ 			};
+ 		};
+@@ -131,7 +130,8 @@
  		};
  	};
 
--	/include/ "juno-clocks.dtsi"
+-	main-funnel at 20040000 {
++	/* main funnel on Juno r0, cssys0 funnel on Juno r1/r2 as per TRM*/
++	main_funnel: funnel at 20040000 {
+ 		compatible = "arm,coresight-funnel", "arm,primecell";
+ 		reg = <0 0x20040000 0 0x1000>;
+
+@@ -142,13 +142,15 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+
++			/* output port */
+ 			port at 0 {
+ 				reg = <0>;
+ 				main_funnel_out_port: endpoint {
+-					remote-endpoint = <&etf_in_port>;
++					remote-endpoint = <&etf0_in_port>;
+ 				};
+ 			};
+
++			/* input ports */
+ 			port at 1 {
+ 				reg = <0>;
+ 				main_funnel_in_port0: endpoint {
+@@ -164,7 +166,6 @@
+ 					remote-endpoint = <&cluster1_funnel_out_port>;
+ 				};
+ 			};
 -
- 	smmu_dma: iommu at 7fb00000 {
- 		compatible = "arm,mmu-401", "arm,smmu-v1";
- 		reg = <0x0 0x7fb00000 0x0 0x10000>;
-@@ -719,3 +720,4 @@
- 		interrupt-map-mask = <0 0>;
- 		interrupt-map = <0 0 &gic 0 0 0 168 IRQ_TYPE_LEVEL_HIGH>;
+ 		};
  	};
-+};
-diff --git a/arch/arm64/boot/dts/arm/juno-clocks.dtsi b/arch/arm64/boot/dts/arm/juno-clocks.dtsi
-index 25352ed943e6..e5e265dfa902 100644
---- a/arch/arm64/boot/dts/arm/juno-clocks.dtsi
-+++ b/arch/arm64/boot/dts/arm/juno-clocks.dtsi
-@@ -6,7 +6,7 @@
-  * This file is licensed under a dual GPLv2 or BSD license.
-  *
-  */
--
-+/ {
- 	/* SoC fixed clocks */
- 	soc_uartclk: refclk7273800hz {
- 		compatible = "fixed-clock";
-@@ -42,3 +42,4 @@
- 		clock-frequency = <400000000>;
- 		clock-output-names = "faxi_clk";
+
+@@ -198,7 +199,7 @@
+ 		};
  	};
-+};
-diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
-index eec37feee8fc..b883a8afb6f4 100644
---- a/arch/arm64/boot/dts/arm/juno-r1.dts
-+++ b/arch/arm64/boot/dts/arm/juno-r1.dts
-@@ -9,6 +9,7 @@
- /dts-v1/;
 
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include "juno-base.dtsi"
+-	cluster0-funnel at 220c0000 {
++	funnel at 220c0000 { /* cluster0 funnel */
+ 		compatible = "arm,coresight-funnel", "arm,primecell";
+ 		reg = <0 0x220c0000 0 0x1000>;
 
- / {
- 	model = "ARM Juno development board (r1)";
-@@ -176,8 +177,6 @@
- 				     <&A53_2>,
- 				     <&A53_3>;
+@@ -262,7 +263,7 @@
+ 		};
  	};
--
--	#include "juno-base.dtsi"
- };
 
- &memtimer {
-diff --git a/arch/arm64/boot/dts/arm/juno-r2.dts b/arch/arm64/boot/dts/arm/juno-r2.dts
-index 28f40ec44090..cfd8150bf30a 100644
---- a/arch/arm64/boot/dts/arm/juno-r2.dts
-+++ b/arch/arm64/boot/dts/arm/juno-r2.dts
-@@ -9,6 +9,7 @@
- /dts-v1/;
+-	cluster1-funnel at 230c0000 {
++	funnel at 230c0000 { /* cluster1 funnel */
+ 		compatible = "arm,coresight-funnel", "arm,primecell";
+ 		reg = <0 0x230c0000 0 0x1000>;
 
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include "juno-base.dtsi"
-
- / {
- 	model = "ARM Juno development board (r2)";
-@@ -176,8 +177,6 @@
- 				     <&A53_2>,
- 				     <&A53_3>;
- 	};
--
--	#include "juno-base.dtsi"
- };
-
- &memtimer {
+@@ -385,7 +386,6 @@
+ 				reg = <0>;
+ 				replicator_in_port0: endpoint {
+ 					slave-mode;
+-					remote-endpoint = <&etf_out_port>;
+ 				};
+ 			};
+ 		};
 diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
-index ac5ceb73f45f..9967c808a92d 100644
+index 9967c808a92d..66fa4388d181 100644
 --- a/arch/arm64/boot/dts/arm/juno.dts
 +++ b/arch/arm64/boot/dts/arm/juno.dts
-@@ -9,6 +9,7 @@
- /dts-v1/;
-
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include "juno-base.dtsi"
-
- / {
- 	model = "ARM Juno development board (r0)";
-@@ -176,8 +177,6 @@
- 				     <&A53_2>,
- 				     <&A53_3>;
- 	};
--
--	#include "juno-base.dtsi"
+@@ -202,3 +202,11 @@
+ &etm5 {
+ 	cpu = <&A53_3>;
  };
-
- &etm0 {
++
++&etf0_out_port {
++	remote-endpoint = <&replicator_in_port0>;
++};
++
++&replicator_in_port0 {
++	remote-endpoint = <&etf0_out_port>;
++};
 --
 2.7.4
