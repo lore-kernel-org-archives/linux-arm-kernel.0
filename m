@@ -1,88 +1,112 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 17 Jan 2017 10:20:53 +0000
-Subject: [RFC PATCH 32/33] irqchip/gic-v4: Add some basic documentation
+Date: Tue, 17 Jan 2017 10:20:49 +0000
+Subject: [RFC PATCH 28/33] irqchip/gic-v3-its: Support VPE doorbell
+ invalidation even when !DirectLPI
 In-Reply-To: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
 References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1484648454-21216-33-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1484648454-21216-29-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do a braindump of the way things are supposed to work.
+When we don't have the DirectLPI feature, we must work around the
+architecture shortcomings to be able to perform the required
+invalidation.
+
+For this, we create a fake device whose sole purpose is to
+provide a way to issue a map/inv/unmap sequence (and the corresponding
+sync operations). That's 6 commands and a full serialization point
+to be able to do this.
+
+You just have hope the hypervisor won't do that too often...
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v4.c | 59 ++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
+ drivers/irqchip/irq-gic-v3-its.c | 59 ++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 57 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic-v4.c b/drivers/irqchip/irq-gic-v4.c
-index 36ccaac..8b2d9ee 100644
---- a/drivers/irqchip/irq-gic-v4.c
-+++ b/drivers/irqchip/irq-gic-v4.c
-@@ -22,6 +22,65 @@
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 008fb71..3787579 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -133,6 +133,9 @@ struct its_device {
+ 	u32			device_id;
+ };
  
- #include <linux/irqchip/arm-gic-v4.h>
- 
-+/*
-+ * WARNING: The blurb below assumes that you understand the
-+ * intricacies of GICv3, GICv4, and how a guest's view of a GICv3 gets
-+ * translated into GICv4 comands. So it effectively targets at most
-+ * two individuals. You know who you are.
-+ *
-+ * The core GICv4 code is designed to *avoid* exposing too much of the
-+ * core GIC code (that would in turn leak into the hypervisor code),
-+ * and instead provide a hypervisor agnostic interface to the HW (of
-+ * course, the astute reader will quickly realize that hypervisor
-+ * agnostic actually means KVM-specific - what were you thinking?).
-+ *
-+ * In order to achieve a modicum of isolation, we try to hide most of
-+ * the GICv4 "stuff" behind normal irqchip operations:
-+ *
-+ * - Any guest-visible VLPI is backed by a Linux interrupt (and a
-+ *   physical LPI which gets deconfigured when the guest maps the
-+ *   VLPI). This allows the same DevID/Event pair to be either mapped
-+ *   to the LPI (host) or the VLPI (guest).
-+ *
-+ * - Enabling/disabling a VLPI is done by issuing mask/unmask calls.
-+ *
-+ * - Guest INT/CLEAR commands are implemented through
-+ *   irq_set_irqchip_state().
-+ *
-+ * - The *bizarre* stuff (mapping/unmapping an interrupt to a VLPI, or
-+ *   issuing an INV after changing a priority) gets shoved into the
-+ *   irq_set_vcpu_affinity() method. While this is quite horrible
-+ *   (let's face it, this is the irqchip version of an ioctl), it
-+ *   confines the crap to a single location. And map/unmap really is
-+ *   about setting the affinity of a VLPI to a vcpu, so only INV is
-+ *   majorly out of place. So there.
-+ *
-+ * But handling VLPIs is only one side of the job of the GICv4
-+ * code. The other (darker) side is to take care of the doorbell
-+ * interrupts which are delivered when a VLPI targeting a non-running
-+ * vcpu is being made pending.
-+ *
-+ * The choice made here is that each vcpu (VPE in old northern GICv4
-+ * dialect) gets a single doorbell, no matter how many interrupts are
-+ * targeting it. This has a nice property, which is that the interrupt
-+ * becomes a handle for the VPE, and that the hypervisor code can
-+ * manipulate it through the normal interrupt API:
-+ *
-+ * - VMs (or rather the VM abstraction that matters to the GIC)
-+ *   contain an irq domain where each interrupt maps to a VPE. In
-+ *   turn, this domain stis on top of the normal LPI allocator, and a
-+ *   specially crafted irq_chip implementation.
-+ *
-+ * - mask/unmask do what is expected on the doorbell interrupt.
-+ *
-+ * - irq_set_affinity is used to move a VPE from one redistributor to
-+ *   another.
-+ *
-+ * - irq_set_vcpu_affinity once again gets hijacked for the purpose of
-+ *   creating a new sub-API, namely scheduling/descheduling a VPE and
-+ *   performing INVALL operations.
-+ */
++static struct its_device *vpe_proxy_dev;
++static DEFINE_RAW_SPINLOCK(vpe_proxy_dev_lock);
 +
- static struct irq_domain *its_vpe_domain;
+ static LIST_HEAD(its_nodes);
+ static DEFINE_SPINLOCK(its_lock);
+ static struct rdists *gic_rdists;
+@@ -993,8 +996,35 @@ static void lpi_update_config(struct irq_data *d, u8 clr, u8 set)
+ 		struct its_vpe *vpe = irq_data_get_irq_chip_data(d);
+ 		void __iomem *rdbase;
  
- static struct irq_chip its_vcpu_irq_chip = {
+-		rdbase = per_cpu_ptr(gic_rdists->rdist, vpe->col_idx)->rd_base;
+-		writeq_relaxed(d->hwirq, rdbase + GICR_INVLPIR);
++		if (gic_rdists->has_direct_lpi) {
++			rdbase = per_cpu_ptr(gic_rdists->rdist, vpe->col_idx)->rd_base;
++			writeq_relaxed(d->hwirq, rdbase + GICR_INVLPIR);
++		} else {
++			/*
++			 * This is insane.
++			 *
++			 * If a GICv4 doesn't implement Direct LPIs,
++			 * the only way to perform an invalidate is to
++			 * use a fake device to issue a MAP/INV/UNMAP
++			 * sequence. Since each of these commands has
++			 * a sync operation, this is really fast. Not.
++			 *
++			 * We always use event 0, and this serialize
++			 * all VPE invalidations in the system.
++			 *
++			 * Broken by design(tm).
++			 */
++			unsigned long flags;
++
++			raw_spin_lock_irqsave(&vpe_proxy_dev_lock, flags);
++
++			vpe_proxy_dev->event_map.col_map[0] = vpe->col_idx;
++			its_send_mapvi(vpe_proxy_dev, vpe->vpe_db_lpi, 0);
++			its_send_inv(vpe_proxy_dev, 0);
++			its_send_discard(vpe_proxy_dev, 0);
++
++			raw_spin_unlock_irqrestore(&vpe_proxy_dev_lock, flags);
++		}
+ 	}
+ }
+ 
+@@ -2481,6 +2511,31 @@ static struct irq_domain *its_init_vpe_domain(void)
+ 	struct fwnode_handle *handle;
+ 	struct irq_domain *domain;
+ 
++	if (gic_rdists->has_direct_lpi) {
++		pr_info("ITS: Using DirectLPI for VPE invalidation\n");
++	} else {
++		struct its_node *its;
++
++		list_for_each_entry(its, &its_nodes, entry) {
++			u32 devid;
++
++			if (!its->is_v4)
++				continue;
++
++			/* Use the last possible DevID */
++			devid = GENMASK(its->device_ids - 1, 0);
++			vpe_proxy_dev = its_create_device(its, devid, 1);
++			if (!vpe_proxy_dev) {
++				pr_err("ITS: Can't allocate GICv4 proxy device\n");
++				return NULL;
++			}
++
++			pr_info("ITS: Allocated DevID %x as GICv4 proxy device\n",
++				devid);
++			break;
++		}
++	}
++
+ 	handle = irq_domain_alloc_fwnode("VPE domain");
+ 	if (!handle)
+ 		return NULL;
 -- 
 2.1.4
