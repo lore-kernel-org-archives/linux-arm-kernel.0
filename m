@@ -1,27 +1,45 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 18 Jan 2017 00:08:15 +0100
-Subject: [PATCH 1/2] power/reset: at91-reset: add samx7 support
-In-Reply-To: <20170117163619.x3c5ibhg7h6r7gk5@earth>
-References: <20160922225322.31677-1-alexandre.belloni@free-electrons.com>
- <20170117125910.icdsl2x7lpnukymy@piout.net>
- <20170117163619.x3c5ibhg7h6r7gk5@earth>
-Message-ID: <20170117230815.e2qjzlsnlndtulu5@piout.net>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Tue, 17 Jan 2017 16:20:13 +0100
+Subject: [PATCH -next] mtd: nand: mediatek: remove redundant dev_err call
+ in mtk_nfc_probe()
+In-Reply-To: <20170117142246.9607-1-weiyj.lk@gmail.com>
+References: <20170117142246.9607-1-weiyj.lk@gmail.com>
+Message-ID: <998d159a-d262-6849-b518-6282ae0e183a@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/01/2017 at 17:36:20 +0100, Sebastian Reichel wrote :
-> Hi Alexandre,
+On 01/17/2017 03:22 PM, Wei Yongjun wrote:
+> From: Wei Yongjun <weiyongjun1@huawei.com>
 > 
-> On Tue, Jan 17, 2017 at 01:59:10PM +0100, Alexandre Belloni wrote:
-> > Did you have any comment on those two patches ?
+> There is a error message within devm_ioremap_resource
+> already, so remove the dev_err call to avoid redundant
+> error message.
 > 
-> They look fine, but I can't apply them. Can you resend a rebased
-> version?
+> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+
+Acked-by: Marek Vasut <marek.vasut@gmail.com>
+
+> ---
+>  drivers/mtd/nand/mtk_nand.c | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/drivers/mtd/nand/mtk_nand.c b/drivers/mtd/nand/mtk_nand.c
+> index 6c3eed3..6c517c6 100644
+> --- a/drivers/mtd/nand/mtk_nand.c
+> +++ b/drivers/mtd/nand/mtk_nand.c
+> @@ -1383,7 +1383,6 @@ static int mtk_nfc_probe(struct platform_device *pdev)
+>  	nfc->regs = devm_ioremap_resource(dev, res);
+>  	if (IS_ERR(nfc->regs)) {
+>  		ret = PTR_ERR(nfc->regs);
+> -		dev_err(dev, "no nfi base\n");
+>  		goto release_ecc;
+>  	}
+>  
+> 
+> 
 > 
 
-Done just now.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Best regards,
+Marek Vasut
