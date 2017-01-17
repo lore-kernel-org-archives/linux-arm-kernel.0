@@ -1,90 +1,51 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue, 17 Jan 2017 10:03:51 +0000
-Subject: [RFC PATCH 08/10] arm64/sve: ptrace: Wire up vector length
- control and reporting
-In-Reply-To: <20170116151156.GI28060@E107787-LIN>
-References: <1484220369-23970-1-git-send-email-Dave.Martin@arm.com>
- <1484220369-23970-9-git-send-email-Dave.Martin@arm.com>
- <20170116122038.GG28060@E107787-LIN>
- <20170116133231.GO3699@e103592.cambridge.arm.com>
- <20170116151156.GI28060@E107787-LIN>
-Message-ID: <20170117100349.GR3699@e103592.cambridge.arm.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Tue, 17 Jan 2017 18:06:59 +0800
+Subject: [PATCH] drm/rockchip: vop: make vop register setting take effect
+In-Reply-To: <CAAFQd5CP8ERvJzchZo0=5gvuUuP+EBiyfhKDkgRYBa8iQYW0Kw@mail.gmail.com>
+References: <1472269178-16593-1-git-send-email-zyw@rock-chips.com>
+ <57C3A341.9030302@rock-chips.com>
+ <CAAFQd5CP8ERvJzchZo0=5gvuUuP+EBiyfhKDkgRYBa8iQYW0Kw@mail.gmail.com>
+Message-ID: <587DECC3.50304@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2017 at 03:11:56PM +0000, Yao Qi wrote:
-> On 17-01-16 13:32:31, Dave Martin wrote:
-> > On Mon, Jan 16, 2017 at 12:20:38PM +0000, Yao Qi wrote:
-> > > On 17-01-12 11:26:07, Dave Martin wrote:
-> > > > This patch adds support for manipulating a task's vector length at
-> > > > runtime via ptrace.
-> > > > 
-> > > 
-> > > I hope kernel doesn't provide such interface to ptracer to change vector
-> > > length.
-> > 
-> > It does, with this patch, beacuse...
-> > 
-> > > The vector length is sort of a read-only property of thread/process/
-> > > program to debugger, unless we really have a clear requirement to modify
-> > > vector length in debugging.  I may miss something because I haven't debug
-> > > SVE code yet.
-> > 
-> > ...the vector length is no longer read-only for the task, thanks to
-> > the new prctls().
-> 
-> What I meant "read-only" is that debugger can't change it, while the program
-> itself can change it via prctl().
+Hi Tomasz
 
-I see.
+I had sent to Dave, but maybe something is wrong, it miss.
 
-> > 
-> > This does add complexity, but I figured that any programmer's model
-> > state that the thread can modify for itself should be modifiable by the
-> > debugger, if for no other reason than the user may want to experiment to
-> > see what happens.  Without a ptrace interface, it would be necessary
-> > to inject a prctl() call into the target, which is possible but awkward.
-> 
-> We only need such interface if it is useful, see more below.
-> 
-> Suppose it is useful to change vector length through ptrace, we should align
-> ptrace interface to prctl() as much as possible.  Looks that both prctl
-> change and ptrace change can go through sve_set_vector_length, easy to keep
-> two consistent.
-> 
-> > 
-> > gdb must already re-detect the vector length on stop, since the target
-> > could have called the prctl() in the meantime.
-> 
-> Yes, gdb assumes the vector length may be changed, so it re-detects on
-> every stop, but I don't see the need for gdb to change the vector length.
-> 
-> > 
-> > Access via ptrace also allows things like trapping on exec, fork or
-> > clone and changing the vector length for the new process or thread
-> > before it starts to run.  I'm guessing here, but such a scenario seems
-> > legitimate (?)
-> > 
-> 
-> Yes, these cases are valid, but the usefulness is still questionable to
-> me.  I just doubt that SVE developers do need to change vector length
-> when they are debugging code.  Note that it is not my strong objection
-> to this patch, if kernel people believe this is useful, I am fine with
-> it.
+the patch is on this pull-request:
+https://lists.freedesktop.org/archives/dri-devel/2016-September/118505.html
 
-That's fair.  I'll leave the patch there for now and see if anyone else
-has a comment to make, but it could be removed without affecting
-anything else.
+I forgot to double check it, I will resend to Dave soon.
 
-Are there situations in which injecting a function call into the target
-won't work, i.e., where we couldn't do:
+Thanks.
 
-set prctl(...)
+On 2017?01?17? 17:32, Tomasz Figa wrote:
+> Hi Mark,
+>
+> On Mon, Aug 29, 2016 at 11:51 AM, Mark yao <mark.yao@rock-chips.com> wrote:
+>> On 2016?08?27? 11:39, Chris Zhong wrote:
+>>> The setting of vop registers need a reg_done writing to take effect.
+>>> In vop_enable the vop return to work by by restoring registers, but the
+>>> registers do not take effect immediately, it should a vop_cfg_done
+>>> after it. The same thing is needed by windows_disabled in
+>>> vop_crtc_disable.
+>>>
+>>> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+>>> ---
+>>>    drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 4 ++++
+>>>    1 file changed, 4 insertions(+)
+>> Thanks for your fix.
+>>
+>> applied to my drm-fixes.
+> This patch seems to have been lost in action. I don't see it in linux-next.
+>
+> Best regards,
+> Tomasz
+>
+>
+>
 
-?
 
-Using the prctl interface this way, it would also be preferable to refer
-to the #defines by name.
-
-Cheers
----Dave
+-- 
+?ark Yao
