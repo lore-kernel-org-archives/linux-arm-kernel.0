@@ -1,55 +1,32 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue, 17 Jan 2017 13:26:06 +0100
-Subject: [PATCH v2 04/14] sata: ahci-da850: get the sata clock using a
- connector id
+Date: Tue, 17 Jan 2017 13:26:07 +0100
+Subject: [PATCH v2 05/14] ARM: davinci: da850: add con_id for the SATA clock
 In-Reply-To: <1484655976-25382-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1484655976-25382-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1484655976-25382-5-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1484655976-25382-6-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for using two clocks in the driver (the sysclk2-based
-clock and the external REFCLK), check if we got a functional clock
-after calling ahci_platform_get_resources(). If not, retry calling
-get_clk() with con_id specified.
+The ahci-da850 SATA driver is now capable of retrieving clocks by
+con_id. Add the connector id for the sysclk2-derived SATA clock.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/ata/ahci_da850.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/mach-davinci/da850.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/ata/ahci_da850.c b/drivers/ata/ahci_da850.c
-index 267a3d3..18f57c2 100644
---- a/drivers/ata/ahci_da850.c
-+++ b/drivers/ata/ahci_da850.c
-@@ -71,12 +71,28 @@ static int ahci_da850_probe(struct platform_device *pdev)
- 	struct ahci_host_priv *hpriv;
- 	struct resource *res;
- 	void __iomem *pwrdn_reg;
-+	struct clk *clk;
- 	int rc;
- 
- 	hpriv = ahci_platform_get_resources(pdev);
- 	if (IS_ERR(hpriv))
- 		return PTR_ERR(hpriv);
- 
-+	/*
-+	 * Internally ahci_platform_get_resources() calls clk_get(dev, NULL)
-+	 * when trying to obtain the first clock. This SATA controller uses
-+	 * two clocks for which we specify two connector ids. If we don't
-+	 * have a clock at this point - call clk_get() again with
-+	 * con_id = "sata".
-+	 */
-+	if (!hpriv->clks[0]) {
-+		clk = clk_get(dev, "sata");
-+		if (IS_ERR(clk))
-+			return PTR_ERR(clk);
-+
-+		hpriv->clks[0] = clk;
-+	}
-+
- 	rc = ahci_platform_enable_resources(hpriv);
- 	if (rc)
- 		return rc;
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index 1d873d1..dbf1daa 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -571,7 +571,7 @@ static struct clk_lookup da850_clks[] = {
+ 	CLK("spi_davinci.0",	NULL,		&spi0_clk),
+ 	CLK("spi_davinci.1",	NULL,		&spi1_clk),
+ 	CLK("vpif",		NULL,		&vpif_clk),
+-	CLK("ahci_da850",		NULL,		&sata_clk),
++	CLK("ahci_da850",	"sata",		&sata_clk),
+ 	CLK("davinci-rproc.0",	NULL,		&dsp_clk),
+ 	CLK(NULL,		NULL,		&ehrpwm_clk),
+ 	CLK("ehrpwm.0",		"fck",		&ehrpwm0_clk),
 -- 
 2.9.3
