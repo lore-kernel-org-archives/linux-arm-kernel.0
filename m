@@ -1,34 +1,52 @@
-From: andr2000@gmail.com (Oleksandr Andrushchenko)
-Date: Tue, 17 Jan 2017 17:23:53 +0200
-Subject: [PATCH] arm64: mm: fix __page_to_voff definition
-Message-ID: <1484666633-1753-1-git-send-email-andr2000@gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 17 Jan 2017 19:02:50 +0300
+Subject: [PATCH v2 04/14] sata: ahci-da850: get the sata clock using a
+ connector id
+In-Reply-To: <1484655976-25382-5-git-send-email-bgolaszewski@baylibre.com>
+References: <1484655976-25382-1-git-send-email-bgolaszewski@baylibre.com>
+ <1484655976-25382-5-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <5e98507d-eb66-90e8-cad9-ed9c4a099411@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Oleksandr Andrushchenko <Oleksandr_Andrushchenko@epam.com>
+Hello!
 
-Fix parameter name for __page_to_voff, to match its definition.
-There are other callers of page_to_virt which do not
-declare 'page'.
+On 01/17/2017 03:26 PM, Bartosz Golaszewski wrote:
 
-Fixes: 3fa72fe9c614 ("arm64: mm: fix __page_to_voff definition")
-Signed-off-by: Oleksandr Andrushchenko <Oleksandr_Andrushchenko@epam.com>
----
- arch/arm64/include/asm/memory.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> In preparation for using two clocks in the driver (the sysclk2-based
+> clock and the external REFCLK), check if we got a functional clock
+> after calling ahci_platform_get_resources(). If not, retry calling
+> get_clk() with con_id specified.
 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index bfe632808d77..90c39a662379 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -222,7 +222,7 @@ static inline void *phys_to_virt(phys_addr_t x)
- #define _virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
- #else
- #define __virt_to_pgoff(kaddr)	(((u64)(kaddr) & ~PAGE_OFFSET) / PAGE_SIZE * sizeof(struct page))
--#define __page_to_voff(page)	(((u64)(page) & ~VMEMMAP_START) * PAGE_SIZE / sizeof(struct page))
-+#define __page_to_voff(kaddr)	(((u64)(kaddr) & ~VMEMMAP_START) * PAGE_SIZE / sizeof(struct page))
- 
- #define page_to_virt(page)	((void *)((__page_to_voff(page)) | PAGE_OFFSET))
- #define virt_to_page(vaddr)	((struct page *)((__virt_to_pgoff(vaddr)) | VMEMMAP_START))
--- 
-2.7.4
+    clk_get().
+
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  drivers/ata/ahci_da850.c | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+>
+> diff --git a/drivers/ata/ahci_da850.c b/drivers/ata/ahci_da850.c
+> index 267a3d3..18f57c2 100644
+> --- a/drivers/ata/ahci_da850.c
+> +++ b/drivers/ata/ahci_da850.c
+> @@ -71,12 +71,28 @@ static int ahci_da850_probe(struct platform_device *pdev)
+>  	struct ahci_host_priv *hpriv;
+>  	struct resource *res;
+>  	void __iomem *pwrdn_reg;
+> +	struct clk *clk;
+>  	int rc;
+>
+>  	hpriv = ahci_platform_get_resources(pdev);
+>  	if (IS_ERR(hpriv))
+>  		return PTR_ERR(hpriv);
+>
+> +	/*
+> +	 * Internally ahci_platform_get_resources() calls clk_get(dev, NULL)
+> +	 * when trying to obtain the first clock. This SATA controller uses
+> +	 * two clocks for which we specify two connector ids. If we don't
+
+    It's called connection ID, IIRC.
+
+[...]
+
+MBR, Sergei
