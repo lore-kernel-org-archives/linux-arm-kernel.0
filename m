@@ -1,143 +1,94 @@
-From: jan.kiszka@siemens.com (Jan Kiszka)
-Date: Tue, 17 Jan 2017 19:52:19 +0100
-Subject: [PATCH v2 2/3] spi: pxa2xx: Prepare for edge-triggered interrupts
-In-Reply-To: <7fd7a8eb-4302-523b-08dd-f2a28b845a5e@siemens.com>
-References: <cover.1484592296.git.jan.kiszka@siemens.com>
- <7b15a0910a3ad861fd32161c72559bafa7b71e29.1484592296.git.jan.kiszka@siemens.com>
- <1484593637.2133.152.camel@linux.intel.com>
- <7fd7a8eb-4302-523b-08dd-f2a28b845a5e@siemens.com>
-Message-ID: <4253af0f-b2ea-a8ea-0f34-c7c5bc6555f9@siemens.com>
+From: david@lechnology.com (David Lechner)
+Date: Tue, 17 Jan 2017 12:51:49 -0600
+Subject: [PATCH v2 11/14] sata: ahci-da850: un-hardcode the MPY bits
+In-Reply-To: <1484655976-25382-12-git-send-email-bgolaszewski@baylibre.com>
+References: <1484655976-25382-1-git-send-email-bgolaszewski@baylibre.com>
+ <1484655976-25382-12-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <062b5ef3-cc3a-0f9c-c040-93495f374dac@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-01-16 20:46, Jan Kiszka wrote:
-> On 2017-01-16 20:07, Andy Shevchenko wrote:
->> On Mon, 2017-01-16 at 19:44 +0100, Jan Kiszka wrote:
->>> When using the a device with edge-triggered interrupts, such as MSIs,
->>> the interrupt handler has to ensure that there is a point in time
->>> during
->>> its execution where all interrupts sources are silent so that a new
->>> event can trigger a new interrupt again.
->>>
->>> This is achieved here by looping over SSSR evaluation. We need to take
->>> into account that SSCR1 may be changed by the transfer handler, thus
->>> we
->>> need to redo the mask calculation, at least regarding the volatile
->>> interrupt enable bit (TIE).
->>>
->>
->> So, more comments/questions below.
->>
->>>  
->>>  	sccr1_reg = pxa2xx_spi_read(drv_data, SSCR1);
->>>  
->>> -	/* Ignore possible writes if we don't need to write */
->>> -	if (!(sccr1_reg & SSCR1_TIE))
->>> -		mask &= ~SSSR_TFS;
->>> -
->>>  	/* Ignore RX timeout interrupt if it is disabled */
->>>  	if (!(sccr1_reg & SSCR1_TINTE))
->>>  		mask &= ~SSSR_TINT;
->>>  
->>> -	if (!(status & mask))
->>> -		return IRQ_NONE;
->>> +	while (1) {
->>
->> Can we switch to do-while and move previous block here?
-> 
-> Don't see how this would help (without duplicating more code).
-> 
->> Btw, can TINTE
->> bit be set again during a loop?
-> 
-> Nope, it's statically set, at least so far.
-> 
-> What we could do is simply restarting ssp_int
-> 
->>
->>> +		/* Ignore possible writes if we don't need to write
->>> */
->>> +		if (!(sccr1_reg & SSCR1_TIE))
->>> +			mask &= ~SSSR_TFS;
->>>  
->>> -	if (!drv_data->master->cur_msg) {
->>> -		handle_bad_msg(drv_data);
->>> -		/* Never fail */
->>> -		return IRQ_HANDLED;
->>> -	}
->>> +		if (!(status & mask))
->>> +			return ret;
->>> +
->>> +		if (!drv_data->master->cur_msg) {
->>> +			handle_bad_msg(drv_data);
->>> +			/* Never fail */
->>> +			return IRQ_HANDLED;
->>> +		}
->>> +
->>
->>> +		ret |= drv_data->transfer_handler(drv_data);
->>
->> So, we might call handler several times. This needs to be commented in
->> the code why you do so.
-> 
-> I can move the commit log into the code.
-> 
->>
->>>  
->>> -	return drv_data->transfer_handler(drv_data);
->>> +		status = pxa2xx_spi_read(drv_data, SSSR);
->>
->> Would it be possible to get all 1:s from the register
->> (something/autosuspend just powered off it by timeout?) ?
->>
-> 
-> Not sure if that can happen, but I guess it would be simpler and more
-> readable to simply do this instead:
-> 
-> 	while (1) {
-> 		/*
-> 		 * If the device is not yet in RPM suspended state and we get an
-> 		 * interrupt that is meant for another device, check if status
-> 		 * bits are all set to one. That means that the device is
-> 		 * already powered off.
-> 		 */
-> 		status = pxa2xx_spi_read(drv_data, SSSR);
-> 		if (status == ~0)
-> 			return ret;
-> 
-> 		sccr1_reg = pxa2xx_spi_read(drv_data, SSCR1);
-> 
-> 		/* Ignore RX timeout interrupt if it is disabled */
-> 		if (!(sccr1_reg & SSCR1_TINTE))
-> 			mask &= ~SSSR_TINT;
-> 
-> 		/* Ignore possible writes if we don't need to write */
-> 		if (!(sccr1_reg & SSCR1_TIE))
-> 			mask &= ~SSSR_TFS;
-> 
-> 		if (!(status & mask))
-> 			return ret;
-> 
-> 		if (!drv_data->master->cur_msg) {
-> 			handle_bad_msg(drv_data);
-> 			/* Never fail */
-> 			return IRQ_HANDLED;
-> 		}
-> 
-> 		ret |= drv_data->transfer_handler(drv_data);
-> 	}
-> 
-> 
-> i.e. preserve the current structure, just add the loop.
-> 
+On 01/17/2017 06:26 AM, Bartosz Golaszewski wrote:
+> In order to make the MPY bits configurable, try to obtain the refclk
+> and calculate the required multiplier from its rate.
+>
+> If we fail to get the clock, fall back to the default value which
+> keeps backwards compatibility.
 
-OK, please let me know if you want a v3 of this patch with the structure
-above. If there are further concerns/questions, just let me know as
-well, but I'd like to close this topic if possible.
+It seems like it would be wiser to make is so that if we fail to get the 
+clock, it is an error. This way, if someone makes a new board and 
+forgets to configure a clock, they will get an error instead of 
+wondering why things are not working because it is using the wrong 
+multiplier.
 
-Thanks,
-Jan
+>
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  drivers/ata/ahci_da850.c | 88 +++++++++++++++++++++++++++++++++++++++++-------
+>  1 file changed, 76 insertions(+), 12 deletions(-)
+>
+> diff --git a/drivers/ata/ahci_da850.c b/drivers/ata/ahci_da850.c
+> index a7a7161..f48b7d0 100644
+> --- a/drivers/ata/ahci_da850.c
+> +++ b/drivers/ata/ahci_da850.c
+> @@ -14,6 +14,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/libata.h>
+>  #include <linux/ahci_platform.h>
+> +#include <asm/div64.h>
+>  #include "ahci.h"
+>
+>  #define DRV_NAME		"ahci_da850"
+> @@ -30,16 +31,14 @@
+>  #define SATA_PHY_ENPLL(x)	((x) << 31)
+>
+>  /*
+> - * The multiplier needed for 1.5GHz PLL output.
+> - *
+> - * NOTE: This is currently hardcoded to be suitable for 100MHz crystal
+> - * frequency (which is used by DA850 EVM board) and may need to be changed
+> - * if you would like to use this driver on some other board.
+> + * This is the default multiplier value used if the refclk could not be
+> + * obtained. It corresponds with a crystal rate of 100MHz for 1.5GHz PLL
+> + * output.
+>   */
+> -#define DA850_SATA_CLK_MULTIPLIER	7
+> +#define DA850_SATA_MPY_DEFAULT	0x8
+>
+>  static void da850_sata_init(struct device *dev, void __iomem *pwrdn_reg,
+> -			    void __iomem *ahci_base)
+> +			    void __iomem *ahci_base, u32 mpy)
+>  {
+>  	unsigned int val;
+>
+> @@ -48,13 +47,56 @@ static void da850_sata_init(struct device *dev, void __iomem *pwrdn_reg,
+>  	val &= ~BIT(0);
+>  	writel(val, pwrdn_reg);
+>
+> -	val = SATA_PHY_MPY(DA850_SATA_CLK_MULTIPLIER + 1) | SATA_PHY_LOS(1) |
+> -	      SATA_PHY_RXCDR(4) | SATA_PHY_RXEQ(1) | SATA_PHY_TXSWING(3) |
+> -	      SATA_PHY_ENPLL(1);
+> +	val = SATA_PHY_MPY(mpy) | SATA_PHY_LOS(1) | SATA_PHY_RXCDR(4) |
+> +	      SATA_PHY_RXEQ(1) | SATA_PHY_TXSWING(3) | SATA_PHY_ENPLL(1);
+>
+>  	writel(val, ahci_base + SATA_P0PHYCR_REG);
+>  }
+>
+> +static u32 ahci_da850_calculate_mpy(unsigned long refclk_rate)
+> +{
+> +	u64 pll_output = 1500000000;
+> +	u32 needed;
+> +
+> +	/*
+> +	 * We need to determine the value of the multiplier (MPY) bits.
+> +	 *
+> +	 * In order to include the 12.5 multiplier we need to first multiply
+> +	 * the desired rate of 1.5GHz by 10 before division.
+> +	 */
+> +	pll_output *= 10;
+> +	needed = __div64_32(&pll_output, refclk_rate);
 
--- 
-Siemens AG, Corporate Technology, CT RDA ITP SES-DE
-Corporate Competence Center Embedded Linux
+What if this does not divide evenly and there is a remainder. Shouldn't 
+there be an error in that case?
+
+...
