@@ -1,44 +1,93 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 17 Jan 2017 15:08:21 +0100
-Subject: [PATCH 3/4] arm64: dts: r8a7795: Link ARM GIC to clock and clock
- domain
-In-Reply-To: <HK2PR06MB05451777E7151CA9C7EF8990C37C0@HK2PR06MB0545.apcprd06.prod.outlook.com>
-References: <1484657360-13101-1-git-send-email-geert+renesas@glider.be>
- <1484657360-13101-4-git-send-email-geert+renesas@glider.be>
- <HK2PR06MB05451777E7151CA9C7EF8990C37C0@HK2PR06MB0545.apcprd06.prod.outlook.com>
-Message-ID: <CAMuHMdUjtwv=iVcfNsA4uB_OdUZQgp8XyonWVgbqsPjqwAtwtQ@mail.gmail.com>
+From: tnowicki@caviumnetworks.com (Tomasz Nowicki)
+Date: Tue, 17 Jan 2017 15:13:41 +0100
+Subject: [PATCH v8 11/18] iommu/arm-smmu-v3: Implement reserved region
+ get/put callbacks
+In-Reply-To: <1484127714-3263-12-git-send-email-eric.auger@redhat.com>
+References: <1484127714-3263-1-git-send-email-eric.auger@redhat.com>
+ <1484127714-3263-12-git-send-email-eric.auger@redhat.com>
+Message-ID: <dd80a861-4732-73fb-6d66-b74031925d1b@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ramesh,
-
-On Tue, Jan 17, 2017 at 3:00 PM, Ramesh Shanmugasundaram
-<ramesh.shanmugasundaram@bp.renesas.com> wrote:
->> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
->> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
->> @@ -166,6 +166,9 @@
->>                             <0x0 0xf1060000 0 0x20000>;
->>                       interrupts = <GIC_PPI 9
->>                                       (GIC_CPU_MASK_SIMPLE(4) |
->> IRQ_TYPE_LEVEL_HIGH)>;
->> +                     clocks = <&cpg CPG_MOD 408>;
->> +                     clock-names = "clk";
+On 11.01.2017 10:41, Eric Auger wrote:
+> iommu/arm-smmu: Implement reserved region get/put callbacks
 >
-> Should the module clock be named "fck"?
+> The get() populates the list with the MSI IOVA reserved window.
+>
+> At the moment an arbitray MSI IOVA window is set at 0x8000000
+> of size 1MB. This will allow to report those info in iommu-group
+> sysfs.
+>
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
 
-Not according to
-Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt.
+Reviewed-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
 
-P.S. If you use "git blame", you may think I'm cheating, but naming was
-     ased on the actual Technical Reference Manuals ;-)
+Thanks,
+Tomasz
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>
+> ---
+>
+> v7 -> v8:
+> - added Will's A-b
+>
+> v4: creation
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+>
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 4d6ec44..6c4111c 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -412,6 +412,9 @@
+>  /* High-level queue structures */
+>  #define ARM_SMMU_POLL_TIMEOUT_US	100
+>
+> +#define MSI_IOVA_BASE			0x8000000
+> +#define MSI_IOVA_LENGTH			0x100000
+> +
+>  static bool disable_bypass;
+>  module_param_named(disable_bypass, disable_bypass, bool, S_IRUGO);
+>  MODULE_PARM_DESC(disable_bypass,
+> @@ -1883,6 +1886,29 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+>  	return iommu_fwspec_add_ids(dev, args->args, 1);
+>  }
+>
+> +static void arm_smmu_get_resv_regions(struct device *dev,
+> +				      struct list_head *head)
+> +{
+> +	struct iommu_resv_region *region;
+> +	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
+> +
+> +	region = iommu_alloc_resv_region(MSI_IOVA_BASE, MSI_IOVA_LENGTH,
+> +					 prot, IOMMU_RESV_MSI);
+> +	if (!region)
+> +		return;
+> +
+> +	list_add_tail(&region->list, head);
+> +}
+> +
+> +static void arm_smmu_put_resv_regions(struct device *dev,
+> +				      struct list_head *head)
+> +{
+> +	struct iommu_resv_region *entry, *next;
+> +
+> +	list_for_each_entry_safe(entry, next, head, list)
+> +		kfree(entry);
+> +}
+> +
+>  static struct iommu_ops arm_smmu_ops = {
+>  	.capable		= arm_smmu_capable,
+>  	.domain_alloc		= arm_smmu_domain_alloc,
+> @@ -1898,6 +1924,8 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+>  	.domain_get_attr	= arm_smmu_domain_get_attr,
+>  	.domain_set_attr	= arm_smmu_domain_set_attr,
+>  	.of_xlate		= arm_smmu_of_xlate,
+> +	.get_resv_regions	= arm_smmu_get_resv_regions,
+> +	.put_resv_regions	= arm_smmu_put_resv_regions,
+>  	.pgsize_bitmap		= -1UL, /* Restricted during device attach */
+>  };
+>
+>
