@@ -1,26 +1,40 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Tue, 17 Jan 2017 17:36:20 +0100
-Subject: [PATCH 1/2] power/reset: at91-reset: add samx7 support
-In-Reply-To: <20170117125910.icdsl2x7lpnukymy@piout.net>
-References: <20160922225322.31677-1-alexandre.belloni@free-electrons.com>
- <20170117125910.icdsl2x7lpnukymy@piout.net>
-Message-ID: <20170117163619.x3c5ibhg7h6r7gk5@earth>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 17 Jan 2017 17:41:11 +0100
+Subject: [PATCH v2 01/10] ASoC: sun4i-i2s: Increase DMA max burst to 8
+In-Reply-To: <20170117140230.23142-2-mylene.josserand@free-electrons.com>
+References: <20170117140230.23142-1-mylene.josserand@free-electrons.com>
+ <20170117140230.23142-2-mylene.josserand@free-electrons.com>
+Message-ID: <20170117164111.76mefaj32fy64f7o@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
+On Tue, Jan 17, 2017 at 03:02:21PM +0100, Myl?ne Josserand wrote:
+> As done previously for sun4i-codec, the DMA maxburst of 4
+> is not supported by every SoCs so the DMA controller engine
+> returns "unsupported value".
+> 
+> As a maxburst of 8 is supported by all variants, this patch
+> increases it to 8.
+> 
+> For more details, see commit from Chen-Yu Tsai:
+> commit 730e2dd0cbc7 ("ASoC: sun4i-codec: Increase DMA max burst to 8")
 
-On Tue, Jan 17, 2017 at 01:59:10PM +0100, Alexandre Belloni wrote:
-> Did you have any comment on those two patches ?
+Those details could have been included directly in the commit log.
 
-They look fine, but I can't apply them. Can you resend a rebased
-version?
+Otherwise,
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
--- Sebastian
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 833 bytes
+Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170117/86f32aa0/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170117/04d60086/attachment.sig>
