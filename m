@@ -1,37 +1,70 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 17 Jan 2017 15:27:44 -0800
-Subject: [PATCH 1/2] ARM: dts: dra7-evm: increase QSPI SPL partition size
-In-Reply-To: <6C6B28D4DC342643927BEAFCE8707BF6C0A8C367@DBDE04.ent.ti.com>
-References: <1484311234-21978-1-git-send-email-ravibabu@ti.com>
- <1484311234-21978-2-git-send-email-ravibabu@ti.com>
- <20170113181239.GC2630@atomide.com>
- <6C6B28D4DC342643927BEAFCE8707BF6C0A8C367@DBDE04.ent.ti.com>
-Message-ID: <20170117232743.GA7403@atomide.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 18 Jan 2017 01:34:22 +0200
+Subject: [PATCH net-next v4 05/10] drivers: base: Add
+ device_find_in_class_name()
+In-Reply-To: <20170117232152.1661-6-f.fainelli@gmail.com>
+References: <20170117232152.1661-1-f.fainelli@gmail.com>
+ <20170117232152.1661-6-f.fainelli@gmail.com>
+Message-ID: <CAHp75VfE8t+_2Yu1NYMErKopnCNwFakO6pyDRmqAU-ZsGuyvmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* B, Ravi <ravibabu@ti.com> [170117 00:15]:
-> Hi Tony
-> 
-> >* Ravi Babu <ravibabu@ti.com> [170113 04:41]:
-> >> The SPL size for DRA74x platform has increased and is now more than 
-> >> 64KB. Increase QSPI SPL partition size to 256KB for DRA74x EVM.
-> >> 
-> >> QSPI partition numbering changes because of this.
-> 
-> >And this will break the existing partitions potentially..
-> >See what was discussed on the list few days ago in thread "[PATCH 1/6] ARM: dts: am335x-phycore-som: Update NAND partition table".
-> 
-> >It's best to have these left empty or as they originally were and let u-boot configure the partitions.
-> 
-> Agree with you. For dra7xx platform the SPL size has been increased to 256KB and hence the existing QSPI SPL partition in kernel (64K size) will break when latest mainline u-boot is used. 
-> Here only SPL partition has been changed and other partition & size is NOT changed and kept intact. I feel it will not break the existing partitions for dra7xx platform.
+On Wed, Jan 18, 2017 at 1:21 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> Add a helper function to lookup a device reference given a class name.
+> This is a preliminary patch to remove adhoc code from net/dsa/dsa.c and
+> make it more generic.
 
-What about the renumbering of partitions in your patch?
 
-Probably just best to make the partition information empty in the
-kernel as discussed.
+> +static int device_class_name_match(struct device *dev, void *class)
 
-Regards,
+And why not const char *class?
 
-Tony
+> +{
+> +       if (dev->class != NULL && !strcmp(dev->class->name, class))
+
+if (dev->class && ...)
+
+> +               return 1;
+> +
+> +       return 0;
+
+Perhaps even one line:
+
+return dev->class && ...;
+
+> +}
+> +
+> +/**
+> + * device_find_in_class_name - device iterator for locating a particular device
+> + * within the specified class name
+> + * @parent: parent struct device
+> + * @class_name: Class name to match against
+> + *
+> + * This function returns 1 if the device (specified by @parent), or one of its child
+> + * is in the class whose name is specified by @class_name. Returns 0 otherwise.
+> + *
+> + * NOTE: you will need to drop the reference with put_device() after use.
+> + */
+> +struct device *device_find_in_class_name(struct device *parent,
+> +                                        char *class_name)
+
+const char *class_name
+
+> +{
+> +       if (device_class_name_match(parent, class_name)) {
+> +               get_device(parent);
+> +               return parent;
+> +       }
+> +
+> +       return device_find_child(parent, class_name, device_class_name_match);
+> +}
+> +EXPORT_SYMBOL_GPL(device_find_in_class_name);
+
+> +extern struct device *device_find_in_class_name(struct device *parent,
+> +                                               char *class_name);
+
+Ditto.
+
+-- 
+With Best Regards,
+Andy Shevchenko
