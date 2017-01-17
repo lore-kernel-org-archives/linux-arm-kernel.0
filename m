@@ -1,122 +1,100 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 17 Jan 2017 13:05:37 +0100
-Subject: [PATCH 1/2] pinctrl: meson: Add HDMI HPD/DDC pins functions
-In-Reply-To: <1484654738-5496-1-git-send-email-narmstrong@baylibre.com>
-References: <1484654738-5496-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1484654738-5496-2-git-send-email-narmstrong@baylibre.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Tue, 17 Jan 2017 19:59:43 +0800
+Subject: [PATCH v7 15/15] irqchip: mbigen: Add ACPI support
+In-Reply-To: <20170116152413.GA24135@red-moon>
+References: <1484147199-4267-1-git-send-email-hanjun.guo@linaro.org>
+ <1484147199-4267-16-git-send-email-hanjun.guo@linaro.org>
+ <20170113102104.GB20837@red-moon> <58799376.6040302@huawei.com>
+ <20170116113804.GB23703@red-moon> <587CD754.1050808@huawei.com>
+ <20170116152413.GA24135@red-moon>
+Message-ID: <587E072F.3020305@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinctrl functions for HDMI HPD pin and DDC pins on Amlogic Meson
-GXL and GXBB SoCs.
+On 2017/1/16 23:24, Lorenzo Pieralisi wrote:
+> On Mon, Jan 16, 2017 at 10:23:16PM +0800, Hanjun Guo wrote:
+>> Hi Lorenzo,
+>>
+>> On 2017/1/16 19:38, Lorenzo Pieralisi wrote:
+>>> On Sat, Jan 14, 2017 at 10:56:54AM +0800, Hanjun Guo wrote:
+>>>> Hi Lorenzo,
+>>>>
+>>>> On 2017/1/13 18:21, Lorenzo Pieralisi wrote:
+>>>>> On Wed, Jan 11, 2017 at 11:06:39PM +0800, Hanjun Guo wrote:
+>>>>>> With the preparation of platform msi support and interrupt producer
+>>>>>> in DSDT, we can add mbigen ACPI support now.
+>>>>>>
+>>>>>> We are using _PRS methd to indicate number of irq pins instead
+>>>>>> of num_pins in DT to avoid _DSD usage in this case.
+>>>>>>
+>>>>>> For mbi-gen,
+>>>>>>     Device(MBI0) {
+>>>>>>           Name(_HID, "HISI0152")
+>>>>>>           Name(_UID, Zero)
+>>>>>>           Name(_CRS, ResourceTemplate() {
+>>>>>>                   Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
+>>>>>>           })
+>>>>>>
+>>>>>>           Name (_PRS, ResourceTemplate() {
+>>>>>> 		  Interrupt(ResourceProducer,...) {12,14,....}
+>>>>> I still do not understand why you are using _PRS for this, I think
+>>>>> the MBIgen configuration is static and if it is so the Interrupt
+>>>>> resource should be part of the _CRS unless there is something I am
+>>>>> missing here.
+>>>> Sorry for not clear in the commit message. MBIgen is an interrupt producer
+>>>> which produces irq resource to devices connecting to it, and MBIgen itself
+>>>> don't consume wired interrupts.
+>>> That's why you mark it as ResourceProducer, but that's not a reason to
+>>> put it in the _PRS instead of _CRS.
+>> If using _CRS for the interrupt resource, the irq number represented
+>> will be mapped (i.e acpi_register_gsi()), then will conflict with the
+>> irq number of devices consuming it (mbigen is producing the
+>> interrupts), but I agree with you that let's ask Rafael's point of
+>> view.
+> Aha ! So here is why you are using _PRS because the kernel turns _CRS
+> Interrupt resources (even producers) into GSIs which is probably a
+> kernel bug, is that the reason ?
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- drivers/pinctrl/meson/pinctrl-meson-gxbb.c | 19 +++++++++++++++++++
- drivers/pinctrl/meson/pinctrl-meson-gxl.c  | 19 +++++++++++++++++++
- 2 files changed, 38 insertions(+)
+I thought _CRS is for devices consuming resources, it's a kind of misunderstanding.
 
-diff --git a/drivers/pinctrl/meson/pinctrl-meson-gxbb.c b/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-index c3928aa..0d9ad36 100644
---- a/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-+++ b/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-@@ -232,6 +232,10 @@
- static const unsigned int pwm_f_x_pins[]	= { PIN(GPIOX_7, EE_OFF) };
- static const unsigned int pwm_f_y_pins[]	= { PIN(GPIOY_15, EE_OFF) };
- 
-+static const unsigned int hdmi_hpd_pins[]	= { PIN(GPIOH_0, EE_OFF) };
-+static const unsigned int hdmi_sda_pins[]	= { PIN(GPIOH_1, EE_OFF) };
-+static const unsigned int hdmi_scl_pins[]	= { PIN(GPIOH_2, EE_OFF) };
-+
- static const struct pinctrl_pin_desc meson_gxbb_aobus_pins[] = {
- 	MESON_PIN(GPIOAO_0, 0),
- 	MESON_PIN(GPIOAO_1, 0),
-@@ -440,6 +444,11 @@
- 	GROUP(eth_txd2,		6,	3),
- 	GROUP(eth_txd3,		6,	2),
- 
-+	/* Bank H */
-+	GROUP(hdmi_hpd,		1,	26),
-+	GROUP(hdmi_sda,		1,	25),
-+	GROUP(hdmi_scl,		1,	24),
-+
- 	/* Bank DV */
- 	GROUP(uart_tx_b,	2,	29),
- 	GROUP(uart_rx_b,	2,	28),
-@@ -636,6 +645,14 @@
- 	"pwm_f_y",
- };
- 
-+static const char * const hdmi_hpd_groups[] = {
-+	"hdmi_hpd",
-+};
-+
-+static const char * const hdmi_i2c_groups[] = {
-+	"hdmi_sda", "hdmi_scl",
-+};
-+
- static const char * const gpio_aobus_groups[] = {
- 	"GPIOAO_0", "GPIOAO_1", "GPIOAO_2", "GPIOAO_3", "GPIOAO_4",
- 	"GPIOAO_5", "GPIOAO_6", "GPIOAO_7", "GPIOAO_8", "GPIOAO_9",
-@@ -699,6 +716,8 @@
- 	FUNCTION(pwm_e),
- 	FUNCTION(pwm_f_x),
- 	FUNCTION(pwm_f_y),
-+	FUNCTION(hdmi_hpd),
-+	FUNCTION(hdmi_i2c),
- };
- 
- static struct meson_pmx_func meson_gxbb_aobus_functions[] = {
-diff --git a/drivers/pinctrl/meson/pinctrl-meson-gxl.c b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
-index 25694f7..7703a46 100644
---- a/drivers/pinctrl/meson/pinctrl-meson-gxl.c
-+++ b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
-@@ -197,6 +197,10 @@
- 
- static const unsigned int pwm_e_pins[]		= { PIN(GPIOX_16, EE_OFF) };
- 
-+static const unsigned int hdmi_hpd_pins[]	= { PIN(GPIOH_0, EE_OFF) };
-+static const unsigned int hdmi_sda_pins[]	= { PIN(GPIOH_1, EE_OFF) };
-+static const unsigned int hdmi_scl_pins[]	= { PIN(GPIOH_2, EE_OFF) };
-+
- static const struct pinctrl_pin_desc meson_gxl_aobus_pins[] = {
- 	MESON_PIN(GPIOAO_0, 0),
- 	MESON_PIN(GPIOAO_1, 0),
-@@ -363,6 +367,11 @@
- 	GROUP(eth_txd2,		4,	11),
- 	GROUP(eth_txd3,		4,	10),
- 
-+	/* Bank H */
-+	GROUP(hdmi_hpd,		6,	31),
-+	GROUP(hdmi_sda,		6,	30),
-+	GROUP(hdmi_scl,		6,	29),
-+
- 	/* Bank DV */
- 	GROUP(uart_tx_b,	2,	16),
- 	GROUP(uart_rx_b,	2,	15),
-@@ -506,6 +515,14 @@
- 	"pwm_e",
- };
- 
-+static const char * const hdmi_hpd_groups[] = {
-+	"hdmi_hpd",
-+};
-+
-+static const char * const hdmi_i2c_groups[] = {
-+	"hdmi_sda", "hdmi_scl",
-+};
-+
- static const char * const gpio_aobus_groups[] = {
- 	"GPIOAO_0", "GPIOAO_1", "GPIOAO_2", "GPIOAO_3", "GPIOAO_4",
- 	"GPIOAO_5", "GPIOAO_6", "GPIOAO_7", "GPIOAO_8", "GPIOAO_9",
-@@ -537,6 +554,8 @@
- 	FUNCTION(i2c_c),
- 	FUNCTION(eth),
- 	FUNCTION(pwm_e),
-+	FUNCTION(hdmi_hpd),
-+	FUNCTION(hdmi_i2c),
- };
- 
- static struct meson_pmx_func meson_gxl_aobus_functions[] = {
--- 
-1.9.1
+>
+> We don't abuse firmware bindings to make the kernel work, that's _never_
+> a good idea.
+>
+> If the interrupt resource is a Resource Producer core ACPI should not
+> register the IRQ because that's not a GSI, probably this should be part of
+> Agustin changes too ?
+
+Agreed. If it's a Resource Producer,
+- it's not a GSI
+- and it should not be mapped to any irq domains
+
+I think Agustin needs to add the changes to the patch set but only for
+CONFIG_ACPI_GENERIC_GSI=y, not bother the core code as the complex
+history of firmware in x86, what do you think?
+
+>
+>>> IIUC _PRS is there to provide a way to define the possible resource
+>>> settings of a _configurable_ device (ie programmable) so that the actual
+>>> resource value you would programme with a call to its _SRS is sane (ie
+>>> the OS has a way, through the _PRS, to detect what possible resource
+>>> settings are available for the device).
+>>>
+>>> I think Rafael has more insights into how the _PRS is used on x86
+>>> systems so I would ask his point of view here before merrily merging
+>>> this code.
+>> OK, Rafael is traveling now, hope he will have time to take a look.
+>>
+>> How about updating this patch set then sending a new version for review
+>> with this patch unchanged? if Rafael have comments on this one, I will
+>> send a single updated one for this patch (if no other changes).
+> I think this patch (and the FW that goes with it) is wrong, but the rest
+> of the series, in particular the IORT bits, are ok with me.
+
+Thanks, I updated the patch using _CRS and firmware, with minor changes for
+Agustin's patch set, mbigen works pretty good as before.
+
+I will comment on Agustin's patch set.
+
+Thanks
+Hanjun
