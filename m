@@ -1,267 +1,173 @@
-From: tnowicki@caviumnetworks.com (Tomasz Nowicki)
-Date: Tue, 17 Jan 2017 12:59:02 +0100
-Subject: [PATCH v8 01/18] iommu/dma: Allow MSI-only cookies
-In-Reply-To: <1484127714-3263-2-git-send-email-eric.auger@redhat.com>
-References: <1484127714-3263-1-git-send-email-eric.auger@redhat.com>
- <1484127714-3263-2-git-send-email-eric.auger@redhat.com>
-Message-ID: <63888cd2-dfbd-ecad-abe2-9426fa61e72c@caviumnetworks.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 17 Jan 2017 17:30:31 +0530
+Subject: [PATCH 03/10] devicetree: bindings: add bindings for ahci-da850
+In-Reply-To: <fb93275e-73ad-513b-6ac8-a39bbe43fd5c@lechnology.com>
+References: <1484311084-31547-1-git-send-email-bgolaszewski@baylibre.com>
+ <1484311084-31547-4-git-send-email-bgolaszewski@baylibre.com>
+ <35ff358d-9b17-b2be-38d8-6a51cdddc1a1@lechnology.com>
+ <CAMpxmJUau9BgAOhacPvcA=NwyE6-yEfDgPdcCZ_JCuNH-amJSA@mail.gmail.com>
+ <d8406f53-b97d-ca9a-f7d1-94ce5b7064f7@ti.com>
+ <CAMpxmJW9ns-aG=4zYHcV5-2b_TdmJ7q+Ap1jdyoxstZjWYRL2A@mail.gmail.com>
+ <fb93275e-73ad-513b-6ac8-a39bbe43fd5c@lechnology.com>
+Message-ID: <37c826cc-9804-291e-a7b2-a512b59524fd@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.01.2017 10:41, Eric Auger wrote:
-> From: Robin Murphy <robin.murphy@arm.com>
->
-> IOMMU domain users such as VFIO face a similar problem to DMA API ops
-> with regard to mapping MSI messages in systems where the MSI write is
-> subject to IOMMU translation. With the relevant infrastructure now in
-> place for managed DMA domains, it's actually really simple for other
-> users to piggyback off that and reap the benefits without giving up
-> their own IOVA management, and without having to reinvent their own
-> wheel in the MSI layer.
->
-> Allow such users to opt into automatic MSI remapping by dedicating a
-> region of their IOVA space to a managed cookie, and extend the mapping
-> routine to implement a trivial linear allocator in such cases, to avoid
-> the needless overhead of a full-blown IOVA domain.
->
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+On Tuesday 17 January 2017 12:17 AM, David Lechner wrote:
+> On 01/16/2017 08:30 AM, Bartosz Golaszewski wrote:
+>> 2017-01-16 13:45 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
+>>> On Monday 16 January 2017 03:43 PM, Bartosz Golaszewski wrote:
+>>>> 2017-01-13 20:25 GMT+01:00 David Lechner <david@lechnology.com>:
+>>>>>
+>>>>> A clock multiplier property seems redundant if you are specifying a
+>>>>> clock.
+>>>>> It should be possible to get the rate from the clock to determine
+>>>>> which
+>>>>> multiplier is needed.
+>>>>>
+>>>>
+>>>> I probably should have named it differently. This is not a multiplier
+>>>> of a clock derived from PLL0 or PLL1. Instead it's a value set by
+>>>> writing to the Port PHY Control Register (MPY bits) of the SATA
+>>>> controller that configures the multiplier for the external low-jitter
+>>>> clock. On the lcdk the signals (REFCLKP, REFCLKN) are provided by
+>>>> CDCM61001 (SATA OSCILLATOR component on the schematics).
+>>>>
+>>>> I'll find a better name and comment the property accordingly.
+>>>>
+>>>> FYI: the da850 platform does not use the common clock framework, so I
+>>>> don't specify the clock property on the sata node in the device tree.
+>>>> Instead I add the clock lookup entry in patch [01/10]. This is
+>>>> transparent for AHCI which can get the clock as usual by calling
+>>>> clk_get() in ahci_platform_get_resources().
+>>>
+>>> I think David's point is that the SATA_REFCLK needs to be modeled as a
+>>> actual clock input to the IP. You should be able to get the rate using
+>>> clk_get_rate() and make the MPY bits calculation depending on the
+>>> incoming rate.
+>>>
+>>> You should be able to model the clock even when not using common clock
+>>> framework.
+>>>
+>>> DA850 AHCI does not use a con_id at the moment (it assumes a single
+>>> clock), and that needs to change.
+>>>
+>>
+>> It's true that once davinci gets ported (is this planned?) to using
+>> the common clock framework, we could just create a fixed-clock node in
+>> da850-lcdk for the SATA oscillator, so the new property is redundant.
+>>
+> 
+> I have some commits[1] where I started on converting da850 to use the
+> common clock framework. But, I don't know anything about other davinci
+> family devices, so I don't think I could really take that to completion
+> without lots of help.
 
-Reviewed-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
+I can help with testing, reviewing and filling in any missing
+information. But I wont have time to write the code itself.
 
-Thanks,
-Tomasz
+> 
+> [1]: https://github.com/dlech/ev3dev-kernel/commits/wip-20160509
 
+I see that you have made a copy of the keystone PSC driver. I think you
+will need pretty strong reasons to not use the same driver with some
+customization for DaVinci.
+
+>> What I don't get is how should I model a clock that is not
+>> configurable and is board-specific? Is hard-coding the relevant rate
+>> in da850.c with a huge FIXME the right way?
+> 
+> In arch/arm/mach-davinci/usb-da8xx.c, there is a "usb_refclkin" that is
+> very similar to the situation with the sata refclk. You could do
+> something like this to register the clock...
+> 
 > ---
->  drivers/iommu/dma-iommu.c | 119 +++++++++++++++++++++++++++++++++++++---------
->  include/linux/dma-iommu.h |   6 +++
->  2 files changed, 102 insertions(+), 23 deletions(-)
->
-> diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-> index 2db0d64..de41ead 100644
-> --- a/drivers/iommu/dma-iommu.c
-> +++ b/drivers/iommu/dma-iommu.c
-> @@ -37,15 +37,50 @@ struct iommu_dma_msi_page {
->  	phys_addr_t		phys;
->  };
->
-> +enum iommu_dma_cookie_type {
-> +	IOMMU_DMA_IOVA_COOKIE,
-> +	IOMMU_DMA_MSI_COOKIE,
+> 
+> diff --git a/arch/arm/mach-davinci/devices-da8xx.c
+> b/arch/arm/mach-davinci/devices-da8xx.c
+> index c2457b3..790efce9 100644
+> --- a/arch/arm/mach-davinci/devices-da8xx.c
+> +++ b/arch/arm/mach-davinci/devices-da8xx.c
+> @@ -1023,6 +1023,34 @@ int __init da8xx_register_spi_bus(int instance,
+> unsigned num_chipselect)
+>  }
+> 
+>  #ifdef CONFIG_ARCH_DAVINCI_DA850
+> +
+> +static struct clk sata_refclkin = {
+> +       .name           = "sata_refclkin",
+> +       .set_rate       = davinci_simple_set_rate,
 > +};
 > +
->  struct iommu_dma_cookie {
-> -	struct iova_domain	iovad;
-> -	struct list_head	msi_page_list;
-> -	spinlock_t		msi_lock;
-> +	enum iommu_dma_cookie_type	type;
-> +	union {
-> +		/* Full allocator for IOMMU_DMA_IOVA_COOKIE */
-> +		struct iova_domain	iovad;
-> +		/* Trivial linear page allocator for IOMMU_DMA_MSI_COOKIE */
-> +		dma_addr_t		msi_iova;
-> +	};
-> +	struct list_head		msi_page_list;
-> +	spinlock_t			msi_lock;
->  };
->
-> +static inline size_t cookie_msi_granule(struct iommu_dma_cookie *cookie)
-> +{
-> +	if (cookie->type == IOMMU_DMA_IOVA_COOKIE)
-> +		return cookie->iovad.granule;
-> +	return PAGE_SIZE;
-> +}
-> +
->  static inline struct iova_domain *cookie_iovad(struct iommu_domain *domain)
->  {
-> -	return &((struct iommu_dma_cookie *)domain->iova_cookie)->iovad;
-> +	struct iommu_dma_cookie *cookie = domain->iova_cookie;
-> +
-> +	if (cookie->type == IOMMU_DMA_IOVA_COOKIE)
-> +		return &cookie->iovad;
-> +	return NULL;
-> +}
-> +
-> +static struct iommu_dma_cookie *cookie_alloc(enum iommu_dma_cookie_type type)
-> +{
-> +	struct iommu_dma_cookie *cookie;
-> +
-> +	cookie = kzalloc(sizeof(*cookie), GFP_KERNEL);
-> +	if (cookie) {
-> +		spin_lock_init(&cookie->msi_lock);
-> +		INIT_LIST_HEAD(&cookie->msi_page_list);
-> +		cookie->type = type;
-> +	}
-> +	return cookie;
->  }
->
->  int iommu_dma_init(void)
-> @@ -62,25 +97,53 @@ int iommu_dma_init(void)
->   */
->  int iommu_get_dma_cookie(struct iommu_domain *domain)
->  {
-> +	if (domain->iova_cookie)
-> +		return -EEXIST;
-> +
-> +	domain->iova_cookie = cookie_alloc(IOMMU_DMA_IOVA_COOKIE);
-> +	if (!domain->iova_cookie)
-> +		return -ENOMEM;
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL(iommu_get_dma_cookie);
+> +static struct clk_lookup sata_refclkin_lookup =
+> +       CLK(NULL, "sata_refclkin", &sata_refclkin);
 > +
 > +/**
-> + * iommu_get_msi_cookie - Acquire just MSI remapping resources
-> + * @domain: IOMMU domain to prepare
-> + * @base: Start address of IOVA region for MSI mappings
+> + * da8xx_register_sata_refclkin - register SATA_REFCLKIN clock
 > + *
-> + * Users who manage their own IOVA allocation and do not want DMA API support,
-> + * but would still like to take advantage of automatic MSI remapping, can use
-> + * this to initialise their own domain appropriately. Users should reserve a
-> + * contiguous IOVA region, starting at @base, large enough to accommodate the
-> + * number of PAGE_SIZE mappings necessary to cover every MSI doorbell address
-> + * used by the devices attached to @domain.
+> + * @rate: The clock rate in Hz
 > + */
-> +int iommu_get_msi_cookie(struct iommu_domain *domain, dma_addr_t base)
+> +int __init da850_register_sata_refclkin(int rate)
 > +{
->  	struct iommu_dma_cookie *cookie;
->
-> +	if (domain->type != IOMMU_DOMAIN_UNMANAGED)
-> +		return -EINVAL;
+> +       int ret;
 > +
->  	if (domain->iova_cookie)
->  		return -EEXIST;
->
-> -	cookie = kzalloc(sizeof(*cookie), GFP_KERNEL);
-> +	cookie = cookie_alloc(IOMMU_DMA_MSI_COOKIE);
->  	if (!cookie)
->  		return -ENOMEM;
->
-> -	spin_lock_init(&cookie->msi_lock);
-> -	INIT_LIST_HEAD(&cookie->msi_page_list);
-> +	cookie->msi_iova = base;
->  	domain->iova_cookie = cookie;
->  	return 0;
->  }
-> -EXPORT_SYMBOL(iommu_get_dma_cookie);
-> +EXPORT_SYMBOL(iommu_get_msi_cookie);
->
->  /**
->   * iommu_put_dma_cookie - Release a domain's DMA mapping resources
-> - * @domain: IOMMU domain previously prepared by iommu_get_dma_cookie()
-> + * @domain: IOMMU domain previously prepared by iommu_get_dma_cookie() or
-> + *          iommu_get_msi_cookie()
->   *
->   * IOMMU drivers should normally call this from their domain_free callback.
->   */
-> @@ -92,7 +155,7 @@ void iommu_put_dma_cookie(struct iommu_domain *domain)
->  	if (!cookie)
->  		return;
->
-> -	if (cookie->iovad.granule)
-> +	if (cookie->type == IOMMU_DMA_IOVA_COOKIE && cookie->iovad.granule)
->  		put_iova_domain(&cookie->iovad);
->
->  	list_for_each_entry_safe(msi, tmp, &cookie->msi_page_list, list) {
-> @@ -137,11 +200,12 @@ static void iova_reserve_pci_windows(struct pci_dev *dev,
->  int iommu_dma_init_domain(struct iommu_domain *domain, dma_addr_t base,
->  		u64 size, struct device *dev)
->  {
-> -	struct iova_domain *iovad = cookie_iovad(domain);
-> +	struct iommu_dma_cookie *cookie = domain->iova_cookie;
-> +	struct iova_domain *iovad = &cookie->iovad;
->  	unsigned long order, base_pfn, end_pfn;
->
-> -	if (!iovad)
-> -		return -ENODEV;
-> +	if (!cookie || cookie->type != IOMMU_DMA_IOVA_COOKIE)
-> +		return -EINVAL;
->
->  	/* Use the smallest supported page size for IOVA granularity */
->  	order = __ffs(domain->pgsize_bitmap);
-> @@ -662,11 +726,12 @@ static struct iommu_dma_msi_page *iommu_dma_get_msi_page(struct device *dev,
->  {
->  	struct iommu_dma_cookie *cookie = domain->iova_cookie;
->  	struct iommu_dma_msi_page *msi_page;
-> -	struct iova_domain *iovad = &cookie->iovad;
-> +	struct iova_domain *iovad = cookie_iovad(domain);
->  	struct iova *iova;
->  	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
-> +	size_t size = cookie_msi_granule(cookie);
->
-> -	msi_addr &= ~(phys_addr_t)iova_mask(iovad);
-> +	msi_addr &= ~(phys_addr_t)(size - 1);
->  	list_for_each_entry(msi_page, &cookie->msi_page_list, list)
->  		if (msi_page->phys == msi_addr)
->  			return msi_page;
-> @@ -675,13 +740,18 @@ static struct iommu_dma_msi_page *iommu_dma_get_msi_page(struct device *dev,
->  	if (!msi_page)
->  		return NULL;
->
-> -	iova = __alloc_iova(domain, iovad->granule, dma_get_mask(dev));
-> -	if (!iova)
-> -		goto out_free_page;
-> -
->  	msi_page->phys = msi_addr;
-> -	msi_page->iova = iova_dma_addr(iovad, iova);
-> -	if (iommu_map(domain, msi_page->iova, msi_addr, iovad->granule, prot))
-> +	if (iovad) {
-> +		iova = __alloc_iova(domain, size, dma_get_mask(dev));
-> +		if (!iova)
-> +			goto out_free_page;
-> +		msi_page->iova = iova_dma_addr(iovad, iova);
-> +	} else {
-> +		msi_page->iova = cookie->msi_iova;
-> +		cookie->msi_iova += size;
-> +	}
+> +       sata_refclkin.rate = rate;
+> +       ret = clk_register(&sata_refclkin);
+> +       if (ret)
+> +               return ret;
 > +
-> +	if (iommu_map(domain, msi_page->iova, msi_addr, size, prot))
->  		goto out_free_iova;
->
->  	INIT_LIST_HEAD(&msi_page->list);
-> @@ -689,7 +759,10 @@ static struct iommu_dma_msi_page *iommu_dma_get_msi_page(struct device *dev,
->  	return msi_page;
->
->  out_free_iova:
-> -	__free_iova(iovad, iova);
-> +	if (iovad)
-> +		__free_iova(iovad, iova);
-> +	else
-> +		cookie->msi_iova -= size;
->  out_free_page:
->  	kfree(msi_page);
->  	return NULL;
-> @@ -730,7 +803,7 @@ void iommu_dma_map_msi_msg(int irq, struct msi_msg *msg)
->  		msg->data = ~0U;
->  	} else {
->  		msg->address_hi = upper_32_bits(msi_page->iova);
-> -		msg->address_lo &= iova_mask(&cookie->iovad);
-> +		msg->address_lo &= cookie_msi_granule(cookie) - 1;
->  		msg->address_lo += lower_32_bits(msi_page->iova);
->  	}
->  }
-> diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
-> index 7f7e9a7..28df844 100644
-> --- a/include/linux/dma-iommu.h
-> +++ b/include/linux/dma-iommu.h
-> @@ -27,6 +27,7 @@
->
->  /* Domain management interface for IOMMU drivers */
->  int iommu_get_dma_cookie(struct iommu_domain *domain);
-> +int iommu_get_msi_cookie(struct iommu_domain *domain, dma_addr_t base);
->  void iommu_put_dma_cookie(struct iommu_domain *domain);
->
->  /* Setup call for arch DMA mapping code */
-> @@ -86,6 +87,11 @@ static inline int iommu_get_dma_cookie(struct iommu_domain *domain)
->  	return -ENODEV;
->  }
->
-> +static inline int iommu_get_msi_cookie(struct iommu_domain *domain, dma_addr_t base)
-> +{
-> +	return -ENODEV;
+> +       clkdev_add(&sata_refclkin_lookup);
+> +
+> +       return 0;
 > +}
 > +
->  static inline void iommu_put_dma_cookie(struct iommu_domain *domain)
+>  static struct resource da850_sata_resources[] = {
+>         {
+>                 .start  = DA850_SATA_BASE,
+> @@ -1055,8 +1083,11 @@ static struct platform_device da850_sata_device = {
+> 
+>  int __init da850_register_sata(unsigned long refclkpn)
 >  {
+> -       /* please see comment in drivers/ata/ahci_da850.c */
+> -       BUG_ON(refclkpn != 100 * 1000 * 1000);
+> +       int err;
+> +
+> +       err = da850_register_sata_refclkin(refclkpn);
+> +       if (err)
+> +               return err;
+> 
+>         return platform_device_register(&da850_sata_device);
 >  }
->
+> 
+> ---
+> 
+> Then to get things working from device tree, add this...
+> 
+> ---
+> 
+> diff --git a/arch/arm/mach-davinci/da8xx-dt.c
+> b/arch/arm/mach-davinci/da8xx-dt.c
+> index d2be194..b54bdd6 100644
+> --- a/arch/arm/mach-davinci/da8xx-dt.c
+> +++ b/arch/arm/mach-davinci/da8xx-dt.c
+> @@ -60,6 +60,14 @@ static void __init da850_init_machine(void)
+>                 pr_warn("%s: registering USB 1.1 PHY clock failed: %d",
+>                         __func__, ret);
+> 
+> +       if (of_machine_is_compatible("ti,da850-evm") ||
+> +           of_machine_is_compatible("ti,da850-lcdk")) {
+> +               ret = da850_register_sata_refclkin(100000000);
+> +               if (ret)
+> +                       pr_warn("%s: registering SATA_REFCLK clock
+> failed: %d",
+> +                               __func__, ret);
+> +       }
+> +
+>         of_platform_default_populate(NULL, da850_auxdata_lookup, NULL);
+>         davinci_pm_init();
+>         pdata_quirks_init();
+
+This approach is fine.
+
+Thanks,
+Sekhar
