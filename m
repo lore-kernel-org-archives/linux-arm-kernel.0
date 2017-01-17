@@ -1,118 +1,126 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 17 Jan 2017 10:20:36 +0000
-Subject: [RFC PATCH 15/33] irqchip/gic-v4: Add management structure definitions
+Date: Tue, 17 Jan 2017 10:20:28 +0000
+Subject: [RFC PATCH 07/33] irqchip/gic-v3-its: Macro-ize
+ its_send_single_command
 In-Reply-To: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
 References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1484648454-21216-16-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1484648454-21216-8-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a bunch of GICv4-specific data structures that will get used in
-subsequent patches.
+Most ITS commands do operate on a collection object, and require
+a SYNC command to be performed on that collection in order to
+guarantee the execution of the first command.
+
+With GICv4 ITS, another set of commands perform similar operations
+on a VPE object, and a VSYNC operations must be executed to guarantee
+their execution.
+
+Given the similarities (post a command, perform a synchronization
+operation on a sync object), it makes sense to reuse the same
+mechanism for both class of commands.
+
+Let's start with turning its_send_single_command into a huge macro
+that performs the bulk of the work, and a set of helpers that
+make this macro useeable for the GICv3 ITS commands.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- include/linux/irqchip/arm-gic-v4.h | 92 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 92 insertions(+)
- create mode 100644 include/linux/irqchip/arm-gic-v4.h
+ drivers/irqchip/irq-gic-v3-its.c | 82 ++++++++++++++++++++++------------------
+ 1 file changed, 45 insertions(+), 37 deletions(-)
 
-diff --git a/include/linux/irqchip/arm-gic-v4.h b/include/linux/irqchip/arm-gic-v4.h
-new file mode 100644
-index 0000000..6e9c2b3
---- /dev/null
-+++ b/include/linux/irqchip/arm-gic-v4.h
-@@ -0,0 +1,92 @@
-+/*
-+ * Copyright (C) 2016 ARM Limited, All Rights Reserved.
-+ * Author: Marc Zyngier <marc.zyngier@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 99f6130..520b764 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -484,43 +484,51 @@ static void its_wait_for_range_completion(struct its_node *its,
+ 	}
+ }
+ 
+-static void its_send_single_command(struct its_node *its,
+-				    its_cmd_builder_t builder,
+-				    struct its_cmd_desc *desc)
+-{
+-	struct its_cmd_block *cmd, *sync_cmd, *next_cmd;
+-	struct its_collection *sync_col;
+-	unsigned long flags;
+-
+-	raw_spin_lock_irqsave(&its->lock, flags);
+-
+-	cmd = its_allocate_entry(its);
+-	if (!cmd) {		/* We're soooooo screewed... */
+-		pr_err_ratelimited("ITS can't allocate, dropping command\n");
+-		raw_spin_unlock_irqrestore(&its->lock, flags);
+-		return;
+-	}
+-	sync_col = builder(cmd, desc);
+-	its_flush_cmd(its, cmd);
+-
+-	if (sync_col) {
+-		sync_cmd = its_allocate_entry(its);
+-		if (!sync_cmd) {
+-			pr_err_ratelimited("ITS can't SYNC, skipping\n");
+-			goto post;
+-		}
+-		its_encode_cmd(sync_cmd, GITS_CMD_SYNC);
+-		its_encode_target(sync_cmd, sync_col->target_address);
+-		its_fixup_cmd(sync_cmd);
+-		its_flush_cmd(its, sync_cmd);
+-	}
+-
+-post:
+-	next_cmd = its_post_commands(its);
+-	raw_spin_unlock_irqrestore(&its->lock, flags);
+-
+-	its_wait_for_range_completion(its, cmd, next_cmd);
+-}
++#define __its_send_single_cmd(name, buildtype, synctype, buildfn)	\
++void name(struct its_node *its,						\
++	  buildtype builder,						\
++	  struct its_cmd_desc *desc)					\
++{									\
++	struct its_cmd_block *cmd, *sync_cmd, *next_cmd;		\
++	synctype *sync_obj;						\
++	unsigned long flags;						\
++									\
++	raw_spin_lock_irqsave(&its->lock, flags);			\
++									\
++	cmd = its_allocate_entry(its);					\
++	if (!cmd) {		/* We're soooooo screewed... */		\
++		raw_spin_unlock_irqrestore(&its->lock, flags);		\
++		return;							\
++	}								\
++	sync_obj = builder(cmd, desc);					\
++	its_flush_cmd(its, cmd);					\
++									\
++	if (sync_obj) {							\
++		sync_cmd = its_allocate_entry(its);			\
++		if (!sync_cmd)						\
++			goto post;					\
++									\
++		buildfn(sync_cmd, sync_obj);				\
++		its_fixup_cmd(sync_cmd);				\
++		its_flush_cmd(its, sync_cmd);				\
++	}								\
++									\
++post:									\
++	next_cmd = its_post_commands(its);				\
++	raw_spin_unlock_irqrestore(&its->lock, flags);			\
++									\
++	its_wait_for_range_completion(its, cmd, next_cmd);		\
++}
 +
-+#ifndef __LINUX_IRQCHIP_ARM_GIC_V4_H
-+#define __LINUX_IRQCHIP_ARM_GIC_V4_H
++static void its_build_sync_cmd(struct its_cmd_block *sync_cmd,
++			       struct its_collection *sync_col)
++{
++	its_encode_cmd(sync_cmd, GITS_CMD_SYNC);
++	its_encode_target(sync_cmd, sync_col->target_address);
++}
 +
-+/* Embedded in kvm.arch */
-+struct its_vm {
-+	struct irq_domain	*domain;
-+	struct page		*vprop_page;
-+	irq_hw_number_t		db_lpi_base;
-+	unsigned long		*db_bitmap;
-+	int			nr_db_lpis;
-+};
-+
-+/* Embedded in kvm_vcpu.arch */
-+struct its_vpe {
-+	struct page 		*vpt_page;
-+	struct its_vm		*its_vm;
-+	irq_hw_number_t		vpe_db_lpi;
-+	u16			col_idx;
-+	u16			vpe_id;
-+	bool			idai;
-+	bool			pending_last;
-+};
-+
-+/*
-+ * struct its_vlpi: structure describing a VLPI. Only to be
-+ * interpreted in the context of a physical interrupt it complements.
-+ *
-+ * @vintid:	Virtual LPI number
-+ * @db_enabled:	Is the VPE doorbell to be generated?
-+ * @vpe_idx:	Index (0-based) of the VPE in this VM. Not the vpe_id!
-+ */
-+struct its_vlpi {
-+	u32			vintid;
-+	bool			db_enabled;
-+	u16			vpe_idx;
-+};
-+
-+/*
-+ * struct its_vlpi_map: structure describing the mappings of all vlpis
-+ * for a single device. To be used as the vcpu_info passed to
-+ * irq_set_vcpu_affinity().
-+ *
-+ * @vpes: Array of struct its_vpe, describing the GICv4 view of the
-+ * 	  vpus.
-+ * @vlpis: Array of struct vlpi, each one matching one the
-+ *	   corresponding LPI
-+ * @nr_vpes: Size of the @vpes array
-+ * @nr_vlpis: Size of the @vlpis array
-+ */
-+struct its_vlpi_map {
-+	/* nr_vpes  */
-+	struct its_vpe		**vpes;
-+	struct its_vlpi		*vlpis;
-+	int			nr_vpes;
-+	int			nr_vlpis;
-+};
-+
-+enum its_cmd_type {
-+	MAP_VLPI,
-+	UNMAP_VLPI,
-+	PROP_UPDATE_VLPI,
-+	SCHEDULE_VPE,
-+	DESCHEDULE_VPE,
-+	INVALL_VPE,
-+};
-+
-+struct its_cmd_info {
-+	enum its_cmd_type		cmd_type;
-+	union {
-+		struct its_vlpi_map	*map;
-+		u8			config;
-+	};
-+};
-+
-+#endif
++static __its_send_single_cmd(its_send_single_command, its_cmd_builder_t,
++			     struct its_collection, its_build_sync_cmd)
+ 
+ static void its_send_inv(struct its_device *dev, u32 event_id)
+ {
 -- 
 2.1.4
