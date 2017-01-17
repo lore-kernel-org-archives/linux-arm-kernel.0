@@ -1,102 +1,58 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 17 Jan 2017 10:20:40 +0000
-Subject: [RFC PATCH 19/33] irqchip/gic-v3-its: Add VLPI configuration handling
-In-Reply-To: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
-References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1484648454-21216-20-git-send-email-marc.zyngier@arm.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 17 Jan 2017 11:22:22 +0100
+Subject: [PATCH 1/2] dt-bindings: gpu: Add Mali Utgard bindings
+In-Reply-To: <20170117093813.mxp2hgoxbgske6ru@lukather>
+References: <20170116132424.7038-1-maxime.ripard@free-electrons.com>
+ <20170116184906.r62di7xiil5lae33@kozik-lap>
+ <20170117093813.mxp2hgoxbgske6ru@lukather>
+Message-ID: <4f5b8608-af6c-3ef5-aaf0-e7e034d006cd@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a VLPI is reconfigured (enabled, disabled, change in priority),
-the full configuration byte must be written, and the caches invalidated.
+On 01/17/2017 10:38 AM, Maxime Ripard wrote:
+> Hi,
+> 
+> On Mon, Jan 16, 2017 at 08:49:06PM +0200, Krzysztof Kozlowski wrote:
+>> On Mon, Jan 16, 2017 at 02:24:23PM +0100, Maxime Ripard wrote:
+>>> The ARM Mali Utgard GPU family is embedded into a number of SoCs from
+>>> Allwinner, Amlogic, Mediatek or Rockchip.
+>>>
+>>> Add a binding for the GPU of that family.
+>>>
+>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>> ---
+>>>  .../devicetree/bindings/gpu/arm,mali-utgard.txt    | 76 ++++++++++++++++++++++
+>>>  1 file changed, 76 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
+>>
+>> Do you have a driver in kernel which will implement these bindings?
+> 
+> No, but we have bindings for out-of-tree drivers already.
+> 
+>> Defining them for out-of-tree driver does not bring any benefits
+>> (3rd party driver will not respect them anyway).
+> 
+> You could see it the other way around too. The out-of-tree drivers
+> don't respect it at the moment because there's no binding to respect.
+> 
+> And at least for us, we definitely plan on doing that.
+> 
+> Maxime
 
-Also, when using the irq_mask/irq_unmask methods, it is necessary
-to disable the doorbell for that particular interrupt (by mapping it
-to 1023) on top of clearing the Enable bit.
+Hi Maxime, Krzysztof,
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/irqchip/irq-gic-v3-its.c | 37 +++++++++++++++++++++++++++++++++++--
- 1 file changed, 35 insertions(+), 2 deletions(-)
+We hope this will be accepted so it will solve the same issue we have on Amlogic SoCs
+and all the other mali powered SoCs.
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index d50a019..6931018 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -796,11 +796,18 @@ static inline u32 its_get_event_id(struct irq_data *d)
- static void lpi_update_config(struct irq_data *d, u8 clr, u8 set)
- {
- 	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
--	irq_hw_number_t hwirq = d->hwirq;
-+	irq_hw_number_t hwirq;
- 	struct page *prop_page;
- 	u8 *cfg;
- 
--	prop_page = gic_rdists->prop_page;
-+	if (irqd_is_forwarded_to_vcpu(d)) {
-+		u32 event = its_get_event_id(d);
-+		prop_page = its_dev->event_map.vlpi_map->vpes[0]->its_vm->vprop_page;
-+		hwirq = its_dev->event_map.vlpi_map->vlpis[event].vintid;
-+	} else {
-+		prop_page = gic_rdists->prop_page;
-+		hwirq = d->hwirq;
-+	}
- 
- 	cfg = page_address(prop_page) + hwirq - 8192;
- 	*cfg &= ~clr;
-@@ -818,13 +825,28 @@ static void lpi_update_config(struct irq_data *d, u8 clr, u8 set)
- 	its_send_inv(its_dev, its_get_event_id(d));
- }
- 
-+static void its_vlpi_set_doorbell(struct irq_data *d, bool enable)
-+{
-+	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
-+	u32 event = its_get_event_id(d);
-+
-+	its_dev->event_map.vlpi_map->vlpis[event].db_enabled = enable;
-+	its_send_vmapti(its_dev, event);
-+}
-+
- static void its_mask_irq(struct irq_data *d)
- {
-+	if (irqd_is_forwarded_to_vcpu(d))
-+		its_vlpi_set_doorbell(d, false);
-+
- 	lpi_update_config(d, LPI_PROP_ENABLED, 0);
- }
- 
- static void its_unmask_irq(struct irq_data *d)
- {
-+	if (irqd_is_forwarded_to_vcpu(d))
-+		its_vlpi_set_doorbell(d, true);
-+
- 	lpi_update_config(d, 0, LPI_PROP_ENABLED);
- }
- 
-@@ -837,6 +859,10 @@ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
- 	struct its_collection *target_col;
- 	u32 id = its_get_event_id(d);
- 
-+	/* A forwarded interrupt should use irq_set_vcpu_affinity */
-+	if (irqd_is_forwarded_to_vcpu(d))
-+		return -EINVAL;
-+
-        /* lpi cannot be routed to a redistributor that is on a foreign node */
- 	if (its_dev->its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_23144) {
- 		if (its_dev->its->numa_node >= 0) {
-@@ -969,6 +995,13 @@ static int its_irq_set_vcpu_affinity(struct irq_data *d, void *vcpu_info)
- 
- 	case PROP_UPDATE_VLPI:
- 	{
-+		if (!its_dev->event_map.vlpi_map ||
-+		    !irqd_is_forwarded_to_vcpu(d))
-+			return -EINVAL;
-+
-+		lpi_update_config(d, 0xff, info->config);
-+		its_vlpi_set_doorbell(d, !!(info->config & LPI_PROP_ENABLED));
-+
- 		return 0;
- 	}
- 
--- 
-2.1.4
+Having mainline bindings will forcre out-of-tree driver to respect those bindings
+and remove a dts out-of-tree patch aswell.
+
+Neil
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170117/4be3a61c/attachment.sig>
