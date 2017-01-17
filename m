@@ -1,84 +1,96 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Tue, 17 Jan 2017 20:23:04 +0100
-Subject: [PATCH 0/5] meson-gx: reset RGMII PHYs and configure TX delay
-In-Reply-To: <20161202234739.22929-1-martin.blumenstingl@googlemail.com>
-References: <20161202234739.22929-1-martin.blumenstingl@googlemail.com>
-Message-ID: <1484680984.26620.29.camel@baylibre.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 17 Jan 2017 19:34:14 +0000
+Subject: CONFIG_PCIEASPM breaks PCIe on Marvell Armada 385 machine
+In-Reply-To: <20170117181458.GB11063@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170111194942.q5rdma2es6hkmxfe@perseus.defre.kleine-koenig.org>
+ <20170117151444.GE22776@bhelgaas-glaptop.roam.corp.google.com>
+ <20170117152548.GB27312@n2100.armlinux.org.uk>
+ <20170117174649.GA11063@bhelgaas-glaptop.roam.corp.google.com>
+ <20170117175115.GD27312@n2100.armlinux.org.uk>
+ <20170117175728.GE27312@n2100.armlinux.org.uk>
+ <20170117181458.GB11063@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20170117193414.GG27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2016-12-03 at 00:47 +0100, Martin Blumenstingl wrote:
-> This partially fixes the 1000Mbit/s ethernet TX throughput issues (on
-> networks which are not affected by the EEE problem, as reported here:
-> [1]).
-> The actual problem for the TX throughput issues was that the TX delay
-> was applied twice:
-> - once "accidentally" by the PHY (this was fixed with [2])
-> - once by the MAC because there was a hardcoded TX delay (of 2ns),
-> ? this will be configurable with the changes from [0]
+On Tue, Jan 17, 2017 at 12:14:58PM -0600, Bjorn Helgaas wrote:
+> The instrumentation has evolved a bit since then.  Latest is below (could
+> still use improvement, but it does address your suggestions above):
 > 
-> These are the dts changes which belong to my other series (in v2
-> these patches were part of the other series, upon request of the
-> net maintainers I have split the .dts changes into their own series
-> so
-> we are able to take both through different trees):
-> "[PATCH net-next v3 0/2] stmmac: dwmac-meson8b: configurable
-> RGMII TX delay": [0].
-> Thus this series depends on the ACK for the binding changes in the
-> other series!
-> 
-> I based these changes on my other series "[PATCH v2 0/2] GXL and GXM
-> SCPI improvements": [3]
-> 
-> 
-> [0] http://lists.infradead.org/pipermail/linux-amlogic/2016-December/
-> 001834.html
-> [1] http://lists.infradead.org/pipermail/linux-amlogic/2016-November/
-> 001607.html
-> [2] http://lists.infradead.org/pipermail/linux-amlogic/2016-November/
-> 001707.html
-> [3] http://lists.infradead.org/pipermail/linux-amlogic/2016-December/
-> 001831.html
-> 
-> Martin Blumenstingl (5):
-> ? ARM64: dts: meson-gx: move the MDIO node to meson-gx
+> https://bugzilla.kernel.org/attachment.cgi?id=251691 (CONFIG_PCIEASPM=y)
+> https://bugzilla.kernel.org/attachment.cgi?id=251701 (CONFIG_PCIEASPM not set)
 
-Sorry for the late reply, I've only been able to test this yesterday.
+Thanks.
 
-With "snps,dwmac-mdio" provided in meson-gx.dtsi, the mdio_node is
-defined in?stmmac_mdio_register and auto-detection of the PHY is
-disabled for all meson-gx boards.
+The point at which things die is when we request a link retrain - I've
+augmented the trace with the register names:
 
-I wonder if this is desirable ? or maybe this something we could fix in
-stmmac ? (perform auto-detect the mdio bus is provided without a PHY)
+pci 0000:02:00.0: rd where=0x074 size=4 val=0x8dc1 (hw)         EXP_DEVCAP
 
-Also, I think bisect is broken between patch 1 and patch 4: The PHY of
-some boards won't be detected between these patches. Should we squash
-them ??
+pcie_aspm_configure_common_clock():
 
-> ? ARM64: dts: meson-gxbb-odroidc2: add reset for the ethernet PHY
-> ? ARM64: dts: meson-gxbb-p20x: add reset for the ethernet PHY
-> ? ARM64: dts: meson-gxbb-vega-s95: add reset for the ethernet PHY
-> ? ARM64: dts: amlogic: add the ethernet TX delay configuration
-> 
+pci 0000:02:00.0: rd where=0x082 size=2 val=0x1011 (hw)         EXP_LNKSTA
+pci 0000:??:??.?: rd where=0x052 size=2 val=0x1011 (sw)         EXP_LNKSTA
+pci 0000:02:00.0: rd where=0x080 size=2 val=0x0 (hw)            EXP_LNKCTL
+pci 0000:02:00.0: wr where=0x080 size=2 val=0x40 (hw)           EXP_LNKCTL
 
-Last remark, about the use of?ethernet-phy-idXXXX.XXXX in the odroid
-and the vega: Isn't it better to let phylib do the autodetection of the
-phy id ?
+Enables common clock configuration on the device.
 
-If we want to specify the id in DT, we should probably add it for the
-Micrel PHY of the p200 as well, for consistency.
+pci 0000:??:??.?: rd where=0x050 size=2 val=0x40 (sw)           EXP_LNKCTL
+pci 0000:??:??.?: wr where=0x050 size=2 val=0x40 (sw)           EXP_LNKCTL
 
-> ?arch/arm64/boot/dts/amlogic/meson-gx.dtsi????????????|??6 ++++++
-> ?arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts??| 17
-> +++++++++++++++++
-> ?arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi?????| 17
-> +++++++++++++++++
-> ?arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi | 17
-> +++++++++++++++++
-> ?arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts |??2 ++
-> ?arch/arm64/boot/dts/amlogic/meson-gxl.dtsi???????????|??6 ------
-> ?arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts??|??2 ++
-> ?arch/arm64/boot/dts/amlogic/meson-gxm-s912-q200.dts??|??2 ++
-> ?8 files changed, 63 insertions(+), 6 deletions(-)
-> 
+Common clock configuration is already enabled on the root.
+
+pci 0000:??:??.?: rd where=0x050 size=4 val=0x10110040 (sw)     EXP_LNKCTL
+pci 0000:??:??.?: wr where=0x050 size=2 val=0x60 (sw)           EXP_LNKCTL
+
+Here we request the train, setting bit 5 in the link control
+register.
+
+pci 0000:??:??.?: rd where=0x050 size=4 val=0x110040 (sw)       EXP_LNKCTL
+pci 0000:??:??.?: rd where=0x052 size=2 val=0x811 (sw)          EXP_LNKSTA
+pci 0000:??:??.?: rd where=0x052 size=2 val=0x811 (sw)          EXP_LNKSTA
+
+Waiting for the link training bit to clear...
+
+pci 0000:??:??.?: rd where=0x052 size=2 val=0x11 (sw)           EXP_LNKSTA
+
+and it's cleared here - but note that the link is still down.
+
+pci 0000:??:??.?: rd where=0x04c size=4 val=0x3ac12 (sw)        EXP_LNKCAP
+pci 0000:??:??.?: rd where=0x050 size=2 val=0x40 (sw)           EXP_LNKCTL
+
+pcie_get_aspm_reg() for the root.
+
+pci 0000:02:00.0: rd where=0x07c size=4 val=0xffffffff (no link)
+
+pcie_get_aspm_reg() for the device (fails).
+
+So, I think the question is... why does asking for a retrain cause
+the link to fail and never recover?
+
+Uwe, can you try:
+
+setpci -s <whatever-the-id-of-the-root-is-it's-blanked-out-in-the-above> \
+	0x50.w=0x60
+
+and see whether it remains alive (you can check by reading the root
+register 0x52.w - bit 12 should be set once bit 11 clears again.
+
+If that's successful, maybe setting the common clock bit on the PCIe
+device is what's causing the problem, in which case:
+
+setpci -s 02:00.0 0x80.w=0x40
+setpci -s <whatever-the-id-of-the-root-is-it's-blanked-out-in-the-above> \
+	0x50.w=0x60
+
+I would imagine would cause the link to go down.  So, the question
+this gives us is why the common clock setup is not working on your
+platform.  Maybe we need to source the SLC bit in the link status
+from DT, though I'd like to understand what's going on here more
+first.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
