@@ -1,102 +1,72 @@
 From: mylene.josserand@free-electrons.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Tue, 17 Jan 2017 15:02:27 +0100
-Subject: [PATCH v2 07/10] dt-bindings: sound: Add sun8i audio documentation
+Date: Tue, 17 Jan 2017 15:02:26 +0100
+Subject: [PATCH v2 06/10] ASoC: sun8i-codec-analog: Add amplifier event to fix
+ first delay
 In-Reply-To: <20170117140230.23142-1-mylene.josserand@free-electrons.com>
 References: <20170117140230.23142-1-mylene.josserand@free-electrons.com>
-Message-ID: <20170117140230.23142-8-mylene.josserand@free-electrons.com>
+Message-ID: <20170117140230.23142-7-mylene.josserand@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the documentation for dt-binding of the digital audio codec driver
-and the audio card driver for Sun8i SoCs.
+When playing a sound for the first time, a short delay, where the audio
+file is not played, can be noticed.
+On a second play (right after), the sound is played correctly.
+If we wait a short time (~5 sec which corresponds to the aplay
+timeout), the delay is back.
+
+This patch fixes it by using an event on headphone amplifier.
+It allows to keep the amplifier enable while playing a sound.
+A delay of 700ms allows to wait that the amplifier is powered-up
+before playing the sound.
 
 Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
 ---
- .../devicetree/bindings/sound/sun8i-codec.txt      | 76 ++++++++++++++++++++++
- 1 file changed, 76 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/sun8i-codec.txt
+ sound/soc/sunxi/sun8i-codec-analog.c | 30 ++++++++++++++++++++++++++++--
+ 1 file changed, 28 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/sound/sun8i-codec.txt b/Documentation/devicetree/bindings/sound/sun8i-codec.txt
-new file mode 100644
-index 000000000000..ce3c05219e33
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/sun8i-codec.txt
-@@ -0,0 +1,76 @@
-+Allwinner SUN8I audio codec
-+------------------------------------
+diff --git a/sound/soc/sunxi/sun8i-codec-analog.c b/sound/soc/sunxi/sun8i-codec-analog.c
+index af02290ebe49..72331332b72e 100644
+--- a/sound/soc/sunxi/sun8i-codec-analog.c
++++ b/sound/soc/sunxi/sun8i-codec-analog.c
+@@ -398,11 +398,37 @@ static const struct snd_kcontrol_new sun8i_codec_hp_src[] = {
+ 		      sun8i_codec_hp_src_enum),
+ };
+ 
++static int sun8i_headphone_amp_event(struct snd_soc_dapm_widget *w,
++				     struct snd_kcontrol *k, int event)
++{
++	struct snd_soc_component *component = snd_soc_dapm_to_component(w->dapm);
 +
-+On Sun8i SoCs, and particularly on A33, the audio is separated in
-+different parts:
-+	  - A DAI driver. It uses the "sun4i-i2s" driver which is
-+	  documented here:
-+	  Documentation/devicetree/bindings/sound/sun4i-i2s.txt
-+	  - An analog part of the codec which is handled as PRCM registers.
-+	  See Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt
-+	  - An digital part of the codec which is documented in this current
-+	  binding documentation.
-+	  - And finally, an audio card which links all the above components.
-+	  The simple-audio card will be used.
-+	  See Documentation/devicetree/bindings/sound/simple-card.txt
++	if (SND_SOC_DAPM_EVENT_ON(event)) {
++		snd_soc_component_update_bits(component, SUN8I_ADDA_PAEN_HP_CTRL,
++					      BIT(SUN8I_ADDA_PAEN_HP_CTRL_HPPAEN),
++					      BIT(SUN8I_ADDA_PAEN_HP_CTRL_HPPAEN));
++		/*
++		 * Need a delay to have the amplifier up. 700ms seems the best
++		 * compromise between the time to let the amplifier up and the
++		 * time not to feel this delay while playing a sound.
++		 */
++		msleep(700);
++	} else if (SND_SOC_DAPM_EVENT_OFF(event)) {
++		snd_soc_component_update_bits(component, SUN8I_ADDA_PAEN_HP_CTRL,
++					      BIT(SUN8I_ADDA_PAEN_HP_CTRL_HPPAEN),
++					      0x0);
++	}
 +
-+This bindings documentation exposes Sun8i codec (digital part).
++	return 0;
++}
 +
-+Required properties:
-+- compatible: must be "allwinner,sun8i-a33-codec"
-+- reg: must contain the registers location and length
-+- interrupts: must contain the codec interrupt
-+- clocks: a list of phandle + clock-specifer pairs, one for each entry
-+  in clock-names.
-+- clock-names: should contain followings:
-+   - "bus": the parent APB clock for this controller
-+   - "mod": the parent module clock
-+
-+Example:
-+codec: codec at 01c22e00 {
-+	#sound-dai-cells = <0>;
-+	compatible = "allwinner,sun8i-a33-codec";
-+	reg = <0x01c22e00 0x400>;
-+	interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-+	clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
-+	clock-names = "bus", "mod";
-+	status = "disabled";
-+};
-+
-+Here is an example to add a sound card and the codec binding on sun8i SoCs that
-+are similar to A33 using simple-card:
-+
-+	sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "Sun8i Audio Card";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,frame-master = <&link_codec>;
-+		simple-audio-card,bitclock-master = <&link_codec>;
-+		simple-audio-card,mclk-fs = <512>;
-+		simple-audio-card,aux-devs = <&codec_analog>;
-+		simple-audio-card,routing =
-+				"Left DAC", "Digital Left DAC",
-+				"Right DAC", "Digital Right DAC";
-+
-+		simple-audio-card,cpu {
-+			sound-dai = <&dai>;
-+		};
-+
-+		link_codec: simple-audio-card,codec {
-+			sound-dai = <&codec>;
-+		};
-+
-+	soc at 01c00000 {
-+		[...]
-+
-+		codec: codec at 01c22e00 {
-+			#sound-dai-cells = <0>;
-+			compatible = "allwinner,sun8i-a33-codec";
-+			reg = <0x01c22e00 0x400>;
-+			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
-+			clock-names = "bus", "mod";
-+			status = "disabled";
-+		};
-+	};
-+
+ static const struct snd_soc_dapm_widget sun8i_codec_headphone_widgets[] = {
+ 	SND_SOC_DAPM_MUX("Headphone Source Playback Route",
+ 			 SND_SOC_NOPM, 0, 0, sun8i_codec_hp_src),
+-	SND_SOC_DAPM_OUT_DRV("Headphone Amp", SUN8I_ADDA_PAEN_HP_CTRL,
+-			     SUN8I_ADDA_PAEN_HP_CTRL_HPPAEN, 0, NULL, 0),
++	SND_SOC_DAPM_OUT_DRV_E("Headphone Amp", SUN8I_ADDA_PAEN_HP_CTRL,
++			       SUN8I_ADDA_PAEN_HP_CTRL_HPPAEN, 0, NULL, 0,
++			       sun8i_headphone_amp_event,
++			       SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_PRE_PMD),
+ 	SND_SOC_DAPM_SUPPLY("HPCOM Protection", SUN8I_ADDA_PAEN_HP_CTRL,
+ 			    SUN8I_ADDA_PAEN_HP_CTRL_COMPTEN, 0, NULL, 0),
+ 	SND_SOC_DAPM_REG(snd_soc_dapm_supply, "HPCOM", SUN8I_ADDA_PAEN_HP_CTRL,
 -- 
 2.11.0
