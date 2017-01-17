@@ -1,58 +1,65 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 17 Jan 2017 11:22:22 +0100
-Subject: [PATCH 1/2] dt-bindings: gpu: Add Mali Utgard bindings
-In-Reply-To: <20170117093813.mxp2hgoxbgske6ru@lukather>
-References: <20170116132424.7038-1-maxime.ripard@free-electrons.com>
- <20170116184906.r62di7xiil5lae33@kozik-lap>
- <20170117093813.mxp2hgoxbgske6ru@lukather>
-Message-ID: <4f5b8608-af6c-3ef5-aaf0-e7e034d006cd@baylibre.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 17 Jan 2017 10:27:53 +0000
+Subject: [PATCH V7 04/10] arm64: exception: handle Synchronous External
+ Abort
+In-Reply-To: <0ca6c70e-6033-4cca-8833-15cb8573a939@codeaurora.org>
+References: <1484244924-24786-1-git-send-email-tbaicar@codeaurora.org>
+ <1484244924-24786-5-git-send-email-tbaicar@codeaurora.org>
+ <20170116115309.GE1510@arm.com>
+ <0ca6c70e-6033-4cca-8833-15cb8573a939@codeaurora.org>
+Message-ID: <20170117102753.GA27328@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/17/2017 10:38 AM, Maxime Ripard wrote:
-> Hi,
-> 
-> On Mon, Jan 16, 2017 at 08:49:06PM +0200, Krzysztof Kozlowski wrote:
->> On Mon, Jan 16, 2017 at 02:24:23PM +0100, Maxime Ripard wrote:
->>> The ARM Mali Utgard GPU family is embedded into a number of SoCs from
->>> Allwinner, Amlogic, Mediatek or Rockchip.
->>>
->>> Add a binding for the GPU of that family.
->>>
->>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->>> ---
->>>  .../devicetree/bindings/gpu/arm,mali-utgard.txt    | 76 ++++++++++++++++++++++
->>>  1 file changed, 76 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
->>
->> Do you have a driver in kernel which will implement these bindings?
-> 
-> No, but we have bindings for out-of-tree drivers already.
-> 
->> Defining them for out-of-tree driver does not bring any benefits
->> (3rd party driver will not respect them anyway).
-> 
-> You could see it the other way around too. The out-of-tree drivers
-> don't respect it at the moment because there's no binding to respect.
-> 
-> And at least for us, we definitely plan on doing that.
-> 
-> Maxime
+On Mon, Jan 16, 2017 at 01:09:22PM -0700, Baicar, Tyler wrote:
+> On 1/16/2017 4:53 AM, Will Deacon wrote:
+> >On Thu, Jan 12, 2017 at 11:15:18AM -0700, Tyler Baicar wrote:
+> >>SEA exceptions are often caused by an uncorrected hardware
+> >>error, and are handled when data abort and instruction abort
+> >>exception classes have specific values for their Fault Status
+> >>Code.
+> >>When SEA occurs, before killing the process, go through
+> >>the handlers registered in the notification list.
+> >>Update fault_info[] with specific SEA faults so that the
+> >>new SEA handler is used.
+> >>
+> >>Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+> >>Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+> >>Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
+> >>---
+> >>  arch/arm64/include/asm/system_misc.h | 13 ++++++++
+> >>  arch/arm64/mm/fault.c                | 58 +++++++++++++++++++++++++++++-------
+> >>  2 files changed, 61 insertions(+), 10 deletions(-)
+> >>
+> >>diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
+> >>index 57f110b..e7f3440 100644
+> >>--- a/arch/arm64/include/asm/system_misc.h
+> >>+++ b/arch/arm64/include/asm/system_misc.h
+> >>@@ -64,4 +64,17 @@ extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+> >>  #endif	/* __ASSEMBLY__ */
+> >>+/*
+> >>+ * The functions below are used to register and unregister callbacks
+> >>+ * that are to be invoked when a Synchronous External Abort (SEA)
+> >>+ * occurs. An SEA is raised by certain fault status codes that have
+> >>+ * either data or instruction abort as the exception class, and
+> >>+ * callbacks may be registered to parse or handle such hardware errors.
+> >>+ *
+> >>+ * Registered callbacks are run in an interrupt/atomic context. They
+> >>+ * are not allowed to block or sleep.
+> >>+ */
+> >>+int register_sea_notifier(struct notifier_block *nb);
+> >>+void unregister_sea_notifier(struct notifier_block *nb);
+> >I still don't understand why you need notifiers for this. You register
+> >precisely one hook in the series.
+> I didn't see a response to my last comment on the previous series so I just
+> left it in for this series.
+> The notifier usage is consistent with the GHES code for SCI errors which are
+> also only used a single
+> time in the code. If you think making the call directly is a better option I
+> will remove the notifiers.
 
-Hi Maxime, Krzysztof,
+Yes, please. It's easy to add the notifier infrastructure back if/when it's
+actually needed and I don't see why the low-level fault dispatching needs to
+be consistent with the GHES/SCI code.
 
-We hope this will be accepted so it will solve the same issue we have on Amlogic SoCs
-and all the other mali powered SoCs.
-
-Having mainline bindings will forcre out-of-tree driver to respect those bindings
-and remove a dts out-of-tree patch aswell.
-
-Neil
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170117/4be3a61c/attachment.sig>
+Will
