@@ -1,31 +1,46 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 17 Jan 2017 15:07:12 -0800
-Subject: [PATCH] ARM: smp: Remove CPU: shutdown notice
-Message-ID: <20170117230714.6799-1-f.fainelli@gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 18 Jan 2017 00:07:38 +0100
+Subject: [PATCH v2 2/2] power/reset: at91-reset: remove leftover
+ platform_device_id
+In-Reply-To: <20170117230738.28257-1-alexandre.belloni@free-electrons.com>
+References: <20170117230738.28257-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20170117230738.28257-2-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This message is not particularly informative, and is not paired with an
-identical message when a CPU is brought online. Finally, it slows the
-CPU hotplug path down, thus allowing less CPU hotplug operations per
-second. Just remove it.
+commit eacd8d09db7f ("power/reset: at91-reset: remove useless
+at91_reset_platform_probe()") removed non DT probe support but forgot to
+remove the now useless id_table. Do that now.
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/kernel/smp.c | 1 -
- 1 file changed, 1 deletion(-)
+ drivers/power/reset/at91-reset.c | 8 --------
+ 1 file changed, 8 deletions(-)
 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 7dd14e8395e6..b3e02751ab64 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -251,7 +251,6 @@ void __cpu_die(unsigned int cpu)
- 		pr_err("CPU%u: cpu didn't die\n", cpu);
- 		return;
- 	}
--	pr_notice("CPU%u: shutdown\n", cpu);
+diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
+index bb2588f0a4c7..b99769f8ab15 100644
+--- a/drivers/power/reset/at91-reset.c
++++ b/drivers/power/reset/at91-reset.c
+@@ -248,20 +248,12 @@ static int __exit at91_reset_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
- 	/*
- 	 * platform_cpu_kill() is generally expected to do the powering off
+-static const struct platform_device_id at91_reset_plat_match[] = {
+-	{ "at91-sam9260-reset", (unsigned long)at91sam9260_restart },
+-	{ "at91-sam9g45-reset", (unsigned long)at91sam9g45_restart },
+-	{ /* sentinel */ }
+-};
+-MODULE_DEVICE_TABLE(platform, at91_reset_plat_match);
+-
+ static struct platform_driver at91_reset_driver = {
+ 	.remove = __exit_p(at91_reset_remove),
+ 	.driver = {
+ 		.name = "at91-reset",
+ 		.of_match_table = at91_reset_of_match,
+ 	},
+-	.id_table = at91_reset_plat_match,
+ };
+ module_platform_driver_probe(at91_reset_driver, at91_reset_probe);
+ 
 -- 
-2.9.3
+2.11.0
