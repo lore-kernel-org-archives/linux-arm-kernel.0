@@ -1,156 +1,176 @@
-From: jerry.huang@nxp.com (Jerry Huang)
-Date: Tue, 17 Jan 2017 10:37:17 +0000
-Subject: [PATCH v3 2/3] USB3/DWC3: Add property "snps,
- incr-burst-type-adjustment" for INCR burst type
-In-Reply-To: <87tw8zo0c0.fsf@linux.intel.com>
-References: <1482139554-13618-1-git-send-email-jerry.huang@nxp.com>
- <1482139554-13618-2-git-send-email-jerry.huang@nxp.com>
- <20161222184514.hfd4g7ifrz5cv627@rob-hp-laptop>
- <DB5PR0401MB1813E210B2ADE1C9493F7768FE950@DB5PR0401MB1813.eurprd04.prod.outlook.com>
- <CAL_JsqJuifiSQAt-6FgtYYSukAnjzOLuTGEsO-Spn5LxkU-iwQ@mail.gmail.com>
- <DB5PR0401MB18132BB4CDE32EEA8F479E55FE7D0@DB5PR0401MB1813.eurprd04.prod.outlook.com>
- <87tw8zo0c0.fsf@linux.intel.com>
-Message-ID: <DB5PR0401MB1813548526D3C8D34B9CCE52FE7C0@DB5PR0401MB1813.eurprd04.prod.outlook.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 17 Jan 2017 10:20:45 +0000
+Subject: [RFC PATCH 24/33] irqchip/gic-v3-its: Add VPE scheduling
+In-Reply-To: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
+References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1484648454-21216-25-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+When a VPE is scheduled to run, the corresponding redistributor must
+be told so, by setting VPROPBASER to the VM's property table, and
+VPENDBASER to the vcpu's pending table.
 
+When scheduled out, we preserve the IDAI and PendingLast bits. The
+latter is specially important, as it tells the hypervisor that
+there are pending interrupts for this vcpu.
 
-> -----Original Message-----
-> From: Felipe Balbi [mailto:balbi at kernel.org]
-> Sent: Monday, January 16, 2017 4:50 PM
-> To: Jerry Huang <jerry.huang@nxp.com>; Rob Herring <robh@kernel.org>
-> Cc: mark.rutland at arm.com; catalin.marinas at arm.com;
-> will.deacon at arm.com; linux at armlinux.org.uk; devicetree at vger.kernel.org;
-> linux-usb at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: RE: [PATCH v3 2/3] USB3/DWC3: Add property "snps, incr-burst-
-> type-adjustment" for INCR burst type
-> 
-> 
-> Hi,
-> 
-> Jerry Huang <jerry.huang@nxp.com> writes:
-> >> > On Thu, Dec 22, 2016 at 8:52 PM, Jerry Huang <jerry.huang@nxp.com>
-> >> wrote:
-> >> > > Hi, Rob,
-> >> > >> -----Original Message-----
-> >> > >> From: Rob Herring [mailto:robh at kernel.org]
-> >> > >> Sent: Friday, December 23, 2016 2:45 AM
-> >> > >> To: Jerry Huang <jerry.huang@nxp.com>
-> >> > >> Cc: balbi at kernel.org; mark.rutland at arm.com;
-> >> > >> catalin.marinas at arm.com; will.deacon at arm.com;
-> >> > >> linux at armlinux.org.uk; devicetree at vger.kernel.org;
-> >> > >> linux-usb at vger.kernel.org; linux-kernel at vger.kernel.org;
-> >> > >> linux-arm- kernel at lists.infradead.org
-> >> > >> Subject: Re: [PATCH v3 2/3] USB3/DWC3: Add property "snps,
-> >> > >> incr-burst- type-adjustment" for INCR burst type
-> >> > >>
-> >> > >> On Mon, Dec 19, 2016 at 05:25:53PM +0800, Changming Huang wrote:
-> >> > >> > New property "snps,incr-burst-type-adjustment = <x>, <y>" for
-> >> > >> > USB3.0
-> >> > >> DWC3.
-> >> > >> > Field "x": 1/0 - undefined length INCR burst type enable or
-> >> > >> > not; Field
-> >> > >> > "y": INCR4/INCR8/INCR16/INCR32/INCR64/INCR128/INCR256 burst
-> >> type.
-> >> > >> >
-> >> > >> > While enabling undefined length INCR burst type and INCR16
-> >> > >> > burst type, get better write performance on NXP Layerscape
-> platform:
-> >> > >> > around 3% improvement (from 364MB/s to 375MB/s).
-> >> > >> >
-> >> > >> > Signed-off-by: Changming Huang <jerry.huang@nxp.com>
-> >> > >> > ---
-> >> > >> > Changes in v3:
-> >> > >> >   - add new property for INCR burst in usb node.
-> >> > >> >
-> >> > >> >  Documentation/devicetree/bindings/usb/dwc3.txt |    5 +++++
-> >> > >> >  arch/arm/boot/dts/ls1021a.dtsi                 |    1 +
-> >> > >> >  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi |    3 +++
-> >> > >> >  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi |    2 ++
-> >> > >> >  4 files changed, 11 insertions(+)
-> >> > >> >
-> >> > >> > diff --git a/Documentation/devicetree/bindings/usb/dwc3.txt
-> >> > >> > b/Documentation/devicetree/bindings/usb/dwc3.txt
-> >> > >> > index e3e6983..8c405a3 100644
-> >> > >> > --- a/Documentation/devicetree/bindings/usb/dwc3.txt
-> >> > >> > +++ b/Documentation/devicetree/bindings/usb/dwc3.txt
-> >> > >> > @@ -55,6 +55,10 @@ Optional properties:
-> >> > >> >     fladj_30mhz_sdbnd signal is invalid or incorrect.
-> >> > >> >
-> >> > >> >   - <DEPRECATED> tx-fifo-resize: determines if the FIFO *has*
-> >> > >> > to be
-> >> > >> reallocated.
-> >> > >> > + - snps,incr-burst-type-adjustment: Value for INCR burst type
-> >> > >> > + of
-> >> > >> GSBUSCFG0
-> >> > >> > +   register, undefined length INCR burst type enable and INCRx
-> type.
-> >> > >> > +   First field is for undefined length INCR burst type enable or not.
-> >> > >> > +   Second field is for largest INCRx type enabled.
-> >> > >>
-> >> > >> Why do you need the first field? Is the 2nd field used if the 1st is 0?
-> >> > >> If not, then just use the presence of the property to enable or not.
-> >> > > The first field is one switch.
-> >> > > When it is 1, means undefined length INCR burst type enabled, we
-> >> > > can use
-> >> > any length less than or equal to the largest-enabled burst length
-> >> > of INCR4/8/16/32/64/128/256.
-> >> > > When it is zero, means INCRx burst mode enabled, we can use one
-> >> > > fixed
-> >> > burst length of 1/4/8/16/32/64/128/256 byte.
-> >> > > So, the 2nd field is used if the 1st is 0, we need to select one
-> >> > > largest burst
-> >> > length the USB controller can support.
-> >> > > If we don't want to change the value of this register (use the
-> >> > > default value),
-> >> > we don't need to add this property to usb node.
-> >> >
-> >> > Just make this a single value with 0 meaning INCR and 4/8/16/etc
-> >> > being
-> >> INCRx.
-> >> Maybe, I didn't describe it clearly.
-> >> According to DWC3 spec, the value "0" of field INCRBrstEna means
-> >> INCRx burst mode, 1 means INCR burst mode.
-> >> Regardless of the value of INCRBrstEna [bit0], we need to modify the
-> >> other field bit[1,2,3,4,5,6,7] to one INCR burst type  for the platform
-> supported.
-> >> Ad you mentioned, if we just use a single value with 0 meaning INCR
-> >> and 4/8/16/etc being INCRx.
-> >> I understand totally that when it is none-zero, we can use it for
-> >> INCR burst mode.
-> >> Then, when it is 0, how to select the INCRx value?
-> >>
-> >> So, I think we still need two vaue to specify INCRBrstEna and INCRx
-> >> burst type.
-> > Hi, Balbi,
-> > It seems there is no feedback for my comment, so these patches can be
-> accepted?
-> 
-> probably not, we need to really understand what information we need so it
-> can be described properly. The last thing we want is unnecessary DT
-> properties.
-> 
-> It seems to me that we can extrapolate INCRBrstEna based on which burst
-> modes are enabled. If only 0 is passed, then that bit should be 1, if 0 and any
-> other size is passed, then that bit should be 0, no?
-Hi, Balbi,
-Below is the definition for this property,
-snps,incr-burst-type-adjustment = <x>, <y>
-x: Undefined Length INCR Burst Type Enable (INCRBrstEna)
-    0 - INCRX burst mode (not enable INCRBrstEna)
-    1 - INCR (undefined length) burst mode (enable INCRBrstEna)
-y: the burst length
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/irqchip/irq-gic-v3-its.c   | 57 ++++++++++++++++++++++++++++++++++
+ include/linux/irqchip/arm-gic-v3.h | 63 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 120 insertions(+)
 
-1> if x = 0: means INCRBrstEna not enabled, set bit0 to zero (or clear it) , we select one of INCR1/INCR4/INCR8/INCR16/INCR32/INCR64/INCR128/INCR256 (pass this value through "y")to set the fix burst length controller supported.
-For example:
-snps,incr-burst-type-adjustment = <0>, <16>
-driver will set bit0 to zero and set bit3 to 1 (INCR16 Burst Type Enabled), controller will use INCR16 (with 16 bytes) to transfer data.
-
-2> if x = 1: means INCRBrstEna enabled, we select one of INCR4/INCR8/INCR16/INCR32/INCR64/INCR128/INCR256 (pass this value through "y") to set the burst length, and controller will use any length less than or equal to that we selected.
-For example:
-snps,incr-burst-type-adjustment = <1>, <32>
-driver will set bit0 to 1 and set bit4 to 1 (INCR32 Burst Type Enabled), controller will use any burst length less than (such as 4, 8, 16 byte) or equal to 32 byte to transfer data.
-
-Therefore, I think this two fileds are needed. Do you think about it?
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 598e25b..f918d59 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -143,6 +143,7 @@ static DEFINE_IDA(its_vpeid_ida);
+ 
+ #define gic_data_rdist()		(raw_cpu_ptr(gic_rdists->rdist))
+ #define gic_data_rdist_rd_base()	(gic_data_rdist()->rd_base)
++#define gic_data_rdist_vlpi_base()	(gic_data_rdist_rd_base() + SZ_128K)
+ 
+ static struct its_collection *dev_event_to_col(struct its_device *its_dev,
+ 					       u32 event)
+@@ -2039,8 +2040,64 @@ static const struct irq_domain_ops its_domain_ops = {
+ 	.deactivate		= its_irq_domain_deactivate,
+ };
+ 
++static int its_vpe_set_vcpu_affinity(struct irq_data *d, void *vcpu_info)
++{
++	struct its_vpe *vpe = irq_data_get_irq_chip_data(d);
++	struct its_cmd_info *info = vcpu_info;
++	u64 val;
++
++	switch (info->cmd_type) {
++	case SCHEDULE_VPE:
++	{
++		void * __iomem vlpi_base = gic_data_rdist_vlpi_base();
++
++		/* Schedule the VPE */
++		val  = virt_to_phys(page_address(vpe->its_vm->vprop_page)) &
++			GENMASK_ULL(51, 12);
++		val |= (LPI_NRBITS - 1) & GICR_VPROPBASER_IDBITS_MASK;
++		val |= GICR_VPROPBASER_RaWb;
++		val |= GICR_VPROPBASER_InnerShareable;
++		gits_write_vpropbaser(val, vlpi_base + GICR_VPROPBASER);
++
++		val  = virt_to_phys(page_address(vpe->vpt_page)) & GENMASK(51, 16);
++		val |= GICR_VPENDBASER_WaWb;
++		val |= GICR_VPENDBASER_NonShareable;
++		val |= GICR_PENDBASER_PendingLast;
++		val |= vpe->idai ? GICR_PENDBASER_IDAI : 0;
++		val |= GICR_PENDBASER_Valid;
++		gits_write_vpendbaser(val, vlpi_base + GICR_VPENDBASER);
++
++		return 0;
++	}
++
++	case DESCHEDULE_VPE:
++	{
++		void * __iomem vlpi_base = gic_data_rdist_vlpi_base();
++
++		/* We're being scheduled out */
++		val = gits_read_vpendbaser(vlpi_base + GICR_VPENDBASER);
++		val &= ~GICR_PENDBASER_Valid;
++		gits_write_vpendbaser(val, vlpi_base + GICR_VPENDBASER);
++
++		val = gits_read_vpendbaser(vlpi_base + GICR_VPENDBASER);
++		while (val & GICR_PENDBASER_Dirty) {
++			cpu_relax();
++			val = gits_read_vpendbaser(vlpi_base + GICR_VPENDBASER);
++		}
++
++		vpe->idai = !!(val & GICR_PENDBASER_IDAI);
++		vpe->pending_last = !!(val & GICR_PENDBASER_PendingLast);
++		return 0;
++	}
++
++	default:
++		return -EINVAL;
++	}
++}
++
+ static struct irq_chip its_vpe_irq_chip = {
+ 	.name			= "GICv4-vpe",
++	.irq_set_vcpu_affinity	= its_vpe_set_vcpu_affinity,
+ };
+ 
+ static int its_vpe_id_alloc(void)
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 1b3a070..2789c9a 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -209,6 +209,69 @@
+ #define LPI_PROP_ENABLED		(1 << 0)
+ 
+ /*
++ * Re-Distributor registers, offsets from VLPI_base
++ */
++#define GICR_VPROPBASER			0x0070
++
++#define GICR_VPROPBASER_IDBITS_MASK	0x1f
++
++#define GICR_VPROPBASER_SHAREABILITY_SHIFT		(10)
++#define GICR_VPROPBASER_INNER_CACHEABILITY_SHIFT	(7)
++#define GICR_VPROPBASER_OUTER_CACHEABILITY_SHIFT	(56)
++
++#define GICR_VPROPBASER_SHAREABILITY_MASK				\
++	GIC_BASER_SHAREABILITY(GICR_VPROPBASER, SHAREABILITY_MASK)
++#define GICR_VPROPBASER_INNER_CACHEABILITY_MASK				\
++	GIC_BASER_CACHEABILITY(GICR_VPROPBASER, INNER, MASK)
++#define GICR_VPROPBASER_OUTER_CACHEABILITY_MASK				\
++	GIC_BASER_CACHEABILITY(GICR_VPROPBASER, OUTER, MASK)
++#define GICR_VPROPBASER_CACHEABILITY_MASK				\
++	GICR_VPROPBASER_INNER_CACHEABILITY_MASK
++
++#define GICR_VPROPBASER_InnerShareable					\
++	GIC_BASER_SHAREABILITY(GICR_VPROPBASER, InnerShareable)
++
++#define GICR_VPROPBASER_nCnB	GIC_BASER_CACHEABILITY(GICR_VPROPBASER, INNER, nCnB)
++#define GICR_VPROPBASER_nC 	GIC_BASER_CACHEABILITY(GICR_VPROPBASER, INNER, nC)
++#define GICR_VPROPBASER_RaWt	GIC_BASER_CACHEABILITY(GICR_VPROPBASER, INNER, RaWt)
++#define GICR_VPROPBASER_RaWb	GIC_BASER_CACHEABILITY(GICR_VPROPBASER, INNER, RaWt)
++#define GICR_VPROPBASER_WaWt	GIC_BASER_CACHEABILITY(GICR_VPROPBASER, INNER, WaWt)
++#define GICR_VPROPBASER_WaWb	GIC_BASER_CACHEABILITY(GICR_VPROPBASER, INNER, WaWb)
++#define GICR_VPROPBASER_RaWaWt	GIC_BASER_CACHEABILITY(GICR_VPROPBASER, INNER, RaWaWt)
++#define GICR_VPROPBASER_RaWaWb	GIC_BASER_CACHEABILITY(GICR_VPROPBASER, INNER, RaWaWb)
++
++#define GICR_VPENDBASER			0x0078
++
++#define GICR_VPENDBASER_SHAREABILITY_SHIFT		(10)
++#define GICR_VPENDBASER_INNER_CACHEABILITY_SHIFT	(7)
++#define GICR_VPENDBASER_OUTER_CACHEABILITY_SHIFT	(56)
++#define GICR_VPENDBASER_SHAREABILITY_MASK				\
++	GIC_BASER_SHAREABILITY(GICR_VPENDBASER, SHAREABILITY_MASK)
++#define GICR_VPENDBASER_INNER_CACHEABILITY_MASK				\
++	GIC_BASER_CACHEABILITY(GICR_VPENDBASER, INNER, MASK)
++#define GICR_VPENDBASER_OUTER_CACHEABILITY_MASK				\
++	GIC_BASER_CACHEABILITY(GICR_VPENDBASER, OUTER, MASK)
++#define GICR_VPENDBASER_CACHEABILITY_MASK				\
++	GICR_VPENDBASER_INNER_CACHEABILITY_MASK
++
++#define GICR_VPENDBASER_NonShareable					\
++	GIC_BASER_SHAREABILITY(GICR_VPENDBASER, NonShareable)
++
++#define GICR_VPENDBASER_nCnB	GIC_BASER_CACHEABILITY(GICR_VPENDBASER, INNER, nCnB)
++#define GICR_VPENDBASER_nC 	GIC_BASER_CACHEABILITY(GICR_VPENDBASER, INNER, nC)
++#define GICR_VPENDBASER_RaWt	GIC_BASER_CACHEABILITY(GICR_VPENDBASER, INNER, RaWt)
++#define GICR_VPENDBASER_RaWb	GIC_BASER_CACHEABILITY(GICR_VPENDBASER, INNER, RaWt)
++#define GICR_VPENDBASER_WaWt	GIC_BASER_CACHEABILITY(GICR_VPENDBASER, INNER, WaWt)
++#define GICR_VPENDBASER_WaWb	GIC_BASER_CACHEABILITY(GICR_VPENDBASER, INNER, WaWb)
++#define GICR_VPENDBASER_RaWaWt	GIC_BASER_CACHEABILITY(GICR_VPENDBASER, INNER, RaWaWt)
++#define GICR_VPENDBASER_RaWaWb	GIC_BASER_CACHEABILITY(GICR_VPENDBASER, INNER, RaWaWb)
++
++#define GICR_PENDBASER_Dirty		(1ULL << 60)
++#define GICR_PENDBASER_PendingLast	(1ULL << 61)
++#define GICR_PENDBASER_IDAI		(1ULL << 62)
++#define GICR_PENDBASER_Valid		(1ULL << 63)
++
++/*
+  * ITS registers, offsets from ITS_base
+  */
+ #define GITS_CTLR			0x0000
+-- 
+2.1.4
