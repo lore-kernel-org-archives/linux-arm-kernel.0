@@ -1,79 +1,55 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Tue, 17 Jan 2017 08:56:32 +0800
-Subject: [RFC PATCH] arm64: defconfig: enable SMMUv3 config
-In-Reply-To: <587CF1A8.8020508@hisilicon.com>
-References: <1483962646-33767-1-git-send-email-wangzhou1@hisilicon.com>
- <20170112094729.c2a5tjzsnyubtmte@localhost> <5878F3DA.3090005@hisilicon.com>
- <3026029.1QgHzGBYeh@wuerfel> <587CF1A8.8020508@hisilicon.com>
-Message-ID: <587D6BC0.7060603@hisilicon.com>
+From: xieyisheng1@huawei.com (Yisheng Xie)
+Date: Tue, 17 Jan 2017 09:02:35 +0800
+Subject: [Question] A question about arm64 pte
+In-Reply-To: <20170116143601.GB6832@e104818-lin.cambridge.arm.com>
+References: <d284f510-f025-db84-f21e-a5b167d4bcd2@huawei.com>
+ <20170116115606.GA6832@e104818-lin.cambridge.arm.com>
+ <6b7a9bd2-37af-40cd-b723-9e648fbbc7c8@huawei.com>
+ <20170116143601.GB6832@e104818-lin.cambridge.arm.com>
+Message-ID: <27eb1f12-4a07-94f3-5082-7df8d536c973@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/1/17 0:15, Wei Xu wrote:
-> Hi Arnd,
-> 
-> On 2017/1/13 16:58, Arnd Bergmann wrote:
->> On Friday, January 13, 2017 3:35:54 PM CET Wei Xu wrote:
->>> On 2017/1/12 9:47, Catalin Marinas wrote:
->>>> On Thu, Jan 12, 2017 at 08:36:12AM +0800, Zhou Wang wrote:
->>>>> On 2017/1/9 19:50, Zhou Wang wrote:
->>>>>> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
->>>>>> ---
->>>>>>  arch/arm64/configs/defconfig | 1 +
->>>>>>  1 file changed, 1 insertion(+)
->>>>>>
->>>>>> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
->>>>>> index 869dded..3520c50 100644
->>>>>> --- a/arch/arm64/configs/defconfig
->>>>>> +++ b/arch/arm64/configs/defconfig
->>>>>> @@ -440,6 +440,7 @@ CONFIG_PLATFORM_MHU=y
->>>>>>  CONFIG_BCM2835_MBOX=y
->>>>>>  CONFIG_HI6220_MBOX=y
->>>>>>  CONFIG_ARM_SMMU=y
->>>>>> +CONFIG_ARM_SMMU_V3=y
->>>>>>  CONFIG_RASPBERRYPI_POWER=y
->>>>>>  CONFIG_QCOM_SMEM=y
->>>>>>  CONFIG_QCOM_SMD=y
->>>>>
->>>>> I just happened to find there is no SMMUv3 config in arm64 defconfig.
->>>>>
->>>>> Maybe we should add it in defconfig or I miss something.
->>>>
->>>
->>> Hi Arnd,
->>>
->>>> It looks fine to me but it's usually the arm-soc guys picking the
->>>> defconfig patches.
->>>>
->>>
->>> It is fine to me.
->>> Is it OK for me to pick up this or will you directly pick up this?
->>> Thanks!
->>
->> Either way works for me. I usually recommend platform maintainers
->> picking up patches and then sending them on to arm at kernel.org,
->> as that gets our attention quicker. A patch that gets sent with
->> me personally on Cc might get lost in the email.
-> 
-> In this case I will pick up it.
+Hi Catalin,
 
-Many thanks,
+Thanks again for your reply, and I will check the logic once more.
 
-Regards,
-Zhou
+Thanks
+Yisheng Xie
 
-> Thanks!
-> 
-> Best Regards,
-> Wei
-> 
+On 2017/1/16 22:36, Catalin Marinas wrote:
+> On Mon, Jan 16, 2017 at 08:39:56PM +0800, Yisheng Xie wrote:
+>> On 2017/1/16 19:56, Catalin Marinas wrote:
+>>> On Mon, Jan 16, 2017 at 06:08:47PM +0800, Yisheng Xie wrote:
+>>>> I have question about arm64 pte.
+>>>
+>>> I assume the context is ARMv8.0 (without hardware DBM support).
 >>
->> 	Arnd
+>> Yes.
+>>>
+>>>> For arm64, PTE_WRITE?== PTE_DBM? is to mark whether the page is writable,
+>>>> and PTE_DIRTY is to mark whether the page is dirty.
+>>>> However, PTE_RDONLY is only cleared when both PTE_WRITE and PTE_DIRTY are set.
+>>>
+>>> That's what set_pte_at() does.
+>>>
 >>
+>> So if we mmap a memory region use /dev/mem like:
+>>    fildes = open("/dev/mem", O_RDWR | O_CREAT, 0777);
+>>    addr = mmap(NULL, LEN, PROT_READ | PROT_WRITE, MAP_SHARED, fildes, offset);
 >>
->> .
->>
+>> The PTE_RDONLY will be set? Right ?
 > 
+> Possibly, I haven't checked mmap_mem(). However, that's what you would
+> get with an anonymous mmap() as well.
 > 
-> .
+>> However?when use memset to write the region it still works well, and
+>> the bit PTE_RDONLY is also cleared. Is there anywhere clear the
+>> PTE_RDONLY before write that page ?
+> 
+> See handle_pte_fault(). On the first access to a writable+clean page
+> (PTE_WRITE set, PTE_RDONLY set, PTE_DIRTY cleared), the kernel traps it
+> and, if pte_write() is true (your case), it calls pte_mkdirty(). The
+> subsequently called ptep_set_access_flags() function would clear
+> PTE_RDONLY, giving you a writable mapping.
 > 
