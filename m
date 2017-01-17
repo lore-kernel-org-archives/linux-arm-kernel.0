@@ -1,84 +1,52 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Tue, 17 Jan 2017 04:00:13 +0100
-Subject: [PATCH 08/22] power: supply: add AC power supply driver for
- AXP20X and AXP22X PMICs
-In-Reply-To: <20170102163723.7939-9-quentin.schulz@free-electrons.com>
-References: <20170102163723.7939-1-quentin.schulz@free-electrons.com>
- <20170102163723.7939-9-quentin.schulz@free-electrons.com>
-Message-ID: <20170117030013.g5xhlmrxpthyfewa@earth>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Tue, 17 Jan 2017 04:06:11 +0100
+Subject: [PATCH 2/2] ARM64: dts: meson-gxm-rbox-pro: Enable Bluetooth
+In-Reply-To: <20170117030611.23827-1-afaerber@suse.de>
+References: <20170117030611.23827-1-afaerber@suse.de>
+Message-ID: <20170117030611.23827-3-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Quentin,
+Add an SDIO reset GPIO and enable the serial used by the AP6255
+Bluetooth module. Based on work by Martin Blumenstingl.
 
-The driver looks mostly fine. I do have a two comments, though.
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
-On Mon, Jan 02, 2017 at 05:37:08PM +0100, Quentin Schulz wrote:
-> [...]
->
-> +static int axp20x_ac_power_probe(struct platform_device *pdev)
-> +{
-> +	static const char * const axp20x_irq_names[] = { "ACIN_PLUGIN",
-> +		"ACIN_REMOVAL", NULL };
->
-> +	static const char * const *irq_names;
-> +	const struct power_supply_desc *ac_power_desc;
-> +	int i, irq, ret;
-> +
-> +	if (!of_device_is_available(pdev->dev.of_node))
-> +		return -ENODEV;
-> +
-> +	if (!axp20x) {
-> +		dev_err(&pdev->dev, "Parent drvdata not set\n");
-> +		return -EINVAL;
-> +	}
-
-axp20x will no longer be needed after implementing below
-comments.
-
-> [...]
-> +	irq_names = axp20x_irq_names;
-
-Just rename axp20x_irq_names into irq_names, since its only used
-here.
-
-> [...]
->
-> +	power->np = pdev->dev.of_node;
-
-This can be dropped, it's not used at all.
-
-> +	power->regmap = axp20x->regmap;
-
-power->regmap = dev_get_regmap(pdev->dev.parent, NULL);
-
-> [...]
-> +	/* Request irqs after registering, as irqs may trigger immediately */
-> +	for (i = 0; irq_names[i]; i++) {
-> +		irq = platform_get_irq_byname(pdev, irq_names[i]);
-> +		if (irq < 0) {
-> +			dev_warn(&pdev->dev, "No IRQ for %s: %d\n",
-> +				 irq_names[i], irq);
-> +			continue;
-> +		}
-> +		irq = regmap_irq_get_virq(axp20x->regmap_irqc, irq);
-
-The mapping should actually happen in the mfd driver, so that
-the platform resource contains a valid irq.
-
-> +		ret = devm_request_any_context_irq(&pdev->dev, irq,
-> +						   axp20x_ac_power_irq, 0,
-> +						   DRVNAME, power);
-> +		if (ret < 0)
-> +			dev_warn(&pdev->dev, "Error requesting %s IRQ: %d\n",
-> +				 irq_names[i], ret);
-> +	}
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170117/37a1e7d4/attachment.sig>
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts
+index 9f04fa4e5aec..6ea225f584bd 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts
+@@ -58,6 +58,7 @@
+ 
+ 	aliases {
+ 		serial0 = &uart_AO;
++		serial1 = &uart_A;
+ 	};
+ 
+ 	chosen {
+@@ -122,7 +123,8 @@
+ 
+ 	sdio_pwrseq: sdio-pwrseq {
+ 		compatible = "mmc-pwrseq-simple";
+-		reset-gpios = <&gpio GPIOX_6 GPIO_ACTIVE_LOW>;
++		reset-gpios = <&gpio GPIOX_6 GPIO_ACTIVE_LOW>,
++				<&gpio GPIOX_17 GPIO_ACTIVE_LOW>;
+ 		clocks = <&wifi32k>;
+ 		clock-names = "ext_clock";
+ 	};
+@@ -238,3 +240,10 @@
+ 	pinctrl-0 = <&uart_ao_a_pins>;
+ 	pinctrl-names = "default";
+ };
++
++&uart_A {
++	status = "okay";
++	pinctrl-0 = <&uart_a_pins>, <&uart_a_cts_rts_pins>;
++	pinctrl-names = "default";
++	uart-has-rtscts;
++};
+-- 
+2.10.2
