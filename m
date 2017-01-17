@@ -1,36 +1,50 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 17 Jan 2017 10:37:14 -0300
-Subject: [PATCH 1/2] arm64: dts: exynos: Add USB 3.0 controller node for
- Exynos7
-In-Reply-To: <1484649143-19423-2-git-send-email-pankaj.dubey@samsung.com>
-References: <1484649143-19423-1-git-send-email-pankaj.dubey@samsung.com>
- <CGME20170117102939epcas5p1aa25d6d8d080c086fb237e645bedbd17@epcas5p1.samsung.com>
- <1484649143-19423-2-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <3a607d18-acf9-37f5-a6d4-7f8fe538d27f@osg.samsung.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 17 Jan 2017 13:39:19 +0000
+Subject: [PATCH v4 4/4] arm64: dts: juno: add missing CoreSight STM
+ component
+In-Reply-To: <1484655313-9025-5-git-send-email-sudeep.holla@arm.com>
+References: <1484655313-9025-1-git-send-email-sudeep.holla@arm.com>
+ <1484655313-9025-5-git-send-email-sudeep.holla@arm.com>
+Message-ID: <5c742b98-0707-67fd-d8a1-467f34d99cdb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Pankaj,
+On 17/01/17 12:15, Sudeep Holla wrote:
+> From: Mike Leach <mike.leach@linaro.org>
+>
+> This patch adds the missing CoreSight STM component definition to the
+> device tree of all the juno variants(r0,r1,r2)
+>
+> STM component is connected to different funnels depending on Juno
+> platform variant.
+>
+> Reviewed-and-Tested-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Mike Leach <mike.leach@linaro.org>
+> [sudeep.holla at arm.com: minor changelog update and reorganising the STM
+> 	node back into juno-base.dtsi to avoid duplication]
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  arch/arm64/boot/dts/arm/juno-base.dtsi | 15 +++++++++++++++
+>  arch/arm64/boot/dts/arm/juno-r1.dts    |  4 ++++
+>  arch/arm64/boot/dts/arm/juno-r2.dts    |  4 ++++
+>  arch/arm64/boot/dts/arm/juno.dts       | 16 ++++++++++++++++
+>  4 files changed, 39 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> index faedf357db3b..58c1773c3aa4 100644
+> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
+> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> @@ -185,6 +185,21 @@
+>  		};
+>  	};
+>
+> +	stm at 20100000 {
+> +		compatible = "arm,coresight-stm", "arm,primecell";
+> +		reg = <0 0x20100000 0 0x1000>,
+> +		      <0 0x28000000 0 0x180000>;
 
-On 01/17/2017 07:32 AM, Pankaj Dubey wrote:
-> Add USB 3.0 DRD controller device node, with its clock
-> and phy information to enable the same on Exynos7.
-> 
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> Signed-off-by: Vivek Gautam <gautamvivek1987@gmail.com>
+The size of the stimulus base is 16MB (as per TRM), implies => 0x1000000.
 
-The S-o-B order isn't correct. You are the one posting the patch so
-yours should be the last one.
+with that fixed :
 
-Also, wasn't this patch originally from Vivek? If you didn't change
-that much, I think that he should be listed as the patch author.
-
-I don't have an Exynos7 manual to verify but the patch looks good.
-
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
