@@ -1,16 +1,21 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 16 Jan 2017 22:53:09 -0800
-Subject: [GIT PULL] STM32 DT changes for v4.11 #1
-In-Reply-To: <e36f6aca-120c-b2a5-52da-06e12e5cfb9f@st.com>
-References: <e36f6aca-120c-b2a5-52da-06e12e5cfb9f@st.com>
-Message-ID: <20170117065309.GS16607@localhost>
+Date: Mon, 16 Jan 2017 22:59:09 -0800
+Subject: [GIT PULL] arm64: dts: juno: updates for v4.11
+In-Reply-To: <dbfa1905-d937-7d02-7bbb-5f1a127896cf@arm.com>
+References: <dbfa1905-d937-7d02-7bbb-5f1a127896cf@arm.com>
+Message-ID: <20170117065909.GT16607@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2017 at 04:49:29PM +0100, Alexandre Torgue wrote:
-> Hi Olof, Arnd and Kevin,
+Hi,
+
+On Mon, Jan 16, 2017 at 04:22:06PM +0000, Sudeep Holla wrote:
+> Hi ARM SoC Team,
 > 
-> Please consider this first round of STM32 DT updates for v4.11:
+> Please pull !
+> 
+> Regards,
+> Sudeep
 > 
 > The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 > 
@@ -18,70 +23,25 @@ On Mon, Jan 16, 2017 at 04:49:29PM +0100, Alexandre Torgue wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git
-> tags/stm32-dt-for-v4.11-1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git
+> tags/juno-updates-4.11
 > 
-> for you to fetch changes up to d99c66406a846748e26989759caa7e966c1804dd:
+> for you to fetch changes up to ea2dcf9ac3254c964cddd67a032cb3b691fa47ce:
 > 
->   ARM: dts: stm32: enable RTC on stm32429i-eval (2017-01-16 14:38:14 +0100)
+>   arm64: dts: juno: add missing CoreSight STM component (2017-01-12
+> 17:26:49 +0000)
 > 
 > ----------------------------------------------------------------
-> STM32 DT updates for v4.11, round 1.
+> ARMv8 Vexpress/Juno DT updates for v4.11
 > 
-> Highlights:
-> ----------
+> 1. Addition of Coresight support on Juno R1 and R2 variants
 > 
->  - ADD RTC support on STM32F429 MCU
->  - Enable RTC on STM32F469and STM32F429 boards
->  - ADD ADC support on STM32F429 MCU
->  - Enable ADC on STM32F429 Eval board
->  - Add I2S external clock
->  - Fix memory size for STM32F429 Disco
-> 
-> Note:
-> -----
-> First patch "clk: stm32f4: Update DT bindings documentation")
-> has already been merged in clock tree.
+> 2. Addition of STM(System Trace Macrocell) support on all Juno variants
 
-Ugh. That patch doesn't just update documentation. It also updates the
-dt-include file.
+See comment on one of the patches, not merging until addressed.
 
-So, if it's already been merged into the clock tree, then we can't merge
-a separate copy here.
 
-By now, easiest is to hold off making use of it until it's on a shared
-branch, i.e. next release. Use the numerical values until then.
-
-> ----------------------------------------------------------------
-> Amelie Delaunay (5):
->       ARM: dts: stm32: set HSE_RTC clock frequency to 1 MHz on stm32f429
->       ARM: dts: stm32: Add RTC support for STM32F429 MCU
->       ARM: dts: stm32: enable RTC on stm32f429-disco
->       ARM: dts: stm32: enable RTC on stm32f469-disco
->       ARM: dts: stm32: enable RTC on stm32429i-eval
-> 
-> Bruno Herrera (1):
->       ARM: dts: stm32: Fix memory size from 8MB to 16MB on stm32f469-disco
-> board
-> 
-> Bruno Meirelles Herrera (1):
->       ARM: dts: stm32: Add missing USART3 pin config to stm32f469-disco
-> board
-> 
-> Fabrice GASNIER (2):
->       ARM: dts: stm32: Add ADC support to stm32f429
->       ARM: dts: stm32: enable ADC on stm32f429i-eval board
-> 
-> Gabriel Fernandez (3):
->       clk: stm32f4: Update DT bindings documentation
->       ARM: dts: stm32: Add external I2S clock on stm32f429 MCU
->       ARM: dts: stm32: Include auxiliary stm32fx clock definition
-
-How did you generate this pull request? You didn't include a diffstat with it,
-which is useful for us to make sure that what we merged is what you expected us
-to merge.
-
-Not merging, please revisit based on the above.
+Thanks,
 
 
 -Olof
