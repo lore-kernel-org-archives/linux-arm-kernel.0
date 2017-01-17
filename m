@@ -1,18 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 16 Jan 2017 22:46:48 -0800
-Subject: [GIT PULL] ARM: mvebu: dt64 for v4.11 (#1)
-In-Reply-To: <87y3ye7ul7.fsf@free-electrons.com>
-References: <87y3ye7ul7.fsf@free-electrons.com>
-Message-ID: <20170117064648.GR16607@localhost>
+Date: Mon, 16 Jan 2017 22:53:09 -0800
+Subject: [GIT PULL] STM32 DT changes for v4.11 #1
+In-Reply-To: <e36f6aca-120c-b2a5-52da-06e12e5cfb9f@st.com>
+References: <e36f6aca-120c-b2a5-52da-06e12e5cfb9f@st.com>
+Message-ID: <20170117065309.GS16607@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2017 at 06:12:04PM +0100, Gregory CLEMENT wrote:
-> Hi,
+On Mon, Jan 16, 2017 at 04:49:29PM +0100, Alexandre Torgue wrote:
+> Hi Olof, Arnd and Kevin,
 > 
-> Here is the first pull request for dt64 for mvebu for v4.11.
-> 
-> Gregory
+> Please consider this first round of STM32 DT updates for v4.11:
 > 
 > The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 > 
@@ -20,39 +18,70 @@ On Fri, Jan 13, 2017 at 06:12:04PM +0100, Gregory CLEMENT wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.11-1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git
+> tags/stm32-dt-for-v4.11-1
 > 
-> for you to fetch changes up to 58a748f7dc29d8a7bb74c6cbba6a82425dbba5cc:
+> for you to fetch changes up to d99c66406a846748e26989759caa7e966c1804dd:
 > 
->   ARM64: dts: marvell: Correct license text (2017-01-03 16:24:34 +0100)
-> 
-> ----------------------------------------------------------------
-> mvebu dt64 for 4.11 (part 1)
-> 
-> - Correct license text which was mangled when switching to dual license
-> - Add SPI and I2C nodes on Armada 3700(driver support had been already
->   merged)
-> - Add support for the ethernet switch on the EspressoBin board (driver
->   support not yet merged)
+>   ARM: dts: stm32: enable RTC on stm32429i-eval (2017-01-16 14:38:14 +0100)
 > 
 > ----------------------------------------------------------------
-> Alexandre Belloni (1):
->       ARM64: dts: marvell: Correct license text
+> STM32 DT updates for v4.11, round 1.
 > 
-> Romain Perier (4):
->       arm64: dts: marvell: Add ethernet switch definition for the ESPRESSObin
->       arm64: dts: marvell: Add definition of SPI controller for Armada 3700
->       arm64: dts: marvell: Enable spi0 on the board Armada-3720-db
->       arm64: dts: marvell: Add I2C definitions for the Armada 3700
+> Highlights:
+> ----------
 > 
->  arch/arm64/boot/dts/marvell/armada-371x.dtsi       | 10 +--
->  arch/arm64/boot/dts/marvell/armada-3720-db.dts     | 44 +++++++++++--
->  .../boot/dts/marvell/armada-3720-espressobin.dts   | 76 ++++++++++++++++++++--
->  arch/arm64/boot/dts/marvell/armada-372x.dtsi       | 10 +--
->  arch/arm64/boot/dts/marvell/armada-37xx.dtsi       | 39 +++++++++--
->  5 files changed, 154 insertions(+), 25 deletions(-)
+>  - ADD RTC support on STM32F429 MCU
+>  - Enable RTC on STM32F469and STM32F429 boards
+>  - ADD ADC support on STM32F429 MCU
+>  - Enable ADC on STM32F429 Eval board
+>  - Add I2S external clock
+>  - Fix memory size for STM32F429 Disco
+> 
+> Note:
+> -----
+> First patch "clk: stm32f4: Update DT bindings documentation")
+> has already been merged in clock tree.
 
-Merged, thanks.
+Ugh. That patch doesn't just update documentation. It also updates the
+dt-include file.
+
+So, if it's already been merged into the clock tree, then we can't merge
+a separate copy here.
+
+By now, easiest is to hold off making use of it until it's on a shared
+branch, i.e. next release. Use the numerical values until then.
+
+> ----------------------------------------------------------------
+> Amelie Delaunay (5):
+>       ARM: dts: stm32: set HSE_RTC clock frequency to 1 MHz on stm32f429
+>       ARM: dts: stm32: Add RTC support for STM32F429 MCU
+>       ARM: dts: stm32: enable RTC on stm32f429-disco
+>       ARM: dts: stm32: enable RTC on stm32f469-disco
+>       ARM: dts: stm32: enable RTC on stm32429i-eval
+> 
+> Bruno Herrera (1):
+>       ARM: dts: stm32: Fix memory size from 8MB to 16MB on stm32f469-disco
+> board
+> 
+> Bruno Meirelles Herrera (1):
+>       ARM: dts: stm32: Add missing USART3 pin config to stm32f469-disco
+> board
+> 
+> Fabrice GASNIER (2):
+>       ARM: dts: stm32: Add ADC support to stm32f429
+>       ARM: dts: stm32: enable ADC on stm32f429i-eval board
+> 
+> Gabriel Fernandez (3):
+>       clk: stm32f4: Update DT bindings documentation
+>       ARM: dts: stm32: Add external I2S clock on stm32f429 MCU
+>       ARM: dts: stm32: Include auxiliary stm32fx clock definition
+
+How did you generate this pull request? You didn't include a diffstat with it,
+which is useful for us to make sure that what we merged is what you expected us
+to merge.
+
+Not merging, please revisit based on the above.
 
 
 -Olof
