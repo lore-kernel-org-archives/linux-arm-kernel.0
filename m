@@ -1,69 +1,31 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue, 17 Jan 2017 13:26:02 +0100
-Subject: [PATCH v2 00/14] ARM: da850-lcdk: add SATA support
-Message-ID: <1484655976-25382-1-git-send-email-bgolaszewski@baylibre.com>
+Date: Tue, 17 Jan 2017 13:26:05 +0100
+Subject: [PATCH v2 03/14] ARM: davinci: add a clock lookup entry for the SATA
+ clock
+In-Reply-To: <1484655976-25382-1-git-send-email-bgolaszewski@baylibre.com>
+References: <1484655976-25382-1-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1484655976-25382-4-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series contains all the changes necessary to make SATA work on
-the da850-lcdk board.
+This entry is needed for the ahci driver to get a functional clock.
 
-The first patch adds DT bindings for the ahci-da850 driver.
+Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+---
+ arch/arm/mach-davinci/da8xx-dt.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-The second enables relevant modules in davinci_all_defconfig.
-
-Patches 03/14-06/14 modify the way the clocks are handled regarding
-SATA on the da850 platform. We modify the ahci driver to retrieve
-the clock via con_id and model the external SATA oscillator as
-a real clock.
-
-Patches 07/14-11/14 extend the ahci-da850 driver. Add DT support,
-implement workarounds necessary to make SATA work on the da850-lcdk
-board and un-hardcode the external clock multiplier.
-
-Last three patches add device tree changes required to probe the
-driver.
-
-v1 -> v2:
-- dropped patch 04/10 - replaced with local changes in the
-  ahci-da850 driver
-- added comments explaining the workaround in ahci softreset
-- s/0x218000/218000 in the sata DT node label
-- added patches chaning the way clocks are handled in the da850 SATA
-  code both in arch/ and in the ahci driver
-- dropped the clock multiplier property in the DT bindings in favor
-  of using struct clk to pass the refclk rate to the driver
-- minor tweaks in commit messages
-
-Bartosz Golaszewski (14):
-  devicetree: bindings: add bindings for ahci-da850
-  ARM: davinci_all_defconfig: enable SATA modules
-  ARM: davinci: add a clock lookup entry for the SATA clock
-  sata: ahci-da850: get the sata clock using a connector id
-  ARM: davinci: da850: add con_id for the SATA clock
-  ARM: davinci: da850: model the SATA refclk
-  sata: ahci-da850: add device tree match table
-  sata: ahci-da850: implement a workaround for the softreset quirk
-  sata: ahci: export ahci_do_hardreset() locally
-  sata: ahci-da850: add a workaround for controller instability
-  sata: ahci-da850: un-hardcode the MPY bits
-  ARM: dts: da850: add pinmux settings for the SATA controller
-  ARM: dts: da850: add the SATA node
-  ARM: dts: da850-lcdk: enable the SATA node
-
- .../devicetree/bindings/ata/ahci-da850.txt         |  18 +++
- arch/arm/boot/dts/da850-lcdk.dts                   |   4 +
- arch/arm/boot/dts/da850.dtsi                       |  30 ++++
- arch/arm/configs/davinci_all_defconfig             |   2 +
- arch/arm/mach-davinci/da850.c                      |   2 +-
- arch/arm/mach-davinci/da8xx-dt.c                   |   9 ++
- arch/arm/mach-davinci/devices-da8xx.c              |  23 +++
- arch/arm/mach-davinci/include/mach/da8xx.h         |   1 +
- drivers/ata/ahci.h                                 |   3 +
- drivers/ata/ahci_da850.c                           | 172 +++++++++++++++++++--
- drivers/ata/libahci.c                              |  18 ++-
- 11 files changed, 262 insertions(+), 20 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/ata/ahci-da850.txt
-
+diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+index 9ee44da..b83e5d1 100644
+--- a/arch/arm/mach-davinci/da8xx-dt.c
++++ b/arch/arm/mach-davinci/da8xx-dt.c
+@@ -42,6 +42,7 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("ti,da830-ohci", 0x01e25000, "ohci-da8xx", NULL),
+ 	OF_DEV_AUXDATA("ti,da830-musb", 0x01e00000, "musb-da8xx", NULL),
+ 	OF_DEV_AUXDATA("ti,da830-usb-phy", 0x01c1417c, "da8xx-usb-phy", NULL),
++	OF_DEV_AUXDATA("ti,da850-ahci", 0x01e18000, "ahci_da850", NULL),
+ 	{}
+ };
+ 
 -- 
 2.9.3
