@@ -1,359 +1,253 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 17 Jan 2017 17:37:44 -0600
-Subject: [PATCH v3 2/4] dt-bindings: Add TI SCI PM Domains
-In-Reply-To: <4cb25cf9-216f-2e18-f45d-ef7e48fa6c5e@ti.com>
-References: <20170104205536.15963-1-d-gerlach@ti.com>
- <20170104205536.15963-3-d-gerlach@ti.com>
- <20170109175012.sg7eze7llqq7qevd@rob-hp-laptop>
- <7bd282d9-df6f-f4c6-1f7f-c8ed81c78af3@ti.com>
- <CAL_JsqKxU4c=KSn0=xX9kmbk498fhqpiXMeGjcoe8Ah48FAzUg@mail.gmail.com>
- <3bb89649-fd2a-acc6-6968-e54a00842ce2@ti.com>
- <CAL_JsqL+L1oHAOv7tLevzbtRFSKRs9J01SgF=HR_vNNqNV+4+Q@mail.gmail.com>
- <84d7d49b-933b-8b26-f18a-3a5054738cb1@ti.com>
- <CAL_JsqJ9RitNC7ihC8ckJgV+49kaHk=W9tgdNBSjEfydhQS46A@mail.gmail.com>
- <0eaa9914-83f1-7716-cf04-1e3dd44df647@ti.com>
- <4cb25cf9-216f-2e18-f45d-ef7e48fa6c5e@ti.com>
-Message-ID: <CAL_JsqKN8+jR96Sz12PZGGyQHJr8C79zbnXNgx1pSObNTFx9HA@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 17 Jan 2017 15:21:52 -0800
+Subject: [PATCH net-next v4 10/10] ARM: orion: Register DSA switch as a MDIO
+ device
+In-Reply-To: <20170117232152.1661-1-f.fainelli@gmail.com>
+References: <20170117232152.1661-1-f.fainelli@gmail.com>
+Message-ID: <20170117232152.1661-11-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 1:48 AM, Tero Kristo <t-kristo@ti.com> wrote:
-> On 17/01/17 00:12, Dave Gerlach wrote:
->>
->> On 01/13/2017 08:40 PM, Rob Herring wrote:
->>>
->>> On Fri, Jan 13, 2017 at 2:28 PM, Dave Gerlach <d-gerlach@ti.com> wrote:
->>>>
->>>> On 01/13/2017 01:25 PM, Rob Herring wrote:
->>>>>
->>>>>
->>>>> On Thu, Jan 12, 2017 at 9:27 AM, Dave Gerlach <d-gerlach@ti.com> wrote:
->>>>>>
->>>>>>
->>>>>> Rob,
->>>>>>
->>>>>> On 01/11/2017 03:34 PM, Rob Herring wrote:
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>> On Mon, Jan 9, 2017 at 11:57 AM, Dave Gerlach <d-gerlach@ti.com>
->>>>>>> wrote:
->>>>>>>>
->>>>>>>>
->>>>>>>>
->>>>>>>> Rob,
->>>>>>>>
->>>>>>>> On 01/09/2017 11:50 AM, Rob Herring wrote:
->>>>>>>>>
->>>>>>>>>
->>>>>>>>>
->>>>>>>>>
->>>>>>>>> On Wed, Jan 04, 2017 at 02:55:34PM -0600, Dave Gerlach wrote:
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>> Add a generic power domain implementation, TI SCI PM Domains, that
->>>>>>>>>> will hook into the genpd framework and allow the TI SCI
->>>>>>>>>> protocol to
->>>>>>>>>> control device power states.
->>>>>>>>>>
->>>>>>>>>> Also, provide macros representing each device index as understood
->>>>>>>>>> by TI SCI to be used in the device node power-domain references.
->>>>>>>>>> These are identifiers for the K2G devices managed by the PMMC.
->>>>>>>>>>
->>>>>>>>>> Signed-off-by: Nishanth Menon <nm@ti.com>
->>>>>>>>>> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->>>>>>>>>> ---
->>>>>>>>>> v2->v3:
->>>>>>>>>>         Update k2g_pds node docs to show it should be a child
->>>>>>>>>> of pmmc
->>>>>>>>>> node.
->>>>>>>>>>         In early versions a phandle was used to point to pmmc and
->>>>>>>>>> docs
->>>>>>>>>> still
->>>>>>>>>>         incorrectly showed this.
->>>>>>>>>>
->>>>>>>>>>  .../devicetree/bindings/soc/ti/sci-pm-domain.txt   | 59
->>>>>>>>>> ++++++++++++++
->>>>>>>>>>  MAINTAINERS                                        |  2 +
->>>>>>>>>>  include/dt-bindings/genpd/k2g.h                    | 90
->>>>>>>>>> ++++++++++++++++++++++
->>>>>>>>>>  3 files changed, 151 insertions(+)
->>>>>>>>>>  create mode 100644
->>>>>>>>>> Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->>>>>>>>>>  create mode 100644 include/dt-bindings/genpd/k2g.h
->>>>>>>>>>
->>>>>>>>>> diff --git
->>>>>>>>>> a/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->>>>>>>>>> b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->>>>>>>>>> new file mode 100644
->>>>>>>>>> index 000000000000..4c9064e512cb
->>>>>>>>>> --- /dev/null
->>>>>>>>>> +++ b/Documentation/devicetree/bindings/soc/ti/sci-pm-domain.txt
->>>>>>>>>> @@ -0,0 +1,59 @@
->>>>>>>>>> +Texas Instruments TI-SCI Generic Power Domain
->>>>>>>>>> +---------------------------------------------
->>>>>>>>>> +
->>>>>>>>>> +Some TI SoCs contain a system controller (like the PMMC, etc...)
->>>>>>>>>> that
->>>>>>>>>> is
->>>>>>>>>> +responsible for controlling the state of the IPs that are
->>>>>>>>>> present.
->>>>>>>>>> +Communication between the host processor running an OS and the
->>>>>>>>>> system
->>>>>>>>>> +controller happens through a protocol known as TI-SCI [1].
->>>>>>>>>> This pm
->>>>>>>>>> domain
->>>>>>>>>> +implementation plugs into the generic pm domain framework and
->>>>>>>>>> makes
->>>>>>>>>> use
->>>>>>>>>> of
->>>>>>>>>> +the TI SCI protocol power on and off each device when needed.
->>>>>>>>>> +
->>>>>>>>>> +[1] Documentation/devicetree/bindings/arm/keystone/ti,sci.txt
->>>>>>>>>> +
->>>>>>>>>> +PM Domain Node
->>>>>>>>>> +==============
->>>>>>>>>> +The PM domain node represents the global PM domain managed by the
->>>>>>>>>> PMMC,
->>>>>>>>>> +which in this case is the single implementation as documented
->>>>>>>>>> by the
->>>>>>>>>> generic
->>>>>>>>>> +PM domain bindings in
->>>>>>>>>> Documentation/devicetree/bindings/power/power_domain.txt.
->>>>>>>>>> +Because this relies on the TI SCI protocol to communicate with
->>>>>>>>>> the
->>>>>>>>>> PMMC
->>>>>>>>>> it
->>>>>>>>>> +must be a child of the pmmc node.
->>>>>>>>>> +
->>>>>>>>>> +Required Properties:
->>>>>>>>>> +--------------------
->>>>>>>>>> +- compatible: should be "ti,sci-pm-domain"
->>>>>>>>>> +- #power-domain-cells: Must be 0.
->>>>>>>>>> +
->>>>>>>>>> +Example (K2G):
->>>>>>>>>> +-------------
->>>>>>>>>> +       pmmc: pmmc {
->>>>>>>>>> +               compatible = "ti,k2g-sci";
->>>>>>>>>> +               ...
->>>>>>>>>> +
->>>>>>>>>> +               k2g_pds: k2g_pds {
->>>>>>>>>> +                       compatible = "ti,sci-pm-domain";
->>>>>>>>>> +                       #power-domain-cells = <0>;
->>>>>>>>>> +               };
->>>>>>>>>> +       };
->>>>>>>>>> +
->>>>>>>>>> +PM Domain Consumers
->>>>>>>>>> +===================
->>>>>>>>>> +Hardware blocks that require SCI control over their state must
->>>>>>>>>> provide
->>>>>>>>>> +a reference to the sci-pm-domain they are part of and a unique
->>>>>>>>>> device
->>>>>>>>>> +specific ID that identifies the device.
->>>>>>>>>> +
->>>>>>>>>> +Required Properties:
->>>>>>>>>> +--------------------
->>>>>>>>>> +- power-domains: phandle pointing to the corresponding PM domain
->>>>>>>>>> node.
->>>>>>>>>> +- ti,sci-id: index representing the device id to be passed
->>>>>>>>>> oevr SCI
->>>>>>>>>> to
->>>>>>>>>> +            be used for device control.
->>>>>>>>>
->>>>>>>>>
->>>>>>>>>
->>>>>>>>>
->>>>>>>>>
->>>>>>>>> As I've already stated before, this goes in power-domain cells.
->>>>>>>>> When
->>>>>>>>> you
->>>>>>>>> have a single thing (i.e. node) that controls multiple things, then
->>>>>>>>> you
->>>>>>>>> you need to specify the ID for each of them in phandle args.
->>>>>>>>> This is
->>>>>>>>> how
->>>>>>>>> irqs, gpio, clocks, *everything* in DT works.
->>>>>>>>
->>>>>>>>
->>>>>>>>
->>>>>>>>
->>>>>>>>
->>>>>>>> You think the reasoning for doing it this way provided by both
->>>>>>>> Ulf and
->>>>>>>> myself on v2 [1] is not valid then?
->>>>>>>>
->>>>>>>> From Ulf:
->>>>>>>>
->>>>>>>> To me, the TI SCI ID, is similar to a "conid" for any another
->>>>>>>> "device
->>>>>>>> resource" (like clock, pinctrl, regulator etc) which we can describe
->>>>>>>> in DT and assign to a device node. The only difference here, is that
->>>>>>>> we don't have common API to fetch the resource (like clk_get(),
->>>>>>>> regulator_get()), but instead we fetches the device's resource from
->>>>>>>> SoC specific code, via genpd's device ->attach() callback.
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>> Sorry, but that sounds like a kernel problem to me and has nothing to
->>>>>>> do with DT bindings.
->>>>>>>
->>>>>>>> From me:
->>>>>>>>
->>>>>>>> Yes, you've pretty much hit it on the head. It is not an index
->>>>>>>> into a
->>>>>>>> list
->>>>>>>> of genpds but rather identifies the device *within* a single
->>>>>>>> genpd. It
->>>>>>>> is
->>>>>>>> a
->>>>>>>> property specific to each device that resides in a ti-sci-genpd,
->>>>>>>> not a
->>>>>>>> mapping describing which genpd the device belongs to. The generic
->>>>>>>> power
->>>>>>>> domain binding is concerned with mapping the device to a specific
->>>>>>>> genpd,
->>>>>>>> which is does fine for us, but we have a sub mapping for devices
->>>>>>>> that
->>>>>>>> exist
->>>>>>>> inside a genpd which, we must describe as well, hence the ti,sci-id.
->>>>>>>>
->>>>>>>>
->>>>>>>> So to summarize, the genpd framework does interpret the phandle
->>>>>>>> arg as
->>>>>>>> an
->>>>>>>> index into multiple genpds, just as you've said other frameworks do,
->>>>>>>> but
->>>>>>>> this is not what I am trying to do, we have multiple devices within
->>>>>>>> this
->>>>>>>> *single* genpd, hence the need for the ti,sci-id property.
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>> Fix the genpd framework rather than work around it in DT.
->>>>>>
->>>>>>
->>>>>>
->>>>>>
->>>>>> I still disagree that this has nothing to do with DT bindings, as the
->>>>>> current DT binding represents something different already. I am
->>>>>> trying to
->>>>>> extend it to give me additional information needed for our
->>>>>> platforms. Are
->>>>>> you saying that we should break what the current DT binding already
->>>>>> represents to mean something else?
->>>>>
->>>>>
->>>>>
->>>>> No idea because what's the current binding? From the patch, looks like
->>>>> a new binding to me.
->>>>
->>>>
->>>>
->>>> Yes, ti,sci-id is a new binding. I am referring to the current
->>>> meaning of
->>>> the "power-domains" binding, which is where you are asking this
->>>> property to
->>>> be added, in "power-domains" cells. This is documented here [1] in the
->>>> kernel, although looking at it I must admit it is not very clear.
->>>>
->>>> The power-domains cell represents an offset into an array of power
->>>> domains,
->>>> if you choose to use it. That's what the genpd framework is hard
->>>> coded to
->>>> interpret it as. This is correct, as it is an index into a static
->>>> list of
->>>> power domains, used to identify which power domain a device belongs to,
->>>> which is exactly what the genpd framework itself is concerned with.
->>>> This is
->>>> already how it is used in the kernel today.
->>>
->>>
->>> Strictly speaking, the cells are purely for the interpretation of the
->>> phandle they are associated with. If some controller wants to have 20
->>> cells, then it could assuming a good reason. The reality is we tend to
->>> align the meaning of the cells. If genpd is interpreting the cells and
->>> not letting the driver for the power domain controller interpret them,
->>> then still, genpd needs to be fixed.
->>
->>
->> Ok, perhaps the genpd folks on the thread can jump in here with any
->> thoughts that they have.
->>
->>>
->>> IIRC, initially it was said genpd required 0 cells, hence my confusion.
->>>
->>>> My ti,sci-id is not an index into a list of power domains, so it
->>>> should not
->>>> go in the power-domains cells and go against what the power-domains
->>>> binding
->>>> says that the cell expects. We have one single power domain, and the new
->>>> ti,sci-id binding is not something the genpd framework itself is
->>>> concerned
->>>> with as it's our property to identify a device inside a power domain,
->>>> not to
->>>> identify which power domain it is associated with.
->>>
->>>
->>> What is the id used for? I can understand why you need to know what
->>> power domain a device is in (as power-domains identifies), but not
->>> what devices are in a power domain.
->>
->>
->> We have a system control processor that provides power management
->> services to the OS and it responsible for handling the power state of
->> each device. This control happens over a communication interface we have
->> called TI SCI (implemented at drivers/firmware/ti-sci.c). The
->> communication protocol uses these ids to identify each device within the
->> power domain so that the control processor can do what is necessary to
->> enable that device.
->
->
-> I think a minor detail here that Rob might be missing right now is, that the
-> ti,sci-id is only controlling the PM runtime handling, and providing the ID
-> per-device for this purpose only. AFAIK, it is not really connected to the
-> power domain anymore as such, as we don't have power-domains / per device
-> anymore as was the case in some earlier revision of this work.
+Utilize the ability to pass board specific MDIO bus information towards a
+particular MDIO device thus allowing us to provide the per-port switch layout
+to the Marvell 88E6XXX switch driver.
 
-So you used to have multiple power domains and now you don't? Did the
-h/w change?
+Since we would end-up with conflicting registration paths, do not register the
+"dsa" platform device anymore.
 
-> One could argue though that the whole usage of power-domains is now moot, as
-> we basically only have implemented one genpd in the whole SoC, which doesn't
-> really reflect the reality. I wonder if better approach would be to have
-> this replaced with proper power domains at some point (if needed), and just
-> have a runtime-pm implementation in place for the devices that require it.
+Note that the MDIO devices registered by code in net/dsa/dsa2.c does not
+parse a dsa_platform_data, but directly take a dsa_chip_data (specific
+to a single switch chip), so we update the different call sites to pass
+this structure down to orion_ge00_switch_init().
 
-We're talking about bindings here. Any explanation in terms of
-runtime-pm and genpd a) goes over my head and b) isn't relevant to
-describing the hardware.
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ arch/arm/mach-orion5x/common.c               |  2 +-
+ arch/arm/mach-orion5x/common.h               |  4 ++--
+ arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c |  7 +------
+ arch/arm/mach-orion5x/rd88f5181l-ge-setup.c  |  7 +------
+ arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c |  7 +------
+ arch/arm/mach-orion5x/wnr854t-setup.c        |  2 +-
+ arch/arm/mach-orion5x/wrt350n-v2-setup.c     |  7 +------
+ arch/arm/plat-orion/common.c                 | 25 +++++++++++++++++++------
+ arch/arm/plat-orion/include/plat/common.h    |  4 ++--
+ 9 files changed, 29 insertions(+), 36 deletions(-)
 
-I'm still confused with how many power domains (as defined by the h/w
-design) there are controlled by the SCI? Is it 1 or multiple? If 1,
-then why do you need the sci-id? For other things that are not the
-power domain?
-
-Or perhaps the SCI abstracts things such that you don't really know
-what the relationship between devices and power domains is? IOW, you
-can't tell from the SCI interface how many power domains there are.
-
->
-> So, as an example in DT, we would only have:
->
-> uart0: serial at 02530c00 {
->   compatible = "xyz";
->   ...
->   ti,sci-id = <K2G_DEV_UART0>;
-> };
->
-> This is somewhat analogous to what OMAP family of SoCs have in place now,
-> under "ti,hwmods" property. I also wonder if the "ti,sci-id" should be
-> replaced with something like "ti,sci-dev-id" to make its purpose clearer.
-
-Describing in terms of hwmods doesn't help me either. Never understood
-that either. Sorry.
-
-Rob
+diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
+index 04910764c385..83a7ec4c16d0 100644
+--- a/arch/arm/mach-orion5x/common.c
++++ b/arch/arm/mach-orion5x/common.c
+@@ -105,7 +105,7 @@ void __init orion5x_eth_init(struct mv643xx_eth_platform_data *eth_data)
+ /*****************************************************************************
+  * Ethernet switch
+  ****************************************************************************/
+-void __init orion5x_eth_switch_init(struct dsa_platform_data *d)
++void __init orion5x_eth_switch_init(struct dsa_chip_data *d)
+ {
+ 	orion_ge00_switch_init(d);
+ }
+diff --git a/arch/arm/mach-orion5x/common.h b/arch/arm/mach-orion5x/common.h
+index 8a4115bd441d..efeffc6b4ebb 100644
+--- a/arch/arm/mach-orion5x/common.h
++++ b/arch/arm/mach-orion5x/common.h
+@@ -3,7 +3,7 @@
+ 
+ #include <linux/reboot.h>
+ 
+-struct dsa_platform_data;
++struct dsa_chip_data;
+ struct mv643xx_eth_platform_data;
+ struct mv_sata_platform_data;
+ 
+@@ -41,7 +41,7 @@ void orion5x_setup_wins(void);
+ void orion5x_ehci0_init(void);
+ void orion5x_ehci1_init(void);
+ void orion5x_eth_init(struct mv643xx_eth_platform_data *eth_data);
+-void orion5x_eth_switch_init(struct dsa_platform_data *d);
++void orion5x_eth_switch_init(struct dsa_chip_data *d);
+ void orion5x_i2c_init(void);
+ void orion5x_sata_init(struct mv_sata_platform_data *sata_data);
+ void orion5x_spi_init(void);
+diff --git a/arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c b/arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c
+index dccadf68ea2b..a3c1336d30c9 100644
+--- a/arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c
++++ b/arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c
+@@ -101,11 +101,6 @@ static struct dsa_chip_data rd88f5181l_fxo_switch_chip_data = {
+ 	.port_names[7]	= "lan3",
+ };
+ 
+-static struct dsa_platform_data __initdata rd88f5181l_fxo_switch_plat_data = {
+-	.nr_chips	= 1,
+-	.chip		= &rd88f5181l_fxo_switch_chip_data,
+-};
+-
+ static void __init rd88f5181l_fxo_init(void)
+ {
+ 	/*
+@@ -120,7 +115,7 @@ static void __init rd88f5181l_fxo_init(void)
+ 	 */
+ 	orion5x_ehci0_init();
+ 	orion5x_eth_init(&rd88f5181l_fxo_eth_data);
+-	orion5x_eth_switch_init(&rd88f5181l_fxo_switch_plat_data);
++	orion5x_eth_switch_init(&rd88f5181l_fxo_switch_chip_data);
+ 	orion5x_uart0_init();
+ 
+ 	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,
+diff --git a/arch/arm/mach-orion5x/rd88f5181l-ge-setup.c b/arch/arm/mach-orion5x/rd88f5181l-ge-setup.c
+index affe5ec825de..252efe29bd1a 100644
+--- a/arch/arm/mach-orion5x/rd88f5181l-ge-setup.c
++++ b/arch/arm/mach-orion5x/rd88f5181l-ge-setup.c
+@@ -102,11 +102,6 @@ static struct dsa_chip_data rd88f5181l_ge_switch_chip_data = {
+ 	.port_names[7]	= "lan3",
+ };
+ 
+-static struct dsa_platform_data __initdata rd88f5181l_ge_switch_plat_data = {
+-	.nr_chips	= 1,
+-	.chip		= &rd88f5181l_ge_switch_chip_data,
+-};
+-
+ static struct i2c_board_info __initdata rd88f5181l_ge_i2c_rtc = {
+ 	I2C_BOARD_INFO("ds1338", 0x68),
+ };
+@@ -125,7 +120,7 @@ static void __init rd88f5181l_ge_init(void)
+ 	 */
+ 	orion5x_ehci0_init();
+ 	orion5x_eth_init(&rd88f5181l_ge_eth_data);
+-	orion5x_eth_switch_init(&rd88f5181l_ge_switch_plat_data);
++	orion5x_eth_switch_init(&rd88f5181l_ge_switch_chip_data);
+ 	orion5x_i2c_init();
+ 	orion5x_uart0_init();
+ 
+diff --git a/arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c b/arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c
+index 67ee8571b03c..f4f1dbe1d91d 100644
+--- a/arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c
++++ b/arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c
+@@ -40,11 +40,6 @@ static struct dsa_chip_data rd88f6183ap_ge_switch_chip_data = {
+ 	.port_names[5]	= "cpu",
+ };
+ 
+-static struct dsa_platform_data __initdata rd88f6183ap_ge_switch_plat_data = {
+-	.nr_chips	= 1,
+-	.chip		= &rd88f6183ap_ge_switch_chip_data,
+-};
+-
+ static struct mtd_partition rd88f6183ap_ge_partitions[] = {
+ 	{
+ 		.name	= "kernel",
+@@ -89,7 +84,7 @@ static void __init rd88f6183ap_ge_init(void)
+ 	 */
+ 	orion5x_ehci0_init();
+ 	orion5x_eth_init(&rd88f6183ap_ge_eth_data);
+-	orion5x_eth_switch_init(&rd88f6183ap_ge_switch_plat_data);
++	orion5x_eth_switch_init(&rd88f6183ap_ge_switch_chip_data);
+ 	spi_register_board_info(rd88f6183ap_ge_spi_slave_info,
+ 				ARRAY_SIZE(rd88f6183ap_ge_spi_slave_info));
+ 	orion5x_spi_init();
+diff --git a/arch/arm/mach-orion5x/wnr854t-setup.c b/arch/arm/mach-orion5x/wnr854t-setup.c
+index 4dbcdbe1de7c..ac3376fc269f 100644
+--- a/arch/arm/mach-orion5x/wnr854t-setup.c
++++ b/arch/arm/mach-orion5x/wnr854t-setup.c
+@@ -124,7 +124,7 @@ static void __init wnr854t_init(void)
+ 	 * Configure peripherals.
+ 	 */
+ 	orion5x_eth_init(&wnr854t_eth_data);
+-	orion5x_eth_switch_init(&wnr854t_switch_plat_data);
++	orion5x_eth_switch_init(&wnr854t_switch_chip_data);
+ 	orion5x_uart0_init();
+ 
+ 	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,
+diff --git a/arch/arm/mach-orion5x/wrt350n-v2-setup.c b/arch/arm/mach-orion5x/wrt350n-v2-setup.c
+index a6a8c4648d74..9250bb2e429c 100644
+--- a/arch/arm/mach-orion5x/wrt350n-v2-setup.c
++++ b/arch/arm/mach-orion5x/wrt350n-v2-setup.c
+@@ -191,11 +191,6 @@ static struct dsa_chip_data wrt350n_v2_switch_chip_data = {
+ 	.port_names[7]	= "lan4",
+ };
+ 
+-static struct dsa_platform_data __initdata wrt350n_v2_switch_plat_data = {
+-	.nr_chips	= 1,
+-	.chip		= &wrt350n_v2_switch_chip_data,
+-};
+-
+ static void __init wrt350n_v2_init(void)
+ {
+ 	/*
+@@ -210,7 +205,7 @@ static void __init wrt350n_v2_init(void)
+ 	 */
+ 	orion5x_ehci0_init();
+ 	orion5x_eth_init(&wrt350n_v2_eth_data);
+-	orion5x_eth_switch_init(&wrt350n_v2_switch_plat_data);
++	orion5x_eth_switch_init(&wrt350n_v2_switch_chip_data);
+ 	orion5x_uart0_init();
+ 
+ 	mvebu_mbus_add_window_by_id(ORION_MBUS_DEVBUS_BOOT_TARGET,
+diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+index 272f49b2c68f..9255b6d67ba5 100644
+--- a/arch/arm/plat-orion/common.c
++++ b/arch/arm/plat-orion/common.c
+@@ -22,6 +22,7 @@
+ #include <linux/platform_data/dma-mv_xor.h>
+ #include <linux/platform_data/usb-ehci-orion.h>
+ #include <plat/common.h>
++#include <linux/phy.h>
+ 
+ /* Create a clkdev entry for a given device/clk */
+ void __init orion_clkdev_add(const char *con_id, const char *dev_id,
+@@ -470,15 +471,27 @@ void __init orion_ge11_init(struct mv643xx_eth_platform_data *eth_data,
+ /*****************************************************************************
+  * Ethernet switch
+  ****************************************************************************/
+-void __init orion_ge00_switch_init(struct dsa_platform_data *d)
++static __initconst const char *orion_ge00_mvmdio_bus_name = "orion-mii";
++static __initdata struct mdio_board_info
++		  orion_ge00_switch_board_info;
++
++void __init orion_ge00_switch_init(struct dsa_chip_data *d)
+ {
+-	int i;
++	struct mdio_board_info *bd;
++	unsigned int i;
++
++	for (i = 0; i < ARRAY_SIZE(d->port_names); i++)
++		if (!strcmp(d->port_names[i], "cpu"))
++			break;
+ 
+-	d->netdev = &orion_ge00.dev;
+-	for (i = 0; i < d->nr_chips; i++)
+-		d->chip[i].host_dev = &orion_ge_mvmdio.dev;
++	bd = &orion_ge00_switch_board_info;
++	bd->bus_id = orion_ge00_mvmdio_bus_name;
++	bd->mdio_addr = d->sw_addr;
++	d->netdev[i] = &orion_ge00.dev;
++	strcpy(bd->modalias, "mv88e6085");
++	bd->platform_data = d;
+ 
+-	platform_device_register_data(NULL, "dsa", 0, d, sizeof(d));
++	mdiobus_register_board_info(&orion_ge00_switch_board_info, 1);
+ }
+ 
+ /*****************************************************************************
+diff --git a/arch/arm/plat-orion/include/plat/common.h b/arch/arm/plat-orion/include/plat/common.h
+index 9347f3c58a6d..3647d3b33c20 100644
+--- a/arch/arm/plat-orion/include/plat/common.h
++++ b/arch/arm/plat-orion/include/plat/common.h
+@@ -12,7 +12,7 @@
+ #include <linux/mv643xx_eth.h>
+ #include <linux/platform_data/usb-ehci-orion.h>
+ 
+-struct dsa_platform_data;
++struct dsa_chip_data;
+ struct mv_sata_platform_data;
+ 
+ void __init orion_uart0_init(void __iomem *membase,
+@@ -57,7 +57,7 @@ void __init orion_ge11_init(struct mv643xx_eth_platform_data *eth_data,
+ 			    unsigned long mapbase,
+ 			    unsigned long irq);
+ 
+-void __init orion_ge00_switch_init(struct dsa_platform_data *d);
++void __init orion_ge00_switch_init(struct dsa_chip_data *d);
+ 
+ void __init orion_i2c_init(unsigned long mapbase,
+ 			   unsigned long irq,
+-- 
+2.9.3
