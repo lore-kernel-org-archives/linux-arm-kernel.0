@@ -1,37 +1,73 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 17 Jan 2017 10:20:26 +0000
-Subject: [RFC PATCH 05/33] irqchip/gic-v3-its: Zero command on allocation
+Date: Tue, 17 Jan 2017 10:20:32 +0000
+Subject: [RFC PATCH 11/33] irqchip/gic-v3-its: Split out pending table
+ allocation
 In-Reply-To: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
 References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1484648454-21216-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1484648454-21216-12-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When reusing commands from the ring buffer, it would be better
-to zero them out, even if the ITS should ignore the unused
-fields.
+Just as for the property table, let's move the pending table
+allocation to a separate function.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/irqchip/irq-gic-v3-its.c | 29 ++++++++++++++++++++---------
+ 1 file changed, 20 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 2ca27f6..9304dd2 100644
+index 14305db1..dce8f8c 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -426,6 +426,12 @@ static struct its_cmd_block *its_allocate_entry(struct its_node *its)
- 	if (its->cmd_write == (its->cmd_base + ITS_CMD_QUEUE_NR_ENTRIES))
- 		its->cmd_write = its->cmd_base;
- 
-+	/* Clear command  */
-+	cmd->raw_cmd[0] = 0;
-+	cmd->raw_cmd[1] = 0;
-+	cmd->raw_cmd[2] = 0;
-+	cmd->raw_cmd[3] = 0;
-+
- 	return cmd;
+@@ -1188,6 +1188,24 @@ static int its_alloc_collections(struct its_node *its)
+ 	return 0;
  }
  
++static struct page *its_allocate_pending_table(gfp_t gfp_flags)
++{
++	struct page *pend_page;
++	/*
++	 * The pending pages have to be at least 64kB aligned,
++	 * hence the 'max(LPI_PENDBASE_SZ, SZ_64K)' below.
++	 */
++	pend_page = alloc_pages(gfp_flags | __GFP_ZERO,
++				get_order(max(LPI_PENDBASE_SZ, SZ_64K)));
++	if (!pend_page)
++		return NULL;
++
++	/* Make sure the GIC will observe the zero-ed page */
++	gic_flush_dcache_to_poc(page_address(pend_page), LPI_PENDBASE_SZ);
++
++	return pend_page;
++}
++
+ static void its_cpu_init_lpis(void)
+ {
+ 	void __iomem *rbase = gic_data_rdist_rd_base();
+@@ -1198,21 +1216,14 @@ static void its_cpu_init_lpis(void)
+ 	pend_page = gic_data_rdist()->pend_page;
+ 	if (!pend_page) {
+ 		phys_addr_t paddr;
+-		/*
+-		 * The pending pages have to be at least 64kB aligned,
+-		 * hence the 'max(LPI_PENDBASE_SZ, SZ_64K)' below.
+-		 */
+-		pend_page = alloc_pages(GFP_NOWAIT | __GFP_ZERO,
+-					get_order(max(LPI_PENDBASE_SZ, SZ_64K)));
++
++		pend_page = its_allocate_pending_table(GFP_NOWAIT);
+ 		if (!pend_page) {
+ 			pr_err("Failed to allocate PENDBASE for CPU%d\n",
+ 			       smp_processor_id());
+ 			return;
+ 		}
+ 
+-		/* Make sure the GIC will observe the zero-ed page */
+-		gic_flush_dcache_to_poc(page_address(pend_page), LPI_PENDBASE_SZ);
+-
+ 		paddr = page_to_phys(pend_page);
+ 		pr_info("CPU%d: using LPI pending table @%pa\n",
+ 			smp_processor_id(), &paddr);
 -- 
 2.1.4
