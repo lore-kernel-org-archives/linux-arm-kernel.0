@@ -1,62 +1,22 @@
-From: christopher.spinrath@rwth-aachen.de (Christopher Spinrath)
-Date: Tue, 17 Jan 2017 19:35:09 +0100
-Subject: [PATCH] ARM: dts: imx6q-utilite-pro: enable 2nd display pipeline
-In-Reply-To: <88bdfd5321484efc82af4132ac2f0d7e@rwthex-s1-b.rwth-ad.de>
-References: <ec9676f344eb4786a28a3c7b969f0e94@rwthex-s1-b.rwth-ad.de>
- <88bdfd5321484efc82af4132ac2f0d7e@rwthex-s1-b.rwth-ad.de>
-Message-ID: <9175c3b9abc24d348eca65afd15aa11e@rwthex-s1-b.rwth-ad.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 17 Jan 2017 18:38:31 +0000
+Subject: [PATCH] arm64: mm: fix __page_to_voff definition
+In-Reply-To: <424a4f63-316b-3f14-6a29-a8a754d9d68d@gmail.com>
+References: <1484666633-1753-1-git-send-email-andr2000@gmail.com>
+ <20170117161546.GF11939@leverpostej>
+ <e57db47e-3c3a-1344-9492-442b37c6897c@gmail.com>
+ <20170117171929.GA367@leverpostej>
+ <424a4f63-316b-3f14-6a29-a8a754d9d68d@gmail.com>
+Message-ID: <20170117183831.GC367@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+On Tue, Jan 17, 2017 at 08:15:36PM +0200, Oleksandr Andrushchenko wrote:
+> Do you also want "Fixes: 3fa72fe9c614 ("arm64: mm: fix
+> __page_to_voff definition")"
 
-thanks for the review!
+>From a look at the git history, that Fixes tag looks correct, so yes
+please.
 
-On 01/17/2017 09:57 AM, Philipp Zabel wrote:
-> [...]
->> +
->> +	parallel-display {
->> +		compatible = "fsl,imx-parallel-display";
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&pinctrl_ipu1>;
->> +
->> +		interface-pix-fmt = "rgb24";
->
-> This is not necessary if the connector created by the tpf410 has the
-> correct media bus format set in its display_info structure. This can be
-> done in tfp410_attach, before calling drm_mode_connector_attach_encoder:
->
->         u32 bus_format = MEDIA_BUS_FMT_RGB888_1X24;
->
-> 	drm_display_info_set_bus_formats(&dvi->connector.display_info,
-> 					 &bus_format, 1);
->
-> After this is done, the above line should be removed in a follow-up
-> patch.
-
-Ok, I will send a mini follow-up series doing that with your 
-Suggested-by (unless you object) in the next few days.
-
-Cheers,
-Christopher
-
->> +		port at 0 {
->> +			reg = <0>;
->> +
->> +			parallel_display_in: endpoint {
->> +				remote-endpoint = <&ipu1_di0_disp0>;
->> +			};
->> +		};
->> +
->> +		port at 1 {
->> +			reg = <1>;
->> +
->> +			parallel_display_out: endpoint {
->> +				remote-endpoint = <&tfp410_in>;
->> +			};
->> +		};
->> +	};
->>  };
->>  [...]
+Thanks,
+Mark.
