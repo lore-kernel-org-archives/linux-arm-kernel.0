@@ -1,102 +1,51 @@
-From: jerry.huang@nxp.com (Jerry Huang)
-Date: Tue, 17 Jan 2017 11:08:57 +0000
-Subject: [PATCH v3 2/3] USB3/DWC3: Add property "snps,
- incr-burst-type-adjustment" for INCR burst type
-In-Reply-To: <8737gikls0.fsf@linux.intel.com>
-References: <1482139554-13618-1-git-send-email-jerry.huang@nxp.com>
- <1482139554-13618-2-git-send-email-jerry.huang@nxp.com>
- <20161222184514.hfd4g7ifrz5cv627@rob-hp-laptop>
- <DB5PR0401MB1813E210B2ADE1C9493F7768FE950@DB5PR0401MB1813.eurprd04.prod.outlook.com>
- <CAL_JsqJuifiSQAt-6FgtYYSukAnjzOLuTGEsO-Spn5LxkU-iwQ@mail.gmail.com>
- <DB5PR0401MB18132BB4CDE32EEA8F479E55FE7D0@DB5PR0401MB1813.eurprd04.prod.outlook.com>
- <87tw8zo0c0.fsf@linux.intel.com>
- <DB5PR0401MB1813548526D3C8D34B9CCE52FE7C0@DB5PR0401MB1813.eurprd04.prod.outlook.com>
- <8737gikls0.fsf@linux.intel.com>
-Message-ID: <DB5PR0401MB18131480F5EFDCB2B1847948FE7C0@DB5PR0401MB1813.eurprd04.prod.outlook.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 17 Jan 2017 11:13:24 +0000
+Subject: [PATCH v29 9/9] Documentation: dt: chosen properties for arm64
+ kdump
+In-Reply-To: <20170116082505.GL20972@linaro.org>
+References: <20161228043347.27358-1-takahiro.akashi@linaro.org>
+ <20161228043734.27535-1-takahiro.akashi@linaro.org>
+ <20170112153944.GB12249@leverpostej>
+ <20170113091339.GK20972@linaro.org>
+ <20170113111756.GC26120@leverpostej>
+ <20170116082505.GL20972@linaro.org>
+Message-ID: <20170117111323.GB11939@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jan 16, 2017 at 05:25:07PM +0900, AKASHI Takahiro wrote:
+> On Fri, Jan 13, 2017 at 11:17:56AM +0000, Mark Rutland wrote:
+> > On Fri, Jan 13, 2017 at 06:13:49PM +0900, AKASHI Takahiro wrote:
+> > > On Thu, Jan 12, 2017 at 03:39:45PM +0000, Mark Rutland wrote:
 
-> -----Original Message-----
-> From: Felipe Balbi [mailto:balbi at kernel.org]
-> Sent: Tuesday, January 17, 2017 6:45 PM
-> To: Jerry Huang <jerry.huang@nxp.com>; Rob Herring <robh@kernel.org>
-> Cc: mark.rutland at arm.com; catalin.marinas at arm.com;
-> will.deacon at arm.com; linux at armlinux.org.uk; devicetree at vger.kernel.org;
-> linux-usb at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: RE: [PATCH v3 2/3] USB3/DWC3: Add property "snps, incr-burst-
-> type-adjustment" for INCR burst type
+> > > > arm64 we should either ensure that /proc/iomem is consistently usable
+> > > > (and have userspace consistently use it), or we should expose a new file
+> > > > specifically to expose this information.
+> > > 
+> > > The thing that I had in my mind when adding this property is that
+> > > /proc/iomem would be obsolete in the future, then we should have
+> > > an alternative in hand.
+> > 
+> > Ok.
+> > 
+> > My disagreement is with using the DT as a channel to convey information
+> > from the kernel to userspace.
+> > 
+> > I'm more than happy for a new file or other mechanism to express this
+> > information. For example, we could add
+> > /sys/kernel/kexec_crash_{base,size} or similar.
 > 
-> 
-> Hi,
-> 
-> Jerry Huang <jerry.huang@nxp.com> writes:
-> 
-> <snip>
-> 
-> >> >> So, I think we still need two vaue to specify INCRBrstEna and
-> >> >> INCRx burst type.
-> >> > Hi, Balbi,
-> >> > It seems there is no feedback for my comment, so these patches can
-> >> > be
-> >> accepted?
-> >>
-> >> probably not, we need to really understand what information we need
-> >> so it can be described properly. The last thing we want is
-> >> unnecessary DT properties.
-> >>
-> >> It seems to me that we can extrapolate INCRBrstEna based on which
-> >> burst modes are enabled. If only 0 is passed, then that bit should be
-> >> 1, if 0 and any other size is passed, then that bit should be 0, no?
-> > Hi, Balbi,
-> > Below is the definition for this property,
-> > snps,incr-burst-type-adjustment = <x>, <y>
-> > x: Undefined Length INCR Burst Type Enable (INCRBrstEna)
-> >     0 - INCRX burst mode (not enable INCRBrstEna)
-> >     1 - INCR (undefined length) burst mode (enable INCRBrstEna)
-> > y: the burst length
-> >
-> > 1> if x = 0: means INCRBrstEna not enabled, set bit0 to zero (or clear
-> > it) , we select one of
-> > INCR1/INCR4/INCR8/INCR16/INCR32/INCR64/INCR128/INCR256 (pass this
-> > value through "y")to set the fix burst length controller supported.
-> >
-> > For example:
-> >
-> > 	snps,incr-burst-type-adjustment = <0>, <16>
-> >
-> > driver will set bit0 to zero and set bit3 to 1 (INCR16 Burst Type
-> > Enabled), controller will use INCR16 (with 16 bytes) to transfer data.
-> >
-> > 2> if x = 1: means INCRBrstEna enabled, we select one of
-> > INCR4/INCR8/INCR16/INCR32/INCR64/INCR128/INCR256 (pass this value
-> > through "y") to set the burst length, and controller will use any
-> > length less than or equal to that we selected.
-> >
-> > For example:
-> >
-> > 	snps,incr-burst-type-adjustment = <1>, <32>
-> >
-> > driver will set bit0 to 1 and set bit4 to 1 (INCR32 Burst Type
-> > Enabled), controller will use any burst length less than (such as 4,
-> > 8, 16 byte) or equal to 32 byte to transfer data.
-> >
-> > Therefore, I think this two fileds are needed. Do you think about it?
-> 
-> no, I don't think two values are needed, because first value can be
-> extrapolated from the second. Something like this:
-> 
-> 	snps,incr-burst-type-adjustment = <4>, <8>, <16>, <32>;
-> 
-> This is basically telling us that we can support anything in this list. So
-> INCRBrstEna should be set to 1.
-> 
-> If DT, on the other hand, says:
-> 
-> 	snps,incr-burst-type-adjustment = <32>;
-> 
-> this means that we can only support INCR32, so INCRBrstEna should be
-> cleared to 0.
-Got it, I will try this mode.
-Thanks a lot, Balbi,
+> It may make sense because /sys/kernel/kexec_crash_size already exists,
+> so why not kexec_crash_base?
+> My concern, however, is that this kind of interface might prevent us from
+> allowing multiple regions to be reserved for crash dump kernel in the future.
+> (There is an assumption that we have only one region at least on arm64 though.)
+
+Ok.
+
+If we need to handle that, we should also update the description of
+linux,usable-memory-range to allow multiple entries (and probably
+s/range/ranges).
+
+Thanks,
+Mark.
