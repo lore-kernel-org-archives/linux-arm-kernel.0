@@ -1,67 +1,82 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Tue, 17 Jan 2017 17:14:31 +0800
-Subject: [PATCH v19 00/15] acpi, clocksource: add GTDT driver and GTDT
- support in arm_arch_timer
-In-Reply-To: <20170116170010.GH5908@leverpostej>
-References: <20161221064603.11830-1-fu.wei@linaro.org>
- <20170116170010.GH5908@leverpostej>
-Message-ID: <CADyBb7ukKotnhcY=uOsrqhVr_M9UbLU_UdKcKnTcBWfxF5VAyQ@mail.gmail.com>
+From: erin.lo@mediatek.com (Erin Lo)
+Date: Tue, 17 Jan 2017 17:24:09 +0800
+Subject: [PATCH v3] arm: dts: mt2701: Add thermal device node.
+In-Reply-To: <1484645049-4477-1-git-send-email-erin.lo@mediatek.com>
+References: <1484645049-4477-1-git-send-email-erin.lo@mediatek.com>
+Message-ID: <1484645049-4477-2-git-send-email-erin.lo@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+From: Dawei Chien <dawei.chien@mediatek.com>
 
-On 17 January 2017 at 01:00, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi,
->
-> On Wed, Dec 21, 2016 at 02:45:48PM +0800, fu.wei at linaro.org wrote:
->> From: Fu Wei <fu.wei@linaro.org>
->>
->> This patchset:
->>     (1)Preparation for adding GTDT support in arm_arch_timer:
->>         1. Move some enums and marcos to header file;
->>         2. Add a new enum for spi type;
->>         3. Improve printk relevant code;
->>         4. Rename some enums and defines;
->
-> Can we please rework these first few patches into a series:
->
-> 1. Clean up printk() usage
-> 2. Rename the type macros
-> 3. Rename the PPI enum & enum values
-> 4. Move the type macro and PPI enum into a header
-> 5. Add new enum for SPIs
->
-> Please leave CNTHCL_* as they originally were. It's not part of the
-> interface of the driver, and leaving them as they are will save us an
-> interdependency with KVM.
->
-> I'm happy to queue that immediately, as it's purely structural and
-> shouldn't have a functional impact anywhere. That will also shrink the
-> series a bit, and we can rebase the following patches atop of that.
+Add thermal controller device nodes for MT2701.
 
-Thanks for your suggestion, I have finished this improvement.
-It will be in v20.
+Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
+Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+---
+ arch/arm/boot/dts/mt2701.dtsi | 43 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
-https://git.linaro.org/people/fu.wei/linux.git/log/?h=topic-gtdt-wakeup-timer_upstream_v20_devel
-
->
->>         5. Rework PPI determination;
->>         6. Rework counter frequency detection;
->>         7. Refactor arch_timer_needs_probing, move it into DT init call
->>         8. Introduce some new structs and refactor the MMIO timer init code
->>         for reusing some common code.
->
-> I'll review these in separate replies.
->
-> Thanks,
-> Mark.
-
-
-
+diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+index 4cfec57..26a88cb 100644
+--- a/arch/arm/boot/dts/mt2701.dtsi
++++ b/arch/arm/boot/dts/mt2701.dtsi
+@@ -89,6 +89,36 @@
+ 		clock-output-names = "rtc32k";
+ 	};
+ 
++	thermal-zones {
++		cpu_thermal: cpu_thermal {
++			polling-delay-passive = <1000>; /* milliseconds */
++			polling-delay = <1000>; /* milliseconds */
++
++			thermal-sensors = <&thermal 0>;
++			sustainable-power = <1000>;
++
++			trips {
++				threshold: trip-point at 0 {
++					temperature = <68000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++
++				target: trip-point at 1 {
++					temperature = <85000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++
++				cpu_crit: cpu_crit at 0 {
++					temperature = <115000>;
++					hysteresis = <2000>;
++					type = "critical";
++				};
++			};
++		};
++	};
++
+ 	timer {
+ 		compatible = "arm,armv7-timer";
+ 		interrupt-parent = <&gic>;
+@@ -270,6 +300,19 @@
+ 		status = "disabled";
+ 	};
+ 
++	thermal: thermal at 1100b000 {
++		#thermal-sensor-cells = <0>;
++		compatible = "mediatek,mt2701-thermal";
++		reg = <0 0x1100b000 0 0x1000>;
++		interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
++		clock-names = "therm", "auxadc";
++		resets = <&pericfg MT2701_PERI_THERM_SW_RST>;
++		reset-names = "therm";
++		mediatek,auxadc = <&auxadc>;
++		mediatek,apmixedsys = <&apmixedsys>;
++	};
++
+ 	nandc: nfi at 1100d000 {
+ 		compatible = "mediatek,mt2701-nfc";
+ 		reg = <0 0x1100d000 0 0x1000>;
 -- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+1.9.1
