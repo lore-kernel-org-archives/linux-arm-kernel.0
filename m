@@ -1,70 +1,53 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 17 Jan 2017 10:03:41 +0100 (CET)
-Subject: [PATCH] clocksource: exynos_mct: clear irq at stop local mct to
- fix suspend
-In-Reply-To: <1484628876-22065-1-git-send-email-jy0922.shim@samsung.com>
-References: <CGME20170117045403epcas1p1c64f1563c31947059430e0fbf370ee75@epcas1p1.samsung.com>
- <1484628876-22065-1-git-send-email-jy0922.shim@samsung.com>
-Message-ID: <alpine.DEB.2.20.1701170955250.3495@nanos>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 17 Jan 2017 10:04:56 +0100
+Subject: [PATCH v2 2/4] clk: sunxi-ng: add support for V3s CCU
+In-Reply-To: <20170116180116.36729-3-icenowy@aosc.xyz>
+References: <20170116180116.36729-2-icenowy@aosc.xyz>
+ <20170116180116.36729-3-icenowy@aosc.xyz>
+Message-ID: <20170117090456.fgw6lpqgurwwcczj@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Jan 2017, Joonyoung Shim wrote:
+Hi,
 
-> This patch adds clear interrupt to exynos4_mct_dying_cpu(). Without
+On Tue, Jan 17, 2017 at 02:01:14AM +0800, Icenowy Zheng wrote:
+> V3s has a similar but cut-down CCU to H3.
+> 
+> Add support for it.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> ---
 
-Please read Documentation/process/SubmittingPatches. Search for 'This
-patch' ....
+Output from checkpatch:
+total: 5 errors, 2 warnings, 3 checks, 857 lines checked
 
-A changelog should explain the problem first and then explain the concept
-of the fix. You start explaining WHAT the patch does and not what the
-problem is.
+> I think I should make a comparsion between V3s and H3 CCU here:
+> (I won't mention the missing/added clocks here, only list conflicting clocks)
 
-> clearing, after turning on non boot cpu at wakeup from suspend to
-> ram, not cleared tick interrupt occurs and it causes following null
-> deference for MCT_INT_SPI type mct.
+That should be in your commit log.
 
-This has nothing to do with suspend. That can happen with a normal cpu
-offline/online sequence as well, which happens to be utilized by
-suspend/resume.
+> - "bus-ehci0" is at different bit (The bit that is "bus-ehci0" on V3s is
+>   "bus-ehci2" on H3)
+> - The mux of "ce" is different. (According the view at V3s datasheet by the
+>   author of sun4i-ss, V3s may have sun4i-ss, not sun8i-ce)
+> - The mux of "de" is different. (V3s do not have "pll-de", but it can mux "de"
+>   to "pll-video")
+> - Clocks about CSI largely differs. (As V3s is designed as a camera SoC, and
+>   it have an extra "pll-isp")
 
-Please trim back traces so they contain only useful information. There is
-no point in having all these useless stack entries and whatever, which do
-not at all help to diagnose the problem.
-
-I'll fix that up when applying the patch. Checkout the resulting changelog
-and please be more careful next time.
-
-> [   51.251378] Unable to handle kernel NULL pointer dereference at virtual address 00000040
-> [   51.257980] pgd = c0004000
-> [   51.260666] [00000040] *pgd=00000000
-> [   51.264222] Internal error: Oops: 5 [#1] PREEMPT SMP ARM
-> [   51.269503] Modules linked in:
-> [   51.272541] CPU: 7 PID: 53 Comm: ksoftirqd/7 Tainted: G        W 4.9.0-rc7-next-20161201-00007-g74076859ec44 #140
-> [   51.283282] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
-> [   51.289348] task: ee942d00 task.stack: ee960000
-> [   51.293861] PC is at tick_periodic+0x38/0xb0
-> [   51.298102] LR is at tick_handle_periodic+0x1c/0x90
-> [   51.486409] [<c0183358>] (tick_periodic) from [<ef013ec0>] (0xef013ec0)
-> [   51.492990] Code: ee1d2f90 e34c30b6 e8bd4070 e7923003 (e5933040)
-> [   51.499057] ---[ end trace 995703fe1bede0b4 ]---
- 
-> Fixes: 56a94f13919c ("clocksource: exynos_mct: Avoid blocking calls in the cpu hotplug notifier")
-> Cc: stable at vger.kernel.org #v4.2+ #v4.1.4+ #3.18.18+ #v3.16.18+ #v3.12.46+
-
-Adding the version tags is pointless when you have a Fixes tag, which
-allows the stable maintainers to find the affected kernels automatically.
-
-> Reported-by: Seung-Woo Kim <sw0312.kim@samsung.com>
-> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
-> Signed-off-by: Seung-Woo Kim <sw0312.kim@samsung.com>
-
-This Signed-off-by sequence is wrong.
-
-Seung-Woo reported the problem. You wrote the patch and sent it to the
-mailing list. The above sequence suggests that you wrote the patch and
-Seung-Woo sent it to the mailing list, which is obviously not the case.
+OK.
 
 Thanks,
+Maxime
 
-	tglx
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170117/0c1f6aeb/attachment.sig>
