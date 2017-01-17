@@ -1,45 +1,32 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 16 Jan 2017 21:46:56 -0800
-Subject: [GIT PULL] ARM: exynos: Fixes for v4.10
-In-Reply-To: <20170113143225.11311-1-krzk@kernel.org>
-References: <20170113143225.11311-1-krzk@kernel.org>
-Message-ID: <20170117054656.GC16607@localhost>
+Date: Mon, 16 Jan 2017 22:04:14 -0800
+Subject: [GIT PULL] Amlogic fixes for v4.10-rc4
+In-Reply-To: <c781a080-455f-bba2-1bfb-cdd39343842b@suse.de>
+References: <m2inpi6d09.fsf@baylibre.com>
+ <c781a080-455f-bba2-1bfb-cdd39343842b@suse.de>
+Message-ID: <20170117060414.GD16607@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2017 at 04:32:25PM +0200, Krzysztof Kozlowski wrote:
-> Hi,
+On Mon, Jan 16, 2017 at 03:24:59PM +0100, Andreas F??rber wrote:
+> Am 13.01.2017 um 19:17 schrieb Kevin Hilman:
+> > ----------------------------------------------------------------
+> > Amlogic fixes for v4.10-rc4
+> > - odroid-c2: disable DVFS to avoid crashes due to broken SCPI
+> > - fix misc. crashes by adding known reserved memory regions
+> > 
+> > ----------------------------------------------------------------
+> > Neil Armstrong (2):
+> >       ARM64: dts: meson-gxbb-odroidc2: Disable SCPI DVFS
 > 
-> Just a couple of minor fixes for this release cycle.
+> >       ARM64: dts: meson-gx: Add reserved memory zone and usable memory range
 > 
-> Best regards,
-> Krzysztof
-> 
-> 
-> The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
-> 
->   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-fixes-4.10
-> 
-> for you to fetch changes up to 3ef01c968fbfb21c2f16281445d30a865ee4412c:
-> 
->   ARM: s3c2410_defconfig: Fix invalid values for NF_CT_PROTO_* (2017-01-02 21:05:34 +0200)
-> 
-> ----------------------------------------------------------------
-> Samsung fixes for v4.10:
-> 1. Update maintainers entry with Patchwork address.
-> 2. Fix invalid values for NF_CT_PROTO_* in s3c2410 defconfig (these options
->    cannot be modules anymore).
-> 
-> ----------------------------------------------------------------
-> Krzysztof Kozlowski (2):
->       MAINTAINERS: Add Patchwork URL to Samsung Exynos entry
->       ARM: s3c2410_defconfig: Fix invalid values for NF_CT_PROTO_*
+> Objection against the latter patch introducing widespread usage of
+> hardcoded linux,usable-memory properties - please review closely before
+> considering to merge.
 
-Merged, thanks.
+Holding off until that discussion has concluded. Following up on that thread as
+well.
 
 
 -Olof
