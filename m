@@ -1,21 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 16 Jan 2017 22:26:57 -0800
-Subject: [GIT PULL] Ux500 development for v4.11
-In-Reply-To: <CACRpkdZnk-qpJi-FOPuMyWBT-=AEK7krxZJZp=UZYzjbuBOK7Q@mail.gmail.com>
-References: <CACRpkdZnk-qpJi-FOPuMyWBT-=AEK7krxZJZp=UZYzjbuBOK7Q@mail.gmail.com>
-Message-ID: <20170117062657.GJ16607@localhost>
+Date: Mon, 16 Jan 2017 22:28:32 -0800
+Subject: [GIT PULL] STi DT update for v4.11 round 1
+In-Reply-To: <a9026a2a-f5e1-60c3-4e98-0a392d12163d@st.com>
+References: <a9026a2a-f5e1-60c3-4e98-0a392d12163d@st.com>
+Message-ID: <20170117062832.GK16607@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2017 at 02:06:14PM +0100, Linus Walleij wrote:
-> Hi ARM SoC folks,
+On Thu, Jan 12, 2017 at 05:59:43PM +0100, Patrice Chotard wrote:
+> Hi Arnd, Kevin, Olof
 > 
-> here is a set of two patches ready to be queued for v4.11 already.
-> 
-> Please pull them to a suitable branch on the ARM SoC tree.
-> 
-> Yours,
-> Linus Walleij
+> PLease consider this first round of STi dts update for v4.11 :
 > 
 > The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 > 
@@ -23,24 +18,20 @@ On Thu, Jan 12, 2017 at 02:06:14PM +0100, Linus Walleij wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-> tags/ux500-dev-for-armsoc
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git tags/sti-dt-for-v4.11
 > 
-> for you to fetch changes up to f3c05596344fa09074220513583bc5d6ff2d5c43:
+> for you to fetch changes up to 2016ead446b98c42dffd9b6c03ce813e5cb3b810:
 > 
->   ARM: ux500: remove duplicated include from cpu-db8500.c (2017-01-12
-> 14:02:34 +0100)
+>   ARM: dts: STiH407-family: Supply Mailbox properties to delta RProc (2017-01-12 17:23:39 +0100)
 > 
 > ----------------------------------------------------------------
-> Some two collected patches simplifying some Ux500
-> stuff.
+> STi dts update:
 > 
-> ----------------------------------------------------------------
-> Linus Walleij (1):
->       ARM: ux500: simplify secondary boot
-> 
-> Wei Yongjun (1):
->       ARM: ux500: remove duplicated include from cpu-db8500.c
+> Enable High Quality Video Data Plane (HQVDP) DT entry
+> Add DELTA V4L2 video decoder DT entry
+> Disable unused fdma instances
+> Fix sti-display-subsystem wrong clock parent's value
+> Cleanup and update DT entries related to remoteproc
 
 Merged, thanks!
 
