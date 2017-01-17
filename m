@@ -1,20 +1,26 @@
 From: jarkko.nikula@linux.intel.com (Jarkko Nikula)
-Date: Tue, 17 Jan 2017 13:18:35 +0200
-Subject: [PATCH v2 1/3] spi: pxa2xx: Factor out handle_bad_msg
-In-Reply-To: <776c72d3de4b75ff0a8b91791740389950d8abe8.1484592296.git.jan.kiszka@siemens.com>
+Date: Tue, 17 Jan 2017 13:18:42 +0200
+Subject: [PATCH v2 3/3] spi: pca2xx-pci: Allow MSI
+In-Reply-To: <1484593718.2133.156.camel@linux.intel.com>
 References: <cover.1484592296.git.jan.kiszka@siemens.com>
- <776c72d3de4b75ff0a8b91791740389950d8abe8.1484592296.git.jan.kiszka@siemens.com>
-Message-ID: <fb68555c-ec49-5f08-5b26-e6776855b3c6@linux.intel.com>
+ <9f5bc54a5842b383dc81fa8586d6774c03d2c452.1484592296.git.jan.kiszka@siemens.com>
+ <1484593718.2133.156.camel@linux.intel.com>
+Message-ID: <1a9ed825-2585-8c76-c6ea-866de2e33e50@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/16/2017 08:44 PM, Jan Kiszka wrote:
-> As suggested by Andy Shevchenko: Decouple this corner cause from the
-> general handling logic in ssp_int.
+On 01/16/2017 09:08 PM, Andy Shevchenko wrote:
+> On Mon, 2017-01-16 at 19:44 +0100, Jan Kiszka wrote:
+>> Now that the core is ready for edge-triggered interrupts, we can
+>> safely
+>> allow the PCI versions that provide this to enable the feature and,
+>> thus, have less shared interrupts.
+>>
 >
-> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
-> ---
->  drivers/spi/spi-pxa2xx.c | 29 +++++++++++++++--------------
->  1 file changed, 15 insertions(+), 14 deletions(-)
+> Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
 >
+I was looking at is there need to call pci_free_irq_vectors() but 
+pcim_release() takes care of that since this driver uses 
+pcim_enable_device().
+
 Reviewed-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
