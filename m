@@ -1,54 +1,104 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 17 Jan 2017 09:42:16 +0100
-Subject: [PATCH v3 1/3] dt: bindings: add documentation for zx2967
- family reset controller
-In-Reply-To: <1484623377-16208-1-git-send-email-baoyou.xie@linaro.org>
-References: <1484623377-16208-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <1484642536.4087.0.camel@pengutronix.de>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Tue, 17 Jan 2017 09:42:55 +0100
+Subject: [GIT PULL] STM32 DT changes for v4.11 #1
+In-Reply-To: <20170117065309.GS16607@localhost>
+References: <e36f6aca-120c-b2a5-52da-06e12e5cfb9f@st.com>
+ <20170117065309.GS16607@localhost>
+Message-ID: <380ac3e3-59f9-f47b-9127-74992906be26@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-01-17 at 11:22 +0800, Baoyou Xie wrote:
-> This patch adds dt-binding documentation for zx2967 family
-> reset controller.
-> 
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
-> Reviewed-by: Shawn Guo <shawnguo@kernel.org>
+Hi Olof
 
-Thanks, I've applied all three patches with Shawn's Reviewed-by: on the
-driver patch.
+On 01/17/2017 07:53 AM, Olof Johansson wrote:
+> On Mon, Jan 16, 2017 at 04:49:29PM +0100, Alexandre Torgue wrote:
+>> Hi Olof, Arnd and Kevin,
+>>
+>> Please consider this first round of STM32 DT updates for v4.11:
+>>
+>> The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+>>
+>>   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git
+>> tags/stm32-dt-for-v4.11-1
+>>
+>> for you to fetch changes up to d99c66406a846748e26989759caa7e966c1804dd:
+>>
+>>   ARM: dts: stm32: enable RTC on stm32429i-eval (2017-01-16 14:38:14 +0100)
+>>
+>> ----------------------------------------------------------------
+>> STM32 DT updates for v4.11, round 1.
+>>
+>> Highlights:
+>> ----------
+>>
+>>  - ADD RTC support on STM32F429 MCU
+>>  - Enable RTC on STM32F469and STM32F429 boards
+>>  - ADD ADC support on STM32F429 MCU
+>>  - Enable ADC on STM32F429 Eval board
+>>  - Add I2S external clock
+>>  - Fix memory size for STM32F429 Disco
+>>
+>> Note:
+>> -----
+>> First patch "clk: stm32f4: Update DT bindings documentation")
+>> has already been merged in clock tree.
+>
+> Ugh. That patch doesn't just update documentation. It also updates the
+> dt-include file.
+>
+> So, if it's already been merged into the clock tree, then we can't merge
+> a separate copy here.
+>
+> By now, easiest is to hold off making use of it until it's on a shared
+> branch, i.e. next release. Use the numerical values until then.
+
+I know it is not a comfortable situation. I discussed this point with 
+Arnd last week. The result of the discussion was to start from 4.10-rc1 
++ "patch include/dt-bindings..." and to add my patches then create pull 
+request. Maybe I miss something.
+
+>
+>> ----------------------------------------------------------------
+>> Amelie Delaunay (5):
+>>       ARM: dts: stm32: set HSE_RTC clock frequency to 1 MHz on stm32f429
+>>       ARM: dts: stm32: Add RTC support for STM32F429 MCU
+>>       ARM: dts: stm32: enable RTC on stm32f429-disco
+>>       ARM: dts: stm32: enable RTC on stm32f469-disco
+>>       ARM: dts: stm32: enable RTC on stm32429i-eval
+>>
+>> Bruno Herrera (1):
+>>       ARM: dts: stm32: Fix memory size from 8MB to 16MB on stm32f469-disco
+>> board
+>>
+>> Bruno Meirelles Herrera (1):
+>>       ARM: dts: stm32: Add missing USART3 pin config to stm32f469-disco
+>> board
+>>
+>> Fabrice GASNIER (2):
+>>       ARM: dts: stm32: Add ADC support to stm32f429
+>>       ARM: dts: stm32: enable ADC on stm32f429i-eval board
+>>
+>> Gabriel Fernandez (3):
+>>       clk: stm32f4: Update DT bindings documentation
+>>       ARM: dts: stm32: Add external I2S clock on stm32f429 MCU
+>>       ARM: dts: stm32: Include auxiliary stm32fx clock definition
+>
+> How did you generate this pull request? You didn't include a diffstat with it,
+> which is useful for us to make sure that what we merged is what you expected us
+> to merge.
+
+Sorry!! A bad copy/paste.
 
 regards
-Philipp
+Alex
 
-> ---
->  .../devicetree/bindings/reset/zte,zx2967-reset.txt   | 20 ++++++++++++++++++++
->  1 file changed, 20 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/reset/zte,zx2967-reset.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/reset/zte,zx2967-reset.txt b/Documentation/devicetree/bindings/reset/zte,zx2967-reset.txt
-> new file mode 100644
-> index 0000000..b015508
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/reset/zte,zx2967-reset.txt
-> @@ -0,0 +1,20 @@
-> +ZTE zx2967 SoCs Reset Controller
-> +=======================================
-> +
-> +Please also refer to reset.txt in this directory for common reset
-> +controller binding usage.
-> +
-> +Required properties:
-> +- compatible: should be one of the following.
-> +	* zte,zx296718-reset
-> +- reg: physical base address of the controller and length of memory mapped
-> +	region.
-> +- #reset-cells: must be 1.
-> +
-> +example:
-> +
-> +	reset: reset-controller at 1461060 {
-> +		compatible = "zte,zx296718-reset";
-> +		reg = <0x01461060 0x8>;
-> +		#reset-cells = <1>;
-> +	};
+>
+> Not merging, please revisit based on the above.
+>
+>
+> -Olof
+>
