@@ -1,46 +1,118 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 17 Jan 2017 13:27:22 +0000
-Subject: [PATCH v4 3/4] arm64: dts: juno: add CoreSight support for Juno
- r1/r2 variants
-In-Reply-To: <1484655313-9025-4-git-send-email-sudeep.holla@arm.com>
-References: <1484655313-9025-1-git-send-email-sudeep.holla@arm.com>
- <1484655313-9025-4-git-send-email-sudeep.holla@arm.com>
-Message-ID: <d89b805b-cc6f-37d5-2b64-4f83fa086db6@arm.com>
+From: Alan.Hayward@arm.com (Alan Hayward)
+Date: Tue, 17 Jan 2017 13:31:03 +0000
+Subject: [RFC PATCH 08/10] arm64/sve: ptrace: Wire up vector length
+ control and reporting
+In-Reply-To: <20170117100349.GR3699@e103592.cambridge.arm.com>
+References: <1484220369-23970-1-git-send-email-Dave.Martin@arm.com>
+ <1484220369-23970-9-git-send-email-Dave.Martin@arm.com>
+ <20170116122038.GG28060@E107787-LIN>
+ <20170116133231.GO3699@e103592.cambridge.arm.com>
+ <20170116151156.GI28060@E107787-LIN>
+ <20170117100349.GR3699@e103592.cambridge.arm.com>
+Message-ID: <6610C1B4-C08A-4A15-B272-77A45F341168@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/01/17 12:15, Sudeep Holla wrote:
-> From: Mike Leach <mike.leach@linaro.org>
->
-> The CoreSight support added for Juno is valid for only Juno r0.
-> The Juno r1 and r2 variants have additional components and alternative
-> connection routes between trace source and sinks.
->
-> This patch builds on top of the existing r0 support and extends it to
-> Juno r1/r2 variants.
->
-> Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Mike Leach <mike.leach@linaro.org>
-> [sudeep.holla at arm.com: minor changelog update and major reorganisation of
-> 	the common coresight components back into juno-base.dtsi to avoid
-> 	duplication, also renamed funnel node names]
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi | 100 ++++++++++++++++++++++++++++++
->  arch/arm64/boot/dts/arm/juno-r1.dts       |   9 +++
->  arch/arm64/boot/dts/arm/juno-r2.dts       |   9 +++
->  3 files changed, 118 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
->
-> diff --git a/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
-> new file mode 100644
-> index 000000000000..563463ed28c7
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
-> @@ -0,0 +1,100 @@
-> +/ {
-> +	funnel at 20130000 { /* cssys2 */
 
-Typo, that should be csys1. Rest looks good to me.
+> On 17 Jan 2017, at 10:03, Dave Martin <Dave.Martin@arm.com> wrote:
+> 
+> On Mon, Jan 16, 2017 at 03:11:56PM +0000, Yao Qi wrote:
+>> On 17-01-16 13:32:31, Dave Martin wrote:
+>>> On Mon, Jan 16, 2017 at 12:20:38PM +0000, Yao Qi wrote:
+>>>> On 17-01-12 11:26:07, Dave Martin wrote:
+>>>>> This patch adds support for manipulating a task's vector length at
+>>>>> runtime via ptrace.
+>>>>> 
+>>>> 
+>>>> I hope kernel doesn't provide such interface to ptracer to change vector
+>>>> length.
+>>> 
+>>> It does, with this patch, beacuse...
+>>> 
+>>>> The vector length is sort of a read-only property of thread/process/
+>>>> program to debugger, unless we really have a clear requirement to modify
+>>>> vector length in debugging.  I may miss something because I haven't debug
+>>>> SVE code yet.
+>>> 
+>>> ...the vector length is no longer read-only for the task, thanks to
+>>> the new prctls().
+>> 
+>> What I meant "read-only" is that debugger can't change it, while the program
+>> itself can change it via prctl().
+> 
+> I see.
+> 
+>>> 
+>>> This does add complexity, but I figured that any programmer's model
+>>> state that the thread can modify for itself should be modifiable by the
+>>> debugger, if for no other reason than the user may want to experiment to
+>>> see what happens.  Without a ptrace interface, it would be necessary
+>>> to inject a prctl() call into the target, which is possible but awkward.
+>> 
+>> We only need such interface if it is useful, see more below.
+>> 
+>> Suppose it is useful to change vector length through ptrace, we should align
+>> ptrace interface to prctl() as much as possible.  Looks that both prctl
+>> change and ptrace change can go through sve_set_vector_length, easy to keep
+>> two consistent.
+>> 
+>>> 
+>>> gdb must already re-detect the vector length on stop, since the target
+>>> could have called the prctl() in the meantime.
+>> 
+>> Yes, gdb assumes the vector length may be changed, so it re-detects on
+>> every stop, but I don't see the need for gdb to change the vector length.
+>> 
+>>> 
+>>> Access via ptrace also allows things like trapping on exec, fork or
+>>> clone and changing the vector length for the new process or thread
+>>> before it starts to run.  I'm guessing here, but such a scenario seems
+>>> legitimate (?)
+>>> 
+>> 
+>> Yes, these cases are valid, but the usefulness is still questionable to
+>> me.  I just doubt that SVE developers do need to change vector length
+>> when they are debugging code.  Note that it is not my strong objection
+>> to this patch, if kernel people believe this is useful, I am fine with
+>> it.
+> 
+> That's fair.  I'll leave the patch there for now and see if anyone else
+> has a comment to make, but it could be removed without affecting
+> anything else.
+> 
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+I would say that whilst it is a very dangerous thing to do and has many
+consequences, there is a requirement for a gdb user to be able to change VL
+whilst debugging a running process, and I don?t think we should see
+changing VL as much different from changing a register value on the fly.
+
+Say you have a loop in assembly you are trying to debug - you might write
+to $x2 and then single step to see how this effects the result. With SVE
+code you might want to see how different VL values will effect the layout
+of results in the vectors, how it effects the predicates and how it changes
+the number of iterations the loop makes. Of course, once you exit the
+loop all bets are off - just like if you had been changing register values.
+
+The current proposal for gdb is that we will show $VL in the list of
+registers, therefore for consistency it?d make sense for the gdb user to
+be able to set it as if it was just another register. For this we need a
+simple way to change the VL in another process, and I think ptrace() is
+the easiest way (given that prctl() only changes its own process).
+
+
+> Are there situations in which injecting a function call into the target
+> won't work, i.e., where we couldn't do:
+> 
+> set prctl(...)
+> 
+> ?
+> 
+> Using the prctl interface this way, it would also be preferable to refer
+> to the #defines by name.
+> 
+> Cheers
+> ?Dave
+
+
+Thanks,
+Alan.
