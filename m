@@ -1,57 +1,56 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 17 Jan 2017 16:15:46 +0000
-Subject: [PATCH] arm64: mm: fix __page_to_voff definition
-In-Reply-To: <1484666633-1753-1-git-send-email-andr2000@gmail.com>
-References: <1484666633-1753-1-git-send-email-andr2000@gmail.com>
-Message-ID: <20170117161546.GF11939@leverpostej>
+From: EladN@gilat.com (Elad Nachman)
+Date: Tue, 17 Jan 2017 16:20:00 +0000
+Subject: Kernel 4.6.7-rt14 kernel workqueue lockup - rtnl deadlock plus
+ syscall endless loop
+Message-ID: <AM5PR0701MB187319ED63BCB767DA438C0CA07C0@AM5PR0701MB1873.eurprd07.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 05:23:53PM +0200, Oleksandr Andrushchenko wrote:
-> From: Oleksandr Andrushchenko <Oleksandr_Andrushchenko@epam.com>
-> 
-> Fix parameter name for __page_to_voff, to match its definition.
-> There are other callers of page_to_virt which do not
-> declare 'page'.
-> 
-> Fixes: 3fa72fe9c614 ("arm64: mm: fix __page_to_voff definition")
-> Signed-off-by: Oleksandr Andrushchenko <Oleksandr_Andrushchenko@epam.com>
+Hi,
 
-I take it this is because it messes up the 'struct page' at the end of
-the macro expansion?
+I am experiencing sporadic work queue lockups on kernel 4.6.7-rt14 (mach-socfpga).
 
-It would be good to explicitly state that, since that's not immediately
-obvious.
+Using a HW debugger I got the following information:
 
-With that:
+A process containing a network namespace is terminating itself (SIGKILL), which causes cleanup_net() to be scheduled to kworker/u4:2 to clean up the network namespace running on the process.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Kworker/u4:2 got preempted (plus there are a lot of other work queue items, like vmstat_shepherd, wakeup_dirtytime_writeback, phy_state_machine, neigh_periodic_work, check_lifetime plus another one by a LKM) while holding the rtnl lock.
+
+A processing running waitpid() on the terminated process starts a new process, which forks busybox to run sysctl -w net.ipv6.conf.all.forwarding = 1 .
+This in turn starts making a write syscall, calling in turn vfs_write, proc_sys_call_handler, addrconf_sysctl_forward, and finally addrconf_fixup_forwarding().
+
+addrconf_fixup_forwarding() runs the following code:
+
+if (!rtnl_trylock())
+                 return restart_syscall();
+
+This fails and restart_syscall() does the following:
+
+set_tsk_thread_flag(current, TIF_SIGPENDING);
+         return -ERESTARTNOINTR;
+
+Now the system call goes back to ret_fast_syscall (arch/arm/kernel/entry-common.S)
+Testing the flags in the task_struct (which contain TIF_SIGPENDING) the code branches to fast_work_pending, then falls through to slow_work_pending, which
+Calls do_work_pending(), and in turn calls do_signal(), get_signal(), dequeuer_signal(), which find no signals, and clears the TIF_SIGPENDING bit when recalc_sigpending() is called, then returns zero.
+
+This causes do_signal() to examine r0 and return 1 (-ERESTARTNOINTR), which is propogated to the assembly code by do_work_pending().
+Having r0 equal zero causes a branch to local_restart, which restarts the very same write system call in an endless loop.
+No scheduling is possible, so the cleanup_net() cannot finish and release rtnl, which in turn causes the endless restarting of the write system call.
+
+Going over the x86 assembly code and does not look like system calls are restarted within the assembly syscall handler without returning to user-space.
+
+There could be several remedies:
+
+1.Adopt the X86 handling (avoid restarting system calls within the handler, but rather return to user-space).
+2.Count the number of retries. Above a set threshold (1? 2? 3? retries) force a return to user-space.
+3.Count the number of retries. Above a set threshold (1? 2? 3? retries) force a reschedule() in do_work_pending() (as if _TIF_NEED_RESCHED) was set.
+
+What do you think is the best solution for this issue?
 
 Thanks,
-Mark.
 
-> ---
->  arch/arm64/include/asm/memory.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> index bfe632808d77..90c39a662379 100644
-> --- a/arch/arm64/include/asm/memory.h
-> +++ b/arch/arm64/include/asm/memory.h
-> @@ -222,7 +222,7 @@ static inline void *phys_to_virt(phys_addr_t x)
->  #define _virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
->  #else
->  #define __virt_to_pgoff(kaddr)	(((u64)(kaddr) & ~PAGE_OFFSET) / PAGE_SIZE * sizeof(struct page))
-> -#define __page_to_voff(page)	(((u64)(page) & ~VMEMMAP_START) * PAGE_SIZE / sizeof(struct page))
-> +#define __page_to_voff(kaddr)	(((u64)(kaddr) & ~VMEMMAP_START) * PAGE_SIZE / sizeof(struct page))
->  
->  #define page_to_virt(page)	((void *)((__page_to_voff(page)) | PAGE_OFFSET))
->  #define virt_to_page(vaddr)	((struct page *)((__virt_to_pgoff(vaddr)) | VMEMMAP_START))
-> -- 
-> 2.7.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Elad.
+
+
+
+IMPORTANT - This email and any attachments is intended for the above named addressee(s), and may contain information which is confidential or privileged. If you are not the intended recipient, please inform the sender immediately and delete this email: you should not copy or use this e-mail for any purpose nor disclose its contents to any person.
