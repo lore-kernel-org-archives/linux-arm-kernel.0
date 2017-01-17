@@ -1,67 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 17 Jan 2017 12:14:59 +0000
-Subject: [PATCH] arm64: Fix swiotlb fallback allocation
-In-Reply-To: <1484567193-71258-1-git-send-email-agraf@suse.de>
-References: <1484567193-71258-1-git-send-email-agraf@suse.de>
-Message-ID: <20170117121459.GG18923@e104818-lin.cambridge.arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 17 Jan 2017 12:15:09 +0000
+Subject: [PATCH v4 0/4] arm64: dts: juno: CoreSight support updates
+Message-ID: <1484655313-9025-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2017 at 12:46:33PM +0100, Alexander Graf wrote:
-> Commit b67a8b29df introduced logic to skip swiotlb allocation when all memory
-> is DMA accessible anyway.
-> 
-> While this is a great idea, __dma_alloc still calls swiotlb code unconditionally
-> to allocate memory when there is no CMA memory available. The swiotlb code is
-> called to ensure that we at least try get_free_pages().
-> 
-> Without initialization, swiotlb allocation code tries to access io_tlb_list
-> which is NULL. That results in a stack trace like this:
-> 
->   Unable to handle kernel NULL pointer dereference at virtual address 00000000
->   [...]
->   [<ffff00000845b908>] swiotlb_tbl_map_single+0xd0/0x2b0
->   [<ffff00000845be94>] swiotlb_alloc_coherent+0x10c/0x198
->   [<ffff000008099dc0>] __dma_alloc+0x68/0x1a8
->   [<ffff000000a1b410>] drm_gem_cma_create+0x98/0x108 [drm]
->   [<ffff000000abcaac>] drm_fbdev_cma_create_with_funcs+0xbc/0x368 [drm_kms_helper]
->   [<ffff000000abcd84>] drm_fbdev_cma_create+0x2c/0x40 [drm_kms_helper]
->   [<ffff000000abc040>] drm_fb_helper_initial_config+0x238/0x410 [drm_kms_helper]
->   [<ffff000000abce88>] drm_fbdev_cma_init_with_funcs+0x98/0x160 [drm_kms_helper]
->   [<ffff000000abcf90>] drm_fbdev_cma_init+0x40/0x58 [drm_kms_helper]
->   [<ffff000000b47980>] vc4_kms_load+0x90/0xf0 [vc4]
->   [<ffff000000b46a94>] vc4_drm_bind+0xec/0x168 [vc4]
->   [...]
-> 
-> Thankfully swiotlb code just learned how to not do allocations with the FORCE_NO
-> option. This patch configures the swiotlb code to use that if we decide not to
-> initialize the swiotlb framework.
-> 
-> Fixes: b67a8b29df ("arm64: mm: only initialize swiotlb when necessary")
-> Signed-off-by: Alexander Graf <agraf@suse.de>
-> CC: Catalin Marinas <catalin.marinas@arm.com>
-> CC: Jisheng Zhang <jszhang@marvell.com>
-> CC: Geert Uytterhoeven <geert+renesas@glider.be>
-> CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Juno r1/r2 boards have different CoreSight infrastructure outside the
+CPU clusters. This patchset adds the additional coreSight components to
+separate .dtsi files to support these differences.
 
-Thanks for the fix.
+v1->v2:
+	- moved the addition of the STM component into a separate patch
 
-BTW, I wonder whether we also need to improve the original commit
-slightly, in case we get a device mask smaller than what max_pfn covers:
+v2->v3:
+	- moved the back the common coreSight components back into
+	  juno-base.dtsi
 
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index e04082700bb1..23090db2f5ba 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -349,7 +349,7 @@ static int __swiotlb_dma_supported(struct device *hwdev, u64 mask)
- {
- 	if (swiotlb)
- 		return swiotlb_dma_supported(hwdev, mask);
--	return 1;
-+	return phys_to_dma(hwdev, PFN_PHYS(max_pfn) - 1) <= mask;
- }
- 
- static struct dma_map_ops swiotlb_dma_ops = {
+v3->v4:
+	- removed dtsi nesting in the existing Juno dts file to avoid
+	  further addition of such nesting
+	- renamed some of the funnel and etf node names(which were
+	  previously named confusing them to the labels
 
--- 
-Catalin
+Mike Leach (2):
+  arm64: dts: juno: add CoreSight support for Juno r1/r2 variants
+  arm64: dts: juno: add missing CoreSight STM component
+
+Sudeep Holla (2):
+  arm64: dts: juno: remove dtsi nesting inside tree structure
+  arm64: dts: juno: refactor CoreSight support on Juno r0
+
+ arch/arm64/boot/dts/arm/juno-base.dtsi    |  41 ++++++++----
+ arch/arm64/boot/dts/arm/juno-clocks.dtsi  |   3 +-
+ arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi | 100 ++++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/arm/juno-r1.dts       |  16 ++++-
+ arch/arm64/boot/dts/arm/juno-r2.dts       |  16 ++++-
+ arch/arm64/boot/dts/arm/juno.dts          |  27 +++++++-
+ 6 files changed, 184 insertions(+), 19 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+
+--
+2.7.4
