@@ -1,31 +1,55 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue, 17 Jan 2017 13:26:04 +0100
-Subject: [PATCH v2 02/14] ARM: davinci_all_defconfig: enable SATA modules
+Date: Tue, 17 Jan 2017 13:26:06 +0100
+Subject: [PATCH v2 04/14] sata: ahci-da850: get the sata clock using a
+ connector id
 In-Reply-To: <1484655976-25382-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1484655976-25382-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1484655976-25382-3-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1484655976-25382-5-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the da850-ahci driver to davinci defconfig.
+In preparation for using two clocks in the driver (the sysclk2-based
+clock and the external REFCLK), check if we got a functional clock
+after calling ahci_platform_get_resources(). If not, retry calling
+get_clk() with con_id specified.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/configs/davinci_all_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/ata/ahci_da850.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
-index 8806754..a1b9c58 100644
---- a/arch/arm/configs/davinci_all_defconfig
-+++ b/arch/arm/configs/davinci_all_defconfig
-@@ -78,6 +78,8 @@ CONFIG_IDE=m
- CONFIG_BLK_DEV_PALMCHIP_BK3710=m
- CONFIG_SCSI=m
- CONFIG_BLK_DEV_SD=m
-+CONFIG_ATA=m
-+CONFIG_AHCI_DA850=m
- CONFIG_NETDEVICES=y
- CONFIG_NETCONSOLE=y
- CONFIG_TUN=m
+diff --git a/drivers/ata/ahci_da850.c b/drivers/ata/ahci_da850.c
+index 267a3d3..18f57c2 100644
+--- a/drivers/ata/ahci_da850.c
++++ b/drivers/ata/ahci_da850.c
+@@ -71,12 +71,28 @@ static int ahci_da850_probe(struct platform_device *pdev)
+ 	struct ahci_host_priv *hpriv;
+ 	struct resource *res;
+ 	void __iomem *pwrdn_reg;
++	struct clk *clk;
+ 	int rc;
+ 
+ 	hpriv = ahci_platform_get_resources(pdev);
+ 	if (IS_ERR(hpriv))
+ 		return PTR_ERR(hpriv);
+ 
++	/*
++	 * Internally ahci_platform_get_resources() calls clk_get(dev, NULL)
++	 * when trying to obtain the first clock. This SATA controller uses
++	 * two clocks for which we specify two connector ids. If we don't
++	 * have a clock at this point - call clk_get() again with
++	 * con_id = "sata".
++	 */
++	if (!hpriv->clks[0]) {
++		clk = clk_get(dev, "sata");
++		if (IS_ERR(clk))
++			return PTR_ERR(clk);
++
++		hpriv->clks[0] = clk;
++	}
++
+ 	rc = ahci_platform_enable_resources(hpriv);
+ 	if (rc)
+ 		return rc;
 -- 
 2.9.3
