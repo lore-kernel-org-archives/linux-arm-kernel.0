@@ -1,61 +1,103 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 17 Jan 2017 14:07:39 +0000
-Subject: [PATCH v4 3/4] arm64: dts: juno: add CoreSight support for Juno
- r1/r2 variants
-In-Reply-To: <d89b805b-cc6f-37d5-2b64-4f83fa086db6@arm.com>
-References: <1484655313-9025-1-git-send-email-sudeep.holla@arm.com>
- <1484655313-9025-4-git-send-email-sudeep.holla@arm.com>
- <d89b805b-cc6f-37d5-2b64-4f83fa086db6@arm.com>
-Message-ID: <a336df07-3e7c-c977-f7b3-22a90a728a2c@arm.com>
+From: tnowicki@caviumnetworks.com (Tomasz Nowicki)
+Date: Tue, 17 Jan 2017 15:06:16 +0100
+Subject: [PATCH v8 14/18] irqdomain: irq_domain_check_msi_remap
+In-Reply-To: <f5aacc54-ca8e-cb09-461a-6105346b18b9@redhat.com>
+References: <1484127714-3263-1-git-send-email-eric.auger@redhat.com>
+ <1484127714-3263-15-git-send-email-eric.auger@redhat.com>
+ <8db94e75-7939-c6da-2101-cfa73827c16c@semihalf.com>
+ <f5aacc54-ca8e-cb09-461a-6105346b18b9@redhat.com>
+Message-ID: <5eb6945b-9d4c-9521-1d5d-10eba633fd59@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 17/01/17 13:27, Suzuki K Poulose wrote:
-> On 17/01/17 12:15, Sudeep Holla wrote:
->> From: Mike Leach <mike.leach@linaro.org>
+On 17.01.2017 14:53, Auger Eric wrote:
+> Hi Tomasz,
+>
+> On 17/01/2017 14:40, Tomasz Nowicki wrote:
+>> On 11.01.2017 10:41, Eric Auger wrote:
+>>> This new function checks whether all MSI irq domains
+>>> implement IRQ remapping. This is useful to understand
+>>> whether VFIO passthrough is safe with respect to interrupts.
+>>>
+>>> On ARM typically an MSI controller can sit downstream
+>>> to the IOMMU without preventing VFIO passthrough.
+>>> As such any assigned device can write into the MSI doorbell.
+>>> In case the MSI controller implements IRQ remapping, assigned
+>>> devices will not be able to trigger interrupts towards the
+>>> host. On the contrary, the assignment must be emphasized as
+>>> unsafe with respect to interrupts.
+>>>
+>>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>>> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>
+>>> ---
+>>> v7 -> v8:
+>>> - remove goto in irq_domain_check_msi_remap
+>>> - Added Marc's R-b
+>>>
+>>> v5 -> v6:
+>>> - use irq_domain_hierarchical_is_msi_remap()
+>>> - comment rewording
+>>>
+>>> v4 -> v5:
+>>> - Handle DOMAIN_BUS_FSL_MC_MSI domains
+>>> - Check parents
+>>> ---
+>>>  include/linux/irqdomain.h |  1 +
+>>>  kernel/irq/irqdomain.c    | 22 ++++++++++++++++++++++
+>>>  2 files changed, 23 insertions(+)
+>>>
+>>> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+>>> index bc2f571..188eced 100644
+>>> --- a/include/linux/irqdomain.h
+>>> +++ b/include/linux/irqdomain.h
+>>> @@ -222,6 +222,7 @@ struct irq_domain *irq_domain_add_legacy(struct
+>>> device_node *of_node,
+>>>                       void *host_data);
+>>>  extern struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec
+>>> *fwspec,
+>>>                             enum irq_domain_bus_token bus_token);
+>>> +extern bool irq_domain_check_msi_remap(void);
+>>>  extern void irq_set_default_host(struct irq_domain *host);
+>>>  extern int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
+>>>                    irq_hw_number_t hwirq, int node,
+>>> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+>>> index 876e131..d889751 100644
+>>> --- a/kernel/irq/irqdomain.c
+>>> +++ b/kernel/irq/irqdomain.c
+>>> @@ -278,6 +278,28 @@ struct irq_domain
+>>> *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
+>>>  EXPORT_SYMBOL_GPL(irq_find_matching_fwspec);
+>>>
+>>>  /**
+>>> + * irq_domain_check_msi_remap - Check whether all MSI
+>>> + * irq domains implement IRQ remapping
+>>> + */
+>>> +bool irq_domain_check_msi_remap(void)
+>>> +{
+>>> +    struct irq_domain *h;
+>>> +    bool ret = true;
+>>> +
+>>> +    mutex_lock(&irq_domain_mutex);
+>>> +    list_for_each_entry(h, &irq_domain_list, link) {
+>>> +        if (irq_domain_is_msi(h) &&
+>>> +            !irq_domain_hierarchical_is_msi_remap(h)) {
+>>> +            ret = false;
+>>> +            break;
+>>> +        }
+>>> +    }
+>>> +    mutex_unlock(&irq_domain_mutex);
+>>> +    return ret;
+>>> +}
 >>
->> The CoreSight support added for Juno is valid for only Juno r0.
->> The Juno r1 and r2 variants have additional components and alternative
->> connection routes between trace source and sinks.
->>
->> This patch builds on top of the existing r0 support and extends it to
->> Juno r1/r2 variants.
->>
->> Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->> Signed-off-by: Mike Leach <mike.leach@linaro.org>
->> [sudeep.holla at arm.com: minor changelog update and major reorganisation of
->>     the common coresight components back into juno-base.dtsi to avoid
->>     duplication, also renamed funnel node names]
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->> ---
->>  arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi | 100
->> ++++++++++++++++++++++++++++++
->>  arch/arm64/boot/dts/arm/juno-r1.dts       |   9 +++
->>  arch/arm64/boot/dts/arm/juno-r2.dts       |   9 +++
->>  3 files changed, 118 insertions(+)
->>  create mode 100644 arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
->>
->> diff --git a/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
->> b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
->> new file mode 100644
->> index 000000000000..563463ed28c7
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
->> @@ -0,0 +1,100 @@
->> +/ {
->> +    funnel at 20130000 { /* cssys2 */
-> 
-> Typo, that should be csys1. Rest looks good to me.
-> 
+>> Above function returns true, even though there is no MSI irq domains. Is
+>> it intentional ?
+> From the VFIO integration point of view this is what we want. If there
+> is no MSI controller in the system, we have no vulnerability with
+> respect to IRQ assignment and we consider the system as safe. If
+> requested I can add a comment?
+>
 
-Fixed locally.
+I see. Yes, a comment would be helpful then :) Thanks!
 
-> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-
-Thanks again.
-
--- 
-Regards,
-Sudeep
+Tomasz
