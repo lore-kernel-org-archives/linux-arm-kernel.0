@@ -1,68 +1,70 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 17 Jan 2017 10:20:52 +0000
-Subject: [RFC PATCH 31/33] irqchip/gic-v4: Add VLPI configuration interface
+Date: Tue, 17 Jan 2017 10:20:51 +0000
+Subject: [RFC PATCH 30/33] irqchip/gic-v4: Add VPE command interface
 In-Reply-To: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
 References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1484648454-21216-32-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1484648454-21216-31-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the required interfaces to map, unmap and update a VLPI.
+Add the required interfaces to schedule a VPE and perform a
+VINVALL command.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v4.c       | 29 +++++++++++++++++++++++++++++
- include/linux/irqchip/arm-gic-v4.h |  3 +++
- 2 files changed, 32 insertions(+)
+ drivers/irqchip/irq-gic-v4.c       | 31 +++++++++++++++++++++++++++++++
+ include/linux/irqchip/arm-gic-v4.h |  2 ++
+ 2 files changed, 33 insertions(+)
 
 diff --git a/drivers/irqchip/irq-gic-v4.c b/drivers/irqchip/irq-gic-v4.c
-index 7d74089..36ccaac 100644
+index b9a0b34..7d74089 100644
 --- a/drivers/irqchip/irq-gic-v4.c
 +++ b/drivers/irqchip/irq-gic-v4.c
-@@ -140,3 +140,32 @@ int its_invall_vpe(struct its_vpe *vpe)
+@@ -109,3 +109,34 @@ void its_free_vcpu_irqs(struct its_vm *vm, int nr_vpes)
  
- 	return its_send_vpe_cmd(vpe, &info);
+ 	irq_domain_free_irqs(irq, nr_vpes);
  }
 +
-+int its_map_vlpi(int irq, struct its_vlpi_map *map)
++static int its_send_vpe_cmd(struct its_vpe *vpe, struct its_cmd_info *info)
 +{
-+	struct its_cmd_info info = {
-+		.cmd_type = MAP_VLPI,
-+		.map      = map,
-+	};
++	unsigned int irq;
++	irq_hw_number_t hwirq;
 +
-+	return irq_set_vcpu_affinity(irq, &info);
++	WARN_ON(preemptible());
++
++	hwirq = vpe->vpe_db_lpi - vpe->its_vm->db_lpi_base;
++	irq = irq_find_mapping(vpe->its_vm->domain, hwirq);
++
++	return irq_set_vcpu_affinity(irq, info);
 +}
 +
-+int its_unmap_vlpi(int irq)
++int its_schedule_vpe(struct its_vpe *vpe, bool on)
 +{
-+	struct its_cmd_info info = {
-+		.cmd_type = UNMAP_VLPI,
-+	};
++	struct its_cmd_info info;
 +
-+	return irq_set_vcpu_affinity(irq, &info);
++	info.cmd_type = on ? SCHEDULE_VPE : DESCHEDULE_VPE;
++
++	return its_send_vpe_cmd(vpe, &info);
 +}
 +
-+int its_prop_update_vlpi(int irq, u8 config)
++int its_invall_vpe(struct its_vpe *vpe)
 +{
 +	struct its_cmd_info info = {
-+		.cmd_type = PROP_UPDATE_VLPI,
-+		.config   = config,
++		.cmd_type = INVALL_VPE,
 +	};
 +
-+	return irq_set_vcpu_affinity(irq, &info);
++	return its_send_vpe_cmd(vpe, &info);
 +}
 diff --git a/include/linux/irqchip/arm-gic-v4.h b/include/linux/irqchip/arm-gic-v4.h
-index 1c58add..f85a929 100644
+index 2463d70..1c58add 100644
 --- a/include/linux/irqchip/arm-gic-v4.h
 +++ b/include/linux/irqchip/arm-gic-v4.h
-@@ -93,5 +93,8 @@ int its_alloc_vcpu_irqs(struct its_vm *vm, struct its_vpe **vpes, int nr_vpes);
+@@ -91,5 +91,7 @@ struct its_cmd_info {
+ 
+ int its_alloc_vcpu_irqs(struct its_vm *vm, struct its_vpe **vpes, int nr_vpes);
  void its_free_vcpu_irqs(struct its_vm *vm, int nr_vpes);
- int its_schedule_vpe(struct its_vpe *vpe, bool on);
- int its_invall_vpe(struct its_vpe *vpe);
-+int its_map_vlpi(int irq, struct its_vlpi_map *map);
-+int its_unmap_vlpi(int irq);
-+int its_prop_update_vlpi(int irq, u8 config);
++int its_schedule_vpe(struct its_vpe *vpe, bool on);
++int its_invall_vpe(struct its_vpe *vpe);
  
  #endif
 -- 
