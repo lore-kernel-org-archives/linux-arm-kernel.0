@@ -1,45 +1,43 @@
-From: yendapally.reddy@broadcom.com (Yendapally Reddy Dhananjaya Reddy)
-Date: Tue, 17 Jan 2017 11:14:26 -0500
-Subject: [PATCH v2 0/4] USB support for Broadcom NSP SoC 
-Message-ID: <1484669670-4201-1-git-send-email-yendapally.reddy@broadcom.com>
+From: kim.phillips@arm.com (Kim Phillips)
+Date: Tue, 17 Jan 2017 10:31:00 -0600
+Subject: [RFC PATCH v2 10/10] dt-bindings: Document devicetree binding
+ for ARM SPE
+In-Reply-To: <20170116105904.GB1510@arm.com>
+References: <1484323429-15231-1-git-send-email-will.deacon@arm.com>
+ <1484323429-15231-11-git-send-email-will.deacon@arm.com>
+ <20170113184352.GE2472@leverpostej> <20170116105904.GB1510@arm.com>
+Message-ID: <20170117103100.55e98029aac55ef7770350f3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set contains the usb support for Broadcom NSP SoC. The
-usb3 phy is internal to the SoC and is accessed through mdio interface.
-The mdio interface can be used to access either internal usb3 phy or
-external ethernet phy using a multiplexer.
+On Mon, 16 Jan 2017 10:59:04 +0000
+Will Deacon <will.deacon@arm.com> wrote:
 
-The first patch provides the documentation details for usb3 phy. The
-second patch provides the changes to the mdio bus driver. The third
-patch provides the phy driver and fourth patch provides the enable
-method for usb.
+> On Fri, Jan 13, 2017 at 06:43:52PM +0000, Mark Rutland wrote:
+> > On Fri, Jan 13, 2017 at 04:03:49PM +0000, Will Deacon wrote:
+> > > +- compatible : should be one of:
+> > > +	       "arm,arm-spe-pmu-v1"
+> > 
+> > The second "arm" here doesn't seem to add much. Should that be "armv8.2"
+> > instead?
+> 
+> I don't think armv8.2 is particularly helpful, because that effectively ties
+> together the SPE version and the architecture version, which I don't think
+> is strictly required. The reason I added it was so that you could describe
+> a partner implementation as something like:
+> 
+>   acme,arm-spe-pmu-v1
+> 
+> and know that it was acme's implementation of an ARM architectural feature.
 
-This patch series has been tested on NSP bcm958625HR board.
-This patch series is based on v4.10.0-rc3 and is available from
-github-repo: https://github.com/Broadcom/cygnus-linux.git
-branch:nsp-usb-v2
+Wouldn't such an implementation be compatible with an
+"arm,arm-spe-pmu-v1" (or one with less "arm"s)?
 
-Changes in v2:
-* Remove separate nsp mux driver as suggested by Andrew Lunn
-* Addressed comments from Scott and Rob
+> If I drop the second "arm", I was worried that it might conflict with other
+> namespaces (e.g. acme's signal-processing-element's power-management-unit).
 
-Yendapally Reddy Dhananjaya Reddy (4):
-  dt-bindings: phy: Add documentation for NSP USB3 PHY
-  net: phy: Initialize mdio clock at probe function
-  phy: Add USB3 PHY support for Broadcom NSP SoC
-  arm: dts: nsp: Add USB nodes to device tree
+I'd personally let them worry about that, esp. because this problem
+would come up first and hopefully be fixed in the marketing domain
+before it reaches its device tree specification stage.
 
- .../devicetree/bindings/phy/brcm,nsp-usb3-phy.txt  |  39 +++++
- arch/arm/boot/dts/bcm-nsp.dtsi                     |  56 +++++++
- arch/arm/boot/dts/bcm958625k.dts                   |  16 ++
- drivers/net/phy/mdio-bcm-iproc.c                   |   6 +-
- drivers/phy/Kconfig                                |   8 +
- drivers/phy/Makefile                               |   1 +
- drivers/phy/phy-bcm-nsp-usb3.c                     | 176 +++++++++++++++++++++
- 7 files changed, 298 insertions(+), 4 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/phy/brcm,nsp-usb3-phy.txt
- create mode 100644 drivers/phy/phy-bcm-nsp-usb3.c
-
--- 
-2.1.0
+Kim
