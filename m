@@ -1,51 +1,54 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 17 Jan 2017 11:13:24 +0000
-Subject: [PATCH v29 9/9] Documentation: dt: chosen properties for arm64
- kdump
-In-Reply-To: <20170116082505.GL20972@linaro.org>
-References: <20161228043347.27358-1-takahiro.akashi@linaro.org>
- <20161228043734.27535-1-takahiro.akashi@linaro.org>
- <20170112153944.GB12249@leverpostej>
- <20170113091339.GK20972@linaro.org>
- <20170113111756.GC26120@leverpostej>
- <20170116082505.GL20972@linaro.org>
-Message-ID: <20170117111323.GB11939@leverpostej>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Tue, 17 Jan 2017 16:44:56 +0530
+Subject: [RFC PATCH] initramfs: finish fput() before accessing any binary from
+ initramfs
+Message-ID: <20170117111456.2269-1-lokeshvutla@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2017 at 05:25:07PM +0900, AKASHI Takahiro wrote:
-> On Fri, Jan 13, 2017 at 11:17:56AM +0000, Mark Rutland wrote:
-> > On Fri, Jan 13, 2017 at 06:13:49PM +0900, AKASHI Takahiro wrote:
-> > > On Thu, Jan 12, 2017 at 03:39:45PM +0000, Mark Rutland wrote:
+commit 4a9d4b024a31 ("switch fput to task_work_add") implements a
+schedule_work() for completing fput(), but did not guarantee calling
+__fput() after unpacking initramfs. Because of this, there is a
+possibility that during boot a driver can see ETXTBSY when it tries
+to load a binary from initramfs as fput() is still pending on that
+binary. This patch makes sure that fput() is completed after unpacking
+initramfs.
 
-> > > > arm64 we should either ensure that /proc/iomem is consistently usable
-> > > > (and have userspace consistently use it), or we should expose a new file
-> > > > specifically to expose this information.
-> > > 
-> > > The thing that I had in my mind when adding this property is that
-> > > /proc/iomem would be obsolete in the future, then we should have
-> > > an alternative in hand.
-> > 
-> > Ok.
-> > 
-> > My disagreement is with using the DT as a channel to convey information
-> > from the kernel to userspace.
-> > 
-> > I'm more than happy for a new file or other mechanism to express this
-> > information. For example, we could add
-> > /sys/kernel/kexec_crash_{base,size} or similar.
-> 
-> It may make sense because /sys/kernel/kexec_crash_size already exists,
-> so why not kexec_crash_base?
-> My concern, however, is that this kind of interface might prevent us from
-> allowing multiple regions to be reserved for crash dump kernel in the future.
-> (There is an assumption that we have only one region at least on arm64 though.)
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+---
 
-Ok.
+- Reproduced on TI K2HK EVM. K2HK Queue Manager subsystem driver[1] tries
+to load a firmware from initramfs during boot. Sometimes loading of this
+firmware fails with error ETXTBSY. Digging a bit more observed that
+deny_write_access() is returning ETXTBSY as inode->i_writecount is > 0
+for that file. This is because Unpacking initramfs does a
+get_write_access(from open) but hasn't done put_write_access(from fput)
+as it hasn't been scheduled yet.
 
-If we need to handle that, we should also update the description of
-linux,usable-memory-range to allow multiple entries (and probably
-s/range/ranges).
+[1] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/soc/ti/knav_qmss_queue.c
 
-Thanks,
-Mark.
+ init/initramfs.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/init/initramfs.c b/init/initramfs.c
+index b32ad7d97ac9..c42c69b48a4b 100644
+--- a/init/initramfs.c
++++ b/init/initramfs.c
+@@ -18,6 +18,7 @@
+ #include <linux/dirent.h>
+ #include <linux/syscalls.h>
+ #include <linux/utime.h>
++#include <linux/file.h>
+ 
+ static ssize_t __init xwrite(int fd, const char *p, size_t count)
+ {
+@@ -652,6 +653,7 @@ static int __init populate_rootfs(void)
+ 		 * us a chance to load before device_initcalls.
+ 		 */
+ 		load_default_modules();
++		flush_delayed_fput();
+ 	}
+ 	return 0;
+ }
+-- 
+2.11.0
