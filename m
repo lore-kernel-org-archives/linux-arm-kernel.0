@@ -1,126 +1,75 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 17 Jan 2017 10:20:28 +0000
-Subject: [RFC PATCH 07/33] irqchip/gic-v3-its: Macro-ize
- its_send_single_command
+Date: Tue, 17 Jan 2017 10:20:35 +0000
+Subject: [RFC PATCH 14/33] irqchip/gic-v3-its: Generalize LPI configuration
 In-Reply-To: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
 References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1484648454-21216-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1484648454-21216-15-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most ITS commands do operate on a collection object, and require
-a SYNC command to be performed on that collection in order to
-guarantee the execution of the first command.
+We're are going to need to change a bit more than just the enable
+bit in the LPI property table in the future. So let's change the
+LPI configuration funtion to take a set of bits to be cleared,
+and a set of bits to be set.
 
-With GICv4 ITS, another set of commands perform similar operations
-on a VPE object, and a VSYNC operations must be executed to guarantee
-their execution.
-
-Given the similarities (post a command, perform a synchronization
-operation on a sync object), it makes sense to reuse the same
-mechanism for both class of commands.
-
-Let's start with turning its_send_single_command into a huge macro
-that performs the bulk of the work, and a set of helpers that
-make this macro useeable for the GICv3 ITS commands.
+This way, we'll be able to use it when a guest updates an LPI
+property (priority, for example).
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 82 ++++++++++++++++++++++------------------
- 1 file changed, 45 insertions(+), 37 deletions(-)
+ drivers/irqchip/irq-gic-v3-its.c | 21 +++++++++++----------
+ 1 file changed, 11 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 99f6130..520b764 100644
+index dcd4771..0dbc8b0 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -484,43 +484,51 @@ static void its_wait_for_range_completion(struct its_node *its,
- 	}
+@@ -672,17 +672,18 @@ static inline u32 its_get_event_id(struct irq_data *d)
+ 	return d->hwirq - its_dev->event_map.lpi_base;
  }
  
--static void its_send_single_command(struct its_node *its,
--				    its_cmd_builder_t builder,
--				    struct its_cmd_desc *desc)
--{
--	struct its_cmd_block *cmd, *sync_cmd, *next_cmd;
--	struct its_collection *sync_col;
--	unsigned long flags;
--
--	raw_spin_lock_irqsave(&its->lock, flags);
--
--	cmd = its_allocate_entry(its);
--	if (!cmd) {		/* We're soooooo screewed... */
--		pr_err_ratelimited("ITS can't allocate, dropping command\n");
--		raw_spin_unlock_irqrestore(&its->lock, flags);
--		return;
--	}
--	sync_col = builder(cmd, desc);
--	its_flush_cmd(its, cmd);
--
--	if (sync_col) {
--		sync_cmd = its_allocate_entry(its);
--		if (!sync_cmd) {
--			pr_err_ratelimited("ITS can't SYNC, skipping\n");
--			goto post;
--		}
--		its_encode_cmd(sync_cmd, GITS_CMD_SYNC);
--		its_encode_target(sync_cmd, sync_col->target_address);
--		its_fixup_cmd(sync_cmd);
--		its_flush_cmd(its, sync_cmd);
--	}
--
--post:
--	next_cmd = its_post_commands(its);
--	raw_spin_unlock_irqrestore(&its->lock, flags);
--
--	its_wait_for_range_completion(its, cmd, next_cmd);
--}
-+#define __its_send_single_cmd(name, buildtype, synctype, buildfn)	\
-+void name(struct its_node *its,						\
-+	  buildtype builder,						\
-+	  struct its_cmd_desc *desc)					\
-+{									\
-+	struct its_cmd_block *cmd, *sync_cmd, *next_cmd;		\
-+	synctype *sync_obj;						\
-+	unsigned long flags;						\
-+									\
-+	raw_spin_lock_irqsave(&its->lock, flags);			\
-+									\
-+	cmd = its_allocate_entry(its);					\
-+	if (!cmd) {		/* We're soooooo screewed... */		\
-+		raw_spin_unlock_irqrestore(&its->lock, flags);		\
-+		return;							\
-+	}								\
-+	sync_obj = builder(cmd, desc);					\
-+	its_flush_cmd(its, cmd);					\
-+									\
-+	if (sync_obj) {							\
-+		sync_cmd = its_allocate_entry(its);			\
-+		if (!sync_cmd)						\
-+			goto post;					\
-+									\
-+		buildfn(sync_cmd, sync_obj);				\
-+		its_fixup_cmd(sync_cmd);				\
-+		its_flush_cmd(its, sync_cmd);				\
-+	}								\
-+									\
-+post:									\
-+	next_cmd = its_post_commands(its);				\
-+	raw_spin_unlock_irqrestore(&its->lock, flags);			\
-+									\
-+	its_wait_for_range_completion(its, cmd, next_cmd);		\
-+}
-+
-+static void its_build_sync_cmd(struct its_cmd_block *sync_cmd,
-+			       struct its_collection *sync_col)
-+{
-+	its_encode_cmd(sync_cmd, GITS_CMD_SYNC);
-+	its_encode_target(sync_cmd, sync_col->target_address);
-+}
-+
-+static __its_send_single_cmd(its_send_single_command, its_cmd_builder_t,
-+			     struct its_collection, its_build_sync_cmd)
- 
- static void its_send_inv(struct its_device *dev, u32 event_id)
+-static void lpi_set_config(struct irq_data *d, bool enable)
++static void lpi_update_config(struct irq_data *d, u8 clr, u8 set)
  {
+ 	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
+ 	irq_hw_number_t hwirq = d->hwirq;
+-	u32 id = its_get_event_id(d);
+-	u8 *cfg = page_address(gic_rdists->prop_page) + hwirq - 8192;
++	struct page *prop_page;
++	u8 *cfg;
+ 
+-	if (enable)
+-		*cfg |= LPI_PROP_ENABLED;
+-	else
+-		*cfg &= ~LPI_PROP_ENABLED;
++	prop_page = gic_rdists->prop_page;
++
++	cfg = page_address(prop_page) + hwirq - 8192;
++	*cfg &= ~clr;
++	*cfg |= set;
+ 
+ 	/*
+ 	 * Make the above write visible to the redistributors.
+@@ -693,17 +694,17 @@ static void lpi_set_config(struct irq_data *d, bool enable)
+ 		gic_flush_dcache_to_poc(cfg, sizeof(*cfg));
+ 	else
+ 		dsb(ishst);
+-	its_send_inv(its_dev, id);
++	its_send_inv(its_dev, its_get_event_id(d));
+ }
+ 
+ static void its_mask_irq(struct irq_data *d)
+ {
+-	lpi_set_config(d, false);
++	lpi_update_config(d, LPI_PROP_ENABLED, 0);
+ }
+ 
+ static void its_unmask_irq(struct irq_data *d)
+ {
+-	lpi_set_config(d, true);
++	lpi_update_config(d, 0, LPI_PROP_ENABLED);
+ }
+ 
+ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
 -- 
 2.1.4
