@@ -1,41 +1,49 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 17 Jan 2017 20:10:56 +0200
-Subject: [PATCH v7 2/3] input: tm2-touchkey: Add touchkey driver support
- for TM2
-In-Reply-To: <CAKdAkRQij9VuG1mguE0FwQMKuHrnyLAZJxOtkoR97uuX+ZBmLQ@mail.gmail.com>
-References: <1484632479-3111-1-git-send-email-jcsing.lee@samsung.com>
- <CGME20170117055444epcas1p47b0b0a0ae3260b22fa61d2b92362050b@epcas1p4.samsung.com>
- <1484632479-3111-3-git-send-email-jcsing.lee@samsung.com>
- <20170117172047.47535bj5xd6toayu@kozik-lap>
- <CAKdAkRQij9VuG1mguE0FwQMKuHrnyLAZJxOtkoR97uuX+ZBmLQ@mail.gmail.com>
-Message-ID: <20170117181056.mrwyudslfgh2wfms@kozik-lap>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 17 Jan 2017 12:14:58 -0600
+Subject: CONFIG_PCIEASPM breaks PCIe on Marvell Armada 385 machine
+In-Reply-To: <20170117175728.GE27312@n2100.armlinux.org.uk>
+References: <20170111194942.q5rdma2es6hkmxfe@perseus.defre.kleine-koenig.org>
+ <20170117151444.GE22776@bhelgaas-glaptop.roam.corp.google.com>
+ <20170117152548.GB27312@n2100.armlinux.org.uk>
+ <20170117174649.GA11063@bhelgaas-glaptop.roam.corp.google.com>
+ <20170117175115.GD27312@n2100.armlinux.org.uk>
+ <20170117175728.GE27312@n2100.armlinux.org.uk>
+Message-ID: <20170117181458.GB11063@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 10:06:27AM -0800, Dmitry Torokhov wrote:
-> On Tue, Jan 17, 2017 at 9:20 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> > On Tue, Jan 17, 2017 at 02:54:38PM +0900, Jaechul Lee wrote:
-> >> This patch adds support for the TM2 touch key and led
-> >> functionality.
-> >>
-> >> The driver interfaces with userspace through an input device and
-> >> reports KEY_PHONE and KEY_BACK event types. LED brightness can be
-> >> controlled by "/sys/class/leds/tm2-touchkey/brightness".
-> >>
-> >> Signed-off-by: Beomho Seo <beomho.seo@samsung.com>
-> >> Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
-> >> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> >> Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
-> >> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
-> >> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
-> >> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
-> >> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> >
-> > This looks unusual. How did Dmitry's Sob end here?
+On Tue, Jan 17, 2017 at 05:57:28PM +0000, Russell King - ARM Linux wrote:
+> On Tue, Jan 17, 2017 at 05:51:16PM +0000, Russell King - ARM Linux wrote:
+> > On Tue, Jan 17, 2017 at 11:46:49AM -0600, Bjorn Helgaas wrote:
+> > > Uwe has already done that; the dmesg logs including this
+> > > instrumentation are at
+> > > https://bugzilla.kernel.org/show_bug.cgi?id=192441
+> > 
+> > Grr, <swears about SSL incompatibilities>... wget's the URL and then
+> > uses elinks on it...
+> > 
+> > Umm, not quite.  He's done mvebu_pcie_hw_wr_conf() and mvebu_pcie_hw_rd_conf()
+> > but not the bridge from the descriptions given on the attachments.
+> > Obviously, it's going to be a lot of work to manufacture the links to
+> > look at each attachment to thoroughly check, so I'm not going to do
+> > that given quite how broken SSL crap is today.
+> > 
+> > (Try installing elinks and pointing it at the above URL.)
 > 
-> I sent Jaechul a version of the patch to try out.
+> Oh, and looking at some of the debug that's been added:
+> 
+> [    3.646322] mvebu_pcie_rd_conf(where=16, size=4, val=3892314116) => 0
+> [    3.646325] mvebu_pcie_wr_conf(where=16, size=4, val=4294967295)
+> [    3.646329] mvebu_pcie_rd_conf(where=16, size=4, val=4292870148) => 0
+> [    3.646332] mvebu_pcie_wr_conf(where=16, size=4, val=3892314116)
+> 
+> Please print register values in HEX, not decimal.  Same for register
+> addresses.  Hex is the normal base to print this information, which
+> the human brain can easily comprehend and translate to bits in a
+> register.  Decimal values are useless and might as well be encrypted.
 
-Ah, makes sense then.
+The instrumentation has evolved a bit since then.  Latest is below (could
+still use improvement, but it does address your suggestions above):
 
-Best regards,
-Krzysztof
+https://bugzilla.kernel.org/attachment.cgi?id=251691 (CONFIG_PCIEASPM=y)
+https://bugzilla.kernel.org/attachment.cgi?id=251701 (CONFIG_PCIEASPM not set)
