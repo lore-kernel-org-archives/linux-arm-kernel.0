@@ -1,111 +1,45 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 17 Jan 2017 11:37:57 +0000
-Subject: [PATCH v3 2/3] arm64: dts: juno: fix CoreSight support for Juno
- r1/r2 variants
-In-Reply-To: <CAOesGMj_23cehRP0ftdM_+Wvuj3tUWi5T5+w5z5v62zfkLu9+w@mail.gmail.com>
-References: <1484234410-7670-1-git-send-email-sudeep.holla@arm.com>
- <1484234410-7670-3-git-send-email-sudeep.holla@arm.com>
- <CAOesGMj_23cehRP0ftdM_+Wvuj3tUWi5T5+w5z5v62zfkLu9+w@mail.gmail.com>
-Message-ID: <ae9edbff-b315-7709-84e7-d72bc6394a4e@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 17 Jan 2017 11:45:19 +0000
+Subject: [Question] A question about arm64 pte
+In-Reply-To: <ecf2bd9f-9f96-0e6d-564d-93cff5bbf0cb@huawei.com>
+References: <d284f510-f025-db84-f21e-a5b167d4bcd2@huawei.com>
+ <20170116115606.GA6832@e104818-lin.cambridge.arm.com>
+ <6b7a9bd2-37af-40cd-b723-9e648fbbc7c8@huawei.com>
+ <20170116143601.GB6832@e104818-lin.cambridge.arm.com>
+ <ecf2bd9f-9f96-0e6d-564d-93cff5bbf0cb@huawei.com>
+Message-ID: <20170117114518.GF18923@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 17/01/17 06:58, Olof Johansson wrote:
-> Hi,
+On Tue, Jan 17, 2017 at 11:53:43AM +0800, Yisheng Xie wrote:
+> On 2017/1/16 22:36, Catalin Marinas wrote:
+> > On Mon, Jan 16, 2017 at 08:39:56PM +0800, Yisheng Xie wrote:
+> >> On 2017/1/16 19:56, Catalin Marinas wrote:
+> >>> On Mon, Jan 16, 2017 at 06:08:47PM +0800, Yisheng Xie wrote:
+> >>>
+> >> However?when use memset to write the region it still works well, and
+> >> the bit PTE_RDONLY is also cleared. Is there anywhere clear the
+> >> PTE_RDONLY before write that page ?
+> > 
+> > See handle_pte_fault(). On the first access to a writable+clean page
+> > (PTE_WRITE set, PTE_RDONLY set, PTE_DIRTY cleared), the kernel traps it
+> > and, if pte_write() is true (your case), it calls pte_mkdirty(). The
+> > subsequently called ptep_set_access_flags() function would clear
+> > PTE_RDONLY, giving you a writable mapping.
 > 
-> On Thu, Jan 12, 2017 at 7:20 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> From: Mike Leach <mike.leach@linaro.org>
->>
->> The CoreSight support added for Juno is valid for only Juno r0.
->> The Juno r1 and r2 variants have additional components and alternative
->> connection routes between trace source and sinks.
->>
->> This patch builds on top of the existing r0 support and extends it to
->> Juno r1/r2 variants.
->>
->> Signed-off-by: Mike Leach <mike.leach@linaro.org>
->> [sudeep.holla at arm.com: minor changelog update and reorganising the common
->>         coresight components back into juno-base.dtsi to avoid duplication]
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->> ---
->>  arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi | 102 ++++++++++++++++++++++++++++++
->>  arch/arm64/boot/dts/arm/juno-r1.dts       |   9 +++
->>  arch/arm64/boot/dts/arm/juno-r2.dts       |   9 +++
->>  3 files changed, 120 insertions(+)
->>  create mode 100644 arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
->>
->> diff --git a/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
->> new file mode 100644
->> index 000000000000..89fcef366ff9
->> --- /dev/null
->> +++ b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
->> @@ -0,0 +1,102 @@
->> +       csys1_funnel at 20130000 {
->> +               compatible = "arm,coresight-funnel", "arm,primecell";
->> +               reg = <0 0x20130000 0 0x1000>;
->> +
->> +               clocks = <&soc_smc50mhz>;
->> +               clock-names = "apb_pclk";
->> +               power-domains = <&scpi_devpd 0>;
->> +               ports {
->> +                       #address-cells = <1>;
->> +                       #size-cells = <0>;
->> +
->> +                       /* input port */
->> +                       port at 0 {
->> +                               reg = <0>;
->> +                               csys1_funnel_out_port: endpoint {
->> +                                       remote-endpoint =
->> +                                               <&etf1_in_port>;
->> +                               };
->> +                       };
->> +
->> +                       /* output port */
->> +                       port at 1 {
->> +                               reg = <0>;
->> +                               csys1_funnel_in_port0: endpoint {
->> +                                       slave-mode;
->> +                               };
->> +                       };
->> +
->> +               };
->> +       };
->> +
->> +       etf1 at 20140000 {
+> Sorry to disturb, but why page fault will happened here, for pte already
+> present with AF bit set?
 > 
-> The concept behind device-tree is that you name the nodes based on the
-> type of device they are. "i2c", "ethernet", etc. Not "eth0", "i2c3",
-> and so on.
-> 
-> So, this should probably be something else than "etf1", and the
-> etf->etf0 rename you did somewhere else shouldn't be made either.
-> 
+> Here is what I get when mmap a reserved memory region 0x39ef 0000~0x3a00 0000
+> use /dev/mem:
+> [  442.704228] pgd = ffff802785f14000
+> [  442.707641] [ffff86e4b000] *pgd=000000279080c003, *pud=0000002785f01003, *pmd=0000002783f5b003, *pte=0168000039ef0fd3
 
-Agreed, will fix it. Sorry for not noticing that before. I somehow
-always confused them to be labels rather that node names and even missed
-to observe that when I changed for R0.
-
-[...]
-
->> diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
->> index eec37feee8fc..d4b85d9d343e 100644
->> --- a/arch/arm64/boot/dts/arm/juno-r1.dts
->> +++ b/arch/arm64/boot/dts/arm/juno-r1.dts
->> @@ -178,6 +178,7 @@
->>         };
->>
->>         #include "juno-base.dtsi"
->> +       #include "juno-cs-r1r2.dtsi"
-> 
-> Please don't nest dtsi inside a structure like this. We normally let
-> them stand by themselves at the top of the file instead.
-> 
-> (yes, please fix for juno-base too).
-
-Agreed and fixed locally, will post it as part of v4.
+The pte seems to have bit 7 set: PTE_RDONLY. So you would get a fault on
+write (but not read). Since PTE_WRITE is also set, handle_pte_fault()
+will mark the entry as dirty (bit 55, cleared above) and clear
+PTE_RDONLY before restarting the access instruction. User space wouldn't
+notice, just a slight delay on the first access.
 
 -- 
-Regards,
-Sudeep
+Catalin
