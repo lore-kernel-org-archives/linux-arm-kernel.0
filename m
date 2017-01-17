@@ -1,50 +1,38 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 16 Jan 2017 21:46:24 -0800
-Subject: [GIT PULL] Allwinner fixes for 4.10
-In-Reply-To: <20170110175124.oqlucb6a2qut2ten@lukather>
-References: <20170110175124.oqlucb6a2qut2ten@lukather>
-Message-ID: <20170117054624.GB16607@localhost>
+Date: Mon, 16 Jan 2017 22:08:49 -0800
+Subject: [GIT PULL 2/2] Broadcom defconfig fixes for 4.10
+In-Reply-To: <20170115023637.24759-1-f.fainelli@gmail.com>
+References: <20170115023637.24759-1-f.fainelli@gmail.com>
+Message-ID: <20170117060849.GE16607@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 06:51:24PM +0100, Maxime Ripard wrote:
-> Hi Arnd, Olof,
-> 
-> Please pull the following changes for 4.10.
-> 
-> Thanks!
-> Maxime
-> 
+On Sat, Jan 14, 2017 at 06:36:36PM -0800, Florian Fainelli wrote:
 > The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 > 
 >   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-fixes-for-4.10
+>   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.10/defconfig-fixes
 > 
-> for you to fetch changes up to 3116d37651d77125bf50f81f859b1278e02ccce6:
+> for you to fetch changes up to 91546c56624a79f4a8fd80bede6b5a38c0f0ad78:
 > 
->   ARM: dts: sunxi: Change node name for pwrseq pin on Olinuxino-lime2-emmc (2017-01-10 18:33:16 +0100)
-> 
-> ----------------------------------------------------------------
-> Allwinner fixes for 4.10
-> 
-> A few fixes here and there to enable the build of some DT leftover, prevent
-> display issues or setup a proper muxing.
+>   ARM: multi_v7_defconfig: set bcm47xx watchdog (2017-01-12 16:03:12 -0800)
 > 
 > ----------------------------------------------------------------
-> Chen-Yu Tsai (2):
->       ARM: dts: sun6i: Disable display pipeline by default
->       ARM: dts: sun6i: hummingbird: Enable display engine again
+> This pull request contains fixes to multi_v7_defconfig for Broadcom ARM-based
+> SoCs, please pull the following changes:
 > 
-> Emmanuel Vadot (1):
->       ARM: dts: sunxi: Change node name for pwrseq pin on Olinuxino-lime2-emmc
+> - Valenting fixes two incorrect Kconfig symbols for BCM47xx: NVRAM and watchdog drivers
 > 
-> Milo Kim (1):
->       ARM: dts: sun8i: Support DTB build for NanoPi M1
+> ----------------------------------------------------------------
+> Valentin Rothberg (2):
+>       ARM: multi_v7_defconfig: fix config typo
+>       ARM: multi_v7_defconfig: set bcm47xx watchdog
 
-Merged, thanks.
+Merged. How did we even get here? Did the options rename or did someone
+edit config files by hand?
 
 
 -Olof
