@@ -1,100 +1,40 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 17 Jan 2017 19:59:43 +0800
-Subject: [PATCH v7 15/15] irqchip: mbigen: Add ACPI support
-In-Reply-To: <20170116152413.GA24135@red-moon>
-References: <1484147199-4267-1-git-send-email-hanjun.guo@linaro.org>
- <1484147199-4267-16-git-send-email-hanjun.guo@linaro.org>
- <20170113102104.GB20837@red-moon> <58799376.6040302@huawei.com>
- <20170116113804.GB23703@red-moon> <587CD754.1050808@huawei.com>
- <20170116152413.GA24135@red-moon>
-Message-ID: <587E072F.3020305@huawei.com>
+From: xieyisheng1@huawei.com (Yisheng Xie)
+Date: Tue, 17 Jan 2017 20:02:30 +0800
+Subject: [Question] A question about arm64 pte
+In-Reply-To: <20170117114518.GF18923@e104818-lin.cambridge.arm.com>
+References: <d284f510-f025-db84-f21e-a5b167d4bcd2@huawei.com>
+ <20170116115606.GA6832@e104818-lin.cambridge.arm.com>
+ <6b7a9bd2-37af-40cd-b723-9e648fbbc7c8@huawei.com>
+ <20170116143601.GB6832@e104818-lin.cambridge.arm.com>
+ <ecf2bd9f-9f96-0e6d-564d-93cff5bbf0cb@huawei.com>
+ <20170117114518.GF18923@e104818-lin.cambridge.arm.com>
+Message-ID: <c0bb0be5-c7fa-948b-62ed-122eb89562dc@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/1/16 23:24, Lorenzo Pieralisi wrote:
-> On Mon, Jan 16, 2017 at 10:23:16PM +0800, Hanjun Guo wrote:
->> Hi Lorenzo,
+
+
+On 2017/1/17 19:45, Catalin Marinas wrote:
+> On Tue, Jan 17, 2017 at 11:53:43AM +0800, Yisheng Xie wrote:
+>> On 2017/1/16 22:36, Catalin Marinas wrote:
+>>> On Mon, Jan 16, 2017 at 08:39:56PM +0800, Yisheng Xie wrote:
+>>>> On 2017/1/16 19:56, Catalin Marinas wrote:
+>>>>> On Mon, Jan 16, 2017 at 06:08:47PM +0800, Yisheng Xie wrote:
+>>>>>
 >>
->> On 2017/1/16 19:38, Lorenzo Pieralisi wrote:
->>> On Sat, Jan 14, 2017 at 10:56:54AM +0800, Hanjun Guo wrote:
->>>> Hi Lorenzo,
->>>>
->>>> On 2017/1/13 18:21, Lorenzo Pieralisi wrote:
->>>>> On Wed, Jan 11, 2017 at 11:06:39PM +0800, Hanjun Guo wrote:
->>>>>> With the preparation of platform msi support and interrupt producer
->>>>>> in DSDT, we can add mbigen ACPI support now.
->>>>>>
->>>>>> We are using _PRS methd to indicate number of irq pins instead
->>>>>> of num_pins in DT to avoid _DSD usage in this case.
->>>>>>
->>>>>> For mbi-gen,
->>>>>>     Device(MBI0) {
->>>>>>           Name(_HID, "HISI0152")
->>>>>>           Name(_UID, Zero)
->>>>>>           Name(_CRS, ResourceTemplate() {
->>>>>>                   Memory32Fixed(ReadWrite, 0xa0080000, 0x10000)
->>>>>>           })
->>>>>>
->>>>>>           Name (_PRS, ResourceTemplate() {
->>>>>> 		  Interrupt(ResourceProducer,...) {12,14,....}
->>>>> I still do not understand why you are using _PRS for this, I think
->>>>> the MBIgen configuration is static and if it is so the Interrupt
->>>>> resource should be part of the _CRS unless there is something I am
->>>>> missing here.
->>>> Sorry for not clear in the commit message. MBIgen is an interrupt producer
->>>> which produces irq resource to devices connecting to it, and MBIgen itself
->>>> don't consume wired interrupts.
->>> That's why you mark it as ResourceProducer, but that's not a reason to
->>> put it in the _PRS instead of _CRS.
->> If using _CRS for the interrupt resource, the irq number represented
->> will be mapped (i.e acpi_register_gsi()), then will conflict with the
->> irq number of devices consuming it (mbigen is producing the
->> interrupts), but I agree with you that let's ask Rafael's point of
->> view.
-> Aha ! So here is why you are using _PRS because the kernel turns _CRS
-> Interrupt resources (even producers) into GSIs which is probably a
-> kernel bug, is that the reason ?
-
-I thought _CRS is for devices consuming resources, it's a kind of misunderstanding.
-
->
-> We don't abuse firmware bindings to make the kernel work, that's _never_
-> a good idea.
->
-> If the interrupt resource is a Resource Producer core ACPI should not
-> register the IRQ because that's not a GSI, probably this should be part of
-> Agustin changes too ?
-
-Agreed. If it's a Resource Producer,
-- it's not a GSI
-- and it should not be mapped to any irq domains
-
-I think Agustin needs to add the changes to the patch set but only for
-CONFIG_ACPI_GENERIC_GSI=y, not bother the core code as the complex
-history of firmware in x86, what do you think?
-
->
->>> IIUC _PRS is there to provide a way to define the possible resource
->>> settings of a _configurable_ device (ie programmable) so that the actual
->>> resource value you would programme with a call to its _SRS is sane (ie
->>> the OS has a way, through the _PRS, to detect what possible resource
->>> settings are available for the device).
->>>
->>> I think Rafael has more insights into how the _PRS is used on x86
->>> systems so I would ask his point of view here before merrily merging
->>> this code.
->> OK, Rafael is traveling now, hope he will have time to take a look.
->>
->> How about updating this patch set then sending a new version for review
->> with this patch unchanged? if Rafael have comments on this one, I will
->> send a single updated one for this patch (if no other changes).
-> I think this patch (and the FW that goes with it) is wrong, but the rest
-> of the series, in particular the IORT bits, are ok with me.
-
-Thanks, I updated the patch using _CRS and firmware, with minor changes for
-Agustin's patch set, mbigen works pretty good as before.
-
-I will comment on Agustin's patch set.
+>> Here is what I get when mmap a reserved memory region 0x39ef 0000~0x3a00 0000
+>> use /dev/mem:
+>> [  442.704228] pgd = ffff802785f14000
+>> [  442.707641] [ffff86e4b000] *pgd=000000279080c003, *pud=0000002785f01003, *pmd=0000002783f5b003, *pte=0168000039ef0fd3
+> 
+> The pte seems to have bit 7 set: PTE_RDONLY. So you would get a fault on
+> write (but not read). Since PTE_WRITE is also set, handle_pte_fault()
+> will mark the entry as dirty (bit 55, cleared above) and clear
+> PTE_RDONLY before restarting the access instruction. User space wouldn't
+> notice, just a slight delay on the first access.
+> 
+Hi Catalin,
+Really thank you for kindly explain, quite clear now.
 
 Thanks
-Hanjun
+Yisheng Xie.
