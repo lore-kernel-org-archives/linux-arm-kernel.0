@@ -1,99 +1,40 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Tue, 17 Jan 2017 04:46:01 +0100
-Subject: [PATCH 17/22] power: supply: add battery driver for AXP20X and
- AXP22X PMICs
-In-Reply-To: <20170102163723.7939-18-quentin.schulz@free-electrons.com>
-References: <20170102163723.7939-1-quentin.schulz@free-electrons.com>
- <20170102163723.7939-18-quentin.schulz@free-electrons.com>
-Message-ID: <20170117034601.wevqblqiwrerpmal@earth>
+From: xieyisheng1@huawei.com (Yisheng Xie)
+Date: Tue, 17 Jan 2017 11:53:43 +0800
+Subject: [Question] A question about arm64 pte
+In-Reply-To: <20170116143601.GB6832@e104818-lin.cambridge.arm.com>
+References: <d284f510-f025-db84-f21e-a5b167d4bcd2@huawei.com>
+ <20170116115606.GA6832@e104818-lin.cambridge.arm.com>
+ <6b7a9bd2-37af-40cd-b723-9e648fbbc7c8@huawei.com>
+ <20170116143601.GB6832@e104818-lin.cambridge.arm.com>
+Message-ID: <ecf2bd9f-9f96-0e6d-564d-93cff5bbf0cb@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Quentin,
 
-Just a couple of small things in this patch.
 
-On Mon, Jan 02, 2017 at 05:37:17PM +0100, Quentin Schulz wrote:
-> [...]
-> +	case POWER_SUPPLY_PROP_CURRENT_NOW:
-> +		ret = regmap_read(axp20x_batt->regmap, AXP20X_PWR_INPUT_STATUS,
-> +				  &reg);
-> +		if (ret)
-> +			return ret;
-> +
-> +		if (reg & AXP20X_PWR_STATUS_BAT_CHARGING)
-> +			chan = axp20x_batt->batt_chrg_i;
-> +		else
-> +			chan = axp20x_batt->batt_dischrg_i;
-> +
-> +		ret = iio_read_channel_processed(chan, &val->intval);
-> +		if (ret)
-> +			return ret;
-> +
-> +		/*
-> +		 * IIO framework gives mV but Power Supply framework gives ?V.
-> +		 */
+On 2017/1/16 22:36, Catalin Marinas wrote:
+> On Mon, Jan 16, 2017 at 08:39:56PM +0800, Yisheng Xie wrote:
+>> On 2017/1/16 19:56, Catalin Marinas wrote:
+>>> On Mon, Jan 16, 2017 at 06:08:47PM +0800, Yisheng Xie wrote:
+>>>
+>> However?when use memset to write the region it still works well, and
+>> the bit PTE_RDONLY is also cleared. Is there anywhere clear the
+>> PTE_RDONLY before write that page ?
+> 
+> See handle_pte_fault(). On the first access to a writable+clean page
+> (PTE_WRITE set, PTE_RDONLY set, PTE_DIRTY cleared), the kernel traps it
+> and, if pte_write() is true (your case), it calls pte_mkdirty(). The
+> subsequently called ptep_set_access_flags() function would clear
+> PTE_RDONLY, giving you a writable mapping.
+> 
+hi Catalin?
+Sorry to disturb, but why page fault will happened here, for pte already
+present with AF bit set?
 
-Nit: Volt -> Ampere
+Here is what I get when mmap a reserved memory region 0x39ef 0000~0x3a00 0000
+use /dev/mem:
+[  442.704228] pgd = ffff802785f14000
+[  442.707641] [ffff86e4b000] *pgd=000000279080c003, *pud=0000002785f01003, *pmd=0000002783f5b003, *pte=0168000039ef0fd3
 
-> +		val->intval *= 1000;
-> +		break;
->
-> [...]
->
-> +static int axp20x_power_probe(struct platform_device *pdev)
-> +{
-> +	struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
-> +	struct axp20x_batt_ps *axp20x_batt;
-> +	struct power_supply_config psy_cfg = {};
-> +
-> +	axp20x_batt = devm_kzalloc(&pdev->dev, sizeof(*axp20x_batt),
-> +				   GFP_KERNEL);
-> +	if (!axp20x_batt)
-> +		return -ENOMEM;
-> +
-> +	axp20x_batt->batt_v = devm_iio_channel_get(&pdev->dev, "batt_v");
-> +	if (IS_ERR(axp20x_batt->batt_v)) {
-> +		if (PTR_ERR(axp20x_batt->batt_v) == -ENODEV)
-> +			return -EPROBE_DEFER;
-> +		return PTR_ERR(axp20x_batt->batt_v);
-> +	}
-> +
-> +	axp20x_batt->batt_chrg_i = devm_iio_channel_get(&pdev->dev,
-> +							"batt_chrg_i");
-> +	if (IS_ERR(axp20x_batt->batt_chrg_i)) {
-> +		if (PTR_ERR(axp20x_batt->batt_chrg_i) == -ENODEV)
-> +			return -EPROBE_DEFER;
-> +		return PTR_ERR(axp20x_batt->batt_chrg_i);
-> +	}
-> +
-> +	axp20x_batt->batt_dischrg_i = devm_iio_channel_get(&pdev->dev,
-> +							   "batt_dischrg_i");
-> +	if (IS_ERR(axp20x_batt->batt_dischrg_i)) {
-> +		if (PTR_ERR(axp20x_batt->batt_dischrg_i) == -ENODEV)
-> +			return -EPROBE_DEFER;
-> +		return PTR_ERR(axp20x_batt->batt_dischrg_i);
-> +	}
-> +
-> +	axp20x_batt->regmap = axp20x->regmap;
-> +	platform_set_drvdata(pdev, axp20x_batt);
-
-Please use drv_get_regmap(pdev->dev.parent, NULL) instead (and drop
-axp20x).
-
-> +	psy_cfg.drv_data = axp20x_batt;
-> +	psy_cfg.of_node = pdev->dev.of_node;
-> +
-> +	axp20x_batt->axp_id = (int)of_device_get_match_data(&pdev->dev);
-
-use (uintptr_t) to avoid compiler warnings on systems with sizeof
-int != sizeof ptr.
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170117/a8f71c66/attachment.sig>
+Thanks,
+Yisheng Xie.
