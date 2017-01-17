@@ -1,114 +1,84 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 17 Jan 2017 14:10:42 -0800
-Subject: [PATCH v3 2/3] arm64: dts: juno: fix CoreSight support for Juno
- r1/r2 variants
-In-Reply-To: <ae9edbff-b315-7709-84e7-d72bc6394a4e@arm.com>
-References: <1484234410-7670-1-git-send-email-sudeep.holla@arm.com>
- <1484234410-7670-3-git-send-email-sudeep.holla@arm.com>
- <CAOesGMj_23cehRP0ftdM_+Wvuj3tUWi5T5+w5z5v62zfkLu9+w@mail.gmail.com>
- <ae9edbff-b315-7709-84e7-d72bc6394a4e@arm.com>
-Message-ID: <CAOesGMiULmYezwL3PQXGkOAOQrev-pXw2eGAYx+=rWJUM9QJWQ@mail.gmail.com>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Tue, 17 Jan 2017 14:20:54 -0800 (PST)
+Subject: [RFC] Device memory mappings for Dom0 on ARM64 ACPI systems
+Message-ID: <alpine.DEB.2.10.1701171309040.2347@sstabellini-ThinkPad-X260>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 3:37 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->
->
-> On 17/01/17 06:58, Olof Johansson wrote:
->> Hi,
->>
->> On Thu, Jan 12, 2017 at 7:20 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->>> From: Mike Leach <mike.leach@linaro.org>
->>>
->>> The CoreSight support added for Juno is valid for only Juno r0.
->>> The Juno r1 and r2 variants have additional components and alternative
->>> connection routes between trace source and sinks.
->>>
->>> This patch builds on top of the existing r0 support and extends it to
->>> Juno r1/r2 variants.
->>>
->>> Signed-off-by: Mike Leach <mike.leach@linaro.org>
->>> [sudeep.holla at arm.com: minor changelog update and reorganising the common
->>>         coresight components back into juno-base.dtsi to avoid duplication]
->>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->>> ---
->>>  arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi | 102 ++++++++++++++++++++++++++++++
->>>  arch/arm64/boot/dts/arm/juno-r1.dts       |   9 +++
->>>  arch/arm64/boot/dts/arm/juno-r2.dts       |   9 +++
->>>  3 files changed, 120 insertions(+)
->>>  create mode 100644 arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
->>>
->>> diff --git a/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
->>> new file mode 100644
->>> index 000000000000..89fcef366ff9
->>> --- /dev/null
->>> +++ b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
->>> @@ -0,0 +1,102 @@
->>> +       csys1_funnel at 20130000 {
->>> +               compatible = "arm,coresight-funnel", "arm,primecell";
->>> +               reg = <0 0x20130000 0 0x1000>;
->>> +
->>> +               clocks = <&soc_smc50mhz>;
->>> +               clock-names = "apb_pclk";
->>> +               power-domains = <&scpi_devpd 0>;
->>> +               ports {
->>> +                       #address-cells = <1>;
->>> +                       #size-cells = <0>;
->>> +
->>> +                       /* input port */
->>> +                       port at 0 {
->>> +                               reg = <0>;
->>> +                               csys1_funnel_out_port: endpoint {
->>> +                                       remote-endpoint =
->>> +                                               <&etf1_in_port>;
->>> +                               };
->>> +                       };
->>> +
->>> +                       /* output port */
->>> +                       port at 1 {
->>> +                               reg = <0>;
->>> +                               csys1_funnel_in_port0: endpoint {
->>> +                                       slave-mode;
->>> +                               };
->>> +                       };
->>> +
->>> +               };
->>> +       };
->>> +
->>> +       etf1 at 20140000 {
->>
->> The concept behind device-tree is that you name the nodes based on the
->> type of device they are. "i2c", "ethernet", etc. Not "eth0", "i2c3",
->> and so on.
->>
->> So, this should probably be something else than "etf1", and the
->> etf->etf0 rename you did somewhere else shouldn't be made either.
->>
->
-> Agreed, will fix it. Sorry for not noticing that before. I somehow
-> always confused them to be labels rather that node names and even missed
-> to observe that when I changed for R0.
->
-> [...]
->
->>> diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
->>> index eec37feee8fc..d4b85d9d343e 100644
->>> --- a/arch/arm64/boot/dts/arm/juno-r1.dts
->>> +++ b/arch/arm64/boot/dts/arm/juno-r1.dts
->>> @@ -178,6 +178,7 @@
->>>         };
->>>
->>>         #include "juno-base.dtsi"
->>> +       #include "juno-cs-r1r2.dtsi"
->>
->> Please don't nest dtsi inside a structure like this. We normally let
->> them stand by themselves at the top of the file instead.
->>
->> (yes, please fix for juno-base too).
->
-> Agreed and fixed locally, will post it as part of v4.
+Hi all,
 
-Both look reasonable here on repost!
+I would like to discuss with ARM64 and ACPI Linux maintainers the best
+way to complete ACPI support in Linux for Dom0 on ARM64.
 
 
--Olof
+As a reminder, Xen can only parse static ACPI tables. It doesn't have a
+bytecode interpreter. Xen maps all ACPI tables to Dom0, which parses
+them as it does on native. Device memory is mapped in stage-2 by Xen
+upon Dom0 request: a small driver under drivers/xen registers for
+BUS_NOTIFY_ADD_DEVICE events, then calls xen_map_device_mmio, which
+issues XENMEM_add_to_physmap_range hypercalls to Xen that creates the
+appropriate stage-2 mappings.
+
+This approach works well, but it breaks in few interesting cases.
+Specifically, anything that requires a device memory mapping but it is
+not a device, doesn't generate a BUS_NOTIFY_ADD_DEVICE event, thus, no
+hypercalls to Xen are made. Examples are: ACPI OperationRegion (1), ECAM
+(2), other memory regions described in static tables such as BERT (3).
+
+What is the best way to map these regions in Dom0? I am going to
+detail a few options that have been proposed and evaluated so far.
+
+
+(2) and (3), being described by static tables, could be parsed by Xen
+and mapped beforehand. However, this approach wouldn't work for (1).
+Additionally, Xen and Linux versions can mix and match, so it is
+possible, even likely, to run an old Xen and a new Dom0 on a new
+platform. Xen might not know about a new ACPI table, while Linux might.
+In this scenario, Xen wouldn't be able to map the region described in
+the new table beforehand, but Linux would still try to access it. I
+imagine that this problem could be work-arounded by blacklisting any
+unknown static tables in Xen, but it seems suboptimal. (By blacklisting,
+I mean removing them before starting Dom0.)
+
+For this reason, and to use the same approach for (1), (2) and (3), it
+looks like the best solution is for Dom0 to request the stage-2
+mappings to Xen.  If we go down this route, what is the best way to do
+it?
+
+
+a) One option is to provide a Xen specific implementation of
+acpi_os_ioremap in Linux. I think this is the cleanest approach, but
+unfortunately, it doesn't cover cases where ioremap is used directly. (2)
+is one of such cases, see
+arch/arm64/kernel/pci.c:pci_acpi_setup_ecam_mapping and
+drivers/pci/ecam.c:pci_ecam_create. (3) is another one of these cases,
+see drivers/acpi/apei/bert.c:bert_init.
+
+b) Otherwise, we could write an alternative implementation of ioremap
+on arm64. The Xen specific ioremap would request a stage-2 mapping
+first, then create the stage-1 mapping as usual. However, this means
+issuing an hypercall for every ioremap call.
+
+c) Finally, a third option is to create the stage-2 mappings seamlessly
+in Xen upon Dom0 memory faults. Keeping in mind that SMMU and guest
+pagetables are shared in the Xen hypervisor, this approach does not work
+if one of the pages that need a stage-2 mapping is used as DMA target
+before Dom0 accesses it. No SMMU mappings would be available for the
+page yet, so the DMA transaction would fail. After Dom0 touches the
+page, the DMA transaction would succeed. I don't know how likely is this
+scenario to happen, but it seems fragile to rely on it.
+
+
+For these reasons, I think that the best option might be b).
+Do you agree? Did I miss anything? Do you have other suggestions?
+
+
+Many thanks,
+
+Stefano
+
+
+References:
+https://lists.xenproject.org/archives/html/xen-devel/2016-12/msg01693.html
+https://lists.xenproject.org/archives/html/xen-devel/2016-12/msg02425.html
+https://lists.xenproject.org/archives/html/xen-devel/2016-12/msg02531.html
