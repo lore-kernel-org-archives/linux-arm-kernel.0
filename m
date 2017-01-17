@@ -1,60 +1,21 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 17 Jan 2017 19:29:42 +0200
-Subject: [PATCH v5 3/4] dmaengine: pl330: Store pointer to slave device
-In-Reply-To: <1484657338-26338-4-git-send-email-m.szyprowski@samsung.com>
-References: <1484657338-26338-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170117124922eucas1p1d4037d80229e55007169cf85c19e5eec@eucas1p1.samsung.com>
- <1484657338-26338-4-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20170117172445.3itztktiay22as26@kozik-lap>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 17 Jan 2017 18:30:47 +0100
+Subject: [PATCH v2 7/8] ARM: dts: kirkwood-mv88f6281gtw-ge: Utilize new
+ DSA binding
+In-Reply-To: <20170105192957.14304-8-f.fainelli@gmail.com>
+References: <20170105192957.14304-1-f.fainelli@gmail.com>
+ <20170105192957.14304-8-f.fainelli@gmail.com>
+Message-ID: <20170117173047.GF9470@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 01:48:57PM +0100, Marek Szyprowski wrote:
-> Store the pointer to slave device, which requested our channel. It will be
-> later used to implement runtime PM of PL330 DMA controller. Although
-> DMA channels might be requested many times, each DMA peripheral channel is
-> physically dedicated only for specific hardware, so there should be only
-> one slave device for each channel.
+On Thu, Jan 05, 2017 at 11:29:56AM -0800, Florian Fainelli wrote:
+> Utilize the new DSA binding, introduced with commit 8c5ad1d6179d ("net: dsa:
+> Document new binding"). The legacy binding node is kept included, but is marked
+> disabled.
 > 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 
-Any particular reason for removing my Reviewed-by? Any changes here?
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
-Best regards,
-Krzysztof
-
-> ---
->  drivers/dma/pl330.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index b6b2cc912380..c77a3494659c 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -450,6 +450,7 @@ struct dma_pl330_chan {
->  
->  	/* for runtime pm tracking */
->  	bool active;
-> +	struct device *slave;
->  };
->  
->  struct pl330_dmac {
-> @@ -2093,6 +2094,14 @@ static struct dma_chan *of_dma_pl330_xlate(struct of_phandle_args *dma_spec,
->  	if (chan_id >= pl330->num_peripherals)
->  		return NULL;
->  
-> +	if (!pl330->peripherals[chan_id].slave) {
-> +		pl330->peripherals[chan_id].slave = slave;
-> +	} else if (pl330->peripherals[chan_id].slave != slave) {
-> +		dev_err(pl330->ddma.dev,
-> +			"Can't use same channel with multiple slave devices!\n");
-> +		return NULL;
-> +	}
-> +
->  	return dma_get_slave_channel(&pl330->peripherals[chan_id].chan);
->  }
->  
-> -- 
-> 1.9.1
-> 
+    Andrew
