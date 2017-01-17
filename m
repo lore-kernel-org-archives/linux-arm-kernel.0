@@ -1,132 +1,57 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Tue, 17 Jan 2017 03:23:53 +0200
-Subject: [PATCH v2] watchdog: imx2: fix hang-up on boot for i.MX21,
- i.MX27 and i.MX31 SoCs
-Message-ID: <20170117012353.6948-1-vz@mleia.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 16 Jan 2017 17:30:38 -0800
+Subject: [PATCH v2 0/8] ARM: dts: Switch to new DSA binding
+In-Reply-To: <20170105192957.14304-1-f.fainelli@gmail.com>
+References: <20170105192957.14304-1-f.fainelli@gmail.com>
+Message-ID: <61c15ec6-6c0d-7865-d140-dba4ca3657a4@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Power down counter enable/disable bit switch is located in WMCR register,
-but watchdog controllers found on legacy i.MX21, i.MX27 and i.MX31 SoCs
-don't have this register. As a result of writing data to the non-existing
-register on driver probe the SoC hangs up, to fix the problem add more OF
-compatible strings and on this basis get information about availability of
-the WMCR register.
+On 01/05/2017 11:29 AM, Florian Fainelli wrote:
+> Hi all,
+> 
+> This patch series converts the in-tree users to utilize the new (relatively)
+> DSA binding that was introduced with commit 8c5ad1d6179d ("net: dsa: Document
+> new binding"). The legacy binding node is kept included, but is marked
+> disabled.
+> 
+> Changes in v2:
+> 
+> - patch 1: Use an hexadecimal reg property
+> - patch 2: fixed the subject
+> - patch 3: s/okay/disabled/ for the legacy DSA node
+> - patches 7/8: fixed a stray whitespace
+> 
+> In about 2-3 releases we may consider removing the old DSA binding entirely
+> from the kernel.
 
-Fixes: 5fe65ce7ccbb ("watchdog: imx2_wdt: Disable power down counter on boot")
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
-Tested-by: Magnus Lilja <lilja.magnus@gmail.com>
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
----
-Changes from v1 to v2:
-* removed i.MX27 and i.MX31 compatibles from the list, since it is expected
-  that their DTB files has a reference to the listed i.MX21 compatible,
-  many thanks to Uwe Kleine-K?nig for the hint,
-* start the list of compatibles from an i.MX35 specific one, since it is
-  agreed that i.MX35 precedes i.MX25, thanks to Uwe Kleine-K?nig for review,
-* added a comment describing any potential changes in future over the list
-  of watchdog compatible values,
-* added all collected tags to the commit message.
+Gregory, are you going to take this for 4.11? Thanks
 
-Changes from RFC to v1:
-* replaced private data struct with a macro as suggested by Guenter,
-* updated the comment in the source code to reflect the change,
-* rearranged and simplified the logic of detecting WMCR presence,
-* pulled the fix out from the series with optional proposed DTS changes.
+> 
+> Thank you!
+> 
+> Florian Fainelli (8):
+>   ARM: dts: armada-370-rd: Utilize new DSA binding
+>   ARM: dts: armada-385-linksys: Utilize new DSA binding
+>   ARM: dts: armada-388-clearfog: Utilize new DSA binding
+>   ARM: dts: armada-xp-linksys-mamba: Utilize new DSA binding
+>   ARM: dts: kirkwood-dir665: Utilize new DSA binding
+>   ARM: dts: kirkwood-linksys-viper: Utilize new DSA binding
+>   ARM: dts: kirkwood-mv88f6281gtw-ge: Utilize new DSA binding
+>   ARM: dts: kirkwood-rd88f6281: Utilize new DSA binding
+> 
+>  arch/arm/boot/dts/armada-370-rd.dts            | 44 +++++++++++++++++
+>  arch/arm/boot/dts/armada-385-linksys.dtsi      | 52 ++++++++++++++++++++-
+>  arch/arm/boot/dts/armada-388-clearfog.dts      | 65 ++++++++++++++++++++++++++
+>  arch/arm/boot/dts/armada-xp-linksys-mamba.dts  | 53 +++++++++++++++++++++
+>  arch/arm/boot/dts/kirkwood-dir665.dts          | 49 +++++++++++++++++++
+>  arch/arm/boot/dts/kirkwood-linksys-viper.dts   | 49 +++++++++++++++++++
+>  arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts | 49 +++++++++++++++++++
+>  arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts    | 11 +++++
+>  arch/arm/boot/dts/kirkwood-rd88f6281.dtsi      | 44 +++++++++++++++++
+>  9 files changed, 415 insertions(+), 1 deletion(-)
+> 
 
- drivers/watchdog/imx2_wdt.c | 41 ++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 36 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
-index 4874b0f..e08c367 100644
---- a/drivers/watchdog/imx2_wdt.c
-+++ b/drivers/watchdog/imx2_wdt.c
-@@ -30,6 +30,7 @@
- #include <linux/module.h>
- #include <linux/moduleparam.h>
- #include <linux/of_address.h>
-+#include <linux/of_device.h>
- #include <linux/platform_device.h>
- #include <linux/regmap.h>
- #include <linux/watchdog.h>
-@@ -57,6 +58,7 @@
- #define IMX2_WDT_WICR_WICT	0xFF		/* -> Interrupt Count Timeout */
- 
- #define IMX2_WDT_WMCR		0x08		/* Misc Register */
-+#define IMX2_WDT_NO_WMCR	((void *)true)	/* Indicates unavailable WMCR */
- 
- #define IMX2_WDT_MAX_TIME	128
- #define IMX2_WDT_DEFAULT_TIME	60		/* in seconds */
-@@ -70,6 +72,8 @@ struct imx2_wdt_device {
- 	bool ext_reset;
- };
- 
-+static const struct of_device_id imx2_wdt_dt_ids[];
-+
- static bool nowayout = WATCHDOG_NOWAYOUT;
- module_param(nowayout, bool, 0);
- MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default="
-@@ -242,6 +246,7 @@ static const struct regmap_config imx2_wdt_regmap_config = {
- 
- static int __init imx2_wdt_probe(struct platform_device *pdev)
- {
-+	const struct of_device_id *of_id;
- 	struct imx2_wdt_device *wdev;
- 	struct watchdog_device *wdog;
- 	struct resource *res;
-@@ -310,11 +315,13 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
- 	}
- 
- 	/*
--	 * Disable the watchdog power down counter at boot. Otherwise the power
--	 * down counter will pull down the #WDOG interrupt line for one clock
--	 * cycle.
-+	 * If watchdog controller has WMCR, disable the watchdog power
-+	 * down counter at boot. Otherwise the power down counter will
-+	 * pull down the #WDOG interrupt line for one clock cycle.
- 	 */
--	regmap_write(wdev->regmap, IMX2_WDT_WMCR, 0);
-+	of_id = of_match_device(imx2_wdt_dt_ids, &pdev->dev);
-+	if (of_id && !of_id->data)
-+		regmap_write(wdev->regmap, IMX2_WDT_WMCR, 0);
- 
- 	ret = watchdog_register_device(wdog);
- 	if (ret) {
-@@ -411,8 +418,32 @@ static int imx2_wdt_resume(struct device *dev)
- static SIMPLE_DEV_PM_OPS(imx2_wdt_pm_ops, imx2_wdt_suspend,
- 			 imx2_wdt_resume);
- 
-+/*
-+ * The list of compatibles is added to achieve compatibility between
-+ * old DTS and new kernel while fixing the incompatibility between
-+ * i.MX21/i.MX27/i.MX31 and i.MX35/i.MX25/etc. watchdog controllers.
-+ *
-+ * Please do *NOT* extend the list by adding a compatible value for
-+ * a controller, which is compatible with one of the already listed,
-+ * almost certainly "fsl,imx35-wdt" compatible serves newer i.MX SoCs.
-+ *
-+ * You may consider to shrink the list at your own risk, but this may
-+ * break the backward compatibility and users may have to update their
-+ * DTB, which is good eventually.
-+ */
- static const struct of_device_id imx2_wdt_dt_ids[] = {
--	{ .compatible = "fsl,imx21-wdt", },
-+	{ .compatible = "fsl,imx21-wdt", .data = IMX2_WDT_NO_WMCR },
-+	{ .compatible = "fsl,imx35-wdt",  },
-+	{ .compatible = "fsl,imx25-wdt",  },
-+	{ .compatible = "fsl,imx50-wdt",  },
-+	{ .compatible = "fsl,imx51-wdt",  },
-+	{ .compatible = "fsl,imx53-wdt",  },
-+	{ .compatible = "fsl,imx6q-wdt",  },
-+	{ .compatible = "fsl,imx6sl-wdt", },
-+	{ .compatible = "fsl,imx6sx-wdt", },
-+	{ .compatible = "fsl,imx6ul-wdt", },
-+	{ .compatible = "fsl,imx7d-wdt",  },
-+	{ .compatible = "fsl,vf610-wdt",  },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, imx2_wdt_dt_ids);
 -- 
-2.10.2
+Florian
