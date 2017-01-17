@@ -1,67 +1,49 @@
 From: bruherrera@gmail.com (Bruno Herrera)
-Date: Tue, 17 Jan 2017 14:12:34 -0200
-Subject: [PATCH v3 2/5] ARM: dts: stm32: Add USB FS support for STM32F429 MCU
+Date: Tue, 17 Jan 2017 14:12:35 -0200
+Subject: [PATCH v3 3/5] ARM: dts: stm32: Enable USB FS on stm32f469-disco
 In-Reply-To: <20170117161237.3802-1-bruherrera@gmail.com>
 References: <20170117161237.3802-1-bruherrera@gmail.com>
-Message-ID: <20170117161237.3802-3-bruherrera@gmail.com>
+Message-ID: <20170117161237.3802-4-bruherrera@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the USB pins and nodes for USB FS core. 
+This patch enables USB FS on stm32f469-disco with 5V VBUS enable.
 
 Signed-off-by: Bruno Herrera <bruherrera@gmail.com>
 ---
- arch/arm/boot/dts/stm32f429.dtsi | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ arch/arm/boot/dts/stm32f469-disco.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index e4dae0e..26f2395 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -316,6 +316,28 @@
- 				};
- 			};
+diff --git a/arch/arm/boot/dts/stm32f469-disco.dts b/arch/arm/boot/dts/stm32f469-disco.dts
+index 8877c00..3e0a83e 100644
+--- a/arch/arm/boot/dts/stm32f469-disco.dts
++++ b/arch/arm/boot/dts/stm32f469-disco.dts
+@@ -68,6 +68,15 @@
+ 	soc {
+ 		dma-ranges = <0xc0000000 0x0 0x10000000>;
+ 	};
++
++	/* This turns on vbus for otg for host mode (dwc2) */
++	vcc5v_otg: vcc5v-otg-regulator {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpiob 2 0>;
++		regulator-name = "vcc5_host1";
++		regulator-always-on;
++	};
+ };
  
-+			usbotg_fs_pins_a: usbotg_fs at 0 {
-+				pins {
-+					pinmux = <STM32F429_PA10_FUNC_OTG_FS_ID>,
-+						 <STM32F429_PA11_FUNC_OTG_FS_DM>,
-+						 <STM32F429_PA12_FUNC_OTG_FS_DP>;
-+					bias-disable;
-+					drive-push-pull;
-+					slew-rate = <2>;
-+				};
-+			};
+ &rcc {
+@@ -81,3 +90,10 @@
+ &usart3 {
+ 	status = "okay";
+ };
 +
-+			usbotg_fs_pins_b: usbotg_fs at 1 {
-+				pins {
-+					pinmux = <STM32F429_PB12_FUNC_OTG_HS_ID>,
-+						 <STM32F429_PB14_FUNC_OTG_HS_DM>,
-+						 <STM32F429_PB15_FUNC_OTG_HS_DP>;
-+					bias-disable;
-+					drive-push-pull;
-+					slew-rate = <2>;
-+				};
-+			};
-+
- 			usbotg_hs_pins_a: usbotg_hs at 0 {
- 				pins {
- 					pinmux = <STM32F429_PH4_FUNC_OTG_HS_ULPI_NXT>,
-@@ -420,6 +442,15 @@
- 			status = "disabled";
- 		};
- 
-+		usbotg_fs: usb at 50000000 {
-+			compatible = "st,stm32f4xx-fsotg";
-+			reg = <0x50000000 0x40000>;
-+			interrupts = <67>;
-+			clocks = <&rcc 0 39>;
-+			clock-names = "otg";
-+			status = "disabled";
-+		};
-+
- 		rng: rng at 50060800 {
- 			compatible = "st,stm32-rng";
- 			reg = <0x50060800 0x400>;
++&usbotg_fs {
++	dr_mode = "host";
++	pinctrl-0 = <&usbotg_fs_pins_a>;
++	pinctrl-names = "default";
++	status = "okay";
++};
 -- 
 2.10.1 (Apple Git-78)
