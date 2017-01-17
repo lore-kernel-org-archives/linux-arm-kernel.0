@@ -1,132 +1,75 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 17 Jan 2017 10:20:27 +0000
-Subject: [RFC PATCH 06/33] irqchip/gic-v3-its: Add probing for VLPI properties
+Date: Tue, 17 Jan 2017 10:20:34 +0000
+Subject: [RFC PATCH 13/33] irqchip/gic-v3-its: Generalize device table
+ allocation
 In-Reply-To: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
 References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1484648454-21216-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1484648454-21216-14-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the probing code for the ITS VLPI support. This includes
-configuring the ITS number if not supporting the single VMOVP
-command feature.
+As we want to use 2-level tables for VCPUs, let's hack the device
+table allocator in order to make it slightly more generic. It
+will get reused in subsequent patches.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c   | 47 ++++++++++++++++++++++++++++++++++----
- include/linux/irqchip/arm-gic-v3.h |  4 ++++
- 2 files changed, 47 insertions(+), 4 deletions(-)
+ drivers/irqchip/irq-gic-v3-its.c | 26 ++++++++++++++++----------
+ 1 file changed, 16 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 9304dd2..99f6130 100644
+index 5d96b37..dcd4771 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -103,6 +103,7 @@ struct its_node {
- 	u32			ite_size;
- 	u32			device_ids;
- 	int			numa_node;
-+	bool			is_v4;
- };
+@@ -1371,26 +1371,19 @@ static struct its_baser *its_get_baser(struct its_node *its, u32 type)
+ 	return NULL;
+ }
  
- #define ITS_ITT_ALIGN		SZ_256
-@@ -135,6 +136,8 @@ static DEFINE_SPINLOCK(its_lock);
- static struct rdists *gic_rdists;
- static struct irq_domain *its_parent;
- 
-+static unsigned long its_list_map;
-+
- #define gic_data_rdist()		(raw_cpu_ptr(gic_rdists->rdist))
- #define gic_data_rdist_rd_base()	(gic_data_rdist()->rd_base)
- 
-@@ -1661,8 +1664,8 @@ static int __init its_probe_one(struct resource *res,
+-static bool its_alloc_device_table(struct its_node *its, u32 dev_id)
++static bool its_alloc_table_entry(struct its_baser *baser, u32 id)
  {
- 	struct its_node *its;
- 	void __iomem *its_base;
--	u32 val;
--	u64 baser, tmp;
-+	u32 val, ctlr;
-+	u64 baser, tmp, typer;
- 	int err;
+-	struct its_baser *baser;
+ 	struct page *page;
+ 	u32 esz, idx;
+ 	__le64 *table;
  
- 	its_base = ioremap(res->start, resource_size(res));
-@@ -1695,9 +1698,44 @@ static int __init its_probe_one(struct resource *res,
- 	raw_spin_lock_init(&its->lock);
- 	INIT_LIST_HEAD(&its->entry);
- 	INIT_LIST_HEAD(&its->its_device_list);
-+	typer = gic_read_typer(its_base + GITS_TYPER);
- 	its->base = its_base;
- 	its->phys_base = res->start;
--	its->ite_size = ((gic_read_typer(its_base + GITS_TYPER) >> 4) & 0xf) + 1;
-+	its->ite_size = ((typer >> 4) & 0xf) + 1;
-+	its->is_v4 = !!(typer & GITS_TYPER_VLPIS);
-+	if (its->is_v4 && !(typer & GITS_TYPER_VMOVP)) {
-+		int its_number;
+-	baser = its_get_baser(its, GITS_BASER_TYPE_DEVICE);
+-
+-	/* Don't allow device id that exceeds ITS hardware limit */
+-	if (!baser)
+-		return (ilog2(dev_id) < its->device_ids);
+-
+ 	/* Don't allow device id that exceeds single, flat table limit */
+ 	esz = GITS_BASER_ENTRY_SIZE(baser->val);
+ 	if (!(baser->val & GITS_BASER_INDIRECT))
+-		return (dev_id < (PAGE_ORDER_TO_SIZE(baser->order) / esz));
++		return (id < (PAGE_ORDER_TO_SIZE(baser->order) / esz));
+ 
+ 	/* Compute 1st level table index & check if that exceeds table limit */
+-	idx = dev_id >> ilog2(baser->psz / esz);
++	idx = id >> ilog2(baser->psz / esz);
+ 	if (idx >= (PAGE_ORDER_TO_SIZE(baser->order) / GITS_LVL1_ENTRY_SIZE))
+ 		return false;
+ 
+@@ -1419,6 +1412,19 @@ static bool its_alloc_device_table(struct its_node *its, u32 dev_id)
+ 	return true;
+ }
+ 
++static bool its_alloc_device_table(struct its_node *its, u32 dev_id)
++{
++	struct its_baser *baser;
 +
-+		its_number = find_first_zero_bit(&its_list_map, 16);
-+		if (its_number >= 16) {
-+			pr_err("ITS@%pa: No ITSList entry available!\n",
-+			       &res->start);
-+			err = -EINVAL;
-+			goto out_free_its;
-+		}
++	baser = its_get_baser(its, GITS_BASER_TYPE_DEVICE);
 +
-+		ctlr = readl_relaxed(its_base + GITS_CTLR);
-+		ctlr &= ~GITS_CTLR_ITS_NUMBER;
-+		ctlr |= its_number << GITS_CTLR_ITS_NUMBER_SHIFT;
-+		writel_relaxed(ctlr, its_base + GITS_CTLR);
-+		ctlr = readl_relaxed(its_base + GITS_CTLR);
-+		if ((ctlr & GITS_CTLR_ITS_NUMBER) != (its_number << GITS_CTLR_ITS_NUMBER_SHIFT)) {
-+			its_number = ctlr & GITS_CTLR_ITS_NUMBER;
-+			its_number >>= GITS_CTLR_ITS_NUMBER_SHIFT;
-+		}
++	/* Don't allow device id that exceeds ITS hardware limit */
++	if (!baser)
++		return (ilog2(dev_id) < its->device_ids);
 +
-+		if (test_and_set_bit(its_number, &its_list_map)) {
-+			pr_err("ITS@%pa: Duplicate ITSList entry %d\n",
-+			       &res->start, its_number);
-+			err = -EINVAL;
-+			goto out_free_its;
-+		}
++	return its_alloc_table_entry(baser, dev_id);
++}
 +
-+		pr_info("ITS@%pa: Using ITS number %d\n", &res->start, its_number);
-+	} else {
-+		pr_info("ITS@%pa: Single VMOVP capable\n", &res->start);
-+	}
-+
- 	its->numa_node = numa_node;
- 
- 	its->cmd_base = kzalloc(ITS_CMD_QUEUE_SZ, GFP_KERNEL);
-@@ -1743,7 +1781,8 @@ static int __init its_probe_one(struct resource *res,
- 	}
- 
- 	gits_write_cwriter(0, its->base + GITS_CWRITER);
--	writel_relaxed(GITS_CTLR_ENABLE, its->base + GITS_CTLR);
-+	ctlr = readl_relaxed(its->base + GITS_CTLR);
-+	writel_relaxed(ctlr | GITS_CTLR_ENABLE, its->base + GITS_CTLR);
- 
- 	err = its_init_domain(handle, its);
- 	if (err)
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index b162bfa..dc7dcc6 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -231,14 +231,18 @@
- #define GITS_TRANSLATER			0x10040
- 
- #define GITS_CTLR_ENABLE		(1U << 0)
-+#define	GITS_CTLR_ITS_NUMBER_SHIFT	4
-+#define	GITS_CTLR_ITS_NUMBER		(0xFU << GITS_CTLR_ITS_NUMBER_SHIFT)
- #define GITS_CTLR_QUIESCENT		(1U << 31)
- 
- #define GITS_TYPER_PLPIS		(1UL << 0)
-+#define GITS_TYPER_VLPIS		(1UL << 1)
- #define GITS_TYPER_IDBITS_SHIFT		8
- #define GITS_TYPER_DEVBITS_SHIFT	13
- #define GITS_TYPER_DEVBITS(r)		((((r) >> GITS_TYPER_DEVBITS_SHIFT) & 0x1f) + 1)
- #define GITS_TYPER_PTA			(1UL << 19)
- #define GITS_TYPER_HWCOLLCNT_SHIFT	24
-+#define GITS_TYPER_VMOVP		(1ULL << 37)
- 
- #define GITS_CBASER_VALID			(1ULL << 63)
- #define GITS_CBASER_SHAREABILITY_SHIFT		(10)
+ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+ 					    int nvecs)
+ {
 -- 
 2.1.4
