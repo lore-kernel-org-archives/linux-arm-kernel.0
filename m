@@ -1,82 +1,35 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Tue, 17 Jan 2017 20:47:49 +0800
-Subject: [PATCH V9 2/3] ACPI: Add support for ResourceSource/IRQ domain
- mapping
-In-Reply-To: <1481753438-3905-3-git-send-email-agustinv@codeaurora.org>
-References: <1481753438-3905-1-git-send-email-agustinv@codeaurora.org>
- <1481753438-3905-3-git-send-email-agustinv@codeaurora.org>
-Message-ID: <587E1275.7030007@huawei.com>
+From: fparent@baylibre.com (Fabien Parent)
+Date: Tue, 17 Jan 2017 13:57:42 +0100
+Subject: [PATCH] ARM: davinci: da850-evm: fix read access to SPI flash
+Message-ID: <20170117125742.9536-1-fparent@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/12/15 6:10, Agustin Vega-Frias wrote:
-> ACPI extended IRQ resources may contain a ResourceSource to specify
-> an alternate interrupt controller. Introduce acpi_irq_get and use it
-> to implement ResourceSource/IRQ domain mapping.
->
-> The new API is similar to of_irq_get and allows re-initialization
-> of a platform resource from the ACPI extended IRQ resource, and
-> provides proper behavior for probe deferral when the domain is not
-> yet present when called.
->
-> Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
-> ---
->  drivers/acpi/Makefile         |   2 +-
->  drivers/acpi/{gsi.c => irq.c} | 182 ++++++++++++++++++++++++++++++++++++++++++
->  drivers/base/platform.c       |   9 ++-
->  include/linux/acpi.h          |  10 +++
->  4 files changed, 201 insertions(+), 2 deletions(-)
->  rename drivers/acpi/{gsi.c => irq.c} (32%)
->
-[...]
-> +/**
-> + * acpi_irq_parse_one_cb - Handle the given resource
-> + * @ares: resource to handle
-> + * @context: context for the walk, contains the lookup index and references
-> + *           to the flags and fwspec where the result is returned
-> + *
-> + * This is called by acpi_walk_resources passing each resource returned by
-> + * the _CRS method. We only inspect IRQ resources. Since IRQ resources
-> + * might contain multiple interrupts we check if the index is within this
-> + * one's interrupt array, otherwise we subtract the current resource IRQ
-> + * count from the lookup index to prepare for the next resource.
-> + * Once a match is found we call acpi_irq_parse_one_match to populate
-> + * the result and end the walk by returning AE_CTRL_TERMINATE.
-> + *
-> + * Return AE_OK if the walk should continue, AE_CTRL_TERMINATE if a matching
-> + * IRQ resource was found.
-> + */
-> +static acpi_status acpi_irq_parse_one_cb(struct acpi_resource *ares,
-> +					 void *context)
-> +{
-> +	struct acpi_irq_parse_one_ctx *ctx = context;
-> +	struct acpi_resource_irq *irq;
-> +	struct acpi_resource_extended_irq *eirq;
-> +	struct fwnode_handle *fwnode;
-> +
-> +	switch (ares->type) {
-> +	case ACPI_RESOURCE_TYPE_IRQ:
-> +		irq = &ares->data.irq;
-> +		if (ctx->index >= irq->interrupt_count) {
-> +			ctx->index -= irq->interrupt_count;
-> +			return AE_OK;
-> +		}
-> +		fwnode = acpi_gsi_domain_id;
-> +		acpi_irq_parse_one_match(fwnode, irq->interrupts[ctx->index],
-> +					 irq->triggering, irq->polarity,
-> +					 irq->sharable, ctx);
-> +		return AE_CTRL_TERMINATE;
-> +	case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
-> +		eirq = &ares->data.extended_irq;
+Read access to the SPI flash are broken on da850-evm, i.e. the data
+read is not what is actually programmed on the flash.
+According to the datasheet for the M25P64 part present on the da850-evm,
+if the SPI frequency is higher than 20MHz then the READ command is not
+usable anymore and only the FAST_READ command can be used to read data.
 
-If it's an interrupt producer, I think we don't need to map the interrupts in
-any irqdomain, and return AE_CTRL_TERMINATE here.
+This commit specifies in the DTS that we should use FAST_READ command
+instead of the READ command.
 
-        case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
-                eirq = &ares->data.extended_irq;
-+         if (eirq->producer_consumer == ACPI_PRODUCER)
-+                 return AE_CTRL_TERMINATE;
-                if (ctx->index >= eirq->interrupt_count) {
+Signed-off-by: Fabien Parent <fparent@baylibre.com>
+---
+ arch/arm/boot/dts/da850-evm.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks
-Hanjun
+diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+index 41de15fe15a2..78492a0bbbab 100644
+--- a/arch/arm/boot/dts/da850-evm.dts
++++ b/arch/arm/boot/dts/da850-evm.dts
+@@ -99,6 +99,7 @@
+ 				#size-cells = <1>;
+ 				compatible = "m25p64";
+ 				spi-max-frequency = <30000000>;
++				m25p,fast-read;
+ 				reg = <0>;
+ 				partition at 0 {
+ 					label = "U-Boot-SPL";
+-- 
+2.11.0
