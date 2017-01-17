@@ -1,58 +1,58 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Wed, 18 Jan 2017 01:08:14 +0800
-Subject: [PATCH v2 2/4] clk: sunxi-ng: add support for V3s CCU
-In-Reply-To: <20170117090456.fgw6lpqgurwwcczj@lukather>
-References: <20170116180116.36729-2-icenowy@aosc.xyz>
- <20170116180116.36729-3-icenowy@aosc.xyz>
- <20170117090456.fgw6lpqgurwwcczj@lukather>
-Message-ID: <5926181484672894@web12g.yandex.ru>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 17 Jan 2017 17:09:12 +0000
+Subject: [RFC 0/8] Provide the EL1 physical timer to the VM
+In-Reply-To: <1482772326-29110-1-git-send-email-jintack@cs.columbia.edu>
+References: <1482772326-29110-1-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <b15297e4-1b30-27f8-dd43-fb1a85bd2cd5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 26/12/16 17:11, Jintack Lim wrote:
+> The ARM architecture defines the EL1 physical timer and the virtual
+> timer, and it is reasonable for an OS to expect to be able to access
+> both.  However, the current KVM implementation does not provide the EL1
+> physical timer to VMs but terminates VMs on access to the timer.
+> 
+> On VHE systems, this would be as simple as allowing full access to the
+> EL1 physical timer to VMs because the KVM host does not use the EL1
+> physical timer.  However, on non-VHE systems, the KVM host already uses
+> the EL1 physical timer which prevents us from granting full access of
+> the EL1 physical timer to VMs.
+> 
+> This patchset enables VMs to use the EL1 physical timer through
+> trap-and-emulate.  The KVM host emulates each EL1 physical timer
+> register access and sets up the background timer accordingly.  When the
+> background timer expires, the KVM host injects EL1 physical timer
+> interrupts to the VM.  Alternatively, it's also possible to allow VMs to
+> access the EL1 physical timer without trapping.  However, this requires
+> somehow using the EL2 physical timer for the Linux host while running
+> the VM instead of the EL1 physical timer.  Right now I just implemented
+> trap-and-emulate because this was straightforward to do, and I leave it
+> to future work to determine if transferring the EL1 physical timer state
+> to the EL2 timer provides any performance benefit.
+> 
+> This feature will be useful for any OS that wishes to access the EL1
+> physical timer. Nested virtualization is one of those use cases. A
+> nested hypervisor running inside a VM would think it has full access to
+> the hardware and naturally tries to use the EL1 physical timer as Linux
+> would do. Other nested hypervisors may try to use the EL2 physical timer
+> as Xen would do, but supporting the EL2 physical timer to the VM is out
+> of scope of this patchset. This patchset will make it easy to add the
+> EL2 timer support in the future, though.
+> 
+> Note, Linux VMs booting in EL1 will be unaffected by this patch set and
+> will continue to use only the virtual timer and this patch set will
+> therefore not introduce any performance degredation as a result of
+> trap-and-emulate.
 
+Hi Jintack,
 
-17.01.2017, 17:05, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> Hi,
->
-> On Tue, Jan 17, 2017 at 02:01:14AM +0800, Icenowy Zheng wrote:
->> ?V3s has a similar but cut-down CCU to H3.
->>
->> ?Add support for it.
->>
->> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->> ?---
->
-> Output from checkpatch:
-> total: 5 errors, 2 warnings, 3 checks, 857 lines checked
+Any chance you could address Christoffer's comments and respin this
+series? This looks like a good enhancement to our emulation, and
+definitely a requirement for the nested work, so I'm obviously keen on it.
 
-I remembered some errors' code is directly derived from ccu-sun8i-h3.c,
-so I generated a patch file for "clk: sunxi-ng: Add H3 clocks" and run
-checkpatch on it:
-total: 4 errors, 5 warnings, 1159 lines checked
+Thanks,
 
-Should I still get all errors fixed?
-
->
->> ?I think I should make a comparsion between V3s and H3 CCU here:
->> ?(I won't mention the missing/added clocks here, only list conflicting clocks)
->
-> That should be in your commit log.
->
->> ?- "bus-ehci0" is at different bit (The bit that is "bus-ehci0" on V3s is
->> ???"bus-ehci2" on H3)
->> ?- The mux of "ce" is different. (According the view at V3s datasheet by the
->> ???author of sun4i-ss, V3s may have sun4i-ss, not sun8i-ce)
->> ?- The mux of "de" is different. (V3s do not have "pll-de", but it can mux "de"
->> ???to "pll-video")
->> ?- Clocks about CSI largely differs. (As V3s is designed as a camera SoC, and
->> ???it have an extra "pll-isp")
->
-> OK.
->
-> Thanks,
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+	M.
+-- 
+Jazz is not dead. It just smells funny...
