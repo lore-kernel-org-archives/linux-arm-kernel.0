@@ -1,147 +1,126 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Tue, 17 Jan 2017 18:38:41 +0800
-Subject: [01/26] drm/rockchip: dw-mipi-dsi: use mode from display state
-In-Reply-To: <20160919171747.28512-2-john@metanate.com>
-References: <20160919171747.28512-2-john@metanate.com>
-Message-ID: <587DF431.5040003@rock-chips.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Tue, 17 Jan 2017 18:39:18 +0800
+Subject: [PATCH v19 10/15] clocksource/drivers/arm_arch_timer: Refactor
+ the timer init code to prepare for GTDT
+In-Reply-To: <CADyBb7tFaSshUmZsJbNO2tnbqAKEii39NQVfcx5CqDiDsK5OJA@mail.gmail.com>
+References: <20161221064603.11830-1-fu.wei@linaro.org>
+ <20161221064603.11830-11-fu.wei@linaro.org>
+ <20170116183032.GL5908@leverpostej>
+ <CADyBb7tFaSshUmZsJbNO2tnbqAKEii39NQVfcx5CqDiDsK5OJA@mail.gmail.com>
+Message-ID: <CADyBb7sa4Lfk+JestQj6FUd460JRM3GiSijGopHrQr5mHj8efA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Mark,
 
-
-On 09/20/2016 01:17 AM, John Keeping wrote:
-> There is no need to keep a pointer to the mode around since we know it
-> will be present in the connector state.
+On 17 January 2017 at 18:30, Fu Wei <fu.wei@linaro.org> wrote:
+> Hi Mark,
 >
-> Signed-off-by: John Keeping <john@metanate.com>
-> ---
->   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 31 ++++++++++++++++---------------
->   1 file changed, 16 insertions(+), 15 deletions(-)
+> On 17 January 2017 at 02:30, Mark Rutland <mark.rutland@arm.com> wrote:
+>> On Wed, Dec 21, 2016 at 02:45:58PM +0800, fu.wei at linaro.org wrote:
+>>> From: Fu Wei <fu.wei@linaro.org>
+>>>
+>>> The patch refactor original memory-mapped timer init code:
+>>>     (1) Refactor "arch_timer_mem_init", make it become a common code for
+>>>         memory-mapped timer init.
+>>>     (2) Add a new function "arch_timer_mem_of_init" for DT init.
+>>
+>> As a general note, please write proper commit messages, describing what
+>> the problem is, and why we are making the changes. These bullet points
+>> don't add anything to what can be derived from a glance at the code.
+>>
+>> For this patch, you can use:
+>>
+>>   clocksource: arm_arch_timer: refactor MMIO timer probing
+>>
+>>   Currently the code to probe MMIO architected timers mixes DT parsing
+>>   with actual poking of hardware. This makes the code harder than
+>>   necessary to understand, and makes it difficult to add support for
+>>   probing via ACPI.
+>>
+>>   This patch factors all the DT-specific logic out of
+>>   arch_timer_mem_init(), into a new function, arch_timer_mem_of_init().
+>>   The former pokes the hardware and determines the suitablility of
+>>   frames based on a datastructure populated by the latter.
+>>
+>>   This cleanly separates the two and will make it possible to add
+>>   probing using the ACPI GTDT in subsequent patches.
 >
-> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> index ca22e5ee89ca..a87037556f5c 100644
-> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> @@ -286,7 +286,6 @@ struct dw_mipi_dsi {
->   	u32 format;
->   	u16 input_div;
->   	u16 feedback_div;
-> -	struct drm_display_mode *mode;
->   
->   	const struct dw_mipi_dsi_plat_data *pdata;
->   };
-> @@ -332,9 +331,10 @@ static int max_mbps_to_testdin(unsigned int max_mbps)
->    */
->   static void dw_mipi_dsi_wait_for_two_frames(struct dw_mipi_dsi *dsi)
->   {
-> +	struct drm_display_mode *mode = &dsi->connector.state->crtc->state->adjusted_mode;
->   	int refresh, two_frames;
->   
-> -	refresh = drm_mode_vrefresh(dsi->mode);
-> +	refresh = drm_mode_vrefresh(mode);
->   	two_frames = DIV_ROUND_UP(MSEC_PER_SEC, refresh) * 2;
->   	msleep(two_frames);
->   }
-> @@ -461,6 +461,7 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
->   
->   static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi)
->   {
-> +	struct drm_display_mode *mode = &dsi->connector.state->crtc->state->adjusted_mode;
->   	unsigned int i, pre;
->   	unsigned long mpclk, pllref, tmp;
->   	unsigned int m = 1, n = 1, target_mbps = 1000;
-> @@ -474,7 +475,7 @@ static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi)
->   		return bpp;
->   	}
->   
-> -	mpclk = DIV_ROUND_UP(dsi->mode->clock, MSEC_PER_SEC);
-> +	mpclk = DIV_ROUND_UP(mode->clock, MSEC_PER_SEC);
->   	if (mpclk) {
->   		/* take 1 / 0.9, since mbps must big than bandwidth of RGB */
->   		tmp = mpclk * (bpp / dsi->lanes) * 10 / 9;
-> @@ -689,9 +690,9 @@ static void dw_mipi_dsi_init(struct dw_mipi_dsi *dsi)
->   	dsi_write(dsi, DSI_LPCLK_CTRL, PHY_TXREQUESTCLKHS);
->   }
->   
-> -static void dw_mipi_dsi_dpi_config(struct dw_mipi_dsi *dsi,
-> -				   struct drm_display_mode *mode)
-> +static void dw_mipi_dsi_dpi_config(struct dw_mipi_dsi *dsi)
->   {
-> +	struct drm_display_mode *mode = &dsi->connector.state->crtc->state->adjusted_mode;
->   	u32 val = 0, color = 0;
->   
->   	switch (dsi->format) {
-> @@ -726,9 +727,10 @@ static void dw_mipi_dsi_packet_handler_config(struct dw_mipi_dsi *dsi)
->   	dsi_write(dsi, DSI_PCKHDL_CFG, EN_CRC_RX | EN_ECC_RX | EN_BTA);
->   }
->   
-> -static void dw_mipi_dsi_video_packet_config(struct dw_mipi_dsi *dsi,
-> -					    struct drm_display_mode *mode)
-> +static void dw_mipi_dsi_video_packet_config(struct dw_mipi_dsi *dsi)
->   {
-> +	struct drm_display_mode *mode = &dsi->connector.state->crtc->state->adjusted_mode;
-> +
->   	dsi_write(dsi, DSI_VID_PKT_SIZE, VID_PKT_SIZE(mode->hdisplay));
->   }
->   
-> @@ -744,12 +746,13 @@ static void dw_mipi_dsi_command_mode_config(struct dw_mipi_dsi *dsi)
->   static u32 dw_mipi_dsi_get_hcomponent_lbcc(struct dw_mipi_dsi *dsi,
->   					   u32 hcomponent)
->   {
-> +	struct drm_display_mode *mode = &dsi->connector.state->crtc->state->adjusted_mode;
->   	u32 frac, lbcc;
->   
->   	lbcc = hcomponent * dsi->lane_mbps * MSEC_PER_SEC / 8;
->   
-> -	frac = lbcc % dsi->mode->clock;
-> -	lbcc = lbcc / dsi->mode->clock;
-> +	frac = lbcc % mode->clock;
-> +	lbcc = lbcc / mode->clock;
->   	if (frac)
->   		lbcc++;
->   
-> @@ -759,7 +762,7 @@ static u32 dw_mipi_dsi_get_hcomponent_lbcc(struct dw_mipi_dsi *dsi,
->   static void dw_mipi_dsi_line_timer_config(struct dw_mipi_dsi *dsi)
->   {
->   	u32 htotal, hsa, hbp, lbcc;
-> -	struct drm_display_mode *mode = dsi->mode;
-> +	struct drm_display_mode *mode = &dsi->connector.state->crtc->state->adjusted_mode;
->   
->   	htotal = mode->htotal;
->   	hsa = mode->hsync_end - mode->hsync_start;
-> @@ -778,7 +781,7 @@ static void dw_mipi_dsi_line_timer_config(struct dw_mipi_dsi *dsi)
->   static void dw_mipi_dsi_vertical_timing_config(struct dw_mipi_dsi *dsi)
->   {
->   	u32 vactive, vsa, vfp, vbp;
-> -	struct drm_display_mode *mode = dsi->mode;
-> +	struct drm_display_mode *mode = &dsi->connector.state->crtc->state->adjusted_mode;
->   
->   	vactive = mode->vdisplay;
->   	vsa = mode->vsync_end - mode->vsync_start;
-> @@ -821,8 +824,6 @@ static void dw_mipi_dsi_encoder_mode_set(struct drm_encoder *encoder,
->   	struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
->   	int ret;
->   
-> -	dsi->mode = adjusted_mode;
-> -
-I prefer to keep the original method, although this"dsi->mode" pointer 
-is same as "&dsi->connector.state->crtc->state->adjusted_mode; "
-I still think dsi->mode makes the process easier to read
+> Great thanks for this upstream tip.
+> I have used your example commit message instead.
+> It will be in v20.
+>
+>>
+>> [...]
+>>
+>>> +     for_each_available_child_of_node(np, frame_node) {
+>>> +             int n;
+>>> +             struct arch_timer_mem_frame *frame = &timer_mem->frame[i];
+>>> +
+>>> +             if (of_property_read_u32(frame_node, "frame-number", &n)) {
+>>> +                     pr_err("Missing frame-number\n");
+>>> +                     of_node_put(frame_node);
+>>> +                     goto out;
+>>> +             }
+>>> +             frame->frame_nr = n;
+>>> +
+>>> +             if (of_address_to_resource(frame_node, 0, &res)) {
+>>> +                     of_node_put(frame_node);
+>>> +                     goto out;
+>>> +             }
+>>> +             frame->cntbase = res.start;
+>>> +             frame->size = resource_size(&res);
+>>> +
+>>> +             frame->virt_irq = irq_of_parse_and_map(frame_node,
+>>> +                                                    ARCH_TIMER_VIRT_SPI);
+>>> +             frame->phys_irq = irq_of_parse_and_map(frame_node,
+>>> +                                                    ARCH_TIMER_PHYS_SPI);
+>>>
+>>> -     if (!arch_timer_needs_of_probing())
+>>> +             if (++i >= ARCH_TIMER_MEM_MAX_FRAMES)
+>>> +                     break;
+>>> +     }
+>>
+>> It would be good if we could warn upon seeing more than
+>> ARCH_TIMER_MEM_MAX_FRAMES children, since that's obviously an error.
+>
+> OK, NP, will use
+>
+> if (i >= ARCH_TIMER_MEM_MAX_FRAMES) {
+>         pr_err(FW_BUG "too many frames, ARMv8 spec only allows 8.\n");
+
+Sorry,  this should be "ARM spec only allows 8.\n"
+
+Not only ARMv8, but also ARMv7
 
 
->   	ret = dw_mipi_dsi_get_lane_bps(dsi);
->   	if (ret < 0)
->   		return;
-> @@ -833,10 +834,10 @@ static void dw_mipi_dsi_encoder_mode_set(struct drm_encoder *encoder,
->   	}
->   
->   	dw_mipi_dsi_init(dsi);
-> -	dw_mipi_dsi_dpi_config(dsi, mode);
-> +	dw_mipi_dsi_dpi_config(dsi);
->   	dw_mipi_dsi_packet_handler_config(dsi);
->   	dw_mipi_dsi_video_mode_config(dsi);
-> -	dw_mipi_dsi_video_packet_config(dsi, mode);
-> +	dw_mipi_dsi_video_packet_config(dsi);
->   	dw_mipi_dsi_command_mode_config(dsi);
->   	dw_mipi_dsi_line_timer_config(dsi);
->   	dw_mipi_dsi_vertical_timing_config(dsi);
+>         goto out;
+> }
+>
+> at the beginning of this loop.
+>
+> Here will be replaced by  i++;
+>
+> Great thanks for your suggestion!
+>
+>>
+>> Thanks,
+>> Mark.
+>
+>
+>
+> --
+> Best regards,
+>
+> Fu Wei
+> Software Engineer
+> Red Hat
+
+
+
+-- 
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
