@@ -1,28 +1,80 @@
 From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 17 Jan 2017 16:02:21 +0530
-Subject: [PATCH 0/2] Add USB DRD 3.0 device node for Exynos7
-References: <CGME20170117102937epcas5p1f49119a781097709b6bd6d29730c0c0f@epcas5p1.samsung.com>
-Message-ID: <1484649143-19423-1-git-send-email-pankaj.dubey@samsung.com>
+Date: Tue, 17 Jan 2017 16:02:23 +0530
+Subject: [PATCH 2/2] arm64: dts: exynos: Add regulators for Vbus and Vbus-Boost
+In-Reply-To: <1484649143-19423-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1484649143-19423-1-git-send-email-pankaj.dubey@samsung.com>
+ <CGME20170117102941epcas1p3a33a312bedd013edb0997b16786dede6@epcas1p3.samsung.com>
+Message-ID: <1484649143-19423-3-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds USB 3.0 DRD device node for Exynos7 and 
-required Vbus and Vbus-boost support for espresso dev boards.
-These patches are part of patch series [1] earlier submitted by Vivek
+Adding fixed voltage regulators for Vbus and Vbus-boost required
+by USB 3.0 DRD controller on Exynos7-espresso board.
 
-[1]: https://lkml.org/lkml/2014/11/21/247
-
-While other patches in these series got merged, DTS related change were
-left. I have prepared and tested these patches on top of krzk/for-next.
-
-
-Pankaj Dubey (2):
-  arm64: dts: exynos: Add USB 3.0 controller node for Exynos7
-  arm64: dts: exynos: Add regulators for Vbus and Vbus-Boost
-
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Signed-off-by: Vivek Gautam <gautamvivek1987@gmail.com>
+---
  arch/arm64/boot/dts/exynos/exynos7-espresso.dts | 44 +++++++++++++++++++++++++
- arch/arm64/boot/dts/exynos/exynos7.dtsi         | 34 +++++++++++++++++++
- 2 files changed, 78 insertions(+)
+ 1 file changed, 44 insertions(+)
 
+diff --git a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+index 9cf73cf..68f3a51 100644
+--- a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
++++ b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+@@ -33,6 +33,29 @@
+ 		device_type = "memory";
+ 		reg = <0x0 0x40000000 0x0 0xC0000000>;
+ 	};
++
++	usb30_vbus_reg: regulator-usb30 {
++		compatible = "regulator-fixed";
++		regulator-name = "VBUS_5V";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gph1 1 0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&usb30_vbus_en>;
++		enable-active-high;
++	};
++
++	usb3drd_boost_5v: regulator-usb3drd-boost {
++		compatible = "regulator-fixed";
++		regulator-name = "VUSB_VBUS_5V";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpf4 1 0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&usb3drd_boost_en>;
++		enable-active-high;
++	};
++
+ };
+ 
+ &fin_pll {
+@@ -366,3 +389,24 @@
+ 	vqmmc-supply = <&ldo2_reg>;
+ 	disable-wp;
+ };
++
++&usbdrd_phy {
++	vbus-supply = <&usb30_vbus_reg>;
++	vbus-boost-supply = <&usb3drd_boost_5v>;
++};
++
++&pinctrl_bus1 {
++	usb30_vbus_en: usb30-vbus-en {
++		samsung,pins = "gph1-1";
++		samsung,pin-function = <1>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
++
++	usb3drd_boost_en: usb3drd-boost-en {
++		samsung,pins = "gpf4-1";
++		samsung,pin-function = <1>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <0>;
++	};
++};
 -- 
 2.7.4
