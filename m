@@ -1,43 +1,18 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 17 Jan 2017 08:07:50 -0800
-Subject: [GIT PULL] Amlogic fixes for v4.10-rc4
-In-Reply-To: <20170117060414.GD16607@localhost> (Olof Johansson's message of
- "Mon, 16 Jan 2017 22:04:14 -0800")
-References: <m2inpi6d09.fsf@baylibre.com>
- <c781a080-455f-bba2-1bfb-cdd39343842b@suse.de>
- <20170117060414.GD16607@localhost>
-Message-ID: <m2wpdt4qll.fsf@baylibre.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 17 Jan 2017 14:11:07 -0200
+Subject: [PATCH] ARM: dts: udoo_neo: Add UDOO Neo USB OTG1 and OTG2 support
+In-Reply-To: <1484074778-2112-1-git-send-email-breno.lima@nxp.com>
+References: <1484074778-2112-1-git-send-email-breno.lima@nxp.com>
+Message-ID: <CAOMZO5ANg8pJLDhSUQXa8AWhGDPafeUFCMoz-iuUs-+GUbXO_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Tue, Jan 10, 2017 at 4:59 PM, Breno Lima <breno.lima@nxp.com> wrote:
 
-Olof Johansson <olof@lixom.net> writes:
+> +&usbotg1 { /* J2 micro USB port */
+> +       vbus-supply = <&reg_usb_otg1_vbus>;
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&pinctrl_usb_otg1>;
+> +       imx6-usb-charger-detection;
 
-> On Mon, Jan 16, 2017 at 03:24:59PM +0100, Andreas F??rber wrote:
->> Am 13.01.2017 um 19:17 schrieb Kevin Hilman:
->> > ----------------------------------------------------------------
->> > Amlogic fixes for v4.10-rc4
->> > - odroid-c2: disable DVFS to avoid crashes due to broken SCPI
->> > - fix misc. crashes by adding known reserved memory regions
->> > 
->> > ----------------------------------------------------------------
->> > Neil Armstrong (2):
->> >       ARM64: dts: meson-gxbb-odroidc2: Disable SCPI DVFS
->> 
->> >       ARM64: dts: meson-gx: Add reserved memory zone and usable memory range
->> 
->> Objection against the latter patch introducing widespread usage of
->> hardcoded linux,usable-memory properties - please review closely before
->> considering to merge.
->
-> Holding off until that discussion has concluded. Following up on that thread as
-> well.
-
-While we rework the reserved memory fix, could you cherry-pick the SCPI
-fix from this branch into fixes?  That one is independent from this, and
-is also a nasty crash.
-
-Thanks,
-
-Kevin
+Please remove this property, as it does not exist in mainline.
