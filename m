@@ -1,39 +1,60 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 17 Jan 2017 21:03:03 +0100
-Subject: [GIT PULL] ARM: at91: drivers for 4.11
-Message-ID: <20170117200303.ycriqdrdwo5usccc@piout.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 17 Jan 2017 21:06:58 +0100
+Subject: [PATCH 1/4] phy: sun4i-usb: support PHY0 on H3 in MUSB mode
+In-Reply-To: <3866431484672228@web20j.yandex.ru>
+References: <20170116191449.50397-1-icenowy@aosc.xyz>
+ <20170116191449.50397-2-icenowy@aosc.xyz>
+ <20170117080611.tn7s7ddj2csqr27m@lukather>
+ <3866431484672228@web20j.yandex.ru>
+Message-ID: <20170117200658.gcrcxeanthdtwg26@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On Wed, Jan 18, 2017 at 12:57:08AM +0800, Icenowy Zheng wrote:
+> 
+> 
+> 17.01.2017, 16:06, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> > On Tue, Jan 17, 2017 at 03:14:46AM +0800, Icenowy Zheng wrote:
+> >> ?The PHY0 on H3 can be wired either to MUSB controller or OHCI/EHCI
+> >> ?controller.
+> >>
+> >> ?The original driver wired it to OHCI/EHCI controller; however, as the
+> >> ?code to use PHY0 as OHCI/EHCI is missing, it makes the PHY fully
+> >> ?unusable.
+> >>
+> >> ?Rename the register (according to its function and the name in BSP
+> >> ?driver), and remove the code which wires the PHY0 to OHCI/EHCI, as MUSB
+> >> ?can support both peripheral and host mode (although the host mode of
+> >> ?MUSB is buggy).
+> >
+> > Can you elaborate on that? What's wrong with it?
+> 
+> The configuration is at bit 0 of register 0x20 in PHY.
+> 
+> When the PHY is reseted, it defaults as MUSB mode.
+> 
+> However, the original author of the H3 PHY code seems to be lack of
+> this knowledge (He named it PHY_UNK_H3), and changed the PHY to HCI
+> mode.
+> 
+> I just removed the code that wires it to HCI mode, thus it will work
+> in MUSB mode, with my sun8i-h3-musb patch.
 
-This is a single fix for the atmel-ebi.
+I have no idea what you mean by MUSB mode.
 
-The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+Do you mean that the previous code was only working in host mode, and
+now it only works in peripheral?
 
-  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.11-drivers
-
-for you to fetch changes up to ee194289502a6901cc77dc9a893bf2afd351ac5e:
-
-  memory/atmel-ebi: Fix ns <-> cycles conversions (2017-01-10 16:01:34 +0100)
-
-----------------------------------------------------------------
-Drivers for 4.11:
-
- - atmel-ebi: Fix ns <-> cycles conversions
-
-----------------------------------------------------------------
-Boris Brezillon (1):
-      memory/atmel-ebi: Fix ns <-> cycles conversions
-
- drivers/memory/atmel-ebi.c | 27 ++++++++++++++-------------
- 1 file changed, 14 insertions(+), 13 deletions(-)
+Maxime
 
 -- 
-Alexandre Belloni, Free Electrons
+Maxime Ripard, Free Electrons
 Embedded Linux and Kernel engineering
 http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170117/69bbe9da/attachment.sig>
