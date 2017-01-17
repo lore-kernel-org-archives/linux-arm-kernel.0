@@ -1,27 +1,26 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 17 Jan 2017 18:34:04 +0100
-Subject: [PATCH v2 8/8] ARM: dts: kirkwood-rd88f6281: Utilize new DSA
- binding
-In-Reply-To: <20170105192957.14304-9-f.fainelli@gmail.com>
-References: <20170105192957.14304-1-f.fainelli@gmail.com>
- <20170105192957.14304-9-f.fainelli@gmail.com>
-Message-ID: <20170117173404.GG9470@lunn.ch>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 17 Jan 2017 19:36:38 +0200
+Subject: [PATCH v2 06/13] pinctrl: samsung: Fix
+ samsung_pinctrl_create_functions return value
+In-Reply-To: <1484657084-26227-7-git-send-email-m.szyprowski@samsung.com>
+References: <1484657084-26227-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170117124459eucas1p1ead13705d84054c1d69b5d7a9795f0e9@eucas1p1.samsung.com>
+ <1484657084-26227-7-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20170117173638.hcnzpcsxtz4dlpjk@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2017 at 11:29:57AM -0800, Florian Fainelli wrote:
-> Utilize the new DSA binding, introduced with commit 8c5ad1d6179d ("net: dsa:
-> Document new binding"). The legacy binding node is kept included, but is marked
-> disabled.
+On Tue, Jan 17, 2017 at 01:44:37PM +0100, Marek Szyprowski wrote:
+> Return proper error code in case of memory allocation failure.
 > 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > ---
->  arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts | 11 ++++++++
->  arch/arm/boot/dts/kirkwood-rd88f6281.dtsi   | 44 +++++++++++++++++++++++++++++
->  2 files changed, 55 insertions(+)
+>  drivers/pinctrl/samsung/pinctrl-samsung.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
 
-Hi Florian
+Thanks for fixing.
+Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-What about arch/arm/boot/dts/kirkwood-rd88f6281-a.dts
-
-     Andrew
+Best regards,
+Krzysztof
