@@ -1,46 +1,119 @@
-From: jeyu@redhat.com (Jessica Yu)
-Date: Mon, 16 Jan 2017 23:49:21 -0500
-Subject: arm: module: Add apply_relocate_add
-In-Reply-To: <1481043967-15602-4-git-send-email-abelvesa@linux.com>
-References: <1481043967-15602-1-git-send-email-abelvesa@linux.com>
- <1481043967-15602-4-git-send-email-abelvesa@linux.com>
-Message-ID: <20170117044921.GI9045@packer-debian-8-amd64.digitalocean.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 17 Jan 2017 13:51:15 +0900
+Subject: [PATCH 09/12] pinctrl: samsung: Add infrastructure for pin-bank
+ retention control
+In-Reply-To: <1484549107-5957-10-git-send-email-m.szyprowski@samsung.com>
+References: <CGME20170116064527eucas1p1f0f78e9420e7d9d60d94b6e7381caeb1@eucas1p1.samsung.com>
+ <1484549107-5957-1-git-send-email-m.szyprowski@samsung.com>
+ <1484549107-5957-10-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CA+Ln22GY+RSX3WKvsmAvARxqvYitKq=7TWpy9zn7PbRiKyxeWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+++ Abel Vesa [06/12/16 17:06 +0000]:
->It was only added to fix compiler error. It is not implemented
->yet.
+Hi Marek,
+
+2017-01-16 15:45 GMT+09:00 Marek Szyprowski <m.szyprowski@samsung.com>:
+> Pad retention control after suspend/resume cycle should be done from pin
+> controller driver instead of PMU (power management unit) driver to avoid
+> possible ordering and logical dependencies. Till now it worked fine only
+> because PMU driver registered its sys_ops after pin controller.
 >
->Signed-off-by: Abel Vesa <abelvesa@linux.com>
->---
-> arch/arm/kernel/module.c | 9 +++++++++
-> 1 file changed, 9 insertions(+)
+> This patch adds infrastructure to handle pad retention during pin control
+> driver resume.
 >
->diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
->index 4f14b5c..bf94922 100644
->--- a/arch/arm/kernel/module.c
->+++ b/arch/arm/kernel/module.c
->@@ -52,6 +52,15 @@ void *module_alloc(unsigned long size)
-> #endif
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  drivers/pinctrl/samsung/pinctrl-samsung.c | 12 ++++++---
+>  drivers/pinctrl/samsung/pinctrl-samsung.h | 42 +++++++++++++++++++++++++++++++
+>  2 files changed, 51 insertions(+), 3 deletions(-)
+
+Please see my comments inline.
+
+> diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
+> index 86f23842f681..95a84086a2e9 100644
+> --- a/drivers/pinctrl/samsung/pinctrl-samsung.c
+> +++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
+> @@ -1075,6 +1075,9 @@ static int samsung_pinctrl_probe(struct platform_device *pdev)
+>                 ctrl->eint_gpio_init(drvdata);
+>         if (ctrl->eint_wkup_init)
+>                 ctrl->eint_wkup_init(drvdata);
+> +       if (ctrl->retention_data && ctrl->retention_data->init)
+> +               drvdata->retention_ctrl = ctrl->retention_data->init(drvdata,
+> +                                                         ctrl->retention_data);
+
+Is there really a use case for init being optional? Also maybe it
+could make sense to add a pr_debug() in case retention_data is not
+present (maybe even a warning would make sense, since the old code
+should be deprecated...).
+
 >
-> int
->+apply_relocate_add(Elf32_Shdr *sechdrs, const char *strtab,
->+		   unsigned int symindex, unsigned int relindex,
->+		   struct module *module)
->+{
->+	/* Not implemented yet */
->+	return 0;
->+}
+>         platform_set_drvdata(pdev, drvdata);
+>
+> @@ -1127,15 +1130,15 @@ static void samsung_pinctrl_suspend_dev(
+>
+>         if (drvdata->suspend)
+>                 drvdata->suspend(drvdata);
+> +       if (drvdata->retention_ctrl && drvdata->retention_ctrl->on)
+> +               drvdata->retention_ctrl->on(drvdata);
+> +
 
-Are SHT_RELA relocation sections actually supported on 32-bit arm? It looks
-like there's only support for SHT_REL.
+nit: Stray blank line.
 
-arch/arm/Kconfig:84:	select MODULES_USE_ELF_REL
+>  }
+>
+>  /**
+>   * samsung_pinctrl_resume_dev - restore pinctrl state from suspend for a device
+>   *
+>   * Restore one of the banks that was saved during suspend.
+> - *
+> - * We don't bother doing anything complicated to avoid glitching lines since
+> - * we're called before pad retention is turned off.
 
-If we support SHT_REL sections, the correct fix is to probably have
-klp_write_object_relocations() check if the relocation section is
-SHT_REL or SHT_RELA, and call the appropriate function (apply_relocate
-or apply_relocate_add), similar to how the module loader does it.
+I think the comment is still valid. Just could be adjusted to take
+into account that now we are in charge of turning off the retention
+after restoring the registers.
 
-Jessica
+>   */
+>  static void samsung_pinctrl_resume_dev(struct samsung_pinctrl_drv_data *drvdata)
+>  {
+> @@ -1174,6 +1177,9 @@ static void samsung_pinctrl_resume_dev(struct samsung_pinctrl_drv_data *drvdata)
+>                         if (widths[type])
+>                                 writel(bank->pm_save[type], reg + offs[type]);
+>         }
+> +
+> +       if (drvdata->retention_ctrl && drvdata->retention_ctrl->off)
+> +               drvdata->retention_ctrl->off(drvdata);
+>  }
+>
+>  /**
+> diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.h b/drivers/pinctrl/samsung/pinctrl-samsung.h
+> index 6f7ce7539a00..6079142422f8 100644
+> --- a/drivers/pinctrl/samsung/pinctrl-samsung.h
+> +++ b/drivers/pinctrl/samsung/pinctrl-samsung.h
+> @@ -185,10 +185,48 @@ struct samsung_pin_bank {
+>  };
+>
+>  /**
+> + * struct samsung_retention_data: runtime pin-bank retention control data.
+> + * @regs: array of PMU registers to control pad retention.
+> + * @nr_regs: number of registers in @regs array.
+> + * @value: value to store to registers to turn off retention.
+> + * @refcnt: atomic counter if retention control affects more than one bank.
+> + * @priv: retention control code private data
+> + * @on: platform specific callback to enter retention mode.
+> + * @off: platform specific callback to exit retention mode.
+> + **/
+> +struct samsung_retention_ctrl {
+> +       const u32       *regs;
+> +       int             nr_regs;
+> +       u32             value;
+> +       atomic_t        *refcnt;
+> +       void            *priv;
+> +       void            (*on)(struct samsung_pinctrl_drv_data *);
+> +       void            (*off)(struct samsung_pinctrl_drv_data *);
+
+bikeshed: I think enable/disable is more commonly used for this kind
+of operations.
+
+Best regards,
+Tomasz
