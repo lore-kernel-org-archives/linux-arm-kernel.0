@@ -1,21 +1,21 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 16 Jan 2017 22:26:11 -0800
-Subject: [GIT PULL] Ux500 PM fix from Arnd
-In-Reply-To: <CACRpkdbb5JkPW=1ObA8eAnyKJ5vmEWkHa4Wmv-qRQa2Vr2xjLQ@mail.gmail.com>
-References: <CACRpkdbb5JkPW=1ObA8eAnyKJ5vmEWkHa4Wmv-qRQa2Vr2xjLQ@mail.gmail.com>
-Message-ID: <20170117062611.GI16607@localhost>
+Date: Mon, 16 Jan 2017 22:26:57 -0800
+Subject: [GIT PULL] Ux500 development for v4.11
+In-Reply-To: <CACRpkdZnk-qpJi-FOPuMyWBT-=AEK7krxZJZp=UZYzjbuBOK7Q@mail.gmail.com>
+References: <CACRpkdZnk-qpJi-FOPuMyWBT-=AEK7krxZJZp=UZYzjbuBOK7Q@mail.gmail.com>
+Message-ID: <20170117062657.GJ16607@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2017 at 02:01:47PM +0100, Linus Walleij wrote:
+On Thu, Jan 12, 2017 at 02:06:14PM +0100, Linus Walleij wrote:
 > Hi ARM SoC folks,
 > 
-> this was forgotten on my fixes branch, sorry. Please pull it
-> in for fixes in the ARM SoC tree.
+> here is a set of two patches ready to be queued for v4.11 already.
+> 
+> Please pull them to a suitable branch on the ARM SoC tree.
 > 
 > Yours,
 > Linus Walleij
-> 
 > 
 > The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 > 
@@ -24,18 +24,23 @@ On Thu, Jan 12, 2017 at 02:01:47PM +0100, Linus Walleij wrote:
 > are available in the git repository at:
 > 
 >   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-> tags/ux500-fix-for-armsoc
+> tags/ux500-dev-for-armsoc
 > 
-> for you to fetch changes up to f0e8faa7a5e894b0fc99d24be1b18685a92ea466:
+> for you to fetch changes up to f3c05596344fa09074220513583bc5d6ff2d5c43:
 > 
->   ARM: ux500: fix prcmu_is_cpu_in_wfi() calculation (2017-01-12 13:25:39 +0100)
-> 
-> ----------------------------------------------------------------
-> A single PM fix from Arnd
+>   ARM: ux500: remove duplicated include from cpu-db8500.c (2017-01-12
+> 14:02:34 +0100)
 > 
 > ----------------------------------------------------------------
-> Arnd Bergmann (1):
->       ARM: ux500: fix prcmu_is_cpu_in_wfi() calculation
+> Some two collected patches simplifying some Ux500
+> stuff.
+> 
+> ----------------------------------------------------------------
+> Linus Walleij (1):
+>       ARM: ux500: simplify secondary boot
+> 
+> Wei Yongjun (1):
+>       ARM: ux500: remove duplicated include from cpu-db8500.c
 
 Merged, thanks!
 
