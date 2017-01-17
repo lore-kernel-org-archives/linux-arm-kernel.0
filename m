@@ -1,35 +1,37 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 17 Jan 2017 23:23:14 +0000
-Subject: [PATCH] ARM: smp: Remove CPU: shutdown notice
-In-Reply-To: <20170117230714.6799-1-f.fainelli@gmail.com>
-References: <20170117230714.6799-1-f.fainelli@gmail.com>
-Message-ID: <20170117232314.GI27312@n2100.armlinux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 17 Jan 2017 15:27:44 -0800
+Subject: [PATCH 1/2] ARM: dts: dra7-evm: increase QSPI SPL partition size
+In-Reply-To: <6C6B28D4DC342643927BEAFCE8707BF6C0A8C367@DBDE04.ent.ti.com>
+References: <1484311234-21978-1-git-send-email-ravibabu@ti.com>
+ <1484311234-21978-2-git-send-email-ravibabu@ti.com>
+ <20170113181239.GC2630@atomide.com>
+ <6C6B28D4DC342643927BEAFCE8707BF6C0A8C367@DBDE04.ent.ti.com>
+Message-ID: <20170117232743.GA7403@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 03:07:12PM -0800, Florian Fainelli wrote:
-> This message is not particularly informative, and is not paired with an
-> identical message when a CPU is brought online. Finally, it slows the
-> CPU hotplug path down, thus allowing less CPU hotplug operations per
-> second. Just remove it.
+* B, Ravi <ravibabu@ti.com> [170117 00:15]:
+> Hi Tony
+> 
+> >* Ravi Babu <ravibabu@ti.com> [170113 04:41]:
+> >> The SPL size for DRA74x platform has increased and is now more than 
+> >> 64KB. Increase QSPI SPL partition size to 256KB for DRA74x EVM.
+> >> 
+> >> QSPI partition numbering changes because of this.
+> 
+> >And this will break the existing partitions potentially..
+> >See what was discussed on the list few days ago in thread "[PATCH 1/6] ARM: dts: am335x-phycore-som: Update NAND partition table".
+> 
+> >It's best to have these left empty or as they originally were and let u-boot configure the partitions.
+> 
+> Agree with you. For dra7xx platform the SPL size has been increased to 256KB and hence the existing QSPI SPL partition in kernel (64K size) will break when latest mainline u-boot is used. 
+> Here only SPL partition has been changed and other partition & size is NOT changed and kept intact. I feel it will not break the existing partitions for dra7xx platform.
 
-CPU hotplug isn't a fast operation anyway - it's also fairly disruptive
-in that it uses stop_machine() to halt activity everywhere while taking
-the CPU offline.
+What about the renumbering of partitions in your patch?
 
-If you're worried about a single printk slowing things down, it sounds
-like you're doing something wrong here - maybe you should be using
-cpuidle for power management rather than trying to make CPU hotplug do
-that for you?
+Probably just best to make the partition information empty in the
+kernel as discussed.
 
-A rapidly changing CPU hotplug state has other side effects - such as
-reading /proc/interrupts is meaningless, because as soon as you've read
-it the CPUs could have changed.  It also makes a farce of spreading
-interrupts over the available CPUs.
+Regards,
 
-All in all, I don't think this is a good idea...
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Tony
