@@ -1,130 +1,130 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 17 Jan 2017 10:20:21 +0000
-Subject: [RFC PATCH 00/33] irqchip: Core support for GICv4
-Message-ID: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
+Date: Tue, 17 Jan 2017 10:20:22 +0000
+Subject: [RFC PATCH 01/33] irqchip/gic-v3: Add redistributor iterator
+In-Reply-To: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
+References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1484648454-21216-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series implements the core support for GICv4. And despite its
-size, it does exactly *nothing*. What it adds is an infrastructure
-that a hypervisor (KVM) can use to route VLPIs to a guest.
+In order to discover the VLPI properties, we need to iterate over
+the redistributor regions. As we already have code that does this,
+let's factor it out and make it slightly more generic.
 
->From the bit of documentation that is in patch #32:
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/irqchip/irq-gic-v3.c | 77 ++++++++++++++++++++++++++++++++------------
+ 1 file changed, 56 insertions(+), 21 deletions(-)
 
-WARNING: The blurb below assumes that you understand the
-intricacies of GICv3, GICv4, and how a guest's view of a GICv3 gets
-translated into GICv4 commands. So it effectively targets at most
-two individuals. You know who you are.
-
-The core GICv4 code is designed to *avoid* exposing too much of the
-core GIC code (that would in turn leak into the hypervisor code),
-and instead provide a hypervisor agnostic interface to the HW (of
-course, the astute reader will quickly realize that hypervisor
-agnostic actually means KVM-specific - what were you thinking?).
-
-In order to achieve a modicum of isolation, we try to hide most of
-the GICv4 "stuff" behind normal irqchip operations:
-
-- Any guest-visible VLPI is backed by a Linux interrupt (and a
-  physical LPI which gets deconfigured when the guest maps the
-  VLPI). This allows the same DevID/Event pair to be either mapped
-  to the LPI (host) or the VLPI (guest).
-
-- Enabling/disabling a VLPI is done by issuing mask/unmask calls.
-
-- Guest INT/CLEAR commands are implemented through
-  irq_set_irqchip_state().
-
-- The *bizarre* stuff (mapping/unmapping an interrupt to a VLPI, or
-  issuing an INV after changing a priority) gets shoved into the
-  irq_set_vcpu_affinity() method. While this is quite horrible
-  (let's face it, this is the irqchip version of an ioctl), it
-  confines the crap to a single location. And map/unmap really is
-  about setting the affinity of a VLPI to a vcpu, so only INV is
-  majorly out of place. So there.
-
-But handling VLPIs is only one side of the job of the GICv4
-code. The other (darker) side is to take care of the doorbell
-interrupts which are delivered when a VLPI targeting a non-running
-vcpu is being made pending.
-
-The choice made here is that each vcpu (VPE in old northern GICv4
-dialect) gets a single doorbell, no matter how many interrupts are
-targeting it. This has a nice property, which is that the interrupt
-becomes a handle for the VPE, and that the hypervisor code can
-manipulate it through the normal interrupt API:
-
-- VMs (or rather the VM abstraction that matters to the GIC)
-  contain an irq domain where each interrupt maps to a VPE. In
-  turn, this domain sits on top of the normal LPI allocator, and a
-  specially crafted irq_chip implementation.
-
-- mask/unmask do what is expected on the doorbell interrupt.
-
-- irq_set_affinity is used to move a VPE from one redistributor to
-  another.
-
-- irq_set_vcpu_affinity once again gets hijacked for the purpose of
-  creating a new sub-API, namely scheduling/descheduling a VPE and
-  performing INVALL operations.
-
-
-I'm posting these patches separately from the rest of the KVM work
-because:
-
-- they are complicated enough already
-- I want to keep the interface as clean as possible
-- the KVM device assignment is still in a state of flux
-
-Patches on top of v4.10-rc3.
-
-Marc Zyngier (33):
-  irqchip/gic-v3: Add redistributor iterator
-  irqchip/gic-v3: Add VLPI/DirectLPI discovery
-  irqchip/gic-v3-its: Refactor command encoding
-  irqchip/gic-v3-its: Move LPI definitions around
-  irqchip/gic-v3-its: Zero command on allocation
-  irqchip/gic-v3-its: Add probing for VLPI properties
-  irqchip/gic-v3-its: Macro-ize its_send_single_command
-  irqchip/gic-v3-its: Implement irq_set_irqchip_state for pending state
-  irqchip/gic-v3-its: Split out property table allocation
-  irqchip/gic-v4-its: Allow use of indirect VCPU tables
-  irqchip/gic-v3-its: Split out pending table allocation
-  irqchip/gic-v3-its: Rework LPI freeing
-  irqchip/gic-v3-its: Generalize device table allocation
-  irqchip/gic-v3-its: Generalize LPI configuration
-  irqchip/gic-v4: Add management structure definitions
-  irqchip/gic-v3-its: Add GICv4 ITS command definitions
-  irqchip/gic-v3-its: Add VLPI configuration hook
-  irqchip/gic-v3-its: Add VLPI map/unmap operations
-  irqchip/gic-v3-its: Add VLPI configuration handling
-  irqchip/gic-v3-its: Add VPE domain infrastructure
-  irqchip/gic-v3-its: Add VPE irq domain allocation/teardown
-  irqchip/gic-v3-its: Add VPE irq domain [de]activation
-  irqchip/gic-v3-its: Add VPENDBASER/VPROPBASER accessors
-  irqchip/gic-v3-its: Add VPE scheduling
-  irqchip/gic-v3-its: Add VPE invalidation hook
-  irqchip/gic-v3-its: Add VPE affinity changes
-  irqchip/gic-v3-its: Add VPE interrupt masking
-  irqchip/gic-v3-its: Support VPE doorbell invalidation even when
-    !DirectLPI
-  irqchip/gic-v4: Add per-VM VPE domain creation
-  irqchip/gic-v4: Add VPE command interface
-  irqchip/gic-v4: Add VLPI configuration interface
-  irqchip/gic-v4: Add some basic documentation
-  irqchip/gic-v4: Enable low-level GICv4 operations
-
- arch/arm/include/asm/arch_gicv3.h   |   28 +
- arch/arm64/include/asm/arch_gicv3.h |    5 +
- drivers/irqchip/Makefile            |    2 +-
- drivers/irqchip/irq-gic-v3-its.c    | 1183 +++++++++++++++++++++++++++++++----
- drivers/irqchip/irq-gic-v3.c        |   99 ++-
- drivers/irqchip/irq-gic-v4.c        |  241 +++++++
- include/linux/irqchip/arm-gic-v3.h  |   82 +++
- include/linux/irqchip/arm-gic-v4.h  |  102 +++
- 8 files changed, 1602 insertions(+), 140 deletions(-)
- create mode 100644 drivers/irqchip/irq-gic-v4.c
- create mode 100644 include/linux/irqchip/arm-gic-v4.h
-
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index c132f29..5cadec0 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -421,24 +421,15 @@ static void __init gic_dist_init(void)
+ 		gic_write_irouter(affinity, base + GICD_IROUTER + i * 8);
+ }
+ 
+-static int gic_populate_rdist(void)
++static int gic_scan_rdist_properties(int (*fn)(struct redist_region *,
++					       void __iomem *))
+ {
+-	unsigned long mpidr = cpu_logical_map(smp_processor_id());
+-	u64 typer;
+-	u32 aff;
++	int ret = 0;
+ 	int i;
+ 
+-	/*
+-	 * Convert affinity to a 32bit value that can be matched to
+-	 * GICR_TYPER bits [63:32].
+-	 */
+-	aff = (MPIDR_AFFINITY_LEVEL(mpidr, 3) << 24 |
+-	       MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16 |
+-	       MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8 |
+-	       MPIDR_AFFINITY_LEVEL(mpidr, 0));
+-
+ 	for (i = 0; i < gic_data.nr_redist_regions; i++) {
+ 		void __iomem *ptr = gic_data.redist_regions[i].redist_base;
++		u64 typer;
+ 		u32 reg;
+ 
+ 		reg = readl_relaxed(ptr + GICR_PIDR2) & GIC_PIDR2_ARCH_MASK;
+@@ -450,14 +441,14 @@ static int gic_populate_rdist(void)
+ 
+ 		do {
+ 			typer = gic_read_typer(ptr + GICR_TYPER);
+-			if ((typer >> 32) == aff) {
+-				u64 offset = ptr - gic_data.redist_regions[i].redist_base;
+-				gic_data_rdist_rd_base() = ptr;
+-				gic_data_rdist()->phys_base = gic_data.redist_regions[i].phys_base + offset;
+-				pr_info("CPU%d: found redistributor %lx region %d:%pa\n",
+-					smp_processor_id(), mpidr, i,
+-					&gic_data_rdist()->phys_base);
++			ret = fn(gic_data.redist_regions + i, ptr);
++			switch (ret) {
++			case 0:
+ 				return 0;
++			case -1:
++				break;
++			default:
++				ret = 0;
+ 			}
+ 
+ 			if (gic_data.redist_regions[i].single_redist)
+@@ -473,9 +464,53 @@ static int gic_populate_rdist(void)
+ 		} while (!(typer & GICR_TYPER_LAST));
+ 	}
+ 
++	if (ret == -1)
++		ret = -ENODEV;
++
++	return 0;
++}
++
++static int __gic_populate_rdist(struct redist_region *region, void __iomem *ptr)
++{
++	unsigned long mpidr = cpu_logical_map(smp_processor_id());
++	u64 typer;
++	u32 aff;
++
++	/*
++	 * Convert affinity to a 32bit value that can be matched to
++	 * GICR_TYPER bits [63:32].
++	 */
++	aff = (MPIDR_AFFINITY_LEVEL(mpidr, 3) << 24 |
++	       MPIDR_AFFINITY_LEVEL(mpidr, 2) << 16 |
++	       MPIDR_AFFINITY_LEVEL(mpidr, 1) << 8 |
++	       MPIDR_AFFINITY_LEVEL(mpidr, 0));
++
++	typer = gic_read_typer(ptr + GICR_TYPER);
++	if ((typer >> 32) == aff) {
++		u64 offset = ptr - region->redist_base;
++		gic_data_rdist_rd_base() = ptr;
++		gic_data_rdist()->phys_base = region->phys_base + offset;
++
++		pr_info("CPU%d: found redistributor %lx region %d:%pa\n",
++			smp_processor_id(), mpidr,
++			(int)(region - gic_data.redist_regions),
++			&gic_data_rdist()->phys_base);
++		return 0;
++	}
++
++	/* Try next one */
++	return 1;
++}
++
++static int gic_populate_rdist(void)
++{
++	if (gic_scan_rdist_properties(__gic_populate_rdist) == 0)
++		return 0;
++
+ 	/* We couldn't even deal with ourselves... */
+ 	WARN(true, "CPU%d: mpidr %lx has no re-distributor!\n",
+-	     smp_processor_id(), mpidr);
++	     smp_processor_id(),
++	     (unsigned long)cpu_logical_map(smp_processor_id()));
+ 	return -ENODEV;
+ }
+ 
 -- 
 2.1.4
