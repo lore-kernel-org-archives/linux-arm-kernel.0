@@ -1,52 +1,46 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Tue, 17 Jan 2017 21:22:17 +0800
-Subject: [PATCH v19 10/15] clocksource/drivers/arm_arch_timer: Refactor
- the timer init code to prepare for GTDT
-In-Reply-To: <20170117122921.GE11939@leverpostej>
-References: <20161221064603.11830-1-fu.wei@linaro.org>
- <20161221064603.11830-11-fu.wei@linaro.org>
- <20170116183032.GL5908@leverpostej>
- <CADyBb7tFaSshUmZsJbNO2tnbqAKEii39NQVfcx5CqDiDsK5OJA@mail.gmail.com>
- <b977f47b-a85e-d4d5-666c-b8c9cd21c25e@codeaurora.org>
- <20170117122921.GE11939@leverpostej>
-Message-ID: <CADyBb7ugEbFB42PcoJc0J8q4BAzCC5HfC8638sMm-5nzA3zcZA@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 17 Jan 2017 13:27:22 +0000
+Subject: [PATCH v4 3/4] arm64: dts: juno: add CoreSight support for Juno
+ r1/r2 variants
+In-Reply-To: <1484655313-9025-4-git-send-email-sudeep.holla@arm.com>
+References: <1484655313-9025-1-git-send-email-sudeep.holla@arm.com>
+ <1484655313-9025-4-git-send-email-sudeep.holla@arm.com>
+Message-ID: <d89b805b-cc6f-37d5-2b64-4f83fa086db6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On 17 January 2017 at 20:29, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Jan 17, 2017 at 06:18:12AM -0600, Timur Tabi wrote:
->> Fu Wei wrote:
->> >if (i >= ARCH_TIMER_MEM_MAX_FRAMES) {
->> >        pr_err(FW_BUG "too many frames, ARMv8 spec only allows 8.\n");
->>
->> pr_err(FW_BUG "too many frames, ARMv8 spec only allows %u.\n",
->>       ARCH_TIMER_MEM_MAX_FRAMES);
+On 17/01/17 12:15, Sudeep Holla wrote:
+> From: Mike Leach <mike.leach@linaro.org>
 >
-> While I don't see ARCH_TIMER_MEM_MAX_FRAMES changing, this would be
-> nicer to ensure the result obviously matches.
+> The CoreSight support added for Juno is valid for only Juno r0.
+> The Juno r1 and r2 variants have additional components and alternative
+> connection routes between trace source and sinks.
 >
-> As for wording, I'd perfer:
+> This patch builds on top of the existing r0 support and extends it to
+> Juno r1/r2 variants.
 >
->         pr_err(FW_BUG "too many frames, only %u are permitted.\n",
->                ARCH_TIMER_MEM_MAX_FRAMES);
-
-OK, will do so.
-Thanks!
-
+> Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Mike Leach <mike.leach@linaro.org>
+> [sudeep.holla at arm.com: minor changelog update and major reorganisation of
+> 	the common coresight components back into juno-base.dtsi to avoid
+> 	duplication, also renamed funnel node names]
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi | 100 ++++++++++++++++++++++++++++++
+>  arch/arm64/boot/dts/arm/juno-r1.dts       |   9 +++
+>  arch/arm64/boot/dts/arm/juno-r2.dts       |   9 +++
+>  3 files changed, 118 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
 >
-> ... so as to avoid any confusion between spec versions and so on. We can
-> reconsider the message if/when that changes.
->
-> Thanks,
-> Mark.
+> diff --git a/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+> new file mode 100644
+> index 000000000000..563463ed28c7
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+> @@ -0,0 +1,100 @@
+> +/ {
+> +	funnel at 20130000 { /* cssys2 */
 
+Typo, that should be csys1. Rest looks good to me.
 
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
