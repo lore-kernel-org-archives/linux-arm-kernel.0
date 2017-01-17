@@ -1,70 +1,63 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 17 Jan 2017 20:34:03 +0530
-Subject: [PATCH v2 1/2] arm64: dts: exynos: Add USB 3.0 controller node for
- Exynos7
-In-Reply-To: <1484665444-23365-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1484665444-23365-1-git-send-email-pankaj.dubey@samsung.com>
- <CGME20170117150121epcas1p102bd1355f780a56e14a0a7a81bd6dfaf@epcas1p1.samsung.com>
-Message-ID: <1484665444-23365-2-git-send-email-pankaj.dubey@samsung.com>
+From: agustinv@codeaurora.org (Agustin Vega-Frias)
+Date: Tue, 17 Jan 2017 10:04:57 -0500
+Subject: [PATCH V9 1/3] ACPI: Generic GSI: Do not attempt to map non-GSI
+ IRQs during bus scan
+In-Reply-To: <587E0AD7.40303@huawei.com>
+References: <1481753438-3905-1-git-send-email-agustinv@codeaurora.org>
+ <1481753438-3905-2-git-send-email-agustinv@codeaurora.org>
+ <587E0AD7.40303@huawei.com>
+Message-ID: <b77d4a60613e7d380623ac81b9ebd131@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vivek Gautam <gautamvivek1987@gmail.com>
+Hi Hanjun,
 
-Add USB 3.0 DRD controller device node, with its clock
-and phy information to enable the same on Exynos7.
+On 2017-01-17 07:15, Hanjun Guo wrote:
+> On 2016/12/15 6:10, Agustin Vega-Frias wrote:
+>> ACPI extended IRQ resources may contain a Resource Source field to 
+>> specify
+>> an alternate interrupt controller, attempting to map them as GSIs is
+>> incorrect, so just disable the platform resource.
+>> 
+>> Since this field is currently ignored, we make this change conditional
+>> on CONFIG_ACPI_GENERIC_GSI to keep the current behavior on x86 
+>> platforms,
+>> in case some existing ACPI tables are using this incorrectly.
+>> 
+>> Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
+>> ---
+>>  drivers/acpi/resource.c | 17 ++++++++++++++++-
+>>  1 file changed, 16 insertions(+), 1 deletion(-)
+>> 
+>> diff --git a/drivers/acpi/resource.c b/drivers/acpi/resource.c
+>> index 56241eb..76ca4e9 100644
+>> --- a/drivers/acpi/resource.c
+>> +++ b/drivers/acpi/resource.c
+>> @@ -43,6 +43,18 @@ static inline bool 
+>> acpi_iospace_resource_valid(struct resource *res)
+>>  acpi_iospace_resource_valid(struct resource *res) { return true; }
+>>  #endif
+>> 
+>> +#ifdef CONFIG_ACPI_GENERIC_GSI
+>> +static inline bool is_gsi(struct acpi_resource_extended_irq *ext_irq)
+>> +{
+>> +	return ext_irq->resource_source.string_length == 0;
+> 
+> As pointed out by Lorenzo, if the interrupt resource is a Resource 
+> Producer,
+> it's not GSI, so maybe the code needs to be updated as
+> 
+> -   return ext_irq->resource_source.string_length == 0;
+> + return ext_irq->resource_source.string_length == 0 &&
+> +        ext_irq->producer_consumer != ACPI_PRODUCER;
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-Signed-off-by: Vivek Gautam <gautamvivek1987@gmail.com>
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
----
- arch/arm64/boot/dts/exynos/exynos7.dtsi | 34 +++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+Agreed. I'll add the check.
 
-diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-index 9080a11..a2d8d11 100644
---- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
-+++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
-@@ -603,6 +603,40 @@
- 				#include "exynos7-trip-points.dtsi"
- 			};
- 		};
-+
-+		usbdrd_phy: phy at 15500000 {
-+			compatible = "samsung,exynos7-usbdrd-phy";
-+			reg = <0x15500000 0x100>;
-+			clocks = <&clock_fsys0 ACLK_USBDRD300>,
-+			       <&clock_fsys0 OSCCLK_PHY_CLKOUT_USB30_PHY>,
-+			       <&clock_fsys0 PHYCLK_USBDRD300_UDRD30_PIPE_PCLK_USER>,
-+			       <&clock_fsys0 PHYCLK_USBDRD300_UDRD30_PHYCLK_USER>,
-+			       <&clock_fsys0 SCLK_USBDRD300_REFCLK>;
-+			clock-names = "phy", "ref", "phy_pipe",
-+				"phy_utmi", "itp";
-+			samsung,pmu-syscon = <&pmu_system_controller>;
-+			#phy-cells = <1>;
-+		};
-+
-+		usbdrd3: usb at 15400000 {
-+			compatible = "samsung,exynos7-dwusb3";
-+			clocks = <&clock_fsys0 ACLK_USBDRD300>,
-+			       <&clock_fsys0 SCLK_USBDRD300_SUSPENDCLK>,
-+			       <&clock_fsys0 ACLK_AXIUS_USBDRD30X_FSYS0X>;
-+			clock-names = "usbdrd30", "usbdrd30_susp_clk",
-+				"usbdrd30_axius_clk";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			dwc3 {
-+				compatible = "snps,dwc3";
-+				reg = <0x15400000 0x10000>;
-+				interrupts = <GIC_SPI 223 IRQ_TYPE_LEVEL_HIGH>;
-+				phys = <&usbdrd_phy 0>, <&usbdrd_phy 1>;
-+				phy-names = "usb2-phy", "usb3-phy";
-+			};
-+		};
- 	};
- };
- 
+Thanks,
+Agustin
+
 -- 
-2.7.4
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
+Linux Foundation Collaborative Project.
