@@ -1,93 +1,31 @@
-From: tnowicki@caviumnetworks.com (Tomasz Nowicki)
-Date: Tue, 17 Jan 2017 15:13:41 +0100
-Subject: [PATCH v8 11/18] iommu/arm-smmu-v3: Implement reserved region
- get/put callbacks
-In-Reply-To: <1484127714-3263-12-git-send-email-eric.auger@redhat.com>
-References: <1484127714-3263-1-git-send-email-eric.auger@redhat.com>
- <1484127714-3263-12-git-send-email-eric.auger@redhat.com>
-Message-ID: <dd80a861-4732-73fb-6d66-b74031925d1b@caviumnetworks.com>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Tue, 17 Jan 2017 14:22:46 +0000
+Subject: [PATCH -next] mtd: nand: mediatek: remove redundant dev_err call in
+ mtk_nfc_probe()
+Message-ID: <20170117142246.9607-1-weiyj.lk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.01.2017 10:41, Eric Auger wrote:
-> iommu/arm-smmu: Implement reserved region get/put callbacks
->
-> The get() populates the list with the MSI IOVA reserved window.
->
-> At the moment an arbitray MSI IOVA window is set at 0x8000000
-> of size 1MB. This will allow to report those info in iommu-group
-> sysfs.
->
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> Acked-by: Will Deacon <will.deacon@arm.com>
+From: Wei Yongjun <weiyongjun1@huawei.com>
 
-Reviewed-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
+There is a error message within devm_ioremap_resource
+already, so remove the dev_err call to avoid redundant
+error message.
 
-Thanks,
-Tomasz
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+---
+ drivers/mtd/nand/mtk_nand.c | 1 -
+ 1 file changed, 1 deletion(-)
 
->
-> ---
->
-> v7 -> v8:
-> - added Will's A-b
->
-> v4: creation
-> ---
->  drivers/iommu/arm-smmu-v3.c | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
->
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 4d6ec44..6c4111c 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -412,6 +412,9 @@
->  /* High-level queue structures */
->  #define ARM_SMMU_POLL_TIMEOUT_US	100
->
-> +#define MSI_IOVA_BASE			0x8000000
-> +#define MSI_IOVA_LENGTH			0x100000
-> +
->  static bool disable_bypass;
->  module_param_named(disable_bypass, disable_bypass, bool, S_IRUGO);
->  MODULE_PARM_DESC(disable_bypass,
-> @@ -1883,6 +1886,29 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
->  	return iommu_fwspec_add_ids(dev, args->args, 1);
->  }
->
-> +static void arm_smmu_get_resv_regions(struct device *dev,
-> +				      struct list_head *head)
-> +{
-> +	struct iommu_resv_region *region;
-> +	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
-> +
-> +	region = iommu_alloc_resv_region(MSI_IOVA_BASE, MSI_IOVA_LENGTH,
-> +					 prot, IOMMU_RESV_MSI);
-> +	if (!region)
-> +		return;
-> +
-> +	list_add_tail(&region->list, head);
-> +}
-> +
-> +static void arm_smmu_put_resv_regions(struct device *dev,
-> +				      struct list_head *head)
-> +{
-> +	struct iommu_resv_region *entry, *next;
-> +
-> +	list_for_each_entry_safe(entry, next, head, list)
-> +		kfree(entry);
-> +}
-> +
->  static struct iommu_ops arm_smmu_ops = {
->  	.capable		= arm_smmu_capable,
->  	.domain_alloc		= arm_smmu_domain_alloc,
-> @@ -1898,6 +1924,8 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
->  	.domain_get_attr	= arm_smmu_domain_get_attr,
->  	.domain_set_attr	= arm_smmu_domain_set_attr,
->  	.of_xlate		= arm_smmu_of_xlate,
-> +	.get_resv_regions	= arm_smmu_get_resv_regions,
-> +	.put_resv_regions	= arm_smmu_put_resv_regions,
->  	.pgsize_bitmap		= -1UL, /* Restricted during device attach */
->  };
->
->
+diff --git a/drivers/mtd/nand/mtk_nand.c b/drivers/mtd/nand/mtk_nand.c
+index 6c3eed3..6c517c6 100644
+--- a/drivers/mtd/nand/mtk_nand.c
++++ b/drivers/mtd/nand/mtk_nand.c
+@@ -1383,7 +1383,6 @@ static int mtk_nfc_probe(struct platform_device *pdev)
+ 	nfc->regs = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(nfc->regs)) {
+ 		ret = PTR_ERR(nfc->regs);
+-		dev_err(dev, "no nfi base\n");
+ 		goto release_ecc;
+ 	}
+ 
