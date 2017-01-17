@@ -1,65 +1,67 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 17 Jan 2017 10:27:53 +0000
-Subject: [PATCH V7 04/10] arm64: exception: handle Synchronous External
- Abort
-In-Reply-To: <0ca6c70e-6033-4cca-8833-15cb8573a939@codeaurora.org>
-References: <1484244924-24786-1-git-send-email-tbaicar@codeaurora.org>
- <1484244924-24786-5-git-send-email-tbaicar@codeaurora.org>
- <20170116115309.GE1510@arm.com>
- <0ca6c70e-6033-4cca-8833-15cb8573a939@codeaurora.org>
-Message-ID: <20170117102753.GA27328@arm.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Tue, 17 Jan 2017 16:02:22 +0530
+Subject: [PATCH 1/2] arm64: dts: exynos: Add USB 3.0 controller node for
+ Exynos7
+In-Reply-To: <1484649143-19423-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1484649143-19423-1-git-send-email-pankaj.dubey@samsung.com>
+ <CGME20170117102939epcas5p1aa25d6d8d080c086fb237e645bedbd17@epcas5p1.samsung.com>
+Message-ID: <1484649143-19423-2-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2017 at 01:09:22PM -0700, Baicar, Tyler wrote:
-> On 1/16/2017 4:53 AM, Will Deacon wrote:
-> >On Thu, Jan 12, 2017 at 11:15:18AM -0700, Tyler Baicar wrote:
-> >>SEA exceptions are often caused by an uncorrected hardware
-> >>error, and are handled when data abort and instruction abort
-> >>exception classes have specific values for their Fault Status
-> >>Code.
-> >>When SEA occurs, before killing the process, go through
-> >>the handlers registered in the notification list.
-> >>Update fault_info[] with specific SEA faults so that the
-> >>new SEA handler is used.
-> >>
-> >>Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
-> >>Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
-> >>Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
-> >>---
-> >>  arch/arm64/include/asm/system_misc.h | 13 ++++++++
-> >>  arch/arm64/mm/fault.c                | 58 +++++++++++++++++++++++++++++-------
-> >>  2 files changed, 61 insertions(+), 10 deletions(-)
-> >>
-> >>diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
-> >>index 57f110b..e7f3440 100644
-> >>--- a/arch/arm64/include/asm/system_misc.h
-> >>+++ b/arch/arm64/include/asm/system_misc.h
-> >>@@ -64,4 +64,17 @@ extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
-> >>  #endif	/* __ASSEMBLY__ */
-> >>+/*
-> >>+ * The functions below are used to register and unregister callbacks
-> >>+ * that are to be invoked when a Synchronous External Abort (SEA)
-> >>+ * occurs. An SEA is raised by certain fault status codes that have
-> >>+ * either data or instruction abort as the exception class, and
-> >>+ * callbacks may be registered to parse or handle such hardware errors.
-> >>+ *
-> >>+ * Registered callbacks are run in an interrupt/atomic context. They
-> >>+ * are not allowed to block or sleep.
-> >>+ */
-> >>+int register_sea_notifier(struct notifier_block *nb);
-> >>+void unregister_sea_notifier(struct notifier_block *nb);
-> >I still don't understand why you need notifiers for this. You register
-> >precisely one hook in the series.
-> I didn't see a response to my last comment on the previous series so I just
-> left it in for this series.
-> The notifier usage is consistent with the GHES code for SCI errors which are
-> also only used a single
-> time in the code. If you think making the call directly is a better option I
-> will remove the notifiers.
+Add USB 3.0 DRD controller device node, with its clock
+and phy information to enable the same on Exynos7.
 
-Yes, please. It's easy to add the notifier infrastructure back if/when it's
-actually needed and I don't see why the low-level fault dispatching needs to
-be consistent with the GHES/SCI code.
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Signed-off-by: Vivek Gautam <gautamvivek1987@gmail.com>
+---
+ arch/arm64/boot/dts/exynos/exynos7.dtsi | 34 +++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-Will
+diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+index 9080a11..a2d8d11 100644
+--- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+@@ -603,6 +603,40 @@
+ 				#include "exynos7-trip-points.dtsi"
+ 			};
+ 		};
++
++		usbdrd_phy: phy at 15500000 {
++			compatible = "samsung,exynos7-usbdrd-phy";
++			reg = <0x15500000 0x100>;
++			clocks = <&clock_fsys0 ACLK_USBDRD300>,
++			       <&clock_fsys0 OSCCLK_PHY_CLKOUT_USB30_PHY>,
++			       <&clock_fsys0 PHYCLK_USBDRD300_UDRD30_PIPE_PCLK_USER>,
++			       <&clock_fsys0 PHYCLK_USBDRD300_UDRD30_PHYCLK_USER>,
++			       <&clock_fsys0 SCLK_USBDRD300_REFCLK>;
++			clock-names = "phy", "ref", "phy_pipe",
++				"phy_utmi", "itp";
++			samsung,pmu-syscon = <&pmu_system_controller>;
++			#phy-cells = <1>;
++		};
++
++		usbdrd3: usb at 15400000 {
++			compatible = "samsung,exynos7-dwusb3";
++			clocks = <&clock_fsys0 ACLK_USBDRD300>,
++			       <&clock_fsys0 SCLK_USBDRD300_SUSPENDCLK>,
++			       <&clock_fsys0 ACLK_AXIUS_USBDRD30X_FSYS0X>;
++			clock-names = "usbdrd30", "usbdrd30_susp_clk",
++				"usbdrd30_axius_clk";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges;
++
++			dwc3 {
++				compatible = "snps,dwc3";
++				reg = <0x15400000 0x10000>;
++				interrupts = <GIC_SPI 223 IRQ_TYPE_LEVEL_HIGH>;
++				phys = <&usbdrd_phy 0>, <&usbdrd_phy 1>;
++				phy-names = "usb2-phy", "usb3-phy";
++			};
++		};
+ 	};
+ };
+ 
+-- 
+2.7.4
