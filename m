@@ -1,30 +1,43 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 16 Jan 2017 21:45:10 -0800
-Subject: [GIT PULL] i.MX fixes for 4.10, 2nd round
-In-Reply-To: <20170110074949.GD20956@dragon>
-References: <20170110074949.GD20956@dragon>
-Message-ID: <20170117054510.GA16607@localhost>
+Date: Mon, 16 Jan 2017 21:46:56 -0800
+Subject: [GIT PULL] ARM: exynos: Fixes for v4.10
+In-Reply-To: <20170113143225.11311-1-krzk@kernel.org>
+References: <20170113143225.11311-1-krzk@kernel.org>
+Message-ID: <20170117054656.GC16607@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 03:49:51PM +0800, Shawn Guo wrote:
-> The following changes since commit 116dad7d4339d0965169df8a864fc829f684794d:
+On Fri, Jan 13, 2017 at 04:32:25PM +0200, Krzysztof Kozlowski wrote:
+> Hi,
 > 
->   ARM: dts: imx6: Disable "weim" node in the dtsi files (2017-01-03 10:59:07 +0800)
+> Just a couple of minor fixes for this release cycle.
+> 
+> Best regards,
+> Krzysztof
+> 
+> 
+> The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+> 
+>   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.10-2
+>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-fixes-4.10
 > 
-> for you to fetch changes up to 37530e74609a28ae3a3b51e7685fe54a00b1e2f2:
+> for you to fetch changes up to 3ef01c968fbfb21c2f16281445d30a865ee4412c:
 > 
->   ARM: dts: imx6qdl-nitrogen6_som2: fix sgtl5000 pinctrl init (2017-01-10 10:51:14 +0800)
+>   ARM: s3c2410_defconfig: Fix invalid values for NF_CT_PROTO_* (2017-01-02 21:05:34 +0200)
 > 
 > ----------------------------------------------------------------
-> i.MX fixes for 4.10, 2nd round:
->  - A couple of Nitrogen6 device tree fixes for audio codec probe
->    failure, which is caused by that pinctrl setting for codec clock
->    was not in the correct device node.
+> Samsung fixes for v4.10:
+> 1. Update maintainers entry with Patchwork address.
+> 2. Fix invalid values for NF_CT_PROTO_* in s3c2410 defconfig (these options
+>    cannot be modules anymore).
+> 
+> ----------------------------------------------------------------
+> Krzysztof Kozlowski (2):
+>       MAINTAINERS: Add Patchwork URL to Samsung Exynos entry
+>       ARM: s3c2410_defconfig: Fix invalid values for NF_CT_PROTO_*
 
 Merged, thanks.
 
