@@ -1,88 +1,89 @@
-From: mbrugger@suse.com (Matthias Brugger)
-Date: Tue, 17 Jan 2017 10:25:14 +0100
-Subject: [PATCH v7 07/15] irqchip: gicv3-its: platform-msi: scan MADT to
- create platform msi domain
-In-Reply-To: <1484147199-4267-8-git-send-email-hanjun.guo@linaro.org>
-References: <1484147199-4267-1-git-send-email-hanjun.guo@linaro.org>
- <1484147199-4267-8-git-send-email-hanjun.guo@linaro.org>
-Message-ID: <575e0341-2a2c-4498-8b01-550ad7732390@suse.com>
+From: david.engraf@sysgo.com (David Engraf)
+Date: Tue, 17 Jan 2017 10:29:02 +0100
+Subject: [PATCH] tcb_clksrc: Use 32 bit tcb as sched_clock
+In-Reply-To: <e9fa8375-70e9-e621-954e-48c3190171ad@linaro.org>
+References: <20170111135059.21318-1-david.engraf@sysgo.com>
+ <e9fa8375-70e9-e621-954e-48c3190171ad@linaro.org>
+Message-ID: <d509dc18-58e8-36bc-74dc-0acca5f8f7ad@sysgo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 11/01/17 16:06, Hanjun Guo wrote:
-> With the introduction of its_pmsi_init_one(), we can add some code
-> on top for ACPI support of platform MSI.
+Am 17.01.2017 um 10:13 schrieb Daniel Lezcano:
+> On 11/01/2017 14:50, David Engraf wrote:
+>> On newer boards the TC can be read as single 32 bit value without locking.
+>> Thus the clock can be used as reference for sched_clock which is much more
+>> accurate than the jiffies implementation.
+>>
+>> Tested on a Atmel SAMA5D2 board.
 >
-> We are scanning the MADT table to get the ITS entry(ies), then use
-> the information to create the platform msi domain for devices connect
-> to it, just like the PCI MSI for ITS did.
->
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Sinan Kaya <okaya@codeaurora.org>
-> Cc: Tomasz Nowicki <tn@semihalf.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> ---
->  drivers/irqchip/irq-gic-v3-its-platform-msi.c | 36 +++++++++++++++++++++++++++
->  1 file changed, 36 insertions(+)
->
+> Is this change backward compatible ?
 
-Reviewed-by: Matthias Brugger <mbrugger@suse.com>
+The way how the driver reads the clock hasn't been changed. I've only 
+introduced the call to sched_clock_register() which will use this clock 
+for the scheduler as long as no better clock is already used. So I don't 
+see a backward compatibility problem.
 
-> diff --git a/drivers/irqchip/irq-gic-v3-its-platform-msi.c b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-> index 3d9efd1..ebe933e 100644
-> --- a/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-> +++ b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-> @@ -103,6 +103,41 @@ static int __init its_pmsi_init_one(struct fwnode_handle *fwnode,
->  	return 0;
->  }
+Best regards
+- David
+
 >
-> +#ifdef CONFIG_ACPI
-> +static int __init
-> +its_pmsi_parse_madt(struct acpi_subtable_header *header,
-> +			const unsigned long end)
-> +{
-> +	struct acpi_madt_generic_translator *its_entry;
-> +	struct fwnode_handle *domain_handle;
-> +	const char *node_name;
-> +	int err = -ENXIO;
-> +
-> +	its_entry = (struct acpi_madt_generic_translator *)header;
-> +	node_name = kasprintf(GFP_KERNEL, "ITS at 0x%lx",
-> +			      (long)its_entry->base_address);
-> +	domain_handle = iort_find_domain_token(its_entry->translation_id);
-> +	if (!domain_handle) {
-> +		pr_err("%s: Unable to locate ITS domain handle\n", node_name);
-> +		goto out;
-> +	}
-> +
-> +	err = its_pmsi_init_one(domain_handle, node_name);
-> +
-> +out:
-> +	kfree(node_name);
-> +	return err;
-> +}
-> +
-> +static void __init its_pmsi_acpi_init(void)
-> +{
-> +	acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
-> +			      its_pmsi_parse_madt, 0);
-> +}
-> +#else
-> +static inline void its_pmsi_acpi_init(void) { }
-> +#endif
-> +
->  static void __init its_pmsi_of_init(void)
->  {
->  	struct device_node *np;
-> @@ -119,6 +154,7 @@ static void __init its_pmsi_of_init(void)
->  static int __init its_pmsi_init(void)
->  {
->  	its_pmsi_of_init();
-> +	its_pmsi_acpi_init();
->  	return 0;
->  }
->  early_initcall(its_pmsi_init);
+>> Signed-off-by: David Engraf <david.engraf@sysgo.com>
+>> ---
+>>  drivers/clocksource/tcb_clksrc.c | 16 +++++++++++++++-
+>>  1 file changed, 15 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+>> index d4ca996..745844e 100644
+>> --- a/drivers/clocksource/tcb_clksrc.c
+>> +++ b/drivers/clocksource/tcb_clksrc.c
+>> @@ -10,6 +10,7 @@
+>>  #include <linux/io.h>
+>>  #include <linux/platform_device.h>
+>>  #include <linux/atmel_tc.h>
+>> +#include <linux/sched_clock.h>
+>>
+>>
+>>  /*
+>> @@ -56,11 +57,16 @@ static u64 tc_get_cycles(struct clocksource *cs)
+>>  	return (upper << 16) | lower;
+>>  }
+>>
+>> -static u64 tc_get_cycles32(struct clocksource *cs)
+>> +static u32 tc_get_cv32(void)
+>>  {
+>>  	return __raw_readl(tcaddr + ATMEL_TC_REG(0, CV));
+>>  }
+>>
+>> +static u64 tc_get_cycles32(struct clocksource *cs)
+>> +{
+>> +	return tc_get_cv32();
+>> +}
+>> +
+>>  static struct clocksource clksrc = {
+>>  	.name           = "tcb_clksrc",
+>>  	.rating         = 200,
+>> @@ -69,6 +75,11 @@ static struct clocksource clksrc = {
+>>  	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+>>  };
+>>
+>> +static u64 notrace tc_read_sched_clock(void)
+>> +{
+>> +	return tc_get_cv32();
+>> +}
+>> +
+>>  #ifdef CONFIG_GENERIC_CLOCKEVENTS
+>>
+>>  struct tc_clkevt_device {
+>> @@ -339,6 +350,9 @@ static int __init tcb_clksrc_init(void)
+>>  		clksrc.read = tc_get_cycles32;
+>>  		/* setup ony channel 0 */
+>>  		tcb_setup_single_chan(tc, best_divisor_idx);
+>> +
+>> +		/* register sched_clock on chips with single 32 bit counter */
+>> +		sched_clock_register(tc_read_sched_clock, 32, divided_rate);
+>>  	} else {
+>>  		/* tclib will give us three clocks no matter what the
+>>  		 * underlying platform supports.
+>>
+>
 >
