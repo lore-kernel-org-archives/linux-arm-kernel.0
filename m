@@ -1,77 +1,102 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 17 Jan 2017 10:20:54 +0000
-Subject: [RFC PATCH 33/33] irqchip/gic-v4: Enable low-level GICv4 operations
+Date: Tue, 17 Jan 2017 10:20:40 +0000
+Subject: [RFC PATCH 19/33] irqchip/gic-v3-its: Add VLPI configuration handling
 In-Reply-To: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
 References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1484648454-21216-34-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1484648454-21216-20-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Get the show on the road...
+When a VLPI is reconfigured (enabled, disabled, change in priority),
+the full configuration byte must be written, and the caches invalidated.
+
+Also, when using the irq_mask/irq_unmask methods, it is necessary
+to disable the doorbell for that particular interrupt (by mapping it
+to 1023) on top of clearing the Enable bit.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/Makefile           |  2 +-
- drivers/irqchip/irq-gic-v3-its.c   |  2 +-
- drivers/irqchip/irq-gic-v4.c       | 11 +++++++++++
- include/linux/irqchip/arm-gic-v4.h |  2 ++
- 4 files changed, 15 insertions(+), 2 deletions(-)
+ drivers/irqchip/irq-gic-v3-its.c | 37 +++++++++++++++++++++++++++++++++++--
+ 1 file changed, 35 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-index 0e55d94..d57e03f 100644
---- a/drivers/irqchip/Makefile
-+++ b/drivers/irqchip/Makefile
-@@ -28,7 +28,7 @@ obj-$(CONFIG_ARM_GIC_PM)		+= irq-gic-pm.o
- obj-$(CONFIG_ARCH_REALVIEW)		+= irq-gic-realview.o
- obj-$(CONFIG_ARM_GIC_V2M)		+= irq-gic-v2m.o
- obj-$(CONFIG_ARM_GIC_V3)		+= irq-gic-v3.o irq-gic-common.o
--obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-pci-msi.o irq-gic-v3-its-platform-msi.o
-+obj-$(CONFIG_ARM_GIC_V3_ITS)		+= irq-gic-v3-its.o irq-gic-v3-its-pci-msi.o irq-gic-v3-its-platform-msi.o irq-gic-v4.o
- obj-$(CONFIG_PARTITION_PERCPU)		+= irq-partition-percpu.o
- obj-$(CONFIG_HISILICON_IRQ_MBIGEN)	+= irq-mbigen.o
- obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 3787579..5658dd8 100644
+index d50a019..6931018 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -2824,7 +2824,7 @@ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
- 		has_v4 |= its->is_v4;
+@@ -796,11 +796,18 @@ static inline u32 its_get_event_id(struct irq_data *d)
+ static void lpi_update_config(struct irq_data *d, u8 clr, u8 set)
+ {
+ 	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
+-	irq_hw_number_t hwirq = d->hwirq;
++	irq_hw_number_t hwirq;
+ 	struct page *prop_page;
+ 	u8 *cfg;
  
- 	if (has_v4 & rdists->has_vlpis)
--		its_init_vpe_domain();
-+		its_init_v4(its_init_vpe_domain());
- 
- 	return 0;
- }
-diff --git a/drivers/irqchip/irq-gic-v4.c b/drivers/irqchip/irq-gic-v4.c
-index 8b2d9ee..38ce6f0 100644
---- a/drivers/irqchip/irq-gic-v4.c
-+++ b/drivers/irqchip/irq-gic-v4.c
-@@ -228,3 +228,14 @@ int its_prop_update_vlpi(int irq, u8 config)
- 
- 	return irq_set_vcpu_affinity(irq, &info);
- }
-+
-+void its_init_v4(struct irq_domain *domain)
-+{
-+	if (domain) {
-+		pr_info("ITS: Enabling GICv4 support\n");
-+		its_vpe_domain = domain;
-+		return;
+-	prop_page = gic_rdists->prop_page;
++	if (irqd_is_forwarded_to_vcpu(d)) {
++		u32 event = its_get_event_id(d);
++		prop_page = its_dev->event_map.vlpi_map->vpes[0]->its_vm->vprop_page;
++		hwirq = its_dev->event_map.vlpi_map->vlpis[event].vintid;
++	} else {
++		prop_page = gic_rdists->prop_page;
++		hwirq = d->hwirq;
 +	}
-+
-+	pr_err("ITS: No GICv4 VPE domain allocated\n");
-+}
-diff --git a/include/linux/irqchip/arm-gic-v4.h b/include/linux/irqchip/arm-gic-v4.h
-index f85a929..b87c54f 100644
---- a/include/linux/irqchip/arm-gic-v4.h
-+++ b/include/linux/irqchip/arm-gic-v4.h
-@@ -97,4 +97,6 @@ int its_map_vlpi(int irq, struct its_vlpi_map *map);
- int its_unmap_vlpi(int irq);
- int its_prop_update_vlpi(int irq, u8 config);
  
-+void its_init_v4(struct irq_domain *domain);
+ 	cfg = page_address(prop_page) + hwirq - 8192;
+ 	*cfg &= ~clr;
+@@ -818,13 +825,28 @@ static void lpi_update_config(struct irq_data *d, u8 clr, u8 set)
+ 	its_send_inv(its_dev, its_get_event_id(d));
+ }
+ 
++static void its_vlpi_set_doorbell(struct irq_data *d, bool enable)
++{
++	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
++	u32 event = its_get_event_id(d);
 +
- #endif
++	its_dev->event_map.vlpi_map->vlpis[event].db_enabled = enable;
++	its_send_vmapti(its_dev, event);
++}
++
+ static void its_mask_irq(struct irq_data *d)
+ {
++	if (irqd_is_forwarded_to_vcpu(d))
++		its_vlpi_set_doorbell(d, false);
++
+ 	lpi_update_config(d, LPI_PROP_ENABLED, 0);
+ }
+ 
+ static void its_unmask_irq(struct irq_data *d)
+ {
++	if (irqd_is_forwarded_to_vcpu(d))
++		its_vlpi_set_doorbell(d, true);
++
+ 	lpi_update_config(d, 0, LPI_PROP_ENABLED);
+ }
+ 
+@@ -837,6 +859,10 @@ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ 	struct its_collection *target_col;
+ 	u32 id = its_get_event_id(d);
+ 
++	/* A forwarded interrupt should use irq_set_vcpu_affinity */
++	if (irqd_is_forwarded_to_vcpu(d))
++		return -EINVAL;
++
+        /* lpi cannot be routed to a redistributor that is on a foreign node */
+ 	if (its_dev->its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_23144) {
+ 		if (its_dev->its->numa_node >= 0) {
+@@ -969,6 +995,13 @@ static int its_irq_set_vcpu_affinity(struct irq_data *d, void *vcpu_info)
+ 
+ 	case PROP_UPDATE_VLPI:
+ 	{
++		if (!its_dev->event_map.vlpi_map ||
++		    !irqd_is_forwarded_to_vcpu(d))
++			return -EINVAL;
++
++		lpi_update_config(d, 0xff, info->config);
++		its_vlpi_set_doorbell(d, !!(info->config & LPI_PROP_ENABLED));
++
+ 		return 0;
+ 	}
+ 
 -- 
 2.1.4
