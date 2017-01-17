@@ -1,58 +1,61 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 17 Jan 2017 17:09:12 +0000
-Subject: [RFC 0/8] Provide the EL1 physical timer to the VM
-In-Reply-To: <1482772326-29110-1-git-send-email-jintack@cs.columbia.edu>
-References: <1482772326-29110-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <b15297e4-1b30-27f8-dd43-fb1a85bd2cd5@arm.com>
+From: andr2000@gmail.com (Oleksandr Andrushchenko)
+Date: Tue, 17 Jan 2017 19:13:45 +0200
+Subject: [PATCH] arm64: mm: fix __page_to_voff definition
+In-Reply-To: <20170117161546.GF11939@leverpostej>
+References: <1484666633-1753-1-git-send-email-andr2000@gmail.com>
+ <20170117161546.GF11939@leverpostej>
+Message-ID: <e57db47e-3c3a-1344-9492-442b37c6897c@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/12/16 17:11, Jintack Lim wrote:
-> The ARM architecture defines the EL1 physical timer and the virtual
-> timer, and it is reasonable for an OS to expect to be able to access
-> both.  However, the current KVM implementation does not provide the EL1
-> physical timer to VMs but terminates VMs on access to the timer.
-> 
-> On VHE systems, this would be as simple as allowing full access to the
-> EL1 physical timer to VMs because the KVM host does not use the EL1
-> physical timer.  However, on non-VHE systems, the KVM host already uses
-> the EL1 physical timer which prevents us from granting full access of
-> the EL1 physical timer to VMs.
-> 
-> This patchset enables VMs to use the EL1 physical timer through
-> trap-and-emulate.  The KVM host emulates each EL1 physical timer
-> register access and sets up the background timer accordingly.  When the
-> background timer expires, the KVM host injects EL1 physical timer
-> interrupts to the VM.  Alternatively, it's also possible to allow VMs to
-> access the EL1 physical timer without trapping.  However, this requires
-> somehow using the EL2 physical timer for the Linux host while running
-> the VM instead of the EL1 physical timer.  Right now I just implemented
-> trap-and-emulate because this was straightforward to do, and I leave it
-> to future work to determine if transferring the EL1 physical timer state
-> to the EL2 timer provides any performance benefit.
-> 
-> This feature will be useful for any OS that wishes to access the EL1
-> physical timer. Nested virtualization is one of those use cases. A
-> nested hypervisor running inside a VM would think it has full access to
-> the hardware and naturally tries to use the EL1 physical timer as Linux
-> would do. Other nested hypervisors may try to use the EL2 physical timer
-> as Xen would do, but supporting the EL2 physical timer to the VM is out
-> of scope of this patchset. This patchset will make it easy to add the
-> EL2 timer support in the future, though.
-> 
-> Note, Linux VMs booting in EL1 will be unaffected by this patch set and
-> will continue to use only the virtual timer and this patch set will
-> therefore not introduce any performance degredation as a result of
-> trap-and-emulate.
-
-Hi Jintack,
-
-Any chance you could address Christoffer's comments and respin this
-series? This looks like a good enhancement to our emulation, and
-definitely a requirement for the nested work, so I'm obviously keen on it.
-
+On 01/17/2017 06:15 PM, Mark Rutland wrote:
+> On Tue, Jan 17, 2017 at 05:23:53PM +0200, Oleksandr Andrushchenko wrote:
+>> From: Oleksandr Andrushchenko <Oleksandr_Andrushchenko@epam.com>
+>>
+>> Fix parameter name for __page_to_voff, to match its definition.
+>> There are other callers of page_to_virt which do not
+>> declare 'page'.
+>>
+>> Fixes: 3fa72fe9c614 ("arm64: mm: fix __page_to_voff definition")
+>> Signed-off-by: Oleksandr Andrushchenko <Oleksandr_Andrushchenko@epam.com>
+> I take it this is because it messes up the 'struct page' at the end of
+> the macro expansion?
+yes, you got it right
+> It would be good to explicitly state that, since that's not immediately
+> obvious.
+Will do that in patch v1
+>
+> With that:
+>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+Can I put your ack into the v1?
+>
+> Thanks,
+> Mark.
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Oleksandr
+>> ---
+>>   arch/arm64/include/asm/memory.h | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+>> index bfe632808d77..90c39a662379 100644
+>> --- a/arch/arm64/include/asm/memory.h
+>> +++ b/arch/arm64/include/asm/memory.h
+>> @@ -222,7 +222,7 @@ static inline void *phys_to_virt(phys_addr_t x)
+>>   #define _virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
+>>   #else
+>>   #define __virt_to_pgoff(kaddr)	(((u64)(kaddr) & ~PAGE_OFFSET) / PAGE_SIZE * sizeof(struct page))
+>> -#define __page_to_voff(page)	(((u64)(page) & ~VMEMMAP_START) * PAGE_SIZE / sizeof(struct page))
+>> +#define __page_to_voff(kaddr)	(((u64)(kaddr) & ~VMEMMAP_START) * PAGE_SIZE / sizeof(struct page))
+>>   
+>>   #define page_to_virt(page)	((void *)((__page_to_voff(page)) | PAGE_OFFSET))
+>>   #define virt_to_page(vaddr)	((struct page *)((__virt_to_pgoff(vaddr)) | VMEMMAP_START))
+>> -- 
+>> 2.7.4
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
