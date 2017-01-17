@@ -1,513 +1,234 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 17 Jan 2017 16:55:36 +0800
-Subject: [PATCH v1 3/3] watchdog: zx2967: add watchdog controller driver
- for ZTE's zx2967 family
-In-Reply-To: <1484540395-3335-3-git-send-email-baoyou.xie@linaro.org>
-References: <1484540395-3335-1-git-send-email-baoyou.xie@linaro.org>
- <1484540395-3335-3-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <20170117085535.GE11600@x250>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 17 Jan 2017 09:57:52 +0100
+Subject: [PATCH] ARM: dts: imx6q-utilite-pro: enable 2nd display pipeline
+In-Reply-To: <ec9676f344eb4786a28a3c7b969f0e94@rwthex-s1-b.rwth-ad.de>
+References: <ec9676f344eb4786a28a3c7b969f0e94@rwthex-s1-b.rwth-ad.de>
+Message-ID: <1484643472.4087.6.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2017 at 12:19:55PM +0800, Baoyou Xie wrote:
-> This patch adds watchdog controller driver for ZTE's zx2967 family.
+Hi Christopher,
+
+On Fri, 2016-12-02 at 15:37 +0100, christopher.spinrath at rwth-aachen.de
+wrote:
+> From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
 > 
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+> Apart from the already enabled Designware HDMI port, the Utilite Pro
+> has a second display pipeline which has the following shape:
+> 
+>   IPU1 DI0 --> Parallel display --> tfp410 rgb24 to DVI encoder
+>                                 --> HDMI connector.
+> Enable support for it.
+> 
+> In addition, since this pipeline is hardwired to IPU1, sever the link
+> between IPU1 and the SoC-internal Designware HDMI encoder forcing the
+> latter to be connected to IPU2 instead of IPU1. Otherwise, it is not
+> possible to drive both displays at high resolution due to the bandwidth
+> limitations of a single IPU.
+> 
+> Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+>
 > ---
->  drivers/watchdog/Kconfig      |  10 ++
->  drivers/watchdog/Makefile     |   1 +
->  drivers/watchdog/zx2967_wdt.c | 405 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 416 insertions(+)
->  create mode 100644 drivers/watchdog/zx2967_wdt.c
 > 
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index 3eb58cb..79027da 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -714,6 +714,16 @@ config ASPEED_WATCHDOG
->  	  To compile this driver as a module, choose M here: the
->  	  module will be called aspeed_wdt.
+> Hi all,
+> 
+> the removal of the link between IPU1 and the Designware HDMI encoder is the
+> result of a discussion I had with Philipp Zabel:
+> 
+>   https://lists.freedesktop.org/archives/dri-devel/2016-November/125399.html .
+> 
+> Altough it is not possible to connect anything else to IPU1 on the Utilite, this
+> approach has at least one disadvantage: if the resolution is low enough such 
+> that a single IPU can handle both displays then muxing both displays to IPU1
+> would reduce the power consumption.
+> 
+> However, IMHO omitting the link IPU1 <--> DW HDMI is still the preferrable
+> solution since I'm not aware of any OS/driver that is capable of switching IPUs
+> or can handle the bandwidth limitation in a sane way. In particular, Linux is
+> unusable when both displays are supposed to be driven at high resolution and
+> both muxing options for the DW HDMI are available (this is not a userspace
+> issue; the system becomes almost unresponsive as soon as the kernel sets the
+> initial resolution).
+> 
+> Cheers,
+> Christopher
+> 
+> P.S.: this patch depends on the tfp410 bridge driver which has recently been
+> merged into drm-next.
+> 
+>  arch/arm/boot/dts/imx6q-utilite-pro.dts | 115 ++++++++++++++++++++++++++++++++
+>  1 file changed, 115 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q-utilite-pro.dts b/arch/arm/boot/dts/imx6q-utilite-pro.dts
+> index 2200994..69bdd82 100644
+> --- a/arch/arm/boot/dts/imx6q-utilite-pro.dts
+> +++ b/arch/arm/boot/dts/imx6q-utilite-pro.dts
+> @@ -59,6 +59,33 @@
+>  		rtc1 = &snvs_rtc;
+>  	};
 >  
-> +config ZX2967_WATCHDOG
-> +	tristate "ZTE zx2967 SoCs watchdog support"
-> +	depends on ARCH_ZX
-> +	select WATCHDOG_CORE
-> +	help
-> +	  Say Y here to include support for the watchdog timer
-> +	  in ZTE zx2967 SoCs.
-> +	  To compile this driver as a module, choose M here: the
-> +	  module will be called zx2967_wdt.
+> +	encoder {
+> +		compatible = "ti,tfp410";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
 > +
->  # AVR32 Architecture
+> +		ports {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			port at 0 {
+> +				reg = <0>;
+> +
+> +				tfp410_in: endpoint {
+> +					remote-endpoint = <&parallel_display_out>;
+> +				};
+> +			};
+> +
+> +			port at 1 {
+> +				reg = <1>;
+> +
+> +				tfp410_out: endpoint {
+> +					remote-endpoint = <&hdmi_connector_in>;
+> +				};
+> +			};
+> +		};
+> +	};
+> +
+>  	gpio-keys {
+>  		compatible = "gpio-keys";
+>  		pinctrl-names = "default";
+> @@ -72,6 +99,19 @@
+>  		};
+>  	};
 >  
->  config AT32AP700X_WDT
-> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-> index caa9f4a..ea08925 100644
-> --- a/drivers/watchdog/Makefile
-> +++ b/drivers/watchdog/Makefile
-> @@ -82,6 +82,7 @@ obj-$(CONFIG_BCM7038_WDT) += bcm7038_wdt.o
->  obj-$(CONFIG_ATLAS7_WATCHDOG) += atlas7_wdt.o
->  obj-$(CONFIG_RENESAS_WDT) += renesas_wdt.o
->  obj-$(CONFIG_ASPEED_WATCHDOG) += aspeed_wdt.o
-> +obj-$(CONFIG_ZX2967_WATCHDOG) += zx2967_wdt.o
+> +	hdmi-connector {
+> +		compatible = "hdmi-connector";
+> +
+> +		type = "a";
+> +		ddc-i2c-bus = <&i2c_dvi_ddc>;
+> +
+> +		port {
+> +			hdmi_connector_in: endpoint {
+> +				remote-endpoint = <&tfp410_out>;
+> +			};
+> +		};
+> +	};
+> +
+>  	i2cmux {
+>  		compatible = "i2c-mux-gpio";
+>  		pinctrl-names = "default";
+> @@ -105,8 +145,46 @@
+>  			#size-cells = <0>;
+>  		};
+>  	};
+> +
+> +	parallel-display {
+> +		compatible = "fsl,imx-parallel-display";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_ipu1>;
+> +
+> +		interface-pix-fmt = "rgb24";
+
+This is not necessary if the connector created by the tpf410 has the
+correct media bus format set in its display_info structure. This can be
+done in tfp410_attach, before calling drm_mode_connector_attach_encoder:
+
+        u32 bus_format = MEDIA_BUS_FMT_RGB888_1X24;
+
+	drm_display_info_set_bus_formats(&dvi->connector.display_info,                                                                         
+					 &bus_format, 1);
+
+After this is done, the above line should be removed in a follow-up
+patch.
+
+> +		port at 0 {
+> +			reg = <0>;
+> +
+> +			parallel_display_in: endpoint {
+> +				remote-endpoint = <&ipu1_di0_disp0>;
+> +			};
+> +		};
+> +
+> +		port at 1 {
+> +			reg = <1>;
+> +
+> +			parallel_display_out: endpoint {
+> +				remote-endpoint = <&tfp410_in>;
+> +			};
+> +		};
+> +	};
+>  };
 >  
->  # AVR32 Architecture
->  obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
-> diff --git a/drivers/watchdog/zx2967_wdt.c b/drivers/watchdog/zx2967_wdt.c
-> new file mode 100644
-> index 0000000..8791dd2
-> --- /dev/null
-> +++ b/drivers/watchdog/zx2967_wdt.c
-> @@ -0,0 +1,405 @@
 > +/*
-> + * watchdog driver for ZTE's zx2967 family
-> + *
-> + * Copyright (C) 2017 ZTE Ltd.
-> + *
-> + * Author: Baoyou Xie <baoyou.xie@linaro.org>
-> + *
-> + * License terms: GNU General Public License (GPL) version 2
+> + * A single IPU is not able to drive both display interfaces available on the
+> + * Utilite Pro at high resolution due to its bandwidth limitation. Since the
+> + * tfp410 encoder is wired up to IPU1, sever the link between IPU1 and the
+> + * SoC-internal Designware HDMI encoder forcing the latter to be connected to
+> + * IPU2 instead of IPU1.
 > + */
+> +/delete-node/&ipu1_di0_hdmi;
+> +/delete-node/&hdmi_mux_0;
+> +/delete-node/&ipu1_di1_hdmi;
+> +/delete-node/&hdmi_mux_1;
 > +
-> +#include <linux/clk.h>
-> +#include <linux/delay.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/of_address.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/reboot.h>
-> +#include <linux/reset.h>
-> +#include <linux/watchdog.h>
+>  &hdmi {
+>  	ddc-i2c-bus = <&i2c2>;
+>  	status = "okay";
+> @@ -151,6 +229,39 @@
+>  		>;
+>  	};
+>  
+> +	pinctrl_ipu1: ipu1grp {
+> +		fsl,pins = <
+> +			MX6QDL_PAD_DI0_DISP_CLK__IPU1_DI0_DISP_CLK 0x38
+> +			MX6QDL_PAD_DI0_PIN15__IPU1_DI0_PIN15       0x38
+> +			MX6QDL_PAD_DI0_PIN2__IPU1_DI0_PIN02        0x38
+> +			MX6QDL_PAD_DI0_PIN3__IPU1_DI0_PIN03        0x38
+> +			MX6QDL_PAD_DISP0_DAT0__IPU1_DISP0_DATA00   0x38
+> +			MX6QDL_PAD_DISP0_DAT1__IPU1_DISP0_DATA01   0x38
+> +			MX6QDL_PAD_DISP0_DAT2__IPU1_DISP0_DATA02   0x38
+> +			MX6QDL_PAD_DISP0_DAT3__IPU1_DISP0_DATA03   0x38
+> +			MX6QDL_PAD_DISP0_DAT4__IPU1_DISP0_DATA04   0x38
+> +			MX6QDL_PAD_DISP0_DAT5__IPU1_DISP0_DATA05   0x38
+> +			MX6QDL_PAD_DISP0_DAT6__IPU1_DISP0_DATA06   0x38
+> +			MX6QDL_PAD_DISP0_DAT7__IPU1_DISP0_DATA07   0x38
+> +			MX6QDL_PAD_DISP0_DAT8__IPU1_DISP0_DATA08   0x38
+> +			MX6QDL_PAD_DISP0_DAT9__IPU1_DISP0_DATA09   0x38
+> +			MX6QDL_PAD_DISP0_DAT10__IPU1_DISP0_DATA10  0x38
+> +			MX6QDL_PAD_DISP0_DAT11__IPU1_DISP0_DATA11  0x38
+> +			MX6QDL_PAD_DISP0_DAT12__IPU1_DISP0_DATA12  0x38
+> +			MX6QDL_PAD_DISP0_DAT13__IPU1_DISP0_DATA13  0x38
+> +			MX6QDL_PAD_DISP0_DAT14__IPU1_DISP0_DATA14  0x38
+> +			MX6QDL_PAD_DISP0_DAT15__IPU1_DISP0_DATA15  0x38
+> +			MX6QDL_PAD_DISP0_DAT16__IPU1_DISP0_DATA16  0x38
+> +			MX6QDL_PAD_DISP0_DAT17__IPU1_DISP0_DATA17  0x38
+> +			MX6QDL_PAD_DISP0_DAT18__IPU1_DISP0_DATA18  0x38
+> +			MX6QDL_PAD_DISP0_DAT19__IPU1_DISP0_DATA19  0x38
+> +			MX6QDL_PAD_DISP0_DAT20__IPU1_DISP0_DATA20  0x38
+> +			MX6QDL_PAD_DISP0_DAT21__IPU1_DISP0_DATA21  0x38
+> +			MX6QDL_PAD_DISP0_DAT22__IPU1_DISP0_DATA22  0x38
+> +			MX6QDL_PAD_DISP0_DAT23__IPU1_DISP0_DATA23  0x38
+> +		>;
+> +	};
 > +
-> +#define ZX2967_WDT_CFG_REG			0x4
-> +#define ZX2967_WDT_LOAD_REG			0x8
-> +#define ZX2967_WDT_REFRESH_REG			0x18
-> +#define ZX2967_WDT_START_REG			0x1c
-> +
-> +#define ZX2967_WDT_REFRESH_MASK			0x3f
-> +
-> +#define ZX2967_WDT_CFG_DIV(n)			((((n)&0xff) - 1) << 8)
-
-Please have a space before and after '&' operator.
-
-> +#define ZX2967_WDT_START_EN			0x1
-> +
-> +#define ZX2967_WDT_WRITEKEY			0x12340000
-> +
-> +#define ZX2967_WDT_DIV_DEFAULT			16
-> +#define ZX2967_WDT_DEFAULT_TIMEOUT		32
-> +#define ZX2967_WDT_MIN_TIMEOUT			1
-> +#define ZX2967_WDT_MAX_TIMEOUT			500
-> +#define ZX2967_WDT_MAX_COUNT			0xffff
-> +
-> +#define ZX2967_WDT_FLAG_REBOOT_MON		(1 << 0)
-> +
-> +#define ZX2967_RESET_MASK_REG			0xb0
-> +
-> +#define zx2967_wdt_write_reg(v, r) \
-> +			writel((v) | ZX2967_WDT_WRITEKEY, r)
-> +#define zx2967_wdt_read_reg(r)			readl(r)
-
-I think inline functions are better than macros in this case.
-
-> +
-> +static bool nowayout = WATCHDOG_NOWAYOUT;
-> +static unsigned int timeout = ZX2967_WDT_DEFAULT_TIMEOUT;
-
-The variable name is too generic.  For example, the same name is used in
-functions like __zx2967_wdt_set_timeout().
-
-> +
-> +struct zx2967_wdt {
-> +	struct device		*dev;
-> +	struct clk		*clock;
-> +	void __iomem		*reg_base;
-> +	unsigned int		conf;
-> +	unsigned int		load;
-> +	unsigned int		flags;
-> +	spinlock_t		lock;
-> +	struct watchdog_device	wdt_device;
-> +	struct notifier_block	restart_handler;
-> +	struct notifier_block	reboot_handler;
+>  	pinctrl_uart2: uart2grp {
+>  		fsl,pins = <
+>  			MX6QDL_PAD_GPIO_7__UART2_TX_DATA 0x1b0b1
+> @@ -194,6 +305,10 @@
+>  	};
+>  };
+>  
+> +&ipu1_di0_disp0 {
+> +	remote-endpoint = <&parallel_display_in>;
 > +};
 > +
-> +static void zx2967_wdt_refresh(struct zx2967_wdt *wdt)
-> +{
-> +	unsigned int val;
+>  &pcie {
+>  	pcie at 0,0 {
+>  		reg = <0x000000 0 0 0 0>;
 
-u32 for 32-bit register access is more readable.
+Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-> +
-> +	spin_lock(&wdt->lock);
-> +
-> +	val = zx2967_wdt_read_reg(wdt->reg_base + ZX2967_WDT_REFRESH_REG);
-> +	val ^= ZX2967_WDT_REFRESH_MASK;
-> +	zx2967_wdt_write_reg(val, wdt->reg_base + ZX2967_WDT_REFRESH_REG);
-> +
-> +	spin_unlock(&wdt->lock);
-> +}
-> +
-> +static void __zx2967_wdt_stop(struct zx2967_wdt *wdt)
-> +{
-> +	unsigned int val;
-> +
-> +	spin_lock(&wdt->lock);
-> +
-> +	val = zx2967_wdt_read_reg(wdt->reg_base + ZX2967_WDT_START_REG);
-> +	val &= ~(ZX2967_WDT_START_EN);
-
-The parentheses is not needed.
-
-> +	zx2967_wdt_write_reg(val, wdt->reg_base + ZX2967_WDT_START_REG);
-> +
-> +	spin_unlock(&wdt->lock);
-> +}
-> +
-> +static void __zx2967_wdt_start(struct zx2967_wdt *wdt)
-> +{
-> +	unsigned int val;
-> +
-> +	spin_lock(&wdt->lock);
-> +
-> +	val = zx2967_wdt_read_reg(wdt->reg_base + ZX2967_WDT_START_REG);
-> +	val |= ZX2967_WDT_START_EN;
-> +	zx2967_wdt_write_reg(val, wdt->reg_base + ZX2967_WDT_START_REG);
-> +
-> +	spin_unlock(&wdt->lock);
-> +}
-> +
-> +static unsigned int
-> +__zx2967_wdt_set_timeout(struct zx2967_wdt *wdt, unsigned int timeout)
-> +{
-> +	unsigned int freq = clk_get_rate(wdt->clock);
-> +	unsigned int divisor = ZX2967_WDT_DIV_DEFAULT, count;
-
-Unless the variables are closely related, it's more conventional to have
-each variable on a new line.
-
-> +
-> +	count = timeout * freq;
-> +	if (count > divisor * ZX2967_WDT_MAX_COUNT)
-> +		divisor = DIV_ROUND_UP(count, ZX2967_WDT_MAX_COUNT);
-> +	count = DIV_ROUND_UP(count, divisor);
-> +	zx2967_wdt_write_reg(ZX2967_WDT_CFG_DIV(divisor),
-> +			     wdt->reg_base + ZX2967_WDT_CFG_REG);
-> +	zx2967_wdt_write_reg(count, wdt->reg_base + ZX2967_WDT_LOAD_REG);
-> +	zx2967_wdt_refresh(wdt);
-> +
-> +	wdt->load = count;
-> +	dev_info(wdt->dev, "count=%d, timeout=%d, divisor=%d\n",
-> +		 count, timeout, divisor);
-
-Noisy.  Maybe dev_dbg().
-
-> +
-> +	return (count * divisor) / freq;
-> +}
-> +
-> +static int zx2967_wdt_set_timeout(struct watchdog_device *wdd,
-> +				  unsigned int timeout)
-> +{
-> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
-> +
-> +	if (watchdog_timeout_invalid(&wdt->wdt_device, timeout)) {
-> +		dev_err(wdt->dev, "timeout %d is invalid\n", timeout);
-> +
-
-Drop the newline.
-
-> +		return -EINVAL;
-> +	}
-> +
-> +	wdd->timeout = __zx2967_wdt_set_timeout(wdt, timeout);
-> +
-> +	return 0;
-> +}
-> +
-> +static int zx2967_wdt_start(struct watchdog_device *wdd)
-> +{
-> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
-> +
-> +	__zx2967_wdt_stop(wdt);
-> +	zx2967_wdt_set_timeout(wdd, wdd->timeout);
-> +	__zx2967_wdt_start(wdt);
-> +
-> +	return 0;
-> +}
-> +
-> +static int zx2967_wdt_stop(struct watchdog_device *wdd)
-> +{
-> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
-> +
-> +	__zx2967_wdt_stop(wdt);
-> +
-> +	return 0;
-> +}
-> +
-> +static int zx2967_wdt_keepalive(struct watchdog_device *wdd)
-> +{
-> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
-> +
-> +	zx2967_wdt_refresh(wdt);
-> +
-> +	return 0;
-> +}
-> +
-> +#define ZX2967_WDT_OPTIONS \
-> +	(WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE)
-> +static const struct watchdog_info zx2967_wdt_ident = {
-> +	.options          =     ZX2967_WDT_OPTIONS,
-> +	.firmware_version =	0,
-> +	.identity         =	"zx2967 watchdog",
-> +};
-> +
-> +static struct watchdog_ops zx2967_wdt_ops = {
-> +	.owner = THIS_MODULE,
-> +	.start = zx2967_wdt_start,
-> +	.stop = zx2967_wdt_stop,
-> +	.ping = zx2967_wdt_keepalive,
-> +	.set_timeout = zx2967_wdt_set_timeout,
-> +};
-> +
-> +static void zx2967_wdt_fix_sysdown(struct zx2967_wdt *wdt)
-> +{
-> +	__zx2967_wdt_stop(wdt);
-> +	__zx2967_wdt_set_timeout(wdt, 15);
-> +	__zx2967_wdt_start(wdt);
-> +}
-> +
-> +static int zx2967_wdt_notify_sys(struct notifier_block *this,
-> +			     unsigned long code, void *unused)
-> +{
-> +	struct zx2967_wdt *wdt = container_of(this, struct zx2967_wdt,
-> +					      reboot_handler);
-> +
-> +	wdt->flags |= ZX2967_WDT_FLAG_REBOOT_MON;
-> +	switch (code) {
-> +	case SYS_HALT:
-> +	case SYS_POWER_OFF:
-> +	case SYS_RESTART:
-> +		zx2967_wdt_fix_sysdown(wdt);
-> +		break;
-> +	default:
-> +		break;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int zx2967_wdt_restart(struct notifier_block *this,
-> +			      unsigned long mode, void *cmd)
-> +{
-> +	struct zx2967_wdt *wdt;
-> +
-> +	wdt = container_of(this, struct zx2967_wdt, restart_handler);
-> +
-> +	zx2967_wdt_stop(&wdt->wdt_device);
-> +
-> +	zx2967_wdt_write_reg(0x80, wdt->reg_base + ZX2967_WDT_LOAD_REG);
-> +	zx2967_wdt_refresh(wdt);
-> +	zx2967_wdt_write_reg(ZX2967_WDT_START_EN,
-> +			     wdt->reg_base + ZX2967_WDT_START_REG);
-> +
-> +	zx2967_wdt_start(&wdt->wdt_device);
-> +	/* wait for reset*/
-> +	mdelay(500);
-> +
-> +	return NOTIFY_DONE;
-> +}
-> +
-> +static void zx2967_reset_mask_config(struct device *dev)
-> +{
-> +	struct device_node *np = NULL;
-> +	void __iomem *reg;
-> +	unsigned int  val, mask, config, size;
-> +	const unsigned int *prop;
-> +
-> +	prop = of_get_property(dev->of_node, "reset-mask-config", &size);
-> +	if (size < (sizeof(*prop) * 2)) {
-> +		dev_err(dev, "bad data for reset-mask-config");
-> +		return;
-> +	}
-> +	config = be32_to_cpup(prop++);
-> +	mask = be32_to_cpup(prop);
-> +	np = of_find_compatible_node(NULL, NULL, "zte,aon-sysctrl");
-> +	if (!np) {
-> +		dev_err(dev, "Cannot found pcu device node\n");
-> +		return;
-> +	}
-> +	reg = of_iomap(np, 0) + ZX2967_RESET_MASK_REG;
-> +	of_node_put(np);
-
-We should use syscon interface to access sysctrl block.
-
-> +
-> +	val = readl(reg);
-> +	val &= ~mask;
-> +	val |= config;
-> +	writel(val, reg);
-> +}
-> +
-> +static int zx2967_wdt_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev;
-> +	struct zx2967_wdt *wdt;
-> +	struct resource *base;
-> +	int err, ret = 0;
-> +	unsigned int rate, val;
-> +
-> +	struct reset_control *rstc;
-> +
-> +	dev = &pdev->dev;
-> +
-> +	wdt = devm_kzalloc(dev, sizeof(*wdt), GFP_KERNEL);
-> +	if (!wdt) {
-> +		ret = -ENOMEM;
-> +		goto out;
-> +	}
-
-return -ENOMEM;
-
-> +
-> +	platform_set_drvdata(pdev, wdt);
-> +
-> +	wdt->dev = dev;
-> +	spin_lock_init(&wdt->lock);
-> +
-> +	wdt->wdt_device.info = &zx2967_wdt_ident;
-> +	wdt->wdt_device.ops = &zx2967_wdt_ops;
-> +	wdt->wdt_device.timeout = ZX2967_WDT_DEFAULT_TIMEOUT;
-> +	wdt->wdt_device.max_timeout = ZX2967_WDT_MAX_TIMEOUT;
-> +	wdt->wdt_device.min_timeout = ZX2967_WDT_MIN_TIMEOUT;
-> +	wdt->wdt_device.parent = &pdev->dev;
-> +
-> +	base = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	wdt->reg_base = devm_ioremap_resource(dev, base);
-
-It should be error checked.
-
-> +
-> +	if (of_find_property(dev->of_node, "reset-mask-config", NULL))
-> +		zx2967_reset_mask_config(dev);
-> +
-> +	wdt->reboot_handler.notifier_call = zx2967_wdt_notify_sys;
-> +	ret = register_reboot_notifier(&wdt->reboot_handler);
-> +	wdt->clock = devm_clk_get(dev, "wdtclk");
-> +	if (IS_ERR(wdt->clock)) {
-> +		dev_err(dev, "failed to find watchdog clock source\n");
-> +		ret = PTR_ERR(wdt->clock);
-> +		goto out;
-> +	}
-> +	ret = clk_prepare_enable(wdt->clock);
-> +	if (ret < 0) {
-> +		dev_err(dev, "failed to enable clock\n");
-> +		goto out;
-> +	}
-> +
-> +	rate = clk_get_rate(wdt->clock);
-> +	if (rate == 24000000)
-> +		ret = clk_set_rate(wdt->clock, 32768);
-> +	rate = clk_get_rate(wdt->clock);
-> +
-> +	rstc = devm_reset_control_get(dev, "wdtrst");
-> +	if (!rstc) {
-> +		dev_info(dev, "rstc get failed");
-> +	} else {
-> +		reset_control_assert(rstc);
-> +		mdelay(10);
-> +		reset_control_deassert(rstc);
-> +	}
-> +
-> +	watchdog_set_drvdata(&wdt->wdt_device, wdt);
-> +
-> +	watchdog_init_timeout(&wdt->wdt_device, timeout, &pdev->dev);
-> +	watchdog_set_nowayout(&wdt->wdt_device, nowayout);
-> +
-> +	zx2967_wdt_stop(&wdt->wdt_device);
-> +
-> +	err = watchdog_register_device(&wdt->wdt_device);
-> +	if (unlikely(err)) {
-> +		ret = err;
-> +		goto fail_register;
-> +	}
-> +
-> +	wdt->restart_handler.notifier_call = zx2967_wdt_restart;
-> +	wdt->restart_handler.priority = 128;
-> +	ret = register_restart_handler(&wdt->restart_handler);
-> +	if (ret) {
-> +		pr_err("cannot register restart handler, %d\n", ret);
-
-dev_err()
-
-> +		goto fail_restart;
-> +	}
-> +
-> +	val = zx2967_wdt_read_reg(wdt->reg_base + ZX2967_WDT_START_REG);
-> +	dev_info(&pdev->dev, "watchdog enabled (timeout=%d sec, nowayout=%d)",
-> +		 wdt->wdt_device.timeout, nowayout);
-> +
-> +	return 0;
-> +
-> +fail_restart:
-> +	watchdog_unregister_device(&wdt->wdt_device);
-> +fail_register:
-> +	clk_disable_unprepare(wdt->clock);
-> +out:
-> +	return ret;
-> +}
-> +
-> +static int zx2967_wdt_remove(struct platform_device *pdev)
-> +{
-> +	struct zx2967_wdt *wdt = platform_get_drvdata(pdev);
-> +
-> +	unregister_restart_handler(&wdt->restart_handler);
-> +	watchdog_unregister_device(&wdt->wdt_device);
-> +	clk_disable_unprepare(wdt->clock);
-> +
-> +	return 0;
-> +}
-> +
-> +static void zx2967_wdt_shutdown(struct platform_device *pdev)
-> +{
-> +	struct zx2967_wdt *wdt = platform_get_drvdata(pdev);
-> +
-> +	if (!(wdt->flags & ZX2967_WDT_FLAG_REBOOT_MON))
-> +		zx2967_wdt_stop(&wdt->wdt_device);
-> +}
-> +
-> +static const struct of_device_id zx2967_wdt_match[] = {
-> +	{ .compatible = "zte,zx296718-wdt", },
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(of, zx2967_wdt_match);
-> +
-> +static const struct platform_device_id zx2967_wdt_ids[] = {
-> +	{ .name = "zx2967-wdt", },
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(platform, zx2967_wdt_ids);
-
-This is not needed, as we do not support platform probe but only DT on
-ZTE platforms.
-
-Shawn
-
-> +
-> +static struct platform_driver zx2967_wdt_driver = {
-> +	.probe		= zx2967_wdt_probe,
-> +	.remove		= zx2967_wdt_remove,
-> +	.shutdown	= zx2967_wdt_shutdown,
-> +	.id_table	= zx2967_wdt_ids,
-> +	.driver		= {
-> +		.name	= "zx2967-wdt",
-> +		.of_match_table	= of_match_ptr(zx2967_wdt_match),
-> +	},
-> +};
-> +module_platform_driver(zx2967_wdt_driver);
-> +
-> +MODULE_AUTHOR("Baoyou Xie <baoyou.xie@linaro.org>");
-> +MODULE_DESCRIPTION("ZTE zx2967 Watchdog Device Driver");
-> +MODULE_LICENSE("GPL");
-> -- 
-> 2.7.4
-> 
+regards
+Philipp
