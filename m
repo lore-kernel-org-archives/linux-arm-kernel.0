@@ -1,77 +1,156 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 17 Jan 2017 10:31:21 +0000
-Subject: [PATCH V7 04/10] arm64: exception: handle Synchronous External
- Abort
-In-Reply-To: <1484244924-24786-5-git-send-email-tbaicar@codeaurora.org>
-References: <1484244924-24786-1-git-send-email-tbaicar@codeaurora.org>
- <1484244924-24786-5-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <587DF279.1010402@arm.com>
+From: jerry.huang@nxp.com (Jerry Huang)
+Date: Tue, 17 Jan 2017 10:37:17 +0000
+Subject: [PATCH v3 2/3] USB3/DWC3: Add property "snps,
+ incr-burst-type-adjustment" for INCR burst type
+In-Reply-To: <87tw8zo0c0.fsf@linux.intel.com>
+References: <1482139554-13618-1-git-send-email-jerry.huang@nxp.com>
+ <1482139554-13618-2-git-send-email-jerry.huang@nxp.com>
+ <20161222184514.hfd4g7ifrz5cv627@rob-hp-laptop>
+ <DB5PR0401MB1813E210B2ADE1C9493F7768FE950@DB5PR0401MB1813.eurprd04.prod.outlook.com>
+ <CAL_JsqJuifiSQAt-6FgtYYSukAnjzOLuTGEsO-Spn5LxkU-iwQ@mail.gmail.com>
+ <DB5PR0401MB18132BB4CDE32EEA8F479E55FE7D0@DB5PR0401MB1813.eurprd04.prod.outlook.com>
+ <87tw8zo0c0.fsf@linux.intel.com>
+Message-ID: <DB5PR0401MB1813548526D3C8D34B9CCE52FE7C0@DB5PR0401MB1813.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
-
-On 12/01/17 18:15, Tyler Baicar wrote:
-> SEA exceptions are often caused by an uncorrected hardware
-> error, and are handled when data abort and instruction abort
-> exception classes have specific values for their Fault Status
-> Code.
-> When SEA occurs, before killing the process, go through
-> the handlers registered in the notification list.
-> Update fault_info[] with specific SEA faults so that the
-> new SEA handler is used.
-
-> @@ -480,6 +496,28 @@ static int do_bad(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->  	return 1;
->  }
->  
-> +/*
-> + * This abort handler deals with Synchronous External Abort.
-> + * It calls notifiers, and then returns "fault".
-> + */
-> +static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
-> +{
-> +	struct siginfo info;
-> +
-> +	atomic_notifier_call_chain(&sea_handler_chain, 0, NULL);
-> +
-> +	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
-> +		 fault_name(esr), esr, addr);
-> +
-> +	info.si_signo = SIGBUS;
-> +	info.si_errno = 0;
-> +	info.si_code  = 0;
-
-Half of the other do_*() functions in this file read the signo and code from the
-fault_info table.
 
 
-> +	info.si_addr  = (void __user *)addr;
+> -----Original Message-----
+> From: Felipe Balbi [mailto:balbi at kernel.org]
+> Sent: Monday, January 16, 2017 4:50 PM
+> To: Jerry Huang <jerry.huang@nxp.com>; Rob Herring <robh@kernel.org>
+> Cc: mark.rutland at arm.com; catalin.marinas at arm.com;
+> will.deacon at arm.com; linux at armlinux.org.uk; devicetree at vger.kernel.org;
+> linux-usb at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: RE: [PATCH v3 2/3] USB3/DWC3: Add property "snps, incr-burst-
+> type-adjustment" for INCR burst type
+> 
+> 
+> Hi,
+> 
+> Jerry Huang <jerry.huang@nxp.com> writes:
+> >> > On Thu, Dec 22, 2016 at 8:52 PM, Jerry Huang <jerry.huang@nxp.com>
+> >> wrote:
+> >> > > Hi, Rob,
+> >> > >> -----Original Message-----
+> >> > >> From: Rob Herring [mailto:robh at kernel.org]
+> >> > >> Sent: Friday, December 23, 2016 2:45 AM
+> >> > >> To: Jerry Huang <jerry.huang@nxp.com>
+> >> > >> Cc: balbi at kernel.org; mark.rutland at arm.com;
+> >> > >> catalin.marinas at arm.com; will.deacon at arm.com;
+> >> > >> linux at armlinux.org.uk; devicetree at vger.kernel.org;
+> >> > >> linux-usb at vger.kernel.org; linux-kernel at vger.kernel.org;
+> >> > >> linux-arm- kernel at lists.infradead.org
+> >> > >> Subject: Re: [PATCH v3 2/3] USB3/DWC3: Add property "snps,
+> >> > >> incr-burst- type-adjustment" for INCR burst type
+> >> > >>
+> >> > >> On Mon, Dec 19, 2016 at 05:25:53PM +0800, Changming Huang wrote:
+> >> > >> > New property "snps,incr-burst-type-adjustment = <x>, <y>" for
+> >> > >> > USB3.0
+> >> > >> DWC3.
+> >> > >> > Field "x": 1/0 - undefined length INCR burst type enable or
+> >> > >> > not; Field
+> >> > >> > "y": INCR4/INCR8/INCR16/INCR32/INCR64/INCR128/INCR256 burst
+> >> type.
+> >> > >> >
+> >> > >> > While enabling undefined length INCR burst type and INCR16
+> >> > >> > burst type, get better write performance on NXP Layerscape
+> platform:
+> >> > >> > around 3% improvement (from 364MB/s to 375MB/s).
+> >> > >> >
+> >> > >> > Signed-off-by: Changming Huang <jerry.huang@nxp.com>
+> >> > >> > ---
+> >> > >> > Changes in v3:
+> >> > >> >   - add new property for INCR burst in usb node.
+> >> > >> >
+> >> > >> >  Documentation/devicetree/bindings/usb/dwc3.txt |    5 +++++
+> >> > >> >  arch/arm/boot/dts/ls1021a.dtsi                 |    1 +
+> >> > >> >  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi |    3 +++
+> >> > >> >  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi |    2 ++
+> >> > >> >  4 files changed, 11 insertions(+)
+> >> > >> >
+> >> > >> > diff --git a/Documentation/devicetree/bindings/usb/dwc3.txt
+> >> > >> > b/Documentation/devicetree/bindings/usb/dwc3.txt
+> >> > >> > index e3e6983..8c405a3 100644
+> >> > >> > --- a/Documentation/devicetree/bindings/usb/dwc3.txt
+> >> > >> > +++ b/Documentation/devicetree/bindings/usb/dwc3.txt
+> >> > >> > @@ -55,6 +55,10 @@ Optional properties:
+> >> > >> >     fladj_30mhz_sdbnd signal is invalid or incorrect.
+> >> > >> >
+> >> > >> >   - <DEPRECATED> tx-fifo-resize: determines if the FIFO *has*
+> >> > >> > to be
+> >> > >> reallocated.
+> >> > >> > + - snps,incr-burst-type-adjustment: Value for INCR burst type
+> >> > >> > + of
+> >> > >> GSBUSCFG0
+> >> > >> > +   register, undefined length INCR burst type enable and INCRx
+> type.
+> >> > >> > +   First field is for undefined length INCR burst type enable or not.
+> >> > >> > +   Second field is for largest INCRx type enabled.
+> >> > >>
+> >> > >> Why do you need the first field? Is the 2nd field used if the 1st is 0?
+> >> > >> If not, then just use the presence of the property to enable or not.
+> >> > > The first field is one switch.
+> >> > > When it is 1, means undefined length INCR burst type enabled, we
+> >> > > can use
+> >> > any length less than or equal to the largest-enabled burst length
+> >> > of INCR4/8/16/32/64/128/256.
+> >> > > When it is zero, means INCRx burst mode enabled, we can use one
+> >> > > fixed
+> >> > burst length of 1/4/8/16/32/64/128/256 byte.
+> >> > > So, the 2nd field is used if the 1st is 0, we need to select one
+> >> > > largest burst
+> >> > length the USB controller can support.
+> >> > > If we don't want to change the value of this register (use the
+> >> > > default value),
+> >> > we don't need to add this property to usb node.
+> >> >
+> >> > Just make this a single value with 0 meaning INCR and 4/8/16/etc
+> >> > being
+> >> INCRx.
+> >> Maybe, I didn't describe it clearly.
+> >> According to DWC3 spec, the value "0" of field INCRBrstEna means
+> >> INCRx burst mode, 1 means INCR burst mode.
+> >> Regardless of the value of INCRBrstEna [bit0], we need to modify the
+> >> other field bit[1,2,3,4,5,6,7] to one INCR burst type  for the platform
+> supported.
+> >> Ad you mentioned, if we just use a single value with 0 meaning INCR
+> >> and 4/8/16/etc being INCRx.
+> >> I understand totally that when it is none-zero, we can use it for
+> >> INCR burst mode.
+> >> Then, when it is 0, how to select the INCRx value?
+> >>
+> >> So, I think we still need two vaue to specify INCRBrstEna and INCRx
+> >> burst type.
+> > Hi, Balbi,
+> > It seems there is no feedback for my comment, so these patches can be
+> accepted?
+> 
+> probably not, we need to really understand what information we need so it
+> can be described properly. The last thing we want is unnecessary DT
+> properties.
+> 
+> It seems to me that we can extrapolate INCRBrstEna based on which burst
+> modes are enabled. If only 0 is passed, then that bit should be 1, if 0 and any
+> other size is passed, then that bit should be 0, no?
+Hi, Balbi,
+Below is the definition for this property,
+snps,incr-burst-type-adjustment = <x>, <y>
+x: Undefined Length INCR Burst Type Enable (INCRBrstEna)
+    0 - INCRX burst mode (not enable INCRBrstEna)
+    1 - INCR (undefined length) burst mode (enable INCRBrstEna)
+y: the burst length
 
-addr here was read from FAR_EL1, but for some of the classes of exception you
-have listed below this register isn't updated with the faulting address.
+1> if x = 0: means INCRBrstEna not enabled, set bit0 to zero (or clear it) , we select one of INCR1/INCR4/INCR8/INCR16/INCR32/INCR64/INCR128/INCR256 (pass this value through "y")to set the fix burst length controller supported.
+For example:
+snps,incr-burst-type-adjustment = <0>, <16>
+driver will set bit0 to zero and set bit3 to 1 (INCR16 Burst Type Enabled), controller will use INCR16 (with 16 bytes) to transfer data.
 
-The ARM-ARM version 'k' in D1.10.5 "Summary of registers on faults taken to an
-Exception level that is using Aarch64" has:
-> The architecture permits that the FAR_ELx is UNKNOWN for Synchronous External
-> Aborts other than Synchronous External Aborts on Translation Table Walks. In
-> this case, the ISS.FnV bit returned in ESR_ELx  indicates whether FAR_ELx is
-> valid.
+2> if x = 1: means INCRBrstEna enabled, we select one of INCR4/INCR8/INCR16/INCR32/INCR64/INCR128/INCR256 (pass this value through "y") to set the burst length, and controller will use any length less than or equal to that we selected.
+For example:
+snps,incr-burst-type-adjustment = <1>, <32>
+driver will set bit0 to 1 and set bit4 to 1 (INCR32 Burst Type Enabled), controller will use any burst length less than (such as 4, 8, 16 byte) or equal to 32 byte to transfer data.
 
-This is a problem if we get 'synchronous external abort' or 'synchronous parity
-error' while a user space process was running.
-
-
-> +	arm64_notify_die("", regs, &info, esr);
-> +
-> +	return 0;
-> +}
-> +
->  static const struct fault_info {
->  	int	(*fn)(unsigned long addr, unsigned int esr, struct pt_regs *regs);
->  	int	sig;
-
-
-Thanks,
-
-James
+Therefore, I think this two fileds are needed. Do you think about it?
