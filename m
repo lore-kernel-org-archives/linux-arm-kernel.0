@@ -1,96 +1,90 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Tue, 17 Jan 2017 12:45:19 +0200
-Subject: [PATCH v3 2/3] USB3/DWC3: Add property "snps,
- incr-burst-type-adjustment" for INCR burst type
-In-Reply-To: <DB5PR0401MB1813548526D3C8D34B9CCE52FE7C0@DB5PR0401MB1813.eurprd04.prod.outlook.com>
-References: <1482139554-13618-1-git-send-email-jerry.huang@nxp.com>
- <1482139554-13618-2-git-send-email-jerry.huang@nxp.com>
- <20161222184514.hfd4g7ifrz5cv627@rob-hp-laptop>
- <DB5PR0401MB1813E210B2ADE1C9493F7768FE950@DB5PR0401MB1813.eurprd04.prod.outlook.com>
- <CAL_JsqJuifiSQAt-6FgtYYSukAnjzOLuTGEsO-Spn5LxkU-iwQ@mail.gmail.com>
- <DB5PR0401MB18132BB4CDE32EEA8F479E55FE7D0@DB5PR0401MB1813.eurprd04.prod.outlook.com>
- <87tw8zo0c0.fsf@linux.intel.com>
- <DB5PR0401MB1813548526D3C8D34B9CCE52FE7C0@DB5PR0401MB1813.eurprd04.prod.outlook.com>
-Message-ID: <8737gikls0.fsf@linux.intel.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 17 Jan 2017 10:23:50 +0000
+Subject: [PATCH V7 04/10] arm64: exception: handle Synchronous External
+ Abort
+In-Reply-To: <20170116115309.GE1510@arm.com>
+References: <1484244924-24786-1-git-send-email-tbaicar@codeaurora.org>
+ <1484244924-24786-5-git-send-email-tbaicar@codeaurora.org>
+ <20170116115309.GE1510@arm.com>
+Message-ID: <587DF0B6.4060000@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Tyler,
 
-Hi,
+On 16/01/17 11:53, Will Deacon wrote:
+> On Thu, Jan 12, 2017 at 11:15:18AM -0700, Tyler Baicar wrote:
+>> SEA exceptions are often caused by an uncorrected hardware
+>> error, and are handled when data abort and instruction abort
+>> exception classes have specific values for their Fault Status
+>> Code.
+>> When SEA occurs, before killing the process, go through
+>> the handlers registered in the notification list.
+>> Update fault_info[] with specific SEA faults so that the
+>> new SEA handler is used.
 
-Jerry Huang <jerry.huang@nxp.com> writes:
+>> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+>> index 05d2bd7..81039c7 100644
+>> --- a/arch/arm64/mm/fault.c
+>> +++ b/arch/arm64/mm/fault.c
+>> @@ -480,6 +496,28 @@ static int do_bad(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>>  	return 1;
+>>  }
+>>  
+>> +/*
+>> + * This abort handler deals with Synchronous External Abort.
+>> + * It calls notifiers, and then returns "fault".
+>> + */
+>> +static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>> +{
+>> +	struct siginfo info;
+>> +
+>> +	atomic_notifier_call_chain(&sea_handler_chain, 0, NULL);
+>> +
+>> +	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
+>> +		 fault_name(esr), esr, addr);
+>> +
+>> +	info.si_signo = SIGBUS;
+>> +	info.si_errno = 0;
+>> +	info.si_code  = 0;
+>> +	info.si_addr  = (void __user *)addr;
+>> +	arm64_notify_die("", regs, &info, esr);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>>  static const struct fault_info {
+>>  	int	(*fn)(unsigned long addr, unsigned int esr, struct pt_regs *regs);
+>>  	int	sig;
+>> @@ -502,22 +540,22 @@ static const struct fault_info {
+>>  	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 1 permission fault"	},
+>>  	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 2 permission fault"	},
+>>  	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 3 permission fault"	},
+>> -	{ do_bad,		SIGBUS,  0,		"synchronous external abort"	},
+>> +	{ do_sea,		SIGBUS,  0,		"synchronous external abort"	},
+>>  	{ do_bad,		SIGBUS,  0,		"unknown 17"			},
+>>  	{ do_bad,		SIGBUS,  0,		"unknown 18"			},
+>>  	{ do_bad,		SIGBUS,  0,		"unknown 19"			},
+>> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
+>> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
+>> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
+>> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
+>> -	{ do_bad,		SIGBUS,  0,		"synchronous parity error"	},
+>> +	{ do_sea,		SIGBUS,  0,		"level 0 SEA (translation table walk)"	},
+>> +	{ do_sea,		SIGBUS,  0,		"level 1 SEA (translation table walk)"	},
+>> +	{ do_sea,		SIGBUS,  0,		"level 2 SEA (translation table walk)"	},
+>> +	{ do_sea,		SIGBUS,  0,		"level 3 SEA (translation table walk)"	},
+> 
+> Perhaps I wasn't clear enough in my previous review, but please expand the
+> acronym for strings and comments.
 
-<snip>
 
->> >> So, I think we still need two vaue to specify INCRBrstEna and INCRx
->> >> burst type.
->> > Hi, Balbi,
->> > It seems there is no feedback for my comment, so these patches can be
->> accepted?
->> 
->> probably not, we need to really understand what information we need so it
->> can be described properly. The last thing we want is unnecessary DT
->> properties.
->> 
->> It seems to me that we can extrapolate INCRBrstEna based on which burst
->> modes are enabled. If only 0 is passed, then that bit should be 1, if 0 and any
->> other size is passed, then that bit should be 0, no?
-> Hi, Balbi,
-> Below is the definition for this property,
-> snps,incr-burst-type-adjustment = <x>, <y>
-> x: Undefined Length INCR Burst Type Enable (INCRBrstEna)
->     0 - INCRX burst mode (not enable INCRBrstEna)
->     1 - INCR (undefined length) burst mode (enable INCRBrstEna)
-> y: the burst length
->
-> 1> if x = 0: means INCRBrstEna not enabled, set bit0 to zero (or clear
-> it) , we select one of
-> INCR1/INCR4/INCR8/INCR16/INCR32/INCR64/INCR128/INCR256 (pass this
-> value through "y")to set the fix burst length controller supported.
->
-> For example:
->
-> 	snps,incr-burst-type-adjustment = <0>, <16>
->
-> driver will set bit0 to zero and set bit3 to 1 (INCR16 Burst Type
-> Enabled), controller will use INCR16 (with 16 bytes) to transfer data.
->
-> 2> if x = 1: means INCRBrstEna enabled, we select one of
-> INCR4/INCR8/INCR16/INCR32/INCR64/INCR128/INCR256 (pass this value
-> through "y") to set the burst length, and controller will use any
-> length less than or equal to that we selected.
->
-> For example:
->
-> 	snps,incr-burst-type-adjustment = <1>, <32>
->
-> driver will set bit0 to 1 and set bit4 to 1 (INCR32 Burst Type
-> Enabled), controller will use any burst length less than (such as 4,
-> 8, 16 byte) or equal to 32 byte to transfer data.
->
-> Therefore, I think this two fileds are needed. Do you think about it?
+The 'SEA' in this user-string doesn't add anything. Now that these use do_sea()
+instead of do_bad(), when they are printed won't it be:
+> Synchronous External Abort: level 3 SEA (translation table walk) (...) at ....
 
-no, I don't think two values are needed, because first value can be
-extrapolated from the second. Something like this:
 
-	snps,incr-burst-type-adjustment = <4>, <8>, <16>, <32>;
 
-This is basically telling us that we can support anything in this
-list. So INCRBrstEna should be set to 1.
+Thanks,
 
-If DT, on the other hand, says:
-
-	snps,incr-burst-type-adjustment = <32>;
-
-this means that we can only support INCR32, so INCRBrstEna should be
-cleared to 0.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170117/596669fd/attachment.sig>
+James
