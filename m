@@ -1,50 +1,89 @@
-From: jan.kiszka@siemens.com (Jan Kiszka)
-Date: Tue, 17 Jan 2017 09:10:24 +0100
-Subject: [PATCH v2 2/3] spi: pxa2xx: Prepare for edge-triggered interrupts
-In-Reply-To: <87vatedsn1.fsf@belgarion.home>
-References: <cover.1484592296.git.jan.kiszka@siemens.com>
- <cover.1484592296.git.jan.kiszka@siemens.com>
- <7b15a0910a3ad861fd32161c72559bafa7b71e29.1484592296.git.jan.kiszka@siemens.com>
- <87vatedsn1.fsf@belgarion.home>
-Message-ID: <bfebbcbc-3d02-137b-72c0-7664900fe279@siemens.com>
+From: ravibabu@ti.com (B, Ravi)
+Date: Tue, 17 Jan 2017 08:14:04 +0000
+Subject: [PATCH 1/2] ARM: dts: dra7-evm: increase QSPI SPL partition size
+In-Reply-To: <20170113181239.GC2630@atomide.com>
+References: <1484311234-21978-1-git-send-email-ravibabu@ti.com>
+ <1484311234-21978-2-git-send-email-ravibabu@ti.com>
+ <20170113181239.GC2630@atomide.com>
+Message-ID: <6C6B28D4DC342643927BEAFCE8707BF6C0A8C367@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-01-17 08:58, Robert Jarzmik wrote:
-> Jan Kiszka <jan.kiszka@siemens.com> writes:
-> 
->> When using the a device with edge-triggered interrupts, such as MSIs,
->> the interrupt handler has to ensure that there is a point in time during
->> its execution where all interrupts sources are silent so that a new
->> event can trigger a new interrupt again.
->>
->> This is achieved here by looping over SSSR evaluation. We need to take
->> into account that SSCR1 may be changed by the transfer handler, thus we
->> need to redo the mask calculation, at least regarding the volatile
->> interrupt enable bit (TIE).
-> 
-> I'd like moreover to add a question here.
-> 
-> In pxa architecture, SPI interrupts are already edge-triggered, and it's working
-> well. The interrupt source disabling is not disabled, but the interrupt
-> controller doesn't trigger an interrupt anymore (as it is masked), yet it marks
-> it as pending if an interrupt arrives while the interrupt handler is running.
-> 
-> All of this is handled by the interrupt core. My question is why for Intel MSI's
-> is it necessary to make a change in the driver instead or relying on the
-> interrupt core as for the pxa ?
+Hi Tony
 
-If someone was using this driver with edge-triggered interrupt sources
-so far, it was probably slower hardware and some luck (I've seen this
-when driving fast-clocked devices vs. slower ones - only the latter
-exposed the bug). Or that hardware did some temporary masking at
-interrupt controller level while the handler was running. But that is
-also not by design. It's the driver's task to ensure that all interrupt
-sources are addressed once when returning from an edge-triggered
-handler, and that is missing in this one.
+>* Ravi Babu <ravibabu@ti.com> [170113 04:41]:
+>> The SPL size for DRA74x platform has increased and is now more than 
+>> 64KB. Increase QSPI SPL partition size to 256KB for DRA74x EVM.
+>> 
+>> QSPI partition numbering changes because of this.
 
-Jan
+>And this will break the existing partitions potentially..
+>See what was discussed on the list few days ago in thread "[PATCH 1/6] ARM: dts: am335x-phycore-som: Update NAND partition table".
 
--- 
-Siemens AG, Corporate Technology, CT RDA ITP SES-DE
-Corporate Competence Center Embedded Linux
+>It's best to have these left empty or as they originally were and let u-boot configure the partitions.
+
+Agree with you. For dra7xx platform the SPL size has been increased to 256KB and hence the existing QSPI SPL partition in kernel (64K size) will break when latest mainline u-boot is used. 
+Here only SPL partition has been changed and other partition & size is NOT changed and kept intact. I feel it will not break the existing partitions for dra7xx platform.
+
+>> Signed-off-by: Ravi Babu <ravibabu@ti.com>
+>> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+>> ---
+>>  arch/arm/boot/dts/dra7-evm.dts | 24 ++++++------------------
+>>  1 file changed, 6 insertions(+), 18 deletions(-)
+>> 
+>> diff --git a/arch/arm/boot/dts/dra7-evm.dts 
+>> b/arch/arm/boot/dts/dra7-evm.dts index 132f2be..2784241 100644
+>> --- a/arch/arm/boot/dts/dra7-evm.dts
+>> +++ b/arch/arm/boot/dts/dra7-evm.dts
+>> @@ -681,41 +681,29 @@
+>>  		 */
+>>  		partition at 0 {
+>>  			label = "QSPI.SPL";
+>> -			reg = <0x00000000 0x000010000>;
+>> +			reg = <0x00000000 0x000040000>;
+>>  		};
+>>  		partition at 1 {
+>> -			label = "QSPI.SPL.backup1";
+>> -			reg = <0x00010000 0x00010000>;
+>> -		};
+>> -		partition at 2 {
+>> -			label = "QSPI.SPL.backup2";
+>> -			reg = <0x00020000 0x00010000>;
+>> -		};
+>> -		partition at 3 {
+>> -			label = "QSPI.SPL.backup3";
+>> -			reg = <0x00030000 0x00010000>;
+>> -		};
+>> -		partition at 4 {
+>>  			label = "QSPI.u-boot";
+>>  			reg = <0x00040000 0x00100000>;
+>>  		};
+>> -		partition at 5 {
+>> +		partition at 2 {
+>>  			label = "QSPI.u-boot-spl-os";
+>>  			reg = <0x00140000 0x00080000>;
+>>  		};
+>> -		partition at 6 {
+>> +		partition at 3 {
+>>  			label = "QSPI.u-boot-env";
+>>  			reg = <0x001c0000 0x00010000>;
+>>  		};
+>> -		partition at 7 {
+>> +		partition at 4 {
+>>  			label = "QSPI.u-boot-env.backup1";
+>>  			reg = <0x001d0000 0x0010000>;
+>>  		};
+>> -		partition at 8 {
+>> +		partition at 5 {
+>>  			label = "QSPI.kernel";
+>>  			reg = <0x001e0000 0x0800000>;
+>>  		};
+>> -		partition at 9 {
+>> +		partition at 6 {
+>>  			label = "QSPI.file-system";
+>>  			reg = <0x009e0000 0x01620000>;
+>>  		};
+>> --
+
+Regards
+Ravi
