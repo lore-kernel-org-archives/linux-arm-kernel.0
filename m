@@ -1,46 +1,107 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Wed, 18 Jan 2017 00:57:08 +0800
-Subject: [PATCH 1/4] phy: sun4i-usb: support PHY0 on H3 in MUSB mode
-In-Reply-To: <20170117080611.tn7s7ddj2csqr27m@lukather>
-References: <20170116191449.50397-1-icenowy@aosc.xyz>
- <20170116191449.50397-2-icenowy@aosc.xyz>
- <20170117080611.tn7s7ddj2csqr27m@lukather>
-Message-ID: <3866431484672228@web20j.yandex.ru>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 17 Jan 2017 17:58:47 +0100
+Subject: [PATCH v2 08/10] ARM: dts: sun8i: Add audio codec, dai and card
+ for A33
+In-Reply-To: <20170117140230.23142-9-mylene.josserand@free-electrons.com>
+References: <20170117140230.23142-1-mylene.josserand@free-electrons.com>
+ <20170117140230.23142-9-mylene.josserand@free-electrons.com>
+Message-ID: <20170117165847.olotkisojwgtdzrz@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On Tue, Jan 17, 2017 at 03:02:28PM +0100, Myl?ne Josserand wrote:
+> Add the audio codec, dai and a simple card to be able to use the
+> audio stream of the builtin codec on sun8i SoC.
+> 
+> This commit adds also an audio-routing for the sound card node to link
+> the analog DAPM widgets (Right/Left DAC) and the digital one's as they
+> are created in different drivers.
+> 
+> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/sun8i-a33.dtsi | 47 ++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 47 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
+> index 63d5181ffff8..fe8a4f4760d2 100644
+> --- a/arch/arm/boot/dts/sun8i-a33.dtsi
+> +++ b/arch/arm/boot/dts/sun8i-a33.dtsi
+> @@ -43,6 +43,7 @@
+>   */
+>  
+>  #include "sun8i-a23-a33.dtsi"
+> +#include <dt-bindings/dma/sun4i-a10.h>
+>  
+>  / {
+>  	cpus {
+> @@ -69,6 +70,27 @@
+>  		reg = <0x40000000 0x80000000>;
+>  	};
+>  
+> +	sound {
+> +		compatible = "simple-audio-card";
+> +		simple-audio-card,name = "Sun8i Audio Card";
 
-17.01.2017, 16:06, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> On Tue, Jan 17, 2017 at 03:14:46AM +0800, Icenowy Zheng wrote:
->> ?The PHY0 on H3 can be wired either to MUSB controller or OHCI/EHCI
->> ?controller.
->>
->> ?The original driver wired it to OHCI/EHCI controller; however, as the
->> ?code to use PHY0 as OHCI/EHCI is missing, it makes the PHY fully
->> ?unusable.
->>
->> ?Rename the register (according to its function and the name in BSP
->> ?driver), and remove the code which wires the PHY0 to OHCI/EHCI, as MUSB
->> ?can support both peripheral and host mode (although the host mode of
->> ?MUSB is buggy).
->
-> Can you elaborate on that? What's wrong with it?
+You might have several of them if you're using an internal i2s DAI
+with a codec too. What about "a33-codec" or something alike?
 
-The configuration is at bit 0 of register 0x20 in PHY.
+> +		simple-audio-card,format = "i2s";
+> +		simple-audio-card,frame-master = <&link_codec>;
+> +		simple-audio-card,bitclock-master = <&link_codec>;
+> +		simple-audio-card,mclk-fs = <512>;
+> +		simple-audio-card,aux-devs = <&codec_analog>;
+> +		simple-audio-card,routing =
+> +				"Left DAC", "Digital Left DAC",
+> +				"Right DAC", "Digital Right DAC";
 
-When the PHY is reseted, it defaults as MUSB mode.
+This will be enabled all the time (even if your DAI and codec are
+not), which means that the driver will probe and.. do nothing. You
+probably want to disable it here.
 
-However, the original author of the H3 PHY code seems to be lack of this
-knowledge (He named it PHY_UNK_H3), and changed the PHY to HCI mode.
+> +
+> +		simple-audio-card,cpu {
+> +			sound-dai = <&dai>;
+> +		};
+> +
+> +		link_codec: simple-audio-card,codec {
+> +			sound-dai = <&codec>;
+> +		};
+> +	};
+> +
+>  	soc at 01c00000 {
+>  		tcon0: lcd-controller at 01c0c000 {
+>  			compatible = "allwinner,sun8i-a33-tcon";
+> @@ -116,6 +138,31 @@
+>  			reset-names = "ahb";
+>  		};
+>  
+> +		dai: dai at 01c22c00 {
+> +			#sound-dai-cells = <0>;
+> +			compatible = "allwinner,sun6i-a31-i2s";
+> +			reg = <0x01c22c00 0x200>;
+> +			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
+> +			clock-names = "apb", "mod";
+> +			resets = <&ccu RST_BUS_CODEC>;
+> +			reset-names = "rst";
+> +			dmas = <&dma 15>, /* AUDIO_CODEC port */
+> +				<&dma 15>; /* AUDIO_CODEC port */
 
-I just removed the code that wires it to HCI mode, thus it will work in MUSB
-mode, with my sun8i-h3-musb patch.
+There's no need for those comments.
 
->
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+Thanks!
+Maxime 
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170117/7bc16a97/attachment.sig>
