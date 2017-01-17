@@ -1,40 +1,83 @@
-From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Tue, 17 Jan 2017 11:53:43 +0800
-Subject: [Question] A question about arm64 pte
-In-Reply-To: <20170116143601.GB6832@e104818-lin.cambridge.arm.com>
-References: <d284f510-f025-db84-f21e-a5b167d4bcd2@huawei.com>
- <20170116115606.GA6832@e104818-lin.cambridge.arm.com>
- <6b7a9bd2-37af-40cd-b723-9e648fbbc7c8@huawei.com>
- <20170116143601.GB6832@e104818-lin.cambridge.arm.com>
-Message-ID: <ecf2bd9f-9f96-0e6d-564d-93cff5bbf0cb@huawei.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 17 Jan 2017 13:39:46 +0900
+Subject: [PATCH 01/12] soc: samsung: pmu: Use common device name to let
+ others to find it easily
+In-Reply-To: <1484549107-5957-2-git-send-email-m.szyprowski@samsung.com>
+References: <CGME20170116064523eucas1p18a55f951566df5ddd978364486154931@eucas1p1.samsung.com>
+ <1484549107-5957-1-git-send-email-m.szyprowski@samsung.com>
+ <1484549107-5957-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CA+Ln22F6Lnm6LkOO-X9ceqYknxXmuwCBowJzDGACmZzQCBj13w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Marek,
 
+2017-01-16 15:44 GMT+09:00 Marek Szyprowski <m.szyprowski@samsung.com>:
+> This patch always set device name to "exynos-pmu" to let other drivers to
+> find PMU device easily. This is done mainly to get regmap to access PMU
+> registers from other drivers. This way it can be avoided to add phandle to
+> the PMU node to almost all drivers in the SoC just to get a regmap access
+> in the drivers. PMU is something like a SoC wide service, so there is no
+> point modeling it as hardware dependency for all devices in device tree.
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  drivers/soc/samsung/exynos-pmu.c       |  1 +
+>  include/linux/soc/samsung/exynos-pmu.h | 19 +++++++++++++++++++
+>  2 files changed, 20 insertions(+)
+>
+> diff --git a/drivers/soc/samsung/exynos-pmu.c b/drivers/soc/samsung/exynos-pmu.c
+> index 0acdfd82e751..63bb471845cb 100644
+> --- a/drivers/soc/samsung/exynos-pmu.c
+> +++ b/drivers/soc/samsung/exynos-pmu.c
+> @@ -120,6 +120,7 @@ static int exynos_pmu_probe(struct platform_device *pdev)
+>                 pmu_context->pmu_data->pmu_init();
+>
+>         platform_set_drvdata(pdev, pmu_context);
+> +       dev_set_name(dev, EXYNOS_PMU_DEV_NAME);
+>
+>         dev_dbg(dev, "Exynos PMU Driver probe done\n");
+>         return 0;
+> diff --git a/include/linux/soc/samsung/exynos-pmu.h b/include/linux/soc/samsung/exynos-pmu.h
+> index e2e9de1acc5b..90d9205805ea 100644
+> --- a/include/linux/soc/samsung/exynos-pmu.h
+> +++ b/include/linux/soc/samsung/exynos-pmu.h
+> @@ -12,6 +12,10 @@
+>  #ifndef __LINUX_SOC_EXYNOS_PMU_H
+>  #define __LINUX_SOC_EXYNOS_PMU_H
+>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regmap.h>
+> +
+>  enum sys_powerdown {
+>         SYS_AFTR,
+>         SYS_LPA,
+> @@ -21,4 +25,19 @@ enum sys_powerdown {
+>
+>  extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
+>
+> +#define EXYNOS_PMU_DEV_NAME "exynos-pmu"
+> +
+> +static inline struct regmap *exynos_get_pmu_regs(void)
+> +{
+> +       struct device *dev = bus_find_device_by_name(&platform_bus_type, NULL,
+> +                                                    EXYNOS_PMU_DEV_NAME);
+> +       if (dev) {
+> +               struct regmap *regs = syscon_node_to_regmap(dev->of_node);
+> +               put_device(dev);
+> +               if (!IS_ERR(regs))
+> +                       return regs;
+> +       }
+> +       return NULL;
 
-On 2017/1/16 22:36, Catalin Marinas wrote:
-> On Mon, Jan 16, 2017 at 08:39:56PM +0800, Yisheng Xie wrote:
->> On 2017/1/16 19:56, Catalin Marinas wrote:
->>> On Mon, Jan 16, 2017 at 06:08:47PM +0800, Yisheng Xie wrote:
->>>
->> However?when use memset to write the region it still works well, and
->> the bit PTE_RDONLY is also cleared. Is there anywhere clear the
->> PTE_RDONLY before write that page ?
-> 
-> See handle_pte_fault(). On the first access to a writable+clean page
-> (PTE_WRITE set, PTE_RDONLY set, PTE_DIRTY cleared), the kernel traps it
-> and, if pte_write() is true (your case), it calls pte_mkdirty(). The
-> subsequently called ptep_set_access_flags() function would clear
-> PTE_RDONLY, giving you a writable mapping.
-> 
-hi Catalin?
-Sorry to disturb, but why page fault will happened here, for pte already
-present with AF bit set?
+As discussed offline, since this function relies on the PMU driver
+probing, we need to defer here if someone calls this function before
+that. Since PMU is something that should be assumed to be available in
+any Exynos system (it controls to many critical aspects of the SoC), I
+think we can simply return ERR_PTR(-EDEFER_PROBE) here instead of
+NULL. Maybe also a pr_debug() before deferring could be useful to
+debug PMU probe failures.
 
-Here is what I get when mmap a reserved memory region 0x39ef 0000~0x3a00 0000
-use /dev/mem:
-[  442.704228] pgd = ffff802785f14000
-[  442.707641] [ffff86e4b000] *pgd=000000279080c003, *pud=0000002785f01003, *pmd=0000002783f5b003, *pte=0168000039ef0fd3
-
-Thanks,
-Yisheng Xie.
+Best regards,
+Tomasz
