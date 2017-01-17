@@ -1,59 +1,82 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 17 Jan 2017 14:53:08 +0200
-Subject: [RFC PATCH] initramfs: finish fput() before accessing any binary
- from initramfs
-In-Reply-To: <20170117111456.2269-1-lokeshvutla@ti.com>
-References: <20170117111456.2269-1-lokeshvutla@ti.com>
-Message-ID: <35e88dbe-f269-2558-c3b7-9ba228a70504@ti.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Tue, 17 Jan 2017 20:47:49 +0800
+Subject: [PATCH V9 2/3] ACPI: Add support for ResourceSource/IRQ domain
+ mapping
+In-Reply-To: <1481753438-3905-3-git-send-email-agustinv@codeaurora.org>
+References: <1481753438-3905-1-git-send-email-agustinv@codeaurora.org>
+ <1481753438-3905-3-git-send-email-agustinv@codeaurora.org>
+Message-ID: <587E1275.7030007@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/01/17 13:14, Lokesh Vutla wrote:
-> commit 4a9d4b024a31 ("switch fput to task_work_add") implements a
-> schedule_work() for completing fput(), but did not guarantee calling
-> __fput() after unpacking initramfs. Because of this, there is a
-> possibility that during boot a driver can see ETXTBSY when it tries
-> to load a binary from initramfs as fput() is still pending on that
-> binary. This patch makes sure that fput() is completed after unpacking
-> initramfs.
-
-Good find there.
-
+On 2016/12/15 6:10, Agustin Vega-Frias wrote:
+> ACPI extended IRQ resources may contain a ResourceSource to specify
+> an alternate interrupt controller. Introduce acpi_irq_get and use it
+> to implement ResourceSource/IRQ domain mapping.
 >
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> The new API is similar to of_irq_get and allows re-initialization
+> of a platform resource from the ACPI extended IRQ resource, and
+> provides proper behavior for probe deferral when the domain is not
+> yet present when called.
+>
+> Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
 > ---
+>  drivers/acpi/Makefile         |   2 +-
+>  drivers/acpi/{gsi.c => irq.c} | 182 ++++++++++++++++++++++++++++++++++++++++++
+>  drivers/base/platform.c       |   9 ++-
+>  include/linux/acpi.h          |  10 +++
+>  4 files changed, 201 insertions(+), 2 deletions(-)
+>  rename drivers/acpi/{gsi.c => irq.c} (32%)
 >
-> - Reproduced on TI K2HK EVM. K2HK Queue Manager subsystem driver[1] tries
-> to load a firmware from initramfs during boot. Sometimes loading of this
-> firmware fails with error ETXTBSY. Digging a bit more observed that
-> deny_write_access() is returning ETXTBSY as inode->i_writecount is > 0
-> for that file. This is because Unpacking initramfs does a
-> get_write_access(from open) but hasn't done put_write_access(from fput)
-> as it hasn't been scheduled yet.
->
-> [1] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/soc/ti/knav_qmss_queue.c
->
->  init/initramfs.c | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/init/initramfs.c b/init/initramfs.c
-> index b32ad7d97ac9..c42c69b48a4b 100644
-> --- a/init/initramfs.c
-> +++ b/init/initramfs.c
-> @@ -18,6 +18,7 @@
->  #include <linux/dirent.h>
->  #include <linux/syscalls.h>
->  #include <linux/utime.h>
-> +#include <linux/file.h>
->
->  static ssize_t __init xwrite(int fd, const char *p, size_t count)
->  {
-> @@ -652,6 +653,7 @@ static int __init populate_rootfs(void)
->  		 * us a chance to load before device_initcalls.
->  		 */
->  		load_default_modules();
-> +		flush_delayed_fput();
+[...]
+> +/**
+> + * acpi_irq_parse_one_cb - Handle the given resource
+> + * @ares: resource to handle
+> + * @context: context for the walk, contains the lookup index and references
+> + *           to the flags and fwspec where the result is returned
+> + *
+> + * This is called by acpi_walk_resources passing each resource returned by
+> + * the _CRS method. We only inspect IRQ resources. Since IRQ resources
+> + * might contain multiple interrupts we check if the index is within this
+> + * one's interrupt array, otherwise we subtract the current resource IRQ
+> + * count from the lookup index to prepare for the next resource.
+> + * Once a match is found we call acpi_irq_parse_one_match to populate
+> + * the result and end the walk by returning AE_CTRL_TERMINATE.
+> + *
+> + * Return AE_OK if the walk should continue, AE_CTRL_TERMINATE if a matching
+> + * IRQ resource was found.
+> + */
+> +static acpi_status acpi_irq_parse_one_cb(struct acpi_resource *ares,
+> +					 void *context)
+> +{
+> +	struct acpi_irq_parse_one_ctx *ctx = context;
+> +	struct acpi_resource_irq *irq;
+> +	struct acpi_resource_extended_irq *eirq;
+> +	struct fwnode_handle *fwnode;
+> +
+> +	switch (ares->type) {
+> +	case ACPI_RESOURCE_TYPE_IRQ:
+> +		irq = &ares->data.irq;
+> +		if (ctx->index >= irq->interrupt_count) {
+> +			ctx->index -= irq->interrupt_count;
+> +			return AE_OK;
+> +		}
+> +		fwnode = acpi_gsi_domain_id;
+> +		acpi_irq_parse_one_match(fwnode, irq->interrupts[ctx->index],
+> +					 irq->triggering, irq->polarity,
+> +					 irq->sharable, ctx);
+> +		return AE_CTRL_TERMINATE;
+> +	case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
+> +		eirq = &ares->data.extended_irq;
 
-Shouldn't the flush be called before the load_default_modules() though?
+If it's an interrupt producer, I think we don't need to map the interrupts in
+any irqdomain, and return AE_CTRL_TERMINATE here.
 
--Tero
+        case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
+                eirq = &ares->data.extended_irq;
++         if (eirq->producer_consumer == ACPI_PRODUCER)
++                 return AE_CTRL_TERMINATE;
+                if (ctx->index >= eirq->interrupt_count) {
+
+Thanks
+Hanjun
