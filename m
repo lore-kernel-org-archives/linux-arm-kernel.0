@@ -1,110 +1,50 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 17 Jan 2017 09:10:06 +0100
-Subject: [PATCH 2/3] dts: teach newer i.MX machines to have the i.MX35
- type watchdog
-In-Reply-To: <0586b2cd-6cbb-2e8a-9cd6-d7220708931d@mleia.com>
-References: <20170109095039.11979-1-u.kleine-koenig@pengutronix.de>
- <20170109095039.11979-3-u.kleine-koenig@pengutronix.de>
- <CAOMZO5CjkW1SdSAcSOj8Uws-xjoh=iZ1Ey9dwBdOdBzQLS6h8w@mail.gmail.com>
- <20170116204337.j67oeknraas7ryib@pengutronix.de>
- <0586b2cd-6cbb-2e8a-9cd6-d7220708931d@mleia.com>
-Message-ID: <20170117081006.rptalfhzois5sjvu@pengutronix.de>
+From: jan.kiszka@siemens.com (Jan Kiszka)
+Date: Tue, 17 Jan 2017 09:10:24 +0100
+Subject: [PATCH v2 2/3] spi: pxa2xx: Prepare for edge-triggered interrupts
+In-Reply-To: <87vatedsn1.fsf@belgarion.home>
+References: <cover.1484592296.git.jan.kiszka@siemens.com>
+ <cover.1484592296.git.jan.kiszka@siemens.com>
+ <7b15a0910a3ad861fd32161c72559bafa7b71e29.1484592296.git.jan.kiszka@siemens.com>
+ <87vatedsn1.fsf@belgarion.home>
+Message-ID: <bfebbcbc-3d02-137b-72c0-7664900fe279@siemens.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Vladimir,
-
-On Mon, Jan 16, 2017 at 11:48:40PM +0200, Vladimir Zapolskiy wrote:
-> On 01/16/2017 10:43 PM, Uwe Kleine-K?nig wrote:
-> > On Mon, Jan 16, 2017 at 04:35:26PM -0200, Fabio Estevam wrote:
-> >> On Mon, Jan 9, 2017 at 7:50 AM, Uwe Kleine-K?nig
-> >> <u.kleine-koenig@pengutronix.de> wrote:
-> >>> Only i.MX35 and newer feature a WMCR register that should be written to. Older
-> >>> SoCs hang when this address is written.
-> >>>
-> >>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> >>
-> >> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
-> >>
-> >> Only a minor nit: Subject could: ARM: dts: imx: teach...
-> > 
-> > Ack. To reference the commit id of the first patch in the third I can
-> > prepare a branch to pull. There I'd fix the Subject. Shawn, is this OK?
-> > 
+On 2017-01-17 08:58, Robert Jarzmik wrote:
+> Jan Kiszka <jan.kiszka@siemens.com> writes:
 > 
-> This is too early for changes, which are not reviewed by Linux watchdog masters.
+>> When using the a device with edge-triggered interrupts, such as MSIs,
+>> the interrupt handler has to ensure that there is a point in time during
+>> its execution where all interrupts sources are silent so that a new
+>> event can trigger a new interrupt again.
+>>
+>> This is achieved here by looping over SSSR evaluation. We need to take
+>> into account that SSCR1 may be changed by the transfer handler, thus we
+>> need to redo the mask calculation, at least regarding the volatile
+>> interrupt enable bit (TIE).
 > 
-> As I emphasized multiple times in our discussions your series is organized
-> improperly, it has interdependencies between DTS and driver, it lacks
-> atomicity feature of a proper fix, in the middle it breaks backward compatibility
-> with old DTB, all that makes it impossible to send an atomic fix for linux-stable,
+> I'd like moreover to add a question here.
+> 
+> In pxa architecture, SPI interrupts are already edge-triggered, and it's working
+> well. The interrupt source disabling is not disabled, but the interrupt
+> controller doesn't trigger an interrupt anymore (as it is masked), yet it marks
+> it as pending if an interrupt arrives while the interrupt handler is running.
+> 
+> All of this is handled by the interrupt core. My question is why for Intel MSI's
+> is it necessary to make a change in the driver instead or relying on the
+> interrupt core as for the pxa ?
 
-Oh, I must have missed that. In my inbox there are two replys to my
-series, the one I reply to being the first to mention these critics.
+If someone was using this driver with edge-triggered interrupt sources
+so far, it was probably slower hardware and some luck (I've seen this
+when driving fast-clocked devices vs. slower ones - only the latter
+exposed the bug). Or that hardware did some temporary masking at
+interrupt controller level while the handler was running. But that is
+also not by design. It's the driver's task to ensure that all interrupt
+sources are addressed once when returning from an edge-triggered
+handler, and that is missing in this one.
 
-Regarding your critics:
-
- - organized improperly: that alone is too abstract to understand what
-   you mean.
- - interdependencies between DTS and driver, lacks atomicity, impossible
-   to send an atomic fix for linux-stable: I wonder how you want to get
-   rid of that. Yes there are interdependencies, that's because both
-   driver and dts need adaption. Well, I could squash together some of
-   the changes, then there is a single patch that atomically fixes
-   everything. Personally I prefer to have three commits, each one
-   changing a single thing and considering all three together as a fix
-   for stable.
- - in the middle it breaks backward compatibility: There are three
-   patches:
-
-   	1) watchdog: imx2: Only i.MX35 and later have a WMCR register
-	2) dts: teach newer i.MX machines to have the i.MX35 type watchdog
-	3) watchdog: imx2: add compatibility for new i.MX35 type watchdog
-
-   Before the first patch we have:
-
-	- newer i.mx dtsi wrongly claims to have i.mx21 type watchdog
-	- watchdog handles i.MX21 as if it were i.MX35
-
-   After the first patch we have:
-
-	- newer i.mx dtsi wrongly claims to have i.mx21 type watchdog
-
-   And after the second everything is fine (assuming a dtb not older
-   than the kernel). So each patch fixes a single thing.
-
-   Yes, after the first patch machines having an i.MX35 type watchdog
-   might have a problem. That's because there are two things to fix (so
-   there are two patches): The driver must know about the new type and
-   the dts must make use of it. And fixing the first makes the second
-   visible, but doesn't introduce it (after all the i.MX35 dtsi is wrong
-   claiming to have the i.MX21 type).
-
-Now that there are machines known that suffer from the problem under
-discussion it's obvious that we want the changes from the third patch.
-Personally I don't care much if it stays separate or is squashed into
-the first one.
-
-> some of the changes are captured from mine ones without preserving the authorship
-> or even a reported-by credit.
-
-Compared to your v1 the similarities are AFAICT:
-
- - added .data to dt_ids array
- - added an if to only conditionally execute the breaking command
- - added a new compatible to several dtsi files
-
-All these are necessary to fix the problem discussed here. The way I
-implemented the first two ones are different to your way. So IMHO it's
-at least questionable if you or I should be the author of the patches I
-sent.
-
-I'm ok to add a Reported-by for you. I usually add such a tag only after
-a request for it. I missed to ask for that, please excuse this.
-
-Best regards
-Uwe
+Jan
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Siemens AG, Corporate Technology, CT RDA ITP SES-DE
+Corporate Competence Center Embedded Linux
