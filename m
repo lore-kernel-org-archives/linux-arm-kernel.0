@@ -1,29 +1,38 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 17 Jan 2017 11:43:40 +0100
-Subject: [PATCH] rtc: stm32: use 0 instead of ~PWR_CR_DBP in
- regmap_update_bits
-In-Reply-To: <1484557058-21601-1-git-send-email-amelie.delaunay@st.com>
-References: <1484557058-21601-1-git-send-email-amelie.delaunay@st.com>
-Message-ID: <20170117104340.rn2upxp3z7zzmg32@piout.net>
+Date: Tue, 17 Jan 2017 11:43:52 +0100
+Subject: [PATCH] rtc: stm32: fix comparison warnings
+In-Reply-To: <1484561333-12087-1-git-send-email-amelie.delaunay@st.com>
+References: <1484561333-12087-1-git-send-email-amelie.delaunay@st.com>
+Message-ID: <20170117104352.65velakwiaia36xq@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/01/2017 at 09:57:38 +0100, Amelie Delaunay wrote :
-> Using the ~ operator on a BIT() constant results in a large 'unsigned long'
-> constant that won't fit into an 'unsigned int' function argument on 64-bit
-> architectures, resulting in a harmless build warning in x86 allmodconfig:
+On 16/01/2017 at 11:08:53 +0100, Amelie Delaunay wrote :
+> This patches fixes comparison between signed and unsigned values as it
+> could produce an incorrect result when the signed value is converted to
+> unsigned:
 > 
-> drivers/rtc/rtc-stm32.c: In function 'stm32_rtc_probe':
-> drivers/rtc/rtc-stm32.c:651:51: error: large integer implicitly truncated to unsigned type [-Werror=overflow]
->   regmap_update_bits(rtc->dbp, PWR_CR, PWR_CR_DBP, ~PWR_CR_DBP);
+> drivers/rtc/rtc-stm32.c: In function 'stm32_rtc_valid_alrm':
+> drivers/rtc/rtc-stm32.c:404:21: warning: comparison between signed and unsigned integer expressions [-Wsign-compare]
+>   if ((((tm->tm_year > cur_year) &&
+> ...
 > 
-> As PWR_CR_DBP mask prevents other bits to be cleared, replace all
-> ~PWR_CR_DBP by 0.
+> It also fixes comparison always true or false due to the fact that unsigned
+> value is compared against zero with >= or <:
+> 
+> drivers/rtc/rtc-stm32.c: In function 'stm32_rtc_init':
+> drivers/rtc/rtc-stm32.c:514:35: warning: comparison of unsigned expression >= 0 is always true [-Wtype-limits]
+>   for (pred_a = pred_a_max; pred_a >= 0; pred_a-- ) {
+> 
+> drivers/rtc/rtc-stm32.c:530:44: warning: comparison of unsigned expression < 0 is always false [-Wtype-limits]
+>      (rate - ((pred_a + 1) * (pred_s + 1)) < 0) ?
 > 
 > Fixes: 4e64350f42e2 ("rtc: add STM32 RTC driver")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
 > ---
+>  drivers/rtc/rtc-stm32.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+> 
 Applied, thanks.
 
 -- 
