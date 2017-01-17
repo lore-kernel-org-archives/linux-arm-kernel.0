@@ -1,35 +1,35 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue, 17 Jan 2017 13:26:15 +0100
-Subject: [PATCH v2 13/14] ARM: dts: da850: add the SATA node
-In-Reply-To: <1484655976-25382-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1484655976-25382-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1484655976-25382-14-git-send-email-bgolaszewski@baylibre.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 17 Jan 2017 12:29:21 +0000
+Subject: [PATCH v19 10/15] clocksource/drivers/arm_arch_timer: Refactor
+ the timer init code to prepare for GTDT
+In-Reply-To: <b977f47b-a85e-d4d5-666c-b8c9cd21c25e@codeaurora.org>
+References: <20161221064603.11830-1-fu.wei@linaro.org>
+ <20161221064603.11830-11-fu.wei@linaro.org>
+ <20170116183032.GL5908@leverpostej>
+ <CADyBb7tFaSshUmZsJbNO2tnbqAKEii39NQVfcx5CqDiDsK5OJA@mail.gmail.com>
+ <b977f47b-a85e-d4d5-666c-b8c9cd21c25e@codeaurora.org>
+Message-ID: <20170117122921.GE11939@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the SATA node to the da850 device tree.
+On Tue, Jan 17, 2017 at 06:18:12AM -0600, Timur Tabi wrote:
+> Fu Wei wrote:
+> >if (i >= ARCH_TIMER_MEM_MAX_FRAMES) {
+> >        pr_err(FW_BUG "too many frames, ARMv8 spec only allows 8.\n");
+> 
+> pr_err(FW_BUG "too many frames, ARMv8 spec only allows %u.\n",
+> 	ARCH_TIMER_MEM_MAX_FRAMES);
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/boot/dts/da850.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+While I don't see ARCH_TIMER_MEM_MAX_FRAMES changing, this would be
+nicer to ensure the result obviously matches.
 
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 1f6a47d..7c32bf7 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -427,6 +427,12 @@
- 			phy-names = "usb-phy";
- 			status = "disabled";
- 		};
-+		sata: ahci at 218000 {
-+			compatible = "ti,da850-ahci";
-+			reg = <0x218000 0x2000>, <0x22c018 0x4>;
-+			interrupts = <67>;
-+			status = "disabled";
-+		};
- 		mdio: mdio at 224000 {
- 			compatible = "ti,davinci_mdio";
- 			#address-cells = <1>;
--- 
-2.9.3
+As for wording, I'd perfer:
+
+	pr_err(FW_BUG "too many frames, only %u are permitted.\n",
+	       ARCH_TIMER_MEM_MAX_FRAMES);
+
+... so as to avoid any confusion between spec versions and so on. We can
+reconsider the message if/when that changes.
+
+Thanks,
+Mark.
