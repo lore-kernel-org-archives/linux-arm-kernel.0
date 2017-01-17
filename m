@@ -1,37 +1,57 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 17 Jan 2017 16:15:25 +0000
-Subject: [PATCH 0/3] arm64: {adr,ldr}_l cleanup
-In-Reply-To: <1484669458-31713-1-git-send-email-mark.rutland@arm.com>
-References: <1484669458-31713-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <CAKv+Gu9j9U_UhLXvHx+XRhZJe+Q3-Z3b_KYOnNRFoZU01Zmh9g@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 17 Jan 2017 16:15:46 +0000
+Subject: [PATCH] arm64: mm: fix __page_to_voff definition
+In-Reply-To: <1484666633-1753-1-git-send-email-andr2000@gmail.com>
+References: <1484666633-1753-1-git-send-email-andr2000@gmail.com>
+Message-ID: <20170117161546.GF11939@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 January 2017 at 16:10, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi,
->
-> While looking at the way we use adrp, I spotted that there are still a few
-> open-coded instances of adr_l and ldr_l.
->
-> These patches clean those up, making the code a little easier to follow.
->
+On Tue, Jan 17, 2017 at 05:23:53PM +0200, Oleksandr Andrushchenko wrote:
+> From: Oleksandr Andrushchenko <Oleksandr_Andrushchenko@epam.com>
+> 
+> Fix parameter name for __page_to_voff, to match its definition.
+> There are other callers of page_to_virt which do not
+> declare 'page'.
+> 
+> Fixes: 3fa72fe9c614 ("arm64: mm: fix __page_to_voff definition")
+> Signed-off-by: Oleksandr Andrushchenko <Oleksandr_Andrushchenko@epam.com>
 
-For the series:
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+I take it this is because it messes up the 'struct page' at the end of
+the macro expansion?
 
-> Thanks,
-> Mark.
->
-> Mark Rutland (3):
->   arm64: head.S: avoid open-coded adr_l
->   arm64: efi-entry.S: avoid open-coded adr_l
->   arm64: entry-ftrace.S: avoid open-coded {adr,ldr}_l
->
->  arch/arm64/kernel/efi-entry.S    |  9 +++------
->  arch/arm64/kernel/entry-ftrace.S | 12 ++++--------
->  arch/arm64/kernel/head.S         |  3 +--
->  3 files changed, 8 insertions(+), 16 deletions(-)
->
-> --
-> 1.9.1
->
+It would be good to explicitly state that, since that's not immediately
+obvious.
+
+With that:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
+
+> ---
+>  arch/arm64/include/asm/memory.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+> index bfe632808d77..90c39a662379 100644
+> --- a/arch/arm64/include/asm/memory.h
+> +++ b/arch/arm64/include/asm/memory.h
+> @@ -222,7 +222,7 @@ static inline void *phys_to_virt(phys_addr_t x)
+>  #define _virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
+>  #else
+>  #define __virt_to_pgoff(kaddr)	(((u64)(kaddr) & ~PAGE_OFFSET) / PAGE_SIZE * sizeof(struct page))
+> -#define __page_to_voff(page)	(((u64)(page) & ~VMEMMAP_START) * PAGE_SIZE / sizeof(struct page))
+> +#define __page_to_voff(kaddr)	(((u64)(kaddr) & ~VMEMMAP_START) * PAGE_SIZE / sizeof(struct page))
+>  
+>  #define page_to_virt(page)	((void *)((__page_to_voff(page)) | PAGE_OFFSET))
+>  #define virt_to_page(vaddr)	((struct page *)((__virt_to_pgoff(vaddr)) | VMEMMAP_START))
+> -- 
+> 2.7.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
