@@ -1,130 +1,85 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 17 Jan 2017 10:22:24 -0800
-Subject: [PATCH v3 8/8] ARM: dts: kirkwood-rd88f6281: Utilize new DSA binding
-In-Reply-To: <20170117182224.32212-1-f.fainelli@gmail.com>
-References: <20170117182224.32212-1-f.fainelli@gmail.com>
-Message-ID: <20170117182224.32212-9-f.fainelli@gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 17 Jan 2017 20:23:18 +0200
+Subject: [PATCH v2 1/2] arm64: dts: exynos: Add USB 3.0 controller node
+ for Exynos7
+In-Reply-To: <1484665444-23365-2-git-send-email-pankaj.dubey@samsung.com>
+References: <1484665444-23365-1-git-send-email-pankaj.dubey@samsung.com>
+ <CGME20170117150121epcas1p102bd1355f780a56e14a0a7a81bd6dfaf@epcas1p1.samsung.com>
+ <1484665444-23365-2-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <20170117182318.fvatrazvyuzmdsor@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Utilize the new DSA binding, introduced with commit 8c5ad1d6179d ("net: dsa:
-Document new binding"). The legacy binding node is kept included, but is marked
-disabled.
+On Tue, Jan 17, 2017 at 08:34:03PM +0530, Pankaj Dubey wrote:
+> From: Vivek Gautam <gautamvivek1987@gmail.com>
+> 
+> Add USB 3.0 DRD controller device node, with its clock
+> and phy information to enable the same on Exynos7.
+> 
+> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Signed-off-by: Vivek Gautam <gautamvivek1987@gmail.com>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm/boot/dts/kirkwood-rd88f6281-a.dts  |  9 +++---
- arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts | 11 ++++++++
- arch/arm/boot/dts/kirkwood-rd88f6281.dtsi   | 44 +++++++++++++++++++++++++++++
- 3 files changed, 59 insertions(+), 5 deletions(-)
+Javier's Reviewed-by should be at the end.
 
-diff --git a/arch/arm/boot/dts/kirkwood-rd88f6281-a.dts b/arch/arm/boot/dts/kirkwood-rd88f6281-a.dts
-index 6f771a99cb02..9ec5a65561e9 100644
---- a/arch/arm/boot/dts/kirkwood-rd88f6281-a.dts
-+++ b/arch/arm/boot/dts/kirkwood-rd88f6281-a.dts
-@@ -19,11 +19,6 @@
- 	model = "Marvell RD88f6281 Reference design, with A0 or higher SoC";
- 	compatible = "marvell,rd88f6281-a", "marvell,rd88f6281","marvell,kirkwood-88f6281", "marvell,kirkwood";
- 
--	dsa {
--		switch at 0 {
--			reg = <10 0>;	 /* MDIO address 10, switch 0 in tree */
--		};
--	};
- };
- 
- &mdio {
-@@ -34,6 +29,10 @@
- 	};
- };
- 
-+&switch {
-+	reg = <10>;
-+};
-+
- &eth1 {
- 	status = "okay";
- 
-diff --git a/arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts b/arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts
-index 1a797381d3d4..6a4a65ec7944 100644
---- a/arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts
-+++ b/arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts
-@@ -33,3 +33,14 @@
- &eth1 {
-       status = "disabled";
- };
-+
-+&switch {
-+	reg = <0>;
-+
-+	ports {
-+		port at 4 {
-+			reg = <4>;
-+			label = "wan";
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/kirkwood-rd88f6281.dtsi b/arch/arm/boot/dts/kirkwood-rd88f6281.dtsi
-index d5aacf137e40..91f5da5dae5f 100644
---- a/arch/arm/boot/dts/kirkwood-rd88f6281.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-rd88f6281.dtsi
-@@ -54,6 +54,8 @@
- 	};
- 
- 	dsa {
-+		status = "disabled";
-+
- 		compatible = "marvell,dsa";
- 		#address-cells = <2>;
- 		#size-cells = <0>;
-@@ -115,6 +117,48 @@
- 
- &mdio {
- 	status = "okay";
-+
-+	switch: switch at 0 {
-+		compatible = "marvell,mv88e6085";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			port at 0 {
-+				reg = <0>;
-+				label = "lan1";
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+				label = "lan2";
-+			};
-+
-+			port at 2 {
-+				reg = <2>;
-+				label = "lan3";
-+			};
-+
-+			port at 3 {
-+				reg = <3>;
-+				label = "lan4";
-+			};
-+
-+			port at 5 {
-+				reg = <5>;
-+				label = "cpu";
-+				ethernet = <&eth0port>;
-+				fixed-link {
-+					speed = <1000>;
-+					full-duplex;
-+				};
-+			};
-+
-+		};
-+	};
- };
- 
- &eth0 {
--- 
-2.9.3
+> ---
+>  arch/arm64/boot/dts/exynos/exynos7.dtsi | 34 +++++++++++++++++++++++++++++++++
+>  1 file changed, 34 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+> index 9080a11..a2d8d11 100644
+> --- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
+> +++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+> @@ -603,6 +603,40 @@
+>  				#include "exynos7-trip-points.dtsi"
+>  			};
+>  		};
+> +
+> +		usbdrd_phy: phy at 15500000 {
+> +			compatible = "samsung,exynos7-usbdrd-phy";
+> +			reg = <0x15500000 0x100>;
+> +			clocks = <&clock_fsys0 ACLK_USBDRD300>,
+> +			       <&clock_fsys0 OSCCLK_PHY_CLKOUT_USB30_PHY>,
+> +			       <&clock_fsys0 PHYCLK_USBDRD300_UDRD30_PIPE_PCLK_USER>,
+> +			       <&clock_fsys0 PHYCLK_USBDRD300_UDRD30_PHYCLK_USER>,
+> +			       <&clock_fsys0 SCLK_USBDRD300_REFCLK>;
+> +			clock-names = "phy", "ref", "phy_pipe",
+> +				"phy_utmi", "itp";
+> +			samsung,pmu-syscon = <&pmu_system_controller>;
+> +			#phy-cells = <1>;
+> +		};
+> +
+> +		usbdrd3: usb at 15400000 {
+> +			compatible = "samsung,exynos7-dwusb3";
+> +			clocks = <&clock_fsys0 ACLK_USBDRD300>,
+> +			       <&clock_fsys0 SCLK_USBDRD300_SUSPENDCLK>,
+> +			       <&clock_fsys0 ACLK_AXIUS_USBDRD30X_FSYS0X>;
+> +			clock-names = "usbdrd30", "usbdrd30_susp_clk",
+> +				"usbdrd30_axius_clk";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
+> +
+> +			dwc3 {
+
+dtc should complain here - you need:
+	dwc3 at 15400000
+In the same time I think the address node does not have to be put after
+parent's usb.
+
+Best regards,
+Krzysztof
+
+> +				compatible = "snps,dwc3";
+> +				reg = <0x15400000 0x10000>;
+> +				interrupts = <GIC_SPI 223 IRQ_TYPE_LEVEL_HIGH>;
+> +				phys = <&usbdrd_phy 0>, <&usbdrd_phy 1>;
+> +				phy-names = "usb2-phy", "usb3-phy";
+> +			};
+> +		};
+>  	};
+>  };
+>  
+> -- 
+> 2.7.4
+> 
