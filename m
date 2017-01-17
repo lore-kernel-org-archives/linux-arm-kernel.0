@@ -1,56 +1,39 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 17 Jan 2017 15:25:49 +0000
-Subject: CONFIG_PCIEASPM breaks PCIe on Marvell Armada 385 machine
-In-Reply-To: <20170117151444.GE22776@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170111194942.q5rdma2es6hkmxfe@perseus.defre.kleine-koenig.org>
- <20170117151444.GE22776@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20170117152548.GB27312@n2100.armlinux.org.uk>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Tue, 17 Jan 2017 16:26:56 +0100
+Subject: [PATCH v9 0/5] Add support for the STM32F4 I2C
+Message-ID: <1484666821-20551-1-git-send-email-cedric.madianga@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 09:14:44AM -0600, Bjorn Helgaas wrote:
-> On Wed, Jan 11, 2017 at 08:49:46PM +0100, Uwe Kleine-K?nig wrote:
-> > Hello,
-> > 
-> > on an Marvell Armada 385 based machine (Turris Omnia) with 4.9 the
-> > ath10k driver fails to bind to the matching hardware if CONFIG_PCIEASPM
-> > is enabled:
-> > 
-> > # dmesg | grep ath
-> > [    7.207770] ath10k_pci 0000:02:00.0: Refused to change power state, currently in D3
-> > [    7.237955] ath10k_pci 0000:02:00.0: failed to wake up device : -110
-> > [    7.238146] ath10k_pci: probe of 0000:02:00.0 failed with error -110
-> > 
-> > if however PCIEASPM is off, the driver probes correctly and the ath10k
-> > adapter works fine.
-> > 
-> > I wonder if someone has an idea what needs to be done to fix this
-> > problem. (OK, I could disable PCIEASPM, but I'd like to have a solution
-> > for a distribution kernel where I think PCIEASPM=y is sensible in
-> > general.)
-> 
-> Can somebody confirm that this system (Marvell Armada 385-based Turris
-> Omnia) does actually support ASPM in hardware?
+This patchset adds support for the I2C controller embedded in STM32F4xx SoC.
+It enables I2C transfer in interrupt mode with Standard-mode and Fast-mode bus
+speed.
 
-What sort of "hardware" are you referring to?
+Changes since v8:
+- Rework I2C Clock Control Register computation (Uwe)
+- Save register accesses as often as possible (Uwe)
+- Don't use mask before saving rx buffer (Uwe)
+- Add more comments to explain hardware way of working (Uwe)
+- Rename stm32f4_i2c_handle_rx_btf function by stm32f4_i2c_handle_rx_done (Uwe)
+- Set/Clear Ack position bit during address match phase
 
->From my reading of the specs, ASPM doesn't require any external hardware.
-It's all done inside the PCIe root hub and PCIe device.
+M'boumba Cedric Madianga (5):
+  dt-bindings: Document the STM32 I2C bindings
+  i2c: Add STM32F4 I2C driver
+  ARM: dts: stm32: Add I2C1 support for STM32F429 SoC
+  ARM: dts: stm32: Add I2C1 support for STM32429 eval board
+  ARM: configs: stm32: Add I2C support for STM32 defconfig
 
-The PCIe spec specifically prohibits cutting power supplies and clocks to
-PCIe devices during L0s and L1, with the exception that the PCIe clock may
-be stopped in L1 if CLKREQ# is deasserted.  CLKREQ# handling generally
-requires GPIO usage, and as there's no support for that, there's no support
-for stopping the PCIe clock in L1.  We do the correct thing there,
-preventing the PCI_EXP_LNKCTL_CLKREQ_EN bit being set.
-
-That all said, it would probably be a good idea to throw some printk()
-debugging into mvebu_sw_pci_bridge_write() and mvebu_sw_pci_bridge_read()
-so we can see what's going on at that level, and maybe also some debug
-in mvebu_pcie_hw_wr_conf() and mvebu_pcie_hw_rd_conf() so we can see
-what's happening at the PCIe device too.
+ .../devicetree/bindings/i2c/i2c-stm32.txt          |  33 +
+ arch/arm/boot/dts/stm32429i-eval.dts               |   6 +
+ arch/arm/boot/dts/stm32f429.dtsi                   |  23 +
+ arch/arm/configs/stm32_defconfig                   |   3 +
+ drivers/i2c/busses/Kconfig                         |  10 +
+ drivers/i2c/busses/Makefile                        |   1 +
+ drivers/i2c/busses/i2c-stm32f4.c                   | 883 +++++++++++++++++++++
+ 7 files changed, 959 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-stm32.txt
+ create mode 100644 drivers/i2c/busses/i2c-stm32f4.c
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
