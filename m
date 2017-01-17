@@ -1,87 +1,75 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 17 Jan 2017 10:20:41 +0000
-Subject: [RFC PATCH 20/33] irqchip/gic-v3-its: Add VPE domain infrastructure
+Date: Tue, 17 Jan 2017 10:20:44 +0000
+Subject: [RFC PATCH 23/33] irqchip/gic-v3-its: Add VPENDBASER/VPROPBASER
+ accessors
 In-Reply-To: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
 References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1484648454-21216-21-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1484648454-21216-24-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the basic GICv4 VPE (vcpu in GICv4 parlance) infrastructure
-(irqchip, irq domain) that is going to be populated in the following
-patches.
+V{PEND,PROP}BASER being 64bit registers, they need some ad-hoc
+accessors on 32bit, specially given that VPENDBASER contains
+a Valid bit, making the access a bit convoluted.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+ arch/arm/include/asm/arch_gicv3.h   | 28 ++++++++++++++++++++++++++++
+ arch/arm64/include/asm/arch_gicv3.h |  5 +++++
+ 2 files changed, 33 insertions(+)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 6931018..ddd8096 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -1918,6 +1918,13 @@ static const struct irq_domain_ops its_domain_ops = {
- 	.deactivate		= its_irq_domain_deactivate,
- };
+diff --git a/arch/arm/include/asm/arch_gicv3.h b/arch/arm/include/asm/arch_gicv3.h
+index 2747590..3f18832 100644
+--- a/arch/arm/include/asm/arch_gicv3.h
++++ b/arch/arm/include/asm/arch_gicv3.h
+@@ -291,5 +291,33 @@ static inline u64 __gic_readq_nonatomic(const volatile void __iomem *addr)
+  */
+ #define gits_write_cwriter(v, c)	__gic_writeq_nonatomic(v, c)
  
-+static struct irq_chip its_vpe_irq_chip = {
-+	.name			= "GICv4-vpe",
-+};
++/*
++ * GITS_VPROPBASER - hi and lo bits may be accessed independently.
++ */
++#define gits_write_vpropbaser(v, c)	__gic_writeq_nonatomic(v, c)
 +
-+static const struct irq_domain_ops its_vpe_domain_ops = {
-+};
-+
- static int its_force_quiescent(void __iomem *base)
- {
- 	u32 count = 1000000;	/* 1s */
-@@ -2017,6 +2024,27 @@ static int its_init_domain(struct fwnode_handle *handle, struct its_node *its)
- 	return 0;
- }
- 
-+static struct irq_domain *its_init_vpe_domain(void)
++/*
++ * GITS_VPENDBASER - the Valid bit must be cleared before changing
++ * anything else.
++ */
++static inline void gits_write_vpendbaser(u64 val, void * __iomem addr)
 +{
-+	struct fwnode_handle *handle;
-+	struct irq_domain *domain;
++	u32 tmp;
 +
-+	handle = irq_domain_alloc_fwnode("VPE domain");
-+	if (!handle)
-+		return NULL;
-+
-+	domain = irq_domain_create_tree(handle, &its_vpe_domain_ops, NULL);
-+	if (!domain) {
-+		kfree(handle);
-+		return NULL;
++	tmp = readl_relaxed(addr + 4);
++	if (tmp & GICR_PENDBASER_Valid) {
++		tmp &= ~GICR_PENDBASER_Valid;
++		writel_relaxed(tmp, addr + 4);
 +	}
 +
-+	domain->parent = its_parent;
-+	domain->bus_token = DOMAIN_BUS_NEXUS;
-+
-+	return domain;
++	/*
++	 * Use the fact that __gic_writeq_nonatomic writes the second
++	 * half of the 64bit quantity after the first.
++	 */
++	__gic_writeq_nonatomic(val, addr);
 +}
 +
- static int __init its_probe_one(struct resource *res,
- 				struct fwnode_handle *handle, int numa_node)
- {
-@@ -2266,6 +2294,8 @@ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
- 		    struct irq_domain *parent_domain)
- {
- 	struct device_node *of_node;
-+	struct its_node *its;
-+	bool has_v4 = false;
- 
- 	its_parent = parent_domain;
- 	of_node = to_of_node(handle);
-@@ -2283,5 +2313,11 @@ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
- 	its_alloc_lpi_tables();
- 	its_lpi_init(rdists->id_bits);
- 
-+	list_for_each_entry(its, &its_nodes, entry)
-+		has_v4 |= its->is_v4;
++#define gits_read_vpendbaser(c)		__gic_readq_nonatomic(c)
 +
-+	if (has_v4 & rdists->has_vlpis)
-+		its_init_vpe_domain();
+ #endif /* !__ASSEMBLY__ */
+ #endif /* !__ASM_ARCH_GICV3_H */
+diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
+index f37e3a2..9420b7a 100644
+--- a/arch/arm64/include/asm/arch_gicv3.h
++++ b/arch/arm64/include/asm/arch_gicv3.h
+@@ -188,5 +188,10 @@ static inline void gic_write_bpr1(u32 val)
+ #define gicr_write_pendbaser(v, c)	writeq_relaxed(v, c)
+ #define gicr_read_pendbaser(c)		readq_relaxed(c)
+ 
++#define gits_write_vpropbaser(v, c)	writeq_relaxed(v, c)
 +
- 	return 0;
- }
++#define gits_write_vpendbaser(v, c)	writeq_relaxed(v, c)
++#define gits_read_vpendbaser(c)		readq_relaxed(c)
++
+ #endif /* __ASSEMBLY__ */
+ #endif /* __ASM_ARCH_GICV3_H */
 -- 
 2.1.4
