@@ -1,47 +1,61 @@
-From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Tue, 17 Jan 2017 19:39:41 +0530
-Subject: [PATCH 1/2] arm64: dts: exynos: Add USB 3.0 controller node for
- Exynos7
-In-Reply-To: <3a607d18-acf9-37f5-a6d4-7f8fe538d27f@osg.samsung.com>
-References: <1484649143-19423-1-git-send-email-pankaj.dubey@samsung.com>
- <CGME20170117102939epcas5p1aa25d6d8d080c086fb237e645bedbd17@epcas5p1.samsung.com>
- <1484649143-19423-2-git-send-email-pankaj.dubey@samsung.com>
- <3a607d18-acf9-37f5-a6d4-7f8fe538d27f@osg.samsung.com>
-Message-ID: <23067cbb-08de-abd9-3530-246c81ba5931@samsung.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 17 Jan 2017 14:07:39 +0000
+Subject: [PATCH v4 3/4] arm64: dts: juno: add CoreSight support for Juno
+ r1/r2 variants
+In-Reply-To: <d89b805b-cc6f-37d5-2b64-4f83fa086db6@arm.com>
+References: <1484655313-9025-1-git-send-email-sudeep.holla@arm.com>
+ <1484655313-9025-4-git-send-email-sudeep.holla@arm.com>
+ <d89b805b-cc6f-37d5-2b64-4f83fa086db6@arm.com>
+Message-ID: <a336df07-3e7c-c977-f7b3-22a90a728a2c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
 
-On Tuesday 17 January 2017 07:07 PM, Javier Martinez Canillas wrote:
-> Hello Pankaj,
-> 
-> On 01/17/2017 07:32 AM, Pankaj Dubey wrote:
->> Add USB 3.0 DRD controller device node, with its clock
->> and phy information to enable the same on Exynos7.
+
+On 17/01/17 13:27, Suzuki K Poulose wrote:
+> On 17/01/17 12:15, Sudeep Holla wrote:
+>> From: Mike Leach <mike.leach@linaro.org>
 >>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> Signed-off-by: Vivek Gautam <gautamvivek1987@gmail.com>
+>> The CoreSight support added for Juno is valid for only Juno r0.
+>> The Juno r1 and r2 variants have additional components and alternative
+>> connection routes between trace source and sinks.
+>>
+>> This patch builds on top of the existing r0 support and extends it to
+>> Juno r1/r2 variants.
+>>
+>> Reviewed-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> Signed-off-by: Mike Leach <mike.leach@linaro.org>
+>> [sudeep.holla at arm.com: minor changelog update and major reorganisation of
+>>     the common coresight components back into juno-base.dtsi to avoid
+>>     duplication, also renamed funnel node names]
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>> ---
+>>  arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi | 100
+>> ++++++++++++++++++++++++++++++
+>>  arch/arm64/boot/dts/arm/juno-r1.dts       |   9 +++
+>>  arch/arm64/boot/dts/arm/juno-r2.dts       |   9 +++
+>>  3 files changed, 118 insertions(+)
+>>  create mode 100644 arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+>>
+>> diff --git a/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+>> b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+>> new file mode 100644
+>> index 000000000000..563463ed28c7
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+>> @@ -0,0 +1,100 @@
+>> +/ {
+>> +    funnel at 20130000 { /* cssys2 */
 > 
-> The S-o-B order isn't correct. You are the one posting the patch so
-> yours should be the last one.
-> 
-> Also, wasn't this patch originally from Vivek? If you didn't change
-> that much, I think that he should be listed as the patch author.
+> Typo, that should be csys1. Rest looks good to me.
 > 
 
-Thanks for review.
+Fixed locally.
 
-Just noticed, I missed to take care of this, as original patch could not
-be applied on latest tree and I had to do all these changes manually,
-will submit soon with Signed-off-by and author change.
+> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 
-Thanks,
-Pankaj Dubey
+Thanks again.
 
-> I don't have an Exynos7 manual to verify but the patch looks good.
-> 
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
-> Best regards,
-> 
+-- 
+Regards,
+Sudeep
