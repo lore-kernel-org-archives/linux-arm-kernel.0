@@ -1,33 +1,53 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 17 Jan 2017 14:32:08 +1100
-Subject: [PATCH v1 2/2] arm: dts: mt2701: add nor flash node
-In-Reply-To: <20170113175628.1793f433@bbrezillon>
-References: <1484291609-20195-1-git-send-email-guochun.mao@mediatek.com>
- <1484291609-20195-3-git-send-email-guochun.mao@mediatek.com>
- <20170113151747.6bc85245@bbrezillon>
- <d7b866ad-5b2f-62d3-3aa3-6fa42803d625@gmail.com>
- <b850b751-1d8d-0053-cf1f-d5314542e5c3@gmail.com>
- <20170113172825.75d545a3@bbrezillon>
- <86c997be-f500-eaa1-3ba5-d21cff6223b7@gmail.com>
- <20170113175628.1793f433@bbrezillon>
-Message-ID: <20170117143208.03c9af83@free-electrons.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Tue, 17 Jan 2017 04:35:10 +0100
+Subject: [PATCH 1/2] ARM64: dts: meson-gxm: Add R-Box Pro
+In-Reply-To: <20170117030611.23827-2-afaerber@suse.de>
+References: <20170117030611.23827-1-afaerber@suse.de>
+ <20170117030611.23827-2-afaerber@suse.de>
+Message-ID: <63fbfc68-917f-68b2-9e7d-e1834e2841d3@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Am 17.01.2017 um 04:06 schrieb Andreas F?rber:
+> +	leds {
+> +		compatible = "gpio-leds";
+> +
+> +		blue {
+> +			label = "rbox-pro:blue:on";
+> +			gpios = <&gpio_ao GPIOAO_9 GPIO_ACTIVE_HIGH>;
+> +			default-state = "on";
+> +		};
+> +
+> +		red {
+> +			label = "rbox-pro:red:standby";
+> +			gpios = <&gpio GPIODV_28 GPIO_ACTIVE_HIGH>;
+> +			default-state = "off";
+> +			retain-state-suspended;
+> +			panic-indicator;
+> +		};
+> +	};
 
-On Fri, 13 Jan 2017 17:56:28 +0100, Boris Brezillon wrote:
+The original property names for these two were led and red. If anyone
+has better label names than the above, please speak up. Ditto for
+vega-s95. On the odroidc2 it's called alive but uses heartbeat there.
 
-> because both compatible are referring to very specific IP version. It's
-> not the same as
-> 
-> 	compatible = "mediatek,mt8173-nor", "mediatek,mt81xx-nor";
+The vendor device tree had a third "mcu" GPIO in the sysled node,
+GPIOAO_6, which leads to immediate power-off. I tried using
+"gpio-poweroff" to configure this pin, but that driver fails to
+initialize because some pm callback is already registered - I assume
+from psci, which apparently succeeds to power-off the system, too. For
+comparison, the S905 based Vega S95 Telos has no such mcu property. Any
+thoughts?
 
-mt81xx-nor is a bogus compatible string, and DT binding maintainers
-will not accept it. They don't want compatible strings with "wildcards".
+Also, any ideas how best to switch from blue to red for suspend? Add
+pinctrl properties above? systemd service doing echo from userspace? I
+assume in Android the Amlogic sysled driver handles all that logic -
+didn't find any suspend equivalent to gpio-poweroff.
 
-Thomas
+Regards,
+Andreas
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
