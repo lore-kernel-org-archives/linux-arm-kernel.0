@@ -1,95 +1,52 @@
-From: tnowicki@caviumnetworks.com (Tomasz Nowicki)
-Date: Tue, 17 Jan 2017 14:20:56 +0100
-Subject: [PATCH v8 10/18] iommu/arm-smmu: Implement reserved region
- get/put callbacks
-In-Reply-To: <1484127714-3263-11-git-send-email-eric.auger@redhat.com>
-References: <1484127714-3263-1-git-send-email-eric.auger@redhat.com>
- <1484127714-3263-11-git-send-email-eric.auger@redhat.com>
-Message-ID: <e45ab455-4a34-cad1-74de-9db395e0dea7@caviumnetworks.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Tue, 17 Jan 2017 21:22:17 +0800
+Subject: [PATCH v19 10/15] clocksource/drivers/arm_arch_timer: Refactor
+ the timer init code to prepare for GTDT
+In-Reply-To: <20170117122921.GE11939@leverpostej>
+References: <20161221064603.11830-1-fu.wei@linaro.org>
+ <20161221064603.11830-11-fu.wei@linaro.org>
+ <20170116183032.GL5908@leverpostej>
+ <CADyBb7tFaSshUmZsJbNO2tnbqAKEii39NQVfcx5CqDiDsK5OJA@mail.gmail.com>
+ <b977f47b-a85e-d4d5-666c-b8c9cd21c25e@codeaurora.org>
+ <20170117122921.GE11939@leverpostej>
+Message-ID: <CADyBb7ugEbFB42PcoJc0J8q4BAzCC5HfC8638sMm-5nzA3zcZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.01.2017 10:41, Eric Auger wrote:
-> The get() populates the list with the MSI IOVA reserved window.
->
-> At the moment an arbitray MSI IOVA window is set at 0x8000000
-> of size 1MB. This will allow to report those info in iommu-group
-> sysfs.
->
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Hi Mark,
 
-Reviewed-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
+On 17 January 2017 at 20:29, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Tue, Jan 17, 2017 at 06:18:12AM -0600, Timur Tabi wrote:
+>> Fu Wei wrote:
+>> >if (i >= ARCH_TIMER_MEM_MAX_FRAMES) {
+>> >        pr_err(FW_BUG "too many frames, ARMv8 spec only allows 8.\n");
+>>
+>> pr_err(FW_BUG "too many frames, ARMv8 spec only allows %u.\n",
+>>       ARCH_TIMER_MEM_MAX_FRAMES);
+>
+> While I don't see ARCH_TIMER_MEM_MAX_FRAMES changing, this would be
+> nicer to ensure the result obviously matches.
+>
+> As for wording, I'd perfer:
+>
+>         pr_err(FW_BUG "too many frames, only %u are permitted.\n",
+>                ARCH_TIMER_MEM_MAX_FRAMES);
 
-Thanks,
-Tomasz
+OK, will do so.
+Thanks!
 
 >
-> ---
+> ... so as to avoid any confusion between spec versions and so on. We can
+> reconsider the message if/when that changes.
 >
-> v3 -> v4:
-> - do not handle PCI host bridge windows anymore
-> - encode prot
->
-> RFC v2 -> v3:
-> - use existing get/put_resv_regions
->
-> RFC v1 -> v2:
-> - use defines for MSI IOVA base and length
-> ---
->  drivers/iommu/arm-smmu.c | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
->
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index a60cded..a354572 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -281,6 +281,9 @@ enum arm_smmu_s2cr_privcfg {
->
->  #define FSYNR0_WNR			(1 << 4)
->
-> +#define MSI_IOVA_BASE			0x8000000
-> +#define MSI_IOVA_LENGTH			0x100000
-> +
->  static int force_stage;
->  module_param(force_stage, int, S_IRUGO);
->  MODULE_PARM_DESC(force_stage,
-> @@ -1549,6 +1552,29 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
->  	return iommu_fwspec_add_ids(dev, &fwid, 1);
->  }
->
-> +static void arm_smmu_get_resv_regions(struct device *dev,
-> +				      struct list_head *head)
-> +{
-> +	struct iommu_resv_region *region;
-> +	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
-> +
-> +	region = iommu_alloc_resv_region(MSI_IOVA_BASE, MSI_IOVA_LENGTH,
-> +					 prot, IOMMU_RESV_MSI);
-> +	if (!region)
-> +		return;
-> +
-> +	list_add_tail(&region->list, head);
-> +}
-> +
-> +static void arm_smmu_put_resv_regions(struct device *dev,
-> +				      struct list_head *head)
-> +{
-> +	struct iommu_resv_region *entry, *next;
-> +
-> +	list_for_each_entry_safe(entry, next, head, list)
-> +		kfree(entry);
-> +}
-> +
->  static struct iommu_ops arm_smmu_ops = {
->  	.capable		= arm_smmu_capable,
->  	.domain_alloc		= arm_smmu_domain_alloc,
-> @@ -1564,6 +1590,8 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
->  	.domain_get_attr	= arm_smmu_domain_get_attr,
->  	.domain_set_attr	= arm_smmu_domain_set_attr,
->  	.of_xlate		= arm_smmu_of_xlate,
-> +	.get_resv_regions	= arm_smmu_get_resv_regions,
-> +	.put_resv_regions	= arm_smmu_put_resv_regions,
->  	.pgsize_bitmap		= -1UL, /* Restricted during device attach */
->  };
->
->
+> Thanks,
+> Mark.
+
+
+
+-- 
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
