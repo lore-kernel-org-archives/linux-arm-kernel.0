@@ -1,103 +1,71 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 17 Jan 2017 10:47:16 -0300
-Subject: [PATCH 2/2] arm64: dts: exynos: Add regulators for Vbus and
- Vbus-Boost
-In-Reply-To: <1484649143-19423-3-git-send-email-pankaj.dubey@samsung.com>
-References: <1484649143-19423-1-git-send-email-pankaj.dubey@samsung.com>
- <CGME20170117102941epcas1p3a33a312bedd013edb0997b16786dede6@epcas1p3.samsung.com>
- <1484649143-19423-3-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <0266f79b-d667-d8f0-89f5-fd604a721a39@osg.samsung.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 17 Jan 2017 15:47:19 +0200
+Subject: Nokia N900: mixers changed between 4.9 and 4.10-rc3, no longer
+ can use in-call speaker
+In-Reply-To: <40dbce4e-d99d-d77d-e682-5b004c70ca40@bitmer.com>
+References: <20170112181826.GA28290@amd> <201701121934.19810@pali>
+ <20170114225614.GA25321@amd> <201701150100.54214@pali>
+ <20170115100533.GA15816@amd>
+ <40dbce4e-d99d-d77d-e682-5b004c70ca40@bitmer.com>
+Message-ID: <d2c78625-565a-86ec-a03e-f15ae071942a@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Pankaj,
-
-On 01/17/2017 07:32 AM, Pankaj Dubey wrote:
-> Adding fixed voltage regulators for Vbus and Vbus-boost required
-> by USB 3.0 DRD controller on Exynos7-espresso board.
+On 01/15/2017 09:08 PM, Jarkko Nikula wrote:
+> On 01/15/2017 12:05 PM, Pavel Machek wrote:
+>>>> So regression seems to be between v4.9 and v4.10. Any ideas?
+>>>
+>>> Interesting... seems there are no sound relevant changes after v4.9.
+>>>
+>>> Looks like there are only three commits after v4.9 for sound/soc which 
+>>> are built for Nokia N900:
+>>>
+>>> e411b0b5eb9b65257a050eac333d181d6e00e2c6
+>>> e7aa450fe17890e59db7d3c2d8eff5b6b41fc531
+>>> 63c3194b82530bd71fd49db84eb7ab656b8d404a
+>>>
+>>> Maybe something not related to sound/soc could broke it?
+>>
+>> Lets see.
+>>
+>> a9042defa29a01cc538b742eab047848e9b5ae14 -- works ok.
+>> ce38207f161513ee3d2bd3860489f07ebe65bc78 --
+>>
+>> alsactl: set_control:1328: failed to obtain info for control #229 (No
+>> such file or directory)
+>>
+> I'm unable to test older kernels at the moment since modules don't load
+> by some reason (bluetooth: Unknown symbol _GLOBAL_OFFSET_TABLE_ (err
+> 0)). Probably some recent regression in my debian/testing installation
+> since the same configs were working before.
 > 
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> Signed-off-by: Vivek Gautam <gautamvivek1987@gmail.com>
-
-Same comment than 1/2 here.
-
-> ---
->  arch/arm64/boot/dts/exynos/exynos7-espresso.dts | 44 +++++++++++++++++++++++++
->  1 file changed, 44 insertions(+)
+> However v4.9.4 works and with it I can see there is an issue with these
+> aic3x controls:
 > 
-> diff --git a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
-> index 9cf73cf..68f3a51 100644
-> --- a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
-> +++ b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
-> @@ -33,6 +33,29 @@
->  		device_type = "memory";
->  		reg = <0x0 0x40000000 0x0 0xC0000000>;
->  	};
-> +
-> +	usb30_vbus_reg: regulator-usb30 {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "VBUS_5V";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		gpio = <&gph1 1 0>;
+> amixer: Unable to find simple control 'Left DAC_L1 Mixer Line',0
+> 
+> 
+> 
+> amixer: Unable to find simple control 'Right DAC_R1 Mixer Line',0
 
-Please use the GPIO_ACTIVE_HIGH instead for the GPIO polarity.
+These are certainly not the regression between 4.6 and 4.9, more like
+more like regression since 2.6:
+'Line Switch' -> 'LineL Switch':
+54f01916297bafc18bd7df4e2300a0544a84fce3
 
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&usb30_vbus_en>;
-> +		enable-active-high;
-> +	};
-> +
-> +	usb3drd_boost_5v: regulator-usb3drd-boost {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "VUSB_VBUS_5V";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		gpio = <&gpf4 1 0>;
+'LineL Switch' -> 'DACL1 Switch':
+c3b79e05b4d9ab2e7c3ba281261ea87ab5b71a92
 
-Same here.
+> At quick look I don't see why above commits could cause it. Maybe
+> regression happened earlier between v4.6 and v4.9?
 
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&usb3drd_boost_en>;
-> +		enable-active-high;
-> +	};
-> +
->  };
->  
->  &fin_pll {
-> @@ -366,3 +389,24 @@
->  	vqmmc-supply = <&ldo2_reg>;
->  	disable-wp;
->  };
-> +
-> +&usbdrd_phy {
-> +	vbus-supply = <&usb30_vbus_reg>;
-> +	vbus-boost-supply = <&usb3drd_boost_5v>;
-> +};
-> +
-> +&pinctrl_bus1 {
-> +	usb30_vbus_en: usb30-vbus-en {
-> +		samsung,pins = "gph1-1";
-> +		samsung,pin-function = <1>;
+It might be that there were some work to fix control names for different aic
+versions to match with the HW or support for new codec is added and some
+control gone missing for 3x?
 
-EXYNOS_PIN_FUNC_OUTPUT
+I would compare the 'amixer controls' for the working and regressed
+kernel to see what differs. From there git blame or smthing will for
+sure point to the correct commit.
 
-> +		samsung,pin-pud = <0>;
-
-EXYNOS_PIN_PULL_NONE
-
-> +		samsung,pin-drv = <0>;
-
-I see that there are no Exynos7 drive strengths values for 
-Exynos7 in include/dt-bindings/pinctrl/samsung.h. It would
-be good to add those (on a different series of course).
-
-The patch looks good to me, so after the minor nits:
-
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-Best regards,
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+P?ter
