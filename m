@@ -1,101 +1,188 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Tue, 17 Jan 2017 03:57:33 +0200
-Subject: [PATCH 0/4] video: ARM CLCD: add support of an optional GPIO to
- enable panel
-In-Reply-To: <3057141.7Vn8X5ONyT@amdc3058>
-References: <20161221032717.13154-1-vz@mleia.com>
- <CGME20170112212713epcas2p108e55dc682911981f750f197f30c7d5f@epcas2p1.samsung.com>
- <d1534f4b-e564-d87e-b408-9b7215a90de2@mleia.com>
- <3057141.7Vn8X5ONyT@amdc3058>
-Message-ID: <ae187f91-ca9b-c51a-d7cb-14fd99baa434@mleia.com>
+From: jeyu@redhat.com (Jessica Yu)
+Date: Mon, 16 Jan 2017 21:27:48 -0500
+Subject: arm: Add livepatch arch specific code
+In-Reply-To: <20170117002239.GF9045@packer-debian-8-amd64.digitalocean.com>
+References: <1481043967-15602-1-git-send-email-abelvesa@linux.com>
+ <1481043967-15602-2-git-send-email-abelvesa@linux.com>
+ <alpine.LSU.2.20.1701161733531.17768@pobox.suse.cz>
+ <20170117002239.GF9045@packer-debian-8-amd64.digitalocean.com>
+Message-ID: <20170117022748.GH9045@packer-debian-8-amd64.digitalocean.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13/2017 01:08 PM, Bartlomiej Zolnierkiewicz wrote:
-> 
-> Hi,
-> 
-> On Thursday, January 12, 2017 11:26:14 PM Vladimir Zapolskiy wrote:
->> On 01/12/2017 10:27 AM, Linus Walleij wrote:
->>> On Thu, Jan 12, 2017 at 1:05 AM, Vladimir Zapolskiy <vz@mleia.com> wrote:
->>>> On 01/11/2017 05:16 PM, Linus Walleij wrote:
->>>>> On Tue, Jan 10, 2017 at 2:47 PM, Vladimir Murzin
->>>>> <vladimir.murzin@arm.com> wrote:
->>>>>
->>>>>> In another thread Benjamin pointed at patch [1] in drm/kms part for noMMU.
->>>>>>
->>>>>> [1] https://cgit.freedesktop.org/drm/drm-misc/commit/?id=62a0d98a188cc4ebd8ea54b37d274ec20465e464
->>>>>
->>>>> Problem solved?
->>>>>
->>>>> Vladimir: I do not require in any way that you create a CLCD driver for DRM,
->>>>> I just think it would be very very nice...
->>>>>
->>>>
->>>> I have no other option, this series is unreviewed and thus unlikely it will
->>>> be applied, still a panel PCB on my board needs power management support.
++++ Jessica Yu [16/01/17 19:22 -0500]:
+>+++ Miroslav Benes [16/01/17 17:47 +0100]:
+>>On Tue, 6 Dec 2016, Abel Vesa wrote:
+>>
+>>>klp_get_ftrace_location is used by ftrace to get the entry for a
+>>>specific function from the mcount list. klp_arch_set_pc is used
+>>>to set the pc from the regs passed as an argument to the
+>>>ftrace_ops_no_ops function to the starting address of the patched
+>>>function. klp_write_module_reloc is not doing anything at this
+>>>moment.
 >>>
->>> Hm I can ACK it I guess, but mergeing it into an unmaintained subsystem
->>> is another issue, just not very optimal. 
->>
->> + Bartlomiej
->>
->> Linus, your ack is always more than appreciated.
-> 
-> +1
-> 
->> To all appearance Bartlomiej is a new honoured framebuffer layer maintainer.
->>
->> Bartlomiej, do you have the changes under discussion in your mailbox or
->> should I resend them to you directly for review?
-> 
-> No need for resend, I picked them from the list and they are on TODO.
-> 
-
-Bartlomiej, Linus,
-
-I've noticed that 4/4 requires special attention due to the anticipated
-change of devm_get_gpiod_from_child() interface.
-
-If you have any concerns regarding 4/4, please review and consider to
-apply the first three clean-up patches in the series, basically I've
-achieved my goal of describing a power supply for a panel in DTS by
-introducing a DRM driver (see a note below), however support of
-"enable-gpios" property mentioned in the "panel-dpi" device tree binding
-documentation still is seen as beneficial for the CLCD fbdev driver.
-
-> 
->>> If you get it working on your system I can look into migrating all the old
->>> users to DRM as well.
+>>>Signed-off-by: Abel Vesa <abelvesa@linux.com>
+>>>---
+>>> MAINTAINERS                      |  3 +++
+>>> arch/arm/include/asm/livepatch.h | 46 ++++++++++++++++++++++++++++++++++++++++
+>>> arch/arm/kernel/livepatch.c      | 43 +++++++++++++++++++++++++++++++++++++
+>>> 3 files changed, 92 insertions(+)
+>>> create mode 100644 arch/arm/include/asm/livepatch.h
+>>> create mode 100644 arch/arm/kernel/livepatch.c
 >>>
+>>>diff --git a/MAINTAINERS b/MAINTAINERS
+>>>index bd182a1..d43b790 100644
+>>>--- a/MAINTAINERS
+>>>+++ b/MAINTAINERS
+>>>@@ -7466,12 +7466,15 @@ M:	Josh Poimboeuf <jpoimboe@redhat.com>
+>>> M:	Jessica Yu <jeyu@redhat.com>
+>>> M:	Jiri Kosina <jikos@kernel.org>
+>>> M:	Miroslav Benes <mbenes@suse.cz>
+>>>+M:	Abel Vesa <abelvesa@linux.com>
+>>> R:	Petr Mladek <pmladek@suse.com>
+>>> S:	Maintained
+>>> F:	kernel/livepatch/
+>>> F:	include/linux/livepatch.h
+>>> F:	arch/x86/include/asm/livepatch.h
+>>> F:	arch/x86/kernel/livepatch.c
+>>>+F:	arch/arm/include/asm/livepatch.h
+>>>+F:	arch/arm/kernel/livepatch.c
+>>> F:	Documentation/livepatch/
+>>> F:	Documentation/ABI/testing/sysfs-kernel-livepatch
+>>> F:	samples/livepatch/
 >>
->> Sure, I started development of a simple CLCD DRM driver as an own attractive
->> exercise, I'll keep you informed of the progress.
+>>Thanks for the offer but I think we manage quite well ;)
 >>
+>>>diff --git a/arch/arm/include/asm/livepatch.h b/arch/arm/include/asm/livepatch.h
+>>>new file mode 100644
+>>>index 0000000..d4e3ff0
+>>>--- /dev/null
+>>>+++ b/arch/arm/include/asm/livepatch.h
+>>>@@ -0,0 +1,46 @@
+>>>+/*
+>>>+ * livepatch.h - arm specific Kernel Live Patching Core
+>>>+ *
+>>>+ * Copyright (C) 2016 Abel Vesa <abelvesa@linux.com>
+>>>+ *
+>>>+ * This program is free software; you can redistribute it and/or
+>>>+ * modify it under the terms of the GNU General Public License
+>>>+ * as published by the Free Software Foundation; either version 2
+>>>+ * of the License, or (at your option) any later version.
+>>>+ *
+>>>+ * This program is distributed in the hope that it will be useful,
+>>>+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>>+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>>+ * GNU General Public License for more details.
+>>>+ *
+>>>+ * You should have received a copy of the GNU General Public License
+>>>+ * along with this program; if not, see <http://www.gnu.org/licenses/>.
+>>>+ */
+>>>+
+>>>+#ifndef _ASM_ARM_LIVEPATCH_H
+>>>+#define _ASM_ARM_LIVEPATCH_H
+>>>+
+>>>+#include <asm/setup.h>
+>>>+#include <linux/module.h>
+>>>+#include <linux/ftrace.h>
+>>>+
+>>>+static inline int klp_check_compiler_support(void)
+>>>+{
+>>>+	return 0;
+>>>+}
+>>>+
+>>>+int klp_write_module_reloc(struct module *mod, unsigned long type,
+>>>+			   unsigned long loc, unsigned long value);
+>>
+>>This is not needed. See below.
+>>
+>>>+
+>>>+static inline void klp_arch_set_pc(struct pt_regs *regs, unsigned long ip)
+>>>+{
+>>>+	regs->uregs[15] = ip;
+>>>+}
+>>>+
+>>>+#define klp_get_ftrace_location klp_get_ftrace_location
+>>>+static inline unsigned long klp_get_ftrace_location(unsigned long faddr)
+>>>+{
+>>>+	return ftrace_location_range(faddr, faddr + 24);
+>>
+>>Comment here about +24 would be great. See similar in powerpc header file.
+>>
+>>>+}
+>>>+
+>>>+#endif /* _ASM_ARM_LIVEPATCH_H */
+>>>diff --git a/arch/arm/kernel/livepatch.c b/arch/arm/kernel/livepatch.c
+>>>new file mode 100644
+>>>index 0000000..0656cd6
+>>>--- /dev/null
+>>>+++ b/arch/arm/kernel/livepatch.c
+>>>@@ -0,0 +1,43 @@
+>>>+/*
+>>>+ * livepatch.c - arm specific Kernel Live Patching Core
+>>>+ *
+>>>+ * Copyright (C) 2016 Abel Vesa <abelvesa@linux.com>
+>>>+ *
+>>>+ * This program is free software; you can redistribute it and/or
+>>>+ * modify it under the terms of the GNU General Public License
+>>>+ * as published by the Free Software Foundation; either version 2
+>>>+ * of the License, or (at your option) any later version.
+>>>+ *
+>>>+ * This program is distributed in the hope that it will be useful,
+>>>+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>>+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>>+ * GNU General Public License for more details.
+>>>+ *
+>>>+ * You should have received a copy of the GNU General Public License
+>>>+ * along with this program; if not, see <http://www.gnu.org/licenses/>.
+>>>+ */
+>>>+
+>>>+#include <linux/module.h>
+>>>+#include <linux/uaccess.h>
+>>>+#include <linux/ftrace.h>
+>>>+#include <asm/elf.h>
+>>>+#include <asm/livepatch.h>
+>>>+#include <asm/insn.h>
+>>>+#include <asm/ftrace.h>
+>>>+
+>>>+/**
+>>>+ * klp_write_module_reloc() - write a relocation in a module
+>>>+ * @mod:	module in which the section to be modified is found
+>>>+ * @type:	ELF relocation type (see asm/elf.h)
+>>>+ * @loc:	address that the relocation should be written to
+>>>+ * @value:	relocation value (sym address + addend)
+>>>+ *
+>>>+ * This function writes a relocation to the specified location for
+>>>+ * a particular module.
+>>>+ */
+>>>+int klp_write_module_reloc(struct module *mod, unsigned long type,
+>>>+			   unsigned long loc, unsigned long value)
+>>>+{
+>>>+	/* Not implemented yet */
+>>>+	return 0;
+>>>+}
+>>
+>>This whole file is not needed. Livepatching uses kernel's internal
+>>apply_relocate_add() for dealing with relocations. The only thing you need
+>>to do is to make sure that all needed arch-specific info is preserved
+>>during a module loading. Specifically mod_arch_specific structure needs to
+>>be examined in this respect.
+>
+>Yup. Since we rely on apply_relocate_add() to apply relocations, just
+>make sure that you preserve anything (e.g., plt tables) you need to
+>make that call post-module init. In the case of s390, we needed to
+>make sure we kept mod->arch.syminfo, so that the call to
+>apply_relocate_add() would succeed.
+>
+>>But apply_relocate_add() is not implemented on arm yet. I guess it would
+>>nice to have it... otherwise we could get to an unpleasant situation.
+>>Livepatch module can rely on its livepatching relocations (that is, there
+>>are some). apply_relocate_add() returns 0 on arm, so everything seems to
+>>be nice and then boom some time later.
+>
+>Doesn't it return -ENOEXEC? MODULES_USE_ELF_RELA is not defined
+>on arm, I think (see moduleloader.h).
 
-Some updates, now I've developed a simple CLCD DRM driver which works
-nicely on one of my boards powered by LPC3250 (has MMU), but I still
-have to find enough time and check that the driver works on MMU-less
-LPC4357 with the applied DRM core change referenced by Vladimir earlier.
+...And I should have looked at the whole patchset first before
+replying :-) I see now that a placeholder was added in patch 3/7.
 
-Most probably I'll complete polishing the driver on this weekend and
-send it for review on the next week.
-
-One more comment, I've found a discussion when DT support to the CLCD
-fbdev driver was added [1], there are some comments about panel device
-node and endpoints incompatibility in comparison to the common layout
-for Linux-ish DRM devices, and I do confirm that this incompatibility
-exists. I have both versions though, but you guess that DRM flavour
-is cleaner, and for CLCD DRM driver I'm going to use it.
-
-The legacy DT layout can be supported in the same driver in parallel,
-but unfortunately it makes the driver not so cute, and I decide to
-drop it in the initial version. It implies that CLCD fbdev users with
-the controller and panel descriptions in DT and who want to switch to
-CLCD DRM driver should update DTS. Sorry, I know it is inconvenient...
-
-[1] https://patchwork.kernel.org/patch/3777391/
-
---
-With best wishes,
-Vladimir
+Jessica
