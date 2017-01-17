@@ -1,107 +1,37 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue, 17 Jan 2017 16:46:55 +0000
-Subject: [PATCH] ARM: DT: STiH407: Add RTS / CTS pinctrl definition for UARTs.
-Message-ID: <1484671615-16343-1-git-send-email-peter.griffin@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 17 Jan 2017 17:47:22 +0100
+Subject: [PATCH v2 04/10] ASoC: sun4i-i2s: Add quirks to handle new
+ compatible for reset
+In-Reply-To: <20170117140230.23142-5-mylene.josserand@free-electrons.com>
+References: <20170117140230.23142-1-mylene.josserand@free-electrons.com>
+ <20170117140230.23142-5-mylene.josserand@free-electrons.com>
+Message-ID: <20170117164722.yohrxvlempkjldu3@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The uart IP is capable of doing hardware flow control. Define
-the RTS and CTS pins for STiH407 family Socs so we can use this
-feature in the future if we wish to.
+On Tue, Jan 17, 2017 at 03:02:24PM +0100, Myl?ne Josserand wrote:
+> Some SoCs have a reset line that must be asserted/deasserted.
+> This patch adds a quirk to handle the new compatible
+> "allwinner,sun6i-a31-i2s" which will deassert the reset
+> line on probe function and assert it on remove's one.
+> 
+> This new compatible is useful in case of A33 codec driver, for example.
+> 
+> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- arch/arm/boot/dts/stih407-pinctrl.dtsi | 50 ++++++++++++++++++++++++++++++++++
- 1 file changed, 50 insertions(+)
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-index daab16b..3bbb0c0 100644
---- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-@@ -149,6 +149,16 @@
- 						rx = <&pio3 5 ALT1 IN>;
- 					};
- 				};
-+				pinctrl_sbc_serial0_rts: sbc_serial0-0_rts {
-+					st,pins {
-+						rts = <&pio3 7 ALT1 OUT>;
-+					};
-+				};
-+				pinctrl_sbc_serial0_cts: sbc_serial0-0_cts {
-+					st,pins {
-+						cts = <&pio3 6 ALT1 IN>;
-+					};
-+				};
- 			};
- 			/* SBC_ASC1 - UART11 */
- 			sbc_serial1 {
-@@ -158,6 +168,16 @@
- 						rx = <&pio2 7 ALT3 IN>;
- 					};
- 				};
-+				pinctrl_sbc_serial1_rts: sbc_serial1-0_rts {
-+					st,pins {
-+						rts = <&pio3 1 ALT3 OUT>;
-+					};
-+				};
-+				pinctrl_sbc_serial1_cts: sbc_serial1-0_cts {
-+					st,pins {
-+						cts = <&pio3 0 ALT3 IN>;
-+					};
-+				};
- 			};
- 
- 			i2c10 {
-@@ -469,6 +489,16 @@
- 						rx = <&pio17 1 ALT1 IN>;
- 					};
- 				};
-+				pinctrl_serial0_rts: serial0-0_rts {
-+					st,pins {
-+						rts = <&pio17 3	ALT1 OUT>;
-+					};
-+				};
-+				pinctrl_serial0_cts: serial0-0_cts {
-+					st,pins {
-+						cts = <&pio17 2	ALT1 IN>;
-+					};
-+				};
- 			};
- 
- 			serial1 {
-@@ -478,6 +508,16 @@
- 						rx = <&pio16 1 ALT1 IN>;
- 					};
- 				};
-+				pinctrl_serial1_rts: serial1-0_rts {
-+					st,pins {
-+						rts = <&pio16 3	ALT1 OUT>;
-+					};
-+				};
-+				pinctrl_serial1_cts: serial1-0_cts {
-+					st,pins {
-+						cts = <&pio16 2 ALT1 IN>;
-+					};
-+				};
- 			};
- 
- 			serial2 {
-@@ -487,6 +527,16 @@
- 						rx = <&pio15 1 ALT1 IN>;
- 					};
- 				};
-+				pinctrl_serial2_rts: serial2-0_rts {
-+					st,pins {
-+						rts = <&pio15 3	ALT1 OUT>;
-+					};
-+				};
-+				pinctrl_serial2_cts: serial2-0_cts {
-+					st,pins {
-+						cts = <&pio15 2	ALT1 IN>;
-+					};
-+				};
- 			};
- 
- 			mmc1 {
+Thanks,
+Maxime
+
 -- 
-2.7.4
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170117/ba3a4f3a/attachment.sig>
