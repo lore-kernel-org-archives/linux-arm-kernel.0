@@ -1,26 +1,39 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 16 Jan 2017 20:13:25 -0500 (EST)
-Subject: [PATCH v2 net-next 0/2] mvneta xmit_more and bql support
-In-Reply-To: <1484586512-16412-1-git-send-email-mw@semihalf.com>
-References: <1484586512-16412-1-git-send-email-mw@semihalf.com>
-Message-ID: <20170116.201325.2191165766691361664.davem@davemloft.net>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Tue, 17 Jan 2017 02:17:53 +0100
+Subject: [PATCH] ARM64: dts: meson-gxbb-vega-s95: Add LED
+Message-ID: <20170117011753.29978-1-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcin Wojtas <mw@semihalf.com>
-Date: Mon, 16 Jan 2017 18:08:30 +0100
+There is one blue LED on the front of the device. Keep it lit and
+configure it as panic indicator.
 
-> This is a delayed v2 of short patchset, which introduces xmit_more and BQL
-> to mvneta driver. The only one change was added in xmit_more support -
-> condition check preventing excessive descriptors concatenation before
-> flushing in HW.
-> 
-> Any comments or feedback would be welcome.
- ...
-> Changelog:
-> v1 -> v2:
-> 
-> * Add checking condition that ensures too much descriptors are not
->   concatenated before flushing in HW.
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-Looks good, series applied, thanks.
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
+index ab497126c9a3..b3937b72d102 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
+@@ -53,6 +53,17 @@
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
++	leds {
++		compatible = "gpio-leds";
++
++		blue {
++			label = "vega-s95:blue:on";
++			gpios = <&gpio_ao GPIOAO_13 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++			panic-indicator;
++		};
++	};
++
+ 	usb_vbus: regulator-usb0-vbus {
+ 		compatible = "regulator-fixed";
+ 
+-- 
+2.10.2
