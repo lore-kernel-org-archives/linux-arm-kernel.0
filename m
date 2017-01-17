@@ -1,94 +1,201 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Tue, 17 Jan 2017 13:19:40 +0800
-Subject: [PATCH v11 06/12] drm/mediatek: update display module connections
-In-Reply-To: <1484117473-46644-7-git-send-email-yt.shen@mediatek.com>
-References: <1484117473-46644-1-git-send-email-yt.shen@mediatek.com>
- <1484117473-46644-7-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1484630380.5483.1.camel@mtksdaap41>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Mon, 16 Jan 2017 21:23:43 -0800
+Subject: [PATCH v4 3/3] thermal: zx2967: add thermal driver for ZTE's
+ zx2967 family
+In-Reply-To: <1484304418-17489-3-git-send-email-baoyou.xie@linaro.org>
+References: <1484304418-17489-1-git-send-email-baoyou.xie@linaro.org>
+ <1484304418-17489-3-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <20170117052342.GA3176@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, YT:
+Hello,
 
-On Wed, 2017-01-11 at 14:51 +0800, YT Shen wrote:
-> update connections for OVL, RDMA, BLS, DSI
+On Fri, Jan 13, 2017 at 06:46:58PM +0800, Baoyou Xie wrote:
+> This patch adds thermal driver for ZTE's zx2967 family.
+
+Please consider the comments I sent on your v3. They still apply here.
+
+and also the following:
+
 > 
-> Signed-off-by: YT Shen <yt.shen@mediatek.com>
+> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
 
-Acked-by: CK Hu <ck.hu@mediatek.com>
 
-> ---
->  drivers/gpu/drm/mediatek/mtk_drm_ddp.c | 25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> index b77d456..a9b209c 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> @@ -32,6 +32,10 @@
->  #define DISP_REG_CONFIG_DISP_RDMA1_MOUT_EN	0x0c8
->  #define DISP_REG_CONFIG_MMSYS_CG_CON0		0x100
->  
-> +#define DISP_REG_CONFIG_DISP_OVL_MOUT_EN	0x030
-> +#define DISP_REG_CONFIG_OUT_SEL			0x04c
-> +#define DISP_REG_CONFIG_DSI_SEL			0x050
-> +
->  #define DISP_REG_MUTEX_EN(n)	(0x20 + 0x20 * (n))
->  #define DISP_REG_MUTEX(n)	(0x24 + 0x20 * (n))
->  #define DISP_REG_MUTEX_RST(n)	(0x28 + 0x20 * (n))
-> @@ -71,6 +75,10 @@
->  #define DPI0_SEL_IN_RDMA1		0x1
->  #define COLOR1_SEL_IN_OVL1		0x1
->  
-> +#define OVL_MOUT_EN_RDMA		0x1
-> +#define BLS_TO_DSI_RDMA1_TO_DPI1	0x8
-> +#define DSI_SEL_IN_BLS			0x0
-> +
->  struct mtk_disp_mutex {
->  	int id;
->  	bool claimed;
-> @@ -111,6 +119,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
->  	if (cur == DDP_COMPONENT_OVL0 && next == DDP_COMPONENT_COLOR0) {
->  		*addr = DISP_REG_CONFIG_DISP_OVL0_MOUT_EN;
->  		value = OVL0_MOUT_EN_COLOR0;
-> +	} else if (cur == DDP_COMPONENT_OVL0 && next == DDP_COMPONENT_RDMA0) {
-> +		*addr = DISP_REG_CONFIG_DISP_OVL_MOUT_EN;
-> +		value = OVL_MOUT_EN_RDMA;
->  	} else if (cur == DDP_COMPONENT_OD && next == DDP_COMPONENT_RDMA0) {
->  		*addr = DISP_REG_CONFIG_DISP_OD_MOUT_EN;
->  		value = OD_MOUT_EN_RDMA0;
-> @@ -148,6 +159,9 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
->  	} else if (cur == DDP_COMPONENT_OVL1 && next == DDP_COMPONENT_COLOR1) {
->  		*addr = DISP_REG_CONFIG_DISP_COLOR1_SEL_IN;
->  		value = COLOR1_SEL_IN_OVL1;
-> +	} else if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0) {
-> +		*addr = DISP_REG_CONFIG_DSI_SEL;
-> +		value = DSI_SEL_IN_BLS;
->  	} else {
->  		value = 0;
->  	}
-> @@ -155,6 +169,15 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
->  	return value;
->  }
->  
-> +static void mtk_ddp_sout_sel(void __iomem *config_regs,
-> +			     enum mtk_ddp_comp_id cur,
-> +			     enum mtk_ddp_comp_id next)
+<cut>
+
+> +static int zx2967_thermal_get_temp(void *data, int *temp)
 > +{
-> +	if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0)
-> +		writel_relaxed(BLS_TO_DSI_RDMA1_TO_DPI1,
-> +			       config_regs + DISP_REG_CONFIG_OUT_SEL);
+> +	void __iomem *regs;
+> +	struct zx2967_thermal_sensor *sensor = data;
+> +	struct zx2967_thermal_priv *priv = sensor->priv;
+> +	unsigned long timeout = jiffies + msecs_to_jiffies(100);
+> +	u32 val, sel_id;
+> +
+> +	regs = priv->regs;
+> +	mutex_lock(&priv->lock);
+> +
+> +	writel_relaxed(0, regs + ZX2967_THERMAL_POWER_MODE);
+> +	writel_relaxed(2, regs + ZX2967_THERMAL_DCF);
+> +
+> +	val = readl_relaxed(regs + ZX2967_THERMAL_SEL);
+> +	val &= ~ZX2967_THERMAL_ID_MASK;
+> +	sel_id = sensor->id ? ZX2967_THERMAL_ID0 : ZX2967_THERMAL_ID1;
+> +	val |= sel_id;
+> +	writel_relaxed(val, regs + ZX2967_THERMAL_SEL);
+> +
+> +	usleep_range(100, 300);
+> +	val = readl_relaxed(regs + ZX2967_THERMAL_CTRL);
+> +	while (!(val & ZX2967_THERMAL_READY)) {
+> +		if (time_after(jiffies, timeout)) {
+> +			dev_err(priv->dev, "Thermal sensor %d data timeout\n",
+> +				sensor->id);
+> +			mutex_unlock(&priv->lock);
+> +			return -ETIMEDOUT;
+> +		}
+> +		val = readl_relaxed(regs + ZX2967_THERMAL_CTRL);
+
+should you usleep_range() in between loops iterations?
+
+> +	}
+> +
+> +	writel_relaxed(3, regs + ZX2967_THERMAL_DCF);
+> +	val = readl_relaxed(regs + ZX2967_THERMAL_CTRL)
+> +			 & ZX2967_THERMAL_TEMP_MASK;
+> +	writel_relaxed(1, regs + ZX2967_THERMAL_POWER_MODE);
+> +
+> +	/*
+> +	 * Calculate temperature
+> +	 *   922	initial value of calibration cure
+> +	 *   1.951	slope of calibration cure
+> +	 */
+> +	*temp = DIV_ROUND_CLOSEST((val - 922) * 1000, 1951);
+> +
+> +	mutex_unlock(&priv->lock);
+> +
+> +	return 0;
 > +}
 > +
->  void mtk_ddp_add_comp_to_path(void __iomem *config_regs,
->  			      enum mtk_ddp_comp_id cur,
->  			      enum mtk_ddp_comp_id next)
-> @@ -167,6 +190,8 @@ void mtk_ddp_add_comp_to_path(void __iomem *config_regs,
->  		writel_relaxed(reg, config_regs + addr);
->  	}
->  
-> +	mtk_ddp_sout_sel(config_regs, cur, next);
+> +static struct thermal_zone_of_device_ops zx2967_of_thermal_ops = {
+> +	.get_temp = zx2967_thermal_get_temp,
+> +};
 > +
->  	value = mtk_ddp_sel_in(cur, next, &addr);
->  	if (value) {
->  		reg = readl_relaxed(config_regs + addr) | value;
+> +static int zx2967_thermal_probe(struct platform_device *pdev)
+> +{
+> +	struct zx2967_thermal_priv *priv;
+> +	struct resource *res;
+> +	int ret, i;
+> +
+> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
+> +	if (!priv)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	priv->regs = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(priv->regs))
+> +		return PTR_ERR(priv->regs);
+> +
+> +	priv->clk_gate = devm_clk_get(&pdev->dev, "gate");
+> +	if (IS_ERR(priv->clk_gate)) {
+> +		ret = PTR_ERR(priv->clk_gate);
+> +		dev_err(&pdev->dev, "failed to get clock gate: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	ret = clk_prepare_enable(priv->clk_gate);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to enable converter clock: %d\n",
+> +			ret);
+> +		return ret;
+> +	}
+> +
+> +	priv->pclk = devm_clk_get(&pdev->dev, "pclk");
+> +	if (IS_ERR(priv->pclk)) {
+> +		ret = PTR_ERR(priv->pclk);
+> +		dev_err(&pdev->dev, "failed to get apb clock: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	ret = clk_prepare_enable(priv->pclk);
+> +	if (ret) {
+> +		clk_disable_unprepare(priv->clk_gate);
+> +		dev_err(&pdev->dev, "failed to enable converter clock: %d\n",
+> +			ret);
+> +		return ret;
+> +	}
+> +
+> +	mutex_init(&priv->lock);
+> +	for (i = 0; i < NUM_SENSORS; i++) {
+> +		struct zx2967_thermal_sensor *sensor = &priv->sensors[i];
+> +
+> +		sensor->priv = priv;
+> +		sensor->id = i;
+> +		sensor->tzd = thermal_zone_of_sensor_register(&pdev->dev,
+> +					i, sensor, &zx2967_of_thermal_ops);
+> +		if (IS_ERR(sensor->tzd)) {
+> +			ret = PTR_ERR(sensor->tzd);
+> +			dev_err(&pdev->dev, "failed to register sensor %d: %d\n",
+> +				i, ret);
+> +			goto remove_ts;
+> +		}
+> +	}
+> +	priv->dev = &pdev->dev;
+> +	platform_set_drvdata(pdev, priv);
+> +
+> +	return 0;
+> +
+> +remove_ts:
+> +	clk_disable_unprepare(priv->clk_gate);
+> +	clk_disable_unprepare(priv->pclk);
+> +	for (i--; i >= 0; i--)
+> +		thermal_zone_of_sensor_unregister(&pdev->dev,
+> +						  priv->sensors[i].tzd);
+> +
+> +	return ret;
+> +}
+> +
+> +static int zx2967_thermal_exit(struct platform_device *pdev)
+> +{
+> +	struct zx2967_thermal_priv *priv = platform_get_drvdata(pdev);
+> +	int i;
+> +
+> +	for (i = 0; i < NUM_SENSORS; i++) {
+> +		struct zx2967_thermal_sensor *sensor = &priv->sensors[i];
+> +
+> +		thermal_zone_of_sensor_unregister(&pdev->dev, sensor->tzd);
+> +	}
+> +	clk_disable_unprepare(priv->pclk);
+> +	clk_disable_unprepare(priv->clk_gate);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id zx2967_thermal_id_table[] = {
+> +	{ .compatible = "zte,zx296718-thermal" },
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, zx2967_thermal_id_table);
+> +
+> +static SIMPLE_DEV_PM_OPS(zx2967_thermal_pm_ops,
+> +			 zx2967_thermal_suspend, zx2967_thermal_resume);
+> +
+> +static struct platform_driver zx2967_thermal_driver = {
+> +	.probe = zx2967_thermal_probe,
+> +	.remove = zx2967_thermal_exit,
+> +	.driver = {
+> +		.name = "zx2967_thermal",
+> +		.of_match_table = zx2967_thermal_id_table,
+> +		.pm = &zx2967_thermal_pm_ops,
+> +	},
+> +};
+> +module_platform_driver(zx2967_thermal_driver);
+> +
+> +MODULE_AUTHOR("Baoyou Xie <baoyou.xie@linaro.org>");
+> +MODULE_DESCRIPTION("ZTE zx2967 thermal driver");
+> +MODULE_LICENSE("GPL");
+
+GPLv2?
+
+> -- 
+> 2.7.4
+> 
