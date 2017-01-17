@@ -1,31 +1,43 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Tue, 17 Jan 2017 13:26:05 +0100
-Subject: [PATCH v2 03/14] ARM: davinci: add a clock lookup entry for the SATA
- clock
+Date: Tue, 17 Jan 2017 13:26:03 +0100
+Subject: [PATCH v2 01/14] devicetree: bindings: add bindings for ahci-da850
 In-Reply-To: <1484655976-25382-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1484655976-25382-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1484655976-25382-4-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1484655976-25382-2-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This entry is needed for the ahci driver to get a functional clock.
+Add DT bindings for the TI DA850 AHCI SATA controller.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/da8xx-dt.c | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/ata/ahci-da850.txt | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/ata/ahci-da850.txt
 
-diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-index 9ee44da..b83e5d1 100644
---- a/arch/arm/mach-davinci/da8xx-dt.c
-+++ b/arch/arm/mach-davinci/da8xx-dt.c
-@@ -42,6 +42,7 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("ti,da830-ohci", 0x01e25000, "ohci-da8xx", NULL),
- 	OF_DEV_AUXDATA("ti,da830-musb", 0x01e00000, "musb-da8xx", NULL),
- 	OF_DEV_AUXDATA("ti,da830-usb-phy", 0x01c1417c, "da8xx-usb-phy", NULL),
-+	OF_DEV_AUXDATA("ti,da850-ahci", 0x01e18000, "ahci_da850", NULL),
- 	{}
- };
- 
+diff --git a/Documentation/devicetree/bindings/ata/ahci-da850.txt b/Documentation/devicetree/bindings/ata/ahci-da850.txt
+new file mode 100644
+index 0000000..e7111b4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/ata/ahci-da850.txt
+@@ -0,0 +1,18 @@
++Device tree binding for the TI DA850 AHCI SATA Controller
++---------------------------------------------------------
++
++Required properties:
++  - compatible: must be "ti,da850-ahci"
++  - reg: physical base addresses and sizes of the controller's register areas
++  - interrupts: interrupt specifier (refer to the interrupt binding)
++
++Optional properties:
++  - clocks: clock specifier (refer to the common clock binding)
++
++Example:
++
++	sata: ahci at 218000 {
++		compatible = "ti,da850-ahci";
++		reg = <0x218000 0x2000>, <0x22c018 0x4>;
++		interrupts = <67>;
++	};
 -- 
 2.9.3
