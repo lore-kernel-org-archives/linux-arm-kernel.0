@@ -1,107 +1,140 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 17 Jan 2017 13:44:38 +0100
-Subject: [PATCH v2 07/13] pinctrl: samsung: Add missing initconst annotation
+Date: Tue, 17 Jan 2017 13:44:43 +0100
+Subject: [PATCH v2 12/13] pinctrl: samsung: Move retention control from
+ mach-s5pv210 to the pinctrl driver
 In-Reply-To: <1484657084-26227-1-git-send-email-m.szyprowski@samsung.com>
 References: <1484657084-26227-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170117124500eucas1p1b61ec676f421eae7d28d750a0746a813@eucas1p1.samsung.com>
-Message-ID: <1484657084-26227-8-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170117124502eucas1p19ce0cd772fc4295b207b20cdad30485e@eucas1p1.samsung.com>
+Message-ID: <1484657084-26227-13-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos5433 support has been added in parallel to adding initconst
-annotation to most of the init data structures, so add those
-annotations also to Exynos5433 structures.
+This patch moves pad retention control from S5PV210 machine code to
+Exynos pin controller driver. This helps to avoid possible ordering
+and logical dependencies between machine and pin control code. Till
+now it worked fine only because sys_ops for machine code and pin
+controller were called in registration order.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/pinctrl/samsung/pinctrl-exynos.c | 22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
+ arch/arm/mach-s5pv210/pm.c               |  7 ----
+ arch/arm/mach-s5pv210/regs-clock.h       |  4 ---
+ drivers/pinctrl/samsung/pinctrl-exynos.c | 56 ++++++++++++++++++++++++++++++++
+ 3 files changed, 56 insertions(+), 11 deletions(-)
 
+diff --git a/arch/arm/mach-s5pv210/pm.c b/arch/arm/mach-s5pv210/pm.c
+index 21b4b13c5ab7..7d69666de5ba 100644
+--- a/arch/arm/mach-s5pv210/pm.c
++++ b/arch/arm/mach-s5pv210/pm.c
+@@ -155,13 +155,6 @@ static void s5pv210_suspend_finish(void)
+  */
+ static void s5pv210_pm_resume(void)
+ {
+-	u32 tmp;
+-
+-	tmp = __raw_readl(S5P_OTHERS);
+-	tmp |= (S5P_OTHERS_RET_IO | S5P_OTHERS_RET_CF |\
+-		S5P_OTHERS_RET_MMC | S5P_OTHERS_RET_UART);
+-	__raw_writel(tmp , S5P_OTHERS);
+-
+ 	s3c_pm_do_restore_core(s5pv210_core_save, ARRAY_SIZE(s5pv210_core_save));
+ }
+ 
+diff --git a/arch/arm/mach-s5pv210/regs-clock.h b/arch/arm/mach-s5pv210/regs-clock.h
+index 4640f0f03c12..fb3eb77412db 100644
+--- a/arch/arm/mach-s5pv210/regs-clock.h
++++ b/arch/arm/mach-s5pv210/regs-clock.h
+@@ -188,10 +188,6 @@
+ #define S5P_SLEEP_CFG_USBOSC_EN		(1 << 1)
+ 
+ /* OTHERS Resgister */
+-#define S5P_OTHERS_RET_IO		(1 << 31)
+-#define S5P_OTHERS_RET_CF		(1 << 30)
+-#define S5P_OTHERS_RET_MMC		(1 << 29)
+-#define S5P_OTHERS_RET_UART		(1 << 28)
+ #define S5P_OTHERS_USB_SIG_MASK		(1 << 16)
+ 
+ /* S5P_DAC_CONTROL */
 diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
-index bf753a596209..70b94ad10cc1 100644
+index 7beb0d4d2f20..675a38e956f8 100644
 --- a/drivers/pinctrl/samsung/pinctrl-exynos.c
 +++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
-@@ -1266,7 +1266,7 @@ static void exynos_pinctrl_resume(struct samsung_pinctrl_drv_data *drvdata)
+@@ -24,6 +24,7 @@
+ #include <linux/irqdomain.h>
+ #include <linux/irq.h>
+ #include <linux/irqchip/chained_irq.h>
++#include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/io.h>
+ #include <linux/slab.h>
+@@ -643,6 +644,60 @@ static void exynos_pinctrl_resume(struct samsung_pinctrl_drv_data *drvdata)
+ 			exynos_pinctrl_resume_bank(drvdata, bank);
+ }
+ 
++/* Retention control for S5PV210 are located at the end of clock controller */
++#define S5P_OTHERS 0xE000
++
++#define S5P_OTHERS_RET_IO		(1 << 31)
++#define S5P_OTHERS_RET_CF		(1 << 30)
++#define S5P_OTHERS_RET_MMC		(1 << 29)
++#define S5P_OTHERS_RET_UART		(1 << 28)
++
++static void s5pv210_retention_disable(struct samsung_pinctrl_drv_data *drvdata)
++{
++	void *clk_base = drvdata->retention_ctrl->priv;
++	u32 tmp;
++
++	tmp = __raw_readl(clk_base + S5P_OTHERS);
++	tmp |= (S5P_OTHERS_RET_IO | S5P_OTHERS_RET_CF | S5P_OTHERS_RET_MMC |
++		S5P_OTHERS_RET_UART);
++	__raw_writel(tmp, clk_base + S5P_OTHERS);
++}
++
++static struct samsung_retention_ctrl *
++s5pv210_retention_init(struct samsung_pinctrl_drv_data *drvdata,
++		       const struct samsung_retention_data *data)
++{
++	struct samsung_retention_ctrl *ctrl;
++	struct device_node *np;
++	void *clk_base;
++
++	ctrl = devm_kzalloc(drvdata->dev, sizeof(*ctrl), GFP_KERNEL);
++	if (!ctrl)
++		return ERR_PTR(-ENOMEM);
++
++	np = of_find_compatible_node(NULL, NULL, "samsung,s5pv210-clock");
++	if (!np) {
++		pr_err("%s: failed to find clock controller DT node\n",
++			__func__);
++		return ERR_PTR(-ENODEV);
++	}
++
++	clk_base = of_iomap(np, 0);
++	if (!clk_base) {
++		pr_err("%s: failed to map clock registers\n", __func__);
++		return ERR_PTR(-EINVAL);
++	}
++
++	ctrl->priv = clk_base;
++	ctrl->disable = s5pv210_retention_disable;
++
++	return ctrl;
++}
++
++static const struct samsung_retention_data s5pv210_retention_data __initconst = {
++	.init	 = s5pv210_retention_init,
++};
++
+ /* pin banks of s5pv210 pin-controller */
+ static const struct samsung_pin_bank_data s5pv210_pin_bank[] __initconst = {
+ 	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpa0", 0x00),
+@@ -690,6 +745,7 @@ static void exynos_pinctrl_resume(struct samsung_pinctrl_drv_data *drvdata)
+ 		.eint_wkup_init = exynos_eint_wkup_init,
+ 		.suspend	= exynos_pinctrl_suspend,
+ 		.resume		= exynos_pinctrl_resume,
++		.retention_data	= &s5pv210_retention_data,
+ 	},
  };
  
- /* pin banks of exynos5433 pin-controller - ALIVE */
--static const struct samsung_pin_bank_data exynos5433_pin_banks0[] = {
-+static const struct samsung_pin_bank_data exynos5433_pin_banks0[] __initconst = {
- 	EXYNOS5433_PIN_BANK_EINTW(8, 0x000, "gpa0", 0x00),
- 	EXYNOS5433_PIN_BANK_EINTW(8, 0x020, "gpa1", 0x04),
- 	EXYNOS5433_PIN_BANK_EINTW(8, 0x040, "gpa2", 0x08),
-@@ -1279,28 +1279,28 @@ static void exynos_pinctrl_resume(struct samsung_pinctrl_drv_data *drvdata)
- };
- 
- /* pin banks of exynos5433 pin-controller - AUD */
--static const struct samsung_pin_bank_data exynos5433_pin_banks1[] = {
-+static const struct samsung_pin_bank_data exynos5433_pin_banks1[] __initconst = {
- 	EXYNOS5433_PIN_BANK_EINTG(7, 0x000, "gpz0", 0x00),
- 	EXYNOS5433_PIN_BANK_EINTG(4, 0x020, "gpz1", 0x04),
- };
- 
- /* pin banks of exynos5433 pin-controller - CPIF */
--static const struct samsung_pin_bank_data exynos5433_pin_banks2[] = {
-+static const struct samsung_pin_bank_data exynos5433_pin_banks2[] __initconst = {
- 	EXYNOS5433_PIN_BANK_EINTG(2, 0x000, "gpv6", 0x00),
- };
- 
- /* pin banks of exynos5433 pin-controller - eSE */
--static const struct samsung_pin_bank_data exynos5433_pin_banks3[] = {
-+static const struct samsung_pin_bank_data exynos5433_pin_banks3[] __initconst = {
- 	EXYNOS5433_PIN_BANK_EINTG(3, 0x000, "gpj2", 0x00),
- };
- 
- /* pin banks of exynos5433 pin-controller - FINGER */
--static const struct samsung_pin_bank_data exynos5433_pin_banks4[] = {
-+static const struct samsung_pin_bank_data exynos5433_pin_banks4[] __initconst = {
- 	EXYNOS5433_PIN_BANK_EINTG(4, 0x000, "gpd5", 0x00),
- };
- 
- /* pin banks of exynos5433 pin-controller - FSYS */
--static const struct samsung_pin_bank_data exynos5433_pin_banks5[] = {
-+static const struct samsung_pin_bank_data exynos5433_pin_banks5[] __initconst = {
- 	EXYNOS5433_PIN_BANK_EINTG(6, 0x000, "gph1", 0x00),
- 	EXYNOS5433_PIN_BANK_EINTG(7, 0x020, "gpr4", 0x04),
- 	EXYNOS5433_PIN_BANK_EINTG(5, 0x040, "gpr0", 0x08),
-@@ -1310,17 +1310,17 @@ static void exynos_pinctrl_resume(struct samsung_pinctrl_drv_data *drvdata)
- };
- 
- /* pin banks of exynos5433 pin-controller - IMEM */
--static const struct samsung_pin_bank_data exynos5433_pin_banks6[] = {
-+static const struct samsung_pin_bank_data exynos5433_pin_banks6[] __initconst = {
- 	EXYNOS5433_PIN_BANK_EINTG(8, 0x000, "gpf0", 0x00),
- };
- 
- /* pin banks of exynos5433 pin-controller - NFC */
--static const struct samsung_pin_bank_data exynos5433_pin_banks7[] = {
-+static const struct samsung_pin_bank_data exynos5433_pin_banks7[] __initconst = {
- 	EXYNOS5433_PIN_BANK_EINTG(3, 0x000, "gpj0", 0x00),
- };
- 
- /* pin banks of exynos5433 pin-controller - PERIC */
--static const struct samsung_pin_bank_data exynos5433_pin_banks8[] = {
-+static const struct samsung_pin_bank_data exynos5433_pin_banks8[] __initconst = {
- 	EXYNOS5433_PIN_BANK_EINTG(6, 0x000, "gpv7", 0x00),
- 	EXYNOS5433_PIN_BANK_EINTG(5, 0x020, "gpb0", 0x04),
- 	EXYNOS5433_PIN_BANK_EINTG(8, 0x040, "gpc0", 0x08),
-@@ -1341,7 +1341,7 @@ static void exynos_pinctrl_resume(struct samsung_pinctrl_drv_data *drvdata)
- };
- 
- /* pin banks of exynos5433 pin-controller - TOUCH */
--static const struct samsung_pin_bank_data exynos5433_pin_banks9[] = {
-+static const struct samsung_pin_bank_data exynos5433_pin_banks9[] __initconst = {
- 	EXYNOS5433_PIN_BANK_EINTG(3, 0x000, "gpj1", 0x00),
- };
- 
-@@ -1349,7 +1349,7 @@ static void exynos_pinctrl_resume(struct samsung_pinctrl_drv_data *drvdata)
-  * Samsung pinctrl driver data for Exynos5433 SoC. Exynos5433 SoC includes
-  * ten gpio/pin-mux/pinconfig controllers.
-  */
--const struct samsung_pin_ctrl exynos5433_pin_ctrl[] = {
-+const struct samsung_pin_ctrl exynos5433_pin_ctrl[] __initconst = {
- 	{
- 		/* pin-controller instance 0 data */
- 		.pin_banks	= exynos5433_pin_banks0,
 -- 
 1.9.1
