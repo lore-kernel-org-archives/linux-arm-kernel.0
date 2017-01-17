@@ -1,51 +1,45 @@
 From: yendapally.reddy@broadcom.com (Yendapally Reddy Dhananjaya Reddy)
-Date: Tue, 17 Jan 2017 11:14:28 -0500
-Subject: [PATCH v2 2/4] net: phy: Initialize mdio clock at probe function
-In-Reply-To: <1484669670-4201-1-git-send-email-yendapally.reddy@broadcom.com>
-References: <1484669670-4201-1-git-send-email-yendapally.reddy@broadcom.com>
-Message-ID: <1484669670-4201-3-git-send-email-yendapally.reddy@broadcom.com>
+Date: Tue, 17 Jan 2017 11:14:26 -0500
+Subject: [PATCH v2 0/4] USB support for Broadcom NSP SoC 
+Message-ID: <1484669670-4201-1-git-send-email-yendapally.reddy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initialize mdio clock divisor in probe function. The ext bus
-bit available in the same register will be used by mdio mux
-to enable external mdio.
+This patch set contains the usb support for Broadcom NSP SoC. The
+usb3 phy is internal to the SoC and is accessed through mdio interface.
+The mdio interface can be used to access either internal usb3 phy or
+external ethernet phy using a multiplexer.
 
-Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
----
- drivers/net/phy/mdio-bcm-iproc.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+The first patch provides the documentation details for usb3 phy. The
+second patch provides the changes to the mdio bus driver. The third
+patch provides the phy driver and fourth patch provides the enable
+method for usb.
 
-diff --git a/drivers/net/phy/mdio-bcm-iproc.c b/drivers/net/phy/mdio-bcm-iproc.c
-index c0b4e65..46fe1ae 100644
---- a/drivers/net/phy/mdio-bcm-iproc.c
-+++ b/drivers/net/phy/mdio-bcm-iproc.c
-@@ -81,8 +81,6 @@ static int iproc_mdio_read(struct mii_bus *bus, int phy_id, int reg)
- 	if (rc)
- 		return rc;
- 
--	iproc_mdio_config_clk(priv->base);
--
- 	/* Prepare the read operation */
- 	cmd = (MII_DATA_TA_VAL << MII_DATA_TA_SHIFT) |
- 		(reg << MII_DATA_RA_SHIFT) |
-@@ -112,8 +110,6 @@ static int iproc_mdio_write(struct mii_bus *bus, int phy_id,
- 	if (rc)
- 		return rc;
- 
--	iproc_mdio_config_clk(priv->base);
--
- 	/* Prepare the write operation */
- 	cmd = (MII_DATA_TA_VAL << MII_DATA_TA_SHIFT) |
- 		(reg << MII_DATA_RA_SHIFT) |
-@@ -163,6 +159,8 @@ static int iproc_mdio_probe(struct platform_device *pdev)
- 	bus->read = iproc_mdio_read;
- 	bus->write = iproc_mdio_write;
- 
-+	iproc_mdio_config_clk(priv->base);
-+
- 	rc = of_mdiobus_register(bus, pdev->dev.of_node);
- 	if (rc) {
- 		dev_err(&pdev->dev, "MDIO bus registration failed\n");
+This patch series has been tested on NSP bcm958625HR board.
+This patch series is based on v4.10.0-rc3 and is available from
+github-repo: https://github.com/Broadcom/cygnus-linux.git
+branch:nsp-usb-v2
+
+Changes in v2:
+* Remove separate nsp mux driver as suggested by Andrew Lunn
+* Addressed comments from Scott and Rob
+
+Yendapally Reddy Dhananjaya Reddy (4):
+  dt-bindings: phy: Add documentation for NSP USB3 PHY
+  net: phy: Initialize mdio clock at probe function
+  phy: Add USB3 PHY support for Broadcom NSP SoC
+  arm: dts: nsp: Add USB nodes to device tree
+
+ .../devicetree/bindings/phy/brcm,nsp-usb3-phy.txt  |  39 +++++
+ arch/arm/boot/dts/bcm-nsp.dtsi                     |  56 +++++++
+ arch/arm/boot/dts/bcm958625k.dts                   |  16 ++
+ drivers/net/phy/mdio-bcm-iproc.c                   |   6 +-
+ drivers/phy/Kconfig                                |   8 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-bcm-nsp-usb3.c                     | 176 +++++++++++++++++++++
+ 7 files changed, 298 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/brcm,nsp-usb3-phy.txt
+ create mode 100644 drivers/phy/phy-bcm-nsp-usb3.c
+
 -- 
 2.1.0
