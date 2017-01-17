@@ -1,96 +1,89 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 17 Jan 2017 21:50:03 +0100
-Subject: [PATCH 1/2] dt-bindings: gpu: Add Mali Utgard bindings
-In-Reply-To: <CAJKOXPe5AWTK+NuVpiObzjEG+CFWB5_AeYncNkbkSXRr+4RQUQ@mail.gmail.com>
-References: <20170116132424.7038-1-maxime.ripard@free-electrons.com>
- <20170116184906.r62di7xiil5lae33@kozik-lap>
- <20170117093813.mxp2hgoxbgske6ru@lukather>
- <4f5b8608-af6c-3ef5-aaf0-e7e034d006cd@baylibre.com>
- <CAJKOXPe5AWTK+NuVpiObzjEG+CFWB5_AeYncNkbkSXRr+4RQUQ@mail.gmail.com>
-Message-ID: <20170117205003.5vrwo4gnsdse2isk@lukather>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Tue, 17 Jan 2017 14:50:08 -0600
+Subject: [PATCH v13 5/7] arm64: pmu: Detect multiple generic PMUs and append
+ counter
+In-Reply-To: <1484686210-7211-1-git-send-email-jeremy.linton@arm.com>
+References: <1484686210-7211-1-git-send-email-jeremy.linton@arm.com>
+Message-ID: <1484686210-7211-6-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 01:33:57PM +0200, Krzysztof Kozlowski wrote:
-> On Tue, Jan 17, 2017 at 12:22 PM, Neil Armstrong
-> <narmstrong@baylibre.com> wrote:
-> > On 01/17/2017 10:38 AM, Maxime Ripard wrote:
-> >> Hi,
-> >>
-> >> On Mon, Jan 16, 2017 at 08:49:06PM +0200, Krzysztof Kozlowski wrote:
-> >>> On Mon, Jan 16, 2017 at 02:24:23PM +0100, Maxime Ripard wrote:
-> >>>> The ARM Mali Utgard GPU family is embedded into a number of SoCs from
-> >>>> Allwinner, Amlogic, Mediatek or Rockchip.
-> >>>>
-> >>>> Add a binding for the GPU of that family.
-> >>>>
-> >>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> >>>> ---
-> >>>>  .../devicetree/bindings/gpu/arm,mali-utgard.txt    | 76 ++++++++++++++++++++++
-> >>>>  1 file changed, 76 insertions(+)
-> >>>>  create mode 100644 Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-> >>>
-> >>> Do you have a driver in kernel which will implement these bindings?
-> >>
-> >> No, but we have bindings for out-of-tree drivers already.
-> >>
-> >>> Defining them for out-of-tree driver does not bring any benefits
-> >>> (3rd party driver will not respect them anyway).
-> >>
-> >> You could see it the other way around too. The out-of-tree drivers
-> >> don't respect it at the moment because there's no binding to respect.
-> >>
-> >> And at least for us, we definitely plan on doing that.
-> >>
-> >> Maxime
-> >
-> > Hi Maxime, Krzysztof,
-> >
-> > We hope this will be accepted so it will solve the same issue we have on Amlogic SoCs
-> > and all the other mali powered SoCs.
-> 
-> It will be helpful also for other SoCs using Mali 400 (e.g.
-> Exynos3250, Exynos4412).
+In heterogeneous CPU systems its likely that there are multiple
+PMU types. If a system is using the generic armv8_pmuv3 rather
+than a PMU with a hard-coded set of events then we want to uniquely
+identify each PMU in /sys. We do this by appending an "_x" to the
+pmu name. This then creates PMUs like, "armv8_pmuv3" and
+"armv8_pmuv3_1", "armv8_pmuv3_2" for a system with 3 PMU types.
 
-Yep, hence why you were in Cc :)
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+---
+ arch/arm64/kernel/perf_event.c |  2 +-
+ drivers/perf/arm_pmu.c         | 20 ++++++++++++++++++++
+ include/linux/perf/arm_pmu.h   |  1 +
+ 3 files changed, 22 insertions(+), 1 deletion(-)
 
-> > Having mainline bindings will forcre out-of-tree driver to respect those bindings
-> > and remove a dts out-of-tree patch aswell.
-> 
-> I would argue here over the word "force". Having bindings defined here
-> does not force anyone into anything. The out-of-tree can do whatever
-> they want. It is a wish from kernel side - it might be respected but
-> it might not.
-
-Well, that statement can be made for each line of the kernel itself,
-nothing forces you to use the code as is, or to make any kind of
-modifications, including to its ABI. You just have an incentive to
-respect the various frameworks and ABI because it's the path of least
-resistance and all the tools, libraries and applications already know
-how to use those interfaces.
-
-But that's just it, an incentive, that anyone is free or not to comply
-to.
-
-> Just to be sure - I am not opposed against. Some time ago I wanted
-> Mali400 to be upstreamed but with current policy about user-space side
-> it is not possible.
-
-While I would also very much like to see the kernel driver upstreamed,
-this is unreasonable at this point. But this patch is here only to add
-a binding to it, so that the out-of-tree drivers can comply to it, and
-this is something we already have done.
-
-Maxime
-
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index 57ae9d9..0fbd7ef 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -1002,7 +1002,7 @@ static void armv8_pmu_init(struct arm_pmu *cpu_pmu)
+ static int armv8_pmuv3_init(struct arm_pmu *cpu_pmu)
+ {
+ 	armv8_pmu_init(cpu_pmu);
+-	cpu_pmu->name			= "armv8_pmuv3";
++	cpu_pmu->name			= ARMV8_PMUV3_DESCRIPTION;
+ 	cpu_pmu->map_event		= armv8_pmuv3_map_event;
+ 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
+ 		&armv8_pmuv3_events_attr_group;
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index 37e241f..85566f6 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -1035,6 +1035,7 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ 			 const struct of_device_id *of_table,
+ 			 const struct pmu_probe_info *probe_table)
+ {
++	static int duplicate_pmus;
+ 	const struct of_device_id *of_id;
+ 	const int (*init_fn)(struct arm_pmu *);
+ 	struct device_node *node = pdev->dev.of_node;
+@@ -1075,6 +1076,25 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ 		goto out_free;
+ 	}
+ 
++	/*
++	 * if this pmu declaration is a generic pmu and we have
++	 * previously found a generic pmu on this platform
++	 * then append a PMU number to the pmu name. This avoids
++	 * changing the names of PMUs that are specific to a class
++	 * of CPUs. The assumption is that if we match a specific PMU
++	 * then it's unique, and another PMU in the system will match
++	 * a different entry rather than needing the _number to
++	 * assure its unique.
++	 */
++	if (!strcmp(pmu->name, ARMV8_PMUV3_DESCRIPTION)) {
++		if (duplicate_pmus) {
++			pmu->name = kasprintf(GFP_KERNEL, "%s_%d",
++					      pmu->name, duplicate_pmus);
++			if (!pmu->name)
++				goto out_free;
++		}
++		duplicate_pmus++;
++	}
+ 
+ 	ret = cpu_pmu_init(pmu);
+ 	if (ret)
+diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
+index df1ba55..42b5edb 100644
+--- a/include/linux/perf/arm_pmu.h
++++ b/include/linux/perf/arm_pmu.h
+@@ -161,6 +161,7 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ 			 const struct pmu_probe_info *probe_table);
+ 
+ #define ARMV8_PMU_PDEV_NAME "armv8-pmu"
++#define ARMV8_PMUV3_DESCRIPTION "armv8_pmuv3"
+ 
+ #endif /* CONFIG_ARM_PMU */
+ 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170117/9e0c63ec/attachment-0001.sig>
+2.5.5
