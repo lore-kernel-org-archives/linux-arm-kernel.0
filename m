@@ -1,20 +1,21 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 17 Jan 2017 18:03:59 +0100
-Subject: [PATCH v2 1/8] ARM: dts: armada-370-rd: Utilize new DSA binding
-In-Reply-To: <20170105192957.14304-2-f.fainelli@gmail.com>
+Date: Tue, 17 Jan 2017 18:05:55 +0100
+Subject: [PATCH v2 2/8] ARM: dts: armada-385-linksys: Utilize new DSA
+ binding
+In-Reply-To: <20170105192957.14304-3-f.fainelli@gmail.com>
 References: <20170105192957.14304-1-f.fainelli@gmail.com>
- <20170105192957.14304-2-f.fainelli@gmail.com>
-Message-ID: <20170117170359.GA9470@lunn.ch>
+ <20170105192957.14304-3-f.fainelli@gmail.com>
+Message-ID: <20170117170555.GB9470@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2017 at 11:29:50AM -0800, Florian Fainelli wrote:
+On Thu, Jan 05, 2017 at 11:29:51AM -0800, Florian Fainelli wrote:
 > Utilize the new DSA binding, introduced with commit 8c5ad1d6179d ("net: dsa:
 > Document new binding"). The legacy binding node is kept included, but is marked
 > disabled.
 > 
 > Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 
-Tested-by: Andrew Lunn <andrew@lunn.ch>
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
     Andrew
