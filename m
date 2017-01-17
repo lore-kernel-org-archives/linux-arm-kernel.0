@@ -1,20 +1,21 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 16 Jan 2017 22:25:30 -0800
-Subject: [GIT PULL 2/2] SoCFPGA DTS updates for v4.11, part 1
-In-Reply-To: <1484165237-26640-2-git-send-email-dinguyen@kernel.org>
-References: <1484165237-26640-1-git-send-email-dinguyen@kernel.org>
- <1484165237-26640-2-git-send-email-dinguyen@kernel.org>
-Message-ID: <20170117062530.GH16607@localhost>
+Date: Mon, 16 Jan 2017 22:26:11 -0800
+Subject: [GIT PULL] Ux500 PM fix from Arnd
+In-Reply-To: <CACRpkdbb5JkPW=1ObA8eAnyKJ5vmEWkHa4Wmv-qRQa2Vr2xjLQ@mail.gmail.com>
+References: <CACRpkdbb5JkPW=1ObA8eAnyKJ5vmEWkHa4Wmv-qRQa2Vr2xjLQ@mail.gmail.com>
+Message-ID: <20170117062611.GI16607@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2017 at 02:07:17PM -0600, Dinh Nguyen wrote:
-> Hi Arnd, Kevin, and Olof:
+On Thu, Jan 12, 2017 at 02:01:47PM +0100, Linus Walleij wrote:
+> Hi ARM SoC folks,
 > 
-> Please pull in these DTS updates for v4.11.
+> this was forgotten on my fixes branch, sorry. Please pull it
+> in for fixes in the ARM SoC tree.
 > 
-> Thanks,
-> Dinh
+> Yours,
+> Linus Walleij
+> 
 > 
 > The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 > 
@@ -22,21 +23,19 @@ On Wed, Jan 11, 2017 at 02:07:17PM -0600, Dinh Nguyen wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git tags/socfpga_dts_for_v4.11_part_1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+> tags/ux500-fix-for-armsoc
 > 
-> for you to fetch changes up to 7f0f5460d46867a8f980683136a054cff1357780:
+> for you to fetch changes up to f0e8faa7a5e894b0fc99d24be1b18685a92ea466:
 > 
->   ARM: dts: socfpga: add missing compatible string for SDRAM controller (2017-01-06 01:42:06 -0600)
+>   ARM: ux500: fix prcmu_is_cpu_in_wfi() calculation (2017-01-12 13:25:39 +0100)
 > 
 > ----------------------------------------------------------------
-> SoCFPGA DTS updates for v4.11, part 1
-> - Adds FPGA manager bits
-> - Enable I2C on Cyclone5 and Arria5 devkits
-> - Adds LED support on C5/A5 devkits
-> - Enables CAN on C5 devkit
-> - Enables watchdog
-> - Add NAND on Arria10
-> - Add the LTC2977 Power Monitor on Arria10 devkit
+> A single PM fix from Arnd
+> 
+> ----------------------------------------------------------------
+> Arnd Bergmann (1):
+>       ARM: ux500: fix prcmu_is_cpu_in_wfi() calculation
 
 Merged, thanks!
 
