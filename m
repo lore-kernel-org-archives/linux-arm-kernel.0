@@ -1,19 +1,18 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 17 Jan 2017 18:44:54 +0000
-Subject: Applied "ASoC: sun4i-i2s: Increase DMA max burst to 8" to the asoc
- tree
-In-Reply-To: <20170117140230.23142-2-mylene.josserand@free-electrons.com>
-Message-ID: <E1cTYkY-0008Ku-Kd@debutante>
+Date: Tue, 17 Jan 2017 18:46:20 +0000
+Subject: Applied "spi: pxa2xx: Factor out handle_bad_msg" to the spi tree
+In-Reply-To: <776c72d3de4b75ff0a8b91791740389950d8abe8.1484592296.git.jan.kiszka@siemens.com>
+Message-ID: <E1cTYlw-0000Vs-Kw@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: sun4i-i2s: Increase DMA max burst to 8
+   spi: pxa2xx: Factor out handle_bad_msg
 
-has been applied to the asoc tree at
+has been applied to the spi tree at
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
 
 All being well this means that it will be integrated into the linux-next
 tree (usually sometime in the next 24 hours) and sent to Linus during
@@ -34,48 +33,67 @@ to this mail.
 Thanks,
 Mark
 
->From ebad64d19377957976963f99ce1fcf2f09796357 Mon Sep 17 00:00:00 2001
-From: =?UTF-8?q?Myl=C3=A8ne=20Josserand?=
- <mylene.josserand@free-electrons.com>
-Date: Tue, 17 Jan 2017 15:02:21 +0100
-Subject: [PATCH] ASoC: sun4i-i2s: Increase DMA max burst to 8
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
+>From b03124825b8612bf371e5b4ccc2cd812ed3c2dbb Mon Sep 17 00:00:00 2001
+From: Jan Kiszka <jan.kiszka@siemens.com>
+Date: Mon, 16 Jan 2017 19:44:54 +0100
+Subject: [PATCH] spi: pxa2xx: Factor out handle_bad_msg
 
-As done previously for sun4i-codec, the DMA maxburst of 4
-is not supported by every SoCs so the DMA controller engine
-returns "unsupported value".
+As suggested by Andy Shevchenko: Decouple this corner cause from the
+general handling logic in ssp_int.
 
-As a maxburst of 8 is supported by all variants, this patch
-increases it to 8.
-
-For more details, see commit from Chen-Yu Tsai:
-commit 730e2dd0cbc7 ("ASoC: sun4i-codec: Increase DMA max burst to 8")
-
-Signed-off-by: Myl??ne Josserand <mylene.josserand@free-electrons.com>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+Reviewed-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/sunxi/sun4i-i2s.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/spi/spi-pxa2xx.c | 29 +++++++++++++++--------------
+ 1 file changed, 15 insertions(+), 14 deletions(-)
 
-diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
-index f24d19526603..4237323ef594 100644
---- a/sound/soc/sunxi/sun4i-i2s.c
-+++ b/sound/soc/sunxi/sun4i-i2s.c
-@@ -694,10 +694,10 @@ static int sun4i_i2s_probe(struct platform_device *pdev)
+diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
+index d6239fa718be..8c65bc1823f3 100644
+--- a/drivers/spi/spi-pxa2xx.c
++++ b/drivers/spi/spi-pxa2xx.c
+@@ -732,6 +732,20 @@ static irqreturn_t interrupt_transfer(struct driver_data *drv_data)
+ 	return IRQ_HANDLED;
+ }
+ 
++static void handle_bad_msg(struct driver_data *drv_data)
++{
++	pxa2xx_spi_write(drv_data, SSCR0,
++			 pxa2xx_spi_read(drv_data, SSCR0) & ~SSCR0_SSE);
++	pxa2xx_spi_write(drv_data, SSCR1,
++			 pxa2xx_spi_read(drv_data, SSCR1) & ~drv_data->int_cr1);
++	if (!pxa25x_ssp_comp(drv_data))
++		pxa2xx_spi_write(drv_data, SSTO, 0);
++	write_SSSR_CS(drv_data, drv_data->clear_sr);
++
++	dev_err(&drv_data->pdev->dev,
++		"bad message state in interrupt handler\n");
++}
++
+ static irqreturn_t ssp_int(int irq, void *dev_id)
+ {
+ 	struct driver_data *drv_data = dev_id;
+@@ -772,20 +786,7 @@ static irqreturn_t ssp_int(int irq, void *dev_id)
+ 		return IRQ_NONE;
+ 
+ 	if (!drv_data->master->cur_msg) {
+-
+-		pxa2xx_spi_write(drv_data, SSCR0,
+-				 pxa2xx_spi_read(drv_data, SSCR0)
+-				 & ~SSCR0_SSE);
+-		pxa2xx_spi_write(drv_data, SSCR1,
+-				 pxa2xx_spi_read(drv_data, SSCR1)
+-				 & ~drv_data->int_cr1);
+-		if (!pxa25x_ssp_comp(drv_data))
+-			pxa2xx_spi_write(drv_data, SSTO, 0);
+-		write_SSSR_CS(drv_data, drv_data->clear_sr);
+-
+-		dev_err(&drv_data->pdev->dev,
+-			"bad message state in interrupt handler\n");
+-
++		handle_bad_msg(drv_data);
+ 		/* Never fail */
+ 		return IRQ_HANDLED;
  	}
- 	
- 	i2s->playback_dma_data.addr = res->start + SUN4I_I2S_FIFO_TX_REG;
--	i2s->playback_dma_data.maxburst = 4;
-+	i2s->playback_dma_data.maxburst = 8;
- 
- 	i2s->capture_dma_data.addr = res->start + SUN4I_I2S_FIFO_RX_REG;
--	i2s->capture_dma_data.maxburst = 4;
-+	i2s->capture_dma_data.maxburst = 8;
- 
- 	pm_runtime_enable(&pdev->dev);
- 	if (!pm_runtime_enabled(&pdev->dev)) {
 -- 
 2.11.0
