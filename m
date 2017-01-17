@@ -1,67 +1,66 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 17 Jan 2017 10:20:25 +0000
-Subject: [RFC PATCH 04/33] irqchip/gic-v3-its: Move LPI definitions around
+Date: Tue, 17 Jan 2017 10:20:31 +0000
+Subject: [RFC PATCH 10/33] irqchip/gic-v4-its: Allow use of indirect VCPU
+ tables
 In-Reply-To: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
 References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1484648454-21216-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1484648454-21216-11-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The various LPI definitions are in the middle of the code, and
-would be better placed at the beginning, given that we're going
-to use some of them much earlier.
+The VCPU tables can be quite sparse as well, and it makes sense
+to use indirect tables as well if possible.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 27 +++++++++++++++------------
- 1 file changed, 15 insertions(+), 12 deletions(-)
+ drivers/irqchip/irq-gic-v3-its.c | 20 +++++++++++++-------
+ 1 file changed, 13 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 49b681e..2ca27f6 100644
+index c92ff4d..14305db1 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -49,6 +49,21 @@
- #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
- 
- /*
-+ * We allocate 64kB for PROPBASE. That gives us@most 64K LPIs to
-+ * deal with (one configuration byte per interrupt). PENDBASE has to
-+ * be 64kB aligned (one bit per LPI, plus 8192 bits for SPI/PPI/SGI).
-+ */
-+#define LPI_PROPBASE_SZ		SZ_64K
-+#define LPI_PENDBASE_SZ		(LPI_PROPBASE_SZ / 8 + SZ_1K)
-+
-+/*
-+ * This is how many bits of ID we need, including the useless ones.
-+ */
-+#define LPI_NRBITS		ilog2(LPI_PROPBASE_SZ + SZ_8K)
-+
-+#define LPI_PROP_DEFAULT_PRIO	0xa0
-+
-+/*
-  * Collection structure - just an ID, and a redistributor address to
-  * ping. We use one per CPU as a bag of interrupts assigned to this
-  * CPU.
-@@ -779,20 +794,8 @@ static void its_lpi_free(struct event_lpi_map *map)
- 	kfree(map->col_map);
+@@ -1060,10 +1060,13 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+ 	return 0;
  }
  
--/*
-- * We allocate 64kB for PROPBASE. That gives us at most 64K LPIs to
-- * deal with (one configuration byte per interrupt). PENDBASE has to
-- * be 64kB aligned (one bit per LPI, plus 8192 bits for SPI/PPI/SGI).
-- */
--#define LPI_PROPBASE_SZ		SZ_64K
--#define LPI_PENDBASE_SZ		(LPI_PROPBASE_SZ / 8 + SZ_1K)
- 
--/*
-- * This is how many bits of ID we need, including the useless ones.
-- */
--#define LPI_NRBITS		ilog2(LPI_PROPBASE_SZ + SZ_8K)
- 
--#define LPI_PROP_DEFAULT_PRIO	0xa0
- 
- static int __init its_alloc_lpi_tables(void)
+-static bool its_parse_baser_device(struct its_node *its, struct its_baser *baser,
+-				   u32 psz, u32 *order)
++static bool its_parse_indirect_baser(struct its_node *its,
++				     struct its_baser *baser,
++				     u32 psz, u32 *order)
  {
+-	u64 esz = GITS_BASER_ENTRY_SIZE(its_read_baser(its, baser));
++	u64 tmp = its_read_baser(its, baser);
++	u64 type = GITS_BASER_TYPE(tmp);
++	u64 esz = GITS_BASER_ENTRY_SIZE(tmp);
+ 	u64 val = GITS_BASER_InnerShareable | GITS_BASER_WaWb;
+ 	u32 ids = its->device_ids;
+ 	u32 new_order = *order;
+@@ -1102,8 +1105,9 @@ static bool its_parse_baser_device(struct its_node *its, struct its_baser *baser
+ 	if (new_order >= MAX_ORDER) {
+ 		new_order = MAX_ORDER - 1;
+ 		ids = ilog2(PAGE_ORDER_TO_SIZE(new_order) / (int)esz);
+-		pr_warn("ITS@%pa: Device Table too large, reduce ids %u->%u\n",
+-			&its->phys_base, its->device_ids, ids);
++		pr_warn("ITS@%pa: %s Table too large, reduce ids %u->%u\n",
++			&its->phys_base, its_base_type_string[type],
++			its->device_ids, ids);
+ 	}
+ 
+ 	*order = new_order;
+@@ -1154,8 +1158,10 @@ static int its_alloc_tables(struct its_node *its)
+ 		if (type == GITS_BASER_TYPE_NONE)
+ 			continue;
+ 
+-		if (type == GITS_BASER_TYPE_DEVICE)
+-			indirect = its_parse_baser_device(its, baser, psz, &order);
++		if (type == GITS_BASER_TYPE_DEVICE ||
++		    type == GITS_BASER_TYPE_VCPU)
++			indirect = its_parse_indirect_baser(its, baser,
++							    psz, &order);
+ 
+ 		err = its_setup_baser(its, baser, cache, shr, psz, order, indirect);
+ 		if (err < 0) {
 -- 
 2.1.4
