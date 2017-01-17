@@ -1,54 +1,245 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 17 Jan 2017 13:08:48 +0100
-Subject: [PATCH] clk: meson-gxbb: Export HDMI clocks
-Message-ID: <1484654928-5640-1-git-send-email-narmstrong@baylibre.com>
+From: tnowicki@caviumnetworks.com (Tomasz Nowicki)
+Date: Tue, 17 Jan 2017 13:08:47 +0100
+Subject: [PATCH v8 02/18] iommu: Rename iommu_dm_regions into
+ iommu_resv_regions
+In-Reply-To: <1484127714-3263-3-git-send-email-eric.auger@redhat.com>
+References: <1484127714-3263-1-git-send-email-eric.auger@redhat.com>
+ <1484127714-3263-3-git-send-email-eric.auger@redhat.com>
+Message-ID: <0280061d-4973-0864-07b0-06e8d7e765fe@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Export HDMI clock from internal to dt-bindings.
+On 11.01.2017 10:41, Eric Auger wrote:
+> We want to extend the callbacks used for dm regions and
+> use them for reserved regions. Reserved regions can be
+> - directly mapped regions
+> - regions that cannot be iommu mapped (PCI host bridge windows, ...)
+> - MSI regions (because they belong to another address space or because
+>   they are not translated by the IOMMU and need special handling)
+>
+> So let's rename the struct and also the callbacks.
+>
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> Acked-by: Robin Murphy <robin.murphy@arm.com>
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- drivers/clk/meson/gxbb.h              | 4 ++--
- include/dt-bindings/clock/gxbb-clkc.h | 2 ++
- 2 files changed, 4 insertions(+), 2 deletions(-)
+Reviewed-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
 
-diff --git a/drivers/clk/meson/gxbb.h b/drivers/clk/meson/gxbb.h
-index 0252939..2139e97 100644
---- a/drivers/clk/meson/gxbb.h
-+++ b/drivers/clk/meson/gxbb.h
-@@ -231,7 +231,7 @@
- #define CLKID_AHB_DATA_BUS	  60
- #define CLKID_AHB_CTRL_BUS	  61
- #define CLKID_HDMI_INTR_SYNC	  62
--#define CLKID_HDMI_PCLK		  63
-+/* CLKID_HDMI_PCLK */
- /* CLKID_USB1_DDR_BRIDGE */
- /* CLKID_USB0_DDR_BRIDGE */
- #define CLKID_MMC_PCLK		  66
-@@ -245,7 +245,7 @@
- #define CLKID_VCLK2_VENCI1	  74
- #define CLKID_VCLK2_VENCP0	  75
- #define CLKID_VCLK2_VENCP1	  76
--#define CLKID_GCLK_VENCI_INT0	  77
-+/* CLKID_GCLK_VENCI_INT0 */
- #define CLKID_GCLK_VENCI_INT	  78
- #define CLKID_DAC_CLK		  79
- #define CLKID_AOCLK_GATE	  80
-diff --git a/include/dt-bindings/clock/gxbb-clkc.h b/include/dt-bindings/clock/gxbb-clkc.h
-index baade6f..da1d473 100644
---- a/include/dt-bindings/clock/gxbb-clkc.h
-+++ b/include/dt-bindings/clock/gxbb-clkc.h
-@@ -18,8 +18,10 @@
- #define CLKID_USB0		50
- #define CLKID_USB1		51
- #define CLKID_USB		55
-+#define CLKID_HDMI_PCLK		63
- #define CLKID_USB1_DDR_BRIDGE	64
- #define CLKID_USB0_DDR_BRIDGE	65
-+#define CLKID_GCLK_VENCI_INT0	77
- #define CLKID_AO_I2C		93
- #define CLKID_SD_EMMC_A		94
- #define CLKID_SD_EMMC_B		95
--- 
-1.9.1
+Thanks,
+Tomasz
+
+>
+> ---
+>
+> v3 -> v4:
+> - add Robin's A-b
+> ---
+>  drivers/iommu/amd_iommu.c | 20 ++++++++++----------
+>  drivers/iommu/iommu.c     | 22 +++++++++++-----------
+>  include/linux/iommu.h     | 29 +++++++++++++++--------------
+>  3 files changed, 36 insertions(+), 35 deletions(-)
+>
+> diff --git a/drivers/iommu/amd_iommu.c b/drivers/iommu/amd_iommu.c
+> index 3ef0f42..f7a024f 100644
+> --- a/drivers/iommu/amd_iommu.c
+> +++ b/drivers/iommu/amd_iommu.c
+> @@ -3161,8 +3161,8 @@ static bool amd_iommu_capable(enum iommu_cap cap)
+>  	return false;
+>  }
+>
+> -static void amd_iommu_get_dm_regions(struct device *dev,
+> -				     struct list_head *head)
+> +static void amd_iommu_get_resv_regions(struct device *dev,
+> +				       struct list_head *head)
+>  {
+>  	struct unity_map_entry *entry;
+>  	int devid;
+> @@ -3172,7 +3172,7 @@ static void amd_iommu_get_dm_regions(struct device *dev,
+>  		return;
+>
+>  	list_for_each_entry(entry, &amd_iommu_unity_map, list) {
+> -		struct iommu_dm_region *region;
+> +		struct iommu_resv_region *region;
+>
+>  		if (devid < entry->devid_start || devid > entry->devid_end)
+>  			continue;
+> @@ -3195,18 +3195,18 @@ static void amd_iommu_get_dm_regions(struct device *dev,
+>  	}
+>  }
+>
+> -static void amd_iommu_put_dm_regions(struct device *dev,
+> +static void amd_iommu_put_resv_regions(struct device *dev,
+>  				     struct list_head *head)
+>  {
+> -	struct iommu_dm_region *entry, *next;
+> +	struct iommu_resv_region *entry, *next;
+>
+>  	list_for_each_entry_safe(entry, next, head, list)
+>  		kfree(entry);
+>  }
+>
+> -static void amd_iommu_apply_dm_region(struct device *dev,
+> +static void amd_iommu_apply_resv_region(struct device *dev,
+>  				      struct iommu_domain *domain,
+> -				      struct iommu_dm_region *region)
+> +				      struct iommu_resv_region *region)
+>  {
+>  	struct dma_ops_domain *dma_dom = to_dma_ops_domain(to_pdomain(domain));
+>  	unsigned long start, end;
+> @@ -3230,9 +3230,9 @@ static void amd_iommu_apply_dm_region(struct device *dev,
+>  	.add_device = amd_iommu_add_device,
+>  	.remove_device = amd_iommu_remove_device,
+>  	.device_group = amd_iommu_device_group,
+> -	.get_dm_regions = amd_iommu_get_dm_regions,
+> -	.put_dm_regions = amd_iommu_put_dm_regions,
+> -	.apply_dm_region = amd_iommu_apply_dm_region,
+> +	.get_resv_regions = amd_iommu_get_resv_regions,
+> +	.put_resv_regions = amd_iommu_put_resv_regions,
+> +	.apply_resv_region = amd_iommu_apply_resv_region,
+>  	.pgsize_bitmap	= AMD_IOMMU_PGSIZES,
+>  };
+>
+> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+> index dbe7f65..1cee5c3 100644
+> --- a/drivers/iommu/iommu.c
+> +++ b/drivers/iommu/iommu.c
+> @@ -318,7 +318,7 @@ static int iommu_group_create_direct_mappings(struct iommu_group *group,
+>  					      struct device *dev)
+>  {
+>  	struct iommu_domain *domain = group->default_domain;
+> -	struct iommu_dm_region *entry;
+> +	struct iommu_resv_region *entry;
+>  	struct list_head mappings;
+>  	unsigned long pg_size;
+>  	int ret = 0;
+> @@ -331,14 +331,14 @@ static int iommu_group_create_direct_mappings(struct iommu_group *group,
+>  	pg_size = 1UL << __ffs(domain->pgsize_bitmap);
+>  	INIT_LIST_HEAD(&mappings);
+>
+> -	iommu_get_dm_regions(dev, &mappings);
+> +	iommu_get_resv_regions(dev, &mappings);
+>
+>  	/* We need to consider overlapping regions for different devices */
+>  	list_for_each_entry(entry, &mappings, list) {
+>  		dma_addr_t start, end, addr;
+>
+> -		if (domain->ops->apply_dm_region)
+> -			domain->ops->apply_dm_region(dev, domain, entry);
+> +		if (domain->ops->apply_resv_region)
+> +			domain->ops->apply_resv_region(dev, domain, entry);
+>
+>  		start = ALIGN(entry->start, pg_size);
+>  		end   = ALIGN(entry->start + entry->length, pg_size);
+> @@ -358,7 +358,7 @@ static int iommu_group_create_direct_mappings(struct iommu_group *group,
+>  	}
+>
+>  out:
+> -	iommu_put_dm_regions(dev, &mappings);
+> +	iommu_put_resv_regions(dev, &mappings);
+>
+>  	return ret;
+>  }
+> @@ -1559,20 +1559,20 @@ int iommu_domain_set_attr(struct iommu_domain *domain,
+>  }
+>  EXPORT_SYMBOL_GPL(iommu_domain_set_attr);
+>
+> -void iommu_get_dm_regions(struct device *dev, struct list_head *list)
+> +void iommu_get_resv_regions(struct device *dev, struct list_head *list)
+>  {
+>  	const struct iommu_ops *ops = dev->bus->iommu_ops;
+>
+> -	if (ops && ops->get_dm_regions)
+> -		ops->get_dm_regions(dev, list);
+> +	if (ops && ops->get_resv_regions)
+> +		ops->get_resv_regions(dev, list);
+>  }
+>
+> -void iommu_put_dm_regions(struct device *dev, struct list_head *list)
+> +void iommu_put_resv_regions(struct device *dev, struct list_head *list)
+>  {
+>  	const struct iommu_ops *ops = dev->bus->iommu_ops;
+>
+> -	if (ops && ops->put_dm_regions)
+> -		ops->put_dm_regions(dev, list);
+> +	if (ops && ops->put_resv_regions)
+> +		ops->put_resv_regions(dev, list);
+>  }
+>
+>  /* Request that a device is direct mapped by the IOMMU */
+> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+> index 0ff5111..bfecb8b 100644
+> --- a/include/linux/iommu.h
+> +++ b/include/linux/iommu.h
+> @@ -118,13 +118,13 @@ enum iommu_attr {
+>  };
+>
+>  /**
+> - * struct iommu_dm_region - descriptor for a direct mapped memory region
+> + * struct iommu_resv_region - descriptor for a reserved memory region
+>   * @list: Linked list pointers
+>   * @start: System physical start address of the region
+>   * @length: Length of the region in bytes
+>   * @prot: IOMMU Protection flags (READ/WRITE/...)
+>   */
+> -struct iommu_dm_region {
+> +struct iommu_resv_region {
+>  	struct list_head	list;
+>  	phys_addr_t		start;
+>  	size_t			length;
+> @@ -150,9 +150,9 @@ struct iommu_dm_region {
+>   * @device_group: find iommu group for a particular device
+>   * @domain_get_attr: Query domain attributes
+>   * @domain_set_attr: Change domain attributes
+> - * @get_dm_regions: Request list of direct mapping requirements for a device
+> - * @put_dm_regions: Free list of direct mapping requirements for a device
+> - * @apply_dm_region: Temporary helper call-back for iova reserved ranges
+> + * @get_resv_regions: Request list of reserved regions for a device
+> + * @put_resv_regions: Free list of reserved regions for a device
+> + * @apply_resv_region: Temporary helper call-back for iova reserved ranges
+>   * @domain_window_enable: Configure and enable a particular window for a domain
+>   * @domain_window_disable: Disable a particular window for a domain
+>   * @domain_set_windows: Set the number of windows for a domain
+> @@ -184,11 +184,12 @@ struct iommu_ops {
+>  	int (*domain_set_attr)(struct iommu_domain *domain,
+>  			       enum iommu_attr attr, void *data);
+>
+> -	/* Request/Free a list of direct mapping requirements for a device */
+> -	void (*get_dm_regions)(struct device *dev, struct list_head *list);
+> -	void (*put_dm_regions)(struct device *dev, struct list_head *list);
+> -	void (*apply_dm_region)(struct device *dev, struct iommu_domain *domain,
+> -				struct iommu_dm_region *region);
+> +	/* Request/Free a list of reserved regions for a device */
+> +	void (*get_resv_regions)(struct device *dev, struct list_head *list);
+> +	void (*put_resv_regions)(struct device *dev, struct list_head *list);
+> +	void (*apply_resv_region)(struct device *dev,
+> +				  struct iommu_domain *domain,
+> +				  struct iommu_resv_region *region);
+>
+>  	/* Window handling functions */
+>  	int (*domain_window_enable)(struct iommu_domain *domain, u32 wnd_nr,
+> @@ -233,8 +234,8 @@ extern size_t default_iommu_map_sg(struct iommu_domain *domain, unsigned long io
+>  extern void iommu_set_fault_handler(struct iommu_domain *domain,
+>  			iommu_fault_handler_t handler, void *token);
+>
+> -extern void iommu_get_dm_regions(struct device *dev, struct list_head *list);
+> -extern void iommu_put_dm_regions(struct device *dev, struct list_head *list);
+> +extern void iommu_get_resv_regions(struct device *dev, struct list_head *list);
+> +extern void iommu_put_resv_regions(struct device *dev, struct list_head *list);
+>  extern int iommu_request_dm_for_dev(struct device *dev);
+>
+>  extern int iommu_attach_group(struct iommu_domain *domain,
+> @@ -443,12 +444,12 @@ static inline void iommu_set_fault_handler(struct iommu_domain *domain,
+>  {
+>  }
+>
+> -static inline void iommu_get_dm_regions(struct device *dev,
+> +static inline void iommu_get_resv_regions(struct device *dev,
+>  					struct list_head *list)
+>  {
+>  }
+>
+> -static inline void iommu_put_dm_regions(struct device *dev,
+> +static inline void iommu_put_resv_regions(struct device *dev,
+>  					struct list_head *list)
+>  {
+>  }
+>
