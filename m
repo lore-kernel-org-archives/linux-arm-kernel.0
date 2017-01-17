@@ -1,70 +1,37 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 17 Jan 2017 18:04:47 +0000
-Subject: [PATCH] ARM: LPAE: catch pending imprecise abort on unmask
-In-Reply-To: <20170117174210.28122-1-alexander.sverdlin@nokia.com>
-References: <20170117174210.28122-1-alexander.sverdlin@nokia.com>
-Message-ID: <20170117180446.GF27312@n2100.armlinux.org.uk>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 17 Jan 2017 10:06:27 -0800
+Subject: [PATCH v7 2/3] input: tm2-touchkey: Add touchkey driver support
+ for TM2
+In-Reply-To: <20170117172047.47535bj5xd6toayu@kozik-lap>
+References: <1484632479-3111-1-git-send-email-jcsing.lee@samsung.com>
+ <CGME20170117055444epcas1p47b0b0a0ae3260b22fa61d2b92362050b@epcas1p4.samsung.com>
+ <1484632479-3111-3-git-send-email-jcsing.lee@samsung.com>
+ <20170117172047.47535bj5xd6toayu@kozik-lap>
+Message-ID: <CAKdAkRQij9VuG1mguE0FwQMKuHrnyLAZJxOtkoR97uuX+ZBmLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 06:42:10PM +0100, Alexander Sverdlin wrote:
-> Asynchronous external abort is coded differently in DFSR with LPAE enabled.
-> 
-> Fixes: 9254970c "ARM: 8447/1: catch pending imprecise abort on unmask".
+On Tue, Jan 17, 2017 at 9:20 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> On Tue, Jan 17, 2017 at 02:54:38PM +0900, Jaechul Lee wrote:
+>> This patch adds support for the TM2 touch key and led
+>> functionality.
+>>
+>> The driver interfaces with userspace through an input device and
+>> reports KEY_PHONE and KEY_BACK event types. LED brightness can be
+>> controlled by "/sys/class/leds/tm2-touchkey/brightness".
+>>
+>> Signed-off-by: Beomho Seo <beomho.seo@samsung.com>
+>> Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
+>> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>> Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
+>> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+>> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+>
+> This looks unusual. How did Dmitry's Sob end here?
 
-Please drop it into the patch system, thanks.
-
-> 
-> Signed-off-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
-> Cc: Russell King <linux@armlinux.org.uk>
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  arch/arm/mm/fault.c | 4 ++--
->  arch/arm/mm/fault.h | 4 ++++
->  2 files changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-> index 3a2e678b8d30..0122ad1a6027 100644
-> --- a/arch/arm/mm/fault.c
-> +++ b/arch/arm/mm/fault.c
-> @@ -610,9 +610,9 @@ static int __init early_abort_handler(unsigned long addr, unsigned int fsr,
->  
->  void __init early_abt_enable(void)
->  {
-> -	fsr_info[22].fn = early_abort_handler;
-> +	fsr_info[FSR_FS_AEA].fn = early_abort_handler;
->  	local_abt_enable();
-> -	fsr_info[22].fn = do_bad;
-> +	fsr_info[FSR_FS_AEA].fn = do_bad;
->  }
->  
->  #ifndef CONFIG_ARM_LPAE
-> diff --git a/arch/arm/mm/fault.h b/arch/arm/mm/fault.h
-> index 67532f242271..afc1f84e763b 100644
-> --- a/arch/arm/mm/fault.h
-> +++ b/arch/arm/mm/fault.h
-> @@ -11,11 +11,15 @@
->  #define FSR_FS5_0		(0x3f)
->  
->  #ifdef CONFIG_ARM_LPAE
-> +#define FSR_FS_AEA		17
-> +
->  static inline int fsr_fs(unsigned int fsr)
->  {
->  	return fsr & FSR_FS5_0;
->  }
->  #else
-> +#define FSR_FS_AEA		22
-> +
->  static inline int fsr_fs(unsigned int fsr)
->  {
->  	return (fsr & FSR_FS3_0) | (fsr & FSR_FS4) >> 6;
-> -- 
-> 2.11.0
-> 
+I sent Jaechul a version of the patch to try out.
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Dmitry
