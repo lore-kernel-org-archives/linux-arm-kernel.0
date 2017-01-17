@@ -1,21 +1,25 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 17 Jan 2017 17:47:22 +0100
-Subject: [PATCH v2 04/10] ASoC: sun4i-i2s: Add quirks to handle new
- compatible for reset
-In-Reply-To: <20170117140230.23142-5-mylene.josserand@free-electrons.com>
+Date: Tue, 17 Jan 2017 17:49:04 +0100
+Subject: [PATCH v2 06/10] ASoC: sun8i-codec-analog: Add amplifier event
+ to fix first delay
+In-Reply-To: <20170117140230.23142-7-mylene.josserand@free-electrons.com>
 References: <20170117140230.23142-1-mylene.josserand@free-electrons.com>
- <20170117140230.23142-5-mylene.josserand@free-electrons.com>
-Message-ID: <20170117164722.yohrxvlempkjldu3@lukather>
+ <20170117140230.23142-7-mylene.josserand@free-electrons.com>
+Message-ID: <20170117164904.c22f7tmtu67l23dd@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 03:02:24PM +0100, Myl?ne Josserand wrote:
-> Some SoCs have a reset line that must be asserted/deasserted.
-> This patch adds a quirk to handle the new compatible
-> "allwinner,sun6i-a31-i2s" which will deassert the reset
-> line on probe function and assert it on remove's one.
+On Tue, Jan 17, 2017 at 03:02:26PM +0100, Myl?ne Josserand wrote:
+> When playing a sound for the first time, a short delay, where the audio
+> file is not played, can be noticed.
+> On a second play (right after), the sound is played correctly.
+> If we wait a short time (~5 sec which corresponds to the aplay
+> timeout), the delay is back.
 > 
-> This new compatible is useful in case of A33 codec driver, for example.
+> This patch fixes it by using an event on headphone amplifier.
+> It allows to keep the amplifier enable while playing a sound.
+> A delay of 700ms allows to wait that the amplifier is powered-up
+> before playing the sound.
 > 
 > Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
 
@@ -34,4 +38,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170117/ba3a4f3a/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170117/b6afa6d0/attachment.sig>
