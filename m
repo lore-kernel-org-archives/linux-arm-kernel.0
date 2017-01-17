@@ -1,66 +1,111 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 17 Jan 2017 13:33:57 +0200
-Subject: [PATCH 1/2] dt-bindings: gpu: Add Mali Utgard bindings
-In-Reply-To: <4f5b8608-af6c-3ef5-aaf0-e7e034d006cd@baylibre.com>
-References: <20170116132424.7038-1-maxime.ripard@free-electrons.com>
- <20170116184906.r62di7xiil5lae33@kozik-lap>
- <20170117093813.mxp2hgoxbgske6ru@lukather>
- <4f5b8608-af6c-3ef5-aaf0-e7e034d006cd@baylibre.com>
-Message-ID: <CAJKOXPe5AWTK+NuVpiObzjEG+CFWB5_AeYncNkbkSXRr+4RQUQ@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 17 Jan 2017 11:37:57 +0000
+Subject: [PATCH v3 2/3] arm64: dts: juno: fix CoreSight support for Juno
+ r1/r2 variants
+In-Reply-To: <CAOesGMj_23cehRP0ftdM_+Wvuj3tUWi5T5+w5z5v62zfkLu9+w@mail.gmail.com>
+References: <1484234410-7670-1-git-send-email-sudeep.holla@arm.com>
+ <1484234410-7670-3-git-send-email-sudeep.holla@arm.com>
+ <CAOesGMj_23cehRP0ftdM_+Wvuj3tUWi5T5+w5z5v62zfkLu9+w@mail.gmail.com>
+Message-ID: <ae9edbff-b315-7709-84e7-d72bc6394a4e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 12:22 PM, Neil Armstrong
-<narmstrong@baylibre.com> wrote:
-> On 01/17/2017 10:38 AM, Maxime Ripard wrote:
->> Hi,
->>
->> On Mon, Jan 16, 2017 at 08:49:06PM +0200, Krzysztof Kozlowski wrote:
->>> On Mon, Jan 16, 2017 at 02:24:23PM +0100, Maxime Ripard wrote:
->>>> The ARM Mali Utgard GPU family is embedded into a number of SoCs from
->>>> Allwinner, Amlogic, Mediatek or Rockchip.
->>>>
->>>> Add a binding for the GPU of that family.
->>>>
->>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->>>> ---
->>>>  .../devicetree/bindings/gpu/arm,mali-utgard.txt    | 76 ++++++++++++++++++++++
->>>>  1 file changed, 76 insertions(+)
->>>>  create mode 100644 Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
->>>
->>> Do you have a driver in kernel which will implement these bindings?
->>
->> No, but we have bindings for out-of-tree drivers already.
->>
->>> Defining them for out-of-tree driver does not bring any benefits
->>> (3rd party driver will not respect them anyway).
->>
->> You could see it the other way around too. The out-of-tree drivers
->> don't respect it at the moment because there's no binding to respect.
->>
->> And at least for us, we definitely plan on doing that.
->>
->> Maxime
->
-> Hi Maxime, Krzysztof,
->
-> We hope this will be accepted so it will solve the same issue we have on Amlogic SoCs
-> and all the other mali powered SoCs.
 
-It will be helpful also for other SoCs using Mali 400 (e.g.
-Exynos3250, Exynos4412).
 
-> Having mainline bindings will forcre out-of-tree driver to respect those bindings
-> and remove a dts out-of-tree patch aswell.
+On 17/01/17 06:58, Olof Johansson wrote:
+> Hi,
+> 
+> On Thu, Jan 12, 2017 at 7:20 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>> From: Mike Leach <mike.leach@linaro.org>
+>>
+>> The CoreSight support added for Juno is valid for only Juno r0.
+>> The Juno r1 and r2 variants have additional components and alternative
+>> connection routes between trace source and sinks.
+>>
+>> This patch builds on top of the existing r0 support and extends it to
+>> Juno r1/r2 variants.
+>>
+>> Signed-off-by: Mike Leach <mike.leach@linaro.org>
+>> [sudeep.holla at arm.com: minor changelog update and reorganising the common
+>>         coresight components back into juno-base.dtsi to avoid duplication]
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>> ---
+>>  arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi | 102 ++++++++++++++++++++++++++++++
+>>  arch/arm64/boot/dts/arm/juno-r1.dts       |   9 +++
+>>  arch/arm64/boot/dts/arm/juno-r2.dts       |   9 +++
+>>  3 files changed, 120 insertions(+)
+>>  create mode 100644 arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+>>
+>> diff --git a/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+>> new file mode 100644
+>> index 000000000000..89fcef366ff9
+>> --- /dev/null
+>> +++ b/arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+>> @@ -0,0 +1,102 @@
+>> +       csys1_funnel at 20130000 {
+>> +               compatible = "arm,coresight-funnel", "arm,primecell";
+>> +               reg = <0 0x20130000 0 0x1000>;
+>> +
+>> +               clocks = <&soc_smc50mhz>;
+>> +               clock-names = "apb_pclk";
+>> +               power-domains = <&scpi_devpd 0>;
+>> +               ports {
+>> +                       #address-cells = <1>;
+>> +                       #size-cells = <0>;
+>> +
+>> +                       /* input port */
+>> +                       port at 0 {
+>> +                               reg = <0>;
+>> +                               csys1_funnel_out_port: endpoint {
+>> +                                       remote-endpoint =
+>> +                                               <&etf1_in_port>;
+>> +                               };
+>> +                       };
+>> +
+>> +                       /* output port */
+>> +                       port at 1 {
+>> +                               reg = <0>;
+>> +                               csys1_funnel_in_port0: endpoint {
+>> +                                       slave-mode;
+>> +                               };
+>> +                       };
+>> +
+>> +               };
+>> +       };
+>> +
+>> +       etf1 at 20140000 {
+> 
+> The concept behind device-tree is that you name the nodes based on the
+> type of device they are. "i2c", "ethernet", etc. Not "eth0", "i2c3",
+> and so on.
+> 
+> So, this should probably be something else than "etf1", and the
+> etf->etf0 rename you did somewhere else shouldn't be made either.
+> 
 
-I would argue here over the word "force". Having bindings defined here
-does not force anyone into anything. The out-of-tree can do whatever
-they want. It is a wish from kernel side - it might be respected but
-it might not.
+Agreed, will fix it. Sorry for not noticing that before. I somehow
+always confused them to be labels rather that node names and even missed
+to observe that when I changed for R0.
 
-Just to be sure - I am not opposed against. Some time ago I wanted
-Mali400 to be upstreamed but with current policy about user-space side
-it is not possible.
+[...]
 
-Best regards,
-Krzysztof
+>> diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
+>> index eec37feee8fc..d4b85d9d343e 100644
+>> --- a/arch/arm64/boot/dts/arm/juno-r1.dts
+>> +++ b/arch/arm64/boot/dts/arm/juno-r1.dts
+>> @@ -178,6 +178,7 @@
+>>         };
+>>
+>>         #include "juno-base.dtsi"
+>> +       #include "juno-cs-r1r2.dtsi"
+> 
+> Please don't nest dtsi inside a structure like this. We normally let
+> them stand by themselves at the top of the file instead.
+> 
+> (yes, please fix for juno-base too).
+
+Agreed and fixed locally, will post it as part of v4.
+
+-- 
+Regards,
+Sudeep
