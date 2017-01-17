@@ -1,31 +1,192 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Tue, 17 Jan 2017 14:22:46 +0000
-Subject: [PATCH -next] mtd: nand: mediatek: remove redundant dev_err call in
- mtk_nfc_probe()
-Message-ID: <20170117142246.9607-1-weiyj.lk@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 17 Jan 2017 15:25:13 +0100
+Subject: [PATCH 1/3 v3] iio: adc: add device tree bindings for Qualcomm PM8xxx
+ ADCs
+Message-ID: <20170117142515.10578-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <weiyongjun1@huawei.com>
+This adds the device tree bindings for the Qualcomm PM8xxx
+ADCs. This is based on the existing DT bindings for the
+SPMI ADC so there are hopefully no controversial features.
 
-There is a error message within devm_ioremap_resource
-already, so remove the dev_err call to avoid redundant
-error message.
-
-Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+Cc: devicetree at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-arm-msm at vger.kernel.org
+Cc: Ivan T. Ivanov <iivanov.xz@gmail.com>
+Cc: Andy Gross <andy.gross@linaro.org>
+Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Cc: Rama Krishna Phani A <rphani@codeaurora.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/mtd/nand/mtk_nand.c | 1 -
- 1 file changed, 1 deletion(-)
+ChangeLog v2->v3:
+- Collapse the ratiometric property into one that enables and
+  selects a ratiometric reference in one go.
+- Use foo: adc-channel at X notation consequently
+- Document that the reference voltage is compulsory.
+ChangeLog v1->v2:
+- Spelling fixes
+---
+ .../bindings/iio/adc/qcom,pm8xxx-xoadc.txt         | 149 +++++++++++++++++++++
+ 1 file changed, 149 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/qcom,pm8xxx-xoadc.txt
 
-diff --git a/drivers/mtd/nand/mtk_nand.c b/drivers/mtd/nand/mtk_nand.c
-index 6c3eed3..6c517c6 100644
---- a/drivers/mtd/nand/mtk_nand.c
-+++ b/drivers/mtd/nand/mtk_nand.c
-@@ -1383,7 +1383,6 @@ static int mtk_nfc_probe(struct platform_device *pdev)
- 	nfc->regs = devm_ioremap_resource(dev, res);
- 	if (IS_ERR(nfc->regs)) {
- 		ret = PTR_ERR(nfc->regs);
--		dev_err(dev, "no nfi base\n");
- 		goto release_ecc;
- 	}
- 
+diff --git a/Documentation/devicetree/bindings/iio/adc/qcom,pm8xxx-xoadc.txt b/Documentation/devicetree/bindings/iio/adc/qcom,pm8xxx-xoadc.txt
+new file mode 100644
+index 000000000000..53cd146d8096
+--- /dev/null
++++ b/Documentation/devicetree/bindings/iio/adc/qcom,pm8xxx-xoadc.txt
+@@ -0,0 +1,149 @@
++Qualcomm's PM8xxx voltage XOADC
++
++The Qualcomm PM8xxx PMICs contain a HK/XO ADC (Housekeeping/Crystal
++oscillator ADC) encompassing PM8018, PM8038, PM8058 and PM8921.
++
++Required properties:
++
++- compatible: should be one of:
++  "qcom,pm8018-adc"
++  "qcom,pm8038-adc"
++  "qcom,pm8058-adc"
++  "qcom,pm8921-adc"
++
++- reg: should contain the ADC base address in the PMIC, typically
++  0x197.
++
++- xoadc-ref-supply: should reference a regulator that can supply
++  a reference voltage on demand. The reference voltage may vary
++  with PMIC variant but is typically something like 2.2 or 1.8V.
++
++The following required properties are standard for IO channels, see
++iio-bindings.txt for more details:
++
++- #address-cells: should be set to <1>
++
++- #size-cells: should be set to <0>
++
++- #io-channel-cells: should be set to <1>
++
++- interrupts: should refer to the parent PMIC interrupt controller
++  and reference the proper ADC interrupt.
++
++Required subnodes:
++
++The ADC channels are configured as subnodes of the ADC. Since some of
++them are used for calibrating the ADC, these nodes are compulsory:
++
++adc-channel at c {
++	reg = <0x0c>;
++};
++
++adc-channel at d {
++	reg = <0x0d>;
++};
++
++adc-channel at f {
++	reg = <0x0f>;
++};
++
++These three nodes are used for absolute and ratiometric calibration
++and only need to have these reg values: they are by hardware definition
++1:1 ratio converters that sample 625, 1250 and 0 milliV and create
++an interpolation calibration for all other ADCs.
++
++Optional subnodes: any channels other than channel 0x0c, 0x0d and
++0x0f are optional.
++
++Required channel node properties:
++
++- reg: should contain the hardware channel number in the range
++  0 .. 0x0f (4 bits). The hardware only supports 16 channels.
++
++Optional channel node properties:
++
++- qcom,decimation:
++  Value type: <u32>
++  Definition: This parameter is used to decrease the ADC sampling rate.
++          Quicker measurements can be made by reducing the decimation ratio.
++          Valid values are 512, 1024, 2048, 4096.
++          If the property is not found, a default value of 512 will be used.
++
++- qcom,ratiometric:
++  Value type: <u32>
++  Definition: Channel calibration type. If this property is specified
++          VADC will use a special voltage references for channel
++          calibration. The available references are specified in the
++	  as a u32 value setting (see below) and it is compulsory
++	  to also specify this reference if ratiometric calibration
++	  is selected.
++
++	  If the property is not found, the channel will be
++          calibrated with the 0.625V and 1.25V reference channels, also
++          known as an absolute calibration.
++  The reference voltage pairs when using ratiometric calibration:
++	  0 = XO_IN/XOADC_GND
++	  1 = PMIC_IN/XOADC_GND
++	  2 = PMIC_IN/BMS_CSP
++	  3 (invalid)
++	  4 = XOADC_GND/XOADC_GND
++	  5 = XOADC_VREF/XOADC_GND
++
++Example:
++
++xoadc: xoadc at 197 {
++	compatible = "qcom,pm8058-adc";
++	reg = <0x197>;
++	interrupt-parent = <&pm8058>;
++	interrupts = <76 1>;
++	#address-cells = <1>;
++	#size-cells = <0>;
++	#io-channel-cells = <1>;
++
++	vcoin: adc-channel at 0 {
++		reg = <0x00>;
++	};
++	vbat: adc-channel at 1 {
++		reg = <0x01>;
++	};
++	dcin: adc-channel at 2 {
++		reg = <0x02>;
++	};
++	ichg: adc-channel at 3 {
++		reg = <0x03>;
++	};
++	vph_pwr: adc-channel at 4 {
++		reg = <0x04>;
++	};
++	usb_vbus: adc-channel at a {
++		reg = <0x0a>;
++	};
++	die_temp: adc-channel at b {
++		reg = <0x0b>;
++	};
++	ref_625mv: adc-channel at c {
++		reg = <0x0c>;
++	};
++	ref_1250mv: adc-channel at d {
++		reg = <0x0d>;
++	};
++	ref_325mv: adc-channel at e {
++		reg = <0x0e>;
++	};
++	ref_muxoff: adc-channel at f {
++		reg = <0x0f>;
++	};
++};
++
++
++/* IIO client node */
++iio-hwmon {
++	compatible = "iio-hwmon";
++	io-channels = <&xoadc 0x01>, /* Battery */
++		    <&xoadc 0x02>, /* DC in (charger) */
++		    <&xoadc 0x04>, /* VPH the main system voltage */
++		    <&xoadc 0x0b>, /* Die temperature */
++		    <&xoadc 0x0c>, /* Reference voltage 1.25V */
++		    <&xoadc 0x0d>, /* Reference voltage 0.625V */
++		    <&xoadc 0x0e>; /* Reference voltage 0.325V */
++};
+-- 
+2.9.3
