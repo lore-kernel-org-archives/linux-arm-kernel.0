@@ -1,52 +1,37 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 17 Jan 2017 13:44:33 +0100
-Subject: [PATCH v2 02/13] soc: samsung: pmu: Use of_device_get_match_data
- helper
+Date: Tue, 17 Jan 2017 13:44:34 +0100
+Subject: [PATCH v2 03/13] soc: samsung: pmu: Remove messages for failed memory
+ allocation
 In-Reply-To: <1484657084-26227-1-git-send-email-m.szyprowski@samsung.com>
 References: <1484657084-26227-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170117124457eucas1p120dac823e1cd08421cb8d7411a9eebbd@eucas1p1.samsung.com>
-Message-ID: <1484657084-26227-3-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170117124458eucas1p10463c19d77a501284c7302c3b848fecc@eucas1p1.samsung.com>
+Message-ID: <1484657084-26227-4-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace custom code with generic helper to retrieve driver data.
+Memory subsystem already prints message about failed memory
+allocation, there is no need to do it in the driver.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
- drivers/soc/samsung/exynos-pmu.c | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
+ drivers/soc/samsung/exynos-pmu.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
 diff --git a/drivers/soc/samsung/exynos-pmu.c b/drivers/soc/samsung/exynos-pmu.c
-index 5c269bf23210..1f914e63dcc6 100644
+index 1f914e63dcc6..813df6e7292d 100644
 --- a/drivers/soc/samsung/exynos-pmu.c
 +++ b/drivers/soc/samsung/exynos-pmu.c
-@@ -11,6 +11,7 @@
- 
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/of_device.h>
- #include <linux/mfd/syscon.h>
- #include <linux/platform_device.h>
- #include <linux/delay.h>
-@@ -105,7 +106,6 @@ struct regmap *exynos_get_pmu_regmap(void)
- 
- static int exynos_pmu_probe(struct platform_device *pdev)
- {
--	const struct of_device_id *match;
- 	struct device *dev = &pdev->dev;
- 	struct resource *res;
- 
-@@ -122,10 +122,7 @@ static int exynos_pmu_probe(struct platform_device *pdev)
+@@ -117,10 +117,8 @@ static int exynos_pmu_probe(struct platform_device *pdev)
+ 	pmu_context = devm_kzalloc(&pdev->dev,
+ 			sizeof(struct exynos_pmu_context),
+ 			GFP_KERNEL);
+-	if (!pmu_context) {
+-		dev_err(dev, "Cannot allocate memory.\n");
++	if (!pmu_context)
  		return -ENOMEM;
- 	}
+-	}
  	pmu_context->dev = dev;
--
--	match = of_match_node(exynos_pmu_of_device_ids, dev->of_node);
--
--	pmu_context->pmu_data = match->data;
-+	pmu_context->pmu_data = of_device_get_match_data(dev);
+ 	pmu_context->pmu_data = of_device_get_match_data(dev);
  
- 	if (pmu_context->pmu_data->pmu_init)
- 		pmu_context->pmu_data->pmu_init();
 -- 
 1.9.1
