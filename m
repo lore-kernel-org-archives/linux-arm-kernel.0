@@ -1,74 +1,24 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 17 Jan 2017 15:35:22 +0100
-Subject: [PATCH 3/3 v2] iio: adc: add a driver for Qualcomm PM8xxx HK/XOADC
-In-Reply-To: <20161227065814.GC10531@minitux>
-References: <1481842118-14095-1-git-send-email-linus.walleij@linaro.org>
- <20161227065814.GC10531@minitux>
-Message-ID: <CACRpkdZ2eqpFhBjbzaDu2kAKE0_4Q15Kb-p_TnnXGrox42-QjA@mail.gmail.com>
+From: b-liu@ti.com (Bin Liu)
+Date: Tue, 17 Jan 2017 08:38:11 -0600
+Subject: [PATCH 2/4] musb: sunxi: add support for the variant in H3/V3s SoC
+In-Reply-To: <20170106135715.y7cwrwqyzybl6t5m@lukather>
+References: <20170103152534.20118-1-icenowy@aosc.xyz>
+ <20170103152534.20118-3-icenowy@aosc.xyz>
+ <20170106135715.y7cwrwqyzybl6t5m@lukather>
+Message-ID: <20170117143811.GC31716@uda0271908>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 27, 2016 at 7:58 AM, Bjorn Andersson
-<bjorn.andersson@linaro.org> wrote:
-> On Thu 15 Dec 14:48 PST 2016, Linus Walleij wrote:
+On Fri, Jan 06, 2017 at 02:57:15PM +0100, Maxime Ripard wrote:
+> On Tue, Jan 03, 2017 at 11:25:32PM +0800, Icenowy Zheng wrote:
+> > Allwinner H3/V3s features a variant of MUSB controller, which lacks one
+> > endpoint.
+> > 
+> > Add support for it.
+> > 
+> > Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> 
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-> I gave this a spin on one of my APQ8064 devices - with PM8921 - and I
-> can do measurements.
-
-Nice :) I hope the v3 patchset also gives something, hopefully more.
-
-> Several of the channels do give me reasonable readings. But the channels
-> in PM8921 are different than PM8058, so it looks like we need additional
-> prescales defined. Further more, the 8921 has several different
-> thermo-related channels, each with their own (post-)scaling function.
-
-I hope I have fixed this for all variants in the v3 version.
-
-> And lastly it seems that I have 2 thermo-channels on "mpp amux", but I'm
-> still confused to how that is supposed to work in the downstream code -
-> I will need to investigate this further.
->
-> One of the channels defined in my APQ8064 device measures
-> ADC_MPP_1_AMUX5, a lookup table is used to convert the measured value to
-> a temperature. As the table depends on an external thermistor, which
-> seems to differ between products a number of lookup tables exists - with
-> 156 data points each.
-(...)
-> On my 8064 device I have 6 different temperatures (2 coming from amux'ed
-> mpp channels). They all have different lookup tables, which seems
-> calibrated based on some external resistor.
-
-Rama Krishna cleared it up a bit, then I have tried to make it even
-clearer.
-
-Essentially all MPP (multi-purpose pins indeed) can have any random
-analog value coming in, but there are some layers of enums on top
-of the actual hardware channels confusing things a bit.
-
-Some MPPs are used for reading battery temperature and system
-temperature in some systems, but this is essentially a board-specific
-use of a general purpose ADC and need to be above the driver, however
-I tried to encode the most typical usecases a bit in the different PMIC
-channel tables, so that MPP8 is usually set up a temperature channel.
-
-We need additional bindings to specify conversion functions from the
-device tree but that can be made on top of this patch set as an
-expansion.
-
-The approach chosen here is that this ADC driver should present
-"processed" (scaled etc) values, and to achieve this the scaling is
-done directly on the raw values read from the ADC, which are
-first scaled to uV from calibration and then scaled to e.g. a
-temperature.
-
-This is all clearer after Rama Krishna's patches.
-
->> +     /* We strictly require this voltage */
->> +     ret = regulator_set_voltage(adc->vref, 2200000, 2200000);
->
-> On 8064 the reference is L14 and it's at 1.8V, so this fails for me.
-
-I have removes this hard setting of voltage.
-
-Yours,
-Linus Walleij
+Applied. Thanks.
+-Bin.
