@@ -1,50 +1,111 @@
-From: lilja.magnus@gmail.com (Magnus Lilja)
-Date: Tue, 17 Jan 2017 22:21:12 +0100
-Subject: usb: gadget: Kernel panic (NULL pointer dereference) when using
- fsl_udc2_core on i.MX31 PDK
-Message-ID: <f984e50b-0e64-88ef-2f53-b8da2a62daf0@gmail.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Tue, 17 Jan 2017 22:26:33 +0100
+Subject: [PATCH 3/5] ARM64: dts: meson-gxbb-p20x: add reset for the
+ ethernet PHY
+In-Reply-To: <1484680941.26620.28.camel@baylibre.com>
+References: <20161202234739.22929-1-martin.blumenstingl@googlemail.com>
+ <20161202234739.22929-4-martin.blumenstingl@googlemail.com>
+ <1484680941.26620.28.camel@baylibre.com>
+Message-ID: <CAFBinCBfJ4b1a1Bqn7kJHyj79i8UJnjJh00u3NvARzJPuUmrNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Tue, Jan 17, 2017 at 8:22 PM, Jerome Brunet <jbrunet@baylibre.com> wrote:
+> On Sat, 2016-12-03 at 00:47 +0100, Martin Blumenstingl wrote:
+>> This resets the ethernet PHY during boot to get the PHY into a
+>> "clean"
+>> state. While here also specify the phy-handle of the ethmac node to
+>> make the PHY configuration similar to the one we have on GXL devices.
+>>
+>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.co
+>> m>
+>> Tested-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
+>>  arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi | 15
+>> +++++++++++++++
+>>  1 file changed, 15 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+>> b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+>> index 203be28..2abc553 100644
+>> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+>> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+>> @@ -134,10 +134,25 @@
+>>       pinctrl-names = "default";
+>>  };
+>>
+>> +&mdio0 {
+>> +     ethernet_phy0: ethernet-phy at 0 {
+>> +             compatible = "ethernet-phy-ieee802.3-c22";
+>> +             reg = <0>;
+>
+> Sorry for the late reply.
+> I just tried on the p200 and this patch (serie) breaks the network on
+> it. The PHY is not detected anymore.
+>
+> From the KSZ9031 Datasheet : "PHY Address 0h is supported as the unique
+> PHY address only; it is not supported as the broadcast PHY address
+> [...]"
+>
+> So we can't just use the broadcast address here:
+> reg should be <3>.
+OK, I'll fix that in a follow-up. as mentioned in the other thread:
+can you confirm that the PHY ID is 0x00221620?
+It seems that I also broke meson-gxbb-nexbox-a95x.dts with that series
+(no idea why that slipped through): according to the photos from
+Neil's wiki [0] this seems to use an IC+ 10/100 ethernet PHY (probably
+an IP101A)
 
-I tried the fsl_udc_core gadget driver on the i.MX31 PDK board and got a 
-kernel panic (NULL pointer dereference) when connecting the USB cable. I 
-had the g_serial module loaded as well.
+>> +     };
+>> +};
+>> +
+>>  &ethmac {
+>>       status = "okay";
+>>       pinctrl-0 = <&eth_rgmii_pins>;
+>>       pinctrl-names = "default";
+>> +
+>> +     phy-handle = <&ethernet_phy0>;
+>> +
+>> +     snps,reset-gpio = <&gpio GPIOZ_14 0>;
+>> +     snps,reset-delays-us = <0 10000 1000000>;
+>> +     snps,reset-active-low;
+>> +
+>> +     phy-mode = "rgmii";
+>
+> We can't define this in p20x. actually the p201 uses an rmii.
+> I have not idea about gpio reset, or the phy address for the p201.
+>
+> I suppose it would be better to move this to meson-gxbb_p200.dts
+>
+> I don't know if anybody has a p201, but until we can confirm a working
+> Ethernet configuration, we should probably drop it for the p201
+>
+> Of course the problem was already there before this patch ...
+indeed, that seems to be a problem.
+the GXBB Nexbox A95x I mentioned above is based on the p201 board.
+Amlogic's .dts also toggles GPIOZ_14 for it: [1]
+chances are high that it also features an IP101A PHY (this is pure
+speculation though).
 
-The NULL pointer panic comes from gadget/udc/core.c 
-usb_gadget_giveback_request() which calls req->complete() and in some 
-cases req->complete is NULL.
+I propose four patches to fix all this situation:
+- add the GPIOZ_14 reset and an ethernet_phy0 (with reg = <0>) to
+meson-gxbb-nexbox-a95x.dts
+- add the ethernet_phy0 node with reg = <0> (and ideally I also want
+to include the KSZ9031 PHY ID) to meson-gxbb-p200.dtsi along with
+phy-mode = "rgmii"
+- add the ethernet_phy0 node with reg = <0> (without any PHY ID as we
+don't know which one is used) to meson-gxbb-p201.dtsi along with
+phy-mode = "rgmii"
+- remove "phy-mode" and ethernet_phy0 from meson-gxbb-p20x.dtsi and
+add a comment that both, the RGMII and the RMII PHY have GPIOZ_14
+connected to their reset line
 
-Commit 304f7e5e1d08 ("usb: gadget: Refactor request completion") changed 
-fsl_udc2_core.c (and several other files) and in fsl_udc2_core.c a check 
-that req->complete is non-NULL was removed:
+does that make sense?
 
---- a/drivers/usb/gadget/udc/fsl_udc_core.c
-+++ b/drivers/usb/gadget/udc/fsl_udc_core.c
-@@ -197,10 +197,8 @@ __acquires(ep->udc->lock)
-         ep->stopped = 1;
 
-         spin_unlock(&ep->udc->lock);
--       /* complete() is from gadget layer,
--        * eg fsg->bulk_in_complete() */
--       if (req->req.complete)
--               req->req.complete(&ep->ep, &req->req);
-+
-+       usb_gadget_giveback_request(&ep->ep, &req->req);
+Regards,
+Martin
 
-         spin_lock(&ep->udc->lock);
-         ep->stopped = stopped;
 
-If I re-introduce the check (either in fsl_udc_core.c or core.c) at 
-least USB gadget operation using g_serial seems to work just fine.
-
-I don't know the logic in detail to understand whether this is a proper 
-fix or if there is some other more problem with the fls_udc_core driver. 
-Does anyone have input in this matter?
-
-I can produce a proper patch that fixes this problem by re-introducing 
-the check (in either fsl_udc_core.c or core.c) if that is a proper 
-solution and I can also assist in testing other fixes to the problem.
-
-Thanks, Magnus
+[0] https://github.com/superna9999/linux/wiki/Boards#nexbox-a95x-s905
+[1] https://github.com/khadas/linux/blob/Vim/arch/arm64/boot/dts/amlogic/gxbb_p201.dts#L186
