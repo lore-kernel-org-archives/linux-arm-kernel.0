@@ -1,40 +1,48 @@
-From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Tue, 17 Jan 2017 20:02:30 +0800
-Subject: [Question] A question about arm64 pte
-In-Reply-To: <20170117114518.GF18923@e104818-lin.cambridge.arm.com>
-References: <d284f510-f025-db84-f21e-a5b167d4bcd2@huawei.com>
- <20170116115606.GA6832@e104818-lin.cambridge.arm.com>
- <6b7a9bd2-37af-40cd-b723-9e648fbbc7c8@huawei.com>
- <20170116143601.GB6832@e104818-lin.cambridge.arm.com>
- <ecf2bd9f-9f96-0e6d-564d-93cff5bbf0cb@huawei.com>
- <20170117114518.GF18923@e104818-lin.cambridge.arm.com>
-Message-ID: <c0bb0be5-c7fa-948b-62ed-122eb89562dc@huawei.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Tue, 17 Jan 2017 12:07:49 +0000
+Subject: [kvm-unit-tests PATCH 6/6] run_tests: allow passing of options to
+ QEMU
+In-Reply-To: <648638bd-a90e-ee98-337a-223ed533f53a@redhat.com>
+References: <20170111162841.15569-1-alex.bennee@linaro.org>
+ <20170111162841.15569-7-alex.bennee@linaro.org>
+ <20170112173204.ufd2ggw7iz7xv772@hawk.localdomain>
+ <648638bd-a90e-ee98-337a-223ed533f53a@redhat.com>
+Message-ID: <87wpdtubxm.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+Paolo Bonzini <pbonzini@redhat.com> writes:
 
-On 2017/1/17 19:45, Catalin Marinas wrote:
-> On Tue, Jan 17, 2017 at 11:53:43AM +0800, Yisheng Xie wrote:
->> On 2017/1/16 22:36, Catalin Marinas wrote:
->>> On Mon, Jan 16, 2017 at 08:39:56PM +0800, Yisheng Xie wrote:
->>>> On 2017/1/16 19:56, Catalin Marinas wrote:
->>>>> On Mon, Jan 16, 2017 at 06:08:47PM +0800, Yisheng Xie wrote:
->>>>>
->>
->> Here is what I get when mmap a reserved memory region 0x39ef 0000~0x3a00 0000
->> use /dev/mem:
->> [  442.704228] pgd = ffff802785f14000
->> [  442.707641] [ffff86e4b000] *pgd=000000279080c003, *pud=0000002785f01003, *pmd=0000002783f5b003, *pte=0168000039ef0fd3
-> 
-> The pte seems to have bit 7 set: PTE_RDONLY. So you would get a fault on
-> write (but not read). Since PTE_WRITE is also set, handle_pte_fault()
-> will mark the entry as dirty (bit 55, cleared above) and clear
-> PTE_RDONLY before restarting the access instruction. User space wouldn't
-> notice, just a slight delay on the first access.
-> 
-Hi Catalin,
-Really thank you for kindly explain, quite clear now.
+> On 12/01/2017 18:32, Andrew Jones wrote:
+>>>
+>>> +# Any options left for QEMU?
+>>> +shift $((OPTIND-1))
+>>> +if [ "$#" -gt  0 ]; then
+>>> +    extra_opts="$@"
+>>> +fi
+>> We can unconditionally do the extra_opts="$@", extra_opts will just
+>> be null in the case there aren't more args, like it was before.
+>
+> extra_opts is not an array, so this would mess up options that contain
+> spaces.  (Alex's patch in general, not your tweak).
 
-Thanks
-Yisheng Xie.
+Is it worth treating extra_opts as an array?
+
+>
+> Paolo
+>
+>>> +
+>>>  RUNTIME_log_stderr () { cat >> test.log; }
+>>>  RUNTIME_log_stdout () {
+>>>      if [ "$PRETTY_PRINT_STACKS" = "yes" ]; then
+>>> @@ -59,4 +68,4 @@ RUNTIME_log_stdout () {
+>>>  config=$TEST_DIR/unittests.cfg
+>>>  rm -f test.log
+>>>  printf "BUILD_HEAD=$(cat build-head)\n\n" > test.log
+>>> -for_each_unittest $config run
+>>> +for_each_unittest $config run "$extra_opts"
+
+
+--
+Alex Benn?e
