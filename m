@@ -1,46 +1,34 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 17 Jan 2017 17:57:28 +0000
-Subject: CONFIG_PCIEASPM breaks PCIe on Marvell Armada 385 machine
-In-Reply-To: <20170117175115.GD27312@n2100.armlinux.org.uk>
-References: <20170111194942.q5rdma2es6hkmxfe@perseus.defre.kleine-koenig.org>
- <20170117151444.GE22776@bhelgaas-glaptop.roam.corp.google.com>
- <20170117152548.GB27312@n2100.armlinux.org.uk>
- <20170117174649.GA11063@bhelgaas-glaptop.roam.corp.google.com>
- <20170117175115.GD27312@n2100.armlinux.org.uk>
-Message-ID: <20170117175728.GE27312@n2100.armlinux.org.uk>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Tue, 17 Jan 2017 09:58:33 -0800
+Subject: [PATCH v6 23/25] usb: chipidea: Pullup D+ in device mode via phy
+ APIs
+In-Reply-To: <20170116034551.GA27364@b29397-desktop>
+References: <20161228225711.698-1-stephen.boyd@linaro.org>
+ <20161228225711.698-24-stephen.boyd@linaro.org>
+ <20170103065318.GB14542@b29397-desktop>
+ <148418039309.32258.7247753739063801774@sboyd-linaro>
+ <20170112095040.GA15726@b29397-desktop>
+ <148426139182.20672.2422337338087784924@sboyd-linaro>
+ <20170113033536.GA20723@b29397-desktop>
+ <148433778067.32719.6179204976256776867@sboyd-linaro>
+ <20170116034551.GA27364@b29397-desktop>
+Message-ID: <148467591341.23457.3638889856786813589@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 05:51:16PM +0000, Russell King - ARM Linux wrote:
-> On Tue, Jan 17, 2017 at 11:46:49AM -0600, Bjorn Helgaas wrote:
-> > Uwe has already done that; the dmesg logs including this
-> > instrumentation are at
-> > https://bugzilla.kernel.org/show_bug.cgi?id=192441
+Quoting Peter Chen (2017-01-15 19:45:51)
 > 
-> Grr, <swears about SSL incompatibilities>... wget's the URL and then
-> uses elinks on it...
+> So, you need to call phy_set_mode when switching between host and device.
+> Besides, you also need to toggle VBUSVLDEXT when the external vbus
+> is on or off at device mode (doesn't need for host mode), is it correct?
+
+Correct.
+
 > 
-> Umm, not quite.  He's done mvebu_pcie_hw_wr_conf() and mvebu_pcie_hw_rd_conf()
-> but not the bridge from the descriptions given on the attachments.
-> Obviously, it's going to be a lot of work to manufacture the links to
-> look at each attachment to thoroughly check, so I'm not going to do
-> that given quite how broken SSL crap is today.
+> At include/linux/usb/phy.h, we have .set_vbus interface, maybe you need
+> to port it to generic phy framework.
 > 
-> (Try installing elinks and pointing it at the above URL.)
 
-Oh, and looking at some of the debug that's been added:
-
-[    3.646322] mvebu_pcie_rd_conf(where=16, size=4, val=3892314116) => 0
-[    3.646325] mvebu_pcie_wr_conf(where=16, size=4, val=4294967295)
-[    3.646329] mvebu_pcie_rd_conf(where=16, size=4, val=4292870148) => 0
-[    3.646332] mvebu_pcie_wr_conf(where=16, size=4, val=3892314116)
-
-Please print register values in HEX, not decimal.  Same for register
-addresses.  Hex is the normal base to print this information, which
-the human brain can easily comprehend and translate to bits in a
-register.  Decimal values are useless and might as well be encrypted.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Ok. I'll look into that. Can the other patches in this series be picked
+up? Otherwise I can resend them all again once I fix the phy_set_mode()
+call location and introduce a new phy op.
