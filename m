@@ -1,80 +1,33 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 17 Jan 2017 17:19:30 +0000
-Subject: [PATCH] arm64: mm: fix __page_to_voff definition
-In-Reply-To: <e57db47e-3c3a-1344-9492-442b37c6897c@gmail.com>
-References: <1484666633-1753-1-git-send-email-andr2000@gmail.com>
- <20170117161546.GF11939@leverpostej>
- <e57db47e-3c3a-1344-9492-442b37c6897c@gmail.com>
-Message-ID: <20170117171929.GA367@leverpostej>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 17 Jan 2017 19:20:47 +0200
+Subject: [PATCH v7 2/3] input: tm2-touchkey: Add touchkey driver support
+ for TM2
+In-Reply-To: <1484632479-3111-3-git-send-email-jcsing.lee@samsung.com>
+References: <1484632479-3111-1-git-send-email-jcsing.lee@samsung.com>
+ <CGME20170117055444epcas1p47b0b0a0ae3260b22fa61d2b92362050b@epcas1p4.samsung.com>
+ <1484632479-3111-3-git-send-email-jcsing.lee@samsung.com>
+Message-ID: <20170117172047.47535bj5xd6toayu@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 07:13:45PM +0200, Oleksandr Andrushchenko wrote:
-> On 01/17/2017 06:15 PM, Mark Rutland wrote:
-> >On Tue, Jan 17, 2017 at 05:23:53PM +0200, Oleksandr Andrushchenko wrote:
-> >>From: Oleksandr Andrushchenko <Oleksandr_Andrushchenko@epam.com>
-> >>
-> >>Fix parameter name for __page_to_voff, to match its definition.
-> >>There are other callers of page_to_virt which do not
-> >>declare 'page'.
-> >>
-> >>Fixes: 3fa72fe9c614 ("arm64: mm: fix __page_to_voff definition")
-> >>Signed-off-by: Oleksandr Andrushchenko <Oleksandr_Andrushchenko@epam.com>
-> >I take it this is because it messes up the 'struct page' at the end of
-> >the macro expansion?
-> yes, you got it right
-> >It would be good to explicitly state that, since that's not immediately
-> >obvious.
-> Will do that in patch v1
-> >
-> >With that:
-> >
-> >Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Can I put your ack into the v1?
-
-Yes, with the updated commit message and title, you can add my ack.
-
-W.r.t. wording, I'd recommend:
-
-  arm64: mm: avoid name clash in __page_to_voff()
-
-  The arm64 __page_to_voff() macro taks a parameter called 'page', and
-  also refers to 'struct page'. Thus, if the value passed in is not
-  called 'page', we'll refer to the wrong struct name (which might not
-  exist).
-
-  Rename the parameter so that it doesn't clash.
-
-Thanks,
-Mark.
-
-> >
-> >Thanks,
-> >Mark.
-> Thanks,
-> Oleksandr
-> >>---
-> >>  arch/arm64/include/asm/memory.h | 2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >>diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> >>index bfe632808d77..90c39a662379 100644
-> >>--- a/arch/arm64/include/asm/memory.h
-> >>+++ b/arch/arm64/include/asm/memory.h
-> >>@@ -222,7 +222,7 @@ static inline void *phys_to_virt(phys_addr_t x)
-> >>  #define _virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
-> >>  #else
-> >>  #define __virt_to_pgoff(kaddr)	(((u64)(kaddr) & ~PAGE_OFFSET) / PAGE_SIZE * sizeof(struct page))
-> >>-#define __page_to_voff(page)	(((u64)(page) & ~VMEMMAP_START) * PAGE_SIZE / sizeof(struct page))
-> >>+#define __page_to_voff(kaddr)	(((u64)(kaddr) & ~VMEMMAP_START) * PAGE_SIZE / sizeof(struct page))
-> >>  #define page_to_virt(page)	((void *)((__page_to_voff(page)) | PAGE_OFFSET))
-> >>  #define virt_to_page(vaddr)	((struct page *)((__virt_to_pgoff(vaddr)) | VMEMMAP_START))
-> >>-- 
-> >>2.7.4
-> >>
-> >>
-> >>_______________________________________________
-> >>linux-arm-kernel mailing list
-> >>linux-arm-kernel at lists.infradead.org
-> >>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+On Tue, Jan 17, 2017 at 02:54:38PM +0900, Jaechul Lee wrote:
+> This patch adds support for the TM2 touch key and led
+> functionality.
 > 
+> The driver interfaces with userspace through an input device and
+> reports KEY_PHONE and KEY_BACK event types. LED brightness can be
+> controlled by "/sys/class/leds/tm2-touchkey/brightness".
+> 
+> Signed-off-by: Beomho Seo <beomho.seo@samsung.com>
+> Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
+> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
+> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+
+This looks unusual. How did Dmitry's Sob end here?
+
+Best regards,
+Krzysztof
