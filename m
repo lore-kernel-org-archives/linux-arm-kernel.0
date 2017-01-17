@@ -1,50 +1,69 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 17 Jan 2017 10:38:13 +0100
-Subject: [PATCH 1/2] dt-bindings: gpu: Add Mali Utgard bindings
-In-Reply-To: <20170116184906.r62di7xiil5lae33@kozik-lap>
-References: <20170116132424.7038-1-maxime.ripard@free-electrons.com>
- <20170116184906.r62di7xiil5lae33@kozik-lap>
-Message-ID: <20170117093813.mxp2hgoxbgske6ru@lukather>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Tue, 17 Jan 2017 17:31:53 +0800
+Subject: [PATCH v2 11/11] drm/rockchip/dsi: fix insufficient bandwidth of
+ some panel
+In-Reply-To: <20170116124453.2154def9.john@metanate.com>
+References: <1484561311-494-1-git-send-email-zyw@rock-chips.com>
+ <1484561311-494-12-git-send-email-zyw@rock-chips.com>
+ <20170116124453.2154def9.john@metanate.com>
+Message-ID: <587DE489.2010004@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi John
 
-On Mon, Jan 16, 2017 at 08:49:06PM +0200, Krzysztof Kozlowski wrote:
-> On Mon, Jan 16, 2017 at 02:24:23PM +0100, Maxime Ripard wrote:
-> > The ARM Mali Utgard GPU family is embedded into a number of SoCs from
-> > Allwinner, Amlogic, Mediatek or Rockchip.
-> > 
-> > Add a binding for the GPU of that family.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  .../devicetree/bindings/gpu/arm,mali-utgard.txt    | 76 ++++++++++++++++++++++
-> >  1 file changed, 76 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-> 
-> Do you have a driver in kernel which will implement these bindings?
+On 01/16/2017 08:44 PM, John Keeping wrote:
+> On Mon, 16 Jan 2017 18:08:31 +0800, Chris Zhong wrote:
+>
+>> Set the lanes bps to 1 / 0.9 times of pclk, the margin is not enough
+>> for some panel, it will cause the screen display is not normal, so
+>> increases the badnwidth to 1 / 0.8.
+>>
+>> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+>>
+>> ---
+>>
+>>   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 4 ++--
+>>   1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+>> index 9dfa73d..5a973fe 100644
+>> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+>> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+>> @@ -501,8 +501,8 @@ static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi)
+>>   
+>>   	mpclk = DIV_ROUND_UP(dsi->mode->clock, MSEC_PER_SEC);
+>>   	if (mpclk) {
+>> -		/* take 1 / 0.9, since mbps must big than bandwidth of RGB */
+>> -		tmp = mpclk * (bpp / dsi->lanes) * 10 / 9;
+>> +		/* take 1 / 0.8, since mbps must big than bandwidth of RGB */
+>> +		tmp = mpclk * (bpp / dsi->lanes) * 10 / 8;
+> This and patch 9 are just hacking around the underlying problem in order
+> to make particular panels work.  I'm pretty sure the actual issue is the
+> use of hardcoded values when configuring the PHY, since the PHY
+> parameters are specified in clock cycles but the MIPI spec requires
+> absolute time durations.
+>
+> I posted a series addressing this a while ago, although I screwed up
+> sending it so some patches were included twice and since no one
+> expressed any interest I didn't post a cleaned up version.
+>
+> The relevant patch is here:
+>
+> https://patchwork.kernel.org/patch/9340193/
+Thanks very much, your patches are very useful for me. It looks your 
+method is correct.
+And I am very confused why Mark Yao and me did not receive your patches 
+before,
+although we have subscribed the <linux-rockchip@lists.infradead.org>.
 
-No, but we have bindings for out-of-tree drivers already.
+In addition, could you tell me which device ware you testing with these 
+mipi patches.
+I going to test them these day.
 
-> Defining them for out-of-tree driver does not bring any benefits
-> (3rd party driver will not respect them anyway).
-
-You could see it the other way around too. The out-of-tree drivers
-don't respect it at the moment because there's no binding to respect.
-
-And at least for us, we definitely plan on doing that.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170117/a98cc236/attachment.sig>
+Chris Zhong
+>>   		if (tmp < max_mbps)
+>>   			target_mbps = tmp;
+>>   		else
+>
+>
