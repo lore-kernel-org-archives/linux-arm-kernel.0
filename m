@@ -1,41 +1,17 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 17 Jan 2017 17:49:04 +0100
-Subject: [PATCH v2 06/10] ASoC: sun8i-codec-analog: Add amplifier event
- to fix first delay
-In-Reply-To: <20170117140230.23142-7-mylene.josserand@free-electrons.com>
-References: <20170117140230.23142-1-mylene.josserand@free-electrons.com>
- <20170117140230.23142-7-mylene.josserand@free-electrons.com>
-Message-ID: <20170117164904.c22f7tmtu67l23dd@lukather>
+From: rkrcmar@redhat.com (Radim =?utf-8?B?S3LEjW3DocWZ?=)
+Date: Tue, 17 Jan 2017 17:49:24 +0100
+Subject: [PATCH 0/3] KVM/ARM updates for 4.10-rc4
+In-Reply-To: <1484307093-29153-1-git-send-email-marc.zyngier@arm.com>
+References: <1484307093-29153-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20170117164923.GB2386@potion>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 03:02:26PM +0100, Myl?ne Josserand wrote:
-> When playing a sound for the first time, a short delay, where the audio
-> file is not played, can be noticed.
-> On a second play (right after), the sound is played correctly.
-> If we wait a short time (~5 sec which corresponds to the aplay
-> timeout), the delay is back.
+2017-01-13 11:31+0000, Marc Zyngier:
+> Radim, Paolo,
 > 
-> This patch fixes it by using an event on headphone amplifier.
-> It allows to keep the amplifier enable while playing a sound.
-> A delay of 700ms allows to wait that the amplifier is powered-up
-> before playing the sound.
-> 
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
+> Here's the KVM/ARM updates for 4.10-rc4. Two timer fixes, and one vgic
+> fix for a deadlock that's been reported this week (which should land
+> into stable).
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170117/b6afa6d0/attachment.sig>
+Pulled to kvm/master, thanks.
