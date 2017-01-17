@@ -1,35 +1,36 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 17 Jan 2017 12:29:21 +0000
-Subject: [PATCH v19 10/15] clocksource/drivers/arm_arch_timer: Refactor
- the timer init code to prepare for GTDT
-In-Reply-To: <b977f47b-a85e-d4d5-666c-b8c9cd21c25e@codeaurora.org>
-References: <20161221064603.11830-1-fu.wei@linaro.org>
- <20161221064603.11830-11-fu.wei@linaro.org>
- <20170116183032.GL5908@leverpostej>
- <CADyBb7tFaSshUmZsJbNO2tnbqAKEii39NQVfcx5CqDiDsK5OJA@mail.gmail.com>
- <b977f47b-a85e-d4d5-666c-b8c9cd21c25e@codeaurora.org>
-Message-ID: <20170117122921.GE11939@leverpostej>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Tue, 17 Jan 2017 13:34:24 +0100
+Subject: [PATCH 00/10] ARM: da850-lcdk: add SATA support
+In-Reply-To: <1484311084-31547-1-git-send-email-bgolaszewski@baylibre.com>
+References: <1484311084-31547-1-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <CAMpxmJVdFhzLGmY8maUo8k1Gzgwp+2ivFD8VqG3SbspFoXNvbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 06:18:12AM -0600, Timur Tabi wrote:
-> Fu Wei wrote:
-> >if (i >= ARCH_TIMER_MEM_MAX_FRAMES) {
-> >        pr_err(FW_BUG "too many frames, ARMv8 spec only allows 8.\n");
-> 
-> pr_err(FW_BUG "too many frames, ARMv8 spec only allows %u.\n",
-> 	ARCH_TIMER_MEM_MAX_FRAMES);
+2017-01-13 13:37 GMT+01:00 Bartosz Golaszewski <bgolaszewski@baylibre.com>:
+> This series contains all the changes necessary to make SATA work on
+> the da850-lcdk board.
+>
+> The first patch adds a clock lookup entry required for the ahci core
+> to retrieve a functional clock.
+>
+> The second enables relevant config options for all davinci boards.
+>
+> The third adds device tree bindings for the ahci_da850 driver.
+>
+> The fourth adds a workaround for a SATA controller instability we
+> detected after increasing the PLL0 frequency for proper LCD
+> controller support.
+>
+> Patches 5 through 7 extend the ahci_da850 driver - add DT support,
+> un-hardcode the clock multiplier value and add a workaround for
+> a quirk present on the da850 SATA controller.
+>
+> Patches 8-10 add the device tree changes required to probe the driver.
+>
+> I'm posting the series as a whole to give all reviewers the full
+> picture and visibility of the changes required, if needed I can resend
+> the patches separately.
+>
 
-While I don't see ARCH_TIMER_MEM_MAX_FRAMES changing, this would be
-nicer to ensure the result obviously matches.
-
-As for wording, I'd perfer:
-
-	pr_err(FW_BUG "too many frames, only %u are permitted.\n",
-	       ARCH_TIMER_MEM_MAX_FRAMES);
-
-... so as to avoid any confusion between spec versions and so on. We can
-reconsider the message if/when that changes.
-
-Thanks,
-Mark.
+Superseded by v2.
