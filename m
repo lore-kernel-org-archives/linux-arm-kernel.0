@@ -1,90 +1,165 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 17 Jan 2017 10:23:50 +0000
-Subject: [PATCH V7 04/10] arm64: exception: handle Synchronous External
- Abort
-In-Reply-To: <20170116115309.GE1510@arm.com>
-References: <1484244924-24786-1-git-send-email-tbaicar@codeaurora.org>
- <1484244924-24786-5-git-send-email-tbaicar@codeaurora.org>
- <20170116115309.GE1510@arm.com>
-Message-ID: <587DF0B6.4060000@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 17 Jan 2017 10:20:43 +0000
+Subject: [RFC PATCH 22/33] irqchip/gic-v3-its: Add VPE irq domain
+ [de]activation
+In-Reply-To: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
+References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1484648454-21216-23-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
+On activation, a VPE is mapped using the VMAPP command, followed
+by a VINVALL for a good measure. On deactivation, the VPE is
+simply unmapped.
 
-On 16/01/17 11:53, Will Deacon wrote:
-> On Thu, Jan 12, 2017 at 11:15:18AM -0700, Tyler Baicar wrote:
->> SEA exceptions are often caused by an uncorrected hardware
->> error, and are handled when data abort and instruction abort
->> exception classes have specific values for their Fault Status
->> Code.
->> When SEA occurs, before killing the process, go through
->> the handlers registered in the notification list.
->> Update fault_info[] with specific SEA faults so that the
->> new SEA handler is used.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/irqchip/irq-gic-v3-its.c | 102 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 102 insertions(+)
 
->> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
->> index 05d2bd7..81039c7 100644
->> --- a/arch/arm64/mm/fault.c
->> +++ b/arch/arm64/mm/fault.c
->> @@ -480,6 +496,28 @@ static int do_bad(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->>  	return 1;
->>  }
->>  
->> +/*
->> + * This abort handler deals with Synchronous External Abort.
->> + * It calls notifiers, and then returns "fault".
->> + */
->> +static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->> +{
->> +	struct siginfo info;
->> +
->> +	atomic_notifier_call_chain(&sea_handler_chain, 0, NULL);
->> +
->> +	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
->> +		 fault_name(esr), esr, addr);
->> +
->> +	info.si_signo = SIGBUS;
->> +	info.si_errno = 0;
->> +	info.si_code  = 0;
->> +	info.si_addr  = (void __user *)addr;
->> +	arm64_notify_die("", regs, &info, esr);
->> +
->> +	return 0;
->> +}
->> +
->>  static const struct fault_info {
->>  	int	(*fn)(unsigned long addr, unsigned int esr, struct pt_regs *regs);
->>  	int	sig;
->> @@ -502,22 +540,22 @@ static const struct fault_info {
->>  	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 1 permission fault"	},
->>  	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 2 permission fault"	},
->>  	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 3 permission fault"	},
->> -	{ do_bad,		SIGBUS,  0,		"synchronous external abort"	},
->> +	{ do_sea,		SIGBUS,  0,		"synchronous external abort"	},
->>  	{ do_bad,		SIGBUS,  0,		"unknown 17"			},
->>  	{ do_bad,		SIGBUS,  0,		"unknown 18"			},
->>  	{ do_bad,		SIGBUS,  0,		"unknown 19"			},
->> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
->> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
->> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
->> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
->> -	{ do_bad,		SIGBUS,  0,		"synchronous parity error"	},
->> +	{ do_sea,		SIGBUS,  0,		"level 0 SEA (translation table walk)"	},
->> +	{ do_sea,		SIGBUS,  0,		"level 1 SEA (translation table walk)"	},
->> +	{ do_sea,		SIGBUS,  0,		"level 2 SEA (translation table walk)"	},
->> +	{ do_sea,		SIGBUS,  0,		"level 3 SEA (translation table walk)"	},
-> 
-> Perhaps I wasn't clear enough in my previous review, but please expand the
-> acronym for strings and comments.
-
-
-The 'SEA' in this user-string doesn't add anything. Now that these use do_sea()
-instead of do_bad(), when they are printed won't it be:
-> Synchronous External Abort: level 3 SEA (translation table walk) (...) at ....
-
-
-
-Thanks,
-
-James
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 54d0075..598e25b 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -206,6 +206,16 @@ struct its_cmd_desc {
+ 
+ 		struct {
+ 			struct its_vpe *vpe;
++		} its_vinvall_cmd;
++
++		struct {
++			struct its_vpe *vpe;
++			struct its_collection *col;
++			bool valid;
++		} its_vmapp_cmd;
++
++		struct {
++			struct its_vpe *vpe;
+ 			struct its_device *dev;
+ 			u32 virt_id;
+ 			u32 event_id;
+@@ -309,6 +319,16 @@ static void its_encode_db_valid(struct its_cmd_block *cmd, bool db_valid)
+ 	its_mask_encode(&cmd->raw_cmd[2], db_valid, 0, 0);
+ }
+ 
++static void its_encode_vpt_addr(struct its_cmd_block *cmd, u64 vpt_pa)
++{
++	its_mask_encode(&cmd->raw_cmd[3], vpt_pa >> 16, 50, 16);
++}
++
++static void its_encode_vpt_size(struct its_cmd_block *cmd, u8 vpt_size)
++{
++	its_mask_encode(&cmd->raw_cmd[3], vpt_size, 4, 0);
++}
++
+ static inline void its_fixup_cmd(struct its_cmd_block *cmd)
+ {
+ 	/* Let's fixup BE commands */
+@@ -467,6 +487,36 @@ static struct its_collection *its_build_invall_cmd(struct its_cmd_block *cmd,
+ 	return NULL;
+ }
+ 
++static struct its_vpe *its_build_vinvall_cmd(struct its_cmd_block *cmd,
++					     struct its_cmd_desc *desc)
++{
++	its_encode_cmd(cmd, GITS_CMD_VINVALL);
++	its_encode_vpeid(cmd, desc->its_vinvall_cmd.vpe->vpe_id);
++
++	its_fixup_cmd(cmd);
++
++	return desc->its_vinvall_cmd.vpe;
++}
++
++static struct its_vpe *its_build_vmapp_cmd(struct its_cmd_block *cmd,
++					   struct its_cmd_desc *desc)
++{
++	unsigned long vpt_addr;
++
++	vpt_addr = virt_to_phys(page_address(desc->its_vmapp_cmd.vpe->vpt_page));
++
++	its_encode_cmd(cmd, GITS_CMD_VMAPP);
++	its_encode_vpeid(cmd, desc->its_vmapp_cmd.vpe->vpe_id);
++	its_encode_valid(cmd, desc->its_vmapp_cmd.valid);
++	its_encode_target(cmd, desc->its_vmapp_cmd.col->target_address);
++	its_encode_vpt_addr(cmd, vpt_addr >> 16);
++	its_encode_vpt_size(cmd, LPI_NRBITS - 1);
++
++	its_fixup_cmd(cmd);
++
++	return desc->its_vmapp_cmd.vpe;
++}
++
+ static struct its_vpe *its_build_vmapti_cmd(struct its_cmd_block *cmd,
+ 					    struct its_cmd_desc *desc)
+ {
+@@ -784,6 +834,37 @@ static void its_send_vmovi(struct its_device *dev, u32 id)
+ 	its_send_single_vcommand(dev->its, its_build_vmovi_cmd, &desc);
+ }
+ 
++static void its_send_vmapp(struct its_vpe *vpe, bool valid)
++{
++	struct its_cmd_desc desc;
++	struct its_node *its;
++
++	desc.its_vmapp_cmd.vpe = vpe;
++	desc.its_vmapp_cmd.valid = valid;
++
++	list_for_each_entry(its, &its_nodes, entry) {
++		if (!its->is_v4)
++			continue;
++
++		desc.its_vmapp_cmd.col = &its->collections[vpe->col_idx];
++		its_send_single_vcommand(its, its_build_vmapp_cmd, &desc);
++	}
++}
++
++static void its_send_vinvall(struct its_vpe *vpe)
++{
++	struct its_cmd_desc desc;
++	struct its_node *its;
++
++	desc.its_vinvall_cmd.vpe = vpe;
++
++	list_for_each_entry(its, &its_nodes, entry) {
++		if (!its->is_v4)
++			continue;
++		its_send_single_vcommand(its, its_build_vinvall_cmd, &desc);
++	}
++}
++
+ /*
+  * irqchip functions - assumes MSI, mostly.
+  */
+@@ -2094,9 +2175,30 @@ static void its_vpe_irq_domain_free(struct irq_domain *domain,
+ 	irq_domain_free_irqs_parent(domain, virq, nr_irqs);
+ }
+ 
++static void its_vpe_irq_domain_activate(struct irq_domain *domain,
++					struct irq_data *d)
++{
++	struct its_vpe *vpe = irq_data_get_irq_chip_data(d);
++
++	/* Map the VPE to the first possible CPU */
++	vpe->col_idx = cpumask_first(cpu_online_mask);
++	its_send_vmapp(vpe, true);
++	its_send_vinvall(vpe);
++}
++
++static void its_vpe_irq_domain_deactivate(struct irq_domain *domain,
++					  struct irq_data *d)
++{
++	struct its_vpe *vpe = irq_data_get_irq_chip_data(d);
++
++	its_send_vmapp(vpe, false);
++}
++
+ static const struct irq_domain_ops its_vpe_domain_ops = {
+ 	.alloc			= its_vpe_irq_domain_alloc,
+ 	.free			= its_vpe_irq_domain_free,
++	.activate		= its_vpe_irq_domain_activate,
++	.deactivate		= its_vpe_irq_domain_deactivate,
+ };
+ 
+ static int its_force_quiescent(void __iomem *base)
+-- 
+2.1.4
