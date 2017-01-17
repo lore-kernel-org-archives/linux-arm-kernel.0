@@ -1,99 +1,76 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 17 Jan 2017 17:46:36 +0100
-Subject: [PATCH v2 03/10] dt-bindings: sound: Add new reset compatible
- for sun4i-i2s
-In-Reply-To: <20170117140230.23142-4-mylene.josserand@free-electrons.com>
-References: <20170117140230.23142-1-mylene.josserand@free-electrons.com>
- <20170117140230.23142-4-mylene.josserand@free-electrons.com>
-Message-ID: <20170117164636.qhkxvqcs7l732wxk@lukather>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 17 Jan 2017 16:45:59 +0000
+Subject: [RFC PATCH v2 10/10] dt-bindings: Document devicetree binding
+ for ARM SPE
+In-Reply-To: <20170116105904.GB1510@arm.com>
+References: <1484323429-15231-1-git-send-email-will.deacon@arm.com>
+ <1484323429-15231-11-git-send-email-will.deacon@arm.com>
+ <20170113184352.GE2472@leverpostej> <20170116105904.GB1510@arm.com>
+Message-ID: <20170117164559.GG11939@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 03:02:23PM +0100, Myl?ne Josserand wrote:
-> Add a new compatible for sun4i-i2s driver to handle some
-> SoCs that have a reset line that must be asserted/deasserted.
+On Mon, Jan 16, 2017 at 10:59:04AM +0000, Will Deacon wrote:
+> On Fri, Jan 13, 2017 at 06:43:52PM +0000, Mark Rutland wrote:
+> > On Fri, Jan 13, 2017 at 04:03:49PM +0000, Will Deacon wrote:
+> > > This patch documents the devicetree binding in use for ARM SPE.
+> > > 
+> > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > > Cc: Rob Herring <robh@kernel.org>
+> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > > ---
+> > >  Documentation/devicetree/bindings/arm/spe-pmu.txt | 20 ++++++++++++++++++++
+> > >  1 file changed, 20 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/arm/spe-pmu.txt
+> > > 
+> > > diff --git a/Documentation/devicetree/bindings/arm/spe-pmu.txt b/Documentation/devicetree/bindings/arm/spe-pmu.txt
+> > > new file mode 100644
+> > > index 000000000000..d6540b491af4
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/arm/spe-pmu.txt
+> > > @@ -0,0 +1,20 @@
+> > > +* ARMv8.2 Statistical Profiling Extension (SPE) Performance Monitor Units (PMU)
+> > > +
+> > > +ARMv8.2 introduces the optional Statistical Profiling Extension for collecting
+> > > +performance sample data using an in-memory trace buffer.
+> > > +
+> > > +** SPE Required properties:
+> > > +
+> > > +- compatible : should be one of:
+> > > +	       "arm,arm-spe-pmu-v1"
+> > 
+> > The second "arm" here doesn't seem to add much. Should that be "armv8.2"
+> > instead?
 > 
-> This new compatible, "allwinner,sun6i-a31-i2s", requires two
-> properties:
-> 	- resets: phandle to the reset line
-> 	- reset-names: the name of the reset line ("rst").
-> Except these differences, the compatible is identical to previous one
-> which will not handle a reset line.
+> I don't think armv8.2 is particularly helpful, because that effectively ties
+> together the SPE version and the architecture version, which I don't think
+> is strictly required.
+
+Sure; I was mostly going by the example of the generic timer (which
+changed somewhat between ARMv7 and ARMv8), but if SPE is somewhat
+decoupled from ARMv8.2 that's not a big concern.
+
+> The reason I added it was so that you could describe
+> a partner implementation as something like:
 > 
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
-> ---
->  .../devicetree/bindings/sound/sun4i-i2s.txt        | 23 ++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
+>   acme,arm-spe-pmu-v1
 > 
-> diff --git a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
-> index 7a2c0945fd22..f673206e309b 100644
-> --- a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
-> +++ b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
-> @@ -7,6 +7,7 @@ Required properties:
->  
->  - compatible: should be one of the following:
->     - "allwinner,sun4i-a10-i2s"
-> +   - "allwinner,sun6i-a31-i2s" for controller with reset lines
+> and know that it was acme's implementation of an ARM architectural feature.
 
-That's not only for controllers with reset lines, but for the
-controllers found in the A31 (and later). I'd simply drop the last
-part of that line.
+We don't seem to do this for the SMMU, or elsewhere that I am aware of.
 
->  - reg: physical base address of the controller and length of memory mapped
->    region.
->  - interrupts: should contain the I2S interrupt.
-> @@ -19,7 +20,13 @@ Required properties:
->     - "mod" : module clock for the I2S controller
->  - #sound-dai-cells : Must be equal to 0
->  
-> +Required properties for the following compatibles:
-> +		- "allwinner,sun6i-a31-i2s"
-> +- resets: phandle to the reset line for this codec
-> +- reset-names: Contains the reset signal name "rst"
+> If I drop the second "arm", I was worried that it might conflict with other
+> namespaces (e.g. acme's signal-processing-element's power-management-unit).
 
-You don't need reset-names if there's a single reset line.
+That does sound possible.
 
-> +
->  Example:
-> +For "allwinner,sun4i-a10-i2s":
->  
->  i2s0: i2s at 01c22400 {
->  	#sound-dai-cells = <0>;
-> @@ -32,3 +39,19 @@ i2s0: i2s at 01c22400 {
->  	       <&dma SUN4I_DMA_NORMAL 3>;
->  	dma-names = "rx", "tx";
->  };
-> +
-> +For "allwinner,sun6i-a31-i2s":
-> +
-> +dai: dai at 01c22c00 {
-> +	#sound-dai-cells = <0>;
-> +	compatible = "allwinner,sun6i-a31-i2s";
-> +	reg = <0x01c22c00 0x200>;
-> +	interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-> +	clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
-> +	clock-names = "apb", "mod";
-> +	resets = <&ccu RST_BUS_CODEC>;
-> +	reset-names = "rst";
-> +	dmas = <&dma 15>, /* AUDIO_CODEC port */
-> +		<&dma 15>; /* AUDIO_CODEC port */
-> +	dma-names = "rx", "tx";
-> +};
+Another way of avoiding this would be to expand "spe" (and we can drop
+"pmu", since that's not actually part of the SPE name, and implied
+anyhow).
 
-And we already have an example, so there's no need to add a new one
-either.
+How would you feel about:
 
-Thanks!
-Maxime
+"arm,statisitical-profiling-extension-v1"
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170117/798afa34/attachment.sig>
+Thanks,
+Mark.
