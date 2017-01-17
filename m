@@ -1,51 +1,37 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 17 Jan 2017 13:48:57 +0100
-Subject: [PATCH v5 3/4] dmaengine: pl330: Store pointer to slave device
-In-Reply-To: <1484657338-26338-1-git-send-email-m.szyprowski@samsung.com>
-References: <1484657338-26338-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170117124922eucas1p1d4037d80229e55007169cf85c19e5eec@eucas1p1.samsung.com>
-Message-ID: <1484657338-26338-4-git-send-email-m.szyprowski@samsung.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Tue, 17 Jan 2017 13:49:19 +0100
+Subject: [PATCH 3/4] arm64: dts: r8a7795: Link ARM GIC to clock and clock
+ domain
+In-Reply-To: <1484657360-13101-1-git-send-email-geert+renesas@glider.be>
+References: <1484657360-13101-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1484657360-13101-4-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Store the pointer to slave device, which requested our channel. It will be
-later used to implement runtime PM of PL330 DMA controller. Although
-DMA channels might be requested many times, each DMA peripheral channel is
-physically dedicated only for specific hardware, so there should be only
-one slave device for each channel.
+Link the ARM GIC to the INTC-AP module clock, and add it to the SYSC
+"always-on" PM Domain, so it can be power managed using that clock.
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Note that currently the GIC-400 driver doesn't support module clocks nor
+Runtime PM, so this must be handled as a critical clock.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- drivers/dma/pl330.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-index b6b2cc912380..c77a3494659c 100644
---- a/drivers/dma/pl330.c
-+++ b/drivers/dma/pl330.c
-@@ -450,6 +450,7 @@ struct dma_pl330_chan {
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 026a16ac41b422a1..0627df2a0b810c86 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -166,6 +166,9 @@
+ 			      <0x0 0xf1060000 0 0x20000>;
+ 			interrupts = <GIC_PPI 9
+ 					(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
++			clocks = <&cpg CPG_MOD 408>;
++			clock-names = "clk";
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+ 		};
  
- 	/* for runtime pm tracking */
- 	bool active;
-+	struct device *slave;
- };
- 
- struct pl330_dmac {
-@@ -2093,6 +2094,14 @@ static struct dma_chan *of_dma_pl330_xlate(struct of_phandle_args *dma_spec,
- 	if (chan_id >= pl330->num_peripherals)
- 		return NULL;
- 
-+	if (!pl330->peripherals[chan_id].slave) {
-+		pl330->peripherals[chan_id].slave = slave;
-+	} else if (pl330->peripherals[chan_id].slave != slave) {
-+		dev_err(pl330->ddma.dev,
-+			"Can't use same channel with multiple slave devices!\n");
-+		return NULL;
-+	}
-+
- 	return dma_get_slave_channel(&pl330->peripherals[chan_id].chan);
- }
- 
+ 		wdt0: watchdog at e6020000 {
 -- 
 1.9.1
