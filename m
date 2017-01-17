@@ -1,42 +1,103 @@
-From: mbenes@suse.cz (Miroslav Benes)
-Date: Tue, 17 Jan 2017 14:53:06 +0100 (CET)
-Subject: arm: Add livepatch arch specific code
-In-Reply-To: <20170117002239.GF9045@packer-debian-8-amd64.digitalocean.com>
-References: <1481043967-15602-1-git-send-email-abelvesa@linux.com>
- <1481043967-15602-2-git-send-email-abelvesa@linux.com>
- <alpine.LSU.2.20.1701161733531.17768@pobox.suse.cz>
- <20170117002239.GF9045@packer-debian-8-amd64.digitalocean.com>
-Message-ID: <alpine.LSU.2.20.1701171452030.20563@pobox.suse.cz>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 17 Jan 2017 14:53:50 +0100
+Subject: [PATCH v8 14/18] irqdomain: irq_domain_check_msi_remap
+In-Reply-To: <8db94e75-7939-c6da-2101-cfa73827c16c@semihalf.com>
+References: <1484127714-3263-1-git-send-email-eric.auger@redhat.com>
+ <1484127714-3263-15-git-send-email-eric.auger@redhat.com>
+ <8db94e75-7939-c6da-2101-cfa73827c16c@semihalf.com>
+Message-ID: <f5aacc54-ca8e-cb09-461a-6105346b18b9@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Tomasz,
 
-> > But apply_relocate_add() is not implemented on arm yet. I guess it would
-> > nice to have it... otherwise we could get to an unpleasant situation.
-> > Livepatch module can rely on its livepatching relocations (that is, there
-> > are some). apply_relocate_add() returns 0 on arm, so everything seems to
-> > be nice and then boom some time later.
+On 17/01/2017 14:40, Tomasz Nowicki wrote:
+> On 11.01.2017 10:41, Eric Auger wrote:
+>> This new function checks whether all MSI irq domains
+>> implement IRQ remapping. This is useful to understand
+>> whether VFIO passthrough is safe with respect to interrupts.
+>>
+>> On ARM typically an MSI controller can sit downstream
+>> to the IOMMU without preventing VFIO passthrough.
+>> As such any assigned device can write into the MSI doorbell.
+>> In case the MSI controller implements IRQ remapping, assigned
+>> devices will not be able to trigger interrupts towards the
+>> host. On the contrary, the assignment must be emphasized as
+>> unsafe with respect to interrupts.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+>> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+>>
+>> ---
+>> v7 -> v8:
+>> - remove goto in irq_domain_check_msi_remap
+>> - Added Marc's R-b
+>>
+>> v5 -> v6:
+>> - use irq_domain_hierarchical_is_msi_remap()
+>> - comment rewording
+>>
+>> v4 -> v5:
+>> - Handle DOMAIN_BUS_FSL_MC_MSI domains
+>> - Check parents
+>> ---
+>>  include/linux/irqdomain.h |  1 +
+>>  kernel/irq/irqdomain.c    | 22 ++++++++++++++++++++++
+>>  2 files changed, 23 insertions(+)
+>>
+>> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+>> index bc2f571..188eced 100644
+>> --- a/include/linux/irqdomain.h
+>> +++ b/include/linux/irqdomain.h
+>> @@ -222,6 +222,7 @@ struct irq_domain *irq_domain_add_legacy(struct
+>> device_node *of_node,
+>>                       void *host_data);
+>>  extern struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec
+>> *fwspec,
+>>                             enum irq_domain_bus_token bus_token);
+>> +extern bool irq_domain_check_msi_remap(void);
+>>  extern void irq_set_default_host(struct irq_domain *host);
+>>  extern int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
+>>                    irq_hw_number_t hwirq, int node,
+>> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+>> index 876e131..d889751 100644
+>> --- a/kernel/irq/irqdomain.c
+>> +++ b/kernel/irq/irqdomain.c
+>> @@ -278,6 +278,28 @@ struct irq_domain
+>> *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
+>>  EXPORT_SYMBOL_GPL(irq_find_matching_fwspec);
+>>
+>>  /**
+>> + * irq_domain_check_msi_remap - Check whether all MSI
+>> + * irq domains implement IRQ remapping
+>> + */
+>> +bool irq_domain_check_msi_remap(void)
+>> +{
+>> +    struct irq_domain *h;
+>> +    bool ret = true;
+>> +
+>> +    mutex_lock(&irq_domain_mutex);
+>> +    list_for_each_entry(h, &irq_domain_list, link) {
+>> +        if (irq_domain_is_msi(h) &&
+>> +            !irq_domain_hierarchical_is_msi_remap(h)) {
+>> +            ret = false;
+>> +            break;
+>> +        }
+>> +    }
+>> +    mutex_unlock(&irq_domain_mutex);
+>> +    return ret;
+>> +}
 > 
-> Doesn't it return -ENOEXEC? MODULES_USE_ELF_RELA is not defined
-> on arm, I think (see moduleloader.h).
+> Above function returns true, even though there is no MSI irq domains. Is
+> it intentional ?
+>From the VFIO integration point of view this is what we want. If there
+is no MSI controller in the system, we have no vulnerability with
+respect to IRQ assignment and we consider the system as safe. If
+requested I can add a comment?
 
-You're right. It confused me too.
- 
-> > The question is what happens with normal modules. There are no SHT_RELA
-> > records probably.
+Thanks
+
+Eric
 > 
-> For arm, I think there are only SHT_REL relocation sections
-> (MODULES_USE_ELF_REL is set instead of MODULES_USE_ELF_RELA), so
-> during apply_relocations() in load_module(), only apply_relocate()
-> should be called, and not apply_relocate_add().
-
-True.
-
-> Hm, I guess that means if we want livepatch support for the
-> architectures that don't support RELA relocations, we would have to
-> check if the section is SHT_REL or SHT_RELA before calling the right
-> apply_relocate* function.
-
-Agreed.
-
-Miroslav
+> Thanks,
+> Tomasz
