@@ -1,34 +1,70 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Tue, 17 Jan 2017 09:58:33 -0800
-Subject: [PATCH v6 23/25] usb: chipidea: Pullup D+ in device mode via phy
- APIs
-In-Reply-To: <20170116034551.GA27364@b29397-desktop>
-References: <20161228225711.698-1-stephen.boyd@linaro.org>
- <20161228225711.698-24-stephen.boyd@linaro.org>
- <20170103065318.GB14542@b29397-desktop>
- <148418039309.32258.7247753739063801774@sboyd-linaro>
- <20170112095040.GA15726@b29397-desktop>
- <148426139182.20672.2422337338087784924@sboyd-linaro>
- <20170113033536.GA20723@b29397-desktop>
- <148433778067.32719.6179204976256776867@sboyd-linaro>
- <20170116034551.GA27364@b29397-desktop>
-Message-ID: <148467591341.23457.3638889856786813589@sboyd-linaro>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 17 Jan 2017 18:04:47 +0000
+Subject: [PATCH] ARM: LPAE: catch pending imprecise abort on unmask
+In-Reply-To: <20170117174210.28122-1-alexander.sverdlin@nokia.com>
+References: <20170117174210.28122-1-alexander.sverdlin@nokia.com>
+Message-ID: <20170117180446.GF27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Peter Chen (2017-01-15 19:45:51)
+On Tue, Jan 17, 2017 at 06:42:10PM +0100, Alexander Sverdlin wrote:
+> Asynchronous external abort is coded differently in DFSR with LPAE enabled.
 > 
-> So, you need to call phy_set_mode when switching between host and device.
-> Besides, you also need to toggle VBUSVLDEXT when the external vbus
-> is on or off at device mode (doesn't need for host mode), is it correct?
+> Fixes: 9254970c "ARM: 8447/1: catch pending imprecise abort on unmask".
 
-Correct.
+Please drop it into the patch system, thanks.
 
 > 
-> At include/linux/usb/phy.h, we have .set_vbus interface, maybe you need
-> to port it to generic phy framework.
+> Signed-off-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
+> Cc: Russell King <linux@armlinux.org.uk>
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  arch/arm/mm/fault.c | 4 ++--
+>  arch/arm/mm/fault.h | 4 ++++
+>  2 files changed, 6 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+> index 3a2e678b8d30..0122ad1a6027 100644
+> --- a/arch/arm/mm/fault.c
+> +++ b/arch/arm/mm/fault.c
+> @@ -610,9 +610,9 @@ static int __init early_abort_handler(unsigned long addr, unsigned int fsr,
+>  
+>  void __init early_abt_enable(void)
+>  {
+> -	fsr_info[22].fn = early_abort_handler;
+> +	fsr_info[FSR_FS_AEA].fn = early_abort_handler;
+>  	local_abt_enable();
+> -	fsr_info[22].fn = do_bad;
+> +	fsr_info[FSR_FS_AEA].fn = do_bad;
+>  }
+>  
+>  #ifndef CONFIG_ARM_LPAE
+> diff --git a/arch/arm/mm/fault.h b/arch/arm/mm/fault.h
+> index 67532f242271..afc1f84e763b 100644
+> --- a/arch/arm/mm/fault.h
+> +++ b/arch/arm/mm/fault.h
+> @@ -11,11 +11,15 @@
+>  #define FSR_FS5_0		(0x3f)
+>  
+>  #ifdef CONFIG_ARM_LPAE
+> +#define FSR_FS_AEA		17
+> +
+>  static inline int fsr_fs(unsigned int fsr)
+>  {
+>  	return fsr & FSR_FS5_0;
+>  }
+>  #else
+> +#define FSR_FS_AEA		22
+> +
+>  static inline int fsr_fs(unsigned int fsr)
+>  {
+>  	return (fsr & FSR_FS3_0) | (fsr & FSR_FS4) >> 6;
+> -- 
+> 2.11.0
 > 
 
-Ok. I'll look into that. Can the other patches in this series be picked
-up? Otherwise I can resend them all again once I fix the phy_set_mode()
-call location and introduce a new phy op.
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
