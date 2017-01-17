@@ -1,178 +1,67 @@
-From: tnowicki@caviumnetworks.com (Tomasz Nowicki)
-Date: Tue, 17 Jan 2017 13:14:31 +0100
-Subject: [PATCH v8 06/18] iommu: iommu_get_group_resv_regions
-In-Reply-To: <1484127714-3263-7-git-send-email-eric.auger@redhat.com>
-References: <1484127714-3263-1-git-send-email-eric.auger@redhat.com>
- <1484127714-3263-7-git-send-email-eric.auger@redhat.com>
-Message-ID: <15053a96-c3c2-69d4-760b-a213f4bff53f@caviumnetworks.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 17 Jan 2017 12:14:59 +0000
+Subject: [PATCH] arm64: Fix swiotlb fallback allocation
+In-Reply-To: <1484567193-71258-1-git-send-email-agraf@suse.de>
+References: <1484567193-71258-1-git-send-email-agraf@suse.de>
+Message-ID: <20170117121459.GG18923@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.01.2017 10:41, Eric Auger wrote:
-> Introduce iommu_get_group_resv_regions whose role consists in
-> enumerating all devices from the group and collecting their
-> reserved regions. The list is sorted and overlaps between
-> regions of the same type are handled by merging the regions.
->
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+On Mon, Jan 16, 2017 at 12:46:33PM +0100, Alexander Graf wrote:
+> Commit b67a8b29df introduced logic to skip swiotlb allocation when all memory
+> is DMA accessible anyway.
+> 
+> While this is a great idea, __dma_alloc still calls swiotlb code unconditionally
+> to allocate memory when there is no CMA memory available. The swiotlb code is
+> called to ensure that we at least try get_free_pages().
+> 
+> Without initialization, swiotlb allocation code tries to access io_tlb_list
+> which is NULL. That results in a stack trace like this:
+> 
+>   Unable to handle kernel NULL pointer dereference at virtual address 00000000
+>   [...]
+>   [<ffff00000845b908>] swiotlb_tbl_map_single+0xd0/0x2b0
+>   [<ffff00000845be94>] swiotlb_alloc_coherent+0x10c/0x198
+>   [<ffff000008099dc0>] __dma_alloc+0x68/0x1a8
+>   [<ffff000000a1b410>] drm_gem_cma_create+0x98/0x108 [drm]
+>   [<ffff000000abcaac>] drm_fbdev_cma_create_with_funcs+0xbc/0x368 [drm_kms_helper]
+>   [<ffff000000abcd84>] drm_fbdev_cma_create+0x2c/0x40 [drm_kms_helper]
+>   [<ffff000000abc040>] drm_fb_helper_initial_config+0x238/0x410 [drm_kms_helper]
+>   [<ffff000000abce88>] drm_fbdev_cma_init_with_funcs+0x98/0x160 [drm_kms_helper]
+>   [<ffff000000abcf90>] drm_fbdev_cma_init+0x40/0x58 [drm_kms_helper]
+>   [<ffff000000b47980>] vc4_kms_load+0x90/0xf0 [vc4]
+>   [<ffff000000b46a94>] vc4_drm_bind+0xec/0x168 [vc4]
+>   [...]
+> 
+> Thankfully swiotlb code just learned how to not do allocations with the FORCE_NO
+> option. This patch configures the swiotlb code to use that if we decide not to
+> initialize the swiotlb framework.
+> 
+> Fixes: b67a8b29df ("arm64: mm: only initialize swiotlb when necessary")
+> Signed-off-by: Alexander Graf <agraf@suse.de>
+> CC: Catalin Marinas <catalin.marinas@arm.com>
+> CC: Jisheng Zhang <jszhang@marvell.com>
+> CC: Geert Uytterhoeven <geert+renesas@glider.be>
+> CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 
-Reviewed-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
+Thanks for the fix.
 
-Thanks,
-Tomasz
+BTW, I wonder whether we also need to improve the original commit
+slightly, in case we get a device mask smaller than what max_pfn covers:
 
->
-> ---
-> v6 -> v7:
-> - avoid merge of regions of different type
->
-> v3 -> v4:
-> - take the iommu_group lock in iommu_get_group_resv_regions
-> - the list now is sorted and overlaps are checked
->
-> NOTE:
-> - we do not move list elements from device to group list since
->   the iommu_put_resv_regions() could not be called.
-> - at the moment I did not introduce any iommu_put_group_resv_regions
->   since it simply consists in voiding/freeing the list
-> ---
->  drivers/iommu/iommu.c | 98 +++++++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/iommu.h |  8 +++++
->  2 files changed, 106 insertions(+)
->
-> diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-> index 41c1906..640056b 100644
-> --- a/drivers/iommu/iommu.c
-> +++ b/drivers/iommu/iommu.c
-> @@ -133,6 +133,104 @@ static ssize_t iommu_group_show_name(struct iommu_group *group, char *buf)
->  	return sprintf(buf, "%s\n", group->name);
->  }
->
-> +/**
-> + * iommu_insert_resv_region - Insert a new region in the
-> + * list of reserved regions.
-> + * @new: new region to insert
-> + * @regions: list of regions
-> + *
-> + * The new element is sorted by address with respect to the other
-> + * regions of the same type. In case it overlaps with another
-> + * region of the same type, regions are merged. In case it
-> + * overlaps with another region of different type, regions are
-> + * not merged.
-> + */
-> +static int iommu_insert_resv_region(struct iommu_resv_region *new,
-> +				    struct list_head *regions)
-> +{
-> +	struct iommu_resv_region *region;
-> +	phys_addr_t start = new->start;
-> +	phys_addr_t end = new->start + new->length - 1;
-> +	struct list_head *pos = regions->next;
-> +
-> +	while (pos != regions) {
-> +		struct iommu_resv_region *entry =
-> +			list_entry(pos, struct iommu_resv_region, list);
-> +		phys_addr_t a = entry->start;
-> +		phys_addr_t b = entry->start + entry->length - 1;
-> +		int type = entry->type;
-> +
-> +		if (end < a) {
-> +			goto insert;
-> +		} else if (start > b) {
-> +			pos = pos->next;
-> +		} else if ((start >= a) && (end <= b)) {
-> +			if (new->type == type)
-> +				goto done;
-> +			else
-> +				pos = pos->next;
-> +		} else {
-> +			if (new->type == type) {
-> +				phys_addr_t new_start = min(a, start);
-> +				phys_addr_t new_end = max(b, end);
-> +
-> +				list_del(&entry->list);
-> +				entry->start = new_start;
-> +				entry->length = new_end - new_start + 1;
-> +				iommu_insert_resv_region(entry, regions);
-> +			} else {
-> +				pos = pos->next;
-> +			}
-> +		}
-> +	}
-> +insert:
-> +	region = iommu_alloc_resv_region(new->start, new->length,
-> +					 new->prot, new->type);
-> +	if (!region)
-> +		return -ENOMEM;
-> +
-> +	list_add_tail(&region->list, pos);
-> +done:
-> +	return 0;
-> +}
-> +
-> +static int
-> +iommu_insert_device_resv_regions(struct list_head *dev_resv_regions,
-> +				 struct list_head *group_resv_regions)
-> +{
-> +	struct iommu_resv_region *entry;
-> +	int ret;
-> +
-> +	list_for_each_entry(entry, dev_resv_regions, list) {
-> +		ret = iommu_insert_resv_region(entry, group_resv_regions);
-> +		if (ret)
-> +			break;
-> +	}
-> +	return ret;
-> +}
-> +
-> +int iommu_get_group_resv_regions(struct iommu_group *group,
-> +				 struct list_head *head)
-> +{
-> +	struct iommu_device *device;
-> +	int ret = 0;
-> +
-> +	mutex_lock(&group->mutex);
-> +	list_for_each_entry(device, &group->devices, list) {
-> +		struct list_head dev_resv_regions;
-> +
-> +		INIT_LIST_HEAD(&dev_resv_regions);
-> +		iommu_get_resv_regions(device->dev, &dev_resv_regions);
-> +		ret = iommu_insert_device_resv_regions(&dev_resv_regions, head);
-> +		iommu_put_resv_regions(device->dev, &dev_resv_regions);
-> +		if (ret)
-> +			break;
-> +	}
-> +	mutex_unlock(&group->mutex);
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(iommu_get_group_resv_regions);
-> +
->  static IOMMU_GROUP_ATTR(name, S_IRUGO, iommu_group_show_name, NULL);
->
->  static void iommu_group_release(struct kobject *kobj)
-> diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-> index f6bb55d3..bec3730 100644
-> --- a/include/linux/iommu.h
-> +++ b/include/linux/iommu.h
-> @@ -246,6 +246,8 @@ extern void iommu_set_fault_handler(struct iommu_domain *domain,
->  extern int iommu_request_dm_for_dev(struct device *dev);
->  extern struct iommu_resv_region *
->  iommu_alloc_resv_region(phys_addr_t start, size_t length, int prot, int type);
-> +extern int iommu_get_group_resv_regions(struct iommu_group *group,
-> +					struct list_head *head);
->
->  extern int iommu_attach_group(struct iommu_domain *domain,
->  			      struct iommu_group *group);
-> @@ -463,6 +465,12 @@ static inline void iommu_put_resv_regions(struct device *dev,
->  {
->  }
->
-> +static inline int iommu_get_group_resv_regions(struct iommu_group *group,
-> +					       struct list_head *head)
-> +{
-> +	return -ENODEV;
-> +}
-> +
->  static inline int iommu_request_dm_for_dev(struct device *dev)
->  {
->  	return -ENODEV;
->
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index e04082700bb1..23090db2f5ba 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -349,7 +349,7 @@ static int __swiotlb_dma_supported(struct device *hwdev, u64 mask)
+ {
+ 	if (swiotlb)
+ 		return swiotlb_dma_supported(hwdev, mask);
+-	return 1;
++	return phys_to_dma(hwdev, PFN_PHYS(max_pfn) - 1) <= mask;
+ }
+ 
+ static struct dma_map_ops swiotlb_dma_ops = {
+
+-- 
+Catalin
