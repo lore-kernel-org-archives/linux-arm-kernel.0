@@ -1,112 +1,77 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 17 Jan 2017 10:20:49 +0000
-Subject: [RFC PATCH 28/33] irqchip/gic-v3-its: Support VPE doorbell
- invalidation even when !DirectLPI
+Date: Tue, 17 Jan 2017 10:20:38 +0000
+Subject: [RFC PATCH 17/33] irqchip/gic-v3-its: Add VLPI configuration hook
 In-Reply-To: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
 References: <1484648454-21216-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1484648454-21216-29-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1484648454-21216-18-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we don't have the DirectLPI feature, we must work around the
-architecture shortcomings to be able to perform the required
-invalidation.
-
-For this, we create a fake device whose sole purpose is to
-provide a way to issue a map/inv/unmap sequence (and the corresponding
-sync operations). That's 6 commands and a full serialization point
-to be able to do this.
-
-You just have hope the hypervisor won't do that too often...
+Add the skeleton irq_set_vcpu_affinity method that will be used
+to configure VLPIs.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 59 ++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 57 insertions(+), 2 deletions(-)
+ drivers/irqchip/irq-gic-v3-its.c | 33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 008fb71..3787579 100644
+index 0dbc8b0..1bd78ca 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -133,6 +133,9 @@ struct its_device {
- 	u32			device_id;
- };
+@@ -36,6 +36,7 @@
  
-+static struct its_device *vpe_proxy_dev;
-+static DEFINE_RAW_SPINLOCK(vpe_proxy_dev_lock);
-+
- static LIST_HEAD(its_nodes);
- static DEFINE_SPINLOCK(its_lock);
- static struct rdists *gic_rdists;
-@@ -993,8 +996,35 @@ static void lpi_update_config(struct irq_data *d, u8 clr, u8 set)
- 		struct its_vpe *vpe = irq_data_get_irq_chip_data(d);
- 		void __iomem *rdbase;
+ #include <linux/irqchip.h>
+ #include <linux/irqchip/arm-gic-v3.h>
++#include <linux/irqchip/arm-gic-v4.h>
  
--		rdbase = per_cpu_ptr(gic_rdists->rdist, vpe->col_idx)->rd_base;
--		writeq_relaxed(d->hwirq, rdbase + GICR_INVLPIR);
-+		if (gic_rdists->has_direct_lpi) {
-+			rdbase = per_cpu_ptr(gic_rdists->rdist, vpe->col_idx)->rd_base;
-+			writeq_relaxed(d->hwirq, rdbase + GICR_INVLPIR);
-+		} else {
-+			/*
-+			 * This is insane.
-+			 *
-+			 * If a GICv4 doesn't implement Direct LPIs,
-+			 * the only way to perform an invalidate is to
-+			 * use a fake device to issue a MAP/INV/UNMAP
-+			 * sequence. Since each of these commands has
-+			 * a sync operation, this is really fast. Not.
-+			 *
-+			 * We always use event 0, and this serialize
-+			 * all VPE invalidations in the system.
-+			 *
-+			 * Broken by design(tm).
-+			 */
-+			unsigned long flags;
-+
-+			raw_spin_lock_irqsave(&vpe_proxy_dev_lock, flags);
-+
-+			vpe_proxy_dev->event_map.col_map[0] = vpe->col_idx;
-+			its_send_mapvi(vpe_proxy_dev, vpe->vpe_db_lpi, 0);
-+			its_send_inv(vpe_proxy_dev, 0);
-+			its_send_discard(vpe_proxy_dev, 0);
-+
-+			raw_spin_unlock_irqrestore(&vpe_proxy_dev_lock, flags);
-+		}
- 	}
+ #include <asm/cputype.h>
+ #include <asm/exception.h>
+@@ -771,6 +772,37 @@ static int its_irq_set_irqchip_state(struct irq_data *d,
+ 	return 0;
  }
  
-@@ -2481,6 +2511,31 @@ static struct irq_domain *its_init_vpe_domain(void)
- 	struct fwnode_handle *handle;
- 	struct irq_domain *domain;
- 
-+	if (gic_rdists->has_direct_lpi) {
-+		pr_info("ITS: Using DirectLPI for VPE invalidation\n");
-+	} else {
-+		struct its_node *its;
++static int its_irq_set_vcpu_affinity(struct irq_data *d, void *vcpu_info)
++{
++	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
++	struct its_cmd_info *info = vcpu_info;
++	u32 event = its_get_event_id(d);
 +
-+		list_for_each_entry(its, &its_nodes, entry) {
-+			u32 devid;
++	/* Need a v4 ITS */
++	if (!its_dev->its->is_v4 || !info)
++		return -EINVAL;
 +
-+			if (!its->is_v4)
-+				continue;
-+
-+			/* Use the last possible DevID */
-+			devid = GENMASK(its->device_ids - 1, 0);
-+			vpe_proxy_dev = its_create_device(its, devid, 1);
-+			if (!vpe_proxy_dev) {
-+				pr_err("ITS: Can't allocate GICv4 proxy device\n");
-+				return NULL;
-+			}
-+
-+			pr_info("ITS: Allocated DevID %x as GICv4 proxy device\n",
-+				devid);
-+			break;
-+		}
++	switch (info->cmd_type) {
++	case MAP_VLPI:
++	{
++		return 0;
 +	}
 +
- 	handle = irq_domain_alloc_fwnode("VPE domain");
- 	if (!handle)
- 		return NULL;
++	case UNMAP_VLPI:
++	{
++		return 0;
++	}
++
++	case PROP_UPDATE_VLPI:
++	{
++		return 0;
++	}
++
++	default:
++		return -EINVAL;
++	}
++}
++
+ static struct irq_chip its_irq_chip = {
+ 	.name			= "ITS",
+ 	.irq_mask		= its_mask_irq,
+@@ -779,6 +811,7 @@ static struct irq_chip its_irq_chip = {
+ 	.irq_set_affinity	= its_set_affinity,
+ 	.irq_compose_msi_msg	= its_irq_compose_msi_msg,
+ 	.irq_set_irqchip_state	= its_irq_set_irqchip_state,
++	.irq_set_vcpu_affinity	= its_irq_set_vcpu_affinity,
+ };
+ 
+ /*
 -- 
 2.1.4
