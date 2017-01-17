@@ -1,40 +1,46 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 17 Jan 2017 21:10:55 +0100
-Subject: [GIT PULL] ARM: at91: defconfig for 4.11
-Message-ID: <20170117201055.6jcirstom52lowxa@piout.net>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 17 Jan 2017 12:11:12 -0800
+Subject: [GIT PULL] Amlogic fixes for v4.10-rc4
+In-Reply-To: <m2wpdt4qll.fsf@baylibre.com>
+References: <m2inpi6d09.fsf@baylibre.com>
+ <c781a080-455f-bba2-1bfb-cdd39343842b@suse.de>
+ <20170117060414.GD16607@localhost> <m2wpdt4qll.fsf@baylibre.com>
+Message-ID: <20170117201112.GA15508@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+On Tue, Jan 17, 2017 at 08:07:50AM -0800, Kevin Hilman wrote:
+> Hi Olof,
+> 
+> Olof Johansson <olof@lixom.net> writes:
+> 
+> > On Mon, Jan 16, 2017 at 03:24:59PM +0100, Andreas F??rber wrote:
+> >> Am 13.01.2017 um 19:17 schrieb Kevin Hilman:
+> >> > ----------------------------------------------------------------
+> >> > Amlogic fixes for v4.10-rc4
+> >> > - odroid-c2: disable DVFS to avoid crashes due to broken SCPI
+> >> > - fix misc. crashes by adding known reserved memory regions
+> >> > 
+> >> > ----------------------------------------------------------------
+> >> > Neil Armstrong (2):
+> >> >       ARM64: dts: meson-gxbb-odroidc2: Disable SCPI DVFS
+> >> 
+> >> >       ARM64: dts: meson-gx: Add reserved memory zone and usable memory range
+> >> 
+> >> Objection against the latter patch introducing widespread usage of
+> >> hardcoded linux,usable-memory properties - please review closely before
+> >> considering to merge.
+> >
+> > Holding off until that discussion has concluded. Following up on that thread as
+> > well.
+> 
+> While we rework the reserved memory fix, could you cherry-pick the SCPI
+> fix from this branch into fixes?  That one is independent from this, and
+> is also a nasty crash.
 
-A single patch, adding the drivers needed by the newly added Axentia
-TSE-850
+Sure! Applied to fixes.
 
-The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 
-  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+Thanks,
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.11-defconfig
-
-for you to fetch changes up to f46b1d47d4a14ddf0f935283c7c0bd0d446c54b0:
-
-  ARM: sama5_defconfig: add support for the Axentia TSE-850 board (2017-01-10 16:13:48 +0100)
-
-----------------------------------------------------------------
-defconfig for 4.11:
-
- - Add driver support for the Axentia TSE-850
-
-----------------------------------------------------------------
-Peter Rosin (1):
-      ARM: sama5_defconfig: add support for the Axentia TSE-850 board
-
- arch/arm/configs/sama5_defconfig | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+-Olof
