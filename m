@@ -1,54 +1,155 @@
 From: Minghuan.Lian@nxp.com (Minghuan Lian)
-Date: Tue, 17 Jan 2017 17:32:39 +0800
-Subject: [PATCH v3 5/9] arm64: dts: ls1043a: share all MSIs
+Date: Tue, 17 Jan 2017 17:32:42 +0800
+Subject: [PATCH v3 8/9] irqchip/ls-scfg-msi: add LS1043a v1.1 MSI support
 In-Reply-To: <1484645563-29877-1-git-send-email-Minghuan.Lian@nxp.com>
 References: <1484645563-29877-1-git-send-email-Minghuan.Lian@nxp.com>
-Message-ID: <1484645563-29877-6-git-send-email-Minghuan.Lian@nxp.com>
+Message-ID: <1484645563-29877-9-git-send-email-Minghuan.Lian@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to maximize the use of MSI, a PCIe controller will share
-all MSI controllers. The patch changes "msi-parent" to refer to all
-MSI controller dts nodes.
+A MSI controller of LS1043a v1.0 only includes one MSIR and
+is assigned one GIC interrupt. In order to support affinity,
+LS1043a v1.1 MSI is assigned 4 MSIRs and 4 GIC interrupts.
+But the MSIR has the different offset and only supports 8 MSIs.
+The bits between variable bit_start and bit_end in structure
+ls_scfg_msir are used to show 8 MSI interrupts. msir_irqs and
+msir_base are added to describe the difference of MSI between
+LS1043a v1.1 and other SoCs.
 
 Signed-off-by: Minghuan Lian <Minghuan.Lian@nxp.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
 v3-v1:
 - None
 
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ .../interrupt-controller/fsl,ls-scfg-msi.txt       |  1 +
+ drivers/irqchip/irq-ls-scfg-msi.c                  | 45 +++++++++++++++++++---
+ 2 files changed, 40 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-index 692fc35..3947220 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-@@ -625,7 +625,7 @@
- 			bus-range = <0x0 0xff>;
- 			ranges = <0x81000000 0x0 0x00000000 0x40 0x00010000 0x0 0x00010000   /* downstream I/O */
- 				  0x82000000 0x0 0x40000000 0x40 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
--			msi-parent = <&msi1>;
-+			msi-parent = <&msi1>, <&msi2>, <&msi3>;
- 			#interrupt-cells = <1>;
- 			interrupt-map-mask = <0 0 0 7>;
- 			interrupt-map = <0000 0 0 1 &gic 0 110 0x4>,
-@@ -650,7 +650,7 @@
- 			bus-range = <0x0 0xff>;
- 			ranges = <0x81000000 0x0 0x00000000 0x48 0x00010000 0x0 0x00010000   /* downstream I/O */
- 				  0x82000000 0x0 0x40000000 0x48 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
--			msi-parent = <&msi2>;
-+			msi-parent = <&msi1>, <&msi2>, <&msi3>;
- 			#interrupt-cells = <1>;
- 			interrupt-map-mask = <0 0 0 7>;
- 			interrupt-map = <0000 0 0 1 &gic 0 120  0x4>,
-@@ -675,7 +675,7 @@
- 			bus-range = <0x0 0xff>;
- 			ranges = <0x81000000 0x0 0x00000000 0x50 0x00010000 0x0 0x00010000   /* downstream I/O */
- 				  0x82000000 0x0 0x40000000 0x50 0x40000000 0x0 0x40000000>; /* non-prefetchable memory */
--			msi-parent = <&msi3>;
-+			msi-parent = <&msi1>, <&msi2>, <&msi3>;
- 			#interrupt-cells = <1>;
- 			interrupt-map-mask = <0 0 0 7>;
- 			interrupt-map = <0000 0 0 1 &gic 0 154 0x4>,
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt b/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
+index dde4552..49ccabb 100644
+--- a/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
++++ b/Documentation/devicetree/bindings/interrupt-controller/fsl,ls-scfg-msi.txt
+@@ -7,6 +7,7 @@ Required properties:
+               "fsl,ls1021a-msi"
+               "fsl,ls1043a-msi"
+               "fsl,ls1046a-msi"
++              "fsl,ls1043a-v1.1-msi"
+ - msi-controller: indicates that this is a PCIe MSI controller node
+ - reg: physical base address of the controller and length of memory mapped.
+ - interrupts: an interrupt to the parent interrupt controller.
+diff --git a/drivers/irqchip/irq-ls-scfg-msi.c b/drivers/irqchip/irq-ls-scfg-msi.c
+index 0b1f34d..8d57a59 100644
+--- a/drivers/irqchip/irq-ls-scfg-msi.c
++++ b/drivers/irqchip/irq-ls-scfg-msi.c
+@@ -25,14 +25,21 @@
+ #define MSI_IRQS_PER_MSIR	32
+ #define MSI_MSIR_OFFSET		4
+ 
++#define MSI_LS1043V1_1_IRQS_PER_MSIR	8
++#define MSI_LS1043V1_1_MSIR_OFFSET	0x10
++
+ struct ls_scfg_msi_cfg {
+ 	u32 ibs_shift; /* Shift of interrupt bit select */
++	u32 msir_irqs; /* The irq number per MSIR */
++	u32 msir_base; /* The base address of MSIR */
+ };
+ 
+ struct ls_scfg_msir {
+ 	struct ls_scfg_msi *msi_data;
+ 	unsigned int index;
+ 	unsigned int gic_irq;
++	unsigned int bit_start;
++	unsigned int bit_end;
+ 	void __iomem *reg;
+ };
+ 
+@@ -140,13 +147,18 @@ static void ls_scfg_msi_irq_handler(struct irq_desc *desc)
+ 	struct ls_scfg_msir *msir = irq_desc_get_handler_data(desc);
+ 	struct ls_scfg_msi *msi_data = msir->msi_data;
+ 	unsigned long val;
+-	int pos, virq, hwirq;
++	int pos, size, virq, hwirq;
+ 
+ 	chained_irq_enter(irq_desc_get_chip(desc), desc);
+ 
+ 	val = ioread32be(msir->reg);
+-	for_each_set_bit(pos, &val, MSI_IRQS_PER_MSIR) {
+-		hwirq = ((31 - pos) << msi_data->cfg->ibs_shift) | msir->index;
++
++	pos = msir->bit_start;
++	size = msir->bit_end + 1;
++
++	for_each_set_bit_from(pos, &val, size) {
++		hwirq = ((msir->bit_end - pos) << msi_data->cfg->ibs_shift) |
++			msir->index;
+ 		virq = irq_find_mapping(msi_data->parent, hwirq);
+ 		if (virq)
+ 			generic_handle_irq(virq);
+@@ -193,14 +205,24 @@ static int ls_scfg_msi_setup_hwirq(struct ls_scfg_msi *msi_data, int index)
+ 	msir->index = index;
+ 	msir->msi_data = msi_data;
+ 	msir->gic_irq = virq;
+-	msir->reg = msi_data->regs + MSI_MSIR_OFFSET + 4 * index;
++	msir->reg = msi_data->regs + msi_data->cfg->msir_base + 4 * index;
++
++	if (msi_data->cfg->msir_irqs == MSI_LS1043V1_1_IRQS_PER_MSIR) {
++		msir->bit_start = 32 - ((msir->index + 1) *
++				  MSI_LS1043V1_1_IRQS_PER_MSIR);
++		msir->bit_end = msir->bit_start +
++				MSI_LS1043V1_1_IRQS_PER_MSIR - 1;
++	} else {
++		msir->bit_start = 0;
++		msir->bit_end = msi_data->cfg->msir_irqs - 1;
++	}
+ 
+ 	irq_set_chained_handler_and_data(msir->gic_irq,
+ 					 ls_scfg_msi_irq_handler,
+ 					 msir);
+ 
+ 	/* Release the hwirqs corresponding to this MSIR */
+-	for (i = 0; i < MSI_IRQS_PER_MSIR; i++) {
++	for (i = 0; i < msi_data->cfg->msir_irqs; i++) {
+ 		hwirq = i << msi_data->cfg->ibs_shift | msir->index;
+ 		bitmap_clear(msi_data->used, hwirq, 1);
+ 	}
+@@ -216,7 +238,7 @@ static int ls_scfg_msi_teardown_hwirq(struct ls_scfg_msir *msir)
+ 	if (msir->gic_irq > 0)
+ 		irq_set_chained_handler_and_data(msir->gic_irq, NULL, NULL);
+ 
+-	for (i = 0; i < MSI_IRQS_PER_MSIR; i++) {
++	for (i = 0; i < msi_data->cfg->msir_irqs; i++) {
+ 		hwirq = i << msi_data->cfg->ibs_shift | msir->index;
+ 		bitmap_set(msi_data->used, hwirq, 1);
+ 	}
+@@ -226,10 +248,20 @@ static int ls_scfg_msi_teardown_hwirq(struct ls_scfg_msir *msir)
+ 
+ static struct ls_scfg_msi_cfg ls1021_msi_cfg = {
+ 	.ibs_shift = 3,
++	.msir_irqs = MSI_IRQS_PER_MSIR,
++	.msir_base = MSI_MSIR_OFFSET,
+ };
+ 
+ static struct ls_scfg_msi_cfg ls1046_msi_cfg = {
+ 	.ibs_shift = 2,
++	.msir_irqs = MSI_IRQS_PER_MSIR,
++	.msir_base = MSI_MSIR_OFFSET,
++};
++
++static struct ls_scfg_msi_cfg ls1043_v1_1_msi_cfg = {
++	.ibs_shift = 2,
++	.msir_irqs = MSI_LS1043V1_1_IRQS_PER_MSIR,
++	.msir_base = MSI_LS1043V1_1_MSIR_OFFSET,
+ };
+ 
+ static const struct of_device_id ls_scfg_msi_id[] = {
+@@ -239,6 +271,7 @@ static int ls_scfg_msi_teardown_hwirq(struct ls_scfg_msir *msir)
+ 
+ 	{ .compatible = "fsl,ls1021a-msi", .data = &ls1021_msi_cfg },
+ 	{ .compatible = "fsl,ls1043a-msi", .data = &ls1021_msi_cfg },
++	{ .compatible = "fsl,ls1043a-v1.1-msi", .data = &ls1043_v1_1_msi_cfg },
+ 	{ .compatible = "fsl,ls1046a-msi", .data = &ls1046_msi_cfg },
+ 	{},
+ };
 -- 
 1.9.1
