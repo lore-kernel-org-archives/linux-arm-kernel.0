@@ -1,69 +1,291 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 17 Jan 2017 09:21:27 +0100
-Subject: [PATCH v1] ARM: dts: imx: add fsl, imx35-wdt compatible to all
- relevant watchdog nodes
-In-Reply-To: <20170117012336.6891-1-vz@mleia.com>
-References: <20170117012336.6891-1-vz@mleia.com>
-Message-ID: <20170117082127.7kfxtvqg6t4a4ncc@pengutronix.de>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Tue, 17 Jan 2017 16:25:07 +0800
+Subject: drm: rockchip: CONFIG_DRM_FBDEV_EMULATION will crash the HDMI
+ down sometimes
+In-Reply-To: <edb88801-6ea1-3909-2e4e-ba78df6d3c7c@rock-chips.com>
+References: <edb88801-6ea1-3909-2e4e-ba78df6d3c7c@rock-chips.com>
+Message-ID: <587DD4E3.5070202@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 03:23:36AM +0200, Vladimir Zapolskiy wrote:
-> Watchdog device controller found on all modern SoCs from i.MX series
-> and firstly introduced in i.MX35 is not one in one compatible with the
-> watchdog controllers on i.MX21, i.MX27 and i.MX31, the latter
-> controlles don't have WICR (and pretimeout notification support) and
-> WMCR registers. To get benefit from the more advanced watchdog device
-> and to avoid operations over non-existing registers on legacy SoCs add
-> fsl,imx35-wdt compatible to descriptions of all i.MX35 compatible
-> watchdog controllers.
-> 
-> Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
-> ---
-> RFC change is found at https://patchwork.kernel.org/patch/9350007
-> 
-> Changes from RFC to v1:
-> * added the same change to devicetree bindings documentation, thanks
->   to Baruch Siach for review,
-> * replaced a new shared compatible derived from i.MX25 with an earlier
->   from i.MX35 SoC one, thanks to Uwe Kleine-K?nig for review.
-> 
-> Compatible "fsl,imx21-wdt" is preserved as a generic one, because
-> interface to a watchdog controller on i.MX35 is a superset of the
-> interface to a i.MX21 watchdog controller.
 
-One could argue here, but apart from the discussion if this is correct
-or not, choosing this way has the upside that teaching the driver after
-this change about the i.MX35 type doesn't make the machines based on the
-newer type suffer from a breakage for one commit.
+static void vop_plane_atomic_update(struct drm_plane *plane,
+         struct drm_plane_state *old_state)
+{
+     if (WARN_ON(!vop->is_enabled))
+         return;
 
->  Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt |  2 +-
+The issues seems vop is not enable. but commit planes is using 
+DRM_PLANE_COMMIT_ACTIVE_ONLY...
 
-When I created my patch set for this breakage I wondered if the
-documentation should point out which are the unique types.
+Hi Randy
 
->  arch/arm/boot/dts/imx25.dtsi                               |  3 ++-
->  arch/arm/boot/dts/imx50.dtsi                               |  3 ++-
->  arch/arm/boot/dts/imx51.dtsi                               |  6 ++++--
->  arch/arm/boot/dts/imx53.dtsi                               |  6 ++++--
->  arch/arm/boot/dts/imx6qdl.dtsi                             |  6 ++++--
->  arch/arm/boot/dts/imx6sl.dtsi                              |  6 ++++--
->  arch/arm/boot/dts/imx6sx.dtsi                              |  9 ++++++---
->  arch/arm/boot/dts/imx6ul.dtsi                              |  6 ++++--
->  arch/arm/boot/dts/imx7s.dtsi                               | 12 ++++++++----
->  arch/arm/boot/dts/ls1021a.dtsi                             |  2 +-
->  arch/arm/boot/dts/vfxxx.dtsi                               |  3 ++-
+Can you add some print for this bug:
+     1, I think vop_crtc_enable function should be call before 
+vop_plane_atomic_update, you can add some print to verified it.
+     2, also add a trace on vop_crtc_disable.
+     3, print the status of  crtc->state->active and 
+plane_crtc_active(plane->state) when bug happen.
 
-The imx21 type is also used in
+Thanks.
+On 2017?01?17? 15:58, Randy Li wrote:
+> Hello:
+>   I want to enable the video output at RK3288 Firefly board, but I 
+> found if I enable CONFIG_DRM_FBDEV_EMULATION, the HDMI would crash 
+> down sometimes but sometimes it works. After disable that opinion, I 
+> never meet a problem. I have not verified it with eDP as I meet a big 
+> problem in there.
+>
+> [  OK  ] Stopped LSB: Load kernel modules needed to enable cpufreq 
+> scaling.
+> [   33.282843] [drm:drm_atomic_helper_commit_cleanup_done 
+> [drm_kms_helper]] *ERROR* [CRTC:27:crtc-0] flip_done timed out
+> [   33.361489] ------------[ cut here ]------------
+> [   33.366251] WARNING: CPU: 2 PID: 476 at 
+> /home/ayaka/workspace/rk3288/kernel/linux-kernel/drivers/gpu/drm/rockchip/rockchip_drm$
+> vop.c:730 vop_plane_atomic_update+0x1218/0x177c [rockchipdrm]
+> [   33.383071] Modules linked in: rockchip_vop_reg rockchipdrm 
+> dw_hdmi_rockchip dw_hdmi drm_kms_helper cfbfillrect mali_kbase sys$
+> opyarea gpio_ir_recv cfbimgblt sysfillrect rc_core dwc2 sysimgblt 
+> fb_sys_fops panel_simple cfbcopyarea rk_crypto drm nvmem_rockch$
+> p_efuse udc_core des_generic phy_rockchip_usb pwm_rockchip pwm_bl 
+> backlight fb
+> [   33.412751] CPU: 2 PID: 476 Comm: X Tainted: G        W 
+> 4.10.0-rc3-next-20170111+ #148
+> [   33.421182] Hardware name: Rockchip (Device Tree)
+> [   33.425905] [<c0112b98>] (unwind_backtrace) from [<c010dab8>] 
+> (show_stack+0x20/0x24)
+> [   33.433652] [<c010dab8>] (show_stack) from [<c044973c>] 
+> (dump_stack+0x8c/0xa0)
+> [   33.440881] [<c044973c>] (dump_stack) from [<c0125f88>] 
+> (__warn+0xf8/0x110)
+> [   33.447839] [<c0125f88>] (__warn) from [<c01260b8>] 
+> (warn_slowpath_null+0x30/0x38)
+> [   33.455431] [<c01260b8>] (warn_slowpath_null) from [<bf5cb4dc>] 
+> (vop_plane_atomic_update+0x1218/0x177c [rockchipdrm])
+> [   33.466126] [<bf5cb4dc>] (vop_plane_atomic_update [rockchipdrm]) 
+> from [<bf4d8590>] (drm_atomic_helper_commit_planes+0xd4/0x2b8
+> [drm_kms_helper])
+> [   33.479160] [<bf4d8590>] (drm_atomic_helper_commit_planes 
+> [drm_kms_helper]) from [<bf5c6a88>] (rockchip_atomic_commit_tail+0x4$
+> /0x68 [rockchipdrm])
+> [   33.492451] [<bf5c6a88>] (rockchip_atomic_commit_tail 
+> [rockchipdrm]) from [<bf4dc714>] (commit_tail+0x50/0xb8 [drm_kms_helper]$
+> [   33.504061] [<bf4dc714>] (commit_tail [drm_kms_helper]) from 
+> [<bf4dc870>] (drm_atomic_helper_commit+0xd4/0x13c [drm_kms_helper$
+> )
+> [   33.515850] [<bf4dc870>] (drm_atomic_helper_commit 
+> [drm_kms_helper]) from [<bf09318c>] (drm_atomic_commit+0x5c/0x68 [drm])
+> [   33.527126] [<bf09318c>] (drm_atomic_commit [drm]) from 
+> [<bf4e00f8>] (restore_fbdev_mode+0x160/0x300 [drm_kms_helper])
+> [   33.537952] [<bf4e00f8>] (restore_fbdev_mode [drm_kms_helper]) from 
+> [<bf4e171c>] (drm_fb_helper_restore_fbdev_mode_unlocked+0x$
+> 0/0x84 [drm_kms_helper])
+> [   33.551590] [<bf4e171c>] (drm_fb_helper_restore_fbdev_mode_unlocked 
+> [drm_kms_helper]) from [<bf5c6218>] (rockchip_drm_lastclos$
+> +0x1c/0x20 [rockchipdrm])
+> [   33.565404] [<bf5c6218>] (rockchip_drm_lastclose [rockchipdrm]) 
+> from [<bf07d20c>] (drm_lastclose+0x48/0xd8 [drm])
+> [   33.575977] [<bf07d20c>] (drm_lastclose [drm]) from [<bf07d560>] 
+> (drm_release+0x2c4/0x36c [drm])
+> [   33.584927] [<bf07d560>] (drm_release [drm]) from [<c02d7b34>] 
+> (__fput+0x9c/0x1e8)
+> [   33.592501] [<c02d7b34>] (__fput) from [<c02d7cf0>] 
+> (____fput+0x18/0x1c)
+> [   33.599206] [<c02d7cf0>] (____fput) from [<c0146ed4>] 
+> (task_work_run+0xcc/0xf0)
+> [   33.606519] [<c0146ed4>] (task_work_run) from [<c010d1b0>] 
+> (do_work_pending+0xd0/0xd4)
+> [   33.614439] [<c010d1b0>] (do_work_pending) from [<c0108e28>] 
+> (slow_work_pending+0xc/0x20)
+> [   33.622674] ---[ end trace 95ed2c3f167607d2 ]---
+> [   33.627327] ------------[ cut here ]------------
+> [   33.632013] WARNING: CPU: 2 PID: 476 at 
+> /home/ayaka/workspace/rk3288/kernel/linux-kernel/drivers/gpu/drm/rockchip/rockchip_drm_
+> vop.c:1017 vop_crtc_atomic_flush+0x27c/0x2b8 [rockchipdrm]
+> [   33.648542] Modules linked in: rockchip_vop_reg rockchipdrm 
+> dw_hdmi_rockchip dw_hdmi drm_kms_helper cfbfillrect mali_kbase sysc
+> opyarea gpio_ir_recv cfbimgblt sysfillrect rc_core dwc2 sysimgblt 
+> fb_sys_fops panel_simple cfbcopyarea rk_crypto drm nvmem_rockchi
+> p_efuse udc_core des_generic phy_rockchip_usb pwm_rockchip pwm_bl 
+> backlight fb
+> [   33.678191] CPU: 2 PID: 476 Comm: X Tainted: G        W 
+> 4.10.0-rc3-next-20170111+ #148
+> [   33.686621] Hardware name: Rockchip (Device Tree)
+> [   33.691339] [<c0112b98>] (unwind_backtrace) from [<c010dab8>] 
+> (show_stack+0x20/0x24)
+> [   33.699084] [<c010dab8>] (show_stack) from [<c044973c>] 
+> (dump_stack+0x8c/0xa0)
+> [   33.706309] [<c044973c>] (dump_stack) from [<c0125f88>] 
+> (__warn+0xf8/0x110)
+> [   33.713275] [<c0125f88>] (__warn) from [<c01260b8>] 
+> (warn_slowpath_null+0x30/0x38)
+> [   33.720864] [<c01260b8>] (warn_slowpath_null) from [<bf5c83e0>] 
+> (vop_crtc_atomic_flush+0x27c/0x2b8 [rockchipdrm])
+> [   33.731208] [<bf5c83e0>] (vop_crtc_atomic_flush [rockchipdrm]) from 
+> [<bf4d868c>] (drm_atomic_helper_commit_planes+0x1d0/0x2b8 [
+> drm_kms_helper])
+> [   33.744159] [<bf4d868c>] (drm_atomic_helper_commit_planes 
+> [drm_kms_helper]) from [<bf5c6a88>] (rockchip_atomic_commit_tail+0x44
+> /0x68 [rockchipdrm])
+> [   33.757451] [<bf5c6a88>] (rockchip_atomic_commit_tail 
+> [rockchipdrm]) from [<bf4dc714>] (commit_tail+0x50/0xb8 [drm_kms_helper])
+> [   33.769064] [<bf4dc714>] (commit_tail [drm_kms_helper]) from 
+> [<bf4dc870>] (drm_atomic_helper_commit+0xd4/0x13c [drm_kms_helper]
+> )
+> [   33.780861] [<bf4dc870>] (drm_atomic_helper_commit 
+> [drm_kms_helper]) from [<bf09318c>] (drm_atomic_commit+0x5c/0x68 [drm])
+> [   33.792131] [<bf09318c>] (drm_atomic_commit [drm]) from 
+> [<bf4e00f8>] (restore_fbdev_mode+0x160/0x300 [drm_kms_helper])
+> [   33.802956] [<bf4e00f8>] (restore_fbdev_mode [drm_kms_helper]) from 
+> [<bf4e171c>] (drm_fb_helper_restore_fbdev_mode_unlocked+0x4
+> 0/0x84 [drm_kms_helper])
+> [   33.816590] [<bf4e171c>] (drm_fb_helper_restore_fbdev_mode_unlocked 
+> [drm_kms_helper]) from [<bf5c6218>] (rockchip_drm_lastclose
+> +0x1c/0x20 [rockchipdrm])
+> [   33.830406] [<bf5c6218>] (rockchip_drm_lastclose [rockchipdrm]) 
+> from [<bf07d20c>] (drm_lastclose+0x48/0xd8 [drm])
+> [   33.840975] [<bf07d20c>] (drm_lastclose [drm]) from [<bf07d560>] 
+> (drm_release+0x2c4/0x36c [drm])
+> [   33.849923] [<bf07d560>] (drm_release [drm]) from [<c02d7b34>] 
+> (__fput+0x9c/0x1e8)
+> [   33.857497] [<c02d7b34>] (__fput) from [<c02d7cf0>] 
+> (____fput+0x18/0x1c)
+> [   33.864201] [<c02d7cf0>] (____fput) from [<c0146ed4>] 
+> (task_work_run+0xcc/0xf0)
+> [   33.871514] [<c0146ed4>] (task_work_run) from [<c010d1b0>] 
+> (do_work_pending+0xd0/0xd4)
+> [   33.879434] [<c010d1b0>] (do_work_pending) from [<c0108e28>] 
+> (slow_work_pending+0xc/0x20)
+> [   33.887671] ---[ end trace 95ed2c3f167607d3 ]---
+> [   33.892322] ------------[ cut here ]------------
+> [   33.897058] WARNING: CPU: 2 PID: 476 at 
+> /home/ayaka/workspace/rk3288/kernel/linux-kernel/drivers/gpu/drm/drm_atomic_helper.c:15
+> 63 drm_atomic_helper_commit_hw_done+0xc0/0xc8 [drm_kms_helper]
+> [   33.913937] Modules linked in: rockchip_vop_reg rockchipdrm 
+> dw_hdmi_rockchip dw_hdmi drm_kms_helper cfbfillrect mali_kbase sysc
+> opyarea gpio_ir_recv cfbimgblt sysfillrect rc_core dwc2 sysimgblt 
+> fb_sys_fops panel_simple cfbcopyarea rk_crypto drm nvmem_rockchi
+> p_efuse udc_core des_generic phy_rockchip_usb pwm_rockchip pwm_bl 
+> backlight fb
+> [   33.943581] CPU: 2 PID: 476 Comm: X Tainted: G        W 
+> 4.10.0-rc3-next-20170111+ #148
+> [   33.952010] Hardware name: Rockchip (Device Tree)
+> [   33.956726] [<c0112b98>] (unwind_backtrace) from [<c010dab8>] 
+> (show_stack+0x20/0x24)
+> [   33.964470] [<c010dab8>] (show_stack) from [<c044973c>] 
+> (dump_stack+0x8c/0xa0)
+> [   33.971695] [<c044973c>] (dump_stack) from [<c0125f88>] 
+> (__warn+0xf8/0x110)
+> [   33.978661] [<c0125f88>] (__warn) from [<c01260b8>] 
+> (warn_slowpath_null+0x30/0x38)
+> [   33.986301] [<c01260b8>] (warn_slowpath_null) from [<bf4d9410>] 
+> (drm_atomic_helper_commit_hw_done+0xc0/0xc8 [drm_kms_helper])
+> [   33.997686] [<bf4d9410>] (drm_atomic_helper_commit_hw_done 
+> [drm_kms_helper]) from [<bf5c6a90>] (rockchip_atomic_commit_tail+0x4
+> c/0x68 [rockchipdrm])
+> [   34.011062] [<bf5c6a90>] (rockchip_atomic_commit_tail 
+> [rockchipdrm]) from [<bf4dc714>] (commit_tail+0x50/0xb8 [drm_kms_helper])
+> [   34.022670] [<bf4dc714>] (commit_tail [drm_kms_helper]) from 
+> [<bf4dc870>] (drm_atomic_helper_commit+0xd4/0x13c [drm_kms_helper]
+> )
+> [   34.034458] [<bf4dc870>] (drm_atomic_helper_commit 
+> [drm_kms_helper]) from [<bf09318c>] (drm_atomic_commit+0x5c/0x68 [drm])
+> [   34.045728] [<bf09318c>] (drm_atomic_commit [drm]) from 
+> [<bf4e00f8>] (restore_fbdev_mode+0x160/0x300 [drm_kms_helper])
+> [   34.056555] [<bf4e00f8>] (restore_fbdev_mode [drm_kms_helper]) from 
+> [<bf4e171c>] (drm_fb_helper_restore_fbdev_mode_unlocked+0x4
+> 0/0x84 [drm_kms_helper])
+> [   34.070190] [<bf4e171c>] (drm_fb_helper_restore_fbdev_mode_unlocked 
+> [drm_kms_helper]) from [<bf5c6218>] (rockchip_drm_lastclose
+> +0x1c/0x20 [rockchipdrm])
+> [   34.084005] [<bf5c6218>] (rockchip_drm_lastclose [rockchipdrm]) 
+> from [<bf07d20c>] (drm_lastclose+0x48/0xd8 [drm])
+> [   34.094581] [<bf07d20c>] (drm_lastclose [drm]) from [<bf07d560>] 
+> (drm_release+0x2c4/0x36c [drm])
+> [   34.103526] [<bf07d560>] (drm_release [drm]) from [<c02d7b34>] 
+> (__fput+0x9c/0x1e8)
+> [   34.111099] [<c02d7b34>] (__fput) from [<c02d7cf0>] 
+> (____fput+0x18/0x1c)
+> [   34.117802] [<c02d7cf0>] (____fput) from [<c0146ed4>] 
+> (task_work_run+0xcc/0xf0)
+> [   34.125115] [<c0146ed4>] (task_work_run) from [<c010d1b0>] 
+> (do_work_pending+0xd0/0xd4)
+> [   34.133034] [<c010d1b0>] (do_work_pending) from [<c0108e28>] 
+> (slow_work_pending+0xc/0x20)
+> [   34.141250] ---[ end trace 95ed2c3f167607d4 ]---
+> [   34.145921] ------------[ cut here ]------------
+> [   34.150566] WARNING: CPU: 2 PID: 476 at 
+> /home/ayaka/workspace/rk3288/kernel/linux-kernel/drivers/gpu/drm/rockchip/rockchip_drm_
+> vop.c:828 vop_crtc_enable_vblank+0x1ac/0x1b4 [rockchipdrm]
+> [   34.167054] Modules linked in: rockchip_vop_reg rockchipdrm 
+> dw_hdmi_rockchip dw_hdmi drm_kms_helper cfbfillrect mali_kbase sysc
+> opyarea gpio_ir_recv cfbimgblt sysfillrect rc_core dwc2 sysimgblt 
+> fb_sys_fops panel_simple cfbcopyarea rk_crypto drm nvmem_rockchi
+> p_efuse udc_core des_generic phy_rockchip_usb pwm_rockchip pwm_bl 
+> backlight fb
+> [   34.196651] CPU: 2 PID: 476 Comm: X Tainted: G        W 
+> 4.10.0-rc3-next-20170111+ #148
+> [   34.205078] Hardware name: Rockchip (Device Tree)
+> [   34.209794] [<c0112b98>] (unwind_backtrace) from [<c010dab8>] 
+> (show_stack+0x20/0x24)
+> [   34.217538] [<c010dab8>] (show_stack) from [<c044973c>] 
+> (dump_stack+0x8c/0xa0)
+> [   34.224763] [<c044973c>] (dump_stack) from [<c0125f88>] 
+> (__warn+0xf8/0x110)
+> [   34.231729] [<c0125f88>] (__warn) from [<c01260b8>] 
+> (warn_slowpath_null+0x30/0x38)
+> [   34.239318] [<c01260b8>] (warn_slowpath_null) from [<bf5c7b7c>] 
+> (vop_crtc_enable_vblank+0x1ac/0x1b4 [rockchipdrm])
+> [   34.249693] [<bf5c7b7c>] (vop_crtc_enable_vblank [rockchipdrm]) 
+> from [<bf5c61f0>] (rockchip_drm_crtc_enable_vblank+0x48/0x54 [r
+> ockchipdrm])
+> [   34.262378] [<bf5c61f0>] (rockchip_drm_crtc_enable_vblank 
+> [rockchipdrm]) from [<bf07ff80>] (drm_vblank_enable+0x8c/0xf8 [drm])
+> [   34.274077] [<bf07ff80>] (drm_vblank_enable [drm]) from 
+> [<bf0800b4>] (drm_vblank_get+0xc8/0xf0 [drm])
+> [   34.283616] [<bf0800b4>] (drm_vblank_get [drm]) from [<bf0800fc>] 
+> (drm_crtc_vblank_get+0x20/0x24 [drm])
+> [   34.293239] [<bf0800fc>] (drm_crtc_vblank_get [drm]) from 
+> [<bf4dc00c>] (drm_atomic_helper_wait_for_vblanks.part.0+0xa8/0x2a8 [d
+> rm_kms_helper])
+> [   34.306146] [<bf4dc00c>] (drm_atomic_helper_wait_for_vblanks.part.0 
+> [drm_kms_helper]) from [<bf4dc230>] (drm_atomic_helper_wait
+> _for_vblanks+0x24/0x28 [drm_kms_helper])
+> [   34.321176] [<bf4dc230>] (drm_atomic_helper_wait_for_vblanks 
+> [drm_kms_helper]) from [<bf5c6a9c>] (rockchip_atomic_commit_tail+0
+> x58/0x68 [rockchipdrm])
+> [   34.334725] [<bf5c6a9c>] (rockchip_atomic_commit_tail 
+> [rockchipdrm]) from [<bf4dc714>] (commit_tail+0x50/0xb8 [drm_kms_helper])
+> [   34.346330] [<bf4dc714>] (commit_tail [drm_kms_helper]) from 
+> [<bf4dc870>] (drm_atomic_helper_commit+0xd4/0x13c [drm_kms_helper]
+> )
+> [   34.358117] [<bf4dc870>] (drm_atomic_helper_commit 
+> [drm_kms_helper]) from [<bf09318c>] (drm_atomic_commit+0x5c/0x68 [drm])
+> [   34.369386] [<bf09318c>] (drm_atomic_commit [drm]) from 
+> [<bf4e00f8>] (restore_fbdev_mode+0x160/0x300 [drm_kms_helper])
+> [   34.380209] [<bf4e00f8>] (restore_fbdev_mode [drm_kms_helper]) from 
+> [<bf4e171c>] (drm_fb_helper_restore_fbdev_mode_unlocked+0x4
+> 0/0x84 [drm_kms_helper])
+> [   34.393845] [<bf4e171c>] (drm_fb_helper_restore_fbdev_mode_unlocked 
+> [drm_kms_helper]) from [<bf5c6218>] (rockchip_drm_lastclose
+> +0x1c/0x20 [rockchipdrm])
+> [   34.407664] [<bf5c6218>] (rockchip_drm_lastclose [rockchipdrm]) 
+> from [<bf07d20c>] (drm_lastclose+0x48/0xd8 [drm])
+> [   34.418237] [<bf07d20c>] (drm_lastclose [drm]) from [<bf07d560>] 
+> (drm_release+0x2c4/0x36c [drm])
+> [   34.427179] [<bf07d560>] (drm_release [drm]) from [<c02d7b34>] 
+> (__fput+0x9c/0x1e8)
+> [   34.434754] [<c02d7b34>] (__fput) from [<c02d7cf0>] 
+> (____fput+0x18/0x1c)
+> [   34.441458] [<c02d7cf0>] (____fput) from [<c0146ed4>] 
+> (task_work_run+0xcc/0xf0)
+> [   34.448769] [<c0146ed4>] (task_work_run) from [<c010d1b0>] 
+> (do_work_pending+0xd0/0xd4)
+> [   34.456688] [<c010d1b0>] (do_work_pending) from [<c0108e28>] 
+> (slow_work_pending+0xc/0x20)
+> [   34.464856] ---[ end trace 95ed2c3f167607d5 ]---
 
-	arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-	arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
-
-What about these?
-
-Best regards
-Uwe
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+?ark Yao
