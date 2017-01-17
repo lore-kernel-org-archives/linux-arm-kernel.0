@@ -1,57 +1,26 @@
-From: xieyisheng1@huawei.com (Yisheng Xie)
-Date: Tue, 17 Jan 2017 09:04:51 +0800
-Subject: [Question] A question about arm64 pte
-In-Reply-To: <20170116125724.GA16265@e103986-lin>
-References: <d284f510-f025-db84-f21e-a5b167d4bcd2@huawei.com>
- <20170116115606.GA6832@e104818-lin.cambridge.arm.com>
- <6b7a9bd2-37af-40cd-b723-9e648fbbc7c8@huawei.com>
- <20170116125724.GA16265@e103986-lin>
-Message-ID: <5fd5d70b-986c-3b26-1085-58fbd5dbd71e@huawei.com>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 16 Jan 2017 20:13:25 -0500 (EST)
+Subject: [PATCH v2 net-next 0/2] mvneta xmit_more and bql support
+In-Reply-To: <1484586512-16412-1-git-send-email-mw@semihalf.com>
+References: <1484586512-16412-1-git-send-email-mw@semihalf.com>
+Message-ID: <20170116.201325.2191165766691361664.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Marcin Wojtas <mw@semihalf.com>
+Date: Mon, 16 Jan 2017 18:08:30 +0100
 
-On 2017/1/16 20:57, Steve Capper wrote:
-> On Mon, Jan 16, 2017 at 08:39:56PM +0800, Yisheng Xie wrote:
->> hi Catalin,
->> Thank you so much for you reply.
->>
->> On 2017/1/16 19:56, Catalin Marinas wrote:
->>> On Mon, Jan 16, 2017 at 06:08:47PM +0800, Yisheng Xie wrote:
->>>> I have question about arm64 pte.
->>>
->>> I assume the context is ARMv8.0 (without hardware DBM support).
->>
->> Yes.
->>>
->>>> For arm64, PTE_WRITE?== PTE_DBM? is to mark whether the page is writable,
->>>> and PTE_DIRTY is to mark whether the page is dirty.
->>>> However, PTE_RDONLY is only cleared when both PTE_WRITE and PTE_DIRTY are set.
->>>
->>> That's what set_pte_at() does.
->>>
->>
->> So if we mmap a memory region use /dev/mem like:
->>    fildes = open("/dev/mem", O_RDWR | O_CREAT, 0777);
->>    addr = mmap(NULL, LEN, PROT_READ | PROT_WRITE, MAP_SHARED, fildes, offset);
->>
->> The PTE_RDONLY will be set? Right ?
->> However?when use memset to write the region it still works well, and the bit PTE_RDONLY is also cleared.
->> Is there anywhere clear the PTE_RDONLY before write that page ?
->>
+> This is a delayed v2 of short patchset, which introduces xmit_more and BQL
+> to mvneta driver. The only one change was added in xmit_more support -
+> condition check preventing excessive descriptors concatenation before
+> flushing in HW.
 > 
-> Hi Yisheng,
-> Out of interest, why is /dev/mem being accessed directly from userspace?
-hi Steve,
-Thank you for your reply.
-We just want to access some reserved memory region.
+> Any comments or feedback would be welcome.
+ ...
+> Changelog:
+> v1 -> v2:
+> 
+> * Add checking condition that ensures too much descriptors are not
+>   concatenated before flushing in HW.
 
-Thanks
-Yisheng Xie.
-
-> 
-> The case above will have subtley different logic (mmap_mem will affect
-> how things are actually mapped); which I'm trying to understand...
-> 
-> Cheers,
-> 
+Looks good, series applied, thanks.
