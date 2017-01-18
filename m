@@ -1,108 +1,50 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 18 Jan 2017 17:36:44 +0900
-Subject: [PATCH v2 10/13] pinctrl: samsung: Add infrastructure for
- pin-bank retention control
-In-Reply-To: <1484657084-26227-11-git-send-email-m.szyprowski@samsung.com>
-References: <CGME20170117124501eucas1p2ab3ec2a1dee18486878733826037d071@eucas1p2.samsung.com>
- <1484657084-26227-1-git-send-email-m.szyprowski@samsung.com>
- <1484657084-26227-11-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CA+Ln22FyDQ00cxNNxzthkxUwxcPRkJxGEC6g7m9rO2U4dNirKA@mail.gmail.com>
+From: tnowicki@caviumnetworks.com (Tomasz Nowicki)
+Date: Wed, 18 Jan 2017 09:36:44 +0100
+Subject: [PATCH v8 13/18] genirq/msi: Set IRQ_DOMAIN_FLAG_MSI on MSI
+ domain creation
+In-Reply-To: <1484127714-3263-14-git-send-email-eric.auger@redhat.com>
+References: <1484127714-3263-1-git-send-email-eric.auger@redhat.com>
+ <1484127714-3263-14-git-send-email-eric.auger@redhat.com>
+Message-ID: <0dd978ef-5834-f222-c49d-4f3775803562@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
-
-2017-01-17 21:44 GMT+09:00 Marek Szyprowski <m.szyprowski@samsung.com>:
-> Pad retention control after suspend/resume cycle should be done from pin
-> controller driver instead of PMU (power management unit) driver to avoid
-> possible ordering and logical dependencies. Till now it worked fine only
-> because PMU driver registered its sys_ops after pin controller.
+On 11.01.2017 10:41, Eric Auger wrote:
+> Now we have a flag value indicating an IRQ domain implements MSI,
+> let's set it on msi_create_irq_domain().
 >
-> This patch adds infrastructure to handle pad retention during pin control
-> driver resume.
->
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
-> ---
->  drivers/pinctrl/samsung/pinctrl-samsung.c | 12 +++++++++
->  drivers/pinctrl/samsung/pinctrl-samsung.h | 42 +++++++++++++++++++++++++++++++
->  2 files changed, 54 insertions(+)
->
-> diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
-> index 59f99ea7e65b..021abd7221f8 100644
-> --- a/drivers/pinctrl/samsung/pinctrl-samsung.c
-> +++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
-> @@ -1060,6 +1060,13 @@ static int samsung_pinctrl_probe(struct platform_device *pdev)
->         if (res)
->                 drvdata->irq = res->start;
->
-> +       if (ctrl->retention_data) {
-> +               drvdata->retention_ctrl = ctrl->retention_data->init(drvdata,
-> +                                                         ctrl->retention_data);
-> +               if (IS_ERR(drvdata->retention_ctrl))
-> +                       return PTR_ERR(drvdata->retention_ctrl);
-> +       }
-> +
->         ret = samsung_gpiolib_register(pdev, drvdata);
->         if (ret)
->                 return ret;
-> @@ -1126,6 +1133,8 @@ static void samsung_pinctrl_suspend_dev(
->
->         if (drvdata->suspend)
->                 drvdata->suspend(drvdata);
-> +       if (drvdata->retention_ctrl && drvdata->retention_ctrl->enable)
-> +               drvdata->retention_ctrl->enable(drvdata);
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Do we need to check presence of ->enable? I think it doesn't make much
-sense to provide retention_ctrl with NULL enable or disable.
+Reviewed-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
 
->  }
->
->  /**
-> @@ -1173,6 +1182,9 @@ static void samsung_pinctrl_resume_dev(struct samsung_pinctrl_drv_data *drvdata)
->                         if (widths[type])
->                                 writel(bank->pm_save[type], reg + offs[type]);
->         }
-> +
-> +       if (drvdata->retention_ctrl && drvdata->retention_ctrl->disable)
-> +               drvdata->retention_ctrl->disable(drvdata);
-
-Ditto.
-
->  }
->
->  /**
-> diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.h b/drivers/pinctrl/samsung/pinctrl-samsung.h
-> index 6f7ce7539a00..5ebbf4137a06 100644
-> --- a/drivers/pinctrl/samsung/pinctrl-samsung.h
-> +++ b/drivers/pinctrl/samsung/pinctrl-samsung.h
-> @@ -185,10 +185,48 @@ struct samsung_pin_bank {
->  };
->
->  /**
-> + * struct samsung_retention_data: runtime pin-bank retention control data.
-> + * @regs: array of PMU registers to control pad retention.
-> + * @nr_regs: number of registers in @regs array.
-> + * @value: value to store to registers to turn off retention.
-> + * @refcnt: atomic counter if retention control affects more than one bank.
-> + * @priv: retention control code private data
-> + * @on: platform specific callback to enter retention mode.
-> + * @off: platform specific callback to exit retention mode.
-
-s/on/enable/ and s/off/disable/ in comments too. Thanks for taking my
-bikeshedding into account, though. :)
-
-> + **/
-> +struct samsung_retention_ctrl {
-> +       const u32       *regs;
-> +       int             nr_regs;
-> +       u32             value;
-> +       atomic_t        *refcnt;
-> +       void            *priv;
-> +       void            (*enable)(struct samsung_pinctrl_drv_data *);
-> +       void            (*disable)(struct samsung_pinctrl_drv_data *);
-
-^^
-
-Best regards,
+Thanks,
 Tomasz
+
+>
+> ---
+>
+> v7 -> v8
+> - Added Marc's R-b
+>
+> v6: new
+> ---
+>  kernel/irq/msi.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
+> index ee23006..ddc2f54 100644
+> --- a/kernel/irq/msi.c
+> +++ b/kernel/irq/msi.c
+> @@ -270,8 +270,8 @@ struct irq_domain *msi_create_irq_domain(struct fwnode_handle *fwnode,
+>  	if (info->flags & MSI_FLAG_USE_DEF_CHIP_OPS)
+>  		msi_domain_update_chip_ops(info);
+>
+> -	return irq_domain_create_hierarchy(parent, 0, 0, fwnode,
+> -					   &msi_domain_ops, info);
+> +	return irq_domain_create_hierarchy(parent, IRQ_DOMAIN_FLAG_MSI, 0,
+> +					   fwnode, &msi_domain_ops, info);
+>  }
+>
+>  int msi_domain_prepare_irqs(struct irq_domain *domain, struct device *dev,
+>
