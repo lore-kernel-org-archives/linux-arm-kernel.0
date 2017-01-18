@@ -1,171 +1,69 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 18 Jan 2017 22:36:30 +0000
-Subject: [PATCH] ARM: mm: add testcases for RODATA
-In-Reply-To: <e5433e24-7a3d-25a4-26a3-9d02644cc3f4@redhat.com>
-References: <20170118135310.GA4733@pjb1027-Latitude-E5410>
- <e5433e24-7a3d-25a4-26a3-9d02644cc3f4@redhat.com>
-Message-ID: <20170118223629.GQ27312@n2100.armlinux.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 18 Jan 2017 16:38:16 -0600
+Subject: [PATCH v3 1/2] dt-bindings: mmc: add DT binding for S3C24XX
+ MMC/SD/SDIO controller
+In-Reply-To: <1484319953-6479-2-git-send-email-sergio.prado@e-labworks.com>
+References: <1484319953-6479-1-git-send-email-sergio.prado@e-labworks.com>
+ <1484319953-6479-2-git-send-email-sergio.prado@e-labworks.com>
+Message-ID: <20170118223816.nccyc7aoa7succsi@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2017 at 11:20:54AM -0800, Laura Abbott wrote:
-> On 01/18/2017 05:53 AM, Jinbum Park wrote:
-> > diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-> > index bdd283b..741e2e8 100644
-> > --- a/arch/arm/include/asm/cacheflush.h
-> > +++ b/arch/arm/include/asm/cacheflush.h
-> > @@ -498,6 +498,16 @@ static inline void set_kernel_text_rw(void) { }
-> >  static inline void set_kernel_text_ro(void) { }
-> >  #endif
-> >  
-> > +#ifdef CONFIG_DEBUG_RODATA_TEST
-> > +extern const int rodata_test_data;
-> > +int rodata_test(void);
-> > +#else
-> > +static inline int rodata_test(void)
-> > +{
-> > +	return 0;
-> > +}
-> > +#endif
-> > +
-
-I don't see why this needs to be in cacheflush.h - it doesn't seem to
-have anything to do with cache flushing, and placing it in here means
-that if you change the state of CONFIG_DEBUG_RODATA_TEST, most likely
-the entire kernel gets rebuilt.  Please put it in a separate header
-file.
-
-> > diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> > index 4127f57..3c15f3b 100644
-> > --- a/arch/arm/mm/init.c
-> > +++ b/arch/arm/mm/init.c
-> > @@ -716,6 +716,7 @@ void fix_kernmem_perms(void)
-> >  int __mark_rodata_ro(void *unused)
-> >  {
-> >  	update_sections_early(ro_perms, ARRAY_SIZE(ro_perms));
-> > +	rodata_test();
+On Fri, Jan 13, 2017 at 01:05:52PM -0200, Sergio Prado wrote:
+> Adds the device tree bindings description for Samsung S3C24XX
+> MMC/SD/SDIO controller, used as a connectivity interface with external
+> MMC, SD and SDIO storage mediums.
 > 
-> We don't do anything with this return value, should we at least
-> spit out a warning?
+> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
+> ---
+>  .../devicetree/bindings/mmc/samsung,s3cmci.txt     | 34 ++++++++++++++++++++++
+>  1 file changed, 34 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt
 > 
-> >  	return 0;
-> >  }
-> >  
-> > @@ -740,6 +741,11 @@ void set_kernel_text_ro(void)
-> >  static inline void fix_kernmem_perms(void) { }
-> >  #endif /* CONFIG_DEBUG_RODATA */
-> >  
-> > +#ifdef CONFIG_DEBUG_RODATA_TEST
-> > +const int rodata_test_data = 0xC3;
-> 
-> This isn't accessed outside of test_rodata.c, it can just
-> be moved there.
+> diff --git a/Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt b/Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt
+> new file mode 100644
+> index 000000000000..d09dbf4b3824
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt
+> @@ -0,0 +1,34 @@
+> +* Samsung's S3C24XX MMC/SD/SDIO controller device tree bindings
+> +
+> +Samsung's S3C24XX MMC/SD/SDIO controller is used as a connectivity interface
+> +with external MMC, SD and SDIO storage mediums.
+> +
+> +This file documents differences between the core mmc properties described by
+> +mmc.txt and the properties used by the Samsung S3C24XX MMC/SD/SDIO controller
+> +implementation.
+> +
+> +Required SoC Specific Properties:
+> +- compatible: should be one of the following
+> +  - "samsung,s3c2410-sdi": for controllers compatible with s3c2410
+> +  - "samsung,s3c2412-sdi": for controllers compatible with s3c2412
+> +  - "samsung,s3c2440-sdi": for controllers compatible with s3c2440
+> +- clocks: Should reference the controller clock
+> +- clock-names: Should contain "sdi"
 
-I think the intention was to place it in some .c file which gets built
-into the kernel, rather than a module, so testing whether read-only
-data in the kernel image is read-only.
+You are missing things from the example.
 
-If it's placed in a module, then you're only checking that read-only
-data in the module is read-only (which is another test which should
-be done!)
+> +
+> +Example:
+> +	mmc0: mmc at 5a000000 {
+> +		compatible = "samsung,s3c2440-sdi";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&sdi_pins>;
+> +		reg = <0x5a000000 0x100000>;
+> +		interrupts = <0 0 21 3>;
+> +		clocks = <&clocks PCLK_SDI>;
+> +		clock-names = "sdi";
+> +		bus-width = <4>;
+> +		cd-gpios = <&gpg 8 GPIO_ACTIVE_LOW>;
+> +		wp-gpios = <&gph 8 GPIO_ACTIVE_LOW>;
+> +	};
+> +
+> +	Note: This example shows both SoC specific and board specific properties
+> +	in a single device node. The properties can be actually be separated
+> +	into SoC specific node and board specific node.
 
-In any case, placing it in arch/arm/mm/init.c seems unnecessary, I'd
-rather it went in its own separate file.
+The source structure is not relavent to the binding.
 
-> > diff --git a/arch/arm/mm/test_rodata.c b/arch/arm/mm/test_rodata.c
-> > new file mode 100644
-> > index 0000000..133d092
-> > --- /dev/null
-> > +++ b/arch/arm/mm/test_rodata.c
-> > @@ -0,0 +1,79 @@
-> > +/*
-> > + * test_rodata.c: functional test for mark_rodata_ro function
-> > + *
-> > + * (C) Copyright 2017 Jinbum Park <jinb.park7@gmail.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or
-> > + * modify it under the terms of the GNU General Public License
-> > + * as published by the Free Software Foundation; version 2
-> > + * of the License.
-> > + */
-> > +#include <asm/cacheflush.h>
-> > +#include <asm/sections.h>
-> > +
-> > +int rodata_test(void)
-> > +{
-> > +	unsigned long result;
-> > +	unsigned long start, end;
-> > +
-> > +	/* test 1: read the value */
-> > +	/* If this test fails, some previous testrun has clobbered the state */
-> > +
-> > +	if (!rodata_test_data) {
-> > +		pr_err("rodata_test: test 1 fails (start data)\n");
-> > +		return -ENODEV;
-> > +	}
-> > +
-> > +	/* test 2: write to the variable; this should fault */
-> > +	/*
-> > +	 * If this test fails, we managed to overwrite the data
-> > +	 *
-> > +	 * This is written in assembly to be able to catch the
-> > +	 * exception that is supposed to happen in the correct
-> > +	 * case
-> > +	*/
-> > +
-> > +	result = 1;
-> > +	asm volatile(
-> > +		"0:	str %[zero], [%[rodata_test]]\n"
-> > +		"	mov %[rslt], %[zero]\n"
-> > +		"1:\n"
-> > +		".pushsection .text.fixup,\"ax\"\n"
-> > +		".align 2\n"
-> > +		"2:\n"
-> > +		"b 1b\n"
-> > +		".popsection\n"
-> > +		".pushsection __ex_table,\"a\"\n"
-> > +		".align 3\n"
-> > +		".long 0b, 2b\n"
-> > +		".popsection\n"
-> > +		: [rslt] "=r" (result)
-> > +		: [zero] "r" (0UL), [rodata_test] "r" (&rodata_test_data)
-> > +	);
-> > +
-> > +	if (!result) {
-> > +		pr_err("rodata_test: test data was not read only\n");
-> > +		return -ENODEV;
-> > +	}
-> > +
-> > +	/* test 3: check the value hasn't changed */
-> > +	/* If this test fails, we managed to overwrite the data */
-> > +	if (!rodata_test_data) {
-> > +		pr_err("rodata_test: Test 3 fails (end data)\n");
-> > +		return -ENODEV;
-> > +	}
-> 
-> I'm confused why we are checking this again when we have the result
-> check above. Is there a case where we would still have result = 1
-> but rodata_test_data overwritten?
-
-Seems sensible when you consider that "result" tests that _a_ fault
-happened.  Verifying that the data wasn't changed seems like a belt
-and braces approach, which ensures that the location really has not
-been modified.
-
-IOW, the test is "make sure that read-only data is not modified" not
-"make sure that writing to read-only data causes a fault".  They're
-two subtly different tests.
-
-> As Mark mentioned, this is possibly redundant with LKDTM. It
-> would be good to explain what benefit this is bringing in addition
-> to LKDTM.
-
-Finding https://lwn.net/Articles/198690/ and github links, it doesn't
-seem obvious that LKDTM actually does this.  It seems more focused on
-creating crashdumps than testing that (in this instance) write
-protection works - and it seems to be a destructive test.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Rob
