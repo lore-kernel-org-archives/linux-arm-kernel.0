@@ -1,28 +1,72 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 18 Jan 2017 08:06:38 +0100
-Subject: [PATCH net-next v4 05/10] drivers: base: Add
- device_find_in_class_name()
-In-Reply-To: <20170117232152.1661-6-f.fainelli@gmail.com>
-References: <20170117232152.1661-1-f.fainelli@gmail.com>
- <20170117232152.1661-6-f.fainelli@gmail.com>
-Message-ID: <20170118070638.GA28945@kroah.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 18 Jan 2017 08:07:22 +0100
+Subject: [PATCH v5 3/4] dmaengine: pl330: Store pointer to slave device
+In-Reply-To: <20170117172445.3itztktiay22as26@kozik-lap>
+References: <1484657338-26338-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170117124922eucas1p1d4037d80229e55007169cf85c19e5eec@eucas1p1.samsung.com>
+ <1484657338-26338-4-git-send-email-m.szyprowski@samsung.com>
+ <20170117172445.3itztktiay22as26@kozik-lap>
+Message-ID: <539bd321-66f5-9d06-923e-88dcb12787b8@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 03:21:47PM -0800, Florian Fainelli wrote:
-> Add a helper function to lookup a device reference given a class name.
-> This is a preliminary patch to remove adhoc code from net/dsa/dsa.c and
-> make it more generic.
-> 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
->  drivers/base/core.c    | 31 +++++++++++++++++++++++++++++++
->  include/linux/device.h |  2 ++
->  2 files changed, 33 insertions(+)
+Hi Krzysztof,
 
-My NAK still stands here, please give me a day or so to respond to the
-other thread about this...
+On 2017-01-17 18:29, Krzysztof Kozlowski wrote:
+> On Tue, Jan 17, 2017 at 01:48:57PM +0100, Marek Szyprowski wrote:
+>> Store the pointer to slave device, which requested our channel. It will be
+>> later used to implement runtime PM of PL330 DMA controller. Although
+>> DMA channels might be requested many times, each DMA peripheral channel is
+>> physically dedicated only for specific hardware, so there should be only
+>> one slave device for each channel.
+>>
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Any particular reason for removing my Reviewed-by? Any changes here?
 
-thanks,
+No changes here. I'm sorry, the tag got lost during rebase.
 
-greg k-h
+> Best regards,
+> Krzysztof
+>
+>> ---
+>>   drivers/dma/pl330.c | 9 +++++++++
+>>   1 file changed, 9 insertions(+)
+>>
+>> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+>> index b6b2cc912380..c77a3494659c 100644
+>> --- a/drivers/dma/pl330.c
+>> +++ b/drivers/dma/pl330.c
+>> @@ -450,6 +450,7 @@ struct dma_pl330_chan {
+>>   
+>>   	/* for runtime pm tracking */
+>>   	bool active;
+>> +	struct device *slave;
+>>   };
+>>   
+>>   struct pl330_dmac {
+>> @@ -2093,6 +2094,14 @@ static struct dma_chan *of_dma_pl330_xlate(struct of_phandle_args *dma_spec,
+>>   	if (chan_id >= pl330->num_peripherals)
+>>   		return NULL;
+>>   
+>> +	if (!pl330->peripherals[chan_id].slave) {
+>> +		pl330->peripherals[chan_id].slave = slave;
+>> +	} else if (pl330->peripherals[chan_id].slave != slave) {
+>> +		dev_err(pl330->ddma.dev,
+>> +			"Can't use same channel with multiple slave devices!\n");
+>> +		return NULL;
+>> +	}
+>> +
+>>   	return dma_get_slave_channel(&pl330->peripherals[chan_id].chan);
+>>   }
+>>   
+>> -- 
+>> 1.9.1
+>>
+>
+>
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
