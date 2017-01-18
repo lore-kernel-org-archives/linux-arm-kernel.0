@@ -1,193 +1,135 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Wed, 18 Jan 2017 12:27:37 +0800
-Subject: [PATCH v19 06/15] clocksource/drivers/arm_arch_timer: Rework
- counter frequency detection.
-In-Reply-To: <20170116175025.GJ5908@leverpostej>
-References: <20161221064603.11830-1-fu.wei@linaro.org>
- <20161221064603.11830-7-fu.wei@linaro.org>
- <20170116175025.GJ5908@leverpostej>
-Message-ID: <CADyBb7tMaOJ9D-AYnaNP1OX8kkst7DCkVT0giB2HqdrjSpgX3A@mail.gmail.com>
+From: baoyou.xie@linaro.org (Baoyou Xie)
+Date: Wed, 18 Jan 2017 12:42:00 +0800
+Subject: [PATCH v5 1/3] dt: bindings: add documentation for zx2967 family
+ thermal sensor
+Message-ID: <1484714522-26651-1-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+This patch adds dt-binding documentation for zx2967 family thermal sensor.
 
-On 17 January 2017 at 01:50, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Dec 21, 2016 at 02:45:54PM +0800, fu.wei at linaro.org wrote:
->> From: Fu Wei <fu.wei@linaro.org>
->>
->> Currently, the counter frequency detection call(arch_timer_detect_rate)
->> combines all the ways to get counter frequency: device-tree property,
->> system coprocessor register, MMIO timer. But in the most of use cases,
->> we don't need all the ways to try:
->> For example, reading device-tree property will be needed only when
->> system boot with device-tree, getting frequency from MMIO timer register
->> will beneeded only when we init MMIO timer.
->>
->> This patch separates paths to determine frequency:
->> Separate out device-tree code, keep them in device-tree init function.
->
-> Splitting these out makes sense to me.
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Shawn Guo <shawnguo@kernel.org>
+---
+ .../devicetree/bindings/thermal/zx2967-thermal.txt | 109 +++++++++++++++++++++
+ 1 file changed, 109 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/zx2967-thermal.txt
 
-OK , will do
-
->
->> Separate out the MMIO frequency and the sysreg frequency detection call,
->> and use the appropriate one for the counter.
->
->> Signed-off-by: Fu Wei <fu.wei@linaro.org>
->> Tested-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
->> ---
->>  drivers/clocksource/arm_arch_timer.c | 49 +++++++++++++++++++++++-------------
->>  1 file changed, 31 insertions(+), 18 deletions(-)
->>
->> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
->> index c7b4482..9a1f138 100644
->> --- a/drivers/clocksource/arm_arch_timer.c
->> +++ b/drivers/clocksource/arm_arch_timer.c
->> @@ -488,27 +488,31 @@ static int arch_timer_starting_cpu(unsigned int cpu)
->>       return 0;
->>  }
->>
->> -static void
->> -arch_timer_detect_rate(void __iomem *cntbase, struct device_node *np)
->> +static void arch_timer_detect_rate(void)
->>  {
->> -     /* Who has more than one independent system counter? */
->> -     if (arch_timer_rate)
->> -             return;
->> +     /*
->> +      * Try to get the timer frequency from
->> +      * cntfrq_el0(system coprocessor register).
->> +      */
->> +     if (!arch_timer_rate)
->> +             arch_timer_rate = arch_timer_get_cntfrq();
->> +
->> +     /* Check the timer frequency. */
->> +     if (!arch_timer_rate)
->> +             pr_warn("frequency not available\n");
->> +}
->>
->> +static void arch_timer_mem_detect_rate(void __iomem *cntbase)
->> +{
->>       /*
->> -      * Try to determine the frequency from the device tree or CNTFRQ,
->> -      * if ACPI is enabled, get the frequency from CNTFRQ ONLY.
->> +      * Try to determine the frequency from
->> +      * CNTFRQ in memory-mapped timer.
->>        */
->> -     if (!acpi_disabled ||
->> -         of_property_read_u32(np, "clock-frequency", &arch_timer_rate)) {
->> -             if (cntbase)
->> -                     arch_timer_rate = readl_relaxed(cntbase + CNTFRQ);
->> -             else
->> -                     arch_timer_rate = arch_timer_get_cntfrq();
->> -     }
->> +     if (!arch_timer_rate)
->> +             arch_timer_rate = readl_relaxed(cntbase + CNTFRQ);
->>
->>       /* Check the timer frequency. */
->> -     if (arch_timer_rate == 0)
->> +     if (!arch_timer_rate)
-
-I think you mean this one, this is for keeping consistency with
-arch_timer_detect_rate.
-
->>               pr_warn("frequency not available\n");
->>  }
->
-> There's a subtle change in behaviour here. Previously for ACPI we'd only
-> ever use the sysreg CNTFRQ value for arch_timer_rate, whereas now we
-> might use the MMIO timer rate. Maybe that's not a big deal, but I will
-> need to think.
->
-> Generally, the logic to determine the rate is fairly gnarly regardless.
->
-> It would be nice if we could split the MMIO and sysreg rates entirely,
-
-Yes, I am doing this way,
-
-For sysreg rates,
-static void arch_timer_detect_rate(void)
-{
-/*
-* Try to get the timer frequency from
-* cntfrq_el0(system coprocessor register).
-*/
-if (!arch_timer_rate)
-arch_timer_rate = arch_timer_get_cntfrq();
-
-/* Check the timer frequency. */
-if (!arch_timer_rate)
-pr_warn("frequency not available\n");
-}
-
-For MMIO timer,
-static void arch_timer_mem_detect_rate(void __iomem *cntbase)
-{
-/*
-* Try to determine the frequency from
-* CNTFRQ in memory-mapped timer.
-*/
-if (!arch_timer_rate)
-arch_timer_rate = readl_relaxed(cntbase + CNTFRQ);
-
-/* Check the timer frequency. */
-if (!arch_timer_rate)
-pr_warn("frequency not available\n");
-}
-
-in arch_time_*_init, only call  arch_timer_detect_rate,
-in arch_timer_mem_init, only call arch_timer_mem_detect_rate.
-
-But you are right, this is fairly gnarly regardless.
-
-> and kill the implicit relationship between the two, or at least make one
-> canonical and warn if the two differ.
-
-So I think maybe we can do this:
-
-static void __arch_timer_determine_rate(u32 rate)
-{
-/* Check the timer frequency. */
-if (!arch_timer_rate)
-if (rate)
-arch_timer_rate = rate;
-else
-pr_warn("frequency not available\n");
-else if (arch_timer_rate != rate)
-pr_warn("got different frequency, keep original.\n");
-}
-
-static void arch_timer_detect_rate(void)
-{
-/*
-* Try to get the timer frequency from
-* cntfrq_el0(system coprocessor register).
-*/
-__arch_timer_determine_rate(arch_timer_get_cntfrq());
-}
-
-static void arch_timer_mem_detect_rate(void __iomem *cntbase)
-{
-/*
-* Try to get the timer frequency from
-* CNTFRQ in the MMIO timer.
-*/
-__arch_timer_determine_rate(readl_relaxed(cntbase + CNTFRQ));
-}
-
-any thought?
-
->
-> Thanks,
-> Mark.
-
-
-
+diff --git a/Documentation/devicetree/bindings/thermal/zx2967-thermal.txt b/Documentation/devicetree/bindings/thermal/zx2967-thermal.txt
+new file mode 100644
+index 0000000..a96c8b3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/thermal/zx2967-thermal.txt
+@@ -0,0 +1,109 @@
++* ZTE zx2967 family Thermal
++
++Required Properties:
++- compatible: should be one of the following.
++    * zte,zx296718-thermal
++- reg: physical base address of the controller and length of memory mapped
++    region.
++- clocks : Pairs of phandle and specifier referencing the controller's clocks.
++- clock-names: "gate" for the topcrm clock.
++	       "pclk" for the apb clock.
++- #thermal-sensor-cells: must be 0.
++
++Example for tempsensor:
++
++	tempsensor: tempsensor at 148a000 {
++		compatible = "zte,zx296718-thermal";
++		reg = <0x0148a000 0x20>;
++		clocks = <&topcrm TEMPSENSOR_GATE>, <&audiocrm AUDIO_TS_PCLK>;
++		clock-names = "gate", "pclk";
++		#thermal-sensor-cells = <0>;
++	};
++
++Example for cooling device:
++
++	cooling_dev: cooling_dev {
++		cluster0_cooling_dev: cluster0-cooling-dev {
++			#cooling-cells = <2>;
++			cpumask = <0xf>;
++			capacitance = <1500>;
++		};
++
++	cluster1_cooling_dev: cluster1-cooling-dev {
++			#cooling-cells = <2>;
++			cpumask = <0x30>;
++			capacitance = <2000>;
++		};
++	};
++
++Example for thermal zones:
++
++	thermal-zones {
++		zx296718_thermal: zx296718_thermal {
++			polling-delay-passive = <500>;
++			polling-delay = <1000>;
++			sustainable-power = <6500>;
++
++			thermal-sensors = <&tempsensor 0>;
++
++			trips {
++				trip0: switch_on_temperature {
++					temperature = <90000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++
++				trip1: desired_temperature {
++					temperature = <100000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++
++				crit: critical_temperature {
++					temperature = <110000>;
++					hysteresis = <2000>;
++					type = "critical";
++				};
++			};
++
++			cooling-maps {
++				map0 {
++					trip = <&trip0>;
++					cooling-device = <&gpu 2 5>;
++				};
++
++				map1 {
++					trip = <&trip0>;
++					cooling-device = <&cluster0_cooling_dev 1 2>;
++				};
++
++				map2 {
++					trip = <&trip1>;
++					cooling-device = <&cluster0_cooling_dev 1 2>;
++				};
++
++				map3 {
++					trip = <&crit>;
++					cooling-device = <&cluster0_cooling_dev 1 2>;
++				};
++
++				map4 {
++					trip = <&trip0>;
++					cooling-device = <&cluster1_cooling_dev 1 2>;
++					contribution = <9000>;
++				};
++
++				map5 {
++					trip = <&trip1>;
++					cooling-device = <&cluster1_cooling_dev 1 2>;
++					contribution = <4096>;
++				};
++
++				map6 {
++					trip = <&crit>;
++					cooling-device = <&cluster1_cooling_dev 1 2>;
++					contribution = <4096>;
++				};
++			};
++		};
++	};
 -- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+2.7.4
