@@ -1,31 +1,32 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Wed, 18 Jan 2017 14:19:50 +0100
-Subject: [PATCH v3 02/13] ARM: davinci_all_defconfig: enable SATA modules
+Date: Wed, 18 Jan 2017 14:19:53 +0100
+Subject: [PATCH v3 05/13] ARM: davinci: da850: add con_id for the SATA clock
 In-Reply-To: <1484745601-4769-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1484745601-4769-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1484745601-4769-3-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1484745601-4769-6-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the da850-ahci driver to davinci defconfig.
+The ahci-da850 SATA driver is now capable of retrieving clocks by
+con_id. Add the connection id for the sysclk2-derived SATA clock.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/configs/davinci_all_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/mach-davinci/da850.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/davinci_all_defconfig b/arch/arm/configs/davinci_all_defconfig
-index 8806754..a1b9c58 100644
---- a/arch/arm/configs/davinci_all_defconfig
-+++ b/arch/arm/configs/davinci_all_defconfig
-@@ -78,6 +78,8 @@ CONFIG_IDE=m
- CONFIG_BLK_DEV_PALMCHIP_BK3710=m
- CONFIG_SCSI=m
- CONFIG_BLK_DEV_SD=m
-+CONFIG_ATA=m
-+CONFIG_AHCI_DA850=m
- CONFIG_NETDEVICES=y
- CONFIG_NETCONSOLE=y
- CONFIG_TUN=m
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index 1d873d1..dbf1daa 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -571,7 +571,7 @@ static struct clk_lookup da850_clks[] = {
+ 	CLK("spi_davinci.0",	NULL,		&spi0_clk),
+ 	CLK("spi_davinci.1",	NULL,		&spi1_clk),
+ 	CLK("vpif",		NULL,		&vpif_clk),
+-	CLK("ahci_da850",		NULL,		&sata_clk),
++	CLK("ahci_da850",	"sata",		&sata_clk),
+ 	CLK("davinci-rproc.0",	NULL,		&dsp_clk),
+ 	CLK(NULL,		NULL,		&ehrpwm_clk),
+ 	CLK("ehrpwm.0",		"fck",		&ehrpwm0_clk),
 -- 
 2.9.3
