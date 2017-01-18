@@ -1,58 +1,69 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Wed, 18 Jan 2017 05:48:56 +0100
-Subject: [PATCH v2 2/2] power/reset: at91-reset: remove leftover
- platform_device_id
-In-Reply-To: <20170117230738.28257-2-alexandre.belloni@free-electrons.com>
-References: <20170117230738.28257-1-alexandre.belloni@free-electrons.com>
- <20170117230738.28257-2-alexandre.belloni@free-electrons.com>
-Message-ID: <20170118044856.iszgtnwjuzdtl2i6@earth>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Wed, 18 Jan 2017 10:30:55 +0530
+Subject: odroid xu4:pinctrl and gpio mapping for usb 3.0
+Message-ID: <CANAwSgSsXXuFjK6ckyYBNCqwAp6KS1V+LwMBMNkzW90BxUxpAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexandre,
+Hi All,
 
-On Wed, Jan 18, 2017 at 12:07:38AM +0100, Alexandre Belloni wrote:
-> commit eacd8d09db7f ("power/reset: at91-reset: remove useless
-> at91_reset_platform_probe()") removed non DT probe support but forgot to
-> remove the now useless id_table. Do that now.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  drivers/power/reset/at91-reset.c | 8 --------
->  1 file changed, 8 deletions(-)
-> 
-> diff --git a/drivers/power/reset/at91-reset.c b/drivers/power/reset/at91-reset.c
-> index bb2588f0a4c7..b99769f8ab15 100644
-> --- a/drivers/power/reset/at91-reset.c
-> +++ b/drivers/power/reset/at91-reset.c
-> @@ -248,20 +248,12 @@ static int __exit at91_reset_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> -static const struct platform_device_id at91_reset_plat_match[] = {
-> -	{ "at91-sam9260-reset", (unsigned long)at91sam9260_restart },
-> -	{ "at91-sam9g45-reset", (unsigned long)at91sam9g45_restart },
-> -	{ /* sentinel */ }
-> -};
-> -MODULE_DEVICE_TABLE(platform, at91_reset_plat_match);
-> -
->  static struct platform_driver at91_reset_driver = {
->  	.remove = __exit_p(at91_reset_remove),
->  	.driver = {
->  		.name = "at91-reset",
->  		.of_match_table = at91_reset_of_match,
->  	},
-> -	.id_table = at91_reset_plat_match,
->  };
->  module_platform_driver_probe(at91_reset_driver, at91_reset_probe);
+I tried to find the link between pinctrl and internal gpio for usb 3.0 ports
+from the schematics, but I could not find valuable input.
 
-Thanks, also queued into power-supply's for-next branch.
+I tired to map the internal gpio pins to gather information on
+id-gpio and vbus-gpio pins, but it was no luck.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170118/baf17805/attachment.sig>
+I tried to debug the phy-exynos5-usbdrd.c and the vbus regulator
+input is missing, but with no correct input on internal gpio and pinctrl
+so it hard to map this correctly.
+
+Is their some thing missing configuration.
+
+Their are some issues into the phy-exynos5-usbdrd.c
+with respect to exynos5_usbdrd_phy_exit not getting called
+on the warm boot which leads to usb ports not getting reset.
+
+Please share me some input on improve the power on usb 3.0 ports
+
+odroid at odroidxu4n:~$ lsusb -t
+/:  Bus 06.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 5000M
+/:  Bus 05.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 480M
+    |__ Port 1: Dev 3, If 0, Class=Vendor Specific Class, Driver=r8152, 480M
+/:  Bus 04.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 5000M
+    |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/2p, 5000M
+        |__ Port 1: Dev 3, If 0, Class=Mass Storage, Driver=usb-storage, 5000M
+/:  Bus 03.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 480M
+    |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/2p, 480M
+        |__ Port 2: Dev 3, If 0, Class=Video, Driver=uvcvideo, 480M
+        |__ Port 2: Dev 3, If 1, Class=Video, Driver=uvcvideo, 480M
+/:  Bus 02.Port 1: Dev 1, Class=root_hub, Driver=exynos-ohci/3p, 12M
+/:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=exynos-ehci/3p, 480M
+
+root at odroidxu4n:~# lsusb -v|egrep "^Bus|MaxPower"
+Bus 006 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+    MaxPower                0mA
+Bus 005 Device 002: ID 0bda:8153 Realtek Semiconductor Corp.
+    MaxPower              180mA
+    MaxPower              180mA
+Bus 005 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+    MaxPower                0mA
+Bus 004 Device 003: ID 174c:5106 ASMedia Technology Inc. ASM1051 SATA
+3Gb/s bridge
+    MaxPower                0mA
+Bus 004 Device 002: ID 05e3:0616 Genesys Logic, Inc. hub
+    MaxPower                0mA
+Bus 004 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
+    MaxPower                0mA
+Bus 003 Device 004: ID 04b4:00f8 Cypress Semiconductor Corp.
+    MaxPower              500mA
+Bus 003 Device 002: ID 05e3:0610 Genesys Logic, Inc. 4-port hub
+    MaxPower              100mA
+Bus 003 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+    MaxPower                0mA
+Bus 002 Device 001: ID 1d6b:0001 Linux Foundation 1.1 root hub
+    MaxPower                0mA
+Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+    MaxPower                0mA
+
+-Best Regards
+Anand Moon
