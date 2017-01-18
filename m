@@ -1,45 +1,53 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 18 Jan 2017 12:16:48 -0300
-Subject: [PATCH 2/2] ARM: DTS: Fix register map for virt-capable GIC
-In-Reply-To: <1484736811-24002-3-git-send-email-marc.zyngier@arm.com>
-References: <1484736811-24002-1-git-send-email-marc.zyngier@arm.com>
- <1484736811-24002-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <e2295a5d-3224-1198-8b46-f45b153b540a@osg.samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 18 Jan 2017 15:17:29 +0000
+Subject: [PATCH v3 6/9] kvm: arm/arm64: Add host pmu to support VM
+ introspection
+In-Reply-To: <87fukgmnf0.fsf@e105922-lin.cambridge.arm.com>
+References: <20170110113856.7183-1-punit.agrawal@arm.com>
+ <20170110113856.7183-7-punit.agrawal@arm.com>
+ <1a6b8d71-58a5-b29b-3f01-e945deb2baf6@arm.com>
+ <20170118113523.GB3231@leverpostej>
+ <87o9z4msi3.fsf@e105922-lin.cambridge.arm.com>
+ <c2382140-b7ac-11d8-89f0-bf421e38f844@arm.com>
+ <87fukgmnf0.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <20170118151729.GI3231@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Marc,
+On Wed, Jan 18, 2017 at 02:51:31PM +0000, Punit Agrawal wrote:
+> I should've clarified in my reply that I wasn't looking to support the
+> third instance from Mark's examples above - "monitor all vCPUs on a
+> pCPU". I think it'll be quite expensive to figure out which threads from
+> a given pool are vCPUs.
 
-On 01/18/2017 07:53 AM, Marc Zyngier wrote:
-> Since everybody copied my own mistake from the DT binding example,
-> let's address all the offenders in one swift go.
-> 
-> Most of them got the CPU interface size wrong (4kB, while it should
-> be 8kB), except for both keystone platforms which got the control
-> interface wrong (4kB instead of 8kB).
-> 
-> In the couple of cases were I knew for sure what implementation
-> was used, I've added the "arm,gic-400" compatible string. I'm 99%
-> sure that this is what everyong is using, but short of having the
-> TRM for all the other SoCs, I've let them alone.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/boot/dts/exynos3250.dtsi    | 2 +-
->  arch/arm/boot/dts/exynos5.dtsi       | 2 +-
->  arch/arm/boot/dts/exynos5260.dtsi    | 2 +-
->  arch/arm/boot/dts/exynos5440.dtsi    | 2 +-
+I'm not sure I follow why you would need to do that?
 
-I've looked at the Exynos5250 and Exynos5420 TRM and both say that adopts
-GIC-400, so I think it's safe for you to also update the compatible in the
-exynos5.dtsi. Unfortunately I don't have manuals for 3250, 5260 and 5440.
+In that case, we'd open a CPU-bound perf event for the pCPU, which would
+get installed in the CPU context immediately. It would be present for
+all tasks.
 
-The register map changes looks good to me, so for Exynos:
+Given it's present for all tasks, we don't need to figure out which
+happen to have vCPUs. The !vCPU tasks simply shouldn't trigger events.
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Am I missing something?
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+> For the other instances, we only need to find the vCPU for a given
+> pid. Userspace will hand us a pid that needs to be checked against vCPUs
+> to establish that it is a valid vCPU pid (here I was looking to use
+> kvm_vcpu->pid and kvm->pid introduced in Patch 2).
+
+Thinking about this further, a pid is not a unique identifier for either
+a vCPU or a VM.
+
+A single task (which has a single pid), could own multiple VMs, each
+with multiple vCPUs. A thread pool (with several pids) could share those
+arbitrarily. So we need VM and vCPU IDs which are distinct from pids or
+tids.
+
+I see that struct kvm_vcpu has a vcpu_id (which from a glance appears to
+be local to the kvm instance). It's not clear to me if a kvm instance
+could be shared by multiple processes, or if we can get away with a
+process-local ID.
+
+Thanks,
+Mark.
