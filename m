@@ -1,129 +1,109 @@
-From: jun.gao@mediatek.com (Jun Gao)
-Date: Wed, 18 Jan 2017 17:41:01 +0800
-Subject: [RESEND PATCH 2/2] arm: dts: mt2701: Add i2c device node
-In-Reply-To: <1484732461-13594-1-git-send-email-jun.gao@mediatek.com>
-References: <1484732461-13594-1-git-send-email-jun.gao@mediatek.com>
-Message-ID: <1484732461-13594-3-git-send-email-jun.gao@mediatek.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Wed, 18 Jan 2017 10:42:04 +0100
+Subject: [PATCH v7 3/8] PWM: add pwm-stm32 DT bindings
+In-Reply-To: <20170118092021.GE18989@ulmo.ba.sec>
+References: <1483608344-9012-1-git-send-email-benjamin.gaignard@st.com>
+ <1483608344-9012-4-git-send-email-benjamin.gaignard@st.com>
+ <20170118092021.GE18989@ulmo.ba.sec>
+Message-ID: <CA+M3ks5t8j8bgyK7iq7oig_7+swiWzhB12=Q4q-umesWk4-m9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jun Gao <jun.gao@mediatek.com>
+2017-01-18 10:20 GMT+01:00 Thierry Reding <thierry.reding@gmail.com>:
+> On Thu, Jan 05, 2017 at 10:25:39AM +0100, Benjamin Gaignard wrote:
+>> Define bindings for pwm-stm32
+>>
+>> version 6:
+>> - change st,breakinput parameter format to make it usuable on stm32f7 too.
+>>
+>> version 2:
+>> - use parameters instead of compatible of handle the hardware configuration
+>>
+>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+>> ---
+>>  .../devicetree/bindings/pwm/pwm-stm32.txt          | 33 ++++++++++++++++++++++
+>>  1 file changed, 33 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/pwm/pwm-stm32.txt b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+>> new file mode 100644
+>> index 0000000..866f222
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+>> @@ -0,0 +1,33 @@
+>> +STMicroelectronics STM32 Timers PWM bindings
+>> +
+>> +Must be a sub-node of an STM32 Timers device tree node.
+>> +See ../mfd/stm32-timers.txt for details about the parent node.
+>> +
+>> +Required parameters:
+>> +- compatible:                Must be "st,stm32-pwm".
+>> +- pinctrl-names:     Set to "default".
+>> +- pinctrl-0:                 List of phandles pointing to pin configuration nodes for PWM module.
+>> +                     For Pinctrl properties see ../pinctrl/pinctrl-bindings.txt
+>> +
+>> +Optional parameters:
+>> +- st,breakinput:     Arrays of three u32 <index level filter> to describe break input configurations.
+>> +                     "index" indicates on which break input the configuration should be applied.
+>
+> It might be useful to specify what the valid values are for the break
+> input index.
 
-Add i2c device node for MT2701.
+It could 0 and 1, I will add this information.
 
-Signed-off-by: Jun Gao <jun.gao@mediatek.com>
----
- arch/arm/boot/dts/mt2701-evb.dts |   44 ++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/mt2701.dtsi    |   42 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 86 insertions(+)
+>
+> Also, u32 is kind of a Linuxism, perhaps "Arrays of three cells"? Also,
+> does this mean there can be multiple entries? Such as 6 cells for two
+> configurations? What's the maximum number of such configurations?
+>
+> If it's possible to specify multiple configurations, maybe a slightly
+> clearer wording would be: "One or more <index level filter> triplets to
+> describe..."
+>
 
-diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
-index 082ca88..a908e94 100644
---- a/arch/arm/boot/dts/mt2701-evb.dts
-+++ b/arch/arm/boot/dts/mt2701-evb.dts
-@@ -24,6 +24,50 @@
- 	};
- };
- 
-+&i2c0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "okay";
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins_a>;
-+	status = "okay";
-+};
-+
-+&pio {
-+	i2c0_pins_a: i2c0 at 0 {
-+		pins1 {
-+			pinmux = <MT2701_PIN_75_SDA0__FUNC_SDA0>,
-+				 <MT2701_PIN_76_SCL0__FUNC_SCL0>;
-+			bias-disable;
-+		};
-+	};
-+
-+	i2c1_pins_a: i2c1 at 0 {
-+		pins1 {
-+			pinmux = <MT2701_PIN_57_SDA1__FUNC_SDA1>,
-+				 <MT2701_PIN_58_SCL1__FUNC_SCL1>;
-+			bias-disable;
-+		};
-+	};
-+
-+	i2c2_pins_a: i2c2 at 0 {
-+		pins1 {
-+			pinmux = <MT2701_PIN_77_SDA2__FUNC_SDA2>,
-+				 <MT2701_PIN_78_SCL2__FUNC_SCL2>;
-+			bias-disable;
-+		};
-+	};
-+};
-+
- &uart0 {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index bdf8954..0d1539f 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -227,6 +227,48 @@
- 		status = "disabled";
- 	};
- 
-+	i2c0: i2c at 11007000 {
-+		compatible = "mediatek,mt2701-i2c",
-+			     "mediatek,mt6577-i2c";
-+		reg = <0 0x11007000 0 0x70>,
-+		      <0 0x11000200 0 0x80>;
-+		interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_LOW>;
-+		clock-div = <16>;
-+		clocks = <&pericfg CLK_PERI_I2C0>, <&pericfg CLK_PERI_AP_DMA>;
-+		clock-names = "main", "dma";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
-+
-+	i2c1: i2c at 11008000 {
-+		compatible = "mediatek,mt2701-i2c",
-+			     "mediatek,mt6577-i2c";
-+		reg = <0 0x11008000 0 0x70>,
-+		      <0 0x11000280 0 0x80>;
-+		interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_LOW>;
-+		clock-div = <16>;
-+		clocks = <&pericfg CLK_PERI_I2C1>, <&pericfg CLK_PERI_AP_DMA>;
-+		clock-names = "main", "dma";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
-+
-+	i2c2: i2c at 11009000 {
-+		compatible = "mediatek,mt2701-i2c",
-+			     "mediatek,mt6577-i2c";
-+		reg = <0 0x11009000 0 0x70>,
-+		      <0 0x11000300 0 0x80>;
-+		interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_LOW>;
-+		clock-div = <16>;
-+		clocks = <&pericfg CLK_PERI_I2C2>, <&pericfg CLK_PERI_AP_DMA>;
-+		clock-names = "main", "dma";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
-+
- 	mmsys: syscon at 14000000 {
- 		compatible = "mediatek,mt2701-mmsys", "syscon";
- 		reg = <0 0x14000000 0 0x1000>;
+You can have one configuration per index so I will rephrase it like that:
+One or two <index level filter> to describe break input configurations.
+"index" indicates on which break input (0 or 1 ) the configuration
+should be applied.
+
+
+>> +                     "level" gives the active level (0=low or 1=high) for this configuration.
+>
+> So how does this work exactly? "level" specifies the output level if the
+> filter value is matched?
+
+No it specify on which input level the break event is generated
+
+>
+>> +                     "filter" gives the filtering value to be applied.
+>
+> Is this a single value at which "level" will be applied? Or is it an
+> upper/lower bound that can be used to restrict the output to "level" if
+> the signal goes beyond/below a certain threshold?
+
+Very very basically filter is more a debounce value set on the signal
+to avoid glitches.
+The goal of break input feature is to stop PWM generation in hardware
+errors failure case.
+
+For a more completed description you can read "using break input
+function" (starting page 645) in this doc:
+
+http://www.st.com/content/ccc/resource/technical/document/reference_manual/c5/cf/ef/52/c0/f1/4b/fa/DM00124865.pdf/files/DM00124865.pdf/jcr:content/translations/en.DM00124865.pdf
+
+>
+> Maybe an example would clarify this. Or perhaps a reference to a manual
+> where a more in-depth description of this functionality can be found.
+>
+> Thierry
+
+
+
 -- 
-1.7.9.5
+Benjamin Gaignard
+
+Graphic Study Group
+
+Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro: Facebook | Twitter | Blog
