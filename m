@@ -1,336 +1,584 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 18 Jan 2017 11:13:21 +0000
-Subject: [RFC PATCH v5 5/7] ARM: NOMMU: Introduce dma operations for noMMU
-In-Reply-To: <1484738003-29892-1-git-send-email-vladimir.murzin@arm.com>
-References: <1484738003-29892-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1484738003-29892-6-git-send-email-vladimir.murzin@arm.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Wed, 18 Jan 2017 12:15:58 +0100
+Subject: [PATCH v7 4/8] PWM: add PWM driver for STM32 plaftorm
+In-Reply-To: <20170118100817.GF18989@ulmo.ba.sec>
+References: <1483608344-9012-1-git-send-email-benjamin.gaignard@st.com>
+ <1483608344-9012-5-git-send-email-benjamin.gaignard@st.com>
+ <20170118100817.GF18989@ulmo.ba.sec>
+Message-ID: <CA+M3ks64VEE8a0oeiA8J-T5FDzwWTo=pdaMACy+pz7EyOQY-Jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-R/M classes of cpus can have memory covered by MPU which in turn might
-configure RAM as Normal i.e. bufferable and cacheable. It breaks
-dma_alloc_coherent() and friends, since data can stuck in caches now
-or be buffered.
+2017-01-18 11:08 GMT+01:00 Thierry Reding <thierry.reding@gmail.com>:
+> On Thu, Jan 05, 2017 at 10:25:40AM +0100, Benjamin Gaignard wrote:
+>> This driver adds support for PWM driver on STM32 platform.
+>> The SoC have multiple instances of the hardware IP and each
+>> of them could have small differences: number of channels,
+>> complementary output, auto reload register size...
+>>
+>> version 6:
+>> - change st,breakinput parameter to make it usuable for stm32f7 too.
+>>
+>> version 4:
+>> - detect at probe time hardware capabilities
+>> - fix comments done on v2 and v3
+>> - use PWM atomic ops
+>>
+>> version 2:
+>> - only keep one comptatible
+>> - use DT parameters to discover hardware block configuration
+>>
+>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+>> ---
+>>  drivers/pwm/Kconfig     |   9 +
+>>  drivers/pwm/Makefile    |   1 +
+>>  drivers/pwm/pwm-stm32.c | 434 ++++++++++++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 444 insertions(+)
+>>  create mode 100644 drivers/pwm/pwm-stm32.c
+>>
+>> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+>> index f92dd41..88035c0 100644
+>> --- a/drivers/pwm/Kconfig
+>> +++ b/drivers/pwm/Kconfig
+>> @@ -397,6 +397,15 @@ config PWM_STI
+>>         To compile this driver as a module, choose M here: the module
+>>         will be called pwm-sti.
+>>
+>> +config PWM_STM32
+>> +     tristate "STMicroelectronics STM32 PWM"
+>> +     depends on (ARCH_STM32 && OF && MFD_STM32_TIMERS) || COMPILE_TEST
+>> +     help
+>> +       Generic PWM framework driver for STM32 SoCs.
+>> +
+>> +       To compile this driver as a module, choose M here: the module
+>> +       will be called pwm-stm32.
+>> +
+>>  config PWM_STMPE
+>>       bool "STMPE expander PWM export"
+>>       depends on MFD_STMPE
+>> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
+>> index a48bdb5..346a83b 100644
+>> --- a/drivers/pwm/Makefile
+>> +++ b/drivers/pwm/Makefile
+>> @@ -38,6 +38,7 @@ obj-$(CONFIG_PWM_ROCKCHIP)  += pwm-rockchip.o
+>>  obj-$(CONFIG_PWM_SAMSUNG)    += pwm-samsung.o
+>>  obj-$(CONFIG_PWM_SPEAR)              += pwm-spear.o
+>>  obj-$(CONFIG_PWM_STI)                += pwm-sti.o
+>> +obj-$(CONFIG_PWM_STM32)              += pwm-stm32.o
+>>  obj-$(CONFIG_PWM_STMPE)              += pwm-stmpe.o
+>>  obj-$(CONFIG_PWM_SUN4I)              += pwm-sun4i.o
+>>  obj-$(CONFIG_PWM_TEGRA)              += pwm-tegra.o
+>> diff --git a/drivers/pwm/pwm-stm32.c b/drivers/pwm/pwm-stm32.c
+>> new file mode 100644
+>> index 0000000..fcf0a78
+>> --- /dev/null
+>> +++ b/drivers/pwm/pwm-stm32.c
+>> @@ -0,0 +1,434 @@
+>> +/*
+>> + * Copyright (C) STMicroelectronics 2016
+>> + *
+>> + * Author: Gerald Baeza <gerald.baeza@st.com>
+>> + *
+>> + * License terms: GNU General Public License (GPL), version 2
+>> + *
+>> + * Inspired by timer-stm32.c from Maxime Coquelin
+>> + *             pwm-atmel.c from Bo Shen
+>> + */
+>> +
+>> +#include <linux/mfd/stm32-timers.h>
+>> +#include <linux/module.h>
+>> +#include <linux/platform_device.h>
+>> +#include <linux/pwm.h>
+>> +#include <linux/of.h>
+>
+> Can you please sort these alphabetically?
 
-This patch factors out DMA support for NOMMU configuration into
-separate entity which provides dedicated dma_ops. We have to handle
-there several cases:
-- configurations with MMU/MPU setup
-- configurations without MMU/MPU setup
-- special case for M-class, since caches and MPU there are optional
+sure
 
-In general we rely on default DMA area for coherent allocations or/and
-per-device memory reserves suitable for coherent DMA, so if such
-regions are set coherent allocations go from there.
+>
+>> +
+>> +#define CCMR_CHANNEL_SHIFT 8
+>> +#define CCMR_CHANNEL_MASK  0xFF
+>> +#define MAX_BREAKINPUT 2
+>
+> Okay, this answers my question regarding the st,breakinput property. I
+> still think it'd be good to have this in the binding documentation just
+> to avoid having to look at implementation to find out.
+>
+>> +
+>> +struct stm32_pwm {
+>> +     struct pwm_chip chip;
+>> +     struct device *dev;
+>> +     struct clk *clk;
+>> +     struct regmap *regmap;
+>> +     unsigned int caps;
+>
+> This seems completely unused?
 
-In case MPU/MPU was not setup we fallback to normal page allocator for
-DMA memory allocation.
+Yes I will remove it
 
-In case we run M-class cpus, for configuration without cache support
-(like Cortex-M3/M4) dma operations are forced to be coherent and wired
-with dma-noop (such decision is made based on cacheid global
-variable); however, if caches are detected there and no DMA coherent
-region is given (either default or per-device), dma is disallowed even
-MPU is not set - it is because M-class implement system memory map
-which defines part of address space as Normal memory.
+>
+>> +     unsigned int npwm;
+>
+> It's somewhat redundant to have this here, since the same information is
+> already contained in struct pwm_chip.npwm.
+>
+> Since you use this primarily for detection, how about you make the
+> stm32_pwm_detect_channels() function return the value and store it in a
+> local variable in ->probe()? That might be useful also because you
+> need to check the return value of regmap_update_bits() which technically
+> could fail.
+>
 
-Reported-by: Alexandre Torgue <alexandre.torgue@st.com>
-Reported-by: Andras Szemzo <sza@esh.hu>
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- arch/arm/include/asm/dma-mapping.h |   3 +-
- arch/arm/mm/Makefile               |   5 +-
- arch/arm/mm/dma-mapping-nommu.c    | 252 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 256 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/mm/dma-mapping-nommu.c
+I will remove npwm field and put the result of stm32_pwm_detect_channels()
+directly on chip.npwm.
 
-diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-index bf02dbd..559faad 100644
---- a/arch/arm/include/asm/dma-mapping.h
-+++ b/arch/arm/include/asm/dma-mapping.h
-@@ -20,7 +20,8 @@ static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
- {
- 	if (dev && dev->archdata.dma_ops)
- 		return dev->archdata.dma_ops;
--	return &arm_dma_ops;
-+
-+	return IS_ENABLED(CONFIG_MMU) ? &arm_dma_ops : &dma_noop_ops;
- }
- 
- static inline struct dma_map_ops *get_dma_ops(struct device *dev)
-diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
-index 2ac7988..5796357 100644
---- a/arch/arm/mm/Makefile
-+++ b/arch/arm/mm/Makefile
-@@ -2,9 +2,8 @@
- # Makefile for the linux arm-specific parts of the memory manager.
- #
- 
--obj-y				:= dma-mapping.o extable.o fault.o init.o \
--				   iomap.o
--
-+obj-y				:= extable.o fault.o init.o iomap.o
-+obj-y				+= dma-mapping$(MMUEXT).o
- obj-$(CONFIG_MMU)		+= fault-armv.o flush.o idmap.o ioremap.o \
- 				   mmap.o pgd.o mmu.o pageattr.o
- 
-diff --git a/arch/arm/mm/dma-mapping-nommu.c b/arch/arm/mm/dma-mapping-nommu.c
-new file mode 100644
-index 0000000..76f00c9
---- /dev/null
-+++ b/arch/arm/mm/dma-mapping-nommu.c
-@@ -0,0 +1,252 @@
-+/*
-+ *  Based on linux/arch/arm/mm/dma-mapping.c
-+ *
-+ *  Copyright (C) 2000-2004 Russell King
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+#include <linux/export.h>
-+#include <linux/mm.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/scatterlist.h>
-+
-+#include <asm/cachetype.h>
-+#include <asm/cacheflush.h>
-+#include <asm/outercache.h>
-+#include <asm/cp15.h>
-+
-+#include "dma.h"
-+
-+/*
-+ *  dma_noop_ops is used if
-+ *   - MMU/MPU is off
-+ *   - cpu is v7m w/o cache support
-+ *   - device is coherent
-+ *  otherwise arm_nommu_dma_ops is used.
-+ *
-+ *  arm_nommu_dma_ops rely on consistent DMA memory (please, refer to
-+ *  [1] on how to declare such memory).
-+ *
-+ *  [1] Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
-+ */
-+
-+static void *arm_nommu_dma_alloc(struct device *dev, size_t size,
-+				 dma_addr_t *dma_handle, gfp_t gfp,
-+				 unsigned long attrs)
-+
-+{
-+	struct dma_map_ops *ops = &dma_noop_ops;
-+
-+	/*
-+	 * We are here because:
-+	 * - no consistent DMA region has been defined, so we can't
-+	 *   continue.
-+	 * - there is no space left in consistent DMA region, so we
-+	 *   only can fallback to generic allocator if we are
-+	 *   advertised that consistency is not required.
-+	 */
-+
-+	if (attrs & DMA_ATTR_NON_CONSISTENT)
-+		return ops->alloc(dev, size, dma_handle, gfp, attrs);
-+
-+	WARN_ON_ONCE(1);
-+	return NULL;
-+}
-+
-+static void arm_nommu_dma_free(struct device *dev, size_t size,
-+			       void *cpu_addr, dma_addr_t dma_addr,
-+			       unsigned long attrs)
-+{
-+	struct dma_map_ops *ops = &dma_noop_ops;
-+
-+	if (attrs & DMA_ATTR_NON_CONSISTENT)
-+		ops->free(dev, size, cpu_addr, dma_addr, attrs);
-+
-+	WARN_ON_ONCE(1);
-+	return;
-+}
-+
-+static int arm_nommu_dma_mmap(struct device *dev, struct vm_area_struct *vma,
-+			      void *cpu_addr, dma_addr_t dma_addr, size_t size,
-+			      unsigned long attrs)
-+{
-+	struct dma_map_ops *ops = &dma_noop_ops;
-+	int ret;
-+
-+	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
-+		return ret;
-+
-+	if (attrs & DMA_ATTR_NON_CONSISTENT)
-+		return ops->mmap(dev, vma, cpu_addr, dma_addr, size, attrs);
-+
-+	WARN_ON_ONCE(1);
-+	return -ENXIO;
-+}
-+
-+static void __dma_page_cpu_to_dev(phys_addr_t paddr, size_t size,
-+				  enum dma_data_direction dir)
-+{
-+	dmac_map_area(__va(paddr), size, dir);
-+
-+	if (dir == DMA_FROM_DEVICE)
-+		outer_inv_range(paddr, paddr + size);
-+	else
-+		outer_clean_range(paddr, paddr + size);
-+}
-+
-+static void __dma_page_dev_to_cpu(phys_addr_t paddr, size_t size,
-+				  enum dma_data_direction dir)
-+{
-+	if (dir != DMA_TO_DEVICE) {
-+		outer_inv_range(paddr, paddr + size);
-+		dmac_unmap_area(__va(paddr), size, dir);
-+	}
-+}
-+
-+static dma_addr_t arm_nommu_dma_map_page(struct device *dev, struct page *page,
-+					 unsigned long offset, size_t size,
-+					 enum dma_data_direction dir,
-+					 unsigned long attrs)
-+{
-+	dma_addr_t handle = page_to_phys(page) + offset;
-+
-+	__dma_page_cpu_to_dev(handle, size, dir);
-+
-+	return handle;
-+}
-+
-+static void arm_nommu_dma_unmap_page(struct device *dev, dma_addr_t handle,
-+				     size_t size, enum dma_data_direction dir,
-+				     unsigned long attrs)
-+{
-+	__dma_page_dev_to_cpu(handle, size, dir);
-+}
-+
-+
-+static int arm_nommu_dma_map_sg(struct device *dev, struct scatterlist *sgl,
-+				int nents, enum dma_data_direction dir,
-+				unsigned long attrs)
-+{
-+	int i;
-+	struct scatterlist *sg;
-+
-+	for_each_sg(sgl, sg, nents, i) {
-+		sg_dma_address(sg) = sg_phys(sg);
-+		sg_dma_len(sg) = sg->length;
-+		__dma_page_cpu_to_dev(sg_dma_address(sg), sg_dma_len(sg), dir);
-+	}
-+
-+	return nents;
-+}
-+
-+static void arm_nommu_dma_unmap_sg(struct device *dev, struct scatterlist *sgl,
-+				   int nents, enum dma_data_direction dir,
-+				   unsigned long attrs)
-+{
-+	struct scatterlist *sg;
-+	int i;
-+
-+	for_each_sg(sgl, sg, nents, i)
-+		__dma_page_dev_to_cpu(sg_dma_address(sg), sg_dma_len(sg), dir);
-+}
-+
-+static void arm_nommu_dma_sync_single_for_device(struct device *dev,
-+		dma_addr_t handle, size_t size, enum dma_data_direction dir)
-+{
-+	__dma_page_cpu_to_dev(handle, size, dir);
-+}
-+
-+static void arm_nommu_dma_sync_single_for_cpu(struct device *dev,
-+		dma_addr_t handle, size_t size, enum dma_data_direction dir)
-+{
-+	__dma_page_cpu_to_dev(handle, size, dir);
-+}
-+
-+static void arm_nommu_dma_sync_sg_for_device(struct device *dev, struct scatterlist *sgl,
-+					     int nents, enum dma_data_direction dir)
-+{
-+	struct scatterlist *sg;
-+	int i;
-+
-+	for_each_sg(sgl, sg, nents, i)
-+		__dma_page_cpu_to_dev(sg_dma_address(sg), sg_dma_len(sg), dir);
-+}
-+
-+static void arm_nommu_dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sgl,
-+					  int nents, enum dma_data_direction dir)
-+{
-+	struct scatterlist *sg;
-+	int i;
-+
-+	for_each_sg(sgl, sg, nents, i)
-+		__dma_page_dev_to_cpu(sg_dma_address(sg), sg_dma_len(sg), dir);
-+}
-+
-+struct dma_map_ops arm_nommu_dma_ops = {
-+	.alloc			= arm_nommu_dma_alloc,
-+	.free			= arm_nommu_dma_free,
-+	.mmap			= arm_nommu_dma_mmap,
-+	.map_page		= arm_nommu_dma_map_page,
-+	.unmap_page		= arm_nommu_dma_unmap_page,
-+	.map_sg			= arm_nommu_dma_map_sg,
-+	.unmap_sg		= arm_nommu_dma_unmap_sg,
-+	.sync_single_for_device	= arm_nommu_dma_sync_single_for_device,
-+	.sync_single_for_cpu	= arm_nommu_dma_sync_single_for_cpu,
-+	.sync_sg_for_device	= arm_nommu_dma_sync_sg_for_device,
-+	.sync_sg_for_cpu	= arm_nommu_dma_sync_sg_for_cpu,
-+};
-+EXPORT_SYMBOL(arm_nommu_dma_ops);
-+
-+static struct dma_map_ops *arm_nommu_get_dma_map_ops(bool coherent)
-+{
-+	return coherent ? &dma_noop_ops : &arm_nommu_dma_ops;
-+}
-+
-+void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-+			const struct iommu_ops *iommu, bool coherent)
-+{
-+	struct dma_map_ops *dma_ops;
-+
-+	if (IS_ENABLED(CONFIG_CPU_V7M)) {
-+		/*
-+		 * Cache support for v7m is optional, so can be treated as
-+		 * coherent if no cache has been detected. Note that it is not
-+		 * enough to check if MPU is in use or not since in absense of
-+		 * MPU system memory map is used.
-+		 */
-+		dev->archdata.dma_coherent = (cacheid) ? coherent : true;
-+	} else {
-+		/*
-+		 * Assume coherent DMA in case MMU/MPU has not been set up.
-+		 */
-+		dev->archdata.dma_coherent = (get_cr() & CR_M) ? coherent : true;
-+	}
-+
-+	dma_ops = arm_nommu_get_dma_map_ops(dev->archdata.dma_coherent);
-+
-+	set_dma_ops(dev, dma_ops);
-+}
-+
-+void arch_teardown_dma_ops(struct device *dev)
-+{
-+}
-+
-+int dma_supported(struct device *dev, u64 mask)
-+{
-+	return 1;
-+}
-+
-+EXPORT_SYMBOL(dma_supported);
-+
-+#define PREALLOC_DMA_DEBUG_ENTRIES	4096
-+
-+static int __init dma_debug_do_init(void)
-+{
-+	dma_debug_init(PREALLOC_DMA_DEBUG_ENTRIES);
-+	return 0;
-+}
-+core_initcall(dma_debug_do_init);
+regmap functions could failed (even if I haven't experiment that case)
+but testing all
+return make the code unreadable so I have decide to not test it....
+
+>> +     u32 max_arr;
+>> +     bool have_complementary_output;
+>> +};
+>> +
+>> +struct stm32_breakinput {
+>> +     u32 index;
+>> +     u32 level;
+>> +     u32 filter;
+>> +};
+>> +
+>> +static inline struct stm32_pwm *to_stm32_pwm_dev(struct pwm_chip *chip)
+>> +{
+>> +     return container_of(chip, struct stm32_pwm, chip);
+>> +}
+>> +
+>> +static u32 active_channels(struct stm32_pwm *dev)
+>> +{
+>> +     u32 ccer;
+>> +
+>> +     regmap_read(dev->regmap, TIM_CCER, &ccer);
+>> +
+>> +     return ccer & TIM_CCER_CCXE;
+>> +}
+>
+> This looks like something that you could track in software, but this is
+> probably fine, too. Again, technically regmap_read() could fail, so you
+> might want to consider adding some code to handle it. In practice it
+> probably won't, so maybe you don't.
+
+TIM_CCER_CCXE is a value that IIO timer can also read (not write) so
+I have keep the same logic for pwm driver.
+
+>
+>> +
+>> +static int write_ccrx(struct stm32_pwm *dev, struct pwm_device *pwm,
+>> +                   u32 value)
+>> +{
+>> +     switch (pwm->hwpwm) {
+>> +     case 0:
+>> +             return regmap_write(dev->regmap, TIM_CCR1, value);
+>> +     case 1:
+>> +             return regmap_write(dev->regmap, TIM_CCR2, value);
+>> +     case 2:
+>> +             return regmap_write(dev->regmap, TIM_CCR3, value);
+>> +     case 3:
+>> +             return regmap_write(dev->regmap, TIM_CCR4, value);
+>> +     }
+>> +     return -EINVAL;
+>> +}
+>> +
+>> +static int stm32_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+>> +                         int duty_ns, int period_ns)
+>> +{
+>> +     struct stm32_pwm *priv = to_stm32_pwm_dev(chip);
+>> +     unsigned long long prd, div, dty;
+>> +     unsigned int prescaler = 0;
+>> +     u32 ccmr, mask, shift;
+>> +
+>> +     /* Period and prescaler values depends on clock rate */
+>> +     div = (unsigned long long)clk_get_rate(priv->clk) * period_ns;
+>> +
+>> +     do_div(div, NSEC_PER_SEC);
+>> +     prd = div;
+>> +
+>> +     while (div > priv->max_arr) {
+>> +             prescaler++;
+>> +             div = prd;
+>> +             do_div(div, (prescaler + 1));
+>
+> Nit: there's no need for the parentheses here.
+
+okay
+
+>> +     }
+>> +
+>> +     prd = div;
+>> +
+>> +     if (prescaler > MAX_TIM_PSC) {
+>> +             dev_err(chip->dev, "prescaler exceeds the maximum value\n");
+>> +             return -EINVAL;
+>> +     }
+>> +
+>> +     /*
+>> +      * All channels share the same prescaler and counter so when two
+>> +      * channels are active at the same we can't change them
+>
+> Nit: "at the same time"?
+
+okay
+
+>
+>> +      */
+>> +     if (active_channels(priv) & ~(1 << pwm->hwpwm * 4)) {
+>> +             u32 psc, arr;
+>> +
+>> +             regmap_read(priv->regmap, TIM_PSC, &psc);
+>> +             regmap_read(priv->regmap, TIM_ARR, &arr);
+>> +
+>> +             if ((psc != prescaler) || (arr != prd - 1))
+>> +                     return -EBUSY;
+>> +     }
+>> +
+>> +     regmap_write(priv->regmap, TIM_PSC, prescaler);
+>> +     regmap_write(priv->regmap, TIM_ARR, prd - 1);
+>> +     regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_ARPE, TIM_CR1_ARPE);
+>> +
+>> +     /* Calculate the duty cycles */
+>> +     dty = prd * duty_ns;
+>> +     do_div(dty, period_ns);
+>> +
+>> +     write_ccrx(priv, pwm, dty);
+>> +
+>> +     /* Configure output mode */
+>> +     shift = (pwm->hwpwm & 0x1) * CCMR_CHANNEL_SHIFT;
+>> +     ccmr = (TIM_CCMR_PE | TIM_CCMR_M1) << shift;
+>> +     mask = CCMR_CHANNEL_MASK << shift;
+>> +
+>> +     if (pwm->hwpwm < 2)
+>> +             regmap_update_bits(priv->regmap, TIM_CCMR1, mask, ccmr);
+>> +     else
+>> +             regmap_update_bits(priv->regmap, TIM_CCMR2, mask, ccmr);
+>> +
+>> +     regmap_update_bits(priv->regmap, TIM_BDTR,
+>> +                        TIM_BDTR_MOE | TIM_BDTR_AOE,
+>> +                        TIM_BDTR_MOE | TIM_BDTR_AOE);
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static int stm32_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
+>> +                               enum pwm_polarity polarity)
+>> +{
+>> +     u32 mask;
+>> +     struct stm32_pwm *priv = to_stm32_pwm_dev(chip);
+>> +
+>> +     mask = TIM_CCER_CC1P << (pwm->hwpwm * 4);
+>> +     if (priv->have_complementary_output)
+>> +             mask |= TIM_CCER_CC1NP << (pwm->hwpwm * 4);
+>> +
+>> +     regmap_update_bits(priv->regmap, TIM_CCER, mask,
+>> +                        polarity == PWM_POLARITY_NORMAL ? 0 : mask);
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static int stm32_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+>> +{
+>> +     u32 mask;
+>> +     struct stm32_pwm *priv = to_stm32_pwm_dev(chip);
+>> +
+>> +     clk_enable(priv->clk);
+>
+> This can fail, so its return value should be checked. Also, I don't see
+> a clk_prepare() anywhere. Is that something that maybe the MFD driver
+> should be doing? It currently isn't.
+
+I will check the return value.
+You are right clk_prepare() is done in mfd driver when calling
+devm_regmap_init_mmio_clk()
+
+>
+>> +
+>> +     /* Enable channel */
+>> +     mask = TIM_CCER_CC1E << (pwm->hwpwm * 4);
+>> +     if (priv->have_complementary_output)
+>> +             mask |= TIM_CCER_CC1NE << (pwm->hwpwm * 4);
+>> +
+>> +     regmap_update_bits(priv->regmap, TIM_CCER, mask, mask);
+>> +
+>> +     /* Make sure that registers are updated */
+>> +     regmap_update_bits(priv->regmap, TIM_EGR, TIM_EGR_UG, TIM_EGR_UG);
+>> +
+>> +     /* Enable controller */
+>> +     regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_CEN, TIM_CR1_CEN);
+>> +
+>> +     return 0;
+>> +}
+>> +
+>> +static void stm32_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+>> +{
+>> +     u32 mask;
+>> +     struct stm32_pwm *priv = to_stm32_pwm_dev(chip);
+>> +
+>> +     /* Disable channel */
+>> +     mask = TIM_CCER_CC1E << (pwm->hwpwm * 4);
+>> +     if (priv->have_complementary_output)
+>> +             mask |= TIM_CCER_CC1NE << (pwm->hwpwm * 4);
+>> +
+>> +     regmap_update_bits(priv->regmap, TIM_CCER, mask, 0);
+>> +
+>> +     /* When all channels are disabled, we can disable the controller */
+>> +     if (!active_channels(priv))
+>> +             regmap_update_bits(priv->regmap, TIM_CR1, TIM_CR1_CEN, 0);
+>> +
+>> +     clk_disable(priv->clk);
+>> +}
+>> +
+>> +static int stm32_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+>> +                        struct pwm_state *state)
+>> +{
+>> +     struct pwm_state curstate;
+>> +     bool enabled;
+>> +     int ret;
+>> +
+>> +     pwm_get_state(pwm, &curstate);
+>> +     enabled = curstate.enabled;
+>
+> There should be no need to do this in drivers. pwm_get_state() is for
+> PWM API users. Drivers can directly dereference pwm->state.
+
+ok
+
+>
+>> +
+>> +     if (enabled && !state->enabled) {
+>> +             stm32_pwm_disable(chip, pwm);
+>> +             return 0;
+>> +     }
+>> +
+>> +     if (state->polarity != curstate.polarity && enabled)
+>> +             stm32_pwm_set_polarity(chip, pwm, state->polarity);
+>
+> So that's kind of a violation of atomic API semantics. The above means
+> that if you have a PWM in the following state:
+>
+>         enabled: no
+>         polarity: normal
+>
+> and want to set this:
+>
+>         enabled: yes
+>         polarity: inversed
+>
+> then you will ignore the new polarity setting. What's the reason for
+> "&& enabled) in the conditional above?
+
+There is no reason, I will remove it.
+
+>> +
+>> +     ret = stm32_pwm_config(chip, pwm, state->duty_cycle, state->period);
+>> +     if (ret)
+>> +             return ret;
+>> +
+>> +     if (!enabled && state->enabled)
+>> +             ret = stm32_pwm_enable(chip, pwm);
+>> +
+>> +     return ret;
+>> +}
+>
+> Would it be possible to merge stm32_pwm_disable(), stm32_pwm_enable(),
+> stm32_pwm_set_polarity() and stm32_pwm_config() into stm32_pwm_apply()?
+> Part of the reason for the atomic API was to make it easier to write
+> these drivers, but your implementation effectively copies what the
+> transitional helpers do.
+>
+> It might not make a difference technically in your case, but I think
+> it'd make the implementation more compact and set a better example for
+> future reference.
+
+hmm... it will create a fat function with lot of where
+enabling/disabling/configuration
+will be mixed I'm really not convince that will more compact and readable.
+
+>
+>> +
+>> +static const struct pwm_ops stm32pwm_ops = {
+>> +     .owner = THIS_MODULE,
+>> +     .apply = stm32_pwm_apply,
+>> +};
+>> +
+>> +static int stm32_pwm_set_breakinput(struct stm32_pwm *priv,
+>> +                                 int level, int filter)
+>> +{
+>> +     u32 bdtr = TIM_BDTR_BKE;
+>> +
+>> +     if (level)
+>> +             bdtr |= TIM_BDTR_BKP;
+>> +
+>> +     bdtr |= (filter & TIM_BDTR_BKF_MASK) << TIM_BDTR_BKF_SHIFT;
+>> +
+>> +     regmap_update_bits(priv->regmap,
+>> +                        TIM_BDTR, TIM_BDTR_BKE | TIM_BDTR_BKP | TIM_BDTR_BKF,
+>> +                        bdtr);
+>> +
+>> +     regmap_read(priv->regmap, TIM_BDTR, &bdtr);
+>> +
+>> +     return (bdtr & TIM_BDTR_BKE) ? 0 : -EINVAL;
+>> +}
+>> +
+>> +static int stm32_pwm_set_breakinput2(struct stm32_pwm *priv,
+>> +                                  int level, int filter)
+>> +{
+>> +     u32 bdtr = TIM_BDTR_BK2E;
+>> +
+>> +     if (level)
+>> +             bdtr |= TIM_BDTR_BK2P;
+>> +
+>> +     bdtr |= (filter & TIM_BDTR_BKF_MASK) << TIM_BDTR_BK2F_SHIFT;
+>> +
+>> +     regmap_update_bits(priv->regmap,
+>> +                        TIM_BDTR, TIM_BDTR_BK2E |
+>> +                        TIM_BDTR_BK2P |
+>> +                        TIM_BDTR_BK2F,
+>> +                        bdtr);
+>> +
+>> +     regmap_read(priv->regmap, TIM_BDTR, &bdtr);
+>> +
+>> +     return (bdtr & TIM_BDTR_BK2E) ? 0 : -EINVAL;
+>> +}
+>
+> As far as I can tell the only difference here is the various bit
+> positions. Can you collapse the above two functions and add a new
+> parameter to unify some code?
+
+Yes it is all about bit shifting, I had try unify those two functions
+with index has additional parameter
+but it just add if() before each lines so no real benefit for code size.
+
+>
+>> +
+>> +static int stm32_pwm_apply_breakinputs(struct stm32_pwm *priv,
+>> +                                    struct device_node *np)
+>> +{
+>> +     struct stm32_breakinput breakinput[MAX_BREAKINPUT];
+>> +     int nb, ret, i, array_size;
+>> +
+>> +     nb = of_property_count_elems_of_size(np, "st,breakinput",
+>> +                                          sizeof(struct stm32_breakinput));
+>> +
+>> +     /*
+>> +      * Because "st,breakinput" parameter is optional do not make probe
+>> +      * failed if it doesn't exist.
+>> +      */
+>> +     if (nb <= 0)
+>> +             return 0;
+>> +
+>> +     if (nb > MAX_BREAKINPUT)
+>> +             return -EINVAL;
+>> +
+>> +     array_size = nb * sizeof(struct stm32_breakinput) / sizeof(u32);
+>> +     ret = of_property_read_u32_array(np, "st,breakinput",
+>> +                                      &breakinput[0].index, array_size);
+>
+> Maybe (u32 *)breakinput? That would make it more resilient against
+> changes in ordering of fields in the struct. Granted, that's not likely
+> to change, but I think it's a good idea in general to write code in a
+> way that's safe in a more general case. That way if somebody ever were
+> to copy from your code and then decide to reorder fields in their code
+> things wouldn't fall apart.
+
+Yes it is not suppose to change but I will use (u32 *)breakinput.
+
+>> +     if (ret)
+>> +             return ret;
+>> +
+>> +     for (i = 0; i < nb && !ret; i++) {
+>> +             switch (breakinput[i].index) {
+>> +             case 0:
+>> +             {
+>> +                     ret = stm32_pwm_set_breakinput(priv,
+>> +                                                    breakinput[i].level,
+>> +                                                    breakinput[i].filter);
+>> +                     break;
+>> +             }
+>
+> Curly braces are unnecessary here.
+
+removed
+
+>
+>> +             case 1:
+>> +             {
+>> +                     ret = stm32_pwm_set_breakinput2(priv,
+>> +                                                     breakinput[i].level,
+>> +                                                     breakinput[i].filter);
+>> +
+>> +                     break;
+>> +             }
+>> +             default:
+>> +             {
+>> +                     ret = -EINVAL;
+>> +                     break;
+>> +             }
+>> +             }
+>> +     }
+>> +
+>> +     return ret;
+>> +}
+>> +
+>> +static void stm32_pwm_detect_complementary(struct stm32_pwm *priv)
+>> +{
+>> +     u32 ccer;
+>> +
+>> +     /*
+>> +      * If complementary bit doesn't exist writing 1 will have no
+>> +      * effect so we can detect it.
+>> +      */
+>> +     regmap_update_bits(priv->regmap,
+>> +                        TIM_CCER, TIM_CCER_CC1NE, TIM_CCER_CC1NE);
+>> +     regmap_read(priv->regmap, TIM_CCER, &ccer);
+>> +     regmap_update_bits(priv->regmap, TIM_CCER, TIM_CCER_CCXE, 0);
+>
+> This is strange: why are we disabling outputs here? Shouldn't the last
+> line here undo the first instead?
+
+Yes it should TIM_CCER_CC1NE not TIM_CCER_CCXE, I will fix it, thanks
+
+>
+>> +
+>> +     priv->have_complementary_output = (ccer != 0);
+>> +}
+>> +
+>> +static void stm32_pwm_detect_channels(struct stm32_pwm *priv)
+>> +{
+>> +     u32 ccer;
+>> +
+>> +     /*
+>> +      * If channels enable bits don't exist writing 1 will have no
+>> +      * effect so we can detect and count them.
+>> +      */
+>> +     regmap_update_bits(priv->regmap,
+>> +                        TIM_CCER, TIM_CCER_CCXE, TIM_CCER_CCXE);
+>> +     regmap_read(priv->regmap, TIM_CCER, &ccer);
+>> +     regmap_update_bits(priv->regmap, TIM_CCER, TIM_CCER_CCXE, 0);
+>
+> Does this have the potential to glitch? I suspect that the clock may not
+> be on at this point and therefore no PWM outputs will be generated, but
+> is that guaranteed to always be the case?
+
+Set TIM_CCER_CCXE isn't enough to enable PWM generation, TIM_CR1_CEN
+in TIM_CR1 register must also to set so no risk of glitch here
+
+>
+> Thierry
+
+
+
 -- 
-2.0.0
+Benjamin Gaignard
+
+Graphic Study Group
+
+Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro: Facebook | Twitter | Blog
