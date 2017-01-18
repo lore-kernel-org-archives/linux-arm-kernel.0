@@ -1,106 +1,154 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Wed, 18 Jan 2017 14:51:31 +0000
-Subject: [PATCH v3 6/9] kvm: arm/arm64: Add host pmu to support VM
- introspection
-In-Reply-To: <c2382140-b7ac-11d8-89f0-bf421e38f844@arm.com> (Marc Zyngier's
- message of "Wed, 18 Jan 2017 13:18:33 +0000")
-References: <20170110113856.7183-1-punit.agrawal@arm.com>
- <20170110113856.7183-7-punit.agrawal@arm.com>
- <1a6b8d71-58a5-b29b-3f01-e945deb2baf6@arm.com>
- <20170118113523.GB3231@leverpostej>
- <87o9z4msi3.fsf@e105922-lin.cambridge.arm.com>
- <c2382140-b7ac-11d8-89f0-bf421e38f844@arm.com>
-Message-ID: <87fukgmnf0.fsf@e105922-lin.cambridge.arm.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Wed, 18 Jan 2017 15:51:59 +0100
+Subject: [PATCH 01/11] [media] s5p-mfc: Rename IS_MFCV8 macro
+In-Reply-To: <1484733729-25371-2-git-send-email-smitha.t@samsung.com>
+References: <1484733729-25371-1-git-send-email-smitha.t@samsung.com>
+ <CGME20170118100718epcas5p1f9aebb16fc61d41a13d09054fa96a14d@epcas5p1.samsung.com>
+ <1484733729-25371-2-git-send-email-smitha.t@samsung.com>
+Message-ID: <35fef778-fa21-5f40-d399-96acd64c8511@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Zyngier <marc.zyngier@arm.com> writes:
-
-> On 18/01/17 13:01, Punit Agrawal wrote:
->> Mark Rutland <mark.rutland@arm.com> writes:
->> 
->>> On Wed, Jan 18, 2017 at 11:21:21AM +0000, Marc Zyngier wrote:
->>>> On 10/01/17 11:38, Punit Agrawal wrote:
->>>>> +#define VM_MASK	GENMASK_ULL(31, 0)
->>>>> +#define EVENT_MASK	GENMASK_ULL(32, 39)
->>>>> +#define EVENT_SHIFT	(32)
->>>>> +
->>>>> +#define to_pid(cfg)	((cfg) & VM_MASK)
->>>>> +#define to_event(cfg)	(((cfg) & EVENT_MASK) >> EVENT_SHIFT)
->>>>> +
->>>>> +PMU_FORMAT_ATTR(vm, "config:0-31");
->>>>> +PMU_FORMAT_ATTR(event, "config:32-39");
->>>>
->>>> I'm a bit confused by these. Can't you get the PID of the VM you're
->>>> tracing directly from perf, without having to encode things?
->> 
->> With perf attached to a PID, the event gets scheduled out when the task
->> is context switched. As the PID of the controlling process was used,
->> none of the vCPU events were counted.
->> 
->>> And if you
->>>> can't, surely this should be a function of the size of pid_t?
->> 
->> Agreed. I'll update above if we decide to carry on with this
->> approach. More below...
->> 
->>>>
->>>> Mark, can you shine some light here?
->>>
->>> AFAICT, this is not necessary.
->>>
->>> The perf_event_open() syscall takes a PID separately from the
->>> perf_event_attr. i.e. we should be able to do:
->>>
->>> // monitor a particular vCPU
->>> perf_event_open(attr, vcpupid, -1, -1, 0)
->>>
->>> ... or .. 
->>>
->>> // monitor a particular vCPU on a pCPU
->>> perf_event_open(attr, vcpupid, cpu, -1, 0)
->>>
->>> ... or ...
->>>
->>> // monitor all vCPUs on a pCPU
->>> perf_event_open(attr, -1, cpu, -1, 0)
->>>
->>> ... so this shouldn't be necessary. AFAICT, this is a SW PMU, so there
->>> should be no issue with using the perf_sw_context.
->> 
->> I might have missed it but none of the modes of invoking perf_event_open
->> allow monitoring a set of process, i.e., all vcpus belonging to a
->> particular VM, which was one of the aims and a feature I was carrying
->> over from the previous version. If we do not care about this...
->> 
->>>
->>> If this is a bodge to avoid opening a perf_event per vCPU thread, then I
->>> completely disagree with the approach. This would be better handled in
->>> userspace by discovering the set of threads and opening events for
->>> each.
->> 
->> ... then requiring userspace to invoke perf_event_open perf vCPU will
->> simplify this patch.
->> 
->> Marc, any objections?
+On 18.01.2017 11:01, Smitha T Murthy wrote:
+> This patch renames macro IS_MFCV8 to IS_MFCV8_PLUS so that the MFCv8
+> code can be resued for MFCv10.10 support. Since the MFCv8 specific code
+> holds good for MFC v10.10 also.
 >
-> Not so far, but I'm curious to find out how you determine which thread
-> is a vcpu, let alone a given vcpu.
+> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
 
-I should've clarified in my reply that I wasn't looking to support the
-third instance from Mark's examples above - "monitor all vCPUs on a
-pCPU". I think it'll be quite expensive to figure out which threads from
-a given pool are vCPUs.
+Acked-by: Andrzej Hajda <a.hajda@samsung.com>
+--
+Regards
+Andrzej
 
-For the other instances, we only need to find the vCPU for a given
-pid. Userspace will hand us a pid that needs to be checked against vCPUs
-to establish that it is a valid vCPU pid (here I was looking to use
-kvm_vcpu->pid and kvm->pid introduced in Patch 2).
-
-This will happen when setting up the event and the vCPU can be cached
-for later use.
-
+> ---
+>  drivers/media/platform/s5p-mfc/s5p_mfc_common.h |    2 +-
+>  drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c   |    2 +-
+>  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c    |    2 +-
+>  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c |   18 +++++++++---------
+>  4 files changed, 12 insertions(+), 12 deletions(-)
 >
-> Thanks,
->
-> 	M.
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+> index ab23236..b45d18c 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
+> @@ -722,7 +722,7 @@ struct mfc_control {
+>  #define IS_TWOPORT(dev)		(dev->variant->port_num == 2 ? 1 : 0)
+>  #define IS_MFCV6_PLUS(dev)	(dev->variant->version >= 0x60 ? 1 : 0)
+>  #define IS_MFCV7_PLUS(dev)	(dev->variant->version >= 0x70 ? 1 : 0)
+> -#define IS_MFCV8(dev)		(dev->variant->version >= 0x80 ? 1 : 0)
+> +#define IS_MFCV8_PLUS(dev)	(dev->variant->version >= 0x80 ? 1 : 0)
+>  
+>  #define MFC_V5_BIT	BIT(0)
+>  #define MFC_V6_BIT	BIT(1)
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c b/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
+> index cc88871..484af6b 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
+> @@ -427,7 +427,7 @@ int s5p_mfc_wakeup(struct s5p_mfc_dev *dev)
+>  	s5p_mfc_clear_cmds(dev);
+>  	s5p_mfc_clean_dev_int_flags(dev);
+>  	/* 3. Send MFC wakeup command and wait for completion*/
+> -	if (IS_MFCV8(dev))
+> +	if (IS_MFCV8_PLUS(dev))
+>  		ret = s5p_mfc_v8_wait_wakeup(dev);
+>  	else
+>  		ret = s5p_mfc_wait_wakeup(dev);
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> index 367ef8e..0ec2928 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+> @@ -1177,7 +1177,7 @@ void s5p_mfc_dec_init(struct s5p_mfc_ctx *ctx)
+>  	struct v4l2_format f;
+>  	f.fmt.pix_mp.pixelformat = V4L2_PIX_FMT_H264;
+>  	ctx->src_fmt = find_format(&f, MFC_FMT_DEC);
+> -	if (IS_MFCV8(ctx->dev))
+> +	if (IS_MFCV8_PLUS(ctx->dev))
+>  		f.fmt.pix_mp.pixelformat = V4L2_PIX_FMT_NV12M;
+>  	else if (IS_MFCV6_PLUS(ctx->dev))
+>  		f.fmt.pix_mp.pixelformat = V4L2_PIX_FMT_NV12MT_16X16;
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+> index 57da798..0572521 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+> @@ -74,7 +74,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+>  			  ctx->luma_size, ctx->chroma_size, ctx->mv_size);
+>  		mfc_debug(2, "Totals bufs: %d\n", ctx->total_dpb_count);
+>  	} else if (ctx->type == MFCINST_ENCODER) {
+> -		if (IS_MFCV8(dev))
+> +		if (IS_MFCV8_PLUS(dev))
+>  			ctx->tmv_buffer_size = S5P_FIMV_NUM_TMV_BUFFERS_V6 *
+>  			ALIGN(S5P_FIMV_TMV_BUFFER_SIZE_V8(mb_width, mb_height),
+>  			S5P_FIMV_TMV_BUFFER_ALIGN_V6);
+> @@ -89,7 +89,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+>  		ctx->chroma_dpb_size = ALIGN((mb_width * mb_height) *
+>  				S5P_FIMV_CHROMA_MB_TO_PIXEL_V6,
+>  				S5P_FIMV_CHROMA_DPB_BUFFER_ALIGN_V6);
+> -		if (IS_MFCV8(dev))
+> +		if (IS_MFCV8_PLUS(dev))
+>  			ctx->me_buffer_size = ALIGN(S5P_FIMV_ME_BUFFER_SIZE_V8(
+>  						ctx->img_width, ctx->img_height,
+>  						mb_width, mb_height),
+> @@ -110,7 +110,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+>  	switch (ctx->codec_mode) {
+>  	case S5P_MFC_CODEC_H264_DEC:
+>  	case S5P_MFC_CODEC_H264_MVC_DEC:
+> -		if (IS_MFCV8(dev))
+> +		if (IS_MFCV8_PLUS(dev))
+>  			ctx->scratch_buf_size =
+>  				S5P_FIMV_SCRATCH_BUF_SIZE_H264_DEC_V8(
+>  					mb_width,
+> @@ -167,7 +167,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+>  		ctx->bank1.size = ctx->scratch_buf_size;
+>  		break;
+>  	case S5P_MFC_CODEC_VP8_DEC:
+> -		if (IS_MFCV8(dev))
+> +		if (IS_MFCV8_PLUS(dev))
+>  			ctx->scratch_buf_size =
+>  				S5P_FIMV_SCRATCH_BUF_SIZE_VP8_DEC_V8(
+>  						mb_width,
+> @@ -182,7 +182,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+>  		ctx->bank1.size = ctx->scratch_buf_size;
+>  		break;
+>  	case S5P_MFC_CODEC_H264_ENC:
+> -		if (IS_MFCV8(dev))
+> +		if (IS_MFCV8_PLUS(dev))
+>  			ctx->scratch_buf_size =
+>  				S5P_FIMV_SCRATCH_BUF_SIZE_H264_ENC_V8(
+>  					mb_width,
+> @@ -215,7 +215,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+>  		ctx->bank2.size = 0;
+>  		break;
+>  	case S5P_MFC_CODEC_VP8_ENC:
+> -		if (IS_MFCV8(dev))
+> +		if (IS_MFCV8_PLUS(dev))
+>  			ctx->scratch_buf_size =
+>  				S5P_FIMV_SCRATCH_BUF_SIZE_VP8_ENC_V8(
+>  					mb_width,
+> @@ -366,7 +366,7 @@ static void s5p_mfc_dec_calc_dpb_size_v6(struct s5p_mfc_ctx *ctx)
+>  
+>  	ctx->luma_size = calc_plane(ctx->img_width, ctx->img_height);
+>  	ctx->chroma_size = calc_plane(ctx->img_width, (ctx->img_height >> 1));
+> -	if (IS_MFCV8(ctx->dev)) {
+> +	if (IS_MFCV8_PLUS(ctx->dev)) {
+>  		/* MFCv8 needs additional 64 bytes for luma,chroma dpb*/
+>  		ctx->luma_size += S5P_FIMV_D_ALIGN_PLANE_SIZE_V8;
+>  		ctx->chroma_size += S5P_FIMV_D_ALIGN_PLANE_SIZE_V8;
+> @@ -454,7 +454,7 @@ static int s5p_mfc_set_dec_frame_buffer_v6(struct s5p_mfc_ctx *ctx)
+>  	writel(buf_addr1, mfc_regs->d_scratch_buffer_addr);
+>  	writel(ctx->scratch_buf_size, mfc_regs->d_scratch_buffer_size);
+>  
+> -	if (IS_MFCV8(dev)) {
+> +	if (IS_MFCV8_PLUS(dev)) {
+>  		writel(ctx->img_width,
+>  			mfc_regs->d_first_plane_dpb_stride_size);
+>  		writel(ctx->img_width,
+> @@ -2120,7 +2120,7 @@ static unsigned int s5p_mfc_get_crop_info_v_v6(struct s5p_mfc_ctx *ctx)
+>  			S5P_FIMV_E_ENCODED_SOURCE_SECOND_ADDR_V7);
+>  	R(e_vp8_options, S5P_FIMV_E_VP8_OPTIONS_V7);
+>  
+> -	if (!IS_MFCV8(dev))
+> +	if (!IS_MFCV8_PLUS(dev))
+>  		goto done;
+>  
+>  	/* Initialize registers used in MFC v8 only.
