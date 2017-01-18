@@ -1,22 +1,21 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 18 Jan 2017 13:26:44 +0100
-Subject: [PATCH] pinctrl: uniphier: fix Ethernet (RMII) pin-mux setting
- for LD20
-In-Reply-To: <1484650374-30989-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1484650374-30989-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CACRpkdZXTmGmsGG7kiVuPRs4vRk_-8FbRHvZGjt1cnmYutFvDw@mail.gmail.com>
+Date: Wed, 18 Jan 2017 13:27:55 +0100
+Subject: [PATCH 1/2] pinctrl: meson: Add HDMI HPD/DDC pins functions
+In-Reply-To: <1484654738-5496-2-git-send-email-narmstrong@baylibre.com>
+References: <1484654738-5496-1-git-send-email-narmstrong@baylibre.com>
+ <1484654738-5496-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <CACRpkdbNjtFOZV=2-5kjGH=xBor5BNqS9B86R0nTv9oZXvzSFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 11:52 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
+On Tue, Jan 17, 2017 at 1:05 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
 
-> Fix the pin-mux values for the MDC, MDIO, MDIO_INTL, PHYRSTL pins.
+> Add pinctrl functions for HDMI HPD pin and DDC pins on Amlogic Meson
+> GXL and GXBB SoCs.
 >
-> Fixes: 1e359ab1285e ("pinctrl: uniphier: add Ethernet pin-mux settings")
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
-Applied for fixes.
+Patch applied.
 
 Yours,
 Linus Walleij
