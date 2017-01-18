@@ -1,120 +1,111 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 18 Jan 2017 15:03:57 +0100
-Subject: Initializing MAC address at run-time
-Message-ID: <e083ed68-0e8e-380e-23bd-5ad387c88575@free.fr>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Wed, 18 Jan 2017 23:04:54 +0900
+Subject: [PATCH v3 2/2] arm64: dts: exynos: Add regulators for Vbus and
+ Vbus-Boost
+In-Reply-To: <1484721173-30474-3-git-send-email-pankaj.dubey@samsung.com>
+References: <CGME20170118063009epcas5p27f555398c9f3f44d733e04a585e74139@epcas5p2.samsung.com>
+ <1484721173-30474-1-git-send-email-pankaj.dubey@samsung.com>
+ <1484721173-30474-3-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <CAGOxZ51jV87oEZLQ73g+b1doLpGZ1LRRXn073TPppbcFTWWs8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi,
 
-When my system boots up, eth0 is given a seemingly random MAC address.
+On Wed, Jan 18, 2017 at 3:32 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
+> From: Vivek Gautam <gautamvivek1987@gmail.com>
+>
+> Adding fixed voltage regulators for Vbus and Vbus-boost required
+> by USB 3.0 DRD controller on Exynos7-espresso board.
+>
+> Signed-off-by: Vivek Gautam <gautamvivek1987@gmail.com>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> ---
 
-[    0.950734] nb8800 26000.ethernet eth0: MAC address ba:de:d6:38:b8:38
-[    0.957334] nb8800 26000.ethernet eth0: MAC address 6e:f1:48:de:d6:c4
+Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
+
+>  arch/arm64/boot/dts/exynos/exynos7-espresso.dts | 45 +++++++++++++++++++++++++
+>  1 file changed, 45 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+> index 1b2db9f0..e4705fd 100644
+> --- a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+> +++ b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+> @@ -13,6 +13,7 @@
+>  #include "exynos7.dtsi"
+>  #include <dt-bindings/interrupt-controller/irq.h>
+>  #include <dt-bindings/clock/samsung,s2mps11.h>
+> +#include <dt-bindings/gpio/gpio.h>
+>
+>  / {
+>         model = "Samsung Exynos7 Espresso board based on EXYNOS7";
+> @@ -32,6 +33,29 @@
+>                 device_type = "memory";
+>                 reg = <0x0 0x40000000 0x0 0xC0000000>;
+>         };
+> +
+> +       usb30_vbus_reg: regulator-usb30 {
+> +               compatible = "regulator-fixed";
+> +               regulator-name = "VBUS_5V";
+> +               regulator-min-microvolt = <5000000>;
+> +               regulator-max-microvolt = <5000000>;
+> +               gpio = <&gph1 1 GPIO_ACTIVE_HIGH>;
+> +               pinctrl-names = "default";
+> +               pinctrl-0 = <&usb30_vbus_en>;
+> +               enable-active-high;
+> +       };
+> +
+> +       usb3drd_boost_5v: regulator-usb3drd-boost {
+> +               compatible = "regulator-fixed";
+> +               regulator-name = "VUSB_VBUS_5V";
+> +               regulator-min-microvolt = <5000000>;
+> +               regulator-max-microvolt = <5000000>;
+> +               gpio = <&gpf4 1 GPIO_ACTIVE_HIGH>;
+> +               pinctrl-names = "default";
+> +               pinctrl-0 = <&usb3drd_boost_en>;
+> +               enable-active-high;
+> +       };
+> +
+>  };
+>
+>  &fin_pll {
+> @@ -365,3 +389,24 @@
+>         vqmmc-supply = <&ldo2_reg>;
+>         disable-wp;
+>  };
+> +
+> +&usbdrd_phy {
+> +       vbus-supply = <&usb30_vbus_reg>;
+> +       vbus-boost-supply = <&usb3drd_boost_5v>;
+> +};
+> +
+> +&pinctrl_bus1 {
+> +       usb30_vbus_en: usb30-vbus-en {
+> +               samsung,pins = "gph1-1";
+> +               samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
+> +               samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+> +               samsung,pin-drv = <EXYNOS4_PIN_DRV_LV1>;
+> +       };
+> +
+> +       usb3drd_boost_en: usb3drd-boost-en {
+> +               samsung,pins = "gpf4-1";
+> +               samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
+> +               samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+> +               samsung,pin-drv = <EXYNOS4_PIN_DRV_LV1>;
+> +       };
+> +};
+> --
+> 2.7.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 
-The DT node for eth0 is:
 
-	eth0: ethernet at 26000 {
-		compatible = "sigma,smp8734-ethernet";
-		reg = <0x26000 0x800>;
-		interrupts = <38 IRQ_TYPE_LEVEL_HIGH>;
-		clocks = <&clkgen SYS_CLK>;
-	};
-
-Documentation/devicetree/bindings/net/ethernet.txt mentions
-- local-mac-address: array of 6 bytes, specifies the MAC address that was
-  assigned to the network device;
-
-And indeed, if I define this property, eth0 ends up with the MAC address
-I specify in the device tree. But of course, I don't want all my boards
-to share the same MAC address. Every interface has a unique MAC address.
-
-In fact, the boot loader (not Uboot, a custom non-DT boot loader) stores
-the MAC address somewhere in MMIO space, in some weird custom format.
-
-So, at init, I can find the MAC address, and dynamically insert the
-"local-mac-address" property in the eth0 node.
-
-Is there another (better) way to do this?
-
-I'll post my code below, for illustration purpose.
-
-Mark suggested this can be done from user-space, but I can't do that,
-because I'm using an NFS rootfs, so I need the network before I even
-have a user-space. And the DHCP server is configured to serve different
-root filesystems, based on the MAC address.
-
-I need to do something similar with the NAND partitions. The boot loader
-stores the partition offsets somewhere, and I need to pass this info
-to the NAND framework, so I assumed that inserting the corresponding
-properties at run-time was the correct way to do it.
-
-Regards.
-
-
-
-#include <linux/of.h>
-#include <linux/io.h>
-#include <asm/unaligned.h>
-
-#define XENV_LRRW_ADDR	0x61a00
-#define XENV_LRRW_SIZE	628
-
-static u8 xenv[XENV_LRRW_SIZE] __initdata;
-
-static void __init *xenv_lookup(void *addr, const char *key, int keylen)
-{
-	u32 len = le32_to_cpup(addr);
-	void *end = addr + len;
-
-	if (len > XENV_LRRW_SIZE)
-		return NULL;
-
-	for (addr += 36; addr < end; addr += len)
-	{
-		len = get_unaligned_be16(addr) & 0xfff;
-		if (strcmp(key, addr + 2) == 0)
-			return addr + 2 + keylen;
-	}
-
-	return NULL;
-}
-
-static struct property prop;
-static u8 mac[6];
-
-static const char mac_lo[] __initconst = "lrrw.maclo";
-static const char mac_hi[] __initconst = "lrrw.machi";
-
-static int __init tango_get_mac_address(void *xenv)
-{
-	struct device_node *np = of_find_node_by_path("eth0");
-	u8 *lo = xenv_lookup(xenv, mac_lo, sizeof mac_lo);
-	u8 *hi = xenv_lookup(xenv, mac_hi, sizeof mac_hi);
-
-	if (np == NULL || lo == NULL || hi == NULL) return -ENODEV;
-
-	mac[0] = hi[1];
-	mac[1] = hi[0];
-	mac[2] = lo[3];
-	mac[3] = lo[2];
-	mac[4] = lo[1];
-	mac[5] = lo[0];
-
-	prop.name = "local-mac-address";
-	prop.length = sizeof mac;
-	prop.value = mac;
-
-	return of_update_property(np, &prop);
-}
-
-static int __init mac_fixup(void)
-{
-	void __iomem *xenv_orig = ioremap(XENV_LRRW_ADDR, XENV_LRRW_SIZE);
-	memcpy_fromio(xenv, xenv_orig, XENV_LRRW_SIZE);
-	iounmap(xenv_orig);
-	return tango_get_mac_address(xenv);
-}
-
-device_initcall(mac_fixup);
+-- 
+Regards,
+Alim
