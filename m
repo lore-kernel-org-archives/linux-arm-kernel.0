@@ -1,27 +1,21 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 18 Jan 2017 11:22:45 +0100
-Subject: [PATCH 2/2] ARM64: dts: meson-gx: add the missing uart_AO_B
-In-Reply-To: <20170115222029.8271-3-martin.blumenstingl@googlemail.com>
-References: <20170115222029.8271-1-martin.blumenstingl@googlemail.com>
- <20170115222029.8271-3-martin.blumenstingl@googlemail.com>
-Message-ID: <CACRpkdY9LGHJinCeJvJ=38fpWU7eAZwuv5-HG=kEFKzouAF-vQ@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 18 Jan 2017 11:25:21 +0100
+Subject: [PATCH] clk: rockchip: fix the incorrect pclk_edp div width for
+ RK3399
+In-Reply-To: <1484713256-3005-1-git-send-email-zhengxing@rock-chips.com>
+References: <1484713256-3005-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <1739624.bC7E8g3lgy@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 15, 2017 at 11:20 PM, Martin Blumenstingl
-<martin.blumenstingl@googlemail.com> wrote:
+Am Mittwoch, 18. Januar 2017, 12:20:56 CET schrieb Xing Zheng:
+> The range of the  pclk_edp_div_con is [13:8] and 6 bits, not 5.
+> 
+> Reported-by: Lin Huang <hl@rock-chips.com>
+> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 
-> This adds the missing node for the uart_AO_B port to the meson-gx.dtsi
-> (as this is supported by GXBB, GXL and GXM) along with the required
-> pinctrl pins. This is required as some boards are using it (the boards
-> from the Khadas VIM series for example have it exposed on the pin
-> headers).
->
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+applied for 4.11 with Lin's test tag
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Please funnel this through the apropriate ARM SoC-feed tree.
-
-Yours,
-Linus Walleij
+Thanks
+Heiko
