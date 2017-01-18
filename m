@@ -1,44 +1,57 @@
-From: sebastien.szymanski@armadeus.com (=?UTF-8?q?S=C3=A9bastien=20Szymanski?=)
-Date: Wed, 18 Jan 2017 11:09:51 +0100
-Subject: [PATCH 1/1] ARM: dts: imx6dl: fix GPIO4 range
-Message-ID: <1484734191-18556-1-git-send-email-sebastien.szymanski@armadeus.com>
+From: smitha.t@samsung.com (Smitha T Murthy)
+Date: Wed, 18 Jan 2017 15:31:58 +0530
+Subject: [PATCH 00/11] Add MFC v10.10 support
+References: <CGME20170118100714epcas1p274e2e68d14a788417fbde2c26c91bcb9@epcas1p2.samsung.com>
+Message-ID: <1484733729-25371-1-git-send-email-smitha.t@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPIO4_11 is on pin 152(MX6DL_PAD_KEY_ROW2) and not on pin
-151(MX6DL_PAD_KEY_ROW1).
+This patch series adds MFC v10.10 support. MFC v10.10 is used in some
+of Exynos7 variants.
 
-I found the error while booting a mainline kernel on APF6S SoM and
-noticed the following message:
+This adds support for following:
 
-[    2.609337] imx6dl-pinctrl 20e0000.iomuxc: pin MX6DL_PAD_KEY_ROW1
-already requested by 20a8000.gpio:105; cannot claim for 20a8000.gpio:107
-[    2.621884] imx6dl-pinctrl 20e0000.iomuxc: pin-151 (20a8000.gpio:107)
-status -22
-[    2.629303] spi_imx 2008000.ecspi: Can't get CS GPIO 107
+* Add support for HEVC encoder and decoder
+* Add support for VP9 decoder
+* Update Documentation for control id definitions
+* Update computation of min scratch buffer size requirement for V8 onwards
 
-With this patch, the message is gone and spi_imx driver probes correctly.
+This patch series is created on top of krzk/for-next and following patch [1]
+[1]: https://lkml.org/lkml/2017/1/18/136
 
-Fixes: bb728d662bed ("ARM: dts: add gpio-ranges property to iMX GPIO
-controllers")
 
-Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
----
- arch/arm/boot/dts/imx6dl.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Smitha T Murthy (11):
+  [media] s5p-mfc: Rename IS_MFCV8 macro
+  [media] s5p-mfc: Adding initial support for MFC v10.10
+  [media] s5p-mfc: Use min scratch buffer size
+  [media] s5p-mfc: Support MFCv10.10 buffer requirements
+  [media] s5p-mfc: Add support for HEVC decoder
+  [media] videodev2.h: Add v4l2 definition for HEVC
+  Documentation: v4l: Documentation for HEVC v4l2 definition
+  [media] s5p-mfc: Add VP9 decoder support
+  [media] s5p-mfc: Add support for HEVC encoder
+  [media] v4l2: Add v4l2 control IDs for HEVC encoder
+  Documention: v4l: Documentation for HEVC CIDs
 
-diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-index 1ade195..7aa120f 100644
---- a/arch/arm/boot/dts/imx6dl.dtsi
-+++ b/arch/arm/boot/dts/imx6dl.dtsi
-@@ -137,7 +137,7 @@
- &gpio4 {
- 	gpio-ranges = <&iomuxc  5 136 1>, <&iomuxc  6 145 1>, <&iomuxc  7 150 1>,
- 		      <&iomuxc  8 146 1>, <&iomuxc  9 151 1>, <&iomuxc 10 147 1>,
--		      <&iomuxc 11 151 1>, <&iomuxc 12 148 1>, <&iomuxc 13 153 1>,
-+		      <&iomuxc 11 152 1>, <&iomuxc 12 148 1>, <&iomuxc 13 153 1>,
- 		      <&iomuxc 14 149 1>, <&iomuxc 15 154 1>, <&iomuxc 16  39 7>,
- 		      <&iomuxc 23  56 1>, <&iomuxc 24  61 7>, <&iomuxc 31  46 1>;
- };
+ .../devicetree/bindings/media/s5p-mfc.txt          |    1 +
+ Documentation/media/uapi/v4l/extended-controls.rst |  190 ++++++
+ Documentation/media/uapi/v4l/pixfmt-013.rst        |    5 +
+ drivers/media/platform/s5p-mfc/regs-mfc-v10.h      |   84 +++
+ drivers/media/platform/s5p-mfc/regs-mfc-v8.h       |    2 +
+ drivers/media/platform/s5p-mfc/s5p_mfc.c           |   33 +
+ drivers/media/platform/s5p-mfc/s5p_mfc_cmd_v6.c    |    9 +
+ drivers/media/platform/s5p-mfc/s5p_mfc_common.h    |   64 ++-
+ drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c      |    6 +-
+ drivers/media/platform/s5p-mfc/s5p_mfc_dec.c       |   62 ++-
+ drivers/media/platform/s5p-mfc/s5p_mfc_enc.c       |  623 +++++++++++++++++++-
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr.h       |   14 +
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c    |  420 ++++++++++++--
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h    |   16 +
+ drivers/media/v4l2-core/v4l2-ctrls.c               |   51 ++
+ include/uapi/linux/v4l2-controls.h                 |  109 ++++
+ include/uapi/linux/videodev2.h                     |    1 +
+ 17 files changed, 1613 insertions(+), 77 deletions(-)
+ create mode 100644 drivers/media/platform/s5p-mfc/regs-mfc-v10.h
+
 -- 
-2.7.3
+1.7.2.3
