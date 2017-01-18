@@ -1,48 +1,41 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 18 Jan 2017 09:46:30 -0800
-Subject: [PATCH 09/33] Input: sun4i-lradc-keys - Drop unnecessary call to
- platform_set_drvdata and other changes
-In-Reply-To: <1484761614-12225-1-git-send-email-linux@roeck-us.net>
-References: <1484761614-12225-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1484761614-12225-10-git-send-email-linux@roeck-us.net>
+From: fabio.estevam@nxp.com (Fabio Estevam)
+Date: Wed, 18 Jan 2017 15:53:56 -0200
+Subject: [PATCH 1/2] clk: imx7d: Add the OCOTP clock
+Message-ID: <1484762037-10737-1-git-send-email-fabio.estevam@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no call to platform_get_drvdata() or dev_get_drvdata().
-Drop the unnecessary call to platform_set_drvdata().
-Other relevant changes:
-  Simplify error return
+Add the OCOTP so that this hardware block can be used.
 
-This conversion was done automatically with coccinelle using the
-following semantic patches. The semantic patches and the scripts
-used to generate this commit log are available at
-https://github.com/groeck/coccinelle-patches
-
-- Replace 'if (e) return e; return 0;' with 'return e;'
-- Drop platform_set_drvdata()
-
-Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- drivers/input/keyboard/sun4i-lradc-keys.c | 7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+ drivers/clk/imx/clk-imx7d.c             | 1 +
+ include/dt-bindings/clock/imx7d-clock.h | 3 ++-
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/input/keyboard/sun4i-lradc-keys.c b/drivers/input/keyboard/sun4i-lradc-keys.c
-index cc8f7ddcee53..c153d956778c 100644
---- a/drivers/input/keyboard/sun4i-lradc-keys.c
-+++ b/drivers/input/keyboard/sun4i-lradc-keys.c
-@@ -257,12 +257,7 @@ static int sun4i_lradc_probe(struct platform_device *pdev)
- 	if (error)
- 		return error;
- 
--	error = input_register_device(lradc->input);
--	if (error)
--		return error;
--
--	platform_set_drvdata(pdev, lradc);
--	return 0;
-+	return input_register_device(lradc->input);
- }
- 
- static const struct of_device_id sun4i_lradc_of_match[] = {
+diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
+index e7c7353..ae1d31b 100644
+--- a/drivers/clk/imx/clk-imx7d.c
++++ b/drivers/clk/imx/clk-imx7d.c
+@@ -803,6 +803,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX7D_DRAM_PHYM_ROOT_CLK] = imx_clk_gate4("dram_phym_root_clk", "dram_phym_cg", base + 0x4130, 0);
+ 	clks[IMX7D_DRAM_PHYM_ALT_ROOT_CLK] = imx_clk_gate4("dram_phym_alt_root_clk", "dram_phym_alt_post_div", base + 0x4130, 0);
+ 	clks[IMX7D_DRAM_ALT_ROOT_CLK] = imx_clk_gate4("dram_alt_root_clk", "dram_alt_post_div", base + 0x4130, 0);
++	clks[IMX7D_OCOTP_CLK] = imx_clk_gate4("ocotp_clk", "ipg_root_clk", base + 0x4230, 0);
+ 	clks[IMX7D_USB_HSIC_ROOT_CLK] = imx_clk_gate4("usb_hsic_root_clk", "usb_hsic_post_div", base + 0x4420, 0);
+ 	clks[IMX7D_SDMA_CORE_CLK] = imx_clk_gate4("sdma_root_clk", "ahb_root_clk", base + 0x4480, 0);
+ 	clks[IMX7D_PCIE_CTRL_ROOT_CLK] = imx_clk_gate4("pcie_ctrl_root_clk", "pcie_ctrl_post_div", base + 0x4600, 0);
+diff --git a/include/dt-bindings/clock/imx7d-clock.h b/include/dt-bindings/clock/imx7d-clock.h
+index 1183347..a7a1a50 100644
+--- a/include/dt-bindings/clock/imx7d-clock.h
++++ b/include/dt-bindings/clock/imx7d-clock.h
+@@ -449,5 +449,6 @@
+ #define IMX7D_ADC_ROOT_CLK		436
+ #define IMX7D_CLK_ARM			437
+ #define IMX7D_CKIL			438
+-#define IMX7D_CLK_END			439
++#define IMX7D_OCOTP_CLK			439
++#define IMX7D_CLK_END			440
+ #endif /* __DT_BINDINGS_CLOCK_IMX7D_H */
 -- 
 2.7.4
