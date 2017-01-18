@@ -1,30 +1,33 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 18 Jan 2017 14:53:53 -0800
-Subject: [PATCH 2/3] ARM64: dts: meson-gxbb: Add support for WeTek Hub and
- Play
-In-Reply-To: <1484736642-5451-3-git-send-email-narmstrong@baylibre.com> (Neil
- Armstrong's message of "Wed, 18 Jan 2017 11:50:41 +0100")
-References: <1484736642-5451-1-git-send-email-narmstrong@baylibre.com>
- <1484736642-5451-3-git-send-email-narmstrong@baylibre.com>
-Message-ID: <m2mveox9mm.fsf@baylibre.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 18 Jan 2017 14:53:26 -0800
+Subject: [PATCH] ARM: Reduce "CPU: shutdown" message to debug level
+In-Reply-To: <20170117230714.6799-1-f.fainelli@gmail.com>
+References: <20170117230714.6799-1-f.fainelli@gmail.com>
+Message-ID: <20170118225328.2597-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
+Similar to c68b0274fb3c ("ARM: reduce "Booted secondary processor"
+message to debug level"), demote the "CPU: shutdown" pr_notice() into a
+pr_debug().
 
-> Adds support for the WeTek Hub and Play2 boards.
-> The Hub is an extremely small IPTv Set-Top-Box and the Play2 is a more
-> traditionnal Satellite or Terrestrial and IPTv Set-Top-Box.
->
-> Both are based on the p200 Reference Design and out-of-tree support is
-> based on OpenELEC kernel at [1].
->
-> [1] https://github.com/wetek-enigma/linux-amlogic
->
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ arch/arm/kernel/smp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Did you get the GPIO/button info from the LibreELEC tree or did you find
-some schematics someplace?  If you found any schematics, it would be
-nice to have links in the DTS files.
-
-Kevin
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 7dd14e8395e6..46377c40d056 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -251,7 +251,7 @@ void __cpu_die(unsigned int cpu)
+ 		pr_err("CPU%u: cpu didn't die\n", cpu);
+ 		return;
+ 	}
+-	pr_notice("CPU%u: shutdown\n", cpu);
++	pr_debug("CPU%u: shutdown\n", cpu);
+ 
+ 	/*
+ 	 * platform_cpu_kill() is generally expected to do the powering off
+-- 
+2.9.3
