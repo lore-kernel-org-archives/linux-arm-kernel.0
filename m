@@ -1,54 +1,35 @@
 From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Wed, 18 Jan 2017 11:13:16 +0000
-Subject: [RFC PATCH v5 0/7] ARM: Fix dma_alloc_coherent() and friends for NOMMU
-Message-ID: <1484738003-29892-1-git-send-email-vladimir.murzin@arm.com>
+Date: Wed, 18 Jan 2017 11:13:19 +0000
+Subject: [RFC PATCH v5 3/7] drivers: dma-coherent: Account dma_pfn_offset when
+ used with device tree
+In-Reply-To: <1484738003-29892-1-git-send-email-vladimir.murzin@arm.com>
+References: <1484738003-29892-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1484738003-29892-4-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+dma_declare_coherent_memory() and friends are designed to account
+difference in CPU and device addresses. However, when it is used with
+reserved memory regions there is assumption that CPU and device have
+the same view on address space. This assumption gets invalid when
+reserved memory for coherent DMA allocations is referenced by device
+with non-empty "dma-range" property.
 
-It seem that addition of cache support for M-class CPUs uncovered
-latent bug in DMA usage. NOMMU memory model has been treated as being
-always consistent; however, for R/M CPU classes memory can be covered
-by MPU which in turn might configure RAM as Normal i.e. bufferable and
-cacheable. It breaks dma_alloc_coherent() and friends, since data can
-stuck in caches now or be buffered.
+Simply feeding device address as rmem->base + dev->dma_pfn_offset
+would not work due to reserved memory region can be shared, so this
+patch turns device address to be expressed with help of CPU address
+and device's dma_pfn_offset.
 
-This patch set is trying to address the issue by providing region of
-memory suitable for consistent DMA operations. It is supposed that
-such region is marked by MPU as non-cacheable. Robin suggested to
-advertise such memory as reserved shared-dma-pool, rather then using
-homebrew command line option, and extend dma-coherent to provide
-default DMA area in the similar way as it is done for CMA (PATCH
-4/7). It allows us to offload all bookkeeping on generic coherent DMA
-framework, and it seems that it might be reused by other architectures
-like c6x and blackfin.
+For the case where device tree is not used and device sees memory
+different to CPU we explicitly set device's dma_pfn_offset to
+accomplish such difference. The latter might look controversial, but
+it seems only a few drivers set device address different to CPU's:
+- drivers/usb/host/ohci-sm501.c
+- arch/sh/drivers/pci/fixups-dreamcast.c
+so they can be screwed only if dma_pfn_offset there is set and not in
+sync with device address range - we try to catch such cases with
+WARN_ON.
 
-While reviewing/testing previous vesrions of the patch set it turned
-out that dma-coherent does not take into account "dma-ranges" device
-tree property, so it is addressed in PATCH 3/7.
-
-For ARM, dedicated DMA region is required for cases other than:
- - MMU/MPU is off
- - cpu is v7m w/o cache support
- - device is coherent
-
-In case one of the above conditions is true dma operations are forced
-to be coherent and wired with dma_noop_ops.
-
-To make life easier NOMMU dma operations are kept in separate
-compilation unit.
-
-Since the issue was reported in the same time as Benjamin sent his
-patch [1] to allow mmap for NOMMU, his case is also addressed in this
-series (PATCH 1/7 and PATCH 2/7).
-
-Thanks!
-
-[1] http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8633/1
-
-Cc: Joerg Roedel <jroedel@suse.de>
-Cc: Christian Borntraeger <borntraeger@de.ibm.com>
 Cc: Michal Nazarewicz <mina86@mina86.com>
 Cc: Marek Szyprowski <m.szyprowski@samsung.com>
 Cc: Alan Stern <stern@rowland.harvard.edu>
@@ -56,29 +37,62 @@ Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
 Cc: Rich Felker <dalias@libc.org>
 Cc: Roger Quadros <rogerq@ti.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ drivers/base/dma-coherent.c | 17 +++++++++++++++--
+ 1 file changed, 15 insertions(+), 2 deletions(-)
 
-Vladimir Murzin (7):
-  dma: Take into account dma_pfn_offset
-  dma: Add simple dma_noop_mmap
-  drivers: dma-coherent: Account dma_pfn_offset when used with device
-    tree
-  drivers: dma-coherent: Introduce default DMA pool
-  ARM: NOMMU: Introduce dma operations for noMMU
-  ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class cpus
-  ARM: dma-mapping: Remove traces of NOMMU code
-
- .../bindings/reserved-memory/reserved-memory.txt   |   3 +
- arch/arm/include/asm/dma-mapping.h                 |   3 +-
- arch/arm/mm/Kconfig                                |   2 +-
- arch/arm/mm/Makefile                               |   5 +-
- arch/arm/mm/dma-mapping-nommu.c                    | 252 +++++++++++++++++++++
- arch/arm/mm/dma-mapping.c                          |  26 +--
- drivers/base/dma-coherent.c                        |  76 ++++++-
- lib/dma-noop.c                                     |  29 ++-
- 8 files changed, 355 insertions(+), 41 deletions(-)
- create mode 100644 arch/arm/mm/dma-mapping-nommu.c
-
+diff --git a/drivers/base/dma-coherent.c b/drivers/base/dma-coherent.c
+index 640a7e6..c59708c 100644
+--- a/drivers/base/dma-coherent.c
++++ b/drivers/base/dma-coherent.c
+@@ -18,6 +18,12 @@ struct dma_coherent_mem {
+ 	spinlock_t	spinlock;
+ };
+ 
++static inline dma_addr_t dma_get_device_base(struct device *dev,
++					     struct dma_coherent_mem * mem)
++{
++	return (mem->pfn_base - dev->dma_pfn_offset) << PAGE_SHIFT;
++}
++
+ static bool dma_init_coherent_memory(
+ 	phys_addr_t phys_addr, dma_addr_t device_addr, size_t size, int flags,
+ 	struct dma_coherent_mem **mem)
+@@ -83,9 +89,16 @@ static void dma_release_coherent_memory(struct dma_coherent_mem *mem)
+ static int dma_assign_coherent_memory(struct device *dev,
+ 				      struct dma_coherent_mem *mem)
+ {
++	unsigned long dma_pfn_offset = mem->pfn_base - PFN_DOWN(mem->device_base);
++
+ 	if (dev->dma_mem)
+ 		return -EBUSY;
+ 
++	if (dev->dma_pfn_offset)
++		WARN_ON(dma_pfn_offset && (dev->dma_pfn_offset != dma_pfn_offset));
++	else
++		dev->dma_pfn_offset = dma_pfn_offset;
++
+ 	dev->dma_mem = mem;
+ 	/* FIXME: this routine just ignores DMA_MEMORY_INCLUDES_CHILDREN */
+ 
+@@ -133,7 +146,7 @@ void *dma_mark_declared_memory_occupied(struct device *dev,
+ 		return ERR_PTR(-EINVAL);
+ 
+ 	spin_lock_irqsave(&mem->spinlock, flags);
+-	pos = (device_addr - mem->device_base) >> PAGE_SHIFT;
++	pos = PFN_DOWN(device_addr - dma_get_device_base(dev, mem));
+ 	err = bitmap_allocate_region(mem->bitmap, pos, get_order(size));
+ 	spin_unlock_irqrestore(&mem->spinlock, flags);
+ 
+@@ -186,7 +199,7 @@ int dma_alloc_from_coherent(struct device *dev, ssize_t size,
+ 	/*
+ 	 * Memory was found in the per-device area.
+ 	 */
+-	*dma_handle = mem->device_base + (pageno << PAGE_SHIFT);
++	*dma_handle = dma_get_device_base(dev, mem) + (pageno << PAGE_SHIFT);
+ 	*ret = mem->virt_base + (pageno << PAGE_SHIFT);
+ 	dma_memory_map = (mem->flags & DMA_MEMORY_MAP);
+ 	spin_unlock_irqrestore(&mem->spinlock, flags);
 -- 
 2.0.0
