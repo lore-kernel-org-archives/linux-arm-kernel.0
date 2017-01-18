@@ -1,116 +1,157 @@
 From: jerry.huang@nxp.com (Changming Huang)
-Date: Wed, 18 Jan 2017 16:12:17 +0800
-Subject: [PATCH v4 2/3] USB3/DWC3: Add property "snps,
- incr-burst-type-adjustment" for INCR burst type
+Date: Wed, 18 Jan 2017 16:12:18 +0800
+Subject: [PATCH v4 3/3] USB3/DWC3: Enable undefined length INCR burst type
 In-Reply-To: <1484727138-3264-1-git-send-email-jerry.huang@nxp.com>
 References: <1484727138-3264-1-git-send-email-jerry.huang@nxp.com>
-Message-ID: <1484727138-3264-2-git-send-email-jerry.huang@nxp.com>
+Message-ID: <1484727138-3264-3-git-send-email-jerry.huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Property "snps,incr-burst-type-adjustment = <x>, <y>..." for USB3.0 DWC3.
-When Just one value means INCRx mode with fix burst type.
-When more than one value, means undefined length burst mode, USB controller
-can use the length less than or equal to the largest enabled burst length.
-
-While enabling undefined length INCR burst type and INCR16 burst type,
-get better write performance on NXP Layerscape platform:
-around 3% improvement (from 364MB/s to 375MB/s).
+Enable the undefined length INCR burst type and set INCRx.
+Different platform may has the different burst size type.
+In order to get best performance, we need to tune the burst size to
+one special value, instead of the default value.
 
 Signed-off-by: Changming Huang <jerry.huang@nxp.com>
+Signed-off-by: Rajesh Bhagat <rajesh.bhagat@nxp.com>
 ---
 Changes in v4:
-  - change definition for this property.
+  - Modify the codes according to the definition of this property.
 Changes in v3:
-  - add new property for INCR burst in usb node.
+  - add new property for INCR burst in usb node to reset GSBUSCFG0.
+Changes in v2:
+  - split patch
+  - create one new function to handle soc bus configuration register.
 
- Documentation/devicetree/bindings/usb/dwc3.txt |    6 ++++++
- arch/arm/boot/dts/ls1021a.dtsi                 |    1 +
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi |    3 +++
- arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi |    2 ++
- 4 files changed, 12 insertions(+)
+ drivers/usb/dwc3/core.c |   83 +++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/usb/dwc3/core.h |    7 ++++
+ 2 files changed, 90 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/usb/dwc3.txt b/Documentation/devicetree/bindings/usb/dwc3.txt
-index e3e6983..a68dbfc 100644
---- a/Documentation/devicetree/bindings/usb/dwc3.txt
-+++ b/Documentation/devicetree/bindings/usb/dwc3.txt
-@@ -55,6 +55,11 @@ Optional properties:
- 	fladj_30mhz_sdbnd signal is invalid or incorrect.
+diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
+index 369bab1..446aec3 100644
+--- a/drivers/usb/dwc3/core.c
++++ b/drivers/usb/dwc3/core.c
+@@ -650,6 +650,87 @@ static void dwc3_core_setup_global_control(struct dwc3 *dwc)
+ 	dwc3_writel(dwc->regs, DWC3_GCTL, reg);
+ }
  
-  - <DEPRECATED> tx-fifo-resize: determines if the FIFO *has* to be reallocated.
-+ - snps,incr-burst-type-adjustment: Value for INCR burst type of GSBUSCFG0
-+	register, undefined length INCR burst type enable and INCRx type.
-+	When just one value, which means INCRX burst mode. When more than one
-+	value, which means undefined length INCR burst type enabled.
-+	The values can be 1, 4, 8, 16, 32, 64, 128 and 256.
++/* set global soc bus configuration registers */
++static void dwc3_set_soc_bus_cfg(struct dwc3 *dwc)
++{
++	struct device *dev = dwc->dev;
++	u32 *vals;
++	u32 cfg;
++	int ntype;
++	int ret;
++	int i;
++
++	cfg = dwc3_readl(dwc->regs, DWC3_GSBUSCFG0);
++
++	/*
++	 * Handle property "snps,incr-burst-type-adjustment".
++	 * Get the number of value from this property:
++	 * result <= 0, means this property is not supported.
++	 * result = 1, means INCRx burst mode supported.
++	 * result > 1, means undefined length burst mode supported.
++	 */
++	ntype = device_property_read_u32_array(dev,
++			"snps,incr-burst-type-adjustment", NULL, 0);
++	if (ntype > 0) {
++		vals = kcalloc(ntype, sizeof(u32), GFP_KERNEL);
++		if (!vals) {
++			dev_err(dev, "Error to get memory\n");
++			return;
++		}
++		/* Get INCR burst type, and parse it */
++		ret = device_property_read_u32_array(dev,
++			"snps,incr-burst-type-adjustment", vals, ntype);
++		if (ret) {
++			dev_err(dev, "Error to get property\n");
++			return;
++		}
++		*(dwc->incrx_type + 1) = vals[0];
++		if (ntype > 1) {
++			*dwc->incrx_type = 1;
++			for (i = 1; i < ntype; i++) {
++				if (vals[i] > *(dwc->incrx_type + 1))
++					*(dwc->incrx_type + 1) = vals[i];
++			}
++		} else
++			*dwc->incrx_type = 0;
++
++		/* Enable Undefined Length INCR Burst and Enable INCRx Burst */
++		cfg &= ~DWC3_GSBUSCFG0_INCRBRST_MASK;
++		if (*dwc->incrx_type)
++			cfg |= DWC3_GSBUSCFG0_INCRBRSTENA;
++		switch (*(dwc->incrx_type + 1)) {
++		case 256:
++			cfg |= DWC3_GSBUSCFG0_INCR256BRSTENA;
++			break;
++		case 128:
++			cfg |= DWC3_GSBUSCFG0_INCR128BRSTENA;
++			break;
++		case 64:
++			cfg |= DWC3_GSBUSCFG0_INCR64BRSTENA;
++			break;
++		case 32:
++			cfg |= DWC3_GSBUSCFG0_INCR32BRSTENA;
++			break;
++		case 16:
++			cfg |= DWC3_GSBUSCFG0_INCR16BRSTENA;
++			break;
++		case 8:
++			cfg |= DWC3_GSBUSCFG0_INCR8BRSTENA;
++			break;
++		case 4:
++			cfg |= DWC3_GSBUSCFG0_INCR4BRSTENA;
++			break;
++		case 1:
++			break;
++		default:
++			dev_err(dev, "Invalid property\n");
++			break;
++		}
++	}
++
++	dwc3_writel(dwc->regs, DWC3_GSBUSCFG0, cfg);
++}
++
+ /**
+  * dwc3_core_init - Low-level initialization of DWC3 Core
+  * @dwc: Pointer to our controller context structure
+@@ -698,6 +779,8 @@ static int dwc3_core_init(struct dwc3 *dwc)
+ 	/* Adjust Frame Length */
+ 	dwc3_frame_length_adjustment(dwc);
  
- This is usually a subnode to DWC3 glue to which it is connected.
++	dwc3_set_soc_bus_cfg(dwc);
++
+ 	usb_phy_set_suspend(dwc->usb2_phy, 0);
+ 	usb_phy_set_suspend(dwc->usb3_phy, 0);
+ 	ret = phy_power_on(dwc->usb2_generic_phy);
+diff --git a/drivers/usb/dwc3/core.h b/drivers/usb/dwc3/core.h
+index 065aa6f..9df6304 100644
+--- a/drivers/usb/dwc3/core.h
++++ b/drivers/usb/dwc3/core.h
+@@ -805,6 +805,7 @@ struct dwc3_scratchpad_array {
+  * @regs: base address for our registers
+  * @regs_size: address space size
+  * @fladj: frame length adjustment
++ * @incrx_type: INCR burst type adjustment
+  * @irq_gadget: peripheral controller's IRQ number
+  * @nr_scratch: number of scratch buffers
+  * @u1u2: only used on revisions <1.83a for workaround
+@@ -928,6 +929,12 @@ struct dwc3 {
+ 	enum usb_phy_interface	hsphy_mode;
  
-@@ -63,4 +68,5 @@ dwc3 at 4a030000 {
- 	reg = <0x4a030000 0xcfff>;
- 	interrupts = <0 92 4>
- 	usb-phy = <&usb2_phy>, <&usb3,phy>;
-+	snps,incr-burst-type-adjustment = <1>, <4>, <8>, <16>;
- };
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index 368e219..6eee0d5 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -627,6 +627,7 @@
- 			dr_mode = "host";
- 			snps,quirk-frame-length-adjustment = <0x20>;
- 			snps,dis_rxdet_inp3_quirk;
-+			snps,incr-burst-type-adjustment = <1>, <4>, <8>, <16>;
- 		};
- 
- 		pcie at 3400000 {
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-index 97d331e..04ffd66 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
-@@ -482,6 +482,7 @@
- 			dr_mode = "host";
- 			snps,quirk-frame-length-adjustment = <0x20>;
- 			snps,dis_rxdet_inp3_quirk;
-+			snps,incr-burst-type-adjustment = <1>, <4>, <8>, <16>;
- 		};
- 
- 		usb1: usb3 at 3000000 {
-@@ -491,6 +492,7 @@
- 			dr_mode = "host";
- 			snps,quirk-frame-length-adjustment = <0x20>;
- 			snps,dis_rxdet_inp3_quirk;
-+			snps,incr-burst-type-adjustment = <1>, <4>, <8>, <16>;
- 		};
- 
- 		usb2: usb3 at 3100000 {
-@@ -500,6 +502,7 @@
- 			dr_mode = "host";
- 			snps,quirk-frame-length-adjustment = <0x20>;
- 			snps,dis_rxdet_inp3_quirk;
-+			snps,incr-burst-type-adjustment = <1>, <4>, <8>, <16>;
- 		};
- 
- 		sata: sata at 3200000 {
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-index d058e56..902cc93 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-@@ -710,6 +710,7 @@
- 			dr_mode = "host";
- 			snps,quirk-frame-length-adjustment = <0x20>;
- 			snps,dis_rxdet_inp3_quirk;
-+			snps,incr-burst-type-adjustment = <1>, <4>, <8>, <16>;
- 		};
- 
- 		usb1: usb3 at 3110000 {
-@@ -720,6 +721,7 @@
- 			dr_mode = "host";
- 			snps,quirk-frame-length-adjustment = <0x20>;
- 			snps,dis_rxdet_inp3_quirk;
-+			snps,incr-burst-type-adjustment = <1>, <4>, <8>, <16>;
- 		};
- 
- 		ccn at 4000000 {
+ 	u32			fladj;
++	/*
++	 * For INCR burst type.
++	 * First field: for undefined length INCR burst type enable.
++	 * Second field: for INCRx burst type enable
++	 */
++	u32			incrx_type[2];
+ 	u32			irq_gadget;
+ 	u32			nr_scratch;
+ 	u32			u1u2;
 -- 
 1.7.9.5
