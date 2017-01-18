@@ -1,23 +1,27 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Wed, 18 Jan 2017 16:06:05 -0600
-Subject: [PATCH v2 18/18] insert build break
-In-Reply-To: <20170113071545.GB12441@kroah.com>
-References: <1484260655-80477-1-git-send-email-christopher.lee.bostic@gmail.com>
- <20170113071545.GB12441@kroah.com>
-Message-ID: <CAL_JsqL-yQD=oFQW0YfB9JnSpDVcOcUG0GM8NgLCB1nsFQsrEQ@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 18 Jan 2017 14:06:43 -0800
+Subject: [PATCH net-next v4 00/10] net: dsa: Support for pdata in dsa2
+In-Reply-To: <20170118.165050.2165692521961713529.davem@davemloft.net>
+References: <20170117232152.1661-1-f.fainelli@gmail.com>
+ <20170118.165050.2165692521961713529.davem@davemloft.net>
+Message-ID: <c41c6746-9489-80f6-92a9-aa3595ce92c5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2017 at 1:15 AM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> On Thu, Jan 12, 2017 at 04:37:35PM -0600, christopher.lee.bostic at gmail.com wrote:
->> From: Chris Bostic <cbostic@us.ibm.com>
->>
->> Signed-off-by: Chris Bostic <cbostic@us.ibm.com>
->
-> I can not accept patches that have no changelog text, and this one is
-> very odd:
+On 01/18/2017 01:50 PM, David Miller wrote:
+> From: Florian Fainelli <f.fainelli@gmail.com>
+> Date: Tue, 17 Jan 2017 15:21:42 -0800
+> 
+>> This is not exactly new, and was sent before, although back then, I did not
+>> have an user of the pre-declared MDIO board information, but now we do. Note
+>> that I have additional changes queued up to have b53 register platform data for
+>> MIPS bcm47xx and bcm63xx.
+>  ...
+> 
+> We're waiting for Greg's further review and Vivien's changes which I just
+> applied are going to create some conflicts, so I am presuming that you will
+> respin a v5 anyways.
 
-Seems like this would be an easy check to add to 0-day. And perhaps
-missing S-o-B, too.
-
-Rob
+Yes indeed. Thanks for your patience!
+-- 
+Florian
