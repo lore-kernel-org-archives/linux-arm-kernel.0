@@ -1,42 +1,31 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 18 Jan 2017 14:18:10 +0000
-Subject: [PATCH 3/3] arm64: dts: juno: Remove Motherboard USB node
-In-Reply-To: <20170118123802.GE995@e110455-lin.cambridge.arm.com>
-References: <74595d6d866518db7cfabc39b4cf9b54d3be9bde.1484741104.git.robin.murphy@arm.com>
- <39868e0d327456be61aa9ac318fc2d958523a696.1484741104.git.robin.murphy@arm.com>
- <20170118123802.GE995@e110455-lin.cambridge.arm.com>
-Message-ID: <61d3b621-bb47-c59b-d89f-07636ef8408c@arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 18 Jan 2017 16:19:35 +0200
+Subject: [PATCH 2/3] pinctrl: dt-bindings: samsung: Add Exynos7 specific
+ pinctrl macro definitions
+In-Reply-To: <1484718141-28785-3-git-send-email-pankaj.dubey@samsung.com>
+References: <1484718141-28785-1-git-send-email-pankaj.dubey@samsung.com>
+ <CGME20170118054002epcas5p3b08e2f419976e17a3c584d64776810fd@epcas5p3.samsung.com>
+ <1484718141-28785-3-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <20170118141935.eu7wmki7jnjdarkw@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 18/01/17 12:38, Local user for Liviu Dudau wrote:
-> Hi Robin,
+On Wed, Jan 18, 2017 at 11:12:20AM +0530, Pankaj Dubey wrote:
+> Exynos7 SoC pinctrl configurations are similar to existing Exynos4/5 except
+> for FSYS1 pinctrl drive strengths. So adding Exynos7 specific FSYS1 blocks
+> pinctrl driver strength related macros which will be used in Exynos7
+> DTSi files.
 > 
-> On Wed, Jan 18, 2017 at 12:12:52PM +0000, Robin Murphy wrote:
->> The first batch of Juno boards included a discrete USB controller chip
->> as a contingency in case of issues with the USB 2.0 IP integrated into
->> the SoC. As it turned out, the latter was fine, and to the best of my
->> knowledge the motherboard USB was never even brought up and validated.
->>
->> Since this also isn't present on later boards, and uses a compatible
->> string undocumented and unmatched by any driver in the kernel, let's
->> just tidy it away for ever to avoid any confusion.
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> 
-> For all 3 patches:
-> 
-> Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  include/dt-bindings/pinctrl/samsung.h | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 > 
 
-Thanks Liviu (or/and Local user for Liviu Dudau :))
+Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-All 3 patches applied to [1]
+I will need this header, so Sylwester if it is okay with you, could you
+provide a tag with it (or ack it)?
 
--- 
-Regards,
-Sudeep
-
-[1] git.kernel.org/sudeep.holla/linux/h/for-next/updates/juno
+Best regards,
+Krzysztof
