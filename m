@@ -1,86 +1,134 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 18 Jan 2017 17:31:17 +0900
-Subject: [PATCH v2 01/13] soc: samsung: pmu: Provide global function to
- get PMU regmap
-In-Reply-To: <1484657084-26227-2-git-send-email-m.szyprowski@samsung.com>
-References: <CGME20170117124456eucas1p1d42d11aa2117caed8d89faa8c09e6218@eucas1p1.samsung.com>
- <1484657084-26227-1-git-send-email-m.szyprowski@samsung.com>
- <1484657084-26227-2-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CA+Ln22F8JPcL35XO9sN6C+HPOeh==gm28Lt2WttW74CFQsoFLg@mail.gmail.com>
+From: tnowicki@caviumnetworks.com (Tomasz Nowicki)
+Date: Wed, 18 Jan 2017 09:35:53 +0100
+Subject: [PATCH v8 12/18] irqdomain: Add irq domain MSI and MSI_REMAP flags
+In-Reply-To: <1484127714-3263-13-git-send-email-eric.auger@redhat.com>
+References: <1484127714-3263-1-git-send-email-eric.auger@redhat.com>
+ <1484127714-3263-13-git-send-email-eric.auger@redhat.com>
+Message-ID: <5b5695c2-2607-4997-516a-699b39bfdb43@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+On 11.01.2017 10:41, Eric Auger wrote:
+> We introduce two new enum values for the irq domain flag:
+> - IRQ_DOMAIN_FLAG_MSI indicates the irq domain corresponds to
+>   an MSI domain
+> - IRQ_DOMAIN_FLAG_MSI_REMAP indicates the irq domain has MSI
+>   remapping capabilities.
+>
+> Those values will be useful to check all MSI irq domains have
+> MSI remapping support when assessing the safety of IRQ assignment
+> to a guest.
+>
+> irq_domain_hierarchical_is_msi_remap() allows to check if an
+> irq domain or any parent implements MSI remapping.
+>
+> Signed-off-by: Eric Auger <eric.auger@redhat.com>
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-2017-01-17 21:44 GMT+09:00 Marek Szyprowski <m.szyprowski@samsung.com>:
-> PMU is something like a SoC wide service, so add a helper function to get
-> PMU regmap. This will be used by other Exynos device drivers. This way it
-> can be avoided to model this dependency in device tree (as phandles to PMU
-> node) for almost every device in the SoC.
->
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  drivers/soc/samsung/exynos-pmu.c       | 11 +++++++++++
->  include/linux/soc/samsung/exynos-pmu.h |  7 +++++++
->  2 files changed, 18 insertions(+)
->
-> diff --git a/drivers/soc/samsung/exynos-pmu.c b/drivers/soc/samsung/exynos-pmu.c
-> index 0acdfd82e751..5c269bf23210 100644
-> --- a/drivers/soc/samsung/exynos-pmu.c
-> +++ b/drivers/soc/samsung/exynos-pmu.c
-> @@ -11,6 +11,7 @@
->
->  #include <linux/of.h>
->  #include <linux/of_address.h>
-> +#include <linux/mfd/syscon.h>
->  #include <linux/platform_device.h>
->  #include <linux/delay.h>
->
-> @@ -92,6 +93,16 @@ void exynos_sys_powerdown_conf(enum sys_powerdown mode)
->         { /*sentinel*/ },
->  };
->
-> +struct regmap *exynos_get_pmu_regmap(void)
-> +{
-> +       struct device_node *np = of_find_matching_node(NULL,
-> +                                                     exynos_pmu_of_device_ids);
-> +       if (np)
-> +               return syscon_node_to_regmap(np);
-> +       return ERR_PTR(-ENODEV);
-> +}
-> +EXPORT_SYMBOL_GPL(exynos_get_pmu_regmap);
-> +
->  static int exynos_pmu_probe(struct platform_device *pdev)
->  {
->         const struct of_device_id *match;
-> diff --git a/include/linux/soc/samsung/exynos-pmu.h b/include/linux/soc/samsung/exynos-pmu.h
-> index e2e9de1acc5b..2a841a474684 100644
-> --- a/include/linux/soc/samsung/exynos-pmu.h
-> +++ b/include/linux/soc/samsung/exynos-pmu.h
-> @@ -12,6 +12,8 @@
->  #ifndef __LINUX_SOC_EXYNOS_PMU_H
->  #define __LINUX_SOC_EXYNOS_PMU_H
->
-> +#include <linux/regmap.h>
-> +
+Reviewed-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
 
-nit: It would save some compilation time to just add a forward
-declaration of struct regmap here instead, in case of files that
-include this header, but don't need regmap functionality.
-
->  enum sys_powerdown {
->         SYS_AFTR,
->         SYS_LPA,
-> @@ -20,5 +22,10 @@ enum sys_powerdown {
->  };
->
->  extern void exynos_sys_powerdown_conf(enum sys_powerdown mode);
-> +#ifdef CONFIG_EXYNOS_PMU
-> +extern struct regmap *exynos_get_pmu_regmap(void);
-> +#else
-> +static inline struct regmap *exynos_get_pmu_regmap(void) { return NULL; }
-
-Shouldn't be some ERR_PTR() instead?
-
-Best regards,
+Thanks,
 Tomasz
+
+>
+> ---
+>
+> v7 -> v8:
+> - remove h variable in irq_domain_hierarchical_is_msi_remap
+> - add Marc's R-b
+>
+> v6:
+> - add IRQ_DOMAIN_FLAG_MSI as suggested by Marc
+> - add irq_domain_is_msi, irq_domain_is_msi_remap and
+>   irq_domain_hierarchical_is_msi_remap
+> ---
+>  include/linux/irqdomain.h | 35 +++++++++++++++++++++++++++++++++++
+>  kernel/irq/irqdomain.c    | 14 ++++++++++++++
+>  2 files changed, 49 insertions(+)
+>
+> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
+> index ffb8460..bc2f571 100644
+> --- a/include/linux/irqdomain.h
+> +++ b/include/linux/irqdomain.h
+> @@ -183,6 +183,12 @@ enum {
+>  	/* Irq domain is an IPI domain with single virq */
+>  	IRQ_DOMAIN_FLAG_IPI_SINGLE	= (1 << 3),
+>
+> +	/* Irq domain implements MSIs */
+> +	IRQ_DOMAIN_FLAG_MSI		= (1 << 4),
+> +
+> +	/* Irq domain implements MSI remapping */
+> +	IRQ_DOMAIN_FLAG_MSI_REMAP	= (1 << 5),
+> +
+>  	/*
+>  	 * Flags starting from IRQ_DOMAIN_FLAG_NONCORE are reserved
+>  	 * for implementation specific purposes and ignored by the
+> @@ -446,6 +452,19 @@ static inline bool irq_domain_is_ipi_single(struct irq_domain *domain)
+>  {
+>  	return domain->flags & IRQ_DOMAIN_FLAG_IPI_SINGLE;
+>  }
+> +
+> +static inline bool irq_domain_is_msi(struct irq_domain *domain)
+> +{
+> +	return domain->flags & IRQ_DOMAIN_FLAG_MSI;
+> +}
+> +
+> +static inline bool irq_domain_is_msi_remap(struct irq_domain *domain)
+> +{
+> +	return domain->flags & IRQ_DOMAIN_FLAG_MSI_REMAP;
+> +}
+> +
+> +extern bool irq_domain_hierarchical_is_msi_remap(struct irq_domain *domain);
+> +
+>  #else	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
+>  static inline void irq_domain_activate_irq(struct irq_data *data) { }
+>  static inline void irq_domain_deactivate_irq(struct irq_data *data) { }
+> @@ -477,6 +496,22 @@ static inline bool irq_domain_is_ipi_single(struct irq_domain *domain)
+>  {
+>  	return false;
+>  }
+> +
+> +static inline bool irq_domain_is_msi(struct irq_domain *domain)
+> +{
+> +	return false;
+> +}
+> +
+> +static inline bool irq_domain_is_msi_remap(struct irq_domain *domain)
+> +{
+> +	return false;
+> +}
+> +
+> +static inline bool
+> +irq_domain_hierarchical_is_msi_remap(struct irq_domain *domain)
+> +{
+> +	return false;
+> +}
+>  #endif	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
+>
+>  #else /* CONFIG_IRQ_DOMAIN */
+> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
+> index 8c0a0ae..876e131 100644
+> --- a/kernel/irq/irqdomain.c
+> +++ b/kernel/irq/irqdomain.c
+> @@ -1392,6 +1392,20 @@ static void irq_domain_check_hierarchy(struct irq_domain *domain)
+>  	if (domain->ops->alloc)
+>  		domain->flags |= IRQ_DOMAIN_FLAG_HIERARCHY;
+>  }
+> +
+> +/**
+> + * irq_domain_hierarchical_is_msi_remap - Check if the domain or any
+> + * parent has MSI remapping support
+> + * @domain: domain pointer
+> + */
+> +bool irq_domain_hierarchical_is_msi_remap(struct irq_domain *domain)
+> +{
+> +	for (; domain; domain = domain->parent) {
+> +		if (irq_domain_is_msi_remap(domain))
+> +			return true;
+> +	}
+> +	return false;
+> +}
+>  #else	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
+>  /**
+>   * irq_domain_get_irq_data - Get irq_data associated with @virq and @domain
+>
