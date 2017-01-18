@@ -1,56 +1,50 @@
-From: liviu.dudau@arm.com (Local user for Liviu Dudau)
-Date: Wed, 18 Jan 2017 12:38:02 +0000
-Subject: [PATCH 3/3] arm64: dts: juno: Remove Motherboard USB node
-In-Reply-To: <39868e0d327456be61aa9ac318fc2d958523a696.1484741104.git.robin.murphy@arm.com>
-References: <74595d6d866518db7cfabc39b4cf9b54d3be9bde.1484741104.git.robin.murphy@arm.com>
- <39868e0d327456be61aa9ac318fc2d958523a696.1484741104.git.robin.murphy@arm.com>
-Message-ID: <20170118123802.GE995@e110455-lin.cambridge.arm.com>
+From: mbenes@suse.cz (Miroslav Benes)
+Date: Wed, 18 Jan 2017 13:40:23 +0100 (CET)
+Subject: [PATCH 7/7] arm: Add livepatch necessary arch selects into Kconfig
+In-Reply-To: <1481043967-15602-8-git-send-email-abelvesa@linux.com>
+References: <1481043967-15602-1-git-send-email-abelvesa@linux.com>
+ <1481043967-15602-8-git-send-email-abelvesa@linux.com>
+Message-ID: <alpine.LSU.2.20.1701181339350.23458@pobox.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On Tue, 6 Dec 2016, Abel Vesa wrote:
 
-On Wed, Jan 18, 2017 at 12:12:52PM +0000, Robin Murphy wrote:
-> The first batch of Juno boards included a discrete USB controller chip
-> as a contingency in case of issues with the USB 2.0 IP integrated into
-> the SoC. As it turned out, the latter was fine, and to the best of my
-> knowledge the motherboard USB was never even brought up and validated.
+> This adds HAVE_LIVEPATCH, MODULES_USE_ELF_RELA and HAVE_LIVEPATCH
+> to arm Kconfig.
 > 
-> Since this also isn't present on later boards, and uses a compatible
-> string undocumented and unmatched by any driver in the kernel, let's
-> just tidy it away for ever to avoid any confusion.
-> 
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-
-For all 3 patches:
-
-Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
-
-Thanks,
-Liviu
-
+> Signed-off-by: Abel Vesa <abelvesa@linux.com>
 > ---
->  arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 7 -------
->  1 file changed, 7 deletions(-)
+>  arch/arm/Kconfig | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> diff --git a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-> index 3ad4c3000611..098601657f82 100644
-> --- a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-> +++ b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-> @@ -131,13 +131,6 @@
->  				vddvario-supply = <&mb_fixed_3v3>;
->  			};
->  
-> -			usb at 5,00000000 {
-> -				compatible = "nxp,usb-isp1763";
-> -				reg = <5 0x00000000 0x20000>;
-> -				bus-width = <16>;
-> -				interrupts = <4>;
-> -			};
-> -
->  			iofpga at 3,00000000 {
->  				compatible = "simple-bus";
->  				#address-cells = <1>;
-> -- 
-> 2.11.0.dirty
-> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 186c4c2..f4e9ace 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -50,6 +50,7 @@ config ARM
+>  	select HAVE_DMA_API_DEBUG
+>  	select HAVE_DMA_CONTIGUOUS if MMU
+>  	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
+> +	select HAVE_DYNAMIC_FTRACE_WITH_REGS
+>  	select HAVE_EFFICIENT_UNALIGNED_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && MMU
+>  	select HAVE_EXIT_THREAD
+>  	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
+> @@ -67,6 +68,7 @@ config ARM
+>  	select HAVE_KERNEL_XZ
+>  	select HAVE_KPROBES if !XIP_KERNEL && !CPU_ENDIAN_BE32 && !CPU_V7M
+>  	select HAVE_KRETPROBES if (HAVE_KPROBES)
+> +	select HAVE_LIVEPATCH
+>  	select HAVE_MEMBLOCK
+>  	select HAVE_MOD_ARCH_SPECIFIC
+>  	select HAVE_NMI
+> @@ -82,6 +84,7 @@ config ARM
+>  	select HAVE_VIRT_CPU_ACCOUNTING_GEN
+>  	select IRQ_FORCED_THREADING
+>  	select MODULES_USE_ELF_REL
+> +	select MODULES_USE_ELF_RELA
+
+I wrote it before but I think you cannot have both MODULES_USE_ELF_REL and 
+MODULES_USE_ELF_RELA.
+
+Miroslav
