@@ -1,71 +1,35 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 18 Jan 2017 16:09:45 +0200
-Subject: [PATCH 2/2] ARM: DTS: Fix register map for virt-capable GIC
-In-Reply-To: <1484736811-24002-3-git-send-email-marc.zyngier@arm.com>
-References: <1484736811-24002-1-git-send-email-marc.zyngier@arm.com>
- <1484736811-24002-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20170118140945.cdna46dllbccwk43@kozik-lap>
+Date: Wed, 18 Jan 2017 16:13:46 +0200
+Subject: [PATCH v5 3/4] dmaengine: pl330: Store pointer to slave device
+In-Reply-To: <539bd321-66f5-9d06-923e-88dcb12787b8@samsung.com>
+References: <1484657338-26338-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170117124922eucas1p1d4037d80229e55007169cf85c19e5eec@eucas1p1.samsung.com>
+ <1484657338-26338-4-git-send-email-m.szyprowski@samsung.com>
+ <20170117172445.3itztktiay22as26@kozik-lap>
+ <539bd321-66f5-9d06-923e-88dcb12787b8@samsung.com>
+Message-ID: <20170118141346.wfwp7ybtqmwsiee7@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2017 at 10:53:31AM +0000, Marc Zyngier wrote:
-> Since everybody copied my own mistake from the DT binding example,
-> let's address all the offenders in one swift go.
+On Wed, Jan 18, 2017 at 08:07:22AM +0100, Marek Szyprowski wrote:
+> Hi Krzysztof,
 > 
-> Most of them got the CPU interface size wrong (4kB, while it should
-> be 8kB), except for both keystone platforms which got the control
-> interface wrong (4kB instead of 8kB).
+> On 2017-01-17 18:29, Krzysztof Kozlowski wrote:
+> > On Tue, Jan 17, 2017 at 01:48:57PM +0100, Marek Szyprowski wrote:
+> > > Store the pointer to slave device, which requested our channel. It will be
+> > > later used to implement runtime PM of PL330 DMA controller. Although
+> > > DMA channels might be requested many times, each DMA peripheral channel is
+> > > physically dedicated only for specific hardware, so there should be only
+> > > one slave device for each channel.
+> > > 
+> > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > Any particular reason for removing my Reviewed-by? Any changes here?
 > 
-> In the couple of cases were I knew for sure what implementation
-> was used, I've added the "arm,gic-400" compatible string. I'm 99%
-> sure that this is what everyong is using, but short of having the
-> TRM for all the other SoCs, I've let them alone.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/boot/dts/alpine.dtsi        | 2 +-
->  arch/arm/boot/dts/axm55xx.dtsi       | 2 +-
->  arch/arm/boot/dts/dra7.dtsi          | 2 +-
->  arch/arm/boot/dts/ecx-2000.dts       | 2 +-
->  arch/arm/boot/dts/exynos3250.dtsi    | 2 +-
->  arch/arm/boot/dts/exynos5.dtsi       | 2 +-
->  arch/arm/boot/dts/exynos5260.dtsi    | 2 +-
->  arch/arm/boot/dts/exynos5440.dtsi    | 2 +-
+> No changes here. I'm sorry, the tag got lost during rebase.
 
-For Exynos:
-Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+Okay:
+Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 
 Best regards,
 Krzysztof
-
->  arch/arm/boot/dts/imx6ul.dtsi        | 4 ++--
->  arch/arm/boot/dts/keystone-k2g.dtsi  | 2 +-
->  arch/arm/boot/dts/keystone.dtsi      | 2 +-
->  arch/arm/boot/dts/ls1021a.dtsi       | 4 ++--
->  arch/arm/boot/dts/mt2701.dtsi        | 2 +-
->  arch/arm/boot/dts/mt6580.dtsi        | 2 +-
->  arch/arm/boot/dts/mt6589.dtsi        | 2 +-
->  arch/arm/boot/dts/mt7623.dtsi        | 2 +-
->  arch/arm/boot/dts/mt8127.dtsi        | 2 +-
->  arch/arm/boot/dts/mt8135.dtsi        | 2 +-
->  arch/arm/boot/dts/omap5.dtsi         | 2 +-
->  arch/arm/boot/dts/r8a73a4.dtsi       | 2 +-
->  arch/arm/boot/dts/r8a7743.dtsi       | 2 +-
->  arch/arm/boot/dts/r8a7745.dtsi       | 2 +-
->  arch/arm/boot/dts/r8a7790.dtsi       | 2 +-
->  arch/arm/boot/dts/r8a7791.dtsi       | 2 +-
->  arch/arm/boot/dts/r8a7792.dtsi       | 2 +-
->  arch/arm/boot/dts/r8a7793.dtsi       | 2 +-
->  arch/arm/boot/dts/r8a7794.dtsi       | 2 +-
->  arch/arm/boot/dts/rk1108.dtsi        | 2 +-
->  arch/arm/boot/dts/rk3036.dtsi        | 2 +-
->  arch/arm/boot/dts/rk322x.dtsi        | 2 +-
->  arch/arm/boot/dts/rk3288.dtsi        | 2 +-
->  arch/arm/boot/dts/sun6i-a31.dtsi     | 2 +-
->  arch/arm/boot/dts/sun7i-a20.dtsi     | 4 ++--
->  arch/arm/boot/dts/sun8i-a23-a33.dtsi | 2 +-
->  arch/arm/boot/dts/sun8i-a83t.dtsi    | 2 +-
->  arch/arm/boot/dts/sun8i-h3.dtsi      | 2 +-
->  arch/arm/boot/dts/sun9i-a80.dtsi     | 2 +-
->  37 files changed, 40 insertions(+), 40 deletions(-)
-> 
