@@ -1,45 +1,51 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 18 Jan 2017 14:27:19 -0800
-Subject: [PATCH 1/2] ARM64: dts: meson-gxm: Add R-Box Pro
-In-Reply-To: <3005a457-b7cf-393b-42ff-4149e080321c@suse.de> ("Andreas
- =?utf-8?Q?F=C3=A4rber=22's?= message of "Wed, 18 Jan 2017 00:06:07 +0100")
+Date: Wed, 18 Jan 2017 14:29:58 -0800
+Subject: [PATCH 2/2] ARM64: dts: meson-gxm-rbox-pro: Enable Bluetooth
+In-Reply-To: <20170117030611.23827-3-afaerber@suse.de> ("Andreas
+ =?utf-8?Q?F=C3=A4rber=22's?=
+ message of "Tue, 17 Jan 2017 04:06:11 +0100")
 References: <20170117030611.23827-1-afaerber@suse.de>
- <20170117030611.23827-2-afaerber@suse.de>
- <3005a457-b7cf-393b-42ff-4149e080321c@suse.de>
-Message-ID: <m237ggypfc.fsf@baylibre.com>
+ <20170117030611.23827-3-afaerber@suse.de>
+Message-ID: <m2y3y8xaqh.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Andreas F?rber <afaerber@suse.de> writes:
 
-> Am 17.01.2017 um 04:06 schrieb Andreas F?rber:
->> diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
->> index 0d7bfbf7d922..66bc809a5eae 100644
->> --- a/arch/arm64/boot/dts/amlogic/Makefile
->> +++ b/arch/arm64/boot/dts/amlogic/Makefile
->> @@ -12,6 +12,7 @@ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-nexbox-a95x.dtb
->>  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-s912-q200.dtb
->>  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-s912-q201.dtb
->>  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-nexbox-a1.dtb
+> Add an SDIO reset GPIO and enable the serial used by the AP6255
+> Bluetooth module. Based on work by Martin Blumenstingl.
 >
-> What is the logic behind meson-gxm-s912-q201 vs. meson-gxm-nexbox-a1?
-> Should it be renamed to include -s912 for consistency?
-
-Oops, I think it should be renamed for consistency.
-
-I believe there's only one chip in the GXM family (S912) so it might be
-that we could either drop the -s912 from the q20x boards or, add it to
-the nexbox.
-
-I lean towards dropping the -s912 since there's a single chip in GXM.
-(FWIW, GXL has more than one chip in the family so we added the chip
-there.)
-
->> +dtb-$(CONFIG_ARCH_MESON) += meson-gxm-rbox-pro.dtb
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts | 11 ++++++++++-
+>  1 file changed, 10 insertions(+), 1 deletion(-)
 >
-> Should this new board use meson-gxm-s912-?
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts
+> index 9f04fa4e5aec..6ea225f584bd 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxm-rbox-pro.dts
+> @@ -58,6 +58,7 @@
+>  
+>  	aliases {
+>  		serial0 = &uart_AO;
+> +		serial1 = &uart_A;
+>  	};
+>  
+>  	chosen {
+> @@ -122,7 +123,8 @@
+>  
+>  	sdio_pwrseq: sdio-pwrseq {
+>  		compatible = "mmc-pwrseq-simple";
+> -		reset-gpios = <&gpio GPIOX_6 GPIO_ACTIVE_LOW>;
+> +		reset-gpios = <&gpio GPIOX_6 GPIO_ACTIVE_LOW>,
+> +				<&gpio GPIOX_17 GPIO_ACTIVE_LOW>;
+>  		clocks = <&wifi32k>;
+>  		clock-names = "ext_clock";
 
-No.  Unless Neil or you thing otherwise, I think we should send a patch
-to drop the -s912 from the q20x boards instead.  (where "we" == Neil) ;)
+c.f. thread on Martin's series.   I don't like this (ab)use of
+reset-gpios for sdio-pwrseq, and there's some work coming that will make
+this much cleaner.
 
-Kevin
+So, I'll hold off on this until the other solution is ready.
+
+Kevin 
