@@ -1,63 +1,164 @@
-From: guy.shapiro@mobi-wize.com (Guy Shapiro)
-Date: Wed, 18 Jan 2017 16:49:11 +0200
-Subject: imx6ul: power-up using the RTC
-Message-ID: <b516070d-6539-98d1-c832-d79ac89e8d43@mobi-wize.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed, 18 Jan 2017 14:50:15 +0000
+Subject: [PATCH V7 05/10] acpi: apei: handle SEA notification type for
+ ARMv8
+In-Reply-To: <1484244924-24786-6-git-send-email-tbaicar@codeaurora.org>
+References: <1484244924-24786-1-git-send-email-tbaicar@codeaurora.org>
+ <1484244924-24786-6-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <587F80A7.10008@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Tyler,
 
-I'm trying to use the low power RTC of the i.MX6UL to start from 
-power-off state.
+On 12/01/17 18:15, Tyler Baicar wrote:
+> ARM APEI extension proposal added SEA (Synchrounous External
 
-I started by hopefully running:
-# echo +30 > /sys/class/rtc/rtc0/wakealarm && shutdown -h now
-The system was powered down, but it didn't come up after 30 seconds as
-expected.
+Nit: Synchronous
 
-So I dug into the datasheet and the source...
-To activate the power on alarm, the flags SRTC_ENV, LPTA_EN and LPWUI_EN 
-on the SNVS_LP Control register (LPCR) should be asserted. The wakeup 
-time should be written to the SNVS_LP Time alarm register (LPTA). The 
-code that does this is on drivers/rtc/rtc-snvs.c:snvs_rtc_set_alarm().
+> Abort) notification type for ARMv8.
+> Add a new GHES error source handling function for SEA. If an error
+> source's notification type is SEA, then this function can be registered
+> into the SEA exception handler. That way GHES will parse and report
+> SEA exceptions when they occur.
 
-The first problem I found was with the use of the syscon-poweroff 
-driver. The "Turn off System Power" flag is part of the same register 
-(LPCR). The current code of syscon-poweroff set the register to the 
-"mask" property from the device tree on power off, overriding all the 
-existing flags.
-After setting the "mask" property on the device tree to 0x6b instead of
-0x60 (asserting the mentioned bits), the system do power up on timer, as 
-expected.
+> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+> index 2acbc60..87efe26 100644
+> --- a/drivers/acpi/apei/ghes.c
+> +++ b/drivers/acpi/apei/ghes.c
+> @@ -767,6 +772,62 @@ static struct notifier_block ghes_notifier_sci = {
+>  	.notifier_call = ghes_notify_sci,
+>  };
+>  
+> +#ifdef CONFIG_HAVE_ACPI_APEI_SEA
+> +static LIST_HEAD(ghes_sea);
+> +
+> +static int ghes_notify_sea(struct notifier_block *this,
+> +				  unsigned long event, void *data)
+> +{
+> +	struct ghes *ghes;
+> +	int ret = NOTIFY_DONE;
+> +
 
-However, I didn't like the idea of keeping those flags on even when no 
-one set the alarm.
-As a quick test, I modified the syscon-poweroff driver to ignore the 
-bits that are not on the mask:
+> +	nmi_enter();
 
-diff --git a/drivers/power/reset/syscon-poweroff.c 
-b/drivers/power/reset/syscon-poweroff.c
-index b683383..a5da02b 100644
---- a/drivers/power/reset/syscon-poweroff.c
-+++ b/drivers/power/reset/syscon-poweroff.c
-@@ -33,7 +33,7 @@ static u32 mask;
-static void syscon_poweroff(void)
-{
-         /* Issue the poweroff */
--       regmap_write(map, offset, mask);
-+       regmap_update_bits(map, offset, mask, mask);
-         mdelay(1000);
+Can we move this into the arch code? Its because we got here from a
+synchronous-exception that makes this nmi-like, I think it only makes sense for
+it be called from under /arch/.
 
 
-After applying this fix, the wake up alarm didn't work. Strangely, when 
-I added some debug prints to investigate the case, it worked again 
-(sometimes... depends on the exact places I add the prints).
-I suspect that some other driver clears the flags during the power down, 
-but I couldn't find such driver.
+Where did the rcu_read_lock() go? I can see its missing from ghes_notify_nmi()
+too, but I don't know enough about RCU to know if that's safe!
 
-Do you have any clue what code may change this register during the 
-shutdown process?
-Any other insights are welcomed as well :)
+The second paragraph in the comment above rcu_read_lock() describes it as
+preventing call_rcu() during a read-side critical section that was running
+concurrently. Doesn't this mean we can race with ghes_sea_remove() on another
+CPU because we wait for the wrong grace period?
+
+The same comment talks about how these read-side critical sections can nest, so
+I think its quite safe to make these 'lock' calls here.
 
 
-Guy.
+> +	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
+> +		if (!ghes_proc(ghes))
+> +			ret = NOTIFY_OK;
+> +	}
+> +	nmi_exit();
+> +
+> +	return ret;
+> +}
+> +
+> +static struct notifier_block ghes_notifier_sea = {
+> +	.notifier_call = ghes_notify_sea,
+> +};
+> +
+> +static int ghes_sea_add(struct ghes *ghes)
+> +{
+> +	mutex_lock(&ghes_list_mutex);
+> +	if (list_empty(&ghes_sea))
+> +		register_sea_notifier(&ghes_notifier_sea);
+> +	list_add_rcu(&ghes->list, &ghes_sea);
+> +	mutex_unlock(&ghes_list_mutex);
+> +	return 0;
+> +}
+> +
+> +static void ghes_sea_remove(struct ghes *ghes)
+> +{
+> +	mutex_lock(&ghes_list_mutex);
+> +	list_del_rcu(&ghes->list);
+> +	if (list_empty(&ghes_sea))
+> +		unregister_sea_notifier(&ghes_notifier_sea);
+> +	mutex_unlock(&ghes_list_mutex);
+
+ghes_nmi_remove() has:
+>	/*
+>  	* To synchronize with NMI handler, ghes can only be
+>  	* freed after NMI handler finishes.
+> 	*/
+> 	synchronize_rcu()
+
+This 'waits until a grace period has elapsed'. This is because ghes_remove()
+goes and kfree()s the ghes object while another CPU may be holding that entry in
+the list in ghes_notify_sea().
+
+
+> +}
+> +#else /* CONFIG_HAVE_ACPI_APEI_SEA */
+> +static inline int ghes_sea_add(struct ghes *ghes)
+> +{
+> +	pr_err(GHES_PFX "ID: %d, trying to add SEA notification which is not supported\n",
+> +	       ghes->generic->header.source_id);
+> +	return -ENOTSUPP;
+> +}
+> +
+> +static inline void ghes_sea_remove(struct ghes *ghes)
+> +{
+> +	pr_err(GHES_PFX "ID: %d, trying to remove SEA notification which is not supported\n",
+> +	       ghes->generic->header.source_id);
+> +}
+> +#endif /* CONFIG_HAVE_ACPI_APEI_SEA */
+> +
+>  #ifdef CONFIG_HAVE_ACPI_APEI_NMI
+>  /*
+>   * printk is not safe in NMI context.  So in NMI handler, we allocate
+> @@ -1011,6 +1072,14 @@ static int ghes_probe(struct platform_device *ghes_dev)
+>  	case ACPI_HEST_NOTIFY_EXTERNAL:
+>  	case ACPI_HEST_NOTIFY_SCI:
+>  		break;
+> +	case ACPI_HEST_NOTIFY_SEA:
+> +		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_SEA)) {
+> +			pr_warn(GHES_PFX "Generic hardware error source: %d notified via SEA is not supported\n",
+> +				generic->header.source_id);
+> +			rc = -ENOTSUPP;
+> +			goto err;
+> +		}
+> +		break;
+>  	case ACPI_HEST_NOTIFY_NMI:
+>  		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
+>  			pr_warn(GHES_PFX "Generic hardware error source: %d notified via NMI interrupt is not supported!\n",
+> @@ -1022,6 +1091,13 @@ static int ghes_probe(struct platform_device *ghes_dev)
+>  		pr_warning(GHES_PFX "Generic hardware error source: %d notified via local interrupt is not supported!\n",
+>  			   generic->header.source_id);
+>  		goto err;
+
+
+> +	case ACPI_HEST_NOTIFY_GPIO:
+> +	case ACPI_HEST_NOTIFY_SEI:
+> +	case ACPI_HEST_NOTIFY_GSIV:
+
+These three weren't mentioned in the commit message. I guess they are drive-by
+cleanup?
+
+
+> +		pr_warn(GHES_PFX "Generic hardware error source: %d notified via notification type %u is not supported\n",
+> +			generic->header.source_id, generic->header.source_id);
+> +		rc = -ENOTSUPP;
+> +		goto err;
+>  	default:
+>  		pr_warning(FW_WARN GHES_PFX "Unknown notification type: %u for generic hardware error source: %d\n",
+>  			   generic->notify.type, generic->header.source_id);
+
+
+Thanks,
+
+James
