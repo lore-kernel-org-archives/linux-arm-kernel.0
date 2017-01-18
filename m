@@ -1,48 +1,36 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 18 Jan 2017 14:47:11 -0800
-Subject: [PATCH v7 2/3] input: tm2-touchkey: Add touchkey driver support
- for TM2
-In-Reply-To: <20170117181056.mrwyudslfgh2wfms@kozik-lap>
-References: <1484632479-3111-1-git-send-email-jcsing.lee@samsung.com>
- <CGME20170117055444epcas1p47b0b0a0ae3260b22fa61d2b92362050b@epcas1p4.samsung.com>
- <1484632479-3111-3-git-send-email-jcsing.lee@samsung.com>
- <20170117172047.47535bj5xd6toayu@kozik-lap>
- <CAKdAkRQij9VuG1mguE0FwQMKuHrnyLAZJxOtkoR97uuX+ZBmLQ@mail.gmail.com>
- <20170117181056.mrwyudslfgh2wfms@kozik-lap>
-Message-ID: <20170118224711.GB11881@dtor-ws>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 18 Jan 2017 14:49:55 -0800
+Subject: [PATCH] ARM: smp: Remove CPU: shutdown notice
+In-Reply-To: <20170118223948.GR27312@n2100.armlinux.org.uk>
+References: <20170117230714.6799-1-f.fainelli@gmail.com>
+ <20170117232314.GI27312@n2100.armlinux.org.uk>
+ <fd4a4f48-f19e-dcac-c286-8e03db89e99a@gmail.com>
+ <20170118223948.GR27312@n2100.armlinux.org.uk>
+Message-ID: <c91c2cc7-d516-2dec-ccd8-9b36b6644f24@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 08:10:56PM +0200, Krzysztof Kozlowski wrote:
-> On Tue, Jan 17, 2017 at 10:06:27AM -0800, Dmitry Torokhov wrote:
-> > On Tue, Jan 17, 2017 at 9:20 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> > > On Tue, Jan 17, 2017 at 02:54:38PM +0900, Jaechul Lee wrote:
-> > >> This patch adds support for the TM2 touch key and led
-> > >> functionality.
-> > >>
-> > >> The driver interfaces with userspace through an input device and
-> > >> reports KEY_PHONE and KEY_BACK event types. LED brightness can be
-> > >> controlled by "/sys/class/leds/tm2-touchkey/brightness".
-> > >>
-> > >> Signed-off-by: Beomho Seo <beomho.seo@samsung.com>
-> > >> Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
-> > >> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> > >> Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
-> > >> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
-> > >> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
-> > >> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
-> > >> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> > >
-> > > This looks unusual. How did Dmitry's Sob end here?
-> > 
-> > I sent Jaechul a version of the patch to try out.
+On 01/18/2017 02:39 PM, Russell King - ARM Linux wrote:
+> On Tue, Jan 17, 2017 at 03:39:45PM -0800, Florian Fainelli wrote:
+>> Well, for one it's inconsistent, and it also leaves room for subtle
+>> timing/caching issues with some platforms (OK, maybe not so much).
+>> Improving the speed and consistency was the primary motive.
 > 
-> Ah, makes sense then.
+> Actually, it's not as inconsistent as you claim.
+> 
+> c68b0274fb3c ("ARM: reduce "Booted secondary processor" message to debug level")
+> dropped the corresponding pr_info() in the bringup path to debug level,
+> so to be consistent, this one should be dropped to debug level too.
+> 
+> Removing it arguably makes it more inconsistent!
 
-I picked up (and folded) the binding doc and driver patches, DTS should
-go through some other tree I believe.
+OK, fair point, I missed that one.
 
-Thanks.
+> 
+> So, I'd be willing to accept a patch lowering this to a pr_debug()
+> to make it more consistent with the bringup path, but otherwise the
+> consistency argument doesn't really stand.
 
+Sounds good, thanks!
 -- 
-Dmitry
+Florian
