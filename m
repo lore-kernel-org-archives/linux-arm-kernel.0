@@ -1,74 +1,39 @@
 From: roy.pledge@nxp.com (Roy Pledge)
-Date: Wed, 18 Jan 2017 17:39:32 -0500
-Subject: [PATCH 02/10] soc/qbman: Drop set/clear_bits usage
+Date: Wed, 18 Jan 2017 17:39:36 -0500
+Subject: [PATCH 06/10] soc/qbman: Add ARM equivalent for flush_dcache_range()
 In-Reply-To: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
 References: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
-Message-ID: <1484779180-1344-3-git-send-email-roy.pledge@nxp.com>
+Message-ID: <1484779180-1344-7-git-send-email-roy.pledge@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Madalin Bucur <madalin.bucur@nxp.com>
-
-Replace PPC specific set/clear_bits API with standard
-bit twiddling so driver is portalable outside PPC.
+From: Claudiu Manoil <claudiu.manoil@nxp.com>
 
 Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
 Signed-off-by: Claudiu Manoil <claudiu.manoil@nxp.com>
 Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
 ---
- drivers/soc/fsl/qbman/bman.c |    2 +-
- drivers/soc/fsl/qbman/qman.c |    8 ++++----
- 2 files changed, 5 insertions(+), 5 deletions(-)
+ drivers/soc/fsl/qbman/qman_ccsr.c |    6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/soc/fsl/qbman/bman.c b/drivers/soc/fsl/qbman/bman.c
-index a3d6d7c..3acded1 100644
---- a/drivers/soc/fsl/qbman/bman.c
-+++ b/drivers/soc/fsl/qbman/bman.c
-@@ -607,7 +607,7 @@ int bman_p_irqsource_add(struct bman_portal *p, u32 bits)
- 	unsigned long irqflags;
+diff --git a/drivers/soc/fsl/qbman/qman_ccsr.c b/drivers/soc/fsl/qbman/qman_ccsr.c
+index 43feaa9..67ae073 100644
+--- a/drivers/soc/fsl/qbman/qman_ccsr.c
++++ b/drivers/soc/fsl/qbman/qman_ccsr.c
+@@ -446,8 +446,14 @@ static int zero_priv_mem(struct device *dev, struct device_node *node,
+ 		return -ENOMEM;
  
- 	local_irq_save(irqflags);
--	set_bits(bits & BM_PIRQ_VISIBLE, &p->irq_sources);
-+	p->irq_sources |= bits & BM_PIRQ_VISIBLE;
- 	bm_out(&p->p, BM_REG_IER, p->irq_sources);
- 	local_irq_restore(irqflags);
+ 	memset(tmpp, 0, sz);
++#ifdef CONFIG_PPC
+ 	flush_dcache_range((unsigned long)tmpp,
+ 			   (unsigned long)tmpp + sz);
++#elif defined(CONFIG_ARM)
++	__cpuc_flush_dcache_area(tmpp, sz);
++#elif defined(CONFIG_ARM64)
++	__flush_dcache_area(tmpp, sz);
++#endif
+ 	memunmap(tmpp);
+ 
  	return 0;
-diff --git a/drivers/soc/fsl/qbman/qman.c b/drivers/soc/fsl/qbman/qman.c
-index 6f509f6..879e8f2 100644
---- a/drivers/soc/fsl/qbman/qman.c
-+++ b/drivers/soc/fsl/qbman/qman.c
-@@ -909,12 +909,12 @@ static inline int qm_mc_result_timeout(struct qm_portal *portal,
- 
- static inline void fq_set(struct qman_fq *fq, u32 mask)
- {
--	set_bits(mask, &fq->flags);
-+	fq->flags |= mask;
- }
- 
- static inline void fq_clear(struct qman_fq *fq, u32 mask)
- {
--	clear_bits(mask, &fq->flags);
-+	fq->flags &= ~mask;
- }
- 
- static inline int fq_isset(struct qman_fq *fq, u32 mask)
-@@ -1561,7 +1561,7 @@ void qman_p_irqsource_add(struct qman_portal *p, u32 bits)
- 	unsigned long irqflags;
- 
- 	local_irq_save(irqflags);
--	set_bits(bits & QM_PIRQ_VISIBLE, &p->irq_sources);
-+	p->irq_sources |= bits & QM_PIRQ_VISIBLE;
- 	qm_out(&p->p, QM_REG_IER, p->irq_sources);
- 	local_irq_restore(irqflags);
- }
-@@ -1584,7 +1584,7 @@ void qman_p_irqsource_remove(struct qman_portal *p, u32 bits)
- 	 */
- 	local_irq_save(irqflags);
- 	bits &= QM_PIRQ_VISIBLE;
--	clear_bits(bits, &p->irq_sources);
-+	p->irq_sources &= ~bits;
- 	qm_out(&p->p, QM_REG_IER, p->irq_sources);
- 	ier = qm_in(&p->p, QM_REG_IER);
- 	/*
 -- 
 1.7.9.5
