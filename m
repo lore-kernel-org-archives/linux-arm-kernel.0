@@ -1,35 +1,38 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 18 Jan 2017 15:27:25 -0800
-Subject: [PATCH 4/5] ARM: qcom_defconfig: Drop SoC specific configs
-In-Reply-To: <20170118232726.22876-1-sboyd@codeaurora.org>
-References: <20170118232726.22876-1-sboyd@codeaurora.org>
-Message-ID: <20170118232726.22876-5-sboyd@codeaurora.org>
+Date: Wed, 18 Jan 2017 15:27:21 -0800
+Subject: [PATCH 0/5] Remove qcom SoC configs
+Message-ID: <20170118232726.22876-1-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that these configs are gone let's remove them from the
-defconfig.
+We want to remove the ARCH_MSM* configs in mach-qcom/Kconfig
+because they are proxy configs for selecting the right
+clocksource driver and adjusting the text offset and there is no
+difference between ARCH_MSM8X60 and ARCH_MSM8960 anymore.
+Furthermore, there aren't configs for all the SoCs supported by
+the mainline kernel, leading to confusion about which SoCs are
+supported. This patch series removes them, leading to less confusion
+with the minor downside of always forcing a text offset shift and
+the selection of the qcom specific clocksource driver. The size
+increase from the clocksource driver is already taken in
+the qcom_defconfig, so most likely nobody will care.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/configs/qcom_defconfig | 4 ----
- 1 file changed, 4 deletions(-)
+Cc: Joerg Roedel <joro@8bytes.org>
 
-diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
-index 8c3a0108a231..03fc52964902 100644
---- a/arch/arm/configs/qcom_defconfig
-+++ b/arch/arm/configs/qcom_defconfig
-@@ -20,10 +20,6 @@ CONFIG_MODULE_FORCE_UNLOAD=y
- CONFIG_MODVERSIONS=y
- CONFIG_PARTITION_ADVANCED=y
- CONFIG_ARCH_QCOM=y
--CONFIG_ARCH_MSM8X60=y
--CONFIG_ARCH_MSM8960=y
--CONFIG_ARCH_MSM8974=y
--CONFIG_ARCH_MDM9615=y
- CONFIG_SMP=y
- CONFIG_HAVE_ARM_ARCH_TIMER=y
- CONFIG_PREEMPT=y
+Stephen Boyd (5):
+  iommu: Generalize MSM_IOMMU config to ARCH_QCOM
+  ARM: Makefile: Generalize qcom platform text offset
+  ARM: qcom: Remove SoC specific configs
+  ARM: qcom_defconfig: Drop SoC specific configs
+  ARM: multi_v7_defconfig: Remove qcom SoC configs
+
+ arch/arm/Makefile                   |  3 +--
+ arch/arm/configs/multi_v7_defconfig |  3 ---
+ arch/arm/configs/qcom_defconfig     |  4 ----
+ arch/arm/mach-qcom/Kconfig          | 23 ++---------------------
+ drivers/iommu/Kconfig               |  2 +-
+ 5 files changed, 4 insertions(+), 31 deletions(-)
+
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
