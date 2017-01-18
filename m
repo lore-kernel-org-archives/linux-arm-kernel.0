@@ -1,46 +1,28 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 18 Jan 2017 23:12:06 +0000
-Subject: [PATCH 06/10] soc/qbman: Add ARM equivalent for
- flush_dcache_range()
-In-Reply-To: <1484779180-1344-7-git-send-email-roy.pledge@nxp.com>
-References: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
- <1484779180-1344-7-git-send-email-roy.pledge@nxp.com>
-Message-ID: <20170118231206.GT27312@n2100.armlinux.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 18 Jan 2017 17:14:02 -0600
+Subject: [PATCH 4/4] drm: exynos: Remove support for Exynos4415 (SoC not
+ supported anymore)
+In-Reply-To: <20170114123642.15581-5-krzk@kernel.org>
+References: <20170114123642.15581-1-krzk@kernel.org>
+ <20170114123642.15581-5-krzk@kernel.org>
+Message-ID: <20170118231402.xxje54gag3mb6b3x@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2017 at 05:39:36PM -0500, Roy Pledge wrote:
-> From: Claudiu Manoil <claudiu.manoil@nxp.com>
+On Sat, Jan 14, 2017 at 02:36:42PM +0200, Krzysztof Kozlowski wrote:
+> Support for Exynos4415 is going away because there are no internal nor
+> external users.
 > 
-> Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
-> Signed-off-by: Claudiu Manoil <claudiu.manoil@nxp.com>
-> Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
+> Since commit 46dcf0ff0de3 ("ARM: dts: exynos: Remove exynos4415.dtsi"),
+> the platform cannot be instantiated so remove also the drivers.
+> 
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 > ---
->  drivers/soc/fsl/qbman/qman_ccsr.c |    6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/drivers/soc/fsl/qbman/qman_ccsr.c b/drivers/soc/fsl/qbman/qman_ccsr.c
-> index 43feaa9..67ae073 100644
-> --- a/drivers/soc/fsl/qbman/qman_ccsr.c
-> +++ b/drivers/soc/fsl/qbman/qman_ccsr.c
-> @@ -446,8 +446,14 @@ static int zero_priv_mem(struct device *dev, struct device_node *node,
->  		return -ENOMEM;
->  
->  	memset(tmpp, 0, sz);
-> +#ifdef CONFIG_PPC
->  	flush_dcache_range((unsigned long)tmpp,
->  			   (unsigned long)tmpp + sz);
-> +#elif defined(CONFIG_ARM)
-> +	__cpuc_flush_dcache_area(tmpp, sz);
+>  .../devicetree/bindings/display/exynos/exynos_dsim.txt |  1 -
+>  .../bindings/display/exynos/samsung-fimd.txt           |  1 -
 
-Please do not fiddle about under the covers, there be dragons there.
+Acked-by: Rob Herring <robh@kernel.org>
 
-It looks to me like you're trying to use __cpuc_flush_dcache_area()
-on an area that's been ioremap()'d, which is a waste of CPU cycles.
-ioremap()'d areas are mapped as "device" memory type, which means
-the region isn't even cached.  So I don't think this is necessary.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+>  drivers/gpu/drm/exynos/exynos_drm_dsi.c                | 15 +--------------
+>  drivers/gpu/drm/exynos/exynos_drm_fimd.c               | 18 ++----------------
+>  4 files changed, 3 insertions(+), 32 deletions(-)
