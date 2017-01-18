@@ -1,129 +1,79 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Jan 2017 09:23:38 +0000
-Subject: [PATCH] ARM: DT: STiH407: Add RTS / CTS pinctrl definition for
- UARTs.
-In-Reply-To: <1484671615-16343-1-git-send-email-peter.griffin@linaro.org>
-References: <1484671615-16343-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20170118092338.GE3718@dell>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 18 Jan 2017 10:20:21 +0100
+Subject: [PATCH v7 3/8] PWM: add pwm-stm32 DT bindings
+In-Reply-To: <1483608344-9012-4-git-send-email-benjamin.gaignard@st.com>
+References: <1483608344-9012-1-git-send-email-benjamin.gaignard@st.com>
+ <1483608344-9012-4-git-send-email-benjamin.gaignard@st.com>
+Message-ID: <20170118092021.GE18989@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Couple of nits and a question.
-
-On Tue, 17 Jan 2017, Peter Griffin wrote:
-
-> The uart IP is capable of doing hardware flow control. Define
-
-UART
-
-> the RTS and CTS pins for STiH407 family Socs so we can use this
-
-SoCs
-
-> feature in the future if we wish to.
+On Thu, Jan 05, 2017 at 10:25:39AM +0100, Benjamin Gaignard wrote:
+> Define bindings for pwm-stm32
 > 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> version 6:
+> - change st,breakinput parameter format to make it usuable on stm32f7 too.
+> 
+> version 2:
+> - use parameters instead of compatible of handle the hardware configuration
+> 
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 > ---
->  arch/arm/boot/dts/stih407-pinctrl.dtsi | 50 ++++++++++++++++++++++++++++++++++
->  1 file changed, 50 insertions(+)
+>  .../devicetree/bindings/pwm/pwm-stm32.txt          | 33 ++++++++++++++++++++++
+>  1 file changed, 33 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32.txt
 > 
-> diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-> index daab16b..3bbb0c0 100644
-> --- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
-> +++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-> @@ -149,6 +149,16 @@
->  						rx = <&pio3 5 ALT1 IN>;
->  					};
->  				};
-> +				pinctrl_sbc_serial0_rts: sbc_serial0-0_rts {
-> +					st,pins {
-> +						rts = <&pio3 7 ALT1 OUT>;
-> +					};
-> +				};
-> +				pinctrl_sbc_serial0_cts: sbc_serial0-0_cts {
-> +					st,pins {
-> +						cts = <&pio3 6 ALT1 IN>;
-> +					};
-> +				};
+> diff --git a/Documentation/devicetree/bindings/pwm/pwm-stm32.txt b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+> new file mode 100644
+> index 0000000..866f222
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+> @@ -0,0 +1,33 @@
+> +STMicroelectronics STM32 Timers PWM bindings
+> +
+> +Must be a sub-node of an STM32 Timers device tree node.
+> +See ../mfd/stm32-timers.txt for details about the parent node.
+> +
+> +Required parameters:
+> +- compatible:		Must be "st,stm32-pwm".
+> +- pinctrl-names: 	Set to "default".
+> +- pinctrl-0: 		List of phandles pointing to pin configuration nodes for PWM module.
+> +			For Pinctrl properties see ../pinctrl/pinctrl-bindings.txt
+> +
+> +Optional parameters:
+> +- st,breakinput:	Arrays of three u32 <index level filter> to describe break input configurations.
+> +			"index" indicates on which break input the configuration should be applied.
 
-Basic premise looks good, but why have you separated the lines?
+It might be useful to specify what the valid values are for the break
+input index.
 
-I believe they are used together when HW flow-control is enabled.
+Also, u32 is kind of a Linuxism, perhaps "Arrays of three cells"? Also,
+does this mean there can be multiple entries? Such as 6 cells for two
+configurations? What's the maximum number of such configurations?
 
->  			};
->  			/* SBC_ASC1 - UART11 */
->  			sbc_serial1 {
-> @@ -158,6 +168,16 @@
->  						rx = <&pio2 7 ALT3 IN>;
->  					};
->  				};
-> +				pinctrl_sbc_serial1_rts: sbc_serial1-0_rts {
-> +					st,pins {
-> +						rts = <&pio3 1 ALT3 OUT>;
-> +					};
-> +				};
-> +				pinctrl_sbc_serial1_cts: sbc_serial1-0_cts {
-> +					st,pins {
-> +						cts = <&pio3 0 ALT3 IN>;
-> +					};
-> +				};
->  			};
->  
->  			i2c10 {
-> @@ -469,6 +489,16 @@
->  						rx = <&pio17 1 ALT1 IN>;
->  					};
->  				};
-> +				pinctrl_serial0_rts: serial0-0_rts {
-> +					st,pins {
-> +						rts = <&pio17 3	ALT1 OUT>;
-> +					};
-> +				};
-> +				pinctrl_serial0_cts: serial0-0_cts {
-> +					st,pins {
-> +						cts = <&pio17 2	ALT1 IN>;
-> +					};
-> +				};
->  			};
->  
->  			serial1 {
-> @@ -478,6 +508,16 @@
->  						rx = <&pio16 1 ALT1 IN>;
->  					};
->  				};
-> +				pinctrl_serial1_rts: serial1-0_rts {
-> +					st,pins {
-> +						rts = <&pio16 3	ALT1 OUT>;
-> +					};
-> +				};
-> +				pinctrl_serial1_cts: serial1-0_cts {
-> +					st,pins {
-> +						cts = <&pio16 2 ALT1 IN>;
-> +					};
-> +				};
->  			};
->  
->  			serial2 {
-> @@ -487,6 +527,16 @@
->  						rx = <&pio15 1 ALT1 IN>;
->  					};
->  				};
-> +				pinctrl_serial2_rts: serial2-0_rts {
-> +					st,pins {
-> +						rts = <&pio15 3	ALT1 OUT>;
-> +					};
-> +				};
-> +				pinctrl_serial2_cts: serial2-0_cts {
-> +					st,pins {
-> +						cts = <&pio15 2	ALT1 IN>;
-> +					};
-> +				};
->  			};
->  
->  			mmc1 {
+If it's possible to specify multiple configurations, maybe a slightly
+clearer wording would be: "One or more <index level filter> triplets to
+describe..."
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> +			"level" gives the active level (0=low or 1=high) for this configuration.
+
+So how does this work exactly? "level" specifies the output level if the
+filter value is matched?
+
+> +			"filter" gives the filtering value to be applied.
+
+Is this a single value at which "level" will be applied? Or is it an
+upper/lower bound that can be used to restrict the output to "level" if
+the signal goes beyond/below a certain threshold?
+
+Maybe an example would clarify this. Or perhaps a reference to a manual
+where a more in-depth description of this functionality can be found.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170118/45afc3e2/attachment.sig>
