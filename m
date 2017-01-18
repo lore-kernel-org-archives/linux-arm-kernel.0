@@ -1,72 +1,47 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Wed, 18 Jan 2017 14:02:45 +0100
-Subject: [PATCH v8 00/18] KVM PCIe/MSI passthrough on ARM/ARM64 and IOVA
- reserved regions
-In-Reply-To: <e1e6d9cf-5fb8-e118-3a47-4c6be77c21a3@semihalf.com>
-References: <1484127714-3263-1-git-send-email-eric.auger@redhat.com>
- <e1e6d9cf-5fb8-e118-3a47-4c6be77c21a3@semihalf.com>
-Message-ID: <9ee8a03b-3231-bb58-1c64-e7f2f76ed5b9@redhat.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Wed, 18 Jan 2017 20:54:54 +0800
+Subject: [PATCH v8 04/15] irqchip: gic-v3-its: keep the head file include in
+ alphabetic order
+In-Reply-To: <1484744105-53140-1-git-send-email-guohanjun@huawei.com>
+References: <1484744105-53140-1-git-send-email-guohanjun@huawei.com>
+Message-ID: <1484744105-53140-5-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+From: Hanjun Guo <hanjun.guo@linaro.org>
 
-On 13/01/2017 14:59, Tomasz Nowicki wrote:
-> Hello Eric,
-> 
-> On 11.01.2017 10:41, Eric Auger wrote:
->> Following LPC discussions, we now report reserved regions through
->> the iommu-group sysfs reserved_regions attribute file.
->>
->> Reserved regions are populated through the IOMMU get_resv_region
->> callback (former get_dm_regions), now implemented by amd-iommu,
->> intel-iommu and arm-smmu:
->> - the intel-iommu reports the [0xfee00000 - 0xfeefffff] MSI window
->>   as a reserved region and RMRR regions as direct-mapped regions.
->> - the amd-iommu reports device direct mapped regions, the MSI region
->>   and HT regions.
->> - the arm-smmu reports the MSI window (arbitrarily located at
->>   0x8000000 and 1MB large).
->>
->> Unsafe interrupt assignment is tested by enumerating all MSI irq
->> domains and checking MSI remapping is supported in the above hierarchy.
->> This check is done in case we detect the iommu translates MSI
->> (an IOMMU_RESV_MSI window exists). Otherwise the IRQ remapping
->> capability is checked at IOMMU level. Obviously this is a defensive
->> IRQ safety assessment: Assuming there are several MSI controllers
->> in the system and at least one does not implement IRQ remapping,
->> the assignment will be considered as unsafe (even if this controller
->> is not acessible from the assigned devices).
->>
->> The series first patch stems from Robin's branch:
->> http://linux-arm.org/git?p=linux-rm.git;a=shortlog;h=refs/heads/iommu/misc
->>
->>
->> Best Regards
->>
->> Eric
->>
->> Git: complete series available at
->> https://github.com/eauger/linux/tree/v4.10-rc3-reserved-v8
-> 
-> I tested the series on ThunderX with internal 10G VNIC and Intel IXGBE
-> NIC. Please feel free to add my:
-> Tested-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
+Rearrange header file includes to alphabetic order. As acpi_iort.h
+includes acpi.h so remove the duplidate acpi.h inclusion as well.
 
-Thank you for your review. I will respin tomorrow adding the comment we
-discussed in [PATCH v8 14/18] irqdomain: irq_domain_check_msi_remap.
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Tested-by: Ming Lei <ming.lei@canonical.com>
+Tested-by: Wei Xu <xuwei5@hisilicon.com>
+Tested-by: Sinan Kaya <okaya@codeaurora.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Tomasz Nowicki <tn@semihalf.com>
+---
+ drivers/irqchip/irq-gic-v3-its.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-I will also apply Bharat's Tested-by, your T-b and your R-b's.
-
-Thanks
-
-Eric
-> 
-> Thanks,
-> Tomasz
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 69b040f..f471939 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -15,14 +15,13 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
+-#include <linux/acpi.h>
++#include <linux/acpi_iort.h>
+ #include <linux/bitmap.h>
+ #include <linux/cpu.h>
+ #include <linux/delay.h>
+ #include <linux/dma-iommu.h>
+ #include <linux/interrupt.h>
+ #include <linux/irqdomain.h>
+-#include <linux/acpi_iort.h>
+ #include <linux/log2.h>
+ #include <linux/mm.h>
+ #include <linux/msi.h>
+-- 
+1.7.12.4
