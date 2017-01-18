@@ -1,32 +1,31 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 18 Jan 2017 11:50:39 +0100
-Subject: [PATCH 0/3] ARM64: meson-gxbb: Add WeTek Boards
-Message-ID: <1484736642-5451-1-git-send-email-narmstrong@baylibre.com>
+Date: Wed, 18 Jan 2017 11:50:40 +0100
+Subject: [PATCH 1/3] dt-bindings: vendor-prefix: Add wetek vendor prefix
+In-Reply-To: <1484736642-5451-1-git-send-email-narmstrong@baylibre.com>
+References: <1484736642-5451-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1484736642-5451-2-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This serie adds support for the WeTek Hub and Play2 boards.
-The Hub is an extremely small IPTv Set-Top-Box and the Play2 is a more
-traditionnal Satellite or Terrestrial and IPTv Set-Top-Box.
+Add prefix for WeTek Electronics, limited, a company producing multimedia
+Set-Top-Boxes and supporting KODI and OpenELEC distributions.
 
-Both are based on the p200 Reference Design and out-of-tree support is
-based on OpenELEC kernel at [1].
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-[1] https://github.com/wetek-enigma/linux-amlogic
-
-Neil Armstrong (3):
-  dt-bindings: vendor-prefix: Add wetek vendor prefix
-  ARM64: dts: meson-gxbb: Add support for WeTek Hub and Play
-  dt-bindings: amlogic: Add WeTek boards
-
- Documentation/devicetree/bindings/arm/amlogic.txt  |  2 +
- .../devicetree/bindings/vendor-prefixes.txt        |  1 +
- arch/arm64/boot/dts/amlogic/Makefile               |  2 +
- .../boot/dts/amlogic/meson-gxbb-wetek-hub.dts      | 66 +++++++++++++++
- .../boot/dts/amlogic/meson-gxbb-wetek-play2.dts    | 94 ++++++++++++++++++++++
- 5 files changed, 165 insertions(+)
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-hub.dts
- create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-play2.dts
-
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 16d3b5e..0c16d85 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -320,6 +320,7 @@ virtio	Virtual I/O Device Specification, developed by the OASIS consortium
+ vivante	Vivante Corporation
+ voipac	Voipac Technologies s.r.o.
+ wd	Western Digital Corp.
++wetek	WeTek Electronics, limited.
+ wexler	Wexler
+ winbond Winbond Electronics corp.
+ wlf	Wolfson Microelectronics
 -- 
 1.9.1
