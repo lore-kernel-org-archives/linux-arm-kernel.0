@@ -1,69 +1,110 @@
-From: linux.amoon@gmail.com (Anand Moon)
-Date: Wed, 18 Jan 2017 10:30:55 +0530
-Subject: odroid xu4:pinctrl and gpio mapping for usb 3.0
-Message-ID: <CANAwSgSsXXuFjK6ckyYBNCqwAp6KS1V+LwMBMNkzW90BxUxpAQ@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 18 Jan 2017 07:17:58 +0200
+Subject: [PATCH v2 2/2] arm64: dts: exynos: Add regulators for Vbus and
+ Vbus-Boost
+In-Reply-To: <68177964-890d-7061-dac0-f37717b1a254@samsung.com>
+References: <1484665444-23365-1-git-send-email-pankaj.dubey@samsung.com>
+ <CGME20170117150123epcas1p12709f99a0993ae58ea1fe294df5a12fe@epcas1p1.samsung.com>
+ <1484665444-23365-3-git-send-email-pankaj.dubey@samsung.com>
+ <20170117182826.gngf7gjkvfyg3uww@kozik-lap>
+ <68177964-890d-7061-dac0-f37717b1a254@samsung.com>
+Message-ID: <CAJKOXPfY=LbRQtOKtcetMqiroEkP5crUiM6OeUww5fPsvJgd6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+On Wed, Jan 18, 2017 at 5:20 AM, pankaj.dubey <pankaj.dubey@samsung.com> wrote:
+>
+>
+> On Tuesday 17 January 2017 11:58 PM, Krzysztof Kozlowski wrote:
+>> On Tue, Jan 17, 2017 at 08:34:04PM +0530, Pankaj Dubey wrote:
+>>> From: Vivek Gautam <gautamvivek1987@gmail.com>
+>>>
+>>> Adding fixed voltage regulators for Vbus and Vbus-boost required
+>>> by USB 3.0 DRD controller on Exynos7-espresso board.
+>>>
+>>> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>>> Signed-off-by: Vivek Gautam <gautamvivek1987@gmail.com>
+>>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>>
+>> Same as patch 1.
+>>
+>
+> OK, will update.
+>
+>>> ---
+>>>  arch/arm64/boot/dts/exynos/exynos7-espresso.dts | 45 +++++++++++++++++++++++++
+>>>  1 file changed, 45 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+>>> index 9cf73cf..8d5abdd 100644
+>>> --- a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+>>> +++ b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+>>> @@ -13,6 +13,7 @@
+>>>  #include "exynos7.dtsi"
+>>>  #include <dt-bindings/interrupt-controller/irq.h>
+>>>  #include <dt-bindings/clock/samsung,s2mps11.h>
+>>> +#include <dt-bindings/gpio/gpio.h>
+>>>
+>>>  / {
+>>>      model = "Samsung Exynos7 Espresso board based on EXYNOS7";
+>>> @@ -33,6 +34,29 @@
+>>>              device_type = "memory";
+>>>              reg = <0x0 0x40000000 0x0 0xC0000000>;
+>>>      };
+>>> +
+>>> +    usb30_vbus_reg: regulator-usb30 {
+>>> +            compatible = "regulator-fixed";
+>>> +            regulator-name = "VBUS_5V";
+>>> +            regulator-min-microvolt = <5000000>;
+>>> +            regulator-max-microvolt = <5000000>;
+>>> +            gpio = <&gph1 1 GPIO_ACTIVE_HIGH>;
+>>> +            pinctrl-names = "default";
+>>> +            pinctrl-0 = <&usb30_vbus_en>;
+>>> +            enable-active-high;
+>>> +    };
+>>> +
+>>> +    usb3drd_boost_5v: regulator-usb3drd-boost {
+>>> +            compatible = "regulator-fixed";
+>>> +            regulator-name = "VUSB_VBUS_5V";
+>>> +            regulator-min-microvolt = <5000000>;
+>>> +            regulator-max-microvolt = <5000000>;
+>>> +            gpio = <&gpf4 1 GPIO_ACTIVE_HIGH>;
+>>> +            pinctrl-names = "default";
+>>> +            pinctrl-0 = <&usb3drd_boost_en>;
+>>> +            enable-active-high;
+>>> +    };
+>>> +
+>>>  };
+>>>
+>>>  &fin_pll {
+>>> @@ -366,3 +390,24 @@
+>>>      vqmmc-supply = <&ldo2_reg>;
+>>>      disable-wp;
+>>>  };
+>>> +
+>>> +&usbdrd_phy {
+>>> +    vbus-supply = <&usb30_vbus_reg>;
+>>> +    vbus-boost-supply = <&usb3drd_boost_5v>;
+>>> +};
+>>> +
+>>> +&pinctrl_bus1 {
+>>> +    usb30_vbus_en: usb30-vbus-en {
+>>> +            samsung,pins = "gph1-1";
+>>> +            samsung,pin-function = <1>;
+>>
+>> Javier mentioned it, please use EXYNOS_PIN_FUNC_OUTPUT
+>>
+>
+> Yes, but as it's not taken care in existing dts for other pin
+> definitions, so a Javier mentioned, this can be taken care as a separate
+> patch for all pin definitions? Or do you want me to first add patch
+> converting all these with macros and then on top of add this usb related
+> pin definitions.
 
-I tried to find the link between pinctrl and internal gpio for usb 3.0 ports
-from the schematics, but I could not find valuable input.
+For new code let's use the macros even if entire file is not converted
+(yet). The same like mixture of values and GPIO_ACTIVE_* macros. If
+you wish to convert the file to macros, feel free to go. But I see it
+as separate patch.
 
-I tired to map the internal gpio pins to gather information on
-id-gpio and vbus-gpio pins, but it was no luck.
-
-I tried to debug the phy-exynos5-usbdrd.c and the vbus regulator
-input is missing, but with no correct input on internal gpio and pinctrl
-so it hard to map this correctly.
-
-Is their some thing missing configuration.
-
-Their are some issues into the phy-exynos5-usbdrd.c
-with respect to exynos5_usbdrd_phy_exit not getting called
-on the warm boot which leads to usb ports not getting reset.
-
-Please share me some input on improve the power on usb 3.0 ports
-
-odroid at odroidxu4n:~$ lsusb -t
-/:  Bus 06.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 5000M
-/:  Bus 05.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 480M
-    |__ Port 1: Dev 3, If 0, Class=Vendor Specific Class, Driver=r8152, 480M
-/:  Bus 04.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 5000M
-    |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/2p, 5000M
-        |__ Port 1: Dev 3, If 0, Class=Mass Storage, Driver=usb-storage, 5000M
-/:  Bus 03.Port 1: Dev 1, Class=root_hub, Driver=xhci-hcd/1p, 480M
-    |__ Port 1: Dev 2, If 0, Class=Hub, Driver=hub/2p, 480M
-        |__ Port 2: Dev 3, If 0, Class=Video, Driver=uvcvideo, 480M
-        |__ Port 2: Dev 3, If 1, Class=Video, Driver=uvcvideo, 480M
-/:  Bus 02.Port 1: Dev 1, Class=root_hub, Driver=exynos-ohci/3p, 12M
-/:  Bus 01.Port 1: Dev 1, Class=root_hub, Driver=exynos-ehci/3p, 480M
-
-root at odroidxu4n:~# lsusb -v|egrep "^Bus|MaxPower"
-Bus 006 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
-    MaxPower                0mA
-Bus 005 Device 002: ID 0bda:8153 Realtek Semiconductor Corp.
-    MaxPower              180mA
-    MaxPower              180mA
-Bus 005 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
-    MaxPower                0mA
-Bus 004 Device 003: ID 174c:5106 ASMedia Technology Inc. ASM1051 SATA
-3Gb/s bridge
-    MaxPower                0mA
-Bus 004 Device 002: ID 05e3:0616 Genesys Logic, Inc. hub
-    MaxPower                0mA
-Bus 004 Device 001: ID 1d6b:0003 Linux Foundation 3.0 root hub
-    MaxPower                0mA
-Bus 003 Device 004: ID 04b4:00f8 Cypress Semiconductor Corp.
-    MaxPower              500mA
-Bus 003 Device 002: ID 05e3:0610 Genesys Logic, Inc. 4-port hub
-    MaxPower              100mA
-Bus 003 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
-    MaxPower                0mA
-Bus 002 Device 001: ID 1d6b:0001 Linux Foundation 1.1 root hub
-    MaxPower                0mA
-Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
-    MaxPower                0mA
-
--Best Regards
-Anand Moon
+Best regards,
+Krzysztof
