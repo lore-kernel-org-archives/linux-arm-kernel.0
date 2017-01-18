@@ -1,81 +1,63 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Wed, 18 Jan 2017 17:18:07 +0530
-Subject: [PATCH] ARM: OMAP5: Add HWMOD_SWSUP_SIDLE_ACT flag for UART
-Message-ID: <20170118114807.9543-1-vigneshr@ti.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 18 Jan 2017 11:57:40 +0000
+Subject: [PATCH 2/2] ARM: DTS: Fix register map for virt-capable GIC
+In-Reply-To: <1484736811-24002-3-git-send-email-marc.zyngier@arm.com>
+References: <1484736811-24002-1-git-send-email-marc.zyngier@arm.com>
+ <1484736811-24002-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <aa0cb86e-ede2-432b-6248-92679fc06578@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the commit ca43ea345de9 ("ARM: OMAP2+: hwmod: Add a new
-flag to handle SIDLE in SWSUP only in active"), UART IP needs the sidle
-mode to be controlled in SW only while they are active. Once inactive,
-the IP needs to be put back in HW control so they are also wakeup
-capable. The flag HWMOD_SWSUP_SIDLE takes care of this. So add this flag
-to all instances of UART.
+On 18/01/17 10:53, Marc Zyngier wrote:
+> Since everybody copied my own mistake from the DT binding example,
+> let's address all the offenders in one swift go.
+> 
+> Most of them got the CPU interface size wrong (4kB, while it should
+> be 8kB), except for both keystone platforms which got the control
+> interface wrong (4kB instead of 8kB).
+> 
+> In the couple of cases were I knew for sure what implementation
 
-With this change, 8250 UART now gives out proper RX Timeout interrupts
-and is usable as console.
+                         where
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
+> was used, I've added the "arm,gic-400" compatible string. I'm 99%
+> sure that this is what everyong is using, but short of having the
 
-Tested on OMAP5 uEVM.
+                         everyone
 
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+> TRM for all the other SoCs, I've let them alone.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+[...]
+> diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
+> index 63c7cf0..07bf300 100644
+> --- a/arch/arm/boot/dts/keystone-k2g.dtsi
+> +++ b/arch/arm/boot/dts/keystone-k2g.dtsi
+> @@ -45,7 +45,7 @@
+>  		interrupt-controller;
+>  		reg = <0x0 0x02561000 0x0 0x1000>,
+>  		      <0x0 0x02562000 0x0 0x2000>,
+> -		      <0x0 0x02564000 0x0 0x1000>,
+> +		      <0x0 0x02564000 0x0 0x2000>,
+>  		      <0x0 0x02566000 0x0 0x2000>;
+>  		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) |
+>  				IRQ_TYPE_LEVEL_HIGH)>;
+> diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+> index 02708ba..aaff6816 100644
+> --- a/arch/arm/boot/dts/keystone.dtsi
+> +++ b/arch/arm/boot/dts/keystone.dtsi
+> @@ -35,7 +35,7 @@
+>  		interrupt-controller;
+>  		reg = <0x0 0x02561000 0x0 0x1000>,
+>  		      <0x0 0x02562000 0x0 0x2000>,
+> -		      <0x0 0x02564000 0x0 0x1000>,
+> +		      <0x0 0x02564000 0x0 0x2000>,
+>  		      <0x0 0x02566000 0x0 0x2000>;
+>  		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) |
+>  				IRQ_TYPE_LEVEL_HIGH)>;
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-index 8cdfd9b7ab4f..a2d763a4cc57 100644
---- a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
-@@ -1748,6 +1748,7 @@ static struct omap_hwmod omap54xx_uart1_hwmod = {
- 	.name		= "uart1",
- 	.class		= &omap54xx_uart_hwmod_class,
- 	.clkdm_name	= "l4per_clkdm",
-+	.flags		= HWMOD_SWSUP_SIDLE_ACT,
- 	.main_clk	= "func_48m_fclk",
- 	.prcm = {
- 		.omap4 = {
-@@ -1763,6 +1764,7 @@ static struct omap_hwmod omap54xx_uart2_hwmod = {
- 	.name		= "uart2",
- 	.class		= &omap54xx_uart_hwmod_class,
- 	.clkdm_name	= "l4per_clkdm",
-+	.flags		= HWMOD_SWSUP_SIDLE_ACT,
- 	.main_clk	= "func_48m_fclk",
- 	.prcm = {
- 		.omap4 = {
-@@ -1778,7 +1780,7 @@ static struct omap_hwmod omap54xx_uart3_hwmod = {
- 	.name		= "uart3",
- 	.class		= &omap54xx_uart_hwmod_class,
- 	.clkdm_name	= "l4per_clkdm",
--	.flags		= DEBUG_OMAP4UART3_FLAGS,
-+	.flags		= DEBUG_OMAP4UART3_FLAGS | HWMOD_SWSUP_SIDLE_ACT,
- 	.main_clk	= "func_48m_fclk",
- 	.prcm = {
- 		.omap4 = {
-@@ -1794,7 +1796,7 @@ static struct omap_hwmod omap54xx_uart4_hwmod = {
- 	.name		= "uart4",
- 	.class		= &omap54xx_uart_hwmod_class,
- 	.clkdm_name	= "l4per_clkdm",
--	.flags		= DEBUG_OMAP4UART4_FLAGS,
-+	.flags		= DEBUG_OMAP4UART4_FLAGS | HWMOD_SWSUP_SIDLE_ACT,
- 	.main_clk	= "func_48m_fclk",
- 	.prcm = {
- 		.omap4 = {
-@@ -1810,6 +1812,7 @@ static struct omap_hwmod omap54xx_uart5_hwmod = {
- 	.name		= "uart5",
- 	.class		= &omap54xx_uart_hwmod_class,
- 	.clkdm_name	= "l4per_clkdm",
-+	.flags		= HWMOD_SWSUP_SIDLE_ACT,
- 	.main_clk	= "func_48m_fclk",
- 	.prcm = {
- 		.omap4 = {
-@@ -1825,6 +1828,7 @@ static struct omap_hwmod omap54xx_uart6_hwmod = {
- 	.name		= "uart6",
- 	.class		= &omap54xx_uart_hwmod_class,
- 	.clkdm_name	= "l4per_clkdm",
-+	.flags		= HWMOD_SWSUP_SIDLE_ACT,
- 	.main_clk	= "func_48m_fclk",
- 	.prcm = {
- 		.omap4 = {
--- 
-2.11.0
+FWIW I happen to have some public Keystone TRMs handy from my DMA offset
+investigations, and both K2G and K2H explicitly say it's a GIC-400 too.
+
+Robin.
