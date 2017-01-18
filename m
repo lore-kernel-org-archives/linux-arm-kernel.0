@@ -1,76 +1,63 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 18 Jan 2017 14:45:29 +0000
-Subject: Initializing MAC address at run-time
-In-Reply-To: <e083ed68-0e8e-380e-23bd-5ad387c88575@free.fr>
-References: <e083ed68-0e8e-380e-23bd-5ad387c88575@free.fr>
-Message-ID: <20170118144528.GH3231@leverpostej>
+From: guy.shapiro@mobi-wize.com (Guy Shapiro)
+Date: Wed, 18 Jan 2017 16:49:11 +0200
+Subject: imx6ul: power-up using the RTC
+Message-ID: <b516070d-6539-98d1-c832-d79ac89e8d43@mobi-wize.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2017 at 03:03:57PM +0100, Mason wrote:
-> Hello,
-> 
-> When my system boots up, eth0 is given a seemingly random MAC address.
-> 
-> [    0.950734] nb8800 26000.ethernet eth0: MAC address ba:de:d6:38:b8:38
-> [    0.957334] nb8800 26000.ethernet eth0: MAC address 6e:f1:48:de:d6:c4
-> 
-> 
-> The DT node for eth0 is:
-> 
-> 	eth0: ethernet at 26000 {
-> 		compatible = "sigma,smp8734-ethernet";
-> 		reg = <0x26000 0x800>;
-> 		interrupts = <38 IRQ_TYPE_LEVEL_HIGH>;
-> 		clocks = <&clkgen SYS_CLK>;
-> 	};
-> 
-> Documentation/devicetree/bindings/net/ethernet.txt mentions
-> - local-mac-address: array of 6 bytes, specifies the MAC address that was
->   assigned to the network device;
-> 
-> And indeed, if I define this property, eth0 ends up with the MAC address
-> I specify in the device tree. But of course, I don't want all my boards
-> to share the same MAC address. Every interface has a unique MAC address.
-> 
-> In fact, the boot loader (not Uboot, a custom non-DT boot loader) stores
-> the MAC address somewhere in MMIO space, in some weird custom format.
-> 
-> So, at init, I can find the MAC address, and dynamically insert the
-> "local-mac-address" property in the eth0 node.
+Hi,
 
-To me it sounds very convoluted to do this from the kernel, to pass
-information back to itself. I don't think this is the best way to handle
-this.
+I'm trying to use the low power RTC of the i.MX6UL to start from 
+power-off state.
 
-> Is there another (better) way to do this?
-> 
-> I'll post my code below, for illustration purpose.
-> 
-> Mark suggested this can be done from user-space, but I can't do that,
-> because I'm using an NFS rootfs, so I need the network before I even
-> have a user-space. And the DHCP server is configured to serve different
-> root filesystems, based on the MAC address.
+I started by hopefully running:
+# echo +30 > /sys/class/rtc/rtc0/wakealarm && shutdown -h now
+The system was powered down, but it didn't come up after 30 seconds as
+expected.
 
-That's not quite what I said. I asked whether your information was
-coming from userspace or from a kernel driver.
+So I dug into the datasheet and the source...
+To activate the power on alarm, the flags SRTC_ENV, LPTA_EN and LPWUI_EN 
+on the SNVS_LP Control register (LPCR) should be asserted. The wakeup 
+time should be written to the SNVS_LP Time alarm register (LPTA). The 
+code that does this is on drivers/rtc/rtc-snvs.c:snvs_rtc_set_alarm().
 
-My suggestion was that this should be done in the probe path somehow,
-by describing the relationship between the ethernet controller and the
-device containing the MAC information.
+The first problem I found was with the use of the syscon-poweroff 
+driver. The "Turn off System Power" flag is part of the same register 
+(LPCR). The current code of syscon-poweroff set the register to the 
+"mask" property from the device tree on power off, overriding all the 
+existing flags.
+After setting the "mask" property on the device tree to 0x6b instead of
+0x60 (asserting the mentioned bits), the system do power up on timer, as 
+expected.
 
-e.g. on the ethernet device, have a phandle (and perhaps some other
-args) describinng the device containing the MAC, and how to extract it.
+However, I didn't like the idea of keeping those flags on even when no 
+one set the alarm.
+As a quick test, I modified the syscon-poweroff driver to ignore the 
+bits that are not on the mask:
 
-That way, in the ethernet probe path we can go and look up the MAC
-address from the provider of that information.
+diff --git a/drivers/power/reset/syscon-poweroff.c 
+b/drivers/power/reset/syscon-poweroff.c
+index b683383..a5da02b 100644
+--- a/drivers/power/reset/syscon-poweroff.c
++++ b/drivers/power/reset/syscon-poweroff.c
+@@ -33,7 +33,7 @@ static u32 mask;
+static void syscon_poweroff(void)
+{
+         /* Issue the poweroff */
+-       regmap_write(map, offset, mask);
++       regmap_update_bits(map, offset, mask, mask);
+         mdelay(1000);
 
-> I need to do something similar with the NAND partitions. The boot loader
-> stores the partition offsets somewhere, and I need to pass this info
-> to the NAND framework, so I assumed that inserting the corresponding
-> properties at run-time was the correct way to do it.
 
-I would say similar could happen here.
+After applying this fix, the wake up alarm didn't work. Strangely, when 
+I added some debug prints to investigate the case, it worked again 
+(sometimes... depends on the exact places I add the prints).
+I suspect that some other driver clears the flags during the power down, 
+but I couldn't find such driver.
 
-Thanks,
-Mark.
+Do you have any clue what code may change this register during the 
+shutdown process?
+Any other insights are welcomed as well :)
+
+
+Guy.
