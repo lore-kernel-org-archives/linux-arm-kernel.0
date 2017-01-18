@@ -1,36 +1,98 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 18 Jan 2017 14:49:55 -0800
-Subject: [PATCH] ARM: smp: Remove CPU: shutdown notice
-In-Reply-To: <20170118223948.GR27312@n2100.armlinux.org.uk>
-References: <20170117230714.6799-1-f.fainelli@gmail.com>
- <20170117232314.GI27312@n2100.armlinux.org.uk>
- <fd4a4f48-f19e-dcac-c286-8e03db89e99a@gmail.com>
- <20170118223948.GR27312@n2100.armlinux.org.uk>
-Message-ID: <c91c2cc7-d516-2dec-ccd8-9b36b6644f24@gmail.com>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Wed, 18 Jan 2017 15:52:03 -0700
+Subject: [PATCH V7 04/10] arm64: exception: handle Synchronous External
+ Abort
+In-Reply-To: <587DF0B6.4060000@arm.com>
+References: <1484244924-24786-1-git-send-email-tbaicar@codeaurora.org>
+ <1484244924-24786-5-git-send-email-tbaicar@codeaurora.org>
+ <20170116115309.GE1510@arm.com> <587DF0B6.4060000@arm.com>
+Message-ID: <9185f5f2-7bc4-5727-af3a-920dd22578dc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/18/2017 02:39 PM, Russell King - ARM Linux wrote:
-> On Tue, Jan 17, 2017 at 03:39:45PM -0800, Florian Fainelli wrote:
->> Well, for one it's inconsistent, and it also leaves room for subtle
->> timing/caching issues with some platforms (OK, maybe not so much).
->> Improving the speed and consistency was the primary motive.
-> 
-> Actually, it's not as inconsistent as you claim.
-> 
-> c68b0274fb3c ("ARM: reduce "Booted secondary processor" message to debug level")
-> dropped the corresponding pr_info() in the bringup path to debug level,
-> so to be consistent, this one should be dropped to debug level too.
-> 
-> Removing it arguably makes it more inconsistent!
+On 1/17/2017 3:23 AM, James Morse wrote:
+> Hi Tyler,
+>
+> On 16/01/17 11:53, Will Deacon wrote:
+>> On Thu, Jan 12, 2017 at 11:15:18AM -0700, Tyler Baicar wrote:
+>>> SEA exceptions are often caused by an uncorrected hardware
+>>> error, and are handled when data abort and instruction abort
+>>> exception classes have specific values for their Fault Status
+>>> Code.
+>>> When SEA occurs, before killing the process, go through
+>>> the handlers registered in the notification list.
+>>> Update fault_info[] with specific SEA faults so that the
+>>> new SEA handler is used.
+>>> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+>>> index 05d2bd7..81039c7 100644
+>>> --- a/arch/arm64/mm/fault.c
+>>> +++ b/arch/arm64/mm/fault.c
+>>> @@ -480,6 +496,28 @@ static int do_bad(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>>>   	return 1;
+>>>   }
+>>>   
+>>> +/*
+>>> + * This abort handler deals with Synchronous External Abort.
+>>> + * It calls notifiers, and then returns "fault".
+>>> + */
+>>> +static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>>> +{
+>>> +	struct siginfo info;
+>>> +
+>>> +	atomic_notifier_call_chain(&sea_handler_chain, 0, NULL);
+>>> +
+>>> +	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
+>>> +		 fault_name(esr), esr, addr);
+>>> +
+>>> +	info.si_signo = SIGBUS;
+>>> +	info.si_errno = 0;
+>>> +	info.si_code  = 0;
+>>> +	info.si_addr  = (void __user *)addr;
+>>> +	arm64_notify_die("", regs, &info, esr);
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>>   static const struct fault_info {
+>>>   	int	(*fn)(unsigned long addr, unsigned int esr, struct pt_regs *regs);
+>>>   	int	sig;
+>>> @@ -502,22 +540,22 @@ static const struct fault_info {
+>>>   	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 1 permission fault"	},
+>>>   	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 2 permission fault"	},
+>>>   	{ do_page_fault,	SIGSEGV, SEGV_ACCERR,	"level 3 permission fault"	},
+>>> -	{ do_bad,		SIGBUS,  0,		"synchronous external abort"	},
+>>> +	{ do_sea,		SIGBUS,  0,		"synchronous external abort"	},
+>>>   	{ do_bad,		SIGBUS,  0,		"unknown 17"			},
+>>>   	{ do_bad,		SIGBUS,  0,		"unknown 18"			},
+>>>   	{ do_bad,		SIGBUS,  0,		"unknown 19"			},
+>>> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
+>>> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
+>>> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
+>>> -	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
+>>> -	{ do_bad,		SIGBUS,  0,		"synchronous parity error"	},
+>>> +	{ do_sea,		SIGBUS,  0,		"level 0 SEA (translation table walk)"	},
+>>> +	{ do_sea,		SIGBUS,  0,		"level 1 SEA (translation table walk)"	},
+>>> +	{ do_sea,		SIGBUS,  0,		"level 2 SEA (translation table walk)"	},
+>>> +	{ do_sea,		SIGBUS,  0,		"level 3 SEA (translation table walk)"	},
+>> Perhaps I wasn't clear enough in my previous review, but please expand the
+>> acronym for strings and comments.
+>
+> The 'SEA' in this user-string doesn't add anything. Now that these use do_sea()
+> instead of do_bad(), when they are printed won't it be:
+>> Synchronous External Abort: level 3 SEA (translation table walk) (...) at ....
 
-OK, fair point, I missed that one.
+Good point, yes they will:
 
-> 
-> So, I'd be willing to accept a patch lowering this to a pr_debug()
-> to make it more consistent with the bringup path, but otherwise the
-> consistency argument doesn't really stand.
++	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
++		 fault_name(esr), esr, addr);
 
-Sounds good, thanks!
+I can just remove SEA here then.
+
+Thanks,
+Tyler
+
+
 -- 
-Florian
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
