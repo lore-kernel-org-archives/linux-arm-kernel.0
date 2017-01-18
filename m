@@ -1,52 +1,48 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 18 Jan 2017 09:46:44 -0800
-Subject: [PATCH 23/33] Input: xilinx_ps2 - Use 'dev' instead of dereferencing
- it and other changes
+Date: Wed, 18 Jan 2017 09:46:30 -0800
+Subject: [PATCH 09/33] Input: sun4i-lradc-keys - Drop unnecessary call to
+ platform_set_drvdata and other changes
 In-Reply-To: <1484761614-12225-1-git-send-email-linux@roeck-us.net>
 References: <1484761614-12225-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1484761614-12225-24-git-send-email-linux@roeck-us.net>
+Message-ID: <1484761614-12225-10-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use local variable 'dev' instead of dereferencing it several times.
+There is no call to platform_get_drvdata() or dev_get_drvdata().
+Drop the unnecessary call to platform_set_drvdata().
+Other relevant changes:
+  Simplify error return
 
 This conversion was done automatically with coccinelle using the
 following semantic patches. The semantic patches and the scripts
 used to generate this commit log are available at
 https://github.com/groeck/coccinelle-patches
 
-- Use local variable 'struct device *dev' consistently
+- Replace 'if (e) return e; return 0;' with 'return e;'
+- Drop platform_set_drvdata()
 
 Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
- drivers/input/serio/xilinx_ps2.c | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ drivers/input/keyboard/sun4i-lradc-keys.c | 7 +------
+ 1 file changed, 1 insertion(+), 6 deletions(-)
 
-diff --git a/drivers/input/serio/xilinx_ps2.c b/drivers/input/serio/xilinx_ps2.c
-index 5223cbf94262..14c40892ed82 100644
---- a/drivers/input/serio/xilinx_ps2.c
-+++ b/drivers/input/serio/xilinx_ps2.c
-@@ -243,18 +243,17 @@ static int xps2_of_probe(struct platform_device *ofdev)
- 	unsigned int irq;
- 	int error;
- 
--	dev_info(dev, "Device Tree Probing \'%s\'\n",
--			ofdev->dev.of_node->name);
-+	dev_info(dev, "Device Tree Probing \'%s\'\n", dev->of_node->name);
- 
- 	/* Get iospace for the device */
--	error = of_address_to_resource(ofdev->dev.of_node, 0, &r_mem);
-+	error = of_address_to_resource(dev->of_node, 0, &r_mem);
- 	if (error) {
- 		dev_err(dev, "invalid address\n");
+diff --git a/drivers/input/keyboard/sun4i-lradc-keys.c b/drivers/input/keyboard/sun4i-lradc-keys.c
+index cc8f7ddcee53..c153d956778c 100644
+--- a/drivers/input/keyboard/sun4i-lradc-keys.c
++++ b/drivers/input/keyboard/sun4i-lradc-keys.c
+@@ -257,12 +257,7 @@ static int sun4i_lradc_probe(struct platform_device *pdev)
+ 	if (error)
  		return error;
- 	}
  
- 	/* Get IRQ for the device */
--	irq = irq_of_parse_and_map(ofdev->dev.of_node, 0);
-+	irq = irq_of_parse_and_map(dev->of_node, 0);
- 	if (!irq) {
- 		dev_err(dev, "no IRQ found\n");
- 		return -ENODEV;
+-	error = input_register_device(lradc->input);
+-	if (error)
+-		return error;
+-
+-	platform_set_drvdata(pdev, lradc);
+-	return 0;
++	return input_register_device(lradc->input);
+ }
+ 
+ static const struct of_device_id sun4i_lradc_of_match[] = {
 -- 
 2.7.4
