@@ -1,55 +1,41 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Wed, 18 Jan 2017 01:27:16 +0100
-Subject: [PATCH v4] ARM64: dts: meson-gx: Add reserved memory zone and
- usable memory range
-In-Reply-To: <04113569-e342-77ff-f79a-2c9c4dc4c602@suse.de>
-References: <1484129414-23325-1-git-send-email-narmstrong@baylibre.com>
- <m21sw66828.fsf@baylibre.com> <d3a00788-c3c1-4b10-90bf-2a8bc6a138f8@suse.de>
- <7fcb8d94-840a-de2c-f43b-9123ccc65514@baylibre.com>
- <CAOesGMhYfhrd-hy=N-FYDEPmumR0=QNzn5xTLxFuKG7apo5qiw@mail.gmail.com>
- <ecb5ff50-f5d5-ffe6-0732-faf5e51906f8@baylibre.com>
- <04113569-e342-77ff-f79a-2c9c4dc4c602@suse.de>
-Message-ID: <6bba535f-42bc-3e4b-129b-adc39152cfeb@suse.de>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 17 Jan 2017 21:30:00 -0300
+Subject: [PATCH 1/2] [media] exynos-gsc: Fix unbalanced pm_runtime_enable()
+ error
+Message-ID: <1484699402-28738-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 18.01.2017 um 01:00 schrieb Andreas F?rber:
-> Am 17.01.2017 um 09:21 schrieb Neil Armstrong:
->> The stress-ng package provides this "stress" command and is used to force the kernel to map more memory
->> zones, but I also got the issue while running a fully fledged Desktop Environment thanks to the
->> recently merged DRM driver.
->> You may not be able to trigger the issue since it seems Amlogic reduces this reserved size on GXL/GXM :
->> https://github.com/khadas/linux/commit/698df2c6cfbb0d1a9359743208e83517b31da6ce
->> But it should be confirmed.
-> 
-> Confirming no issues on three runs on meson-gxm-rbox-pro:
-> 
-> boxer:~ # stress-ng --vm 4 --vm-bytes 128M --timeout 10s &
-> [1] 2528
-> boxer:~ # stress-ng: info:  [2528] dispatching hogs: 4 vm
-> stress-ng: info:  [2528] cache allocate: default cache size: 256K
-> stress-ng: info:  [2528] successful run completed in 10.07s
-> 
-> [1]+  Done                    stress-ng --vm 4 --vm-bytes 128M --timeout 10s
-> boxer:~ # stress-ng --vm 4 --vm-bytes 128M --timeout 10s
-> stress-ng: info:  [2537] dispatching hogs: 4 vm
-> stress-ng: info:  [2537] cache allocate: default cache size: 256K
-> stress-ng: info:  [2537] successful run completed in 10.07s
-> boxer:~ # stress-ng --vm 4 --vm-bytes 128M --timeout 10s
-> stress-ng: info:  [2546] dispatching hogs: 4 vm
-> stress-ng: info:  [2546] cache allocate: default cache size: 256K
-> stress-ng: info:  [2546] successful run completed in 10.07s
-> boxer:~ #
+Commit a006c04e6218 ("[media] exynos-gsc: Fixup clock management at
+->remove()") changed the driver's .remove function logic to fist do
+a pm_runtime_get_sync() to make sure the device is powered before
+attempting to gate the gsc clock.
 
-Similar results on meson-gxbb-vega-s95-telos (except 512K cache size),
-with both mainline EFI and vendor U-Boot.
+But the commit also removed a pm_runtime_disable() call that leads
+to an unbalanced pm_runtime_enable() error if the driver is removed
+and re-probed:
 
-I notice that I don't have CONFIG_DRM enabled - maybe related?
+exynos-gsc 13e00000.video-scaler: Unbalanced pm_runtime_enable!
+exynos-gsc 13e10000.video-scaler: Unbalanced pm_runtime_enable!
 
-Regards,
-Andreas
+Fixes: a006c04e6218 ("[media] exynos-gsc: Fixup clock management at ->remove()")
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
 
+ drivers/media/platform/exynos-gsc/gsc-core.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
+index cbf75b6194b4..83272f10722d 100644
+--- a/drivers/media/platform/exynos-gsc/gsc-core.c
++++ b/drivers/media/platform/exynos-gsc/gsc-core.c
+@@ -1118,6 +1118,7 @@ static int gsc_remove(struct platform_device *pdev)
+ 		clk_disable_unprepare(gsc->clock[i]);
+ 
+ 	pm_runtime_put_noidle(&pdev->dev);
++	pm_runtime_disable(&pdev->dev);
+ 
+ 	dev_dbg(&pdev->dev, "%s driver unloaded\n", pdev->name);
+ 	return 0;
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+2.7.4
