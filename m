@@ -1,69 +1,140 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 18 Jan 2017 18:42:21 +0000
-Subject: [GIT PULL v2] arm64: dts: juno: updates for v4.11
-In-Reply-To: <dbfa1905-d937-7d02-7bbb-5f1a127896cf@arm.com>
-References: <dbfa1905-d937-7d02-7bbb-5f1a127896cf@arm.com>
-Message-ID: <20170118184221.GA21734@e107155-lin>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 18 Jan 2017 19:42:37 +0100
+Subject: [PATCH v9 2/5] i2c: Add STM32F4 I2C driver
+In-Reply-To: <CAOAejn0ea2j_oUijOdHgiL3JU4TM0HZoL+-ggzjpPL2eA7tDCw@mail.gmail.com>
+References: <1484666821-20551-1-git-send-email-cedric.madianga@gmail.com>
+ <1484666821-20551-3-git-send-email-cedric.madianga@gmail.com>
+ <20170117193752.e6hju25w74bb4i4z@pengutronix.de>
+ <CAOAejn0ea2j_oUijOdHgiL3JU4TM0HZoL+-ggzjpPL2eA7tDCw@mail.gmail.com>
+Message-ID: <20170118184237.tvhlsksdcw2ckwan@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC Team,
+Hello Cedric,
 
-Please pull !
+On Wed, Jan 18, 2017 at 04:21:17PM +0100, M'boumba Cedric Madianga wrote:
+> >> +      * In standard mode, the maximum allowed SCL rise time is 1000 ns.
+> >> +      * If, in the I2C_CR2 register, the value of FREQ[5:0] bits is equal to
+> >> +      * 0x08 so period = 125 ns therefore the TRISE[5:0] bits must be
+> >> +      * programmed with 09h.(1000 ns / 125 ns = 8 + 1)
+> >
+> >         * programmed with 0x9.
+> > (1000 ns / 125 ns = 8)
+> >
+> >> +      * So, for I2C standard mode TRISE = FREQ[5:0] + 1
+> >> +      *
+> >> +      * In fast mode, the maximum allowed SCL rise time is 300 ns.
+> >> +      * If, in the I2C_CR2 register, the value of FREQ[5:0] bits is equal to
+> >> +      * 0x08 so period = 125 ns therefore the TRISE[5:0] bits must be
+> >> +      * programmed with 03h.(300 ns / 125 ns = 2 + 1)
+> >
+> > as above s/03h/0x3/;
+> 
+> ok
+> 
+> > s/.(/. (/;
+> ok
+> 
+> > s/+ 1//;
+> This formula is use to understand how we find the result 0x3
+> So, 0x3 => 300 ns / 125ns = 2 + 1
 
-Regards,
-Sudeep
+Yeah, I understood that, but writing 300 ns / 125ns = 2 + 1 is
+irritating at best.
 
-v1->v2:
-	- Fixed device node names for coresight components as suggested by Olof
-	- Removed nested dtsi inclusions(again Olof's suggestions - Thanks)
-	- Added some minor cleanup and updates from Robin
+> >> +      * So, for I2C fast mode TRISE = FREQ[5:0] * 300 / 1000 + 1
+> >> +      */
+> >> +     if (i2c_dev->speed == STM32F4_I2C_SPEED_STANDARD)
+> >> +             trise = freq + 1;
+> >> +     else
+> >> +             trise = freq * 300 / 1000 + 1;
+> >
+> > I'd use
+> >
+> >         * 3 / 10
+> >
+> > without downside and lesser chance to overflow.
+> 
+> There is no chance of overflow as the max freq value allowed is 46
 
-The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+ok
 
-  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+> >> +             /*
+> >> +              * In fast mode, we compute CCR with duty = 0 as with low
+> >> +              * frequencies we are not able to reach 400 kHz.
+> >> +              * In that case:
+> >> +              * t_scl_high = CCR * I2C parent clk period
+> >> +              * t_scl_low = 2 * CCR * I2C parent clk period
+> >> +              * So, CCR = I2C parent rate / (400 kHz * 3)
+> >> +              *
+> >> +              * For example with parent rate = 6 MHz:
+> >> +              * CCR = 6000000 / (400000 * 3) = 5
+> >> +              * t_scl_high = 5 * (1 / 6000000) = 833 ns > 600 ns
+> >> +              * t_scl_low = 2 * 5 * (1 / 6000000) = 1667 ns > 1300 ns
+> >> +              * t_scl_high + t_scl_low = 2500 ns so 400 kHz is reached
+> >> +              */
+> >
+> > Huh, that's surprising. So you don't use DUTY any more. I found two
+> > hints in the manual that contradict here:
+> 
+> Yes with the above formula we could use duty = 0 by default
+> 
+> >
+> >         f_{PCLK1} must be at least 2 MHz to achieve Sm mode I2C frequencies
+> 
+> STM32F4_I2C_MIN_STANDARD_FREQ = 2
+> 
+> >         It must be at least 4 MHz to achieve Fm mode I2C frequencies.
+> 
+> STM32F4_I2C_MIN_FAST_FREQ = 6
+> 
+> > It must be a multiple of 10MHz to reach the 400 kHz maximum I2C Fm mode clock.
+> 
+> If we use this rule only 3 values are allowed 10 Mhz, 20 Mhz, 30 Mhz and 40 Mhz.
+> It is very restrictive.
+> So I don't take it into account in order to have more frequencies even
+> if 400 Khz is not reached.
+> Indeed, in many cases we are very close to 400 Khz.
+> For example, the default I2C parent clock in my board is 45 Mhz
+> I reach 395 kHz in theory and 390 kHz by testing.
+> I am in Fast mode but not with the max freq but very close.
 
-are available in the git repository at:
+fine
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux.git tags/juno-updates-4.11
+> > and
+> >
+> >         [...]
+> >         If DUTY = 1: (to reach 400 kHz)
+> >
+> > Strange.
+> >
+> >> +             val = DIV_ROUND_UP(i2c_dev->parent_rate, 400000 * 3);
+> >
+> > the manual reads:
+> >
+> >         The minimum allowed value is 0x04, except in FAST DUTY mode
+> >         where the minimum allowed value is 0x01
+> >
+> > You don't check for that, right?
+> 
+> As the minimum freq value is 6 Mhz in fast mode the minimum CCR is 5
+> as described in the comment.
+> So I don't need to check that again as it is already done by checking
+> parent frequency.
 
-for you to fetch changes up to 1492a864364ed46be2abeaaaf3b1a248f19e6644:
+That would then go into a comment.
 
-  arm64: dts: juno: remove motherboard USB node (2017-01-18 14:01:20 +0000)
+> > CCR is 11 bits wide. A comment confirming that this cannot overflow
+> > would be nice.
+> 
+> Again there is no chance of overflow thanks to parent frequency check
 
-----------------------------------------------------------------
-ARMv8 Vexpress/Juno DT updates for v4.11
+Right, this time I saw this myself, so I requested a comment stating
+this fact.
+ 
+Best regards
+Uwe
 
-1. Addition of Coresight support on Juno R1 and R2 variants
-
-2. Addition of STM(System Trace Macrocell) support on all Juno variants
-
-3. Removed incorrect nesting of dtsi files
-
-4. Removed untested USB hub only available on initial Juno R0 motherboard
-
-5. Added ETR SMMU power domain and dma-ranges property
-
-----------------------------------------------------------------
-Mike Leach (2):
-      arm64: dts: juno: add CoreSight support for Juno r1/r2 variants
-      arm64: dts: juno: add missing CoreSight STM component
-
-Robin Murphy (3):
-      arm64: dts: juno: add dma-ranges property
-      arm64: dts: juno: add ETR SMMU power domain
-      arm64: dts: juno: remove motherboard USB node
-
-Sudeep Holla (2):
-      arm64: dts: juno: remove dtsi nesting inside tree structure
-      arm64: dts: juno: refactor CoreSight support on Juno r0
-
- arch/arm64/boot/dts/arm/juno-base.dtsi        |  43 +++++++----
- arch/arm64/boot/dts/arm/juno-clocks.dtsi      |   3 +-
- arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi     | 100 ++++++++++++++++++++++++++
- arch/arm64/boot/dts/arm/juno-motherboard.dtsi |   7 --
- arch/arm64/boot/dts/arm/juno-r1.dts           |  16 ++++-
- arch/arm64/boot/dts/arm/juno-r2.dts           |  16 ++++-
- arch/arm64/boot/dts/arm/juno.dts              |  27 ++++++-
- 7 files changed, 186 insertions(+), 26 deletions(-)
- create mode 100644 arch/arm64/boot/dts/arm/juno-cs-r1r2.dtsi
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
