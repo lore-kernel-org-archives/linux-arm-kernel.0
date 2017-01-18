@@ -1,95 +1,76 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Wed, 18 Jan 2017 15:37:09 +0100
-Subject: [PATCH] [media] s5p-mfc: Align stream buffer and CPB buffer to 512
-In-Reply-To: <1484732223-24670-1-git-send-email-smitha.t@samsung.com>
-References: <CGME20170118094212epcas5p22e588016d2b330dcd0b99b6e1012c744@epcas5p2.samsung.com>
- <1484732223-24670-1-git-send-email-smitha.t@samsung.com>
-Message-ID: <de7bbdbf-35cc-a575-79d1-2ec5764469a5@samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 18 Jan 2017 14:45:29 +0000
+Subject: Initializing MAC address at run-time
+In-Reply-To: <e083ed68-0e8e-380e-23bd-5ad387c88575@free.fr>
+References: <e083ed68-0e8e-380e-23bd-5ad387c88575@free.fr>
+Message-ID: <20170118144528.GH3231@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Smitha,
+On Wed, Jan 18, 2017 at 03:03:57PM +0100, Mason wrote:
+> Hello,
+> 
+> When my system boots up, eth0 is given a seemingly random MAC address.
+> 
+> [    0.950734] nb8800 26000.ethernet eth0: MAC address ba:de:d6:38:b8:38
+> [    0.957334] nb8800 26000.ethernet eth0: MAC address 6e:f1:48:de:d6:c4
+> 
+> 
+> The DT node for eth0 is:
+> 
+> 	eth0: ethernet at 26000 {
+> 		compatible = "sigma,smp8734-ethernet";
+> 		reg = <0x26000 0x800>;
+> 		interrupts = <38 IRQ_TYPE_LEVEL_HIGH>;
+> 		clocks = <&clkgen SYS_CLK>;
+> 	};
+> 
+> Documentation/devicetree/bindings/net/ethernet.txt mentions
+> - local-mac-address: array of 6 bytes, specifies the MAC address that was
+>   assigned to the network device;
+> 
+> And indeed, if I define this property, eth0 ends up with the MAC address
+> I specify in the device tree. But of course, I don't want all my boards
+> to share the same MAC address. Every interface has a unique MAC address.
+> 
+> In fact, the boot loader (not Uboot, a custom non-DT boot loader) stores
+> the MAC address somewhere in MMIO space, in some weird custom format.
+> 
+> So, at init, I can find the MAC address, and dynamically insert the
+> "local-mac-address" property in the eth0 node.
 
-On 18.01.2017 10:37, Smitha T Murthy wrote:
-> >From MFCv6 onwards encoder stream buffer and decoder CPB buffer
+To me it sounds very convoluted to do this from the kernel, to pass
+information back to itself. I don't think this is the best way to handle
+this.
 
-Unexpected char at the beginning.
+> Is there another (better) way to do this?
+> 
+> I'll post my code below, for illustration purpose.
+> 
+> Mark suggested this can be done from user-space, but I can't do that,
+> because I'm using an NFS rootfs, so I need the network before I even
+> have a user-space. And the DHCP server is configured to serve different
+> root filesystems, based on the MAC address.
 
-> need to be aligned with 512.
+That's not quite what I said. I asked whether your information was
+coming from userspace or from a kernel driver.
 
-Patch below adds checks only if buffer size is multiple of 512, am I right?
-If yes, please precise the subject, for example "...CPB buffer size need
-to be...".
+My suggestion was that this should be done in the probe path somehow,
+by describing the relationship between the ethernet controller and the
+device containing the MAC information.
 
+e.g. on the ethernet device, have a phandle (and perhaps some other
+args) describinng the device containing the MAC, and how to extract it.
 
->
-> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
-> ---
->  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c |    9 +++++++++
->  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h |    3 +++
->  2 files changed, 12 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-> index d6f207e..57da798 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-> @@ -408,8 +408,15 @@ static int s5p_mfc_set_dec_stream_buffer_v6(struct s5p_mfc_ctx *ctx,
->  	struct s5p_mfc_dev *dev = ctx->dev;
->  	const struct s5p_mfc_regs *mfc_regs = dev->mfc_regs;
->  	struct s5p_mfc_buf_size *buf_size = dev->variant->buf_size;
-> +	size_t cpb_buf_size;
->  
->  	mfc_debug_enter();
-> +	cpb_buf_size = ALIGN(buf_size->cpb, CPB_ALIGN);
+That way, in the ethernet probe path we can go and look up the MAC
+address from the provider of that information.
 
-Since buf_size->cpb is constant of know size there is no need to align
-it here.
+> I need to do something similar with the NAND partitions. The boot loader
+> stores the partition offsets somewhere, and I need to pass this info
+> to the NAND framework, so I assumed that inserting the corresponding
+> properties at run-time was the correct way to do it.
 
-> +	if (strm_size >= set_strm_size_max(cpb_buf_size)) {
-> +		mfc_debug(2, "Decrease strm_size : %u -> %zu, gap : %d\n",
-> +			strm_size, set_strm_size_max(cpb_buf_size), CPB_ALIGN);
-> +		strm_size = set_strm_size_max(cpb_buf_size);
-> +	}
+I would say similar could happen here.
 
-As I understand strm_size here is a size of buffer to be decoded, why it
-cannot be equal to buf_size->cpb? Commit message says nothing about it.
-
->  	mfc_debug(2, "inst_no: %d, buf_addr: 0x%08x,\n"
->  		"buf_size: 0x%08x (%d)\n",
->  		ctx->inst_no, buf_addr, strm_size, strm_size);
-> @@ -519,6 +526,8 @@ static int s5p_mfc_set_enc_stream_buffer_v6(struct s5p_mfc_ctx *ctx,
->  	struct s5p_mfc_dev *dev = ctx->dev;
->  	const struct s5p_mfc_regs *mfc_regs = dev->mfc_regs;
->  
-> +	size = ALIGN(size, 512);
-> +
-
-Shouldn't be CPB_ALIGN instead of 512? And more importantly size is a
-length of buffer for encoded stream,
-by up-aligning you tell MFC that it can write beyond the buffer, it
-could potentially overwrite random memory? Am I right?
-
-
->  	writel(addr, mfc_regs->e_stream_buffer_addr); /* 16B align */
->  	writel(size, mfc_regs->e_stream_buffer_size);
->  
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h
-> index 8055848..16a7b1d 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h
-> @@ -40,6 +40,9 @@
->  #define FRAME_DELTA_H264_H263		1
->  #define TIGHT_CBR_MAX			10
->  
-> +#define CPB_ALIGN			512
-> +#define set_strm_size_max(cpb_max)	((cpb_max) - CPB_ALIGN)
-
-Name of the macro is misleading.
-
-Regards
-Andrzej
-
-> +
->  struct s5p_mfc_hw_ops *s5p_mfc_init_hw_ops_v6(void);
->  const struct s5p_mfc_regs *s5p_mfc_init_regs_v6_plus(struct s5p_mfc_dev *dev);
->  #endif /* S5P_MFC_OPR_V6_H_ */
+Thanks,
+Mark.
