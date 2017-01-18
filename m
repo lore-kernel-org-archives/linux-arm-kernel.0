@@ -1,37 +1,35 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 18 Jan 2017 15:27:23 -0800
-Subject: [PATCH 2/5] ARM: Makefile: Generalize qcom platform text offset
+Date: Wed, 18 Jan 2017 15:27:22 -0800
+Subject: [PATCH 1/5] iommu: Generalize MSM_IOMMU config to ARCH_QCOM
 In-Reply-To: <20170118232726.22876-1-sboyd@codeaurora.org>
 References: <20170118232726.22876-1-sboyd@codeaurora.org>
-Message-ID: <20170118232726.22876-3-sboyd@codeaurora.org>
+Message-ID: <20170118232726.22876-2-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some qcom platforms need a specific text offset because the first
-2MB of memory is reserved for shared memory. Let's just always
-shift the text segment up by 2MB when ARCH_QCOM is selected so
-that we don't have to specify the specific platforms that exhibit
-this problem in Kconfig.
+We want to get rid of the ARCH_MSM* configs in the future, but
+this still depends on them. Generalize to the ARCH_QCOM config,
+which isn't going away.
 
+Cc: Joerg Roedel <joro@8bytes.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/Makefile | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/iommu/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index ab30cc634d02..8a6d344e6043 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -145,8 +145,7 @@ textofs-$(CONFIG_PM_H1940)      := 0x00108000
- ifeq ($(CONFIG_ARCH_SA1100),y)
- textofs-$(CONFIG_SA1111) := 0x00208000
- endif
--textofs-$(CONFIG_ARCH_MSM8X60) := 0x00208000
--textofs-$(CONFIG_ARCH_MSM8960) := 0x00208000
-+textofs-$(CONFIG_ARCH_QCOM) := 0x00208000
- textofs-$(CONFIG_ARCH_AXXIA) := 0x00308000
- 
- # Machine directory name.  This list is sorted alphanumerically
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index 8ee54d71c7eb..a91fc7986428 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -88,7 +88,7 @@ config FSL_PAMU
+ config MSM_IOMMU
+ 	bool "MSM IOMMU Support"
+ 	depends on ARM
+-	depends on ARCH_MSM8X60 || ARCH_MSM8960 || COMPILE_TEST
++	depends on ARCH_QCOM || COMPILE_TEST
+ 	select IOMMU_API
+ 	select IOMMU_IO_PGTABLE_ARMV7S
+ 	help
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 a Linux Foundation Collaborative Project
