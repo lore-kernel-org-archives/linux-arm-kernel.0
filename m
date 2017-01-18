@@ -1,34 +1,26 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 18 Jan 2017 15:27:26 -0800
-Subject: [PATCH 5/5] ARM: multi_v7_defconfig: Remove qcom SoC configs
-In-Reply-To: <20170118232726.22876-1-sboyd@codeaurora.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 18 Jan 2017 23:31:16 +0000
+Subject: [PATCH 2/5] ARM: Makefile: Generalize qcom platform text offset
+In-Reply-To: <20170118232726.22876-3-sboyd@codeaurora.org>
 References: <20170118232726.22876-1-sboyd@codeaurora.org>
-Message-ID: <20170118232726.22876-6-sboyd@codeaurora.org>
+ <20170118232726.22876-3-sboyd@codeaurora.org>
+Message-ID: <20170118233115.GV27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that these configs are gone let's remove them from the
-defconfig.
+On Wed, Jan 18, 2017 at 03:27:23PM -0800, Stephen Boyd wrote:
+> Some qcom platforms need a specific text offset because the first
+> 2MB of memory is reserved for shared memory. Let's just always
+> shift the text segment up by 2MB when ARCH_QCOM is selected so
+> that we don't have to specify the specific platforms that exhibit
+> this problem in Kconfig.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/configs/multi_v7_defconfig | 3 ---
- 1 file changed, 3 deletions(-)
+I was really hoping that this sillyness would stop, but I guess
+expecting it to stop is asking too much...
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index f084a0a928b8..1d05f6df8a5f 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -70,9 +70,6 @@ CONFIG_SOC_AM43XX=y
- CONFIG_SOC_DRA7XX=y
- CONFIG_ARCH_QCOM=y
- CONFIG_ARCH_MEDIATEK=y
--CONFIG_ARCH_MSM8X60=y
--CONFIG_ARCH_MSM8960=y
--CONFIG_ARCH_MSM8974=y
- CONFIG_ARCH_ROCKCHIP=y
- CONFIG_ARCH_SOCFPGA=y
- CONFIG_PLAT_SPEAR=y
+Is there really no other option?
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
