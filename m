@@ -1,42 +1,67 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 18 Jan 2017 16:25:08 -0600
-Subject: [PATCHv4 1/5] clk: mvebu: support for 98DX3236 SoC
-In-Reply-To: <20170113091222.7132-2-chris.packham@alliedtelesis.co.nz>
-References: <20170113091222.7132-1-chris.packham@alliedtelesis.co.nz>
- <20170113091222.7132-2-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20170118222508.prn5xk63nuc3ocr7@rob-hp-laptop>
+Date: Wed, 18 Jan 2017 16:20:10 -0600
+Subject: [PATCH v1 2/2] arm: dts: mt2701: add nor flash node
+In-Reply-To: <20170117143650.5db87148@free-electrons.com>
+References: <d7b866ad-5b2f-62d3-3aa3-6fa42803d625@gmail.com>
+ <b850b751-1d8d-0053-cf1f-d5314542e5c3@gmail.com>
+ <20170113172825.75d545a3@bbrezillon>
+ <86c997be-f500-eaa1-3ba5-d21cff6223b7@gmail.com>
+ <20170113175628.1793f433@bbrezillon>
+ <0fafcd8d-cf99-de6b-728f-5e3637810b68@gmail.com>
+ <20170114092958.022f2fc8@bbrezillon>
+ <e7fa1542-f0e2-0e45-23b3-25d6491ae40d@gmail.com>
+ <20170116094032.6f471f11@bbrezillon>
+ <20170117143650.5db87148@free-electrons.com>
+Message-ID: <20170118222010.ivc6jxpnrumemvdf@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2017 at 10:12:16PM +1300, Chris Packham wrote:
-> The 98DX3236, 98DX3336, 98DX4521 and variants have a different TCLK from
-> the Armada XP (200MHz vs 250MHz). The CPU core clock is fixed at 800MHz.
+On Tue, Jan 17, 2017 at 02:36:50PM +1100, Thomas Petazzoni wrote:
+> Hello,
 > 
-> The clock gating options are a subset of those on the Armada XP.
+> (Side note: you guys should learn about stripping irrelevant parts of
+> an e-mail when replying!)
+>
+> On Mon, 16 Jan 2017 09:40:32 +0100, Boris Brezillon wrote:
 > 
-> The core clock divider is different to the Armada XP also.
-> 
-> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
-> ---
-> 
-> Notes:
->     Changes in v2:
->     - Update devicetree binding documentation for new compatible string
->     Changes in v3:
->     - Add 98dx3236 support to mvebu/clk-corediv.c rather than creating a new
->       driver.
->     - Document mv98dx3236-corediv-clock binding
->     Changes in v4:
->     - None
-> 
->  .../bindings/clock/mvebu-corediv-clock.txt         |  1 +
->  .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |  1 +
+> > > Well this is OK I guess, but then you can also use "mediatek,mt8173-nor"
+> > > as the oldest supported compatible and be done with it, no ? It looks a
+> > > bit crappy though, I admit that ...
+> > 
+> > Let's stop bikeshedding and wait for DT maintainers feedback
+> > before taking a decision ;-).
+> > 
+> > Rob, Mark, any opinion?
+>
 
-Please add acks when posting new versions.
+Sigh, is how to do compatibles really not yet understood?
+ 
+> I agree that a clarification would be good. There are really two
+> options:
+> 
+>  1. Have two compatible strings in the DT, the one that matches the
+>     exact SoC where the IP is found (first compatible string) and the
+>     one that matches some other SoC where the same IP is found (second
+>     compatible string). Originally, Linux only supports the second
+>     compatible string in its device driver, but if it happens that a
+>     difference is found between two IPs that we thought were the same,
+>     we can add support for the first compatible string in the driver,
+>     with a slightly different behavior.
 
-Acked-by: Rob Herring <robh@kernel.org>
+This. And no wildcards in the compatible string. 
 
->  drivers/clk/mvebu/armada-xp.c                      | 42 ++++++++++++++++++++++
->  drivers/clk/mvebu/clk-corediv.c                    | 23 ++++++++++++
->  drivers/clk/mvebu/clk-cpu.c                        | 31 ++++++++++++++--
->  5 files changed, 96 insertions(+), 2 deletions(-)
+>  2. Have a single compatible string in the DT, matching the exact SoC
+>     where the IP is found. This involves adding immediately this
+>     compatible string in the corresponding driver.
+
+I wouldn't object to this from a DT perspective as I have no clue 
+generally if IP blocks are "the same" or not. Subsystem maintainers will 
+object though.
+
+> I've not really been able to figure out which of the two options is the
+> most future-proof/appropriate.
+
+They are both future-proof. #2 has the disadvantage of requiring a 
+kernel update for a new SoC. 
+
+Rob
