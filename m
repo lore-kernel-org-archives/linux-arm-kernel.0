@@ -1,110 +1,36 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 18 Jan 2017 07:17:58 +0200
-Subject: [PATCH v2 2/2] arm64: dts: exynos: Add regulators for Vbus and
- Vbus-Boost
-In-Reply-To: <68177964-890d-7061-dac0-f37717b1a254@samsung.com>
-References: <1484665444-23365-1-git-send-email-pankaj.dubey@samsung.com>
- <CGME20170117150123epcas1p12709f99a0993ae58ea1fe294df5a12fe@epcas1p1.samsung.com>
- <1484665444-23365-3-git-send-email-pankaj.dubey@samsung.com>
- <20170117182826.gngf7gjkvfyg3uww@kozik-lap>
- <68177964-890d-7061-dac0-f37717b1a254@samsung.com>
-Message-ID: <CAJKOXPfY=LbRQtOKtcetMqiroEkP5crUiM6OeUww5fPsvJgd6A@mail.gmail.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Wed, 18 Jan 2017 11:12:18 +0530
+Subject: [PATCH 0/3] Use macros for pinctrl configuration on Exynos7
+References: <CGME20170118053944epcas1p1bed1518b3ba444434bfbe4048b6fe4bd@epcas1p1.samsung.com>
+Message-ID: <1484718141-28785-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2017 at 5:20 AM, pankaj.dubey <pankaj.dubey@samsung.com> wrote:
->
->
-> On Tuesday 17 January 2017 11:58 PM, Krzysztof Kozlowski wrote:
->> On Tue, Jan 17, 2017 at 08:34:04PM +0530, Pankaj Dubey wrote:
->>> From: Vivek Gautam <gautamvivek1987@gmail.com>
->>>
->>> Adding fixed voltage regulators for Vbus and Vbus-boost required
->>> by USB 3.0 DRD controller on Exynos7-espresso board.
->>>
->>> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>> Signed-off-by: Vivek Gautam <gautamvivek1987@gmail.com>
->>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->>
->> Same as patch 1.
->>
->
-> OK, will update.
->
->>> ---
->>>  arch/arm64/boot/dts/exynos/exynos7-espresso.dts | 45 +++++++++++++++++++++++++
->>>  1 file changed, 45 insertions(+)
->>>
->>> diff --git a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
->>> index 9cf73cf..8d5abdd 100644
->>> --- a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
->>> +++ b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
->>> @@ -13,6 +13,7 @@
->>>  #include "exynos7.dtsi"
->>>  #include <dt-bindings/interrupt-controller/irq.h>
->>>  #include <dt-bindings/clock/samsung,s2mps11.h>
->>> +#include <dt-bindings/gpio/gpio.h>
->>>
->>>  / {
->>>      model = "Samsung Exynos7 Espresso board based on EXYNOS7";
->>> @@ -33,6 +34,29 @@
->>>              device_type = "memory";
->>>              reg = <0x0 0x40000000 0x0 0xC0000000>;
->>>      };
->>> +
->>> +    usb30_vbus_reg: regulator-usb30 {
->>> +            compatible = "regulator-fixed";
->>> +            regulator-name = "VBUS_5V";
->>> +            regulator-min-microvolt = <5000000>;
->>> +            regulator-max-microvolt = <5000000>;
->>> +            gpio = <&gph1 1 GPIO_ACTIVE_HIGH>;
->>> +            pinctrl-names = "default";
->>> +            pinctrl-0 = <&usb30_vbus_en>;
->>> +            enable-active-high;
->>> +    };
->>> +
->>> +    usb3drd_boost_5v: regulator-usb3drd-boost {
->>> +            compatible = "regulator-fixed";
->>> +            regulator-name = "VUSB_VBUS_5V";
->>> +            regulator-min-microvolt = <5000000>;
->>> +            regulator-max-microvolt = <5000000>;
->>> +            gpio = <&gpf4 1 GPIO_ACTIVE_HIGH>;
->>> +            pinctrl-names = "default";
->>> +            pinctrl-0 = <&usb3drd_boost_en>;
->>> +            enable-active-high;
->>> +    };
->>> +
->>>  };
->>>
->>>  &fin_pll {
->>> @@ -366,3 +390,24 @@
->>>      vqmmc-supply = <&ldo2_reg>;
->>>      disable-wp;
->>>  };
->>> +
->>> +&usbdrd_phy {
->>> +    vbus-supply = <&usb30_vbus_reg>;
->>> +    vbus-boost-supply = <&usb3drd_boost_5v>;
->>> +};
->>> +
->>> +&pinctrl_bus1 {
->>> +    usb30_vbus_en: usb30-vbus-en {
->>> +            samsung,pins = "gph1-1";
->>> +            samsung,pin-function = <1>;
->>
->> Javier mentioned it, please use EXYNOS_PIN_FUNC_OUTPUT
->>
->
-> Yes, but as it's not taken care in existing dts for other pin
-> definitions, so a Javier mentioned, this can be taken care as a separate
-> patch for all pin definitions? Or do you want me to first add patch
-> converting all these with macros and then on top of add this usb related
-> pin definitions.
+Currently Exynos7 DTSi files are using hard-coded values for pinctrl
+configurations such as pin-function, pin-pud and pin-drv. These hard
+coded values are difficult to understand without datasheet, lets use
+macros for such configurations. 
 
-For new code let's use the macros even if entire file is not converted
-(yet). The same like mixture of values and GPIO_ACTIVE_* macros. If
-you wish to convert the file to macros, feel free to go. But I see it
-as separate patch.
+While doing this observed that Exynos7 has different drive strengths
+values *ONLY* for FSYS1 blocks pins, so adding new macro definition
+for the same in patch[2/3]
 
-Best regards,
-Krzysztof
+Also some of sd0_xxxx pin definition is using drive strength as 0x3 but
+as per datasheet of Exynos7, FSYS1 block's pin does not support 0x3 value
+for drive strenth so fixing the same in patch[1/3].
+
+I have verified these patches for boot on Exynos7 based espresso board.
+
+Pankaj Dubey (3):
+  arm64: dts: exynos: Fix drive strength of sd0_xxx pin definitions
+  pinctrl: dt-bindings: samsung: Add Exynos7 specific pinctrl macro
+    definitions
+  arm64: dts: exynos: Use macros for pinctrl configuration on Exynos7
+
+ arch/arm64/boot/dts/exynos/exynos7-espresso.dts |   4 +-
+ arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi | 302 ++++++++++++------------
+ include/dt-bindings/pinctrl/samsung.h           |   8 +
+ 3 files changed, 162 insertions(+), 152 deletions(-)
+
+-- 
+2.7.4
