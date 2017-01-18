@@ -1,83 +1,157 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Wed, 18 Jan 2017 14:19:58 +0100
-Subject: [PATCH v3 10/13] sata: ahci-da850: add a workaround for controller
- instability
+Date: Wed, 18 Jan 2017 14:19:59 +0100
+Subject: [PATCH v3 11/13] sata: ahci-da850: un-hardcode the MPY bits
 In-Reply-To: <1484745601-4769-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1484745601-4769-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1484745601-4769-11-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1484745601-4769-12-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have a use case with the da850 SATA controller where at PLL0
-frequency of 456MHz (needed to properly service the LCD controller)
-the chip becomes unstable and the hardreset operation is ignored the
-first time 50% of times.
-
-The sata core driver already retries to resume the link because some
-controllers ignore writes to the SControl register, but just retrying
-the resume operation doesn't work - we need to issue he phy/wake reset
-again to make it work.
-
-Reimplement ahci_hardreset() in the driver and poke the controller a
-couple times before really giving up.
+All platforms using this driver now register the SATA refclk. Remove
+the hardcoded default value from the driver and instead read the rate
+of the external clock and calculate the required MPY value from it.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/ata/ahci_da850.c | 28 +++++++++++++++++++++++++++-
- 1 file changed, 27 insertions(+), 1 deletion(-)
+ drivers/ata/ahci_da850.c | 91 ++++++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 76 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/ata/ahci_da850.c b/drivers/ata/ahci_da850.c
-index 11dd87e..0b2b1a4 100644
+index 0b2b1a4..9ed404d 100644
 --- a/drivers/ata/ahci_da850.c
 +++ b/drivers/ata/ahci_da850.c
-@@ -16,7 +16,8 @@
- #include <linux/ahci_platform.h>
- #include "ahci.h"
+@@ -29,17 +29,8 @@
+ #define SATA_PHY_TXSWING(x)	((x) << 19)
+ #define SATA_PHY_ENPLL(x)	((x) << 31)
  
--#define DRV_NAME "ahci_da850"
-+#define DRV_NAME		"ahci_da850"
-+#define HARDRESET_RETRIES	5
+-/*
+- * The multiplier needed for 1.5GHz PLL output.
+- *
+- * NOTE: This is currently hardcoded to be suitable for 100MHz crystal
+- * frequency (which is used by DA850 EVM board) and may need to be changed
+- * if you would like to use this driver on some other board.
+- */
+-#define DA850_SATA_CLK_MULTIPLIER	7
+-
+ static void da850_sata_init(struct device *dev, void __iomem *pwrdn_reg,
+-			    void __iomem *ahci_base)
++			    void __iomem *ahci_base, u32 mpy)
+ {
+ 	unsigned int val;
  
- /* SATA PHY Control Register offset from AHCI base */
- #define SATA_P0PHYCR_REG	0x178
-@@ -76,6 +77,29 @@ static int ahci_da850_softreset(struct ata_link *link,
- 	return ret;
+@@ -48,13 +39,61 @@ static void da850_sata_init(struct device *dev, void __iomem *pwrdn_reg,
+ 	val &= ~BIT(0);
+ 	writel(val, pwrdn_reg);
+ 
+-	val = SATA_PHY_MPY(DA850_SATA_CLK_MULTIPLIER + 1) | SATA_PHY_LOS(1) |
+-	      SATA_PHY_RXCDR(4) | SATA_PHY_RXEQ(1) | SATA_PHY_TXSWING(3) |
+-	      SATA_PHY_ENPLL(1);
++	val = SATA_PHY_MPY(mpy) | SATA_PHY_LOS(1) | SATA_PHY_RXCDR(4) |
++	      SATA_PHY_RXEQ(1) | SATA_PHY_TXSWING(3) | SATA_PHY_ENPLL(1);
+ 
+ 	writel(val, ahci_base + SATA_P0PHYCR_REG);
  }
  
-+static int ahci_da850_hardreset(struct ata_link *link,
-+				unsigned int *class, unsigned long deadline)
++static u32 ahci_da850_calculate_mpy(unsigned long refclk_rate)
 +{
-+	int ret, retry = HARDRESET_RETRIES;
-+	bool online;
++	u32 pll_output = 1500000000, needed;
 +
 +	/*
-+	 * In order to correctly service the LCD controller of the da850 SoC,
-+	 * we increased the PLL0 frequency to 456MHz from the default 300MHz.
++	 * We need to determine the value of the multiplier (MPY) bits.
++	 * In order to include the 12.5 multiplier we need to first divide
++	 * the refclk rate by ten.
 +	 *
-+	 * This made the SATA controller unstable and the hardreset operation
-+	 * does not always succeed the first time. Before really giving up to
-+	 * bring up the link, retry the reset a couple times.
++	 * __div64_32() turned out to be unreliable, sometimes returning
++	 * false results.
 +	 */
-+	do {
-+		ret = ahci_do_hardreset(link, class, deadline, &online);
-+		if (online)
-+			return ret;
-+	} while (retry--);
++	WARN((refclk_rate % 10) != 0, "refclk must be divisible by 10");
++	needed = pll_output / (refclk_rate / 10);
 +
-+	return ret;
++	/*
++	 * What we have now is (multiplier * 10).
++	 *
++	 * Let's determine the actual register value we need to write.
++	 */
++
++	switch (needed) {
++	case 50:
++		return 0x1;
++	case 60:
++		return 0x2;
++	case 80:
++		return 0x4;
++	case 100:
++		return 0x5;
++	case 120:
++		return 0x6;
++	case 125:
++		return 0x7;
++	case 150:
++		return 0x8;
++	case 200:
++		return 0x9;
++	case 250:
++		return 0xa;
++	default:
++		/*
++		 * We should have divided evenly - if not, return an invalid
++		 * value.
++		 */
++		return 0;
++	}
 +}
 +
- static struct ata_port_operations ahci_da850_port_ops = {
- 	.inherits = &ahci_platform_ops,
- 	.softreset = ahci_da850_softreset,
-@@ -83,6 +107,8 @@ static struct ata_port_operations ahci_da850_port_ops = {
- 	 * No need to override .pmp_softreset - it's only used for actual
- 	 * PMP-enabled ports.
- 	 */
-+	.hardreset = ahci_da850_hardreset,
-+	.pmp_hardreset = ahci_da850_hardreset,
- };
+ static int ahci_da850_softreset(struct ata_link *link,
+ 				unsigned int *class, unsigned long deadline)
+ {
+@@ -126,9 +165,10 @@ static int ahci_da850_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+ 	struct ahci_host_priv *hpriv;
+-	struct resource *res;
+ 	void __iomem *pwrdn_reg;
++	struct resource *res;
+ 	struct clk *clk;
++	u32 mpy;
+ 	int rc;
  
- static const struct ata_port_info ahci_da850_port_info = {
+ 	hpriv = ahci_platform_get_resources(pdev);
+@@ -150,6 +190,27 @@ static int ahci_da850_probe(struct platform_device *pdev)
+ 		hpriv->clks[0] = clk;
+ 	}
+ 
++	/*
++	 * The second clock used by ahci-da850 is the external REFCLK. If we
++	 * didn't get it from ahci_platform_get_resources(), let's try to
++	 * specify the con_id in clk_get().
++	 */
++	if (!hpriv->clks[1]) {
++		clk = clk_get(dev, "refclk");
++		if (IS_ERR(clk)) {
++			dev_err(dev, "unable to obtain the reference clock");
++			return -ENODEV;
++		} else {
++			hpriv->clks[1] = clk;
++		}
++	}
++
++	mpy = ahci_da850_calculate_mpy(clk_get_rate(hpriv->clks[1]));
++	if (mpy == 0) {
++		dev_err(dev, "invalid REFCLK multiplier value: 0x%x", mpy);
++		return -EINVAL;
++	}
++
+ 	rc = ahci_platform_enable_resources(hpriv);
+ 	if (rc)
+ 		return rc;
+@@ -162,7 +223,7 @@ static int ahci_da850_probe(struct platform_device *pdev)
+ 	if (!pwrdn_reg)
+ 		goto disable_resources;
+ 
+-	da850_sata_init(dev, pwrdn_reg, hpriv->mmio);
++	da850_sata_init(dev, pwrdn_reg, hpriv->mmio, mpy);
+ 
+ 	rc = ahci_platform_init_host(pdev, hpriv, &ahci_da850_port_info,
+ 				     &ahci_platform_sht);
 -- 
 2.9.3
