@@ -1,648 +1,272 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 18 Jan 2017 13:51:02 +0800
-Subject: [PATCH 3/6] phy: phy-mt65xx-usb3: add support for mt2712 platform
-In-Reply-To: <1484718665-11584-1-git-send-email-chunfeng.yun@mediatek.com>
-References: <1484718665-11584-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1484718665-11584-3-git-send-email-chunfeng.yun@mediatek.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Wed, 18 Jan 2017 13:55:32 +0800
+Subject: [PATCH v11 07/12] drm/mediatek: cleaning up and refine
+In-Reply-To: <1484117473-46644-8-git-send-email-yt.shen@mediatek.com>
+References: <1484117473-46644-1-git-send-email-yt.shen@mediatek.com>
+ <1484117473-46644-8-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1484718932.26941.1.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are some variations from mt2701 to mt2712:
-1. banks shared by multiple ports are put back into each port,
-    such as SPLLC and U2FREQ;
-2. add a new bank MISC for u2port, and CHIP for u3port;
-3. bank's offset in each port are also rearranged;
+Hi, YT:
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- drivers/phy/phy-mt65xx-usb3.c |  326 ++++++++++++++++++++++++++---------------
- 1 file changed, 208 insertions(+), 118 deletions(-)
+On Wed, 2017-01-11 at 14:51 +0800, YT Shen wrote:
+> cleaning up unused define and refine function name and variable
+> 
+> Signed-off-by: shaoming chen <shaoming.chen@mediatek.com>
+> Signed-off-by: YT Shen <yt.shen@mediatek.com>
 
-diff --git a/drivers/phy/phy-mt65xx-usb3.c b/drivers/phy/phy-mt65xx-usb3.c
-index c187a3b..d515c69 100644
---- a/drivers/phy/phy-mt65xx-usb3.c
-+++ b/drivers/phy/phy-mt65xx-usb3.c
-@@ -23,46 +23,54 @@
- #include <linux/phy/phy.h>
- #include <linux/platform_device.h>
- 
--/*
-- * for sifslv2 register, but exclude port's;
-- * relative to USB3_SIF2_BASE base address
-- */
--#define SSUSB_SIFSLV_SPLLC		0x0000
--#define SSUSB_SIFSLV_U2FREQ		0x0100
--
--/* offsets of banks in each u2phy registers */
--#define SSUSB_SIFSLV_U2PHY_COM_BASE	0x0000
--/* offsets of banks in each u3phy registers */
--#define SSUSB_SIFSLV_U3PHYD_BASE	0x0000
--#define SSUSB_SIFSLV_U3PHYA_BASE	0x0200
--
--#define U3P_USBPHYACR0		(SSUSB_SIFSLV_U2PHY_COM_BASE + 0x0000)
-+/* version V1 sub-banks offset base address */
-+/* banks shared by multiple phys */
-+#define SSUSB_SIFSLV_V1_SPLLC		0x000	/* shared by u3 phys */
-+#define SSUSB_SIFSLV_V1_U2FREQ		0x100	/* shared by u2 phys */
-+/* u2 phy bank */
-+#define SSUSB_SIFSLV_V1_U2PHY_COM	0x000
-+/* u3 phy banks */
-+#define SSUSB_SIFSLV_V1_U3PHYD		0x000
-+#define SSUSB_SIFSLV_V1_U3PHYA		0x200
-+
-+/* version V2 sub-banks offset base address */
-+/* u2 phy banks */
-+#define SSUSB_SIFSLV_V2_MISC		0x000
-+#define SSUSB_SIFSLV_V2_U2FREQ		0x100
-+#define SSUSB_SIFSLV_V2_U2PHY_COM	0x300
-+/* u3 phy banks */
-+#define SSUSB_SIFSLV_V2_SPLLC		0x000
-+#define SSUSB_SIFSLV_V2_CHIP		0x100
-+#define SSUSB_SIFSLV_V2_U3PHYD		0x200
-+#define SSUSB_SIFSLV_V2_U3PHYA		0x400
-+
-+#define U3P_USBPHYACR0		0x000
- #define PA0_RG_U2PLL_FORCE_ON		BIT(15)
- 
--#define U3P_USBPHYACR2		(SSUSB_SIFSLV_U2PHY_COM_BASE + 0x0008)
-+#define U3P_USBPHYACR2		0x008
- #define PA2_RG_SIF_U2PLL_FORCE_EN	BIT(18)
- 
--#define U3P_USBPHYACR5		(SSUSB_SIFSLV_U2PHY_COM_BASE + 0x0014)
-+#define U3P_USBPHYACR5		0x014
- #define PA5_RG_U2_HSTX_SRCAL_EN	BIT(15)
- #define PA5_RG_U2_HSTX_SRCTRL		GENMASK(14, 12)
- #define PA5_RG_U2_HSTX_SRCTRL_VAL(x)	((0x7 & (x)) << 12)
- #define PA5_RG_U2_HS_100U_U3_EN	BIT(11)
- 
--#define U3P_USBPHYACR6		(SSUSB_SIFSLV_U2PHY_COM_BASE + 0x0018)
-+#define U3P_USBPHYACR6		0x018
- #define PA6_RG_U2_BC11_SW_EN		BIT(23)
- #define PA6_RG_U2_OTG_VBUSCMP_EN	BIT(20)
- #define PA6_RG_U2_SQTH		GENMASK(3, 0)
- #define PA6_RG_U2_SQTH_VAL(x)	(0xf & (x))
- 
--#define U3P_U2PHYACR4		(SSUSB_SIFSLV_U2PHY_COM_BASE + 0x0020)
-+#define U3P_U2PHYACR4		0x020
- #define P2C_RG_USB20_GPIO_CTL		BIT(9)
- #define P2C_USB20_GPIO_MODE		BIT(8)
- #define P2C_U2_GPIO_CTR_MSK	(P2C_RG_USB20_GPIO_CTL | P2C_USB20_GPIO_MODE)
- 
--#define U3D_U2PHYDCR0		(SSUSB_SIFSLV_U2PHY_COM_BASE + 0x0060)
-+#define U3D_U2PHYDCR0		0x060
- #define P2C_RG_SIF_U2PLL_FORCE_ON	BIT(24)
- 
--#define U3P_U2PHYDTM0		(SSUSB_SIFSLV_U2PHY_COM_BASE + 0x0068)
-+#define U3P_U2PHYDTM0		0x068
- #define P2C_FORCE_UART_EN		BIT(26)
- #define P2C_FORCE_DATAIN		BIT(23)
- #define P2C_FORCE_DM_PULLDOWN		BIT(21)
-@@ -84,47 +92,44 @@
- 		P2C_FORCE_TERMSEL | P2C_RG_DMPULLDOWN | \
- 		P2C_RG_DPPULLDOWN | P2C_RG_TERMSEL)
- 
--#define U3P_U2PHYDTM1		(SSUSB_SIFSLV_U2PHY_COM_BASE + 0x006C)
-+#define U3P_U2PHYDTM1		0x06C
- #define P2C_RG_UART_EN			BIT(16)
- #define P2C_RG_VBUSVALID		BIT(5)
- #define P2C_RG_SESSEND			BIT(4)
- #define P2C_RG_AVALID			BIT(2)
- 
--#define U3P_U3_PHYA_REG0	(SSUSB_SIFSLV_U3PHYA_BASE + 0x0000)
--#define P3A_RG_U3_VUSB10_ON		BIT(5)
--
--#define U3P_U3_PHYA_REG6	(SSUSB_SIFSLV_U3PHYA_BASE + 0x0018)
-+#define U3P_U3_PHYA_REG6	0x018
- #define P3A_RG_TX_EIDLE_CM		GENMASK(31, 28)
- #define P3A_RG_TX_EIDLE_CM_VAL(x)	((0xf & (x)) << 28)
- 
--#define U3P_U3_PHYA_REG9	(SSUSB_SIFSLV_U3PHYA_BASE + 0x0024)
-+#define U3P_U3_PHYA_REG9	0x024
- #define P3A_RG_RX_DAC_MUX		GENMASK(5, 1)
- #define P3A_RG_RX_DAC_MUX_VAL(x)	((0x1f & (x)) << 1)
- 
--#define U3P_U3PHYA_DA_REG0	(SSUSB_SIFSLV_U3PHYA_BASE + 0x0100)
-+#define U3P_U3_PHYA_DA_REG0	0x100
- #define P3A_RG_XTAL_EXT_EN_U3		GENMASK(11, 10)
- #define P3A_RG_XTAL_EXT_EN_U3_VAL(x)	((0x3 & (x)) << 10)
- 
--#define U3P_PHYD_CDR1		(SSUSB_SIFSLV_U3PHYD_BASE + 0x005c)
-+#define U3P_U3_PHYD_CDR1		0x05c
- #define P3D_RG_CDR_BIR_LTD1		GENMASK(28, 24)
- #define P3D_RG_CDR_BIR_LTD1_VAL(x)	((0x1f & (x)) << 24)
- #define P3D_RG_CDR_BIR_LTD0		GENMASK(12, 8)
- #define P3D_RG_CDR_BIR_LTD0_VAL(x)	((0x1f & (x)) << 8)
- 
--#define U3P_XTALCTL3		(SSUSB_SIFSLV_SPLLC + 0x0018)
-+#define U3P_SPLLC_XTALCTL3		0x018
- #define XC3_RG_U3_XTAL_RX_PWD		BIT(9)
- #define XC3_RG_U3_FRC_XTAL_RX_PWD	BIT(8)
- 
--#define U3P_U2FREQ_FMCR0	(SSUSB_SIFSLV_U2FREQ + 0x00)
-+#define U3P_U2FREQ_FMCR0	0x00
- #define P2F_RG_MONCLK_SEL	GENMASK(27, 26)
- #define P2F_RG_MONCLK_SEL_VAL(x)	((0x3 & (x)) << 26)
- #define P2F_RG_FREQDET_EN	BIT(24)
- #define P2F_RG_CYCLECNT		GENMASK(23, 0)
- #define P2F_RG_CYCLECNT_VAL(x)	((P2F_RG_CYCLECNT) & (x))
- 
--#define U3P_U2FREQ_VALUE	(SSUSB_SIFSLV_U2FREQ + 0x0c)
-+#define U3P_U2FREQ_VALUE	0x0c
- 
--#define U3P_U2FREQ_FMMONR1	(SSUSB_SIFSLV_U2FREQ + 0x10)
-+#define U3P_U2FREQ_FMMONR1	0x10
- #define P2F_USB_FM_VALID	BIT(0)
- #define P2F_RG_FRCK_EN		BIT(8)
- 
-@@ -133,14 +138,37 @@
- #define U3P_SR_COEF_DIVISOR	1000
- #define U3P_FM_DET_CYCLE_CNT	1024
- 
-+enum mt_phy_version {
-+	MT_PHY_V1 = 1,
-+	MT_PHY_V2,
-+};
-+
- struct mt65xx_phy_pdata {
- 	/* avoid RX sensitivity level degradation only for mt8173 */
- 	bool avoid_rx_sen_degradation;
-+	enum mt_phy_version version;
-+};
-+
-+struct u2phy_banks {
-+	void __iomem *misc;
-+	void __iomem *fmreg;
-+	void __iomem *com;
-+};
-+
-+struct u3phy_banks {
-+	void __iomem *spllc;
-+	void __iomem *chip;
-+	void __iomem *phyd; /* include u3phyd_bank2 */
-+	void __iomem *phya; /* include u3phya_da */
- };
- 
- struct mt65xx_phy_instance {
- 	struct phy *phy;
- 	void __iomem *port_base;
-+	union {
-+		struct u2phy_banks u2_banks;
-+		struct u3phy_banks u3_banks;
-+	};
- 	u32 index;
- 	u8 type;
- };
-@@ -158,49 +186,53 @@ struct mt65xx_u3phy {
- static void hs_slew_rate_calibrate(struct mt65xx_u3phy *u3phy,
- 	struct mt65xx_phy_instance *instance)
- {
--	void __iomem *sif_base = u3phy->sif_base;
-+	struct u2phy_banks *u2_banks = &instance->u2_banks;
-+	void __iomem *fmreg = u2_banks->fmreg;
-+	void __iomem *com = u2_banks->com;
- 	int calibration_val;
- 	int fm_out;
- 	u32 tmp;
- 
- 	/* enable USB ring oscillator */
--	tmp = readl(instance->port_base + U3P_USBPHYACR5);
-+	tmp = readl(com + U3P_USBPHYACR5);
- 	tmp |= PA5_RG_U2_HSTX_SRCAL_EN;
--	writel(tmp, instance->port_base + U3P_USBPHYACR5);
-+	writel(tmp, com + U3P_USBPHYACR5);
- 	udelay(1);
- 
- 	/*enable free run clock */
--	tmp = readl(sif_base + U3P_U2FREQ_FMMONR1);
-+	tmp = readl(fmreg + U3P_U2FREQ_FMMONR1);
- 	tmp |= P2F_RG_FRCK_EN;
--	writel(tmp, sif_base + U3P_U2FREQ_FMMONR1);
-+	writel(tmp, fmreg + U3P_U2FREQ_FMMONR1);
- 
- 	/* set cycle count as 1024, and select u2 channel */
--	tmp = readl(sif_base + U3P_U2FREQ_FMCR0);
-+	tmp = readl(fmreg + U3P_U2FREQ_FMCR0);
- 	tmp &= ~(P2F_RG_CYCLECNT | P2F_RG_MONCLK_SEL);
- 	tmp |= P2F_RG_CYCLECNT_VAL(U3P_FM_DET_CYCLE_CNT);
--	tmp |= P2F_RG_MONCLK_SEL_VAL(instance->index >> 1);
--	writel(tmp, sif_base + U3P_U2FREQ_FMCR0);
-+	if (u3phy->pdata->version == MT_PHY_V1)
-+		tmp |= P2F_RG_MONCLK_SEL_VAL(instance->index >> 1);
-+
-+	writel(tmp, fmreg + U3P_U2FREQ_FMCR0);
- 
- 	/* enable frequency meter */
--	tmp = readl(sif_base + U3P_U2FREQ_FMCR0);
-+	tmp = readl(fmreg + U3P_U2FREQ_FMCR0);
- 	tmp |= P2F_RG_FREQDET_EN;
--	writel(tmp, sif_base + U3P_U2FREQ_FMCR0);
-+	writel(tmp, fmreg + U3P_U2FREQ_FMCR0);
- 
- 	/* ignore return value */
--	readl_poll_timeout(sif_base + U3P_U2FREQ_FMMONR1, tmp,
-+	readl_poll_timeout(fmreg + U3P_U2FREQ_FMMONR1, tmp,
- 		  (tmp & P2F_USB_FM_VALID), 10, 200);
- 
--	fm_out = readl(sif_base + U3P_U2FREQ_VALUE);
-+	fm_out = readl(fmreg + U3P_U2FREQ_VALUE);
- 
- 	/* disable frequency meter */
--	tmp = readl(sif_base + U3P_U2FREQ_FMCR0);
-+	tmp = readl(fmreg + U3P_U2FREQ_FMCR0);
- 	tmp &= ~P2F_RG_FREQDET_EN;
--	writel(tmp, sif_base + U3P_U2FREQ_FMCR0);
-+	writel(tmp, fmreg + U3P_U2FREQ_FMCR0);
- 
- 	/*disable free run clock */
--	tmp = readl(sif_base + U3P_U2FREQ_FMMONR1);
-+	tmp = readl(fmreg + U3P_U2FREQ_FMMONR1);
- 	tmp &= ~P2F_RG_FRCK_EN;
--	writel(tmp, sif_base + U3P_U2FREQ_FMMONR1);
-+	writel(tmp, fmreg + U3P_U2FREQ_FMMONR1);
- 
- 	if (fm_out) {
- 		/* ( 1024 / FM_OUT ) x reference clock frequency x 0.028 */
-@@ -215,48 +247,48 @@ static void hs_slew_rate_calibrate(struct mt65xx_u3phy *u3phy,
- 		instance->index, fm_out, calibration_val);
- 
- 	/* set HS slew rate */
--	tmp = readl(instance->port_base + U3P_USBPHYACR5);
-+	tmp = readl(com + U3P_USBPHYACR5);
- 	tmp &= ~PA5_RG_U2_HSTX_SRCTRL;
- 	tmp |= PA5_RG_U2_HSTX_SRCTRL_VAL(calibration_val);
--	writel(tmp, instance->port_base + U3P_USBPHYACR5);
-+	writel(tmp, com + U3P_USBPHYACR5);
- 
- 	/* disable USB ring oscillator */
--	tmp = readl(instance->port_base + U3P_USBPHYACR5);
-+	tmp = readl(com + U3P_USBPHYACR5);
- 	tmp &= ~PA5_RG_U2_HSTX_SRCAL_EN;
--	writel(tmp, instance->port_base + U3P_USBPHYACR5);
-+	writel(tmp, com + U3P_USBPHYACR5);
- }
- 
- static void u3_phy_instance_init(struct mt65xx_u3phy *u3phy,
- 	struct mt65xx_phy_instance *instance)
- {
--	void __iomem *port_base = instance->port_base;
-+	struct u3phy_banks *u3_banks = &instance->u3_banks;
- 	u32 tmp;
- 
- 	/* gating PCIe Analog XTAL clock */
--	tmp = readl(u3phy->sif_base + U3P_XTALCTL3);
-+	tmp = readl(u3_banks->spllc + U3P_SPLLC_XTALCTL3);
- 	tmp |= XC3_RG_U3_XTAL_RX_PWD | XC3_RG_U3_FRC_XTAL_RX_PWD;
--	writel(tmp, u3phy->sif_base + U3P_XTALCTL3);
-+	writel(tmp, u3_banks->spllc + U3P_SPLLC_XTALCTL3);
- 
- 	/* gating XSQ */
--	tmp = readl(port_base + U3P_U3PHYA_DA_REG0);
-+	tmp = readl(u3_banks->phya + U3P_U3_PHYA_DA_REG0);
- 	tmp &= ~P3A_RG_XTAL_EXT_EN_U3;
- 	tmp |= P3A_RG_XTAL_EXT_EN_U3_VAL(2);
--	writel(tmp, port_base + U3P_U3PHYA_DA_REG0);
-+	writel(tmp, u3_banks->phya + U3P_U3_PHYA_DA_REG0);
- 
--	tmp = readl(port_base + U3P_U3_PHYA_REG9);
-+	tmp = readl(u3_banks->phya + U3P_U3_PHYA_REG9);
- 	tmp &= ~P3A_RG_RX_DAC_MUX;
- 	tmp |= P3A_RG_RX_DAC_MUX_VAL(4);
--	writel(tmp, port_base + U3P_U3_PHYA_REG9);
-+	writel(tmp, u3_banks->phya + U3P_U3_PHYA_REG9);
- 
--	tmp = readl(port_base + U3P_U3_PHYA_REG6);
-+	tmp = readl(u3_banks->phya + U3P_U3_PHYA_REG6);
- 	tmp &= ~P3A_RG_TX_EIDLE_CM;
- 	tmp |= P3A_RG_TX_EIDLE_CM_VAL(0xe);
--	writel(tmp, port_base + U3P_U3_PHYA_REG6);
-+	writel(tmp, u3_banks->phya + U3P_U3_PHYA_REG6);
- 
--	tmp = readl(port_base + U3P_PHYD_CDR1);
-+	tmp = readl(u3_banks->phyd + U3P_U3_PHYD_CDR1);
- 	tmp &= ~(P3D_RG_CDR_BIR_LTD0 | P3D_RG_CDR_BIR_LTD1);
- 	tmp |= P3D_RG_CDR_BIR_LTD0_VAL(0xc) | P3D_RG_CDR_BIR_LTD1_VAL(0x3);
--	writel(tmp, port_base + U3P_PHYD_CDR1);
-+	writel(tmp, u3_banks->phyd + U3P_U3_PHYD_CDR1);
- 
- 	dev_dbg(u3phy->dev, "%s(%d)\n", __func__, instance->index);
- }
-@@ -264,51 +296,52 @@ static void u3_phy_instance_init(struct mt65xx_u3phy *u3phy,
- static void phy_instance_init(struct mt65xx_u3phy *u3phy,
- 	struct mt65xx_phy_instance *instance)
- {
--	void __iomem *port_base = instance->port_base;
-+	struct u2phy_banks *u2_banks = &instance->u2_banks;
-+	void __iomem *com = u2_banks->com;
- 	u32 index = instance->index;
- 	u32 tmp;
- 
- 	/* switch to USB function. (system register, force ip into usb mode) */
--	tmp = readl(port_base + U3P_U2PHYDTM0);
-+	tmp = readl(com + U3P_U2PHYDTM0);
- 	tmp &= ~P2C_FORCE_UART_EN;
- 	tmp |= P2C_RG_XCVRSEL_VAL(1) | P2C_RG_DATAIN_VAL(0);
--	writel(tmp, port_base + U3P_U2PHYDTM0);
-+	writel(tmp, com + U3P_U2PHYDTM0);
- 
--	tmp = readl(port_base + U3P_U2PHYDTM1);
-+	tmp = readl(com + U3P_U2PHYDTM1);
- 	tmp &= ~P2C_RG_UART_EN;
--	writel(tmp, port_base + U3P_U2PHYDTM1);
-+	writel(tmp, com + U3P_U2PHYDTM1);
- 
- 	if (!index) {
--		tmp = readl(port_base + U3P_U2PHYACR4);
-+		tmp = readl(com + U3P_U2PHYACR4);
- 		tmp &= ~P2C_U2_GPIO_CTR_MSK;
--		writel(tmp, port_base + U3P_U2PHYACR4);
-+		writel(tmp, com + U3P_U2PHYACR4);
- 	}
- 
- 	if (u3phy->pdata->avoid_rx_sen_degradation) {
- 		if (!index) {
--			tmp = readl(port_base + U3P_USBPHYACR2);
-+			tmp = readl(com + U3P_USBPHYACR2);
- 			tmp |= PA2_RG_SIF_U2PLL_FORCE_EN;
--			writel(tmp, port_base + U3P_USBPHYACR2);
-+			writel(tmp, com + U3P_USBPHYACR2);
- 
--			tmp = readl(port_base + U3D_U2PHYDCR0);
-+			tmp = readl(com + U3D_U2PHYDCR0);
- 			tmp &= ~P2C_RG_SIF_U2PLL_FORCE_ON;
--			writel(tmp, port_base + U3D_U2PHYDCR0);
-+			writel(tmp, com + U3D_U2PHYDCR0);
- 		} else {
--			tmp = readl(port_base + U3D_U2PHYDCR0);
-+			tmp = readl(com + U3D_U2PHYDCR0);
- 			tmp |= P2C_RG_SIF_U2PLL_FORCE_ON;
--			writel(tmp, port_base + U3D_U2PHYDCR0);
-+			writel(tmp, com + U3D_U2PHYDCR0);
- 
--			tmp = readl(port_base + U3P_U2PHYDTM0);
-+			tmp = readl(com + U3P_U2PHYDTM0);
- 			tmp |= P2C_RG_SUSPENDM | P2C_FORCE_SUSPENDM;
--			writel(tmp, port_base + U3P_U2PHYDTM0);
-+			writel(tmp, com + U3P_U2PHYDTM0);
- 		}
- 	}
- 
--	tmp = readl(port_base + U3P_USBPHYACR6);
-+	tmp = readl(com + U3P_USBPHYACR6);
- 	tmp &= ~PA6_RG_U2_BC11_SW_EN;	/* DP/DM BC1.1 path Disable */
- 	tmp &= ~PA6_RG_U2_SQTH;
- 	tmp |= PA6_RG_U2_SQTH_VAL(2);
--	writel(tmp, port_base + U3P_USBPHYACR6);
-+	writel(tmp, com + U3P_USBPHYACR6);
- 
- 	dev_dbg(u3phy->dev, "%s(%d)\n", __func__, index);
- }
-@@ -316,41 +349,42 @@ static void phy_instance_init(struct mt65xx_u3phy *u3phy,
- static void phy_instance_power_on(struct mt65xx_u3phy *u3phy,
- 	struct mt65xx_phy_instance *instance)
- {
--	void __iomem *port_base = instance->port_base;
-+	struct u2phy_banks *u2_banks = &instance->u2_banks;
-+	void __iomem *com = u2_banks->com;
- 	u32 index = instance->index;
- 	u32 tmp;
- 
- 	/* (force_suspendm=0) (let suspendm=1, enable usb 480MHz pll) */
--	tmp = readl(port_base + U3P_U2PHYDTM0);
-+	tmp = readl(com + U3P_U2PHYDTM0);
- 	tmp &= ~(P2C_FORCE_SUSPENDM | P2C_RG_XCVRSEL);
- 	tmp &= ~(P2C_RG_DATAIN | P2C_DTM0_PART_MASK);
--	writel(tmp, port_base + U3P_U2PHYDTM0);
-+	writel(tmp, com + U3P_U2PHYDTM0);
- 
- 	/* OTG Enable */
--	tmp = readl(port_base + U3P_USBPHYACR6);
-+	tmp = readl(com + U3P_USBPHYACR6);
- 	tmp |= PA6_RG_U2_OTG_VBUSCMP_EN;
--	writel(tmp, port_base + U3P_USBPHYACR6);
-+	writel(tmp, com + U3P_USBPHYACR6);
- 
- 	if (!index) {
- 		/* switch 100uA current to SSUSB */
--		tmp = readl(port_base + U3P_USBPHYACR5);
-+		tmp = readl(com + U3P_USBPHYACR5);
- 		tmp |= PA5_RG_U2_HS_100U_U3_EN;
--		writel(tmp, port_base + U3P_USBPHYACR5);
-+		writel(tmp, com + U3P_USBPHYACR5);
- 	}
- 
--	tmp = readl(port_base + U3P_U2PHYDTM1);
-+	tmp = readl(com + U3P_U2PHYDTM1);
- 	tmp |= P2C_RG_VBUSVALID | P2C_RG_AVALID;
- 	tmp &= ~P2C_RG_SESSEND;
--	writel(tmp, port_base + U3P_U2PHYDTM1);
-+	writel(tmp, com + U3P_U2PHYDTM1);
- 
- 	if (u3phy->pdata->avoid_rx_sen_degradation && index) {
--		tmp = readl(port_base + U3D_U2PHYDCR0);
-+		tmp = readl(com + U3D_U2PHYDCR0);
- 		tmp |= P2C_RG_SIF_U2PLL_FORCE_ON;
--		writel(tmp, port_base + U3D_U2PHYDCR0);
-+		writel(tmp, com + U3D_U2PHYDCR0);
- 
--		tmp = readl(port_base + U3P_U2PHYDTM0);
-+		tmp = readl(com + U3P_U2PHYDTM0);
- 		tmp |= P2C_RG_SUSPENDM | P2C_FORCE_SUSPENDM;
--		writel(tmp, port_base + U3P_U2PHYDTM0);
-+		writel(tmp, com + U3P_U2PHYDTM0);
- 	}
- 	dev_dbg(u3phy->dev, "%s(%d)\n", __func__, index);
- }
-@@ -358,42 +392,43 @@ static void phy_instance_power_on(struct mt65xx_u3phy *u3phy,
- static void phy_instance_power_off(struct mt65xx_u3phy *u3phy,
- 	struct mt65xx_phy_instance *instance)
- {
--	void __iomem *port_base = instance->port_base;
-+	struct u2phy_banks *u2_banks = &instance->u2_banks;
-+	void __iomem *com = u2_banks->com;
- 	u32 index = instance->index;
- 	u32 tmp;
- 
--	tmp = readl(port_base + U3P_U2PHYDTM0);
-+	tmp = readl(com + U3P_U2PHYDTM0);
- 	tmp &= ~(P2C_RG_XCVRSEL | P2C_RG_DATAIN);
- 	tmp |= P2C_FORCE_SUSPENDM;
--	writel(tmp, port_base + U3P_U2PHYDTM0);
-+	writel(tmp, com + U3P_U2PHYDTM0);
- 
- 	/* OTG Disable */
--	tmp = readl(port_base + U3P_USBPHYACR6);
-+	tmp = readl(com + U3P_USBPHYACR6);
- 	tmp &= ~PA6_RG_U2_OTG_VBUSCMP_EN;
--	writel(tmp, port_base + U3P_USBPHYACR6);
-+	writel(tmp, com + U3P_USBPHYACR6);
- 
- 	if (!index) {
- 		/* switch 100uA current back to USB2.0 */
--		tmp = readl(port_base + U3P_USBPHYACR5);
-+		tmp = readl(com + U3P_USBPHYACR5);
- 		tmp &= ~PA5_RG_U2_HS_100U_U3_EN;
--		writel(tmp, port_base + U3P_USBPHYACR5);
-+		writel(tmp, com + U3P_USBPHYACR5);
- 	}
- 
- 	/* let suspendm=0, set utmi into analog power down */
--	tmp = readl(port_base + U3P_U2PHYDTM0);
-+	tmp = readl(com + U3P_U2PHYDTM0);
- 	tmp &= ~P2C_RG_SUSPENDM;
--	writel(tmp, port_base + U3P_U2PHYDTM0);
-+	writel(tmp, com + U3P_U2PHYDTM0);
- 	udelay(1);
- 
--	tmp = readl(port_base + U3P_U2PHYDTM1);
-+	tmp = readl(com + U3P_U2PHYDTM1);
- 	tmp &= ~(P2C_RG_VBUSVALID | P2C_RG_AVALID);
- 	tmp |= P2C_RG_SESSEND;
--	writel(tmp, port_base + U3P_U2PHYDTM1);
-+	writel(tmp, com + U3P_U2PHYDTM1);
- 
- 	if (u3phy->pdata->avoid_rx_sen_degradation && index) {
--		tmp = readl(port_base + U3D_U2PHYDCR0);
-+		tmp = readl(com + U3D_U2PHYDCR0);
- 		tmp &= ~P2C_RG_SIF_U2PLL_FORCE_ON;
--		writel(tmp, port_base + U3D_U2PHYDCR0);
-+		writel(tmp, com + U3D_U2PHYDCR0);
- 	}
- 
- 	dev_dbg(u3phy->dev, "%s(%d)\n", __func__, index);
-@@ -402,18 +437,55 @@ static void phy_instance_power_off(struct mt65xx_u3phy *u3phy,
- static void phy_instance_exit(struct mt65xx_u3phy *u3phy,
- 	struct mt65xx_phy_instance *instance)
- {
--	void __iomem *port_base = instance->port_base;
-+	struct u2phy_banks *u2_banks = &instance->u2_banks;
-+	void __iomem *com = u2_banks->com;
- 	u32 index = instance->index;
- 	u32 tmp;
- 
- 	if (u3phy->pdata->avoid_rx_sen_degradation && index) {
--		tmp = readl(port_base + U3D_U2PHYDCR0);
-+		tmp = readl(com + U3D_U2PHYDCR0);
- 		tmp &= ~P2C_RG_SIF_U2PLL_FORCE_ON;
--		writel(tmp, port_base + U3D_U2PHYDCR0);
-+		writel(tmp, com + U3D_U2PHYDCR0);
- 
--		tmp = readl(port_base + U3P_U2PHYDTM0);
-+		tmp = readl(com + U3P_U2PHYDTM0);
- 		tmp &= ~P2C_FORCE_SUSPENDM;
--		writel(tmp, port_base + U3P_U2PHYDTM0);
-+		writel(tmp, com + U3P_U2PHYDTM0);
-+	}
-+}
-+
-+static void phy_v1_banks_init(struct mt65xx_u3phy *u3phy,
-+	struct mt65xx_phy_instance *instance)
-+{
-+	struct u2phy_banks *u2_banks = &instance->u2_banks;
-+	struct u3phy_banks *u3_banks = &instance->u3_banks;
-+
-+	if (instance->type == PHY_TYPE_USB2) {
-+		u2_banks->misc = NULL;
-+		u2_banks->fmreg = u3phy->sif_base + SSUSB_SIFSLV_V1_U2FREQ;
-+		u2_banks->com = instance->port_base + SSUSB_SIFSLV_V1_U2PHY_COM;
-+	} else if (instance->type == PHY_TYPE_USB3) {
-+		u3_banks->spllc = u3phy->sif_base + SSUSB_SIFSLV_V1_SPLLC;
-+		u3_banks->chip = NULL;
-+		u3_banks->phyd = instance->port_base + SSUSB_SIFSLV_V1_U3PHYD;
-+		u3_banks->phya = instance->port_base + SSUSB_SIFSLV_V1_U3PHYA;
-+	}
-+}
-+
-+static void phy_v2_banks_init(struct mt65xx_u3phy *u3phy,
-+	struct mt65xx_phy_instance *instance)
-+{
-+	struct u2phy_banks *u2_banks = &instance->u2_banks;
-+	struct u3phy_banks *u3_banks = &instance->u3_banks;
-+
-+	if (instance->type == PHY_TYPE_USB2) {
-+		u2_banks->misc = instance->port_base + SSUSB_SIFSLV_V2_MISC;
-+		u2_banks->fmreg = instance->port_base + SSUSB_SIFSLV_V2_U2FREQ;
-+		u2_banks->com = instance->port_base + SSUSB_SIFSLV_V2_U2PHY_COM;
-+	} else if (instance->type == PHY_TYPE_USB3) {
-+		u3_banks->spllc = instance->port_base + SSUSB_SIFSLV_V2_SPLLC;
-+		u3_banks->chip = instance->port_base + SSUSB_SIFSLV_V2_CHIP;
-+		u3_banks->phyd = instance->port_base + SSUSB_SIFSLV_V2_U3PHYD;
-+		u3_banks->phya = instance->port_base + SSUSB_SIFSLV_V2_U3PHYA;
- 	}
- }
- 
-@@ -490,7 +562,6 @@ static struct phy *mt65xx_phy_xlate(struct device *dev,
- 	struct device_node *phy_np = args->np;
- 	int index;
- 
--
- 	if (args->args_count != 1) {
- 		dev_err(dev, "invalid number of cells in 'phy' property\n");
- 		return ERR_PTR(-EINVAL);
-@@ -508,13 +579,21 @@ static struct phy *mt65xx_phy_xlate(struct device *dev,
- 	}
- 
- 	instance->type = args->args[0];
--
- 	if (!(instance->type == PHY_TYPE_USB2 ||
- 	      instance->type == PHY_TYPE_USB3)) {
- 		dev_err(dev, "unsupported device type: %d\n", instance->type);
- 		return ERR_PTR(-EINVAL);
- 	}
- 
-+	if (u3phy->pdata->version == MT_PHY_V1) {
-+		phy_v1_banks_init(u3phy, instance);
-+	} else if (u3phy->pdata->version == MT_PHY_V2) {
-+		phy_v2_banks_init(u3phy, instance);
-+	} else {
-+		dev_err(dev, "phy version is not supported\n");
-+		return ERR_PTR(-EINVAL);
-+	}
-+
- 	return instance->phy;
- }
- 
-@@ -528,14 +607,22 @@ static struct phy *mt65xx_phy_xlate(struct device *dev,
- 
- static const struct mt65xx_phy_pdata mt2701_pdata = {
- 	.avoid_rx_sen_degradation = false,
-+	.version = MT_PHY_V1,
-+};
-+
-+static const struct mt65xx_phy_pdata mt2712_pdata = {
-+	.avoid_rx_sen_degradation = false,
-+	.version = MT_PHY_V2,
- };
- 
- static const struct mt65xx_phy_pdata mt8173_pdata = {
- 	.avoid_rx_sen_degradation = true,
-+	.version = MT_PHY_V1,
- };
- 
- static const struct of_device_id mt65xx_u3phy_id_table[] = {
- 	{ .compatible = "mediatek,mt2701-u3phy", .data = &mt2701_pdata },
-+	{ .compatible = "mediatek,mt2712-u3phy", .data = &mt2712_pdata },
- 	{ .compatible = "mediatek,mt8173-u3phy", .data = &mt8173_pdata },
- 	{ },
- };
-@@ -571,11 +658,14 @@ static int mt65xx_u3phy_probe(struct platform_device *pdev)
- 	u3phy->dev = dev;
- 	platform_set_drvdata(pdev, u3phy);
- 
--	sif_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	u3phy->sif_base = devm_ioremap_resource(dev, sif_res);
--	if (IS_ERR(u3phy->sif_base)) {
--		dev_err(dev, "failed to remap sif regs\n");
--		return PTR_ERR(u3phy->sif_base);
-+	if (u3phy->pdata->version == MT_PHY_V1) {
-+		/* get banks shared by multiple phys */
-+		sif_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+		u3phy->sif_base = devm_ioremap_resource(dev, sif_res);
-+		if (IS_ERR(u3phy->sif_base)) {
-+			dev_err(dev, "failed to remap sif regs\n");
-+			return PTR_ERR(u3phy->sif_base);
-+		}
- 	}
- 
- 	u3phy->u2ref_clk = devm_clk_get(dev, "u2ref_clk");
--- 
-1.7.9.5
+Acked-by: CK Hu <ck.hu@mediatek.com>
+
+> ---
+>  drivers/gpu/drm/mediatek/mtk_dsi.c     | 73 ++++++++++++++++------------------
+>  drivers/gpu/drm/mediatek/mtk_mipi_tx.c |  8 ++--
+>  2 files changed, 39 insertions(+), 42 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
+> index 2c42f90..6f4b3bb 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_dsi.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
+> @@ -27,9 +27,6 @@
+>  
+>  #include "mtk_drm_ddp_comp.h"
+>  
+> -#define DSI_VIDEO_FIFO_DEPTH	(1920 / 4)
+> -#define DSI_HOST_FIFO_DEPTH	64
+> -
+>  #define DSI_START		0x00
+>  
+>  #define DSI_CON_CTRL		0x10
+> @@ -46,7 +43,7 @@
+>  #define MIX_MODE			BIT(17)
+>  
+>  #define DSI_TXRX_CTRL		0x18
+> -#define VC_NUM				(2 << 0)
+> +#define VC_NUM				BIT(1)
+>  #define LANE_NUM			(0xf << 2)
+>  #define DIS_EOT				BIT(6)
+>  #define NULL_EN				BIT(7)
+> @@ -164,7 +161,7 @@ static void mtk_dsi_mask(struct mtk_dsi *dsi, u32 offset, u32 mask, u32 data)
+>  	writel((temp & ~mask) | (data & mask), dsi->regs + offset);
+>  }
+>  
+> -static void dsi_phy_timconfig(struct mtk_dsi *dsi)
+> +static void mtk_dsi_phy_timconfig(struct mtk_dsi *dsi)
+>  {
+>  	u32 timcon0, timcon1, timcon2, timcon3;
+>  	u32 ui, cycle_time;
+> @@ -196,7 +193,7 @@ static void mtk_dsi_disable(struct mtk_dsi *dsi)
+>  	mtk_dsi_mask(dsi, DSI_CON_CTRL, DSI_EN, 0);
+>  }
+>  
+> -static void mtk_dsi_reset(struct mtk_dsi *dsi)
+> +static void mtk_dsi_reset_engine(struct mtk_dsi *dsi)
+>  {
+>  	mtk_dsi_mask(dsi, DSI_CON_CTRL, DSI_RESET, DSI_RESET);
+>  	mtk_dsi_mask(dsi, DSI_CON_CTRL, DSI_RESET, 0);
+> @@ -267,8 +264,8 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
+>  	}
+>  
+>  	mtk_dsi_enable(dsi);
+> -	mtk_dsi_reset(dsi);
+> -	dsi_phy_timconfig(dsi);
+> +	mtk_dsi_reset_engine(dsi);
+> +	mtk_dsi_phy_timconfig(dsi);
+>  
+>  	return 0;
+>  
+> @@ -281,33 +278,33 @@ static int mtk_dsi_poweron(struct mtk_dsi *dsi)
+>  	return ret;
+>  }
+>  
+> -static void dsi_clk_ulp_mode_enter(struct mtk_dsi *dsi)
+> +static void mtk_dsi_clk_ulp_mode_enter(struct mtk_dsi *dsi)
+>  {
+>  	mtk_dsi_mask(dsi, DSI_PHY_LCCON, LC_HS_TX_EN, 0);
+>  	mtk_dsi_mask(dsi, DSI_PHY_LCCON, LC_ULPM_EN, 0);
+>  }
+>  
+> -static void dsi_clk_ulp_mode_leave(struct mtk_dsi *dsi)
+> +static void mtk_dsi_clk_ulp_mode_leave(struct mtk_dsi *dsi)
+>  {
+>  	mtk_dsi_mask(dsi, DSI_PHY_LCCON, LC_ULPM_EN, 0);
+>  	mtk_dsi_mask(dsi, DSI_PHY_LCCON, LC_WAKEUP_EN, LC_WAKEUP_EN);
+>  	mtk_dsi_mask(dsi, DSI_PHY_LCCON, LC_WAKEUP_EN, 0);
+>  }
+>  
+> -static void dsi_lane0_ulp_mode_enter(struct mtk_dsi *dsi)
+> +static void mtk_dsi_lane0_ulp_mode_enter(struct mtk_dsi *dsi)
+>  {
+>  	mtk_dsi_mask(dsi, DSI_PHY_LD0CON, LD0_HS_TX_EN, 0);
+>  	mtk_dsi_mask(dsi, DSI_PHY_LD0CON, LD0_ULPM_EN, 0);
+>  }
+>  
+> -static void dsi_lane0_ulp_mode_leave(struct mtk_dsi *dsi)
+> +static void mtk_dsi_lane0_ulp_mode_leave(struct mtk_dsi *dsi)
+>  {
+>  	mtk_dsi_mask(dsi, DSI_PHY_LD0CON, LD0_ULPM_EN, 0);
+>  	mtk_dsi_mask(dsi, DSI_PHY_LD0CON, LD0_WAKEUP_EN, LD0_WAKEUP_EN);
+>  	mtk_dsi_mask(dsi, DSI_PHY_LD0CON, LD0_WAKEUP_EN, 0);
+>  }
+>  
+> -static bool dsi_clk_hs_state(struct mtk_dsi *dsi)
+> +static bool mtk_dsi_clk_hs_state(struct mtk_dsi *dsi)
+>  {
+>  	u32 tmp_reg1;
+>  
+> @@ -315,15 +312,15 @@ static bool dsi_clk_hs_state(struct mtk_dsi *dsi)
+>  	return ((tmp_reg1 & LC_HS_TX_EN) == 1) ? true : false;
+>  }
+>  
+> -static void dsi_clk_hs_mode(struct mtk_dsi *dsi, bool enter)
+> +static void mtk_dsi_clk_hs_mode(struct mtk_dsi *dsi, bool enter)
+>  {
+> -	if (enter && !dsi_clk_hs_state(dsi))
+> +	if (enter && !mtk_dsi_clk_hs_state(dsi))
+>  		mtk_dsi_mask(dsi, DSI_PHY_LCCON, LC_HS_TX_EN, LC_HS_TX_EN);
+> -	else if (!enter && dsi_clk_hs_state(dsi))
+> +	else if (!enter && mtk_dsi_clk_hs_state(dsi))
+>  		mtk_dsi_mask(dsi, DSI_PHY_LCCON, LC_HS_TX_EN, 0);
+>  }
+>  
+> -static void dsi_set_mode(struct mtk_dsi *dsi)
+> +static void mtk_dsi_set_mode(struct mtk_dsi *dsi)
+>  {
+>  	u32 vid_mode = CMD_MODE;
+>  
+> @@ -338,7 +335,7 @@ static void dsi_set_mode(struct mtk_dsi *dsi)
+>  	writel(vid_mode, dsi->regs + DSI_MODE_CTRL);
+>  }
+>  
+> -static void dsi_ps_control_vact(struct mtk_dsi *dsi)
+> +static void mtk_dsi_ps_control_vact(struct mtk_dsi *dsi)
+>  {
+>  	struct videomode *vm = &dsi->vm;
+>  	u32 dsi_buf_bpp, ps_wc;
+> @@ -372,7 +369,7 @@ static void dsi_ps_control_vact(struct mtk_dsi *dsi)
+>  	writel(ps_wc, dsi->regs + DSI_HSTX_CKL_WC);
+>  }
+>  
+> -static void dsi_rxtx_control(struct mtk_dsi *dsi)
+> +static void mtk_dsi_rxtx_control(struct mtk_dsi *dsi)
+>  {
+>  	u32 tmp_reg;
+>  
+> @@ -397,9 +394,9 @@ static void dsi_rxtx_control(struct mtk_dsi *dsi)
+>  	writel(tmp_reg, dsi->regs + DSI_TXRX_CTRL);
+>  }
+>  
+> -static void dsi_ps_control(struct mtk_dsi *dsi)
+> +static void mtk_dsi_ps_control(struct mtk_dsi *dsi)
+>  {
+> -	unsigned int dsi_tmp_buf_bpp;
+> +	u32 dsi_tmp_buf_bpp;
+>  	u32 tmp_reg;
+>  
+>  	switch (dsi->format) {
+> @@ -429,12 +426,12 @@ static void dsi_ps_control(struct mtk_dsi *dsi)
+>  	writel(tmp_reg, dsi->regs + DSI_PSCTRL);
+>  }
+>  
+> -static void dsi_config_vdo_timing(struct mtk_dsi *dsi)
+> +static void mtk_dsi_config_vdo_timing(struct mtk_dsi *dsi)
+>  {
+> -	unsigned int horizontal_sync_active_byte;
+> -	unsigned int horizontal_backporch_byte;
+> -	unsigned int horizontal_frontporch_byte;
+> -	unsigned int dsi_tmp_buf_bpp;
+> +	u32 horizontal_sync_active_byte;
+> +	u32 horizontal_backporch_byte;
+> +	u32 horizontal_frontporch_byte;
+> +	u32 dsi_tmp_buf_bpp;
+>  
+>  	struct videomode *vm = &dsi->vm;
+>  
+> @@ -463,7 +460,7 @@ static void dsi_config_vdo_timing(struct mtk_dsi *dsi)
+>  	writel(horizontal_backporch_byte, dsi->regs + DSI_HBP_WC);
+>  	writel(horizontal_frontporch_byte, dsi->regs + DSI_HFP_WC);
+>  
+> -	dsi_ps_control(dsi);
+> +	mtk_dsi_ps_control(dsi);
+>  }
+>  
+>  static void mtk_dsi_start(struct mtk_dsi *dsi)
+> @@ -480,8 +477,8 @@ static void mtk_dsi_poweroff(struct mtk_dsi *dsi)
+>  	if (--dsi->refcount != 0)
+>  		return;
+>  
+> -	dsi_lane0_ulp_mode_enter(dsi);
+> -	dsi_clk_ulp_mode_enter(dsi);
+> +	mtk_dsi_lane0_ulp_mode_enter(dsi);
+> +	mtk_dsi_clk_ulp_mode_enter(dsi);
+>  
+>  	mtk_dsi_disable(dsi);
+>  
+> @@ -511,18 +508,18 @@ static void mtk_output_dsi_enable(struct mtk_dsi *dsi)
+>  		return;
+>  	}
+>  
+> -	dsi_rxtx_control(dsi);
+> +	mtk_dsi_rxtx_control(dsi);
+>  
+> -	dsi_clk_ulp_mode_leave(dsi);
+> -	dsi_lane0_ulp_mode_leave(dsi);
+> -	dsi_clk_hs_mode(dsi, 0);
+> -	dsi_set_mode(dsi);
+> +	mtk_dsi_clk_ulp_mode_leave(dsi);
+> +	mtk_dsi_lane0_ulp_mode_leave(dsi);
+> +	mtk_dsi_clk_hs_mode(dsi, 0);
+> +	mtk_dsi_set_mode(dsi);
+>  
+> -	dsi_ps_control_vact(dsi);
+> -	dsi_config_vdo_timing(dsi);
+> +	mtk_dsi_ps_control_vact(dsi);
+> +	mtk_dsi_config_vdo_timing(dsi);
+>  
+> -	dsi_set_mode(dsi);
+> -	dsi_clk_hs_mode(dsi, 1);
+> +	mtk_dsi_set_mode(dsi);
+> +	mtk_dsi_clk_hs_mode(dsi, 1);
+>  
+>  	mtk_dsi_start(dsi);
+>  
+> diff --git a/drivers/gpu/drm/mediatek/mtk_mipi_tx.c b/drivers/gpu/drm/mediatek/mtk_mipi_tx.c
+> index c4a0165..fd84914 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_mipi_tx.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_mipi_tx.c
+> @@ -134,7 +134,7 @@ struct mtk_mipitx_data {
+>  struct mtk_mipi_tx {
+>  	struct device *dev;
+>  	void __iomem *regs;
+> -	unsigned int data_rate;
+> +	u32 data_rate;
+>  	const struct mtk_mipitx_data *driver_data;
+>  	struct clk_hw pll_hw;
+>  	struct clk *pll;
+> @@ -172,7 +172,7 @@ static void mtk_mipi_tx_update_bits(struct mtk_mipi_tx *mipi_tx, u32 offset,
+>  static int mtk_mipi_tx_pll_prepare(struct clk_hw *hw)
+>  {
+>  	struct mtk_mipi_tx *mipi_tx = mtk_mipi_tx_from_clk_hw(hw);
+> -	unsigned int txdiv, txdiv0, txdiv1;
+> +	u8 txdiv, txdiv0, txdiv1;
+>  	u64 pcw;
+>  
+>  	dev_dbg(mipi_tx->dev, "prepare: %u Hz\n", mipi_tx->data_rate);
+> @@ -326,7 +326,7 @@ static unsigned long mtk_mipi_tx_pll_recalc_rate(struct clk_hw *hw,
+>  static int mtk_mipi_tx_power_on_signal(struct phy *phy)
+>  {
+>  	struct mtk_mipi_tx *mipi_tx = phy_get_drvdata(phy);
+> -	unsigned int reg;
+> +	u32 reg;
+>  
+>  	for (reg = MIPITX_DSI_CLOCK_LANE;
+>  	     reg <= MIPITX_DSI_DATA_LANE3; reg += 4)
+> @@ -357,7 +357,7 @@ static int mtk_mipi_tx_power_on(struct phy *phy)
+>  static void mtk_mipi_tx_power_off_signal(struct phy *phy)
+>  {
+>  	struct mtk_mipi_tx *mipi_tx = phy_get_drvdata(phy);
+> -	unsigned int reg;
+> +	u32 reg;
+>  
+>  	mtk_mipi_tx_set_bits(mipi_tx, MIPITX_DSI_TOP_CON,
+>  			     RG_DSI_PAD_TIE_LOW_EN);
