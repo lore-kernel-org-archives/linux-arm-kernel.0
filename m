@@ -1,95 +1,90 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Wed, 18 Jan 2017 20:54:56 +0800
-Subject: [PATCH v8 06/15] irqchip: gicv3-its: platform-msi: refactor
- its_pmsi_init() to prepare for ACPI
-In-Reply-To: <1484744105-53140-1-git-send-email-guohanjun@huawei.com>
-References: <1484744105-53140-1-git-send-email-guohanjun@huawei.com>
-Message-ID: <1484744105-53140-7-git-send-email-guohanjun@huawei.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 18 Jan 2017 13:18:33 +0000
+Subject: [PATCH v3 6/9] kvm: arm/arm64: Add host pmu to support VM
+ introspection
+In-Reply-To: <87o9z4msi3.fsf@e105922-lin.cambridge.arm.com>
+References: <20170110113856.7183-1-punit.agrawal@arm.com>
+ <20170110113856.7183-7-punit.agrawal@arm.com>
+ <1a6b8d71-58a5-b29b-3f01-e945deb2baf6@arm.com>
+ <20170118113523.GB3231@leverpostej>
+ <87o9z4msi3.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <c2382140-b7ac-11d8-89f0-bf421e38f844@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hanjun Guo <hanjun.guo@linaro.org>
+On 18/01/17 13:01, Punit Agrawal wrote:
+> Mark Rutland <mark.rutland@arm.com> writes:
+> 
+>> On Wed, Jan 18, 2017 at 11:21:21AM +0000, Marc Zyngier wrote:
+>>> On 10/01/17 11:38, Punit Agrawal wrote:
+>>>> +#define VM_MASK	GENMASK_ULL(31, 0)
+>>>> +#define EVENT_MASK	GENMASK_ULL(32, 39)
+>>>> +#define EVENT_SHIFT	(32)
+>>>> +
+>>>> +#define to_pid(cfg)	((cfg) & VM_MASK)
+>>>> +#define to_event(cfg)	(((cfg) & EVENT_MASK) >> EVENT_SHIFT)
+>>>> +
+>>>> +PMU_FORMAT_ATTR(vm, "config:0-31");
+>>>> +PMU_FORMAT_ATTR(event, "config:32-39");
+>>>
+>>> I'm a bit confused by these. Can't you get the PID of the VM you're
+>>> tracing directly from perf, without having to encode things?
+> 
+> With perf attached to a PID, the event gets scheduled out when the task
+> is context switched. As the PID of the controlling process was used,
+> none of the vCPU events were counted.
+> 
+>> And if you
+>>> can't, surely this should be a function of the size of pid_t?
+> 
+> Agreed. I'll update above if we decide to carry on with this
+> approach. More below...
+> 
+>>>
+>>> Mark, can you shine some light here?
+>>
+>> AFAICT, this is not necessary.
+>>
+>> The perf_event_open() syscall takes a PID separately from the
+>> perf_event_attr. i.e. we should be able to do:
+>>
+>> // monitor a particular vCPU
+>> perf_event_open(attr, vcpupid, -1, -1, 0)
+>>
+>> ... or .. 
+>>
+>> // monitor a particular vCPU on a pCPU
+>> perf_event_open(attr, vcpupid, cpu, -1, 0)
+>>
+>> ... or ...
+>>
+>> // monitor all vCPUs on a pCPU
+>> perf_event_open(attr, -1, cpu, -1, 0)
+>>
+>> ... so this shouldn't be necessary. AFAICT, this is a SW PMU, so there
+>> should be no issue with using the perf_sw_context.
+> 
+> I might have missed it but none of the modes of invoking perf_event_open
+> allow monitoring a set of process, i.e., all vcpus belonging to a
+> particular VM, which was one of the aims and a feature I was carrying
+> over from the previous version. If we do not care about this...
+> 
+>>
+>> If this is a bodge to avoid opening a perf_event per vCPU thread, then I
+>> completely disagree with the approach. This would be better handled in
+>> userspace by discovering the set of threads and opening events for
+>> each.
+> 
+> ... then requiring userspace to invoke perf_event_open perf vCPU will
+> simplify this patch.
+> 
+> Marc, any objections?
 
-Introduce its_pmsi_init_one() to refactor the code to isolate
-ACPI&DT common code to prepare for ACPI later.
+Not so far, but I'm curious to find out how you determine which thread
+is a vcpu, let alone a given vcpu.
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Reviewed-by: Matthias Brugger <mbrugger@suse.com>
-Tested-by: Ming Lei <ming.lei@canonical.com>
-Tested-by: Wei Xu <xuwei5@hisilicon.com>
-Tested-by: Sinan Kaya <okaya@codeaurora.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Tomasz Nowicki <tn@semihalf.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
----
- drivers/irqchip/irq-gic-v3-its-platform-msi.c | 45 ++++++++++++++++-----------
- 1 file changed, 27 insertions(+), 18 deletions(-)
+Thanks,
 
-diff --git a/drivers/irqchip/irq-gic-v3-its-platform-msi.c b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-index 3c94278..3d9efd1 100644
---- a/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-+++ b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-@@ -82,34 +82,43 @@ static int its_pmsi_prepare(struct irq_domain *domain, struct device *dev,
- 	{},
- };
- 
--static int __init its_pmsi_init(void)
-+static int __init its_pmsi_init_one(struct fwnode_handle *fwnode,
-+				const char *name)
- {
--	struct device_node *np;
- 	struct irq_domain *parent;
- 
-+	parent = irq_find_matching_fwnode(fwnode, DOMAIN_BUS_NEXUS);
-+	if (!parent || !msi_get_domain_info(parent)) {
-+		pr_err("%s: unable to locate ITS domain\n", name);
-+		return -ENXIO;
-+	}
-+
-+	if (!platform_msi_create_irq_domain(fwnode, &its_pmsi_domain_info,
-+					    parent)) {
-+		pr_err("%s: unable to create platform domain\n", name);
-+		return -ENXIO;
-+	}
-+
-+	pr_info("Platform MSI: %s domain created\n", name);
-+	return 0;
-+}
-+
-+static void __init its_pmsi_of_init(void)
-+{
-+	struct device_node *np;
-+
- 	for (np = of_find_matching_node(NULL, its_device_id); np;
- 	     np = of_find_matching_node(np, its_device_id)) {
- 		if (!of_property_read_bool(np, "msi-controller"))
- 			continue;
- 
--		parent = irq_find_matching_host(np, DOMAIN_BUS_NEXUS);
--		if (!parent || !msi_get_domain_info(parent)) {
--			pr_err("%s: unable to locate ITS domain\n",
--			       np->full_name);
--			continue;
--		}
--
--		if (!platform_msi_create_irq_domain(of_node_to_fwnode(np),
--						    &its_pmsi_domain_info,
--						    parent)) {
--			pr_err("%s: unable to create platform domain\n",
--			       np->full_name);
--			continue;
--		}
--
--		pr_info("Platform MSI: %s domain created\n", np->full_name);
-+		its_pmsi_init_one(of_node_to_fwnode(np), np->full_name);
- 	}
-+}
- 
-+static int __init its_pmsi_init(void)
-+{
-+	its_pmsi_of_init();
- 	return 0;
- }
- early_initcall(its_pmsi_init);
+	M.
 -- 
-1.7.12.4
+Jazz is not dead. It just smells funny...
