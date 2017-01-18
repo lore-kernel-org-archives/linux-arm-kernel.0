@@ -1,45 +1,21 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 18 Jan 2017 15:46:03 -0600
-Subject: [PATCH 30/37] dt-bindings: PCI: dra7xx: Add dt bindings to
- enable legacy mode
-In-Reply-To: <1484216786-17292-31-git-send-email-kishon@ti.com>
-References: <1484216786-17292-1-git-send-email-kishon@ti.com>
- <1484216786-17292-31-git-send-email-kishon@ti.com>
-Message-ID: <20170118214603.qnewy3sm6sgw7lbg@rob-hp-laptop>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 18 Jan 2017 16:50:50 -0500 (EST)
+Subject: [PATCH net-next v4 00/10] net: dsa: Support for pdata in dsa2
+In-Reply-To: <20170117232152.1661-1-f.fainelli@gmail.com>
+References: <20170117232152.1661-1-f.fainelli@gmail.com>
+Message-ID: <20170118.165050.2165692521961713529.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2017 at 03:56:19PM +0530, Kishon Vijay Abraham I wrote:
-> Update device tree binding documentation of TI's dra7xx PCI
-> controller to include property for enabling legacy mode.
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  Documentation/devicetree/bindings/pci/ti-pci.txt |    4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/ti-pci.txt b/Documentation/devicetree/bindings/pci/ti-pci.txt
-> index 62f5f59..ed85e8e 100644
-> --- a/Documentation/devicetree/bindings/pci/ti-pci.txt
-> +++ b/Documentation/devicetree/bindings/pci/ti-pci.txt
-> @@ -39,6 +39,10 @@ DEVICE MODE
->   - interrupts : one interrupt entries must be specified for main interrupt.
->   - num-ib-windows : number of inbound address translation windows
->   - num-ob-windows : number of outbound address translation windows
-> + - syscon-legacy-mode: phandle to the syscon dt node. The 1st argument should
-> +		       contain the register offset within syscon and the 2nd
-> +		       argument should contain the bit field for setting the
-> +		       legacy mode
+From: Florian Fainelli <f.fainelli@gmail.com>
+Date: Tue, 17 Jan 2017 15:21:42 -0800
 
-What's legacy mode?
+> This is not exactly new, and was sent before, although back then, I did not
+> have an user of the pre-declared MDIO board information, but now we do. Note
+> that I have additional changes queued up to have b53 register platform data for
+> MIPS bcm47xx and bcm63xx.
+ ...
 
->  
->  Optional Property:
->   - gpios : Should be added if a gpio line is required to drive PERST# line
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+We're waiting for Greg's further review and Vivien's changes which I just
+applied are going to create some conflicts, so I am presuming that you will
+respin a v5 anyways.
