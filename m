@@ -1,281 +1,248 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Wed, 18 Jan 2017 13:13:00 +0530
-Subject: [PATCH V2 1/2] kexec: arm64: create identity page table to be
- used in purgatory
-In-Reply-To: <587E53A6.6020709@arm.com>
-References: <cover.1482129830.git.panand@redhat.com>
- <ea98a0045c8d466456f53150f341546810dd47e1.1482129830.git.panand@redhat.com>
- <587E53A6.6020709@arm.com>
-Message-ID: <281f2f04-842d-73d3-cd52-8774ab549c23@redhat.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Wed, 18 Jan 2017 15:49:47 +0800
+Subject: [PATCH v11 09/12] drm/mediatek: add dsi transfer function
+In-Reply-To: <1484117473-46644-10-git-send-email-yt.shen@mediatek.com>
+References: <1484117473-46644-1-git-send-email-yt.shen@mediatek.com>
+ <1484117473-46644-10-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1484725787.26941.4.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+Hi, YT:
 
-Thanks for your review.
+On Wed, 2017-01-11 at 14:51 +0800, YT Shen wrote:
+> From: shaoming chen <shaoming.chen@mediatek.com>
+> 
+> add dsi read/write commands for transfer function
+> 
+> Signed-off-by: shaoming chen <shaoming.chen@mediatek.com>
 
-On Tuesday 17 January 2017 10:55 PM, James Morse wrote:
-> Hi Pratyush,
->
-> On 19/12/16 07:13, Pratyush Anand wrote:
->> Purgatory sha verification is very slow when D-cache is not enabled there.
->> We need to enable MMU as well to enable D-Cache.Therefore,we need to an
->> identity mapped page table in purgatory.
->>
->> Since debugging is very difficult in purgatory therefore we prefer to do as
->> much work as possible in kexec.
->>
->> This patch prepares page table for purgatory in advance. We support only 4K
->> page table,because it will be available on most of the platform. This page
->> table is passed to the purgatory as a new segment.
->>
->> VA bit is fixed as 48, page table level is 3 where 3rd level page table
->> contains 2M block entries.
->
->> diff --git a/kexec/arch/arm64/kexec-arm64.c b/kexec/arch/arm64/kexec-arm64.c
->> index 04fd3968bb52..c2c8ff1b6940 100644
->> --- a/kexec/arch/arm64/kexec-arm64.c
->> +++ b/kexec/arch/arm64/kexec-arm64.c
->> @@ -24,6 +24,45 @@
->>  #include "kexec-syscall.h"
->>  #include "arch/options.h"
->>
->> +/*
->> + * kexec creates identity page table to be used in purgatory so that
->> + * dcache verification becomes faster.
->> + *
->> + * These are the definitions to be used by page table creation routine.
->> + *
->> + * Only 4K page table, 3 level, 2M block mapping, 48bit VA is supported
->> + */
->> +#define PGDIR_SHIFT		39
->> +#define PUD_SHIFT		30
->> +#define PMD_SHIFT		21
->> +#define PTRS_PER_PGD		0x1FF
->> +#define PTRS_PER_PUD		0x1FF
->> +#define PTRS_PER_PMD		0x1FF
->
-> Aren't these 0x200 for 4K pages in the kernel? It looks like you use them as a
-> mask instead.
->
+Acked-by: CK Hu <ck.hu@mediatek.com>
 
-will use definitions as in kernel.
-
->
->> +#define PMD_TYPE_TABLE		(3UL << 0)
->> +#define PMD_TYPE_SECT		(1UL << 0)
->> +#define PMD_SECT_AF		(1UL << 10)
->> +#define PMD_ATTRINDX(t)		((unsigned long)(t) << 2)
->
->> +#define MT_NORMAL		4
->
-> This needs to correspond to the part of MAIR that describes the memory type for
-> 'normal'. You define MT_NORMAL again in the next patch, it would be better to
-> share the definition so they can't be different. (I don't see why you can't use 0!)
-
-Hummm...Had thought to share the definition, but inclusion of header 
-file into purgatory code looked like ugly. But I see 
-purgatory/purgatory.c is including "../kexec/kexec-sha256.h". So, 
-probably I can do that similarly.
-
-Yes, can use 0 as well, as there is no other memory type now.
-
->
->
->> +#define PMD_FLAGS_NORMAL	(PMD_TYPE_SECT | PMD_SECT_AF)
->> +#define MMU_FLAGS_NORMAL	(PMD_ATTRINDX(MT_NORMAL) | PMD_FLAGS_NORMAL)
->
-> The SH and AP bits are left as zero, which means non-shareable, read/writeable,
-> (which I think is fine).
->
->
->> +#define SECTION_SIZE		(2 * 1024 * 1024)
->> +#define PAGE_SIZE		(4 * 1024)
->> +/* Since we are using 3 level of page tables, therefore minimum number of
->> + * table will be 3. Most likely we will never need more than 3. Each entry
->> + * in level 3 page table can map 2MB memory area. Thus a level 3 page table
->> + * indexed by bit 29:21 can map a total of 1G memory area. Therefore, if
->> + * any segment crosses 1G boundary, then we will need one more level 3
->> + * table. Similarly, level 2 page table indexed by bit 38:30 can map a
->> + * total of 512G memory area. If segment addresses are more than 512G apart
->> + * then we will need two more table for each such block. We do not expect
->> + * any memory segment to cross 512G boundary, however if we will ever wish
->> + * to support uart debugging in purgatory then that might cross the
->> + * boundary and therefore additional 2 more table space. Thus we will need
->> + * maximum of 6 table space.
->
-> Surely we only need 6 page_size table entries if we support uart debugging,
-> which your 'if we ever' suggests we don't. So surely we only need 3, and a
-> comment that this needs expanding to 6 if we need to map two distinct areas.
->
-
-OK, will use 3 now and write comments accordingly.
-
->
->> + */
->> +#define MAX_PGTBLE_SZ	(6 * 4096)
->> +static int next_tbl_cnt = 1;
->> +
->>  /* Global varables the core kexec routines expect. */
->>
->>  unsigned char reuse_initrd;
->> @@ -316,6 +355,117 @@ unsigned long arm64_locate_kernel_segment(struct kexec_info *info)
->>  	return hole;
->>  }
->>
->> +static unsigned long *create_table_entry(unsigned long *pgtbl_buf,
->> +		unsigned long pgtbl_mem, unsigned long *tbl,
->> +		unsigned long virt, int shift,
->> +		unsigned long ptrs)
->> +{
->> +	unsigned long index, desc, offset;
->> +
->> +	index = (virt >> shift) & ptrs;
->> +	/* check if we have allocated a table already for this index */
->> +	if (tbl[index]) {
->> +		/*
->> +		 * table index will have entry as per purgatory page table
->> +		 * memory. Find out corresponding buffer address of table.
->> +		 */
->> +		desc = tbl[index] & ~3UL;
->> +		offset = desc - pgtbl_mem;
->
-> wait .. no .. pgtbl_mem is also a guest physical address, so this is fine... its
-> not obvious at first glance!  You could do with a typedef to make it clear which
-> addresses are the guests (pgtable_mem) and which are the hosts (pgtable_buf).
-> Something like phys_addr_t?
-
-so may be host_addr_t and guest_addr_t??
-
->
->
->> +		return &pgtbl_buf[offset >> 3];
->> +	}
->> +
->> +	/*
->> +	 * Always write page table content as per page table memory allocated
->> +	 * for purgaory area, but return corresponding buffer area alloced
->
-> Nit: purgatory, allocated,
-
-ok.
-
->
->> +	 * in kexec
->> +	 */
->> +	if (next_tbl_cnt > 5)
->> +		die("%s: No more memory for page table\n", __func__);
->
-> die()? With a bit of juggling can't we return an error so we never try to enable
-> the MMU+dcache instead?
->
-
-OK. can do that.
-
->
->> +
->> +	tbl[index] = (pgtbl_mem + PAGE_SIZE * next_tbl_cnt) | PMD_TYPE_TABLE;
->> +
->> +	return &pgtbl_buf[(next_tbl_cnt++ * PAGE_SIZE) >> 3];
->> +}
->> +
->> +static void craete_block_entry(unsigned long *tbl, unsigned long flags,
->> +		unsigned long phys, unsigned long virt)
->
-> Why have separate phys and virt parameters if all this ever does is idmap?
-
-Agreed.
-
->
->
->> +{
->> +	unsigned long index;
->> +	unsigned long desc;
->> +
->> +	index = (virt >> PMD_SHIFT) & PTRS_PER_PMD;
->
-> Copying the pmd_index() macro would make this clearer.
-
-Right.
-
->
->
->> +	desc = (phys >> PMD_SHIFT) << PMD_SHIFT;
->
-> Looks like you wanted a PMD_MASK.
-
-Right.
-
->
->
->> +	desc |= flags;
->> +	tbl[index] = desc;
->> +}
->> +
->> +static void create_identity_entry(unsigned long *pgtbl_buf,
->> +		unsigned long pgtbl_mem, unsigned long virt,
->> +		unsigned long flags)
->> +{
->> +	unsigned long *tbl = pgtbl_buf;
->> +
->> +	tbl = create_table_entry(pgtbl_buf, pgtbl_mem, tbl, virt,
->> +			PGDIR_SHIFT, PTRS_PER_PGD);
->> +	tbl = create_table_entry(pgtbl_buf, pgtbl_mem, tbl, virt,
->> +			PUD_SHIFT, PTRS_PER_PUD);
->> +	craete_block_entry(tbl, flags, virt, virt);
->
-> Nit: create
-
-Ok.
-
->
->> +}
->> +
->> +/**
->> + * arm64_create_pgtbl_segment - Create page table segments to be used by
->> + * purgatory. Page table will have entries to access memory area of all
->> + * those segments which becomes part of sha verification in purgatory.
->> + * Additionaly, we also create page table for purgatory segment as well.
->
-> Nit: additionally,
-
-Ok.
-
->
->> + */
->> +
->> +static int arm64_create_pgtbl_segment(struct kexec_info *info,
->> +		unsigned long hole_min, unsigned long hole_max)
->> +{
->> +	unsigned long *pgtbl_buf;
->> +	int i;
->> +	unsigned long mstart, mend, pgtbl_mem;
->> +	unsigned long purgatory_base, purgatory_len;
->> +
->> +	pgtbl_buf = xmalloc(MAX_PGTBLE_SZ);
->> +	memset(pgtbl_buf, 0, MAX_PGTBLE_SZ);
->
->> +	pgtbl_mem = add_buffer_phys_virt(info, pgtbl_buf, MAX_PGTBLE_SZ,
->> +			MAX_PGTBLE_SZ, PAGE_SIZE, hole_min, hole_max, 1, 0);
->
-> I want to check what this does, but this all looks like it is doing the right thing.
->
->
->> +	for (i = 0; i < info->nr_segments; i++) {
->> +		if (info->segment[i].mem == (void *)info->rhdr.rel_addr) {
->> +			purgatory_base = (unsigned long)info->segment[i].mem;
->> +			purgatory_len = info->segment[i].memsz;
->> +		}
->> +		mstart = (unsigned long)info->segment[i].mem;
->> +		mend = mstart + info->segment[i].memsz;
->> +		mstart &= ~(SECTION_SIZE - 1);
->> +		while (mstart < mend) {
->> +			create_identity_entry(pgtbl_buf, pgtbl_mem,
->> +					mstart, MMU_FLAGS_NORMAL);
->> +			mstart += SECTION_SIZE;
->> +		}
->> +	}
->
-
-
-~Pratyush
+> ---
+>  drivers/gpu/drm/mediatek/mtk_dsi.c | 168 ++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 166 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
+> index 474861a..b3c7fd8 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_dsi.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/of_graph.h>
+>  #include <linux/phy/phy.h>
+>  #include <linux/platform_device.h>
+> +#include <video/mipi_display.h>
+>  #include <video/videomode.h>
+>  
+>  #include "mtk_drm_ddp_comp.h"
+> @@ -80,8 +81,16 @@
+>  #define DSI_HBP_WC		0x54
+>  #define DSI_HFP_WC		0x58
+>  
+> +#define DSI_CMDQ_SIZE		0x60
+> +#define CMDQ_SIZE			0x3f
+> +
+>  #define DSI_HSTX_CKL_WC		0x64
+>  
+> +#define DSI_RX_DATA0		0x74
+> +#define DSI_RX_DATA1		0x78
+> +#define DSI_RX_DATA2		0x7c
+> +#define DSI_RX_DATA3		0x80
+> +
+>  #define DSI_RACK		0x84
+>  #define RACK				BIT(0)
+>  
+> @@ -117,6 +126,15 @@
+>  #define CLK_HS_POST			(0xff << 8)
+>  #define CLK_HS_EXIT			(0xff << 16)
+>  
+> +#define DSI_CMDQ0		0x180
+> +#define CONFIG				(0xff << 0)
+> +#define SHORT_PACKET			0
+> +#define LONG_PACKET			2
+> +#define BTA				BIT(2)
+> +#define DATA_ID				(0xff << 8)
+> +#define DATA_0				(0xff << 16)
+> +#define DATA_1				(0xff << 24)
+> +
+>  #define T_LPX		5
+>  #define T_HS_PREP	6
+>  #define T_HS_TRAIL	8
+> @@ -125,6 +143,12 @@
+>  
+>  #define NS_TO_CYCLE(n, c)    ((n) / (c) + (((n) % (c)) ? 1 : 0))
+>  
+> +#define MTK_DSI_HOST_IS_READ(type) \
+> +	((type == MIPI_DSI_GENERIC_READ_REQUEST_0_PARAM) || \
+> +	(type == MIPI_DSI_GENERIC_READ_REQUEST_1_PARAM) || \
+> +	(type == MIPI_DSI_GENERIC_READ_REQUEST_2_PARAM) || \
+> +	(type == MIPI_DSI_DCS_READ))
+> +
+>  struct phy;
+>  
+>  struct mtk_dsi {
+> @@ -497,12 +521,12 @@ static void mtk_dsi_irq_data_set(struct mtk_dsi *dsi, u32 irq_bit)
+>  	dsi->irq_data |= irq_bit;
+>  }
+>  
+> -static __maybe_unused void mtk_dsi_irq_data_clear(struct mtk_dsi *dsi, u32 irq_bit)
+> +static void mtk_dsi_irq_data_clear(struct mtk_dsi *dsi, u32 irq_bit)
+>  {
+>  	dsi->irq_data &= ~irq_bit;
+>  }
+>  
+> -static __maybe_unused s32 mtk_dsi_wait_for_irq_done(struct mtk_dsi *dsi, u32 irq_flag,
+> +static s32 mtk_dsi_wait_for_irq_done(struct mtk_dsi *dsi, u32 irq_flag,
+>  				     unsigned int timeout)
+>  {
+>  	s32 ret = 0;
+> @@ -832,9 +856,149 @@ static int mtk_dsi_host_detach(struct mipi_dsi_host *host,
+>  	return 0;
+>  }
+>  
+> +static void mtk_dsi_wait_for_idle(struct mtk_dsi *dsi)
+> +{
+> +	u32 timeout_ms = 500000; /* total 1s ~ 2s timeout */
+> +
+> +	while (timeout_ms--) {
+> +		if (!(readl(dsi->regs + DSI_INTSTA) & DSI_BUSY))
+> +			break;
+> +
+> +		usleep_range(2, 4);
+> +	}
+> +
+> +	if (timeout_ms == 0) {
+> +		DRM_WARN("polling dsi wait not busy timeout!\n");
+> +
+> +		mtk_dsi_enable(dsi);
+> +		mtk_dsi_reset_engine(dsi);
+> +	}
+> +}
+> +
+> +static u32 mtk_dsi_recv_cnt(u8 type, u8 *read_data)
+> +{
+> +	switch (type) {
+> +	case MIPI_DSI_RX_GENERIC_SHORT_READ_RESPONSE_1BYTE:
+> +	case MIPI_DSI_RX_DCS_SHORT_READ_RESPONSE_1BYTE:
+> +		return 1;
+> +	case MIPI_DSI_RX_GENERIC_SHORT_READ_RESPONSE_2BYTE:
+> +	case MIPI_DSI_RX_DCS_SHORT_READ_RESPONSE_2BYTE:
+> +		return 2;
+> +	case MIPI_DSI_RX_GENERIC_LONG_READ_RESPONSE:
+> +	case MIPI_DSI_RX_DCS_LONG_READ_RESPONSE:
+> +		return read_data[1] + read_data[2] * 16;
+> +	case MIPI_DSI_RX_ACKNOWLEDGE_AND_ERROR_REPORT:
+> +		DRM_INFO("type is 0x02, try again\n");
+> +		break;
+> +	default:
+> +		DRM_INFO("type(0x%x) cannot be non-recognite\n", type);
+> +		break;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static void mtk_dsi_cmdq(struct mtk_dsi *dsi, const struct mipi_dsi_msg *msg)
+> +{
+> +	const char *tx_buf = msg->tx_buf;
+> +	u8 config, cmdq_size, cmdq_off, type = msg->type;
+> +	u32 reg_val, cmdq_mask, i;
+> +
+> +	if (MTK_DSI_HOST_IS_READ(type))
+> +		config = BTA;
+> +	else
+> +		config = (msg->tx_len > 2) ? LONG_PACKET : SHORT_PACKET;
+> +
+> +	if (msg->tx_len > 2) {
+> +		cmdq_size = 1 + (msg->tx_len + 3) / 4;
+> +		cmdq_off = 4;
+> +		cmdq_mask = CONFIG | DATA_ID | DATA_0 | DATA_1;
+> +		reg_val = (msg->tx_len << 16) | (type << 8) | config;
+> +	} else {
+> +		cmdq_size = 1;
+> +		cmdq_off = 2;
+> +		cmdq_mask = CONFIG | DATA_ID;
+> +		reg_val = (type << 8) | config;
+> +	}
+> +
+> +	for (i = 0; i < msg->tx_len; i++)
+> +		writeb(tx_buf[i], dsi->regs + DSI_CMDQ0 + cmdq_off + i);
+> +
+> +	mtk_dsi_mask(dsi, DSI_CMDQ0, cmdq_mask, reg_val);
+> +	mtk_dsi_mask(dsi, DSI_CMDQ_SIZE, CMDQ_SIZE, cmdq_size);
+> +}
+> +
+> +static ssize_t mtk_dsi_host_send_cmd(struct mtk_dsi *dsi,
+> +				     const struct mipi_dsi_msg *msg, u8 flag)
+> +{
+> +	mtk_dsi_wait_for_idle(dsi);
+> +	mtk_dsi_irq_data_clear(dsi, flag);
+> +	mtk_dsi_cmdq(dsi, msg);
+> +	mtk_dsi_start(dsi);
+> +
+> +	if (!mtk_dsi_wait_for_irq_done(dsi, flag, 2000))
+> +		return -ETIME;
+> +	else
+> +		return 0;
+> +}
+> +
+> +static ssize_t mtk_dsi_host_transfer(struct mipi_dsi_host *host,
+> +				     const struct mipi_dsi_msg *msg)
+> +{
+> +	struct mtk_dsi *dsi = host_to_dsi(host);
+> +	u32 recv_cnt, i;
+> +	u8 read_data[16];
+> +	void *src_addr;
+> +	u8 irq_flag = CMD_DONE_INT_FLAG;
+> +
+> +	if (readl(dsi->regs + DSI_MODE_CTRL) & MODE) {
+> +		DRM_ERROR("dsi engine is not command mode\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	if (MTK_DSI_HOST_IS_READ(msg->type))
+> +		irq_flag |= LPRX_RD_RDY_INT_FLAG;
+> +
+> +	if (mtk_dsi_host_send_cmd(dsi, msg, irq_flag) < 0)
+> +		return -ETIME;
+> +
+> +	if (!MTK_DSI_HOST_IS_READ(msg->type))
+> +		return 0;
+> +
+> +	if (!msg->rx_buf) {
+> +		DRM_ERROR("dsi receive buffer size may be NULL\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	for (i = 0; i < 16; i++)
+> +		*(read_data + i) = readb(dsi->regs + DSI_RX_DATA0 + i);
+> +
+> +	recv_cnt = mtk_dsi_recv_cnt(read_data[0], read_data);
+> +
+> +	if (recv_cnt > 2)
+> +		src_addr = &read_data[4];
+> +	else
+> +		src_addr = &read_data[1];
+> +
+> +	if (recv_cnt > 10)
+> +		recv_cnt = 10;
+> +
+> +	if (recv_cnt > msg->rx_len)
+> +		recv_cnt = msg->rx_len;
+> +
+> +	if (recv_cnt)
+> +		memcpy(msg->rx_buf, src_addr, recv_cnt);
+> +
+> +	DRM_INFO("dsi get %d byte data from the panel address(0x%x)\n",
+> +		 recv_cnt, *((u8 *)(msg->tx_buf)));
+> +
+> +	return recv_cnt;
+> +}
+> +
+>  static const struct mipi_dsi_host_ops mtk_dsi_ops = {
+>  	.attach = mtk_dsi_host_attach,
+>  	.detach = mtk_dsi_host_detach,
+> +	.transfer = mtk_dsi_host_transfer,
+>  };
+>  
+>  static int mtk_dsi_bind(struct device *dev, struct device *master, void *data)
