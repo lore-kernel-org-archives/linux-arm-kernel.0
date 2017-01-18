@@ -1,95 +1,55 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Wed, 18 Jan 2017 09:40:35 +0800
-Subject: [PATCH V9 2/3] ACPI: Add support for ResourceSource/IRQ domain
- mapping
-In-Reply-To: <cc305557e91d2de4ae53daf1f5e8fe5a@codeaurora.org>
-References: <1481753438-3905-1-git-send-email-agustinv@codeaurora.org>
- <1481753438-3905-3-git-send-email-agustinv@codeaurora.org>
- <587E1275.7030007@huawei.com>
- <cc305557e91d2de4ae53daf1f5e8fe5a@codeaurora.org>
-Message-ID: <587EC793.2000801@huawei.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 17 Jan 2017 17:32:22 -0800
+Subject: [GIT PULL 2/2] Broadcom devicetree-arm64 changes for 4.11
+In-Reply-To: <20170118012931.10964-2-f.fainelli@gmail.com>
+References: <20170118012931.10964-1-f.fainelli@gmail.com>
+ <20170118012931.10964-2-f.fainelli@gmail.com>
+Message-ID: <1c3325d4-dfcc-4723-89be-94d0adc2f3f3@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/1/17 23:07, Agustin Vega-Frias wrote:
-> Hi Hanjun,
->
-> On 2017-01-17 07:47, Hanjun Guo wrote:
->> On 2016/12/15 6:10, Agustin Vega-Frias wrote:
->>> ACPI extended IRQ resources may contain a ResourceSource to specify
->>> an alternate interrupt controller. Introduce acpi_irq_get and use it
->>> to implement ResourceSource/IRQ domain mapping.
->>>
->>> The new API is similar to of_irq_get and allows re-initialization
->>> of a platform resource from the ACPI extended IRQ resource, and
->>> provides proper behavior for probe deferral when the domain is not
->>> yet present when called.
->>>
->>> Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
->>> ---
->>>  drivers/acpi/Makefile         |   2 +-
->>>  drivers/acpi/{gsi.c => irq.c} | 182 ++++++++++++++++++++++++++++++++++++++++++
->>>  drivers/base/platform.c       |   9 ++-
->>>  include/linux/acpi.h          |  10 +++
->>>  4 files changed, 201 insertions(+), 2 deletions(-)
->>>  rename drivers/acpi/{gsi.c => irq.c} (32%)
->>>
->> [...]
->>> +/**
->>> + * acpi_irq_parse_one_cb - Handle the given resource
->>> + * @ares: resource to handle
->>> + * @context: context for the walk, contains the lookup index and references
->>> + *           to the flags and fwspec where the result is returned
->>> + *
->>> + * This is called by acpi_walk_resources passing each resource returned by
->>> + * the _CRS method. We only inspect IRQ resources. Since IRQ resources
->>> + * might contain multiple interrupts we check if the index is within this
->>> + * one's interrupt array, otherwise we subtract the current resource IRQ
->>> + * count from the lookup index to prepare for the next resource.
->>> + * Once a match is found we call acpi_irq_parse_one_match to populate
->>> + * the result and end the walk by returning AE_CTRL_TERMINATE.
->>> + *
->>> + * Return AE_OK if the walk should continue, AE_CTRL_TERMINATE if a matching
->>> + * IRQ resource was found.
->>> + */
->>> +static acpi_status acpi_irq_parse_one_cb(struct acpi_resource *ares,
->>> +                     void *context)
->>> +{
->>> +    struct acpi_irq_parse_one_ctx *ctx = context;
->>> +    struct acpi_resource_irq *irq;
->>> +    struct acpi_resource_extended_irq *eirq;
->>> +    struct fwnode_handle *fwnode;
->>> +
->>> +    switch (ares->type) {
->>> +    case ACPI_RESOURCE_TYPE_IRQ:
->>> +        irq = &ares->data.irq;
->>> +        if (ctx->index >= irq->interrupt_count) {
->>> +            ctx->index -= irq->interrupt_count;
->>> +            return AE_OK;
->>> +        }
->>> +        fwnode = acpi_gsi_domain_id;
->>> +        acpi_irq_parse_one_match(fwnode, irq->interrupts[ctx->index],
->>> +                     irq->triggering, irq->polarity,
->>> +                     irq->sharable, ctx);
->>> +        return AE_CTRL_TERMINATE;
->>> +    case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
->>> +        eirq = &ares->data.extended_irq;
->>
->> If it's an interrupt producer, I think we don't need to map the interrupts in
->> any irqdomain, and return AE_CTRL_TERMINATE here.
->>
->>         case ACPI_RESOURCE_TYPE_EXTENDED_IRQ:
->>                 eirq = &ares->data.extended_irq;
->> +         if (eirq->producer_consumer == ACPI_PRODUCER)
->> +                 return AE_CTRL_TERMINATE;
->>                 if (ctx->index >= eirq->interrupt_count) {
->
-> Agreed. I'll add the check. However, we need to return AE_OK, not
-> AE_CTRL_TERMINATE, since that terminates the walk and there might
-> be other resources to check after this one.
+On 01/17/2017 05:29 PM, Florian Fainelli wrote:
+> The following changes since commit 0c744ea4f77d72b3dcebb7a8f2684633ec79be88:
+> 
+>   Linux 4.10-rc2 (2017-01-01 14:31:53 -0800)
 
-Yes, thanks for the correction, there might be other Interrupt()
-resources under _CRS which needs to be scanned.
+Forgot to mention that, but this is against v4.10-rc2, because v4.10-rc1
+just was not building on ARM64, thanks!
 
-Thanks
-Hanjun
+> 
+> are available in the git repository at:
+> 
+>   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.11/devicetree-arm64
+> 
+> for you to fetch changes up to 096fe8726e5df2975ed29e1ecd881fa54c80878b:
+> 
+>   arm64: dts: NS2: add support for XMC form factor (2017-01-03 15:23:22 -0800)
+> 
+> ----------------------------------------------------------------
+> This pull request contains Broadcom ARM64-based SoC Device Tree changes for
+> 4.11, please pull the following changes:
+> 
+> - Jon adds Device Tree nodes for the GICv2m and PAXB/PAXC PCIe interfaces on
+>   the Northstar 2 SoCs, he also enables PAXC on the Northstar 2 SVK reference
+>   board. He also updates the reserved memory entry for the Nitro firmware,
+>   required to get the on-chip NICs to work. Finally he adds support for the
+>   BCM958712DxXMC reference board which is a subset of existing boards.
+> 
+> ----------------------------------------------------------------
+> Jon Mason (4):
+>       arm64: dts: NS2: enable GICv2m for PAXB/PAXC interfaces
+>       arm64: dts: NS2: enable PAXC on NS2 SVK
+>       arm64: dts: NS2: reserve memory for Nitro firmware
+>       arm64: dts: NS2: add support for XMC form factor
+> 
+>  arch/arm64/boot/dts/broadcom/Makefile    |   2 +-
+>  arch/arm64/boot/dts/broadcom/ns2-svk.dts |   4 +
+>  arch/arm64/boot/dts/broadcom/ns2-xmc.dts | 191 +++++++++++++++++++++++++++++++
+>  arch/arm64/boot/dts/broadcom/ns2.dtsi    | 123 ++++++++++++++++----
+>  4 files changed, 295 insertions(+), 25 deletions(-)
+>  create mode 100644 arch/arm64/boot/dts/broadcom/ns2-xmc.dts
+> 
+
+
+-- 
+Florian
