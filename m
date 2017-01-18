@@ -1,50 +1,32 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 18 Jan 2017 15:26:24 +0000
-Subject: [PATCH 2/2] ARM: DTS: Fix register map for virt-capable GIC
-In-Reply-To: <e2295a5d-3224-1198-8b46-f45b153b540a@osg.samsung.com>
-References: <1484736811-24002-1-git-send-email-marc.zyngier@arm.com>
- <1484736811-24002-3-git-send-email-marc.zyngier@arm.com>
- <e2295a5d-3224-1198-8b46-f45b153b540a@osg.samsung.com>
-Message-ID: <90ab45ff-3995-600d-c263-e6d350a35aaf@arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 18 Jan 2017 21:00:58 +0530
+Subject: [GIT PULL] DaVinci fix for v4.10
+In-Reply-To: <214ce380-3c45-423c-a7bc-e19ea1ce2a2d@ti.com>
+References: <214ce380-3c45-423c-a7bc-e19ea1ce2a2d@ti.com>
+Message-ID: <74cda305-206b-1660-5567-32b2e7093d00@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/01/17 15:16, Javier Martinez Canillas wrote:
-> Hello Marc,
+On Wednesday 18 January 2017 04:23 PM, Sekhar Nori wrote:
+> The following changes since commit 49def1853334396f948dcb4cedb9347abb318df5:
 > 
-> On 01/18/2017 07:53 AM, Marc Zyngier wrote:
->> Since everybody copied my own mistake from the DT binding example,
->> let's address all the offenders in one swift go.
->>
->> Most of them got the CPU interface size wrong (4kB, while it should
->> be 8kB), except for both keystone platforms which got the control
->> interface wrong (4kB instead of 8kB).
->>
->> In the couple of cases were I knew for sure what implementation
->> was used, I've added the "arm,gic-400" compatible string. I'm 99%
->> sure that this is what everyong is using, but short of having the
->> TRM for all the other SoCs, I've let them alone.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm/boot/dts/exynos3250.dtsi    | 2 +-
->>  arch/arm/boot/dts/exynos5.dtsi       | 2 +-
->>  arch/arm/boot/dts/exynos5260.dtsi    | 2 +-
->>  arch/arm/boot/dts/exynos5440.dtsi    | 2 +-
+>   Linux 4.10-rc4 (2017-01-15 16:21:59 -0800)
 > 
-> I've looked at the Exynos5250 and Exynos5420 TRM and both say that adopts
-> GIC-400, so I think it's safe for you to also update the compatible in the
-> exynos5.dtsi. Unfortunately I don't have manuals for 3250, 5260 and 5440.
-
-Thanks for taking the time to find out, I'll update the patch.
-
+> are available in the git repository at:
 > 
-> The register map changes looks good to me, so for Exynos:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v4.10-part2
 > 
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> for you to fetch changes up to 6f042ee9cc09792c1c0f0cd8f275c2b4b29eaa96:
+> 
+>   ARM: dts: da850-evm: fix read access to SPI flash (2017-01-18 15:38:08 +0530)
+> 
+> ----------------------------------------------------------------
+> This patch uses fast-read opcode to read the
+> SPI flash. This is needed for error-free read
+> at 30Mhz.
 
-Thank you.
+I should have pointed out here that I have tagged the patch for stable
+kernel inclusion since this issue causes data corruption for the user.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks,
+Sekhar
