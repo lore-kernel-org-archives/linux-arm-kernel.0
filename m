@@ -1,30 +1,34 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 18 Jan 2017 16:23:55 +0530
-Subject: [GIT PULL] DaVinci fix for v4.10
-Message-ID: <214ce380-3c45-423c-a7bc-e19ea1ce2a2d@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 18 Jan 2017 21:54:35 +1100
+Subject: [PATCH RFC 0/5] mvebu cleanups and preparation for Armada 7k/8k
+In-Reply-To: <CACRpkdYWV2N7JxyJiLNpygOSw308qTzdtv+5f6Ej-fU4pvM6ew@mail.gmail.com>
+References: <20170113110240.GA29164@n2100.armlinux.org.uk>
+ <20170113112829.GP14217@n2100.armlinux.org.uk>
+ <CACRpkdYWV2N7JxyJiLNpygOSw308qTzdtv+5f6Ej-fU4pvM6ew@mail.gmail.com>
+Message-ID: <20170118215435.43351b96@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 49def1853334396f948dcb4cedb9347abb318df5:
+Hello,
 
-  Linux 4.10-rc4 (2017-01-15 16:21:59 -0800)
+On Wed, 18 Jan 2017 09:52:31 +0100, Linus Walleij wrote:
 
-are available in the git repository at:
+> > BTW, would be useful if MAINTAINERS could list maintainers for both
+> > this code and the mvebu gpio code too.  At the moment, it seems Linus
+> > is the person responsible for both of those - but I suspect the mvebu
+> > people want to be copied on patches...  
+> 
+> Agreed. Since they are silent I will likely simply apply the patches,
+> they certainly look good to me.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v4.10-part2
+Sorry, I'm away on travel. The patches looked generally good to me,
+though I haven't had the time to do a thorough review. I'll post a
+patch for the MAINTAINERS file, as suggested by Russell.
 
-for you to fetch changes up to 6f042ee9cc09792c1c0f0cd8f275c2b4b29eaa96:
+Thanks,
 
-  ARM: dts: da850-evm: fix read access to SPI flash (2017-01-18 15:38:08 +0530)
-
-----------------------------------------------------------------
-This patch uses fast-read opcode to read the
-SPI flash. This is needed for error-free read
-at 30Mhz.
-
-----------------------------------------------------------------
-Fabien Parent (1):
-      ARM: dts: da850-evm: fix read access to SPI flash
-
- arch/arm/boot/dts/da850-evm.dts | 1 +
- 1 file changed, 1 insertion(+)
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
