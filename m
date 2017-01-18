@@ -1,42 +1,47 @@
 From: roy.pledge@nxp.com (Roy Pledge)
-Date: Wed, 18 Jan 2017 17:39:30 -0500
-Subject: [PATCH 00/10] fsl/qbman: ARM Enablement
-Message-ID: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
+Date: Wed, 18 Jan 2017 17:39:31 -0500
+Subject: [PATCH 01/10] soc/qbman: Use portable mapping for the FQD reserved
+ memory
+In-Reply-To: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
+References: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
+Message-ID: <1484779180-1344-2-git-send-email-roy.pledge@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series enables DPAA1 QBMan devices for ARM and
-ARM64 architectures. This allows the LS1043A and LS1046A to use
-QBMan functionality.
+From: Claudiu Manoil <claudiu.manoil@nxp.com>
 
+Use memremap/memset to zero the private QBMan areas to ensure
+portability.
 
-Claudiu Manoil (4):
-  soc/qbman: Use portable mapping for the FQD reserved memory
-  soc/qbman: Drop L1_CACHE_BYTES compile time check
-  soc/qbman: Add ARM equivalent for flush_dcache_range()
-  soc/qbman: Add missing headers on ARM
+Signed-off-by: Claudiu Manoil <claudiu.manoil@nxp.com>
+Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
+---
+ drivers/soc/fsl/qbman/qman_ccsr.c |    8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
-Madalin Bucur (4):
-  soc/qbman: Drop set/clear_bits usage
-  soc/qbman: add QMAN_REV32
-  soc/qbman: different register offsets on ARM
-  fsl/qbman: Enable FSL_LAYERSCAPE config on ARM
-
-Roy Pledge (1):
-  soc/qbman: Rework ioremap() calls for ARM/PPC
-
-Valentin Rothberg (1):
-  soc/qbman: Fix ARM32 typo
-
- drivers/soc/fsl/qbman/Kconfig       |    2 +-
- drivers/soc/fsl/qbman/bman.c        |   24 +++++++++++++++++-
- drivers/soc/fsl/qbman/bman_portal.c |   16 +++++++++---
- drivers/soc/fsl/qbman/dpaa_sys.h    |    8 +++---
- drivers/soc/fsl/qbman/qman.c        |   46 ++++++++++++++++++++++++++++++++---
- drivers/soc/fsl/qbman/qman_ccsr.c   |   16 ++++++++----
- drivers/soc/fsl/qbman/qman_portal.c |   16 +++++++++---
- drivers/soc/fsl/qbman/qman_priv.h   |    1 +
- 8 files changed, 107 insertions(+), 22 deletions(-)
-
---
+diff --git a/drivers/soc/fsl/qbman/qman_ccsr.c b/drivers/soc/fsl/qbman/qman_ccsr.c
+index f4e6e70d..43feaa9 100644
+--- a/drivers/soc/fsl/qbman/qman_ccsr.c
++++ b/drivers/soc/fsl/qbman/qman_ccsr.c
+@@ -441,16 +441,14 @@ static unsigned int qm_get_fqid_maxcnt(void)
+ static int zero_priv_mem(struct device *dev, struct device_node *node,
+ 			 phys_addr_t addr, size_t sz)
+ {
+-	/* map as cacheable, non-guarded */
+-	void __iomem *tmpp = ioremap_prot(addr, sz, 0);
+-
++	void *tmpp = memremap(addr, sz, MEMREMAP_WB);
+ 	if (!tmpp)
+ 		return -ENOMEM;
+ 
+-	memset_io(tmpp, 0, sz);
++	memset(tmpp, 0, sz);
+ 	flush_dcache_range((unsigned long)tmpp,
+ 			   (unsigned long)tmpp + sz);
+-	iounmap(tmpp);
++	memunmap(tmpp);
+ 
+ 	return 0;
+ }
+-- 
 1.7.9.5
