@@ -1,147 +1,95 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Wed, 18 Jan 2017 15:26:22 +0100
-Subject: [PATCH 3/5] ARM64: dts: meson-gxbb-p20x: add reset for the
- ethernet PHY
-In-Reply-To: <1484735769.26620.69.camel@baylibre.com>
-References: <20161202234739.22929-1-martin.blumenstingl@googlemail.com>
- <20161202234739.22929-4-martin.blumenstingl@googlemail.com>
- <1484680941.26620.28.camel@baylibre.com>
- <CAFBinCBfJ4b1a1Bqn7kJHyj79i8UJnjJh00u3NvARzJPuUmrNA@mail.gmail.com>
- <1484735769.26620.69.camel@baylibre.com>
-Message-ID: <CAFBinCCPK7hKa_XRfLHCvuo5L_k++3Sxnsa44KUxNOdq4mpbBQ@mail.gmail.com>
+From: a.hajda@samsung.com (Andrzej Hajda)
+Date: Wed, 18 Jan 2017 15:37:09 +0100
+Subject: [PATCH] [media] s5p-mfc: Align stream buffer and CPB buffer to 512
+In-Reply-To: <1484732223-24670-1-git-send-email-smitha.t@samsung.com>
+References: <CGME20170118094212epcas5p22e588016d2b330dcd0b99b6e1012c744@epcas5p2.samsung.com>
+ <1484732223-24670-1-git-send-email-smitha.t@samsung.com>
+Message-ID: <de7bbdbf-35cc-a575-79d1-2ec5764469a5@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2017 at 11:36 AM, Jerome Brunet <jbrunet@baylibre.com> wrote:
-> On Tue, 2017-01-17 at 22:26 +0100, Martin Blumenstingl wrote:
->> On Tue, Jan 17, 2017 at 8:22 PM, Jerome Brunet <jbrunet@baylibre.com>
->> wrote:
->> >
->> > On Sat, 2016-12-03 at 00:47 +0100, Martin Blumenstingl wrote:
->> > >
->> > > This resets the ethernet PHY during boot to get the PHY into a
->> > > "clean"
->> > > state. While here also specify the phy-handle of the ethmac node
->> > > to
->> > > make the PHY configuration similar to the one we have on GXL
->> > > devices.
->> > >
->> > > Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemai
->> > > l.co
->> > > m>
->> > > Tested-by: Neil Armstrong <narmstrong@baylibre.com>
->> > > ---
->> > >  arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi | 15
->> > > +++++++++++++++
->> > >  1 file changed, 15 insertions(+)
->> > >
->> > > diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
->> > > b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
->> > > index 203be28..2abc553 100644
->> > > --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
->> > > +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
->> > > @@ -134,10 +134,25 @@
->> > >       pinctrl-names = "default";
->> > >  };
->> > >
->> > > +&mdio0 {
->> > > +     ethernet_phy0: ethernet-phy at 0 {
->> > > +             compatible = "ethernet-phy-ieee802.3-c22";
->> > > +             reg = <0>;
->> >
->> > Sorry for the late reply.
->> > I just tried on the p200 and this patch (serie) breaks the network
->> > on
->> > it. The PHY is not detected anymore.
->> >
->> > From the KSZ9031 Datasheet : "PHY Address 0h is supported as the
->> > unique
->> > PHY address only; it is not supported as the broadcast PHY address
->> > [...]"
->> >
->> > So we can't just use the broadcast address here:
->> > reg should be <3>.
->> OK, I'll fix that in a follow-up. as mentioned in the other thread:
->> can you confirm that the PHY ID is 0x00221620?
->
-> That's right.
-thanks for confirming this
+Hi Smitha,
 
->> It seems that I also broke meson-gxbb-nexbox-a95x.dts with that
->> series
->> (no idea why that slipped through): according to the photos from
->> Neil's wiki [0] this seems to use an IC+ 10/100 ethernet PHY
->> (probably
->> an IP101A)
->
-> IP101GR from what I can see on the board.
-thanks :)
+On 18.01.2017 10:37, Smitha T Murthy wrote:
+> >From MFCv6 onwards encoder stream buffer and decoder CPB buffer
 
->>
->> >
->> > >
->> > > +     };
->> > > +};
->> > > +
->> > >  &ethmac {
->> > >       status = "okay";
->> > >       pinctrl-0 = <&eth_rgmii_pins>;
->> > >       pinctrl-names = "default";
->> > > +
->> > > +     phy-handle = <&ethernet_phy0>;
->> > > +
->> > > +     snps,reset-gpio = <&gpio GPIOZ_14 0>;
->> > > +     snps,reset-delays-us = <0 10000 1000000>;
->> > > +     snps,reset-active-low;
->> > > +
->> > > +     phy-mode = "rgmii";
->> >
->> > We can't define this in p20x. actually the p201 uses an rmii.
->> > I have not idea about gpio reset, or the phy address for the p201.
->> >
->> > I suppose it would be better to move this to meson-gxbb_p200.dts
->> >
->> > I don't know if anybody has a p201, but until we can confirm a
->> > working
->> > Ethernet configuration, we should probably drop it for the p201
->> >
->> > Of course the problem was already there before this patch ...
->> indeed, that seems to be a problem.
->> the GXBB Nexbox A95x I mentioned above is based on the p201 board.
->> Amlogic's .dts also toggles GPIOZ_14 for it: [1]
->> chances are high that it also features an IP101A PHY (this is pure
->> speculation though).
->
-> Agreed, chances are high it'll be this way.
->
->>
->> I propose four patches to fix all this situation:
->> - add the GPIOZ_14 reset and an ethernet_phy0 (with reg = <0>) to
->> meson-gxbb-nexbox-a95x.dts
->> - add the ethernet_phy0 node with reg = <0> (and ideally I also want
->> to include the KSZ9031 PHY ID) to meson-gxbb-p200.dtsi along with
->> phy-mode = "rgmii"
->
-> you mean with reg = <3> ?
-you're right, another typo there!
+Unexpected char at the beginning.
 
->> - add the ethernet_phy0 node with reg = <0> (without any PHY ID as we
->> don't know which one is used) to meson-gxbb-p201.dtsi along with
->> phy-mode = "rgmii"
->> - remove "phy-mode" and ethernet_phy0 from meson-gxbb-p20x.dtsi and
->> add a comment that both, the RGMII and the RMII PHY have GPIOZ_14
->> connected to their reset line
+> need to be aligned with 512.
+
+Patch below adds checks only if buffer size is multiple of 512, am I right?
+If yes, please precise the subject, for example "...CPB buffer size need
+to be...".
+
+
 >
-> I'm not too sure about these last 2 points. As you mentioned, we are
-> only speculating regarding the p201. I would prefer to avoid putting
-> things we are not sure about in the DT (as much as possible).
+> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+> ---
+>  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c |    9 +++++++++
+>  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h |    3 +++
+>  2 files changed, 12 insertions(+), 0 deletions(-)
 >
-> We could disable the ethernet for p201:
-> 1) if nobody complains, situation remains unchanged, ethernet is not
-> working on that board
-> 2) if someone complains, then we will be able to some facts from
-> him/her, and get it working properly.
->
-> After all, that's not a regression. With what we had in the meson-gxbb-
-> p20x.dtsi so far, ethernet never worked on that board.
-fine for me as well
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+> index d6f207e..57da798 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+> @@ -408,8 +408,15 @@ static int s5p_mfc_set_dec_stream_buffer_v6(struct s5p_mfc_ctx *ctx,
+>  	struct s5p_mfc_dev *dev = ctx->dev;
+>  	const struct s5p_mfc_regs *mfc_regs = dev->mfc_regs;
+>  	struct s5p_mfc_buf_size *buf_size = dev->variant->buf_size;
+> +	size_t cpb_buf_size;
+>  
+>  	mfc_debug_enter();
+> +	cpb_buf_size = ALIGN(buf_size->cpb, CPB_ALIGN);
+
+Since buf_size->cpb is constant of know size there is no need to align
+it here.
+
+> +	if (strm_size >= set_strm_size_max(cpb_buf_size)) {
+> +		mfc_debug(2, "Decrease strm_size : %u -> %zu, gap : %d\n",
+> +			strm_size, set_strm_size_max(cpb_buf_size), CPB_ALIGN);
+> +		strm_size = set_strm_size_max(cpb_buf_size);
+> +	}
+
+As I understand strm_size here is a size of buffer to be decoded, why it
+cannot be equal to buf_size->cpb? Commit message says nothing about it.
+
+>  	mfc_debug(2, "inst_no: %d, buf_addr: 0x%08x,\n"
+>  		"buf_size: 0x%08x (%d)\n",
+>  		ctx->inst_no, buf_addr, strm_size, strm_size);
+> @@ -519,6 +526,8 @@ static int s5p_mfc_set_enc_stream_buffer_v6(struct s5p_mfc_ctx *ctx,
+>  	struct s5p_mfc_dev *dev = ctx->dev;
+>  	const struct s5p_mfc_regs *mfc_regs = dev->mfc_regs;
+>  
+> +	size = ALIGN(size, 512);
+> +
+
+Shouldn't be CPB_ALIGN instead of 512? And more importantly size is a
+length of buffer for encoded stream,
+by up-aligning you tell MFC that it can write beyond the buffer, it
+could potentially overwrite random memory? Am I right?
+
+
+>  	writel(addr, mfc_regs->e_stream_buffer_addr); /* 16B align */
+>  	writel(size, mfc_regs->e_stream_buffer_size);
+>  
+> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h
+> index 8055848..16a7b1d 100644
+> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h
+> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h
+> @@ -40,6 +40,9 @@
+>  #define FRAME_DELTA_H264_H263		1
+>  #define TIGHT_CBR_MAX			10
+>  
+> +#define CPB_ALIGN			512
+> +#define set_strm_size_max(cpb_max)	((cpb_max) - CPB_ALIGN)
+
+Name of the macro is misleading.
+
+Regards
+Andrzej
+
+> +
+>  struct s5p_mfc_hw_ops *s5p_mfc_init_hw_ops_v6(void);
+>  const struct s5p_mfc_regs *s5p_mfc_init_regs_v6_plus(struct s5p_mfc_dev *dev);
+>  #endif /* S5P_MFC_OPR_V6_H_ */
