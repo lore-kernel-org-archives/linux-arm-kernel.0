@@ -1,97 +1,62 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Wed, 18 Jan 2017 09:36:55 -0800
-Subject: CONFIG_PCIEASPM breaks PCIe on Marvell Armada 385 machine
-In-Reply-To: <20170118142250.GB6534@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170117151444.GE22776@bhelgaas-glaptop.roam.corp.google.com>
- <20170117152548.GB27312@n2100.armlinux.org.uk>
- <20170117174649.GA11063@bhelgaas-glaptop.roam.corp.google.com>
- <20170117175115.GD27312@n2100.armlinux.org.uk>
- <20170117175728.GE27312@n2100.armlinux.org.uk>
- <20170117181458.GB11063@bhelgaas-glaptop.roam.corp.google.com>
- <20170117193414.GG27312@n2100.armlinux.org.uk>
- <20170117210258.GH27312@n2100.armlinux.org.uk>
- <20170117222229.GA6534@bhelgaas-glaptop.roam.corp.google.com>
- <e0ccb7a0-9cc7-c595-7f06-e63c0927f36d@caviumnetworks.com>
- <20170118142250.GB6534@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <1137f732-f31e-8162-af8f-6a7f577a9648@caviumnetworks.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 18 Jan 2017 09:39:25 -0800
+Subject: [PATCH 1/2] ARM: dts: dra7-evm: increase QSPI SPL partition size
+In-Reply-To: <b586537d-49b6-50a6-ae60-11faf25b26f9@ti.com>
+References: <1484311234-21978-1-git-send-email-ravibabu@ti.com>
+ <1484311234-21978-2-git-send-email-ravibabu@ti.com>
+ <20170113181239.GC2630@atomide.com>
+ <6C6B28D4DC342643927BEAFCE8707BF6C0A8C367@DBDE04.ent.ti.com>
+ <20170117232743.GA7403@atomide.com>
+ <b586537d-49b6-50a6-ae60-11faf25b26f9@ti.com>
+Message-ID: <20170118173925.GG7403@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/18/2017 06:22 AM, Bjorn Helgaas wrote:
-> On Tue, Jan 17, 2017 at 03:37:10PM -0800, David Daney wrote:
-[...]
->>
->>
->> Link (re)training can fail for several reasons including, but not
->> limited to:
->>
->> - Poor signal propagation through the
->> chips/packages/boards/connectors, also known as Signal Integrity
->> (SI) problmes.
->>
->> - Incorrect implementation, in hardware, of link training protocols
->> at either end of the link
->>
->> Usually, system and PCIe device vendors do a lot of testing and
->> signal analysis across a variety of configurations with the end goal
->> being that PCIe looks like a bullet-proof interconnect to the end
->> consumer.
->>
->> Unfortunatly, sometimes it doesn't work.  In these cases, the
->> vendors of the devices on each end of the link tend to point fingers
->> at the link partner for being detective in some way.
->>
->> This patch:
->>
->>>
->>> The only one that comes to mind is this patch from David (CC'd) that
->>> avoids ASPM-related retrains when we know the link doesn't support ASPM:
->>> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=e53f9a28bee3
->>>
->>
->> Is an attempt to work around the problem from the system (host) end.
->> If the system vendor knows a priori that a defective PCIe device is
->> present in the system, the PCIe root port can be configured to
->> indicate no ASPM is supported, resulting (with the patch) in no link
->> retraining being attempted.
->>
->> To me it feels that we need a black list of devices that fail at a
->> high rate in the link retraining, that when encountered would
->> disable ASPM on the link where they reside.
->
-> I should have asked you for details about the defective devices
-> related to e53f9a28bee3 :)  If we had included that in the changelog,
-> we would have something to seed a blacklist with.
+* Sekhar Nori <nsekhar@ti.com> [170118 03:59]:
+> Hi Tony,
+> 
+> On Wednesday 18 January 2017 04:57 AM, Tony Lindgren wrote:
+> > * B, Ravi <ravibabu@ti.com> [170117 00:15]:
+> >> Hi Tony
+> >>
+> >>> * Ravi Babu <ravibabu@ti.com> [170113 04:41]:
+> >>>> The SPL size for DRA74x platform has increased and is now more than 
+> >>>> 64KB. Increase QSPI SPL partition size to 256KB for DRA74x EVM.
+> >>>>
+> >>>> QSPI partition numbering changes because of this.
+> >>
+> >>> And this will break the existing partitions potentially..
+> >>> See what was discussed on the list few days ago in thread "[PATCH 1/6] ARM: dts: am335x-phycore-som: Update NAND partition table".
+> >>
+> >>> It's best to have these left empty or as they originally were and let u-boot configure the partitions.
+> >>
+> >> Agree with you. For dra7xx platform the SPL size has been increased to 256KB and hence the existing QSPI SPL partition in kernel (64K size) will break when latest mainline u-boot is used. 
+> >> Here only SPL partition has been changed and other partition & size is NOT changed and kept intact. I feel it will not break the existing partitions for dra7xx platform.
+> > 
+> > What about the renumbering of partitions in your patch?
+> 
+> Thats true, partitions will get renumbered. But mtd numbering can change
+> depending on probe order of devices anyway. So usespace which uses
+> hardcoded mtd partition numbers is pretty fragile already, I guess.
+> 
+> > 
+> > Probably just best to make the partition information empty in the
+> > kernel as discussed.
+> 
+> Given that existing dtbs already have the partition information, wont
+> this be treated as a regression for someone upgrading to new kernel?
 
-The device I saw failing I don't have access to any more, so I don't 
-know the PCI IDs.  It was a solid-state storage device with a Xilinx 
-FPGA acting as the PCIe endpoint.  In any event, it would only fail in 
-about 0.5% of system boots, it wasn't the case that it could be made to 
-reliably fail.
+Well these "flag day" type changes are not acceptable because they are
+impossible to coordinate. You can't assume people update their bootloader
+on regular basis, or update both bootloader and kernel to some specific
+versions.
 
-The tricky thing here is assigning the blame for failure in link 
-training.  In the case in question we spent many months analysing the 
-analog properties of the bus and examining/decoding  analog scope 
-captures of the failures before credibly assigning blame to the other 
-guy.  Usually what happens is the device vendor accurately claims that 
-their device works flawlessly in conjunction with certain Intel root 
-ports, so the problem must be fixed in the root port of the failing 
-system.  If you have a black list, you may be disabling ASPM in systems 
-where it can work without failures.
+> Going forward, is the preference that new boards shall not have
+> partition information in DT?
 
+Yes or else it will have to stay as it was originally set because
+of these issues.
 
+Regards,
 
->
-> There are several situations other than ASPM where link retraining is
-> required per spec (rate change, error handling, etc), and I guess we'd
-> have to avoid all of them.   So I suppose e53f9a28bee3 avoids the most
-> obvious failures, but maybe we could still see issues in those other
-> cases.
->
-> Bjorn
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Tony
