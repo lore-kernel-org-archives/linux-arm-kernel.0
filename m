@@ -1,55 +1,116 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Wed, 18 Jan 2017 14:19:52 +0100
-Subject: [PATCH v3 04/13] sata: ahci-da850: get the sata clock using a
- connection id
+Date: Wed, 18 Jan 2017 14:19:54 +0100
+Subject: [PATCH v3 06/13] ARM: davinci: da850: model the SATA refclk
 In-Reply-To: <1484745601-4769-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1484745601-4769-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1484745601-4769-5-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1484745601-4769-7-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for using two clocks in the driver (the sysclk2-based
-clock and the external REFCLK), check if we got a functional clock
-after calling ahci_platform_get_resources(). If not, retry calling
-clk_get() with con_id specified.
+Register a dummy clock modelling the external SATA oscillator for
+da850 (both DT and board file mode).
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/ata/ahci_da850.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/mach-davinci/da8xx-dt.c           |  8 ++++++++
+ arch/arm/mach-davinci/devices-da8xx.c      | 29 +++++++++++++++++++++++++++++
+ arch/arm/mach-davinci/include/mach/da8xx.h |  1 +
+ 3 files changed, 38 insertions(+)
 
-diff --git a/drivers/ata/ahci_da850.c b/drivers/ata/ahci_da850.c
-index 267a3d3..8cfdc86 100644
---- a/drivers/ata/ahci_da850.c
-+++ b/drivers/ata/ahci_da850.c
-@@ -71,12 +71,28 @@ static int ahci_da850_probe(struct platform_device *pdev)
- 	struct ahci_host_priv *hpriv;
- 	struct resource *res;
- 	void __iomem *pwrdn_reg;
-+	struct clk *clk;
- 	int rc;
+diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+index b83e5d1..0f981b5 100644
+--- a/arch/arm/mach-davinci/da8xx-dt.c
++++ b/arch/arm/mach-davinci/da8xx-dt.c
+@@ -50,6 +50,9 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
  
- 	hpriv = ahci_platform_get_resources(pdev);
- 	if (IS_ERR(hpriv))
- 		return PTR_ERR(hpriv);
+ static void __init da850_init_machine(void)
+ {
++        /* All existing boards use 100MHz SATA refclkpn */
++        static const unsigned long sata_refclkpn = 100 * 1000 * 1000;
++
+ 	int ret;
  
-+	/*
-+	 * Internally ahci_platform_get_resources() calls clk_get(dev, NULL)
-+	 * when trying to obtain the first clock. This SATA controller uses
-+	 * two clocks for which we specify two connection ids. If we don't
-+	 * have a clock at this point - call clk_get() again with
-+	 * con_id = "sata".
-+	 */
-+	if (!hpriv->clks[0]) {
-+		clk = clk_get(dev, "sata");
-+		if (IS_ERR(clk))
-+			return PTR_ERR(clk);
+ 	ret = da8xx_register_usb20_phy_clk(false);
+@@ -61,6 +64,11 @@ static void __init da850_init_machine(void)
+ 		pr_warn("%s: registering USB 1.1 PHY clock failed: %d",
+ 			__func__, ret);
+ 
++        ret = da850_register_sata_refclk(sata_refclkpn);
++        if (ret)
++		pr_warn("%s: registering SATA REFCLK failed: %d",
++			__func__, ret);
 +
-+		hpriv->clks[0] = clk;
-+	}
+ 	of_platform_default_populate(NULL, da850_auxdata_lookup, NULL);
+ 	davinci_pm_init();
+ }
+diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+index c2457b3..cfceb32 100644
+--- a/arch/arm/mach-davinci/devices-da8xx.c
++++ b/arch/arm/mach-davinci/devices-da8xx.c
+@@ -24,6 +24,7 @@
+ #include <mach/common.h>
+ #include <mach/time.h>
+ #include <mach/da8xx.h>
++#include <mach/clock.h>
+ #include "cpuidle.h"
+ #include "sram.h"
+ 
+@@ -1023,6 +1024,28 @@ int __init da8xx_register_spi_bus(int instance, unsigned num_chipselect)
+ }
+ 
+ #ifdef CONFIG_ARCH_DAVINCI_DA850
++static struct clk sata_refclk = {
++	.name		= "sata_refclk",
++	.set_rate	= davinci_simple_set_rate,
++};
 +
- 	rc = ahci_platform_enable_resources(hpriv);
- 	if (rc)
- 		return rc;
++static struct clk_lookup sata_refclk_lookup =
++		CLK("ahci_da850", "refclk", &sata_refclk);
++
++int __init da850_register_sata_refclk(int rate)
++{
++	int ret;
++
++	sata_refclk.rate = rate;
++	ret = clk_register(&sata_refclk);
++	if (ret)
++		return ret;
++
++	clkdev_add(&sata_refclk_lookup);
++
++	return 0;
++}
++
+ static struct resource da850_sata_resources[] = {
+ 	{
+ 		.start	= DA850_SATA_BASE,
+@@ -1055,9 +1078,15 @@ static struct platform_device da850_sata_device = {
+ 
+ int __init da850_register_sata(unsigned long refclkpn)
+ {
++	int ret;
++
+ 	/* please see comment in drivers/ata/ahci_da850.c */
+ 	BUG_ON(refclkpn != 100 * 1000 * 1000);
+ 
++	ret = da850_register_sata_refclk(refclkpn);
++	if (ret)
++		return ret;
++
+ 	return platform_device_register(&da850_sata_device);
+ }
+ #endif
+diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
+index 85ff218..7e46422 100644
+--- a/arch/arm/mach-davinci/include/mach/da8xx.h
++++ b/arch/arm/mach-davinci/include/mach/da8xx.h
+@@ -95,6 +95,7 @@ int da8xx_register_usb11(struct da8xx_ohci_root_hub *pdata);
+ int da8xx_register_usb_refclkin(int rate);
+ int da8xx_register_usb20_phy_clk(bool use_usb_refclkin);
+ int da8xx_register_usb11_phy_clk(bool use_usb_refclkin);
++int da850_register_sata_refclk(int rate);
+ int da8xx_register_emac(void);
+ int da8xx_register_uio_pruss(void);
+ int da8xx_register_lcdc(struct da8xx_lcdc_platform_data *pdata);
 -- 
 2.9.3
