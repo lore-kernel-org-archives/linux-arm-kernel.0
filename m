@@ -1,83 +1,108 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 18 Jan 2017 17:50:45 +0100
-Subject: [PATCH v5] ARM64: dts: meson-gx: Add firmware reserved memory zones
-Message-ID: <1484758245-9354-1-git-send-email-narmstrong@baylibre.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 18 Jan 2017 17:56:12 +0100
+Subject: [linux-sunxi] [PATCH] clk: sunxi-ng: fix PLL_CPUX adjusting on H3
+In-Reply-To: <f1ccd8ce-df6c-8204-71ab-2f774ac269d5@megous.com>
+References: <20161125002852.18097-1-megous@megous.com>
+ <0985b1ec-ba95-1505-cc59-adec4b88238f@megous.com>
+ <20170109095946.6esbfx6pafega5cd@lukather>
+ <557330d0-2dcd-2211-8538-51c4d6b68834@megous.com>
+ <20170116164300.j2zvjkxr7c5h5hyo@lukather>
+ <f1ccd8ce-df6c-8204-71ab-2f774ac269d5@megous.com>
+Message-ID: <20170118165612.zkjaj36kedg64rjw@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Amlogic Meson GXBB/GXL/GXM secure monitor uses part of the memory space,
-this patch adds these reserved zones.
+Hi,
 
-Without such reserved memory zones, running the following stress command :
-$ stress-ng --vm 16 --vm-bytes 128M --timeout 10s
-multiple times:
+On Mon, Jan 16, 2017 at 05:51:30PM +0100, Ond?ej Jirman wrote:
+> Hi Maxime,
+> 
+> Dne 16.1.2017 v 17:43 Maxime Ripard napsal(a):
+> >> It does lock up quickly with mainline ccu_nkmp_find_best algorithm
+> >> for finding factors.
+> >>
+> >> Even with linux kernel, it breaks. It's just more difficult to hit the
+> >> right conditions. I got oops only right after boot when running cpuburn
+> >> to trigger thermal_zone issued OPP change, if I first run some cpupower
+> >> commands. That's why I wrote this program to stress test various CPU_PLL
+> >> change/factor selection algorithms independently of everything else, to
+> >> get more predictable and quicker testing results.
+> > 
+> > Understood. Do you have the code available somewhere?
+> 
+> It's a bit messy, but it's here:
+> 
+> https://github.com/megous/h3-firmware/blob/master/main.c
 
-Could lead to the following kernel crashes :
-[   46.937975] Bad mode in Error handler detected on CPU1, code 0xbf000000 -- SError
-...
-[   47.058536] Internal error: Attempting to execute userspace memory: 8600000f [#3] PREEMPT SMP
-...
-Instead of the OOM killer.
+Awesome, thanks!
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+> >>>> What works is selecting NKMP factors so that M is always 1 and P is
+> >>>> anything other than /1 only for frequencies under 288MHz. As mandated by
+> >>>> the H3 datasheet. Mainline ccu_nkmp_find_best doesn't respect these
+> >>>> conditions. With that I can change CPUX frequencies randomly 20x a
+> >>>> second so far indefinitely without the main CPU ever locking up.
+> >>>>
+> >>>> Please drop or revert this patch. It is not a correct approach to the
+> >>>> problem. I'd suggest dropping the entire clock notifier mechanism, too,
+> >>>> unless it can be proven to work reliably.
+> >>>
+> >>> It has been proven to work reliably on a number of other SoCs.
+> >>
+> >> Unless it was stress tested like this with randomy changed settings, I
+> >> doubt you can call it reliable. It may just be very hard to hit the
+> >> issue on linux with particular OPP/thermal zone configuration. That's
+> >> because the issue is dependent on before and after NKMP values. People
+> >> may have just been lucky so far.
+> > 
+> > Yes, or maybe we just have OPPs that just don't trigger a low enough P
+> > factor.
+> > 
+> > There's no rush anyway, the H3 cpufreq support is not enabled at the
+> > moment, so that code basically does nothing for the moment.
+> > 
+> > What's your current plan to fix that? I guess the easiest (and most
+> > likely to be reusable) would be to allow for clock tables, instead of
+> > using the generic approach. We might have some other clocks (like
+> > audio or video) that would need such a precise tuning in the future
+> > too.
+> 
+> My proposed solution is this for M factor (H3 specific solution):
+> 
+> https://github.com/megous/linux/commit/88be3d421e958579026135d8acec4b3983958738
 
-Changes since v4 at [5]:
-- Move start of ddr memory to reserved-memory node
-- Drop memory node move
-- Fix typo in sizes
+This one is fine.
 
-Changes since resent v2 at [4]:
-- Fix invalid comment of useable memory attributes
+> and this for P factor:
+> 
+> https://github.com/megous/linux/commit/d7f274ed0c13fa9b4099445cb6bf9b2f8f2cfa8a
+> 
+> Perhaps it should be configurable if the P limitation is not universal
+> for all NKMP clocks. But I haven't read all the datasheets.
 
-Changes since original v2 at [3]:
-- Typo in commit 2GiB -> 1GiB, 4GiB -> 2GiB
+And this is exactly what I wanted to avoid, for the reason you're
+giving :)
 
-Changes since v2 at [2]:
-- Moved all memory node out of dtsi
-- Added comment about useable memory
-- Fixed comment about secmon reserved zone
+This is some generic code, and yet you're putting a clock and SoC
+specific limit in there. You have two ways to deal with that. Either
+come up with some generic throttling mecanism to force a particular
+value above or below a given threshold, but that might be tedious to
+do, and require some significant rework.
 
-Changes since v1 at [1] :
-- Renamed reg into linux,usable-memory to ovveride u-boot memory
-- only kept secmon memory zone
+Or you can use a table, which is generic and should be relatively
+easy. I really think this is the most straightforward solution, and
+even more so since we just want to support a limited number of
+frequencies in this case.
 
-[1] http://lkml.kernel.org/r/20161212101801.28491-1-narmstrong at baylibre.com
-[2] http://lkml.kernel.org/r/1483105232-6242-1-git-send-email-narmstrong at baylibre.com
-[3] http://lkml.kernel.org/r/1484128128-22454-1-git-send-email-narmstrong at baylibre.com
-[4] http://lkml.kernel.org/r/1484128540-22662-1-git-send-email-narmstrong at baylibre.com
-[5] http://lkml.kernel.org/r/1484129414-23325-1-git-send-email-narmstrong at baylibre.com
+Maxime
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-index eada0b5..63d52b7 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-@@ -55,6 +55,24 @@
- 	#address-cells = <2>;
- 	#size-cells = <2>;
- 
-+	reserved-memory {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		/* 16 MiB reserved for Hardware ROM Firmware */
-+		hwrom: hwrom {
-+			reg = <0x0 0x0 0x0 0x1000000>;
-+			no-map;
-+		};
-+
-+		/* 2 MiB reserved for ARM Trusted Firmware (BL31) */
-+		secmon: secmon {
-+			reg = <0x0 0x10000000 0x0 0x200000>;
-+			no-map;
-+		};
-+	};
-+
- 	cpus {
- 		#address-cells = <0x2>;
- 		#size-cells = <0x0>;
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170118/269f7a7e/attachment.sig>
