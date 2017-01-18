@@ -1,134 +1,108 @@
-From: tnowicki@caviumnetworks.com (Tomasz Nowicki)
-Date: Wed, 18 Jan 2017 09:35:53 +0100
-Subject: [PATCH v8 12/18] irqdomain: Add irq domain MSI and MSI_REMAP flags
-In-Reply-To: <1484127714-3263-13-git-send-email-eric.auger@redhat.com>
-References: <1484127714-3263-1-git-send-email-eric.auger@redhat.com>
- <1484127714-3263-13-git-send-email-eric.auger@redhat.com>
-Message-ID: <5b5695c2-2607-4997-516a-699b39bfdb43@caviumnetworks.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 18 Jan 2017 17:36:44 +0900
+Subject: [PATCH v2 10/13] pinctrl: samsung: Add infrastructure for
+ pin-bank retention control
+In-Reply-To: <1484657084-26227-11-git-send-email-m.szyprowski@samsung.com>
+References: <CGME20170117124501eucas1p2ab3ec2a1dee18486878733826037d071@eucas1p2.samsung.com>
+ <1484657084-26227-1-git-send-email-m.szyprowski@samsung.com>
+ <1484657084-26227-11-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CA+Ln22FyDQ00cxNNxzthkxUwxcPRkJxGEC6g7m9rO2U4dNirKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.01.2017 10:41, Eric Auger wrote:
-> We introduce two new enum values for the irq domain flag:
-> - IRQ_DOMAIN_FLAG_MSI indicates the irq domain corresponds to
->   an MSI domain
-> - IRQ_DOMAIN_FLAG_MSI_REMAP indicates the irq domain has MSI
->   remapping capabilities.
->
-> Those values will be useful to check all MSI irq domains have
-> MSI remapping support when assessing the safety of IRQ assignment
-> to a guest.
->
-> irq_domain_hierarchical_is_msi_remap() allows to check if an
-> irq domain or any parent implements MSI remapping.
->
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Hi Marek,
 
-Reviewed-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
-
-Thanks,
-Tomasz
-
+2017-01-17 21:44 GMT+09:00 Marek Szyprowski <m.szyprowski@samsung.com>:
+> Pad retention control after suspend/resume cycle should be done from pin
+> controller driver instead of PMU (power management unit) driver to avoid
+> possible ordering and logical dependencies. Till now it worked fine only
+> because PMU driver registered its sys_ops after pin controller.
 >
+> This patch adds infrastructure to handle pad retention during pin control
+> driver resume.
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 > ---
+>  drivers/pinctrl/samsung/pinctrl-samsung.c | 12 +++++++++
+>  drivers/pinctrl/samsung/pinctrl-samsung.h | 42 +++++++++++++++++++++++++++++++
+>  2 files changed, 54 insertions(+)
 >
-> v7 -> v8:
-> - remove h variable in irq_domain_hierarchical_is_msi_remap
-> - add Marc's R-b
+> diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
+> index 59f99ea7e65b..021abd7221f8 100644
+> --- a/drivers/pinctrl/samsung/pinctrl-samsung.c
+> +++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
+> @@ -1060,6 +1060,13 @@ static int samsung_pinctrl_probe(struct platform_device *pdev)
+>         if (res)
+>                 drvdata->irq = res->start;
 >
-> v6:
-> - add IRQ_DOMAIN_FLAG_MSI as suggested by Marc
-> - add irq_domain_is_msi, irq_domain_is_msi_remap and
->   irq_domain_hierarchical_is_msi_remap
-> ---
->  include/linux/irqdomain.h | 35 +++++++++++++++++++++++++++++++++++
->  kernel/irq/irqdomain.c    | 14 ++++++++++++++
->  2 files changed, 49 insertions(+)
->
-> diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-> index ffb8460..bc2f571 100644
-> --- a/include/linux/irqdomain.h
-> +++ b/include/linux/irqdomain.h
-> @@ -183,6 +183,12 @@ enum {
->  	/* Irq domain is an IPI domain with single virq */
->  	IRQ_DOMAIN_FLAG_IPI_SINGLE	= (1 << 3),
->
-> +	/* Irq domain implements MSIs */
-> +	IRQ_DOMAIN_FLAG_MSI		= (1 << 4),
+> +       if (ctrl->retention_data) {
+> +               drvdata->retention_ctrl = ctrl->retention_data->init(drvdata,
+> +                                                         ctrl->retention_data);
+> +               if (IS_ERR(drvdata->retention_ctrl))
+> +                       return PTR_ERR(drvdata->retention_ctrl);
+> +       }
 > +
-> +	/* Irq domain implements MSI remapping */
-> +	IRQ_DOMAIN_FLAG_MSI_REMAP	= (1 << 5),
-> +
->  	/*
->  	 * Flags starting from IRQ_DOMAIN_FLAG_NONCORE are reserved
->  	 * for implementation specific purposes and ignored by the
-> @@ -446,6 +452,19 @@ static inline bool irq_domain_is_ipi_single(struct irq_domain *domain)
->  {
->  	return domain->flags & IRQ_DOMAIN_FLAG_IPI_SINGLE;
+>         ret = samsung_gpiolib_register(pdev, drvdata);
+>         if (ret)
+>                 return ret;
+> @@ -1126,6 +1133,8 @@ static void samsung_pinctrl_suspend_dev(
+>
+>         if (drvdata->suspend)
+>                 drvdata->suspend(drvdata);
+> +       if (drvdata->retention_ctrl && drvdata->retention_ctrl->enable)
+> +               drvdata->retention_ctrl->enable(drvdata);
+
+Do we need to check presence of ->enable? I think it doesn't make much
+sense to provide retention_ctrl with NULL enable or disable.
+
 >  }
-> +
-> +static inline bool irq_domain_is_msi(struct irq_domain *domain)
-> +{
-> +	return domain->flags & IRQ_DOMAIN_FLAG_MSI;
-> +}
-> +
-> +static inline bool irq_domain_is_msi_remap(struct irq_domain *domain)
-> +{
-> +	return domain->flags & IRQ_DOMAIN_FLAG_MSI_REMAP;
-> +}
-> +
-> +extern bool irq_domain_hierarchical_is_msi_remap(struct irq_domain *domain);
-> +
->  #else	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
->  static inline void irq_domain_activate_irq(struct irq_data *data) { }
->  static inline void irq_domain_deactivate_irq(struct irq_data *data) { }
-> @@ -477,6 +496,22 @@ static inline bool irq_domain_is_ipi_single(struct irq_domain *domain)
->  {
->  	return false;
->  }
-> +
-> +static inline bool irq_domain_is_msi(struct irq_domain *domain)
-> +{
-> +	return false;
-> +}
-> +
-> +static inline bool irq_domain_is_msi_remap(struct irq_domain *domain)
-> +{
-> +	return false;
-> +}
-> +
-> +static inline bool
-> +irq_domain_hierarchical_is_msi_remap(struct irq_domain *domain)
-> +{
-> +	return false;
-> +}
->  #endif	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
 >
->  #else /* CONFIG_IRQ_DOMAIN */
-> diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-> index 8c0a0ae..876e131 100644
-> --- a/kernel/irq/irqdomain.c
-> +++ b/kernel/irq/irqdomain.c
-> @@ -1392,6 +1392,20 @@ static void irq_domain_check_hierarchy(struct irq_domain *domain)
->  	if (domain->ops->alloc)
->  		domain->flags |= IRQ_DOMAIN_FLAG_HIERARCHY;
->  }
-> +
-> +/**
-> + * irq_domain_hierarchical_is_msi_remap - Check if the domain or any
-> + * parent has MSI remapping support
-> + * @domain: domain pointer
-> + */
-> +bool irq_domain_hierarchical_is_msi_remap(struct irq_domain *domain)
-> +{
-> +	for (; domain; domain = domain->parent) {
-> +		if (irq_domain_is_msi_remap(domain))
-> +			return true;
-> +	}
-> +	return false;
-> +}
->  #else	/* CONFIG_IRQ_DOMAIN_HIERARCHY */
 >  /**
->   * irq_domain_get_irq_data - Get irq_data associated with @virq and @domain
+> @@ -1173,6 +1182,9 @@ static void samsung_pinctrl_resume_dev(struct samsung_pinctrl_drv_data *drvdata)
+>                         if (widths[type])
+>                                 writel(bank->pm_save[type], reg + offs[type]);
+>         }
+> +
+> +       if (drvdata->retention_ctrl && drvdata->retention_ctrl->disable)
+> +               drvdata->retention_ctrl->disable(drvdata);
+
+Ditto.
+
+>  }
 >
+>  /**
+> diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.h b/drivers/pinctrl/samsung/pinctrl-samsung.h
+> index 6f7ce7539a00..5ebbf4137a06 100644
+> --- a/drivers/pinctrl/samsung/pinctrl-samsung.h
+> +++ b/drivers/pinctrl/samsung/pinctrl-samsung.h
+> @@ -185,10 +185,48 @@ struct samsung_pin_bank {
+>  };
+>
+>  /**
+> + * struct samsung_retention_data: runtime pin-bank retention control data.
+> + * @regs: array of PMU registers to control pad retention.
+> + * @nr_regs: number of registers in @regs array.
+> + * @value: value to store to registers to turn off retention.
+> + * @refcnt: atomic counter if retention control affects more than one bank.
+> + * @priv: retention control code private data
+> + * @on: platform specific callback to enter retention mode.
+> + * @off: platform specific callback to exit retention mode.
+
+s/on/enable/ and s/off/disable/ in comments too. Thanks for taking my
+bikeshedding into account, though. :)
+
+> + **/
+> +struct samsung_retention_ctrl {
+> +       const u32       *regs;
+> +       int             nr_regs;
+> +       u32             value;
+> +       atomic_t        *refcnt;
+> +       void            *priv;
+> +       void            (*enable)(struct samsung_pinctrl_drv_data *);
+> +       void            (*disable)(struct samsung_pinctrl_drv_data *);
+
+^^
+
+Best regards,
+Tomasz
