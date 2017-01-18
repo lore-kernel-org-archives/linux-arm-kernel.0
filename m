@@ -1,103 +1,62 @@
-From: mylene.josserand@free-electrons.com (Mylene Josserand)
-Date: Wed, 18 Jan 2017 09:23:10 +0100
-Subject: [PATCH v2 03/10] dt-bindings: sound: Add new reset compatible for
- sun4i-i2s
-In-Reply-To: <20170117164636.qhkxvqcs7l732wxk@lukather>
-References: <20170117140230.23142-1-mylene.josserand@free-electrons.com>
- <20170117140230.23142-4-mylene.josserand@free-electrons.com>
- <20170117164636.qhkxvqcs7l732wxk@lukather>
-Message-ID: <1f318cd1-6a50-5b33-01aa-e11e7e925e88@free-electrons.com>
+From: jerry.huang@nxp.com (Changming Huang)
+Date: Wed, 18 Jan 2017 16:12:16 +0800
+Subject: [PATCH v4 1/3] USB3/DWC3: Add definition for global soc bus
+ configuration register
+Message-ID: <1484727138-3264-1-git-send-email-jerry.huang@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add the macro definition for global soc bus configuration register 0/1
 
-On 17/01/2017 17:46, Maxime Ripard wrote:
-> On Tue, Jan 17, 2017 at 03:02:23PM +0100, Myl?ne Josserand wrote:
->> Add a new compatible for sun4i-i2s driver to handle some
->> SoCs that have a reset line that must be asserted/deasserted.
->>
->> This new compatible, "allwinner,sun6i-a31-i2s", requires two
->> properties:
->> 	- resets: phandle to the reset line
->> 	- reset-names: the name of the reset line ("rst").
->> Except these differences, the compatible is identical to previous one
->> which will not handle a reset line.
->>
->> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
->> ---
->>  .../devicetree/bindings/sound/sun4i-i2s.txt        | 23 ++++++++++++++++++++++
->>  1 file changed, 23 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
->> index 7a2c0945fd22..f673206e309b 100644
->> --- a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
->> +++ b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
->> @@ -7,6 +7,7 @@ Required properties:
->>
->>  - compatible: should be one of the following:
->>     - "allwinner,sun4i-a10-i2s"
->> +   - "allwinner,sun6i-a31-i2s" for controller with reset lines
->
-> That's not only for controllers with reset lines, but for the
-> controllers found in the A31 (and later). I'd simply drop the last
-> part of that line.
+Signed-off-by: Changming Huang <jerry.huang@nxp.com>
+---
+Changes in v4:
+  - no change
+Changes in v3:
+  - no change
+Changes in v2:
+  - split the patch
+  - add more macro definition for soc bus configuration register
 
-ACK
+ drivers/usb/dwc3/core.h |   26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
->
->>  - reg: physical base address of the controller and length of memory mapped
->>    region.
->>  - interrupts: should contain the I2S interrupt.
->> @@ -19,7 +20,13 @@ Required properties:
->>     - "mod" : module clock for the I2S controller
->>  - #sound-dai-cells : Must be equal to 0
->>
->> +Required properties for the following compatibles:
->> +		- "allwinner,sun6i-a31-i2s"
->> +- resets: phandle to the reset line for this codec
->> +- reset-names: Contains the reset signal name "rst"
->
-> You don't need reset-names if there's a single reset line.
->
-
-ACK
-
->> +
->>  Example:
->> +For "allwinner,sun4i-a10-i2s":
->>
->>  i2s0: i2s at 01c22400 {
->>  	#sound-dai-cells = <0>;
->> @@ -32,3 +39,19 @@ i2s0: i2s at 01c22400 {
->>  	       <&dma SUN4I_DMA_NORMAL 3>;
->>  	dma-names = "rx", "tx";
->>  };
->> +
->> +For "allwinner,sun6i-a31-i2s":
->> +
->> +dai: dai at 01c22c00 {
->> +	#sound-dai-cells = <0>;
->> +	compatible = "allwinner,sun6i-a31-i2s";
->> +	reg = <0x01c22c00 0x200>;
->> +	interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
->> +	clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
->> +	clock-names = "apb", "mod";
->> +	resets = <&ccu RST_BUS_CODEC>;
->> +	reset-names = "rst";
->> +	dmas = <&dma 15>, /* AUDIO_CODEC port */
->> +		<&dma 15>; /* AUDIO_CODEC port */
->> +	dma-names = "rx", "tx";
->> +};
->
-> And we already have an example, so there's no need to add a new one
-> either.
-
-I will remove it on a V3.
-
-Thank you the review!
-
+diff --git a/drivers/usb/dwc3/core.h b/drivers/usb/dwc3/core.h
+index de5a857..065aa6f 100644
+--- a/drivers/usb/dwc3/core.h
++++ b/drivers/usb/dwc3/core.h
+@@ -161,6 +161,32 @@
+ 
+ /* Bit fields */
+ 
++/* Global SoC Bus Configuration Register 0 */
++#define AXI3_CACHE_TYPE_AW		0x8 /* write allocate */
++#define AXI3_CACHE_TYPE_AR		0x4 /* read allocate */
++#define AXI3_CACHE_TYPE_SNP		0x2 /* cacheable */
++#define AXI3_CACHE_TYPE_BUF		0x1 /* bufferable */
++#define DWC3_GSBUSCFG0_DATARD_SHIFT	28
++#define DWC3_GSBUSCFG0_DESCRD_SHIFT	24
++#define DWC3_GSBUSCFG0_DATAWR_SHIFT	20
++#define DWC3_GSBUSCFG0_DESCWR_SHIFT	16
++#define DWC3_GSBUSCFG0_SNP_MASK		0xffff0000
++#define DWC3_GSBUSCFG0_DATABIGEND	(1 << 11)
++#define DWC3_GSBUSCFG0_DESCBIGEND	(1 << 10)
++#define DWC3_GSBUSCFG0_INCR256BRSTENA	(1 << 7) /* INCR256 burst */
++#define DWC3_GSBUSCFG0_INCR128BRSTENA	(1 << 6) /* INCR128 burst */
++#define DWC3_GSBUSCFG0_INCR64BRSTENA	(1 << 5) /* INCR64 burst */
++#define DWC3_GSBUSCFG0_INCR32BRSTENA	(1 << 4) /* INCR32 burst */
++#define DWC3_GSBUSCFG0_INCR16BRSTENA	(1 << 3) /* INCR16 burst */
++#define DWC3_GSBUSCFG0_INCR8BRSTENA	(1 << 2) /* INCR8 burst */
++#define DWC3_GSBUSCFG0_INCR4BRSTENA	(1 << 1) /* INCR4 burst */
++#define DWC3_GSBUSCFG0_INCRBRSTENA	(1 << 0) /* undefined length enable */
++#define DWC3_GSBUSCFG0_INCRBRST_MASK	0xff
++
++/* Global SoC Bus Configuration Register 1 */
++#define DWC3_GSBUSCFG1_1KPAGEENA	(1 << 12) /* 1K page boundary enable */
++#define DWC3_GSBUSCFG1_PTRANSLIMIT_MASK	0xf00
++
+ /* Global Debug Queue/FIFO Space Available Register */
+ #define DWC3_GDBGFIFOSPACE_NUM(n)	((n) & 0x1f)
+ #define DWC3_GDBGFIFOSPACE_TYPE(n)	(((n) << 5) & 0x1e0)
 -- 
-Myl?ne Josserand, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.7.9.5
