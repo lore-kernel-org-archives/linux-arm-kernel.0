@@ -1,21 +1,71 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 18 Jan 2017 13:57:14 +0100
-Subject: [PATCH v3 8/8] ARM: dts: kirkwood-rd88f6281: Utilize new DSA
- binding
-In-Reply-To: <20170117182224.32212-9-f.fainelli@gmail.com>
-References: <20170117182224.32212-1-f.fainelli@gmail.com>
- <20170117182224.32212-9-f.fainelli@gmail.com>
-Message-ID: <20170118125714.GD7690@lunn.ch>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Wed, 18 Jan 2017 13:58:12 +0100
+Subject: [PATCH v14 1/5] dt/bindings: add bindings for optee
+In-Reply-To: <1484744296-30003-1-git-send-email-jens.wiklander@linaro.org>
+References: <1484744296-30003-1-git-send-email-jens.wiklander@linaro.org>
+Message-ID: <1484744296-30003-2-git-send-email-jens.wiklander@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 10:22:24AM -0800, Florian Fainelli wrote:
-> Utilize the new DSA binding, introduced with commit 8c5ad1d6179d ("net: dsa:
-> Document new binding"). The legacy binding node is kept included, but is marked
-> disabled.
-> 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+Introduces linaro prefix and adds bindings for ARM TrustZone based OP-TEE
+implementation.
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+---
+ .../bindings/arm/firmware/linaro,optee-tz.txt      | 31 ++++++++++++++++++++++
+ .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+ 2 files changed, 32 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/firmware/linaro,optee-tz.txt
 
-    Andrew
+diff --git a/Documentation/devicetree/bindings/arm/firmware/linaro,optee-tz.txt b/Documentation/devicetree/bindings/arm/firmware/linaro,optee-tz.txt
+new file mode 100644
+index 000000000000..d38834c67dff
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/firmware/linaro,optee-tz.txt
+@@ -0,0 +1,31 @@
++OP-TEE Device Tree Bindings
++
++OP-TEE is a piece of software using hardware features to provide a Trusted
++Execution Environment. The security can be provided with ARM TrustZone, but
++also by virtualization or a separate chip.
++
++We're using "linaro" as the first part of the compatible property for
++the reference implementation maintained by Linaro.
++
++* OP-TEE based on ARM TrustZone required properties:
++
++- compatible     : should contain "linaro,optee-tz"
++
++- method         : The method of calling the OP-TEE Trusted OS. Permitted
++                   values are:
++
++                   "smc" : SMC #0, with the register assignments specified
++		           in drivers/tee/optee/optee_smc.h
++
++                   "hvc" : HVC #0, with the register assignments specified
++		           in drivers/tee/optee/optee_smc.h
++
++
++
++Example:
++	firmware {
++		optee {
++			compatible = "linaro,optee-tz";
++			method = "smc";
++		};
++	};
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 16d3b5e7f5d1..4b1192bb4224 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -161,6 +161,7 @@ lacie	LaCie
+ lantiq	Lantiq Semiconductor
+ lenovo	Lenovo Group Ltd.
+ lg	LG Corporation
++linaro	Linaro Limited
+ linux	Linux-specific binding
+ lltc	Linear Technology Corporation
+ lsi	LSI Corp. (LSI Logic)
+-- 
+2.7.4
