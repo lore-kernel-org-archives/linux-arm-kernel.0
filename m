@@ -1,83 +1,50 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 18 Jan 2017 12:25:00 +0100
-Subject: [PATCH 2/2] ARM: DTS: Fix register map for virt-capable GIC
-In-Reply-To: <1484736811-24002-3-git-send-email-marc.zyngier@arm.com>
-References: <1484736811-24002-1-git-send-email-marc.zyngier@arm.com>
- <1484736811-24002-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <2229087.5bOlf9DNaK@diego>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 18 Jan 2017 11:25:07 +0000
+Subject: [PATCH] arm64: Fix swiotlb fallback allocation
+In-Reply-To: <1484567193-71258-1-git-send-email-agraf@suse.de>
+References: <1484567193-71258-1-git-send-email-agraf@suse.de>
+Message-ID: <20170118112506.GC7566@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 18. Januar 2017, 10:53:31 CET schrieb Marc Zyngier:
-> Since everybody copied my own mistake from the DT binding example,
-> let's address all the offenders in one swift go.
+On Mon, Jan 16, 2017 at 12:46:33PM +0100, Alexander Graf wrote:
+> Commit b67a8b29df introduced logic to skip swiotlb allocation when all memory
+> is DMA accessible anyway.
 > 
-> Most of them got the CPU interface size wrong (4kB, while it should
-> be 8kB), except for both keystone platforms which got the control
-> interface wrong (4kB instead of 8kB).
+> While this is a great idea, __dma_alloc still calls swiotlb code unconditionally
+> to allocate memory when there is no CMA memory available. The swiotlb code is
+> called to ensure that we at least try get_free_pages().
 > 
-> In the couple of cases were I knew for sure what implementation
-> was used, I've added the "arm,gic-400" compatible string. I'm 99%
-> sure that this is what everyong is using, but short of having the
-> TRM for all the other SoCs, I've let them alone.
+> Without initialization, swiotlb allocation code tries to access io_tlb_list
+> which is NULL. That results in a stack trace like this:
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>   Unable to handle kernel NULL pointer dereference at virtual address 00000000
+>   [...]
+>   [<ffff00000845b908>] swiotlb_tbl_map_single+0xd0/0x2b0
+>   [<ffff00000845be94>] swiotlb_alloc_coherent+0x10c/0x198
+>   [<ffff000008099dc0>] __dma_alloc+0x68/0x1a8
+>   [<ffff000000a1b410>] drm_gem_cma_create+0x98/0x108 [drm]
+>   [<ffff000000abcaac>] drm_fbdev_cma_create_with_funcs+0xbc/0x368 [drm_kms_helper]
+>   [<ffff000000abcd84>] drm_fbdev_cma_create+0x2c/0x40 [drm_kms_helper]
+>   [<ffff000000abc040>] drm_fb_helper_initial_config+0x238/0x410 [drm_kms_helper]
+>   [<ffff000000abce88>] drm_fbdev_cma_init_with_funcs+0x98/0x160 [drm_kms_helper]
+>   [<ffff000000abcf90>] drm_fbdev_cma_init+0x40/0x58 [drm_kms_helper]
+>   [<ffff000000b47980>] vc4_kms_load+0x90/0xf0 [vc4]
+>   [<ffff000000b46a94>] vc4_drm_bind+0xec/0x168 [vc4]
+>   [...]
+> 
+> Thankfully swiotlb code just learned how to not do allocations with the FORCE_NO
+> option. This patch configures the swiotlb code to use that if we decide not to
+> initialize the swiotlb framework.
+> 
+> Fixes: b67a8b29df ("arm64: mm: only initialize swiotlb when necessary")
+> Signed-off-by: Alexander Graf <agraf@suse.de>
+> CC: Catalin Marinas <catalin.marinas@arm.com>
+> CC: Jisheng Zhang <jszhang@marvell.com>
+> CC: Geert Uytterhoeven <geert+renesas@glider.be>
+> CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
 
-for the Rockchip parts
-Acked-by: Heiko Stuebner <heiko@sntech.de>
+Queued for 4.10. Thanks.
 
-> diff --git a/arch/arm/boot/dts/rk1108.dtsi b/arch/arm/boot/dts/rk1108.dtsi
-> index d770023..d6194bf 100644
-> --- a/arch/arm/boot/dts/rk1108.dtsi
-> +++ b/arch/arm/boot/dts/rk1108.dtsi
-> @@ -215,7 +215,7 @@
->  		#address-cells = <0>;
-> 
->  		reg = <0x32011000 0x1000>,
-> -		      <0x32012000 0x1000>,
-> +		      <0x32012000 0x2000>,
->  		      <0x32014000 0x2000>,
->  		      <0x32016000 0x2000>;
->  		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(1) | 
-IRQ_TYPE_LEVEL_HIGH)>;
-> diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
-> index 4ed49a2..ff9b90b 100644
-> --- a/arch/arm/boot/dts/rk3036.dtsi
-> +++ b/arch/arm/boot/dts/rk3036.dtsi
-> @@ -189,7 +189,7 @@
->  		#address-cells = <0>;
-> 
->  		reg = <0x10139000 0x1000>,
-> -		      <0x1013a000 0x1000>,
-> +		      <0x1013a000 0x2000>,
->  		      <0x1013c000 0x2000>,
->  		      <0x1013e000 0x2000>;
->  		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(2) | 
-IRQ_TYPE_LEVEL_HIGH)>;
-> diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
-> index 9d3aee5..9dff822 100644
-> --- a/arch/arm/boot/dts/rk322x.dtsi
-> +++ b/arch/arm/boot/dts/rk322x.dtsi
-> @@ -443,7 +443,7 @@
->  		#address-cells = <0>;
-> 
->  		reg = <0x32011000 0x1000>,
-> -		      <0x32012000 0x1000>,
-> +		      <0x32012000 0x2000>,
->  		      <0x32014000 0x2000>,
->  		      <0x32016000 0x2000>;
->  		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | 
-IRQ_TYPE_LEVEL_HIGH)>;
-> diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-> index 4fad133..af46cba 100644
-> --- a/arch/arm/boot/dts/rk3288.dtsi
-> +++ b/arch/arm/boot/dts/rk3288.dtsi
-> @@ -1110,7 +1110,7 @@
->  		#address-cells = <0>;
-> 
->  		reg = <0xffc01000 0x1000>,
-> -		      <0xffc02000 0x1000>,
-> +		      <0xffc02000 0x2000>,
->  		      <0xffc04000 0x2000>,
->  		      <0xffc06000 0x2000>;
->  		interrupts = <GIC_PPI 9 0xf04>;
+-- 
+Catalin
