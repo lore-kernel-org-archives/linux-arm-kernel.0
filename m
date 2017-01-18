@@ -1,85 +1,32 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 18 Jan 2017 11:49:36 +0100
-Subject: [PATCH] pwm: constify pwm_ops structures
-In-Reply-To: <1484071926-21582-1-git-send-email-bhumirks@gmail.com>
-References: <1484071926-21582-1-git-send-email-bhumirks@gmail.com>
-Message-ID: <20170118104936.GJ18989@ulmo.ba.sec>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed, 18 Jan 2017 11:50:39 +0100
+Subject: [PATCH 0/3] ARM64: meson-gxbb: Add WeTek Boards
+Message-ID: <1484736642-5451-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 11:42:06PM +0530, Bhumika Goyal wrote:
-> Declare pwm_ops structures as const as they are only stored in the ops
-> field of a pwm_chip structure. This field is of type const struct pwm_ops
-> *, so pwm_ops structures having this property can be declared as const.
-> Done using Coccinelle:
-> 
-> @r1 disable optional_qualifier@
-> identifier i;
-> position p;
-> @@
-> static struct pwm_ops i at p={...};
-> 
-> @ok1@
-> identifier r1.i;
-> position p;
-> struct pxa_pwm_chip pwm;
-> struct bfin_pwm_chip bwm;
-> struct vt8500_chip vp;
-> struct imx_chip icp;
-> @@
-> (
-> pwm.chip.ops=&i at p
-> |
-> bwm.chip.ops=&i at p
-> |
-> vp.chip.ops=&i at p
-> |
-> icp.chip.ops=&i at p
-> )
-> 
-> @bad@
-> position p!={r1.p,ok1.p};
-> identifier r1.i;
-> @@
-> i at p
-> 
-> @depends on !bad disable optional_qualifier@
-> identifier r1.i;
-> @@
-> +const
-> struct pwm_ops i;
-> 
-> File size details:
-> 
->    text	   data	    bss	    dec	    hex	filename
->    1646	    328	      0	   1974	    7b6	drivers/pwm/pwm-imx.o
->    1742	    224	      0	   1966	    7ae	drivers/pwm/pwm-imx.o
-> 
->    1941	    296	      0	   2237	    8bd	drivers/pwm/pwm-pxa.o
->    2037	    192	      0	   2229	    8b5	drivers/pwm/pwm-pxa.o
-> 
->    1946	    296	      0	   2242	    8c2	drivers/pwm/pwm-vt8500.o
->    2050	    192	      0	   2242	    8c2	drivers/pwm/pwm-vt8500.o
-> 
-> The drivers/pwm/pwm-bfin.o file did not compile.
-> 
-> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
-> ---
-> File: drivers/pwm/pwm-bfin.c is not tested
-> 
->  drivers/pwm/pwm-bfin.c   | 2 +-
->  drivers/pwm/pwm-imx.c    | 2 +-
->  drivers/pwm/pwm-pxa.c    | 2 +-
->  drivers/pwm/pwm-vt8500.c | 2 +-
->  4 files changed, 4 insertions(+), 4 deletions(-)
+This serie adds support for the WeTek Hub and Play2 boards.
+The Hub is an extremely small IPTv Set-Top-Box and the Play2 is a more
+traditionnal Satellite or Terrestrial and IPTv Set-Top-Box.
 
-Applied, thanks.
+Both are based on the p200 Reference Design and out-of-tree support is
+based on OpenELEC kernel at [1].
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170118/34466a59/attachment-0001.sig>
+[1] https://github.com/wetek-enigma/linux-amlogic
+
+Neil Armstrong (3):
+  dt-bindings: vendor-prefix: Add wetek vendor prefix
+  ARM64: dts: meson-gxbb: Add support for WeTek Hub and Play
+  dt-bindings: amlogic: Add WeTek boards
+
+ Documentation/devicetree/bindings/arm/amlogic.txt  |  2 +
+ .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+ arch/arm64/boot/dts/amlogic/Makefile               |  2 +
+ .../boot/dts/amlogic/meson-gxbb-wetek-hub.dts      | 66 +++++++++++++++
+ .../boot/dts/amlogic/meson-gxbb-wetek-play2.dts    | 94 ++++++++++++++++++++++
+ 5 files changed, 165 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-hub.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-play2.dts
+
+-- 
+1.9.1
