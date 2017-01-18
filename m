@@ -1,63 +1,111 @@
 From: afzal.mohd.ma@gmail.com (afzal mohammed)
-Date: Thu, 19 Jan 2017 02:05:25 +0530
-Subject: [PATCH 0/4] ARM: v7-A !MMU support,
- CONFIG_VECTORS_BASE removal (almost)
-Message-ID: <20170118203525.6246-1-afzal.mohd.ma@gmail.com>
+Date: Thu, 19 Jan 2017 02:07:39 +0530
+Subject: [PATCH 1/4] ARM: mmu: decouple VECTORS_BASE from Kconfig
+In-Reply-To: <20170118203525.6246-1-afzal.mohd.ma@gmail.com>
+References: <20170118203525.6246-1-afzal.mohd.ma@gmail.com>
+Message-ID: <20170118203739.6400-1-afzal.mohd.ma@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+For MMU configurations, VECTORS_BASE is always 0xffff0000, a macro
+definition will suffice.
 
-ARM core changes to support !MMU Kernel on v7-A MMU processors. This
-series also does the preparation for CONFIG_VECTORS_BASE removal.
+Once exception address is handled dynamically for no-MMU also (this
+would involve taking care of region setup too), VECTORS_BASE can be
+removed from Kconfig.
 
-Based on the feedback from Russell on the initial patches (part RFC),
-it was decided to handle vector base dynamically in C & work towards
-the the goal of removing VECTORS_BASE from Kconfig. MMU platform's
-always have exception base address at 0xffff0000, while no-MMU CP15
-scenario was handled dynamically in C. Hivecs handling for no-MMU CP15
-that was done in asm has been moved to C as part of dynamic handling.
-This now leaves only vector region setup, used by Cortex-R, to be made
-devoid of VECTORS_BASE so as to remove it from Kconfig.
+Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: afzal mohammed <afzal.mohd.ma@gmail.com>
+---
 
-Vladimir is planning to rework MPU code, so it has been left untouched.
-VECTORS_BASE is to be removed from Kconfig after the MPU region rework.
+Though there was no build error without inclusion of asm/memory.h, to
+be on the safer side it has been added, to reduce chances of build
+breakage in random configurations.
 
-This series has been tested on top of mainline on,
-1. Vybrid CM4 (!MMU)
-2. Vybrid CA5 (MMU)
+ arch/arm/include/asm/memory.h  | 2 ++
+ arch/arm/mach-berlin/platsmp.c | 3 ++-
+ arch/arm/mm/dump.c             | 5 +++--
+ arch/arm/mm/init.c             | 4 ++--
+ 4 files changed, 9 insertions(+), 5 deletions(-)
 
-and on top of Vladimir's series[1] on,
-1. Vybrid CM4 (!MMU)
-2. Vybrid CA5 (MMU & !MMU)
-3. AM437x IDK (MMU & !MMU)
-
-Both above had an additional patch [2] as well, which is in next now.
-
-Regards
-afzal
-
-[1] "[RFC v2 PATCH 00/23] Allow NOMMU for MULTIPLATFORM",
-    http://lists.infradead.org/pipermail/linux-arm-kernel/2016-November/470966.html
-    (git://linux-arm.org/linux-vm.git nommu-rfc-v2)
-
-[2] "[PATCH 1/2] ARM: nommu: allow enabling REMAP_VECTORS_TO_RAM"
-    http://lists.infradead.org/pipermail/linux-arm-kernel/2016-December/473593.html
-
-afzal mohammed (4):
-  ARM: mmu: decouple VECTORS_BASE from Kconfig
-  ARM: nommu: dynamic exception base address setting
-  ARM: nommu: display vectors base
-  ARM: nommu: remove Hivecs configuration is asm
-
- arch/arm/include/asm/memory.h  |  2 ++
- arch/arm/kernel/head-nommu.S   |  5 ----
- arch/arm/mach-berlin/platsmp.c |  3 +-
- arch/arm/mm/dump.c             |  5 ++--
- arch/arm/mm/init.c             |  9 ++++--
- arch/arm/mm/mm.h               |  5 ++--
- arch/arm/mm/nommu.c            | 64 ++++++++++++++++++++++++++++++++++++++++--
- 7 files changed, 79 insertions(+), 14 deletions(-)
-
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 76cbd9c674df..9cc9f1dbc88e 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -83,6 +83,8 @@
+ #define IOREMAP_MAX_ORDER	24
+ #endif
+ 
++#define VECTORS_BASE		0xffff0000
++
+ #else /* CONFIG_MMU */
+ 
+ /*
+diff --git a/arch/arm/mach-berlin/platsmp.c b/arch/arm/mach-berlin/platsmp.c
+index 93f90688db18..578d41031abf 100644
+--- a/arch/arm/mach-berlin/platsmp.c
++++ b/arch/arm/mach-berlin/platsmp.c
+@@ -15,6 +15,7 @@
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/cp15.h>
++#include <asm/memory.h>
+ #include <asm/smp_plat.h>
+ #include <asm/smp_scu.h>
+ 
+@@ -75,7 +76,7 @@ static void __init berlin_smp_prepare_cpus(unsigned int max_cpus)
+ 	if (!cpu_ctrl)
+ 		goto unmap_scu;
+ 
+-	vectors_base = ioremap(CONFIG_VECTORS_BASE, SZ_32K);
++	vectors_base = ioremap(VECTORS_BASE, SZ_32K);
+ 	if (!vectors_base)
+ 		goto unmap_scu;
+ 
+diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
+index 9fe8e241335c..21192d6eda40 100644
+--- a/arch/arm/mm/dump.c
++++ b/arch/arm/mm/dump.c
+@@ -18,6 +18,7 @@
+ #include <linux/seq_file.h>
+ 
+ #include <asm/fixmap.h>
++#include <asm/memory.h>
+ #include <asm/pgtable.h>
+ 
+ struct addr_marker {
+@@ -31,8 +32,8 @@ static struct addr_marker address_markers[] = {
+ 	{ 0,			"vmalloc() Area" },
+ 	{ VMALLOC_END,		"vmalloc() End" },
+ 	{ FIXADDR_START,	"Fixmap Area" },
+-	{ CONFIG_VECTORS_BASE,	"Vectors" },
+-	{ CONFIG_VECTORS_BASE + PAGE_SIZE * 2, "Vectors End" },
++	{ VECTORS_BASE,	"Vectors" },
++	{ VECTORS_BASE + PAGE_SIZE * 2, "Vectors End" },
+ 	{ -1,			NULL },
+ };
+ 
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 370581aeb871..cf47f86f79ed 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -27,6 +27,7 @@
+ #include <asm/cp15.h>
+ #include <asm/mach-types.h>
+ #include <asm/memblock.h>
++#include <asm/memory.h>
+ #include <asm/prom.h>
+ #include <asm/sections.h>
+ #include <asm/setup.h>
+@@ -521,8 +522,7 @@ void __init mem_init(void)
+ 			"      .data : 0x%p" " - 0x%p" "   (%4td kB)\n"
+ 			"       .bss : 0x%p" " - 0x%p" "   (%4td kB)\n",
+ 
+-			MLK(UL(CONFIG_VECTORS_BASE), UL(CONFIG_VECTORS_BASE) +
+-				(PAGE_SIZE)),
++			MLK(UL(VECTORS_BASE), UL(VECTORS_BASE) + (PAGE_SIZE)),
+ #ifdef CONFIG_HAVE_TCM
+ 			MLK(DTCM_OFFSET, (unsigned long) dtcm_end),
+ 			MLK(ITCM_OFFSET, (unsigned long) itcm_end),
 -- 
 2.11.0
