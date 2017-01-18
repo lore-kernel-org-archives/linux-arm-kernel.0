@@ -1,70 +1,49 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 18 Jan 2017 19:54:35 +0100
-Subject: Initializing MAC address at run-time
-In-Reply-To: <e083ed68-0e8e-380e-23bd-5ad387c88575@free.fr>
-References: <e083ed68-0e8e-380e-23bd-5ad387c88575@free.fr>
-Message-ID: <20170118185435.fen6np7lydzgxxek@pengutronix.de>
+From: agustinv@codeaurora.org (Agustin Vega-Frias)
+Date: Wed, 18 Jan 2017 14:02:53 -0500
+Subject: [PATCH V10 2/3] ACPI: Add support for ResourceSource/IRQ domain
+ mapping
+In-Reply-To: <CAHp75VcLL9zvRXGCy2ynjhYFUgbYwJvLpCiUxjtsKmXjVFHmKA@mail.gmail.com>
+References: <1484757988-23739-1-git-send-email-agustinv@codeaurora.org>
+ <1484757988-23739-3-git-send-email-agustinv@codeaurora.org>
+ <CAHp75VcLL9zvRXGCy2ynjhYFUgbYwJvLpCiUxjtsKmXjVFHmKA@mail.gmail.com>
+Message-ID: <5bf630b0ab0b818db6e4e63a41020a55@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Andy,
 
-On Wed, Jan 18, 2017 at 03:03:57PM +0100, Mason wrote:
-> When my system boots up, eth0 is given a seemingly random MAC address.
+On 2017-01-18 13:00, Andy Shevchenko wrote:
+> On Wed, Jan 18, 2017 at 6:46 PM, Agustin Vega-Frias
+> <agustinv@codeaurora.org> wrote:
+>> ACPI extended IRQ resources may contain a ResourceSource to specify
+>> an alternate interrupt controller. Introduce acpi_irq_get and use it
+>> to implement ResourceSource/IRQ domain mapping.
+>> 
+>> The new API is similar to of_irq_get and allows re-initialization
+>> of a platform resource from the ACPI extended IRQ resource, and
+>> provides proper behavior for probe deferral when the domain is not
+>> yet present when called.
+>> 
 > 
-> [    0.950734] nb8800 26000.ethernet eth0: MAC address ba:de:d6:38:b8:38
-> [    0.957334] nb8800 26000.ethernet eth0: MAC address 6e:f1:48:de:d6:c4
+> Care to use -M -C when prepare this patch?
 > 
-> 
-> The DT node for eth0 is:
-> 
-> 	eth0: ethernet at 26000 {
-> 		compatible = "sigma,smp8734-ethernet";
-> 		reg = <0x26000 0x800>;
-> 		interrupts = <38 IRQ_TYPE_LEVEL_HIGH>;
-> 		clocks = <&clkgen SYS_CLK>;
-> 	};
-> 
-> Documentation/devicetree/bindings/net/ethernet.txt mentions
-> - local-mac-address: array of 6 bytes, specifies the MAC address that was
->   assigned to the network device;
-> 
-> And indeed, if I define this property, eth0 ends up with the MAC address
-> I specify in the device tree. But of course, I don't want all my boards
-> to share the same MAC address. Every interface has a unique MAC address.
-> 
-> In fact, the boot loader (not Uboot, a custom non-DT boot loader) stores
-> the MAC address somewhere in MMIO space, in some weird custom format.
 
-Where does your machine get the dtb from? You write it to the boot
-medium at a certain point of time I assume. So AFAICT you have the
-following options (in no particular order):
+I did use it, but the similarity index was below the default threshold.
+I'll send in a new version of this patch with this fixed.
 
- a) Describe in the dtb how to find out how the MAC address is stored
-    (already pointed out Mark and Robin)
- b) Make your bootloader dt aware and let it provide the
-    local-mac-address property.
- c) Adapt the dtb before it is written to the boot medium.
- d) Let the bootloader configure the device and teach the driver to pick
-    up the mac from the device's address space.
- e) Accept that the mac address is random during development, and make
-    Userspace configure the MAC address, which is early enough for
-    production use.
+Thanks,
+Agustin
 
-Not sure d) is considered ok today, but some drivers have this feature.
-I'd say b) is the best choice.
-
-> I need to do something similar with the NAND partitions. The boot loader
-> stores the partition offsets somewhere, and I need to pass this info
-> to the NAND framework, so I assumed that inserting the corresponding
-> properties at run-time was the correct way to do it.
-
-The list of options here is similar to the list above. d) doesn't work,
-but instead you can pass the partitioning on the kernel commandline.
-
-Best regards
-Uwe
+>>  drivers/acpi/gsi.c      |  98 -----------------
+>>  drivers/acpi/irq.c      | 282 
+>> ++++++++++++++++++++++++++++++++++++++++++++++++
+> 
+> --
+> With Best Regards,
+> Andy Shevchenko
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
+Linux Foundation Collaborative Project.
