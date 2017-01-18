@@ -1,175 +1,69 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Wed, 18 Jan 2017 13:54:21 -0800
-Subject: [PATCH v14 4/5] Documentation: tee subsystem and op-tee driver
-In-Reply-To: <1484744296-30003-5-git-send-email-jens.wiklander@linaro.org>
-References: <1484744296-30003-1-git-send-email-jens.wiklander@linaro.org>
- <1484744296-30003-5-git-send-email-jens.wiklander@linaro.org>
-Message-ID: <315ef64f-0d9e-1cfa-d861-0f6653b05230@broadcom.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 18 Jan 2017 22:55:49 +0100
+Subject: Nokia N900: mixers changed between 4.9 and 4.10-rc3, no longer
+ can use in-call speaker
+In-Reply-To: <20170118204459.GA5622@amd>
+References: <20170112181826.GA28290@amd> <201701121934.19810@pali>
+ <20170114225614.GA25321@amd> <201701150100.54214@pali>
+ <20170116211540.GA19736@amd> <20170118204459.GA5622@amd>
+Message-ID: <20170118215549.GA25865@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jens,
+Hi!
 
-Documentation looks good.
+> > > > So regression seems to be between v4.9 and v4.10. Any ideas?
+> > > 
+> > > Interesting... seems there are no sound relevant changes after v4.9.
+> > > 
+> > > Looks like there are only three commits after v4.9 for sound/soc which 
+> > > are built for Nokia N900:
+> ...
+> > Its definitely caused by something merged here:
+> > 
+> > commit ce38207f161513ee3d2bd3860489f07ebe65bc78
+> > Merge: a9042de 995c6a7
+> > Author: Linus Torvalds <torvalds@linux-foundation.org>
+> > Date:   Wed Dec 14 11:14:28 2016 -0800
+> > 
+> > So it should be easy to find out..
+> 
+> Doing git bisect now. Hmmm.
+> 
+> pavel at amd:/data/l/linux-n900$ git bisect bad
+> 1a653aa44725668590b36bbe2d7fe4736a69f055 is the first bad commit
+> commit 1a653aa44725668590b36bbe2d7fe4736a69f055
+> Author: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Date:   Wed Nov 30 06:22:55 2016 +0000
+> 
+>     ASoC: core: replace aux_comp_list to component_dev_list
+> 
+>     Now, Card has component_dev_list, we can replace aux_comp_list
+>         to component_dev_list with new auxiliary flags
+> 
+>     Signed-off-by: Kuninori Morimoto
+>     <kuninori.morimoto.gx@renesas.com>
+>         Signed-off-by: Mark Brown <broonie@kernel.org>
+> 
+> :040000 040000 a571fa05e5ce8e00b73bbc3f1e30e26775d619e8
+> e9336929cacf2d7bc94da99acfc10c9a7f513b8b M	include
+> :040000 040000 87976e9406d452e791870cc12e27cb67ba04fd12
+> 60d36f685642621c0e3ebb61ba7a14186d8b3eb0 M	sound
+> pavel at amd:/data/l/linux-n900$
+> 
+> I'll try reverting this patch on top of 4.10-rc, next. Any other ideas?
 
-On 17-01-18 04:58 AM, Jens Wiklander wrote:
-> Acked-by: Andreas Dannenberg <dannenberg@ti.com>
-> Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
-Acked-by: Scott Branden <scott.branden@broadcom.com>
-> ---
->  Documentation/00-INDEX |   2 +
->  Documentation/tee.txt  | 118 +++++++++++++++++++++++++++++++++++++++++++++++++
->  MAINTAINERS            |   1 +
->  3 files changed, 121 insertions(+)
->  create mode 100644 Documentation/tee.txt
->
-> diff --git a/Documentation/00-INDEX b/Documentation/00-INDEX
-> index c8a8eb1a2b11..fc6a3cb83d97 100644
-> --- a/Documentation/00-INDEX
-> +++ b/Documentation/00-INDEX
-> @@ -412,6 +412,8 @@ sysctl/
->  	- directory with info on the /proc/sys/* files.
->  target/
->  	- directory with info on generating TCM v4 fabric .ko modules
-> +tee.txt
-> +	- info on the TEE subsystem and drivers
->  this_cpu_ops.txt
->  	- List rationale behind and the way to use this_cpu operations.
->  thermal/
-> diff --git a/Documentation/tee.txt b/Documentation/tee.txt
-> new file mode 100644
-> index 000000000000..718599357596
-> --- /dev/null
-> +++ b/Documentation/tee.txt
-> @@ -0,0 +1,118 @@
-> +TEE subsystem
-> +This document describes the TEE subsystem in Linux.
-> +
-> +A TEE (Trusted Execution Environment) is a trusted OS running in some
-> +secure environment, for example, TrustZone on ARM CPUs, or a separate
-> +secure co-processor etc. A TEE driver handles the details needed to
-> +communicate with the TEE.
-> +
-> +This subsystem deals with:
-> +
-> +- Registration of TEE drivers
-> +
-> +- Managing shared memory between Linux and the TEE
-> +
-> +- Providing a generic API to the TEE
-> +
-> +The TEE interface
-> +=================
-> +
-> +include/uapi/linux/tee.h defines the generic interface to a TEE.
-> +
-> +User space (the client) connects to the driver by opening /dev/tee[0-9]* or
-> +/dev/teepriv[0-9]*.
-> +
-> +- TEE_IOC_SHM_ALLOC allocates shared memory and returns a file descriptor
-> +  which user space can mmap. When user space doesn't need the file
-> +  descriptor any more, it should be closed. When shared memory isn't needed
-> +  any longer it should be unmapped with munmap() to allow the reuse of
-> +  memory.
-> +
-> +- TEE_IOC_VERSION lets user space know which TEE this driver handles and
-> +  the its capabilities.
-> +
-> +- TEE_IOC_OPEN_SESSION opens a new session to a Trusted Application.
-> +
-> +- TEE_IOC_INVOKE invokes a function in a Trusted Application.
-> +
-> +- TEE_IOC_CANCEL may cancel an ongoing TEE_IOC_OPEN_SESSION or TEE_IOC_INVOKE.
-> +
-> +- TEE_IOC_CLOSE_SESSION closes a session to a Trusted Application.
-> +
-> +There are two classes of clients, normal clients and supplicants. The latter is
-> +a helper process for the TEE to access resources in Linux, for example file
-> +system access. A normal client opens /dev/tee[0-9]* and a supplicant opens
-> +/dev/teepriv[0-9].
-> +
-> +Much of the communication between clients and the TEE is opaque to the
-> +driver. The main job for the driver is to receive requests from the
-> +clients, forward them to the TEE and send back the results. In the case of
-> +supplicants the communication goes in the other direction, the TEE sends
-> +requests to the supplicant which then sends back the result.
-> +
-> +OP-TEE driver
-> +=============
-> +
-> +The OP-TEE driver handles OP-TEE [1] based TEEs. Currently it is only the ARM
-> +TrustZone based OP-TEE solution that is supported.
-> +
-> +Lowest level of communication with OP-TEE builds on ARM SMC Calling
-> +Convention (SMCCC) [2], which is the foundation for OP-TEE's SMC interface
-> +[3] used internally by the driver. Stacked on top of that is OP-TEE Message
-> +Protocol [4].
-> +
-> +OP-TEE SMC interface provides the basic functions required by SMCCC and some
-> +additional functions specific for OP-TEE. The most interesting functions are:
-> +
-> +- OPTEE_SMC_FUNCID_CALLS_UID (part of SMCCC) returns the version information
-> +  which is then returned by TEE_IOC_VERSION
-> +
-> +- OPTEE_SMC_CALL_GET_OS_UUID returns the particular OP-TEE implementation, used
-> +  to tell, for instance, a TrustZone OP-TEE apart from an OP-TEE running on a
-> +  separate secure co-processor.
-> +
-> +- OPTEE_SMC_CALL_WITH_ARG drives the OP-TEE message protocol
-> +
-> +- OPTEE_SMC_GET_SHM_CONFIG lets the driver and OP-TEE agree on which memory
-> +  range to used for shared memory between Linux and OP-TEE.
-> +
-> +The GlobalPlatform TEE Client API [5] is implemented on top of the generic
-> +TEE API.
-> +
-> +Picture of the relationship between the different components in the
-> +OP-TEE architecture.
-> +
-> +    User space                  Kernel                   Secure world
-> +    ~~~~~~~~~~                  ~~~~~~                   ~~~~~~~~~~~~
-> + +--------+                                             +-------------+
-> + | Client |                                             | Trusted     |
-> + +--------+                                             | Application |
-> +    /\                                                  +-------------+
-> +    || +----------+                                           /\
-> +    || |tee-      |                                           ||
-> +    || |supplicant|                                           \/
-> +    || +----------+                                     +-------------+
-> +    \/      /\                                          | TEE Internal|
-> + +-------+  ||                                          | API         |
-> + + TEE   |  ||            +--------+--------+           +-------------+
-> + | Client|  ||            | TEE    | OP-TEE |           | OP-TEE      |
-> + | API   |  \/            | subsys | driver |           | Trusted OS  |
-> + +-------+----------------+----+-------+----+-----------+-------------+
-> + |      Generic TEE API        |       |     OP-TEE MSG               |
-> + |      IOCTL (TEE_IOC_*)      |       |     SMCCC (OPTEE_SMC_CALL_*) |
-> + +-----------------------------+       +------------------------------+
-> +
-> +RPC (Remote Procedure Call) are requests from secure world to kernel driver
-> +or tee-supplicant. An RPC is identified by a special range of SMCCC return
-> +values from OPTEE_SMC_CALL_WITH_ARG. RPC messages which are intended for the
-> +kernel are handled by the kernel driver. Other RPC messages will be forwarded to
-> +tee-supplicant without further involvement of the driver, except switching
-> +shared memory buffer representation.
-> +
-> +References:
-> +[1] https://github.com/OP-TEE/optee_os
-> +[2] http://infocenter.arm.com/help/topic/com.arm.doc.den0028a/index.html
-> +[3] drivers/tee/optee/optee_smc.h
-> +[4] drivers/tee/optee/optee_msg.h
-> +[5] http://www.globalplatform.org/specificationsdevice.asp look for
-> +    "TEE Client API Specification v1.0" and click download.
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 975fd339c026..eec9bee0d752 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -10895,6 +10895,7 @@ S:	Maintained
->  F:	include/linux/tee_drv.h
->  F:	include/uapi/linux/tee.h
->  F:	drivers/tee/
-> +F:	Documentation/tee.txt
->
->  THUNDERBOLT DRIVER
->  M:	Andreas Noever <andreas.noever@gmail.com>
->
+Reverting that fixed the issue, but when I re-checked current -rc4, it
+seems it has similar fix there, too. GOod.
+
+								Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170118/a0a015ca/attachment.sig>
