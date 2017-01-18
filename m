@@ -1,67 +1,45 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 18 Jan 2017 16:20:10 -0600
-Subject: [PATCH v1 2/2] arm: dts: mt2701: add nor flash node
-In-Reply-To: <20170117143650.5db87148@free-electrons.com>
-References: <d7b866ad-5b2f-62d3-3aa3-6fa42803d625@gmail.com>
- <b850b751-1d8d-0053-cf1f-d5314542e5c3@gmail.com>
- <20170113172825.75d545a3@bbrezillon>
- <86c997be-f500-eaa1-3ba5-d21cff6223b7@gmail.com>
- <20170113175628.1793f433@bbrezillon>
- <0fafcd8d-cf99-de6b-728f-5e3637810b68@gmail.com>
- <20170114092958.022f2fc8@bbrezillon>
- <e7fa1542-f0e2-0e45-23b3-25d6491ae40d@gmail.com>
- <20170116094032.6f471f11@bbrezillon>
- <20170117143650.5db87148@free-electrons.com>
-Message-ID: <20170118222010.ivc6jxpnrumemvdf@rob-hp-laptop>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 18 Jan 2017 14:27:19 -0800
+Subject: [PATCH 1/2] ARM64: dts: meson-gxm: Add R-Box Pro
+In-Reply-To: <3005a457-b7cf-393b-42ff-4149e080321c@suse.de> ("Andreas
+ =?utf-8?Q?F=C3=A4rber=22's?= message of "Wed, 18 Jan 2017 00:06:07 +0100")
+References: <20170117030611.23827-1-afaerber@suse.de>
+ <20170117030611.23827-2-afaerber@suse.de>
+ <3005a457-b7cf-393b-42ff-4149e080321c@suse.de>
+Message-ID: <m237ggypfc.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 02:36:50PM +1100, Thomas Petazzoni wrote:
-> Hello,
-> 
-> (Side note: you guys should learn about stripping irrelevant parts of
-> an e-mail when replying!)
+Andreas F?rber <afaerber@suse.de> writes:
+
+> Am 17.01.2017 um 04:06 schrieb Andreas F?rber:
+>> diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
+>> index 0d7bfbf7d922..66bc809a5eae 100644
+>> --- a/arch/arm64/boot/dts/amlogic/Makefile
+>> +++ b/arch/arm64/boot/dts/amlogic/Makefile
+>> @@ -12,6 +12,7 @@ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-nexbox-a95x.dtb
+>>  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-s912-q200.dtb
+>>  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-s912-q201.dtb
+>>  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-nexbox-a1.dtb
 >
-> On Mon, 16 Jan 2017 09:40:32 +0100, Boris Brezillon wrote:
-> 
-> > > Well this is OK I guess, but then you can also use "mediatek,mt8173-nor"
-> > > as the oldest supported compatible and be done with it, no ? It looks a
-> > > bit crappy though, I admit that ...
-> > 
-> > Let's stop bikeshedding and wait for DT maintainers feedback
-> > before taking a decision ;-).
-> > 
-> > Rob, Mark, any opinion?
+> What is the logic behind meson-gxm-s912-q201 vs. meson-gxm-nexbox-a1?
+> Should it be renamed to include -s912 for consistency?
+
+Oops, I think it should be renamed for consistency.
+
+I believe there's only one chip in the GXM family (S912) so it might be
+that we could either drop the -s912 from the q20x boards or, add it to
+the nexbox.
+
+I lean towards dropping the -s912 since there's a single chip in GXM.
+(FWIW, GXL has more than one chip in the family so we added the chip
+there.)
+
+>> +dtb-$(CONFIG_ARCH_MESON) += meson-gxm-rbox-pro.dtb
 >
+> Should this new board use meson-gxm-s912-?
 
-Sigh, is how to do compatibles really not yet understood?
- 
-> I agree that a clarification would be good. There are really two
-> options:
-> 
->  1. Have two compatible strings in the DT, the one that matches the
->     exact SoC where the IP is found (first compatible string) and the
->     one that matches some other SoC where the same IP is found (second
->     compatible string). Originally, Linux only supports the second
->     compatible string in its device driver, but if it happens that a
->     difference is found between two IPs that we thought were the same,
->     we can add support for the first compatible string in the driver,
->     with a slightly different behavior.
+No.  Unless Neil or you thing otherwise, I think we should send a patch
+to drop the -s912 from the q20x boards instead.  (where "we" == Neil) ;)
 
-This. And no wildcards in the compatible string. 
-
->  2. Have a single compatible string in the DT, matching the exact SoC
->     where the IP is found. This involves adding immediately this
->     compatible string in the corresponding driver.
-
-I wouldn't object to this from a DT perspective as I have no clue 
-generally if IP blocks are "the same" or not. Subsystem maintainers will 
-object though.
-
-> I've not really been able to figure out which of the two options is the
-> most future-proof/appropriate.
-
-They are both future-proof. #2 has the disadvantage of requiring a 
-kernel update for a new SoC. 
-
-Rob
+Kevin
