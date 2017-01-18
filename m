@@ -1,70 +1,57 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 18 Jan 2017 14:38:17 +0000
-Subject: [PATCH] ARM: mm: add testcases for RODATA
-In-Reply-To: <20170118135310.GA4733@pjb1027-Latitude-E5410>
-References: <20170118135310.GA4733@pjb1027-Latitude-E5410>
-Message-ID: <20170118143815.GG3231@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 Jan 2017 15:52:53 +0100
+Subject: [PATCH 3/3] bcm63xx_enet: avoid uninitialized variable warning
+In-Reply-To: <20170118145306.1004008-1-arnd@arndb.de>
+References: <20170118145306.1004008-1-arnd@arndb.de>
+Message-ID: <20170118145306.1004008-3-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2017 at 10:53:10PM +0900, Jinbum Park wrote:
-> This patch adds testcases for the CONFIG_DEBUG_RODATA option.
-> It's similar to x86's testcases.
-> It tests read-only mapped data and page-size aligned rodata section.
+gcc-7 and probably earlier versions get confused by this function
+and print a harmless warning:
 
-I note that LKDTM already has a similar test (though it just has a raw
-write, and will crash the kernel).
+drivers/net/ethernet/broadcom/bcm63xx_enet.c: In function 'bcm_enet_open':
+drivers/net/ethernet/broadcom/bcm63xx_enet.c:1130:3: error: 'phydev' may be used uninitialized in this function [-Werror=maybe-uninitialized]
 
-> +	asm volatile(
-> +		"0:	str %[zero], [%[rodata_test]]\n"
-> +		"	mov %[rslt], %[zero]\n"
-> +		"1:\n"
-> +		".pushsection .text.fixup,\"ax\"\n"
-> +		".align 2\n"
-> +		"2:\n"
-> +		"b 1b\n"
-> +		".popsection\n"
-> +		".pushsection __ex_table,\"a\"\n"
-> +		".align 3\n"
-> +		".long 0b, 2b\n"
-> +		".popsection\n"
-> +		: [rslt] "=r" (result)
-> +		: [zero] "r" (0UL), [rodata_test] "r" (&rodata_test_data)
-> +	);
+This adds an initialization for the 'phydev' variable when it is unused
+and changes the check to test for that NULL pointer to make it clear
+that we always pass a valid pointer here.
 
-This is the only architecture-specific part of the file.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/net/ethernet/broadcom/bcm63xx_enet.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-Rather than duplicating the logic from x86, can't we use generic
-infrastructure for this part, and move the existing test into a shared
-location?
-
-e.g. could we change to KERNEL_DS and use put_user here?
-
-> +	if (!result) {
-> +		pr_err("rodata_test: test data was not read only\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	/* test 3: check the value hasn't changed */
-> +	/* If this test fails, we managed to overwrite the data */
-> +	if (!rodata_test_data) {
-> +		pr_err("rodata_test: Test 3 fails (end data)\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	/* test 4: check if the rodata section is 4Kb aligned */
-> +	start = (unsigned long)__start_rodata;
-> +	end = (unsigned long)__end_rodata;
-> +	if (start & (PAGE_SIZE - 1)) {
-> +		pr_err("rodata_test: .rodata is not 4k aligned\n");
-> +		return -ENODEV;
-> +	}
-> +	if (end & (PAGE_SIZE - 1)) {
-> +		pr_err("rodata_test: .rodata end is not 4k aligned\n");
-> +		return -ENODEV;
-> +	}
-
-s/4k/page/ in the prints, if this becomes generic.
-
-Thanks,
-Mark.
+diff --git a/drivers/net/ethernet/broadcom/bcm63xx_enet.c b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
+index 1ad904680ca6..f0a0bcb31b7e 100644
+--- a/drivers/net/ethernet/broadcom/bcm63xx_enet.c
++++ b/drivers/net/ethernet/broadcom/bcm63xx_enet.c
+@@ -913,6 +913,8 @@ static int bcm_enet_open(struct net_device *dev)
+ 		priv->old_link = 0;
+ 		priv->old_duplex = -1;
+ 		priv->old_pause = -1;
++	} else {
++		phydev = NULL;
+ 	}
+ 
+ 	/* mask all interrupts and request them */
+@@ -1083,7 +1085,7 @@ static int bcm_enet_open(struct net_device *dev)
+ 	enet_dmac_writel(priv, priv->dma_chan_int_mask,
+ 			 ENETDMAC_IRMASK, priv->tx_chan);
+ 
+-	if (priv->has_phy)
++	if (phydev)
+ 		phy_start(phydev);
+ 	else
+ 		bcm_enet_adjust_link(dev);
+@@ -1126,7 +1128,7 @@ static int bcm_enet_open(struct net_device *dev)
+ 	free_irq(dev->irq, dev);
+ 
+ out_phy_disconnect:
+-	if (priv->has_phy)
++	if (phydev)
+ 		phy_disconnect(phydev);
+ 
+ 	return ret;
+-- 
+2.9.0
