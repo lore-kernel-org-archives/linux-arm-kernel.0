@@ -1,52 +1,75 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 18 Jan 2017 12:29:19 -0800
-Subject: [PATCH 0/7] ARM: Broadcom Brahma-B15 readahead cache support
-Message-ID: <20170118202927.28740-1-f.fainelli@gmail.com>
+Date: Wed, 18 Jan 2017 12:29:22 -0800
+Subject: [PATCH 3/7] ARM: Hook B15 readahead cache functions based on processor
+In-Reply-To: <20170118202927.28740-1-f.fainelli@gmail.com>
+References: <20170118202927.28740-1-f.fainelli@gmail.com>
+Message-ID: <20170118202927.28740-4-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+If we detect that we are running on a Broadcom Brahma-B15 CPU, and
+CONFIG_CACHE_B15_RAC is enabled, make sure that we pick-up the
+b15_cache_fns function operations.
 
-This patch series adds support for the Broadcom Brahma-B15 readahead cache.
-I submitted that patch series a couple of years ago, and then slept on it so
-here is another stab at it.
+If CONFIG_CACHE_B15_RAC is enabled, but we are not running on a Broadcom
+Brahma-B15 CPU, we will fallback to calling into the regular
+v7_cache_fns with no cost. If CONFIG_CACHE_B15_RAC is disabled, there is
+no cost and we just use the regular v7_cache_fns.
 
-Note that we did not implement this cache as a version of an outer cache
-for several reasons:
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ arch/arm/mm/cache-v7.S | 21 +++++++++++++++++++++
+ arch/arm/mm/proc-v7.S  |  2 +-
+ 2 files changed, 22 insertions(+), 1 deletion(-)
 
-- we initially thought we needed to intercept flush_icache_all and
-  flush_kern_cache_louis but upon further inspection we convinced ourselves
-  this is no longer needed, still, flush_cache_all() needs special handling
-  here and needs to wrap around
-
-- the outer cache does not allow differentiating a DMA transfer direction
-  this is a readahead cache, so it does not participate in writes, flushing
-  it during reads *and* writes kills the performance
-
-- finally, most operations that outer_cache cares about are on MVA, which
-  is transparent to the readahead cache here
-
-Florian Fainelli (8):
-  ARM: v7: allow setting different cache functions
-  ARM: Add Broadcom Brahma-B15 readahead cache support
-  ARM: Hook B15 readahead cache functions based on processor
-  ARM: B15: Add CPU hotplug awareness
-  ARM: B15: Add suspend/resume hooks
-  ARM: B15: Register reboot notifier for KEXEC
-  MAINTAINERS: Update brcmstb entries to cover B15 code
-
- MAINTAINERS                                   |   2 +
- arch/arm/include/asm/glue-cache.h             |   4 +
- arch/arm/include/asm/hardware/cache-b15-rac.h |  10 +
- arch/arm/mm/Kconfig                           |   8 +
- arch/arm/mm/Makefile                          |   1 +
- arch/arm/mm/cache-b15-rac.c                   | 360 ++++++++++++++++++++++++++
- arch/arm/mm/cache-v7.S                        |  21 ++
- arch/arm/mm/proc-v7.S                         |   6 +-
- include/linux/cpuhotplug.h                    |   2 +
- 10 files changed, 411 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm/include/asm/hardware/cache-b15-rac.h
- create mode 100644 arch/arm/mm/cache-b15-rac.c
-
+diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+index a134d8a13d00..02f8a259c0d6 100644
+--- a/arch/arm/mm/cache-v7.S
++++ b/arch/arm/mm/cache-v7.S
+@@ -15,6 +15,7 @@
+ #include <asm/assembler.h>
+ #include <asm/errno.h>
+ #include <asm/unwind.h>
++#include <asm/hardware/cache-b15-rac.h>
+ 
+ #include "proc-macros.S"
+ 
+@@ -446,3 +447,23 @@ ENDPROC(v7_dma_unmap_area)
+ 
+ 	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)
+ 	define_cache_functions v7
++
++	/* The Broadcom Brahma-B15 read-ahead cache requires some modifications
++	 * to the v7_cache_fns, we only override the ones we need
++	 */
++#ifndef CONFIG_CACHE_B15_RAC
++	globl_equ	b15_flush_kern_cache_all,	v7_flush_kern_cache_all
++#endif
++	globl_equ	b15_flush_icache_all,		v7_flush_icache_all
++	globl_equ	b15_flush_kern_cache_louis,	v7_flush_kern_cache_louis
++	globl_equ	b15_flush_user_cache_all,	v7_flush_user_cache_all
++	globl_equ	b15_flush_user_cache_range,	v7_flush_user_cache_range
++	globl_equ	b15_coherent_kern_range,	v7_coherent_kern_range
++	globl_equ	b15_coherent_user_range,	v7_coherent_user_range
++	globl_equ	b15_flush_kern_dcache_area,	v7_flush_kern_dcache_area
++
++	globl_equ	b15_dma_map_area,		v7_dma_map_area
++	globl_equ	b15_dma_unmap_area,		v7_dma_unmap_area
++	globl_equ	b15_dma_flush_range,		v7_dma_flush_range
++
++	define_cache_functions b15
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index a7b270970e03..6e7c96df0dc1 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -673,7 +673,7 @@ __v7_ca15mp_proc_info:
+ __v7_b15mp_proc_info:
+ 	.long	0x420f00f0
+ 	.long	0xff0ffff0
+-	__v7_proc __v7_b15mp_proc_info, __v7_b15mp_setup
++	__v7_proc __v7_b15mp_proc_info, __v7_b15mp_setup, cache_fns = b15_cache_fns
+ 	.size	__v7_b15mp_proc_info, . - __v7_b15mp_proc_info
+ 
+ 	/*
 -- 
 2.9.3
