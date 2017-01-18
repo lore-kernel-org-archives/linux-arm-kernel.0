@@ -1,50 +1,59 @@
-From: mbenes@suse.cz (Miroslav Benes)
-Date: Wed, 18 Jan 2017 13:40:23 +0100 (CET)
-Subject: [PATCH 7/7] arm: Add livepatch necessary arch selects into Kconfig
-In-Reply-To: <1481043967-15602-8-git-send-email-abelvesa@linux.com>
-References: <1481043967-15602-1-git-send-email-abelvesa@linux.com>
- <1481043967-15602-8-git-send-email-abelvesa@linux.com>
-Message-ID: <alpine.LSU.2.20.1701181339350.23458@pobox.suse.cz>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 18 Jan 2017 12:46:45 +0000
+Subject: [PATCH v2 2/3] spi: pxa2xx: Prepare for edge-triggered interrupts
+In-Reply-To: <b3e0d393-b841-1556-ddd2-5634f12b6f2c@siemens.com>
+References: <cover.1484592296.git.jan.kiszka@siemens.com>
+ <cover.1484592296.git.jan.kiszka@siemens.com>
+ <7b15a0910a3ad861fd32161c72559bafa7b71e29.1484592296.git.jan.kiszka@siemens.com>
+ <87ziiqdstr.fsf@belgarion.home>
+ <4d97e416-4d32-3b9f-0695-de116a4b26bd@siemens.com>
+ <87r340eq28.fsf@belgarion.home>
+ <b3e0d393-b841-1556-ddd2-5634f12b6f2c@siemens.com>
+Message-ID: <20170118124645.6ugjwbfeq5vsh2to@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 6 Dec 2016, Abel Vesa wrote:
+On Wed, Jan 18, 2017 at 10:33:07AM +0100, Jan Kiszka wrote:
+> On 2017-01-18 09:21, Robert Jarzmik wrote:
 
-> This adds HAVE_LIVEPATCH, MODULES_USE_ELF_RELA and HAVE_LIVEPATCH
-> to arm Kconfig.
-> 
-> Signed-off-by: Abel Vesa <abelvesa@linux.com>
-> ---
->  arch/arm/Kconfig | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 186c4c2..f4e9ace 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -50,6 +50,7 @@ config ARM
->  	select HAVE_DMA_API_DEBUG
->  	select HAVE_DMA_CONTIGUOUS if MMU
->  	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
-> +	select HAVE_DYNAMIC_FTRACE_WITH_REGS
->  	select HAVE_EFFICIENT_UNALIGNED_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && MMU
->  	select HAVE_EXIT_THREAD
->  	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
-> @@ -67,6 +68,7 @@ config ARM
->  	select HAVE_KERNEL_XZ
->  	select HAVE_KPROBES if !XIP_KERNEL && !CPU_ENDIAN_BE32 && !CPU_V7M
->  	select HAVE_KRETPROBES if (HAVE_KPROBES)
-> +	select HAVE_LIVEPATCH
->  	select HAVE_MEMBLOCK
->  	select HAVE_MOD_ARCH_SPECIFIC
->  	select HAVE_NMI
-> @@ -82,6 +84,7 @@ config ARM
->  	select HAVE_VIRT_CPU_ACCOUNTING_GEN
->  	select IRQ_FORCED_THREADING
->  	select MODULES_USE_ELF_REL
-> +	select MODULES_USE_ELF_RELA
+> >>>> +	while (1) {
 
-I wrote it before but I think you cannot have both MODULES_USE_ELF_REL and 
-MODULES_USE_ELF_RELA.
+> >>> This bit worries me a bit, as this can be either :
+> >>>  - hogging the SoC's CPU, endlessly running
+> >>>  - or even worse, blocking the CPU for ever
 
-Miroslav
+> >>> The question behind is, should this be done in a top-half, or moved to a irq
+> >>> thread ?
+
+> >> Every device with a broken interrupt source can hog CPUs, nothing
+> >> special with this one. If you don't close the loop in the handler
+> >> itself, you close it over the hardware retriggering the interrupt over
+> >> and over again.
+
+> > I'm not speaking of a broken interrupt source, I'm speaking of a broken code,
+> > such as in the handler, or broken status readback, or lack of understanding on
+> > the status register which may imply the while(1) to loop forever.
+
+> >> So, I don't see a point in offloading to a thread. The normal case is
+> >> some TX done (FIFO available) event followed by an RX event, then the
+> >> transfer is complete, isn't it?
+
+> > The point is if you stay forever in the while(1) loop, you can at least have a
+> > print a backtrace (LOCKUP_DETECTOR).
+
+> I won't consider "debugability" as a good reason to move interrupt
+> handlers into threads. There should be real workload that requires
+> offloading or specific prioritization.
+
+It's failure mitigation - you're translating a hard lockup into
+something that will potentially allow the system to soldier on which is
+likely to be less severe for the user as well as making things easier to
+figure out.  If we're doing something like this I'd at least have a
+limit on how long we allow the interrupt to scream.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170118/2d8e46dd/attachment-0001.sig>
