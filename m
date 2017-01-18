@@ -1,50 +1,29 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 17 Jan 2017 16:13:11 -0800
-Subject: [PATCH net-next v4 05/10] drivers: base: Add
- device_find_in_class_name()
-In-Reply-To: <CAHp75VeqLb2hDgj2jfWzQgw4wa31gckSw=jZS0UhUAnZgNA14Q@mail.gmail.com>
-References: <20170117232152.1661-1-f.fainelli@gmail.com>
- <20170117232152.1661-6-f.fainelli@gmail.com>
- <CAHp75VfE8t+_2Yu1NYMErKopnCNwFakO6pyDRmqAU-ZsGuyvmg@mail.gmail.com>
- <b8cc0d2f-f544-0e06-32bd-47e6b9be5393@gmail.com>
- <CAHp75Ve9xn6wDxFwnkPDyY8yVwVysK3-pUsoxv3GfVbbEVZoBg@mail.gmail.com>
- <e3132d31-f94f-8794-1121-0fe25be2f61b@gmail.com>
- <CAHp75VeqLb2hDgj2jfWzQgw4wa31gckSw=jZS0UhUAnZgNA14Q@mail.gmail.com>
-Message-ID: <dbb8a715-0e34-24a6-803e-dad4b13d14af@gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 17 Jan 2017 16:25:23 -0800
+Subject: [PATCH] ARM: davinci: da850-evm: fix read access to SPI flash
+In-Reply-To: <20170117125742.9536-1-fparent@baylibre.com> (Fabien Parent's
+ message of "Tue, 17 Jan 2017 13:57:42 +0100")
+References: <20170117125742.9536-1-fparent@baylibre.com>
+Message-ID: <m237gh2ozw.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/17/2017 04:07 PM, Andy Shevchenko wrote:
-> On Wed, Jan 18, 2017 at 2:04 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->> On 01/17/2017 04:00 PM, Andy Shevchenko wrote:
->>> On Wed, Jan 18, 2017 at 1:43 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
->>>> On 01/17/2017 03:34 PM, Andy Shevchenko wrote:
->>>>> On Wed, Jan 18, 2017 at 1:21 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> 
->>> But why not to use void *class_name to be consistent with callback and
->>> device_find_child()?
->>
->> The top-level function: device_find_in_class_name() should have a
->> stronger typing of its argument even if it internally uses
->> device_find_child() and a callback that takes a void * argument, that's
->> how I see it.
-> 
-> Fair enough.
-> 
->>> Btw,
->>> return get_device(parent);
->>
->> Not sure I follow what that means here?
-> 
-> Missed remark. Instead of
-> 
-> get_device(parent);
-> return parent;
-> 
-> you can use
-> 
-> return get_device(parent);
+Fabien Parent <fparent@baylibre.com> writes:
 
-Seems reasonable, if I have to respin a v5, will add that, thanks!
--- 
-Florian
+> Read access to the SPI flash are broken on da850-evm, i.e. the data
+> read is not what is actually programmed on the flash.
+> According to the datasheet for the M25P64 part present on the da850-evm,
+> if the SPI frequency is higher than 20MHz then the READ command is not
+> usable anymore and only the FAST_READ command can be used to read data.
+>
+> This commit specifies in the DTS that we should use FAST_READ command
+> instead of the READ command.
+>
+> Signed-off-by: Fabien Parent <fparent@baylibre.com>
+
+Tested on da850-evm on top of v4.10-rc3.  This gets the DT boot
+functionatliy in line with the legacy (board-file) boot.
+
+Tested-by: Kevin Hilman <khilman@baylibre.com>
+
+Kevin
