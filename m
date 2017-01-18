@@ -1,47 +1,35 @@
 From: roy.pledge@nxp.com (Roy Pledge)
-Date: Wed, 18 Jan 2017 17:39:31 -0500
-Subject: [PATCH 01/10] soc/qbman: Use portable mapping for the FQD reserved
- memory
+Date: Wed, 18 Jan 2017 17:39:33 -0500
+Subject: [PATCH 03/10] soc/qbman: Drop L1_CACHE_BYTES compile time check
 In-Reply-To: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
 References: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
-Message-ID: <1484779180-1344-2-git-send-email-roy.pledge@nxp.com>
+Message-ID: <1484779180-1344-4-git-send-email-roy.pledge@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Claudiu Manoil <claudiu.manoil@nxp.com>
 
-Use memremap/memset to zero the private QBMan areas to ensure
-portability.
+Not relevant and arch dependent. Overkill for PPC.
 
 Signed-off-by: Claudiu Manoil <claudiu.manoil@nxp.com>
-Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
 ---
- drivers/soc/fsl/qbman/qman_ccsr.c |    8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+ drivers/soc/fsl/qbman/dpaa_sys.h |    4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/drivers/soc/fsl/qbman/qman_ccsr.c b/drivers/soc/fsl/qbman/qman_ccsr.c
-index f4e6e70d..43feaa9 100644
---- a/drivers/soc/fsl/qbman/qman_ccsr.c
-+++ b/drivers/soc/fsl/qbman/qman_ccsr.c
-@@ -441,16 +441,14 @@ static unsigned int qm_get_fqid_maxcnt(void)
- static int zero_priv_mem(struct device *dev, struct device_node *node,
- 			 phys_addr_t addr, size_t sz)
- {
--	/* map as cacheable, non-guarded */
--	void __iomem *tmpp = ioremap_prot(addr, sz, 0);
+diff --git a/drivers/soc/fsl/qbman/dpaa_sys.h b/drivers/soc/fsl/qbman/dpaa_sys.h
+index 2eaf318..4f1623b 100644
+--- a/drivers/soc/fsl/qbman/dpaa_sys.h
++++ b/drivers/soc/fsl/qbman/dpaa_sys.h
+@@ -48,10 +48,6 @@
+ #define DPAA_PORTAL_CE 0
+ #define DPAA_PORTAL_CI 1
+ 
+-#if (L1_CACHE_BYTES != 32) && (L1_CACHE_BYTES != 64)
+-#error "Unsupported Cacheline Size"
+-#endif
 -
-+	void *tmpp = memremap(addr, sz, MEMREMAP_WB);
- 	if (!tmpp)
- 		return -ENOMEM;
- 
--	memset_io(tmpp, 0, sz);
-+	memset(tmpp, 0, sz);
- 	flush_dcache_range((unsigned long)tmpp,
- 			   (unsigned long)tmpp + sz);
--	iounmap(tmpp);
-+	memunmap(tmpp);
- 
- 	return 0;
- }
+ static inline void dpaa_flush(void *p)
+ {
+ #ifdef CONFIG_PPC
 -- 
 1.7.9.5
