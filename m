@@ -1,35 +1,71 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Wed, 18 Jan 2017 14:20:00 +0100
-Subject: [PATCH v3 12/13] ARM: dts: da850: add the SATA node
-In-Reply-To: <1484745601-4769-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1484745601-4769-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1484745601-4769-13-git-send-email-bgolaszewski@baylibre.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 18 Jan 2017 13:25:37 +0000
+Subject: [PATCH 2/2] ARM: DTS: Fix register map for virt-capable GIC
+In-Reply-To: <aa0cb86e-ede2-432b-6248-92679fc06578@arm.com>
+References: <1484736811-24002-1-git-send-email-marc.zyngier@arm.com>
+ <1484736811-24002-3-git-send-email-marc.zyngier@arm.com>
+ <aa0cb86e-ede2-432b-6248-92679fc06578@arm.com>
+Message-ID: <fc58dd17-a46a-e7ff-7ad4-5c3539ffaf93@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the SATA node to the da850 device tree.
+On 18/01/17 11:57, Robin Murphy wrote:
+> On 18/01/17 10:53, Marc Zyngier wrote:
+>> Since everybody copied my own mistake from the DT binding example,
+>> let's address all the offenders in one swift go.
+>>
+>> Most of them got the CPU interface size wrong (4kB, while it should
+>> be 8kB), except for both keystone platforms which got the control
+>> interface wrong (4kB instead of 8kB).
+>>
+>> In the couple of cases were I knew for sure what implementation
+> 
+>                          where
+> 
+>> was used, I've added the "arm,gic-400" compatible string. I'm 99%
+>> sure that this is what everyong is using, but short of having the
+> 
+>                          everyone
+> 
+>> TRM for all the other SoCs, I've let them alone.
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+> [...]
+>> diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
+>> index 63c7cf0..07bf300 100644
+>> --- a/arch/arm/boot/dts/keystone-k2g.dtsi
+>> +++ b/arch/arm/boot/dts/keystone-k2g.dtsi
+>> @@ -45,7 +45,7 @@
+>>  		interrupt-controller;
+>>  		reg = <0x0 0x02561000 0x0 0x1000>,
+>>  		      <0x0 0x02562000 0x0 0x2000>,
+>> -		      <0x0 0x02564000 0x0 0x1000>,
+>> +		      <0x0 0x02564000 0x0 0x2000>,
+>>  		      <0x0 0x02566000 0x0 0x2000>;
+>>  		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) |
+>>  				IRQ_TYPE_LEVEL_HIGH)>;
+>> diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+>> index 02708ba..aaff6816 100644
+>> --- a/arch/arm/boot/dts/keystone.dtsi
+>> +++ b/arch/arm/boot/dts/keystone.dtsi
+>> @@ -35,7 +35,7 @@
+>>  		interrupt-controller;
+>>  		reg = <0x0 0x02561000 0x0 0x1000>,
+>>  		      <0x0 0x02562000 0x0 0x2000>,
+>> -		      <0x0 0x02564000 0x0 0x1000>,
+>> +		      <0x0 0x02564000 0x0 0x2000>,
+>>  		      <0x0 0x02566000 0x0 0x2000>;
+>>  		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) |
+>>  				IRQ_TYPE_LEVEL_HIGH)>;
+> 
+> FWIW I happen to have some public Keystone TRMs handy from my DMA offset
+> investigations, and both K2G and K2H explicitly say it's a GIC-400 too.
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
----
- arch/arm/boot/dts/da850.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+Ah, brilliant. I'll update the patch accordingly.
 
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 104155d..e9bf30e 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -403,6 +403,12 @@
- 			phy-names = "usb-phy";
- 			status = "disabled";
- 		};
-+		sata: ahci at 218000 {
-+			compatible = "ti,da850-ahci";
-+			reg = <0x218000 0x2000>, <0x22c018 0x4>;
-+			interrupts = <67>;
-+			status = "disabled";
-+		};
- 		mdio: mdio at 224000 {
- 			compatible = "ti,davinci_mdio";
- 			#address-cells = <1>;
+Thanks,
+
+	M.
 -- 
-2.9.3
+Jazz is not dead. It just smells funny...
