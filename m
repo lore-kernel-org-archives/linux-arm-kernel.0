@@ -1,23 +1,23 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 18 Jan 2017 14:05:09 -0800
-Subject: [PATCH] ARM64: dts: meson-gxbb-vega-s95: Add LED
-In-Reply-To: <20170117011753.29978-1-afaerber@suse.de> ("Andreas
- =?utf-8?Q?F=C3=A4rber=22's?=
- message of "Tue, 17 Jan 2017 02:17:53 +0100")
-References: <20170117011753.29978-1-afaerber@suse.de>
-Message-ID: <m2bmv4yqga.fsf@baylibre.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Wed, 18 Jan 2017 16:06:05 -0600
+Subject: [PATCH v2 18/18] insert build break
+In-Reply-To: <20170113071545.GB12441@kroah.com>
+References: <1484260655-80477-1-git-send-email-christopher.lee.bostic@gmail.com>
+ <20170113071545.GB12441@kroah.com>
+Message-ID: <CAL_JsqL-yQD=oFQW0YfB9JnSpDVcOcUG0GM8NgLCB1nsFQsrEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andreas F?rber <afaerber@suse.de> writes:
-
-> There is one blue LED on the front of the device. Keep it lit and
-> configure it as panic indicator.
+On Fri, Jan 13, 2017 at 1:15 AM, Greg KH <gregkh@linuxfoundation.org> wrote:
+> On Thu, Jan 12, 2017 at 04:37:35PM -0600, christopher.lee.bostic at gmail.com wrote:
+>> From: Chris Bostic <cbostic@us.ibm.com>
+>>
+>> Signed-off-by: Chris Bostic <cbostic@us.ibm.com>
 >
-> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> I can not accept patches that have no changelog text, and this one is
+> very odd:
 
-Applied to v4.11/dt64,
+Seems like this would be an easy check to add to 0-day. And perhaps
+missing S-o-B, too.
 
-Thanks,
-
-Kevin
+Rob
