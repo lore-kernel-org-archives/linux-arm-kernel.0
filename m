@@ -1,62 +1,62 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 18 Jan 2017 09:39:25 -0800
-Subject: [PATCH 1/2] ARM: dts: dra7-evm: increase QSPI SPL partition size
-In-Reply-To: <b586537d-49b6-50a6-ae60-11faf25b26f9@ti.com>
-References: <1484311234-21978-1-git-send-email-ravibabu@ti.com>
- <1484311234-21978-2-git-send-email-ravibabu@ti.com>
- <20170113181239.GC2630@atomide.com>
- <6C6B28D4DC342643927BEAFCE8707BF6C0A8C367@DBDE04.ent.ti.com>
- <20170117232743.GA7403@atomide.com>
- <b586537d-49b6-50a6-ae60-11faf25b26f9@ti.com>
-Message-ID: <20170118173925.GG7403@atomide.com>
+From: megous@megous.com (=?UTF-8?Q?Ond=c5=99ej_Jirman?=)
+Date: Wed, 18 Jan 2017 18:48:35 +0100
+Subject: [linux-sunxi] [PATCH] clk: sunxi-ng: fix PLL_CPUX adjusting on H3
+In-Reply-To: <20170118165612.zkjaj36kedg64rjw@lukather>
+References: <20161125002852.18097-1-megous@megous.com>
+ <0985b1ec-ba95-1505-cc59-adec4b88238f@megous.com>
+ <20170109095946.6esbfx6pafega5cd@lukather>
+ <557330d0-2dcd-2211-8538-51c4d6b68834@megous.com>
+ <20170116164300.j2zvjkxr7c5h5hyo@lukather>
+ <f1ccd8ce-df6c-8204-71ab-2f774ac269d5@megous.com>
+ <20170118165612.zkjaj36kedg64rjw@lukather>
+Message-ID: <c4152a9b-9b31-5ed7-39cd-da1a3489bc89@megous.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sekhar Nori <nsekhar@ti.com> [170118 03:59]:
-> Hi Tony,
+Dne 18.1.2017 v 17:56 Maxime Ripard napsal(a):
+>>> What's your current plan to fix that? I guess the easiest (and most
+>>> likely to be reusable) would be to allow for clock tables, instead of
+>>> using the generic approach. We might have some other clocks (like
+>>> audio or video) that would need such a precise tuning in the future
+>>> too.
+>>
+>> My proposed solution is this for M factor (H3 specific solution):
+>>
+>> https://github.com/megous/linux/commit/88be3d421e958579026135d8acec4b3983958738
 > 
-> On Wednesday 18 January 2017 04:57 AM, Tony Lindgren wrote:
-> > * B, Ravi <ravibabu@ti.com> [170117 00:15]:
-> >> Hi Tony
-> >>
-> >>> * Ravi Babu <ravibabu@ti.com> [170113 04:41]:
-> >>>> The SPL size for DRA74x platform has increased and is now more than 
-> >>>> 64KB. Increase QSPI SPL partition size to 256KB for DRA74x EVM.
-> >>>>
-> >>>> QSPI partition numbering changes because of this.
-> >>
-> >>> And this will break the existing partitions potentially..
-> >>> See what was discussed on the list few days ago in thread "[PATCH 1/6] ARM: dts: am335x-phycore-som: Update NAND partition table".
-> >>
-> >>> It's best to have these left empty or as they originally were and let u-boot configure the partitions.
-> >>
-> >> Agree with you. For dra7xx platform the SPL size has been increased to 256KB and hence the existing QSPI SPL partition in kernel (64K size) will break when latest mainline u-boot is used. 
-> >> Here only SPL partition has been changed and other partition & size is NOT changed and kept intact. I feel it will not break the existing partitions for dra7xx platform.
-> > 
-> > What about the renumbering of partitions in your patch?
+> This one is fine.
 > 
-> Thats true, partitions will get renumbered. But mtd numbering can change
-> depending on probe order of devices anyway. So usespace which uses
-> hardcoded mtd partition numbers is pretty fragile already, I guess.
+>> and this for P factor:
+>>
+>> https://github.com/megous/linux/commit/d7f274ed0c13fa9b4099445cb6bf9b2f8f2cfa8a
+>>
+>> Perhaps it should be configurable if the P limitation is not universal
+>> for all NKMP clocks. But I haven't read all the datasheets.
 > 
-> > 
-> > Probably just best to make the partition information empty in the
-> > kernel as discussed.
+> And this is exactly what I wanted to avoid, for the reason you're
+> giving :)
 > 
-> Given that existing dtbs already have the partition information, wont
-> this be treated as a regression for someone upgrading to new kernel?
+> This is some generic code, and yet you're putting a clock and SoC
+> specific limit in there. You have two ways to deal with that. Either
+> come up with some generic throttling mecanism to force a particular
+> value above or below a given threshold, but that might be tedious to
+> do, and require some significant rework.
+> 
+> Or you can use a table, which is generic and should be relatively
+> easy. I really think this is the most straightforward solution, and
+> even more so since we just want to support a limited number of
+> frequencies in this case.
 
-Well these "flag day" type changes are not acceptable because they are
-impossible to coordinate. You can't assume people update their bootloader
-on regular basis, or update both bootloader and kernel to some specific
-versions.
+So I would add a pointer to a table to struct ccu_nkmp and define the
+table itself in ccu-sun8i-h3.c?
 
-> Going forward, is the preference that new boards shall not have
-> partition information in DT?
+If struct ccu_nkmp would have non-NULL pointer to a table, it would be
+used instead of the math in ccu_nkmp.c.
 
-Yes or else it will have to stay as it was originally set because
-of these issues.
+Sounds ok?
 
-Regards,
+regards,
+  o.
 
-Tony
+> Maxime
+> 
