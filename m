@@ -1,42 +1,106 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Wed, 18 Jan 2017 10:21:48 +0800
-Subject: [01/26] drm/rockchip: dw-mipi-dsi: use mode from display state
-In-Reply-To: <587DF431.5040003@rock-chips.com>
-References: <20160919171747.28512-2-john@metanate.com>
- <587DF431.5040003@rock-chips.com>
-Message-ID: <587ED13C.3000301@rock-chips.com>
+From: pankaj.dubey@samsung.com (pankaj.dubey)
+Date: Wed, 18 Jan 2017 08:46:04 +0530
+Subject: [PATCH v2 1/2] arm64: dts: exynos: Add USB 3.0 controller node for
+ Exynos7
+In-Reply-To: <20170117182318.fvatrazvyuzmdsor@kozik-lap>
+References: <1484665444-23365-1-git-send-email-pankaj.dubey@samsung.com>
+ <CGME20170117150121epcas1p102bd1355f780a56e14a0a7a81bd6dfaf@epcas1p1.samsung.com>
+ <1484665444-23365-2-git-send-email-pankaj.dubey@samsung.com>
+ <20170117182318.fvatrazvyuzmdsor@kozik-lap>
+Message-ID: <9f45a921-ebfb-c252-20bb-3a7adf508343@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017?01?17? 18:38, Chris Zhong wrote:
->> @@ -821,8 +824,6 @@ static void dw_mipi_dsi_encoder_mode_set(struct 
->> drm_encoder *encoder,
->>       struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
->>       int ret;
->>   -    dsi->mode = adjusted_mode;
->> -
-> I prefer to keep the original method, although this"dsi->mode" pointer 
-> is same as "&dsi->connector.state->crtc->state->adjusted_mode; "
-> I still think dsi->mode makes the process easier to read
-"&dsi->connector.state->crtc->state->adjusted_mode;" is too long, and 
-dsi->connector.state->crtc can be NULL, seems not good.
 
-agree with Chris, I think dsi->mode is better.
 
-Bug the origin code "dsi->mode = adjusted_mode; " also has a bug, 
-adjusted_mode's lift time is unknown, use a pointer from adjusted_mode 
-is dangerous.
+On Tuesday 17 January 2017 11:53 PM, Krzysztof Kozlowski wrote:
+> On Tue, Jan 17, 2017 at 08:34:03PM +0530, Pankaj Dubey wrote:
+>> From: Vivek Gautam <gautamvivek1987@gmail.com>
+>>
+>> Add USB 3.0 DRD controller device node, with its clock
+>> and phy information to enable the same on Exynos7.
+>>
+>> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>> Signed-off-by: Vivek Gautam <gautamvivek1987@gmail.com>
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> 
+> Javier's Reviewed-by should be at the end.
+> 
 
-I think we can use like that, copy a display mode to dsi->mode:
-struct dw_mipi_dsi
-{
-    -    struct drm_display_mode *mode;
-    +    struct drm_display_mode mode;
-}
-   xxx_encoder_mode_set()
-{
-    drm_mode_copy(&dsi->mode, adjusted_mode);
-}
+OK, will update.
 
--- 
-?ark Yao
+>> ---
+>>  arch/arm64/boot/dts/exynos/exynos7.dtsi | 34 +++++++++++++++++++++++++++++++++
+>>  1 file changed, 34 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+>> index 9080a11..a2d8d11 100644
+>> --- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
+>> +++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
+>> @@ -603,6 +603,40 @@
+>>  				#include "exynos7-trip-points.dtsi"
+>>  			};
+>>  		};
+>> +
+>> +		usbdrd_phy: phy at 15500000 {
+>> +			compatible = "samsung,exynos7-usbdrd-phy";
+>> +			reg = <0x15500000 0x100>;
+>> +			clocks = <&clock_fsys0 ACLK_USBDRD300>,
+>> +			       <&clock_fsys0 OSCCLK_PHY_CLKOUT_USB30_PHY>,
+>> +			       <&clock_fsys0 PHYCLK_USBDRD300_UDRD30_PIPE_PCLK_USER>,
+>> +			       <&clock_fsys0 PHYCLK_USBDRD300_UDRD30_PHYCLK_USER>,
+>> +			       <&clock_fsys0 SCLK_USBDRD300_REFCLK>;
+>> +			clock-names = "phy", "ref", "phy_pipe",
+>> +				"phy_utmi", "itp";
+>> +			samsung,pmu-syscon = <&pmu_system_controller>;
+>> +			#phy-cells = <1>;
+>> +		};
+>> +
+>> +		usbdrd3: usb at 15400000 {
+>> +			compatible = "samsung,exynos7-dwusb3";
+>> +			clocks = <&clock_fsys0 ACLK_USBDRD300>,
+>> +			       <&clock_fsys0 SCLK_USBDRD300_SUSPENDCLK>,
+>> +			       <&clock_fsys0 ACLK_AXIUS_USBDRD30X_FSYS0X>;
+>> +			clock-names = "usbdrd30", "usbdrd30_susp_clk",
+>> +				"usbdrd30_axius_clk";
+>> +			#address-cells = <1>;
+>> +			#size-cells = <1>;
+>> +			ranges;
+>> +
+>> +			dwc3 {
+> 
+> dtc should complain here - you need:
+> 	dwc3 at 15400000
+
+No, it didn't complain. Anyway, I will update as it's already taken care
+in other Exynos SoC DTSi files.
+
+> In the same time I think the address node does not have to be put after
+> parent's usb.
+> 
+
+OK, will update.
+
+
+Thanks,
+Pankaj Dubey
+
+> Best regards,
+> Krzysztof
+> 
+>> +				compatible = "snps,dwc3";
+>> +				reg = <0x15400000 0x10000>;
+>> +				interrupts = <GIC_SPI 223 IRQ_TYPE_LEVEL_HIGH>;
+>> +				phys = <&usbdrd_phy 0>, <&usbdrd_phy 1>;
+>> +				phy-names = "usb2-phy", "usb3-phy";
+>> +			};
+>> +		};
+>>  	};
+>>  };
+>>  
+>> -- 
+>> 2.7.4
+>>
+> 
+> 
+> 
