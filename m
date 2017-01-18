@@ -1,120 +1,95 @@
 From: guohanjun@huawei.com (Hanjun Guo)
-Date: Wed, 18 Jan 2017 20:54:58 +0800
-Subject: [PATCH v8 08/15] ACPI: IORT: rename iort_node_map_rid() to make it
- generic
+Date: Wed, 18 Jan 2017 20:54:56 +0800
+Subject: [PATCH v8 06/15] irqchip: gicv3-its: platform-msi: refactor
+ its_pmsi_init() to prepare for ACPI
 In-Reply-To: <1484744105-53140-1-git-send-email-guohanjun@huawei.com>
 References: <1484744105-53140-1-git-send-email-guohanjun@huawei.com>
-Message-ID: <1484744105-53140-9-git-send-email-guohanjun@huawei.com>
+Message-ID: <1484744105-53140-7-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Hanjun Guo <hanjun.guo@linaro.org>
 
-iort_node_map_rid() was designed to take an input id (that is not
-necessarily a PCI requester id) and map it to an output id (eg an SMMU
-streamid or an ITS deviceid) according to the mappings provided by an
-IORT node mapping entries. This means that the iort_node_map_rid() input
-id is not always a PCI requester id as its name, parameters and local
-variables suggest, which is misleading.
+Introduce its_pmsi_init_one() to refactor the code to isolate
+ACPI&DT common code to prepare for ACPI later.
 
-Apply the s/rid/id substitution to the iort_node_map_rid() mapping
-function and its users to make sure its intended usage is clearer.
-
-Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Reviewed-by: Matthias Brugger <mbrugger@suse.com>
 Tested-by: Ming Lei <ming.lei@canonical.com>
 Tested-by: Wei Xu <xuwei5@hisilicon.com>
 Tested-by: Sinan Kaya <okaya@codeaurora.org>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: Tomasz Nowicki <tn@semihalf.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
 ---
- drivers/acpi/arm64/iort.c | 30 +++++++++++++++---------------
- 1 file changed, 15 insertions(+), 15 deletions(-)
+ drivers/irqchip/irq-gic-v3-its-platform-msi.c | 45 ++++++++++++++++-----------
+ 1 file changed, 27 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index 208eac9..069a690 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -355,11 +355,11 @@ struct acpi_iort_node *iort_node_get_id(struct acpi_iort_node *node,
- 	return NULL;
- }
+diff --git a/drivers/irqchip/irq-gic-v3-its-platform-msi.c b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
+index 3c94278..3d9efd1 100644
+--- a/drivers/irqchip/irq-gic-v3-its-platform-msi.c
++++ b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
+@@ -82,34 +82,43 @@ static int its_pmsi_prepare(struct irq_domain *domain, struct device *dev,
+ 	{},
+ };
  
--static struct acpi_iort_node *iort_node_map_rid(struct acpi_iort_node *node,
--						u32 rid_in, u32 *rid_out,
--						u8 type_mask)
-+static struct acpi_iort_node *iort_node_map_id(struct acpi_iort_node *node,
-+					       u32 id_in, u32 *id_out,
-+					       u8 type_mask)
+-static int __init its_pmsi_init(void)
++static int __init its_pmsi_init_one(struct fwnode_handle *fwnode,
++				const char *name)
  {
--	u32 rid = rid_in;
-+	u32 id = id_in;
+-	struct device_node *np;
+ 	struct irq_domain *parent;
  
- 	/* Parse the ID mapping tree to find specified node type */
- 	while (node) {
-@@ -367,8 +367,8 @@ static struct acpi_iort_node *iort_node_map_rid(struct acpi_iort_node *node,
- 		int i;
++	parent = irq_find_matching_fwnode(fwnode, DOMAIN_BUS_NEXUS);
++	if (!parent || !msi_get_domain_info(parent)) {
++		pr_err("%s: unable to locate ITS domain\n", name);
++		return -ENXIO;
++	}
++
++	if (!platform_msi_create_irq_domain(fwnode, &its_pmsi_domain_info,
++					    parent)) {
++		pr_err("%s: unable to create platform domain\n", name);
++		return -ENXIO;
++	}
++
++	pr_info("Platform MSI: %s domain created\n", name);
++	return 0;
++}
++
++static void __init its_pmsi_of_init(void)
++{
++	struct device_node *np;
++
+ 	for (np = of_find_matching_node(NULL, its_device_id); np;
+ 	     np = of_find_matching_node(np, its_device_id)) {
+ 		if (!of_property_read_bool(np, "msi-controller"))
+ 			continue;
  
- 		if (IORT_TYPE_MASK(node->type) & type_mask) {
--			if (rid_out)
--				*rid_out = rid;
-+			if (id_out)
-+				*id_out = id;
- 			return node;
- 		}
- 
-@@ -385,9 +385,9 @@ static struct acpi_iort_node *iort_node_map_rid(struct acpi_iort_node *node,
- 			goto fail_map;
- 		}
- 
--		/* Do the RID translation */
-+		/* Do the ID translation */
- 		for (i = 0; i < node->mapping_count; i++, map++) {
--			if (!iort_id_map(map, node->type, rid, &rid))
-+			if (!iort_id_map(map, node->type, id, &id))
- 				break;
- 		}
- 
-@@ -399,9 +399,9 @@ static struct acpi_iort_node *iort_node_map_rid(struct acpi_iort_node *node,
+-		parent = irq_find_matching_host(np, DOMAIN_BUS_NEXUS);
+-		if (!parent || !msi_get_domain_info(parent)) {
+-			pr_err("%s: unable to locate ITS domain\n",
+-			       np->full_name);
+-			continue;
+-		}
+-
+-		if (!platform_msi_create_irq_domain(of_node_to_fwnode(np),
+-						    &its_pmsi_domain_info,
+-						    parent)) {
+-			pr_err("%s: unable to create platform domain\n",
+-			       np->full_name);
+-			continue;
+-		}
+-
+-		pr_info("Platform MSI: %s domain created\n", np->full_name);
++		its_pmsi_init_one(of_node_to_fwnode(np), np->full_name);
  	}
++}
  
- fail_map:
--	/* Map input RID to output RID unchanged on mapping failure*/
--	if (rid_out)
--		*rid_out = rid_in;
-+	/* Map input ID to output ID unchanged on mapping failure */
-+	if (id_out)
-+		*id_out = id_in;
- 
- 	return NULL;
++static int __init its_pmsi_init(void)
++{
++	its_pmsi_of_init();
+ 	return 0;
  }
-@@ -439,7 +439,7 @@ u32 iort_msi_map_rid(struct device *dev, u32 req_id)
- 	if (!node)
- 		return req_id;
- 
--	iort_node_map_rid(node, req_id, &dev_id, IORT_MSI_TYPE);
-+	iort_node_map_id(node, req_id, &dev_id, IORT_MSI_TYPE);
- 	return dev_id;
- }
- 
-@@ -462,7 +462,7 @@ static int iort_dev_find_its_id(struct device *dev, u32 req_id,
- 	if (!node)
- 		return -ENXIO;
- 
--	node = iort_node_map_rid(node, req_id, NULL, IORT_MSI_TYPE);
-+	node = iort_node_map_id(node, req_id, NULL, IORT_MSI_TYPE);
- 	if (!node)
- 		return -ENXIO;
- 
-@@ -591,8 +591,8 @@ const struct iommu_ops *iort_iommu_configure(struct device *dev)
- 		if (!node)
- 			return NULL;
- 
--		parent = iort_node_map_rid(node, rid, &streamid,
--					   IORT_IOMMU_TYPE);
-+		parent = iort_node_map_id(node, rid, &streamid,
-+					  IORT_IOMMU_TYPE);
- 
- 		ops = iort_iommu_xlate(dev, parent, streamid);
- 
+ early_initcall(its_pmsi_init);
 -- 
 1.7.12.4
