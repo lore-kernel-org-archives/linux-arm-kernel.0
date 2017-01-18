@@ -1,36 +1,116 @@
 From: roy.pledge@nxp.com (Roy Pledge)
-Date: Wed, 18 Jan 2017 17:39:39 -0500
-Subject: [PATCH 09/10] soc/qbman: Add missing headers on ARM
+Date: Wed, 18 Jan 2017 17:39:38 -0500
+Subject: [PATCH 08/10] soc/qbman: different register offsets on ARM
 In-Reply-To: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
 References: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
-Message-ID: <1484779180-1344-10-git-send-email-roy.pledge@nxp.com>
+Message-ID: <1484779180-1344-9-git-send-email-roy.pledge@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Claudiu Manoil <claudiu.manoil@nxp.com>
+From: Madalin Bucur <madalin.bucur@nxp.com>
 
-Unlike PPC builds, ARM builds need following headers
-explicitly:
-+#include <linux/io.h>		for ioread32be()
-+#include <linux/delay.h>		for udelay()
-
+Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
 Signed-off-by: Claudiu Manoil <claudiu.manoil@nxp.com>
 ---
- drivers/soc/fsl/qbman/dpaa_sys.h |    2 ++
- 1 file changed, 2 insertions(+)
+ drivers/soc/fsl/qbman/bman.c |   22 ++++++++++++++++++++++
+ drivers/soc/fsl/qbman/qman.c |   38 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 60 insertions(+)
 
-diff --git a/drivers/soc/fsl/qbman/dpaa_sys.h b/drivers/soc/fsl/qbman/dpaa_sys.h
-index ae65758..6239e18 100644
---- a/drivers/soc/fsl/qbman/dpaa_sys.h
-+++ b/drivers/soc/fsl/qbman/dpaa_sys.h
-@@ -43,6 +43,8 @@
- #include <linux/prefetch.h>
- #include <linux/genalloc.h>
- #include <asm/cacheflush.h>
-+#include <linux/io.h>
-+#include <linux/delay.h>
+diff --git a/drivers/soc/fsl/qbman/bman.c b/drivers/soc/fsl/qbman/bman.c
+index 3acded1..1fa9099 100644
+--- a/drivers/soc/fsl/qbman/bman.c
++++ b/drivers/soc/fsl/qbman/bman.c
+@@ -35,6 +35,27 @@
  
- /* For 2-element tables related to cache-inhibited and cache-enabled mappings */
- #define DPAA_PORTAL_CE 0
+ /* Portal register assists */
+ 
++#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
++/* Cache-inhibited register offsets */
++#define BM_REG_RCR_PI_CINH	0x3000
++#define BM_REG_RCR_CI_CINH	0x3100
++#define BM_REG_RCR_ITR		0x3200
++#define BM_REG_CFG		0x3300
++#define BM_REG_SCN(n)		(0x3400 + ((n) << 6))
++#define BM_REG_ISR		0x3e00
++#define BM_REG_IER		0x3e40
++#define BM_REG_ISDR		0x3e80
++#define BM_REG_IIR		0x3ec0
++
++/* Cache-enabled register offsets */
++#define BM_CL_CR		0x0000
++#define BM_CL_RR0		0x0100
++#define BM_CL_RR1		0x0140
++#define BM_CL_RCR		0x1000
++#define BM_CL_RCR_PI_CENA	0x3000
++#define BM_CL_RCR_CI_CENA	0x3100
++
++#else
+ /* Cache-inhibited register offsets */
+ #define BM_REG_RCR_PI_CINH	0x0000
+ #define BM_REG_RCR_CI_CINH	0x0004
+@@ -53,6 +74,7 @@
+ #define BM_CL_RCR		0x1000
+ #define BM_CL_RCR_PI_CENA	0x3000
+ #define BM_CL_RCR_CI_CENA	0x3100
++#endif
+ 
+ /*
+  * Portal modes.
+diff --git a/drivers/soc/fsl/qbman/qman.c b/drivers/soc/fsl/qbman/qman.c
+index 879e8f2..d67b8e1 100644
+--- a/drivers/soc/fsl/qbman/qman.c
++++ b/drivers/soc/fsl/qbman/qman.c
+@@ -41,6 +41,43 @@
+ 
+ /* Portal register assists */
+ 
++#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
++/* Cache-inhibited register offsets */
++#define QM_REG_EQCR_PI_CINH	0x3000
++#define QM_REG_EQCR_CI_CINH	0x3040
++#define QM_REG_EQCR_ITR		0x3080
++#define QM_REG_DQRR_PI_CINH	0x3100
++#define QM_REG_DQRR_CI_CINH	0x3140
++#define QM_REG_DQRR_ITR		0x3180
++#define QM_REG_DQRR_DCAP	0x31C0
++#define QM_REG_DQRR_SDQCR	0x3200
++#define QM_REG_DQRR_VDQCR	0x3240
++#define QM_REG_DQRR_PDQCR	0x3280
++#define QM_REG_MR_PI_CINH	0x3300
++#define QM_REG_MR_CI_CINH	0x3340
++#define QM_REG_MR_ITR		0x3380
++#define QM_REG_CFG		0x3500
++#define QM_REG_ISR		0x3600
++#define QM_REG_IER		0x3640
++#define QM_REG_ISDR		0x3680
++#define QM_REG_IIR		0x36C0
++#define QM_REG_ITPR		0x3740
++
++/* Cache-enabled register offsets */
++#define QM_CL_EQCR		0x0000
++#define QM_CL_DQRR		0x1000
++#define QM_CL_MR		0x2000
++#define QM_CL_EQCR_PI_CENA	0x3000
++#define QM_CL_EQCR_CI_CENA	0x3040
++#define QM_CL_DQRR_PI_CENA	0x3100
++#define QM_CL_DQRR_CI_CENA	0x3140
++#define QM_CL_MR_PI_CENA	0x3300
++#define QM_CL_MR_CI_CENA	0x3340
++#define QM_CL_CR		0x3800
++#define QM_CL_RR0		0x3900
++#define QM_CL_RR1		0x3940
++
++#else
+ /* Cache-inhibited register offsets */
+ #define QM_REG_EQCR_PI_CINH	0x0000
+ #define QM_REG_EQCR_CI_CINH	0x0004
+@@ -75,6 +112,7 @@
+ #define QM_CL_CR		0x3800
+ #define QM_CL_RR0		0x3900
+ #define QM_CL_RR1		0x3940
++#endif
+ 
+ /*
+  * BTW, the drivers (and h/w programming model) already obtain the required
 -- 
 1.7.9.5
