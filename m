@@ -1,43 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 18 Jan 2017 13:45:58 +0000
-Subject: [PATCH v3 6/9] kvm: arm/arm64: Add host pmu to support VM
- introspection
-In-Reply-To: <87o9z4msi3.fsf@e105922-lin.cambridge.arm.com>
-References: <20170110113856.7183-1-punit.agrawal@arm.com>
- <20170110113856.7183-7-punit.agrawal@arm.com>
- <1a6b8d71-58a5-b29b-3f01-e945deb2baf6@arm.com>
- <20170118113523.GB3231@leverpostej>
- <87o9z4msi3.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <20170118134558.GF28063@arm.com>
+From: jroedel@suse.de (Joerg Roedel)
+Date: Wed, 18 Jan 2017 14:47:05 +0100
+Subject: [RFC PATCH v5 1/7] dma: Take into account dma_pfn_offset
+In-Reply-To: <1484738003-29892-2-git-send-email-vladimir.murzin@arm.com>
+References: <1484738003-29892-1-git-send-email-vladimir.murzin@arm.com>
+ <1484738003-29892-2-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <20170118134447.GG9529@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2017 at 01:01:40PM +0000, Punit Agrawal wrote:
-> Mark Rutland <mark.rutland@arm.com> writes:
+On Wed, Jan 18, 2017 at 11:13:17AM +0000, Vladimir Murzin wrote:
+> Even though dma-noop-ops assumes 1:1 memory mapping DMA memory range
+> can be different to RAM. For example, ARM STM32F4 MCU offers the
+> possibility to remap SDRAM from 0xc000_0000 to 0x0 to get CPU
+> performance boost, but DMA continue to see SDRAM at 0xc000_0000. This
+> difference in mapping is handled via device-tree "dma-range" property
+> which leads to dev->dma_pfn_offset is set nonzero. To handle such
+> cases take dma_pfn_offset into account.
 > 
-> > On Wed, Jan 18, 2017 at 11:21:21AM +0000, Marc Zyngier wrote:
-> >> On 10/01/17 11:38, Punit Agrawal wrote:
-> >> > +#define VM_MASK	GENMASK_ULL(31, 0)
-> >> > +#define EVENT_MASK	GENMASK_ULL(32, 39)
-> >> > +#define EVENT_SHIFT	(32)
-> >> > +
-> >> > +#define to_pid(cfg)	((cfg) & VM_MASK)
-> >> > +#define to_event(cfg)	(((cfg) & EVENT_MASK) >> EVENT_SHIFT)
-> >> > +
-> >> > +PMU_FORMAT_ATTR(vm, "config:0-31");
-> >> > +PMU_FORMAT_ATTR(event, "config:32-39");
-> >> 
-> >> I'm a bit confused by these. Can't you get the PID of the VM you're
-> >> tracing directly from perf, without having to encode things?
+> Cc: Joerg Roedel <jroedel@suse.de>
+> Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+> Reported-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> ---
+>  lib/dma-noop.c | 8 +++++---
+>  1 file changed, 5 insertions(+), 3 deletions(-)
 > 
-> With perf attached to a PID, the event gets scheduled out when the task
-> is context switched. As the PID of the controlling process was used,
-> none of the vCPU events were counted.
+> diff --git a/lib/dma-noop.c b/lib/dma-noop.c
+> index 3d766e7..a14eee5 100644
+> --- a/lib/dma-noop.c
+> +++ b/lib/dma-noop.c
+> @@ -7,6 +7,7 @@
+>  #include <linux/mm.h>
+>  #include <linux/dma-mapping.h>
+>  #include <linux/scatterlist.h>
+> +#include <linux/pfn.h>
+>  
+>  static void *dma_noop_alloc(struct device *dev, size_t size,
+>  			    dma_addr_t *dma_handle, gfp_t gfp,
+> @@ -16,7 +17,8 @@ static void *dma_noop_alloc(struct device *dev, size_t size,
+>  
+>  	ret = (void *)__get_free_pages(gfp, get_order(size));
+>  	if (ret)
+> -		*dma_handle = virt_to_phys(ret);
+> +		*dma_handle = virt_to_phys(ret) - PFN_PHYS(dev->dma_pfn_offset);
+> +
 
-So it sounds like userspace needs to deal with this by attaching to the PIDs
-of the vCPUs. Given that perf kvm seems to have knowledge of vCPUs, it would
-be nice to know why that logic isn't reusable here. Take a look in
-tools/perf/builtin-kvm.c and if it's not up to the job, then perhaps it can
-be improved.
+If you need to do a '-' operation here, the offset is basically a
+cpu_pfn_offset for the device. Is that correct?
 
-Will
+
+	Joerg
