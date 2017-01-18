@@ -1,31 +1,214 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 18 Jan 2017 11:50:40 +0100
-Subject: [PATCH 1/3] dt-bindings: vendor-prefix: Add wetek vendor prefix
+Date: Wed, 18 Jan 2017 11:50:41 +0100
+Subject: [PATCH 2/3] ARM64: dts: meson-gxbb: Add support for WeTek Hub and Play
 In-Reply-To: <1484736642-5451-1-git-send-email-narmstrong@baylibre.com>
 References: <1484736642-5451-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1484736642-5451-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1484736642-5451-3-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add prefix for WeTek Electronics, limited, a company producing multimedia
-Set-Top-Boxes and supporting KODI and OpenELEC distributions.
+Adds support for the WeTek Hub and Play2 boards.
+The Hub is an extremely small IPTv Set-Top-Box and the Play2 is a more
+traditionnal Satellite or Terrestrial and IPTv Set-Top-Box.
+
+Both are based on the p200 Reference Design and out-of-tree support is
+based on OpenELEC kernel at [1].
+
+[1] https://github.com/wetek-enigma/linux-amlogic
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/amlogic/Makefile               |  2 +
+ .../boot/dts/amlogic/meson-gxbb-wetek-hub.dts      | 66 +++++++++++++++
+ .../boot/dts/amlogic/meson-gxbb-wetek-play2.dts    | 94 ++++++++++++++++++++++
+ 3 files changed, 162 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-hub.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-play2.dts
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 16d3b5e..0c16d85 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -320,6 +320,7 @@ virtio	Virtual I/O Device Specification, developed by the OASIS consortium
- vivante	Vivante Corporation
- voipac	Voipac Technologies s.r.o.
- wd	Western Digital Corp.
-+wetek	WeTek Electronics, limited.
- wexler	Wexler
- winbond Winbond Electronics corp.
- wlf	Wolfson Microelectronics
+diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
+index 0d7bfbf..cc2e2dd 100644
+--- a/arch/arm64/boot/dts/amlogic/Makefile
++++ b/arch/arm64/boot/dts/amlogic/Makefile
+@@ -5,6 +5,8 @@ dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-p201.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-pro.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-meta.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-vega-s95-telos.dtb
++dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-wetek-hub.dtb
++dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-wetek-play2.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-p212.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p230.dtb
+ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p231.dtb
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-hub.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-hub.dts
+new file mode 100644
+index 0000000..56f8559
+--- /dev/null
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-hub.dts
+@@ -0,0 +1,66 @@
++/*
++ * Copyright (c) 2016 BayLibre, Inc.
++ * Author: Neil Armstrong <narmstrong@baylibre.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "meson-gxbb-p20x.dtsi"
++
++/ {
++	compatible = "wetek,hub", "amlogic,meson-gxbb";
++	model = "WeTek Hub";
++
++	leds {
++		compatible = "gpio-leds";
++
++		system {
++			label = "wetek-play:system-status";
++			gpios = <&gpio_ao GPIOAO_13 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++			panic-indicator;
++		};
++	};
++
++	cvbs-connector {
++		status = "disabled";
++	};
++};
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-play2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-play2.dts
+new file mode 100644
+index 0000000..ea79fdd
+--- /dev/null
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-play2.dts
+@@ -0,0 +1,94 @@
++/*
++ * Copyright (c) 2016 BayLibre, Inc.
++ * Author: Neil Armstrong <narmstrong@baylibre.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++
++#include "meson-gxbb-p20x.dtsi"
++#include <dt-bindings/input/input.h>
++
++/ {
++	compatible = "wetek,play2", "amlogic,meson-gxbb";
++	model = "WeTek Play 2";
++
++	leds {
++		compatible = "gpio-leds";
++
++		system {
++			label = "wetek-play:system-status";
++			gpios = <&gpio_ao GPIOAO_13 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++			panic-indicator;
++		};
++
++		wifi {
++			label = "wetek-play:wifi-status";
++			gpios = <&gpio GPIODV_26 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++		};
++
++		ethernet {
++			label = "wetek-play:ethernet-status";
++			gpios = <&gpio GPIODV_27 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++		};
++	};
++
++	gpio-keys-polled {
++		compatible = "gpio-keys-polled";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		poll-interval = <100>;
++
++		button at 0 {
++			label = "reset";
++			linux,code = <KEY_RESTART>;
++			gpios = <&gpio_ao GPIOAO_3 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
++
++&i2c_A {
++	status = "okay";
++	pinctrl-0 = <&i2c_a_pins>;
++	pinctrl-names = "default";
++};
 -- 
 1.9.1
