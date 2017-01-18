@@ -1,38 +1,60 @@
 From: guohanjun@huawei.com (Hanjun Guo)
-Date: Wed, 18 Jan 2017 20:55:03 +0800
-Subject: [PATCH v8 13/15] irqchip: mbigen: drop module owner
+Date: Wed, 18 Jan 2017 20:54:53 +0800
+Subject: [PATCH v8 03/15] ACPI: IORT: minor cleanup for
+ iort_match_node_callback()
 In-Reply-To: <1484744105-53140-1-git-send-email-guohanjun@huawei.com>
 References: <1484744105-53140-1-git-send-email-guohanjun@huawei.com>
-Message-ID: <1484744105-53140-14-git-send-email-guohanjun@huawei.com>
+Message-ID: <1484744105-53140-4-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kefeng Wang <wangkefeng.wang@huawei.com>
+From: Hanjun Guo <hanjun.guo@linaro.org>
 
-Module owner will be set by driver core, so drop it.
+Cleanup iort_match_node_callback() a little bit to reduce
+some lines of code.
 
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Reviewed-by: Ma Jun <majun258@huawei.com>
 Tested-by: Ming Lei <ming.lei@canonical.com>
 Tested-by: Wei Xu <xuwei5@hisilicon.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
+Tested-by: Sinan Kaya <okaya@codeaurora.org>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Tomasz Nowicki <tn@semihalf.com>
 ---
- drivers/irqchip/irq-mbigen.c | 1 -
- 1 file changed, 1 deletion(-)
+ drivers/acpi/arm64/iort.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/irqchip/irq-mbigen.c b/drivers/irqchip/irq-mbigen.c
-index 03b79b0..c01ab41 100644
---- a/drivers/irqchip/irq-mbigen.c
-+++ b/drivers/irqchip/irq-mbigen.c
-@@ -293,7 +293,6 @@ static int mbigen_device_probe(struct platform_device *pdev)
- static struct platform_driver mbigen_platform_driver = {
- 	.driver = {
- 		.name		= "Hisilicon MBIGEN-V2",
--		.owner		= THIS_MODULE,
- 		.of_match_table	= mbigen_of_match,
- 	},
- 	.probe			= mbigen_device_probe,
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index 15f32bf..208eac9 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -253,17 +253,15 @@ static acpi_status iort_match_node_callback(struct acpi_iort_node *node,
+ 					    void *context)
+ {
+ 	struct device *dev = context;
+-	acpi_status status;
++	acpi_status status = AE_NOT_FOUND;
+ 
+ 	if (node->type == ACPI_IORT_NODE_NAMED_COMPONENT) {
+ 		struct acpi_buffer buf = { ACPI_ALLOCATE_BUFFER, NULL };
+ 		struct acpi_device *adev = to_acpi_device_node(dev->fwnode);
+ 		struct acpi_iort_named_component *ncomp;
+ 
+-		if (!adev) {
+-			status = AE_NOT_FOUND;
++		if (!adev)
+ 			goto out;
+-		}
+ 
+ 		status = acpi_get_name(adev->handle, ACPI_FULL_PATHNAME, &buf);
+ 		if (ACPI_FAILURE(status)) {
+@@ -289,8 +287,6 @@ static acpi_status iort_match_node_callback(struct acpi_iort_node *node,
+ 		 */
+ 		status = pci_rc->pci_segment_number == pci_domain_nr(bus) ?
+ 							AE_OK : AE_NOT_FOUND;
+-	} else {
+-		status = AE_NOT_FOUND;
+ 	}
+ out:
+ 	return status;
 -- 
 1.7.12.4
