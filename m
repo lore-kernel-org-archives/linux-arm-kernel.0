@@ -1,27 +1,41 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 18 Jan 2017 14:06:43 -0800
-Subject: [PATCH net-next v4 00/10] net: dsa: Support for pdata in dsa2
-In-Reply-To: <20170118.165050.2165692521961713529.davem@davemloft.net>
-References: <20170117232152.1661-1-f.fainelli@gmail.com>
- <20170118.165050.2165692521961713529.davem@davemloft.net>
-Message-ID: <c41c6746-9489-80f6-92a9-aa3595ce92c5@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 18 Jan 2017 16:08:09 -0600
+Subject: [PATCH v1 1/2] Documentation: mtk-quadspi: update DT bindings
+In-Reply-To: <20170113151326.11e9451a@bbrezillon>
+References: <1484291609-20195-1-git-send-email-guochun.mao@mediatek.com>
+ <1484291609-20195-2-git-send-email-guochun.mao@mediatek.com>
+ <20170113151326.11e9451a@bbrezillon>
+Message-ID: <20170118220809.pmaa2f3kwiddehti@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/18/2017 01:50 PM, David Miller wrote:
-> From: Florian Fainelli <f.fainelli@gmail.com>
-> Date: Tue, 17 Jan 2017 15:21:42 -0800
+On Fri, Jan 13, 2017 at 03:13:26PM +0100, Boris Brezillon wrote:
+> On Fri, 13 Jan 2017 15:13:28 +0800
+> Guochun Mao <guochun.mao@mediatek.com> wrote:
 > 
->> This is not exactly new, and was sent before, although back then, I did not
->> have an user of the pre-declared MDIO board information, but now we do. Note
->> that I have additional changes queued up to have b53 register platform data for
->> MIPS bcm47xx and bcm63xx.
->  ...
+> > Add "mediatek,mt2701-nor" for nor flash node's compatible.
+> > 
+> > Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/mtd/mtk-quadspi.txt        |    4 +++-
+> >  1 file changed, 3 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+> > index fb314f0..f83d31d 100644
+> > --- a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+> > +++ b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+> > @@ -1,7 +1,9 @@
+> >  * Serial NOR flash controller for MTK MT81xx (and similar)
+> >  
+> >  Required properties:
+> > -- compatible: 	  should be "mediatek,mt8173-nor";
+> > +- compatible: 	  should contain:
+> > +		  "mediatek,mt2701-nor" for MT2701,
+> > +		  "mediatek,mt8173-nor" for MT8173.
 > 
-> We're waiting for Greg's further review and Vivien's changes which I just
-> applied are going to create some conflicts, so I am presuming that you will
-> respin a v5 anyways.
+> Do you need to define a new compatible? If the IPs are exactly the same
+> in both SoCs it shouldn't be needed.
 
-Yes indeed. Thanks for your patience!
--- 
-Florian
+Rather the 2701 should contain both strings in that case.
+
+Rob
