@@ -1,38 +1,38 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 18 Jan 2017 11:16:28 +0100
-Subject: [PATCH v7 4/8] PWM: add PWM driver for STM32 plaftorm
-In-Reply-To: <1483608344-9012-5-git-send-email-benjamin.gaignard@st.com>
-References: <1483608344-9012-1-git-send-email-benjamin.gaignard@st.com>
- <1483608344-9012-5-git-send-email-benjamin.gaignard@st.com>
-Message-ID: <20170118101628.GG18989@ulmo.ba.sec>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 18 Jan 2017 11:21:47 +0100
+Subject: [PATCH 1/2] pinctrl: meson: fix uart_ao_b for GXBB and GXL/GXM
+In-Reply-To: <20170115222029.8271-2-martin.blumenstingl@googlemail.com>
+References: <20170115222029.8271-1-martin.blumenstingl@googlemail.com>
+ <20170115222029.8271-2-martin.blumenstingl@googlemail.com>
+Message-ID: <CACRpkdaDB5LoNSdUFUdypHbUseo0KqKiK1hteeD5RK1KkF60XA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2017 at 10:25:40AM +0100, Benjamin Gaignard wrote:
-[...]
-> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-> index f92dd41..88035c0 100644
-> --- a/drivers/pwm/Kconfig
-> +++ b/drivers/pwm/Kconfig
-> @@ -397,6 +397,15 @@ config PWM_STI
->  	  To compile this driver as a module, choose M here: the module
->  	  will be called pwm-sti.
->  
-> +config PWM_STM32
-> +	tristate "STMicroelectronics STM32 PWM"
-> +	depends on (ARCH_STM32 && OF && MFD_STM32_TIMERS) || COMPILE_TEST
+On Sun, Jan 15, 2017 at 11:20 PM, Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
 
-One other thing: is the dependency on ARCH_STM32 and OF necessary here?
-ARCH_STM32 and OF are both pulled in by MFD_STM32_TIMERS. The dependency
-is probably fine for MFD_STM32_TIMERS, though even there && OF seems too
-much, since it's already pulled in via ARCH_STM32 -> ARM_SINGLE_ARMV7M
--> USE_OF.
+> The GXBB and GXL/GXM pinctrl drivers had a configuration which conflicts
+> with uart_ao_a. According to the GXBB ("S905") datasheet the AO UART
+> functions are:
+> - GPIOAO_0: Func1 = UART_TX_AO_A (bit 12), Func2 = UART_TX_AO_B (bit 26)
+> - GPIOAO_1: Func1 = UART_RX_AO_A (bit 11), Func2 = UART_RX_AO_B (bit 25)
+> - GPIOAO_4: Func2 = UART_TX_AO_B (bit 24)
+> - GPIOAO_5: Func2 = UART_RX_AO_B (bit 25)
+>
+> The existing definition for uart_AO_A already uses GPIOAO_0 and GPIOAO_1.
+> The old definition of uart_AO_B however was broken, as it used GPIOAO_0
+> for TX (which would be fine) and two pins (GPIOAO_1 and GPIOAO_5) for RX
+> (which does not make any sense).
+>
+> This fixes the uart_AO_B configuration by moving it to GPIOAO_4 and
+> GPIOAO_5 (it would be possible to use GPIOAO_0 and GPIOAO_1 in theory,
+> but all existing hardware uses uart_AO_A there).
+> The fix for GXBB and GXL/GXM is identical since it seems that these
+> specific pins are identical on both SoC variants.
+>
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170118/f45a1318/attachment.sig>
+Patch applied for fixes.
+
+Yours,
+Linus Walleij
