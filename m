@@ -1,140 +1,75 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 18 Jan 2017 15:57:55 -0600
-Subject: [PATCH v2 15/18] drivers/fsi: Add documentation for GPIO based
- FSI master
-In-Reply-To: <1484260543-80300-1-git-send-email-christopher.lee.bostic@gmail.com>
-References: <1484260543-80300-1-git-send-email-christopher.lee.bostic@gmail.com>
-Message-ID: <20170118215755.xoamoc2rrzhy4kyz@rob-hp-laptop>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 18 Jan 2017 14:02:06 -0800
+Subject: [PATCH 0/4] Bluetooth support for GXBB/GXL/GXM based devices
+In-Reply-To: <CAFBinCC0RADEKnkYEF6_DkBTftdjmPMku+N3bdvZMCoqs96xGA@mail.gmail.com>
+ (Martin Blumenstingl's message of "Wed, 18 Jan 2017 12:25:43 +0100")
+References: <20170115223255.10350-1-martin.blumenstingl@googlemail.com>
+ <CAFBinCC0RADEKnkYEF6_DkBTftdjmPMku+N3bdvZMCoqs96xGA@mail.gmail.com>
+Message-ID: <m2fukgyqld.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2017 at 04:35:43PM -0600, christopher.lee.bostic at gmail.com wrote:
-> From: Chris Bostic <cbostic@us.ibm.com>
-> 
-> Define the device tree bindings for the GPIO master type.
-> 
-> Signed-off-by: Chris Bostic <cbostic@us.ibm.com>
-> 
-> ---
-> 
-> V2 - Break out this documentation update from the code implementing
->      The GPIO master function.
-> 
->    - Move the documentation to an earlier patch than the code
->      implementing the function.
-> 
->    - Document all 'compatible' strings used in the series.
-> 
->    - Write binding document in terms of hardware, not software.
-> 
->    - Elaborate on what a GPIO based FSI master is versus a non
->      GPIO based master.
-> 
->    - Give a more detailed description of what each pin in the GPIO
->      FSI master is to be used for.
-> 
->    - Re-order compatible strings in example so that most specific
->      comes first.
-> 
->    - Indicate the proper order each pin should be initialized.
-> 
->    - Fix an unmatched '>' bracket in the example for binding.
-> 
->    - Bracket each element of the example list items individually.
-> ---
->  .../devicetree/bindings/fsi/fsi-master-gpio.txt    | 71 ++++++++++++++++++++++
->  1 file changed, 71 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt b/Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt
-> new file mode 100644
-> index 0000000..5d589bf
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt
-> @@ -0,0 +1,71 @@
-> +Device-tree bindings for FSI master implemented with GPIO
-> +---------------------------------------------------------
-> +
-> +Typically a FSI master is defined in hardware with output control
-> +lines designated for Enable, Data, Clock, etc..  In the case of
-> +a 'GPIO FSI master', however, it may be the case that there is no
-> +such master defined in hardware and must be implemented in standard
-> +GPIO to interact with its slaves.  In this 'virtual' FSI master
-> +case the GPIO pins representing clk and data are directly
-> +connected to the slaves.
-> +
-> +The GPIO FSI master node
-> +-------------------------
-> +This node describes a FSI master implmented with GPIO.
-> +Required property:
-> +	compatible = "ibm,fsi-master-gpio"
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
 
-Generally, we don't have a vendor prefix for GPIO based implementations.
+> Kevin,
+>
+> On Sun, Jan 15, 2017 at 11:32 PM, Martin Blumenstingl
+> <martin.blumenstingl@googlemail.com> wrote:
+>> This adds the missing kernel bits for Bluetooth support on the
+>> Tronsmart Vega S95 (GXBB based) boards as well as for the GXL
+>> P230/P231 and GXM Q200/Q201 reference boards.
+>>
+>> The Bluetooth functionality on these boards is provided by the
+>> SDIO wifi/Bluetooth combo-chip (Broadcom bcm43xx based). The
+>> Bluetooth module on that combo-chip has to be taken out of reset,
+>> which is taken care of the GPIO in the sdio_pwrseq.
+>>
+>> Once the module is taken out of reset it can be set up from userspace
+>> using the "hciattach" tool from bluez, which talks to the Bluetooth
+>> module which is connected to one of the serial ports (in our case
+>> uart_A). To get the Bluetooth module initialized within the timeout
+>> defined by "hciattach" (and to achieve usable speeds for Bluetooth
+>> transfers) the communication uses a speed of 2000000 baud, which was
+>> not supported by meson_uart before.
+>>
+>> NOTE: The .dts-changes from this series depends on my previous series
+>> "add support for uart_AO_B" - see [0]
+>>
+>>
+>> [0] http://lists.infradead.org/pipermail/linux-amlogic/2017-January/001982.html
+>>
+>>
+>> Martin Blumenstingl (4):
+>>   tty: serial: meson: allow baud-rates higher than 115200
+>>   ARM64: dts: meson-gx: add the serial CTS and RTS pin groups
+>
+> Neil just informed me that Rob Herring is working on defining the UART
+> Bluetooth device properly using devicetree (preparation for this is
+> named "[PATCH v2 0/9] Serial slave device bus", see [0] for the
+> mailing-list conversation and [1] for a WiP git repo).
 
-> +
-> +The standard FSI master node
-> +----------------------------
-> +This node describes a FSI master implmemented fully in hardware
-> +with dedicated input/output pins required for its function (i.e.
-> +not using generic GPIO pins).
-> +Required property:
-> +	compatible = "ibm,fsi-master"
+Ah, good news.  I knew Rob had been talking about that for awhile, so
+I'm glad to see it coming into existence.  Thanks for the pointers.
 
-This and GPIO binding should be in 2 docs.
+> This means that there will be a better solution than the one proposed
+> in the meson-gx-p23x-q20x and meson-gxbb-vega-s95 patches (patches #1
+> and #2 are not affected by this),> namely:
+> - I'm currently (ab)using sdio-pwrseq node to power on the UART
+> Bluetooth module, this can solved by specifying a bluetooth {  } node
+> inside the &uart_A node in the future and providing the corresponding
+> GPIOs there
 
-> +
-> +
-> +GPIO FSI master property/pin descriptions
-> +------------------------------------------
-> +clk -	The master controlled clock line that indicates to the
-> +	slave when to read in or send out new data - required.
-> +data -	The serial data line containing information to be sent or
-> +	received by the master.  This line is bi-directional.  During
-> +	command phase the master controls the line and when a response
-> +	is required the slave takes control - required.
-> +enable - Controls power state of data line - optional.
-> +trans - Voltage translator control. In some applications the data line
-> +	must have its signal levels altered by a translator. If this is
-> +	necessary then control of signal direction is managed via this
-> +	line - optional.
-> +mux -	Multiplexor control.  This activates/deactivates the data line
-> +	in cases where it is one of many possible selections via mux -
-> +	optional.
+Good.  I didn't like the (ab)use of sdio_pwrseq GPIO resets for the
+bluetooth either.
 
-Combine these descriptions and the property names, grouped as below.
+> - all the userspace commands will not be necessary once
+> drivers/bluetooth/hci_bcm.c is changed to the serio framework and gets
+> devicetree support
 
-> +
-> +Required properties:
-> +	- compatible = "ibm,fsi-master-gpio";
-> +	- clk-gpios;
-> +	- data-gpios;
-> +
-> +Optional properties:
-> +	- enable-gpios;
-> +	- trans-gpios;
-> +	- mux-gpios;
-> +
-> +Order of property activation:
-> +1. clk
-> +2. data
-> +3. trans
-> +4. enable
-> +5. mux
-> +
-> +
-> +Example:
-> +
-> +fsi-master {
-> +	compatible = "ibm,fsi-master-gpio", "ibm,fsi-master";
+Cool.  Maybe you can setup a WIP branch based on Rob's work for broader
+testing on Amlogic boards until this gets merged?
 
->From the description, these should be mutually exclusive.
+In the mean time, I've applied patch 2/4 and hopefully the drivers/tty
+patch will go through the serial tree.
 
-> +	clk-gpios = <&gpio 0>, <&gpio 6>;
-> +	data-gpios = <&gpio 1>, <&gpio 7>;
-> +	enable-gpios = <&gpio 2>, <&gpio 8>;
-> +	trans-gpios = <&gpio 3>, <&gpio 9>;
-> +	mux-gpios = <&gpio 4>, <&gpio 10>;
-> +}
-> -- 
-> 1.8.2.2
-> 
+Kevin
