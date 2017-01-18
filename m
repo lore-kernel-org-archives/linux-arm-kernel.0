@@ -1,48 +1,46 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Tue, 17 Jan 2017 16:50:38 -0800
-Subject: [PATCH v2 3/3] gpio: Support gpio nexus dt bindings
-In-Reply-To: <20170118005038.9216-1-stephen.boyd@linaro.org>
-References: <20170118005038.9216-1-stephen.boyd@linaro.org>
-Message-ID: <20170118005038.9216-4-stephen.boyd@linaro.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 18 Jan 2017 09:01:05 +0800
+Subject: [PATCH] ARM: dts: sun6i: sina31s: Enable USB OTG controller in
+ peripheral mode
+Message-ID: <20170118010105.20069-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Platforms like 96boards have a standardized connector/expansion
-slot that exposes signals like GPIOs to expansion boards in an
-SoC agnostic way. We'd like the DT overlays for the expansion
-boards to be written once without knowledge of the SoC on the
-other side of the connector. This avoids the unscalable
-combinatorial explosion of a different DT overlay for each
-expansion board and SoC pair.
+While the SinA31s does have a proper 5-pin mini USB OTG port, the ID
+pin does not seem to work. The pin used in the schematics is always low,
+regardless of the attached OTG cable or SoC internal pin bias settings.
 
-Now that we have nexus support in the OF core let's change the
-function call here that parses the phandle lists of gpios to use
-the nexus variant. This allows us to remap phandles and their
-arguments through any number of nexus nodes and end up with the
-actual gpio provider being used.
+The v1.5 board is missing bias resistors shown in the schematics for
+earlier revisions, and the connections of the remaining one does not
+match the schematics either.
 
-Cc: Pantelis Antoniou <pantelis.antoniou@konsulko.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Mark Brown <broonie@kernel.org>
-Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+In addition, VBUS for this port is disconnected from the board's 5V
+power rail. The board features a pad to solder jumper pins to connect
+VBUS to 5V manually.
+
+Given the above and the fact that the board has 5 more USB host ports,
+it makes more sense to have the OTG port work in peripheral mode.
+
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/gpio/gpiolib-of.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/sun6i-a31s-sina31s.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/gpio/gpiolib-of.c b/drivers/gpio/gpiolib-of.c
-index 92b185f19232..17bca36d4ebb 100644
---- a/drivers/gpio/gpiolib-of.c
-+++ b/drivers/gpio/gpiolib-of.c
-@@ -75,8 +75,8 @@ struct gpio_desc *of_get_named_gpiod_flags(struct device_node *np,
- 	struct gpio_desc *desc;
- 	int ret;
+diff --git a/arch/arm/boot/dts/sun6i-a31s-sina31s.dts b/arch/arm/boot/dts/sun6i-a31s-sina31s.dts
+index 8743aeed1275..7ff68bdd7109 100644
+--- a/arch/arm/boot/dts/sun6i-a31s-sina31s.dts
++++ b/arch/arm/boot/dts/sun6i-a31s-sina31s.dts
+@@ -153,6 +153,11 @@
+ 	regulator-name = "vcc-gmac-phy";
+ };
  
--	ret = of_parse_phandle_with_args(np, propname, "#gpio-cells", index,
--					 &gpiospec);
-+	ret = of_parse_phandle_with_args_map(np, propname, "gpio", index,
-+					     &gpiospec);
- 	if (ret) {
- 		pr_debug("%s: can't parse '%s' property of node '%s[%d]'\n",
- 			__func__, propname, np->full_name, index);
++&usb_otg {
++	dr_mode = "peripheral";
++	status = "okay";
++};
++
+ &usbphy {
+ 	status = "okay";
+ };
 -- 
-2.10.0.297.gf6727b0
+2.11.0
