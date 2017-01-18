@@ -1,99 +1,103 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 18 Jan 2017 09:21:35 +0100
-Subject: [PATCH v2 2/3] spi: pxa2xx: Prepare for edge-triggered interrupts
-In-Reply-To: <4d97e416-4d32-3b9f-0695-de116a4b26bd@siemens.com> (Jan Kiszka's
- message of "Tue, 17 Jan 2017 09:05:14 +0100")
-References: <cover.1484592296.git.jan.kiszka@siemens.com>
- <cover.1484592296.git.jan.kiszka@siemens.com>
- <7b15a0910a3ad861fd32161c72559bafa7b71e29.1484592296.git.jan.kiszka@siemens.com>
- <87ziiqdstr.fsf@belgarion.home>
- <4d97e416-4d32-3b9f-0695-de116a4b26bd@siemens.com>
-Message-ID: <87r340eq28.fsf@belgarion.home>
+From: mylene.josserand@free-electrons.com (Mylene Josserand)
+Date: Wed, 18 Jan 2017 09:23:10 +0100
+Subject: [PATCH v2 03/10] dt-bindings: sound: Add new reset compatible for
+ sun4i-i2s
+In-Reply-To: <20170117164636.qhkxvqcs7l732wxk@lukather>
+References: <20170117140230.23142-1-mylene.josserand@free-electrons.com>
+ <20170117140230.23142-4-mylene.josserand@free-electrons.com>
+ <20170117164636.qhkxvqcs7l732wxk@lukather>
+Message-ID: <1f318cd1-6a50-5b33-01aa-e11e7e925e88@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jan Kiszka <jan.kiszka@siemens.com> writes:
+Hi,
 
-> On 2017-01-17 08:54, Robert Jarzmik wrote:
->> Jan Kiszka <jan.kiszka@siemens.com> writes:
->> 
->>> When using the a device with edge-triggered interrupts, such as MSIs,
->>> the interrupt handler has to ensure that there is a point in time during
->>> its execution where all interrupts sources are silent so that a new
->>> event can trigger a new interrupt again.
->>>
->>> This is achieved here by looping over SSSR evaluation. We need to take
->>> into account that SSCR1 may be changed by the transfer handler, thus we
->>> need to redo the mask calculation, at least regarding the volatile
->>> interrupt enable bit (TIE).
->>>
->>> Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
->> Hi Jan,
->> 
->>> +	while (1) {
->> This bit worries me a bit, as this can be either :
->>  - hogging the SoC's CPU, endlessly running
->>  - or even worse, blocking the CPU for ever
->> 
->> The question behind is, should this be done in a top-half, or moved to a irq
->> thread ?
+On 17/01/2017 17:46, Maxime Ripard wrote:
+> On Tue, Jan 17, 2017 at 03:02:23PM +0100, Myl?ne Josserand wrote:
+>> Add a new compatible for sun4i-i2s driver to handle some
+>> SoCs that have a reset line that must be asserted/deasserted.
+>>
+>> This new compatible, "allwinner,sun6i-a31-i2s", requires two
+>> properties:
+>> 	- resets: phandle to the reset line
+>> 	- reset-names: the name of the reset line ("rst").
+>> Except these differences, the compatible is identical to previous one
+>> which will not handle a reset line.
+>>
+>> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
+>> ---
+>>  .../devicetree/bindings/sound/sun4i-i2s.txt        | 23 ++++++++++++++++++++++
+>>  1 file changed, 23 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+>> index 7a2c0945fd22..f673206e309b 100644
+>> --- a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+>> +++ b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+>> @@ -7,6 +7,7 @@ Required properties:
+>>
+>>  - compatible: should be one of the following:
+>>     - "allwinner,sun4i-a10-i2s"
+>> +   - "allwinner,sun6i-a31-i2s" for controller with reset lines
 >
-> Every device with a broken interrupt source can hog CPUs, nothing
-> special with this one. If you don't close the loop in the handler
-> itself, you close it over the hardware retriggering the interrupt over
-> and over again.
-I'm not speaking of a broken interrupt source, I'm speaking of a broken code,
-such as in the handler, or broken status readback, or lack of understanding on
-the status register which may imply the while(1) to loop forever.
+> That's not only for controllers with reset lines, but for the
+> controllers found in the A31 (and later). I'd simply drop the last
+> part of that line.
 
-> So, I don't see a point in offloading to a thread. The normal case is
-> some TX done (FIFO available) event followed by an RX event, then the
-> transfer is complete, isn't it?
-The point is if you stay forever in the while(1) loop, you can at least have a
-print a backtrace (LOCKUP_DETECTOR).
+ACK
 
->> Imagine that on first iteration the handler returns IRQ_NONE, and on second
->> IRQ_HANDLED. This makes ret IRQ_HANDLED. Yet after the first iteration the
->> handler should have exited, especially if the interrupt is shared with another
->> driver.
 >
-> That would be a bug in transfer_handler, because we don't enter it
-> without a reason (status != 0).
-Sure, but can you be sure that all the people modifying the code after you will
-see that also ? The other way will _force_ them to see it.
-
->> Another thing which is along what Andy already said : it would be better
->> practice to have this loop in the form :
->> do {
->> ...
->> } while (exit_condition_not_met);
+>>  - reg: physical base address of the controller and length of memory mapped
+>>    region.
+>>  - interrupts: should contain the I2S interrupt.
+>> @@ -19,7 +20,13 @@ Required properties:
+>>     - "mod" : module clock for the I2S controller
+>>  - #sound-dai-cells : Must be equal to 0
+>>
+>> +Required properties for the following compatibles:
+>> +		- "allwinner,sun6i-a31-i2s"
+>> +- resets: phandle to the reset line for this codec
+>> +- reset-names: Contains the reset signal name "rst"
 >
-> This implies code duplication in order to calculate the condition
-> (mask...). I can do this if desired, I wouldn't do this to my own code,
-> though.
-Okay, that's acceptable.
-Why not have something like this :
+> You don't need reset-names if there's a single reset line.
+>
 
-sccr1_reg = pxa2xx_spi_read(drv_data, SSCR1);
-if (!(sccr1_reg & SSCR1_TIE))
-	mask &= ~SSSR_TFS;
+ACK
 
-/* Ignore RX timeout interrupt if it is disabled */
-if (!(sccr1_reg & SSCR1_TINTE))
-	mask &= ~SSSR_TINT;
+>> +
+>>  Example:
+>> +For "allwinner,sun4i-a10-i2s":
+>>
+>>  i2s0: i2s at 01c22400 {
+>>  	#sound-dai-cells = <0>;
+>> @@ -32,3 +39,19 @@ i2s0: i2s at 01c22400 {
+>>  	       <&dma SUN4I_DMA_NORMAL 3>;
+>>  	dma-names = "rx", "tx";
+>>  };
+>> +
+>> +For "allwinner,sun6i-a31-i2s":
+>> +
+>> +dai: dai at 01c22c00 {
+>> +	#sound-dai-cells = <0>;
+>> +	compatible = "allwinner,sun6i-a31-i2s";
+>> +	reg = <0x01c22c00 0x200>;
+>> +	interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
+>> +	clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
+>> +	clock-names = "apb", "mod";
+>> +	resets = <&ccu RST_BUS_CODEC>;
+>> +	reset-names = "rst";
+>> +	dmas = <&dma 15>, /* AUDIO_CODEC port */
+>> +		<&dma 15>; /* AUDIO_CODEC port */
+>> +	dma-names = "rx", "tx";
+>> +};
+>
+> And we already have an example, so there's no need to add a new one
+> either.
 
-status = pxa2xx_spi_read(drv_data, SSR);
-while (status & mask) {
-   ... handlers etc ...
-   status = pxa2xx_spi_read(drv_data, SSR);
-};
+I will remove it on a V3.
 
-There is a duplication of the status read, but that looks acceptable, and the
-mask calculation is moved out of the loop (this should be checked more
-thoroughly as it looked to me only probe() would change these values, yet I
-might be wrong).
-
-Cheers.
+Thank you the review!
 
 -- 
-Robert
+Myl?ne Josserand, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
