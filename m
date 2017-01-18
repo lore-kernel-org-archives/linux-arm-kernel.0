@@ -1,23 +1,85 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 18 Jan 2017 11:39:40 +0100
-Subject: [PATCH v2 00/13] Move pad retention control to Exynos pin
- controller driver
-In-Reply-To: <1484657084-26227-1-git-send-email-m.szyprowski@samsung.com>
-References: <CGME20170117124453eucas1p1b812596939db4c4f3298b941555eb05a@eucas1p1.samsung.com>
- <1484657084-26227-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CACRpkdbXcY5PtLUfJ5idq0XnHUZOdUk2GT5PVG9pkNYvQJ4vbQ@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 18 Jan 2017 11:49:36 +0100
+Subject: [PATCH] pwm: constify pwm_ops structures
+In-Reply-To: <1484071926-21582-1-git-send-email-bhumirks@gmail.com>
+References: <1484071926-21582-1-git-send-email-bhumirks@gmail.com>
+Message-ID: <20170118104936.GJ18989@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 1:44 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
+On Tue, Jan 10, 2017 at 11:42:06PM +0530, Bhumika Goyal wrote:
+> Declare pwm_ops structures as const as they are only stored in the ops
+> field of a pwm_chip structure. This field is of type const struct pwm_ops
+> *, so pwm_ops structures having this property can be declared as const.
+> Done using Coccinelle:
+> 
+> @r1 disable optional_qualifier@
+> identifier i;
+> position p;
+> @@
+> static struct pwm_ops i at p={...};
+> 
+> @ok1@
+> identifier r1.i;
+> position p;
+> struct pxa_pwm_chip pwm;
+> struct bfin_pwm_chip bwm;
+> struct vt8500_chip vp;
+> struct imx_chip icp;
+> @@
+> (
+> pwm.chip.ops=&i at p
+> |
+> bwm.chip.ops=&i at p
+> |
+> vp.chip.ops=&i at p
+> |
+> icp.chip.ops=&i at p
+> )
+> 
+> @bad@
+> position p!={r1.p,ok1.p};
+> identifier r1.i;
+> @@
+> i at p
+> 
+> @depends on !bad disable optional_qualifier@
+> identifier r1.i;
+> @@
+> +const
+> struct pwm_ops i;
+> 
+> File size details:
+> 
+>    text	   data	    bss	    dec	    hex	filename
+>    1646	    328	      0	   1974	    7b6	drivers/pwm/pwm-imx.o
+>    1742	    224	      0	   1966	    7ae	drivers/pwm/pwm-imx.o
+> 
+>    1941	    296	      0	   2237	    8bd	drivers/pwm/pwm-pxa.o
+>    2037	    192	      0	   2229	    8b5	drivers/pwm/pwm-pxa.o
+> 
+>    1946	    296	      0	   2242	    8c2	drivers/pwm/pwm-vt8500.o
+>    2050	    192	      0	   2242	    8c2	drivers/pwm/pwm-vt8500.o
+> 
+> The drivers/pwm/pwm-bfin.o file did not compile.
+> 
+> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+> ---
+> File: drivers/pwm/pwm-bfin.c is not tested
+> 
+>  drivers/pwm/pwm-bfin.c   | 2 +-
+>  drivers/pwm/pwm-imx.c    | 2 +-
+>  drivers/pwm/pwm-pxa.c    | 2 +-
+>  drivers/pwm/pwm-vt8500.c | 2 +-
+>  4 files changed, 4 insertions(+), 4 deletions(-)
 
-> This patchset is a follow-up of my work on adding runtime PM support
-> to Exynos pin controller driver:
-> http://www.spinics.net/lists/arm-kernel/msg550161.html
+Applied, thanks.
 
-Nice, once you are done fixing the remaining nits, add Tomasz ACKs
-and resend as v3 and I will apply it.
-
-Yours,
-Linus Walleij
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170118/34466a59/attachment-0001.sig>
