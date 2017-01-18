@@ -1,58 +1,53 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 18 Jan 2017 11:58:08 +0100
-Subject: [PATCH v4] ARM64: dts: meson-gx: Add reserved memory zone and
- usable memory range
-In-Reply-To: <6bba535f-42bc-3e4b-129b-adc39152cfeb@suse.de>
-References: <1484129414-23325-1-git-send-email-narmstrong@baylibre.com>
- <m21sw66828.fsf@baylibre.com> <d3a00788-c3c1-4b10-90bf-2a8bc6a138f8@suse.de>
- <7fcb8d94-840a-de2c-f43b-9123ccc65514@baylibre.com>
- <CAOesGMhYfhrd-hy=N-FYDEPmumR0=QNzn5xTLxFuKG7apo5qiw@mail.gmail.com>
- <ecb5ff50-f5d5-ffe6-0732-faf5e51906f8@baylibre.com>
- <04113569-e342-77ff-f79a-2c9c4dc4c602@suse.de>
- <6bba535f-42bc-3e4b-129b-adc39152cfeb@suse.de>
-Message-ID: <0d34e6b4-17cc-cfa3-4d10-6a4dc2afbf98@baylibre.com>
+From: roger.pau@citrix.com (Roger Pau =?iso-8859-1?Q?Monn=E9?=)
+Date: Wed, 18 Jan 2017 11:02:43 +0000
+Subject: [Xen-devel] [RFC] Device memory mappings for Dom0 on ARM64 ACPI
+ systems
+In-Reply-To: <alpine.DEB.2.10.1701171309040.2347@sstabellini-ThinkPad-X260>
+References: <alpine.DEB.2.10.1701171309040.2347@sstabellini-ThinkPad-X260>
+Message-ID: <20170118110243.ctqpperggim5k7dw@dhcp-3-221.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/18/2017 01:27 AM, Andreas F?rber wrote:
-> Am 18.01.2017 um 01:00 schrieb Andreas F?rber:
->> Am 17.01.2017 um 09:21 schrieb Neil Armstrong:
->>> The stress-ng package provides this "stress" command and is used to force the kernel to map more memory
->>> zones, but I also got the issue while running a fully fledged Desktop Environment thanks to the
->>> recently merged DRM driver.
->>> You may not be able to trigger the issue since it seems Amlogic reduces this reserved size on GXL/GXM :
->>> https://github.com/khadas/linux/commit/698df2c6cfbb0d1a9359743208e83517b31da6ce
->>> But it should be confirmed.
->>
->> Confirming no issues on three runs on meson-gxm-rbox-pro:
->>
->> boxer:~ # stress-ng --vm 4 --vm-bytes 128M --timeout 10s &
->> [1] 2528
->> boxer:~ # stress-ng: info:  [2528] dispatching hogs: 4 vm
->> stress-ng: info:  [2528] cache allocate: default cache size: 256K
->> stress-ng: info:  [2528] successful run completed in 10.07s
->>
->> [1]+  Done                    stress-ng --vm 4 --vm-bytes 128M --timeout 10s
->> boxer:~ # stress-ng --vm 4 --vm-bytes 128M --timeout 10s
->> stress-ng: info:  [2537] dispatching hogs: 4 vm
->> stress-ng: info:  [2537] cache allocate: default cache size: 256K
->> stress-ng: info:  [2537] successful run completed in 10.07s
->> boxer:~ # stress-ng --vm 4 --vm-bytes 128M --timeout 10s
->> stress-ng: info:  [2546] dispatching hogs: 4 vm
->> stress-ng: info:  [2546] cache allocate: default cache size: 256K
->> stress-ng: info:  [2546] successful run completed in 10.07s
->> boxer:~ #
-> 
-> Similar results on meson-gxbb-vega-s95-telos (except 512K cache size),
-> with both mainline EFI and vendor U-Boot.
-> 
-> I notice that I don't have CONFIG_DRM enabled - maybe related?
+On Tue, Jan 17, 2017 at 02:20:54PM -0800, Stefano Stabellini wrote:
+> a) One option is to provide a Xen specific implementation of
+> acpi_os_ioremap in Linux. I think this is the cleanest approach, but
+> unfortunately, it doesn't cover cases where ioremap is used directly. (2)
+> is one of such cases, see
+> arch/arm64/kernel/pci.c:pci_acpi_setup_ecam_mapping and
+> drivers/pci/ecam.c:pci_ecam_create. (3) is another one of these cases,
+> see drivers/acpi/apei/bert.c:bert_init.
 
-Yes, It may add more pressure on the memory allocation.
+This is basically the same as b) from Xen's PoV, the only difference is where
+you would call the hypercall from Dom0 to establish stage-2 mappings.
 
-Neil
+> b) Otherwise, we could write an alternative implementation of ioremap
+> on arm64. The Xen specific ioremap would request a stage-2 mapping
+> first, then create the stage-1 mapping as usual. However, this means
+> issuing an hypercall for every ioremap call.
 
-> 
-> Regards,
-> Andreas
-> 
+This seems fine to me, and at present is the only way to get something working.
+As you said not being able to discover OperationRegions from Xen means that
+there's a chance some MMIO might not be added to the stage-2 mappings.
+
+Then what's the initial memory map state when Dom0 is booted? There are no MMIO
+mappings at all, and Dom0 must request mappings for everything?
+
+What happens to ACPI tables crafted for Dom0 that reside in RAM? That would
+apply to the STAO and to the other tables that are crafted for Dom0 at build
+time. Should Dom0 also request stage-2 mappings for them, and Xen simply ignore
+those calls?
+
+> c) Finally, a third option is to create the stage-2 mappings seamlessly
+> in Xen upon Dom0 memory faults. Keeping in mind that SMMU and guest
+> pagetables are shared in the Xen hypervisor, this approach does not work
+> if one of the pages that need a stage-2 mapping is used as DMA target
+> before Dom0 accesses it. No SMMU mappings would be available for the
+> page yet, so the DMA transaction would fail. After Dom0 touches the
+> page, the DMA transaction would succeed. I don't know how likely is this
+> scenario to happen, but it seems fragile to rely on it.
+
+Don't you get faults on SMMU failures? But I guess those are not synchronous,
+so there's no way you can add mappings on fault, like you can for processor
+accesses.
+
+Roger.
