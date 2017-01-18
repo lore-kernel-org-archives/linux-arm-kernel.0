@@ -1,31 +1,37 @@
-From: fabio.estevam@nxp.com (Fabio Estevam)
-Date: Wed, 18 Jan 2017 15:53:57 -0200
-Subject: [PATCH 2/2] clk: imx7d: Add the IPG root clock
-In-Reply-To: <1484762037-10737-1-git-send-email-fabio.estevam@nxp.com>
-References: <1484762037-10737-1-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <1484762037-10737-2-git-send-email-fabio.estevam@nxp.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 18 Jan 2017 17:55:20 +0000
+Subject: CONFIG_PCIEASPM breaks PCIe on Marvell Armada 385 machine
+In-Reply-To: <1137f732-f31e-8162-af8f-6a7f577a9648@caviumnetworks.com>
+References: <20170117174649.GA11063@bhelgaas-glaptop.roam.corp.google.com>
+ <20170117175115.GD27312@n2100.armlinux.org.uk>
+ <20170117175728.GE27312@n2100.armlinux.org.uk>
+ <20170117181458.GB11063@bhelgaas-glaptop.roam.corp.google.com>
+ <20170117193414.GG27312@n2100.armlinux.org.uk>
+ <20170117210258.GH27312@n2100.armlinux.org.uk>
+ <20170117222229.GA6534@bhelgaas-glaptop.roam.corp.google.com>
+ <e0ccb7a0-9cc7-c595-7f06-e63c0927f36d@caviumnetworks.com>
+ <20170118142250.GB6534@bhelgaas-glaptop.roam.corp.google.com>
+ <1137f732-f31e-8162-af8f-6a7f577a9648@caviumnetworks.com>
+Message-ID: <20170118175520.GN27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add an entry for the IMX7D_IPG_ROOT clock.
+On Wed, Jan 18, 2017 at 09:36:55AM -0800, David Daney wrote:
+> On 01/18/2017 06:22 AM, Bjorn Helgaas wrote:
+> The tricky thing here is assigning the blame for failure in link training.
+> In the case in question we spent many months analysing the analog properties
+> of the bus and examining/decoding  analog scope captures of the failures
+> before credibly assigning blame to the other guy.  Usually what happens is
+> the device vendor accurately claims that their device works flawlessly in
+> conjunction with certain Intel root ports, so the problem must be fixed in
+> the root port of the failing system.  If you have a black list, you may be
+> disabling ASPM in systems where it can work without failures.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- drivers/clk/imx/clk-imx7d.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+So what we need is not a table of just devices, but a combination of
+devices... iow, "when root A and endpoint B are combined, retrains
+need to be avoided."
 
-diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
-index ae1d31b..1705f44 100644
---- a/drivers/clk/imx/clk-imx7d.c
-+++ b/drivers/clk/imx/clk-imx7d.c
-@@ -788,7 +788,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
- 	clks[IMX7D_WRCLK_ROOT_DIV] = imx_clk_divider2("wrclk_post_div", "wrclk_pre_div", base + 0xbd00, 0, 6);
- 	clks[IMX7D_CLKO1_ROOT_DIV] = imx_clk_divider2("clko1_post_div", "clko1_pre_div", base + 0xbd80, 0, 6);
- 	clks[IMX7D_CLKO2_ROOT_DIV] = imx_clk_divider2("clko2_post_div", "clko2_pre_div", base + 0xbe00, 0, 6);
--
-+	clks[IMX7D_IPG_ROOT_CLK] = imx_clk_divider2("ipg_root_clk", "ahb_root_clk", base + 0x9080, 0, 2);
- 	clks[IMX7D_ARM_A7_ROOT_CLK] = imx_clk_gate4("arm_a7_root_clk", "arm_a7_div", base + 0x4000, 0);
- 	clks[IMX7D_ARM_M4_ROOT_CLK] = imx_clk_gate4("arm_m4_root_clk", "arm_m4_div", base + 0x4010, 0);
- 	clks[IMX7D_ARM_M0_ROOT_CLK] = imx_clk_gate4("arm_m0_root_clk", "arm_m0_div", base + 0x4020, 0);
 -- 
-2.7.4
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
