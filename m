@@ -1,53 +1,60 @@
-From: roger.pau@citrix.com (Roger Pau =?iso-8859-1?Q?Monn=E9?=)
-Date: Wed, 18 Jan 2017 11:02:43 +0000
-Subject: [Xen-devel] [RFC] Device memory mappings for Dom0 on ARM64 ACPI
- systems
-In-Reply-To: <alpine.DEB.2.10.1701171309040.2347@sstabellini-ThinkPad-X260>
-References: <alpine.DEB.2.10.1701171309040.2347@sstabellini-ThinkPad-X260>
-Message-ID: <20170118110243.ctqpperggim5k7dw@dhcp-3-221.uk.xensource.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Wed, 18 Jan 2017 11:13:18 +0000
+Subject: [RFC PATCH v5 2/7] dma: Add simple dma_noop_mmap
+In-Reply-To: <1484738003-29892-1-git-send-email-vladimir.murzin@arm.com>
+References: <1484738003-29892-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1484738003-29892-3-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 02:20:54PM -0800, Stefano Stabellini wrote:
-> a) One option is to provide a Xen specific implementation of
-> acpi_os_ioremap in Linux. I think this is the cleanest approach, but
-> unfortunately, it doesn't cover cases where ioremap is used directly. (2)
-> is one of such cases, see
-> arch/arm64/kernel/pci.c:pci_acpi_setup_ecam_mapping and
-> drivers/pci/ecam.c:pci_ecam_create. (3) is another one of these cases,
-> see drivers/acpi/apei/bert.c:bert_init.
+This patch adds a simple implementation of mmap to dma_noop_ops.
 
-This is basically the same as b) from Xen's PoV, the only difference is where
-you would call the hypercall from Dom0 to establish stage-2 mappings.
+Cc: Joerg Roedel <jroedel@suse.de>
+Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+Reported-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ lib/dma-noop.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-> b) Otherwise, we could write an alternative implementation of ioremap
-> on arm64. The Xen specific ioremap would request a stage-2 mapping
-> first, then create the stage-1 mapping as usual. However, this means
-> issuing an hypercall for every ioremap call.
-
-This seems fine to me, and at present is the only way to get something working.
-As you said not being able to discover OperationRegions from Xen means that
-there's a chance some MMIO might not be added to the stage-2 mappings.
-
-Then what's the initial memory map state when Dom0 is booted? There are no MMIO
-mappings at all, and Dom0 must request mappings for everything?
-
-What happens to ACPI tables crafted for Dom0 that reside in RAM? That would
-apply to the STAO and to the other tables that are crafted for Dom0 at build
-time. Should Dom0 also request stage-2 mappings for them, and Xen simply ignore
-those calls?
-
-> c) Finally, a third option is to create the stage-2 mappings seamlessly
-> in Xen upon Dom0 memory faults. Keeping in mind that SMMU and guest
-> pagetables are shared in the Xen hypervisor, this approach does not work
-> if one of the pages that need a stage-2 mapping is used as DMA target
-> before Dom0 accesses it. No SMMU mappings would be available for the
-> page yet, so the DMA transaction would fail. After Dom0 touches the
-> page, the DMA transaction would succeed. I don't know how likely is this
-> scenario to happen, but it seems fragile to rely on it.
-
-Don't you get faults on SMMU failures? But I guess those are not synchronous,
-so there's no way you can add mappings on fault, like you can for processor
-accesses.
-
-Roger.
+diff --git a/lib/dma-noop.c b/lib/dma-noop.c
+index a14eee5..70504eb 100644
+--- a/lib/dma-noop.c
++++ b/lib/dma-noop.c
+@@ -66,6 +66,26 @@ static int dma_noop_supported(struct device *dev, u64 mask)
+ 	return 1;
+ }
+ 
++static int dma_noop_mmap(struct device *dev, struct vm_area_struct *vma,
++			 void *cpu_addr, dma_addr_t dma_addr, size_t size,
++			 unsigned long attrs)
++{
++	unsigned long user_count = vma_pages(vma);
++	unsigned long count = PAGE_ALIGN(size) >> PAGE_SHIFT;
++	unsigned long pfn = page_to_pfn(virt_to_page(cpu_addr));
++	unsigned long off = vma->vm_pgoff;
++	int ret = -ENXIO;
++
++	if (off < count && user_count <= (count - off)) {
++		ret = remap_pfn_range(vma, vma->vm_start,
++				      pfn + off,
++				      user_count << PAGE_SHIFT,
++				      vma->vm_page_prot);
++	}
++
++	return ret;
++}
++
+ struct dma_map_ops dma_noop_ops = {
+ 	.alloc			= dma_noop_alloc,
+ 	.free			= dma_noop_free,
+@@ -73,6 +93,7 @@ struct dma_map_ops dma_noop_ops = {
+ 	.map_sg			= dma_noop_map_sg,
+ 	.mapping_error		= dma_noop_mapping_error,
+ 	.dma_supported		= dma_noop_supported,
++	.mmap			= dma_noop_mmap,
+ };
+ 
+ EXPORT_SYMBOL(dma_noop_ops);
+-- 
+2.0.0
