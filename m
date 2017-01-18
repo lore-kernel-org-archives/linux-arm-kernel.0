@@ -1,108 +1,124 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 18 Jan 2017 17:23:41 +0000
-Subject: [PATCH] arm64: avoid returning from bad_mode
-Message-ID: <1484760221-30205-1-git-send-email-mark.rutland@arm.com>
+From: david@lechnology.com (David Lechner)
+Date: Wed, 18 Jan 2017 11:26:41 -0600
+Subject: [PATCH v3 06/13] ARM: davinci: da850: model the SATA refclk
+In-Reply-To: <1484745601-4769-7-git-send-email-bgolaszewski@baylibre.com>
+References: <1484745601-4769-1-git-send-email-bgolaszewski@baylibre.com>
+ <1484745601-4769-7-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <ff4deee6-9700-fff3-be96-0ad2f008914b@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Generally, taking an unexpected exception should be a fatal event, and
-bad_mode is intended to cater for this. However, it should be possible
-to contain unexpected synchronous exceptions from EL0 without bringing
-the kernel down, by sending a SIGILL to the task.
+On 01/18/2017 07:19 AM, Bartosz Golaszewski wrote:
+> Register a dummy clock modelling the external SATA oscillator for
 
-We tried to apply this approach in commit 9955ac47f4ba1c95 ("arm64:
-don't kill the kernel on a bad esr from el0"), by sending a signal for
-any bad_mode call resulting from an EL0 exception.
+modeling
 
-However, this also applies to other unexpected exceptions, such as
-SError and FIQ. The entry paths for these exceptions branch to bad_mode
-without configuring the link register, and have no kernel_exit. Thus, if
-we take one of these exceptions from EL0, bad_mode will eventually
-return to the original user link register value.
+> da850 (both DT and board file mode).
+>
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  arch/arm/mach-davinci/da8xx-dt.c           |  8 ++++++++
+>  arch/arm/mach-davinci/devices-da8xx.c      | 29 +++++++++++++++++++++++++++++
+>  arch/arm/mach-davinci/include/mach/da8xx.h |  1 +
+>  3 files changed, 38 insertions(+)
+>
+> diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+> index b83e5d1..0f981b5 100644
+> --- a/arch/arm/mach-davinci/da8xx-dt.c
+> +++ b/arch/arm/mach-davinci/da8xx-dt.c
+> @@ -50,6 +50,9 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
+>
+>  static void __init da850_init_machine(void)
+>  {
+> +        /* All existing boards use 100MHz SATA refclkpn */
+> +        static const unsigned long sata_refclkpn = 100 * 1000 * 1000;
+> +
+>  	int ret;
+>
+>  	ret = da8xx_register_usb20_phy_clk(false);
+> @@ -61,6 +64,11 @@ static void __init da850_init_machine(void)
+>  		pr_warn("%s: registering USB 1.1 PHY clock failed: %d",
+>  			__func__, ret);
+>
+> +        ret = da850_register_sata_refclk(sata_refclkpn);
+> +        if (ret)
+> +		pr_warn("%s: registering SATA REFCLK failed: %d",
+> +			__func__, ret);
+> +
+>  	of_platform_default_populate(NULL, da850_auxdata_lookup, NULL);
+>  	davinci_pm_init();
+>  }
+> diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
+> index c2457b3..cfceb32 100644
+> --- a/arch/arm/mach-davinci/devices-da8xx.c
+> +++ b/arch/arm/mach-davinci/devices-da8xx.c
+> @@ -24,6 +24,7 @@
+>  #include <mach/common.h>
+>  #include <mach/time.h>
+>  #include <mach/da8xx.h>
+> +#include <mach/clock.h>
+>  #include "cpuidle.h"
+>  #include "sram.h"
+>
+> @@ -1023,6 +1024,28 @@ int __init da8xx_register_spi_bus(int instance, unsigned num_chipselect)
+>  }
+>
+>  #ifdef CONFIG_ARCH_DAVINCI_DA850
+> +static struct clk sata_refclk = {
+> +	.name		= "sata_refclk",
+> +	.set_rate	= davinci_simple_set_rate,
+> +};
+> +
+> +static struct clk_lookup sata_refclk_lookup =
+> +		CLK("ahci_da850", "refclk", &sata_refclk);
+> +
+> +int __init da850_register_sata_refclk(int rate)
+> +{
+> +	int ret;
+> +
+> +	sata_refclk.rate = rate;
+> +	ret = clk_register(&sata_refclk);
+> +	if (ret)
+> +		return ret;
+> +
+> +	clkdev_add(&sata_refclk_lookup);
+> +
+> +	return 0;
+> +}
+> +
+>  static struct resource da850_sata_resources[] = {
+>  	{
+>  		.start	= DA850_SATA_BASE,
+> @@ -1055,9 +1078,15 @@ static struct platform_device da850_sata_device = {
+>
+>  int __init da850_register_sata(unsigned long refclkpn)
+>  {
+> +	int ret;
+> +
+>  	/* please see comment in drivers/ata/ahci_da850.c */
+>  	BUG_ON(refclkpn != 100 * 1000 * 1000);
 
-This patch fixes this by introducing a new bad_el0_sync handler to cater
-for the recoverable case, and restoring bad_mode to its original state,
-whereby it calls panic() and never returns. The recoverable case
-branches to bad_el0_sync with a bl, and returns to userspace via the
-usual ret_to_user mechanism.
+This BUG_ON() should be removed since the sata driver can now handle 
+other clock frequencies.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Fixes: 9955ac47f4ba1c95 ("arm64: don't kill the kernel on a bad esr from el0")
-Reported-by: Mark Salter <msalter@redhat.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: stable at vger.kernel.org
----
- arch/arm64/kernel/entry.S |  2 +-
- arch/arm64/kernel/traps.c | 28 ++++++++++++++++++++++++----
- 2 files changed, 25 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 923841f..43512d4 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -683,7 +683,7 @@ el0_inv:
- 	mov	x0, sp
- 	mov	x1, #BAD_SYNC
- 	mov	x2, x25
--	bl	bad_mode
-+	bl	bad_el0_sync
- 	b	ret_to_user
- ENDPROC(el0_sync)
- 
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 5b830be..659b2e6 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -604,17 +604,34 @@ const char *esr_get_class_string(u32 esr)
- }
- 
- /*
-- * bad_mode handles the impossible case in the exception vector.
-+ * bad_mode handles the impossible case in the exception vector. This is always
-+ * fatal.
-  */
- asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
- {
--	siginfo_t info;
--	void __user *pc = (void __user *)instruction_pointer(regs);
- 	console_verbose();
- 
- 	pr_crit("Bad mode in %s handler detected on CPU%d, code 0x%08x -- %s\n",
- 		handler[reason], smp_processor_id(), esr,
- 		esr_get_class_string(esr));
-+
-+	die("Oops - bad mode", regs, 0);
-+	local_irq_disable();
-+	panic("bad mode");
-+}
-+
-+/*
-+ * bad_el0_sync handles unexpected, but potentially recoverable synchronous
-+ * exceptions taken from EL0. Unlike bad_mode, this returns.
-+ */
-+asmlinkage void bad_el0_sync(struct pt_regs *regs, int reason, unsigned int esr)
-+{
-+	siginfo_t info;
-+	void __user *pc = (void __user *)instruction_pointer(regs);
-+	console_verbose();
-+
-+	pr_crit("Bad EL0 synchronous exception detected on CPU%d, code 0x%08x -- %s\n",
-+		smp_processor_id(), esr, esr_get_class_string(esr));
- 	__show_regs(regs);
- 
- 	info.si_signo = SIGILL;
-@@ -622,7 +639,10 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
- 	info.si_code  = ILL_ILLOPC;
- 	info.si_addr  = pc;
- 
--	arm64_notify_die("Oops - bad mode", regs, &info, 0);
-+	current->thread.fault_address = 0;
-+	current->thread.fault_code = 0;
-+
-+	force_sig_info(info.si_signo, &info, current);
- }
- 
- void __pte_error(const char *file, int line, unsigned long val)
--- 
-1.9.1
+>
+> +	ret = da850_register_sata_refclk(refclkpn);
+> +	if (ret)
+> +		return ret;
+> +
+>  	return platform_device_register(&da850_sata_device);
+>  }
+>  #endif
+> diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
+> index 85ff218..7e46422 100644
+> --- a/arch/arm/mach-davinci/include/mach/da8xx.h
+> +++ b/arch/arm/mach-davinci/include/mach/da8xx.h
+> @@ -95,6 +95,7 @@ int da8xx_register_usb11(struct da8xx_ohci_root_hub *pdata);
+>  int da8xx_register_usb_refclkin(int rate);
+>  int da8xx_register_usb20_phy_clk(bool use_usb_refclkin);
+>  int da8xx_register_usb11_phy_clk(bool use_usb_refclkin);
+> +int da850_register_sata_refclk(int rate);
+>  int da8xx_register_emac(void);
+>  int da8xx_register_uio_pruss(void);
+>  int da8xx_register_lcdc(struct da8xx_lcdc_platform_data *pdata);
+>
