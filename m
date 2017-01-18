@@ -1,69 +1,37 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 18 Jan 2017 16:38:16 -0600
-Subject: [PATCH v3 1/2] dt-bindings: mmc: add DT binding for S3C24XX
- MMC/SD/SDIO controller
-In-Reply-To: <1484319953-6479-2-git-send-email-sergio.prado@e-labworks.com>
-References: <1484319953-6479-1-git-send-email-sergio.prado@e-labworks.com>
- <1484319953-6479-2-git-send-email-sergio.prado@e-labworks.com>
-Message-ID: <20170118223816.nccyc7aoa7succsi@rob-hp-laptop>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Wed, 18 Jan 2017 23:38:48 +0100
+Subject: [PATCH 2/3] Documentation: devicetree: amlogic: Add R-Box Pro
+In-Reply-To: <819ac0c0-92b7-bac7-dcfc-a56c34a6bf62@baylibre.com>
+References: <20170117030611.23827-2-afaerber@suse.de>
+ <20170117225459.4438-1-afaerber@suse.de>
+ <20170117225459.4438-2-afaerber@suse.de>
+ <819ac0c0-92b7-bac7-dcfc-a56c34a6bf62@baylibre.com>
+Message-ID: <9439ba55-c56c-71bf-00a5-870e2f4dd07b@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2017 at 01:05:52PM -0200, Sergio Prado wrote:
-> Adds the device tree bindings description for Samsung S3C24XX
-> MMC/SD/SDIO controller, used as a connectivity interface with external
-> MMC, SD and SDIO storage mediums.
+Am 18.01.2017 um 10:35 schrieb Neil Armstrong:
+> On 01/17/2017 11:54 PM, Andreas F?rber wrote:
+>> Cc: ada at kingnoval.com
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>> ---
+>>  Originally I thought we would group by SoC (6, 8, 8b, gxbb, gxl, gmx, etc.)
+>>  but this got out of order with nexbox,a95x - so inserting kingnovel between
+>>  amlogic and nexbox here. If that's what we want going forward, we should move
+>>  the old entries to make the scheme clearer. The alternative would be to
+>>  reorder alphabetically within each SoC group, but nexbox,a95x with two SoCs
+>>  makes it difficult to categorize, we could choose gxbb as the earlier one.
 > 
-> Signed-off-by: Sergio Prado <sergio.prado@e-labworks.com>
-> ---
->  .../devicetree/bindings/mmc/samsung,s3cmci.txt     | 34 ++++++++++++++++++++++
->  1 file changed, 34 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt
+> Andreas,
 > 
-> diff --git a/Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt b/Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt
-> new file mode 100644
-> index 000000000000..d09dbf4b3824
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mmc/samsung,s3cmci.txt
-> @@ -0,0 +1,34 @@
-> +* Samsung's S3C24XX MMC/SD/SDIO controller device tree bindings
-> +
-> +Samsung's S3C24XX MMC/SD/SDIO controller is used as a connectivity interface
-> +with external MMC, SD and SDIO storage mediums.
-> +
-> +This file documents differences between the core mmc properties described by
-> +mmc.txt and the properties used by the Samsung S3C24XX MMC/SD/SDIO controller
-> +implementation.
-> +
-> +Required SoC Specific Properties:
-> +- compatible: should be one of the following
-> +  - "samsung,s3c2410-sdi": for controllers compatible with s3c2410
-> +  - "samsung,s3c2412-sdi": for controllers compatible with s3c2412
-> +  - "samsung,s3c2440-sdi": for controllers compatible with s3c2440
-> +- clocks: Should reference the controller clock
-> +- clock-names: Should contain "sdi"
+> Feel free to provide a fixup.
 
-You are missing things from the example.
+Sure, the question is which way. ;) Kevin? Carlo?
 
-> +
-> +Example:
-> +	mmc0: mmc at 5a000000 {
-> +		compatible = "samsung,s3c2440-sdi";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&sdi_pins>;
-> +		reg = <0x5a000000 0x100000>;
-> +		interrupts = <0 0 21 3>;
-> +		clocks = <&clocks PCLK_SDI>;
-> +		clock-names = "sdi";
-> +		bus-width = <4>;
-> +		cd-gpios = <&gpg 8 GPIO_ACTIVE_LOW>;
-> +		wp-gpios = <&gph 8 GPIO_ACTIVE_LOW>;
-> +	};
-> +
-> +	Note: This example shows both SoC specific and board specific properties
-> +	in a single device node. The properties can be actually be separated
-> +	into SoC specific node and board specific node.
+Cheers,
+Andreas
 
-The source structure is not relavent to the binding.
-
-Rob
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
