@@ -1,30 +1,36 @@
-From: rogershimizu@gmail.com (Roger Shimizu)
-Date: Wed, 18 Jan 2017 21:08:13 +0900
-Subject: [PATCH v4 1/2] power: reset: add linkstation-reset driver
-In-Reply-To: <20170107150451.17912-2-rogershimizu@gmail.com>
-References: <20161227070611.14852-1-rogershimizu@gmail.com>
- <20170107150451.17912-1-rogershimizu@gmail.com>
- <20170107150451.17912-2-rogershimizu@gmail.com>
-Message-ID: <CAEQ9gEkoKc0Yv+kLYGWgHZZW92u0tW8E9U0eT7ZhAx79yKxzLQ@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 18 Jan 2017 12:12:51 +0000
+Subject: [PATCH 2/3] arm64: dts: juno: Add ETR SMMU power domain
+In-Reply-To: <74595d6d866518db7cfabc39b4cf9b54d3be9bde.1484741104.git.robin.murphy@arm.com>
+References: <74595d6d866518db7cfabc39b4cf9b54d3be9bde.1484741104.git.robin.murphy@arm.com>
+Message-ID: <55add42885c182648ff466254176e43e66137597.1484741104.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sebastian,
+It is not at all clear from the documentation, but straightforward to
+determine in practice, that the ETR SMMU is actually in the DEBUGSYS
+power domain. Add that to the DT so that anyone brave enough to enable
+said SMMU doesn't experience a system lockup on boot, especially a
+sneaky one which goes away as soon as you connect an external debugger
+to have a look at where it's stuck (thus powering up DEBUGSYS by other
+means and allowing it to make progress again before actually halting...)
 
-On Sun, Jan 8, 2017 at 12:04 AM, Roger Shimizu <rogershimizu@gmail.com> wrote:
-> Buffalo Linkstation / KuroBox and their variants need magic command
-> sending to UART1 to power-off.
->
-> Power driver linkstation-reset implements the magic command and I/O
-> routine, which come from files listed below:
->   - arch/arm/mach-orion5x/kurobox_pro-setup.c
->   - arch/arm/mach-orion5x/terastation_pro2-setup.c
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ arch/arm64/boot/dts/arm/juno-base.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-I think there's not much concern regarding to this series.
-Could you kindly help to apply this patch?
-Thank you!
-
-Cheers,
+diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+index 5e7640d6ec69..37225dfdc995 100644
+--- a/arch/arm64/boot/dts/arm/juno-base.dtsi
++++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+@@ -52,6 +52,7 @@
+ 		#iommu-cells = <1>;
+ 		#global-interrupts = <1>;
+ 		dma-coherent;
++		power-domains = <&scpi_devpd 0>;
+ 		status = "disabled";
+ 	};
+ 
 -- 
-Roger Shimizu, GMT +9 Tokyo
-PGP/GPG: 4096R/6C6ACD6417B3ACB1
+2.11.0.dirty
