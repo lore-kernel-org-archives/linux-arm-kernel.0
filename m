@@ -1,49 +1,30 @@
-From: agustinv@codeaurora.org (Agustin Vega-Frias)
-Date: Wed, 18 Jan 2017 14:02:53 -0500
-Subject: [PATCH V10 2/3] ACPI: Add support for ResourceSource/IRQ domain
- mapping
-In-Reply-To: <CAHp75VcLL9zvRXGCy2ynjhYFUgbYwJvLpCiUxjtsKmXjVFHmKA@mail.gmail.com>
-References: <1484757988-23739-1-git-send-email-agustinv@codeaurora.org>
- <1484757988-23739-3-git-send-email-agustinv@codeaurora.org>
- <CAHp75VcLL9zvRXGCy2ynjhYFUgbYwJvLpCiUxjtsKmXjVFHmKA@mail.gmail.com>
-Message-ID: <5bf630b0ab0b818db6e4e63a41020a55@codeaurora.org>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Wed, 18 Jan 2017 11:05:32 -0800 (PST)
+Subject: [RFC] Device memory mappings for Dom0 on ARM64 ACPI systems
+In-Reply-To: <587F518802000078001312AB@prv-mh.provo.novell.com>
+References: <alpine.DEB.2.10.1701171309040.2347@sstabellini-ThinkPad-X260>
+ <587F518802000078001312AB@prv-mh.provo.novell.com>
+Message-ID: <alpine.DEB.2.10.1701181054280.10192@sstabellini-ThinkPad-X260>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
-
-On 2017-01-18 13:00, Andy Shevchenko wrote:
-> On Wed, Jan 18, 2017 at 6:46 PM, Agustin Vega-Frias
-> <agustinv@codeaurora.org> wrote:
->> ACPI extended IRQ resources may contain a ResourceSource to specify
->> an alternate interrupt controller. Introduce acpi_irq_get and use it
->> to implement ResourceSource/IRQ domain mapping.
->> 
->> The new API is similar to of_irq_get and allows re-initialization
->> of a platform resource from the ACPI extended IRQ resource, and
->> provides proper behavior for probe deferral when the domain is not
->> yet present when called.
->> 
+On Wed, 18 Jan 2017, Jan Beulich wrote:
+> >>> On 17.01.17 at 23:20, <sstabellini@kernel.org> wrote:
+> > b) Otherwise, we could write an alternative implementation of ioremap
+> > on arm64. The Xen specific ioremap would request a stage-2 mapping
+> > first, then create the stage-1 mapping as usual. However, this means
+> > issuing an hypercall for every ioremap call.
 > 
-> Care to use -M -C when prepare this patch?
-> 
+> +1 for this being the best choice among the ones listed. In fact
+> this may also be a reasonable approach for PVHv2, unless facing
+> resistance by the x86 maintainers.
 
-I did use it, but the similarity index was below the default threshold.
-I'll send in a new version of this patch with this fixed.
+Adding more context so that the Linux folks can follow. PVHv2 is a new
+Xen x86 virtual machine type with very similar requirements as Xen ARM
+virtual machines.
 
-Thanks,
-Agustin
+In other words, PVHv2 has the same problems described here, except that
+it's x86, rather than arm64.
 
->>  drivers/acpi/gsi.c      |  98 -----------------
->>  drivers/acpi/irq.c      | 282 
->> ++++++++++++++++++++++++++++++++++++++++++++++++
-> 
-> --
-> With Best Regards,
-> Andy Shevchenko
-
--- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm 
-Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
-Linux Foundation Collaborative Project.
+With my ARM maintainer hat on, I described the issue for Xen on ARM, but
+it pretty much applies to x86 as well.
