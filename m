@@ -1,414 +1,330 @@
-From: smitha.t@samsung.com (Smitha T Murthy)
-Date: Wed, 18 Jan 2017 15:32:00 +0530
-Subject: [PATCH 02/11] [media] s5p-mfc: Adding initial support for MFC v10.10
-In-Reply-To: <1484733729-25371-1-git-send-email-smitha.t@samsung.com>
-References: <1484733729-25371-1-git-send-email-smitha.t@samsung.com>
- <CGME20170118100723epcas5p132e0ebfad38261bed95cffc47334f9dc@epcas5p1.samsung.com>
-Message-ID: <1484733729-25371-3-git-send-email-smitha.t@samsung.com>
+From: hw.wangxiaoyin@hisilicon.com (Wang Xiaoyin)
+Date: Wed, 18 Jan 2017 18:04:35 +0800
+Subject: [PATCH] arm64: dts: hisilicon: add dtsi file for Hisilicon Hi3660 SOC
+Message-ID: <20170118100435.43318-1-hw.wangxiaoyin@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding the support for MFC v10.10, with new register file and
-necessary hw control, decoder, encoder and structural changes.
+This patch adds pinctrl dtsi file
 
-CC: Rob Herring <robh+dt@kernel.org>
-CC: devicetree at vger.kernel.org 
-Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+Signed-off-by: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
 ---
- .../devicetree/bindings/media/s5p-mfc.txt          |    1 +
- drivers/media/platform/s5p-mfc/regs-mfc-v10.h      |   36 ++++++++++++++++
- drivers/media/platform/s5p-mfc/s5p_mfc.c           |   30 +++++++++++++
- drivers/media/platform/s5p-mfc/s5p_mfc_common.h    |    4 +-
- drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c      |    4 ++
- drivers/media/platform/s5p-mfc/s5p_mfc_dec.c       |   44 +++++++++++---------
- drivers/media/platform/s5p-mfc/s5p_mfc_enc.c       |   21 +++++----
- drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c    |    9 +++-
- drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h    |    2 +
- 9 files changed, 118 insertions(+), 33 deletions(-)
- create mode 100644 drivers/media/platform/s5p-mfc/regs-mfc-v10.h
+ arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts  |   3 +-
+ .../arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi | 292 +++++++++++++++++++++
+ 2 files changed, 293 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi
 
-diff --git a/Documentation/devicetree/bindings/media/s5p-mfc.txt b/Documentation/devicetree/bindings/media/s5p-mfc.txt
-index 2c90128..b70c613 100644
---- a/Documentation/devicetree/bindings/media/s5p-mfc.txt
-+++ b/Documentation/devicetree/bindings/media/s5p-mfc.txt
-@@ -13,6 +13,7 @@ Required properties:
- 	(c) "samsung,mfc-v7" for MFC v7 present in Exynos5420 SoC
- 	(d) "samsung,mfc-v8" for MFC v8 present in Exynos5800 SoC
- 	(e) "samsung,exynos5433-mfc" for MFC v8 present in Exynos5433 SoC
-+	(f) "samsung,mfc-v10" for MFC v10 present in a variant of Exynos7 SoC
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+index 9a1d36aa84ce..de21ebfa4bd8 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
++++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+@@ -8,8 +8,7 @@
+ /dts-v1/;
  
-   - reg : Physical base address of the IP registers and length of memory
- 	  mapped region.
-diff --git a/drivers/media/platform/s5p-mfc/regs-mfc-v10.h b/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
+ #include "hi3660.dtsi"
+-/*#include "hi3660-ion.dtsi"*/
+-/*#include "hikey960-pinctrl.dtsi"*/
++#include "hikey960-pinctrl.dtsi"
+ 
+ / {
+ 	model = "HiKey960";
+diff --git a/arch/arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi b/arch/arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi
 new file mode 100644
-index 0000000..bd671a5
+index 000000000000..98a0b78289b6
 --- /dev/null
-+++ b/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
-@@ -0,0 +1,36 @@
++++ b/arch/arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi
+@@ -0,0 +1,292 @@
 +/*
-+ * Register definition file for Samsung MFC V10.x Interface (FIMV) driver
++ * pinctrl dts fils for Hislicon HiKey960 development board
 + *
-+ * Copyright (c) 2017 Samsung Electronics Co., Ltd.
-+ *     http://www.samsung.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
 + */
 +
-+#ifndef _REGS_MFC_V10_H
-+#define _REGS_MFC_V10_H
++#include <dt-bindings/pinctrl/hisi.h>
 +
-+#include <linux/sizes.h>
-+#include "regs-mfc-v8.h"
++/ {
++	soc {
++		/* [IOMG_000, IOMG_123] */
++		range: gpio-range {
++			#pinctrl-single,gpio-range-cells = <3>;
++		};
++		pmx0: pinmux at e896c000 {
++			compatible = "pinctrl-single";
++			reg = <0x0 0xe896c000 0x0 0x1f0>;
++			#pinctrl-cells = <1>;
++			#gpio-range-cells = <0x3>;
++			pinctrl-single,register-width = <0x20>;
++			pinctrl-single,function-mask = <0x7>;
++			/* pin base, nr pins & gpio function */
++			pinctrl-single,gpio-range = <
++				&range 0 7 0
++				&range 8 116 0>;
 +
-+/* MFCv10 register definitions*/
-+#define S5P_FIMV_MFC_CLOCK_OFF_V10			0x7120
-+#define S5P_FIMV_MFC_STATE_V10				0x7124
++			isp0_pmx_func: isp0_pmx_func {
++				pinctrl-single,pins = <
++					0x058 MUX_M1 /* ISP_CLK0 */
++					0x064 MUX_M1 /* ISP_SCL0 */
++					0x068 MUX_M1 /* ISP_SDA0 */
++				>;
++			};
 +
-+/* MFCv10 Context buffer sizes */
-+#define MFC_CTX_BUF_SIZE_V10		(30 * SZ_1K)	/* 30KB */
-+#define MFC_H264_DEC_CTX_BUF_SIZE_V10	(2 * SZ_1M)	/* 2MB */
-+#define MFC_OTHER_DEC_CTX_BUF_SIZE_V10	(20 * SZ_1K)	/* 20KB */
-+#define MFC_H264_ENC_CTX_BUF_SIZE_V10	(100 * SZ_1K)	/* 100KB */
-+#define MFC_OTHER_ENC_CTX_BUF_SIZE_V10	(15 * SZ_1K)	/* 15KB */
++			isp1_pmx_func: isp1_pmx_func {
++				pinctrl-single,pins = <
++					0x05c MUX_M1 /* ISP_CLK1 */
++					0x06c MUX_M1 /* ISP_SCL1 */
++					0x070 MUX_M1 /* ISP_SDA1 */
++				>;
++			};
 +
-+/* MFCv10 variant defines */
-+#define MAX_FW_SIZE_V10		(SZ_1M)		/* 1MB */
-+#define MAX_CPB_SIZE_V10	(3 * SZ_1M)	/* 3MB */
-+#define MFC_VERSION_V10		0xA0
-+#define MFC_NUM_PORTS_V10	1
++			i2c3_pmx_func: i2c3_pmx_func {
++				pinctrl-single,pins = <
++					0x02c MUX_M1 /* I2C3_SCL */
++					0x030 MUX_M1 /* I2C3_SDA */
++				>;
++			};
 +
-+#endif /*_REGS_MFC_V10_H*/
++			i2c4_pmx_func: i2c4_pmx_func {
++				pinctrl-single,pins = <
++					0x090 MUX_M1 /* I2C4_SCL */
++					0x094 MUX_M1 /* I2C4_SDA */
++				>;
++			};
 +
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-index bb0a588..a043cce 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-@@ -1542,6 +1542,33 @@ static int s5p_mfc_resume(struct device *dev)
- 	.num_clocks	= 3,
- };
- 
-+static struct s5p_mfc_buf_size_v6 mfc_buf_size_v10 = {
-+	.dev_ctx        = MFC_CTX_BUF_SIZE_V10,
-+	.h264_dec_ctx   = MFC_H264_DEC_CTX_BUF_SIZE_V10,
-+	.other_dec_ctx  = MFC_OTHER_DEC_CTX_BUF_SIZE_V10,
-+	.h264_enc_ctx   = MFC_H264_ENC_CTX_BUF_SIZE_V10,
-+	.other_enc_ctx  = MFC_OTHER_ENC_CTX_BUF_SIZE_V10,
++			pcie_perstn_pmx_func: pcie_perstn_pmx_func {
++				pinctrl-single,pins = <
++					0x15c MUX_M1 /* PCIE_PERST_N */
++				>;
++			};
++
++			usbhub5734_pmx_func: usbhub5734_pmx_func {
++				pinctrl-single,pins = <
++					0x11c MUX_M0 /* GPIO_073 */
++					0x120 MUX_M0 /* GPIO_074 */
++				>;
++			};
++
++			spi1_pmx_func: spi1_pmx_func {
++				pinctrl-single,pins = <
++					0x034 MUX_M1 /* SPI1_CLK */
++					0x038 MUX_M1 /* SPI1_DI */
++					0x03c MUX_M1 /* SPI1_DO */
++					0x040 MUX_M1 /* SPI1_CS_N */
++				>;
++			};
++
++			uart0_pmx_func: uart0_pmx_func {
++				pinctrl-single,pins = <
++					0x0cc MUX_M2 /* UART0_RXD */
++					0x0d0 MUX_M2 /* UART0_TXD */
++					0x0d4 MUX_M2 /* UART0_RXD_M */
++					0x0d8 MUX_M2 /* UART0_TXD_M */
++				>;
++			};
++
++			uart1_pmx_func: uart1_pmx_func {
++				pinctrl-single,pins = <
++					0x0b0 MUX_M2 /* UART1_CTS_N */
++					0x0b4 MUX_M2 /* UART1_RTS_N */
++					0x0a8 MUX_M2 /* UART1_RXD */
++					0x0ac MUX_M2 /* UART1_TXD */
++				>;
++			};
++
++			uart2_pmx_func: uart2_pmx_func {
++				pinctrl-single,pins = <
++					0x0bc MUX_M2 /* UART2_CTS_N */
++					0x0c0 MUX_M2 /* UART2_RTS_N */
++					0x0c8 MUX_M2 /* UART2_RXD */
++					0x0c4 MUX_M2 /* UART2_TXD */
++				>;
++			};
++
++			uart3_pmx_func: uart3_pmx_func {
++				pinctrl-single,pins = <
++					0x0dc MUX_M1 /* UART3_CTS_N */
++					0x0e0 MUX_M1 /* UART3_RTS_N */
++					0x0e4 MUX_M1 /* UART3_RXD */
++					0x0e8 MUX_M1 /* UART3_TXD */
++				>;
++			};
++
++			uart4_pmx_func: uart4_pmx_func {
++				pinctrl-single,pins = <
++					0x0ec MUX_M1 /* UART4_CTS_N */
++					0x0f0 MUX_M1 /* UART4_RTS_N */
++					0x0f4 MUX_M1 /* UART4_RXD */
++					0x0f8 MUX_M1 /* UART4_TXD */
++				>;
++			};
++
++			uart5_pmx_func: uart5_pmx_func {
++				pinctrl-single,pins = <
++					0x0c4 MUX_M3 /* UART5_CTS_N */
++					0x0c8 MUX_M3 /* UART5_RTS_N */
++					0x0bc MUX_M3 /* UART5_RXD */
++					0x0c0 MUX_M3 /* UART5_TXD */
++				>;
++			};
++
++			uart6_pmx_func: uart6_pmx_func {
++				pinctrl-single,pins = <
++					0x0cc MUX_M1 /* UART6_CTS_N */
++					0x0d0 MUX_M1 /* UART6_RTS_N */
++					0x0d4 MUX_M1 /* UART6_RXD */
++					0x0d8 MUX_M1 /* UART6_TXD */
++				>;
++			};
++		};
++
++		/* [IOMG_MMC0_000, IOMG_MMC0_005] */
++		pmx1: pinmux at ff37e000 {
++			compatible = "pinctrl-single";
++			reg = <0x0 0xff37e000 0x0 0x18>;
++			#gpio-range-cells = <0x3>;
++			#pinctrl-cells = <1>;
++			pinctrl-single,register-width = <0x20>;
++			pinctrl-single,function-mask = <0x7>;
++			/* pin base, nr pins & gpio function */
++			pinctrl-single,gpio-range = <&range 0 6 0>;
++
++			sdcard_pmx_func: sdcard_pmx_func {
++				pinctrl-single,pins = <
++					0x000 MUX_M1 /* SD_CLK */
++					0x004 MUX_M1 /* SD_CMD */
++					0x008 MUX_M1 /* SD_DATA0 */
++					0x00c MUX_M1 /* SD_DATA1 */
++					0x010 MUX_M1 /* SD_DATA2 */
++					0x014 MUX_M1 /* SD_DATA3 */
++				>;
++			};
++		};
++
++		/* [IOMG_FIX_000, IOMG_FIX_011] */
++		pmx2: pinmux at ff3b6000 {
++			compatible = "pinctrl-single";
++			reg = <0x0 0xff3b6000 0x0 0x30>;
++			#pinctrl-cells = <1>;
++			#gpio-range-cells = <0x3>;
++			pinctrl-single,register-width = <0x20>;
++			pinctrl-single,function-mask = <0x7>;
++			/* pin base, nr pins & gpio function */
++			pinctrl-single,gpio-range = <&range 0 12 0>;
++
++			spi3_pmx_func: spi3_pmx_func {
++				pinctrl-single,pins = <
++					0x008 MUX_M1 /* SPI3_CLK */
++					0x00c MUX_M1 /* SPI3_DI */
++					0x010 MUX_M1 /* SPI3_DO */
++					0x014 MUX_M1 /* SPI3_CS0_N */
++				>;
++			};
++		};
++
++		/* [IOMG_MMC1_000, IOMG_MMC1_005] */
++		pmx3: pinmux at ff3fd000 {
++			compatible = "pinctrl-single";
++			reg = <0x0 0xff3fd000 0x0 0x18>;
++			#pinctrl-cells = <1>;
++			#gpio-range-cells = <0x3>;
++			pinctrl-single,register-width = <0x20>;
++			pinctrl-single,function-mask = <0x7>;
++			/* pin base, nr pins & gpio function */
++			pinctrl-single,gpio-range = <&range 0 6 0>;
++
++			sdio_pmx_func: sdio_pmx_func {
++				pinctrl-single,pins = <
++					0x000 MUX_M1 /* SDIO_CLK */
++					0x004 MUX_M1 /* SDIO_CMD */
++					0x008 MUX_M1 /* SDIO_DATA0 */
++					0x00c MUX_M1 /* SDIO_DATA1 */
++					0x010 MUX_M1 /* SDIO_DATA2 */
++					0x014 MUX_M1 /* SDIO_DATA3 */
++				>;
++			};
++		};
++
++		/* [IOMG_AO_000, IOMG_AO_041] */
++		pmx4: pinmux at fff11000 {
++			compatible = "pinctrl-single";
++			reg = <0x0 0xfff11000 0x0 0xa8>;
++			#pinctrl-cells = <1>;
++			#gpio-range-cells = <0x3>;
++			pinctrl-single,register-width = <0x20>;
++			pinctrl-single,function-mask = <0x7>;
++			/* pin base in node, nr pins & gpio function */
++			pinctrl-single,gpio-range = <&range 0 42 0>;
++
++			i2s2_pmx_func: i2s2_pmx_func {
++				pinctrl-single,pins = <
++					0x044 MUX_M1 /* I2S2_DI */
++					0x048 MUX_M1 /* I2S2_DO */
++					0x04c MUX_M1 /* I2S2_XCLK */
++					0x050 MUX_M1 /* I2S2_XFS */
++				>;
++			};
++
++			slimbus_pmx_func: slimbus_pmx_func {
++				pinctrl-single,pins = <
++					0x02c MUX_M1 /* SLIMBUS_CLK */
++					0x030 MUX_M1 /* SLIMBUS_DATA */
++				>;
++			};
++
++			i2c0_pmx_func: i2c0_pmx_func {
++				pinctrl-single,pins = <
++					0x014 MUX_M1 /* I2C0_SCL */
++					0x018 MUX_M1 /* I2C0_SDA */
++				>;
++			};
++
++			i2c1_pmx_func: i2c1_pmx_func {
++				pinctrl-single,pins = <
++					0x01c MUX_M1 /* I2C1_SCL */
++					0x020 MUX_M1 /* I2C1_SDA */
++				>;
++			};
++
++			i2c2_pmx_func: i2c2_pmx_func {
++				pinctrl-single,pins = <
++					0x024 MUX_M1 /* I2C2_SCL */
++					0x028 MUX_M1 /* I2C2_SDA */
++				>;
++			};
++
++			i2c7_pmx_func: i2c7_pmx_func {
++				pinctrl-single,pins = <
++					0x024 MUX_M3 /* I2C7_SCL */
++					0x028 MUX_M3 /* I2C7_SDA */
++				>;
++			};
++
++			spi2_pmx_func: spi2_pmx_func {
++				pinctrl-single,pins = <
++					0x08c MUX_M1 /* SPI2_CLK */
++					0x090 MUX_M1 /* SPI2_DI */
++					0x094 MUX_M1 /* SPI2_DO */
++					0x098 MUX_M1 /* SPI2_CS0_N */
++				>;
++			};
++
++			spi4_pmx_func: spi4_pmx_func {
++				pinctrl-single,pins = <
++					0x08c MUX_M4 /* SPI4_CLK */
++					0x090 MUX_M4 /* SPI4_DI */
++					0x094 MUX_M4 /* SPI4_DO */
++					0x098 MUX_M4 /* SPI4_CS0_N */
++				>;
++			};
++
++			i2s0_pmx_func: i2s0_pmx_func {
++				pinctrl-single,pins = <
++					0x034 MUX_M1 /* I2S0_DI */
++					0x038 MUX_M1 /* I2S0_DO */
++					0x03c MUX_M1 /* I2S0_XCLK */
++					0x040 MUX_M1 /* I2S0_XFS */
++				>;
++			};
++		};
++	};
 +};
-+
-+static struct s5p_mfc_buf_size buf_size_v10 = {
-+	.fw     = MAX_FW_SIZE_V10,
-+	.cpb    = MAX_CPB_SIZE_V10,
-+	.priv   = &mfc_buf_size_v10,
-+};
-+
-+static struct s5p_mfc_buf_align mfc_buf_align_v10 = {
-+	.base = 0,
-+};
-+
-+static struct s5p_mfc_variant mfc_drvdata_v10 = {
-+	.version        = MFC_VERSION_V10,
-+	.version_bit    = MFC_V10_BIT,
-+	.port_num       = MFC_NUM_PORTS_V10,
-+	.buf_size       = &buf_size_v10,
-+	.buf_align      = &mfc_buf_align_v10,
-+	.fw_name[0]     = "s5p-mfc-v10.fw",
-+};
-+
- static const struct of_device_id exynos_mfc_match[] = {
- 	{
- 		.compatible = "samsung,mfc-v5",
-@@ -1558,6 +1585,9 @@ static int s5p_mfc_resume(struct device *dev)
- 	}, {
- 		.compatible = "samsung,exynos5433-mfc",
- 		.data = &mfc_drvdata_v8_5433,
-+	}, {
-+		.compatible = "samsung,mfc-v10",
-+		.data = &mfc_drvdata_v10,
- 	},
- 	{},
- };
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-index b45d18c..1941c63 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-@@ -23,7 +23,7 @@
- #include <media/v4l2-ioctl.h>
- #include <media/videobuf2-v4l2.h>
- #include "regs-mfc.h"
--#include "regs-mfc-v8.h"
-+#include "regs-mfc-v10.h"
- 
- #define S5P_MFC_NAME		"s5p-mfc"
- 
-@@ -723,11 +723,13 @@ struct mfc_control {
- #define IS_MFCV6_PLUS(dev)	(dev->variant->version >= 0x60 ? 1 : 0)
- #define IS_MFCV7_PLUS(dev)	(dev->variant->version >= 0x70 ? 1 : 0)
- #define IS_MFCV8_PLUS(dev)	(dev->variant->version >= 0x80 ? 1 : 0)
-+#define IS_MFCV10(dev)		(dev->variant->version >= 0xA0 ? 1 : 0)
- 
- #define MFC_V5_BIT	BIT(0)
- #define MFC_V6_BIT	BIT(1)
- #define MFC_V7_BIT	BIT(2)
- #define MFC_V8_BIT	BIT(3)
-+#define MFC_V10_BIT	BIT(5)
- 
- 
- #endif /* S5P_MFC_COMMON_H_ */
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c b/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
-index 484af6b..0ded23c 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
-@@ -267,6 +267,10 @@ int s5p_mfc_init_hw(struct s5p_mfc_dev *dev)
- 	}
- 	else
- 		mfc_write(dev, 0x3ff, S5P_FIMV_SW_RESET);
-+
-+	if (IS_MFCV10(dev))
-+		mfc_write(dev, 0x0, S5P_FIMV_MFC_CLOCK_OFF_V10);
-+
- 	mfc_debug(2, "Will now wait for completion of firmware transfer\n");
- 	if (s5p_mfc_wait_for_done_dev(dev, S5P_MFC_R2H_CMD_FW_STATUS_RET)) {
- 		mfc_err("Failed to load firmware\n");
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-index 0ec2928..784b28e 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-@@ -54,7 +54,8 @@
- 		.codec_mode	= S5P_MFC_CODEC_NONE,
- 		.type		= MFC_FMT_RAW,
- 		.num_planes	= 2,
--		.versions	= MFC_V6_BIT | MFC_V7_BIT | MFC_V8_BIT,
-+		.versions	= MFC_V6_BIT | MFC_V7_BIT | MFC_V8_BIT |
-+								MFC_V10_BIT,
- 	},
- 	{
- 		.name		= "4:2:0 2 Planes Y/CrCb",
-@@ -62,7 +63,8 @@
- 		.codec_mode	= S5P_MFC_CODEC_NONE,
- 		.type		= MFC_FMT_RAW,
- 		.num_planes	= 2,
--		.versions	= MFC_V6_BIT | MFC_V7_BIT | MFC_V8_BIT,
-+		.versions	= MFC_V6_BIT | MFC_V7_BIT | MFC_V8_BIT |
-+								MFC_V10_BIT,
- 	},
- 	{
- 		.name		= "H264 Encoded Stream",
-@@ -70,8 +72,8 @@
- 		.codec_mode	= S5P_MFC_CODEC_H264_DEC,
- 		.type		= MFC_FMT_DEC,
- 		.num_planes	= 1,
--		.versions	= MFC_V5_BIT | MFC_V6_BIT | MFC_V7_BIT |
--								MFC_V8_BIT,
-+		.versions	= MFC_V5_BIT | MFC_V6_BIT |
-+					MFC_V7_BIT | MFC_V8_BIT | MFC_V10_BIT,
- 	},
- 	{
- 		.name		= "H264/MVC Encoded Stream",
-@@ -79,7 +81,8 @@
- 		.codec_mode	= S5P_MFC_CODEC_H264_MVC_DEC,
- 		.type		= MFC_FMT_DEC,
- 		.num_planes	= 1,
--		.versions	= MFC_V6_BIT | MFC_V7_BIT | MFC_V8_BIT,
-+		.versions	= MFC_V6_BIT | MFC_V7_BIT | MFC_V8_BIT |
-+								MFC_V10_BIT,
- 	},
- 	{
- 		.name		= "H263 Encoded Stream",
-@@ -87,8 +90,8 @@
- 		.codec_mode	= S5P_MFC_CODEC_H263_DEC,
- 		.type		= MFC_FMT_DEC,
- 		.num_planes	= 1,
--		.versions	= MFC_V5_BIT | MFC_V6_BIT | MFC_V7_BIT |
--								MFC_V8_BIT,
-+		.versions	= MFC_V5_BIT | MFC_V6_BIT |
-+					MFC_V7_BIT | MFC_V8_BIT | MFC_V10_BIT,
- 	},
- 	{
- 		.name		= "MPEG1 Encoded Stream",
-@@ -96,8 +99,8 @@
- 		.codec_mode	= S5P_MFC_CODEC_MPEG2_DEC,
- 		.type		= MFC_FMT_DEC,
- 		.num_planes	= 1,
--		.versions	= MFC_V5_BIT | MFC_V6_BIT | MFC_V7_BIT |
--								MFC_V8_BIT,
-+		.versions	= MFC_V5_BIT | MFC_V6_BIT |
-+					MFC_V7_BIT | MFC_V8_BIT | MFC_V10_BIT,
- 	},
- 	{
- 		.name		= "MPEG2 Encoded Stream",
-@@ -105,8 +108,8 @@
- 		.codec_mode	= S5P_MFC_CODEC_MPEG2_DEC,
- 		.type		= MFC_FMT_DEC,
- 		.num_planes	= 1,
--		.versions	= MFC_V5_BIT | MFC_V6_BIT | MFC_V7_BIT |
--								MFC_V8_BIT,
-+		.versions	= MFC_V5_BIT | MFC_V6_BIT |
-+					MFC_V7_BIT | MFC_V8_BIT | MFC_V10_BIT,
- 	},
- 	{
- 		.name		= "MPEG4 Encoded Stream",
-@@ -114,8 +117,8 @@
- 		.codec_mode	= S5P_MFC_CODEC_MPEG4_DEC,
- 		.type		= MFC_FMT_DEC,
- 		.num_planes	= 1,
--		.versions	= MFC_V5_BIT | MFC_V6_BIT | MFC_V7_BIT |
--								MFC_V8_BIT,
-+		.versions	= MFC_V5_BIT | MFC_V6_BIT |
-+					MFC_V7_BIT | MFC_V8_BIT | MFC_V10_BIT,
- 	},
- 	{
- 		.name		= "XviD Encoded Stream",
-@@ -123,8 +126,8 @@
- 		.codec_mode	= S5P_MFC_CODEC_MPEG4_DEC,
- 		.type		= MFC_FMT_DEC,
- 		.num_planes	= 1,
--		.versions	= MFC_V5_BIT | MFC_V6_BIT | MFC_V7_BIT |
--								MFC_V8_BIT,
-+		.versions	= MFC_V5_BIT | MFC_V6_BIT |
-+					MFC_V7_BIT | MFC_V8_BIT | MFC_V10_BIT,
- 	},
- 	{
- 		.name		= "VC1 Encoded Stream",
-@@ -132,8 +135,8 @@
- 		.codec_mode	= S5P_MFC_CODEC_VC1_DEC,
- 		.type		= MFC_FMT_DEC,
- 		.num_planes	= 1,
--		.versions	= MFC_V5_BIT | MFC_V6_BIT | MFC_V7_BIT |
--								MFC_V8_BIT,
-+		.versions	= MFC_V5_BIT | MFC_V6_BIT |
-+					MFC_V7_BIT | MFC_V8_BIT | MFC_V10_BIT,
- 	},
- 	{
- 		.name		= "VC1 RCV Encoded Stream",
-@@ -141,8 +144,8 @@
- 		.codec_mode	= S5P_MFC_CODEC_VC1RCV_DEC,
- 		.type		= MFC_FMT_DEC,
- 		.num_planes	= 1,
--		.versions	= MFC_V5_BIT | MFC_V6_BIT | MFC_V7_BIT |
--								MFC_V8_BIT,
-+		.versions	= MFC_V5_BIT | MFC_V6_BIT |
-+					MFC_V7_BIT | MFC_V8_BIT | MFC_V10_BIT,
- 	},
- 	{
- 		.name		= "VP8 Encoded Stream",
-@@ -150,7 +153,8 @@
- 		.codec_mode	= S5P_MFC_CODEC_VP8_DEC,
- 		.type		= MFC_FMT_DEC,
- 		.num_planes	= 1,
--		.versions	= MFC_V6_BIT | MFC_V7_BIT | MFC_V8_BIT,
-+		.versions	= MFC_V6_BIT | MFC_V7_BIT | MFC_V8_BIT |
-+								MFC_V10_BIT,
- 	},
- };
- 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-index e39d9e0..9042378 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-@@ -57,8 +57,8 @@
- 		.codec_mode	= S5P_MFC_CODEC_NONE,
- 		.type		= MFC_FMT_RAW,
- 		.num_planes	= 2,
--		.versions	= MFC_V5_BIT | MFC_V6_BIT | MFC_V7_BIT |
--								MFC_V8_BIT,
-+		.versions	= MFC_V5_BIT | MFC_V6_BIT |
-+					MFC_V7_BIT | MFC_V8_BIT | MFC_V10_BIT,
- 	},
- 	{
- 		.name		= "4:2:0 2 Planes Y/CrCb",
-@@ -66,7 +66,8 @@
- 		.codec_mode	= S5P_MFC_CODEC_NONE,
- 		.type		= MFC_FMT_RAW,
- 		.num_planes	= 2,
--		.versions	= MFC_V6_BIT | MFC_V7_BIT | MFC_V8_BIT,
-+		.versions	= MFC_V6_BIT | MFC_V7_BIT | MFC_V8_BIT |
-+								MFC_V10_BIT,
- 	},
- 	{
- 		.name		= "H264 Encoded Stream",
-@@ -74,8 +75,8 @@
- 		.codec_mode	= S5P_MFC_CODEC_H264_ENC,
- 		.type		= MFC_FMT_ENC,
- 		.num_planes	= 1,
--		.versions	= MFC_V5_BIT | MFC_V6_BIT | MFC_V7_BIT |
--								MFC_V8_BIT,
-+		.versions	= MFC_V5_BIT | MFC_V6_BIT |
-+					MFC_V7_BIT | MFC_V8_BIT | MFC_V10_BIT,
- 	},
- 	{
- 		.name		= "MPEG4 Encoded Stream",
-@@ -83,8 +84,8 @@
- 		.codec_mode	= S5P_MFC_CODEC_MPEG4_ENC,
- 		.type		= MFC_FMT_ENC,
- 		.num_planes	= 1,
--		.versions	= MFC_V5_BIT | MFC_V6_BIT | MFC_V7_BIT |
--								MFC_V8_BIT,
-+		.versions	= MFC_V5_BIT | MFC_V6_BIT |
-+					MFC_V7_BIT | MFC_V8_BIT | MFC_V10_BIT,
- 	},
- 	{
- 		.name		= "H263 Encoded Stream",
-@@ -92,8 +93,8 @@
- 		.codec_mode	= S5P_MFC_CODEC_H263_ENC,
- 		.type		= MFC_FMT_ENC,
- 		.num_planes	= 1,
--		.versions	= MFC_V5_BIT | MFC_V6_BIT | MFC_V7_BIT |
--								MFC_V8_BIT,
-+		.versions	= MFC_V5_BIT | MFC_V6_BIT |
-+					MFC_V7_BIT | MFC_V8_BIT | MFC_V10_BIT,
- 	},
- 	{
- 		.name		= "VP8 Encoded Stream",
-@@ -101,7 +102,7 @@
- 		.codec_mode	= S5P_MFC_CODEC_VP8_ENC,
- 		.type		= MFC_FMT_ENC,
- 		.num_planes	= 1,
--		.versions	= MFC_V7_BIT | MFC_V8_BIT,
-+		.versions	= MFC_V7_BIT | MFC_V8_BIT | MFC_V10_BIT,
- 	},
- };
- 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-index 0572521..63dce5a 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-@@ -358,6 +358,7 @@ static int calc_plane(int width, int height)
- 
- static void s5p_mfc_dec_calc_dpb_size_v6(struct s5p_mfc_ctx *ctx)
- {
-+	struct s5p_mfc_dev *dev = ctx->dev;
- 	ctx->buf_width = ALIGN(ctx->img_width, S5P_FIMV_NV12MT_HALIGN_V6);
- 	ctx->buf_height = ALIGN(ctx->img_height, S5P_FIMV_NV12MT_VALIGN_V6);
- 	mfc_debug(2, "SEQ Done: Movie dimensions %dx%d,\n"
-@@ -374,8 +375,12 @@ static void s5p_mfc_dec_calc_dpb_size_v6(struct s5p_mfc_ctx *ctx)
- 
- 	if (ctx->codec_mode == S5P_MFC_CODEC_H264_DEC ||
- 			ctx->codec_mode == S5P_MFC_CODEC_H264_MVC_DEC) {
--		ctx->mv_size = S5P_MFC_DEC_MV_SIZE_V6(ctx->img_width,
--				ctx->img_height);
-+		if (IS_MFCV10(dev))
-+			ctx->mv_size = S5P_MFC_DEC_MV_SIZE_V10(ctx->img_width,
-+					ctx->img_height);
-+		else
-+			ctx->mv_size = S5P_MFC_DEC_MV_SIZE_V6(ctx->img_width,
-+					ctx->img_height);
- 		ctx->mv_size = ALIGN(ctx->mv_size, 16);
- 	} else {
- 		ctx->mv_size = 0;
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h
-index 16a7b1d..fcc2368 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h
-@@ -24,6 +24,8 @@
- #define MB_HEIGHT(y_size)		DIV_ROUND_UP(y_size, 16)
- #define S5P_MFC_DEC_MV_SIZE_V6(x, y)	(MB_WIDTH(x) * \
- 					(((MB_HEIGHT(y)+1)/2)*2) * 64 + 128)
-+#define S5P_MFC_DEC_MV_SIZE_V10(x, y)	(MB_WIDTH(x) * \
-+					(((MB_HEIGHT(y)+1)/2)*2) * 64 + 512)
- 
- /* Definition */
- #define ENC_MULTI_SLICE_MB_MAX		((1 << 30) - 1)
 -- 
-1.7.2.3
+2.11.0-rc2
