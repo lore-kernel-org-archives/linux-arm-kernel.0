@@ -1,90 +1,79 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 18 Jan 2017 13:18:33 +0000
-Subject: [PATCH v3 6/9] kvm: arm/arm64: Add host pmu to support VM
- introspection
-In-Reply-To: <87o9z4msi3.fsf@e105922-lin.cambridge.arm.com>
-References: <20170110113856.7183-1-punit.agrawal@arm.com>
- <20170110113856.7183-7-punit.agrawal@arm.com>
- <1a6b8d71-58a5-b29b-3f01-e945deb2baf6@arm.com>
- <20170118113523.GB3231@leverpostej>
- <87o9z4msi3.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <c2382140-b7ac-11d8-89f0-bf421e38f844@arm.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Wed, 18 Jan 2017 14:19:48 +0100
+Subject: [PATCH v3 00/13] ARM: da850-lcdk: add SATA support
+Message-ID: <1484745601-4769-1-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/01/17 13:01, Punit Agrawal wrote:
-> Mark Rutland <mark.rutland@arm.com> writes:
-> 
->> On Wed, Jan 18, 2017 at 11:21:21AM +0000, Marc Zyngier wrote:
->>> On 10/01/17 11:38, Punit Agrawal wrote:
->>>> +#define VM_MASK	GENMASK_ULL(31, 0)
->>>> +#define EVENT_MASK	GENMASK_ULL(32, 39)
->>>> +#define EVENT_SHIFT	(32)
->>>> +
->>>> +#define to_pid(cfg)	((cfg) & VM_MASK)
->>>> +#define to_event(cfg)	(((cfg) & EVENT_MASK) >> EVENT_SHIFT)
->>>> +
->>>> +PMU_FORMAT_ATTR(vm, "config:0-31");
->>>> +PMU_FORMAT_ATTR(event, "config:32-39");
->>>
->>> I'm a bit confused by these. Can't you get the PID of the VM you're
->>> tracing directly from perf, without having to encode things?
-> 
-> With perf attached to a PID, the event gets scheduled out when the task
-> is context switched. As the PID of the controlling process was used,
-> none of the vCPU events were counted.
-> 
->> And if you
->>> can't, surely this should be a function of the size of pid_t?
-> 
-> Agreed. I'll update above if we decide to carry on with this
-> approach. More below...
-> 
->>>
->>> Mark, can you shine some light here?
->>
->> AFAICT, this is not necessary.
->>
->> The perf_event_open() syscall takes a PID separately from the
->> perf_event_attr. i.e. we should be able to do:
->>
->> // monitor a particular vCPU
->> perf_event_open(attr, vcpupid, -1, -1, 0)
->>
->> ... or .. 
->>
->> // monitor a particular vCPU on a pCPU
->> perf_event_open(attr, vcpupid, cpu, -1, 0)
->>
->> ... or ...
->>
->> // monitor all vCPUs on a pCPU
->> perf_event_open(attr, -1, cpu, -1, 0)
->>
->> ... so this shouldn't be necessary. AFAICT, this is a SW PMU, so there
->> should be no issue with using the perf_sw_context.
-> 
-> I might have missed it but none of the modes of invoking perf_event_open
-> allow monitoring a set of process, i.e., all vcpus belonging to a
-> particular VM, which was one of the aims and a feature I was carrying
-> over from the previous version. If we do not care about this...
-> 
->>
->> If this is a bodge to avoid opening a perf_event per vCPU thread, then I
->> completely disagree with the approach. This would be better handled in
->> userspace by discovering the set of threads and opening events for
->> each.
-> 
-> ... then requiring userspace to invoke perf_event_open perf vCPU will
-> simplify this patch.
-> 
-> Marc, any objections?
+This series contains all the changes necessary to make SATA work on
+the da850-lcdk board.
 
-Not so far, but I'm curious to find out how you determine which thread
-is a vcpu, let alone a given vcpu.
+The first patch adds DT bindings for the ahci-da850 driver.
 
-Thanks,
+The second enables relevant modules in davinci_all_defconfig.
 
-	M.
+Patches 03/14-06/14 modify the way the clocks are handled regarding
+SATA on the da850 platform. We modify the ahci driver to retrieve
+the clock via con_id and model the external SATA oscillator as
+a real clock.
+
+Patches 07/14-11/14 extend the ahci-da850 driver. Add DT support,
+implement workarounds necessary to make SATA work on the da850-lcdk
+board and un-hardcode the external clock multiplier.
+
+Last two patches add device tree changes required to probe the
+driver.
+
+v1 -> v2:
+- dropped patch 04/10 - replaced with local changes in the
+  ahci-da850 driver
+- added comments explaining the workaround in ahci softreset
+- s/0x218000/218000 in the sata DT node label
+- added patches chaning the way clocks are handled in the da850 SATA
+  code both in arch/ and in the ahci driver
+- dropped the clock multiplier property in the DT bindings in favor
+  of using struct clk to pass the refclk rate to the driver
+- minor tweaks in commit messages
+
+v2 -> v3:
+- dropped the clocks property from the ahci-da850 DT binding
+- dropped patch 12/14 (SATA pinmux settings)
+- dropped an outdated fragment from the commit message in patch 14/14
+- s/get_clk()/clk_get()/
+- s/connector id/connection id/
+- stopped using __div64_32() after noticing that it sometimes produces
+  invalid results
+- removed the default MPY value from ahci-da850
+- registered SATA refclk for board file boot mode as well
+
+Bartosz Golaszewski (13):
+  devicetree: bindings: add bindings for ahci-da850
+  ARM: davinci_all_defconfig: enable SATA modules
+  ARM: davinci: add a clock lookup entry for the SATA clock
+  sata: ahci-da850: get the sata clock using a connection id
+  ARM: davinci: da850: add con_id for the SATA clock
+  ARM: davinci: da850: model the SATA refclk
+  sata: ahci-da850: add device tree match table
+  sata: ahci-da850: implement a workaround for the softreset quirk
+  sata: ahci: export ahci_do_hardreset() locally
+  sata: ahci-da850: add a workaround for controller instability
+  sata: ahci-da850: un-hardcode the MPY bits
+  ARM: dts: da850: add the SATA node
+  ARM: dts: da850-lcdk: enable the SATA node
+
+ .../devicetree/bindings/ata/ahci-da850.txt         |  15 ++
+ arch/arm/boot/dts/da850-lcdk.dts                   |   4 +
+ arch/arm/boot/dts/da850.dtsi                       |   6 +
+ arch/arm/configs/davinci_all_defconfig             |   2 +
+ arch/arm/mach-davinci/da850.c                      |   2 +-
+ arch/arm/mach-davinci/da8xx-dt.c                   |   9 ++
+ arch/arm/mach-davinci/devices-da8xx.c              |  29 ++++
+ arch/arm/mach-davinci/include/mach/da8xx.h         |   1 +
+ drivers/ata/ahci.h                                 |   3 +
+ drivers/ata/ahci_da850.c                           | 175 +++++++++++++++++++--
+ drivers/ata/libahci.c                              |  18 ++-
+ 11 files changed, 241 insertions(+), 23 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/ata/ahci-da850.txt
+
 -- 
-Jazz is not dead. It just smells funny...
+2.9.3
