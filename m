@@ -1,28 +1,102 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 18 Jan 2017 13:35:04 +0000
-Subject: [PATCH 7/7] arm: Add livepatch necessary arch selects into Kconfig
-In-Reply-To: <alpine.LSU.2.20.1701181339350.23458@pobox.suse.cz>
-References: <1481043967-15602-1-git-send-email-abelvesa@linux.com>
- <1481043967-15602-8-git-send-email-abelvesa@linux.com>
- <alpine.LSU.2.20.1701181339350.23458@pobox.suse.cz>
-Message-ID: <20170118133504.GL27312@n2100.armlinux.org.uk>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Wed, 18 Jan 2017 22:40:42 +0900
+Subject: [PATCH 1/3] arm64: dts: exynos: Fix drive strength of sd0_xxx pin
+ definitions
+In-Reply-To: <1484718141-28785-2-git-send-email-pankaj.dubey@samsung.com>
+References: <CGME20170118053953epcas1p18e06184783a0edc6a2cfc3b6a9d9ce31@epcas1p1.samsung.com>
+ <1484718141-28785-1-git-send-email-pankaj.dubey@samsung.com>
+ <1484718141-28785-2-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <CAGOxZ50aXxVitrgS6EXLbZdip0M7Xb0AwmSUvb7diVFVBK5OLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2017 at 01:40:23PM +0100, Miroslav Benes wrote:
-> On Tue, 6 Dec 2016, Abel Vesa wrote:
-> > @@ -82,6 +84,7 @@ config ARM
-> >  	select HAVE_VIRT_CPU_ACCOUNTING_GEN
-> >  	select IRQ_FORCED_THREADING
-> >  	select MODULES_USE_ELF_REL
-> > +	select MODULES_USE_ELF_RELA
-> 
-> I wrote it before but I think you cannot have both MODULES_USE_ELF_REL and 
-> MODULES_USE_ELF_RELA.
+Hi,
 
-ARM doesn't use RELA relocations, so it's pointless enabling them.
+On Wed, Jan 18, 2017 at 2:42 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
+> As per Exynos7 datasheet FSYS1 pinctrl block does not support drive
+> strength value of 0x3. This patch fixes this and update the correct
+> drive strength for sd0_xxx pin definitions.
+>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+Looks good.
+Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
+
+>  arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi | 14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
+>
+> diff --git a/arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi b/arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi
+> index 8232198..7ebb939 100644
+> --- a/arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi
+> +++ b/arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi
+> @@ -497,49 +497,49 @@
+>                 samsung,pins = "gpr0-0";
+>                 samsung,pin-function = <2>;
+>                 samsung,pin-pud = <0>;
+> -               samsung,pin-drv = <3>;
+> +               samsung,pin-drv = <4>;
+>         };
+>
+>         sd0_cmd: sd0-cmd {
+>                 samsung,pins = "gpr0-1";
+>                 samsung,pin-function = <2>;
+>                 samsung,pin-pud = <3>;
+> -               samsung,pin-drv = <3>;
+> +               samsung,pin-drv = <4>;
+>         };
+>
+>         sd0_ds: sd0-ds {
+>                 samsung,pins = "gpr0-2";
+>                 samsung,pin-function = <2>;
+>                 samsung,pin-pud = <1>;
+> -               samsung,pin-drv = <3>;
+> +               samsung,pin-drv = <4>;
+>         };
+>
+>         sd0_qrdy: sd0-qrdy {
+>                 samsung,pins = "gpr0-3";
+>                 samsung,pin-function = <2>;
+>                 samsung,pin-pud = <1>;
+> -               samsung,pin-drv = <3>;
+> +               samsung,pin-drv = <4>;
+>         };
+>
+>         sd0_bus1: sd0-bus-width1 {
+>                 samsung,pins = "gpr1-0";
+>                 samsung,pin-function = <2>;
+>                 samsung,pin-pud = <3>;
+> -               samsung,pin-drv = <3>;
+> +               samsung,pin-drv = <4>;
+>         };
+>
+>         sd0_bus4: sd0-bus-width4 {
+>                 samsung,pins = "gpr1-1", "gpr1-2", "gpr1-3";
+>                 samsung,pin-function = <2>;
+>                 samsung,pin-pud = <3>;
+> -               samsung,pin-drv = <3>;
+> +               samsung,pin-drv = <4>;
+>         };
+>
+>         sd0_bus8: sd0-bus-width8 {
+>                 samsung,pins = "gpr1-4", "gpr1-5", "gpr1-6", "gpr1-7";
+>                 samsung,pin-function = <2>;
+>                 samsung,pin-pud = <3>;
+> -               samsung,pin-drv = <3>;
+> +               samsung,pin-drv = <4>;
+>         };
+>
+>         sd1_clk: sd1-clk {
+> --
+> 2.7.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+Alim
