@@ -1,79 +1,33 @@
-From: christopher.spinrath@rwth-aachen.de (Christopher Spinrath)
-Date: Wed, 18 Jan 2017 23:20:17 +0100
-Subject: [PATCH] ARM: dts: imx6q-utilite-pro: enable 2nd display pipeline
-In-Reply-To: <6ed3f695104044f18e98fc9619aab16e@rwthex-s1-b.rwth-ad.de>
-References: <ec9676f344eb4786a28a3c7b969f0e94@rwthex-s1-b.rwth-ad.de>
- <88bdfd5321484efc82af4132ac2f0d7e@rwthex-s1-b.rwth-ad.de>
- <6ed3f695104044f18e98fc9619aab16e@rwthex-s1-b.rwth-ad.de>
-Message-ID: <17a7f9cea35944288f97735e66859929@rwthex-s1-b.rwth-ad.de>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 18 Jan 2017 16:22:38 -0600
+Subject: [PATCH v3 1/3] Documentation: devicetree: move shared property
+ used by rc into a common place
+In-Reply-To: <1484292939-9454-2-git-send-email-sean.wang@mediatek.com>
+References: <1484292939-9454-1-git-send-email-sean.wang@mediatek.com>
+ <1484292939-9454-2-git-send-email-sean.wang@mediatek.com>
+Message-ID: <20170118222238.7iqt7joopu45dq46@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+On Fri, Jan 13, 2017 at 03:35:37PM +0800, sean.wang at mediatek.com wrote:
+> From: Sean Wang <sean.wang@mediatek.com>
+> 
+> Most IR drivers uses the same label to identify the
+> scancdoe/key table they used by multiple bindings and lack
+> explanation well. So move the shared property into a common
+> place and give better explanation.
+> 
+> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> ---
+>  .../devicetree/bindings/media/gpio-ir-receiver.txt |   3 +-
+>  .../devicetree/bindings/media/hix5hd2-ir.txt       |   2 +-
+>  Documentation/devicetree/bindings/media/rc.txt     | 116 +++++++++++++++++++++
+>  .../devicetree/bindings/media/sunxi-ir.txt         |   2 +-
+>  4 files changed, 120 insertions(+), 3 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/media/rc.txt
 
-turns out I have a question on your comment after all:
+Acked-by: Rob Herring <robh@kernel.org>
 
-On 01/17/2017 07:35 PM, Christopher Spinrath wrote:
-> Hi Philipp,
->
-> thanks for the review!
->
-> On 01/17/2017 09:57 AM, Philipp Zabel wrote:
->> [...]
->>> +
->>> +    parallel-display {
->>> +        compatible = "fsl,imx-parallel-display";
->>> +        #address-cells = <1>;
->>> +        #size-cells = <0>;
->>> +        pinctrl-names = "default";
->>> +        pinctrl-0 = <&pinctrl_ipu1>;
->>> +
->>> +        interface-pix-fmt = "rgb24";
->>
->> This is not necessary if the connector created by the tpf410 has the
->> correct media bus format set in its display_info structure. This can be
->> done in tfp410_attach, before calling drm_mode_connector_attach_encoder:
->>
->>         u32 bus_format = MEDIA_BUS_FMT_RGB888_1X24;
->>
->>     drm_display_info_set_bus_formats(&dvi->connector.display_info,
->>                      &bus_format, 1);
->>
->> After this is done, the above line should be removed in a follow-up
->> patch.
+Thanks for doing this.
 
-On closer inspection the tfp410 can handle rgb12, rgb24, and DVI 
-formats. Considering this it feels wrong to hardcode the bus format to 
-rgb24 (isn't it?).
-
-So a solution might be to add a property specifying the bus format to 
-the tfp410 binding. But then we would effectively just move this 
-property from one node to another. I wonder if this is still desireable...?
-
-Cheers,
-Christopher
-
-> Ok, I will send a mini follow-up series doing that with your
-> Suggested-by (unless you object) in the next few days.
->
-> Cheers,
-> Christopher
->
->>> +        port at 0 {
->>> +            reg = <0>;
->>> +
->>> +            parallel_display_in: endpoint {
->>> +                remote-endpoint = <&ipu1_di0_disp0>;
->>> +            };
->>> +        };
->>> +
->>> +        port at 1 {
->>> +            reg = <1>;
->>> +
->>> +            parallel_display_out: endpoint {
->>> +                remote-endpoint = <&tfp410_in>;
->>> +            };
->>> +        };
->>> +    };
->>>  };
->>>  [...]
+Rob
