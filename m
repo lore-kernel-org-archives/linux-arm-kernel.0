@@ -1,65 +1,47 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 18 Jan 2017 13:22:21 +0100
-Subject: [PATCH 0/4] video: ARM CLCD: add support of an optional GPIO to
- enable panel
-In-Reply-To: <ae187f91-ca9b-c51a-d7cb-14fd99baa434@mleia.com>
-References: <20161221032717.13154-1-vz@mleia.com>
- <CGME20170112212713epcas2p108e55dc682911981f750f197f30c7d5f@epcas2p1.samsung.com>
- <d1534f4b-e564-d87e-b408-9b7215a90de2@mleia.com> <3057141.7Vn8X5ONyT@amdc3058>
- <ae187f91-ca9b-c51a-d7cb-14fd99baa434@mleia.com>
-Message-ID: <CACRpkdYbwr8kH-o7C3GN2UeLSmL2=MgNr0rXu+rW-WpPj9moQw@mail.gmail.com>
+Date: Wed, 18 Jan 2017 13:24:30 +0100
+Subject: [PATCH v2 05/12] Document: dt: binding: imx: update pinctrl doc
+ for imx6sll
+In-Reply-To: <AM3PR04MB530F532D867C08824DADDC9877C0@AM3PR04MB530.eurprd04.prod.outlook.com>
+References: <1482832070-22668-1-git-send-email-ping.bai@nxp.com>
+ <1482832070-22668-6-git-send-email-ping.bai@nxp.com>
+ <CACRpkdYUME8K+JusA0ORRKqxyBuhDdyei8eg7UZbHidKw9=bQw@mail.gmail.com>
+ <AM3PR04MB5304992095753B761E66A9A87640@AM3PR04MB530.eurprd04.prod.outlook.com>
+ <CACRpkdYTpEHyzBY-mA4YUsj=xt46Pibka3-4VHwUXosfgbgp1Q@mail.gmail.com>
+ <AM3PR04MB530A88C5C0E7C6AD2C59B9E87790@AM3PR04MB530.eurprd04.prod.outlook.com>
+ <CACRpkda1a4+yOrzBnKs6J84PS0StwQ68gHxDub_u7i5ofU9s7w@mail.gmail.com>
+ <AM3PR04MB530F532D867C08824DADDC9877C0@AM3PR04MB530.eurprd04.prod.outlook.com>
+Message-ID: <CACRpkdaxvf6eHujfvKuOsRb69aL8+4jTE-aR3a6ywhytTEu6Hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 2:57 AM, Vladimir Zapolskiy <vz@mleia.com> wrote:
-
-> I've noticed that 4/4 requires special attention due to the anticipated
-> change of devm_get_gpiod_from_child() interface.
-
-Hm. Yeah I merged that patch to the GPIO tree yesterday.
-
-I can of course put those patches on an immutable branch to
-be pulled into the fbdev tree, if Bartlomiej wants to kickstart
-the fbdev work with some complex cross-git merging :D
-
-> Some updates, now I've developed a simple CLCD DRM driver which works
-> nicely on one of my boards powered by LPC3250 (has MMU), but I still
-> have to find enough time and check that the driver works on MMU-less
-> LPC4357 with the applied DRM core change referenced by Vladimir earlier.
+On Tue, Jan 17, 2017 at 7:35 AM, Jacky Bai <ping.bai@nxp.com> wrote:
+>> Subject: Re: [PATCH v2 05/12] Document: dt: binding: imx: update pinctrl doc
+>> On Thu, Jan 12, 2017 at 3:57 AM, Jacky Bai <ping.bai@nxp.com> wrote:
+>>
+>> > Another thing is that we can use a pins-tool program developed by NXP
+>> > to  generate the pinctrl configuration code that can be used directly
+>> > in dts. This tiny program can avoid pin function conflict. As on i.MX,
+>> > there are so may pins, each pin can be used for up 8  function.
+>> > Configuring the pins is a time-consuming work.  This tools is very useful for
+>> customer to generate the dts code.
+>>
+>> I understand, but every silicon vendor has such a tool, all are different,
+>> proprietary and unfriendly to programmers and open source developers, who
+>> need to understand how the hardware is working without magic tools and
+>> secret data sheets to fix bugs.
+>>
+>> For the people working with maintaining the code it is paramount that DTS files
+>> are self-descriptive.
 >
-> Most probably I'll complete polishing the driver on this weekend and
-> send it for review on the next week.
+> OK.  Thanks for your comments.  Adding generic-pinconf in imx pinctrl needs some time
+> to finish and the legacy method still need be here even if generic-pinconf is added.
+> Do you plan to pick this legacy binding patch for now?
 
-Nice! I look forward to it.
+As I said earlier:
 
-> One more comment, I've found a discussion when DT support to the CLCD
-> fbdev driver was added [1], there are some comments about panel device
-> node and endpoints incompatibility in comparison to the common layout
-> for Linux-ish DRM devices, and I do confirm that this incompatibility
-> exists. I have both versions though, but you guess that DRM flavour
-> is cleaner, and for CLCD DRM driver I'm going to use it.
-
-Probably a good idea.
-
-> The legacy DT layout can be supported in the same driver in parallel,
-> but unfortunately it makes the driver not so cute, and I decide to
-> drop it in the initial version. It implies that CLCD fbdev users with
-> the controller and panel descriptions in DT and who want to switch to
-> CLCD DRM driver should update DTS. Sorry, I know it is inconvenient...
-
-I'm one of those who tend to be lax on these DT ABI issues.
-
-I guess it makes most sense to merge the DRM driver in parallel,
-using the DRM bindings, then I can work on adding in support for
-my misc systems (all ARM reference designs essentially, plus
-Nomadik) using the DRM bindings, and we can stabilize that,
-then as a last step simply switch over, augment all device trees
-and delete the old fbdev driver.
-
-These systems do NOT have deployed DTB device trees that cannot
-be upgraded, they are reference designs not consumer products,
-so requireing people to update their device trees is totally
-reasonable. In fact I use attached device tree on all of them.
+> atleast I need an indication from one of the i.MX maintainers how they
+> want to proceed.
 
 Yours,
 Linus Walleij
