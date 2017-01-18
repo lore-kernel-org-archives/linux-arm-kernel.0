@@ -1,75 +1,30 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Wed, 18 Jan 2017 15:53:24 -0700
-Subject: [PATCH V7 04/10] arm64: exception: handle Synchronous External
- Abort
-In-Reply-To: <20170117102753.GA27328@arm.com>
-References: <1484244924-24786-1-git-send-email-tbaicar@codeaurora.org>
- <1484244924-24786-5-git-send-email-tbaicar@codeaurora.org>
- <20170116115309.GE1510@arm.com>
- <0ca6c70e-6033-4cca-8833-15cb8573a939@codeaurora.org>
- <20170117102753.GA27328@arm.com>
-Message-ID: <93ba3d26-a80e-5686-0b13-26bc7df0ee6e@codeaurora.org>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 18 Jan 2017 14:53:53 -0800
+Subject: [PATCH 2/3] ARM64: dts: meson-gxbb: Add support for WeTek Hub and
+ Play
+In-Reply-To: <1484736642-5451-3-git-send-email-narmstrong@baylibre.com> (Neil
+ Armstrong's message of "Wed, 18 Jan 2017 11:50:41 +0100")
+References: <1484736642-5451-1-git-send-email-narmstrong@baylibre.com>
+ <1484736642-5451-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <m2mveox9mm.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/17/2017 3:27 AM, Will Deacon wrote:
-> On Mon, Jan 16, 2017 at 01:09:22PM -0700, Baicar, Tyler wrote:
->> On 1/16/2017 4:53 AM, Will Deacon wrote:
->>> On Thu, Jan 12, 2017 at 11:15:18AM -0700, Tyler Baicar wrote:
->>>> SEA exceptions are often caused by an uncorrected hardware
->>>> error, and are handled when data abort and instruction abort
->>>> exception classes have specific values for their Fault Status
->>>> Code.
->>>> When SEA occurs, before killing the process, go through
->>>> the handlers registered in the notification list.
->>>> Update fault_info[] with specific SEA faults so that the
->>>> new SEA handler is used.
->>>>
->>>> Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
->>>> Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
->>>> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
->>>> ---
->>>>   arch/arm64/include/asm/system_misc.h | 13 ++++++++
->>>>   arch/arm64/mm/fault.c                | 58 +++++++++++++++++++++++++++++-------
->>>>   2 files changed, 61 insertions(+), 10 deletions(-)
->>>>
->>>> diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
->>>> index 57f110b..e7f3440 100644
->>>> --- a/arch/arm64/include/asm/system_misc.h
->>>> +++ b/arch/arm64/include/asm/system_misc.h
->>>> @@ -64,4 +64,17 @@ extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
->>>>   #endif	/* __ASSEMBLY__ */
->>>> +/*
->>>> + * The functions below are used to register and unregister callbacks
->>>> + * that are to be invoked when a Synchronous External Abort (SEA)
->>>> + * occurs. An SEA is raised by certain fault status codes that have
->>>> + * either data or instruction abort as the exception class, and
->>>> + * callbacks may be registered to parse or handle such hardware errors.
->>>> + *
->>>> + * Registered callbacks are run in an interrupt/atomic context. They
->>>> + * are not allowed to block or sleep.
->>>> + */
->>>> +int register_sea_notifier(struct notifier_block *nb);
->>>> +void unregister_sea_notifier(struct notifier_block *nb);
->>> I still don't understand why you need notifiers for this. You register
->>> precisely one hook in the series.
->> I didn't see a response to my last comment on the previous series so I just
->> left it in for this series.
->> The notifier usage is consistent with the GHES code for SCI errors which are
->> also only used a single
->> time in the code. If you think making the call directly is a better option I
->> will remove the notifiers.
-> Yes, please. It's easy to add the notifier infrastructure back if/when it's
-> actually needed and I don't see why the low-level fault dispatching needs to
-> be consistent with the GHES/SCI code.
+Neil Armstrong <narmstrong@baylibre.com> writes:
+
+> Adds support for the WeTek Hub and Play2 boards.
+> The Hub is an extremely small IPTv Set-Top-Box and the Play2 is a more
+> traditionnal Satellite or Terrestrial and IPTv Set-Top-Box.
 >
-> Will
-Sounds good, I will remove the notifier in the next patchset.
+> Both are based on the p200 Reference Design and out-of-tree support is
+> based on OpenELEC kernel at [1].
+>
+> [1] https://github.com/wetek-enigma/linux-amlogic
+>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
-Thanks,
-Tyler
+Did you get the GPIO/button info from the LibreELEC tree or did you find
+some schematics someplace?  If you found any schematics, it would be
+nice to have links in the DTS files.
 
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Kevin
