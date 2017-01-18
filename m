@@ -1,137 +1,67 @@
 From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 18 Jan 2017 19:42:37 +0100
-Subject: [PATCH v9 2/5] i2c: Add STM32F4 I2C driver
-In-Reply-To: <CAOAejn0ea2j_oUijOdHgiL3JU4TM0HZoL+-ggzjpPL2eA7tDCw@mail.gmail.com>
-References: <1484666821-20551-1-git-send-email-cedric.madianga@gmail.com>
- <1484666821-20551-3-git-send-email-cedric.madianga@gmail.com>
- <20170117193752.e6hju25w74bb4i4z@pengutronix.de>
- <CAOAejn0ea2j_oUijOdHgiL3JU4TM0HZoL+-ggzjpPL2eA7tDCw@mail.gmail.com>
-Message-ID: <20170118184237.tvhlsksdcw2ckwan@pengutronix.de>
+Date: Wed, 18 Jan 2017 19:54:35 +0100
+Subject: Initializing MAC address at run-time
+In-Reply-To: <e083ed68-0e8e-380e-23bd-5ad387c88575@free.fr>
+References: <e083ed68-0e8e-380e-23bd-5ad387c88575@free.fr>
+Message-ID: <20170118185435.fen6np7lydzgxxek@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Cedric,
+Hello,
 
-On Wed, Jan 18, 2017 at 04:21:17PM +0100, M'boumba Cedric Madianga wrote:
-> >> +      * In standard mode, the maximum allowed SCL rise time is 1000 ns.
-> >> +      * If, in the I2C_CR2 register, the value of FREQ[5:0] bits is equal to
-> >> +      * 0x08 so period = 125 ns therefore the TRISE[5:0] bits must be
-> >> +      * programmed with 09h.(1000 ns / 125 ns = 8 + 1)
-> >
-> >         * programmed with 0x9.
-> > (1000 ns / 125 ns = 8)
-> >
-> >> +      * So, for I2C standard mode TRISE = FREQ[5:0] + 1
-> >> +      *
-> >> +      * In fast mode, the maximum allowed SCL rise time is 300 ns.
-> >> +      * If, in the I2C_CR2 register, the value of FREQ[5:0] bits is equal to
-> >> +      * 0x08 so period = 125 ns therefore the TRISE[5:0] bits must be
-> >> +      * programmed with 03h.(300 ns / 125 ns = 2 + 1)
-> >
-> > as above s/03h/0x3/;
+On Wed, Jan 18, 2017 at 03:03:57PM +0100, Mason wrote:
+> When my system boots up, eth0 is given a seemingly random MAC address.
 > 
-> ok
+> [    0.950734] nb8800 26000.ethernet eth0: MAC address ba:de:d6:38:b8:38
+> [    0.957334] nb8800 26000.ethernet eth0: MAC address 6e:f1:48:de:d6:c4
 > 
-> > s/.(/. (/;
-> ok
 > 
-> > s/+ 1//;
-> This formula is use to understand how we find the result 0x3
-> So, 0x3 => 300 ns / 125ns = 2 + 1
+> The DT node for eth0 is:
+> 
+> 	eth0: ethernet at 26000 {
+> 		compatible = "sigma,smp8734-ethernet";
+> 		reg = <0x26000 0x800>;
+> 		interrupts = <38 IRQ_TYPE_LEVEL_HIGH>;
+> 		clocks = <&clkgen SYS_CLK>;
+> 	};
+> 
+> Documentation/devicetree/bindings/net/ethernet.txt mentions
+> - local-mac-address: array of 6 bytes, specifies the MAC address that was
+>   assigned to the network device;
+> 
+> And indeed, if I define this property, eth0 ends up with the MAC address
+> I specify in the device tree. But of course, I don't want all my boards
+> to share the same MAC address. Every interface has a unique MAC address.
+> 
+> In fact, the boot loader (not Uboot, a custom non-DT boot loader) stores
+> the MAC address somewhere in MMIO space, in some weird custom format.
 
-Yeah, I understood that, but writing 300 ns / 125ns = 2 + 1 is
-irritating at best.
+Where does your machine get the dtb from? You write it to the boot
+medium at a certain point of time I assume. So AFAICT you have the
+following options (in no particular order):
 
-> >> +      * So, for I2C fast mode TRISE = FREQ[5:0] * 300 / 1000 + 1
-> >> +      */
-> >> +     if (i2c_dev->speed == STM32F4_I2C_SPEED_STANDARD)
-> >> +             trise = freq + 1;
-> >> +     else
-> >> +             trise = freq * 300 / 1000 + 1;
-> >
-> > I'd use
-> >
-> >         * 3 / 10
-> >
-> > without downside and lesser chance to overflow.
-> 
-> There is no chance of overflow as the max freq value allowed is 46
+ a) Describe in the dtb how to find out how the MAC address is stored
+    (already pointed out Mark and Robin)
+ b) Make your bootloader dt aware and let it provide the
+    local-mac-address property.
+ c) Adapt the dtb before it is written to the boot medium.
+ d) Let the bootloader configure the device and teach the driver to pick
+    up the mac from the device's address space.
+ e) Accept that the mac address is random during development, and make
+    Userspace configure the MAC address, which is early enough for
+    production use.
 
-ok
+Not sure d) is considered ok today, but some drivers have this feature.
+I'd say b) is the best choice.
 
-> >> +             /*
-> >> +              * In fast mode, we compute CCR with duty = 0 as with low
-> >> +              * frequencies we are not able to reach 400 kHz.
-> >> +              * In that case:
-> >> +              * t_scl_high = CCR * I2C parent clk period
-> >> +              * t_scl_low = 2 * CCR * I2C parent clk period
-> >> +              * So, CCR = I2C parent rate / (400 kHz * 3)
-> >> +              *
-> >> +              * For example with parent rate = 6 MHz:
-> >> +              * CCR = 6000000 / (400000 * 3) = 5
-> >> +              * t_scl_high = 5 * (1 / 6000000) = 833 ns > 600 ns
-> >> +              * t_scl_low = 2 * 5 * (1 / 6000000) = 1667 ns > 1300 ns
-> >> +              * t_scl_high + t_scl_low = 2500 ns so 400 kHz is reached
-> >> +              */
-> >
-> > Huh, that's surprising. So you don't use DUTY any more. I found two
-> > hints in the manual that contradict here:
-> 
-> Yes with the above formula we could use duty = 0 by default
-> 
-> >
-> >         f_{PCLK1} must be at least 2 MHz to achieve Sm mode I2C frequencies
-> 
-> STM32F4_I2C_MIN_STANDARD_FREQ = 2
-> 
-> >         It must be at least 4 MHz to achieve Fm mode I2C frequencies.
-> 
-> STM32F4_I2C_MIN_FAST_FREQ = 6
-> 
-> > It must be a multiple of 10MHz to reach the 400 kHz maximum I2C Fm mode clock.
-> 
-> If we use this rule only 3 values are allowed 10 Mhz, 20 Mhz, 30 Mhz and 40 Mhz.
-> It is very restrictive.
-> So I don't take it into account in order to have more frequencies even
-> if 400 Khz is not reached.
-> Indeed, in many cases we are very close to 400 Khz.
-> For example, the default I2C parent clock in my board is 45 Mhz
-> I reach 395 kHz in theory and 390 kHz by testing.
-> I am in Fast mode but not with the max freq but very close.
+> I need to do something similar with the NAND partitions. The boot loader
+> stores the partition offsets somewhere, and I need to pass this info
+> to the NAND framework, so I assumed that inserting the corresponding
+> properties at run-time was the correct way to do it.
 
-fine
+The list of options here is similar to the list above. d) doesn't work,
+but instead you can pass the partitioning on the kernel commandline.
 
-> > and
-> >
-> >         [...]
-> >         If DUTY = 1: (to reach 400 kHz)
-> >
-> > Strange.
-> >
-> >> +             val = DIV_ROUND_UP(i2c_dev->parent_rate, 400000 * 3);
-> >
-> > the manual reads:
-> >
-> >         The minimum allowed value is 0x04, except in FAST DUTY mode
-> >         where the minimum allowed value is 0x01
-> >
-> > You don't check for that, right?
-> 
-> As the minimum freq value is 6 Mhz in fast mode the minimum CCR is 5
-> as described in the comment.
-> So I don't need to check that again as it is already done by checking
-> parent frequency.
-
-That would then go into a comment.
-
-> > CCR is 11 bits wide. A comment confirming that this cannot overflow
-> > would be nice.
-> 
-> Again there is no chance of overflow thanks to parent frequency check
-
-Right, this time I saw this myself, so I requested a comment stating
-this fact.
- 
 Best regards
 Uwe
 
