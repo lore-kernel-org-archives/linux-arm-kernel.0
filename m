@@ -1,84 +1,90 @@
 From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Wed, 18 Jan 2017 21:25:40 +0800
-Subject: [PATCH v20 16/17] clocksource/drivers/arm_arch_timer: Add GTDT
- support for memory-mapped timer
+Date: Wed, 18 Jan 2017 21:25:28 +0800
+Subject: [PATCH v20 04/17] clocksource/drivers/arm_arch_timer: Move enums and
+ defines to header file.
 In-Reply-To: <20170118132541.8989-1-fu.wei@linaro.org>
 References: <20170118132541.8989-1-fu.wei@linaro.org>
-Message-ID: <20170118132541.8989-17-fu.wei@linaro.org>
+Message-ID: <20170118132541.8989-5-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fu Wei <fu.wei@linaro.org>
 
-The patch add memory-mapped timer register support by using the
-information provided by the new GTDT driver of ACPI.
+To support the arm_arch_timer via ACPI we need to share defines and enums
+between the driver and the ACPI parser code.
+So we split out the relevant defines and enums into arm_arch_timer.h.
+
+No functional change.
 
 Signed-off-by: Fu Wei <fu.wei@linaro.org>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
 ---
- drivers/clocksource/arm_arch_timer.c | 35 ++++++++++++++++++++++++++++++++---
- 1 file changed, 32 insertions(+), 3 deletions(-)
+ drivers/clocksource/arm_arch_timer.c | 11 -----------
+ include/clocksource/arm_arch_timer.h | 12 ++++++++++++
+ 2 files changed, 12 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 79dc004..7ca2da7 100644
+index d5a1664..90b6661 100644
 --- a/drivers/clocksource/arm_arch_timer.c
 +++ b/drivers/clocksource/arm_arch_timer.c
-@@ -1077,10 +1077,36 @@ CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem, "arm,armv7-timer-mem",
- 		       arch_timer_mem_of_init);
+@@ -54,8 +54,6 @@
+ #define CNTV_TVAL	0x38
+ #define CNTV_CTL	0x3c
  
- #ifdef CONFIG_ACPI_GTDT
--/* Initialize per-processor generic timer */
-+static int __init arch_timer_mem_acpi_init(int platform_timer_count)
-+{
-+	struct arch_timer_mem *timer_mem;
-+	int timer_count, i, ret;
-+
-+	timer_mem = kcalloc(platform_timer_count, sizeof(*timer_mem),
-+			    GFP_KERNEL);
-+	if (!timer_mem)
-+		return -ENOMEM;
-+
-+	ret = acpi_arch_timer_mem_init(timer_mem, &timer_count);
-+	if (ret || !timer_count)
-+		goto error;
-+
-+	for (i = 0; i < timer_count; i++) {
-+		ret = arch_timer_mem_init(timer_mem);
-+		if (!ret)
-+			break;
-+		timer_mem++;
-+	}
-+
-+error:
-+	kfree(timer_mem);
-+	return ret;
-+}
-+
-+/* Initialize per-processor generic timer and memory-mapped timer(if present) */
- static int __init arch_timer_acpi_init(struct acpi_table_header *table)
- {
--	int ret;
-+	int ret, platform_timer_count;
+-#define ARCH_TIMER_TYPE_CP15		BIT(0)
+-#define ARCH_TIMER_TYPE_MEM		BIT(1)
+ static unsigned arch_timers_present __initdata;
  
- 	if (arch_timers_present & ARCH_TIMER_TYPE_CP15) {
- 		pr_warn("already initialized, skipping\n");
-@@ -1089,7 +1115,7 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
+ static void __iomem *arch_counter_base;
+@@ -68,15 +66,6 @@ struct arch_timer {
+ #define to_arch_timer(e) container_of(e, struct arch_timer, evt)
  
- 	arch_timers_present |= ARCH_TIMER_TYPE_CP15;
+ static u32 arch_timer_rate;
+-
+-enum arch_timer_ppi_nr {
+-	ARCH_TIMER_PHYS_SECURE_PPI,
+-	ARCH_TIMER_PHYS_NONSECURE_PPI,
+-	ARCH_TIMER_VIRT_PPI,
+-	ARCH_TIMER_HYP_PPI,
+-	ARCH_TIMER_MAX_TIMER_PPI
+-};
+-
+ static int arch_timer_ppi[ARCH_TIMER_MAX_TIMER_PPI];
  
--	ret = acpi_gtdt_init(table, NULL);
-+	ret = acpi_gtdt_init(table, &platform_timer_count);
- 	if (ret) {
- 		pr_err("Failed to init GTDT table.\n");
- 		return ret;
-@@ -1122,6 +1148,9 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
- 	if (ret)
- 		return ret;
+ static struct clock_event_device __percpu *arch_timer_evt;
+diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
+index caedb74..b898637 100644
+--- a/include/clocksource/arm_arch_timer.h
++++ b/include/clocksource/arm_arch_timer.h
+@@ -16,9 +16,13 @@
+ #ifndef __CLKSOURCE_ARM_ARCH_TIMER_H
+ #define __CLKSOURCE_ARM_ARCH_TIMER_H
  
-+	if (arch_timer_mem_acpi_init(platform_timer_count))
-+		pr_err("Failed to initialize memory-mapped timer.\n");
++#include <linux/bitops.h>
+ #include <linux/timecounter.h>
+ #include <linux/types.h>
+ 
++#define ARCH_TIMER_TYPE_CP15		BIT(0)
++#define ARCH_TIMER_TYPE_MEM		BIT(1)
 +
- 	return arch_timer_common_init();
- }
- CLOCKSOURCE_ACPI_DECLARE(arch_timer, ACPI_SIG_GTDT, arch_timer_acpi_init);
+ #define ARCH_TIMER_CTRL_ENABLE		(1 << 0)
+ #define ARCH_TIMER_CTRL_IT_MASK		(1 << 1)
+ #define ARCH_TIMER_CTRL_IT_STAT		(1 << 2)
+@@ -34,6 +38,14 @@ enum arch_timer_reg {
+ 	ARCH_TIMER_REG_TVAL,
+ };
+ 
++enum arch_timer_ppi_nr {
++	ARCH_TIMER_PHYS_SECURE_PPI,
++	ARCH_TIMER_PHYS_NONSECURE_PPI,
++	ARCH_TIMER_VIRT_PPI,
++	ARCH_TIMER_HYP_PPI,
++	ARCH_TIMER_MAX_TIMER_PPI
++};
++
+ #define ARCH_TIMER_PHYS_ACCESS		0
+ #define ARCH_TIMER_VIRT_ACCESS		1
+ #define ARCH_TIMER_MEM_PHYS_ACCESS	2
 -- 
 2.9.3
