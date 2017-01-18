@@ -1,26 +1,43 @@
 From: jun.gao@mediatek.com (Jun Gao)
-Date: Wed, 18 Jan 2017 17:40:59 +0800
-Subject: [RESEND PATCH 0/2] Add i2c DT binding and device node for Mediatek
- MT2701 Soc
-Message-ID: <1484732461-13594-1-git-send-email-jun.gao@mediatek.com>
+Date: Wed, 18 Jan 2017 17:41:00 +0800
+Subject: [RESEND PATCH 1/2] Documentation: devicetree: Add i2c binding for
+ mediatek MT2701 Soc Platform
+In-Reply-To: <1484732461-13594-1-git-send-email-jun.gao@mediatek.com>
+References: <1484732461-13594-1-git-send-email-jun.gao@mediatek.com>
+Message-ID: <1484732461-13594-2-git-send-email-jun.gao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series based on v4.10-rc2, include MT2701 i2c DT binding and device node.
+From: Jun Gao <jun.gao@mediatek.com>
 
-Dependent on "Add clock and power domain DT nodes for Mediatek MT2701"[1].
+This add i2c DT binding to i2c-mt6577.txt for MT2701.
 
-[1] http://lists.infradead.org/pipermail/linux-mediatek/2016-December/007637.html
+Signed-off-by: Jun Gao <jun.gao@mediatek.com>
+---
+ .../devicetree/bindings/i2c/i2c-mt6577.txt         |   11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-Jun Gao (2):
-  Documentation: devicetree: Add i2c binding for mediatek MT2701 Soc
-    Platform
-  arm: dts: mt2701: Add i2c device node
-
- .../devicetree/bindings/i2c/i2c-mt6577.txt         |   11 ++---
- arch/arm/boot/dts/mt2701-evb.dts                   |   44 ++++++++++++++++++++
- arch/arm/boot/dts/mt2701.dtsi                      |   42 +++++++++++++++++++
- 3 files changed, 92 insertions(+), 5 deletions(-)
-
---
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+index 0ce6fa3..ef22ecf 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-mt6577.txt
+@@ -4,11 +4,12 @@ The Mediatek's I2C controller is used to interface with I2C devices.
+ 
+ Required properties:
+   - compatible: value should be either of the following.
+-      (a) "mediatek,mt6577-i2c", for i2c compatible with mt6577 i2c.
+-      (b) "mediatek,mt6589-i2c", for i2c compatible with mt6589 i2c.
+-      (c) "mediatek,mt8127-i2c", for i2c compatible with mt8127 i2c.
+-      (d) "mediatek,mt8135-i2c", for i2c compatible with mt8135 i2c.
+-      (e) "mediatek,mt8173-i2c", for i2c compatible with mt8173 i2c.
++	"mediatek,mt2701-i2c", for i2c compatible with mt2701 i2c.
++	"mediatek,mt6577-i2c", for i2c compatible with mt6577 i2c.
++	"mediatek,mt6589-i2c", for i2c compatible with mt6589 i2c.
++	"mediatek,mt8127-i2c", for i2c compatible with mt8127 i2c.
++	"mediatek,mt8135-i2c", for i2c compatible with mt8135 i2c.
++	"mediatek,mt8173-i2c", for i2c compatible with mt8173 i2c.
+   - reg: physical base address of the controller and dma base, length of memory
+     mapped region.
+   - interrupts: interrupt number to the cpu.
+-- 
 1.7.9.5
