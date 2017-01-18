@@ -1,160 +1,56 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Wed, 18 Jan 2017 13:37:24 +0100
-Subject: [PATCH v7 4/8] PWM: add PWM driver for STM32 plaftorm
-In-Reply-To: <20170118113759.GA16826@ulmo.ba.sec>
-References: <1483608344-9012-1-git-send-email-benjamin.gaignard@st.com>
- <1483608344-9012-5-git-send-email-benjamin.gaignard@st.com>
- <20170118100817.GF18989@ulmo.ba.sec>
- <CA+M3ks64VEE8a0oeiA8J-T5FDzwWTo=pdaMACy+pz7EyOQY-Jg@mail.gmail.com>
- <20170118113759.GA16826@ulmo.ba.sec>
-Message-ID: <CA+M3ks4b7SVVz-SH633BEP8b4Ap+5rsG8zND51iq4EPLSY74hQ@mail.gmail.com>
+From: liviu.dudau@arm.com (Local user for Liviu Dudau)
+Date: Wed, 18 Jan 2017 12:38:02 +0000
+Subject: [PATCH 3/3] arm64: dts: juno: Remove Motherboard USB node
+In-Reply-To: <39868e0d327456be61aa9ac318fc2d958523a696.1484741104.git.robin.murphy@arm.com>
+References: <74595d6d866518db7cfabc39b4cf9b54d3be9bde.1484741104.git.robin.murphy@arm.com>
+ <39868e0d327456be61aa9ac318fc2d958523a696.1484741104.git.robin.murphy@arm.com>
+Message-ID: <20170118123802.GE995@e110455-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-01-18 12:37 GMT+01:00 Thierry Reding <thierry.reding@gmail.com>:
-> On Wed, Jan 18, 2017 at 12:15:58PM +0100, Benjamin Gaignard wrote:
->> 2017-01-18 11:08 GMT+01:00 Thierry Reding <thierry.reding@gmail.com>:
->> > On Thu, Jan 05, 2017 at 10:25:40AM +0100, Benjamin Gaignard wrote:
-> [...]
->> >> +static u32 active_channels(struct stm32_pwm *dev)
->> >> +{
->> >> +     u32 ccer;
->> >> +
->> >> +     regmap_read(dev->regmap, TIM_CCER, &ccer);
->> >> +
->> >> +     return ccer & TIM_CCER_CCXE;
->> >> +}
->> >
->> > This looks like something that you could track in software, but this is
->> > probably fine, too. Again, technically regmap_read() could fail, so you
->> > might want to consider adding some code to handle it. In practice it
->> > probably won't, so maybe you don't.
->>
->> TIM_CCER_CCXE is a value that IIO timer can also read (not write) so
->> I have keep the same logic for pwm driver.
->
-> Would that not be racy? What happens if after active_channels() here,
-> the IIO timer modifies the TIM_CCER register?
+Hi Robin,
 
-IIO timer only read this register not write it so no racy condition here
+On Wed, Jan 18, 2017 at 12:12:52PM +0000, Robin Murphy wrote:
+> The first batch of Juno boards included a discrete USB controller chip
+> as a contingency in case of issues with the USB 2.0 IP integrated into
+> the SoC. As it turned out, the latter was fine, and to the best of my
+> knowledge the motherboard USB was never even brought up and validated.
+> 
+> Since this also isn't present on later boards, and uses a compatible
+> string undocumented and unmatched by any driver in the kernel, let's
+> just tidy it away for ever to avoid any confusion.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
->
->> >> +     ret = stm32_pwm_config(chip, pwm, state->duty_cycle, state->period);
->> >> +     if (ret)
->> >> +             return ret;
->> >> +
->> >> +     if (!enabled && state->enabled)
->> >> +             ret = stm32_pwm_enable(chip, pwm);
->> >> +
->> >> +     return ret;
->> >> +}
->> >
->> > Would it be possible to merge stm32_pwm_disable(), stm32_pwm_enable(),
->> > stm32_pwm_set_polarity() and stm32_pwm_config() into stm32_pwm_apply()?
->> > Part of the reason for the atomic API was to make it easier to write
->> > these drivers, but your implementation effectively copies what the
->> > transitional helpers do.
->> >
->> > It might not make a difference technically in your case, but I think
->> > it'd make the implementation more compact and set a better example for
->> > future reference.
->>
->> hmm... it will create a fat function with lot of where
->> enabling/disabling/configuration
->> will be mixed I'm really not convince that will more compact and readable.
->
-> I don't object to splitting this up into separate functions, I just
-> don't think the functions should correspond to the legacy ones. One
-> variant that I think could work out nicely would be to have one
-> function that precomputes the various values, call in from ->apply()
-> and then do only the register writes along with a couple of
-> conditionals depending on enable state, for example.
+For all 3 patches:
 
-Ok I will change functions prototype so they will not be like legacy ones
-but I will keep the current split.
+Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
 
->
->> >> +static const struct pwm_ops stm32pwm_ops = {
->> >> +     .owner = THIS_MODULE,
->> >> +     .apply = stm32_pwm_apply,
->> >> +};
->> >> +
->> >> +static int stm32_pwm_set_breakinput(struct stm32_pwm *priv,
->> >> +                                 int level, int filter)
->> >> +{
->> >> +     u32 bdtr = TIM_BDTR_BKE;
->> >> +
->> >> +     if (level)
->> >> +             bdtr |= TIM_BDTR_BKP;
->> >> +
->> >> +     bdtr |= (filter & TIM_BDTR_BKF_MASK) << TIM_BDTR_BKF_SHIFT;
->> >> +
->> >> +     regmap_update_bits(priv->regmap,
->> >> +                        TIM_BDTR, TIM_BDTR_BKE | TIM_BDTR_BKP | TIM_BDTR_BKF,
->> >> +                        bdtr);
->> >> +
->> >> +     regmap_read(priv->regmap, TIM_BDTR, &bdtr);
->> >> +
->> >> +     return (bdtr & TIM_BDTR_BKE) ? 0 : -EINVAL;
->> >> +}
->> >> +
->> >> +static int stm32_pwm_set_breakinput2(struct stm32_pwm *priv,
->> >> +                                  int level, int filter)
->> >> +{
->> >> +     u32 bdtr = TIM_BDTR_BK2E;
->> >> +
->> >> +     if (level)
->> >> +             bdtr |= TIM_BDTR_BK2P;
->> >> +
->> >> +     bdtr |= (filter & TIM_BDTR_BKF_MASK) << TIM_BDTR_BK2F_SHIFT;
->> >> +
->> >> +     regmap_update_bits(priv->regmap,
->> >> +                        TIM_BDTR, TIM_BDTR_BK2E |
->> >> +                        TIM_BDTR_BK2P |
->> >> +                        TIM_BDTR_BK2F,
->> >> +                        bdtr);
->> >> +
->> >> +     regmap_read(priv->regmap, TIM_BDTR, &bdtr);
->> >> +
->> >> +     return (bdtr & TIM_BDTR_BK2E) ? 0 : -EINVAL;
->> >> +}
->> >
->> > As far as I can tell the only difference here is the various bit
->> > positions. Can you collapse the above two functions and add a new
->> > parameter to unify some code?
->>
->> Yes it is all about bit shifting, I had try unify those two functions
->> with index has additional parameter
->> but it just add if() before each lines so no real benefit for code size.
->
-> How about if you precompute the values and masks? Something like:
->
->         u32 bke = (index == 0) ? ... : ...;
->         u32 bkp = (index == 0) ? ... : ...;
->         u32 bkf = (index == 0) ? ... : ...;
->         u32 mask = (index == 0) ? ... : ...;
->
->         bdtr = bke | bkf;
->
->         if (level)
->                 bdtr |= bkp;
->
->         regmap_update_bits(priv->regmap, TIM_BDTR, mask, bdtr);
->
->         regmap_read(priv->regmap, TIM_BDTR, &bdtr);
->
->         return (bdtr & bke) ? 0 : -EINVAL;
->
-> ?
+Thanks,
+Liviu
 
-ok done
-
-
--- 
-Benjamin Gaignard
-
-Graphic Study Group
-
-Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro: Facebook | Twitter | Blog
+> ---
+>  arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 7 -------
+>  1 file changed, 7 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+> index 3ad4c3000611..098601657f82 100644
+> --- a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+> +++ b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
+> @@ -131,13 +131,6 @@
+>  				vddvario-supply = <&mb_fixed_3v3>;
+>  			};
+>  
+> -			usb at 5,00000000 {
+> -				compatible = "nxp,usb-isp1763";
+> -				reg = <5 0x00000000 0x20000>;
+> -				bus-width = <16>;
+> -				interrupts = <4>;
+> -			};
+> -
+>  			iofpga at 3,00000000 {
+>  				compatible = "simple-bus";
+>  				#address-cells = <1>;
+> -- 
+> 2.11.0.dirty
+> 
