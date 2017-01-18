@@ -1,221 +1,207 @@
 From: smitha.t@samsung.com (Smitha T Murthy)
-Date: Wed, 18 Jan 2017 15:32:09 +0530
-Subject: [PATCH 11/11] Documention: v4l: Documentation for HEVC CIDs
+Date: Wed, 18 Jan 2017 15:32:08 +0530
+Subject: [PATCH 10/11] [media] v4l2: Add v4l2 control IDs for HEVC encoder
 In-Reply-To: <1484733729-25371-1-git-send-email-smitha.t@samsung.com>
 References: <1484733729-25371-1-git-send-email-smitha.t@samsung.com>
- <CGME20170118100827epcas5p16023525ba778b58b8e9a31b8a764b382@epcas5p1.samsung.com>
-Message-ID: <1484733729-25371-12-git-send-email-smitha.t@samsung.com>
+ <CGME20170118100818epcas5p1c7153a6fe9d93f96269008f42f736b90@epcas5p1.samsung.com>
+Message-ID: <1484733729-25371-11-git-send-email-smitha.t@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added V4l2 controls for HEVC encoder
+Add v4l2 controls for HEVC encoder
 
+CC: Hans Verkuil <hans.verkuil@cisco.com>
+CC: Wu-Cheng Li <wuchengli@chromium.org>
+CC: Kieran Bingham <kieran@bingham.xyz>
+CC: Vladimir Zapolskiy <vz@mleia.com>
 CC: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
 ---
- Documentation/media/uapi/v4l/extended-controls.rst |  190 ++++++++++++++++++++
- 1 files changed, 190 insertions(+), 0 deletions(-)
+ drivers/media/v4l2-core/v4l2-ctrls.c |   51 ++++++++++++++++
+ include/uapi/linux/v4l2-controls.h   |  109 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 160 insertions(+), 0 deletions(-)
 
-diff --git a/Documentation/media/uapi/v4l/extended-controls.rst b/Documentation/media/uapi/v4l/extended-controls.rst
-index abb1057..fe23919 100644
---- a/Documentation/media/uapi/v4l/extended-controls.rst
-+++ b/Documentation/media/uapi/v4l/extended-controls.rst
-@@ -1960,6 +1960,196 @@ enum v4l2_vp8_golden_frame_sel -
-     1, 2 and 3 corresponding to encoder profiles 0, 1, 2 and 3.
+diff --git a/drivers/media/v4l2-core/v4l2-ctrls.c b/drivers/media/v4l2-core/v4l2-ctrls.c
+index 47001e2..387439d 100644
+--- a/drivers/media/v4l2-core/v4l2-ctrls.c
++++ b/drivers/media/v4l2-core/v4l2-ctrls.c
+@@ -775,6 +775,57 @@ static bool is_new_manual(const struct v4l2_ctrl *master)
+ 	case V4L2_CID_MPEG_VIDEO_VPX_P_FRAME_QP:		return "VPX P-Frame QP Value";
+ 	case V4L2_CID_MPEG_VIDEO_VPX_PROFILE:			return "VPX Profile";
  
++	/* HEVC controls */
++	case V4L2_CID_MPEG_VIDEO_HEVC_I_FRAME_QP:		return "HEVC Frame QP value";
++	case V4L2_CID_MPEG_VIDEO_HEVC_P_FRAME_QP:		return "HEVC P frame QP value";
++	case V4L2_CID_MPEG_VIDEO_HEVC_B_FRAME_QP:		return "HEVC B frame QP value";
++	case V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP:			return "HEVC Minimum QP value";
++	case V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP:			return "HEVC Maximum QP value";
++	case V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_DARK:		return "HEVC dark region adaptive";
++	case V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_SMOOTH:	return "HEVC smooth region adaptive";
++	case V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_STATIC:	return "HEVC static region adaptive";
++	case V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_ACTIVITY:	return "HEVC activity adaptive";
++	case V4L2_CID_MPEG_VIDEO_HEVC_PROFILE:			return "HEVC Profile";
++	case V4L2_CID_MPEG_VIDEO_HEVC_LEVEL:			return "HEVC level";
++	case V4L2_CID_MPEG_VIDEO_HEVC_TIER_FLAG:		return "HEVC tier_flag default is Main";
++	case V4L2_CID_MPEG_VIDEO_HEVC_RC_FRAME_RATE:		return "HEVC Frame rate";
++	case V4L2_CID_MPEG_VIDEO_HEVC_MAX_PARTITION_DEPTH:	return "HEVC Maximum coding unit depth";
++	case V4L2_CID_MPEG_VIDEO_HEVC_REF_NUMBER_FOR_PFRAMES:	return "HEVC Number of reference picture";
++	case V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_TYPE:		return "HEVC refresh type";
++	case V4L2_CID_MPEG_VIDEO_HEVC_CONST_INTRA_PRED_ENABLE:	return "HEVC constant intra prediction enabled";
++	case V4L2_CID_MPEG_VIDEO_HEVC_LOSSLESS_CU_ENABLE:	return "HEVC lossless encoding select";
++	case V4L2_CID_MPEG_VIDEO_HEVC_WAVEFRONT_ENABLE:		return "HEVC Wavefront enable";
++	case V4L2_CID_MPEG_VIDEO_HEVC_LF_DISABLE:		return "HEVC Filter disable";
++	case V4L2_CID_MPEG_VIDEO_HEVC_LF_SLICE_BOUNDARY:	return "across or not slice boundary";
++	case V4L2_CID_MPEG_VIDEO_HEVC_LTR_ENABLE:		return "long term reference enable";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_QP_ENABLE:	return "QP values for temporal layer";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_TYPE:	return "Hierarchical Coding Type";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER:return "Hierarchical Coding Layer";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_QP:return "Hierarchical Coding Layer QP";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT0:return "Hierarchical Coding Layer BIT0";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT1:return "Hierarchical Coding Layer BIT1";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT2:return "Hierarchical Coding Layer BIT2";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT3:return "Hierarchical Coding Layer BIT3";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT4:return "Hierarchical Coding Layer BIT4";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT5:return "Hierarchical Coding Layer BIT5";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT6:return "Hierarchical Coding Layer BIT6";
++	case V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_CH:return "Hierarchical Coding Layer Change";
++	case V4L2_CID_MPEG_VIDEO_HEVC_SIGN_DATA_HIDING:		return "HEVC Sign data hiding";
++	case V4L2_CID_MPEG_VIDEO_HEVC_GENERAL_PB_ENABLE:	return "HEVC General pb enable";
++	case V4L2_CID_MPEG_VIDEO_HEVC_TEMPORAL_ID_ENABLE:	return "HEVC Temporal id enable";
++	case V4L2_CID_MPEG_VIDEO_HEVC_STRONG_SMOTHING_FLAG:	return "HEVC Strong intra smoothing flag";
++	case V4L2_CID_MPEG_VIDEO_HEVC_DISABLE_INTRA_PU_SPLIT:	return "HEVC disable intra pu split";
++	case V4L2_CID_MPEG_VIDEO_HEVC_DISABLE_TMV_PREDICTION:	return "HEVC disable tmv prediction";
++	case V4L2_CID_MPEG_VIDEO_HEVC_MAX_NUM_MERGE_MV_MINUS1:	return "max number of candidate MVs";
++	case V4L2_CID_MPEG_VIDEO_HEVC_WITHOUT_STARTCODE_ENABLE:	return "ENC without startcode enable";
++	case V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_PERIOD:		return "HEVC Number of reference picture";
++	case V4L2_CID_MPEG_VIDEO_HEVC_LF_BETA_OFFSET_DIV2:	return "HEVC loop filter beta offset";
++	case V4L2_CID_MPEG_VIDEO_HEVC_LF_TC_OFFSET_DIV2:	return "HEVC loop filter tc offset";
++	case V4L2_CID_MPEG_VIDEO_HEVC_SIZE_OF_LENGTH_FIELD:	return "HEVC size of length field";
++	case V4L2_CID_MPEG_VIDEO_HEVC_USER_REF:			return "user long term reference frame";
++	case V4L2_CID_MPEG_VIDEO_HEVC_STORE_REF:		return "store long term reference frame";
++	case V4L2_CID_MPEG_VIDEO_HEVC_PREPEND_SPSPPS_TO_IDR:	return "Prepend SPS/PPS to every IDR";
++
+ 	/* CAMERA controls */
+ 	/* Keep the order of the 'case's the same as in v4l2-controls.h! */
+ 	case V4L2_CID_CAMERA_CLASS:		return "Camera Controls";
+diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
+index 0d2e1e0..a2a1c5d 100644
+--- a/include/uapi/linux/v4l2-controls.h
++++ b/include/uapi/linux/v4l2-controls.h
+@@ -579,6 +579,115 @@ enum v4l2_vp8_golden_frame_sel {
+ #define V4L2_CID_MPEG_VIDEO_VPX_P_FRAME_QP		(V4L2_CID_MPEG_BASE+510)
+ #define V4L2_CID_MPEG_VIDEO_VPX_PROFILE			(V4L2_CID_MPEG_BASE+511)
  
-+HEVC Control Reference
-+---------------------
-+
-+The HEVC controls include controls for encoding parameters of HEVC video
-+codec.
-+
-+
-+.. _hevc-control-id:
-+
-+HEVC Control IDs
-+^^^^^^^^^^^^^^^
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP``
-+    Minimum quantization parameter for HEVC.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP``
-+    Maximum quantization parameter for HEVC.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_I_FRAME_QP``
-+    Quantization parameter for an I frame for HEVC.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_P_FRAME_QP``
-+    Quantization parameter for a P frame for HEVC.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_B_FRAME_QP``
-+    Quantization parameter for a B frame for HEVC.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_QP_ENABLE``
-+    Enable the QP values for temporal layer.
-+
-+.. _v4l2-mpeg-video-hevc-hier-coding-type:
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_TYPE``
-+    (enum)
-+
-+enum v4l2_mpeg_video_hevc_hier_coding_type -
-+    Selects the hierarchical coding type for encoding. Possible values are:
-+
-+.. raw:: latex
-+
-+    \begin{adjustbox}{width=\columnwidth}
-+
-+.. tabularcolumns:: |p{11.0cm}|p{10.0cm}|
-+
-+.. flat-table::
-+    :header-rows:  0
-+    :stub-columns: 0
-+
-+    * - ``V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_B``
-+      - Use the B frame for hierarchical coding.
-+    * - ``V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_P``
-+      - Use the P frame for hierarchical coding.
-+
-+.. raw:: latex
-+
-+    \end{adjustbox}
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER``
-+    Indicates the hierarchical coding layer.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_QP``
-+    Indicates the hierarchical coding layer quantization parameter.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_PROFILE``
-+    Select the desired profile for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_LEVEL``
-+    Selects the desired level for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_RC_FRAME_RATE``
-+    Selects the RC filter frame rate for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_TIER_FLAG``
-+    By default selects HEVC tier_flag as Main.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_MAX_PARTITION_DEPTH``
-+    Selects HEVC Maximum coding unit depth.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_REF_NUMBER_FOR_PFRAMES``
-+    Selects number of P reference picture required for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_LF_DISABLE``
-+    Disables HEVC filter.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_LF_SLICE_BOUNDARY``
-+    Selects across or not slice boundary for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_LF_BETA_OFFSET_DIV2``
-+    Selects HEVC loop filter beta offset.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_LF_TC_OFFSET_DIV2``
-+    Selects HEVC loop filter tc offset.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_TYPE``
-+    Selects refresh type for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_PERIOD``
-+    Selects the refresh period for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_LOSSLESS_CU_ENABLE``
-+    Selects HEVC lossless encoding.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_CONST_INTRA_PRED_ENABLE``
-+    Enables constant intra prediction for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_WAVEFRONT_ENABLE``
-+    Enables wavefront for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_LTR_ENABLE``
-+    Enables long term reference for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_USER_REF``
-+    Selects user long term reference frame.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_STORE_REF``
-+    Stores long term reference frame.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_SIGN_DATA_HIDING``
-+    Enable sign data hiding for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_GENERAL_PB_ENABLE``
-+    Enable general picture buffers for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_TEMPORAL_ID_ENABLE``
-+    Enable temporal ID for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_STRONG_SMOTHING_FLAG``
-+    Enable HEVC Strong intra smoothing.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_MAX_NUM_MERGE_MV_MINUS1``
-+    Indicates max number of candidate motion vectors.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_DARK``
-+    Indicates HEVC dark region adaptive.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_SMOOTH``
-+    Indicates HEVC smooth region adaptive.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_STATIC``
-+    Indicates HEVC static region adaptive.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_ACTIVITY``
-+    Indicates HEVC activity adaptive.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_DISABLE_INTRA_PU_SPLIT``
-+    Disables intra pu split for HEVC Encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_DISABLE_TMV_PREDICTION``
-+    Disables tmv prediction for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_WITHOUT_STARTCODE_ENABLE``
-+    Enabling HEVC encoding without a startcode.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_QP_INDEX_CR``
-+    Indicates the quantization parameter CR index.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_QP_INDEX_CB``
-+    Indicates the quantization parameter CB index.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_SIZE_OF_LENGTH_FIELD``
-+    Indicates size of length field for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_PREPEND_SPSPPS_TO_IDR``
-+    Indicates prepend SPS/PPS to every IDR.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_CH``
-+    Indicates hierarchical coding layer change for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT0``
-+    Indicates hierarchical coding layer BIT0 for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT1``
-+    Indicates hierarchical coding layer BIT1 for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT2``
-+    Indicates hierarchical coding layer BIT2 for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT3``
-+    Indicates hierarchical coding layer BIT3 for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT4``
-+    Indicates hierarchical coding layer BIT4 for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT5``
-+    Indicates hierarchical coding layer BIT5 for HEVC encoder.
-+
-+``V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT6``
-+    Indicates hierarchical coding layer BIT6 for HEVC encoder.
-+
-+
- .. _camera-controls:
- 
- Camera Control Reference
++/* CIDs for HEVC encoding. Number gaps are for compatibility */
++
++#define V4L2_CID_MPEG_VIDEO_HEVC_MIN_QP                         \
++					(V4L2_CID_MPEG_BASE + 512)
++#define V4L2_CID_MPEG_VIDEO_HEVC_MAX_QP                         \
++					(V4L2_CID_MPEG_BASE + 513)
++#define V4L2_CID_MPEG_VIDEO_HEVC_I_FRAME_QP                     \
++					(V4L2_CID_MPEG_BASE + 514)
++#define V4L2_CID_MPEG_VIDEO_HEVC_P_FRAME_QP                     \
++					(V4L2_CID_MPEG_BASE + 515)
++#define V4L2_CID_MPEG_VIDEO_HEVC_B_FRAME_QP                     \
++					(V4L2_CID_MPEG_BASE + 516)
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_QP_ENABLE \
++					(V4L2_CID_MPEG_BASE + 517)
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_TYPE       \
++					(V4L2_CID_MPEG_BASE + 518)
++enum v4l2_mpeg_video_hevc_hier_coding_type {
++	V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_B	= 0,
++	V4L2_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_P	= 1,
++};
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER      \
++					(V4L2_CID_MPEG_BASE + 519)
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_QP   \
++					(V4L2_CID_MPEG_BASE + 520)
++#define V4L2_CID_MPEG_VIDEO_HEVC_PROFILE                        \
++					(V4L2_CID_MPEG_BASE + 521)
++#define V4L2_CID_MPEG_VIDEO_HEVC_LEVEL                          \
++					(V4L2_CID_MPEG_BASE + 522)
++#define V4L2_CID_MPEG_VIDEO_HEVC_RC_FRAME_RATE            \
++					(V4L2_CID_MPEG_BASE + 523)
++#define V4L2_CID_MPEG_VIDEO_HEVC_TIER_FLAG                \
++					(V4L2_CID_MPEG_BASE + 524)
++#define V4L2_CID_MPEG_VIDEO_HEVC_MAX_PARTITION_DEPTH      \
++					(V4L2_CID_MPEG_BASE + 525)
++#define V4L2_CID_MPEG_VIDEO_HEVC_REF_NUMBER_FOR_PFRAMES   \
++					(V4L2_CID_MPEG_BASE + 526)
++#define V4L2_CID_MPEG_VIDEO_HEVC_LF_DISABLE               \
++					(V4L2_CID_MPEG_BASE + 527)
++#define V4L2_CID_MPEG_VIDEO_HEVC_LF_SLICE_BOUNDARY        \
++					(V4L2_CID_MPEG_BASE + 528)
++#define V4L2_CID_MPEG_VIDEO_HEVC_LF_BETA_OFFSET_DIV2      \
++					(V4L2_CID_MPEG_BASE + 529)
++#define V4L2_CID_MPEG_VIDEO_HEVC_LF_TC_OFFSET_DIV2        \
++					(V4L2_CID_MPEG_BASE + 530)
++#define V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_TYPE             \
++					(V4L2_CID_MPEG_BASE + 531)
++#define V4L2_CID_MPEG_VIDEO_HEVC_REFRESH_PERIOD           \
++					(V4L2_CID_MPEG_BASE + 532)
++#define V4L2_CID_MPEG_VIDEO_HEVC_LOSSLESS_CU_ENABLE       \
++					(V4L2_CID_MPEG_BASE + 533)
++#define V4L2_CID_MPEG_VIDEO_HEVC_CONST_INTRA_PRED_ENABLE  \
++					(V4L2_CID_MPEG_BASE + 534)
++#define V4L2_CID_MPEG_VIDEO_HEVC_WAVEFRONT_ENABLE         \
++					(V4L2_CID_MPEG_BASE + 535)
++#define V4L2_CID_MPEG_VIDEO_HEVC_LTR_ENABLE               \
++					(V4L2_CID_MPEG_BASE + 536)
++#define V4L2_CID_MPEG_VIDEO_HEVC_USER_REF                 \
++					(V4L2_CID_MPEG_BASE + 537)
++#define V4L2_CID_MPEG_VIDEO_HEVC_STORE_REF                \
++					(V4L2_CID_MPEG_BASE + 538)
++#define V4L2_CID_MPEG_VIDEO_HEVC_SIGN_DATA_HIDING         \
++					(V4L2_CID_MPEG_BASE + 539)
++#define V4L2_CID_MPEG_VIDEO_HEVC_GENERAL_PB_ENABLE        \
++					(V4L2_CID_MPEG_BASE + 540)
++#define V4L2_CID_MPEG_VIDEO_HEVC_TEMPORAL_ID_ENABLE       \
++					(V4L2_CID_MPEG_BASE + 541)
++#define V4L2_CID_MPEG_VIDEO_HEVC_STRONG_SMOTHING_FLAG     \
++					(V4L2_CID_MPEG_BASE + 542)
++#define V4L2_CID_MPEG_VIDEO_HEVC_MAX_NUM_MERGE_MV_MINUS1  \
++					(V4L2_CID_MPEG_BASE + 543)
++#define V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_DARK         \
++					(V4L2_CID_MPEG_BASE + 544)
++#define V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_SMOOTH       \
++					(V4L2_CID_MPEG_BASE + 545)
++#define V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_STATIC       \
++					(V4L2_CID_MPEG_BASE + 546)
++#define V4L2_CID_MPEG_VIDEO_HEVC_ADAPTIVE_RC_ACTIVITY     \
++					(V4L2_CID_MPEG_BASE + 547)
++#define V4L2_CID_MPEG_VIDEO_HEVC_DISABLE_INTRA_PU_SPLIT   \
++					(V4L2_CID_MPEG_BASE + 548)
++#define V4L2_CID_MPEG_VIDEO_HEVC_DISABLE_TMV_PREDICTION   \
++					(V4L2_CID_MPEG_BASE + 549)
++#define V4L2_CID_MPEG_VIDEO_HEVC_WITHOUT_STARTCODE_ENABLE \
++					(V4L2_CID_MPEG_BASE + 550)
++#define V4L2_CID_MPEG_VIDEO_HEVC_QP_INDEX_CR              \
++					(V4L2_CID_MPEG_BASE + 551)
++#define V4L2_CID_MPEG_VIDEO_HEVC_QP_INDEX_CB              \
++					(V4L2_CID_MPEG_BASE + 552)
++#define V4L2_CID_MPEG_VIDEO_HEVC_SIZE_OF_LENGTH_FIELD     \
++					(V4L2_CID_MPEG_BASE + 553)
++#define V4L2_CID_MPEG_VIDEO_HEVC_PREPEND_SPSPPS_TO_IDR          \
++					(V4L2_CID_MPEG_BASE + 554)
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_CH   \
++					(V4L2_CID_MPEG_BASE + 555)
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT0 \
++					(V4L2_CID_MPEG_BASE + 556)
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT1 \
++					(V4L2_CID_MPEG_BASE + 557)
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT2 \
++					(V4L2_CID_MPEG_BASE + 558)
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT3 \
++					(V4L2_CID_MPEG_BASE + 559)
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT4 \
++					(V4L2_CID_MPEG_BASE + 560)
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT5 \
++					(V4L2_CID_MPEG_BASE + 561)
++#define V4L2_CID_MPEG_VIDEO_HEVC_HIERARCHICAL_CODING_LAYER_BIT6 \
++					(V4L2_CID_MPEG_BASE + 562)
++
+ /*  MPEG-class control IDs specific to the CX2341x driver as defined by V4L2 */
+ #define V4L2_CID_MPEG_CX2341X_BASE 				(V4L2_CTRL_CLASS_MPEG | 0x1000)
+ #define V4L2_CID_MPEG_CX2341X_VIDEO_SPATIAL_FILTER_MODE 	(V4L2_CID_MPEG_CX2341X_BASE+0)
 -- 
 1.7.2.3
