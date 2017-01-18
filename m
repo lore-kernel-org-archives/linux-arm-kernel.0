@@ -1,86 +1,148 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 18 Jan 2017 11:56:46 -0800
-Subject: [PATCH] ARM: smp: Remove CPU: shutdown notice
-In-Reply-To: <20170118095523.GK20462@pathway.suse.cz>
-References: <20170117230714.6799-1-f.fainelli@gmail.com>
- <20170117232314.GI27312@n2100.armlinux.org.uk>
- <fd4a4f48-f19e-dcac-c286-8e03db89e99a@gmail.com>
- <20170118095523.GK20462@pathway.suse.cz>
-Message-ID: <1041c46f-13e7-4446-33e0-75eee9ffb91f@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 Jan 2017 21:19:25 +0100
+Subject: [PATCH v13 2/5] tee: generic TEE subsystem
+In-Reply-To: <1479480700-554-3-git-send-email-jens.wiklander@linaro.org>
+References: <1479480700-554-1-git-send-email-jens.wiklander@linaro.org>
+ <1479480700-554-3-git-send-email-jens.wiklander@linaro.org>
+Message-ID: <5825882.vZRDMrBMkW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/18/2017 01:55 AM, Petr Mladek wrote:
-> On Tue 2017-01-17 15:39:45, Florian Fainelli wrote:
->> On 01/17/2017 03:23 PM, Russell King - ARM Linux wrote:
->>> On Tue, Jan 17, 2017 at 03:07:12PM -0800, Florian Fainelli wrote:
->>>> This message is not particularly informative, and is not paired with an
->>>> identical message when a CPU is brought online. Finally, it slows the
->>>> CPU hotplug path down, thus allowing less CPU hotplug operations per
->>>> second. Just remove it.
->>>
->>> CPU hotplug isn't a fast operation anyway - it's also fairly disruptive
->>> in that it uses stop_machine() to halt activity everywhere while taking
->>> the CPU offline.
->>
->> We have a test that consists in shutting down all CPUs as frequently as
->> we can and do this for about 2 million iterations which takes roughly
->> 24h, and this printk slows thing down by a reasonable amount. Here are
->> some numbers on 500 hotplug operations:
->>
->> w/ printk:
->> real    0m9.997s
->> user    0m0.725s
->> sys     0m3.030s
->> #
->>
->> w/o printk:
->> real    0m8.547s
->> user    0m0.436s
->> sys     0m1.838s
+On Friday, November 18, 2016 3:51:37 PM CET Jens Wiklander wrote:
+> Initial patch for generic TEE subsystem.
+> This subsystem provides:
+> * Registration/un-registration of TEE drivers.
+> * Shared memory between normal world and secure world.
+> * Ioctl interface for interaction with user space.
+> * Sysfs implementation_id of TEE driver
 > 
-> I am curious that a single printk() might make such a big difference.
-
-It does, because of how printk() is implemented (there is nothing wrong
-with it, just slow by nature and how the UART gets written to as well).
-
+> A TEE (Trusted Execution Environment) driver is a driver that interfaces
+> with a trusted OS running in some secure environment, for example,
+> TrustZone on ARM cpus, or a separate secure co-processor etc.
 > 
-> One reason might be that the messages are pushed to a "slow" console.
-
-115200 UART, yes that's slow, but not unusual.
-
+> The TEE subsystem can serve a TEE driver for a Global Platform compliant
+> TEE, but it's not limited to only Global Platform TEEs.
 > 
-> Another reason might be that there are many other messages printed
-> on the system and there is a contention on logbuf_lock or other
-> console related locks.
+> This patch builds on other similar implementations trying to solve
+> the same problem:
+> * "optee_linuxdriver" by among others
+>   Jean-michel DELORME<jean-michel.delorme@st.com> and
+>   Emmanuel MICHEL <emmanuel.michel@st.com>
+> * "Generic TrustZone Driver" by Javier Gonz?lez <javier@javigon.com>
 
-The other messages being printed are those from the hotplug script that
-I run which just checkpoints its running every 50 instances, so it does
-not occur that often, the console really is not busy, which really
-extracts the overhead of printing "CPU: shutdown".
+Can you give an example for a system that would contain more than one
+TEE? I see that you support dynamic registration, and it's clear that
+there can be more than one type of TEE, but why would one have more
+than one at a time, and why not more than 32?
 
-> 
-> There might be also the opposite problem. The messages are also read
-> by userspace tools that store them into /var/log/messages or systemd
-> logs. If these are the only messages printed to the log and if there
-> is no other activity on the system. Then the waken loggers might make
-> a difference, especially if all CPUs are getting disabled and only
-> one is available at some point.
+> +static int tee_ioctl_invoke(struct tee_context *ctx,
+> +			    struct tee_ioctl_buf_data __user *ubuf)
+> +{
+> +	int rc;
+> +	size_t n;
+> +	struct tee_ioctl_buf_data buf;
+> +	struct tee_ioctl_invoke_arg __user *uarg;
+> +	struct tee_ioctl_invoke_arg arg;
+> +	struct tee_ioctl_param __user *uparams = NULL;
+> +	struct tee_param *params = NULL;
+> +
+> +	if (!ctx->teedev->desc->ops->invoke_func)
+> +		return -EINVAL;
+> +
+> +	if (copy_from_user(&buf, ubuf, sizeof(buf)))
+> +		return -EFAULT;
+> +
+> +	if (buf.buf_len > TEE_MAX_ARG_SIZE ||
+> +	    buf.buf_len < sizeof(struct tee_ioctl_invoke_arg))
+> +		return -EINVAL;
+> +
+> +	uarg = (struct tee_ioctl_invoke_arg __user *)(unsigned long)buf.buf_ptr;
 
-There is none of that, no systemd, no syslog, just minimal userspace
-running.
+u64_to_user_ptr()
 
-> 
-> Well, I am not sure what other operations are needed to do the
-> CPU hotplug operation.
-> 
-> I cannot judge how the message is useful and if the speed up
-> is worth removing it.
-> 
-> Best Regards,
-> Petr
-> 
+> +	if (copy_from_user(&arg, uarg, sizeof(arg)))
+> +		return -EFAULT;
+> +
+> +	if (sizeof(arg) + TEE_IOCTL_PARAM_SIZE(arg.num_params) != buf.buf_len)
+> +		return -EINVAL;
+> +
+> +	if (arg.num_params) {
+> +		params = kcalloc(arg.num_params, sizeof(struct tee_param),
+> +				 GFP_KERNEL);
+> +		if (!params)
+> +			return -ENOMEM;
 
+It would be good to have an upper bound on the number of parameters
+to limit the size of the memory allocation here.
 
--- 
-Florian
+> +int tee_device_register(struct tee_device *teedev)
+> +{
+> +	int rc;
+> +
+> +	/*
+> +	 * If the teedev already is registered, don't do it again. It's
+> +	 * obviously an error to try to register twice, but if we return
+> +	 * an error we'll force the driver to remove the teedev.
+> +	 */
+> +	if (teedev->flags & TEE_DEVICE_FLAG_REGISTERED) {
+> +		dev_err(&teedev->dev, "attempt to register twice\n");
+> +		return 0;
+> +	}
+
+I don't understand what you are protecting against here.
+How would we get to this function twice for the same device?
+
+Could you change the caller so it doesn't happen?
+
+> +/**
+> + * struct tee_ioctl_param - parameter
+> + * @attr: attributes
+> + * @memref: a memory reference
+> + * @value: a value
+> + *
+> + * @attr & TEE_PARAM_ATTR_TYPE_MASK indicates if memref or value is used in
+> + * the union. TEE_PARAM_ATTR_TYPE_VALUE_* indicates value and
+> + * TEE_PARAM_ATTR_TYPE_MEMREF_* indicates memref. TEE_PARAM_ATTR_TYPE_NONE
+> + * indicates that none of the members are used.
+> + */
+> +struct tee_ioctl_param {
+> +	__u64 attr;
+> +	union {
+> +		struct tee_ioctl_param_memref memref;
+> +		struct tee_ioctl_param_value value;
+> +	} u;
+> +};
+> +
+> +#define TEE_IOCTL_UUID_LEN		16
+> +
+
+Having a union in an ioctl argument seems odd. Have you considered
+using two different ioctl command numbers depending on the type?
+
+> +/**
+> + * struct tee_iocl_supp_send_arg - Send a response to a received request
+> + * @ret:	[out] return value
+> + * @num_params	[in] number of parameters following this struct
+> + */
+> +struct tee_iocl_supp_send_arg {
+> +	__u32 ret;
+> +	__u32 num_params;
+> +	/*
+> +	 * this struct is 8 byte aligned since the 'struct tee_ioctl_param'
+> +	 * which follows requires 8 byte alignment.
+> +	 *
+> +	 * Commented out element used to visualize the layout dynamic part
+> +	 * of the struct. This field is not available at all if
+> +	 * num_params == 0.
+> +	 *
+> +	 * struct tee_ioctl_param params[num_params];
+> +	 */
+> +} __aligned(8);
+
+I'd make that 
+
+	struct tee_ioctl_param params[0];
+
+as wel here, as I also commented in patch 3 that has a similar structure.
+
+	Arnd
