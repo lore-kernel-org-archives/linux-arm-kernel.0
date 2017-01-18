@@ -1,65 +1,40 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 17 Jan 2017 15:21:48 -0800
-Subject: [PATCH net-next v4 06/10] net: dsa: Migrate to
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 18 Jan 2017 02:00:25 +0200
+Subject: [PATCH net-next v4 05/10] drivers: base: Add
  device_find_in_class_name()
-In-Reply-To: <20170117232152.1661-1-f.fainelli@gmail.com>
+In-Reply-To: <b8cc0d2f-f544-0e06-32bd-47e6b9be5393@gmail.com>
 References: <20170117232152.1661-1-f.fainelli@gmail.com>
-Message-ID: <20170117232152.1661-7-f.fainelli@gmail.com>
+ <20170117232152.1661-6-f.fainelli@gmail.com>
+ <CAHp75VfE8t+_2Yu1NYMErKopnCNwFakO6pyDRmqAU-ZsGuyvmg@mail.gmail.com>
+ <b8cc0d2f-f544-0e06-32bd-47e6b9be5393@gmail.com>
+Message-ID: <CAHp75Ve9xn6wDxFwnkPDyY8yVwVysK3-pUsoxv3GfVbbEVZoBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the base device driver code provides an identical
-implementation of dev_find_class() utilize device_find_in_class_name()
-instead of our own version of it.
+On Wed, Jan 18, 2017 at 1:43 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> On 01/17/2017 03:34 PM, Andy Shevchenko wrote:
+>> On Wed, Jan 18, 2017 at 1:21 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- net/dsa/dsa.c | 22 ++--------------------
- 1 file changed, 2 insertions(+), 20 deletions(-)
+>>> +static int device_class_name_match(struct device *dev, void *class)
+>>
+>> And why not const char *class?
+>
+> This was raised back in v2, and the same response applies:
+>
+> https://www.mail-archive.com/netdev at vger.kernel.org/msg147559.html
+>
+> Changing the signature of a callback is out of the scope of this patch
+> series.
 
-diff --git a/net/dsa/dsa.c b/net/dsa/dsa.c
-index 2306d1b87c83..d9db63910887 100644
---- a/net/dsa/dsa.c
-+++ b/net/dsa/dsa.c
-@@ -455,29 +455,11 @@ EXPORT_SYMBOL_GPL(dsa_switch_resume);
- #endif
- 
- /* platform driver init and cleanup *****************************************/
--static int dev_is_class(struct device *dev, void *class)
--{
--	if (dev->class != NULL && !strcmp(dev->class->name, class))
--		return 1;
--
--	return 0;
--}
--
--static struct device *dev_find_class(struct device *parent, char *class)
--{
--	if (dev_is_class(parent, class)) {
--		get_device(parent);
--		return parent;
--	}
--
--	return device_find_child(parent, class, dev_is_class);
--}
--
- struct mii_bus *dsa_host_dev_to_mii_bus(struct device *dev)
- {
- 	struct device *d;
- 
--	d = dev_find_class(dev, "mdio_bus");
-+	d = device_find_in_class_name(dev, "mdio_bus");
- 	if (d != NULL) {
- 		struct mii_bus *bus;
- 
-@@ -495,7 +477,7 @@ static struct net_device *dev_to_net_device(struct device *dev)
- {
- 	struct device *d;
- 
--	d = dev_find_class(dev, "net");
-+	d = device_find_in_class_name(dev, "net");
- 	if (d != NULL) {
- 		struct net_device *nd;
- 
+Ah, right.
+
+But why not to use void *class_name to be consistent with callback and
+device_find_child()?
+
+Btw,
+
+return get_device(parent);
+
 -- 
-2.9.3
+With Best Regards,
+Andy Shevchenko
