@@ -1,21 +1,28 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 18 Jan 2017 16:50:50 -0500 (EST)
-Subject: [PATCH net-next v4 00/10] net: dsa: Support for pdata in dsa2
-In-Reply-To: <20170117232152.1661-1-f.fainelli@gmail.com>
-References: <20170117232152.1661-1-f.fainelli@gmail.com>
-Message-ID: <20170118.165050.2165692521961713529.davem@davemloft.net>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 18 Jan 2017 13:52:26 -0800
+Subject: [PATCH 2/4] ARM64: dts: meson-gx: add the serial CTS and RTS pin
+ groups
+In-Reply-To: <b74ed3d7-ea69-5a5b-a313-baab3a9e2396@suse.de> ("Andreas
+ =?utf-8?Q?F=C3=A4rber=22's?= message of "Sun, 15 Jan 2017 23:50:17 +0100")
+References: <20170115223255.10350-1-martin.blumenstingl@googlemail.com>
+ <20170115223255.10350-3-martin.blumenstingl@googlemail.com>
+ <b74ed3d7-ea69-5a5b-a313-baab3a9e2396@suse.de>
+Message-ID: <m2k29syr1h.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Florian Fainelli <f.fainelli@gmail.com>
-Date: Tue, 17 Jan 2017 15:21:42 -0800
+Andreas F?rber <afaerber@suse.de> writes:
 
-> This is not exactly new, and was sent before, although back then, I did not
-> have an user of the pre-declared MDIO board information, but now we do. Note
-> that I have additional changes queued up to have b53 register platform data for
-> MIPS bcm47xx and bcm63xx.
- ...
+> Am 15.01.2017 um 23:32 schrieb Martin Blumenstingl:
+>> This adds pinctrl group nodes for the CTS and RTS pins of each serial
+>> controller. This makes it possible to enable the CTS and RTS pins which
+>> are controlled by the serial controller hardware (through the meson_uart
+>> driver).
+>> 
+>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+>
+> Tested-by: Andreas F?rber <afaerber@suse.de>
 
-We're waiting for Greg's further review and Vivien's changes which I just
-applied are going to create some conflicts, so I am presuming that you will
-respin a v5 anyways.
+Applied to v4.11/dt64 with Andreas' ack.
+
+Kevin
