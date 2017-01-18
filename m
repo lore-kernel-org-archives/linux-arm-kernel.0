@@ -1,53 +1,35 @@
 From: afzal.mohd.ma@gmail.com (afzal mohammed)
-Date: Thu, 19 Jan 2017 02:08:37 +0530
-Subject: [PATCH 3/4] ARM: nommu: display vectors base
+Date: Thu, 19 Jan 2017 02:09:20 +0530
+Subject: [PATCH 4/4] ARM: nommu: remove Hivecs configuration is asm
 In-Reply-To: <20170118203525.6246-1-afzal.mohd.ma@gmail.com>
 References: <20170118203525.6246-1-afzal.mohd.ma@gmail.com>
-Message-ID: <20170118203837.6536-1-afzal.mohd.ma@gmail.com>
+Message-ID: <20170118203920.6609-1-afzal.mohd.ma@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The exception base address is now dynamically estimated for no-MMU
-case, display it.
+Now that exception based address is handled dynamically for
+processors with CP15, remove Highvecs configuration in assembly.
 
 Signed-off-by: afzal mohammed <afzal.mohd.ma@gmail.com>
 ---
- arch/arm/mm/init.c | 5 +++++
- arch/arm/mm/mm.h   | 5 +++--
- 2 files changed, 8 insertions(+), 2 deletions(-)
+ arch/arm/kernel/head-nommu.S | 5 -----
+ 1 file changed, 5 deletions(-)
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index cf47f86f79ed..9e11f255c3bf 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -522,7 +522,12 @@ void __init mem_init(void)
- 			"      .data : 0x%p" " - 0x%p" "   (%4td kB)\n"
- 			"       .bss : 0x%p" " - 0x%p" "   (%4td kB)\n",
- 
-+#ifdef CONFIG_MMU
- 			MLK(UL(VECTORS_BASE), UL(VECTORS_BASE) + (PAGE_SIZE)),
-+#else
-+			MLK_ROUNDUP(vectors_base, vectors_base + PAGE_SIZE),
-+#endif
-+
- #ifdef CONFIG_HAVE_TCM
- 			MLK(DTCM_OFFSET, (unsigned long) dtcm_end),
- 			MLK(ITCM_OFFSET, (unsigned long) itcm_end),
-diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
-index ce727d47275c..546f09437fca 100644
---- a/arch/arm/mm/mm.h
-+++ b/arch/arm/mm/mm.h
-@@ -79,8 +79,9 @@ struct static_vm {
- extern struct list_head static_vmlist;
- extern struct static_vm *find_static_vm_vaddr(void *vaddr);
- extern __init void add_static_vm_early(struct static_vm *svm);
--
+diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
+index 6b4eb27b8758..2e21e08de747 100644
+--- a/arch/arm/kernel/head-nommu.S
++++ b/arch/arm/kernel/head-nommu.S
+@@ -152,11 +152,6 @@ __after_proc_init:
+ #ifdef CONFIG_CPU_ICACHE_DISABLE
+ 	bic	r0, r0, #CR_I
+ #endif
+-#ifdef CONFIG_CPU_HIGH_VECTOR
+-	orr	r0, r0, #CR_V
+-#else
+-	bic	r0, r0, #CR_V
 -#endif
-+#else /* CONFIG_MMU */
-+extern unsigned long vectors_base;
-+#endif /* CONFIG_MMU */
- 
- #ifdef CONFIG_ZONE_DMA
- extern phys_addr_t arm_dma_limit;
+ 	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
+ #elif defined (CONFIG_CPU_V7M)
+ 	/* For V7M systems we want to modify the CCR similarly to the SCTLR */
 -- 
 2.11.0
