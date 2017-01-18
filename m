@@ -1,30 +1,172 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 18 Jan 2017 23:45:28 +0000
-Subject: [kernel-hardening] Re: [PATCH] ARM: mm: add testcases for RODATA
-In-Reply-To: <46bae2bb-4b4f-158b-6a8d-3737e181ad74@redhat.com>
-References: <20170118135310.GA4733@pjb1027-Latitude-E5410>
- <e5433e24-7a3d-25a4-26a3-9d02644cc3f4@redhat.com>
- <20170118223629.GQ27312@n2100.armlinux.org.uk>
- <46bae2bb-4b4f-158b-6a8d-3737e181ad74@redhat.com>
-Message-ID: <20170118234527.GW27312@n2100.armlinux.org.uk>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Wed, 18 Jan 2017 16:51:05 -0700
+Subject: [PATCH V7 05/10] acpi: apei: handle SEA notification type for
+ ARMv8
+In-Reply-To: <587F80A7.10008@arm.com>
+References: <1484244924-24786-1-git-send-email-tbaicar@codeaurora.org>
+ <1484244924-24786-6-git-send-email-tbaicar@codeaurora.org>
+ <587F80A7.10008@arm.com>
+Message-ID: <3de443d7-2c68-f179-daae-bc8f851470b7@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2017 at 03:38:52PM -0800, Laura Abbott wrote:
-> On 01/18/2017 02:36 PM, Russell King - ARM Linux wrote:
-> > I don't see why this needs to be in cacheflush.h - it doesn't seem to
-> > have anything to do with cache flushing, and placing it in here means
-> > that if you change the state of CONFIG_DEBUG_RODATA_TEST, most likely
-> > the entire kernel gets rebuilt.  Please put it in a separate header
-> > file.
-> 
-> cacheflush.h seems to be where all the set_memory_* functions have
-> ended up. I was just looking at cleaning that up unless someone
-> beats me to it.
+Hello James,
 
-+1
+
+On 1/18/2017 7:50 AM, James Morse wrote:
+> Hi Tyler,
+>
+> On 12/01/17 18:15, Tyler Baicar wrote:
+>> ARM APEI extension proposal added SEA (Synchrounous External
+> Nit: Synchronous
+I'll fix that :)
+>> Abort) notification type for ARMv8.
+>> Add a new GHES error source handling function for SEA. If an error
+>> source's notification type is SEA, then this function can be registered
+>> into the SEA exception handler. That way GHES will parse and report
+>> SEA exceptions when they occur.
+>> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+>> index 2acbc60..87efe26 100644
+>> --- a/drivers/acpi/apei/ghes.c
+>> +++ b/drivers/acpi/apei/ghes.c
+>> @@ -767,6 +772,62 @@ static struct notifier_block ghes_notifier_sci = {
+>>   	.notifier_call = ghes_notify_sci,
+>>   };
+>>   
+>> +#ifdef CONFIG_HAVE_ACPI_APEI_SEA
+>> +static LIST_HEAD(ghes_sea);
+>> +
+>> +static int ghes_notify_sea(struct notifier_block *this,
+>> +				  unsigned long event, void *data)
+>> +{
+>> +	struct ghes *ghes;
+>> +	int ret = NOTIFY_DONE;
+>> +
+>> +	nmi_enter();
+> Can we move this into the arch code? Its because we got here from a
+> synchronous-exception that makes this nmi-like, I think it only makes sense for
+> it be called from under /arch/.
+So move the nmi_enter/exit calls into do_sea of the previous patch? I 
+can do that in the next patchset.
+> Where did the rcu_read_lock() go? I can see its missing from ghes_notify_nmi()
+> too, but I don't know enough about RCU to know if that's safe!
+>
+> The second paragraph in the comment above rcu_read_lock() describes it as
+> preventing call_rcu() during a read-side critical section that was running
+> concurrently. Doesn't this mean we can race with ghes_sea_remove() on another
+> CPU because we wait for the wrong grace period?
+>
+> The same comment talks about how these read-side critical sections can nest, so
+> I think its quite safe to make these 'lock' calls here.
+Sorry, I thought we wanted nmi_enter/exit instead of the 
+rcu_read_lock/unlock. I guess the rcu locks
+will not cause the deadlock scenario you described in the previous 
+patchset if we have the
+nmi_enter/exit wrapped around the rcu critical section.
+>> +	list_for_each_entry_rcu(ghes, &ghes_sea, list) {
+>> +		if (!ghes_proc(ghes))
+>> +			ret = NOTIFY_OK;
+>> +	}
+>> +	nmi_exit();
+>> +
+>> +	return ret;
+>> +}
+>> +
+>> +static struct notifier_block ghes_notifier_sea = {
+>> +	.notifier_call = ghes_notify_sea,
+>> +};
+>> +
+>> +static int ghes_sea_add(struct ghes *ghes)
+>> +{
+>> +	mutex_lock(&ghes_list_mutex);
+>> +	if (list_empty(&ghes_sea))
+>> +		register_sea_notifier(&ghes_notifier_sea);
+>> +	list_add_rcu(&ghes->list, &ghes_sea);
+>> +	mutex_unlock(&ghes_list_mutex);
+>> +	return 0;
+>> +}
+>> +
+>> +static void ghes_sea_remove(struct ghes *ghes)
+>> +{
+>> +	mutex_lock(&ghes_list_mutex);
+>> +	list_del_rcu(&ghes->list);
+>> +	if (list_empty(&ghes_sea))
+>> +		unregister_sea_notifier(&ghes_notifier_sea);
+>> +	mutex_unlock(&ghes_list_mutex);
+> ghes_nmi_remove() has:
+>> 	/*
+>>   	* To synchronize with NMI handler, ghes can only be
+>>   	* freed after NMI handler finishes.
+>> 	*/
+>> 	synchronize_rcu()
+> This 'waits until a grace period has elapsed'. This is because ghes_remove()
+> goes and kfree()s the ghes object while another CPU may be holding that entry in
+> the list in ghes_notify_sea().
+I will add synchronize_rcu() in the next patchset.
+>> +}
+>> +#else /* CONFIG_HAVE_ACPI_APEI_SEA */
+>> +static inline int ghes_sea_add(struct ghes *ghes)
+>> +{
+>> +	pr_err(GHES_PFX "ID: %d, trying to add SEA notification which is not supported\n",
+>> +	       ghes->generic->header.source_id);
+>> +	return -ENOTSUPP;
+>> +}
+>> +
+>> +static inline void ghes_sea_remove(struct ghes *ghes)
+>> +{
+>> +	pr_err(GHES_PFX "ID: %d, trying to remove SEA notification which is not supported\n",
+>> +	       ghes->generic->header.source_id);
+>> +}
+>> +#endif /* CONFIG_HAVE_ACPI_APEI_SEA */
+>> +
+>>   #ifdef CONFIG_HAVE_ACPI_APEI_NMI
+>>   /*
+>>    * printk is not safe in NMI context.  So in NMI handler, we allocate
+>> @@ -1011,6 +1072,14 @@ static int ghes_probe(struct platform_device *ghes_dev)
+>>   	case ACPI_HEST_NOTIFY_EXTERNAL:
+>>   	case ACPI_HEST_NOTIFY_SCI:
+>>   		break;
+>> +	case ACPI_HEST_NOTIFY_SEA:
+>> +		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_SEA)) {
+>> +			pr_warn(GHES_PFX "Generic hardware error source: %d notified via SEA is not supported\n",
+>> +				generic->header.source_id);
+>> +			rc = -ENOTSUPP;
+>> +			goto err;
+>> +		}
+>> +		break;
+>>   	case ACPI_HEST_NOTIFY_NMI:
+>>   		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
+>>   			pr_warn(GHES_PFX "Generic hardware error source: %d notified via NMI interrupt is not supported!\n",
+>> @@ -1022,6 +1091,13 @@ static int ghes_probe(struct platform_device *ghes_dev)
+>>   		pr_warning(GHES_PFX "Generic hardware error source: %d notified via local interrupt is not supported!\n",
+>>   			   generic->header.source_id);
+>>   		goto err;
+>
+>> +	case ACPI_HEST_NOTIFY_GPIO:
+>> +	case ACPI_HEST_NOTIFY_SEI:
+>> +	case ACPI_HEST_NOTIFY_GSIV:
+> These three weren't mentioned in the commit message. I guess they are drive-by
+> cleanup?
+SEI and GSIV were also added in the ACPI 6.1 spec (18.3.2.9 Hardware 
+Error Notification) and GPIO was missing, so I added all three.
+
+Thanks,
+Tyler
+>> +		pr_warn(GHES_PFX "Generic hardware error source: %d notified via notification type %u is not supported\n",
+>> +			generic->header.source_id, generic->header.source_id);
+>> +		rc = -ENOTSUPP;
+>> +		goto err;
+>>   	default:
+>>   		pr_warning(FW_WARN GHES_PFX "Unknown notification type: %u for generic hardware error source: %d\n",
+>>   			   generic->notify.type, generic->header.source_id);
+>
+> Thanks,
+>
+> James
+>
+>
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
