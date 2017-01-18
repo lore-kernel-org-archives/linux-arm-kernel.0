@@ -1,33 +1,41 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 18 Jan 2017 14:53:26 -0800
-Subject: [PATCH] ARM: Reduce "CPU: shutdown" message to debug level
-In-Reply-To: <20170117230714.6799-1-f.fainelli@gmail.com>
-References: <20170117230714.6799-1-f.fainelli@gmail.com>
-Message-ID: <20170118225328.2597-1-f.fainelli@gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 18 Jan 2017 22:56:30 +0000
+Subject: [PATCH 2/7] ARM: Add Broadcom Brahma-B15 readahead cache support
+In-Reply-To: <20170118202927.28740-3-f.fainelli@gmail.com>
+References: <20170118202927.28740-1-f.fainelli@gmail.com>
+ <20170118202927.28740-3-f.fainelli@gmail.com>
+Message-ID: <20170118225630.GS27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Similar to c68b0274fb3c ("ARM: reduce "Booted secondary processor"
-message to debug level"), demote the "CPU: shutdown" pr_notice() into a
-pr_debug().
+On Wed, Jan 18, 2017 at 12:29:21PM -0800, Florian Fainelli wrote:
+> The readahead cache only intercepts reads, not writes, as such, some
+> data can remain stale in any of its buffers, such that we need to flush
+> it, which is an operation that needs to happen in a particular order:
+> 
+> - disable the readahead cache
+> - flush it
+> - call the appropriate cache-v7.S function
+> - re-enable
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm/kernel/smp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I really do hope that the above explanation is wrong, because if that's
+really how it's implemented, it's going to cause coherency problems.
 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 7dd14e8395e6..46377c40d056 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -251,7 +251,7 @@ void __cpu_die(unsigned int cpu)
- 		pr_err("CPU%u: cpu didn't die\n", cpu);
- 		return;
- 	}
--	pr_notice("CPU%u: shutdown\n", cpu);
-+	pr_debug("CPU%u: shutdown\n", cpu);
- 
- 	/*
- 	 * platform_cpu_kill() is generally expected to do the powering off
+It's got to at least monitor writes, otherwise how do you guarantee
+that the CPU doesn't see stale data?  IOW:
+
+Consider this at the L2 memory-side interface (iow, downstream of the
+point-of-coherency):
+
+	CPU1		CPU2		Read-ahead buffer
+			read cache line C
+					reads cache line C and C+1
+	writes cache line C+1
+			read cache line C+1
+
+What ensures that CPU2 sees the written out cache line from CPU1?
+
 -- 
-2.9.3
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
