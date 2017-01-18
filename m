@@ -1,111 +1,71 @@
-From: alim.akhtar@gmail.com (Alim Akhtar)
-Date: Wed, 18 Jan 2017 23:04:54 +0900
-Subject: [PATCH v3 2/2] arm64: dts: exynos: Add regulators for Vbus and
- Vbus-Boost
-In-Reply-To: <1484721173-30474-3-git-send-email-pankaj.dubey@samsung.com>
-References: <CGME20170118063009epcas5p27f555398c9f3f44d733e04a585e74139@epcas5p2.samsung.com>
- <1484721173-30474-1-git-send-email-pankaj.dubey@samsung.com>
- <1484721173-30474-3-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <CAGOxZ51jV87oEZLQ73g+b1doLpGZ1LRRXn073TPppbcFTWWs8w@mail.gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 18 Jan 2017 16:09:45 +0200
+Subject: [PATCH 2/2] ARM: DTS: Fix register map for virt-capable GIC
+In-Reply-To: <1484736811-24002-3-git-send-email-marc.zyngier@arm.com>
+References: <1484736811-24002-1-git-send-email-marc.zyngier@arm.com>
+ <1484736811-24002-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20170118140945.cdna46dllbccwk43@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Jan 18, 2017 at 3:32 PM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
-> From: Vivek Gautam <gautamvivek1987@gmail.com>
->
-> Adding fixed voltage regulators for Vbus and Vbus-boost required
-> by USB 3.0 DRD controller on Exynos7-espresso board.
->
-> Signed-off-by: Vivek Gautam <gautamvivek1987@gmail.com>
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+On Wed, Jan 18, 2017 at 10:53:31AM +0000, Marc Zyngier wrote:
+> Since everybody copied my own mistake from the DT binding example,
+> let's address all the offenders in one swift go.
+> 
+> Most of them got the CPU interface size wrong (4kB, while it should
+> be 8kB), except for both keystone platforms which got the control
+> interface wrong (4kB instead of 8kB).
+> 
+> In the couple of cases were I knew for sure what implementation
+> was used, I've added the "arm,gic-400" compatible string. I'm 99%
+> sure that this is what everyong is using, but short of having the
+> TRM for all the other SoCs, I've let them alone.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
+>  arch/arm/boot/dts/alpine.dtsi        | 2 +-
+>  arch/arm/boot/dts/axm55xx.dtsi       | 2 +-
+>  arch/arm/boot/dts/dra7.dtsi          | 2 +-
+>  arch/arm/boot/dts/ecx-2000.dts       | 2 +-
+>  arch/arm/boot/dts/exynos3250.dtsi    | 2 +-
+>  arch/arm/boot/dts/exynos5.dtsi       | 2 +-
+>  arch/arm/boot/dts/exynos5260.dtsi    | 2 +-
+>  arch/arm/boot/dts/exynos5440.dtsi    | 2 +-
 
-Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
+For Exynos:
+Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
 
->  arch/arm64/boot/dts/exynos/exynos7-espresso.dts | 45 +++++++++++++++++++++++++
->  1 file changed, 45 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
-> index 1b2db9f0..e4705fd 100644
-> --- a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
-> +++ b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
-> @@ -13,6 +13,7 @@
->  #include "exynos7.dtsi"
->  #include <dt-bindings/interrupt-controller/irq.h>
->  #include <dt-bindings/clock/samsung,s2mps11.h>
-> +#include <dt-bindings/gpio/gpio.h>
->
->  / {
->         model = "Samsung Exynos7 Espresso board based on EXYNOS7";
-> @@ -32,6 +33,29 @@
->                 device_type = "memory";
->                 reg = <0x0 0x40000000 0x0 0xC0000000>;
->         };
-> +
-> +       usb30_vbus_reg: regulator-usb30 {
-> +               compatible = "regulator-fixed";
-> +               regulator-name = "VBUS_5V";
-> +               regulator-min-microvolt = <5000000>;
-> +               regulator-max-microvolt = <5000000>;
-> +               gpio = <&gph1 1 GPIO_ACTIVE_HIGH>;
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&usb30_vbus_en>;
-> +               enable-active-high;
-> +       };
-> +
-> +       usb3drd_boost_5v: regulator-usb3drd-boost {
-> +               compatible = "regulator-fixed";
-> +               regulator-name = "VUSB_VBUS_5V";
-> +               regulator-min-microvolt = <5000000>;
-> +               regulator-max-microvolt = <5000000>;
-> +               gpio = <&gpf4 1 GPIO_ACTIVE_HIGH>;
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&usb3drd_boost_en>;
-> +               enable-active-high;
-> +       };
-> +
->  };
->
->  &fin_pll {
-> @@ -365,3 +389,24 @@
->         vqmmc-supply = <&ldo2_reg>;
->         disable-wp;
->  };
-> +
-> +&usbdrd_phy {
-> +       vbus-supply = <&usb30_vbus_reg>;
-> +       vbus-boost-supply = <&usb3drd_boost_5v>;
-> +};
-> +
-> +&pinctrl_bus1 {
-> +       usb30_vbus_en: usb30-vbus-en {
-> +               samsung,pins = "gph1-1";
-> +               samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
-> +               samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
-> +               samsung,pin-drv = <EXYNOS4_PIN_DRV_LV1>;
-> +       };
-> +
-> +       usb3drd_boost_en: usb3drd-boost-en {
-> +               samsung,pins = "gpf4-1";
-> +               samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
-> +               samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
-> +               samsung,pin-drv = <EXYNOS4_PIN_DRV_LV1>;
-> +       };
-> +};
-> --
-> 2.7.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Best regards,
+Krzysztof
 
-
-
--- 
-Regards,
-Alim
+>  arch/arm/boot/dts/imx6ul.dtsi        | 4 ++--
+>  arch/arm/boot/dts/keystone-k2g.dtsi  | 2 +-
+>  arch/arm/boot/dts/keystone.dtsi      | 2 +-
+>  arch/arm/boot/dts/ls1021a.dtsi       | 4 ++--
+>  arch/arm/boot/dts/mt2701.dtsi        | 2 +-
+>  arch/arm/boot/dts/mt6580.dtsi        | 2 +-
+>  arch/arm/boot/dts/mt6589.dtsi        | 2 +-
+>  arch/arm/boot/dts/mt7623.dtsi        | 2 +-
+>  arch/arm/boot/dts/mt8127.dtsi        | 2 +-
+>  arch/arm/boot/dts/mt8135.dtsi        | 2 +-
+>  arch/arm/boot/dts/omap5.dtsi         | 2 +-
+>  arch/arm/boot/dts/r8a73a4.dtsi       | 2 +-
+>  arch/arm/boot/dts/r8a7743.dtsi       | 2 +-
+>  arch/arm/boot/dts/r8a7745.dtsi       | 2 +-
+>  arch/arm/boot/dts/r8a7790.dtsi       | 2 +-
+>  arch/arm/boot/dts/r8a7791.dtsi       | 2 +-
+>  arch/arm/boot/dts/r8a7792.dtsi       | 2 +-
+>  arch/arm/boot/dts/r8a7793.dtsi       | 2 +-
+>  arch/arm/boot/dts/r8a7794.dtsi       | 2 +-
+>  arch/arm/boot/dts/rk1108.dtsi        | 2 +-
+>  arch/arm/boot/dts/rk3036.dtsi        | 2 +-
+>  arch/arm/boot/dts/rk322x.dtsi        | 2 +-
+>  arch/arm/boot/dts/rk3288.dtsi        | 2 +-
+>  arch/arm/boot/dts/sun6i-a31.dtsi     | 2 +-
+>  arch/arm/boot/dts/sun7i-a20.dtsi     | 4 ++--
+>  arch/arm/boot/dts/sun8i-a23-a33.dtsi | 2 +-
+>  arch/arm/boot/dts/sun8i-a83t.dtsi    | 2 +-
+>  arch/arm/boot/dts/sun8i-h3.dtsi      | 2 +-
+>  arch/arm/boot/dts/sun9i-a80.dtsi     | 2 +-
+>  37 files changed, 40 insertions(+), 40 deletions(-)
+> 
