@@ -1,50 +1,72 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 18 Jan 2017 11:25:07 +0000
-Subject: [PATCH] arm64: Fix swiotlb fallback allocation
-In-Reply-To: <1484567193-71258-1-git-send-email-agraf@suse.de>
-References: <1484567193-71258-1-git-send-email-agraf@suse.de>
-Message-ID: <20170118112506.GC7566@e104818-lin.cambridge.arm.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Wed, 18 Jan 2017 12:25:43 +0100
+Subject: [PATCH 0/4] Bluetooth support for GXBB/GXL/GXM based devices
+In-Reply-To: <20170115223255.10350-1-martin.blumenstingl@googlemail.com>
+References: <20170115223255.10350-1-martin.blumenstingl@googlemail.com>
+Message-ID: <CAFBinCC0RADEKnkYEF6_DkBTftdjmPMku+N3bdvZMCoqs96xGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2017 at 12:46:33PM +0100, Alexander Graf wrote:
-> Commit b67a8b29df introduced logic to skip swiotlb allocation when all memory
-> is DMA accessible anyway.
-> 
-> While this is a great idea, __dma_alloc still calls swiotlb code unconditionally
-> to allocate memory when there is no CMA memory available. The swiotlb code is
-> called to ensure that we at least try get_free_pages().
-> 
-> Without initialization, swiotlb allocation code tries to access io_tlb_list
-> which is NULL. That results in a stack trace like this:
-> 
->   Unable to handle kernel NULL pointer dereference at virtual address 00000000
->   [...]
->   [<ffff00000845b908>] swiotlb_tbl_map_single+0xd0/0x2b0
->   [<ffff00000845be94>] swiotlb_alloc_coherent+0x10c/0x198
->   [<ffff000008099dc0>] __dma_alloc+0x68/0x1a8
->   [<ffff000000a1b410>] drm_gem_cma_create+0x98/0x108 [drm]
->   [<ffff000000abcaac>] drm_fbdev_cma_create_with_funcs+0xbc/0x368 [drm_kms_helper]
->   [<ffff000000abcd84>] drm_fbdev_cma_create+0x2c/0x40 [drm_kms_helper]
->   [<ffff000000abc040>] drm_fb_helper_initial_config+0x238/0x410 [drm_kms_helper]
->   [<ffff000000abce88>] drm_fbdev_cma_init_with_funcs+0x98/0x160 [drm_kms_helper]
->   [<ffff000000abcf90>] drm_fbdev_cma_init+0x40/0x58 [drm_kms_helper]
->   [<ffff000000b47980>] vc4_kms_load+0x90/0xf0 [vc4]
->   [<ffff000000b46a94>] vc4_drm_bind+0xec/0x168 [vc4]
->   [...]
-> 
-> Thankfully swiotlb code just learned how to not do allocations with the FORCE_NO
-> option. This patch configures the swiotlb code to use that if we decide not to
-> initialize the swiotlb framework.
-> 
-> Fixes: b67a8b29df ("arm64: mm: only initialize swiotlb when necessary")
-> Signed-off-by: Alexander Graf <agraf@suse.de>
-> CC: Catalin Marinas <catalin.marinas@arm.com>
-> CC: Jisheng Zhang <jszhang@marvell.com>
-> CC: Geert Uytterhoeven <geert+renesas@glider.be>
-> CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Kevin,
 
-Queued for 4.10. Thanks.
+On Sun, Jan 15, 2017 at 11:32 PM, Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+> This adds the missing kernel bits for Bluetooth support on the
+> Tronsmart Vega S95 (GXBB based) boards as well as for the GXL
+> P230/P231 and GXM Q200/Q201 reference boards.
+>
+> The Bluetooth functionality on these boards is provided by the
+> SDIO wifi/Bluetooth combo-chip (Broadcom bcm43xx based). The
+> Bluetooth module on that combo-chip has to be taken out of reset,
+> which is taken care of the GPIO in the sdio_pwrseq.
+>
+> Once the module is taken out of reset it can be set up from userspace
+> using the "hciattach" tool from bluez, which talks to the Bluetooth
+> module which is connected to one of the serial ports (in our case
+> uart_A). To get the Bluetooth module initialized within the timeout
+> defined by "hciattach" (and to achieve usable speeds for Bluetooth
+> transfers) the communication uses a speed of 2000000 baud, which was
+> not supported by meson_uart before.
+>
+> NOTE: The .dts-changes from this series depends on my previous series
+> "add support for uart_AO_B" - see [0]
+>
+>
+> [0] http://lists.infradead.org/pipermail/linux-amlogic/2017-January/001982.html
+>
+>
+> Martin Blumenstingl (4):
+>   tty: serial: meson: allow baud-rates higher than 115200
+>   ARM64: dts: meson-gx: add the serial CTS and RTS pin groups
 
--- 
-Catalin
+Neil just informed me that Rob Herring is working on defining the UART
+Bluetooth device properly using devicetree (preparation for this is
+named "[PATCH v2 0/9] Serial slave device bus", see [0] for the
+mailing-list conversation and [1] for a WiP git repo).
+This means that there will be a better solution than the one proposed
+in the meson-gx-p23x-q20x and meson-gxbb-vega-s95 patches (patches #1
+and #2 are not affected by this), namely:
+- I'm currently (ab)using sdio-pwrseq node to power on the UART
+Bluetooth module, this can solved by specifying a bluetooth {  } node
+inside the &uart_A node in the future and providing the corresponding
+GPIOs there
+- all the userspace commands will not be necessary once
+drivers/bluetooth/hci_bcm.c is changed to the serio framework and gets
+devicetree support
+>   ARM64: dts: meson-gx-p23x-q20x: enable the Bluetooth module
+>   ARM64: dts: meson-gxbb-vega-s95: enable the Bluetooth module
+>
+>  .../arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi | 12 ++++++-
+>  .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      |  9 +++++
+>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        | 40 ++++++++++++++++++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi         | 40 ++++++++++++++++++++++
+>  drivers/tty/serial/meson_uart.c                    |  2 +-
+>  5 files changed, 101 insertions(+), 2 deletions(-)
+>
+> --
+> 2.11.0
+>
+
+
+[0] http://marc.info/?l=linux-serial&m=148460728417109&w=2
+[1] https://git.kernel.org/cgit/linux/kernel/git/robh/linux.git/log/?h=serial-bus-v3
