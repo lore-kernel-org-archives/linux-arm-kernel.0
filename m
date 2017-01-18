@@ -1,78 +1,61 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Wed, 18 Jan 2017 19:13:23 +0000
-Subject: [Xen-devel] [RFC] Device memory mappings for Dom0 on ARM64 ACPI
- systems
-In-Reply-To: <alpine.DEB.2.10.1701181058110.10192@sstabellini-ThinkPad-X260>
-References: <alpine.DEB.2.10.1701171309040.2347@sstabellini-ThinkPad-X260>
- <20170118110243.ctqpperggim5k7dw@dhcp-3-221.uk.xensource.com>
- <alpine.DEB.2.10.1701181058110.10192@sstabellini-ThinkPad-X260>
-Message-ID: <20c89f12-cb0c-1145-99d0-320b2080b503@arm.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Wed, 18 Jan 2017 11:17:12 -0800
+Subject: [PATCH 23/33] Input: xilinx_ps2 - Use 'dev' instead of
+ dereferencing it and other changes
+In-Reply-To: <1484761614-12225-24-git-send-email-linux@roeck-us.net>
+References: <1484761614-12225-1-git-send-email-linux@roeck-us.net>
+ <1484761614-12225-24-git-send-email-linux@roeck-us.net>
+Message-ID: <20170118191712.GA33920@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jan 18, 2017 at 09:46:44AM -0800, Guenter Roeck wrote:
+> Use local variable 'dev' instead of dereferencing it several times.
+> 
+> This conversion was done automatically with coccinelle using the
+> following semantic patches. The semantic patches and the scripts
+> used to generate this commit log are available at
+> https://github.com/groeck/coccinelle-patches
+> 
+> - Use local variable 'struct device *dev' consistently
+> 
+> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 
-On 18/01/17 19:05, Stefano Stabellini wrote:
-> On Wed, 18 Jan 2017, Roger Pau Monn? wrote:
->> On Tue, Jan 17, 2017 at 02:20:54PM -0800, Stefano Stabellini wrote:
->>> a) One option is to provide a Xen specific implementation of
->>> acpi_os_ioremap in Linux. I think this is the cleanest approach, but
->>> unfortunately, it doesn't cover cases where ioremap is used directly. (2)
->>> is one of such cases, see
->>> arch/arm64/kernel/pci.c:pci_acpi_setup_ecam_mapping and
->>> drivers/pci/ecam.c:pci_ecam_create. (3) is another one of these cases,
->>> see drivers/acpi/apei/bert.c:bert_init.
->>
->> This is basically the same as b) from Xen's PoV, the only difference is where
->> you would call the hypercall from Dom0 to establish stage-2 mappings.
->
-> Right, but it is important from the Linux point of view, this is why I
-> am asking the Linux maintainers.
->
->
->>> b) Otherwise, we could write an alternative implementation of ioremap
->>> on arm64. The Xen specific ioremap would request a stage-2 mapping
->>> first, then create the stage-1 mapping as usual. However, this means
->>> issuing an hypercall for every ioremap call.
->>
->> This seems fine to me, and at present is the only way to get something working.
->> As you said not being able to discover OperationRegions from Xen means that
->> there's a chance some MMIO might not be added to the stage-2 mappings.
->>
->> Then what's the initial memory map state when Dom0 is booted? There are no MMIO
->> mappings at all, and Dom0 must request mappings for everything?
->
-> Yes
+Applied, thank you.
 
-To give more context here, the UEFI memory map does not report all the 
-MMIO regions. So there is no possibility to map MMIO at boot.
-
->
->
->> What happens to ACPI tables crafted for Dom0 that reside in RAM? That would
->> apply to the STAO and to the other tables that are crafted for Dom0 at build
->> time. Should Dom0 also request stage-2 mappings for them, and Xen simply ignore
->> those calls?
->
-> The ACPI (and UEFI) tables are mapped by Xen
-
-I think Royger's point is DOM0 cannot tell whether a region has been 
-mapped by Xen or not.
-
-The function ioremap will be used to map anything (it is the leaf of all 
-mapping functions), and will call Xen no matter the address passed. It 
-could be a RAM region, HW device region, emulated device region.
-
-For the RAM and emulated device region we don't want Xen to modify the 
-mapping. Note that the current hypercall does not report an error back 
-(see [1]) but I think it is a different error.
-
-Also, I think we would need some work in Xen because, from my 
-understanding of acpi_iomem_deny_access, DOM0 would be able to map the 
-RAM through this hypercall. So it would mess-up with the page table even 
-if it should not.
-
-Cheers,
+> ---
+>  drivers/input/serio/xilinx_ps2.c | 7 +++----
+>  1 file changed, 3 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/input/serio/xilinx_ps2.c b/drivers/input/serio/xilinx_ps2.c
+> index 5223cbf94262..14c40892ed82 100644
+> --- a/drivers/input/serio/xilinx_ps2.c
+> +++ b/drivers/input/serio/xilinx_ps2.c
+> @@ -243,18 +243,17 @@ static int xps2_of_probe(struct platform_device *ofdev)
+>  	unsigned int irq;
+>  	int error;
+>  
+> -	dev_info(dev, "Device Tree Probing \'%s\'\n",
+> -			ofdev->dev.of_node->name);
+> +	dev_info(dev, "Device Tree Probing \'%s\'\n", dev->of_node->name);
+>  
+>  	/* Get iospace for the device */
+> -	error = of_address_to_resource(ofdev->dev.of_node, 0, &r_mem);
+> +	error = of_address_to_resource(dev->of_node, 0, &r_mem);
+>  	if (error) {
+>  		dev_err(dev, "invalid address\n");
+>  		return error;
+>  	}
+>  
+>  	/* Get IRQ for the device */
+> -	irq = irq_of_parse_and_map(ofdev->dev.of_node, 0);
+> +	irq = irq_of_parse_and_map(dev->of_node, 0);
+>  	if (!irq) {
+>  		dev_err(dev, "no IRQ found\n");
+>  		return -ENODEV;
+> -- 
+> 2.7.4
+> 
 
 -- 
-Julien Grall
+Dmitry
