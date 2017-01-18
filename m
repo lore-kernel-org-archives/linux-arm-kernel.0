@@ -1,42 +1,31 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 18 Jan 2017 08:47:59 +0530
-Subject: [PATCH v4 4/4] cpufreq: dt: Don't use generic platdev driver for
- ti-cpufreq platforms
-In-Reply-To: <20170117131808.29798-5-d-gerlach@ti.com>
-References: <20170117131808.29798-1-d-gerlach@ti.com>
- <20170117131808.29798-5-d-gerlach@ti.com>
-Message-ID: <20170118031759.GD11478@vireshk-i7>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Wed, 18 Jan 2017 12:20:56 +0800
+Subject: [PATCH] clk: rockchip: fix the incorrect pclk_edp div width for RK3399
+Message-ID: <1484713256-3005-1-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17-01-17, 07:18, Dave Gerlach wrote:
-> Some TI platforms, specifically those in the am33xx, am43xx, dra7xx, and
-> am57xx families of SoCs can make use of the ti-cpufreq driver to
-> selectively enable OPPs based on the exact configuration in use. The
-> ti-cpufreq is given the responsibility of creating the cpufreq-dt
-> platform device when the driver is in use so drop am33xx and dra7xx
-> from the cpufreq-dt-platdev driver so it is not created twice.
-> 
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> ---
->  drivers/cpufreq/cpufreq-dt-platdev.c | 2 --
->  1 file changed, 2 deletions(-)
-> 
-> diff --git a/drivers/cpufreq/cpufreq-dt-platdev.c b/drivers/cpufreq/cpufreq-dt-platdev.c
-> index 7fcaf26e8f81..921b4a6c3d16 100644
-> --- a/drivers/cpufreq/cpufreq-dt-platdev.c
-> +++ b/drivers/cpufreq/cpufreq-dt-platdev.c
-> @@ -87,8 +87,6 @@ static const struct of_device_id machines[] __initconst = {
->  	{ .compatible = "socionext,uniphier-ld11", },
->  	{ .compatible = "socionext,uniphier-ld20", },
->  
-> -	{ .compatible = "ti,am33xx", },
-> -	{ .compatible = "ti,dra7", },
->  	{ .compatible = "ti,omap2", },
->  	{ .compatible = "ti,omap3", },
->  	{ .compatible = "ti,omap4", },
+The range of the  pclk_edp_div_con is [13:8] and 6 bits, not 5.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Reported-by: Lin Huang <hl@rock-chips.com>
+Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+---
 
+ drivers/clk/rockchip/clk-rk3399.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
+index 3490887..73121b14 100644
+--- a/drivers/clk/rockchip/clk-rk3399.c
++++ b/drivers/clk/rockchip/clk-rk3399.c
+@@ -1132,7 +1132,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
+ 			RK3399_CLKGATE_CON(11), 8, GFLAGS),
+ 
+ 	COMPOSITE(PCLK_EDP, "pclk_edp", mux_pll_src_cpll_gpll_p, 0,
+-			RK3399_CLKSEL_CON(44), 15, 1, MFLAGS, 8, 5, DFLAGS,
++			RK3399_CLKSEL_CON(44), 15, 1, MFLAGS, 8, 6, DFLAGS,
+ 			RK3399_CLKGATE_CON(11), 11, GFLAGS),
+ 	GATE(PCLK_EDP_NOC, "pclk_edp_noc", "pclk_edp", CLK_IGNORE_UNUSED,
+ 			RK3399_CLKGATE_CON(32), 12, GFLAGS),
 -- 
-viresh
+2.7.4
