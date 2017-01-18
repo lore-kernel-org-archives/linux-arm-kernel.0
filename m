@@ -1,108 +1,31 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 18 Jan 2017 17:56:12 +0100
-Subject: [linux-sunxi] [PATCH] clk: sunxi-ng: fix PLL_CPUX adjusting on H3
-In-Reply-To: <f1ccd8ce-df6c-8204-71ab-2f774ac269d5@megous.com>
-References: <20161125002852.18097-1-megous@megous.com>
- <0985b1ec-ba95-1505-cc59-adec4b88238f@megous.com>
- <20170109095946.6esbfx6pafega5cd@lukather>
- <557330d0-2dcd-2211-8538-51c4d6b68834@megous.com>
- <20170116164300.j2zvjkxr7c5h5hyo@lukather>
- <f1ccd8ce-df6c-8204-71ab-2f774ac269d5@megous.com>
-Message-ID: <20170118165612.zkjaj36kedg64rjw@lukather>
+From: david@lechnology.com (David Lechner)
+Date: Wed, 18 Jan 2017 10:57:31 -0600
+Subject: [PATCH v2 1/2] ARM: davinci: Allocate extra interrupts
+In-Reply-To: <95440160-8346-fef8-27d2-fb17c0da38f6@ti.com>
+References: <1484337612-11120-1-git-send-email-david@lechnology.com>
+ <1484337612-11120-2-git-send-email-david@lechnology.com>
+ <95440160-8346-fef8-27d2-fb17c0da38f6@ti.com>
+Message-ID: <25c0bc60-bb99-9aa5-db56-6299d82db9c1@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 01/18/2017 03:50 AM, Sekhar Nori wrote:
+> On Saturday 14 January 2017 01:30 AM, David Lechner wrote:
+>> This allocates extra interrupts for mach-davinci. These extra interrupts
+>> are need for things like IIO triggers.
+>
+> I am not really familiar with IIO triggers. Can you give some more
+> detail on what fails without this patch?
 
-On Mon, Jan 16, 2017 at 05:51:30PM +0100, Ond?ej Jirman wrote:
-> Hi Maxime,
-> 
-> Dne 16.1.2017 v 17:43 Maxime Ripard napsal(a):
-> >> It does lock up quickly with mainline ccu_nkmp_find_best algorithm
-> >> for finding factors.
-> >>
-> >> Even with linux kernel, it breaks. It's just more difficult to hit the
-> >> right conditions. I got oops only right after boot when running cpuburn
-> >> to trigger thermal_zone issued OPP change, if I first run some cpupower
-> >> commands. That's why I wrote this program to stress test various CPU_PLL
-> >> change/factor selection algorithms independently of everything else, to
-> >> get more predictable and quicker testing results.
-> > 
-> > Understood. Do you have the code available somewhere?
-> 
-> It's a bit messy, but it's here:
-> 
-> https://github.com/megous/h3-firmware/blob/master/main.c
+A trigger is used to initiate the reading of an iio device. For example, 
+there is a mechanism for a sysfs trigger. When you write 1 to the sysfs 
+attribute, it triggers an interrupt that is handled by the iio device.
 
-Awesome, thanks!
+Since these triggers use interrupts, you need to allocate spare 
+interrupts in order to set up the trigger. Otherwise, setting up the 
+trigger will fail with an error code (I forgot which one exactly) 
+because all of the allocated irqs have already been assigned to hardware 
+irqs and are not available.
 
-> >>>> What works is selecting NKMP factors so that M is always 1 and P is
-> >>>> anything other than /1 only for frequencies under 288MHz. As mandated by
-> >>>> the H3 datasheet. Mainline ccu_nkmp_find_best doesn't respect these
-> >>>> conditions. With that I can change CPUX frequencies randomly 20x a
-> >>>> second so far indefinitely without the main CPU ever locking up.
-> >>>>
-> >>>> Please drop or revert this patch. It is not a correct approach to the
-> >>>> problem. I'd suggest dropping the entire clock notifier mechanism, too,
-> >>>> unless it can be proven to work reliably.
-> >>>
-> >>> It has been proven to work reliably on a number of other SoCs.
-> >>
-> >> Unless it was stress tested like this with randomy changed settings, I
-> >> doubt you can call it reliable. It may just be very hard to hit the
-> >> issue on linux with particular OPP/thermal zone configuration. That's
-> >> because the issue is dependent on before and after NKMP values. People
-> >> may have just been lucky so far.
-> > 
-> > Yes, or maybe we just have OPPs that just don't trigger a low enough P
-> > factor.
-> > 
-> > There's no rush anyway, the H3 cpufreq support is not enabled at the
-> > moment, so that code basically does nothing for the moment.
-> > 
-> > What's your current plan to fix that? I guess the easiest (and most
-> > likely to be reusable) would be to allow for clock tables, instead of
-> > using the generic approach. We might have some other clocks (like
-> > audio or video) that would need such a precise tuning in the future
-> > too.
-> 
-> My proposed solution is this for M factor (H3 specific solution):
-> 
-> https://github.com/megous/linux/commit/88be3d421e958579026135d8acec4b3983958738
-
-This one is fine.
-
-> and this for P factor:
-> 
-> https://github.com/megous/linux/commit/d7f274ed0c13fa9b4099445cb6bf9b2f8f2cfa8a
-> 
-> Perhaps it should be configurable if the P limitation is not universal
-> for all NKMP clocks. But I haven't read all the datasheets.
-
-And this is exactly what I wanted to avoid, for the reason you're
-giving :)
-
-This is some generic code, and yet you're putting a clock and SoC
-specific limit in there. You have two ways to deal with that. Either
-come up with some generic throttling mecanism to force a particular
-value above or below a given threshold, but that might be tedious to
-do, and require some significant rework.
-
-Or you can use a table, which is generic and should be relatively
-easy. I really think this is the most straightforward solution, and
-even more so since we just want to support a limited number of
-frequencies in this case.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170118/269f7a7e/attachment.sig>
+Here is where the iio subsytem actually allocates the irq:
+http://lxr.free-electrons.com/source/drivers/iio/industrialio-trigger.c#L525
