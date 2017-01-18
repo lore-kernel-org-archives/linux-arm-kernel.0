@@ -1,56 +1,79 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 18 Jan 2017 14:18:39 -0800
-Subject: [PATCH 1/2] ARM64: dts: meson-gxm: Add R-Box Pro
-In-Reply-To: <63fbfc68-917f-68b2-9e7d-e1834e2841d3@suse.de> ("Andreas
- =?utf-8?Q?F=C3=A4rber=22's?= message of "Tue, 17 Jan 2017 04:35:10 +0100")
-References: <20170117030611.23827-1-afaerber@suse.de>
- <20170117030611.23827-2-afaerber@suse.de>
- <63fbfc68-917f-68b2-9e7d-e1834e2841d3@suse.de>
-Message-ID: <m27f5sypts.fsf@baylibre.com>
+From: christopher.spinrath@rwth-aachen.de (Christopher Spinrath)
+Date: Wed, 18 Jan 2017 23:20:17 +0100
+Subject: [PATCH] ARM: dts: imx6q-utilite-pro: enable 2nd display pipeline
+In-Reply-To: <6ed3f695104044f18e98fc9619aab16e@rwthex-s1-b.rwth-ad.de>
+References: <ec9676f344eb4786a28a3c7b969f0e94@rwthex-s1-b.rwth-ad.de>
+ <88bdfd5321484efc82af4132ac2f0d7e@rwthex-s1-b.rwth-ad.de>
+ <6ed3f695104044f18e98fc9619aab16e@rwthex-s1-b.rwth-ad.de>
+Message-ID: <17a7f9cea35944288f97735e66859929@rwthex-s1-b.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andreas F?rber <afaerber@suse.de> writes:
+Hi Philipp,
 
-> Am 17.01.2017 um 04:06 schrieb Andreas F?rber:
->> +	leds {
->> +		compatible = "gpio-leds";
->> +
->> +		blue {
->> +			label = "rbox-pro:blue:on";
->> +			gpios = <&gpio_ao GPIOAO_9 GPIO_ACTIVE_HIGH>;
->> +			default-state = "on";
->> +		};
->> +
->> +		red {
->> +			label = "rbox-pro:red:standby";
->> +			gpios = <&gpio GPIODV_28 GPIO_ACTIVE_HIGH>;
->> +			default-state = "off";
->> +			retain-state-suspended;
->> +			panic-indicator;
->> +		};
->> +	};
->
-> The original property names for these two were led and red. If anyone
-> has better label names than the above, please speak up. Ditto for
-> vega-s95. On the odroidc2 it's called alive but uses heartbeat there.
->
-> The vendor device tree had a third "mcu" GPIO in the sysled node,
-> GPIOAO_6, which leads to immediate power-off. I tried using
-> "gpio-poweroff" to configure this pin, but that driver fails to
-> initialize because some pm callback is already registered - I assume
-> from psci, which apparently succeeds to power-off the system, too. For
-> comparison, the S905 based Vega S95 Telos has no such mcu property. Any
-> thoughts?
->
-> Also, any ideas how best to switch from blue to red for suspend? Add
-> pinctrl properties above? systemd service doing echo from userspace? I
-> assume in Android the Amlogic sysled driver handles all that logic -
-> didn't find any suspend equivalent to gpio-poweroff.
+turns out I have a question on your comment after all:
 
-in leds-gpio, when retain-state-suspended is not set, the LED is
-automatically set to value 0.  I wonder if leds-gpio should grow support
-to make the suspend value configurable?  Or a property like
-"toggle-state-suspended" ?
+On 01/17/2017 07:35 PM, Christopher Spinrath wrote:
+> Hi Philipp,
+>
+> thanks for the review!
+>
+> On 01/17/2017 09:57 AM, Philipp Zabel wrote:
+>> [...]
+>>> +
+>>> +    parallel-display {
+>>> +        compatible = "fsl,imx-parallel-display";
+>>> +        #address-cells = <1>;
+>>> +        #size-cells = <0>;
+>>> +        pinctrl-names = "default";
+>>> +        pinctrl-0 = <&pinctrl_ipu1>;
+>>> +
+>>> +        interface-pix-fmt = "rgb24";
+>>
+>> This is not necessary if the connector created by the tpf410 has the
+>> correct media bus format set in its display_info structure. This can be
+>> done in tfp410_attach, before calling drm_mode_connector_attach_encoder:
+>>
+>>         u32 bus_format = MEDIA_BUS_FMT_RGB888_1X24;
+>>
+>>     drm_display_info_set_bus_formats(&dvi->connector.display_info,
+>>                      &bus_format, 1);
+>>
+>> After this is done, the above line should be removed in a follow-up
+>> patch.
 
-Kevin
+On closer inspection the tfp410 can handle rgb12, rgb24, and DVI 
+formats. Considering this it feels wrong to hardcode the bus format to 
+rgb24 (isn't it?).
+
+So a solution might be to add a property specifying the bus format to 
+the tfp410 binding. But then we would effectively just move this 
+property from one node to another. I wonder if this is still desireable...?
+
+Cheers,
+Christopher
+
+> Ok, I will send a mini follow-up series doing that with your
+> Suggested-by (unless you object) in the next few days.
+>
+> Cheers,
+> Christopher
+>
+>>> +        port at 0 {
+>>> +            reg = <0>;
+>>> +
+>>> +            parallel_display_in: endpoint {
+>>> +                remote-endpoint = <&ipu1_di0_disp0>;
+>>> +            };
+>>> +        };
+>>> +
+>>> +        port at 1 {
+>>> +            reg = <1>;
+>>> +
+>>> +            parallel_display_out: endpoint {
+>>> +                remote-endpoint = <&tfp410_in>;
+>>> +            };
+>>> +        };
+>>> +    };
+>>>  };
+>>>  [...]
