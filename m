@@ -1,27 +1,28 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Wed, 18 Jan 2017 19:21:04 +0100
-Subject: [PATCH] ARM: pxa: include linux/leds.h
-In-Reply-To: <20170118164936.3832865-1-arnd@arndb.de> (Arnd Bergmann's message
- of "Wed, 18 Jan 2017 17:49:24 +0100")
-References: <20170118164936.3832865-1-arnd@arndb.de>
-Message-ID: <87mveodyb3.fsf@belgarion.home>
+From: tj@kernel.org (Tejun Heo)
+Date: Wed, 18 Jan 2017 10:28:26 -0800
+Subject: [PATCH v3 09/13] sata: ahci: export ahci_do_hardreset() locally
+In-Reply-To: <1484745601-4769-10-git-send-email-bgolaszewski@baylibre.com>
+References: <1484745601-4769-1-git-send-email-bgolaszewski@baylibre.com>
+ <1484745601-4769-10-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <20170118182826.GA1451@mtj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+Hello, Bartosz.
 
-> When the header is not included implicitly, we get a build failure:
->
-> arch/arm/mach-pxa/idp.c:205:22: error: field 'cdev' has incomplete type
->   struct led_classdev     cdev;
->
-> This adds an explicit #include.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Sure, pushed into pxa/for-next, I hope it's not troublesome enough to include it
-in the 4.10 cycle pxa fixes which is ... empty so far.
+On Wed, Jan 18, 2017 at 02:19:57PM +0100, Bartosz Golaszewski wrote:
+> We need a way to retrieve the information about the online state of
+> the link in the ahci-da850 driver.
+> 
+> Create a new function: ahci_do_hardreset() which is called from
+> ahci_hardreset() for backwards compatibility, but has an additional
+> argument: 'online' - which can be used to check if the link is online
+> after this function returns.
 
-Cheers.
+Please just add @online to ahci_hardreset() and update the callers.
+Other than that, the sata changes look good to me.
 
---
-Robert
+Thanks.
+
+-- 
+tejun
