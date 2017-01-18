@@ -1,72 +1,44 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 17 Jan 2017 21:30:01 -0300
-Subject: [PATCH 2/2] [media] exynos-gsc: Fix imprecise external abort due
- disabled power domain
-In-Reply-To: <1484699402-28738-1-git-send-email-javier@osg.samsung.com>
-References: <1484699402-28738-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1484699402-28738-2-git-send-email-javier@osg.samsung.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 17 Jan 2017 16:39:24 -0800
+Subject: [PATCH v2 14/14] ARM: dts: da850-lcdk: enable the SATA node
+In-Reply-To: <1484655976-25382-15-git-send-email-bgolaszewski@baylibre.com>
+ (Bartosz Golaszewski's message of "Tue, 17 Jan 2017 13:26:16 +0100")
+References: <1484655976-25382-1-git-send-email-bgolaszewski@baylibre.com>
+ <1484655976-25382-15-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <m2r34119s3.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 15f90ab57acc ("[media] exynos-gsc: Make driver functional when
-CONFIG_PM is unset") removed the implicit dependency that the driver
-had with CONFIG_PM, since it relied on the config option to be enabled.
+Bartosz Golaszewski <bgolaszewski@baylibre.com> writes:
 
-In order to work with !CONFIG_PM, the GSC reset logic that happens in
-the runtime resume callback had to be executed on the probe function.
+> Enable the SATA node for da850-lcdk. We omit the pinctrl property on
+> purpose - the muxed SATA pins are not hooked up to anything
+> SATA-related on the lcdk.
+>
+> The REFCLKN/P rate on the board is 100MHz, so we need a multiplier of
+> 15 for 1.5GHz PLL rate.
 
-The problem is that if CONFIG_PM is enabled, the power domain for the
-GSC could be disabled and so an attempt to write to the GSC_SW_RESET
-register leads to an unhandled fault / imprecise external abort error:
+leftover comment from previous version?
 
-[   10.178825] Unhandled fault: imprecise external abort (0x1406) at 0x00000000
-[   10.186982] pgd = ed728000
-[   10.190847] [00000000] *pgd=00000000
-[   10.195553] Internal error: : 1406 [#1] PREEMPT SMP ARM
-[   10.229761] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
-[   10.237134] task: ed49e400 task.stack: ed724000
-[   10.242934] PC is at gsc_wait_reset+0x5c/0x6c [exynos_gsc]
-[   10.249710] LR is at gsc_probe+0x300/0x33c [exynos_gsc]
-[   10.256139] pc : [<bf2429e0>]    lr : [<bf240734>]    psr: 60070013
-[   10.256139] sp : ed725d30  ip : 00000000  fp : 00000001
-[   10.271492] r10: eea74800  r9 : ecd6a2c0  r8 : ed7d8854
-[   10.277912] r7 : ed7d8c08  r6 : ed7d8810  r5 : ffff8ecd  r4 : c0c03900
-[   10.285664] r3 : 00000000  r2 : 00000001  r1 : ed7d8b98  r0 : ed7d8810
+Kevin
 
-So only do a GSC reset if CONFIG_PM is disabled, since if is enabled the
-runtime PM resume callback will be called by the VIDIOC_STREAMON ioctl,
-making the reset in probe unneeded.
-
-Fixes: 15f90ab57acc ("[media] exynos-gsc: Make driver functional when CONFIG_PM is unset")
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
----
-
-I-ve only tested with CONFIG_PM enabled since my Exynos5422 Odroid
-XU4 board fails to boot when the config option is disabled.
-
-Best regards,
-Javier
-
- drivers/media/platform/exynos-gsc/gsc-core.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
-index 83272f10722d..42e1e09ea915 100644
---- a/drivers/media/platform/exynos-gsc/gsc-core.c
-+++ b/drivers/media/platform/exynos-gsc/gsc-core.c
-@@ -1083,8 +1083,10 @@ static int gsc_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, gsc);
- 
--	gsc_hw_set_sw_reset(gsc);
--	gsc_wait_reset(gsc);
-+	if (!IS_ENABLED(CONFIG_PM)) {
-+		gsc_hw_set_sw_reset(gsc);
-+		gsc_wait_reset(gsc);
-+	}
- 
- 	vb2_dma_contig_set_max_seg_size(dev, DMA_BIT_MASK(32));
- 
--- 
-2.7.4
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  arch/arm/boot/dts/da850-lcdk.dts | 4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
+> index afcb482..fbeee3c 100644
+> --- a/arch/arm/boot/dts/da850-lcdk.dts
+> +++ b/arch/arm/boot/dts/da850-lcdk.dts
+> @@ -105,6 +105,10 @@
+>  	status = "okay";
+>  };
+>  
+> +&sata {
+> +	status = "okay";
+> +};
+> +
+>  &mdio {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&mdio_pins>;
