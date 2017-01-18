@@ -1,33 +1,83 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Jan 2017 17:49:24 +0100
-Subject: [PATCH] ARM: pxa: include linux/leds.h
-Message-ID: <20170118164936.3832865-1-arnd@arndb.de>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed, 18 Jan 2017 17:50:45 +0100
+Subject: [PATCH v5] ARM64: dts: meson-gx: Add firmware reserved memory zones
+Message-ID: <1484758245-9354-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the header is not included implicitly, we get a build failure:
+The Amlogic Meson GXBB/GXL/GXM secure monitor uses part of the memory space,
+this patch adds these reserved zones.
 
-arch/arm/mach-pxa/idp.c:205:22: error: field 'cdev' has incomplete type
-  struct led_classdev     cdev;
+Without such reserved memory zones, running the following stress command :
+$ stress-ng --vm 16 --vm-bytes 128M --timeout 10s
+multiple times:
 
-This adds an explicit #include.
+Could lead to the following kernel crashes :
+[   46.937975] Bad mode in Error handler detected on CPU1, code 0xbf000000 -- SError
+...
+[   47.058536] Internal error: Attempting to execute userspace memory: 8600000f [#3] PREEMPT SMP
+...
+Instead of the OOM killer.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- arch/arm/mach-pxa/idp.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm/mach-pxa/idp.c b/arch/arm/mach-pxa/idp.c
-index d1db32b1a2c6..88e0068f92a8 100644
---- a/arch/arm/mach-pxa/idp.c
-+++ b/arch/arm/mach-pxa/idp.c
-@@ -19,6 +19,7 @@
- #include <linux/init.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
-+#include <linux/leds.h>
- #include <linux/platform_device.h>
- #include <linux/fb.h>
+Changes since v4 at [5]:
+- Move start of ddr memory to reserved-memory node
+- Drop memory node move
+- Fix typo in sizes
+
+Changes since resent v2 at [4]:
+- Fix invalid comment of useable memory attributes
+
+Changes since original v2 at [3]:
+- Typo in commit 2GiB -> 1GiB, 4GiB -> 2GiB
+
+Changes since v2 at [2]:
+- Moved all memory node out of dtsi
+- Added comment about useable memory
+- Fixed comment about secmon reserved zone
+
+Changes since v1 at [1] :
+- Renamed reg into linux,usable-memory to ovveride u-boot memory
+- only kept secmon memory zone
+
+[1] http://lkml.kernel.org/r/20161212101801.28491-1-narmstrong at baylibre.com
+[2] http://lkml.kernel.org/r/1483105232-6242-1-git-send-email-narmstrong at baylibre.com
+[3] http://lkml.kernel.org/r/1484128128-22454-1-git-send-email-narmstrong at baylibre.com
+[4] http://lkml.kernel.org/r/1484128540-22662-1-git-send-email-narmstrong at baylibre.com
+[5] http://lkml.kernel.org/r/1484129414-23325-1-git-send-email-narmstrong at baylibre.com
+
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+index eada0b5..63d52b7 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+@@ -55,6 +55,24 @@
+ 	#address-cells = <2>;
+ 	#size-cells = <2>;
  
++	reserved-memory {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		/* 16 MiB reserved for Hardware ROM Firmware */
++		hwrom: hwrom {
++			reg = <0x0 0x0 0x0 0x1000000>;
++			no-map;
++		};
++
++		/* 2 MiB reserved for ARM Trusted Firmware (BL31) */
++		secmon: secmon {
++			reg = <0x0 0x10000000 0x0 0x200000>;
++			no-map;
++		};
++	};
++
+ 	cpus {
+ 		#address-cells = <0x2>;
+ 		#size-cells = <0x0>;
 -- 
-2.9.0
+1.9.1
