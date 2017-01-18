@@ -1,43 +1,52 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 18 Jan 2017 12:29:20 -0800
-Subject: [PATCH 1/7] ARM: v7: allow setting different cache functions
-In-Reply-To: <20170118202927.28740-1-f.fainelli@gmail.com>
-References: <20170118202927.28740-1-f.fainelli@gmail.com>
-Message-ID: <20170118202927.28740-2-f.fainelli@gmail.com>
+Date: Wed, 18 Jan 2017 12:29:19 -0800
+Subject: [PATCH 0/7] ARM: Broadcom Brahma-B15 readahead cache support
+Message-ID: <20170118202927.28740-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for adding support for the Broadcom Brahma-B15 read-ahead
-cache which requires a different set of cache functions, allow the
-__v7_proc macro to override the cache_fns settings, and default to
-v7_cache_fns unless specified otherwise.
+Hi all,
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm/mm/proc-v7.S | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+This patch series adds support for the Broadcom Brahma-B15 readahead cache.
+I submitted that patch series a couple of years ago, and then slept on it so
+here is another stab at it.
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index d00d52c9de3e..a7b270970e03 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -562,7 +562,7 @@ __v7_setup_stack:
- 	/*
- 	 * Standard v7 proc info content
- 	 */
--.macro __v7_proc name, initfunc, mm_mmuflags = 0, io_mmuflags = 0, hwcaps = 0, proc_fns = v7_processor_functions
-+.macro __v7_proc name, initfunc, mm_mmuflags = 0, io_mmuflags = 0, hwcaps = 0, proc_fns = v7_processor_functions, cache_fns = v7_cache_fns
- 	ALT_SMP(.long	PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ | \
- 			PMD_SECT_AF | PMD_FLAGS_SMP | \mm_mmuflags)
- 	ALT_UP(.long	PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ | \
-@@ -578,7 +578,7 @@ __v7_setup_stack:
- 	.long	\proc_fns
- 	.long	v7wbi_tlb_fns
- 	.long	v6_user_fns
--	.long	v7_cache_fns
-+	.long	\cache_fns
- .endm
- 
- #ifndef CONFIG_ARM_LPAE
+Note that we did not implement this cache as a version of an outer cache
+for several reasons:
+
+- we initially thought we needed to intercept flush_icache_all and
+  flush_kern_cache_louis but upon further inspection we convinced ourselves
+  this is no longer needed, still, flush_cache_all() needs special handling
+  here and needs to wrap around
+
+- the outer cache does not allow differentiating a DMA transfer direction
+  this is a readahead cache, so it does not participate in writes, flushing
+  it during reads *and* writes kills the performance
+
+- finally, most operations that outer_cache cares about are on MVA, which
+  is transparent to the readahead cache here
+
+Florian Fainelli (8):
+  ARM: v7: allow setting different cache functions
+  ARM: Add Broadcom Brahma-B15 readahead cache support
+  ARM: Hook B15 readahead cache functions based on processor
+  ARM: B15: Add CPU hotplug awareness
+  ARM: B15: Add suspend/resume hooks
+  ARM: B15: Register reboot notifier for KEXEC
+  MAINTAINERS: Update brcmstb entries to cover B15 code
+
+ MAINTAINERS                                   |   2 +
+ arch/arm/include/asm/glue-cache.h             |   4 +
+ arch/arm/include/asm/hardware/cache-b15-rac.h |  10 +
+ arch/arm/mm/Kconfig                           |   8 +
+ arch/arm/mm/Makefile                          |   1 +
+ arch/arm/mm/cache-b15-rac.c                   | 360 ++++++++++++++++++++++++++
+ arch/arm/mm/cache-v7.S                        |  21 ++
+ arch/arm/mm/proc-v7.S                         |   6 +-
+ include/linux/cpuhotplug.h                    |   2 +
+ 10 files changed, 411 insertions(+), 4 deletions(-)
+ create mode 100644 arch/arm/include/asm/hardware/cache-b15-rac.h
+ create mode 100644 arch/arm/mm/cache-b15-rac.c
+
 -- 
 2.9.3
