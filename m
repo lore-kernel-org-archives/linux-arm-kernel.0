@@ -1,46 +1,31 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 18 Jan 2017 11:58:45 +0000
-Subject: [PATCH] arm64/cpufeatures: Enforce inline/const properties of
- cpus_have_const_cap
-Message-ID: <1484740725-24776-1-git-send-email-marc.zyngier@arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 18 Jan 2017 14:06:23 +0200
+Subject: [PATCH v2 00/13] Move pad retention control to Exynos pin
+ controller driver
+In-Reply-To: <CACRpkdbXcY5PtLUfJ5idq0XnHUZOdUk2GT5PVG9pkNYvQJ4vbQ@mail.gmail.com>
+References: <CGME20170117124453eucas1p1b812596939db4c4f3298b941555eb05a@eucas1p1.samsung.com>
+ <1484657084-26227-1-git-send-email-m.szyprowski@samsung.com>
+ <CACRpkdbXcY5PtLUfJ5idq0XnHUZOdUk2GT5PVG9pkNYvQJ4vbQ@mail.gmail.com>
+Message-ID: <CAJKOXPf8a8MF9=4NKPDa1O9y1gabkG4D_khPV=9+CAWBeaqOTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Despite being flagged "inline", cpus_have_const_cap may end-up being
-placed out of line if the compiler decides so. This would be unfortunate,
-as we want to be able to use this function in HYP, where we need to
-be 100% sure of what is mapped there. __always_inline seems to be a
-better choice given the constraint.
+On Wed, Jan 18, 2017 at 12:39 PM, Linus Walleij
+<linus.walleij@linaro.org> wrote:
+> On Tue, Jan 17, 2017 at 1:44 PM, Marek Szyprowski
+> <m.szyprowski@samsung.com> wrote:
+>
+>> This patchset is a follow-up of my work on adding runtime PM support
+>> to Exynos pin controller driver:
+>> http://www.spinics.net/lists/arm-kernel/msg550161.html
+>
+> Nice, once you are done fixing the remaining nits, add Tomasz ACKs
+> and resend as v3 and I will apply it.
 
-Also, be a lot tougher on non-const or out-of-range capability values
-(a non-const cap value shouldn't be used here, and the semantic of an
-OOR value is at best ill defined). In those two case, BUILD_BUG_ON is
-what you get.
+Wait, for the pinctrl patches (and also the commits moving the bits
+arch/arm -> pintrl) you need the soc changes (mostly: the header).
+I'll prepare a tag with them but I am still giving some time for
+review.
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/include/asm/cpufeature.h | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index b4989df..4710469 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -105,10 +105,11 @@ static inline bool cpu_have_feature(unsigned int num)
- }
- 
- /* System capability check for constant caps */
--static inline bool cpus_have_const_cap(int num)
-+static __always_inline bool cpus_have_const_cap(int num)
- {
--	if (num >= ARM64_NCAPS)
--		return false;
-+	BUILD_BUG_ON(!__builtin_constant_p(num));
-+	BUILD_BUG_ON(num >= ARM64_NCAPS);
-+
- 	return static_branch_unlikely(&cpu_hwcap_keys[num]);
- }
- 
--- 
-2.1.4
+Best regards,
+Krzysztof
