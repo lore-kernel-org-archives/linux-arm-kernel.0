@@ -1,157 +1,37 @@
-From: jerry.huang@nxp.com (Changming Huang)
-Date: Wed, 18 Jan 2017 16:12:18 +0800
-Subject: [PATCH v4 3/3] USB3/DWC3: Enable undefined length INCR burst type
-In-Reply-To: <1484727138-3264-1-git-send-email-jerry.huang@nxp.com>
-References: <1484727138-3264-1-git-send-email-jerry.huang@nxp.com>
-Message-ID: <1484727138-3264-3-git-send-email-jerry.huang@nxp.com>
+From: mylene.josserand@free-electrons.com (Mylene Josserand)
+Date: Wed, 18 Jan 2017 09:25:47 +0100
+Subject: [PATCH v2 07/10] dt-bindings: sound: Add sun8i audio documentation
+In-Reply-To: <20170117165029.wu4m6flhdwxk5e3q@sirena.org.uk>
+References: <20170117140230.23142-1-mylene.josserand@free-electrons.com>
+ <20170117140230.23142-8-mylene.josserand@free-electrons.com>
+ <20170117165029.wu4m6flhdwxk5e3q@sirena.org.uk>
+Message-ID: <bc022ae2-d766-891f-9626-189fb6834c03@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the undefined length INCR burst type and set INCRx.
-Different platform may has the different burst size type.
-In order to get best performance, we need to tune the burst size to
-one special value, instead of the default value.
+Hi,
 
-Signed-off-by: Changming Huang <jerry.huang@nxp.com>
-Signed-off-by: Rajesh Bhagat <rajesh.bhagat@nxp.com>
----
-Changes in v4:
-  - Modify the codes according to the definition of this property.
-Changes in v3:
-  - add new property for INCR burst in usb node to reset GSBUSCFG0.
-Changes in v2:
-  - split patch
-  - create one new function to handle soc bus configuration register.
+On 17/01/2017 17:50, Mark Brown wrote:
+> On Tue, Jan 17, 2017 at 03:02:27PM +0100, Myl?ne Josserand wrote:
+>> Add the documentation for dt-binding of the digital audio codec driver
+>> and the audio card driver for Sun8i SoCs.
+>
+>
+> Please submit patches using subject lines reflecting the style for the
+> subsystem.  This makes it easier for people to identify relevant
+> patches.  Look at what existing commits in the area you're changing are
+> doing and make sure your subject lines visually resemble what they're
+> doing.
+>
 
- drivers/usb/dwc3/core.c |   83 +++++++++++++++++++++++++++++++++++++++++++++++
- drivers/usb/dwc3/core.h |    7 ++++
- 2 files changed, 90 insertions(+)
+Yeah, sorry about that. Maxime indicated it in another patch. I will 
+keep it in mind for next times.
 
-diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
-index 369bab1..446aec3 100644
---- a/drivers/usb/dwc3/core.c
-+++ b/drivers/usb/dwc3/core.c
-@@ -650,6 +650,87 @@ static void dwc3_core_setup_global_control(struct dwc3 *dwc)
- 	dwc3_writel(dwc->regs, DWC3_GCTL, reg);
- }
- 
-+/* set global soc bus configuration registers */
-+static void dwc3_set_soc_bus_cfg(struct dwc3 *dwc)
-+{
-+	struct device *dev = dwc->dev;
-+	u32 *vals;
-+	u32 cfg;
-+	int ntype;
-+	int ret;
-+	int i;
-+
-+	cfg = dwc3_readl(dwc->regs, DWC3_GSBUSCFG0);
-+
-+	/*
-+	 * Handle property "snps,incr-burst-type-adjustment".
-+	 * Get the number of value from this property:
-+	 * result <= 0, means this property is not supported.
-+	 * result = 1, means INCRx burst mode supported.
-+	 * result > 1, means undefined length burst mode supported.
-+	 */
-+	ntype = device_property_read_u32_array(dev,
-+			"snps,incr-burst-type-adjustment", NULL, 0);
-+	if (ntype > 0) {
-+		vals = kcalloc(ntype, sizeof(u32), GFP_KERNEL);
-+		if (!vals) {
-+			dev_err(dev, "Error to get memory\n");
-+			return;
-+		}
-+		/* Get INCR burst type, and parse it */
-+		ret = device_property_read_u32_array(dev,
-+			"snps,incr-burst-type-adjustment", vals, ntype);
-+		if (ret) {
-+			dev_err(dev, "Error to get property\n");
-+			return;
-+		}
-+		*(dwc->incrx_type + 1) = vals[0];
-+		if (ntype > 1) {
-+			*dwc->incrx_type = 1;
-+			for (i = 1; i < ntype; i++) {
-+				if (vals[i] > *(dwc->incrx_type + 1))
-+					*(dwc->incrx_type + 1) = vals[i];
-+			}
-+		} else
-+			*dwc->incrx_type = 0;
-+
-+		/* Enable Undefined Length INCR Burst and Enable INCRx Burst */
-+		cfg &= ~DWC3_GSBUSCFG0_INCRBRST_MASK;
-+		if (*dwc->incrx_type)
-+			cfg |= DWC3_GSBUSCFG0_INCRBRSTENA;
-+		switch (*(dwc->incrx_type + 1)) {
-+		case 256:
-+			cfg |= DWC3_GSBUSCFG0_INCR256BRSTENA;
-+			break;
-+		case 128:
-+			cfg |= DWC3_GSBUSCFG0_INCR128BRSTENA;
-+			break;
-+		case 64:
-+			cfg |= DWC3_GSBUSCFG0_INCR64BRSTENA;
-+			break;
-+		case 32:
-+			cfg |= DWC3_GSBUSCFG0_INCR32BRSTENA;
-+			break;
-+		case 16:
-+			cfg |= DWC3_GSBUSCFG0_INCR16BRSTENA;
-+			break;
-+		case 8:
-+			cfg |= DWC3_GSBUSCFG0_INCR8BRSTENA;
-+			break;
-+		case 4:
-+			cfg |= DWC3_GSBUSCFG0_INCR4BRSTENA;
-+			break;
-+		case 1:
-+			break;
-+		default:
-+			dev_err(dev, "Invalid property\n");
-+			break;
-+		}
-+	}
-+
-+	dwc3_writel(dwc->regs, DWC3_GSBUSCFG0, cfg);
-+}
-+
- /**
-  * dwc3_core_init - Low-level initialization of DWC3 Core
-  * @dwc: Pointer to our controller context structure
-@@ -698,6 +779,8 @@ static int dwc3_core_init(struct dwc3 *dwc)
- 	/* Adjust Frame Length */
- 	dwc3_frame_length_adjustment(dwc);
- 
-+	dwc3_set_soc_bus_cfg(dwc);
-+
- 	usb_phy_set_suspend(dwc->usb2_phy, 0);
- 	usb_phy_set_suspend(dwc->usb3_phy, 0);
- 	ret = phy_power_on(dwc->usb2_generic_phy);
-diff --git a/drivers/usb/dwc3/core.h b/drivers/usb/dwc3/core.h
-index 065aa6f..9df6304 100644
---- a/drivers/usb/dwc3/core.h
-+++ b/drivers/usb/dwc3/core.h
-@@ -805,6 +805,7 @@ struct dwc3_scratchpad_array {
-  * @regs: base address for our registers
-  * @regs_size: address space size
-  * @fladj: frame length adjustment
-+ * @incrx_type: INCR burst type adjustment
-  * @irq_gadget: peripheral controller's IRQ number
-  * @nr_scratch: number of scratch buffers
-  * @u1u2: only used on revisions <1.83a for workaround
-@@ -928,6 +929,12 @@ struct dwc3 {
- 	enum usb_phy_interface	hsphy_mode;
- 
- 	u32			fladj;
-+	/*
-+	 * For INCR burst type.
-+	 * First field: for undefined length INCR burst type enable.
-+	 * Second field: for INCRx burst type enable
-+	 */
-+	u32			incrx_type[2];
- 	u32			irq_gadget;
- 	u32			nr_scratch;
- 	u32			u1u2;
+Anyway, thank you for the review!
+
+Best regards,
+
 -- 
-1.7.9.5
+Myl?ne Josserand, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
