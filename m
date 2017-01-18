@@ -1,33 +1,132 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 18 Jan 2017 08:46:57 +0530
-Subject: [PATCH v4 2/4] Documentation: dt: add bindings for ti-cpufreq
-In-Reply-To: <20170117131808.29798-3-d-gerlach@ti.com>
-References: <20170117131808.29798-1-d-gerlach@ti.com>
- <20170117131808.29798-3-d-gerlach@ti.com>
-Message-ID: <20170118031657.GB11478@vireshk-i7>
+From: pankaj.dubey@samsung.com (pankaj.dubey)
+Date: Wed, 18 Jan 2017 08:50:12 +0530
+Subject: [PATCH v2 2/2] arm64: dts: exynos: Add regulators for Vbus and
+ Vbus-Boost
+In-Reply-To: <20170117182826.gngf7gjkvfyg3uww@kozik-lap>
+References: <1484665444-23365-1-git-send-email-pankaj.dubey@samsung.com>
+ <CGME20170117150123epcas1p12709f99a0993ae58ea1fe294df5a12fe@epcas1p1.samsung.com>
+ <1484665444-23365-3-git-send-email-pankaj.dubey@samsung.com>
+ <20170117182826.gngf7gjkvfyg3uww@kozik-lap>
+Message-ID: <68177964-890d-7061-dac0-f37717b1a254@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17-01-17, 07:18, Dave Gerlach wrote:
-> Add the device tree bindings document for the TI CPUFreq/OPP driver
-> on AM33xx, AM43xx, DRA7xx, and AM57xx SoCs. The operating-points-v2
-> binding allows us to provide an opp-supported-hw property for each OPP
-> to define when it is available. This driver is responsible for reading
-> and parsing registers to determine which OPPs can be selectively enabled
-> based on the specific SoC in use by matching against the opp-supported-hw
-> data.
-> 
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> ---
-> v3->v4:
-> 	Update to simplify binding, only use "syscon" now to pass control
-> 	module register space and let driver handle offsets.
-> 
->  .../devicetree/bindings/cpufreq/ti-cpufreq.txt     | 128 +++++++++++++++++++++
->  1 file changed, 128 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
--- 
-viresh
+On Tuesday 17 January 2017 11:58 PM, Krzysztof Kozlowski wrote:
+> On Tue, Jan 17, 2017 at 08:34:04PM +0530, Pankaj Dubey wrote:
+>> From: Vivek Gautam <gautamvivek1987@gmail.com>
+>>
+>> Adding fixed voltage regulators for Vbus and Vbus-boost required
+>> by USB 3.0 DRD controller on Exynos7-espresso board.
+>>
+>> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>> Signed-off-by: Vivek Gautam <gautamvivek1987@gmail.com>
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> 
+> Same as patch 1.
+> 
+
+OK, will update.
+
+>> ---
+>>  arch/arm64/boot/dts/exynos/exynos7-espresso.dts | 45 +++++++++++++++++++++++++
+>>  1 file changed, 45 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+>> index 9cf73cf..8d5abdd 100644
+>> --- a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+>> +++ b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+>> @@ -13,6 +13,7 @@
+>>  #include "exynos7.dtsi"
+>>  #include <dt-bindings/interrupt-controller/irq.h>
+>>  #include <dt-bindings/clock/samsung,s2mps11.h>
+>> +#include <dt-bindings/gpio/gpio.h>
+>>  
+>>  / {
+>>  	model = "Samsung Exynos7 Espresso board based on EXYNOS7";
+>> @@ -33,6 +34,29 @@
+>>  		device_type = "memory";
+>>  		reg = <0x0 0x40000000 0x0 0xC0000000>;
+>>  	};
+>> +
+>> +	usb30_vbus_reg: regulator-usb30 {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "VBUS_5V";
+>> +		regulator-min-microvolt = <5000000>;
+>> +		regulator-max-microvolt = <5000000>;
+>> +		gpio = <&gph1 1 GPIO_ACTIVE_HIGH>;
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <&usb30_vbus_en>;
+>> +		enable-active-high;
+>> +	};
+>> +
+>> +	usb3drd_boost_5v: regulator-usb3drd-boost {
+>> +		compatible = "regulator-fixed";
+>> +		regulator-name = "VUSB_VBUS_5V";
+>> +		regulator-min-microvolt = <5000000>;
+>> +		regulator-max-microvolt = <5000000>;
+>> +		gpio = <&gpf4 1 GPIO_ACTIVE_HIGH>;
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <&usb3drd_boost_en>;
+>> +		enable-active-high;
+>> +	};
+>> +
+>>  };
+>>  
+>>  &fin_pll {
+>> @@ -366,3 +390,24 @@
+>>  	vqmmc-supply = <&ldo2_reg>;
+>>  	disable-wp;
+>>  };
+>> +
+>> +&usbdrd_phy {
+>> +	vbus-supply = <&usb30_vbus_reg>;
+>> +	vbus-boost-supply = <&usb3drd_boost_5v>;
+>> +};
+>> +
+>> +&pinctrl_bus1 {
+>> +	usb30_vbus_en: usb30-vbus-en {
+>> +		samsung,pins = "gph1-1";
+>> +		samsung,pin-function = <1>;
+> 
+> Javier mentioned it, please use EXYNOS_PIN_FUNC_OUTPUT
+> 
+
+Yes, but as it's not taken care in existing dts for other pin
+definitions, so a Javier mentioned, this can be taken care as a separate
+patch for all pin definitions? Or do you want me to first add patch
+converting all these with macros and then on top of add this usb related
+pin definitions.
+
+Thanks,
+Pankaj Dubey
+
+
+>> +		samsung,pin-pud = <0>;
+> 
+> EXYNOS_PIN_PULL_NONE
+> 
+>> +		samsung,pin-drv = <0>;
+> 
+> I think these are the same as in Exynos5422, so EXYNOS5420_PIN_DRV_LV1
+> 
+> Best regards,
+> Krzysztof
+> 
+> 
+>> +	};
+>> +
+>> +	usb3drd_boost_en: usb3drd-boost-en {
+>> +		samsung,pins = "gpf4-1";
+>> +		samsung,pin-function = <1>;
+>> +		samsung,pin-pud = <0>;
+>> +		samsung,pin-drv = <0>;
+>> +	};
+>> +};
+>> -- 
+>> 2.7.4
+>>
+> 
+> 
+> 
