@@ -1,92 +1,36 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 18 Jan 2017 13:51:00 +0800
-Subject: [PATCH 1/6] phy: phy-mt65xx-usb3: add reference clock of usb3 analog
- phy
-Message-ID: <1484718665-11584-1-git-send-email-chunfeng.yun@mediatek.com>
+Date: Wed, 18 Jan 2017 13:51:03 +0800
+Subject: [PATCH 4/6] arm64: dts: mt8173: add a new reference clock for usb3
+ analog phy
+In-Reply-To: <1484718665-11584-1-git-send-email-chunfeng.yun@mediatek.com>
+References: <1484718665-11584-1-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1484718665-11584-4-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-usually, the reference clock of usb3 analog phy comes from
-26M oscillator directly, but some SoCs are not, add it for
-compatibility.
+add a new reference clock which comes from 26M oscillator directly
+for SuperSpeed analog phy. and the old one which comes for PLL is
+48M for HighSpeed analog phy.
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- drivers/phy/phy-mt65xx-usb3.c |   36 ++++++++++++++++++++++++++++--------
- 1 file changed, 28 insertions(+), 8 deletions(-)
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/phy/phy-mt65xx-usb3.c b/drivers/phy/phy-mt65xx-usb3.c
-index d972067..fc9a4f0 100644
---- a/drivers/phy/phy-mt65xx-usb3.c
-+++ b/drivers/phy/phy-mt65xx-usb3.c
-@@ -149,7 +149,8 @@ struct mt65xx_phy_instance {
- struct mt65xx_u3phy {
- 	struct device *dev;
- 	void __iomem *sif_base;	/* include sif2, but exclude port's */
--	struct clk *u3phya_ref;	/* reference clock of usb3 anolog phy */
-+	struct clk *u2ref_clk;	/* reference clock of u2 analog phy */
-+	struct clk *u3ref_clk;	/* reference clock of u3 analog phy */
- 	const struct mt65xx_phy_pdata *pdata;
- 	struct mt65xx_phy_instance **phys;
- 	int nphys;
-@@ -429,11 +430,17 @@ static int mt65xx_phy_init(struct phy *phy)
- {
- 	struct mt65xx_phy_instance *instance = phy_get_drvdata(phy);
- 	struct mt65xx_u3phy *u3phy = dev_get_drvdata(phy->dev.parent);
-+	struct clk *ref_clk;
- 	int ret;
- 
--	ret = clk_prepare_enable(u3phy->u3phya_ref);
-+	if (instance->type == PHY_TYPE_USB2)
-+		ref_clk = u3phy->u2ref_clk;
-+	else
-+		ref_clk = u3phy->u3ref_clk;
-+
-+	ret = clk_prepare_enable(ref_clk);
- 	if (ret) {
--		dev_err(u3phy->dev, "failed to enable u3phya_ref\n");
-+		dev_err(u3phy->dev, "failed to enable ref clk\n");
- 		return ret;
- 	}
- 
-@@ -464,9 +471,16 @@ static int mt65xx_phy_exit(struct phy *phy)
- {
- 	struct mt65xx_phy_instance *instance = phy_get_drvdata(phy);
- 	struct mt65xx_u3phy *u3phy = dev_get_drvdata(phy->dev.parent);
-+	struct clk *ref_clk;
- 
- 	phy_instance_exit(u3phy, instance);
--	clk_disable_unprepare(u3phy->u3phya_ref);
-+
-+	if (instance->type == PHY_TYPE_USB2)
-+		ref_clk = u3phy->u2ref_clk;
-+	else
-+		ref_clk = u3phy->u3ref_clk;
-+
-+	clk_disable_unprepare(ref_clk);
- 	return 0;
- }
- 
-@@ -566,10 +580,16 @@ static int mt65xx_u3phy_probe(struct platform_device *pdev)
- 		return PTR_ERR(u3phy->sif_base);
- 	}
- 
--	u3phy->u3phya_ref = devm_clk_get(dev, "u3phya_ref");
--	if (IS_ERR(u3phy->u3phya_ref)) {
--		dev_err(dev, "error to get u3phya_ref\n");
--		return PTR_ERR(u3phy->u3phya_ref);
-+	u3phy->u2ref_clk = devm_clk_get(dev, "u2ref_clk");
-+	if (IS_ERR(u3phy->u2ref_clk)) {
-+		dev_err(dev, "failed to get u2ref_clk\n");
-+		return PTR_ERR(u3phy->u2ref_clk);
-+	}
-+
-+	u3phy->u3ref_clk = devm_clk_get(dev, "u3ref_clk");
-+	if (IS_ERR(u3phy->u3ref_clk)) {
-+		dev_err(dev, "failed to get u3ref_clk\n");
-+		return PTR_ERR(u3phy->u3ref_clk);
- 	}
- 
- 	port = 0;
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index 12e7027..5d1663b 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -754,8 +754,8 @@
+ 		u3phy: usb-phy at 11290000 {
+ 			compatible = "mediatek,mt8173-u3phy";
+ 			reg = <0 0x11290000 0 0x800>;
+-			clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
+-			clock-names = "u3phya_ref";
++			clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>, <&clk26m>;
++			clock-names = "u2ref_clk", "u3ref_clk";
+ 			#address-cells = <2>;
+ 			#size-cells = <2>;
+ 			ranges;
 -- 
 1.7.9.5
