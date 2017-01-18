@@ -1,59 +1,62 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Wed, 18 Jan 2017 14:08:22 +0800
-Subject: [PATCH 1/6] usb: mtu3: get resources that cause deferred probe earlier
-Message-ID: <1484719707-12107-1-git-send-email-chunfeng.yun@mediatek.com>
+Date: Wed, 18 Jan 2017 14:08:26 +0800
+Subject: [PATCH 5/6] dt-bindings: mt8173-xhci: add reference clock
+In-Reply-To: <1484719707-12107-1-git-send-email-chunfeng.yun@mediatek.com>
+References: <1484719707-12107-1-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1484719707-12107-5-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some resources such as regulator, clock usually cause deferred
-probe, get them earlier to avoid more ineffective processing.
+add a reference clock for compatibility
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- drivers/usb/mtu3/mtu3_plat.c |   24 ++++++++++++------------
- 1 file changed, 12 insertions(+), 12 deletions(-)
+ .../devicetree/bindings/usb/mt8173-xhci.txt        |   10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/usb/mtu3/mtu3_plat.c b/drivers/usb/mtu3/mtu3_plat.c
-index 7833678..6344859 100644
---- a/drivers/usb/mtu3/mtu3_plat.c
-+++ b/drivers/usb/mtu3/mtu3_plat.c
-@@ -204,6 +204,18 @@ static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
- 	int i;
- 	int ret;
+diff --git a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+index 2a930bd..ab8bb27 100644
+--- a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
++++ b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+@@ -23,6 +23,7 @@ Required properties:
+ 	entry in clock-names
+  - clock-names : must contain
+ 	"sys_ck": for clock of xHCI MAC
++	"ref_ck": for reference clock of xHCI MAC
+ 	"wakeup_deb_p0": for USB wakeup debounce clock of port0
+ 	"wakeup_deb_p1": for USB wakeup debounce clock of port1
  
-+	ssusb->vusb33 = devm_regulator_get(&pdev->dev, "vusb33");
-+	if (IS_ERR(ssusb->vusb33)) {
-+		dev_err(dev, "failed to get vusb33\n");
-+		return PTR_ERR(ssusb->vusb33);
-+	}
-+
-+	ssusb->sys_clk = devm_clk_get(dev, "sys_ck");
-+	if (IS_ERR(ssusb->sys_clk)) {
-+		dev_err(dev, "failed to get sys clock\n");
-+		return PTR_ERR(ssusb->sys_clk);
-+	}
-+
- 	ssusb->num_phys = of_count_phandle_with_args(node,
- 			"phys", "#phy-cells");
- 	if (ssusb->num_phys > 0) {
-@@ -230,18 +242,6 @@ static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
- 		return PTR_ERR(ssusb->ippc_base);
- 	}
+@@ -47,10 +48,10 @@ usb30: usb at 11270000 {
+ 	reg-names = "mac", "ippc";
+ 	interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
+ 	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
+-	clocks = <&topckgen CLK_TOP_USB30_SEL>,
++	clocks = <&topckgen CLK_TOP_USB30_SEL>, <&clk26m>,
+ 		 <&pericfg CLK_PERI_USB0>,
+ 		 <&pericfg CLK_PERI_USB1>;
+-	clock-names = "sys_ck",
++	clock-names = "sys_ck", "ref_ck",
+ 		      "wakeup_deb_p0",
+ 		      "wakeup_deb_p1";
+ 	phys = <&phy_port0 PHY_TYPE_USB3>,
+@@ -82,6 +83,7 @@ Required properties:
+ 	entry in clock-names
+  - clock-names : must be
+ 	"sys_ck": for clock of xHCI MAC
++	"ref_ck": for reference clock of xHCI MAC
  
--	ssusb->vusb33 = devm_regulator_get(&pdev->dev, "vusb33");
--	if (IS_ERR(ssusb->vusb33)) {
--		dev_err(dev, "failed to get vusb33\n");
--		return PTR_ERR(ssusb->vusb33);
--	}
--
--	ssusb->sys_clk = devm_clk_get(dev, "sys_ck");
--	if (IS_ERR(ssusb->sys_clk)) {
--		dev_err(dev, "failed to get sys clock\n");
--		return PTR_ERR(ssusb->sys_clk);
--	}
--
- 	ssusb->dr_mode = usb_get_dr_mode(dev);
- 	if (ssusb->dr_mode == USB_DR_MODE_UNKNOWN) {
- 		dev_err(dev, "dr_mode is error\n");
+ Optional properties:
+  - vbus-supply : reference to the VBUS regulator;
+@@ -94,8 +96,8 @@ usb30: usb at 11270000 {
+ 	reg-names = "mac";
+ 	interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
+ 	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
+-	clocks = <&topckgen CLK_TOP_USB30_SEL>;
+-	clock-names = "sys_ck";
++	clocks = <&topckgen CLK_TOP_USB30_SEL>, <&clk26m>;
++	clock-names = "sys_ck", "ref_ck";
+ 	vusb33-supply = <&mt6397_vusb_reg>;
+ 	usb3-lpm-capable;
+ };
 -- 
 1.7.9.5
