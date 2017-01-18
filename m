@@ -1,41 +1,40 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 18 Jan 2017 16:08:09 -0600
-Subject: [PATCH v1 1/2] Documentation: mtk-quadspi: update DT bindings
-In-Reply-To: <20170113151326.11e9451a@bbrezillon>
-References: <1484291609-20195-1-git-send-email-guochun.mao@mediatek.com>
- <1484291609-20195-2-git-send-email-guochun.mao@mediatek.com>
- <20170113151326.11e9451a@bbrezillon>
-Message-ID: <20170118220809.pmaa2f3kwiddehti@rob-hp-laptop>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 18 Jan 2017 22:13:15 +0000
+Subject: [PATCH 3/4] ARM: nommu: display vectors base
+In-Reply-To: <20170118203837.6536-1-afzal.mohd.ma@gmail.com>
+References: <20170118203525.6246-1-afzal.mohd.ma@gmail.com>
+ <20170118203837.6536-1-afzal.mohd.ma@gmail.com>
+Message-ID: <20170118221315.GP27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 13, 2017 at 03:13:26PM +0100, Boris Brezillon wrote:
-> On Fri, 13 Jan 2017 15:13:28 +0800
-> Guochun Mao <guochun.mao@mediatek.com> wrote:
+On Thu, Jan 19, 2017 at 02:08:37AM +0530, afzal mohammed wrote:
+> The exception base address is now dynamically estimated for no-MMU
+> case, display it.
 > 
-> > Add "mediatek,mt2701-nor" for nor flash node's compatible.
-> > 
-> > Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
-> > ---
-> >  .../devicetree/bindings/mtd/mtk-quadspi.txt        |    4 +++-
-> >  1 file changed, 3 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> > index fb314f0..f83d31d 100644
-> > --- a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> > +++ b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> > @@ -1,7 +1,9 @@
-> >  * Serial NOR flash controller for MTK MT81xx (and similar)
-> >  
-> >  Required properties:
-> > -- compatible: 	  should be "mediatek,mt8173-nor";
-> > +- compatible: 	  should contain:
-> > +		  "mediatek,mt2701-nor" for MT2701,
-> > +		  "mediatek,mt8173-nor" for MT8173.
+> Signed-off-by: afzal mohammed <afzal.mohd.ma@gmail.com>
+> ---
+>  arch/arm/mm/init.c | 5 +++++
+>  arch/arm/mm/mm.h   | 5 +++--
+>  2 files changed, 8 insertions(+), 2 deletions(-)
 > 
-> Do you need to define a new compatible? If the IPs are exactly the same
-> in both SoCs it shouldn't be needed.
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index cf47f86f79ed..9e11f255c3bf 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -522,7 +522,12 @@ void __init mem_init(void)
+>  			"      .data : 0x%p" " - 0x%p" "   (%4td kB)\n"
+>  			"       .bss : 0x%p" " - 0x%p" "   (%4td kB)\n",
+>  
+> +#ifdef CONFIG_MMU
+>  			MLK(UL(VECTORS_BASE), UL(VECTORS_BASE) + (PAGE_SIZE)),
+> +#else
+> +			MLK_ROUNDUP(vectors_base, vectors_base + PAGE_SIZE),
 
-Rather the 2701 should contain both strings in that case.
+I think MLK() will do here - no need to use the rounding-up version
+as PAGE_SIZE is a multiple of 1k.
 
-Rob
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
