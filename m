@@ -1,44 +1,44 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Tue, 17 Jan 2017 16:39:24 -0800
-Subject: [PATCH v2 14/14] ARM: dts: da850-lcdk: enable the SATA node
-In-Reply-To: <1484655976-25382-15-git-send-email-bgolaszewski@baylibre.com>
- (Bartosz Golaszewski's message of "Tue, 17 Jan 2017 13:26:16 +0100")
-References: <1484655976-25382-1-git-send-email-bgolaszewski@baylibre.com>
- <1484655976-25382-15-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <m2r34119s3.fsf@baylibre.com>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Tue, 17 Jan 2017 16:50:35 -0800
+Subject: [PATCHv2 0/3] OF phandle nexus support + GPIO nexus
+Message-ID: <20170118005038.9216-1-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bartosz Golaszewski <bgolaszewski@baylibre.com> writes:
+This is one small chunk of work related to DT overlays for expansion
+boards. It would be good to have a way to expose #<list>-cells types of
+providers through a connector in a standard way. So we introduce a way
+to make "nexus" nodes for these types of properties to remap the consumer
+number space to the other side of the connector's number space. It's
+basically a copy of the interrupt nexus implementation, but without
+the address space matching design and interrupt-parent walking.
 
-> Enable the SATA node for da850-lcdk. We omit the pinctrl property on
-> purpose - the muxed SATA pins are not hooked up to anything
-> SATA-related on the lcdk.
->
-> The REFCLKN/P rate on the board is 100MHz, so we need a multiplier of
-> 15 for 1.5GHz PLL rate.
+The first patch implements a generic method to do this, and the second patch
+adds a unit test for it. The third patch is more of an example than anything
+else. It shows how we would modify frameworks to use the new API.
 
-leftover comment from previous version?
+I wasn't certain what more to document, but I
 
-Kevin
+Changes since v1:
+ * Addition of optional pass-thru parameter
+ * Reduction of strings passed to 1 instead of 3 (or 4 now)
+ * Updated gpio patch for the new function signature
+ * Updated test-case for new funciton signature and pass-thru parameter
+ * Updated kernel-doc to be correct and highlighted difference between
+   this API and of_parse_phandle_with_args()
 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> ---
->  arch/arm/boot/dts/da850-lcdk.dts | 4 ++++
->  1 file changed, 4 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
-> index afcb482..fbeee3c 100644
-> --- a/arch/arm/boot/dts/da850-lcdk.dts
-> +++ b/arch/arm/boot/dts/da850-lcdk.dts
-> @@ -105,6 +105,10 @@
->  	status = "okay";
->  };
->  
-> +&sata {
-> +	status = "okay";
-> +};
-> +
->  &mdio {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&mdio_pins>;
+Stephen Boyd (3):
+  of: Support parsing phandle argument lists through a nexus node
+  of: unittest: Add phandle remapping test
+  gpio: Support gpio nexus dt bindings
+
+ drivers/gpio/gpiolib-of.c                   |   4 +-
+ drivers/of/base.c                           | 186 ++++++++++++++++++++++++++++
+ drivers/of/unittest-data/testcases.dts      |  11 ++
+ drivers/of/unittest-data/tests-phandle.dtsi |  25 ++++
+ drivers/of/unittest.c                       | 120 ++++++++++++++++++
+ include/linux/of.h                          |  12 ++
+ 6 files changed, 356 insertions(+), 2 deletions(-)
+
+-- 
+2.10.0.297.gf6727b0
