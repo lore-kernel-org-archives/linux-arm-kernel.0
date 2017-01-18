@@ -1,50 +1,32 @@
-From: tnowicki@caviumnetworks.com (Tomasz Nowicki)
-Date: Wed, 18 Jan 2017 09:36:44 +0100
-Subject: [PATCH v8 13/18] genirq/msi: Set IRQ_DOMAIN_FLAG_MSI on MSI
- domain creation
-In-Reply-To: <1484127714-3263-14-git-send-email-eric.auger@redhat.com>
-References: <1484127714-3263-1-git-send-email-eric.auger@redhat.com>
- <1484127714-3263-14-git-send-email-eric.auger@redhat.com>
-Message-ID: <0dd978ef-5834-f222-c49d-4f3775803562@caviumnetworks.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 18 Jan 2017 17:40:47 +0900
+Subject: [PATCH v2 00/13] Move pad retention control to Exynos pin
+ controller driver
+In-Reply-To: <1484657084-26227-1-git-send-email-m.szyprowski@samsung.com>
+References: <CGME20170117124453eucas1p1b812596939db4c4f3298b941555eb05a@eucas1p1.samsung.com>
+ <1484657084-26227-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CA+Ln22EpeAu59Yp0x7Ph_Z06xP4WY7KMJypwQ9x6Wkpf2yEhgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11.01.2017 10:41, Eric Auger wrote:
-> Now we have a flag value indicating an IRQ domain implements MSI,
-> let's set it on msi_create_irq_domain().
+Hi Marek,
+
+2017-01-17 21:44 GMT+09:00 Marek Szyprowski <m.szyprowski@samsung.com>:
+> Changelog:
 >
-> Signed-off-by: Eric Auger <eric.auger@redhat.com>
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> v2:
+> - reworked exynos_get_pmu_regmap() function and moved to Exynos PMU driver,
+>   now it doesn't depend on driver probe order thus doesn't need to defer probing
+>   of pinctrl driver if PMU has not yet been probed
+> - collected Acks, minor fixes according to review comments
 
-Reviewed-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
+After fixing remaining nits in patch 1 and 10, for all pinctrl patches (4-13):
 
-Thanks,
+Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
+
+and for other patches (1-3):
+
+Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
+
+Best regards,
 Tomasz
-
->
-> ---
->
-> v7 -> v8
-> - Added Marc's R-b
->
-> v6: new
-> ---
->  kernel/irq/msi.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
-> index ee23006..ddc2f54 100644
-> --- a/kernel/irq/msi.c
-> +++ b/kernel/irq/msi.c
-> @@ -270,8 +270,8 @@ struct irq_domain *msi_create_irq_domain(struct fwnode_handle *fwnode,
->  	if (info->flags & MSI_FLAG_USE_DEF_CHIP_OPS)
->  		msi_domain_update_chip_ops(info);
->
-> -	return irq_domain_create_hierarchy(parent, 0, 0, fwnode,
-> -					   &msi_domain_ops, info);
-> +	return irq_domain_create_hierarchy(parent, IRQ_DOMAIN_FLAG_MSI, 0,
-> +					   fwnode, &msi_domain_ops, info);
->  }
->
->  int msi_domain_prepare_irqs(struct irq_domain *domain, struct device *dev,
->
