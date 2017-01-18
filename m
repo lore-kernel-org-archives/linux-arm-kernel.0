@@ -1,330 +1,219 @@
-From: hw.wangxiaoyin@hisilicon.com (Wang Xiaoyin)
-Date: Wed, 18 Jan 2017 18:04:35 +0800
-Subject: [PATCH] arm64: dts: hisilicon: add dtsi file for Hisilicon Hi3660 SOC
-Message-ID: <20170118100435.43318-1-hw.wangxiaoyin@hisilicon.com>
+From: smitha.t@samsung.com (Smitha T Murthy)
+Date: Wed, 18 Jan 2017 15:32:02 +0530
+Subject: [PATCH 04/11] [media] s5p-mfc: Support MFCv10.10 buffer requirements
+In-Reply-To: <1484733729-25371-1-git-send-email-smitha.t@samsung.com>
+References: <1484733729-25371-1-git-send-email-smitha.t@samsung.com>
+ <CGME20170118100731epcas5p16f07548a8a6c95f2ef539704e032a54d@epcas5p1.samsung.com>
+Message-ID: <1484733729-25371-5-git-send-email-smitha.t@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds pinctrl dtsi file
+Aligning the luma_dpb_size, chroma_dpb_size, mv_size and me_buffer_size
+for MFCv10.10.
 
-Signed-off-by: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
+Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
 ---
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts  |   3 +-
- .../arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi | 292 +++++++++++++++++++++
- 2 files changed, 293 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi
+ drivers/media/platform/s5p-mfc/regs-mfc-v10.h   |   13 +++
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c |   97 ++++++++++++++++++-----
+ drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h |    2 +
+ 3 files changed, 91 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-index 9a1d36aa84ce..de21ebfa4bd8 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-@@ -8,8 +8,7 @@
- /dts-v1/;
+diff --git a/drivers/media/platform/s5p-mfc/regs-mfc-v10.h b/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
+index bd671a5..153ee68 100644
+--- a/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
++++ b/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
+@@ -32,5 +32,18 @@
+ #define MFC_VERSION_V10		0xA0
+ #define MFC_NUM_PORTS_V10	1
  
- #include "hi3660.dtsi"
--/*#include "hi3660-ion.dtsi"*/
--/*#include "hikey960-pinctrl.dtsi"*/
-+#include "hikey960-pinctrl.dtsi"
++/* Encoder buffer size for MFC v10.0 */
++#define ENC_V100_H264_ME_SIZE(x, y)	\
++	(((x + 3) * (y + 3) * 8)	\
++	 + ((((x * y) + 63) / 64) * 32)	\
++	 + (((y * 64) + 1280) * (x + 7) / 8))
++#define ENC_V100_MPEG4_ME_SIZE(x, y)		\
++	(((x + 3) * (y + 3) * 8)		\
++	 + ((((x * y) + 127) / 128) * 16)	\
++	 + (((y * 64) + 1280) * (x + 7) / 8))
++#define ENC_V100_VP8_ME_SIZE(x, y)	\
++	(((x + 3) * (y + 3) * 8)	\
++	 + (((y * 64) + 1280) * (x + 7) / 8))
++
+ #endif /*_REGS_MFC_V10_H*/
  
- / {
- 	model = "HiKey960";
-diff --git a/arch/arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi b/arch/arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi
-new file mode 100644
-index 000000000000..98a0b78289b6
---- /dev/null
-+++ b/arch/arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi
-@@ -0,0 +1,292 @@
-+/*
-+ * pinctrl dts fils for Hislicon HiKey960 development board
-+ *
-+ */
-+
-+#include <dt-bindings/pinctrl/hisi.h>
-+
-+/ {
-+	soc {
-+		/* [IOMG_000, IOMG_123] */
-+		range: gpio-range {
-+			#pinctrl-single,gpio-range-cells = <3>;
-+		};
-+		pmx0: pinmux at e896c000 {
-+			compatible = "pinctrl-single";
-+			reg = <0x0 0xe896c000 0x0 0x1f0>;
-+			#pinctrl-cells = <1>;
-+			#gpio-range-cells = <0x3>;
-+			pinctrl-single,register-width = <0x20>;
-+			pinctrl-single,function-mask = <0x7>;
-+			/* pin base, nr pins & gpio function */
-+			pinctrl-single,gpio-range = <
-+				&range 0 7 0
-+				&range 8 116 0>;
-+
-+			isp0_pmx_func: isp0_pmx_func {
-+				pinctrl-single,pins = <
-+					0x058 MUX_M1 /* ISP_CLK0 */
-+					0x064 MUX_M1 /* ISP_SCL0 */
-+					0x068 MUX_M1 /* ISP_SDA0 */
-+				>;
-+			};
-+
-+			isp1_pmx_func: isp1_pmx_func {
-+				pinctrl-single,pins = <
-+					0x05c MUX_M1 /* ISP_CLK1 */
-+					0x06c MUX_M1 /* ISP_SCL1 */
-+					0x070 MUX_M1 /* ISP_SDA1 */
-+				>;
-+			};
-+
-+			i2c3_pmx_func: i2c3_pmx_func {
-+				pinctrl-single,pins = <
-+					0x02c MUX_M1 /* I2C3_SCL */
-+					0x030 MUX_M1 /* I2C3_SDA */
-+				>;
-+			};
-+
-+			i2c4_pmx_func: i2c4_pmx_func {
-+				pinctrl-single,pins = <
-+					0x090 MUX_M1 /* I2C4_SCL */
-+					0x094 MUX_M1 /* I2C4_SDA */
-+				>;
-+			};
-+
-+			pcie_perstn_pmx_func: pcie_perstn_pmx_func {
-+				pinctrl-single,pins = <
-+					0x15c MUX_M1 /* PCIE_PERST_N */
-+				>;
-+			};
-+
-+			usbhub5734_pmx_func: usbhub5734_pmx_func {
-+				pinctrl-single,pins = <
-+					0x11c MUX_M0 /* GPIO_073 */
-+					0x120 MUX_M0 /* GPIO_074 */
-+				>;
-+			};
-+
-+			spi1_pmx_func: spi1_pmx_func {
-+				pinctrl-single,pins = <
-+					0x034 MUX_M1 /* SPI1_CLK */
-+					0x038 MUX_M1 /* SPI1_DI */
-+					0x03c MUX_M1 /* SPI1_DO */
-+					0x040 MUX_M1 /* SPI1_CS_N */
-+				>;
-+			};
-+
-+			uart0_pmx_func: uart0_pmx_func {
-+				pinctrl-single,pins = <
-+					0x0cc MUX_M2 /* UART0_RXD */
-+					0x0d0 MUX_M2 /* UART0_TXD */
-+					0x0d4 MUX_M2 /* UART0_RXD_M */
-+					0x0d8 MUX_M2 /* UART0_TXD_M */
-+				>;
-+			};
-+
-+			uart1_pmx_func: uart1_pmx_func {
-+				pinctrl-single,pins = <
-+					0x0b0 MUX_M2 /* UART1_CTS_N */
-+					0x0b4 MUX_M2 /* UART1_RTS_N */
-+					0x0a8 MUX_M2 /* UART1_RXD */
-+					0x0ac MUX_M2 /* UART1_TXD */
-+				>;
-+			};
-+
-+			uart2_pmx_func: uart2_pmx_func {
-+				pinctrl-single,pins = <
-+					0x0bc MUX_M2 /* UART2_CTS_N */
-+					0x0c0 MUX_M2 /* UART2_RTS_N */
-+					0x0c8 MUX_M2 /* UART2_RXD */
-+					0x0c4 MUX_M2 /* UART2_TXD */
-+				>;
-+			};
-+
-+			uart3_pmx_func: uart3_pmx_func {
-+				pinctrl-single,pins = <
-+					0x0dc MUX_M1 /* UART3_CTS_N */
-+					0x0e0 MUX_M1 /* UART3_RTS_N */
-+					0x0e4 MUX_M1 /* UART3_RXD */
-+					0x0e8 MUX_M1 /* UART3_TXD */
-+				>;
-+			};
-+
-+			uart4_pmx_func: uart4_pmx_func {
-+				pinctrl-single,pins = <
-+					0x0ec MUX_M1 /* UART4_CTS_N */
-+					0x0f0 MUX_M1 /* UART4_RTS_N */
-+					0x0f4 MUX_M1 /* UART4_RXD */
-+					0x0f8 MUX_M1 /* UART4_TXD */
-+				>;
-+			};
-+
-+			uart5_pmx_func: uart5_pmx_func {
-+				pinctrl-single,pins = <
-+					0x0c4 MUX_M3 /* UART5_CTS_N */
-+					0x0c8 MUX_M3 /* UART5_RTS_N */
-+					0x0bc MUX_M3 /* UART5_RXD */
-+					0x0c0 MUX_M3 /* UART5_TXD */
-+				>;
-+			};
-+
-+			uart6_pmx_func: uart6_pmx_func {
-+				pinctrl-single,pins = <
-+					0x0cc MUX_M1 /* UART6_CTS_N */
-+					0x0d0 MUX_M1 /* UART6_RTS_N */
-+					0x0d4 MUX_M1 /* UART6_RXD */
-+					0x0d8 MUX_M1 /* UART6_TXD */
-+				>;
-+			};
-+		};
-+
-+		/* [IOMG_MMC0_000, IOMG_MMC0_005] */
-+		pmx1: pinmux at ff37e000 {
-+			compatible = "pinctrl-single";
-+			reg = <0x0 0xff37e000 0x0 0x18>;
-+			#gpio-range-cells = <0x3>;
-+			#pinctrl-cells = <1>;
-+			pinctrl-single,register-width = <0x20>;
-+			pinctrl-single,function-mask = <0x7>;
-+			/* pin base, nr pins & gpio function */
-+			pinctrl-single,gpio-range = <&range 0 6 0>;
-+
-+			sdcard_pmx_func: sdcard_pmx_func {
-+				pinctrl-single,pins = <
-+					0x000 MUX_M1 /* SD_CLK */
-+					0x004 MUX_M1 /* SD_CMD */
-+					0x008 MUX_M1 /* SD_DATA0 */
-+					0x00c MUX_M1 /* SD_DATA1 */
-+					0x010 MUX_M1 /* SD_DATA2 */
-+					0x014 MUX_M1 /* SD_DATA3 */
-+				>;
-+			};
-+		};
-+
-+		/* [IOMG_FIX_000, IOMG_FIX_011] */
-+		pmx2: pinmux at ff3b6000 {
-+			compatible = "pinctrl-single";
-+			reg = <0x0 0xff3b6000 0x0 0x30>;
-+			#pinctrl-cells = <1>;
-+			#gpio-range-cells = <0x3>;
-+			pinctrl-single,register-width = <0x20>;
-+			pinctrl-single,function-mask = <0x7>;
-+			/* pin base, nr pins & gpio function */
-+			pinctrl-single,gpio-range = <&range 0 12 0>;
-+
-+			spi3_pmx_func: spi3_pmx_func {
-+				pinctrl-single,pins = <
-+					0x008 MUX_M1 /* SPI3_CLK */
-+					0x00c MUX_M1 /* SPI3_DI */
-+					0x010 MUX_M1 /* SPI3_DO */
-+					0x014 MUX_M1 /* SPI3_CS0_N */
-+				>;
-+			};
-+		};
-+
-+		/* [IOMG_MMC1_000, IOMG_MMC1_005] */
-+		pmx3: pinmux at ff3fd000 {
-+			compatible = "pinctrl-single";
-+			reg = <0x0 0xff3fd000 0x0 0x18>;
-+			#pinctrl-cells = <1>;
-+			#gpio-range-cells = <0x3>;
-+			pinctrl-single,register-width = <0x20>;
-+			pinctrl-single,function-mask = <0x7>;
-+			/* pin base, nr pins & gpio function */
-+			pinctrl-single,gpio-range = <&range 0 6 0>;
-+
-+			sdio_pmx_func: sdio_pmx_func {
-+				pinctrl-single,pins = <
-+					0x000 MUX_M1 /* SDIO_CLK */
-+					0x004 MUX_M1 /* SDIO_CMD */
-+					0x008 MUX_M1 /* SDIO_DATA0 */
-+					0x00c MUX_M1 /* SDIO_DATA1 */
-+					0x010 MUX_M1 /* SDIO_DATA2 */
-+					0x014 MUX_M1 /* SDIO_DATA3 */
-+				>;
-+			};
-+		};
-+
-+		/* [IOMG_AO_000, IOMG_AO_041] */
-+		pmx4: pinmux at fff11000 {
-+			compatible = "pinctrl-single";
-+			reg = <0x0 0xfff11000 0x0 0xa8>;
-+			#pinctrl-cells = <1>;
-+			#gpio-range-cells = <0x3>;
-+			pinctrl-single,register-width = <0x20>;
-+			pinctrl-single,function-mask = <0x7>;
-+			/* pin base in node, nr pins & gpio function */
-+			pinctrl-single,gpio-range = <&range 0 42 0>;
-+
-+			i2s2_pmx_func: i2s2_pmx_func {
-+				pinctrl-single,pins = <
-+					0x044 MUX_M1 /* I2S2_DI */
-+					0x048 MUX_M1 /* I2S2_DO */
-+					0x04c MUX_M1 /* I2S2_XCLK */
-+					0x050 MUX_M1 /* I2S2_XFS */
-+				>;
-+			};
-+
-+			slimbus_pmx_func: slimbus_pmx_func {
-+				pinctrl-single,pins = <
-+					0x02c MUX_M1 /* SLIMBUS_CLK */
-+					0x030 MUX_M1 /* SLIMBUS_DATA */
-+				>;
-+			};
-+
-+			i2c0_pmx_func: i2c0_pmx_func {
-+				pinctrl-single,pins = <
-+					0x014 MUX_M1 /* I2C0_SCL */
-+					0x018 MUX_M1 /* I2C0_SDA */
-+				>;
-+			};
-+
-+			i2c1_pmx_func: i2c1_pmx_func {
-+				pinctrl-single,pins = <
-+					0x01c MUX_M1 /* I2C1_SCL */
-+					0x020 MUX_M1 /* I2C1_SDA */
-+				>;
-+			};
-+
-+			i2c2_pmx_func: i2c2_pmx_func {
-+				pinctrl-single,pins = <
-+					0x024 MUX_M1 /* I2C2_SCL */
-+					0x028 MUX_M1 /* I2C2_SDA */
-+				>;
-+			};
-+
-+			i2c7_pmx_func: i2c7_pmx_func {
-+				pinctrl-single,pins = <
-+					0x024 MUX_M3 /* I2C7_SCL */
-+					0x028 MUX_M3 /* I2C7_SDA */
-+				>;
-+			};
-+
-+			spi2_pmx_func: spi2_pmx_func {
-+				pinctrl-single,pins = <
-+					0x08c MUX_M1 /* SPI2_CLK */
-+					0x090 MUX_M1 /* SPI2_DI */
-+					0x094 MUX_M1 /* SPI2_DO */
-+					0x098 MUX_M1 /* SPI2_CS0_N */
-+				>;
-+			};
-+
-+			spi4_pmx_func: spi4_pmx_func {
-+				pinctrl-single,pins = <
-+					0x08c MUX_M4 /* SPI4_CLK */
-+					0x090 MUX_M4 /* SPI4_DI */
-+					0x094 MUX_M4 /* SPI4_DO */
-+					0x098 MUX_M4 /* SPI4_CS0_N */
-+				>;
-+			};
-+
-+			i2s0_pmx_func: i2s0_pmx_func {
-+				pinctrl-single,pins = <
-+					0x034 MUX_M1 /* I2S0_DI */
-+					0x038 MUX_M1 /* I2S0_DO */
-+					0x03c MUX_M1 /* I2S0_XCLK */
-+					0x040 MUX_M1 /* I2S0_XFS */
-+				>;
-+			};
-+		};
-+	};
-+};
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+index faceee6..369210a 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
+@@ -64,6 +64,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+ {
+ 	struct s5p_mfc_dev *dev = ctx->dev;
+ 	unsigned int mb_width, mb_height;
++	unsigned int lcu_width = 0, lcu_height = 0;
+ 	int ret;
+ 
+ 	mb_width = MB_WIDTH(ctx->img_width);
+@@ -74,7 +75,9 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+ 			  ctx->luma_size, ctx->chroma_size, ctx->mv_size);
+ 		mfc_debug(2, "Totals bufs: %d\n", ctx->total_dpb_count);
+ 	} else if (ctx->type == MFCINST_ENCODER) {
+-		if (IS_MFCV8_PLUS(dev))
++		if (IS_MFCV10(dev)) {
++			ctx->tmv_buffer_size = 0;
++		} else if (IS_MFCV8_PLUS(dev))
+ 			ctx->tmv_buffer_size = S5P_FIMV_NUM_TMV_BUFFERS_V6 *
+ 			ALIGN(S5P_FIMV_TMV_BUFFER_SIZE_V8(mb_width, mb_height),
+ 			S5P_FIMV_TMV_BUFFER_ALIGN_V6);
+@@ -82,13 +85,36 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+ 			ctx->tmv_buffer_size = S5P_FIMV_NUM_TMV_BUFFERS_V6 *
+ 			ALIGN(S5P_FIMV_TMV_BUFFER_SIZE_V6(mb_width, mb_height),
+ 			S5P_FIMV_TMV_BUFFER_ALIGN_V6);
+-
+-		ctx->luma_dpb_size = ALIGN((mb_width * mb_height) *
+-				S5P_FIMV_LUMA_MB_TO_PIXEL_V6,
+-				S5P_FIMV_LUMA_DPB_BUFFER_ALIGN_V6);
+-		ctx->chroma_dpb_size = ALIGN((mb_width * mb_height) *
+-				S5P_FIMV_CHROMA_MB_TO_PIXEL_V6,
+-				S5P_FIMV_CHROMA_DPB_BUFFER_ALIGN_V6);
++		if (IS_MFCV10(dev)) {
++			lcu_width = enc_lcu_width(ctx->img_width);
++			lcu_height = enc_lcu_height(ctx->img_height);
++			if (ctx->codec_mode != S5P_FIMV_CODEC_HEVC_ENC) {
++				ctx->luma_dpb_size =
++					ALIGN((((mb_width * 16) + 63) / 64)
++						* 64 * (((mb_height * 16) + 31)
++						/ 32) * 32 + 64, 64);
++				ctx->chroma_dpb_size =
++					ALIGN((((mb_width * 16) + 63) / 64)
++							* 64 * (mb_height * 8)
++							+ 64, 64);
++			} else {
++				ctx->luma_dpb_size =
++					ALIGN((((lcu_width * 32) + 63) / 64)
++						* 64 * (((lcu_height * 32) + 31)
++						/ 32) * 32 + 64, 64);
++				ctx->chroma_dpb_size =
++					ALIGN((((lcu_width * 32) + 63) / 64)
++							* 64 * (lcu_height * 16)
++							+ 64, 64);
++			}
++		} else {
++			ctx->luma_dpb_size = ALIGN((mb_width * mb_height) *
++					S5P_FIMV_LUMA_MB_TO_PIXEL_V6,
++					S5P_FIMV_LUMA_DPB_BUFFER_ALIGN_V6);
++			ctx->chroma_dpb_size = ALIGN((mb_width * mb_height) *
++					S5P_FIMV_CHROMA_MB_TO_PIXEL_V6,
++					S5P_FIMV_CHROMA_DPB_BUFFER_ALIGN_V6);
++		}
+ 		if (IS_MFCV8_PLUS(dev))
+ 			ctx->me_buffer_size = ALIGN(S5P_FIMV_ME_BUFFER_SIZE_V8(
+ 						ctx->img_width, ctx->img_height,
+@@ -197,6 +223,8 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+ 	case S5P_MFC_CODEC_H264_ENC:
+ 		if (IS_MFCV10(dev)) {
+ 			mfc_debug(2, "Use min scratch buffer size\n");
++			ctx->me_buffer_size =
++			ALIGN(ENC_V100_H264_ME_SIZE(mb_width, mb_height), 16);
+ 		} else if (IS_MFCV8_PLUS(dev))
+ 			ctx->scratch_buf_size =
+ 				S5P_FIMV_SCRATCH_BUF_SIZE_H264_ENC_V8(
+@@ -219,6 +247,9 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+ 	case S5P_MFC_CODEC_H263_ENC:
+ 		if (IS_MFCV10(dev)) {
+ 			mfc_debug(2, "Use min scratch buffer size\n");
++			ctx->me_buffer_size =
++				ALIGN(ENC_V100_MPEG4_ME_SIZE(mb_width,
++							mb_height), 16);
+ 		} else
+ 			ctx->scratch_buf_size =
+ 				S5P_FIMV_SCRATCH_BUF_SIZE_MPEG4_ENC_V6(
+@@ -235,7 +266,10 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
+ 	case S5P_MFC_CODEC_VP8_ENC:
+ 		if (IS_MFCV10(dev)) {
+ 			mfc_debug(2, "Use min scratch buffer size\n");
+-			} else if (IS_MFCV8_PLUS(dev))
++			ctx->me_buffer_size =
++				ALIGN(ENC_V100_VP8_ME_SIZE(mb_width, mb_height),
++						16);
++		} else if (IS_MFCV8_PLUS(dev))
+ 			ctx->scratch_buf_size =
+ 				S5P_FIMV_SCRATCH_BUF_SIZE_VP8_ENC_V8(
+ 					mb_width,
+@@ -395,13 +429,15 @@ static void s5p_mfc_dec_calc_dpb_size_v6(struct s5p_mfc_ctx *ctx)
+ 
+ 	if (ctx->codec_mode == S5P_MFC_CODEC_H264_DEC ||
+ 			ctx->codec_mode == S5P_MFC_CODEC_H264_MVC_DEC) {
+-		if (IS_MFCV10(dev))
++		if (IS_MFCV10(dev)) {
+ 			ctx->mv_size = S5P_MFC_DEC_MV_SIZE_V10(ctx->img_width,
+ 					ctx->img_height);
+-		else
++			ctx->mv_size = ALIGN(ctx->mv_size, 32);
++		} else {
+ 			ctx->mv_size = S5P_MFC_DEC_MV_SIZE_V6(ctx->img_width,
+ 					ctx->img_height);
+-		ctx->mv_size = ALIGN(ctx->mv_size, 16);
++			ctx->mv_size = ALIGN(ctx->mv_size, 16);
++		}
+ 	} else {
+ 		ctx->mv_size = 0;
+ 	}
+@@ -607,15 +643,34 @@ static int s5p_mfc_set_enc_ref_buffer_v6(struct s5p_mfc_ctx *ctx)
+ 
+ 	mfc_debug(2, "Buf1: %p (%d)\n", (void *)buf_addr1, buf_size1);
+ 
+-	for (i = 0; i < ctx->pb_count; i++) {
+-		writel(buf_addr1, mfc_regs->e_luma_dpb + (4 * i));
+-		buf_addr1 += ctx->luma_dpb_size;
+-		writel(buf_addr1, mfc_regs->e_chroma_dpb + (4 * i));
+-		buf_addr1 += ctx->chroma_dpb_size;
+-		writel(buf_addr1, mfc_regs->e_me_buffer + (4 * i));
+-		buf_addr1 += ctx->me_buffer_size;
+-		buf_size1 -= (ctx->luma_dpb_size + ctx->chroma_dpb_size +
+-			ctx->me_buffer_size);
++	if (IS_MFCV10(dev)) {
++		/* start address of per buffer is aligned */
++		for (i = 0; i < ctx->pb_count; i++) {
++			writel(buf_addr1, mfc_regs->e_luma_dpb + (4 * i));
++			buf_addr1 += ctx->luma_dpb_size;
++			buf_size1 -= ctx->luma_dpb_size;
++		}
++		for (i = 0; i < ctx->pb_count; i++) {
++			writel(buf_addr1, mfc_regs->e_chroma_dpb + (4 * i));
++			buf_addr1 += ctx->chroma_dpb_size;
++			buf_size1 -= ctx->chroma_dpb_size;
++		}
++		for (i = 0; i < ctx->pb_count; i++) {
++			writel(buf_addr1, mfc_regs->e_me_buffer + (4 * i));
++			buf_addr1 += ctx->me_buffer_size;
++			buf_size1 -= ctx->me_buffer_size;
++		}
++	} else {
++		for (i = 0; i < ctx->pb_count; i++) {
++			writel(buf_addr1, mfc_regs->e_luma_dpb + (4 * i));
++			buf_addr1 += ctx->luma_dpb_size;
++			writel(buf_addr1, mfc_regs->e_chroma_dpb + (4 * i));
++			buf_addr1 += ctx->chroma_dpb_size;
++			writel(buf_addr1, mfc_regs->e_me_buffer + (4 * i));
++			buf_addr1 += ctx->me_buffer_size;
++			buf_size1 -= (ctx->luma_dpb_size + ctx->chroma_dpb_size
++					+ ctx->me_buffer_size);
++		}
+ 	}
+ 
+ 	writel(buf_addr1, mfc_regs->e_scratch_buffer_addr);
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h
+index fcc2368..2b5a9f4 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h
+@@ -26,6 +26,8 @@
+ 					(((MB_HEIGHT(y)+1)/2)*2) * 64 + 128)
+ #define S5P_MFC_DEC_MV_SIZE_V10(x, y)	(MB_WIDTH(x) * \
+ 					(((MB_HEIGHT(y)+1)/2)*2) * 64 + 512)
++#define enc_lcu_width(x_size)          ((x_size + 31) / 32)
++#define enc_lcu_height(y_size)         ((y_size + 31) / 32)
+ 
+ /* Definition */
+ #define ENC_MULTI_SLICE_MB_MAX		((1 << 30) - 1)
 -- 
-2.11.0-rc2
+1.7.2.3
