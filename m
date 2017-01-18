@@ -1,19 +1,27 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 17 Jan 2017 17:06:54 -0800
-Subject: [PATCH 1/2] ARM: BCM5301X: Add DT for Luxul XAP-1410
-In-Reply-To: <1484447368-7622-1-git-send-email-dhaab@luxul.com>
-References: <1484447368-7622-1-git-send-email-dhaab@luxul.com>
-Message-ID: <526a01c1-cde8-5119-567a-22c71b9071f8@gmail.com>
+Date: Tue, 17 Jan 2017 17:11:32 -0800
+Subject: [GIT PULL] bcm2835-dt-next-2017-01-17
+In-Reply-To: <20170117101043.28802-1-eric@anholt.net>
+References: <20170117101043.28802-1-eric@anholt.net>
+Message-ID: <8e0c3d8e-c264-a832-b400-5a0502757559@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/14/2017 06:29 PM, Dan Haab wrote:
-> Luxul XAP-1410 in a dual-band access point device based on BCM47081 with
-> serial flash. It has 3 LEDs and just one (reset) button.
+On 01/17/2017 02:10 AM, Eric Anholt wrote:
+>   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
 > 
-> Signed-off-by: Dan Haab <dhaab@luxul.com>
-> ---
+> are available in the git repository at:
+> 
+>   https://github.com/anholt/linux tags/bcm2835-dt-next-2017-01-17
+> 
+> for you to fetch changes up to 38742ca2b8b21bfc2a2cc24278b58485ff781644:
+> 
+>   ARM: bcm/dt: Enable the VEC IP on all RaspberryPi boards (2017-01-16 21:50:26 +1100)
+> 
+> ----------------------------------------------------------------
+> This pull request brings in the DT changes for VEC (TV-out) on
+> Raspberry Pi.
 
-Applied, thanks
+Merged, thanks Eric!
 -- 
 Florian
