@@ -1,40 +1,56 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 18 Jan 2017 22:13:15 +0000
-Subject: [PATCH 3/4] ARM: nommu: display vectors base
-In-Reply-To: <20170118203837.6536-1-afzal.mohd.ma@gmail.com>
-References: <20170118203525.6246-1-afzal.mohd.ma@gmail.com>
- <20170118203837.6536-1-afzal.mohd.ma@gmail.com>
-Message-ID: <20170118221315.GP27312@n2100.armlinux.org.uk>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 18 Jan 2017 14:18:39 -0800
+Subject: [PATCH 1/2] ARM64: dts: meson-gxm: Add R-Box Pro
+In-Reply-To: <63fbfc68-917f-68b2-9e7d-e1834e2841d3@suse.de> ("Andreas
+ =?utf-8?Q?F=C3=A4rber=22's?= message of "Tue, 17 Jan 2017 04:35:10 +0100")
+References: <20170117030611.23827-1-afaerber@suse.de>
+ <20170117030611.23827-2-afaerber@suse.de>
+ <63fbfc68-917f-68b2-9e7d-e1834e2841d3@suse.de>
+Message-ID: <m27f5sypts.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 02:08:37AM +0530, afzal mohammed wrote:
-> The exception base address is now dynamically estimated for no-MMU
-> case, display it.
-> 
-> Signed-off-by: afzal mohammed <afzal.mohd.ma@gmail.com>
-> ---
->  arch/arm/mm/init.c | 5 +++++
->  arch/arm/mm/mm.h   | 5 +++--
->  2 files changed, 8 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index cf47f86f79ed..9e11f255c3bf 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -522,7 +522,12 @@ void __init mem_init(void)
->  			"      .data : 0x%p" " - 0x%p" "   (%4td kB)\n"
->  			"       .bss : 0x%p" " - 0x%p" "   (%4td kB)\n",
->  
-> +#ifdef CONFIG_MMU
->  			MLK(UL(VECTORS_BASE), UL(VECTORS_BASE) + (PAGE_SIZE)),
-> +#else
-> +			MLK_ROUNDUP(vectors_base, vectors_base + PAGE_SIZE),
+Andreas F?rber <afaerber@suse.de> writes:
 
-I think MLK() will do here - no need to use the rounding-up version
-as PAGE_SIZE is a multiple of 1k.
+> Am 17.01.2017 um 04:06 schrieb Andreas F?rber:
+>> +	leds {
+>> +		compatible = "gpio-leds";
+>> +
+>> +		blue {
+>> +			label = "rbox-pro:blue:on";
+>> +			gpios = <&gpio_ao GPIOAO_9 GPIO_ACTIVE_HIGH>;
+>> +			default-state = "on";
+>> +		};
+>> +
+>> +		red {
+>> +			label = "rbox-pro:red:standby";
+>> +			gpios = <&gpio GPIODV_28 GPIO_ACTIVE_HIGH>;
+>> +			default-state = "off";
+>> +			retain-state-suspended;
+>> +			panic-indicator;
+>> +		};
+>> +	};
+>
+> The original property names for these two were led and red. If anyone
+> has better label names than the above, please speak up. Ditto for
+> vega-s95. On the odroidc2 it's called alive but uses heartbeat there.
+>
+> The vendor device tree had a third "mcu" GPIO in the sysled node,
+> GPIOAO_6, which leads to immediate power-off. I tried using
+> "gpio-poweroff" to configure this pin, but that driver fails to
+> initialize because some pm callback is already registered - I assume
+> from psci, which apparently succeeds to power-off the system, too. For
+> comparison, the S905 based Vega S95 Telos has no such mcu property. Any
+> thoughts?
+>
+> Also, any ideas how best to switch from blue to red for suspend? Add
+> pinctrl properties above? systemd service doing echo from userspace? I
+> assume in Android the Amlogic sysled driver handles all that logic -
+> didn't find any suspend equivalent to gpio-poweroff.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+in leds-gpio, when retain-state-suspended is not set, the LED is
+automatically set to value 0.  I wonder if leds-gpio should grow support
+to make the suspend value configurable?  Or a property like
+"toggle-state-suspended" ?
+
+Kevin
