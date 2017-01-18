@@ -1,36 +1,37 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 18 Jan 2017 12:12:51 +0000
-Subject: [PATCH 2/3] arm64: dts: juno: Add ETR SMMU power domain
-In-Reply-To: <74595d6d866518db7cfabc39b4cf9b54d3be9bde.1484741104.git.robin.murphy@arm.com>
-References: <74595d6d866518db7cfabc39b4cf9b54d3be9bde.1484741104.git.robin.murphy@arm.com>
-Message-ID: <55add42885c182648ff466254176e43e66137597.1484741104.git.robin.murphy@arm.com>
+Date: Wed, 18 Jan 2017 12:12:50 +0000
+Subject: [PATCH 1/3] arm64: dts: juno: Add dma-ranges property
+Message-ID: <74595d6d866518db7cfabc39b4cf9b54d3be9bde.1484741104.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is not at all clear from the documentation, but straightforward to
-determine in practice, that the ETR SMMU is actually in the DEBUGSYS
-power domain. Add that to the DT so that anyone brave enough to enable
-said SMMU doesn't experience a system lockup on boot, especially a
-sneaky one which goes away as soon as you connect an external debugger
-to have a look at where it's stuck (thus powering up DEBUGSYS by other
-means and allowing it to make progress again before actually halting...)
+The interconnects around Juno have a 40-bit address width, and DMA
+masters have no restrictions beyond their own individual limitations.
+Describe this to ensure that DT-based DMA masks get set up correctly
+for all devices capable of 40-bit addressing.
 
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
+
+These apply on top of Sudeep's for-next/updates/juno branch, which
+supercedes the .dtsi cleanup I had locally to make this one work.
+
+Robin.
+
  arch/arm64/boot/dts/arm/juno-base.dtsi | 1 +
  1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-index 5e7640d6ec69..37225dfdc995 100644
+index 44db27776b9d..5e7640d6ec69 100644
 --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
 +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-@@ -52,6 +52,7 @@
- 		#iommu-cells = <1>;
- 		#global-interrupts = <1>;
- 		dma-coherent;
-+		power-domains = <&scpi_devpd 0>;
- 		status = "disabled";
- 	};
+@@ -4,6 +4,7 @@
+ 	/*
+ 	 *  Devices shared by all Juno boards
+ 	 */
++	dma-ranges = <0 0 0 0 0x100 0>;
  
+ 	memtimer: timer at 2a810000 {
+ 		compatible = "arm,armv7-timer-mem";
 -- 
 2.11.0.dirty
