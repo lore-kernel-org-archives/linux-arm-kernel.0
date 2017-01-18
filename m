@@ -1,89 +1,74 @@
 From: roy.pledge@nxp.com (Roy Pledge)
-Date: Wed, 18 Jan 2017 17:39:35 -0500
-Subject: [PATCH 05/10] soc/qbman: Rework ioremap() calls for ARM/PPC
+Date: Wed, 18 Jan 2017 17:39:32 -0500
+Subject: [PATCH 02/10] soc/qbman: Drop set/clear_bits usage
 In-Reply-To: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
 References: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
-Message-ID: <1484779180-1344-6-git-send-email-roy.pledge@nxp.com>
+Message-ID: <1484779180-1344-3-git-send-email-roy.pledge@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rework ioremap() for PPC and ARM. The PPC devices require a
-non-coherent mapping while ARM will work with a non-cachable/write
-combine mapping.
+From: Madalin Bucur <madalin.bucur@nxp.com>
 
+Replace PPC specific set/clear_bits API with standard
+bit twiddling so driver is portalable outside PPC.
+
+Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
+Signed-off-by: Claudiu Manoil <claudiu.manoil@nxp.com>
 Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
 ---
- drivers/soc/fsl/qbman/bman_portal.c |   16 +++++++++++++---
- drivers/soc/fsl/qbman/qman_portal.c |   16 +++++++++++++---
- 2 files changed, 26 insertions(+), 6 deletions(-)
+ drivers/soc/fsl/qbman/bman.c |    2 +-
+ drivers/soc/fsl/qbman/qman.c |    8 ++++----
+ 2 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/soc/fsl/qbman/bman_portal.c b/drivers/soc/fsl/qbman/bman_portal.c
-index 8354d4d..a661f30 100644
---- a/drivers/soc/fsl/qbman/bman_portal.c
-+++ b/drivers/soc/fsl/qbman/bman_portal.c
-@@ -125,7 +125,18 @@ static int bman_portal_probe(struct platform_device *pdev)
- 	}
- 	pcfg->irq = irq;
+diff --git a/drivers/soc/fsl/qbman/bman.c b/drivers/soc/fsl/qbman/bman.c
+index a3d6d7c..3acded1 100644
+--- a/drivers/soc/fsl/qbman/bman.c
++++ b/drivers/soc/fsl/qbman/bman.c
+@@ -607,7 +607,7 @@ int bman_p_irqsource_add(struct bman_portal *p, u32 bits)
+ 	unsigned long irqflags;
  
--	va = ioremap_prot(addr_phys[0]->start, resource_size(addr_phys[0]), 0);
-+#ifdef CONFIG_PPC
-+	/* PPC requires a cacheable/non-coherent mapping of the portal */
-+	va = ioremap_prot(addr_phys[0]->start, resource_size(addr_phys[0]),
-+			  (pgprot_val(PAGE_KERNEL) & ~_PAGE_COHERENT));
-+#else
-+	/*
-+	 * For ARM we can use write combine mapping.  A cacheable/non shareable
-+	 * mapping will perform better but equires additional platform
-+	 * support which is not currently available
-+	 */
-+	va = ioremap_wc(addr_phys[0]->start, resource_size(addr_phys[0]));
-+#endif
- 	if (!va) {
- 		dev_err(dev, "ioremap::CE failed\n");
- 		goto err_ioremap1;
-@@ -133,8 +144,7 @@ static int bman_portal_probe(struct platform_device *pdev)
+ 	local_irq_save(irqflags);
+-	set_bits(bits & BM_PIRQ_VISIBLE, &p->irq_sources);
++	p->irq_sources |= bits & BM_PIRQ_VISIBLE;
+ 	bm_out(&p->p, BM_REG_IER, p->irq_sources);
+ 	local_irq_restore(irqflags);
+ 	return 0;
+diff --git a/drivers/soc/fsl/qbman/qman.c b/drivers/soc/fsl/qbman/qman.c
+index 6f509f6..879e8f2 100644
+--- a/drivers/soc/fsl/qbman/qman.c
++++ b/drivers/soc/fsl/qbman/qman.c
+@@ -909,12 +909,12 @@ static inline int qm_mc_result_timeout(struct qm_portal *portal,
  
- 	pcfg->addr_virt[DPAA_PORTAL_CE] = va;
+ static inline void fq_set(struct qman_fq *fq, u32 mask)
+ {
+-	set_bits(mask, &fq->flags);
++	fq->flags |= mask;
+ }
  
--	va = ioremap_prot(addr_phys[1]->start, resource_size(addr_phys[1]),
--			  _PAGE_GUARDED | _PAGE_NO_CACHE);
-+	va = ioremap(addr_phys[1]->start, resource_size(addr_phys[1]));
- 	if (!va) {
- 		dev_err(dev, "ioremap::CI failed\n");
- 		goto err_ioremap2;
-diff --git a/drivers/soc/fsl/qbman/qman_portal.c b/drivers/soc/fsl/qbman/qman_portal.c
-index adbaa30..e7a9eef 100644
---- a/drivers/soc/fsl/qbman/qman_portal.c
-+++ b/drivers/soc/fsl/qbman/qman_portal.c
-@@ -265,7 +265,18 @@ static int qman_portal_probe(struct platform_device *pdev)
- 	}
- 	pcfg->irq = irq;
+ static inline void fq_clear(struct qman_fq *fq, u32 mask)
+ {
+-	clear_bits(mask, &fq->flags);
++	fq->flags &= ~mask;
+ }
  
--	va = ioremap_prot(addr_phys[0]->start, resource_size(addr_phys[0]), 0);
-+#ifdef CONFIG_PPC
-+	/* PPC requires a cacheable/non-coherent mapping of the portal */
-+	va = ioremap_prot(addr_phys[0]->start, resource_size(addr_phys[0]),
-+			  (pgprot_val(PAGE_KERNEL) & ~_PAGE_COHERENT));
-+#else
-+	/*
-+	 * For ARM we can use write combine mapping.  A cacheable/non shareable
-+	 * mapping will perform better but equires additional platform
-+	 * support which is not currently available
-+	 */
-+	va = ioremap_wc(addr_phys[0]->start, resource_size(addr_phys[0]));
-+#endif
- 	if (!va) {
- 		dev_err(dev, "ioremap::CE failed\n");
- 		goto err_ioremap1;
-@@ -273,8 +284,7 @@ static int qman_portal_probe(struct platform_device *pdev)
+ static inline int fq_isset(struct qman_fq *fq, u32 mask)
+@@ -1561,7 +1561,7 @@ void qman_p_irqsource_add(struct qman_portal *p, u32 bits)
+ 	unsigned long irqflags;
  
- 	pcfg->addr_virt[DPAA_PORTAL_CE] = va;
- 
--	va = ioremap_prot(addr_phys[1]->start, resource_size(addr_phys[1]),
--			  _PAGE_GUARDED | _PAGE_NO_CACHE);
-+	va = ioremap(addr_phys[1]->start, resource_size(addr_phys[1]));
- 	if (!va) {
- 		dev_err(dev, "ioremap::CI failed\n");
- 		goto err_ioremap2;
+ 	local_irq_save(irqflags);
+-	set_bits(bits & QM_PIRQ_VISIBLE, &p->irq_sources);
++	p->irq_sources |= bits & QM_PIRQ_VISIBLE;
+ 	qm_out(&p->p, QM_REG_IER, p->irq_sources);
+ 	local_irq_restore(irqflags);
+ }
+@@ -1584,7 +1584,7 @@ void qman_p_irqsource_remove(struct qman_portal *p, u32 bits)
+ 	 */
+ 	local_irq_save(irqflags);
+ 	bits &= QM_PIRQ_VISIBLE;
+-	clear_bits(bits, &p->irq_sources);
++	p->irq_sources &= ~bits;
+ 	qm_out(&p->p, QM_REG_IER, p->irq_sources);
+ 	ier = qm_in(&p->p, QM_REG_IER);
+ 	/*
 -- 
 1.7.9.5
