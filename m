@@ -1,106 +1,29 @@
-From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Wed, 18 Jan 2017 08:46:04 +0530
-Subject: [PATCH v2 1/2] arm64: dts: exynos: Add USB 3.0 controller node for
- Exynos7
-In-Reply-To: <20170117182318.fvatrazvyuzmdsor@kozik-lap>
-References: <1484665444-23365-1-git-send-email-pankaj.dubey@samsung.com>
- <CGME20170117150121epcas1p102bd1355f780a56e14a0a7a81bd6dfaf@epcas1p1.samsung.com>
- <1484665444-23365-2-git-send-email-pankaj.dubey@samsung.com>
- <20170117182318.fvatrazvyuzmdsor@kozik-lap>
-Message-ID: <9f45a921-ebfb-c252-20bb-3a7adf508343@samsung.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 18 Jan 2017 08:44:55 +0530
+Subject: [PATCH v4 1/4] PM / OPP: Expose _of_get_opp_desc_node as
+ dev_pm_opp API
+In-Reply-To: <20170117131808.29798-2-d-gerlach@ti.com>
+References: <20170117131808.29798-1-d-gerlach@ti.com>
+ <20170117131808.29798-2-d-gerlach@ti.com>
+Message-ID: <20170118031455.GA11478@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Tuesday 17 January 2017 11:53 PM, Krzysztof Kozlowski wrote:
-> On Tue, Jan 17, 2017 at 08:34:03PM +0530, Pankaj Dubey wrote:
->> From: Vivek Gautam <gautamvivek1987@gmail.com>
->>
->> Add USB 3.0 DRD controller device node, with its clock
->> and phy information to enable the same on Exynos7.
->>
->> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
->> Signed-off-by: Vivek Gautam <gautamvivek1987@gmail.com>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+On 17-01-17, 07:18, Dave Gerlach wrote:
+> Rename _of_get_opp_desc_node to dev_pm_opp_of_get_opp_desc_node and add it
+> to include/linux/pm_opp.h to allow other drivers, such as platform OPP
+> and cpufreq drivers, to make use of it.
 > 
-> Javier's Reviewed-by should be at the end.
-> 
+> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+> ---
+> v3->v4:
+> 	Export dev_pm_opp_of_get_opp_desc_node for use in modules.
+> 	
+>  drivers/base/power/opp/of.c | 9 +++++----
+>  include/linux/pm_opp.h      | 6 ++++++
+>  2 files changed, 11 insertions(+), 4 deletions(-)
 
-OK, will update.
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
->> ---
->>  arch/arm64/boot/dts/exynos/exynos7.dtsi | 34 +++++++++++++++++++++++++++++++++
->>  1 file changed, 34 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/exynos/exynos7.dtsi b/arch/arm64/boot/dts/exynos/exynos7.dtsi
->> index 9080a11..a2d8d11 100644
->> --- a/arch/arm64/boot/dts/exynos/exynos7.dtsi
->> +++ b/arch/arm64/boot/dts/exynos/exynos7.dtsi
->> @@ -603,6 +603,40 @@
->>  				#include "exynos7-trip-points.dtsi"
->>  			};
->>  		};
->> +
->> +		usbdrd_phy: phy at 15500000 {
->> +			compatible = "samsung,exynos7-usbdrd-phy";
->> +			reg = <0x15500000 0x100>;
->> +			clocks = <&clock_fsys0 ACLK_USBDRD300>,
->> +			       <&clock_fsys0 OSCCLK_PHY_CLKOUT_USB30_PHY>,
->> +			       <&clock_fsys0 PHYCLK_USBDRD300_UDRD30_PIPE_PCLK_USER>,
->> +			       <&clock_fsys0 PHYCLK_USBDRD300_UDRD30_PHYCLK_USER>,
->> +			       <&clock_fsys0 SCLK_USBDRD300_REFCLK>;
->> +			clock-names = "phy", "ref", "phy_pipe",
->> +				"phy_utmi", "itp";
->> +			samsung,pmu-syscon = <&pmu_system_controller>;
->> +			#phy-cells = <1>;
->> +		};
->> +
->> +		usbdrd3: usb at 15400000 {
->> +			compatible = "samsung,exynos7-dwusb3";
->> +			clocks = <&clock_fsys0 ACLK_USBDRD300>,
->> +			       <&clock_fsys0 SCLK_USBDRD300_SUSPENDCLK>,
->> +			       <&clock_fsys0 ACLK_AXIUS_USBDRD30X_FSYS0X>;
->> +			clock-names = "usbdrd30", "usbdrd30_susp_clk",
->> +				"usbdrd30_axius_clk";
->> +			#address-cells = <1>;
->> +			#size-cells = <1>;
->> +			ranges;
->> +
->> +			dwc3 {
-> 
-> dtc should complain here - you need:
-> 	dwc3 at 15400000
-
-No, it didn't complain. Anyway, I will update as it's already taken care
-in other Exynos SoC DTSi files.
-
-> In the same time I think the address node does not have to be put after
-> parent's usb.
-> 
-
-OK, will update.
-
-
-Thanks,
-Pankaj Dubey
-
-> Best regards,
-> Krzysztof
-> 
->> +				compatible = "snps,dwc3";
->> +				reg = <0x15400000 0x10000>;
->> +				interrupts = <GIC_SPI 223 IRQ_TYPE_LEVEL_HIGH>;
->> +				phys = <&usbdrd_phy 0>, <&usbdrd_phy 1>;
->> +				phy-names = "usb2-phy", "usb3-phy";
->> +			};
->> +		};
->>  	};
->>  };
->>  
->> -- 
->> 2.7.4
->>
-> 
-> 
-> 
+-- 
+viresh
