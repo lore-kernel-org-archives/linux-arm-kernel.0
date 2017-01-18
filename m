@@ -1,68 +1,59 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Wed, 18 Jan 2017 11:21:11 +0530
-Subject: [RFC PATCH] initramfs: finish fput() before accessing any binary
- from initramfs
-In-Reply-To: <35e88dbe-f269-2558-c3b7-9ba228a70504@ti.com>
-References: <20170117111456.2269-1-lokeshvutla@ti.com>
- <35e88dbe-f269-2558-c3b7-9ba228a70504@ti.com>
-Message-ID: <92bbc86b-77b8-7b06-5009-a885831c19d5@ti.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Wed, 18 Jan 2017 14:08:22 +0800
+Subject: [PATCH 1/6] usb: mtu3: get resources that cause deferred probe earlier
+Message-ID: <1484719707-12107-1-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Some resources such as regulator, clock usually cause deferred
+probe, get them earlier to avoid more ineffective processing.
 
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+ drivers/usb/mtu3/mtu3_plat.c |   24 ++++++++++++------------
+ 1 file changed, 12 insertions(+), 12 deletions(-)
 
-On Tuesday 17 January 2017 06:23 PM, Tero Kristo wrote:
-> On 17/01/17 13:14, Lokesh Vutla wrote:
->> commit 4a9d4b024a31 ("switch fput to task_work_add") implements a
->> schedule_work() for completing fput(), but did not guarantee calling
->> __fput() after unpacking initramfs. Because of this, there is a
->> possibility that during boot a driver can see ETXTBSY when it tries
->> to load a binary from initramfs as fput() is still pending on that
->> binary. This patch makes sure that fput() is completed after unpacking
->> initramfs.
-> 
-> Good find there.
-> 
->>
->> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
->> ---
->>
->> - Reproduced on TI K2HK EVM. K2HK Queue Manager subsystem driver[1] tries
->> to load a firmware from initramfs during boot. Sometimes loading of this
->> firmware fails with error ETXTBSY. Digging a bit more observed that
->> deny_write_access() is returning ETXTBSY as inode->i_writecount is > 0
->> for that file. This is because Unpacking initramfs does a
->> get_write_access(from open) but hasn't done put_write_access(from fput)
->> as it hasn't been scheduled yet.
->>
->> [1]
->> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/soc/ti/knav_qmss_queue.c
->>
->>
->>  init/initramfs.c | 2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/init/initramfs.c b/init/initramfs.c
->> index b32ad7d97ac9..c42c69b48a4b 100644
->> --- a/init/initramfs.c
->> +++ b/init/initramfs.c
->> @@ -18,6 +18,7 @@
->>  #include <linux/dirent.h>
->>  #include <linux/syscalls.h>
->>  #include <linux/utime.h>
->> +#include <linux/file.h>
->>
->>  static ssize_t __init xwrite(int fd, const char *p, size_t count)
->>  {
->> @@ -652,6 +653,7 @@ static int __init populate_rootfs(void)
->>           * us a chance to load before device_initcalls.
->>           */
->>          load_default_modules();
->> +        flush_delayed_fput();
-> 
-> Shouldn't the flush be called before the load_default_modules() though?
-
-Good point. Will wait for sometime for more comments and then repost it.
-
-Thanks and regards,
-Lokesh
+diff --git a/drivers/usb/mtu3/mtu3_plat.c b/drivers/usb/mtu3/mtu3_plat.c
+index 7833678..6344859 100644
+--- a/drivers/usb/mtu3/mtu3_plat.c
++++ b/drivers/usb/mtu3/mtu3_plat.c
+@@ -204,6 +204,18 @@ static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
+ 	int i;
+ 	int ret;
+ 
++	ssusb->vusb33 = devm_regulator_get(&pdev->dev, "vusb33");
++	if (IS_ERR(ssusb->vusb33)) {
++		dev_err(dev, "failed to get vusb33\n");
++		return PTR_ERR(ssusb->vusb33);
++	}
++
++	ssusb->sys_clk = devm_clk_get(dev, "sys_ck");
++	if (IS_ERR(ssusb->sys_clk)) {
++		dev_err(dev, "failed to get sys clock\n");
++		return PTR_ERR(ssusb->sys_clk);
++	}
++
+ 	ssusb->num_phys = of_count_phandle_with_args(node,
+ 			"phys", "#phy-cells");
+ 	if (ssusb->num_phys > 0) {
+@@ -230,18 +242,6 @@ static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
+ 		return PTR_ERR(ssusb->ippc_base);
+ 	}
+ 
+-	ssusb->vusb33 = devm_regulator_get(&pdev->dev, "vusb33");
+-	if (IS_ERR(ssusb->vusb33)) {
+-		dev_err(dev, "failed to get vusb33\n");
+-		return PTR_ERR(ssusb->vusb33);
+-	}
+-
+-	ssusb->sys_clk = devm_clk_get(dev, "sys_ck");
+-	if (IS_ERR(ssusb->sys_clk)) {
+-		dev_err(dev, "failed to get sys clock\n");
+-		return PTR_ERR(ssusb->sys_clk);
+-	}
+-
+ 	ssusb->dr_mode = usb_get_dr_mode(dev);
+ 	if (ssusb->dr_mode == USB_DR_MODE_UNKNOWN) {
+ 		dev_err(dev, "dr_mode is error\n");
+-- 
+1.7.9.5
