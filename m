@@ -1,32 +1,61 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Wed, 18 Jan 2017 08:39:16 -0800
-Subject: [PATCH 2/2] ARM: DTS: Fix register map for virt-capable GIC
-In-Reply-To: <1484736811-24002-3-git-send-email-marc.zyngier@arm.com>
-References: <1484736811-24002-1-git-send-email-marc.zyngier@arm.com>
- <1484736811-24002-3-git-send-email-marc.zyngier@arm.com>
-Message-ID: <2cfdd977-5ee9-a66a-acaf-8a4213bdbc37@oracle.com>
+From: agustinv@codeaurora.org (Agustin Vega-Frias)
+Date: Wed, 18 Jan 2017 11:46:25 -0500
+Subject: [PATCH V10 0/3] irqchip: qcom: Add IRQ combiner driver
+Message-ID: <1484757988-23739-1-git-send-email-agustinv@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/18/2017 2:53 AM, Marc Zyngier wrote:
-> Since everybody copied my own mistake from the DT binding example,
-> let's address all the offenders in one swift go.
->
-> Most of them got the CPU interface size wrong (4kB, while it should
-> be 8kB), except for both keystone platforms which got the control
-> interface wrong (4kB instead of 8kB).
->
-> In the couple of cases were I knew for sure what implementation
-> was used, I've added the "arm,gic-400" compatible string. I'm 99%
-> sure that this is what everyong is using, but short of having the
-> TRM for all the other SoCs, I've let them alone.
->
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
+Add support for IRQ combiners in the Top-level Control and Status
+Registers (TCSR) hardware block in Qualcomm Technologies chips.
 
->  arch/arm/boot/dts/imx6ul.dtsi        | 4 ++--
->  arch/arm/boot/dts/keystone-k2g.dtsi  | 2 +-
->  arch/arm/boot/dts/keystone.dtsi      | 2 +-
+The first patch prevents the ACPI core from attempting to map IRQ resources
+with a valid ResourceSource as GSIs.
 
-For keystone bits,
-Acked-by: Santosh Shilimkar <ssantosh@kernel.org>
+The second patch adds support for ResourceSource/IRQ domain mapping and
+fixes IRQ probe deferral by allowing platform_device IRQ resources to be
+re-initialized from the corresponding ACPI IRQ resource.
+
+Both changes described above are conditional on the ACPI_GENERIC_GSI config.
+
+The third patch takes advantage of the new capabilities to implement
+the driver for the IRQ combiners.
+
+Tested on top of v4.10-rc4.
+
+Changes V9 -> V10:
+* Add checks for the producer_consumer field to not use produced IRQ
+  resources as consumed.
+* Minor bug fixes in the driver.
+
+Changes V8 -> V9:
+* Do not attempt the mapping for non-GSI IRQs during bus scan.
+* Make some public APIs private to drivers/acpi/irq.c since they are no
+  longer used on other modules.
+
+Changes V7 -> V8:
+* Reorder patches to allow all new code to be under drivers/acpi/irq.c.
+* Change acpi_irq_get implementation to be more similar to of_irq_get
+  to improve maintainability.
+
+Agustin Vega-Frias (3):
+  ACPI: Generic GSI: Do not attempt to map non-GSI IRQs during bus scan
+  ACPI: Add support for ResourceSource/IRQ domain mapping
+  irqchip: qcom: Add IRQ combiner driver
+
+ drivers/acpi/Makefile               |   2 +-
+ drivers/acpi/gsi.c                  |  98 -----------
+ drivers/acpi/irq.c                  | 282 +++++++++++++++++++++++++++++++
+ drivers/acpi/resource.c             |  18 +-
+ drivers/base/platform.c             |   9 +-
+ drivers/irqchip/Kconfig             |   9 +
+ drivers/irqchip/Makefile            |   1 +
+ drivers/irqchip/qcom-irq-combiner.c | 319 ++++++++++++++++++++++++++++++++++++
+ include/linux/acpi.h                |  10 ++
+ 9 files changed, 647 insertions(+), 101 deletions(-)
+ delete mode 100644 drivers/acpi/gsi.c
+ create mode 100644 drivers/acpi/irq.c
+ create mode 100644 drivers/irqchip/qcom-irq-combiner.c
+
+--
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
