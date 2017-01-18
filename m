@@ -1,96 +1,62 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 18 Jan 2017 15:35:09 +0000
-Subject: Initializing MAC address at run-time
-In-Reply-To: <20170118144528.GH3231@leverpostej>
-References: <e083ed68-0e8e-380e-23bd-5ad387c88575@free.fr>
- <20170118144528.GH3231@leverpostej>
-Message-ID: <f902209c-268b-5abe-4527-c8d0e56bce79@arm.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 18 Jan 2017 12:50:13 -0300
+Subject: [PATCH v3] arm64: dts: exynos: Remove unneeded unit names in
+ Exynos5433 nodes
+Message-ID: <1484754613-2425-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/01/17 14:45, Mark Rutland wrote:
-> On Wed, Jan 18, 2017 at 03:03:57PM +0100, Mason wrote:
->> Hello,
->>
->> When my system boots up, eth0 is given a seemingly random MAC address.
->>
->> [    0.950734] nb8800 26000.ethernet eth0: MAC address ba:de:d6:38:b8:38
->> [    0.957334] nb8800 26000.ethernet eth0: MAC address 6e:f1:48:de:d6:c4
->>
->>
->> The DT node for eth0 is:
->>
->> 	eth0: ethernet at 26000 {
->> 		compatible = "sigma,smp8734-ethernet";
->> 		reg = <0x26000 0x800>;
->> 		interrupts = <38 IRQ_TYPE_LEVEL_HIGH>;
->> 		clocks = <&clkgen SYS_CLK>;
->> 	};
->>
->> Documentation/devicetree/bindings/net/ethernet.txt mentions
->> - local-mac-address: array of 6 bytes, specifies the MAC address that was
->>   assigned to the network device;
->>
->> And indeed, if I define this property, eth0 ends up with the MAC address
->> I specify in the device tree. But of course, I don't want all my boards
->> to share the same MAC address. Every interface has a unique MAC address.
->>
->> In fact, the boot loader (not Uboot, a custom non-DT boot loader) stores
->> the MAC address somewhere in MMIO space, in some weird custom format.
->>
->> So, at init, I can find the MAC address, and dynamically insert the
->> "local-mac-address" property in the eth0 node.
-> 
-> To me it sounds very convoluted to do this from the kernel, to pass
-> information back to itself. I don't think this is the best way to handle
-> this.
-> 
->> Is there another (better) way to do this?
->>
->> I'll post my code below, for illustration purpose.
->>
->> Mark suggested this can be done from user-space, but I can't do that,
->> because I'm using an NFS rootfs, so I need the network before I even
->> have a user-space. And the DHCP server is configured to serve different
->> root filesystems, based on the MAC address.
-> 
-> That's not quite what I said. I asked whether your information was
-> coming from userspace or from a kernel driver.
-> 
-> My suggestion was that this should be done in the probe path somehow,
-> by describing the relationship between the ethernet controller and the
-> device containing the MAC information.
-> 
-> e.g. on the ethernet device, have a phandle (and perhaps some other
-> args) describinng the device containing the MAC, and how to extract it.
-> 
-> That way, in the ethernet probe path we can go and look up the MAC
-> address from the provider of that information.
+The "samsung,exynos5433-mipi-video-phy" and "samsung,exynos5250-dwusb3"
+DT bindings don't specify a reg property for these nodes, so having a
+unit name leads to the following DTC warnings:
 
-See Documentation/devicetree/bindings/mfd/syscon.txt and
-bindings/drivers with syscon dependencies. Essentially, you would use a
-syscon node to describe "somewhere in MMIO space", then your ethernet
-driver probe routine simply grabs the regmap, pulls out the MAC and goes
-from there.
+Node /soc/video-phy at 105c0710 has a unit name, but no reg property
+Node /soc/usb at 15400000 has a unit name, but no reg property
+Node /soc/usb at 15a00000 has a unit name, but no reg property
 
-Be warned that the above represents the totality of my technical
-knowledge on the subject ;) My experience is in hacking up DTs for
-drivers which already use this mechanism, rather than in implementing it.
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-Robin.
+---
 
->> I need to do something similar with the NAND partitions. The boot loader
->> stores the partition offsets somewhere, and I need to pass this info
->> to the NAND framework, so I assumed that inserting the corresponding
->> properties at run-time was the correct way to do it.
-> 
-> I would say similar could happen here.
-> 
-> Thanks,
-> Mark.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+Changes in v3:
+  - Use proper device node names, suggested by Krzysztof.
+
+Changes in v2:
+  - Fix subject line since I forgot the "exynos" prefix.
+
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+index 59788d89b686..57c7bbeb65a7 100644
+--- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
+@@ -706,7 +706,7 @@
+ 			interrupts = <GIC_PPI 9 0xf04>;
+ 		};
+ 
+-		mipi_phy: video-phy at 105c0710 {
++		mipi_phy: video-phy {
+ 			compatible = "samsung,exynos5433-mipi-video-phy";
+ 			#phy-cells = <1>;
+ 			samsung,pmu-syscon = <&pmu_system_controller>;
+@@ -1357,7 +1357,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		usbdrd30: usb at 15400000  {
++		usbdrd30: usbdrd {
+ 			compatible = "samsung,exynos5250-dwusb3";
+ 			clocks = <&cmu_fsys CLK_ACLK_USBDRD30>,
+ 				<&cmu_fsys CLK_SCLK_USBDRD30>;
+@@ -1404,7 +1404,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		usbhost30: usb at 15a00000 {
++		usbhost30: usbhost {
+ 			compatible = "samsung,exynos5250-dwusb3";
+ 			clocks = <&cmu_fsys CLK_ACLK_USBHOST30>,
+ 				<&cmu_fsys CLK_SCLK_USBHOST30>;
+-- 
+2.7.4
