@@ -1,32 +1,83 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Thu, 19 Jan 2017 11:04:22 -0800
-Subject: [PATCH v3 0/4] ARM: K2G: Add support for TI-SCI Generic PM Domains
-In-Reply-To: <7e87e4cd-d859-b941-8cb8-118a8b0d2690@ti.com>
-References: <20170104205536.15963-1-d-gerlach@ti.com>
- <6fc7a6cb-1856-1377-b00c-8166dbb23ea2@oracle.com>
- <bf9286b1-379d-1cc8-4eae-d268540dd2a6@ti.com>
- <25026532-fe4d-8215-9249-c5c7efcd8242@oracle.com>
- <7e87e4cd-d859-b941-8cb8-118a8b0d2690@ti.com>
-Message-ID: <23ba602e-390b-80af-a63f-e0da7aebd2ef@oracle.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 19 Jan 2017 11:05:36 -0800
+Subject: [GIT PULL] Allwinner conversion to generic pin properties
+In-Reply-To: <20170119183558.jjdpobsaedtqywjk@lukather>
+References: <20161226074214.sd53ozm6hvzkdb26@lukather>
+ <20170110032120.GJ22261@localhost>
+ <20170119183558.jjdpobsaedtqywjk@lukather>
+Message-ID: <CAOesGMiqc0XGxbdEn=N-5n5C0iKmPB8V-UWqjgLFyvnfhH8WYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/19/2017 10:59 AM, Dave Gerlach wrote:
-> Santosh,
-> On 01/19/2017 11:51 AM, santosh.shilimkar at oracle.com wrote:
->> On 1/4/17 2:06 PM, Dave Gerlach wrote:
-
-[...]
-
->> Am going to send pull request over weekend, so if you would like
->> me take the series via arm-soc tree, please get Rafaels, ack and
->> let me know.
+On Thu, Jan 19, 2017 at 10:35 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Olof,
 >
-> Thanks for letting me know, unfortunately we have not yet reached
-> alignment on the binding so I do not believe we will be ready for merge
-> in time.
+> On Mon, Jan 09, 2017 at 07:21:20PM -0800, Olof Johansson wrote:
+>> On Mon, Dec 26, 2016 at 08:42:14AM +0100, Maxime Ripard wrote:
+>> > Hi Arnd, Olof,
+>> >
+>> > Like we discussed it last time, here is a pull request with the
+>> > convertion patches to the generic pin properties for 4.10.
+>> >
+>> > Thanks,
+>> > Maxime
+>> >
+>> > The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+>> >
+>> >   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+>> >
+>> > are available in the git repository at:
+>> >
+>> >   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-generic-pinconf-for-4.10
+>> >
+>> > for you to fetch changes up to 1edcd36fcb48fe841bcc62eda36c105037d9583c:
+>> >
+>> >   ARM: sunxi: Convert pinctrl nodes to generic bindings (2016-12-26 08:27:11 +0100)
+>> >
+>> > ----------------------------------------------------------------
+>> > Allwinner conversion to generic pin muxing properties
+>> >
+>> > Here is a list of patches that converts the current DT to the generic pin
+>> > control and muxing properties, now that the pinctrl driver supports it.
+>>
+>> I dropped the ball on this over the holidays for a few reasons, none of them
+>> good. Unfortunately we're at -rc3+ now, so I've queued this up in next/dt for
+>> v4.11 at this point. Hope that's alright.
+>>
+>> You might want to use your branch as a base for new DT contents for
+>> v4.11 in case it ends up being conflict-heavy, which would work fine at our
+>> end.
 >
-Thanks for clarification.
+> We might have conflicts with this unfortunately.
+>
+> It turns out that we fixed an issue where the pinctrl driver in 4.10
+> is now honoring the case where we list our pull-ups as disabled, while
+> it used to be ignored (which was the bug).
+>
+> However, some boards were listing improperly in their DT that their
+> pull-ups were disabled, while they actually needed it, which means
+> that now the driver will disable them, and things get broken (mostly
+> MMC for now, but I expect other devices to be broken too).
+>
+> We have two ways of fixing this.
+>
+> Option 1 is applying a patch that will enable the pull ups on the MMC
+> devices (because it's ok to do so) that was queued with 4.11 and will
+> conflict heavily with this PR.
+>
+> The other option would be to queue the two first patches of that PR as
+> fixes that will reintroduce the previous behaviour (or at least, the
+> one the boards expects). I'm guessing in that case, the merge will
+> just work (since it's the exact same commits anyway), and we fix all
+> the devices and not just MMC. This has not been confirmed to work at
+> the moment though, but should be very soon.
 
-Regards,
-Santosh
+Isn't the third and easiest option to revert back the old behavior on
+the pinctrl driver for 4.10? Sounds like that could (possibly) be just
+a one-line change somewhere?
+
+Then, for 4.11, bring it back once the DT contents is fixed up.
+
+
+-Olof
