@@ -1,35 +1,95 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Thu, 19 Jan 2017 14:29:46 +0100
-Subject: [PATCH v4 12/14] ARM: dts: da850: add the SATA node
+Date: Thu, 19 Jan 2017 14:29:43 +0100
+Subject: [PATCH v4 09/14] sata: ahci: export ahci_do_hardreset() locally
 In-Reply-To: <1484832588-18413-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1484832588-18413-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1484832588-18413-13-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1484832588-18413-10-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the SATA node to the da850 device tree.
+We need a way to retrieve the information about the online state of
+the link in the ahci-da850 driver.
+
+Create a new function: ahci_do_hardreset() which is called from
+ahci_hardreset() for backwards compatibility, but has an additional
+argument: 'online' - which can be used to check if the link is online
+after this function returns.
+
+The new routine will be used in the ahci-da850 driver to avoid code
+duplication when implementing a workaround for tha da850 SATA
+controller quirk/instability.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/boot/dts/da850.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/ata/ahci.h    |  3 +++
+ drivers/ata/libahci.c | 18 +++++++++++++-----
+ 2 files changed, 16 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 104155d..e9bf30e 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -403,6 +403,12 @@
- 			phy-names = "usb-phy";
- 			status = "disabled";
- 		};
-+		sata: ahci at 218000 {
-+			compatible = "ti,da850-ahci";
-+			reg = <0x218000 0x2000>, <0x22c018 0x4>;
-+			interrupts = <67>;
-+			status = "disabled";
-+		};
- 		mdio: mdio at 224000 {
- 			compatible = "ti,davinci_mdio";
- 			#address-cells = <1>;
+diff --git a/drivers/ata/ahci.h b/drivers/ata/ahci.h
+index 0cc08f8..5db6ab2 100644
+--- a/drivers/ata/ahci.h
++++ b/drivers/ata/ahci.h
+@@ -398,6 +398,9 @@ int ahci_do_softreset(struct ata_link *link, unsigned int *class,
+ 		      int pmp, unsigned long deadline,
+ 		      int (*check_ready)(struct ata_link *link));
+ 
++int ahci_do_hardreset(struct ata_link *link, unsigned int *class,
++		      unsigned long deadline, bool *online);
++
+ unsigned int ahci_qc_issue(struct ata_queued_cmd *qc);
+ int ahci_stop_engine(struct ata_port *ap);
+ void ahci_start_fis_rx(struct ata_port *ap);
+diff --git a/drivers/ata/libahci.c b/drivers/ata/libahci.c
+index ee7db31..3159f9e 100644
+--- a/drivers/ata/libahci.c
++++ b/drivers/ata/libahci.c
+@@ -1519,8 +1519,8 @@ static int ahci_pmp_retry_softreset(struct ata_link *link, unsigned int *class,
+ 	return rc;
+ }
+ 
+-static int ahci_hardreset(struct ata_link *link, unsigned int *class,
+-			  unsigned long deadline)
++int ahci_do_hardreset(struct ata_link *link, unsigned int *class,
++		      unsigned long deadline, bool *online)
+ {
+ 	const unsigned long *timing = sata_ehc_deb_timing(&link->eh_context);
+ 	struct ata_port *ap = link->ap;
+@@ -1528,7 +1528,6 @@ static int ahci_hardreset(struct ata_link *link, unsigned int *class,
+ 	struct ahci_host_priv *hpriv = ap->host->private_data;
+ 	u8 *d2h_fis = pp->rx_fis + RX_FIS_D2H_REG;
+ 	struct ata_taskfile tf;
+-	bool online;
+ 	int rc;
+ 
+ 	DPRINTK("ENTER\n");
+@@ -1540,17 +1539,26 @@ static int ahci_hardreset(struct ata_link *link, unsigned int *class,
+ 	tf.command = ATA_BUSY;
+ 	ata_tf_to_fis(&tf, 0, 0, d2h_fis);
+ 
+-	rc = sata_link_hardreset(link, timing, deadline, &online,
++	rc = sata_link_hardreset(link, timing, deadline, online,
+ 				 ahci_check_ready);
+ 
+ 	hpriv->start_engine(ap);
+ 
+-	if (online)
++	if (*online)
+ 		*class = ahci_dev_classify(ap);
+ 
+ 	DPRINTK("EXIT, rc=%d, class=%u\n", rc, *class);
+ 	return rc;
+ }
++EXPORT_SYMBOL_GPL(ahci_do_hardreset);
++
++static int ahci_hardreset(struct ata_link *link, unsigned int *class,
++			  unsigned long deadline)
++{
++	bool online;
++
++	return ahci_do_hardreset(link, class, deadline, &online);
++}
+ 
+ static void ahci_postreset(struct ata_link *link, unsigned int *class)
+ {
 -- 
 2.9.3
