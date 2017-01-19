@@ -1,108 +1,96 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 19 Jan 2017 17:52:07 +0100
-Subject: [PATCH 3/3] PCI: imx6: Add code to support i.MX7D
-In-Reply-To: <20170119163631.10668-4-andrew.smirnov@gmail.com>
-References: <20170119163631.10668-1-andrew.smirnov@gmail.com>
- <20170119163631.10668-4-andrew.smirnov@gmail.com>
-Message-ID: <1484844727.24339.50.camel@pengutronix.de>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 19 Jan 2017 16:51:55 +0000
+Subject: [PATCH net-next v3 06/10] net: dsa: Migrate to device_find_class()
+In-Reply-To: <20170119145315.GD21805@lunn.ch>
+References: <20170114214713.28109-1-f.fainelli@gmail.com>
+ <20170114214713.28109-7-f.fainelli@gmail.com>
+ <20170115110628.GF26374@kroah.com>
+ <fc247aeb-a8d6-5ba9-c26d-cb057a5ac34d@gmail.com>
+ <20170115173949.GA19268@kroah.com>
+ <a9ea1f45-b9a5-d840-68e0-9bf9bc7a6598@gmail.com>
+ <20170115191632.GD5643@lunn.ch>
+ <912e6143-c67a-d909-2a6c-939de79efc5d@gmail.com>
+ <20170119142820.GA494@kroah.com> <20170119145315.GD21805@lunn.ch>
+Message-ID: <20170119165155.GH27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 19.01.2017, 08:36 -0800 schrieb Andrey Smirnov:
-> Add various bits of code needed to support i.MX7D variant of the IP.
-> 
-> Cc: yurovsky at gmail.com
-> Cc: Richard Zhu <hongxing.zhu@nxp.com>
-> Cc: Lucas Stach <l.stach@pengutronix.de>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Fabio Estevam <festevam@gmail.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-> ---
->  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |   6 +-
->  drivers/pci/host/pci-imx6.c                        | 188 ++++++++++++++++++---
->  include/linux/mfd/syscon/imx7-gpc.h                |  18 ++
->  include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
->  include/linux/mfd/syscon/imx7-src.h                |  18 ++
->  5 files changed, 208 insertions(+), 26 deletions(-)
->  create mode 100644 include/linux/mfd/syscon/imx7-gpc.h
->  create mode 100644 include/linux/mfd/syscon/imx7-src.h
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> index 83aeb1f..20b9382 100644
-> --- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> +++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
-> @@ -4,7 +4,8 @@ This PCIe host controller is based on the Synopsis Designware PCIe IP
->  and thus inherits all the common properties defined in designware-pcie.txt.
->  
->  Required properties:
-> -- compatible: "fsl,imx6q-pcie", "fsl,imx6sx-pcie", "fsl,imx6qp-pcie"
-> +- compatible: "fsl,imx6q-pcie", "fsl,imx6sx-pcie",
-> +  	      "fsl,imx6qp-pcie", "fsl,imx7d-pcie"
->  - reg: base address and length of the PCIe controller
->  - interrupts: A list of interrupt outputs of the controller. Must contain an
->    entry for each entry in the interrupt-names property.
-> @@ -34,6 +35,9 @@ Additional required properties for imx6sx-pcie:
->  - clock names: Must include the following additional entries:
->  	- "pcie_inbound_axi"
->  
-> +Additional required properties for imx7d-pcie:
-> +- pcie-phy-supply: Should specify the regulator supplying PCIe PHY
-> +
-This isn't a PHY regulator, but a regulator powering the GPC domain
-where the PHY is located. This should not be handled in the PCIe driver.
-See the previous discussion with i.MX6SX, that is in the same boat.
+(This is mainly for Greg's benefit to help him understand the issue.)
 
-[...]
->  static void imx6_pcie_init_phy(struct imx6_pcie *imx6_pcie)
->  {
-> -	if (imx6_pcie->variant == IMX6SX)
-> +	switch (imx6_pcie->variant) {
-> +	case IMX7D: {
-> +		int ret;
-> +		unsigned int reg, mapping;
-> +		struct pcie_port *pp = &imx6_pcie->pp;
-> +		struct device *dev = pp->dev;
-> +
-> +		regulator_set_voltage(imx6_pcie->pcie_phy_regulator,
-> +				      1000000, 1000000);
-> +		ret = regulator_enable(imx6_pcie->pcie_phy_regulator);
-> +		if (ret) {
-> +			dev_err(dev, "failed to enable pcie regulator.\n");
-> +			return;
-> +		}
-> +
-> +		/*
-> +		 * Now that PHY regulator is enabled, do sofware
-> +		 * power-up request by mapping PHY in A7 domain and
-> +		 * setting power-up request bit
-> +		 */
-> +		regmap_read(imx6_pcie->gpc, GPC_PGC_CPU_MAPPING, &mapping);
-> +		regmap_write(imx6_pcie->gpc, GPC_PGC_CPU_MAPPING,
-> +			     mapping | IMX7D_PCIE_PHY_A7_DOMAIN);
-> +
-> +		regmap_update_bits(imx6_pcie->gpc, GPC_PU_PGC_SW_PUP_REQ,
-> +				   IMX7D_PCIE_PHY_SW_PUP_REQ,
-> +				   IMX7D_PCIE_PHY_SW_PUP_REQ);
-> +		/*
-> +		 * As per "5.5.9.4 Example Code 4" in IMX7DRM.pdf wait
-> +		 * for PUP_REQ bit to be cleared
-> +		 */
-> +		while (!regmap_read(imx6_pcie->gpc,
-> +				    GPC_PU_PGC_SW_PUP_REQ, &reg) &&
-> +		       reg & IMX7D_PCIE_PHY_SW_PUP_REQ)
-> +			;
-> +		regmap_write(imx6_pcie->gpc, GPC_PGC_CPU_MAPPING, mapping);
+I think the diagram you gave initially made this confusing, as it
+talks about a CPU(sic) producing the "RGMII" and "MII-MGMT".
 
-I won't allow code touching the GPC registers to sneak into the PCIe
-driver. I know this is the downstream solution, but this really needs a
-proper GPC power domain driver, instead of this hack.
+Let's instead show a better representation that hopefully helps Greg
+understand networking. :)
 
-Regards,
-Lucas
+
+  CPU
+System <-B->  Ethernet controller <-P-> } PHY <---> network cable
+                                        } - - - - - - - or - - - - - - -
+                  MDIO bus -------M---> } Switch <-P-> PHYs <--> network
+                                              `----M----^        cables
+
+'B' can be an on-SoC bus or something like PCI.
+
+'P' are the high-speed connectivity between the ethernet controller and
+PHY which carries the packet data.  It has no addressing, it's a point
+to point link.  RGMII is just one wiring example, there are many
+different interfaces there (SGMII, AUI, XAUI, XGMII to name a few.)
+
+'M' are the MDIO bus, which is the bus by which ethernet PHYs and
+switches can be identified and controlled.
+
+The MDIO bus has a bus_type, has host drivers which are sometimes
+part of the ethernet controller, but can also be stand-alone devices
+shared between multiple ethernet controllers.
+
+PHYs are a kind of MDIO device which are members of the MDIO bus
+type.  Each PHY (and switch) has a numerical address, and identifying
+numbers within its register set which identifies the manufacturer
+and device type.  We have device_driver objects for these.
+
+Expanding the above diagram to make it (hopefully) even clearer,
+we can have this classic setup:
+
+  CPU
+System <-B-> Ethernet controller <-P-> PHY <---> network cable
+                 MDIO bus -------M------^
+
+Or, in the case of two DSA switches attached to an Ethernet controller:
+
+                                     |~~~~~~~~|
+System <-B-> Ethernet controller <-P-> Switch <-P-> PHY1 <--> network cable
+                 MDIO bus ----+--M--->   1    <-P-> PHY2 <--> network cable
+                              |      |        ...    |
+                              |      |        <-P-> PHYn <--> network cable
+                              |      |....^...|      |
+                              |           |  `---M---'
+                              |           P
+                              |           |
+                              |      |~~~~v~~~|
+                              `------> Switch <-P-> PHY1 <--> network cable
+                                     |   2    ...    |
+                                     |        <-P-> PHYn <--> network cable
+                                     |........|      |
+                                             `---M---'
+
+The problem that the DSA guys are trying to deal with is how to
+represent the link between the DSA switches (which are devices
+sitting off their controlling bus - the MDIO bus) and the ethernet
+controller associated with that collection of devices, be it a
+switch or PHY.
+
+Merely changing the parent/child relationships to try and solve
+one issue just creates exactly the same problem elsewhere.
+
+So, I hope with these diagrams, you can see that trying to make
+the ethernet controller a child device of the DSA switches
+means that (eg) it's no longer a PCI device, which is rather
+absurd, especially when considering that what happens to the
+right of the ethernet controller in the diagrams above is
+normally external chips to the SoC or ethernet device.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
