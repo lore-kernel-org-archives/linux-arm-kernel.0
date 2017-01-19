@@ -1,44 +1,22 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 19 Jan 2017 21:35:16 +0800
-Subject: [PATCH v9 4/4] arm64: arch timer: Add timer erratum property for
- Hip05-d02 and Hip06-d03
-In-Reply-To: <1484832916-7248-1-git-send-email-dingtianhong@huawei.com>
-References: <1484832916-7248-1-git-send-email-dingtianhong@huawei.com>
-Message-ID: <1484832916-7248-5-git-send-email-dingtianhong@huawei.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 19 Jan 2017 14:31:44 +0100
+Subject: [PATCH v10 2/5] i2c: Add STM32F4 I2C driver
+In-Reply-To: <1484832316-5594-3-git-send-email-cedric.madianga@gmail.com>
+References: <1484832316-5594-1-git-send-email-cedric.madianga@gmail.com>
+ <1484832316-5594-3-git-send-email-cedric.madianga@gmail.com>
+Message-ID: <20170119133144.wrzj3uexho5cpw4k@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable workaround for hisilicon erratum 161010101 on Hip05-d02 and Hip06-d03 board.
+On Thu, Jan 19, 2017 at 02:25:13PM +0100, M'boumba Cedric Madianga wrote:
+> This patch adds support for the STM32F4 I2C controller.
+> 
+> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 
-Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
----
- arch/arm64/boot/dts/hisilicon/hip05.dtsi | 1 +
- arch/arm64/boot/dts/hisilicon/hip06.dtsi | 1 +
- 2 files changed, 2 insertions(+)
+Thanks
+Uwe
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hip05.dtsi b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
-index 4b472a3..6b76f3a 100644
---- a/arch/arm64/boot/dts/hisilicon/hip05.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
-@@ -281,6 +281,7 @@
- 			     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
- 			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
- 			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
-+		hisilicon,erratum-161010101;
- 	};
- 
- 	pmu {
-diff --git a/arch/arm64/boot/dts/hisilicon/hip06.dtsi b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
-index a049b64..cf8b9db 100644
---- a/arch/arm64/boot/dts/hisilicon/hip06.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
-@@ -260,6 +260,7 @@
- 			     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
- 			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
- 			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
-+		hisilicon,erratum-161010101;
- 	};
- 
- 	pmu {
 -- 
-1.9.0
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
