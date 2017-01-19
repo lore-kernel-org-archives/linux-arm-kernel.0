@@ -1,59 +1,134 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Thu, 19 Jan 2017 14:29:43 +0800
-Subject: [PATCH v6 23/25] usb: chipidea: Pullup D+ in device mode via phy
- APIs
-In-Reply-To: <CAL_JsqJw-nQj0LtLA_o_Upos_7Kg3bPDoCDghPyOEien_QCLSA@mail.gmail.com>
-References: <148418039309.32258.7247753739063801774@sboyd-linaro>
- <20170112095040.GA15726@b29397-desktop>
- <148426139182.20672.2422337338087784924@sboyd-linaro>
- <20170113033536.GA20723@b29397-desktop>
- <148433778067.32719.6179204976256776867@sboyd-linaro>
- <20170116034551.GA27364@b29397-desktop>
- <148467591341.23457.3638889856786813589@sboyd-linaro>
- <20170118073432.GA26659@b29397-desktop>
- <148477287318.29219.9447874002624055587@sboyd-linaro>
- <CAL_JsqJw-nQj0LtLA_o_Upos_7Kg3bPDoCDghPyOEien_QCLSA@mail.gmail.com>
-Message-ID: <20170119062943.GA10621@b29397-desktop>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 19 Jan 2017 08:43:55 +0000
+Subject: [PATCH v8 0/8] Add PWM and IIO timer drivers for STM32
+In-Reply-To: <1484749251-14445-1-git-send-email-benjamin.gaignard@st.com>
+References: <1484749251-14445-1-git-send-email-benjamin.gaignard@st.com>
+Message-ID: <20170119084355.GF3718@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2017 at 02:57:27PM -0600, Rob Herring wrote:
-> On Wed, Jan 18, 2017 at 2:54 PM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
-> > Quoting Peter Chen (2017-01-17 23:34:32)
-> >> On Tue, Jan 17, 2017 at 09:58:33AM -0800, Stephen Boyd wrote:
-> >> > Quoting Peter Chen (2017-01-15 19:45:51)
-> >> > >
-> >> > > At include/linux/usb/phy.h, we have .set_vbus interface, maybe you need
-> >> > > to port it to generic phy framework.
-> >> > >
-> >> >
-> >> > Ok. I'll look into that. Can the other patches in this series be picked
-> >> > up? Otherwise I can resend them all again once I fix the phy_set_mode()
-> >> > call location and introduce a new phy op.
-> >>
-> >> I can pick up chipidea patches after you test the patch I supplied at:
-> >>
-> >>         [PATCH v6 11/25] usb: chipidea: vbus event may exist before starting
-> >> gadget
-> >
-> > Ok. I've confirmed that this updated patch works fine for me. You can
-> > have my Tested-by and Reviewed-by there.
-> >
-> >>
-> >> You may ping other maintainers to pick up other patches.
-> >>
-> >
-> > I was hoping you could pick the beginning of the series up until the PHY
-> > drivers, which can go via Kishon's tree. That would mean applying the
-> > drivers/of/ part. Rob is that ok?
-> 
-> Peter, If there's a dependency then please take the patches I've
-> acked. That's why I acked them.
-> 
+On Wed, 18 Jan 2017, Benjamin Gaignard wrote:
 
-Ok, I will do it.
+> version 8:
+> - rebase on v4.10-rc4
+> - fix comments done by Thierry on PWM
+> - reword "reg" parameter description
+> - change kernel kernel in IIO ABI documentation
+> 
+> version 7:
+> - rebase on v4.10-rc2
+> - remove iio_device code from driver and keep only the trigger part
+> 
+> version 6:
+> - rename stm32-gptimer in stm32-timers.
+> - change "st,stm32-gptimer" compatible to "st,stm32-timers".
+> - modify "st,breakinput" parameter in pwm part.
+> - split DT patch in 2
+> 
+> version 5:
+> - fix comments done on version 4
+> - rebased on kernel 4.9-rc8
+> - change nodes names and re-order then by addresses
+> 
+> version 4:
+> - fix comments done on version 3
+> - don't use interrupts anymore in IIO timer
+> - detect hardware capabilities at probe time to simplify binding
+> 
+> version 3:
+> - no change on mfd and pwm divers patches
+> - add cross reference between bindings
+> - change compatible to "st,stm32-timer-trigger"
+> - fix attributes access rights
+> - use string instead of int for master_mode and slave_mode
+> - document device attributes in sysfs-bus-iio-timer-stm32
+> - update DT with the new compatible
+> 
+> version 2:
+> - keep only one compatible per driver
+> - use DT parameters to describe hardware block configuration:
+>   - pwm channels, complementary output, counter size, break input
+>   - triggers accepted and create by IIO timers
+> - change DT to limite use of reference to the node
+> - interrupt is now in IIO timer driver
+> - rename stm32-mfd-timer to stm32-timers (for general purpose timer)
+> 
+> The following patches enable PWM and IIO Timer features for STM32 platforms.
+> 
+> Those two features are mixed into the registers of the same hardware block
+> (named general purpose timer) which lead to introduce a multifunctions driver 
+> on the top of them to be able to share the registers.
+> 
+> In STM32f4 14 instances of timer hardware block exist, even if they all have
+> the same register mapping they could have a different number of pwm channels
+> and/or different triggers capabilities. We use various parameters in DT to 
+> describe the differences between hardware blocks
+> 
+> The MFD (stm32-timers.c) takes care of clock and register mapping
+> by using regmap. stm32_timers structure is provided to its sub-node to
+> share those information.
+> 
+> PWM driver is implemented into pwm-stm32.c. Depending of the instance we may
+> have up to 4 channels, sometime with complementary outputs or 32 bits counter
+> instead of 16 bits. Some hardware blocks may also have a break input function
+> which allows to stop pwm depending of a level, defined in devicetree, on an
+> external pin.
+> 
+> IIO timer driver (stm32-timer-trigger.c and stm32-timer-trigger.h) define a list
+> of hardware triggers usable by hardware blocks like ADC, DAC or other timers. 
+> 
+> The matrix of possible connections between blocks is quite complex so we use 
+> trigger names and is_stm32_iio_timer_trigger() function to be sure that
+> triggers are valid and configure the IPs.
+> 
+> At run time IIO timer hardware blocks can configure (through "master_mode" 
+> IIO device attribute) which internal signal (counter enable, reset,
+> comparison block, etc...) is used to generate the trigger.
+> 
+> Benjamin Gaignard (8):
+>   MFD: add bindings for STM32 Timers driver
+>   MFD: add STM32 Timers driver
+>   PWM: add pwm-stm32 DT bindings
+>   PWM: add PWM driver for STM32 plaftorm
+>   IIO: add bindings for STM32 timer trigger driver
+>   IIO: add STM32 timer trigger driver
+>   ARM: dts: stm32: add Timers driver for stm32f429 MCU
+>   ARM: dts: stm32: Enable pwm1 and pwm3 for stm32f469-disco
+> 
+>  .../ABI/testing/sysfs-bus-iio-timer-stm32          |  29 ++
+>  .../bindings/iio/timer/stm32-timer-trigger.txt     |  23 ++
+>  .../devicetree/bindings/mfd/stm32-timers.txt       |  46 +++
+>  .../devicetree/bindings/pwm/pwm-stm32.txt          |  35 ++
+>  arch/arm/boot/dts/stm32f429.dtsi                   | 275 ++++++++++++++
+>  arch/arm/boot/dts/stm32f469-disco.dts              |  28 ++
+>  drivers/iio/trigger/Kconfig                        |   9 +
+>  drivers/iio/trigger/Makefile                       |   1 +
+>  drivers/iio/trigger/stm32-timer-trigger.c          | 342 ++++++++++++++++++
+>  drivers/mfd/Kconfig                                |  11 +
+>  drivers/mfd/Makefile                               |   2 +
+>  drivers/mfd/stm32-timers.c                         |  80 +++++
+>  drivers/pwm/Kconfig                                |   9 +
+>  drivers/pwm/Makefile                               |   1 +
+>  drivers/pwm/pwm-stm32.c                            | 398 +++++++++++++++++++++
+>  include/linux/iio/timer/stm32-timer-trigger.h      |  62 ++++
+>  include/linux/mfd/stm32-timers.h                   |  71 ++++
+>  17 files changed, 1422 insertions(+)
+>  create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-timer-stm32
+>  create mode 100644 Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
+>  create mode 100644 Documentation/devicetree/bindings/mfd/stm32-timers.txt
+>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+>  create mode 100644 drivers/iio/trigger/stm32-timer-trigger.c
+>  create mode 100644 drivers/mfd/stm32-timers.c
+>  create mode 100644 drivers/pwm/pwm-stm32.c
+>  create mode 100644 include/linux/iio/timer/stm32-timer-trigger.h
+>  create mode 100644 include/linux/mfd/stm32-timers.h
+
+Let me know when you have all your Acks.
+
+I would be happy to take this through the MFD tree.
 
 -- 
-
-Best Regards,
-Peter Chen
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
