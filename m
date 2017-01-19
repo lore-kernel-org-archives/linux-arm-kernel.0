@@ -1,22 +1,28 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu, 19 Jan 2017 21:10:39 +0000
-Subject: [PATCHv4 3/5] pinctrl: mvebu: pinctrl driver for 98DX3236 SoC
-References: <20170113091222.7132-1-chris.packham@alliedtelesis.co.nz>
- <20170113091222.7132-4-chris.packham@alliedtelesis.co.nz>
- <20170119100244.GX27312@n2100.armlinux.org.uk>
-Message-ID: <c873040cba1a4d5aa15dbaf3c5cc44e0@svr-chch-ex1.atlnz.lc>
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Thu, 19 Jan 2017 13:23:53 -0800
+Subject: [PATCH v4 1/2] mailbox: Add driver for Broadcom FlexRM ring
+ manager
+In-Reply-To: <CAALAos8RVRenZXeLg6ARPqJNteHKQ2d0n9cnfFfsp2MV4sj3Bg@mail.gmail.com>
+References: <1483614475-3442-1-git-send-email-anup.patel@broadcom.com>
+ <1483614475-3442-2-git-send-email-anup.patel@broadcom.com>
+ <CAALAos8RVRenZXeLg6ARPqJNteHKQ2d0n9cnfFfsp2MV4sj3Bg@mail.gmail.com>
+Message-ID: <1fb39c44-3a8f-4df4-2654-ef10f01c927f@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/01/17 23:03, Russell King - ARM Linux wrote:
-> On Fri, Jan 13, 2017 at 10:12:18PM +1300, Chris Packham wrote:
->> +static struct mvebu_mpp_ctrl mv98dx3236_mpp_controls[] = {
->> +	MPP_FUNC_CTRL(0, 32, NULL, armada_xp_mpp_ctrl),
->> +};
+Hi Anup,
+
+On 17-01-18 07:15 PM, Anup Patel wrote:
+> Hi All,
 >
-> As Linus has taken my mvebu pinctrl series, this will need to be
-> changed to "mvebu_mmio_mpp_ctrl" rather than "armada_xp_mpp_ctrl"
-> when it's merged.
+> Any comments on this patch ??
+>
+> Regards,
+> Anup
 >
 
-OK I was thinking about rebasing my series so maybe it's time.
+Looks good to me.
+
+Jassi, can you pickup this patchset?
+
+Scott
