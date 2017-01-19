@@ -1,38 +1,66 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 19 Jan 2017 13:31:19 -0600
-Subject: [PATCH v8 5/8] IIO: add bindings for STM32 timer trigger driver
-In-Reply-To: <1484749251-14445-6-git-send-email-benjamin.gaignard@st.com>
+Date: Thu, 19 Jan 2017 13:35:25 -0600
+Subject: [PATCH v8 0/8] Add PWM and IIO timer drivers for STM32
+In-Reply-To: <CA+M3ks7UchJ3QdQrHO6rSsc4YNhNEmLejoeRBVNhn=2biSn=cQ@mail.gmail.com>
 References: <1484749251-14445-1-git-send-email-benjamin.gaignard@st.com>
- <1484749251-14445-6-git-send-email-benjamin.gaignard@st.com>
-Message-ID: <20170119193119.kejcwpqrqo735mxh@rob-hp-laptop>
+ <20170119084355.GF3718@dell>
+ <CA+M3ks7UchJ3QdQrHO6rSsc4YNhNEmLejoeRBVNhn=2biSn=cQ@mail.gmail.com>
+Message-ID: <20170119193525.jufn5vh4huap7umm@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2017 at 03:20:48PM +0100, Benjamin Gaignard wrote:
-> Define bindings for STM32 timer trigger
-> 
-> version 8:
-> - reword "reg" parameter description
-> 
-> version 4:
-> - remove triggers enumeration from DT
-> - add reg parameter
-> 
-> version 3:
-> - change file name
-> - add cross reference with mfd bindings
-> 
-> version 2:
-> - only keep one compatible
-> - add DT parameters to set lists of the triggers:
->   one list describe the triggers created by the device
->   another one give the triggers accepted by the device
-> 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> Acked-by: Jonathan Cameron <jic23@kernel.org>
-> ---
->  .../bindings/iio/timer/stm32-timer-trigger.txt     | 23 ++++++++++++++++++++++
->  1 file changed, 23 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
+On Thu, Jan 19, 2017 at 05:02:11PM +0100, Benjamin Gaignard wrote:
+> 2017-01-19 9:43 GMT+01:00 Lee Jones <lee.jones@linaro.org>:
+> > On Wed, 18 Jan 2017, Benjamin Gaignard wrote:
+> >
 
-Acked-by: Rob Herring <robh@kernel.org>
+> >> Benjamin Gaignard (8):
+> >>   MFD: add bindings for STM32 Timers driver
+> >>   MFD: add STM32 Timers driver
+> >>   PWM: add pwm-stm32 DT bindings
+> >>   PWM: add PWM driver for STM32 plaftorm
+> >>   IIO: add bindings for STM32 timer trigger driver
+> >>   IIO: add STM32 timer trigger driver
+> >>   ARM: dts: stm32: add Timers driver for stm32f429 MCU
+> >>   ARM: dts: stm32: Enable pwm1 and pwm3 for stm32f469-disco
+> >>
+> >>  .../ABI/testing/sysfs-bus-iio-timer-stm32          |  29 ++
+> >>  .../bindings/iio/timer/stm32-timer-trigger.txt     |  23 ++
+> >>  .../devicetree/bindings/mfd/stm32-timers.txt       |  46 +++
+> >>  .../devicetree/bindings/pwm/pwm-stm32.txt          |  35 ++
+> >>  arch/arm/boot/dts/stm32f429.dtsi                   | 275 ++++++++++++++
+> >>  arch/arm/boot/dts/stm32f469-disco.dts              |  28 ++
+> >>  drivers/iio/trigger/Kconfig                        |   9 +
+> >>  drivers/iio/trigger/Makefile                       |   1 +
+> >>  drivers/iio/trigger/stm32-timer-trigger.c          | 342 ++++++++++++++++++
+> >>  drivers/mfd/Kconfig                                |  11 +
+> >>  drivers/mfd/Makefile                               |   2 +
+> >>  drivers/mfd/stm32-timers.c                         |  80 +++++
+> >>  drivers/pwm/Kconfig                                |   9 +
+> >>  drivers/pwm/Makefile                               |   1 +
+> >>  drivers/pwm/pwm-stm32.c                            | 398 +++++++++++++++++++++
+> >>  include/linux/iio/timer/stm32-timer-trigger.h      |  62 ++++
+> >>  include/linux/mfd/stm32-timers.h                   |  71 ++++
+> >>  17 files changed, 1422 insertions(+)
+> >>  create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-timer-stm32
+> >>  create mode 100644 Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
+> >>  create mode 100644 Documentation/devicetree/bindings/mfd/stm32-timers.txt
+> >>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+> >>  create mode 100644 drivers/iio/trigger/stm32-timer-trigger.c
+> >>  create mode 100644 drivers/mfd/stm32-timers.c
+> >>  create mode 100644 drivers/pwm/pwm-stm32.c
+> >>  create mode 100644 include/linux/iio/timer/stm32-timer-trigger.h
+> >>  create mode 100644 include/linux/mfd/stm32-timers.h
+> >
+> > Let me know when you have all your Acks.
+> >
+> > I would be happy to take this through the MFD tree.
+> 
+> Some Acks are still missing on DT patches, I hope that Rob could find
+> to review them
+> after that it will ok :-)
+
+I've acked all the bindings. stm32 maintainer needs to ack the dts 
+files.
+
+Rob
