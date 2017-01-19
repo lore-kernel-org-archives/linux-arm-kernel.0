@@ -1,152 +1,72 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Thu, 19 Jan 2017 17:02:11 +0100
-Subject: [PATCH v8 0/8] Add PWM and IIO timer drivers for STM32
-In-Reply-To: <20170119084355.GF3718@dell>
-References: <1484749251-14445-1-git-send-email-benjamin.gaignard@st.com>
- <20170119084355.GF3718@dell>
-Message-ID: <CA+M3ks7UchJ3QdQrHO6rSsc4YNhNEmLejoeRBVNhn=2biSn=cQ@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 19 Jan 2017 17:02:39 +0100
+Subject: [PATCH 1/2] dt-bindings: gpu: Add Mali Utgard bindings
+In-Reply-To: <20170119155103.e6hctoqllfgypesm@lukather>
+References: <20170116132424.7038-1-maxime.ripard@free-electrons.com>
+ <20170116184906.r62di7xiil5lae33@kozik-lap>
+ <20170117093813.mxp2hgoxbgske6ru@lukather>
+ <4f5b8608-af6c-3ef5-aaf0-e7e034d006cd@baylibre.com>
+ <20170119155103.e6hctoqllfgypesm@lukather>
+Message-ID: <9b9f7542-9a13-9f76-502d-85abb1d45a80@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-01-19 9:43 GMT+01:00 Lee Jones <lee.jones@linaro.org>:
-> On Wed, 18 Jan 2017, Benjamin Gaignard wrote:
->
->> version 8:
->> - rebase on v4.10-rc4
->> - fix comments done by Thierry on PWM
->> - reword "reg" parameter description
->> - change kernel kernel in IIO ABI documentation
+On 01/19/2017 04:51 PM, Maxime Ripard wrote:
+> Hi Neil,
+> 
+> On Tue, Jan 17, 2017 at 11:22:22AM +0100, Neil Armstrong wrote:
+>> On 01/17/2017 10:38 AM, Maxime Ripard wrote:
+>>> Hi,
+>>>
+>>> On Mon, Jan 16, 2017 at 08:49:06PM +0200, Krzysztof Kozlowski wrote:
+>>>> On Mon, Jan 16, 2017 at 02:24:23PM +0100, Maxime Ripard wrote:
+>>>>> The ARM Mali Utgard GPU family is embedded into a number of SoCs from
+>>>>> Allwinner, Amlogic, Mediatek or Rockchip.
+>>>>>
+>>>>> Add a binding for the GPU of that family.
+>>>>>
+>>>>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>>>> ---
+>>>>>  .../devicetree/bindings/gpu/arm,mali-utgard.txt    | 76 ++++++++++++++++++++++
+>>>>>  1 file changed, 76 insertions(+)
+>>>>>  create mode 100644 Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
+>>>>
+>>>> Do you have a driver in kernel which will implement these bindings?
+>>>
+>>> No, but we have bindings for out-of-tree drivers already.
+>>>
+>>>> Defining them for out-of-tree driver does not bring any benefits
+>>>> (3rd party driver will not respect them anyway).
+>>>
+>>> You could see it the other way around too. The out-of-tree drivers
+>>> don't respect it at the moment because there's no binding to respect.
+>>>
+>>> And at least for us, we definitely plan on doing that.
+>>>
+>>> Maxime
 >>
->> version 7:
->> - rebase on v4.10-rc2
->> - remove iio_device code from driver and keep only the trigger part
+>> Hi Maxime, Krzysztof,
 >>
->> version 6:
->> - rename stm32-gptimer in stm32-timers.
->> - change "st,stm32-gptimer" compatible to "st,stm32-timers".
->> - modify "st,breakinput" parameter in pwm part.
->> - split DT patch in 2
->>
->> version 5:
->> - fix comments done on version 4
->> - rebased on kernel 4.9-rc8
->> - change nodes names and re-order then by addresses
->>
->> version 4:
->> - fix comments done on version 3
->> - don't use interrupts anymore in IIO timer
->> - detect hardware capabilities at probe time to simplify binding
->>
->> version 3:
->> - no change on mfd and pwm divers patches
->> - add cross reference between bindings
->> - change compatible to "st,stm32-timer-trigger"
->> - fix attributes access rights
->> - use string instead of int for master_mode and slave_mode
->> - document device attributes in sysfs-bus-iio-timer-stm32
->> - update DT with the new compatible
->>
->> version 2:
->> - keep only one compatible per driver
->> - use DT parameters to describe hardware block configuration:
->>   - pwm channels, complementary output, counter size, break input
->>   - triggers accepted and create by IIO timers
->> - change DT to limite use of reference to the node
->> - interrupt is now in IIO timer driver
->> - rename stm32-mfd-timer to stm32-timers (for general purpose timer)
->>
->> The following patches enable PWM and IIO Timer features for STM32 platforms.
->>
->> Those two features are mixed into the registers of the same hardware block
->> (named general purpose timer) which lead to introduce a multifunctions driver
->> on the top of them to be able to share the registers.
->>
->> In STM32f4 14 instances of timer hardware block exist, even if they all have
->> the same register mapping they could have a different number of pwm channels
->> and/or different triggers capabilities. We use various parameters in DT to
->> describe the differences between hardware blocks
->>
->> The MFD (stm32-timers.c) takes care of clock and register mapping
->> by using regmap. stm32_timers structure is provided to its sub-node to
->> share those information.
->>
->> PWM driver is implemented into pwm-stm32.c. Depending of the instance we may
->> have up to 4 channels, sometime with complementary outputs or 32 bits counter
->> instead of 16 bits. Some hardware blocks may also have a break input function
->> which allows to stop pwm depending of a level, defined in devicetree, on an
->> external pin.
->>
->> IIO timer driver (stm32-timer-trigger.c and stm32-timer-trigger.h) define a list
->> of hardware triggers usable by hardware blocks like ADC, DAC or other timers.
->>
->> The matrix of possible connections between blocks is quite complex so we use
->> trigger names and is_stm32_iio_timer_trigger() function to be sure that
->> triggers are valid and configure the IPs.
->>
->> At run time IIO timer hardware blocks can configure (through "master_mode"
->> IIO device attribute) which internal signal (counter enable, reset,
->> comparison block, etc...) is used to generate the trigger.
->>
->> Benjamin Gaignard (8):
->>   MFD: add bindings for STM32 Timers driver
->>   MFD: add STM32 Timers driver
->>   PWM: add pwm-stm32 DT bindings
->>   PWM: add PWM driver for STM32 plaftorm
->>   IIO: add bindings for STM32 timer trigger driver
->>   IIO: add STM32 timer trigger driver
->>   ARM: dts: stm32: add Timers driver for stm32f429 MCU
->>   ARM: dts: stm32: Enable pwm1 and pwm3 for stm32f469-disco
->>
->>  .../ABI/testing/sysfs-bus-iio-timer-stm32          |  29 ++
->>  .../bindings/iio/timer/stm32-timer-trigger.txt     |  23 ++
->>  .../devicetree/bindings/mfd/stm32-timers.txt       |  46 +++
->>  .../devicetree/bindings/pwm/pwm-stm32.txt          |  35 ++
->>  arch/arm/boot/dts/stm32f429.dtsi                   | 275 ++++++++++++++
->>  arch/arm/boot/dts/stm32f469-disco.dts              |  28 ++
->>  drivers/iio/trigger/Kconfig                        |   9 +
->>  drivers/iio/trigger/Makefile                       |   1 +
->>  drivers/iio/trigger/stm32-timer-trigger.c          | 342 ++++++++++++++++++
->>  drivers/mfd/Kconfig                                |  11 +
->>  drivers/mfd/Makefile                               |   2 +
->>  drivers/mfd/stm32-timers.c                         |  80 +++++
->>  drivers/pwm/Kconfig                                |   9 +
->>  drivers/pwm/Makefile                               |   1 +
->>  drivers/pwm/pwm-stm32.c                            | 398 +++++++++++++++++++++
->>  include/linux/iio/timer/stm32-timer-trigger.h      |  62 ++++
->>  include/linux/mfd/stm32-timers.h                   |  71 ++++
->>  17 files changed, 1422 insertions(+)
->>  create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-timer-stm32
->>  create mode 100644 Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
->>  create mode 100644 Documentation/devicetree/bindings/mfd/stm32-timers.txt
->>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32.txt
->>  create mode 100644 drivers/iio/trigger/stm32-timer-trigger.c
->>  create mode 100644 drivers/mfd/stm32-timers.c
->>  create mode 100644 drivers/pwm/pwm-stm32.c
->>  create mode 100644 include/linux/iio/timer/stm32-timer-trigger.h
->>  create mode 100644 include/linux/mfd/stm32-timers.h
->
-> Let me know when you have all your Acks.
->
-> I would be happy to take this through the MFD tree.
+>> We hope this will be accepted so it will solve the same issue we
+>> have on Amlogic SoCs and all the other mali powered SoCs.
+> 
+> Do you have any requirements (or weird case) that is not covered by
+> the current doc?
+> 
+> Thanks,
+> Maxime
+> 
 
-Some Acks are still missing on DT patches, I hope that Rob could find
-to review them
-after that it will ok :-)
+Hi Maxime,
 
->
-> --
-> Lee Jones
-> Linaro STMicroelectronics Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+Apart the GPU DVFS, all is covered by the current doc for the Amlogic Meson GXBB and GXL SoCs.
 
+Neil
 
-
--- 
-Benjamin Gaignard
-
-Graphic Study Group
-
-Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro: Facebook | Twitter | Blog
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170119/869ba77a/attachment.sig>
