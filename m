@@ -1,262 +1,127 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Thu, 19 Jan 2017 13:30:01 +0800
-Subject: [PATCH v11 12/12] drm/mediatek: add support for Mediatek SoC
- MT2701
-In-Reply-To: <1484117473-46644-13-git-send-email-yt.shen@mediatek.com>
-References: <1484117473-46644-1-git-send-email-yt.shen@mediatek.com>
- <1484117473-46644-13-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1484803801.19089.6.camel@mtksdaap41>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Thu, 19 Jan 2017 09:29:53 +0100
+Subject: [PATCH v9 2/5] i2c: Add STM32F4 I2C driver
+In-Reply-To: <20170119080258.fovhfy2v6rrtgwgp@pengutronix.de>
+References: <1484666821-20551-1-git-send-email-cedric.madianga@gmail.com>
+ <1484666821-20551-3-git-send-email-cedric.madianga@gmail.com>
+ <20170117193752.e6hju25w74bb4i4z@pengutronix.de>
+ <CAOAejn0ea2j_oUijOdHgiL3JU4TM0HZoL+-ggzjpPL2eA7tDCw@mail.gmail.com>
+ <20170118184237.tvhlsksdcw2ckwan@pengutronix.de>
+ <CAOAejn2LobTMfvsvmW8cCiToFHuM6n26s5QPLLXxLzb-WKkhQw@mail.gmail.com>
+ <20170119080258.fovhfy2v6rrtgwgp@pengutronix.de>
+Message-ID: <CAOAejn1HdZACqBLfw9r-yXZeSatz=mYDBGc9fdQ2puPVhsOp1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, YT:
+ok fine
 
-On Wed, 2017-01-11 at 14:51 +0800, YT Shen wrote:
-> This patch add support for the Mediatek MT2701 DISP subsystem.
-> There is only one OVL engine in MT2701.
-> 
-> Signed-off-by: YT Shen <yt.shen@mediatek.com>
-
-Acked-by: CK Hu <ck.hu@mediatek.com>
-
-> ---
->  drivers/gpu/drm/mediatek/mtk_disp_ovl.c     |  8 ++++++++
->  drivers/gpu/drm/mediatek/mtk_disp_rdma.c    |  6 ++++++
->  drivers/gpu/drm/mediatek/mtk_drm_ddp.c      | 17 +++++++++++++++++
->  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |  7 +++++++
->  drivers/gpu/drm/mediatek/mtk_drm_drv.c      | 29 +++++++++++++++++++++++++++++
->  drivers/gpu/drm/mediatek/mtk_dsi.c          |  1 +
->  drivers/gpu/drm/mediatek/mtk_mipi_tx.c      |  6 ++++++
->  7 files changed, 74 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-> index 4552178..a14d7d6 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-> @@ -35,6 +35,7 @@
->  #define DISP_REG_OVL_PITCH(n)			(0x0044 + 0x20 * (n))
->  #define DISP_REG_OVL_RDMA_CTRL(n)		(0x00c0 + 0x20 * (n))
->  #define DISP_REG_OVL_RDMA_GMC(n)		(0x00c8 + 0x20 * (n))
-> +#define DISP_REG_OVL_ADDR_MT2701		0x0040
->  #define DISP_REG_OVL_ADDR_MT8173		0x0f40
->  #define DISP_REG_OVL_ADDR(ovl, n)		((ovl)->data->addr + 0x20 * (n))
->  
-> @@ -303,12 +304,19 @@ static int mtk_disp_ovl_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +static const struct mtk_disp_ovl_data mt2701_ovl_driver_data = {
-> +	.addr = DISP_REG_OVL_ADDR_MT2701,
-> +	.fmt_rgb565_is_0 = false,
-> +};
-> +
->  static const struct mtk_disp_ovl_data mt8173_ovl_driver_data = {
->  	.addr = DISP_REG_OVL_ADDR_MT8173,
->  	.fmt_rgb565_is_0 = true,
->  };
->  
->  static const struct of_device_id mtk_disp_ovl_driver_dt_match[] = {
-> +	{ .compatible = "mediatek,mt2701-disp-ovl",
-> +	  .data = &mt2701_ovl_driver_data},
->  	{ .compatible = "mediatek,mt8173-disp-ovl",
->  	  .data = &mt8173_ovl_driver_data},
->  	{},
-> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-> index e5e5318..b68a513 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
-> @@ -236,11 +236,17 @@ static int mtk_disp_rdma_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +static const struct mtk_disp_rdma_data mt2701_rdma_driver_data = {
-> +	.fifo_size = SZ_4K,
-> +};
-> +
->  static const struct mtk_disp_rdma_data mt8173_rdma_driver_data = {
->  	.fifo_size = SZ_8K,
->  };
->  
->  static const struct of_device_id mtk_disp_rdma_driver_dt_match[] = {
-> +	{ .compatible = "mediatek,mt2701-disp-rdma",
-> +	  .data = &mt2701_rdma_driver_data},
->  	{ .compatible = "mediatek,mt8173-disp-rdma",
->  	  .data = &mt8173_rdma_driver_data},
->  	{},
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> index a9b209c..8130f3d 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> @@ -60,6 +60,13 @@
->  #define MT8173_MUTEX_MOD_DISP_PWM1		BIT(24)
->  #define MT8173_MUTEX_MOD_DISP_OD		BIT(25)
->  
-> +#define MT2701_MUTEX_MOD_DISP_OVL		BIT(3)
-> +#define MT2701_MUTEX_MOD_DISP_WDMA		BIT(6)
-> +#define MT2701_MUTEX_MOD_DISP_COLOR		BIT(7)
-> +#define MT2701_MUTEX_MOD_DISP_BLS		BIT(9)
-> +#define MT2701_MUTEX_MOD_DISP_RDMA0		BIT(10)
-> +#define MT2701_MUTEX_MOD_DISP_RDMA1		BIT(12)
-> +
->  #define MUTEX_SOF_SINGLE_MODE		0
->  #define MUTEX_SOF_DSI0			1
->  #define MUTEX_SOF_DSI1			2
-> @@ -92,6 +99,15 @@ struct mtk_ddp {
->  	const unsigned int		*mutex_mod;
->  };
->  
-> +static const unsigned int mt2701_mutex_mod[DDP_COMPONENT_ID_MAX] = {
-> +	[DDP_COMPONENT_BLS] = MT2701_MUTEX_MOD_DISP_BLS,
-> +	[DDP_COMPONENT_COLOR0] = MT2701_MUTEX_MOD_DISP_COLOR,
-> +	[DDP_COMPONENT_OVL0] = MT2701_MUTEX_MOD_DISP_OVL,
-> +	[DDP_COMPONENT_RDMA0] = MT2701_MUTEX_MOD_DISP_RDMA0,
-> +	[DDP_COMPONENT_RDMA1] = MT2701_MUTEX_MOD_DISP_RDMA1,
-> +	[DDP_COMPONENT_WDMA0] = MT2701_MUTEX_MOD_DISP_WDMA,
-> +};
-> +
->  static const unsigned int mt8173_mutex_mod[DDP_COMPONENT_ID_MAX] = {
->  	[DDP_COMPONENT_AAL] = MT8173_MUTEX_MOD_DISP_AAL,
->  	[DDP_COMPONENT_COLOR0] = MT8173_MUTEX_MOD_DISP_COLOR0,
-> @@ -390,6 +406,7 @@ static int mtk_ddp_remove(struct platform_device *pdev)
->  }
->  
->  static const struct of_device_id ddp_driver_dt_match[] = {
-> +	{ .compatible = "mediatek,mt2701-disp-mutex", .data = mt2701_mutex_mod},
->  	{ .compatible = "mediatek,mt8173-disp-mutex", .data = mt8173_mutex_mod},
->  	{},
->  };
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> index f6e853a..8b52416 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
-> @@ -39,6 +39,7 @@
->  #define DISP_REG_UFO_START			0x0000
->  
->  #define DISP_COLOR_CFG_MAIN			0x0400
-> +#define DISP_COLOR_START_MT2701			0x0f00
->  #define DISP_COLOR_START_MT8173			0x0c00
->  #define DISP_COLOR_START(comp)			((comp)->data->color_offset)
->  #define DISP_COLOR_WIDTH(comp)			(DISP_COLOR_START(comp) + 0x50)
-> @@ -285,11 +286,17 @@ struct mtk_ddp_comp_match {
->  	[DDP_COMPONENT_WDMA1]	= { MTK_DISP_WDMA,	1, NULL },
->  };
->  
-> +static const struct mtk_disp_color_data mt2701_color_driver_data = {
-> +	.color_offset = DISP_COLOR_START_MT2701,
-> +};
-> +
->  static const struct mtk_disp_color_data mt8173_color_driver_data = {
->  	.color_offset = DISP_COLOR_START_MT8173,
->  };
->  
->  static const struct of_device_id mtk_disp_color_driver_dt_match[] = {
-> +	{ .compatible = "mediatek,mt2701-disp-color",
-> +	  .data = &mt2701_color_driver_data},
->  	{ .compatible = "mediatek,mt8173-disp-color",
->  	  .data = &mt8173_color_driver_data},
->  	{},
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> index 074fe31..7daabae 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> @@ -128,6 +128,19 @@ static int mtk_atomic_commit(struct drm_device *drm,
->  	.atomic_commit = mtk_atomic_commit,
->  };
->  
-> +static const enum mtk_ddp_comp_id mt2701_mtk_ddp_main[] = {
-> +	DDP_COMPONENT_OVL0,
-> +	DDP_COMPONENT_RDMA0,
-> +	DDP_COMPONENT_COLOR0,
-> +	DDP_COMPONENT_BLS,
-> +	DDP_COMPONENT_DSI0,
-> +};
-> +
-> +static const enum mtk_ddp_comp_id mt2701_mtk_ddp_ext[] = {
-> +	DDP_COMPONENT_RDMA1,
-> +	DDP_COMPONENT_DPI0,
-> +};
-> +
->  static const enum mtk_ddp_comp_id mt8173_mtk_ddp_main[] = {
->  	DDP_COMPONENT_OVL0,
->  	DDP_COMPONENT_COLOR0,
-> @@ -147,6 +160,14 @@ static int mtk_atomic_commit(struct drm_device *drm,
->  	DDP_COMPONENT_DPI0,
->  };
->  
-> +static const struct mtk_mmsys_driver_data mt2701_mmsys_driver_data = {
-> +	.main_path = mt2701_mtk_ddp_main,
-> +	.main_len = ARRAY_SIZE(mt2701_mtk_ddp_main),
-> +	.ext_path = mt2701_mtk_ddp_ext,
-> +	.ext_len = ARRAY_SIZE(mt2701_mtk_ddp_ext),
-> +	.shadow_register = true,
-> +};
-> +
->  static const struct mtk_mmsys_driver_data mt8173_mmsys_driver_data = {
->  	.main_path = mt8173_mtk_ddp_main,
->  	.main_len = ARRAY_SIZE(mt8173_mtk_ddp_main),
-> @@ -340,16 +361,22 @@ static void mtk_drm_unbind(struct device *dev)
->  };
->  
->  static const struct of_device_id mtk_ddp_comp_dt_ids[] = {
-> +	{ .compatible = "mediatek,mt2701-disp-ovl",   .data = (void *)MTK_DISP_OVL },
->  	{ .compatible = "mediatek,mt8173-disp-ovl",   .data = (void *)MTK_DISP_OVL },
-> +	{ .compatible = "mediatek,mt2701-disp-rdma",  .data = (void *)MTK_DISP_RDMA },
->  	{ .compatible = "mediatek,mt8173-disp-rdma",  .data = (void *)MTK_DISP_RDMA },
->  	{ .compatible = "mediatek,mt8173-disp-wdma",  .data = (void *)MTK_DISP_WDMA },
-> +	{ .compatible = "mediatek,mt2701-disp-color", .data = (void *)MTK_DISP_COLOR },
->  	{ .compatible = "mediatek,mt8173-disp-color", .data = (void *)MTK_DISP_COLOR },
->  	{ .compatible = "mediatek,mt8173-disp-aal",   .data = (void *)MTK_DISP_AAL},
->  	{ .compatible = "mediatek,mt8173-disp-gamma", .data = (void *)MTK_DISP_GAMMA, },
->  	{ .compatible = "mediatek,mt8173-disp-ufoe",  .data = (void *)MTK_DISP_UFOE },
-> +	{ .compatible = "mediatek,mt2701-dsi",	      .data = (void *)MTK_DSI },
->  	{ .compatible = "mediatek,mt8173-dsi",        .data = (void *)MTK_DSI },
->  	{ .compatible = "mediatek,mt8173-dpi",        .data = (void *)MTK_DPI },
-> +	{ .compatible = "mediatek,mt2701-disp-mutex", .data = (void *)MTK_DISP_MUTEX },
->  	{ .compatible = "mediatek,mt8173-disp-mutex", .data = (void *)MTK_DISP_MUTEX },
-> +	{ .compatible = "mediatek,mt2701-disp-pwm",   .data = (void *)MTK_DISP_BLS },
->  	{ .compatible = "mediatek,mt8173-disp-pwm",   .data = (void *)MTK_DISP_PWM },
->  	{ .compatible = "mediatek,mt8173-disp-od",    .data = (void *)MTK_DISP_OD },
->  	{ }
-> @@ -523,6 +550,8 @@ static SIMPLE_DEV_PM_OPS(mtk_drm_pm_ops, mtk_drm_sys_suspend,
->  			 mtk_drm_sys_resume);
->  
->  static const struct of_device_id mtk_drm_of_ids[] = {
-> +	{ .compatible = "mediatek,mt2701-mmsys",
-> +	  .data = &mt2701_mmsys_driver_data},
->  	{ .compatible = "mediatek,mt8173-mmsys",
->  	  .data = &mt8173_mmsys_driver_data},
->  	{ }
-> diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
-> index 21392c4..e1832ea 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_dsi.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
-> @@ -1228,6 +1228,7 @@ static int mtk_dsi_remove(struct platform_device *pdev)
->  }
->  
->  static const struct of_device_id mtk_dsi_of_match[] = {
-> +	{ .compatible = "mediatek,mt2701-dsi" },
->  	{ .compatible = "mediatek,mt8173-dsi" },
->  	{ },
->  };
-> diff --git a/drivers/gpu/drm/mediatek/mtk_mipi_tx.c b/drivers/gpu/drm/mediatek/mtk_mipi_tx.c
-> index fd84914..90e9131 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_mipi_tx.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_mipi_tx.c
-> @@ -465,11 +465,17 @@ static int mtk_mipi_tx_remove(struct platform_device *pdev)
->  	return 0;
->  }
->  
-> +static const struct mtk_mipitx_data mt2701_mipitx_data = {
-> +	.mppll_preserve = (3 << 8)
-> +};
-> +
->  static const struct mtk_mipitx_data mt8173_mipitx_data = {
->  	.mppll_preserve = (0 << 8)
->  };
->  
->  static const struct of_device_id mtk_mipi_tx_match[] = {
-> +	{ .compatible = "mediatek,mt2701-mipi-tx",
-> +	  .data = &mt2701_mipitx_data },
->  	{ .compatible = "mediatek,mt8173-mipi-tx",
->  	  .data = &mt8173_mipitx_data },
->  	{},
+2017-01-19 9:02 GMT+01:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+> Hello Cedric,
+>
+> On Wed, Jan 18, 2017 at 09:55:39PM +0100, M'boumba Cedric Madianga wrote:
+>> 2017-01-18 19:42 GMT+01:00 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
+>> > Hello Cedric,
+>> >
+>> > On Wed, Jan 18, 2017 at 04:21:17PM +0100, M'boumba Cedric Madianga wrote:
+>> >> >> +      * In standard mode, the maximum allowed SCL rise time is 1000 ns.
+>> >> >> +      * If, in the I2C_CR2 register, the value of FREQ[5:0] bits is equal to
+>> >> >> +      * 0x08 so period = 125 ns therefore the TRISE[5:0] bits must be
+>> >> >> +      * programmed with 09h.(1000 ns / 125 ns = 8 + 1)
+>> >> >
+>> >> >         * programmed with 0x9.
+>> >> > (1000 ns / 125 ns = 8)
+>> >> >
+>> >> >> +      * So, for I2C standard mode TRISE = FREQ[5:0] + 1
+>> >> >> +      *
+>> >> >> +      * In fast mode, the maximum allowed SCL rise time is 300 ns.
+>> >> >> +      * If, in the I2C_CR2 register, the value of FREQ[5:0] bits is equal to
+>> >> >> +      * 0x08 so period = 125 ns therefore the TRISE[5:0] bits must be
+>> >> >> +      * programmed with 03h.(300 ns / 125 ns = 2 + 1)
+>> >> >
+>> >> > as above s/03h/0x3/;
+>> >>
+>> >> ok
+>> >>
+>> >> > s/.(/. (/;
+>> >> ok
+>> >>
+>> >> > s/+ 1//;
+>> >> This formula is use to understand how we find the result 0x3
+>> >> So, 0x3 => 300 ns / 125ns = 2 + 1
+>> >
+>> > Yeah, I understood that, but writing 300 ns / 125ns = 2 + 1 is
+>> > irritating at best.
+>>
+>> Ok. I will write 0x3 (300 ns / 125 ns + 1) and 0x9 (1000 ns / 125 ns + 1)
+>>
+>> >> >         [...]
+>> >> >         If DUTY = 1: (to reach 400 kHz)
+>> >> >
+>> >> > Strange.
+>> >> >
+>> >> >> +             val = DIV_ROUND_UP(i2c_dev->parent_rate, 400000 * 3);
+>> >> >
+>> >> > the manual reads:
+>> >> >
+>> >> >         The minimum allowed value is 0x04, except in FAST DUTY mode
+>> >> >         where the minimum allowed value is 0x01
+>> >> >
+>> >> > You don't check for that, right?
+>> >>
+>> >> As the minimum freq value is 6 Mhz in fast mode the minimum CCR is 5
+>> >> as described in the comment.
+>> >> So I don't need to check that again as it is already done by checking
+>> >> parent frequency.
+>> >
+>> > That would then go into a comment.
+>>
+>> Is it really needed ?
+>> Adding some comments to explain implementation choices or  hardware
+>> way of working is clearly useful.
+>> But for this kind of thing, I am really surprised...
+>
+> TL;DR: It's not needed, but it probably helps.
+>
+> Consider someone sees a breakage in your driver in five years. By then
+> you either have other interests or at least forgot 95 % of the thoughts
+> you had when implementing the driver.
+>
+> So when I see:
+>
+>         val = DIV_ROUND_UP(i2c_dev->parent_rate, 400000 * 3);
+>         ccr |= STM32F4_I2C_CCR_CCR(val);
+>         writel_relaxed(ccr, i2c_dev->base + STM32F4_I2C_CCR);
+>
+> after seeing that the bus freq is wrong the obvious thoughts are:
+>
+>  - Does this use the right algorithm?
+>  - Does this calculation result in values that are usable by the
+>    hardware?
+>
+> That you thought about this today doesn't mean it's still right in five
+> years. During that time a new hardware variant is available with a
+> higher parent freq. Or there is a new errata available for the SoC.
+>
+> So to help answer the questions above it helps if you add today the
+> formulas from the manual and a quick reason for why val fits into the
+> respective bits in the CCR register. That comment might be wrong until
+> then, too, but that only means you should make it easy to verify.
+> Something like:
+>
+>         /*
+>          * Function bla_blub made sure that parent_rate is not higher
+>          * than 23 * pi MHz. As a result val is at most 13.2 bits wide
+>          * and so fits into the CCR bits.
+>          */
+>
+> This gives you in five years time the opportunity to quickly check
+> bla_blub if this is still true, add a printk for parent_rate to check
+> this, or quickly identify the bug in the code or the mismatch to the
+> manual.
+>
+> Best regards
+> Uwe
+>
+> --
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
