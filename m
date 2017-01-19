@@ -1,130 +1,174 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Thu, 19 Jan 2017 20:57:52 +0000
-Subject: [PATCH v9 07/18] iommu: Implement reserved_regions iommu-group sysfs
- file
+Date: Thu, 19 Jan 2017 20:57:51 +0000
+Subject: [PATCH v9 06/18] iommu: iommu_get_group_resv_regions
 In-Reply-To: <1484859483-2866-1-git-send-email-eric.auger@redhat.com>
 References: <1484859483-2866-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1484859483-2866-8-git-send-email-eric.auger@redhat.com>
+Message-ID: <1484859483-2866-7-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A new iommu-group sysfs attribute file is introduced. It contains
-the list of reserved regions for the iommu-group. Each reserved
-region is described on a separate line:
-- first field is the start IOVA address,
-- second is the end IOVA address,
-- third is the type.
+Introduce iommu_get_group_resv_regions whose role consists in
+enumerating all devices from the group and collecting their
+reserved regions. The list is sorted and overlaps between
+regions of the same type are handled by merging the regions.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Reviewed-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
 Tested-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
 Tested-by: Bharat Bhushan <bharat.bhushan@nxp.com>
 
 ---
-v7 -> v8:
-- remove iommu_group_remove_file() in iommu_group_release since
-  the /sys/kernel/iommu_groups/n directory seems to be removed
-  already
-
 v6 -> v7:
-- also report the type of the reserved region as a string
-- updated ABI documentation
+- avoid merge of regions of different type
 
 v3 -> v4:
-- add cast to long long int when printing to avoid warning on
-  i386
-- change S_IRUGO into 0444
-- remove sort. The list is natively sorted now.
+- take the iommu_group lock in iommu_get_group_resv_regions
+- the list now is sorted and overlaps are checked
 
-The file layout is inspired of /sys/bus/pci/devices/BDF/resource.
-I also read Documentation/filesystems/sysfs.txt so I expect this
-to be frowned upon.
+NOTE:
+- we do not move list elements from device to group list since
+  the iommu_put_resv_regions() could not be called.
+- at the moment I did not introduce any iommu_put_group_resv_regions
+  since it simply consists in voiding/freeing the list
 ---
- .../ABI/testing/sysfs-kernel-iommu_groups          | 12 ++++++++
- drivers/iommu/iommu.c                              | 36 ++++++++++++++++++++++
- 2 files changed, 48 insertions(+)
+ drivers/iommu/iommu.c | 98 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/iommu.h |  8 +++++
+ 2 files changed, 106 insertions(+)
 
-diff --git a/Documentation/ABI/testing/sysfs-kernel-iommu_groups b/Documentation/ABI/testing/sysfs-kernel-iommu_groups
-index 9b31556..35c64e0 100644
---- a/Documentation/ABI/testing/sysfs-kernel-iommu_groups
-+++ b/Documentation/ABI/testing/sysfs-kernel-iommu_groups
-@@ -12,3 +12,15 @@ Description:	/sys/kernel/iommu_groups/ contains a number of sub-
- 		file if the IOMMU driver has chosen to register a more
- 		common name for the group.
- Users:
-+
-+What:		/sys/kernel/iommu_groups/reserved_regions
-+Date: 		January 2017
-+KernelVersion:  v4.11
-+Contact: 	Eric Auger <eric.auger@redhat.com>
-+Description:    /sys/kernel/iommu_groups/reserved_regions list IOVA
-+		regions that are reserved. Not necessarily all
-+		reserved regions are listed. This is typically used to
-+		output direct-mapped, MSI, non mappable regions. Each
-+		region is described on a single line: the 1st field is
-+		the base IOVA, the second is the end IOVA and the third
-+		field describes the type of the region.
 diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index 640056b..f4a176e 100644
+index 41c1906..640056b 100644
 --- a/drivers/iommu/iommu.c
 +++ b/drivers/iommu/iommu.c
-@@ -68,6 +68,12 @@ struct iommu_group_attribute {
- 			 const char *buf, size_t count);
- };
- 
-+static const char * const iommu_group_resv_type_string[] = {
-+	[IOMMU_RESV_DIRECT]	= "direct",
-+	[IOMMU_RESV_RESERVED]	= "reserved",
-+	[IOMMU_RESV_MSI]	= "msi",
-+};
-+
- #define IOMMU_GROUP_ATTR(_name, _mode, _show, _store)		\
- struct iommu_group_attribute iommu_group_attr_##_name =		\
- 	__ATTR(_name, _mode, _show, _store)
-@@ -231,8 +237,33 @@ int iommu_get_group_resv_regions(struct iommu_group *group,
+@@ -133,6 +133,104 @@ static ssize_t iommu_group_show_name(struct iommu_group *group, char *buf)
+ 	return sprintf(buf, "%s\n", group->name);
  }
- EXPORT_SYMBOL_GPL(iommu_get_group_resv_regions);
  
-+static ssize_t iommu_group_show_resv_regions(struct iommu_group *group,
-+					     char *buf)
++/**
++ * iommu_insert_resv_region - Insert a new region in the
++ * list of reserved regions.
++ * @new: new region to insert
++ * @regions: list of regions
++ *
++ * The new element is sorted by address with respect to the other
++ * regions of the same type. In case it overlaps with another
++ * region of the same type, regions are merged. In case it
++ * overlaps with another region of different type, regions are
++ * not merged.
++ */
++static int iommu_insert_resv_region(struct iommu_resv_region *new,
++				    struct list_head *regions)
 +{
-+	struct iommu_resv_region *region, *next;
-+	struct list_head group_resv_regions;
-+	char *str = buf;
++	struct iommu_resv_region *region;
++	phys_addr_t start = new->start;
++	phys_addr_t end = new->start + new->length - 1;
++	struct list_head *pos = regions->next;
 +
-+	INIT_LIST_HEAD(&group_resv_regions);
-+	iommu_get_group_resv_regions(group, &group_resv_regions);
++	while (pos != regions) {
++		struct iommu_resv_region *entry =
++			list_entry(pos, struct iommu_resv_region, list);
++		phys_addr_t a = entry->start;
++		phys_addr_t b = entry->start + entry->length - 1;
++		int type = entry->type;
 +
-+	list_for_each_entry_safe(region, next, &group_resv_regions, list) {
-+		str += sprintf(str, "0x%016llx 0x%016llx %s\n",
-+			       (long long int)region->start,
-+			       (long long int)(region->start +
-+						region->length - 1),
-+			       iommu_group_resv_type_string[region->type]);
-+		kfree(region);
++		if (end < a) {
++			goto insert;
++		} else if (start > b) {
++			pos = pos->next;
++		} else if ((start >= a) && (end <= b)) {
++			if (new->type == type)
++				goto done;
++			else
++				pos = pos->next;
++		} else {
++			if (new->type == type) {
++				phys_addr_t new_start = min(a, start);
++				phys_addr_t new_end = max(b, end);
++
++				list_del(&entry->list);
++				entry->start = new_start;
++				entry->length = new_end - new_start + 1;
++				iommu_insert_resv_region(entry, regions);
++			} else {
++				pos = pos->next;
++			}
++		}
 +	}
++insert:
++	region = iommu_alloc_resv_region(new->start, new->length,
++					 new->prot, new->type);
++	if (!region)
++		return -ENOMEM;
 +
-+	return (str - buf);
++	list_add_tail(&region->list, pos);
++done:
++	return 0;
 +}
++
++static int
++iommu_insert_device_resv_regions(struct list_head *dev_resv_regions,
++				 struct list_head *group_resv_regions)
++{
++	struct iommu_resv_region *entry;
++	int ret;
++
++	list_for_each_entry(entry, dev_resv_regions, list) {
++		ret = iommu_insert_resv_region(entry, group_resv_regions);
++		if (ret)
++			break;
++	}
++	return ret;
++}
++
++int iommu_get_group_resv_regions(struct iommu_group *group,
++				 struct list_head *head)
++{
++	struct iommu_device *device;
++	int ret = 0;
++
++	mutex_lock(&group->mutex);
++	list_for_each_entry(device, &group->devices, list) {
++		struct list_head dev_resv_regions;
++
++		INIT_LIST_HEAD(&dev_resv_regions);
++		iommu_get_resv_regions(device->dev, &dev_resv_regions);
++		ret = iommu_insert_device_resv_regions(&dev_resv_regions, head);
++		iommu_put_resv_regions(device->dev, &dev_resv_regions);
++		if (ret)
++			break;
++	}
++	mutex_unlock(&group->mutex);
++	return ret;
++}
++EXPORT_SYMBOL_GPL(iommu_get_group_resv_regions);
 +
  static IOMMU_GROUP_ATTR(name, S_IRUGO, iommu_group_show_name, NULL);
  
-+static IOMMU_GROUP_ATTR(reserved_regions, 0444,
-+			iommu_group_show_resv_regions, NULL);
-+
  static void iommu_group_release(struct kobject *kobj)
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index f6bb55d3..bec3730 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -246,6 +246,8 @@ extern void iommu_set_fault_handler(struct iommu_domain *domain,
+ extern int iommu_request_dm_for_dev(struct device *dev);
+ extern struct iommu_resv_region *
+ iommu_alloc_resv_region(phys_addr_t start, size_t length, int prot, int type);
++extern int iommu_get_group_resv_regions(struct iommu_group *group,
++					struct list_head *head);
+ 
+ extern int iommu_attach_group(struct iommu_domain *domain,
+ 			      struct iommu_group *group);
+@@ -463,6 +465,12 @@ static inline void iommu_put_resv_regions(struct device *dev,
  {
- 	struct iommu_group *group = to_iommu_group(kobj);
-@@ -310,6 +341,11 @@ struct iommu_group *iommu_group_alloc(void)
- 	 */
- 	kobject_put(&group->kobj);
+ }
  
-+	ret = iommu_group_create_file(group,
-+				      &iommu_group_attr_reserved_regions);
-+	if (ret)
-+		return ERR_PTR(ret);
++static inline int iommu_get_group_resv_regions(struct iommu_group *group,
++					       struct list_head *head)
++{
++	return -ENODEV;
++}
 +
- 	pr_debug("Allocated group %d\n", group->id);
- 
- 	return group;
+ static inline int iommu_request_dm_for_dev(struct device *dev)
+ {
+ 	return -ENODEV;
 -- 
 1.9.1
