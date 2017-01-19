@@ -1,104 +1,128 @@
-From: yannick.fertre@st.com (Yannick FERTRE)
-Date: Thu, 19 Jan 2017 16:16:01 +0000
-Subject: [PATCH v1 1/7] dt-bindings: display: add STM32 LTDC driver
-In-Reply-To: <2080174.sm3cyM9MmB@avalon>
-References: <1484573344-11609-1-git-send-email-yannick.fertre@st.com>
- <1484573344-11609-2-git-send-email-yannick.fertre@st.com>
- <2080174.sm3cyM9MmB@avalon>
-Message-ID: <dfb3192a-d5b6-029e-b8cb-65a628a0c30b@st.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 19 Jan 2017 10:16:48 -0600
+Subject: [PATCH 1/2] dt-bindings: gpu: Add Mali Utgard bindings
+In-Reply-To: <20170116132424.7038-1-maxime.ripard@free-electrons.com>
+References: <20170116132424.7038-1-maxime.ripard@free-electrons.com>
+Message-ID: <20170119161648.u6tta5mogadli7ih@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/16/2017 09:30 PM, Laurent Pinchart wrote:
-> Hi Yannick,
->
-> Thank you for the patch.
->
-> On Monday 16 Jan 2017 14:28:58 Yannick Fertre wrote:
->> Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
->> ---
->>  .../devicetree/bindings/display/st,ltdc.txt        | 57 ++++++++++++++++++
->>  1 file changed, 57 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/display/st,ltdc.txt
->>
->> diff --git a/Documentation/devicetree/bindings/display/st,ltdc.txt
->> b/Documentation/devicetree/bindings/display/st,ltdc.txt new file mode
->> 100644
->> index 0000000..20e89da
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/display/st,ltdc.txt
->> @@ -0,0 +1,57 @@
->> +* STMicroelectronics STM32 lcd-tft display controller
->> +
->> +- st-display-subsystem: Master device for DRM sub-components
->> +  This device must be the parent of all the sub-components and is
->> responsible
->> +  of bind them.
->
-> Why do you need this ? At a quick glance the ltdc node should be enough.
-Hi Laurent,
-To prepare next device upstream of dsi, we need a master node 
-"st-display-subsystem" and a sub node "st,ltdc". It's the same kind of 
-node than st,stih4xx.
->
->> +  Required properties:
->> +  - compatible: "st,display-subsystem"
->> +  - ranges: to allow probing of subdevices
->> +
->> +- ltdc_host: lcd-tft display controller host
->> +  must be a sub-node of st-display-subsystem
->> +  Required properties:
->> +  - compatible: "st,ltdc"
->> +  - reg: Physical base address of the IP registers and length of memory
->> mapped region.
->> +  - clocks: from common clock binding: handle hardware IP needed clocks,
->> the
->> +    number of clocks may depend of the SoC type.
->> +    See ../clocks/clock-bindings.txt for details.
->> +  - clock-names: names of the clocks listed in clocks property in the same
->> +    order.
->
-> You need to define the required/optional clocks with their names here. If they
-> vary depending on the SoC, the DT bindings document need to list them for each
-> SoC.
->
-Ok, I'll push news bindings with pack V2.
->> +  - resets: resets to be used by the device
->> +    See ../reset/reset.txt for details.
->> +  - reset-names: names of the resets listed in resets property in the same
->> +    order.
->> +  Required nodes:
->> +    - Video port for RGB output.
->> +
->> +Example:
->> +
->> +/ {
->> +	...
->> +	soc {
->> +	...
->> +		st-display-subsystem {
->> +			compatible = "st,display-subsystem";
->> +			#address-cells = <1>;
->> +			#size-cells = <1>;
->> +			ranges;
->> +			dma-ranges;
->> +
->> +			ltdc_host: stm32-ltdc at 40016800 {
->> +				compatible = "st,ltdc";
->> +				reg = <0x40016800 0x200>;
->> +				interrupts = <88>, <89>;
->> +				resets = <&rcc 314>;
->> +				clocks = <&rcc 1 8>;
->> +				clock-names = "clk-lcd";
->> +				status = "disabled";
->> +
->> +				port {
->> +					ltdc_out_rgb: endpoint {
->> +					};
->> +				};
->> +			};
->> +		};
->> +	...
->> +	};
->> +};
->
+On Mon, Jan 16, 2017 at 02:24:23PM +0100, Maxime Ripard wrote:
+> The ARM Mali Utgard GPU family is embedded into a number of SoCs from
+> Allwinner, Amlogic, Mediatek or Rockchip.
+> 
+> Add a binding for the GPU of that family.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  .../devicetree/bindings/gpu/arm,mali-utgard.txt    | 76 ++++++++++++++++++++++
+>  1 file changed, 76 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
+> new file mode 100644
+> index 000000000000..df05ba0ec357
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
+> @@ -0,0 +1,76 @@
+> +ARM Mali Utgard GPU
+> +===================
+> +
+> +Required properties:
+> +  - compatible:
+> +    * "arm,mali-utgard" and one of the following:
+
+Drop this. It's meaningless and 3 compatibles to match is the kernel is 
+not a big deal.
+
+> +      + "arm,mali-300"
+> +      + "arm,mali-400"
+> +      + "arm,mali-450"
+> +
+> +  - reg: Physical base address and length of the GPU registers
+> +
+> +  - interrupts: an entry for each entry in interrupt-names.
+> +    See ../interrupt-controller/interrupts.txt for details.
+> +
+> +  - interrupt-names:
+> +    * ppX: Pixel Processor X interrupt (X from 0 to 7)
+> +    * ppmmuX: Pixel Processor X MMU interrupt (X from 0 to 7)
+
+Is the number of pixel processors probe-able? If not, then it needs to 
+be implied by the vendor compatible string or a property.
+
+> +    * pp: Pixel Processor broadcast interrupt (mali-450 only)
+> +    * gp: Geometry Processor interrupt
+> +    * gpmmu: Geometry Processor MMU interrupt
+
+That's a lot of interrupts. Was going to ask about combining, but 
+I see Linus raised that.
+
+> +
+> +
+> +Optional properties:
+> +  - interrupt-names:
+> +    * pmu: Power Management Unit interrupt, if implemented in hardware
+> +
+> +Vendor-specific bindings
+> +------------------------
+> +
+> +The Mali GPU is integrated very differently from one SoC to
+> +another. In order to accommodate those differences, you have the option
+> +to specify one more vendor-specific compatible, among:
+> +
+> +  - allwinner,sun4i-a10-mali
+
+List this with the compatible strings. I assume one of the arm,mali-??? 
+strings applies too.
+
+> +    Required properties:
+> +      * clocks: an entry for each entry in clock-names
+> +      * clock-names:
+> +        + bus: bus clock for the GPU
+> +        + core: clock driving the GPU itself
+
+This should be in the core binding. The number of clocks should not 
+vary. We often get this wrong because the IP blocks get integrated and 
+connected to the same clock source. But this should be equal to the 
+number of clock inputs.
+
+> +      * resets: phandle to the reset line for the GPU
+> +
+> +  - allwinner,sun7i-a20-mali
+> +    Required properties:
+> +      * clocks: an entry for each entry in clock-names
+> +      * clock-names:
+> +        + bus: bus clock for the GPU
+> +        + core: clock driving the GPU itself
+> +      * resets: phandle to the reset line for the GPU
+> +
+> +Example:
+> +
+> +mali: gpu at 01c40000 {
+> +	compatible = "allwinner,sun7i-a20-mali", "arm,mali-400",
+> +		     "arm,mali-utgard";
+> +	reg = <0x01c40000 0x10000>;
+> +	interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>,
+> +		     <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>,
+> +		     <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>,
+> +		     <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
+> +		     <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>,
+> +		     <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>,
+> +		     <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
+> +	interrupt-names = "gp",
+> +			  "gpmmu",
+> +			  "pp0",
+> +			  "ppmmu0",
+> +			  "pp1",
+> +			  "ppmmu1",
+> +			  "pmu";
+> +	clocks = <&ccu CLK_BUS_GPU>, <&ccu CLK_GPU>;
+> +	clock-names = "bus", "core";
+> +	resets = <&ccu RST_BUS_GPU>;
+> +};
+> +
+> +
+> -- 
+> 2.11.0
+> 
