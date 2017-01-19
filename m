@@ -1,38 +1,35 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 19 Jan 2017 14:48:43 +0100
-Subject: [PATCH v3 03/13] soc: samsung: pmu: Remove messages for failed memory
- allocation
+Date: Thu, 19 Jan 2017 14:48:44 +0100
+Subject: [PATCH v3 04/13] pinctrl: samsung: Document Exynos3250 SoC support
 In-Reply-To: <1484833733-16082-1-git-send-email-m.szyprowski@samsung.com>
 References: <1484833733-16082-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170119134905eucas1p2ed9d6baf6283528289a36a58ee6c978e@eucas1p2.samsung.com>
-Message-ID: <1484833733-16082-4-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170119134906eucas1p28eaf30c782d33b5a36afe31a89613123@eucas1p2.samsung.com>
+Message-ID: <1484833733-16082-5-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Memory subsystem already prints message about failed memory
-allocation, there is no need to do it in the driver.
+Add missing compatible id for Exynos3250 SoC to device tree docs.
+Exynos pin control driver supports it since commit d97f5b9804bfcdc1
+("pinctrl: exynos: Add driver data for Exynos3250").
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
+Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- drivers/soc/samsung/exynos-pmu.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/soc/samsung/exynos-pmu.c b/drivers/soc/samsung/exynos-pmu.c
-index 1f914e63dcc6..813df6e7292d 100644
---- a/drivers/soc/samsung/exynos-pmu.c
-+++ b/drivers/soc/samsung/exynos-pmu.c
-@@ -117,10 +117,8 @@ static int exynos_pmu_probe(struct platform_device *pdev)
- 	pmu_context = devm_kzalloc(&pdev->dev,
- 			sizeof(struct exynos_pmu_context),
- 			GFP_KERNEL);
--	if (!pmu_context) {
--		dev_err(dev, "Cannot allocate memory.\n");
-+	if (!pmu_context)
- 		return -ENOMEM;
--	}
- 	pmu_context->dev = dev;
- 	pmu_context->pmu_data = of_device_get_match_data(dev);
- 
+diff --git a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+index 1baf19eecabf..5e00a21de2bf 100644
+--- a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
+@@ -13,6 +13,7 @@ Required Properties:
+   - "samsung,s3c2450-pinctrl": for S3C2450-compatible pin-controller,
+   - "samsung,s3c64xx-pinctrl": for S3C64xx-compatible pin-controller,
+   - "samsung,s5pv210-pinctrl": for S5PV210-compatible pin-controller,
++  - "samsung,exynos3250-pinctrl": for Exynos3250 compatible pin-controller.
+   - "samsung,exynos4210-pinctrl": for Exynos4210 compatible pin-controller.
+   - "samsung,exynos4x12-pinctrl": for Exynos4x12 compatible pin-controller.
+   - "samsung,exynos5250-pinctrl": for Exynos5250 compatible pin-controller.
 -- 
 1.9.1
