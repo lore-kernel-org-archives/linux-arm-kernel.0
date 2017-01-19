@@ -1,87 +1,105 @@
-From: breno.lima@nxp.com (Breno Lima)
-Date: Thu, 19 Jan 2017 14:30:05 -0200
-Subject: [PATCH v3 3/3] ARM: dts: udoo_neo: Add Bluetooth support
-In-Reply-To: <1484843405-14892-1-git-send-email-breno.lima@nxp.com>
-References: <1484843405-14892-1-git-send-email-breno.lima@nxp.com>
-Message-ID: <1484843405-14892-3-git-send-email-breno.lima@nxp.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 19 Jan 2017 10:29:40 -0600
+Subject: [PATCH v1 1/7] dt-bindings: display: add STM32 LTDC driver
+In-Reply-To: <1484573344-11609-2-git-send-email-yannick.fertre@st.com>
+References: <1484573344-11609-1-git-send-email-yannick.fertre@st.com>
+ <1484573344-11609-2-git-send-email-yannick.fertre@st.com>
+Message-ID: <20170119162940.jh762nuhrbtqkboo@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Udoo Neo has a TI WL1831 Bluetooth chip connected to the UART3 port.
+On Mon, Jan 16, 2017 at 02:28:58PM +0100, Yannick Fertre wrote:
+> Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
 
-Add support for it.
+Changelog?
 
-Signed-off-by: Breno Lima <breno.lima@nxp.com>
----
-Changes since v1:
-- Newly introduced in this series
+> ---
+>  .../devicetree/bindings/display/st,ltdc.txt        | 57 ++++++++++++++++++++++
+>  1 file changed, 57 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/st,ltdc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/display/st,ltdc.txt b/Documentation/devicetree/bindings/display/st,ltdc.txt
+> new file mode 100644
+> index 0000000..20e89da
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/st,ltdc.txt
+> @@ -0,0 +1,57 @@
+> +* STMicroelectronics STM32 lcd-tft display controller
+> +
+> +- st-display-subsystem: Master device for DRM sub-components
+> +  This device must be the parent of all the sub-components and is responsible
+> +  of bind them.
+> +  Required properties:
+> +  - compatible: "st,display-subsystem"
+> +  - ranges: to allow probing of subdevices
 
- arch/arm/boot/dts/imx6sx-udoo-neo.dtsi | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+You have a single sub device. There is no need for this node.
 
-diff --git a/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
-index 6787a83..9cc7919 100644
---- a/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
-+++ b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
-@@ -107,6 +107,18 @@
- 		startup-delay-us = <70000>;
- 		enable-active-high;
- 	};
-+
-+	reg_bt: regulator-bt {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_bt_reg>;
-+		enable-active-high;
-+		gpio = <&gpio2 17 GPIO_ACTIVE_HIGH>;
-+		regulator-name = "bt_reg";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-always-on;
-+	};
- };
- 
- &cpu0 {
-@@ -218,6 +230,11 @@
- };
- 
- &iomuxc {
-+	pinctrl_bt_reg: btreggrp {
-+		fsl,pins =
-+			<MX6SX_PAD_KEY_ROW2__GPIO2_IO_17        0x15059>;
-+	};
-+
- 	pinctrl_enet1: enet1grp {
- 		fsl,pins =
- 			<MX6SX_PAD_ENET1_CRS__GPIO2_IO_1	0xa0b1>,
-@@ -255,6 +272,14 @@
- 			<MX6SX_PAD_GPIO1_IO07__UART2_RX		0x1b0b1>;
- 	};
- 
-+	pinctrl_uart3: uart3grp {
-+		fsl,pins =
-+			<MX6SX_PAD_SD3_DATA4__UART3_RX          0x13059>,
-+			<MX6SX_PAD_SD3_DATA5__UART3_TX          0x13059>,
-+			<MX6SX_PAD_SD3_DATA6__UART3_RTS_B       0x13059>,
-+			<MX6SX_PAD_SD3_DATA7__UART3_CTS_B       0x13059>;
-+	};
-+
- 	pinctrl_uart5: uart5grp {
- 		fsl,pins =
- 			<MX6SX_PAD_SD4_DATA4__UART5_RX		0x1b0b1>,
-@@ -333,6 +358,13 @@
- 	status = "disabled";
- };
- 
-+&uart3 { /* Bluetooth */
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart3>;
-+	uart-has-rtscts;
-+	status = "okay";
-+};
-+
- /* Arduino serial */
- &uart5 {
- 	pinctrl-names = "default";
--- 
-2.7.4
+
+> +- ltdc_host: lcd-tft display controller host
+> +  must be a sub-node of st-display-subsystem
+> +  Required properties:
+> +  - compatible: "st,ltdc"
+
+Too generic. Needs to be SoC specific.
+
+> +  - reg: Physical base address of the IP registers and length of memory mapped region.
+> +  - clocks: from common clock binding: handle hardware IP needed clocks, the
+> +    number of clocks may depend of the SoC type.
+
+No. You must be explicit on how many clocks and their order.
+
+> +    See ../clocks/clock-bindings.txt for details.
+> +  - clock-names: names of the clocks listed in clocks property in the same
+> +    order.
+> +  - resets: resets to be used by the device
+
+ditto.
+
+> +    See ../reset/reset.txt for details.
+> +  - reset-names: names of the resets listed in resets property in the same
+> +    order.
+
+You are missing this in the example. However, for a single entry, -names 
+is pointless.
+
+> +  Required nodes:
+> +    - Video port for RGB output.
+> +
+> +Example:
+> +
+> +/ {
+> +	...
+> +	soc {
+> +	...
+> +		st-display-subsystem {
+> +			compatible = "st,display-subsystem";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
+> +			dma-ranges;
+> +
+> +			ltdc_host: stm32-ltdc at 40016800 {
+> +				compatible = "st,ltdc";
+> +				reg = <0x40016800 0x200>;
+> +				interrupts = <88>, <89>;
+> +				resets = <&rcc 314>;
+> +				clocks = <&rcc 1 8>;
+> +				clock-names = "clk-lcd";
+
+The 'clk-' part is redundant.
+
+> +				status = "disabled";
+> +
+> +				port {
+> +					ltdc_out_rgb: endpoint {
+> +					};
+> +				};
+> +			};
+> +		};
+> +	...
+> +	};
+> +};
+> -- 
+> 1.9.1
+> 
