@@ -1,110 +1,344 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 19 Jan 2017 17:55:22 +0000
-Subject: [PATCH V7 04/10] arm64: exception: handle Synchronous External
- Abort
-In-Reply-To: <e8c0151e-2087-d49c-42fc-906755aca052@codeaurora.org>
-References: <1484244924-24786-1-git-send-email-tbaicar@codeaurora.org>
- <1484244924-24786-5-git-send-email-tbaicar@codeaurora.org>
- <587DF279.1010402@arm.com>
- <e8c0151e-2087-d49c-42fc-906755aca052@codeaurora.org>
-Message-ID: <5880FD8A.2000405@arm.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Fri, 20 Jan 2017 01:54:47 +0800
+Subject: [PATCH v3 5/6] ARM: dts: sunxi: add dtsi file for V3s SoC
+In-Reply-To: <20170119175448.11445-1-icenowy@aosc.xyz>
+References: <20170119175448.11445-1-icenowy@aosc.xyz>
+Message-ID: <20170119175448.11445-5-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
+As we have the pinctrl and clock support for the V3s SoC, it's now to
+run a mainline Linux on it.
 
-On 18/01/17 23:26, Baicar, Tyler wrote:
-> On 1/17/2017 3:31 AM, James Morse wrote:
->> On 12/01/17 18:15, Tyler Baicar wrote:
->>> SEA exceptions are often caused by an uncorrected hardware
->>> error, and are handled when data abort and instruction abort
->>> exception classes have specific values for their Fault Status
->>> Code.
->>> When SEA occurs, before killing the process, go through
->>> the handlers registered in the notification list.
->>> Update fault_info[] with specific SEA faults so that the
->>> new SEA handler is used.
->>> @@ -480,6 +496,28 @@ static int do_bad(unsigned long addr, unsigned int esr,
->>> struct pt_regs *regs)
->>>       return 1;
->>>   }
->>>   +/*
->>> + * This abort handler deals with Synchronous External Abort.
->>> + * It calls notifiers, and then returns "fault".
->>> + */
->>> +static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->>> +{
->>> +    struct siginfo info;
->>> +
->>> +    atomic_notifier_call_chain(&sea_handler_chain, 0, NULL);
->>> +
->>> +    pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
->>> +         fault_name(esr), esr, addr);
->>> +
->>> +    info.si_signo = SIGBUS;
->>> +    info.si_errno = 0;
->>> +    info.si_code  = 0;
->> Half of the other do_*() functions in this file read the signo and code from the
->> fault_info table.
->>
->>
->>> +    info.si_addr  = (void __user *)addr;
->> addr here was read from FAR_EL1, but for some of the classes of exception you
->> have listed below this register isn't updated with the faulting address.
->>
->> The ARM-ARM version 'k' in D1.10.5 "Summary of registers on faults taken to an
->> Exception level that is using Aarch64" has:
->>> The architecture permits that the FAR_ELx is UNKNOWN for Synchronous External
->>> Aborts other than Synchronous External Aborts on Translation Table Walks. In
->>> this case, the ISS.FnV bit returned in ESR_ELx  indicates whether FAR_ELx is
->>> valid.
->> This is a problem if we get 'synchronous external abort' or 'synchronous parity
->> error' while a user space process was running.
+So add a .dtsi file for it.
 
-> It looks like this would just cause an incorrect address to be printed in the
-> above pr_err.
-> Unless I'm missing something, I don't see arm64_notify_die or anything that gets
-> called from
-> there using the info.si_addr variable.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+---
+Changes in v3:
+- Add USB nodes. (The PHY and MUSB patches are merged now)
+Changes in v2:
+- Added I2C here.
+ arch/arm/boot/dts/sun8i-v3s.dtsi | 312 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 312 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun8i-v3s.dtsi
 
-I may be misreading something here...
-
-This patch has:
->	info.si_addr  = (void __user *)addr;
->	arm64_notify_die("", regs, &info, esr);
-
->From arch/arm64/kernel/traps.c:arm64_notify_die():
->	if (user_mode(regs)) {
->		current->thread.fault_address = 0;
->		current->thread.fault_code = err;
->		force_sig_info(info->si_signo, info, current);
->	}
-
-So if the SEA interrupted userspace, we put maybe-unknown addr into
-force_sig_info() to deliver a signal to user space. User-space then gets a copy
-of the info struct containing the maybe-unknown addr.
-
-I think this is an existing bug, but if we are separating the synchronous
-external aborts from the generic do_bad handler, we should probably check the
-FnV bit. (I think we should still print it out)
-
-
-> What do you suggest I do here? The firmware should be reporting the physical and
-> virtual
-> address information if it is available in the HEST entry that the kernel will
-> parse.
-
-Its not just firmware that may trigger this, other SoCs may use it for parity or
-ECC errors, and they may not always have a valid address in FAR_EL1.
-
-I think we should check the FnV bit in the esr variable and set info.si_addr to
-0 if the addr we have isn't valid:
-'For some implementations, the value of si_addr may be inaccurate.' [0]
-
-
-Thanks,
-
-James
-
-
-[0] http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/signal.h.html
+diff --git a/arch/arm/boot/dts/sun8i-v3s.dtsi b/arch/arm/boot/dts/sun8i-v3s.dtsi
+new file mode 100644
+index 000000000000..d4628f4fa7f1
+--- /dev/null
++++ b/arch/arm/boot/dts/sun8i-v3s.dtsi
+@@ -0,0 +1,312 @@
++/*
++ * Copyright (C) 2016 Icenowy Zheng <icenowy@aosc.xyz>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include <dt-bindings/clock/sun8i-v3s-ccu.h>
++#include <dt-bindings/reset/sun8i-v3s-ccu.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/pinctrl/sun4i-a10.h>
++
++/ {
++	#address-cells = <1>;
++	#size-cells = <1>;
++	interrupt-parent = <&gic>;
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++			compatible = "arm,cortex-a7";
++			device_type = "cpu";
++			reg = <0>;
++			clocks = <&ccu CLK_CPU>;
++		};
++	};
++
++	timer {
++		compatible = "arm,armv7-timer";
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
++	};
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		osc24M: osc24M_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <24000000>;
++			clock-output-names = "osc24M";
++		};
++
++		osc32k: osc32k_clk {
++			#clock-cells = <0>;
++			compatible = "fixed-clock";
++			clock-frequency = <32768>;
++			clock-output-names = "osc32k";
++		};
++	};
++
++	soc {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		mmc0: mmc at 01c0f000 {
++			compatible = "allwinner,sun7i-a20-mmc";
++			reg = <0x01c0f000 0x1000>;
++			clocks = <&ccu CLK_BUS_MMC0>,
++				 <&ccu CLK_MMC0>,
++				 <&ccu CLK_MMC0_OUTPUT>,
++				 <&ccu CLK_MMC0_SAMPLE>;
++			clock-names = "ahb",
++				      "mmc",
++				      "output",
++				      "sample";
++			resets = <&ccu RST_BUS_MMC0>;
++			reset-names = "ahb";
++			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		mmc1: mmc at 01c10000 {
++			compatible = "allwinner,sun7i-a20-mmc";
++			reg = <0x01c10000 0x1000>;
++			clocks = <&ccu CLK_BUS_MMC1>,
++				 <&ccu CLK_MMC1>,
++				 <&ccu CLK_MMC1_OUTPUT>,
++				 <&ccu CLK_MMC1_SAMPLE>;
++			clock-names = "ahb",
++				      "mmc",
++				      "output",
++				      "sample";
++			resets = <&ccu RST_BUS_MMC1>;
++			reset-names = "ahb";
++			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		mmc2: mmc at 01c11000 {
++			compatible = "allwinner,sun7i-a20-mmc";
++			reg = <0x01c11000 0x1000>;
++			clocks = <&ccu CLK_BUS_MMC2>,
++				 <&ccu CLK_MMC2>,
++				 <&ccu CLK_MMC2_OUTPUT>,
++				 <&ccu CLK_MMC2_SAMPLE>;
++			clock-names = "ahb",
++				      "mmc",
++				      "output",
++				      "sample";
++			resets = <&ccu RST_BUS_MMC2>;
++			reset-names = "ahb";
++			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		usb_otg: usb at 01c19000 {
++			compatible = "allwinner,sun8i-h3-musb";
++			reg = <0x01c19000 0x0400>;
++			clocks = <&ccu CLK_BUS_OTG>;
++			resets = <&ccu RST_BUS_OTG>;
++			interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "mc";
++			phys = <&usbphy 0>;
++			phy-names = "usb";
++			extcon = <&usbphy 0>;
++			status = "disabled";
++		};
++
++		usbphy: phy at 01c19400 {
++			compatible = "allwinner,sun8i-v3s-usb-phy";
++			reg = <0x01c19400 0x2c>,
++			      <0x01c1a800 0x4>;
++			reg-names = "phy_ctrl",
++				    "pmu0";
++			clocks = <&ccu CLK_USB_PHY0>;
++			clock-names = "usb0_phy";
++			resets = <&ccu RST_USB_PHY0>;
++			reset-names = "usb0_reset";
++			status = "disabled";
++			#phy-cells = <1>;
++		};
++
++		ccu: clock at 01c20000 {
++			compatible = "allwinner,sun8i-v3s-ccu";
++			reg = <0x01c20000 0x400>;
++			clocks = <&osc24M>, <&osc32k>;
++			clock-names = "hosc", "losc";
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
++		rtc: rtc at 01c20400 {
++			compatible = "allwinner,sun6i-a31-rtc";
++			reg = <0x01c20400 0x54>;
++			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
++		pio: pinctrl at 01c20800 {
++			compatible = "allwinner,sun8i-v3s-pinctrl";
++			reg = <0x01c20800 0x400>;
++			interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_PIO>, <&osc24M>, <&osc32k>;
++			clock-names = "apb", "hosc", "losc";
++			gpio-controller;
++			#gpio-cells = <3>;
++			interrupt-controller;
++			#interrupt-cells = <3>;
++
++			i2c0_pins: i2c0 {
++				pins = "PB6", "PB7";
++				function = "i2c0";
++			};
++
++			uart0_pins_a: uart0 at 0 {
++				pins = "PB8", "PB9";
++				function = "uart0";
++			};
++
++			mmc0_pins_a: mmc0 at 0 {
++				pins = "PF0", "PF1", "PF2", "PF3",
++				       "PF4", "PF5";
++				function = "mmc0";
++				drive-strength = <30>;
++				bias-pull-up;
++			};
++		};
++
++		timer at 01c20c00 {
++			compatible = "allwinner,sun4i-a10-timer";
++			reg = <0x01c20c00 0xa0>;
++			interrupts = <GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 19 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&osc24M>;
++		};
++
++		wdt0: watchdog at 01c20ca0 {
++			compatible = "allwinner,sun6i-a31-wdt";
++			reg = <0x01c20ca0 0x20>;
++			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
++		};
++
++		uart0: serial at 01c28000 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x01c28000 0x400>;
++			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&ccu CLK_BUS_UART0>;
++			resets = <&ccu RST_BUS_UART0>;
++			status = "disabled";
++		};
++
++		uart1: serial at 01c28400 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x01c28400 0x400>;
++			interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&ccu CLK_BUS_UART1>;
++			resets = <&ccu RST_BUS_UART1>;
++			status = "disabled";
++		};
++
++		uart2: serial at 01c28800 {
++			compatible = "snps,dw-apb-uart";
++			reg = <0x01c28800 0x400>;
++			interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
++			reg-shift = <2>;
++			reg-io-width = <4>;
++			clocks = <&ccu CLK_BUS_UART2>;
++			resets = <&ccu RST_BUS_UART2>;
++			status = "disabled";
++		};
++
++		i2c0: i2c at 01c2ac00 {
++			compatible = "allwinner,sun6i-a31-i2c";
++			reg = <0x01c2ac00 0x400>;
++			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_I2C0>;
++			resets = <&ccu RST_BUS_I2C0>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c0_pins>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		i2c1: i2c at 01c2b000 {
++			compatible = "allwinner,sun6i-a31-i2c";
++			reg = <0x01c2b000 0x400>;
++			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_I2C1>;
++			resets = <&ccu RST_BUS_I2C1>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
++		gic: interrupt-controller at 01c81000 {
++			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
++			reg = <0x01c81000 0x1000>,
++			      <0x01c82000 0x1000>,
++			      <0x01c84000 0x2000>,
++			      <0x01c86000 0x2000>;
++			interrupt-controller;
++			#interrupt-cells = <3>;
++			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
++		};
++	};
++};
+-- 
+2.11.0
