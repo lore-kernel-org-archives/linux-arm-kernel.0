@@ -1,66 +1,187 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 19 Jan 2017 22:49:32 +0100
-Subject: [PATCH v5 0/2] Add support for the ethernet switch on the ESPRESSObin
-Message-ID: <20170119214934.27442-1-gregory.clement@free-electrons.com>
+Date: Thu, 19 Jan 2017 22:49:34 +0100
+Subject: [PATCH v5 2/2] net: dsa: mv88e6xxx: Add support for ethernet switch
+ 88E6341
+In-Reply-To: <20170119214934.27442-1-gregory.clement@free-electrons.com>
+References: <20170119214934.27442-1-gregory.clement@free-electrons.com>
+Message-ID: <20170119214934.27442-3-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The Marvell 88E6341 device is single-chip, 6-port Ethernet switch with
+four integrated 10/100/1000Mbps Ethernet transceivers and one high speed
+SerDes interfaces. It is partially compatible with switches of family
+88E6352 and switches of family 88E6390.
 
-This set of patches adds support for the Marvell Ethernet switch
-88E6341 which is found on the ESPRESSObin. With this series the
-network is usable on this board.
+This commit adds an initial support for this switch by describing its
+capabilities to the driver and introducing a new family.
 
->From now on, I am taking care of this series.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/net/dsa/mv88e6xxx/chip.c      | 55 +++++++++++++++++++++++++++++++++--
+ drivers/net/dsa/mv88e6xxx/mv88e6xxx.h | 21 ++++++++++++-
+ 2 files changed, 72 insertions(+), 4 deletions(-)
 
-As Andrew Lunn pointed this switch is not fully compatible with the
-6352. However it is neither fully compatible with the 6390. Actually
-it is more a mix between this two families.
-
-I created a new family for this switch and filled the ops structure by
-selecting which seems the more appropriate functions. I rebased the
-series on net-next/master which allowed me to benefit to the eeprom
-functions introduced for the 6390.
-
-
-
-While comparing the datasheet and the ops functions used, some
-question came to me. They should not prevent applying this series,
-but their answer would help me to have a better understanding of the
-dsa subsystem.
-
-- Are the temperature related operation still useful with dsa2 ?
-
-Indeed the hwmon initialization is only done from dsa_probe which is
-not called if we use dsa2.
-
-- Why the setup is done differently between the 6390 and the 6352
-  families when the have exactly the same register?
-
-  - On the Port Controller 2, the bit PORT_CONTROL_2_MAP_DA is set for
-    6352 and not for 6390 whereas the same bit exists in 6360 and the
-    description for this bit is the same for both datasheet.
-
-
-  - Register PORT_ATU_CONTROL and PORT_PRI_OVERRIDE are reset on 6352
-    and not on 6390. While here again the registers description are
-    the same.
-
-Thanks,
-
-Gregory
-
-
-Gregory CLEMENT (1):
-  net: dsa: mv88e6xxx: Add support for ethernet switch 88E6341
-
-Romain Perier (1):
-  net: dsa: mv88e6xxx: Don't forbid MDIO I/Os for PHY addr >=
-    num_of_ports
-
- drivers/net/dsa/mv88e6xxx/chip.c      | 61 +++++++++++++++++++++++++++++------
- drivers/net/dsa/mv88e6xxx/mv88e6xxx.h | 21 +++++++++++-
- 2 files changed, 72 insertions(+), 10 deletions(-)
-
+diff --git a/drivers/net/dsa/mv88e6xxx/chip.c b/drivers/net/dsa/mv88e6xxx/chip.c
+index d1960ae0a618..c73800e8105b 100644
+--- a/drivers/net/dsa/mv88e6xxx/chip.c
++++ b/drivers/net/dsa/mv88e6xxx/chip.c
+@@ -664,6 +664,11 @@ static bool mv88e6xxx_6320_family(struct mv88e6xxx_chip *chip)
+ 	return chip->info->family == MV88E6XXX_FAMILY_6320;
+ }
+ 
++static bool mv88e6xxx_6341_family(struct mv88e6xxx_chip *chip)
++{
++	return chip->info->family == MV88E6XXX_FAMILY_6341;
++}
++
+ static bool mv88e6xxx_6351_family(struct mv88e6xxx_chip *chip)
+ {
+ 	return chip->info->family == MV88E6XXX_FAMILY_6351;
+@@ -1688,7 +1693,8 @@ static int _mv88e6xxx_vtu_new(struct mv88e6xxx_chip *chip, u16 vid,
+ 			: GLOBAL_VTU_DATA_MEMBER_TAG_NON_MEMBER;
+ 
+ 	if (mv88e6xxx_6097_family(chip) || mv88e6xxx_6165_family(chip) ||
+-	    mv88e6xxx_6351_family(chip) || mv88e6xxx_6352_family(chip)) {
++	    mv88e6xxx_6351_family(chip) || mv88e6xxx_6352_family(chip) ||
++	    mv88e6xxx_6341_family(chip)) {
+ 		struct mv88e6xxx_vtu_entry vstp;
+ 
+ 		/* Adding a VTU entry requires a valid STU entry. As VSTP is not
+@@ -2543,7 +2549,7 @@ static int mv88e6xxx_setup_port(struct mv88e6xxx_chip *chip, int port)
+ 	if (mv88e6xxx_6352_family(chip) || mv88e6xxx_6351_family(chip) ||
+ 	    mv88e6xxx_6165_family(chip) || mv88e6xxx_6097_family(chip) ||
+ 	    mv88e6xxx_6095_family(chip) || mv88e6xxx_6320_family(chip) ||
+-	    mv88e6xxx_6185_family(chip))
++	    mv88e6xxx_6185_family(chip) || mv88e6xxx_6341_family(chip))
+ 		reg = PORT_CONTROL_2_MAP_DA;
+ 
+ 	if (mv88e6xxx_6095_family(chip) || mv88e6xxx_6185_family(chip)) {
+@@ -2597,7 +2603,8 @@ static int mv88e6xxx_setup_port(struct mv88e6xxx_chip *chip, int port)
+ 
+ 	if (mv88e6xxx_6352_family(chip) || mv88e6xxx_6351_family(chip) ||
+ 	    mv88e6xxx_6165_family(chip) || mv88e6xxx_6097_family(chip) ||
+-	    mv88e6xxx_6320_family(chip)) {
++	    mv88e6xxx_6320_family(chip) || mv88e6xxx_6341_family(chip) ||
++	    mv88e6xxx_6341_family(chip)) {
+ 		/* Port ATU control: disable limiting the number of
+ 		 * address database entries that this port is allowed
+ 		 * to use.
+@@ -3714,6 +3721,34 @@ static const struct mv88e6xxx_ops mv88e6352_ops = {
+ 	.reset = mv88e6352_g1_reset,
+ };
+ 
++static const struct mv88e6xxx_ops mv88e6341_ops = {
++	/* MV88E6XXX_FAMILY_6341 */
++	.get_eeprom = mv88e6xxx_g2_get_eeprom8,
++	.set_eeprom = mv88e6xxx_g2_set_eeprom8,
++	.set_switch_mac = mv88e6xxx_g2_set_switch_mac,
++	.phy_read = mv88e6xxx_g2_smi_phy_read,
++	.phy_write = mv88e6xxx_g2_smi_phy_write,
++	.port_set_link = mv88e6xxx_port_set_link,
++	.port_set_duplex = mv88e6xxx_port_set_duplex,
++	.port_set_rgmii_delay = mv88e6390_port_set_rgmii_delay,
++	.port_set_speed = mv88e6390_port_set_speed,
++	.port_tag_remap = mv88e6095_port_tag_remap,
++	.port_set_frame_mode = mv88e6351_port_set_frame_mode,
++	.port_set_egress_unknowns = mv88e6351_port_set_egress_unknowns,
++	.port_set_ether_type = mv88e6351_port_set_ether_type,
++	.port_jumbo_config = mv88e6165_port_jumbo_config,
++	.port_egress_rate_limiting = mv88e6097_port_egress_rate_limiting,
++	.port_pause_config = mv88e6097_port_pause_config,
++	.stats_snapshot = mv88e6390_g1_stats_snapshot,
++	.stats_get_sset_count = mv88e6320_stats_get_sset_count,
++	.stats_get_strings = mv88e6320_stats_get_strings,
++	.stats_get_stats = mv88e6390_stats_get_stats,
++	.g1_set_cpu_port = mv88e6390_g1_set_cpu_port,
++	.g1_set_egress_port = mv88e6390_g1_set_egress_port,
++	.mgmt_rsvd2cpu =  mv88e6390_g1_mgmt_rsvd2cpu,
++	.reset = mv88e6352_g1_reset,
++};
++
+ static const struct mv88e6xxx_ops mv88e6390_ops = {
+ 	/* MV88E6XXX_FAMILY_6390 */
+ 	.get_eeprom = mv88e6xxx_g2_get_eeprom8,
+@@ -4101,6 +4136,20 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
+ 		.ops = &mv88e6321_ops,
+ 	},
+ 
++	[MV88E6341] = {
++		.prod_num = PORT_SWITCH_ID_PROD_NUM_6341,
++		.family = MV88E6XXX_FAMILY_6341,
++		.name = "Marvell 88E6341",
++		.num_databases = 4096,
++		.num_ports = 6,
++		.port_base_addr = 0x10,
++		.global1_addr = 0x1b,
++		.age_time_coeff = 15000,
++		.tag_protocol = DSA_TAG_PROTO_EDSA,
++		.flags = MV88E6XXX_FLAGS_FAMILY_6341,
++		.ops = &mv88e6341_ops,
++	},
++
+ 	[MV88E6350] = {
+ 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6350,
+ 		.family = MV88E6XXX_FAMILY_6351,
+diff --git a/drivers/net/dsa/mv88e6xxx/mv88e6xxx.h b/drivers/net/dsa/mv88e6xxx/mv88e6xxx.h
+index 466cfdadb7bd..35e879169003 100644
+--- a/drivers/net/dsa/mv88e6xxx/mv88e6xxx.h
++++ b/drivers/net/dsa/mv88e6xxx/mv88e6xxx.h
+@@ -100,6 +100,7 @@
+ #define PORT_SWITCH_ID_PROD_NUM_6240	0x240
+ #define PORT_SWITCH_ID_PROD_NUM_6290	0x290
+ #define PORT_SWITCH_ID_PROD_NUM_6321	0x310
++#define PORT_SWITCH_ID_PROD_NUM_6341	0x340
+ #define PORT_SWITCH_ID_PROD_NUM_6352	0x352
+ #define PORT_SWITCH_ID_PROD_NUM_6350	0x371
+ #define PORT_SWITCH_ID_PROD_NUM_6351	0x375
+@@ -382,7 +383,7 @@
+ #define GLOBAL2_EEPROM_CMD_WRITE_EN	BIT(10)
+ #define GLOBAL2_EEPROM_CMD_ADDR_MASK	0xff
+ #define GLOBAL2_EEPROM_DATA	0x15
+-#define GLOBAL2_EEPROM_ADDR	0x15 /* 6390 */
++#define GLOBAL2_EEPROM_ADDR	0x15 /* 6390, 6341 */
+ #define GLOBAL2_PTP_AVB_OP	0x16
+ #define GLOBAL2_PTP_AVB_DATA	0x17
+ #define GLOBAL2_SMI_PHY_CMD			0x18
+@@ -433,6 +434,7 @@ enum mv88e6xxx_model {
+ 	MV88E6290,
+ 	MV88E6320,
+ 	MV88E6321,
++	MV88E6341,
+ 	MV88E6350,
+ 	MV88E6351,
+ 	MV88E6352,
+@@ -448,6 +450,7 @@ enum mv88e6xxx_family {
+ 	MV88E6XXX_FAMILY_6165,	/* 6123 6161 6165 */
+ 	MV88E6XXX_FAMILY_6185,	/* 6108 6121 6122 6131 6152 6155 6182 6185 */
+ 	MV88E6XXX_FAMILY_6320,	/* 6320 6321 */
++	MV88E6XXX_FAMILY_6341,	/* 6141 6341 */
+ 	MV88E6XXX_FAMILY_6351,	/* 6171 6175 6350 6351 */
+ 	MV88E6XXX_FAMILY_6352,	/* 6172 6176 6240 6352 */
+ 	MV88E6XXX_FAMILY_6390,  /* 6190 6190X 6191 6290 6390 6390X */
+@@ -612,6 +615,22 @@ enum mv88e6xxx_cap {
+ 	 MV88E6XXX_FLAGS_MULTI_CHIP |	\
+ 	 MV88E6XXX_FLAGS_PVT)
+ 
++#define MV88E6XXX_FLAGS_FAMILY_6341	\
++	(MV88E6XXX_FLAG_EEE |		\
++	 MV88E6XXX_FLAG_G1_ATU_FID |	\
++	 MV88E6XXX_FLAG_G1_VTU_FID |	\
++	 MV88E6XXX_FLAG_GLOBAL2 |	\
++	 MV88E6XXX_FLAG_G2_INT |	\
++	 MV88E6XXX_FLAG_G2_POT |	\
++	 MV88E6XXX_FLAG_STU |		\
++	 MV88E6XXX_FLAG_TEMP |		\
++	 MV88E6XXX_FLAG_TEMP_LIMIT |	\
++	 MV88E6XXX_FLAG_VTU |		\
++	 MV88E6XXX_FLAGS_IRL |		\
++	 MV88E6XXX_FLAGS_MULTI_CHIP |	\
++	 MV88E6XXX_FLAGS_PVT |		\
++	 MV88E6XXX_FLAGS_SERDES)
++
+ #define MV88E6XXX_FLAGS_FAMILY_6351	\
+ 	(MV88E6XXX_FLAG_G1_ATU_FID |	\
+ 	 MV88E6XXX_FLAG_G1_VTU_FID |	\
 -- 
 2.11.0
