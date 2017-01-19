@@ -1,94 +1,61 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Thu, 19 Jan 2017 23:51:06 +0200
-Subject: [PATCH v2 2/2] vring: Force use of DMA API for ARM-based systems
-In-Reply-To: <20170116143408.GG1510@arm.com>
-References: <20170112232931-mutt-send-email-mst@kernel.org>
- <20170113092522.GB22538@arm.com>
- <20170113183222-mutt-send-email-mst@kernel.org>
- <20170113172154.GL3253@arm.com>
- <20170113201933-mutt-send-email-mst@kernel.org>
- <20170116104028.GA1510@arm.com>
- <20170116161639-mutt-send-email-mst@kernel.org>
- <20170116142103.GF1510@arm.com>
- <20170116162225-mutt-send-email-mst@kernel.org>
- <20170116143408.GG1510@arm.com>
-Message-ID: <20170119234852-mutt-send-email-mst@kernel.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 19 Jan 2017 22:04:23 +0100
+Subject: [PATCH v2 3/7] clk: sunxi-ng: Implement multiplier maximum
+In-Reply-To: <CAGb2v65K8zQvHbhwZ6b6VhO6egXVQN4agHQ1JT8rkHzNsAEUtw@mail.gmail.com>
+References: <cover.8762813dc78858261716126c700983d4aee00458.1484035021.git-series.maxime.ripard@free-electrons.com>
+ <ab8ef79d63fc09c3eaa556d299832ec06e9869cf.1484035021.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v65K8zQvHbhwZ6b6VhO6egXVQN4agHQ1JT8rkHzNsAEUtw@mail.gmail.com>
+Message-ID: <20170119210423.5kjs3envfosjlsmr@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2017 at 02:34:08PM +0000, Will Deacon wrote:
-> On Mon, Jan 16, 2017 at 04:27:28PM +0200, Michael S. Tsirkin wrote:
-> > On Mon, Jan 16, 2017 at 02:21:03PM +0000, Will Deacon wrote:
-> > > On Mon, Jan 16, 2017 at 04:18:03PM +0200, Michael S. Tsirkin wrote:
-> > > > On Mon, Jan 16, 2017 at 10:40:28AM +0000, Will Deacon wrote:
-> > > > > On Fri, Jan 13, 2017 at 08:23:35PM +0200, Michael S. Tsirkin wrote:
-> > > > > > On Fri, Jan 13, 2017 at 05:21:54PM +0000, Will Deacon wrote:
-> > > > > > > On Fri, Jan 13, 2017 at 06:46:32PM +0200, Michael S. Tsirkin wrote:
-> > > > > > > > On Fri, Jan 13, 2017 at 09:25:22AM +0000, Will Deacon wrote:
-> > > > > > > > > On Fri, Jan 13, 2017 at 12:12:56AM +0200, Michael S. Tsirkin wrote:
-> > > > > > > > > > I'd rather people didn't use SMMU with legacy devices.
-> > > > > > > > > 
-> > > > > > > > > I'm afraid we've been doing that for two years and the model already
-> > > > > > > > > exists in a mature state, being actively used for development and
-> > > > > > > > > validation by ARM and our partners. One of the big things its used for
-> > > > > > > > > is to develop SMMU and GIC (our interrupt controller) code with PCI, so
-> > > > > > > > > dropping the SMMU from the picture isn't an option.
-> > > > > > > > 
-> > > > > > > > Oh so this fixes a regression?  This is something I didn't realize.
-> > > > > > > 
-> > > > > > > Yes, thanks. The regression came about because we implemented SMMU-backed
-> > > > > > > DMA ops and only then was it apparent that the virtio stuff was bypassing
-> > > > > > > even with translation enabled (because it wasn't using the DMA API).
-> > > > > > 
-> > > > > > Could you point out a commit ID?
-> > > > > 
-> > > > > There has been a fair amount of work in this area recently, but you're
-> > > > > probably after something like 876945dbf649 ("arm64: Hook up IOMMU dma_ops")
-> > > > > as the culprit, which is the point at which we started to swizzle DMA
-> > > > > ops for devices upstream of an SMMU automatically.
-> > > > > 
-> > > > > > > > A "Fixes:" tag can't hurt here.  I then wonder
-> > > > > > > > might DMA ops ever use a DMA address which isn't a physical address
-> > > > > > > > from QEMU point of view? If that happens, this hack breaks
-> > > > > > > > because in legacy mode QEMU still uses the GPA.
-> > > > > > > 
-> > > > > > > If QEMU doesn't advertise an SMMU, then it will work fine with the GPA,
-> > > > > > > because we won't swizzle the DMA ops for the master device. If QEMU does
-> > > > > > > advertise an SMMU, then we'll allocate DMA addresses to fit within the
-> > > > > > > the intersection of the SMMU aperture and device's DMA mask.
-> > > > > > 
-> > > > > > 
-> > > > > > Right but doesn't just poking from qemu into phys addresses work
-> > > > > > anymore? It used to ...
-> > > > > 
-> > > > > Provided that there's no SMMU, then it will continue to work. and my
-> > > > > understanding (from talking to Peter Maydell) is that qemu doesn't model
-> > > > > an SMMU for ARM-based machines.
-> > > > > 
-> > > > 
-> > > > So how come people report failures due to presence of SMMU?
-> > > > Using some other hypervisor?
-> > > 
-> > > The failures are reported on the ARM fastmodel (a complete system
-> > > emulation that runs on an x86 box), where an SMMU *is* present
-> > > downstream of the virtio-pci masters. There's no qemu involved there.
-> > > 
-> > I see. And this hypervisor actually coded up looking up
-> > translations in the SMMU unconditionally for legacy devices,
-> > and this worked as long as guest didn't touch the SMMU?
-> 
-> Well, the fastmodel isn't a hypervisor really. It's a full system emulation,
-> so it's better to think of it like a piece of hardware. For example, you
-> could run KVM on the fastmodel. But yes, when Linux didn't swizzle the
-> DMA ops to point at the SMMU, then everything defaults to bypass (because
-> that's the default behaviour of the SMMU driver -- this is configurable
-> on the command line) which is why things used to work.
-> 
-> Will
+Hi,
 
-I would be a bit happier if Linux checked virtio iommu quirk and skipped
-the DMA ops thing then. It's a bit ugly but at least it's consistently
-ugly.  To get clean emulation you would then use a modern device.
+On Mon, Jan 16, 2017 at 01:58:18PM +0800, Chen-Yu Tsai wrote:
+> On Tue, Jan 10, 2017 at 3:57 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/clk/sunxi-ng/ccu_mult.c |  4 ++--
+> >  drivers/clk/sunxi-ng/ccu_mult.h | 10 ++++++----
+> >  drivers/clk/sunxi-ng/ccu_nk.c   |  8 ++++----
+> >  drivers/clk/sunxi-ng/ccu_nkm.c  |  8 ++++----
+> >  drivers/clk/sunxi-ng/ccu_nkmp.c |  8 ++++----
+> >  drivers/clk/sunxi-ng/ccu_nm.c   |  4 ++--
+> >  6 files changed, 22 insertions(+), 20 deletions(-)
+> >
+> > diff --git a/drivers/clk/sunxi-ng/ccu_mult.c b/drivers/clk/sunxi-ng/ccu_mult.c
+> > index bf5e11c803f9..fccfe1e1961a 100644
+> > --- a/drivers/clk/sunxi-ng/ccu_mult.c
+> > +++ b/drivers/clk/sunxi-ng/ccu_mult.c
+> > @@ -41,7 +41,7 @@ static unsigned long ccu_mult_round_rate(struct ccu_mux_internal *mux,
+> >         struct _ccu_mult _cm;
+> >
+> >         _cm.min = 1;
+> > -       _cm.max = 1 << cm->mult.width;
+> > +       _cm.max = cm->mult.max ?: 1 << cm->mult.width;
+> 
+> Should you also factor in the offset when providing the default
+> value for max? Otherwise you might end up with a value that is
+> actually not progammable?
+> 
+> Say if offset is 1, then max would be 1 << width.
+> But if offset is 0, then max would have to be (1 << width) - 1,
+> as (1 << width) is not valid.
+
+Ah, yes, that's true. I'll fix it.
+
+Thanks!
+Maxime
 
 -- 
-MST
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170119/d2beb4bd/attachment.sig>
