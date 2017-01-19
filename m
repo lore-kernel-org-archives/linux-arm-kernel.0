@@ -1,103 +1,40 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 19 Jan 2017 18:07:06 +0100
-Subject: [PATCH 2/3] mm: cma_alloc: allow to specify GFP mask
-In-Reply-To: <20170119170707.31741-1-l.stach@pengutronix.de>
-References: <20170119170707.31741-1-l.stach@pengutronix.de>
-Message-ID: <20170119170707.31741-2-l.stach@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 19 Jan 2017 09:08:55 -0800
+Subject: [PATCH 0/2] ARM: DTS: Fix broken GICv2 register maps
+In-Reply-To: <16613dbe-08b9-98d8-c747-a977e78601b1@arm.com>
+References: <1484736811-24002-1-git-send-email-marc.zyngier@arm.com>
+ <2966702.djJyWhCMlK@wuerfel>
+ <16613dbe-08b9-98d8-c747-a977e78601b1@arm.com>
+Message-ID: <20170119170854.GX7403@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most users of this interface just want to use it with the default
-GFP_KERNEL flags, but for cases where DMA memory is allocated it may
-be called from a different context.
+* Marc Zyngier <marc.zyngier@arm.com> [170118 05:09]:
+> On 18/01/17 12:34, Arnd Bergmann wrote:
+> > On Wednesday, January 18, 2017 10:53:29 AM CET Marc Zyngier wrote:
+> >> For a GICv2 (which happens to be virtualization capable), the
+> >> architecture mandates the following regions:
+> >>
+> >> 	     GICD: 4kB
+> >> 	     GICC: 8kB
+> >> 	     GICH: 8kB
+> >> 	     GICV: 8kB
+> >>
+> >> Unfortunately, I made a mistake in one of the examples contained in
+> >> the DT binding document, and everyone duplicated that same mistake all
+> >> over the map.
+> >>
+> >> This small series fixes the DT binding, and hopefully updates all the
+> >> offending DTs to be compliant with the architecture.
+> >>
+> > 
+> > Looks good to me, can you send this as a pull request to arm at kernel.org
+> > once you have collected a reasonable number of Acks?
+> 
+> Sure, will do.
+> 
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-No functional change yet, just passing through the flag to the
-underlying alloc_contig_range function.
+Here's yet another ack to paste for both patches:
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
- arch/powerpc/kvm/book3s_hv_builtin.c | 3 ++-
- drivers/base/dma-contiguous.c        | 2 +-
- include/linux/cma.h                  | 3 ++-
- mm/cma.c                             | 5 +++--
- mm/cma_debug.c                       | 2 +-
- 5 files changed, 9 insertions(+), 6 deletions(-)
-
-diff --git a/arch/powerpc/kvm/book3s_hv_builtin.c b/arch/powerpc/kvm/book3s_hv_builtin.c
-index 5bb24be0b346..56a62d97ab2d 100644
---- a/arch/powerpc/kvm/book3s_hv_builtin.c
-+++ b/arch/powerpc/kvm/book3s_hv_builtin.c
-@@ -56,7 +56,8 @@ struct page *kvm_alloc_hpt(unsigned long nr_pages)
- {
- 	VM_BUG_ON(order_base_2(nr_pages) < KVM_CMA_CHUNK_ORDER - PAGE_SHIFT);
- 
--	return cma_alloc(kvm_cma, nr_pages, order_base_2(HPT_ALIGN_PAGES));
-+	return cma_alloc(kvm_cma, nr_pages, order_base_2(HPT_ALIGN_PAGES),
-+			 GFP_KERNEL);
- }
- EXPORT_SYMBOL_GPL(kvm_alloc_hpt);
- 
-diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
-index e167a1e1bccb..d1a9cbabc627 100644
---- a/drivers/base/dma-contiguous.c
-+++ b/drivers/base/dma-contiguous.c
-@@ -193,7 +193,7 @@ struct page *dma_alloc_from_contiguous(struct device *dev, size_t count,
- 	if (align > CONFIG_CMA_ALIGNMENT)
- 		align = CONFIG_CMA_ALIGNMENT;
- 
--	return cma_alloc(dev_get_cma_area(dev), count, align);
-+	return cma_alloc(dev_get_cma_area(dev), count, align, GFP_KERNEL);
- }
- 
- /**
-diff --git a/include/linux/cma.h b/include/linux/cma.h
-index 6f0a91b37f68..03f32d0bd1d8 100644
---- a/include/linux/cma.h
-+++ b/include/linux/cma.h
-@@ -29,6 +29,7 @@ extern int __init cma_declare_contiguous(phys_addr_t base,
- extern int cma_init_reserved_mem(phys_addr_t base, phys_addr_t size,
- 					unsigned int order_per_bit,
- 					struct cma **res_cma);
--extern struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align);
-+extern struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
-+			      gfp_t gfp_mask);
- extern bool cma_release(struct cma *cma, const struct page *pages, unsigned int count);
- #endif
-diff --git a/mm/cma.c b/mm/cma.c
-index fbd67d866f67..a33ddfde315d 100644
---- a/mm/cma.c
-+++ b/mm/cma.c
-@@ -362,7 +362,8 @@ int __init cma_declare_contiguous(phys_addr_t base,
-  * This function allocates part of contiguous memory on specific
-  * contiguous memory area.
-  */
--struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align)
-+struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
-+		       gfp_t gfp_mask)
- {
- 	unsigned long mask, offset;
- 	unsigned long pfn = -1;
-@@ -408,7 +409,7 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align)
- 		pfn = cma->base_pfn + (bitmap_no << cma->order_per_bit);
- 		mutex_lock(&cma_mutex);
- 		ret = alloc_contig_range(pfn, pfn + count, MIGRATE_CMA,
--					 GFP_KERNEL);
-+					 gfp_mask);
- 		mutex_unlock(&cma_mutex);
- 		if (ret == 0) {
- 			page = pfn_to_page(pfn);
-diff --git a/mm/cma_debug.c b/mm/cma_debug.c
-index f8e4b60db167..ffc0c3d0ae64 100644
---- a/mm/cma_debug.c
-+++ b/mm/cma_debug.c
-@@ -138,7 +138,7 @@ static int cma_alloc_mem(struct cma *cma, int count)
- 	if (!mem)
- 		return -ENOMEM;
- 
--	p = cma_alloc(cma, count, 0);
-+	p = cma_alloc(cma, count, 0, GFP_KERNEL);
- 	if (!p) {
- 		kfree(mem);
- 		return -ENOMEM;
--- 
-2.11.0
+Acked-by: Tony Lindgren <tony@atomide.com>
