@@ -1,32 +1,63 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 19 Jan 2017 10:09:20 +0100
-Subject: ARM: i.MX7: Fix LPSR specific iomux pins
-Message-ID: <20170119090924.19636-1-s.hauer@pengutronix.de>
+Date: Thu, 19 Jan 2017 10:09:22 +0100
+Subject: [PATCH 2/4] ARM: dts: imx7d-sdp: Fix watchdog and pwm pinmux
+In-Reply-To: <20170119090924.19636-1-s.hauer@pengutronix.de>
+References: <20170119090924.19636-1-s.hauer@pengutronix.de>
+Message-ID: <20170119090924.19636-3-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX7 has two iomux controllers. the iomuxc and the iomuxc_lpsr.
-Some pinmux settings in the board dts files are non functional because
-they are attached to the wrong iomux controller. The following patches
-fix this.
-It's way too easy to fall into this trap again. Only a look into the
-reference manual can reveal which pin belongs to which controller.
-To make this clearer the last patch adds "LPSR" to the pin names
-which belong to the LPSR controller.
+The watchdog pin and the pwm output pin are controlled by the
+iomuxc_lpsr, not the regular iomux, so move the pins there.
 
-Sascha
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/boot/dts/imx7d-sdb.dts | 26 ++++++++++++++------------
+ 1 file changed, 14 insertions(+), 12 deletions(-)
 
-----------------------------------------------------------------
-Sascha Hauer (4):
-      ARM: dts: imx7s-warp: Fix watchdog pinmux
-      ARM: dts: imx7d-sdp: Fix watchdog and pwm pinmux
-      ARM: dts: imx7d-cl-som: Fix OTG power pinctrl
-      ARM: dts: imx7: Add "LPSR" to LPSR iomux pin names
-
- arch/arm/boot/dts/imx7-colibri.dtsi     |  16 ++---
- arch/arm/boot/dts/imx7d-cl-som-imx7.dts |  14 ++--
- arch/arm/boot/dts/imx7d-nitrogen7.dts   |  14 ++--
- arch/arm/boot/dts/imx7d-pinfunc.h       | 110 ++++++++++++++++----------------
- arch/arm/boot/dts/imx7d-sdb.dts         |  26 ++++----
- arch/arm/boot/dts/imx7s-warp.dts        |   4 +-
- 6 files changed, 95 insertions(+), 89 deletions(-)
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+index 2f33c463cbce..84f35a6cbb30 100644
+--- a/arch/arm/boot/dts/imx7d-sdb.dts
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -502,12 +502,6 @@
+ 			>;
+ 		};
+ 
+-		pinctrl_pwm1: pwm1grp {
+-			fsl,pins = <
+-				MX7D_PAD_GPIO1_IO01__PWM1_OUT		0x110b0
+-			>;
+-		};
+-
+ 		pinctrl_tsc2046_pendown: tsc2046_pendown {
+ 			fsl,pins = <
+ 				MX7D_PAD_EPDC_BDR1__GPIO2_IO29		0x59
+@@ -635,11 +629,19 @@
+ 				MX7D_PAD_SD3_STROBE__SD3_STROBE		0x1b
+ 			>;
+ 		};
+-
+-		pinctrl_wdog: wdoggrp {
+-			fsl,pins = <
+-				MX7D_PAD_GPIO1_IO00__WDOD1_WDOG_B	0x74
+-			>;
+-		};
+ 	};
+ };
++
++&iomuxc_lpsr {
++	pinctrl_wdog: wdoggrp {
++		fsl,pins = <
++			MX7D_PAD_GPIO1_IO00__WDOD1_WDOG_B	0x74
++		>;
++	};
++
++	pinctrl_pwm1: pwm1grp {
++		fsl,pins = <
++			MX7D_PAD_GPIO1_IO01__PWM1_OUT		0x110b0
++		>;
++	};
++};
+\ No newline at end of file
+-- 
+2.11.0
