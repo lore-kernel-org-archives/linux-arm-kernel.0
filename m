@@ -1,34 +1,39 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 Jan 2017 14:24:24 +0000
-Subject: [PATCH 1/4] ARM: mmu: decouple VECTORS_BASE from Kconfig
-In-Reply-To: <20170118203739.6400-1-afzal.mohd.ma@gmail.com>
-References: <20170118203525.6246-1-afzal.mohd.ma@gmail.com>
- <20170118203739.6400-1-afzal.mohd.ma@gmail.com>
-Message-ID: <20170119142424.GZ27312@n2100.armlinux.org.uk>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 19 Jan 2017 15:24:47 +0100
+Subject: imx6: PCIe imx6_pcie_assert_core_reset() hangs after watchdog
+ reset
+In-Reply-To: <CAOMZO5C+3rCnpQvonXyDaMmUxsDYAnXRBXrUwbP3AT5TbofSgQ@mail.gmail.com>
+References: <1427377198.3378.16.camel@pengutronix.de>
+ <20161106153117.GA22538@frolo.macqel>
+ <CAOMZO5ADK9TvQiBs8HrKjNp+avZsO9xujZvG6CO2onZdAcDSGA@mail.gmail.com>
+ <1478514883.12872.2.camel@pengutronix.de>
+ <CAOMZO5C+3rCnpQvonXyDaMmUxsDYAnXRBXrUwbP3AT5TbofSgQ@mail.gmail.com>
+Message-ID: <1484835887.24339.40.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 02:07:39AM +0530, afzal mohammed wrote:
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index 76cbd9c674df..9cc9f1dbc88e 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -83,6 +83,8 @@
->  #define IOREMAP_MAX_ORDER	24
->  #endif
->  
-> +#define VECTORS_BASE		0xffff0000
+Hi Fabio,
 
-This should be UL(0xffff0000)
+Am Montag, den 07.11.2016, 10:15 -0200 schrieb Fabio Estevam:
+> Hi Lucas,
+> 
+> On Mon, Nov 7, 2016 at 8:34 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> 
+> > The problem is definitely present in current mainline Linux. I intent to
+> > remove this workaround from the kernel, but we need to make sure that
+> > the bootloader properly disables PCIe before jumping to the kernel
+> > image.
+> >
+> > I don't know what the status of this is in U-Boot, but Barebox already
+> > does this correctly.
+> >
+> > Fabio, would you mind to port this coed to U-Boot, or at least check if
+> > it does the right thing?
+> 
+> Sure, could you point me to the Barebox fix so I can take a look?
 
-> -			MLK(UL(CONFIG_VECTORS_BASE), UL(CONFIG_VECTORS_BASE) +
-> -				(PAGE_SIZE)),
-> +			MLK(UL(VECTORS_BASE), UL(VECTORS_BASE) + (PAGE_SIZE)),
+Did you have some time to validate/fix this in U-Boot? I would like to
+get the workaround removed from the kernel.
 
-which means you don't need it here, which will then fix the build error
-reported by the 0-day builder.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+Lucas
