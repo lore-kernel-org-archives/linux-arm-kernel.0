@@ -1,119 +1,74 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 19 Jan 2017 10:12:07 -0800
-Subject: [PATCH net-next v3 06/10] net: dsa: Migrate to device_find_class()
-In-Reply-To: <20170119165155.GH27312@n2100.armlinux.org.uk>
-References: <20170114214713.28109-1-f.fainelli@gmail.com>
- <20170114214713.28109-7-f.fainelli@gmail.com>
- <20170115110628.GF26374@kroah.com>
- <fc247aeb-a8d6-5ba9-c26d-cb057a5ac34d@gmail.com>
- <20170115173949.GA19268@kroah.com>
- <a9ea1f45-b9a5-d840-68e0-9bf9bc7a6598@gmail.com>
- <20170115191632.GD5643@lunn.ch>
- <912e6143-c67a-d909-2a6c-939de79efc5d@gmail.com>
- <20170119142820.GA494@kroah.com> <20170119145315.GD21805@lunn.ch>
- <20170119165155.GH27312@n2100.armlinux.org.uk>
-Message-ID: <841dc133-e9af-e7ca-75bf-8371337d6281@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 19 Jan 2017 18:19:11 +0000
+Subject: [PATCH 1/5] iommu/arm-smmu: Restrict domain attributes to UNMANAGED
+ domains
+In-Reply-To: <1484849955-1871-1-git-send-email-will.deacon@arm.com>
+References: <1484849955-1871-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1484849955-1871-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The ARM SMMU drivers provide a DOMAIN_ATTR_NESTING domain attribute,
+which allows callers of the IOMMU API to request that the page table
+for a domain is installed at stage-2, if supported by the hardware.
 
+Since setting this attribute only makes sense for UNMANAGED domains,
+this patch returns -ENODEV if the domain_{get,set}_attr operations are
+called on other domain types.
 
-On 01/19/2017 08:51 AM, Russell King - ARM Linux wrote:
-> (This is mainly for Greg's benefit to help him understand the issue.)
-> 
-> I think the diagram you gave initially made this confusing, as it
-> talks about a CPU(sic) producing the "RGMII" and "MII-MGMT".
-> 
-> Let's instead show a better representation that hopefully helps Greg
-> understand networking. :)
-> 
-> 
->   CPU
-> System <-B->  Ethernet controller <-P-> } PHY <---> network cable
->                                         } - - - - - - - or - - - - - - -
->                   MDIO bus -------M---> } Switch <-P-> PHYs <--> network
->                                               `----M----^        cables
-> 
-> 'B' can be an on-SoC bus or something like PCI.
-> 
-> 'P' are the high-speed connectivity between the ethernet controller and
-> PHY which carries the packet data.  It has no addressing, it's a point
-> to point link.  RGMII is just one wiring example, there are many
-> different interfaces there (SGMII, AUI, XAUI, XGMII to name a few.)
-> 
-> 'M' are the MDIO bus, which is the bus by which ethernet PHYs and
-> switches can be identified and controlled.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ drivers/iommu/arm-smmu-v3.c | 6 ++++++
+ drivers/iommu/arm-smmu.c    | 6 ++++++
+ 2 files changed, 12 insertions(+)
 
-So MDIO is one possible bus type to connect an Ethernet switch (and
-PHYs) to a the System, but is not necessarily the only one. You have
-existing devices out there with on-chip integrated switches (platform),
-SPI/GPIO/I2C/PCI(e).
-
-> 
-> The MDIO bus has a bus_type, has host drivers which are sometimes
-> part of the ethernet controller, but can also be stand-alone devices
-> shared between multiple ethernet controllers.
-> 
-> PHYs are a kind of MDIO device which are members of the MDIO bus
-> type.  Each PHY (and switch) has a numerical address, and identifying
-> numbers within its register set which identifies the manufacturer
-> and device type.  We have device_driver objects for these.
-> 
-> Expanding the above diagram to make it (hopefully) even clearer,
-> we can have this classic setup:
-> 
->   CPU
-> System <-B-> Ethernet controller <-P-> PHY <---> network cable
->                  MDIO bus -------M------^
-> 
-> Or, in the case of two DSA switches attached to an Ethernet controller:
-> 
->                                      |~~~~~~~~|
-> System <-B-> Ethernet controller <-P-> Switch <-P-> PHY1 <--> network cable
->                  MDIO bus ----+--M--->   1    <-P-> PHY2 <--> network cable
->                               |      |        ...    |
->                               |      |        <-P-> PHYn <--> network cable
->                               |      |....^...|      |
->                               |           |  `---M---'
->                               |           P
->                               |           |
->                               |      |~~~~v~~~|
->                               `------> Switch <-P-> PHY1 <--> network cable
->                                      |   2    ...    |
->                                      |        <-P-> PHYn <--> network cable
->                                      |........|      |
->                                              `---M---'
-> 
-> The problem that the DSA guys are trying to deal with is how to
-> represent the link between the DSA switches (which are devices
-> sitting off their controlling bus - the MDIO bus) and the ethernet
-> controller associated with that collection of devices, be it a
-> switch or PHY.
-> 
-> Merely changing the parent/child relationships to try and solve
-> one issue just creates exactly the same problem elsewhere.
-
-Exactly!
-
-> 
-> So, I hope with these diagrams, you can see that trying to make
-> the ethernet controller a child device of the DSA switches
-> means that (eg) it's no longer a PCI device, which is rather
-> absurd, especially when considering that what happens to the
-> right of the ethernet controller in the diagrams above is
-> normally external chips to the SoC or ethernet device.
-> 
-
-Indeed.
-
-Back to the actual code that triggered this discussion, the whole
-purpose is just a safeguard. Given a device reference, we can assume
-that it is indeed the backing device for a net_device, and we could do a
-to_net_device() right away (and crash if someone did not write correct
-platform_data structures), or, by walking the device tree (the device
-driver model one) we can make sure it does belong in the proper class
-and this is indeed what we think it is.
-
-HTH
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 4d6ec444a9d6..c254325b0c7a 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1839,6 +1839,9 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
+ {
+ 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+ 
++	if (domain->type != IOMMU_DOMAIN_UNMANAGED)
++		return -ENODEV;
++
+ 	switch (attr) {
+ 	case DOMAIN_ATTR_NESTING:
+ 		*(int *)data = (smmu_domain->stage == ARM_SMMU_DOMAIN_NESTED);
+@@ -1854,6 +1857,9 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
+ 	int ret = 0;
+ 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+ 
++	if (domain->type != IOMMU_DOMAIN_UNMANAGED)
++		return -ENODEV;
++
+ 	mutex_lock(&smmu_domain->init_mutex);
+ 
+ 	switch (attr) {
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index a60cded8a6ed..a328ffb75509 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1497,6 +1497,9 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
+ {
+ 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+ 
++	if (domain->type != IOMMU_DOMAIN_UNMANAGED)
++		return -ENODEV;
++
+ 	switch (attr) {
+ 	case DOMAIN_ATTR_NESTING:
+ 		*(int *)data = (smmu_domain->stage == ARM_SMMU_DOMAIN_NESTED);
+@@ -1512,6 +1515,9 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
+ 	int ret = 0;
+ 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+ 
++	if (domain->type != IOMMU_DOMAIN_UNMANAGED)
++		return -ENODEV;
++
+ 	mutex_lock(&smmu_domain->init_mutex);
+ 
+ 	switch (attr) {
 -- 
-Florian
+2.1.4
