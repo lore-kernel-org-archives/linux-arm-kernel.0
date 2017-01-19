@@ -1,71 +1,85 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Thu, 19 Jan 2017 21:08:42 +0800
-Subject: [arm:phy-cleanup 10/10]
- arch/mips/cavium-octeon/octeon-platform.c:1064:15: error: expected
- declaration specifiers or '...' before string constant
-Message-ID: <201701192138.NZ3q3lNY%fengguang.wu@intel.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Thu, 19 Jan 2017 21:11:49 +0800
+Subject: [linux-sunxi] [PATCH 1/2] drivers: pinctrl: add driver for
+ Allwinner H5 SoC
+In-Reply-To: <CACRpkdaTVY7Of5bKyk81xA2kUnZVMQ8LnWEJosg7Ns3s5nAEYQ@mail.gmail.com>
+References: <20161223125001.1176-1-icenowy@aosc.xyz>
+ <1280f095-ab03-93f8-14d2-99d13ba1ce55@arm.com>
+ <CACRpkdYQhfid3VRcaj=7as_+Zg=pX3Svp9FJ_W_Ft8nVuoZqKQ@mail.gmail.com>
+ <20170105224210.wfinfucbpkkd44om@lukather>
+ <38fe3491-457a-f0c5-54fb-9defdcd45045@arm.com>
+ <20170116163124.c5gusyd3j3goivnf@lukather>
+ <87a535d3-1170-c388-ce7d-4921e69f4cab@arm.com>
+ <CACRpkdaTVY7Of5bKyk81xA2kUnZVMQ8LnWEJosg7Ns3s5nAEYQ@mail.gmail.com>
+Message-ID: <128701484831509@web34m.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git phy-cleanup
-head:   ef8cb7d5f838770f22cae0e20fee8d1157fc88fd
-commit: ef8cb7d5f838770f22cae0e20fee8d1157fc88fd [10/10] net: dsa: remove unnecessary phy*.h includes
-config: mips-cavium_octeon_defconfig (attached as .config)
-compiler: mips64-linux-gnuabi64-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout ef8cb7d5f838770f22cae0e20fee8d1157fc88fd
-        # save the attached .config to linux build tree
-        make.cross ARCH=mips 
 
-All errors (new ones prefixed by >>):
 
->> arch/mips/cavium-octeon/octeon-platform.c:1064:15: error: expected declaration specifiers or '...' before string constant
-    MODULE_AUTHOR("David Daney <ddaney@caviumnetworks.com>");
-                  ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   arch/mips/cavium-octeon/octeon-platform.c:1065:16: error: expected declaration specifiers or '...' before string constant
-    MODULE_LICENSE("GPL");
-                   ^~~~~
-   arch/mips/cavium-octeon/octeon-platform.c:1066:20: error: expected declaration specifiers or '...' before string constant
-    MODULE_DESCRIPTION("Platform driver for Octeon SOC");
-                       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+19.01.2017, 17:23, "Linus Walleij" <linus.walleij@linaro.org>:
+> On Wed, Jan 18, 2017 at 10:44 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+>
+>> ?Any future SoCs could then just use that compatible and would describe
+>> ?the SoC details in the DT, like it's meant to be and like we do already,
+>> ?but extended by putting the mux value in there as well.
+>> ?So the only kernel contribution would then be the DT, really, (...)
+>
+> Your different positions have existed since the inception of the
+> pinctrl subsystem:
+>
+> - One camp (myself included) wanted to describe the hardware mostly
+> ??in the driver: functions, groups etc are tables in the driver file.
+>
+> - Another camp (OMAP included) think that the device tree should take
+> ??store most things: groups functions, etc.
+>
+> What we know for sure should be described in DT is how different
+> IP blocks are connected in an SoC (e.g. interrupts, clocks, DMA
+> channels, regulators) and on the of course outside of the SoC, on
+> the board.
+>
+> The question here is whether the way a hardware has instantiated
+> a certain IP block when doing physical compilation in their
+> Verilog, VHDL or SystemC files, is something that should be
+> described in DT.
+>
+> Many companies have developed tools to
+> extract this data from their hardware design files and provide
+> it to developers as a blob och incomprehensible data, such was
+> the situation for OMAP for example. So to them it made most
+> sense to implement pinctrl-single, just parsing that data into
+> DTS(I) files.
+>
+> Other companies (such as STMicroelectronics) instead put a
+> team of people to write a datasheet with a special chapter
+> on how pins etc are connected, and programmers are given
+> this datasheet and need to again type in the data and define
+> groups etc.
+>
+> Whether parametrization of a HW block should be done in the
+> driver file from the compatible string or with custom attributes
+> in the node is not a simple answer to the question. OF is vague
+> on this kind of things: both solutions exist.
+>
+> Allwinner and Qualcomm authors faced a situation such as that
+> they were given a code dump and no datasheet and no data
+> tables either. That creates an especially complicated situation
+> where none of the above scenarios apply.
 
-vim +1064 arch/mips/cavium-octeon/octeon-platform.c
+Allwinner do give user manual about the pin controller, and they're
+used when we write the pinctrl-sunxi driver.
 
-d617f9e9 David Daney   2013-12-03  1048  				break;
-d617f9e9 David Daney   2013-12-03  1049  			default:
-d617f9e9 David Daney   2013-12-03  1050  				break;
-d617f9e9 David Daney   2013-12-03  1051  			}
-d617f9e9 David Daney   2013-12-03  1052  		}
-d617f9e9 David Daney   2013-12-03  1053  	}
-d617f9e9 David Daney   2013-12-03  1054  
-7ed18152 David Daney   2012-07-05  1055  	return 0;
-7ed18152 David Daney   2012-07-05  1056  }
-7ed18152 David Daney   2012-07-05  1057  
-7ed18152 David Daney   2012-07-05  1058  static int __init octeon_publish_devices(void)
-7ed18152 David Daney   2012-07-05  1059  {
-7ed18152 David Daney   2012-07-05  1060  	return of_platform_bus_probe(NULL, octeon_ids, NULL);
-7ed18152 David Daney   2012-07-05  1061  }
-8074d782 Aaro Koskinen 2016-08-23  1062  arch_initcall(octeon_publish_devices);
-7ed18152 David Daney   2012-07-05  1063  
-512254ba David Daney   2009-09-16 @1064  MODULE_AUTHOR("David Daney <ddaney@caviumnetworks.com>");
-512254ba David Daney   2009-09-16  1065  MODULE_LICENSE("GPL");
-512254ba David Daney   2009-09-16  1066  MODULE_DESCRIPTION("Platform driver for Octeon SOC");
-
-:::::: The code at line 1064 was first introduced by commit
-:::::: 512254ba8383c5dd7eca6819d0da1ce2fe9ede47 MIPS: Octeon:  Move some platform device registration to its own file.
-
-:::::: TO: David Daney <ddaney@caviumnetworks.com>
-:::::: CC: Ralf Baechle <ralf@linux-mips.org>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 15852 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170119/93fef9e0/attachment-0001.gz>
+>
+> What we/you need to ask: what is most helpful for the Allwinner
+> community? What makes the barrier low for new contributions,
+> and makes it easiest to cooperate?
+>
+> I try to live by this motto from IETF:
+>
+> ???"rough consensus and running code"
+>
+> Please do the same.
+>
+> Yours,
+> Linus Walleij
