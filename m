@@ -1,35 +1,39 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 19 Jan 2017 11:13:32 -0800
-Subject: [PATCH v3 2/4] clk: gxbb: add the SAR ADC clocks and expose them
-In-Reply-To: <20170119145822.26239-3-martin.blumenstingl@googlemail.com>
-References: <20170115224221.15510-1-martin.blumenstingl@googlemail.com>
- <20170119145822.26239-1-martin.blumenstingl@googlemail.com>
- <20170119145822.26239-3-martin.blumenstingl@googlemail.com>
-Message-ID: <20170119191332.GA7829@codeaurora.org>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 19 Jan 2017 13:16:50 -0600
+Subject: [PATCH 1/3 v3] iio: adc: add device tree bindings for Qualcomm
+ PM8xxx ADCs
+In-Reply-To: <20170117142515.10578-1-linus.walleij@linaro.org>
+References: <20170117142515.10578-1-linus.walleij@linaro.org>
+Message-ID: <20170119191650.o3ghoysxkhrqw4gw@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/19, Martin Blumenstingl wrote:
-> The HHI_SAR_CLK_CNTL contains three SAR ADC specific clocks:
-> - a mux clock to choose between different ADC reference clocks (this is
->   2-bit wide, but the datasheet only lists the parents for the first
->   bit)
-> - a divider for the input/reference clock
-> - a gate which enables the ADC clock
+On Tue, Jan 17, 2017 at 03:25:13PM +0100, Linus Walleij wrote:
+> This adds the device tree bindings for the Qualcomm PM8xxx
+> ADCs. This is based on the existing DT bindings for the
+> SPMI ADC so there are hopefully no controversial features.
 > 
-> Additionally this exposes the ADC core clock (CLKID_SAR_ADC) and
-> CLKID_SANA (which seems to enable the analog inputs, but unfortunately
-> there is no documentation for this - we just mimic what the vendor
-> driver does).
-> 
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> Tested-by: Neil Armstrong <narmstrong@baylibre.com>
+> Cc: devicetree at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-arm-msm at vger.kernel.org
+> Cc: Ivan T. Ivanov <iivanov.xz@gmail.com>
+> Cc: Andy Gross <andy.gross@linaro.org>
+> Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> Cc: Rama Krishna Phani A <rphani@codeaurora.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
+> ChangeLog v2->v3:
+> - Collapse the ratiometric property into one that enables and
+>   selects a ratiometric reference in one go.
+> - Use foo: adc-channel at X notation consequently
+> - Document that the reference voltage is compulsory.
+> ChangeLog v1->v2:
+> - Spelling fixes
+> ---
+>  .../bindings/iio/adc/qcom,pm8xxx-xoadc.txt         | 149 +++++++++++++++++++++
+>  1 file changed, 149 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/iio/adc/qcom,pm8xxx-xoadc.txt
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
-
-This should go through arm-soc along with the other patch to dts.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Acked-by: Rob Herring <robh@kernel.org>
