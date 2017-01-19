@@ -1,78 +1,88 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 19 Jan 2017 17:14:41 +0100
-Subject: [PATCH v2] ARM: dts: imx: Pass 'chosen' and 'memory' nodes
-In-Reply-To: <20170119145642.GC27312@n2100.armlinux.org.uk>
-References: <1484834566-19845-1-git-send-email-fabio.estevam@nxp.com>
- <20170119141335.kpbrbpbwaovnijjv@pengutronix.de>
- <CAOMZO5AdgM9eFnerLRdYxwE7gsOE5OvkWs6rCR4zta1XmXHj1A@mail.gmail.com>
- <20170119144641.jxj2bqg5uqjol23x@pengutronix.de>
- <20170119145642.GC27312@n2100.armlinux.org.uk>
-Message-ID: <20170119161441.jcctgig7np4v7sam@pengutronix.de>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Thu, 19 Jan 2017 10:16:58 -0600
+Subject: [Patch v3 1/2] arm: kernel: Add SMC structure parameter
+In-Reply-To: <20170119154818.GE27312@n2100.armlinux.org.uk>
+References: <1484173918-25090-1-git-send-email-andy.gross@linaro.org>
+ <1484173918-25090-2-git-send-email-andy.gross@linaro.org>
+ <20170119144008.GA27312@n2100.armlinux.org.uk>
+ <20170119154506.GB9631@hector.attlocal.net>
+ <20170119154818.GE27312@n2100.armlinux.org.uk>
+Message-ID: <20170119161658.GC9631@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 02:56:42PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Jan 19, 2017 at 03:46:41PM +0100, Uwe Kleine-K?nig wrote:
-> > On Thu, Jan 19, 2017 at 12:35:40PM -0200, Fabio Estevam wrote:
-> > > Hi Uwe,
+On Thu, Jan 19, 2017 at 03:48:18PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Jan 19, 2017 at 09:45:06AM -0600, Andy Gross wrote:
+> > On Thu, Jan 19, 2017 at 02:40:08PM +0000, Russell King - ARM Linux wrote:
+> > > On Wed, Jan 11, 2017 at 04:31:57PM -0600, Andy Gross wrote:
+> > > > diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
+> > > > index b5abfda..3e28d08 100644
+> > > > --- a/include/linux/arm-smccc.h
+> > > > +++ b/include/linux/arm-smccc.h
+> > > > @@ -72,19 +72,33 @@ struct arm_smccc_res {
+> > > >  };
+> > > >  
+> > > >  /**
+> > > > - * arm_smccc_smc() - make SMC calls
+> > > > + * struct arm_smccc_quirk - Contains quirk information
+> > > > + * id contains quirk identification
+> > > > + * state contains the quirk specific information
 > > > 
-> > > On Thu, Jan 19, 2017 at 12:13 PM, Uwe Kleine-K?nig
-> > > <u.kleine-koenig@pengutronix.de> wrote:
+> > > Given that this is a kerneldoc comment, it should really conform to the
+> > > kerneldoc requirements - see Documentation/kernel-doc-nano-HOWTO.txt:
 > > > 
-> > > > Would it be nice to add a comment about why this was added? Something to
-> > > > prevent a cleanup like "remove empty nodes and invalid memory
-> > > > configurations".
-> > > 
-> > > Do you mean something like this?
-> > > 
-> > > /* "chosen" and "memory" nodes are mandatory */
-> > > chosen {};
-> > > memory { device_type = "memory"; reg = <0 0>; };
+> > > /**
+> > >  * struct arm_smccc_quirk - Contains quirk information
+> > >  * @id: quirk identification
+> > >  * @state: the quirk specific information
 > > 
-> > Not very helpful comment. Something like:
+> > Ah, I flubbed that.  I'll fix this.
 > > 
-> > 	/*
-> > 	 * The decompressor relies on a pre-existing chosen node to be
-> > 	 * available to insert the command line and merge other ATAGS
-> > 	 * info.
-> > 	 */
+> > > 
+> > > > + */
+> > > > +struct arm_smccc_quirk {
+> > > > +	int	id;
+> > > > +	union {
+> > > > +		unsigned long a6;
+> > > > +	} state;
+> > > > +};
+> > > > +
+> > > > +/**
+> > > > + * __arm_smccc_smc() - make SMC calls
+> > > >   * @a0-a7: arguments passed in registers 0 to 7
+> > > >   * @res: result values from registers 0 to 3
+> > > > + * @quirk: optional quirk structure
+> > > >   *
+> > > >   * This function is used to make SMC calls following SMC Calling Convention.
+> > > >   * The content of the supplied param are copied to registers 0 to 7 prior
+> > > >   * to the SMC instruction. The return values are updated with the content
+> > > > - * from register 0 to 3 on return from the SMC instruction.
+> > > > + * from register 0 to 3 on return from the SMC instruction.  An optional
+> > > > + * quirk structure provides vendor specific behavior.
+> > > 
+> > > It's quite odd to have the result buried in the middle of arguments
+> > > passed to a function, but I guess for the sake of simplicity in the
+> > > assembly code that's what we need.
+> > > 
+> > > Also:
+> > > 
+> > > "@quirk points to an arm_smccc_quirk, or NULL when no quirks are required."
 > > 
-> > Is it difficult to fix the decompressor?
+> > Fixed.
+> > 
+> > > 
+> > > And... should this not be const?  Are we expecting anyone to modify
+> > > the quirk structure?
+> > 
+> > No, unfortunately.  For qcom, we are stuffing the contents of a6 into the
+> > structure so the caller can get that information.
 > 
-> ... and that comment would be wrong.  Yes, the decompressor relies on it,
-> as do some uboot versions.
+> Please add that detail to the kerneldoc comments for the structure
+> concerning state.a6.  It's important that such information is not
+> lost in the depths of history.
 
-Good that we talked about this, otherwise I would have removed that once
-the decompressor is fixed. So the comment must be
+For documentation, should I split out the union separately?  I don't see any
+good examples for documenting union members in unions defined inside structures.
 
-	/*
-	 * The decompressor and also some versions of U-Boot rely on a
-	 * pre-existing /chosen node to be available to insert the
-	 * command line and merge other ATAGS info.
-	 * Also for U-Boot there must be a pre-existing /memory node.
-	 */
- 
-> > I didn't understood the breakage regarding the memory node good enough
-> > to suggest a comment for that.
-> 
-> A missing memory node appears to prevent some uboot versions supplying
-> any kind of memory layout to the kernel, which then causes the kernel to
-> crash very early during boot.
-> 
-> Again, this is not using appended DTB - this is using a separately loaded
-> DTB in uboot.  uboot fails to update the dtb if these nodes are missing.
-> 
-> Frankly, I think the original change (removing the skeleton.dtsi include)
-> was misguided and needs to be reverted - the change is imho built upon an
-> incorrect assumption that nothing in skeleton.dtsi is required.  That's
-> clearly false.
-
-I tend to agree as I assume it's not only U-Boot on i.MX but on all ARM
-platforms.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards,
+Andy
