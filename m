@@ -1,144 +1,102 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Thu, 19 Jan 2017 20:35:54 +0530
-Subject: [PATCH V5 10/12] drivers: acpi: Configure acpi devices dma operation
- at probe time
-In-Reply-To: <1484838356-24962-1-git-send-email-sricharan@codeaurora.org>
-References: <1484838356-24962-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1484838356-24962-11-git-send-email-sricharan@codeaurora.org>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 19 Jan 2017 16:31:56 +0100
+Subject: Initializing MAC address at run-time
+In-Reply-To: <20170118185435.fen6np7lydzgxxek@pengutronix.de>
+References: <e083ed68-0e8e-380e-23bd-5ad387c88575@free.fr>
+ <20170118185435.fen6np7lydzgxxek@pengutronix.de>
+Message-ID: <79fef293-74ec-dece-1941-747cd55f1ca2@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With all the DT based devices getting their dma ops configured
-during probe time to have the right iommu setup, let us do the
-same for acpi based devices as well.
+Hello Uwe,
 
-Configuring DMA ops at probe time will allow deferring device probe when
-the IOMMU isn't available yet. The dma_configure for the device is
-now called from the generic device_attach callback just before the
-bus/driver probe is called. This way, configuring the DMA ops for the
-device would be called at the same place for all bus_types, hence the
-deferred probing mechanism should work for all buses as well.
+On 18/01/2017 19:54, Uwe Kleine-K?nig wrote:
 
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
----
- * Removed the dma configuration for the pci devices in case of ACPI
-   from pci_dma_configure which was hanging outside separately and
-   doing it in dma_configure function itself.
+> On Wed, Jan 18, 2017 at 03:03:57PM +0100, Mason wrote:
+>
+>> When my system boots up, eth0 is given a seemingly random MAC address.
+>>
+>> [    0.950734] nb8800 26000.ethernet eth0: MAC address ba:de:d6:38:b8:38
+>> [    0.957334] nb8800 26000.ethernet eth0: MAC address 6e:f1:48:de:d6:c4
+>>
+>>
+>> The DT node for eth0 is:
+>>
+>> 	eth0: ethernet at 26000 {
+>> 		compatible = "sigma,smp8734-ethernet";
+>> 		reg = <0x26000 0x800>;
+>> 		interrupts = <38 IRQ_TYPE_LEVEL_HIGH>;
+>> 		clocks = <&clkgen SYS_CLK>;
+>> 	};
+>>
+>> Documentation/devicetree/bindings/net/ethernet.txt mentions
+>> - local-mac-address: array of 6 bytes, specifies the MAC address that was
+>>   assigned to the network device;
+>>
+>> And indeed, if I define this property, eth0 ends up with the MAC address
+>> I specify in the device tree. But of course, I don't want all my boards
+>> to share the same MAC address. Every interface has a unique MAC address.
+>>
+>> In fact, the boot loader (not Uboot, a custom non-DT boot loader) stores
+>> the MAC address somewhere in MMIO space, in some weird custom format.
+> 
+> Where does your machine get the dtb from? You write it to the boot
+> medium at a certain point of time I assume.
 
- drivers/acpi/glue.c        |  5 -----
- drivers/base/dma-mapping.c | 13 ++++++++++++-
- drivers/pci/probe.c        | 25 -------------------------
- 3 files changed, 12 insertions(+), 31 deletions(-)
+The DTB is appended to the kernel uImage.
+(It's never written to the board's storage.)
 
-diff --git a/drivers/acpi/glue.c b/drivers/acpi/glue.c
-index fb19e1c..c05f241 100644
---- a/drivers/acpi/glue.c
-+++ b/drivers/acpi/glue.c
-@@ -176,7 +176,6 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
- 	struct list_head *physnode_list;
- 	unsigned int node_id;
- 	int retval = -EINVAL;
--	enum dev_dma_attr attr;
- 
- 	if (has_acpi_companion(dev)) {
- 		if (acpi_dev) {
-@@ -233,10 +232,6 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
- 	if (!has_acpi_companion(dev))
- 		ACPI_COMPANION_SET(dev, acpi_dev);
- 
--	attr = acpi_get_dma_attr(acpi_dev);
--	if (attr != DEV_DMA_NOT_SUPPORTED)
--		acpi_dma_configure(dev, attr);
--
- 	acpi_physnode_link_name(physical_node_name, node_id);
- 	retval = sysfs_create_link(&acpi_dev->dev.kobj, &dev->kobj,
- 				   physical_node_name);
-diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
-index f82212c..294942d 100644
---- a/drivers/base/dma-mapping.c
-+++ b/drivers/base/dma-mapping.c
-@@ -7,6 +7,7 @@
-  * This file is released under the GPLv2.
-  */
- 
-+#include <linux/acpi.h>
- #include <linux/dma-mapping.h>
- #include <linux/export.h>
- #include <linux/gfp.h>
-@@ -352,6 +353,7 @@ int dma_configure(struct device *dev)
- {
- 	struct device *_dev = dev;
- 	int is_pci = dev_is_pci(dev);
-+	enum dev_dma_attr attr;
- 	int ret = 0;
- 
- 	if (is_pci) {
-@@ -361,8 +363,16 @@ int dma_configure(struct device *dev)
- 			_dev = _dev->parent;
- 	}
- 
--	if (_dev->of_node)
-+	if (_dev->of_node) {
- 		ret = of_dma_configure(dev, _dev->of_node);
-+	} else if (has_acpi_companion(_dev)) {
-+		attr = acpi_get_dma_attr(to_acpi_device_node(_dev->fwnode));
-+
-+		if (attr == DEV_DMA_NOT_SUPPORTED)
-+			dev_warn(dev, "DMA not supported.\n");
-+		else
-+			acpi_dma_configure(dev, attr);
-+	}
- 
- 	if (is_pci)
- 		pci_put_host_bridge_device(_dev);
-@@ -373,4 +383,5 @@ int dma_configure(struct device *dev)
- void dma_deconfigure(struct device *dev)
- {
- 	of_dma_deconfigure(dev);
-+	acpi_dma_deconfigure(dev);
- }
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 634d34e..b86e9b1 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1862,30 +1862,6 @@ static void pci_set_msi_domain(struct pci_dev *dev)
- 	dev_set_msi_domain(&dev->dev, d);
- }
- 
--/**
-- * pci_dma_configure - Setup DMA configuration
-- * @dev: ptr to pci_dev struct of the PCI device
-- *
-- * Function to update PCI devices's DMA configuration using the same
-- * info from the OF node or ACPI node of host bridge's parent (if any).
-- */
--static void pci_dma_configure(struct pci_dev *dev)
--{
--	struct device *bridge = pci_get_host_bridge_device(dev);
--
--	if (has_acpi_companion(bridge)) {
--		struct acpi_device *adev = to_acpi_device_node(bridge->fwnode);
--		enum dev_dma_attr attr = acpi_get_dma_attr(adev);
--
--		if (attr == DEV_DMA_NOT_SUPPORTED)
--			dev_warn(&dev->dev, "DMA not supported.\n");
--		else
--			acpi_dma_configure(&dev->dev, attr);
--	}
--
--	pci_put_host_bridge_device(bridge);
--}
--
- void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
- {
- 	int ret;
-@@ -1899,7 +1875,6 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
- 	dev->dev.dma_mask = &dev->dma_mask;
- 	dev->dev.dma_parms = &dev->dma_parms;
- 	dev->dev.coherent_dma_mask = 0xffffffffull;
--	pci_dma_configure(dev);
- 
- 	pci_set_dma_max_seg_size(dev, 65536);
- 	pci_set_dma_seg_boundary(dev, 0xffffffff);
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+> So AFAICT you have the following options (in no particular order):
+> 
+>  a) Describe in the dtb how to find out how the MAC address is stored
+>     (already pointed out Mark and Robin)
+>  b) Make your bootloader dt aware and let it provide the
+>     local-mac-address property.
+
+Do you agree that such boot loader would execute code that is roughly
+identical to the one posted for illustration purposes?
+  1. find the MAC address to use for eth0
+  2. find the eth0 node in the DT
+  3. insert the right prop in the eth0 node
+
+In which case, it seems a waste to add the DT library to the boot
+loader, when the operation can be done in Linux, which requires the
+DT library anyway. (Additionally, adding DT support to some custom
+legacy boot loader might be a complex task.)
+
+>  c) Adapt the dtb before it is written to the boot medium.
+
+This is not applicable, as the DTB is not written to the board.
+
+>  d) Let the bootloader configure the device and teach the driver to pick
+>     up the mac from the device's address space.
+
+I'm not sure what you call "the device" ?
+The local RAM where the MAC is stored? the eth controller?
+
+>  e) Accept that the mac address is random during development, and make
+>     Userspace configure the MAC address, which is early enough for
+>     production use.
+
+During development, some devs configure the DHCP server to provide
+a specific uImage and/or rootfs to their board, based on the MAC
+address. This scheme would fall apart with a random MAC.
+
+> Not sure d) is considered ok today, but some drivers have this feature.
+> I'd say b) is the best choice.
+
+In my mind, doing it early in Linux is similar in spirit to doing it
+at the boot loader stage, in that it's neatly separated from the rest
+of the setup.
+
+>> I need to do something similar with the NAND partitions. The boot loader
+>> stores the partition offsets somewhere, and I need to pass this info
+>> to the NAND framework, so I assumed that inserting the corresponding
+>> properties at run-time was the correct way to do it.
+> 
+> The list of options here is similar to the list above. d) doesn't work,
+> but instead you can pass the partitioning on the kernel commandline.
+
+Yes, I will test the command line approach. Thanks.
+
+Regards.
