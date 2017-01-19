@@ -1,43 +1,20 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 19 Jan 2017 19:29:55 -0300
-Subject: [PATCH 2/2] ARM: dts: exynos: Use correct mfc_pd async-bridge clock
- for Exynos5420
-In-Reply-To: <1484864995-10679-1-git-send-email-javier@osg.samsung.com>
-References: <1484864995-10679-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1484864995-10679-2-git-send-email-javier@osg.samsung.com>
+From: vivien.didelot@savoirfairelinux.com (Vivien Didelot)
+Date: Thu, 19 Jan 2017 17:33:13 -0500
+Subject: [PATCH v5 0/2] Add support for the ethernet switch on the
+ ESPRESSObin
+In-Reply-To: <874m0u1z65.fsf@weeman.i-did-not-set--mail-host-address--so-tickle-me>
+References: <20170119214934.27442-1-gregory.clement@free-electrons.com>
+ <874m0u1z65.fsf@weeman.i-did-not-set--mail-host-address--so-tickle-me>
+Message-ID: <87h94uptna.fsf@weeman.i-did-not-set--mail-host-address--so-tickle-me>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 94aed538e032 ("ARM: dts: exynos: Add async-bridge clock to MFC
-power domain for Exynos5420") fixed an imprecise external abort error
-when the MFC registers were tried to be accessed and the needed clock
-for the asynchronous bridges were gated.
+Hi Gregory,
 
-But according to the Exynos5420 manual the "Gating AXI clock for MFC"
-is not CLK_ACLK333 but CLK_MFC.
+Vivien Didelot <vivien.didelot@savoirfairelinux.com> writes:
 
-The end effect is the same because CLK_ACLK333 is a parent of CLK_MFC
-but the correct clock should be used instead.
+> The temperature is accessed via ethtool -e|-E.
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Oops, that was a silly mistake, no need to explain! ;-)
 
----
-
- arch/arm/boot/dts/exynos5420.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index 906a1a42a7ea..ffb148ea91d6 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -294,7 +294,7 @@
- 			reg = <0x10044060 0x20>;
- 			clocks = <&clock CLK_FIN_PLL>,
- 				 <&clock CLK_MOUT_USER_ACLK333>,
--				 <&clock CLK_ACLK333>;
-+				 <&clock CLK_MFC>;
- 			clock-names = "oscclk", "clk0","asb0";
- 			#power-domain-cells = <0>;
- 		};
--- 
-2.7.4
+      Vivien
