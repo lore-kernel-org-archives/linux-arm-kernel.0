@@ -1,115 +1,50 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 19 Jan 2017 17:30:13 +0100
-Subject: [PATCH net-next v3 06/10] net: dsa: Migrate to device_find_class()
-In-Reply-To: <20170119145315.GD21805@lunn.ch>
-References: <20170114214713.28109-1-f.fainelli@gmail.com>
- <20170114214713.28109-7-f.fainelli@gmail.com>
- <20170115110628.GF26374@kroah.com>
- <fc247aeb-a8d6-5ba9-c26d-cb057a5ac34d@gmail.com>
- <20170115173949.GA19268@kroah.com>
- <a9ea1f45-b9a5-d840-68e0-9bf9bc7a6598@gmail.com>
- <20170115191632.GD5643@lunn.ch>
- <912e6143-c67a-d909-2a6c-939de79efc5d@gmail.com>
- <20170119142820.GA494@kroah.com> <20170119145315.GD21805@lunn.ch>
-Message-ID: <20170119163013.GA22777@kroah.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 19 Jan 2017 10:31:38 -0600
+Subject: [PATCH v1 1/7] dt-bindings: display: add STM32 LTDC driver
+In-Reply-To: <dfb3192a-d5b6-029e-b8cb-65a628a0c30b@st.com>
+References: <1484573344-11609-1-git-send-email-yannick.fertre@st.com>
+ <1484573344-11609-2-git-send-email-yannick.fertre@st.com>
+ <2080174.sm3cyM9MmB@avalon>
+ <dfb3192a-d5b6-029e-b8cb-65a628a0c30b@st.com>
+Message-ID: <20170119163138.va23ppx3ictp6wjr@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 03:53:15PM +0100, Andrew Lunn wrote:
-> > > > struct dsa_platform_data {
-> > > >         /*
-> > > >          * Reference to a Linux network interface that connects
-> > > >          * to the root switch chip of the tree.
-> > > >          */
-> > > >         struct device   *netdev;
-> > 
-> > This I think is the oddest thing, why do you need to have the "root
-> > switch" here?  You seem to have dropped the next value in this
-> > structure:
-> > 	struct net_device *of_netdev;
-> 
-> We are implementing platform_data for devices which don't support
-> device tree. When using OF, we don't have any of these issues. We can
-> go straight to the device.
-> 
-> It is a bit convoluted, but look at
-> arch/arm/mach-orion5x/rd88f5181l-ge-setup.c. It defines the start of
-> the dsa_platform_data in that file. It then gets passed through
-> common.c: orion5x_eth_switch_init() to 
-> arch/arm/plat-orion/common.c:orion_ge00_switch_init() :
-> 
-> void __init orion_ge00_switch_init(struct dsa_platform_data *d)
-> {
->         int i;
-> 
->         d->netdev = &orion_ge00.dev;
->         for (i = 0; i < d->nr_chips; i++)
->                 d->chip[i].host_dev = &orion_ge_mvmdio.dev;
-> 
->         platform_device_register_data(NULL, "dsa", 0, d, sizeof(d));
-> }
-> 
-> Where we have
-> 
-> static struct platform_device orion_ge00 = {
->         .name           = MV643XX_ETH_NAME,
->         .id             = 0,
->         .num_resources  = 1,
->         .resource       = orion_ge00_resources,
->         .dev            = {
->                 .coherent_dma_mask      = DMA_BIT_MASK(32),
->         },
-> };
-> 
-> So this is the platform device for the Ethernet device. We cannot go
-> to the net_device, because it does not exist until this Ethernet
-> platform device is instantiated.
+On Thu, Jan 19, 2017 at 04:16:01PM +0000, Yannick FERTRE wrote:
+> On 01/16/2017 09:30 PM, Laurent Pinchart wrote:
+> > Hi Yannick,
+> >
+> > Thank you for the patch.
+> >
+> > On Monday 16 Jan 2017 14:28:58 Yannick Fertre wrote:
+> >> Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
+> >> ---
+> >>  .../devicetree/bindings/display/st,ltdc.txt        | 57 ++++++++++++++++++
+> >>  1 file changed, 57 insertions(+)
+> >>  create mode 100644 Documentation/devicetree/bindings/display/st,ltdc.txt
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/display/st,ltdc.txt
+> >> b/Documentation/devicetree/bindings/display/st,ltdc.txt new file mode
+> >> 100644
+> >> index 0000000..20e89da
+> >> --- /dev/null
+> >> +++ b/Documentation/devicetree/bindings/display/st,ltdc.txt
+> >> @@ -0,0 +1,57 @@
+> >> +* STMicroelectronics STM32 lcd-tft display controller
+> >> +
+> >> +- st-display-subsystem: Master device for DRM sub-components
+> >> +  This device must be the parent of all the sub-components and is
+> >> responsible
+> >> +  of bind them.
+> >
+> > Why do you need this ? At a quick glance the ltdc node should be enough.
+> Hi Laurent,
+> To prepare next device upstream of dsi, we need a master node 
+> "st-display-subsystem" and a sub node "st,ltdc". It's the same kind of 
+> node than st,stih4xx.
 
-Ok, fine, but why isn't the ethernet device a child of this platform
-device?  Why is it floating around somewhere else?  You don't see that
-happening for other devices.
+No, you don't. That's what OF graph is for. The DRM driver binds to the 
+LCD controller node and walks the graph to find the DSI node and then 
+the panel.
 
-> > Shouldn't you have a bus for RGMII devices?  Is that the real problem
-> > here, you don't have a representation for your RGMII "bus" with a
-> > controller to bundle everything under (like a USB host controller, it
-> > bridges from one bus to another).
-> 
-> RGMII is not a bus. It is a point to point link.
-
-That's fine, but you have multiple devices talking across it, so in the
-kernel driver model "naming", it's a bus.  Anything can be a bus, it's
-just a way to group together devices of the same type.
-
-> Normally, it is
-> between the Ethernet MAC and the Ethernet PHY. But you can also have
-> it between an Ethernet MAC and another Ethernet MAC. I'm not sure
-> describing this is a bus would be practical. It would mean every
-> ethernet driver also becomes a bus driver!
-
-Instead of a custom platform device driver, yes.  Is that a big deal?
-How many do you have?
-
-> Every Ethernet PHY would become a bus device. That is a huge change,
-> for a few legacy boards which are not getting converted to device
-> tree.
-
-How many different drivers are we talking about here?
-
-> > If so, why is eth1 not below f1072004.mdio-mi in the heirachy already?
-> 
-> See the initial diagram above. The switch has two parents. It hangs of
-> an MDIO bus, and you would like to make RGMII also a bus. Can the
-> device model handle that? I thought it was a tree, not a graph?
-
-It is a tree, you are correct.  But right now you are picking and
-choosing where you want to put that network device.  Why not put it over
-on the mdio bus?  Or, like I mentioned, make it a custom bus where you
-can properly show this relationship, not just in a generic "let's jump
-to the parent and poke around randomly."
-
-Again, it's that last sentance that I object the most to here.  You all
-keep ignoring it for some reason...
-
-thanks,
-
-greg k-h
+Rob
