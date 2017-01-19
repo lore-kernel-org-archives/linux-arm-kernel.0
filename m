@@ -1,128 +1,78 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 19 Jan 2017 10:16:48 -0600
-Subject: [PATCH 1/2] dt-bindings: gpu: Add Mali Utgard bindings
-In-Reply-To: <20170116132424.7038-1-maxime.ripard@free-electrons.com>
-References: <20170116132424.7038-1-maxime.ripard@free-electrons.com>
-Message-ID: <20170119161648.u6tta5mogadli7ih@rob-hp-laptop>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 19 Jan 2017 17:14:41 +0100
+Subject: [PATCH v2] ARM: dts: imx: Pass 'chosen' and 'memory' nodes
+In-Reply-To: <20170119145642.GC27312@n2100.armlinux.org.uk>
+References: <1484834566-19845-1-git-send-email-fabio.estevam@nxp.com>
+ <20170119141335.kpbrbpbwaovnijjv@pengutronix.de>
+ <CAOMZO5AdgM9eFnerLRdYxwE7gsOE5OvkWs6rCR4zta1XmXHj1A@mail.gmail.com>
+ <20170119144641.jxj2bqg5uqjol23x@pengutronix.de>
+ <20170119145642.GC27312@n2100.armlinux.org.uk>
+Message-ID: <20170119161441.jcctgig7np4v7sam@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2017 at 02:24:23PM +0100, Maxime Ripard wrote:
-> The ARM Mali Utgard GPU family is embedded into a number of SoCs from
-> Allwinner, Amlogic, Mediatek or Rockchip.
+On Thu, Jan 19, 2017 at 02:56:42PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Jan 19, 2017 at 03:46:41PM +0100, Uwe Kleine-K?nig wrote:
+> > On Thu, Jan 19, 2017 at 12:35:40PM -0200, Fabio Estevam wrote:
+> > > Hi Uwe,
+> > > 
+> > > On Thu, Jan 19, 2017 at 12:13 PM, Uwe Kleine-K?nig
+> > > <u.kleine-koenig@pengutronix.de> wrote:
+> > > 
+> > > > Would it be nice to add a comment about why this was added? Something to
+> > > > prevent a cleanup like "remove empty nodes and invalid memory
+> > > > configurations".
+> > > 
+> > > Do you mean something like this?
+> > > 
+> > > /* "chosen" and "memory" nodes are mandatory */
+> > > chosen {};
+> > > memory { device_type = "memory"; reg = <0 0>; };
+> > 
+> > Not very helpful comment. Something like:
+> > 
+> > 	/*
+> > 	 * The decompressor relies on a pre-existing chosen node to be
+> > 	 * available to insert the command line and merge other ATAGS
+> > 	 * info.
+> > 	 */
+> > 
+> > Is it difficult to fix the decompressor?
 > 
-> Add a binding for the GPU of that family.
+> ... and that comment would be wrong.  Yes, the decompressor relies on it,
+> as do some uboot versions.
+
+Good that we talked about this, otherwise I would have removed that once
+the decompressor is fixed. So the comment must be
+
+	/*
+	 * The decompressor and also some versions of U-Boot rely on a
+	 * pre-existing /chosen node to be available to insert the
+	 * command line and merge other ATAGS info.
+	 * Also for U-Boot there must be a pre-existing /memory node.
+	 */
+ 
+> > I didn't understood the breakage regarding the memory node good enough
+> > to suggest a comment for that.
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  .../devicetree/bindings/gpu/arm,mali-utgard.txt    | 76 ++++++++++++++++++++++
->  1 file changed, 76 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
+> A missing memory node appears to prevent some uboot versions supplying
+> any kind of memory layout to the kernel, which then causes the kernel to
+> crash very early during boot.
 > 
-> diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-> new file mode 100644
-> index 000000000000..df05ba0ec357
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-> @@ -0,0 +1,76 @@
-> +ARM Mali Utgard GPU
-> +===================
-> +
-> +Required properties:
-> +  - compatible:
-> +    * "arm,mali-utgard" and one of the following:
-
-Drop this. It's meaningless and 3 compatibles to match is the kernel is 
-not a big deal.
-
-> +      + "arm,mali-300"
-> +      + "arm,mali-400"
-> +      + "arm,mali-450"
-> +
-> +  - reg: Physical base address and length of the GPU registers
-> +
-> +  - interrupts: an entry for each entry in interrupt-names.
-> +    See ../interrupt-controller/interrupts.txt for details.
-> +
-> +  - interrupt-names:
-> +    * ppX: Pixel Processor X interrupt (X from 0 to 7)
-> +    * ppmmuX: Pixel Processor X MMU interrupt (X from 0 to 7)
-
-Is the number of pixel processors probe-able? If not, then it needs to 
-be implied by the vendor compatible string or a property.
-
-> +    * pp: Pixel Processor broadcast interrupt (mali-450 only)
-> +    * gp: Geometry Processor interrupt
-> +    * gpmmu: Geometry Processor MMU interrupt
-
-That's a lot of interrupts. Was going to ask about combining, but 
-I see Linus raised that.
-
-> +
-> +
-> +Optional properties:
-> +  - interrupt-names:
-> +    * pmu: Power Management Unit interrupt, if implemented in hardware
-> +
-> +Vendor-specific bindings
-> +------------------------
-> +
-> +The Mali GPU is integrated very differently from one SoC to
-> +another. In order to accommodate those differences, you have the option
-> +to specify one more vendor-specific compatible, among:
-> +
-> +  - allwinner,sun4i-a10-mali
-
-List this with the compatible strings. I assume one of the arm,mali-??? 
-strings applies too.
-
-> +    Required properties:
-> +      * clocks: an entry for each entry in clock-names
-> +      * clock-names:
-> +        + bus: bus clock for the GPU
-> +        + core: clock driving the GPU itself
-
-This should be in the core binding. The number of clocks should not 
-vary. We often get this wrong because the IP blocks get integrated and 
-connected to the same clock source. But this should be equal to the 
-number of clock inputs.
-
-> +      * resets: phandle to the reset line for the GPU
-> +
-> +  - allwinner,sun7i-a20-mali
-> +    Required properties:
-> +      * clocks: an entry for each entry in clock-names
-> +      * clock-names:
-> +        + bus: bus clock for the GPU
-> +        + core: clock driving the GPU itself
-> +      * resets: phandle to the reset line for the GPU
-> +
-> +Example:
-> +
-> +mali: gpu at 01c40000 {
-> +	compatible = "allwinner,sun7i-a20-mali", "arm,mali-400",
-> +		     "arm,mali-utgard";
-> +	reg = <0x01c40000 0x10000>;
-> +	interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>,
-> +		     <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>,
-> +		     <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>,
-> +		     <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
-> +		     <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>,
-> +		     <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>,
-> +		     <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
-> +	interrupt-names = "gp",
-> +			  "gpmmu",
-> +			  "pp0",
-> +			  "ppmmu0",
-> +			  "pp1",
-> +			  "ppmmu1",
-> +			  "pmu";
-> +	clocks = <&ccu CLK_BUS_GPU>, <&ccu CLK_GPU>;
-> +	clock-names = "bus", "core";
-> +	resets = <&ccu RST_BUS_GPU>;
-> +};
-> +
-> +
-> -- 
-> 2.11.0
+> Again, this is not using appended DTB - this is using a separately loaded
+> DTB in uboot.  uboot fails to update the dtb if these nodes are missing.
 > 
+> Frankly, I think the original change (removing the skeleton.dtsi include)
+> was misguided and needs to be reverted - the change is imho built upon an
+> incorrect assumption that nothing in skeleton.dtsi is required.  That's
+> clearly false.
+
+I tend to agree as I assume it's not only U-Boot on i.MX but on all ARM
+platforms.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
