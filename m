@@ -1,74 +1,43 @@
-From: vivien.didelot@savoirfairelinux.com (Vivien Didelot)
-Date: Thu, 19 Jan 2017 17:07:46 -0500
-Subject: [PATCH v5 0/2] Add support for the ethernet switch on the
- ESPRESSObin
-In-Reply-To: <20170119214934.27442-1-gregory.clement@free-electrons.com>
-References: <20170119214934.27442-1-gregory.clement@free-electrons.com>
-Message-ID: <874m0u1z65.fsf@weeman.i-did-not-set--mail-host-address--so-tickle-me>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 19 Jan 2017 14:08:12 -0800
+Subject: [RFC][PATCH 0/2] Better hardening names
+In-Reply-To: <1484789346-21012-1-git-send-email-labbott@redhat.com>
+References: <1484789346-21012-1-git-send-email-labbott@redhat.com>
+Message-ID: <CAGXu5j+KA_+OxBo_fFO+YoZDyNYTCttRh06868o5-DAz53D30Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
-
-Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
-
-> I created a new family for this switch and filled the ops structure by
-> selecting which seems the more appropriate functions.
-
-We don't create families, this information comes from the Marvell
-DSDT. If you don't know which switch family Marvell put the 6341 in, you
-should be able to use MV88E6XXX_FAMILY_NONE safely.
-
-Note that this is anyway not a useful information since the Marvell
-chips have lots of per-models specificities... Any family related code
-(e.g. the mv88e6xxx_*_family() helpers) are likely to be removed soon.
-    
-> While comparing the datasheet and the ops functions used, some
-> question came to me. They should not prevent applying this series,
-> but their answer would help me to have a better understanding of the
-> dsa subsystem.
+On Wed, Jan 18, 2017 at 5:29 PM, Laura Abbott <labbott@redhat.com> wrote:
+> Hi,
 >
-> - Are the temperature related operation still useful with dsa2 ?
+> It's come up previously that CONFIG_DEBUG_SET_MODULE_RONX and
+> CONFIG_DEBUG_RODATA are not accurate names, mostly they should not have the
+> word 'debug' in them. This series attempts to change the names to something
+> a bit more descriptive and indicative of what they are actually used for these
+> days.
 >
-> Indeed the hwmon initialization is only done from dsa_probe which is
-> not called if we use dsa2.
-
-HWMON is not supported anymore in dsa2. Andrew is in the process of
-moving its support to the PHY driver instead. However you can still test
-it locally with this patch:
-
-    http://ix.io/1QvY
-
-The temperature is accessed via ethtool -e|-E.
-
-> - Why the setup is done differently between the 6390 and the 6352
->   families when the have exactly the same register?
+> I marked this RFC for
+> - Bike shedding purposes.
+> - A discussion of what defaults should be. The way I did the refactoring, both
+>   options are default y. I'd appreciate comments if there is a better approach.
+> - Approach to split this up into more sub patches to make review/merging easier?
+>   Or maybe it's fine.
 >
->   - On the Port Controller 2, the bit PORT_CONTROL_2_MAP_DA is set for
->     6352 and not for 6390 whereas the same bit exists in 6360 and the
->     description for this bit is the same for both datasheet.
+> Quickly tested on arm/arm64/x86.
 >
+> Thanks,
+> Laura
 >
->   - Register PORT_ATU_CONTROL and PORT_PRI_OVERRIDE are reset on 6352
->     and not on 6390. While here again the registers description are
->     the same.
+> Laura Abbott (2):
+>   security: Change name of CONFIG_DEBUG_RODATA
+>   security: Change name of CONFIG_DEBUG_SET_MODULE_RONX
 
-You are totally correct here. We are in the process of moving every old
-pieces of code such as this:
+Some day I'll quit reading my email backwards. :) I see you've got
+MODULE_RONX renamed too here, please ignore my comment about needing
+it "too". :)
 
-	if (mv88e6xxx_6352_family(chip) || mv88e6xxx_6351_family(chip) ||
-	    mv88e6xxx_6165_family(chip) || mv88e6xxx_6097_family(chip) ||
-	    mv88e6xxx_6095_family(chip) || mv88e6xxx_6320_family(chip) ||
-	    mv88e6xxx_6185_family(chip))
-		reg = PORT_CONTROL_2_MAP_DA;
+-Kees
 
-into proper "library" functions defined in the correct internal SMI
-device specific file (here, port.c), to be used in the mv88e6xxx_ops
-structure, if a given model support the feature described in the
-datasheet.
-
-So the two registers you mentioned don't have proper ops yet.
-
-Thanks!
-
-        Vivien
+-- 
+Kees Cook
+Nexus Security
