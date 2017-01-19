@@ -1,78 +1,84 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 19 Jan 2017 15:34:45 +0100
-Subject: [PATCH 1/4] phy: sun4i-usb: support PHY0 on H3 in MUSB mode
-In-Reply-To: <CAGb2v67kYtrTdw9YMS7wvRa=2MWYJ=BEc9SmUOds7hNYZKOz9g@mail.gmail.com>
-References: <20170116191449.50397-1-icenowy@aosc.xyz>
- <20170116191449.50397-2-icenowy@aosc.xyz>
- <20170117080611.tn7s7ddj2csqr27m@lukather>
- <3866431484672228@web20j.yandex.ru>
- <20170117200658.gcrcxeanthdtwg26@lukather>
- <CAGb2v67kYtrTdw9YMS7wvRa=2MWYJ=BEc9SmUOds7hNYZKOz9g@mail.gmail.com>
-Message-ID: <20170119143445.dmckuqjxmfhwr3h5@lukather>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 19 Jan 2017 15:34:06 +0100
+Subject: [PATCH] ARM: dts: imx6q-utilite-pro: enable 2nd display pipeline
+In-Reply-To: <17a7f9cea35944288f97735e66859929@rwthex-s1-b.rwth-ad.de>
+References: <ec9676f344eb4786a28a3c7b969f0e94@rwthex-s1-b.rwth-ad.de>
+ <88bdfd5321484efc82af4132ac2f0d7e@rwthex-s1-b.rwth-ad.de>
+ <6ed3f695104044f18e98fc9619aab16e@rwthex-s1-b.rwth-ad.de>
+ <17a7f9cea35944288f97735e66859929@rwthex-s1-b.rwth-ad.de>
+Message-ID: <1484836446.2989.18.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2017 at 04:09:32AM +0800, Chen-Yu Tsai wrote:
-> Hi,
+Hi Christopher,
+
+On Wed, 2017-01-18 at 23:20 +0100, Christopher Spinrath wrote:
+> Hi Philipp,
 > 
-> On Wed, Jan 18, 2017 at 4:06 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Wed, Jan 18, 2017 at 12:57:08AM +0800, Icenowy Zheng wrote:
-> >>
-> >>
-> >> 17.01.2017, 16:06, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> >> > On Tue, Jan 17, 2017 at 03:14:46AM +0800, Icenowy Zheng wrote:
-> >> >>  The PHY0 on H3 can be wired either to MUSB controller or OHCI/EHCI
-> >> >>  controller.
-> >> >>
-> >> >>  The original driver wired it to OHCI/EHCI controller; however, as the
-> >> >>  code to use PHY0 as OHCI/EHCI is missing, it makes the PHY fully
-> >> >>  unusable.
-> >> >>
-> >> >>  Rename the register (according to its function and the name in BSP
-> >> >>  driver), and remove the code which wires the PHY0 to OHCI/EHCI, as MUSB
-> >> >>  can support both peripheral and host mode (although the host mode of
-> >> >>  MUSB is buggy).
-> >> >
-> >> > Can you elaborate on that? What's wrong with it?
-> >>
-> >> The configuration is at bit 0 of register 0x20 in PHY.
-> >>
-> >> When the PHY is reseted, it defaults as MUSB mode.
-> >>
-> >> However, the original author of the H3 PHY code seems to be lack of
-> >> this knowledge (He named it PHY_UNK_H3), and changed the PHY to HCI
-> >> mode.
-> >>
-> >> I just removed the code that wires it to HCI mode, thus it will work
-> >> in MUSB mode, with my sun8i-h3-musb patch.
+> turns out I have a question on your comment after all:
+> 
+> On 01/17/2017 07:35 PM, Christopher Spinrath wrote:
+> > Hi Philipp,
 > >
-> > I have no idea what you mean by MUSB mode.
+> > thanks for the review!
 > >
-> > Do you mean that the previous code was only working in host mode, and
-> > now it only works in peripheral?
+> > On 01/17/2017 09:57 AM, Philipp Zabel wrote:
+> >> [...]
+> >>> +
+> >>> +    parallel-display {
+> >>> +        compatible = "fsl,imx-parallel-display";
+> >>> +        #address-cells = <1>;
+> >>> +        #size-cells = <0>;
+> >>> +        pinctrl-names = "default";
+> >>> +        pinctrl-0 = <&pinctrl_ipu1>;
+> >>> +
+> >>> +        interface-pix-fmt = "rgb24";
+> >>
+> >> This is not necessary if the connector created by the tpf410 has the
+> >> correct media bus format set in its display_info structure. This can be
+> >> done in tfp410_attach, before calling drm_mode_connector_attach_encoder:
+> >>
+> >>         u32 bus_format = MEDIA_BUS_FMT_RGB888_1X24;
+> >>
+> >>     drm_display_info_set_bus_formats(&dvi->connector.display_info,
+> >>                      &bus_format, 1);
+> >>
+> >> After this is done, the above line should be removed in a follow-up
+> >> patch.
 > 
-> From what I understand, with the H3, Allwinner has put a mux
-> in front of the MUSB controller. The mux can send the USB data
-> to/from the MUSB controller, or a standard EHCI/OHCI pair.
-> This register controls said mux.
-> 
-> This means we can use a proper USB host for host mode,
-> instead of the limited support in MUSB.
+> On closer inspection the tfp410 can handle rgb12, rgb24, and DVI 
+> formats. Considering this it feels wrong to hardcode the bus format to 
+> rgb24 (isn't it?).
 
-But musb can still operate as a host, right?
+That is a good point, I agree. I have some thoughts on this:
 
-Thanks!
-Maxime
+> So a solution might be to add a property specifying the bus format to 
+> the tfp410 binding. But then we would effectively just move this 
+> property from one node to another. I wonder if this is still desireable...?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170119/1ebb8bc2/attachment.sig>
+If this is configurable on both ends, the necessary setting is neither a
+hardware property of the bridge, nor of the display interface, but
+rather one of the board specific wiring between the two (if at all).
+
+Ideally all possible settings should be known to the drivers and the
+best format should be negotiated. Note that display_info.bus_formats
+already is an array of possible bus formats, even though the parallel
+display driver currently only looks at the first element.
+
+If there is no limitation imposed by the wiring, presenting best format
+first in that array seems reasonable for now.
+
+Otherwise I think the links should describe the parallel bus layout,
+which is specified for the (input) media video interfaces:
+
+Documentation/devicetree/bindings/media/video-interfaces.txt
+
+Using the
+	bus-width = <24>;
+or
+	bus-width = <12>;
+property the tfp510 driver could choose which bus_formats to add to the
+display_info.
+
+regards
+Philipp
