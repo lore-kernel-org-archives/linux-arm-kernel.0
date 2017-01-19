@@ -1,126 +1,23 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Thu, 19 Jan 2017 18:02:59 +0800
-Subject: [PATCH v20 16/17] clocksource/drivers/arm_arch_timer: Add GTDT
- support for memory-mapped timer
-In-Reply-To: <ed4efe25-1b40-66e2-ae3f-77a4e32715b6@linaro.org>
-References: <20170118132541.8989-1-fu.wei@linaro.org>
- <20170118132541.8989-17-fu.wei@linaro.org>
- <ed4efe25-1b40-66e2-ae3f-77a4e32715b6@linaro.org>
-Message-ID: <CADyBb7tpDynA0EEUkFZXpUAksjvXeUzuoC82GnbVA2O1w2T22g@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 19 Jan 2017 10:02:44 +0000
+Subject: [PATCHv4 3/5] pinctrl: mvebu: pinctrl driver for 98DX3236 SoC
+In-Reply-To: <20170113091222.7132-4-chris.packham@alliedtelesis.co.nz>
+References: <20170113091222.7132-1-chris.packham@alliedtelesis.co.nz>
+ <20170113091222.7132-4-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20170119100244.GX27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hanjun,
+On Fri, Jan 13, 2017 at 10:12:18PM +1300, Chris Packham wrote:
+> +static struct mvebu_mpp_ctrl mv98dx3236_mpp_controls[] = {
+> +	MPP_FUNC_CTRL(0, 32, NULL, armada_xp_mpp_ctrl),
+> +};
 
-On 19 January 2017 at 17:16, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> On 2017/1/18 21:25, fu.wei at linaro.org wrote:
->>
->> From: Fu Wei <fu.wei@linaro.org>
->>
->> The patch add memory-mapped timer register support by using the
->> information provided by the new GTDT driver of ACPI.
->>
->> Signed-off-by: Fu Wei <fu.wei@linaro.org>
->> ---
->>  drivers/clocksource/arm_arch_timer.c | 35
->> ++++++++++++++++++++++++++++++++---
->>  1 file changed, 32 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/clocksource/arm_arch_timer.c
->> b/drivers/clocksource/arm_arch_timer.c
->> index 79dc004..7ca2da7 100644
->> --- a/drivers/clocksource/arm_arch_timer.c
->> +++ b/drivers/clocksource/arm_arch_timer.c
->> @@ -1077,10 +1077,36 @@ CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem,
->> "arm,armv7-timer-mem",
->>                        arch_timer_mem_of_init);
->>
->>  #ifdef CONFIG_ACPI_GTDT
->> -/* Initialize per-processor generic timer */
->> +static int __init arch_timer_mem_acpi_init(int platform_timer_count)
->> +{
->> +       struct arch_timer_mem *timer_mem;
->> +       int timer_count, i, ret;
->> +
->
->
-> if (!platform_timer_count)
->         return 0;
->
-> Did I miss something?
-
-Ah, thanks, I guess I miss this check below.
-
->
-> Thanks
-> Hanjun
->
->
->> +       timer_mem = kcalloc(platform_timer_count, sizeof(*timer_mem),
->> +                           GFP_KERNEL);
->> +       if (!timer_mem)
->> +               return -ENOMEM;
->> +
->> +       ret = acpi_arch_timer_mem_init(timer_mem, &timer_count);
->> +       if (ret || !timer_count)
->> +               goto error;
->> +
->> +       for (i = 0; i < timer_count; i++) {
->> +               ret = arch_timer_mem_init(timer_mem);
->> +               if (!ret)
->> +                       break;
->> +               timer_mem++;
->> +       }
->> +
->> +error:
->> +       kfree(timer_mem);
->> +       return ret;
->> +}
->> +
->> +/* Initialize per-processor generic timer and memory-mapped timer(if
->> present) */
->>  static int __init arch_timer_acpi_init(struct acpi_table_header *table)
->>  {
->> -       int ret;
->> +       int ret, platform_timer_count;
->>
->>         if (arch_timers_present & ARCH_TIMER_TYPE_CP15) {
->>                 pr_warn("already initialized, skipping\n");
->> @@ -1089,7 +1115,7 @@ static int __init arch_timer_acpi_init(struct
->> acpi_table_header *table)
->>
->>         arch_timers_present |= ARCH_TIMER_TYPE_CP15;
->>
->> -       ret = acpi_gtdt_init(table, NULL);
->> +       ret = acpi_gtdt_init(table, &platform_timer_count);
->>         if (ret) {
->>                 pr_err("Failed to init GTDT table.\n");
->>                 return ret;
->> @@ -1122,6 +1148,9 @@ static int __init arch_timer_acpi_init(struct
->> acpi_table_header *table)
->>         if (ret)
->>                 return ret;
->>
->> +       if (arch_timer_mem_acpi_init(platform_timer_count))
-
-+       if (platform_timer_count &&
-+           arch_timer_mem_acpi_init(platform_timer_count))
-
-
->> +               pr_err("Failed to initialize memory-mapped timer.\n");
->> +
->>         return arch_timer_common_init();
->>  }
->>  CLOCKSOURCE_ACPI_DECLARE(arch_timer, ACPI_SIG_GTDT,
->> arch_timer_acpi_init);
->>
->
-
-
+As Linus has taken my mvebu pinctrl series, this will need to be
+changed to "mvebu_mmio_mpp_ctrl" rather than "armada_xp_mpp_ctrl"
+when it's merged.
 
 -- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
