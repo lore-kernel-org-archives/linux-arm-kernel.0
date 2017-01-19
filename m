@@ -1,80 +1,134 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Thu, 19 Jan 2017 09:45:06 -0600
-Subject: [Patch v3 1/2] arm: kernel: Add SMC structure parameter
-In-Reply-To: <20170119144008.GA27312@n2100.armlinux.org.uk>
-References: <1484173918-25090-1-git-send-email-andy.gross@linaro.org>
- <1484173918-25090-2-git-send-email-andy.gross@linaro.org>
- <20170119144008.GA27312@n2100.armlinux.org.uk>
-Message-ID: <20170119154506.GB9631@hector.attlocal.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 19 Jan 2017 16:49:46 +0100
+Subject: [PATCH 1/2] dt-bindings: gpu: Add Mali Utgard bindings
+In-Reply-To: <CACRpkdbU=DeZx4a8Ax8hh6iv0n1c-6XKVrts1ff=-_E5=_dc8A@mail.gmail.com>
+References: <20170116132424.7038-1-maxime.ripard@free-electrons.com>
+ <CACRpkdbU=DeZx4a8Ax8hh6iv0n1c-6XKVrts1ff=-_E5=_dc8A@mail.gmail.com>
+Message-ID: <20170119154946.ozuxixafsoqblxvw@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 02:40:08PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Jan 11, 2017 at 04:31:57PM -0600, Andy Gross wrote:
-> > diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
-> > index b5abfda..3e28d08 100644
-> > --- a/include/linux/arm-smccc.h
-> > +++ b/include/linux/arm-smccc.h
-> > @@ -72,19 +72,33 @@ struct arm_smccc_res {
-> >  };
-> >  
-> >  /**
-> > - * arm_smccc_smc() - make SMC calls
-> > + * struct arm_smccc_quirk - Contains quirk information
-> > + * id contains quirk identification
-> > + * state contains the quirk specific information
-> 
-> Given that this is a kerneldoc comment, it should really conform to the
-> kerneldoc requirements - see Documentation/kernel-doc-nano-HOWTO.txt:
-> 
-> /**
->  * struct arm_smccc_quirk - Contains quirk information
->  * @id: quirk identification
->  * @state: the quirk specific information
+Hi Linus,
 
-Ah, I flubbed that.  I'll fix this.
-
+On Thu, Jan 19, 2017 at 12:09:37AM +0100, Linus Walleij wrote:
+> On Mon, Jan 16, 2017 at 2:24 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
 > 
-> > + */
-> > +struct arm_smccc_quirk {
-> > +	int	id;
-> > +	union {
-> > +		unsigned long a6;
-> > +	} state;
-> > +};
+> > The ARM Mali Utgard GPU family is embedded into a number of SoCs from
+> > Allwinner, Amlogic, Mediatek or Rockchip.
+> >
+> > Add a binding for the GPU of that family.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  .../devicetree/bindings/gpu/arm,mali-utgard.txt    | 76 ++++++++++++++++++++++
+> >  1 file changed, 76 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
+> >
+> > diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
+> > new file mode 100644
+> > index 000000000000..df05ba0ec357
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
+> > @@ -0,0 +1,76 @@
+> > +ARM Mali Utgard GPU
+> > +===================
 > > +
-> > +/**
-> > + * __arm_smccc_smc() - make SMC calls
-> >   * @a0-a7: arguments passed in registers 0 to 7
-> >   * @res: result values from registers 0 to 3
-> > + * @quirk: optional quirk structure
-> >   *
-> >   * This function is used to make SMC calls following SMC Calling Convention.
-> >   * The content of the supplied param are copied to registers 0 to 7 prior
-> >   * to the SMC instruction. The return values are updated with the content
-> > - * from register 0 to 3 on return from the SMC instruction.
-> > + * from register 0 to 3 on return from the SMC instruction.  An optional
-> > + * quirk structure provides vendor specific behavior.
+> > +Required properties:
+> > +  - compatible:
+> > +    * "arm,mali-utgard" and one of the following:
+> > +      + "arm,mali-300"
+> > +      + "arm,mali-400"
+> > +      + "arm,mali-450"
+> > +
+> > +  - reg: Physical base address and length of the GPU registers
+> > +
+> > +  - interrupts: an entry for each entry in interrupt-names.
+> > +    See ../interrupt-controller/interrupts.txt for details.
+> > +
+> > +  - interrupt-names:
+> > +    * ppX: Pixel Processor X interrupt (X from 0 to 7)
+> > +    * ppmmuX: Pixel Processor X MMU interrupt (X from 0 to 7)
+> > +    * pp: Pixel Processor broadcast interrupt (mali-450 only)
+> > +    * gp: Geometry Processor interrupt
+> > +    * gpmmu: Geometry Processor MMU interrupt
+> > +
+> > +
+> > +Optional properties:
+> > +  - interrupt-names:
+> > +    * pmu: Power Management Unit interrupt, if implemented in hardware
 > 
-> It's quite odd to have the result buried in the middle of arguments
-> passed to a function, but I guess for the sake of simplicity in the
-> assembly code that's what we need.
+> On the MALI-400 MP in the ST-Ericsson DB8500 we have an additional interrupt
+> called "Mali400 combined". This is simply the HW designer's
+> doing an OR over all the 4 IRQ lines. Is this useful to define in the
+> bindings? Then it should be an optional
+
+Do you still have all the other interrupts, or just this combined interrupt?
+
+Either way, that should definitely be part of the binding, but maybe
+as part of the vendor specific binding below?
+
+I didn't encounter any other platform doing so when I gave it a
+(quick) look.
+
+>  * combined: all lines OR:ed together (if available)
 > 
-> Also:
+> Also you are defining "resets" below in the examples, should
+> this be listed as an optional property?
+
+In my mind, this is not optional. For some platforms, it's mandatory,
+and for some, it's not there at all. IMO, this should really be a
+mandatory property, but only for the compatibles that use it (just
+like the clocks are).
+
+> > +The Mali GPU is integrated very differently from one SoC to
+> > +another. In order to accommodate those differences, you have the option
+> > +to specify one more vendor-specific compatible, among:
+> > +
+> > +  - allwinner,sun4i-a10-mali
+> > +    Required properties:
+> > +      * clocks: an entry for each entry in clock-names
+> > +      * clock-names:
+> > +        + bus: bus clock for the GPU
+> > +        + core: clock driving the GPU itself
+> > +      * resets: phandle to the reset line for the GPU
+> > +
+> > +  - allwinner,sun7i-a20-mali
+> > +    Required properties:
+> > +      * clocks: an entry for each entry in clock-names
+> > +      * clock-names:
+> > +        + bus: bus clock for the GPU
+> > +        + core: clock driving the GPU itself
+> > +      * resets: phandle to the reset line for the GPU
 > 
-> "@quirk points to an arm_smccc_quirk, or NULL when no quirks are required."
-
-Fixed.
-
+> Please add:
 > 
-> And... should this not be const?  Are we expecting anyone to modify
-> the quirk structure?
+> - stericsson,db8500-mali: also known as the "Smart Graphics
+> Accelerator" (SGA500)
+>    Required properties:
+>     * clocks: an entry for each entry in clock-names
+>     * clock-names:
+>       + bus: bus clock for the GPU (ICNCLK a.k.a. PRCMU_ACLK)
+>       + core: clock driving the GPU itself (PRCMU_SGACLK)
+>
+> (It has no explicit reset line.)
 
-No, unfortunately.  For qcom, we are stuffing the contents of a6 into the
-structure so the caller can get that information.
+Ack.
 
-I'll resend with the documentation fixes.
+> With these:
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-Regards,
+Thanks!
+Maxime
 
-Andy
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170119/57898ac2/attachment-0001.sig>
