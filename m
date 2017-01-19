@@ -1,178 +1,73 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Thu, 19 Jan 2017 18:32:55 +0800
-Subject: [PATCH v20 13/17] acpi/arm64: Add GTDT table parse driver
-In-Reply-To: <e69d80d1-0954-b1be-817e-c0be6fc24b77@linaro.org>
-References: <20170118132541.8989-1-fu.wei@linaro.org>
- <20170118132541.8989-14-fu.wei@linaro.org>
- <e69d80d1-0954-b1be-817e-c0be6fc24b77@linaro.org>
-Message-ID: <CADyBb7tdfw+wbTZbcnsaHRa=aG6i9acLp7rzMpfMs-vOHXL6pQ@mail.gmail.com>
+From: yannick.fertre@st.com (Yannick FERTRE)
+Date: Thu, 19 Jan 2017 10:35:49 +0000
+Subject: [PATCH v1 0/7] DRM: add LTDC support for STM32F4
+In-Reply-To: <cf29809f-f951-eeed-5886-02d0a7a1e56f@baylibre.com>
+References: <1484573344-11609-1-git-send-email-yannick.fertre@st.com>
+ <cf29809f-f951-eeed-5886-02d0a7a1e56f@baylibre.com>
+Message-ID: <7b7a26e1-90d2-9d42-e44f-fc2ce5635545@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hanjun,
+Hi Neil,
+ST may use this hardware IP also in other SoC, even that is not true 
+now, I hope that "st" is a more futur proof name.
 
-On 19 January 2017 at 17:11, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> On 2017/1/18 21:25, fu.wei at linaro.org wrote:
+Best regards
+
+Yannick Fertr?
+
+
+On 01/16/2017 05:02 PM, Neil Armstrong wrote:
+> On 01/16/2017 02:28 PM, Yannick Fertre wrote:
+>> The purpose of this set of patches is to add a new driver for stm32f429.
+>> This driver was developed and tested on evaluation board stm32429i.
 >>
->> From: Fu Wei <fu.wei@linaro.org>
+>> Stm32f4 is a MCU platform which don't have MMU so the last patches developed
+>> by Benjamin Gaignard regarding "DRM: allow to use mmuless devices"
+>> are necessary.
 >>
->> This patch adds support for parsing arch timer info in GTDT,
->> provides some kernel APIs to parse all the PPIs and
->> always-on info in GTDT and export them.
+>> The board stm429i embeds a Ampire AM-480272H3TMQW-T01H screen.
+>> A new simple panel am-480272h3tmqw-t01h have been added to support it.
 >>
->> By this driver, we can simplify arm_arch_timer drivers, and
->> separate the ACPI GTDT knowledge from it.
+>> Yannick Fertre (7):
+>>   dt-bindings: display: add STM32 LTDC driver
+>>   drm/st: Add STM32 LTDC driver
+>>   dt-bindings: Add Ampire AM-480272H3TMQW-T01H panel
+>>   drm/panel: simple: Add support for Ampire AM-480272H3TMQW-T01H
+>>   ARM: dts: stm32f429: Add ltdc support
+>>   ARM: dts: stm32429i-eval: Enable ltdc & simple panel on Eval board
+>>   ARM: configs: Add STM32 LTDC support in STM32 defconfig
 >>
->> Signed-off-by: Fu Wei <fu.wei@linaro.org>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
->> Tested-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
->> ---
->>  arch/arm64/Kconfig          |   1 +
->>  drivers/acpi/arm64/Kconfig  |   3 +
->>  drivers/acpi/arm64/Makefile |   1 +
->>  drivers/acpi/arm64/gtdt.c   | 157
->> ++++++++++++++++++++++++++++++++++++++++++++
->>  include/linux/acpi.h        |   6 ++
->>  5 files changed, 168 insertions(+)
+>>  .../display/panel/ampire,am-480272h3tmqw-t01h.txt  |    7 +
+>>  .../devicetree/bindings/display/st,ltdc.txt        |   57 +
+>>  arch/arm/boot/dts/stm32429i-eval.dts               |   58 +
+>>  arch/arm/boot/dts/stm32f429.dtsi                   |   25 +-
+>>  arch/arm/configs/stm32_defconfig                   |    5 +
+>>  drivers/gpu/drm/Kconfig                            |    2 +
+>>  drivers/gpu/drm/Makefile                           |    1 +
+>>  drivers/gpu/drm/panel/panel-simple.c               |   29 +
+>>  drivers/gpu/drm/st/Kconfig                         |   14 +
+>>  drivers/gpu/drm/st/Makefile                        |    7 +
+>>  drivers/gpu/drm/st/drv.c                           |  279 ++++
+>>  drivers/gpu/drm/st/drv.h                           |   25 +
+>>  drivers/gpu/drm/st/ltdc.c                          | 1438 ++++++++++++++++++++
+>>  drivers/gpu/drm/st/ltdc.h                          |   20 +
+>>  14 files changed, 1966 insertions(+), 1 deletion(-)
+>>  create mode 100644 Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
+>>  create mode 100644 Documentation/devicetree/bindings/display/st,ltdc.txt
+>>  create mode 100644 drivers/gpu/drm/st/Kconfig
+>>  create mode 100644 drivers/gpu/drm/st/Makefile
+>>  create mode 100644 drivers/gpu/drm/st/drv.c
+>>  create mode 100644 drivers/gpu/drm/st/drv.h
+>>  create mode 100644 drivers/gpu/drm/st/ltdc.c
+>>  create mode 100644 drivers/gpu/drm/st/ltdc.h
 >>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 1117421..ab1ee10 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -2,6 +2,7 @@ config ARM64
->>         def_bool y
->>         select ACPI_CCA_REQUIRED if ACPI
->>         select ACPI_GENERIC_GSI if ACPI
->> +       select ACPI_GTDT if ACPI
->>         select ACPI_REDUCED_HARDWARE_ONLY if ACPI
->>         select ACPI_MCFG if ACPI
->>         select ACPI_SPCR_TABLE if ACPI
->> diff --git a/drivers/acpi/arm64/Kconfig b/drivers/acpi/arm64/Kconfig
->> index 4616da4..5a6f80f 100644
->> --- a/drivers/acpi/arm64/Kconfig
->> +++ b/drivers/acpi/arm64/Kconfig
->> @@ -4,3 +4,6 @@
->>
->>  config ACPI_IORT
->>         bool
->> +
->> +config ACPI_GTDT
->> +       bool
->> diff --git a/drivers/acpi/arm64/Makefile b/drivers/acpi/arm64/Makefile
->> index 72331f2..1017def 100644
->> --- a/drivers/acpi/arm64/Makefile
->> +++ b/drivers/acpi/arm64/Makefile
->> @@ -1 +1,2 @@
->>  obj-$(CONFIG_ACPI_IORT)        += iort.o
->> +obj-$(CONFIG_ACPI_GTDT)        += gtdt.o
->> diff --git a/drivers/acpi/arm64/gtdt.c b/drivers/acpi/arm64/gtdt.c
->> new file mode 100644
->> index 0000000..d93a790
->> --- /dev/null
->> +++ b/drivers/acpi/arm64/gtdt.c
->> @@ -0,0 +1,157 @@
 >
-> [...]
+> Hi Yannick,
 >
->> +
->> +/**
->> + * acpi_gtdt_init() - Get the info of GTDT table to prepare for further
->> init.
->> + * @table:     The pointer to GTDT table.
->> + * @platform_timer_count:      The pointer of int variate for returning
->> the
->> + *                             number of platform timers. It can be NULL,
->> if
->> + *                             driver don't need this info.
->> + *
->> + * Return: 0 if success, -EINVAL if error.
->> + */
->> +int __init acpi_gtdt_init(struct acpi_table_header *table,
->> +                         int *platform_timer_count)
->> +{
->> +       int ret = 0;
->> +       int timer_count = 0;
->> +       void *platform_timer = NULL;
->> +       struct acpi_table_gtdt *gtdt;
->> +
->> +       gtdt = container_of(table, struct acpi_table_gtdt, header);
->> +       acpi_gtdt_desc.gtdt = gtdt;
->> +       acpi_gtdt_desc.gtdt_end = (void *)table + table->length;
->> +
->> +       if (table->revision < 2)
->> +               pr_debug("Revision:%d doesn't support Platform Timers.\n",
->> +                        table->revision);
+> Shouldn't be more logical to use stm32 for the driver instead of st ?
+> It would eventually collude with the other STMicroelectronics SoCs and
+> will be aligned with other drivers like stm32-rtc, stm32-i2c, ...
 >
+> Neil
 >
-> GTDT table revision is updated to 2 in ACPI 5.1, we will
-> not support ACPI version under 5.1 and disable ACPI in FADT
-> parse before this code is called, so if we get revision
-> <2 here, I think we need to print warning (we need to keep
-> the firmware stick to the spec on ARM64).
-
-agree, will change pr_debug to pr_warn.
-
-Thanks :-)
-
->
->> +       else if (!gtdt->platform_timer_count)
->> +               pr_debug("No Platform Timer.\n");
->> +       else
->> +               timer_count = gtdt->platform_timer_count;
->> +
->> +       if (timer_count) {
->> +               platform_timer = (void *)gtdt +
->> gtdt->platform_timer_offset;
->> +               if (platform_timer < (void *)table +
->> +                                    sizeof(struct acpi_table_gtdt)) {
->> +                       pr_err(FW_BUG "invalid timer data.\n");
->
->
-> It's ok but I didn't see other ACPI tables parsing did this check,
-> maybe we can just remove it :)
-
-here, I want to make sure the FW is valid.
-Once there is a FW bug, we could just return with error.  :-)
-
->
->> +                       timer_count = 0;
->> +                       platform_timer = NULL;
->> +                       ret = -EINVAL;
->> +               }
->> +       }
->> +
->> +       acpi_gtdt_desc.platform_timer = platform_timer;
->> +       if (platform_timer_count)
->> +               *platform_timer_count = timer_count;
->
->
-> Then the code will much simple:
->
-> if (gtdt->platform_timer_count) {
->         acpi_gtdt_desc.platform_timer = (void *)gtdt +
-> gtdt->platform_timer_offset;
->         if (platform_timer_count)
->                 *platform_timer_count = gtdt->platform_timer_count;
-> }
->
-> return 0;
->
-> and remove ret, timer_count and platform_timer.
-
-yes, this may can simplify the function, but this will be released at
-the end of init because of "__init" :-)
-So how about let's just keep this check to make sure the FW is OK.  :-)
-
->
-> Thanks
-> Hanjun
-
-
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
