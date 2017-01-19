@@ -1,189 +1,48 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 18 Jan 2017 20:36:15 -0800
-Subject: [PATCH v5] ARM64: dts: meson-gx: Add firmware reserved memory
- zones
-In-Reply-To: <eca803d3-1a67-cda5-554d-4313ae56635e@suse.de> ("Andreas
- =?utf-8?Q?F=C3=A4rber=22's?= message of "Thu, 19 Jan 2017 02:18:27 +0100")
-References: <1484758245-9354-1-git-send-email-narmstrong@baylibre.com>
- <2bdb6818-4620-53b1-112d-2d6a29e484d9@suse.de>
- <eca803d3-1a67-cda5-554d-4313ae56635e@suse.de>
-Message-ID: <m24m0vy8cg.fsf@baylibre.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Thu, 19 Jan 2017 05:43:28 +0100
+Subject: [PATCH v4 1/2] power: reset: add linkstation-reset driver
+In-Reply-To: <CAEQ9gEkoKc0Yv+kLYGWgHZZW92u0tW8E9U0eT7ZhAx79yKxzLQ@mail.gmail.com>
+References: <20161227070611.14852-1-rogershimizu@gmail.com>
+ <20170107150451.17912-1-rogershimizu@gmail.com>
+ <20170107150451.17912-2-rogershimizu@gmail.com>
+ <CAEQ9gEkoKc0Yv+kLYGWgHZZW92u0tW8E9U0eT7ZhAx79yKxzLQ@mail.gmail.com>
+Message-ID: <20170119044327.j3d2rlpn5va3iw37@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andreas F?rber <afaerber@suse.de> writes:
+Hi Roger,
 
-> Am 19.01.2017 um 01:20 schrieb Andreas F?rber:
->> Hi,
->> 
->> Am 18.01.2017 um 17:50 schrieb Neil Armstrong:
->>> The Amlogic Meson GXBB/GXL/GXM secure monitor uses part of the memory space,
->>> this patch adds these reserved zones.
->>>
->>> Without such reserved memory zones, running the following stress command :
->>> $ stress-ng --vm 16 --vm-bytes 128M --timeout 10s
->>> multiple times:
->>>
->>> Could lead to the following kernel crashes :
->>> [   46.937975] Bad mode in Error handler detected on CPU1, code 0xbf000000 -- SError
->>> ...
->>> [   47.058536] Internal error: Attempting to execute userspace memory: 8600000f [#3] PREEMPT SMP
->>> ...
->>> Instead of the OOM killer.
->>>
->> 
->> I miss a Fixes: or Cc: here for the backport you desired. To have it
->> fixed back to my very introduction:
->> 
->> Fixes: 4f24eda8401f ("ARM64: dts: Prepare configs for Amlogic Meson GXBaby")
->> 
->> People backporting it would need to handle the meson-{gx => gxbb}.dtsi
->> transition for 4.9 down to 4.6, which seems fairly straightforward.
->> 
->>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->>> ---
->>>  arch/arm64/boot/dts/amlogic/meson-gx.dtsi | 18 ++++++++++++++++++
->>>  1 file changed, 18 insertions(+)
->>>
->>> Changes since v4 at [5]:
->>> - Move start of ddr memory to reserved-memory node
->>> - Drop memory node move
->>> - Fix typo in sizes
->>>
->>> Changes since resent v2 at [4]:
->>> - Fix invalid comment of useable memory attributes
->>>
->>> Changes since original v2 at [3]:
->>> - Typo in commit 2GiB -> 1GiB, 4GiB -> 2GiB
->>>
->>> Changes since v2 at [2]:
->>> - Moved all memory node out of dtsi
->>> - Added comment about useable memory
->>> - Fixed comment about secmon reserved zone
->>>
->>> Changes since v1 at [1] :
->>> - Renamed reg into linux,usable-memory to ovveride u-boot memory
->>> - only kept secmon memory zone
->>>
->>> [1] http://lkml.kernel.org/r/20161212101801.28491-1-narmstrong at baylibre.com
->>> [2] http://lkml.kernel.org/r/1483105232-6242-1-git-send-email-narmstrong at baylibre.com
->>> [3] http://lkml.kernel.org/r/1484128128-22454-1-git-send-email-narmstrong at baylibre.com
->>> [4] http://lkml.kernel.org/r/1484128540-22662-1-git-send-email-narmstrong at baylibre.com
->>> [5] http://lkml.kernel.org/r/1484129414-23325-1-git-send-email-narmstrong at baylibre.com
->>>
->>> diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
->>> index eada0b5..63d52b7 100644
->>> --- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
->>> +++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
->>> @@ -55,6 +55,24 @@
->>>  	#address-cells = <2>;
->>>  	#size-cells = <2>;
->>>  
->>> +	reserved-memory {
->>> +		#address-cells = <2>;
->>> +		#size-cells = <2>;
->>> +		ranges;
->>> +
->>> +		/* 16 MiB reserved for Hardware ROM Firmware */
->>> +		hwrom: hwrom {
->> 
->> Both sub-nodes get a label that is unused, but reserved-memory itself
->> does not (my v4 remark). Intentional?
->> 
->>> +			reg = <0x0 0x0 0x0 0x1000000>;
->>> +			no-map;
->>> +		};
->>> +
->>> +		/* 2 MiB reserved for ARM Trusted Firmware (BL31) */
->>> +		secmon: secmon {
->> 
->> I note that this .dtsi further down has a node /firmware/secure-monitor
->> with label sm.
->> a) Is there any naming convention such as secmon_mem to adopt here to
->> avoid mixups with sm?
->> b) Should this secmon node be referenced in the secure-monitor node via
->> memory-node = <&secmon>; to model their connection, thereby giving the
->> label a use? Or should we maybe merge the two nodes by moving the
->> compatible string here?
->> 
->> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
->
-> Answering my own question: the example labels use _reserved suffix.
->
->>> +			reg = <0x0 0x10000000 0x0 0x200000>;
->
-> And since we use a reg property here, the node name should get a unit
-> address to avoid future dtc warnings/errors. Ditto for hwrom.
+On Wed, Jan 18, 2017 at 09:08:13PM +0900, Roger Shimizu wrote:
+> On Sun, Jan 8, 2017 at 12:04 AM, Roger Shimizu <rogershimizu@gmail.com> wrote:
+> > Buffalo Linkstation / KuroBox and their variants need magic command
+> > sending to UART1 to power-off.
+> >
+> > Power driver linkstation-reset implements the magic command and I/O
+> > routine, which come from files listed below:
+> >   - arch/arm/mach-orion5x/kurobox_pro-setup.c
+> >   - arch/arm/mach-orion5x/terastation_pro2-setup.c
+> 
+> I think there's not much concern regarding to this series.
+> Could you kindly help to apply this patch?
 
-OK, I added Fixes:, your Reviewed-by, added the _reserved suffix and
-unit address and applied to v4.10/fixes.
+Well you dropped the DT binding, but still introduce new DT
+properties. Since they are not documented without the binding
+I won't merge this. DT binding documentation is not optional.
+In other words: NAK on the binding effectively means NAK on
+the driver in its current state.
 
-Update patch below for reference.
+If you want to see this merged rebase it to Rob's generic
+serial bindings [0] and help to support him getting everything
+into mainline ASAP. Currently the feedback seems to be quite
+positive, so I hope to see it merged for 4.11.
 
-Other cleanups/fixups (like adding a phandle from secure monitor) can be
-done as add-ons, as they are not strictly related to this fix.
+[0] https://lwn.net/Articles/711794/ (current proposal from 2 days ago)
 
-Kevin
-
->From ecb88f3001ed9ee8c53450d971de8c18bcbf7925 Mon Sep 17 00:00:00 2001
-From: Neil Armstrong <narmstrong@baylibre.com>
-Date: Wed, 18 Jan 2017 17:50:45 +0100
-Subject: [PATCH] ARM64: dts: meson-gx: Add firmware reserved memory zones
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
-
-The Amlogic Meson GXBB/GXL/GXM secure monitor uses part of the memory space,
-this patch adds these reserved zones.
-
-Without such reserved memory zones, running the following stress command :
-$ stress-ng --vm 16 --vm-bytes 128M --timeout 10s
-multiple times:
-
-Could lead to the following kernel crashes :
-[   46.937975] Bad mode in Error handler detected on CPU1, code 0xbf000000 -- SError
-...
-[   47.058536] Internal error: Attempting to execute userspace memory: 8600000f [#3] PREEMPT SMP
-...
-Instead of the OOM killer.
-
-Fixes: 4f24eda8401f ("ARM64: dts: Prepare configs for Amlogic Meson GXBaby")
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-Reviewed-by: Andreas F?rber <afaerber@suse.de>
-[khilman: added Fixes tag, added _reserved and unit addresses]
-Signed-off-by: Kevin Hilman <khilman@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-index eada0b58ba1c..0cbe24b49710 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
-@@ -55,6 +55,24 @@
- 	#address-cells = <2>;
- 	#size-cells = <2>;
- 
-+	reserved-memory {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		/* 16 MiB reserved for Hardware ROM Firmware */
-+		hwrom_reserved: hwrom at 0 {
-+			reg = <0x0 0x0 0x0 0x1000000>;
-+			no-map;
-+		};
-+
-+		/* 2 MiB reserved for ARM Trusted Firmware (BL31) */
-+		secmon_reserved: secmon at 10000000 {
-+			reg = <0x0 0x10000000 0x0 0x200000>;
-+			no-map;
-+		};
-+	};
-+
- 	cpus {
- 		#address-cells = <0x2>;
- 		#size-cells = <0x0>;
--- 
-2.9.3
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170119/ef6a2441/attachment.sig>
