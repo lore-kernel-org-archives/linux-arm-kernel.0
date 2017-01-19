@@ -1,99 +1,115 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Thu, 19 Jan 2017 09:11:06 -0800
-Subject: [arm:phy-cleanup 10/10]
- arch/mips/cavium-octeon/octeon-platform.c:1064:15: error: expected
- declaration specifiers or '...' before string constant
-In-Reply-To: <20170119135452.GY27312@n2100.armlinux.org.uk>
-References: <201701192138.NZ3q3lNY%fengguang.wu@intel.com>
- <20170119135452.GY27312@n2100.armlinux.org.uk>
-Message-ID: <0605309c-5e79-ae31-8f37-bba722ba8354@caviumnetworks.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 19 Jan 2017 17:11:59 +0000
+Subject: [RFC PATCH 08/10] arm64/sve: ptrace: Wire up vector length
+ control and reporting
+In-Reply-To: <6610C1B4-C08A-4A15-B272-77A45F341168@arm.com>
+References: <1484220369-23970-1-git-send-email-Dave.Martin@arm.com>
+ <1484220369-23970-9-git-send-email-Dave.Martin@arm.com>
+ <20170116122038.GG28060@E107787-LIN>
+ <20170116133231.GO3699@e103592.cambridge.arm.com>
+ <20170116151156.GI28060@E107787-LIN>
+ <20170117100349.GR3699@e103592.cambridge.arm.com>
+ <6610C1B4-C08A-4A15-B272-77A45F341168@arm.com>
+Message-ID: <20170119171157.GS3699@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/19/2017 05:54 AM, Russell King - ARM Linux wrote:
-> Hi David,
->
-> Is there a reason why there's these MODULE_* macros at the bottom of
-> this file?  From what I can see:
->
-> (a) this file can't be built as a module as the Makefile doesn't allow it:
->     obj-y := cpu.o setup.o octeon-platform.o octeon-irq.o csrc-octeon.o
->
-> (b) this file will not be functional as a module anyway, because of the
->     multiple *_initcall() statements, each of which are translated to
->     a module_init() call, each of which define an alias to
->     int init_module(void) - and that will cause a build error.
->
-> Can we just kill these, rather than adding a linux/module.h include to
-> this file?
+On Tue, Jan 17, 2017 at 01:31:03PM +0000, Alan Hayward wrote:
+> 
+> > On 17 Jan 2017, at 10:03, Dave Martin <Dave.Martin@arm.com> wrote:
+> > 
+> > On Mon, Jan 16, 2017 at 03:11:56PM +0000, Yao Qi wrote:
+> >> On 17-01-16 13:32:31, Dave Martin wrote:
+> >>> On Mon, Jan 16, 2017 at 12:20:38PM +0000, Yao Qi wrote:
+> >>>> On 17-01-12 11:26:07, Dave Martin wrote:
+> >>>>> This patch adds support for manipulating a task's vector length at
+> >>>>> runtime via ptrace.
+> >>>>> 
+> >>>> 
+> >>>> I hope kernel doesn't provide such interface to ptracer to change vector
+> >>>> length.
+> >>> 
+> >>> It does, with this patch, beacuse...
+> >>> 
+> >>>> The vector length is sort of a read-only property of thread/process/
+> >>>> program to debugger, unless we really have a clear requirement to modify
+> >>>> vector length in debugging.  I may miss something because I haven't debug
+> >>>> SVE code yet.
+> >>> 
+> >>> ...the vector length is no longer read-only for the task, thanks to
+> >>> the new prctls().
+> >> 
+> >> What I meant "read-only" is that debugger can't change it, while the program
+> >> itself can change it via prctl().
+> > 
+> > I see.
+> > 
+> >>> 
+> >>> This does add complexity, but I figured that any programmer's model
+> >>> state that the thread can modify for itself should be modifiable by the
+> >>> debugger, if for no other reason than the user may want to experiment to
+> >>> see what happens.  Without a ptrace interface, it would be necessary
+> >>> to inject a prctl() call into the target, which is possible but awkward.
+> >> 
+> >> We only need such interface if it is useful, see more below.
+> >> 
+> >> Suppose it is useful to change vector length through ptrace, we should align
+> >> ptrace interface to prctl() as much as possible.  Looks that both prctl
+> >> change and ptrace change can go through sve_set_vector_length, easy to keep
+> >> two consistent.
+> >> 
+> >>> 
+> >>> gdb must already re-detect the vector length on stop, since the target
+> >>> could have called the prctl() in the meantime.
+> >> 
+> >> Yes, gdb assumes the vector length may be changed, so it re-detects on
+> >> every stop, but I don't see the need for gdb to change the vector length.
+> >> 
+> >>> 
+> >>> Access via ptrace also allows things like trapping on exec, fork or
+> >>> clone and changing the vector length for the new process or thread
+> >>> before it starts to run.  I'm guessing here, but such a scenario seems
+> >>> legitimate (?)
+> >>> 
+> >> 
+> >> Yes, these cases are valid, but the usefulness is still questionable to
+> >> me.  I just doubt that SVE developers do need to change vector length
+> >> when they are debugging code.  Note that it is not my strong objection
+> >> to this patch, if kernel people believe this is useful, I am fine with
+> >> it.
+> > 
+> > That's fair.  I'll leave the patch there for now and see if anyone else
+> > has a comment to make, but it could be removed without affecting
+> > anything else.
+> > 
+> 
+> I would say that whilst it is a very dangerous thing to do and has many
 
-Yes, as you note, this file cannot be built as a module.
+ptrace is inherently dangerous for the target task... that's rather the
+point.
 
-You can add: Acked-by: David Daney <david.daney@cavium.com> to a patch 
-that removes the offending MODULE_*
+> consequences, there is a requirement for a gdb user to be able to change VL
+> whilst debugging a running process, and I don?t think we should see
+> changing VL as much different from changing a register value on the fly.
+> 
+> Say you have a loop in assembly you are trying to debug - you might write
+> to $x2 and then single step to see how this effects the result. With SVE
+> code you might want to see how different VL values will effect the layout
+> of results in the vectors, how it effects the predicates and how it changes
+> the number of iterations the loop makes. Of course, once you exit the
+> loop all bets are off - just like if you had been changing register values.
+> 
+> The current proposal for gdb is that we will show $VL in the list of
+> registers, therefore for consistency it?d make sense for the gdb user to
+> be able to set it as if it was just another register. For this we need a
+> simple way to change the VL in another process, and I think ptrace() is
+> the easiest way (given that prctl() only changes its own process).
 
-Thanks for venturing into the murky world of MIPS,
-David Daney
+OK, I'll keep it for now, unless somebody has a strong objection.
 
->
-> Thanks.
->
-> On Thu, Jan 19, 2017 at 09:08:42PM +0800, kbuild test robot wrote:
->> tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git phy-cleanup
->> head:   ef8cb7d5f838770f22cae0e20fee8d1157fc88fd
->> commit: ef8cb7d5f838770f22cae0e20fee8d1157fc88fd [10/10] net: dsa: remove unnecessary phy*.h includes
->> config: mips-cavium_octeon_defconfig (attached as .config)
->> compiler: mips64-linux-gnuabi64-gcc (Debian 6.1.1-9) 6.1.1 20160705
->> reproduce:
->>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->>         chmod +x ~/bin/make.cross
->>         git checkout ef8cb7d5f838770f22cae0e20fee8d1157fc88fd
->>         # save the attached .config to linux build tree
->>         make.cross ARCH=mips
->>
->> All errors (new ones prefixed by >>):
->>
->>>> arch/mips/cavium-octeon/octeon-platform.c:1064:15: error: expected declaration specifiers or '...' before string constant
->>     MODULE_AUTHOR("David Daney <ddaney@caviumnetworks.com>");
->>                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
->>    arch/mips/cavium-octeon/octeon-platform.c:1065:16: error: expected declaration specifiers or '...' before string constant
->>     MODULE_LICENSE("GPL");
->>                    ^~~~~
->>    arch/mips/cavium-octeon/octeon-platform.c:1066:20: error: expected declaration specifiers or '...' before string constant
->>     MODULE_DESCRIPTION("Platform driver for Octeon SOC");
->>                        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
->>
->> vim +1064 arch/mips/cavium-octeon/octeon-platform.c
->>
->> d617f9e9 David Daney   2013-12-03  1048  				break;
->> d617f9e9 David Daney   2013-12-03  1049  			default:
->> d617f9e9 David Daney   2013-12-03  1050  				break;
->> d617f9e9 David Daney   2013-12-03  1051  			}
->> d617f9e9 David Daney   2013-12-03  1052  		}
->> d617f9e9 David Daney   2013-12-03  1053  	}
->> d617f9e9 David Daney   2013-12-03  1054
->> 7ed18152 David Daney   2012-07-05  1055  	return 0;
->> 7ed18152 David Daney   2012-07-05  1056  }
->> 7ed18152 David Daney   2012-07-05  1057
->> 7ed18152 David Daney   2012-07-05  1058  static int __init octeon_publish_devices(void)
->> 7ed18152 David Daney   2012-07-05  1059  {
->> 7ed18152 David Daney   2012-07-05  1060  	return of_platform_bus_probe(NULL, octeon_ids, NULL);
->> 7ed18152 David Daney   2012-07-05  1061  }
->> 8074d782 Aaro Koskinen 2016-08-23  1062  arch_initcall(octeon_publish_devices);
->> 7ed18152 David Daney   2012-07-05  1063
->> 512254ba David Daney   2009-09-16 @1064  MODULE_AUTHOR("David Daney <ddaney@caviumnetworks.com>");
->> 512254ba David Daney   2009-09-16  1065  MODULE_LICENSE("GPL");
->> 512254ba David Daney   2009-09-16  1066  MODULE_DESCRIPTION("Platform driver for Octeon SOC");
->>
->> :::::: The code at line 1064 was first introduced by commit
->> :::::: 512254ba8383c5dd7eca6819d0da1ce2fe9ede47 MIPS: Octeon:  Move some platform device registration to its own file.
->>
->> :::::: TO: David Daney <ddaney@caviumnetworks.com>
->> :::::: CC: Ralf Baechle <ralf@linux-mips.org>
->>
->> ---
->> 0-DAY kernel test infrastructure                Open Source Technology Center
->> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
->
->
->
+It doesn't affect the underlying plumbing much -- doing this via
+ptrace() is actually the simpler of the two options, since the task
+is stopped and thus less synchronisation is needed.
+
+Cheers
+---Dave
