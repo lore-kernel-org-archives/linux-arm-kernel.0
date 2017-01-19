@@ -1,59 +1,93 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Thu, 19 Jan 2017 15:59:04 +0100
-Subject: [PATCH v1 3/3] ARM: dts: tango4: Import USB nodes
-In-Reply-To: <bd989965-fa8a-a175-5e14-8467f01e6d5b@sigmadesigns.com>
-References: <bd989965-fa8a-a175-5e14-8467f01e6d5b@sigmadesigns.com>
-Message-ID: <48dc3582-c5d0-ad19-0a4a-bbbfd7e7552d@sigmadesigns.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Thu, 19 Jan 2017 20:35:46 +0530
+Subject: [PATCH V5 02/12] iommu/of: Prepare for deferred IOMMU configuration
+In-Reply-To: <1484838356-24962-1-git-send-email-sricharan@codeaurora.org>
+References: <1484838356-24962-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1484838356-24962-3-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tango4 provides 2 USB 2.0 controllers.
+From: Robin Murphy <robin.murphy@arm.com>
 
-Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+IOMMU configuration represents unchanging properties of the hardware,
+and as such should only need happen once in a device's lifetime, but
+the necessary interaction with the IOMMU device and driver complicates
+exactly when that point should be.
+
+Since the only reasonable tool available for handling the inter-device
+dependency is probe deferral, we need to prepare of_iommu_configure()
+to run later than it is currently called (i.e. at driver probe rather
+than device creation), to handle being retried, and to tell whether a
+not-yet present IOMMU should be waited for or skipped (by virtue of
+having declared a built-in driver or not).
+
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- arch/arm/boot/dts/tango4-common.dtsi | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ * No change
 
-diff --git a/arch/arm/boot/dts/tango4-common.dtsi b/arch/arm/boot/dts/tango4-common.dtsi
-index 2eb92a2649ed..0c8cad4d6ee6 100644
---- a/arch/arm/boot/dts/tango4-common.dtsi
-+++ b/arch/arm/boot/dts/tango4-common.dtsi
-@@ -113,6 +113,36 @@
- 			interrupts = <8 IRQ_TYPE_LEVEL_HIGH>;
- 		};
+ drivers/iommu/of_iommu.c | 30 +++++++++++++++++++++++++++++-
+ 1 file changed, 29 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+index ee49081..349bd1d 100644
+--- a/drivers/iommu/of_iommu.c
++++ b/drivers/iommu/of_iommu.c
+@@ -104,12 +104,20 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
+ 	int err;
  
-+		usb0: usb at 21400 {
-+			compatible = "chipidea,usb2";
-+			reg = <0x21400 0x200>;
-+			interrupts = <40 IRQ_TYPE_LEVEL_HIGH>;
-+			phys = <&usb0_phy>;
-+			phy-names = "usb-phy";
-+		};
+ 	ops = iommu_get_instance(fwnode);
+-	if (!ops || !ops->of_xlate)
++	if ((ops && !ops->of_xlate) ||
++	    (!ops && !of_match_node(&__iommu_of_table, iommu_spec->np)))
+ 		return NULL;
+ 
+ 	err = iommu_fwspec_init(dev, &iommu_spec->np->fwnode, ops);
+ 	if (err)
+ 		return ERR_PTR(err);
++	/*
++	 * The otherwise-empty fwspec handily serves to indicate the specific
++	 * IOMMU device we're waiting for, which will be useful if we ever get
++	 * a proper probe-ordering dependency mechanism in future.
++	 */
++	if (!ops)
++		return ERR_PTR(-EPROBE_DEFER);
+ 
+ 	err = ops->of_xlate(dev, iommu_spec);
+ 	if (err)
+@@ -186,14 +194,34 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
+ 					   struct device_node *master_np)
+ {
+ 	const struct iommu_ops *ops;
++	struct iommu_fwspec *fwspec = dev->iommu_fwspec;
+ 
+ 	if (!master_np)
+ 		return NULL;
+ 
++	if (fwspec) {
++		if (fwspec->ops)
++			return fwspec->ops;
 +
-+		usb0_phy: phy at 21700 {
-+			compatible = "sigma,smp8642-usb-phy";
-+			reg = <0x21700 0x100>;
-+			#phy-cells = <0>;
-+			clocks = <&clkgen USB_CLK>;
-+		};
++		/* In the deferred case, start again from scratch */
++		iommu_fwspec_free(dev);
++	}
 +
-+		usb1: usb at 25400 {
-+			compatible = "chipidea,usb2";
-+			reg = <0x25400 0x200>;
-+			interrupts = <7 IRQ_TYPE_LEVEL_HIGH>;
-+			phys = <&usb1_phy>;
-+			phy-names = "usb-phy";
-+		};
+ 	if (dev_is_pci(dev))
+ 		ops = of_pci_iommu_init(to_pci_dev(dev), master_np);
+ 	else
+ 		ops = of_platform_iommu_init(dev, master_np);
++	/*
++	 * If we have reason to believe the IOMMU driver missed the initial
++	 * add_device callback for dev, replay it to get things in order.
++	 */
++	if (!IS_ERR_OR_NULL(ops) && ops->add_device &&
++	    dev->bus && !dev->iommu_group) {
++		int err = ops->add_device(dev);
 +
-+		usb1_phy: phy at 25700 {
-+			compatible = "sigma,smp8642-usb-phy";
-+			reg = <0x25700 0x100>;
-+			#phy-cells = <0>;
-+			clocks = <&clkgen USB_CLK>;
-+		};
-+
- 		eth0: ethernet at 26000 {
- 			compatible = "sigma,smp8734-ethernet";
- 			reg = <0x26000 0x800>;
++		if (err)
++			ops = ERR_PTR(err);
++	}
+ 
+ 	return IS_ERR(ops) ? NULL : ops;
+ }
 -- 
-2.10.0
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
