@@ -1,44 +1,52 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 19 Jan 2017 08:23:28 -0700
-Subject: [PATCH] ARM: dts: at91: Enable DMA on sama5d4_xplained console
-In-Reply-To: <20170119004658.32750-1-alexandre.belloni@free-electrons.com>
-References: <20170119004658.32750-1-alexandre.belloni@free-electrons.com>
-Message-ID: <1ae3beb4-cfd1-1c6d-8c59-c94c45e1ba42@atmel.com>
+From: sza@esh.hu (=?utf-8?B?U3plbXrFkSBBbmRyw6Fz?=)
+Date: Thu, 19 Jan 2017 16:23:03 +0100
+Subject: [RFC PATCH v5 0/7] ARM: Fix dma_alloc_coherent() and friends for
+ NOMMU
+In-Reply-To: <1484738003-29892-1-git-send-email-vladimir.murzin@arm.com>
+References: <1484738003-29892-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <8BBDE689-7AA0-4074-A322-66C3DBBEA351@esh.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 18/01/2017 ? 17:46, Alexandre Belloni a ?crit :
-> Enable DMA on usart3 to get a more reliable console. This is especially
-> useful for automation and kernelci were a kernel with PROVE_LOCKING enabled
-> is quite susceptible to character loss, resulting in tests failure.
+Hi, 
+> On 2017. Jan 18., at 12:13, Vladimir Murzin <vladimir.murzin@arm.com> wrote:
 > 
-> Cc: stable <stable@vger.kernel.org> #v4.1+
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-Thanks,
-Regards.
-
-> ---
->  arch/arm/boot/dts/at91-sama5d4_xplained.dts | 2 ++
->  1 file changed, 2 insertions(+)
+> Hi,
 > 
-> diff --git a/arch/arm/boot/dts/at91-sama5d4_xplained.dts b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-> index ed7fce297738..44d1171c7fc0 100644
-> --- a/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-> +++ b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-> @@ -110,6 +110,8 @@
->  			};
->  
->  			usart3: serial at fc00c000 {
-> +				atmel,use-dma-rx;
-> +				atmel,use-dma-tx;
->  				status = "okay";
->  			};
->  
+> It seem that addition of cache support for M-class CPUs uncovered
+> latent bug in DMA usage. NOMMU memory model has been treated as being
+> always consistent; however, for R/M CPU classes memory can be covered
+> by MPU which in turn might configure RAM as Normal i.e. bufferable and
+> cacheable. It breaks dma_alloc_coherent() and friends, since data can
+> stuck in caches now or be buffered.
+> 
+> This patch set is trying to address the issue by providing region of
+> memory suitable for consistent DMA operations. It is supposed that
+> such region is marked by MPU as non-cacheable. Robin suggested to
+> advertise such memory as reserved shared-dma-pool, rather then using
+> homebrew command line option, and extend dma-coherent to provide
+> default DMA area in the similar way as it is done for CMA (PATCH
+> 4/7). It allows us to offload all bookkeeping on generic coherent DMA
+> framework, and it seems that it might be reused by other architectures
+> like c6x and blackfin.
 > 
 
+I have tested the v5 on my ATMEL armv7m board. Caches enabled,
+DMA on MMC, USART and Ethernet. 
+Everything works as expected, so you can add my tested-by.
 
--- 
-Nicolas Ferre
+Booting Linux on physical CPU 0x0
+Linux version 4.9.0 (root at debian) (gcc version 4.8.3 20140320 (prerelease) (Sourcery CodeBench Lite 2014.05-29) ) #1 Wed Jan 18 22:10:39 CET 2017
+CPU: ARMv7-M [410fc271] revision 1 (ARMv7M), cr=00000000
+CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
+OF: fdt:Machine model: SAME70-sampione board
+Reserved memory: created DMA memory pool at 0x73e00000, size 2 MiB
+OF: reserved mem: initialized node linux,cma, compatible id shared-dma-pool
+...
+DMA: default coherent area is set
+?
+
+Thanks for the patches!
+
+Regards,
+Andras
