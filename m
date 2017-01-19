@@ -1,75 +1,42 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 19 Jan 2017 12:46:50 +0100
-Subject: [PATCH RFC] mmc: mxs-mmc: Implement CMD23 support
-In-Reply-To: <1484414958-2665-1-git-send-email-stefan.wahren@i2se.com>
-References: <1484414958-2665-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <CAPDyKFp8ooKfMBYj_fDmpvSeg1ANNRHRudTOtaTzYhSXA7t3gA@mail.gmail.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Thu, 19 Jan 2017 19:46:43 +0800
+Subject: [PATCH RESEND v8 1/4] arm64: arch_timer: Add device tree binding for
+ hisilicon-161010101 erratum
+In-Reply-To: <1484826406-16348-1-git-send-email-dingtianhong@huawei.com>
+References: <1484826406-16348-1-git-send-email-dingtianhong@huawei.com>
+Message-ID: <1484826406-16348-2-git-send-email-dingtianhong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 January 2017 at 18:29, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> This patch implements support for multiblock transfers bounded
-> by SET_BLOCK_COUNT (CMD23) on the MXS MMC host driver.
->
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+This erratum describes a bug in logic outside the core, so MIDR can't be
+used to identify its presence, and reading an SoC-specific revision
+register from common arch timer code would be awkward.  So, describe it
+in the device tree.
 
-Thanks, applied for next!
+Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/arm/arch_timer.txt | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-Kind regards
-Uffe
-
-> ---
->  drivers/mmc/host/mxs-mmc.c |   16 ++++++++++++----
->  1 file changed, 12 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-> index c8b8ac6..add1e70 100644
-> --- a/drivers/mmc/host/mxs-mmc.c
-> +++ b/drivers/mmc/host/mxs-mmc.c
-> @@ -153,7 +153,11 @@ static void mxs_mmc_request_done(struct mxs_mmc_host *host)
->                 }
->         }
->
-> -       if (data) {
-> +       if (cmd == mrq->sbc) {
-> +               /* Finished CMD23, now send actual command. */
-> +               mxs_mmc_start_cmd(host, mrq->cmd);
-> +               return;
-> +       } else if (data) {
->                 dma_unmap_sg(mmc_dev(host->mmc), data->sg,
->                              data->sg_len, ssp->dma_dir);
->                 /*
-> @@ -166,7 +170,7 @@ static void mxs_mmc_request_done(struct mxs_mmc_host *host)
->                         data->bytes_xfered = 0;
->
->                 host->data = NULL;
-> -               if (mrq->stop) {
-> +               if (data->stop && (data->error || !mrq->sbc)) {
->                         mxs_mmc_start_cmd(host, mrq->stop);
->                         return;
->                 }
-> @@ -495,7 +499,11 @@ static void mxs_mmc_request(struct mmc_host *mmc, struct mmc_request *mrq)
->
->         WARN_ON(host->mrq != NULL);
->         host->mrq = mrq;
-> -       mxs_mmc_start_cmd(host, mrq->cmd);
-> +
-> +       if (mrq->sbc)
-> +               mxs_mmc_start_cmd(host, mrq->sbc);
-> +       else
-> +               mxs_mmc_start_cmd(host, mrq->cmd);
->  }
->
->  static void mxs_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
-> @@ -642,7 +650,7 @@ static int mxs_mmc_probe(struct platform_device *pdev)
->         /* set mmc core parameters */
->         mmc->ops = &mxs_mmc_ops;
->         mmc->caps = MMC_CAP_SD_HIGHSPEED | MMC_CAP_MMC_HIGHSPEED |
-> -                   MMC_CAP_SDIO_IRQ | MMC_CAP_NEEDS_POLL;
-> +                   MMC_CAP_SDIO_IRQ | MMC_CAP_NEEDS_POLL | MMC_CAP_CMD23;
->
->         host->broken_cd = of_property_read_bool(np, "broken-cd");
->
-> --
-> 1.7.9.5
->
+diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
+index ad440a2..9116934 100644
+--- a/Documentation/devicetree/bindings/arm/arch_timer.txt
++++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
+@@ -31,6 +31,14 @@ to deliver its interrupts via SPIs.
+   This also affects writes to the tval register, due to the implicit
+   counter read.
+ 
++- hisilicon,erratum-161010101 : A boolean property. Indicates the presence of
++  erratum 161010101, which says that reading the counter is unreliable unless
++  reading twice on the register and the value of the second read is larger
++  than the first by less than 32. If the verification is unsuccessful, then
++  discard the value of this read and repeat this procedure until the verification
++  is successful.  This also affects writes to the tval register, due to the
++  implicit counter read.
++
+ ** Optional properties:
+ 
+ - arm,cpu-registers-not-fw-configured : Firmware does not initialize
+-- 
+1.9.0
