@@ -1,81 +1,63 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 19 Jan 2017 17:42:31 +0100
-Subject: [PATCH v3 6/9] kvm: arm/arm64: Add host pmu to support VM
- introspection
-In-Reply-To: <20170118180546.GN3231@leverpostej>
-References: <20170110113856.7183-1-punit.agrawal@arm.com>
- <20170110113856.7183-7-punit.agrawal@arm.com>
- <1a6b8d71-58a5-b29b-3f01-e945deb2baf6@arm.com>
- <20170118113523.GB3231@leverpostej>
- <87o9z4msi3.fsf@e105922-lin.cambridge.arm.com>
- <c2382140-b7ac-11d8-89f0-bf421e38f844@arm.com>
- <87fukgmnf0.fsf@e105922-lin.cambridge.arm.com>
- <20170118151729.GI3231@leverpostej>
- <877f5smjg1.fsf@e105922-lin.cambridge.arm.com>
- <20170118180546.GN3231@leverpostej>
-Message-ID: <20170119164231.GA5664@cbox>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 19 Jan 2017 17:44:27 +0100
+Subject: [PATCH 2/3] PCI: imx6: Allow probe deferal by reset GPIO
+In-Reply-To: <20170119163631.10668-3-andrew.smirnov@gmail.com>
+References: <20170119163631.10668-1-andrew.smirnov@gmail.com>
+ <20170119163631.10668-3-andrew.smirnov@gmail.com>
+Message-ID: <1484844267.24339.44.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2017 at 06:05:46PM +0000, Mark Rutland wrote:
-> On Wed, Jan 18, 2017 at 04:17:18PM +0000, Punit Agrawal wrote:
-> > Mark Rutland <mark.rutland@arm.com> writes:
-> > 
-> > > On Wed, Jan 18, 2017 at 02:51:31PM +0000, Punit Agrawal wrote:
-> > >> I should've clarified in my reply that I wasn't looking to support the
-> > >> third instance from Mark's examples above - "monitor all vCPUs on a
-> > >> pCPU". I think it'll be quite expensive to figure out which threads from
-> > >> a given pool are vCPUs.
-> > >
-> > > I'm not sure I follow why you would need to do that?
-> > >
-> > > In that case, we'd open a CPU-bound perf event for the pCPU, which would
-> > > get installed in the CPU context immediately. It would be present for
-> > > all tasks.
-> > >
-> > > Given it's present for all tasks, we don't need to figure out which
-> > > happen to have vCPUs. The !vCPU tasks simply shouldn't trigger events.
-> > >
-> > > Am I missing something?
-> > 
-> > When enabling a CPU-bound event for pCPU, we'd have to enable trapping
-> > of TLB operations for the vCPUs running on pCPU. Have a look at Patch
-> > 7/9.
-> > 
-> > Also, we'd have to enable/disable trapping when tasks are migrated
-> > between pCPUs.
+Am Donnerstag, den 19.01.2017, 08:36 -0800 schrieb Andrey Smirnov:
+> Some designs implement reset GPIO via a GPIO expander connected to a
+> peripheral bus. One such example would be i.MX7 Sabre board where said
+> GPIO is provided by SPI shift register connected to a bitbanged SPI
+> bus. In order to support such designs allow reset GPIO request to defer
+> probing of the driver.
 > 
-> Ah, so we can't configure the trap and leave it active, since it'll
-> affect the host.
+> Cc: yurovsky at gmail.com
+> Cc: Richard Zhu <hongxing.zhu@nxp.com>
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Fabio Estevam <festevam@gmail.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+> ---
+>  drivers/pci/host/pci-imx6.c | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
 > 
-> We could have a per-cpu flag, and a hook into vcpu_run, but that's also
-> gnarly.
-> 
-> I'll have a think.
-> 
-> > So far I've assumed that a VM pid is immutable. If that doesn't hold
-> > then we need to think of another mechanism to refer to a VM from
-> > userspace.
-> 
-> Even if we can't migrate the VM between processes (i.e. it's immutable),
-> it's still not unique within a process, so I'm fairly sure we need
-> another mechanism (even if we get away with the common case today).
-> 
-I don't understand what the requirements here are exactly but the KVM
-API documentation says:
+> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+> index 50a1291..574f026 100644
+> --- a/drivers/pci/host/pci-imx6.c
+> +++ b/drivers/pci/host/pci-imx6.c
+> @@ -653,6 +653,9 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+>  			dev_err(dev, "unable to get reset gpio\n");
+>  			return ret;
+>  		}
+> +	} else if (imx6_pcie->reset_gpio == -EPROBE_DEFER) {
+> +		dev_info(dev, "probe is defered by reset GPIO\n");
 
-  In general file descriptors can be migrated among processes by means
-  of fork() and the SCM_RIGHTS facility of unix domain socket.  These
-  kinds of tricks are explicitly not supported by kvm.  While they will
-  not cause harm to the host, their actual behavior is not guaranteed by
-  the API.  The only supported use is one virtual machine per process,
-  and one vcpu per thread.
+No, please no messages for probe deferrals, as those might happen quite
+often until the required driver is there and then just spams the logs.
+Otherwise looks good.
 
-So this code should maintain those semantics and it's fair to assume the
-thread group leader of a given VM stays the same, but the code must not
-rely on this fact for safe operations.
-
-I also don't see why a process couldn't open multiple VMs; however
-messy that may be, it appears possible to me.
-
--Christoffer
+> +		return imx6_pcie->reset_gpio;
+>  	}
+>  
+>  	/* Fetch clocks */
+> @@ -746,11 +749,12 @@ static struct platform_driver imx6_pcie_driver = {
+>  		.name	= "imx6q-pcie",
+>  		.of_match_table = imx6_pcie_of_match,
+>  	},
+> +	.probe    = imx6_pcie_probe,
+>  	.shutdown = imx6_pcie_shutdown,
+>  };
+>  
+>  static int __init imx6_pcie_init(void)
+>  {
+> -	return platform_driver_probe(&imx6_pcie_driver, imx6_pcie_probe);
+> +	return platform_driver_register(&imx6_pcie_driver);
+>  }
+>  device_initcall(imx6_pcie_init);
