@@ -1,22 +1,37 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 19 Jan 2017 14:31:44 +0100
-Subject: [PATCH v10 2/5] i2c: Add STM32F4 I2C driver
-In-Reply-To: <1484832316-5594-3-git-send-email-cedric.madianga@gmail.com>
-References: <1484832316-5594-1-git-send-email-cedric.madianga@gmail.com>
- <1484832316-5594-3-git-send-email-cedric.madianga@gmail.com>
-Message-ID: <20170119133144.wrzj3uexho5cpw4k@pengutronix.de>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 19 Jan 2017 13:55:57 +0000
+Subject: [PATCH] coresight: STM: Balance enable/disable
+In-Reply-To: <20170119114037.GR28024@kroah.com>
+References: <1484589600-21397-1-git-send-email-suzuki.poulose@arm.com>
+ <20170119114037.GR28024@kroah.com>
+Message-ID: <d98d0fb3-4271-ed5f-893f-e342bf0776ca@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 02:25:13PM +0100, M'boumba Cedric Madianga wrote:
-> This patch adds support for the STM32F4 I2C controller.
-> 
-> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+On 19/01/17 11:40, Greg KH wrote:
+>> Fixes: commit 237483aa5cf43 ("coresight: stm: adding driver for CoreSight STM component")
+>> Cc: Pratik Patel <pratikp@codeaurora.org>
+>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> Cc: stable at vger.kernel.org # 4.7+
+>> Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>> Reviewed-by: Chunyan Zhang <zhang.chunyan@linaro.org>
+>> Reported-by: Robert Walker <robert.walker@arm.com>
+>> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> ---
+>>
+>> Greg,
+>>
+>> Without this patch, the coresight STM IP can only be used for one tracing
+>> session per boot, seriously limiting its usability.
+>
+> When you resend a patch, please tell me what is different from the
+> previous version you sent.  I figured it out here, but please do this
+> next time.
 
-Thanks
-Uwe
+Hi Greg,
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Sure, will keep that in mind. For this patch nothing has changed, except for
+the addition of Review/Ack. It was resent (with to: you) just to make sure it
+gets through the rc series. Thanks for queuing it.
+
+Suzuki
