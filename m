@@ -1,58 +1,30 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 19 Jan 2017 14:00:57 -0800
-Subject: [PATCH 1/2] security: Change name of CONFIG_DEBUG_RODATA
-In-Reply-To: <20170119105646.GA11176@leverpostej>
-References: <1484789346-21012-1-git-send-email-labbott@redhat.com>
- <1484789346-21012-2-git-send-email-labbott@redhat.com>
- <20170119105646.GA11176@leverpostej>
-Message-ID: <CAGXu5jJRrsvRAvD99O=0teqMFn9Z2rwbm=K794cD5yXKg0OL8g@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 19 Jan 2017 23:05:39 +0100
+Subject: [PATCH] ARM: dts: at91: Enable DMA on sama5d2_xplained console
+Message-ID: <20170119220539.19011-1-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 2:56 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi Laura,
->
-> On Wed, Jan 18, 2017 at 05:29:05PM -0800, Laura Abbott wrote:
->> diff --git a/security/Kconfig b/security/Kconfig
->> index 118f454..ad6ce82 100644
->> --- a/security/Kconfig
->> +++ b/security/Kconfig
->> @@ -158,6 +158,22 @@ config HARDENED_USERCOPY_PAGESPAN
->>         been removed. This config is intended to be used only while
->>         trying to find such users.
->>
->> +config ARCH_HAS_HARDENED_MAPPINGS
->> +     def_bool n
->> +
->> +config HARDENED_PAGE_MAPPINGS
->> +     bool "Mark kernel mappings with stricter permissions (RO/W^X)"
->> +     default y
->> +     depends on ARCH_HAS_HARDENED_MAPPINGS
->> +     help
->> +          If this is set, kernel text and rodata memory will be made read-only,
->> +       and non-text memory will be made non-executable. This provides
->> +       protection against certain security attacks (e.g. executing the heap
->> +       or modifying text).
->> +
->> +       Unless your system has known restrictions or performance issues, it
->> +       is recommended to say Y here.
->
-> It's somewhat unfortunate that this means the feature is no longer
-> mandatory on arm64 (and s390+x86). We have a boot-time switch to turn
-> the protections off, so I was hoping we could make this mandatory on all
-> architectures with support.
+Enable DMA on uart1 to get a more reliable console.
 
-Oh, I totally missed this. Yes, we need it to stay mandatory. It
-should be possible by just adding "select HARDENED_PAGE_MAPPINGS" to
-the arch Kconfig, yes?
+Cc: stable <stable@vger.kernel.org> #v4.3+
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> It would be good to see if we could make this mandatory for arm and
-> parisc, or if it really needs to be optional for either of those.
-
-(Adding mpe to CC...) Michael, what's needed to get this working on powerpc too?
-
--Kees
-
+diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+index 0b9a59d5fdac..30fac04289a5 100644
+--- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
++++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+@@ -148,6 +148,8 @@
+ 			uart1: serial at f8020000 {
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_uart1_default>;
++				atmel,use-dma-rx;
++				atmel,use-dma-tx;
+ 				status = "okay";
+ 			};
+ 
 -- 
-Kees Cook
-Nexus Security
+2.11.0
