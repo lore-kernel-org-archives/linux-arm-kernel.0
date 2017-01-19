@@ -1,61 +1,51 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 19 Jan 2017 22:04:23 +0100
-Subject: [PATCH v2 3/7] clk: sunxi-ng: Implement multiplier maximum
-In-Reply-To: <CAGb2v65K8zQvHbhwZ6b6VhO6egXVQN4agHQ1JT8rkHzNsAEUtw@mail.gmail.com>
-References: <cover.8762813dc78858261716126c700983d4aee00458.1484035021.git-series.maxime.ripard@free-electrons.com>
- <ab8ef79d63fc09c3eaa556d299832ec06e9869cf.1484035021.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v65K8zQvHbhwZ6b6VhO6egXVQN4agHQ1JT8rkHzNsAEUtw@mail.gmail.com>
-Message-ID: <20170119210423.5kjs3envfosjlsmr@lukather>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Thu, 19 Jan 2017 21:12:02 +0000
+Subject: [PATCHv4 3/5] pinctrl: mvebu: pinctrl driver for 98DX3236 SoC
+References: <20170113091222.7132-1-chris.packham@alliedtelesis.co.nz>
+ <20170113091222.7132-4-chris.packham@alliedtelesis.co.nz>
+ <2fca7ac2-9a88-19b1-28c5-5192b9c4a2bc@gmail.com>
+ <9996b6a215f944e1a47fa6239d8de21f@svr-chch-ex1.atlnz.lc>
+Message-ID: <66c205acea6046978bf17e6d8fc1959f@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 14/01/17 20:50, Chris Packham wrote:
+> On 13/01/17 22:54, Sebastian Hesselbarth wrote:
+>> On 13.01.2017 10:12, Chris Packham wrote:
+>>> From: Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz>
+>>>
+>>> This pinctrl driver supports the 98DX3236, 98DX3336 and 98DX4251 SoCs
+>>> from Marvell.
+>>>
+>>> Signed-off-by: Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz>
+>>> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+>>> Acked-by: Rob Herring <robh@kernel.org>
+>>> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>>> ---
+>>>
+>>> Notes:
+>>>     Changes in v2:
+>>>     - include sdio support for the 98DX4251
+>>>     Changes in v3:
+>>>     - None
+>>>     Changes in v4:
+>>>     - Correct some discrepencies between binding and driver.
+>>
+>> Well, unfortunately I still see differences between the "gpio" in
+>> the binding and "gpo" in the driver.
+>>
+>> Please go back to that list I sent you yesterday and fix them all.
+>>
+>
+> I think you may have missed my initial reply [1]. Or I have missed your
+> response to it. Long story short "gpo" is intentional because some of
+> those pins can't be used as inputs. But if you still want me to change
+> it I will.
+>
+> [1] - https://lkml.org/lkml/2017/1/12/117
+>
 
-On Mon, Jan 16, 2017 at 01:58:18PM +0800, Chen-Yu Tsai wrote:
-> On Tue, Jan 10, 2017 at 3:57 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  drivers/clk/sunxi-ng/ccu_mult.c |  4 ++--
-> >  drivers/clk/sunxi-ng/ccu_mult.h | 10 ++++++----
-> >  drivers/clk/sunxi-ng/ccu_nk.c   |  8 ++++----
-> >  drivers/clk/sunxi-ng/ccu_nkm.c  |  8 ++++----
-> >  drivers/clk/sunxi-ng/ccu_nkmp.c |  8 ++++----
-> >  drivers/clk/sunxi-ng/ccu_nm.c   |  4 ++--
-> >  6 files changed, 22 insertions(+), 20 deletions(-)
-> >
-> > diff --git a/drivers/clk/sunxi-ng/ccu_mult.c b/drivers/clk/sunxi-ng/ccu_mult.c
-> > index bf5e11c803f9..fccfe1e1961a 100644
-> > --- a/drivers/clk/sunxi-ng/ccu_mult.c
-> > +++ b/drivers/clk/sunxi-ng/ccu_mult.c
-> > @@ -41,7 +41,7 @@ static unsigned long ccu_mult_round_rate(struct ccu_mux_internal *mux,
-> >         struct _ccu_mult _cm;
-> >
-> >         _cm.min = 1;
-> > -       _cm.max = 1 << cm->mult.width;
-> > +       _cm.max = cm->mult.max ?: 1 << cm->mult.width;
-> 
-> Should you also factor in the offset when providing the default
-> value for max? Otherwise you might end up with a value that is
-> actually not progammable?
-> 
-> Say if offset is 1, then max would be 1 << width.
-> But if offset is 0, then max would have to be (1 << width) - 1,
-> as (1 << width) is not valid.
+Hi Sebastian,
 
-Ah, yes, that's true. I'll fix it.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170119/d2beb4bd/attachment.sig>
+Did you get a chance to consider this. Do you still want me to change 
+gpo -> gpio given the information above?
