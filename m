@@ -1,46 +1,38 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 19 Jan 2017 22:11:32 +0000
-Subject: [PATCH] arm: module: add support for R_ARM_REL32 relocations
-Message-ID: <1484863892-5818-1-git-send-email-ard.biesheuvel@linaro.org>
+From: vivien.didelot@savoirfairelinux.com (Vivien Didelot)
+Date: Thu, 19 Jan 2017 17:13:12 -0500
+Subject: [PATCH v5 1/2] net: dsa: mv88e6xxx: Don't forbid MDIO I/Os for
+ PHY addr >= num_of_ports
+In-Reply-To: <20170119214934.27442-2-gregory.clement@free-electrons.com>
+References: <20170119214934.27442-1-gregory.clement@free-electrons.com>
+ <20170119214934.27442-2-gregory.clement@free-electrons.com>
+Message-ID: <871svylmvb.fsf@weeman.i-did-not-set--mail-host-address--so-tickle-me>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for R_ARM_REL32 relocations in the module loader,
-which will be used by the modversions code when (if) it switches
-to using relative references to refer to CRC values.
+Hi Gregory,
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm/include/asm/elf.h | 1 +
- arch/arm/kernel/module.c   | 4 ++++
- 2 files changed, 5 insertions(+)
+Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
 
-diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
-index d2315ffd8f12..d450a59ca121 100644
---- a/arch/arm/include/asm/elf.h
-+++ b/arch/arm/include/asm/elf.h
-@@ -50,6 +50,7 @@ typedef struct user_fp elf_fpregset_t;
- #define R_ARM_NONE		0
- #define R_ARM_PC24		1
- #define R_ARM_ABS32		2
-+#define R_ARM_REL32		3
- #define R_ARM_CALL		28
- #define R_ARM_JUMP24		29
- #define R_ARM_TARGET1		38
-diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-index 4f14b5ce6535..29629fe02ce5 100644
---- a/arch/arm/kernel/module.c
-+++ b/arch/arm/kernel/module.c
-@@ -159,6 +159,10 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
- 			*(u32 *)loc = offset & 0x7fffffff;
- 			break;
- 
-+		case R_ARM_REL32:
-+			*(u32 *)loc += sym->st_value - loc;
-+			break;
-+
- 		case R_ARM_MOVW_ABS_NC:
- 		case R_ARM_MOVT_ABS:
- 			offset = tmp = __mem_to_opcode_arm(*(u32 *)loc);
--- 
-2.7.4
+> From: Romain Perier <romain.perier@free-electrons.com>
+>
+> Some Marvell ethernet switches have internal ethernet transceivers with
+> hardcoded phy addresses. These addresses can be greater than the number
+> of ports or its value might be different than the associated port number.
+> This is for example the case for MV88E6341 that has 6 ports and internal
+> Port 1 to Port4 PHYs mapped at SMI addresses from 0x11 to 0x14.
+
+Isn't there an hardware table used to map the PHY addresses on such chip?
+
+> This commits fixes the issue by removing the condition in MDIO callbacks.
+>
+> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
+> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+The patch is anyway still valid:
+
+Reviewed-by: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
+
+Thanks,
+
+        Vivien
