@@ -1,38 +1,62 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Thu, 19 Jan 2017 08:36:29 -0800
-Subject: [PATCH 1/3] PCI: imx6: Fix a typo in error message
-In-Reply-To: <20170119163631.10668-1-andrew.smirnov@gmail.com>
-References: <20170119163631.10668-1-andrew.smirnov@gmail.com>
-Message-ID: <20170119163631.10668-2-andrew.smirnov@gmail.com>
+Date: Thu, 19 Jan 2017 08:36:28 -0800
+Subject: [PATCH 0/3] i.MX7 PCI support
+Message-ID: <20170119163631.10668-1-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: yurovsky at gmail.com
-Cc: Richard Zhu <hongxing.zhu@nxp.com>
-Cc: Lucas Stach <l.stach@pengutronix.de>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Fabio Estevam <festevam@gmail.com>
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
----
- drivers/pci/host/pci-imx6.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+Hello, everyone:
 
-diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index c8cefb0..50a1291 100644
---- a/drivers/pci/host/pci-imx6.c
-+++ b/drivers/pci/host/pci-imx6.c
-@@ -678,8 +678,7 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
- 		imx6_pcie->pcie_inbound_axi = devm_clk_get(dev,
- 							   "pcie_inbound_axi");
- 		if (IS_ERR(imx6_pcie->pcie_inbound_axi)) {
--			dev_err(dev,
--				"pcie_incbound_axi clock missing or invalid\n");
-+			dev_err(dev, "pcie_inbound_axi clock missing or invalid\n");
- 			return PTR_ERR(imx6_pcie->pcie_inbound_axi);
- 		}
- 	}
+This is a small patchset intended to add PCI-subsystem bits necessary
+for enabling PCI support on i.MX7. This patchset is not
+self-sufficient and depends on three other patchsets:
+
+  - Changes to anatop regulator driver
+  - Chagnes to i.MX device tree code pertaining to anatop regulator
+  - Changes to i.MX device tree pertaining to PCIe controller
+
+I submitted first two in [1] and [2], and, unless adwised otherwise,
+am planning on submitting the last one once [1], [2] and this patchset
+are accepted.
+
+This patch was tested against i210 card on i.MX7 Sabre board
+(connected via mini-PCIe to PCIe adapter) with general functionality
+and bandwidth tests.
+
+Note that this patchset have known "blemish" where Gen1 cards (at
+least) report this message:
+
+ imx6q-pcie 33800000.pcie: Speed change timeout
+ imx6q-pcie 33800000.pcie: Failed to bring link up!
+
+due to hardware not clearing PORT_LOGIC_SPEED_CHANGE bit after speed
+change is requested, but since this does not seem to affect the
+functioning of the link I am hoping this is not a deal breaker.
+
+I posted a question on NXP community web-site [3] hoping to get some
+additional info to help resolve the matter and if anyone has any
+suggestions I'd love to hear them.
+
+Thanks,
+Andrey Smirnov
+
+[1] https://www.spinics.net/lists/arm-kernel/msg553215.html
+[2] https://www.spinics.net/lists/kernel/msg2418471.html
+[3] https://community.nxp.com/message/867943
+
+Andrey Smirnov (3):
+  PCI: imx6: Fix a typo in error message
+  PCI: imx6: Allow probe deferal by reset GPIO
+  PCI: imx6: Add code to support i.MX7D
+
+ .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |   6 +-
+ drivers/pci/host/pci-imx6.c                        | 197 ++++++++++++++++++---
+ include/linux/mfd/syscon/imx7-gpc.h                |  18 ++
+ include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
+ include/linux/mfd/syscon/imx7-src.h                |  18 ++
+ 5 files changed, 214 insertions(+), 29 deletions(-)
+ create mode 100644 include/linux/mfd/syscon/imx7-gpc.h
+ create mode 100644 include/linux/mfd/syscon/imx7-src.h
+
 -- 
 2.9.3
