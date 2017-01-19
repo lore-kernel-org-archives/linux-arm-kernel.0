@@ -1,33 +1,49 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 19 Jan 2017 10:09:21 +0100
-Subject: [PATCH 1/4] ARM: dts: imx7s-warp: Fix watchdog pinmux
+Date: Thu, 19 Jan 2017 10:09:23 +0100
+Subject: [PATCH 3/4] ARM: dts: imx7d-cl-som: Fix OTG power pinctrl
 In-Reply-To: <20170119090924.19636-1-s.hauer@pengutronix.de>
 References: <20170119090924.19636-1-s.hauer@pengutronix.de>
-Message-ID: <20170119090924.19636-2-s.hauer@pengutronix.de>
+Message-ID: <20170119090924.19636-4-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The watchdog pin is controlled by the iomuxc_lpsr, not the regular
-iomux, so move it there.
+GPIO01_IO05 is controlled by the LPSR iomux controller, so attach
+the corresponding pin to this controller.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/boot/dts/imx7s-warp.dts | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/imx7d-cl-som-imx7.dts | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx7s-warp.dts b/arch/arm/boot/dts/imx7s-warp.dts
-index 0345267f3390..cbb5bc16e713 100644
---- a/arch/arm/boot/dts/imx7s-warp.dts
-+++ b/arch/arm/boot/dts/imx7s-warp.dts
-@@ -437,7 +437,9 @@
- 			MX7D_PAD_SD3_RESET_B__SD3_RESET_B	0x1b
+diff --git a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
+index 58b09bf1ba2d..1135bc99b3e7 100644
+--- a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
++++ b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
+@@ -261,12 +261,6 @@
  		>;
  	};
-+};
  
-+&iomuxc_lpsr {
- 	pinctrl_wdog: wdoggrp {
+-	pinctrl_usbotg1: usbotg1grp {
+-		fsl,pins = <
+-			MX7D_PAD_GPIO1_IO05__GPIO1_IO5		0x14 /* OTG PWREN */
+-		>;
+-	};
+-
+ 	pinctrl_usdhc3: usdhc3grp {
  		fsl,pins = <
- 			MX7D_PAD_GPIO1_IO00__WDOD1_WDOG_B	0x74
+ 			MX7D_PAD_SD3_CMD__SD3_CMD		0x59
+@@ -283,3 +277,11 @@
+ 		>;
+ 	};
+ };
++
++&iomuxc_lpsr {
++	pinctrl_usbotg1: usbotg1grp {
++		fsl,pins = <
++			MX7D_PAD_GPIO1_IO05__GPIO1_IO5		0x14 /* OTG PWREN */
++		>;
++	};
++};
+\ No newline at end of file
 -- 
 2.11.0
