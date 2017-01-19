@@ -1,85 +1,94 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 19 Jan 2017 18:41:34 +0000
-Subject: [PATCH 1/5] iommu/arm-smmu: Restrict domain attributes to
- UNMANAGED domains
-In-Reply-To: <1484849955-1871-2-git-send-email-will.deacon@arm.com>
+Date: Thu, 19 Jan 2017 18:50:48 +0000
+Subject: [PATCH 2/5] iommu/arm-smmu: Install bypass S2CRs for
+ IOMMU_DOMAIN_IDENTITY domains
+In-Reply-To: <1484849955-1871-3-git-send-email-will.deacon@arm.com>
 References: <1484849955-1871-1-git-send-email-will.deacon@arm.com>
- <1484849955-1871-2-git-send-email-will.deacon@arm.com>
-Message-ID: <89d795b9-a6d7-7f41-705c-b918ee66ebf0@arm.com>
+ <1484849955-1871-3-git-send-email-will.deacon@arm.com>
+Message-ID: <20946171-e832-0803-2450-c095e19b2f64@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 19/01/17 18:19, Will Deacon wrote:
-> The ARM SMMU drivers provide a DOMAIN_ATTR_NESTING domain attribute,
-> which allows callers of the IOMMU API to request that the page table
-> for a domain is installed at stage-2, if supported by the hardware.
+> In preparation for allowing the default domain type to be overridden,
+> this patch adds support for IOMMU_DOMAIN_IDENTITY domains to the
+> ARM SMMU driver.
 > 
-> Since setting this attribute only makes sense for UNMANAGED domains,
-> this patch returns -ENODEV if the domain_{get,set}_attr operations are
-> called on other domain types.
+> An identity domain is created by placing the corresponding S2CR
+> registers into "bypass" mode, which allows transactions to flow through
+> the SMMU without any translation.
 
-For the sake of discussion, would it make sense to enforce this in
-domain_set_attr() itself? The intersection of drivers providing these
-callbacks and drivers supporting anything other than unmanaged domains
-is currently these two below, so it clearly wouldn't break anything to
-put this check in core code today. Looking forward, is there likely to
-be any plausible situation where users of a managed domain would be
-legitimate in mucking about with its attrs, on any platform?
+The other subtle nicety this opens the door to is being able to disable
+unmatched stream bypass without needing enough context banks for every
+single known device, since S2CRs are generally more abundant.
 
-Robin.
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 
 > Signed-off-by: Will Deacon <will.deacon@arm.com>
 > ---
->  drivers/iommu/arm-smmu-v3.c | 6 ++++++
->  drivers/iommu/arm-smmu.c    | 6 ++++++
->  2 files changed, 12 insertions(+)
+>  drivers/iommu/arm-smmu.c | 20 +++++++++++++++++---
+>  1 file changed, 17 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index 4d6ec444a9d6..c254325b0c7a 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -1839,6 +1839,9 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
->  {
->  	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
->  
-> +	if (domain->type != IOMMU_DOMAIN_UNMANAGED)
-> +		return -ENODEV;
-> +
->  	switch (attr) {
->  	case DOMAIN_ATTR_NESTING:
->  		*(int *)data = (smmu_domain->stage == ARM_SMMU_DOMAIN_NESTED);
-> @@ -1854,6 +1857,9 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
->  	int ret = 0;
->  	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
->  
-> +	if (domain->type != IOMMU_DOMAIN_UNMANAGED)
-> +		return -ENODEV;
-> +
->  	mutex_lock(&smmu_domain->init_mutex);
->  
->  	switch (attr) {
 > diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index a60cded8a6ed..a328ffb75509 100644
+> index a328ffb75509..0f5e42a719e5 100644
 > --- a/drivers/iommu/arm-smmu.c
 > +++ b/drivers/iommu/arm-smmu.c
-> @@ -1497,6 +1497,9 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
+> @@ -404,6 +404,7 @@ enum arm_smmu_domain_stage {
+>  	ARM_SMMU_DOMAIN_S1 = 0,
+>  	ARM_SMMU_DOMAIN_S2,
+>  	ARM_SMMU_DOMAIN_NESTED,
+> +	ARM_SMMU_DOMAIN_BYPASS,
+>  };
+>  
+>  struct arm_smmu_domain {
+> @@ -824,6 +825,12 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+>  	if (smmu_domain->smmu)
+>  		goto out_unlock;
+>  
+> +	if (domain->type == IOMMU_DOMAIN_IDENTITY) {
+> +		smmu_domain->stage = ARM_SMMU_DOMAIN_BYPASS;
+> +		smmu_domain->smmu = smmu;
+> +		goto out_unlock;
+> +	}
+> +
+>  	/*
+>  	 * Mapping the requested stage onto what we support is surprisingly
+>  	 * complicated, mainly because the spec allows S1+S2 SMMUs without
+> @@ -984,7 +991,7 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
+>  	void __iomem *cb_base;
+>  	int irq;
+>  
+> -	if (!smmu)
+> +	if (!smmu || domain->type == IOMMU_DOMAIN_IDENTITY)
+>  		return;
+>  
+>  	/*
+> @@ -1007,7 +1014,9 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
 >  {
->  	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+>  	struct arm_smmu_domain *smmu_domain;
 >  
-> +	if (domain->type != IOMMU_DOMAIN_UNMANAGED)
-> +		return -ENODEV;
+> -	if (type != IOMMU_DOMAIN_UNMANAGED && type != IOMMU_DOMAIN_DMA)
+> +	if (type != IOMMU_DOMAIN_UNMANAGED &&
+> +	    type != IOMMU_DOMAIN_DMA &&
+> +	    type != IOMMU_DOMAIN_IDENTITY)
+>  		return NULL;
+>  	/*
+>  	 * Allocate the domain and initialise some of its data structures.
+> @@ -1205,10 +1214,15 @@ static int arm_smmu_domain_add_master(struct arm_smmu_domain *smmu_domain,
+>  {
+>  	struct arm_smmu_device *smmu = smmu_domain->smmu;
+>  	struct arm_smmu_s2cr *s2cr = smmu->s2crs;
+> -	enum arm_smmu_s2cr_type type = S2CR_TYPE_TRANS;
+>  	u8 cbndx = smmu_domain->cfg.cbndx;
+> +	enum arm_smmu_s2cr_type type;
+>  	int i, idx;
+>  
+> +	if (smmu_domain->stage == ARM_SMMU_DOMAIN_BYPASS)
+> +		type = S2CR_TYPE_BYPASS;
+> +	else
+> +		type = S2CR_TYPE_TRANS;
 > +
->  	switch (attr) {
->  	case DOMAIN_ATTR_NESTING:
->  		*(int *)data = (smmu_domain->stage == ARM_SMMU_DOMAIN_NESTED);
-> @@ -1512,6 +1515,9 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
->  	int ret = 0;
->  	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
->  
-> +	if (domain->type != IOMMU_DOMAIN_UNMANAGED)
-> +		return -ENODEV;
-> +
->  	mutex_lock(&smmu_domain->init_mutex);
->  
->  	switch (attr) {
+>  	for_each_cfg_sme(fwspec, i, idx) {
+>  		if (type == s2cr[idx].type && cbndx == s2cr[idx].cbndx)
+>  			continue;
 > 
