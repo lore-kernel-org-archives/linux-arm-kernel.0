@@ -1,84 +1,42 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 19 Jan 2017 11:11:18 +0000
-Subject: [PATCH 2/2] security: Change name of CONFIG_DEBUG_SET_MODULE_RONX
-In-Reply-To: <1484789346-21012-3-git-send-email-labbott@redhat.com>
-References: <1484789346-21012-1-git-send-email-labbott@redhat.com>
- <1484789346-21012-3-git-send-email-labbott@redhat.com>
-Message-ID: <20170119111117.GB11176@leverpostej>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Thu, 19 Jan 2017 19:14:31 +0800
+Subject: [PATCH v8 1/4] arm64: arch_timer: Add device tree binding for
+ hisilicon-161010101 erratum
+In-Reply-To: <1484824474-12172-1-git-send-email-dingtianhong@huawei.com>
+References: <1484824474-12172-1-git-send-email-dingtianhong@huawei.com>
+Message-ID: <1484824474-12172-2-git-send-email-dingtianhong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This erratum describes a bug in logic outside the core, so MIDR can't be
+used to identify its presence, and reading an SoC-specific revision
+register from common arch timer code would be awkward.  So, describe it
+in the device tree.
 
-On Wed, Jan 18, 2017 at 05:29:06PM -0800, Laura Abbott wrote:
-> 
-> Despite the word 'debug' in CONFIG_DEBUG_SET_MODULE_RONX, this kernel
-> option provides key security features that are to be expected on a
-> modern system. Change the name to CONFIG_HARDENED_MODULE_MAPPINGS which
-> more accurately describes what this option is intended to do.
+Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/arm/arch_timer.txt | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-This looks good; my naming comments from the DEBUG_RODATA also apply
-here -- the proposed name is fine.
-
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 06fed56..2fe0e98 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -12,6 +12,7 @@ config ARM64
->  	select ARCH_HAS_GCOV_PROFILE_ALL
->  	select ARCH_HAS_GIGANTIC_PAGE
->  	select ARCH_HAS_HARDENED_MAPPINGS
-> +	select ARCH_HAS_HARDENED_MODULE_MAPPINGS
->  	select ARCH_HAS_KCOV
->  	select ARCH_HAS_SG_CHAIN
->  	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
-> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-> index a26d27f..1eebe1f 100644
-> --- a/arch/arm64/Kconfig.debug
-> +++ b/arch/arm64/Kconfig.debug
-> @@ -71,17 +71,6 @@ config DEBUG_WX
->  
->  	  If in doubt, say "Y".
->  
-> -config DEBUG_SET_MODULE_RONX
-> -	bool "Set loadable kernel module data as NX and text as RO"
-> -	depends on MODULES
-> -	default y
-> -	help
-> -	  Is this is set, kernel module text and rodata will be made read-only.
-> -	  This is to help catch accidental or malicious attempts to change the
-> -	  kernel's executable code.
-> -
-> -	  If in doubt, say Y.
-> -
-
-> +config ARCH_HAS_HARDENED_MODULE_MAPPINGS
-> +	def_bool n
-> +
-> +config HARDENED_MODULE_MAPPINGS
-> +	bool "Mark module mappings with stricter permissions (RO/W^X)"
-> +	default y
-> +	depends on ARCH_HAS_HARDENED_MODULE_MAPPINGS
-> +	help
-> +	  If this is set, module text and rodata memory will be made read-only,
-> +	  and non-text memory will be made non-executable. This provides
-> +	  protection against certain security vulnerabilities (e.g. modifying
-> +	  code)
-> +
-> +	  Unless your system has known restrictions or performance issues, it
-> +	  is recommended to say Y here.
-> +
-
-I was hoping that we'd make this mandatory, as we'd already done for
-DEBUG_RODATA.
-
-Takahiro-san did a bit of work towards that in commit 39290b389ea2654f
-("module: extend 'rodata=off' boot cmdline parameter to module
-mappings").
-
-It would be good to know if there's any reason we can't do that.
-
-Otherwise, this looks fine.
-
-Thanks,
-Mark.
+diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
+index ad440a2..9116934 100644
+--- a/Documentation/devicetree/bindings/arm/arch_timer.txt
++++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
+@@ -31,6 +31,14 @@ to deliver its interrupts via SPIs.
+   This also affects writes to the tval register, due to the implicit
+   counter read.
+ 
++- hisilicon,erratum-161010101 : A boolean property. Indicates the presence of
++  erratum 161010101, which says that reading the counter is unreliable unless
++  reading twice on the register and the value of the second read is larger
++  than the first by less than 32. If the verification is unsuccessful, then
++  discard the value of this read and repeat this procedure until the verification
++  is successful.  This also affects writes to the tval register, due to the
++  implicit counter read.
++
+ ** Optional properties:
+ 
+ - arm,cpu-registers-not-fw-configured : Firmware does not initialize
+-- 
+1.9.0
