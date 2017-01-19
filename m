@@ -1,139 +1,72 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 19 Jan 2017 11:59:13 +0000
-Subject: [PATCH v8 2/4] arm64: arch_timer: Introduce a generic erratum
- handing mechanism for fsl-a008585
-In-Reply-To: <1484824474-12172-3-git-send-email-dingtianhong@huawei.com>
-References: <1484824474-12172-1-git-send-email-dingtianhong@huawei.com>
- <1484824474-12172-3-git-send-email-dingtianhong@huawei.com>
-Message-ID: <eeab7907-77c3-163c-f489-319012a13913@arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 19 Jan 2017 10:02:00 -0200
+Subject: [PATCH 2/4] ARM: dts: imx7d-sdp: Fix watchdog and pwm pinmux
+In-Reply-To: <20170119090924.19636-3-s.hauer@pengutronix.de>
+References: <20170119090924.19636-1-s.hauer@pengutronix.de>
+ <20170119090924.19636-3-s.hauer@pengutronix.de>
+Message-ID: <CAOMZO5B+EnTnhNKeuO9rs8t6o-1gSw3SztC9KQtFPui8D+CPBQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/01/17 11:14, Ding Tianhong wrote:
-> The workaround for hisilicon,161010101 will check the return value of the system counter
-> by different way, in order to distinguish with the fsl-a008585 workaround, introduce
-> a new generic erratum handing mechanism for fsl-a008585 and rename some functions.
-> 
-> After discussion with Marc and Will, a consensus decision was made to remove the commandline
-> parameter for enabling fsl,erratum-a008585 erratum.
-> 
-> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+On Thu, Jan 19, 2017 at 7:09 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> The watchdog pin and the pwm output pin are controlled by the
+> iomuxc_lpsr, not the regular iomux, so move the pins there.
+>
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+
+Just two minor nits that probably Shawn can take care while applying it"
+
+in Subject there is a typo "sdb".
+
 > ---
->  Documentation/admin-guide/kernel-parameters.txt |   9 --
->  arch/arm64/include/asm/arch_timer.h             |  38 +++------
->  drivers/clocksource/Kconfig                     |   8 ++
->  drivers/clocksource/arm_arch_timer.c            | 105 ++++++++++++++----------
->  4 files changed, 84 insertions(+), 76 deletions(-)
-> 
-> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-> index 21e2d88..76437ad 100644
-> --- a/Documentation/admin-guide/kernel-parameters.txt
-> +++ b/Documentation/admin-guide/kernel-parameters.txt
-> @@ -539,15 +539,6 @@
->  			loops can be debugged more effectively on production
->  			systems.
->  
-> -	clocksource.arm_arch_timer.fsl-a008585=
-> -			[ARM64]
-> -			Format: <bool>
-> -			Enable/disable the workaround of Freescale/NXP
-> -			erratum A-008585.  This can be useful for KVM
-> -			guests, if the guest device tree doesn't show the
-> -			erratum.  If unspecified, the workaround is
-> -			enabled based on the device tree.
+>  arch/arm/boot/dts/imx7d-sdb.dts | 26 ++++++++++++++------------
+>  1 file changed, 14 insertions(+), 12 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+> index 2f33c463cbce..84f35a6cbb30 100644
+> --- a/arch/arm/boot/dts/imx7d-sdb.dts
+> +++ b/arch/arm/boot/dts/imx7d-sdb.dts
+> @@ -502,12 +502,6 @@
+>                         >;
+>                 };
+>
+> -               pinctrl_pwm1: pwm1grp {
+> -                       fsl,pins = <
+> -                               MX7D_PAD_GPIO1_IO01__PWM1_OUT           0x110b0
+> -                       >;
+> -               };
 > -
->  	clearcpuid=BITNUM [X86]
->  			Disable CPUID feature X for the kernel. See
->  			arch/x86/include/asm/cpufeatures.h for the valid bit
-> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-> index eaa5bbe..b4b3400 100644
-> --- a/arch/arm64/include/asm/arch_timer.h
-> +++ b/arch/arm64/include/asm/arch_timer.h
-> @@ -29,41 +29,29 @@
->  
->  #include <clocksource/arm_arch_timer.h>
->  
-> -#if IS_ENABLED(CONFIG_FSL_ERRATUM_A008585)
-> +#if IS_ENABLED(CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND)
->  extern struct static_key_false arch_timer_read_ool_enabled;
-> -#define needs_fsl_a008585_workaround() \
-> +#define needs_unstable_timer_counter_workaround() \
->  	static_branch_unlikely(&arch_timer_read_ool_enabled)
->  #else
-> -#define needs_fsl_a008585_workaround()  false
-> +#define needs_unstable_timer_counter_workaround()  false
->  #endif
->  
-> -u32 __fsl_a008585_read_cntp_tval_el0(void);
-> -u32 __fsl_a008585_read_cntv_tval_el0(void);
-> -u64 __fsl_a008585_read_cntvct_el0(void);
->  
-> -/*
-> - * The number of retries is an arbitrary value well beyond the highest number
-> - * of iterations the loop has been observed to take.
-> - */
-> -#define __fsl_a008585_read_reg(reg) ({			\
-> -	u64 _old, _new;					\
-> -	int _retries = 200;				\
-> -							\
-> -	do {						\
-> -		_old = read_sysreg(reg);		\
-> -		_new = read_sysreg(reg);		\
-> -		_retries--;				\
-> -	} while (unlikely(_old != _new) && _retries);	\
-> -							\
-> -	WARN_ON_ONCE(!_retries);			\
-> -	_new;						\
-> -})
-> +struct arch_timer_erratum_workaround {
-> +	const char *id;		/* Indicate the Erratum ID */
-> +	u32 (*read_cntp_tval_el0)(void);
-> +	u32 (*read_cntv_tval_el0)(void);
-> +	u64 (*read_cntvct_el0)(void);
+>                 pinctrl_tsc2046_pendown: tsc2046_pendown {
+>                         fsl,pins = <
+>                                 MX7D_PAD_EPDC_BDR1__GPIO2_IO29          0x59
+> @@ -635,11 +629,19 @@
+>                                 MX7D_PAD_SD3_STROBE__SD3_STROBE         0x1b
+>                         >;
+>                 };
+> -
+> -               pinctrl_wdog: wdoggrp {
+> -                       fsl,pins = <
+> -                               MX7D_PAD_GPIO1_IO00__WDOD1_WDOG_B       0x74
+> -                       >;
+> -               };
+>         };
+>  };
+> +
+> +&iomuxc_lpsr {
+> +       pinctrl_wdog: wdoggrp {
+> +               fsl,pins = <
+> +                       MX7D_PAD_GPIO1_IO00__WDOD1_WDOG_B       0x74
+> +               >;
+> +       };
+> +
+> +       pinctrl_pwm1: pwm1grp {
+> +               fsl,pins = <
+> +                       MX7D_PAD_GPIO1_IO01__PWM1_OUT           0x110b0
+> +               >;
+> +       };
 > +};
-> +
-> +extern const struct arch_timer_erratum_workaround *timer_unstable_counter_workaround;
->  
->  #define arch_timer_reg_read_stable(reg) 		\
->  ({							\
->  	u64 _val;					\
-> -	if (needs_fsl_a008585_workaround())		\
-> -		_val = __fsl_a008585_read_##reg();	\
-> +	if (needs_unstable_timer_counter_workaround())		\
-> +		_val = timer_unstable_counter_workaround->read_##reg();\
->  	else						\
->  		_val = read_sysreg(reg);		\
->  	_val;						\
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index 4866f7a..04c2b93 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -325,10 +325,18 @@ config ARM_ARCH_TIMER_EVTSTREAM
->  	  This must be disabled for hardware validation purposes to detect any
->  	  hardware anomalies of missing events.
->  
-> +config ARM_ARCH_TIMER_OOL_WORKAROUND
-> +	bool "Workaround for arm arch timer unstable counter"
+> \ No newline at end of file
 
-Please drop the message. We don't want that option to be selectable by a
-user, but only selected if an erratum that depends on it is enabled.
-
-> +	depends on FSL_ERRATUM_A008585
-> +	help
-> +	  This option would only be enabled by Freescale/NXP Erratum A-008585
-> +	  or something else chip has similar erratum.
-> +
->  config FSL_ERRATUM_A008585
->  	bool "Workaround for Freescale/NXP Erratum A-008585"
->  	default y
->  	depends on ARM_ARCH_TIMER && ARM64
-> +	select ARM_ARCH_TIMER_OOL_WORKAROUND
->  	help
->  	  This option enables a workaround for Freescale/NXP Erratum
->  	  A-008585 ("ARM generic timer may contain an erroneous
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+This could be fixed as well.
