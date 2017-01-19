@@ -1,63 +1,46 @@
-From: jan.kiszka@siemens.com (Jan Kiszka)
-Date: Thu, 19 Jan 2017 20:37:40 +0100
-Subject: [PATCH v3 2/3] spi: pxa2xx: Prepare for edge-triggered interrupts
-In-Reply-To: <7e5fb21d-35bd-6ac3-9e6f-cffed656997f@siemens.com>
-References: <cover.1484592296.git.jan.kiszka@siemens.com>
- <cover.1484592296.git.jan.kiszka@siemens.com>
- <7b15a0910a3ad861fd32161c72559bafa7b71e29.1484592296.git.jan.kiszka@siemens.com>
- <87ziiqdstr.fsf@belgarion.home>
- <4d97e416-4d32-3b9f-0695-de116a4b26bd@siemens.com>
- <87r340eq28.fsf@belgarion.home>
- <b3e0d393-b841-1556-ddd2-5634f12b6f2c@siemens.com>
- <20170118124645.6ugjwbfeq5vsh2to@sirena.org.uk>
- <7e5fb21d-35bd-6ac3-9e6f-cffed656997f@siemens.com>
-Message-ID: <e692c4a9-6320-b9e0-d6e7-f58bbe6ba867@siemens.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 19 Jan 2017 11:42:47 -0800
+Subject: [PATCH RFC 0/7] Clean up PHY MMD accessors
+In-Reply-To: <20170113152059.GR14217@n2100.armlinux.org.uk>
+References: <20170113152059.GR14217@n2100.armlinux.org.uk>
+Message-ID: <9fb97d58-6ad3-f9d1-c255-9f91e5857f88@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using the a device with edge-triggered interrupts, such as MSIs,
-the interrupt handler has to ensure that there is a point in time during
-its execution where all interrupts sources are silent so that a new
-event can trigger a new interrupt again.
+On 01/13/2017 07:20 AM, Russell King - ARM Linux wrote:
+> This series cleans up phylib's MMD accessors, so that we have a common
+> way of accessing the Clause 45 register set.
+> 
+> The current situation is far from ideal - we have phy_(read|write)_mmd()
+> which accesses Clause 45 registers over Clause 45 accesses, and we have
+> phy_(read|write)_mmd_indirect(), which accesses Clause 45 registers via
+> Clause 22 register 13/14.
+> 
+> Generic code uses the indirect methods to access standard Clause 45
+> features, and when we come to add Clause 45 PHY support to phylib, we
+> would need to make these conditional upon the PHY type, or duplicate
+> these functions.
+> 
+> An alternative solution is to merge these accessors together, and select
+> the appropriate access method depending upon the 802.3 clause that the
+> PHY conforms with.  The result is that we have a single set of
+> phy_(read|write)_mmd() accessors.
+> 
+> For cases which require special handling, we still allow PHY drivers to
+> override all MMD accesses - except rather than just overriding the
+> indirect accesses.  This keeps existing overrides working.
+> 
+> Combining the two also has another beneficial side effect - we get rid
+> of similar functions that take arguments in different orders.  The
+> old direct accessors took the phy structure, devad and register number,
+> whereas the indirect accessors took the phy structure, register number
+> and devad in that order.  Care must be taken when updating future
+> drivers that the argument order is correct, and the function name is
+> not merely replaced.
 
-This is achieved here by disabling all interrupt sources for a moment
-before processing them according to the status register. If a new
-interrupt should have arrived after we read the status, it will now
-re-trigger the interrupt, even in edge mode.
+I really like that series, this is much much cleaner, do you mind
+resubmitting this without a RFC tag so David can apply it?
 
-Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
----
-
-Successfully tested by now.
-
-Changes to v2:
-- avoid inner looping by making the hardware retrigger on "forgotten"
-  IRQ sources
-
- drivers/spi/spi-pxa2xx.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
-index 0d10090..f9c2329 100644
---- a/drivers/spi/spi-pxa2xx.c
-+++ b/drivers/spi/spi-pxa2xx.c
-@@ -785,6 +785,9 @@ static irqreturn_t ssp_int(int irq, void *dev_id)
- 	if (!(status & mask))
- 		return IRQ_NONE;
- 
-+	pxa2xx_spi_write(drv_data, SSCR1, sccr1_reg & ~drv_data->int_cr1);
-+	pxa2xx_spi_write(drv_data, SSCR1, sccr1_reg);
-+
- 	if (!drv_data->master->cur_msg) {
- 		handle_bad_msg(drv_data);
- 		/* Never fail */
+Thanks!
 -- 
-2.1.4
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170119/035bfd45/attachment.sig>
+Florian
