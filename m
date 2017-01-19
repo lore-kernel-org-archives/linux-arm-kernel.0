@@ -1,32 +1,75 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 19 Jan 2017 01:46:58 +0100
-Subject: [PATCH] ARM: dts: at91: Enable DMA on sama5d4_xplained console
-Message-ID: <20170119004658.32750-1-alexandre.belloni@free-electrons.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 18 Jan 2017 16:47:50 -0800
+Subject: [PATCHv4 2/5] arm: mvebu: support for SMP on 98DX3336 SoC
+In-Reply-To: <20170113091222.7132-3-chris.packham@alliedtelesis.co.nz>
+References: <20170113091222.7132-1-chris.packham@alliedtelesis.co.nz>
+ <20170113091222.7132-3-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20170119004750.GC4857@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable DMA on usart3 to get a more reliable console. This is especially
-useful for automation and kernelci were a kernel with PROVE_LOCKING enabled
-is quite susceptible to character loss, resulting in tests failure.
+On 01/13, Chris Packham wrote:
+> diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
+> index 46c742d3bd41..59be3ca0464f 100644
+> --- a/arch/arm/mach-mvebu/platsmp.c
+> +++ b/arch/arm/mach-mvebu/platsmp.c
+> @@ -184,3 +184,89 @@ const struct smp_operations armada_xp_smp_ops __initconst = {
+>  
+>  CPU_METHOD_OF_DECLARE(armada_xp_smp, "marvell,armada-xp-smp",
+>  		      &armada_xp_smp_ops);
+> +
+> +struct resume_controller {
+> +	u32 resume_control;
+> +	u32 resume_boot_addr;
+> +};
+> +
+> +static const struct resume_controller mv98dx3336_resume_controller = {
+> +	.resume_control = 0x08,
+> +	.resume_boot_addr = 0x04,
+> +};
+> +
+> +static const struct of_device_id of_mv98dx3236_resume_table[] = {
+> +	{
+> +		.compatible = "marvell,98dx3336-resume-ctrl",
+> +		.data = (void *)&mv98dx3336_resume_controller,
 
-Cc: stable <stable@vger.kernel.org> #v4.1+
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/boot/dts/at91-sama5d4_xplained.dts | 2 ++
- 1 file changed, 2 insertions(+)
+Useless cast?
 
-diff --git a/arch/arm/boot/dts/at91-sama5d4_xplained.dts b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-index ed7fce297738..44d1171c7fc0 100644
---- a/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-@@ -110,6 +110,8 @@
- 			};
- 
- 			usart3: serial at fc00c000 {
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
- 				status = "okay";
- 			};
- 
+> +	},
+> +	{ /* end of list */ },
+> +};
+> +
+> +static int mv98dx3236_resume_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
+> +{
+> +	const struct of_device_id *match;
+> +	struct device_node *np;
+> +	void __iomem *base;
+> +	struct resume_controller *rc;
+> +
+> +	WARN_ON(hw_cpu != 1);
+> +
+> +	np = of_find_matching_node_and_match(NULL, of_mv98dx3236_resume_table,
+> +					     &match);
+> +	if (!np)
+> +		return -ENODEV;
+> +
+> +	base = of_io_request_and_map(np, 0, of_node_full_name(np));
+> +	rc = (struct resume_controller *)match->data;
+
+Useless cast?
+
+> +	of_node_put(np);
+> +	if (IS_ERR(base))
+> +		return PTR_ERR(base);
+> +
+> +	writel(0, base + rc->resume_control);
+> +	writel(virt_to_phys(boot_addr), base + rc->resume_boot_addr);
+> +
+
+Otherwise
+
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+
 -- 
-2.11.0
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
