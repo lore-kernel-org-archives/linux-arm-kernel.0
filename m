@@ -1,87 +1,171 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Thu, 19 Jan 2017 20:35:48 +0530
-Subject: [PATCH V5 04/12] of: dma: Make of_dma_deconfigure() public
+Date: Thu, 19 Jan 2017 20:35:50 +0530
+Subject: [PATCH V5 06/12] iommu: of: Handle IOMMU lookup failure with deferred
+ probing or error
 In-Reply-To: <1484838356-24962-1-git-send-email-sricharan@codeaurora.org>
 References: <1484838356-24962-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1484838356-24962-5-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1484838356-24962-7-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-As part of moving DMA initializing to probe time the
-of_dma_deconfigure() function will need to be called from different
-source files. Make it public and move it to drivers/of/device.c where
-the of_dma_configure() function is.
+Failures to look up an IOMMU when parsing the DT iommus property need to
+be handled separately from the .of_xlate() failures to support deferred
+probing.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+The lack of a registered IOMMU can be caused by the lack of a driver for
+the IOMMU, the IOMMU device probe not having been performed yet, having
+been deferred, or having failed.
+
+The first case occurs when the device tree describes the bus master and
+IOMMU topology correctly but no device driver exists for the IOMMU yet
+or the device driver has not been compiled in. Return NULL, the caller
+will configure the device without an IOMMU.
+
+The second and third cases are handled by deferring the probe of the bus
+master device which will eventually get reprobed after the IOMMU.
+
+The last case is currently handled by deferring the probe of the bus
+master device as well. A mechanism to either configure the bus master
+device without an IOMMU or to fail the bus master device probe depending
+on whether the IOMMU is optional or mandatory would be a good
+enhancement.
+
+Signed-off-by: Laurent Pichart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 ---
- * No change
+ * Removed the dma configuration for the pci devices in case of DT
+   from pci_dma_configure which was hanging outside separately and
+   doing it in dma_configure function itself.
 
- drivers/of/device.c       | 12 ++++++++++++
- drivers/of/platform.c     |  5 -----
- include/linux/of_device.h |  3 +++
- 3 files changed, 15 insertions(+), 5 deletions(-)
+ drivers/base/dma-mapping.c | 5 +++--
+ drivers/iommu/of_iommu.c   | 5 +++--
+ drivers/of/device.c        | 9 +++++++--
+ include/linux/of_device.h  | 9 ++++++---
+ 4 files changed, 19 insertions(+), 9 deletions(-)
 
+diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
+index dfe6fd7..f82212c 100644
+--- a/drivers/base/dma-mapping.c
++++ b/drivers/base/dma-mapping.c
+@@ -352,6 +352,7 @@ int dma_configure(struct device *dev)
+ {
+ 	struct device *_dev = dev;
+ 	int is_pci = dev_is_pci(dev);
++	int ret = 0;
+ 
+ 	if (is_pci) {
+ 		_dev = pci_get_host_bridge_device(to_pci_dev(dev));
+@@ -361,12 +362,12 @@ int dma_configure(struct device *dev)
+ 	}
+ 
+ 	if (_dev->of_node)
+-		of_dma_configure(dev, _dev->of_node);
++		ret = of_dma_configure(dev, _dev->of_node);
+ 
+ 	if (is_pci)
+ 		pci_put_host_bridge_device(_dev);
+ 
+-	return 0;
++	return ret;
+ }
+ 
+ void dma_deconfigure(struct device *dev)
+diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+index 349bd1d..9529d6c 100644
+--- a/drivers/iommu/of_iommu.c
++++ b/drivers/iommu/of_iommu.c
+@@ -23,6 +23,7 @@
+ #include <linux/of.h>
+ #include <linux/of_iommu.h>
+ #include <linux/of_pci.h>
++#include <linux/pci.h>
+ #include <linux/slab.h>
+ 
+ static const struct of_device_id __iommu_of_table_sentinel
+@@ -223,7 +224,7 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
+ 			ops = ERR_PTR(err);
+ 	}
+ 
+-	return IS_ERR(ops) ? NULL : ops;
++	return ops;
+ }
+ 
+ static int __init of_iommu_init(void)
+@@ -234,7 +235,7 @@ static int __init of_iommu_init(void)
+ 	for_each_matching_node_and_match(np, matches, &match) {
+ 		const of_iommu_init_fn init_fn = match->data;
+ 
+-		if (init_fn(np))
++		if (init_fn && init_fn(np))
+ 			pr_err("Failed to initialise IOMMU %s\n",
+ 				of_node_full_name(np));
+ 	}
 diff --git a/drivers/of/device.c b/drivers/of/device.c
-index d9898d9..1c843e2 100644
+index 1c843e2..d58595c 100644
 --- a/drivers/of/device.c
 +++ b/drivers/of/device.c
-@@ -136,6 +136,18 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+@@ -82,7 +82,7 @@ int of_device_add(struct platform_device *ofdev)
+  * can use a platform bus notifier and handle BUS_NOTIFY_ADD_DEVICE events
+  * to fix up DMA configuration.
+  */
+-void of_dma_configure(struct device *dev, struct device_node *np)
++int of_dma_configure(struct device *dev, struct device_node *np)
+ {
+ 	u64 dma_addr, paddr, size;
+ 	int ret;
+@@ -107,7 +107,7 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+ 	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
+ 	if (ret < 0) {
+ 		dma_addr = offset = 0;
+-		size = dev->coherent_dma_mask + 1;
++		size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
+ 	} else {
+ 		offset = PFN_DOWN(paddr - dma_addr);
+ 		dev_dbg(dev, "dma_pfn_offset(%#08lx)\n", offset);
+@@ -129,10 +129,15 @@ void of_dma_configure(struct device *dev, struct device_node *np)
+ 		coherent ? " " : " not ");
+ 
+ 	iommu = of_iommu_configure(dev, np);
++	if (IS_ERR(iommu))
++		return PTR_ERR(iommu);
++
+ 	dev_dbg(dev, "device is%sbehind an iommu\n",
+ 		iommu ? " " : " not ");
+ 
+ 	arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
++
++	return 0;
  }
  EXPORT_SYMBOL_GPL(of_dma_configure);
  
-+/**
-+ * of_dma_deconfigure - Clean up DMA configuration
-+ * @dev:	Device for which to clean up DMA configuration
-+ *
-+ * Clean up all configuration performed by of_dma_configure_ops() and free all
-+ * resources that have been allocated.
-+ */
-+void of_dma_deconfigure(struct device *dev)
-+{
-+	arch_teardown_dma_ops(dev);
-+}
-+
- int of_device_register(struct platform_device *pdev)
- {
- 	device_initialize(&pdev->dev);
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index b8064bc..57418f7 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -158,11 +158,6 @@ struct platform_device *of_device_alloc(struct device_node *np,
- }
- EXPORT_SYMBOL(of_device_alloc);
- 
--static void of_dma_deconfigure(struct device *dev)
--{
--	arch_teardown_dma_ops(dev);
--}
--
- /**
-  * of_platform_device_create_pdata - Alloc, initialize and register an of_device
-  * @np: pointer to node to create device for
 diff --git a/include/linux/of_device.h b/include/linux/of_device.h
-index cc7dd687..d20a31a 100644
+index d20a31a..6dca65c 100644
 --- a/include/linux/of_device.h
 +++ b/include/linux/of_device.h
-@@ -56,6 +56,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
+@@ -55,7 +55,7 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
+ 	return of_node_get(cpu_dev->of_node);
  }
  
- void of_dma_configure(struct device *dev, struct device_node *np);
-+void of_dma_deconfigure(struct device *dev);
+-void of_dma_configure(struct device *dev, struct device_node *np);
++int of_dma_configure(struct device *dev, struct device_node *np);
+ void of_dma_deconfigure(struct device *dev);
  #else /* CONFIG_OF */
  
- static inline int of_driver_match_device(struct device *dev,
-@@ -100,6 +101,8 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
+@@ -99,8 +99,11 @@ static inline struct device_node *of_cpu_device_node_get(int cpu)
+ {
+ 	return NULL;
  }
- static inline void of_dma_configure(struct device *dev, struct device_node *np)
+-static inline void of_dma_configure(struct device *dev, struct device_node *np)
+-{}
++
++static inline int of_dma_configure(struct device *dev, struct device_node *np)
++{
++	return 0;
++}
+ static inline void of_dma_deconfigure(struct device *dev)
  {}
-+static inline void of_dma_deconfigure(struct device *dev)
-+{}
  #endif /* CONFIG_OF */
- 
- #endif /* _LINUX_OF_DEVICE_H */
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
