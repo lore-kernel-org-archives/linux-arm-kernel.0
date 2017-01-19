@@ -1,68 +1,89 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 19 Jan 2017 20:18:31 +0800
-Subject: [PATCH RESEND v8 1/4] arm64: arch_timer: Add device tree binding
- for hisilicon-161010101 erratum
-In-Reply-To: <20170119121008.GE11176@leverpostej>
-References: <1484826406-16348-1-git-send-email-dingtianhong@huawei.com>
- <1484826406-16348-2-git-send-email-dingtianhong@huawei.com>
- <20170119121008.GE11176@leverpostej>
-Message-ID: <b6db0384-afdf-b1d9-5790-328d63f1c306@huawei.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 19 Jan 2017 13:22:56 +0100
+Subject: [PATCH 2/6] usb: mtu3: add reference clock
+In-Reply-To: <1484719707-12107-2-git-send-email-chunfeng.yun@mediatek.com>
+References: <1484719707-12107-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1484719707-12107-2-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <7fc9de99-4bef-ddf2-c5fe-985f8d2348d2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 2017/1/19 20:10, Mark Rutland wrote:
-> On Thu, Jan 19, 2017 at 07:46:43PM +0800, Ding Tianhong wrote:
->> This erratum describes a bug in logic outside the core, so MIDR can't be
->> used to identify its presence, and reading an SoC-specific revision
->> register from common arch timer code would be awkward.  So, describe it
->> in the device tree.
->>
->> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
->> Acked-by: Rob Herring <robh@kernel.org>
->> ---
->>  Documentation/devicetree/bindings/arm/arch_timer.txt | 8 ++++++++
->>  1 file changed, 8 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/arch_timer.txt b/Documentation/devicetree/bindings/arm/arch_timer.txt
->> index ad440a2..9116934 100644
->> --- a/Documentation/devicetree/bindings/arm/arch_timer.txt
->> +++ b/Documentation/devicetree/bindings/arm/arch_timer.txt
->> @@ -31,6 +31,14 @@ to deliver its interrupts via SPIs.
->>    This also affects writes to the tval register, due to the implicit
->>    counter read.
->>  
->> +- hisilicon,erratum-161010101 : A boolean property. Indicates the presence of
->> +  erratum 161010101, which says that reading the counter is unreliable unless
->> +  reading twice on the register and the value of the second read is larger
->> +  than the first by less than 32. If the verification is unsuccessful, then
->> +  discard the value of this read and repeat this procedure until the verification
->> +  is successful.  This also affects writes to the tval register, due to the
->> +  implicit counter read.
-> 
-> This describes the workaround, which shouldn't be necessary.
-> 
-> My understanding (from the cover letter) is that reads of the
-> {virtual,physical} counters may return a value precisely 32 above the
-> true value.
-> 
-> So it would be better to say:
-> 
-> - hisilicon,erratum-161010101 : A boolean property. Indicates the
->   presence of Hisilicon erratum 161010101, which says that reading the
->   counters is unreliable in some cases, and reads may return a value 32
->   beyond the correct value. This also affects writes to the tval
->   registers, due to the implicit counter read.
-> 
-> Thanks,
-> Mark.
+On 18/01/17 07:08, Chunfeng Yun wrote:
+> usually, the reference clock comes from 26M oscillator directly,
+> but some SoCs are not, add it for compatibility.
+>
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> ---
+>  drivers/usb/mtu3/mtu3.h      |    1 +
+>  drivers/usb/mtu3/mtu3_plat.c |   21 +++++++++++++++++++--
+>  2 files changed, 20 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/usb/mtu3/mtu3.h b/drivers/usb/mtu3/mtu3.h
+> index ba9df71..aa6fd6a 100644
+> --- a/drivers/usb/mtu3/mtu3.h
+> +++ b/drivers/usb/mtu3/mtu3.h
+> @@ -225,6 +225,7 @@ struct ssusb_mtk {
+>  	/* common power & clock */
+>  	struct regulator *vusb33;
+>  	struct clk *sys_clk;
+> +	struct clk *ref_clk;
+>  	/* otg */
+>  	struct otg_switch_mtk otg_switch;
+>  	enum usb_dr_mode dr_mode;
+> diff --git a/drivers/usb/mtu3/mtu3_plat.c b/drivers/usb/mtu3/mtu3_plat.c
+> index 6344859..19a345d 100644
+> --- a/drivers/usb/mtu3/mtu3_plat.c
+> +++ b/drivers/usb/mtu3/mtu3_plat.c
+> @@ -123,7 +123,13 @@ static int ssusb_rscs_init(struct ssusb_mtk *ssusb)
+>  	ret = clk_prepare_enable(ssusb->sys_clk);
+>  	if (ret) {
+>  		dev_err(ssusb->dev, "failed to enable sys_clk\n");
+> -		goto clk_err;
+> +		goto sys_clk_err;
+> +	}
+> +
+> +	ret = clk_prepare_enable(ssusb->ref_clk);
+> +	if (ret) {
+> +		dev_err(ssusb->dev, "failed to enable ref_clk\n");
+> +		goto ref_clk_err;
+>  	}
+>
+>  	ret = ssusb_phy_init(ssusb);
+> @@ -143,8 +149,10 @@ static int ssusb_rscs_init(struct ssusb_mtk *ssusb)
+>  phy_err:
+>  	ssusb_phy_exit(ssusb);
+>  phy_init_err:
+> +	clk_disable_unprepare(ssusb->ref_clk);
+> +ref_clk_err:
+>  	clk_disable_unprepare(ssusb->sys_clk);
+> -clk_err:
+> +sys_clk_err:
+>  	regulator_disable(ssusb->vusb33);
+>  vusb33_err:
+>
+> @@ -154,6 +162,7 @@ static int ssusb_rscs_init(struct ssusb_mtk *ssusb)
+>  static void ssusb_rscs_exit(struct ssusb_mtk *ssusb)
+>  {
+>  	clk_disable_unprepare(ssusb->sys_clk);
+> +	clk_disable_unprepare(ssusb->ref_clk);
+>  	regulator_disable(ssusb->vusb33);
+>  	ssusb_phy_power_off(ssusb);
+>  	ssusb_phy_exit(ssusb);
+> @@ -216,6 +225,12 @@ static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
+>  		return PTR_ERR(ssusb->sys_clk);
+>  	}
+>
+> +	ssusb->ref_clk = devm_clk_get(dev, "ref_ck");
+> +	if (IS_ERR(ssusb->ref_clk)) {
+> +		dev_err(dev, "failed to get ref clock\n");
+> +		return PTR_ERR(ssusb->ref_clk);
+> +	}
+> +
 
-Looks more accurate.
+That would break older dts bindings, right?
+ref_ck must be optional for the code.
 
-Thanks.
-Ding
-
-> 
-> .
-> 
+Regards,
+Matthias
