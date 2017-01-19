@@ -1,35 +1,61 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 19 Jan 2017 14:48:44 +0100
-Subject: [PATCH v3 04/13] pinctrl: samsung: Document Exynos3250 SoC support
+Date: Thu, 19 Jan 2017 14:48:49 +0100
+Subject: [PATCH v3 09/13] pinctrl: samsung: Use generic
+ of_device_get_match_data helper
 In-Reply-To: <1484833733-16082-1-git-send-email-m.szyprowski@samsung.com>
 References: <1484833733-16082-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170119134906eucas1p28eaf30c782d33b5a36afe31a89613123@eucas1p2.samsung.com>
-Message-ID: <1484833733-16082-5-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170119134908eucas1p1768743f7e2578af5ae47291a6123c3f8@eucas1p1.samsung.com>
+Message-ID: <1484833733-16082-10-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing compatible id for Exynos3250 SoC to device tree docs.
-Exynos pin control driver supports it since commit d97f5b9804bfcdc1
-("pinctrl: exynos: Add driver data for Exynos3250").
+Replace custom code with generic helper.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/pinctrl/samsung/pinctrl-samsung.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
-index 1baf19eecabf..5e00a21de2bf 100644
---- a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
-@@ -13,6 +13,7 @@ Required Properties:
-   - "samsung,s3c2450-pinctrl": for S3C2450-compatible pin-controller,
-   - "samsung,s3c64xx-pinctrl": for S3C64xx-compatible pin-controller,
-   - "samsung,s5pv210-pinctrl": for S5PV210-compatible pin-controller,
-+  - "samsung,exynos3250-pinctrl": for Exynos3250 compatible pin-controller.
-   - "samsung,exynos4210-pinctrl": for Exynos4210 compatible pin-controller.
-   - "samsung,exynos4x12-pinctrl": for Exynos4x12 compatible pin-controller.
-   - "samsung,exynos5250-pinctrl": for Exynos5250 compatible pin-controller.
+diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
+index 2803ae57f373..59f99ea7e65b 100644
+--- a/drivers/pinctrl/samsung/pinctrl-samsung.c
++++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
+@@ -27,6 +27,7 @@
+ #include <linux/err.h>
+ #include <linux/gpio.h>
+ #include <linux/irqdomain.h>
++#include <linux/of_device.h>
+ #include <linux/spinlock.h>
+ #include <linux/syscore_ops.h>
+ 
+@@ -955,15 +956,12 @@ static int samsung_gpiolib_unregister(struct platform_device *pdev,
+ 	return 0;
+ }
+ 
+-static const struct of_device_id samsung_pinctrl_dt_match[];
+-
+ /* retrieve the soc specific data */
+ static const struct samsung_pin_ctrl *
+ samsung_pinctrl_get_soc_data(struct samsung_pinctrl_drv_data *d,
+ 			     struct platform_device *pdev)
+ {
+ 	int id;
+-	const struct of_device_id *match;
+ 	struct device_node *node = pdev->dev.of_node;
+ 	struct device_node *np;
+ 	const struct samsung_pin_bank_data *bdata;
+@@ -978,8 +976,8 @@ static int samsung_gpiolib_unregister(struct platform_device *pdev,
+ 		dev_err(&pdev->dev, "failed to get alias id\n");
+ 		return ERR_PTR(-ENOENT);
+ 	}
+-	match = of_match_node(samsung_pinctrl_dt_match, node);
+-	ctrl = (struct samsung_pin_ctrl *)match->data + id;
++	ctrl = of_device_get_match_data(&pdev->dev);
++	ctrl += id;
+ 
+ 	d->suspend = ctrl->suspend;
+ 	d->resume = ctrl->resume;
 -- 
 1.9.1
