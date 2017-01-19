@@ -1,51 +1,66 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu, 19 Jan 2017 21:12:02 +0000
-Subject: [PATCHv4 3/5] pinctrl: mvebu: pinctrl driver for 98DX3236 SoC
-References: <20170113091222.7132-1-chris.packham@alliedtelesis.co.nz>
- <20170113091222.7132-4-chris.packham@alliedtelesis.co.nz>
- <2fca7ac2-9a88-19b1-28c5-5192b9c4a2bc@gmail.com>
- <9996b6a215f944e1a47fa6239d8de21f@svr-chch-ex1.atlnz.lc>
-Message-ID: <66c205acea6046978bf17e6d8fc1959f@svr-chch-ex1.atlnz.lc>
+From: eric.auger@redhat.com (Eric Auger)
+Date: Thu, 19 Jan 2017 20:58:02 +0000
+Subject: [PATCH v9 17/18] vfio/type1: Check MSI remapping at irq domain level
+In-Reply-To: <1484859483-2866-1-git-send-email-eric.auger@redhat.com>
+References: <1484859483-2866-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <1484859483-2866-18-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/01/17 20:50, Chris Packham wrote:
-> On 13/01/17 22:54, Sebastian Hesselbarth wrote:
->> On 13.01.2017 10:12, Chris Packham wrote:
->>> From: Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz>
->>>
->>> This pinctrl driver supports the 98DX3236, 98DX3336 and 98DX4251 SoCs
->>> from Marvell.
->>>
->>> Signed-off-by: Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz>
->>> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
->>> Acked-by: Rob Herring <robh@kernel.org>
->>> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->>> ---
->>>
->>> Notes:
->>>     Changes in v2:
->>>     - include sdio support for the 98DX4251
->>>     Changes in v3:
->>>     - None
->>>     Changes in v4:
->>>     - Correct some discrepencies between binding and driver.
->>
->> Well, unfortunately I still see differences between the "gpio" in
->> the binding and "gpo" in the driver.
->>
->> Please go back to that list I sent you yesterday and fix them all.
->>
->
-> I think you may have missed my initial reply [1]. Or I have missed your
-> response to it. Long story short "gpo" is intentional because some of
-> those pins can't be used as inputs. But if you still want me to change
-> it I will.
->
-> [1] - https://lkml.org/lkml/2017/1/12/117
->
+In case the IOMMU translates MSI transactions (typical case
+on ARM), we check MSI remapping capability at IRQ domain
+level. Otherwise it is checked at IOMMU level.
 
-Hi Sebastian,
+At this stage the arm-smmu-(v3) still advertise the
+IOMMU_CAP_INTR_REMAP capability at IOMMU level. This will be
+removed in subsequent patches.
 
-Did you get a chance to consider this. Do you still want me to change 
-gpo -> gpio given the information above?
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Acked-by: Alex Williamson <alex.williamson@redhat.com>
+Reviewed-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
+Tested-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
+Tested-by: Bharat Bhushan <bharat.bhushan@nxp.com>
+
+---
+
+v6: rewrite test
+---
+ drivers/vfio/vfio_iommu_type1.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+index 8deca9b..0f353f5 100644
+--- a/drivers/vfio/vfio_iommu_type1.c
++++ b/drivers/vfio/vfio_iommu_type1.c
+@@ -39,6 +39,7 @@
+ #include <linux/mdev.h>
+ #include <linux/notifier.h>
+ #include <linux/dma-iommu.h>
++#include <linux/irqdomain.h>
+ 
+ #define DRIVER_VERSION  "0.2"
+ #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
+@@ -1210,7 +1211,7 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+ 	struct vfio_domain *domain, *d;
+ 	struct bus_type *bus = NULL, *mdev_bus;
+ 	int ret;
+-	bool resv_msi;
++	bool resv_msi, msi_remap;
+ 	phys_addr_t resv_msi_base;
+ 
+ 	mutex_lock(&iommu->lock);
+@@ -1286,8 +1287,10 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
+ 	INIT_LIST_HEAD(&domain->group_list);
+ 	list_add(&group->next, &domain->group_list);
+ 
+-	if (!allow_unsafe_interrupts &&
+-	    !iommu_capable(bus, IOMMU_CAP_INTR_REMAP)) {
++	msi_remap = resv_msi ? irq_domain_check_msi_remap() :
++				iommu_capable(bus, IOMMU_CAP_INTR_REMAP);
++
++	if (!allow_unsafe_interrupts && !msi_remap) {
+ 		pr_warn("%s: No interrupt remapping support.  Use the module param \"allow_unsafe_interrupts\" to enable VFIO IOMMU support on this platform\n",
+ 		       __func__);
+ 		ret = -EPERM;
+-- 
+1.9.1
