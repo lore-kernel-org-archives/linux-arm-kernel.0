@@ -1,34 +1,71 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 Jan 2017 16:24:38 +0000
-Subject: [Patch v3 1/2] arm: kernel: Add SMC structure parameter
-In-Reply-To: <20170119161658.GC9631@hector.attlocal.net>
-References: <1484173918-25090-1-git-send-email-andy.gross@linaro.org>
- <1484173918-25090-2-git-send-email-andy.gross@linaro.org>
- <20170119144008.GA27312@n2100.armlinux.org.uk>
- <20170119154506.GB9631@hector.attlocal.net>
- <20170119154818.GE27312@n2100.armlinux.org.uk>
- <20170119161658.GC9631@hector.attlocal.net>
-Message-ID: <20170119162438.GF27312@n2100.armlinux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 19 Jan 2017 17:26:52 +0100
+Subject: Initializing MAC address at run-time
+In-Reply-To: <79fef293-74ec-dece-1941-747cd55f1ca2@free.fr>
+References: <e083ed68-0e8e-380e-23bd-5ad387c88575@free.fr>
+ <20170118185435.fen6np7lydzgxxek@pengutronix.de>
+ <79fef293-74ec-dece-1941-747cd55f1ca2@free.fr>
+Message-ID: <20170119162652.yef3ni6ylhzxpvgz@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 10:16:58AM -0600, Andy Gross wrote:
-> On Thu, Jan 19, 2017 at 03:48:18PM +0000, Russell King - ARM Linux wrote:
-> > Please add that detail to the kerneldoc comments for the structure
-> > concerning state.a6.  It's important that such information is not
-> > lost in the depths of history.
+Hello,
+
+On Thu, Jan 19, 2017 at 04:31:56PM +0100, Mason wrote:
+> Do you agree that such boot loader would execute code that is roughly
+> identical to the one posted for illustration purposes?
+>   1. find the MAC address to use for eth0
+>   2. find the eth0 node in the DT
+>   3. insert the right prop in the eth0 node
+
+yes.
+ 
+> In which case, it seems a waste to add the DT library to the boot
+> loader, when the operation can be done in Linux, which requires the
+> DT library anyway. (Additionally, adding DT support to some custom
+> legacy boot loader might be a complex task.)
+
+With this reasoning you can discuss away the bootloader. Linux relies on
+a bootloader for a reason. It's there to initialize RAM and some further
+things that Linux might not be able to and provide a machine description
+to Linux (either in form of a dtb or an ATAG list) such that Linux
+doesn't need to fiddle with machine specific stuff in early init code.
+
+> >  c) Adapt the dtb before it is written to the boot medium.
 > 
-> For documentation, should I split out the union separately?  I don't see any
-> good examples for documenting union members in unions defined inside structures.
+> This is not applicable, as the DTB is not written to the board.
 
-Good question - I don't know.
+Ah, then adapt the dtb before it is put into the tftp folder.
 
- @state.a6: blah
+> >  d) Let the bootloader configure the device and teach the driver to pick
+> >     up the mac from the device's address space.
+> 
+> I'm not sure what you call "the device" ?
 
-would seem to be a logical and unambiguous way to document it, but I
-don't know whether kerneldoc will accept that.
+The network device. IIRC the fec driver checks if there is something
+configured in the two registers configuring the MAC before falling back
+to a random MAC.
+
+> >  e) Accept that the mac address is random during development, and make
+> >     Userspace configure the MAC address, which is early enough for
+> >     production use.
+> 
+> During development, some devs configure the DHCP server to provide
+> a specific uImage and/or rootfs to their board, based on the MAC
+> address. This scheme would fall apart with a random MAC.
+> 
+> > Not sure d) is considered ok today, but some drivers have this feature.
+> > I'd say b) is the best choice.
+> 
+> In my mind, doing it early in Linux is similar in spirit to doing it
+> at the boot loader stage, in that it's neatly separated from the rest
+> of the setup.
+
+Sure you can do this. But it won't be accepted mainline for sure.
+
+Best regards
+Uwe
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
