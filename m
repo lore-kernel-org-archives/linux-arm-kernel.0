@@ -1,185 +1,91 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Thu, 19 Jan 2017 20:57:53 +0000
-Subject: [PATCH v9 08/18] iommu/vt-d: Implement reserved region get/put
+Date: Thu, 19 Jan 2017 20:57:55 +0000
+Subject: [PATCH v9 10/18] iommu/arm-smmu: Implement reserved region get/put
  callbacks
 In-Reply-To: <1484859483-2866-1-git-send-email-eric.auger@redhat.com>
 References: <1484859483-2866-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1484859483-2866-9-git-send-email-eric.auger@redhat.com>
+Message-ID: <1484859483-2866-11-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch registers the [FEE0_0000h - FEF0_000h] 1MB MSI
-range as a reserved region and RMRR regions as direct regions.
+The get() populates the list with the MSI IOVA reserved window.
 
-This will allow to report those reserved regions in the
-iommu-group sysfs.
+At the moment an arbitray MSI IOVA window is set at 0x8000000
+of size 1MB. This will allow to report those info in iommu-group
+sysfs.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Reviewed-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
+Tested-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
+Tested-by: Bharat Bhushan <bharat.bhushan@nxp.com>
 
 ---
-v6 -> v7:
-- report RMRR regions as direct regions
-- Due to the usage of rcu_read_lock, the rmrr reserved region
-  allocation is done on rmrr allocation.
-- use IOMMU_RESV_RESERVED
 
-RFCv2 -> RFCv3:
-- use get/put_resv_region callbacks.
+v3 -> v4:
+- do not handle PCI host bridge windows anymore
+- encode prot
 
-RFC v1 -> RFC v2:
-- fix intel_iommu_add_reserved_regions name
-- use IOAPIC_RANGE_START and IOAPIC_RANGE_END defines
-- return if the MSI region is already registered;
+RFC v2 -> v3:
+- use existing get/put_resv_regions
+
+RFC v1 -> v2:
+- use defines for MSI IOVA base and length
 ---
- drivers/iommu/intel-iommu.c | 92 ++++++++++++++++++++++++++++++++++++---------
- 1 file changed, 74 insertions(+), 18 deletions(-)
+ drivers/iommu/arm-smmu.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/drivers/iommu/intel-iommu.c b/drivers/iommu/intel-iommu.c
-index 8a18525..bce59a5 100644
---- a/drivers/iommu/intel-iommu.c
-+++ b/drivers/iommu/intel-iommu.c
-@@ -440,6 +440,7 @@ struct dmar_rmrr_unit {
- 	u64	end_address;		/* reserved end address */
- 	struct dmar_dev_scope *devices;	/* target devices */
- 	int	devices_cnt;		/* target device count */
-+	struct iommu_resv_region *resv; /* reserved region handle */
- };
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index a60cded..a354572 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -281,6 +281,9 @@ enum arm_smmu_s2cr_privcfg {
  
- struct dmar_atsr_unit {
-@@ -4246,27 +4247,40 @@ static inline void init_iommu_pm_ops(void) {}
- int __init dmar_parse_one_rmrr(struct acpi_dmar_header *header, void *arg)
- {
- 	struct acpi_dmar_reserved_memory *rmrr;
-+	int prot = DMA_PTE_READ|DMA_PTE_WRITE;
- 	struct dmar_rmrr_unit *rmrru;
-+	size_t length;
+ #define FSYNR0_WNR			(1 << 4)
  
- 	rmrru = kzalloc(sizeof(*rmrru), GFP_KERNEL);
- 	if (!rmrru)
--		return -ENOMEM;
-+		goto out;
- 
- 	rmrru->hdr = header;
- 	rmrr = (struct acpi_dmar_reserved_memory *)header;
- 	rmrru->base_address = rmrr->base_address;
- 	rmrru->end_address = rmrr->end_address;
++#define MSI_IOVA_BASE			0x8000000
++#define MSI_IOVA_LENGTH			0x100000
 +
-+	length = rmrr->end_address - rmrr->base_address + 1;
-+	rmrru->resv = iommu_alloc_resv_region(rmrr->base_address, length, prot,
-+					      IOMMU_RESV_DIRECT);
-+	if (!rmrru->resv)
-+		goto free_rmrru;
-+
- 	rmrru->devices = dmar_alloc_dev_scope((void *)(rmrr + 1),
- 				((void *)rmrr) + rmrr->header.length,
- 				&rmrru->devices_cnt);
--	if (rmrru->devices_cnt && rmrru->devices == NULL) {
--		kfree(rmrru);
--		return -ENOMEM;
--	}
-+	if (rmrru->devices_cnt && rmrru->devices == NULL)
-+		goto free_all;
- 
- 	list_add(&rmrru->list, &dmar_rmrr_units);
- 
- 	return 0;
-+free_all:
-+	kfree(rmrru->resv);
-+free_rmrru:
-+	kfree(rmrru);
-+out:
-+	return -ENOMEM;
+ static int force_stage;
+ module_param(force_stage, int, S_IRUGO);
+ MODULE_PARM_DESC(force_stage,
+@@ -1549,6 +1552,29 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+ 	return iommu_fwspec_add_ids(dev, &fwid, 1);
  }
  
- static struct dmar_atsr_unit *dmar_find_atsr(struct acpi_dmar_atsr *atsr)
-@@ -4480,6 +4494,7 @@ static void intel_iommu_free_dmars(void)
- 	list_for_each_entry_safe(rmrru, rmrr_n, &dmar_rmrr_units, list) {
- 		list_del(&rmrru->list);
- 		dmar_free_dev_scope(&rmrru->devices, &rmrru->devices_cnt);
-+		kfree(rmrru->resv);
- 		kfree(rmrru);
- 	}
- 
-@@ -5203,6 +5218,45 @@ static void intel_iommu_remove_device(struct device *dev)
- 	iommu_device_unlink(iommu->iommu_dev, dev);
- }
- 
-+static void intel_iommu_get_resv_regions(struct device *device,
-+					 struct list_head *head)
++static void arm_smmu_get_resv_regions(struct device *dev,
++				      struct list_head *head)
 +{
-+	struct iommu_resv_region *reg;
-+	struct dmar_rmrr_unit *rmrr;
-+	struct device *i_dev;
-+	int i;
++	struct iommu_resv_region *region;
++	int prot = IOMMU_WRITE | IOMMU_NOEXEC | IOMMU_MMIO;
 +
-+	rcu_read_lock();
-+	for_each_rmrr_units(rmrr) {
-+		for_each_active_dev_scope(rmrr->devices, rmrr->devices_cnt,
-+					  i, i_dev) {
-+			if (i_dev != device)
-+				continue;
-+
-+			list_add_tail(&rmrr->resv->list, head);
-+		}
-+	}
-+	rcu_read_unlock();
-+
-+	reg = iommu_alloc_resv_region(IOAPIC_RANGE_START,
-+				      IOAPIC_RANGE_END - IOAPIC_RANGE_START + 1,
-+				      0, IOMMU_RESV_RESERVED);
-+	if (!reg)
++	region = iommu_alloc_resv_region(MSI_IOVA_BASE, MSI_IOVA_LENGTH,
++					 prot, IOMMU_RESV_MSI);
++	if (!region)
 +		return;
-+	list_add_tail(&reg->list, head);
++
++	list_add_tail(&region->list, head);
 +}
 +
-+static void intel_iommu_put_resv_regions(struct device *dev,
-+					 struct list_head *head)
++static void arm_smmu_put_resv_regions(struct device *dev,
++				      struct list_head *head)
 +{
 +	struct iommu_resv_region *entry, *next;
 +
-+	list_for_each_entry_safe(entry, next, head, list) {
-+		if (entry->type == IOMMU_RESV_RESERVED)
-+			kfree(entry);
-+	}
++	list_for_each_entry_safe(entry, next, head, list)
++		kfree(entry);
 +}
 +
- #ifdef CONFIG_INTEL_IOMMU_SVM
- #define MAX_NR_PASID_BITS (20)
- static inline unsigned long intel_iommu_get_pts(struct intel_iommu *iommu)
-@@ -5333,19 +5387,21 @@ struct intel_iommu *intel_svm_device_to_iommu(struct device *dev)
- #endif /* CONFIG_INTEL_IOMMU_SVM */
- 
- static const struct iommu_ops intel_iommu_ops = {
--	.capable	= intel_iommu_capable,
--	.domain_alloc	= intel_iommu_domain_alloc,
--	.domain_free	= intel_iommu_domain_free,
--	.attach_dev	= intel_iommu_attach_device,
--	.detach_dev	= intel_iommu_detach_device,
--	.map		= intel_iommu_map,
--	.unmap		= intel_iommu_unmap,
--	.map_sg		= default_iommu_map_sg,
--	.iova_to_phys	= intel_iommu_iova_to_phys,
--	.add_device	= intel_iommu_add_device,
--	.remove_device	= intel_iommu_remove_device,
--	.device_group   = pci_device_group,
--	.pgsize_bitmap	= INTEL_IOMMU_PGSIZES,
-+	.capable		= intel_iommu_capable,
-+	.domain_alloc		= intel_iommu_domain_alloc,
-+	.domain_free		= intel_iommu_domain_free,
-+	.attach_dev		= intel_iommu_attach_device,
-+	.detach_dev		= intel_iommu_detach_device,
-+	.map			= intel_iommu_map,
-+	.unmap			= intel_iommu_unmap,
-+	.map_sg			= default_iommu_map_sg,
-+	.iova_to_phys		= intel_iommu_iova_to_phys,
-+	.add_device		= intel_iommu_add_device,
-+	.remove_device		= intel_iommu_remove_device,
-+	.get_resv_regions	= intel_iommu_get_resv_regions,
-+	.put_resv_regions	= intel_iommu_put_resv_regions,
-+	.device_group		= pci_device_group,
-+	.pgsize_bitmap		= INTEL_IOMMU_PGSIZES,
+ static struct iommu_ops arm_smmu_ops = {
+ 	.capable		= arm_smmu_capable,
+ 	.domain_alloc		= arm_smmu_domain_alloc,
+@@ -1564,6 +1590,8 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+ 	.domain_get_attr	= arm_smmu_domain_get_attr,
+ 	.domain_set_attr	= arm_smmu_domain_set_attr,
+ 	.of_xlate		= arm_smmu_of_xlate,
++	.get_resv_regions	= arm_smmu_get_resv_regions,
++	.put_resv_regions	= arm_smmu_put_resv_regions,
+ 	.pgsize_bitmap		= -1UL, /* Restricted during device attach */
  };
  
- static void quirk_iommu_g4x_gfx(struct pci_dev *dev)
 -- 
 1.9.1
