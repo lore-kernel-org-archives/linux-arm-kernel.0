@@ -1,86 +1,85 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 19 Jan 2017 19:35:58 +0100
-Subject: [GIT PULL] Allwinner conversion to generic pin properties
-In-Reply-To: <20170110032120.GJ22261@localhost>
-References: <20161226074214.sd53ozm6hvzkdb26@lukather>
- <20170110032120.GJ22261@localhost>
-Message-ID: <20170119183558.jjdpobsaedtqywjk@lukather>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 19 Jan 2017 18:41:34 +0000
+Subject: [PATCH 1/5] iommu/arm-smmu: Restrict domain attributes to
+ UNMANAGED domains
+In-Reply-To: <1484849955-1871-2-git-send-email-will.deacon@arm.com>
+References: <1484849955-1871-1-git-send-email-will.deacon@arm.com>
+ <1484849955-1871-2-git-send-email-will.deacon@arm.com>
+Message-ID: <89d795b9-a6d7-7f41-705c-b918ee66ebf0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
-
-On Mon, Jan 09, 2017 at 07:21:20PM -0800, Olof Johansson wrote:
-> On Mon, Dec 26, 2016 at 08:42:14AM +0100, Maxime Ripard wrote:
-> > Hi Arnd, Olof,
-> > 
-> > Like we discussed it last time, here is a pull request with the
-> > convertion patches to the generic pin properties for 4.10.
-> > 
-> > Thanks,
-> > Maxime
-> > 
-> > The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
-> > 
-> >   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
-> > 
-> > are available in the git repository at:
-> > 
-> >   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-generic-pinconf-for-4.10
-> > 
-> > for you to fetch changes up to 1edcd36fcb48fe841bcc62eda36c105037d9583c:
-> > 
-> >   ARM: sunxi: Convert pinctrl nodes to generic bindings (2016-12-26 08:27:11 +0100)
-> > 
-> > ----------------------------------------------------------------
-> > Allwinner conversion to generic pin muxing properties
-> > 
-> > Here is a list of patches that converts the current DT to the generic pin
-> > control and muxing properties, now that the pinctrl driver supports it.
+On 19/01/17 18:19, Will Deacon wrote:
+> The ARM SMMU drivers provide a DOMAIN_ATTR_NESTING domain attribute,
+> which allows callers of the IOMMU API to request that the page table
+> for a domain is installed at stage-2, if supported by the hardware.
 > 
-> I dropped the ball on this over the holidays for a few reasons, none of them
-> good. Unfortunately we're at -rc3+ now, so I've queued this up in next/dt for
-> v4.11 at this point. Hope that's alright.
+> Since setting this attribute only makes sense for UNMANAGED domains,
+> this patch returns -ENODEV if the domain_{get,set}_attr operations are
+> called on other domain types.
+
+For the sake of discussion, would it make sense to enforce this in
+domain_set_attr() itself? The intersection of drivers providing these
+callbacks and drivers supporting anything other than unmanaged domains
+is currently these two below, so it clearly wouldn't break anything to
+put this check in core code today. Looking forward, is there likely to
+be any plausible situation where users of a managed domain would be
+legitimate in mucking about with its attrs, on any platform?
+
+Robin.
+
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 6 ++++++
+>  drivers/iommu/arm-smmu.c    | 6 ++++++
+>  2 files changed, 12 insertions(+)
 > 
-> You might want to use your branch as a base for new DT contents for
-> v4.11 in case it ends up being conflict-heavy, which would work fine at our
-> end.
-
-We might have conflicts with this unfortunately.
-
-It turns out that we fixed an issue where the pinctrl driver in 4.10
-is now honoring the case where we list our pull-ups as disabled, while
-it used to be ignored (which was the bug).
-
-However, some boards were listing improperly in their DT that their
-pull-ups were disabled, while they actually needed it, which means
-that now the driver will disable them, and things get broken (mostly
-MMC for now, but I expect other devices to be broken too).
-
-We have two ways of fixing this.
-
-Option 1 is applying a patch that will enable the pull ups on the MMC
-devices (because it's ok to do so) that was queued with 4.11 and will
-conflict heavily with this PR.
-
-The other option would be to queue the two first patches of that PR as
-fixes that will reintroduce the previous behaviour (or at least, the
-one the boards expects). I'm guessing in that case, the merge will
-just work (since it's the exact same commits anyway), and we fix all
-the devices and not just MMC. This has not been confirmed to work at
-the moment though, but should be very soon.
-
-What do you think?
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170119/dc253827/attachment.sig>
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index 4d6ec444a9d6..c254325b0c7a 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -1839,6 +1839,9 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
+>  {
+>  	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+>  
+> +	if (domain->type != IOMMU_DOMAIN_UNMANAGED)
+> +		return -ENODEV;
+> +
+>  	switch (attr) {
+>  	case DOMAIN_ATTR_NESTING:
+>  		*(int *)data = (smmu_domain->stage == ARM_SMMU_DOMAIN_NESTED);
+> @@ -1854,6 +1857,9 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
+>  	int ret = 0;
+>  	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+>  
+> +	if (domain->type != IOMMU_DOMAIN_UNMANAGED)
+> +		return -ENODEV;
+> +
+>  	mutex_lock(&smmu_domain->init_mutex);
+>  
+>  	switch (attr) {
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index a60cded8a6ed..a328ffb75509 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -1497,6 +1497,9 @@ static int arm_smmu_domain_get_attr(struct iommu_domain *domain,
+>  {
+>  	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+>  
+> +	if (domain->type != IOMMU_DOMAIN_UNMANAGED)
+> +		return -ENODEV;
+> +
+>  	switch (attr) {
+>  	case DOMAIN_ATTR_NESTING:
+>  		*(int *)data = (smmu_domain->stage == ARM_SMMU_DOMAIN_NESTED);
+> @@ -1512,6 +1515,9 @@ static int arm_smmu_domain_set_attr(struct iommu_domain *domain,
+>  	int ret = 0;
+>  	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+>  
+> +	if (domain->type != IOMMU_DOMAIN_UNMANAGED)
+> +		return -ENODEV;
+> +
+>  	mutex_lock(&smmu_domain->init_mutex);
+>  
+>  	switch (attr) {
+> 
