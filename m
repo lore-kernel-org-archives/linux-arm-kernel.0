@@ -1,797 +1,216 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Thu, 19 Jan 2017 14:37:56 +0000
-Subject: [PATCH 6/7] arm, arm64: factorize common cpu capacity default code
-In-Reply-To: <20170119143757.14537-1-juri.lelli@arm.com>
-References: <20170119143757.14537-1-juri.lelli@arm.com>
-Message-ID: <20170119143757.14537-7-juri.lelli@arm.com>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Thu, 19 Jan 2017 17:36:36 +0300
+Subject: [PATCH v4] iommu/arm-smmu: Support for Extended Stream ID (16 bit)
+Message-ID: <20170119143653.7576-1-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm and arm64 share lot of code relative to parsing CPU capacity
-information from DT, using that information for appropriate scaling and
-exposing a sysfs interface for chaging such values at runtime.
+It is the time we have the real 16-bit Stream ID user, which is the
+ThunderX. Its IO topology uses 1:1 map for Requester ID to Stream ID
+translation for each root complex which allows to get full 16-bit
+Stream ID.  Firmware assigns bus IDs that are greater than 128 (0x80)
+to some buses under PEM (external PCIe interface).  Eventually SMMU
+drops devices on that buses because their Stream ID is out of range:
 
-Factorize such code in a common place (driver/base/arch_topology.c) in
-preparation for further additions.
+  pci 0006:90:00.0: stream ID 0x9000 out of range for SMMU (0x7fff)
 
-Suggested-by: Will Deacon <will.deacon@arm.com>
-Suggested-by: Mark Rutland <mark.rutland@arm.com>
-Suggested-by: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Signed-off-by: Juri Lelli <juri.lelli@arm.com>
+To fix above issue enable the Extended Stream ID optional feature
+when available.
+
+Reviewed-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
+Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+Tested-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
 ---
- arch/arm/Kconfig             |   1 +
- arch/arm/kernel/topology.c   | 213 ++------------------------------------
- arch/arm64/Kconfig           |   1 +
- arch/arm64/kernel/topology.c | 213 +-------------------------------------
- drivers/base/Kconfig         |   8 ++
- drivers/base/Makefile        |   1 +
- drivers/base/arch_topology.c | 240 +++++++++++++++++++++++++++++++++++++++++++
- 7 files changed, 260 insertions(+), 417 deletions(-)
- create mode 100644 drivers/base/arch_topology.c
+v4:
+change the commit message:
+- explain the reason why the warning happens (Tomasz Nowicki)
+- add 'Reviewed-by' and 'Tested-by' from Tomasz Nowicki
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 186c4c214e0a..f7059b3a1265 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -19,6 +19,7 @@ config ARM
- 	select EDAC_SUPPORT
- 	select EDAC_ATOMIC_SCRUB
- 	select GENERIC_ALLOCATOR
-+	select GENERIC_ARCH_TOPOLOGY
- 	select GENERIC_ATOMIC64 if (CPU_V7M || CPU_V6 || !CPU_32v6K || !AEABI)
- 	select GENERIC_CLOCKEVENTS_BROADCAST if SMP
- 	select GENERIC_EARLY_IOREMAP
-diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-index c760a321935b..51e9ed6439f1 100644
---- a/arch/arm/kernel/topology.c
-+++ b/arch/arm/kernel/topology.c
-@@ -43,75 +43,10 @@
-  * to run the rebalance_domains for all idle cores and the cpu_capacity can be
-  * updated during this sequence.
+v3:
+https://lkml.kernel.org/r/20170117151431.17085-1-aleksey.makarov at linaro.org
+- keep formatting of the comment
+- fix printk message after the deleted chunk.  "[Do] not print a mask
+  here, since it's not overly interesting in itself, and add_device will
+  still show the offending mask in full if it ever actually matters (as in
+  the commit message)." (Robin Murphy)
+
+v2:
+https://lkml.kernel.org/r/20170116141111.29444-1-aleksey.makarov at linaro.org
+- remove unnecessary parentheses (Robin Murphy)
+- refactor testing SMR fields to after setting sCR0 as theirs width
+  depends on sCR0_EXIDENABLE (Robin Murphy)
+
+v1 (rfc):
+https://lkml.kernel.org/r/20170110115755.19102-1-aleksey.makarov at linaro.org
+
+ drivers/iommu/arm-smmu.c | 69 +++++++++++++++++++++++++++++++++---------------
+ 1 file changed, 48 insertions(+), 21 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 13d26009b8e0..861cc135722f 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -24,6 +24,7 @@
+  *	- v7/v8 long-descriptor format
+  *	- Non-secure access to the SMMU
+  *	- Context fault reporting
++ *	- Extended Stream ID (16 bit)
   */
--static DEFINE_PER_CPU(unsigned long, cpu_scale) = SCHED_CAPACITY_SCALE;
--static DEFINE_MUTEX(cpu_scale_mutex);
  
--unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
--{
--	return per_cpu(cpu_scale, cpu);
--}
--
--static void set_capacity_scale(unsigned int cpu, unsigned long capacity)
--{
--	per_cpu(cpu_scale, cpu) = capacity;
--}
--
--static ssize_t cpu_capacity_show(struct device *dev,
--				 struct device_attribute *attr,
--				 char *buf)
--{
--	struct cpu *cpu = container_of(dev, struct cpu, dev);
--
--	return sprintf(buf, "%lu\n",
--			arch_scale_cpu_capacity(NULL, cpu->dev.id));
--}
--
--static ssize_t cpu_capacity_store(struct device *dev,
--				  struct device_attribute *attr,
--				  const char *buf,
--				  size_t count)
--{
--	struct cpu *cpu = container_of(dev, struct cpu, dev);
--	int this_cpu = cpu->dev.id, i;
--	unsigned long new_capacity;
--	ssize_t ret;
--
--	if (count) {
--		ret = kstrtoul(buf, 0, &new_capacity);
--		if (ret)
--			return ret;
--		if (new_capacity > SCHED_CAPACITY_SCALE)
--			return -EINVAL;
--
--		mutex_lock(&cpu_scale_mutex);
--		for_each_cpu(i, &cpu_topology[this_cpu].core_sibling)
--			set_capacity_scale(i, new_capacity);
--		mutex_unlock(&cpu_scale_mutex);
--	}
--
--	return count;
--}
--
--static DEVICE_ATTR_RW(cpu_capacity);
--
--static int register_cpu_capacity_sysctl(void)
--{
--	int i;
--	struct device *cpu;
--
--	for_each_possible_cpu(i) {
--		cpu = get_cpu_device(i);
--		if (!cpu) {
--			pr_err("%s: too early to get CPU%d device!\n",
--			       __func__, i);
--			continue;
--		}
--		device_create_file(cpu, &dev_attr_cpu_capacity);
--	}
--
--	return 0;
--}
--subsys_initcall(register_cpu_capacity_sysctl);
-+extern unsigned long
-+arch_scale_cpu_capacity(struct sched_domain *sd, int cpu);
-+extern void set_capacity_scale(unsigned int cpu, unsigned long capacity);
+ #define pr_fmt(fmt) "arm-smmu: " fmt
+@@ -87,6 +88,7 @@
+ #define sCR0_CLIENTPD			(1 << 0)
+ #define sCR0_GFRE			(1 << 1)
+ #define sCR0_GFIE			(1 << 2)
++#define sCR0_EXIDENABLE			(1 << 3)
+ #define sCR0_GCFGFRE			(1 << 4)
+ #define sCR0_GCFGFIE			(1 << 5)
+ #define sCR0_USFCFG			(1 << 10)
+@@ -126,6 +128,7 @@
+ #define ID0_NUMIRPT_MASK		0xff
+ #define ID0_NUMSIDB_SHIFT		9
+ #define ID0_NUMSIDB_MASK		0xf
++#define ID0_EXIDS			(1 << 8)
+ #define ID0_NUMSMRG_SHIFT		0
+ #define ID0_NUMSMRG_MASK		0xff
  
- #ifdef CONFIG_OF
- struct cpu_efficiency {
-@@ -140,145 +75,9 @@ static unsigned long *__cpu_capacity;
+@@ -169,6 +172,7 @@
+ #define ARM_SMMU_GR0_S2CR(n)		(0xc00 + ((n) << 2))
+ #define S2CR_CBNDX_SHIFT		0
+ #define S2CR_CBNDX_MASK			0xff
++#define S2CR_EXIDVALID			(1 << 10)
+ #define S2CR_TYPE_SHIFT			16
+ #define S2CR_TYPE_MASK			0x3
+ enum arm_smmu_s2cr_type {
+@@ -354,6 +358,7 @@ struct arm_smmu_device {
+ #define ARM_SMMU_FEAT_FMT_AARCH64_64K	(1 << 9)
+ #define ARM_SMMU_FEAT_FMT_AARCH32_L	(1 << 10)
+ #define ARM_SMMU_FEAT_FMT_AARCH32_S	(1 << 11)
++#define ARM_SMMU_FEAT_EXIDS		(1 << 12)
+ 	u32				features;
  
- static unsigned long middle_capacity = 1;
- static bool cap_from_dt = true;
--static u32 *raw_capacity;
--static bool cap_parsing_failed;
--static u32 capacity_scale;
--
--static int __init parse_cpu_capacity(struct device_node *cpu_node, int cpu)
--{
--	int ret = 1;
--	u32 cpu_capacity;
--
--	if (cap_parsing_failed)
--		return !ret;
--
--	ret = of_property_read_u32(cpu_node,
--				   "capacity-dmips-mhz",
--				   &cpu_capacity);
--	if (!ret) {
--		if (!raw_capacity) {
--			raw_capacity = kcalloc(num_possible_cpus(),
--					       sizeof(*raw_capacity),
--					       GFP_KERNEL);
--			if (!raw_capacity) {
--				pr_err("cpu_capacity: failed to allocate memory for raw capacities\n");
--				cap_parsing_failed = true;
--				return ret;
--			}
--		}
--		capacity_scale = max(cpu_capacity, capacity_scale);
--		raw_capacity[cpu] = cpu_capacity;
--		pr_debug("cpu_capacity: %s cpu_capacity=%u (raw)\n",
--			cpu_node->full_name, raw_capacity[cpu]);
--	} else {
--		if (raw_capacity) {
--			pr_err("cpu_capacity: missing %s raw capacity\n",
--				cpu_node->full_name);
--			pr_err("cpu_capacity: partial information: fallback to 1024 for all CPUs\n");
--		}
--		cap_parsing_failed = true;
--		kfree(raw_capacity);
--	}
--
--	return !ret;
--}
--
--static void normalize_cpu_capacity(void)
--{
--	u64 capacity;
--	int cpu;
--
--	if (!raw_capacity || cap_parsing_failed)
--		return;
--
--	pr_debug("cpu_capacity: capacity_scale=%u\n", capacity_scale);
--	mutex_lock(&cpu_scale_mutex);
--	for_each_possible_cpu(cpu) {
--		capacity = (raw_capacity[cpu] << SCHED_CAPACITY_SHIFT)
--			/ capacity_scale;
--		set_capacity_scale(cpu, capacity);
--		pr_debug("cpu_capacity: CPU%d cpu_capacity=%lu\n",
--			cpu, arch_scale_cpu_capacity(NULL, cpu));
--	}
--	mutex_unlock(&cpu_scale_mutex);
--}
--
--#ifdef CONFIG_CPU_FREQ
--static cpumask_var_t cpus_to_visit;
--static bool cap_parsing_done;
--static void parsing_done_workfn(struct work_struct *work);
--static DECLARE_WORK(parsing_done_work, parsing_done_workfn);
--
--static int
--init_cpu_capacity_callback(struct notifier_block *nb,
--			   unsigned long val,
--			   void *data)
--{
--	struct cpufreq_policy *policy = data;
--	int cpu;
--
--	if (cap_parsing_failed || cap_parsing_done)
--		return 0;
--
--	switch (val) {
--	case CPUFREQ_NOTIFY:
--		pr_debug("cpu_capacity: init cpu capacity for CPUs [%*pbl] (to_visit=%*pbl)\n",
--				cpumask_pr_args(policy->related_cpus),
--				cpumask_pr_args(cpus_to_visit));
--		cpumask_andnot(cpus_to_visit,
--			       cpus_to_visit,
--			       policy->related_cpus);
--		for_each_cpu(cpu, policy->related_cpus) {
--			raw_capacity[cpu] = arch_scale_cpu_capacity(NULL, cpu) *
--					    policy->cpuinfo.max_freq / 1000UL;
--			capacity_scale = max(raw_capacity[cpu], capacity_scale);
--		}
--		if (cpumask_empty(cpus_to_visit)) {
--			normalize_cpu_capacity();
--			kfree(raw_capacity);
--			pr_debug("cpu_capacity: parsing done\n");
--			cap_parsing_done = true;
--			schedule_work(&parsing_done_work);
--		}
--	}
--	return 0;
--}
--
--static struct notifier_block init_cpu_capacity_notifier = {
--	.notifier_call = init_cpu_capacity_callback,
--};
--
--static int __init register_cpufreq_notifier(void)
--{
--	if (cap_parsing_failed)
--		return -EINVAL;
--
--	if (!alloc_cpumask_var(&cpus_to_visit, GFP_KERNEL)) {
--		pr_err("cpu_capacity: failed to allocate memory for cpus_to_visit\n");
--		return -ENOMEM;
--	}
--	cpumask_copy(cpus_to_visit, cpu_possible_mask);
--
--	return cpufreq_register_notifier(&init_cpu_capacity_notifier,
--					 CPUFREQ_POLICY_NOTIFIER);
--}
--core_initcall(register_cpufreq_notifier);
--
--static void parsing_done_workfn(struct work_struct *work)
--{
--	cpufreq_unregister_notifier(&init_cpu_capacity_notifier,
--					 CPUFREQ_POLICY_NOTIFIER);
--}
--
--#else
--static int __init free_raw_capacity(void)
--{
--	kfree(raw_capacity);
--
--	return 0;
--}
--core_initcall(free_raw_capacity);
--#endif
-+extern bool cap_parsing_failed;
-+extern void normalize_cpu_capacity(void);
-+extern int __init parse_cpu_capacity(struct device_node *cpu_node, int cpu);
+ #define ARM_SMMU_OPT_SECURE_CFG_ACCESS (1 << 0)
+@@ -1051,7 +1056,7 @@ static void arm_smmu_write_smr(struct arm_smmu_device *smmu, int idx)
+ 	struct arm_smmu_smr *smr = smmu->smrs + idx;
+ 	u32 reg = smr->id << SMR_ID_SHIFT | smr->mask << SMR_MASK_SHIFT;
  
- /*
-  * Iterate all CPUs' descriptor in DT and compute the efficiency
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 111742126897..7534bb41ee09 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -36,6 +36,7 @@ config ARM64
- 	select EDAC_SUPPORT
- 	select FRAME_POINTER
- 	select GENERIC_ALLOCATOR
-+	select GENERIC_ARCH_TOPOLOGY
- 	select GENERIC_CLOCKEVENTS
- 	select GENERIC_CLOCKEVENTS_BROADCAST
- 	select GENERIC_CPU_AUTOPROBE
-diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-index 62b370388d72..f629f7524d65 100644
---- a/arch/arm64/kernel/topology.c
-+++ b/arch/arm64/kernel/topology.c
-@@ -21,221 +21,14 @@
- #include <linux/sched.h>
- #include <linux/slab.h>
- #include <linux/string.h>
--#include <linux/cpufreq.h>
+-	if (smr->valid)
++	if (!(smmu->features & ARM_SMMU_FEAT_EXIDS) && smr->valid)
+ 		reg |= SMR_VALID;
+ 	writel_relaxed(reg, ARM_SMMU_GR0(smmu) + ARM_SMMU_GR0_SMR(idx));
+ }
+@@ -1063,6 +1068,9 @@ static void arm_smmu_write_s2cr(struct arm_smmu_device *smmu, int idx)
+ 		  (s2cr->cbndx & S2CR_CBNDX_MASK) << S2CR_CBNDX_SHIFT |
+ 		  (s2cr->privcfg & S2CR_PRIVCFG_MASK) << S2CR_PRIVCFG_SHIFT;
  
- #include <asm/cpu.h>
- #include <asm/cputype.h>
- #include <asm/topology.h>
++	if (smmu->features & ARM_SMMU_FEAT_EXIDS && smmu->smrs &&
++	    smmu->smrs[idx].valid)
++		reg |= S2CR_EXIDVALID;
+ 	writel_relaxed(reg, ARM_SMMU_GR0(smmu) + ARM_SMMU_GR0_S2CR(idx));
+ }
  
--static DEFINE_PER_CPU(unsigned long, cpu_scale) = SCHED_CAPACITY_SCALE;
--static DEFINE_MUTEX(cpu_scale_mutex);
--
--unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
--{
--	return per_cpu(cpu_scale, cpu);
--}
--
--static void set_capacity_scale(unsigned int cpu, unsigned long capacity)
--{
--	per_cpu(cpu_scale, cpu) = capacity;
--}
--
--static ssize_t cpu_capacity_show(struct device *dev,
--				 struct device_attribute *attr,
--				 char *buf)
--{
--	struct cpu *cpu = container_of(dev, struct cpu, dev);
--
--	return sprintf(buf, "%lu\n",
--			arch_scale_cpu_capacity(NULL, cpu->dev.id));
--}
--
--static ssize_t cpu_capacity_store(struct device *dev,
--				  struct device_attribute *attr,
--				  const char *buf,
--				  size_t count)
--{
--	struct cpu *cpu = container_of(dev, struct cpu, dev);
--	int this_cpu = cpu->dev.id, i;
--	unsigned long new_capacity;
--	ssize_t ret;
--
--	if (count) {
--		ret = kstrtoul(buf, 0, &new_capacity);
--		if (ret)
--			return ret;
--		if (new_capacity > SCHED_CAPACITY_SCALE)
--			return -EINVAL;
--
--		mutex_lock(&cpu_scale_mutex);
--		for_each_cpu(i, &cpu_topology[this_cpu].core_sibling)
--			set_capacity_scale(i, new_capacity);
--		mutex_unlock(&cpu_scale_mutex);
--	}
--
--	return count;
--}
--
--static DEVICE_ATTR_RW(cpu_capacity);
--
--static int register_cpu_capacity_sysctl(void)
--{
--	int i;
--	struct device *cpu;
--
--	for_each_possible_cpu(i) {
--		cpu = get_cpu_device(i);
--		if (!cpu) {
--			pr_err("%s: too early to get CPU%d device!\n",
--			       __func__, i);
--			continue;
--		}
--		device_create_file(cpu, &dev_attr_cpu_capacity);
--	}
--
--	return 0;
--}
--subsys_initcall(register_cpu_capacity_sysctl);
--
--static u32 capacity_scale;
--static u32 *raw_capacity;
--static bool cap_parsing_failed;
--
--static void __init parse_cpu_capacity(struct device_node *cpu_node, int cpu)
--{
--	int ret;
--	u32 cpu_capacity;
--
--	if (cap_parsing_failed)
--		return;
--
--	ret = of_property_read_u32(cpu_node,
--				   "capacity-dmips-mhz",
--				   &cpu_capacity);
--	if (!ret) {
--		if (!raw_capacity) {
--			raw_capacity = kcalloc(num_possible_cpus(),
--					       sizeof(*raw_capacity),
--					       GFP_KERNEL);
--			if (!raw_capacity) {
--				pr_err("cpu_capacity: failed to allocate memory for raw capacities\n");
--				cap_parsing_failed = true;
--				return;
--			}
--		}
--		capacity_scale = max(cpu_capacity, capacity_scale);
--		raw_capacity[cpu] = cpu_capacity;
--		pr_debug("cpu_capacity: %s cpu_capacity=%u (raw)\n",
--			cpu_node->full_name, raw_capacity[cpu]);
--	} else {
--		if (raw_capacity) {
--			pr_err("cpu_capacity: missing %s raw capacity\n",
--				cpu_node->full_name);
--			pr_err("cpu_capacity: partial information: fallback to 1024 for all CPUs\n");
--		}
--		cap_parsing_failed = true;
--		kfree(raw_capacity);
--	}
--}
--
--static void normalize_cpu_capacity(void)
--{
--	u64 capacity;
--	int cpu;
--
--	if (!raw_capacity || cap_parsing_failed)
--		return;
--
--	pr_debug("cpu_capacity: capacity_scale=%u\n", capacity_scale);
--	mutex_lock(&cpu_scale_mutex);
--	for_each_possible_cpu(cpu) {
--		pr_debug("cpu_capacity: cpu=%d raw_capacity=%u\n",
--			 cpu, raw_capacity[cpu]);
--		capacity = (raw_capacity[cpu] << SCHED_CAPACITY_SHIFT)
--			/ capacity_scale;
--		set_capacity_scale(cpu, capacity);
--		pr_debug("cpu_capacity: CPU%d cpu_capacity=%lu\n",
--			cpu, arch_scale_cpu_capacity(NULL, cpu));
--	}
--	mutex_unlock(&cpu_scale_mutex);
--}
--
--#ifdef CONFIG_CPU_FREQ
--static cpumask_var_t cpus_to_visit;
--static bool cap_parsing_done;
--static void parsing_done_workfn(struct work_struct *work);
--static DECLARE_WORK(parsing_done_work, parsing_done_workfn);
--
--static int
--init_cpu_capacity_callback(struct notifier_block *nb,
--			   unsigned long val,
--			   void *data)
--{
--	struct cpufreq_policy *policy = data;
--	int cpu;
--
--	if (cap_parsing_failed || cap_parsing_done)
--		return 0;
--
--	switch (val) {
--	case CPUFREQ_NOTIFY:
--		pr_debug("cpu_capacity: init cpu capacity for CPUs [%*pbl] (to_visit=%*pbl)\n",
--				cpumask_pr_args(policy->related_cpus),
--				cpumask_pr_args(cpus_to_visit));
--		cpumask_andnot(cpus_to_visit,
--			       cpus_to_visit,
--			       policy->related_cpus);
--		for_each_cpu(cpu, policy->related_cpus) {
--			raw_capacity[cpu] = arch_scale_cpu_capacity(NULL, cpu) *
--					    policy->cpuinfo.max_freq / 1000UL;
--			capacity_scale = max(raw_capacity[cpu], capacity_scale);
--		}
--		if (cpumask_empty(cpus_to_visit)) {
--			normalize_cpu_capacity();
--			kfree(raw_capacity);
--			pr_debug("cpu_capacity: parsing done\n");
--			cap_parsing_done = true;
--			schedule_work(&parsing_done_work);
--		}
--	}
--	return 0;
--}
--
--static struct notifier_block init_cpu_capacity_notifier = {
--	.notifier_call = init_cpu_capacity_callback,
--};
--
--static int __init register_cpufreq_notifier(void)
--{
--	if (cap_parsing_failed)
--		return -EINVAL;
--
--	if (!alloc_cpumask_var(&cpus_to_visit, GFP_KERNEL)) {
--		pr_err("cpu_capacity: failed to allocate memory for cpus_to_visit\n");
--		return -ENOMEM;
--	}
--	cpumask_copy(cpus_to_visit, cpu_possible_mask);
--
--	return cpufreq_register_notifier(&init_cpu_capacity_notifier,
--					 CPUFREQ_POLICY_NOTIFIER);
--}
--core_initcall(register_cpufreq_notifier);
--
--static void parsing_done_workfn(struct work_struct *work)
--{
--	cpufreq_unregister_notifier(&init_cpu_capacity_notifier,
--					 CPUFREQ_POLICY_NOTIFIER);
--}
--
--#else
--static int __init free_raw_capacity(void)
--{
--	kfree(raw_capacity);
--
--	return 0;
--}
--core_initcall(free_raw_capacity);
--#endif
-+extern bool cap_parsing_failed;
-+extern void normalize_cpu_capacity(void);
-+extern int __init parse_cpu_capacity(struct device_node *cpu_node, int cpu);
+@@ -1073,6 +1081,34 @@ static void arm_smmu_write_sme(struct arm_smmu_device *smmu, int idx)
+ 		arm_smmu_write_smr(smmu, idx);
+ }
  
- static int __init get_cpu_for_node(struct device_node *node)
- {
-diff --git a/drivers/base/Kconfig b/drivers/base/Kconfig
-index d718ae4b907a..307ea31187dd 100644
---- a/drivers/base/Kconfig
-+++ b/drivers/base/Kconfig
-@@ -339,4 +339,12 @@ config CMA_ALIGNMENT
- 
- endif
- 
-+config GENERIC_ARCH_TOPOLOGY
-+	bool
-+	help
-+	  Enable support for architectures common topology code: e.g., parsing
-+	  CPU capacity information from DT, usage of such information for
-+	  appropriate scaling, sysfs interface for changing capacity values at
-+          runtime.
-+
- endmenu
-diff --git a/drivers/base/Makefile b/drivers/base/Makefile
-index f2816f6ff76a..397e5c344e6a 100644
---- a/drivers/base/Makefile
-+++ b/drivers/base/Makefile
-@@ -23,6 +23,7 @@ obj-$(CONFIG_SOC_BUS) += soc.o
- obj-$(CONFIG_PINCTRL) += pinctrl.o
- obj-$(CONFIG_DEV_COREDUMP) += devcoredump.o
- obj-$(CONFIG_GENERIC_MSI_IRQ_DOMAIN) += platform-msi.o
-+obj-$(CONFIG_GENERIC_ARCH_TOPOLOGY) += arch_topology.o
- 
- obj-y			+= test/
- 
-diff --git a/drivers/base/arch_topology.c b/drivers/base/arch_topology.c
-new file mode 100644
-index 000000000000..3faf89518892
---- /dev/null
-+++ b/drivers/base/arch_topology.c
-@@ -0,0 +1,240 @@
 +/*
-+ * driver/base/arch_topology.c - Arch specific cpu topology information
-+ *
-+ * Written by: Juri Lelli, ARM Ltd.
-+ *
-+ * Copyright (C) 2016, ARM Ltd.
-+ *
-+ * All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, GOOD TITLE or
-+ * NON INFRINGEMENT.  See the GNU General Public License for more
-+ * details.
-+ *
++ * The width of SMR's mask field depends on sCR0_EXIDENABLE, so this function
++ * should be called after sCR0 is written.
 + */
-+#include <linux/cpu.h>
-+#include <linux/cpufreq.h>
-+#include <linux/device.h>
-+#include <linux/of.h>
-+#include <linux/slab.h>
-+#include <linux/string.h>
-+#include <linux/topology.h>
-+
-+static DEFINE_MUTEX(cpu_scale_mutex);
-+static DEFINE_PER_CPU(unsigned long, cpu_scale) = SCHED_CAPACITY_SCALE;
-+
-+unsigned long arch_scale_cpu_capacity(struct sched_domain *sd, int cpu)
++static void arm_smmu_test_smr_masks(struct arm_smmu_device *smmu)
 +{
-+	return per_cpu(cpu_scale, cpu);
-+}
++	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
++	u32 smr;
 +
-+void set_capacity_scale(unsigned int cpu, unsigned long capacity)
-+{
-+	per_cpu(cpu_scale, cpu) = capacity;
-+}
-+
-+static ssize_t cpu_capacity_show(struct device *dev,
-+				 struct device_attribute *attr,
-+				 char *buf)
-+{
-+	struct cpu *cpu = container_of(dev, struct cpu, dev);
-+
-+	return sprintf(buf, "%lu\n",
-+			arch_scale_cpu_capacity(NULL, cpu->dev.id));
-+}
-+
-+static ssize_t cpu_capacity_store(struct device *dev,
-+				  struct device_attribute *attr,
-+				  const char *buf,
-+				  size_t count)
-+{
-+	struct cpu *cpu = container_of(dev, struct cpu, dev);
-+	int this_cpu = cpu->dev.id, i;
-+	unsigned long new_capacity;
-+	ssize_t ret;
-+
-+	if (count) {
-+		ret = kstrtoul(buf, 0, &new_capacity);
-+		if (ret)
-+			return ret;
-+		if (new_capacity > SCHED_CAPACITY_SCALE)
-+			return -EINVAL;
-+
-+		mutex_lock(&cpu_scale_mutex);
-+		for_each_cpu(i, &cpu_topology[this_cpu].core_sibling)
-+			set_capacity_scale(i, new_capacity);
-+		mutex_unlock(&cpu_scale_mutex);
-+	}
-+
-+	return count;
-+}
-+
-+static DEVICE_ATTR_RW(cpu_capacity);
-+
-+static int register_cpu_capacity_sysctl(void)
-+{
-+	int i;
-+	struct device *cpu;
-+
-+	for_each_possible_cpu(i) {
-+		cpu = get_cpu_device(i);
-+		if (!cpu) {
-+			pr_err("%s: too early to get CPU%d device!\n",
-+			       __func__, i);
-+			continue;
-+		}
-+		device_create_file(cpu, &dev_attr_cpu_capacity);
-+	}
-+
-+	return 0;
-+}
-+subsys_initcall(register_cpu_capacity_sysctl);
-+
-+u32 capacity_scale;
-+u32 *raw_capacity;
-+bool cap_parsing_failed;
-+
-+void normalize_cpu_capacity(void)
-+{
-+	u64 capacity;
-+	int cpu;
-+
-+	if (!raw_capacity || cap_parsing_failed)
++	if (!smmu->smrs)
 +		return;
 +
-+	pr_debug("cpu_capacity: capacity_scale=%u\n", capacity_scale);
-+	mutex_lock(&cpu_scale_mutex);
-+	for_each_possible_cpu(cpu) {
-+		pr_debug("cpu_capacity: cpu=%d raw_capacity=%u\n",
-+			 cpu, raw_capacity[cpu]);
-+		capacity = (raw_capacity[cpu] << SCHED_CAPACITY_SHIFT)
-+			/ capacity_scale;
-+		set_capacity_scale(cpu, capacity);
-+		pr_debug("cpu_capacity: CPU%d cpu_capacity=%lu\n",
-+			cpu, arch_scale_cpu_capacity(NULL, cpu));
-+	}
-+	mutex_unlock(&cpu_scale_mutex);
++	/*
++	 * SMR.ID bits may not be preserved if the corresponding MASK
++	 * bits are set, so check each one separately. We can reject
++	 * masters later if they try to claim IDs outside these masks.
++	 */
++	smr = smmu->streamid_mask << SMR_ID_SHIFT;
++	writel_relaxed(smr, gr0_base + ARM_SMMU_GR0_SMR(0));
++	smr = readl_relaxed(gr0_base + ARM_SMMU_GR0_SMR(0));
++	smmu->streamid_mask = smr >> SMR_ID_SHIFT;
++
++	smr = smmu->streamid_mask << SMR_MASK_SHIFT;
++	writel_relaxed(smr, gr0_base + ARM_SMMU_GR0_SMR(0));
++	smr = readl_relaxed(gr0_base + ARM_SMMU_GR0_SMR(0));
++	smmu->smr_mask_mask = smr >> SMR_MASK_SHIFT;
 +}
 +
-+int __init parse_cpu_capacity(struct device_node *cpu_node, int cpu)
-+{
-+	int ret = 1;
-+	u32 cpu_capacity;
+ static int arm_smmu_find_sme(struct arm_smmu_device *smmu, u16 id, u16 mask)
+ {
+ 	struct arm_smmu_smr *smrs = smmu->smrs;
+@@ -1674,6 +1710,9 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
+ 	if (smmu->features & ARM_SMMU_FEAT_VMID16)
+ 		reg |= sCR0_VMID16EN;
+ 
++	if (smmu->features & ARM_SMMU_FEAT_EXIDS)
++		reg |= sCR0_EXIDENABLE;
 +
-+	if (cap_parsing_failed)
-+		return !ret;
-+
-+	ret = of_property_read_u32(cpu_node,
-+				   "capacity-dmips-mhz",
-+				   &cpu_capacity);
-+	if (!ret) {
-+		if (!raw_capacity) {
-+			raw_capacity = kcalloc(num_possible_cpus(),
-+					       sizeof(*raw_capacity),
-+					       GFP_KERNEL);
-+			if (!raw_capacity) {
-+				pr_err("cpu_capacity: failed to allocate memory for raw capacities\n");
-+				cap_parsing_failed = true;
-+				return ret;
-+			}
-+		}
-+		capacity_scale = max(cpu_capacity, capacity_scale);
-+		raw_capacity[cpu] = cpu_capacity;
-+		pr_debug("cpu_capacity: %s cpu_capacity=%u (raw)\n",
-+			cpu_node->full_name, raw_capacity[cpu]);
+ 	/* Push the button */
+ 	__arm_smmu_tlb_sync(smmu);
+ 	writel(reg, ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sCR0);
+@@ -1761,11 +1800,14 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+ 			   "\t(IDR0.CTTW overridden by FW configuration)\n");
+ 
+ 	/* Max. number of entries we have for stream matching/indexing */
+-	size = 1 << ((id >> ID0_NUMSIDB_SHIFT) & ID0_NUMSIDB_MASK);
++	if (smmu->version == ARM_SMMU_V2 && id & ID0_EXIDS) {
++		smmu->features |= ARM_SMMU_FEAT_EXIDS;
++		size = 1 << 16;
 +	} else {
-+		if (raw_capacity) {
-+			pr_err("cpu_capacity: missing %s raw capacity\n",
-+				cpu_node->full_name);
-+			pr_err("cpu_capacity: partial information: fallback to 1024 for all CPUs\n");
-+		}
-+		cap_parsing_failed = true;
-+		kfree(raw_capacity);
++		size = 1 << ((id >> ID0_NUMSIDB_SHIFT) & ID0_NUMSIDB_MASK);
 +	}
-+
-+	return !ret;
-+}
-+
-+#ifdef CONFIG_CPU_FREQ
-+static cpumask_var_t cpus_to_visit;
-+static bool cap_parsing_done;
-+static void parsing_done_workfn(struct work_struct *work);
-+static DECLARE_WORK(parsing_done_work, parsing_done_workfn);
-+
-+static int
-+init_cpu_capacity_callback(struct notifier_block *nb,
-+			   unsigned long val,
-+			   void *data)
-+{
-+	struct cpufreq_policy *policy = data;
-+	int cpu;
-+
-+	if (cap_parsing_failed || cap_parsing_done)
-+		return 0;
-+
-+	switch (val) {
-+	case CPUFREQ_NOTIFY:
-+		pr_debug("cpu_capacity: init cpu capacity for CPUs [%*pbl] (to_visit=%*pbl)\n",
-+				cpumask_pr_args(policy->related_cpus),
-+				cpumask_pr_args(cpus_to_visit));
-+		cpumask_andnot(cpus_to_visit,
-+			       cpus_to_visit,
-+			       policy->related_cpus);
-+		for_each_cpu(cpu, policy->related_cpus) {
-+			raw_capacity[cpu] = arch_scale_cpu_capacity(NULL, cpu) *
-+					    policy->cpuinfo.max_freq / 1000UL;
-+			capacity_scale = max(raw_capacity[cpu], capacity_scale);
-+		}
-+		if (cpumask_empty(cpus_to_visit)) {
-+			normalize_cpu_capacity();
-+			kfree(raw_capacity);
-+			pr_debug("cpu_capacity: parsing done\n");
-+			cap_parsing_done = true;
-+			schedule_work(&parsing_done_work);
-+		}
-+	}
-+	return 0;
-+}
-+
-+static struct notifier_block init_cpu_capacity_notifier = {
-+	.notifier_call = init_cpu_capacity_callback,
-+};
-+
-+static int __init register_cpufreq_notifier(void)
-+{
-+	if (cap_parsing_failed)
-+		return -EINVAL;
-+
-+	if (!alloc_cpumask_var(&cpus_to_visit, GFP_KERNEL)) {
-+		pr_err("cpu_capacity: failed to allocate memory for cpus_to_visit\n");
-+		return -ENOMEM;
-+	}
-+	cpumask_copy(cpus_to_visit, cpu_possible_mask);
-+
-+	return cpufreq_register_notifier(&init_cpu_capacity_notifier,
-+					 CPUFREQ_POLICY_NOTIFIER);
-+}
-+core_initcall(register_cpufreq_notifier);
-+
-+static void parsing_done_workfn(struct work_struct *work)
-+{
-+	cpufreq_unregister_notifier(&init_cpu_capacity_notifier,
-+					 CPUFREQ_POLICY_NOTIFIER);
-+}
-+
-+#else
-+static int __init free_raw_capacity(void)
-+{
-+	kfree(raw_capacity);
-+
-+	return 0;
-+}
-+core_initcall(free_raw_capacity);
-+#endif
+ 	smmu->streamid_mask = size - 1;
+ 	if (id & ID0_SMS) {
+-		u32 smr;
+-
+ 		smmu->features |= ARM_SMMU_FEAT_STREAM_MATCH;
+ 		size = (id >> ID0_NUMSMRG_SHIFT) & ID0_NUMSMRG_MASK;
+ 		if (size == 0) {
+@@ -1774,21 +1816,6 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+ 			return -ENODEV;
+ 		}
+ 
+-		/*
+-		 * SMR.ID bits may not be preserved if the corresponding MASK
+-		 * bits are set, so check each one separately. We can reject
+-		 * masters later if they try to claim IDs outside these masks.
+-		 */
+-		smr = smmu->streamid_mask << SMR_ID_SHIFT;
+-		writel_relaxed(smr, gr0_base + ARM_SMMU_GR0_SMR(0));
+-		smr = readl_relaxed(gr0_base + ARM_SMMU_GR0_SMR(0));
+-		smmu->streamid_mask = smr >> SMR_ID_SHIFT;
+-
+-		smr = smmu->streamid_mask << SMR_MASK_SHIFT;
+-		writel_relaxed(smr, gr0_base + ARM_SMMU_GR0_SMR(0));
+-		smr = readl_relaxed(gr0_base + ARM_SMMU_GR0_SMR(0));
+-		smmu->smr_mask_mask = smr >> SMR_MASK_SHIFT;
+-
+ 		/* Zero-initialised to mark as invalid */
+ 		smmu->smrs = devm_kcalloc(smmu->dev, size, sizeof(*smmu->smrs),
+ 					  GFP_KERNEL);
+@@ -1796,8 +1823,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
+ 			return -ENOMEM;
+ 
+ 		dev_notice(smmu->dev,
+-			   "\tstream matching with %lu register groups, mask 0x%x",
+-			   size, smmu->smr_mask_mask);
++			   "\tstream matching with %lu register groups", size);
+ 	}
+ 	/* s2cr->type == 0 means translation, so initialise explicitly */
+ 	smmu->s2crs = devm_kmalloc_array(smmu->dev, size, sizeof(*smmu->s2crs),
+@@ -2120,6 +2146,7 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
+ 	iommu_register_instance(dev->fwnode, &arm_smmu_ops);
+ 	platform_set_drvdata(pdev, smmu);
+ 	arm_smmu_device_reset(smmu);
++	arm_smmu_test_smr_masks(smmu);
+ 
+ 	/* Oh, for a proper bus abstraction */
+ 	if (!iommu_present(&platform_bus_type))
 -- 
-2.10.0
+2.11.0
