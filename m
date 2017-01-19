@@ -1,48 +1,28 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 19 Jan 2017 10:04:27 +0100
-Subject: [PATCH v8 3/8] PWM: add pwm-stm32 DT bindings
-In-Reply-To: <1484749251-14445-4-git-send-email-benjamin.gaignard@st.com>
-References: <1484749251-14445-1-git-send-email-benjamin.gaignard@st.com>
- <1484749251-14445-4-git-send-email-benjamin.gaignard@st.com>
-Message-ID: <20170119090427.GA28834@ulmo.ba.sec>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Thu, 19 Jan 2017 14:35:21 +0530
+Subject: [PATCH] ARM: OMAP5: Add HWMOD_SWSUP_SIDLE_ACT flag for UART
+In-Reply-To: <20170118114807.9543-1-vigneshr@ti.com>
+References: <20170118114807.9543-1-vigneshr@ti.com>
+Message-ID: <e84cd7c8-89bc-b2ef-e57d-6c0a37b0b51e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2017 at 03:20:46PM +0100, Benjamin Gaignard wrote:
-> Define bindings for pwm-stm32
+
+
+On Wednesday 18 January 2017 05:18 PM, Vignesh R wrote:
+> According to the commit ca43ea345de9 ("ARM: OMAP2+: hwmod: Add a new
+> flag to handle SIDLE in SWSUP only in active"), UART IP needs the sidle
+> mode to be controlled in SW only while they are active. Once inactive,
+> the IP needs to be put back in HW control so they are also wakeup
+> capable. The flag HWMOD_SWSUP_SIDLE takes care of this. So add this flag
+> to all instances of UART.
 > 
-> version 8:
-> - reword st,breakinput description.
+> With this change, 8250 UART now gives out proper RX Timeout interrupts
+> and is usable as console.
 > 
-> version 6:
-> - change st,breakinput parameter format to make it usuable on stm32f7 too.
-> 
-> version 2:
-> - use parameters instead of compatible of handle the hardware configuration
-> 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> ---
->  .../devicetree/bindings/pwm/pwm-stm32.txt          | 35 ++++++++++++++++++++++
->  1 file changed, 35 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
 
-One last nit: please use "dt-bindings: pwm:" as prefix for the patch
-subject. So it would read something like this:
+Reviewed-by: Lokesh Vutla <lokeshvutla@ti.com>
 
-	dt-bindings: pwm: Add STM32 bindings
-
-or similar. That's the style that's been used for a while now. I'd have
-fixed that up myself, but since Lee plans to take this through the MFD
-tree I'd like to see that fixed up before it gets applied.
-
-With the above:
-
-Acked-by: Thierry Reding <thierry.reding@gmail.com>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170119/8a632a2f/attachment.sig>
+Thanks and regards,
+Lokesh
