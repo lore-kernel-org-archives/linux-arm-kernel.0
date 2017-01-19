@@ -1,57 +1,57 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 19 Jan 2017 19:36:20 -0300
-Subject: [PATCH v2 2/2] [media] exynos-gsc: Only reset the GSC HW on probe()
- if !CONFIG_PM
-In-Reply-To: <1484865380-12651-1-git-send-email-javier@osg.samsung.com>
-References: <1484865380-12651-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1484865380-12651-2-git-send-email-javier@osg.samsung.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 19 Jan 2017 23:48:33 +0100
+Subject: [PATCH v3 0/8] ARM: dts: Switch to new DSA binding
+In-Reply-To: <633afd2c-75e4-adeb-f3a0-b59b5f47f1a7@gmail.com> (Florian
+ Fainelli's message of "Thu, 19 Jan 2017 14:26:21 -0800")
+References: <20170117182224.32212-1-f.fainelli@gmail.com>
+ <633afd2c-75e4-adeb-f3a0-b59b5f47f1a7@gmail.com>
+Message-ID: <878tq67jjy.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 15f90ab57acc ("[media] exynos-gsc: Make driver functional when
-CONFIG_PM is unset") removed the implicit dependency that the driver
-had with CONFIG_PM, since it relied on the config option to be enabled.
-
-In order to work with !CONFIG_PM, the GSC reset logic that happens in
-the runtime resume callback had to be executed on the probe function.
-
-But there's no need to do this if CONFIG_PM is enabled, since in this
-case the runtime PM resume callback will be called by VIDIOC_STREAMON
-ioctl, so the resume handler will call the GSC HW reset function.
-
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
----
-
-I-ve only tested with CONFIG_PM enabled since my Exynos5422 Odroid
-XU4 board fails to boot when the config option is disabled.
-
-Best regards,
-Javier
-
-Changes in v2:
- - Remove the Fixes tag and reword the commit message after feedback
-   from Marek Szyprowski.
-
- drivers/media/platform/exynos-gsc/gsc-core.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
-index 83272f10722d..42e1e09ea915 100644
---- a/drivers/media/platform/exynos-gsc/gsc-core.c
-+++ b/drivers/media/platform/exynos-gsc/gsc-core.c
-@@ -1083,8 +1083,10 @@ static int gsc_probe(struct platform_device *pdev)
+Hi Florian,
  
- 	platform_set_drvdata(pdev, gsc);
- 
--	gsc_hw_set_sw_reset(gsc);
--	gsc_wait_reset(gsc);
-+	if (!IS_ENABLED(CONFIG_PM)) {
-+		gsc_hw_set_sw_reset(gsc);
-+		gsc_wait_reset(gsc);
-+	}
- 
- 	vb2_dma_contig_set_max_seg_size(dev, DMA_BIT_MASK(32));
- 
+ On jeu., janv. 19 2017, Florian Fainelli <f.fainelli@gmail.com> wrote:
+
+> On 01/17/2017 10:22 AM, Florian Fainelli wrote:
+>> Hi all,
+>> 
+>> This patch series converts the in-tree users to utilize the new (relatively)
+>> DSA binding that was introduced with commit 8c5ad1d6179d ("net: dsa: Document
+>> new binding"). The legacy binding node is kept included, but is marked
+>> disabled.
+>> 
+>> Changes in v3:
+>> 
+>> - collected tags from Andrew and Russell
+>> - added missing change to arch/arm/boot/dts/kirkwood-rd88f6281-a.dts
+>> 
+>> Changes in v2:
+>> 
+>> - patch 1: Use an hexadecimal reg property
+>> - patch 2: fixed the subject
+>> - patch 3: s/okay/disabled/ for the legacy DSA node
+>> - patches 7/8: fixed a stray whitespace
+>> 
+>> In about 2-3 releases we may consider removing the old DSA binding entirely
+>> from the kernel.
+>
+> Gregory, all patches have been reviewed/tested now, can you take this
+> for an upcoming 4.11 pull request? Thanks!
+
+
+All the series applied on mvebu/dt
+
+Thanks,
+
+Gregory
+
+
+> -- 
+> Florian
+
 -- 
-2.7.4
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
