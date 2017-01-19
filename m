@@ -1,21 +1,20 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 19 Jan 2017 13:26:10 -0600
-Subject: [PATCH v2 1/4] dt-bindings: phy: Add documentation for NSP USB3
- PHY
-In-Reply-To: <1484669670-4201-2-git-send-email-yendapally.reddy@broadcom.com>
+From: florian.fainelli@broadcom.com (Florian Fainelli)
+Date: Thu, 19 Jan 2017 11:26:49 -0800
+Subject: [PATCH v2 2/4] net: phy: Initialize mdio clock at probe function
+In-Reply-To: <1484669670-4201-3-git-send-email-yendapally.reddy@broadcom.com>
 References: <1484669670-4201-1-git-send-email-yendapally.reddy@broadcom.com>
- <1484669670-4201-2-git-send-email-yendapally.reddy@broadcom.com>
-Message-ID: <20170119192610.3wq5f2cl2a3c7nzu@rob-hp-laptop>
+ <1484669670-4201-3-git-send-email-yendapally.reddy@broadcom.com>
+Message-ID: <8bca5f28-b6be-cf45-3982-59a8ce0db982@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 11:14:27AM -0500, Yendapally Reddy Dhananjaya Reddy wrote:
-> Add documentation for USB3 PHY available in Northstar plus SoC
+On 01/17/2017 08:14 AM, Yendapally Reddy Dhananjaya Reddy wrote:
+> Initialize mdio clock divisor in probe function. The ext bus
+> bit available in the same register will be used by mdio mux
+> to enable external mdio.
 > 
 > Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
-> ---
->  .../devicetree/bindings/phy/brcm,nsp-usb3-phy.txt  | 39 ++++++++++++++++++++++
->  1 file changed, 39 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/phy/brcm,nsp-usb3-phy.txt
 
-Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
+-- 
+Florian
