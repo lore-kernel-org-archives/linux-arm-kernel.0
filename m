@@ -1,41 +1,82 @@
-From: jarkko.nikula@bitmer.com (Jarkko Nikula)
-Date: Thu, 19 Jan 2017 20:51:53 +0200
-Subject: Nokia N900: mixers changed between 4.9 and 4.10-rc3, no longer
- can use in-call speaker
-In-Reply-To: <d2c78625-565a-86ec-a03e-f15ae071942a@ti.com>
-References: <20170112181826.GA28290@amd> <201701121934.19810@pali>
- <20170114225614.GA25321@amd> <201701150100.54214@pali>
- <20170115100533.GA15816@amd>
- <40dbce4e-d99d-d77d-e682-5b004c70ca40@bitmer.com>
- <d2c78625-565a-86ec-a03e-f15ae071942a@ti.com>
-Message-ID: <ecdc073b-d83f-ba7d-89bf-da8899414217@bitmer.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 19 Jan 2017 18:56:40 +0000
+Subject: [PATCH 3/5] iommu/arm-smmu-v3: Install bypass STEs for
+ IOMMU_DOMAIN_IDENTITY domains
+In-Reply-To: <1484849955-1871-4-git-send-email-will.deacon@arm.com>
+References: <1484849955-1871-1-git-send-email-will.deacon@arm.com>
+ <1484849955-1871-4-git-send-email-will.deacon@arm.com>
+Message-ID: <900d38e4-d847-9920-f74a-0c0ed77d8894@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/17/2017 03:47 PM, Peter Ujfalusi wrote:
-> On 01/15/2017 09:08 PM, Jarkko Nikula wrote:
->> However v4.9.4 works and with it I can see there is an issue with these
->> aic3x controls:
->>
->> amixer: Unable to find simple control 'Left DAC_L1 Mixer Line',0
->>
->>
->>
->> amixer: Unable to find simple control 'Right DAC_R1 Mixer Line',0
+On 19/01/17 18:19, Will Deacon wrote:
+> In preparation for allowing the default domain type to be overridden,
+> this patch adds support for IOMMU_DOMAIN_IDENTITY domains to the
+> ARM SMMUv3 driver.
 > 
-> These are certainly not the regression between 4.6 and 4.9, more like
-> more like regression since 2.6:
-> 'Line Switch' -> 'LineL Switch':
-> 54f01916297bafc18bd7df4e2300a0544a84fce3
+> An identity domain is created by placing the corresponding stream table
+> entries into "bypass" mode, which allows transactions to flow through
+> the SMMU without any translation.
 > 
-> 'LineL Switch' -> 'DACL1 Switch':
-> c3b79e05b4d9ab2e7c3ba281261ea87ab5b71a92
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  drivers/iommu/arm-smmu-v3.c | 14 ++++++++++++--
+>  1 file changed, 12 insertions(+), 2 deletions(-)
 > 
-You are right. Those mixer scripts were for Maemo 2.6.28 kernel and
-dated 2009... grr, looks like I've overwritten my N900 mixer scripts at
-some point.
+> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+> index c254325b0c7a..d33291274455 100644
+> --- a/drivers/iommu/arm-smmu-v3.c
+> +++ b/drivers/iommu/arm-smmu-v3.c
+> @@ -629,6 +629,7 @@ enum arm_smmu_domain_stage {
+>  	ARM_SMMU_DOMAIN_S1 = 0,
+>  	ARM_SMMU_DOMAIN_S2,
+>  	ARM_SMMU_DOMAIN_NESTED,
+> +	ARM_SMMU_DOMAIN_BYPASS,
+>  };
+>  
+>  struct arm_smmu_domain {
+> @@ -1385,7 +1386,9 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+>  {
+>  	struct arm_smmu_domain *smmu_domain;
+>  
+> -	if (type != IOMMU_DOMAIN_UNMANAGED && type != IOMMU_DOMAIN_DMA)
+> +	if (type != IOMMU_DOMAIN_UNMANAGED &&
+> +	    type != IOMMU_DOMAIN_DMA &&
+> +	    type != IOMMU_DOMAIN_IDENTITY)
+>  		return NULL;
+>  
+>  	/*
+> @@ -1516,6 +1519,11 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
+>  	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+>  	struct arm_smmu_device *smmu = smmu_domain->smmu;
+>  
+> +	if (domain->type == IOMMU_DOMAIN_IDENTITY) {
+> +		smmu_domain->stage = ARM_SMMU_DOMAIN_BYPASS;
+> +		return 0;
+> +	}
+> +
+>  	/* Restrict the stage to what we can actually support */
+>  	if (!(smmu->features & ARM_SMMU_FEAT_TRANS_S1))
+>  		smmu_domain->stage = ARM_SMMU_DOMAIN_S2;
+> @@ -1651,7 +1659,9 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+>  	ste->bypass = false;
+>  	ste->valid = true;
+>  
+> -	if (smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
+> +	if (smmu_domain->stage == ARM_SMMU_DOMAIN_BYPASS) {
+> +		ste->bypass = true;
 
-Fortunately the issue seems to be fixed in v4.10-rc4.
+How is this intended to interact with the disable_bypass parameter? at
+the moment, that will still end up transforming this into a faulting
+STE, and I'm not sure that's right. I'd say we want to treat "bypass
+because not attached to a domain" and "bypass because attached to a
+passthrough domain" as distinct things, and it's only really the former
+which makes sense to disable.
 
--- 
-Jarkko
+Robin.
+
+> +	} else if (smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
+>  		ste->s1_cfg = &smmu_domain->s1_cfg;
+>  		ste->s2_cfg = NULL;
+>  		arm_smmu_write_ctx_desc(smmu, ste->s1_cfg);
+> 
