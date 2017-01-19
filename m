@@ -1,143 +1,130 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Thu, 19 Jan 2017 21:14:03 +0100
-Subject: [Xen-devel] [RFC] Device memory mappings for Dom0 on ARM64 ACPI
- systems
-In-Reply-To: <alpine.DEB.2.10.1701191002330.10192@sstabellini-ThinkPad-X260>
-References: <alpine.DEB.2.10.1701171309040.2347@sstabellini-ThinkPad-X260>
- <20170118110243.ctqpperggim5k7dw@dhcp-3-221.uk.xensource.com>
- <alpine.DEB.2.10.1701181058110.10192@sstabellini-ThinkPad-X260>
- <20c89f12-cb0c-1145-99d0-320b2080b503@arm.com>
- <20170119154129.7dnjzvq23jop7oye@dhcp-3-221.uk.xensource.com>
- <alpine.DEB.2.10.1701191002330.10192@sstabellini-ThinkPad-X260>
-Message-ID: <94e89cb4-f40c-585e-b3e8-d9f8f58b53d9@arm.com>
+From: eric.auger@redhat.com (Eric Auger)
+Date: Thu, 19 Jan 2017 20:57:52 +0000
+Subject: [PATCH v9 07/18] iommu: Implement reserved_regions iommu-group sysfs
+ file
+In-Reply-To: <1484859483-2866-1-git-send-email-eric.auger@redhat.com>
+References: <1484859483-2866-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <1484859483-2866-8-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+A new iommu-group sysfs attribute file is introduced. It contains
+the list of reserved regions for the iommu-group. Each reserved
+region is described on a separate line:
+- first field is the start IOVA address,
+- second is the end IOVA address,
+- third is the type.
 
-On 19/01/2017 19:22, Stefano Stabellini wrote:
-> On Thu, 19 Jan 2017, Roger Pau Monn? wrote:
->> On Wed, Jan 18, 2017 at 07:13:23PM +0000, Julien Grall wrote:
->>> Hi,
->>>
->>> On 18/01/17 19:05, Stefano Stabellini wrote:
->>>> On Wed, 18 Jan 2017, Roger Pau Monn? wrote:
->>>>> On Tue, Jan 17, 2017 at 02:20:54PM -0800, Stefano Stabellini wrote:
->>>>>> a) One option is to provide a Xen specific implementation of
->>>>>> acpi_os_ioremap in Linux. I think this is the cleanest approach, but
->>>>>> unfortunately, it doesn't cover cases where ioremap is used directly. (2)
->>>>>> is one of such cases, see
->>>>>> arch/arm64/kernel/pci.c:pci_acpi_setup_ecam_mapping and
->>>>>> drivers/pci/ecam.c:pci_ecam_create. (3) is another one of these cases,
->>>>>> see drivers/acpi/apei/bert.c:bert_init.
->>>>>
->>>>> This is basically the same as b) from Xen's PoV, the only difference is where
->>>>> you would call the hypercall from Dom0 to establish stage-2 mappings.
->>>>
->>>> Right, but it is important from the Linux point of view, this is why I
->>>> am asking the Linux maintainers.
->>>>
->>>>
->>>>>> b) Otherwise, we could write an alternative implementation of ioremap
->>>>>> on arm64. The Xen specific ioremap would request a stage-2 mapping
->>>>>> first, then create the stage-1 mapping as usual. However, this means
->>>>>> issuing an hypercall for every ioremap call.
->>>>>
->>>>> This seems fine to me, and at present is the only way to get something working.
->>>>> As you said not being able to discover OperationRegions from Xen means that
->>>>> there's a chance some MMIO might not be added to the stage-2 mappings.
->>>>>
->>>>> Then what's the initial memory map state when Dom0 is booted? There are no MMIO
->>>>> mappings at all, and Dom0 must request mappings for everything?
->>>>
->>>> Yes
->>>
->>> To give more context here, the UEFI memory map does not report all the MMIO
->>> regions. So there is no possibility to map MMIO at boot.
->>
->> I've been able to get a Dom0 booting on x86 by mapping all the regions marked
->> as ACPI in the memory map, plus the BARs of PCI devices and the MCFG areas.
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Tested-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
+Tested-by: Bharat Bhushan <bharat.bhushan@nxp.com>
 
-But how do you find the BAR? Is it by reading the BAR from the config 
-space when a PCI is added?
+---
+v7 -> v8:
+- remove iommu_group_remove_file() in iommu_group_release since
+  the /sys/kernel/iommu_groups/n directory seems to be removed
+  already
 
-Also, you are assuming that the MCFG will describe the host controller. 
-This is the case only when host controller available at boot. So you may 
-miss some here.
+v6 -> v7:
+- also report the type of the reserved region as a string
+- updated ABI documentation
 
-Furthermore, on ARM we have other static tables (such as GTDT) contain 
-MMIO region to map.
+v3 -> v4:
+- add cast to long long int when printing to avoid warning on
+  i386
+- change S_IRUGO into 0444
+- remove sort. The list is natively sorted now.
 
-Lastly, all devices are not PCI and you may have platform devices. The 
-platform devices will only be described in the ASL. Just in case, those 
-regions are not necessarily described in UEFI memory map.
+The file layout is inspired of /sys/bus/pci/devices/BDF/resource.
+I also read Documentation/filesystems/sysfs.txt so I expect this
+to be frowned upon.
+---
+ .../ABI/testing/sysfs-kernel-iommu_groups          | 12 ++++++++
+ drivers/iommu/iommu.c                              | 36 ++++++++++++++++++++++
+ 2 files changed, 48 insertions(+)
 
-So you need DOM0 to tell the list of regions.
-
->> But
->> this is not really optimal, since as Stefano says:
->>
->>  1. If there are new tables that contain memory regions that should be mapped to
->>    Dom0, Xen will need to be updated in order to work on those systems.
->>  2. ATM it's not possible for Xen to know all the OperationRegions described in
->>    the ACPI DSDT/SSDT tables.
->>
->> I'm not that worried about 1, since the user will also need a newish Dom0
->> kernel in order to access those devices, and it doesn't seem like new ACPI
->> tables appear out of the blue everyday. It however puts more pressure on Xen in
->> order to aggressively track ACPI changes.
->>
->> In order to fix 2 an AML parser would need to be added to Xen.
->
-> This brings me to another possible solution: we could map everything
-> beforehand in Xen as you wrote, then use a), an alternative
-> implementation of acpi_os_ioremap, to fix problem 2.
-> In this scheme, 1. remains unfixed.
-
-This solution will not work on ARM (see why above). It is not the first 
-time we have this discussion, so it is probably time to document in the 
-tree how ACPI is working with Xen on ARM/x86. This would avoid us to 
-come back again in the future on why an hypercall from Dom0 is required 
-to map MMIO.
-
->
-> I think this is suboptimal, but it is a possibility.
->
->
->>>>> What happens to ACPI tables crafted for Dom0 that reside in RAM? That would
->>>>> apply to the STAO and to the other tables that are crafted for Dom0 at build
->>>>> time. Should Dom0 also request stage-2 mappings for them, and Xen simply ignore
->>>>> those calls?
->>>>
->>>> The ACPI (and UEFI) tables are mapped by Xen
->>>
->>> I think Royger's point is DOM0 cannot tell whether a region has been mapped
->>> by Xen or not.
->>>
->>> The function ioremap will be used to map anything (it is the leaf of all
->>> mapping functions), and will call Xen no matter the address passed. It could
->>> be a RAM region, HW device region, emulated device region.
->>
->> Exactly, from a guest OS PoV it would request those mappings for all device
->> memory regions. But from Xen's perspective, those request might be made against
->> at least 3 different types of p2m regions:
->>
->>  - Regions trapped by emulated devices inside of Xen: no direct MMIO mapping
->>    should be established in this case.
->>  - RAM regions that belong to Xen-crafted ACPI tables (STAO, MADT...).
->>  - Real MMIO regions that should be passed through.
->>
->> Right now AFAIK Xen doesn't track any of this information, so we would need
->> additional non-trivial logic in order to account for all this inside the
->> hypervisor.
->
-> I think this is something we'll have to do to guarantee that we have a
-> good implementation of XENMEM_add_to_physmap_range in Xen, regardless of
-> the rest of the discussion.
-
-Agree here.
-
-Cheers,
-
+diff --git a/Documentation/ABI/testing/sysfs-kernel-iommu_groups b/Documentation/ABI/testing/sysfs-kernel-iommu_groups
+index 9b31556..35c64e0 100644
+--- a/Documentation/ABI/testing/sysfs-kernel-iommu_groups
++++ b/Documentation/ABI/testing/sysfs-kernel-iommu_groups
+@@ -12,3 +12,15 @@ Description:	/sys/kernel/iommu_groups/ contains a number of sub-
+ 		file if the IOMMU driver has chosen to register a more
+ 		common name for the group.
+ Users:
++
++What:		/sys/kernel/iommu_groups/reserved_regions
++Date: 		January 2017
++KernelVersion:  v4.11
++Contact: 	Eric Auger <eric.auger@redhat.com>
++Description:    /sys/kernel/iommu_groups/reserved_regions list IOVA
++		regions that are reserved. Not necessarily all
++		reserved regions are listed. This is typically used to
++		output direct-mapped, MSI, non mappable regions. Each
++		region is described on a single line: the 1st field is
++		the base IOVA, the second is the end IOVA and the third
++		field describes the type of the region.
+diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+index 640056b..f4a176e 100644
+--- a/drivers/iommu/iommu.c
++++ b/drivers/iommu/iommu.c
+@@ -68,6 +68,12 @@ struct iommu_group_attribute {
+ 			 const char *buf, size_t count);
+ };
+ 
++static const char * const iommu_group_resv_type_string[] = {
++	[IOMMU_RESV_DIRECT]	= "direct",
++	[IOMMU_RESV_RESERVED]	= "reserved",
++	[IOMMU_RESV_MSI]	= "msi",
++};
++
+ #define IOMMU_GROUP_ATTR(_name, _mode, _show, _store)		\
+ struct iommu_group_attribute iommu_group_attr_##_name =		\
+ 	__ATTR(_name, _mode, _show, _store)
+@@ -231,8 +237,33 @@ int iommu_get_group_resv_regions(struct iommu_group *group,
+ }
+ EXPORT_SYMBOL_GPL(iommu_get_group_resv_regions);
+ 
++static ssize_t iommu_group_show_resv_regions(struct iommu_group *group,
++					     char *buf)
++{
++	struct iommu_resv_region *region, *next;
++	struct list_head group_resv_regions;
++	char *str = buf;
++
++	INIT_LIST_HEAD(&group_resv_regions);
++	iommu_get_group_resv_regions(group, &group_resv_regions);
++
++	list_for_each_entry_safe(region, next, &group_resv_regions, list) {
++		str += sprintf(str, "0x%016llx 0x%016llx %s\n",
++			       (long long int)region->start,
++			       (long long int)(region->start +
++						region->length - 1),
++			       iommu_group_resv_type_string[region->type]);
++		kfree(region);
++	}
++
++	return (str - buf);
++}
++
+ static IOMMU_GROUP_ATTR(name, S_IRUGO, iommu_group_show_name, NULL);
+ 
++static IOMMU_GROUP_ATTR(reserved_regions, 0444,
++			iommu_group_show_resv_regions, NULL);
++
+ static void iommu_group_release(struct kobject *kobj)
+ {
+ 	struct iommu_group *group = to_iommu_group(kobj);
+@@ -310,6 +341,11 @@ struct iommu_group *iommu_group_alloc(void)
+ 	 */
+ 	kobject_put(&group->kobj);
+ 
++	ret = iommu_group_create_file(group,
++				      &iommu_group_attr_reserved_regions);
++	if (ret)
++		return ERR_PTR(ret);
++
+ 	pr_debug("Allocated group %d\n", group->id);
+ 
+ 	return group;
 -- 
-Julien Grall
+1.9.1
