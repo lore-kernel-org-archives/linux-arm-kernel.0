@@ -1,22 +1,32 @@
 From: eddie.cai.linux@gmail.com (Eddie Cai)
-Date: Thu, 19 Jan 2017 10:11:57 +0800
-Subject: [PATCH 0/2] Add support for RK3288 Tinker board
-Message-ID: <1484791919-4665-1-git-send-email-eddie.cai@rock-chips.com>
+Date: Thu, 19 Jan 2017 10:11:58 +0800
+Subject: [PATCH 1/2] dt-bindings: add Asus Tinker board
+In-Reply-To: <1484791919-4665-1-git-send-email-eddie.cai@rock-chips.com>
+References: <1484791919-4665-1-git-send-email-eddie.cai@rock-chips.com>
+Message-ID: <1484791919-4665-2-git-send-email-eddie.cai@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set add support for RK3288 Tinker board. 
-Tinker board is a credit card size develop board powered by RK3288.
+Tinker board is a credit card size develop board designed by Asus.
+Powered by RK3288.
 
-Eddie Cai (2):
-  dt-bindings: add Asus Tinker board
-  ARM: dts: rockchip: add dts for RK3288-Tinker board
+Signed-off-by: Eddie Cai <eddie.cai@rock-chips.com>
+---
+ Documentation/devicetree/bindings/arm/rockchip.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
- Documentation/devicetree/bindings/arm/rockchip.txt |   3 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/rk3288-tinker.dts                | 556 +++++++++++++++++++++
- 3 files changed, 560 insertions(+)
- create mode 100644 arch/arm/boot/dts/rk3288-tinker.dts
-
+diff --git a/Documentation/devicetree/bindings/arm/rockchip.txt b/Documentation/devicetree/bindings/arm/rockchip.txt
+index cc4ace6..ce1f04a 100644
+--- a/Documentation/devicetree/bindings/arm/rockchip.txt
++++ b/Documentation/devicetree/bindings/arm/rockchip.txt
+@@ -1,5 +1,8 @@
+ Rockchip platforms device tree bindings
+ ---------------------------------------
++- Asus Tinker board
++    Required root node properties:
++      - compatible = "rockchip,rk3288-tinker", "rockchip,rk3288";
+ 
+ - Kylin RK3036 board:
+     Required root node properties:
 -- 
 2.7.4
