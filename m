@@ -1,49 +1,44 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 19 Jan 2017 11:51:28 +0800
-Subject: [PATCH v13 1/7] arm64: Rename the common MADT parse routine
-In-Reply-To: <1484686210-7211-2-git-send-email-jeremy.linton@arm.com>
-References: <1484686210-7211-1-git-send-email-jeremy.linton@arm.com>
- <1484686210-7211-2-git-send-email-jeremy.linton@arm.com>
-Message-ID: <c9056b99-7a32-3c91-eb8a-5b44a182c140@linaro.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 19 Jan 2017 09:20:55 +0530
+Subject: [GIT PULL] DaVinci fix for v4.10
+In-Reply-To: <20170119001242.GB23725@localhost>
+References: <214ce380-3c45-423c-a7bc-e19ea1ce2a2d@ti.com>
+ <20170119001242.GB23725@localhost>
+Message-ID: <dd59ae9d-e224-7fd0-bcaf-856ca1b10b94@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeremy,
+Hi Olof,
 
-On 2017/1/18 4:50, Jeremy Linton wrote:
-> The MADT parser in smp.c is now being used to parse
-> out NUMA, PMU and ACPI parking protocol information as
-> well as the GIC information for which it was originally
-> created. Rename it to avoid a misleading name.
->
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> ---
->  arch/arm64/kernel/smp.c | 13 +++++++------
->  1 file changed, 7 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index cb87234..8ea244c 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -517,13 +517,14 @@ static unsigned int cpu_count = 1;
->
->  #ifdef CONFIG_ACPI
->  /*
-> - * acpi_map_gic_cpu_interface - parse processor MADT entry
-> + * acpi_verify_and_map_madt - parse processor MADT entry
->   *
->   * Carry out sanity checks on MADT processor entry and initialize
-> - * cpu_logical_map on success
-> + * cpu_logical_map, the ACPI parking protocol, NUMA mapping
-> + * and the PMU interrupts on success
->   */
->  static void __init
-> -acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
-> +acpi_verify_and_map_madt(struct acpi_madt_generic_interrupt *processor)
+On Thursday 19 January 2017 05:42 AM, Olof Johansson wrote:
+> Hi Sekhar,
+> 
+> On Wed, Jan 18, 2017 at 04:23:55PM +0530, Sekhar Nori wrote:
+>> The following changes since commit 49def1853334396f948dcb4cedb9347abb318df5:
+>>
+>>   Linux 4.10-rc4 (2017-01-15 16:21:59 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v4.10-part2
+>>
+>> for you to fetch changes up to 6f042ee9cc09792c1c0f0cd8f275c2b4b29eaa96:
+>>
+>>   ARM: dts: da850-evm: fix read access to SPI flash (2017-01-18 15:38:08 +0530)
+>>
+>> ----------------------------------------------------------------
+>> This patch uses fast-read opcode to read the
+>> SPI flash. This is needed for error-free read
+>> at 30Mhz.
+>>
+>> ----------------------------------------------------------------
+>> Fabien Parent (1):
+>>       ARM: dts: da850-evm: fix read access to SPI flash
+> 
+> You're ahead of our branch since this is based on -rc4 when it doesn't
+> have to. Want to respin, or should I cherry-pick the patch?
 
-Nit, MADT is a table includes multi type of table entries, we just
-need to map the the processor type, how about updating it to
-acpi_verify_and_map_madt_processor()?
+Cherry-picking is fine. Thanks!
 
-Thanks
-Hanjun
+Regards,
+Sekhar
