@@ -1,43 +1,46 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 19 Jan 2017 14:08:12 -0800
-Subject: [RFC][PATCH 0/2] Better hardening names
-In-Reply-To: <1484789346-21012-1-git-send-email-labbott@redhat.com>
-References: <1484789346-21012-1-git-send-email-labbott@redhat.com>
-Message-ID: <CAGXu5j+KA_+OxBo_fFO+YoZDyNYTCttRh06868o5-DAz53D30Q@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 19 Jan 2017 22:11:32 +0000
+Subject: [PATCH] arm: module: add support for R_ARM_REL32 relocations
+Message-ID: <1484863892-5818-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2017 at 5:29 PM, Laura Abbott <labbott@redhat.com> wrote:
-> Hi,
->
-> It's come up previously that CONFIG_DEBUG_SET_MODULE_RONX and
-> CONFIG_DEBUG_RODATA are not accurate names, mostly they should not have the
-> word 'debug' in them. This series attempts to change the names to something
-> a bit more descriptive and indicative of what they are actually used for these
-> days.
->
-> I marked this RFC for
-> - Bike shedding purposes.
-> - A discussion of what defaults should be. The way I did the refactoring, both
->   options are default y. I'd appreciate comments if there is a better approach.
-> - Approach to split this up into more sub patches to make review/merging easier?
->   Or maybe it's fine.
->
-> Quickly tested on arm/arm64/x86.
->
-> Thanks,
-> Laura
->
-> Laura Abbott (2):
->   security: Change name of CONFIG_DEBUG_RODATA
->   security: Change name of CONFIG_DEBUG_SET_MODULE_RONX
+Add support for R_ARM_REL32 relocations in the module loader,
+which will be used by the modversions code when (if) it switches
+to using relative references to refer to CRC values.
 
-Some day I'll quit reading my email backwards. :) I see you've got
-MODULE_RONX renamed too here, please ignore my comment about needing
-it "too". :)
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/include/asm/elf.h | 1 +
+ arch/arm/kernel/module.c   | 4 ++++
+ 2 files changed, 5 insertions(+)
 
--Kees
-
+diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
+index d2315ffd8f12..d450a59ca121 100644
+--- a/arch/arm/include/asm/elf.h
++++ b/arch/arm/include/asm/elf.h
+@@ -50,6 +50,7 @@ typedef struct user_fp elf_fpregset_t;
+ #define R_ARM_NONE		0
+ #define R_ARM_PC24		1
+ #define R_ARM_ABS32		2
++#define R_ARM_REL32		3
+ #define R_ARM_CALL		28
+ #define R_ARM_JUMP24		29
+ #define R_ARM_TARGET1		38
+diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+index 4f14b5ce6535..29629fe02ce5 100644
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -159,6 +159,10 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 			*(u32 *)loc = offset & 0x7fffffff;
+ 			break;
+ 
++		case R_ARM_REL32:
++			*(u32 *)loc += sym->st_value - loc;
++			break;
++
+ 		case R_ARM_MOVW_ABS_NC:
+ 		case R_ARM_MOVT_ABS:
+ 			offset = tmp = __mem_to_opcode_arm(*(u32 *)loc);
 -- 
-Kees Cook
-Nexus Security
+2.7.4
