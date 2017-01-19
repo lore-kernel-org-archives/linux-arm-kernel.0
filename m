@@ -1,107 +1,51 @@
-From: sstabellini@kernel.org (Stefano Stabellini)
-Date: Thu, 19 Jan 2017 10:22:10 -0800 (PST)
-Subject: [Xen-devel] [RFC] Device memory mappings for Dom0 on ARM64 ACPI
- systems
-In-Reply-To: <20170119154129.7dnjzvq23jop7oye@dhcp-3-221.uk.xensource.com>
-References: <alpine.DEB.2.10.1701171309040.2347@sstabellini-ThinkPad-X260>
- <20170118110243.ctqpperggim5k7dw@dhcp-3-221.uk.xensource.com>
- <alpine.DEB.2.10.1701181058110.10192@sstabellini-ThinkPad-X260>
- <20c89f12-cb0c-1145-99d0-320b2080b503@arm.com>
- <20170119154129.7dnjzvq23jop7oye@dhcp-3-221.uk.xensource.com>
-Message-ID: <alpine.DEB.2.10.1701191002330.10192@sstabellini-ThinkPad-X260>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 19 Jan 2017 18:23:50 +0000
+Subject: [PATCH v2 0/5] ARM: add module autoloading support for crypto
+ modules
+In-Reply-To: <1484154118-22139-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1484154118-22139-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu9q5sH2_=3TZNbPAf3fdFB=F7Ut5swnp7qiUgwbuqemnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 Jan 2017, Roger Pau Monn? wrote:
-> On Wed, Jan 18, 2017 at 07:13:23PM +0000, Julien Grall wrote:
-> > Hi,
-> > 
-> > On 18/01/17 19:05, Stefano Stabellini wrote:
-> > > On Wed, 18 Jan 2017, Roger Pau Monn? wrote:
-> > > > On Tue, Jan 17, 2017 at 02:20:54PM -0800, Stefano Stabellini wrote:
-> > > > > a) One option is to provide a Xen specific implementation of
-> > > > > acpi_os_ioremap in Linux. I think this is the cleanest approach, but
-> > > > > unfortunately, it doesn't cover cases where ioremap is used directly. (2)
-> > > > > is one of such cases, see
-> > > > > arch/arm64/kernel/pci.c:pci_acpi_setup_ecam_mapping and
-> > > > > drivers/pci/ecam.c:pci_ecam_create. (3) is another one of these cases,
-> > > > > see drivers/acpi/apei/bert.c:bert_init.
-> > > > 
-> > > > This is basically the same as b) from Xen's PoV, the only difference is where
-> > > > you would call the hypercall from Dom0 to establish stage-2 mappings.
-> > > 
-> > > Right, but it is important from the Linux point of view, this is why I
-> > > am asking the Linux maintainers.
-> > > 
-> > > 
-> > > > > b) Otherwise, we could write an alternative implementation of ioremap
-> > > > > on arm64. The Xen specific ioremap would request a stage-2 mapping
-> > > > > first, then create the stage-1 mapping as usual. However, this means
-> > > > > issuing an hypercall for every ioremap call.
-> > > > 
-> > > > This seems fine to me, and at present is the only way to get something working.
-> > > > As you said not being able to discover OperationRegions from Xen means that
-> > > > there's a chance some MMIO might not be added to the stage-2 mappings.
-> > > > 
-> > > > Then what's the initial memory map state when Dom0 is booted? There are no MMIO
-> > > > mappings at all, and Dom0 must request mappings for everything?
-> > > 
-> > > Yes
-> > 
-> > To give more context here, the UEFI memory map does not report all the MMIO
-> > regions. So there is no possibility to map MMIO at boot.
-> 
-> I've been able to get a Dom0 booting on x86 by mapping all the regions marked
-> as ACPI in the memory map, plus the BARs of PCI devices and the MCFG areas. But
-> this is not really optimal, since as Stefano says:
-> 
->  1. If there are new tables that contain memory regions that should be mapped to
->    Dom0, Xen will need to be updated in order to work on those systems.
->  2. ATM it's not possible for Xen to know all the OperationRegions described in
->    the ACPI DSDT/SSDT tables.
-> 
-> I'm not that worried about 1, since the user will also need a newish Dom0
-> kernel in order to access those devices, and it doesn't seem like new ACPI
-> tables appear out of the blue everyday. It however puts more pressure on Xen in
-> order to aggressively track ACPI changes.
-> 
-> In order to fix 2 an AML parser would need to be added to Xen.
+On 11 January 2017 at 17:01, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> This series wires up the crypto modules that use the ARM 32-bit versions of
+> the ARMv8 Crypto Extensions to udev autoloading, by exposing the HWCAP2
+> feature bits via the CPU modalias. This is very similar to the arm64
+> implementation, with the notable exception that ARM has its CPU feature
+> definitions split across HWCAP and HWCAP2.
+>
+> Given that the crypto feature bits are all exposed via HWCAP2, and considering
+> that there are currently no features exposed via HWCAP that are relevant to
+> udev module autoloading, exposing HWCAP2 only should be sufficient, at least
+> for now.
+>
+> Changes since v1:
+> - rebase onto v4.10-rc2
+>
+> Ard Biesheuvel (5):
+>   ARM: wire up HWCAP2 feature bits to the CPU modalias
 
-This brings me to another possible solution: we could map everything
-beforehand in Xen as you wrote, then use a), an alternative
-implementation of acpi_os_ioremap, to fix problem 2.
-In this scheme, 1. remains unfixed.
+Ping?
 
-I think this is suboptimal, but it is a possibility.
-
-
-> > > > What happens to ACPI tables crafted for Dom0 that reside in RAM? That would
-> > > > apply to the STAO and to the other tables that are crafted for Dom0 at build
-> > > > time. Should Dom0 also request stage-2 mappings for them, and Xen simply ignore
-> > > > those calls?
-> > > 
-> > > The ACPI (and UEFI) tables are mapped by Xen
-> > 
-> > I think Royger's point is DOM0 cannot tell whether a region has been mapped
-> > by Xen or not.
-> > 
-> > The function ioremap will be used to map anything (it is the leaf of all
-> > mapping functions), and will call Xen no matter the address passed. It could
-> > be a RAM region, HW device region, emulated device region.
-> 
-> Exactly, from a guest OS PoV it would request those mappings for all device
-> memory regions. But from Xen's perspective, those request might be made against
-> at least 3 different types of p2m regions:
-> 
->  - Regions trapped by emulated devices inside of Xen: no direct MMIO mapping
->    should be established in this case.
->  - RAM regions that belong to Xen-crafted ACPI tables (STAO, MADT...).
->  - Real MMIO regions that should be passed through.
-> 
-> Right now AFAIK Xen doesn't track any of this information, so we would need
-> additional non-trivial logic in order to account for all this inside the
-> hypervisor.
-
-I think this is something we'll have to do to guarantee that we have a
-good implementation of XENMEM_add_to_physmap_range in Xen, regardless of
-the rest of the discussion.
+>   crypto: arm/aes-ce - enable module autoloading based on CPU feature
+>     bits
+>   crypto: arm/ghash-ce - enable module autoloading based on CPU feature
+>     bits
+>   crypto: arm/sha1-ce - enable module autoloading based on CPU feature
+>     bits
+>   crypto: arm/sha2-ce - enable module autoloading based on CPU feature
+>     bits
+>
+>  arch/arm/Kconfig                  |  1 +
+>  arch/arm/crypto/aes-ce-glue.c     |  6 ++--
+>  arch/arm/crypto/ghash-ce-glue.c   |  6 ++--
+>  arch/arm/crypto/sha1-ce-glue.c    |  5 ++-
+>  arch/arm/crypto/sha2-ce-glue.c    |  5 ++-
+>  arch/arm/include/asm/cpufeature.h | 32 ++++++++++++++++++++
+>  6 files changed, 41 insertions(+), 14 deletions(-)
+>  create mode 100644 arch/arm/include/asm/cpufeature.h
+>
+> --
+> 2.7.4
+>
