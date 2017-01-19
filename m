@@ -1,44 +1,36 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 19 Jan 2017 15:21:34 +0100
-Subject: [PATCH 2/2] ARM: imx6: fix regulator constraints on anatop 1p1 and 2p5
-In-Reply-To: <20170119142134.8572-1-l.stach@pengutronix.de>
-References: <20170119142134.8572-1-l.stach@pengutronix.de>
-Message-ID: <20170119142134.8572-2-l.stach@pengutronix.de>
+Date: Thu, 19 Jan 2017 15:21:33 +0100
+Subject: [PATCH 1/2] ARM: imx6: fix min/max voltage of anatop 2p5 regulator
+Message-ID: <20170119142134.8572-1-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the min/max voltage constraints for the anatop 1p1 and 2p5
-regulator to match the typical operating range mentioned in the
-datasheet.
+The regulation bound of this regulator are 2.1V to 2.875V, the
+wrong DT values cause the driver to miscalculate the effective
+voltage.
+
+This isn't really an issue right now, as nobody actively changes
+the regulator voltage, but better fix it now.
 
 Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- arch/arm/boot/dts/imx6qdl.dtsi | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/imx6qdl.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 9313b9af2da8..e9ba244cda54 100644
+index 53e6e63cbb02..9313b9af2da8 100644
 --- a/arch/arm/boot/dts/imx6qdl.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -626,8 +626,8 @@
- 				regulator-1p1 {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd1p1";
--					regulator-min-microvolt = <800000>;
--					regulator-max-microvolt = <1375000>;
-+					regulator-min-microvolt = <1000000>;
-+					regulator-max-microvolt = <1200000>;
- 					regulator-always-on;
- 					anatop-reg-offset = <0x110>;
+@@ -661,8 +661,8 @@
  					anatop-vol-bit-shift = <8>;
-@@ -654,7 +654,7 @@
- 				regulator-2p5 {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd2p5";
--					regulator-min-microvolt = <2000000>;
-+					regulator-min-microvolt = <2250000>;
- 					regulator-max-microvolt = <2750000>;
- 					regulator-always-on;
- 					anatop-reg-offset = <0x130>;
+ 					anatop-vol-bit-width = <5>;
+ 					anatop-min-bit-val = <0>;
+-					anatop-min-voltage = <2000000>;
+-					anatop-max-voltage = <2750000>;
++					anatop-min-voltage = <2100000>;
++					anatop-max-voltage = <2875000>;
+ 				};
+ 
+ 				reg_arm: regulator-vddcore {
 -- 
 2.11.0
