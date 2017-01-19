@@ -1,59 +1,60 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 19 Jan 2017 09:10:02 +0100
-Subject: [PATCH 1/2] ARM64: dts: meson-gxm: Add R-Box Pro
-In-Reply-To: <m237ggypfc.fsf@baylibre.com>
-References: <20170117030611.23827-1-afaerber@suse.de>
- <20170117030611.23827-2-afaerber@suse.de>
- <3005a457-b7cf-393b-42ff-4149e080321c@suse.de> <m237ggypfc.fsf@baylibre.com>
-Message-ID: <809182ae-cfb5-7f6f-c383-ee337e78fa4c@baylibre.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 19 Jan 2017 16:02:28 +0800
+Subject: [PATCH v20 08/17] clocksource/drivers/arm_arch_timer: Rework
+ counter frequency detection.
+In-Reply-To: <20170118132541.8989-9-fu.wei@linaro.org>
+References: <20170118132541.8989-1-fu.wei@linaro.org>
+ <20170118132541.8989-9-fu.wei@linaro.org>
+Message-ID: <cafa8c7a-9c7c-51ba-5566-0cfe1fe6f764@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andreas, Kevin,
+Hi Fuwei,
 
-On 01/18/2017 11:27 PM, Kevin Hilman wrote:
-> Andreas F?rber <afaerber@suse.de> writes:
-> 
->> Am 17.01.2017 um 04:06 schrieb Andreas F?rber:
->>> diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
->>> index 0d7bfbf7d922..66bc809a5eae 100644
->>> --- a/arch/arm64/boot/dts/amlogic/Makefile
->>> +++ b/arch/arm64/boot/dts/amlogic/Makefile
->>> @@ -12,6 +12,7 @@ dtb-$(CONFIG_ARCH_MESON) += meson-gxl-nexbox-a95x.dtb
->>>  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-s912-q200.dtb
->>>  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-s912-q201.dtb
->>>  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-nexbox-a1.dtb
->>
->> What is the logic behind meson-gxm-s912-q201 vs. meson-gxm-nexbox-a1?
->> Should it be renamed to include -s912 for consistency?
+One comments below.
 
-It followed the GXL logic... until I posted the nexbox-a1 without !
-Since the q20x and p23x boards are the same, it was to enforce the fact that
-the S912 was on the q200 and q201 boards.
+On 2017/1/18 21:25, fu.wei at linaro.org wrote:
+> From: Fu Wei <fu.wei@linaro.org>
+>
+> The counter frequency detection call(arch_timer_detect_rate) combines two
+> ways to get counter frequency: system coprocessor register and MMIO timer.
+> But in a specific timer init code, we only need one way to try:
+> getting frequency from MMIO timer register will be needed only when we
+> init MMIO timer; getting frequency from system coprocessor register will
+> be needed only when we init arch timer.
+>
+> This patch separates paths to determine frequency:
+> Separate out the MMIO frequency and the sysreg frequency detection call,
+> and use the appropriate one for the counter.
+>
+> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+> ---
+>  drivers/clocksource/arm_arch_timer.c | 40 ++++++++++++++++++++++--------------
+>  1 file changed, 25 insertions(+), 15 deletions(-)
+>
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 6484f84..9482481 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -488,23 +488,33 @@ static int arch_timer_starting_cpu(unsigned int cpu)
+>  	return 0;
+>  }
+>
+> -static void arch_timer_detect_rate(void __iomem *cntbase)
+> +static void __arch_timer_determine_rate(u32 rate)
+>  {
+> -	/* Who has more than one independent system counter? */
+> -	if (arch_timer_rate)
+> -		return;
+> +	/* Check the timer frequency. */
+> +	if (!arch_timer_rate) {
+> +		if (rate)
+> +			arch_timer_rate = rate;
+> +		else
+> +			pr_warn("frequency not available\n");
+> +	} else if (rate && arch_timer_rate != rate) {
+                         ^
+Typo? I think it's "&" here.
 
-> Oops, I think it should be renamed for consistency.
-> 
-> I believe there's only one chip in the GXM family (S912) so it might be
-> that we could either drop the -s912 from the q20x boards or, add it to
-> the nexbox.
-
-I believe this aswell AFAIK.
-
-> 
-> I lean towards dropping the -s912 since there's a single chip in GXM.
-> (FWIW, GXL has more than one chip in the family so we added the chip
-> there.)
-> 
->>> +dtb-$(CONFIG_ARCH_MESON) += meson-gxm-rbox-pro.dtb
->>
->> Should this new board use meson-gxm-s912-?
-> 
-> No.  Unless Neil or you thing otherwise, I think we should send a patch
-> to drop the -s912 from the q20x boards instead.  (where "we" == Neil) ;)
-
-Ok, will do.
-
-> 
-> Kevin
-
-Neil
+Thanks
+Hanjun
