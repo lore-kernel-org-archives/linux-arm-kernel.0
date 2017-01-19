@@ -1,45 +1,104 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 19 Jan 2017 16:16:16 +0000
-Subject: [PATCH 1/1] iommu/arm-smmu: Fix for ThunderX erratum #27704
-In-Reply-To: <1484550967-6328-1-git-send-email-tn@semihalf.com>
-References: <1484550967-6328-1-git-send-email-tn@semihalf.com>
-Message-ID: <20170119161615.GH31594@arm.com>
+From: yannick.fertre@st.com (Yannick FERTRE)
+Date: Thu, 19 Jan 2017 16:16:01 +0000
+Subject: [PATCH v1 1/7] dt-bindings: display: add STM32 LTDC driver
+In-Reply-To: <2080174.sm3cyM9MmB@avalon>
+References: <1484573344-11609-1-git-send-email-yannick.fertre@st.com>
+ <1484573344-11609-2-git-send-email-yannick.fertre@st.com>
+ <2080174.sm3cyM9MmB@avalon>
+Message-ID: <dfb3192a-d5b6-029e-b8cb-65a628a0c30b@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2017 at 08:16:07AM +0100, Tomasz Nowicki wrote:
-> The goal of erratum #27704 workaround was to make sure that ASIDs and VMIDs
-> are unique across all SMMU instances on affected Cavium systems.
-> 
-> Currently, the workaround code partitions ASIDs and VMIDs by increasing
-> global cavium_smmu_context_count which in turn becomes the base ASID and VMID
-> value for the given SMMU instance upon the context bank initialization.
-> 
-> For systems with multiple SMMU instances this approach implies the risk
-> of crossing 8-bit ASID, like for 1-socket CN88xx capable of 4 SMMUv2,
-> 128 context banks each:
-> SMMU_0 (0-127 ASID RANGE)
-> SMMU_1 (127-255 ASID RANGE)
-> SMMU_2 (256-383 ASID RANGE) <--- crossing 8-bit ASID
-> SMMU_3 (384-511 ASID RANGE) <--- crossing 8-bit ASID
-> 
-> Since now we use 8-bit ASID (SMMU_CBn_TCR2.AS = 0) we effectively misconfigure
-> ASID[15:8] bits of SMMU_CBn_TTBRm register for SMMU_2/3. Moreover, we still
-> assume non-zero ASID[15:8] bits upon context invalidation. In the end,
-> except SMMU_0/1 devices all other devices under other SMMUs will fail on guest
-> power off/on. Since we try to invalidate TLB with 16-bit ASID but we actually
-> have 8-bit zero padded 16-bit entry.
-> 
-> This patch adds 16-bit ASID support for stage-1 AArch64 contexts so that
-> we use ASIDs consistently for all SMMU instances.
-> 
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-> Reviewed-by: Tirumalesh Chalamarla  <Tirumalesh.Chalamarla@cavium.com>
-> ---
->  drivers/iommu/arm-smmu.c | 3 +++
->  1 file changed, 3 insertions(+)
-
-Thanks, queued for 4.11.
-
-Will
+On 01/16/2017 09:30 PM, Laurent Pinchart wrote:
+> Hi Yannick,
+>
+> Thank you for the patch.
+>
+> On Monday 16 Jan 2017 14:28:58 Yannick Fertre wrote:
+>> Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
+>> ---
+>>  .../devicetree/bindings/display/st,ltdc.txt        | 57 ++++++++++++++++++
+>>  1 file changed, 57 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/display/st,ltdc.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/display/st,ltdc.txt
+>> b/Documentation/devicetree/bindings/display/st,ltdc.txt new file mode
+>> 100644
+>> index 0000000..20e89da
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/display/st,ltdc.txt
+>> @@ -0,0 +1,57 @@
+>> +* STMicroelectronics STM32 lcd-tft display controller
+>> +
+>> +- st-display-subsystem: Master device for DRM sub-components
+>> +  This device must be the parent of all the sub-components and is
+>> responsible
+>> +  of bind them.
+>
+> Why do you need this ? At a quick glance the ltdc node should be enough.
+Hi Laurent,
+To prepare next device upstream of dsi, we need a master node 
+"st-display-subsystem" and a sub node "st,ltdc". It's the same kind of 
+node than st,stih4xx.
+>
+>> +  Required properties:
+>> +  - compatible: "st,display-subsystem"
+>> +  - ranges: to allow probing of subdevices
+>> +
+>> +- ltdc_host: lcd-tft display controller host
+>> +  must be a sub-node of st-display-subsystem
+>> +  Required properties:
+>> +  - compatible: "st,ltdc"
+>> +  - reg: Physical base address of the IP registers and length of memory
+>> mapped region.
+>> +  - clocks: from common clock binding: handle hardware IP needed clocks,
+>> the
+>> +    number of clocks may depend of the SoC type.
+>> +    See ../clocks/clock-bindings.txt for details.
+>> +  - clock-names: names of the clocks listed in clocks property in the same
+>> +    order.
+>
+> You need to define the required/optional clocks with their names here. If they
+> vary depending on the SoC, the DT bindings document need to list them for each
+> SoC.
+>
+Ok, I'll push news bindings with pack V2.
+>> +  - resets: resets to be used by the device
+>> +    See ../reset/reset.txt for details.
+>> +  - reset-names: names of the resets listed in resets property in the same
+>> +    order.
+>> +  Required nodes:
+>> +    - Video port for RGB output.
+>> +
+>> +Example:
+>> +
+>> +/ {
+>> +	...
+>> +	soc {
+>> +	...
+>> +		st-display-subsystem {
+>> +			compatible = "st,display-subsystem";
+>> +			#address-cells = <1>;
+>> +			#size-cells = <1>;
+>> +			ranges;
+>> +			dma-ranges;
+>> +
+>> +			ltdc_host: stm32-ltdc at 40016800 {
+>> +				compatible = "st,ltdc";
+>> +				reg = <0x40016800 0x200>;
+>> +				interrupts = <88>, <89>;
+>> +				resets = <&rcc 314>;
+>> +				clocks = <&rcc 1 8>;
+>> +				clock-names = "clk-lcd";
+>> +				status = "disabled";
+>> +
+>> +				port {
+>> +					ltdc_out_rgb: endpoint {
+>> +					};
+>> +				};
+>> +			};
+>> +		};
+>> +	...
+>> +	};
+>> +};
+>
