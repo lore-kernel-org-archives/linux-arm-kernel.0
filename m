@@ -1,28 +1,56 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Thu, 19 Jan 2017 14:35:21 +0530
-Subject: [PATCH] ARM: OMAP5: Add HWMOD_SWSUP_SIDLE_ACT flag for UART
-In-Reply-To: <20170118114807.9543-1-vigneshr@ti.com>
-References: <20170118114807.9543-1-vigneshr@ti.com>
-Message-ID: <e84cd7c8-89bc-b2ef-e57d-6c0a37b0b51e@ti.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 19 Jan 2017 10:08:41 +0100
+Subject: [PATCH v8 4/8] PWM: add PWM driver for STM32 plaftorm
+In-Reply-To: <1484749251-14445-5-git-send-email-benjamin.gaignard@st.com>
+References: <1484749251-14445-1-git-send-email-benjamin.gaignard@st.com>
+ <1484749251-14445-5-git-send-email-benjamin.gaignard@st.com>
+Message-ID: <20170119090841.GB28834@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Wednesday 18 January 2017 05:18 PM, Vignesh R wrote:
-> According to the commit ca43ea345de9 ("ARM: OMAP2+: hwmod: Add a new
-> flag to handle SIDLE in SWSUP only in active"), UART IP needs the sidle
-> mode to be controlled in SW only while they are active. Once inactive,
-> the IP needs to be put back in HW control so they are also wakeup
-> capable. The flag HWMOD_SWSUP_SIDLE takes care of this. So add this flag
-> to all instances of UART.
+On Wed, Jan 18, 2017 at 03:20:47PM +0100, Benjamin Gaignard wrote:
+> This driver adds support for PWM driver on STM32 platform.
+> The SoC have multiple instances of the hardware IP and each
+> of them could have small differences: number of channels,
+> complementary output, auto reload register size...
 > 
-> With this change, 8250 UART now gives out proper RX Timeout interrupts
-> and is usable as console.
+> version 8:
+> - fix comments done by Thierry on version 7
 > 
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> version 6:
+> - change st,breakinput parameter to make it usuable for stm32f7 too.
+> 
+> version 4:
+> - detect at probe time hardware capabilities
+> - fix comments done on v2 and v3
+> - use PWM atomic ops
+> 
+> version 2:
+> - only keep one comptatible
+> - use DT parameters to discover hardware block configuration
+> 
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> ---
+>  drivers/pwm/Kconfig     |   9 ++
+>  drivers/pwm/Makefile    |   1 +
+>  drivers/pwm/pwm-stm32.c | 398 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 408 insertions(+)
+>  create mode 100644 drivers/pwm/pwm-stm32.c
 
-Reviewed-by: Lokesh Vutla <lokeshvutla@ti.com>
+Similar nit than for 3/8. The canonical prefix for PWM subsystem patches
+is "pwm: ". One other thing that I had missed earlier...
 
-Thanks and regards,
-Lokesh
+> +MODULE_ALIAS("platform: stm32-pwm");
+
+I don't think there should be a space after ':'.
+
+With those two fixed:
+
+Acked-by: Thierry Reding <treding@nvidia.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170119/886f7f40/attachment-0001.sig>
