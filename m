@@ -1,114 +1,67 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 19 Jan 2017 20:42:59 +0800
-Subject: [PATCH v20 16/17] clocksource/drivers/arm_arch_timer: Add GTDT
- support for memory-mapped timer
-In-Reply-To: <CADyBb7tpDynA0EEUkFZXpUAksjvXeUzuoC82GnbVA2O1w2T22g@mail.gmail.com>
-References: <20170118132541.8989-1-fu.wei@linaro.org>
- <20170118132541.8989-17-fu.wei@linaro.org>
- <ed4efe25-1b40-66e2-ae3f-77a4e32715b6@linaro.org>
- <CADyBb7tpDynA0EEUkFZXpUAksjvXeUzuoC82GnbVA2O1w2T22g@mail.gmail.com>
-Message-ID: <c1821a5b-8b32-e194-125c-3fd243059425@linaro.org>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Thu, 19 Jan 2017 12:44:27 +0000
+Subject: [PATCH] ARM: dts: fix SolidRun iMX6 platforms
+Message-ID: <E1cUC4p-00087z-NF@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/1/19 18:02, Fu Wei wrote:
-> Hi Hanjun,
->
-> On 19 January 2017 at 17:16, Hanjun Guo <hanjun.guo@linaro.org> wrote:
->> On 2017/1/18 21:25, fu.wei at linaro.org wrote:
->>>
->>> From: Fu Wei <fu.wei@linaro.org>
->>>
->>> The patch add memory-mapped timer register support by using the
->>> information provided by the new GTDT driver of ACPI.
->>>
->>> Signed-off-by: Fu Wei <fu.wei@linaro.org>
->>> ---
->>>  drivers/clocksource/arm_arch_timer.c | 35
->>> ++++++++++++++++++++++++++++++++---
->>>  1 file changed, 32 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/drivers/clocksource/arm_arch_timer.c
->>> b/drivers/clocksource/arm_arch_timer.c
->>> index 79dc004..7ca2da7 100644
->>> --- a/drivers/clocksource/arm_arch_timer.c
->>> +++ b/drivers/clocksource/arm_arch_timer.c
->>> @@ -1077,10 +1077,36 @@ CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem,
->>> "arm,armv7-timer-mem",
->>>                        arch_timer_mem_of_init);
->>>
->>>  #ifdef CONFIG_ACPI_GTDT
->>> -/* Initialize per-processor generic timer */
->>> +static int __init arch_timer_mem_acpi_init(int platform_timer_count)
->>> +{
->>> +       struct arch_timer_mem *timer_mem;
->>> +       int timer_count, i, ret;
->>> +
->>
->>
->> if (!platform_timer_count)
->>         return 0;
->>
->> Did I miss something?
->
-> Ah, thanks, I guess I miss this check below.
->
->>
->> Thanks
->> Hanjun
->>
->>
->>> +       timer_mem = kcalloc(platform_timer_count, sizeof(*timer_mem),
->>> +                           GFP_KERNEL);
->>> +       if (!timer_mem)
->>> +               return -ENOMEM;
->>> +
->>> +       ret = acpi_arch_timer_mem_init(timer_mem, &timer_count);
->>> +       if (ret || !timer_count)
->>> +               goto error;
->>> +
->>> +       for (i = 0; i < timer_count; i++) {
->>> +               ret = arch_timer_mem_init(timer_mem);
->>> +               if (!ret)
->>> +                       break;
->>> +               timer_mem++;
->>> +       }
->>> +
->>> +error:
->>> +       kfree(timer_mem);
->>> +       return ret;
->>> +}
->>> +
->>> +/* Initialize per-processor generic timer and memory-mapped timer(if
->>> present) */
->>>  static int __init arch_timer_acpi_init(struct acpi_table_header *table)
->>>  {
->>> -       int ret;
->>> +       int ret, platform_timer_count;
->>>
->>>         if (arch_timers_present & ARCH_TIMER_TYPE_CP15) {
->>>                 pr_warn("already initialized, skipping\n");
->>> @@ -1089,7 +1115,7 @@ static int __init arch_timer_acpi_init(struct
->>> acpi_table_header *table)
->>>
->>>         arch_timers_present |= ARCH_TIMER_TYPE_CP15;
->>>
->>> -       ret = acpi_gtdt_init(table, NULL);
->>> +       ret = acpi_gtdt_init(table, &platform_timer_count);
->>>         if (ret) {
->>>                 pr_err("Failed to init GTDT table.\n");
->>>                 return ret;
->>> @@ -1122,6 +1148,9 @@ static int __init arch_timer_acpi_init(struct
->>> acpi_table_header *table)
->>>         if (ret)
->>>                 return ret;
->>>
->>> +       if (arch_timer_mem_acpi_init(platform_timer_count))
->
-> +       if (platform_timer_count &&
-> +           arch_timer_mem_acpi_init(platform_timer_count))
+Removal of skeleton.dtsi from imx6qdl.dtsi caused a regression on
+SolidRun platforms as the /chosen and /memory nodes are no longer
+populated.  Fix this by adding the nodes into the platform .dtsi
+files.
 
-It's better.
+Uncompressing Linux... done, booting the kernel.
+Booting Linux on physical CPU 0x0
+Linux version 4.10.0-rc3+ (rmk at rmk-PC.arm.linux.org.uk) (gcc version 4.7.4 (GCC) ) #2066 SMP Thu Jan 19 12:31:19 GMT 2017
+CPU: ARMv7 Processor [412fc09a] revision 10 (ARMv7), cr=10c5387d
+CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
+OF: fdt:Machine model: SolidRun Cubox-i Dual/Quad
+INITRD: 0x20000000+0x001cd000 is not a memory region - disabling initrd
+cma: Failed to reserve 256 MiB
+Memory policy: Data cache writealloc
+Kernel panic - not syncing: ERROR: Failed to allocate 0x2000 bytes below 0x0.
 
-Thanks
-Hanjun
+CPU: 0 PID: 0 Comm: swapper Not tainted 4.10.0-rc3+ #2066
+Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
+Backtrace: invalid frame pointer 0xc09e5e44c
+---[ end Kernel panic - not syncing: ERROR: Failed to allocate 0x2000 bytes below 0x0.
+
+Fixes: 7f107887d199 ("ARM: dts: imx: Remove skeleton.dtsi")
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/boot/dts/imx6qdl-cubox-i.dtsi      | 6 ++++++
+ arch/arm/boot/dts/imx6qdl-hummingboard.dtsi | 2 ++
+ 2 files changed, 8 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+index ff41f83551de..69e3a848ee74 100644
+--- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+@@ -44,6 +44,12 @@
+ #include <dt-bindings/gpio/gpio.h>
+ 
+ / {
++	chosen {
++		stdout-path = &uart1;
++	};
++
++	memory { device_type = "memory"; reg = <0 0>; };
++
+ 	ir_recv: ir-receiver {
+ 		compatible = "gpio-ir-receiver";
+ 		gpios = <&gpio3 9 1>;
+diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
+index a5e5356cdc6a..ae2feb882193 100644
+--- a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
+@@ -46,6 +46,8 @@
+ 		stdout-path = &uart1;
+ 	};
+ 
++	memory { device_type = "memory"; reg = <0 0>; };
++
+ 	ir_recv: ir-receiver {
+ 		compatible = "gpio-ir-receiver";
+ 		gpios = <&gpio3 5 GPIO_ACTIVE_LOW>;
+-- 
+2.7.4
