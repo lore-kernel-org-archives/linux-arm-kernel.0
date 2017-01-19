@@ -1,81 +1,46 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Thu, 19 Jan 2017 17:47:14 +0800
-Subject: [PATCH v20 11/17] clocksource/drivers/arm_arch_timer: Introduce
- some new structs to prepare for GTDT
-In-Reply-To: <a47f2474-fb29-9217-3de1-6e2a6a36f21f@linaro.org>
-References: <20170118132541.8989-1-fu.wei@linaro.org>
- <20170118132541.8989-12-fu.wei@linaro.org>
- <a47f2474-fb29-9217-3de1-6e2a6a36f21f@linaro.org>
-Message-ID: <CADyBb7uhwU_ACGQRvw8zPg-VCdxyO2L1MEoeZWS1zYdveLK6PA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 19 Jan 2017 09:49:17 +0000
+Subject: [PATCH] arm64: defconfig: disable CONFIG_DEVMEM
+In-Reply-To: <CAF7UmSxMqKodEZfqheRsJxsM_R1yZHJaXMnyLyJwqULRz1xH=A@mail.gmail.com>
+References: <20170113113734.16524-1-leif.lindholm@linaro.org>
+ <20170113114801.GD3253@arm.com>
+ <20170115124254.GF25883@bivouac.eciton.net>
+ <CAF7UmSxMqKodEZfqheRsJxsM_R1yZHJaXMnyLyJwqULRz1xH=A@mail.gmail.com>
+Message-ID: <20170119094917.GA11954@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hanjun,
+On Wed, Jan 18, 2017 at 05:58:05PM +0000, Leif Lindholm wrote:
+> On 15 January 2017 at 12:42, Leif Lindholm <leif.lindholm@linaro.org> wrote:
+> > On Fri, Jan 13, 2017 at 11:48:01AM +0000, Will Deacon wrote:
+> >> On Fri, Jan 13, 2017 at 11:37:34AM +0000, Leif Lindholm wrote:
+> >> > /dev/mem is the opposite of what an operating system is for.
+> >> > Additionally, on arm* it opens up for denial-of-service attacks from
+> >> > userspace. So leave it disabled by default, requiring people who need
+> >> > it to enable it explicitly.
+> >>
+> >> I really like the idea, but are we sure that nothing common breaks without
+> >> this? For example, does Debian still boot nicely with this patch applied?
+> >
+> > Getting distros to not have to shop around for config fragments in
+> > order to be able to a stable system is one of my main purposes of this
+> > patch.
+> >
+> > Since Debian just published a 4.9 kernel, I gave that a spin (both DT
+> > and ACPI). No issues.
+> 
+> Will, any comments?
 
-On 19 January 2017 at 16:28, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> On 2017/1/18 21:25, fu.wei at linaro.org wrote:
->>
->> From: Fu Wei <fu.wei@linaro.org>
->>
->> The patch introduce two new structs: arch_timer_mem, arch_timer_mem_frame.
->> And also introduce a new define: ARCH_TIMER_MEM_MAX_FRAMES
->>
->> These will be used for refactoring the memory-mapped timer init code to
->> prepare for GTDT
->>
->> Signed-off-by: Fu Wei <fu.wei@linaro.org>
->> ---
->>  include/clocksource/arm_arch_timer.h | 17 +++++++++++++++++
->>  1 file changed, 17 insertions(+)
->>
->> diff --git a/include/clocksource/arm_arch_timer.h
->> b/include/clocksource/arm_arch_timer.h
->> index 4a98c06..b7dd185 100644
->> --- a/include/clocksource/arm_arch_timer.h
->> +++ b/include/clocksource/arm_arch_timer.h
->> @@ -57,6 +57,8 @@ enum arch_timer_spi_nr {
->>  #define ARCH_TIMER_MEM_PHYS_ACCESS     2
->>  #define ARCH_TIMER_MEM_VIRT_ACCESS     3
->>
->> +#define ARCH_TIMER_MEM_MAX_FRAMES      8
->> +
->>  #define ARCH_TIMER_USR_PCT_ACCESS_EN   (1 << 0) /* physical counter */
->>  #define ARCH_TIMER_USR_VCT_ACCESS_EN   (1 << 1) /* virtual counter */
->>  #define ARCH_TIMER_VIRT_EVT_EN         (1 << 2)
->> @@ -72,6 +74,21 @@ struct arch_timer_kvm_info {
->>         int virtual_irq;
->>  };
->>
->> +struct arch_timer_mem_frame {
->> +       int frame_nr;
->> +       phys_addr_t cntbase;
->> +       size_t size;
->> +       int phys_irq;
->> +       int virt_irq;
->> +};
->> +
->> +struct arch_timer_mem {
->> +       phys_addr_t cntctlbase;
->> +       size_t size;
->> +       int num_frames;
->> +       struct arch_timer_mem_frame frame[ARCH_TIMER_MEM_MAX_FRAMES];
->> +};
->
->
-> Since struct is introduced but not used in this patch, how about
-> squash it with patch 12/17?
+Nope; fine by me. arm-soc usually pick these up.
 
-In the previous patchset, I have been suggested that I should split it out.
+FWIW, I did do a Debian CodeSearch for /dev/mem and there were more hits
+than I was hoping for. However, much of the code looked either:
 
->
-> Thanks
-> Hanjun
+ (a) Broken anyway
+ (b) Not relevant to arm64
+ (c) /dev/mem was just a string in a comment or something
 
+There are a couple of crazy projects that appear to use /dev/mem to
+implement a heap, but I really couldn't figure out how that worked.
 
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+Will
