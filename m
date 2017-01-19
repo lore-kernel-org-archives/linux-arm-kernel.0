@@ -1,7 +1,9 @@
 From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Thu, 19 Jan 2017 20:52:56 +0100
-Subject: [PATCH v2 0/2] ASoC: sun4i-spdif: Add support for the H3 SoC 
-Message-ID: <20170119195258.29652-1-codekipper@gmail.com>
+Date: Thu, 19 Jan 2017 20:52:57 +0100
+Subject: [PATCH v2 1/2] ASoC: sunxi: Add bindings for sun8i to SPDIF
+In-Reply-To: <20170119195258.29652-1-codekipper@gmail.com>
+References: <20170119195258.29652-1-codekipper@gmail.com>
+Message-ID: <20170119195258.29652-2-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,20 +12,22 @@ From: Marcus Cooper <codekipper@gmail.com>
 The H3 SoC uses the same SPDIF block as found in earlier SoCs, but the
 transmit fifo is at a different address.
 
-This has been tested on the Beelink X2.
-BR,
-CK
+Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 ---
-Changes since v1:
- - Now a patch set with bindings and driver changes.
----
-Marcus Cooper (2):
-  ASoC: sunxi: Add bindings for sun8i to SPDIF
-  ASoC: sun4i-spdif: Add support for the H3 SoC
+ Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
- Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt |  1 +
- sound/soc/sunxi/sun4i-spdif.c                                 | 11 +++++++++++
- 2 files changed, 12 insertions(+)
-
+diff --git a/Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt b/Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt
+index 0230c4d20506..fe0a65e6d629 100644
+--- a/Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt
++++ b/Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt
+@@ -10,6 +10,7 @@ Required properties:
+   - compatible		: should be one of the following:
+     - "allwinner,sun4i-a10-spdif": for the Allwinner A10 SoC
+     - "allwinner,sun6i-a31-spdif": for the Allwinner A31 SoC
++    - "allwinner,sun8i-h3-spdif": for the Allwinner H3 SoC
+ 
+   - reg			: Offset and length of the register set for the device.
+ 
 -- 
 2.11.0
