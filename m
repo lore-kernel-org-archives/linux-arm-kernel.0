@@ -1,29 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 19 Jan 2017 16:20:31 +0000
-Subject: [PATCH V5 07/12] arm64: dma-mapping: Remove the notifier trick
- to handle early setting of dma_ops
-In-Reply-To: <1484838356-24962-8-git-send-email-sricharan@codeaurora.org>
-References: <1484838356-24962-1-git-send-email-sricharan@codeaurora.org>
- <1484838356-24962-8-git-send-email-sricharan@codeaurora.org>
-Message-ID: <20170119162030.GJ31594@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 19 Jan 2017 16:24:38 +0000
+Subject: [Patch v3 1/2] arm: kernel: Add SMC structure parameter
+In-Reply-To: <20170119161658.GC9631@hector.attlocal.net>
+References: <1484173918-25090-1-git-send-email-andy.gross@linaro.org>
+ <1484173918-25090-2-git-send-email-andy.gross@linaro.org>
+ <20170119144008.GA27312@n2100.armlinux.org.uk>
+ <20170119154506.GB9631@hector.attlocal.net>
+ <20170119154818.GE27312@n2100.armlinux.org.uk>
+ <20170119161658.GC9631@hector.attlocal.net>
+Message-ID: <20170119162438.GF27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 08:35:51PM +0530, Sricharan R wrote:
-> With arch_setup_dma_ops now being called late during device's probe after
-> the device's iommu is probed, the notifier trick required to handle the
-> early setup of dma_ops before the iommu group gets created is not
-> required. So removing the notifier's here.
+On Thu, Jan 19, 2017 at 10:16:58AM -0600, Andy Gross wrote:
+> On Thu, Jan 19, 2017 at 03:48:18PM +0000, Russell King - ARM Linux wrote:
+> > Please add that detail to the kerneldoc comments for the structure
+> > concerning state.a6.  It's important that such information is not
+> > lost in the depths of history.
 > 
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> [rm: clean up even more]
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  * No change
-> 
->  arch/arm64/mm/dma-mapping.c | 132 ++++----------------------------------------
->  1 file changed, 12 insertions(+), 120 deletions(-)
+> For documentation, should I split out the union separately?  I don't see any
+> good examples for documenting union members in unions defined inside structures.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+Good question - I don't know.
 
-Will
+ @state.a6: blah
+
+would seem to be a logical and unambiguous way to document it, but I
+don't know whether kerneldoc will accept that.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
