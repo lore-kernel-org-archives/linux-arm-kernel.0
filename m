@@ -1,72 +1,32 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Thu, 19 Jan 2017 14:29:42 +0100
-Subject: [PATCH v4 08/14] sata: ahci-da850: implement a workaround for the
- softreset quirk
+Date: Thu, 19 Jan 2017 14:29:39 +0100
+Subject: [PATCH v4 05/14] ARM: davinci: da850: add con_id for the SATA clock
 In-Reply-To: <1484832588-18413-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1484832588-18413-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1484832588-18413-9-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1484832588-18413-6-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's an issue with the da850 SATA controller: if port multiplier
-support is compiled in, but we're connecting the drive directly to
-the SATA port on the board, the drive can't be detected.
-
-To make SATA work on the da850-lcdk board: first try to softreset
-with pmp - if the operation fails with -EBUSY, retry without pmp.
+The ahci-da850 SATA driver is now capable of retrieving clocks by
+con_id. Add the connection id for the sysclk2-derived SATA clock.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/ata/ahci_da850.c | 33 ++++++++++++++++++++++++++++++++-
- 1 file changed, 32 insertions(+), 1 deletion(-)
+ arch/arm/mach-davinci/da850.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/ata/ahci_da850.c b/drivers/ata/ahci_da850.c
-index 7f5328f..11dd87e 100644
---- a/drivers/ata/ahci_da850.c
-+++ b/drivers/ata/ahci_da850.c
-@@ -54,11 +54,42 @@ static void da850_sata_init(struct device *dev, void __iomem *pwrdn_reg,
- 	writel(val, ahci_base + SATA_P0PHYCR_REG);
- }
- 
-+static int ahci_da850_softreset(struct ata_link *link,
-+				unsigned int *class, unsigned long deadline)
-+{
-+	int pmp, ret;
-+
-+	pmp = sata_srst_pmp(link);
-+
-+	/*
-+	 * There's an issue with the SATA controller on da850 SoCs: if we
-+	 * enable Port Multiplier support, but the drive is connected directly
-+	 * to the board, it can't be detected. As a workaround: if PMP is
-+	 * enabled, we first call ahci_do_softreset() and pass it the result of
-+	 * sata_srst_pmp(). If this call fails, we retry with pmp = 0.
-+	 */
-+	ret = ahci_do_softreset(link, class, pmp, deadline, ahci_check_ready);
-+	if (pmp && ret == -EBUSY)
-+		return ahci_do_softreset(link, class, 0,
-+					 deadline, ahci_check_ready);
-+
-+	return ret;
-+}
-+
-+static struct ata_port_operations ahci_da850_port_ops = {
-+	.inherits = &ahci_platform_ops,
-+	.softreset = ahci_da850_softreset,
-+	/*
-+	 * No need to override .pmp_softreset - it's only used for actual
-+	 * PMP-enabled ports.
-+	 */
-+};
-+
- static const struct ata_port_info ahci_da850_port_info = {
- 	.flags		= AHCI_FLAG_COMMON,
- 	.pio_mask	= ATA_PIO4,
- 	.udma_mask	= ATA_UDMA6,
--	.port_ops	= &ahci_platform_ops,
-+	.port_ops	= &ahci_da850_port_ops,
- };
- 
- static struct scsi_host_template ahci_platform_sht = {
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index 1d873d1..dbf1daa 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -571,7 +571,7 @@ static struct clk_lookup da850_clks[] = {
+ 	CLK("spi_davinci.0",	NULL,		&spi0_clk),
+ 	CLK("spi_davinci.1",	NULL,		&spi1_clk),
+ 	CLK("vpif",		NULL,		&vpif_clk),
+-	CLK("ahci_da850",		NULL,		&sata_clk),
++	CLK("ahci_da850",	"sata",		&sata_clk),
+ 	CLK("davinci-rproc.0",	NULL,		&dsp_clk),
+ 	CLK(NULL,		NULL,		&ehrpwm_clk),
+ 	CLK("ehrpwm.0",		"fck",		&ehrpwm0_clk),
 -- 
 2.9.3
