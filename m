@@ -1,41 +1,52 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu, 19 Jan 2017 03:24:35 +0000
-Subject: [PATCHv4 1/5] clk: mvebu: support for 98DX3236 SoC
-References: <20170113091222.7132-1-chris.packham@alliedtelesis.co.nz>
- <20170113091222.7132-2-chris.packham@alliedtelesis.co.nz>
- <20170118222508.prn5xk63nuc3ocr7@rob-hp-laptop>
-Message-ID: <e9cd1318dfe04d7ca3bad0e2073587d8@svr-chch-ex1.atlnz.lc>
+From: spjoshi@codeaurora.org (Sarangdhar Joshi)
+Date: Wed, 18 Jan 2017 19:31:53 -0800
+Subject: [PATCH] arm64: dts: msm8996: Add ADSP PIL node
+Message-ID: <1484796713-30796-1-git-send-email-spjoshi@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/01/17 11:25, Rob Herring wrote:
-> On Fri, Jan 13, 2017 at 10:12:16PM +1300, Chris Packham wrote:
->> The 98DX3236, 98DX3336, 98DX4521 and variants have a different TCLK from
->> the Armada XP (200MHz vs 250MHz). The CPU core clock is fixed at 800MHz.
->>
->> The clock gating options are a subset of those on the Armada XP.
->>
->> The core clock divider is different to the Armada XP also.
->>
->> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
->> ---
->>
->> Notes:
->>     Changes in v2:
->>     - Update devicetree binding documentation for new compatible string
->>     Changes in v3:
->>     - Add 98dx3236 support to mvebu/clk-corediv.c rather than creating a new
->>       driver.
->>     - Document mv98dx3236-corediv-clock binding
->>     Changes in v4:
->>     - None
->>
->>  .../bindings/clock/mvebu-corediv-clock.txt         |  1 +
->>  .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |  1 +
->
-> Please add acks when posting new versions.
->
-> Acked-by: Rob Herring <robh@kernel.org>
->
+Add ADSP node required for Qualcomm ADSP Peripheral Image Loader.
 
-Thanks Rob. I must have missed the earlier ack. Will be in v5.
+Signed-off-by: Sarangdhar Joshi <spjoshi@codeaurora.org>
+---
+
+This patch uses "xo_board" clock for now. We would have to move to
+rpmcc once it is available.
+
+ arch/arm64/boot/dts/qcom/msm8996.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+index c9c7fd7..7cebf63 100644
+--- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
+@@ -181,6 +181,26 @@
+ 		method = "smc";
+ 	};
+ 
++	adsp-pil {
++		compatible = "qcom,msm8996-adsp-pil";
++
++		interrupts-extended = <&intc 0 162 IRQ_TYPE_EDGE_RISING>,
++				      <&adsp_smp2p_in 0 IRQ_TYPE_EDGE_RISING>,
++				      <&adsp_smp2p_in 1 IRQ_TYPE_EDGE_RISING>,
++				      <&adsp_smp2p_in 2 IRQ_TYPE_EDGE_RISING>,
++				      <&adsp_smp2p_in 3 IRQ_TYPE_EDGE_RISING>;
++		interrupt-names = "wdog", "fatal", "ready",
++				  "handover", "stop-ack";
++
++		clocks = <&xo_board>;
++		clock-names = "xo";
++
++		memory-region = <&adsp_region>;
++
++		qcom,smem-states = <&adsp_smp2p_out 0>;
++		qcom,smem-state-names = "stop";
++	};
++
+ 	adsp-smp2p {
+ 		compatible = "qcom,smp2p";
+ 		qcom,smem = <443>, <429>;
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
