@@ -1,249 +1,145 @@
-From: tnowicki@caviumnetworks.com (Tomasz Nowicki)
-Date: Thu, 19 Jan 2017 09:55:10 +0100
-Subject: [PATCH v3] IOMMU: SMMUv2: Support for Extended Stream ID (16 bit)
-In-Reply-To: <20170117151431.17085-1-aleksey.makarov@linaro.org>
-References: <20170117151431.17085-1-aleksey.makarov@linaro.org>
-Message-ID: <bc9eb7ab-5cc7-411b-60f3-b8c369753f9b@caviumnetworks.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 19 Jan 2017 18:01:11 +0900
+Subject: [PATCH v29 9/9] Documentation: dt: chosen properties for arm64
+ kdump
+In-Reply-To: <20170117082629.GA7012@dhcp-128-65.nay.redhat.com>
+References: <20161228043347.27358-1-takahiro.akashi@linaro.org>
+ <20161228043734.27535-1-takahiro.akashi@linaro.org>
+ <20170112153944.GB12249@leverpostej>
+ <20170113091339.GK20972@linaro.org>
+ <20170113111756.GC26120@leverpostej>
+ <20170116082505.GL20972@linaro.org>
+ <20170117082629.GA7012@dhcp-128-65.nay.redhat.com>
+Message-ID: <20170119090110.GO20972@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Aleksey,
+On Tue, Jan 17, 2017 at 04:26:29PM +0800, Dave Young wrote:
+> On 01/16/17 at 05:25pm, AKASHI Takahiro wrote:
+> > On Fri, Jan 13, 2017 at 11:17:56AM +0000, Mark Rutland wrote:
+> > > On Fri, Jan 13, 2017 at 06:13:49PM +0900, AKASHI Takahiro wrote:
+> > > > On Thu, Jan 12, 2017 at 03:39:45PM +0000, Mark Rutland wrote:
+> > > > > On Wed, Dec 28, 2016 at 01:37:34PM +0900, AKASHI Takahiro wrote:
+> > > > > > +linux,crashkernel-base
+> > > > > > +linux,crashkernel-size
+> > > > > > +----------------------
+> > > > > > +
+> > > > > > +These properties (currently used on PowerPC and arm64) indicates
+> > > > > > +the base address and the size, respectively, of the reserved memory
+> > > > > > +range for crash dump kernel.
+> > > > > 
+> > > > > From this description, it's not clear to me what the (expected)
+> > > > > consumers of this property are, nor what is expected to provide it.
+> > > > > 
+> > > > > In previous rounds of review, I had assumed that this was used to
+> > > > > describe a preference to the first kernel as to what region of memory
+> > > > > should be used for a subsequent kdump kernel. Looking around, I'm not
+> > > > > sure if I was correct in that assessment.
+> > > > > 
+> > > > > I see that arch/powerpc seems to consume this property to configure
+> > > > > crashk_res, but it also rewrites it based on crashk_res, presumably for
+> > > > > the benefit of userspace. It's not clear to me how on powerpc the kdump
+> > > > > kernel knows its memory range -- is more DT modification done in the
+> > > > > kernel and/or userspace?
+> > > > 
+> > > > I don't believe that powerpc will rewrite the property any way.
+> > > > As far as I know from *the source code*, powerpc kernel retrieves
+> > > > the memory range for crash dump kernel from a kernel command line, i.e.
+> > > > crashkernel=, and then exposes it through DT to userspace (assuming
+> > > > kexec-tools).
+> > > 
+> > > The rewriting I describe is in export_crashk_values() in
+> > > arch/powerpc/kernel/machine_kexec.c, where the code deletes existing the
+> > > properties, and adds new ones, to the DT exposed to userspace.
+> > > 
+> > > So I think we're just quibbling over the definition of "rewrite".
+> > 
+> > Gotcha
+> > 
+> > > > > arm64 we should either ensure that /proc/iomem is consistently usable
+> > > > > (and have userspace consistently use it), or we should expose a new file
+> > > > > specifically to expose this information.
+> > > > 
+> > > > The thing that I had in my mind when adding this property is that
+> > > > /proc/iomem would be obsolete in the future, then we should have
+> > > > an alternative in hand.
+> > > 
+> > > Ok.
+> > > 
+> > > My disagreement is with using the DT as a channel to convey information
+> > > from the kernel to userspace.
+> > > 
+> > > I'm more than happy for a new file or other mechanism to express this
+> > > information. For example, we could add
+> > > /sys/kernel/kexec_crash_{base,size} or similar.
+> > 
+> > It may make sense because /sys/kernel/kexec_crash_size already exists,
+> > so why not kexec_crash_base?
+> > My concern, however, is that this kind of interface might prevent us from
+> > allowing multiple regions to be reserved for crash dump kernel in the future.
+> > (There is an assumption that we have only one region at least on arm64 though.)
+> 
+> In x86 there could be two ranges, one for softiotlb under 4G and another
+> for range over 4G, but kexec_crash_size only shows the size of
+> over-4g-range.
+> 
+> It is better to use /proc/iomem, most arches use /proc/iomem. Do you
+> have any reason why it will be obsolete? At least for the time being it
+> is fine.
 
-On 17.01.2017 16:14, Aleksey Makarov wrote:
-> Enable the Extended Stream ID feature when available.
->
-> This patch on top of series "KVM PCIe/MSI passthrough on ARM/ARM64
-> and IOVA reserved regions" by Eric Auger [1] allows to passthrough
-> an external PCIe network card on a ThunderX server successfully.
->
-> Without this patch that card caused a warning like
->
-> 	pci 0006:90:00.0: stream ID 0x9000 out of range for SMMU (0x7fff)
->
-> during boot.
->
-> [1] https://lkml.kernel.org/r/1484127714-3263-1-git-send-email-eric.auger at redhat.com
->
-> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+I don't know.
+I just think that I might have seen that someone said so somewhere
+and that more _powerful_ (structured) tool could supersede it :)
 
-I do not thing this is related to PCIe network card. It is rather common 
-to all devices which bus number > 127
+-Takahiro AKASHI
 
-----
-
-iommu/arm-smmu: Support for Extended Stream ID (16 bit)
-
-It is the time we have the real 16-bit Stream ID user, which is the 
-ThunderX. Its IO topology uses 1:1 map for requester to stream ID 
-translation:
-
-RC no. | Requester ID | Stream ID
-        |              |
-RC_0   | 0-FFFF --->  | 0-FFFF
-
-which allows to get full 16-bit stream ID. Currently all devices with 
-bus number >= 128 (0x80) get non-zero 16th bit of BDF and stream ID (due 
-to 1:1 map). Eventually SMMU drops such device because the stream ID is 
-out of range. This is the case for all devices connected as external 
-endpoints on ThunderX.
-
-To fix above issue enable the Extended Stream ID optional feature when 
-available.
-
-----
-
-Please add my:
-Reviewed-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
-Tested-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
-
-Thanks,
-Tomasz
-
-
-> ---
-> v3:
-> - keep formatting of the comment
-> - fix printk message after the deleted chunk.  "[Do] not print a mask
->   here, since it's not overly interesting in itself, and add_device will
->   still show the offending mask in full if it ever actually matters (as in
->   the commit message)." (Robin Murphy)
->
-> v2:
-> https://lkml.kernel.org/r/20170116141111.29444-1-aleksey.makarov at linaro.org
-> - remove unnecessary parentheses (Robin Murphy)
-> - refactor testing SMR fields to after setting sCR0 as theirs width
->   depends on sCR0_EXIDENABLE (Robin Murphy)
->
-> v1 (rfc):
-> https://lkml.kernel.org/r/20170110115755.19102-1-aleksey.makarov at linaro.org
->
->  drivers/iommu/arm-smmu.c | 69 +++++++++++++++++++++++++++++++++---------------
->  1 file changed, 48 insertions(+), 21 deletions(-)
->
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 13d26009b8e0..861cc135722f 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -24,6 +24,7 @@
->   *	- v7/v8 long-descriptor format
->   *	- Non-secure access to the SMMU
->   *	- Context fault reporting
-> + *	- Extended Stream ID (16 bit)
->   */
->
->  #define pr_fmt(fmt) "arm-smmu: " fmt
-> @@ -87,6 +88,7 @@
->  #define sCR0_CLIENTPD			(1 << 0)
->  #define sCR0_GFRE			(1 << 1)
->  #define sCR0_GFIE			(1 << 2)
-> +#define sCR0_EXIDENABLE			(1 << 3)
->  #define sCR0_GCFGFRE			(1 << 4)
->  #define sCR0_GCFGFIE			(1 << 5)
->  #define sCR0_USFCFG			(1 << 10)
-> @@ -126,6 +128,7 @@
->  #define ID0_NUMIRPT_MASK		0xff
->  #define ID0_NUMSIDB_SHIFT		9
->  #define ID0_NUMSIDB_MASK		0xf
-> +#define ID0_EXIDS			(1 << 8)
->  #define ID0_NUMSMRG_SHIFT		0
->  #define ID0_NUMSMRG_MASK		0xff
->
-> @@ -169,6 +172,7 @@
->  #define ARM_SMMU_GR0_S2CR(n)		(0xc00 + ((n) << 2))
->  #define S2CR_CBNDX_SHIFT		0
->  #define S2CR_CBNDX_MASK			0xff
-> +#define S2CR_EXIDVALID			(1 << 10)
->  #define S2CR_TYPE_SHIFT			16
->  #define S2CR_TYPE_MASK			0x3
->  enum arm_smmu_s2cr_type {
-> @@ -354,6 +358,7 @@ struct arm_smmu_device {
->  #define ARM_SMMU_FEAT_FMT_AARCH64_64K	(1 << 9)
->  #define ARM_SMMU_FEAT_FMT_AARCH32_L	(1 << 10)
->  #define ARM_SMMU_FEAT_FMT_AARCH32_S	(1 << 11)
-> +#define ARM_SMMU_FEAT_EXIDS		(1 << 12)
->  	u32				features;
->
->  #define ARM_SMMU_OPT_SECURE_CFG_ACCESS (1 << 0)
-> @@ -1051,7 +1056,7 @@ static void arm_smmu_write_smr(struct arm_smmu_device *smmu, int idx)
->  	struct arm_smmu_smr *smr = smmu->smrs + idx;
->  	u32 reg = smr->id << SMR_ID_SHIFT | smr->mask << SMR_MASK_SHIFT;
->
-> -	if (smr->valid)
-> +	if (!(smmu->features & ARM_SMMU_FEAT_EXIDS) && smr->valid)
->  		reg |= SMR_VALID;
->  	writel_relaxed(reg, ARM_SMMU_GR0(smmu) + ARM_SMMU_GR0_SMR(idx));
->  }
-> @@ -1063,6 +1068,9 @@ static void arm_smmu_write_s2cr(struct arm_smmu_device *smmu, int idx)
->  		  (s2cr->cbndx & S2CR_CBNDX_MASK) << S2CR_CBNDX_SHIFT |
->  		  (s2cr->privcfg & S2CR_PRIVCFG_MASK) << S2CR_PRIVCFG_SHIFT;
->
-> +	if (smmu->features & ARM_SMMU_FEAT_EXIDS && smmu->smrs &&
-> +	    smmu->smrs[idx].valid)
-> +		reg |= S2CR_EXIDVALID;
->  	writel_relaxed(reg, ARM_SMMU_GR0(smmu) + ARM_SMMU_GR0_S2CR(idx));
->  }
->
-> @@ -1073,6 +1081,34 @@ static void arm_smmu_write_sme(struct arm_smmu_device *smmu, int idx)
->  		arm_smmu_write_smr(smmu, idx);
->  }
->
-> +/*
-> + * The width of SMR's mask field depends on sCR0_EXIDENABLE, so this function
-> + * should be called after sCR0 is written.
-> + */
-> +static void arm_smmu_test_smr_masks(struct arm_smmu_device *smmu)
-> +{
-> +	void __iomem *gr0_base = ARM_SMMU_GR0(smmu);
-> +	u32 smr;
-> +
-> +	if (!smmu->smrs)
-> +		return;
-> +
-> +	/*
-> +	 * SMR.ID bits may not be preserved if the corresponding MASK
-> +	 * bits are set, so check each one separately. We can reject
-> +	 * masters later if they try to claim IDs outside these masks.
-> +	 */
-> +	smr = smmu->streamid_mask << SMR_ID_SHIFT;
-> +	writel_relaxed(smr, gr0_base + ARM_SMMU_GR0_SMR(0));
-> +	smr = readl_relaxed(gr0_base + ARM_SMMU_GR0_SMR(0));
-> +	smmu->streamid_mask = smr >> SMR_ID_SHIFT;
-> +
-> +	smr = smmu->streamid_mask << SMR_MASK_SHIFT;
-> +	writel_relaxed(smr, gr0_base + ARM_SMMU_GR0_SMR(0));
-> +	smr = readl_relaxed(gr0_base + ARM_SMMU_GR0_SMR(0));
-> +	smmu->smr_mask_mask = smr >> SMR_MASK_SHIFT;
-> +}
-> +
->  static int arm_smmu_find_sme(struct arm_smmu_device *smmu, u16 id, u16 mask)
->  {
->  	struct arm_smmu_smr *smrs = smmu->smrs;
-> @@ -1674,6 +1710,9 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
->  	if (smmu->features & ARM_SMMU_FEAT_VMID16)
->  		reg |= sCR0_VMID16EN;
->
-> +	if (smmu->features & ARM_SMMU_FEAT_EXIDS)
-> +		reg |= sCR0_EXIDENABLE;
-> +
->  	/* Push the button */
->  	__arm_smmu_tlb_sync(smmu);
->  	writel(reg, ARM_SMMU_GR0_NS(smmu) + ARM_SMMU_GR0_sCR0);
-> @@ -1761,11 +1800,14 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
->  			   "\t(IDR0.CTTW overridden by FW configuration)\n");
->
->  	/* Max. number of entries we have for stream matching/indexing */
-> -	size = 1 << ((id >> ID0_NUMSIDB_SHIFT) & ID0_NUMSIDB_MASK);
-> +	if (smmu->version == ARM_SMMU_V2 && id & ID0_EXIDS) {
-> +		smmu->features |= ARM_SMMU_FEAT_EXIDS;
-> +		size = 1 << 16;
-> +	} else {
-> +		size = 1 << ((id >> ID0_NUMSIDB_SHIFT) & ID0_NUMSIDB_MASK);
-> +	}
->  	smmu->streamid_mask = size - 1;
->  	if (id & ID0_SMS) {
-> -		u32 smr;
-> -
->  		smmu->features |= ARM_SMMU_FEAT_STREAM_MATCH;
->  		size = (id >> ID0_NUMSMRG_SHIFT) & ID0_NUMSMRG_MASK;
->  		if (size == 0) {
-> @@ -1774,21 +1816,6 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
->  			return -ENODEV;
->  		}
->
-> -		/*
-> -		 * SMR.ID bits may not be preserved if the corresponding MASK
-> -		 * bits are set, so check each one separately. We can reject
-> -		 * masters later if they try to claim IDs outside these masks.
-> -		 */
-> -		smr = smmu->streamid_mask << SMR_ID_SHIFT;
-> -		writel_relaxed(smr, gr0_base + ARM_SMMU_GR0_SMR(0));
-> -		smr = readl_relaxed(gr0_base + ARM_SMMU_GR0_SMR(0));
-> -		smmu->streamid_mask = smr >> SMR_ID_SHIFT;
-> -
-> -		smr = smmu->streamid_mask << SMR_MASK_SHIFT;
-> -		writel_relaxed(smr, gr0_base + ARM_SMMU_GR0_SMR(0));
-> -		smr = readl_relaxed(gr0_base + ARM_SMMU_GR0_SMR(0));
-> -		smmu->smr_mask_mask = smr >> SMR_MASK_SHIFT;
-> -
->  		/* Zero-initialised to mark as invalid */
->  		smmu->smrs = devm_kcalloc(smmu->dev, size, sizeof(*smmu->smrs),
->  					  GFP_KERNEL);
-> @@ -1796,8 +1823,7 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
->  			return -ENOMEM;
->
->  		dev_notice(smmu->dev,
-> -			   "\tstream matching with %lu register groups, mask 0x%x",
-> -			   size, smmu->smr_mask_mask);
-> +			   "\tstream matching with %lu register groups", size);
->  	}
->  	/* s2cr->type == 0 means translation, so initialise explicitly */
->  	smmu->s2crs = devm_kmalloc_array(smmu->dev, size, sizeof(*smmu->s2crs),
-> @@ -2120,6 +2146,7 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
->  	iommu_register_instance(dev->fwnode, &arm_smmu_ops);
->  	platform_set_drvdata(pdev, smmu);
->  	arm_smmu_device_reset(smmu);
-> +	arm_smmu_test_smr_masks(smmu);
->
->  	/* Oh, for a proper bus abstraction */
->  	if (!iommu_present(&platform_bus_type))
->
+> > 
+> > Thanks,
+> > -Takahiro AKASHI
+> > 
+> > > 
+> > > > > Further, I do not think we need this property. It makes more sense to me
+> > > > > for the preference of a a region to be described to the *first* kernel
+> > > > > using the command line consistently.
+> > > > > 
+> > > > > So I think we should drop this property, and not use it on arm64. Please
+> > > > > document this as powerpc only.
+> > > > 
+> > > > OK, but if we drop the property from arm64 code, we have no reason
+> > > > to leave its description in this patch.
+> > > > (In fact, there are a few more (undocumented) properties that only ppc
+> > > > uses for kdump.)
+> > > 
+> > > I'm happy to drop it, then.
+> > > 
+> > > > > > +linux,usable-memory-range
+> > > > > > +-------------------------
+> > > > > > +
+> > > > > > +This property (currently used only on arm64) holds the memory range,
+> > > > > > +the base address and the size, which can be used as system ram on
+> > > > > > +the *current* kernel. Note that, if this property is present, any memory
+> > > > > > +regions under "memory" nodes in DT blob or ones marked as "conventional
+> > > > > > +memory" in EFI memory map should be ignored.
+> > > > > 
+> > > > > Could you please replace this with:
+> > > > > 
+> > > > >   This property (arm64 only) holds a base address and size, describing a
+> > > > >   limited region in which memory may be considered available for use by
+> > > > >   the kernel. Memory outside of this range is not available for use.
+> > > > >   
+> > > > >   This property describes a limitation: memory within this range is only
+> > > > >   valid when also described through another mechanism that the kernel
+> > > > >   would otherwise use to determine available memory (e.g. memory nodes
+> > > > >   or the EFI memory map). Valid memory may be sparse within the range.
+> > > > 
+> > > > Sure.
+> > > 
+> > > Cheers!
+> > > 
+> > > Thanks,
+> > > Mark.
+> > 
+> > _______________________________________________
+> > kexec mailing list
+> > kexec at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/kexec
