@@ -1,94 +1,61 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 19 Jan 2017 17:16:33 +0800
-Subject: [PATCH v20 16/17] clocksource/drivers/arm_arch_timer: Add GTDT
- support for memory-mapped timer
-In-Reply-To: <20170118132541.8989-17-fu.wei@linaro.org>
+Date: Thu, 19 Jan 2017 17:20:07 +0800
+Subject: [PATCH v20 00/17] acpi, clocksource: add GTDT driver and GTDT
+ support in arm_arch_timer
+In-Reply-To: <20170118132541.8989-1-fu.wei@linaro.org>
 References: <20170118132541.8989-1-fu.wei@linaro.org>
- <20170118132541.8989-17-fu.wei@linaro.org>
-Message-ID: <ed4efe25-1b40-66e2-ae3f-77a4e32715b6@linaro.org>
+Message-ID: <bddc52ed-d1c9-c3c9-cb79-2c15d97450cc@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Hi Fuwei,
 
 On 2017/1/18 21:25, fu.wei at linaro.org wrote:
 > From: Fu Wei <fu.wei@linaro.org>
 >
-> The patch add memory-mapped timer register support by using the
-> information provided by the new GTDT driver of ACPI.
+> This patchset:
+>     (1)Preparation for adding GTDT support in arm_arch_timer:
+>         1. Clean up printk() usage
+>         2. Rename the type macros
+>         3. Rename the PPI enum & enum values
+>         4. Move the type macro and PPI enum into the header file
+>         5. Add new enum for SPIs
+>         6. Rework PPI determination;
+>         7. Rework counter frequency detection;
+>         8. Refactor arch_timer_needs_probing, move it into DT init call
+>         9. Introduce some new structs and refactor the MMIO timer init code
+>         for reusing some common code.
 >
-> Signed-off-by: Fu Wei <fu.wei@linaro.org>
-> ---
->  drivers/clocksource/arm_arch_timer.c | 35 ++++++++++++++++++++++++++++++++---
->  1 file changed, 32 insertions(+), 3 deletions(-)
+>     (2)Introduce ACPI GTDT parser: drivers/acpi/arm64/acpi_gtdt.c
+>     Parse all kinds of timer in GTDT table of ACPI:arch timer,
+>     memory-mapped timer and SBSA Generic Watchdog timer.
+>     This driver can help to simplify all the relevant timer drivers,
+>     and separate all the ACPI GTDT knowledge from them.
 >
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 79dc004..7ca2da7 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -1077,10 +1077,36 @@ CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem, "arm,armv7-timer-mem",
->  		       arch_timer_mem_of_init);
+>     (3)Simplify ACPI code for arm_arch_timer
 >
->  #ifdef CONFIG_ACPI_GTDT
-> -/* Initialize per-processor generic timer */
-> +static int __init arch_timer_mem_acpi_init(int platform_timer_count)
-> +{
-> +	struct arch_timer_mem *timer_mem;
-> +	int timer_count, i, ret;
-> +
+>     (4)Add GTDT support for ARM memory-mapped timer.
+>
+> This patchset has been tested on the following platforms with ACPI enabled:
+>     (1)ARM Foundation v8 model
+>
+> Changelog:
+> v20: https://lkml.org/lkml/2017/1/18/
+>      Reorder the first 4 patches and split the 4th patches.
+>      Leave CNTHCTL_* as they originally were.
+>      Fix the bug in arch_timer_select_ppi.
+>      Split "Rework counter frequency detection" patch.
+>      Rework the arch_timer_detect_rate function.
+>      Improve the commit message of "Refactor MMIO timer probing".
+>      Rebase to 4.10.0-rc4
 
-if (!platform_timer_count)
-	return 0;
+Other than some minor comments I raised, the patch set
+looks fine to me, and I tested this patch set on D03,
+the percpu arch timer works fine as before.
 
-Did I miss something?
+With the comments fixed,
+Reviewed-by: Hanjun Guo <hanjun.gu@linaro.org>
+Tested-by: Hanjun Guo <hanjun.gu@linaro.org>
 
 Thanks
 Hanjun
-
-> +	timer_mem = kcalloc(platform_timer_count, sizeof(*timer_mem),
-> +			    GFP_KERNEL);
-> +	if (!timer_mem)
-> +		return -ENOMEM;
-> +
-> +	ret = acpi_arch_timer_mem_init(timer_mem, &timer_count);
-> +	if (ret || !timer_count)
-> +		goto error;
-> +
-> +	for (i = 0; i < timer_count; i++) {
-> +		ret = arch_timer_mem_init(timer_mem);
-> +		if (!ret)
-> +			break;
-> +		timer_mem++;
-> +	}
-> +
-> +error:
-> +	kfree(timer_mem);
-> +	return ret;
-> +}
-> +
-> +/* Initialize per-processor generic timer and memory-mapped timer(if present) */
->  static int __init arch_timer_acpi_init(struct acpi_table_header *table)
->  {
-> -	int ret;
-> +	int ret, platform_timer_count;
->
->  	if (arch_timers_present & ARCH_TIMER_TYPE_CP15) {
->  		pr_warn("already initialized, skipping\n");
-> @@ -1089,7 +1115,7 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
->
->  	arch_timers_present |= ARCH_TIMER_TYPE_CP15;
->
-> -	ret = acpi_gtdt_init(table, NULL);
-> +	ret = acpi_gtdt_init(table, &platform_timer_count);
->  	if (ret) {
->  		pr_err("Failed to init GTDT table.\n");
->  		return ret;
-> @@ -1122,6 +1148,9 @@ static int __init arch_timer_acpi_init(struct acpi_table_header *table)
->  	if (ret)
->  		return ret;
->
-> +	if (arch_timer_mem_acpi_init(platform_timer_count))
-> +		pr_err("Failed to initialize memory-mapped timer.\n");
-> +
->  	return arch_timer_common_init();
->  }
->  CLOCKSOURCE_ACPI_DECLARE(arch_timer, ACPI_SIG_GTDT, arch_timer_acpi_init);
->
