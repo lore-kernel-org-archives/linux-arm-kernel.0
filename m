@@ -1,28 +1,90 @@
-From: codekipper@gmail.com (Code Kipper)
-Date: Thu, 19 Jan 2017 18:57:34 +0100
-Subject: [linux-sunxi] Re: [PATCH] ASoC: sunxi: Add bindings for sun8i to
- SPDIF
-In-Reply-To: <20170119170343.bxkm3353yqt5vkhc@sirena.org.uk>
-References: <20170112173343.9953-1-codekipper@gmail.com>
- <20170117181531.fdwc5vglpvxpx7su@sirena.org.uk>
- <CAEKpxBmkbYJzMdn-BFTa0485XSDPcMd6yQHgaqKQZoirG_DnUA@mail.gmail.com>
- <20170119170343.bxkm3353yqt5vkhc@sirena.org.uk>
-Message-ID: <CAEKpxB=Hdv8CzqY9eiG-HU1Nd8bVi9u2bsQtcNL9dsSZn1_ayw@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 19 Jan 2017 19:02:00 +0100
+Subject: [PATCH] ARM: dts: rockchip: add soc-specific uart compatibles for
+ rk3066/rk3188
+Message-ID: <20170119180201.2547-1-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 January 2017 at 18:03, Mark Brown <broonie@kernel.org> wrote:
-> On Wed, Jan 18, 2017 at 08:09:00AM +0100, Code Kipper wrote:
->
->> I missed the binding documentation on the patch for the driver so I
->> pushed it separately instead of pushing a new patch version.
->> You can find it under the subject heading 'ASoC: sun4i-spdif: Add
->> support for the H3 SoC' and Maxime has ACK it (on the condition that I
->> add the binding doc).
->
-> I don't seem to have that patch.  If Maxime said it needed changes for
-> him to ack it there's every chance I just deleted it waiting for you to
-> resend, it's certainly confusing to see a patch like this without the
-> matching code.
-No worries...I'll squash this patch into it and send as a V2.
-CK
+The serial IPs in Rockchip socs are based on Designware uarts and thus
+bind against the snps,dw-apb-uart compatible.
+On all newer socs we also carry around per-soc compatibles that allow
+us to have more specific drivers in the future - if needed.
+
+The cortex-a9 socs rk3066 and rk3188 that were added first don't have
+those yet, so add them for completenes sake.
+
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/boot/dts/rk3066a.dtsi | 4 ++++
+ arch/arm/boot/dts/rk3188.dtsi  | 4 ++++
+ 2 files changed, 8 insertions(+)
+
+diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
+index e498c362b9e7..f50481fd8e5c 100644
+--- a/arch/arm/boot/dts/rk3066a.dtsi
++++ b/arch/arm/boot/dts/rk3066a.dtsi
+@@ -687,6 +687,7 @@
+ };
+ 
+ &uart0 {
++	compatible = "rockchip,rk3066-uart", "snps,dw-apb-uart";
+ 	dmas = <&dmac1_s 0>, <&dmac1_s 1>;
+ 	dma-names = "tx", "rx";
+ 	pinctrl-names = "default";
+@@ -694,6 +695,7 @@
+ };
+ 
+ &uart1 {
++	compatible = "rockchip,rk3066-uart", "snps,dw-apb-uart";
+ 	dmas = <&dmac1_s 2>, <&dmac1_s 3>;
+ 	dma-names = "tx", "rx";
+ 	pinctrl-names = "default";
+@@ -701,6 +703,7 @@
+ };
+ 
+ &uart2 {
++	compatible = "rockchip,rk3066-uart", "snps,dw-apb-uart";
+ 	dmas = <&dmac2 6>, <&dmac2 7>;
+ 	dma-names = "tx", "rx";
+ 	pinctrl-names = "default";
+@@ -708,6 +711,7 @@
+ };
+ 
+ &uart3 {
++	compatible = "rockchip,rk3066-uart", "snps,dw-apb-uart";
+ 	dmas = <&dmac2 8>, <&dmac2 9>;
+ 	dma-names = "tx", "rx";
+ 	pinctrl-names = "default";
+diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
+index 869e189331ec..cf91254d0a43 100644
+--- a/arch/arm/boot/dts/rk3188.dtsi
++++ b/arch/arm/boot/dts/rk3188.dtsi
+@@ -599,21 +599,25 @@
+ };
+ 
+ &uart0 {
++	compatible = "rockchip,rk3188-uart", "snps,dw-apb-uart";
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_xfer>;
+ };
+ 
+ &uart1 {
++	compatible = "rockchip,rk3188-uart", "snps,dw-apb-uart";
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart1_xfer>;
+ };
+ 
+ &uart2 {
++	compatible = "rockchip,rk3188-uart", "snps,dw-apb-uart";
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart2_xfer>;
+ };
+ 
+ &uart3 {
++	compatible = "rockchip,rk3188-uart", "snps,dw-apb-uart";
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart3_xfer>;
+ };
+-- 
+2.11.0
