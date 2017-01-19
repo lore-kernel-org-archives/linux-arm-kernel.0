@@ -1,43 +1,43 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Thu, 19 Jan 2017 13:59:51 +1100
-Subject: [GIT PULL] ARM: aspeed: devicetree for 4.11
-In-Reply-To: <20170119002711.GJ23725@localhost>
-References: <CACPK8XffqYCRipx+KzxyH0z-5=t53ezPjRv+MxOj7-tj2kbG2A@mail.gmail.com>
- <20170119002711.GJ23725@localhost>
-Message-ID: <CACPK8Xds110=xAxXqb=pK3vufA_mm1ntrrtJ2EOvbFBqd0V+eg@mail.gmail.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Thu, 19 Jan 2017 11:00:09 +0800
+Subject: [PATCH v3 2/3] Documentation: devicetree: Add document bindings
+ for mtk-cir
+In-Reply-To: <CAL_JsqKsxwY+v-8Q=o1ERpyfFkR7d+83kKUdfY=u21FHUX5UEw@mail.gmail.com>
+References: <1484292939-9454-1-git-send-email-sean.wang@mediatek.com>
+ <1484292939-9454-3-git-send-email-sean.wang@mediatek.com>
+ <20170118222321.ec6p7oqwwqfiofhp@rob-hp-laptop>
+ <CAL_JsqKsxwY+v-8Q=o1ERpyfFkR7d+83kKUdfY=u21FHUX5UEw@mail.gmail.com>
+Message-ID: <1484794809.29021.9.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 11:27 AM, Olof Johansson <olof@lixom.net> wrote:
-> On Wed, Jan 18, 2017 at 09:50:02AM +1100, Joel Stanley wrote:
+On Wed, 2017-01-18 at 16:42 -0600, Rob Herring wrote:
+> On Wed, Jan 18, 2017 at 4:23 PM, Rob Herring <robh@kernel.org> wrote:
+> > On Fri, Jan 13, 2017 at 03:35:38PM +0800, sean.wang at mediatek.com wrote:
+> >> From: Sean Wang <sean.wang@mediatek.com>
+> >>
+> >> This patch adds documentation for devicetree bindings for
+> >> consumer Mediatek IR controller.
+> >>
+> >> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> >> ---
+> >>  .../devicetree/bindings/media/mtk-cir.txt          | 24 ++++++++++++++++++++++
+> >>  1 file changed, 24 insertions(+)
+> >>  create mode 100644 Documentation/devicetree/bindings/media/mtk-cir.txt
+> >
+> > Acked-by: Rob Herring <robh@kernel.org>
+> 
+> I guess I rescind my ack if this email doesn't work:
+> 
+> "The response from the remote server was:
+> 
+> 550 Relaying mail to sean.wang at mediatek.com is not allowed"
 
->> These commits also add newly upstreamed drivers to the Palmetto BMC and ast2500
->> eval board. We now have working network, ipmi bt, gpio and pinmux on
->> all platforms.
->>
->>   ARM: dts: aspeed: Add Romulus BMC platform
->>   ARM: dts: aspeed: Add ftgmac100 to g4 and g5 platforms
->>   ARM: dts: aspeed: Correct palmetto device tree
->>   ARM: dts: aspeed: Reserve framebuffer memory
->>   ARM: dts: aspeed-g5: Add gpio controller to devicetree
->>   ARM: dts: aspeed-g5: Add syscon and pin controller nodes
->>   ARM: dts: aspeed-g5: Add LPC Controller node
->>   ARM: dts: aspeed-g5: Add SoC Display Controller node
->>   ARM: dts: aspeed-g4: Add gpio controller to devicetree
->>   ARM: dts: aspeed-g4: Add syscon and pin controller nodes
->
-> Hi,
->
-> Merged, but for the future there's no need for you to list the patches in the
-> tag message, git inserts a list when we merge (--log), and git request-pull
-> already provides the shortlog.
 
-Thanks for the heads up. I've made a note of that for next time.
+sorry for causing you inconvenience.
 
-> (512MB RAM on a BMC? That's just insane :).
+it should be able to work because i almost use this daily
+maybe that's just a sudden problem from internal server (?) 
 
-Yep :) It was 1GB in the first spin of the board.
-
-Cheers,
-
-Joel
+but if the problem still continues, please let me know and 
+i will try to fix this.
