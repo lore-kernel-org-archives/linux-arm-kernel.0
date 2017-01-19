@@ -1,172 +1,119 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 19 Jan 2017 12:07:02 -0600
-Subject: [PATCH v4 2/4] Documentation: dt: add bindings for ti-cpufreq
-In-Reply-To: <20170117131808.29798-3-d-gerlach@ti.com>
-References: <20170117131808.29798-1-d-gerlach@ti.com>
- <20170117131808.29798-3-d-gerlach@ti.com>
-Message-ID: <20170119180702.62xg2ta5pq4mf7sd@rob-hp-laptop>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 19 Jan 2017 10:12:07 -0800
+Subject: [PATCH net-next v3 06/10] net: dsa: Migrate to device_find_class()
+In-Reply-To: <20170119165155.GH27312@n2100.armlinux.org.uk>
+References: <20170114214713.28109-1-f.fainelli@gmail.com>
+ <20170114214713.28109-7-f.fainelli@gmail.com>
+ <20170115110628.GF26374@kroah.com>
+ <fc247aeb-a8d6-5ba9-c26d-cb057a5ac34d@gmail.com>
+ <20170115173949.GA19268@kroah.com>
+ <a9ea1f45-b9a5-d840-68e0-9bf9bc7a6598@gmail.com>
+ <20170115191632.GD5643@lunn.ch>
+ <912e6143-c67a-d909-2a6c-939de79efc5d@gmail.com>
+ <20170119142820.GA494@kroah.com> <20170119145315.GD21805@lunn.ch>
+ <20170119165155.GH27312@n2100.armlinux.org.uk>
+Message-ID: <841dc133-e9af-e7ca-75bf-8371337d6281@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 07:18:06AM -0600, Dave Gerlach wrote:
-> Add the device tree bindings document for the TI CPUFreq/OPP driver
-> on AM33xx, AM43xx, DRA7xx, and AM57xx SoCs. The operating-points-v2
-> binding allows us to provide an opp-supported-hw property for each OPP
-> to define when it is available. This driver is responsible for reading
-> and parsing registers to determine which OPPs can be selectively enabled
-> based on the specific SoC in use by matching against the opp-supported-hw
-> data.
-> 
-> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> ---
-> v3->v4:
-> 	Update to simplify binding, only use "syscon" now to pass control
-> 	module register space and let driver handle offsets.
-> 
->  .../devicetree/bindings/cpufreq/ti-cpufreq.txt     | 128 +++++++++++++++++++++
->  1 file changed, 128 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt b/Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt
-> new file mode 100644
-> index 000000000000..58efa4c72545
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt
-> @@ -0,0 +1,128 @@
-> +TI CPUFreq and OPP bindings
-> +================================
-> +
-> +Certain TI SoCs, like those in the am335x, am437x, am57xx, and dra7xx
-> +families support different OPPs depending on the silicon variant in use.
-> +The ti-cpufreq driver can use revision and an efuse value from the SoC to
-> +provide the OPP framework with supported hardware information. This is
-> +used to determine which OPPs from the operating-points-v2 table get enabled
-> +when it is parsed by the OPP framework.
-> +
-> +Required properties:
-> +--------------------
-> +In 'cpus' nodes:
-> +- operating-points-v2: Phandle to the operating-points-v2 table to use.
-> +
-> +In 'operating-points-v2' table:
-> +- compatible: Should be
-> +	- 'operating-points-v2-ti-cpu' for am335x, am43xx, and dra7xx/am57xx SoCs
-> +- syscon: A phandle pointing to a syscon node representing the control module
-> +	  register space of the SoC.
-> +
-> +Optional properties:
-> +--------------------
-> +For each opp entry in 'operating-points-v2' table:
-> +- opp-supported-hw: Two bitfields indicating:
-> +	1. Which revision of the SoC the OPP is supported by
-> +	2. Which eFuse bits indicate this OPP is available
-> +
-> +	A bitwise AND is performed against these values and if any bit
-> +	matches, the OPP gets enabled.
-> +
-> +Example:
-> +--------
-> +
-> +/* From arch/arm/boot/dts/am33xx.dtsi */
-> +cpus {
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +	cpu at 0 {
-> +		compatible = "arm,cortex-a8";
-> +		device_type = "cpu";
-> +		reg = <0>;
-> +
-> +		operating-points-v2 = <&cpu0_opp_table>;
-> +
-> +		clocks = <&dpll_mpu_ck>;
-> +		clock-names = "cpu";
-> +
-> +		clock-latency = <300000>; /* From omap-cpufreq driver */
-> +	};
-> +};
-> +
-> +/*
-> + * cpu0 has different OPPs depending on SoC revision and some on revisions
-> + * 0x2 and 0x4 have eFuse bits that indicate if they are available or not
-> + */
-> +cpu0_opp_table: opp_table0 {
 
-Just "opp-table {"
 
-> +	compatible = "operating-points-v2-ti-cpu";
-> +	syscon = <&scm_conf>;
-> +
-> +	/*
-> +	 * The three following nodes are marked with opp-suspend
-> +	 * because they can not be enabled simultaneously on a
-> +	 * single SoC.
-> +	 */
-> +	opp50 at 300000000 {
-
-What's the 50, 100, 120 in the names?
-
-> +		opp-hz = /bits/ 64 <300000000>;
-> +		opp-microvolt = <950000 931000 969000>;
-> +		opp-supported-hw = <0x06 0x0010>;
-> +		opp-suspend;
-> +	};
-> +
-> +	opp100 at 275000000 {
-> +		opp-hz = /bits/ 64 <275000000>;
-> +		opp-microvolt = <1100000 1078000 1122000>;
-> +		opp-supported-hw = <0x01 0x00FF>;
-> +		opp-suspend;
-> +	};
-> +
-> +	opp100 at 300000000 {
-> +		opp-hz = /bits/ 64 <300000000>;
-> +		opp-microvolt = <1100000 1078000 1122000>;
-> +		opp-supported-hw = <0x06 0x0020>;
-> +		opp-suspend;
-> +	};
-> +
-> +	opp100 at 500000000 {
-> +		opp-hz = /bits/ 64 <500000000>;
-> +		opp-microvolt = <1100000 1078000 1122000>;
-> +		opp-supported-hw = <0x01 0xFFFF>;
-> +	};
-> +
-> +	opp100 at 600000000 {
-> +		opp-hz = /bits/ 64 <600000000>;
-> +		opp-microvolt = <1100000 1078000 1122000>;
-> +		opp-supported-hw = <0x06 0x0040>;
-> +	};
-> +
-> +	opp120 at 600000000 {
-> +		opp-hz = /bits/ 64 <600000000>;
-> +		opp-microvolt = <1200000 1176000 1224000>;
-> +		opp-supported-hw = <0x01 0xFFFF>;
-> +	};
-> +
-> +	opp120 at 720000000 {
-> +		opp-hz = /bits/ 64 <720000000>;
-> +		opp-microvolt = <1200000 1176000 1224000>;
-> +		opp-supported-hw = <0x06 0x0080>;
-> +	};
-> +
-> +	oppturbo at 720000000 {
-> +		opp-hz = /bits/ 64 <720000000>;
-> +		opp-microvolt = <1260000 1234800 1285200>;
-> +		opp-supported-hw = <0x01 0xFFFF>;
-> +	};
-> +
-> +	oppturbo at 800000000 {
-> +		opp-hz = /bits/ 64 <800000000>;
-> +		opp-microvolt = <1260000 1234800 1285200>;
-> +		opp-supported-hw = <0x06 0x0100>;
-> +	};
-> +
-> +	oppnitro at 1000000000 {
-> +		opp-hz = /bits/ 64 <1000000000>;
-> +		opp-microvolt = <1325000 1298500 1351500>;
-> +		opp-supported-hw = <0x04 0x0200>;
-> +	};
-> +};
-> -- 
-> 2.11.0
+On 01/19/2017 08:51 AM, Russell King - ARM Linux wrote:
+> (This is mainly for Greg's benefit to help him understand the issue.)
 > 
+> I think the diagram you gave initially made this confusing, as it
+> talks about a CPU(sic) producing the "RGMII" and "MII-MGMT".
+> 
+> Let's instead show a better representation that hopefully helps Greg
+> understand networking. :)
+> 
+> 
+>   CPU
+> System <-B->  Ethernet controller <-P-> } PHY <---> network cable
+>                                         } - - - - - - - or - - - - - - -
+>                   MDIO bus -------M---> } Switch <-P-> PHYs <--> network
+>                                               `----M----^        cables
+> 
+> 'B' can be an on-SoC bus or something like PCI.
+> 
+> 'P' are the high-speed connectivity between the ethernet controller and
+> PHY which carries the packet data.  It has no addressing, it's a point
+> to point link.  RGMII is just one wiring example, there are many
+> different interfaces there (SGMII, AUI, XAUI, XGMII to name a few.)
+> 
+> 'M' are the MDIO bus, which is the bus by which ethernet PHYs and
+> switches can be identified and controlled.
+
+So MDIO is one possible bus type to connect an Ethernet switch (and
+PHYs) to a the System, but is not necessarily the only one. You have
+existing devices out there with on-chip integrated switches (platform),
+SPI/GPIO/I2C/PCI(e).
+
+> 
+> The MDIO bus has a bus_type, has host drivers which are sometimes
+> part of the ethernet controller, but can also be stand-alone devices
+> shared between multiple ethernet controllers.
+> 
+> PHYs are a kind of MDIO device which are members of the MDIO bus
+> type.  Each PHY (and switch) has a numerical address, and identifying
+> numbers within its register set which identifies the manufacturer
+> and device type.  We have device_driver objects for these.
+> 
+> Expanding the above diagram to make it (hopefully) even clearer,
+> we can have this classic setup:
+> 
+>   CPU
+> System <-B-> Ethernet controller <-P-> PHY <---> network cable
+>                  MDIO bus -------M------^
+> 
+> Or, in the case of two DSA switches attached to an Ethernet controller:
+> 
+>                                      |~~~~~~~~|
+> System <-B-> Ethernet controller <-P-> Switch <-P-> PHY1 <--> network cable
+>                  MDIO bus ----+--M--->   1    <-P-> PHY2 <--> network cable
+>                               |      |        ...    |
+>                               |      |        <-P-> PHYn <--> network cable
+>                               |      |....^...|      |
+>                               |           |  `---M---'
+>                               |           P
+>                               |           |
+>                               |      |~~~~v~~~|
+>                               `------> Switch <-P-> PHY1 <--> network cable
+>                                      |   2    ...    |
+>                                      |        <-P-> PHYn <--> network cable
+>                                      |........|      |
+>                                              `---M---'
+> 
+> The problem that the DSA guys are trying to deal with is how to
+> represent the link between the DSA switches (which are devices
+> sitting off their controlling bus - the MDIO bus) and the ethernet
+> controller associated with that collection of devices, be it a
+> switch or PHY.
+> 
+> Merely changing the parent/child relationships to try and solve
+> one issue just creates exactly the same problem elsewhere.
+
+Exactly!
+
+> 
+> So, I hope with these diagrams, you can see that trying to make
+> the ethernet controller a child device of the DSA switches
+> means that (eg) it's no longer a PCI device, which is rather
+> absurd, especially when considering that what happens to the
+> right of the ethernet controller in the diagrams above is
+> normally external chips to the SoC or ethernet device.
+> 
+
+Indeed.
+
+Back to the actual code that triggered this discussion, the whole
+purpose is just a safeguard. Given a device reference, we can assume
+that it is indeed the backing device for a net_device, and we could do a
+to_net_device() right away (and crash if someone did not write correct
+platform_data structures), or, by walking the device tree (the device
+driver model one) we can make sure it does belong in the proper class
+and this is indeed what we think it is.
+
+HTH
+-- 
+Florian
