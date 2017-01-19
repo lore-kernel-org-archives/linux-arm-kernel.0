@@ -1,97 +1,62 @@
-From: eric.auger@redhat.com (Eric Auger)
-Date: Thu, 19 Jan 2017 20:57:59 +0000
-Subject: [PATCH v9 14/18] irqdomain: irq_domain_check_msi_remap
-In-Reply-To: <1484859483-2866-1-git-send-email-eric.auger@redhat.com>
-References: <1484859483-2866-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1484859483-2866-15-git-send-email-eric.auger@redhat.com>
+From: deller@gmx.de (Helge Deller)
+Date: Thu, 19 Jan 2017 22:17:12 +0100
+Subject: [PATCH 1/2] security: Change name of CONFIG_DEBUG_RODATA
+In-Reply-To: <20170119113305.GB5110@osiris>
+References: <1484789346-21012-1-git-send-email-labbott@redhat.com>
+ <1484789346-21012-2-git-send-email-labbott@redhat.com>
+ <20170119105646.GA11176@leverpostej> <20170119113305.GB5110@osiris>
+Message-ID: <a3c9b67f-9b10-15d5-c00f-7b8a98d11001@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This new function checks whether all MSI irq domains
-implement IRQ remapping. This is useful to understand
-whether VFIO passthrough is safe with respect to interrupts.
+On 19.01.2017 12:33, Heiko Carstens wrote:
+> On Thu, Jan 19, 2017 at 10:56:46AM +0000, Mark Rutland wrote:
+>>> +config HARDENED_PAGE_MAPPINGS
+>>> +	bool "Mark kernel mappings with stricter permissions (RO/W^X)"
+>>> +	default y
+>>> +	depends on ARCH_HAS_HARDENED_MAPPINGS
+>>> +	help
+>>> +          If this is set, kernel text and rodata memory will be made read-only,
+>>> +	  and non-text memory will be made non-executable. This provides
+>>> +	  protection against certain security attacks (e.g. executing the heap
+>>> +	  or modifying text).
+>>> +
+>>> +	  Unless your system has known restrictions or performance issues, it
+>>> +	  is recommended to say Y here.
+>>
+>> It's somewhat unfortunate that this means the feature is no longer
+>> mandatory on arm64 (and s390+x86). We have a boot-time switch to turn
+>> the protections off, so I was hoping we could make this mandatory on all
+>> architectures with support.
+>>
+>> It would be good to see if we could make this mandatory for arm and
+>> parisc, or if it really needs to be optional for either of those.
+> 
+> Looks like the config option is a no-op on parisc just like it is on
+> s390. Irrelavant of the config option at least on s390 the page tables for
+> kernel text and rodata will be read-only anyway.
 
-On ARM typically an MSI controller can sit downstream
-to the IOMMU without preventing VFIO passthrough.
-As such any assigned device can write into the MSI doorbell.
-In case the MSI controller implements IRQ remapping, assigned
-devices will not be able to trigger interrupts towards the
-host. On the contrary, the assignment must be emphasized as
-unsafe with respect to interrupts.
-
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
-Tested-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
-Tested-by: Bharat Bhushan <bharat.bhushan@nxp.com>
-
----
-v8 -> v9:
-- reword doc comment
-
-v7 -> v8:
-- remove goto in irq_domain_check_msi_remap
-- Added Marc's R-b
-
-v5 -> v6:
-- use irq_domain_hierarchical_is_msi_remap()
-- comment rewording
-
-v4 -> v5:
-- Handle DOMAIN_BUS_FSL_MC_MSI domains
-- Check parents
----
- include/linux/irqdomain.h |  1 +
- kernel/irq/irqdomain.c    | 25 +++++++++++++++++++++++++
- 2 files changed, 26 insertions(+)
-
-diff --git a/include/linux/irqdomain.h b/include/linux/irqdomain.h
-index bc2f571..188eced 100644
---- a/include/linux/irqdomain.h
-+++ b/include/linux/irqdomain.h
-@@ -222,6 +222,7 @@ struct irq_domain *irq_domain_add_legacy(struct device_node *of_node,
- 					 void *host_data);
- extern struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
- 						   enum irq_domain_bus_token bus_token);
-+extern bool irq_domain_check_msi_remap(void);
- extern void irq_set_default_host(struct irq_domain *host);
- extern int irq_domain_alloc_descs(int virq, unsigned int nr_irqs,
- 				  irq_hw_number_t hwirq, int node,
-diff --git a/kernel/irq/irqdomain.c b/kernel/irq/irqdomain.c
-index 876e131..80c4f93 100644
---- a/kernel/irq/irqdomain.c
-+++ b/kernel/irq/irqdomain.c
-@@ -278,6 +278,31 @@ struct irq_domain *irq_find_matching_fwspec(struct irq_fwspec *fwspec,
- EXPORT_SYMBOL_GPL(irq_find_matching_fwspec);
+Right, that's true at the moment for parisc as well.
+I do have unfinished patches which will add runtime kernel patching
+for ftrace to parisc, and those patches will need to add code to 
+enable/disable ro text/data like x86.
  
- /**
-+ * irq_domain_check_msi_remap - Check whether all MSI irq domains implement
-+ * IRQ remapping
-+ *
-+ * Return: false if any MSI irq domain does not support IRQ remapping,
-+ * true otherwise (including if there is no MSI irq domain)
-+ */
-+bool irq_domain_check_msi_remap(void)
-+{
-+	struct irq_domain *h;
-+	bool ret = true;
-+
-+	mutex_lock(&irq_domain_mutex);
-+	list_for_each_entry(h, &irq_domain_list, link) {
-+		if (irq_domain_is_msi(h) &&
-+		    !irq_domain_hierarchical_is_msi_remap(h)) {
-+			ret = false;
-+			break;
-+		}
-+	}
-+	mutex_unlock(&irq_domain_mutex);
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(irq_domain_check_msi_remap);
-+
-+/**
-  * irq_set_default_host() - Set a "default" irq domain
-  * @domain: default domain pointer
-  *
--- 
-1.9.1
+> This works since ages and I don't see a reason why this should be
+> changed. Also trying to disable this with the "rodata=" command line option
+> does not work at least on s390, and I guess this is true for parisc as
+> well.
+
+I never tried the option itself, but it should work on parisc to disable
+the ro protection by this option.
+ 
+> The only thing implemented with CONFIG_DEBUG_RODATA on both architectures
+> is to emit a message that states memory has been protected
+> (mark_rodata_ro).
+> This just avoids a wrong "Kernel memory protection disabled." message.
+> 
+> So yes, I'd really like to keep this option mandatory.
+ 
+I'd be fine with a rename of the config option to ARCH_HAS_HARDENED_MAPPINGS
+and keeping the "rodata=" command line.
+
+Helge
