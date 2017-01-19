@@ -1,120 +1,45 @@
-From: agustinv@codeaurora.org (Agustin Vega-Frias)
-Date: Thu, 19 Jan 2017 11:14:34 -0500
-Subject: [PATCH V10 2/3] ACPI: Add support for ResourceSource/IRQ domain
- mapping
-In-Reply-To: <20170119123608.GA3431@red-moon>
-References: <1484766276-9668-1-git-send-email-agustinv@codeaurora.org>
- <CAHp75Vem=mCOGVoOpCJFYHcO17mJ9gexsQxa0Pjf4Lbt3hibRA@mail.gmail.com>
- <20170119123608.GA3431@red-moon>
-Message-ID: <cb200409ff636b220a89b1ee8aa1a599@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 19 Jan 2017 16:16:16 +0000
+Subject: [PATCH 1/1] iommu/arm-smmu: Fix for ThunderX erratum #27704
+In-Reply-To: <1484550967-6328-1-git-send-email-tn@semihalf.com>
+References: <1484550967-6328-1-git-send-email-tn@semihalf.com>
+Message-ID: <20170119161615.GH31594@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-01-19 07:36, Lorenzo Pieralisi wrote:
-> On Wed, Jan 18, 2017 at 09:45:56PM +0200, Andy Shevchenko wrote:
+On Mon, Jan 16, 2017 at 08:16:07AM +0100, Tomasz Nowicki wrote:
+> The goal of erratum #27704 workaround was to make sure that ASIDs and VMIDs
+> are unique across all SMMU instances on affected Cavium systems.
 > 
-> [...]
+> Currently, the workaround code partitions ASIDs and VMIDs by increasing
+> global cavium_smmu_context_count which in turn becomes the base ASID and VMID
+> value for the given SMMU instance upon the context bank initialization.
 > 
->> > +/**
->> > + * acpi_irq_get - Look for the ACPI IRQ resource with the given index and
->> > + *                use it to initialize the given Linux IRQ resource.
->> > + * @handle ACPI device handle
->> > + * @index  ACPI IRQ resource index to lookup
->> > + * @res    Linux IRQ resource to initialize
->> 
->> Ah, you missed colons after field names:
->> * @field1:
->> 
->> > + *
->> > + * Return:
->> 
->> Next line:  0 on success
->> 
->> > + *         -EINVAL if an error occurs
->> > + *         -EPROBE_DEFER if the IRQ lookup/conversion failed
->> > + */
->> > +int acpi_irq_get(acpi_handle handle, unsigned int index, struct resource *res)
->> > +{
->> 
->> > +       int rc;
->> 
->> Put this last in the definition block.
->> 
->> > +       struct irq_fwspec fwspec;
->> > +       struct irq_domain *domain;
->> > +       unsigned long flags;
->> > +
->> > +       rc = acpi_irq_parse_one(handle, index, &fwspec, &flags);
->> > +       if (rc)
->> > +               return rc;
->> > +
->> > +       domain = irq_find_matching_fwnode(fwspec.fwnode, DOMAIN_BUS_ANY);
->> > +       if (!domain)
->> > +               return -EPROBE_DEFER;
->> 
->> Hmm... Could it be other issues here?
+> For systems with multiple SMMU instances this approach implies the risk
+> of crossing 8-bit ASID, like for 1-socket CN88xx capable of 4 SMMUv2,
+> 128 context banks each:
+> SMMU_0 (0-127 ASID RANGE)
+> SMMU_1 (127-255 ASID RANGE)
+> SMMU_2 (256-383 ASID RANGE) <--- crossing 8-bit ASID
+> SMMU_3 (384-511 ASID RANGE) <--- crossing 8-bit ASID
 > 
-> That's a good point. Here probing should be deferred only if we know a
-> driver capable of handling fwspec.fwnode will have a chance to be
-> probed/initialized eventually right (which basically means it is
-> compiled in the kernel and we hope it will probed successfully) ? I am
-> not sure there is an easy way to detect that in ACPI at the moment, I
-> suspect it is time we added a linker section (or augment the existing
-> one used for irqchip early MADT parsing - IRQCHIP_ACPI_DECLARE) for 
-> this
-> purpose I do not see any other option (apart from leaving devices in 
-> the
-> deferred probe list if a driver for the irqchip represented by
-> fwspec.fwnode is not present in the kernel, which is a bit sloppy, or
-> resorting to checking Kconfig entries to detect compile time enabled
-> irqchip drivers).
-
-I'll add the linker section suggested by Lorenzo for the extra check.
-We can do that check in acpi_get_irq_source_fwhandle and make the lookup
-fail if the device is not listed in the table.
-
-That way we can keep this check as-is.
-
-Thoughts?
-
+> Since now we use 8-bit ASID (SMMU_CBn_TCR2.AS = 0) we effectively misconfigure
+> ASID[15:8] bits of SMMU_CBn_TTBRm register for SMMU_2/3. Moreover, we still
+> assume non-zero ASID[15:8] bits upon context invalidation. In the end,
+> except SMMU_0/1 devices all other devices under other SMMUs will fail on guest
+> power off/on. Since we try to invalidate TLB with 16-bit ASID but we actually
+> have 8-bit zero padded 16-bit entry.
 > 
->> > +
->> > +       rc = irq_create_fwspec_mapping(&fwspec);
->> > +       if (rc <= 0)
->> > +               return -EINVAL;
->> > +
->> 
->> > +       res->start = rc;
->> > +       res->end = rc;
->> > +       res->flags = flags;
->> 
->> Perhaps struct resource *r should be a parameter to 
->> acpi_irq_parse_one().
+> This patch adds 16-bit ASID support for stage-1 AArch64 contexts so that
+> we use ASIDs consistently for all SMMU instances.
 > 
-> Yeah but then you would end up with flags initialized in
-> acpi_irq_parse_one() and the other resource params (ie start, end) 
-> here,
-> I do not think it is nicer.
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+> Reviewed-by: Tirumalesh Chalamarla  <Tirumalesh.Chalamarla@cavium.com>
+> ---
+>  drivers/iommu/arm-smmu.c | 3 +++
+>  1 file changed, 3 insertions(+)
 
-The reason this took this form is that we are trying to get some 
-symmetry
-with what of_irq_get does.
+Thanks, queued for 4.11.
 
-Thanks,
-Agustin
-
-> 
-> Thanks,
-> Lorenzo
-> 
-> [...]
-> 
->> 
->> With Best Regards,
->> Andy Shevchenko
-
--- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm 
-Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
-Linux Foundation Collaborative Project.
+Will
