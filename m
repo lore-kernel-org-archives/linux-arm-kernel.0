@@ -1,25 +1,44 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 19 Jan 2017 13:49:59 +0000
-Subject: [PATCH v9 0/4] arm64: arch_timer: Add workaround for
- hisilicon-161010101 erratum
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Thu, 19 Jan 2017 21:35:16 +0800
+Subject: [PATCH v9 4/4] arm64: arch timer: Add timer erratum property for
+ Hip05-d02 and Hip06-d03
 In-Reply-To: <1484832916-7248-1-git-send-email-dingtianhong@huawei.com>
 References: <1484832916-7248-1-git-send-email-dingtianhong@huawei.com>
-Message-ID: <23512329-e8d9-4b4f-c460-4d769ef7102e@arm.com>
+Message-ID: <1484832916-7248-5-git-send-email-dingtianhong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/01/17 13:35, Ding Tianhong wrote:
-> Erratum Hisilicon-161010101 says that the ARM generic timer counter "has the
-> potential to contain an erroneous value when the timer value changes".
-> Accesses to TVAL (both read and write) are also affected due to the implicit counter
-> read.  Accesses to CVAL are not affected.
+Enable workaround for hisilicon erratum 161010101 on Hip05-d02 and Hip06-d03 board.
 
-Please. 3 series in 2 hours is not fun, and is not helping your case
-either. Give us the time to properly review your patches, and wait until
-we ask you to respin if we think that this is required.
+Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+---
+ arch/arm64/boot/dts/hisilicon/hip05.dtsi | 1 +
+ arch/arm64/boot/dts/hisilicon/hip06.dtsi | 1 +
+ 2 files changed, 2 insertions(+)
 
-Thanks,
-
-	M.
+diff --git a/arch/arm64/boot/dts/hisilicon/hip05.dtsi b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
+index 4b472a3..6b76f3a 100644
+--- a/arch/arm64/boot/dts/hisilicon/hip05.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
+@@ -281,6 +281,7 @@
+ 			     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
+ 			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
+ 			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
++		hisilicon,erratum-161010101;
+ 	};
+ 
+ 	pmu {
+diff --git a/arch/arm64/boot/dts/hisilicon/hip06.dtsi b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
+index a049b64..cf8b9db 100644
+--- a/arch/arm64/boot/dts/hisilicon/hip06.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
+@@ -260,6 +260,7 @@
+ 			     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
+ 			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
+ 			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
++		hisilicon,erratum-161010101;
+ 	};
+ 
+ 	pmu {
 -- 
-Jazz is not dead. It just smells funny...
+1.9.0
