@@ -1,120 +1,78 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Thu, 19 Jan 2017 20:40:18 +0530
-Subject: [PATCH 02/10] iommu/of: Prepare for deferred IOMMU configuration
-In-Reply-To: <20170119144056.GA4312@red-moon>
-References: <1480465344-11862-1-git-send-email-sricharan@codeaurora.org>
- <1480465344-11862-3-git-send-email-sricharan@codeaurora.org>
- <20161130161723.GA9042@red-moon>
- <c89825aa-c75f-8493-fe92-7cc97f525bc7@arm.com>
- <20161201112917.GA9680@red-moon>
- <003601d2672e$91744b40$b45ce1c0$@codeaurora.org>
- <20170105122714.GA30449@red-moon>
- <7cd7bcfb-abae-2948-c3f8-230c0d9c9db6@arm.com>
- <005f01d26763$450f9cc0$cf2ed640$@codeaurora.org>
- <20170106162400.GA8109@red-moon> <20170119144056.GA4312@red-moon>
-Message-ID: <001a01d27266$295a2550$7c0e6ff0$@codeaurora.org>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Thu, 19 Jan 2017 23:10:08 +0800
+Subject: [PATCH 1/4] phy: sun4i-usb: support PHY0 on H3 in MUSB mode
+In-Reply-To: <20170119143445.dmckuqjxmfhwr3h5@lukather>
+References: <20170116191449.50397-1-icenowy@aosc.xyz>
+ <20170116191449.50397-2-icenowy@aosc.xyz>
+ <20170117080611.tn7s7ddj2csqr27m@lukather>
+ <3866431484672228@web20j.yandex.ru>
+ <20170117200658.gcrcxeanthdtwg26@lukather>
+ <CAGb2v67kYtrTdw9YMS7wvRa=2MWYJ=BEc9SmUOds7hNYZKOz9g@mail.gmail.com>
+ <20170119143445.dmckuqjxmfhwr3h5@lukather>
+Message-ID: <1682741484838608@web2j.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
 
->-----Original Message-----
->From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Lorenzo Pieralisi
->Sent: Thursday, January 19, 2017 8:11 PM
->To: Sricharan <sricharan@codeaurora.org>
->Cc: linux-arm-msm at vger.kernel.org; joro at 8bytes.org; will.deacon at arm.com; iommu at lists.linux-foundation.org; 'Robin Murphy'
-><robin.murphy@arm.com>; linux-arm-kernel at lists.infradead.org
->Subject: Re: [PATCH 02/10] iommu/of: Prepare for deferred IOMMU configuration
->
->Hi Sricharan,
->
->On Fri, Jan 06, 2017 at 04:24:00PM +0000, Lorenzo Pieralisi wrote:
->> On Thu, Jan 05, 2017 at 08:21:53PM +0530, Sricharan wrote:
->> > Hi,
->> >
->> > [...]
->> >
->> > >>>
->> > >>> With the thinking of taking this series through, would it be fine if i
->> > >>> cleanup the pci configure hanging outside and push it in to
->> > >>> of/acpi_iommu configure respectively ? This time with all neeeded for
->> > >>> ACPI added as well.  Also on the last post of V4, Lorenzo commented
->> > >>> that it worked for him, although still the of_match_node equivalent in
->> > >>> ACPI has to be added. If i can get that, then i will add that as well
->> > >>> to make this complete.
->> > >>
->> > >> Question: I had a look into this and instead of fiddling about with the
->> > >> linker script entries in ACPI (ie IORT_ACPI_DECLARE - which I hope this
->> > >> patchset would help remove entirely), I think that the only check we
->> > >> need in IORT is, depending on what type of SMMU a given device is
->> > >> connected to, to check if the respective SMMU driver is compiled in the
->> > >> kernel and it will be probed, _eventually_.
->> > >>
->> > >> As Robin said, by the time a device is probed the respective SMMU
->> > >> devices are already created and registered with IORT kernel code or
->> > >> they will never be, so to understand if we should defer probing
->> > >> SMMU device creation is _not_ really a problem in ACPI.
->> > >>
->> > >> To check if a SMMU driver is enabled, do we really need a linker
->> > >> table ?
->> > >>
->> > >> Would not a check based on eg:
->> > >>
->> > >> /**
->> > >>  * @type: IOMMU IORT node type of the IOMMU a device is connected to
->> > >>  */
->> > >> static bool iort_iommu_driver_enabled(u8 type)
->> > >> {
->> > >> 	switch (type) {
->> > >> 	case ACPI_IORT_SMMU_V3:
->> > >> 		return IS_ENABLED(CONFIG_ARM_SMMU_V3);
->> > >
->> > >IS_BUILTIN(...)
->> > >
->> > >> 	case ACPI_IORT_SMMU:
->> > >> 		return IS_ENABLED(CONFIG_ARM_SMMU);
->> > >> 	default:
->> > >> 		pr_warn("Unknown IORT SMMU type\n");
->> > >
->> > >Might displaying the actual value be helfpul for debugging a broken IORT
->> > >table?
->> > >
->> > >> 		return false;
->> > >> 	}
->> > >> }
->> > >>
->> > >> be sufficient (it is a bit gross, agreed, but it is to understand if
->> > >> that's all we need) ? Is there anything I am missing ?
->> > >>
->> > >> Let me know, I will put together a patch for you I really do not
->> > >> want to block your series for this trivial niggle.
->> > >
->> > >Other than that, though, I like it :) IORT has a small, strictly
->> > >bounded, set of supported devices, so I really don't see the need to go
->> > >overboard putting it on parity with DT when something this neat and
->> > >simple will suffice.
->> > >
->> >
->> > Ok sure, looks correct for me as well in whole of the context here.
->>
->> Ok, I put together a branch where you can find your original series
->> plus some ACPI patches for you to test and use:
->>
->> git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git iommu/probe-deferral
->>
->> Feel free to post the additional patches I added along with your series
->> (that from what I gather you have reworked already) and please both have a
->> look if the deferral mechanism I put in place in ACPI makes sense to you.
->
->Did you have time to make progress on this ? I think it is time we
->posted the complete series to aim for 4.11 please, if you need help just
->let us know.
->
 
-I just posted V5 now.  I have mainly reworked the pci dma configure code which
-was lying outside and having it all in one place in dma_configure. The ACPI changes
-from you looked fine for me. I have tested on arm64/32 with DT, and require testing
-help on ACPI. Thanks.
+19.01.2017, 22:34, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+> On Wed, Jan 18, 2017 at 04:09:32AM +0800, Chen-Yu Tsai wrote:
+>> ?Hi,
+>>
+>> ?On Wed, Jan 18, 2017 at 4:06 AM, Maxime Ripard
+>> ?<maxime.ripard@free-electrons.com> wrote:
+>> ?> On Wed, Jan 18, 2017 at 12:57:08AM +0800, Icenowy Zheng wrote:
+>> ?>>
+>> ?>>
+>> ?>> 17.01.2017, 16:06, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+>> ?>> > On Tue, Jan 17, 2017 at 03:14:46AM +0800, Icenowy Zheng wrote:
+>> ?>> >> The PHY0 on H3 can be wired either to MUSB controller or OHCI/EHCI
+>> ?>> >> controller.
+>> ?>> >>
+>> ?>> >> The original driver wired it to OHCI/EHCI controller; however, as the
+>> ?>> >> code to use PHY0 as OHCI/EHCI is missing, it makes the PHY fully
+>> ?>> >> unusable.
+>> ?>> >>
+>> ?>> >> Rename the register (according to its function and the name in BSP
+>> ?>> >> driver), and remove the code which wires the PHY0 to OHCI/EHCI, as MUSB
+>> ?>> >> can support both peripheral and host mode (although the host mode of
+>> ?>> >> MUSB is buggy).
+>> ?>> >
+>> ?>> > Can you elaborate on that? What's wrong with it?
+>> ?>>
+>> ?>> The configuration is at bit 0 of register 0x20 in PHY.
+>> ?>>
+>> ?>> When the PHY is reseted, it defaults as MUSB mode.
+>> ?>>
+>> ?>> However, the original author of the H3 PHY code seems to be lack of
+>> ?>> this knowledge (He named it PHY_UNK_H3), and changed the PHY to HCI
+>> ?>> mode.
+>> ?>>
+>> ?>> I just removed the code that wires it to HCI mode, thus it will work
+>> ?>> in MUSB mode, with my sun8i-h3-musb patch.
+>> ?>
+>> ?> I have no idea what you mean by MUSB mode.
+>> ?>
+>> ?> Do you mean that the previous code was only working in host mode, and
+>> ?> now it only works in peripheral?
+>>
+>> ?From what I understand, with the H3, Allwinner has put a mux
+>> ?in front of the MUSB controller. The mux can send the USB data
+>> ?to/from the MUSB controller, or a standard EHCI/OHCI pair.
+>> ?This register controls said mux.
+>>
+>> ?This means we can use a proper USB host for host mode,
+>> ?instead of the limited support in MUSB.
+>
+> But musb can still operate as a host, right?
 
-Regards,
- Sricharan
+Yes!
+
+>
+> Thanks!
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
