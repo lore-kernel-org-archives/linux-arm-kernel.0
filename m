@@ -1,46 +1,91 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu, 19 Jan 2017 10:47:47 +0100
-Subject: [PATCH 0/5] meson-gx: reset RGMII PHYs and configure TX delay
-In-Reply-To: <CAFBinCACbeZPRXQO4OA5mJdGRvMkQoUmQEAKCi8KU2ZvrspF6A@mail.gmail.com>
-References: <20161202234739.22929-1-martin.blumenstingl@googlemail.com>
- <m2a8ao1833.fsf@baylibre.com>
- <CAFBinCACbeZPRXQO4OA5mJdGRvMkQoUmQEAKCi8KU2ZvrspF6A@mail.gmail.com>
-Message-ID: <1484819267.26620.75.camel@baylibre.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 19 Jan 2017 10:58:19 +0100
+Subject: [PATCH 2/2] ARM: dts: rockchip: add dts for RK3288-Tinker board
+In-Reply-To: <1484791919-4665-3-git-send-email-eddie.cai@rock-chips.com>
+References: <1484791919-4665-1-git-send-email-eddie.cai@rock-chips.com>
+ <1484791919-4665-3-git-send-email-eddie.cai@rock-chips.com>
+Message-ID: <40159140.kOHBSj8v8b@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-01-18 at 20:40 +0100, Martin Blumenstingl wrote:
-> Kevin,
-> 
-> On Wed, Jan 18, 2017 at 8:28 PM, Kevin Hilman <khilman@baylibre.com>
-> wrote:
-> > 
-> > Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
-> > 
-> > > 
-> > > This partially fixes the 1000Mbit/s ethernet TX throughput issues
-> > > (on
-> > > networks which are not affected by the EEE problem, as reported
-> > > here:
-> > 
-> > Based on the discussions with Jerome, I'm dropping this series from
-> > the
-> > v4.11/dt64 branch for now.
-> what is you opinion on having the MDIO node in meson-gx (and keeping
-> GXBB and GXL/GXM consistent) vs not having PHY autodetection for GXBB
-> (= not having the MDIO in meson-gx)?
-> I cannot send a v2 until we have a decision for this
-> 
-> > 
-> > This series also had a small conflict with Jerome's fix[1] for the
-> > odroid-c2, so please rebase any updates here on my v4.10/fixes
-> > branch.
-> will keep that in mind, noted.
-Most this patch can go away with your patch.
-Just make sure to keep "eee-broken-1000t;" in the odroidc2 dtsi and
-it'll be OK.
+Hi Eddie,
 
-> _______________________________________________
-> linux-amlogic mailing list
-> linux-amlogic at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-amlogic
+Am Donnerstag, 19. Januar 2017, 10:11:59 CET schrieb Eddie Cai:
+> This patch add basic support for RK3288-Tinker board. We can boot in to
+> rootfs with this patch.
+> 
+> Signed-off-by: Eddie Cai <eddie.cai@rock-chips.com>
+
+looks good in general, just some small question down below.
+
+[...]
+
+> +	/*
+> +	 * NOTE: vcc_sd isn't hooked up on v1.0 boards where power comes from
+> +	 * vcc_io directly.  Those boards won't be able to power cycle SD cards
+> +	 * but it shouldn't hurt to toggle this pin there anyway.
+> +	 */
+
+just to clarify, later board will have that pin connected, right?
+
+> +	vcc_sd: sdmmc-regulator {
+> +		compatible = "regulator-fixed";
+> +		gpio = <&gpio7 11 GPIO_ACTIVE_LOW>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&sdmmc_pwr>;
+> +		regulator-name = "vcc_sd";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		startup-delay-us = <100000>;
+> +		vin-supply = <&vcc_io>;
+> +	};
+> +};
+
+[...]
+
+> +&hdmi {
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +	#sound-dai-cells = <0>;
+> +	ddc-i2c-bus = <&i2c5>;
+> +	status = "okay";
+> +	/* Don't use vopl for HDMI */
+> +	ports {
+> +		hdmi_in: port {
+> +			/delete-node/ endpoint at 1;
+> +		};
+
+what is the reason for this? You enable both VOPs below and the linux display 
+subsystem should be able to select an appropriate VOP for output just fine on 
+its own. So there should be no reason for capping the hdmi's connection to one 
+of the vops.
+
+> +	};
+> +};
+
+[...]
+
+> +&usb_host0_ehci {
+> +	no-relinquish-port;
+
+This seems like an unused/undocumented property
+
+> +	status = "okay";
+> +};
+
+[...]
+
+> +&vopl {
+> +	status = "okay";
+> +	/* Don't use vopl for HDMI */
+> +	vopl_out: port {
+> +		/delete-node/ endpoint at 0;
+> +	};
+
+see comment at the hdmi node
+
+> +};
+
+
+Thanks
+Heiko
