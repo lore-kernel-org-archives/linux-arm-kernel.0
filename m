@@ -1,57 +1,87 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 19 Jan 2017 18:19:14 +0000
-Subject: [PATCH 4/5] arm64: dma-mapping: Only swizzle DMA ops for
- IOMMU_DOMAIN_DMA
+Date: Thu, 19 Jan 2017 18:19:12 +0000
+Subject: [PATCH 2/5] iommu/arm-smmu: Install bypass S2CRs for
+ IOMMU_DOMAIN_IDENTITY domains
 In-Reply-To: <1484849955-1871-1-git-send-email-will.deacon@arm.com>
 References: <1484849955-1871-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1484849955-1871-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1484849955-1871-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm64 DMA-mapping implementation sets the DMA ops to the IOMMU DMA
-ops if we detect that an IOMMU is present for the master and the DMA
-ranges are valid.
+In preparation for allowing the default domain type to be overridden,
+this patch adds support for IOMMU_DOMAIN_IDENTITY domains to the
+ARM SMMU driver.
 
-In the case when the IOMMU domain for the device is not of type
-IOMMU_DOMAIN_DMA, then we have no business swizzling the ops, since
-we're not in control of the underlying address space. This patch leaves
-the DMA ops alone for masters attached to non-DMA IOMMU domains.
+An identity domain is created by placing the corresponding S2CR
+registers into "bypass" mode, which allows transactions to flow through
+the SMMU without any translation.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/mm/dma-mapping.c | 17 ++++++++++++-----
- 1 file changed, 12 insertions(+), 5 deletions(-)
+ drivers/iommu/arm-smmu.c | 20 +++++++++++++++++---
+ 1 file changed, 17 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index e04082700bb1..5d3c6ad621e8 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -831,14 +831,21 @@ static bool do_iommu_attach(struct device *dev, const struct iommu_ops *ops,
- 	 * then the IOMMU core will have already configured a group for this
- 	 * device, and allocated the default domain for that group.
- 	 */
--	if (!domain || iommu_dma_init_domain(domain, dma_base, size, dev)) {
--		pr_warn("Failed to set up IOMMU for device %s; retaining platform DMA ops\n",
--			dev_name(dev));
--		return false;
-+	if (!domain)
-+		goto out_err;
-+
-+	if (domain->type == IOMMU_DOMAIN_DMA) {
-+		if (iommu_dma_init_domain(domain, dma_base, size, dev))
-+			goto out_err;
-+
-+		dev->archdata.dma_ops = &iommu_dma_ops;
- 	}
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index a328ffb75509..0f5e42a719e5 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -404,6 +404,7 @@ enum arm_smmu_domain_stage {
+ 	ARM_SMMU_DOMAIN_S1 = 0,
+ 	ARM_SMMU_DOMAIN_S2,
+ 	ARM_SMMU_DOMAIN_NESTED,
++	ARM_SMMU_DOMAIN_BYPASS,
+ };
  
--	dev->archdata.dma_ops = &iommu_dma_ops;
- 	return true;
-+out_err:
-+	pr_warn("Failed to set up IOMMU for device %s; retaining platform DMA ops\n",
-+		 dev_name(dev));
-+	return false;
- }
+ struct arm_smmu_domain {
+@@ -824,6 +825,12 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
+ 	if (smmu_domain->smmu)
+ 		goto out_unlock;
  
- static void queue_iommu_attach(struct device *dev, const struct iommu_ops *ops,
++	if (domain->type == IOMMU_DOMAIN_IDENTITY) {
++		smmu_domain->stage = ARM_SMMU_DOMAIN_BYPASS;
++		smmu_domain->smmu = smmu;
++		goto out_unlock;
++	}
++
+ 	/*
+ 	 * Mapping the requested stage onto what we support is surprisingly
+ 	 * complicated, mainly because the spec allows S1+S2 SMMUs without
+@@ -984,7 +991,7 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
+ 	void __iomem *cb_base;
+ 	int irq;
+ 
+-	if (!smmu)
++	if (!smmu || domain->type == IOMMU_DOMAIN_IDENTITY)
+ 		return;
+ 
+ 	/*
+@@ -1007,7 +1014,9 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+ {
+ 	struct arm_smmu_domain *smmu_domain;
+ 
+-	if (type != IOMMU_DOMAIN_UNMANAGED && type != IOMMU_DOMAIN_DMA)
++	if (type != IOMMU_DOMAIN_UNMANAGED &&
++	    type != IOMMU_DOMAIN_DMA &&
++	    type != IOMMU_DOMAIN_IDENTITY)
+ 		return NULL;
+ 	/*
+ 	 * Allocate the domain and initialise some of its data structures.
+@@ -1205,10 +1214,15 @@ static int arm_smmu_domain_add_master(struct arm_smmu_domain *smmu_domain,
+ {
+ 	struct arm_smmu_device *smmu = smmu_domain->smmu;
+ 	struct arm_smmu_s2cr *s2cr = smmu->s2crs;
+-	enum arm_smmu_s2cr_type type = S2CR_TYPE_TRANS;
+ 	u8 cbndx = smmu_domain->cfg.cbndx;
++	enum arm_smmu_s2cr_type type;
+ 	int i, idx;
+ 
++	if (smmu_domain->stage == ARM_SMMU_DOMAIN_BYPASS)
++		type = S2CR_TYPE_BYPASS;
++	else
++		type = S2CR_TYPE_TRANS;
++
+ 	for_each_cfg_sme(fwspec, i, idx) {
+ 		if (type == s2cr[idx].type && cbndx == s2cr[idx].cbndx)
+ 			continue;
 -- 
 2.1.4
