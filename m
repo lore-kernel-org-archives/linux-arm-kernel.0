@@ -1,33 +1,43 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Thu, 19 Jan 2017 14:29:48 +0100
-Subject: [PATCH v4 14/14] ARM: davinci: remove BUG_ON() from
- da850_register_sata()
-In-Reply-To: <1484832588-18413-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1484832588-18413-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1484832588-18413-15-git-send-email-bgolaszewski@baylibre.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Thu, 19 Jan 2017 14:34:11 +0100
+Subject: [PATCH 4/7] Documentation: dt: iio: stm32-adc: optional dma support
+In-Reply-To: <1484832854-6314-1-git-send-email-fabrice.gasnier@st.com>
+References: <1484832854-6314-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1484832854-6314-5-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ahci driver now supports other refclk clock rates.
+STM32 ADC can use dma. Add dt documentation for optional dma support.
 
-Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 ---
- arch/arm/mach-davinci/devices-da8xx.c | 3 ---
- 1 file changed, 3 deletions(-)
+ Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-index cfceb32..7cf529f 100644
---- a/arch/arm/mach-davinci/devices-da8xx.c
-+++ b/arch/arm/mach-davinci/devices-da8xx.c
-@@ -1080,9 +1080,6 @@ int __init da850_register_sata(unsigned long refclkpn)
- {
- 	int ret;
+diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+index 49ed82e..5dfc88e 100644
+--- a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
++++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+@@ -53,6 +53,11 @@ Required properties:
+ - #io-channel-cells = <1>: See the IIO bindings section "IIO consumers" in
+   Documentation/devicetree/bindings/iio/iio-bindings.txt
  
--	/* please see comment in drivers/ata/ahci_da850.c */
--	BUG_ON(refclkpn != 100 * 1000 * 1000);
--
- 	ret = da850_register_sata_refclk(refclkpn);
- 	if (ret)
- 		return ret;
++Optional properties:
++- dmas: Phandle to dma channel for this ADC instance.
++  See ../../dma/dma.txt for details.
++- dma-names: Must be "rx" when dmas property is being used.
++
+ Example:
+ 	adc: adc at 40012000 {
+ 		compatible = "st,stm32f4-adc-core";
+@@ -77,6 +82,8 @@ Example:
+ 			interrupt-parent = <&adc>;
+ 			interrupts = <0>;
+ 			st,adc-channels = <8>;
++			dmas = <&dma2 0 0 0x400 0x0>;
++			dma-names = "rx";
+ 		};
+ 		...
+ 		other adc child nodes follow...
 -- 
-2.9.3
+1.9.1
