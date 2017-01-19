@@ -1,117 +1,59 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Thu, 19 Jan 2017 14:34:10 +0100
-Subject: [PATCH 3/7] iio: adc: stm32: add trigger polarity extended attribute
-In-Reply-To: <1484832854-6314-1-git-send-email-fabrice.gasnier@st.com>
-References: <1484832854-6314-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1484832854-6314-4-git-send-email-fabrice.gasnier@st.com>
+Date: Thu, 19 Jan 2017 14:34:07 +0100
+Subject: [PATCH 0/7] Add support for triggered buffer mode to STM32 ADC
+Message-ID: <1484832854-6314-1-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define extended attribute so that user may choose rising, falling or both
-edges for external trigger sources.
-Default to rising edge in case it isn't set.
+The following patches add support for triggered buffer mode.
+These are based on top of "Add PWM and IIO timer drivers for STM32"
+series. Reference:
+https://lkml.org/lkml/2017/1/18/588
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
- drivers/iio/adc/stm32-adc.c | 51 ++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 50 insertions(+), 1 deletion(-)
+STM32 ADC, can use either interrupts or DMA to collect data.
+Either timer trigger output (TRGO) or PWM can be used as trigger source.
+This patchset has been tested on STM32F429 eval board.
 
-diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
-index 30708bc..9753c39 100644
---- a/drivers/iio/adc/stm32-adc.c
-+++ b/drivers/iio/adc/stm32-adc.c
-@@ -164,6 +164,7 @@ struct stm32_adc_trig_info {
-  * @lock:		spinlock
-  * @bufi:		data buffer index
-  * @num_conv:		expected number of scan conversions
-+ * @exten:		external trigger config (enable/polarity)
-  */
- struct stm32_adc {
- 	struct stm32_adc_common	*common;
-@@ -175,6 +176,7 @@ struct stm32_adc {
- 	spinlock_t		lock;		/* interrupt lock */
- 	int			bufi;
- 	int			num_conv;
-+	enum stm32_adc_exten	exten;
- };
- 
- /**
-@@ -449,7 +451,9 @@ static int stm32_adc_set_trig(struct iio_dev *indio_dev,
- 
- 		/* set trigger source, default to rising edge */
- 		extsel = ret;
--		exten = STM32_EXTEN_HWTRIG_RISING_EDGE;
-+		if (adc->exten == STM32_EXTEN_SWTRIG)
-+			adc->exten = STM32_EXTEN_HWTRIG_RISING_EDGE;
-+		exten = adc->exten;
- 	}
- 
- 	spin_lock_irqsave(&adc->lock, flags);
-@@ -463,6 +467,39 @@ static int stm32_adc_set_trig(struct iio_dev *indio_dev,
- 	return 0;
- }
- 
-+static int stm32_adc_set_trig_pol(struct iio_dev *indio_dev,
-+				  const struct iio_chan_spec *chan,
-+				  unsigned int type)
-+{
-+	struct stm32_adc *adc = iio_priv(indio_dev);
-+
-+	adc->exten = type;
-+
-+	return 0;
-+}
-+
-+static int stm32_adc_get_trig_pol(struct iio_dev *indio_dev,
-+				  const struct iio_chan_spec *chan)
-+{
-+	struct stm32_adc *adc = iio_priv(indio_dev);
-+
-+	return adc->exten;
-+}
-+
-+static const char * const stm32_trig_pol_items[] = {
-+	[STM32_EXTEN_SWTRIG] = "swtrig",
-+	[STM32_EXTEN_HWTRIG_RISING_EDGE] = "rising-edge",
-+	[STM32_EXTEN_HWTRIG_FALLING_EDGE] = "falling-edge",
-+	[STM32_EXTEN_HWTRIG_BOTH_EDGES] = "both-edges",
-+};
-+
-+const struct iio_enum stm32_adc_trig_pol = {
-+	.items = stm32_trig_pol_items,
-+	.num_items = ARRAY_SIZE(stm32_trig_pol_items),
-+	.get = stm32_adc_get_trig_pol,
-+	.set = stm32_adc_set_trig_pol,
-+};
-+
- /**
-  * stm32_adc_single_conv() - Performs a single conversion
-  * @indio_dev: IIO device
-@@ -745,6 +782,17 @@ static irqreturn_t stm32_adc_trigger_handler(int irq, void *p)
- 	return IRQ_HANDLED;
- }
- 
-+static const struct iio_chan_spec_ext_info stm32_adc_ext_info[] = {
-+	IIO_ENUM("trigger_pol", IIO_SHARED_BY_ALL, &stm32_adc_trig_pol),
-+	{
-+		.name = "trigger_pol_available",
-+		.shared = IIO_SHARED_BY_ALL,
-+		.read = iio_enum_available_read,
-+		.private = (uintptr_t)&stm32_adc_trig_pol,
-+	},
-+	{},
-+};
-+
- static void stm32_adc_chan_init_one(struct iio_dev *indio_dev,
- 				    struct iio_chan_spec *chan,
- 				    const struct stm32_adc_chan_spec *channel,
-@@ -760,6 +808,7 @@ static void stm32_adc_chan_init_one(struct iio_dev *indio_dev,
- 	chan->scan_type.sign = 'u';
- 	chan->scan_type.realbits = 12;
- 	chan->scan_type.storagebits = 16;
-+	chan->ext_info = stm32_adc_ext_info;
- }
- 
- static int stm32_adc_chan_of_init(struct iio_dev *indio_dev)
+- Example to enable timer1 PWM:
+cd /sys/devices/platform/soc/40010000.timers/40010000.timers:pwm/pwm/pwmchip4/
+echo 0 > export # timer 1 channel 1
+echo 1000000 > pwm0/period # 1000Hz
+echo 500000 > pwm0/duty_cycle
+echo 1 > pwm0/enable
+
+- Example to enable timer3 TRGO:
+cd /sys/bus/iio/devices/
+cat trigger6/name 
+tim1_ch1
+cat trigger0/name 
+tim3_trgo
+echo 1000 > trigger0/sampling_frequency
+
+- Example to configure STM32ADC in triggered buffer mode, with timer1 PWM
+  or timer3 TRGO:
+cd /sys/bus/iio/devices/iio\:device0
+echo tim1_ch1 > trigger/current_trigger
+OR: echo tim3_trgo > trigger/current_trigger
+echo 1 > scan_elements/in_voltage8_en
+echo 1 > buffer/enable
+
+Fabrice Gasnier (7):
+  iio: adc: stm32: add support for triggered buffer mode
+  iio: adc: stm32: Enable use of stm32 timer triggers
+  iio: adc: stm32: add trigger polarity extended attribute
+  Documentation: dt: iio: stm32-adc: optional dma support
+  iio: adc: stm32: add optional dma support
+  ARM: dts: stm32: Enable dma by default on stm32f4 adc
+  ARM: dts: stm32: Enable pwm1 and pwm3 for stm32f469-eval
+
+ .../devicetree/bindings/iio/adc/st,stm32-adc.txt   |   7 +
+ arch/arm/boot/dts/stm32429i-eval.dts               |  28 +
+ arch/arm/boot/dts/stm32f429.dtsi                   |   6 +
+ drivers/iio/adc/Kconfig                            |   6 +
+ drivers/iio/adc/stm32-adc-core.c                   |   1 +
+ drivers/iio/adc/stm32-adc-core.h                   |   2 +
+ drivers/iio/adc/stm32-adc.c                        | 643 ++++++++++++++++++++-
+ 7 files changed, 690 insertions(+), 3 deletions(-)
+
 -- 
 1.9.1
