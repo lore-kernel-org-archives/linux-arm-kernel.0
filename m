@@ -1,62 +1,58 @@
 From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Thu, 19 Jan 2017 08:36:28 -0800
-Subject: [PATCH 0/3] i.MX7 PCI support
-Message-ID: <20170119163631.10668-1-andrew.smirnov@gmail.com>
+Date: Thu, 19 Jan 2017 08:36:30 -0800
+Subject: [PATCH 2/3] PCI: imx6: Allow probe deferal by reset GPIO
+In-Reply-To: <20170119163631.10668-1-andrew.smirnov@gmail.com>
+References: <20170119163631.10668-1-andrew.smirnov@gmail.com>
+Message-ID: <20170119163631.10668-3-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, everyone:
+Some designs implement reset GPIO via a GPIO expander connected to a
+peripheral bus. One such example would be i.MX7 Sabre board where said
+GPIO is provided by SPI shift register connected to a bitbanged SPI
+bus. In order to support such designs allow reset GPIO request to defer
+probing of the driver.
 
-This is a small patchset intended to add PCI-subsystem bits necessary
-for enabling PCI support on i.MX7. This patchset is not
-self-sufficient and depends on three other patchsets:
+Cc: yurovsky at gmail.com
+Cc: Richard Zhu <hongxing.zhu@nxp.com>
+Cc: Lucas Stach <l.stach@pengutronix.de>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+Cc: Fabio Estevam <festevam@gmail.com>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+---
+ drivers/pci/host/pci-imx6.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-  - Changes to anatop regulator driver
-  - Chagnes to i.MX device tree code pertaining to anatop regulator
-  - Changes to i.MX device tree pertaining to PCIe controller
-
-I submitted first two in [1] and [2], and, unless adwised otherwise,
-am planning on submitting the last one once [1], [2] and this patchset
-are accepted.
-
-This patch was tested against i210 card on i.MX7 Sabre board
-(connected via mini-PCIe to PCIe adapter) with general functionality
-and bandwidth tests.
-
-Note that this patchset have known "blemish" where Gen1 cards (at
-least) report this message:
-
- imx6q-pcie 33800000.pcie: Speed change timeout
- imx6q-pcie 33800000.pcie: Failed to bring link up!
-
-due to hardware not clearing PORT_LOGIC_SPEED_CHANGE bit after speed
-change is requested, but since this does not seem to affect the
-functioning of the link I am hoping this is not a deal breaker.
-
-I posted a question on NXP community web-site [3] hoping to get some
-additional info to help resolve the matter and if anyone has any
-suggestions I'd love to hear them.
-
-Thanks,
-Andrey Smirnov
-
-[1] https://www.spinics.net/lists/arm-kernel/msg553215.html
-[2] https://www.spinics.net/lists/kernel/msg2418471.html
-[3] https://community.nxp.com/message/867943
-
-Andrey Smirnov (3):
-  PCI: imx6: Fix a typo in error message
-  PCI: imx6: Allow probe deferal by reset GPIO
-  PCI: imx6: Add code to support i.MX7D
-
- .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |   6 +-
- drivers/pci/host/pci-imx6.c                        | 197 ++++++++++++++++++---
- include/linux/mfd/syscon/imx7-gpc.h                |  18 ++
- include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
- include/linux/mfd/syscon/imx7-src.h                |  18 ++
- 5 files changed, 214 insertions(+), 29 deletions(-)
- create mode 100644 include/linux/mfd/syscon/imx7-gpc.h
- create mode 100644 include/linux/mfd/syscon/imx7-src.h
-
+diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+index 50a1291..574f026 100644
+--- a/drivers/pci/host/pci-imx6.c
++++ b/drivers/pci/host/pci-imx6.c
+@@ -653,6 +653,9 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+ 			dev_err(dev, "unable to get reset gpio\n");
+ 			return ret;
+ 		}
++	} else if (imx6_pcie->reset_gpio == -EPROBE_DEFER) {
++		dev_info(dev, "probe is defered by reset GPIO\n");
++		return imx6_pcie->reset_gpio;
+ 	}
+ 
+ 	/* Fetch clocks */
+@@ -746,11 +749,12 @@ static struct platform_driver imx6_pcie_driver = {
+ 		.name	= "imx6q-pcie",
+ 		.of_match_table = imx6_pcie_of_match,
+ 	},
++	.probe    = imx6_pcie_probe,
+ 	.shutdown = imx6_pcie_shutdown,
+ };
+ 
+ static int __init imx6_pcie_init(void)
+ {
+-	return platform_driver_probe(&imx6_pcie_driver, imx6_pcie_probe);
++	return platform_driver_register(&imx6_pcie_driver);
+ }
+ device_initcall(imx6_pcie_init);
 -- 
 2.9.3
