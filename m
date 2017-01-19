@@ -1,75 +1,47 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 18 Jan 2017 16:47:50 -0800
-Subject: [PATCHv4 2/5] arm: mvebu: support for SMP on 98DX3336 SoC
-In-Reply-To: <20170113091222.7132-3-chris.packham@alliedtelesis.co.nz>
-References: <20170113091222.7132-1-chris.packham@alliedtelesis.co.nz>
- <20170113091222.7132-3-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20170119004750.GC4857@codeaurora.org>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Thu, 19 Jan 2017 01:17:46 +0000
+Subject: Nokia N900: mixers changed between 4.9 and 4.10-rc3,
+ no longer can use in-call speaker
+In-Reply-To: <20170118215549.GA25865@amd>
+References: <20170112181826.GA28290@amd> <201701121934.19810@pali>
+ <20170114225614.GA25321@amd> <201701150100.54214@pali>
+ <20170116211540.GA19736@amd> <20170118204459.GA5622@amd>
+ <20170118215549.GA25865@amd>
+Message-ID: <87tw8v4zpt.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13, Chris Packham wrote:
-> diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
-> index 46c742d3bd41..59be3ca0464f 100644
-> --- a/arch/arm/mach-mvebu/platsmp.c
-> +++ b/arch/arm/mach-mvebu/platsmp.c
-> @@ -184,3 +184,89 @@ const struct smp_operations armada_xp_smp_ops __initconst = {
->  
->  CPU_METHOD_OF_DECLARE(armada_xp_smp, "marvell,armada-xp-smp",
->  		      &armada_xp_smp_ops);
-> +
-> +struct resume_controller {
-> +	u32 resume_control;
-> +	u32 resume_boot_addr;
-> +};
-> +
-> +static const struct resume_controller mv98dx3336_resume_controller = {
-> +	.resume_control = 0x08,
-> +	.resume_boot_addr = 0x04,
-> +};
-> +
-> +static const struct of_device_id of_mv98dx3236_resume_table[] = {
-> +	{
-> +		.compatible = "marvell,98dx3336-resume-ctrl",
-> +		.data = (void *)&mv98dx3336_resume_controller,
 
-Useless cast?
+Hi Pavel
 
-> +	},
-> +	{ /* end of list */ },
-> +};
-> +
-> +static int mv98dx3236_resume_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
-> +{
-> +	const struct of_device_id *match;
-> +	struct device_node *np;
-> +	void __iomem *base;
-> +	struct resume_controller *rc;
-> +
-> +	WARN_ON(hw_cpu != 1);
-> +
-> +	np = of_find_matching_node_and_match(NULL, of_mv98dx3236_resume_table,
-> +					     &match);
-> +	if (!np)
-> +		return -ENODEV;
-> +
-> +	base = of_io_request_and_map(np, 0, of_node_full_name(np));
-> +	rc = (struct resume_controller *)match->data;
+> > pavel at amd:/data/l/linux-n900$ git bisect bad
+> > 1a653aa44725668590b36bbe2d7fe4736a69f055 is the first bad commit
+> > commit 1a653aa44725668590b36bbe2d7fe4736a69f055
+> > Author: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> > Date:   Wed Nov 30 06:22:55 2016 +0000
+> > 
+> >     ASoC: core: replace aux_comp_list to component_dev_list
+> > 
+> >     Now, Card has component_dev_list, we can replace aux_comp_list
+> >         to component_dev_list with new auxiliary flags
+> > 
+> >     Signed-off-by: Kuninori Morimoto
+> >     <kuninori.morimoto.gx@renesas.com>
+> >         Signed-off-by: Mark Brown <broonie@kernel.org>
+> > 
+> > :040000 040000 a571fa05e5ce8e00b73bbc3f1e30e26775d619e8
+> > e9336929cacf2d7bc94da99acfc10c9a7f513b8b M	include
+> > :040000 040000 87976e9406d452e791870cc12e27cb67ba04fd12
+> > 60d36f685642621c0e3ebb61ba7a14186d8b3eb0 M	sound
+> > pavel at amd:/data/l/linux-n900$
+> > 
+> > I'll try reverting this patch on top of 4.10-rc, next. Any other ideas?
+> 
+> Reverting that fixed the issue, but when I re-checked current -rc4, it
+> seems it has similar fix there, too. GOod.
 
-Useless cast?
+Sorry about my fault, thanks to Sylwester for fixing it
 
-> +	of_node_put(np);
-> +	if (IS_ERR(base))
-> +		return PTR_ERR(base);
-> +
-> +	writel(0, base + rc->resume_control);
-> +	writel(virt_to_phys(boot_addr), base + rc->resume_boot_addr);
-> +
-
-Otherwise
-
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Best regards
+---
+Kuninori Morimoto
