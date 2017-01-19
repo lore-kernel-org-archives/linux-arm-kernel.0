@@ -1,31 +1,33 @@
-From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Thu, 19 Jan 2017 14:31:56 +0100
-Subject: [PATCH v3 06/13] ARM: davinci: da850: model the SATA refclk
-In-Reply-To: <ff4deee6-9700-fff3-be96-0ad2f008914b@lechnology.com>
-References: <1484745601-4769-1-git-send-email-bgolaszewski@baylibre.com>
- <1484745601-4769-7-git-send-email-bgolaszewski@baylibre.com>
- <ff4deee6-9700-fff3-be96-0ad2f008914b@lechnology.com>
-Message-ID: <CAMpxmJXBx4TUd-T3zuTY=VD=YAZf5kaq1fqbGTOzZrgnLosp1A@mail.gmail.com>
+From: amelie.delaunay@st.com (Amelie Delaunay)
+Date: Thu, 19 Jan 2017 14:45:19 +0100
+Subject: [PATCH 3/3] ARM: dts: stm32: enable RTC on stm32746g-eval
+In-Reply-To: <1484833519-9298-1-git-send-email-amelie.delaunay@st.com>
+References: <1484833519-9298-1-git-send-email-amelie.delaunay@st.com>
+Message-ID: <1484833519-9298-4-git-send-email-amelie.delaunay@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-01-18 18:26 GMT+01:00 David Lechner <david@lechnology.com>:
-> On 01/18/2017 07:19 AM, Bartosz Golaszewski wrote:
->>
->>  int __init da850_register_sata(unsigned long refclkpn)
->>  {
->> +       int ret;
->> +
->>         /* please see comment in drivers/ata/ahci_da850.c */
->>         BUG_ON(refclkpn != 100 * 1000 * 1000);
->
->
-> This BUG_ON() should be removed since the sata driver can now handle other
-> clock frequencies.
->
+This patch enables RTC on stm32746g-eval with default LSE clock source.
 
-I did that in a separate patch coming after the ahci changes to keep
-the series bisectable.
+Signed-off-by: Amelie Delaunay <amelie.delaunay@st.com>
+---
+ arch/arm/boot/dts/stm32746g-eval.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Thanks,
-Bartosz Golaszewski
+diff --git a/arch/arm/boot/dts/stm32746g-eval.dts b/arch/arm/boot/dts/stm32746g-eval.dts
+index 58d5393..ae64ea4 100644
+--- a/arch/arm/boot/dts/stm32746g-eval.dts
++++ b/arch/arm/boot/dts/stm32746g-eval.dts
+@@ -82,6 +82,10 @@
+ 	};
+ };
+ 
++&rtc {
++	status = "okay";
++};
++
+ &usart1 {
+ 	pinctrl-0 = <&usart1_pins_a>;
+ 	pinctrl-names = "default";
+-- 
+1.9.1
