@@ -1,67 +1,41 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Thu, 19 Jan 2017 12:44:27 +0000
-Subject: [PATCH] ARM: dts: fix SolidRun iMX6 platforms
-Message-ID: <E1cUC4p-00087z-NF@rmk-PC.armlinux.org.uk>
+From: tj@kernel.org (Tejun Heo)
+Date: Thu, 19 Jan 2017 04:52:29 -0800
+Subject: [PATCH v3 09/13] sata: ahci: export ahci_do_hardreset() locally
+In-Reply-To: <CAMpxmJULuF3cB7+Vy_qeWkTjooHvx8yk70w59Q=XNd0aAREcuw@mail.gmail.com>
+References: <1484745601-4769-1-git-send-email-bgolaszewski@baylibre.com>
+ <1484745601-4769-10-git-send-email-bgolaszewski@baylibre.com>
+ <20170118182826.GA1451@mtj.duckdns.org>
+ <CAMpxmJULuF3cB7+Vy_qeWkTjooHvx8yk70w59Q=XNd0aAREcuw@mail.gmail.com>
+Message-ID: <20170119125229.GA16438@mtj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Removal of skeleton.dtsi from imx6qdl.dtsi caused a regression on
-SolidRun platforms as the /chosen and /memory nodes are no longer
-populated.  Fix this by adding the nodes into the platform .dtsi
-files.
+On Thu, Jan 19, 2017 at 11:55:24AM +0100, Bartosz Golaszewski wrote:
+> 2017-01-18 19:28 GMT+01:00 Tejun Heo <tj@kernel.org>:
+> > Hello, Bartosz.
+> >
+> > On Wed, Jan 18, 2017 at 02:19:57PM +0100, Bartosz Golaszewski wrote:
+> >> We need a way to retrieve the information about the online state of
+> >> the link in the ahci-da850 driver.
+> >>
+> >> Create a new function: ahci_do_hardreset() which is called from
+> >> ahci_hardreset() for backwards compatibility, but has an additional
+> >> argument: 'online' - which can be used to check if the link is online
+> >> after this function returns.
+> >
+> > Please just add @online to ahci_hardreset() and update the callers.
+> > Other than that, the sata changes look good to me.
+> >
+> 
+> Are you sure? There are 23 places in drivers/ata/ where the .hardreset
+> callback is assigned. I'd prefer not to change the drivers I can't
+> test. Besides all other **reset callbacks take three arguments -
+> should we really only change one of them for a single driver's needs?
 
-Uncompressing Linux... done, booting the kernel.
-Booting Linux on physical CPU 0x0
-Linux version 4.10.0-rc3+ (rmk at rmk-PC.arm.linux.org.uk) (gcc version 4.7.4 (GCC) ) #2066 SMP Thu Jan 19 12:31:19 GMT 2017
-CPU: ARMv7 Processor [412fc09a] revision 10 (ARMv7), cr=10c5387d
-CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
-OF: fdt:Machine model: SolidRun Cubox-i Dual/Quad
-INITRD: 0x20000000+0x001cd000 is not a memory region - disabling initrd
-cma: Failed to reserve 256 MiB
-Memory policy: Data cache writealloc
-Kernel panic - not syncing: ERROR: Failed to allocate 0x2000 bytes below 0x0.
+Ah, didn't realize this was the callback, sorry.  What you did is
+perfect.  Please disregard my comment.
 
-CPU: 0 PID: 0 Comm: swapper Not tainted 4.10.0-rc3+ #2066
-Hardware name: Freescale i.MX6 Quad/DualLite (Device Tree)
-Backtrace: invalid frame pointer 0xc09e5e44c
----[ end Kernel panic - not syncing: ERROR: Failed to allocate 0x2000 bytes below 0x0.
+Thanks.
 
-Fixes: 7f107887d199 ("ARM: dts: imx: Remove skeleton.dtsi")
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- arch/arm/boot/dts/imx6qdl-cubox-i.dtsi      | 6 ++++++
- arch/arm/boot/dts/imx6qdl-hummingboard.dtsi | 2 ++
- 2 files changed, 8 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-index ff41f83551de..69e3a848ee74 100644
---- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-@@ -44,6 +44,12 @@
- #include <dt-bindings/gpio/gpio.h>
- 
- / {
-+	chosen {
-+		stdout-path = &uart1;
-+	};
-+
-+	memory { device_type = "memory"; reg = <0 0>; };
-+
- 	ir_recv: ir-receiver {
- 		compatible = "gpio-ir-receiver";
- 		gpios = <&gpio3 9 1>;
-diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-index a5e5356cdc6a..ae2feb882193 100644
---- a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-@@ -46,6 +46,8 @@
- 		stdout-path = &uart1;
- 	};
- 
-+	memory { device_type = "memory"; reg = <0 0>; };
-+
- 	ir_recv: ir-receiver {
- 		compatible = "gpio-ir-receiver";
- 		gpios = <&gpio3 5 GPIO_ACTIVE_LOW>;
 -- 
-2.7.4
+tejun
