@@ -1,74 +1,107 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 19 Jan 2017 18:19:15 +0000
-Subject: [PATCH 5/5] iommu: Allow default domain type to be set on the kernel
- command line
-In-Reply-To: <1484849955-1871-1-git-send-email-will.deacon@arm.com>
-References: <1484849955-1871-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1484849955-1871-6-git-send-email-will.deacon@arm.com>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Thu, 19 Jan 2017 10:22:10 -0800 (PST)
+Subject: [Xen-devel] [RFC] Device memory mappings for Dom0 on ARM64 ACPI
+ systems
+In-Reply-To: <20170119154129.7dnjzvq23jop7oye@dhcp-3-221.uk.xensource.com>
+References: <alpine.DEB.2.10.1701171309040.2347@sstabellini-ThinkPad-X260>
+ <20170118110243.ctqpperggim5k7dw@dhcp-3-221.uk.xensource.com>
+ <alpine.DEB.2.10.1701181058110.10192@sstabellini-ThinkPad-X260>
+ <20c89f12-cb0c-1145-99d0-320b2080b503@arm.com>
+ <20170119154129.7dnjzvq23jop7oye@dhcp-3-221.uk.xensource.com>
+Message-ID: <alpine.DEB.2.10.1701191002330.10192@sstabellini-ThinkPad-X260>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IOMMU core currently initialises the default domain for each group
-to IOMMU_DOMAIN_DMA, under the assumption that devices will use
-IOMMU-backed DMA ops by default. However, in some cases it is desirable
-for the DMA ops to bypass the IOMMU for performance reasons, reserving
-use of translation for subsystems such as VFIO that require it for
-enforcing device isolation.
+On Thu, 19 Jan 2017, Roger Pau Monn? wrote:
+> On Wed, Jan 18, 2017 at 07:13:23PM +0000, Julien Grall wrote:
+> > Hi,
+> > 
+> > On 18/01/17 19:05, Stefano Stabellini wrote:
+> > > On Wed, 18 Jan 2017, Roger Pau Monn? wrote:
+> > > > On Tue, Jan 17, 2017 at 02:20:54PM -0800, Stefano Stabellini wrote:
+> > > > > a) One option is to provide a Xen specific implementation of
+> > > > > acpi_os_ioremap in Linux. I think this is the cleanest approach, but
+> > > > > unfortunately, it doesn't cover cases where ioremap is used directly. (2)
+> > > > > is one of such cases, see
+> > > > > arch/arm64/kernel/pci.c:pci_acpi_setup_ecam_mapping and
+> > > > > drivers/pci/ecam.c:pci_ecam_create. (3) is another one of these cases,
+> > > > > see drivers/acpi/apei/bert.c:bert_init.
+> > > > 
+> > > > This is basically the same as b) from Xen's PoV, the only difference is where
+> > > > you would call the hypercall from Dom0 to establish stage-2 mappings.
+> > > 
+> > > Right, but it is important from the Linux point of view, this is why I
+> > > am asking the Linux maintainers.
+> > > 
+> > > 
+> > > > > b) Otherwise, we could write an alternative implementation of ioremap
+> > > > > on arm64. The Xen specific ioremap would request a stage-2 mapping
+> > > > > first, then create the stage-1 mapping as usual. However, this means
+> > > > > issuing an hypercall for every ioremap call.
+> > > > 
+> > > > This seems fine to me, and at present is the only way to get something working.
+> > > > As you said not being able to discover OperationRegions from Xen means that
+> > > > there's a chance some MMIO might not be added to the stage-2 mappings.
+> > > > 
+> > > > Then what's the initial memory map state when Dom0 is booted? There are no MMIO
+> > > > mappings at all, and Dom0 must request mappings for everything?
+> > > 
+> > > Yes
+> > 
+> > To give more context here, the UEFI memory map does not report all the MMIO
+> > regions. So there is no possibility to map MMIO at boot.
+> 
+> I've been able to get a Dom0 booting on x86 by mapping all the regions marked
+> as ACPI in the memory map, plus the BARs of PCI devices and the MCFG areas. But
+> this is not really optimal, since as Stefano says:
+> 
+>  1. If there are new tables that contain memory regions that should be mapped to
+>    Dom0, Xen will need to be updated in order to work on those systems.
+>  2. ATM it's not possible for Xen to know all the OperationRegions described in
+>    the ACPI DSDT/SSDT tables.
+> 
+> I'm not that worried about 1, since the user will also need a newish Dom0
+> kernel in order to access those devices, and it doesn't seem like new ACPI
+> tables appear out of the blue everyday. It however puts more pressure on Xen in
+> order to aggressively track ACPI changes.
+> 
+> In order to fix 2 an AML parser would need to be added to Xen.
 
-Rather than modify each IOMMU driver to provide different semantics for
-DMA domains, instead we introduce a command line parameter that can be
-used to change the type of the default domain. Passthrough can then be
-specified using "iommu.default_domain=identity" on the kernel command
-line.
+This brings me to another possible solution: we could map everything
+beforehand in Xen as you wrote, then use a), an alternative
+implementation of acpi_os_ioremap, to fix problem 2.
+In this scheme, 1. remains unfixed.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- drivers/iommu/iommu.c | 19 +++++++++++++++++--
- 1 file changed, 17 insertions(+), 2 deletions(-)
+I think this is suboptimal, but it is a possibility.
 
-diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
-index dbe7f653bb7c..69f7f1a75543 100644
---- a/drivers/iommu/iommu.c
-+++ b/drivers/iommu/iommu.c
-@@ -36,6 +36,7 @@
- 
- static struct kset *iommu_group_kset;
- static DEFINE_IDA(iommu_group_ida);
-+static unsigned int iommu_def_domain_type = IOMMU_DOMAIN_DMA;
- 
- struct iommu_callback_data {
- 	const struct iommu_ops *ops;
-@@ -86,6 +87,20 @@ static int __iommu_attach_group(struct iommu_domain *domain,
- static void __iommu_detach_group(struct iommu_domain *domain,
- 				 struct iommu_group *group);
- 
-+static int __init iommu_set_def_domain_type(char *str)
-+{
-+	if (!str)
-+		return -EINVAL;
-+
-+	if (!strcmp(str, "identity"))
-+		iommu_def_domain_type = IOMMU_DOMAIN_IDENTITY;
-+	else if (!strcmp(str, "dma"))
-+		iommu_def_domain_type = IOMMU_DOMAIN_DMA;
-+
-+	return 0;
-+}
-+early_param("iommu.default_domain", iommu_set_def_domain_type);
-+
- static ssize_t iommu_group_attr_show(struct kobject *kobj,
- 				     struct attribute *__attr, char *buf)
- {
-@@ -847,8 +862,8 @@ struct iommu_group *iommu_group_get_for_dev(struct device *dev)
- 	 * IOMMU driver.
- 	 */
- 	if (!group->default_domain) {
--		group->default_domain = __iommu_domain_alloc(dev->bus,
--							     IOMMU_DOMAIN_DMA);
-+		group->default_domain =
-+			__iommu_domain_alloc(dev->bus, iommu_def_domain_type);
- 		if (!group->domain)
- 			group->domain = group->default_domain;
- 	}
--- 
-2.1.4
+
+> > > > What happens to ACPI tables crafted for Dom0 that reside in RAM? That would
+> > > > apply to the STAO and to the other tables that are crafted for Dom0 at build
+> > > > time. Should Dom0 also request stage-2 mappings for them, and Xen simply ignore
+> > > > those calls?
+> > > 
+> > > The ACPI (and UEFI) tables are mapped by Xen
+> > 
+> > I think Royger's point is DOM0 cannot tell whether a region has been mapped
+> > by Xen or not.
+> > 
+> > The function ioremap will be used to map anything (it is the leaf of all
+> > mapping functions), and will call Xen no matter the address passed. It could
+> > be a RAM region, HW device region, emulated device region.
+> 
+> Exactly, from a guest OS PoV it would request those mappings for all device
+> memory regions. But from Xen's perspective, those request might be made against
+> at least 3 different types of p2m regions:
+> 
+>  - Regions trapped by emulated devices inside of Xen: no direct MMIO mapping
+>    should be established in this case.
+>  - RAM regions that belong to Xen-crafted ACPI tables (STAO, MADT...).
+>  - Real MMIO regions that should be passed through.
+> 
+> Right now AFAIK Xen doesn't track any of this information, so we would need
+> additional non-trivial logic in order to account for all this inside the
+> hypervisor.
+
+I think this is something we'll have to do to guarantee that we have a
+good implementation of XENMEM_add_to_physmap_range in Xen, regardless of
+the rest of the discussion.
