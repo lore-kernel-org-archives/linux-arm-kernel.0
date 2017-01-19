@@ -1,43 +1,30 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 19 Jan 2017 11:16:28 +0000
-Subject: [PATCH v20 13/17] acpi/arm64: Add GTDT table parse driver
-In-Reply-To: <CADyBb7tdfw+wbTZbcnsaHRa=aG6i9acLp7rzMpfMs-vOHXL6pQ@mail.gmail.com>
-References: <20170118132541.8989-1-fu.wei@linaro.org>
- <20170118132541.8989-14-fu.wei@linaro.org>
- <e69d80d1-0954-b1be-817e-c0be6fc24b77@linaro.org>
- <CADyBb7tdfw+wbTZbcnsaHRa=aG6i9acLp7rzMpfMs-vOHXL6pQ@mail.gmail.com>
-Message-ID: <20170119111628.GC11176@leverpostej>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Thu, 19 Jan 2017 12:18:28 +0100
+Subject: [PATCH v3 06/13] ARM: davinci: da850: model the SATA refclk
+In-Reply-To: <ff4deee6-9700-fff3-be96-0ad2f008914b@lechnology.com>
+References: <1484745601-4769-1-git-send-email-bgolaszewski@baylibre.com>
+ <1484745601-4769-7-git-send-email-bgolaszewski@baylibre.com>
+ <ff4deee6-9700-fff3-be96-0ad2f008914b@lechnology.com>
+Message-ID: <CAMpxmJWmrwOnnUBHw_5_v9Fort_kphOE0x75hrat6_sXiyAvGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 06:32:55PM +0800, Fu Wei wrote:
-> On 19 January 2017 at 17:11, Hanjun Guo <hanjun.guo@linaro.org> wrote:
-> > On 2017/1/18 21:25, fu.wei at linaro.org wrote:
-> >> From: Fu Wei <fu.wei@linaro.org>
+2017-01-18 18:26 GMT+01:00 David Lechner <david@lechnology.com>:
+> On 01/18/2017 07:19 AM, Bartosz Golaszewski wrote:
+>>
+>>  int __init da850_register_sata(unsigned long refclkpn)
+>>  {
+>> +       int ret;
+>> +
+>>         /* please see comment in drivers/ata/ahci_da850.c */
+>>         BUG_ON(refclkpn != 100 * 1000 * 1000);
+>
+>
+> This BUG_ON() should be removed since the sata driver can now handle other
+> clock frequencies.
+>
 
-> >> +       else if (!gtdt->platform_timer_count)
-> >> +               pr_debug("No Platform Timer.\n");
-> >> +       else
-> >> +               timer_count = gtdt->platform_timer_count;
-> >> +
-> >> +       if (timer_count) {
-> >> +               platform_timer = (void *)gtdt +
-> >> gtdt->platform_timer_offset;
-> >> +               if (platform_timer < (void *)table +
-> >> +                                    sizeof(struct acpi_table_gtdt)) {
-> >> +                       pr_err(FW_BUG "invalid timer data.\n");
-> >
-> >
-> > It's ok but I didn't see other ACPI tables parsing did this check,
-> > maybe we can just remove it :)
-> 
-> here, I want to make sure the FW is valid.
-> Once there is a FW bug, we could just return with error.  :-)
-
-Yes, please keep the check!
-
-If anything, it would be nicer for the other ACPI code to verify things
-a little more stringently.
+Right, will fix in v4.
 
 Thanks,
-Mark.
+Bartosz Golaszewski
