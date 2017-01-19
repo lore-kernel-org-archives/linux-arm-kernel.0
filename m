@@ -1,348 +1,169 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 19 Jan 2017 15:11:04 +0000
-Subject: [RFC PATCH v5 5/7] ARM: NOMMU: Introduce dma operations for noMMU
-In-Reply-To: <1484738003-29892-6-git-send-email-vladimir.murzin@arm.com>
-References: <1484738003-29892-1-git-send-email-vladimir.murzin@arm.com>
- <1484738003-29892-6-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <7c1f73a9-47cb-851a-1374-4f8436a688f3@arm.com>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Thu, 19 Jan 2017 20:35:55 +0530
+Subject: [PATCH V5 11/12] drivers: acpi: Handle IOMMU lookup failure with
+ deferred probing or error
+In-Reply-To: <1484838356-24962-1-git-send-email-sricharan@codeaurora.org>
+References: <1484838356-24962-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1484838356-24962-12-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/01/17 11:13, Vladimir Murzin wrote:
-> R/M classes of cpus can have memory covered by MPU which in turn might
-> configure RAM as Normal i.e. bufferable and cacheable. It breaks
-> dma_alloc_coherent() and friends, since data can stuck in caches now
-> or be buffered.
-> 
-> This patch factors out DMA support for NOMMU configuration into
-> separate entity which provides dedicated dma_ops. We have to handle
-> there several cases:
-> - configurations with MMU/MPU setup
-> - configurations without MMU/MPU setup
-> - special case for M-class, since caches and MPU there are optional
-> 
-> In general we rely on default DMA area for coherent allocations or/and
-> per-device memory reserves suitable for coherent DMA, so if such
-> regions are set coherent allocations go from there.
-> 
-> In case MPU/MPU was not setup we fallback to normal page allocator for
-> DMA memory allocation.
-> 
-> In case we run M-class cpus, for configuration without cache support
-> (like Cortex-M3/M4) dma operations are forced to be coherent and wired
-> with dma-noop (such decision is made based on cacheid global
-> variable); however, if caches are detected there and no DMA coherent
-> region is given (either default or per-device), dma is disallowed even
-> MPU is not set - it is because M-class implement system memory map
-> which defines part of address space as Normal memory.
-> 
-> Reported-by: Alexandre Torgue <alexandre.torgue@st.com>
-> Reported-by: Andras Szemzo <sza@esh.hu>
-> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
-> ---
->  arch/arm/include/asm/dma-mapping.h |   3 +-
->  arch/arm/mm/Makefile               |   5 +-
->  arch/arm/mm/dma-mapping-nommu.c    | 252 +++++++++++++++++++++++++++++++++++++
->  3 files changed, 256 insertions(+), 4 deletions(-)
->  create mode 100644 arch/arm/mm/dma-mapping-nommu.c
-> 
-> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> index bf02dbd..559faad 100644
-> --- a/arch/arm/include/asm/dma-mapping.h
-> +++ b/arch/arm/include/asm/dma-mapping.h
-> @@ -20,7 +20,8 @@ static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
->  {
->  	if (dev && dev->archdata.dma_ops)
->  		return dev->archdata.dma_ops;
-> -	return &arm_dma_ops;
-> +
-> +	return IS_ENABLED(CONFIG_MMU) ? &arm_dma_ops : &dma_noop_ops;
->  }
->  
->  static inline struct dma_map_ops *get_dma_ops(struct device *dev)
-> diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
-> index 2ac7988..5796357 100644
-> --- a/arch/arm/mm/Makefile
-> +++ b/arch/arm/mm/Makefile
-> @@ -2,9 +2,8 @@
->  # Makefile for the linux arm-specific parts of the memory manager.
->  #
->  
-> -obj-y				:= dma-mapping.o extable.o fault.o init.o \
-> -				   iomap.o
-> -
-> +obj-y				:= extable.o fault.o init.o iomap.o
-> +obj-y				+= dma-mapping$(MMUEXT).o
->  obj-$(CONFIG_MMU)		+= fault-armv.o flush.o idmap.o ioremap.o \
->  				   mmap.o pgd.o mmu.o pageattr.o
->  
-> diff --git a/arch/arm/mm/dma-mapping-nommu.c b/arch/arm/mm/dma-mapping-nommu.c
-> new file mode 100644
-> index 0000000..76f00c9
-> --- /dev/null
-> +++ b/arch/arm/mm/dma-mapping-nommu.c
-> @@ -0,0 +1,252 @@
-> +/*
-> + *  Based on linux/arch/arm/mm/dma-mapping.c
-> + *
-> + *  Copyright (C) 2000-2004 Russell King
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + */
-> +
-> +#include <linux/export.h>
-> +#include <linux/mm.h>
-> +#include <linux/dma-mapping.h>
-> +#include <linux/scatterlist.h>
-> +
-> +#include <asm/cachetype.h>
-> +#include <asm/cacheflush.h>
-> +#include <asm/outercache.h>
-> +#include <asm/cp15.h>
-> +
-> +#include "dma.h"
-> +
-> +/*
-> + *  dma_noop_ops is used if
-> + *   - MMU/MPU is off
-> + *   - cpu is v7m w/o cache support
-> + *   - device is coherent
-> + *  otherwise arm_nommu_dma_ops is used.
-> + *
-> + *  arm_nommu_dma_ops rely on consistent DMA memory (please, refer to
-> + *  [1] on how to declare such memory).
-> + *
-> + *  [1] Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
-> + */
-> +
-> +static void *arm_nommu_dma_alloc(struct device *dev, size_t size,
-> +				 dma_addr_t *dma_handle, gfp_t gfp,
-> +				 unsigned long attrs)
-> +
-> +{
-> +	struct dma_map_ops *ops = &dma_noop_ops;
-> +
-> +	/*
-> +	 * We are here because:
-> +	 * - no consistent DMA region has been defined, so we can't
-> +	 *   continue.
-> +	 * - there is no space left in consistent DMA region, so we
-> +	 *   only can fallback to generic allocator if we are
-> +	 *   advertised that consistency is not required.
-> +	 */
-> +
-> +	if (attrs & DMA_ATTR_NON_CONSISTENT)
-> +		return ops->alloc(dev, size, dma_handle, gfp, attrs);
-> +
-> +	WARN_ON_ONCE(1);
-> +	return NULL;
-> +}
-> +
-> +static void arm_nommu_dma_free(struct device *dev, size_t size,
-> +			       void *cpu_addr, dma_addr_t dma_addr,
-> +			       unsigned long attrs)
-> +{
-> +	struct dma_map_ops *ops = &dma_noop_ops;
-> +
-> +	if (attrs & DMA_ATTR_NON_CONSISTENT)
-> +		ops->free(dev, size, cpu_addr, dma_addr, attrs);
+This is an equivalent to the DT's handling of the iommu master's probe
+with deferred probing when the corrsponding iommu is not probed yet.
+The lack of a registered IOMMU can be caused by the lack of a driver for
+the IOMMU, the IOMMU device probe not having been performed yet, having
+been deferred, or having failed.
 
-+	else
+The first case occurs when the firmware describes the bus master and
+IOMMU topology correctly but no device driver exists for the IOMMU yet
+or the device driver has not been compiled in. Return NULL, the caller
+will configure the device without an IOMMU.
 
-Unlike in alloc, there's no early return...
+The second and third cases are handled by deferring the probe of the bus
+master device which will eventually get reprobed after the IOMMU.
 
-> +	WARN_ON_ONCE(1);
+The last case is currently handled by deferring the probe of the bus
+master device as well. A mechanism to either configure the bus master
+device without an IOMMU or to fail the bus master device probe depending
+on whether the IOMMU is optional or mandatory would be a good
+enhancement.
 
-...so this would still fire for a legitimate non-consistent free.
+Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+---
+ * Removed the dma configuration for the pci devices in case of ACPI
+   from pci_dma_configure which was hanging outside separately and
+   doing it in dma_configure function itself.
 
-Otherwise, I think we're pretty much done - with the above fixed:
+ drivers/acpi/arm64/iort.c  | 25 ++++++++++++++++++++++++-
+ drivers/acpi/scan.c        |  7 +++++--
+ drivers/base/dma-mapping.c |  2 +-
+ include/acpi/acpi_bus.h    |  2 +-
+ include/linux/acpi.h       |  7 +++++--
+ 5 files changed, 36 insertions(+), 7 deletions(-)
 
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-
-> +	return;
-> +}
-> +
-> +static int arm_nommu_dma_mmap(struct device *dev, struct vm_area_struct *vma,
-> +			      void *cpu_addr, dma_addr_t dma_addr, size_t size,
-> +			      unsigned long attrs)
-> +{
-> +	struct dma_map_ops *ops = &dma_noop_ops;
-> +	int ret;
-> +
-> +	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
-> +		return ret;
-> +
-> +	if (attrs & DMA_ATTR_NON_CONSISTENT)
-> +		return ops->mmap(dev, vma, cpu_addr, dma_addr, size, attrs);
-> +
-> +	WARN_ON_ONCE(1);
-> +	return -ENXIO;
-> +}
-> +
-> +static void __dma_page_cpu_to_dev(phys_addr_t paddr, size_t size,
-> +				  enum dma_data_direction dir)
-> +{
-> +	dmac_map_area(__va(paddr), size, dir);
-> +
-> +	if (dir == DMA_FROM_DEVICE)
-> +		outer_inv_range(paddr, paddr + size);
-> +	else
-> +		outer_clean_range(paddr, paddr + size);
-> +}
-> +
-> +static void __dma_page_dev_to_cpu(phys_addr_t paddr, size_t size,
-> +				  enum dma_data_direction dir)
-> +{
-> +	if (dir != DMA_TO_DEVICE) {
-> +		outer_inv_range(paddr, paddr + size);
-> +		dmac_unmap_area(__va(paddr), size, dir);
-> +	}
-> +}
-> +
-> +static dma_addr_t arm_nommu_dma_map_page(struct device *dev, struct page *page,
-> +					 unsigned long offset, size_t size,
-> +					 enum dma_data_direction dir,
-> +					 unsigned long attrs)
-> +{
-> +	dma_addr_t handle = page_to_phys(page) + offset;
-> +
-> +	__dma_page_cpu_to_dev(handle, size, dir);
-> +
-> +	return handle;
-> +}
-> +
-> +static void arm_nommu_dma_unmap_page(struct device *dev, dma_addr_t handle,
-> +				     size_t size, enum dma_data_direction dir,
-> +				     unsigned long attrs)
-> +{
-> +	__dma_page_dev_to_cpu(handle, size, dir);
-> +}
-> +
-> +
-> +static int arm_nommu_dma_map_sg(struct device *dev, struct scatterlist *sgl,
-> +				int nents, enum dma_data_direction dir,
-> +				unsigned long attrs)
-> +{
-> +	int i;
-> +	struct scatterlist *sg;
-> +
-> +	for_each_sg(sgl, sg, nents, i) {
-> +		sg_dma_address(sg) = sg_phys(sg);
-> +		sg_dma_len(sg) = sg->length;
-> +		__dma_page_cpu_to_dev(sg_dma_address(sg), sg_dma_len(sg), dir);
-> +	}
-> +
-> +	return nents;
-> +}
-> +
-> +static void arm_nommu_dma_unmap_sg(struct device *dev, struct scatterlist *sgl,
-> +				   int nents, enum dma_data_direction dir,
-> +				   unsigned long attrs)
-> +{
-> +	struct scatterlist *sg;
-> +	int i;
-> +
-> +	for_each_sg(sgl, sg, nents, i)
-> +		__dma_page_dev_to_cpu(sg_dma_address(sg), sg_dma_len(sg), dir);
-> +}
-> +
-> +static void arm_nommu_dma_sync_single_for_device(struct device *dev,
-> +		dma_addr_t handle, size_t size, enum dma_data_direction dir)
-> +{
-> +	__dma_page_cpu_to_dev(handle, size, dir);
-> +}
-> +
-> +static void arm_nommu_dma_sync_single_for_cpu(struct device *dev,
-> +		dma_addr_t handle, size_t size, enum dma_data_direction dir)
-> +{
-> +	__dma_page_cpu_to_dev(handle, size, dir);
-> +}
-> +
-> +static void arm_nommu_dma_sync_sg_for_device(struct device *dev, struct scatterlist *sgl,
-> +					     int nents, enum dma_data_direction dir)
-> +{
-> +	struct scatterlist *sg;
-> +	int i;
-> +
-> +	for_each_sg(sgl, sg, nents, i)
-> +		__dma_page_cpu_to_dev(sg_dma_address(sg), sg_dma_len(sg), dir);
-> +}
-> +
-> +static void arm_nommu_dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sgl,
-> +					  int nents, enum dma_data_direction dir)
-> +{
-> +	struct scatterlist *sg;
-> +	int i;
-> +
-> +	for_each_sg(sgl, sg, nents, i)
-> +		__dma_page_dev_to_cpu(sg_dma_address(sg), sg_dma_len(sg), dir);
-> +}
-> +
-> +struct dma_map_ops arm_nommu_dma_ops = {
-> +	.alloc			= arm_nommu_dma_alloc,
-> +	.free			= arm_nommu_dma_free,
-> +	.mmap			= arm_nommu_dma_mmap,
-> +	.map_page		= arm_nommu_dma_map_page,
-> +	.unmap_page		= arm_nommu_dma_unmap_page,
-> +	.map_sg			= arm_nommu_dma_map_sg,
-> +	.unmap_sg		= arm_nommu_dma_unmap_sg,
-> +	.sync_single_for_device	= arm_nommu_dma_sync_single_for_device,
-> +	.sync_single_for_cpu	= arm_nommu_dma_sync_single_for_cpu,
-> +	.sync_sg_for_device	= arm_nommu_dma_sync_sg_for_device,
-> +	.sync_sg_for_cpu	= arm_nommu_dma_sync_sg_for_cpu,
-> +};
-> +EXPORT_SYMBOL(arm_nommu_dma_ops);
-> +
-> +static struct dma_map_ops *arm_nommu_get_dma_map_ops(bool coherent)
-> +{
-> +	return coherent ? &dma_noop_ops : &arm_nommu_dma_ops;
-> +}
-> +
-> +void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
-> +			const struct iommu_ops *iommu, bool coherent)
-> +{
-> +	struct dma_map_ops *dma_ops;
-> +
-> +	if (IS_ENABLED(CONFIG_CPU_V7M)) {
-> +		/*
-> +		 * Cache support for v7m is optional, so can be treated as
-> +		 * coherent if no cache has been detected. Note that it is not
-> +		 * enough to check if MPU is in use or not since in absense of
-> +		 * MPU system memory map is used.
-> +		 */
-> +		dev->archdata.dma_coherent = (cacheid) ? coherent : true;
-> +	} else {
-> +		/*
-> +		 * Assume coherent DMA in case MMU/MPU has not been set up.
-> +		 */
-> +		dev->archdata.dma_coherent = (get_cr() & CR_M) ? coherent : true;
-> +	}
-> +
-> +	dma_ops = arm_nommu_get_dma_map_ops(dev->archdata.dma_coherent);
-> +
-> +	set_dma_ops(dev, dma_ops);
-> +}
-> +
-> +void arch_teardown_dma_ops(struct device *dev)
-> +{
-> +}
-> +
-> +int dma_supported(struct device *dev, u64 mask)
-> +{
-> +	return 1;
-> +}
-> +
-> +EXPORT_SYMBOL(dma_supported);
-> +
-> +#define PREALLOC_DMA_DEBUG_ENTRIES	4096
-> +
-> +static int __init dma_debug_do_init(void)
-> +{
-> +	dma_debug_init(PREALLOC_DMA_DEBUG_ENTRIES);
-> +	return 0;
-> +}
-> +core_initcall(dma_debug_do_init);
-> 
+diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
+index bf0ed09..d01bae8 100644
+--- a/drivers/acpi/arm64/iort.c
++++ b/drivers/acpi/arm64/iort.c
+@@ -550,8 +550,17 @@ static const struct iommu_ops *iort_iommu_xlate(struct device *dev,
+ 			return NULL;
+ 
+ 		ops = iommu_get_instance(iort_fwnode);
++		/*
++		 * If the ops look-up fails, this means that either
++		 * the SMMU drivers have not been probed yet or that
++		 * the SMMU drivers are not built in the kernel;
++		 * Depending on whether the SMMU drivers are built-in
++		 * in the kernel or not, defer the IOMMU configuration
++		 * or just abort it.
++		 */
+ 		if (!ops)
+-			return NULL;
++			return iort_iommu_driver_enabled(node->type) ?
++			       ERR_PTR(-EPROBE_DEFER) : NULL;
+ 
+ 		ret = arm_smmu_iort_xlate(dev, streamid, iort_fwnode, ops);
+ 	}
+@@ -625,12 +634,26 @@ const struct iommu_ops *iort_iommu_configure(struct device *dev)
+ 
+ 		while (parent) {
+ 			ops = iort_iommu_xlate(dev, parent, streamid);
++			if (IS_ERR_OR_NULL(ops))
++				return ops;
+ 
+ 			parent = iort_node_get_id(node, &streamid,
+ 						  IORT_IOMMU_TYPE, i++);
+ 		}
+ 	}
+ 
++	/*
++	 * If we have reason to believe the IOMMU driver missed the initial
++	 * add_device callback for dev, replay it to get things in order.
++	 */
++	if (!IS_ERR_OR_NULL(ops) && ops->add_device &&
++	    dev->bus && !dev->iommu_group) {
++		int err = ops->add_device(dev);
++
++		if (err)
++			ops = ERR_PTR(err);
++	}
++
+ 	return ops;
+ }
+ 
+diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+index 1926918..823b005 100644
+--- a/drivers/acpi/scan.c
++++ b/drivers/acpi/scan.c
+@@ -1373,20 +1373,23 @@ enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev)
+  * @dev: The pointer to the device
+  * @attr: device dma attributes
+  */
+-void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
++int acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
+ {
+ 	const struct iommu_ops *iommu;
+ 
+ 	iort_set_dma_mask(dev);
+ 
+ 	iommu = iort_iommu_configure(dev);
+-
++	if (IS_ERR(iommu))
++		return PTR_ERR(iommu);
+ 	/*
+ 	 * Assume dma valid range starts at 0 and covers the whole
+ 	 * coherent_dma_mask.
+ 	 */
+ 	arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, iommu,
+ 			   attr == DEV_DMA_COHERENT);
++
++	return 0;
+ }
+ EXPORT_SYMBOL_GPL(acpi_dma_configure);
+ 
+diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
+index 294942d..4b62a32 100644
+--- a/drivers/base/dma-mapping.c
++++ b/drivers/base/dma-mapping.c
+@@ -371,7 +371,7 @@ int dma_configure(struct device *dev)
+ 		if (attr == DEV_DMA_NOT_SUPPORTED)
+ 			dev_warn(dev, "DMA not supported.\n");
+ 		else
+-			acpi_dma_configure(dev, attr);
++			ret = acpi_dma_configure(dev, attr);
+ 	}
+ 
+ 	if (is_pci)
+diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
+index 4242c31..9aa762fe 100644
+--- a/include/acpi/acpi_bus.h
++++ b/include/acpi/acpi_bus.h
+@@ -573,7 +573,7 @@ struct acpi_pci_root {
+ 
+ bool acpi_dma_supported(struct acpi_device *adev);
+ enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev);
+-void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr);
++int acpi_dma_configure(struct device *dev, enum dev_dma_attr attr);
+ void acpi_dma_deconfigure(struct device *dev);
+ 
+ struct acpi_device *acpi_find_child_device(struct acpi_device *parent,
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index 5b36974..8b958b6 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -764,8 +764,11 @@ static inline enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev)
+ 	return DEV_DMA_NOT_SUPPORTED;
+ }
+ 
+-static inline void acpi_dma_configure(struct device *dev,
+-				      enum dev_dma_attr attr) { }
++static inline int acpi_dma_configure(struct device *dev,
++				     enum dev_dma_attr attr)
++{
++	return 0;
++}
+ 
+ static inline void acpi_dma_deconfigure(struct device *dev) { }
+ 
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
