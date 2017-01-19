@@ -1,10 +1,10 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Thu, 19 Jan 2017 20:57:55 +0000
-Subject: [PATCH v9 10/18] iommu/arm-smmu: Implement reserved region get/put
+Date: Thu, 19 Jan 2017 20:57:56 +0000
+Subject: [PATCH v9 11/18] iommu/arm-smmu-v3: Implement reserved region get/put
  callbacks
 In-Reply-To: <1484859483-2866-1-git-send-email-eric.auger@redhat.com>
 References: <1484859483-2866-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1484859483-2866-11-git-send-email-eric.auger@redhat.com>
+Message-ID: <1484859483-2866-12-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,41 +15,35 @@ of size 1MB. This will allow to report those info in iommu-group
 sysfs.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
 Reviewed-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
-Tested-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
-Tested-by: Bharat Bhushan <bharat.bhushan@nxp.com>
 
 ---
 
-v3 -> v4:
-- do not handle PCI host bridge windows anymore
-- encode prot
+v7 -> v8:
+- added Will's A-b
 
-RFC v2 -> v3:
-- use existing get/put_resv_regions
-
-RFC v1 -> v2:
-- use defines for MSI IOVA base and length
+v4: creation
 ---
- drivers/iommu/arm-smmu.c | 28 ++++++++++++++++++++++++++++
+ drivers/iommu/arm-smmu-v3.c | 28 ++++++++++++++++++++++++++++
  1 file changed, 28 insertions(+)
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index a60cded..a354572 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -281,6 +281,9 @@ enum arm_smmu_s2cr_privcfg {
- 
- #define FSYNR0_WNR			(1 << 4)
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 4d6ec44..6c4111c 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -412,6 +412,9 @@
+ /* High-level queue structures */
+ #define ARM_SMMU_POLL_TIMEOUT_US	100
  
 +#define MSI_IOVA_BASE			0x8000000
 +#define MSI_IOVA_LENGTH			0x100000
 +
- static int force_stage;
- module_param(force_stage, int, S_IRUGO);
- MODULE_PARM_DESC(force_stage,
-@@ -1549,6 +1552,29 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
- 	return iommu_fwspec_add_ids(dev, &fwid, 1);
+ static bool disable_bypass;
+ module_param_named(disable_bypass, disable_bypass, bool, S_IRUGO);
+ MODULE_PARM_DESC(disable_bypass,
+@@ -1883,6 +1886,29 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+ 	return iommu_fwspec_add_ids(dev, args->args, 1);
  }
  
 +static void arm_smmu_get_resv_regions(struct device *dev,
@@ -78,7 +72,7 @@ index a60cded..a354572 100644
  static struct iommu_ops arm_smmu_ops = {
  	.capable		= arm_smmu_capable,
  	.domain_alloc		= arm_smmu_domain_alloc,
-@@ -1564,6 +1590,8 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
+@@ -1898,6 +1924,8 @@ static int arm_smmu_of_xlate(struct device *dev, struct of_phandle_args *args)
  	.domain_get_attr	= arm_smmu_domain_get_attr,
  	.domain_set_attr	= arm_smmu_domain_set_attr,
  	.of_xlate		= arm_smmu_of_xlate,
