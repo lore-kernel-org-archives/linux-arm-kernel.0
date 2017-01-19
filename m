@@ -1,78 +1,31 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 19 Jan 2017 14:39:06 +0100
-Subject: [PATCH 0/4] Bluetooth support for GXBB/GXL/GXM based devices
-In-Reply-To: <m2fukgyqld.fsf@baylibre.com>
-References: <20170115223255.10350-1-martin.blumenstingl@googlemail.com>
- <CAFBinCC0RADEKnkYEF6_DkBTftdjmPMku+N3bdvZMCoqs96xGA@mail.gmail.com>
- <m2fukgyqld.fsf@baylibre.com>
-Message-ID: <20170119133906.GB6072@kroah.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Thu, 19 Jan 2017 14:31:56 +0100
+Subject: [PATCH v3 06/13] ARM: davinci: da850: model the SATA refclk
+In-Reply-To: <ff4deee6-9700-fff3-be96-0ad2f008914b@lechnology.com>
+References: <1484745601-4769-1-git-send-email-bgolaszewski@baylibre.com>
+ <1484745601-4769-7-git-send-email-bgolaszewski@baylibre.com>
+ <ff4deee6-9700-fff3-be96-0ad2f008914b@lechnology.com>
+Message-ID: <CAMpxmJXBx4TUd-T3zuTY=VD=YAZf5kaq1fqbGTOzZrgnLosp1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2017 at 02:02:06PM -0800, Kevin Hilman wrote:
-> Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
-> 
-> > Kevin,
-> >
-> > On Sun, Jan 15, 2017 at 11:32 PM, Martin Blumenstingl
-> > <martin.blumenstingl@googlemail.com> wrote:
-> >> This adds the missing kernel bits for Bluetooth support on the
-> >> Tronsmart Vega S95 (GXBB based) boards as well as for the GXL
-> >> P230/P231 and GXM Q200/Q201 reference boards.
-> >>
-> >> The Bluetooth functionality on these boards is provided by the
-> >> SDIO wifi/Bluetooth combo-chip (Broadcom bcm43xx based). The
-> >> Bluetooth module on that combo-chip has to be taken out of reset,
-> >> which is taken care of the GPIO in the sdio_pwrseq.
-> >>
-> >> Once the module is taken out of reset it can be set up from userspace
-> >> using the "hciattach" tool from bluez, which talks to the Bluetooth
-> >> module which is connected to one of the serial ports (in our case
-> >> uart_A). To get the Bluetooth module initialized within the timeout
-> >> defined by "hciattach" (and to achieve usable speeds for Bluetooth
-> >> transfers) the communication uses a speed of 2000000 baud, which was
-> >> not supported by meson_uart before.
-> >>
-> >> NOTE: The .dts-changes from this series depends on my previous series
-> >> "add support for uart_AO_B" - see [0]
-> >>
-> >>
-> >> [0] http://lists.infradead.org/pipermail/linux-amlogic/2017-January/001982.html
-> >>
-> >>
-> >> Martin Blumenstingl (4):
-> >>   tty: serial: meson: allow baud-rates higher than 115200
-> >>   ARM64: dts: meson-gx: add the serial CTS and RTS pin groups
-> >
-> > Neil just informed me that Rob Herring is working on defining the UART
-> > Bluetooth device properly using devicetree (preparation for this is
-> > named "[PATCH v2 0/9] Serial slave device bus", see [0] for the
-> > mailing-list conversation and [1] for a WiP git repo).
-> 
-> Ah, good news.  I knew Rob had been talking about that for awhile, so
-> I'm glad to see it coming into existence.  Thanks for the pointers.
-> 
-> > This means that there will be a better solution than the one proposed
-> > in the meson-gx-p23x-q20x and meson-gxbb-vega-s95 patches (patches #1
-> > and #2 are not affected by this),> namely:
-> > - I'm currently (ab)using sdio-pwrseq node to power on the UART
-> > Bluetooth module, this can solved by specifying a bluetooth {  } node
-> > inside the &uart_A node in the future and providing the corresponding
-> > GPIOs there
-> 
-> Good.  I didn't like the (ab)use of sdio_pwrseq GPIO resets for the
-> bluetooth either.
-> 
-> > - all the userspace commands will not be necessary once
-> > drivers/bluetooth/hci_bcm.c is changed to the serio framework and gets
-> > devicetree support
-> 
-> Cool.  Maybe you can setup a WIP branch based on Rob's work for broader
-> testing on Amlogic boards until this gets merged?
-> 
-> In the mean time, I've applied patch 2/4 and hopefully the drivers/tty
-> patch will go through the serial tree.
+2017-01-18 18:26 GMT+01:00 David Lechner <david@lechnology.com>:
+> On 01/18/2017 07:19 AM, Bartosz Golaszewski wrote:
+>>
+>>  int __init da850_register_sata(unsigned long refclkpn)
+>>  {
+>> +       int ret;
+>> +
+>>         /* please see comment in drivers/ata/ahci_da850.c */
+>>         BUG_ON(refclkpn != 100 * 1000 * 1000);
+>
+>
+> This BUG_ON() should be removed since the sata driver can now handle other
+> clock frequencies.
+>
 
-Yes, I've taken it now, thanks.
+I did that in a separate patch coming after the ahci changes to keep
+the series bisectable.
 
-greg k-h
+Thanks,
+Bartosz Golaszewski
