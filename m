@@ -1,80 +1,60 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Thu, 19 Jan 2017 23:36:43 +0000
-Subject: [PATCHv4 3/5] pinctrl: mvebu: pinctrl driver for 98DX3236 SoC
-References: <20170113091222.7132-1-chris.packham@alliedtelesis.co.nz>
- <20170113091222.7132-4-chris.packham@alliedtelesis.co.nz>
- <2fca7ac2-9a88-19b1-28c5-5192b9c4a2bc@gmail.com>
- <9996b6a215f944e1a47fa6239d8de21f@svr-chch-ex1.atlnz.lc>
- <66c205acea6046978bf17e6d8fc1959f@svr-chch-ex1.atlnz.lc>
- <42aa88b1-4807-245b-6107-0f1db28679b8@gmail.com>
-Message-ID: <6a047346b2994e99b96bb50a12c2e41c@svr-chch-ex1.atlnz.lc>
+From: jpannell@marvell.com (Jon Pannell)
+Date: Thu, 19 Jan 2017 23:41:28 +0000
+Subject: [EXT] Re: [PATCH v5 0/2] Add support for the ethernet switch on
+ the ESPRESSObin
+In-Reply-To: <20170119220607.GA25907@lunn.ch>
+References: <20170119214934.27442-1-gregory.clement@free-electrons.com>
+ <20170119220607.GA25907@lunn.ch>
+Message-ID: <af59fcdd27754934a8149eda2098d601@SC-EXCH01.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/01/17 12:19, Sebastian Hesselbarth wrote:
-> On 19.01.2017 22:12, Chris Packham wrote:
->> On 14/01/17 20:50, Chris Packham wrote:
->>> On 13/01/17 22:54, Sebastian Hesselbarth wrote:
->>>> On 13.01.2017 10:12, Chris Packham wrote:
->>>>> From: Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz>
->>>>>
->>>>> This pinctrl driver supports the 98DX3236, 98DX3336 and 98DX4251 SoCs
->>>>> from Marvell.
->>>>>
->>>>> Signed-off-by: Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz>
->>>>> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
->>>>> Acked-by: Rob Herring <robh@kernel.org>
->>>>> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->>>>> ---
->>>>>
->>>>> Notes:
->>>>>     Changes in v2:
->>>>>     - include sdio support for the 98DX4251
->>>>>     Changes in v3:
->>>>>     - None
->>>>>     Changes in v4:
->>>>>     - Correct some discrepencies between binding and driver.
->>>>
->>>> Well, unfortunately I still see differences between the "gpio" in
->>>> the binding and "gpo" in the driver.
->>>>
->>>> Please go back to that list I sent you yesterday and fix them all.
->>>>
->>>
->>> I think you may have missed my initial reply [1]. Or I have missed your
->>> response to it. Long story short "gpo" is intentional because some of
->>> those pins can't be used as inputs. But if you still want me to change
->>> it I will.
->>>
->>> [1] - https://lkml.org/lkml/2017/1/12/117
->>>
->>
->> Did you get a chance to consider this. Do you still want me to change
->> gpo -> gpio given the information above?
->
-> Chris,
->
-> sorry if I wasn't clear enough. I don't want you to change every gpo
-> into gpio. All I was referring to is the _difference_ between driver
-> implementation and device tree binding - and soley resolve that.
->
-> So, for the gpo's I see that the binding doc still says "gpio" for the
-> available functions where the driver expects "gpo".
->
-> e.g. the binding has this:
->
-> mpp6          6        gpio, sd0(clk), dev(a2)
->
-> if you change it to
->
-> mpp6          6        gpo, sd0(clk), dev(a2)
->
-> both binding and driver are the same, right?
->
-> I do understand that the hardware is gp-output only and you correctly
-> reflected that in the pinctrl driver - but the binding doc does not
-> reflect that for those mpps in the list.
->
++ Bob + Christine
 
-Ah OK thanks for clearing up my confusion. I'll make sure the binding 
-and the driver are consistent when I submit v5 (probably next week).
+Jon Pannell
+
+
+-----Original Message-----
+From: Andrew Lunn [mailto:andrew at lunn.ch] 
+Sent: Thursday, January 19, 2017 2:06 PM
+To: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: Vivien Didelot <vivien.didelot@savoirfairelinux.com>; Florian Fainelli <f.fainelli@gmail.com>; netdev at vger.kernel.org; linux-kernel at vger.kernel.org; David S. Miller <davem@davemloft.net>; Jason Cooper <jason@lakedaemon.net>; Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>; Thomas Petazzoni <thomas.petazzoni@free-electrons.com>; linux-arm-kernel at lists.infradead.org; Nadav Haklai <nadavh@marvell.com>; Wilson Ding <dingwei@marvell.com>; Kostya Porotchkin <kostap@marvell.com>; Joe Zhou <shjzhou@marvell.com>; Jon Pannell <jpannell@marvell.com>
+Subject: [EXT] Re: [PATCH v5 0/2] Add support for the ethernet switch on the ESPRESSObin
+
+External Email
+
+----------------------------------------------------------------------
+> While comparing the datasheet and the ops functions used, some 
+> question came to me. They should not prevent applying this series, but 
+> their answer would help me to have a better understanding of the dsa 
+> subsystem.
+> 
+> - Are the temperature related operation still useful with dsa2 ?
+
+No. I'm in the process of moving the code into the Marvell PHY driver, since the sensor is in the embedded PHYs.
+
+What ID does the embedded PHY use? The 6390 has a blank ID, where as older device have a real ID.
+
+> - Why the setup is done differently between the 6390 and the 6352
+>   families when the have exactly the same register?
+
+EDSA on 6390 works differently to 6352, meaning it breaks. So we need to run the 6390 with DSA tagging, not EDSA. Maybe this is the source of the differences?
+
+It should also be noted that the 6390 support is not yet complete. I have a few more patches in my tree to post.
+
+>   - On the Port Controller 2, the bit PORT_CONTROL_2_MAP_DA is set for
+>     6352 and not for 6390 whereas the same bit exists in 6360 and the
+>     description for this bit is the same for both datasheet.
+
+Humm, it does look like it is missing mv88e6xxx_6390_family(chip).
+ 
+> 
+>   - Register PORT_ATU_CONTROL and PORT_PRI_OVERRIDE are reset on 6352
+>     and not on 6390. While here again the registers description are
+>     the same.
+
+And the same here. I've mostly been working on where the 6390 is different. Where it is the same i've mostly ignored it so far :-)
+
+There is also an ongoing effort to remove all these big if statements with a list of families.
+
+     Andrew
