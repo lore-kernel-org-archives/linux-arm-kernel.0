@@ -1,71 +1,107 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 19 Jan 2017 17:26:52 +0100
-Subject: Initializing MAC address at run-time
-In-Reply-To: <79fef293-74ec-dece-1941-747cd55f1ca2@free.fr>
-References: <e083ed68-0e8e-380e-23bd-5ad387c88575@free.fr>
- <20170118185435.fen6np7lydzgxxek@pengutronix.de>
- <79fef293-74ec-dece-1941-747cd55f1ca2@free.fr>
-Message-ID: <20170119162652.yef3ni6ylhzxpvgz@pengutronix.de>
+From: breno.lima@nxp.com (Breno Lima)
+Date: Thu, 19 Jan 2017 14:30:03 -0200
+Subject: [PATCH v2 1/3] ARM: dts: udoo_neo: Add UDOO Neo USB OTG1 and OTG2
+ support
+Message-ID: <1484843405-14892-1-git-send-email-breno.lima@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Add support for micro USB (OTG1) and USB Host (OTG2) for UDOO Neo board.
 
-On Thu, Jan 19, 2017 at 04:31:56PM +0100, Mason wrote:
-> Do you agree that such boot loader would execute code that is roughly
-> identical to the one posted for illustration purposes?
->   1. find the MAC address to use for eth0
->   2. find the eth0 node in the DT
->   3. insert the right prop in the eth0 node
+Tested on a UDOO Neo Full board by mounting a mass storage device
+on both ports.
 
-yes.
+Signed-off-by: Breno Lima <breno.lima@nxp.com>
+---
+Changes since v1:
+- imx6-usb-charger-detection property removed.
+
+ arch/arm/boot/dts/imx6sx-udoo-neo.dtsi | 59 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 59 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
+index 2b65d26..e9d0596 100644
+--- a/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
++++ b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
+@@ -75,6 +75,28 @@
+ 		regulator-max-microvolt = <3300000>;
+ 		regulator-boot-on;
+ 	};
++
++	reg_usb_otg1_vbus: usb-otg1-vbus {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_otg1_reg>;
++		regulator-name = "usb_otg1_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio1 9 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	reg_usb_otg2_vbus: usb-otg2-vbus {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_otg2_reg>;
++		regulator-name = "usb_otg2_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio4 12 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
+ };
  
-> In which case, it seems a waste to add the DT library to the boot
-> loader, when the operation can be done in Linux, which requires the
-> DT library anyway. (Additionally, adding DT support to some custom
-> legacy boot loader might be a complex task.)
-
-With this reasoning you can discuss away the bootloader. Linux relies on
-a bootloader for a reason. It's there to initialize RAM and some further
-things that Linux might not be able to and provide a machine description
-to Linux (either in form of a dtb or an ATAG list) such that Linux
-doesn't need to fiddle with machine specific stuff in early init code.
-
-> >  c) Adapt the dtb before it is written to the boot medium.
-> 
-> This is not applicable, as the DTB is not written to the board.
-
-Ah, then adapt the dtb before it is put into the tftp folder.
-
-> >  d) Let the bootloader configure the device and teach the driver to pick
-> >     up the mac from the device's address space.
-> 
-> I'm not sure what you call "the device" ?
-
-The network device. IIRC the fec driver checks if there is something
-configured in the two registers configuring the MAC before falling back
-to a random MAC.
-
-> >  e) Accept that the mac address is random during development, and make
-> >     Userspace configure the MAC address, which is early enough for
-> >     production use.
-> 
-> During development, some devs configure the DHCP server to provide
-> a specific uImage and/or rootfs to their board, based on the MAC
-> address. This scheme would fall apart with a random MAC.
-> 
-> > Not sure d) is considered ok today, but some drivers have this feature.
-> > I'd say b) is the best choice.
-> 
-> In my mind, doing it early in Linux is similar in spirit to doing it
-> at the boot loader stage, in that it's neatly separated from the rest
-> of the setup.
-
-Sure you can do this. But it won't be accepted mainline for sure.
-
-Best regards
-Uwe
-
+ &cpu0 {
+@@ -241,6 +263,28 @@
+ 			<MX6SX_PAD_CSI_DATA07__UART6_CTS_B	0x1b0b1>;
+ 	};
+ 
++	pinctrl_otg1_reg: otg1grp {
++		fsl,pins =
++			<MX6SX_PAD_GPIO1_IO09__GPIO1_IO_9        0x10b0>;
++	};
++
++
++	pinctrl_otg2_reg: otg2grp {
++		fsl,pins =
++			<MX6SX_PAD_NAND_RE_B__GPIO4_IO_12        0x10b0>;
++	};
++
++	pinctrl_usb_otg1: usbotg1grp {
++		fsl,pins =
++			<MX6SX_PAD_GPIO1_IO10__ANATOP_OTG1_ID    0x17059>,
++			<MX6SX_PAD_GPIO1_IO08__USB_OTG1_OC       0x10b0>;
++	};
++
++	pinctrl_usb_otg2: usbot2ggrp {
++		fsl,pins =
++			<MX6SX_PAD_QSPI1A_DATA0__USB_OTG2_OC     0x10b0>;
++	};
++
+ 	pinctrl_usdhc2: usdhc2grp {
+ 		fsl,pins =
+ 			<MX6SX_PAD_SD2_CMD__USDHC2_CMD		0x17059>,
+@@ -280,6 +324,21 @@
+ 	status = "disabled";
+ };
+ 
++&usbotg1 { /* J2 micro USB port */
++	vbus-supply = <&reg_usb_otg1_vbus>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usb_otg1>;
++	status = "okay";
++};
++
++&usbotg2 { /* J3 host USB port */
++	vbus-supply = <&reg_usb_otg2_vbus>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usb_otg2>;
++	dr_mode = "host";
++	status = "okay";
++};
++
+ &usdhc2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_usdhc2>;
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.7.4
