@@ -1,149 +1,175 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Fri, 20 Jan 2017 01:54:48 +0800
-Subject: [PATCH v3 6/6] ARM: dts: sunxi: add support for Lichee Pi Zero board
-In-Reply-To: <20170119175448.11445-1-icenowy@aosc.xyz>
-References: <20170119175448.11445-1-icenowy@aosc.xyz>
-Message-ID: <20170119175448.11445-6-icenowy@aosc.xyz>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 19 Jan 2017 17:58:16 +0000
+Subject: [PATCH V5 08/12] iommu/arm-smmu: Clean up early-probing
+ workarounds
+In-Reply-To: <20170119165053.GC28483@red-moon>
+References: <1484838356-24962-1-git-send-email-sricharan@codeaurora.org>
+ <1484838356-24962-9-git-send-email-sricharan@codeaurora.org>
+ <20170119165053.GC28483@red-moon>
+Message-ID: <b3f0f112-e4a0-fa4d-4f18-44484392a5e9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lichee Pi Zero is a small-sized V3s board, which is
-breadboard-compatible, and with a MicroUSB port with both OTG function
-and power function.
+On 19/01/17 16:50, Lorenzo Pieralisi wrote:
+> On Thu, Jan 19, 2017 at 08:35:52PM +0530, Sricharan R wrote:
+>> From: Robin Murphy <robin.murphy@arm.com>
+>>
+>> Now that the appropriate ordering is enforced via profe-deferral of
+>> masters in core code, rip it all out and bask in the simplicity.
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> [Sricharan: Rebased on top of ACPI IORT SMMU series]
+>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>> ---
+>>  * No change
+> 
+> Well, a tad too early on the series for ACPI, aka if we bisect the
+> series here you would break ACPI.
+> 
+> Totally agree on the patch, but you should move it to the end of the
+> series.
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
-Changes in v3:
-- Add LEDs.
-- Add USB-related nodes.
+Indeed - I think a more appropriate ordering of the current patch
+numbers would be:
 
- arch/arm/boot/dts/Makefile                    |   3 +-
- arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts | 103 ++++++++++++++++++++++++++
- 2 files changed, 105 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
+1, 2, 3, 4, 9, 5+10 (squashed), 6, 11, 7, 8, 12
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index cccdbcb557b6..3e099e9b1ad7 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -853,7 +853,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-h3-orangepi-pc-plus.dtb \
- 	sun8i-h3-orangepi-plus.dtb \
- 	sun8i-h3-orangepi-plus2e.dtb \
--	sun8i-r16-parrot.dtb
-+	sun8i-r16-parrot.dtb \
-+	sun8i-v3s-licheepi-zero.dtb
- dtb-$(CONFIG_MACH_SUN9I) += \
- 	sun9i-a80-optimus.dtb \
- 	sun9i-a80-cubieboard4.dtb
-diff --git a/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-new file mode 100644
-index 000000000000..387fc2aa546d
---- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-v3s-licheepi-zero.dts
-@@ -0,0 +1,103 @@
-+/*
-+ * Copyright (C) 2016 Icenowy Zheng <icenowy@aosc.xyz>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun8i-v3s.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+
-+/ {
-+	model = "Lichee Pi Zero";
-+	compatible = "licheepi,licheepi-zero", "allwinner,sun8i-v3s";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		blue_led {
-+			label = "licheepi:blue:usr";
-+			gpios = <&pio 6 1 GPIO_ACTIVE_LOW>; /* PG1 */
-+		};
-+
-+		green_led {
-+			label = "licheepi:green:usr";
-+			gpios = <&pio 6 0 GPIO_ACTIVE_LOW>; /* PG0 */
-+			default-state = "on";
-+		};
-+
-+		red_led {
-+			label = "licheepi:red:usr";
-+			gpios = <&pio 6 2 GPIO_ACTIVE_LOW>; /* PG2 */
-+		};
-+	};
-+};
-+
-+&mmc0 {
-+	pinctrl-0 = <&mmc0_pins_a>;
-+	pinctrl-names = "default";
-+	broken-cd;
-+	bus-width = <4>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-0 = <&uart0_pins_a>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+};
-+
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	usb0_id_det-gpio = <&pio 5 6 GPIO_ACTIVE_HIGH>;
-+	status = "okay";
-+};
--- 
-2.11.0
+Robin.
+
+> 
+> Lorenzo
+> 
+>>  drivers/iommu/arm-smmu-v3.c | 46 ++---------------------------------
+>>  drivers/iommu/arm-smmu.c    | 58 +++++++--------------------------------------
+>>  2 files changed, 10 insertions(+), 94 deletions(-)
+>>
+>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>> index 7d45d8b..7fc4e5f 100644
+>> --- a/drivers/iommu/arm-smmu-v3.c
+>> +++ b/drivers/iommu/arm-smmu-v3.c
+>> @@ -2724,51 +2724,9 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
+>>  	.probe	= arm_smmu_device_probe,
+>>  	.remove	= arm_smmu_device_remove,
+>>  };
+>> +module_platform_driver(arm_smmu_driver);
+>>  
+>> -static int __init arm_smmu_init(void)
+>> -{
+>> -	static bool registered;
+>> -	int ret = 0;
+>> -
+>> -	if (!registered) {
+>> -		ret = platform_driver_register(&arm_smmu_driver);
+>> -		registered = !ret;
+>> -	}
+>> -	return ret;
+>> -}
+>> -
+>> -static void __exit arm_smmu_exit(void)
+>> -{
+>> -	return platform_driver_unregister(&arm_smmu_driver);
+>> -}
+>> -
+>> -subsys_initcall(arm_smmu_init);
+>> -module_exit(arm_smmu_exit);
+>> -
+>> -static int __init arm_smmu_of_init(struct device_node *np)
+>> -{
+>> -	int ret = arm_smmu_init();
+>> -
+>> -	if (ret)
+>> -		return ret;
+>> -
+>> -	if (!of_platform_device_create(np, NULL, platform_bus_type.dev_root))
+>> -		return -ENODEV;
+>> -
+>> -	return 0;
+>> -}
+>> -IOMMU_OF_DECLARE(arm_smmuv3, "arm,smmu-v3", arm_smmu_of_init);
+>> -
+>> -#ifdef CONFIG_ACPI
+>> -static int __init acpi_smmu_v3_init(struct acpi_table_header *table)
+>> -{
+>> -	if (iort_node_match(ACPI_IORT_NODE_SMMU_V3))
+>> -		return arm_smmu_init();
+>> -
+>> -	return 0;
+>> -}
+>> -IORT_ACPI_DECLARE(arm_smmu_v3, ACPI_SIG_IORT, acpi_smmu_v3_init);
+>> -#endif
+>> +IOMMU_OF_DECLARE(arm_smmuv3, "arm,smmu-v3", NULL);
+>>  
+>>  MODULE_DESCRIPTION("IOMMU API for ARM architected SMMUv3 implementations");
+>>  MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
+>> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+>> index 73a0a25..c86ae5f 100644
+>> --- a/drivers/iommu/arm-smmu.c
+>> +++ b/drivers/iommu/arm-smmu.c
+>> @@ -2134,56 +2134,14 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
+>>  	.probe	= arm_smmu_device_probe,
+>>  	.remove	= arm_smmu_device_remove,
+>>  };
+>> -
+>> -static int __init arm_smmu_init(void)
+>> -{
+>> -	static bool registered;
+>> -	int ret = 0;
+>> -
+>> -	if (!registered) {
+>> -		ret = platform_driver_register(&arm_smmu_driver);
+>> -		registered = !ret;
+>> -	}
+>> -	return ret;
+>> -}
+>> -
+>> -static void __exit arm_smmu_exit(void)
+>> -{
+>> -	return platform_driver_unregister(&arm_smmu_driver);
+>> -}
+>> -
+>> -subsys_initcall(arm_smmu_init);
+>> -module_exit(arm_smmu_exit);
+>> -
+>> -static int __init arm_smmu_of_init(struct device_node *np)
+>> -{
+>> -	int ret = arm_smmu_init();
+>> -
+>> -	if (ret)
+>> -		return ret;
+>> -
+>> -	if (!of_platform_device_create(np, NULL, platform_bus_type.dev_root))
+>> -		return -ENODEV;
+>> -
+>> -	return 0;
+>> -}
+>> -IOMMU_OF_DECLARE(arm_smmuv1, "arm,smmu-v1", arm_smmu_of_init);
+>> -IOMMU_OF_DECLARE(arm_smmuv2, "arm,smmu-v2", arm_smmu_of_init);
+>> -IOMMU_OF_DECLARE(arm_mmu400, "arm,mmu-400", arm_smmu_of_init);
+>> -IOMMU_OF_DECLARE(arm_mmu401, "arm,mmu-401", arm_smmu_of_init);
+>> -IOMMU_OF_DECLARE(arm_mmu500, "arm,mmu-500", arm_smmu_of_init);
+>> -IOMMU_OF_DECLARE(cavium_smmuv2, "cavium,smmu-v2", arm_smmu_of_init);
+>> -
+>> -#ifdef CONFIG_ACPI
+>> -static int __init arm_smmu_acpi_init(struct acpi_table_header *table)
+>> -{
+>> -	if (iort_node_match(ACPI_IORT_NODE_SMMU))
+>> -		return arm_smmu_init();
+>> -
+>> -	return 0;
+>> -}
+>> -IORT_ACPI_DECLARE(arm_smmu, ACPI_SIG_IORT, arm_smmu_acpi_init);
+>> -#endif
+>> +module_platform_driver(arm_smmu_driver);
+>> +
+>> +IOMMU_OF_DECLARE(arm_smmuv1, "arm,smmu-v1", NULL);
+>> +IOMMU_OF_DECLARE(arm_smmuv2, "arm,smmu-v2", NULL);
+>> +IOMMU_OF_DECLARE(arm_mmu400, "arm,mmu-400", NULL);
+>> +IOMMU_OF_DECLARE(arm_mmu401, "arm,mmu-401", NULL);
+>> +IOMMU_OF_DECLARE(arm_mmu500, "arm,mmu-500", NULL);
+>> +IOMMU_OF_DECLARE(cavium_smmuv2, "cavium,smmu-v2", NULL);
+>>  
+>>  MODULE_DESCRIPTION("IOMMU API for ARM architected SMMU implementations");
+>>  MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
+>> -- 
+>> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+>>
