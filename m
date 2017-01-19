@@ -1,137 +1,120 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Thu, 19 Jan 2017 02:18:27 +0100
-Subject: [PATCH v5] ARM64: dts: meson-gx: Add firmware reserved memory
- zones
-In-Reply-To: <2bdb6818-4620-53b1-112d-2d6a29e484d9@suse.de>
-References: <1484758245-9354-1-git-send-email-narmstrong@baylibre.com>
- <2bdb6818-4620-53b1-112d-2d6a29e484d9@suse.de>
-Message-ID: <eca803d3-1a67-cda5-554d-4313ae56635e@suse.de>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 18 Jan 2017 17:25:53 -0800
+Subject: [GIT PULL 1/2] Broadcom devicetree changes for 4.11 (try 2)
+In-Reply-To: <20170119003025.GL23725@localhost>
+References: <20170119003025.GL23725@localhost>
+Message-ID: <20170119012553.2844-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 19.01.2017 um 01:20 schrieb Andreas F?rber:
-> Hi,
-> 
-> Am 18.01.2017 um 17:50 schrieb Neil Armstrong:
->> The Amlogic Meson GXBB/GXL/GXM secure monitor uses part of the memory space,
->> this patch adds these reserved zones.
->>
->> Without such reserved memory zones, running the following stress command :
->> $ stress-ng --vm 16 --vm-bytes 128M --timeout 10s
->> multiple times:
->>
->> Could lead to the following kernel crashes :
->> [   46.937975] Bad mode in Error handler detected on CPU1, code 0xbf000000 -- SError
->> ...
->> [   47.058536] Internal error: Attempting to execute userspace memory: 8600000f [#3] PREEMPT SMP
->> ...
->> Instead of the OOM killer.
->>
-> 
-> I miss a Fixes: or Cc: here for the backport you desired. To have it
-> fixed back to my very introduction:
-> 
-> Fixes: 4f24eda8401f ("ARM64: dts: Prepare configs for Amlogic Meson GXBaby")
-> 
-> People backporting it would need to handle the meson-{gx => gxbb}.dtsi
-> transition for 4.9 down to 4.6, which seems fairly straightforward.
-> 
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->> ---
->>  arch/arm64/boot/dts/amlogic/meson-gx.dtsi | 18 ++++++++++++++++++
->>  1 file changed, 18 insertions(+)
->>
->> Changes since v4 at [5]:
->> - Move start of ddr memory to reserved-memory node
->> - Drop memory node move
->> - Fix typo in sizes
->>
->> Changes since resent v2 at [4]:
->> - Fix invalid comment of useable memory attributes
->>
->> Changes since original v2 at [3]:
->> - Typo in commit 2GiB -> 1GiB, 4GiB -> 2GiB
->>
->> Changes since v2 at [2]:
->> - Moved all memory node out of dtsi
->> - Added comment about useable memory
->> - Fixed comment about secmon reserved zone
->>
->> Changes since v1 at [1] :
->> - Renamed reg into linux,usable-memory to ovveride u-boot memory
->> - only kept secmon memory zone
->>
->> [1] http://lkml.kernel.org/r/20161212101801.28491-1-narmstrong at baylibre.com
->> [2] http://lkml.kernel.org/r/1483105232-6242-1-git-send-email-narmstrong at baylibre.com
->> [3] http://lkml.kernel.org/r/1484128128-22454-1-git-send-email-narmstrong at baylibre.com
->> [4] http://lkml.kernel.org/r/1484128540-22662-1-git-send-email-narmstrong at baylibre.com
->> [5] http://lkml.kernel.org/r/1484129414-23325-1-git-send-email-narmstrong at baylibre.com
->>
->> diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
->> index eada0b5..63d52b7 100644
->> --- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
->> +++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
->> @@ -55,6 +55,24 @@
->>  	#address-cells = <2>;
->>  	#size-cells = <2>;
->>  
->> +	reserved-memory {
->> +		#address-cells = <2>;
->> +		#size-cells = <2>;
->> +		ranges;
->> +
->> +		/* 16 MiB reserved for Hardware ROM Firmware */
->> +		hwrom: hwrom {
-> 
-> Both sub-nodes get a label that is unused, but reserved-memory itself
-> does not (my v4 remark). Intentional?
-> 
->> +			reg = <0x0 0x0 0x0 0x1000000>;
->> +			no-map;
->> +		};
->> +
->> +		/* 2 MiB reserved for ARM Trusted Firmware (BL31) */
->> +		secmon: secmon {
-> 
-> I note that this .dtsi further down has a node /firmware/secure-monitor
-> with label sm.
-> a) Is there any naming convention such as secmon_mem to adopt here to
-> avoid mixups with sm?
-> b) Should this secmon node be referenced in the secure-monitor node via
-> memory-node = <&secmon>; to model their connection, thereby giving the
-> label a use? Or should we maybe merge the two nodes by moving the
-> compatible string here?
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 
-Answering my own question: the example labels use _reserved suffix.
+  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
 
->> +			reg = <0x0 0x10000000 0x0 0x200000>;
+are available in the git repository at:
 
-And since we use a reg property here, the node name should get a unit
-address to avoid future dtc warnings/errors. Ditto for hwrom.
+  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.11/devicetree
 
->> +			no-map;
->> +		};
->> +	};
->> +
->>  	cpus {
->>  		#address-cells = <0x2>;
->>  		#size-cells = <0x0>;
-> 
-> Anyway, objection resolved,
-> 
-> Reviewed-by: Andreas F?rber <afaerber@suse.de>
-> 
-> I don't expect breakage from these more confined additions, but I can
-> try to test tomorrow.
-> 
-> Thanks,
-> Andreas
-> 
+for you to fetch changes up to c5a8e3add28ca4063410353acfbe6e650174e432:
 
+  Merge tag 'bcm2835-dt-next-2017-01-17' into devicetree/next (2017-01-18 17:20:32 -0800)
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+----------------------------------------------------------------
+This pull request contains Broadcom ARM-based SoC Device Tree changes for 4.11,
+please pull the following changes:
+
+- Rafal enables the UART by default on all BCM5301x, BCM4708, BCM4709 since
+  every device found out there has it enabled by default. He also fixes the
+  LED definitions for the Luxul XWR-3100 device, enables USB controllers and
+  their respective PHY devices, specifies the correct GPIO to power on USB
+  HUBs, adds the additional RAM bank for somes devices, and finally sets the
+  correct 5Ghz frequency limits on the Netgear R8000
+
+- Jon does a number of Norsthar Plus SoC cleanups, fixes NAND partitions unit
+  addresses, adds QSPI support to a bunch of boards, adds Ethernet switch ports
+  to the BCM958625K reference board, enables 3rd Ethernet MAC instance to
+  relevant DTSes, enables Ethernet on the XMC board, and finally adds SD/MMC
+  support to the XMC board
+
+- Boris adds the Video Encoder nodes to the Raspberry Pi DTS include files
+  ands enables it on the relevant boards
+
+- Dan adds support for two new Luxul devices: XAP-1410 and XWR-1200, both
+  BCM47081 based SoCs
+
+----------------------------------------------------------------
+Boris Brezillon (2):
+      ARM: dts: bcm283x: Add VEC node in bcm283x.dtsi
+      ARM: dts: bcm283x: Enable the VEC IP on all RaspberryPi boards
+
+Dan Haab (2):
+      ARM: dts: BCM5301X: Add DT for Luxul XAP-1410
+      ARM: dts: BCM5301X: Add DT for Luxul XWR-1200
+
+Florian Fainelli (1):
+      Merge tag 'bcm2835-dt-next-2017-01-17' into devicetree/next
+
+Jon Mason (7):
+      ARM: dts: NSP: DT Clean-ups
+      ARM: dts: NSP: Correct NAND partition unit address
+      ARM: dts: NSP: Add QSPI support to missing boards
+      ARM: dts: NSP: Add BCM958625K switch ports
+      ARM: dts: NSP: Add and enable amac2
+      ARM: dts: NSP: Add Ethernet to NSP XMC
+      ARM: dts: NSP: Add SD/MMC support
+
+Rafa? Mi?ecki (7):
+      ARM: dts: BCM5301X: Enable UART by default for BCM4708(1), BCM4709(4) & BCM53012
+      ARM: dts: BCM5301X: Fix LAN LED labels for Luxul XWR-3100
+      ARM: dts: BCM5301X: Specify USB controllers in DT
+      ARM: dts: BCM5301X: Set GPIO enabling USB power on Netgear R7000
+      ARM: dts: BCM5301X: Specify all RAM by including an extra block
+      ARM: dts: BCM53573: Specify USB ports of on-SoC controllers
+      ARM: dts: BCM5301X: Set 5 GHz wireless frequency limits on Netgear R8000
+
+ arch/arm/boot/dts/Makefile                         |   2 +
+ arch/arm/boot/dts/bcm-nsp.dtsi                     |  64 +++++----
+ arch/arm/boot/dts/bcm2835-rpi.dtsi                 |   5 +
+ arch/arm/boot/dts/bcm283x.dtsi                     |   8 ++
+ arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts        |   3 +-
+ arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts        |   3 +-
+ arch/arm/boot/dts/bcm4708-buffalo-wzr-1750dhp.dts  |   7 +-
+ arch/arm/boot/dts/bcm4708-luxul-xap-1510.dts       |   4 -
+ arch/arm/boot/dts/bcm4708-luxul-xwc-1000.dts       |   4 -
+ arch/arm/boot/dts/bcm4708-netgear-r6250.dts        |   7 +-
+ arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts     |   3 +-
+ arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts      |   7 +-
+ arch/arm/boot/dts/bcm4708.dtsi                     |   4 +
+ arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts        |   3 +-
+ arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts |   7 +-
+ arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts  |   3 +-
+ arch/arm/boot/dts/bcm47081-luxul-xap-1410.dts      |  60 ++++++++
+ arch/arm/boot/dts/bcm47081-luxul-xwr-1200.dts      | 107 +++++++++++++++
+ arch/arm/boot/dts/bcm47081.dtsi                    |   4 +
+ arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts        |   3 +-
+ arch/arm/boot/dts/bcm4709-buffalo-wxr-1900dhp.dts  |   3 +-
+ arch/arm/boot/dts/bcm4709-netgear-r7000.dts        |  11 +-
+ arch/arm/boot/dts/bcm4709-netgear-r8000.dts        |  51 ++++++-
+ arch/arm/boot/dts/bcm4709-tplink-archer-c9-v1.dts  |   4 -
+ arch/arm/boot/dts/bcm4709.dtsi                     |   1 +
+ arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts      |   7 +-
+ arch/arm/boot/dts/bcm47094-luxul-xwr-3100.dts      |  13 +-
+ arch/arm/boot/dts/bcm47094-netgear-r8500.dts       |   7 +-
+ arch/arm/boot/dts/bcm47094.dtsi                    |   1 +
+ arch/arm/boot/dts/bcm5301x.dtsi                    |  41 +++++-
+ arch/arm/boot/dts/bcm53573.dtsi                    |  22 +++
+ arch/arm/boot/dts/bcm94708.dts                     |   4 -
+ arch/arm/boot/dts/bcm94709.dts                     |   4 -
+ arch/arm/boot/dts/bcm953012er.dts                  |   4 -
+ arch/arm/boot/dts/bcm953012k.dts                   |   1 -
+ arch/arm/boot/dts/bcm958522er.dts                  |  35 ++++-
+ arch/arm/boot/dts/bcm958525er.dts                  |  35 ++++-
+ arch/arm/boot/dts/bcm958525xmc.dts                 |  68 ++++++++--
+ arch/arm/boot/dts/bcm958622hr.dts                  |  42 ++++++
+ arch/arm/boot/dts/bcm958623hr.dts                  |  58 ++++++--
+ arch/arm/boot/dts/bcm958625hr.dts                  |  72 ++++++++--
+ arch/arm/boot/dts/bcm958625k.dts                   | 151 ++++++++++++++++-----
+ arch/arm/boot/dts/bcm988312hr.dts                  |  42 ++++++
+ 43 files changed, 813 insertions(+), 172 deletions(-)
+ create mode 100644 arch/arm/boot/dts/bcm47081-luxul-xap-1410.dts
+ create mode 100644 arch/arm/boot/dts/bcm47081-luxul-xwr-1200.dts
