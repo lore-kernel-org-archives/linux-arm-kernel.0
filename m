@@ -1,78 +1,348 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Thu, 19 Jan 2017 23:10:08 +0800
-Subject: [PATCH 1/4] phy: sun4i-usb: support PHY0 on H3 in MUSB mode
-In-Reply-To: <20170119143445.dmckuqjxmfhwr3h5@lukather>
-References: <20170116191449.50397-1-icenowy@aosc.xyz>
- <20170116191449.50397-2-icenowy@aosc.xyz>
- <20170117080611.tn7s7ddj2csqr27m@lukather>
- <3866431484672228@web20j.yandex.ru>
- <20170117200658.gcrcxeanthdtwg26@lukather>
- <CAGb2v67kYtrTdw9YMS7wvRa=2MWYJ=BEc9SmUOds7hNYZKOz9g@mail.gmail.com>
- <20170119143445.dmckuqjxmfhwr3h5@lukather>
-Message-ID: <1682741484838608@web2j.yandex.ru>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 19 Jan 2017 15:11:04 +0000
+Subject: [RFC PATCH v5 5/7] ARM: NOMMU: Introduce dma operations for noMMU
+In-Reply-To: <1484738003-29892-6-git-send-email-vladimir.murzin@arm.com>
+References: <1484738003-29892-1-git-send-email-vladimir.murzin@arm.com>
+ <1484738003-29892-6-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <7c1f73a9-47cb-851a-1374-4f8436a688f3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 18/01/17 11:13, Vladimir Murzin wrote:
+> R/M classes of cpus can have memory covered by MPU which in turn might
+> configure RAM as Normal i.e. bufferable and cacheable. It breaks
+> dma_alloc_coherent() and friends, since data can stuck in caches now
+> or be buffered.
+> 
+> This patch factors out DMA support for NOMMU configuration into
+> separate entity which provides dedicated dma_ops. We have to handle
+> there several cases:
+> - configurations with MMU/MPU setup
+> - configurations without MMU/MPU setup
+> - special case for M-class, since caches and MPU there are optional
+> 
+> In general we rely on default DMA area for coherent allocations or/and
+> per-device memory reserves suitable for coherent DMA, so if such
+> regions are set coherent allocations go from there.
+> 
+> In case MPU/MPU was not setup we fallback to normal page allocator for
+> DMA memory allocation.
+> 
+> In case we run M-class cpus, for configuration without cache support
+> (like Cortex-M3/M4) dma operations are forced to be coherent and wired
+> with dma-noop (such decision is made based on cacheid global
+> variable); however, if caches are detected there and no DMA coherent
+> region is given (either default or per-device), dma is disallowed even
+> MPU is not set - it is because M-class implement system memory map
+> which defines part of address space as Normal memory.
+> 
+> Reported-by: Alexandre Torgue <alexandre.torgue@st.com>
+> Reported-by: Andras Szemzo <sza@esh.hu>
+> Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+> ---
+>  arch/arm/include/asm/dma-mapping.h |   3 +-
+>  arch/arm/mm/Makefile               |   5 +-
+>  arch/arm/mm/dma-mapping-nommu.c    | 252 +++++++++++++++++++++++++++++++++++++
+>  3 files changed, 256 insertions(+), 4 deletions(-)
+>  create mode 100644 arch/arm/mm/dma-mapping-nommu.c
+> 
+> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> index bf02dbd..559faad 100644
+> --- a/arch/arm/include/asm/dma-mapping.h
+> +++ b/arch/arm/include/asm/dma-mapping.h
+> @@ -20,7 +20,8 @@ static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
+>  {
+>  	if (dev && dev->archdata.dma_ops)
+>  		return dev->archdata.dma_ops;
+> -	return &arm_dma_ops;
+> +
+> +	return IS_ENABLED(CONFIG_MMU) ? &arm_dma_ops : &dma_noop_ops;
+>  }
+>  
+>  static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+> diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
+> index 2ac7988..5796357 100644
+> --- a/arch/arm/mm/Makefile
+> +++ b/arch/arm/mm/Makefile
+> @@ -2,9 +2,8 @@
+>  # Makefile for the linux arm-specific parts of the memory manager.
+>  #
+>  
+> -obj-y				:= dma-mapping.o extable.o fault.o init.o \
+> -				   iomap.o
+> -
+> +obj-y				:= extable.o fault.o init.o iomap.o
+> +obj-y				+= dma-mapping$(MMUEXT).o
+>  obj-$(CONFIG_MMU)		+= fault-armv.o flush.o idmap.o ioremap.o \
+>  				   mmap.o pgd.o mmu.o pageattr.o
+>  
+> diff --git a/arch/arm/mm/dma-mapping-nommu.c b/arch/arm/mm/dma-mapping-nommu.c
+> new file mode 100644
+> index 0000000..76f00c9
+> --- /dev/null
+> +++ b/arch/arm/mm/dma-mapping-nommu.c
+> @@ -0,0 +1,252 @@
+> +/*
+> + *  Based on linux/arch/arm/mm/dma-mapping.c
+> + *
+> + *  Copyright (C) 2000-2004 Russell King
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +
+> +#include <linux/export.h>
+> +#include <linux/mm.h>
+> +#include <linux/dma-mapping.h>
+> +#include <linux/scatterlist.h>
+> +
+> +#include <asm/cachetype.h>
+> +#include <asm/cacheflush.h>
+> +#include <asm/outercache.h>
+> +#include <asm/cp15.h>
+> +
+> +#include "dma.h"
+> +
+> +/*
+> + *  dma_noop_ops is used if
+> + *   - MMU/MPU is off
+> + *   - cpu is v7m w/o cache support
+> + *   - device is coherent
+> + *  otherwise arm_nommu_dma_ops is used.
+> + *
+> + *  arm_nommu_dma_ops rely on consistent DMA memory (please, refer to
+> + *  [1] on how to declare such memory).
+> + *
+> + *  [1] Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+> + */
+> +
+> +static void *arm_nommu_dma_alloc(struct device *dev, size_t size,
+> +				 dma_addr_t *dma_handle, gfp_t gfp,
+> +				 unsigned long attrs)
+> +
+> +{
+> +	struct dma_map_ops *ops = &dma_noop_ops;
+> +
+> +	/*
+> +	 * We are here because:
+> +	 * - no consistent DMA region has been defined, so we can't
+> +	 *   continue.
+> +	 * - there is no space left in consistent DMA region, so we
+> +	 *   only can fallback to generic allocator if we are
+> +	 *   advertised that consistency is not required.
+> +	 */
+> +
+> +	if (attrs & DMA_ATTR_NON_CONSISTENT)
+> +		return ops->alloc(dev, size, dma_handle, gfp, attrs);
+> +
+> +	WARN_ON_ONCE(1);
+> +	return NULL;
+> +}
+> +
+> +static void arm_nommu_dma_free(struct device *dev, size_t size,
+> +			       void *cpu_addr, dma_addr_t dma_addr,
+> +			       unsigned long attrs)
+> +{
+> +	struct dma_map_ops *ops = &dma_noop_ops;
+> +
+> +	if (attrs & DMA_ATTR_NON_CONSISTENT)
+> +		ops->free(dev, size, cpu_addr, dma_addr, attrs);
 
++	else
 
-19.01.2017, 22:34, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
-> On Wed, Jan 18, 2017 at 04:09:32AM +0800, Chen-Yu Tsai wrote:
->> ?Hi,
->>
->> ?On Wed, Jan 18, 2017 at 4:06 AM, Maxime Ripard
->> ?<maxime.ripard@free-electrons.com> wrote:
->> ?> On Wed, Jan 18, 2017 at 12:57:08AM +0800, Icenowy Zheng wrote:
->> ?>>
->> ?>>
->> ?>> 17.01.2017, 16:06, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
->> ?>> > On Tue, Jan 17, 2017 at 03:14:46AM +0800, Icenowy Zheng wrote:
->> ?>> >> The PHY0 on H3 can be wired either to MUSB controller or OHCI/EHCI
->> ?>> >> controller.
->> ?>> >>
->> ?>> >> The original driver wired it to OHCI/EHCI controller; however, as the
->> ?>> >> code to use PHY0 as OHCI/EHCI is missing, it makes the PHY fully
->> ?>> >> unusable.
->> ?>> >>
->> ?>> >> Rename the register (according to its function and the name in BSP
->> ?>> >> driver), and remove the code which wires the PHY0 to OHCI/EHCI, as MUSB
->> ?>> >> can support both peripheral and host mode (although the host mode of
->> ?>> >> MUSB is buggy).
->> ?>> >
->> ?>> > Can you elaborate on that? What's wrong with it?
->> ?>>
->> ?>> The configuration is at bit 0 of register 0x20 in PHY.
->> ?>>
->> ?>> When the PHY is reseted, it defaults as MUSB mode.
->> ?>>
->> ?>> However, the original author of the H3 PHY code seems to be lack of
->> ?>> this knowledge (He named it PHY_UNK_H3), and changed the PHY to HCI
->> ?>> mode.
->> ?>>
->> ?>> I just removed the code that wires it to HCI mode, thus it will work
->> ?>> in MUSB mode, with my sun8i-h3-musb patch.
->> ?>
->> ?> I have no idea what you mean by MUSB mode.
->> ?>
->> ?> Do you mean that the previous code was only working in host mode, and
->> ?> now it only works in peripheral?
->>
->> ?From what I understand, with the H3, Allwinner has put a mux
->> ?in front of the MUSB controller. The mux can send the USB data
->> ?to/from the MUSB controller, or a standard EHCI/OHCI pair.
->> ?This register controls said mux.
->>
->> ?This means we can use a proper USB host for host mode,
->> ?instead of the limited support in MUSB.
->
-> But musb can still operate as a host, right?
+Unlike in alloc, there's no early return...
 
-Yes!
+> +	WARN_ON_ONCE(1);
 
->
-> Thanks!
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+...so this would still fire for a legitimate non-consistent free.
+
+Otherwise, I think we're pretty much done - with the above fixed:
+
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
+
+> +	return;
+> +}
+> +
+> +static int arm_nommu_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+> +			      void *cpu_addr, dma_addr_t dma_addr, size_t size,
+> +			      unsigned long attrs)
+> +{
+> +	struct dma_map_ops *ops = &dma_noop_ops;
+> +	int ret;
+> +
+> +	if (dma_mmap_from_coherent(dev, vma, cpu_addr, size, &ret))
+> +		return ret;
+> +
+> +	if (attrs & DMA_ATTR_NON_CONSISTENT)
+> +		return ops->mmap(dev, vma, cpu_addr, dma_addr, size, attrs);
+> +
+> +	WARN_ON_ONCE(1);
+> +	return -ENXIO;
+> +}
+> +
+> +static void __dma_page_cpu_to_dev(phys_addr_t paddr, size_t size,
+> +				  enum dma_data_direction dir)
+> +{
+> +	dmac_map_area(__va(paddr), size, dir);
+> +
+> +	if (dir == DMA_FROM_DEVICE)
+> +		outer_inv_range(paddr, paddr + size);
+> +	else
+> +		outer_clean_range(paddr, paddr + size);
+> +}
+> +
+> +static void __dma_page_dev_to_cpu(phys_addr_t paddr, size_t size,
+> +				  enum dma_data_direction dir)
+> +{
+> +	if (dir != DMA_TO_DEVICE) {
+> +		outer_inv_range(paddr, paddr + size);
+> +		dmac_unmap_area(__va(paddr), size, dir);
+> +	}
+> +}
+> +
+> +static dma_addr_t arm_nommu_dma_map_page(struct device *dev, struct page *page,
+> +					 unsigned long offset, size_t size,
+> +					 enum dma_data_direction dir,
+> +					 unsigned long attrs)
+> +{
+> +	dma_addr_t handle = page_to_phys(page) + offset;
+> +
+> +	__dma_page_cpu_to_dev(handle, size, dir);
+> +
+> +	return handle;
+> +}
+> +
+> +static void arm_nommu_dma_unmap_page(struct device *dev, dma_addr_t handle,
+> +				     size_t size, enum dma_data_direction dir,
+> +				     unsigned long attrs)
+> +{
+> +	__dma_page_dev_to_cpu(handle, size, dir);
+> +}
+> +
+> +
+> +static int arm_nommu_dma_map_sg(struct device *dev, struct scatterlist *sgl,
+> +				int nents, enum dma_data_direction dir,
+> +				unsigned long attrs)
+> +{
+> +	int i;
+> +	struct scatterlist *sg;
+> +
+> +	for_each_sg(sgl, sg, nents, i) {
+> +		sg_dma_address(sg) = sg_phys(sg);
+> +		sg_dma_len(sg) = sg->length;
+> +		__dma_page_cpu_to_dev(sg_dma_address(sg), sg_dma_len(sg), dir);
+> +	}
+> +
+> +	return nents;
+> +}
+> +
+> +static void arm_nommu_dma_unmap_sg(struct device *dev, struct scatterlist *sgl,
+> +				   int nents, enum dma_data_direction dir,
+> +				   unsigned long attrs)
+> +{
+> +	struct scatterlist *sg;
+> +	int i;
+> +
+> +	for_each_sg(sgl, sg, nents, i)
+> +		__dma_page_dev_to_cpu(sg_dma_address(sg), sg_dma_len(sg), dir);
+> +}
+> +
+> +static void arm_nommu_dma_sync_single_for_device(struct device *dev,
+> +		dma_addr_t handle, size_t size, enum dma_data_direction dir)
+> +{
+> +	__dma_page_cpu_to_dev(handle, size, dir);
+> +}
+> +
+> +static void arm_nommu_dma_sync_single_for_cpu(struct device *dev,
+> +		dma_addr_t handle, size_t size, enum dma_data_direction dir)
+> +{
+> +	__dma_page_cpu_to_dev(handle, size, dir);
+> +}
+> +
+> +static void arm_nommu_dma_sync_sg_for_device(struct device *dev, struct scatterlist *sgl,
+> +					     int nents, enum dma_data_direction dir)
+> +{
+> +	struct scatterlist *sg;
+> +	int i;
+> +
+> +	for_each_sg(sgl, sg, nents, i)
+> +		__dma_page_cpu_to_dev(sg_dma_address(sg), sg_dma_len(sg), dir);
+> +}
+> +
+> +static void arm_nommu_dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sgl,
+> +					  int nents, enum dma_data_direction dir)
+> +{
+> +	struct scatterlist *sg;
+> +	int i;
+> +
+> +	for_each_sg(sgl, sg, nents, i)
+> +		__dma_page_dev_to_cpu(sg_dma_address(sg), sg_dma_len(sg), dir);
+> +}
+> +
+> +struct dma_map_ops arm_nommu_dma_ops = {
+> +	.alloc			= arm_nommu_dma_alloc,
+> +	.free			= arm_nommu_dma_free,
+> +	.mmap			= arm_nommu_dma_mmap,
+> +	.map_page		= arm_nommu_dma_map_page,
+> +	.unmap_page		= arm_nommu_dma_unmap_page,
+> +	.map_sg			= arm_nommu_dma_map_sg,
+> +	.unmap_sg		= arm_nommu_dma_unmap_sg,
+> +	.sync_single_for_device	= arm_nommu_dma_sync_single_for_device,
+> +	.sync_single_for_cpu	= arm_nommu_dma_sync_single_for_cpu,
+> +	.sync_sg_for_device	= arm_nommu_dma_sync_sg_for_device,
+> +	.sync_sg_for_cpu	= arm_nommu_dma_sync_sg_for_cpu,
+> +};
+> +EXPORT_SYMBOL(arm_nommu_dma_ops);
+> +
+> +static struct dma_map_ops *arm_nommu_get_dma_map_ops(bool coherent)
+> +{
+> +	return coherent ? &dma_noop_ops : &arm_nommu_dma_ops;
+> +}
+> +
+> +void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+> +			const struct iommu_ops *iommu, bool coherent)
+> +{
+> +	struct dma_map_ops *dma_ops;
+> +
+> +	if (IS_ENABLED(CONFIG_CPU_V7M)) {
+> +		/*
+> +		 * Cache support for v7m is optional, so can be treated as
+> +		 * coherent if no cache has been detected. Note that it is not
+> +		 * enough to check if MPU is in use or not since in absense of
+> +		 * MPU system memory map is used.
+> +		 */
+> +		dev->archdata.dma_coherent = (cacheid) ? coherent : true;
+> +	} else {
+> +		/*
+> +		 * Assume coherent DMA in case MMU/MPU has not been set up.
+> +		 */
+> +		dev->archdata.dma_coherent = (get_cr() & CR_M) ? coherent : true;
+> +	}
+> +
+> +	dma_ops = arm_nommu_get_dma_map_ops(dev->archdata.dma_coherent);
+> +
+> +	set_dma_ops(dev, dma_ops);
+> +}
+> +
+> +void arch_teardown_dma_ops(struct device *dev)
+> +{
+> +}
+> +
+> +int dma_supported(struct device *dev, u64 mask)
+> +{
+> +	return 1;
+> +}
+> +
+> +EXPORT_SYMBOL(dma_supported);
+> +
+> +#define PREALLOC_DMA_DEBUG_ENTRIES	4096
+> +
+> +static int __init dma_debug_do_init(void)
+> +{
+> +	dma_debug_init(PREALLOC_DMA_DEBUG_ENTRIES);
+> +	return 0;
+> +}
+> +core_initcall(dma_debug_do_init);
+> 
