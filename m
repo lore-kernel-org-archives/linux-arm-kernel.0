@@ -1,61 +1,89 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Thu, 19 Jan 2017 15:58:19 +0100
-Subject: [PATCH v3 1/4] Documentation: dt-bindings: add the Amlogic Meson SAR
- ADC documentation
+Date: Thu, 19 Jan 2017 15:58:22 +0100
+Subject: [PATCH v3 4/4] ARM64: dts: meson: meson-gx: add the SAR ADC
 In-Reply-To: <20170119145822.26239-1-martin.blumenstingl@googlemail.com>
 References: <20170115224221.15510-1-martin.blumenstingl@googlemail.com>
  <20170119145822.26239-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20170119145822.26239-2-martin.blumenstingl@googlemail.com>
+Message-ID: <20170119145822.26239-5-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the devicetree binding documentation for the SAR ADC found in
-Amlogic Meson SoCs.
-Currently only the GXBB, GXL and GXM SoCs are supported.
+Add the SAR ADC to meson-gxbb.dtsi and meson-gxl.dtsi. GXBB provides a
+10-bit ADC while GXL (and GXM, which uses the same ADC as GXL) provides
+a 12-bit ADC.
+Some boards use resistor ladder buttons connected through one of the ADC
+channels. On newer devices (GXL and GXM) some boards use pull-ups/downs
+to change the resistance (and thus the ADC value) on of the ADC channels
+to indicate the board revision.
 
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 Tested-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- .../bindings/iio/adc/amlogic,meson-saradc.txt      | 31 ++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/iio/adc/amlogic,meson-saradc.txt
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi   |  8 ++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 10 ++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 10 ++++++++++
+ 3 files changed, 28 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/iio/adc/amlogic,meson-saradc.txt b/Documentation/devicetree/bindings/iio/adc/amlogic,meson-saradc.txt
-new file mode 100644
-index 000000000000..9a0bec7afc63
---- /dev/null
-+++ b/Documentation/devicetree/bindings/iio/adc/amlogic,meson-saradc.txt
-@@ -0,0 +1,31 @@
-+* Amlogic Meson SAR (Successive Approximation Register) A/D converter
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+index 99e6a8d5cb9e..55abfb74aab2 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+@@ -255,6 +255,14 @@
+ 				status = "disabled";
+ 			};
+ 
++			saradc: adc at 8680 {
++				compatible = "amlogic,meson-saradc";
++				#io-channel-cells = <1>;
++				status = "disabled";
++				reg = <0x0 0x8680 0x0 0x34>;
++				interrupts = <GIC_SPI 73 IRQ_TYPE_EDGE_RISING>;
++			};
 +
-+Required properties:
-+- compatible:	depending on the SoC this should be one of:
-+			- "amlogic,meson-gxbb-saradc" for GXBB
-+			- "amlogic,meson-gxl-saradc" for GXL and GXM
-+		along with the generic "amlogic,meson-saradc"
-+- reg:		the physical base address and length of the registers
-+- clocks:	phandle and clock identifier (see clock-names)
-+- clock-names:	mandatory clocks:
-+			- "clkin" for the reference clock (typically XTAL)
-+			- "core" for the SAR ADC core clock
-+		optional clocks:
-+			- "sana" for the analog clock
-+			- "adc_clk" for the ADC (sampling) clock
-+			- "adc_sel" for the ADC (sampling) clock mux
-+- vref-supply:	the regulator supply for the ADC reference voltage
-+- #io-channel-cells: must be 1, see ../iio-bindings.txt
+ 			pwm_ef: pwm at 86c0 {
+ 				compatible = "amlogic,meson-gx-pwm", "amlogic,meson-gxbb-pwm";
+ 				reg = <0x0 0x086c0 0x0 0x10>;
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index 39a774ad83ce..04b3324bc132 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -490,6 +490,16 @@
+ 	clocks = <&clkc CLKID_I2C>;
+ };
+ 
++&saradc {
++	compatible = "amlogic,meson-gxbb-saradc", "amlogic,meson-saradc";
++	clocks = <&xtal>,
++		 <&clkc CLKID_SAR_ADC>,
++		 <&clkc CLKID_SANA>,
++		 <&clkc CLKID_SAR_ADC_CLK>,
++		 <&clkc CLKID_SAR_ADC_SEL>;
++	clock-names = "clkin", "core", "sana", "adc_clk", "adc_sel";
++};
 +
-+Example:
-+	saradc: adc at 8680 {
-+		compatible = "amlogic,meson-gxl-saradc", "amlogic,meson-saradc";
-+		#io-channel-cells = <1>;
-+		reg = <0x0 0x8680 0x0 0x34>;
-+		clocks = <&xtal>,
-+			 <&clkc CLKID_SAR_ADC>,
-+			 <&clkc CLKID_SANA>,
-+			 <&clkc CLKID_SAR_ADC_CLK>,
-+			 <&clkc CLKID_SAR_ADC_SEL>;
-+		clock-names = "clkin", "core", "sana", "adc_clk", "adc_sel";
-+	};
+ &sd_emmc_a {
+ 	clocks = <&clkc CLKID_SD_EMMC_A>,
+ 		 <&xtal>,
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+index bdf2305a2e25..7c72dbcef1ba 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+@@ -340,6 +340,16 @@
+ 	clocks = <&clkc CLKID_I2C>;
+ };
+ 
++&saradc {
++	compatible = "amlogic,meson-gxl-saradc", "amlogic,meson-saradc";
++	clocks = <&xtal>,
++		 <&clkc CLKID_SAR_ADC>,
++		 <&clkc CLKID_SANA>,
++		 <&clkc CLKID_SAR_ADC_CLK>,
++		 <&clkc CLKID_SAR_ADC_SEL>;
++	clock-names = "clkin", "core", "sana", "adc_clk", "adc_sel";
++};
++
+ &sd_emmc_a {
+ 	clocks = <&clkc CLKID_SD_EMMC_A>,
+ 		 <&xtal>,
 -- 
 2.11.0
