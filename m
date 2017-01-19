@@ -1,86 +1,73 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 19 Jan 2017 15:17:13 +0100
-Subject: [PATCH 2/2] [media] exynos-gsc: Fix imprecise external abort due
- disabled power domain
-In-Reply-To: <1484699402-28738-2-git-send-email-javier@osg.samsung.com>
-References: <1484699402-28738-1-git-send-email-javier@osg.samsung.com>
- <CGME20170118003022epcas3p34cf03bb6feb830c4fa231497f2536d0e@epcas3p3.samsung.com>
- <1484699402-28738-2-git-send-email-javier@osg.samsung.com>
-Message-ID: <cc9c6837-7141-b63c-ddf6-68252493df11@samsung.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 19 Jan 2017 15:13:35 +0100
+Subject: [PATCH v2] ARM: dts: imx: Pass 'chosen' and 'memory' nodes
+In-Reply-To: <1484834566-19845-1-git-send-email-fabio.estevam@nxp.com>
+References: <1484834566-19845-1-git-send-email-fabio.estevam@nxp.com>
+Message-ID: <20170119141335.kpbrbpbwaovnijjv@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
-
-On 2017-01-18 01:30, Javier Martinez Canillas wrote:
-> Commit 15f90ab57acc ("[media] exynos-gsc: Make driver functional when
-> CONFIG_PM is unset") removed the implicit dependency that the driver
-> had with CONFIG_PM, since it relied on the config option to be enabled.
->
-> In order to work with !CONFIG_PM, the GSC reset logic that happens in
-> the runtime resume callback had to be executed on the probe function.
->
-> The problem is that if CONFIG_PM is enabled, the power domain for the
-> GSC could be disabled and so an attempt to write to the GSC_SW_RESET
-> register leads to an unhandled fault / imprecise external abort error:
-
-Driver core ensures that driver's probe() is called with respective power
-domain turned on, so this is not the right reason for the proposed change.
-
-> [   10.178825] Unhandled fault: imprecise external abort (0x1406) at 0x00000000
-> [   10.186982] pgd = ed728000
-> [   10.190847] [00000000] *pgd=00000000
-> [   10.195553] Internal error: : 1406 [#1] PREEMPT SMP ARM
-> [   10.229761] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
-> [   10.237134] task: ed49e400 task.stack: ed724000
-> [   10.242934] PC is at gsc_wait_reset+0x5c/0x6c [exynos_gsc]
-> [   10.249710] LR is at gsc_probe+0x300/0x33c [exynos_gsc]
-> [   10.256139] pc : [<bf2429e0>]    lr : [<bf240734>]    psr: 60070013
-> [   10.256139] sp : ed725d30  ip : 00000000  fp : 00000001
-> [   10.271492] r10: eea74800  r9 : ecd6a2c0  r8 : ed7d8854
-> [   10.277912] r7 : ed7d8c08  r6 : ed7d8810  r5 : ffff8ecd  r4 : c0c03900
-> [   10.285664] r3 : 00000000  r2 : 00000001  r1 : ed7d8b98  r0 : ed7d8810
->
-> So only do a GSC reset if CONFIG_PM is disabled, since if is enabled the
-> runtime PM resume callback will be called by the VIDIOC_STREAMON ioctl,
-> making the reset in probe unneeded.
->
-> Fixes: 15f90ab57acc ("[media] exynos-gsc: Make driver functional when CONFIG_PM is unset")
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-Frankly, I don't get why this change is needed.
-
->
+On Thu, Jan 19, 2017 at 12:02:46PM -0200, Fabio Estevam wrote:
+> Commit 7f107887d199 ("ARM: dts: imx: Remove skeleton.dtsi") causes boot
+> issues when the bootloader does not create a 'chosen' node if such node
+> is not present in the dtb.
+> 
+> The reason for the boot failure is well explained by Javier Martinez
+> Canillas: "the decompressor relies on a pre-existing chosen node to be
+> available to insert the command line and merge other ATAGS info."
+> 
+> , so pass an empty 'chosen' node to fix the boot problem.
+> 
+> This issue has been seen in the kernelci reports with Barebox as
+> bootloader.
+> 
+> Also pass the 'memory' node in order to fix boot issues on the SolidRun
+> iMX6 platforms.
+> 
+> Fixes: 7f107887d199 ("ARM: dts: imx: Remove skeleton.dtsi")
+> Reported-by: kernelci.org bot <bot@kernelci.org>
+> Reported-by: Russell King <rmk+kernel@armlinux.org.uk>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 > ---
->
-> I-ve only tested with CONFIG_PM enabled since my Exynos5422 Odroid
-> XU4 board fails to boot when the config option is disabled.
->
-> Best regards,
-> Javier
->
->   drivers/media/platform/exynos-gsc/gsc-core.c | 6 ++++--
->   1 file changed, 4 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
-> index 83272f10722d..42e1e09ea915 100644
-> --- a/drivers/media/platform/exynos-gsc/gsc-core.c
-> +++ b/drivers/media/platform/exynos-gsc/gsc-core.c
-> @@ -1083,8 +1083,10 @@ static int gsc_probe(struct platform_device *pdev)
->   
->   	platform_set_drvdata(pdev, gsc);
->   
-> -	gsc_hw_set_sw_reset(gsc);
-> -	gsc_wait_reset(gsc);
-> +	if (!IS_ENABLED(CONFIG_PM)) {
-> +		gsc_hw_set_sw_reset(gsc);
-> +		gsc_wait_reset(gsc);
-> +	}
->   
->   	vb2_dma_contig_set_max_seg_size(dev, DMA_BIT_MASK(32));
->   
+> Changes since v1:
+> - Also pass the memory node.
+> 
+>  arch/arm/boot/dts/imx1.dtsi    | 2 ++
+>  arch/arm/boot/dts/imx23.dtsi   | 2 ++
+>  arch/arm/boot/dts/imx25.dtsi   | 2 ++
+>  arch/arm/boot/dts/imx27.dtsi   | 2 ++
+>  arch/arm/boot/dts/imx28.dtsi   | 2 ++
+>  arch/arm/boot/dts/imx31.dtsi   | 2 ++
+>  arch/arm/boot/dts/imx35.dtsi   | 2 ++
+>  arch/arm/boot/dts/imx50.dtsi   | 2 ++
+>  arch/arm/boot/dts/imx51.dtsi   | 2 ++
+>  arch/arm/boot/dts/imx53.dtsi   | 2 ++
+>  arch/arm/boot/dts/imx6qdl.dtsi | 2 ++
+>  arch/arm/boot/dts/imx6sl.dtsi  | 2 ++
+>  arch/arm/boot/dts/imx6sx.dtsi  | 2 ++
+>  arch/arm/boot/dts/imx6ul.dtsi  | 2 ++
+>  arch/arm/boot/dts/imx7s.dtsi   | 2 ++
+>  15 files changed, 30 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx1.dtsi b/arch/arm/boot/dts/imx1.dtsi
+> index dd3de38..7ef0d36 100644
+> --- a/arch/arm/boot/dts/imx1.dtsi
+> +++ b/arch/arm/boot/dts/imx1.dtsi
+> @@ -18,6 +18,8 @@
+>  / {
+>  	#address-cells = <1>;
+>  	#size-cells = <1>;
+> +	chosen {};
+> +	memory { device_type = "memory"; reg = <0 0>; };
+
+Would it be nice to add a comment about why this was added? Something to
+prevent a cleanup like "remove empty nodes and invalid memory
+configurations".
 
 Best regards
+Uwe
+
+
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
