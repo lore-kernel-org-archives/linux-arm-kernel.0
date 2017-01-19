@@ -1,50 +1,59 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 19 Jan 2017 09:17:21 +0200
-Subject: [PATCH v7 2/3] input: tm2-touchkey: Add touchkey driver support
- for TM2
-In-Reply-To: <20170118224711.GB11881@dtor-ws>
-References: <1484632479-3111-1-git-send-email-jcsing.lee@samsung.com>
- <CGME20170117055444epcas1p47b0b0a0ae3260b22fa61d2b92362050b@epcas1p4.samsung.com>
- <1484632479-3111-3-git-send-email-jcsing.lee@samsung.com>
- <20170117172047.47535bj5xd6toayu@kozik-lap>
- <CAKdAkRQij9VuG1mguE0FwQMKuHrnyLAZJxOtkoR97uuX+ZBmLQ@mail.gmail.com>
- <20170117181056.mrwyudslfgh2wfms@kozik-lap> <20170118224711.GB11881@dtor-ws>
-Message-ID: <CAJKOXPd1jd2LkdTPB4oUK071v0X92YWCsc=japDUv3tuFbNXHQ@mail.gmail.com>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Thu, 19 Jan 2017 14:29:43 +0800
+Subject: [PATCH v6 23/25] usb: chipidea: Pullup D+ in device mode via phy
+ APIs
+In-Reply-To: <CAL_JsqJw-nQj0LtLA_o_Upos_7Kg3bPDoCDghPyOEien_QCLSA@mail.gmail.com>
+References: <148418039309.32258.7247753739063801774@sboyd-linaro>
+ <20170112095040.GA15726@b29397-desktop>
+ <148426139182.20672.2422337338087784924@sboyd-linaro>
+ <20170113033536.GA20723@b29397-desktop>
+ <148433778067.32719.6179204976256776867@sboyd-linaro>
+ <20170116034551.GA27364@b29397-desktop>
+ <148467591341.23457.3638889856786813589@sboyd-linaro>
+ <20170118073432.GA26659@b29397-desktop>
+ <148477287318.29219.9447874002624055587@sboyd-linaro>
+ <CAL_JsqJw-nQj0LtLA_o_Upos_7Kg3bPDoCDghPyOEien_QCLSA@mail.gmail.com>
+Message-ID: <20170119062943.GA10621@b29397-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 12:47 AM, Dmitry Torokhov
-<dmitry.torokhov@gmail.com> wrote:
-> On Tue, Jan 17, 2017 at 08:10:56PM +0200, Krzysztof Kozlowski wrote:
->> On Tue, Jan 17, 2017 at 10:06:27AM -0800, Dmitry Torokhov wrote:
->> > On Tue, Jan 17, 2017 at 9:20 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->> > > On Tue, Jan 17, 2017 at 02:54:38PM +0900, Jaechul Lee wrote:
->> > >> This patch adds support for the TM2 touch key and led
->> > >> functionality.
->> > >>
->> > >> The driver interfaces with userspace through an input device and
->> > >> reports KEY_PHONE and KEY_BACK event types. LED brightness can be
->> > >> controlled by "/sys/class/leds/tm2-touchkey/brightness".
->> > >>
->> > >> Signed-off-by: Beomho Seo <beomho.seo@samsung.com>
->> > >> Signed-off-by: Jaechul Lee <jcsing.lee@samsung.com>
->> > >> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
->> > >> Reviewed-by: Andi Shyti <andi.shyti@samsung.com>
->> > >> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
->> > >> Tested-by: Chanwoo Choi <cw00.choi@samsung.com>
->> > >> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
->> > >> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
->> > >
->> > > This looks unusual. How did Dmitry's Sob end here?
->> >
->> > I sent Jaechul a version of the patch to try out.
->>
->> Ah, makes sense then.
->
-> I picked up (and folded) the binding doc and driver patches, DTS should
-> go through some other tree I believe.
+On Wed, Jan 18, 2017 at 02:57:27PM -0600, Rob Herring wrote:
+> On Wed, Jan 18, 2017 at 2:54 PM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
+> > Quoting Peter Chen (2017-01-17 23:34:32)
+> >> On Tue, Jan 17, 2017 at 09:58:33AM -0800, Stephen Boyd wrote:
+> >> > Quoting Peter Chen (2017-01-15 19:45:51)
+> >> > >
+> >> > > At include/linux/usb/phy.h, we have .set_vbus interface, maybe you need
+> >> > > to port it to generic phy framework.
+> >> > >
+> >> >
+> >> > Ok. I'll look into that. Can the other patches in this series be picked
+> >> > up? Otherwise I can resend them all again once I fix the phy_set_mode()
+> >> > call location and introduce a new phy op.
+> >>
+> >> I can pick up chipidea patches after you test the patch I supplied at:
+> >>
+> >>         [PATCH v6 11/25] usb: chipidea: vbus event may exist before starting
+> >> gadget
+> >
+> > Ok. I've confirmed that this updated patch works fine for me. You can
+> > have my Tested-by and Reviewed-by there.
+> >
+> >>
+> >> You may ping other maintainers to pick up other patches.
+> >>
+> >
+> > I was hoping you could pick the beginning of the series up until the PHY
+> > drivers, which can go via Kishon's tree. That would mean applying the
+> > drivers/of/ part. Rob is that ok?
+> 
+> Peter, If there's a dependency then please take the patches I've
+> acked. That's why I acked them.
+> 
 
-Yes, I will take it. I waited for driver and bindings to be accepted.
+Ok, I will do it.
 
-Thanks,
-Krzysztof
+-- 
+
+Best Regards,
+Peter Chen
