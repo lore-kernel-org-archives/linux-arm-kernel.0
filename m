@@ -1,47 +1,34 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 19 Jan 2017 10:08:03 -0600
-Subject: [PATCH 1/2] dt-bindings: gpu: Add Mali Utgard bindings
-In-Reply-To: <20170117093813.mxp2hgoxbgske6ru@lukather>
-References: <20170116132424.7038-1-maxime.ripard@free-electrons.com>
- <20170116184906.r62di7xiil5lae33@kozik-lap>
- <20170117093813.mxp2hgoxbgske6ru@lukather>
-Message-ID: <20170119160803.indfxkvvirobmmv6@rob-hp-laptop>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 19 Jan 2017 16:13:31 +0000
+Subject: [PATCH v4] iommu/arm-smmu: Support for Extended Stream ID (16 bit)
+In-Reply-To: <20170119143653.7576-1-aleksey.makarov@linaro.org>
+References: <20170119143653.7576-1-aleksey.makarov@linaro.org>
+Message-ID: <20170119161331.GG31594@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 10:38:13AM +0100, Maxime Ripard wrote:
-> Hi,
+On Thu, Jan 19, 2017 at 05:36:36PM +0300, Aleksey Makarov wrote:
+> It is the time we have the real 16-bit Stream ID user, which is the
+> ThunderX. Its IO topology uses 1:1 map for Requester ID to Stream ID
+> translation for each root complex which allows to get full 16-bit
+> Stream ID.  Firmware assigns bus IDs that are greater than 128 (0x80)
+> to some buses under PEM (external PCIe interface).  Eventually SMMU
+> drops devices on that buses because their Stream ID is out of range:
 > 
-> On Mon, Jan 16, 2017 at 08:49:06PM +0200, Krzysztof Kozlowski wrote:
-> > On Mon, Jan 16, 2017 at 02:24:23PM +0100, Maxime Ripard wrote:
-> > > The ARM Mali Utgard GPU family is embedded into a number of SoCs from
-> > > Allwinner, Amlogic, Mediatek or Rockchip.
-> > > 
-> > > Add a binding for the GPU of that family.
-> > > 
-> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > > ---
-> > >  .../devicetree/bindings/gpu/arm,mali-utgard.txt    | 76 ++++++++++++++++++++++
-> > >  1 file changed, 76 insertions(+)
-> > >  create mode 100644 Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-> > 
-> > Do you have a driver in kernel which will implement these bindings?
+>   pci 0006:90:00.0: stream ID 0x9000 out of range for SMMU (0x7fff)
 > 
-> No, but we have bindings for out-of-tree drivers already.
+> To fix above issue enable the Extended Stream ID optional feature
+> when available.
 > 
-> > Defining them for out-of-tree driver does not bring any benefits
-> > (3rd party driver will not respect them anyway).
-> 
-> You could see it the other way around too. The out-of-tree drivers
-> don't respect it at the moment because there's no binding to respect.
-> 
-> And at least for us, we definitely plan on doing that.
+> Reviewed-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
+> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+> Tested-by: Tomasz Nowicki <tomasz.nowicki@caviumnetworks.com>
+> ---
+> v4:
+> change the commit message:
+> - explain the reason why the warning happens (Tomasz Nowicki)
+> - add 'Reviewed-by' and 'Tested-by' from Tomasz Nowicki
 
-I have no issue taking this. Bindings are in the kernel for 
-convenience. Having a driver can help make sure they are complete and 
-sound, but otherwise isn't strictly required.
+Thanks, I'll queue this for 4.11.
 
-In fact, the ARM folks already asked me about this, but you beat them to 
-it (plus it's hard to get them to care about mali400 much).
-
-Rob
+Will
