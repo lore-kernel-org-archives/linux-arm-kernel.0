@@ -1,20 +1,38 @@
-From: florian.fainelli@broadcom.com (Florian Fainelli)
-Date: Thu, 19 Jan 2017 11:26:49 -0800
-Subject: [PATCH v2 2/4] net: phy: Initialize mdio clock at probe function
-In-Reply-To: <1484669670-4201-3-git-send-email-yendapally.reddy@broadcom.com>
-References: <1484669670-4201-1-git-send-email-yendapally.reddy@broadcom.com>
- <1484669670-4201-3-git-send-email-yendapally.reddy@broadcom.com>
-Message-ID: <8bca5f28-b6be-cf45-3982-59a8ce0db982@broadcom.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 19 Jan 2017 13:31:19 -0600
+Subject: [PATCH v8 5/8] IIO: add bindings for STM32 timer trigger driver
+In-Reply-To: <1484749251-14445-6-git-send-email-benjamin.gaignard@st.com>
+References: <1484749251-14445-1-git-send-email-benjamin.gaignard@st.com>
+ <1484749251-14445-6-git-send-email-benjamin.gaignard@st.com>
+Message-ID: <20170119193119.kejcwpqrqo735mxh@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/17/2017 08:14 AM, Yendapally Reddy Dhananjaya Reddy wrote:
-> Initialize mdio clock divisor in probe function. The ext bus
-> bit available in the same register will be used by mdio mux
-> to enable external mdio.
+On Wed, Jan 18, 2017 at 03:20:48PM +0100, Benjamin Gaignard wrote:
+> Define bindings for STM32 timer trigger
 > 
-> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
+> version 8:
+> - reword "reg" parameter description
+> 
+> version 4:
+> - remove triggers enumeration from DT
+> - add reg parameter
+> 
+> version 3:
+> - change file name
+> - add cross reference with mfd bindings
+> 
+> version 2:
+> - only keep one compatible
+> - add DT parameters to set lists of the triggers:
+>   one list describe the triggers created by the device
+>   another one give the triggers accepted by the device
+> 
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> Acked-by: Jonathan Cameron <jic23@kernel.org>
+> ---
+>  .../bindings/iio/timer/stm32-timer-trigger.txt     | 23 ++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
 
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
--- 
-Florian
+Acked-by: Rob Herring <robh@kernel.org>
