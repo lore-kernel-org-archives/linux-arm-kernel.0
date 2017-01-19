@@ -1,75 +1,178 @@
-From: Andrei.Pistirica@microchip.com (Andrei.Pistirica at microchip.com)
-Date: Thu, 19 Jan 2017 10:21:08 +0000
-Subject: [PATCH net-next] macb: Common code to enable ptp support for
- SAMA5Dx platforms.
-In-Reply-To: <1c534b5a-25cb-a5d6-f87c-db9ed958a606@atmel.com>
-References: <1484758673-8694-1-git-send-email-andrei.pistirica@microchip.com>
- <1c534b5a-25cb-a5d6-f87c-db9ed958a606@atmel.com>
-Message-ID: <07C910AB6AC6C345A093D5A08F5AF568CB786983@CHN-SV-EXMX03.mchp-main.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Thu, 19 Jan 2017 18:32:55 +0800
+Subject: [PATCH v20 13/17] acpi/arm64: Add GTDT table parse driver
+In-Reply-To: <e69d80d1-0954-b1be-817e-c0be6fc24b77@linaro.org>
+References: <20170118132541.8989-1-fu.wei@linaro.org>
+ <20170118132541.8989-14-fu.wei@linaro.org>
+ <e69d80d1-0954-b1be-817e-c0be6fc24b77@linaro.org>
+Message-ID: <CADyBb7tdfw+wbTZbcnsaHRa=aG6i9acLp7rzMpfMs-vOHXL6pQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: Re: [PATCH net-next] macb: Common code to enable ptp support
-> for SAMA5Dx platforms.
-> 
-> Le 18/01/2017 ? 09:57, Andrei Pistirica a ?crit :
-> > This patch does the following:
-> > - add GEM-PTP interface
-> > - registers and bitfields for TSU are named according to SAMA5Dx data
-> > sheet
-> > - PTP support based on platform capability
-> 
-> The $subject will certainly never match reality, sadly "enable ptp support
-> for SAMA5Dx platforms". So, you'd better change it.
-> (no "." at the end BTW).
+Hi Hanjun,
 
-I will change it to: " Common code to enable ptp support for MACB/GEM"
+On 19 January 2017 at 17:11, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+> On 2017/1/18 21:25, fu.wei at linaro.org wrote:
+>>
+>> From: Fu Wei <fu.wei@linaro.org>
+>>
+>> This patch adds support for parsing arch timer info in GTDT,
+>> provides some kernel APIs to parse all the PPIs and
+>> always-on info in GTDT and export them.
+>>
+>> By this driver, we can simplify arm_arch_timer drivers, and
+>> separate the ACPI GTDT knowledge from it.
+>>
+>> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>> Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+>> Tested-by: Xiongfeng Wang <wangxiongfeng2@huawei.com>
+>> ---
+>>  arch/arm64/Kconfig          |   1 +
+>>  drivers/acpi/arm64/Kconfig  |   3 +
+>>  drivers/acpi/arm64/Makefile |   1 +
+>>  drivers/acpi/arm64/gtdt.c   | 157
+>> ++++++++++++++++++++++++++++++++++++++++++++
+>>  include/linux/acpi.h        |   6 ++
+>>  5 files changed, 168 insertions(+)
+>>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 1117421..ab1ee10 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -2,6 +2,7 @@ config ARM64
+>>         def_bool y
+>>         select ACPI_CCA_REQUIRED if ACPI
+>>         select ACPI_GENERIC_GSI if ACPI
+>> +       select ACPI_GTDT if ACPI
+>>         select ACPI_REDUCED_HARDWARE_ONLY if ACPI
+>>         select ACPI_MCFG if ACPI
+>>         select ACPI_SPCR_TABLE if ACPI
+>> diff --git a/drivers/acpi/arm64/Kconfig b/drivers/acpi/arm64/Kconfig
+>> index 4616da4..5a6f80f 100644
+>> --- a/drivers/acpi/arm64/Kconfig
+>> +++ b/drivers/acpi/arm64/Kconfig
+>> @@ -4,3 +4,6 @@
+>>
+>>  config ACPI_IORT
+>>         bool
+>> +
+>> +config ACPI_GTDT
+>> +       bool
+>> diff --git a/drivers/acpi/arm64/Makefile b/drivers/acpi/arm64/Makefile
+>> index 72331f2..1017def 100644
+>> --- a/drivers/acpi/arm64/Makefile
+>> +++ b/drivers/acpi/arm64/Makefile
+>> @@ -1 +1,2 @@
+>>  obj-$(CONFIG_ACPI_IORT)        += iort.o
+>> +obj-$(CONFIG_ACPI_GTDT)        += gtdt.o
+>> diff --git a/drivers/acpi/arm64/gtdt.c b/drivers/acpi/arm64/gtdt.c
+>> new file mode 100644
+>> index 0000000..d93a790
+>> --- /dev/null
+>> +++ b/drivers/acpi/arm64/gtdt.c
+>> @@ -0,0 +1,157 @@
+>
+> [...]
+>
+>> +
+>> +/**
+>> + * acpi_gtdt_init() - Get the info of GTDT table to prepare for further
+>> init.
+>> + * @table:     The pointer to GTDT table.
+>> + * @platform_timer_count:      The pointer of int variate for returning
+>> the
+>> + *                             number of platform timers. It can be NULL,
+>> if
+>> + *                             driver don't need this info.
+>> + *
+>> + * Return: 0 if success, -EINVAL if error.
+>> + */
+>> +int __init acpi_gtdt_init(struct acpi_table_header *table,
+>> +                         int *platform_timer_count)
+>> +{
+>> +       int ret = 0;
+>> +       int timer_count = 0;
+>> +       void *platform_timer = NULL;
+>> +       struct acpi_table_gtdt *gtdt;
+>> +
+>> +       gtdt = container_of(table, struct acpi_table_gtdt, header);
+>> +       acpi_gtdt_desc.gtdt = gtdt;
+>> +       acpi_gtdt_desc.gtdt_end = (void *)table + table->length;
+>> +
+>> +       if (table->revision < 2)
+>> +               pr_debug("Revision:%d doesn't support Platform Timers.\n",
+>> +                        table->revision);
+>
+>
+> GTDT table revision is updated to 2 in ACPI 5.1, we will
+> not support ACPI version under 5.1 and disable ACPI in FADT
+> parse before this code is called, so if we get revision
+> <2 here, I think we need to print warning (we need to keep
+> the firmware stick to the spec on ARM64).
 
-> > +2518,7 @@ static void macb_configure_caps(struct macb *bp,
-> >  		dcfg = gem_readl(bp, DCFG2);
-> >  		if ((dcfg & (GEM_BIT(RX_PKT_BUFF) |
-> GEM_BIT(TX_PKT_BUFF))) == 0)
-> >  			bp->caps |= MACB_CAPS_FIFO_MODE;
-> > +
-> 
-> Nitpicking, just because other issue exists: this white line doesn't belong to
-> the patch.
+agree, will change pr_debug to pr_warn.
 
-Ok I'll remove it. I missed it because checkpatch didn't report any warning.
+Thanks :-)
 
-[...]
+>
+>> +       else if (!gtdt->platform_timer_count)
+>> +               pr_debug("No Platform Timer.\n");
+>> +       else
+>> +               timer_count = gtdt->platform_timer_count;
+>> +
+>> +       if (timer_count) {
+>> +               platform_timer = (void *)gtdt +
+>> gtdt->platform_timer_offset;
+>> +               if (platform_timer < (void *)table +
+>> +                                    sizeof(struct acpi_table_gtdt)) {
+>> +                       pr_err(FW_BUG "invalid timer data.\n");
+>
+>
+> It's ok but I didn't see other ACPI tables parsing did this check,
+> maybe we can just remove it :)
 
-> >  #define MACB_CAPS_GIGABIT_MODE_AVAILABLE	0x20000000
-> >  #define MACB_CAPS_SG_DISABLED			0x40000000
-> >  #define MACB_CAPS_MACB_IS_GEM			0x80000000
-> > +#define MACB_CAPS_GEM_HAS_PTP			0x00000020
-> 
-> No, this mask already exists a couple of lines above:
-> #define MACB_CAPS_JUMBO        0x00000020
-> 
-> That leads to a NACK, sorry (I didn't spotted earlier, BTW).
+here, I want to make sure the FW is valid.
+Once there is a FW bug, we could just return with error.  :-)
 
-Yes... you are right... sorry.
+>
+>> +                       timer_count = 0;
+>> +                       platform_timer = NULL;
+>> +                       ret = -EINVAL;
+>> +               }
+>> +       }
+>> +
+>> +       acpi_gtdt_desc.platform_timer = platform_timer;
+>> +       if (platform_timer_count)
+>> +               *platform_timer_count = timer_count;
+>
+>
+> Then the code will much simple:
+>
+> if (gtdt->platform_timer_count) {
+>         acpi_gtdt_desc.platform_timer = (void *)gtdt +
+> gtdt->platform_timer_offset;
+>         if (platform_timer_count)
+>                 *platform_timer_count = gtdt->platform_timer_count;
+> }
+>
+> return 0;
+>
+> and remove ret, timer_count and platform_timer.
 
-[...] 
+yes, this may can simplify the function, but this will be released at
+the end of init because of "__init" :-)
+So how about let's just keep this check to make sure the FW is OK.  :-)
 
-> Otherwise, I'm okay with the rest.
-> 
-> I suggest to people that will keep the ball rolling on this topic to take
-> advantage of the chunks of code that Andrei developed with the help of
-> Richard and the best practices discussed. I think particularly, if it makes
-> sense with HW, about:
-> - gem_ptp_do_[rt]xstamp(bp, skb) dereference scheme
-> - gem_ptp_adjfine() rationale
-> - gem_get_ptp_peer() if needed
+>
+> Thanks
+> Hanjun
 
-Just mind that in case of an implementation with buffer rings and irqs
-a different mechanism have to be used.
 
-Regards,
-Andrei
 
-> 
-> Regards,
-> --
-> Nicolas Ferre
+-- 
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
