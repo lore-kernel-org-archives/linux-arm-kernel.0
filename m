@@ -1,180 +1,146 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 19 Jan 2017 19:46:45 +0800
-Subject: [PATCH RESEND v8 3/4] arm64: arch_timer: Work around Erratum
- Hisilicon-161010101
-In-Reply-To: <1484826406-16348-1-git-send-email-dingtianhong@huawei.com>
-References: <1484826406-16348-1-git-send-email-dingtianhong@huawei.com>
-Message-ID: <1484826406-16348-4-git-send-email-dingtianhong@huawei.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 19 Jan 2017 13:49:25 +0200
+Subject: [PATCH V7 1/4] Documentation/devicetree/bindings: b850v3_lvds_dp
+In-Reply-To: <20170119092532.GB29457@collabora.com>
+References: <74f0-58704480-5-27259840@173563636> <2338437.Vj2otdygnZ@avalon>
+ <20170119092532.GB29457@collabora.com>
+Message-ID: <6829547.Y11xI2zT5C@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Erratum Hisilicon-161010101 says that the ARM generic timer counter "has the
-potential to contain an erroneous value when the timer value changes".
-Accesses to TVAL (both read and write) are also affected due to the implicit counter
-read.  Accesses to CVAL are not affected.
+Hi Peter,
 
-The workaround is to reread the system count registers until the value of the second
-read is larger than the first one by less than 32, the system counter can be guaranteed
-not to return wrong value twice by back-to-back read and the error value is always larger
-than the correct one by 32. Writes to TVAL are replaced with an equivalent write to CVAL.
+On Thursday 19 Jan 2017 10:25:32 Peter Senna Tschudin wrote:
+> On Thu, Jan 19, 2017 at 10:17:45AM +0200, Laurent Pinchart wrote:
+> > On Thursday 19 Jan 2017 09:12:14 Peter Senna Tschudin wrote:
+> >> On Wed, Jan 18, 2017 at 11:10:58PM +0200, Laurent Pinchart wrote:
+> >>> On Monday 16 Jan 2017 09:37:11 Peter Senna Tschudin wrote:
+> >>>> On Tue, Jan 10, 2017 at 11:04:58PM +0200, Laurent Pinchart wrote:
+> >>>>> On Saturday 07 Jan 2017 01:29:52 Peter Senna Tschudin wrote:
+> >>>>>> On 04 January, 2017 21:39 CET, Rob Herring wrote:
+> >>>>>>> On Tue, Jan 3, 2017 at 5:34 PM, Peter Senna Tschudin wrote:
+> >>>>>>>> On 03 January, 2017 23:51 CET, Rob Herring <robh@kernel.org> wrote:
+> >>>>>>>>> On Sun, Jan 01, 2017 at 09:24:29PM +0100, Peter Senna Tschudin 
+> > wrote:
+> >>>>>>>>>> Devicetree bindings documentation for the GE B850v3 LVDS/DP++
+> >>>>>>>>>> display bridge.
+> >>>>>>>>>> 
+> >>>>>>>>>> Cc: Martyn Welch <martyn.welch@collabora.co.uk>
+> >>>>>>>>>> Cc: Martin Donnelly <martin.donnelly@ge.com>
+> >>>>>>>>>> Cc: Javier Martinez Canillas <javier@dowhile0.org>
+> >>>>>>>>>> Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> >>>>>>>>>> Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> >>>>>>>>>> Cc: Rob Herring <robh@kernel.org>
+> >>>>>>>>>> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> >>>>>>>>>> Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
+> >>>>>>>>> ---
+> >>>>>>>>>> There was an Acked-by from Rob Herring <robh@kernel.org> for
+> >>>>>>>>>> V6, but I changed the bindings to use i2c_new_secondary_device()
+> >>>>>>>>>> so I removed it from the commit message.
+> >> 
+> >> [...]
+> >> 
+> >>>>>>>>>> .../devicetree/bindings/ge/b850v3-lvds-dp.txt      | 39 +++++++++
+> >>>>>>>>> 
+> >>>>>>>>> Isn't '-lvds-dp' redundant? The part# should be enough.
+> >>>>>>>> 
+> >>>>>>>> b850v3 is the name of the product, this is why the proposed name.
+> >>>>>>>> What about, b850v3-dp2 dp2 indicating the second DP output?
+> >>>>>>> 
+> >>>>>> Humm, b850v3 is the board name? This node should be the name of
+> >>>>>>> the bridge chip.
+> >>>>>> 
+> >>>>>> From the cover letter:
+> >>>>>> 
+> >>>>>> -- // --
+> >>>>>> There are two physical bridges on the video signal pipeline: a
+> >>>>>> STDP4028(LVDS to DP) and a STDP2690(DP to DP++).  The hardware and
+> >>>>>> firmware made it complicated for this binding to comprise two
+> >>>>>> device tree nodes, as the design goal is to configure both bridges
+> >>>>>> based on the LVDS signal, which leave the driver powerless to control
+> >>>>>> the video processing pipeline. The two bridges behaves as a single
+> >>>>>> bridge, and the driver is only needed for telling the host about EDID
+> >>>>>> / HPD, and for giving the host powers to ack interrupts. The video
+> >>>>>> signal pipeline
+> >>>>>> 
+> >>>>>> is as follows:
+> >>>>>>   Host -> LVDS|--(STDP4028)--|DP -> DP|--(STDP2690)--|DP++ -> Video
+> >>>>>>   output
+> >>>>>> 
+> >>>>>> -- // --
+> >>>>> 
+> >>>>> You forgot to prefix your patch series with [HACK] ;-)
+> >>>>> 
+> >>>>> How about fixing the issues that make the two DT nodes solution
+> >>>>> difficult ? What are they ?
+> >>>> 
+> >>>> The Firmware and the hardware design. Both bridges, with stock
+> >>>> firmware, are fully capable of providig EDID information and handling
+> >>>> interrupts. But on this specific design, with this specific firmware, I
+> >>>> need to read EDID from one bridge, and handle interrupts on the other.
+> >>> 
+> >>> Which firmware are you talking about ? Firmware running on the
+> >>> bridges, or somewhere else ?
+> >> 
+> >> Each bridge has it's own external flash containing a binary firmware.
+> >> The goal of the firmware is to configure the output end based on the
+> >> input end. This is part of what makes handling EDID and HPD challenging.
+> >> 
+> >>>> Back when I was starting the development I could not come up with a
+> >>>> proper way to split EDID and interrupts between two bridges in a way
+> >>>> that would result in a fully functional connector. Did I miss
+> >>>> something?
+> >>> 
+> >>> You didn't, we did :-) I've been telling for quite some time now that
+> >>> we must decouple bridges from connectors, and this is another example of
+> >>> why we have such a need. Bridges should expose additional functions
+> >>> needed to implement connector operations, and the connector should be
+> >>> instantiated by the display driver with the help of bridge operations.
+> >>> You could then create a connector that relies on one bridge to read the
+> >>> EDID and on the other bridge to handle HPD.
+> >> 
+> >> Ah thanks. So for now the single DT node approach is acceptable, right?
+> >> The problem is that even if the driver is getting better on each
+> >> iteration, the single DT node for two chips issue comes back often and I
+> >> believe is _the_ issue preventing the driver from getting upstream. V1
+> >> was sent ~ 8 months ago...
+> >> 
+> >> Can I have some blessing on the single DT node approach for now?
+> > 
+> > With the "DT as an ABI" approach, I'm afraid not. Temporary hacks are
+> > acceptable on the driver side, but you need two nodes in DT.
+> 
+> So can I make two node DT "in the right way" and work around current
+> connectors vs. bridge limitations on the driver side? This seems to be
+> doable.
+> 
+> Then I could fix bridge API, with my own driver and update API clients
+> affected by the change...
 
-The hisilicon erratum CONFIG name is too long, breaking the line format in silicon-errata.txt,
-so extended the character spacing to fit all the erratum config.
+I'm willing to discuss that as long as the DT bindings are correct, yes.
 
-Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
----
- Documentation/arm64/silicon-errata.txt | 43 ++++++++++++++---------------
- drivers/clocksource/Kconfig            | 12 ++++++++-
- drivers/clocksource/arm_arch_timer.c   | 49 ++++++++++++++++++++++++++++++++++
- 3 files changed, 82 insertions(+), 22 deletions(-)
+> >> I'm one of the 3 proposed maintainers for the driver, and I'm willing to
+> >> maintain the driver on the long run, as is the same with the other two
+> >> proposed maintainers. So when the time to split the node in two comes,
+> >> we will be around, and willing to do it ourselves.
+> > 
+> > How about putting that team of 3 maintainers to work on fixing the problem
+> > in the bridge API ? :-)
+> 
+> Guess you would be a good lawyer! My point was not exactly that we could
+> work in parallel. Point was that there is redundancy in case one or two
+> of us loose interest. But nice try! :-)
+> 
+> Chances of having resources to fix bridge API and clients were better 6
+> months ago, but let me see what I can get.  Last blocking issue was the
+> migration to atomic, now this. I'm going to need to answer what the next
+> blocking issue is going to be.
+> 
+> Actually in these ~8 months one bit of the required changes was
+> accepted: dc80d7038883, but this was generic and not related to our
+> specific use case.
 
-diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-index 405da11..0aaae35 100644
---- a/Documentation/arm64/silicon-errata.txt
-+++ b/Documentation/arm64/silicon-errata.txt
-@@ -42,24 +42,25 @@ file acts as a registry of software workarounds in the Linux Kernel and
- will be updated when new workarounds are committed and backported to
- stable kernels.
- 
--| Implementor    | Component       | Erratum ID      | Kconfig                 |
--+----------------+-----------------+-----------------+-------------------------+
--| ARM            | Cortex-A53      | #826319         | ARM64_ERRATUM_826319    |
--| ARM            | Cortex-A53      | #827319         | ARM64_ERRATUM_827319    |
--| ARM            | Cortex-A53      | #824069         | ARM64_ERRATUM_824069    |
--| ARM            | Cortex-A53      | #819472         | ARM64_ERRATUM_819472    |
--| ARM            | Cortex-A53      | #845719         | ARM64_ERRATUM_845719    |
--| ARM            | Cortex-A53      | #843419         | ARM64_ERRATUM_843419    |
--| ARM            | Cortex-A57      | #832075         | ARM64_ERRATUM_832075    |
--| ARM            | Cortex-A57      | #852523         | N/A                     |
--| ARM            | Cortex-A57      | #834220         | ARM64_ERRATUM_834220    |
--| ARM            | Cortex-A72      | #853709         | N/A                     |
--| ARM            | MMU-500         | #841119,#826419 | N/A                     |
--|                |                 |                 |                         |
--| Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375    |
--| Cavium         | ThunderX ITS    | #23144          | CAVIUM_ERRATUM_23144    |
--| Cavium         | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154    |
--| Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456    |
--| Cavium         | ThunderX SMMUv2 | #27704          | N/A		       |
--|                |                 |                 |                         |
--| Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585     |
-+| Implementor    | Component       | Erratum ID      | Kconfig                         |
-++----------------+-----------------+-----------------+---------------------------------+
-+| ARM            | Cortex-A53      | #826319         | ARM64_ERRATUM_826319            |
-+| ARM            | Cortex-A53      | #827319         | ARM64_ERRATUM_827319            |
-+| ARM            | Cortex-A53      | #824069         | ARM64_ERRATUM_824069            |
-+| ARM            | Cortex-A53      | #819472         | ARM64_ERRATUM_819472            |
-+| ARM            | Cortex-A53      | #845719         | ARM64_ERRATUM_845719            |
-+| ARM            | Cortex-A53      | #843419         | ARM64_ERRATUM_843419            |
-+| ARM            | Cortex-A57      | #832075         | ARM64_ERRATUM_832075            |
-+| ARM            | Cortex-A57      | #852523         | N/A                             |
-+| ARM            | Cortex-A57      | #834220         | ARM64_ERRATUM_834220            |
-+| ARM            | Cortex-A72      | #853709         | N/A                             |
-+| ARM            | MMU-500         | #841119,#826419 | N/A                             |
-+|                |                 |                 |                                 |
-+| Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375            |
-+| Cavium         | ThunderX ITS    | #23144          | CAVIUM_ERRATUM_23144            |
-+| Cavium         | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154            |
-+| Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456            |
-+| Cavium         | ThunderX SMMUv2 | #27704          | N/A                             |
-+|                |                 |                 |                                 |
-+| Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585             |
-+| Hisilicon      | Hip0{5,6,7}     | #161010101      | HISILICON_ERRATUM_161010101     |
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 04c2b93..628cb44 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -327,7 +327,7 @@ config ARM_ARCH_TIMER_EVTSTREAM
- 
- config ARM_ARCH_TIMER_OOL_WORKAROUND
- 	bool "Workaround for arm arch timer unstable counter"
--	depends on FSL_ERRATUM_A008585
-+	depends on FSL_ERRATUM_A008585 || HISILICON_ERRATUM_161010101
- 	help
- 	  This option would only be enabled by Freescale/NXP Erratum A-008585
- 	  or something else chip has similar erratum.
-@@ -343,6 +343,16 @@ config FSL_ERRATUM_A008585
- 	  value").  The workaround will only be active if the
- 	  fsl,erratum-a008585 property is found in the timer node.
- 
-+config HISILICON_ERRATUM_161010101
-+	bool "Workaround for Hisilicon Erratum 161010101"
-+	default y
-+	select ARM_ARCH_TIMER_OOL_WORKAROUND
-+	depends on ARM_ARCH_TIMER && ARM64
-+	help
-+	  This option enables a workaround for Hisilicon Erratum
-+	  161010101. The workaround will be active if the hisilicon,erratum-161010101
-+	  property is found in the timer node.
-+
- config ARM_GLOBAL_TIMER
- 	bool "Support for the ARM global timer" if COMPILE_TEST
- 	select CLKSRC_OF if OF
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 2487c66..7451b62 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -131,6 +131,47 @@ static u64 notrace fsl_a008585_read_cntvct_el0(void)
- }
- #endif
- 
-+#ifdef CONFIG_HISILICON_ERRATUM_161010101
-+/*
-+ * Verify whether the value of the second read is larger than the first by
-+ * less than 32 is the only way to confirm the value is correct, so clear the
-+ * lower 5 bits to check whether the difference is greater than 32 or not.
-+ * Theoretically the erratum should not occur more than twice in succession
-+ * when reading the system counter, but it is possible that some interrupts
-+ * may lead to more than twice read errors, triggering the warning, so setting
-+ * the number of retries far beyond the number of iterations the loop has been
-+ * observed to take.
-+ */
-+#define __hisi_161010101_read_reg(reg) ({				\
-+	u64 _old, _new;						\
-+	int _retries = 50;					\
-+								\
-+	do {							\
-+		_old = read_sysreg(reg);			\
-+		_new = read_sysreg(reg);			\
-+		_retries--;					\
-+	} while (unlikely((_new - _old) >> 5) && _retries);	\
-+								\
-+	WARN_ON_ONCE(!_retries);				\
-+	_new;							\
-+})
-+
-+static u32 notrace hisi_161010101_read_cntp_tval_el0(void)
-+{
-+	return __hisi_161010101_read_reg(cntp_tval_el0);
-+}
-+
-+static u32 notrace hisi_161010101_read_cntv_tval_el0(void)
-+{
-+	return __hisi_161010101_read_reg(cntv_tval_el0);
-+}
-+
-+static u64 notrace hisi_161010101_read_cntvct_el0(void)
-+{
-+	return __hisi_161010101_read_reg(cntvct_el0);
-+}
-+#endif
-+
- #ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
- const struct arch_timer_erratum_workaround *timer_unstable_counter_workaround = NULL;
- EXPORT_SYMBOL_GPL(timer_unstable_counter_workaround);
-@@ -147,6 +188,14 @@ static u64 notrace fsl_a008585_read_cntvct_el0(void)
- 		.read_cntvct_el0 = fsl_a008585_read_cntvct_el0,
- 	},
- #endif
-+#ifdef CONFIG_HISILICON_ERRATUM_161010101
-+	{
-+		.id = "hisilicon,erratum-161010101",
-+		.read_cntp_tval_el0 = hisi_161010101_read_cntp_tval_el0,
-+		.read_cntv_tval_el0 = hisi_161010101_read_cntv_tval_el0,
-+		.read_cntvct_el0 = hisi_161010101_read_cntvct_el0,
-+	},
-+#endif
- };
- #endif /* CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND */
- 
 -- 
-1.9.0
+Regards,
+
+Laurent Pinchart
