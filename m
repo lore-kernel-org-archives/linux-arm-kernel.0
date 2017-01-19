@@ -1,49 +1,117 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Thu, 19 Jan 2017 14:34:13 +0100
-Subject: [PATCH 6/7] ARM: dts: stm32: Enable dma by default on stm32f4 adc
+Date: Thu, 19 Jan 2017 14:34:10 +0100
+Subject: [PATCH 3/7] iio: adc: stm32: add trigger polarity extended attribute
 In-Reply-To: <1484832854-6314-1-git-send-email-fabrice.gasnier@st.com>
 References: <1484832854-6314-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1484832854-6314-7-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1484832854-6314-4-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Configure STM32F4 ADC to use dma by default.
+Define extended attribute so that user may choose rising, falling or both
+edges for external trigger sources.
+Default to rising edge in case it isn't set.
 
 Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 ---
- arch/arm/boot/dts/stm32f429.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/iio/adc/stm32-adc.c | 51 ++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 50 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index 11d2715..e85db07 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -207,6 +207,8 @@
- 				clocks = <&rcc 0 168>;
- 				interrupt-parent = <&adc>;
- 				interrupts = <0>;
-+				dmas = <&dma2 0 0 0x400 0x0>;
-+				dma-names = "rx";
- 				status = "disabled";
- 			};
+diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
+index 30708bc..9753c39 100644
+--- a/drivers/iio/adc/stm32-adc.c
++++ b/drivers/iio/adc/stm32-adc.c
+@@ -164,6 +164,7 @@ struct stm32_adc_trig_info {
+  * @lock:		spinlock
+  * @bufi:		data buffer index
+  * @num_conv:		expected number of scan conversions
++ * @exten:		external trigger config (enable/polarity)
+  */
+ struct stm32_adc {
+ 	struct stm32_adc_common	*common;
+@@ -175,6 +176,7 @@ struct stm32_adc {
+ 	spinlock_t		lock;		/* interrupt lock */
+ 	int			bufi;
+ 	int			num_conv;
++	enum stm32_adc_exten	exten;
+ };
  
-@@ -217,6 +219,8 @@
- 				clocks = <&rcc 0 169>;
- 				interrupt-parent = <&adc>;
- 				interrupts = <1>;
-+				dmas = <&dma2 3 1 0x400 0x0>;
-+				dma-names = "rx";
- 				status = "disabled";
- 			};
+ /**
+@@ -449,7 +451,9 @@ static int stm32_adc_set_trig(struct iio_dev *indio_dev,
  
-@@ -227,6 +231,8 @@
- 				clocks = <&rcc 0 170>;
- 				interrupt-parent = <&adc>;
- 				interrupts = <2>;
-+				dmas = <&dma2 1 2 0x400 0x0>;
-+				dma-names = "rx";
- 				status = "disabled";
- 			};
- 		};
+ 		/* set trigger source, default to rising edge */
+ 		extsel = ret;
+-		exten = STM32_EXTEN_HWTRIG_RISING_EDGE;
++		if (adc->exten == STM32_EXTEN_SWTRIG)
++			adc->exten = STM32_EXTEN_HWTRIG_RISING_EDGE;
++		exten = adc->exten;
+ 	}
+ 
+ 	spin_lock_irqsave(&adc->lock, flags);
+@@ -463,6 +467,39 @@ static int stm32_adc_set_trig(struct iio_dev *indio_dev,
+ 	return 0;
+ }
+ 
++static int stm32_adc_set_trig_pol(struct iio_dev *indio_dev,
++				  const struct iio_chan_spec *chan,
++				  unsigned int type)
++{
++	struct stm32_adc *adc = iio_priv(indio_dev);
++
++	adc->exten = type;
++
++	return 0;
++}
++
++static int stm32_adc_get_trig_pol(struct iio_dev *indio_dev,
++				  const struct iio_chan_spec *chan)
++{
++	struct stm32_adc *adc = iio_priv(indio_dev);
++
++	return adc->exten;
++}
++
++static const char * const stm32_trig_pol_items[] = {
++	[STM32_EXTEN_SWTRIG] = "swtrig",
++	[STM32_EXTEN_HWTRIG_RISING_EDGE] = "rising-edge",
++	[STM32_EXTEN_HWTRIG_FALLING_EDGE] = "falling-edge",
++	[STM32_EXTEN_HWTRIG_BOTH_EDGES] = "both-edges",
++};
++
++const struct iio_enum stm32_adc_trig_pol = {
++	.items = stm32_trig_pol_items,
++	.num_items = ARRAY_SIZE(stm32_trig_pol_items),
++	.get = stm32_adc_get_trig_pol,
++	.set = stm32_adc_set_trig_pol,
++};
++
+ /**
+  * stm32_adc_single_conv() - Performs a single conversion
+  * @indio_dev: IIO device
+@@ -745,6 +782,17 @@ static irqreturn_t stm32_adc_trigger_handler(int irq, void *p)
+ 	return IRQ_HANDLED;
+ }
+ 
++static const struct iio_chan_spec_ext_info stm32_adc_ext_info[] = {
++	IIO_ENUM("trigger_pol", IIO_SHARED_BY_ALL, &stm32_adc_trig_pol),
++	{
++		.name = "trigger_pol_available",
++		.shared = IIO_SHARED_BY_ALL,
++		.read = iio_enum_available_read,
++		.private = (uintptr_t)&stm32_adc_trig_pol,
++	},
++	{},
++};
++
+ static void stm32_adc_chan_init_one(struct iio_dev *indio_dev,
+ 				    struct iio_chan_spec *chan,
+ 				    const struct stm32_adc_chan_spec *channel,
+@@ -760,6 +808,7 @@ static void stm32_adc_chan_init_one(struct iio_dev *indio_dev,
+ 	chan->scan_type.sign = 'u';
+ 	chan->scan_type.realbits = 12;
+ 	chan->scan_type.storagebits = 16;
++	chan->ext_info = stm32_adc_ext_info;
+ }
+ 
+ static int stm32_adc_chan_of_init(struct iio_dev *indio_dev)
 -- 
 1.9.1
