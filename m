@@ -1,52 +1,144 @@
-From: sza@esh.hu (=?utf-8?B?U3plbXrFkSBBbmRyw6Fz?=)
-Date: Thu, 19 Jan 2017 16:23:03 +0100
-Subject: [RFC PATCH v5 0/7] ARM: Fix dma_alloc_coherent() and friends for
- NOMMU
-In-Reply-To: <1484738003-29892-1-git-send-email-vladimir.murzin@arm.com>
-References: <1484738003-29892-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <8BBDE689-7AA0-4074-A322-66C3DBBEA351@esh.hu>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Thu, 19 Jan 2017 20:35:54 +0530
+Subject: [PATCH V5 10/12] drivers: acpi: Configure acpi devices dma operation
+ at probe time
+In-Reply-To: <1484838356-24962-1-git-send-email-sricharan@codeaurora.org>
+References: <1484838356-24962-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1484838356-24962-11-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, 
-> On 2017. Jan 18., at 12:13, Vladimir Murzin <vladimir.murzin@arm.com> wrote:
-> 
-> Hi,
-> 
-> It seem that addition of cache support for M-class CPUs uncovered
-> latent bug in DMA usage. NOMMU memory model has been treated as being
-> always consistent; however, for R/M CPU classes memory can be covered
-> by MPU which in turn might configure RAM as Normal i.e. bufferable and
-> cacheable. It breaks dma_alloc_coherent() and friends, since data can
-> stuck in caches now or be buffered.
-> 
-> This patch set is trying to address the issue by providing region of
-> memory suitable for consistent DMA operations. It is supposed that
-> such region is marked by MPU as non-cacheable. Robin suggested to
-> advertise such memory as reserved shared-dma-pool, rather then using
-> homebrew command line option, and extend dma-coherent to provide
-> default DMA area in the similar way as it is done for CMA (PATCH
-> 4/7). It allows us to offload all bookkeeping on generic coherent DMA
-> framework, and it seems that it might be reused by other architectures
-> like c6x and blackfin.
-> 
+With all the DT based devices getting their dma ops configured
+during probe time to have the right iommu setup, let us do the
+same for acpi based devices as well.
 
-I have tested the v5 on my ATMEL armv7m board. Caches enabled,
-DMA on MMC, USART and Ethernet. 
-Everything works as expected, so you can add my tested-by.
+Configuring DMA ops at probe time will allow deferring device probe when
+the IOMMU isn't available yet. The dma_configure for the device is
+now called from the generic device_attach callback just before the
+bus/driver probe is called. This way, configuring the DMA ops for the
+device would be called at the same place for all bus_types, hence the
+deferred probing mechanism should work for all buses as well.
 
-Booting Linux on physical CPU 0x0
-Linux version 4.9.0 (root at debian) (gcc version 4.8.3 20140320 (prerelease) (Sourcery CodeBench Lite 2014.05-29) ) #1 Wed Jan 18 22:10:39 CET 2017
-CPU: ARMv7-M [410fc271] revision 1 (ARMv7M), cr=00000000
-CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
-OF: fdt:Machine model: SAME70-sampione board
-Reserved memory: created DMA memory pool at 0x73e00000, size 2 MiB
-OF: reserved mem: initialized node linux,cma, compatible id shared-dma-pool
-...
-DMA: default coherent area is set
-?
+Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+---
+ * Removed the dma configuration for the pci devices in case of ACPI
+   from pci_dma_configure which was hanging outside separately and
+   doing it in dma_configure function itself.
 
-Thanks for the patches!
+ drivers/acpi/glue.c        |  5 -----
+ drivers/base/dma-mapping.c | 13 ++++++++++++-
+ drivers/pci/probe.c        | 25 -------------------------
+ 3 files changed, 12 insertions(+), 31 deletions(-)
 
-Regards,
-Andras
+diff --git a/drivers/acpi/glue.c b/drivers/acpi/glue.c
+index fb19e1c..c05f241 100644
+--- a/drivers/acpi/glue.c
++++ b/drivers/acpi/glue.c
+@@ -176,7 +176,6 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
+ 	struct list_head *physnode_list;
+ 	unsigned int node_id;
+ 	int retval = -EINVAL;
+-	enum dev_dma_attr attr;
+ 
+ 	if (has_acpi_companion(dev)) {
+ 		if (acpi_dev) {
+@@ -233,10 +232,6 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
+ 	if (!has_acpi_companion(dev))
+ 		ACPI_COMPANION_SET(dev, acpi_dev);
+ 
+-	attr = acpi_get_dma_attr(acpi_dev);
+-	if (attr != DEV_DMA_NOT_SUPPORTED)
+-		acpi_dma_configure(dev, attr);
+-
+ 	acpi_physnode_link_name(physical_node_name, node_id);
+ 	retval = sysfs_create_link(&acpi_dev->dev.kobj, &dev->kobj,
+ 				   physical_node_name);
+diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
+index f82212c..294942d 100644
+--- a/drivers/base/dma-mapping.c
++++ b/drivers/base/dma-mapping.c
+@@ -7,6 +7,7 @@
+  * This file is released under the GPLv2.
+  */
+ 
++#include <linux/acpi.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/export.h>
+ #include <linux/gfp.h>
+@@ -352,6 +353,7 @@ int dma_configure(struct device *dev)
+ {
+ 	struct device *_dev = dev;
+ 	int is_pci = dev_is_pci(dev);
++	enum dev_dma_attr attr;
+ 	int ret = 0;
+ 
+ 	if (is_pci) {
+@@ -361,8 +363,16 @@ int dma_configure(struct device *dev)
+ 			_dev = _dev->parent;
+ 	}
+ 
+-	if (_dev->of_node)
++	if (_dev->of_node) {
+ 		ret = of_dma_configure(dev, _dev->of_node);
++	} else if (has_acpi_companion(_dev)) {
++		attr = acpi_get_dma_attr(to_acpi_device_node(_dev->fwnode));
++
++		if (attr == DEV_DMA_NOT_SUPPORTED)
++			dev_warn(dev, "DMA not supported.\n");
++		else
++			acpi_dma_configure(dev, attr);
++	}
+ 
+ 	if (is_pci)
+ 		pci_put_host_bridge_device(_dev);
+@@ -373,4 +383,5 @@ int dma_configure(struct device *dev)
+ void dma_deconfigure(struct device *dev)
+ {
+ 	of_dma_deconfigure(dev);
++	acpi_dma_deconfigure(dev);
+ }
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 634d34e..b86e9b1 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1862,30 +1862,6 @@ static void pci_set_msi_domain(struct pci_dev *dev)
+ 	dev_set_msi_domain(&dev->dev, d);
+ }
+ 
+-/**
+- * pci_dma_configure - Setup DMA configuration
+- * @dev: ptr to pci_dev struct of the PCI device
+- *
+- * Function to update PCI devices's DMA configuration using the same
+- * info from the OF node or ACPI node of host bridge's parent (if any).
+- */
+-static void pci_dma_configure(struct pci_dev *dev)
+-{
+-	struct device *bridge = pci_get_host_bridge_device(dev);
+-
+-	if (has_acpi_companion(bridge)) {
+-		struct acpi_device *adev = to_acpi_device_node(bridge->fwnode);
+-		enum dev_dma_attr attr = acpi_get_dma_attr(adev);
+-
+-		if (attr == DEV_DMA_NOT_SUPPORTED)
+-			dev_warn(&dev->dev, "DMA not supported.\n");
+-		else
+-			acpi_dma_configure(&dev->dev, attr);
+-	}
+-
+-	pci_put_host_bridge_device(bridge);
+-}
+-
+ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
+ {
+ 	int ret;
+@@ -1899,7 +1875,6 @@ void pci_device_add(struct pci_dev *dev, struct pci_bus *bus)
+ 	dev->dev.dma_mask = &dev->dma_mask;
+ 	dev->dev.dma_parms = &dev->dma_parms;
+ 	dev->dev.coherent_dma_mask = 0xffffffffull;
+-	pci_dma_configure(dev);
+ 
+ 	pci_set_dma_max_seg_size(dev, 65536);
+ 	pci_set_dma_seg_boundary(dev, 0xffffffff);
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
