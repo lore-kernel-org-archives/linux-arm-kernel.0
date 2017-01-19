@@ -1,72 +1,86 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 19 Jan 2017 14:48:32 +0000
-Subject: [PATCH] arm64/cpufeatures: Enforce inline/const properties of
- cpus_have_const_cap
-In-Reply-To: <8dcd71b7-3896-26aa-115c-4d0af8abe916@arm.com>
-References: <1484740725-24776-1-git-send-email-marc.zyngier@arm.com>
- <20170119143703.GB31594@arm.com>
- <8dcd71b7-3896-26aa-115c-4d0af8abe916@arm.com>
-Message-ID: <20170119144831.GC31594@arm.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 19 Jan 2017 15:53:15 +0100
+Subject: [PATCH net-next v3 06/10] net: dsa: Migrate to device_find_class()
+In-Reply-To: <20170119142820.GA494@kroah.com>
+References: <20170114214713.28109-1-f.fainelli@gmail.com>
+ <20170114214713.28109-7-f.fainelli@gmail.com>
+ <20170115110628.GF26374@kroah.com>
+ <fc247aeb-a8d6-5ba9-c26d-cb057a5ac34d@gmail.com>
+ <20170115173949.GA19268@kroah.com>
+ <a9ea1f45-b9a5-d840-68e0-9bf9bc7a6598@gmail.com>
+ <20170115191632.GD5643@lunn.ch>
+ <912e6143-c67a-d909-2a6c-939de79efc5d@gmail.com>
+ <20170119142820.GA494@kroah.com>
+Message-ID: <20170119145315.GD21805@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 02:42:50PM +0000, Marc Zyngier wrote:
-> On 19/01/17 14:37, Will Deacon wrote:
-> > On Wed, Jan 18, 2017 at 11:58:45AM +0000, Marc Zyngier wrote:
-> >> Despite being flagged "inline", cpus_have_const_cap may end-up being
-> >> placed out of line if the compiler decides so. This would be unfortunate,
-> >> as we want to be able to use this function in HYP, where we need to
-> >> be 100% sure of what is mapped there. __always_inline seems to be a
-> >> better choice given the constraint.
-> >>
-> >> Also, be a lot tougher on non-const or out-of-range capability values
-> >> (a non-const cap value shouldn't be used here, and the semantic of an
-> >> OOR value is at best ill defined). In those two case, BUILD_BUG_ON is
-> >> what you get.
-> >>
-> >> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >> ---
-> >>  arch/arm64/include/asm/cpufeature.h | 7 ++++---
-> >>  1 file changed, 4 insertions(+), 3 deletions(-)
-> >>
-> >> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> >> index b4989df..4710469 100644
-> >> --- a/arch/arm64/include/asm/cpufeature.h
-> >> +++ b/arch/arm64/include/asm/cpufeature.h
-> >> @@ -105,10 +105,11 @@ static inline bool cpu_have_feature(unsigned int num)
-> >>  }
-> >>  
-> >>  /* System capability check for constant caps */
-> >> -static inline bool cpus_have_const_cap(int num)
-> >> +static __always_inline bool cpus_have_const_cap(int num)
-> >>  {
-> >> -	if (num >= ARM64_NCAPS)
-> >> -		return false;
-> >> +	BUILD_BUG_ON(!__builtin_constant_p(num));
-> >> +	BUILD_BUG_ON(num >= ARM64_NCAPS);
-> > 
-> > This gives different behaviour to cpus_have_const_cap when compared to
-> > cpus_have_cap, which I really don't like. What is the current behaviour
-> > if you pass a non-constant num parameter? Does the kernel actually build?
+> > > struct dsa_platform_data {
+> > >         /*
+> > >          * Reference to a Linux network interface that connects
+> > >          * to the root switch chip of the tree.
+> > >          */
+> > >         struct device   *netdev;
 > 
-> If your toolchain doesn't support jump labels (gcc 4.8 for example), it
-> will build. But my point here is that if you're using the _const
-> version, it should to be an actual constant, within the range of
-> existing capabilities. Otherwise, I don't really understand what the
-> semantic of _const means here.
+> This I think is the oddest thing, why do you need to have the "root
+> switch" here?  You seem to have dropped the next value in this
+> structure:
+> 	struct net_device *of_netdev;
 
-There are two things here:
+We are implementing platform_data for devices which don't support
+device tree. When using OF, we don't have any of these issues. We can
+go straight to the device.
 
-  1. GCC can make non-const values constant using a runtime conditional
+It is a bit convoluted, but look at
+arch/arm/mach-orion5x/rd88f5181l-ge-setup.c. It defines the start of
+the dsa_platform_data in that file. It then gets passed through
+common.c: orion5x_eth_switch_init() to 
+arch/arm/plat-orion/common.c:orion_ge00_switch_init() :
 
-  2. If we treat out-of-range caps as a BUILD_BUG_ON, then we've got
-     different behaviour with cpus_have_cap, which will return false.
+void __init orion_ge00_switch_init(struct dsa_platform_data *d)
+{
+        int i;
 
-So I don't think that the BUILD_BUG_ON(num >= ARM64_NCAPS) makes an awful
-lot of sense, whilst the other BUILD_BUG_ON seems more like a sanity check
-on jump labels. That might be justifiable if the build failure is more
-obvious than what we currently get, so it's mainly the range check that
-I object to.
+        d->netdev = &orion_ge00.dev;
+        for (i = 0; i < d->nr_chips; i++)
+                d->chip[i].host_dev = &orion_ge_mvmdio.dev;
 
-Will
+        platform_device_register_data(NULL, "dsa", 0, d, sizeof(d));
+}
+
+Where we have
+
+static struct platform_device orion_ge00 = {
+        .name           = MV643XX_ETH_NAME,
+        .id             = 0,
+        .num_resources  = 1,
+        .resource       = orion_ge00_resources,
+        .dev            = {
+                .coherent_dma_mask      = DMA_BIT_MASK(32),
+        },
+};
+
+So this is the platform device for the Ethernet device. We cannot go
+to the net_device, because it does not exist until this Ethernet
+platform device is instantiated.
+
+> Shouldn't you have a bus for RGMII devices?  Is that the real problem
+> here, you don't have a representation for your RGMII "bus" with a
+> controller to bundle everything under (like a USB host controller, it
+> bridges from one bus to another).
+
+RGMII is not a bus. It is a point to point link. Normally, it is
+between the Ethernet MAC and the Ethernet PHY. But you can also have
+it between an Ethernet MAC and another Ethernet MAC. I'm not sure
+describing this is a bus would be practical. It would mean every
+ethernet driver also becomes a bus driver! Every Ethernet PHY would
+become a bus device. That is a huge change, for a few legacy boards
+which are not getting converted to device tree.
+
+> If so, why is eth1 not below f1072004.mdio-mi in the heirachy already?
+
+See the initial diagram above. The switch has two parents. It hangs of
+an MDIO bus, and you would like to make RGMII also a bus. Can the
+device model handle that? I thought it was a tree, not a graph?
+
+       Andrew
