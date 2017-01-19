@@ -1,94 +1,41 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 19 Jan 2017 18:50:48 +0000
-Subject: [PATCH 2/5] iommu/arm-smmu: Install bypass S2CRs for
- IOMMU_DOMAIN_IDENTITY domains
-In-Reply-To: <1484849955-1871-3-git-send-email-will.deacon@arm.com>
-References: <1484849955-1871-1-git-send-email-will.deacon@arm.com>
- <1484849955-1871-3-git-send-email-will.deacon@arm.com>
-Message-ID: <20946171-e832-0803-2450-c095e19b2f64@arm.com>
+From: jarkko.nikula@bitmer.com (Jarkko Nikula)
+Date: Thu, 19 Jan 2017 20:51:53 +0200
+Subject: Nokia N900: mixers changed between 4.9 and 4.10-rc3, no longer
+ can use in-call speaker
+In-Reply-To: <d2c78625-565a-86ec-a03e-f15ae071942a@ti.com>
+References: <20170112181826.GA28290@amd> <201701121934.19810@pali>
+ <20170114225614.GA25321@amd> <201701150100.54214@pali>
+ <20170115100533.GA15816@amd>
+ <40dbce4e-d99d-d77d-e682-5b004c70ca40@bitmer.com>
+ <d2c78625-565a-86ec-a03e-f15ae071942a@ti.com>
+Message-ID: <ecdc073b-d83f-ba7d-89bf-da8899414217@bitmer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/01/17 18:19, Will Deacon wrote:
-> In preparation for allowing the default domain type to be overridden,
-> this patch adds support for IOMMU_DOMAIN_IDENTITY domains to the
-> ARM SMMU driver.
+On 01/17/2017 03:47 PM, Peter Ujfalusi wrote:
+> On 01/15/2017 09:08 PM, Jarkko Nikula wrote:
+>> However v4.9.4 works and with it I can see there is an issue with these
+>> aic3x controls:
+>>
+>> amixer: Unable to find simple control 'Left DAC_L1 Mixer Line',0
+>>
+>>
+>>
+>> amixer: Unable to find simple control 'Right DAC_R1 Mixer Line',0
 > 
-> An identity domain is created by placing the corresponding S2CR
-> registers into "bypass" mode, which allows transactions to flow through
-> the SMMU without any translation.
-
-The other subtle nicety this opens the door to is being able to disable
-unmatched stream bypass without needing enough context banks for every
-single known device, since S2CRs are generally more abundant.
-
-Reviewed-by: Robin Murphy <robin.murphy@arm.com>
-
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  drivers/iommu/arm-smmu.c | 20 +++++++++++++++++---
->  1 file changed, 17 insertions(+), 3 deletions(-)
+> These are certainly not the regression between 4.6 and 4.9, more like
+> more like regression since 2.6:
+> 'Line Switch' -> 'LineL Switch':
+> 54f01916297bafc18bd7df4e2300a0544a84fce3
 > 
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index a328ffb75509..0f5e42a719e5 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -404,6 +404,7 @@ enum arm_smmu_domain_stage {
->  	ARM_SMMU_DOMAIN_S1 = 0,
->  	ARM_SMMU_DOMAIN_S2,
->  	ARM_SMMU_DOMAIN_NESTED,
-> +	ARM_SMMU_DOMAIN_BYPASS,
->  };
->  
->  struct arm_smmu_domain {
-> @@ -824,6 +825,12 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
->  	if (smmu_domain->smmu)
->  		goto out_unlock;
->  
-> +	if (domain->type == IOMMU_DOMAIN_IDENTITY) {
-> +		smmu_domain->stage = ARM_SMMU_DOMAIN_BYPASS;
-> +		smmu_domain->smmu = smmu;
-> +		goto out_unlock;
-> +	}
-> +
->  	/*
->  	 * Mapping the requested stage onto what we support is surprisingly
->  	 * complicated, mainly because the spec allows S1+S2 SMMUs without
-> @@ -984,7 +991,7 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
->  	void __iomem *cb_base;
->  	int irq;
->  
-> -	if (!smmu)
-> +	if (!smmu || domain->type == IOMMU_DOMAIN_IDENTITY)
->  		return;
->  
->  	/*
-> @@ -1007,7 +1014,9 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
->  {
->  	struct arm_smmu_domain *smmu_domain;
->  
-> -	if (type != IOMMU_DOMAIN_UNMANAGED && type != IOMMU_DOMAIN_DMA)
-> +	if (type != IOMMU_DOMAIN_UNMANAGED &&
-> +	    type != IOMMU_DOMAIN_DMA &&
-> +	    type != IOMMU_DOMAIN_IDENTITY)
->  		return NULL;
->  	/*
->  	 * Allocate the domain and initialise some of its data structures.
-> @@ -1205,10 +1214,15 @@ static int arm_smmu_domain_add_master(struct arm_smmu_domain *smmu_domain,
->  {
->  	struct arm_smmu_device *smmu = smmu_domain->smmu;
->  	struct arm_smmu_s2cr *s2cr = smmu->s2crs;
-> -	enum arm_smmu_s2cr_type type = S2CR_TYPE_TRANS;
->  	u8 cbndx = smmu_domain->cfg.cbndx;
-> +	enum arm_smmu_s2cr_type type;
->  	int i, idx;
->  
-> +	if (smmu_domain->stage == ARM_SMMU_DOMAIN_BYPASS)
-> +		type = S2CR_TYPE_BYPASS;
-> +	else
-> +		type = S2CR_TYPE_TRANS;
-> +
->  	for_each_cfg_sme(fwspec, i, idx) {
->  		if (type == s2cr[idx].type && cbndx == s2cr[idx].cbndx)
->  			continue;
+> 'LineL Switch' -> 'DACL1 Switch':
+> c3b79e05b4d9ab2e7c3ba281261ea87ab5b71a92
 > 
+You are right. Those mixer scripts were for Maemo 2.6.28 kernel and
+dated 2009... grr, looks like I've overwritten my N900 mixer scripts at
+some point.
+
+Fortunately the issue seems to be fixed in v4.10-rc4.
+
+-- 
+Jarkko
