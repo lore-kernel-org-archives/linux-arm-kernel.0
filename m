@@ -1,60 +1,122 @@
-From: jpannell@marvell.com (Jon Pannell)
-Date: Thu, 19 Jan 2017 23:41:28 +0000
-Subject: [EXT] Re: [PATCH v5 0/2] Add support for the ethernet switch on
- the ESPRESSObin
-In-Reply-To: <20170119220607.GA25907@lunn.ch>
-References: <20170119214934.27442-1-gregory.clement@free-electrons.com>
- <20170119220607.GA25907@lunn.ch>
-Message-ID: <af59fcdd27754934a8149eda2098d601@SC-EXCH01.marvell.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Fri, 20 Jan 2017 07:52:18 +0800
+Subject: [arm:phy-cleanup 10/10] drivers/net/wireless/ath/ath5k/ahb.c:233:1:
+ note: in expansion of macro 'module_platform_driver'
+Message-ID: <201701200700.w0DZO2hP%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Bob + Christine
+tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git phy-cleanup
+head:   a8d93f6890893686b4e5f5e8e4ae39c64af2391d
+commit: a8d93f6890893686b4e5f5e8e4ae39c64af2391d [10/10] net: dsa: remove unnecessary phy*.h includes
+config: mips-ath25_defconfig (attached as .config)
+compiler: mips-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout a8d93f6890893686b4e5f5e8e4ae39c64af2391d
+        # save the attached .config to linux build tree
+        make.cross ARCH=mips 
 
-Jon Pannell
+All warnings (new ones prefixed by >>):
 
+   In file included from include/linux/platform_device.h:14:0,
+                    from drivers/net/wireless/ath/ath5k/ahb.c:20:
+   include/linux/device.h:1463:1: warning: data definition has no type or storage class
+    module_init(__driver##_init); \
+    ^
+   include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
+     module_driver(__platform_driver, platform_driver_register, \
+     ^~~~~~~~~~~~~
+>> drivers/net/wireless/ath/ath5k/ahb.c:233:1: note: in expansion of macro 'module_platform_driver'
+    module_platform_driver(ath_ahb_driver);
+    ^~~~~~~~~~~~~~~~~~~~~~
+   include/linux/device.h:1463:1: error: type defaults to 'int' in declaration of 'module_init' [-Werror=implicit-int]
+    module_init(__driver##_init); \
+    ^
+   include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
+     module_driver(__platform_driver, platform_driver_register, \
+     ^~~~~~~~~~~~~
+>> drivers/net/wireless/ath/ath5k/ahb.c:233:1: note: in expansion of macro 'module_platform_driver'
+    module_platform_driver(ath_ahb_driver);
+    ^~~~~~~~~~~~~~~~~~~~~~
+>> drivers/net/wireless/ath/ath5k/ahb.c:233:1: warning: parameter names (without types) in function declaration
+   In file included from include/linux/platform_device.h:14:0,
+                    from drivers/net/wireless/ath/ath5k/ahb.c:20:
+   include/linux/device.h:1468:1: warning: data definition has no type or storage class
+    module_exit(__driver##_exit);
+    ^
+   include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
+     module_driver(__platform_driver, platform_driver_register, \
+     ^~~~~~~~~~~~~
+>> drivers/net/wireless/ath/ath5k/ahb.c:233:1: note: in expansion of macro 'module_platform_driver'
+    module_platform_driver(ath_ahb_driver);
+    ^~~~~~~~~~~~~~~~~~~~~~
+   include/linux/device.h:1468:1: error: type defaults to 'int' in declaration of 'module_exit' [-Werror=implicit-int]
+    module_exit(__driver##_exit);
+    ^
+   include/linux/platform_device.h:228:2: note: in expansion of macro 'module_driver'
+     module_driver(__platform_driver, platform_driver_register, \
+     ^~~~~~~~~~~~~
+>> drivers/net/wireless/ath/ath5k/ahb.c:233:1: note: in expansion of macro 'module_platform_driver'
+    module_platform_driver(ath_ahb_driver);
+    ^~~~~~~~~~~~~~~~~~~~~~
+>> drivers/net/wireless/ath/ath5k/ahb.c:233:1: warning: parameter names (without types) in function declaration
+   In file included from include/linux/platform_device.h:14:0,
+                    from drivers/net/wireless/ath/ath5k/ahb.c:20:
+   drivers/net/wireless/ath/ath5k/ahb.c:233:24: warning: 'ath_ahb_driver_exit' defined but not used [-Wunused-function]
+    module_platform_driver(ath_ahb_driver);
+                           ^
+   include/linux/device.h:1464:20: note: in definition of macro 'module_driver'
+    static void __exit __driver##_exit(void) \
+                       ^~~~~~~~
+>> drivers/net/wireless/ath/ath5k/ahb.c:233:1: note: in expansion of macro 'module_platform_driver'
+    module_platform_driver(ath_ahb_driver);
+    ^~~~~~~~~~~~~~~~~~~~~~
+   drivers/net/wireless/ath/ath5k/ahb.c:233:24: warning: 'ath_ahb_driver_init' defined but not used [-Wunused-function]
+    module_platform_driver(ath_ahb_driver);
+                           ^
+   include/linux/device.h:1459:19: note: in definition of macro 'module_driver'
+    static int __init __driver##_init(void) \
+                      ^~~~~~~~
+>> drivers/net/wireless/ath/ath5k/ahb.c:233:1: note: in expansion of macro 'module_platform_driver'
+    module_platform_driver(ath_ahb_driver);
+    ^~~~~~~~~~~~~~~~~~~~~~
+   cc1: some warnings being treated as errors
 
------Original Message-----
-From: Andrew Lunn [mailto:andrew at lunn.ch] 
-Sent: Thursday, January 19, 2017 2:06 PM
-To: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Cc: Vivien Didelot <vivien.didelot@savoirfairelinux.com>; Florian Fainelli <f.fainelli@gmail.com>; netdev at vger.kernel.org; linux-kernel at vger.kernel.org; David S. Miller <davem@davemloft.net>; Jason Cooper <jason@lakedaemon.net>; Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>; Thomas Petazzoni <thomas.petazzoni@free-electrons.com>; linux-arm-kernel at lists.infradead.org; Nadav Haklai <nadavh@marvell.com>; Wilson Ding <dingwei@marvell.com>; Kostya Porotchkin <kostap@marvell.com>; Joe Zhou <shjzhou@marvell.com>; Jon Pannell <jpannell@marvell.com>
-Subject: [EXT] Re: [PATCH v5 0/2] Add support for the ethernet switch on the ESPRESSObin
+vim +/module_platform_driver +233 drivers/net/wireless/ath/ath5k/ahb.c
 
-External Email
+0e5d3ab5 Sergey Ryazanov 2014-10-29  217  
+0e5d3ab5 Sergey Ryazanov 2014-10-29  218  	ath5k_deinit_ah(ah);
+0e5d3ab5 Sergey Ryazanov 2014-10-29  219  	iounmap(ah->iobase);
+0e5d3ab5 Sergey Ryazanov 2014-10-29  220  	ieee80211_free_hw(hw);
+0e5d3ab5 Sergey Ryazanov 2014-10-29  221  
+0e5d3ab5 Sergey Ryazanov 2014-10-29  222  	return 0;
+0e5d3ab5 Sergey Ryazanov 2014-10-29  223  }
+0e5d3ab5 Sergey Ryazanov 2014-10-29  224  
+0e5d3ab5 Sergey Ryazanov 2014-10-29  225  static struct platform_driver ath_ahb_driver = {
+0e5d3ab5 Sergey Ryazanov 2014-10-29  226  	.probe      = ath_ahb_probe,
+0e5d3ab5 Sergey Ryazanov 2014-10-29  227  	.remove     = ath_ahb_remove,
+0e5d3ab5 Sergey Ryazanov 2014-10-29  228  	.driver		= {
+0e5d3ab5 Sergey Ryazanov 2014-10-29  229  		.name	= "ar231x-wmac",
+0e5d3ab5 Sergey Ryazanov 2014-10-29  230  	},
+0e5d3ab5 Sergey Ryazanov 2014-10-29  231  };
+0e5d3ab5 Sergey Ryazanov 2014-10-29  232  
+0e5d3ab5 Sergey Ryazanov 2014-10-29 @233  module_platform_driver(ath_ahb_driver);
 
-----------------------------------------------------------------------
-> While comparing the datasheet and the ops functions used, some 
-> question came to me. They should not prevent applying this series, but 
-> their answer would help me to have a better understanding of the dsa 
-> subsystem.
-> 
-> - Are the temperature related operation still useful with dsa2 ?
+:::::: The code at line 233 was first introduced by commit
+:::::: 0e5d3ab532dd6bd43406d91b1dacb391973f831f ath5k: revert AHB bus support removing
 
-No. I'm in the process of moving the code into the Marvell PHY driver, since the sensor is in the embedded PHYs.
+:::::: TO: Sergey Ryazanov <ryazanov.s.a@gmail.com>
+:::::: CC: Ralf Baechle <ralf@linux-mips.org>
 
-What ID does the embedded PHY use? The 6390 has a blank ID, where as older device have a real ID.
-
-> - Why the setup is done differently between the 6390 and the 6352
->   families when the have exactly the same register?
-
-EDSA on 6390 works differently to 6352, meaning it breaks. So we need to run the 6390 with DSA tagging, not EDSA. Maybe this is the source of the differences?
-
-It should also be noted that the 6390 support is not yet complete. I have a few more patches in my tree to post.
-
->   - On the Port Controller 2, the bit PORT_CONTROL_2_MAP_DA is set for
->     6352 and not for 6390 whereas the same bit exists in 6360 and the
->     description for this bit is the same for both datasheet.
-
-Humm, it does look like it is missing mv88e6xxx_6390_family(chip).
- 
-> 
->   - Register PORT_ATU_CONTROL and PORT_PRI_OVERRIDE are reset on 6352
->     and not on 6390. While here again the registers description are
->     the same.
-
-And the same here. I've mostly been working on where the 6390 is different. Where it is the same i've mostly ignored it so far :-)
-
-There is also an ongoing effort to remove all these big if statements with a list of families.
-
-     Andrew
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 11636 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170120/95324930/attachment-0001.gz>
