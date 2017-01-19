@@ -1,50 +1,36 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 19 Jan 2017 10:31:38 -0600
-Subject: [PATCH v1 1/7] dt-bindings: display: add STM32 LTDC driver
-In-Reply-To: <dfb3192a-d5b6-029e-b8cb-65a628a0c30b@st.com>
+Date: Thu, 19 Jan 2017 10:32:48 -0600
+Subject: [PATCH v1 3/7] dt-bindings: Add Ampire AM-480272H3TMQW-T01H panel
+In-Reply-To: <1484573344-11609-4-git-send-email-yannick.fertre@st.com>
 References: <1484573344-11609-1-git-send-email-yannick.fertre@st.com>
- <1484573344-11609-2-git-send-email-yannick.fertre@st.com>
- <2080174.sm3cyM9MmB@avalon>
- <dfb3192a-d5b6-029e-b8cb-65a628a0c30b@st.com>
-Message-ID: <20170119163138.va23ppx3ictp6wjr@rob-hp-laptop>
+ <1484573344-11609-4-git-send-email-yannick.fertre@st.com>
+Message-ID: <20170119163248.botftlakcae65ehz@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 04:16:01PM +0000, Yannick FERTRE wrote:
-> On 01/16/2017 09:30 PM, Laurent Pinchart wrote:
-> > Hi Yannick,
-> >
-> > Thank you for the patch.
-> >
-> > On Monday 16 Jan 2017 14:28:58 Yannick Fertre wrote:
-> >> Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
-> >> ---
-> >>  .../devicetree/bindings/display/st,ltdc.txt        | 57 ++++++++++++++++++
-> >>  1 file changed, 57 insertions(+)
-> >>  create mode 100644 Documentation/devicetree/bindings/display/st,ltdc.txt
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/display/st,ltdc.txt
-> >> b/Documentation/devicetree/bindings/display/st,ltdc.txt new file mode
-> >> 100644
-> >> index 0000000..20e89da
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/display/st,ltdc.txt
-> >> @@ -0,0 +1,57 @@
-> >> +* STMicroelectronics STM32 lcd-tft display controller
-> >> +
-> >> +- st-display-subsystem: Master device for DRM sub-components
-> >> +  This device must be the parent of all the sub-components and is
-> >> responsible
-> >> +  of bind them.
-> >
-> > Why do you need this ? At a quick glance the ltdc node should be enough.
-> Hi Laurent,
-> To prepare next device upstream of dsi, we need a master node 
-> "st-display-subsystem" and a sub node "st,ltdc". It's the same kind of 
-> node than st,stih4xx.
+On Mon, Jan 16, 2017 at 02:29:00PM +0100, Yannick Fertre wrote:
+> Signed-off-by: Yannick Fertre <yannick.fertre@st.com>
+> ---
+>  .../bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt         | 7 +++++++
+>  1 file changed, 7 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt b/Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
+> new file mode 100644
+> index 0000000..f59e3c4
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/panel/ampire,am-480272h3tmqw-t01h.txt
+> @@ -0,0 +1,7 @@
+> +Ampire AM-480272H3TMQW-T01H 4.3" WQVGA TFT LCD panel
+> +
+> +Required properties:
+> +- compatible: should be "ampire,am-480272h3tmqw-t01h"
 
-No, you don't. That's what OF graph is for. The DRM driver binds to the 
-LCD controller node and walks the graph to find the DSI node and then 
-the panel.
+No GPIOs or power supply?
 
-Rob
+> +
+> +This binding is compatible with the simple-panel binding, which is specified
+> +in simple-panel.txt in this directory.
+> -- 
+> 1.9.1
+> 
