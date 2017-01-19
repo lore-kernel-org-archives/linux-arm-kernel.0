@@ -1,186 +1,86 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Thu, 19 Jan 2017 12:31:23 -0600
-Subject: [PATCH v4 2/4] Documentation: dt: add bindings for ti-cpufreq
-In-Reply-To: <20170119180702.62xg2ta5pq4mf7sd@rob-hp-laptop>
-References: <20170117131808.29798-1-d-gerlach@ti.com>
- <20170117131808.29798-3-d-gerlach@ti.com>
- <20170119180702.62xg2ta5pq4mf7sd@rob-hp-laptop>
-Message-ID: <b7d11925-879a-9be0-fdd8-45b70e642ce1@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 19 Jan 2017 19:35:58 +0100
+Subject: [GIT PULL] Allwinner conversion to generic pin properties
+In-Reply-To: <20170110032120.GJ22261@localhost>
+References: <20161226074214.sd53ozm6hvzkdb26@lukather>
+ <20170110032120.GJ22261@localhost>
+Message-ID: <20170119183558.jjdpobsaedtqywjk@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/19/2017 12:07 PM, Rob Herring wrote:
-> On Tue, Jan 17, 2017 at 07:18:06AM -0600, Dave Gerlach wrote:
->> Add the device tree bindings document for the TI CPUFreq/OPP driver
->> on AM33xx, AM43xx, DRA7xx, and AM57xx SoCs. The operating-points-v2
->> binding allows us to provide an opp-supported-hw property for each OPP
->> to define when it is available. This driver is responsible for reading
->> and parsing registers to determine which OPPs can be selectively enabled
->> based on the specific SoC in use by matching against the opp-supported-hw
->> data.
->>
->> Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
->> ---
->> v3->v4:
->> 	Update to simplify binding, only use "syscon" now to pass control
->> 	module register space and let driver handle offsets.
->>
->>  .../devicetree/bindings/cpufreq/ti-cpufreq.txt     | 128 +++++++++++++++++++++
->>  1 file changed, 128 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt
->>
->> diff --git a/Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt b/Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt
->> new file mode 100644
->> index 000000000000..58efa4c72545
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt
->> @@ -0,0 +1,128 @@
->> +TI CPUFreq and OPP bindings
->> +================================
->> +
->> +Certain TI SoCs, like those in the am335x, am437x, am57xx, and dra7xx
->> +families support different OPPs depending on the silicon variant in use.
->> +The ti-cpufreq driver can use revision and an efuse value from the SoC to
->> +provide the OPP framework with supported hardware information. This is
->> +used to determine which OPPs from the operating-points-v2 table get enabled
->> +when it is parsed by the OPP framework.
->> +
->> +Required properties:
->> +--------------------
->> +In 'cpus' nodes:
->> +- operating-points-v2: Phandle to the operating-points-v2 table to use.
->> +
->> +In 'operating-points-v2' table:
->> +- compatible: Should be
->> +	- 'operating-points-v2-ti-cpu' for am335x, am43xx, and dra7xx/am57xx SoCs
->> +- syscon: A phandle pointing to a syscon node representing the control module
->> +	  register space of the SoC.
->> +
->> +Optional properties:
->> +--------------------
->> +For each opp entry in 'operating-points-v2' table:
->> +- opp-supported-hw: Two bitfields indicating:
->> +	1. Which revision of the SoC the OPP is supported by
->> +	2. Which eFuse bits indicate this OPP is available
->> +
->> +	A bitwise AND is performed against these values and if any bit
->> +	matches, the OPP gets enabled.
->> +
->> +Example:
->> +--------
->> +
->> +/* From arch/arm/boot/dts/am33xx.dtsi */
->> +cpus {
->> +	#address-cells = <1>;
->> +	#size-cells = <0>;
->> +	cpu at 0 {
->> +		compatible = "arm,cortex-a8";
->> +		device_type = "cpu";
->> +		reg = <0>;
->> +
->> +		operating-points-v2 = <&cpu0_opp_table>;
->> +
->> +		clocks = <&dpll_mpu_ck>;
->> +		clock-names = "cpu";
->> +
->> +		clock-latency = <300000>; /* From omap-cpufreq driver */
->> +	};
->> +};
->> +
->> +/*
->> + * cpu0 has different OPPs depending on SoC revision and some on revisions
->> + * 0x2 and 0x4 have eFuse bits that indicate if they are available or not
->> + */
->> +cpu0_opp_table: opp_table0 {
->
-> Just "opp-table {"
+Hi Olof,
 
-Ok.
+On Mon, Jan 09, 2017 at 07:21:20PM -0800, Olof Johansson wrote:
+> On Mon, Dec 26, 2016 at 08:42:14AM +0100, Maxime Ripard wrote:
+> > Hi Arnd, Olof,
+> > 
+> > Like we discussed it last time, here is a pull request with the
+> > convertion patches to the generic pin properties for 4.10.
+> > 
+> > Thanks,
+> > Maxime
+> > 
+> > The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+> > 
+> >   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+> > 
+> > are available in the git repository at:
+> > 
+> >   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-generic-pinconf-for-4.10
+> > 
+> > for you to fetch changes up to 1edcd36fcb48fe841bcc62eda36c105037d9583c:
+> > 
+> >   ARM: sunxi: Convert pinctrl nodes to generic bindings (2016-12-26 08:27:11 +0100)
+> > 
+> > ----------------------------------------------------------------
+> > Allwinner conversion to generic pin muxing properties
+> > 
+> > Here is a list of patches that converts the current DT to the generic pin
+> > control and muxing properties, now that the pinctrl driver supports it.
+> 
+> I dropped the ball on this over the holidays for a few reasons, none of them
+> good. Unfortunately we're at -rc3+ now, so I've queued this up in next/dt for
+> v4.11 at this point. Hope that's alright.
+> 
+> You might want to use your branch as a base for new DT contents for
+> v4.11 in case it ends up being conflict-heavy, which would work fine at our
+> end.
 
->
->> +	compatible = "operating-points-v2-ti-cpu";
->> +	syscon = <&scm_conf>;
->> +
->> +	/*
->> +	 * The three following nodes are marked with opp-suspend
->> +	 * because they can not be enabled simultaneously on a
->> +	 * single SoC.
->> +	 */
->> +	opp50 at 300000000 {
->
-> What's the 50, 100, 120 in the names?
+We might have conflicts with this unfortunately.
 
-Those are the names of the OPPs given in Table 5-7 of the AM335x data 
-manual, seen here http://www.ti.com/lit/ds/symlink/am3359.pdf . I 
-typically reference the table and document in the commit message of the 
-actual DT patches but didn't here for the binding.
+It turns out that we fixed an issue where the pinctrl driver in 4.10
+is now honoring the case where we list our pull-ups as disabled, while
+it used to be ignored (which was the bug).
 
-Regards,
-Dave
+However, some boards were listing improperly in their DT that their
+pull-ups were disabled, while they actually needed it, which means
+that now the driver will disable them, and things get broken (mostly
+MMC for now, but I expect other devices to be broken too).
 
->
->> +		opp-hz = /bits/ 64 <300000000>;
->> +		opp-microvolt = <950000 931000 969000>;
->> +		opp-supported-hw = <0x06 0x0010>;
->> +		opp-suspend;
->> +	};
->> +
->> +	opp100 at 275000000 {
->> +		opp-hz = /bits/ 64 <275000000>;
->> +		opp-microvolt = <1100000 1078000 1122000>;
->> +		opp-supported-hw = <0x01 0x00FF>;
->> +		opp-suspend;
->> +	};
->> +
->> +	opp100 at 300000000 {
->> +		opp-hz = /bits/ 64 <300000000>;
->> +		opp-microvolt = <1100000 1078000 1122000>;
->> +		opp-supported-hw = <0x06 0x0020>;
->> +		opp-suspend;
->> +	};
->> +
->> +	opp100 at 500000000 {
->> +		opp-hz = /bits/ 64 <500000000>;
->> +		opp-microvolt = <1100000 1078000 1122000>;
->> +		opp-supported-hw = <0x01 0xFFFF>;
->> +	};
->> +
->> +	opp100 at 600000000 {
->> +		opp-hz = /bits/ 64 <600000000>;
->> +		opp-microvolt = <1100000 1078000 1122000>;
->> +		opp-supported-hw = <0x06 0x0040>;
->> +	};
->> +
->> +	opp120 at 600000000 {
->> +		opp-hz = /bits/ 64 <600000000>;
->> +		opp-microvolt = <1200000 1176000 1224000>;
->> +		opp-supported-hw = <0x01 0xFFFF>;
->> +	};
->> +
->> +	opp120 at 720000000 {
->> +		opp-hz = /bits/ 64 <720000000>;
->> +		opp-microvolt = <1200000 1176000 1224000>;
->> +		opp-supported-hw = <0x06 0x0080>;
->> +	};
->> +
->> +	oppturbo at 720000000 {
->> +		opp-hz = /bits/ 64 <720000000>;
->> +		opp-microvolt = <1260000 1234800 1285200>;
->> +		opp-supported-hw = <0x01 0xFFFF>;
->> +	};
->> +
->> +	oppturbo at 800000000 {
->> +		opp-hz = /bits/ 64 <800000000>;
->> +		opp-microvolt = <1260000 1234800 1285200>;
->> +		opp-supported-hw = <0x06 0x0100>;
->> +	};
->> +
->> +	oppnitro at 1000000000 {
->> +		opp-hz = /bits/ 64 <1000000000>;
->> +		opp-microvolt = <1325000 1298500 1351500>;
->> +		opp-supported-hw = <0x04 0x0200>;
->> +	};
->> +};
->> --
->> 2.11.0
->>
+We have two ways of fixing this.
+
+Option 1 is applying a patch that will enable the pull ups on the MMC
+devices (because it's ok to do so) that was queued with 4.11 and will
+conflict heavily with this PR.
+
+The other option would be to queue the two first patches of that PR as
+fixes that will reintroduce the previous behaviour (or at least, the
+one the boards expects). I'm guessing in that case, the merge will
+just work (since it's the exact same commits anyway), and we fix all
+the devices and not just MMC. This has not been confirmed to work at
+the moment though, but should be very soon.
+
+What do you think?
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170119/dc253827/attachment.sig>
