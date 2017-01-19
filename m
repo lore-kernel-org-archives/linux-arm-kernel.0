@@ -1,87 +1,187 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 19 Jan 2017 12:40:37 +0100
-Subject: [PATCH] coresight: STM: Balance enable/disable
-In-Reply-To: <1484589600-21397-1-git-send-email-suzuki.poulose@arm.com>
-References: <1484589600-21397-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20170119114037.GR28024@kroah.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 19 Jan 2017 11:43:25 +0000
+Subject: [PATCH 2/2] security: Change name of CONFIG_DEBUG_SET_MODULE_RONX
+In-Reply-To: <1484789346-21012-3-git-send-email-labbott@redhat.com>
+References: <1484789346-21012-1-git-send-email-labbott@redhat.com>
+ <1484789346-21012-3-git-send-email-labbott@redhat.com>
+Message-ID: <5005f110-2279-9ac7-c9c5-1894b8f6387d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 16, 2017 at 06:00:00PM +0000, Suzuki K Poulose wrote:
-> The stm is automatically enabled when an application sets the policy
-> via ->link() call back by using coresight_enable(), which keeps the
-> refcount of the current users of the STM. However, the unlink() callback
-> issues stm_disable() directly, which leaves the STM turned off, without
-> the coresight layer knowing about it. This prevents any further uses
-> of the STM hardware as the coresight layer still thinks the STM is
-> turned on and doesn't enable the hardware when required. Even manually
-> enabling the STM via sysfs can't really enable the hw.
+Hi Laura,
+
+On 19/01/17 01:29, Laura Abbott wrote:
 > 
-> e.g,
+> Despite the word 'debug' in CONFIG_DEBUG_SET_MODULE_RONX, this kernel
+> option provides key security features that are to be expected on a
+> modern system. Change the name to CONFIG_HARDENED_MODULE_MAPPINGS which
+> more accurately describes what this option is intended to do.
 > 
->  $ echo 1 > $CS_DEVS/$ETR/enable_sink
->  $ mkdir -p $CONFIG_FS/stp-policy/$source.0/stm_test/
->  $ echo 32768 65535 > $CONFIG_FS/stp-policy/$source.0/stm_test/channels
->  $ echo 64 > $CS_DEVS/$source/traceid
->  $ ./stm_app
->  Sending 64000 byte blocks of pattern 0 at 0us intervals
->  Success to map channel(32768~32783) to 0xffffa95fa000
->  Sending on channel 32768
->  $ dd if=/dev/$ETR of=~/trace.bin.1
->  597+1 records in
->  597+1 records out
->  305920 bytes (306 kB) copied, 0.399952 s, 765 kB/s
->  $ ./stm_app
->  Sending 64000 byte blocks of pattern 0 at 0us intervals
->  Success to map channel(32768~32783) to 0xffff7e9e2000
->  Sending on channel 32768
->  $ dd if=/dev/$ETR of=~/trace.bin.2
->  0+0 records in
->  0+0 records out
->  0 bytes (0 B) copied, 0.0232083 s, 0.0 kB/s
-> 
->  Note that we don't get any data from the ETR for the second session.
-> 
->  Also dmesg shows :
-> 
->  [   77.520458] coresight-tmc 20800000.etr: TMC-ETR enabled
->  [   77.537097] coresight-replicator etr_replicator at 20890000: REPLICATOR enabled
->  [   77.558828] coresight-replicator main_replicator at 208a0000: REPLICATOR enabled
->  [   77.581068] coresight-funnel 208c0000.main_funnel: FUNNEL inport 0 enabled
->  [   77.602217] coresight-tmc 20840000.etf: TMC-ETF enabled
->  [   77.618422] coresight-stm 20860000.stm: STM tracing enabled
->  [  139.554252] coresight-stm 20860000.stm: STM tracing disabled
->   # End of first tracing session
->  [  146.351135] coresight-tmc 20800000.etr: TMC read start
->  [  146.514486] coresight-tmc 20800000.etr: TMC read end
->   # Note that the STM is not turned on via stm_generic_link()->coresight_enable()
->   # and hence none of the components are turned on.
->  [  152.479080] coresight-tmc 20800000.etr: TMC read start
->  [  152.542632] coresight-tmc 20800000.etr: TMC read end
-> 
-> This patch fixes the problem by balancing the unlink operation by using
-> the coresight_disable(), keeping the coresight layer in sync with the
-> hardware state and thus allowing normal usage of the STM component.
-> 
-> Fixes: commit 237483aa5cf43 ("coresight: stm: adding driver for CoreSight STM component")
-> Cc: Pratik Patel <pratikp@codeaurora.org>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: stable at vger.kernel.org # 4.7+
-> Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Reviewed-by: Chunyan Zhang <zhang.chunyan@linaro.org>
-> Reported-by: Robert Walker <robert.walker@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
 > ---
+
+[...]
+
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 09aff28..ef852e4 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -8,6 +8,7 @@ config ARM
+>  	select ARCH_HAVE_CUSTOM_GPIO_H
+>  	select ARCH_HAS_GCOV_PROFILE_ALL
+>  	select ARCH_HAS_HARDENED_MAPPINGS if MMU && !XIP_KERNEL
+> +	select ARCH_HAS_HARDENED_MODULE_MAPPINGS if MMU
+>  	select ARCH_MIGHT_HAVE_PC_PARPORT
+>  	select ARCH_SUPPORTS_ATOMIC_RMW
+>  	select ARCH_USE_BUILTIN_BSWAP
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index d83f7c3..426d271 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -1738,17 +1738,6 @@ config PID_IN_CONTEXTIDR
+>  	  additional instructions during context switch. Say Y here only if you
+>  	  are planning to use hardware trace tools with this kernel.
+>  
+> -config DEBUG_SET_MODULE_RONX
+> -	bool "Set loadable kernel module data as NX and text as RO"
+> -	depends on MODULES && MMU
+> -	---help---
+> -	  This option helps catch unintended modifications to loadable
+> -	  kernel module's text and read-only data. It also prevents execution
+> -	  of module data. Such protection may interfere with run-time code
+> -	  patching and dynamic kernel tracing - and they might also protect
+> -	  against certain classes of kernel exploits.
+> -	  If in doubt, say "N".
+> -
+>  source "drivers/hwtracing/coresight/Kconfig"
+>  
+>  endmenu
+
+[...]
+
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -12,6 +12,7 @@ config ARM64
+>  	select ARCH_HAS_GCOV_PROFILE_ALL
+>  	select ARCH_HAS_GIGANTIC_PAGE
+>  	select ARCH_HAS_HARDENED_MAPPINGS
+> +	select ARCH_HAS_HARDENED_MODULE_MAPPINGS
+>  	select ARCH_HAS_KCOV
+>  	select ARCH_HAS_SG_CHAIN
+>  	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+> index a26d27f..1eebe1f 100644
+> --- a/arch/arm64/Kconfig.debug
+> +++ b/arch/arm64/Kconfig.debug
+> @@ -71,17 +71,6 @@ config DEBUG_WX
+>  
+>  	  If in doubt, say "Y".
+>  
+> -config DEBUG_SET_MODULE_RONX
+> -	bool "Set loadable kernel module data as NX and text as RO"
+> -	depends on MODULES
+> -	default y
+> -	help
+> -	  Is this is set, kernel module text and rodata will be made read-only.
+> -	  This is to help catch accidental or malicious attempts to change the
+> -	  kernel's executable code.
+> -
+> -	  If in doubt, say Y.
+> -
+>  config DEBUG_ALIGN_RODATA
+>  	depends on ARCH_HAS_HARDENED_MAPPINGS
+>  	bool "Align linker sections up to SECTION_SIZE"
+
+[...]
+
+> --- a/arch/s390/Kconfig
+> +++ b/arch/s390/Kconfig
+> @@ -69,6 +69,7 @@ config S390
+>  	select ARCH_HAS_GCOV_PROFILE_ALL
+>  	select ARCH_HAS_GIGANTIC_PAGE
+>  	select ARCH_HAS_HARDENED_MAPPINGS
+> +	select ARCH_HAS_HARDENED_MODULE_MAPPINGS
+>  	select ARCH_HAS_KCOV
+>  	select ARCH_HAS_SG_CHAIN
+>  	select ARCH_HAS_UBSAN_SANITIZE_ALL
+> diff --git a/arch/s390/Kconfig.debug b/arch/s390/Kconfig.debug
+> index 26c5d5be..57f8ea9 100644
+> --- a/arch/s390/Kconfig.debug
+> +++ b/arch/s390/Kconfig.debug
+> @@ -17,7 +17,4 @@ config S390_PTDUMP
+>  	  kernel.
+>  	  If in doubt, say "N"
+>  
+> -config DEBUG_SET_MODULE_RONX
+> -	def_bool y
+> -	depends on MODULES
+>  endmenu
+> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+> index 9d80cd8..38ce850 100644
+> --- a/arch/x86/Kconfig
+> +++ b/arch/x86/Kconfig
+> @@ -51,6 +51,7 @@ config X86
+>  	select ARCH_HAS_FAST_MULTIPLIER
+>  	select ARCH_HAS_GCOV_PROFILE_ALL
+>  	select ARCH_HAS_HARDENED_MAPPINGS
+> +	select ARCH_HAS_HARDENED_MODULE_MAPPINGS
+>  	select ARCH_HAS_KCOV			if X86_64
+>  	select ARCH_HAS_MMIO_FLUSH
+>  	select ARCH_HAS_PMEM_API		if X86_64
+> diff --git a/arch/x86/Kconfig.debug b/arch/x86/Kconfig.debug
+> index 67eec55..69cdd0b 100644
+> --- a/arch/x86/Kconfig.debug
+> +++ b/arch/x86/Kconfig.debug
+> @@ -109,17 +109,6 @@ config DEBUG_WX
+>  
+>  	  If in doubt, say "Y".
+>  
+> -config DEBUG_SET_MODULE_RONX
+> -	bool "Set loadable kernel module data as NX and text as RO"
+> -	depends on MODULES
+> -	---help---
+> -	  This option helps catch unintended modifications to loadable
+> -	  kernel module's text and read-only data. It also prevents execution
+> -	  of module data. Such protection may interfere with run-time code
+> -	  patching and dynamic kernel tracing - and they might also protect
+> -	  against certain classes of kernel exploits.
+> -	  If in doubt, say "N".
+> -
+>  config DEBUG_NX_TEST
+>  	tristate "Testcase for the NX non-executable stack feature"
+>  	depends on DEBUG_KERNEL && m
+
+[...]
+
+> --- a/security/Kconfig
+> +++ b/security/Kconfig
+> @@ -174,6 +174,22 @@ config HARDENED_PAGE_MAPPINGS
+>  	  Unless your system has known restrictions or performance issues, it
+>  	  is recommended to say Y here.
+>  
+> +config ARCH_HAS_HARDENED_MODULE_MAPPINGS
+> +	def_bool n
+> +
+> +config HARDENED_MODULE_MAPPINGS
+> +	bool "Mark module mappings with stricter permissions (RO/W^X)"
+> +	default y
+> +	depends on ARCH_HAS_HARDENED_MODULE_MAPPINGS
+
+It would seem that this ends up losing the previous dependency on
+MODULES - is that intentional?
+
+Robin.
+
+> +	help
+> +	  If this is set, module text and rodata memory will be made read-only,
+> +	  and non-text memory will be made non-executable. This provides
+> +	  protection against certain security vulnerabilities (e.g. modifying
+> +	  code)
+> +
+> +	  Unless your system has known restrictions or performance issues, it
+> +	  is recommended to say Y here.
+> +
+>  source security/selinux/Kconfig
+>  source security/smack/Kconfig
+>  source security/tomoyo/Kconfig
 > 
-> Greg,
-> 
-> Without this patch, the coresight STM IP can only be used for one tracing
-> session per boot, seriously limiting its usability.
-
-When you resend a patch, please tell me what is different from the
-previous version you sent.  I figured it out here, but please do this
-next time.
-
-thanks,
-
-greg k-h
