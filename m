@@ -1,77 +1,149 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 19 Jan 2017 10:23:16 +0100
-Subject: [linux-sunxi] [PATCH 1/2] drivers: pinctrl: add driver for
- Allwinner H5 SoC
-In-Reply-To: <87a535d3-1170-c388-ce7d-4921e69f4cab@arm.com>
-References: <20161223125001.1176-1-icenowy@aosc.xyz>
- <1280f095-ab03-93f8-14d2-99d13ba1ce55@arm.com>
- <CACRpkdYQhfid3VRcaj=7as_+Zg=pX3Svp9FJ_W_Ft8nVuoZqKQ@mail.gmail.com>
- <20170105224210.wfinfucbpkkd44om@lukather>
- <38fe3491-457a-f0c5-54fb-9defdcd45045@arm.com>
- <20170116163124.c5gusyd3j3goivnf@lukather>
- <87a535d3-1170-c388-ce7d-4921e69f4cab@arm.com>
-Message-ID: <CACRpkdaTVY7Of5bKyk81xA2kUnZVMQ8LnWEJosg7Ns3s5nAEYQ@mail.gmail.com>
+From: peter.senna@collabora.com (Peter Senna Tschudin)
+Date: Thu, 19 Jan 2017 10:25:32 +0100
+Subject: [PATCH V7 1/4] Documentation/devicetree/bindings: b850v3_lvds_dp
+In-Reply-To: <2338437.Vj2otdygnZ@avalon>
+References: <74f0-58704480-5-27259840@173563636> <2088084.GDlN6tZSQv@avalon>
+ <20170119081214.GA29457@collabora.com> <2338437.Vj2otdygnZ@avalon>
+Message-ID: <20170119092532.GB29457@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2017 at 10:44 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+On Thu, Jan 19, 2017 at 10:17:45AM +0200, Laurent Pinchart wrote:
+> Hi Peter,
+> 
+> On Thursday 19 Jan 2017 09:12:14 Peter Senna Tschudin wrote:
+> > On Wed, Jan 18, 2017 at 11:10:58PM +0200, Laurent Pinchart wrote:
+> > > On Monday 16 Jan 2017 09:37:11 Peter Senna Tschudin wrote:
+> > >> On Tue, Jan 10, 2017 at 11:04:58PM +0200, Laurent Pinchart wrote:
+> > >>> On Saturday 07 Jan 2017 01:29:52 Peter Senna Tschudin wrote:
+> > >>>> On 04 January, 2017 21:39 CET, Rob Herring wrote:
+> > >>>>> On Tue, Jan 3, 2017 at 5:34 PM, Peter Senna Tschudin wrote:
+> > >>>>>> On 03 January, 2017 23:51 CET, Rob Herring <robh@kernel.org> wrote:
+> > >>>>>>> On Sun, Jan 01, 2017 at 09:24:29PM +0100, Peter Senna Tschudin 
+> wrote:
+> > >>>>>>>> Devicetree bindings documentation for the GE B850v3 LVDS/DP++
+> > >>>>>>>> display bridge.
+> > >>>>>>>> 
+> > >>>>>>>> Cc: Martyn Welch <martyn.welch@collabora.co.uk>
+> > >>>>>>>> Cc: Martin Donnelly <martin.donnelly@ge.com>
+> > >>>>>>>> Cc: Javier Martinez Canillas <javier@dowhile0.org>
+> > >>>>>>>> Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> > >>>>>>>> Cc: Philipp Zabel <p.zabel@pengutronix.de>
+> > >>>>>>>> Cc: Rob Herring <robh@kernel.org>
+> > >>>>>>>> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> > >>>>>>>> Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
+> > >>>>>>>> ---
+> > >>>>>>>> There was an Acked-by from Rob Herring <robh@kernel.org> for V6,
+> > >>>>>>>> but I changed the bindings to use i2c_new_secondary_device() so I
+> > >>>>>>>> removed it from the commit message.
+> > 
+> > [...]
+> > 
+> > >>>>>>>>  .../devicetree/bindings/ge/b850v3-lvds-dp.txt      | 39 +++++++++
+> > >>>>>>> 
+> > >>>>>>> Isn't '-lvds-dp' redundant? The part# should be enough.
+> > >>>>>> 
+> > >>>>>> b850v3 is the name of the product, this is why the proposed name.
+> > >>>>>> What about, b850v3-dp2 dp2 indicating the second DP output?
+> > >>>>> 
+> > >>>>> Humm, b850v3 is the board name? This node should be the name of the
+> > >>>>> bridge chip.
+> > >>>> 
+> > >>>> From the cover letter:
+> > >>>> 
+> > >>>> -- // --
+> > >>>> There are two physical bridges on the video signal pipeline: a
+> > >>>> STDP4028(LVDS to DP) and a STDP2690(DP to DP++).  The hardware and
+> > >>>> firmware made it complicated for this binding to comprise two device
+> > >>>> tree nodes, as the design goal is to configure both bridges based on
+> > >>>> the LVDS signal, which leave the driver powerless to control the
+> > >>>> video processing pipeline. The two bridges behaves as a single bridge,
+> > >>>> and the driver is only needed for telling the host about EDID / HPD,
+> > >>>> and for giving the host powers to ack interrupts. The video signal
+> > >>>> pipeline
+> > >>>> 
+> > >>>> is as follows:
+> > >>>>   Host -> LVDS|--(STDP4028)--|DP -> DP|--(STDP2690)--|DP++ -> Video
+> > >>>>   output
+> > >>>> 
+> > >>>> -- // --
+> > >>> 
+> > >>> You forgot to prefix your patch series with [HACK] ;-)
+> > >>> 
+> > >>> How about fixing the issues that make the two DT nodes solution
+> > >>> difficult ? What are they ?
+> > >> 
+> > >> The Firmware and the hardware design. Both bridges, with stock firmware,
+> > >> are fully capable of providig EDID information and handling interrupts.
+> > >> But on this specific design, with this specific firmware, I need to read
+> > >> EDID from one bridge, and handle interrupts on the other.
+> > > 
+> > > Which firmware are you talking about ? Firmware running on the bridges, or
+> > > somewhere else ?
+> > 
+> > Each bridge has it's own external flash containing a binary firmware.
+> > The goal of the firmware is to configure the output end based on the
+> > input end. This is part of what makes handling EDID and HPD challenging.
+> > 
+> > >> Back when I was starting the development I could not come up with a
+> > >> proper way to split EDID and interrupts between two bridges in a way
+> > >> that would result in a fully functional connector. Did I miss something?
+> > > 
+> > > You didn't, we did :-) I've been telling for quite some time now that we
+> > > must decouple bridges from connectors, and this is another example of why
+> > > we have such a need. Bridges should expose additional functions needed to
+> > > implement connector operations, and the connector should be instantiated
+> > > by the display driver with the help of bridge operations. You could then
+> > > create a connector that relies on one bridge to read the EDID and on the
+> > > other bridge to handle HPD.
+> > 
+> > Ah thanks. So for now the single DT node approach is acceptable, right?
+> > The problem is that even if the driver is getting better on each
+> > iteration, the single DT node for two chips issue comes back often and I
+> > believe is _the_ issue preventing the driver from getting upstream. V1
+> > was sent ~ 8 months ago...
+> > 
+> > Can I have some blessing on the single DT node approach for now?
+> 
+> With the "DT as an ABI" approach, I'm afraid not. Temporary hacks are 
+> acceptable on the driver side, but you need two nodes in DT.
 
-> Any future SoCs could then just use that compatible and would describe
-> the SoC details in the DT, like it's meant to be and like we do already,
-> but extended by putting the mux value in there as well.
-> So the only kernel contribution would then be the DT, really, (...)
+So can I make two node DT "in the right way" and work around current
+connectors vs. bridge limitations on the driver side? This seems to be
+doable.
 
-Your different positions have existed since the inception of the
-pinctrl subsystem:
+Then I could fix bridge API, with my own driver and update API clients
+affected by the change...
 
-- One camp (myself included) wanted to describe the hardware mostly
-  in the driver: functions, groups etc are tables in the driver file.
+> 
+> > I'm one of the 3 proposed maintainers for the driver, and I'm willing to
+> > maintain the driver on the long run, as is the same with the other two
+> > proposed maintainers. So when the time to split the node in two comes,
+> > we will be around, and willing to do it ourselves.
+> 
+> How about putting that team of 3 maintainers to work on fixing the problem in 
+> the bridge API ? :-)
 
-- Another camp (OMAP included) think that the device tree should take
-  store most things: groups functions, etc.
+Guess you would be a good lawyer! My point was not exactly that we could
+work in parallel. Point was that there is redundancy in case one or two
+of us loose interest. But nice try! :-)
 
-What we know for sure should be described in DT is how different
-IP blocks are connected in an SoC (e.g. interrupts, clocks, DMA
-channels, regulators) and on the of course outside of the SoC, on
-the board.
+Chances of having resources to fix bridge API and clients were better 6
+months ago, but let me see what I can get.  Last blocking issue was the
+migration to atomic, now this. I'm going to need to answer what the next
+blocking issue is going to be.
 
-The question here is whether the way a hardware has instantiated
-a certain IP block when doing physical compilation in their
-Verilog, VHDL or SystemC files, is something that should be
-described in DT.
+Actually in these ~8 months one bit of the required changes was
+accepted: dc80d7038883, but this was generic and not related to our
+specific use case.
 
-Many companies have developed tools to
-extract this data from their hardware design files and provide
-it to developers as a blob och incomprehensible data, such was
-the situation for OMAP for example. So to them it made most
-sense to implement pinctrl-single, just parsing that data into
-DTS(I) files.
+Thanks!
 
-Other companies (such as STMicroelectronics) instead put a
-team of people to write a datasheet with a special chapter
-on how pins etc are connected, and programmers are given
-this datasheet and need to again type in the data and define
-groups etc.
+Peter
 
-Whether parametrization of a HW block should be done in the
-driver file from the compatible string or with custom attributes
-in the node is not a simple answer to the question. OF is vague
-on this kind of things: both solutions exist.
-
-Allwinner and Qualcomm authors faced a situation such as that
-they were given a code dump and no datasheet and no data
-tables either. That creates an especially complicated situation
-where none of the above scenarios apply.
-
-What we/you need to ask: what is most helpful for the Allwinner
-community? What makes the barrier low for new contributions,
-and makes it easiest to cooperate?
-
-I try to live by this motto from IETF:
-
-   "rough consensus and running code"
-
-Please do the same.
-
-Yours,
-Linus Walleij
+> 
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
+> 
