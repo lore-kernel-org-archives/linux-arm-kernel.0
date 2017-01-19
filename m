@@ -1,52 +1,49 @@
-From: spjoshi@codeaurora.org (Sarangdhar Joshi)
-Date: Wed, 18 Jan 2017 19:31:53 -0800
-Subject: [PATCH] arm64: dts: msm8996: Add ADSP PIL node
-Message-ID: <1484796713-30796-1-git-send-email-spjoshi@codeaurora.org>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 19 Jan 2017 11:51:28 +0800
+Subject: [PATCH v13 1/7] arm64: Rename the common MADT parse routine
+In-Reply-To: <1484686210-7211-2-git-send-email-jeremy.linton@arm.com>
+References: <1484686210-7211-1-git-send-email-jeremy.linton@arm.com>
+ <1484686210-7211-2-git-send-email-jeremy.linton@arm.com>
+Message-ID: <c9056b99-7a32-3c91-eb8a-5b44a182c140@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ADSP node required for Qualcomm ADSP Peripheral Image Loader.
+Hi Jeremy,
 
-Signed-off-by: Sarangdhar Joshi <spjoshi@codeaurora.org>
----
+On 2017/1/18 4:50, Jeremy Linton wrote:
+> The MADT parser in smp.c is now being used to parse
+> out NUMA, PMU and ACPI parking protocol information as
+> well as the GIC information for which it was originally
+> created. Rename it to avoid a misleading name.
+>
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>  arch/arm64/kernel/smp.c | 13 +++++++------
+>  1 file changed, 7 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index cb87234..8ea244c 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -517,13 +517,14 @@ static unsigned int cpu_count = 1;
+>
+>  #ifdef CONFIG_ACPI
+>  /*
+> - * acpi_map_gic_cpu_interface - parse processor MADT entry
+> + * acpi_verify_and_map_madt - parse processor MADT entry
+>   *
+>   * Carry out sanity checks on MADT processor entry and initialize
+> - * cpu_logical_map on success
+> + * cpu_logical_map, the ACPI parking protocol, NUMA mapping
+> + * and the PMU interrupts on success
+>   */
+>  static void __init
+> -acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
+> +acpi_verify_and_map_madt(struct acpi_madt_generic_interrupt *processor)
 
-This patch uses "xo_board" clock for now. We would have to move to
-rpmcc once it is available.
+Nit, MADT is a table includes multi type of table entries, we just
+need to map the the processor type, how about updating it to
+acpi_verify_and_map_madt_processor()?
 
- arch/arm64/boot/dts/qcom/msm8996.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/qcom/msm8996.dtsi b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-index c9c7fd7..7cebf63 100644
---- a/arch/arm64/boot/dts/qcom/msm8996.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8996.dtsi
-@@ -181,6 +181,26 @@
- 		method = "smc";
- 	};
- 
-+	adsp-pil {
-+		compatible = "qcom,msm8996-adsp-pil";
-+
-+		interrupts-extended = <&intc 0 162 IRQ_TYPE_EDGE_RISING>,
-+				      <&adsp_smp2p_in 0 IRQ_TYPE_EDGE_RISING>,
-+				      <&adsp_smp2p_in 1 IRQ_TYPE_EDGE_RISING>,
-+				      <&adsp_smp2p_in 2 IRQ_TYPE_EDGE_RISING>,
-+				      <&adsp_smp2p_in 3 IRQ_TYPE_EDGE_RISING>;
-+		interrupt-names = "wdog", "fatal", "ready",
-+				  "handover", "stop-ack";
-+
-+		clocks = <&xo_board>;
-+		clock-names = "xo";
-+
-+		memory-region = <&adsp_region>;
-+
-+		qcom,smem-states = <&adsp_smp2p_out 0>;
-+		qcom,smem-state-names = "stop";
-+	};
-+
- 	adsp-smp2p {
- 		compatible = "qcom,smp2p";
- 		qcom,smem = <443>, <429>;
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thanks
+Hanjun
