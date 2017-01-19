@@ -1,66 +1,63 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 19 Jan 2017 13:35:25 -0600
-Subject: [PATCH v8 0/8] Add PWM and IIO timer drivers for STM32
-In-Reply-To: <CA+M3ks7UchJ3QdQrHO6rSsc4YNhNEmLejoeRBVNhn=2biSn=cQ@mail.gmail.com>
-References: <1484749251-14445-1-git-send-email-benjamin.gaignard@st.com>
- <20170119084355.GF3718@dell>
- <CA+M3ks7UchJ3QdQrHO6rSsc4YNhNEmLejoeRBVNhn=2biSn=cQ@mail.gmail.com>
-Message-ID: <20170119193525.jufn5vh4huap7umm@rob-hp-laptop>
+From: jan.kiszka@siemens.com (Jan Kiszka)
+Date: Thu, 19 Jan 2017 20:37:40 +0100
+Subject: [PATCH v3 2/3] spi: pxa2xx: Prepare for edge-triggered interrupts
+In-Reply-To: <7e5fb21d-35bd-6ac3-9e6f-cffed656997f@siemens.com>
+References: <cover.1484592296.git.jan.kiszka@siemens.com>
+ <cover.1484592296.git.jan.kiszka@siemens.com>
+ <7b15a0910a3ad861fd32161c72559bafa7b71e29.1484592296.git.jan.kiszka@siemens.com>
+ <87ziiqdstr.fsf@belgarion.home>
+ <4d97e416-4d32-3b9f-0695-de116a4b26bd@siemens.com>
+ <87r340eq28.fsf@belgarion.home>
+ <b3e0d393-b841-1556-ddd2-5634f12b6f2c@siemens.com>
+ <20170118124645.6ugjwbfeq5vsh2to@sirena.org.uk>
+ <7e5fb21d-35bd-6ac3-9e6f-cffed656997f@siemens.com>
+Message-ID: <e692c4a9-6320-b9e0-d6e7-f58bbe6ba867@siemens.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 05:02:11PM +0100, Benjamin Gaignard wrote:
-> 2017-01-19 9:43 GMT+01:00 Lee Jones <lee.jones@linaro.org>:
-> > On Wed, 18 Jan 2017, Benjamin Gaignard wrote:
-> >
+When using the a device with edge-triggered interrupts, such as MSIs,
+the interrupt handler has to ensure that there is a point in time during
+its execution where all interrupts sources are silent so that a new
+event can trigger a new interrupt again.
 
-> >> Benjamin Gaignard (8):
-> >>   MFD: add bindings for STM32 Timers driver
-> >>   MFD: add STM32 Timers driver
-> >>   PWM: add pwm-stm32 DT bindings
-> >>   PWM: add PWM driver for STM32 plaftorm
-> >>   IIO: add bindings for STM32 timer trigger driver
-> >>   IIO: add STM32 timer trigger driver
-> >>   ARM: dts: stm32: add Timers driver for stm32f429 MCU
-> >>   ARM: dts: stm32: Enable pwm1 and pwm3 for stm32f469-disco
-> >>
-> >>  .../ABI/testing/sysfs-bus-iio-timer-stm32          |  29 ++
-> >>  .../bindings/iio/timer/stm32-timer-trigger.txt     |  23 ++
-> >>  .../devicetree/bindings/mfd/stm32-timers.txt       |  46 +++
-> >>  .../devicetree/bindings/pwm/pwm-stm32.txt          |  35 ++
-> >>  arch/arm/boot/dts/stm32f429.dtsi                   | 275 ++++++++++++++
-> >>  arch/arm/boot/dts/stm32f469-disco.dts              |  28 ++
-> >>  drivers/iio/trigger/Kconfig                        |   9 +
-> >>  drivers/iio/trigger/Makefile                       |   1 +
-> >>  drivers/iio/trigger/stm32-timer-trigger.c          | 342 ++++++++++++++++++
-> >>  drivers/mfd/Kconfig                                |  11 +
-> >>  drivers/mfd/Makefile                               |   2 +
-> >>  drivers/mfd/stm32-timers.c                         |  80 +++++
-> >>  drivers/pwm/Kconfig                                |   9 +
-> >>  drivers/pwm/Makefile                               |   1 +
-> >>  drivers/pwm/pwm-stm32.c                            | 398 +++++++++++++++++++++
-> >>  include/linux/iio/timer/stm32-timer-trigger.h      |  62 ++++
-> >>  include/linux/mfd/stm32-timers.h                   |  71 ++++
-> >>  17 files changed, 1422 insertions(+)
-> >>  create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-timer-stm32
-> >>  create mode 100644 Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
-> >>  create mode 100644 Documentation/devicetree/bindings/mfd/stm32-timers.txt
-> >>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32.txt
-> >>  create mode 100644 drivers/iio/trigger/stm32-timer-trigger.c
-> >>  create mode 100644 drivers/mfd/stm32-timers.c
-> >>  create mode 100644 drivers/pwm/pwm-stm32.c
-> >>  create mode 100644 include/linux/iio/timer/stm32-timer-trigger.h
-> >>  create mode 100644 include/linux/mfd/stm32-timers.h
-> >
-> > Let me know when you have all your Acks.
-> >
-> > I would be happy to take this through the MFD tree.
-> 
-> Some Acks are still missing on DT patches, I hope that Rob could find
-> to review them
-> after that it will ok :-)
+This is achieved here by disabling all interrupt sources for a moment
+before processing them according to the status register. If a new
+interrupt should have arrived after we read the status, it will now
+re-trigger the interrupt, even in edge mode.
 
-I've acked all the bindings. stm32 maintainer needs to ack the dts 
-files.
+Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+---
 
-Rob
+Successfully tested by now.
+
+Changes to v2:
+- avoid inner looping by making the hardware retrigger on "forgotten"
+  IRQ sources
+
+ drivers/spi/spi-pxa2xx.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
+index 0d10090..f9c2329 100644
+--- a/drivers/spi/spi-pxa2xx.c
++++ b/drivers/spi/spi-pxa2xx.c
+@@ -785,6 +785,9 @@ static irqreturn_t ssp_int(int irq, void *dev_id)
+ 	if (!(status & mask))
+ 		return IRQ_NONE;
+ 
++	pxa2xx_spi_write(drv_data, SSCR1, sccr1_reg & ~drv_data->int_cr1);
++	pxa2xx_spi_write(drv_data, SSCR1, sccr1_reg);
++
+ 	if (!drv_data->master->cur_msg) {
+ 		handle_bad_msg(drv_data);
+ 		/* Never fail */
+-- 
+2.1.4
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170119/035bfd45/attachment.sig>
