@@ -1,16 +1,17 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 18 Jan 2017 16:17:13 -0800
-Subject: [GIT PULL] ARM: at91: drivers for 4.11
-In-Reply-To: <20170117200303.ycriqdrdwo5usccc@piout.net>
-References: <20170117200303.ycriqdrdwo5usccc@piout.net>
-Message-ID: <20170119001713.GE23725@localhost>
+Date: Wed, 18 Jan 2017 16:16:36 -0800
+Subject: [GIT PULL] ARM: at91: soc for 4.11
+In-Reply-To: <20170117200201.iab5vcvmjbfw33nf@piout.net>
+References: <20170117200201.iab5vcvmjbfw33nf@piout.net>
+Message-ID: <20170119001636.GD23725@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 09:03:03PM +0100, Alexandre Belloni wrote:
-> Arnd, Olof,
+On Tue, Jan 17, 2017 at 09:02:01PM +0100, Alexandre Belloni wrote:
+> Hi Arnd, Olof
 > 
-> This is a single fix for the atmel-ebi.
+> A single cleanup for mach-at91. Maybe I'll send another pull request
+> later with further PM cleanup. Else, that will probably be all for 4.11
 > 
 > The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 > 
@@ -18,11 +19,16 @@ On Tue, Jan 17, 2017 at 09:03:03PM +0100, Alexandre Belloni wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.11-drivers
+>   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.11-soc
 > 
-> for you to fetch changes up to ee194289502a6901cc77dc9a893bf2afd351ac5e:
+> for you to fetch changes up to 6cc7fbdf8d931eefa2d0aabf0d2840e94ba09ae5:
 > 
->   memory/atmel-ebi: Fix ns <-> cycles conversions (2017-01-10 16:01:34 +0100)
+>   ARM: at91: pm: remove useless extern definition (2017-01-11 13:21:24 +0100)
+> 
+> ----------------------------------------------------------------
+> SoC for 4.11:
+> 
+>  - small cleanup
 > 
 
 Merged, thanks.
