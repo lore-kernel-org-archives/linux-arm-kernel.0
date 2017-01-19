@@ -1,215 +1,187 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 19 Jan 2017 16:48:21 +0000
-Subject: [PATCH V5 05/12] drivers: platform: Configure dma operations at
- probe time
-In-Reply-To: <1484838356-24962-6-git-send-email-sricharan@codeaurora.org>
-References: <1484838356-24962-1-git-send-email-sricharan@codeaurora.org>
- <1484838356-24962-6-git-send-email-sricharan@codeaurora.org>
-Message-ID: <20170119164821.GB28483@red-moon>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Thu, 19 Jan 2017 17:45:43 +0100
+Subject: [PATCH v13 2/5] tee: generic TEE subsystem
+In-Reply-To: <5825882.vZRDMrBMkW@wuerfel>
+References: <1479480700-554-1-git-send-email-jens.wiklander@linaro.org>
+ <1479480700-554-3-git-send-email-jens.wiklander@linaro.org>
+ <5825882.vZRDMrBMkW@wuerfel>
+Message-ID: <20170119164541.GA22094@jax>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 08:35:49PM +0530, Sricharan R wrote:
-> Configuring DMA ops at probe time will allow deferring device probe when
-> the IOMMU isn't available yet. The dma_configure for the device is
-> now called from the generic device_attach callback just before the
-> bus/driver probe is called. This way, configuring the DMA ops for the
-> device would be called at the same place for all bus_types, hence the
-> deferred probing mechanism should work for all buses as well.
-> 
-> pci_bus_add_devices    (platform/amba)(_device_create/driver_register)
->        |                         |
-> pci_bus_add_device     (device_add/driver_register)
->        |                         |
-> device_attach           device_initial_probe
->        |                         |
-> __device_attach_driver    __device_attach_driver
->        |
-> driver_probe_device
->        |
-> really_probe
->        |
-> dma_configure
-> 
-> Similarly on the device/driver_unregister path __device_release_driver is
-> called which inturn calls dma_deconfigure.
-> 
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> ---
->  * Removed the dma configuration for the pci devices in case of DT
->    from pci_dma_configure which was hanging outside separately and
->    doing it in dma_configure function itself.
+Hi Arnd,
 
-Rename the patch subject then, it is misleading.
+This is the old v13 patch set you're commenting, but it doesn't matter
+it's essentially identical to v14 in this patch.
 
+On Wed, Jan 18, 2017 at 09:19:25PM +0100, Arnd Bergmann wrote:
+> On Friday, November 18, 2016 3:51:37 PM CET Jens Wiklander wrote:
+> > Initial patch for generic TEE subsystem.
+> > This subsystem provides:
+> > * Registration/un-registration of TEE drivers.
+> > * Shared memory between normal world and secure world.
+> > * Ioctl interface for interaction with user space.
+> > * Sysfs implementation_id of TEE driver
+> > 
+> > A TEE (Trusted Execution Environment) driver is a driver that interfaces
+> > with a trusted OS running in some secure environment, for example,
+> > TrustZone on ARM cpus, or a separate secure co-processor etc.
+> > 
+> > The TEE subsystem can serve a TEE driver for a Global Platform compliant
+> > TEE, but it's not limited to only Global Platform TEEs.
+> > 
+> > This patch builds on other similar implementations trying to solve
+> > the same problem:
+> > * "optee_linuxdriver" by among others
+> >   Jean-michel DELORME<jean-michel.delorme@st.com> and
+> >   Emmanuel MICHEL <emmanuel.michel@st.com>
+> > * "Generic TrustZone Driver" by Javier Gonz?lez <javier@javigon.com>
+> 
+> Can you give an example for a system that would contain more than one
+> TEE? I see that you support dynamic registration, and it's clear that
+> there can be more than one type of TEE, but why would one have more
+> than one at a time, and why not more than 32?
+
+I know that ST has systems where there's one TEE in TrustZone and
+another TEE on a separate secure co-processor. If you have several TEEs
+it's probably because they have different capabilities (performance
+versus level of security). Just going beyond two or three different
+levels of security with different TEEs sounds a bit extreme, so a
+maximum of 32 or 16 should be fairly safe. If it turns out I'm wrong in
+this assumption it's not that hard to correct it.
+
+> 
+> > +static int tee_ioctl_invoke(struct tee_context *ctx,
+> > +			    struct tee_ioctl_buf_data __user *ubuf)
+> > +{
+> > +	int rc;
+> > +	size_t n;
+> > +	struct tee_ioctl_buf_data buf;
+> > +	struct tee_ioctl_invoke_arg __user *uarg;
+> > +	struct tee_ioctl_invoke_arg arg;
+> > +	struct tee_ioctl_param __user *uparams = NULL;
+> > +	struct tee_param *params = NULL;
+> > +
+> > +	if (!ctx->teedev->desc->ops->invoke_func)
+> > +		return -EINVAL;
+> > +
+> > +	if (copy_from_user(&buf, ubuf, sizeof(buf)))
+> > +		return -EFAULT;
+> > +
+> > +	if (buf.buf_len > TEE_MAX_ARG_SIZE ||
+> > +	    buf.buf_len < sizeof(struct tee_ioctl_invoke_arg))
+> > +		return -EINVAL;
+> > +
+> > +	uarg = (struct tee_ioctl_invoke_arg __user *)(unsigned long)buf.buf_ptr;
+> 
+> u64_to_user_ptr()
+
+Thanks, that's convenient.
+
+> 
+> > +	if (copy_from_user(&arg, uarg, sizeof(arg)))
+> > +		return -EFAULT;
+> > +
+> > +	if (sizeof(arg) + TEE_IOCTL_PARAM_SIZE(arg.num_params) != buf.buf_len)
+> > +		return -EINVAL;
+> > +
+> > +	if (arg.num_params) {
+> > +		params = kcalloc(arg.num_params, sizeof(struct tee_param),
+> > +				 GFP_KERNEL);
+> > +		if (!params)
+> > +			return -ENOMEM;
+> 
+> It would be good to have an upper bound on the number of parameters
+> to limit the size of the memory allocation here.
+
+This is already limited due to:
+
+The test with: buf.buf_len > TEE_MAX_ARG_SIZE
+
+And then another test that the number of parameters matches the buffer size
+with: sizeof(arg) + TEE_IOCTL_PARAM_SIZE(arg.num_params) != buf.buf_len
+
+> 
+> > +int tee_device_register(struct tee_device *teedev)
+> > +{
+> > +	int rc;
+> > +
+> > +	/*
+> > +	 * If the teedev already is registered, don't do it again. It's
+> > +	 * obviously an error to try to register twice, but if we return
+> > +	 * an error we'll force the driver to remove the teedev.
+> > +	 */
+> > +	if (teedev->flags & TEE_DEVICE_FLAG_REGISTERED) {
+> > +		dev_err(&teedev->dev, "attempt to register twice\n");
+> > +		return 0;
+> > +	}
+> 
+> I don't understand what you are protecting against here.
+> How would we get to this function twice for the same device?
+> 
+> Could you change the caller so it doesn't happen?
+
+Yes the caller can be changed, I'll return an error instead (and remove
+the comment).
+
+> 
+> > +/**
+> > + * struct tee_ioctl_param - parameter
+> > + * @attr: attributes
+> > + * @memref: a memory reference
+> > + * @value: a value
+> > + *
+> > + * @attr & TEE_PARAM_ATTR_TYPE_MASK indicates if memref or value is used in
+> > + * the union. TEE_PARAM_ATTR_TYPE_VALUE_* indicates value and
+> > + * TEE_PARAM_ATTR_TYPE_MEMREF_* indicates memref. TEE_PARAM_ATTR_TYPE_NONE
+> > + * indicates that none of the members are used.
+> > + */
+> > +struct tee_ioctl_param {
+> > +	__u64 attr;
+> > +	union {
+> > +		struct tee_ioctl_param_memref memref;
+> > +		struct tee_ioctl_param_value value;
+> > +	} u;
+> > +};
+> > +
+> > +#define TEE_IOCTL_UUID_LEN		16
+> > +
+> 
+> Having a union in an ioctl argument seems odd. Have you considered
+> using two different ioctl command numbers depending on the type?
+
+struct tee_ioctl_param is used as an array and some parameters can be
+memrefs while other are values.
+
+> 
+> > +/**
+> > + * struct tee_iocl_supp_send_arg - Send a response to a received request
+> > + * @ret:	[out] return value
+> > + * @num_params	[in] number of parameters following this struct
+> > + */
+> > +struct tee_iocl_supp_send_arg {
+> > +	__u32 ret;
+> > +	__u32 num_params;
+> > +	/*
+> > +	 * this struct is 8 byte aligned since the 'struct tee_ioctl_param'
+> > +	 * which follows requires 8 byte alignment.
+> > +	 *
+> > +	 * Commented out element used to visualize the layout dynamic part
+> > +	 * of the struct. This field is not available at all if
+> > +	 * num_params == 0.
+> > +	 *
+> > +	 * struct tee_ioctl_param params[num_params];
+> > +	 */
+> > +} __aligned(8);
+> 
+> I'd make that 
+> 
+> 	struct tee_ioctl_param params[0];
+> 
+> as wel here, as I also commented in patch 3 that has a similar structure.
+
+I'm concerned that this may cause warnings when compiling for user space
+depending on compiler and options. Am I too cautious here?
+ 
 Thanks,
-Lorenzo
-
->  drivers/base/dd.c           |  9 +++++++++
->  drivers/base/dma-mapping.c  | 32 ++++++++++++++++++++++++++++++++
->  drivers/of/platform.c       |  5 +----
->  drivers/pci/probe.c         |  5 +----
->  include/linux/dma-mapping.h |  3 +++
->  5 files changed, 46 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/base/dd.c b/drivers/base/dd.c
-> index a1fbf55..4882f06 100644
-> --- a/drivers/base/dd.c
-> +++ b/drivers/base/dd.c
-> @@ -19,6 +19,7 @@
->  
->  #include <linux/device.h>
->  #include <linux/delay.h>
-> +#include <linux/dma-mapping.h>
->  #include <linux/module.h>
->  #include <linux/kthread.h>
->  #include <linux/wait.h>
-> @@ -356,6 +357,10 @@ static int really_probe(struct device *dev, struct device_driver *drv)
->  	if (ret)
->  		goto pinctrl_bind_failed;
->  
-> +	ret = dma_configure(dev);
-> +	if (ret)
-> +		goto dma_failed;
-> +
->  	if (driver_sysfs_add(dev)) {
->  		printk(KERN_ERR "%s: driver_sysfs_add(%s) failed\n",
->  			__func__, dev_name(dev));
-> @@ -417,6 +422,8 @@ static int really_probe(struct device *dev, struct device_driver *drv)
->  	goto done;
->  
->  probe_failed:
-> +	dma_deconfigure(dev);
-> +dma_failed:
->  	if (dev->bus)
->  		blocking_notifier_call_chain(&dev->bus->p->bus_notifier,
->  					     BUS_NOTIFY_DRIVER_NOT_BOUND, dev);
-> @@ -826,6 +833,8 @@ static void __device_release_driver(struct device *dev, struct device *parent)
->  			drv->remove(dev);
->  
->  		device_links_driver_cleanup(dev);
-> +		dma_deconfigure(dev);
-> +
->  		devres_release_all(dev);
->  		dev->driver = NULL;
->  		dev_set_drvdata(dev, NULL);
-> diff --git a/drivers/base/dma-mapping.c b/drivers/base/dma-mapping.c
-> index efd71cf..dfe6fd7 100644
-> --- a/drivers/base/dma-mapping.c
-> +++ b/drivers/base/dma-mapping.c
-> @@ -10,6 +10,7 @@
->  #include <linux/dma-mapping.h>
->  #include <linux/export.h>
->  #include <linux/gfp.h>
-> +#include <linux/of_device.h>
->  #include <linux/slab.h>
->  #include <linux/vmalloc.h>
->  
-> @@ -341,3 +342,34 @@ void dma_common_free_remap(void *cpu_addr, size_t size, unsigned long vm_flags)
->  	vunmap(cpu_addr);
->  }
->  #endif
-> +
-> +/*
-> + * Common configuration to enable DMA API use for a device
-> + */
-> +#include <linux/pci.h>
-> +
-> +int dma_configure(struct device *dev)
-> +{
-> +	struct device *_dev = dev;
-> +	int is_pci = dev_is_pci(dev);
-> +
-> +	if (is_pci) {
-> +		_dev = pci_get_host_bridge_device(to_pci_dev(dev));
-> +		if (IS_ENABLED(CONFIG_OF) && _dev->parent &&
-> +		    _dev->parent->of_node)
-> +			_dev = _dev->parent;
-> +	}
-> +
-> +	if (_dev->of_node)
-> +		of_dma_configure(dev, _dev->of_node);
-> +
-> +	if (is_pci)
-> +		pci_put_host_bridge_device(_dev);
-> +
-> +	return 0;
-> +}
-> +
-> +void dma_deconfigure(struct device *dev)
-> +{
-> +	of_dma_deconfigure(dev);
-> +}
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index 57418f7..cf35030 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -22,6 +22,7 @@
->  #include <linux/slab.h>
->  #include <linux/of_address.h>
->  #include <linux/of_device.h>
-> +#include <linux/of_iommu.h>
->  #include <linux/of_irq.h>
->  #include <linux/of_platform.h>
->  #include <linux/platform_device.h>
-> @@ -186,11 +187,9 @@ static struct platform_device *of_platform_device_create_pdata(
->  
->  	dev->dev.bus = &platform_bus_type;
->  	dev->dev.platform_data = platform_data;
-> -	of_dma_configure(&dev->dev, dev->dev.of_node);
->  	of_msi_configure(&dev->dev, dev->dev.of_node);
->  
->  	if (of_device_add(dev) != 0) {
-> -		of_dma_deconfigure(&dev->dev);
->  		platform_device_put(dev);
->  		goto err_clear_flag;
->  	}
-> @@ -248,7 +247,6 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
->  		dev_set_name(&dev->dev, "%s", bus_id);
->  	else
->  		of_device_make_bus_id(&dev->dev);
-> -	of_dma_configure(&dev->dev, dev->dev.of_node);
->  
->  	/* Allow the HW Peripheral ID to be overridden */
->  	prop = of_get_property(node, "arm,primecell-periphid", NULL);
-> @@ -542,7 +540,6 @@ static int of_platform_device_destroy(struct device *dev, void *data)
->  		amba_device_unregister(to_amba_device(dev));
->  #endif
->  
-> -	of_dma_deconfigure(dev);
->  	of_node_clear_flag(dev->of_node, OF_POPULATED);
->  	of_node_clear_flag(dev->of_node, OF_POPULATED_BUS);
->  	return 0;
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index e164b5c..634d34e 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -1873,10 +1873,7 @@ static void pci_dma_configure(struct pci_dev *dev)
->  {
->  	struct device *bridge = pci_get_host_bridge_device(dev);
->  
-> -	if (IS_ENABLED(CONFIG_OF) &&
-> -		bridge->parent && bridge->parent->of_node) {
-> -			of_dma_configure(&dev->dev, bridge->parent->of_node);
-> -	} else if (has_acpi_companion(bridge)) {
-> +	if (has_acpi_companion(bridge)) {
->  		struct acpi_device *adev = to_acpi_device_node(bridge->fwnode);
->  		enum dev_dma_attr attr = acpi_get_dma_attr(adev);
->  
-> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-> index abf685ed..b56320a 100644
-> --- a/include/linux/dma-mapping.h
-> +++ b/include/linux/dma-mapping.h
-> @@ -718,6 +718,9 @@ void *dma_mark_declared_memory_occupied(struct device *dev,
->  }
->  #endif /* CONFIG_HAVE_GENERIC_DMA_COHERENT */
->  
-> +int dma_configure(struct device *dev);
-> +void dma_deconfigure(struct device *dev);
-> +
->  /*
->   * Managed DMA API
->   */
-> -- 
-> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
-> 
+Jens
