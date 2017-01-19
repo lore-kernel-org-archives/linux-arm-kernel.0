@@ -1,80 +1,114 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Thu, 19 Jan 2017 20:41:14 +0800
-Subject: [PATCH v20 08/17] clocksource/drivers/arm_arch_timer: Rework
- counter frequency detection.
-In-Reply-To: <CADyBb7uGVu6Po4hCD45WOrQvWYwZgtSbE5z9rbRa7gZ1P5-4tg@mail.gmail.com>
+Date: Thu, 19 Jan 2017 20:42:59 +0800
+Subject: [PATCH v20 16/17] clocksource/drivers/arm_arch_timer: Add GTDT
+ support for memory-mapped timer
+In-Reply-To: <CADyBb7tpDynA0EEUkFZXpUAksjvXeUzuoC82GnbVA2O1w2T22g@mail.gmail.com>
 References: <20170118132541.8989-1-fu.wei@linaro.org>
- <20170118132541.8989-9-fu.wei@linaro.org>
- <cafa8c7a-9c7c-51ba-5566-0cfe1fe6f764@linaro.org>
- <CADyBb7uGVu6Po4hCD45WOrQvWYwZgtSbE5z9rbRa7gZ1P5-4tg@mail.gmail.com>
-Message-ID: <74160889-5eb0-ceb2-2727-61e9d538cf2f@linaro.org>
+ <20170118132541.8989-17-fu.wei@linaro.org>
+ <ed4efe25-1b40-66e2-ae3f-77a4e32715b6@linaro.org>
+ <CADyBb7tpDynA0EEUkFZXpUAksjvXeUzuoC82GnbVA2O1w2T22g@mail.gmail.com>
+Message-ID: <c1821a5b-8b32-e194-125c-3fd243059425@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/1/19 17:44, Fu Wei wrote:
+On 2017/1/19 18:02, Fu Wei wrote:
 > Hi Hanjun,
 >
-> On 19 January 2017 at 16:02, Hanjun Guo <hanjun.guo@linaro.org> wrote:
->> Hi Fuwei,
->>
->> One comments below.
->>
->>
+> On 19 January 2017 at 17:16, Hanjun Guo <hanjun.guo@linaro.org> wrote:
 >> On 2017/1/18 21:25, fu.wei at linaro.org wrote:
 >>>
 >>> From: Fu Wei <fu.wei@linaro.org>
 >>>
->>> The counter frequency detection call(arch_timer_detect_rate) combines two
->>> ways to get counter frequency: system coprocessor register and MMIO timer.
->>> But in a specific timer init code, we only need one way to try:
->>> getting frequency from MMIO timer register will be needed only when we
->>> init MMIO timer; getting frequency from system coprocessor register will
->>> be needed only when we init arch timer.
->>>
->>> This patch separates paths to determine frequency:
->>> Separate out the MMIO frequency and the sysreg frequency detection call,
->>> and use the appropriate one for the counter.
+>>> The patch add memory-mapped timer register support by using the
+>>> information provided by the new GTDT driver of ACPI.
 >>>
 >>> Signed-off-by: Fu Wei <fu.wei@linaro.org>
 >>> ---
->>>  drivers/clocksource/arm_arch_timer.c | 40
->>> ++++++++++++++++++++++--------------
->>>  1 file changed, 25 insertions(+), 15 deletions(-)
+>>>  drivers/clocksource/arm_arch_timer.c | 35
+>>> ++++++++++++++++++++++++++++++++---
+>>>  1 file changed, 32 insertions(+), 3 deletions(-)
 >>>
 >>> diff --git a/drivers/clocksource/arm_arch_timer.c
 >>> b/drivers/clocksource/arm_arch_timer.c
->>> index 6484f84..9482481 100644
+>>> index 79dc004..7ca2da7 100644
 >>> --- a/drivers/clocksource/arm_arch_timer.c
 >>> +++ b/drivers/clocksource/arm_arch_timer.c
->>> @@ -488,23 +488,33 @@ static int arch_timer_starting_cpu(unsigned int cpu)
->>>         return 0;
->>>  }
+>>> @@ -1077,10 +1077,36 @@ CLOCKSOURCE_OF_DECLARE(armv7_arch_timer_mem,
+>>> "arm,armv7-timer-mem",
+>>>                        arch_timer_mem_of_init);
 >>>
->>> -static void arch_timer_detect_rate(void __iomem *cntbase)
->>> +static void __arch_timer_determine_rate(u32 rate)
->>>  {
->>> -       /* Who has more than one independent system counter? */
->>> -       if (arch_timer_rate)
->>> -               return;
->>> +       /* Check the timer frequency. */
->>> +       if (!arch_timer_rate) {
->>> +               if (rate)
->>> +                       arch_timer_rate = rate;
->>> +               else
->>> +                       pr_warn("frequency not available\n");
->>> +       } else if (rate && arch_timer_rate != rate) {
+>>>  #ifdef CONFIG_ACPI_GTDT
+>>> -/* Initialize per-processor generic timer */
+>>> +static int __init arch_timer_mem_acpi_init(int platform_timer_count)
+>>> +{
+>>> +       struct arch_timer_mem *timer_mem;
+>>> +       int timer_count, i, ret;
+>>> +
 >>
->>                         ^
->> Typo? I think it's "&" here.
+>>
+>> if (!platform_timer_count)
+>>         return 0;
+>>
+>> Did I miss something?
 >
-> Not a typo, It's definitely a ?&&?  :-)
+> Ah, thanks, I guess I miss this check below.
 >
-> Here arch_timer_rate is not zero.
+>>
+>> Thanks
+>> Hanjun
+>>
+>>
+>>> +       timer_mem = kcalloc(platform_timer_count, sizeof(*timer_mem),
+>>> +                           GFP_KERNEL);
+>>> +       if (!timer_mem)
+>>> +               return -ENOMEM;
+>>> +
+>>> +       ret = acpi_arch_timer_mem_init(timer_mem, &timer_count);
+>>> +       if (ret || !timer_count)
+>>> +               goto error;
+>>> +
+>>> +       for (i = 0; i < timer_count; i++) {
+>>> +               ret = arch_timer_mem_init(timer_mem);
+>>> +               if (!ret)
+>>> +                       break;
+>>> +               timer_mem++;
+>>> +       }
+>>> +
+>>> +error:
+>>> +       kfree(timer_mem);
+>>> +       return ret;
+>>> +}
+>>> +
+>>> +/* Initialize per-processor generic timer and memory-mapped timer(if
+>>> present) */
+>>>  static int __init arch_timer_acpi_init(struct acpi_table_header *table)
+>>>  {
+>>> -       int ret;
+>>> +       int ret, platform_timer_count;
+>>>
+>>>         if (arch_timers_present & ARCH_TIMER_TYPE_CP15) {
+>>>                 pr_warn("already initialized, skipping\n");
+>>> @@ -1089,7 +1115,7 @@ static int __init arch_timer_acpi_init(struct
+>>> acpi_table_header *table)
+>>>
+>>>         arch_timers_present |= ARCH_TIMER_TYPE_CP15;
+>>>
+>>> -       ret = acpi_gtdt_init(table, NULL);
+>>> +       ret = acpi_gtdt_init(table, &platform_timer_count);
+>>>         if (ret) {
+>>>                 pr_err("Failed to init GTDT table.\n");
+>>>                 return ret;
+>>> @@ -1122,6 +1148,9 @@ static int __init arch_timer_acpi_init(struct
+>>> acpi_table_header *table)
+>>>         if (ret)
+>>>                 return ret;
+>>>
+>>> +       if (arch_timer_mem_acpi_init(platform_timer_count))
 >
-> If rate is not zero(that means we got a valid rate), and
-> arch_timer_rate != rate ,
-> we will print warning message.
+> +       if (platform_timer_count &&
+> +           arch_timer_mem_acpi_init(platform_timer_count))
 
-Ah, misreading the code, thanks for clarify :)
+It's better.
 
+Thanks
 Hanjun
