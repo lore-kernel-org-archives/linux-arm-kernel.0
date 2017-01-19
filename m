@@ -1,50 +1,67 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 19 Jan 2017 15:42:09 +0100
-Subject: [PATCH 2/2] ARM: imx6: fix regulator constraints on anatop 1p1
- and 2p5
-In-Reply-To: <20170119142134.8572-2-l.stach@pengutronix.de>
-References: <20170119142134.8572-1-l.stach@pengutronix.de>
- <20170119142134.8572-2-l.stach@pengutronix.de>
-Message-ID: <1484836929.2989.22.camel@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 19 Jan 2017 14:42:50 +0000
+Subject: [PATCH] arm64/cpufeatures: Enforce inline/const properties of
+ cpus_have_const_cap
+In-Reply-To: <20170119143703.GB31594@arm.com>
+References: <1484740725-24776-1-git-send-email-marc.zyngier@arm.com>
+ <20170119143703.GB31594@arm.com>
+Message-ID: <8dcd71b7-3896-26aa-115c-4d0af8abe916@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-01-19 at 15:21 +0100, Lucas Stach wrote:
-> Fix the min/max voltage constraints for the anatop 1p1 and 2p5
-> regulator to match the typical operating range mentioned in the
-> datasheet.
+On 19/01/17 14:37, Will Deacon wrote:
+> On Wed, Jan 18, 2017 at 11:58:45AM +0000, Marc Zyngier wrote:
+>> Despite being flagged "inline", cpus_have_const_cap may end-up being
+>> placed out of line if the compiler decides so. This would be unfortunate,
+>> as we want to be able to use this function in HYP, where we need to
+>> be 100% sure of what is mapped there. __always_inline seems to be a
+>> better choice given the constraint.
+>>
+>> Also, be a lot tougher on non-const or out-of-range capability values
+>> (a non-const cap value shouldn't be used here, and the semantic of an
+>> OOR value is at best ill defined). In those two case, BUILD_BUG_ON is
+>> what you get.
+>>
+>> Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/include/asm/cpufeature.h | 7 ++++---
+>>  1 file changed, 4 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+>> index b4989df..4710469 100644
+>> --- a/arch/arm64/include/asm/cpufeature.h
+>> +++ b/arch/arm64/include/asm/cpufeature.h
+>> @@ -105,10 +105,11 @@ static inline bool cpu_have_feature(unsigned int num)
+>>  }
+>>  
+>>  /* System capability check for constant caps */
+>> -static inline bool cpus_have_const_cap(int num)
+>> +static __always_inline bool cpus_have_const_cap(int num)
+>>  {
+>> -	if (num >= ARM64_NCAPS)
+>> -		return false;
+>> +	BUILD_BUG_ON(!__builtin_constant_p(num));
+>> +	BUILD_BUG_ON(num >= ARM64_NCAPS);
 > 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
->  arch/arm/boot/dts/imx6qdl.dtsi | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-> index 9313b9af2da8..e9ba244cda54 100644
-> --- a/arch/arm/boot/dts/imx6qdl.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-> @@ -626,8 +626,8 @@
->  				regulator-1p1 {
->  					compatible = "fsl,anatop-regulator";
->  					regulator-name = "vdd1p1";
-> -					regulator-min-microvolt = <800000>;
-> -					regulator-max-microvolt = <1375000>;
-> +					regulator-min-microvolt = <1000000>;
-> +					regulator-max-microvolt = <1200000>;
->  					regulator-always-on;
->  					anatop-reg-offset = <0x110>;
->  					anatop-vol-bit-shift = <8>;
-> @@ -654,7 +654,7 @@
->  				regulator-2p5 {
->  					compatible = "fsl,anatop-regulator";
->  					regulator-name = "vdd2p5";
-> -					regulator-min-microvolt = <2000000>;
-> +					regulator-min-microvolt = <2250000>;
->  					regulator-max-microvolt = <2750000>;
->  					regulator-always-on;
->  					anatop-reg-offset = <0x130>;
+> This gives different behaviour to cpus_have_const_cap when compared to
+> cpus_have_cap, which I really don't like. What is the current behaviour
+> if you pass a non-constant num parameter? Does the kernel actually build?
 
-Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+If your toolchain doesn't support jump labels (gcc 4.8 for example), it
+will build. But my point here is that if you're using the _const
+version, it should to be an actual constant, within the range of
+existing capabilities. Otherwise, I don't really understand what the
+semantic of _const means here.
 
-regards
-Philipp
+> Maybe it's best to spin a separate patch that makes cpus_have_cap and
+> cpus_have_const_cap both use __always_inline, then we can debate the merit
+> of the BUILD_BUG_ONs separately.
+
+Sure, will do.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
