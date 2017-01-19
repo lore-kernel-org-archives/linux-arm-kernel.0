@@ -1,17 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 18 Jan 2017 16:18:50 -0800
-Subject: [GIT PULL] ARM: at91: defconfig for 4.11
-In-Reply-To: <20170117201055.6jcirstom52lowxa@piout.net>
-References: <20170117201055.6jcirstom52lowxa@piout.net>
-Message-ID: <20170119001850.GG23725@localhost>
+Date: Wed, 18 Jan 2017 16:21:09 -0800
+Subject: [GIT PULL] ARM: aspeed: defconfig for 4.11
+In-Reply-To: <CACPK8XdfRoJjRX_txZjx2gxS4sqtUZNnUMvQS8Z=WXRQY3rKPw@mail.gmail.com>
+References: <CACPK8XdfRoJjRX_txZjx2gxS4sqtUZNnUMvQS8Z=WXRQY3rKPw@mail.gmail.com>
+Message-ID: <20170119002109.GH23725@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 09:10:55PM +0100, Alexandre Belloni wrote:
-> Arnd, Olof,
+On Wed, Jan 18, 2017 at 09:46:50AM +1100, Joel Stanley wrote:
+> Hello Arnd and Olof,
 > 
-> A single patch, adding the drivers needed by the newly added Axentia
-> TSE-850
+> Please pull the Aspeed defconfig tree for 4.11.
 > 
 > The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 > 
@@ -19,18 +18,20 @@ On Tue, Jan 17, 2017 at 09:10:55PM +0100, Alexandre Belloni wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.11-defconfig
+>   git://git.kernel.org/pub/scm/linux/kernel/git/joel/aspeed.git
+> tags/aspeed-4.11-defconfig
 > 
-> for you to fetch changes up to f46b1d47d4a14ddf0f935283c7c0bd0d446c54b0:
+> for you to fetch changes up to 0e81eb77f5f81be9a3fd4a080eba9abfb6e54a3a:
 > 
->   ARM: sama5_defconfig: add support for the Axentia TSE-850 board (2017-01-10 16:13:48 +0100)
+>   ARM: configs: Update Aspeed with new drivers (2017-01-10 23:01:35 +1100)
 > 
 > ----------------------------------------------------------------
-> defconfig for 4.11:
+> Aspeed defconfig updates for 4.11
 > 
->  - Add driver support for the Axentia TSE-850
+> Just the one commit that updates our defconfigs with network (ftgmac100
+> and ncsi), bt ipmi, gpio and ncsi.
 
-Merged, thanks!
+Merged, thanks.
 
 
 -Olof
