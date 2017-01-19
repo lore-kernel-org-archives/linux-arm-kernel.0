@@ -1,67 +1,22 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 19 Jan 2017 16:51:03 +0100
-Subject: [PATCH 1/2] dt-bindings: gpu: Add Mali Utgard bindings
-In-Reply-To: <4f5b8608-af6c-3ef5-aaf0-e7e034d006cd@baylibre.com>
-References: <20170116132424.7038-1-maxime.ripard@free-electrons.com>
- <20170116184906.r62di7xiil5lae33@kozik-lap>
- <20170117093813.mxp2hgoxbgske6ru@lukather>
- <4f5b8608-af6c-3ef5-aaf0-e7e034d006cd@baylibre.com>
-Message-ID: <20170119155103.e6hctoqllfgypesm@lukather>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 19 Jan 2017 13:57:50 -0200
+Subject: [PATCH v2] ARM: dts: imx: Pass 'chosen' and 'memory' nodes
+In-Reply-To: <20170119145642.GC27312@n2100.armlinux.org.uk>
+References: <1484834566-19845-1-git-send-email-fabio.estevam@nxp.com>
+ <20170119141335.kpbrbpbwaovnijjv@pengutronix.de>
+ <CAOMZO5AdgM9eFnerLRdYxwE7gsOE5OvkWs6rCR4zta1XmXHj1A@mail.gmail.com>
+ <20170119144641.jxj2bqg5uqjol23x@pengutronix.de>
+ <20170119145642.GC27312@n2100.armlinux.org.uk>
+Message-ID: <CAOMZO5AkD9n-9cJRQCkj_g+=HeSWzKHQ=9UB81WXa-0LkWP1xQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil,
+On Thu, Jan 19, 2017 at 12:56 PM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
 
-On Tue, Jan 17, 2017 at 11:22:22AM +0100, Neil Armstrong wrote:
-> On 01/17/2017 10:38 AM, Maxime Ripard wrote:
-> > Hi,
-> > 
-> > On Mon, Jan 16, 2017 at 08:49:06PM +0200, Krzysztof Kozlowski wrote:
-> >> On Mon, Jan 16, 2017 at 02:24:23PM +0100, Maxime Ripard wrote:
-> >>> The ARM Mali Utgard GPU family is embedded into a number of SoCs from
-> >>> Allwinner, Amlogic, Mediatek or Rockchip.
-> >>>
-> >>> Add a binding for the GPU of that family.
-> >>>
-> >>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> >>> ---
-> >>>  .../devicetree/bindings/gpu/arm,mali-utgard.txt    | 76 ++++++++++++++++++++++
-> >>>  1 file changed, 76 insertions(+)
-> >>>  create mode 100644 Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-> >>
-> >> Do you have a driver in kernel which will implement these bindings?
-> > 
-> > No, but we have bindings for out-of-tree drivers already.
-> > 
-> >> Defining them for out-of-tree driver does not bring any benefits
-> >> (3rd party driver will not respect them anyway).
-> > 
-> > You could see it the other way around too. The out-of-tree drivers
-> > don't respect it at the moment because there's no binding to respect.
-> > 
-> > And at least for us, we definitely plan on doing that.
-> > 
-> > Maxime
-> 
-> Hi Maxime, Krzysztof,
-> 
-> We hope this will be accepted so it will solve the same issue we
-> have on Amlogic SoCs and all the other mali powered SoCs.
+> Frankly, I think the original change (removing the skeleton.dtsi include)
+> was misguided and needs to be reverted - the change is imho built upon an
+> incorrect assumption that nothing in skeleton.dtsi is required.  That's
+> clearly false.
 
-Do you have any requirements (or weird case) that is not covered by
-the current doc?
-
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170119/c102004c/attachment.sig>
+Wouldn't this v2 patch restore things back to normal?
