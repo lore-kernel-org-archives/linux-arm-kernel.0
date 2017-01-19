@@ -1,53 +1,94 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 19 Jan 2017 22:49:33 +0100
-Subject: [PATCH v5 1/2] net: dsa: mv88e6xxx: Don't forbid MDIO I/Os for PHY
- addr >= num_of_ports
-In-Reply-To: <20170119214934.27442-1-gregory.clement@free-electrons.com>
-References: <20170119214934.27442-1-gregory.clement@free-electrons.com>
-Message-ID: <20170119214934.27442-2-gregory.clement@free-electrons.com>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Thu, 19 Jan 2017 23:51:06 +0200
+Subject: [PATCH v2 2/2] vring: Force use of DMA API for ARM-based systems
+In-Reply-To: <20170116143408.GG1510@arm.com>
+References: <20170112232931-mutt-send-email-mst@kernel.org>
+ <20170113092522.GB22538@arm.com>
+ <20170113183222-mutt-send-email-mst@kernel.org>
+ <20170113172154.GL3253@arm.com>
+ <20170113201933-mutt-send-email-mst@kernel.org>
+ <20170116104028.GA1510@arm.com>
+ <20170116161639-mutt-send-email-mst@kernel.org>
+ <20170116142103.GF1510@arm.com>
+ <20170116162225-mutt-send-email-mst@kernel.org>
+ <20170116143408.GG1510@arm.com>
+Message-ID: <20170119234852-mutt-send-email-mst@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Romain Perier <romain.perier@free-electrons.com>
+On Mon, Jan 16, 2017 at 02:34:08PM +0000, Will Deacon wrote:
+> On Mon, Jan 16, 2017 at 04:27:28PM +0200, Michael S. Tsirkin wrote:
+> > On Mon, Jan 16, 2017 at 02:21:03PM +0000, Will Deacon wrote:
+> > > On Mon, Jan 16, 2017 at 04:18:03PM +0200, Michael S. Tsirkin wrote:
+> > > > On Mon, Jan 16, 2017 at 10:40:28AM +0000, Will Deacon wrote:
+> > > > > On Fri, Jan 13, 2017 at 08:23:35PM +0200, Michael S. Tsirkin wrote:
+> > > > > > On Fri, Jan 13, 2017 at 05:21:54PM +0000, Will Deacon wrote:
+> > > > > > > On Fri, Jan 13, 2017 at 06:46:32PM +0200, Michael S. Tsirkin wrote:
+> > > > > > > > On Fri, Jan 13, 2017 at 09:25:22AM +0000, Will Deacon wrote:
+> > > > > > > > > On Fri, Jan 13, 2017 at 12:12:56AM +0200, Michael S. Tsirkin wrote:
+> > > > > > > > > > I'd rather people didn't use SMMU with legacy devices.
+> > > > > > > > > 
+> > > > > > > > > I'm afraid we've been doing that for two years and the model already
+> > > > > > > > > exists in a mature state, being actively used for development and
+> > > > > > > > > validation by ARM and our partners. One of the big things its used for
+> > > > > > > > > is to develop SMMU and GIC (our interrupt controller) code with PCI, so
+> > > > > > > > > dropping the SMMU from the picture isn't an option.
+> > > > > > > > 
+> > > > > > > > Oh so this fixes a regression?  This is something I didn't realize.
+> > > > > > > 
+> > > > > > > Yes, thanks. The regression came about because we implemented SMMU-backed
+> > > > > > > DMA ops and only then was it apparent that the virtio stuff was bypassing
+> > > > > > > even with translation enabled (because it wasn't using the DMA API).
+> > > > > > 
+> > > > > > Could you point out a commit ID?
+> > > > > 
+> > > > > There has been a fair amount of work in this area recently, but you're
+> > > > > probably after something like 876945dbf649 ("arm64: Hook up IOMMU dma_ops")
+> > > > > as the culprit, which is the point at which we started to swizzle DMA
+> > > > > ops for devices upstream of an SMMU automatically.
+> > > > > 
+> > > > > > > > A "Fixes:" tag can't hurt here.  I then wonder
+> > > > > > > > might DMA ops ever use a DMA address which isn't a physical address
+> > > > > > > > from QEMU point of view? If that happens, this hack breaks
+> > > > > > > > because in legacy mode QEMU still uses the GPA.
+> > > > > > > 
+> > > > > > > If QEMU doesn't advertise an SMMU, then it will work fine with the GPA,
+> > > > > > > because we won't swizzle the DMA ops for the master device. If QEMU does
+> > > > > > > advertise an SMMU, then we'll allocate DMA addresses to fit within the
+> > > > > > > the intersection of the SMMU aperture and device's DMA mask.
+> > > > > > 
+> > > > > > 
+> > > > > > Right but doesn't just poking from qemu into phys addresses work
+> > > > > > anymore? It used to ...
+> > > > > 
+> > > > > Provided that there's no SMMU, then it will continue to work. and my
+> > > > > understanding (from talking to Peter Maydell) is that qemu doesn't model
+> > > > > an SMMU for ARM-based machines.
+> > > > > 
+> > > > 
+> > > > So how come people report failures due to presence of SMMU?
+> > > > Using some other hypervisor?
+> > > 
+> > > The failures are reported on the ARM fastmodel (a complete system
+> > > emulation that runs on an x86 box), where an SMMU *is* present
+> > > downstream of the virtio-pci masters. There's no qemu involved there.
+> > > 
+> > I see. And this hypervisor actually coded up looking up
+> > translations in the SMMU unconditionally for legacy devices,
+> > and this worked as long as guest didn't touch the SMMU?
+> 
+> Well, the fastmodel isn't a hypervisor really. It's a full system emulation,
+> so it's better to think of it like a piece of hardware. For example, you
+> could run KVM on the fastmodel. But yes, when Linux didn't swizzle the
+> DMA ops to point at the SMMU, then everything defaults to bypass (because
+> that's the default behaviour of the SMMU driver -- this is configurable
+> on the command line) which is why things used to work.
+> 
+> Will
 
-Some Marvell ethernet switches have internal ethernet transceivers with
-hardcoded phy addresses. These addresses can be greater than the number
-of ports or its value might be different than the associated port number.
-This is for example the case for MV88E6341 that has 6 ports and internal
-Port 1 to Port4 PHYs mapped at SMI addresses from 0x11 to 0x14.
+I would be a bit happier if Linux checked virtio iommu quirk and skipped
+the DMA ops thing then. It's a bit ugly but at least it's consistently
+ugly.  To get clean emulation you would then use a modern device.
 
-This commits fixes the issue by removing the condition in MDIO callbacks.
-
-Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/net/dsa/mv88e6xxx/chip.c | 6 ------
- 1 file changed, 6 deletions(-)
-
-diff --git a/drivers/net/dsa/mv88e6xxx/chip.c b/drivers/net/dsa/mv88e6xxx/chip.c
-index 987b2dbbd35a..d1960ae0a618 100644
---- a/drivers/net/dsa/mv88e6xxx/chip.c
-+++ b/drivers/net/dsa/mv88e6xxx/chip.c
-@@ -2882,9 +2882,6 @@ static int mv88e6xxx_mdio_read(struct mii_bus *bus, int phy, int reg)
- 	u16 val;
- 	int err;
- 
--	if (phy >= mv88e6xxx_num_ports(chip))
--		return 0xffff;
--
- 	mutex_lock(&chip->reg_lock);
- 	err = mv88e6xxx_phy_read(chip, phy, reg, &val);
- 	mutex_unlock(&chip->reg_lock);
-@@ -2897,9 +2894,6 @@ static int mv88e6xxx_mdio_write(struct mii_bus *bus, int phy, int reg, u16 val)
- 	struct mv88e6xxx_chip *chip = bus->priv;
- 	int err;
- 
--	if (phy >= mv88e6xxx_num_ports(chip))
--		return 0xffff;
--
- 	mutex_lock(&chip->reg_lock);
- 	err = mv88e6xxx_phy_write(chip, phy, reg, val);
- 	mutex_unlock(&chip->reg_lock);
 -- 
-2.11.0
+MST
