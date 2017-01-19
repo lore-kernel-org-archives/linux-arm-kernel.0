@@ -1,126 +1,80 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 19 Jan 2017 12:36:08 +0000
-Subject: [PATCH V10 2/3] ACPI: Add support for ResourceSource/IRQ domain
- mapping
-In-Reply-To: <CAHp75Vem=mCOGVoOpCJFYHcO17mJ9gexsQxa0Pjf4Lbt3hibRA@mail.gmail.com>
-References: <1484766276-9668-1-git-send-email-agustinv@codeaurora.org>
- <CAHp75Vem=mCOGVoOpCJFYHcO17mJ9gexsQxa0Pjf4Lbt3hibRA@mail.gmail.com>
-Message-ID: <20170119123608.GA3431@red-moon>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Thu, 19 Jan 2017 20:41:14 +0800
+Subject: [PATCH v20 08/17] clocksource/drivers/arm_arch_timer: Rework
+ counter frequency detection.
+In-Reply-To: <CADyBb7uGVu6Po4hCD45WOrQvWYwZgtSbE5z9rbRa7gZ1P5-4tg@mail.gmail.com>
+References: <20170118132541.8989-1-fu.wei@linaro.org>
+ <20170118132541.8989-9-fu.wei@linaro.org>
+ <cafa8c7a-9c7c-51ba-5566-0cfe1fe6f764@linaro.org>
+ <CADyBb7uGVu6Po4hCD45WOrQvWYwZgtSbE5z9rbRa7gZ1P5-4tg@mail.gmail.com>
+Message-ID: <74160889-5eb0-ceb2-2727-61e9d538cf2f@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2017 at 09:45:56PM +0200, Andy Shevchenko wrote:
+On 2017/1/19 17:44, Fu Wei wrote:
+> Hi Hanjun,
+>
+> On 19 January 2017 at 16:02, Hanjun Guo <hanjun.guo@linaro.org> wrote:
+>> Hi Fuwei,
+>>
+>> One comments below.
+>>
+>>
+>> On 2017/1/18 21:25, fu.wei at linaro.org wrote:
+>>>
+>>> From: Fu Wei <fu.wei@linaro.org>
+>>>
+>>> The counter frequency detection call(arch_timer_detect_rate) combines two
+>>> ways to get counter frequency: system coprocessor register and MMIO timer.
+>>> But in a specific timer init code, we only need one way to try:
+>>> getting frequency from MMIO timer register will be needed only when we
+>>> init MMIO timer; getting frequency from system coprocessor register will
+>>> be needed only when we init arch timer.
+>>>
+>>> This patch separates paths to determine frequency:
+>>> Separate out the MMIO frequency and the sysreg frequency detection call,
+>>> and use the appropriate one for the counter.
+>>>
+>>> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+>>> ---
+>>>  drivers/clocksource/arm_arch_timer.c | 40
+>>> ++++++++++++++++++++++--------------
+>>>  1 file changed, 25 insertions(+), 15 deletions(-)
+>>>
+>>> diff --git a/drivers/clocksource/arm_arch_timer.c
+>>> b/drivers/clocksource/arm_arch_timer.c
+>>> index 6484f84..9482481 100644
+>>> --- a/drivers/clocksource/arm_arch_timer.c
+>>> +++ b/drivers/clocksource/arm_arch_timer.c
+>>> @@ -488,23 +488,33 @@ static int arch_timer_starting_cpu(unsigned int cpu)
+>>>         return 0;
+>>>  }
+>>>
+>>> -static void arch_timer_detect_rate(void __iomem *cntbase)
+>>> +static void __arch_timer_determine_rate(u32 rate)
+>>>  {
+>>> -       /* Who has more than one independent system counter? */
+>>> -       if (arch_timer_rate)
+>>> -               return;
+>>> +       /* Check the timer frequency. */
+>>> +       if (!arch_timer_rate) {
+>>> +               if (rate)
+>>> +                       arch_timer_rate = rate;
+>>> +               else
+>>> +                       pr_warn("frequency not available\n");
+>>> +       } else if (rate && arch_timer_rate != rate) {
+>>
+>>                         ^
+>> Typo? I think it's "&" here.
+>
+> Not a typo, It's definitely a ?&&?  :-)
+>
+> Here arch_timer_rate is not zero.
+>
+> If rate is not zero(that means we got a valid rate), and
+> arch_timer_rate != rate ,
+> we will print warning message.
 
-[...]
+Ah, misreading the code, thanks for clarify :)
 
-> > +/**
-> > + * acpi_irq_get - Look for the ACPI IRQ resource with the given index and
-> > + *                use it to initialize the given Linux IRQ resource.
-> > + * @handle ACPI device handle
-> > + * @index  ACPI IRQ resource index to lookup
-> > + * @res    Linux IRQ resource to initialize
-> 
-> Ah, you missed colons after field names:
-> * @field1:
-> 
-> > + *
-> > + * Return:
-> 
-> Next line:  0 on success
-> 
-> > + *         -EINVAL if an error occurs
-> > + *         -EPROBE_DEFER if the IRQ lookup/conversion failed
-> > + */
-> > +int acpi_irq_get(acpi_handle handle, unsigned int index, struct resource *res)
-> > +{
-> 
-> > +       int rc;
-> 
-> Put this last in the definition block.
-> 
-> > +       struct irq_fwspec fwspec;
-> > +       struct irq_domain *domain;
-> > +       unsigned long flags;
-> > +
-> > +       rc = acpi_irq_parse_one(handle, index, &fwspec, &flags);
-> > +       if (rc)
-> > +               return rc;
-> > +
-> > +       domain = irq_find_matching_fwnode(fwspec.fwnode, DOMAIN_BUS_ANY);
-> > +       if (!domain)
-> > +               return -EPROBE_DEFER;
-> 
-> Hmm... Could it be other issues here?
-
-That's a good point. Here probing should be deferred only if we know a
-driver capable of handling fwspec.fwnode will have a chance to be
-probed/initialized eventually right (which basically means it is
-compiled in the kernel and we hope it will probed successfully) ? I am
-not sure there is an easy way to detect that in ACPI at the moment, I
-suspect it is time we added a linker section (or augment the existing
-one used for irqchip early MADT parsing - IRQCHIP_ACPI_DECLARE) for this
-purpose I do not see any other option (apart from leaving devices in the
-deferred probe list if a driver for the irqchip represented by
-fwspec.fwnode is not present in the kernel, which is a bit sloppy, or
-resorting to checking Kconfig entries to detect compile time enabled
-irqchip drivers).
-
-> > +
-> > +       rc = irq_create_fwspec_mapping(&fwspec);
-> > +       if (rc <= 0)
-> > +               return -EINVAL;
-> > +
-> 
-> > +       res->start = rc;
-> > +       res->end = rc;
-> > +       res->flags = flags;
-> 
-> Perhaps struct resource *r should be a parameter to acpi_irq_parse_one().
-
-Yeah but then you would end up with flags initialized in
-acpi_irq_parse_one() and the other resource params (ie start, end) here,
-I do not think it is nicer.
-
-Thanks,
-Lorenzo
-
-> 
-> > +
-> > +       return 0;
-> > +}
-> > +EXPORT_SYMBOL_GPL(acpi_irq_get);
-> > +
-> > +/**
-> >   * acpi_set_irq_model - Setup the GSI irqdomain information
-> >   * @model: the value assigned to acpi_irq_model
-> >   * @fwnode: the irq_domain identifier for mapping and looking up
-> > diff --git a/drivers/base/platform.c b/drivers/base/platform.c
-> > index c4af003..61423d2 100644
-> > --- a/drivers/base/platform.c
-> > +++ b/drivers/base/platform.c
-> > @@ -102,6 +102,14 @@ int platform_get_irq(struct platform_device *dev, unsigned int num)
-> >         }
-> >
-> >         r = platform_get_resource(dev, IORESOURCE_IRQ, num);
-> > +       if (r && r->flags & IORESOURCE_DISABLED && ACPI_COMPANION(&dev->dev)) {
-> 
-> has_acpi_companion() ?
-> 
-> > +               int ret;
-> > +
-> > +               ret = acpi_irq_get(ACPI_HANDLE(&dev->dev), num, r);
-> > +               if (ret)
-> > +                       return ret;
-> > +       }
-> 
-> > @@ -1450,4 +1458,3 @@ void __init early_platform_cleanup(void)
-> >                 memset(&pd->dev.devres_head, 0, sizeof(pd->dev.devres_head));
-> >         }
-> >  }
-> > -
-> 
-> It doesn't belong here.
-> 
-> -- 
-> With Best Regards,
-> Andy Shevchenko
+Hanjun
