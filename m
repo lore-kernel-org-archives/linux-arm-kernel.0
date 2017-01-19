@@ -1,96 +1,52 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 Jan 2017 16:51:55 +0000
-Subject: [PATCH net-next v3 06/10] net: dsa: Migrate to device_find_class()
-In-Reply-To: <20170119145315.GD21805@lunn.ch>
-References: <20170114214713.28109-1-f.fainelli@gmail.com>
- <20170114214713.28109-7-f.fainelli@gmail.com>
- <20170115110628.GF26374@kroah.com>
- <fc247aeb-a8d6-5ba9-c26d-cb057a5ac34d@gmail.com>
- <20170115173949.GA19268@kroah.com>
- <a9ea1f45-b9a5-d840-68e0-9bf9bc7a6598@gmail.com>
- <20170115191632.GD5643@lunn.ch>
- <912e6143-c67a-d909-2a6c-939de79efc5d@gmail.com>
- <20170119142820.GA494@kroah.com> <20170119145315.GD21805@lunn.ch>
-Message-ID: <20170119165155.GH27312@n2100.armlinux.org.uk>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Thu, 19 Jan 2017 10:58:38 -0600
+Subject: [Patch v4 0/2] Support ARM SMCC SoC vendor quirks
+Message-ID: <1484845120-3364-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(This is mainly for Greg's benefit to help him understand the issue.)
+At least one SoC vendor (Qualcomm) requires additional processing done
+during ARM SMCCC calls.  As such, an additional parameter to the
+arm_smccc_smc is required to be able to handle SoC specific quirks.
 
-I think the diagram you gave initially made this confusing, as it
-talks about a CPU(sic) producing the "RGMII" and "MII-MGMT".
+The Qualcomm quirk is necessary due to the fact that the scm call can
+be interrupted on Qualcomm ARM64 platforms.  When this occurs, the
+call must be restarted using information that was passed back during
+the original smc call.
 
-Let's instead show a better representation that hopefully helps Greg
-understand networking. :)
+The first patch in this series adds a quirk structure and also adds a
+quirk parameter to arm_smccc_smc calls.  I added macros to allow users
+to choose the API they need.  This keeps all of the current users who
+do not need quirks from having to change anything.
 
+The second patch adds the Qualcomm quirk and also implements the
+Qualcomm firmware changes required to handle the restarting of the
+interrupted SMC call.
 
-  CPU
-System <-B->  Ethernet controller <-P-> } PHY <---> network cable
-                                        } - - - - - - - or - - - - - - -
-                  MDIO bus -------M---> } Switch <-P-> PHYs <--> network
-                                              `----M----^        cables
+The original patch set for the SMCCC session ID is located at:
+https://lkml.org/lkml/2016/8/20/7
 
-'B' can be an on-SoC bus or something like PCI.
+Changes from v3:
+  - Fix documentation
 
-'P' are the high-speed connectivity between the ethernet controller and
-PHY which carries the packet data.  It has no addressing, it's a point
-to point link.  RGMII is just one wiring example, there are many
-different interfaces there (SGMII, AUI, XAUI, XGMII to name a few.)
+Changes from v2:
+  - Use variadic macros
 
-'M' are the MDIO bus, which is the bus by which ethernet PHYs and
-switches can be identified and controlled.
+Changes from v1:
+  - Add macros to handle both use cases per review comments
 
-The MDIO bus has a bus_type, has host drivers which are sometimes
-part of the ethernet controller, but can also be stand-alone devices
-shared between multiple ethernet controllers.
+Andy Gross (2):
+  arm: kernel: Add SMC structure parameter
+  firmware: qcom: scm: Fix interrupted SCM calls
 
-PHYs are a kind of MDIO device which are members of the MDIO bus
-type.  Each PHY (and switch) has a numerical address, and identifying
-numbers within its register set which identifies the manufacturer
-and device type.  We have device_driver objects for these.
-
-Expanding the above diagram to make it (hopefully) even clearer,
-we can have this classic setup:
-
-  CPU
-System <-B-> Ethernet controller <-P-> PHY <---> network cable
-                 MDIO bus -------M------^
-
-Or, in the case of two DSA switches attached to an Ethernet controller:
-
-                                     |~~~~~~~~|
-System <-B-> Ethernet controller <-P-> Switch <-P-> PHY1 <--> network cable
-                 MDIO bus ----+--M--->   1    <-P-> PHY2 <--> network cable
-                              |      |        ...    |
-                              |      |        <-P-> PHYn <--> network cable
-                              |      |....^...|      |
-                              |           |  `---M---'
-                              |           P
-                              |           |
-                              |      |~~~~v~~~|
-                              `------> Switch <-P-> PHY1 <--> network cable
-                                     |   2    ...    |
-                                     |        <-P-> PHYn <--> network cable
-                                     |........|      |
-                                             `---M---'
-
-The problem that the DSA guys are trying to deal with is how to
-represent the link between the DSA switches (which are devices
-sitting off their controlling bus - the MDIO bus) and the ethernet
-controller associated with that collection of devices, be it a
-switch or PHY.
-
-Merely changing the parent/child relationships to try and solve
-one issue just creates exactly the same problem elsewhere.
-
-So, I hope with these diagrams, you can see that trying to make
-the ethernet controller a child device of the DSA switches
-means that (eg) it's no longer a PCI device, which is rather
-absurd, especially when considering that what happens to the
-right of the ethernet controller in the diagrams above is
-normally external chips to the SoC or ethernet device.
+ arch/arm/kernel/armksyms.c      |  2 +-
+ arch/arm/kernel/smccc-call.S    |  7 ++++---
+ arch/arm64/kernel/arm64ksyms.c  |  2 +-
+ arch/arm64/kernel/asm-offsets.c |  7 +++++--
+ arch/arm64/kernel/smccc-call.S  | 16 ++++++++++++----
+ drivers/firmware/qcom_scm-64.c  | 13 ++++++++++---
+ include/linux/arm-smccc.h       | 38 +++++++++++++++++++++++++++++++-------
+ 7 files changed, 64 insertions(+), 21 deletions(-)
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
