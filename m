@@ -1,92 +1,149 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 Jan 2017 13:54:52 +0000
-Subject: [arm:phy-cleanup 10/10]
- arch/mips/cavium-octeon/octeon-platform.c:1064:15: error: expected
- declaration specifiers or '...' before string constant
-In-Reply-To: <201701192138.NZ3q3lNY%fengguang.wu@intel.com>
-References: <201701192138.NZ3q3lNY%fengguang.wu@intel.com>
-Message-ID: <20170119135452.GY27312@n2100.armlinux.org.uk>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Thu, 19 Jan 2017 13:59:09 +0000
+Subject: [PATCH 2/4] ARM: nommu: dynamic exception base address setting
+In-Reply-To: <20170118203807.6467-1-afzal.mohd.ma@gmail.com>
+References: <20170118203525.6246-1-afzal.mohd.ma@gmail.com>
+ <20170118203807.6467-1-afzal.mohd.ma@gmail.com>
+Message-ID: <f47f7a48-12e9-7dd0-324d-b736eead3187@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hi,
 
-Is there a reason why there's these MODULE_* macros at the bottom of
-this file?  From what I can see:
-
-(a) this file can't be built as a module as the Makefile doesn't allow it:
-    obj-y := cpu.o setup.o octeon-platform.o octeon-irq.o csrc-octeon.o
-
-(b) this file will not be functional as a module anyway, because of the
-    multiple *_initcall() statements, each of which are translated to
-    a module_init() call, each of which define an alias to
-    int init_module(void) - and that will cause a build error.
-
-Can we just kill these, rather than adding a linux/module.h include to
-this file?
-
-Thanks.
-
-On Thu, Jan 19, 2017 at 09:08:42PM +0800, kbuild test robot wrote:
-> tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git phy-cleanup
-> head:   ef8cb7d5f838770f22cae0e20fee8d1157fc88fd
-> commit: ef8cb7d5f838770f22cae0e20fee8d1157fc88fd [10/10] net: dsa: remove unnecessary phy*.h includes
-> config: mips-cavium_octeon_defconfig (attached as .config)
-> compiler: mips64-linux-gnuabi64-gcc (Debian 6.1.1-9) 6.1.1 20160705
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         git checkout ef8cb7d5f838770f22cae0e20fee8d1157fc88fd
->         # save the attached .config to linux build tree
->         make.cross ARCH=mips 
+On 18/01/17 20:38, afzal mohammed wrote:
+> No-MMU dynamic exception base address configuration on CP15
+> processors. In the case of low vectors, decision based on whether
+> security extensions are enabled & whether remap vectors to RAM
+> CONFIG option is selected.
 > 
-> All errors (new ones prefixed by >>):
+> For no-MMU without CP15, current default value of 0x0 is retained.
 > 
-> >> arch/mips/cavium-octeon/octeon-platform.c:1064:15: error: expected declaration specifiers or '...' before string constant
->     MODULE_AUTHOR("David Daney <ddaney@caviumnetworks.com>");
->                   ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
->    arch/mips/cavium-octeon/octeon-platform.c:1065:16: error: expected declaration specifiers or '...' before string constant
->     MODULE_LICENSE("GPL");
->                    ^~~~~
->    arch/mips/cavium-octeon/octeon-platform.c:1066:20: error: expected declaration specifiers or '...' before string constant
->     MODULE_DESCRIPTION("Platform driver for Octeon SOC");
->                        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-> 
-> vim +1064 arch/mips/cavium-octeon/octeon-platform.c
-> 
-> d617f9e9 David Daney   2013-12-03  1048  				break;
-> d617f9e9 David Daney   2013-12-03  1049  			default:
-> d617f9e9 David Daney   2013-12-03  1050  				break;
-> d617f9e9 David Daney   2013-12-03  1051  			}
-> d617f9e9 David Daney   2013-12-03  1052  		}
-> d617f9e9 David Daney   2013-12-03  1053  	}
-> d617f9e9 David Daney   2013-12-03  1054  
-> 7ed18152 David Daney   2012-07-05  1055  	return 0;
-> 7ed18152 David Daney   2012-07-05  1056  }
-> 7ed18152 David Daney   2012-07-05  1057  
-> 7ed18152 David Daney   2012-07-05  1058  static int __init octeon_publish_devices(void)
-> 7ed18152 David Daney   2012-07-05  1059  {
-> 7ed18152 David Daney   2012-07-05  1060  	return of_platform_bus_probe(NULL, octeon_ids, NULL);
-> 7ed18152 David Daney   2012-07-05  1061  }
-> 8074d782 Aaro Koskinen 2016-08-23  1062  arch_initcall(octeon_publish_devices);
-> 7ed18152 David Daney   2012-07-05  1063  
-> 512254ba David Daney   2009-09-16 @1064  MODULE_AUTHOR("David Daney <ddaney@caviumnetworks.com>");
-> 512254ba David Daney   2009-09-16  1065  MODULE_LICENSE("GPL");
-> 512254ba David Daney   2009-09-16  1066  MODULE_DESCRIPTION("Platform driver for Octeon SOC");
-> 
-> :::::: The code at line 1064 was first introduced by commit
-> :::::: 512254ba8383c5dd7eca6819d0da1ce2fe9ede47 MIPS: Octeon:  Move some platform device registration to its own file.
-> 
-> :::::: TO: David Daney <ddaney@caviumnetworks.com>
-> :::::: CC: Ralf Baechle <ralf@linux-mips.org>
-> 
+> Signed-off-by: afzal mohammed <afzal.mohd.ma@gmail.com>
 > ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+>  arch/arm/mm/nommu.c | 64 +++++++++++++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 62 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
+> index 2740967727e2..db8e784f20f3 100644
+> --- a/arch/arm/mm/nommu.c
+> +++ b/arch/arm/mm/nommu.c
+> @@ -11,6 +11,7 @@
+>  #include <linux/kernel.h>
+>  
+>  #include <asm/cacheflush.h>
+> +#include <asm/cp15.h>
+>  #include <asm/sections.h>
+>  #include <asm/page.h>
+>  #include <asm/setup.h>
+> @@ -22,6 +23,8 @@
+>  
+>  #include "mm.h"
+>  
+> +unsigned long vectors_base;
+> +
+>  #ifdef CONFIG_ARM_MPU
+>  struct mpu_rgn_info mpu_rgn_info;
+>  
+> @@ -278,15 +281,72 @@ static void sanity_check_meminfo_mpu(void) {}
+>  static void __init mpu_setup(void) {}
+>  #endif /* CONFIG_ARM_MPU */
+>  
+> +#ifdef CONFIG_CPU_CP15
+> +#ifdef CONFIG_CPU_HIGH_VECTOR
+> +static unsigned long __init setup_vectors_base(void)
+> +{
+> +	unsigned long reg = get_cr();
+> +
+> +	set_cr(reg | CR_V);
+> +	return 0xffff0000;
+> +}
+> +#else /* CONFIG_CPU_HIGH_VECTOR */
+> +/*
+> + * ID_PRF1 bits (CP#15 ID_PFR1)
+> + */
+> +#define ID_PFR1_SE (0x3 << 4)	/* Security extension enable bits */
+
+This bitfiled is 4 bits wide.
+
+> +
+> +/* Read processor feature register ID_PFR1 */
+> +static unsigned long get_id_pfr1(void)
+> +{
+> +	unsigned long val;
+> +
+> +	asm("mrc p15, 0, %0, c0, c1, 1" : "=r" (val) : : "cc");
+> +	return val;
+> +}
+> +
+> +/* Write exception base address to VBAR */
+> +static void set_vbar(unsigned long val)
+> +{
+> +	asm("mcr p15, 0, %0, c12, c0, 0" : : "r" (val) : "cc");
+> +}
+> +
+> +static bool __init security_extensions_enabled(void)
+> +{
+> +	return !!(get_id_pfr1() & ID_PFR1_SE);
+> +}
+> +
+> +static unsigned long __init setup_vectors_base(void)
+> +{
+> +	unsigned long base = 0, reg = get_cr();
+> +
+> +	set_cr(reg & ~CR_V);
+> +	if (security_extensions_enabled()) {
+
+You can use
+
+    cpuid_feature_extract(CPUID_EXT_PFR1, 4)
+    
+and add a comment explaining what we are looking for and why.
+
+> +		if (IS_ENABLED(CONFIG_REMAP_VECTORS_TO_RAM))
+> +			base = CONFIG_DRAM_BASE;
+> +		set_vbar(base);
+> +	} else if (IS_ENABLED(CONFIG_REMAP_VECTORS_TO_RAM)) {
+> +		if (CONFIG_DRAM_BASE != 0)
+> +			pr_err("Security extensions not enabled, vectors cannot be remapped to RAM, vectors base will be 0x00000000\n");
+> +	}
+> +
+> +	return base;
+> +}
+> +#endif /* CONFIG_CPU_HIGH_VECTOR */
+> +#endif /* CONFIG_CPU_CP15 */
+> +
+>  void __init arm_mm_memblock_reserve(void)
+>  {
+>  #ifndef CONFIG_CPU_V7M
+> +#ifdef CONFIG_CPU_CP15
+> +	vectors_base = setup_vectors_base();
+> +#endif
+
+alternatively it can be
+
+	unsigned long vector_base = IS_ENABLED(CONFIG_CPU_CP15) ? setup_vbar() : 0;
 
 
+Thanks
+Vladimir
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+>  	/*
+>  	 * Register the exception vector page.
+>  	 * some architectures which the DRAM is the exception vector to trap,
+>  	 * alloc_page breaks with error, although it is not NULL, but "0."
+>  	 */
+> -	memblock_reserve(CONFIG_VECTORS_BASE, 2 * PAGE_SIZE);
+> +	memblock_reserve(vectors_base, 2 * PAGE_SIZE);
+>  #else /* ifndef CONFIG_CPU_V7M */
+>  	/*
+>  	 * There is no dedicated vector page on V7-M. So nothing needs to be
+> @@ -310,7 +370,7 @@ void __init sanity_check_meminfo(void)
+>   */
+>  void __init paging_init(const struct machine_desc *mdesc)
+>  {
+> -	early_trap_init((void *)CONFIG_VECTORS_BASE);
+> +	early_trap_init((void *)vectors_base);
+>  	mpu_setup();
+>  	bootmem_init();
+>  }
+> 
