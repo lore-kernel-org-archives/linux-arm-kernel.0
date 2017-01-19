@@ -1,90 +1,44 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 19 Jan 2017 19:02:00 +0100
-Subject: [PATCH] ARM: dts: rockchip: add soc-specific uart compatibles for
- rk3066/rk3188
-Message-ID: <20170119180201.2547-1-heiko@sntech.de>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 19 Jan 2017 10:02:51 -0800
+Subject: [PATCH 2/3] ARM64: dts: meson-gxbb: Add support for WeTek Hub and
+ Play
+In-Reply-To: <61c3c24d-57cd-b81d-0225-5aae14352397@baylibre.com> (Neil
+ Armstrong's message of "Thu, 19 Jan 2017 09:12:20 +0100")
+References: <1484736642-5451-1-git-send-email-narmstrong@baylibre.com>
+ <1484736642-5451-3-git-send-email-narmstrong@baylibre.com>
+ <m2mveox9mm.fsf@baylibre.com>
+ <61c3c24d-57cd-b81d-0225-5aae14352397@baylibre.com>
+Message-ID: <m2wpdrvsfo.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The serial IPs in Rockchip socs are based on Designware uarts and thus
-bind against the snps,dw-apb-uart compatible.
-On all newer socs we also carry around per-soc compatibles that allow
-us to have more specific drivers in the future - if needed.
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-The cortex-a9 socs rk3066 and rk3188 that were added first don't have
-those yet, so add them for completenes sake.
+> On 01/18/2017 11:53 PM, Kevin Hilman wrote:
+>> Neil Armstrong <narmstrong@baylibre.com> writes:
+>> 
+>>> Adds support for the WeTek Hub and Play2 boards.
+>>> The Hub is an extremely small IPTv Set-Top-Box and the Play2 is a more
+>>> traditionnal Satellite or Terrestrial and IPTv Set-Top-Box.
+>>>
+>>> Both are based on the p200 Reference Design and out-of-tree support is
+>>> based on OpenELEC kernel at [1].
+>>>
+>>> [1] https://github.com/wetek-enigma/linux-amlogic
+>>>
+>>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> 
+>> Did you get the GPIO/button info from the LibreELEC tree or did you find
+>> some schematics someplace?  If you found any schematics, it would be
+>> nice to have links in the DTS files.
+>> 
+>> Kevin
+>> 
+>
+> It was in the dts of the LibreELEC tree, I found no schematics so far.
+> I can respin a v2 with a link to the LibreELEC dts files.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/boot/dts/rk3066a.dtsi | 4 ++++
- arch/arm/boot/dts/rk3188.dtsi  | 4 ++++
- 2 files changed, 8 insertions(+)
+No need for a respin.  But I'll s/OpenELEC/LibreELEC/ in the commit
+message when applying.
 
-diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
-index e498c362b9e7..f50481fd8e5c 100644
---- a/arch/arm/boot/dts/rk3066a.dtsi
-+++ b/arch/arm/boot/dts/rk3066a.dtsi
-@@ -687,6 +687,7 @@
- };
- 
- &uart0 {
-+	compatible = "rockchip,rk3066-uart", "snps,dw-apb-uart";
- 	dmas = <&dmac1_s 0>, <&dmac1_s 1>;
- 	dma-names = "tx", "rx";
- 	pinctrl-names = "default";
-@@ -694,6 +695,7 @@
- };
- 
- &uart1 {
-+	compatible = "rockchip,rk3066-uart", "snps,dw-apb-uart";
- 	dmas = <&dmac1_s 2>, <&dmac1_s 3>;
- 	dma-names = "tx", "rx";
- 	pinctrl-names = "default";
-@@ -701,6 +703,7 @@
- };
- 
- &uart2 {
-+	compatible = "rockchip,rk3066-uart", "snps,dw-apb-uart";
- 	dmas = <&dmac2 6>, <&dmac2 7>;
- 	dma-names = "tx", "rx";
- 	pinctrl-names = "default";
-@@ -708,6 +711,7 @@
- };
- 
- &uart3 {
-+	compatible = "rockchip,rk3066-uart", "snps,dw-apb-uart";
- 	dmas = <&dmac2 8>, <&dmac2 9>;
- 	dma-names = "tx", "rx";
- 	pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
-index 869e189331ec..cf91254d0a43 100644
---- a/arch/arm/boot/dts/rk3188.dtsi
-+++ b/arch/arm/boot/dts/rk3188.dtsi
-@@ -599,21 +599,25 @@
- };
- 
- &uart0 {
-+	compatible = "rockchip,rk3188-uart", "snps,dw-apb-uart";
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_xfer>;
- };
- 
- &uart1 {
-+	compatible = "rockchip,rk3188-uart", "snps,dw-apb-uart";
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart1_xfer>;
- };
- 
- &uart2 {
-+	compatible = "rockchip,rk3188-uart", "snps,dw-apb-uart";
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart2_xfer>;
- };
- 
- &uart3 {
-+	compatible = "rockchip,rk3188-uart", "snps,dw-apb-uart";
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart3_xfer>;
- };
--- 
-2.11.0
+Kevin
