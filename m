@@ -1,59 +1,127 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Thu, 19 Jan 2017 14:34:07 +0100
-Subject: [PATCH 0/7] Add support for triggered buffer mode to STM32 ADC
-Message-ID: <1484832854-6314-1-git-send-email-fabrice.gasnier@st.com>
+Date: Thu, 19 Jan 2017 14:34:09 +0100
+Subject: [PATCH 2/7] iio: adc: stm32: Enable use of stm32 timer triggers
+In-Reply-To: <1484832854-6314-1-git-send-email-fabrice.gasnier@st.com>
+References: <1484832854-6314-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1484832854-6314-3-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following patches add support for triggered buffer mode.
-These are based on top of "Add PWM and IIO timer drivers for STM32"
-series. Reference:
-https://lkml.org/lkml/2017/1/18/588
+STM32 ADC has external timer trigger sources. Use stm32 timer triggers
+API (e.g. is_stm32_timer_trigger()) with local ADC lookup table to
+validate a trigger can be used.
+This also provides correct trigger selection value (e.g. extsel).
 
-STM32 ADC, can use either interrupts or DMA to collect data.
-Either timer trigger output (TRGO) or PWM can be used as trigger source.
-This patchset has been tested on STM32F429 eval board.
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+ drivers/iio/adc/Kconfig     |  2 ++
+ drivers/iio/adc/stm32-adc.c | 60 +++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 62 insertions(+)
 
-- Example to enable timer1 PWM:
-cd /sys/devices/platform/soc/40010000.timers/40010000.timers:pwm/pwm/pwmchip4/
-echo 0 > export # timer 1 channel 1
-echo 1000000 > pwm0/period # 1000Hz
-echo 500000 > pwm0/duty_cycle
-echo 1 > pwm0/enable
-
-- Example to enable timer3 TRGO:
-cd /sys/bus/iio/devices/
-cat trigger6/name 
-tim1_ch1
-cat trigger0/name 
-tim3_trgo
-echo 1000 > trigger0/sampling_frequency
-
-- Example to configure STM32ADC in triggered buffer mode, with timer1 PWM
-  or timer3 TRGO:
-cd /sys/bus/iio/devices/iio\:device0
-echo tim1_ch1 > trigger/current_trigger
-OR: echo tim3_trgo > trigger/current_trigger
-echo 1 > scan_elements/in_voltage8_en
-echo 1 > buffer/enable
-
-Fabrice Gasnier (7):
-  iio: adc: stm32: add support for triggered buffer mode
-  iio: adc: stm32: Enable use of stm32 timer triggers
-  iio: adc: stm32: add trigger polarity extended attribute
-  Documentation: dt: iio: stm32-adc: optional dma support
-  iio: adc: stm32: add optional dma support
-  ARM: dts: stm32: Enable dma by default on stm32f4 adc
-  ARM: dts: stm32: Enable pwm1 and pwm3 for stm32f469-eval
-
- .../devicetree/bindings/iio/adc/st,stm32-adc.txt   |   7 +
- arch/arm/boot/dts/stm32429i-eval.dts               |  28 +
- arch/arm/boot/dts/stm32f429.dtsi                   |   6 +
- drivers/iio/adc/Kconfig                            |   6 +
- drivers/iio/adc/stm32-adc-core.c                   |   1 +
- drivers/iio/adc/stm32-adc-core.h                   |   2 +
- drivers/iio/adc/stm32-adc.c                        | 643 ++++++++++++++++++++-
- 7 files changed, 690 insertions(+), 3 deletions(-)
-
+diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
+index 33341f4..9a7b090 100644
+--- a/drivers/iio/adc/Kconfig
++++ b/drivers/iio/adc/Kconfig
+@@ -447,6 +447,8 @@ config STM32_ADC_CORE
+ 	depends on OF
+ 	depends on REGULATOR
+ 	select IIO_BUFFER
++	select MFD_STM32_TIMERS
++	select IIO_STM32_TIMER_TRIGGER
+ 	select IIO_TRIGGERED_BUFFER
+ 	help
+ 	  Select this option to enable the core driver for STMicroelectronics
+diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
+index 8d0b74b..30708bc 100644
+--- a/drivers/iio/adc/stm32-adc.c
++++ b/drivers/iio/adc/stm32-adc.c
+@@ -23,6 +23,7 @@
+ #include <linux/delay.h>
+ #include <linux/iio/iio.h>
+ #include <linux/iio/buffer.h>
++#include <linux/iio/timer/stm32-timer-trigger.h>
+ #include <linux/iio/trigger.h>
+ #include <linux/iio/trigger_consumer.h>
+ #include <linux/iio/triggered_buffer.h>
+@@ -122,6 +123,35 @@ enum stm32_adc_exten {
+ 	STM32_EXTEN_HWTRIG_BOTH_EDGES,
+ };
+ 
++/* extsel - trigger mux selection value */
++enum stm32_adc_extsel {
++	STM32_EXT0,
++	STM32_EXT1,
++	STM32_EXT2,
++	STM32_EXT3,
++	STM32_EXT4,
++	STM32_EXT5,
++	STM32_EXT6,
++	STM32_EXT7,
++	STM32_EXT8,
++	STM32_EXT9,
++	STM32_EXT10,
++	STM32_EXT11,
++	STM32_EXT12,
++	STM32_EXT13,
++	STM32_EXT14,
++	STM32_EXT15,
++};
++
++/**
++ * struct stm32_adc_trig_info - ADC trigger info
++ * @name:		name of the trigger, corresponding to its source
++ * @extsel:		trigger selection
++ */
++struct stm32_adc_trig_info {
++	const char *name;
++	enum stm32_adc_extsel extsel;
++};
+ 
+ /**
+  * struct stm32_adc - private data of each ADC IIO instance
+@@ -218,6 +248,26 @@ struct stm32_adc_regs {
+ 	{ STM32F4_ADC_SQR1, STM32F4_SQ16_MASK, STM32F4_SQ16_SHIFT },
+ };
+ 
++/* STM32F4 external trigger sources for all instances */
++static struct stm32_adc_trig_info stm32f4_adc_timer_trigs[] = {
++	{ TIM1_CH1, STM32_EXT0 },
++	{ TIM1_CH2, STM32_EXT1 },
++	{ TIM1_CH3, STM32_EXT2 },
++	{ TIM2_CH2, STM32_EXT3 },
++	{ TIM2_CH3, STM32_EXT4 },
++	{ TIM2_CH4, STM32_EXT5 },
++	{ TIM2_TRGO, STM32_EXT6 },
++	{ TIM3_CH1, STM32_EXT7 },
++	{ TIM3_TRGO, STM32_EXT8 },
++	{ TIM4_CH4, STM32_EXT9 },
++	{ TIM5_CH1, STM32_EXT10 },
++	{ TIM5_CH2, STM32_EXT11 },
++	{ TIM5_CH3, STM32_EXT12 },
++	{ TIM8_CH1, STM32_EXT13 },
++	{ TIM8_TRGO, STM32_EXT14 },
++	{}, /* sentinel */
++};
++
+ /**
+  * STM32 ADC registers access routines
+  * @adc: stm32 adc instance
+@@ -362,6 +412,16 @@ static int stm32_adc_conf_scan_seq(struct iio_dev *indio_dev,
+ static int stm32_adc_get_trig_extsel(struct iio_dev *indio_dev,
+ 				     struct iio_trigger *trig)
+ {
++	int i;
++
++	/* lookup triggers registered by stm32 timer trigger driver */
++	for (i = 0; stm32f4_adc_timer_trigs[i].name; i++) {
++		if (is_stm32_timer_trigger(trig) &&
++		    !strcmp(stm32f4_adc_timer_trigs[i].name, trig->name)) {
++			return stm32f4_adc_timer_trigs[i].extsel;
++		}
++	}
++
+ 	return -EINVAL;
+ }
+ 
 -- 
 1.9.1
