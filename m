@@ -1,65 +1,34 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 Jan 2017 19:58:19 +0000
-Subject: [PATCH RFC 0/7] Clean up PHY MMD accessors
-In-Reply-To: <9fb97d58-6ad3-f9d1-c255-9f91e5857f88@gmail.com>
-References: <20170113152059.GR14217@n2100.armlinux.org.uk>
- <9fb97d58-6ad3-f9d1-c255-9f91e5857f88@gmail.com>
-Message-ID: <20170119195819.GJ27312@n2100.armlinux.org.uk>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Thu, 19 Jan 2017 22:04:32 +0200
+Subject: [PATCH v3 2/3] spi: pxa2xx: Prepare for edge-triggered interrupts
+In-Reply-To: <20170119195701.kueutgmahr6bmxhq@sirena.org.uk>
+References: <cover.1484592296.git.jan.kiszka@siemens.com>
+ <cover.1484592296.git.jan.kiszka@siemens.com>
+ <7b15a0910a3ad861fd32161c72559bafa7b71e29.1484592296.git.jan.kiszka@siemens.com>
+ <87ziiqdstr.fsf@belgarion.home>
+ <4d97e416-4d32-3b9f-0695-de116a4b26bd@siemens.com>
+ <87r340eq28.fsf@belgarion.home>
+ <b3e0d393-b841-1556-ddd2-5634f12b6f2c@siemens.com>
+ <20170118124645.6ugjwbfeq5vsh2to@sirena.org.uk>
+ <7e5fb21d-35bd-6ac3-9e6f-cffed656997f@siemens.com>
+ <e692c4a9-6320-b9e0-d6e7-f58bbe6ba867@siemens.com>
+ <20170119195701.kueutgmahr6bmxhq@sirena.org.uk>
+Message-ID: <1484856272.2133.253.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 11:42:47AM -0800, Florian Fainelli wrote:
-> On 01/13/2017 07:20 AM, Russell King - ARM Linux wrote:
-> > This series cleans up phylib's MMD accessors, so that we have a common
-> > way of accessing the Clause 45 register set.
-> > 
-> > The current situation is far from ideal - we have phy_(read|write)_mmd()
-> > which accesses Clause 45 registers over Clause 45 accesses, and we have
-> > phy_(read|write)_mmd_indirect(), which accesses Clause 45 registers via
-> > Clause 22 register 13/14.
-> > 
-> > Generic code uses the indirect methods to access standard Clause 45
-> > features, and when we come to add Clause 45 PHY support to phylib, we
-> > would need to make these conditional upon the PHY type, or duplicate
-> > these functions.
-> > 
-> > An alternative solution is to merge these accessors together, and select
-> > the appropriate access method depending upon the 802.3 clause that the
-> > PHY conforms with.  The result is that we have a single set of
-> > phy_(read|write)_mmd() accessors.
-> > 
-> > For cases which require special handling, we still allow PHY drivers to
-> > override all MMD accesses - except rather than just overriding the
-> > indirect accesses.  This keeps existing overrides working.
-> > 
-> > Combining the two also has another beneficial side effect - we get rid
-> > of similar functions that take arguments in different orders.  The
-> > old direct accessors took the phy structure, devad and register number,
-> > whereas the indirect accessors took the phy structure, register number
-> > and devad in that order.  Care must be taken when updating future
-> > drivers that the argument order is correct, and the function name is
-> > not merely replaced.
+On Thu, 2017-01-19 at 19:57 +0000, Mark Brown wrote:
+> On Thu, Jan 19, 2017 at 08:37:40PM +0100, Jan Kiszka wrote:
+> > When using the a device with edge-triggered interrupts, such as
+> > MSIs,
+> > the interrupt handler has to ensure that there is a point in time
+> > during
 > 
-> I really like that series, this is much much cleaner, do you mind
-> resubmitting this without a RFC tag so David can apply it?
+> I'm missing patches 1 and 3, what's going on here?
 
-Hi Florian,
-
-Thanks.
-
-Will do in the next couple of days - I'd prefer to make one change
-to the series before submitting it for real: provide compatibility
-functions marked as deprecated so this doesn't create a flag day.
-We can remove the deprecated _indirect functions later when we know
-there's no new users.
-
-I'd like to get the phy.h untanglement stuff into David's tree first.
-I'm almost there, my allmodconfig from last night almost built fine
-but for something I missed in bgmac.c, and 0-day found a MIPS file
-affected by the change.  New code pushed out for 0-day and I'm
-expecting tonights allmodconfig to be clear.
+Patch 1 had been applied by you. I think Jan just needs to resend with
+proper version and set of patches.
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
