@@ -1,42 +1,132 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 20 Jan 2017 10:43:24 -0800
-Subject: [PATCH v4 2/4] Documentation: dt: add bindings for ti-cpufreq
-In-Reply-To: <b7d11925-879a-9be0-fdd8-45b70e642ce1@ti.com>
-References: <20170117131808.29798-1-d-gerlach@ti.com>
- <20170117131808.29798-3-d-gerlach@ti.com>
- <20170119180702.62xg2ta5pq4mf7sd@rob-hp-laptop>
- <b7d11925-879a-9be0-fdd8-45b70e642ce1@ti.com>
-Message-ID: <20170120184324.GJ7403@atomide.com>
+Date: Fri, 20 Jan 2017 10:51:51 -0800
+Subject: [PATCH] ARM: OMAP2+: Remove duplicate definition of omap_test_timeout
+Message-ID: <20170120185151.1630-1-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [170119 10:32]:
-> On 01/19/2017 12:07 PM, Rob Herring wrote:
-> > > +	/*
-> > > +	 * The three following nodes are marked with opp-suspend
-> > > +	 * because they can not be enabled simultaneously on a
-> > > +	 * single SoC.
-> > > +	 */
-> > > +	opp50 at 300000000 {
-> > 
-> > What's the 50, 100, 120 in the names?
-> 
-> Those are the names of the OPPs given in Table 5-7 of the AM335x data
-> manual, seen here http://www.ti.com/lit/ds/symlink/am3359.pdf . I typically
-> reference the table and document in the commit message of the actual DT
-> patches but didn't here for the binding.
+We have the same defined already in common.h.
 
-If you don't need the names, you could maybe use:
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/cm2xxx.c                |  1 +
+ arch/arm/mach-omap2/cm33xx.c                |  1 +
+ arch/arm/mach-omap2/cm3xxx.c                |  1 +
+ arch/arm/mach-omap2/cminst44xx.c            |  1 +
+ arch/arm/mach-omap2/powerdomains3xxx_data.c |  1 +
+ arch/arm/mach-omap2/prcm-common.h           | 22 ----------------------
+ arch/arm/mach-omap2/prm2xxx_3xxx.c          |  1 +
+ arch/arm/mach-omap2/prm33xx.c               |  1 +
+ 8 files changed, 7 insertions(+), 22 deletions(-)
 
-opp100: opp at 275000000 {
-	...
-};
-
-opp200: opp at 300000000 {
-	...
-};
-...
-
-Regards,
-
-Tony
+diff --git a/arch/arm/mach-omap2/cm2xxx.c b/arch/arm/mach-omap2/cm2xxx.c
+--- a/arch/arm/mach-omap2/cm2xxx.c
++++ b/arch/arm/mach-omap2/cm2xxx.c
+@@ -18,6 +18,7 @@
+ #include <linux/err.h>
+ #include <linux/io.h>
+ 
++#include "common.h"
+ #include "prm2xxx.h"
+ #include "cm.h"
+ #include "cm2xxx.h"
+diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
+--- a/arch/arm/mach-omap2/cm33xx.c
++++ b/arch/arm/mach-omap2/cm33xx.c
+@@ -22,6 +22,7 @@
+ #include <linux/err.h>
+ #include <linux/io.h>
+ 
++#include "common.h"
+ #include "clockdomain.h"
+ #include "cm.h"
+ #include "cm33xx.h"
+diff --git a/arch/arm/mach-omap2/cm3xxx.c b/arch/arm/mach-omap2/cm3xxx.c
+--- a/arch/arm/mach-omap2/cm3xxx.c
++++ b/arch/arm/mach-omap2/cm3xxx.c
+@@ -18,6 +18,7 @@
+ #include <linux/err.h>
+ #include <linux/io.h>
+ 
++#include "common.h"
+ #include "prm2xxx_3xxx.h"
+ #include "cm.h"
+ #include "cm3xxx.h"
+diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
+--- a/arch/arm/mach-omap2/cminst44xx.c
++++ b/arch/arm/mach-omap2/cminst44xx.c
+@@ -21,6 +21,7 @@
+ #include <linux/err.h>
+ #include <linux/io.h>
+ 
++#include "common.h"
+ #include "clockdomain.h"
+ #include "cm.h"
+ #include "cm1_44xx.h"
+diff --git a/arch/arm/mach-omap2/powerdomains3xxx_data.c b/arch/arm/mach-omap2/powerdomains3xxx_data.c
+--- a/arch/arm/mach-omap2/powerdomains3xxx_data.c
++++ b/arch/arm/mach-omap2/powerdomains3xxx_data.c
+@@ -14,6 +14,7 @@
+ #include <linux/kernel.h>
+ #include <linux/init.h>
+ #include <linux/bug.h>
++#include <linux/delay.h>
+ 
+ #include "soc.h"
+ #include "powerdomain.h"
+diff --git a/arch/arm/mach-omap2/prcm-common.h b/arch/arm/mach-omap2/prcm-common.h
+--- a/arch/arm/mach-omap2/prcm-common.h
++++ b/arch/arm/mach-omap2/prcm-common.h
+@@ -434,28 +434,6 @@
+ #define MAX_IOPAD_LATCH_TIME			100
+ # ifndef __ASSEMBLER__
+ 
+-#include <linux/delay.h>
+-
+-/**
+- * omap_test_timeout - busy-loop, testing a condition
+- * @cond: condition to test until it evaluates to true
+- * @timeout: maximum number of microseconds in the timeout
+- * @index: loop index (integer)
+- *
+- * Loop waiting for @cond to become true or until at least @timeout
+- * microseconds have passed.  To use, define some integer @index in the
+- * calling code.  After running, if @index == @timeout, then the loop has
+- * timed out.
+- */
+-#define omap_test_timeout(cond, timeout, index)			\
+-({								\
+-	for (index = 0; index < timeout; index++) {		\
+-		if (cond)					\
+-			break;					\
+-		udelay(1);					\
+-	}							\
+-})
+-
+ /**
+  * struct omap_prcm_irq - describes a PRCM interrupt bit
+  * @name: a short name describing the interrupt type, e.g. "wkup" or "io"
+diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+--- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
++++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+@@ -16,6 +16,7 @@
+ #include <linux/err.h>
+ #include <linux/io.h>
+ 
++#include "common.h"
+ #include "powerdomain.h"
+ #include "prm2xxx_3xxx.h"
+ #include "prm-regbits-24xx.h"
+diff --git a/arch/arm/mach-omap2/prm33xx.c b/arch/arm/mach-omap2/prm33xx.c
+--- a/arch/arm/mach-omap2/prm33xx.c
++++ b/arch/arm/mach-omap2/prm33xx.c
+@@ -19,6 +19,7 @@
+ #include <linux/err.h>
+ #include <linux/io.h>
+ 
++#include "common.h"
+ #include "powerdomain.h"
+ #include "prm33xx.h"
+ #include "prm-regbits-33xx.h"
+-- 
+2.11.0
