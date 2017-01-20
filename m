@@ -1,36 +1,59 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Thu, 19 Jan 2017 20:23:25 -0800
-Subject: [PATCH V9] thermal: bcm2835: add thermal driver for bcm2835 soc
-In-Reply-To: <20170120041400.GA24617@localhost.localdomain>
-References: <1483808145-6206-1-git-send-email-kernel@martin.sperl.org>
- <20170120041400.GA24617@localhost.localdomain>
-Message-ID: <20170120042323.GA6651@localhost.localdomain>
+From: pankaj.dubey@samsung.com (pankaj.dubey)
+Date: Fri, 20 Jan 2017 09:59:19 +0530
+Subject: [PATCH v2] PCI: exynos: refactor exynos pcie driver
+In-Reply-To: <339cc068-567e-09b0-3578-08fd7a5df109@samsung.com>
+References: <CGME20170105035104epcas1p2de6c52e577dd78a4f3539fb32d1f0dfe@epcas1p2.samsung.com>
+ <1483588418-2551-1-git-send-email-pankaj.dubey@samsung.com>
+ <339cc068-567e-09b0-3578-08fd7a5df109@samsung.com>
+Message-ID: <d63bfff9-4ea8-a670-581b-38b224ca1676@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 08:14:02PM -0800, Eduardo Valentin wrote:
-> Hello Martin,
+Hello Jingoo, Bjorn,
+
+On Thursday 05 January 2017 09:47 AM, Jaehoon Chung wrote:
+> On 01/05/2017 12:53 PM, Pankaj Dubey wrote:
+>> From: Niyas Ahmed S T <niyas.ahmed@samsung.com>
+>>
+>> Currently Exynos PCIe driver is only supported for Exynos5440 SoC.
+>> This patch does refactoring of Exynos PCIe driver to extend support
+>> for other Exynos SoC.
+>>
+>> Following are the main changes done via this patch:
+>>
+>> 1) It adds separate structs for memory, clock resources.
+>>
+>> Reason behind this change is, moving ahead various Exynos SoC will
+>> have different hardware resources such as iomem, clocks, regmap handles
+>> etc. for PCIe controller, so keeping these resources in separate struct
+>> will help us in intiailizing them via per SoC ops, and will avoid too
+>> many of_machine_is_compatible in code, and help us simplifying
+>> exynos_pcie struct.
+>>
+>> 2) It add exynos_pcie_ops struct which will allow us to support the
+>> differences in resources in different Exynos SoC.
+>>
+>> No functional change intended.
+>>
+>> Signed-off-by: Niyas Ahmed S T <niyas.ahmed@samsung.com>
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+>> Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
 > 
-> On Sat, Jan 07, 2017 at 04:55:45PM +0000, kernel at martin.sperl.org wrote:
-> > From: Martin Sperl <kernel@martin.sperl.org>
-> > 
-> > Add basic thermal driver for bcm2835 SOC.
-> > 
-> > This driver currently relies on the firmware setting up the
-> > tsense HW block and does not set it up itself.
-> > 
-> > Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
-> > Acked-by: Eric Anholt <eric@anholt.net>
-> > Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
-> > 
+> Reviewed-by: Jaehoon Chung <jh80.chung@samsung.com>
 > 
-> <cut>
+> Best Regards,
+> Jaehoon Chung
+> 
+>> ---
+>> This patch set is prepared on top of Krzysztof's for-next and
+>> PCIe driver cleanup patch [1] by Jaehoon Chung.
+>>
+>> [1]: https://lkml.org/lkml/2016/12/19/44
+>>
+
+Any update on this patch and dependent series [1] from Jaehoon Chung.
 
 
-Also, I am getting this warn from sparse:
-drivers/thermal/bcm2835_thermal.c:110:16: warning: cast truncates bits
-from constant value (3ffffffffff00 becomes ffffff00)
-drivers/thermal/bcm2835_thermal.c:134:16: warning: cast truncates bits
-from constant value (3ffffffffff becomes ffffffff)
-
-Have you seen this?
+Thanks,
+Pankaj Dubey
