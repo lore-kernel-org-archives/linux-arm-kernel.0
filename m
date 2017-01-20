@@ -1,90 +1,252 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 20 Jan 2017 11:46:02 -0800
-Subject: [PATCH v3 0/9] meson-gx: reset RGMII PHYs and configure TX delay
-In-Reply-To: <CAFBinCBQ8S7-tCnkY+Vabs3etSv-gJCsK=tE+RNJZS8+uFfB=Q@mail.gmail.com>
- (Martin Blumenstingl's message of "Fri, 20 Jan 2017 16:32:18 +0100")
-References: <20170120132650.9784-1-martin.blumenstingl@googlemail.com>
- <20170120152232.13943-1-martin.blumenstingl@googlemail.com>
- <CAFBinCBQ8S7-tCnkY+Vabs3etSv-gJCsK=tE+RNJZS8+uFfB=Q@mail.gmail.com>
-Message-ID: <m2y3y53479.fsf@baylibre.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 20 Jan 2017 20:53:38 +0100
+Subject: [PATCH v10 7/8] arm/arm64: vgic: Implement
+ KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO ioctl
+In-Reply-To: <1480576187-5012-8-git-send-email-vijay.kilari@gmail.com>
+References: <1480576187-5012-1-git-send-email-vijay.kilari@gmail.com>
+ <1480576187-5012-8-git-send-email-vijay.kilari@gmail.com>
+Message-ID: <20170120195338.GH13531@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
+On Thu, Dec 01, 2016 at 12:39:46PM +0530, vijay.kilari at gmail.com wrote:
+> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> 
+> Userspace requires to store and restore of line_level for
+> level triggered interrupts using ioctl KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO.
+> 
+> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> ---
+>  arch/arm/include/uapi/asm/kvm.h     |  7 ++++++
+>  arch/arm64/include/uapi/asm/kvm.h   |  6 +++++
+>  virt/kvm/arm/vgic/vgic-kvm-device.c | 45 +++++++++++++++++++++++++++++++++++-
+>  virt/kvm/arm/vgic/vgic-mmio-v3.c    | 11 +++++++++
+>  virt/kvm/arm/vgic/vgic-mmio.c       | 46 +++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic-mmio.h       |  5 ++++
+>  virt/kvm/arm/vgic/vgic.h            |  2 ++
+>  7 files changed, 121 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+> index 98658d9d..f347779 100644
+> --- a/arch/arm/include/uapi/asm/kvm.h
+> +++ b/arch/arm/include/uapi/asm/kvm.h
+> @@ -191,6 +191,13 @@ struct kvm_arch_memory_slot {
+>  #define KVM_DEV_ARM_VGIC_GRP_CTRL       4
+>  #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
+>  #define KVM_DEV_ARM_VGIC_CPU_SYSREGS    6
+> +#define KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO 7
+> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT	10
+> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK \
+> +			(0x3fffffULL << KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT)
+> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK	0x3ff
+> +#define VGIC_LEVEL_INFO_LINE_LEVEL	0
+> +
+>  #define   KVM_DEV_ARM_VGIC_CTRL_INIT    0
+>  
+>  /* KVM_IRQ_LINE irq field index values */
+> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> index 91c7137..4100f8c 100644
+> --- a/arch/arm64/include/uapi/asm/kvm.h
+> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> @@ -211,6 +211,12 @@ struct kvm_arch_memory_slot {
+>  #define KVM_DEV_ARM_VGIC_GRP_CTRL	4
+>  #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
+>  #define KVM_DEV_ARM_VGIC_CPU_SYSREGS    6
+> +#define KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO 7
+> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT	10
+> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK \
+> +			(0x3fffffULL << KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT)
+> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK	0x3ff
+> +#define VGIC_LEVEL_INFO_LINE_LEVEL	0
+>  
+>  #define   KVM_DEV_ARM_VGIC_CTRL_INIT	0
+>  
+> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+> index b6266fe..d5f7197 100644
+> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
+> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+> @@ -510,6 +510,21 @@ static int vgic_v3_attr_regs_access(struct kvm_device *dev,
+>  						  regid, reg);
+>  		break;
+>  	}
+> +	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
+> +		unsigned int info, intid;
+> +
+> +		info = (attr->attr & KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK) >>
+> +			KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT;
+> +		if (info == VGIC_LEVEL_INFO_LINE_LEVEL) {
+> +			intid = attr->attr &
+> +				KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK;
+> +			ret = vgic_v3_line_level_info_uaccess(vcpu, is_write,
+> +							      intid, reg);
+> +		} else {
+> +			ret = -EINVAL;
+> +		}
+> +		break;
+> +	}
+>  	default:
+>  		ret = -EINVAL;
+>  		break;
+> @@ -552,6 +567,17 @@ static int vgic_v3_set_attr(struct kvm_device *dev,
+>  
+>  		return vgic_v3_attr_regs_access(dev, attr, &reg, true);
+>  	}
+> +	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
+> +		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+> +		u64 reg;
+> +		u32 tmp32;
+> +
+> +		if (get_user(tmp32, uaddr))
+> +			return -EFAULT;
+> +
+> +		reg = tmp32;
+> +		return vgic_v3_attr_regs_access(dev, attr, &reg, true);
+> +	}
+>  	}
+>  	return -ENXIO;
+>  }
+> @@ -587,8 +613,18 @@ static int vgic_v3_get_attr(struct kvm_device *dev,
+>  			return ret;
+>  		return put_user(reg, uaddr);
+>  	}
+> -	}
+> +	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
+> +		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+> +		u64 reg;
+> +		u32 tmp32;
+>  
+> +		ret = vgic_v3_attr_regs_access(dev, attr, &reg, false);
+> +		if (ret)
+> +			return ret;
+> +		tmp32 = reg;
+> +		return put_user(tmp32, uaddr);
+> +	}
+> +	}
+>  	return -ENXIO;
+>  }
+>  
+> @@ -609,6 +645,13 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
+>  		return vgic_v3_has_attr_regs(dev, attr);
+>  	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
+>  		return 0;
+> +	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
+> +		if (((attr->attr & KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK) >>
+> +		      KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT) ==
+> +		      VGIC_LEVEL_INFO_LINE_LEVEL)
+> +			return 0;
+> +		break;
+> +	}
+>  	case KVM_DEV_ARM_VGIC_GRP_CTRL:
+>  		switch (attr->attr) {
+>  		case KVM_DEV_ARM_VGIC_CTRL_INIT:
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> index 51439c9..9491d72 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> @@ -809,3 +809,14 @@ int vgic_v3_redist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+>  		return vgic_uaccess(vcpu, &rd_dev, is_write,
+>  				    offset, val);
+>  }
+> +
+> +int vgic_v3_line_level_info_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+> +				    u32 intid, u64 *val)
+> +{
+> +	if (is_write)
+> +		vgic_write_irq_line_level_info(vcpu, intid, *val);
+> +	else
+> +		*val = vgic_read_irq_line_level_info(vcpu, intid);
+> +
+> +	return 0;
+> +}
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+> index f81e0e5..28fef92b 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+> @@ -371,6 +371,52 @@ void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
+>  	}
+>  }
+>  
+> +u64 vgic_read_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid)
+> +{
+> +	int i;
+> +	u64 val = 0;
+> +
+> +	for (i = 0; i < 32; i++) {
+> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> +
+> +		if (irq->line_level)
+> +			val |= (1U << i);
+> +
+> +		vgic_put_irq(vcpu->kvm, irq);
+> +	}
+> +
+> +	return val;
+> +}
+> +
+> +void vgic_write_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid,
+> +				    const u64 val)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < 32; i++) {
+> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> +
+> +		spin_lock(&irq->irq_lock);
+> +		if (val & (1U << i)) {
+> +			if (irq->config == VGIC_CONFIG_LEVEL) {
+> +				irq->line_level = true;
+> +				irq->pending = true;
+> +				vgic_queue_irq_unlock(vcpu->kvm, irq);
+> +			} else {
+> +				spin_unlock(&irq->irq_lock);
+> +			}
+> +		} else {
+> +			if (irq->config == VGIC_CONFIG_EDGE ||
+> +			    (irq->config == VGIC_CONFIG_LEVEL &&
+> +			    !irq->soft_pending))
+> +				irq->line_level = false;
+> +			spin_unlock(&irq->irq_lock);
+> +		}
 
-> On Fri, Jan 20, 2017 at 4:22 PM, Martin Blumenstingl
-> <martin.blumenstingl@googlemail.com> wrote:
->> This series adds the reset GPIOs for the (external) ethernet PHYs on all
->> GXBB boards.
->> Additionally it provides a ethernet PHY node which can be used to specify
->> PHY-specific properties (this may be required if more boards require the
->> "eee-broken-1000t" for the RTL8211F ethernet PHY). To make all board .dts
->> consistent I chose to add the PHY node also for boards which don't have a
->> RTL8211F PHY.
->>
->> Patch #7 from this series also removes ethernet support for the P200
->> board because it was broken anyways and nobody seems to have a board
->> available for testing. This was the outcome of the discussion from [0]
->>
->> Patch #8 was taken from (older versions of) my other series (see [1]):
->> "[PATCH net-next v3 0/2] stmmac: dwmac-meson8b: configurable
->> RGMII TX delay".
->> The binding changes for amlogic,tx-delay-ns were ACK'ed already.
->>
->> Changes since v2:
->> - fixed patch #2 to really update the P200 board (as it's the P200 which
->>   actually uses a Micrel KSZ9031 RGMII PHY). Thanks to Neil Armstrong for
->>   spotting this huge mistake!
->> - instead of dropping ethernet support for P201 we simply re-configure it
->>   to RMII mode (replaces patch #7) without a MDIO node (which keeps PHY
->>   auto-scanning enabled). This got Neil Armstrong's ACK off-list already
->>
->> Changes since v1:
->> - do not move the MDIO bus to meson-gx as this disables PHY auto-scanning
->>   in the stmmac driver (this drops patch #1 from v1)
->> - add the ethernet PHY reset GPIO for nexbox a95x which was forgotten in
->>   v1
->> - add the ethernet PHY reset GPIO for boards which were added since v1
->>   (wetek hub and wetek play2)
->> - rebased to apply against the current v4.11/dt64 branch
->> - new in v2 (patch #7): disabled ethernet support for the P200 board (see
->>   the commit description for more information). this patch is optional
->> - new in v2 (patch #9): removed the phy-mode property from meson-gx (see
->>   the commit description for more information). this patch is optional
->>
->>
->> [0] http://lists.infradead.org/pipermail/linux-amlogic/2017-January/002053.html
->> [1] http://lists.infradead.org/pipermail/linux-amlogic/2016-December/001834.html
->>
->> Martin Blumenstingl (9):
->>   ARM64: dts: meson-gxbb-odroidc2: add the ethernet PHY's reset GPIO
->>   ARM64: dts: meson-gxbb-p200: add the ethernet PHY's reset GPIO
->>   ARM64: dts: meson-gxbb-vega-s95: add the ethernet PHY's reset GPIO
->>   ARM64: dts: meson-gxbb-nexbox-a95x: add the ethernet PHY's reset GPIO
->>   ARM64: dts: meson-gxbb-wetek-hub: add the ethernet PHY's reset GPIO
->>   ARM64: dts: meson-gxbb-wetek-play2: add the ethernet PHY's reset GPIO
->>   ARM64: dts: meson-gxbb-p201: fix ethernet support
->>   ARM64: dts: amlogic: add the ethernet TX delay configuration
->>   ARM64: dts: meson-gx: remove the phy-mode property from meson-gx
->>
->>  arch/arm64/boot/dts/amlogic/meson-gx.dtsi          |  1 -
->>  .../boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts    | 17 ++++++++++++++
->>  .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts |  7 ++++++
->>  arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts    | 26 ++++++++++++++++++++++
->>  arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts    | 11 +++++++++
->>  arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi   |  6 -----
->>  .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      | 20 +++++++++++++++++
->>  .../boot/dts/amlogic/meson-gxbb-wetek-hub.dts      | 26 ++++++++++++++++++++++
->>  .../boot/dts/amlogic/meson-gxbb-wetek-play2.dts    | 26 ++++++++++++++++++++++
->>  .../boot/dts/amlogic/meson-gxl-s905d-p230.dts      |  2 ++
->>  .../arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts |  2 ++
->>  arch/arm64/boot/dts/amlogic/meson-gxm-q200.dts     |  2 ++
->>  12 files changed, 139 insertions(+), 7 deletions(-)
-> I totally forgot to mention:
-> this applies to Kevin's v4.11/dt64 branch with Jerome's Odroid-C2
-> ethernet fix [0] applied on top of it
 
-So when Jerome's fix lands in mainline (probably by -rc5, maybe -rc6)
-I'll rebase the dt64 branch on that and apply this series.
+So last time we had a discussion about whether or not the API should
+support any random order of restoring the registers, but I cannot see
+how we can support that, because how can we tell the difference between
+the following two scenarios without knowing if an interrupt is
+edge-triggered or level triggered:
 
-Kevin
+  (1) Clearing the line_level for an edge-triggered interrupt after
+      having set it to pending, which means it should stay pending.
+
+  (2) Clearing the line_level for a level-triggered interrupt when the
+      state is already pending for some reason, but the soft_pending
+      (latch) state is not set, in which case the pending state should
+      be removed.
+
+This leads me to conclude that userspace must restore the configuration
+state of the interrupt before at least the line_level, in which case the
+implementation becomes:
+
+	for (i = 0; i < 32; i++) {
+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+		bool new_level = !!(val & (1U << i));
+
+		if (irq->config == VGIC_CONFIG_EDGE)
+			continue;
+
+		spin_lock(&irq->irq_lock);
+		irq->line_level = new_level;
+		if (new_level) {
+			irq->pending = true;
+			vgic_queue_irq_unlock(vcpu->kvm, irq);
+		} else {
+			if (!irq->soft_pending)
+				irq->pending = false;
+			spin_unlock(&irq->irq_lock);
+		}
+
+		vgic_put_irq(vcpu->kvm, irq);
+	}
+
+Thanks,
+-Christoffer
