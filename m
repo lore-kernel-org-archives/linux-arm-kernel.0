@@ -1,66 +1,23 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Fri, 20 Jan 2017 11:21:27 +0100
-Subject: [PATCH v11 2/8] power: add power sequence library
-In-Reply-To: <20170120075239.GC21013@b29397-desktop>
-References: <1483596119-27508-1-git-send-email-peter.chen@nxp.com>
- <1483596119-27508-3-git-send-email-peter.chen@nxp.com>
- <20170107085456.w5dhm7qadqa6tc7v@kozik-lap>
- <20170110070240.GA29454@b29397-desktop>
- <20170120075239.GC21013@b29397-desktop>
-Message-ID: <CAJZ5v0h09A2XWLEk7v9XPe+4fP7HDr6AqZzBmvBi_V5nhLoiRw@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 20 Jan 2017 10:28:12 +0000
+Subject: [PATCH] arm: module: add support for R_ARM_REL32 relocations
+In-Reply-To: <20170119235642.GK27312@n2100.armlinux.org.uk>
+References: <1484863892-5818-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20170119235642.GK27312@n2100.armlinux.org.uk>
+Message-ID: <CAKv+Gu84feSvPtoDg_vCtH+gcL_tZw1GgAYv+uk=vtJ6-OVw9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2017 at 8:52 AM, Peter Chen <hzpeterchen@gmail.com> wrote:
-> On Tue, Jan 10, 2017 at 03:02:41PM +0800, Peter Chen wrote:
->> On Sat, Jan 07, 2017 at 10:54:56AM +0200, Krzysztof Kozlowski wrote:
->> > On Thu, Jan 05, 2017 at 02:01:53PM +0800, Peter Chen wrote:
->> > > We have an well-known problem that the device needs to do some power
->> > > sequence before it can be recognized by related host, the typical
->> > > example like hard-wired mmc devices and usb devices.
->> > >
->> > > This power sequence is hard to be described at device tree and handled by
->> > > related host driver, so we have created a common power sequence
->> > > library to cover this requirement. The core code has supplied
->> > > some common helpers for host driver, and individual power sequence
->> > > libraries handle kinds of power sequence for devices. The pwrseq
->> > > librares always need to allocate extra instance for compatible
->> > > string match.
->> > >
->> > > pwrseq_generic is intended for general purpose of power sequence, which
->> > > handles gpios and clocks currently, and can cover other controls in
->> > > future. The host driver just needs to call of_pwrseq_on/of_pwrseq_off
->> > > if only one power sequence is needed, else call of_pwrseq_on_list
->> > > /of_pwrseq_off_list instead (eg, USB hub driver).
->> > >
->> > > For new power sequence library, it can add its compatible string
->> > > to pwrseq_of_match_table, then the pwrseq core will match it with
->> > > DT's, and choose this library at runtime.
->> > >
->> > > Signed-off-by: Peter Chen <peter.chen@nxp.com>
->> > > Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
->> > > Tested-by Joshua Clayton <stillcompiling@gmail.com>
->> > > Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
->> > > Tested-by: Matthias Kaehlcke <mka@chromium.org>
->> >
->> > Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
->> > Tested on Odroid U3 (reset sequence for LAN9730):
->> > Tested-by: Krzysztof Kozlowski <krzk@kernel.org>
->> >
->>
->> A nice ping...
->>
+On 19 January 2017 at 23:56, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Thu, Jan 19, 2017 at 10:11:32PM +0000, Ard Biesheuvel wrote:
+>> Add support for R_ARM_REL32 relocations in the module loader,
+>> which will be used by the modversions code when (if) it switches
+>> to using relative references to refer to CRC values.
 >
-> Rafael, would you please review it? This series was discussed about
-> half a year, and many people need it, I hope it can be in v4.11-rc1,
-> thanks.
+> Thanks, please keep this patch handy for when (if) that does happen.
+> I won't apply this until it is actually needed - no point adding stuff
+> that never gets used (and therefore doesn't get tested.)
+>
 
-I'm travelling now
-(http://marc.info/?l=linux-pm&m=148410629024194&w=2) and (as stated in
-this message) I'll get to the patches when I'm back home.
-
-There is a good chance for your code to go into 4.11-rc1 if the review
-comments so far have been addressed.
-
-Thanks,
-Rafael
+Fair enough
