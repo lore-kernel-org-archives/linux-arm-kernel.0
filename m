@@ -1,46 +1,163 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Sat, 21 Jan 2017 00:50:03 +0530
-Subject: [PATCH V5 08/12] iommu/arm-smmu: Clean up early-probing
- workarounds
-In-Reply-To: <20170119161826.GI31594@arm.com>
-References: <1484838356-24962-1-git-send-email-sricharan@codeaurora.org>
- <1484838356-24962-9-git-send-email-sricharan@codeaurora.org>
- <20170119161826.GI31594@arm.com>
-Message-ID: <000001d27352$37b5cea0$a7216be0$@codeaurora.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 20 Jan 2017 20:26:39 +0100
+Subject: [PATCH v10 6/8] arm/arm64: vgic: Implement VGICv3 CPU interface
+ access
+In-Reply-To: <159a2963-6a58-22a2-a49d-f09bb9679219@redhat.com>
+References: <1480576187-5012-1-git-send-email-vijay.kilari@gmail.com>
+ <1480576187-5012-7-git-send-email-vijay.kilari@gmail.com>
+ <af6f17a5-f20a-91f7-c280-1669e9b805a4@redhat.com>
+ <CALicx6spkmp4ipvCA_TUfzaJ0K38tpWHsV9CGU4MEQzTwa00sw@mail.gmail.com>
+ <159a2963-6a58-22a2-a49d-f09bb9679219@redhat.com>
+Message-ID: <20170120192639.GE13531@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Mon, Dec 19, 2016 at 11:20:02AM +0100, Auger Eric wrote:
+> Hi Vijaya,
+> 
+> On 19/12/2016 10:47, Vijay Kilari wrote:
+> > On Fri, Dec 16, 2016 at 5:55 PM, Auger Eric <eric.auger@redhat.com> wrote:
+> >> Hi Vijaya,
+> >>
+> >> On 01/12/2016 08:09, vijay.kilari at gmail.com wrote:
+> >>> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> >>>
+> >>> VGICv3 CPU interface registers are accessed using
+> >>> KVM_DEV_ARM_VGIC_CPU_SYSREGS ioctl. These registers are accessed
+> >>> as 64-bit. The cpu MPIDR value is passed along with register id.
+> >>> is used to identify the cpu for registers access.
+> >> s/is/It is
+> >>>
+> >>> The VM that supports SEIs expect it on destination machine to handle
+> >>> guest aborts and hence checked for ICC_CTLR_EL1.SEIS compatibility.
+> >>> Similarly, VM that supports Affinity Level 3 that is required for AArch64
+> >>> mode, is required to be supported on destination machine. Hence checked
+> >>> for ICC_CTLR_EL1.A3V compatibility.
+> >> We make sure ICC_CTLR_EL1 SEIS and A3V are compatible on source and target?
+> >>>
+> >>> The arch/arm64/kvm/vgic-sys-reg-v3.c handles read and write of VGIC
+> >>> CPU registers for AArch64.
+> >>>
+> >>> For AArch32 mode, arch/arm/kvm/vgic-v3-coproc.c file is created but
+> >>> APIs are not implemented.
+> >>>
+> >>> Updated arch/arm/include/uapi/asm/kvm.h with new definitions
+> >>> required to compile for AArch32.
+> >>>
+> >>> The version of VGIC v3 specification is define here
+> >> s/define/defined
+> >>> Documentation/virtual/kvm/devices/arm-vgic-v3.txt
+> >>>
+> >>> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+> >>> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> >>> ---
+> >>> --- /dev/null
+> >>> +++ b/arch/arm64/kvm/vgic-sys-reg-v3.c
+> >>> @@ -0,0 +1,338 @@
+> >>> +/*
+> >>> + * VGIC system registers handling functions for AArch64 mode
+> >>> + *
+> >>> + * This program is free software; you can redistribute it and/or modify
+> >>> + * it under the terms of the GNU General Public License version 2 as
+> >>> + * published by the Free Software Foundation.
+> >>> + *
+> >>> + * This program is distributed in the hope that it will be useful,
+> >>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> >>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> >>> + * GNU General Public License for more details.
+> >>> + */
+> >>> +
+> >>> +#include <linux/irqchip/arm-gic-v3.h>
+> >>> +#include <linux/kvm.h>
+> >>> +#include <linux/kvm_host.h>
+> >>> +#include <asm/kvm_emulate.h>
+> >>> +#include "vgic.h"
+> >>> +#include "sys_regs.h"
+> >>> +
+> >>> +static bool access_gic_ctlr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+> >>> +                         const struct sys_reg_desc *r)
+> >>> +{
+> >>> +     u32 host_pri_bits, host_id_bits, host_seis, host_a3v, seis, a3v;
+> >>> +     struct vgic_cpu *vgic_v3_cpu = &vcpu->arch.vgic_cpu;
+> >>> +     struct vgic_vmcr vmcr;
+> >>> +     u64 val;
+> >>> +
+> >>> +     vgic_get_vmcr(vcpu, &vmcr);
+> >>> +     if (p->is_write) {
+> >>> +             val = p->regval;
+> >>> +
+> >>> +             /*
+> >>> +              * Disallow restoring VM state if not supported by this
+> >>> +              * hardware.
+> >>> +              */
+> >>> +             host_pri_bits = ((val & ICC_CTLR_EL1_PRI_BITS_MASK) >>
+> >>> +                              ICC_CTLR_EL1_PRI_BITS_SHIFT) + 1;
+> >> I am confused by the "host" terminology. Those are the "source" values
+> >> we want to restore and we compare with the destination current value, right?
+> > 
+> > yes
+> > 
+> >>> +             if (host_pri_bits > vgic_v3_cpu->num_pri_bits)
+> >>> +                     return false;
+> >> I am lost. Who did set num_pri_bits and num_id_bits we compare with?
+> > 
+> > In vgic_v3_enable()  these values are computed
+> OK I missed that.
+> > 
+> >> Seis and a3v I get this is computed on probe
+> >>> +
+> >>> +             vgic_v3_cpu->num_pri_bits = host_pri_bits;
+> >>> +
+> >>> +             host_id_bits = (val & ICC_CTLR_EL1_ID_BITS_MASK) >>
+> >>> +                             ICC_CTLR_EL1_ID_BITS_SHIFT;
+> >>> +             if (host_id_bits > vgic_v3_cpu->num_id_bits)
+> >>> +                     return false;
+> >>> +
+> >>> +             vgic_v3_cpu->num_id_bits = host_id_bits;
+> >>> +
+> >>> +             host_seis = ((kvm_vgic_global_state.ich_vtr_el2 &
+> >>> +                          ICH_VTR_SEIS_MASK) >> ICH_VTR_SEIS_SHIFT);
+> >>> +             seis = (val & ICC_CTLR_EL1_SEIS_MASK) >>
+> >>> +                     ICC_CTLR_EL1_SEIS_SHIFT;
+> >>> +             if (host_seis != seis)
+> >>> +                     return false;
+> >>> +
+> >>> +             host_a3v = ((kvm_vgic_global_state.ich_vtr_el2 &
+> >>> +                         ICH_VTR_A3V_MASK) >> ICH_VTR_A3V_SHIFT);
+> >>> +             a3v = (val & ICC_CTLR_EL1_A3V_MASK) >> ICC_CTLR_EL1_A3V_SHIFT;
+> >>> +             if (host_a3v != a3v)
+> >>> +                     return false;
+> >>> +
+> >>> +             vmcr.ctlr = val & ICC_CTLR_EL1_CBPR_MASK;
+> >>> +             vmcr.ctlr |= val & ICC_CTLR_EL1_EOImode_MASK;
+> >> nit: I still don't get why the vmcr has CPBR and EOImode set with the
+> >> ICC_CTLR_EL1 layout and then this gets transformed in the proper vmcr
+> >> format by vgic_set_vmcr. This is confusing to me and would at least
+> >> deserve a comment attached to struct vgic_vmcr definition.
+> > 
+> > I will add a comment
+> >>
+> >> Why don't we set the vmcr.ctlr directly in its ICH_VMCR format? In
+> >> set/get_vmcr all the other struct vgic_vmcr fields are handled in
+> >> ICH_VMCR native layout except the ctrl field.
+> > 
+> > None of the fields of struct vgic_vmcr are in ICH_VMCR native layout.
+> > Except ctlr all the other fields are registers having single field value.
+> > Ex: pmr, bpr0 etc.,
+> OK but to me would be more natural to keep vmcr.ctlr in original format
+> but well that's just my pov. If you add a comment that helps already.
+> 
+Honestly this has been confusing and I'm forgetting the history, but I
+think it currently serves the purpose that code shared between v2 and v3
+can look at vgic_vmcr.bpr in some canonical format that works for both
+v2 and v3.  Originally I think the ctlr field only contained the bits
+that then had the common bit position between v2 and v3.
 
->-----Original Message-----
-From: linux-arm-msm-owner@vger.kernel.org [mailto:linux-arm-msm-owner at vger.kernel.org] On Behalf Of Will Deacon
->Sent: Thursday, January 19, 2017 9:48 PM
->To: Sricharan R <sricharan@codeaurora.org>
->Cc: robin.murphy at arm.com; joro at 8bytes.org; lorenzo.pieralisi at arm.com; iommu at lists.linux-foundation.org; linux-arm-
->kernel at lists.infradead.org; linux-arm-msm at vger.kernel.org; m.szyprowski at samsung.com
->Subject: Re: [PATCH V5 08/12] iommu/arm-smmu: Clean up early-probing workarounds
->
->On Thu, Jan 19, 2017 at 08:35:52PM +0530, Sricharan R wrote:
->> From: Robin Murphy <robin.murphy@arm.com>
->>
->> Now that the appropriate ordering is enforced via profe-deferral of
->> masters in core code, rip it all out and bask in the simplicity.
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> [Sricharan: Rebased on top of ACPI IORT SMMU series]
->> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->> ---
->>  * No change
->>
->>  drivers/iommu/arm-smmu-v3.c | 46 ++---------------------------------
->>  drivers/iommu/arm-smmu.c    | 58 +++++++--------------------------------------
->>  2 files changed, 10 insertions(+), 94 deletions(-)
->
->Acked-by: Will Deacon <will.deacon@arm.com>
->
->I can't wait to see this series merged. What's the plan for that?
+A comment will help, and someone taking a look at reworking it to be
+more clear would also be welcome.
 
-Thanks. Posted V6 with your tags and comments for V5 addressed.
+But the currently code (incl this patch) looks right to me at this
+point.
 
-Regards,
- Sricharan
+Thanks,
+-Christoffer
