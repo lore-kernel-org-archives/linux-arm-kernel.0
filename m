@@ -1,71 +1,50 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Fri, 20 Jan 2017 10:42:40 +0000
-Subject: [PATCH 6/7] arm, arm64: factorize common cpu capacity default code
-In-Reply-To: <e5b902a0-8c2b-a682-0f67-0b0d9ee4ef5c@arm.com>
-References: <20170119143757.14537-1-juri.lelli@arm.com>
- <20170119143757.14537-7-juri.lelli@arm.com>
- <e5b902a0-8c2b-a682-0f67-0b0d9ee4ef5c@arm.com>
-Message-ID: <20170120104240.GO30747@e106622-lin>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Fri, 20 Jan 2017 07:46:29 -0300
+Subject: [PATCH 2/2] [media] exynos-gsc: Fix imprecise external abort due
+ disabled power domain
+In-Reply-To: <c72965a4-d6e0-f3e7-1140-039274f7e60b@osg.samsung.com>
+References: <1484699402-28738-1-git-send-email-javier@osg.samsung.com>
+ <CGME20170118003022epcas3p34cf03bb6feb830c4fa231497f2536d0e@epcas3p3.samsung.com>
+ <1484699402-28738-2-git-send-email-javier@osg.samsung.com>
+ <cc9c6837-7141-b63c-ddf6-68252493df11@samsung.com>
+ <842737f2-3faf-7b22-c480-93e183bbb670@osg.samsung.com>
+ <d727576a-fbce-eb54-3b74-270c689b7fa3@osg.samsung.com>
+ <c1d00b28-0252-0fb1-eb7c-5fc69035f12f@samsung.com>
+ <c72965a4-d6e0-f3e7-1140-039274f7e60b@osg.samsung.com>
+Message-ID: <042e9067-7ef1-c942-0341-634963ff3fb0@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dietmar,
+Hello,
 
-On 19/01/17 16:00, Dietmar Eggemann wrote:
-> On 19/01/17 14:37, Juri Lelli wrote:
-> > arm and arm64 share lot of code relative to parsing CPU capacity
-> > information from DT, using that information for appropriate scaling and
-> > exposing a sysfs interface for chaging such values at runtime.
-> > 
-> > Factorize such code in a common place (driver/base/arch_topology.c) in
-> > preparation for further additions.
-> > 
-> > Suggested-by: Will Deacon <will.deacon@arm.com>
-> > Suggested-by: Mark Rutland <mark.rutland@arm.com>
-> > Suggested-by: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Russell King <linux@armlinux.org.uk>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Signed-off-by: Juri Lelli <juri.lelli@arm.com>
-> > ---
-> >  arch/arm/Kconfig             |   1 +
-> >  arch/arm/kernel/topology.c   | 213 ++------------------------------------
-> >  arch/arm64/Kconfig           |   1 +
-> >  arch/arm64/kernel/topology.c | 213 +-------------------------------------
-> >  drivers/base/Kconfig         |   8 ++
-> >  drivers/base/Makefile        |   1 +
-> >  drivers/base/arch_topology.c | 240 +++++++++++++++++++++++++++++++++++++++++++
-> >  7 files changed, 260 insertions(+), 417 deletions(-)
-> >  create mode 100644 drivers/base/arch_topology.c
+On 01/20/2017 07:06 AM, Javier Martinez Canillas wrote:
+> Hello Marek,
 > 
-> [...]
+> On 01/20/2017 05:37 AM, Marek Szyprowski wrote:
 > 
-> > +extern unsigned long
-> > +arch_scale_cpu_capacity(struct sched_domain *sd, int cpu);
+> [snip]
+>>
+>> Please send this patch instead of adding more clocks to the power domains.
+>> This way we will avoid adding more dependencies to userspace (DT ABI).
+>> Likely those clocks are also needed to access any device in that power
+>> domains.
+>>
+>> Later, once the runtime PM for clocks get merged, a patch for exynos542x
+>> clocks driver can be made to replace IS_CRITICAL with proper runtime
+>> handling.
+>>
 > 
-> How about adding a driver specific prefix 'foo_' to all driver interfaces?
-> 
-> I'm asking because I would rather like to do a
-> 
-> #define arch_scale_cpu_capacity foo_scale_cpu_capacity
-> 
-> then a
-> 
-> #define arch_scale_cpu_capacity arch_scale_cpu_capacity
-> 
-> in arch/arm64/include/asm/topology.h
-> 
-> later to wire cpu-invariant load-tracking support up to the task
-> scheduler for ARM64.
-> 
-> That's probably true too for all the 'driver' interfaces which get used
-> in arch/arm{,64}/kernel/topology.c.
+> Ok, I thought that we didn't want to mark more clocks as CLK_IGNORE_UNUSED
+> or CLK_IS_CRITICAL but I agree this can be done as a temporary workaround
+> until a proper runtime PM based solution gets merged.
 > 
 
-Looks like a good way to improve clarity to me. I'll add a patch for the
-next version doing this and we see what people think.
+I posted following patch [0] for clk-exynos5420, so $SUBJECT can be dropped.
 
-Best,
+[0]: https://patchwork.kernel.org/patch/9527957/
 
-- Juri
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
