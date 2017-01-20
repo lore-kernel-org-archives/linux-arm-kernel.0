@@ -1,50 +1,60 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 20 Jan 2017 07:06:06 -0300
-Subject: [PATCH 2/2] [media] exynos-gsc: Fix imprecise external abort due
- disabled power domain
-In-Reply-To: <c1d00b28-0252-0fb1-eb7c-5fc69035f12f@samsung.com>
-References: <1484699402-28738-1-git-send-email-javier@osg.samsung.com>
- <CGME20170118003022epcas3p34cf03bb6feb830c4fa231497f2536d0e@epcas3p3.samsung.com>
- <1484699402-28738-2-git-send-email-javier@osg.samsung.com>
- <cc9c6837-7141-b63c-ddf6-68252493df11@samsung.com>
- <842737f2-3faf-7b22-c480-93e183bbb670@osg.samsung.com>
- <d727576a-fbce-eb54-3b74-270c689b7fa3@osg.samsung.com>
- <c1d00b28-0252-0fb1-eb7c-5fc69035f12f@samsung.com>
-Message-ID: <c72965a4-d6e0-f3e7-1140-039274f7e60b@osg.samsung.com>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Fri, 20 Jan 2017 18:10:46 +0800
+Subject: [PATCH v3 0/5] Rockchip dw-mipi-dsi driver
+Message-ID: <1484907051-7159-1-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Marek,
+Hi all
 
-On 01/20/2017 05:37 AM, Marek Szyprowski wrote:
+This patch serial is for RK3399 MIPI DSI. The MIPI DSI controller of
+RK3399 is almost the same as RK3288, except a little bit of difference
+in phy clock controlling and port id selection register. These patches
+add RK3399 support and the power domain support.
 
-[snip]
+And these patches base on John Keeping's series[0], it fixes many bugs,
+they have been tested on rk3288 evb board.
 
->>   I'll post a proper patch for the exynos5800.dtsi, to override the
->> clocks in the gsc_pd device node.
->>
->> I also see that the two power domains that fail to be disabled msc_pd
->> (power-domain at 10044120) and isp_pd (power-domain at 10044020) don't have
->> clocks defined in the exynos54xx.dtsi. I'll add clocks for those too.
-> 
-> Please send this patch instead of adding more clocks to the power domains.
-> This way we will avoid adding more dependencies to userspace (DT ABI).
-> Likely those clocks are also needed to access any device in that power
-> domains.
-> 
-> Later, once the runtime PM for clocks get merged, a patch for exynos542x
-> clocks driver can be made to replace IS_CRITICAL with proper runtime
-> handling.
-> 
+[0]:
+[01/26] https://patchwork.kernel.org/patch/9340213
+[02/26] https://patchwork.kernel.org/patch/9340145
+[03/26] https://patchwork.kernel.org/patch/9340235
+[04/26] https://patchwork.kernel.org/patch/9340123
+[05/26] https://patchwork.kernel.org/patch/9340161
+[06/26] https://patchwork.kernel.org/patch/9340203
+[07/26] https://patchwork.kernel.org/patch/9340229
+[08/26] https://patchwork.kernel.org/patch/9340131
+[09/26] https://patchwork.kernel.org/patch/9340191
+[10/26] https://patchwork.kernel.org/patch/9340175
+[11/26] https://patchwork.kernel.org/patch/9340237
+[12/26] https://patchwork.kernel.org/patch/9340207
+[13/26] https://patchwork.kernel.org/patch/9340233
+[14/26] https://patchwork.kernel.org/patch/9340205
+[15/26] https://patchwork.kernel.org/patch/9340189
+[16/26] https://patchwork.kernel.org/patch/9340143
+[17/26] https://patchwork.kernel.org/patch/9340117
+[18/26] https://patchwork.kernel.org/patch/9340193
+[19/26] https://patchwork.kernel.org/patch/9340151
+[20/26] https://patchwork.kernel.org/patch/9340183
+[23/26] https://patchwork.kernel.org/patch/9340173
+[24/26] https://patchwork.kernel.org/patch/9340251
+[25/26] https://patchwork.kernel.org/patch/9340127
+[26/26] https://patchwork.kernel.org/patch/9340139
 
-Ok, I thought that we didn't want to mark more clocks as CLK_IGNORE_UNUSED
-or CLK_IS_CRITICAL but I agree this can be done as a temporary workaround
-until a proper runtime PM based solution gets merged.
 
-> Best regards
+Changes in v3:
+- base on John Keeping's patch series
 
-Best regards,
+Chris Zhong (5):
+  dt-bindings: add rk3399 support for dw-mipi-rockchip
+  drm/rockchip/dsi: dw-mipi: support RK3399 mipi dsi
+  drm/rockchip/dsi: remove mode_valid function
+  dt-bindings: add power domain node for dw-mipi-rockchip
+  drm/rockchip/dsi: add dw-mipi power domain support
+
+ .../display/rockchip/dw_mipi_dsi_rockchip.txt      |   7 +-
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c             | 156 ++++++++++++---------
+ 2 files changed, 96 insertions(+), 67 deletions(-)
+
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+2.6.3
