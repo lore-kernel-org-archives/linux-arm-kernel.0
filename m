@@ -1,74 +1,67 @@
-From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Fri, 20 Jan 2017 08:54:07 +0100
-Subject: [PATCH V9] thermal: bcm2835: add thermal driver for bcm2835 soc
-In-Reply-To: <20170120041400.GA24617@localhost.localdomain>
-References: <1483808145-6206-1-git-send-email-kernel@martin.sperl.org>
- <20170120041400.GA24617@localhost.localdomain>
-Message-ID: <060918B6-A773-46A5-8D10-C9F6BBA6D3F1@martin.sperl.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 20 Jan 2017 09:01:33 +0100
+Subject: [PATCH v3 01/15] ARM: pxa: Don't rely on public mmc header to
+ include leds.h
+In-Reply-To: <1484313256-25993-2-git-send-email-ulf.hansson@linaro.org> (Ulf
+ Hansson's message of "Fri, 13 Jan 2017 14:14:02 +0100")
+References: <1484313256-25993-1-git-send-email-ulf.hansson@linaro.org>
+ <1484313256-25993-2-git-send-email-ulf.hansson@linaro.org>
+Message-ID: <87efzydusi.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Ulf Hansson <ulf.hansson@linaro.org> writes:
 
-> On 20.01.2017, at 05:14, Eduardo Valentin <edubezval@gmail.com> wrote:
-> 
-> Hello Martin,
-> 
-> On Sat, Jan 07, 2017 at 04:55:45PM +0000, kernel at martin.sperl.org wrote:
->> From: Martin Sperl <kernel@martin.sperl.org>
->> 
->> Add basic thermal driver for bcm2835 SOC.
->> 
->> This driver currently relies on the firmware setting up the
->> tsense HW block and does not set it up itself.
->> 
->> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
->> Acked-by: Eric Anholt <eric@anholt.net>
->> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
->> 
-> 
-> <cut>
-> 
->> +
->> +static const struct of_device_id bcm2835_thermal_of_match_table[] = {
->> +	{
->> +		.compatible = "brcm,bcm2835-thermal",
->> +		.data = &(struct bcm2835_thermal_info) {
->> +			.offset = 407000,
->> +			.slope = -538,
->> +			.trip_temp = 80000
->> +		}
->> +	},
->> +	{
->> +		.compatible = "brcm,bcm2836-thermal",
->> +		.data = &(struct bcm2835_thermal_info) {
->> +			.offset = 407000,
->> +			.slope = -538,
->> +			.trip_temp = 80000
->> +		}
->> +	},
->> +	{
->> +		.compatible = "brcm,bcm2837-thermal",
->> +		.data = &(struct bcm2835_thermal_info) {
->> +			/* the bcm2837 needs adjustment of +5C */
->> +			.offset = 407000 + 5000,
->> +			.slope = -538,
->> +			.trip_temp = 80000
->> +		}
->> +	},
->> +	{},
-> 
-> Just for the same of clarification, is there anything preventing this
-> driver of using of-thermal API? the above data (slope, offset, and
-> trip_temps) would be in DT the place where they are supposed to be,
-> instead of code.
-> 
+> Some of the pxa platforms, balloon3, colibri-pxa270-income, corgi,
+> trizeps4, vpac270, zeus and zylonite depends on leds.h. Explicitly include
+> it instead of relying on the public mmc header host.h.
+>
+> Cc: Daniel Mack <daniel@zonque.org>
+> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+> Cc: Robert Jarzmik <robert.jarzmik@free.fr>
+> Cc: <linux-arm-kernel@lists.infradead.org>
+> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+> ---
+>
+> I am seeking an ack for this change as following changes for mmc in the
+> series, has build-dependencies to it.
+Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 
-As the DT changes, that only define compatible strings, have already gone
-in without any such properties set, we need to define defaults for the 
-slope/offset and trip_temp values.
+Actually I already have a patch for arch/arm/mach-pxa/idp.c which adds this
+include also in my -next tree, just in case you're tempted to modify this one,
+which would conflict with my pxa tree.
 
-I guess (for newer SOC) you still can use the values in the DT,
-as (I guess) these are parsed and set in thermal_zone_device_register
-after the defaults are set in thermal_zone_params.
+An other point, I checked which files don't have a leds.h :
+ - grep -ls _led arch/arm/mach-pxa/*.c > /tmp/a
+ - grep -ls 'linux/leds.h' arch/arm/mach-pxa/*.c > /tmp/b
+ - sdiff -s /tmp/a /tmp/b
+This gives me :
+	balloon3.c
+	colibri-pxa270-income.c
+	corgi.c
+	corgi_pm.c
+	em-x270.c
+	ezx.c
+	hx4700.c
+	magician.c
+	palmld.c
+	palmtc.c
+	palmtreo.c
+	palmz72.c
+	spitz_pm.c
+	tosa.c
+	trizeps4.c
+	vpac270.c
+	z2.c
+	zeus.c
+	zylonite.c
+	zylonite_pxa300.c
+	zylonite_pxa320.c
 
-Martin
+So I was wondering how you made the choice of which files you add the include to
+and which you don't touch ?
+
+Cheers.
+
+--
+Robert
