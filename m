@@ -1,35 +1,60 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 20 Jan 2017 17:17:40 +0100
-Subject: [PATCH] ARM: imx6qp: adapt DT to changed FEC interrupts
-Message-ID: <20170120161740.19765-1-l.stach@pengutronix.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 20 Jan 2017 17:18:42 +0100
+Subject: [PATCH v3 2/9] ARM64: dts: meson-gxbb-p200: add the ethernet
+ PHY's reset GPIO
+In-Reply-To: <20170120152232.13943-3-martin.blumenstingl@googlemail.com>
+References: <20170120132650.9784-1-martin.blumenstingl@googlemail.com>
+ <20170120152232.13943-1-martin.blumenstingl@googlemail.com>
+ <20170120152232.13943-3-martin.blumenstingl@googlemail.com>
+Message-ID: <20170120161842.GD25907@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On i.MX6QP the FEC interrupts are wired to the GPC, just like all other
-device interrupts. This allows to FEC to wake the CPU from WFI, but for
-this to work the kernel needs to know about the new IRQ routing.
+On Fri, Jan 20, 2017 at 04:22:25PM +0100, Martin Blumenstingl wrote:
+> This resets the ethernet PHY during boot to get the PHY into a "clean"
+> state.
+> While here also specify the phy-handle of the ethmac node to make the
+> PHY configuration similar to the one we have on GXL devices. This will
+> allow us to specify OF-properties for the PHY itself.
+> 
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
+> index 03e3d76626dd..fa0f84cfeaa9 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
+> @@ -51,6 +51,30 @@
+>  	model = "Amlogic Meson GXBB P200 Development Board";
+>  };
+>  
+> +&ethmac {
+> +	status = "okay";
+> +	pinctrl-0 = <&eth_rgmii_pins>;
+> +	pinctrl-names = "default";
+> +	phy-handle = <&eth_phy0>;
+> +	phy-mode = "rgmii";
+> +
+> +	snps,reset-gpio = <&gpio GPIOZ_14 0>;
+> +	snps,reset-delays-us = <0 10000 1000000>;
+> +	snps,reset-active-low;
+> +
+> +	mdio {
+> +		compatible = "snps,dwmac-mdio";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		eth_phy0: ethernet-phy at 0 {
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
- arch/arm/boot/dts/imx6qp.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+Hi Martin
 
-diff --git a/arch/arm/boot/dts/imx6qp.dtsi b/arch/arm/boot/dts/imx6qp.dtsi
-index 0d4977ab7d29..24d071f5d9cd 100644
---- a/arch/arm/boot/dts/imx6qp.dtsi
-+++ b/arch/arm/boot/dts/imx6qp.dtsi
-@@ -95,6 +95,12 @@
- 	};
- };
- 
-+&fec {
-+	/delete-property/interrupts-extended;
-+	interrupts = <0 118 IRQ_TYPE_LEVEL_HIGH>,
-+		     <0 119 IRQ_TYPE_LEVEL_HIGH>;
-+};
-+
- &ldb {
- 	clocks = <&clks IMX6QDL_CLK_LDB_DI0_SEL>, <&clks IMX6QDL_CLK_LDB_DI1_SEL>,
- 		 <&clks IMX6QDL_CLK_IPU1_DI0_SEL>, <&clks IMX6QDL_CLK_IPU1_DI1_SEL>,
--- 
-2.11.0
+ethernet-phy at 3, because of the reg property.
+
+
+> +			compatible = "ethernet-phy-id0022.1620",
+> +				     "ethernet-phy-ieee802.3-c22";
+> +			reg = <3>;
+
+  Andrew
