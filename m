@@ -1,45 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Jan 2017 17:24:30 +0100
-Subject: [PATCH] PCI: rockchip: mark PM functions as __maybe_unused
-Message-ID: <20170120162450.3690225-1-arnd@arndb.de>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 20 Jan 2017 18:28:46 +0200
+Subject: [PATCH 2/2] ARM: dts: exynos: Use correct mfc_pd async-bridge
+ clock for Exynos5420
+In-Reply-To: <1484864995-10679-2-git-send-email-javier@osg.samsung.com>
+References: <1484864995-10679-1-git-send-email-javier@osg.samsung.com>
+ <1484864995-10679-2-git-send-email-javier@osg.samsung.com>
+Message-ID: <20170120162846.x766u3nzblqywggj@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_PM_SLEEP is disabled, we get harmless build warnings:
+On Thu, Jan 19, 2017 at 07:29:55PM -0300, Javier Martinez Canillas wrote:
+> Commit 94aed538e032 ("ARM: dts: exynos: Add async-bridge clock to MFC
+> power domain for Exynos5420") fixed an imprecise external abort error
+> when the MFC registers were tried to be accessed and the needed clock
+> for the asynchronous bridges were gated.
+> 
+> But according to the Exynos5420 manual the "Gating AXI clock for MFC"
+> is not CLK_ACLK333 but CLK_MFC.
+> 
+> The end effect is the same because CLK_ACLK333 is a parent of CLK_MFC
+> but the correct clock should be used instead.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
+> ---
+> 
+>  arch/arm/boot/dts/exynos5420.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-host/pcie-rockchip.c:1267:12: error: 'rockchip_pcie_resume_noirq' defined but not used [-Werror=unused-function]
-host/pcie-rockchip.c:1240:12: error: 'rockchip_pcie_suspend_noirq' defined but not used [-Werror=unused-function]
+Is this still needed?
 
-Marking both functions as __maybe_unused avoids the warning without
-the need for #ifdef around them.
+Best regards,
+Krzysztof
 
-Fixes: 013dd3d5e183 ("PCI: rockchip: Add system PM support")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/pci/host/pcie-rockchip.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
-index 0d6e8ee5b017..b975116d2b03 100644
---- a/drivers/pci/host/pcie-rockchip.c
-+++ b/drivers/pci/host/pcie-rockchip.c
-@@ -1237,7 +1237,7 @@ static int rockchip_pcie_wait_l2(struct rockchip_pcie *rockchip)
- 	return 0;
- }
- 
--static int rockchip_pcie_suspend_noirq(struct device *dev)
-+static int __maybe_unused rockchip_pcie_suspend_noirq(struct device *dev)
- {
- 	struct rockchip_pcie *rockchip = dev_get_drvdata(dev);
- 	int ret;
-@@ -1264,7 +1264,7 @@ static int rockchip_pcie_suspend_noirq(struct device *dev)
- 	return ret;
- }
- 
--static int rockchip_pcie_resume_noirq(struct device *dev)
-+static int __maybe_unused rockchip_pcie_resume_noirq(struct device *dev)
- {
- 	struct rockchip_pcie *rockchip = dev_get_drvdata(dev);
- 	int err;
--- 
-2.9.0
+> 
+> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+> index 906a1a42a7ea..ffb148ea91d6 100644
+> --- a/arch/arm/boot/dts/exynos5420.dtsi
+> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+> @@ -294,7 +294,7 @@
+>  			reg = <0x10044060 0x20>;
+>  			clocks = <&clock CLK_FIN_PLL>,
+>  				 <&clock CLK_MOUT_USER_ACLK333>,
+> -				 <&clock CLK_ACLK333>;
+> +				 <&clock CLK_MFC>;
+>  			clock-names = "oscclk", "clk0","asb0";
+>  			#power-domain-cells = <0>;
+>  		};
+> -- 
+> 2.7.4
+> 
