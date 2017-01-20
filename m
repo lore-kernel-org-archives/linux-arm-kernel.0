@@ -1,89 +1,117 @@
-From: roger.pau@citrix.com (Roger Pau =?iso-8859-1?Q?Monn=E9?=)
-Date: Fri, 20 Jan 2017 14:24:26 +0000
-Subject: [Xen-devel] [RFC] Device memory mappings for Dom0 on ARM64 ACPI
- systems
-In-Reply-To: <a40dda2b-e6f3-3222-9b56-9208d96ce5d0@arm.com>
-References: <alpine.DEB.2.10.1701171309040.2347@sstabellini-ThinkPad-X260>
- <20170118110243.ctqpperggim5k7dw@dhcp-3-221.uk.xensource.com>
- <alpine.DEB.2.10.1701181058110.10192@sstabellini-ThinkPad-X260>
- <20c89f12-cb0c-1145-99d0-320b2080b503@arm.com>
- <20170119154129.7dnjzvq23jop7oye@dhcp-3-221.uk.xensource.com>
- <alpine.DEB.2.10.1701191002330.10192@sstabellini-ThinkPad-X260>
- <94e89cb4-f40c-585e-b3e8-d9f8f58b53d9@arm.com>
- <20170120110114.2ajkmmhxhhbc6acl@dhcp-3-221.uk.xensource.com>
- <a40dda2b-e6f3-3222-9b56-9208d96ce5d0@arm.com>
-Message-ID: <20170120142426.eqs2n23ugrz2f6v5@dhcp-3-221.uk.xensource.com>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Fri, 20 Jan 2017 06:24:03 -0800
+Subject: [PATCH 3/3] PCI: imx6: Add code to support i.MX7D
+In-Reply-To: <1484844727.24339.50.camel@pengutronix.de>
+References: <20170119163631.10668-1-andrew.smirnov@gmail.com>
+ <20170119163631.10668-4-andrew.smirnov@gmail.com>
+ <1484844727.24339.50.camel@pengutronix.de>
+Message-ID: <CAHQ1cqEX82VMLtxToYeg3S6dc=tu2KhuS5u-1RCKBBArtRZSxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2017 at 02:10:33PM +0100, Julien Grall wrote:
-> Hi Royger,
-> 
-> On 20/01/2017 12:01, Roger Pau Monn? wrote:
-> > On Thu, Jan 19, 2017 at 09:14:03PM +0100, Julien Grall wrote:
-> In case of ARM, Xen does not use any PCI devices (no PCI UART) itself so
-> scanning before hand is not necessary. If possible, I would prefer to have
-> the scanning in one place rather than spreading in different place depending
-> on the segments (we do have multiple segment on ARM).
+On Thu, Jan 19, 2017 at 8:52 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> Am Donnerstag, den 19.01.2017, 08:36 -0800 schrieb Andrey Smirnov:
+>> Add various bits of code needed to support i.MX7D variant of the IP.
+>>
+>> Cc: yurovsky at gmail.com
+>> Cc: Richard Zhu <hongxing.zhu@nxp.com>
+>> Cc: Lucas Stach <l.stach@pengutronix.de>
+>> Cc: Bjorn Helgaas <bhelgaas@google.com>
+>> Cc: Fabio Estevam <festevam@gmail.com>
+>> Cc: Shawn Guo <shawnguo@kernel.org>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Lee Jones <lee.jones@linaro.org>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: devicetree at vger.kernel.org
+>> Cc: linux-kernel at vger.kernel.org
+>> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+>> ---
+>>  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |   6 +-
+>>  drivers/pci/host/pci-imx6.c                        | 188 ++++++++++++++++++---
+>>  include/linux/mfd/syscon/imx7-gpc.h                |  18 ++
+>>  include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
+>>  include/linux/mfd/syscon/imx7-src.h                |  18 ++
+>>  5 files changed, 208 insertions(+), 26 deletions(-)
+>>  create mode 100644 include/linux/mfd/syscon/imx7-gpc.h
+>>  create mode 100644 include/linux/mfd/syscon/imx7-src.h
+>>
+>> diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+>> index 83aeb1f..20b9382 100644
+>> --- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+>> +++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+>> @@ -4,7 +4,8 @@ This PCIe host controller is based on the Synopsis Designware PCIe IP
+>>  and thus inherits all the common properties defined in designware-pcie.txt.
+>>
+>>  Required properties:
+>> -- compatible: "fsl,imx6q-pcie", "fsl,imx6sx-pcie", "fsl,imx6qp-pcie"
+>> +- compatible: "fsl,imx6q-pcie", "fsl,imx6sx-pcie",
+>> +           "fsl,imx6qp-pcie", "fsl,imx7d-pcie"
+>>  - reg: base address and length of the PCIe controller
+>>  - interrupts: A list of interrupt outputs of the controller. Must contain an
+>>    entry for each entry in the interrupt-names property.
+>> @@ -34,6 +35,9 @@ Additional required properties for imx6sx-pcie:
+>>  - clock names: Must include the following additional entries:
+>>       - "pcie_inbound_axi"
+>>
+>> +Additional required properties for imx7d-pcie:
+>> +- pcie-phy-supply: Should specify the regulator supplying PCIe PHY
+>> +
+> This isn't a PHY regulator, but a regulator powering the GPC domain
+> where the PHY is located. This should not be handled in the PCIe driver.
+> See the previous discussion with i.MX6SX, that is in the same boat.
+>
 
-AFAIK on ARM you could do the scan inside of the implementation of
-PHYSDEVOP_pci_mmcfg_reserved hypercall, and that would be enough in order to
-discover the devices.
+Good to know, thanks for clarification.
 
-> > 
-> > > Also, you are assuming that the MCFG will describe the host controller. This
-> > > is the case only when host controller available at boot. So you may miss
-> > > some here.
-> > 
-> > Yes, I know, that's why we need the hypercall. The information in the MCFG
-> > table might be incomplete, and the hardware domain would have to fetch extra
-> > ECAM information from the _SEG method of host bridge devices in the ACPI
-> > namespace.
-> > 
-> > > Furthermore, on ARM we have other static tables (such as GTDT) contain MMIO
-> > > region to map.
-> > > 
-> > > Lastly, all devices are not PCI and you may have platform devices. The
-> > > platform devices will only be described in the ASL. Just in case, those
-> > > regions are not necessarily described in UEFI memory map.
-> > 
-> > Will those devices work properly in such scenario? (ie: are they behind the
-> > SMMU?)
-> 
-> Platform devices might or might not be behind of the SMMU. It will depend if
-> the device is DMA-capable and often whether the implementer decided to have
-> an SMMU.
-> 
-> Today, there is no SMMU support (it is by-passed) for ACPI so we haven't yet
-> encountered the problem. We have an item to investigate the work to be done
-> here.
+> [...]
+>>  static void imx6_pcie_init_phy(struct imx6_pcie *imx6_pcie)
+>>  {
+>> -     if (imx6_pcie->variant == IMX6SX)
+>> +     switch (imx6_pcie->variant) {
+>> +     case IMX7D: {
+>> +             int ret;
+>> +             unsigned int reg, mapping;
+>> +             struct pcie_port *pp = &imx6_pcie->pp;
+>> +             struct device *dev = pp->dev;
+>> +
+>> +             regulator_set_voltage(imx6_pcie->pcie_phy_regulator,
+>> +                                   1000000, 1000000);
+>> +             ret = regulator_enable(imx6_pcie->pcie_phy_regulator);
+>> +             if (ret) {
+>> +                     dev_err(dev, "failed to enable pcie regulator.\n");
+>> +                     return;
+>> +             }
+>> +
+>> +             /*
+>> +              * Now that PHY regulator is enabled, do sofware
+>> +              * power-up request by mapping PHY in A7 domain and
+>> +              * setting power-up request bit
+>> +              */
+>> +             regmap_read(imx6_pcie->gpc, GPC_PGC_CPU_MAPPING, &mapping);
+>> +             regmap_write(imx6_pcie->gpc, GPC_PGC_CPU_MAPPING,
+>> +                          mapping | IMX7D_PCIE_PHY_A7_DOMAIN);
+>> +
+>> +             regmap_update_bits(imx6_pcie->gpc, GPC_PU_PGC_SW_PUP_REQ,
+>> +                                IMX7D_PCIE_PHY_SW_PUP_REQ,
+>> +                                IMX7D_PCIE_PHY_SW_PUP_REQ);
+>> +             /*
+>> +              * As per "5.5.9.4 Example Code 4" in IMX7DRM.pdf wait
+>> +              * for PUP_REQ bit to be cleared
+>> +              */
+>> +             while (!regmap_read(imx6_pcie->gpc,
+>> +                                 GPC_PU_PGC_SW_PUP_REQ, &reg) &&
+>> +                    reg & IMX7D_PCIE_PHY_SW_PUP_REQ)
+>> +                     ;
+>> +             regmap_write(imx6_pcie->gpc, GPC_PGC_CPU_MAPPING, mapping);
+>
+> I won't allow code touching the GPC registers to sneak into the PCIe
+> driver. I know this is the downstream solution, but this really needs a
+> proper GPC power domain driver, instead of this hack.
+>
 
-Why would you need the SMMU for ACPI?
+OK, will change in v2.
 
-> Some thoughts, each device will be associated to one of multiple StreamID
-> (ID to configure the SMMU). I guess we could find this from the static table
-> IORT, need to check.
-> 
-> Also, some of the platform device will have MSIs, I suspect the number of
-> MSIs will be either hardcoded or found in the ASL. So we would need to have
-> a new hypercall to advertise those.
-> 
-> > 
-> > > So you need DOM0 to tell the list of regions.
-> > 
-> > Yes, I agree that we need such hypercall ATM, although I think that we might be
-> > able to get rid of it in the long term if we are able to parse the AML tables
-> > from Xen.
-> 
-> Are you suggesting to bring a full AML parser in Xen? If so, it will be much
-> bigger than Xen ARM itself. I would need a strong use case to accept a such
-> thing.
-
-It could be placed in the init section, and get rid of it after boot. Also, I
-find it hard to believe that an AML parser is bigger than the whole Xen on ARM.
-The OpenBSD folks have a DSDT parser in ~4000 lines of code [0], and that's
-probably way more than what Xen actually needs.
-
-Roger.
-
-[0] https://github.com/openbsd/src/blob/master/sys/dev/acpi/dsdt.c
+> Regards,
+> Lucas
+>
