@@ -1,49 +1,50 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 19 Jan 2017 16:23:49 -0800
-Subject: [GIT PULL] DaVinci fix for v4.10
-In-Reply-To: <dd59ae9d-e224-7fd0-bcaf-856ca1b10b94@ti.com>
-References: <214ce380-3c45-423c-a7bc-e19ea1ce2a2d@ti.com>
- <20170119001242.GB23725@localhost>
- <dd59ae9d-e224-7fd0-bcaf-856ca1b10b94@ti.com>
-Message-ID: <20170120002349.GA32705@localhost>
+Date: Thu, 19 Jan 2017 16:25:26 -0800
+Subject: [GIT PULL 1/2] Broadcom devicetree changes for 4.11 (try 2)
+In-Reply-To: <20170119012553.2844-1-f.fainelli@gmail.com>
+References: <20170119003025.GL23725@localhost>
+ <20170119012553.2844-1-f.fainelli@gmail.com>
+Message-ID: <20170120002526.GB685@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 09:20:55AM +0530, Sekhar Nori wrote:
-> Hi Olof,
+On Wed, Jan 18, 2017 at 05:25:53PM -0800, Florian Fainelli wrote:
+> The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 > 
-> On Thursday 19 January 2017 05:42 AM, Olof Johansson wrote:
-> > Hi Sekhar,
-> > 
-> > On Wed, Jan 18, 2017 at 04:23:55PM +0530, Sekhar Nori wrote:
-> >> The following changes since commit 49def1853334396f948dcb4cedb9347abb318df5:
-> >>
-> >>   Linux 4.10-rc4 (2017-01-15 16:21:59 -0800)
-> >>
-> >> are available in the git repository at:
-> >>
-> >>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-fixes-for-v4.10-part2
-> >>
-> >> for you to fetch changes up to 6f042ee9cc09792c1c0f0cd8f275c2b4b29eaa96:
-> >>
-> >>   ARM: dts: da850-evm: fix read access to SPI flash (2017-01-18 15:38:08 +0530)
-> >>
-> >> ----------------------------------------------------------------
-> >> This patch uses fast-read opcode to read the
-> >> SPI flash. This is needed for error-free read
-> >> at 30Mhz.
-> >>
-> >> ----------------------------------------------------------------
-> >> Fabien Parent (1):
-> >>       ARM: dts: da850-evm: fix read access to SPI flash
-> > 
-> > You're ahead of our branch since this is based on -rc4 when it doesn't
-> > have to. Want to respin, or should I cherry-pick the patch?
+>   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
 > 
-> Cherry-picking is fine. Thanks!
+> are available in the git repository at:
+> 
+>   http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.11/devicetree
+> 
+> for you to fetch changes up to c5a8e3add28ca4063410353acfbe6e650174e432:
+> 
+>   Merge tag 'bcm2835-dt-next-2017-01-17' into devicetree/next (2017-01-18 17:20:32 -0800)
+> 
+> ----------------------------------------------------------------
+> This pull request contains Broadcom ARM-based SoC Device Tree changes for 4.11,
+> please pull the following changes:
+> 
+> - Rafal enables the UART by default on all BCM5301x, BCM4708, BCM4709 since
+>   every device found out there has it enabled by default. He also fixes the
+>   LED definitions for the Luxul XWR-3100 device, enables USB controllers and
+>   their respective PHY devices, specifies the correct GPIO to power on USB
+>   HUBs, adds the additional RAM bank for somes devices, and finally sets the
+>   correct 5Ghz frequency limits on the Netgear R8000
+> 
+> - Jon does a number of Norsthar Plus SoC cleanups, fixes NAND partitions unit
+>   addresses, adds QSPI support to a bunch of boards, adds Ethernet switch ports
+>   to the BCM958625K reference board, enables 3rd Ethernet MAC instance to
+>   relevant DTSes, enables Ethernet on the XMC board, and finally adds SD/MMC
+>   support to the XMC board
+> 
+> - Boris adds the Video Encoder nodes to the Raspberry Pi DTS include files
+>   ands enables it on the relevant boards
+> 
+> - Dan adds support for two new Luxul devices: XAP-1410 and XWR-1200, both
+>   BCM47081 based SoCs
 
-Great, cherry-picked to fixes. Please drop from your for-next branch if you
-have one.
+Merged, thanks!
 
 
 -Olof
