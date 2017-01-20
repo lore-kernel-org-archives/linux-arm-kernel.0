@@ -1,82 +1,49 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 20 Jan 2017 17:52:03 +0100
-Subject: [PATCH v3 2/4] dt-bindings: Add TI SCI PM Domains
-In-Reply-To: <58821CA2.4050701@ti.com>
-References: <20170104205536.15963-1-d-gerlach@ti.com>
- <20170104205536.15963-3-d-gerlach@ti.com>
- <20170109175012.sg7eze7llqq7qevd@rob-hp-laptop>
- <7bd282d9-df6f-f4c6-1f7f-c8ed81c78af3@ti.com>
- <CAL_JsqKxU4c=KSn0=xX9kmbk498fhqpiXMeGjcoe8Ah48FAzUg@mail.gmail.com>
- <3bb89649-fd2a-acc6-6968-e54a00842ce2@ti.com>
- <CAL_JsqL+L1oHAOv7tLevzbtRFSKRs9J01SgF=HR_vNNqNV+4+Q@mail.gmail.com>
- <84d7d49b-933b-8b26-f18a-3a5054738cb1@ti.com>
- <CAL_JsqJ9RitNC7ihC8ckJgV+49kaHk=W9tgdNBSjEfydhQS46A@mail.gmail.com>
- <0eaa9914-83f1-7716-cf04-1e3dd44df647@ti.com>
- <4cb25cf9-216f-2e18-f45d-ef7e48fa6c5e@ti.com>
- <m2ziip2puf.fsf@baylibre.com>
- <CAL_Jsq+Vp8iYrAUmuSRzeeY_G6CUqFqG6XB6erDxo1RYo3g4=g@mail.gmail.com>
- <CAPDyKFqzs59N5bc89X-96Fgy9b=_+s8zYmHHshQeDrJCnaqprA@mail.gmail.com>
- <58821CA2.4050701@ti.com>
-Message-ID: <CAPDyKFpTyn2isNahywmOOSWiZKov9xsudyWi_i-FejXjC+1AZw@mail.gmail.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Fri, 20 Jan 2017 16:56:33 +0000
+Subject: [PATCH RESEND] arm64: defconfig: Enable NUMA and NUMA_BALANCING
+In-Reply-To: <1484719039-34801-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1484719039-34801-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <58824141.3010403@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+Hi Kefeng,
 
->>> Another option is create something new either common or TI SCI
->>> specific. It could be just a table of ids and phandles in the SCI
->>> node. I'm much more comfortable with an isolated property in one node
->>> than something scattered throughout the DT.
->>
->> To me, this seems like the best possible solution.
->>
->> However, perhaps we should also consider the SCPI Generic power domain
->> (drivers/firmware/scpi_pm_domain.c), because I believe it's closely
->> related.
->> To change the power state of a device, this PM domain calls
->> scpi_device_set|get_power_state() (drivers/firmware/arm_scpi.c), which
->> also needs a device id as a parameter. Very similar to our case with
->> the TI SCI domain.
->>
->> Currently these SCPI device ids lacks corresponding DT bindings, so
->> the scpi_pm_domain tries to work around it by assigning ids
->> dynamically at genpd creation time.
->>
->> That makes me wonder, whether we should think of something common/generic?
->
-> When you say something common/generic, do you mean a better binding for genpd,
-> or something bigger than that like a new driver? Because I do think a phandle
-> cell left open for the genpd provider to interpret solves both the scpi and
-> ti-sci problem we are facing here in the best way. Using generic PM domains lets
-> us do exactly what we want apart from interpreting the phandle cell with our
-> driver, and I feel like anything else we try at this point is just going to be
-> to work around that. Is bringing back genpd xlate something we can discuss?
+On 2017/1/18 5:57, Kefeng Wang wrote:
+> Since much more arm64 SoCs with numa nodes, it's better to enable
+> NUMA and NUMA_BALANCING to improve the performance on test.
+> 
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> ---
 
-Bringing back xlate, how would that help? Wouldn't that just mean that
-you will get one genpd per device? That's not an option, I think we
-are all in agreement to that.
+Applied to the hisilicon soc tree.
+Thanks!
 
-Or am I missing something here?
+Best Regards,
+Wei
 
-Regarding something "common/generic", I was merely thinking of some
-common bindings describing the list of phandle to device ids mapping.
-However, let's not make this more complicated than it is already. So
-please just ignore my suggestion so we can make this work for your
-case first.
-
-However, maybe I didn't fully understood Rob's suggestion. Perhaps Rob
-can clarify once more.
-
-Anyway, this is how interpreted Rob's suggestion:
-
-TISCI_PM_DOMAIN_DEVLIST: tisci-pm-domain-devlist {
-     devs = <&serial0>, <&mmc0>;
-     devids = <5 10>;
-}
-
-With this, you should be to extract the devid which corresponds to the
-device that has been attached to the TI SCI PM domain. Don't you
-think?
-
-Kind regards
-Uffe
+>  arch/arm64/configs/defconfig | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index 33b744d..0ebb228 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -11,6 +11,7 @@ CONFIG_TASK_XACCT=y
+>  CONFIG_TASK_IO_ACCOUNTING=y
+>  CONFIG_IKCONFIG=y
+>  CONFIG_IKCONFIG_PROC=y
+> +CONFIG_NUMA_BALANCING=y
+>  CONFIG_MEMCG=y
+>  CONFIG_MEMCG_SWAP=y
+>  CONFIG_BLK_CGROUP=y
+> @@ -72,6 +73,7 @@ CONFIG_PCIE_QCOM=y
+>  CONFIG_PCIE_ARMADA_8K=y
+>  CONFIG_ARM64_VA_BITS_48=y
+>  CONFIG_SCHED_MC=y
+> +CONFIG_NUMA=y
+>  CONFIG_PREEMPT=y
+>  CONFIG_KSM=y
+>  CONFIG_TRANSPARENT_HUGEPAGE=y
+> 
