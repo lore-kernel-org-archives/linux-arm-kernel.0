@@ -1,50 +1,82 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 20 Jan 2017 07:46:29 -0300
-Subject: [PATCH 2/2] [media] exynos-gsc: Fix imprecise external abort due
- disabled power domain
-In-Reply-To: <c72965a4-d6e0-f3e7-1140-039274f7e60b@osg.samsung.com>
-References: <1484699402-28738-1-git-send-email-javier@osg.samsung.com>
- <CGME20170118003022epcas3p34cf03bb6feb830c4fa231497f2536d0e@epcas3p3.samsung.com>
- <1484699402-28738-2-git-send-email-javier@osg.samsung.com>
- <cc9c6837-7141-b63c-ddf6-68252493df11@samsung.com>
- <842737f2-3faf-7b22-c480-93e183bbb670@osg.samsung.com>
- <d727576a-fbce-eb54-3b74-270c689b7fa3@osg.samsung.com>
- <c1d00b28-0252-0fb1-eb7c-5fc69035f12f@samsung.com>
- <c72965a4-d6e0-f3e7-1140-039274f7e60b@osg.samsung.com>
-Message-ID: <042e9067-7ef1-c942-0341-634963ff3fb0@osg.samsung.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 20 Jan 2017 10:50:10 +0000
+Subject: [PATCH 2/2] arm64: kvm: upgrade csselr and ccsidr to 64-bit values
+In-Reply-To: <1484909410-11673-1-git-send-email-sudeep.holla@arm.com>
+References: <1484909410-11673-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1484909410-11673-2-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+csselr and ccsidr are treated as 64-bit values already elsewhere in the
+kernel. It also aligns well with the architecture extensions that allow
+64-bit format for ccsidr.
 
-On 01/20/2017 07:06 AM, Javier Martinez Canillas wrote:
-> Hello Marek,
-> 
-> On 01/20/2017 05:37 AM, Marek Szyprowski wrote:
-> 
-> [snip]
->>
->> Please send this patch instead of adding more clocks to the power domains.
->> This way we will avoid adding more dependencies to userspace (DT ABI).
->> Likely those clocks are also needed to access any device in that power
->> domains.
->>
->> Later, once the runtime PM for clocks get merged, a patch for exynos542x
->> clocks driver can be made to replace IS_CRITICAL with proper runtime
->> handling.
->>
-> 
-> Ok, I thought that we didn't want to mark more clocks as CLK_IGNORE_UNUSED
-> or CLK_IS_CRITICAL but I agree this can be done as a temporary workaround
-> until a proper runtime PM based solution gets merged.
-> 
+This patch upgrades the existing accesses to csselr and ccsidr from
+32-bit to 64-bit in preparation to add support to those extensions.
 
-I posted following patch [0] for clk-exynos5420, so $SUBJECT can be dropped.
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ arch/arm64/kvm/sys_regs.c | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-[0]: https://patchwork.kernel.org/patch/9527957/
-
-Best regards,
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 5dca1f10340f..a3559a8a2b0c 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -58,15 +58,15 @@
+  */
+ 
+ /* 3 bits per cache level, as per CLIDR, but non-existent caches always 0 */
+-static u32 cache_levels;
++static u64 cache_levels;
+ 
+ /* CSSELR values; used to index KVM_REG_ARM_DEMUX_ID_CCSIDR */
+ #define CSSELR_MAX 	((MAX_CACHE_LEVEL - 1) >> 1)
+ 
+ /* Which cache CCSIDR represents depends on CSSELR value. */
+-static u32 get_ccsidr(u32 csselr)
++static u64 get_ccsidr(u64 csselr)
+ {
+-	u32 ccsidr;
++	u64 ccsidr;
+ 
+ 	/* Make sure noone else changes CSSELR during this! */
+ 	local_irq_disable();
+@@ -1952,9 +1952,9 @@ static int set_invariant_sys_reg(u64 id, void __user *uaddr)
+ 	return 0;
+ }
+ 
+-static bool is_valid_cache(u32 val)
++static bool is_valid_cache(u64 val)
+ {
+-	u32 level, ctype;
++	u64 level, ctype;
+ 
+ 	if (val >= CSSELR_MAX)
+ 		return false;
+@@ -1979,8 +1979,8 @@ static bool is_valid_cache(u32 val)
+ 
+ static int demux_c15_get(u64 id, void __user *uaddr)
+ {
+-	u32 val;
+-	u32 __user *uval = uaddr;
++	u64 val;
++	u64 __user *uval = uaddr;
+ 
+ 	/* Fail if we have unknown bits set. */
+ 	if (id & ~(KVM_REG_ARCH_MASK|KVM_REG_SIZE_MASK|KVM_REG_ARM_COPROC_MASK
+@@ -2004,8 +2004,8 @@ static int demux_c15_get(u64 id, void __user *uaddr)
+ 
+ static int demux_c15_set(u64 id, void __user *uaddr)
+ {
+-	u32 val, newval;
+-	u32 __user *uval = uaddr;
++	u64 val, newval;
++	u64 __user *uval = uaddr;
+ 
+ 	/* Fail if we have unknown bits set. */
+ 	if (id & ~(KVM_REG_ARCH_MASK|KVM_REG_SIZE_MASK|KVM_REG_ARM_COPROC_MASK
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+2.7.4
