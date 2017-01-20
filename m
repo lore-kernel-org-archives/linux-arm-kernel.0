@@ -1,70 +1,126 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 20 Jan 2017 16:58:37 +0100
-Subject: [PATCH] PCI: imx6: remove LTSSM disable workaround
-Message-ID: <20170120155837.2874-1-l.stach@pengutronix.de>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 20 Jan 2017 16:57:10 +0100
+Subject: [PATCH 4/8] clk: renesas: cpg-mssr: Add support for reset control
+In-Reply-To: <1484921306-9967-5-git-send-email-geert+renesas@glider.be>
+References: <1484921306-9967-1-git-send-email-geert+renesas@glider.be>
+ <1484921306-9967-5-git-send-email-geert+renesas@glider.be>
+Message-ID: <1484927830.2897.51.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This causes CPU hangs when the system is reset by the watchdog, as
-the GPRs aren't cleared, but the clocks are back to disabled state.
+Hi Geert,
 
-If the bootloader uses PCIe, it must take care to bring it down
-into a safe state, before passing control to the Linux kernel.
-This is the only way to get a properly operating system at all
-times and circumstances.
+On Fri, 2017-01-20 at 15:08 +0100, Geert Uytterhoeven wrote:
+> Add optional support for the Reset Control feature of the Renesas Clock
+> Pulse Generator / Module Standby and Software Reset module on R-Car
+> Gen2, R-Car Gen3, and RZ/G1 SoCs.
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
- drivers/pci/host/pci-imx6.c | 30 ------------------------------
- 1 file changed, 30 deletions(-)
+Is there a reason to make this optional?
 
-diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index c8cefb078218..42c1987ffb3d 100644
---- a/drivers/pci/host/pci-imx6.c
-+++ b/drivers/pci/host/pci-imx6.c
-@@ -247,9 +247,6 @@ static int imx6q_pcie_abort_handler(unsigned long addr,
- 
- static void imx6_pcie_assert_core_reset(struct imx6_pcie *imx6_pcie)
- {
--	struct pcie_port *pp = &imx6_pcie->pp;
--	u32 val, gpr1, gpr12;
--
- 	switch (imx6_pcie->variant) {
- 	case IMX6SX:
- 		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
-@@ -266,33 +263,6 @@ static void imx6_pcie_assert_core_reset(struct imx6_pcie *imx6_pcie)
- 				   IMX6Q_GPR1_PCIE_SW_RST);
- 		break;
- 	case IMX6Q:
--		/*
--		 * If the bootloader already enabled the link we need some
--		 * special handling to get the core back into a state where
--		 * it is safe to touch it for configuration.  As there is
--		 * no dedicated reset signal wired up for MX6QDL, we need
--		 * to manually force LTSSM into "detect" state before
--		 * completely disabling LTSSM, which is a prerequisite for
--		 * core configuration.
--		 *
--		 * If both LTSSM_ENABLE and REF_SSP_ENABLE are active we
--		 * have a strong indication that the bootloader activated
--		 * the link.
--		 */
--		regmap_read(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1, &gpr1);
--		regmap_read(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12, &gpr12);
--
--		if ((gpr1 & IMX6Q_GPR1_PCIE_REF_CLK_EN) &&
--		    (gpr12 & IMX6Q_GPR12_PCIE_CTL_2)) {
--			val = dw_pcie_readl_rc(pp, PCIE_PL_PFLR);
--			val &= ~PCIE_PL_PFLR_LINK_STATE_MASK;
--			val |= PCIE_PL_PFLR_FORCE_LINK;
--			dw_pcie_writel_rc(pp, PCIE_PL_PFLR, val);
--
--			regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
--					   IMX6Q_GPR12_PCIE_CTL_2, 0 << 10);
--		}
--
- 		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
- 				   IMX6Q_GPR1_PCIE_TEST_PD, 1 << 18);
- 		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
--- 
-2.11.0
+> This allows to reset SoC devices using the Reset Controller API.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Looks good to me,
+
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+Just a small issue below,
+
+> ---
+>  drivers/clk/renesas/renesas-cpg-mssr.c | 122 +++++++++++++++++++++++++++++++++
+>  1 file changed, 122 insertions(+)
+> 
+> diff --git a/drivers/clk/renesas/renesas-cpg-mssr.c b/drivers/clk/renesas/renesas-cpg-mssr.c
+> index f1161a585c57e433..ea4af714ac14603a 100644
+> --- a/drivers/clk/renesas/renesas-cpg-mssr.c
+> +++ b/drivers/clk/renesas/renesas-cpg-mssr.c
+[...]
+> +static int cpg_mssr_reset(struct reset_controller_dev *rcdev,
+> +			  unsigned long id)
+> +{
+> +	struct cpg_mssr_priv *priv = rcdev_to_priv(rcdev);
+> +	unsigned int reg = id / 32;
+> +	unsigned int bit = id % 32;
+> +	u32 bitmask = BIT(bit);
+
+Here you have a bitmask = BIT(bit) variable.
+
+> +	unsigned long flags;
+> +	u32 value;
+> +
+> +	dev_dbg(priv->dev, "reset %u%02u\n", reg, bit);
+> +
+> +	/* Reset module */
+> +	spin_lock_irqsave(&priv->rmw_lock, flags);
+> +	value = readl(priv->base + SRCR(reg));
+> +	value |= bitmask;
+
+Here you use it.
+
+> +	writel(value, priv->base + SRCR(reg));
+> +	spin_unlock_irqrestore(&priv->rmw_lock, flags);
+> +
+> +	/* Wait for at least one cycle of the RCLK clock (@ ca. 32 kHz) */
+> +	udelay(35);
+> +
+> +	/* Release module from reset state */
+> +	writel(bitmask, priv->base + SRSTCLR(reg));
+> +
+> +	return 0;
+> +}
+> +
+> +static int cpg_mssr_assert(struct reset_controller_dev *rcdev, unsigned long id)
+> +{
+> +	struct cpg_mssr_priv *priv = rcdev_to_priv(rcdev);
+> +	unsigned int reg = id / 32;
+> +	unsigned int bit = id % 32;
+
+Here you haven't.
+
+> +	unsigned long flags;
+> +	u32 value;
+> +
+> +	dev_dbg(priv->dev, "assert %u%02u\n", reg, bit);
+> +
+> +	spin_lock_irqsave(&priv->rmw_lock, flags);
+> +	value = readl(priv->base + SRCR(reg));
+> +	writel(value | BIT(bit), priv->base + SRCR(reg));
+
+Here you don't.
+
+> +	spin_unlock_irqrestore(&priv->rmw_lock, flags);
+> +	return 0;
+> +}
+> +
+> +static int cpg_mssr_deassert(struct reset_controller_dev *rcdev,
+> +			     unsigned long id)
+> +{
+> +	struct cpg_mssr_priv *priv = rcdev_to_priv(rcdev);
+> +	unsigned int reg = id / 32;
+> +	unsigned int bit = id % 32;
+> +
+> +	dev_dbg(priv->dev, "deassert %u%02u\n", reg, bit);
+> +
+> +	writel(BIT(bit), priv->base + SRSTCLR(reg));
+
+And here ...
+
+> +	return 0;
+> +}
+> +
+> +static int cpg_mssr_status(struct reset_controller_dev *rcdev,
+> +			   unsigned long id)
+> +{
+> +	struct cpg_mssr_priv *priv = rcdev_to_priv(rcdev);
+> +	unsigned int reg = id / 32;
+> +	unsigned int bit = id % 32;
+> +
+> +	return !!(readl(priv->base + SRCR(reg)) & BIT(bit));
+
+And here neither.
+
+I'd choose one variant over the other for consistency.
+
+regards
+Philipp
