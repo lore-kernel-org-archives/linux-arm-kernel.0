@@ -1,47 +1,59 @@
-From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
-Date: Fri, 20 Jan 2017 21:50:22 +0530
-Subject: [PATCH 2/4] ARM: nommu: dynamic exception base address setting
-In-Reply-To: <f47f7a48-12e9-7dd0-324d-b736eead3187@arm.com>
-References: <20170118203525.6246-1-afzal.mohd.ma@gmail.com>
- <20170118203807.6467-1-afzal.mohd.ma@gmail.com>
- <f47f7a48-12e9-7dd0-324d-b736eead3187@arm.com>
-Message-ID: <20170120162022.GB3865@afzalpc>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 20 Jan 2017 17:21:38 +0100
+Subject: [PATCH v3 2/9] ARM64: dts: meson-gxbb-p200: add the ethernet
+ PHY's reset GPIO
+In-Reply-To: <20170120152232.13943-3-martin.blumenstingl@googlemail.com>
+References: <20170120132650.9784-1-martin.blumenstingl@googlemail.com>
+ <20170120152232.13943-1-martin.blumenstingl@googlemail.com>
+ <20170120152232.13943-3-martin.blumenstingl@googlemail.com>
+Message-ID: <20170120162138.GE25907@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Jan 19, 2017 at 01:59:09PM +0000, Vladimir Murzin wrote:
-> On 18/01/17 20:38, afzal mohammed wrote:
-
-> > +#define ID_PFR1_SE (0x3 << 4)	/* Security extension enable bits */
+On Fri, Jan 20, 2017 at 04:22:25PM +0100, Martin Blumenstingl wrote:
+> This resets the ethernet PHY during boot to get the PHY into a "clean"
+> state.
+> While here also specify the phy-handle of the ethmac node to make the
+> PHY configuration similar to the one we have on GXL devices. This will
+> allow us to specify OF-properties for the PHY itself.
 > 
-> This bitfiled is 4 bits wide.
-
-Since only 2 LSb's out of the 4 were enough to detect whether security
-extensions were enabled, it was done so. i am going to use your below
-suggestion & this would be taken care by that.
-
-> > +	if (security_extensions_enabled()) {
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
 > 
-> You can use
-> 
->     cpuid_feature_extract(CPUID_EXT_PFR1, 4)
->     
-> and add a comment explaining what we are looking for and why.
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
+> index 03e3d76626dd..fa0f84cfeaa9 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
+> @@ -51,6 +51,30 @@
+>  	model = "Amlogic Meson GXBB P200 Development Board";
+>  };
+>  
+> +&ethmac {
+> +	status = "okay";
+> +	pinctrl-0 = <&eth_rgmii_pins>;
+> +	pinctrl-names = "default";
+> +	phy-handle = <&eth_phy0>;
+> +	phy-mode = "rgmii";
+> +
+> +	snps,reset-gpio = <&gpio GPIOZ_14 0>;
+> +	snps,reset-delays-us = <0 10000 1000000>;
+> +	snps,reset-active-low;
+> +
+> +	mdio {
+> +		compatible = "snps,dwmac-mdio";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		eth_phy0: ethernet-phy at 0 {
+> +			compatible = "ethernet-phy-id0022.1620",
 
-Yes, that is better, was not aware of this, did saw CPUID_EXT_PFR1 as
-an unused macro.
+Hi Martin
 
-> > +#ifdef CONFIG_CPU_CP15
-> > +	vectors_base = setup_vectors_base();
-> > +#endif
-> 
-> alternatively it can be
-> 
-> 	unsigned long vector_base = IS_ENABLED(CONFIG_CPU_CP15) ? setup_vbar() : 0;
+You don't need to specify the PHY ID. You really only need this when
+the PHY is reporting no ID, or a wrong ID. In fact, if a new revision
+of the board is made, with a different PHY, you might have a problem,
+the wrong PHY driver is loaded.
 
-Yes that certainly is better.
-
-Regards
-afzal
+   Andrew
