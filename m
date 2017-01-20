@@ -1,38 +1,34 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 19 Jan 2017 17:05:29 -0800
-Subject: [PATCH] ARM: ep93xx: Disable TS-72xx watchdog before uncompressing
-In-Reply-To: <SN1PR0101MB1565EBACEA749241E3FC3169D0910@SN1PR0101MB1565.prod.exchangelabs.com>
-References: <20161211191615.13696-1-f.fainelli@gmail.com>
- <6d58631d-37a2-8362-e9aa-0c360fac4509@gmail.com>
- <SN1PR0101MB1565EBACEA749241E3FC3169D0910@SN1PR0101MB1565.prod.exchangelabs.com>
-Message-ID: <633e3405-c66d-0503-2626-36ebb0cfb756@gmail.com>
+From: dingtianhong@huawei.com (Ding Tianhong)
+Date: Fri, 20 Jan 2017 09:22:12 +0800
+Subject: [PATCH v9 0/4] arm64: arch_timer: Add workaround for
+ hisilicon-161010101 erratum
+In-Reply-To: <23512329-e8d9-4b4f-c460-4d769ef7102e@arm.com>
+References: <1484832916-7248-1-git-send-email-dingtianhong@huawei.com>
+ <23512329-e8d9-4b4f-c460-4d769ef7102e@arm.com>
+Message-ID: <a8f1f48d-6f59-7252-90ba-9e8a56c218d1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/19/2016 08:08 AM, Hartley Sweeten wrote:
-> On Sunday, December 18, 2016 7:08 PM, Florian Fainelli wrote:
->> Le 12/11/16 ? 11:16, Florian Fainelli a ?crit :
->>> The TS-72xx/73xx boards have a CPLD watchdog which is configured to
->>> reset the board after 8 seconds, if the kernel is large enough that this
->>> takes about this time to decompress the kernel, we will encounter a
->>> spurious reboot.
->>>
->>> Do not pull ts72xx.h, but instead locally define what we need to disable
->>> the watchdog.
->>>
->>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
->>
->> Hartley, Ryan, do you guys maintain a git tree with EP93xx patches, or
->> should I submit them through RMK's patch system once you are okay with them?
-> 
-> Ryan has an old tree on github but it has not been updated since Oct 14, 2013.  I'm
-> not sure if he is doing any active development at this time.
-> 
-> This patch will have to go through RMK's patch system or some other tree.
 
-Olof, Arnd, Kevin, should I just resent this patch to arm at kernel.org for
-you to pick it?
+On 2017/1/19 21:49, Marc Zyngier wrote:
+> On 19/01/17 13:35, Ding Tianhong wrote:
+>> Erratum Hisilicon-161010101 says that the ARM generic timer counter "has the
+>> potential to contain an erroneous value when the timer value changes".
+>> Accesses to TVAL (both read and write) are also affected due to the implicit counter
+>> read.  Accesses to CVAL are not affected.
+> 
+> Please. 3 series in 2 hours is not fun, and is not helping your case
+> either. Give us the time to properly review your patches, and wait until
+> we ask you to respin if we think that this is required.
+> 
+> Thanks,
+> 
+
+OKo<
+Thank you for your correction.
 
 Thanks
--- 
-Florian
+Ding
+
+> 	M.
+> 
