@@ -1,68 +1,89 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri, 20 Jan 2017 09:20:50 -0500
-Subject: [PATCH V2] PCI: enable extended tags support for PCIe devices
-Message-ID: <1484922050-9139-1-git-send-email-okaya@codeaurora.org>
+From: roger.pau@citrix.com (Roger Pau =?iso-8859-1?Q?Monn=E9?=)
+Date: Fri, 20 Jan 2017 14:24:26 +0000
+Subject: [Xen-devel] [RFC] Device memory mappings for Dom0 on ARM64 ACPI
+ systems
+In-Reply-To: <a40dda2b-e6f3-3222-9b56-9208d96ce5d0@arm.com>
+References: <alpine.DEB.2.10.1701171309040.2347@sstabellini-ThinkPad-X260>
+ <20170118110243.ctqpperggim5k7dw@dhcp-3-221.uk.xensource.com>
+ <alpine.DEB.2.10.1701181058110.10192@sstabellini-ThinkPad-X260>
+ <20c89f12-cb0c-1145-99d0-320b2080b503@arm.com>
+ <20170119154129.7dnjzvq23jop7oye@dhcp-3-221.uk.xensource.com>
+ <alpine.DEB.2.10.1701191002330.10192@sstabellini-ThinkPad-X260>
+ <94e89cb4-f40c-585e-b3e8-d9f8f58b53d9@arm.com>
+ <20170120110114.2ajkmmhxhhbc6acl@dhcp-3-221.uk.xensource.com>
+ <a40dda2b-e6f3-3222-9b56-9208d96ce5d0@arm.com>
+Message-ID: <20170120142426.eqs2n23ugrz2f6v5@dhcp-3-221.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Each PCIe device can issue up to 32 transactions at a time by default.
-Each transaction is tracked by a tag number on the bus. 2.2.6.2.
-Transaction Descriptor ? Transaction ID Field section of the PCIe 3.1
-specification describes extended tags.
+On Fri, Jan 20, 2017 at 02:10:33PM +0100, Julien Grall wrote:
+> Hi Royger,
+> 
+> On 20/01/2017 12:01, Roger Pau Monn? wrote:
+> > On Thu, Jan 19, 2017 at 09:14:03PM +0100, Julien Grall wrote:
+> In case of ARM, Xen does not use any PCI devices (no PCI UART) itself so
+> scanning before hand is not necessary. If possible, I would prefer to have
+> the scanning in one place rather than spreading in different place depending
+> on the segments (we do have multiple segment on ARM).
 
-32 transaction limit has been extended to 256 on PCI Express. According
-to the specification, all PCIe devices are required to support receiving
-8-bit Tags (Tag completer). The PCIe-PCI bridges handle the translation
-of 8-bit tags to 5-bit tags.
+AFAIK on ARM you could do the scan inside of the implementation of
+PHYSDEVOP_pci_mmcfg_reserved hypercall, and that would be enough in order to
+discover the devices.
 
-However, the generation of 8-bit tags is left optional to a particular HW
-implementation. The code needs to check HW support before attempting
-to enable extended tags producer capability.
+> > 
+> > > Also, you are assuming that the MCFG will describe the host controller. This
+> > > is the case only when host controller available at boot. So you may miss
+> > > some here.
+> > 
+> > Yes, I know, that's why we need the hypercall. The information in the MCFG
+> > table might be incomplete, and the hardware domain would have to fetch extra
+> > ECAM information from the _SEG method of host bridge devices in the ACPI
+> > namespace.
+> > 
+> > > Furthermore, on ARM we have other static tables (such as GTDT) contain MMIO
+> > > region to map.
+> > > 
+> > > Lastly, all devices are not PCI and you may have platform devices. The
+> > > platform devices will only be described in the ASL. Just in case, those
+> > > regions are not necessarily described in UEFI memory map.
+> > 
+> > Will those devices work properly in such scenario? (ie: are they behind the
+> > SMMU?)
+> 
+> Platform devices might or might not be behind of the SMMU. It will depend if
+> the device is DMA-capable and often whether the implementer decided to have
+> an SMMU.
+> 
+> Today, there is no SMMU support (it is by-passed) for ACPI so we haven't yet
+> encountered the problem. We have an item to investigate the work to be done
+> here.
 
-32 outstanding transactions is not enough for some performance critical
-applications especially when a lot of small sized frames are transmitted.
+Why would you need the SMMU for ACPI?
 
-Extended tags support increases this number to 256. Devices not
-supporting extended tags tie-off this field to 0. According to ECN, it
-is safe to enable this feature for all PCIe devices.
+> Some thoughts, each device will be associated to one of multiple StreamID
+> (ID to configure the SMMU). I guess we could find this from the static table
+> IORT, need to check.
+> 
+> Also, some of the platform device will have MSIs, I suspect the number of
+> MSIs will be either hardcoded or found in the ASL. So we would need to have
+> a new hypercall to advertise those.
+> 
+> > 
+> > > So you need DOM0 to tell the list of regions.
+> > 
+> > Yes, I agree that we need such hypercall ATM, although I think that we might be
+> > able to get rid of it in the long term if we are able to parse the AML tables
+> > from Xen.
+> 
+> Are you suggesting to bring a full AML parser in Xen? If so, it will be much
+> bigger than Xen ARM itself. I would need a strong use case to accept a such
+> thing.
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/pci/probe.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+It could be placed in the init section, and get rid of it after boot. Also, I
+find it hard to believe that an AML parser is bigger than the whole Xen on ARM.
+The OpenBSD folks have a DSDT parser in ~4000 lines of code [0], and that's
+probably way more than what Xen actually needs.
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index e164b5c..1192475 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -1650,12 +1650,28 @@ static void program_hpp_type2(struct pci_dev *dev, struct hpp_type2 *hpp)
- 	 */
- }
- 
-+static void pci_configure_extended_tags(struct pci_dev *pdev)
-+{
-+	u32 dev_cap;
-+	int ret;
-+
-+	ret = pcie_capability_read_dword(pdev, PCI_EXP_DEVCAP, &dev_cap);
-+
-+	if (ret)
-+		return;
-+
-+	if (dev_cap & PCI_EXP_DEVCAP_EXT_TAG)
-+		pcie_capability_set_word(pdev, PCI_EXP_DEVCTL,
-+					 PCI_EXP_DEVCTL_EXT_TAG);
-+}
-+
- static void pci_configure_device(struct pci_dev *dev)
- {
- 	struct hotplug_params hpp;
- 	int ret;
- 
- 	pci_configure_mps(dev);
-+	pci_configure_extended_tags(dev);
- 
- 	memset(&hpp, 0, sizeof(hpp));
- 	ret = pci_get_hp_params(dev, &hpp);
--- 
-1.9.1
+Roger.
+
+[0] https://github.com/openbsd/src/blob/master/sys/dev/acpi/dsdt.c
