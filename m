@@ -1,71 +1,29 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Fri, 20 Jan 2017 23:21:16 +0100
-Subject: [PATCH 16/18] ARM64: dts: meson-gxl-s905x-nexbox-a95x: Reorder nodes
-In-Reply-To: <20170120222118.21476-1-afaerber@suse.de>
-References: <20170120222118.21476-1-afaerber@suse.de>
-Message-ID: <20170120222118.21476-17-afaerber@suse.de>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Fri, 20 Jan 2017 23:34:29 +0100
+Subject: [PATCH] ARM64: dts: meson-gxm: Rename q200 and q201 DT files for
+ consistency
+In-Reply-To: <1484814117-7593-1-git-send-email-narmstrong@baylibre.com>
+References: <1484814117-7593-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <df8b4529-2e8e-df5c-8757-a2b2763a8e37@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sort nodes referenced by label alphabetically.
+Am 19.01.2017 um 09:21 schrieb Neil Armstrong:
+> In order to keep consistency naming with the Nexbox A1 DTS file, remove the
 
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- .../dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts    | 28 +++++++++++-----------
- 1 file changed, 14 insertions(+), 14 deletions(-)
+If dt64 branch does get rebased: "consistency with" or "consistent naming"
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts
-index cea4a3eded9b..9e91f0809dcd 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts
-@@ -129,10 +129,10 @@
- 	};
- };
- 
--&uart_AO {
--	status = "okay";
--	pinctrl-0 = <&uart_ao_a_pins>;
--	pinctrl-names = "default";
-+&cvbs_vdac_port {
-+	cvbs_vdac_out: endpoint {
-+		remote-endpoint = <&cvbs_connector_in>;
-+	};
- };
- 
- &ethmac {
-@@ -147,6 +147,14 @@
- 	pinctrl-names = "default";
- };
- 
-+&pwm_ef {
-+	status = "okay";
-+	pinctrl-0 = <&pwm_e_pins>;
-+	pinctrl-names = "default";
-+	clocks = <&clkc CLKID_FCLK_DIV4>;
-+	clock-names = "clkin0";
-+};
-+
- /* Wireless SDIO Module */
- &sd_emmc_a {
- 	status = "okay";
-@@ -206,16 +214,8 @@
- 	vqmmc-supply = <&vddio_boot>;
- };
- 
--&pwm_ef {
-+&uart_AO {
- 	status = "okay";
--	pinctrl-0 = <&pwm_e_pins>;
-+	pinctrl-0 = <&uart_ao_a_pins>;
- 	pinctrl-names = "default";
--	clocks = <&clkc CLKID_FCLK_DIV4>;
--	clock-names = "clkin0";
--};
--
--&cvbs_vdac_port {
--	cvbs_vdac_out: endpoint {
--		remote-endpoint = <&cvbs_connector_in>;
--	};
- };
+> S912 SoC name in the GXM DT files.
+> 
+> Suggested-by: Andreas F?rber <afaerber@suse.de>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+
+Reviewed-by: Andreas F?rber <afaerber@suse.de>
+
+Regards,
+Andreas
+
 -- 
-2.10.2
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
