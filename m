@@ -1,44 +1,57 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 20 Jan 2017 20:27:49 +0100
-Subject: [PATCH v10 6/8] arm/arm64: vgic: Implement VGICv3 CPU interface
- access
-In-Reply-To: <1480576187-5012-7-git-send-email-vijay.kilari@gmail.com>
-References: <1480576187-5012-1-git-send-email-vijay.kilari@gmail.com>
- <1480576187-5012-7-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <20170120192749.GG13531@cbox>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 20 Jan 2017 20:32:24 +0100
+Subject: Nokia N900: microphone mixers
+In-Reply-To: <20170120140404.GG32502@pali>
+References: <20170114225614.GA25321@amd> <201701150100.54214@pali>
+ <20170115100533.GA15816@amd>
+ <40dbce4e-d99d-d77d-e682-5b004c70ca40@bitmer.com>
+ <d2c78625-565a-86ec-a03e-f15ae071942a@ti.com>
+ <ecdc073b-d83f-ba7d-89bf-da8899414217@bitmer.com>
+ <20170120133159.GA5241@amd> <20170120133830.GF32502@pali>
+ <20170120140047.GB5241@amd> <20170120140404.GG32502@pali>
+Message-ID: <20170120193224.GA14527@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 01, 2016 at 12:39:45PM +0530, vijay.kilari at gmail.com wrote:
-> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+On Fri 2017-01-20 15:04:04, Pali Roh?r wrote:
+> On Friday 20 January 2017 15:00:47 Pavel Machek wrote:
+> > On Fri 2017-01-20 14:38:30, Pali Roh?r wrote:
+> > > On Friday 20 January 2017 14:31:59 Pavel Machek wrote:
+> > > > Hi!
+> > > > 
+> > > > Do you have any idea how to control the microphone? I'd like the audio
+> > > > source to be microphone on headset (not the built in one). So I run
+> > > > alsamixer, set everything in "capture" section to zero... and I still
+> > > > get the audio from the internal microphone :-(.
+> > > > 
+> > > > Tested with arecord | aplay.
+> > > > 
+> > > > Any ideas?
+> > > 
+> > > Hi! Try to set Jack Function to Headset or enable b HS Mic.
+> > 
+> > I can't find "b HS Mic" function. I can set "Input Select" to "ADC",
+> > and ten internal microphone is off, but I can't get any audio on
+> > input. I tried with "Jack function" both "headset" and "headphone".
+> > 
+> > Do I need to enable microphone bias voltage somewhere?
 > 
-> VGICv3 CPU interface registers are accessed using
-> KVM_DEV_ARM_VGIC_CPU_SYSREGS ioctl. These registers are accessed
-> as 64-bit. The cpu MPIDR value is passed along with register id.
-> is used to identify the cpu for registers access.
+> When you set Jack function to headset it automatically enable HS Mic
+> control which controls mic bias.
 > 
-> The VM that supports SEIs expect it on destination machine to handle
-> guest aborts and hence checked for ICC_CTLR_EL1.SEIS compatibility.
-> Similarly, VM that supports Affinity Level 3 that is required for AArch64
-> mode, is required to be supported on destination machine. Hence checked
-> for ICC_CTLR_EL1.A3V compatibility.
-> 
-> The arch/arm64/kvm/vgic-sys-reg-v3.c handles read and write of VGIC
-> CPU registers for AArch64.
-> 
-> For AArch32 mode, arch/arm/kvm/vgic-v3-coproc.c file is created but
-> APIs are not implemented.
-> 
-> Updated arch/arm/include/uapi/asm/kvm.h with new definitions
-> required to compile for AArch32.
-> 
-> The version of VGIC v3 specification is define here
-> Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-> 
-> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
-> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
-> ---
+> If Jack function in headset mode does not work, then there is bug. Try
+> older versions of kernel...
 
-With Eric's comments addressed on this patch, it now looks good to me.
+Would you know which mainline kernel version is "known good"?
 
--Christoffer
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170120/a099e3fe/attachment.sig>
