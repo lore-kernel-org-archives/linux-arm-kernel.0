@@ -1,182 +1,46 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Sat, 21 Jan 2017 00:45:46 +0530
-Subject: [PATCH V6 09/11] arm64: dma-mapping: Remove the notifier trick to
- handle early setting of dma_ops
-In-Reply-To: <1484939748-31591-1-git-send-email-sricharan@codeaurora.org>
-References: <1484939748-31591-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1484939748-31591-10-git-send-email-sricharan@codeaurora.org>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Sat, 21 Jan 2017 00:50:03 +0530
+Subject: [PATCH V5 08/12] iommu/arm-smmu: Clean up early-probing
+ workarounds
+In-Reply-To: <20170119161826.GI31594@arm.com>
+References: <1484838356-24962-1-git-send-email-sricharan@codeaurora.org>
+ <1484838356-24962-9-git-send-email-sricharan@codeaurora.org>
+ <20170119161826.GI31594@arm.com>
+Message-ID: <000001d27352$37b5cea0$a7216be0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With arch_setup_dma_ops now being called late during device's probe after
-the device's iommu is probed, the notifier trick required to handle the
-early setup of dma_ops before the iommu group gets created is not
-required. So removing the notifier's here.
+Hi Will,
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-[rm: clean up even more]
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- arch/arm64/mm/dma-mapping.c | 132 ++++----------------------------------------
- 1 file changed, 12 insertions(+), 120 deletions(-)
+>-----Original Message-----
+From: linux-arm-msm-owner@vger.kernel.org [mailto:linux-arm-msm-owner at vger.kernel.org] On Behalf Of Will Deacon
+>Sent: Thursday, January 19, 2017 9:48 PM
+>To: Sricharan R <sricharan@codeaurora.org>
+>Cc: robin.murphy at arm.com; joro at 8bytes.org; lorenzo.pieralisi at arm.com; iommu at lists.linux-foundation.org; linux-arm-
+>kernel at lists.infradead.org; linux-arm-msm at vger.kernel.org; m.szyprowski at samsung.com
+>Subject: Re: [PATCH V5 08/12] iommu/arm-smmu: Clean up early-probing workarounds
+>
+>On Thu, Jan 19, 2017 at 08:35:52PM +0530, Sricharan R wrote:
+>> From: Robin Murphy <robin.murphy@arm.com>
+>>
+>> Now that the appropriate ordering is enforced via profe-deferral of
+>> masters in core code, rip it all out and bask in the simplicity.
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> [Sricharan: Rebased on top of ACPI IORT SMMU series]
+>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>> ---
+>>  * No change
+>>
+>>  drivers/iommu/arm-smmu-v3.c | 46 ++---------------------------------
+>>  drivers/iommu/arm-smmu.c    | 58 +++++++--------------------------------------
+>>  2 files changed, 10 insertions(+), 94 deletions(-)
+>
+>Acked-by: Will Deacon <will.deacon@arm.com>
+>
+>I can't wait to see this series merged. What's the plan for that?
 
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index e040827..5845b13 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -803,140 +803,32 @@ static void __iommu_unmap_sg_attrs(struct device *dev,
- 	.mapping_error = iommu_dma_mapping_error,
- };
- 
--/*
-- * TODO: Right now __iommu_setup_dma_ops() gets called too early to do
-- * everything it needs to - the device is only partially created and the
-- * IOMMU driver hasn't seen it yet, so it can't have a group. Thus we
-- * need this delayed attachment dance. Once IOMMU probe ordering is sorted
-- * to move the arch_setup_dma_ops() call later, all the notifier bits below
-- * become unnecessary, and will go away.
-- */
--struct iommu_dma_notifier_data {
--	struct list_head list;
--	struct device *dev;
--	const struct iommu_ops *ops;
--	u64 dma_base;
--	u64 size;
--};
--static LIST_HEAD(iommu_dma_masters);
--static DEFINE_MUTEX(iommu_dma_notifier_lock);
--
--static bool do_iommu_attach(struct device *dev, const struct iommu_ops *ops,
--			   u64 dma_base, u64 size)
--{
--	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
--
--	/*
--	 * If the IOMMU driver has the DMA domain support that we require,
--	 * then the IOMMU core will have already configured a group for this
--	 * device, and allocated the default domain for that group.
--	 */
--	if (!domain || iommu_dma_init_domain(domain, dma_base, size, dev)) {
--		pr_warn("Failed to set up IOMMU for device %s; retaining platform DMA ops\n",
--			dev_name(dev));
--		return false;
--	}
--
--	dev->archdata.dma_ops = &iommu_dma_ops;
--	return true;
--}
--
--static void queue_iommu_attach(struct device *dev, const struct iommu_ops *ops,
--			      u64 dma_base, u64 size)
--{
--	struct iommu_dma_notifier_data *iommudata;
--
--	iommudata = kzalloc(sizeof(*iommudata), GFP_KERNEL);
--	if (!iommudata)
--		return;
--
--	iommudata->dev = dev;
--	iommudata->ops = ops;
--	iommudata->dma_base = dma_base;
--	iommudata->size = size;
--
--	mutex_lock(&iommu_dma_notifier_lock);
--	list_add(&iommudata->list, &iommu_dma_masters);
--	mutex_unlock(&iommu_dma_notifier_lock);
--}
--
--static int __iommu_attach_notifier(struct notifier_block *nb,
--				   unsigned long action, void *data)
--{
--	struct iommu_dma_notifier_data *master, *tmp;
--
--	if (action != BUS_NOTIFY_BIND_DRIVER)
--		return 0;
--
--	mutex_lock(&iommu_dma_notifier_lock);
--	list_for_each_entry_safe(master, tmp, &iommu_dma_masters, list) {
--		if (data == master->dev && do_iommu_attach(master->dev,
--				master->ops, master->dma_base, master->size)) {
--			list_del(&master->list);
--			kfree(master);
--			break;
--		}
--	}
--	mutex_unlock(&iommu_dma_notifier_lock);
--	return 0;
--}
--
--static int __init register_iommu_dma_ops_notifier(struct bus_type *bus)
--{
--	struct notifier_block *nb = kzalloc(sizeof(*nb), GFP_KERNEL);
--	int ret;
--
--	if (!nb)
--		return -ENOMEM;
--
--	nb->notifier_call = __iommu_attach_notifier;
--
--	ret = bus_register_notifier(bus, nb);
--	if (ret) {
--		pr_warn("Failed to register DMA domain notifier; IOMMU DMA ops unavailable on bus '%s'\n",
--			bus->name);
--		kfree(nb);
--	}
--	return ret;
--}
--
- static int __init __iommu_dma_init(void)
- {
--	int ret;
--
--	ret = iommu_dma_init();
--	if (!ret)
--		ret = register_iommu_dma_ops_notifier(&platform_bus_type);
--	if (!ret)
--		ret = register_iommu_dma_ops_notifier(&amba_bustype);
--#ifdef CONFIG_PCI
--	if (!ret)
--		ret = register_iommu_dma_ops_notifier(&pci_bus_type);
--#endif
--	return ret;
-+	return iommu_dma_init();
- }
- arch_initcall(__iommu_dma_init);
- 
- static void __iommu_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
- 				  const struct iommu_ops *ops)
- {
--	struct iommu_group *group;
-+	struct iommu_domain *domain;
- 
- 	if (!ops)
- 		return;
-+
- 	/*
--	 * TODO: As a concession to the future, we're ready to handle being
--	 * called both early and late (i.e. after bus_add_device). Once all
--	 * the platform bus code is reworked to call us late and the notifier
--	 * junk above goes away, move the body of do_iommu_attach here.
-+	 * The IOMMU core code allocates the default DMA domain, which the
-+	 * underlying IOMMU driver needs to support via the dma-iommu layer.
- 	 */
--	group = iommu_group_get(dev);
--	if (group) {
--		do_iommu_attach(dev, ops, dma_base, size);
--		iommu_group_put(group);
--	} else {
--		queue_iommu_attach(dev, ops, dma_base, size);
-+	domain = iommu_get_domain_for_dev(dev);
-+	if (!domain || iommu_dma_init_domain(domain, dma_base, size, dev)) {
-+		pr_warn("Failed to set up IOMMU for device %s; retaining platform DMA ops\n",
-+			dev_name(dev));
-+		return;
- 	}
-+
-+	dev->archdata.dma_ops = &iommu_dma_ops;
- }
- 
- void arch_teardown_dma_ops(struct device *dev)
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Thanks. Posted V6 with your tags and comments for V5 addressed.
+
+Regards,
+ Sricharan
