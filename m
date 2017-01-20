@@ -1,48 +1,50 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 20 Jan 2017 15:00:47 +0100
-Subject: Nokia N900: microphone mixers
-In-Reply-To: <20170120133830.GF32502@pali>
-References: <20170112181826.GA28290@amd> <201701121934.19810@pali>
- <20170114225614.GA25321@amd> <201701150100.54214@pali>
- <20170115100533.GA15816@amd>
- <40dbce4e-d99d-d77d-e682-5b004c70ca40@bitmer.com>
- <d2c78625-565a-86ec-a03e-f15ae071942a@ti.com>
- <ecdc073b-d83f-ba7d-89bf-da8899414217@bitmer.com>
- <20170120133159.GA5241@amd> <20170120133830.GF32502@pali>
-Message-ID: <20170120140047.GB5241@amd>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Fri, 20 Jan 2017 11:00:38 -0300
+Subject: [PATCH] clk: samsung: exynos5420: Mark CLK_ACLK432_SCALER as
+ CLK_IS_CRITICAL
+In-Reply-To: <0ffa0d28-1086-887c-dcfc-590b6146b03e@samsung.com>
+References: <CGME20170120104148epcas5p11af0e630f0881092a9b3b43e8b5b1aac@epcas5p1.samsung.com>
+ <1484908891-11820-1-git-send-email-javier@osg.samsung.com>
+ <551ac156-0cfa-29be-335f-d8a1f171cd8a@samsung.com>
+ <0ffa0d28-1086-887c-dcfc-590b6146b03e@samsung.com>
+Message-ID: <48a2f141-4275-cb79-aafd-62191d747107@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2017-01-20 14:38:30, Pali Roh?r wrote:
-> On Friday 20 January 2017 14:31:59 Pavel Machek wrote:
-> > Hi!
-> > 
-> > Do you have any idea how to control the microphone? I'd like the audio
-> > source to be microphone on headset (not the built in one). So I run
-> > alsamixer, set everything in "capture" section to zero... and I still
-> > get the audio from the internal microphone :-(.
-> > 
-> > Tested with arecord | aplay.
-> > 
-> > Any ideas?
+Hello Sylwester,
+
+On 01/20/2017 10:55 AM, Sylwester Nawrocki wrote:
+> On 01/20/2017 01:32 PM, Sylwester Nawrocki wrote:
+>> On 01/20/2017 11:41 AM, Javier Martinez Canillas wrote:
+>>> On Exynos5800 SoC the SCALER block uses 2 input clocks: CLK_ACLK_300_GSCL
+>>> and CLK_ACLK432_SCALER, so both needs to be ungated in order to access it.
+>>>
+>>> But Exynos5420 only has the CLK_ACLK_300_GSCL as gsc_pd clk. So just using
+>>> this definition from exynos5420.dtsi in Exynos5800 leads to the following:
+>> [...]
+>>> So until a proper solution based on runtime PM gets merged, mark the clock
+>>> as critical to prevent it to be gated.
+>>>
+>>> Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>>
+>> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 > 
-> Hi! Try to set Jack Function to Headset or enable b HS Mic.
+> Oops, the $subject patch can be dropped since as Marek just pointed out
+> to me the changes introduced by that patch are already included in a patch
+> which is already in the v4.10 fixes queue:
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/clk/linux.git/commit/?h=clk-next&id=318fa46cc60d37fec1e87dbf03a82aca0f5ce695
+> 
 
-I can't find "b HS Mic" function. I can set "Input Select" to "ADC",
-and ten internal microphone is off, but I can't get any audio on
-input. I tried with "Jack function" both "headset" and "headphone".
+Yes, I just answered to Marek in the other thread saying the same.
+He did mention the patch could fix the issue but for some reason I
+didn't see the CLK_ACLK_300_GSCL in the clocks marked as critical...
 
-Do I need to enable microphone bias voltage somewhere?
+Anyways, sorry for the noise.
 
 Best regards,
-									Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170120/a94c2a45/attachment.sig>
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
