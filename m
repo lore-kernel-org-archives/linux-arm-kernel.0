@@ -1,67 +1,55 @@
 From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Fri, 20 Jan 2017 10:15:06 +0100
-Subject: [PATCH v9 5/8] IIO: add bindings for STM32 timer trigger driver
+Date: Fri, 20 Jan 2017 10:15:09 +0100
+Subject: [PATCH v9 8/8] ARM: dts: stm32: Enable pwm1 and pwm3 for
+ stm32f469-disco
 In-Reply-To: <1484903709-11650-1-git-send-email-benjamin.gaignard@st.com>
 References: <1484903709-11650-1-git-send-email-benjamin.gaignard@st.com>
-Message-ID: <1484903709-11650-6-git-send-email-benjamin.gaignard@st.com>
+Message-ID: <1484903709-11650-9-git-send-email-benjamin.gaignard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define bindings for STM32 timer trigger
-
-version 8:
-- reword "reg" parameter description
-
-version 4:
-- remove triggers enumeration from DT
-- add reg parameter
-
-version 3:
-- change file name
-- add cross reference with mfd bindings
-
-version 2:
-- only keep one compatible
-- add DT parameters to set lists of the triggers:
-  one list describe the triggers created by the device
-  another one give the triggers accepted by the device
+Define and enable pwm1 and pwm3 for stm32f469 discovery board
 
 Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-Acked-by: Jonathan Cameron <jic23@kernel.org>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../bindings/iio/timer/stm32-timer-trigger.txt     | 23 ++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
+ arch/arm/boot/dts/stm32f469-disco.dts | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt b/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
-new file mode 100644
-index 0000000..55a653d
---- /dev/null
-+++ b/Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
-@@ -0,0 +1,23 @@
-+STMicroelectronics STM32 Timers IIO timer bindings
+diff --git a/arch/arm/boot/dts/stm32f469-disco.dts b/arch/arm/boot/dts/stm32f469-disco.dts
+index 8a163d7..92552d3 100644
+--- a/arch/arm/boot/dts/stm32f469-disco.dts
++++ b/arch/arm/boot/dts/stm32f469-disco.dts
+@@ -81,3 +81,31 @@
+ &usart3 {
+ 	status = "okay";
+ };
 +
-+Must be a sub-node of an STM32 Timers device tree node.
-+See ../mfd/stm32-timers.txt for details about the parent node.
++&timers1 {
++	status = "okay";
 +
-+Required parameters:
-+- compatible:	Must be "st,stm32-timer-trigger".
-+- reg:		Identify trigger hardware block.
-+
-+Example:
-+	timers at 40010000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "st,stm32-timers";
-+		reg = <0x40010000 0x400>;
-+		clocks = <&rcc 0 160>;
-+		clock-names = "clk_int";
-+
-+		timer at 0 {
-+			compatible = "st,stm32-timer-trigger";
-+			reg = <0>;
-+		};
++	pwm {
++		pinctrl-0 = <&pwm1_pins>;
++		pinctrl-names = "default";
++		status = "okay";
 +	};
++
++	timer at 0 {
++		status = "okay";
++	};
++};
++
++&timers3 {
++	status = "okay";
++
++	pwm {
++		pinctrl-0 = <&pwm3_pins>;
++		pinctrl-names = "default";
++		status = "okay";
++	};
++
++	timer at 2 {
++		status = "okay";
++	};
++};
 -- 
 1.9.1
