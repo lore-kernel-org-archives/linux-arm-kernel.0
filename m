@@ -1,60 +1,91 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 20 Jan 2017 17:18:42 +0100
-Subject: [PATCH v3 2/9] ARM64: dts: meson-gxbb-p200: add the ethernet
- PHY's reset GPIO
-In-Reply-To: <20170120152232.13943-3-martin.blumenstingl@googlemail.com>
-References: <20170120132650.9784-1-martin.blumenstingl@googlemail.com>
- <20170120152232.13943-1-martin.blumenstingl@googlemail.com>
- <20170120152232.13943-3-martin.blumenstingl@googlemail.com>
-Message-ID: <20170120161842.GD25907@lunn.ch>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 20 Jan 2017 16:22:36 +0000
+Subject: [PATCH v13 1/7] arm64: Rename the common MADT parse routine
+In-Reply-To: <1484686210-7211-2-git-send-email-jeremy.linton@arm.com>
+References: <1484686210-7211-1-git-send-email-jeremy.linton@arm.com>
+ <1484686210-7211-2-git-send-email-jeremy.linton@arm.com>
+Message-ID: <20170120162236.GA14295@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2017 at 04:22:25PM +0100, Martin Blumenstingl wrote:
-> This resets the ethernet PHY during boot to get the PHY into a "clean"
-> state.
-> While here also specify the phy-handle of the ethmac node to make the
-> PHY configuration similar to the one we have on GXL devices. This will
-> allow us to specify OF-properties for the PHY itself.
-> 
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+On Tue, Jan 17, 2017 at 02:50:04PM -0600, Jeremy Linton wrote:
+> The MADT parser in smp.c is now being used to parse
+> out NUMA, PMU and ACPI parking protocol information as
+
+Nit: It is not used to parse PMU yet at this stage so
+either you remove PMU from the list or you move this patch
+to the end of the series.
+
+> well as the GIC information for which it was originally
+> created. Rename it to avoid a misleading name.
+
+It is funny smp.c never mapped _any_ GIC information :) (even
+though it parses the MADT GIC CPU interface entries).
+
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 > ---
->  arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
+>  arch/arm64/kernel/smp.c | 13 +++++++------
+>  1 file changed, 7 insertions(+), 6 deletions(-)
 > 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
-> index 03e3d76626dd..fa0f84cfeaa9 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
-> @@ -51,6 +51,30 @@
->  	model = "Amlogic Meson GXBB P200 Development Board";
->  };
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index cb87234..8ea244c 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -517,13 +517,14 @@ static unsigned int cpu_count = 1;
 >  
-> +&ethmac {
-> +	status = "okay";
-> +	pinctrl-0 = <&eth_rgmii_pins>;
-> +	pinctrl-names = "default";
-> +	phy-handle = <&eth_phy0>;
-> +	phy-mode = "rgmii";
-> +
-> +	snps,reset-gpio = <&gpio GPIOZ_14 0>;
-> +	snps,reset-delays-us = <0 10000 1000000>;
-> +	snps,reset-active-low;
-> +
-> +	mdio {
-> +		compatible = "snps,dwmac-mdio";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		eth_phy0: ethernet-phy at 0 {
+>  #ifdef CONFIG_ACPI
+>  /*
+> - * acpi_map_gic_cpu_interface - parse processor MADT entry
+> + * acpi_verify_and_map_madt - parse processor MADT entry
+>   *
+>   * Carry out sanity checks on MADT processor entry and initialize
+> - * cpu_logical_map on success
+> + * cpu_logical_map, the ACPI parking protocol, NUMA mapping
+> + * and the PMU interrupts on success
+>   */
+>  static void __init
+> -acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
+> +acpi_verify_and_map_madt(struct acpi_madt_generic_interrupt *processor)
 
-Hi Martin
+acpi_map_madt_cpu_entry()
 
-ethernet-phy at 3, because of the reg property.
+or just drop this patch to avoid useless bikeshedding, your choice.
 
+>  {
+>  	u64 hwid = processor->arm_mpidr;
+>  
+> @@ -577,7 +578,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
+>  }
+>  
+>  static int __init
+> -acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
+> +acpi_parse_madt_common(struct acpi_subtable_header *header,
+>  			     const unsigned long end)
 
-> +			compatible = "ethernet-phy-id0022.1620",
-> +				     "ethernet-phy-ieee802.3-c22";
-> +			reg = <3>;
+acpi_madt_parse_cpus()
 
-  Andrew
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+
+>  {
+>  	struct acpi_madt_generic_interrupt *processor;
+> @@ -588,7 +589,7 @@ acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
+>  
+>  	acpi_table_print_madt_entry(header);
+>  
+> -	acpi_map_gic_cpu_interface(processor);
+> +	acpi_verify_and_map_madt(processor);
+>  
+>  	return 0;
+>  }
+> @@ -672,7 +673,7 @@ void __init smp_init_cpus(void)
+>  		 * we need for SMP init
+>  		 */
+>  		acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
+> -				      acpi_parse_gic_cpu_interface, 0);
+> +				      acpi_parse_madt_common, 0);
+>  
+>  	if (cpu_count > nr_cpu_ids)
+>  		pr_warn("Number of cores (%d) exceeds configured maximum of %d - clipping\n",
+> -- 
+> 2.5.5
+> 
