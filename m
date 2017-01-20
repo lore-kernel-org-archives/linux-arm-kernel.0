@@ -1,72 +1,83 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Fri, 20 Jan 2017 12:21:59 +0100
-Subject: [PATCH v5 08/14] sata: ahci-da850: implement a workaround for the
- softreset quirk
+Date: Fri, 20 Jan 2017 12:22:01 +0100
+Subject: [PATCH v5 10/14] sata: ahci-da850: add a workaround for controller
+ instability
 In-Reply-To: <1484911325-23425-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1484911325-23425-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1484911325-23425-9-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1484911325-23425-11-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's an issue with the da850 SATA controller: if port multiplier
-support is compiled in, but we're connecting the drive directly to
-the SATA port on the board, the drive can't be detected.
+We have a use case with the da850 SATA controller where at PLL0
+frequency of 456MHz (needed to properly service the LCD controller)
+the chip becomes unstable and the hardreset operation is ignored the
+first time 50% of times.
 
-To make SATA work on the da850-lcdk board: first try to softreset
-with pmp - if the operation fails with -EBUSY, retry without pmp.
+The sata core driver already retries to resume the link because some
+controllers ignore writes to the SControl register, but just retrying
+the resume operation doesn't work - we need to issue he phy/wake reset
+again to make it work.
+
+Reimplement ahci_hardreset() in the driver and poke the controller a
+couple times before really giving up.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/ata/ahci_da850.c | 33 ++++++++++++++++++++++++++++++++-
- 1 file changed, 32 insertions(+), 1 deletion(-)
+ drivers/ata/ahci_da850.c | 28 +++++++++++++++++++++++++++-
+ 1 file changed, 27 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/ata/ahci_da850.c b/drivers/ata/ahci_da850.c
-index 7f5328f..11dd87e 100644
+index 11dd87e..0b2b1a4 100644
 --- a/drivers/ata/ahci_da850.c
 +++ b/drivers/ata/ahci_da850.c
-@@ -54,11 +54,42 @@ static void da850_sata_init(struct device *dev, void __iomem *pwrdn_reg,
- 	writel(val, ahci_base + SATA_P0PHYCR_REG);
+@@ -16,7 +16,8 @@
+ #include <linux/ahci_platform.h>
+ #include "ahci.h"
+ 
+-#define DRV_NAME "ahci_da850"
++#define DRV_NAME		"ahci_da850"
++#define HARDRESET_RETRIES	5
+ 
+ /* SATA PHY Control Register offset from AHCI base */
+ #define SATA_P0PHYCR_REG	0x178
+@@ -76,6 +77,29 @@ static int ahci_da850_softreset(struct ata_link *link,
+ 	return ret;
  }
  
-+static int ahci_da850_softreset(struct ata_link *link,
++static int ahci_da850_hardreset(struct ata_link *link,
 +				unsigned int *class, unsigned long deadline)
 +{
-+	int pmp, ret;
-+
-+	pmp = sata_srst_pmp(link);
++	int ret, retry = HARDRESET_RETRIES;
++	bool online;
 +
 +	/*
-+	 * There's an issue with the SATA controller on da850 SoCs: if we
-+	 * enable Port Multiplier support, but the drive is connected directly
-+	 * to the board, it can't be detected. As a workaround: if PMP is
-+	 * enabled, we first call ahci_do_softreset() and pass it the result of
-+	 * sata_srst_pmp(). If this call fails, we retry with pmp = 0.
++	 * In order to correctly service the LCD controller of the da850 SoC,
++	 * we increased the PLL0 frequency to 456MHz from the default 300MHz.
++	 *
++	 * This made the SATA controller unstable and the hardreset operation
++	 * does not always succeed the first time. Before really giving up to
++	 * bring up the link, retry the reset a couple times.
 +	 */
-+	ret = ahci_do_softreset(link, class, pmp, deadline, ahci_check_ready);
-+	if (pmp && ret == -EBUSY)
-+		return ahci_do_softreset(link, class, 0,
-+					 deadline, ahci_check_ready);
++	do {
++		ret = ahci_do_hardreset(link, class, deadline, &online);
++		if (online)
++			return ret;
++	} while (retry--);
 +
 +	return ret;
 +}
 +
-+static struct ata_port_operations ahci_da850_port_ops = {
-+	.inherits = &ahci_platform_ops,
-+	.softreset = ahci_da850_softreset,
-+	/*
-+	 * No need to override .pmp_softreset - it's only used for actual
-+	 * PMP-enabled ports.
-+	 */
-+};
-+
- static const struct ata_port_info ahci_da850_port_info = {
- 	.flags		= AHCI_FLAG_COMMON,
- 	.pio_mask	= ATA_PIO4,
- 	.udma_mask	= ATA_UDMA6,
--	.port_ops	= &ahci_platform_ops,
-+	.port_ops	= &ahci_da850_port_ops,
+ static struct ata_port_operations ahci_da850_port_ops = {
+ 	.inherits = &ahci_platform_ops,
+ 	.softreset = ahci_da850_softreset,
+@@ -83,6 +107,8 @@ static struct ata_port_operations ahci_da850_port_ops = {
+ 	 * No need to override .pmp_softreset - it's only used for actual
+ 	 * PMP-enabled ports.
+ 	 */
++	.hardreset = ahci_da850_hardreset,
++	.pmp_hardreset = ahci_da850_hardreset,
  };
  
- static struct scsi_host_template ahci_platform_sht = {
+ static const struct ata_port_info ahci_da850_port_info = {
 -- 
 2.9.3
