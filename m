@@ -1,19 +1,24 @@
-From: vbabka@suse.cz (Vlastimil Babka)
-Date: Fri, 20 Jan 2017 14:35:26 +0100
-Subject: [PATCH 3/3] mm: wire up GFP flag passing in
- dma_alloc_from_contiguous
-In-Reply-To: <20170119170707.31741-3-l.stach@pengutronix.de>
-References: <20170119170707.31741-1-l.stach@pengutronix.de>
- <20170119170707.31741-3-l.stach@pengutronix.de>
-Message-ID: <139e94c3-4d03-de35-0c91-217c73c0f5f2@suse.cz>
+From: tj@kernel.org (Tejun Heo)
+Date: Fri, 20 Jan 2017 08:34:29 -0500
+Subject: [PATCH 1/3 v2] ahci: qoriq: added a condition to enable dma
+ coherence
+In-Reply-To: <1484895576-40379-1-git-send-email-yuantian.tang@nxp.com>
+References: <1484895576-40379-1-git-send-email-yuantian.tang@nxp.com>
+Message-ID: <20170120133429.GB31487@mtj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/19/2017 06:07 PM, Lucas Stach wrote:
-> The callers of the DMA alloc functions already provide the proper
-> context GFP flags. Make sure to pass them through to the CMA
-> allocator, to make the CMA compaction context aware.
+On Fri, Jan 20, 2017 at 02:59:34PM +0800, yuantian.tang at nxp.com wrote:
+> From: Tang Yuantian <Yuantian.Tang@nxp.com>
 > 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> Enable DMA coherence in SATA controller on condition that
+> dma-coherent property exists in sata node in DTS.
+> 
+> Signed-off-by: Tang Yuantian <yuantian.tang@nxp.com>
 
-Acked-by: Vlastimil Babka <vbabka@suse.cz>
+Applied to libata/for-4.11.
+
+Thanks.
+
+-- 
+tejun
