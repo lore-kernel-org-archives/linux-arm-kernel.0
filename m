@@ -1,45 +1,26 @@
-From: aford173@gmail.com (aford173 at gmail.com)
-Date: Fri, 20 Jan 2017 10:44:01 -0600
-Subject: [PATCH] ARM: OMAP3: Fix SoC detection of OMAP36/37 Family
-Message-ID: <1484930641-18566-1-git-send-email-aford173@gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 20 Jan 2017 11:46:00 -0500 (EST)
+Subject: [PATCH 3/3] bcm63xx_enet: avoid uninitialized variable warning
+In-Reply-To: <20170118145306.1004008-3-arnd@arndb.de>
+References: <20170118145306.1004008-1-arnd@arndb.de>
+ <20170118145306.1004008-3-arnd@arndb.de>
+Message-ID: <20170120.114600.1285813871724893800.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Adam Ford <aford173@gmail.com>
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Wed, 18 Jan 2017 15:52:53 +0100
 
-The OMAP36/37 families are similar, but there are a few features sections
-that can help identify some of them.  Let's add checks for 3630/3730,
-OMAP3621, DM3725, OMAP3615/DM3715, OMAP3611, and AM3703 all based on
-features similar to what was done for the OMAP34xx/35xx series
+> gcc-7 and probably earlier versions get confused by this function
+> and print a harmless warning:
+> 
+> drivers/net/ethernet/broadcom/bcm63xx_enet.c: In function 'bcm_enet_open':
+> drivers/net/ethernet/broadcom/bcm63xx_enet.c:1130:3: error: 'phydev' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> 
+> This adds an initialization for the 'phydev' variable when it is unused
+> and changes the check to test for that NULL pointer to make it clear
+> that we always pass a valid pointer here.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-The checkpatch flags some warnings for braces, but I kept the coding style
-to match the adjacent code for consistency.
-
-I don't have an OMAP36xx to test, but this was tested on both a DM3730 and
-AM3703.
-
-Signed-off-by: Adam Ford <aford173@gmail.com>
-
-diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-index cc6d9fa..e2274a1 100644
---- a/arch/arm/mach-omap2/id.c
-+++ b/arch/arm/mach-omap2/id.c
-@@ -223,7 +223,15 @@ static void __init omap3_cpuinfo(void)
- 	 * and CPU class bits.
- 	 */
- 	if (soc_is_omap3630()) {
--		cpu_name = "OMAP3630";
-+		if (omap3_has_iva() && omap3_has_sgx()) {
-+			cpu_name = (omap3_has_isp()) ? "OMAP3630/DM3730" : "OMAP3621";
-+		} else if (omap3_has_iva()) {
-+			cpu_name = "DM3725";
-+		} else if (omap3_has_sgx()) {
-+			cpu_name = "OMAP3615/AM3715";
-+		} else {
-+			cpu_name = (omap3_has_isp()) ? "AM3703" : "OMAP3611";
-+		}
- 	} else if (soc_is_am35xx()) {
- 		cpu_name = (omap3_has_sgx()) ? "AM3517" : "AM3505";
- 	} else if (soc_is_ti816x()) {
--- 
-2.7.4
+Also applied, thanks.
