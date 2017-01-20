@@ -1,157 +1,71 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Fri, 20 Jan 2017 08:15:21 -0600
-Subject: [PATCH 1/2] dt-bindings: gpu: Add Mali Utgard bindings
-In-Reply-To: <20170120091608.ijdhpeq2t5no75rc@lukather>
-References: <20170116132424.7038-1-maxime.ripard@free-electrons.com>
- <CALAqxLV=5ZCu8=rDUFHS9148DxzrqeTipsueA7F4i3t-mcWr=A@mail.gmail.com>
- <20170120091608.ijdhpeq2t5no75rc@lukather>
-Message-ID: <CAL_JsqL5fYVvCRgui9NQVEM+=gkGUnf7-D9KHK9YTtJyfGy3Ew@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 20 Jan 2017 14:18:40 +0000
+Subject: [PATCH v3 2/4] dt-bindings: Add TI SCI PM Domains
+In-Reply-To: <CAPDyKFqzs59N5bc89X-96Fgy9b=_+s8zYmHHshQeDrJCnaqprA@mail.gmail.com>
+References: <20170104205536.15963-1-d-gerlach@ti.com>
+ <20170104205536.15963-3-d-gerlach@ti.com>
+ <20170109175012.sg7eze7llqq7qevd@rob-hp-laptop>
+ <7bd282d9-df6f-f4c6-1f7f-c8ed81c78af3@ti.com>
+ <CAL_JsqKxU4c=KSn0=xX9kmbk498fhqpiXMeGjcoe8Ah48FAzUg@mail.gmail.com>
+ <3bb89649-fd2a-acc6-6968-e54a00842ce2@ti.com>
+ <CAL_JsqL+L1oHAOv7tLevzbtRFSKRs9J01SgF=HR_vNNqNV+4+Q@mail.gmail.com>
+ <84d7d49b-933b-8b26-f18a-3a5054738cb1@ti.com>
+ <CAL_JsqJ9RitNC7ihC8ckJgV+49kaHk=W9tgdNBSjEfydhQS46A@mail.gmail.com>
+ <0eaa9914-83f1-7716-cf04-1e3dd44df647@ti.com>
+ <4cb25cf9-216f-2e18-f45d-ef7e48fa6c5e@ti.com> <m2ziip2puf.fsf@baylibre.com>
+ <CAL_Jsq+Vp8iYrAUmuSRzeeY_G6CUqFqG6XB6erDxo1RYo3g4=g@mail.gmail.com>
+ <CAPDyKFqzs59N5bc89X-96Fgy9b=_+s8zYmHHshQeDrJCnaqprA@mail.gmail.com>
+Message-ID: <c31cffa6-160a-de29-4ee7-fd74fc9cc743@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2017 at 3:16 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi John,
->
-> On Thu, Jan 19, 2017 at 11:24:38AM -0800, John Stultz wrote:
->> On Mon, Jan 16, 2017 at 5:24 AM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > The ARM Mali Utgard GPU family is embedded into a number of SoCs from
->> > Allwinner, Amlogic, Mediatek or Rockchip.
->> >
->> > Add a binding for the GPU of that family.
->> >
->> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> > ---
->> >  .../devicetree/bindings/gpu/arm,mali-utgard.txt    | 76 ++++++++++++++++++++++
->> >  1 file changed, 76 insertions(+)
->> >  create mode 100644 Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
->> >
->> > diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
->> > new file mode 100644
->> > index 000000000000..df05ba0ec357
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
->> > @@ -0,0 +1,76 @@
->> > +ARM Mali Utgard GPU
->> > +===================
->> > +
->> > +Required properties:
->> > +  - compatible:
->> > +    * "arm,mali-utgard" and one of the following:
->> > +      + "arm,mali-300"
->> > +      + "arm,mali-400"
->> > +      + "arm,mali-450"
->> > +
->> > +  - reg: Physical base address and length of the GPU registers
->> > +
->> > +  - interrupts: an entry for each entry in interrupt-names.
->> > +    See ../interrupt-controller/interrupts.txt for details.
->> > +
->> > +  - interrupt-names:
->> > +    * ppX: Pixel Processor X interrupt (X from 0 to 7)
->> > +    * ppmmuX: Pixel Processor X MMU interrupt (X from 0 to 7)
->> > +    * pp: Pixel Processor broadcast interrupt (mali-450 only)
->> > +    * gp: Geometry Processor interrupt
->> > +    * gpmmu: Geometry Processor MMU interrupt
->> > +
->> > +
->> > +Optional properties:
->> > +  - interrupt-names:
->> > +    * pmu: Power Management Unit interrupt, if implemented in hardware
->> > +
->> > +Vendor-specific bindings
->> > +------------------------
->> > +
->> > +The Mali GPU is integrated very differently from one SoC to
->> > +another. In order to accommodate those differences, you have the option
->> > +to specify one more vendor-specific compatible, among:
->> > +
->> > +  - allwinner,sun4i-a10-mali
->> > +    Required properties:
->> > +      * clocks: an entry for each entry in clock-names
->> > +      * clock-names:
->> > +        + bus: bus clock for the GPU
->> > +        + core: clock driving the GPU itself
->> > +      * resets: phandle to the reset line for the GPU
->> > +
->> > +  - allwinner,sun7i-a20-mali
->> > +    Required properties:
->> > +      * clocks: an entry for each entry in clock-names
->> > +      * clock-names:
->> > +        + bus: bus clock for the GPU
->> > +        + core: clock driving the GPU itself
->> > +      * resets: phandle to the reset line for the GPU
->> > +
->> > +Example:
->> > +
->> > +mali: gpu at 01c40000 {
->> > +       compatible = "allwinner,sun7i-a20-mali", "arm,mali-400",
->> > +                    "arm,mali-utgard";
->> > +       reg = <0x01c40000 0x10000>;
->> > +       interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>,
->> > +                    <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>,
->> > +                    <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>,
->> > +                    <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
->> > +                    <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>,
->> > +                    <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>,
->> > +                    <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
->> > +       interrupt-names = "gp",
->> > +                         "gpmmu",
->> > +                         "pp0",
->> > +                         "ppmmu0",
->> > +                         "pp1",
->> > +                         "ppmmu1",
->> > +                         "pmu";
->> > +       clocks = <&ccu CLK_BUS_GPU>, <&ccu CLK_GPU>;
->> > +       clock-names = "bus", "core";
->> > +       resets = <&ccu RST_BUS_GPU>;
->> > +};
+
+
+On 20/01/17 14:00, Ulf Hansson wrote:
+> + Sudeep
+> 
+> On 19 January 2017 at 00:03, Rob Herring <robh@kernel.org> wrote:
+
 >>
->> Having a mali utgard binding upstream would be great. However I'm a
->> little worried that the mali driver I've used sort of only half way
->> uses DT, and still requires a custom built in platform driver to setup
->> numerous other things.  Curious if you have a pointer to the kernel
->> driver you've been using with the vendor specific bindings above?  I'd
->> like to try to adapt what we have to your method to validate the above
->> as generic.
->
-> I've created a custom platform driver, so just like you it seems,
-> because I've not managed to make ARM's DT support work.
->
-> https://github.com/mripard/sunxi-mali/blob/master/driver/src/devicedrv/mali/platform/sunxi/sunxi.c
->
-> I haven't updated it yet with the bindings suggested above, but only
-> the interrupt and clock names have changed. The rest very much
-> applies.
->
-> The only thing that might be vendor specific would be the (optional)
-> declaration of the mali_gpu_device_data structure. As far as I know,
-> there's two things of importance there:
->   - the list of the valid OPPs in order to do DVFS, but that could be
->     made generic too using the operating-points binding
->
->   - And the valid area for the buffers for the fbdev blobs (fb_start,
->     fb_size and shared_mem_size). I'm not entirely happy with this one
->     so far (which is also why I've not pushed it). We'd need to come
->     up with a way to get the base address and size of the CMA region
->     backing the framebuffer allocation, but I haven't find any trivial
->     way to do so, so for now I just hardcoded it. Worst case scenario,
->     we can hardcode values based on the compatible.
-
-memory-region property?
-
->
->> And, just for context, here's the node we've been using with hikey:
+>> We could continue to use the power domain binding (maybe we already
+>> are and that ship has sailed). I'm not totally against the idea even
+>> if there is no power domain, but I'm not sold on it either. If we do
+>> go this route, then I still say the id should be a cell in the
+>> power-domain phandle.
 >>
->>                 mali:mali at f4080000 {
->>                         compatible = "arm,mali-450", "arm,mali-utgard";
->>                         reg = <0x0 0x3f100000 0x0 0x00708000>;
->
-> This is because the hikey is using a 64 bits CPU, right?
+>> Another option is create something new either common or TI SCI
+>> specific. It could be just a table of ids and phandles in the SCI
+>> node. I'm much more comfortable with an isolated property in one node
+>> than something scattered throughout the DT.
+> 
+> To me, this seems like the best possible solution.
+> 
+> However, perhaps we should also consider the SCPI Generic power domain
+> (drivers/firmware/scpi_pm_domain.c), because I believe it's closely
+> related.
+> To change the power state of a device, this PM domain calls
+> scpi_device_set|get_power_state() (drivers/firmware/arm_scpi.c), which
+> also needs a device id as a parameter. Very similar to our case with
+> the TI SCI domain.
+> 
+> Currently these SCPI device ids lacks corresponding DT bindings, so
+> the scpi_pm_domain tries to work around it by assigning ids
+> dynamically at genpd creation time.
+> 
 
-Having 2 cells for address and size is generally entirely pointless.
-The peripheral regions generally don't need 64-bits of address space
-or size. ranges should be used.
+IIUC do you mean the binding for the power domain provider to have a
+list of domain ids ? If so yes, we don't have one.
 
-Rob
+But the idea was to have the range to be continuous and create genpd for
+the complete range. Though the SCPI specification lacked a command to
+get the max. no. of domains supported. That's the reason we had to
+introduce the num-domains(*) which may be optional if we have firmware
+interface to obtain that information.
+
+-- 
+Regards,
+Sudeep
+
+(*) P.S: but it has been considered for SCMI(which is an improvement and
+more flexible/extensible replacement/upgrade to SCPI) which will be
+released soon.
