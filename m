@@ -1,30 +1,24 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 20 Jan 2017 18:46:58 +0100
-Subject: [PATCH v3 2/9] ARM64: dts: meson-gxbb-p200: add the ethernet
- PHY's reset GPIO
-In-Reply-To: <CAFBinCA47Nng_jjxKrWrV_YBHr0bg+7xPaJrVswt_WnZ6wtyjA@mail.gmail.com>
-References: <20170120132650.9784-1-martin.blumenstingl@googlemail.com>
- <20170120152232.13943-1-martin.blumenstingl@googlemail.com>
- <20170120152232.13943-3-martin.blumenstingl@googlemail.com>
- <20170120162138.GE25907@lunn.ch>
- <CAFBinCA47Nng_jjxKrWrV_YBHr0bg+7xPaJrVswt_WnZ6wtyjA@mail.gmail.com>
-Message-ID: <20170120174658.GG25907@lunn.ch>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 20 Jan 2017 09:53:02 -0800
+Subject: [PATCH] ARM64: dts: meson-gxl: rename Nexbox A95x for consistency
+In-Reply-To: <cc16a3ea-7491-a631-4587-abb25a2a235d@suse.de>
+References: <20170120173843.6522-1-khilman@baylibre.com>
+ <cc16a3ea-7491-a631-4587-abb25a2a235d@suse.de>
+Message-ID: <CAOi56cX1NVgeHTHJDjxY0w1eQLs57_zYNHmPXS7XzO8=vWnQMA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2017 at 06:07:20PM +0100, Martin Blumenstingl wrote:
-> I though that this is good practice - the documentation doesn't say
-> that it should only be added in specific cases: [0]
+On Fri, Jan 20, 2017 at 9:45 AM, Andreas F?rber <afaerber@suse.de> wrote:
+> Am 20.01.2017 um 18:38 schrieb Kevin Hilman:
+>> Since the GXL family has S905X and S905D SoCs, we're keeping the SoC
+>> name in the DTS filename for clarity.  Rename this file accordingly to
+>> be consistent with the rest of the GXL DTS files.
+>>
+>> Cc: Neil Armstrong <narmstrong@baylibre.com>
+>> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+>
+> Reviewed-by: Andreas F?rber <afaerber@suse.de>
 
-Agreed, the text should be better, listing when it is appropriate to
-use.
+Applied to v4.11/dt64 with your reviewed-by.
 
-> my intention behind adding the PHY ID was to make it easier to see
-> which devices uses which PHY. this is especially useful for devices
-> with RTL8211F PHY (basically all devices with RGMII PHY except the
-> P200) as these may need similar fixes than [1]
-
-I would not say it is wrong to list the PHY ID, it just has
-consequences if the PHY ever changes.
-
-	     Andrew
+Kevin
