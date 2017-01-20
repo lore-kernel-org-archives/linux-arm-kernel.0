@@ -1,60 +1,41 @@
 From: zyw@rock-chips.com (Chris Zhong)
-Date: Fri, 20 Jan 2017 18:10:46 +0800
-Subject: [PATCH v3 0/5] Rockchip dw-mipi-dsi driver
-Message-ID: <1484907051-7159-1-git-send-email-zyw@rock-chips.com>
+Date: Fri, 20 Jan 2017 18:10:47 +0800
+Subject: [PATCH v3 1/5] dt-bindings: add rk3399 support for dw-mipi-rockchip
+In-Reply-To: <1484907051-7159-1-git-send-email-zyw@rock-chips.com>
+References: <1484907051-7159-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <1484907051-7159-2-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all
+The dw-mipi-dsi of rk3399 is almost the same as rk3288, the rk3399 has
+additional phy config clock.
 
-This patch serial is for RK3399 MIPI DSI. The MIPI DSI controller of
-RK3399 is almost the same as RK3288, except a little bit of difference
-in phy clock controlling and port id selection register. These patches
-add RK3399 support and the power domain support.
+Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
 
-And these patches base on John Keeping's series[0], it fixes many bugs,
-they have been tested on rk3288 evb board.
+Changes in v3: None
 
-[0]:
-[01/26] https://patchwork.kernel.org/patch/9340213
-[02/26] https://patchwork.kernel.org/patch/9340145
-[03/26] https://patchwork.kernel.org/patch/9340235
-[04/26] https://patchwork.kernel.org/patch/9340123
-[05/26] https://patchwork.kernel.org/patch/9340161
-[06/26] https://patchwork.kernel.org/patch/9340203
-[07/26] https://patchwork.kernel.org/patch/9340229
-[08/26] https://patchwork.kernel.org/patch/9340131
-[09/26] https://patchwork.kernel.org/patch/9340191
-[10/26] https://patchwork.kernel.org/patch/9340175
-[11/26] https://patchwork.kernel.org/patch/9340237
-[12/26] https://patchwork.kernel.org/patch/9340207
-[13/26] https://patchwork.kernel.org/patch/9340233
-[14/26] https://patchwork.kernel.org/patch/9340205
-[15/26] https://patchwork.kernel.org/patch/9340189
-[16/26] https://patchwork.kernel.org/patch/9340143
-[17/26] https://patchwork.kernel.org/patch/9340117
-[18/26] https://patchwork.kernel.org/patch/9340193
-[19/26] https://patchwork.kernel.org/patch/9340151
-[20/26] https://patchwork.kernel.org/patch/9340183
-[23/26] https://patchwork.kernel.org/patch/9340173
-[24/26] https://patchwork.kernel.org/patch/9340251
-[25/26] https://patchwork.kernel.org/patch/9340127
-[26/26] https://patchwork.kernel.org/patch/9340139
+ .../devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt     | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-
-Changes in v3:
-- base on John Keeping's patch series
-
-Chris Zhong (5):
-  dt-bindings: add rk3399 support for dw-mipi-rockchip
-  drm/rockchip/dsi: dw-mipi: support RK3399 mipi dsi
-  drm/rockchip/dsi: remove mode_valid function
-  dt-bindings: add power domain node for dw-mipi-rockchip
-  drm/rockchip/dsi: add dw-mipi power domain support
-
- .../display/rockchip/dw_mipi_dsi_rockchip.txt      |   7 +-
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c             | 156 ++++++++++++---------
- 2 files changed, 96 insertions(+), 67 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
+index 1753f0c..0f82568 100644
+--- a/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
++++ b/Documentation/devicetree/bindings/display/rockchip/dw_mipi_dsi_rockchip.txt
+@@ -5,10 +5,12 @@ Required properties:
+ - #address-cells: Should be <1>.
+ - #size-cells: Should be <0>.
+ - compatible: "rockchip,rk3288-mipi-dsi", "snps,dw-mipi-dsi".
++	      "rockchip,rk3399-mipi-dsi", "snps,dw-mipi-dsi".
+ - reg: Represent the physical address range of the controller.
+ - interrupts: Represent the controller's interrupt to the CPU(s).
+ - clocks, clock-names: Phandles to the controller's pll reference
+-  clock(ref) and APB clock(pclk), as described in [1].
++  clock(ref) and APB clock(pclk). For RK3399, a phy config clock
++  (phy_cfg) is additional required. As described in [1].
+ - rockchip,grf: this soc should set GRF regs to mux vopl/vopb.
+ - ports: contain a port node with endpoint definitions as defined in [2].
+   For vopb,set the reg = <0> and set the reg = <1> for vopl.
 -- 
 2.6.3
