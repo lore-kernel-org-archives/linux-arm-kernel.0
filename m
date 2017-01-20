@@ -1,75 +1,32 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 20 Jan 2017 10:24:39 -0800
-Subject: [PATCH 0/3] misc: sram: Introduce protect-exec region type
-In-Reply-To: <20170112205220.26325-1-d-gerlach@ti.com>
-References: <20170112205220.26325-1-d-gerlach@ti.com>
-Message-ID: <20170120182438.GD7403@atomide.com>
+Date: Fri, 20 Jan 2017 10:28:50 -0800
+Subject: [PATCH 36/37] ARM: DRA7: clockdomain: Change the CLKTRCTRL of
+ CM_PCIE_CLKSTCTRL to SW_WKUP
+In-Reply-To: <587C628E.7070804@ti.com>
+References: <1484216786-17292-1-git-send-email-kishon@ti.com>
+ <1484216786-17292-37-git-send-email-kishon@ti.com>
+ <20170113171537.GZ2630@atomide.com> <587C628E.7070804@ti.com>
+Message-ID: <20170120182850.GE7403@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [170112 12:54]:
-> Hi,
-> There are several instances when one would want to execute out of on-chip
-> SRAM, such as PM code on ARM platforms, so once again revisiting this
-> series to allow that in a generic manner. Seems that having a solution for
-> allowing SRAM to be mapped as executable will help clean up PM code on several
-> ARM platforms that are using ARM internal __arm_ioremap_exec API
-> and also open the door for PM support on new platforms like TI AM335x and
-> AM437x.
+* Kishon Vijay Abraham I <kishon@ti.com> [170115 22:06]:
+> Hi Tony,
 > 
-> Previously a generic solution was attempted by introducing a memremap
-> executable API and then calling this from the generic sram driver here [1].
-> Russell King brought up the point that we should not just be mapping
-> memory as both writable and executable for security reasons which led to
-> the solution proposed in this series. 
+> On Friday 13 January 2017 10:45 PM, Tony Lindgren wrote:
+> > * Kishon Vijay Abraham I <kishon@ti.com> [170112 02:35]:
+> >> The PCIe programming sequence in TRM suggests CLKSTCTRL of PCIe should
+> >> be set to SW_WKUP. There are no issues when CLKSTCTRL is set to HW_AUTO
+> >> in RC mode. However in EP mode, the host system is not able to access the
+> >> MEMSPACE and setting the CLKSTCTRL to SW_WKUP fixes it.
+> > 
+> > I guess ideally in the long run we would set this dynamically based on
+> > the selected mode, right?
 > 
-> The generic SRAM driver already has a concept of "partitions" which can be
-> defined and flagged in the device tree, so this series introduces a new flag,
-> protect-exec, which indicates the region of SRAM that has been blocked out in
-> the DT is protected and executable. It will share the same capabilities of the
-> already present sram "pool" which will allow allocation through the use of the
-> genalloc framework but also be protected through the use of an "sram_exec_copy"
-> helper function to handle the copying of data to the space and also the page
-> attributes. In this context protected means the memory is managed such that
-> it is *either* writeable and non-executable or read-only and executable through
-> manipulation of the page attributes.
-> 
-> Unforunately, unlike the previously proposed solution, this is not a drop in
-> replacement for __arm_ioremap_exec, A large side effect of allocating
-> executable SRAM as this series does is that it will require rework for some
-> SRAM code as a lot of the assembly code I have seen makes use of PC relative
-> memory locations at the end of the code for local variables. This will no
-> longer be possible if we must maintain the read-only executable status of
-> the memory. If that's required then SRAM code will need to use pointers to
-> a separately allocated region of sram that is just a normal writable pool.
-> 
-> As mentioned in previous series I still see several platforms (at-91,
-> imx6, socfpga, omap3) that could make use of this although some rework may
-> be required unlike with the last solution, and it will be needed for the
-> forthcoming TI am335x and am437x PM code as portions of PM code are
-> moving in to drivers. An example of this in use can be seen at [2] in the 
-> drivers/memory/ti-emif-sram.c and drivers/soc/ti/pm33xx.c files.
+> The programming sequence mentioned in the TRM w.r.t clock programming is same
+> for both host mode or device mode. Though we never faced any issues in host
+> mode when HW_AUTO is set, it's better to follow TRM recommended settings IMHO.
 
-Looks good to me:
+OK best to merge this with the whole series:
 
 Acked-by: Tony Lindgren <tony@atomide.com>
-
-> [1] http://www.spinics.net/lists/linux-omap/msg132728.html
-> [2] https://github.com/dgerlach/linux-pm/tree/upstream/v4.10/sram-exec-copy-pm
-> 
-> Dave Gerlach (3):
->   misc: sram: Split sram data structures into local header
->   misc: sram: Introduce support code for protect-exec sram type
->   misc: sram: Integrate protect-exec reserved sram area type
-> 
->  Documentation/devicetree/bindings/sram/sram.txt |   6 ++
->  drivers/misc/Kconfig                            |   4 +
->  drivers/misc/Makefile                           |   1 +
->  drivers/misc/sram-exec.c                        | 105 ++++++++++++++++++++++++
->  drivers/misc/sram.c                             |  51 +++++-------
->  drivers/misc/sram.h                             |  58 +++++++++++++
->  include/linux/sram.h                            |  27 ++++++
->  7 files changed, 222 insertions(+), 30 deletions(-)
->  create mode 100644 drivers/misc/sram-exec.c
->  create mode 100644 drivers/misc/sram.h
->  create mode 100644 include/linux/sram.h
