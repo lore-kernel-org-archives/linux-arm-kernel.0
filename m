@@ -1,38 +1,39 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 20 Jan 2017 07:50:07 -0800
-Subject: [PATCH 0/3] ARM64: meson-gxbb: Add WeTek Boards
-In-Reply-To: <1484736642-5451-1-git-send-email-narmstrong@baylibre.com> (Neil
- Armstrong's message of "Wed, 18 Jan 2017 11:50:39 +0100")
-References: <1484736642-5451-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <m237gd4tow.fsf@baylibre.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 20 Jan 2017 16:52:21 +0100
+Subject: [PATCH 0/4] i.MX6 power gating controller rework
+Message-ID: <20170120155225.31905-1-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
+This is a new attempt at rewriting the i.MX6 GPC driver to properly
+support multiple power domains. This needs a new DT binding to properly
+describe the power domain properties in the devicetree. Newer SoCs
+like the i.MX6SX are exposing more than 1 device power domain.
 
-> This serie adds support for the WeTek Hub and Play2 boards.
-> The Hub is an extremely small IPTv Set-Top-Box and the Play2 is a more
-> traditionnal Satellite or Terrestrial and IPTv Set-Top-Box.
->
-> Both are based on the p200 Reference Design and out-of-tree support is
-> based on OpenELEC kernel at [1].
+This new series splits out the PGC part of the GPC driver and moves it
+from the architecture code to drivers/soc. It is essentially a complete
+re-write of the driver, so this time I didn't try to keep it in one
+commit, as this seems to cause more confusion than good for the reviewers.
 
-Applied to v4.11/dt64 after s/OpenELEC/LibreELEC/
+The new driver keeps compatibility with the old DT binding, but new
+features will only be added using the new binding.
 
-Kevin
+Lucas Stach (4):
+  dt-bindings: add multidomain support to i.MX GPC DT binding
+  ARM: imx6: remove PGC handling from GPC driver
+  soc/imx: add new GPC driver
+  ARM: imx6: adopt DT to new GPC binding
 
-> [1] https://github.com/wetek-enigma/linux-amlogic
->
-> Neil Armstrong (3):
->   dt-bindings: vendor-prefix: Add wetek vendor prefix
->   ARM64: dts: meson-gxbb: Add support for WeTek Hub and Play
->   dt-bindings: amlogic: Add WeTek boards
->
->  Documentation/devicetree/bindings/arm/amlogic.txt  |  2 +
->  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
->  arch/arm64/boot/dts/amlogic/Makefile               |  2 +
->  .../boot/dts/amlogic/meson-gxbb-wetek-hub.dts      | 66 +++++++++++++++
->  .../boot/dts/amlogic/meson-gxbb-wetek-play2.dts    | 94 ++++++++++++++++++++++
->  5 files changed, 165 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-hub.dts
->  create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-play2.dts
+ .../devicetree/bindings/power/fsl,imx-gpc.txt      |  81 ++--
+ arch/arm/boot/dts/imx6q.dtsi                       |   2 +-
+ arch/arm/boot/dts/imx6qdl.dtsi                     |  38 +-
+ arch/arm/mach-imx/gpc.c                            | 217 ----------
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/imx/Makefile                           |   1 +
+ drivers/soc/imx/gpc.c                              | 480 +++++++++++++++++++++
+ 7 files changed, 564 insertions(+), 256 deletions(-)
+ create mode 100644 drivers/soc/imx/Makefile
+ create mode 100644 drivers/soc/imx/gpc.c
+
+-- 
+2.11.0
