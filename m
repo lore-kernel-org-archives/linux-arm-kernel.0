@@ -1,152 +1,21 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Sat, 21 Jan 2017 00:45:47 +0530
-Subject: [PATCH V6 10/11] iommu/arm-smmu: Clean up early-probing workarounds
-In-Reply-To: <1484939748-31591-1-git-send-email-sricharan@codeaurora.org>
-References: <1484939748-31591-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1484939748-31591-11-git-send-email-sricharan@codeaurora.org>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 20 Jan 2017 14:17:05 -0500 (EST)
+Subject: [PATCH v5 0/2] Add support for the ethernet switch on the
+ ESPRESSObin
+In-Reply-To: <20170119214934.27442-1-gregory.clement@free-electrons.com>
+References: <20170119214934.27442-1-gregory.clement@free-electrons.com>
+Message-ID: <20170120.141705.1390880809796992457.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Robin Murphy <robin.murphy@arm.com>
+From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Date: Thu, 19 Jan 2017 22:49:32 +0100
 
-Now that the appropriate ordering is enforced via profe-deferral of
-masters in core code, rip it all out and bask in the simplicity.
+> I created a new family for this switch and filled the ops structure
+> by selecting which seems the more appropriate functions. I rebased
+> the series on net-next/master which allowed me to benefit to the
+> eeprom functions introduced for the 6390.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-[Sricharan: Rebased on top of ACPI IORT SMMU series]
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
----
- drivers/iommu/arm-smmu-v3.c | 46 ++---------------------------------
- drivers/iommu/arm-smmu.c    | 58 +++++++--------------------------------------
- 2 files changed, 10 insertions(+), 94 deletions(-)
-
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 4d6ec44..632b541 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -2729,51 +2729,9 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
- 	.probe	= arm_smmu_device_probe,
- 	.remove	= arm_smmu_device_remove,
- };
-+module_platform_driver(arm_smmu_driver);
- 
--static int __init arm_smmu_init(void)
--{
--	static bool registered;
--	int ret = 0;
--
--	if (!registered) {
--		ret = platform_driver_register(&arm_smmu_driver);
--		registered = !ret;
--	}
--	return ret;
--}
--
--static void __exit arm_smmu_exit(void)
--{
--	return platform_driver_unregister(&arm_smmu_driver);
--}
--
--subsys_initcall(arm_smmu_init);
--module_exit(arm_smmu_exit);
--
--static int __init arm_smmu_of_init(struct device_node *np)
--{
--	int ret = arm_smmu_init();
--
--	if (ret)
--		return ret;
--
--	if (!of_platform_device_create(np, NULL, platform_bus_type.dev_root))
--		return -ENODEV;
--
--	return 0;
--}
--IOMMU_OF_DECLARE(arm_smmuv3, "arm,smmu-v3", arm_smmu_of_init);
--
--#ifdef CONFIG_ACPI
--static int __init acpi_smmu_v3_init(struct acpi_table_header *table)
--{
--	if (iort_node_match(ACPI_IORT_NODE_SMMU_V3))
--		return arm_smmu_init();
--
--	return 0;
--}
--IORT_ACPI_DECLARE(arm_smmu_v3, ACPI_SIG_IORT, acpi_smmu_v3_init);
--#endif
-+IOMMU_OF_DECLARE(arm_smmuv3, "arm,smmu-v3", NULL);
- 
- MODULE_DESCRIPTION("IOMMU API for ARM architected SMMUv3 implementations");
- MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index a60cded..93f77bb 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -2134,56 +2134,14 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
- 	.probe	= arm_smmu_device_probe,
- 	.remove	= arm_smmu_device_remove,
- };
--
--static int __init arm_smmu_init(void)
--{
--	static bool registered;
--	int ret = 0;
--
--	if (!registered) {
--		ret = platform_driver_register(&arm_smmu_driver);
--		registered = !ret;
--	}
--	return ret;
--}
--
--static void __exit arm_smmu_exit(void)
--{
--	return platform_driver_unregister(&arm_smmu_driver);
--}
--
--subsys_initcall(arm_smmu_init);
--module_exit(arm_smmu_exit);
--
--static int __init arm_smmu_of_init(struct device_node *np)
--{
--	int ret = arm_smmu_init();
--
--	if (ret)
--		return ret;
--
--	if (!of_platform_device_create(np, NULL, platform_bus_type.dev_root))
--		return -ENODEV;
--
--	return 0;
--}
--IOMMU_OF_DECLARE(arm_smmuv1, "arm,smmu-v1", arm_smmu_of_init);
--IOMMU_OF_DECLARE(arm_smmuv2, "arm,smmu-v2", arm_smmu_of_init);
--IOMMU_OF_DECLARE(arm_mmu400, "arm,mmu-400", arm_smmu_of_init);
--IOMMU_OF_DECLARE(arm_mmu401, "arm,mmu-401", arm_smmu_of_init);
--IOMMU_OF_DECLARE(arm_mmu500, "arm,mmu-500", arm_smmu_of_init);
--IOMMU_OF_DECLARE(cavium_smmuv2, "cavium,smmu-v2", arm_smmu_of_init);
--
--#ifdef CONFIG_ACPI
--static int __init arm_smmu_acpi_init(struct acpi_table_header *table)
--{
--	if (iort_node_match(ACPI_IORT_NODE_SMMU))
--		return arm_smmu_init();
--
--	return 0;
--}
--IORT_ACPI_DECLARE(arm_smmu, ACPI_SIG_IORT, arm_smmu_acpi_init);
--#endif
-+module_platform_driver(arm_smmu_driver);
-+
-+IOMMU_OF_DECLARE(arm_smmuv1, "arm,smmu-v1", NULL);
-+IOMMU_OF_DECLARE(arm_smmuv2, "arm,smmu-v2", NULL);
-+IOMMU_OF_DECLARE(arm_mmu400, "arm,mmu-400", NULL);
-+IOMMU_OF_DECLARE(arm_mmu401, "arm,mmu-401", NULL);
-+IOMMU_OF_DECLARE(arm_mmu500, "arm,mmu-500", NULL);
-+IOMMU_OF_DECLARE(cavium_smmuv2, "cavium,smmu-v2", NULL);
- 
- MODULE_DESCRIPTION("IOMMU API for ARM architected SMMU implementations");
- MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+It looks like there will be at least one more respin of this series,
+specifically to remove the new family as Vivien seems to object to
+this.
