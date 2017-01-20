@@ -1,59 +1,31 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 20 Jan 2017 17:21:38 +0100
-Subject: [PATCH v3 2/9] ARM64: dts: meson-gxbb-p200: add the ethernet
- PHY's reset GPIO
-In-Reply-To: <20170120152232.13943-3-martin.blumenstingl@googlemail.com>
-References: <20170120132650.9784-1-martin.blumenstingl@googlemail.com>
- <20170120152232.13943-1-martin.blumenstingl@googlemail.com>
- <20170120152232.13943-3-martin.blumenstingl@googlemail.com>
-Message-ID: <20170120162138.GE25907@lunn.ch>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 20 Jan 2017 19:21:02 +0300
+Subject: [PATCH] ARM: shmobile: rcar-gen2: Add more register documentation
+In-Reply-To: <1484917448-8320-1-git-send-email-geert+renesas@glider.be>
+References: <1484917448-8320-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <9d12d719-0866-a454-88e2-d51a695085cd@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2017 at 04:22:25PM +0100, Martin Blumenstingl wrote:
-> This resets the ethernet PHY during boot to get the PHY into a "clean"
-> state.
-> While here also specify the phy-handle of the ethmac node to make the
-> PHY configuration similar to the one we have on GXL devices. This will
-> allow us to specify OF-properties for the PHY itself.
-> 
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+On 01/20/2017 04:04 PM, Geert Uytterhoeven wrote:
+
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > ---
->  arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
-> index 03e3d76626dd..fa0f84cfeaa9 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
-> @@ -51,6 +51,30 @@
->  	model = "Amlogic Meson GXBB P200 Development Board";
->  };
->  
-> +&ethmac {
-> +	status = "okay";
-> +	pinctrl-0 = <&eth_rgmii_pins>;
-> +	pinctrl-names = "default";
-> +	phy-handle = <&eth_phy0>;
-> +	phy-mode = "rgmii";
-> +
-> +	snps,reset-gpio = <&gpio GPIOZ_14 0>;
-> +	snps,reset-delays-us = <0 10000 1000000>;
-> +	snps,reset-active-low;
-> +
-> +	mdio {
-> +		compatible = "snps,dwmac-mdio";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		eth_phy0: ethernet-phy at 0 {
-> +			compatible = "ethernet-phy-id0022.1620",
+>  arch/arm/mach-shmobile/pm-rcar-gen2.c | 40 +++++++++++++++++++++++++----------
+>  1 file changed, 29 insertions(+), 11 deletions(-)
+>
+> diff --git a/arch/arm/mach-shmobile/pm-rcar-gen2.c b/arch/arm/mach-shmobile/pm-rcar-gen2.c
+> index dd9ac366868f4336..6ed9aa19c4d34766 100644
+> --- a/arch/arm/mach-shmobile/pm-rcar-gen2.c
+> +++ b/arch/arm/mach-shmobile/pm-rcar-gen2.c
+> @@ -20,14 +20,30 @@
+[...]
+> +static inline u32 phys_to_sbar(phys_addr_t addr)
+> +{
+> +	return (((addr) >> 8) & 0xfffffc00);
 
-Hi Martin
+   It's not a macro -- innermost parens not needed...
 
-You don't need to specify the PHY ID. You really only need this when
-the PHY is reporting no ID, or a wrong ID. In fact, if a new revision
-of the board is made, with a different PHY, you might have a problem,
-the wrong PHY driver is loaded.
+[...]
 
-   Andrew
+MBR, Sergei
