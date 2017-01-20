@@ -1,84 +1,87 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Fri, 20 Jan 2017 16:32:18 +0100
-Subject: [PATCH v3 0/9] meson-gx: reset RGMII PHYs and configure TX delay
-In-Reply-To: <20170120152232.13943-1-martin.blumenstingl@googlemail.com>
-References: <20170120132650.9784-1-martin.blumenstingl@googlemail.com>
- <20170120152232.13943-1-martin.blumenstingl@googlemail.com>
-Message-ID: <CAFBinCBQ8S7-tCnkY+Vabs3etSv-gJCsK=tE+RNJZS8+uFfB=Q@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 20 Jan 2017 16:34:59 +0100
+Subject: imx6ul: power-up using the RTC
+In-Reply-To: <20170120121210.gm3wcg4yyvrigpn3@earth>
+References: <b516070d-6539-98d1-c832-d79ac89e8d43@mobi-wize.com>
+ <20170120121210.gm3wcg4yyvrigpn3@earth>
+Message-ID: <20170120153459.tewyg54dcgqnpz2j@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2017 at 4:22 PM, Martin Blumenstingl
-<martin.blumenstingl@googlemail.com> wrote:
-> This series adds the reset GPIOs for the (external) ethernet PHYs on all
-> GXBB boards.
-> Additionally it provides a ethernet PHY node which can be used to specify
-> PHY-specific properties (this may be required if more boards require the
-> "eee-broken-1000t" for the RTL8211F ethernet PHY). To make all board .dts
-> consistent I chose to add the PHY node also for boards which don't have a
-> RTL8211F PHY.
->
-> Patch #7 from this series also removes ethernet support for the P200
-> board because it was broken anyways and nobody seems to have a board
-> available for testing. This was the outcome of the discussion from [0]
->
-> Patch #8 was taken from (older versions of) my other series (see [1]):
-> "[PATCH net-next v3 0/2] stmmac: dwmac-meson8b: configurable
-> RGMII TX delay".
-> The binding changes for amlogic,tx-delay-ns were ACK'ed already.
->
-> Changes since v2:
-> - fixed patch #2 to really update the P200 board (as it's the P200 which
->   actually uses a Micrel KSZ9031 RGMII PHY). Thanks to Neil Armstrong for
->   spotting this huge mistake!
-> - instead of dropping ethernet support for P201 we simply re-configure it
->   to RMII mode (replaces patch #7) without a MDIO node (which keeps PHY
->   auto-scanning enabled). This got Neil Armstrong's ACK off-list already
->
-> Changes since v1:
-> - do not move the MDIO bus to meson-gx as this disables PHY auto-scanning
->   in the stmmac driver (this drops patch #1 from v1)
-> - add the ethernet PHY reset GPIO for nexbox a95x which was forgotten in
->   v1
-> - add the ethernet PHY reset GPIO for boards which were added since v1
->   (wetek hub and wetek play2)
-> - rebased to apply against the current v4.11/dt64 branch
-> - new in v2 (patch #7): disabled ethernet support for the P200 board (see
->   the commit description for more information). this patch is optional
-> - new in v2 (patch #9): removed the phy-mode property from meson-gx (see
->   the commit description for more information). this patch is optional
->
->
-> [0] http://lists.infradead.org/pipermail/linux-amlogic/2017-January/002053.html
-> [1] http://lists.infradead.org/pipermail/linux-amlogic/2016-December/001834.html
->
-> Martin Blumenstingl (9):
->   ARM64: dts: meson-gxbb-odroidc2: add the ethernet PHY's reset GPIO
->   ARM64: dts: meson-gxbb-p200: add the ethernet PHY's reset GPIO
->   ARM64: dts: meson-gxbb-vega-s95: add the ethernet PHY's reset GPIO
->   ARM64: dts: meson-gxbb-nexbox-a95x: add the ethernet PHY's reset GPIO
->   ARM64: dts: meson-gxbb-wetek-hub: add the ethernet PHY's reset GPIO
->   ARM64: dts: meson-gxbb-wetek-play2: add the ethernet PHY's reset GPIO
->   ARM64: dts: meson-gxbb-p201: fix ethernet support
->   ARM64: dts: amlogic: add the ethernet TX delay configuration
->   ARM64: dts: meson-gx: remove the phy-mode property from meson-gx
->
->  arch/arm64/boot/dts/amlogic/meson-gx.dtsi          |  1 -
->  .../boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts    | 17 ++++++++++++++
->  .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts |  7 ++++++
->  arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts    | 26 ++++++++++++++++++++++
->  arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts    | 11 +++++++++
->  arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi   |  6 -----
->  .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      | 20 +++++++++++++++++
->  .../boot/dts/amlogic/meson-gxbb-wetek-hub.dts      | 26 ++++++++++++++++++++++
->  .../boot/dts/amlogic/meson-gxbb-wetek-play2.dts    | 26 ++++++++++++++++++++++
->  .../boot/dts/amlogic/meson-gxl-s905d-p230.dts      |  2 ++
->  .../arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts |  2 ++
->  arch/arm64/boot/dts/amlogic/meson-gxm-q200.dts     |  2 ++
->  12 files changed, 139 insertions(+), 7 deletions(-)
-I totally forgot to mention:
-this applies to Kevin's v4.11/dt64 branch with Jerome's Odroid-C2
-ethernet fix [0] applied on top of it
+On 20/01/2017 at 13:12:10 +0100, Sebastian Reichel wrote :
+> Hi,
+> 
+> On Wed, Jan 18, 2017 at 04:49:11PM +0200, Guy Shapiro wrote:
+> > I'm trying to use the low power RTC of the i.MX6UL to start from
+> > power-off state.
+> > 
+> > I started by hopefully running: # echo +30 >
+> > /sys/class/rtc/rtc0/wakealarm && shutdown -h now The system was
+> > powered down, but it didn't come up after 30 seconds as expected.
+> > 
+> > So I dug into the datasheet and the source...
+> > To activate the power on alarm, the flags SRTC_ENV, LPTA_EN and LPWUI_EN on
+> > the SNVS_LP Control register (LPCR) should be asserted. The wakeup time
+> > should be written to the SNVS_LP Time alarm register (LPTA). The code that
+> > does this is on drivers/rtc/rtc-snvs.c:snvs_rtc_set_alarm().
+> > 
+> > The first problem I found was with the use of the syscon-poweroff driver.
+> > The "Turn off System Power" flag is part of the same register (LPCR). The
+> > current code of syscon-poweroff set the register to the "mask" property from
+> > the device tree on power off, overriding all the existing flags.
+> > After setting the "mask" property on the device tree to 0x6b instead of
+> > 0x60 (asserting the mentioned bits), the system do power up on timer, as
+> > expected.
+> > 
+> > However, I didn't like the idea of keeping those flags on even when no one
+> > set the alarm.
+> > As a quick test, I modified the syscon-poweroff driver to ignore the bits
+> > that are not on the mask:
+> > 
+> > diff --git a/drivers/power/reset/syscon-poweroff.c
+> > b/drivers/power/reset/syscon-poweroff.c
+> > index b683383..a5da02b 100644
+> > --- a/drivers/power/reset/syscon-poweroff.c
+> > +++ b/drivers/power/reset/syscon-poweroff.c
+> > @@ -33,7 +33,7 @@ static u32 mask;
+> > static void syscon_poweroff(void)
+> > {
+> >         /* Issue the poweroff */
+> > -       regmap_write(map, offset, mask);
+> > +       regmap_update_bits(map, offset, mask, mask);
+> >         mdelay(1000);
+> > 
+> > 
+> > After applying this fix, the wake up alarm didn't work. Strangely, when I
+> > added some debug prints to investigate the case, it worked again
+> > (sometimes... depends on the exact places I add the prints).
+> > I suspect that some other driver clears the flags during the power down, but
+> > I couldn't find such driver.
+> > 
+> > Do you have any clue what code may change this register during the shutdown
+> > process? Any other insights are welcomed as well :)
+> 
+> To summarize it looks like this?
+> 
+> | regmap_write       | 0x60 | broken                     |
+> | regmap_write       | 0x6b | works stable               |
+> | regmap_update_bits | 0x60 | works only with dbg prints |
+> 
+> For me it looks like the debug prints may delay the poweroff driver
+> long enough, that some other driver (rtc?) writes the 0x0b bits.
+> 
+
+Is snvs_rtc_alarm_irq_enable() waiting long enough? I'd say yes but you
+never know... You can also use the kernel tracin infrastructure to trace
+every accesses made to that regmap. That could give you a hint.
+
+At least you can try a regmap_read before returning from
+snvs_rtc_alarm_irq_enable() and see whether SNVS_LPCR_LPTA_EN and
+SNVS_LPCR_LPWUI_EN are still there.
 
 
-[0] https://git.kernel.org/cgit/linux/kernel/git/khilman/linux-amlogic.git/commit/?h=v4.11/integ&id=5a2288a68582ad3f1b42ed63ae5a3ca54e000965
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
