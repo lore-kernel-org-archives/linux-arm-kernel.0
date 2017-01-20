@@ -1,42 +1,75 @@
-From: david@lechnology.com (David Lechner)
-Date: Fri, 20 Jan 2017 12:17:12 -0600
-Subject: [PATCH v2 1/2] ARM: davinci: Allocate extra interrupts
-In-Reply-To: <0bd745dc-df46-0d37-ed18-b419c1cf2e78@ti.com>
-References: <1484337612-11120-1-git-send-email-david@lechnology.com>
- <1484337612-11120-2-git-send-email-david@lechnology.com>
- <95440160-8346-fef8-27d2-fb17c0da38f6@ti.com>
- <25c0bc60-bb99-9aa5-db56-6299d82db9c1@lechnology.com>
- <0bd745dc-df46-0d37-ed18-b419c1cf2e78@ti.com>
-Message-ID: <dedc276f-e25b-f3b8-dc4a-568f41d9f82e@lechnology.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 20 Jan 2017 10:24:39 -0800
+Subject: [PATCH 0/3] misc: sram: Introduce protect-exec region type
+In-Reply-To: <20170112205220.26325-1-d-gerlach@ti.com>
+References: <20170112205220.26325-1-d-gerlach@ti.com>
+Message-ID: <20170120182438.GD7403@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2017 05:50 AM, Sekhar Nori wrote:
-> On Wednesday 18 January 2017 10:27 PM, David Lechner wrote:
->> On 01/18/2017 03:50 AM, Sekhar Nori wrote:
->>> On Saturday 14 January 2017 01:30 AM, David Lechner wrote:
->>>> This allocates extra interrupts for mach-davinci. These extra interrupts
->>>> are need for things like IIO triggers.
->>>
->>> I am not really familiar with IIO triggers. Can you give some more
->>> detail on what fails without this patch?
->>
->> A trigger is used to initiate the reading of an iio device. For example,
->> there is a mechanism for a sysfs trigger. When you write 1 to the sysfs
->> attribute, it triggers an interrupt that is handled by the iio device.
->>
->> Since these triggers use interrupts, you need to allocate spare
->> interrupts in order to set up the trigger. Otherwise, setting up the
->> trigger will fail with an error code (I forgot which one exactly)
->> because all of the allocated irqs have already been assigned to hardware
->> irqs and are not available.
->>
->> Here is where the iio subsytem actually allocates the irq:
->> http://lxr.free-electrons.com/source/drivers/iio/industrialio-trigger.c#L525
->
-> Alright, I will take a look. Do note that this may not get included in
-> the first batch of v4.11 changes I queue. But I promise to come back to
-> it soon afterwards.
->
+* Dave Gerlach <d-gerlach@ti.com> [170112 12:54]:
+> Hi,
+> There are several instances when one would want to execute out of on-chip
+> SRAM, such as PM code on ARM platforms, so once again revisiting this
+> series to allow that in a generic manner. Seems that having a solution for
+> allowing SRAM to be mapped as executable will help clean up PM code on several
+> ARM platforms that are using ARM internal __arm_ioremap_exec API
+> and also open the door for PM support on new platforms like TI AM335x and
+> AM437x.
+> 
+> Previously a generic solution was attempted by introducing a memremap
+> executable API and then calling this from the generic sram driver here [1].
+> Russell King brought up the point that we should not just be mapping
+> memory as both writable and executable for security reasons which led to
+> the solution proposed in this series. 
+> 
+> The generic SRAM driver already has a concept of "partitions" which can be
+> defined and flagged in the device tree, so this series introduces a new flag,
+> protect-exec, which indicates the region of SRAM that has been blocked out in
+> the DT is protected and executable. It will share the same capabilities of the
+> already present sram "pool" which will allow allocation through the use of the
+> genalloc framework but also be protected through the use of an "sram_exec_copy"
+> helper function to handle the copying of data to the space and also the page
+> attributes. In this context protected means the memory is managed such that
+> it is *either* writeable and non-executable or read-only and executable through
+> manipulation of the page attributes.
+> 
+> Unforunately, unlike the previously proposed solution, this is not a drop in
+> replacement for __arm_ioremap_exec, A large side effect of allocating
+> executable SRAM as this series does is that it will require rework for some
+> SRAM code as a lot of the assembly code I have seen makes use of PC relative
+> memory locations at the end of the code for local variables. This will no
+> longer be possible if we must maintain the read-only executable status of
+> the memory. If that's required then SRAM code will need to use pointers to
+> a separately allocated region of sram that is just a normal writable pool.
+> 
+> As mentioned in previous series I still see several platforms (at-91,
+> imx6, socfpga, omap3) that could make use of this although some rework may
+> be required unlike with the last solution, and it will be needed for the
+> forthcoming TI am335x and am437x PM code as portions of PM code are
+> moving in to drivers. An example of this in use can be seen at [2] in the 
+> drivers/memory/ti-emif-sram.c and drivers/soc/ti/pm33xx.c files.
 
-It is not critical at this point, so it is fine to wait a bit.
+Looks good to me:
+
+Acked-by: Tony Lindgren <tony@atomide.com>
+
+> [1] http://www.spinics.net/lists/linux-omap/msg132728.html
+> [2] https://github.com/dgerlach/linux-pm/tree/upstream/v4.10/sram-exec-copy-pm
+> 
+> Dave Gerlach (3):
+>   misc: sram: Split sram data structures into local header
+>   misc: sram: Introduce support code for protect-exec sram type
+>   misc: sram: Integrate protect-exec reserved sram area type
+> 
+>  Documentation/devicetree/bindings/sram/sram.txt |   6 ++
+>  drivers/misc/Kconfig                            |   4 +
+>  drivers/misc/Makefile                           |   1 +
+>  drivers/misc/sram-exec.c                        | 105 ++++++++++++++++++++++++
+>  drivers/misc/sram.c                             |  51 +++++-------
+>  drivers/misc/sram.h                             |  58 +++++++++++++
+>  include/linux/sram.h                            |  27 ++++++
+>  7 files changed, 222 insertions(+), 30 deletions(-)
+>  create mode 100644 drivers/misc/sram-exec.c
+>  create mode 100644 drivers/misc/sram.h
+>  create mode 100644 include/linux/sram.h
