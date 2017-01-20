@@ -1,30 +1,47 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Fri, 20 Jan 2017 10:00:36 -0500
-Subject: [PATCH v5 00/14] ARM: da850-lcdk: add SATA support
-In-Reply-To: <f9055043-507f-74de-b2b8-9eb0eae5dad6@ti.com>
-References: <1484911325-23425-1-git-send-email-bgolaszewski@baylibre.com>
- <20170120132843.GA31487@mtj.duckdns.org>
- <86bcbb3c-87e4-3508-f4a6-26529f39d374@ti.com>
- <CAMpxmJUPh9MZKwG6k6p_mo6niXNNT02JCDgXi4DPRH2Fk3yxng@mail.gmail.com>
- <f9055043-507f-74de-b2b8-9eb0eae5dad6@ti.com>
-Message-ID: <20170120150036.GA6164@mtj.duckdns.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 20 Jan 2017 15:04:28 +0000
+Subject: [PATCH v9 0/4] arm64: arch_timer: Add workaround for
+ hisilicon-161010101 erratum
+In-Reply-To: <1484832916-7248-1-git-send-email-dingtianhong@huawei.com>
+References: <1484832916-7248-1-git-send-email-dingtianhong@huawei.com>
+Message-ID: <20170120150428.GC22152@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, Sekhar.
+On Thu, Jan 19, 2017 at 09:35:12PM +0800, Ding Tianhong wrote:
+> Ding Tianhong (4):
+>   arm64: arch_timer: Add device tree binding for hisilicon-161010101
+>     erratum
+>   arm64: arch_timer: Introduce a generic erratum handing mechanism for
+>     fsl-a008585
+>   arm64: arch_timer: Work around Erratum Hisilicon-161010101
+>   arm64: arch timer: Add timer erratum property for Hip05-d02 and
+>     Hip06-d03
+> 
+>  Documentation/admin-guide/kernel-parameters.txt    |   9 --
+>  Documentation/arm64/silicon-errata.txt             |  43 +++---
+>  .../devicetree/bindings/arm/arch_timer.txt         |   6 +
+>  arch/arm64/boot/dts/hisilicon/hip05.dtsi           |   1 +
+>  arch/arm64/boot/dts/hisilicon/hip06.dtsi           |   1 +
+>  arch/arm64/include/asm/arch_timer.h                |  38 ++----
+>  drivers/clocksource/Kconfig                        |  18 +++
+>  drivers/clocksource/arm_arch_timer.c               | 150 +++++++++++++++------
+>  8 files changed, 171 insertions(+), 95 deletions(-)
 
-On Fri, Jan 20, 2017 at 07:52:35PM +0530, Sekhar Nori wrote:
-> Tejun, I am open to queuing the driver changes through ARM-SoC. I guess
-> with that there is little chance that SATA will be broken on linux-next
-> for a longish period of time.
+I've picked these up (with a few local cleanups), given that some local
+testing, and pushed the result to a branch [1] on my git repo.
 
-Yeah, I'd prefer the patchset staying together.  That's how it was
-developed and tested.  Don't wanna break it apart unnecessarily.  The
-chance for conflicts is low and even when that happens dealing with
-them is pretty easy.  Please feel free to add my acked-by and route
-the patches through ARM-SoC.
+There are likely to be clashes with the arm64 tree (e.g. for
+silicon-errata.txt), and we're also likely to have more arch timer
+updates shortly for the GTDT stuff, so I think the best bet is for both
+arm64 and the clocksource tree to pull that branch for v4.11.
 
-Thanks.
+Alternatively, we could take this all through the arm64 tree, if the
+clocksource maintainers are happy with that.
 
--- 
-tejun
+Thoughts?
+
+Thanks,
+Mark.
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arch-timer/hisi-161010101
