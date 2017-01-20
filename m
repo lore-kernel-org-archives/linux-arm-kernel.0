@@ -1,42 +1,35 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Fri, 20 Jan 2017 12:21:58 +0100
-Subject: [PATCH v5 07/14] sata: ahci-da850: add device tree match table
+Date: Fri, 20 Jan 2017 12:22:04 +0100
+Subject: [PATCH v5 13/14] ARM: dts: da850: add the SATA node
 In-Reply-To: <1484911325-23425-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1484911325-23425-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1484911325-23425-8-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1484911325-23425-14-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're using device tree for da850-lcdk. Add the match table to allow
-to probe the driver.
+Add the SATA node to the da850 device tree.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- drivers/ata/ahci_da850.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/da850.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/ata/ahci_da850.c b/drivers/ata/ahci_da850.c
-index 8cfdc86..7f5328f 100644
---- a/drivers/ata/ahci_da850.c
-+++ b/drivers/ata/ahci_da850.c
-@@ -121,11 +121,18 @@ static int ahci_da850_probe(struct platform_device *pdev)
- static SIMPLE_DEV_PM_OPS(ahci_da850_pm_ops, ahci_platform_suspend,
- 			 ahci_platform_resume);
- 
-+static const struct of_device_id ahci_da850_of_match[] = {
-+	{ .compatible = "ti,da850-ahci", },
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, ahci_da850_of_match);
-+
- static struct platform_driver ahci_da850_driver = {
- 	.probe = ahci_da850_probe,
- 	.remove = ata_platform_remove_one,
- 	.driver = {
- 		.name = DRV_NAME,
-+		.of_match_table = ahci_da850_of_match,
- 		.pm = &ahci_da850_pm_ops,
- 	},
- };
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index 104155d..3b5fd41e 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -403,6 +403,12 @@
+ 			phy-names = "usb-phy";
+ 			status = "disabled";
+ 		};
++		sata: sata at 218000 {
++			compatible = "ti,da850-ahci";
++			reg = <0x218000 0x2000>, <0x22c018 0x4>;
++			interrupts = <67>;
++			status = "disabled";
++		};
+ 		mdio: mdio at 224000 {
+ 			compatible = "ti,davinci_mdio";
+ 			#address-cells = <1>;
 -- 
 2.9.3
