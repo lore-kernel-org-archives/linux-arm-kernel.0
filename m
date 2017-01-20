@@ -1,67 +1,102 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 20 Jan 2017 09:01:33 +0100
-Subject: [PATCH v3 01/15] ARM: pxa: Don't rely on public mmc header to
- include leds.h
-In-Reply-To: <1484313256-25993-2-git-send-email-ulf.hansson@linaro.org> (Ulf
- Hansson's message of "Fri, 13 Jan 2017 14:14:02 +0100")
-References: <1484313256-25993-1-git-send-email-ulf.hansson@linaro.org>
- <1484313256-25993-2-git-send-email-ulf.hansson@linaro.org>
-Message-ID: <87efzydusi.fsf@belgarion.home>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 20 Jan 2017 09:04:40 +0100
+Subject: [linux-sunxi] Re: [PATCH 1/4] phy: sun4i-usb: support PHY0 on H3
+ in MUSB mode
+In-Reply-To: <20170119202709.GA1853@excalibur.cnev.de>
+References: <20170116191449.50397-1-icenowy@aosc.xyz>
+ <20170116191449.50397-2-icenowy@aosc.xyz>
+ <20170117080611.tn7s7ddj2csqr27m@lukather>
+ <3866431484672228@web20j.yandex.ru>
+ <20170117200658.gcrcxeanthdtwg26@lukather>
+ <CAGb2v67kYtrTdw9YMS7wvRa=2MWYJ=BEc9SmUOds7hNYZKOz9g@mail.gmail.com>
+ <20170119143445.dmckuqjxmfhwr3h5@lukather> <1682741484838608@web2j.yandex.ru>
+ <20170119202709.GA1853@excalibur.cnev.de>
+Message-ID: <93a01892-47b5-5445-d802-f56bdac8371f@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ulf Hansson <ulf.hansson@linaro.org> writes:
+HI,
 
-> Some of the pxa platforms, balloon3, colibri-pxa270-income, corgi,
-> trizeps4, vpac270, zeus and zylonite depends on leds.h. Explicitly include
-> it instead of relying on the public mmc header host.h.
+On 19-01-17 21:27, Karsten Merker wrote:
+> On Thu, Jan 19, 2017 at 11:10:08PM +0800, Icenowy Zheng wrote:
+>> 19.01.2017, 22:34, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+>>> On Wed, Jan 18, 2017 at 04:09:32AM +0800, Chen-Yu Tsai wrote:
+>>>>  On Wed, Jan 18, 2017 at 4:06 AM, Maxime Ripard
+>>>>  <maxime.ripard@free-electrons.com> wrote:
+>>>>  > On Wed, Jan 18, 2017 at 12:57:08AM +0800, Icenowy Zheng wrote:
+>>>>  >> 17.01.2017, 16:06, "Maxime Ripard" <maxime.ripard@free-electrons.com>:
+>>>>  >> > On Tue, Jan 17, 2017 at 03:14:46AM +0800, Icenowy Zheng wrote:
+>>>>  >> >> The PHY0 on H3 can be wired either to MUSB controller or OHCI/EHCI
+>>>>  >> >> controller.
+>>>>  >> >>
+>>>>  >> >> The original driver wired it to OHCI/EHCI controller; however, as the
+>>>>  >> >> code to use PHY0 as OHCI/EHCI is missing, it makes the PHY fully
+>>>>  >> >> unusable.
+>>>>  >> >>
+>>>>  >> >> Rename the register (according to its function and the name in BSP
+>>>>  >> >> driver), and remove the code which wires the PHY0 to OHCI/EHCI, as MUSB
+>>>>  >> >> can support both peripheral and host mode (although the host mode of
+>>>>  >> >> MUSB is buggy).
+>>>>  >> >
+>>>>  >> > Can you elaborate on that? What's wrong with it?
+>>>>  >>
+>>>>  >> The configuration is at bit 0 of register 0x20 in PHY.
+>>>>  >>
+>>>>  >> When the PHY is reseted, it defaults as MUSB mode.
+>>>>  >>
+>>>>  >> However, the original author of the H3 PHY code seems to be lack of
+>>>>  >> this knowledge (He named it PHY_UNK_H3), and changed the PHY to HCI
+>>>>  >> mode.
+>>>>  >>
+>>>>  >> I just removed the code that wires it to HCI mode, thus it will work
+>>>>  >> in MUSB mode, with my sun8i-h3-musb patch.
+>>>>  >
+>>>>  > I have no idea what you mean by MUSB mode.
+>>>>  >
+>>>>  > Do you mean that the previous code was only working in host mode, and
+>>>>  > now it only works in peripheral?
+>>>>
+>>>>  From what I understand, with the H3, Allwinner has put a mux
+>>>>  in front of the MUSB controller. The mux can send the USB data
+>>>>  to/from the MUSB controller, or a standard EHCI/OHCI pair.
+>>>>  This register controls said mux.
+>>>>
+>>>>  This means we can use a proper USB host for host mode,
+>>>>  instead of the limited support in MUSB.
+>>>
+>>> But musb can still operate as a host, right?
+>>
+>> Yes!
 >
-> Cc: Daniel Mack <daniel@zonque.org>
-> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-> Cc: Robert Jarzmik <robert.jarzmik@free.fr>
-> Cc: <linux-arm-kernel@lists.infradead.org>
-> Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> ---
+> Hello,
 >
-> I am seeking an ack for this change as following changes for mmc in the
-> series, has build-dependencies to it.
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> I don't know how the MUSB implementation in the H3 behaves as I
+> don't have any H3-based systems, but if it should happen to be
+> similar to the one in the A31s, it probably isn't a full-fledged
+> alternative to using an OHCI/EHCI controller.
 
-Actually I already have a patch for arch/arm/mach-pxa/idp.c which adds this
-include also in my -next tree, just in case you're tempted to modify this one,
-which would conflict with my pxa tree.
+You right it isn't which is why I suggested that the phy-sun4i-usb
+code should set the mux to the OCHI/EHCI pair when the id pin
+is pulled low (host-mode).
 
-An other point, I checked which files don't have a leds.h :
- - grep -ls _led arch/arm/mach-pxa/*.c > /tmp/a
- - grep -ls 'linux/leds.h' arch/arm/mach-pxa/*.c > /tmp/b
- - sdiff -s /tmp/a /tmp/b
-This gives me :
-	balloon3.c
-	colibri-pxa270-income.c
-	corgi.c
-	corgi_pm.c
-	em-x270.c
-	ezx.c
-	hx4700.c
-	magician.c
-	palmld.c
-	palmtc.c
-	palmtreo.c
-	palmz72.c
-	spitz_pm.c
-	tosa.c
-	trizeps4.c
-	vpac270.c
-	z2.c
-	zeus.c
-	zylonite.c
-	zylonite_pxa300.c
-	zylonite_pxa320.c
+> From my practical experiments with the MUSB in the A31s in host
+> mode I can report that I hadn't been able to get multiple HIDs
+> (in my case keyboard and mouse) working at the same time.  The
+> keyboard alone worked without problems, the mouse alone worked
+> without problems, but when both were connected, only one of them
+> worked.
+>
+> I had at that time talked to Hans de Goede about the problem and
+> if I remenber correctly, he had mentioned that the MUSB has
+> problems servicing more than one device that does interrupt
+> transfers (as HIDs do).
+>
+> Hans, can you perhaps shed some light on this?
 
-So I was wondering how you made the choice of which files you add the include to
-and which you don't touch ?
+Everything you've said is correct, the MUSB can emulate a
+host-controller, but it is not really one and when possible
+should not be used as such.
 
-Cheers.
+Regards,
 
---
-Robert
+Hans
