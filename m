@@ -1,407 +1,157 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Fri, 20 Jan 2017 10:50:57 -0800
-Subject: [PATCH v7 5/5] phy: Add support for Qualcomm's USB HS phy
-In-Reply-To: <20170120185057.16206-1-stephen.boyd@linaro.org>
-References: <20170120185057.16206-1-stephen.boyd@linaro.org>
-Message-ID: <20170120185057.16206-6-stephen.boyd@linaro.org>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Sat, 21 Jan 2017 00:45:38 +0530
+Subject: [PATCH V6 01/11] iommu/of: Refactor of_iommu_configure() for error
+ handling
+In-Reply-To: <1484939748-31591-1-git-send-email-sricharan@codeaurora.org>
+References: <1484939748-31591-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1484939748-31591-2-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The high-speed phy on qcom SoCs is controlled via the ULPI
-viewport.
+From: Robin Murphy <robin.murphy@arm.com>
 
-Cc: <devicetree@vger.kernel.org>
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+In preparation for some upcoming cleverness, rework the control flow in
+of_iommu_configure() to minimise duplication and improve the propogation
+of errors. It's also as good a time as any to switch over from the
+now-just-a-compatibility-wrapper of_iommu_get_ops() to using the generic
+IOMMU instance interface directly.
+
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
+ drivers/iommu/of_iommu.c | 83 +++++++++++++++++++++++++++++++-----------------
+ 1 file changed, 53 insertions(+), 30 deletions(-)
 
-phy_set_mode() hook split up to toggle two bits independently
-with new set_vbus() hook.
-
- .../devicetree/bindings/phy/qcom,usb-hs-phy.txt    |  78 +++++++
- drivers/phy/Kconfig                                |   8 +
- drivers/phy/Makefile                               |   1 +
- drivers/phy/phy-qcom-usb-hs.c                      | 256 +++++++++++++++++++++
- 4 files changed, 343 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/qcom,usb-hs-phy.txt
- create mode 100644 drivers/phy/phy-qcom-usb-hs.c
-
-diff --git a/Documentation/devicetree/bindings/phy/qcom,usb-hs-phy.txt b/Documentation/devicetree/bindings/phy/qcom,usb-hs-phy.txt
-new file mode 100644
-index 000000000000..bec77a74bd39
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/qcom,usb-hs-phy.txt
-@@ -0,0 +1,78 @@
-+Qualcomm's USB HS PHY
-+
-+PROPERTIES
-+
-+- compatible:
-+    Usage: required
-+    Value type: <string>
-+    Definition: Should contain "qcom,usb-hs-phy" and more specifically one of the
-+                following:
-+
-+                        "qcom,usb-hs-phy-apq8064"
-+                        "qcom,usb-hs-phy-msm8916"
-+                        "qcom,usb-hs-phy-msm8974"
-+
-+- #phy-cells:
-+    Usage: required
-+    Value type: <u32>
-+    Definition: Should contain 0
-+
-+- clocks:
-+    Usage: required
-+    Value type: <prop-encoded-array>
-+    Definition: Should contain clock specifier for the reference and sleep
-+                clocks
-+
-+- clock-names:
-+    Usage: required
-+    Value type: <stringlist>
-+    Definition: Should contain "ref" and "sleep" for the reference and sleep
-+                clocks respectively
-+
-+- resets:
-+    Usage: required
-+    Value type: <prop-encoded-array>
-+    Definition: Should contain the phy and POR resets
-+
-+- reset-names:
-+    Usage: required
-+    Value type: <stringlist>
-+    Definition: Should contain "phy" and "por" for the phy and POR resets
-+                respectively
-+
-+- v3p3-supply:
-+    Usage: required
-+    Value type: <phandle>
-+    Definition: Should contain a reference to the 3.3V supply
-+
-+- v1p8-supply:
-+    Usage: required
-+    Value type: <phandle>
-+    Definition: Should contain a reference to the 1.8V supply
-+
-+- qcom,init-seq:
-+    Usage: optional
-+    Value type: <u8 array>
-+    Definition: Should contain a sequence of ULPI address and value pairs to
-+                program into the ULPI_EXT_VENDOR_SPECIFIC area. This is related
-+                to Device Mode Eye Diagram test. The addresses are offsets
-+		from the ULPI_EXT_VENDOR_SPECIFIC address, for example,
-+		<0x1 0x53> would mean "write the value 0x53 to address 0x81".
-+
-+EXAMPLE
-+
-+otg: usb-controller {
-+	ulpi {
-+		phy {
-+			compatible = "qcom,usb-hs-phy-msm8974", "qcom,usb-hs-phy";
-+			#phy-cells = <0>;
-+			clocks = <&xo_board>, <&gcc GCC_USB2A_PHY_SLEEP_CLK>;
-+			clock-names = "ref", "sleep";
-+			resets = <&gcc GCC_USB2A_PHY_BCR>, <&otg 0>;
-+			reset-names = "phy", "por";
-+			v3p3-supply = <&pm8941_l24>;
-+			v1p8-supply = <&pm8941_l6>;
-+			qcom,init-seq = /bits/ 8 <0x1 0x63>;
-+		};
-+	};
-+};
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index a430a64981d5..61a22e985831 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -437,6 +437,14 @@ config PHY_QCOM_UFS
- 	help
- 	  Support for UFS PHY on QCOM chipsets.
+diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+index 0f57ddc..ee49081 100644
+--- a/drivers/iommu/of_iommu.c
++++ b/drivers/iommu/of_iommu.c
+@@ -96,6 +96,28 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
+ }
+ EXPORT_SYMBOL_GPL(of_get_dma_window);
  
-+config PHY_QCOM_USB_HS
-+	tristate "Qualcomm USB HS PHY module"
-+	depends on USB_ULPI_BUS
-+	select GENERIC_PHY
-+	help
-+	  Support for the USB high-speed ULPI compliant phy on Qualcomm
-+	  chipsets.
-+
- config PHY_QCOM_USB_HSIC
- 	tristate "Qualcomm USB HSIC ULPI PHY module"
- 	depends on USB_ULPI_BUS
-diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-index c43c9df5d301..0e4259473d28 100644
---- a/drivers/phy/Makefile
-+++ b/drivers/phy/Makefile
-@@ -52,6 +52,7 @@ obj-$(CONFIG_PHY_STIH407_USB)		+= phy-stih407-usb.o
- obj-$(CONFIG_PHY_QCOM_UFS) 	+= phy-qcom-ufs.o
- obj-$(CONFIG_PHY_QCOM_UFS) 	+= phy-qcom-ufs-qmp-20nm.o
- obj-$(CONFIG_PHY_QCOM_UFS) 	+= phy-qcom-ufs-qmp-14nm.o
-+obj-$(CONFIG_PHY_QCOM_USB_HS) 		+= phy-qcom-usb-hs.o
- obj-$(CONFIG_PHY_QCOM_USB_HSIC) 	+= phy-qcom-usb-hsic.o
- obj-$(CONFIG_PHY_TUSB1210)		+= phy-tusb1210.o
- obj-$(CONFIG_PHY_BRCM_SATA)		+= phy-brcm-sata.o
-diff --git a/drivers/phy/phy-qcom-usb-hs.c b/drivers/phy/phy-qcom-usb-hs.c
-new file mode 100644
-index 000000000000..50cb40977737
---- /dev/null
-+++ b/drivers/phy/phy-qcom-usb-hs.c
-@@ -0,0 +1,256 @@
-+/**
-+ * Copyright (C) 2016 Linaro Ltd
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+#include <linux/module.h>
-+#include <linux/ulpi/driver.h>
-+#include <linux/ulpi/regs.h>
-+#include <linux/clk.h>
-+#include <linux/regulator/consumer.h>
-+#include <linux/of_device.h>
-+#include <linux/reset.h>
-+#include <linux/usb/of.h>
-+
-+#include "ulpi_phy.h"
-+
-+#define ULPI_PWR_CLK_MNG_REG		0x88
-+# define ULPI_PWR_OTG_COMP_DISABLE	BIT(0)
-+
-+#define ULPI_MISC_A			0x96
-+# define ULPI_MISC_A_VBUSVLDEXTSEL	BIT(1)
-+# define ULPI_MISC_A_VBUSVLDEXT		BIT(0)
-+
-+
-+struct ulpi_seq {
-+	u8 addr;
-+	u8 val;
-+};
-+
-+struct qcom_usb_hs_phy {
-+	struct ulpi *ulpi;
-+	struct phy *phy;
-+	struct clk *ref_clk;
-+	struct clk *sleep_clk;
-+	struct regulator *v1p8;
-+	struct regulator *v3p3;
-+	struct reset_control *reset;
-+	struct ulpi_seq *init_seq;
-+	enum usb_dr_mode dr_mode;
-+};
-+
-+static int qcom_usb_hs_phy_set_mode(struct phy *phy, enum phy_mode mode)
++static const struct iommu_ops
++*of_iommu_xlate(struct device *dev, struct of_phandle_args *iommu_spec)
 +{
-+	struct qcom_usb_hs_phy *uphy = phy_get_drvdata(phy);
-+	u8 addr, val = 0;
-+	int ret;
++	const struct iommu_ops *ops;
++	struct fwnode_handle *fwnode = &iommu_spec->np->fwnode;
++	int err;
 +
-+	switch (mode) {
-+	case PHY_MODE_USB_OTG:
-+		switch (uphy->dr_mode) {
-+		case USB_DR_MODE_OTG:
-+			val |= ULPI_INT_IDGRD;
-+		case USB_DR_MODE_PERIPHERAL:
-+			val |= ULPI_INT_SESS_VALID;
-+		default:
++	ops = iommu_get_instance(fwnode);
++	if (!ops || !ops->of_xlate)
++		return NULL;
++
++	err = iommu_fwspec_init(dev, &iommu_spec->np->fwnode, ops);
++	if (err)
++		return ERR_PTR(err);
++
++	err = ops->of_xlate(dev, iommu_spec);
++	if (err)
++		return ERR_PTR(err);
++
++	return ops;
++}
++
+ static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
+ {
+ 	struct of_phandle_args *iommu_spec = data;
+@@ -105,10 +127,11 @@ static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
+ }
+ 
+ static const struct iommu_ops
+-*of_pci_iommu_configure(struct pci_dev *pdev, struct device_node *bridge_np)
++*of_pci_iommu_init(struct pci_dev *pdev, struct device_node *bridge_np)
+ {
+ 	const struct iommu_ops *ops;
+ 	struct of_phandle_args iommu_spec;
++	int err;
+ 
+ 	/*
+ 	 * Start by tracing the RID alias down the PCI topology as
+@@ -123,56 +146,56 @@ static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
+ 	 * bus into the system beyond, and which IOMMU it ends up at.
+ 	 */
+ 	iommu_spec.np = NULL;
+-	if (of_pci_map_rid(bridge_np, iommu_spec.args[0], "iommu-map",
+-			   "iommu-map-mask", &iommu_spec.np, iommu_spec.args))
+-		return NULL;
++	err = of_pci_map_rid(bridge_np, iommu_spec.args[0], "iommu-map",
++			     "iommu-map-mask", &iommu_spec.np,
++			     iommu_spec.args);
++	if (err)
++		return ERR_PTR(err);
+ 
+-	ops = of_iommu_get_ops(iommu_spec.np);
+-	if (!ops || !ops->of_xlate ||
+-	    iommu_fwspec_init(&pdev->dev, &iommu_spec.np->fwnode, ops) ||
+-	    ops->of_xlate(&pdev->dev, &iommu_spec))
+-		ops = NULL;
++	ops = of_iommu_xlate(&pdev->dev, &iommu_spec);
+ 
+ 	of_node_put(iommu_spec.np);
+ 	return ops;
+ }
+ 
+-const struct iommu_ops *of_iommu_configure(struct device *dev,
+-					   struct device_node *master_np)
++static const struct iommu_ops
++*of_platform_iommu_init(struct device *dev, struct device_node *np)
+ {
+ 	struct of_phandle_args iommu_spec;
+-	struct device_node *np;
+ 	const struct iommu_ops *ops = NULL;
+ 	int idx = 0;
+ 
+-	if (dev_is_pci(dev))
+-		return of_pci_iommu_configure(to_pci_dev(dev), master_np);
+-
+ 	/*
+ 	 * We don't currently walk up the tree looking for a parent IOMMU.
+ 	 * See the `Notes:' section of
+ 	 * Documentation/devicetree/bindings/iommu/iommu.txt
+ 	 */
+-	while (!of_parse_phandle_with_args(master_np, "iommus",
+-					   "#iommu-cells", idx,
+-					   &iommu_spec)) {
+-		np = iommu_spec.np;
+-		ops = of_iommu_get_ops(np);
+-
+-		if (!ops || !ops->of_xlate ||
+-		    iommu_fwspec_init(dev, &np->fwnode, ops) ||
+-		    ops->of_xlate(dev, &iommu_spec))
+-			goto err_put_node;
+-
+-		of_node_put(np);
++	while (!of_parse_phandle_with_args(np, "iommus", "#iommu-cells",
++					   idx, &iommu_spec)) {
++		ops = of_iommu_xlate(dev, &iommu_spec);
++		of_node_put(iommu_spec.np);
+ 		idx++;
++		if (IS_ERR_OR_NULL(ops))
 +			break;
-+		}
-+
-+		ret = ulpi_write(uphy->ulpi, ULPI_USB_INT_EN_RISE, val);
-+		if (ret)
-+			return ret;
-+		return ulpi_write(uphy->ulpi, ULPI_USB_INT_EN_FALL, val);
-+	case PHY_MODE_USB_DEVICE:
-+		addr = ULPI_SET(ULPI_MISC_A);
-+		break;
-+	case PHY_MODE_USB_HOST:
-+		addr = ULPI_CLR(ULPI_MISC_A);
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	ulpi_write(uphy->ulpi, ULPI_SET(ULPI_PWR_CLK_MNG_REG),
-+		   ULPI_PWR_OTG_COMP_DISABLE);
-+	return ulpi_write(uphy->ulpi, addr, ULPI_MISC_A_VBUSVLDEXTSEL);
+ 	}
+ 
+ 	return ops;
 +}
 +
-+static int qcom_usb_hs_phy_set_vbus(struct phy *phy, int on)
++const struct iommu_ops *of_iommu_configure(struct device *dev,
++					   struct device_node *master_np)
 +{
-+	struct qcom_usb_hs_phy *uphy = phy_get_drvdata(phy);
-+	u8 addr, val;
-+	int ret;
++	const struct iommu_ops *ops;
 +
-+	if (on)
-+		addr = ULPI_SET(ULPI_MISC_A);
++	if (!master_np)
++		return NULL;
++
++	if (dev_is_pci(dev))
++		ops = of_pci_iommu_init(to_pci_dev(dev), master_np);
 +	else
-+		addr = ULPI_CLR(ULPI_MISC_A);
-+
-+	return ulpi_write(uphy->ulpi, addr, ULPI_MISC_A_VBUSVLDEXT);
-+}
-+
-+static int qcom_usb_hs_phy_power_on(struct phy *phy)
-+{
-+	struct qcom_usb_hs_phy *uphy = phy_get_drvdata(phy);
-+	struct ulpi *ulpi = uphy->ulpi;
-+	const struct ulpi_seq *seq;
-+	int ret;
-+
-+	ret = clk_prepare_enable(uphy->ref_clk);
-+	if (ret)
-+		return ret;
-+
-+	ret = clk_prepare_enable(uphy->sleep_clk);
-+	if (ret)
-+		goto err_sleep;
-+
-+	ret = regulator_set_load(uphy->v1p8, 50000);
-+	if (ret < 0)
-+		goto err_1p8;
-+
-+	ret = regulator_enable(uphy->v1p8);
-+	if (ret)
-+		goto err_1p8;
-+
-+	ret = regulator_set_voltage_triplet(uphy->v3p3, 3050000, 3300000,
-+					    3300000);
-+	if (ret)
-+		goto err_3p3;
-+
-+	ret = regulator_set_load(uphy->v3p3, 50000);
-+	if (ret < 0)
-+		goto err_3p3;
-+
-+	ret = regulator_enable(uphy->v3p3);
-+	if (ret)
-+		goto err_3p3;
-+
-+	for (seq = uphy->init_seq; seq->addr; seq++) {
-+		ret = ulpi_write(ulpi, ULPI_EXT_VENDOR_SPECIFIC + seq->addr,
-+				 seq->val);
-+		if (ret)
-+			goto err_ulpi;
-+	}
-+
-+	if (uphy->reset) {
-+		ret = reset_control_reset(uphy->reset);
-+		if (ret)
-+			goto err_ulpi;
-+	}
-+
-+	return 0;
-+err_ulpi:
-+	regulator_disable(uphy->v3p3);
-+err_3p3:
-+	regulator_disable(uphy->v1p8);
-+err_1p8:
-+	clk_disable_unprepare(uphy->sleep_clk);
-+err_sleep:
-+	clk_disable_unprepare(uphy->ref_clk);
-+	return ret;
-+}
-+
-+static int qcom_usb_hs_phy_power_off(struct phy *phy)
-+{
-+	struct qcom_usb_hs_phy *uphy = phy_get_drvdata(phy);
-+
-+	regulator_disable(uphy->v3p3);
-+	regulator_disable(uphy->v1p8);
-+	clk_disable_unprepare(uphy->sleep_clk);
-+	clk_disable_unprepare(uphy->ref_clk);
-+
-+	return 0;
-+}
-+
-+static const struct phy_ops qcom_usb_hs_phy_ops = {
-+	.power_on = qcom_usb_hs_phy_power_on,
-+	.power_off = qcom_usb_hs_phy_power_off,
-+	.set_mode = qcom_usb_hs_phy_set_mode,
-+	.set_vbus = qcom_usb_hs_phy_set_vbus,
-+	.owner = THIS_MODULE,
-+};
-+
-+static int qcom_usb_hs_phy_probe(struct ulpi *ulpi)
-+{
-+	struct qcom_usb_hs_phy *uphy;
-+	struct phy_provider *p;
-+	struct clk *clk;
-+	struct regulator *reg;
-+	struct reset_control *reset;
-+	int size;
-+	int ret;
-+
-+	uphy = devm_kzalloc(&ulpi->dev, sizeof(*uphy), GFP_KERNEL);
-+	if (!uphy)
-+		return -ENOMEM;
-+	ulpi_set_drvdata(ulpi, uphy);
-+	uphy->ulpi = ulpi;
-+	uphy->dr_mode = of_usb_get_dr_mode_by_phy(ulpi->dev.of_node, -1);
-+
-+	size = of_property_count_u8_elems(ulpi->dev.of_node, "qcom,init-seq");
-+	if (size < 0)
-+		size = 0;
-+	uphy->init_seq = devm_kmalloc_array(&ulpi->dev, (size / 2) + 1,
-+					   sizeof(*uphy->init_seq), GFP_KERNEL);
-+	if (!uphy->init_seq)
-+		return -ENOMEM;
-+	ret = of_property_read_u8_array(ulpi->dev.of_node, "qcom,init-seq",
-+					(u8 *)uphy->init_seq, size);
-+	if (ret && size)
-+		return ret;
-+	/* NUL terminate */
-+	uphy->init_seq[size / 2].addr = uphy->init_seq[size / 2].val = 0;
-+
-+	uphy->ref_clk = clk = devm_clk_get(&ulpi->dev, "ref");
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+
-+	uphy->sleep_clk = clk = devm_clk_get(&ulpi->dev, "sleep");
-+	if (IS_ERR(clk))
-+		return PTR_ERR(clk);
-+
-+	uphy->v1p8 = reg = devm_regulator_get(&ulpi->dev, "v1p8");
-+	if (IS_ERR(reg))
-+		return PTR_ERR(reg);
-+
-+	uphy->v3p3 = reg = devm_regulator_get(&ulpi->dev, "v3p3");
-+	if (IS_ERR(reg))
-+		return PTR_ERR(reg);
-+
-+	uphy->reset = reset = devm_reset_control_get(&ulpi->dev, "por");
-+	if (IS_ERR(reset)) {
-+		if (PTR_ERR(reset) == -EPROBE_DEFER)
-+			return PTR_ERR(reset);
-+		uphy->reset = NULL;
-+	}
-+
-+	uphy->phy = devm_phy_create(&ulpi->dev, ulpi->dev.of_node,
-+				    &qcom_usb_hs_phy_ops);
-+	if (IS_ERR(uphy->phy))
-+		return PTR_ERR(uphy->phy);
-+
-+	phy_set_drvdata(uphy->phy, uphy);
-+
-+	p = devm_of_phy_provider_register(&ulpi->dev, of_phy_simple_xlate);
-+	return PTR_ERR_OR_ZERO(p);
-+}
-+
-+static const struct of_device_id qcom_usb_hs_phy_match[] = {
-+	{ .compatible = "qcom,usb-hs-phy", },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, qcom_usb_hs_phy_match);
-+
-+static struct ulpi_driver qcom_usb_hs_phy_driver = {
-+	.probe = qcom_usb_hs_phy_probe,
-+	.driver = {
-+		.name = "qcom_usb_hs_phy",
-+		.of_match_table = qcom_usb_hs_phy_match,
-+	},
-+};
-+module_ulpi_driver(qcom_usb_hs_phy_driver);
-+
-+MODULE_DESCRIPTION("Qualcomm USB HS phy");
-+MODULE_LICENSE("GPL v2");
++		ops = of_platform_iommu_init(dev, master_np);
+ 
+-err_put_node:
+-	of_node_put(np);
+-	return NULL;
++	return IS_ERR(ops) ? NULL : ops;
+ }
+ 
+ static int __init of_iommu_init(void)
 -- 
-2.10.0.297.gf6727b0
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
