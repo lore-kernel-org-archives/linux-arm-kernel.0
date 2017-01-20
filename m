@@ -1,24 +1,22 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 20 Jan 2017 21:24:10 +0100
-Subject: [PATCH v3 1/6] dt-bindings: add device tree binding for
- Allwinner V3s pinctrl
-In-Reply-To: <20170119175448.11445-1-icenowy@aosc.xyz>
-References: <20170119175448.11445-1-icenowy@aosc.xyz>
-Message-ID: <20170120202410.nqesbntbxousxggq@lukather>
+Date: Fri, 20 Jan 2017 21:29:23 +0100
+Subject: [PATCH v3 2/6] arm: sunxi: add support for V3s SoC
+In-Reply-To: <20170119175448.11445-2-icenowy@aosc.xyz>
+Message-ID: <20170120202923.p4uikl6nmhcza2sk@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2017 at 01:54:43AM +0800, Icenowy Zheng wrote:
-> Allwinner V3s SoC has a pin controller like other Allwinner SoCs and got
-> supported by the sunxi-pinctrl driver now.
-> 
-> Add a device tree binding for it.
+On Fri, Jan 20, 2017 at 01:54:44AM +0800, Icenowy Zheng wrote:
+> Allwinner V3s is a low-end single-core Cortex-A7 SoC, with 64MB
+> integrated DRAM, and several peripherals.
 > 
 > Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+This didn't apply. Please make sure to send patches based on my
+current branch.
 
-Thanks,
+Fixed the conflicts and applied.
+
 Maxime
 
 -- 
@@ -31,4 +29,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170120/bd88f951/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170120/9b0aaf0e/attachment.sig>
