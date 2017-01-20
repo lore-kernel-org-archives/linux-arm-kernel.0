@@ -1,42 +1,65 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 20 Jan 2017 10:36:46 -0300
-Subject: [PATCH 2/2] [media] exynos-gsc: Fix imprecise external abort due
- disabled power domain
-In-Reply-To: <20ecbcee-0dfd-04f6-a855-e117ba05732f@samsung.com>
-References: <1484699402-28738-1-git-send-email-javier@osg.samsung.com>
- <CGME20170118003022epcas3p34cf03bb6feb830c4fa231497f2536d0e@epcas3p3.samsung.com>
- <1484699402-28738-2-git-send-email-javier@osg.samsung.com>
- <cc9c6837-7141-b63c-ddf6-68252493df11@samsung.com>
- <842737f2-3faf-7b22-c480-93e183bbb670@osg.samsung.com>
- <20ecbcee-0dfd-04f6-a855-e117ba05732f@samsung.com>
-Message-ID: <5d223b5f-585d-c6a0-0773-d9e42ec3f3a9@osg.samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 20 Jan 2017 13:37:09 +0000
+Subject: Applied "ASoC: sunxi: Add bindings for sun8i to SPDIF" to the asoc
+ tree
+In-Reply-To: <20170112173343.9953-1-codekipper@gmail.com>
+Message-ID: <E1cUZNN-0000hQ-U0@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Marek,
+The patch
 
-On 01/20/2017 05:08 AM, Marek Szyprowski wrote:
+   ASoC: sunxi: Add bindings for sun8i to SPDIF
 
-[snip]
+has been applied to the asoc tree at
 
->>
->> This seems to be caused by some needed clocks to access the power domains
->> to be gated, since I don't get these erros when passing clk_ignore_unused
->> as parameter in the kernel command line.
-> 
-> I think that those issues were fixes by the following patch:
-> https://patchwork.kernel.org/patch/9484607/
-> It still didn't reach mainline, but I hope it will go as a fix to v4.10.
-> 
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
-Argh, I missed on a first read that the patch you mentioned already marks
-CLK_ACLK432_SCALER as CLK_IS_CRITICAL. So please also ignore my clk patch.
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
-Sorry for the noise and the mess with these patches. Thought I also tested
-on linux-next to see if the issue was solved there, but it seems I didn't.
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
-Best regards,
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From cb5c978f9a56c459d5f13901efcfe44b97c4182d Mon Sep 17 00:00:00 2001
+From: Marcus Cooper <codekipper@gmail.com>
+Date: Thu, 19 Jan 2017 20:52:57 +0100
+Subject: [PATCH] ASoC: sunxi: Add bindings for sun8i to SPDIF
+
+The H3 SoC uses the same SPDIF block as found in earlier SoCs, but the
+transmit fifo is at a different address.
+
+Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt b/Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt
+index 0230c4d20506..fe0a65e6d629 100644
+--- a/Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt
++++ b/Documentation/devicetree/bindings/sound/sunxi,sun4i-spdif.txt
+@@ -10,6 +10,7 @@ Required properties:
+   - compatible		: should be one of the following:
+     - "allwinner,sun4i-a10-spdif": for the Allwinner A10 SoC
+     - "allwinner,sun6i-a31-spdif": for the Allwinner A31 SoC
++    - "allwinner,sun8i-h3-spdif": for the Allwinner H3 SoC
+ 
+   - reg			: Offset and length of the register set for the device.
+ 
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+2.11.0
