@@ -1,69 +1,53 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Fri, 20 Jan 2017 11:12:51 -0600
-Subject: [PATCH v13 1/7] arm64: Rename the common MADT parse routine
-In-Reply-To: <20170120162236.GA14295@red-moon>
-References: <1484686210-7211-1-git-send-email-jeremy.linton@arm.com>
- <1484686210-7211-2-git-send-email-jeremy.linton@arm.com>
- <20170120162236.GA14295@red-moon>
-Message-ID: <e28bac36-23a5-ad01-3258-6ffdd6a774cf@arm.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Fri, 20 Jan 2017 14:15:40 -0300
+Subject: [PATCH 2/2] ARM: dts: exynos: Use correct mfc_pd async-bridge
+ clock for Exynos5420
+In-Reply-To: <20170120162846.x766u3nzblqywggj@kozik-lap>
+References: <1484864995-10679-1-git-send-email-javier@osg.samsung.com>
+ <1484864995-10679-2-git-send-email-javier@osg.samsung.com>
+ <20170120162846.x766u3nzblqywggj@kozik-lap>
+Message-ID: <55cdceb9-d768-d5a9-7bc2-d4ef26d2e5e8@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Krzysztof,
 
-On 01/20/2017 10:22 AM, Lorenzo Pieralisi wrote:
-> On Tue, Jan 17, 2017 at 02:50:04PM -0600, Jeremy Linton wrote:
->> The MADT parser in smp.c is now being used to parse
->> out NUMA, PMU and ACPI parking protocol information as
->
-> Nit: It is not used to parse PMU yet at this stage so
-> either you remove PMU from the list or you move this patch
-> to the end of the series.
-
-(per comments below)
-I think the best plan is to drop it in the next spin of the series, 
-although as Will has shown that he is skillful at cherry picking patches 
-out of this series, so maybe that won't be necessary? Of course 3/7 
-probably won't apply cleanly without this one.
-
->
->> well as the GIC information for which it was originally
->> created. Rename it to avoid a misleading name.
->
-> It is funny smp.c never mapped _any_ GIC information :) (even
-> though it parses the MADT GIC CPU interface entries).
-
-<OT chuckle> Ha, map is pretty generic outside of LK and more accurately 
-reflects the "mapping" from one structure/element to another, more so 
-than parse (of which I'm a prime offender, particularly in the previous 
-comment). </OT chuckle>
-
-
-(trimming)
->>  static void __init
->> -acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
->> +acpi_verify_and_map_madt(struct acpi_madt_generic_interrupt *processor)
->
-> acpi_map_madt_cpu_entry()
->
-> or just drop this patch to avoid useless bikeshedding, your choice.
->
->>  {
->>  	u64 hwid = processor->arm_mpidr;
+On 01/20/2017 01:28 PM, Krzysztof Kozlowski wrote:
+> On Thu, Jan 19, 2017 at 07:29:55PM -0300, Javier Martinez Canillas wrote:
+>> Commit 94aed538e032 ("ARM: dts: exynos: Add async-bridge clock to MFC
+>> power domain for Exynos5420") fixed an imprecise external abort error
+>> when the MFC registers were tried to be accessed and the needed clock
+>> for the asynchronous bridges were gated.
 >>
->> @@ -577,7 +578,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
->>  }
+>> But according to the Exynos5420 manual the "Gating AXI clock for MFC"
+>> is not CLK_ACLK333 but CLK_MFC.
 >>
->>  static int __init
->> -acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
->> +acpi_parse_madt_common(struct acpi_subtable_header *header,
->>  			     const unsigned long end)
->
-> acpi_madt_parse_cpus()
->
-> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->
->>  {
->>  	struct acpi_madt_generic_interrupt *processor;
+>> The end effect is the same because CLK_ACLK333 is a parent of CLK_MFC
+>> but the correct clock should be used instead.
+>>
+>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>>
+>> ---
+>>
+>>  arch/arm/boot/dts/exynos5420.dtsi | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> Is this still needed?
+> 
 
-(trimming)
+Not really, only if we care about correctness in the existing power domains
+that have their clocks defined. But as said, even currently with CLK_ACLK333
+works due to the clock hierarchy.
+
+I think is less of an issue now that we prefer to mark clocks that needs to
+be ungated as critical instead of growing the DT ABI.
+
+> Best regards,
+> Krzysztof
+> 
+ 
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
