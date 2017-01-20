@@ -1,94 +1,83 @@
-From: rsahu@apm.com (Rameshwar Prasad Sahu)
-Date: Fri, 20 Jan 2017 17:41:58 +0530
-Subject: [PATCH v2] ata: xgene: Enable NCQ support for APM X-Gene SATA
- controller hardware v1.1
-Message-ID: <1484914318-5406-1-git-send-email-rsahu@apm.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Fri, 20 Jan 2017 13:12:10 +0100
+Subject: imx6ul: power-up using the RTC
+In-Reply-To: <b516070d-6539-98d1-c832-d79ac89e8d43@mobi-wize.com>
+References: <b516070d-6539-98d1-c832-d79ac89e8d43@mobi-wize.com>
+Message-ID: <20170120121210.gm3wcg4yyvrigpn3@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables NCQ support for APM X-Gene SATA controller hardware v1.1
-that was broken with hardware v1.0. Second thing, here we should not assume
-XGENE_AHCI_V2 always in case of having valid _CID in ACPI table. I need to
-remove this assumption because V1_1 also has a valid _CID for backward
-compatibly with v1.
+Hi,
 
-v2 changes:
-	1. Changed patch description
+On Wed, Jan 18, 2017 at 04:49:11PM +0200, Guy Shapiro wrote:
+> I'm trying to use the low power RTC of the i.MX6UL to start from
+> power-off state.
+> 
+> I started by hopefully running: # echo +30 >
+> /sys/class/rtc/rtc0/wakealarm && shutdown -h now The system was
+> powered down, but it didn't come up after 30 seconds as expected.
+> 
+> So I dug into the datasheet and the source...
+> To activate the power on alarm, the flags SRTC_ENV, LPTA_EN and LPWUI_EN on
+> the SNVS_LP Control register (LPCR) should be asserted. The wakeup time
+> should be written to the SNVS_LP Time alarm register (LPTA). The code that
+> does this is on drivers/rtc/rtc-snvs.c:snvs_rtc_set_alarm().
+> 
+> The first problem I found was with the use of the syscon-poweroff driver.
+> The "Turn off System Power" flag is part of the same register (LPCR). The
+> current code of syscon-poweroff set the register to the "mask" property from
+> the device tree on power off, overriding all the existing flags.
+> After setting the "mask" property on the device tree to 0x6b instead of
+> 0x60 (asserting the mentioned bits), the system do power up on timer, as
+> expected.
+> 
+> However, I didn't like the idea of keeping those flags on even when no one
+> set the alarm.
+> As a quick test, I modified the syscon-poweroff driver to ignore the bits
+> that are not on the mask:
+> 
+> diff --git a/drivers/power/reset/syscon-poweroff.c
+> b/drivers/power/reset/syscon-poweroff.c
+> index b683383..a5da02b 100644
+> --- a/drivers/power/reset/syscon-poweroff.c
+> +++ b/drivers/power/reset/syscon-poweroff.c
+> @@ -33,7 +33,7 @@ static u32 mask;
+> static void syscon_poweroff(void)
+> {
+>         /* Issue the poweroff */
+> -       regmap_write(map, offset, mask);
+> +       regmap_update_bits(map, offset, mask, mask);
+>         mdelay(1000);
+> 
+> 
+> After applying this fix, the wake up alarm didn't work. Strangely, when I
+> added some debug prints to investigate the case, it worked again
+> (sometimes... depends on the exact places I add the prints).
+> I suspect that some other driver clears the flags during the power down, but
+> I couldn't find such driver.
+> 
+> Do you have any clue what code may change this register during the shutdown
+> process? Any other insights are welcomed as well :)
 
-Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
----
- drivers/ata/ahci_xgene.c |   14 ++++++++------
- 1 files changed, 8 insertions(+), 6 deletions(-)
+To summarize it looks like this?
 
-diff --git a/drivers/ata/ahci_xgene.c b/drivers/ata/ahci_xgene.c
-index 73b19b2..8b88be9 100644
---- a/drivers/ata/ahci_xgene.c
-+++ b/drivers/ata/ahci_xgene.c
-@@ -87,6 +87,7 @@
+| regmap_write       | 0x60 | broken                     |
+| regmap_write       | 0x6b | works stable               |
+| regmap_update_bits | 0x60 | works only with dbg prints |
 
- enum xgene_ahci_version {
- 	XGENE_AHCI_V1 = 1,
-+	XGENE_AHCI_V1_1,
- 	XGENE_AHCI_V2,
- };
+For me it looks like the debug prints may delay the poweroff driver
+long enough, that some other driver (rtc?) writes the 0x0b bits.
 
-@@ -734,6 +735,7 @@ static struct scsi_host_template ahci_platform_sht = {
- #ifdef CONFIG_ACPI
- static const struct acpi_device_id xgene_ahci_acpi_match[] = {
- 	{ "APMC0D0D", XGENE_AHCI_V1},
-+	{ "APMC0D67", XGENE_AHCI_V1_1},
- 	{ "APMC0D32", XGENE_AHCI_V2},
- 	{},
- };
-@@ -742,6 +744,7 @@ MODULE_DEVICE_TABLE(acpi, xgene_ahci_acpi_match);
+FWIW we can't switch from regmap_write to regmap_update_bits in the
+syscon driver, since that may break other users. I guess we need to
+introduce a DT property providing the update mask. Unfortunately the
+register value property is already named mask :/
 
- static const struct of_device_id xgene_ahci_of_match[] = {
- 	{.compatible = "apm,xgene-ahci", .data = (void *) XGENE_AHCI_V1},
-+	{.compatible = "apm,xgene-ahci-v1-1", .data = (void *) XGENE_AHCI_V1_1},
- 	{.compatible = "apm,xgene-ahci-v2", .data = (void *) XGENE_AHCI_V2},
- 	{},
- };
-@@ -755,8 +758,7 @@ static int xgene_ahci_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	const struct of_device_id *of_devid;
- 	enum xgene_ahci_version version = XGENE_AHCI_V1;
--	const struct ata_port_info *ppi[] = { &xgene_ahci_v1_port_info,
--					      &xgene_ahci_v2_port_info };
-+	const struct ata_port_info *ppi;
- 	int rc;
-
- 	hpriv = ahci_platform_get_resources(pdev);
-@@ -821,8 +823,6 @@ static int xgene_ahci_probe(struct platform_device *pdev)
- 				dev_warn(&pdev->dev, "%s: Error reading device info. Assume version1\n",
- 					__func__);
- 				version = XGENE_AHCI_V1;
--			} else if (info->valid & ACPI_VALID_CID) {
--				version = XGENE_AHCI_V2;
- 			}
- 		}
- 	}
-@@ -858,18 +858,20 @@ skip_clk_phy:
-
- 	switch (version) {
- 	case XGENE_AHCI_V1:
-+		ppi = &xgene_ahci_v1_port_info;
- 		hpriv->flags = AHCI_HFLAG_NO_NCQ;
- 		break;
- 	case XGENE_AHCI_V2:
-+		ppi = &xgene_ahci_v2_port_info;
- 		hpriv->flags |= AHCI_HFLAG_YES_FBS;
- 		hpriv->irq_handler = xgene_ahci_irq_intr;
- 		break;
- 	default:
-+		ppi = &xgene_ahci_v1_port_info;
- 		break;
- 	}
-
--	rc = ahci_platform_init_host(pdev, hpriv, ppi[version - 1],
--				     &ahci_platform_sht);
-+	rc = ahci_platform_init_host(pdev, hpriv, ppi, &ahci_platform_sht);
- 	if (rc)
- 		goto disable_resources;
-
---
-1.7.1
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170120/a7a4320f/attachment-0001.sig>
