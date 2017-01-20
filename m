@@ -1,69 +1,69 @@
-From: yuantian.tang@nxp.com (yuantian.tang at nxp.com)
-Date: Fri, 20 Jan 2017 14:59:36 +0800
-Subject: [PATCH 3/3 v2] ahci: qoriq: added ls2088a platforms support
-In-Reply-To: <1484895576-40379-1-git-send-email-yuantian.tang@nxp.com>
-References: <1484895576-40379-1-git-send-email-yuantian.tang@nxp.com>
-Message-ID: <1484895576-40379-3-git-send-email-yuantian.tang@nxp.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 20 Jan 2017 08:29:41 +0100
+Subject: [PATCH v3 1/7] clk: sunxi-ng: multiplier: Add fractional support
+In-Reply-To: <cover.5df5469d9c7a6233e225a875dca513a03b05e871.1484897383.git-series.maxime.ripard@free-electrons.com>
+References: <cover.5df5469d9c7a6233e225a875dca513a03b05e871.1484897383.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <6434f18ff536df321bb315ed3302285046954b51.1484897383.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tang Yuantian <Yuantian.Tang@nxp.com>
+Some clocks on the earlier SoCs such as the video PLLs are multipliers with
+fractional settings.
 
-Ls2088a is new introduced arm-based soc with sata support with
-following features:
-1. Complies with the serial ATA 3.0 specification and the AHCI 1.3.1
-   specification
-2. Contains a high-speed descriptor-based DMA controller
-3. Supports the following:
-   a. Speeds of 1.5 Gb/s (first-generation SATA), 3 Gb/s
-      (second-generation SATA), and 6 Gb/s (third-generation SATA)
-   b. FIS-based switching
-   c. Native command queuing (NCQ) commands
-   d. Port multiplier operation
-   e. Asynchronous notification
-   f. SATA BIST mode
+Support those cases.
 
-Signed-off-by: Tang Yuantian <yuantian.tang@nxp.com>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
-v2:
-  - no change
+ drivers/clk/sunxi-ng/ccu_mult.c | 8 ++++++++
+ drivers/clk/sunxi-ng/ccu_mult.h | 2 ++
+ 2 files changed, 10 insertions(+), 0 deletions(-)
 
- drivers/ata/ahci_qoriq.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/drivers/ata/ahci_qoriq.c b/drivers/ata/ahci_qoriq.c
-index 137b1c7..85d8332 100644
---- a/drivers/ata/ahci_qoriq.c
-+++ b/drivers/ata/ahci_qoriq.c
-@@ -53,6 +53,7 @@ enum ahci_qoriq_type {
- 	AHCI_LS1043A,
- 	AHCI_LS2080A,
- 	AHCI_LS1046A,
-+	AHCI_LS2088A,
- };
+diff --git a/drivers/clk/sunxi-ng/ccu_mult.c b/drivers/clk/sunxi-ng/ccu_mult.c
+index 678b6cb49f01..826302464650 100644
+--- a/drivers/clk/sunxi-ng/ccu_mult.c
++++ b/drivers/clk/sunxi-ng/ccu_mult.c
+@@ -75,6 +75,9 @@ static unsigned long ccu_mult_recalc_rate(struct clk_hw *hw,
+ 	unsigned long val;
+ 	u32 reg;
  
- struct ahci_qoriq_priv {
-@@ -67,6 +68,7 @@ static const struct of_device_id ahci_qoriq_of_match[] = {
- 	{ .compatible = "fsl,ls1043a-ahci", .data = (void *)AHCI_LS1043A},
- 	{ .compatible = "fsl,ls2080a-ahci", .data = (void *)AHCI_LS2080A},
- 	{ .compatible = "fsl,ls1046a-ahci", .data = (void *)AHCI_LS1046A},
-+	{ .compatible = "fsl,ls2088a-ahci", .data = (void *)AHCI_LS2088A},
- 	{},
- };
- MODULE_DEVICE_TABLE(of, ahci_qoriq_of_match);
-@@ -198,6 +200,13 @@ static int ahci_qoriq_phy_init(struct ahci_host_priv *hpriv)
- 		if (qpriv->is_dmacoherent)
- 			writel(AHCI_PORT_AXICC_CFG, reg_base + PORT_AXICC);
- 		break;
++	if (ccu_frac_helper_is_enabled(&cm->common, &cm->frac))
++		return ccu_frac_helper_read_rate(&cm->common, &cm->frac);
 +
-+	case AHCI_LS2088A:
-+		writel(AHCI_PORT_PHY_1_CFG, reg_base + PORT_PHY1);
-+		writel(AHCI_PORT_TRANS_CFG, reg_base + PORT_TRANS);
-+		if (qpriv->is_dmacoherent)
-+			writel(AHCI_PORT_AXICC_CFG, reg_base + PORT_AXICC);
-+		break;
- 	}
+ 	reg = readl(cm->common.base + cm->common.reg);
+ 	val = reg >> cm->mult.shift;
+ 	val &= (1 << cm->mult.width) - 1;
+@@ -102,6 +105,11 @@ static int ccu_mult_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	unsigned long flags;
+ 	u32 reg;
  
- 	return 0;
++	if (ccu_frac_helper_has_rate(&cm->common, &cm->frac, rate))
++		return ccu_frac_helper_set_rate(&cm->common, &cm->frac, rate);
++	else
++		ccu_frac_helper_disable(&cm->common, &cm->frac);
++
+ 	ccu_mux_helper_adjust_parent_for_prediv(&cm->common, &cm->mux, -1,
+ 						&parent_rate);
+ 
+diff --git a/drivers/clk/sunxi-ng/ccu_mult.h b/drivers/clk/sunxi-ng/ccu_mult.h
+index c1a2134bdc71..bd2e38b5a32a 100644
+--- a/drivers/clk/sunxi-ng/ccu_mult.h
++++ b/drivers/clk/sunxi-ng/ccu_mult.h
+@@ -2,6 +2,7 @@
+ #define _CCU_MULT_H_
+ 
+ #include "ccu_common.h"
++#include "ccu_frac.h"
+ #include "ccu_mux.h"
+ 
+ struct ccu_mult_internal {
+@@ -23,6 +24,7 @@ struct ccu_mult_internal {
+ struct ccu_mult {
+ 	u32			enable;
+ 
++	struct ccu_frac_internal	frac;
+ 	struct ccu_mult_internal	mult;
+ 	struct ccu_mux_internal	mux;
+ 	struct ccu_common	common;
 -- 
-2.1.0.27.g96db324
+git-series 0.8.11
