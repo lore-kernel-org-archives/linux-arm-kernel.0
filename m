@@ -1,342 +1,69 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 20 Jan 2017 17:10:53 +0000
-Subject: [PATCH] arm64: dts: hisilicon: add dtsi file for Hisilicon Hi3660
- SOC
-In-Reply-To: <20170118100435.43318-1-hw.wangxiaoyin@hisilicon.com>
-References: <20170118100435.43318-1-hw.wangxiaoyin@hisilicon.com>
-Message-ID: <5882449D.6050502@hisilicon.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Fri, 20 Jan 2017 11:12:51 -0600
+Subject: [PATCH v13 1/7] arm64: Rename the common MADT parse routine
+In-Reply-To: <20170120162236.GA14295@red-moon>
+References: <1484686210-7211-1-git-send-email-jeremy.linton@arm.com>
+ <1484686210-7211-2-git-send-email-jeremy.linton@arm.com>
+ <20170120162236.GA14295@red-moon>
+Message-ID: <e28bac36-23a5-ad01-3258-6ffdd6a774cf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wang Xiaoyin,
+Hi,
 
-On 2017/1/18 10:04, Wang Xiaoyin wrote:
-> This patch adds pinctrl dtsi file
-> 
-> Signed-off-by: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
-> ---
->  arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts  |   3 +-
->  .../arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi | 292 +++++++++++++++++++++
->  2 files changed, 293 insertions(+), 2 deletions(-)
->  create mode 100644 arch/arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi
-> 
-> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-> index 9a1d36aa84ce..de21ebfa4bd8 100644
-> --- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-> +++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-> @@ -8,8 +8,7 @@
->  /dts-v1/;
->  
->  #include "hi3660.dtsi"
-> -/*#include "hi3660-ion.dtsi"*/
-> -/*#include "hikey960-pinctrl.dtsi"*/
-> +#include "hikey960-pinctrl.dtsi"
+On 01/20/2017 10:22 AM, Lorenzo Pieralisi wrote:
+> On Tue, Jan 17, 2017 at 02:50:04PM -0600, Jeremy Linton wrote:
+>> The MADT parser in smp.c is now being used to parse
+>> out NUMA, PMU and ACPI parking protocol information as
+>
+> Nit: It is not used to parse PMU yet at this stage so
+> either you remove PMU from the list or you move this patch
+> to the end of the series.
 
-Can you please rebase to the 4.10-rc3 or mention which patch you are based on?
-Thanks!
+(per comments below)
+I think the best plan is to drop it in the next spin of the series, 
+although as Will has shown that he is skillful at cherry picking patches 
+out of this series, so maybe that won't be necessary? Of course 3/7 
+probably won't apply cleanly without this one.
 
-Best Regards,
-Wei
+>
+>> well as the GIC information for which it was originally
+>> created. Rename it to avoid a misleading name.
+>
+> It is funny smp.c never mapped _any_ GIC information :) (even
+> though it parses the MADT GIC CPU interface entries).
 
->  
->  / {
->  	model = "HiKey960";
-> diff --git a/arch/arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi b/arch/arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi
-> new file mode 100644
-> index 000000000000..98a0b78289b6
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi
-> @@ -0,0 +1,292 @@
-> +/*
-> + * pinctrl dts fils for Hislicon HiKey960 development board
-> + *
-> + */
-> +
-> +#include <dt-bindings/pinctrl/hisi.h>
-> +
-> +/ {
-> +	soc {
-> +		/* [IOMG_000, IOMG_123] */
-> +		range: gpio-range {
-> +			#pinctrl-single,gpio-range-cells = <3>;
-> +		};
-> +		pmx0: pinmux at e896c000 {
-> +			compatible = "pinctrl-single";
-> +			reg = <0x0 0xe896c000 0x0 0x1f0>;
-> +			#pinctrl-cells = <1>;
-> +			#gpio-range-cells = <0x3>;
-> +			pinctrl-single,register-width = <0x20>;
-> +			pinctrl-single,function-mask = <0x7>;
-> +			/* pin base, nr pins & gpio function */
-> +			pinctrl-single,gpio-range = <
-> +				&range 0 7 0
-> +				&range 8 116 0>;
-> +
-> +			isp0_pmx_func: isp0_pmx_func {
-> +				pinctrl-single,pins = <
-> +					0x058 MUX_M1 /* ISP_CLK0 */
-> +					0x064 MUX_M1 /* ISP_SCL0 */
-> +					0x068 MUX_M1 /* ISP_SDA0 */
-> +				>;
-> +			};
-> +
-> +			isp1_pmx_func: isp1_pmx_func {
-> +				pinctrl-single,pins = <
-> +					0x05c MUX_M1 /* ISP_CLK1 */
-> +					0x06c MUX_M1 /* ISP_SCL1 */
-> +					0x070 MUX_M1 /* ISP_SDA1 */
-> +				>;
-> +			};
-> +
-> +			i2c3_pmx_func: i2c3_pmx_func {
-> +				pinctrl-single,pins = <
-> +					0x02c MUX_M1 /* I2C3_SCL */
-> +					0x030 MUX_M1 /* I2C3_SDA */
-> +				>;
-> +			};
-> +
-> +			i2c4_pmx_func: i2c4_pmx_func {
-> +				pinctrl-single,pins = <
-> +					0x090 MUX_M1 /* I2C4_SCL */
-> +					0x094 MUX_M1 /* I2C4_SDA */
-> +				>;
-> +			};
-> +
-> +			pcie_perstn_pmx_func: pcie_perstn_pmx_func {
-> +				pinctrl-single,pins = <
-> +					0x15c MUX_M1 /* PCIE_PERST_N */
-> +				>;
-> +			};
-> +
-> +			usbhub5734_pmx_func: usbhub5734_pmx_func {
-> +				pinctrl-single,pins = <
-> +					0x11c MUX_M0 /* GPIO_073 */
-> +					0x120 MUX_M0 /* GPIO_074 */
-> +				>;
-> +			};
-> +
-> +			spi1_pmx_func: spi1_pmx_func {
-> +				pinctrl-single,pins = <
-> +					0x034 MUX_M1 /* SPI1_CLK */
-> +					0x038 MUX_M1 /* SPI1_DI */
-> +					0x03c MUX_M1 /* SPI1_DO */
-> +					0x040 MUX_M1 /* SPI1_CS_N */
-> +				>;
-> +			};
-> +
-> +			uart0_pmx_func: uart0_pmx_func {
-> +				pinctrl-single,pins = <
-> +					0x0cc MUX_M2 /* UART0_RXD */
-> +					0x0d0 MUX_M2 /* UART0_TXD */
-> +					0x0d4 MUX_M2 /* UART0_RXD_M */
-> +					0x0d8 MUX_M2 /* UART0_TXD_M */
-> +				>;
-> +			};
-> +
-> +			uart1_pmx_func: uart1_pmx_func {
-> +				pinctrl-single,pins = <
-> +					0x0b0 MUX_M2 /* UART1_CTS_N */
-> +					0x0b4 MUX_M2 /* UART1_RTS_N */
-> +					0x0a8 MUX_M2 /* UART1_RXD */
-> +					0x0ac MUX_M2 /* UART1_TXD */
-> +				>;
-> +			};
-> +
-> +			uart2_pmx_func: uart2_pmx_func {
-> +				pinctrl-single,pins = <
-> +					0x0bc MUX_M2 /* UART2_CTS_N */
-> +					0x0c0 MUX_M2 /* UART2_RTS_N */
-> +					0x0c8 MUX_M2 /* UART2_RXD */
-> +					0x0c4 MUX_M2 /* UART2_TXD */
-> +				>;
-> +			};
-> +
-> +			uart3_pmx_func: uart3_pmx_func {
-> +				pinctrl-single,pins = <
-> +					0x0dc MUX_M1 /* UART3_CTS_N */
-> +					0x0e0 MUX_M1 /* UART3_RTS_N */
-> +					0x0e4 MUX_M1 /* UART3_RXD */
-> +					0x0e8 MUX_M1 /* UART3_TXD */
-> +				>;
-> +			};
-> +
-> +			uart4_pmx_func: uart4_pmx_func {
-> +				pinctrl-single,pins = <
-> +					0x0ec MUX_M1 /* UART4_CTS_N */
-> +					0x0f0 MUX_M1 /* UART4_RTS_N */
-> +					0x0f4 MUX_M1 /* UART4_RXD */
-> +					0x0f8 MUX_M1 /* UART4_TXD */
-> +				>;
-> +			};
-> +
-> +			uart5_pmx_func: uart5_pmx_func {
-> +				pinctrl-single,pins = <
-> +					0x0c4 MUX_M3 /* UART5_CTS_N */
-> +					0x0c8 MUX_M3 /* UART5_RTS_N */
-> +					0x0bc MUX_M3 /* UART5_RXD */
-> +					0x0c0 MUX_M3 /* UART5_TXD */
-> +				>;
-> +			};
-> +
-> +			uart6_pmx_func: uart6_pmx_func {
-> +				pinctrl-single,pins = <
-> +					0x0cc MUX_M1 /* UART6_CTS_N */
-> +					0x0d0 MUX_M1 /* UART6_RTS_N */
-> +					0x0d4 MUX_M1 /* UART6_RXD */
-> +					0x0d8 MUX_M1 /* UART6_TXD */
-> +				>;
-> +			};
-> +		};
-> +
-> +		/* [IOMG_MMC0_000, IOMG_MMC0_005] */
-> +		pmx1: pinmux at ff37e000 {
-> +			compatible = "pinctrl-single";
-> +			reg = <0x0 0xff37e000 0x0 0x18>;
-> +			#gpio-range-cells = <0x3>;
-> +			#pinctrl-cells = <1>;
-> +			pinctrl-single,register-width = <0x20>;
-> +			pinctrl-single,function-mask = <0x7>;
-> +			/* pin base, nr pins & gpio function */
-> +			pinctrl-single,gpio-range = <&range 0 6 0>;
-> +
-> +			sdcard_pmx_func: sdcard_pmx_func {
-> +				pinctrl-single,pins = <
-> +					0x000 MUX_M1 /* SD_CLK */
-> +					0x004 MUX_M1 /* SD_CMD */
-> +					0x008 MUX_M1 /* SD_DATA0 */
-> +					0x00c MUX_M1 /* SD_DATA1 */
-> +					0x010 MUX_M1 /* SD_DATA2 */
-> +					0x014 MUX_M1 /* SD_DATA3 */
-> +				>;
-> +			};
-> +		};
-> +
-> +		/* [IOMG_FIX_000, IOMG_FIX_011] */
-> +		pmx2: pinmux at ff3b6000 {
-> +			compatible = "pinctrl-single";
-> +			reg = <0x0 0xff3b6000 0x0 0x30>;
-> +			#pinctrl-cells = <1>;
-> +			#gpio-range-cells = <0x3>;
-> +			pinctrl-single,register-width = <0x20>;
-> +			pinctrl-single,function-mask = <0x7>;
-> +			/* pin base, nr pins & gpio function */
-> +			pinctrl-single,gpio-range = <&range 0 12 0>;
-> +
-> +			spi3_pmx_func: spi3_pmx_func {
-> +				pinctrl-single,pins = <
-> +					0x008 MUX_M1 /* SPI3_CLK */
-> +					0x00c MUX_M1 /* SPI3_DI */
-> +					0x010 MUX_M1 /* SPI3_DO */
-> +					0x014 MUX_M1 /* SPI3_CS0_N */
-> +				>;
-> +			};
-> +		};
-> +
-> +		/* [IOMG_MMC1_000, IOMG_MMC1_005] */
-> +		pmx3: pinmux at ff3fd000 {
-> +			compatible = "pinctrl-single";
-> +			reg = <0x0 0xff3fd000 0x0 0x18>;
-> +			#pinctrl-cells = <1>;
-> +			#gpio-range-cells = <0x3>;
-> +			pinctrl-single,register-width = <0x20>;
-> +			pinctrl-single,function-mask = <0x7>;
-> +			/* pin base, nr pins & gpio function */
-> +			pinctrl-single,gpio-range = <&range 0 6 0>;
-> +
-> +			sdio_pmx_func: sdio_pmx_func {
-> +				pinctrl-single,pins = <
-> +					0x000 MUX_M1 /* SDIO_CLK */
-> +					0x004 MUX_M1 /* SDIO_CMD */
-> +					0x008 MUX_M1 /* SDIO_DATA0 */
-> +					0x00c MUX_M1 /* SDIO_DATA1 */
-> +					0x010 MUX_M1 /* SDIO_DATA2 */
-> +					0x014 MUX_M1 /* SDIO_DATA3 */
-> +				>;
-> +			};
-> +		};
-> +
-> +		/* [IOMG_AO_000, IOMG_AO_041] */
-> +		pmx4: pinmux at fff11000 {
-> +			compatible = "pinctrl-single";
-> +			reg = <0x0 0xfff11000 0x0 0xa8>;
-> +			#pinctrl-cells = <1>;
-> +			#gpio-range-cells = <0x3>;
-> +			pinctrl-single,register-width = <0x20>;
-> +			pinctrl-single,function-mask = <0x7>;
-> +			/* pin base in node, nr pins & gpio function */
-> +			pinctrl-single,gpio-range = <&range 0 42 0>;
-> +
-> +			i2s2_pmx_func: i2s2_pmx_func {
-> +				pinctrl-single,pins = <
-> +					0x044 MUX_M1 /* I2S2_DI */
-> +					0x048 MUX_M1 /* I2S2_DO */
-> +					0x04c MUX_M1 /* I2S2_XCLK */
-> +					0x050 MUX_M1 /* I2S2_XFS */
-> +				>;
-> +			};
-> +
-> +			slimbus_pmx_func: slimbus_pmx_func {
-> +				pinctrl-single,pins = <
-> +					0x02c MUX_M1 /* SLIMBUS_CLK */
-> +					0x030 MUX_M1 /* SLIMBUS_DATA */
-> +				>;
-> +			};
-> +
-> +			i2c0_pmx_func: i2c0_pmx_func {
-> +				pinctrl-single,pins = <
-> +					0x014 MUX_M1 /* I2C0_SCL */
-> +					0x018 MUX_M1 /* I2C0_SDA */
-> +				>;
-> +			};
-> +
-> +			i2c1_pmx_func: i2c1_pmx_func {
-> +				pinctrl-single,pins = <
-> +					0x01c MUX_M1 /* I2C1_SCL */
-> +					0x020 MUX_M1 /* I2C1_SDA */
-> +				>;
-> +			};
-> +
-> +			i2c2_pmx_func: i2c2_pmx_func {
-> +				pinctrl-single,pins = <
-> +					0x024 MUX_M1 /* I2C2_SCL */
-> +					0x028 MUX_M1 /* I2C2_SDA */
-> +				>;
-> +			};
-> +
-> +			i2c7_pmx_func: i2c7_pmx_func {
-> +				pinctrl-single,pins = <
-> +					0x024 MUX_M3 /* I2C7_SCL */
-> +					0x028 MUX_M3 /* I2C7_SDA */
-> +				>;
-> +			};
-> +
-> +			spi2_pmx_func: spi2_pmx_func {
-> +				pinctrl-single,pins = <
-> +					0x08c MUX_M1 /* SPI2_CLK */
-> +					0x090 MUX_M1 /* SPI2_DI */
-> +					0x094 MUX_M1 /* SPI2_DO */
-> +					0x098 MUX_M1 /* SPI2_CS0_N */
-> +				>;
-> +			};
-> +
-> +			spi4_pmx_func: spi4_pmx_func {
-> +				pinctrl-single,pins = <
-> +					0x08c MUX_M4 /* SPI4_CLK */
-> +					0x090 MUX_M4 /* SPI4_DI */
-> +					0x094 MUX_M4 /* SPI4_DO */
-> +					0x098 MUX_M4 /* SPI4_CS0_N */
-> +				>;
-> +			};
-> +
-> +			i2s0_pmx_func: i2s0_pmx_func {
-> +				pinctrl-single,pins = <
-> +					0x034 MUX_M1 /* I2S0_DI */
-> +					0x038 MUX_M1 /* I2S0_DO */
-> +					0x03c MUX_M1 /* I2S0_XCLK */
-> +					0x040 MUX_M1 /* I2S0_XFS */
-> +				>;
-> +			};
-> +		};
-> +	};
-> +};
-> 
+<OT chuckle> Ha, map is pretty generic outside of LK and more accurately 
+reflects the "mapping" from one structure/element to another, more so 
+than parse (of which I'm a prime offender, particularly in the previous 
+comment). </OT chuckle>
+
+
+(trimming)
+>>  static void __init
+>> -acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
+>> +acpi_verify_and_map_madt(struct acpi_madt_generic_interrupt *processor)
+>
+> acpi_map_madt_cpu_entry()
+>
+> or just drop this patch to avoid useless bikeshedding, your choice.
+>
+>>  {
+>>  	u64 hwid = processor->arm_mpidr;
+>>
+>> @@ -577,7 +578,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
+>>  }
+>>
+>>  static int __init
+>> -acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
+>> +acpi_parse_madt_common(struct acpi_subtable_header *header,
+>>  			     const unsigned long end)
+>
+> acpi_madt_parse_cpus()
+>
+> Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>
+>>  {
+>>  	struct acpi_madt_generic_interrupt *processor;
+
+(trimming)
