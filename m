@@ -1,124 +1,296 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Fri, 20 Jan 2017 10:50:52 -0800
-Subject: [PATCH v7 0/5] Support qcom's HSIC USB and rewrite USB2 HS support
-Message-ID: <20170120185057.16206-1-stephen.boyd@linaro.org>
+Date: Fri, 20 Jan 2017 10:50:53 -0800
+Subject: [PATCH v7 1/5] phy: Add support for Qualcomm's USB HSIC phy
+In-Reply-To: <20170120185057.16206-1-stephen.boyd@linaro.org>
+References: <20170120185057.16206-1-stephen.boyd@linaro.org>
+Message-ID: <20170120185057.16206-2-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series continues the usb chipidea rewrite for 
-Qualcommm platforms. I've dropped the patches that were applied
-to Peter's tree for chipidea. Now the phy drivers are left,
-along with a new hook to set the vbus in the phy and changes
-to chipidea to call the new hook.
+The HSIC USB controller on qcom SoCs has an integrated all
+digital phy controlled via the ULPI viewport.
 
-I've left the HSIC phy driver here, because it wasn't merged in
-the last round. Nothing has changed in that driver, so I believe
-it is ready to be merged now. The real changes are the new
-set_vbus() hook and how we're supposed to handle that in the HS
-phy driver.
+Acked-by: Rob Herring <robh@kernel.org>
+Cc: <devicetree@vger.kernel.org>
+Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+---
 
-The only dependencies between subsystems is the set_vbus callback.
-If that can go into some stable branch in the phy tree, then Kishon
-can apply the phy patches on top of that and Peter can apply the small
-chipidea patch on top of that. Or everything can go in parallel, except
-for the chipidea patch that adds the set_vbus hook. That hook can be
-added after rc1 when dependencies merge.
+No changes.
 
-Patches based on v4.10-rc1 + first 22 patches from v5. Full
-branch is here[1].
-
-Changes from v6:
- * Dropped first 22 applied patches
- * Rewrote phy_set_mode() patch to be msm specific
- * New set_vbus() callback in phy framework
- * Updated HS phy driver for set_vbus() callback
-
-Changes from v5:
- * Replaced "Emulate OTGSC interrupt enable path" patch with a patch
-   from Peter
- * Updated HS phy driver to support set_mode callback to handle pullup
- * New patch to set the mode to device or host in chipidea udc pullup
-   function to toggle the pullup for HS mode
- * New patch to drop lock around event_notify callback to avoid lockdep
-   issues
- * Removal of extcon usage from HS phy driver
- * Picked up acks from Heikki and Peter on ULPI core patch
-
-Changes from v4:
- * Picked up Acks from Rob
- * Updated HS phy init sequence DT property to restrict it to offsets
-
-Changes from v3:
- * Picked up Acks from Peter
- * Updated extcon consolidation patch per Peter's comments
- * Folded in simplification from Heikki for ULPI DT matching
-
-Changes from v2:
- * Added SoC specific compatibles in phy bindings
- * Dropped AVVIS patch for OTG statemachine
- * New patch to consolidate extcon handlers
- * Picked up Acks from Peter
- * Rebased onto v4.8-rc1
- * Reworked ULPI OF code to look at vid == 0 instead of pid == 0
- * Dropped ULPI bindings for vid and pid overrides
-
-Changes from v1:
- * Reworked ULPI device probing to keep using vendor/product ids that
-   come from DT if needed and falls back to OF style match when product id
-   is 0
- * PHY init later patch was rejected so that moved to a quirk flag and
-   the msm wrapper started managing the phy on/off
- * Updated clk requirements for HSIC phy in binding doc
- * Added optional clk in wrapper for "housekeeping" found on older qcom
-   platforms
- * Bug fix to OTGSC polling function
- * Changed runtime PM patch to set as active instead of get/put
-
-TODO:
- * DMA fails on arm64 so we need something like [2] to make it work.
- * The db410c needs a driver to toggle the onboard switch to connect
-   the usb hub instead of micro port when the usb cable is disconnected.
-   I've sent a patch set for this[3], which needs some further
-   discussion/development. The current plan is to reintroduce the usb
-   mux framework.
- * apq8064 platforms need a vbus regulator to really use otg and I haven't
-   tried out the RPM based regulators yet
- * The HSIC phy on the apq8074 dragonboard is connected to a usb4604
-   device which requires the i2c driver to probe and send an i2c
-   sequence before the HSIC controller enumerates or HSIC doesn't work.
-   Right now I have a hack to force the controller to probe defer
-   once so that usb4604 probes first. This needs a more proper solution
-   like having the DT describe a linkage between the controller and
-   the usb device so we can enforce probe ordering. My current plan
-   is to use DT graphs/endpoints for this.
-
-[1] https://git.linaro.org/people/stephen.boyd/linux.git/log/?h=usb-hsic-8074
-[2] https://patchwork.kernel.org/patch/9319527/
-[3] https://lkml.kernel.org/r/20160914014246.31847-1-stephen.boyd at linaro.org
-
-Stephen Boyd (5):
-  phy: Add support for Qualcomm's USB HSIC phy
-  usb: chipidea: msm: Configure phy for appropriate mode
-  phy: Add set_vbus callback
-  usb: chipidea: Signal vbus state to phy
-  phy: Add support for Qualcomm's USB HS phy
-
- .../devicetree/bindings/phy/qcom,usb-hs-phy.txt    |  78 +++++++
- .../devicetree/bindings/phy/qcom,usb-hsic-phy.txt  |  65 ++++++
- drivers/phy/Kconfig                                |  15 ++
- drivers/phy/Makefile                               |   2 +
- drivers/phy/phy-core.c                             |  15 ++
- drivers/phy/phy-qcom-usb-hs.c                      | 256 +++++++++++++++++++++
- drivers/phy/phy-qcom-usb-hsic.c                    | 160 +++++++++++++
- drivers/usb/chipidea/ci.h                          |   7 +-
- drivers/usb/chipidea/ci_hdrc_msm.c                 |   4 +
- drivers/usb/chipidea/otg.c                         |   7 +-
- include/linux/phy/phy.h                            |  10 +
- 11 files changed, 615 insertions(+), 4 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/phy/qcom,usb-hs-phy.txt
+ .../devicetree/bindings/phy/qcom,usb-hsic-phy.txt  |  65 +++++++++
+ drivers/phy/Kconfig                                |   7 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-qcom-usb-hsic.c                    | 160 +++++++++++++++++++++
+ 4 files changed, 233 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/phy/qcom,usb-hsic-phy.txt
- create mode 100644 drivers/phy/phy-qcom-usb-hs.c
  create mode 100644 drivers/phy/phy-qcom-usb-hsic.c
 
+diff --git a/Documentation/devicetree/bindings/phy/qcom,usb-hsic-phy.txt b/Documentation/devicetree/bindings/phy/qcom,usb-hsic-phy.txt
+new file mode 100644
+index 000000000000..3c7cb2be4b12
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/qcom,usb-hsic-phy.txt
+@@ -0,0 +1,65 @@
++Qualcomm's USB HSIC PHY
++
++PROPERTIES
++
++- compatible:
++    Usage: required
++    Value type: <string>
++    Definition: Should contain "qcom,usb-hsic-phy" and more specifically one of the
++		following:
++
++			"qcom,usb-hsic-phy-mdm9615"
++			"qcom,usb-hsic-phy-msm8974"
++
++- #phy-cells:
++    Usage: required
++    Value type: <u32>
++    Definition: Should contain 0
++
++- clocks:
++    Usage: required
++    Value type: <prop-encoded-array>
++    Definition: Should contain clock specifier for phy, calibration and
++                a calibration sleep clock
++
++- clock-names:
++    Usage: required
++    Value type: <stringlist>
++    Definition: Should contain "phy, "cal" and "cal_sleep"
++
++- pinctrl-names:
++    Usage: required
++    Value type: <stringlist>
++    Definition: Should contain "init" and "default" in that order
++
++- pinctrl-0:
++    Usage: required
++    Value type: <prop-encoded-array>
++    Definition: List of pinctrl settings to apply to keep HSIC pins in a glitch
++                free state
++
++- pinctrl-1:
++    Usage: required
++    Value type: <prop-encoded-array>
++    Definition: List of pinctrl settings to apply to mux out the HSIC pins
++
++EXAMPLE
++
++usb-controller {
++	ulpi {
++		phy {
++			compatible = "qcom,usb-hsic-phy-msm8974",
++				     "qcom,usb-hsic-phy";
++			#phy-cells = <0>;
++			pinctrl-names = "init", "default";
++			pinctrl-0 = <&hsic_sleep>;
++			pinctrl-1 = <&hsic_default>;
++			clocks = <&gcc GCC_USB_HSIC_CLK>,
++				 <&gcc GCC_USB_HSIC_IO_CAL_CLK>,
++				 <&gcc GCC_USB_HSIC_IO_CAL_SLEEP_CLK>;
++			clock-names = "phy", "cal", "cal_sleep";
++			assigned-clocks = <&gcc GCC_USB_HSIC_IO_CAL_CLK>;
++			assigned-clock-rates = <960000>;
++		};
++	};
++};
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index e8eb7f225a88..a430a64981d5 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -437,6 +437,13 @@ config PHY_QCOM_UFS
+ 	help
+ 	  Support for UFS PHY on QCOM chipsets.
+ 
++config PHY_QCOM_USB_HSIC
++	tristate "Qualcomm USB HSIC ULPI PHY module"
++	depends on USB_ULPI_BUS
++	select GENERIC_PHY
++	help
++	  Support for the USB HSIC ULPI compliant PHY on QCOM chipsets.
++
+ config PHY_TUSB1210
+ 	tristate "TI TUSB1210 ULPI PHY module"
+ 	depends on USB_ULPI_BUS
+diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+index 65eb2f436a41..c43c9df5d301 100644
+--- a/drivers/phy/Makefile
++++ b/drivers/phy/Makefile
+@@ -52,6 +52,7 @@ obj-$(CONFIG_PHY_STIH407_USB)		+= phy-stih407-usb.o
+ obj-$(CONFIG_PHY_QCOM_UFS) 	+= phy-qcom-ufs.o
+ obj-$(CONFIG_PHY_QCOM_UFS) 	+= phy-qcom-ufs-qmp-20nm.o
+ obj-$(CONFIG_PHY_QCOM_UFS) 	+= phy-qcom-ufs-qmp-14nm.o
++obj-$(CONFIG_PHY_QCOM_USB_HSIC) 	+= phy-qcom-usb-hsic.o
+ obj-$(CONFIG_PHY_TUSB1210)		+= phy-tusb1210.o
+ obj-$(CONFIG_PHY_BRCM_SATA)		+= phy-brcm-sata.o
+ obj-$(CONFIG_PHY_PISTACHIO_USB)		+= phy-pistachio-usb.o
+diff --git a/drivers/phy/phy-qcom-usb-hsic.c b/drivers/phy/phy-qcom-usb-hsic.c
+new file mode 100644
+index 000000000000..47690f9945b9
+--- /dev/null
++++ b/drivers/phy/phy-qcom-usb-hsic.c
+@@ -0,0 +1,160 @@
++/**
++ * Copyright (C) 2016 Linaro Ltd
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#include <linux/module.h>
++#include <linux/ulpi/driver.h>
++#include <linux/ulpi/regs.h>
++#include <linux/pinctrl/consumer.h>
++#include <linux/pinctrl/pinctrl-state.h>
++#include <linux/delay.h>
++#include <linux/clk.h>
++
++#include "ulpi_phy.h"
++
++#define ULPI_HSIC_CFG		0x30
++#define ULPI_HSIC_IO_CAL	0x33
++
++struct qcom_usb_hsic_phy {
++	struct ulpi *ulpi;
++	struct phy *phy;
++	struct pinctrl *pctl;
++	struct clk *phy_clk;
++	struct clk *cal_clk;
++	struct clk *cal_sleep_clk;
++};
++
++static int qcom_usb_hsic_phy_power_on(struct phy *phy)
++{
++	struct qcom_usb_hsic_phy *uphy = phy_get_drvdata(phy);
++	struct ulpi *ulpi = uphy->ulpi;
++	struct pinctrl_state *pins_default;
++	int ret;
++
++	ret = clk_prepare_enable(uphy->phy_clk);
++	if (ret)
++		return ret;
++
++	ret = clk_prepare_enable(uphy->cal_clk);
++	if (ret)
++		goto err_cal;
++
++	ret = clk_prepare_enable(uphy->cal_sleep_clk);
++	if (ret)
++		goto err_sleep;
++
++	/* Set periodic calibration interval to ~2.048sec in HSIC_IO_CAL_REG */
++	ret = ulpi_write(ulpi, ULPI_HSIC_IO_CAL, 0xff);
++	if (ret)
++		goto err_ulpi;
++
++	/* Enable periodic IO calibration in HSIC_CFG register */
++	ret = ulpi_write(ulpi, ULPI_HSIC_CFG, 0xa8);
++	if (ret)
++		goto err_ulpi;
++
++	/* Configure pins for HSIC functionality */
++	pins_default = pinctrl_lookup_state(uphy->pctl, PINCTRL_STATE_DEFAULT);
++	if (IS_ERR(pins_default))
++		return PTR_ERR(pins_default);
++
++	ret = pinctrl_select_state(uphy->pctl, pins_default);
++	if (ret)
++		goto err_ulpi;
++
++	 /* Enable HSIC mode in HSIC_CFG register */
++	ret = ulpi_write(ulpi, ULPI_SET(ULPI_HSIC_CFG), 0x01);
++	if (ret)
++		goto err_ulpi;
++
++	/* Disable auto-resume */
++	ret = ulpi_write(ulpi, ULPI_CLR(ULPI_IFC_CTRL),
++			 ULPI_IFC_CTRL_AUTORESUME);
++	if (ret)
++		goto err_ulpi;
++
++	return ret;
++err_ulpi:
++	clk_disable_unprepare(uphy->cal_sleep_clk);
++err_sleep:
++	clk_disable_unprepare(uphy->cal_clk);
++err_cal:
++	clk_disable_unprepare(uphy->phy_clk);
++	return ret;
++}
++
++static int qcom_usb_hsic_phy_power_off(struct phy *phy)
++{
++	struct qcom_usb_hsic_phy *uphy = phy_get_drvdata(phy);
++
++	clk_disable_unprepare(uphy->cal_sleep_clk);
++	clk_disable_unprepare(uphy->cal_clk);
++	clk_disable_unprepare(uphy->phy_clk);
++
++	return 0;
++}
++
++static const struct phy_ops qcom_usb_hsic_phy_ops = {
++	.power_on = qcom_usb_hsic_phy_power_on,
++	.power_off = qcom_usb_hsic_phy_power_off,
++	.owner = THIS_MODULE,
++};
++
++static int qcom_usb_hsic_phy_probe(struct ulpi *ulpi)
++{
++	struct qcom_usb_hsic_phy *uphy;
++	struct phy_provider *p;
++	struct clk *clk;
++
++	uphy = devm_kzalloc(&ulpi->dev, sizeof(*uphy), GFP_KERNEL);
++	if (!uphy)
++		return -ENOMEM;
++	ulpi_set_drvdata(ulpi, uphy);
++
++	uphy->ulpi = ulpi;
++	uphy->pctl = devm_pinctrl_get(&ulpi->dev);
++	if (IS_ERR(uphy->pctl))
++		return PTR_ERR(uphy->pctl);
++
++	uphy->phy_clk = clk = devm_clk_get(&ulpi->dev, "phy");
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
++
++	uphy->cal_clk = clk = devm_clk_get(&ulpi->dev, "cal");
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
++
++	uphy->cal_sleep_clk = clk = devm_clk_get(&ulpi->dev, "cal_sleep");
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
++
++	uphy->phy = devm_phy_create(&ulpi->dev, ulpi->dev.of_node,
++				    &qcom_usb_hsic_phy_ops);
++	if (IS_ERR(uphy->phy))
++		return PTR_ERR(uphy->phy);
++	phy_set_drvdata(uphy->phy, uphy);
++
++	p = devm_of_phy_provider_register(&ulpi->dev, of_phy_simple_xlate);
++	return PTR_ERR_OR_ZERO(p);
++}
++
++static const struct of_device_id qcom_usb_hsic_phy_match[] = {
++	{ .compatible = "qcom,usb-hsic-phy", },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, qcom_usb_hsic_phy_match);
++
++static struct ulpi_driver qcom_usb_hsic_phy_driver = {
++	.probe = qcom_usb_hsic_phy_probe,
++	.driver = {
++		.name = "qcom_usb_hsic_phy",
++		.of_match_table = qcom_usb_hsic_phy_match,
++	},
++};
++module_ulpi_driver(qcom_usb_hsic_phy_driver);
++
++MODULE_DESCRIPTION("Qualcomm USB HSIC phy");
++MODULE_LICENSE("GPL v2");
 -- 
 2.10.0.297.gf6727b0
