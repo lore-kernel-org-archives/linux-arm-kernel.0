@@ -1,493 +1,223 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 20 Jan 2017 14:08:18 +0800
-Subject: [PATCH v2 3/3] watchdog: zx2967: add watchdog controller driver
- for ZTE's zx2967 family
-In-Reply-To: <1484791192-31674-3-git-send-email-baoyou.xie@linaro.org>
-References: <1484791192-31674-1-git-send-email-baoyou.xie@linaro.org>
- <1484791192-31674-3-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <20170120060759.GB17299@dragon>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Fri, 20 Jan 2017 15:08:57 +0900
+Subject: [PATCH] Revert "mmc: dw_mmc-rockchip: add runtime PM support"
+In-Reply-To: <2cdd0b6c-a099-595d-1c0b-be7933b0d4a6@collabora.com>
+References: <CGME20161228153516epcas2p253c6bc0371ab0df464573b63218795ef@epcas2p2.samsung.com>
+ <1482939288-14950-1-git-send-email-ayaka@soulik.info>
+ <e0cc8029-0155-4879-a643-ddc4239a55ab@samsung.com>
+ <7e37b8ad-39d0-3a94-f75a-2166ae2caf10@samsung.com>
+ <7fb90b9e-75c3-0184-4f0a-d4113899b860@rock-chips.com>
+ <04b667d9-2591-51ff-e024-047bbb6e17c3@rock-chips.com>
+ <6ccade72-ae20-2ffa-1504-2536b9f03adf@soulik.info>
+ <95648282-38f5-42c2-fd8b-ab603eb3a168@gmail.com>
+ <0ccf164f-0d35-9cc3-f288-9b582db23efb@soulik.info>
+ <20afb1da-9e45-f515-01bf-2f5365d20d61@samsung.com>
+ <8f8c66f1-82d6-5151-ff64-ef62596aa10d@rock-chips.com>
+ <c8307da1-8e43-29b5-c87d-292a56831c98@samsung.com>
+ <CABgxDo+3qMcHn6e2s_ZJy1crdi=ch5hQk6sy3W29Q12-ye33Qw@mail.gmail.com>
+ <2cdd0b6c-a099-595d-1c0b-be7933b0d4a6@collabora.com>
+Message-ID: <fba28eda-51c7-2012-03ca-48b6f94e4a18@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 09:59:52AM +0800, Baoyou Xie wrote:
-> This patch adds watchdog controller driver for ZTE's zx2967 family.
+Hi,
+
+On 01/17/2017 10:38 PM, Romain Perier wrote:
+> Hi,
 > 
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
-> ---
->  drivers/watchdog/Kconfig      |  10 ++
->  drivers/watchdog/Makefile     |   1 +
->  drivers/watchdog/zx2967_wdt.c | 383 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 394 insertions(+)
->  create mode 100644 drivers/watchdog/zx2967_wdt.c
+> In my case I can reproduce the issue on the rock2 and the firefly-rk3288. A workaround is to
 > 
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index acb00b5..05093a2 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -714,6 +714,16 @@ config ASPEED_WATCHDOG
->  	  To compile this driver as a module, choose M here: the
->  	  module will be called aspeed_wdt.
->  
-> +config ZX2967_WATCHDOG
-> +	tristate "ZTE zx2967 SoCs watchdog support"
-> +	depends on ARCH_ZX
-> +	select WATCHDOG_CORE
-> +	help
-> +	  Say Y here to include support for the watchdog timer
-> +	  in ZTE zx2967 SoCs.
-> +	  To compile this driver as a module, choose M here: the
-> +	  module will be called zx2967_wdt.
-> +
->  # AVR32 Architecture
->  
->  config AT32AP700X_WDT
-> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-> index 0c3d35e..bf2d296 100644
-> --- a/drivers/watchdog/Makefile
-> +++ b/drivers/watchdog/Makefile
-> @@ -82,6 +82,7 @@ obj-$(CONFIG_BCM7038_WDT) += bcm7038_wdt.o
->  obj-$(CONFIG_ATLAS7_WATCHDOG) += atlas7_wdt.o
->  obj-$(CONFIG_RENESAS_WDT) += renesas_wdt.o
->  obj-$(CONFIG_ASPEED_WATCHDOG) += aspeed_wdt.o
-> +obj-$(CONFIG_ZX2967_WATCHDOG) += zx2967_wdt.o
->  
->  # AVR32 Architecture
->  obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
-> diff --git a/drivers/watchdog/zx2967_wdt.c b/drivers/watchdog/zx2967_wdt.c
-> new file mode 100644
-> index 0000000..35eaecd
-> --- /dev/null
-> +++ b/drivers/watchdog/zx2967_wdt.c
-> @@ -0,0 +1,383 @@
-> +/*
-> + * watchdog driver for ZTE's zx2967 family
-> + *
-> + * Copyright (C) 2017 ZTE Ltd.
-> + *
-> + * Author: Baoyou Xie <baoyou.xie@linaro.org>
-> + *
-> + * License terms: GNU General Public License (GPL) version 2
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/delay.h>
-> +#include <linux/io.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/module.h>
-> +#include <linux/of_address.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/reboot.h>
-> +#include <linux/regmap.h>
-> +#include <linux/reset.h>
-> +#include <linux/watchdog.h>
-> +
-> +#define ZX2967_WDT_CFG_REG			0x4
-> +#define ZX2967_WDT_LOAD_REG			0x8
-> +#define ZX2967_WDT_REFRESH_REG			0x18
-> +#define ZX2967_WDT_START_REG			0x1c
-> +
-> +#define ZX2967_WDT_REFRESH_MASK			0x3f
-> +
-> +#define ZX2967_WDT_CFG_DIV(n)			((((n) & 0xff) - 1) << 8)
-> +#define ZX2967_WDT_START_EN			0x1
-> +
-> +#define ZX2967_WDT_WRITEKEY			0x12340000
-> +
-> +#define ZX2967_WDT_DIV_DEFAULT			16
-> +#define ZX2967_WDT_DEFAULT_TIMEOUT		32
-> +#define ZX2967_WDT_MIN_TIMEOUT			1
-> +#define ZX2967_WDT_MAX_TIMEOUT			500
-> +#define ZX2967_WDT_MAX_COUNT			0xffff
-> +
-> +#define ZX2967_WDT_FLAG_REBOOT_MON		(1 << 0)
-> +
-> +#define ZX2967_RESET_MASK_REG			0xb0
-> +
-> +struct zx2967_wdt {
-> +	struct device		*dev;
-> +	struct clk		*clock;
-> +	void __iomem		*reg_base;
-> +	unsigned int		conf;
-> +	unsigned int		load;
-> +	unsigned int		flags;
-> +	struct watchdog_device	wdt_device;
-> +	struct notifier_block	restart_handler;
-> +	struct notifier_block	reboot_handler;
-> +};
-> +
-> +#define zx2967_wdt_read_reg(r)                  readl_relaxed(r)
-> +
-> +static inline void
-> +zx2967_wdt_write_reg(u32 val, void __iomem *addr)
-> +{
-> +	writel_relaxed(val | ZX2967_WDT_WRITEKEY, addr);
-> +}
+> comment the line ".pm = <&pm_ops_foo>" .
 
-static inline u32 zx2967_wdt_readl(struct zx2967_wdt *wdt, u16 reg)
-{
-	return readl_relaxed(wdt->reg_base + reg);
-}
+Sorry for late. I'm checking runtime PM for this. 
+After that, i will decide whether revert or not.
 
-static inline void zx2967_wdt_writel(struct zx2967_wdt *wdt, u16 reg, u32 val)
-{
-	writel_relaxed(val | ZX2967_WDT_WRITEKEY, wdt->reg_base + reg);
-}
+Best Regards,
+Jaehoon Chung
 
-This is what I would suggest to make the caller a bit easier.  Anyway,
-it's just a suggestion, not a strong opinion.
-
-> +
-> +static void zx2967_wdt_refresh(struct zx2967_wdt *wdt)
-> +{
-> +	u32 val;
-> +
-> +	val = zx2967_wdt_read_reg(wdt->reg_base + ZX2967_WDT_REFRESH_REG);
-> +	val ^= ZX2967_WDT_REFRESH_MASK;
-> +	zx2967_wdt_write_reg(val, wdt->reg_base + ZX2967_WDT_REFRESH_REG);
-> +}
-> +
-> +static unsigned int
-> +__zx2967_wdt_set_timeout(struct zx2967_wdt *wdt, unsigned int timeout)
-> +{
-> +	unsigned int freq = clk_get_rate(wdt->clock);
-> +	unsigned int divisor = ZX2967_WDT_DIV_DEFAULT;
-> +	unsigned int count;
-> +
-> +	count = timeout * freq;
-> +	if (count > divisor * ZX2967_WDT_MAX_COUNT)
-> +		divisor = DIV_ROUND_UP(count, ZX2967_WDT_MAX_COUNT);
-> +	count = DIV_ROUND_UP(count, divisor);
-> +	zx2967_wdt_write_reg(ZX2967_WDT_CFG_DIV(divisor),
-> +			     wdt->reg_base + ZX2967_WDT_CFG_REG);
-> +	zx2967_wdt_write_reg(count, wdt->reg_base + ZX2967_WDT_LOAD_REG);
-> +	zx2967_wdt_refresh(wdt);
-> +	wdt->load = count;
-> +
-> +	return (count * divisor) / freq;
-> +}
-> +
-> +static int zx2967_wdt_set_timeout(struct watchdog_device *wdd,
-> +				  unsigned int timeout)
-> +{
-> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
-> +
-> +	if (watchdog_timeout_invalid(&wdt->wdt_device, timeout)) {
-> +		dev_err(wdt->dev, "timeout %d is invalid\n", timeout);
-> +		return -EINVAL;
-> +	}
-> +
-> +	wdd->timeout = __zx2967_wdt_set_timeout(wdt, timeout);
-> +
-> +	return 0;
-> +}
-> +
-> +static void __zx2967_wdt_start(struct zx2967_wdt *wdt)
-> +{
-> +	u32 val;
-> +
-> +	val = zx2967_wdt_read_reg(wdt->reg_base + ZX2967_WDT_START_REG);
-> +	val |= ZX2967_WDT_START_EN;
-> +	zx2967_wdt_write_reg(val, wdt->reg_base + ZX2967_WDT_START_REG);
-> +}
-> +
-> +static void __zx2967_wdt_stop(struct zx2967_wdt *wdt)
-> +{
-> +	u32 val;
-> +
-> +	val = zx2967_wdt_read_reg(wdt->reg_base + ZX2967_WDT_START_REG);
-> +	val &= ~ZX2967_WDT_START_EN;
-> +	zx2967_wdt_write_reg(val, wdt->reg_base + ZX2967_WDT_START_REG);
-> +}
-> +
-> +static int zx2967_wdt_start(struct watchdog_device *wdd)
-> +{
-> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
-> +
-> +	__zx2967_wdt_stop(wdt);
-> +	zx2967_wdt_set_timeout(wdd, wdd->timeout);
-> +	__zx2967_wdt_start(wdt);
-> +
-> +	return 0;
-> +}
-> +
-> +static int zx2967_wdt_stop(struct watchdog_device *wdd)
-> +{
-> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
-> +
-> +	__zx2967_wdt_stop(wdt);
-> +
-> +	return 0;
-> +}
-> +
-> +static int zx2967_wdt_keepalive(struct watchdog_device *wdd)
-> +{
-> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
-> +
-> +	zx2967_wdt_refresh(wdt);
-> +
-> +	return 0;
-> +}
-> +
-> +#define ZX2967_WDT_OPTIONS \
-> +	(WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE)
-> +static const struct watchdog_info zx2967_wdt_ident = {
-> +	.options          =     ZX2967_WDT_OPTIONS,
-> +	.firmware_version =	0,
-> +	.identity         =	"zx2967 watchdog",
-> +};
-> +
-> +static struct watchdog_ops zx2967_wdt_ops = {
-> +	.owner = THIS_MODULE,
-> +	.start = zx2967_wdt_start,
-> +	.stop = zx2967_wdt_stop,
-> +	.ping = zx2967_wdt_keepalive,
-> +	.set_timeout = zx2967_wdt_set_timeout,
-> +};
-> +
-> +static void zx2967_wdt_fix_sysdown(struct zx2967_wdt *wdt)
-> +{
-> +	__zx2967_wdt_stop(wdt);
-> +	__zx2967_wdt_set_timeout(wdt, 15);
-> +	__zx2967_wdt_start(wdt);
-> +}
-> +
-> +static int zx2967_wdt_notify_sys(struct notifier_block *this,
-> +			     unsigned long code, void *unused)
-> +{
-> +	struct zx2967_wdt *wdt = container_of(this, struct zx2967_wdt,
-> +					      reboot_handler);
-> +
-> +	wdt->flags |= ZX2967_WDT_FLAG_REBOOT_MON;
-> +	switch (code) {
-> +	case SYS_HALT:
-> +	case SYS_POWER_OFF:
-> +	case SYS_RESTART:
-> +		zx2967_wdt_fix_sysdown(wdt);
-> +		break;
-> +	default:
-> +		break;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int zx2967_wdt_restart(struct notifier_block *this,
-> +			      unsigned long mode, void *cmd)
-> +{
-> +	struct zx2967_wdt *wdt;
-> +
-> +	wdt = container_of(this, struct zx2967_wdt, restart_handler);
-> +
-> +	zx2967_wdt_stop(&wdt->wdt_device);
-> +
-> +	zx2967_wdt_write_reg(0x80, wdt->reg_base + ZX2967_WDT_LOAD_REG);
-> +	zx2967_wdt_refresh(wdt);
-> +	zx2967_wdt_write_reg(ZX2967_WDT_START_EN,
-> +			     wdt->reg_base + ZX2967_WDT_START_REG);
-> +
-> +	zx2967_wdt_start(&wdt->wdt_device);
-> +	/* wait for reset*/
-> +	mdelay(500);
-> +
-> +	return NOTIFY_DONE;
-> +}
-> +
-> +static void zx2967_wdt_reset_sysctrl(struct device *dev)
-> +{
-> +	int ret;
-> +	struct device_node *np = NULL;
-> +	void __iomem *regmap;
-> +	unsigned int  val, mask, config;
-> +	struct of_phandle_args out_args;
-> +
-> +	ret = of_parse_phandle_with_fixed_args(dev->of_node,
-> +			"wdt-reset-sysctrl", 2, 0, &out_args);
-> +	if (ret) {
-> +		dev_info(dev, "have no wdt-reset-sysctrl node");
-
-wdt-reset-sysctrl is not a node but a property.  Also, the call can fail
-on other reasons, e.g. the arguments are not two.  So I suggest the
-message like "failed to parse wdt-reset-sysctrl".
-
-> +		return;
-> +	}
-> +	config = out_args.args[0];
-> +	mask = out_args.args[1];
-> +
-> +	regmap = syscon_node_to_regmap(out_args.np);
-> +	if (IS_ERR(regmap))
-> +		goto out;
-> +
-> +	ret = regmap_read(regmap, ZX2967_RESET_MASK_REG, &val);
-
-I think this register offset can also be an argument of phandle in
-device tree.
-
-> +
-> +	val &= ~mask;
-> +	val |= config;
-> +	regmap_write(regmap, ZX2967_RESET_MASK_REG, val);
-
-regmap_update_bits() can be used.
-
-> +out:
-> +	of_node_put(np);
-> +}
-> +
-> +static int zx2967_wdt_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev;
-> +	struct zx2967_wdt *wdt;
-> +	struct resource *base;
-> +	int err, ret = 0;
-> +	unsigned int rate;
-> +
-> +	struct reset_control *rstc;
-> +
-> +	dev = &pdev->dev;
-> +
-> +	wdt = devm_kzalloc(dev, sizeof(*wdt), GFP_KERNEL);
-> +	if (!wdt)
-> +		return -ENOMEM;
-> +
-> +	platform_set_drvdata(pdev, wdt);
-> +
-> +	wdt->dev = dev;
-> +	wdt->wdt_device.info = &zx2967_wdt_ident;
-> +	wdt->wdt_device.ops = &zx2967_wdt_ops;
-> +	wdt->wdt_device.timeout = ZX2967_WDT_DEFAULT_TIMEOUT;
-> +	wdt->wdt_device.max_timeout = ZX2967_WDT_MAX_TIMEOUT;
-> +	wdt->wdt_device.min_timeout = ZX2967_WDT_MIN_TIMEOUT;
-> +	wdt->wdt_device.parent = &pdev->dev;
-> +
-> +	base = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	wdt->reg_base = devm_ioremap_resource(dev, base);
-> +	if (IS_ERR(wdt->reg_base)) {
-> +		dev_err(dev, "ioremap failed\n");
-> +		return PTR_ERR(wdt->reg_base);
-> +	}
-> +
-> +	zx2967_wdt_reset_sysctrl(dev);
-> +
-> +	wdt->reboot_handler.notifier_call = zx2967_wdt_notify_sys;
-> +	ret = register_reboot_notifier(&wdt->reboot_handler);
-> +	wdt->clock = devm_clk_get(dev, "wdtclk");
-
-devm_clk_get(dev, NULL), so that clock-names can be saved from DT.
-
-> +	if (IS_ERR(wdt->clock)) {
-> +		dev_err(dev, "failed to find watchdog clock source\n");
-> +		return PTR_ERR(wdt->clock);
-> +	}
-> +	ret = clk_prepare_enable(wdt->clock);
-> +	if (ret < 0) {
-> +		dev_err(dev, "failed to enable clock\n");
-> +		return ret;
-> +	}
-> +
-> +	rate = clk_get_rate(wdt->clock);
-> +	if (rate == 24000000)
-> +		clk_set_rate(wdt->clock, 32768);
-
-What's the logic behind this?  We need to set the frequency to 32768
-only when it's 24000000?  Any other frequency will just work?
-
-> +
-> +	rstc = devm_reset_control_get(dev, "wdtrst");
-
-devm_reset_control_get(dev, NULL), so that reset-names can be saved.
-
-> +	if (!rstc) {
-> +		dev_err(dev, "rstc get failed");
-
-Will it still work if "reset" property is missing?  If yes, the property
-should be documented as optional, not required.  If no, we should stop
-probing and return error right here.
-
-> +	} else {
-> +		reset_control_assert(rstc);
-> +		mdelay(10);
-> +		reset_control_deassert(rstc);
-> +	}
-> +
-> +	watchdog_set_drvdata(&wdt->wdt_device, wdt);
-> +
-> +	watchdog_init_timeout(&wdt->wdt_device,
-> +			      ZX2967_WDT_DEFAULT_TIMEOUT, dev);
-> +	watchdog_set_nowayout(&wdt->wdt_device, WATCHDOG_NOWAYOUT);
-> +
-> +	zx2967_wdt_stop(&wdt->wdt_device);
-> +
-> +	err = watchdog_register_device(&wdt->wdt_device);
-
-Why not use 'ret' directly?
-
-Shawn
-
-> +	if (unlikely(err)) {
-> +		ret = err;
-> +		goto fail_register;
-> +	}
-> +
-> +	wdt->restart_handler.notifier_call = zx2967_wdt_restart;
-> +	wdt->restart_handler.priority = 128;
-> +	ret = register_restart_handler(&wdt->restart_handler);
-> +	if (ret) {
-> +		dev_err(dev, "cannot register restart handler, %d\n", ret);
-> +		goto fail_restart;
-> +	}
-> +
-> +	dev_info(dev, "watchdog enabled (timeout=%d sec, nowayout=%d)",
-> +		 wdt->wdt_device.timeout, WATCHDOG_NOWAYOUT);
-> +
-> +	return 0;
-> +
-> +fail_restart:
-> +	watchdog_unregister_device(&wdt->wdt_device);
-> +fail_register:
-> +	clk_disable_unprepare(wdt->clock);
-> +	return ret;
-> +}
-> +
-> +static int zx2967_wdt_remove(struct platform_device *pdev)
-> +{
-> +	struct zx2967_wdt *wdt = platform_get_drvdata(pdev);
-> +
-> +	unregister_restart_handler(&wdt->restart_handler);
-> +	watchdog_unregister_device(&wdt->wdt_device);
-> +	clk_disable_unprepare(wdt->clock);
-> +
-> +	return 0;
-> +}
-> +
-> +static void zx2967_wdt_shutdown(struct platform_device *pdev)
-> +{
-> +	struct zx2967_wdt *wdt = platform_get_drvdata(pdev);
-> +
-> +	if (!(wdt->flags & ZX2967_WDT_FLAG_REBOOT_MON))
-> +		zx2967_wdt_stop(&wdt->wdt_device);
-> +}
-> +
-> +static const struct of_device_id zx2967_wdt_match[] = {
-> +	{ .compatible = "zte,zx296718-wdt", },
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(of, zx2967_wdt_match);
-> +
-> +static struct platform_driver zx2967_wdt_driver = {
-> +	.probe		= zx2967_wdt_probe,
-> +	.remove		= zx2967_wdt_remove,
-> +	.shutdown	= zx2967_wdt_shutdown,
-> +	.driver		= {
-> +		.name	= "zx2967-wdt",
-> +		.of_match_table	= of_match_ptr(zx2967_wdt_match),
-> +	},
-> +};
-> +module_platform_driver(zx2967_wdt_driver);
-> +
-> +MODULE_AUTHOR("Baoyou Xie <baoyou.xie@linaro.org>");
-> +MODULE_DESCRIPTION("ZTE zx2967 Watchdog Device Driver");
-> +MODULE_LICENSE("GPL v2");
-> -- 
-> 2.7.4
+> 
+> Thanks,
+> Romain
+> 
+> 
+> Le 17/01/2017 ? 14:28, Romain Perier a ?crit :
+>> Hello,
+>>
+>> This commit also breaks reboot and poweroff (the pmic no longer turn the power supply off), see below:
+>>
+>> # poweroff
+>> # Stopping network: ifdown: interface lo not configured
+>> OK
+>> Saving random seed... done.
+>> Stopping logging: OK
+>> umount: devtmpfs busy - remounted read-only
+>> The system is going down NOW!
+>> Sent SIGTERM to all processes
+>> Sent SIGKILL to all processes
+>> Requesting system poweroff
+>> [  243.673159] INFO: task init:168 blocked for more than 120 seconds.
+>> [  243.701298]       Not tainted 4.10.0-rc4-13066-gc10b6c6 #108
+>> [  243.728802] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+>> [  243.758948] init            D    0   168      1 0x00000000
+>> [  243.786412] [<c0888740>] (__schedule) from [<c0888b10>] (schedule+0x44/0x9c)
+>> [  243.815411] [<c0888b10>] (schedule) from [<c088c218>] (schedule_timeout+0x1d8/0x220)
+>> [  243.845267] [<c088c218>] (schedule_timeout) from [<c0889528>] (wait_for_common+0xa4/0x168)
+>> [  243.876105] [<c0889528>] (wait_for_common) from [<c06da03c>] (mmc_wait_for_req_done+0x8c/0x110)
+>> [  243.907150] [<c06da03c>] (mmc_wait_for_req_done) from [<c06da204>] (mmc_wait_for_cmd+0x58/0x78)
+>> [  243.937855] [<c06da204>] (mmc_wait_for_cmd) from [<c06e14ec>] (__mmc_switch+0xbc/0x34c)
+>> [  243.967791] [<c06e14ec>] (__mmc_switch) from [<c06e17a4>] (mmc_switch+0x28/0x30)
+>> [  243.997029] [<c06e17a4>] (mmc_switch) from [<c06db144>] (mmc_flush_cache+0x54/0x80)
+>> [  244.026955] [<c06db144>] (mmc_flush_cache) from [<c06e0084>] (_mmc_suspend+0x40/0x268)
+>> [  244.057529] [<c06e0084>] (_mmc_suspend) from [<c06dcf3c>] (mmc_bus_shutdown+0x40/0x64)
+>> [  244.088412] [<c06dcf3c>] (mmc_bus_shutdown) from [<c04db050>] (device_shutdown+0x144/0x1d8)
+>> [  244.120015] [<c04db050>] (device_shutdown) from [<c01503b8>] (kernel_power_off+0x34/0x70)
+>> [  244.151235] [<c01503b8>] (kernel_power_off) from [<c0150598>] (SyS_reboot+0x15c/0x1d0)
+>> [  244.182037] [<c0150598>] (SyS_reboot) from [<c01076c0>] (ret_fast_syscall+0x0/0x3c)
+>> [  366.553025] INFO: task init:168 blocked for more than 120 seconds.
+>> [  366.583187]       Not tainted 4.10.0-rc4-13066-gc10b6c6 #108
+>> [  366.613053] "echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+>>
+>>
+>>
+>> Reverting this commit solves the issue.
+>>
+>> Regards,
+>> Romain
+>>
+>>
+>> 2016-12-30 3:50 GMT+01:00 Jaehoon Chung <jh80.chung at samsung.com <mailto:jh80.chung@samsung.com>>:
+>>
+>>     On 12/30/2016 11:44 AM, Randy Li wrote:
+>>     >
+>>     >
+>>     > On 12/30/2016 10:35 AM, Jaehoon Chung wrote:
+>>     >> On 12/30/2016 12:07 AM, ayaka wrote:
+>>     >>>
+>>     >>>
+>>     >>> On 12/29/2016 10:04 PM, Jaehoon Chung wrote:
+>>     >>>> Hi,
+>>     >>>>
+>>     >>>> On 12/29/2016 09:55 PM, ayaka wrote:
+>>     >>>>> [    5.849733] rk_gmac-dwmac ff290000.ethernet (unnamed
+>>     net_device) (uninitialized): Enable RX Mitigation via HW Watchdog
+>>     Timer
+>>     >>>>> [    5.944512] mmc_host mmc1: Bus speed (slot 0) =
+>>     50000000Hz (slot req 50000000Hz, actual 50000000HZ div = 0)
+>>     >>>>> [    5.958249] mmc1: new ultra high speed DDR50 SDIO card at
+>>     address 0001
+>>     >>>>> [    6.294548] dwmmc_rockchip ff0f0000.dwmmc: Successfully
+>>     tuned phase to 177
+>>     >>>>> [    6.301591] mmc2: new HS200 MMC card at address 0001
+>>     >>>>> [    6.306758] mmc_host mmc0: Bus speed (slot 0) = 300000Hz
+>>     (slot req 300000Hz, actual 300000HZ div = 0)
+>>     >>>>> [    6.316830] mmcblk2: mmc2:0001 AGND3R 14.6 GiB
+>>     >>>>> [    6.321881] mmcblk2boot0: mmc2:0001 AGND3R partition 1
+>>     4.00 MiB
+>>     >>>>> [    6.328331] mmcblk2boot1: mmc2:0001 AGND3R partition 2
+>>     4.00 MiB
+>>     >>>>> [    6.334792] mmcblk2rpmb: mmc2:0001 AGND3R partition 3
+>>     4.00 MiB
+>>     >>>>> [    6.344295]  mmcblk2: p1 p2 p3 p4 p5 p6 p7
+>>     >>>>> [    6.469892] mmc_host mmc0: Bus speed (slot 0) = 200000Hz
+>>     (slot req 200000Hz, actual 200000HZ div = 0)
+>>     >>>>> [    6.621888] mmc_host mmc0: Bus speed (slot 0) = 187500Hz
+>>     (slot req 100000Hz, actual 93750HZ div = 1)
+>>     >>>>> [    6.917883] libphy: stmmac: probed
+>>     >>>>> [    6.921319] rk_gmac-dwmac ff290000.ethernet eth0: PHY ID
+>>     001cc915 at 0 IRQ POLL (stmmac-0:00) active
+>>     >>>>> [    6.930476] rk_gmac-dwmac ff290000.ethernet eth0: PHY ID
+>>     001cc915 at 2 IRQ POLL (stmmac-0:02)
+>>     >>>>> [    6.939757] input: gpio-keys as
+>>     /devices/platform/gpio-keys/input/input0
+>>     >>>>> [    6.946937] rtc-hym8563 0-0051: no valid clock/calendar
+>>     values available
+>>     >>>>> [    6.953694] rtc-hym8563 0-0051: hctosys: unable to read
+>>     the hardware clock
+>>     >>>>> [    6.961262] vcc_sd: disabling
+>>     >>>>> [    6.964275] dovdd_1v8: disabling
+>>     >>>>> [    6.967527] dvdd_1v2: disabling
+>>     >>>>> [    6.971006] vdd10_lcd: disabling
+>>     >>>>> [    6.974701] vcc18_lcd: disabling
+>>     >>>>> [    6.978467] ttyS2 - failed to request DMA
+>>     >>>>> [    7.101883] mmc_host mmc0: Bus speed (slot 0) = 400000Hz
+>>     (slot req 400000Hz, actual 400000HZ div = 0)
+>>     >>>>> [    7.253874] mmc_host mmc0: Bus speed (slot 0) = 300000Hz
+>>     (slot req 300000Hz, actual 300000HZ div = 0)
+>>     >>>>> [    7.405883] mmc_host mmc0: Bus speed (slot 0) = 200000Hz
+>>     (slot req 200000Hz, actual 200000HZ div = 0)
+>>     >>>>> [    7.557885] mmc_host mmc0: Bus speed (slot 0) = 187500Hz
+>>     (slot req 100000Hz, actual 93750HZ div = 1)
+>>     >>>>> [    8.037872] mmc_host mmc0: Bus speed (slot 0) = 400000Hz
+>>     (slot req 400000Hz, actual 400000HZ div = 0)
+>>     >>>>> [    8.189877] mmc_host mmc0: Bus speed (slot 0) = 300000Hz
+>>     (slot req 300000Hz, actual 300000HZ div = 0)
+>>     >>>>> [    8.341881] mmc_host mmc0: Bus speed (slot 0) = 200000Hz
+>>     (slot req 200000Hz, actual 200000HZ div = 0)
+>>     >>>>> [    8.493884] mmc_host mmc0: Bus speed (slot 0) = 187500Hz
+>>     (slot req 100000Hz, actual 93750HZ div = 1)
+>>     >>>>> [    8.973871] mmc_host mmc0: Bus speed (slot 0) = 400000Hz
+>>     (slot req 400000Hz, actual 400000HZ div = 0)
+>>     >>>>> [    9.125876] mmc_host mmc0: Bus speed (slot 0) = 300000Hz
+>>     (slot req 300000Hz, actual 300000HZ div = 0)
+>>     >>>>> [    9.277884] mmc_host mmc0: Bus speed (slot 0) = 200000Hz
+>>     (slot req 200000Hz, actual 200000HZ div = 0)
+>>     >>>>> [    9.429882] mmc_host mmc0: Bus speed (slot 0) = 187500Hz
+>>     (slot req 100000Hz, actual 93750HZ div = 1)
+>>     >>>>>
+>>     >>>>> looping here
+>>     >>>>>
+>>     >>>>> If I revert that patch, there are still lots of Bus speed
+>>     messages, but finally would enter into system.
+>>     >>>>>
+>>     >>>> Plz..Don't put the comment on the top.
+>>     >>>>
+>>     >>>> Which kernel did you use?
+>>     >>> Add linux-next specific files for 20161224
+>>     >>
+>>     >> mmc0 is what card? Is it polling for detecting card?
+>>     >> (It seems the SD-card..right?)
+>>     > Yes, but the Firefly release won't show that, just stop at
+>>     "ttyS2 - failed to request DMA". I check both the firefly reload
+>>     and firefly release, they both have a cd line for them, so it
+>>     won't be poll mode.
+>>
+>>     I don't have Rockchip board, so I hope that Shawn will check it.
+>>     But i will check the displayed the log message.
+>>
+>>     Best Regards,
+>>     Jaehoon Chung
+>>
+>>     >> Those logs should be polled for detecting mmc0 card..Hmm..I
+>>     sent the patch for disabling log message when polling.
+>>     >> If this log is displayed, then my patch might be some wrong.. :(
+>>     >>
+>>     >> Best Regards,
+>>     >> Jaehoon Chung
+>>     >>
+>>     >>>>
+>>     >>>>>>>>
+>>     >>>>>>>>
+>>     >>>>>>>>
+>>     >>>>>>>
+>>     >>
+>>     >> [snip]
+>>     >>
+>>     >>>
+>>     >>>
+>>     >>>
+>>     >>>
+>>     >>
+>>     >>
+>>     >
+>>
+>>
+>>     _______________________________________________
+>>     Linux-rockchip mailing list
+>>     Linux-rockchip at lists.infradead.org
+>>     <mailto:Linux-rockchip@lists.infradead.org>
+>>     http://lists.infradead.org/mailman/listinfo/linux-rockchip
+>>     <http://lists.infradead.org/mailman/listinfo/linux-rockchip>
+>>
+>>
+> 
 > 
