@@ -1,111 +1,51 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 20 Jan 2017 16:27:10 +0100
-Subject: [PATCH v3 0/9] meson-gx: reset RGMII PHYs and configure TX delay
-In-Reply-To: <20170120152232.13943-1-martin.blumenstingl@googlemail.com>
-References: <20170120132650.9784-1-martin.blumenstingl@googlemail.com>
- <20170120152232.13943-1-martin.blumenstingl@googlemail.com>
-Message-ID: <1484926030.26620.80.camel@baylibre.com>
+From: jan.kiszka@siemens.com (Jan Kiszka)
+Date: Fri, 20 Jan 2017 16:29:28 +0100
+Subject: [PATCH v3 2/3] spi: pxa2xx: Prepare for edge-triggered interrupts
+In-Reply-To: <20170120122129.6cn5phrobeldpikp@sirena.org.uk>
+References: <7b15a0910a3ad861fd32161c72559bafa7b71e29.1484592296.git.jan.kiszka@siemens.com>
+ <87ziiqdstr.fsf@belgarion.home>
+ <4d97e416-4d32-3b9f-0695-de116a4b26bd@siemens.com>
+ <87r340eq28.fsf@belgarion.home>
+ <b3e0d393-b841-1556-ddd2-5634f12b6f2c@siemens.com>
+ <20170118124645.6ugjwbfeq5vsh2to@sirena.org.uk>
+ <7e5fb21d-35bd-6ac3-9e6f-cffed656997f@siemens.com>
+ <e692c4a9-6320-b9e0-d6e7-f58bbe6ba867@siemens.com>
+ <20170119195701.kueutgmahr6bmxhq@sirena.org.uk>
+ <1484856272.2133.253.camel@linux.intel.com>
+ <20170120122129.6cn5phrobeldpikp@sirena.org.uk>
+Message-ID: <df89519e-e01a-b88b-ca54-112bbf5346b8@siemens.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-01-20 at 16:22 +0100, Martin Blumenstingl wrote:
-> This series adds the reset GPIOs for the (external) ethernet PHYs on
-> all
-> GXBB boards.
-> Additionally it provides a ethernet PHY node which can be used to
-> specify
-> PHY-specific properties (this may be required if more boards require
-> the
-> "eee-broken-1000t" for the RTL8211F ethernet PHY). To make all board
-> .dts
-> consistent I chose to add the PHY node also for boards which don't
-> have a
-> RTL8211F PHY.
+On 2017-01-20 13:21, Mark Brown wrote:
+> On Thu, Jan 19, 2017 at 10:04:32PM +0200, Andy Shevchenko wrote:
+>> On Thu, 2017-01-19 at 19:57 +0000, Mark Brown wrote:
 > 
-> Patch #7 from this series also removes ethernet support for the P200
-> board because it was broken anyways and nobody seems to have a board
-> available for testing. This was the outcome of the discussion from
-> [0]
+>>> I'm missing patches 1 and 3, what's going on here?
 > 
-> Patch #8 was taken from (older versions of) my other series (see
-> [1]):
-> "[PATCH net-next v3 0/2] stmmac: dwmac-meson8b: configurable
-> RGMII TX delay".
-> The binding changes for amlogic,tx-delay-ns were ACK'ed already.
+>> Patch 1 had been applied by you. I think Jan just needs to resend with
+>> proper version and set of patches.
 > 
-> Changes since v2:
-> - fixed patch #2 to really update the P200 board (as it's the P200
-> which
-> ? actually uses a Micrel KSZ9031 RGMII PHY). Thanks to Neil Armstrong
-> for
-> ? spotting this huge mistake!
-> - instead of dropping ethernet support for P201 we simply re-
-> configure it
-> ? to RMII mode (replaces patch #7) without a MDIO node (which keeps
-> PHY
-> ? auto-scanning enabled). This got Neil Armstrong's ACK off-list
-> already
-> 
-> Changes since v1:
-> - do not move the MDIO bus to meson-gx as this disables PHY auto-
-> scanning
-> ? in the stmmac driver (this drops patch #1 from v1)
-> - add the ethernet PHY reset GPIO for nexbox a95x which was forgotten
-> in
-> ? v1
-> - add the ethernet PHY reset GPIO for boards which were added since
-> v1
-> ? (wetek hub and wetek play2)
-> - rebased to apply against the current v4.11/dt64 branch
-> - new in v2 (patch #7): disabled ethernet support for the P200 board
-> (see
-> ? the commit description for more information). this patch is
-> optional
-> - new in v2 (patch #9): removed the phy-mode property from meson-gx
-> (see
-> ? the commit description for more information). this patch is
-> optional
-> 
-> 
-> [0] http://lists.infradead.org/pipermail/linux-amlogic/2017-January/0
-> 02053.html
-> [1] http://lists.infradead.org/pipermail/linux-amlogic/2016-December/
-> 001834.html
-> 
-> Martin Blumenstingl (9):
-> ? ARM64: dts: meson-gxbb-odroidc2: add the ethernet PHY's reset GPIO
-> ? ARM64: dts: meson-gxbb-p200: add the ethernet PHY's reset GPIO
-> ? ARM64: dts: meson-gxbb-vega-s95: add the ethernet PHY's reset GPIO
-> ? ARM64: dts: meson-gxbb-nexbox-a95x: add the ethernet PHY's reset
-> GPIO
-> ? ARM64: dts: meson-gxbb-wetek-hub: add the ethernet PHY's reset GPIO
-> ? ARM64: dts: meson-gxbb-wetek-play2: add the ethernet PHY's reset
-> GPIO
-> ? ARM64: dts: meson-gxbb-p201: fix ethernet support
-> ? ARM64: dts: amlogic: add the ethernet TX delay configuration
-> ? ARM64: dts: meson-gx: remove the phy-mode property from meson-gx
-> 
-> ?arch/arm64/boot/dts/amlogic/meson-gx.dtsi??????????|??1 -
-> ?.../boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts????| 17
-> ++++++++++++++
-> ?.../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts |??7 ++++++
-> ?arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts????| 26
-> ++++++++++++++++++++++
-> ?arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts????| 11 +++++++++
-> ?arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi???|??6 -----
-> ?.../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi??????| 20
-> +++++++++++++++++
-> ?.../boot/dts/amlogic/meson-gxbb-wetek-hub.dts??????| 26
-> ++++++++++++++++++++++
-> ?.../boot/dts/amlogic/meson-gxbb-wetek-play2.dts????| 26
-> ++++++++++++++++++++++
-> ?.../boot/dts/amlogic/meson-gxl-s905d-p230.dts??????|??2 ++
-> ?.../arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts |??2 ++
-> ?arch/arm64/boot/dts/amlogic/meson-gxm-q200.dts?????|??2 ++
-> ?12 files changed, 139 insertions(+), 7 deletions(-)
+> OK - Jan, the purpose of numbering patches in a series is so we can tell
+> what order they come in.  That's it.  If the set of patches gets changed
+> due to things being added or removed the numbers will be different but
+> that's totally OK as their only relevance is in ordering things within a
+> given posting.
 
-Looks good.
+Sorry if the numbering was confusing for you, it was, of course, a
+selective update. Just tell me, if you need a new round with of patches
+2 and 3 (as 1 and 2).
 
-Reviewed-by: Jerome Brunet <jbrunet@baylibre.com>
+Jan
 
-> 
+-- 
+Siemens AG, Corporate Technology, CT RDA ITP SES-DE
+Corporate Competence Center Embedded Linux
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170120/df5a6ba9/attachment-0001.sig>
