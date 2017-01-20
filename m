@@ -1,62 +1,81 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 20 Jan 2017 13:52:52 +0000
-Subject: [GIT PULL] arm64 fixes for 4.10-rc5
-Message-ID: <20170120135249.GA19095@e104818-lin.cambridge.arm.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Fri, 20 Jan 2017 14:52:55 +0100
+Subject: [PATCH v3 00/24] i.MX Media Driver
+In-Reply-To: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <c6e98327-7e2c-f34a-2d23-af7b236de441@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Steve, Philipp,
 
-Please pull the arm64 fixes below for 4.10. Thanks.
+On 01/07/2017 03:11 AM, Steve Longerbeam wrote:
+> In version 3:
+> 
+> Changes suggested by Rob Herring <robh@kernel.org>:
+> 
+>   - prepended FIM node properties with vendor prefix "fsl,".
+> 
+>   - make mipi csi-2 receiver compatible string SoC specific:
+>     "fsl,imx6-mipi-csi2" instead of "fsl,imx-mipi-csi2".
+> 
+>   - redundant "_clk" removed from mipi csi-2 receiver clock-names property.
+> 
+>   - removed board-specific info from the media driver binding doc. These
+>     were all related to sensor bindings, which already are (adv7180)
+>     or will be (ov564x) covered in separate binding docs. All reference
+>     board info not related to DT bindings has been moved to
+>     Documentation/media/v4l-drivers/imx.rst.
+> 
+>   - removed "_mipi" from the OV5640 compatible string.
+> 
+> Changes suggested by Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>:
+> 
+>   Mostly cosmetic/non-functional changes which I won't list here, except
+>   for the following:
+> 
+>   - spin_lock_irqsave() changed to spin_lock() in a couple interrupt handlers.
+> 
+>   - fixed some unnecessary of_node_put()'s in for_each_child_of_node() loops.
+> 
+>   - check/handle return code from required reg property of CSI port nodes.
+> 
+>   - check/handle return code from clk_prepare_enable().
+> 
+> Changes suggested by Fabio Estevam <festevam@gmail.com>:
+> 
+>   - switch to VGEN3 Analog Vdd supply assuming rev. C SabreSD boards.
+> 
+>   - finally got around to passing valid IOMUX pin config values to the
+>     pin groups.
+> 
+> Other changes:
+> 
+>   - removed the FIM properties that overrided the v4l2 FIM control defaults
+>     values. This was left-over from a requirement of a customer and is not
+>     necessary here.
+> 
+>   - The FIM must be explicitly enabled in the fim child node under the CSI
+>     port nodes, using the status property. If not enabled, FIM v4l2 controls
+>     will not appear in the video capture driver.
+> 
+>   - brought in additional media types patch from Philipp Zabel. Use new
+>     MEDIA_ENT_F_VID_IF_BRIDGE in mipi csi-2 receiver subdev.
+> 
+>   - brought in latest platform generic video multiplexer subdevice driver
+>     from Philipp Zabel (squashed with patch that uses new MEDIA_ENT_F_MUX).
+> 
+>   - removed imx-media-of.h, moved those prototypes into imx-media.h.
 
-The following changes since commit 49def1853334396f948dcb4cedb9347abb318df5:
+Based on the discussion on the mailinglist it seems everyone agrees that this
+is the preferred driver, correct?
 
-  Linux 4.10-rc4 (2017-01-15 16:21:59 -0800)
+There are a bunch of review comments, so I will wait for a v4. I plan to merge
+that staging driver unless there are major issues with it.
 
-are available in the git repository at:
+I am not sure if I would merge those sensor drivers in staging, I'll have to
+take a closer look at those once v4 is posted.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
+Regards,
 
-for you to fetch changes up to 7d9e8f71b989230bc613d121ca38507d34ada849:
-
-  arm64: avoid returning from bad_mode (2017-01-19 15:38:22 +0000)
-
-----------------------------------------------------------------
-- Avoid potential stack information leak via the ptrace ABI caused by
-  uninitialised variables
-
-- SWIOTLB DMA API fall-back allocation fix when the SWIOTLB buffer is
-  not initialised (all RAM is suitable for 32-bit DMA masks)
-
-- Fix the bad_mode function returning for unhandled exceptions coming
-  from user space
-
-- Fix name clash in __page_to_voff()
-
-----------------------------------------------------------------
-Alexander Graf (1):
-      arm64: Fix swiotlb fallback allocation
-
-Dave Martin (5):
-      arm64/ptrace: Preserve previous registers for short regset write
-      arm64/ptrace: Preserve previous registers for short regset write
-      arm64/ptrace: Preserve previous registers for short regset write
-      arm64/ptrace: Avoid uninitialised struct padding in fpr_set()
-      arm64/ptrace: Reject attempts to set incomplete hardware breakpoint fields
-
-Mark Rutland (1):
-      arm64: avoid returning from bad_mode
-
-Oleksandr Andrushchenko (1):
-      arm64: mm: avoid name clash in __page_to_voff()
-
- arch/arm64/include/asm/memory.h      |  2 +-
- arch/arm64/include/uapi/asm/ptrace.h |  1 +
- arch/arm64/kernel/entry.S            |  2 +-
- arch/arm64/kernel/ptrace.c           | 16 +++++++++++-----
- arch/arm64/kernel/traps.c            | 28 ++++++++++++++++++++++++----
- arch/arm64/mm/init.c                 |  2 ++
- 6 files changed, 40 insertions(+), 11 deletions(-)
-
--- 
-Catalin
+	Hans
