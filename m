@@ -1,75 +1,32 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Fri, 20 Jan 2017 17:09:04 +0100
-Subject: [RFC PATCH v5 0/7] ARM: Fix dma_alloc_coherent() and friends for
- NOMMU
-In-Reply-To: <8BBDE689-7AA0-4074-A322-66C3DBBEA351@esh.hu>
-References: <1484738003-29892-1-git-send-email-vladimir.murzin@arm.com>
- <8BBDE689-7AA0-4074-A322-66C3DBBEA351@esh.hu>
-Message-ID: <CA+M3ks7Eyj3THGq2quAwsG0ChVTpiC_AWsTPh3=DYysPPMWiXw@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 20 Jan 2017 16:14:55 +0000
+Subject: [PATCH v3 2/3] spi: pxa2xx: Prepare for edge-triggered interrupts
+In-Reply-To: <df89519e-e01a-b88b-ca54-112bbf5346b8@siemens.com>
+References: <4d97e416-4d32-3b9f-0695-de116a4b26bd@siemens.com>
+ <87r340eq28.fsf@belgarion.home>
+ <b3e0d393-b841-1556-ddd2-5634f12b6f2c@siemens.com>
+ <20170118124645.6ugjwbfeq5vsh2to@sirena.org.uk>
+ <7e5fb21d-35bd-6ac3-9e6f-cffed656997f@siemens.com>
+ <e692c4a9-6320-b9e0-d6e7-f58bbe6ba867@siemens.com>
+ <20170119195701.kueutgmahr6bmxhq@sirena.org.uk>
+ <1484856272.2133.253.camel@linux.intel.com>
+ <20170120122129.6cn5phrobeldpikp@sirena.org.uk>
+ <df89519e-e01a-b88b-ca54-112bbf5346b8@siemens.com>
+Message-ID: <20170120161455.eblh4hwvhgg44gbu@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-01-19 16:23 GMT+01:00 Szemz? Andr?s <sza@esh.hu>:
-> Hi,
->> On 2017. Jan 18., at 12:13, Vladimir Murzin <vladimir.murzin@arm.com> wrote:
->>
->> Hi,
->>
->> It seem that addition of cache support for M-class CPUs uncovered
->> latent bug in DMA usage. NOMMU memory model has been treated as being
->> always consistent; however, for R/M CPU classes memory can be covered
->> by MPU which in turn might configure RAM as Normal i.e. bufferable and
->> cacheable. It breaks dma_alloc_coherent() and friends, since data can
->> stuck in caches now or be buffered.
->>
->> This patch set is trying to address the issue by providing region of
->> memory suitable for consistent DMA operations. It is supposed that
->> such region is marked by MPU as non-cacheable. Robin suggested to
->> advertise such memory as reserved shared-dma-pool, rather then using
->> homebrew command line option, and extend dma-coherent to provide
->> default DMA area in the similar way as it is done for CMA (PATCH
->> 4/7). It allows us to offload all bookkeeping on generic coherent DMA
->> framework, and it seems that it might be reused by other architectures
->> like c6x and blackfin.
->>
->
-> I have tested the v5 on my ATMEL armv7m board. Caches enabled,
-> DMA on MMC, USART and Ethernet.
-> Everything works as expected, so you can add my tested-by.
->
-> Booting Linux on physical CPU 0x0
-> Linux version 4.9.0 (root at debian) (gcc version 4.8.3 20140320 (prerelease) (Sourcery CodeBench Lite 2014.05-29) ) #1 Wed Jan 18 22:10:39 CET 2017
-> CPU: ARMv7-M [410fc271] revision 1 (ARMv7M), cr=00000000
-> CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
-> OF: fdt:Machine model: SAME70-sampione board
-> Reserved memory: created DMA memory pool at 0x73e00000, size 2 MiB
-> OF: reserved mem: initialized node linux,cma, compatible id shared-dma-pool
-> ...
-> DMA: default coherent area is set
-> ?
->
-> Thanks for the patches!
->
-> Regards,
-> Andras
->
->
+On Fri, Jan 20, 2017 at 04:29:28PM +0100, Jan Kiszka wrote:
 
-I have tested it on my stm32f4 CortexM4 (no cache, no mmu) with
-display driver (modetest and fbdemo)
-dma-noop part is working fine on my side.
+> Sorry if the numbering was confusing for you, it was, of course, a
+> selective update. Just tell me, if you need a new round with of patches
+> 2 and 3 (as 1 and 2).
 
-You can add my tested-by,
-
-Thanks,
-Benjamin
-
-
--- 
-Benjamin Gaignard
-
-Graphic Study Group
-
-Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro: Facebook | Twitter | Blog
+Please resend.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170120/735ab402/attachment.sig>
