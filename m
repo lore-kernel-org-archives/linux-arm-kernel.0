@@ -1,87 +1,142 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 20 Jan 2017 17:31:51 +0100
-Subject: [PATCH v3 00/24] i.MX Media Driver
-In-Reply-To: <c6e98327-7e2c-f34a-2d23-af7b236de441@xs4all.nl>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <c6e98327-7e2c-f34a-2d23-af7b236de441@xs4all.nl>
-Message-ID: <1484929911.2897.70.camel@pengutronix.de>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 20 Jan 2017 17:34:44 +0100
+Subject: [PATCH v3 8/9] ARM64: dts: amlogic: add the ethernet TX delay
+ configuration
+In-Reply-To: <20170120152232.13943-9-martin.blumenstingl@googlemail.com>
+References: <20170120132650.9784-1-martin.blumenstingl@googlemail.com>
+ <20170120152232.13943-1-martin.blumenstingl@googlemail.com>
+ <20170120152232.13943-9-martin.blumenstingl@googlemail.com>
+Message-ID: <1845313e-d90d-4426-e41c-ac72673f7339@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
-
-On Fri, 2017-01-20 at 14:52 +0100, Hans Verkuil wrote:
-> Hi Steve, Philipp,
+On 01/20/2017 04:22 PM, Martin Blumenstingl wrote:
+> This adds the amlogic,tx-delay-ns property with the old (hardcoded)
+> default value of 2ns to all boards which are using an RGMII ethernet
+> PHY.
 > 
-> On 01/07/2017 03:11 AM, Steve Longerbeam wrote:
-> > In version 3:
-> > 
-> > Changes suggested by Rob Herring <robh@kernel.org>:
-> > 
-> >   - prepended FIM node properties with vendor prefix "fsl,".
-> > 
-> >   - make mipi csi-2 receiver compatible string SoC specific:
-> >     "fsl,imx6-mipi-csi2" instead of "fsl,imx-mipi-csi2".
-> > 
-> >   - redundant "_clk" removed from mipi csi-2 receiver clock-names property.
-> > 
-> >   - removed board-specific info from the media driver binding doc. These
-> >     were all related to sensor bindings, which already are (adv7180)
-> >     or will be (ov564x) covered in separate binding docs. All reference
-> >     board info not related to DT bindings has been moved to
-> >     Documentation/media/v4l-drivers/imx.rst.
-> > 
-> >   - removed "_mipi" from the OV5640 compatible string.
-> > 
-> > Changes suggested by Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>:
-> > 
-> >   Mostly cosmetic/non-functional changes which I won't list here, except
-> >   for the following:
-> > 
-> >   - spin_lock_irqsave() changed to spin_lock() in a couple interrupt handlers.
-> > 
-> >   - fixed some unnecessary of_node_put()'s in for_each_child_of_node() loops.
-> > 
-> >   - check/handle return code from required reg property of CSI port nodes.
-> > 
-> >   - check/handle return code from clk_prepare_enable().
-> > 
-> > Changes suggested by Fabio Estevam <festevam@gmail.com>:
-> > 
-> >   - switch to VGEN3 Analog Vdd supply assuming rev. C SabreSD boards.
-> > 
-> >   - finally got around to passing valid IOMUX pin config values to the
-> >     pin groups.
-> > 
-> > Other changes:
-> > 
-> >   - removed the FIM properties that overrided the v4l2 FIM control defaults
-> >     values. This was left-over from a requirement of a customer and is not
-> >     necessary here.
-> > 
-> >   - The FIM must be explicitly enabled in the fim child node under the CSI
-> >     port nodes, using the status property. If not enabled, FIM v4l2 controls
-> >     will not appear in the video capture driver.
-> > 
-> >   - brought in additional media types patch from Philipp Zabel. Use new
-> >     MEDIA_ENT_F_VID_IF_BRIDGE in mipi csi-2 receiver subdev.
-> > 
-> >   - brought in latest platform generic video multiplexer subdevice driver
-> >     from Philipp Zabel (squashed with patch that uses new MEDIA_ENT_F_MUX).
-> > 
-> >   - removed imx-media-of.h, moved those prototypes into imx-media.h.
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts    | 2 ++
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts        | 2 ++
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi   | 2 ++
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-hub.dts   | 2 ++
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-play2.dts | 2 ++
+>  arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts   | 2 ++
+>  arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts    | 2 ++
+>  arch/arm64/boot/dts/amlogic/meson-gxm-q200.dts         | 2 ++
+>  8 files changed, 16 insertions(+)
 > 
-> Based on the discussion on the mailinglist it seems everyone agrees that this
-> is the preferred driver, correct?
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> index 6b5579522587..e63ed98d6c25 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> @@ -154,6 +154,8 @@
+>  	phy-handle = <&eth_phy0>;
+>  	phy-mode = "rgmii";
+>  
+> +	amlogic,tx-delay-ns = <2>;
+> +
+>  	snps,reset-gpio = <&gpio GPIOZ_14 0>;
+>  	snps,reset-delays-us = <0 10000 1000000>;
+>  	snps,reset-active-low;
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
+> index fa0f84cfeaa9..6c7e914e9bd9 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
+> @@ -58,6 +58,8 @@
+>  	phy-handle = <&eth_phy0>;
+>  	phy-mode = "rgmii";
+>  
+> +	amlogic,tx-delay-ns = <2>;
+> +
+>  	snps,reset-gpio = <&gpio GPIOZ_14 0>;
+>  	snps,reset-delays-us = <0 10000 1000000>;
+>  	snps,reset-active-low;
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
+> index 358ab5159bd5..4301ad860a76 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-vega-s95.dtsi
+> @@ -131,6 +131,8 @@
+>  	phy-handle = <&eth_phy0>;
+>  	phy-mode = "rgmii";
+>  
+> +	amlogic,tx-delay-ns = <2>;
+> +
+>  	snps,reset-gpio = <&gpio GPIOZ_14 0>;
+>  	snps,reset-delays-us = <0 10000 1000000>;
+>  	snps,reset-active-low;
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-hub.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-hub.dts
+> index 47fe4e444f33..f6d8c70a26a2 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-hub.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-hub.dts
+> @@ -72,6 +72,8 @@
+>  	phy-handle = <&eth_phy0>;
+>  	phy-mode = "rgmii";
+>  
+> +	amlogic,tx-delay-ns = <2>;
+> +
+>  	snps,reset-gpio = <&gpio GPIOZ_14 0>;
+>  	snps,reset-delays-us = <0 10000 1000000>;
+>  	snps,reset-active-low;
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-play2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-play2.dts
+> index 9a8e2f492b97..1a222ce60a30 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-play2.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-wetek-play2.dts
+> @@ -94,6 +94,8 @@
+>  	phy-handle = <&eth_phy0>;
+>  	phy-mode = "rgmii";
+>  
+> +	amlogic,tx-delay-ns = <2>;
+> +
+>  	snps,reset-gpio = <&gpio GPIOZ_14 0>;
+>  	snps,reset-delays-us = <0 10000 1000000>;
+>  	snps,reset-active-low;
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts
+> index f66939cacd37..7663d6775823 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts
+> @@ -59,6 +59,8 @@
+>  	/* Select external PHY by default */
+>  	phy-handle = <&external_phy>;
+>  
+> +	amlogic,tx-delay-ns = <2>;
+> +
+>  	/* External PHY reset is shared with internal PHY Led signals */
+>  	snps,reset-gpio = <&gpio GPIOZ_14 0>;
+>  	snps,reset-delays-us = <0 10000 1000000>;
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
+> index 5a337d339df1..a0bc746adb42 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts
+> @@ -162,6 +162,8 @@
+>  	/* Select external PHY by default */
+>  	phy-handle = <&external_phy>;
+>  
+> +	amlogic,tx-delay-ns = <2>;
+> +
+>  	snps,reset-gpio = <&gpio GPIOZ_14 0>;
+>  	snps,reset-delays-us = <0 10000 1000000>;
+>  	snps,reset-active-low;
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxm-q200.dts b/arch/arm64/boot/dts/amlogic/meson-gxm-q200.dts
+> index 5dbc66088355..e6ac39b712b7 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxm-q200.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxm-q200.dts
+> @@ -59,6 +59,8 @@
+>  	/* Select external PHY by default */
+>  	phy-handle = <&external_phy>;
+>  
+> +	amlogic,tx-delay-ns = <2>;
+> +
+>  	/* External PHY reset is shared with internal PHY Led signals */
+>  	snps,reset-gpio = <&gpio GPIOZ_14 0>;
+>  	snps,reset-delays-us = <0 10000 1000000>;
+> 
 
-No. I have some major reservations against the custom mem2mem framework
-embedded in Steve's driver.
-I think it is a misuse of the media entity links (which should describe
-hardware connections) for something that should be done at the vb2 level
-(letting one device's capture EOF interrupt trigger the next device's
-m2m device_run without going through userspace).
-Steve and I disagree on that point, so we'd appreciate if we could get
-some more eyes on the above issue.
-
-regards
-Philipp
+On :
+- Odroid-C2 rev 0.2
+- P200
+- Wetek Play 2
+- Amlogic P230
+- Nexbox A1
+Tested-by: Neil Armstrong <narmstrong@baylibre.com>
