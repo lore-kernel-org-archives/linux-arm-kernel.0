@@ -1,38 +1,24 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 20 Jan 2017 09:38:43 -0800
-Subject: [PATCH] ARM64: dts: meson-gxl: rename Nexbox A95x for consistency
-Message-ID: <20170120173843.6522-1-khilman@baylibre.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 20 Jan 2017 18:43:21 +0100
+Subject: [PATCH v5 0/2] Add support for the ethernet switch on the
+ ESPRESSObin
+In-Reply-To: <87a8al64mp.fsf@free-electrons.com>
+References: <20170119214934.27442-1-gregory.clement@free-electrons.com>
+ <20170119220607.GA25907@lunn.ch>
+ <87a8al64mp.fsf@free-electrons.com>
+Message-ID: <20170120174321.GF25907@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the GXL family has S905X and S905D SoCs, we're keeping the SoC
-name in the DTS filename for clarity.  Rename this file accordingly to
-be consistent with the rest of the GXL DTS files.
+> What I wanted to do was to test 6390 and 6352 temperature related
+> functions and to see if one of them worked. That's how I realized it was
+> not possible to do it with dsa2.
 
-Cc: Neil Armstrong <narmstrong@baylibre.com>
-Signed-off-by: Kevin Hilman <khilman@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/Makefile                                    | 2 +-
- .../{meson-gxl-nexbox-a95x.dts => meson-gxl-s905x-nexbox-a95x.dts}      | 0
- 2 files changed, 1 insertion(+), 1 deletion(-)
- rename arch/arm64/boot/dts/amlogic/{meson-gxl-nexbox-a95x.dts => meson-gxl-s905x-nexbox-a95x.dts} (100%)
+Hi Gregory
 
-diff --git a/arch/arm64/boot/dts/amlogic/Makefile b/arch/arm64/boot/dts/amlogic/Makefile
-index 293e985e3dfa..3f94bce33b7f 100644
---- a/arch/arm64/boot/dts/amlogic/Makefile
-+++ b/arch/arm64/boot/dts/amlogic/Makefile
-@@ -10,7 +10,7 @@ dtb-$(CONFIG_ARCH_MESON) += meson-gxbb-wetek-play2.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-p212.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p230.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905d-p231.dtb
--dtb-$(CONFIG_ARCH_MESON) += meson-gxl-nexbox-a95x.dtb
-+dtb-$(CONFIG_ARCH_MESON) += meson-gxl-s905x-nexbox-a95x.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxm-q200.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxm-q201.dtb
- dtb-$(CONFIG_ARCH_MESON) += meson-gxm-nexbox-a1.dtb
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts
-similarity index 100%
-rename from arch/arm64/boot/dts/amlogic/meson-gxl-nexbox-a95x.dts
-rename to arch/arm64/boot/dts/amlogic/meson-gxl-s905x-nexbox-a95x.dts
--- 
-2.9.3
+Probably the best thing to do is wait until the temperature code moves
+into the PHY driver. It then becomes easier to test. It probably is
+the same as the 6352, or like the 6390 which i've so far failed to get
+working, despite the registers being the same as the 6352.
+
+     Andrew
