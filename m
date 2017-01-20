@@ -1,76 +1,342 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Fri, 20 Jan 2017 18:07:20 +0100
-Subject: [PATCH v3 2/9] ARM64: dts: meson-gxbb-p200: add the ethernet
- PHY's reset GPIO
-In-Reply-To: <20170120162138.GE25907@lunn.ch>
-References: <20170120132650.9784-1-martin.blumenstingl@googlemail.com>
- <20170120152232.13943-1-martin.blumenstingl@googlemail.com>
- <20170120152232.13943-3-martin.blumenstingl@googlemail.com>
- <20170120162138.GE25907@lunn.ch>
-Message-ID: <CAFBinCA47Nng_jjxKrWrV_YBHr0bg+7xPaJrVswt_WnZ6wtyjA@mail.gmail.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Fri, 20 Jan 2017 17:10:53 +0000
+Subject: [PATCH] arm64: dts: hisilicon: add dtsi file for Hisilicon Hi3660
+ SOC
+In-Reply-To: <20170118100435.43318-1-hw.wangxiaoyin@hisilicon.com>
+References: <20170118100435.43318-1-hw.wangxiaoyin@hisilicon.com>
+Message-ID: <5882449D.6050502@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Hi Wang Xiaoyin,
 
-On Fri, Jan 20, 2017 at 5:21 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> On Fri, Jan 20, 2017 at 04:22:25PM +0100, Martin Blumenstingl wrote:
->> This resets the ethernet PHY during boot to get the PHY into a "clean"
->> state.
->> While here also specify the phy-handle of the ethmac node to make the
->> PHY configuration similar to the one we have on GXL devices. This will
->> allow us to specify OF-properties for the PHY itself.
->>
->> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->> ---
->>  arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts | 24 ++++++++++++++++++++++++
->>  1 file changed, 24 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
->> index 03e3d76626dd..fa0f84cfeaa9 100644
->> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
->> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
->> @@ -51,6 +51,30 @@
->>       model = "Amlogic Meson GXBB P200 Development Board";
->>  };
->>
->> +&ethmac {
->> +     status = "okay";
->> +     pinctrl-0 = <&eth_rgmii_pins>;
->> +     pinctrl-names = "default";
->> +     phy-handle = <&eth_phy0>;
->> +     phy-mode = "rgmii";
->> +
->> +     snps,reset-gpio = <&gpio GPIOZ_14 0>;
->> +     snps,reset-delays-us = <0 10000 1000000>;
->> +     snps,reset-active-low;
->> +
->> +     mdio {
->> +             compatible = "snps,dwmac-mdio";
->> +             #address-cells = <1>;
->> +             #size-cells = <0>;
->> +
->> +             eth_phy0: ethernet-phy at 0 {
->> +                     compatible = "ethernet-phy-id0022.1620",
->
-> Hi Martin
->
-> You don't need to specify the PHY ID. You really only need this when
-> the PHY is reporting no ID, or a wrong ID. In fact, if a new revision
-> of the board is made, with a different PHY, you might have a problem,
-> the wrong PHY driver is loaded.
->
->    Andrew
-I though that this is good practice - the documentation doesn't say
-that it should only be added in specific cases: [0]
-my intention behind adding the PHY ID was to make it easier to see
-which devices uses which PHY. this is especially useful for devices
-with RTL8211F PHY (basically all devices with RGMII PHY except the
-P200) as these may need similar fixes than [1]
+On 2017/1/18 10:04, Wang Xiaoyin wrote:
+> This patch adds pinctrl dtsi file
+> 
+> Signed-off-by: Wang Xiaoyin <hw.wangxiaoyin@hisilicon.com>
+> ---
+>  arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts  |   3 +-
+>  .../arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi | 292 +++++++++++++++++++++
+>  2 files changed, 293 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi
+> 
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+> index 9a1d36aa84ce..de21ebfa4bd8 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+> +++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+> @@ -8,8 +8,7 @@
+>  /dts-v1/;
+>  
+>  #include "hi3660.dtsi"
+> -/*#include "hi3660-ion.dtsi"*/
+> -/*#include "hikey960-pinctrl.dtsi"*/
+> +#include "hikey960-pinctrl.dtsi"
 
-regarding your other mail: you're absolutely right that ethernet-phy at 0
-should be ethernet-phy at 3.
+Can you please rebase to the 4.10-rc3 or mention which patch you are based on?
+Thanks!
 
+Best Regards,
+Wei
 
-[0] http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/net/phy.txt
-[1] https://patchwork.kernel.org/patch/9528915/
+>  
+>  / {
+>  	model = "HiKey960";
+> diff --git a/arch/arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi b/arch/arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi
+> new file mode 100644
+> index 000000000000..98a0b78289b6
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/hisilicon/hikey960-pinctrl.dtsi
+> @@ -0,0 +1,292 @@
+> +/*
+> + * pinctrl dts fils for Hislicon HiKey960 development board
+> + *
+> + */
+> +
+> +#include <dt-bindings/pinctrl/hisi.h>
+> +
+> +/ {
+> +	soc {
+> +		/* [IOMG_000, IOMG_123] */
+> +		range: gpio-range {
+> +			#pinctrl-single,gpio-range-cells = <3>;
+> +		};
+> +		pmx0: pinmux at e896c000 {
+> +			compatible = "pinctrl-single";
+> +			reg = <0x0 0xe896c000 0x0 0x1f0>;
+> +			#pinctrl-cells = <1>;
+> +			#gpio-range-cells = <0x3>;
+> +			pinctrl-single,register-width = <0x20>;
+> +			pinctrl-single,function-mask = <0x7>;
+> +			/* pin base, nr pins & gpio function */
+> +			pinctrl-single,gpio-range = <
+> +				&range 0 7 0
+> +				&range 8 116 0>;
+> +
+> +			isp0_pmx_func: isp0_pmx_func {
+> +				pinctrl-single,pins = <
+> +					0x058 MUX_M1 /* ISP_CLK0 */
+> +					0x064 MUX_M1 /* ISP_SCL0 */
+> +					0x068 MUX_M1 /* ISP_SDA0 */
+> +				>;
+> +			};
+> +
+> +			isp1_pmx_func: isp1_pmx_func {
+> +				pinctrl-single,pins = <
+> +					0x05c MUX_M1 /* ISP_CLK1 */
+> +					0x06c MUX_M1 /* ISP_SCL1 */
+> +					0x070 MUX_M1 /* ISP_SDA1 */
+> +				>;
+> +			};
+> +
+> +			i2c3_pmx_func: i2c3_pmx_func {
+> +				pinctrl-single,pins = <
+> +					0x02c MUX_M1 /* I2C3_SCL */
+> +					0x030 MUX_M1 /* I2C3_SDA */
+> +				>;
+> +			};
+> +
+> +			i2c4_pmx_func: i2c4_pmx_func {
+> +				pinctrl-single,pins = <
+> +					0x090 MUX_M1 /* I2C4_SCL */
+> +					0x094 MUX_M1 /* I2C4_SDA */
+> +				>;
+> +			};
+> +
+> +			pcie_perstn_pmx_func: pcie_perstn_pmx_func {
+> +				pinctrl-single,pins = <
+> +					0x15c MUX_M1 /* PCIE_PERST_N */
+> +				>;
+> +			};
+> +
+> +			usbhub5734_pmx_func: usbhub5734_pmx_func {
+> +				pinctrl-single,pins = <
+> +					0x11c MUX_M0 /* GPIO_073 */
+> +					0x120 MUX_M0 /* GPIO_074 */
+> +				>;
+> +			};
+> +
+> +			spi1_pmx_func: spi1_pmx_func {
+> +				pinctrl-single,pins = <
+> +					0x034 MUX_M1 /* SPI1_CLK */
+> +					0x038 MUX_M1 /* SPI1_DI */
+> +					0x03c MUX_M1 /* SPI1_DO */
+> +					0x040 MUX_M1 /* SPI1_CS_N */
+> +				>;
+> +			};
+> +
+> +			uart0_pmx_func: uart0_pmx_func {
+> +				pinctrl-single,pins = <
+> +					0x0cc MUX_M2 /* UART0_RXD */
+> +					0x0d0 MUX_M2 /* UART0_TXD */
+> +					0x0d4 MUX_M2 /* UART0_RXD_M */
+> +					0x0d8 MUX_M2 /* UART0_TXD_M */
+> +				>;
+> +			};
+> +
+> +			uart1_pmx_func: uart1_pmx_func {
+> +				pinctrl-single,pins = <
+> +					0x0b0 MUX_M2 /* UART1_CTS_N */
+> +					0x0b4 MUX_M2 /* UART1_RTS_N */
+> +					0x0a8 MUX_M2 /* UART1_RXD */
+> +					0x0ac MUX_M2 /* UART1_TXD */
+> +				>;
+> +			};
+> +
+> +			uart2_pmx_func: uart2_pmx_func {
+> +				pinctrl-single,pins = <
+> +					0x0bc MUX_M2 /* UART2_CTS_N */
+> +					0x0c0 MUX_M2 /* UART2_RTS_N */
+> +					0x0c8 MUX_M2 /* UART2_RXD */
+> +					0x0c4 MUX_M2 /* UART2_TXD */
+> +				>;
+> +			};
+> +
+> +			uart3_pmx_func: uart3_pmx_func {
+> +				pinctrl-single,pins = <
+> +					0x0dc MUX_M1 /* UART3_CTS_N */
+> +					0x0e0 MUX_M1 /* UART3_RTS_N */
+> +					0x0e4 MUX_M1 /* UART3_RXD */
+> +					0x0e8 MUX_M1 /* UART3_TXD */
+> +				>;
+> +			};
+> +
+> +			uart4_pmx_func: uart4_pmx_func {
+> +				pinctrl-single,pins = <
+> +					0x0ec MUX_M1 /* UART4_CTS_N */
+> +					0x0f0 MUX_M1 /* UART4_RTS_N */
+> +					0x0f4 MUX_M1 /* UART4_RXD */
+> +					0x0f8 MUX_M1 /* UART4_TXD */
+> +				>;
+> +			};
+> +
+> +			uart5_pmx_func: uart5_pmx_func {
+> +				pinctrl-single,pins = <
+> +					0x0c4 MUX_M3 /* UART5_CTS_N */
+> +					0x0c8 MUX_M3 /* UART5_RTS_N */
+> +					0x0bc MUX_M3 /* UART5_RXD */
+> +					0x0c0 MUX_M3 /* UART5_TXD */
+> +				>;
+> +			};
+> +
+> +			uart6_pmx_func: uart6_pmx_func {
+> +				pinctrl-single,pins = <
+> +					0x0cc MUX_M1 /* UART6_CTS_N */
+> +					0x0d0 MUX_M1 /* UART6_RTS_N */
+> +					0x0d4 MUX_M1 /* UART6_RXD */
+> +					0x0d8 MUX_M1 /* UART6_TXD */
+> +				>;
+> +			};
+> +		};
+> +
+> +		/* [IOMG_MMC0_000, IOMG_MMC0_005] */
+> +		pmx1: pinmux at ff37e000 {
+> +			compatible = "pinctrl-single";
+> +			reg = <0x0 0xff37e000 0x0 0x18>;
+> +			#gpio-range-cells = <0x3>;
+> +			#pinctrl-cells = <1>;
+> +			pinctrl-single,register-width = <0x20>;
+> +			pinctrl-single,function-mask = <0x7>;
+> +			/* pin base, nr pins & gpio function */
+> +			pinctrl-single,gpio-range = <&range 0 6 0>;
+> +
+> +			sdcard_pmx_func: sdcard_pmx_func {
+> +				pinctrl-single,pins = <
+> +					0x000 MUX_M1 /* SD_CLK */
+> +					0x004 MUX_M1 /* SD_CMD */
+> +					0x008 MUX_M1 /* SD_DATA0 */
+> +					0x00c MUX_M1 /* SD_DATA1 */
+> +					0x010 MUX_M1 /* SD_DATA2 */
+> +					0x014 MUX_M1 /* SD_DATA3 */
+> +				>;
+> +			};
+> +		};
+> +
+> +		/* [IOMG_FIX_000, IOMG_FIX_011] */
+> +		pmx2: pinmux at ff3b6000 {
+> +			compatible = "pinctrl-single";
+> +			reg = <0x0 0xff3b6000 0x0 0x30>;
+> +			#pinctrl-cells = <1>;
+> +			#gpio-range-cells = <0x3>;
+> +			pinctrl-single,register-width = <0x20>;
+> +			pinctrl-single,function-mask = <0x7>;
+> +			/* pin base, nr pins & gpio function */
+> +			pinctrl-single,gpio-range = <&range 0 12 0>;
+> +
+> +			spi3_pmx_func: spi3_pmx_func {
+> +				pinctrl-single,pins = <
+> +					0x008 MUX_M1 /* SPI3_CLK */
+> +					0x00c MUX_M1 /* SPI3_DI */
+> +					0x010 MUX_M1 /* SPI3_DO */
+> +					0x014 MUX_M1 /* SPI3_CS0_N */
+> +				>;
+> +			};
+> +		};
+> +
+> +		/* [IOMG_MMC1_000, IOMG_MMC1_005] */
+> +		pmx3: pinmux at ff3fd000 {
+> +			compatible = "pinctrl-single";
+> +			reg = <0x0 0xff3fd000 0x0 0x18>;
+> +			#pinctrl-cells = <1>;
+> +			#gpio-range-cells = <0x3>;
+> +			pinctrl-single,register-width = <0x20>;
+> +			pinctrl-single,function-mask = <0x7>;
+> +			/* pin base, nr pins & gpio function */
+> +			pinctrl-single,gpio-range = <&range 0 6 0>;
+> +
+> +			sdio_pmx_func: sdio_pmx_func {
+> +				pinctrl-single,pins = <
+> +					0x000 MUX_M1 /* SDIO_CLK */
+> +					0x004 MUX_M1 /* SDIO_CMD */
+> +					0x008 MUX_M1 /* SDIO_DATA0 */
+> +					0x00c MUX_M1 /* SDIO_DATA1 */
+> +					0x010 MUX_M1 /* SDIO_DATA2 */
+> +					0x014 MUX_M1 /* SDIO_DATA3 */
+> +				>;
+> +			};
+> +		};
+> +
+> +		/* [IOMG_AO_000, IOMG_AO_041] */
+> +		pmx4: pinmux at fff11000 {
+> +			compatible = "pinctrl-single";
+> +			reg = <0x0 0xfff11000 0x0 0xa8>;
+> +			#pinctrl-cells = <1>;
+> +			#gpio-range-cells = <0x3>;
+> +			pinctrl-single,register-width = <0x20>;
+> +			pinctrl-single,function-mask = <0x7>;
+> +			/* pin base in node, nr pins & gpio function */
+> +			pinctrl-single,gpio-range = <&range 0 42 0>;
+> +
+> +			i2s2_pmx_func: i2s2_pmx_func {
+> +				pinctrl-single,pins = <
+> +					0x044 MUX_M1 /* I2S2_DI */
+> +					0x048 MUX_M1 /* I2S2_DO */
+> +					0x04c MUX_M1 /* I2S2_XCLK */
+> +					0x050 MUX_M1 /* I2S2_XFS */
+> +				>;
+> +			};
+> +
+> +			slimbus_pmx_func: slimbus_pmx_func {
+> +				pinctrl-single,pins = <
+> +					0x02c MUX_M1 /* SLIMBUS_CLK */
+> +					0x030 MUX_M1 /* SLIMBUS_DATA */
+> +				>;
+> +			};
+> +
+> +			i2c0_pmx_func: i2c0_pmx_func {
+> +				pinctrl-single,pins = <
+> +					0x014 MUX_M1 /* I2C0_SCL */
+> +					0x018 MUX_M1 /* I2C0_SDA */
+> +				>;
+> +			};
+> +
+> +			i2c1_pmx_func: i2c1_pmx_func {
+> +				pinctrl-single,pins = <
+> +					0x01c MUX_M1 /* I2C1_SCL */
+> +					0x020 MUX_M1 /* I2C1_SDA */
+> +				>;
+> +			};
+> +
+> +			i2c2_pmx_func: i2c2_pmx_func {
+> +				pinctrl-single,pins = <
+> +					0x024 MUX_M1 /* I2C2_SCL */
+> +					0x028 MUX_M1 /* I2C2_SDA */
+> +				>;
+> +			};
+> +
+> +			i2c7_pmx_func: i2c7_pmx_func {
+> +				pinctrl-single,pins = <
+> +					0x024 MUX_M3 /* I2C7_SCL */
+> +					0x028 MUX_M3 /* I2C7_SDA */
+> +				>;
+> +			};
+> +
+> +			spi2_pmx_func: spi2_pmx_func {
+> +				pinctrl-single,pins = <
+> +					0x08c MUX_M1 /* SPI2_CLK */
+> +					0x090 MUX_M1 /* SPI2_DI */
+> +					0x094 MUX_M1 /* SPI2_DO */
+> +					0x098 MUX_M1 /* SPI2_CS0_N */
+> +				>;
+> +			};
+> +
+> +			spi4_pmx_func: spi4_pmx_func {
+> +				pinctrl-single,pins = <
+> +					0x08c MUX_M4 /* SPI4_CLK */
+> +					0x090 MUX_M4 /* SPI4_DI */
+> +					0x094 MUX_M4 /* SPI4_DO */
+> +					0x098 MUX_M4 /* SPI4_CS0_N */
+> +				>;
+> +			};
+> +
+> +			i2s0_pmx_func: i2s0_pmx_func {
+> +				pinctrl-single,pins = <
+> +					0x034 MUX_M1 /* I2S0_DI */
+> +					0x038 MUX_M1 /* I2S0_DO */
+> +					0x03c MUX_M1 /* I2S0_XCLK */
+> +					0x040 MUX_M1 /* I2S0_XFS */
+> +				>;
+> +			};
+> +		};
+> +	};
+> +};
+> 
