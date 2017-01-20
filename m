@@ -1,23 +1,24 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 20 Jan 2017 18:40:13 +0200
-Subject: [PATCH v3 02/13] soc: samsung: pmu: Use of_device_get_match_data
- helper
-In-Reply-To: <1484833733-16082-3-git-send-email-m.szyprowski@samsung.com>
+Date: Fri, 20 Jan 2017 18:40:43 +0200
+Subject: [PATCH v3 03/13] soc: samsung: pmu: Remove messages for failed
+ memory allocation
+In-Reply-To: <1484833733-16082-4-git-send-email-m.szyprowski@samsung.com>
 References: <1484833733-16082-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170119134904eucas1p1cc044892728a1716acc2f77f32180c42@eucas1p1.samsung.com>
- <1484833733-16082-3-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20170120164013.6wvbmma3imis5jpr@kozik-lap>
+ <CGME20170119134905eucas1p2ed9d6baf6283528289a36a58ee6c978e@eucas1p2.samsung.com>
+ <1484833733-16082-4-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20170120164043.y243tf4lsvwa3wpy@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 02:48:42PM +0100, Marek Szyprowski wrote:
-> Replace custom code with generic helper to retrieve driver data.
+On Thu, Jan 19, 2017 at 02:48:43PM +0100, Marek Szyprowski wrote:
+> Memory subsystem already prints message about failed memory
+> allocation, there is no need to do it in the driver.
 > 
 > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
 > ---
->  drivers/soc/samsung/exynos-pmu.c | 7 ++-----
->  1 file changed, 2 insertions(+), 5 deletions(-)
+>  drivers/soc/samsung/exynos-pmu.c | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
 > 
 
 Thanks, applied.
