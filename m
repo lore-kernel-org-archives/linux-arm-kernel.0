@@ -1,117 +1,65 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Fri, 20 Jan 2017 06:24:03 -0800
-Subject: [PATCH 3/3] PCI: imx6: Add code to support i.MX7D
-In-Reply-To: <1484844727.24339.50.camel@pengutronix.de>
-References: <20170119163631.10668-1-andrew.smirnov@gmail.com>
- <20170119163631.10668-4-andrew.smirnov@gmail.com>
- <1484844727.24339.50.camel@pengutronix.de>
-Message-ID: <CAHQ1cqEX82VMLtxToYeg3S6dc=tu2KhuS5u-1RCKBBArtRZSxw@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 20 Jan 2017 19:52:35 +0530
+Subject: [PATCH v5 00/14] ARM: da850-lcdk: add SATA support
+In-Reply-To: <CAMpxmJUPh9MZKwG6k6p_mo6niXNNT02JCDgXi4DPRH2Fk3yxng@mail.gmail.com>
+References: <1484911325-23425-1-git-send-email-bgolaszewski@baylibre.com>
+ <20170120132843.GA31487@mtj.duckdns.org>
+ <86bcbb3c-87e4-3508-f4a6-26529f39d374@ti.com>
+ <CAMpxmJUPh9MZKwG6k6p_mo6niXNNT02JCDgXi4DPRH2Fk3yxng@mail.gmail.com>
+Message-ID: <f9055043-507f-74de-b2b8-9eb0eae5dad6@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 8:52 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> Am Donnerstag, den 19.01.2017, 08:36 -0800 schrieb Andrey Smirnov:
->> Add various bits of code needed to support i.MX7D variant of the IP.
+On Friday 20 January 2017 07:32 PM, Bartosz Golaszewski wrote:
+> 2017-01-20 14:56 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
+>> Hi Tejun,
 >>
->> Cc: yurovsky at gmail.com
->> Cc: Richard Zhu <hongxing.zhu@nxp.com>
->> Cc: Lucas Stach <l.stach@pengutronix.de>
->> Cc: Bjorn Helgaas <bhelgaas@google.com>
->> Cc: Fabio Estevam <festevam@gmail.com>
->> Cc: Shawn Guo <shawnguo@kernel.org>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Lee Jones <lee.jones@linaro.org>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: devicetree at vger.kernel.org
->> Cc: linux-kernel at vger.kernel.org
->> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
->> ---
->>  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |   6 +-
->>  drivers/pci/host/pci-imx6.c                        | 188 ++++++++++++++++++---
->>  include/linux/mfd/syscon/imx7-gpc.h                |  18 ++
->>  include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
->>  include/linux/mfd/syscon/imx7-src.h                |  18 ++
->>  5 files changed, 208 insertions(+), 26 deletions(-)
->>  create mode 100644 include/linux/mfd/syscon/imx7-gpc.h
->>  create mode 100644 include/linux/mfd/syscon/imx7-src.h
+>> On Friday 20 January 2017 06:58 PM, Tejun Heo wrote:
+>>> On Fri, Jan 20, 2017 at 12:21:51PM +0100, Bartosz Golaszewski wrote:
+>>>> This series contains all the changes necessary to make SATA work on
+>>>> the da850-lcdk board.
+>>>>
+>>>> The first patch adds DT bindings for the ahci-da850 driver.
+>>>>
+>>>> The second enables relevant modules in davinci_all_defconfig.
+>>>>
+>>>> Patches 03/14-06/14 modify the way the clocks are handled regarding
+>>>> SATA on the da850 platform. We modify the ahci driver to retrieve
+>>>> the clock via con_id and model the external SATA oscillator as
+>>>> a real clock.
+>>>>
+>>>> Patches 07/14-11/14 extend the ahci-da850 driver. Add DT support,
+>>>> implement workarounds necessary to make SATA work on the da850-lcdk
+>>>> board and un-hardcode the external clock multiplier.
+>>>
+>>> Please feel free to add
+>>>
+>>>  Acked-by: Tejun Heo <tj@kernel.org>
+>>>
+>>> to the all libata patches.  Please let me know how the patches should
+>>> be routed once other parts are settled.
 >>
->> diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
->> index 83aeb1f..20b9382 100644
->> --- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
->> +++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
->> @@ -4,7 +4,8 @@ This PCIe host controller is based on the Synopsis Designware PCIe IP
->>  and thus inherits all the common properties defined in designware-pcie.txt.
+>> I believe you can queue the libata patches independently (patches 1, 4,
+>> 7, 8, 9, 10, 11). It looks like they have been written such that driver
+>> continues to work with existing platform code (Bartosz, please disagree
+>> if I am wrong). 1/14 still needs the ack from DT maintainers.
 >>
->>  Required properties:
->> -- compatible: "fsl,imx6q-pcie", "fsl,imx6sx-pcie", "fsl,imx6qp-pcie"
->> +- compatible: "fsl,imx6q-pcie", "fsl,imx6sx-pcie",
->> +           "fsl,imx6qp-pcie", "fsl,imx7d-pcie"
->>  - reg: base address and length of the PCIe controller
->>  - interrupts: A list of interrupt outputs of the controller. Must contain an
->>    entry for each entry in the interrupt-names property.
->> @@ -34,6 +35,9 @@ Additional required properties for imx6sx-pcie:
->>  - clock names: Must include the following additional entries:
->>       - "pcie_inbound_axi"
->>
->> +Additional required properties for imx7d-pcie:
->> +- pcie-phy-supply: Should specify the regulator supplying PCIe PHY
->> +
-> This isn't a PHY regulator, but a regulator powering the GPC domain
-> where the PHY is located. This should not be handled in the PCIe driver.
-> See the previous discussion with i.MX6SX, that is in the same boat.
->
+> 
+> Patch 11/14 depends on 06/14. Other than that I think it should work
+> independently.
 
-Good to know, thanks for clarification.
+Ah, right. You recently changed 11/14 to error out in case refclkpn is
+not found instead of using a default value (do agree that current
+version is better).
 
-> [...]
->>  static void imx6_pcie_init_phy(struct imx6_pcie *imx6_pcie)
->>  {
->> -     if (imx6_pcie->variant == IMX6SX)
->> +     switch (imx6_pcie->variant) {
->> +     case IMX7D: {
->> +             int ret;
->> +             unsigned int reg, mapping;
->> +             struct pcie_port *pp = &imx6_pcie->pp;
->> +             struct device *dev = pp->dev;
->> +
->> +             regulator_set_voltage(imx6_pcie->pcie_phy_regulator,
->> +                                   1000000, 1000000);
->> +             ret = regulator_enable(imx6_pcie->pcie_phy_regulator);
->> +             if (ret) {
->> +                     dev_err(dev, "failed to enable pcie regulator.\n");
->> +                     return;
->> +             }
->> +
->> +             /*
->> +              * Now that PHY regulator is enabled, do sofware
->> +              * power-up request by mapping PHY in A7 domain and
->> +              * setting power-up request bit
->> +              */
->> +             regmap_read(imx6_pcie->gpc, GPC_PGC_CPU_MAPPING, &mapping);
->> +             regmap_write(imx6_pcie->gpc, GPC_PGC_CPU_MAPPING,
->> +                          mapping | IMX7D_PCIE_PHY_A7_DOMAIN);
->> +
->> +             regmap_update_bits(imx6_pcie->gpc, GPC_PU_PGC_SW_PUP_REQ,
->> +                                IMX7D_PCIE_PHY_SW_PUP_REQ,
->> +                                IMX7D_PCIE_PHY_SW_PUP_REQ);
->> +             /*
->> +              * As per "5.5.9.4 Example Code 4" in IMX7DRM.pdf wait
->> +              * for PUP_REQ bit to be cleared
->> +              */
->> +             while (!regmap_read(imx6_pcie->gpc,
->> +                                 GPC_PU_PGC_SW_PUP_REQ, &reg) &&
->> +                    reg & IMX7D_PCIE_PHY_SW_PUP_REQ)
->> +                     ;
->> +             regmap_write(imx6_pcie->gpc, GPC_PGC_CPU_MAPPING, mapping);
->
-> I won't allow code touching the GPC registers to sneak into the PCIe
-> driver. I know this is the downstream solution, but this really needs a
-> proper GPC power domain driver, instead of this hack.
->
+If there are no build time dependencies still, it might be okay to queue
+these patches through their respective maintainer trees.
 
-OK, will change in v2.
+Tejun, I am open to queuing the driver changes through ARM-SoC. I guess
+with that there is little chance that SATA will be broken on linux-next
+for a longish period of time.
 
-> Regards,
-> Lucas
->
+I have Cced the ARM-SoC maintainers too.
+
+Thanks,
+Sekhar
