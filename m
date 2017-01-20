@@ -1,73 +1,64 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 20 Jan 2017 08:29:40 +0100
-Subject: [PATCH v3 0/7] ARM: sun5i: Convert sun5i SoCs to sunxi-ng
-Message-ID: <cover.5df5469d9c7a6233e225a875dca513a03b05e871.1484897383.git-series.maxime.ripard@free-electrons.com>
+Date: Fri, 20 Jan 2017 08:29:44 +0100
+Subject: [PATCH v3 4/7] clk: sunxi-ng: Implement global pre-divider
+In-Reply-To: <cover.5df5469d9c7a6233e225a875dca513a03b05e871.1484897383.git-series.maxime.ripard@free-electrons.com>
+References: <cover.5df5469d9c7a6233e225a875dca513a03b05e871.1484897383.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <1e37c723845efe18540268a168baeb81a86e8179.1484897383.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Some clocks have a global pre-divider that applies to all their parents.
 
-This is yet another serie bringing more SoCs into the sunxi-ng world.
+Since it might also apply to clocks that have a single parent, this is
+merged in the ccu_common structure, unlike the other pre-divider settings
+that are tied to a specific index, and thus a specific parent.
 
-This is pretty common stuff. Dealing with more corner cases, and adding the
-drivers for the SoCs. The A10 and A20 should be pretty close, and pretty
-easy to support after that.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/clk/sunxi-ng/ccu_common.h | 2 ++
+ drivers/clk/sunxi-ng/ccu_mux.c    | 8 +++++++-
+ 2 files changed, 9 insertions(+), 1 deletion(-)
 
-Let me know what you think,
-Maxime
-
-Changes from v2:
-  - Removed the osc3M, and added a fixed prediv that applies to all
-    parents.
-  - Made a cosmetic change asked by Chen-Yu
-  - Fixed the maximum multiplier when having a different offset
-
-Changes from v1:
-  - Rebased on top of 4.10
-  - Dropped post divider patch
-  - Merged all the CCU drivers in a single one
-  - Added the code to deal with multiplier maximum
-  - Added a comment for the PLL audio offset
-  - Added CLK_IS_CRITICAL to the DDR PLL
-  - Added the fixed pre-divider to the AHB clock
-  - Added a bunch of CLK_SET_RATE_PARENT
-
-Maxime Ripard (7):
-  clk: sunxi-ng: multiplier: Add fractional support
-  clk: sunxi-ng: Implement factors offsets
-  clk: sunxi-ng: Implement multiplier maximum
-  clk: sunxi-ng: Implement global pre-divider
-  clk: sunxi-ng: Add sun5i CCU driver
-  ARM: sun5i: Convert to CCU
-  ARM: gr8: Convert to CCU
-
- arch/arm/boot/dts/sun5i-a10s.dtsi     |   85 +--
- arch/arm/boot/dts/sun5i-a13.dtsi      |  140 +----
- arch/arm/boot/dts/sun5i-gr8.dtsi      |  520 +------------
- arch/arm/boot/dts/sun5i-r8.dtsi       |   10 +-
- arch/arm/boot/dts/sun5i.dtsi          |  353 +---------
- drivers/clk/sunxi-ng/Kconfig          |   10 +-
- drivers/clk/sunxi-ng/Makefile         |    1 +-
- drivers/clk/sunxi-ng/ccu-sun5i.c      | 1008 ++++++++++++++++++++++++++-
- drivers/clk/sunxi-ng/ccu-sun5i.h      |   67 ++-
- drivers/clk/sunxi-ng/ccu_common.h     |    2 +-
- drivers/clk/sunxi-ng/ccu_div.h        |   10 +-
- drivers/clk/sunxi-ng/ccu_mp.c         |   10 +-
- drivers/clk/sunxi-ng/ccu_mult.c       |   30 +-
- drivers/clk/sunxi-ng/ccu_mult.h       |   24 +-
- drivers/clk/sunxi-ng/ccu_mux.c        |    8 +-
- drivers/clk/sunxi-ng/ccu_nk.c         |   22 +-
- drivers/clk/sunxi-ng/ccu_nkm.c        |   26 +-
- drivers/clk/sunxi-ng/ccu_nkmp.c       |   25 +-
- drivers/clk/sunxi-ng/ccu_nm.c         |   17 +-
- include/dt-bindings/clock/sun5i-ccu.h |  103 +++-
- include/dt-bindings/reset/sun5i-ccu.h |   32 +-
- 21 files changed, 1479 insertions(+), 1024 deletions(-)
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun5i.c
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun5i.h
- create mode 100644 include/dt-bindings/clock/sun5i-ccu.h
- create mode 100644 include/dt-bindings/reset/sun5i-ccu.h
-
-base-commit: f9ca9b952ee139fbb9cd4d354a33f440bc1049cd
+diff --git a/drivers/clk/sunxi-ng/ccu_common.h b/drivers/clk/sunxi-ng/ccu_common.h
+index b3d9abfbd721..cdd69eb2e0b9 100644
+--- a/drivers/clk/sunxi-ng/ccu_common.h
++++ b/drivers/clk/sunxi-ng/ccu_common.h
+@@ -21,6 +21,7 @@
+ #define CCU_FEATURE_VARIABLE_PREDIV	BIT(1)
+ #define CCU_FEATURE_FIXED_PREDIV	BIT(2)
+ #define CCU_FEATURE_FIXED_POSTDIV	BIT(3)
++#define CCU_FEATURE_ALL_PREDIV		BIT(4)
+ 
+ struct device_node;
+ 
+@@ -56,6 +57,7 @@ struct device_node;
+ struct ccu_common {
+ 	void __iomem	*base;
+ 	u16		reg;
++	u32		prediv;
+ 
+ 	unsigned long	features;
+ 	spinlock_t	*lock;
+diff --git a/drivers/clk/sunxi-ng/ccu_mux.c b/drivers/clk/sunxi-ng/ccu_mux.c
+index a43ad52a957d..858a48621631 100644
+--- a/drivers/clk/sunxi-ng/ccu_mux.c
++++ b/drivers/clk/sunxi-ng/ccu_mux.c
+@@ -25,9 +25,15 @@ void ccu_mux_helper_adjust_parent_for_prediv(struct ccu_common *common,
+ 	int i;
+ 
+ 	if (!((common->features & CCU_FEATURE_FIXED_PREDIV) ||
+-	      (common->features & CCU_FEATURE_VARIABLE_PREDIV)))
++	      (common->features & CCU_FEATURE_VARIABLE_PREDIV) ||
++	      (common->features & CCU_FEATURE_ALL_PREDIV)))
+ 		return;
+ 
++	if (common->features & CCU_FEATURE_ALL_PREDIV) {
++		*parent_rate = *parent_rate / common->prediv;
++		return;
++	}
++
+ 	reg = readl(common->base + common->reg);
+ 	if (parent_index < 0) {
+ 		parent_index = reg >> cm->shift;
 -- 
 git-series 0.8.11
