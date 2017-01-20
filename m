@@ -1,49 +1,66 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 20 Jan 2017 10:21:03 +0000
-Subject: [PATCH] arm: module: handle negative R_ARM_PREL31 addends correctly
-Message-ID: <1484907663-32322-1-git-send-email-ard.biesheuvel@linaro.org>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Fri, 20 Jan 2017 11:21:27 +0100
+Subject: [PATCH v11 2/8] power: add power sequence library
+In-Reply-To: <20170120075239.GC21013@b29397-desktop>
+References: <1483596119-27508-1-git-send-email-peter.chen@nxp.com>
+ <1483596119-27508-3-git-send-email-peter.chen@nxp.com>
+ <20170107085456.w5dhm7qadqa6tc7v@kozik-lap>
+ <20170110070240.GA29454@b29397-desktop>
+ <20170120075239.GC21013@b29397-desktop>
+Message-ID: <CAJZ5v0h09A2XWLEk7v9XPe+4fP7HDr6AqZzBmvBi_V5nhLoiRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the spec 'ELF for the ARM Architecture' (IHI 0044E),
-addends for R_ARM_PREL31 relocations are 31-bit signed quantities,
-so we need to sign extend the value to 32 bits before it can be used
-as an offset in the calculation of the relocated value.
+On Fri, Jan 20, 2017 at 8:52 AM, Peter Chen <hzpeterchen@gmail.com> wrote:
+> On Tue, Jan 10, 2017 at 03:02:41PM +0800, Peter Chen wrote:
+>> On Sat, Jan 07, 2017 at 10:54:56AM +0200, Krzysztof Kozlowski wrote:
+>> > On Thu, Jan 05, 2017 at 02:01:53PM +0800, Peter Chen wrote:
+>> > > We have an well-known problem that the device needs to do some power
+>> > > sequence before it can be recognized by related host, the typical
+>> > > example like hard-wired mmc devices and usb devices.
+>> > >
+>> > > This power sequence is hard to be described at device tree and handled by
+>> > > related host driver, so we have created a common power sequence
+>> > > library to cover this requirement. The core code has supplied
+>> > > some common helpers for host driver, and individual power sequence
+>> > > libraries handle kinds of power sequence for devices. The pwrseq
+>> > > librares always need to allocate extra instance for compatible
+>> > > string match.
+>> > >
+>> > > pwrseq_generic is intended for general purpose of power sequence, which
+>> > > handles gpios and clocks currently, and can cover other controls in
+>> > > future. The host driver just needs to call of_pwrseq_on/of_pwrseq_off
+>> > > if only one power sequence is needed, else call of_pwrseq_on_list
+>> > > /of_pwrseq_off_list instead (eg, USB hub driver).
+>> > >
+>> > > For new power sequence library, it can add its compatible string
+>> > > to pwrseq_of_match_table, then the pwrseq core will match it with
+>> > > DT's, and choose this library at runtime.
+>> > >
+>> > > Signed-off-by: Peter Chen <peter.chen@nxp.com>
+>> > > Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
+>> > > Tested-by Joshua Clayton <stillcompiling@gmail.com>
+>> > > Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
+>> > > Tested-by: Matthias Kaehlcke <mka@chromium.org>
+>> >
+>> > Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+>> > Tested on Odroid U3 (reset sequence for LAN9730):
+>> > Tested-by: Krzysztof Kozlowski <krzk@kernel.org>
+>> >
+>>
+>> A nice ping...
+>>
+>
+> Rafael, would you please review it? This series was discussed about
+> half a year, and many people need it, I hope it can be in v4.11-rc1,
+> thanks.
 
-We have not been bitten by this because these relocations are usually
-emitted against the start of a section, which means the addends never
-assume negative values in practice. But it is a bug nonetheless, so fix
-it.
+I'm travelling now
+(http://marc.info/?l=linux-pm&m=148410629024194&w=2) and (as stated in
+this message) I'll get to the patches when I'm back home.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-This is something I spotted while looking into adding support for
-R_ARM_REL32 relocations. Feel free to ignore if it is guaranteed in some
-way that these relocations can never be emitted with negative addends.
+There is a good chance for your code to go into 4.11-rc1 if the review
+comments so far have been addressed.
 
- arch/arm/kernel/module.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-index 29629fe02ce5..20d8374711e2 100644
---- a/arch/arm/kernel/module.c
-+++ b/arch/arm/kernel/module.c
-@@ -155,7 +155,15 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
- 		       break;
- 
- 		case R_ARM_PREL31:
--			offset = *(u32 *)loc + sym->st_value - loc;
-+			offset = (*(s32 *)loc << 1) >> 1; /* sign extend */
-+			offset += sym->st_value - loc;
-+			if (offset >= 0x40000000 || offset < -0x40000000) {
-+				pr_err("%s: section %u reloc %u sym '%s': relocation %u out of range (%#lx -> %#x)\n",
-+				       module->name, relindex, i, symname,
-+				       ELF32_R_TYPE(rel->r_info), loc,
-+				       sym->st_value);
-+				return -ENOEXEC;
-+			}
- 			*(u32 *)loc = offset & 0x7fffffff;
- 			break;
- 
--- 
-2.7.4
+Thanks,
+Rafael
