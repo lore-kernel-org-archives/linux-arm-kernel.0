@@ -1,383 +1,80 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Fri, 20 Jan 2017 10:15:08 +0100
-Subject: [PATCH v9 7/8] ARM: dts: stm32: add Timers driver for stm32f429 MCU
-In-Reply-To: <1484903709-11650-1-git-send-email-benjamin.gaignard@st.com>
-References: <1484903709-11650-1-git-send-email-benjamin.gaignard@st.com>
-Message-ID: <1484903709-11650-8-git-send-email-benjamin.gaignard@st.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Fri, 20 Jan 2017 07:01:46 -0300
+Subject: [PATCH 2/2] [media] exynos-gsc: Fix imprecise external abort due
+ disabled power domain
+In-Reply-To: <20ecbcee-0dfd-04f6-a855-e117ba05732f@samsung.com>
+References: <1484699402-28738-1-git-send-email-javier@osg.samsung.com>
+ <CGME20170118003022epcas3p34cf03bb6feb830c4fa231497f2536d0e@epcas3p3.samsung.com>
+ <1484699402-28738-2-git-send-email-javier@osg.samsung.com>
+ <cc9c6837-7141-b63c-ddf6-68252493df11@samsung.com>
+ <842737f2-3faf-7b22-c480-93e183bbb670@osg.samsung.com>
+ <20ecbcee-0dfd-04f6-a855-e117ba05732f@samsung.com>
+Message-ID: <37760cac-7a46-9f40-8b4e-5414627c7fcf@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Timers and it sub-nodes into DT for stm32f429 family.
+Hello Marek,
 
-version 9:
-- re-order timers node per addresses
+On 01/20/2017 05:08 AM, Marek Szyprowski wrote:
+> Hi Javier,
+> 
 
-version 6:
-- split patch in two: one for SoC family and one for stm32f469
-  discovery board.
+[snip]
 
-version 5:
-- rename gptimer node to timers
-- re-order timers node per addresses
+>> Ok, I misunderstood the relationship between runtime PM and the power domains
+>> then. I thought the power domains were only powered on when the runtime PM
+>> framework resumed an associated device (i.e: pm_runtime_get_sync() is called).
+> 
+> Power domains are implemented transparently for the drivers. Even when driver
+> doesn't support runtime pm, but its device is in the power domain, the core will
+> ensure that the domain will be turned on all the time the driver is bound to the
+> device.
+>
 
-version 4:
-- remove unwanted indexing in pwm@ and timer@ node name
-- use "reg" instead of additional parameters to set timer
-  configuration
+I got it now, thank a lot for your explanation.
+ 
+>> But even if this isn't the case, shouldn't the reset in probe only be needed
+>> if CONFIG_PM isn't enabled? (IOW, $SUBJECT but with another commit message).
+> 
+> This looks like an over-engineering. I don't like polluting driver code with
+> conditional statements like IS_ENABLED(CONFIG_*). It should not hurt to reset
+> the device in driver probe, especially just in case the device was left in
+> some partially configured/working state by bootloader or previous kernel run
+> (if started from kexec). Adding this conditional code to avoid some issues
+> with power domain or clocks configuration also suggests that one should
+> instead solve the problem elsewhere. Driver should be able to access device
+> registers in its probe() in any case without the additional hacks.
+>
 
-version 3:
-- use "st,stm32-timer-trigger" in DT
+Fair enough, I already posted the patch but I'll ask it to be dropped.
 
-version 2:
-- use parameters to describe hardware capabilities
-- do not use references for pwm and iio timer subnodes
+[snip]
 
-Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
----
- arch/arm/boot/dts/stm32f429.dtsi | 275 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 275 insertions(+)
+>>
+>> This seems to be caused by some needed clocks to access the power domains
+>> to be gated, since I don't get these erros when passing clk_ignore_unused
+>> as parameter in the kernel command line.
+> 
+> I think that those issues were fixes by the following patch:
+> https://patchwork.kernel.org/patch/9484607/
+> It still didn't reach mainline, but I hope it will go as a fix to v4.10.
+>
 
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index e4dae0e..b608935 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -79,6 +79,27 @@
- 			status = "disabled";
- 		};
+That won't be enough since the CLK_ACLK432_SCALER needs to be ungated for
+Exynos5422/5800 as mentioned on another mail in this thread.
+
+> Please test if this solves your issue. Please not that adding more clocks
+> to the power domain drivers will solve only the problem with turning domain
+> on/off, but the are more cases where those clocks should be turned on (like
+> IOMMU integration), so marking them as critical solves that problem too.
+>
+
+Ok, I understand your point.
  
-+		timers2: timers at 40000000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "st,stm32-timers";
-+			reg = <0x40000000 0x400>;
-+			clocks = <&rcc 0 128>;
-+			clock-names = "int";
-+			status = "disabled";
-+
-+			pwm {
-+				compatible = "st,stm32-pwm";
-+				status = "disabled";
-+			};
-+
-+			timer at 1 {
-+				compatible = "st,stm32-timer-trigger";
-+				reg = <1>;
-+				status = "disabled";
-+			};
-+		};
-+
- 		timer3: timer at 40000400 {
- 			compatible = "st,stm32-timer";
- 			reg = <0x40000400 0x400>;
-@@ -87,6 +108,27 @@
- 			status = "disabled";
- 		};
- 
-+		timers3: timers at 40000400 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "st,stm32-timers";
-+			reg = <0x40000400 0x400>;
-+			clocks = <&rcc 0 129>;
-+			clock-names = "int";
-+			status = "disabled";
-+
-+			pwm {
-+				compatible = "st,stm32-pwm";
-+				status = "disabled";
-+			};
-+
-+			timer at 2 {
-+				compatible = "st,stm32-timer-trigger";
-+				reg = <2>;
-+				status = "disabled";
-+			};
-+		};
-+
- 		timer4: timer at 40000800 {
- 			compatible = "st,stm32-timer";
- 			reg = <0x40000800 0x400>;
-@@ -95,6 +137,27 @@
- 			status = "disabled";
- 		};
- 
-+		timers4: timers at 40000800 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "st,stm32-timers";
-+			reg = <0x40000800 0x400>;
-+			clocks = <&rcc 0 130>;
-+			clock-names = "int";
-+			status = "disabled";
-+
-+			pwm {
-+				compatible = "st,stm32-pwm";
-+				status = "disabled";
-+			};
-+
-+			timer at 3 {
-+				compatible = "st,stm32-timer-trigger";
-+				reg = <3>;
-+				status = "disabled";
-+			};
-+		};
-+
- 		timer5: timer at 40000c00 {
- 			compatible = "st,stm32-timer";
- 			reg = <0x40000c00 0x400>;
-@@ -102,6 +165,27 @@
- 			clocks = <&rcc 0 131>;
- 		};
- 
-+		timers5: timers at 40000c00 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "st,stm32-timers";
-+			reg = <0x40000C00 0x400>;
-+			clocks = <&rcc 0 131>;
-+			clock-names = "int";
-+			status = "disabled";
-+
-+			pwm {
-+				compatible = "st,stm32-pwm";
-+				status = "disabled";
-+			};
-+
-+			timer at 4 {
-+				compatible = "st,stm32-timer-trigger";
-+				reg = <4>;
-+				status = "disabled";
-+			};
-+		};
-+
- 		timer6: timer at 40001000 {
- 			compatible = "st,stm32-timer";
- 			reg = <0x40001000 0x400>;
-@@ -110,6 +194,22 @@
- 			status = "disabled";
- 		};
- 
-+		timers6: timers at 40001000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "st,stm32-timers";
-+			reg = <0x40001000 0x400>;
-+			clocks = <&rcc 0 132>;
-+			clock-names = "int";
-+			status = "disabled";
-+
-+			timer at 5 {
-+				compatible = "st,stm32-timer-trigger";
-+				reg = <5>;
-+				status = "disabled";
-+			};
-+		};
-+
- 		timer7: timer at 40001400 {
- 			compatible = "st,stm32-timer";
- 			reg = <0x40001400 0x400>;
-@@ -118,6 +218,73 @@
- 			status = "disabled";
- 		};
- 
-+		timers7: timers at 40001400 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "st,stm32-timers";
-+			reg = <0x40001400 0x400>;
-+			clocks = <&rcc 0 133>;
-+			clock-names = "int";
-+			status = "disabled";
-+
-+			timer at 6 {
-+				compatible = "st,stm32-timer-trigger";
-+				reg = <6>;
-+				status = "disabled";
-+			};
-+		};
-+
-+			timers12: timers at 40001800 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "st,stm32-timers";
-+			reg = <0x40001800 0x400>;
-+			clocks = <&rcc 0 134>;
-+			clock-names = "int";
-+			status = "disabled";
-+
-+			pwm {
-+				compatible = "st,stm32-pwm";
-+				status = "disabled";
-+			};
-+
-+			timer at 11 {
-+				compatible = "st,stm32-timer-trigger";
-+				reg = <11>;
-+				status = "disabled";
-+			};
-+		};
-+
-+		timers13: timers at 40001c00 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "st,stm32-timers";
-+			reg = <0x40001C00 0x400>;
-+			clocks = <&rcc 0 135>;
-+			clock-names = "int";
-+			status = "disabled";
-+
-+			pwm {
-+				compatible = "st,stm32-pwm";
-+				status = "disabled";
-+			};
-+		};
-+
-+		timers14: timers at 40002000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "st,stm32-timers";
-+			reg = <0x40002000 0x400>;
-+			clocks = <&rcc 0 136>;
-+			clock-names = "int";
-+			status = "disabled";
-+
-+			pwm {
-+				compatible = "st,stm32-pwm";
-+				status = "disabled";
-+			};
-+		};
-+
- 		usart2: serial at 40004400 {
- 			compatible = "st,stm32-usart", "st,stm32-uart";
- 			reg = <0x40004400 0x400>;
-@@ -169,6 +336,48 @@
- 			status = "disabled";
- 		};
- 
-+		timers1: timers at 40010000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "st,stm32-timers";
-+			reg = <0x40010000 0x400>;
-+			clocks = <&rcc 0 160>;
-+			clock-names = "int";
-+			status = "disabled";
-+
-+			pwm {
-+				compatible = "st,stm32-pwm";
-+				status = "disabled";
-+			};
-+
-+			timer at 0 {
-+				compatible = "st,stm32-timer-trigger";
-+				reg = <0>;
-+				status = "disabled";
-+			};
-+		};
-+
-+		timers8: timers at 40010400 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "st,stm32-timers";
-+			reg = <0x40010400 0x400>;
-+			clocks = <&rcc 0 161>;
-+			clock-names = "int";
-+			status = "disabled";
-+
-+			pwm {
-+				compatible = "st,stm32-pwm";
-+				status = "disabled";
-+			};
-+
-+			timer at 7 {
-+				compatible = "st,stm32-timer-trigger";
-+				reg = <7>;
-+				status = "disabled";
-+			};
-+		};
-+
- 		usart1: serial at 40011000 {
- 			compatible = "st,stm32-usart", "st,stm32-uart";
- 			reg = <0x40011000 0x400>;
-@@ -201,6 +410,57 @@
- 			interrupts = <1>, <2>, <3>, <6>, <7>, <8>, <9>, <10>, <23>, <40>, <41>, <42>, <62>, <76>;
- 		};
- 
-+		timers9: timers at 40014000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "st,stm32-timers";
-+			reg = <0x40014000 0x400>;
-+			clocks = <&rcc 0 176>;
-+			clock-names = "int";
-+			status = "disabled";
-+
-+			pwm {
-+				compatible = "st,stm32-pwm";
-+				status = "disabled";
-+			};
-+
-+			timer at 8 {
-+				compatible = "st,stm32-timer-trigger";
-+				reg = <8>;
-+				status = "disabled";
-+			};
-+		};
-+
-+		timers10: timers at 40014400 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "st,stm32-timers";
-+			reg = <0x40014400 0x400>;
-+			clocks = <&rcc 0 177>;
-+			clock-names = "int";
-+			status = "disabled";
-+
-+			pwm {
-+				compatible = "st,stm32-pwm";
-+				status = "disabled";
-+			};
-+		};
-+
-+		timers11: timers at 40014800 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "st,stm32-timers";
-+			reg = <0x40014800 0x400>;
-+			clocks = <&rcc 0 178>;
-+			clock-names = "int";
-+			status = "disabled";
-+
-+			pwm {
-+				compatible = "st,stm32-pwm";
-+				status = "disabled";
-+			};
-+		};
-+
- 		pwrcfg: power-config at 40007000 {
- 			compatible = "syscon";
- 			reg = <0x40007000 0x400>;
-@@ -355,6 +615,21 @@
- 					slew-rate = <2>;
- 				};
- 			};
-+
-+			pwm1_pins: pwm at 1 {
-+				pins {
-+					pinmux = <STM32F429_PA8_FUNC_TIM1_CH1>,
-+						 <STM32F429_PB13_FUNC_TIM1_CH1N>,
-+						 <STM32F429_PB12_FUNC_TIM1_BKIN>;
-+				};
-+			};
-+
-+			pwm3_pins: pwm at 3 {
-+				pins {
-+					pinmux = <STM32F429_PB4_FUNC_TIM3_CH1>,
-+						 <STM32F429_PB5_FUNC_TIM3_CH2>;
-+				};
-+			};
- 		};
- 
- 		rcc: rcc at 40023810 {
+> Best regards
+
+Best regards,
 -- 
-1.9.1
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
