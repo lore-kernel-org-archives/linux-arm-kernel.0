@@ -1,86 +1,128 @@
-From: eddie.cai.linux@gmail.com (Eddie Cai)
-Date: Fri, 20 Jan 2017 16:31:21 +0800
-Subject: [PATCH 2/2] ARM: dts: rockchip: add dts for RK3288-Tinker board
-In-Reply-To: <1831358.CPCqGifkXT@phil>
-References: <1484791919-4665-1-git-send-email-eddie.cai@rock-chips.com>
- <40159140.kOHBSj8v8b@phil>
- <CAJrj+DM5hVsmB_q+P8WPd0z_F1cYcGafyYZHXdX6P=nrqxpFyA@mail.gmail.com>
- <1831358.CPCqGifkXT@phil>
-Message-ID: <CAJrj+DPB+q8nU8fR764Bvtk1k0Gm_tO7mCa80gqdq3p_vx7gLw@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 20 Jan 2017 09:37:47 +0100
+Subject: [PATCH 2/2] [media] exynos-gsc: Fix imprecise external abort due
+ disabled power domain
+In-Reply-To: <d727576a-fbce-eb54-3b74-270c689b7fa3@osg.samsung.com>
+References: <1484699402-28738-1-git-send-email-javier@osg.samsung.com>
+ <CGME20170118003022epcas3p34cf03bb6feb830c4fa231497f2536d0e@epcas3p3.samsung.com>
+ <1484699402-28738-2-git-send-email-javier@osg.samsung.com>
+ <cc9c6837-7141-b63c-ddf6-68252493df11@samsung.com>
+ <842737f2-3faf-7b22-c480-93e183bbb670@osg.samsung.com>
+ <d727576a-fbce-eb54-3b74-270c689b7fa3@osg.samsung.com>
+Message-ID: <c1d00b28-0252-0fb1-eb7c-5fc69035f12f@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-01-20 16:12 GMT+08:00 Heiko Stuebner <heiko@sntech.de>:
-> Hi Eddie,
+Hi Javier,
+
+On 2017-01-19 18:51, Javier Martinez Canillas wrote:
+> On 01/19/2017 11:56 AM, Javier Martinez Canillas wrote:
+>> On 01/19/2017 11:17 AM, Marek Szyprowski wrote:
+> [snip]
 >
-> Am Freitag, 20. Januar 2017, 15:10:47 CET schrieb Eddie Cai:
->> 2017-01-19 17:58 GMT+08:00 Heiko Stuebner <heiko@sntech.de>:
->> > Hi Eddie,
->> >
->> > Am Donnerstag, 19. Januar 2017, 10:11:59 CET schrieb Eddie Cai:
->> >> This patch add basic support for RK3288-Tinker board. We can boot in to
->> >> rootfs with this patch.
->> >>
->> >> Signed-off-by: Eddie Cai <eddie.cai@rock-chips.com>
->> >
->> > looks good in general, just some small question down below.
->> >
->> > [...]
->> >
->> >> +     /*
->> >> +      * NOTE: vcc_sd isn't hooked up on v1.0 boards where power comes
->> >> from
->> >> +      * vcc_io directly.  Those boards won't be able to power cycle SD
->> >> cards +      * but it shouldn't hurt to toggle this pin there anyway.
->> >> +      */
->> >
->> > just to clarify, later board will have that pin connected, right?
+>> Also when removing the exynos_gsc driver, I get the same error:
 >>
->> Copy from rk3288-evb.dtsi. forgot to delete it. I will remove it in next
->> version
->> >> +     vcc_sd: sdmmc-regulator {
->> >> +             compatible = "regulator-fixed";
->> >> +             gpio = <&gpio7 11 GPIO_ACTIVE_LOW>;
->> >> +             pinctrl-names = "default";
->> >> +             pinctrl-0 = <&sdmmc_pwr>;
->> >> +             regulator-name = "vcc_sd";
->> >> +             regulator-min-microvolt = <3300000>;
->> >> +             regulator-max-microvolt = <3300000>;
->> >> +             startup-delay-us = <100000>;
->> >> +             vin-supply = <&vcc_io>;
->> >> +     };
->> >> +};
->> >
->> > [...]
->> >
->> >> +&hdmi {
->> >> +     #address-cells = <1>;
->> >> +     #size-cells = <0>;
->> >> +     #sound-dai-cells = <0>;
->> >> +     ddc-i2c-bus = <&i2c5>;
->> >> +     status = "okay";
->> >> +     /* Don't use vopl for HDMI */
->> >> +     ports {
->> >> +             hdmi_in: port {
->> >> +                     /delete-node/ endpoint at 1;
->> >> +             };
->> >
->> > what is the reason for this? You enable both VOPs below and the linux
->> > display subsystem should be able to select an appropriate VOP for output
->> > just fine on its own. So there should be no reason for capping the hdmi's
->> > connection to one of the vops.
+>> # rmmod s5p_mfc
+>> [  106.405972] s5p-mfc 11000000.codec: Removing 11000000.codec
+>> # rmmod exynos_gsc
+>> [  227.008559] Unhandled fault: imprecise external abort (0x1c06) at 0x00048e14
+>> [  227.015116] pgd = ed5dc000
+>> [  227.017213] [00048e14] *pgd=b17c6835
+>> [  227.020889] Internal error: : 1c06 [#1] PREEMPT SMP ARM
+>> ...
+>> [  227.241585] [<bf2429bc>] (gsc_wait_reset [exynos_gsc]) from [<bf24009c>] (gsc_runtime_resume+0x9c/0xec [exynos_gsc])
+>> [  227.252331] [<bf24009c>] (gsc_runtime_resume [exynos_gsc]) from [<c042e488>] (genpd_runtime_resume+0x120/0x1d4)
+>> [  227.262294] [<c042e488>] (genpd_runtime_resume) from [<c04241c0>] (__rpm_callback+0xc8/0x218)
 >>
->> The VOP big support 4k display. is designed for HDMI  4K display. VOP
->> little is for other display(eDP, LVDS, Mipi etc)
+>> # cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
+>> domain                          status          slaves
+>>      /device                                             runtime status
+>> ----------------------------------------------------------------------
+>> power-domain at 100440C0           on
+>>      /devices/platform/soc/14450000.mixer                active
+>>      /devices/platform/soc/14530000.hdmi                 active
+>> power-domain at 10044120           on
+>> power-domain at 10044060           off-0
+>> power-domain at 10044020           on
+>> power-domain at 10044000           on
+>>      /devices/platform/soc/13e00000.video-scaler         suspended
+>>      /devices/platform/soc/13e10000.video-scaler         resuming
+>>
+>> This seems to be caused by some needed clocks to access the power domains
+>> to be gated, since I don't get these erros when passing clk_ignore_unused
+>> as parameter in the kernel command line.
+>>
+> I found the issue. The problem was that Exynos5422 needs not only the
+> CLK_ACLK_ 300_GSCL but also CLK_ACLK432_SCALER to be ungated in order
+> to access the GSCL IP block.
 >
-> The hdmi _can_ talk to both vops, which is why it has the connection to both.
-> Resolution-limitations and selecting a matching vop should be handled in the
-> drm driver I'd think - but you'll need to talk to Mark Yao or some else
-> knowledgable in graphics.
+> The Exynos5422 manual shows in Figure 7-14 that ACLK_432_SCLAER is needed
+> for the internal buses.
 >
-> The devicetree is about describing the _available_ hardware, not configuring
-> how it is supposed to be used ;-) .
-OK, agree with you, i will remove it in next version.
+> Exynos5420 only needs CLK_ACLK_ 300_GSCL to be ungated.
 >
+> With following hack, the issue goes away for the gsc_pd in the Odroid XU4:
 >
-> Heiko
+> diff --git a/drivers/clk/samsung/clk-exynos5420.c b/drivers/clk/samsung/clk-exynos5420.c
+> index 8c8b495cbf0d..9876ec28b94c 100644
+> --- a/drivers/clk/samsung/clk-exynos5420.c
+> +++ b/drivers/clk/samsung/clk-exynos5420.c
+> @@ -586,7 +586,7 @@ static const struct samsung_gate_clock exynos5800_gate_clks[] __initconst = {
+>   	GATE(CLK_ACLK550_CAM, "aclk550_cam", "mout_user_aclk550_cam",
+>   				GATE_BUS_TOP, 24, 0, 0),
+>   	GATE(CLK_ACLK432_SCALER, "aclk432_scaler", "mout_user_aclk432_scaler",
+> -				GATE_BUS_TOP, 27, 0, 0),
+> +				GATE_BUS_TOP, 27, CLK_IS_CRITICAL, 0),
+>   };
+>
+> # cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
+> domain                          status          slaves
+>      /device                                             runtime status
+> ----------------------------------------------------------------------
+> power-domain at 100440C0           on
+>      /devices/platform/soc/14450000.mixer                active
+>      /devices/platform/soc/14530000.hdmi                 active
+> power-domain at 10044120           on
+> power-domain at 10044060           off-0
+>      /devices/platform/soc/11000000.codec                suspended
+> power-domain at 10044020           on
+> power-domain at 10044000           off-0
+>      /devices/platform/soc/13e00000.video-scaler         suspended
+>      /devices/platform/soc/13e10000.video-scaler         suspended
+>
+> # rmmod s5p_mfc
+> [   82.885227] s5p-mfc 11000000.codec: Removing 11000000.codec
+> # rmmod exynos_gsc
+>
+> # cat /sys/kernel/debug/pm_genpd/pm_genpd_summary
+> domain                          status          slaves
+>      /device                                             runtime status
+> ----------------------------------------------------------------------
+> power-domain at 100440C0           on
+>      /devices/platform/soc/14450000.mixer                active
+>      /devices/platform/soc/14530000.hdmi                 active
+> power-domain at 10044120           on
+> power-domain at 10044060           off-0
+> power-domain at 10044020           on
+> power-domain at 10044000           off-0
+>   
+> I'll post a proper patch for the exynos5800.dtsi, to override the
+> clocks in the gsc_pd device node.
+>
+> I also see that the two power domains that fail to be disabled msc_pd
+> (power-domain at 10044120) and isp_pd (power-domain at 10044020) don't have
+> clocks defined in the exynos54xx.dtsi. I'll add clocks for those too.
+
+Please send this patch instead of adding more clocks to the power domains.
+This way we will avoid adding more dependencies to userspace (DT ABI).
+Likely those clocks are also needed to access any device in that power
+domains.
+
+Later, once the runtime PM for clocks get merged, a patch for exynos542x
+clocks driver can be made to replace IS_CRITICAL with proper runtime
+handling.
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
