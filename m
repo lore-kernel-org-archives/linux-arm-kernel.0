@@ -1,44 +1,30 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 20 Jan 2017 14:56:26 +0000
-Subject: [V2 1/2] document: dt: add binding for Hi3660 SoC
-In-Reply-To: <1484034915-48879-1-git-send-email-puck.chen@hisilicon.com>
-References: <1484034915-48879-1-git-send-email-puck.chen@hisilicon.com>
-Message-ID: <5882251A.8030100@hisilicon.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Fri, 20 Jan 2017 10:00:36 -0500
+Subject: [PATCH v5 00/14] ARM: da850-lcdk: add SATA support
+In-Reply-To: <f9055043-507f-74de-b2b8-9eb0eae5dad6@ti.com>
+References: <1484911325-23425-1-git-send-email-bgolaszewski@baylibre.com>
+ <20170120132843.GA31487@mtj.duckdns.org>
+ <86bcbb3c-87e4-3508-f4a6-26529f39d374@ti.com>
+ <CAMpxmJUPh9MZKwG6k6p_mo6niXNNT02JCDgXi4DPRH2Fk3yxng@mail.gmail.com>
+ <f9055043-507f-74de-b2b8-9eb0eae5dad6@ti.com>
+Message-ID: <20170120150036.GA6164@mtj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen Feng,
+Hello, Sekhar.
 
-On 2017/1/10 7:55, Chen Feng wrote:
-> Add binding for hisilicon Hi3660 SoC and HiKey960 Board.
-> 
-> Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
-> Acked-by: Rob Herring <robh@kernel.org>
-> ---
+On Fri, Jan 20, 2017 at 07:52:35PM +0530, Sekhar Nori wrote:
+> Tejun, I am open to queuing the driver changes through ARM-SoC. I guess
+> with that there is little chance that SATA will be broken on linux-next
+> for a longish period of time.
 
-Applied both to the hisilicon SoC tree
-with minimal changes about the format.
-Thanks!
+Yeah, I'd prefer the patchset staying together.  That's how it was
+developed and tested.  Don't wanna break it apart unnecessarily.  The
+chance for conflicts is low and even when that happens dealing with
+them is pretty easy.  Please feel free to add my acked-by and route
+the patches through ARM-SoC.
 
-Best Regards,
-Wei
+Thanks.
 
->  Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-> index 7df79a7..6de2398 100644
-> --- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-> @@ -8,6 +8,10 @@ Hi6220 SoC
->  Required root node properties:
->  	- compatible = "hisilicon,hi6220";
->  
-> +Hi3660 SoC
-> +Required root node properties:
-> +	- compatible = "hisilicon,hi3660";
-> +
->  HiKey Board
->  Required root node properties:
->  	- compatible = "hisilicon,hi6220-hikey", "hisilicon,hi6220";
-> 
+-- 
+tejun
