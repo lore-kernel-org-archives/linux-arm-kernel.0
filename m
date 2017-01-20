@@ -1,66 +1,59 @@
-From: hs.liao@mediatek.com (Horng-Shyang Liao)
-Date: Fri, 20 Jan 2017 11:11:00 +0800
-Subject: [PATCH v20 0/4] Mediatek MT8173 CMDQ support
-In-Reply-To: <1484270826.14822.1.camel@mtksdaap41>
-References: <1483499169-16329-1-git-send-email-hs.liao@mediatek.com>
- <1484270826.14822.1.camel@mtksdaap41>
-Message-ID: <1484881860.18967.1.camel@mtksdaap41>
+From: pankaj.dubey@samsung.com (pankaj.dubey)
+Date: Fri, 20 Jan 2017 08:49:09 +0530
+Subject: [PATCH 3/3] arm64: dts: exynos: Use macros for pinctrl
+ configuration on Exynos7
+In-Reply-To: <20170118150131.ttalzfxxtpbrw5gb@kozik-lap>
+References: <1484718141-28785-1-git-send-email-pankaj.dubey@samsung.com>
+ <CGME20170118054013epcas5p3b20dca776ee350f4ba863db24d3dea67@epcas5p3.samsung.com>
+ <1484718141-28785-4-git-send-email-pankaj.dubey@samsung.com>
+ <20170118150131.ttalzfxxtpbrw5gb@kozik-lap>
+Message-ID: <7f003a7a-897f-2fef-f48c-44db75be84ff@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-01-13 at 09:27 +0800, Horng-Shyang Liao wrote:
-> On Wed, 2017-01-04 at 11:06 +0800, HS Liao wrote:
-> > Hi,
-> > 
-> > This is Mediatek MT8173 Command Queue(CMDQ) driver. The CMDQ is used
-> > to help write registers with critical time limitation, such as
-> > updating display configuration during the vblank. It controls Global
-> > Command Engine (GCE) hardware to achieve this requirement.
-> > 
-> > These patches have a build dependency on top of v4.10-rc2.
-> > 
-> > Changes since v19:
-> >  - rebase to v4.10-rc2
-> > 
-> > Best regards,
-> > HS Liao
-> > 
-> > HS Liao (4):
-> >   dt-bindings: soc: Add documentation for the MediaTek GCE unit
-> >   mailbox: mediatek: Add Mediatek CMDQ driver
-> >   arm64: dts: mt8173: Add GCE node
-> >   soc: mediatek: Add Mediatek CMDQ helper
-> > 
-> >  .../devicetree/bindings/mailbox/mtk-gce.txt        |  43 ++
-> >  arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  10 +
-> >  drivers/mailbox/Kconfig                            |  10 +
-> >  drivers/mailbox/Makefile                           |   2 +
-> >  drivers/mailbox/mtk-cmdq-mailbox.c                 | 596 +++++++++++++++++++++
-> >  drivers/soc/mediatek/Kconfig                       |  12 +
-> >  drivers/soc/mediatek/Makefile                      |   1 +
-> >  drivers/soc/mediatek/mtk-cmdq-helper.c             | 310 +++++++++++
-> >  include/linux/mailbox/mtk-cmdq-mailbox.h           |  75 +++
-> >  include/linux/soc/mediatek/mtk-cmdq.h              | 174 ++++++
-> >  10 files changed, 1233 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/mailbox/mtk-gce.txt
-> >  create mode 100644 drivers/mailbox/mtk-cmdq-mailbox.c
-> >  create mode 100644 drivers/soc/mediatek/mtk-cmdq-helper.c
-> >  create mode 100644 include/linux/mailbox/mtk-cmdq-mailbox.h
-> >  create mode 100644 include/linux/soc/mediatek/mtk-cmdq.h
-> > 
-> 
-> Hi Jassi, Matthias,
-> 
-> Sorry to disturb you.
-> Do you have any further comments on CMDQ v20?
-> 
-> Thanks.
-> HS
+Hi Krzysztof,
 
-Hi Jassi, Matthias,
+On Wednesday 18 January 2017 08:31 PM, Krzysztof Kozlowski wrote:
+> On Wed, Jan 18, 2017 at 11:12:21AM +0530, Pankaj Dubey wrote:
+>> Usage of DTS macros instead of hard-coded numbers makes code easier to
+>> read.  One does not have to remember which value means pull-up/down or
+>> specific driver strength.
+>>
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>> ---
+>>  arch/arm64/boot/dts/exynos/exynos7-espresso.dts |   4 +-
+>>  arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi | 302 ++++++++++++------------
+>>  2 files changed, 154 insertions(+), 152 deletions(-)
+>>
+>> diff --git a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+>> index c528dd5..1b2db9f0 100644
+>> --- a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+>> +++ b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+>> @@ -328,8 +328,8 @@
+>>  &pinctrl_alive {
+>>  	pmic_irq: pmic-irq {
+>>  		samsung,pins = "gpa0-2";
+>> -		samsung,pin-pud = <3>;
+>> -		samsung,pin-drv = <3>;
+>> +		samsung,pin-pud = <EXYNOS_PIN_PULL_UP>;
+>> +		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV3>;
+>>  	};
+>>  };
+> 
+> This is not equal (value 3 => 1). If the change was intended, please do
+> in separate patch.
+> 
 
-Sorry to disturb you again.
-Do you have any further comments on CMDQ v20?
+This was not an intended change. It should be EXYNOS4_PIN_DRV_LV4, I
+will submit another set after fixing this.
 
-Thanks.
-HS
+Thanks,
+Pankaj Dubey
+
+> Rest looks fine.
+> 
+> Best regards,
+> Krzysztof
+> 
+> 
+> 
