@@ -1,131 +1,41 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 20 Jan 2017 10:50:09 +0000
-Subject: [PATCH 1/2] arm64: kvm: reuse existing cache type/info related macros
-Message-ID: <1484909410-11673-1-git-send-email-sudeep.holla@arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 20 Jan 2017 16:19:11 +0530
+Subject: [PATCH v4 01/14] devicetree: bindings: add bindings for ahci-da850
+In-Reply-To: <1484832588-18413-2-git-send-email-bgolaszewski@baylibre.com>
+References: <1484832588-18413-1-git-send-email-bgolaszewski@baylibre.com>
+ <1484832588-18413-2-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <d691d8dc-fd94-13ca-7f77-6ecfb8443ea4@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We already have various macros related to cache type and bitfields in
-CLIDR system register. We can replace some of the hardcoded values
-here using those existing macros.
+On Thursday 19 January 2017 06:59 PM, Bartosz Golaszewski wrote:
+> Add DT bindings for the TI DA850 AHCI SATA controller.
+> 
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+> ---
+>  Documentation/devicetree/bindings/ata/ahci-da850.txt | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/ata/ahci-da850.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/ata/ahci-da850.txt b/Documentation/devicetree/bindings/ata/ahci-da850.txt
+> new file mode 100644
+> index 0000000..fd90662
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/ata/ahci-da850.txt
+> @@ -0,0 +1,15 @@
+> +Device tree binding for the TI DA850 AHCI SATA Controller
+> +---------------------------------------------------------
+> +
+> +Required properties:
+> +  - compatible: must be "ti,da850-ahci"
+> +  - reg: physical base addresses and sizes of the controller's register areas
+> +  - interrupts: interrupt specifier (refer to the interrupt binding)
+> +
+> +Example:
+> +
+> +	sata: ahci at 218000 {
 
-This patch reuses those existing cache type/info related macros and
-replaces the hardcorded values. It also removes some of the comments
-that become trivial with the macro names.
+Please fix the example too, when you fix Sergei's comment on 12/14
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- arch/arm64/include/asm/cachetype.h |  7 +++++++
- arch/arm64/kernel/cacheinfo.c      |  7 -------
- arch/arm64/kvm/sys_regs.c          | 27 +++++++++++++--------------
- 3 files changed, 20 insertions(+), 21 deletions(-)
-
-diff --git a/arch/arm64/include/asm/cachetype.h b/arch/arm64/include/asm/cachetype.h
-index f5588692f1d4..f58b5e3df6b8 100644
---- a/arch/arm64/include/asm/cachetype.h
-+++ b/arch/arm64/include/asm/cachetype.h
-@@ -39,6 +39,13 @@
- 
- extern unsigned long __icache_flags;
- 
-+#define MAX_CACHE_LEVEL			7	/* Max 7 level supported */
-+/* Ctypen, bits[3(n - 1) + 2 : 3(n - 1)], for n = 1 to 7 */
-+#define CLIDR_CTYPE_SHIFT(level)	(3 * (level - 1))
-+#define CLIDR_CTYPE_MASK(level)		(7 << CLIDR_CTYPE_SHIFT(level))
-+#define CLIDR_CTYPE(clidr, level)	\
-+	(((clidr) & CLIDR_CTYPE_MASK(level)) >> CLIDR_CTYPE_SHIFT(level))
-+
- /*
-  * NumSets, bits[27:13] - (Number of sets in cache) - 1
-  * Associativity, bits[12:3] - (Associativity of cache) - 1
-diff --git a/arch/arm64/kernel/cacheinfo.c b/arch/arm64/kernel/cacheinfo.c
-index 3f2250fc391b..a460208b08cf 100644
---- a/arch/arm64/kernel/cacheinfo.c
-+++ b/arch/arm64/kernel/cacheinfo.c
-@@ -26,13 +26,6 @@
- #include <asm/cachetype.h>
- #include <asm/processor.h>
- 
--#define MAX_CACHE_LEVEL			7	/* Max 7 level supported */
--/* Ctypen, bits[3(n - 1) + 2 : 3(n - 1)], for n = 1 to 7 */
--#define CLIDR_CTYPE_SHIFT(level)	(3 * (level - 1))
--#define CLIDR_CTYPE_MASK(level)		(7 << CLIDR_CTYPE_SHIFT(level))
--#define CLIDR_CTYPE(clidr, level)	\
--	(((clidr) & CLIDR_CTYPE_MASK(level)) >> CLIDR_CTYPE_SHIFT(level))
--
- static inline enum cache_type get_cache_type(int level)
- {
- 	u64 clidr;
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 87e7e6608cd8..5dca1f10340f 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -21,11 +21,13 @@
-  */
- 
- #include <linux/bsearch.h>
-+#include <linux/cacheinfo.h>
- #include <linux/kvm_host.h>
- #include <linux/mm.h>
- #include <linux/uaccess.h>
- 
- #include <asm/cacheflush.h>
-+#include <asm/cachetype.h>
- #include <asm/cputype.h>
- #include <asm/debug-monitors.h>
- #include <asm/esr.h>
-@@ -59,7 +61,7 @@
- static u32 cache_levels;
- 
- /* CSSELR values; used to index KVM_REG_ARM_DEMUX_ID_CCSIDR */
--#define CSSELR_MAX 12
-+#define CSSELR_MAX 	((MAX_CACHE_LEVEL - 1) >> 1)
- 
- /* Which cache CCSIDR represents depends on CSSELR value. */
- static u32 get_ccsidr(u32 csselr)
-@@ -68,9 +70,7 @@ static u32 get_ccsidr(u32 csselr)
- 
- 	/* Make sure noone else changes CSSELR during this! */
- 	local_irq_disable();
--	write_sysreg(csselr, csselr_el1);
--	isb();
--	ccsidr = read_sysreg(ccsidr_el1);
-+	ccsidr = cache_get_ccsidr(csselr);
- 	local_irq_enable();
- 
- 	return ccsidr;
-@@ -1960,19 +1960,18 @@ static bool is_valid_cache(u32 val)
- 		return false;
- 
- 	/* Bottom bit is Instruction or Data bit.  Next 3 bits are level. */
--	level = (val >> 1);
--	ctype = (cache_levels >> (level * 3)) & 7;
-+	level = (val >> 1) + 1;
-+	ctype = CLIDR_CTYPE(cache_levels, level);
- 
- 	switch (ctype) {
--	case 0: /* No cache */
--		return false;
--	case 1: /* Instruction cache only */
--		return (val & 1);
--	case 2: /* Data cache only */
--	case 4: /* Unified cache */
--		return !(val & 1);
--	case 3: /* Separate instruction and data caches */
-+	case CACHE_TYPE_INST:
-+		return (val & CACHE_TYPE_INST);
-+	case CACHE_TYPE_DATA:
-+	case CACHE_TYPE_UNIFIED:
-+		return !(val & CACHE_TYPE_INST);
-+	case CACHE_TYPE_SEPARATE:
- 		return true;
-+	case CACHE_TYPE_NOCACHE:
- 	default: /* Reserved: we can't know instruction or data. */
- 		return false;
- 	}
--- 
-2.7.4
+Thanks,
+Sekhar
