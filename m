@@ -1,37 +1,24 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Fri, 20 Jan 2017 08:28:43 -0500
-Subject: [PATCH v5 00/14] ARM: da850-lcdk: add SATA support
-In-Reply-To: <1484911325-23425-1-git-send-email-bgolaszewski@baylibre.com>
-References: <1484911325-23425-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <20170120132843.GA31487@mtj.duckdns.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 20 Jan 2017 19:16:28 +0530
+Subject: [PATCH RESEND 2/2] ARM: da850: add the nand dev_id to the clock
+ lookup table
+In-Reply-To: <1484301626-30345-3-git-send-email-bgolaszewski@baylibre.com>
+References: <1484301626-30345-1-git-send-email-bgolaszewski@baylibre.com>
+ <1484301626-30345-3-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <0650f8ff-07f7-db06-ca3c-84eed7edb24e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2017 at 12:21:51PM +0100, Bartosz Golaszewski wrote:
-> This series contains all the changes necessary to make SATA work on
-> the da850-lcdk board.
+On Friday 13 January 2017 03:30 PM, Bartosz Golaszewski wrote:
+> The aemif driver can now access struct of_dev_auxdata (using platform
+> data).
 > 
-> The first patch adds DT bindings for the ahci-da850 driver.
+> Add the device id to the clock lookup table for the nand clock and
+> create a separate lookup table for aemif subnodes.
 > 
-> The second enables relevant modules in davinci_all_defconfig.
-> 
-> Patches 03/14-06/14 modify the way the clocks are handled regarding
-> SATA on the da850 platform. We modify the ahci driver to retrieve
-> the clock via con_id and model the external SATA oscillator as
-> a real clock.
-> 
-> Patches 07/14-11/14 extend the ahci-da850 driver. Add DT support,
-> implement workarounds necessary to make SATA work on the da850-lcdk
-> board and un-hardcode the external clock multiplier.
+> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 
-Please feel free to add
+Applied to v4.11/soc
 
- Acked-by: Tejun Heo <tj@kernel.org>
-
-to the all libata patches.  Please let me know how the patches should
-be routed once other parts are settled.
-
-Thanks.
-
--- 
-tejun
+Thanks,
+Sekhar
