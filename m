@@ -1,60 +1,64 @@
 From: agustinv@codeaurora.org (Agustin Vega-Frias)
-Date: Thu, 19 Jan 2017 21:34:17 -0500
-Subject: [PATCH V11 0/3] irqchip: qcom: Add IRQ combiner driver
-Message-ID: <1484879660-1960-1-git-send-email-agustinv@codeaurora.org>
+Date: Thu, 19 Jan 2017 21:34:18 -0500
+Subject: [PATCH V11 1/3] ACPI: Generic GSI: Do not attempt to map non-GSI IRQs
+ during bus scan
+In-Reply-To: <1484879660-1960-1-git-send-email-agustinv@codeaurora.org>
+References: <1484879660-1960-1-git-send-email-agustinv@codeaurora.org>
+Message-ID: <1484879660-1960-2-git-send-email-agustinv@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for IRQ combiners in the Top-level Control and Status
-Registers (TCSR) hardware block in Qualcomm Technologies chips.
+ACPI extended IRQ resources may contain a Resource Source field to specify
+an alternate interrupt controller, attempting to map them as GSIs is
+incorrect, so just disable the platform resource.
 
-The first patch prevents the ACPI core from attempting to map IRQ resources
-with a valid ResourceSource as GSIs.
+Since this field is currently ignored, we make this change conditional
+on CONFIG_ACPI_GENERIC_GSI to keep the current behavior on x86 platforms,
+in case some existing ACPI tables are using this incorrectly.
 
-The second patch adds support for ResourceSource/IRQ domain mapping and
-fixes IRQ probe deferral by allowing platform_device IRQ resources to be
-re-initialized from the corresponding ACPI IRQ resource.
+Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
+---
+ drivers/acpi/resource.c | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
 
-Both changes described above are conditional on the ACPI_GENERIC_GSI config.
-
-The third patch takes advantage of the new capabilities to implement
-the driver for the IRQ combiners.
-
-Tested on top of v4.10-rc4.
-
-Changes V10 -> V11:
-* Add probe table and use it to implement driver presence detection.
-* Fix kernel doc formatting in drivers/acpi/irq.c and some minor style issues.
-* Minor bug fixes in the driver.
-
-Changes V9 -> V10:
-* Add checks for the producer_consumer field to not use produced IRQ
-  resources as consumed.
-* Minor bug fixes in the driver.
-
-Changes V8 -> V9:
-* Do not attempt the mapping for non-GSI IRQs during bus scan.
-* Make some public APIs private to drivers/acpi/irq.c since they are no
-  longer used on other modules.
-
-Agustin Vega-Frias (3):
-  ACPI: Generic GSI: Do not attempt to map non-GSI IRQs during bus scan
-  ACPI: Add support for ResourceSource/IRQ domain mapping
-  irqchip: qcom: Add IRQ combiner driver
-
- drivers/acpi/Makefile               |   2 +-
- drivers/acpi/{gsi.c => irq.c}       | 221 +++++++++++++++++++++++++
- drivers/acpi/resource.c             |  18 +-
- drivers/base/platform.c             |   8 +
- drivers/irqchip/Kconfig             |   9 +
- drivers/irqchip/Makefile            |   1 +
- drivers/irqchip/qcom-irq-combiner.c | 320 ++++++++++++++++++++++++++++++++++++
- include/asm-generic/vmlinux.lds.h   |   1 +
- include/linux/acpi.h                |  15 ++
- 9 files changed, 593 insertions(+), 2 deletions(-)
- rename drivers/acpi/{gsi.c => irq.c} (28%)
- create mode 100644 drivers/irqchip/qcom-irq-combiner.c
-
---
+diff --git a/drivers/acpi/resource.c b/drivers/acpi/resource.c
+index cb57962..69cd430 100644
+--- a/drivers/acpi/resource.c
++++ b/drivers/acpi/resource.c
+@@ -43,6 +43,19 @@ static inline bool acpi_iospace_resource_valid(struct resource *res)
+ acpi_iospace_resource_valid(struct resource *res) { return true; }
+ #endif
+ 
++#ifdef CONFIG_ACPI_GENERIC_GSI
++static inline bool is_gsi(struct acpi_resource_extended_irq *ext_irq)
++{
++	return ext_irq->resource_source.string_length == 0 &&
++	       ext_irq->producer_consumer == ACPI_CONSUMER;
++}
++#else
++static inline bool is_gsi(struct acpi_resource_extended_irq *ext_irq)
++{
++	return true;
++}
++#endif
++
+ static bool acpi_dev_resource_len_valid(u64 start, u64 end, u64 len, bool io)
+ {
+ 	u64 reslen = end - start + 1;
+@@ -470,9 +483,12 @@ bool acpi_dev_resource_interrupt(struct acpi_resource *ares, int index,
+ 			acpi_dev_irqresource_disabled(res, 0);
+ 			return false;
+ 		}
+-		acpi_dev_get_irqresource(res, ext_irq->interrupts[index],
++		if (is_gsi(ext_irq))
++			acpi_dev_get_irqresource(res, ext_irq->interrupts[index],
+ 					 ext_irq->triggering, ext_irq->polarity,
+ 					 ext_irq->sharable, false);
++		else
++			acpi_dev_irqresource_disabled(res, 0);
+ 		break;
+ 	default:
+ 		res->flags = 0;
+-- 
 Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
 Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
