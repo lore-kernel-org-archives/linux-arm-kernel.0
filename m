@@ -1,27 +1,31 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 20 Jan 2017 18:40:43 +0200
-Subject: [PATCH v3 03/13] soc: samsung: pmu: Remove messages for failed
- memory allocation
-In-Reply-To: <1484833733-16082-4-git-send-email-m.szyprowski@samsung.com>
-References: <1484833733-16082-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170119134905eucas1p2ed9d6baf6283528289a36a58ee6c978e@eucas1p2.samsung.com>
- <1484833733-16082-4-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20170120164043.y243tf4lsvwa3wpy@kozik-lap>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 20 Jan 2017 17:44:01 +0100
+Subject: [PATCH] ARM: imx6: remove unit address from LDB node
+Message-ID: <20170120164401.5904-1-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 02:48:43PM +0100, Marek Szyprowski wrote:
-> Memory subsystem already prints message about failed memory
-> allocation, there is no need to do it in the driver.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
-> ---
->  drivers/soc/samsung/exynos-pmu.c | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
-> 
+The LDB has no reg property as it uses the IOMUX-GPR syscon to access
+its registers. Remove the unit address from the DT node to make DT
+compiler happy.
 
-Thanks, applied.
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+ arch/arm/boot/dts/imx6qdl.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Best regards,
-Krzysztof
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index e9ba244cda54..8903794f6ef7 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -808,7 +808,7 @@
+ 				reg = <0x020e0000 0x4000>;
+ 			};
+ 
+-			ldb: ldb at 020e0008 {
++			ldb: ldb {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+ 				compatible = "fsl,imx6q-ldb", "fsl,imx53-ldb";
+-- 
+2.11.0
