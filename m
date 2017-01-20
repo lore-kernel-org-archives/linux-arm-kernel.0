@@ -1,47 +1,40 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 20 Jan 2017 23:38:23 +0100
-Subject: [PATCH v5 0/2] Add support for the ethernet switch on the
- ESPRESSObin
-In-Reply-To: <87a8al64mp.fsf@free-electrons.com>
-References: <20170119214934.27442-1-gregory.clement@free-electrons.com>
- <20170119220607.GA25907@lunn.ch>
- <87a8al64mp.fsf@free-electrons.com>
-Message-ID: <20170120223823.GA25240@lunn.ch>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Fri, 20 Jan 2017 14:53:34 -0800 (PST)
+Subject: [Xen-devel] [RFC] Device memory mappings for Dom0 on ARM64 ACPI
+ systems
+In-Reply-To: <20170120142426.eqs2n23ugrz2f6v5@dhcp-3-221.uk.xensource.com>
+References: <alpine.DEB.2.10.1701171309040.2347@sstabellini-ThinkPad-X260>
+ <20170118110243.ctqpperggim5k7dw@dhcp-3-221.uk.xensource.com>
+ <alpine.DEB.2.10.1701181058110.10192@sstabellini-ThinkPad-X260>
+ <20c89f12-cb0c-1145-99d0-320b2080b503@arm.com>
+ <20170119154129.7dnjzvq23jop7oye@dhcp-3-221.uk.xensource.com>
+ <alpine.DEB.2.10.1701191002330.10192@sstabellini-ThinkPad-X260>
+ <94e89cb4-f40c-585e-b3e8-d9f8f58b53d9@arm.com>
+ <20170120110114.2ajkmmhxhhbc6acl@dhcp-3-221.uk.xensource.com>
+ <a40dda2b-e6f3-3222-9b56-9208d96ce5d0@arm.com>
+ <20170120142426.eqs2n23ugrz2f6v5@dhcp-3-221.uk.xensource.com>
+Message-ID: <alpine.DEB.2.10.1701201445210.10192@sstabellini-ThinkPad-X260>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Actually I didn't find anything related to the temperature measurement
-> in the datasheet I have. For the 6390 there is a dedicated datsheet for
-> the PHY part for the 6352 it is part of the same datasheet.
+On Fri, 20 Jan 2017, Roger Pau Monn? wrote:
+> > > > So you need DOM0 to tell the list of regions.
+> > > 
+> > > Yes, I agree that we need such hypercall ATM, although I think that we might be
+> > > able to get rid of it in the long term if we are able to parse the AML tables
+> > > from Xen.
+> > 
+> > Are you suggesting to bring a full AML parser in Xen? If so, it will be much
+> > bigger than Xen ARM itself. I would need a strong use case to accept a such
+> > thing.
+> 
+> It could be placed in the init section, and get rid of it after boot. Also, I
+> find it hard to believe that an AML parser is bigger than the whole Xen on ARM.
+> The OpenBSD folks have a DSDT parser in ~4000 lines of code [0], and that's
+> probably way more than what Xen actually needs.
 
-Hi Gregory
-
-The temperature sensor changes have landed in net-next. If you have
-time, please rebase to it and do some tests. Here are the likely
-outcomes:
-
-1) Like the 6390, it does not have a valid PHY product ID. Hence the
-Marvell PHY driver is not loaded. You can see the PHY ID in
-
-/sys/bus/mdio_bus/devices/*/phy_id
-
-If it is 0x01410000, there is no product ID. I have a workaround for
-this.
-
-2) It has a valid phy_id, but it is not known to the marvell driver.
-Add an entry to the table at the bottom of drivers/net/phy/marvell.c,
-and a new entry in marvell_drivers. I would copy the 1540.
-
-
-3) The Marvell PHY driver does recognise it, and makes the temperature
-available in /sys/class/hwmon/hwmon*/temp1_input. It always returns
--25000mC. Same problem i have with the 6390. No idea how to fix it yet.
-
-4) The Marvell PHY driver does recognise it, and makes the temperature
-available in /sys/class/hwmon/hwmon*/temp1_input. The value is O.K. It
-all works :-)
-
-Personally, i'm not betting on 4 :-)
-
-
-    Andrew
+Even if it were actually possible, 4 KLOC is a significant increase in
+code size, given that last time I counted Xen on ARM was under 90 KLOC.
+Regardless, some AML methods have side effects. I don't know if the plan
+of accessing some AML in Xen, then remapping tables and accessing them
+again in Dom0 is actually sound. I don't think the spec supports it.
