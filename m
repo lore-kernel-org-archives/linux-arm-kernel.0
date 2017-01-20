@@ -1,61 +1,75 @@
-From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
-Date: Fri, 20 Jan 2017 21:36:18 +0530
-Subject: [PATCH 1/4] ARM: mmu: decouple VECTORS_BASE from Kconfig
-In-Reply-To: <20170119142424.GZ27312@n2100.armlinux.org.uk>
-References: <20170118203525.6246-1-afzal.mohd.ma@gmail.com>
- <20170118203739.6400-1-afzal.mohd.ma@gmail.com>
- <20170119142424.GZ27312@n2100.armlinux.org.uk>
-Message-ID: <20170120160618.GA3865@afzalpc>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Fri, 20 Jan 2017 17:09:04 +0100
+Subject: [RFC PATCH v5 0/7] ARM: Fix dma_alloc_coherent() and friends for
+ NOMMU
+In-Reply-To: <8BBDE689-7AA0-4074-A322-66C3DBBEA351@esh.hu>
+References: <1484738003-29892-1-git-send-email-vladimir.murzin@arm.com>
+ <8BBDE689-7AA0-4074-A322-66C3DBBEA351@esh.hu>
+Message-ID: <CA+M3ks7Eyj3THGq2quAwsG0ChVTpiC_AWsTPh3=DYysPPMWiXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+2017-01-19 16:23 GMT+01:00 Szemz? Andr?s <sza@esh.hu>:
+> Hi,
+>> On 2017. Jan 18., at 12:13, Vladimir Murzin <vladimir.murzin@arm.com> wrote:
+>>
+>> Hi,
+>>
+>> It seem that addition of cache support for M-class CPUs uncovered
+>> latent bug in DMA usage. NOMMU memory model has been treated as being
+>> always consistent; however, for R/M CPU classes memory can be covered
+>> by MPU which in turn might configure RAM as Normal i.e. bufferable and
+>> cacheable. It breaks dma_alloc_coherent() and friends, since data can
+>> stuck in caches now or be buffered.
+>>
+>> This patch set is trying to address the issue by providing region of
+>> memory suitable for consistent DMA operations. It is supposed that
+>> such region is marked by MPU as non-cacheable. Robin suggested to
+>> advertise such memory as reserved shared-dma-pool, rather then using
+>> homebrew command line option, and extend dma-coherent to provide
+>> default DMA area in the similar way as it is done for CMA (PATCH
+>> 4/7). It allows us to offload all bookkeeping on generic coherent DMA
+>> framework, and it seems that it might be reused by other architectures
+>> like c6x and blackfin.
+>>
+>
+> I have tested the v5 on my ATMEL armv7m board. Caches enabled,
+> DMA on MMC, USART and Ethernet.
+> Everything works as expected, so you can add my tested-by.
+>
+> Booting Linux on physical CPU 0x0
+> Linux version 4.9.0 (root at debian) (gcc version 4.8.3 20140320 (prerelease) (Sourcery CodeBench Lite 2014.05-29) ) #1 Wed Jan 18 22:10:39 CET 2017
+> CPU: ARMv7-M [410fc271] revision 1 (ARMv7M), cr=00000000
+> CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
+> OF: fdt:Machine model: SAME70-sampione board
+> Reserved memory: created DMA memory pool at 0x73e00000, size 2 MiB
+> OF: reserved mem: initialized node linux,cma, compatible id shared-dma-pool
+> ...
+> DMA: default coherent area is set
+> ?
+>
+> Thanks for the patches!
+>
+> Regards,
+> Andras
+>
+>
 
-On Thu, Jan 19, 2017 at 02:24:24PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Jan 19, 2017 at 02:07:39AM +0530, afzal mohammed wrote:
+I have tested it on my stm32f4 CortexM4 (no cache, no mmu) with
+display driver (modetest and fbdemo)
+dma-noop part is working fine on my side.
 
-> > +++ b/arch/arm/include/asm/memory.h
+You can add my tested-by,
 
-> > +#define VECTORS_BASE		0xffff0000
-> 
-> This should be UL(0xffff0000)
+Thanks,
+Benjamin
 
-> > -			MLK(UL(CONFIG_VECTORS_BASE), UL(CONFIG_VECTORS_BASE) +
-> > -				(PAGE_SIZE)),
-> > +			MLK(UL(VECTORS_BASE), UL(VECTORS_BASE) + (PAGE_SIZE)),
-> 
-> which means you don't need it here, which will then fix the build error
-> reported by the 0-day builder.
 
-Seems there is some confusion here,
+-- 
+Benjamin Gaignard
 
-VECTORS_BASE definition above in memory.h is enclosed within
-CONFIG_MMU. Robot used a no-MMU defconfig, it didn't get a
-VECTORS_BASE definition at this patch, causing the build error. Our
-dear robot mentioned that my HEAD didn't break build, but
-bisectability is broken at this point.
+Graphic Study Group
 
-With "PATCH 3/4 ARM: nommu: display vectors base", the above is
-changed to
-        #ifdef CONFIG_MMU
-                MLK(UL(VECTORS_BASE), UL(VECTORS_BASE) + (PAGE_SIZE)),
-        #else
-                ...
-        #endif
-thus making the series build again for no-MMU
+Linaro.org ? Open source software for ARM SoCs
 
-One option to keep bisectability would be to squash this with PATCH
-3/4, but i think a better & natural solution would be define
-VECTORS_BASE outside of
-        #ifdef CONFIG_MMU
-        ...
-        #else
-        ...
-        #endif
-and then in PATCH 3/4, move VECTORS_BASE to be inside
-        #ifdef CONFIG_MMU
-        ...
-        #else
-
-Regards
-afzal
+Follow Linaro: Facebook | Twitter | Blog
