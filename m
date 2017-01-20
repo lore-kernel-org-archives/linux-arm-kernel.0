@@ -1,64 +1,49 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Fri, 20 Jan 2017 11:19:08 +0100
-Subject: [PATCH 7/7] ARM: dts: stm32: Enable pwm1 and pwm3 for
- stm32f469-eval
-In-Reply-To: <1484832854-6314-8-git-send-email-fabrice.gasnier@st.com>
-References: <1484832854-6314-1-git-send-email-fabrice.gasnier@st.com>
- <1484832854-6314-8-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <451b28a0-6cf3-d75a-59a2-d4e2f8a7b373@st.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 20 Jan 2017 10:21:03 +0000
+Subject: [PATCH] arm: module: handle negative R_ARM_PREL31 addends correctly
+Message-ID: <1484907663-32322-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabrice
+According to the spec 'ELF for the ARM Architecture' (IHI 0044E),
+addends for R_ARM_PREL31 relocations are 31-bit signed quantities,
+so we need to sign extend the value to 32 bits before it can be used
+as an offset in the calculation of the relocated value.
 
+We have not been bitten by this because these relocations are usually
+emitted against the start of a section, which means the addends never
+assume negative values in practice. But it is a bug nonetheless, so fix
+it.
 
-On 01/19/2017 02:34 PM, Fabrice Gasnier wrote:
-> Define and enable pwm1 and pwm3, timers1 & 3 trigger outputs on
-> stm32f469-eval board.
->
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> ---
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+This is something I spotted while looking into adding support for
+R_ARM_REL32 relocations. Feel free to ignore if it is guaranteed in some
+way that these relocations can never be emitted with negative addends.
 
-Typo issue in commit header (stm32f469 --> stm32f429)
+ arch/arm/kernel/module.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-
->  arch/arm/boot/dts/stm32429i-eval.dts | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/stm32429i-eval.dts b/arch/arm/boot/dts/stm32429i-eval.dts
-> index 2181220..892100f 100644
-> --- a/arch/arm/boot/dts/stm32429i-eval.dts
-> +++ b/arch/arm/boot/dts/stm32429i-eval.dts
-> @@ -171,3 +171,31 @@
->  	pinctrl-names = "default";
->  	status = "okay";
->  };
-> +
-> +&timers1 {
-> +	status = "okay";
-> +
-> +	pwm {
-> +		pinctrl-0 = <&pwm1_pins>;
-> +		pinctrl-names = "default";
-> +		status = "okay";
-> +	};
-> +
-> +	timer at 0 {
-> +		status = "okay";
-> +	};
-> +};
-> +
-> +&timers3 {
-> +	status = "okay";
-> +
-> +	pwm {
-> +		pinctrl-0 = <&pwm3_pins>;
-> +		pinctrl-names = "default";
-> +		status = "okay";
-> +	};
-> +
-> +	timer at 2 {
-> +		status = "okay";
-> +	};
-> +};
->
+diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+index 29629fe02ce5..20d8374711e2 100644
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -155,7 +155,15 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 		       break;
+ 
+ 		case R_ARM_PREL31:
+-			offset = *(u32 *)loc + sym->st_value - loc;
++			offset = (*(s32 *)loc << 1) >> 1; /* sign extend */
++			offset += sym->st_value - loc;
++			if (offset >= 0x40000000 || offset < -0x40000000) {
++				pr_err("%s: section %u reloc %u sym '%s': relocation %u out of range (%#lx -> %#x)\n",
++				       module->name, relindex, i, symname,
++				       ELF32_R_TYPE(rel->r_info), loc,
++				       sym->st_value);
++				return -ENOEXEC;
++			}
+ 			*(u32 *)loc = offset & 0x7fffffff;
+ 			break;
+ 
+-- 
+2.7.4
