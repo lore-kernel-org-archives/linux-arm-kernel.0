@@ -1,37 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 Jan 2017 21:08:12 +0100
-Subject: [PATCH] mmc: s3cmci: include linux/interrupt.h for tasklet_struct
-Message-ID: <20170120200822.3349092-1-arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 20 Jan 2017 12:13:19 -0800
+Subject: [PATCH] ARM: omap2plus_defconfig: Fix probe errors on UARTs 5 and 6
+Message-ID: <20170120201319.2735-1-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I got this new build error on today's linux-next
+We have more than four uarts on some SoCs and that can cause
+noise while booting with errors.
 
-drivers/mmc/host/s3cmci.h:69:24: error: field 'pio_tasklet' has incomplete type
-  struct tasklet_struct pio_tasklet;
-drivers/mmc/host/s3cmci.c: In function 's3cmci_enable_irq':
-drivers/mmc/host/s3cmci.c:390:4: error: implicit declaration of function 'enable_irq';did you mean 'enable_imask'? [-Werror=implicit-function-declaration]
-
-While I haven't found out why this happened now and not earlier, the
-solution is obvious, we should include the header that defines
-the structure.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- drivers/mmc/host/s3cmci.c | 1 +
+ arch/arm/configs/omap2plus_defconfig | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
-index 932a4b1fed33..7a173f8c455b 100644
---- a/drivers/mmc/host/s3cmci.c
-+++ b/drivers/mmc/host/s3cmci.c
-@@ -21,6 +21,7 @@
- #include <linux/debugfs.h>
- #include <linux/seq_file.h>
- #include <linux/gpio.h>
-+#include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/io.h>
- 
+diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
+--- a/arch/arm/configs/omap2plus_defconfig
++++ b/arch/arm/configs/omap2plus_defconfig
+@@ -213,6 +213,7 @@ CONFIG_SERIO=m
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_8250_NR_UARTS=32
++CONFIG_SERIAL_8250_RUNTIME_UARTS=6
+ CONFIG_SERIAL_8250_EXTENDED=y
+ CONFIG_SERIAL_8250_MANY_PORTS=y
+ CONFIG_SERIAL_8250_SHARE_IRQ=y
 -- 
-2.9.0
+2.11.0
