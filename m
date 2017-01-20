@@ -1,39 +1,39 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 20 Jan 2017 08:44:36 -0700
-Subject: [PATCH] ARM: dts: at91: Enable DMA on sama5d2_xplained console
-In-Reply-To: <20170119220539.19011-1-alexandre.belloni@free-electrons.com>
-References: <20170119220539.19011-1-alexandre.belloni@free-electrons.com>
-Message-ID: <116feb3d-01d5-964b-385e-688e29968ab6@atmel.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 20 Jan 2017 07:46:00 -0800
+Subject: [PATCH v3 2/4] clk: gxbb: add the SAR ADC clocks and expose them
+In-Reply-To: <20170119191332.GA7829@codeaurora.org> (Stephen Boyd's message of
+ "Thu, 19 Jan 2017 11:13:32 -0800")
+References: <20170115224221.15510-1-martin.blumenstingl@googlemail.com>
+ <20170119145822.26239-1-martin.blumenstingl@googlemail.com>
+ <20170119145822.26239-3-martin.blumenstingl@googlemail.com>
+ <20170119191332.GA7829@codeaurora.org>
+Message-ID: <m27f5p4tvr.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 19/01/2017 ? 15:05, Alexandre Belloni a ?crit :
-> Enable DMA on uart1 to get a more reliable console.
-> 
-> Cc: stable <stable@vger.kernel.org> #v4.3+
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Stephen Boyd <sboyd@codeaurora.org> writes:
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> On 01/19, Martin Blumenstingl wrote:
+>> The HHI_SAR_CLK_CNTL contains three SAR ADC specific clocks:
+>> - a mux clock to choose between different ADC reference clocks (this is
+>>   2-bit wide, but the datasheet only lists the parents for the first
+>>   bit)
+>> - a divider for the input/reference clock
+>> - a gate which enables the ADC clock
+>> 
+>> Additionally this exposes the ADC core clock (CLKID_SAR_ADC) and
+>> CLKID_SANA (which seems to enable the analog inputs, but unfortunately
+>> there is no documentation for this - we just mimic what the vendor
+>> driver does).
+>> 
+>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+>> Tested-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
+>
+> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+>
+> This should go through arm-soc along with the other patch to dts.
 
-> ---
->  arch/arm/boot/dts/at91-sama5d2_xplained.dts | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-> index 0b9a59d5fdac..30fac04289a5 100644
-> --- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-> +++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-> @@ -148,6 +148,8 @@
->  			uart1: serial at f8020000 {
->  				pinctrl-names = "default";
->  				pinctrl-0 = <&pinctrl_uart1_default>;
-> +				atmel,use-dma-rx;
-> +				atmel,use-dma-tx;
->  				status = "okay";
->  			};
->  
-> 
+Applied to v4.11/dt64 of the amlogic tree.
 
-
--- 
-Nicolas Ferre
+Kevin
