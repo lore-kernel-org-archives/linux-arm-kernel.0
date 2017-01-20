@@ -1,61 +1,109 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Fri, 20 Jan 2017 11:04:19 +0530
-Subject: [PATCH V5 05/12] drivers: platform: Configure dma operations at
- probe time
-In-Reply-To: <20170119164821.GB28483@red-moon>
-References: <1484838356-24962-1-git-send-email-sricharan@codeaurora.org>
- <1484838356-24962-6-git-send-email-sricharan@codeaurora.org>
- <20170119164821.GB28483@red-moon>
-Message-ID: <000201d272de$dc6d1c10$95475430$@codeaurora.org>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Fri, 20 Jan 2017 13:41:11 +0800
+Subject: [PATCH 4/8] crypto: mediatek - rework crypto request completion
+In-Reply-To: <1484890875-57105-1-git-send-email-ryder.lee@mediatek.com>
+References: <1484890875-57105-1-git-send-email-ryder.lee@mediatek.com>
+Message-ID: <1484890875-57105-5-git-send-email-ryder.lee@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+This patch introduces a new callback 'resume' in the struct mtk_aes_rec.
+This callback is run to resume/complete the processing of the crypto
+request when woken up by AES interrupts when DMA completion.
 
->-----Original Message-----
->From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
->Sent: Thursday, January 19, 2017 10:18 PM
->To: Sricharan R <sricharan@codeaurora.org>
->Cc: robin.murphy at arm.com; will.deacon at arm.com; joro at 8bytes.org; iommu at lists.linux-foundation.org; linux-arm-
->kernel at lists.infradead.org; linux-arm-msm at vger.kernel.org; m.szyprowski at samsung.com
->Subject: Re: [PATCH V5 05/12] drivers: platform: Configure dma operations at probe time
->
->On Thu, Jan 19, 2017 at 08:35:49PM +0530, Sricharan R wrote:
->> Configuring DMA ops at probe time will allow deferring device probe when
->> the IOMMU isn't available yet. The dma_configure for the device is
->> now called from the generic device_attach callback just before the
->> bus/driver probe is called. This way, configuring the DMA ops for the
->> device would be called at the same place for all bus_types, hence the
->> deferred probing mechanism should work for all buses as well.
->>
->> pci_bus_add_devices    (platform/amba)(_device_create/driver_register)
->>        |                         |
->> pci_bus_add_device     (device_add/driver_register)
->>        |                         |
->> device_attach           device_initial_probe
->>        |                         |
->> __device_attach_driver    __device_attach_driver
->>        |
->> driver_probe_device
->>        |
->> really_probe
->>        |
->> dma_configure
->>
->> Similarly on the device/driver_unregister path __device_release_driver is
->> called which inturn calls dma_deconfigure.
->>
->> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->> ---
->>  * Removed the dma configuration for the pci devices in case of DT
->>    from pci_dma_configure which was hanging outside separately and
->>    doing it in dma_configure function itself.
->
->Rename the patch subject then, it is misleading.
+This callback will help implementing the GCM mode support in further
+patches.
 
-Ha, infact the patch still does what it says. The above words were
-to mention what was changed from V4 to V5. Sorry i should have
-mentioned that explicitly.
+Signed-off-by: Ryder Lee <ryder.lee@mediatek.com>
+---
+ drivers/crypto/mediatek/mtk-aes.c      | 25 +++++++++++++------------
+ drivers/crypto/mediatek/mtk-platform.h |  3 +++
+ 2 files changed, 16 insertions(+), 12 deletions(-)
 
-Regards,
- Sricharan
+diff --git a/drivers/crypto/mediatek/mtk-aes.c b/drivers/crypto/mediatek/mtk-aes.c
+index 7e5a8e0..9c4e468 100644
+--- a/drivers/crypto/mediatek/mtk-aes.c
++++ b/drivers/crypto/mediatek/mtk-aes.c
+@@ -406,6 +406,15 @@ static int mtk_aes_handle_queue(struct mtk_cryp *cryp, u8 id,
+ 	return ctx->start(cryp, aes);
+ }
+ 
++static int mtk_aes_complete(struct mtk_cryp *cryp, struct mtk_aes_rec *aes)
++{
++	aes->flags &= ~AES_FLAGS_BUSY;
++	aes->areq->complete(aes->areq, 0);
++
++	/* Handle new request */
++	return mtk_aes_handle_queue(cryp, aes->id, NULL);
++}
++
+ static int mtk_aes_start(struct mtk_cryp *cryp, struct mtk_aes_rec *aes)
+ {
+ 	struct ablkcipher_request *req = ablkcipher_request_cast(aes->areq);
+@@ -416,6 +425,8 @@ static int mtk_aes_start(struct mtk_cryp *cryp, struct mtk_aes_rec *aes)
+ 	rctx->mode &= AES_FLAGS_MODE_MSK;
+ 	aes->flags = (aes->flags & ~AES_FLAGS_MODE_MSK) | rctx->mode;
+ 
++	aes->resume = mtk_aes_complete;
++
+ 	err = mtk_aes_map(cryp, aes, req->src, req->dst, req->nbytes);
+ 	if (err)
+ 		return err;
+@@ -458,16 +469,6 @@ static void mtk_aes_unmap(struct mtk_cryp *cryp, struct mtk_aes_rec *aes)
+ 				    aes->buf, aes->total);
+ }
+ 
+-static inline void mtk_aes_complete(struct mtk_cryp *cryp,
+-				    struct mtk_aes_rec *aes)
+-{
+-	aes->flags &= ~AES_FLAGS_BUSY;
+-	aes->areq->complete(aes->areq, 0);
+-
+-	/* Handle new request */
+-	mtk_aes_handle_queue(cryp, aes->id, NULL);
+-}
+-
+ /* Check and set the AES key to transform state buffer */
+ static int mtk_aes_setkey(struct crypto_ablkcipher *tfm,
+ 			  const u8 *key, u32 keylen)
+@@ -591,7 +592,7 @@ static void mtk_aes_enc_task(unsigned long data)
+ 	struct mtk_aes_rec *aes = cryp->aes[0];
+ 
+ 	mtk_aes_unmap(cryp, aes);
+-	mtk_aes_complete(cryp, aes);
++	aes->resume(cryp, aes);
+ }
+ 
+ static void mtk_aes_dec_task(unsigned long data)
+@@ -600,7 +601,7 @@ static void mtk_aes_dec_task(unsigned long data)
+ 	struct mtk_aes_rec *aes = cryp->aes[1];
+ 
+ 	mtk_aes_unmap(cryp, aes);
+-	mtk_aes_complete(cryp, aes);
++	aes->resume(cryp, aes);
+ }
+ 
+ static irqreturn_t mtk_aes_enc_irq(int irq, void *dev_id)
+diff --git a/drivers/crypto/mediatek/mtk-platform.h b/drivers/crypto/mediatek/mtk-platform.h
+index 9f5210c..36d166b 100644
+--- a/drivers/crypto/mediatek/mtk-platform.h
++++ b/drivers/crypto/mediatek/mtk-platform.h
+@@ -131,6 +131,7 @@ struct mtk_aes_dma {
+  * @dst:	the structure that holds destination sg list info
+  * @aligned_sg:	the scatter list is use to alignment
+  * @real_dst:	pointer to the destination sg list
++ * @resume:	pointer to resume function
+  * @total:	request buffer length
+  * @buf:	pointer to page buffer
+  * @id:		record identification
+@@ -150,6 +151,8 @@ struct mtk_aes_rec {
+ 	struct scatterlist aligned_sg;
+ 	struct scatterlist *real_dst;
+ 
++	mtk_aes_fn resume;
++
+ 	size_t total;
+ 	void *buf;
+ 
+-- 
+1.9.1
