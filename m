@@ -1,9 +1,9 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Fri, 20 Jan 2017 23:21:18 +0100
-Subject: [PATCH 18/18] ARM64: dts: meson-gx-p23x-q20x: Reorder nodes
+Date: Fri, 20 Jan 2017 23:21:15 +0100
+Subject: [PATCH 15/18] ARM64: dts: meson-gxl: Reorder nodes
 In-Reply-To: <20170120222118.21476-1-afaerber@suse.de>
 References: <20170120222118.21476-1-afaerber@suse.de>
-Message-ID: <20170120222118.21476-19-afaerber@suse.de>
+Message-ID: <20170120222118.21476-16-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,58 +11,66 @@ Sort nodes referenced by label alphabetically.
 
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- .../arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi | 24 +++++++++++-----------
- 1 file changed, 12 insertions(+), 12 deletions(-)
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi | 40 +++++++++++++++---------------
+ 1 file changed, 20 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-index 419c46cc64e4..cfc26a2a3a90 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi
-@@ -100,11 +100,8 @@
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+index bdf2305a2e25..afa74455e1de 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+@@ -120,6 +120,26 @@
  	};
  };
  
--/* This UART is brought out to the DB9 connector */
--&uart_AO {
-+&ethmac {
- 	status = "okay";
--	pinctrl-0 = <&uart_ao_a_pins>;
--	pinctrl-names = "default";
- };
- 
- &ir {
-@@ -113,6 +110,14 @@
- 	pinctrl-names = "default";
- };
- 
-+&pwm_ef {
-+	status = "okay";
-+	pinctrl-0 = <&pwm_e_pins>;
-+	pinctrl-names = "default";
-+	clocks = <&clkc CLKID_FCLK_DIV4>;
-+	clock-names = "clkin0";
++&hiubus {
++	clkc: clock-controller at 0 {
++		compatible = "amlogic,gxl-clkc", "amlogic,gxbb-clkc";
++		#clock-cells = <1>;
++		reg = <0x0 0x0 0x0 0x3db>;
++	};
 +};
 +
- /* Wireless SDIO Module */
- &sd_emmc_a {
- 	status = "okay";
-@@ -177,14 +182,9 @@
- 	vqmmc-supply = <&vddio_boot>;
++&i2c_A {
++	clocks = <&clkc CLKID_I2C>;
++};
++
++&i2c_B {
++	clocks = <&clkc CLKID_I2C>;
++};
++
++&i2c_C {
++	clocks = <&clkc CLKID_I2C>;
++};
++
+ &periphs {
+ 	pinctrl_periphs: pinctrl at 4b0 {
+ 		compatible = "amlogic,meson-gxl-periphs-pinctrl";
+@@ -320,26 +340,6 @@
+ 	};
  };
  
--&pwm_ef {
-+/* This UART is brought out to the DB9 connector */
-+&uart_AO {
- 	status = "okay";
--	pinctrl-0 = <&pwm_e_pins>;
-+	pinctrl-0 = <&uart_ao_a_pins>;
- 	pinctrl-names = "default";
--	clocks = <&clkc CLKID_FCLK_DIV4>;
--	clock-names = "clkin0";
+-&hiubus {
+-	clkc: clock-controller at 0 {
+-		compatible = "amlogic,gxl-clkc", "amlogic,gxbb-clkc";
+-		#clock-cells = <1>;
+-		reg = <0x0 0x0 0x0 0x3db>;
+-	};
 -};
 -
--&ethmac {
--	status = "okay";
- };
+-&i2c_A {
+-	clocks = <&clkc CLKID_I2C>;
+-};
+-
+-&i2c_B {
+-	clocks = <&clkc CLKID_I2C>;
+-};
+-
+-&i2c_C {
+-	clocks = <&clkc CLKID_I2C>;
+-};
+-
+ &sd_emmc_a {
+ 	clocks = <&clkc CLKID_SD_EMMC_A>,
+ 		 <&xtal>,
 -- 
 2.10.2
