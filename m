@@ -1,29 +1,47 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Fri, 20 Jan 2017 23:34:29 +0100
-Subject: [PATCH] ARM64: dts: meson-gxm: Rename q200 and q201 DT files for
- consistency
-In-Reply-To: <1484814117-7593-1-git-send-email-narmstrong@baylibre.com>
-References: <1484814117-7593-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <df8b4529-2e8e-df5c-8757-a2b2763a8e37@suse.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 20 Jan 2017 23:38:23 +0100
+Subject: [PATCH v5 0/2] Add support for the ethernet switch on the
+ ESPRESSObin
+In-Reply-To: <87a8al64mp.fsf@free-electrons.com>
+References: <20170119214934.27442-1-gregory.clement@free-electrons.com>
+ <20170119220607.GA25907@lunn.ch>
+ <87a8al64mp.fsf@free-electrons.com>
+Message-ID: <20170120223823.GA25240@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 19.01.2017 um 09:21 schrieb Neil Armstrong:
-> In order to keep consistency naming with the Nexbox A1 DTS file, remove the
+> Actually I didn't find anything related to the temperature measurement
+> in the datasheet I have. For the 6390 there is a dedicated datsheet for
+> the PHY part for the 6352 it is part of the same datasheet.
 
-If dt64 branch does get rebased: "consistency with" or "consistent naming"
+Hi Gregory
 
-> S912 SoC name in the GXM DT files.
-> 
-> Suggested-by: Andreas F?rber <afaerber@suse.de>
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+The temperature sensor changes have landed in net-next. If you have
+time, please rebase to it and do some tests. Here are the likely
+outcomes:
 
-Reviewed-by: Andreas F?rber <afaerber@suse.de>
+1) Like the 6390, it does not have a valid PHY product ID. Hence the
+Marvell PHY driver is not loaded. You can see the PHY ID in
 
-Regards,
-Andreas
+/sys/bus/mdio_bus/devices/*/phy_id
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+If it is 0x01410000, there is no product ID. I have a workaround for
+this.
+
+2) It has a valid phy_id, but it is not known to the marvell driver.
+Add an entry to the table at the bottom of drivers/net/phy/marvell.c,
+and a new entry in marvell_drivers. I would copy the 1540.
+
+
+3) The Marvell PHY driver does recognise it, and makes the temperature
+available in /sys/class/hwmon/hwmon*/temp1_input. It always returns
+-25000mC. Same problem i have with the 6390. No idea how to fix it yet.
+
+4) The Marvell PHY driver does recognise it, and makes the temperature
+available in /sys/class/hwmon/hwmon*/temp1_input. The value is O.K. It
+all works :-)
+
+Personally, i'm not betting on 4 :-)
+
+
+    Andrew
