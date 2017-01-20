@@ -1,78 +1,84 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Thu, 19 Jan 2017 20:14:02 -0800
-Subject: [PATCH V9] thermal: bcm2835: add thermal driver for bcm2835 soc
-In-Reply-To: <1483808145-6206-1-git-send-email-kernel@martin.sperl.org>
-References: <1483808145-6206-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <20170120041400.GA24617@localhost.localdomain>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Fri, 20 Jan 2017 09:49:55 +0530
+Subject: [PATCH v2 1/3] arm64: dts: exynos: Fix drive strength of sd0_xxx pin
+ definitions
+In-Reply-To: <1484885997-21004-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1484885997-21004-1-git-send-email-pankaj.dubey@samsung.com>
+ <CGME20170120041718epcas5p18cfaaaf19279744af1522fee5b739c3f@epcas5p1.samsung.com>
+Message-ID: <1484885997-21004-2-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Martin,
+As per Exynos7 datasheet FSYS1 pinctrl block does not support drive
+strength value of 0x3. This patch fixes this and update the correct
+drive strength for sd0_xxx pin definitions.
 
-On Sat, Jan 07, 2017 at 04:55:45PM +0000, kernel at martin.sperl.org wrote:
-> From: Martin Sperl <kernel@martin.sperl.org>
-> 
-> Add basic thermal driver for bcm2835 SOC.
-> 
-> This driver currently relies on the firmware setting up the
-> tsense HW block and does not set it up itself.
-> 
-> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
-> Acked-by: Eric Anholt <eric@anholt.net>
-> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
-> 
+Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
+---
+ arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-<cut>
-
-> +
-> +static const struct of_device_id bcm2835_thermal_of_match_table[] = {
-> +	{
-> +		.compatible = "brcm,bcm2835-thermal",
-> +		.data = &(struct bcm2835_thermal_info) {
-> +			.offset = 407000,
-> +			.slope = -538,
-> +			.trip_temp = 80000
-> +		}
-> +	},
-> +	{
-> +		.compatible = "brcm,bcm2836-thermal",
-> +		.data = &(struct bcm2835_thermal_info) {
-> +			.offset = 407000,
-> +			.slope = -538,
-> +			.trip_temp = 80000
-> +		}
-> +	},
-> +	{
-> +		.compatible = "brcm,bcm2837-thermal",
-> +		.data = &(struct bcm2835_thermal_info) {
-> +			/* the bcm2837 needs adjustment of +5C */
-> +			.offset = 407000 + 5000,
-> +			.slope = -538,
-> +			.trip_temp = 80000
-> +		}
-> +	},
-> +	{},
-
-Just for the same of clarification, is there anything preventing this
-driver of using of-thermal API? the above data (slope, offset, and
-trip_temps) would be in DT the place where they are supposed to be,
-instead of code.
-
-> +};
-> +MODULE_DEVICE_TABLE(of, bcm2835_thermal_of_match_table);
-> +
-> +static struct platform_driver bcm2835_thermal_driver = {
-> +	.probe = bcm2835_thermal_probe,
-> +	.remove = bcm2835_thermal_remove,
-> +	.driver = {
-> +		.name = "bcm2835_thermal",
-> +		.of_match_table = bcm2835_thermal_of_match_table,
-> +	},
-> +};
-> +module_platform_driver(bcm2835_thermal_driver);
-> +
-> +MODULE_AUTHOR("Martin Sperl");
-> +MODULE_DESCRIPTION("Thermal driver for bcm2835 chip");
-> +MODULE_LICENSE("GPL");
-> --
-> 2.1.4
+diff --git a/arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi b/arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi
+index 8232198..7ebb939 100644
+--- a/arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi
++++ b/arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi
+@@ -497,49 +497,49 @@
+ 		samsung,pins = "gpr0-0";
+ 		samsung,pin-function = <2>;
+ 		samsung,pin-pud = <0>;
+-		samsung,pin-drv = <3>;
++		samsung,pin-drv = <4>;
+ 	};
+ 
+ 	sd0_cmd: sd0-cmd {
+ 		samsung,pins = "gpr0-1";
+ 		samsung,pin-function = <2>;
+ 		samsung,pin-pud = <3>;
+-		samsung,pin-drv = <3>;
++		samsung,pin-drv = <4>;
+ 	};
+ 
+ 	sd0_ds: sd0-ds {
+ 		samsung,pins = "gpr0-2";
+ 		samsung,pin-function = <2>;
+ 		samsung,pin-pud = <1>;
+-		samsung,pin-drv = <3>;
++		samsung,pin-drv = <4>;
+ 	};
+ 
+ 	sd0_qrdy: sd0-qrdy {
+ 		samsung,pins = "gpr0-3";
+ 		samsung,pin-function = <2>;
+ 		samsung,pin-pud = <1>;
+-		samsung,pin-drv = <3>;
++		samsung,pin-drv = <4>;
+ 	};
+ 
+ 	sd0_bus1: sd0-bus-width1 {
+ 		samsung,pins = "gpr1-0";
+ 		samsung,pin-function = <2>;
+ 		samsung,pin-pud = <3>;
+-		samsung,pin-drv = <3>;
++		samsung,pin-drv = <4>;
+ 	};
+ 
+ 	sd0_bus4: sd0-bus-width4 {
+ 		samsung,pins = "gpr1-1", "gpr1-2", "gpr1-3";
+ 		samsung,pin-function = <2>;
+ 		samsung,pin-pud = <3>;
+-		samsung,pin-drv = <3>;
++		samsung,pin-drv = <4>;
+ 	};
+ 
+ 	sd0_bus8: sd0-bus-width8 {
+ 		samsung,pins = "gpr1-4", "gpr1-5", "gpr1-6", "gpr1-7";
+ 		samsung,pin-function = <2>;
+ 		samsung,pin-pud = <3>;
+-		samsung,pin-drv = <3>;
++		samsung,pin-drv = <4>;
+ 	};
+ 
+ 	sd1_clk: sd1-clk {
+-- 
+2.7.4
