@@ -1,24 +1,28 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 20 Jan 2017 18:43:21 +0100
-Subject: [PATCH v5 0/2] Add support for the ethernet switch on the
- ESPRESSObin
-In-Reply-To: <87a8al64mp.fsf@free-electrons.com>
-References: <20170119214934.27442-1-gregory.clement@free-electrons.com>
- <20170119220607.GA25907@lunn.ch>
- <87a8al64mp.fsf@free-electrons.com>
-Message-ID: <20170120174321.GF25907@lunn.ch>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Fri, 20 Jan 2017 18:45:57 +0100
+Subject: [PATCH] ARM64: dts: meson-gxl: rename Nexbox A95x for consistency
+In-Reply-To: <20170120173843.6522-1-khilman@baylibre.com>
+References: <20170120173843.6522-1-khilman@baylibre.com>
+Message-ID: <cc16a3ea-7491-a631-4587-abb25a2a235d@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> What I wanted to do was to test 6390 and 6352 temperature related
-> functions and to see if one of them worked. That's how I realized it was
-> not possible to do it with dsa2.
+Am 20.01.2017 um 18:38 schrieb Kevin Hilman:
+> Since the GXL family has S905X and S905D SoCs, we're keeping the SoC
+> name in the DTS filename for clarity.  Rename this file accordingly to
+> be consistent with the rest of the GXL DTS files.
+> 
+> Cc: Neil Armstrong <narmstrong@baylibre.com>
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
 
-Hi Gregory
+Reviewed-by: Andreas F?rber <afaerber@suse.de>
 
-Probably the best thing to do is wait until the temperature code moves
-into the PHY driver. It then becomes easier to test. It probably is
-the same as the 6352, or like the 6390 which i've so far failed to get
-working, despite the registers being the same as the 6352.
+I'll reorder in my follow-up then.
 
-     Andrew
+Thanks,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
