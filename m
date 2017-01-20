@@ -1,102 +1,97 @@
-From: tbaicar@codeaurora.org (Baicar, Tyler)
-Date: Fri, 20 Jan 2017 13:58:58 -0700
-Subject: [PATCH V7 05/10] acpi: apei: handle SEA notification type for
- ARMv8
-In-Reply-To: <5880FDFC.7060304@arm.com>
-References: <1484244924-24786-1-git-send-email-tbaicar@codeaurora.org>
- <1484244924-24786-6-git-send-email-tbaicar@codeaurora.org>
- <587F80A7.10008@arm.com>
- <3de443d7-2c68-f179-daae-bc8f851470b7@codeaurora.org>
- <5880FDFC.7060304@arm.com>
-Message-ID: <8b9d254a-5450-d841-baf7-5819a88043e4@codeaurora.org>
+From: bart.vanassche@sandisk.com (Bart Van Assche)
+Date: Fri, 20 Jan 2017 13:04:03 -0800
+Subject: [PATCH v3 03/37] treewide: Consolidate set_dma_ops() implementations
+In-Reply-To: <20170120210437.26389-1-bart.vanassche@sandisk.com>
+References: <20170120210437.26389-1-bart.vanassche@sandisk.com>
+Message-ID: <20170120210437.26389-4-bart.vanassche@sandisk.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/19/2017 10:57 AM, James Morse wrote:
-> Hi Tyler,
->
-> On 18/01/17 23:51, Baicar, Tyler wrote:
->> On 1/18/2017 7:50 AM, James Morse wrote:
->>> On 12/01/17 18:15, Tyler Baicar wrote:
->>>> ARM APEI extension proposal added SEA (Synchrounous External
->>>> Abort) notification type for ARMv8.
->>>> Add a new GHES error source handling function for SEA. If an error
->>>> source's notification type is SEA, then this function can be registered
->>>> into the SEA exception handler. That way GHES will parse and report
->>>> SEA exceptions when they occur.
->>>> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
->>>> index 2acbc60..87efe26 100644
->>>> --- a/drivers/acpi/apei/ghes.c
->>>> +++ b/drivers/acpi/apei/ghes.c
->>>> @@ -767,6 +772,62 @@ static struct notifier_block ghes_notifier_sci = {
->>>>        .notifier_call = ghes_notify_sci,
->>>>    };
->>>>    +#ifdef CONFIG_HAVE_ACPI_APEI_SEA
->>>> +static LIST_HEAD(ghes_sea);
->>>> +
->>>> +static int ghes_notify_sea(struct notifier_block *this,
->>>> +                  unsigned long event, void *data)
->>>> +{
->>>> +    struct ghes *ghes;
->>>> +    int ret = NOTIFY_DONE;
->>>> +
->>>> +    nmi_enter();
->>> Can we move this into the arch code? Its because we got here from a
->>> synchronous-exception that makes this nmi-like, I think it only makes sense for
->>> it be called from under /arch/.
->> So move the nmi_enter/exit calls into do_sea of the previous patch? I can do
->> that in the next patchset.
->>> Where did the rcu_read_lock() go? I can see its missing from ghes_notify_nmi()
->>> too, but I don't know enough about RCU to know if that's safe!
->>>
->>> The second paragraph in the comment above rcu_read_lock() describes it as
->>> preventing call_rcu() during a read-side critical section that was running
->>> concurrently. Doesn't this mean we can race with ghes_sea_remove() on another
->>> CPU because we wait for the wrong grace period?
->>>
->>> The same comment talks about how these read-side critical sections can nest, so
->>> I think its quite safe to make these 'lock' calls here.
->> Sorry, I thought we wanted nmi_enter/exit instead of the rcu_read_lock/unlock. I
->> guess the rcu locks
->> will not cause the deadlock scenario you described in the previous patchset if
->> we have the
->> nmi_enter/exit wrapped around the rcu critical section.
-> Ah, not instead of, (well, not initially!).
-> The nmi_enter()/nmi_exit() thing was to fix the APEI interrupting APEI problem.
-> This is only a problem for notification types which can interrupt
-> interrupts-masked code, of which SEA is one. (and x86's NMI is the other).
->
-> I think I've found the answer to why the rcu_read_lock() isn't needed.
-> synchronize_sched() has:
->> * This means that all preempt_disable code sequences, including NMI and
->> * non-threaded hardware-interrupt handlers, in progress on entry will
->> * have completed before this primitive returns.
-> synchronize_rcu() has the same innards, so I'm convinced this its safe not to
-> have those calls in here. Could we have a comment along the lines of:
->> synchronize_rcu() will wait for nmi_exit(), so no need to rcu_read_lock().
-Okay, I'll add the comment in the next patchset.
-> (The more I learn about RCU the scarier it becomes!)
->
->
-> There are two other things that need changing to make the in_nmi() code path
-> work on arm64.
-> Always reserve the virtual-address-space forcing GHES_IOREMAP_PAGES to be 2
-> regardless of CONFIG_HAVE_ACPI_APEI_NMI. This is almost revert of
-> 594c7255dce7a13cac50cf2470cc56e2c3b0494e (but that did a few other things too).
-Looks simple enough, should I force it to 2 in all cases, or add a check 
-for CONFIG_HAVE_ACPI_APEI_SEA
-similar to the check for CONFIG_HAVE_ACPI_APEI_NMI?
-> We also need to fix ghes_ioremap_pfn_nmi() to use arch_apei_get_mem_attribute()
-> and not assume PAGE_KERNEL.
-So just change the call to ioremap_page_range to:
+Now that all set_dma_ops() implementations are identical (ignoring
+BUG_ON() statements), remove the architecture specific definitions
+and add a definition in <linux/dma-mapping.h>.
 
-ioremap_page_range(vaddr, vaddr + PAGE_SIZE, pfn << PAGE_SHIFT, 
-arch_apei_get_mem_attribute());
+Signed-off-by: Bart Van Assche <bart.vanassche@sandisk.com>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Chris Metcalf <cmetcalf@mellanox.com>
+Cc: David Woodhouse <dwmw2@infradead.org>
+Cc: linux-arch at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linuxppc-dev at lists.ozlabs.org
+Cc: Paul Mackerras <paulus@samba.org>
+Cc: Russell King <linux@armlinux.org.uk>
+---
+ arch/arm/include/asm/dma-mapping.h     | 6 ------
+ arch/powerpc/include/asm/dma-mapping.h | 5 -----
+ arch/tile/include/asm/dma-mapping.h    | 5 -----
+ include/linux/dma-mapping.h            | 5 +++++
+ 4 files changed, 5 insertions(+), 16 deletions(-)
 
-Thanks,
-Tyler
-
+diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+index 312f4d0564d6..c7432d647e53 100644
+--- a/arch/arm/include/asm/dma-mapping.h
++++ b/arch/arm/include/asm/dma-mapping.h
+@@ -31,12 +31,6 @@ static inline const struct dma_map_ops *get_dma_ops(struct device *dev)
+ 		return __generic_dma_ops(dev);
+ }
+ 
+-static inline void set_dma_ops(struct device *dev, const struct dma_map_ops *ops)
+-{
+-	BUG_ON(!dev);
+-	dev->dma_ops = ops;
+-}
+-
+ #define HAVE_ARCH_DMA_SUPPORTED 1
+ extern int dma_supported(struct device *dev, u64 mask);
+ 
+diff --git a/arch/powerpc/include/asm/dma-mapping.h b/arch/powerpc/include/asm/dma-mapping.h
+index 59fbd4abcbf8..8275603ba4d5 100644
+--- a/arch/powerpc/include/asm/dma-mapping.h
++++ b/arch/powerpc/include/asm/dma-mapping.h
+@@ -91,11 +91,6 @@ static inline const struct dma_map_ops *get_dma_ops(struct device *dev)
+ 	return dev->dma_ops;
+ }
+ 
+-static inline void set_dma_ops(struct device *dev, const struct dma_map_ops *ops)
+-{
+-	dev->dma_ops = ops;
+-}
+-
+ /*
+  * get_dma_offset()
+  *
+diff --git a/arch/tile/include/asm/dma-mapping.h b/arch/tile/include/asm/dma-mapping.h
+index c0620697eaad..2562995a6ac9 100644
+--- a/arch/tile/include/asm/dma-mapping.h
++++ b/arch/tile/include/asm/dma-mapping.h
+@@ -59,11 +59,6 @@ static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t daddr)
+ 
+ static inline void dma_mark_clean(void *addr, size_t size) {}
+ 
+-static inline void set_dma_ops(struct device *dev, const struct dma_map_ops *ops)
+-{
+-	dev->dma_ops = ops;
+-}
+-
+ static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
+ {
+ 	if (!dev->dma_mask)
+diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+index f1da68b82c63..e97f23e8b2d9 100644
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -164,6 +164,11 @@ int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
+ 
+ #ifdef CONFIG_HAS_DMA
+ #include <asm/dma-mapping.h>
++static inline void set_dma_ops(struct device *dev,
++			       const struct dma_map_ops *dma_ops)
++{
++	dev->dma_ops = dma_ops;
++}
+ #else
+ /*
+  * Define the dma api to allow compilation but not linking of
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+2.11.0
