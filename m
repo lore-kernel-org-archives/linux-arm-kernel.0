@@ -1,21 +1,16 @@
 From: xuwei5@hisilicon.com (Wei Xu)
-Date: Fri, 20 Jan 2017 16:56:33 +0000
-Subject: [PATCH RESEND] arm64: defconfig: Enable NUMA and NUMA_BALANCING
-In-Reply-To: <1484719039-34801-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1484719039-34801-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <58824141.3010403@hisilicon.com>
+Date: Fri, 20 Jan 2017 16:57:18 +0000
+Subject: [RFC PATCH] arm64: defconfig: enable SMMUv3 config
+In-Reply-To: <1483962646-33767-1-git-send-email-wangzhou1@hisilicon.com>
+References: <1483962646-33767-1-git-send-email-wangzhou1@hisilicon.com>
+Message-ID: <5882416E.4060105@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kefeng,
+Hi Zhou Wang,
 
-On 2017/1/18 5:57, Kefeng Wang wrote:
-> Since much more arm64 SoCs with numa nodes, it's better to enable
-> NUMA and NUMA_BALANCING to improve the performance on test.
-> 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
-> ---
+On 2017/1/9 11:50, Zhou Wang wrote:
+> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
 
 Applied to the hisilicon soc tree.
 Thanks!
@@ -23,27 +18,20 @@ Thanks!
 Best Regards,
 Wei
 
->  arch/arm64/configs/defconfig | 2 ++
->  1 file changed, 2 insertions(+)
+> ---
+>  arch/arm64/configs/defconfig | 1 +
+>  1 file changed, 1 insertion(+)
 > 
 > diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index 33b744d..0ebb228 100644
+> index 869dded..3520c50 100644
 > --- a/arch/arm64/configs/defconfig
 > +++ b/arch/arm64/configs/defconfig
-> @@ -11,6 +11,7 @@ CONFIG_TASK_XACCT=y
->  CONFIG_TASK_IO_ACCOUNTING=y
->  CONFIG_IKCONFIG=y
->  CONFIG_IKCONFIG_PROC=y
-> +CONFIG_NUMA_BALANCING=y
->  CONFIG_MEMCG=y
->  CONFIG_MEMCG_SWAP=y
->  CONFIG_BLK_CGROUP=y
-> @@ -72,6 +73,7 @@ CONFIG_PCIE_QCOM=y
->  CONFIG_PCIE_ARMADA_8K=y
->  CONFIG_ARM64_VA_BITS_48=y
->  CONFIG_SCHED_MC=y
-> +CONFIG_NUMA=y
->  CONFIG_PREEMPT=y
->  CONFIG_KSM=y
->  CONFIG_TRANSPARENT_HUGEPAGE=y
+> @@ -440,6 +440,7 @@ CONFIG_PLATFORM_MHU=y
+>  CONFIG_BCM2835_MBOX=y
+>  CONFIG_HI6220_MBOX=y
+>  CONFIG_ARM_SMMU=y
+> +CONFIG_ARM_SMMU_V3=y
+>  CONFIG_RASPBERRYPI_POWER=y
+>  CONFIG_QCOM_SMEM=y
+>  CONFIG_QCOM_SMD=y
 > 
