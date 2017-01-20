@@ -1,35 +1,64 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 20 Jan 2017 07:14:06 -0300
-Subject: [PATCH v2 2/2] [media] exynos-gsc: Only reset the GSC HW on
- probe() if !CONFIG_PM
-In-Reply-To: <1484865380-12651-2-git-send-email-javier@osg.samsung.com>
-References: <1484865380-12651-1-git-send-email-javier@osg.samsung.com>
- <1484865380-12651-2-git-send-email-javier@osg.samsung.com>
-Message-ID: <f2ccdd1d-0b70-ecd8-592a-6915164c661b@osg.samsung.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Fri, 20 Jan 2017 11:19:08 +0100
+Subject: [PATCH 7/7] ARM: dts: stm32: Enable pwm1 and pwm3 for
+ stm32f469-eval
+In-Reply-To: <1484832854-6314-8-git-send-email-fabrice.gasnier@st.com>
+References: <1484832854-6314-1-git-send-email-fabrice.gasnier@st.com>
+ <1484832854-6314-8-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <451b28a0-6cf3-d75a-59a2-d4e2f8a7b373@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Fabrice
 
-On 01/19/2017 07:36 PM, Javier Martinez Canillas wrote:
-> Commit 15f90ab57acc ("[media] exynos-gsc: Make driver functional when
-> CONFIG_PM is unset") removed the implicit dependency that the driver
-> had with CONFIG_PM, since it relied on the config option to be enabled.
-> 
-> In order to work with !CONFIG_PM, the GSC reset logic that happens in
-> the runtime resume callback had to be executed on the probe function.
-> 
-> But there's no need to do this if CONFIG_PM is enabled, since in this
-> case the runtime PM resume callback will be called by VIDIOC_STREAMON
-> ioctl, so the resume handler will call the GSC HW reset function.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
 
-Please ignore this patch as suggested by Marek in other thread.
+On 01/19/2017 02:34 PM, Fabrice Gasnier wrote:
+> Define and enable pwm1 and pwm3, timers1 & 3 trigger outputs on
+> stm32f469-eval board.
+>
+> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> ---
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Typo issue in commit header (stm32f469 --> stm32f429)
+
+
+>  arch/arm/boot/dts/stm32429i-eval.dts | 28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/stm32429i-eval.dts b/arch/arm/boot/dts/stm32429i-eval.dts
+> index 2181220..892100f 100644
+> --- a/arch/arm/boot/dts/stm32429i-eval.dts
+> +++ b/arch/arm/boot/dts/stm32429i-eval.dts
+> @@ -171,3 +171,31 @@
+>  	pinctrl-names = "default";
+>  	status = "okay";
+>  };
+> +
+> +&timers1 {
+> +	status = "okay";
+> +
+> +	pwm {
+> +		pinctrl-0 = <&pwm1_pins>;
+> +		pinctrl-names = "default";
+> +		status = "okay";
+> +	};
+> +
+> +	timer at 0 {
+> +		status = "okay";
+> +	};
+> +};
+> +
+> +&timers3 {
+> +	status = "okay";
+> +
+> +	pwm {
+> +		pinctrl-0 = <&pwm3_pins>;
+> +		pinctrl-names = "default";
+> +		status = "okay";
+> +	};
+> +
+> +	timer at 2 {
+> +		status = "okay";
+> +	};
+> +};
+>
