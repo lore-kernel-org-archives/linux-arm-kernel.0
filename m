@@ -1,91 +1,55 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Fri, 20 Jan 2017 09:53:39 +0800
-Subject: [PATCH v2 1/3] dt: bindings: add documentation for zx2967 family
- watchdog controller
-In-Reply-To: <1484791192-31674-1-git-send-email-baoyou.xie@linaro.org>
-References: <1484791192-31674-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <20170120015337.GA17299@dragon>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Fri, 20 Jan 2017 10:20:25 +0800
+Subject: [PATCH 2/6] usb: mtu3: add reference clock
+In-Reply-To: <7fc9de99-4bef-ddf2-c5fe-985f8d2348d2@gmail.com>
+References: <1484719707-12107-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1484719707-12107-2-git-send-email-chunfeng.yun@mediatek.com>
+ <7fc9de99-4bef-ddf2-c5fe-985f8d2348d2@gmail.com>
+Message-ID: <1484878825.10292.58.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 09:59:50AM +0800, Baoyou Xie wrote:
-> This patch adds dt-binding documentation for zx2967 family
-> watchdog controller.
+On Thu, 2017-01-19 at 13:22 +0100, Matthias Brugger wrote:
 > 
-> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
-
-It seems that the comments I put on v1 remains unresolved.
-
-> ---
->  .../bindings/watchdog/zte,zx2967-wdt.txt           | 32 ++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/watchdog/zte,zx2967-wdt.txt
+> On 18/01/17 07:08, Chunfeng Yun wrote:
+> > usually, the reference clock comes from 26M oscillator directly,
+> > but some SoCs are not, add it for compatibility.
+> >
+> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> > ---
+> >  drivers/usb/mtu3/mtu3.h      |    1 +
+> >  drivers/usb/mtu3/mtu3_plat.c |   21 +++++++++++++++++++--
+> >  2 files changed, 20 insertions(+), 2 deletions(-)
+[...]
+> > @@ -154,6 +162,7 @@ static int ssusb_rscs_init(struct ssusb_mtk *ssusb)
+> >  static void ssusb_rscs_exit(struct ssusb_mtk *ssusb)
+> >  {
+> >  	clk_disable_unprepare(ssusb->sys_clk);
+> > +	clk_disable_unprepare(ssusb->ref_clk);
+> >  	regulator_disable(ssusb->vusb33);
+> >  	ssusb_phy_power_off(ssusb);
+> >  	ssusb_phy_exit(ssusb);
+> > @@ -216,6 +225,12 @@ static int get_ssusb_rscs(struct platform_device *pdev, struct ssusb_mtk *ssusb)
+> >  		return PTR_ERR(ssusb->sys_clk);
+> >  	}
+> >
+> > +	ssusb->ref_clk = devm_clk_get(dev, "ref_ck");
+> > +	if (IS_ERR(ssusb->ref_clk)) {
+> > +		dev_err(dev, "failed to get ref clock\n");
+> > +		return PTR_ERR(ssusb->ref_clk);
+> > +	}
+> > +
 > 
-> diff --git a/Documentation/devicetree/bindings/watchdog/zte,zx2967-wdt.txt b/Documentation/devicetree/bindings/watchdog/zte,zx2967-wdt.txt
-> new file mode 100644
-> index 0000000..6e35ce7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/watchdog/zte,zx2967-wdt.txt
-> @@ -0,0 +1,32 @@
-> +ZTE zx2967 Watchdog timer
-> +
-> +Required properties:
-> +
-> +- compatible : should be one of the following.
-> +       * zte,zx296718-wdt
-> +- reg : Specifies base physical address and size of the registers.
-> +- clocks : Pairs of phandle and specifier referencing the controller's clocks.
-> +- clock-names: "wdtclk" for the watchdog clock.
-> +- resets : Reference to the reset controller controlling the watchdog
-> +           controller.
-> +- reset-names : Must include the following entries:
-> +       * wdtrst
+> That would break older dts bindings, right?
+Yes, So I send a new patch for the related dts. Maybe it's not a
+problem, only one dts file need be updated currently.
 
-I do not think clock-names and reset-names are really necessary, since
-there is only one clock and reset signal.
-
-> +
-> +Optional properties:
-> +
-> +- wdt-reset-sysctrl : should include following fields.
-
-We need a vendor prefix for vendor specific property.
-
-> +	* phandle of aon-sysctrl.
-> +	* configuare value that be wrote to aon-sysctrl.
-
-s/configuare/configure, s/wrote/written
-
-> +	* bit mask, corresponding bits will be affected.
-
-I think we need some comments for bindings users to understand the
-different role between "resets" and "wdt-reset-sysctrl".  Also, why is
-wdt-reset-sysctrl is optional?  Does it still work well without this
-property.
-
-FYI. I have a similar bindings for TVENC below, which you may find
-useful.
-
-http://www.spinics.net/lists/devicetree/msg159668.html
-
-> +
-> +Example:
-> +
-> +wdt_ares: watchdog at 1465000 {
-
-What does the suffix "ares" mean?  I guess "wdt" is good enough as the
-label name.
-
-Shawn
-
-> +	compatible = "zte,zx296718-wdt";
-> +	reg = <0x1465000 0x1000>;
-> +	clocks = <&topcrm WDT_WCLK>;
-> +	clock-names = "wdtclk";
-> +	resets = <&toprst 35>;
-> +	reset-names = "wdtrst";
-> +	wdt-reset-sysctrl = <&aon_sysctrl 1 0x115>;
-> +};
-> -- 
-> 2.7.4
+> ref_ck must be optional for the code.
+I tend to make it be optional for the dts, but not for the code.
+There are some "fixed-clock" which can be treated as dummy ones, and if
+a clock is really optional, we can use one fixed-clock in dts, and keep
+the code simple.
+In fact, the reference clock is essential for usb controller.
 > 
+> Regards,
+> Matthias
