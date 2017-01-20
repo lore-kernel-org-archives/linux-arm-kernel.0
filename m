@@ -1,65 +1,107 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Fri, 20 Jan 2017 14:33:53 +0100
-Subject: [PATCH v2 2/9] ARM64: dts: meson-gxbb-p201: add the ethernet
- PHY's reset GPIO
-In-Reply-To: <8a0b6c29-38f0-8474-34a2-8e3df4a5a239@baylibre.com>
-References: <20161202234739.22929-1-martin.blumenstingl@googlemail.com>
- <20170120132650.9784-1-martin.blumenstingl@googlemail.com>
- <20170120132650.9784-3-martin.blumenstingl@googlemail.com>
- <8a0b6c29-38f0-8474-34a2-8e3df4a5a239@baylibre.com>
-Message-ID: <CAFBinCA1YABPzBUnprh_HprjQ8DqpEeF9OQeXKNtQ8Kp8Ou0bw@mail.gmail.com>
+From: vbabka@suse.cz (Vlastimil Babka)
+Date: Fri, 20 Jan 2017 14:35:06 +0100
+Subject: [PATCH 2/3] mm: cma_alloc: allow to specify GFP mask
+In-Reply-To: <20170119170707.31741-2-l.stach@pengutronix.de>
+References: <20170119170707.31741-1-l.stach@pengutronix.de>
+ <20170119170707.31741-2-l.stach@pengutronix.de>
+Message-ID: <d9d903e3-3e84-1074-f05d-f5fb20c6051a@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2017 at 2:31 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
-> On 01/20/2017 02:26 PM, Martin Blumenstingl wrote:
->> This resets the ethernet PHY during boot to get the PHY into a "clean"
->> state.
->> While here also specify the phy-handle of the ethmac node to make the
->> PHY configuration similar to the one we have on GXL devices. This will
->> allow us to specify OF-properties for the PHY itself.
->>
->> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
->> ---
->>  arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts | 24 ++++++++++++++++++++++++
->>  1 file changed, 24 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts
->> index 39bb037a3e47..5d2cd2ecfdc4 100644
->> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts
->> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts
->> @@ -50,3 +50,27 @@
->>       compatible = "amlogic,p201", "amlogic,meson-gxbb";
->>       model = "Amlogic Meson GXBB P201 Development Board";
->>  };
->> +
->> +&ethmac {
->> +     status = "okay";
->> +     pinctrl-0 = <&eth_rgmii_pins>;
->> +     pinctrl-names = "default";
->> +     phy-handle = <&eth_phy0>;
->> +     phy-mode = "rgmii";
->> +
->> +     snps,reset-gpio = <&gpio GPIOZ_14 0>;
->> +     snps,reset-delays-us = <0 10000 1000000>;
->> +     snps,reset-active-low;
->> +
->> +     mdio {
->> +             compatible = "snps,dwmac-mdio";
->> +             #address-cells = <1>;
->> +             #size-cells = <0>;
->> +
->> +             eth_phy0: ethernet-phy at 0 {
->> +                     compatible = "ethernet-phy-id0022.1620",
->> +                                  "ethernet-phy-ieee802.3-c22";
->> +                     reg = <3>;
->> +             };
->> +     };
->> +};
->>
->
-> Hi Martin,
->
-> It seems you mismatched the p200 and the p201, it's the p201 nobody has and uses a rmii link.
-ouch, good catch.
-I'll send a fix for that later - thanks for spotting!
+On 01/19/2017 06:07 PM, Lucas Stach wrote:
+> Most users of this interface just want to use it with the default
+> GFP_KERNEL flags, but for cases where DMA memory is allocated it may
+> be called from a different context.
+> 
+> No functional change yet, just passing through the flag to the
+> underlying alloc_contig_range function.
+> 
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+
+Acked-by: Vlastimil Babka <vbabka@suse.cz>
+
+> ---
+>  arch/powerpc/kvm/book3s_hv_builtin.c | 3 ++-
+>  drivers/base/dma-contiguous.c        | 2 +-
+>  include/linux/cma.h                  | 3 ++-
+>  mm/cma.c                             | 5 +++--
+>  mm/cma_debug.c                       | 2 +-
+>  5 files changed, 9 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/powerpc/kvm/book3s_hv_builtin.c b/arch/powerpc/kvm/book3s_hv_builtin.c
+> index 5bb24be0b346..56a62d97ab2d 100644
+> --- a/arch/powerpc/kvm/book3s_hv_builtin.c
+> +++ b/arch/powerpc/kvm/book3s_hv_builtin.c
+> @@ -56,7 +56,8 @@ struct page *kvm_alloc_hpt(unsigned long nr_pages)
+>  {
+>  	VM_BUG_ON(order_base_2(nr_pages) < KVM_CMA_CHUNK_ORDER - PAGE_SHIFT);
+>  
+> -	return cma_alloc(kvm_cma, nr_pages, order_base_2(HPT_ALIGN_PAGES));
+> +	return cma_alloc(kvm_cma, nr_pages, order_base_2(HPT_ALIGN_PAGES),
+> +			 GFP_KERNEL);
+>  }
+>  EXPORT_SYMBOL_GPL(kvm_alloc_hpt);
+>  
+> diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+> index e167a1e1bccb..d1a9cbabc627 100644
+> --- a/drivers/base/dma-contiguous.c
+> +++ b/drivers/base/dma-contiguous.c
+> @@ -193,7 +193,7 @@ struct page *dma_alloc_from_contiguous(struct device *dev, size_t count,
+>  	if (align > CONFIG_CMA_ALIGNMENT)
+>  		align = CONFIG_CMA_ALIGNMENT;
+>  
+> -	return cma_alloc(dev_get_cma_area(dev), count, align);
+> +	return cma_alloc(dev_get_cma_area(dev), count, align, GFP_KERNEL);
+>  }
+>  
+>  /**
+> diff --git a/include/linux/cma.h b/include/linux/cma.h
+> index 6f0a91b37f68..03f32d0bd1d8 100644
+> --- a/include/linux/cma.h
+> +++ b/include/linux/cma.h
+> @@ -29,6 +29,7 @@ extern int __init cma_declare_contiguous(phys_addr_t base,
+>  extern int cma_init_reserved_mem(phys_addr_t base, phys_addr_t size,
+>  					unsigned int order_per_bit,
+>  					struct cma **res_cma);
+> -extern struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align);
+> +extern struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
+> +			      gfp_t gfp_mask);
+>  extern bool cma_release(struct cma *cma, const struct page *pages, unsigned int count);
+>  #endif
+> diff --git a/mm/cma.c b/mm/cma.c
+> index fbd67d866f67..a33ddfde315d 100644
+> --- a/mm/cma.c
+> +++ b/mm/cma.c
+> @@ -362,7 +362,8 @@ int __init cma_declare_contiguous(phys_addr_t base,
+>   * This function allocates part of contiguous memory on specific
+>   * contiguous memory area.
+>   */
+> -struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align)
+> +struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
+> +		       gfp_t gfp_mask)
+>  {
+>  	unsigned long mask, offset;
+>  	unsigned long pfn = -1;
+> @@ -408,7 +409,7 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align)
+>  		pfn = cma->base_pfn + (bitmap_no << cma->order_per_bit);
+>  		mutex_lock(&cma_mutex);
+>  		ret = alloc_contig_range(pfn, pfn + count, MIGRATE_CMA,
+> -					 GFP_KERNEL);
+> +					 gfp_mask);
+>  		mutex_unlock(&cma_mutex);
+>  		if (ret == 0) {
+>  			page = pfn_to_page(pfn);
+> diff --git a/mm/cma_debug.c b/mm/cma_debug.c
+> index f8e4b60db167..ffc0c3d0ae64 100644
+> --- a/mm/cma_debug.c
+> +++ b/mm/cma_debug.c
+> @@ -138,7 +138,7 @@ static int cma_alloc_mem(struct cma *cma, int count)
+>  	if (!mem)
+>  		return -ENOMEM;
+>  
+> -	p = cma_alloc(cma, count, 0);
+> +	p = cma_alloc(cma, count, 0, GFP_KERNEL);
+>  	if (!p) {
+>  		kfree(mem);
+>  		return -ENOMEM;
+> 
