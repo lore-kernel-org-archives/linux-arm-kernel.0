@@ -1,49 +1,65 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 20 Jan 2017 19:02:08 +0530
-Subject: [PATCH v5 01/14] devicetree: bindings: add bindings for ahci-da850
-In-Reply-To: <1484911325-23425-2-git-send-email-bgolaszewski@baylibre.com>
-References: <1484911325-23425-1-git-send-email-bgolaszewski@baylibre.com>
- <1484911325-23425-2-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <5615fb6b-af26-c2fb-1f97-416548a9faaf@ti.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Fri, 20 Jan 2017 14:33:53 +0100
+Subject: [PATCH v2 2/9] ARM64: dts: meson-gxbb-p201: add the ethernet
+ PHY's reset GPIO
+In-Reply-To: <8a0b6c29-38f0-8474-34a2-8e3df4a5a239@baylibre.com>
+References: <20161202234739.22929-1-martin.blumenstingl@googlemail.com>
+ <20170120132650.9784-1-martin.blumenstingl@googlemail.com>
+ <20170120132650.9784-3-martin.blumenstingl@googlemail.com>
+ <8a0b6c29-38f0-8474-34a2-8e3df4a5a239@baylibre.com>
+Message-ID: <CAFBinCA1YABPzBUnprh_HprjQ8DqpEeF9OQeXKNtQ8Kp8Ou0bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On Friday 20 January 2017 04:51 PM, Bartosz Golaszewski wrote:
-> Add DT bindings for the TI DA850 AHCI SATA controller.
-> 
-> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-
-Could you ack this binding?
-
-Thanks,
-Sekhar
-
-> ---
->  Documentation/devicetree/bindings/ata/ahci-da850.txt | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/ata/ahci-da850.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/ata/ahci-da850.txt b/Documentation/devicetree/bindings/ata/ahci-da850.txt
-> new file mode 100644
-> index 0000000..268fe87
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/ata/ahci-da850.txt
-> @@ -0,0 +1,15 @@
-> +Device tree binding for the TI DA850 AHCI SATA Controller
-> +---------------------------------------------------------
-> +
-> +Required properties:
-> +  - compatible: must be "ti,da850-ahci"
-> +  - reg: physical base addresses and sizes of the controller's register areas
-> +  - interrupts: interrupt specifier (refer to the interrupt binding)
-> +
-> +Example:
-> +
-> +	sata: sata at 218000 {
-> +		compatible = "ti,da850-ahci";
-> +		reg = <0x218000 0x2000>, <0x22c018 0x4>;
-> +		interrupts = <67>;
-> +	};
-> 
+On Fri, Jan 20, 2017 at 2:31 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+> On 01/20/2017 02:26 PM, Martin Blumenstingl wrote:
+>> This resets the ethernet PHY during boot to get the PHY into a "clean"
+>> state.
+>> While here also specify the phy-handle of the ethmac node to make the
+>> PHY configuration similar to the one we have on GXL devices. This will
+>> allow us to specify OF-properties for the PHY itself.
+>>
+>> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+>> ---
+>>  arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts | 24 ++++++++++++++++++++++++
+>>  1 file changed, 24 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts
+>> index 39bb037a3e47..5d2cd2ecfdc4 100644
+>> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts
+>> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts
+>> @@ -50,3 +50,27 @@
+>>       compatible = "amlogic,p201", "amlogic,meson-gxbb";
+>>       model = "Amlogic Meson GXBB P201 Development Board";
+>>  };
+>> +
+>> +&ethmac {
+>> +     status = "okay";
+>> +     pinctrl-0 = <&eth_rgmii_pins>;
+>> +     pinctrl-names = "default";
+>> +     phy-handle = <&eth_phy0>;
+>> +     phy-mode = "rgmii";
+>> +
+>> +     snps,reset-gpio = <&gpio GPIOZ_14 0>;
+>> +     snps,reset-delays-us = <0 10000 1000000>;
+>> +     snps,reset-active-low;
+>> +
+>> +     mdio {
+>> +             compatible = "snps,dwmac-mdio";
+>> +             #address-cells = <1>;
+>> +             #size-cells = <0>;
+>> +
+>> +             eth_phy0: ethernet-phy at 0 {
+>> +                     compatible = "ethernet-phy-id0022.1620",
+>> +                                  "ethernet-phy-ieee802.3-c22";
+>> +                     reg = <3>;
+>> +             };
+>> +     };
+>> +};
+>>
+>
+> Hi Martin,
+>
+> It seems you mismatched the p200 and the p201, it's the p201 nobody has and uses a rmii link.
+ouch, good catch.
+I'll send a fix for that later - thanks for spotting!
