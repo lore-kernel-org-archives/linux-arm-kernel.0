@@ -1,59 +1,74 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Fri, 20 Jan 2017 15:52:39 +0800
-Subject: [PATCH v11 2/8] power: add power sequence library
-In-Reply-To: <20170110070240.GA29454@b29397-desktop>
-References: <1483596119-27508-1-git-send-email-peter.chen@nxp.com>
- <1483596119-27508-3-git-send-email-peter.chen@nxp.com>
- <20170107085456.w5dhm7qadqa6tc7v@kozik-lap>
- <20170110070240.GA29454@b29397-desktop>
-Message-ID: <20170120075239.GC21013@b29397-desktop>
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Fri, 20 Jan 2017 08:54:07 +0100
+Subject: [PATCH V9] thermal: bcm2835: add thermal driver for bcm2835 soc
+In-Reply-To: <20170120041400.GA24617@localhost.localdomain>
+References: <1483808145-6206-1-git-send-email-kernel@martin.sperl.org>
+ <20170120041400.GA24617@localhost.localdomain>
+Message-ID: <060918B6-A773-46A5-8D10-C9F6BBA6D3F1@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 03:02:41PM +0800, Peter Chen wrote:
-> On Sat, Jan 07, 2017 at 10:54:56AM +0200, Krzysztof Kozlowski wrote:
-> > On Thu, Jan 05, 2017 at 02:01:53PM +0800, Peter Chen wrote:
-> > > We have an well-known problem that the device needs to do some power
-> > > sequence before it can be recognized by related host, the typical
-> > > example like hard-wired mmc devices and usb devices.
-> > > 
-> > > This power sequence is hard to be described at device tree and handled by
-> > > related host driver, so we have created a common power sequence
-> > > library to cover this requirement. The core code has supplied
-> > > some common helpers for host driver, and individual power sequence
-> > > libraries handle kinds of power sequence for devices. The pwrseq
-> > > librares always need to allocate extra instance for compatible
-> > > string match.
-> > > 
-> > > pwrseq_generic is intended for general purpose of power sequence, which
-> > > handles gpios and clocks currently, and can cover other controls in
-> > > future. The host driver just needs to call of_pwrseq_on/of_pwrseq_off
-> > > if only one power sequence is needed, else call of_pwrseq_on_list
-> > > /of_pwrseq_off_list instead (eg, USB hub driver).
-> > > 
-> > > For new power sequence library, it can add its compatible string
-> > > to pwrseq_of_match_table, then the pwrseq core will match it with
-> > > DT's, and choose this library at runtime.
-> > > 
-> > > Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> > > Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
-> > > Tested-by Joshua Clayton <stillcompiling@gmail.com>
-> > > Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
-> > > Tested-by: Matthias Kaehlcke <mka@chromium.org>
-> > 
-> > Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
-> > Tested on Odroid U3 (reset sequence for LAN9730):
-> > Tested-by: Krzysztof Kozlowski <krzk@kernel.org>
-> > 
+
+> On 20.01.2017, at 05:14, Eduardo Valentin <edubezval@gmail.com> wrote:
 > 
-> A nice ping...
+> Hello Martin,
+> 
+> On Sat, Jan 07, 2017 at 04:55:45PM +0000, kernel at martin.sperl.org wrote:
+>> From: Martin Sperl <kernel@martin.sperl.org>
+>> 
+>> Add basic thermal driver for bcm2835 SOC.
+>> 
+>> This driver currently relies on the firmware setting up the
+>> tsense HW block and does not set it up itself.
+>> 
+>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+>> Acked-by: Eric Anholt <eric@anholt.net>
+>> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+>> 
+> 
+> <cut>
+> 
+>> +
+>> +static const struct of_device_id bcm2835_thermal_of_match_table[] = {
+>> +	{
+>> +		.compatible = "brcm,bcm2835-thermal",
+>> +		.data = &(struct bcm2835_thermal_info) {
+>> +			.offset = 407000,
+>> +			.slope = -538,
+>> +			.trip_temp = 80000
+>> +		}
+>> +	},
+>> +	{
+>> +		.compatible = "brcm,bcm2836-thermal",
+>> +		.data = &(struct bcm2835_thermal_info) {
+>> +			.offset = 407000,
+>> +			.slope = -538,
+>> +			.trip_temp = 80000
+>> +		}
+>> +	},
+>> +	{
+>> +		.compatible = "brcm,bcm2837-thermal",
+>> +		.data = &(struct bcm2835_thermal_info) {
+>> +			/* the bcm2837 needs adjustment of +5C */
+>> +			.offset = 407000 + 5000,
+>> +			.slope = -538,
+>> +			.trip_temp = 80000
+>> +		}
+>> +	},
+>> +	{},
+> 
+> Just for the same of clarification, is there anything preventing this
+> driver of using of-thermal API? the above data (slope, offset, and
+> trip_temps) would be in DT the place where they are supposed to be,
+> instead of code.
 > 
 
-Rafael, would you please review it? This series was discussed about
-half a year, and many people need it, I hope it can be in v4.11-rc1,
-thanks.
+As the DT changes, that only define compatible strings, have already gone
+in without any such properties set, we need to define defaults for the 
+slope/offset and trip_temp values.
 
--- 
+I guess (for newer SOC) you still can use the values in the DT,
+as (I guess) these are parsed and set in thermal_zone_device_register
+after the defaults are set in thermal_zone_params.
 
-Best Regards,
-Peter Chen
+Martin
