@@ -1,91 +1,47 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 20 Jan 2017 16:22:36 +0000
-Subject: [PATCH v13 1/7] arm64: Rename the common MADT parse routine
-In-Reply-To: <1484686210-7211-2-git-send-email-jeremy.linton@arm.com>
-References: <1484686210-7211-1-git-send-email-jeremy.linton@arm.com>
- <1484686210-7211-2-git-send-email-jeremy.linton@arm.com>
-Message-ID: <20170120162236.GA14295@red-moon>
+From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
+Date: Fri, 20 Jan 2017 21:50:22 +0530
+Subject: [PATCH 2/4] ARM: nommu: dynamic exception base address setting
+In-Reply-To: <f47f7a48-12e9-7dd0-324d-b736eead3187@arm.com>
+References: <20170118203525.6246-1-afzal.mohd.ma@gmail.com>
+ <20170118203807.6467-1-afzal.mohd.ma@gmail.com>
+ <f47f7a48-12e9-7dd0-324d-b736eead3187@arm.com>
+Message-ID: <20170120162022.GB3865@afzalpc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 02:50:04PM -0600, Jeremy Linton wrote:
-> The MADT parser in smp.c is now being used to parse
-> out NUMA, PMU and ACPI parking protocol information as
+Hi,
 
-Nit: It is not used to parse PMU yet at this stage so
-either you remove PMU from the list or you move this patch
-to the end of the series.
+On Thu, Jan 19, 2017 at 01:59:09PM +0000, Vladimir Murzin wrote:
+> On 18/01/17 20:38, afzal mohammed wrote:
 
-> well as the GIC information for which it was originally
-> created. Rename it to avoid a misleading name.
-
-It is funny smp.c never mapped _any_ GIC information :) (even
-though it parses the MADT GIC CPU interface entries).
-
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> ---
->  arch/arm64/kernel/smp.c | 13 +++++++------
->  1 file changed, 7 insertions(+), 6 deletions(-)
+> > +#define ID_PFR1_SE (0x3 << 4)	/* Security extension enable bits */
 > 
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index cb87234..8ea244c 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -517,13 +517,14 @@ static unsigned int cpu_count = 1;
->  
->  #ifdef CONFIG_ACPI
->  /*
-> - * acpi_map_gic_cpu_interface - parse processor MADT entry
-> + * acpi_verify_and_map_madt - parse processor MADT entry
->   *
->   * Carry out sanity checks on MADT processor entry and initialize
-> - * cpu_logical_map on success
-> + * cpu_logical_map, the ACPI parking protocol, NUMA mapping
-> + * and the PMU interrupts on success
->   */
->  static void __init
-> -acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
-> +acpi_verify_and_map_madt(struct acpi_madt_generic_interrupt *processor)
+> This bitfiled is 4 bits wide.
 
-acpi_map_madt_cpu_entry()
+Since only 2 LSb's out of the 4 were enough to detect whether security
+extensions were enabled, it was done so. i am going to use your below
+suggestion & this would be taken care by that.
 
-or just drop this patch to avoid useless bikeshedding, your choice.
-
->  {
->  	u64 hwid = processor->arm_mpidr;
->  
-> @@ -577,7 +578,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
->  }
->  
->  static int __init
-> -acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
-> +acpi_parse_madt_common(struct acpi_subtable_header *header,
->  			     const unsigned long end)
-
-acpi_madt_parse_cpus()
-
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-
->  {
->  	struct acpi_madt_generic_interrupt *processor;
-> @@ -588,7 +589,7 @@ acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
->  
->  	acpi_table_print_madt_entry(header);
->  
-> -	acpi_map_gic_cpu_interface(processor);
-> +	acpi_verify_and_map_madt(processor);
->  
->  	return 0;
->  }
-> @@ -672,7 +673,7 @@ void __init smp_init_cpus(void)
->  		 * we need for SMP init
->  		 */
->  		acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
-> -				      acpi_parse_gic_cpu_interface, 0);
-> +				      acpi_parse_madt_common, 0);
->  
->  	if (cpu_count > nr_cpu_ids)
->  		pr_warn("Number of cores (%d) exceeds configured maximum of %d - clipping\n",
-> -- 
-> 2.5.5
+> > +	if (security_extensions_enabled()) {
 > 
+> You can use
+> 
+>     cpuid_feature_extract(CPUID_EXT_PFR1, 4)
+>     
+> and add a comment explaining what we are looking for and why.
+
+Yes, that is better, was not aware of this, did saw CPUID_EXT_PFR1 as
+an unused macro.
+
+> > +#ifdef CONFIG_CPU_CP15
+> > +	vectors_base = setup_vectors_base();
+> > +#endif
+> 
+> alternatively it can be
+> 
+> 	unsigned long vector_base = IS_ENABLED(CONFIG_CPU_CP15) ? setup_vbar() : 0;
+
+Yes that certainly is better.
+
+Regards
+afzal
