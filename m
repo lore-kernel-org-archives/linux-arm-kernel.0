@@ -1,59 +1,78 @@
-From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Fri, 20 Jan 2017 08:49:09 +0530
-Subject: [PATCH 3/3] arm64: dts: exynos: Use macros for pinctrl
- configuration on Exynos7
-In-Reply-To: <20170118150131.ttalzfxxtpbrw5gb@kozik-lap>
-References: <1484718141-28785-1-git-send-email-pankaj.dubey@samsung.com>
- <CGME20170118054013epcas5p3b20dca776ee350f4ba863db24d3dea67@epcas5p3.samsung.com>
- <1484718141-28785-4-git-send-email-pankaj.dubey@samsung.com>
- <20170118150131.ttalzfxxtpbrw5gb@kozik-lap>
-Message-ID: <7f003a7a-897f-2fef-f48c-44db75be84ff@samsung.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Thu, 19 Jan 2017 20:14:02 -0800
+Subject: [PATCH V9] thermal: bcm2835: add thermal driver for bcm2835 soc
+In-Reply-To: <1483808145-6206-1-git-send-email-kernel@martin.sperl.org>
+References: <1483808145-6206-1-git-send-email-kernel@martin.sperl.org>
+Message-ID: <20170120041400.GA24617@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+Hello Martin,
 
-On Wednesday 18 January 2017 08:31 PM, Krzysztof Kozlowski wrote:
-> On Wed, Jan 18, 2017 at 11:12:21AM +0530, Pankaj Dubey wrote:
->> Usage of DTS macros instead of hard-coded numbers makes code easier to
->> read.  One does not have to remember which value means pull-up/down or
->> specific driver strength.
->>
->> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> ---
->>  arch/arm64/boot/dts/exynos/exynos7-espresso.dts |   4 +-
->>  arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi | 302 ++++++++++++------------
->>  2 files changed, 154 insertions(+), 152 deletions(-)
->>
->> diff --git a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
->> index c528dd5..1b2db9f0 100644
->> --- a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
->> +++ b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
->> @@ -328,8 +328,8 @@
->>  &pinctrl_alive {
->>  	pmic_irq: pmic-irq {
->>  		samsung,pins = "gpa0-2";
->> -		samsung,pin-pud = <3>;
->> -		samsung,pin-drv = <3>;
->> +		samsung,pin-pud = <EXYNOS_PIN_PULL_UP>;
->> +		samsung,pin-drv = <EXYNOS4_PIN_DRV_LV3>;
->>  	};
->>  };
+On Sat, Jan 07, 2017 at 04:55:45PM +0000, kernel at martin.sperl.org wrote:
+> From: Martin Sperl <kernel@martin.sperl.org>
 > 
-> This is not equal (value 3 => 1). If the change was intended, please do
-> in separate patch.
+> Add basic thermal driver for bcm2835 SOC.
+> 
+> This driver currently relies on the firmware setting up the
+> tsense HW block and does not set it up itself.
+> 
+> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+> Acked-by: Eric Anholt <eric@anholt.net>
+> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
 > 
 
-This was not an intended change. It should be EXYNOS4_PIN_DRV_LV4, I
-will submit another set after fixing this.
+<cut>
 
-Thanks,
-Pankaj Dubey
+> +
+> +static const struct of_device_id bcm2835_thermal_of_match_table[] = {
+> +	{
+> +		.compatible = "brcm,bcm2835-thermal",
+> +		.data = &(struct bcm2835_thermal_info) {
+> +			.offset = 407000,
+> +			.slope = -538,
+> +			.trip_temp = 80000
+> +		}
+> +	},
+> +	{
+> +		.compatible = "brcm,bcm2836-thermal",
+> +		.data = &(struct bcm2835_thermal_info) {
+> +			.offset = 407000,
+> +			.slope = -538,
+> +			.trip_temp = 80000
+> +		}
+> +	},
+> +	{
+> +		.compatible = "brcm,bcm2837-thermal",
+> +		.data = &(struct bcm2835_thermal_info) {
+> +			/* the bcm2837 needs adjustment of +5C */
+> +			.offset = 407000 + 5000,
+> +			.slope = -538,
+> +			.trip_temp = 80000
+> +		}
+> +	},
+> +	{},
 
-> Rest looks fine.
-> 
-> Best regards,
-> Krzysztof
-> 
-> 
-> 
+Just for the same of clarification, is there anything preventing this
+driver of using of-thermal API? the above data (slope, offset, and
+trip_temps) would be in DT the place where they are supposed to be,
+instead of code.
+
+> +};
+> +MODULE_DEVICE_TABLE(of, bcm2835_thermal_of_match_table);
+> +
+> +static struct platform_driver bcm2835_thermal_driver = {
+> +	.probe = bcm2835_thermal_probe,
+> +	.remove = bcm2835_thermal_remove,
+> +	.driver = {
+> +		.name = "bcm2835_thermal",
+> +		.of_match_table = bcm2835_thermal_of_match_table,
+> +	},
+> +};
+> +module_platform_driver(bcm2835_thermal_driver);
+> +
+> +MODULE_AUTHOR("Martin Sperl");
+> +MODULE_DESCRIPTION("Thermal driver for bcm2835 chip");
+> +MODULE_LICENSE("GPL");
+> --
+> 2.1.4
