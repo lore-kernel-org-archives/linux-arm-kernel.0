@@ -1,12 +1,12 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 20 Jan 2017 17:23:26 +0100
-Subject: [PATCH v3 2/9] ARM64: dts: meson-gxbb-p200: add the ethernet
- PHY's reset GPIO
-In-Reply-To: <20170120152232.13943-3-martin.blumenstingl@googlemail.com>
+Date: Fri, 20 Jan 2017 17:23:30 +0100
+Subject: [PATCH v3 4/9] ARM64: dts: meson-gxbb-nexbox-a95x: add the
+ ethernet PHY's reset GPIO
+In-Reply-To: <20170120152232.13943-5-martin.blumenstingl@googlemail.com>
 References: <20170120132650.9784-1-martin.blumenstingl@googlemail.com>
  <20170120152232.13943-1-martin.blumenstingl@googlemail.com>
- <20170120152232.13943-3-martin.blumenstingl@googlemail.com>
-Message-ID: <e5b4a224-75b6-aa9d-9781-fc718d4cef42@baylibre.com>
+ <20170120152232.13943-5-martin.blumenstingl@googlemail.com>
+Message-ID: <d9ad0856-60e0-e0d4-6ed1-118bec148e52@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,23 +19,19 @@ On 01/20/2017 04:22 PM, Martin Blumenstingl wrote:
 > 
 > Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 > ---
->  arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
 > 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
-> index 03e3d76626dd..fa0f84cfeaa9 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
-> @@ -51,6 +51,30 @@
->  	model = "Amlogic Meson GXBB P200 Development Board";
->  };
->  
-> +&ethmac {
-> +	status = "okay";
-> +	pinctrl-0 = <&eth_rgmii_pins>;
-> +	pinctrl-names = "default";
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+> index 4cbd626a9e88..c7e3ea008566 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts
+> @@ -164,7 +164,24 @@
+>  	status = "okay";
+>  	pinctrl-0 = <&eth_rmii_pins>;
+>  	pinctrl-names = "default";
 > +	phy-handle = <&eth_phy0>;
-> +	phy-mode = "rgmii";
+>  	phy-mode = "rmii";
 > +
 > +	snps,reset-gpio = <&gpio GPIOZ_14 0>;
 > +	snps,reset-delays-us = <0 10000 1000000>;
@@ -47,17 +43,15 @@ On 01/20/2017 04:22 PM, Martin Blumenstingl wrote:
 > +		#size-cells = <0>;
 > +
 > +		eth_phy0: ethernet-phy at 0 {
-> +			compatible = "ethernet-phy-id0022.1620",
+> +			compatible = "ethernet-phy-id0243.0c54",
 > +				     "ethernet-phy-ieee802.3-c22";
-> +			reg = <3>;
+> +			reg = <0>;
 > +		};
 > +	};
-> +};
-> +
->  &i2c_B {
->  	status = "okay";
->  	pinctrl-0 = <&i2c_b_pins>;
+>  };
+>  
+>  &ir {
 > 
 
-On Amlogic p200 :
+On Nexbox A95X (S905) :
 Tested-by: Neil Armstrong <narmstrong@baylibre.com>
