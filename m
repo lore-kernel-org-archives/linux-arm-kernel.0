@@ -1,31 +1,45 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 20 Jan 2017 17:44:01 +0100
-Subject: [PATCH] ARM: imx6: remove unit address from LDB node
-Message-ID: <20170120164401.5904-1-l.stach@pengutronix.de>
+From: aford173@gmail.com (aford173 at gmail.com)
+Date: Fri, 20 Jan 2017 10:44:01 -0600
+Subject: [PATCH] ARM: OMAP3: Fix SoC detection of OMAP36/37 Family
+Message-ID: <1484930641-18566-1-git-send-email-aford173@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LDB has no reg property as it uses the IOMUX-GPR syscon to access
-its registers. Remove the unit address from the DT node to make DT
-compiler happy.
+From: Adam Ford <aford173@gmail.com>
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
- arch/arm/boot/dts/imx6qdl.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+The OMAP36/37 families are similar, but there are a few features sections
+that can help identify some of them.  Let's add checks for 3630/3730,
+OMAP3621, DM3725, OMAP3615/DM3715, OMAP3611, and AM3703 all based on
+features similar to what was done for the OMAP34xx/35xx series
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index e9ba244cda54..8903794f6ef7 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -808,7 +808,7 @@
- 				reg = <0x020e0000 0x4000>;
- 			};
- 
--			ldb: ldb at 020e0008 {
-+			ldb: ldb {
- 				#address-cells = <1>;
- 				#size-cells = <0>;
- 				compatible = "fsl,imx6q-ldb", "fsl,imx53-ldb";
+The checkpatch flags some warnings for braces, but I kept the coding style
+to match the adjacent code for consistency.
+
+I don't have an OMAP36xx to test, but this was tested on both a DM3730 and
+AM3703.
+
+Signed-off-by: Adam Ford <aford173@gmail.com>
+
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index cc6d9fa..e2274a1 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -223,7 +223,15 @@ static void __init omap3_cpuinfo(void)
+ 	 * and CPU class bits.
+ 	 */
+ 	if (soc_is_omap3630()) {
+-		cpu_name = "OMAP3630";
++		if (omap3_has_iva() && omap3_has_sgx()) {
++			cpu_name = (omap3_has_isp()) ? "OMAP3630/DM3730" : "OMAP3621";
++		} else if (omap3_has_iva()) {
++			cpu_name = "DM3725";
++		} else if (omap3_has_sgx()) {
++			cpu_name = "OMAP3615/AM3715";
++		} else {
++			cpu_name = (omap3_has_isp()) ? "AM3703" : "OMAP3611";
++		}
+ 	} else if (soc_is_am35xx()) {
+ 		cpu_name = (omap3_has_sgx()) ? "AM3517" : "AM3505";
+ 	} else if (soc_is_ti816x()) {
 -- 
-2.11.0
+2.7.4
