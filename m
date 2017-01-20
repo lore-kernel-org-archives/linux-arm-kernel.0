@@ -1,148 +1,421 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 20 Jan 2017 19:03:38 +0100
-Subject: [PATCH 4/8] clk: renesas: cpg-mssr: Add support for reset control
-In-Reply-To: <1484927830.2897.51.camel@pengutronix.de>
-References: <1484921306-9967-1-git-send-email-geert+renesas@glider.be>
- <1484921306-9967-5-git-send-email-geert+renesas@glider.be>
- <1484927830.2897.51.camel@pengutronix.de>
-Message-ID: <CAMuHMdUrtTPKjAnFNkbBJeCaHTvJkOvWRXQM4j38dAqnxA0mLw@mail.gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 20 Jan 2017 18:07:26 +0000
+Subject: [PATCH] KVM: arm/arm64: vgic: Add debugfs vgic-state file
+In-Reply-To: <20170120103330.13858-1-christoffer.dall@linaro.org>
+References: <20170120103330.13858-1-christoffer.dall@linaro.org>
+Message-ID: <d63155bc-84f3-85cc-ec32-5a73e635b774@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+Hej Christoffer,
 
-On Fri, Jan 20, 2017 at 4:57 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> On Fri, 2017-01-20 at 15:08 +0100, Geert Uytterhoeven wrote:
->> Add optional support for the Reset Control feature of the Renesas Clock
->> Pulse Generator / Module Standby and Software Reset module on R-Car
->> Gen2, R-Car Gen3, and RZ/G1 SoCs.
->
-> Is there a reason to make this optional?
+On 20/01/17 10:33, Christoffer Dall wrote:
+> Add a file to debugfs to read the in-kernel state of the vgic.  We don't
+> do any locking of the entire VGIC state while traversing all the IRQs,
+> so if the VM is running the user/developer may not see a quiesced state,
+> but should take care to pause the VM using facilities in user space for
+> that purpose.
+> 
+> We also don't support LPIs yet, but they can be added easily if needed.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm/kvm/Makefile          |   1 +
+>  arch/arm64/kvm/Makefile        |   1 +
+>  include/kvm/arm_vgic.h         |   5 +
+>  virt/kvm/arm/vgic/vgic-debug.c | 278 +++++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic-init.c  |   4 +
+>  virt/kvm/arm/vgic/vgic.h       |   3 +
+>  6 files changed, 292 insertions(+)
+>  create mode 100644 virt/kvm/arm/vgic/vgic-debug.c
+> 
+> diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+> index d571243..12b6281 100644
+> --- a/arch/arm/kvm/Makefile
+> +++ b/arch/arm/kvm/Makefile
+> @@ -33,5 +33,6 @@ obj-y += $(KVM)/arm/vgic/vgic-mmio-v2.o
+>  obj-y += $(KVM)/arm/vgic/vgic-mmio-v3.o
+>  obj-y += $(KVM)/arm/vgic/vgic-kvm-device.o
+>  obj-y += $(KVM)/arm/vgic/vgic-its.o
+> +obj-y += $(KVM)/arm/vgic/vgic-debug.o
+>  obj-y += $(KVM)/irqchip.o
+>  obj-y += $(KVM)/arm/arch_timer.o
+> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+> index d50a82a..e025bec 100644
+> --- a/arch/arm64/kvm/Makefile
+> +++ b/arch/arm64/kvm/Makefile
+> @@ -31,6 +31,7 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v2.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v3.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-kvm-device.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-its.o
+> +kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-debug.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/irqchip.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
+>  kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index 002f092..1087aee 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -165,6 +165,8 @@ struct vgic_its {
+>  	struct list_head	collection_list;
+>  };
+>  
+> +struct vgic_state_iter;
+> +
+>  struct vgic_dist {
+>  	bool			in_kernel;
+>  	bool			ready;
+> @@ -212,6 +214,9 @@ struct vgic_dist {
+>  	spinlock_t		lpi_list_lock;
+>  	struct list_head	lpi_list_head;
+>  	int			lpi_list_count;
+> +
+> +	/* used by vgic-debug */
+> +	struct vgic_state_iter *iter;
+>  };
+>  
+>  struct vgic_v2_cpu_if {
+> diff --git a/virt/kvm/arm/vgic/vgic-debug.c b/virt/kvm/arm/vgic/vgic-debug.c
+> new file mode 100644
+> index 0000000..76e8b11
+> --- /dev/null
+> +++ b/virt/kvm/arm/vgic/vgic-debug.c
+> @@ -0,0 +1,278 @@
+> +/*
+> + * Copyright (C) 2016 Linaro
+> + * Author: Christoffer Dall <christoffer.dall@linaro.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/cpu.h>
+> +#include <linux/debugfs.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/kvm_host.h>
+> +#include <linux/seq_file.h>
+> +#include <linux/uaccess.h>
+> +#include <kvm/arm_vgic.h>
+> +#include <asm/kvm_mmu.h>
+> +#include "vgic.h"
+> +
+> +/*
+> + * Structure to control looping through the entire vgic state.  We start at
+> + * zero for each field and move upwards.  So, if dist_id is 0 we print the
+> + * distributor info.  When dist_id is 1, we have already printed it and move
+> + * on.
+> + *
+> + * When vcpu_id < nr_cpus we print the vcpu info until vcpu_id == nr_cpus and
+> + * so on.
+> + */
+> +struct vgic_state_iter {
+> +	int nr_cpus;
+> +	int nr_spis;
+> +	int dist_id;
+> +	int vcpu_id;
+> +	int intid;
+> +};
+> +
+> +static void iter_next(struct vgic_state_iter *iter)
+> +{
+> +	if (iter->dist_id == 0) {
+> +		iter->dist_id++;
+> +		return;
+> +	}
+> +
+> +	iter->intid++;
+> +	if (iter->intid == VGIC_NR_PRIVATE_IRQS &&
+> +	    ++iter->vcpu_id < iter->nr_cpus)
+> +		iter->intid = 0;
+> +}
+> +
+> +static void iter_init(struct kvm *kvm, struct vgic_state_iter *iter,
+> +		      loff_t pos)
+> +{
+> +	int nr_cpus = atomic_read(&kvm->online_vcpus);
+> +
+> +	memset(iter, 0, sizeof(*iter));
+> +
+> +	iter->nr_cpus = nr_cpus;
+> +	iter->nr_spis = kvm->arch.vgic.nr_spis;
+> +
+> +	/* Fast forward to the right position if needed */
+> +	while (pos--)
+> +		iter_next(iter);
+> +}
+> +
+> +static bool the_end(struct vgic_state_iter *iter)
 
-With "optional", I mean that I don't select CONFIG_RESET_CONTROLLER, and
-make the reset controller code depend on CONFIG_RESET_CONTROLLER.
-So far we don't have any mandatory users.
+"Of everything that stands, the end"? ;-)
 
->> This allows to reset SoC devices using the Reset Controller API.
->>
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->
-> Looks good to me,
->
-> Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+I wonder if we really need this. AFAICT the_end never returns true after
+init has been called, so the only caller is after the iter_next(). So
+can't we just close the Door(s) and fold the_end() into
+iter_next()?
 
-Thanks!
+> +{
+> +	return iter->dist_id > 0 &&
+> +		iter->vcpu_id == iter->nr_cpus &&
+> +		(iter->intid - VGIC_NR_PRIVATE_IRQS) == iter->nr_spis;
+> +}
+> +
+> +static void *debug_start(struct seq_file *s, loff_t *pos)
+> +{
+> +	struct kvm *kvm = (struct kvm *)s->private;
+> +	struct vgic_state_iter *iter;
+> +
+> +	mutex_lock(&kvm->lock);
+> +	iter = kvm->arch.vgic.iter;
+> +	if (iter) {
+> +		iter = ERR_PTR(-EBUSY);
+> +		goto out;
+> +	}
+> +
+> +	iter = kmalloc(sizeof(*iter), GFP_KERNEL);
+> +	if (!iter) {
+> +		iter = ERR_PTR(-ENOMEM);
+> +		goto out;
+> +	}
+> +
+> +	iter_init(kvm, iter, *pos);
+> +	kvm->arch.vgic.iter = iter;
+> +
+> +	if (the_end(iter))
+> +		iter = NULL;
 
-> Just a small issue below,
->
->> ---
->>  drivers/clk/renesas/renesas-cpg-mssr.c | 122 +++++++++++++++++++++++++++++++++
->>  1 file changed, 122 insertions(+)
->>
->> diff --git a/drivers/clk/renesas/renesas-cpg-mssr.c b/drivers/clk/renesas/renesas-cpg-mssr.c
->> index f1161a585c57e433..ea4af714ac14603a 100644
->> --- a/drivers/clk/renesas/renesas-cpg-mssr.c
->> +++ b/drivers/clk/renesas/renesas-cpg-mssr.c
-> [...]
->> +static int cpg_mssr_reset(struct reset_controller_dev *rcdev,
->> +                       unsigned long id)
->> +{
->> +     struct cpg_mssr_priv *priv = rcdev_to_priv(rcdev);
->> +     unsigned int reg = id / 32;
->> +     unsigned int bit = id % 32;
->> +     u32 bitmask = BIT(bit);
->
-> Here you have a bitmask = BIT(bit) variable.
+I don't understand the need for that. If you have just initialized iter,
+the_end() will never return true, as at least dist_id is always 0.
+Or is there some magic (maybe future?) feature that I miss here?
 
-Because there are two users in the function.
+> +out:
+> +	mutex_unlock(&kvm->lock);
+> +	return iter;
+> +}
+> +
+> +static void *debug_next(struct seq_file *s, void *v, loff_t *pos)
+> +{
+> +	struct kvm *kvm = (struct kvm *)s->private;
+> +	struct vgic_state_iter *iter = kvm->arch.vgic.iter;
+> +
+> +	++*pos;
+> +	iter_next(iter);
+> +	if (the_end(iter))
+> +		iter = NULL;
+> +	return iter;
+> +}
+> +
+> +static void debug_stop(struct seq_file *s, void *v)
+> +{
+> +	struct kvm *kvm = (struct kvm *)s->private;
+> +	struct vgic_state_iter *iter;
+> +
+> +	mutex_lock(&kvm->lock);
+> +	iter = kvm->arch.vgic.iter;
+> +	kfree(iter);
+> +	kvm->arch.vgic.iter = NULL;
 
->> +     unsigned long flags;
->> +     u32 value;
->> +
->> +     dev_dbg(priv->dev, "reset %u%02u\n", reg, bit);
->> +
->> +     /* Reset module */
->> +     spin_lock_irqsave(&priv->rmw_lock, flags);
->> +     value = readl(priv->base + SRCR(reg));
->> +     value |= bitmask;
->
-> Here you use it.
->
->> +     writel(value, priv->base + SRCR(reg));
->> +     spin_unlock_irqrestore(&priv->rmw_lock, flags);
->> +
->> +     /* Wait for at least one cycle of the RCLK clock (@ ca. 32 kHz) */
->> +     udelay(35);
->> +
->> +     /* Release module from reset state */
->> +     writel(bitmask, priv->base + SRSTCLR(reg));
->> +
->> +     return 0;
->> +}
->> +
->> +static int cpg_mssr_assert(struct reset_controller_dev *rcdev, unsigned long id)
->> +{
->> +     struct cpg_mssr_priv *priv = rcdev_to_priv(rcdev);
->> +     unsigned int reg = id / 32;
->> +     unsigned int bit = id % 32;
->
-> Here you haven't.
->
->> +     unsigned long flags;
->> +     u32 value;
->> +
->> +     dev_dbg(priv->dev, "assert %u%02u\n", reg, bit);
->> +
->> +     spin_lock_irqsave(&priv->rmw_lock, flags);
->> +     value = readl(priv->base + SRCR(reg));
->> +     writel(value | BIT(bit), priv->base + SRCR(reg));
->
-> Here you don't.
+Would it be better to set the kvm->iter pointer to NULL before we free
+it? Or doesn't this matter as we are under the lock and the only other
+code who cares is debug_start()?
 
-Because there's a single user in the function.
+So far, need to wrap my mind around this sequential file operations
+scheme first ...
 
->> +     spin_unlock_irqrestore(&priv->rmw_lock, flags);
->> +     return 0;
->> +}
->> +
->> +static int cpg_mssr_deassert(struct reset_controller_dev *rcdev,
->> +                          unsigned long id)
->> +{
->> +     struct cpg_mssr_priv *priv = rcdev_to_priv(rcdev);
->> +     unsigned int reg = id / 32;
->> +     unsigned int bit = id % 32;
->> +
->> +     dev_dbg(priv->dev, "deassert %u%02u\n", reg, bit);
->> +
->> +     writel(BIT(bit), priv->base + SRSTCLR(reg));
->
-> And here ...
->
->> +     return 0;
->> +}
->> +
->> +static int cpg_mssr_status(struct reset_controller_dev *rcdev,
->> +                        unsigned long id)
->> +{
->> +     struct cpg_mssr_priv *priv = rcdev_to_priv(rcdev);
->> +     unsigned int reg = id / 32;
->> +     unsigned int bit = id % 32;
->> +
->> +     return !!(readl(priv->base + SRCR(reg)) & BIT(bit));
->
-> And here neither.
->
-> I'd choose one variant over the other for consistency.
+Cheers,
+Andre.
 
-OK, I'll use the "bitmask" variable in all functions.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> +	mutex_unlock(&kvm->lock);
+> +}
+> +
+> +static void print_dist_state(struct seq_file *s, struct vgic_dist *dist)
+> +{
+> +	seq_printf(s, "Distributor\n");
+> +	seq_printf(s, "===========\n");
+> +	seq_printf(s, "vgic_model:\t%s\n",
+> +		   (dist->vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3) ?
+> +		   "GICv3" : "GICv2");
+> +	seq_printf(s, "nr_spis:\t%d\n", dist->nr_spis);
+> +	seq_printf(s, "enabled:\t%d\n", dist->enabled);
+> +	seq_printf(s, "\n");
+> +
+> +	seq_printf(s, "P=pending, L=line_level, S=soft_pending, A=active\n");
+> +	seq_printf(s, "E=enabled, H=hw, L=config_level\n");
+> +}
+> +
+> +static void print_header(struct seq_file *s, struct vgic_irq *irq,
+> +			 struct kvm_vcpu *vcpu)
+> +{
+> +	int id = 0;
+> +	char *hdr = "SPI ";
+> +
+> +	if (vcpu) {
+> +		hdr = "VCPU";
+> +		id = vcpu->vcpu_id;
+> +	}
+> +
+> +	seq_printf(s, "\n");
+> +	seq_printf(s, "%s%2d TYP   ID TGT_ID PLSAEHL     HWID    MPIDR SRC PRI VCPU_ID\n", hdr, id);
+> +	seq_printf(s, "----------------------------------------------------------------\n");
+> +}
+> +
+> +static void print_irq_state(struct seq_file *s, struct vgic_irq *irq,
+> +			    struct kvm_vcpu *vcpu)
+> +{
+> +	char *type;
+> +	if (irq->intid < VGIC_NR_SGIS)
+> +		type = "SGI";
+> +	else if (irq->intid < VGIC_NR_PRIVATE_IRQS)
+> +		type = "PPI";
+> +	else
+> +		type = "SPI";
+> +
+> +	if (irq->intid ==0 || irq->intid == VGIC_NR_PRIVATE_IRQS)
+> +		print_header(s, irq, vcpu);
+> +
+> +	seq_printf(s, "       %s %4d "
+> +		      "    %2d "
+> +		      "%d%d%d%d%d%d%d "
+> +		      "%8x "
+> +		      "%8x "
+> +		      " %2x "
+> +		      " %2x "
+> +		      "     %2d "
+> +		      "\n",
+> +			type, irq->intid,
+> +			(irq->target_vcpu) ? irq->target_vcpu->vcpu_id : -1,
+> +			irq->pending,
+> +			irq->line_level,
+> +			irq->soft_pending,
+> +			irq->active,
+> +			irq->enabled,
+> +			irq->hw,
+> +			irq->config == VGIC_CONFIG_LEVEL,
+> +			irq->hwintid,
+> +			irq->mpidr,
+> +			irq->source,
+> +			irq->priority,
+> +			(irq->vcpu) ? irq->vcpu->vcpu_id : -1);
+> +
+> +}
+> +
+> +static int debug_show(struct seq_file *s, void *v)
+> +{
+> +	struct kvm *kvm = (struct kvm *)s->private;
+> +	struct vgic_state_iter *iter = (struct vgic_state_iter *)v;
+> +	struct vgic_irq *irq;
+> +	struct kvm_vcpu *vcpu = NULL;
+> +
+> +	if (iter->dist_id == 0) {
+> +		print_dist_state(s, &kvm->arch.vgic);
+> +		return 0;
+> +	}
+> +
+> +	if (!kvm->arch.vgic.initialized)
+> +		return 0;
+> +
+> +	if (iter->vcpu_id < iter->nr_cpus) {
+> +		vcpu = kvm_get_vcpu(kvm, iter->vcpu_id);
+> +		irq = &vcpu->arch.vgic_cpu.private_irqs[iter->intid];
+> +	} else {
+> +		irq = &kvm->arch.vgic.spis[iter->intid - VGIC_NR_PRIVATE_IRQS];
+> +	}
+> +
+> +	spin_lock(&irq->irq_lock);
+> +	print_irq_state(s, irq, vcpu);
+> +	spin_unlock(&irq->irq_lock);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct seq_operations debug_seq_ops = {
+> +	.start = debug_start,
+> +	.next  = debug_next,
+> +	.stop  = debug_stop,
+> +	.show  = debug_show
+> +};
+> +
+> +static int debug_open(struct inode *inode, struct file *file)
+> +{
+> +	int ret;
+> +	ret = seq_open(file, &debug_seq_ops);
+> +	if (!ret) {
+> +		struct seq_file *seq;
+> +		/* seq_open will have modified file->private_data */
+> +		seq = file->private_data;
+> +		seq->private = inode->i_private;
+> +	}
+> +
+> +	return ret;
+> +};
+> +
+> +static struct file_operations vgic_debug_fops = {
+> +	.owner   = THIS_MODULE,
+> +	.open    = debug_open,
+> +	.read    = seq_read,
+> +	.llseek  = seq_lseek,
+> +	.release = seq_release
+> +};
+> +
+> +int vgic_debug_init(struct kvm *kvm)
+> +{
+> +	if (!kvm->debugfs_dentry)
+> +		return -ENOENT;
+> +
+> +	if (!debugfs_create_file("vgic-state", 0444,
+> +				 kvm->debugfs_dentry,
+> +				 kvm,
+> +				 &vgic_debug_fops))
+> +		return -ENOMEM;
+> +
+> +	return 0;
+> +}
+> +
+> +int vgic_debug_destroy(struct kvm *kvm)
+> +{
+> +	return 0;
+> +}
+> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+> index 5114391..cf8e812 100644
+> --- a/virt/kvm/arm/vgic/vgic-init.c
+> +++ b/virt/kvm/arm/vgic/vgic-init.c
+> @@ -259,6 +259,8 @@ int vgic_init(struct kvm *kvm)
+>  	if (ret)
+>  		goto out;
+>  
+> +	vgic_debug_init(kvm);
+> +
+>  	dist->initialized = true;
+>  out:
+>  	return ret;
+> @@ -291,6 +293,8 @@ void kvm_vgic_destroy(struct kvm *kvm)
+>  	struct kvm_vcpu *vcpu;
+>  	int i;
+>  
+> +	vgic_debug_destroy(kvm);
+> +
+>  	kvm_vgic_dist_destroy(kvm);
+>  
+>  	kvm_for_each_vcpu(i, vcpu, kvm)
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index 859f65c..bbcbdbb 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -94,4 +94,7 @@ int kvm_register_vgic_device(unsigned long type);
+>  int vgic_lazy_init(struct kvm *kvm);
+>  int vgic_init(struct kvm *kvm);
+>  
+> +int vgic_debug_init(struct kvm *kvm);
+> +int vgic_debug_destroy(struct kvm *kvm);
+> +
+>  #endif
+> 
