@@ -1,31 +1,42 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 20 Jan 2017 19:21:02 +0300
-Subject: [PATCH] ARM: shmobile: rcar-gen2: Add more register documentation
-In-Reply-To: <1484917448-8320-1-git-send-email-geert+renesas@glider.be>
-References: <1484917448-8320-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <9d12d719-0866-a454-88e2-d51a695085cd@cogentembedded.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 20 Jan 2017 17:23:22 +0100
+Subject: [PATCH v3 1/9] ARM64: dts: meson-gxbb-odroidc2: add the ethernet
+ PHY's reset GPIO
+In-Reply-To: <20170120152232.13943-2-martin.blumenstingl@googlemail.com>
+References: <20170120132650.9784-1-martin.blumenstingl@googlemail.com>
+ <20170120152232.13943-1-martin.blumenstingl@googlemail.com>
+ <20170120152232.13943-2-martin.blumenstingl@googlemail.com>
+Message-ID: <3c5b07ce-78ff-edbc-adce-9ed9e70c05b4@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2017 04:04 PM, Geert Uytterhoeven wrote:
-
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+On 01/20/2017 04:22 PM, Martin Blumenstingl wrote:
+> This resets the ethernet PHY during boot to get the PHY into a "clean"
+> state. While here also explicitly specify the phy-mode instead of
+> relying on the default-value from meson-gx.dtsi.
+> 
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 > ---
->  arch/arm/mach-shmobile/pm-rcar-gen2.c | 40 +++++++++++++++++++++++++----------
->  1 file changed, 29 insertions(+), 11 deletions(-)
->
-> diff --git a/arch/arm/mach-shmobile/pm-rcar-gen2.c b/arch/arm/mach-shmobile/pm-rcar-gen2.c
-> index dd9ac366868f4336..6ed9aa19c4d34766 100644
-> --- a/arch/arm/mach-shmobile/pm-rcar-gen2.c
-> +++ b/arch/arm/mach-shmobile/pm-rcar-gen2.c
-> @@ -20,14 +20,30 @@
-[...]
-> +static inline u32 phys_to_sbar(phys_addr_t addr)
-> +{
-> +	return (((addr) >> 8) & 0xfffffc00);
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> index c59403adb387..6b5579522587 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+> @@ -152,6 +152,11 @@
+>  	pinctrl-0 = <&eth_rgmii_pins>;
+>  	pinctrl-names = "default";
+>  	phy-handle = <&eth_phy0>;
+> +	phy-mode = "rgmii";
+> +
+> +	snps,reset-gpio = <&gpio GPIOZ_14 0>;
+> +	snps,reset-delays-us = <0 10000 1000000>;
+> +	snps,reset-active-low;
+>  
+>  	mdio {
+>  		compatible = "snps,dwmac-mdio";
+> 
 
-   It's not a macro -- innermost parens not needed...
-
-[...]
-
-MBR, Sergei
+On Odroid-c2 rev 0.2 :
+Tested-by: Neil Armstrong <narmstrong@baylibre.com>
