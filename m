@@ -1,115 +1,641 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 20 Jan 2017 15:00:02 +0100
-Subject: [PATCH v3 2/4] dt-bindings: Add TI SCI PM Domains
-In-Reply-To: <CAL_Jsq+Vp8iYrAUmuSRzeeY_G6CUqFqG6XB6erDxo1RYo3g4=g@mail.gmail.com>
-References: <20170104205536.15963-1-d-gerlach@ti.com>
- <20170104205536.15963-3-d-gerlach@ti.com>
- <20170109175012.sg7eze7llqq7qevd@rob-hp-laptop>
- <7bd282d9-df6f-f4c6-1f7f-c8ed81c78af3@ti.com>
- <CAL_JsqKxU4c=KSn0=xX9kmbk498fhqpiXMeGjcoe8Ah48FAzUg@mail.gmail.com>
- <3bb89649-fd2a-acc6-6968-e54a00842ce2@ti.com>
- <CAL_JsqL+L1oHAOv7tLevzbtRFSKRs9J01SgF=HR_vNNqNV+4+Q@mail.gmail.com>
- <84d7d49b-933b-8b26-f18a-3a5054738cb1@ti.com>
- <CAL_JsqJ9RitNC7ihC8ckJgV+49kaHk=W9tgdNBSjEfydhQS46A@mail.gmail.com>
- <0eaa9914-83f1-7716-cf04-1e3dd44df647@ti.com>
- <4cb25cf9-216f-2e18-f45d-ef7e48fa6c5e@ti.com>
- <m2ziip2puf.fsf@baylibre.com>
- <CAL_Jsq+Vp8iYrAUmuSRzeeY_G6CUqFqG6XB6erDxo1RYo3g4=g@mail.gmail.com>
-Message-ID: <CAPDyKFqzs59N5bc89X-96Fgy9b=_+s8zYmHHshQeDrJCnaqprA@mail.gmail.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Fri, 20 Jan 2017 15:03:16 +0100
+Subject: [PATCH v3 13/24] platform: add video-multiplexer subdevice driver
+In-Reply-To: <1483755102-24785-14-git-send-email-steve_longerbeam@mentor.com>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <1483755102-24785-14-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <b7695d77-4078-f171-d592-ff679e28b8e0@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Sudeep
+On 01/07/2017 03:11 AM, Steve Longerbeam wrote:
+> From: Philipp Zabel <p.zabel@pengutronix.de>
+> 
+> This driver can handle SoC internal and external video bus multiplexers,
+> controlled either by register bit fields or by a GPIO. The subdevice
+> passes through frame interval and mbus configuration of the active input
+> to the output side.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> 
+> --
+> 
+> - fixed a cut&paste error in vidsw_remove(): v4l2_async_register_subdev()
+>   should be unregister.
+> 
+> - added media_entity_cleanup() and v4l2_device_unregister_subdev()
+>   to vidsw_remove().
+> 
+> - there was a line left over from a previous iteration that negated
+>   the new way of determining the pad count just before it which
+>   has been removed (num_pads = of_get_child_count(np)).
+> 
+> - Philipp Zabel has developed a set of patches that allow adding
+>   to the subdev async notifier waiting list using a chaining method
+>   from the async registered callbacks (v4l2_of_subdev_registered()
+>   and the prep patches for that). For now, I've removed the use of
+>   v4l2_of_subdev_registered() for the vidmux driver's registered
+>   callback. This doesn't affect the functionality of this driver,
+>   but allows for it to be merged now, before adding the chaining
+>   support.
+> 
+> Signed-off-by: Steve Longerbeam <steve_longerbeam@mentor.com>
+> ---
+>  .../bindings/media/video-multiplexer.txt           |  59 +++
+>  drivers/media/platform/Kconfig                     |   8 +
+>  drivers/media/platform/Makefile                    |   2 +
+>  drivers/media/platform/video-multiplexer.c         | 472 +++++++++++++++++++++
+>  4 files changed, 541 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/video-multiplexer.txt
+>  create mode 100644 drivers/media/platform/video-multiplexer.c
+> 
+> diff --git a/Documentation/devicetree/bindings/media/video-multiplexer.txt b/Documentation/devicetree/bindings/media/video-multiplexer.txt
+> new file mode 100644
+> index 0000000..9d133d9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/video-multiplexer.txt
+> @@ -0,0 +1,59 @@
+> +Video Multiplexer
+> +=================
+> +
+> +Video multiplexers allow to select between multiple input ports. Video received
+> +on the active input port is passed through to the output port. Muxes described
+> +by this binding may be controlled by a syscon register bitfield or by a GPIO.
+> +
+> +Required properties:
+> +- compatible : should be "video-multiplexer"
+> +- reg: should be register base of the register containing the control bitfield
+> +- bit-mask: bitmask of the control bitfield in the control register
+> +- bit-shift: bit offset of the control bitfield in the control register
+> +- gpios: alternatively to reg, bit-mask, and bit-shift, a single GPIO phandle
+> +  may be given to switch between two inputs
+> +- #address-cells: should be <1>
+> +- #size-cells: should be <0>
+> +- port@*: at least three port nodes containing endpoints connecting to the
+> +  source and sink devices according to of_graph bindings. The last port is
+> +  the output port, all others are inputs.
+> +
+> +Example:
+> +
+> +syscon {
+> +	compatible = "syscon", "simple-mfd";
+> +
+> +	mux {
+> +		compatible = "video-multiplexer";
+> +		/* Single bit (1 << 19) in syscon register 0x04: */
+> +		reg = <0x04>;
+> +		bit-mask = <1>;
+> +		bit-shift = <19>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		port at 0 {
+> +			reg = <0>;
+> +
+> +			mux_in0: endpoint {
+> +				remote-endpoint = <&video_source0_out>;
+> +			};
+> +		};
+> +
+> +		port at 1 {
+> +			reg = <1>;
+> +
+> +			mux_in1: endpoint {
+> +				remote-endpoint = <&video_source1_out>;
+> +			};
+> +		};
+> +
+> +		port at 2 {
+> +			reg = <2>;
+> +
+> +			mux_out: endpoint {
+> +				remote-endpoint = <&capture_interface_in>;
+> +			};
+> +		};
+> +	};
+> +};
+> diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
+> index d944421..65614b5 100644
+> --- a/drivers/media/platform/Kconfig
+> +++ b/drivers/media/platform/Kconfig
+> @@ -74,6 +74,14 @@ config VIDEO_M32R_AR_M64278
+>  	  To compile this driver as a module, choose M here: the
+>  	  module will be called arv.
+>  
+> +config VIDEO_MULTIPLEXER
+> +	tristate "Video Multiplexer"
+> +	depends on VIDEO_V4L2_SUBDEV_API && MEDIA_CONTROLLER
+> +	help
+> +	  This driver provides support for SoC internal N:1 video bus
+> +	  multiplexers controlled by register bitfields as well as external
+> +	  2:1 video multiplexers controlled by a single GPIO.
+> +
+>  config VIDEO_OMAP3
+>  	tristate "OMAP 3 Camera support"
+>  	depends on VIDEO_V4L2 && I2C && VIDEO_V4L2_SUBDEV_API && ARCH_OMAP3
+> diff --git a/drivers/media/platform/Makefile b/drivers/media/platform/Makefile
+> index 5b3cb27..7cf0ee5 100644
+> --- a/drivers/media/platform/Makefile
+> +++ b/drivers/media/platform/Makefile
+> @@ -27,6 +27,8 @@ obj-$(CONFIG_VIDEO_SH_VEU)		+= sh_veu.o
+>  
+>  obj-$(CONFIG_VIDEO_MEM2MEM_DEINTERLACE)	+= m2m-deinterlace.o
+>  
+> +obj-$(CONFIG_VIDEO_MULTIPLEXER)		+= video-multiplexer.o
+> +
+>  obj-$(CONFIG_VIDEO_S3C_CAMIF) 		+= s3c-camif/
+>  obj-$(CONFIG_VIDEO_SAMSUNG_EXYNOS4_IS) 	+= exynos4-is/
+>  obj-$(CONFIG_VIDEO_SAMSUNG_S5P_JPEG)	+= s5p-jpeg/
+> diff --git a/drivers/media/platform/video-multiplexer.c b/drivers/media/platform/video-multiplexer.c
+> new file mode 100644
+> index 0000000..48980c4
+> --- /dev/null
+> +++ b/drivers/media/platform/video-multiplexer.c
+> @@ -0,0 +1,472 @@
+> +/*
+> + * video stream multiplexer controlled via gpio or syscon
+> + *
+> + * Copyright (C) 2013 Pengutronix, Sascha Hauer <kernel@pengutronix.de>
+> + * Copyright (C) 2016 Pengutronix, Philipp Zabel <kernel@pengutronix.de>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * as published by the Free Software Foundation; either version 2
+> + * of the License, or (at your option) any later version.
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/err.h>
+> +#include <linux/gpio/consumer.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_graph.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regmap.h>
+> +#include <media/v4l2-async.h>
+> +#include <media/v4l2-device.h>
+> +#include <media/v4l2-subdev.h>
+> +#include <media/v4l2-of.h>
+> +
+> +struct vidsw {
+> +	struct v4l2_subdev subdev;
+> +	unsigned int num_pads;
+> +	struct media_pad *pads;
+> +	struct v4l2_mbus_framefmt *format_mbus;
+> +	struct v4l2_fract timeperframe;
+> +	struct v4l2_of_endpoint *endpoint;
+> +	struct regmap_field *field;
+> +	struct gpio_desc *gpio;
+> +	int active;
+> +};
+> +
+> +static inline struct vidsw *v4l2_subdev_to_vidsw(struct v4l2_subdev *sd)
+> +{
+> +	return container_of(sd, struct vidsw, subdev);
+> +}
+> +
+> +static void vidsw_set_active(struct vidsw *vidsw, int active)
+> +{
+> +	vidsw->active = active;
+> +	if (active < 0)
+> +		return;
+> +
+> +	dev_dbg(vidsw->subdev.dev, "setting %d active\n", active);
+> +
+> +	if (vidsw->field)
+> +		regmap_field_write(vidsw->field, active);
+> +	else if (vidsw->gpio)
+> +		gpiod_set_value(vidsw->gpio, active);
+> +}
+> +
+> +static int vidsw_link_setup(struct media_entity *entity,
+> +			    const struct media_pad *local,
+> +			    const struct media_pad *remote, u32 flags)
+> +{
+> +	struct v4l2_subdev *sd = media_entity_to_v4l2_subdev(entity);
+> +	struct vidsw *vidsw = v4l2_subdev_to_vidsw(sd);
+> +
+> +	/* We have no limitations on enabling or disabling our output link */
+> +	if (local->index == vidsw->num_pads - 1)
+> +		return 0;
+> +
+> +	dev_dbg(sd->dev, "link setup %s -> %s", remote->entity->name,
+> +		local->entity->name);
+> +
+> +	if (!(flags & MEDIA_LNK_FL_ENABLED)) {
+> +		if (local->index == vidsw->active) {
+> +			dev_dbg(sd->dev, "going inactive\n");
+> +			vidsw->active = -1;
+> +		}
+> +		return 0;
+> +	}
+> +
+> +	if (vidsw->active >= 0) {
+> +		struct media_pad *pad;
+> +
+> +		if (vidsw->active == local->index)
+> +			return 0;
+> +
+> +		pad = media_entity_remote_pad(&vidsw->pads[vidsw->active]);
+> +		if (pad) {
+> +			struct media_link *link;
+> +			int ret;
+> +
+> +			link = media_entity_find_link(pad,
+> +						&vidsw->pads[vidsw->active]);
+> +			if (link) {
+> +				ret = __media_entity_setup_link(link, 0);
+> +				if (ret)
+> +					return ret;
+> +			}
+> +		}
+> +	}
+> +
+> +	vidsw_set_active(vidsw, local->index);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct media_entity_operations vidsw_ops = {
+> +	.link_setup = vidsw_link_setup,
+> +};
+> +
+> +static bool vidsw_endpoint_disabled(struct device_node *ep)
+> +{
+> +	struct device_node *rpp;
+> +
+> +	if (!of_device_is_available(ep))
+> +		return true;
+> +
+> +	rpp = of_graph_get_remote_port_parent(ep);
+> +	if (!rpp)
+> +		return true;
+> +
+> +	return !of_device_is_available(rpp);
+> +}
+> +
+> +static int vidsw_async_init(struct vidsw *vidsw, struct device_node *node)
+> +{
+> +	struct device_node *ep;
+> +	u32 portno;
+> +	int numports;
+> +	int ret;
+> +	int i;
+> +	bool active_link = false;
+> +
+> +	numports = vidsw->num_pads;
+> +
+> +	for (i = 0; i < numports - 1; i++)
+> +		vidsw->pads[i].flags = MEDIA_PAD_FL_SINK;
+> +	vidsw->pads[numports - 1].flags = MEDIA_PAD_FL_SOURCE;
+> +
+> +	vidsw->subdev.entity.function = MEDIA_ENT_F_MUX;
+> +	ret = media_entity_pads_init(&vidsw->subdev.entity, numports,
+> +				     vidsw->pads);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	vidsw->subdev.entity.ops = &vidsw_ops;
+> +
+> +	for_each_endpoint_of_node(node, ep) {
+> +		struct v4l2_of_endpoint endpoint;
+> +
+> +		v4l2_of_parse_endpoint(ep, &endpoint);
+> +
+> +		portno = endpoint.base.port;
+> +		if (portno >= numports - 1)
+> +			continue;
+> +
+> +		if (vidsw_endpoint_disabled(ep)) {
+> +			dev_dbg(vidsw->subdev.dev, "port %d disabled\n", portno);
+> +			continue;
+> +		}
+> +
+> +		vidsw->endpoint[portno] = endpoint;
+> +
+> +		if (portno == vidsw->active)
+> +			active_link = true;
+> +	}
+> +
+> +	for (portno = 0; portno < numports - 1; portno++) {
+> +		if (!vidsw->endpoint[portno].base.local_node)
+> +			continue;
+> +
+> +		/* If the active input is not connected, use another */
+> +		if (!active_link) {
+> +			vidsw_set_active(vidsw, portno);
+> +			active_link = true;
+> +		}
+> +	}
+> +
+> +	return v4l2_async_register_subdev(&vidsw->subdev);
+> +}
+> +
+> +int vidsw_g_mbus_config(struct v4l2_subdev *sd, struct v4l2_mbus_config *cfg)
+> +{
+> +	struct vidsw *vidsw = v4l2_subdev_to_vidsw(sd);
+> +	struct media_pad *pad;
+> +	int ret;
+> +
+> +	if (vidsw->active == -1) {
+> +		dev_err(sd->dev, "no configuration for inactive mux\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	/*
+> +	 * Retrieve media bus configuration from the entity connected to the
+> +	 * active input
+> +	 */
+> +	pad = media_entity_remote_pad(&vidsw->pads[vidsw->active]);
+> +	if (pad) {
+> +		sd = media_entity_to_v4l2_subdev(pad->entity);
+> +		ret = v4l2_subdev_call(sd, video, g_mbus_config, cfg);
+> +		if (ret == -ENOIOCTLCMD)
+> +			pad = NULL;
+> +		else if (ret < 0) {
+> +			dev_err(sd->dev, "failed to get source configuration\n");
+> +			return ret;
+> +		}
+> +	}
+> +	if (!pad) {
+> +		/* Mirror the input side on the output side */
+> +		cfg->type = vidsw->endpoint[vidsw->active].bus_type;
+> +		if (cfg->type == V4L2_MBUS_PARALLEL ||
+> +		    cfg->type == V4L2_MBUS_BT656)
+> +			cfg->flags = vidsw->endpoint[vidsw->active].bus.parallel.flags;
+> +	}
+> +
+> +	return 0;
+> +}
 
-On 19 January 2017 at 00:03, Rob Herring <robh@kernel.org> wrote:
-> On Tue, Jan 17, 2017 at 6:07 PM, Kevin Hilman <khilman@baylibre.com> wrote:
->> Tero Kristo <t-kristo@ti.com> writes:
->>> On 17/01/17 00:12, Dave Gerlach wrote:
->>>> On 01/13/2017 08:40 PM, Rob Herring wrote:
->>>>> On Fri, Jan 13, 2017 at 2:28 PM, Dave Gerlach <d-gerlach@ti.com> wrote:
->
-> [...]
->
->>>>>> My ti,sci-id is not an index into a list of power domains, so it
->>>>>> should not
->>>>>> go in the power-domains cells and go against what the power-domains
->>>>>> binding
->>>>>> says that the cell expects. We have one single power domain, and the new
->>>>>> ti,sci-id binding is not something the genpd framework itself is
->>>>>> concerned
->>>>>> with as it's our property to identify a device inside a power domain,
->>>>>> not to
->>>>>> identify which power domain it is associated with.
->>>>>
->>>>> What is the id used for? I can understand why you need to know what
->>>>> power domain a device is in (as power-domains identifies), but not
->>>>> what devices are in a power domain.
->>>>
->>>> We have a system control processor that provides power management
->>>> services to the OS and it responsible for handling the power state of
->>>> each device. This control happens over a communication interface we have
->>>> called TI SCI (implemented at drivers/firmware/ti-sci.c). The
->>>> communication protocol uses these ids to identify each device within the
->>>> power domain so that the control processor can do what is necessary to
->>>> enable that device.
->>>
->>> I think a minor detail here that Rob might be missing right now is,
->>> that the ti,sci-id is only controlling the PM runtime handling, and
->>> providing the ID per-device for this purpose only. AFAIK, it is not
->>> really connected to the power domain anymore as such, as we don't have
->>> power-domains / per device anymore as was the case in some earlier
->>> revision of this work.
->>
->> I think this gets to the heart of things.  IMO The confusion arises
->> because we're throwing around the term "power domain" when there isn't
->> an actual hardware power domain here.
->
-> I thought there was 1.
->
->> Unfortunately, the genpd bindings have used the terminology power-domain
->> when in fact genpd is more generic than that and can be used not just
->> for hardware power domains, but for arbitrary grouping of devices that
->> have common PM properties.  That's why genpd actually stands for generic
->> PM domain, not power domain.  Unfortunately, the bindings have grown
->> primarily out of the usage for hardware power domains.
->
-> Now it makes some sense.
->
-> So the question is does this PM domain grouping need to be described
-> in DT or not, and if so what does that look like?
+I am not certain this op is needed at all. In the current kernel this op is only
+used by soc_camera, pxa_camera and omap3isp (somewhat dubious). Normally this
+information should come from the device tree and there should be no need for this op.
 
-Yes, it's needed and already being done. For example, we have clock
-domains for several Renesas platforms.
+My (tentative) long-term plan was to get rid of this op.
 
->
-> We could continue to use the power domain binding (maybe we already
-> are and that ship has sailed). I'm not totally against the idea even
-> if there is no power domain, but I'm not sold on it either. If we do
-> go this route, then I still say the id should be a cell in the
-> power-domain phandle.
->
-> Another option is create something new either common or TI SCI
-> specific. It could be just a table of ids and phandles in the SCI
-> node. I'm much more comfortable with an isolated property in one node
-> than something scattered throughout the DT.
+If you don't need it, then I recommend it is removed.
 
-To me, this seems like the best possible solution.
+> +
+> +static int vidsw_s_stream(struct v4l2_subdev *sd, int enable)
+> +{
+> +	struct vidsw *vidsw = v4l2_subdev_to_vidsw(sd);
+> +	struct v4l2_subdev *upstream_sd;
+> +	struct media_pad *pad;
+> +
+> +	if (vidsw->active == -1) {
+> +		dev_err(sd->dev, "Can not start streaming on inactive mux\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	pad = media_entity_remote_pad(&sd->entity.pads[vidsw->active]);
+> +	if (!pad) {
+> +		dev_err(sd->dev, "Failed to find remote source pad\n");
+> +		return -ENOLINK;
+> +	}
+> +
+> +	if (!is_media_entity_v4l2_subdev(pad->entity)) {
+> +		dev_err(sd->dev, "Upstream entity is not a v4l2 subdev\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	upstream_sd = media_entity_to_v4l2_subdev(pad->entity);
+> +
+> +	return v4l2_subdev_call(upstream_sd, video, s_stream, enable);
+> +}
+> +
+> +static int vidsw_g_frame_interval(struct v4l2_subdev *sd,
+> +				  struct v4l2_subdev_frame_interval *fi)
+> +{
+> +	struct vidsw *vidsw = v4l2_subdev_to_vidsw(sd);
+> +
+> +	fi->interval = vidsw->timeperframe;
+> +
+> +	return 0;
+> +}
+> +
+> +static int vidsw_s_frame_interval(struct v4l2_subdev *sd,
+> +				  struct v4l2_subdev_frame_interval *fi)
+> +{
+> +	struct vidsw *vidsw = v4l2_subdev_to_vidsw(sd);
+> +
+> +	vidsw->timeperframe = fi->interval;
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct v4l2_subdev_video_ops vidsw_subdev_video_ops = {
+> +	.g_mbus_config = vidsw_g_mbus_config,
+> +	.s_stream = vidsw_s_stream,
+> +	.g_frame_interval = vidsw_g_frame_interval,
+> +	.s_frame_interval = vidsw_s_frame_interval,
+> +};
+> +
+> +static struct v4l2_mbus_framefmt *
+> +__vidsw_get_pad_format(struct v4l2_subdev *sd,
+> +		       struct v4l2_subdev_pad_config *cfg,
+> +		       unsigned int pad, u32 which)
+> +{
+> +	struct vidsw *vidsw = v4l2_subdev_to_vidsw(sd);
+> +
+> +	switch (which) {
+> +	case V4L2_SUBDEV_FORMAT_TRY:
+> +		return v4l2_subdev_get_try_format(sd, cfg, pad);
+> +	case V4L2_SUBDEV_FORMAT_ACTIVE:
+> +		return &vidsw->format_mbus[pad];
+> +	default:
+> +		return NULL;
+> +	}
+> +}
+> +
+> +static int vidsw_get_format(struct v4l2_subdev *sd,
+> +			    struct v4l2_subdev_pad_config *cfg,
+> +			    struct v4l2_subdev_format *sdformat)
+> +{
+> +	sdformat->format = *__vidsw_get_pad_format(sd, cfg, sdformat->pad,
+> +						   sdformat->which);
+> +	return 0;
+> +}
+> +
+> +static int vidsw_set_format(struct v4l2_subdev *sd,
+> +			    struct v4l2_subdev_pad_config *cfg,
+> +			    struct v4l2_subdev_format *sdformat)
+> +{
+> +	struct vidsw *vidsw = v4l2_subdev_to_vidsw(sd);
+> +	struct v4l2_mbus_framefmt *mbusformat;
+> +
+> +	if (sdformat->pad >= vidsw->num_pads)
+> +		return -EINVAL;
+> +
+> +	mbusformat = __vidsw_get_pad_format(sd, cfg, sdformat->pad,
+> +					    sdformat->which);
+> +	if (!mbusformat)
+> +		return -EINVAL;
+> +
+> +	/* Output pad mirrors active input pad, no limitations on input pads */
+> +	if (sdformat->pad == (vidsw->num_pads - 1) && vidsw->active >= 0)
+> +		sdformat->format = vidsw->format_mbus[vidsw->active];
+> +
+> +	*mbusformat = sdformat->format;
+> +
+> +	return 0;
+> +}
+> +
+> +static struct v4l2_subdev_pad_ops vidsw_pad_ops = {
+> +	.get_fmt = vidsw_get_format,
+> +	.set_fmt = vidsw_set_format,
+> +};
+> +
+> +static struct v4l2_subdev_ops vidsw_subdev_ops = {
+> +	.pad = &vidsw_pad_ops,
+> +	.video = &vidsw_subdev_video_ops,
+> +};
+> +
+> +static int of_get_reg_field(struct device_node *node, struct reg_field *field)
+> +{
+> +	u32 bit_mask;
+> +	int ret;
+> +
+> +	ret = of_property_read_u32(node, "reg", &field->reg);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	ret = of_property_read_u32(node, "bit-mask", &bit_mask);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	ret = of_property_read_u32(node, "bit-shift", &field->lsb);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	field->msb = field->lsb + fls(bit_mask) - 1;
+> +
+> +	return 0;
+> +}
+> +
+> +static int vidsw_probe(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct of_endpoint endpoint;
+> +	struct device_node *ep;
+> +	struct reg_field field;
+> +	struct vidsw *vidsw;
+> +	struct regmap *map;
+> +	unsigned int num_pads;
+> +	int ret;
+> +
+> +	vidsw = devm_kzalloc(&pdev->dev, sizeof(*vidsw), GFP_KERNEL);
+> +	if (!vidsw)
+> +		return -ENOMEM;
+> +
+> +	platform_set_drvdata(pdev, vidsw);
+> +
+> +	v4l2_subdev_init(&vidsw->subdev, &vidsw_subdev_ops);
+> +	snprintf(vidsw->subdev.name, sizeof(vidsw->subdev.name), "%s",
+> +			np->name);
+> +	vidsw->subdev.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
+> +	vidsw->subdev.dev = &pdev->dev;
+> +
+> +	/*
+> +	 * The largest numbered port is the output port. It determines
+> +	 * total number of pads
+> +	 */
+> +	num_pads = 0;
+> +	for_each_endpoint_of_node(np, ep) {
+> +		of_graph_parse_endpoint(ep, &endpoint);
+> +		num_pads = max(num_pads, endpoint.port + 1);
+> +	}
+> +
+> +	if (num_pads < 2) {
+> +		dev_err(&pdev->dev, "Not enough ports %d\n", num_pads);
+> +		return -EINVAL;
+> +	}
+> +
+> +	ret = of_get_reg_field(np, &field);
+> +	if (ret == 0) {
+> +		map = syscon_node_to_regmap(np->parent);
+> +		if (!map) {
+> +			dev_err(&pdev->dev, "Failed to get syscon register map\n");
+> +			return PTR_ERR(map);
+> +		}
+> +
+> +		vidsw->field = devm_regmap_field_alloc(&pdev->dev, map, field);
+> +		if (IS_ERR(vidsw->field)) {
+> +			dev_err(&pdev->dev, "Failed to allocate regmap field\n");
+> +			return PTR_ERR(vidsw->field);
+> +		}
+> +
+> +		regmap_field_read(vidsw->field, &vidsw->active);
+> +	} else {
+> +		if (num_pads > 3) {
+> +			dev_err(&pdev->dev, "Too many ports %d\n", num_pads);
+> +			return -EINVAL;
+> +		}
+> +
+> +		vidsw->gpio = devm_gpiod_get(&pdev->dev, NULL, GPIOD_OUT_LOW);
+> +		if (IS_ERR(vidsw->gpio)) {
+> +			dev_warn(&pdev->dev,
+> +				 "could not request control gpio: %d\n", ret);
+> +			vidsw->gpio = NULL;
+> +		}
+> +
+> +		vidsw->active = gpiod_get_value(vidsw->gpio) ? 1 : 0;
+> +	}
+> +
+> +	vidsw->num_pads = num_pads;
+> +	vidsw->pads = devm_kzalloc(&pdev->dev, sizeof(*vidsw->pads) * num_pads,
+> +			GFP_KERNEL);
+> +	vidsw->format_mbus = devm_kzalloc(&pdev->dev,
+> +			sizeof(*vidsw->format_mbus) * num_pads, GFP_KERNEL);
+> +	vidsw->endpoint = devm_kzalloc(&pdev->dev,
+> +			sizeof(*vidsw->endpoint) * (num_pads - 1), GFP_KERNEL);
+> +
+> +	ret = vidsw_async_init(vidsw, np);
+> +	if (ret)
+> +		return ret;
+> +
+> +	return 0;
+> +}
+> +
+> +static int vidsw_remove(struct platform_device *pdev)
+> +{
+> +	struct vidsw *vidsw = platform_get_drvdata(pdev);
+> +	struct v4l2_subdev *sd = &vidsw->subdev;
+> +
+> +	v4l2_async_unregister_subdev(sd);
+> +	media_entity_cleanup(&sd->entity);
+> +	v4l2_device_unregister_subdev(sd);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id vidsw_dt_ids[] = {
+> +	{ .compatible = "video-multiplexer", },
+> +	{ /* sentinel */ }
+> +};
+> +
+> +static struct platform_driver vidsw_driver = {
+> +	.probe		= vidsw_probe,
+> +	.remove		= vidsw_remove,
+> +	.driver		= {
+> +		.of_match_table = vidsw_dt_ids,
+> +		.name = "video-multiplexer",
+> +	},
+> +};
+> +
+> +module_platform_driver(vidsw_driver);
+> +
+> +MODULE_DESCRIPTION("video stream multiplexer");
+> +MODULE_AUTHOR("Sascha Hauer, Pengutronix");
+> +MODULE_AUTHOR("Philipp Zabel, Pengutronix");
+> +MODULE_LICENSE("GPL");
+> 
 
-However, perhaps we should also consider the SCPI Generic power domain
-(drivers/firmware/scpi_pm_domain.c), because I believe it's closely
-related.
-To change the power state of a device, this PM domain calls
-scpi_device_set|get_power_state() (drivers/firmware/arm_scpi.c), which
-also needs a device id as a parameter. Very similar to our case with
-the TI SCI domain.
+Regards,
 
-Currently these SCPI device ids lacks corresponding DT bindings, so
-the scpi_pm_domain tries to work around it by assigning ids
-dynamically at genpd creation time.
-
-That makes me wonder, whether we should think of something common/generic?
-
-[...]
-
-Kind regards
-Uffe
+	Hans
