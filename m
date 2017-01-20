@@ -1,132 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 20 Jan 2017 10:51:51 -0800
-Subject: [PATCH] ARM: OMAP2+: Remove duplicate definition of omap_test_timeout
-Message-ID: <20170120185151.1630-1-tony@atomide.com>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Fri, 20 Jan 2017 10:50:56 -0800
+Subject: [PATCH v7 4/5] usb: chipidea: Signal vbus state to phy
+In-Reply-To: <20170120185057.16206-1-stephen.boyd@linaro.org>
+References: <20170120185057.16206-1-stephen.boyd@linaro.org>
+Message-ID: <20170120185057.16206-5-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have the same defined already in common.h.
+Some USB PHYs need to be told about vbus changing state
+explicitly. For example the qcom USB HS PHY needs to toggle a bit
+when vbus goes from low to high (VBUSVLDEXT) to cause the
+"session valid" signal to toggle. This signal will pull up D+
+when the phy starts running. Add the appropriate phy_set_vbus()
+call here to signal vbus state changes to the phy.
 
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- arch/arm/mach-omap2/cm2xxx.c                |  1 +
- arch/arm/mach-omap2/cm33xx.c                |  1 +
- arch/arm/mach-omap2/cm3xxx.c                |  1 +
- arch/arm/mach-omap2/cminst44xx.c            |  1 +
- arch/arm/mach-omap2/powerdomains3xxx_data.c |  1 +
- arch/arm/mach-omap2/prcm-common.h           | 22 ----------------------
- arch/arm/mach-omap2/prm2xxx_3xxx.c          |  1 +
- arch/arm/mach-omap2/prm33xx.c               |  1 +
- 8 files changed, 7 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cm2xxx.c b/arch/arm/mach-omap2/cm2xxx.c
---- a/arch/arm/mach-omap2/cm2xxx.c
-+++ b/arch/arm/mach-omap2/cm2xxx.c
-@@ -18,6 +18,7 @@
- #include <linux/err.h>
- #include <linux/io.h>
+New patch
+
+ drivers/usb/chipidea/otg.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/usb/chipidea/otg.c b/drivers/usb/chipidea/otg.c
+index 10236fe71522..6ea702beed48 100644
+--- a/drivers/usb/chipidea/otg.c
++++ b/drivers/usb/chipidea/otg.c
+@@ -134,10 +134,13 @@ void ci_handle_vbus_change(struct ci_hdrc *ci)
+ 	if (!ci->is_otg)
+ 		return;
  
-+#include "common.h"
- #include "prm2xxx.h"
- #include "cm.h"
- #include "cm2xxx.h"
-diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
---- a/arch/arm/mach-omap2/cm33xx.c
-+++ b/arch/arm/mach-omap2/cm33xx.c
-@@ -22,6 +22,7 @@
- #include <linux/err.h>
- #include <linux/io.h>
+-	if (hw_read_otgsc(ci, OTGSC_BSV) && !ci->vbus_active)
++	if (hw_read_otgsc(ci, OTGSC_BSV) && !ci->vbus_active) {
+ 		usb_gadget_vbus_connect(&ci->gadget);
+-	else if (!hw_read_otgsc(ci, OTGSC_BSV) && ci->vbus_active)
++		phy_set_vbus(ci->phy, 1);
++	} else if (!hw_read_otgsc(ci, OTGSC_BSV) && ci->vbus_active) {
++		phy_set_vbus(ci->phy, 0);
+ 		usb_gadget_vbus_disconnect(&ci->gadget);
++	}
+ }
  
-+#include "common.h"
- #include "clockdomain.h"
- #include "cm.h"
- #include "cm33xx.h"
-diff --git a/arch/arm/mach-omap2/cm3xxx.c b/arch/arm/mach-omap2/cm3xxx.c
---- a/arch/arm/mach-omap2/cm3xxx.c
-+++ b/arch/arm/mach-omap2/cm3xxx.c
-@@ -18,6 +18,7 @@
- #include <linux/err.h>
- #include <linux/io.h>
- 
-+#include "common.h"
- #include "prm2xxx_3xxx.h"
- #include "cm.h"
- #include "cm3xxx.h"
-diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
---- a/arch/arm/mach-omap2/cminst44xx.c
-+++ b/arch/arm/mach-omap2/cminst44xx.c
-@@ -21,6 +21,7 @@
- #include <linux/err.h>
- #include <linux/io.h>
- 
-+#include "common.h"
- #include "clockdomain.h"
- #include "cm.h"
- #include "cm1_44xx.h"
-diff --git a/arch/arm/mach-omap2/powerdomains3xxx_data.c b/arch/arm/mach-omap2/powerdomains3xxx_data.c
---- a/arch/arm/mach-omap2/powerdomains3xxx_data.c
-+++ b/arch/arm/mach-omap2/powerdomains3xxx_data.c
-@@ -14,6 +14,7 @@
- #include <linux/kernel.h>
- #include <linux/init.h>
- #include <linux/bug.h>
-+#include <linux/delay.h>
- 
- #include "soc.h"
- #include "powerdomain.h"
-diff --git a/arch/arm/mach-omap2/prcm-common.h b/arch/arm/mach-omap2/prcm-common.h
---- a/arch/arm/mach-omap2/prcm-common.h
-+++ b/arch/arm/mach-omap2/prcm-common.h
-@@ -434,28 +434,6 @@
- #define MAX_IOPAD_LATCH_TIME			100
- # ifndef __ASSEMBLER__
- 
--#include <linux/delay.h>
--
--/**
-- * omap_test_timeout - busy-loop, testing a condition
-- * @cond: condition to test until it evaluates to true
-- * @timeout: maximum number of microseconds in the timeout
-- * @index: loop index (integer)
-- *
-- * Loop waiting for @cond to become true or until at least @timeout
-- * microseconds have passed.  To use, define some integer @index in the
-- * calling code.  After running, if @index == @timeout, then the loop has
-- * timed out.
-- */
--#define omap_test_timeout(cond, timeout, index)			\
--({								\
--	for (index = 0; index < timeout; index++) {		\
--		if (cond)					\
--			break;					\
--		udelay(1);					\
--	}							\
--})
--
  /**
-  * struct omap_prcm_irq - describes a PRCM interrupt bit
-  * @name: a short name describing the interrupt type, e.g. "wkup" or "io"
-diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
---- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
-+++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-@@ -16,6 +16,7 @@
- #include <linux/err.h>
- #include <linux/io.h>
- 
-+#include "common.h"
- #include "powerdomain.h"
- #include "prm2xxx_3xxx.h"
- #include "prm-regbits-24xx.h"
-diff --git a/arch/arm/mach-omap2/prm33xx.c b/arch/arm/mach-omap2/prm33xx.c
---- a/arch/arm/mach-omap2/prm33xx.c
-+++ b/arch/arm/mach-omap2/prm33xx.c
-@@ -19,6 +19,7 @@
- #include <linux/err.h>
- #include <linux/io.h>
- 
-+#include "common.h"
- #include "powerdomain.h"
- #include "prm33xx.h"
- #include "prm-regbits-33xx.h"
 -- 
-2.11.0
+2.10.0.297.gf6727b0
