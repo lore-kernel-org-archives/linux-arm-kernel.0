@@ -1,37 +1,78 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 20 Jan 2017 14:55:13 +0100
-Subject: [PATCH] clk: samsung: exynos5420: Mark CLK_ACLK432_SCALER as
- CLK_IS_CRITICAL
-In-Reply-To: <551ac156-0cfa-29be-335f-d8a1f171cd8a@samsung.com>
-References: <CGME20170120104148epcas5p11af0e630f0881092a9b3b43e8b5b1aac@epcas5p1.samsung.com>
- <1484908891-11820-1-git-send-email-javier@osg.samsung.com>
- <551ac156-0cfa-29be-335f-d8a1f171cd8a@samsung.com>
-Message-ID: <0ffa0d28-1086-887c-dcfc-590b6146b03e@samsung.com>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Fri, 20 Jan 2017 14:56:35 +0100
+Subject: [PATCH v3 12/24] add mux and video interface bridge entity
+ functions
+In-Reply-To: <1483755102-24785-13-git-send-email-steve_longerbeam@mentor.com>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <1483755102-24785-13-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <f8279cab-b37e-b157-22e6-9abe316da882@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/20/2017 01:32 PM, Sylwester Nawrocki wrote:
-> On 01/20/2017 11:41 AM, Javier Martinez Canillas wrote:
->> On Exynos5800 SoC the SCALER block uses 2 input clocks: CLK_ACLK_300_GSCL
->> and CLK_ACLK432_SCALER, so both needs to be ungated in order to access it.
->>
->> But Exynos5420 only has the CLK_ACLK_300_GSCL as gsc_pd clk. So just using
->> this definition from exynos5420.dtsi in Exynos5800 leads to the following:
-> [...]
->> So until a proper solution based on runtime PM gets merged, mark the clock
->> as critical to prevent it to be gated.
->>
->> Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->
-> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+On 01/07/2017 03:11 AM, Steve Longerbeam wrote:
+> From: Philipp Zabel <p.zabel@pengutronix.de>
+> 
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> ---
+>  Documentation/media/uapi/mediactl/media-types.rst | 22 ++++++++++++++++++++++
+>  include/uapi/linux/media.h                        |  6 ++++++
+>  2 files changed, 28 insertions(+)
+> 
+> diff --git a/Documentation/media/uapi/mediactl/media-types.rst b/Documentation/media/uapi/mediactl/media-types.rst
+> index 3e03dc2..023be29 100644
+> --- a/Documentation/media/uapi/mediactl/media-types.rst
+> +++ b/Documentation/media/uapi/mediactl/media-types.rst
+> @@ -298,6 +298,28 @@ Types and flags used to represent the media graph elements
+>  	  received on its sink pad and outputs the statistics data on
+>  	  its source pad.
+>  
+> +    -  ..  row 29
+> +
+> +       ..  _MEDIA-ENT-F-MUX:
+> +
+> +       -  ``MEDIA_ENT_F_MUX``
 
-Oops, the $subject patch can be dropped since as Marek just pointed out
-to me the changes introduced by that patch are already included in a patch
-which is already in the v4.10 fixes queue:
+I would prefer MEDIA_ENT_F_VID_MUX since this is video specific.
 
-https://git.kernel.org/cgit/linux/kernel/git/clk/linux.git/commit/?h=clk-next&id=318fa46cc60d37fec1e87dbf03a82aca0f5ce695
+Regards,
 
--- 
-Thanks,
-Sylwester
+	Hans
+
+> +
+> +       - Video multiplexer. An entity capable of multiplexing must have at
+> +         least two sink pads and one source pad, and must pass the video
+> +         frame(s) received from the active sink pad to the source pad. Video
+> +         frame(s) from the inactive sink pads are discarded.
+> +
+> +    -  ..  row 30
+> +
+> +       ..  _MEDIA-ENT-F-VID-IF-BRIDGE:
+> +
+> +       -  ``MEDIA_ENT_F_VID_IF_BRIDGE``
+> +
+> +       - Video interface bridge. A video interface bridge entity must have at
+> +         least one sink pad and one source pad. It receives video frame(s) on
+> +         its sink pad in one bus format (HDMI, eDP, MIPI CSI-2, ...) and
+> +         converts them and outputs them on its source pad in another bus format
+> +         (eDP, MIPI CSI-2, parallel, ...).
+>  
+>  ..  tabularcolumns:: |p{5.5cm}|p{12.0cm}|
+>  
+> diff --git a/include/uapi/linux/media.h b/include/uapi/linux/media.h
+> index 4890787..08a8bfa 100644
+> --- a/include/uapi/linux/media.h
+> +++ b/include/uapi/linux/media.h
+> @@ -105,6 +105,12 @@ struct media_device_info {
+>  #define MEDIA_ENT_F_PROC_VIDEO_STATISTICS	(MEDIA_ENT_F_BASE + 0x4006)
+>  
+>  /*
+> + * Switch and bridge entitites
+> + */
+> +#define MEDIA_ENT_F_MUX				(MEDIA_ENT_F_BASE + 0x5001)
+> +#define MEDIA_ENT_F_VID_IF_BRIDGE		(MEDIA_ENT_F_BASE + 0x5002)
+> +
+> +/*
+>   * Connectors
+>   */
+>  /* It is a responsibility of the entity drivers to add connectors and links */
+> 
