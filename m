@@ -1,50 +1,115 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 20 Jan 2017 11:00:38 -0300
-Subject: [PATCH] clk: samsung: exynos5420: Mark CLK_ACLK432_SCALER as
- CLK_IS_CRITICAL
-In-Reply-To: <0ffa0d28-1086-887c-dcfc-590b6146b03e@samsung.com>
-References: <CGME20170120104148epcas5p11af0e630f0881092a9b3b43e8b5b1aac@epcas5p1.samsung.com>
- <1484908891-11820-1-git-send-email-javier@osg.samsung.com>
- <551ac156-0cfa-29be-335f-d8a1f171cd8a@samsung.com>
- <0ffa0d28-1086-887c-dcfc-590b6146b03e@samsung.com>
-Message-ID: <48a2f141-4275-cb79-aafd-62191d747107@osg.samsung.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 20 Jan 2017 15:00:02 +0100
+Subject: [PATCH v3 2/4] dt-bindings: Add TI SCI PM Domains
+In-Reply-To: <CAL_Jsq+Vp8iYrAUmuSRzeeY_G6CUqFqG6XB6erDxo1RYo3g4=g@mail.gmail.com>
+References: <20170104205536.15963-1-d-gerlach@ti.com>
+ <20170104205536.15963-3-d-gerlach@ti.com>
+ <20170109175012.sg7eze7llqq7qevd@rob-hp-laptop>
+ <7bd282d9-df6f-f4c6-1f7f-c8ed81c78af3@ti.com>
+ <CAL_JsqKxU4c=KSn0=xX9kmbk498fhqpiXMeGjcoe8Ah48FAzUg@mail.gmail.com>
+ <3bb89649-fd2a-acc6-6968-e54a00842ce2@ti.com>
+ <CAL_JsqL+L1oHAOv7tLevzbtRFSKRs9J01SgF=HR_vNNqNV+4+Q@mail.gmail.com>
+ <84d7d49b-933b-8b26-f18a-3a5054738cb1@ti.com>
+ <CAL_JsqJ9RitNC7ihC8ckJgV+49kaHk=W9tgdNBSjEfydhQS46A@mail.gmail.com>
+ <0eaa9914-83f1-7716-cf04-1e3dd44df647@ti.com>
+ <4cb25cf9-216f-2e18-f45d-ef7e48fa6c5e@ti.com>
+ <m2ziip2puf.fsf@baylibre.com>
+ <CAL_Jsq+Vp8iYrAUmuSRzeeY_G6CUqFqG6XB6erDxo1RYo3g4=g@mail.gmail.com>
+Message-ID: <CAPDyKFqzs59N5bc89X-96Fgy9b=_+s8zYmHHshQeDrJCnaqprA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sylwester,
++ Sudeep
 
-On 01/20/2017 10:55 AM, Sylwester Nawrocki wrote:
-> On 01/20/2017 01:32 PM, Sylwester Nawrocki wrote:
->> On 01/20/2017 11:41 AM, Javier Martinez Canillas wrote:
->>> On Exynos5800 SoC the SCALER block uses 2 input clocks: CLK_ACLK_300_GSCL
->>> and CLK_ACLK432_SCALER, so both needs to be ungated in order to access it.
+On 19 January 2017 at 00:03, Rob Herring <robh@kernel.org> wrote:
+> On Tue, Jan 17, 2017 at 6:07 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+>> Tero Kristo <t-kristo@ti.com> writes:
+>>> On 17/01/17 00:12, Dave Gerlach wrote:
+>>>> On 01/13/2017 08:40 PM, Rob Herring wrote:
+>>>>> On Fri, Jan 13, 2017 at 2:28 PM, Dave Gerlach <d-gerlach@ti.com> wrote:
+>
+> [...]
+>
+>>>>>> My ti,sci-id is not an index into a list of power domains, so it
+>>>>>> should not
+>>>>>> go in the power-domains cells and go against what the power-domains
+>>>>>> binding
+>>>>>> says that the cell expects. We have one single power domain, and the new
+>>>>>> ti,sci-id binding is not something the genpd framework itself is
+>>>>>> concerned
+>>>>>> with as it's our property to identify a device inside a power domain,
+>>>>>> not to
+>>>>>> identify which power domain it is associated with.
+>>>>>
+>>>>> What is the id used for? I can understand why you need to know what
+>>>>> power domain a device is in (as power-domains identifies), but not
+>>>>> what devices are in a power domain.
+>>>>
+>>>> We have a system control processor that provides power management
+>>>> services to the OS and it responsible for handling the power state of
+>>>> each device. This control happens over a communication interface we have
+>>>> called TI SCI (implemented at drivers/firmware/ti-sci.c). The
+>>>> communication protocol uses these ids to identify each device within the
+>>>> power domain so that the control processor can do what is necessary to
+>>>> enable that device.
 >>>
->>> But Exynos5420 only has the CLK_ACLK_300_GSCL as gsc_pd clk. So just using
->>> this definition from exynos5420.dtsi in Exynos5800 leads to the following:
->> [...]
->>> So until a proper solution based on runtime PM gets merged, mark the clock
->>> as critical to prevent it to be gated.
->>>
->>> Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>>> I think a minor detail here that Rob might be missing right now is,
+>>> that the ti,sci-id is only controlling the PM runtime handling, and
+>>> providing the ID per-device for this purpose only. AFAIK, it is not
+>>> really connected to the power domain anymore as such, as we don't have
+>>> power-domains / per device anymore as was the case in some earlier
+>>> revision of this work.
 >>
->> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> 
-> Oops, the $subject patch can be dropped since as Marek just pointed out
-> to me the changes introduced by that patch are already included in a patch
-> which is already in the v4.10 fixes queue:
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/clk/linux.git/commit/?h=clk-next&id=318fa46cc60d37fec1e87dbf03a82aca0f5ce695
-> 
+>> I think this gets to the heart of things.  IMO The confusion arises
+>> because we're throwing around the term "power domain" when there isn't
+>> an actual hardware power domain here.
+>
+> I thought there was 1.
+>
+>> Unfortunately, the genpd bindings have used the terminology power-domain
+>> when in fact genpd is more generic than that and can be used not just
+>> for hardware power domains, but for arbitrary grouping of devices that
+>> have common PM properties.  That's why genpd actually stands for generic
+>> PM domain, not power domain.  Unfortunately, the bindings have grown
+>> primarily out of the usage for hardware power domains.
+>
+> Now it makes some sense.
+>
+> So the question is does this PM domain grouping need to be described
+> in DT or not, and if so what does that look like?
 
-Yes, I just answered to Marek in the other thread saying the same.
-He did mention the patch could fix the issue but for some reason I
-didn't see the CLK_ACLK_300_GSCL in the clocks marked as critical...
+Yes, it's needed and already being done. For example, we have clock
+domains for several Renesas platforms.
 
-Anyways, sorry for the noise.
+>
+> We could continue to use the power domain binding (maybe we already
+> are and that ship has sailed). I'm not totally against the idea even
+> if there is no power domain, but I'm not sold on it either. If we do
+> go this route, then I still say the id should be a cell in the
+> power-domain phandle.
+>
+> Another option is create something new either common or TI SCI
+> specific. It could be just a table of ids and phandles in the SCI
+> node. I'm much more comfortable with an isolated property in one node
+> than something scattered throughout the DT.
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+To me, this seems like the best possible solution.
+
+However, perhaps we should also consider the SCPI Generic power domain
+(drivers/firmware/scpi_pm_domain.c), because I believe it's closely
+related.
+To change the power state of a device, this PM domain calls
+scpi_device_set|get_power_state() (drivers/firmware/arm_scpi.c), which
+also needs a device id as a parameter. Very similar to our case with
+the TI SCI domain.
+
+Currently these SCPI device ids lacks corresponding DT bindings, so
+the scpi_pm_domain tries to work around it by assigning ids
+dynamically at genpd creation time.
+
+That makes me wonder, whether we should think of something common/generic?
+
+[...]
+
+Kind regards
+Uffe
