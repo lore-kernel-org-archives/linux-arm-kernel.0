@@ -1,56 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 20 Jan 2017 10:14:07 -0800
-Subject: [PATCH] ARM: OMAP3: Fix SoC detection of OMAP36/37 Family
-In-Reply-To: <1484930641-18566-1-git-send-email-aford173@gmail.com>
-References: <1484930641-18566-1-git-send-email-aford173@gmail.com>
-Message-ID: <20170120181407.GC7403@atomide.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 20 Jan 2017 20:13:43 +0200
+Subject: [GIT PULL] soc: samsung: Drivers for v4.11
+Message-ID: <20170120181343.12570-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* aford173 at gmail.com <aford173@gmail.com> [170120 08:45]:
-> From: Adam Ford <aford173@gmail.com>
-> 
-> The OMAP36/37 families are similar, but there are a few features sections
-> that can help identify some of them.  Let's add checks for 3630/3730,
-> OMAP3621, DM3725, OMAP3615/DM3715, OMAP3611, and AM3703 all based on
-> features similar to what was done for the OMAP34xx/35xx series
-> 
-> The checkpatch flags some warnings for braces, but I kept the coding style
-> to match the adjacent code for consistency.
-> 
-> I don't have an OMAP36xx to test, but this was tested on both a DM3730 and
-> AM3703.
+Hi,
 
-AFAIK 3630 is exactly the same as dm3730. Applying into
-omap-for-v4.11/fixes-not-urgent thanks.
+Few changes in Exynos PMU driver including one that is needed by pinctrl
+driver for runtime PM. We want to move forward with the RPM for our drivers
+while keeping still DT ABI.
 
-Regards,
 
-Tony
+This tag is also for Linus Walleij to pull - base for pinctrl changes.
 
-> Signed-off-by: Adam Ford <aford173@gmail.com>
-> 
-> diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
-> index cc6d9fa..e2274a1 100644
-> --- a/arch/arm/mach-omap2/id.c
-> +++ b/arch/arm/mach-omap2/id.c
-> @@ -223,7 +223,15 @@ static void __init omap3_cpuinfo(void)
->  	 * and CPU class bits.
->  	 */
->  	if (soc_is_omap3630()) {
-> -		cpu_name = "OMAP3630";
-> +		if (omap3_has_iva() && omap3_has_sgx()) {
-> +			cpu_name = (omap3_has_isp()) ? "OMAP3630/DM3730" : "OMAP3621";
-> +		} else if (omap3_has_iva()) {
-> +			cpu_name = "DM3725";
-> +		} else if (omap3_has_sgx()) {
-> +			cpu_name = "OMAP3615/AM3715";
-> +		} else {
-> +			cpu_name = (omap3_has_isp()) ? "AM3703" : "OMAP3611";
-> +		}
->  	} else if (soc_is_am35xx()) {
->  		cpu_name = (omap3_has_sgx()) ? "AM3517" : "AM3505";
->  	} else if (soc_is_ti816x()) {
-> -- 
-> 2.7.4
-> 
+Best regards,
+Krzysztof
+
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Tomasz Figa <tomasz.figa@gmail.com>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+
+
+The following changes since commit 0c744ea4f77d72b3dcebb7a8f2684633ec79be88:
+
+  Linux 4.10-rc2 (2017-01-01 14:31:53 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git samsung-drivers-soc-pmu-4.11
+
+for you to fetch changes up to 1da6de33e43901ec5220cbf292d71172635ada67:
+
+  soc: samsung: pmu: Remove messages for failed memory allocation (2017-01-20 18:37:27 +0200)
+
+----------------------------------------------------------------
+Improvements for Exynos PMU driver for v4.11:
+
+Beside basic function of setting proper configuration for low power modes, the
+Exynos PMU (Power Management Unit) driver is also a provider of syscon regmap
+for its registers.  This regmap is essential to many other drivers wanting to
+or needing to implement low power mode.
+
+Exynos pinctrl driver, before getting support for Runtime Power Management,
+needs access to this syscon regmap.  Let's do it in a DT ABI friendly way.
+
+----------------------------------------------------------------
+Marek Szyprowski (3):
+      soc: samsung: pmu: Provide global function to get PMU regmap
+      soc: samsung: pmu: Use of_device_get_match_data helper
+      soc: samsung: pmu: Remove messages for failed memory allocation
+
+ drivers/soc/samsung/exynos-pmu.c       | 22 ++++++++++++++--------
+ include/linux/soc/samsung/exynos-pmu.h | 10 ++++++++++
+ 2 files changed, 24 insertions(+), 8 deletions(-)
