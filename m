@@ -1,46 +1,70 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 20 Jan 2017 16:56:37 +0100
-Subject: [PATCH 0/6] rtc: sun6i: Fix the RTC accuracy
-Message-ID: <cover.180d5ae6bc36ead9625d208824f5cbd7114cf92e.1484927680.git-series.maxime.ripard@free-electrons.com>
+Date: Fri, 20 Jan 2017 16:56:40 +0100
+Subject: [PATCH 3/6] rtc: sun6i: Disable the build as a module
+In-Reply-To: <cover.180d5ae6bc36ead9625d208824f5cbd7114cf92e.1484927680.git-series.maxime.ripard@free-electrons.com>
+References: <cover.180d5ae6bc36ead9625d208824f5cbd7114cf92e.1484927680.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <de1e4b4eda6307b664c40d6c4502058f6bb88c60.1484927680.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Since we have to provide the clock very early on, the RTC driver cannot be
+built as a module. Make sure that won't happen.
 
-The RTC used in the A31 and later SoC has an accuracy issue, which is
-already significant even after a couple of hours.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/rtc/Kconfig     |  2 +-
+ drivers/rtc/rtc-sun6i.c | 17 +----------------
+ 2 files changed, 2 insertions(+), 17 deletions(-)
 
-This is due to the fact that the oscillator used by default is an internal
-and very inaccurate one.
-
-A first attempt at fixing that by switching to the external oscillator was
-done in the patch "rtc: sun6i: Switch to the external oscillator". However,
-it turned out to be problematic since it was tracked properly in the clock
-framework, which might lead to some clocks being disabled, even though
-their devices were not notified.
-
-This is a second attempt, this time by making it part of the CCF. It
-turned out to be a bit more complicated than one would expect since the mux
-found inside the RTC also controls one of the input of the main clock unit.
-Therefore, it needs to be probed before the main clock unit driver.
-
-Let me know what you think,
-Maxime
-
-Maxime Ripard (6):
-  rtc: sun6i: Expose the 32kHz oscillator
-  rtc: sun6i: Add some locking
-  rtc: sun6i: Disable the build as a module
-  rtc: sun6i: Force the mux to the external oscillator
-  ARM: sun8i: a23/a33: Enable the real LOSC and use it
-  ARM: sun8i: a23/a33: Add the oscillators accuracy
-
- Documentation/devicetree/bindings/rtc/sun6i-rtc.txt |   8 +-
- arch/arm/boot/dts/sun8i-a23-a33.dtsi                |  15 +-
- drivers/rtc/Kconfig                                 |   2 +-
- drivers/rtc/rtc-sun6i.c                             | 189 +++++++++++--
- 4 files changed, 181 insertions(+), 33 deletions(-)
-
-base-commit: 99cef370ac9939df2aeb16c96d07e842b2fa8201
+diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+index c93c5a8fba32..53e35c138ff3 100644
+--- a/drivers/rtc/Kconfig
++++ b/drivers/rtc/Kconfig
+@@ -1434,7 +1434,7 @@ config RTC_DRV_SUN4V
+ 	  based RTC on SUN4V systems.
+ 
+ config RTC_DRV_SUN6I
+-	tristate "Allwinner A31 RTC"
++	bool "Allwinner A31 RTC"
+ 	default MACH_SUN6I || MACH_SUN8I || COMPILE_TEST
+ 	depends on ARCH_SUNXI
+ 	help
+diff --git a/drivers/rtc/rtc-sun6i.c b/drivers/rtc/rtc-sun6i.c
+index 872d18609183..edd5627da10f 100644
+--- a/drivers/rtc/rtc-sun6i.c
++++ b/drivers/rtc/rtc-sun6i.c
+@@ -554,15 +554,6 @@ static int sun6i_rtc_probe(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-static int sun6i_rtc_remove(struct platform_device *pdev)
+-{
+-	struct sun6i_rtc_dev *chip = platform_get_drvdata(pdev);
+-
+-	rtc_device_unregister(chip->rtc);
+-
+-	return 0;
+-}
+-
+ static const struct of_device_id sun6i_rtc_dt_ids[] = {
+ 	{ .compatible = "allwinner,sun6i-a31-rtc" },
+ 	{ /* sentinel */ },
+@@ -571,15 +562,9 @@ MODULE_DEVICE_TABLE(of, sun6i_rtc_dt_ids);
+ 
+ static struct platform_driver sun6i_rtc_driver = {
+ 	.probe		= sun6i_rtc_probe,
+-	.remove		= sun6i_rtc_remove,
+ 	.driver		= {
+ 		.name		= "sun6i-rtc",
+ 		.of_match_table = sun6i_rtc_dt_ids,
+ 	},
+ };
+-
+-module_platform_driver(sun6i_rtc_driver);
+-
+-MODULE_DESCRIPTION("sun6i RTC driver");
+-MODULE_AUTHOR("Chen-Yu Tsai <wens@csie.org>");
+-MODULE_LICENSE("GPL");
++builtin_platform_driver(sun6i_rtc_driver);
 -- 
 git-series 0.8.11
