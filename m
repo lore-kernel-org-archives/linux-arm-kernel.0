@@ -1,28 +1,30 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Fri, 20 Jan 2017 18:45:57 +0100
-Subject: [PATCH] ARM64: dts: meson-gxl: rename Nexbox A95x for consistency
-In-Reply-To: <20170120173843.6522-1-khilman@baylibre.com>
-References: <20170120173843.6522-1-khilman@baylibre.com>
-Message-ID: <cc16a3ea-7491-a631-4587-abb25a2a235d@suse.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 20 Jan 2017 18:46:58 +0100
+Subject: [PATCH v3 2/9] ARM64: dts: meson-gxbb-p200: add the ethernet
+ PHY's reset GPIO
+In-Reply-To: <CAFBinCA47Nng_jjxKrWrV_YBHr0bg+7xPaJrVswt_WnZ6wtyjA@mail.gmail.com>
+References: <20170120132650.9784-1-martin.blumenstingl@googlemail.com>
+ <20170120152232.13943-1-martin.blumenstingl@googlemail.com>
+ <20170120152232.13943-3-martin.blumenstingl@googlemail.com>
+ <20170120162138.GE25907@lunn.ch>
+ <CAFBinCA47Nng_jjxKrWrV_YBHr0bg+7xPaJrVswt_WnZ6wtyjA@mail.gmail.com>
+Message-ID: <20170120174658.GG25907@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 20.01.2017 um 18:38 schrieb Kevin Hilman:
-> Since the GXL family has S905X and S905D SoCs, we're keeping the SoC
-> name in the DTS filename for clarity.  Rename this file accordingly to
-> be consistent with the rest of the GXL DTS files.
-> 
-> Cc: Neil Armstrong <narmstrong@baylibre.com>
-> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+On Fri, Jan 20, 2017 at 06:07:20PM +0100, Martin Blumenstingl wrote:
+> I though that this is good practice - the documentation doesn't say
+> that it should only be added in specific cases: [0]
 
-Reviewed-by: Andreas F?rber <afaerber@suse.de>
+Agreed, the text should be better, listing when it is appropriate to
+use.
 
-I'll reorder in my follow-up then.
+> my intention behind adding the PHY ID was to make it easier to see
+> which devices uses which PHY. this is especially useful for devices
+> with RTL8211F PHY (basically all devices with RGMII PHY except the
+> P200) as these may need similar fixes than [1]
 
-Thanks,
-Andreas
+I would not say it is wrong to list the PHY ID, it just has
+consequences if the PHY ever changes.
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+	     Andrew
