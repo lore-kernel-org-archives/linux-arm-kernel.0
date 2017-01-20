@@ -1,57 +1,89 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 20 Jan 2017 18:21:02 +0100
-Subject: [PATCH v5 2/2] net: dsa: mv88e6xxx: Add support for ethernet
- switch 88E6341
-In-Reply-To: <20170120001203.GB31483@lunn.ch> (Andrew Lunn's message of "Fri,
- 20 Jan 2017 01:12:03 +0100")
-References: <20170119214934.27442-1-gregory.clement@free-electrons.com>
- <20170119214934.27442-3-gregory.clement@free-electrons.com>
- <87y3y6k7pg.fsf@weeman.i-did-not-set--mail-host-address--so-tickle-me>
- <20170120001203.GB31483@lunn.ch>
-Message-ID: <8760l9641t.fsf@free-electrons.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 20 Jan 2017 18:26:10 +0100
+Subject: [GIT PULL] Reset controller changes for v4.11
+Message-ID: <1484933170.2897.76.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vvien and Andrew,
- 
- On ven., janv. 20 2017, Andrew Lunn <andrew@lunn.ch> wrote:
+Dear arm-soc maintainers,
 
-> On Thu, Jan 19, 2017 at 05:26:03PM -0500, Vivien Didelot wrote:
->> Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
->> 
->> > +static bool mv88e6xxx_6341_family(struct mv88e6xxx_chip *chip)
->> > +{
->> > +	return chip->info->family == MV88E6XXX_FAMILY_6341;
->> > +}
->> 
->> I don't want to see these erronous family checks anymore, but I cannot
->> blame you for adding it since not all the code is moved to ops yet ;)
+Please consider merging this tag which adds reset controller drivers for
+Hi3660 and ZX2967 SoCs and adds SD reset support for LD11 SoCs. It makes
+the API describe optional and not present reset controls as NULL
+pointers, which will allow some drivers to simplify their return value
+handling. There also is a ti_syscon status return value fix, a typo fix,
+and some constification.
 
-If there a series about to be merged I can rebase my series on it. Else
-I propose to keep it and convert the family check to ops when you will
-send the series for it.
+regards
+Philipp
 
->> 
->> >  	MV88E6XXX_FAMILY_6165,	/* 6123 6161 6165 */
->> >  	MV88E6XXX_FAMILY_6185,	/* 6108 6121 6122 6131 6152 6155 6182 6185 */
->> >  	MV88E6XXX_FAMILY_6320,	/* 6320 6321 */
->> > +	MV88E6XXX_FAMILY_6341,	/* 6141 6341 */
->> 
->> Maybe I missed it, Andrew, can you confirm that 6341 is a proper Marvell
->> family of switch chips?
->
-> My understand is that it is. Marvell have not added it to DSDT. There
-> is a new SDK called UMSD, also GPLv2 and BSD. They call this family
-> Topaz, and the 6390 is Peridot.
+The following changes since commit a121103c922847ba5010819a3f250f1f7fc84ab8:
 
-I confirm that 6141 and 6341 are called Topaz. Actually I can add the
-support for the 6141 too, it is just a matter of adding an ID and maybe
-removing some ops as 6141 is a subset of 6341.
+  Linux 4.10-rc3 (2017-01-08 14:18:17 -0800)
 
-Gregory
+are available in the git repository at:
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+  git://git.pengutronix.de/pza/linux tags/reset-for-4.11
+
+for you to fetch changes up to bb475230b8e59a547ab66ac3b02572df21a580e9:
+
+  reset: make optional functions really optional (2017-01-20 10:36:15 +0100)
+
+----------------------------------------------------------------
+Reset controller changes for v4.11
+
+- fix ti_syscon reset_status reporting
+- add Hisilicon Hi3660 reset controller driver
+- add ZTE ZX2967 reset controller driver
+- add LD11 SD-reset block to uniphier reset controller driver
+- typo and correctness fixes
+- make reset_control_get variants return NULL instead of an
+  error for optional, not specified resets and have the other
+  reset API functions silently ignore rstc == NULL parameters.
+
+----------------------------------------------------------------
+Baoyou Xie (3):
+      dt: bindings: add documentation for zx2967 family reset controller
+      MAINTAINERS: add zx2967 reset controller driver to ARM ZTE architecture
+      reset: zx2967: add reset controller driver for ZTE's zx2967 family
+
+Bhumika Goyal (1):
+      reset: constify reset_control_ops structures
+
+Jiancheng Xue (1):
+      reset: ti_syscon: fix a ti_syscon_reset_status issue
+
+Masahiro Yamada (1):
+      reset: uniphier: add compatible string for LD11 SD-reset block
+
+Ramiro Oliveira (2):
+      reset: Change shared flag from int to bool
+      reset: make optional functions really optional
+
+Suman Anna (1):
+      Documentation: dt: reset: Revise typos in TI syscon reset example
+
+Zhangfei Gao (2):
+      dt-bindings: Document the hi3660 reset bindings
+      reset: hisilicon: add reset-hi3660
+
+ .../bindings/reset/hisilicon,hi3660-reset.txt      |  43 +++++++
+ .../devicetree/bindings/reset/ti-syscon-reset.txt  |   8 +-
+ .../devicetree/bindings/reset/uniphier-reset.txt   |  47 ++++----
+ .../devicetree/bindings/reset/zte,zx2967-reset.txt |  20 ++++
+ MAINTAINERS                                        |   2 +
+ drivers/reset/Kconfig                              |   6 +
+ drivers/reset/Makefile                             |   1 +
+ drivers/reset/core.c                               |  53 +++++++--
+ drivers/reset/hisilicon/Kconfig                    |   7 ++
+ drivers/reset/hisilicon/Makefile                   |   1 +
+ drivers/reset/hisilicon/reset-hi3660.c             | 126 +++++++++++++++++++++
+ drivers/reset/reset-ti-syscon.c                    |   6 +-
+ drivers/reset/reset-uniphier.c                     |   4 +
+ drivers/reset/reset-zx2967.c                       | 106 +++++++++++++++++
+ include/linux/reset.h                              |  45 ++++----
+ 15 files changed, 414 insertions(+), 61 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/reset/hisilicon,hi3660-reset.txt
+ create mode 100644 Documentation/devicetree/bindings/reset/zte,zx2967-reset.txt
+ create mode 100644 drivers/reset/hisilicon/reset-hi3660.c
+ create mode 100644 drivers/reset/reset-zx2967.c
