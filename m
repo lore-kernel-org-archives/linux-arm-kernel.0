@@ -1,67 +1,92 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sat, 21 Jan 2017 14:56:35 -0600
-Subject: [PATCH v3 1/4] Documentation: dt-bindings: add the Amlogic Meson
- SAR ADC documentation
-In-Reply-To: <20170119145822.26239-2-martin.blumenstingl@googlemail.com>
-References: <20170115224221.15510-1-martin.blumenstingl@googlemail.com>
- <20170119145822.26239-1-martin.blumenstingl@googlemail.com>
- <20170119145822.26239-2-martin.blumenstingl@googlemail.com>
-Message-ID: <20170121205635.4qeiqyeyjrweryrh@rob-hp-laptop>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 21 Jan 2017 23:13:09 +0100
+Subject: [PATCH v3 3/7] clk: sunxi-ng: Implement multiplier maximum
+In-Reply-To: <CAGb2v65p9rQv+AQqTVs=wtJbesQNF36YNdeTSSGp=c9SSyjViw@mail.gmail.com>
+References: <cover.5df5469d9c7a6233e225a875dca513a03b05e871.1484897383.git-series.maxime.ripard@free-electrons.com>
+ <8e38914c705c32f3f0daa4a16979cbb9cae5e689.1484897383.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v65p9rQv+AQqTVs=wtJbesQNF36YNdeTSSGp=c9SSyjViw@mail.gmail.com>
+Message-ID: <20170121221309.rf6tpidpipoe2tfj@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 03:58:19PM +0100, Martin Blumenstingl wrote:
-> This adds the devicetree binding documentation for the SAR ADC found in
-> Amlogic Meson SoCs.
-> Currently only the GXBB, GXL and GXM SoCs are supported.
+On Sat, Jan 21, 2017 at 09:27:42AM +0800, Chen-Yu Tsai wrote:
+> On Fri, Jan 20, 2017 at 3:29 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/clk/sunxi-ng/ccu_mult.c | 16 +++++++++++++---
+> >  drivers/clk/sunxi-ng/ccu_mult.h | 10 ++++++----
+> >  drivers/clk/sunxi-ng/ccu_nk.c   |  8 ++++----
+> >  drivers/clk/sunxi-ng/ccu_nkm.c  |  8 ++++----
+> >  drivers/clk/sunxi-ng/ccu_nkmp.c |  8 ++++----
+> >  drivers/clk/sunxi-ng/ccu_nm.c   |  4 ++--
+> >  6 files changed, 33 insertions(+), 21 deletions(-)
+> >
+> > diff --git a/drivers/clk/sunxi-ng/ccu_mult.c b/drivers/clk/sunxi-ng/ccu_mult.c
+> > index 8b7ee7baa85b..8724c01171b1 100644
+> > --- a/drivers/clk/sunxi-ng/ccu_mult.c
+> > +++ b/drivers/clk/sunxi-ng/ccu_mult.c
+> > @@ -40,8 +40,13 @@ static unsigned long ccu_mult_round_rate(struct ccu_mux_internal *mux,
+> >         struct ccu_mult *cm = data;
+> >         struct _ccu_mult _cm;
+> >
+> > -       _cm.min = 1;
+> > -       _cm.max = 1 << cm->mult.width;
+> > +       _cm.min = cm->mult.min;
 > 
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> Tested-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  .../bindings/iio/adc/amlogic,meson-saradc.txt      | 31 ++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iio/adc/amlogic,meson-saradc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/iio/adc/amlogic,meson-saradc.txt b/Documentation/devicetree/bindings/iio/adc/amlogic,meson-saradc.txt
-> new file mode 100644
-> index 000000000000..9a0bec7afc63
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iio/adc/amlogic,meson-saradc.txt
-> @@ -0,0 +1,31 @@
-> +* Amlogic Meson SAR (Successive Approximation Register) A/D converter
-> +
-> +Required properties:
-> +- compatible:	depending on the SoC this should be one of:
-> +			- "amlogic,meson-gxbb-saradc" for GXBB
-> +			- "amlogic,meson-gxl-saradc" for GXL and GXM
+> This particular line should probably be in a separate patch fixing
+> commit 2beaa601c849 ("clk: sunxi-ng: Implement minimum for multipliers")?
+> It kind of sticks out, and doesn't match the commit message.
 
-GXL and GXM should probably be 2 compatibles.
+Indeed (also because there's no commit message, I'll fix that.)
 
-> +		along with the generic "amlogic,meson-saradc"
-> +- reg:		the physical base address and length of the registers
-> +- clocks:	phandle and clock identifier (see clock-names)
-> +- clock-names:	mandatory clocks:
-> +			- "clkin" for the reference clock (typically XTAL)
-> +			- "core" for the SAR ADC core clock
-> +		optional clocks:
-> +			- "sana" for the analog clock
-> +			- "adc_clk" for the ADC (sampling) clock
-> +			- "adc_sel" for the ADC (sampling) clock mux
-> +- vref-supply:	the regulator supply for the ADC reference voltage
-> +- #io-channel-cells: must be 1, see ../iio-bindings.txt
-> +
-> +Example:
-> +	saradc: adc at 8680 {
-> +		compatible = "amlogic,meson-gxl-saradc", "amlogic,meson-saradc";
-> +		#io-channel-cells = <1>;
-> +		reg = <0x0 0x8680 0x0 0x34>;
-> +		clocks = <&xtal>,
-> +			 <&clkc CLKID_SAR_ADC>,
-> +			 <&clkc CLKID_SANA>,
-> +			 <&clkc CLKID_SAR_ADC_CLK>,
-> +			 <&clkc CLKID_SAR_ADC_SEL>;
-> +		clock-names = "clkin", "core", "sana", "adc_clk", "adc_sel";
-> +	};
-> -- 
-> 2.11.0
+> > +
+> > +       if (cm->mult.max)
+> > +               _cm.max = cm->mult.max;
+> > +       else
+> > +               _cm.max = (1 << cm->mult.width) + cm->mult.offset - 1;
+> > +
+> >         ccu_mult_find_best(parent_rate, rate, &_cm);
+> >
+> >         return parent_rate * _cm.mult;
+> > @@ -114,7 +119,12 @@ static int ccu_mult_set_rate(struct clk_hw *hw, unsigned long rate,
+> >                                                 &parent_rate);
+> >
+> >         _cm.min = cm->mult.min;
+> > -       _cm.max = 1 << cm->mult.width;
+> > +
+> > +       if (cm->mult.max)
+> > +               _cm.max = cm->mult.max;
+> > +       else
+> > +               _cm.max = (1 << cm->mult.width) + cm->mult.offset - 1;
 > 
+> The changes look good. Thinking about this more, you might need to
+> adjust the default minimum to account for the offset as well? At
+> the moment it doesn't really affect us, as the offset is either
+> 1 or 0, which means a minimum of 1 is equally good. But leaving
+> a potential error in there doesn't feel right.
+
+I'm not sure we should really care, I'm not aware of any SoC that
+would have such a clock, either in the "old" or "new" ones. I'm not
+sure we should fix that isn't broken.
+
+> Said change would be against patch 2, so
+> 
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> 
+> for this patch once the first comment is addressed.
+
+I'll do that change and respin the serie, thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170121/d293a654/attachment.sig>
