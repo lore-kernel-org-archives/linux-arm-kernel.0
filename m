@@ -1,100 +1,44 @@
-From: amurray@embedded-bits.co.uk (Andrew Murray)
-Date: Sat, 21 Jan 2017 17:36:55 +0000
-Subject: [PATCH] ARM: OMAP1/2: clock: Remove unused mpurate cmdline option
-Message-ID: <1485020215-6550-1-git-send-email-amurray@embedded-bits.co.uk>
+From: eric@anholt.net (Eric Anholt)
+Date: Sat, 21 Jan 2017 10:42:06 -0800
+Subject: [RESENT PATCH] ARM: bcm2835: Add devicetree for the Raspberry Pi
+ 3, for arm (32)
+In-Reply-To: <1484845444-4617-1-git-send-email-kraxel@redhat.com>
+References: <1484845444-4617-1-git-send-email-kraxel@redhat.com>
+Message-ID: <87fukcgsqp.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 'mpurate' option, historically used for specifying an initial
-MPU rate at boot, no longer has any effect due to the supporting
-code being removed as it was 'wrong and dangerous' [1].
+Gerd Hoffmann <kraxel@redhat.com> writes:
 
-This patch removes the remaining dead code associated with the
-__setup macros to avoid confusion and reduce bloat.
+> Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
+> ---
+>  arch/arm/boot/dts/Makefile | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 7327250..82a760d 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -70,7 +70,8 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
+>  	bcm2835-rpi-b-plus.dtb \
+>  	bcm2835-rpi-a-plus.dtb \
+>  	bcm2836-rpi-2-b.dtb \
+> -	bcm2835-rpi-zero.dtb
+> +	bcm2835-rpi-zero.dtb \
+> +	../../../arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dtb
+>  dtb-$(CONFIG_ARCH_BCM_5301X) += \
+>  	bcm4708-asus-rt-ac56u.dtb \
+>  	bcm4708-asus-rt-ac68u.dtb \
 
-[1] https://patchwork.kernel.org/patch/5954631/
+This would be really nice to have.
 
-Signed-off-by: Andrew Murray <amurray@embedded-bits.co.uk>
----
- arch/arm/mach-omap1/clock.c | 20 --------------------
- arch/arm/mach-omap1/clock.h |  2 --
- arch/arm/mach-omap2/clock.c | 20 --------------------
- 3 files changed, 42 deletions(-)
+Acked-by: Eric Anholt <eric@anholt.net>
 
-diff --git a/arch/arm/mach-omap1/clock.c b/arch/arm/mach-omap1/clock.c
-index 4f5fd4a..43e3e18 100644
---- a/arch/arm/mach-omap1/clock.c
-+++ b/arch/arm/mach-omap1/clock.c
-@@ -720,26 +720,6 @@ EXPORT_SYMBOL(clk_get_parent);
-  * OMAP specific clock functions shared between omap1 and omap2
-  */
- 
--int __initdata mpurate;
--
--/*
-- * By default we use the rate set by the bootloader.
-- * You can override this with mpurate= cmdline option.
-- */
--static int __init omap_clk_setup(char *str)
--{
--	get_option(&str, &mpurate);
--
--	if (!mpurate)
--		return 1;
--
--	if (mpurate < 1000)
--		mpurate *= 1000000;
--
--	return 1;
--}
--__setup("mpurate=", omap_clk_setup);
--
- /* Used for clocks that always have same value as the parent clock */
- unsigned long followparent_recalc(struct clk *clk)
- {
-diff --git a/arch/arm/mach-omap1/clock.h b/arch/arm/mach-omap1/clock.h
-index 1e4918a..f2d1be2 100644
---- a/arch/arm/mach-omap1/clock.h
-+++ b/arch/arm/mach-omap1/clock.h
-@@ -173,8 +173,6 @@ struct clk_functions {
- 	void		(*clk_disable_unused)(struct clk *clk);
- };
- 
--extern int mpurate;
--
- extern int clk_init(struct clk_functions *custom_clocks);
- extern void clk_preinit(struct clk *clk);
- extern int clk_register(struct clk *clk);
-diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-index d058125..d999295 100644
---- a/arch/arm/mach-omap2/clock.c
-+++ b/arch/arm/mach-omap2/clock.c
-@@ -112,26 +112,6 @@ void omap2_init_clk_clkdm(struct clk_hw *hw)
- 	}
- }
- 
--static int __initdata mpurate;
--
--/*
-- * By default we use the rate set by the bootloader.
-- * You can override this with mpurate= cmdline option.
-- */
--static int __init omap_clk_setup(char *str)
--{
--	get_option(&str, &mpurate);
--
--	if (!mpurate)
--		return 1;
--
--	if (mpurate < 1000)
--		mpurate *= 1000000;
--
--	return 1;
--}
--__setup("mpurate=", omap_clk_setup);
--
- /**
-  * omap2_clk_print_new_rates - print summary of current clock tree rates
-  * @hfclkin_ck_name: clk name for the off-chip HF oscillator
--- 
-2.5.0
+ARM upstream folks, do you have any issues with this?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170121/dfd2ed71/attachment.sig>
