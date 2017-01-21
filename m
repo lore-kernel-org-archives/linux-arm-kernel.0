@@ -1,78 +1,33 @@
-From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Sat, 21 Jan 2017 12:28:58 +0530
-Subject: [PATCH v2] net: xilinx: constify net_device_ops structure
-Message-ID: <1484981938-29829-1-git-send-email-bhumirks@gmail.com>
+From: cwchoi00@gmail.com (Chanwoo Choi)
+Date: Sat, 21 Jan 2017 16:44:57 +0900
+Subject: [PATCH 2/4] clk: samsung: Remove Exynos4415 driver (SoC not
+ supported anymore)
+In-Reply-To: <5a1bd63a-2246-a0dc-9f13-2ffcd5f28efa@samsung.com>
+References: <20170114123642.15581-1-krzk@kernel.org>
+ <CGME20170114123727epcas2p296aae6459c8575d7e5def74f18e5c64d@epcas2p2.samsung.com>
+ <20170114123642.15581-3-krzk@kernel.org>
+ <c9b51cb6-f798-d41e-afff-f779b963345c@samsung.com>
+ <CAGTfZH2Eh67iMb7bBY2ostNUbxmOtQxy=P7ZRSEDzS4=enyMKg@mail.gmail.com>
+ <5a1bd63a-2246-a0dc-9f13-2ffcd5f28efa@samsung.com>
+Message-ID: <CAGTfZH0RzCFViGw42_tUzm08Duefbw33oAMbhBiKUB46xBFzpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Declare net_device_ops structure as const as it is only stored in
-the netdev_ops field of a net_device structure. This field is of type
-const, so net_device_ops structures having same properties can be made
-const too.
-Done using Coccinelle:
+Hi Sylwester,
 
-@r1 disable optional_qualifier@
-identifier i;
-position p;
-@@
-static struct net_device_ops i at p={...};
+2017-01-21 16:42 GMT+09:00 Sylwester Nawrocki <s.nawrocki@samsung.com>:
+> Hi Chanwoo,
+>
+> On 01/21/2017 06:08 AM, Chanwoo Choi wrote:
+>> I add reveiwed-by tag from this patch. But, on you tree, this patch[1] doesn?t
+>> include the my reviewed-by tag.
+>
+> My apologies for this omission, I'll make sure I use patchwork in future
+> so no tags are lost. It's already pulled and that commit can't be edited.
 
-@ok1@
-identifier r1.i;
-position p;
-struct net_device ndev;
-@@
-ndev.netdev_ops=&i at p
+OK. Thanks for quick reply and explanation.
 
-@bad@
-position p!={r1.p,ok1.p};
-identifier r1.i;
-@@
-i at p
-
-@depends on !bad disable optional_qualifier@
-identifier r1.i;
-@@
-+const
-struct net_device_ops i;
-
-File size before:
-   text	   data	    bss	    dec	    hex	filename
-   6201	    744	      0	   6945	   1b21 ethernet/xilinx/xilinx_emaclite.o
-
-File size after:
-   text	   data	    bss	    dec	    hex	filename
-   6745	    192	      0	   6937	   1b19 ethernet/xilinx/xilinx_emaclite.o
-
-Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
----
-Changes in v2:
-* Corrected the commit message.
-
- drivers/net/ethernet/xilinx/xilinx_emaclite.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-index 93dc10b..546f569 100644
---- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-+++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
-@@ -1065,7 +1065,7 @@ static bool get_bool(struct platform_device *ofdev, const char *s)
- 	}
- }
- 
--static struct net_device_ops xemaclite_netdev_ops;
-+static const struct net_device_ops xemaclite_netdev_ops;
- 
- /**
-  * xemaclite_of_probe - Probe method for the Emaclite device.
-@@ -1219,7 +1219,7 @@ static int xemaclite_of_remove(struct platform_device *of_dev)
- }
- #endif
- 
--static struct net_device_ops xemaclite_netdev_ops = {
-+static const struct net_device_ops xemaclite_netdev_ops = {
- 	.ndo_open		= xemaclite_open,
- 	.ndo_stop		= xemaclite_close,
- 	.ndo_start_xmit		= xemaclite_send,
 -- 
-1.9.1
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
