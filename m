@@ -1,20 +1,21 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sat, 21 Jan 2017 14:54:40 -0600
-Subject: [PATCH 4/7] Documentation: dt: iio: stm32-adc: optional dma
- support
-In-Reply-To: <1484832854-6314-5-git-send-email-fabrice.gasnier@st.com>
-References: <1484832854-6314-1-git-send-email-fabrice.gasnier@st.com>
- <1484832854-6314-5-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20170121205440.s32egtpu5tmlbkdi@rob-hp-laptop>
+Date: Sat, 21 Jan 2017 14:55:09 -0600
+Subject: [PATCH 1/7] Documentation: arm: fix wrong reference number in DT
+ definition
+In-Reply-To: <20170119143757.14537-2-juri.lelli@arm.com>
+References: <20170119143757.14537-1-juri.lelli@arm.com>
+ <20170119143757.14537-2-juri.lelli@arm.com>
+Message-ID: <20170121205509.qv4b5cku47ysnkfx@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 02:34:11PM +0100, Fabrice Gasnier wrote:
-> STM32 ADC can use dma. Add dt documentation for optional dma support.
+On Thu, Jan 19, 2017 at 02:37:51PM +0000, Juri Lelli wrote:
+> Reference to cpu capacity binding has a wrong number. Fix it.
 > 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> Reported-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Signed-off-by: Juri Lelli <juri.lelli@arm.com>
 > ---
->  Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt | 7 +++++++
->  1 file changed, 7 insertions(+)
+>  Documentation/devicetree/bindings/arm/cpus.txt | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 
 Acked-by: Rob Herring <robh@kernel.org>
