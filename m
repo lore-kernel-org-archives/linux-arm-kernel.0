@@ -1,70 +1,48 @@
 From: john@metanate.com (John Keeping)
-Date: Sat, 21 Jan 2017 16:31:22 +0000
-Subject: [PATCH v2 20/26] drm/rockchip: dw-mipi-dsi: use specific poll helper
+Date: Sat, 21 Jan 2017 16:31:18 +0000
+Subject: [PATCH v2 16/26] drm/rockchip: dw-mipi-dsi: configure bias and
+ bandgap before enable
 In-Reply-To: <20170121163128.22240-1-john@metanate.com>
 References: <20170121163128.22240-1-john@metanate.com>
-Message-ID: <20170121163128.22240-21-john@metanate.com>
+Message-ID: <20170121163128.22240-17-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the documentation for readx_poll_timeout says, we want to use the
-specialized macro for readl rather than using the generic version
-directly.
+We should configure these functions before enabling them.
 
 Signed-off-by: John Keeping <john@metanate.com>
 ---
 Unchanged in v2
 ---
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index f2320cf1366c..3e19693ae59b 100644
+index 5b3068e9e8db..ce1e6f9a2041 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -471,14 +471,14 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
- 				     PHY_UNRSTZ | PHY_UNSHUTDOWNZ);
+@@ -420,6 +420,11 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
+ 	dw_mipi_dsi_phy_write(dsi, 0x18, LOOP_DIV_HIGH_SEL(dsi->feedback_div) |
+ 					 HIGH_PROGRAM_EN);
  
++	dw_mipi_dsi_phy_write(dsi, 0x22, LOW_PROGRAM_EN |
++					 BIASEXTR_SEL(BIASEXTR_127_7));
++	dw_mipi_dsi_phy_write(dsi, 0x22, HIGH_PROGRAM_EN |
++					 BANDGAP_SEL(BANDGAP_96_10));
++
+ 	dw_mipi_dsi_phy_write(dsi, 0x20, POWER_CONTROL | INTERNAL_REG_CURRENT |
+ 					 BIAS_BLOCK_ON | BANDGAP_ON);
  
--	ret = readx_poll_timeout(readl, dsi->base + DSI_PHY_STATUS,
-+	ret = readl_poll_timeout(dsi->base + DSI_PHY_STATUS,
- 				 val, val & LOCK, 1000, PHY_STATUS_TIMEOUT_US);
- 	if (ret < 0) {
- 		dev_err(dsi->dev, "failed to wait for phy lock state\n");
- 		return ret;
- 	}
+@@ -429,10 +434,6 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
+ 					 SETRD_MAX | POWER_MANAGE |
+ 					 TER_RESISTORS_ON);
  
--	ret = readx_poll_timeout(readl, dsi->base + DSI_PHY_STATUS,
-+	ret = readl_poll_timeout(dsi->base + DSI_PHY_STATUS,
- 				 val, val & STOP_STATE_CLK_LANE, 1000,
- 				 PHY_STATUS_TIMEOUT_US);
- 	if (ret < 0) {
-@@ -594,7 +594,7 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
- 	int ret;
- 	u32 val, mask;
+-	dw_mipi_dsi_phy_write(dsi, 0x22, LOW_PROGRAM_EN |
+-					 BIASEXTR_SEL(BIASEXTR_127_7));
+-	dw_mipi_dsi_phy_write(dsi, 0x22, HIGH_PROGRAM_EN |
+-					 BANDGAP_SEL(BANDGAP_96_10));
  
--	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
-+	ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
- 				 val, !(val & GEN_CMD_FULL), 1000,
- 				 CMD_PKT_STATUS_TIMEOUT_US);
- 	if (ret < 0) {
-@@ -605,7 +605,7 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
- 	dsi_write(dsi, DSI_GEN_HDR, hdr_val);
- 
- 	mask = GEN_CMD_EMPTY | GEN_PLD_W_EMPTY;
--	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
-+	ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
- 				 val, (val & mask) == mask,
- 				 1000, CMD_PKT_STATUS_TIMEOUT_US);
- 	if (ret < 0) {
-@@ -664,7 +664,7 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
- 			len -= pld_data_bytes;
- 		}
- 
--		ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
-+		ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
- 					 val, !(val & GEN_PLD_W_FULL), 1000,
- 					 CMD_PKT_STATUS_TIMEOUT_US);
- 		if (ret < 0) {
+ 	dw_mipi_dsi_phy_write(dsi, 0x70, TLP_PROGRAM_EN | 0xf);
+ 	dw_mipi_dsi_phy_write(dsi, 0x71, THS_PRE_PROGRAM_EN | 0x55);
 -- 
 2.11.0.197.gb556de5.dirty
