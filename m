@@ -1,53 +1,45 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 21 Jan 2017 01:12:01 +0100
-Subject: [GIT PULL 3/3] Rockchip dts64 updates for 4.11 part1
-In-Reply-To: <6458001.3c0YmcoF8y@phil>
-References: <6458001.3c0YmcoF8y@phil>
-Message-ID: <7817230.eJtdPce88n@phil>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 20 Jan 2017 16:16:48 -0800
+Subject: [PATCH v5 01/12] clk: apn806: Add eMMC clock to system
+ controller driver
+In-Reply-To: <e84d52dfbd9f7d2a14a5ec9d53918119fdc90404.1484154449.git-series.gregory.clement@free-electrons.com>
+References: <cover.8527229dae6c124f24c5e637430c2cdc86f80392.1484154449.git-series.gregory.clement@free-electrons.com>
+ <e84d52dfbd9f7d2a14a5ec9d53918119fdc90404.1484154449.git-series.gregory.clement@free-electrons.com>
+Message-ID: <20170121001648.GJ20800@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 0c744ea4f77d72b3dcebb7a8f2684633ec79be88:
+On 01/11, Gregory CLEMENT wrote:
+> From: Konstantin Porotchkin <kostap@marvell.com>
+> 
+> Add fixed clock of 400MHz to system controller driver.  This clock is
+> used as SD/eMMC clock source.
+> 
+> Signed-off-by: Konstantin Porotchkin <kostap@marvell.com>
+> Reviewed-by: Omri Itach <omrii@marvell.com>
+> Reviewed-by: Hanna Hawa <hannah@marvell.com>
+> [fixed up conflicts, added error handling --rmk]
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
 
-  Linux 4.10-rc2 (2017-01-01 14:31:53 -0800)
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
-are available in the git repository at:
+> diff --git a/drivers/clk/mvebu/ap806-system-controller.c b/drivers/clk/mvebu/ap806-system-controller.c
+> index 8181b919f062..0a785076b0c6 100644
+> --- a/drivers/clk/mvebu/ap806-system-controller.c
+> +++ b/drivers/clk/mvebu/ap806-system-controller.c
+> @@ -117,6 +117,17 @@ static int ap806_syscon_clk_probe(struct platform_device *pdev)
+>  		goto fail3;
+>  	}
+>  
+> +	/* eMMC Clock is fixed clock divided by 3 */
+> +	of_property_read_string_index(np, "clock-output-names",
+> +				      4, &name);
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.11-rockchip-dts64-1
+This could check for failure and not register the clk if the name
+isn't there? Then dts can be backwards compatible.
 
-for you to fetch changes up to 8cbb59af7ecf183b1761a178835e1c771167fa28:
-
-  arm64: dts: rockchip: add rockchip,grf property for RK3399 PMUCRU/CRU (2017-01-13 20:03:15 +0100)
-
-----------------------------------------------------------------
-64bit dts changes with some adjustments to the pcie controller,
-usb clocks, grf phandles for the rk3399 CRUs, epd pinctrl settings,
-a phandle to the rk3399 tsadc and converting boards to use the
-recently introduced pin constants.
-
-----------------------------------------------------------------
-Andy Yan (1):
-      arm64: dts: rockchip: use pin constants to describe gpios
-
-Brian Norris (2):
-      arm64: dts: rockchip: add rk3399 thermal_zones phandle
-      arm64: dts: rockchip: add rk3399 eDP HPD pinctrl
-
-Shawn Lin (2):
-      arm64: dts: rockchip: add max-link-speed for rk3399
-      arm64: dts: rockchip: add aspm-no-l0s for rk3399
-
-William wu (1):
-      arm64: dts: rockchip: add u2phy clock for ehci and ohci of rk3399
-
-Xing Zheng (1):
-      arm64: dts: rockchip: add rockchip,grf property for RK3399 PMUCRU/CRU
-
- arch/arm64/boot/dts/rockchip/rk3368-evb.dtsi       | 10 +++---
- arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts    | 10 +++---
- .../boot/dts/rockchip/rk3368-orion-r68-meta.dts    | 14 ++++----
- arch/arm64/boot/dts/rockchip/rk3368-px5-evb.dts    | 10 +++---
- arch/arm64/boot/dts/rockchip/rk3368-r88.dts        | 16 ++++-----
- arch/arm64/boot/dts/rockchip/rk3399-evb.dts        |  8 ++---
- arch/arm64/boot/dts/rockchip/rk3399.dtsi           | 41 +++++++++++++++++-----
- 7 files changed, 66 insertions(+), 43 deletions(-)
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
