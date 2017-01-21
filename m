@@ -1,154 +1,63 @@
-From: john@metanate.com (John Keeping)
-Date: Sat, 21 Jan 2017 16:31:05 +0000
-Subject: [PATCH v2 03/26] drm/rockchip: dw-mipi-dsi: pass mode in where needed
-In-Reply-To: <20170121163128.22240-1-john@metanate.com>
-References: <20170121163128.22240-1-john@metanate.com>
-Message-ID: <20170121163128.22240-4-john@metanate.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 21 Jan 2017 18:34:47 +0100
+Subject: [PATCH v3 5/7] clk: sunxi-ng: Add sun5i CCU driver
+In-Reply-To: <CAGb2v65uzxu7P3AcnhJJ_rEvT5OL8=d9-jVjU5sWNNqJpkpSRw@mail.gmail.com>
+References: <cover.5df5469d9c7a6233e225a875dca513a03b05e871.1484897383.git-series.maxime.ripard@free-electrons.com>
+ <a51d856e896b7fe59a1a544a7de3081688e377ff.1484897383.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v65uzxu7P3AcnhJJ_rEvT5OL8=d9-jVjU5sWNNqJpkpSRw@mail.gmail.com>
+Message-ID: <20170121173447.hjtddypjxr6achyt@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This shows that we only use the mode from the enable function and
-prepares us to remove the "mode" field and the mode_set hook in the next
-commit.
+Hi,
 
-Signed-off-by: John Keeping <john@metanate.com>
----
-New in v2
----
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 41 ++++++++++++++++++----------------
- 1 file changed, 22 insertions(+), 19 deletions(-)
+On Sat, Jan 21, 2017 at 09:34:15AM +0800, Chen-Yu Tsai wrote:
+> On Fri, Jan 20, 2017 at 3:29 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > The Allwinner A10s, A13, R8 and NextThing GR8 are all based on the same
+> > silicon, and all share the same clocks.
+> >
+> > However, they're not packaged in the same way, and therefore not all the
+> > controllers are actually available on all these SoCs.
+> >
+> > Introduce a clock controller driver for all these SoCs with different
+> > compatibles to take that into account.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
 
-diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index bbd992299f73..cdbd25087e83 100644
---- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-+++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -330,11 +330,11 @@ static int max_mbps_to_testdin(unsigned int max_mbps)
-  * The controller should generate 2 frames before
-  * preparing the peripheral.
-  */
--static void dw_mipi_dsi_wait_for_two_frames(struct dw_mipi_dsi *dsi)
-+static void dw_mipi_dsi_wait_for_two_frames(struct drm_display_mode *mode)
- {
- 	int refresh, two_frames;
- 
--	refresh = drm_mode_vrefresh(dsi->mode);
-+	refresh = drm_mode_vrefresh(mode);
- 	two_frames = DIV_ROUND_UP(MSEC_PER_SEC, refresh) * 2;
- 	msleep(two_frames);
- }
-@@ -459,7 +459,8 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
- 	return ret;
- }
- 
--static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi)
-+static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi,
-+				    struct drm_display_mode *mode)
- {
- 	unsigned int i, pre;
- 	unsigned long mpclk, pllref, tmp;
-@@ -474,7 +475,7 @@ static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi)
- 		return bpp;
- 	}
- 
--	mpclk = DIV_ROUND_UP(dsi->mode->clock, MSEC_PER_SEC);
-+	mpclk = DIV_ROUND_UP(mode->clock, MSEC_PER_SEC);
- 	if (mpclk) {
- 		/* take 1 / 0.9, since mbps must big than bandwidth of RGB */
- 		tmp = mpclk * (bpp / dsi->lanes) * 10 / 9;
-@@ -742,43 +743,44 @@ static void dw_mipi_dsi_command_mode_config(struct dw_mipi_dsi *dsi)
- 
- /* Get lane byte clock cycles. */
- static u32 dw_mipi_dsi_get_hcomponent_lbcc(struct dw_mipi_dsi *dsi,
-+					   struct drm_display_mode *mode,
- 					   u32 hcomponent)
- {
- 	u32 frac, lbcc;
- 
- 	lbcc = hcomponent * dsi->lane_mbps * MSEC_PER_SEC / 8;
- 
--	frac = lbcc % dsi->mode->clock;
--	lbcc = lbcc / dsi->mode->clock;
-+	frac = lbcc % mode->clock;
-+	lbcc = lbcc / mode->clock;
- 	if (frac)
- 		lbcc++;
- 
- 	return lbcc;
- }
- 
--static void dw_mipi_dsi_line_timer_config(struct dw_mipi_dsi *dsi)
-+static void dw_mipi_dsi_line_timer_config(struct dw_mipi_dsi *dsi,
-+					  struct drm_display_mode *mode)
- {
- 	u32 htotal, hsa, hbp, lbcc;
--	struct drm_display_mode *mode = dsi->mode;
- 
- 	htotal = mode->htotal;
- 	hsa = mode->hsync_end - mode->hsync_start;
- 	hbp = mode->htotal - mode->hsync_end;
- 
--	lbcc = dw_mipi_dsi_get_hcomponent_lbcc(dsi, htotal);
-+	lbcc = dw_mipi_dsi_get_hcomponent_lbcc(dsi, mode, htotal);
- 	dsi_write(dsi, DSI_VID_HLINE_TIME, lbcc);
- 
--	lbcc = dw_mipi_dsi_get_hcomponent_lbcc(dsi, hsa);
-+	lbcc = dw_mipi_dsi_get_hcomponent_lbcc(dsi, mode, hsa);
- 	dsi_write(dsi, DSI_VID_HSA_TIME, lbcc);
- 
--	lbcc = dw_mipi_dsi_get_hcomponent_lbcc(dsi, hbp);
-+	lbcc = dw_mipi_dsi_get_hcomponent_lbcc(dsi, mode, hbp);
- 	dsi_write(dsi, DSI_VID_HBP_TIME, lbcc);
- }
- 
--static void dw_mipi_dsi_vertical_timing_config(struct dw_mipi_dsi *dsi)
-+static void dw_mipi_dsi_vertical_timing_config(struct dw_mipi_dsi *dsi,
-+					       struct drm_display_mode *mode)
- {
- 	u32 vactive, vsa, vfp, vbp;
--	struct drm_display_mode *mode = dsi->mode;
- 
- 	vactive = mode->vdisplay;
- 	vsa = mode->vsync_end - mode->vsync_start;
-@@ -852,11 +854,12 @@ static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
- static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
- {
- 	struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
-+	struct drm_display_mode *mode = dsi->mode;
- 	int mux = drm_of_encoder_active_endpoint_id(dsi->dev->of_node, encoder);
- 	u32 val;
- 	int ret;
- 
--	ret = dw_mipi_dsi_get_lane_bps(dsi);
-+	ret = dw_mipi_dsi_get_lane_bps(dsi, mode);
- 	if (ret < 0)
- 		return;
- 
-@@ -866,13 +869,13 @@ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
- 	}
- 
- 	dw_mipi_dsi_init(dsi);
--	dw_mipi_dsi_dpi_config(dsi, dsi->mode);
-+	dw_mipi_dsi_dpi_config(dsi, mode);
- 	dw_mipi_dsi_packet_handler_config(dsi);
- 	dw_mipi_dsi_video_mode_config(dsi);
--	dw_mipi_dsi_video_packet_config(dsi, dsi->mode);
-+	dw_mipi_dsi_video_packet_config(dsi, mode);
- 	dw_mipi_dsi_command_mode_config(dsi);
--	dw_mipi_dsi_line_timer_config(dsi);
--	dw_mipi_dsi_vertical_timing_config(dsi);
-+	dw_mipi_dsi_line_timer_config(dsi, mode);
-+	dw_mipi_dsi_vertical_timing_config(dsi, mode);
- 	dw_mipi_dsi_dphy_timing_config(dsi);
- 	dw_mipi_dsi_dphy_interface_config(dsi);
- 	dw_mipi_dsi_clear_err(dsi);
-@@ -880,7 +883,7 @@ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
- 		dev_err(dsi->dev, "failed to prepare panel\n");
- 
- 	dw_mipi_dsi_phy_init(dsi);
--	dw_mipi_dsi_wait_for_two_frames(dsi);
-+	dw_mipi_dsi_wait_for_two_frames(mode);
- 
- 	dw_mipi_dsi_set_mode(dsi, DW_MIPI_DSI_VID_MODE);
- 	drm_panel_enable(dsi->panel);
+Thanks!
+
+> > ---
+> >  drivers/clk/sunxi-ng/Kconfig          |   10 +-
+> >  drivers/clk/sunxi-ng/Makefile         |    1 +-
+> >  drivers/clk/sunxi-ng/ccu-sun5i.c      | 1008 ++++++++++++++++++++++++++-
+> >  drivers/clk/sunxi-ng/ccu-sun5i.h      |   67 ++-
+> >  include/dt-bindings/clock/sun5i-ccu.h |  103 +++-
+> >  include/dt-bindings/reset/sun5i-ccu.h |   32 +-
+> 
+> I thought having these 2 in a separate patch would be better for
+> cross tree merges?
+
+Not really. This was needed when we had several drivers using it, but
+since we merged all of them, it's not really needed anymore. Having it
+split wouldn't make it easier, because both the DT bits and the
+drivers bits would depend on it.
+
+We don't have much for the sun5i stuff queued for 4.11, so we can just
+have the DT bits merged through the clk tree.
+
+Maxime
+
 -- 
-2.11.0.197.gb556de5.dirty
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170121/e790e8d0/attachment.sig>
