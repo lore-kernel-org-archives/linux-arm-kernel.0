@@ -1,19 +1,50 @@
 From: yong.mao@mediatek.com (Yong Mao)
-Date: Sat, 21 Jan 2017 16:55:20 +0800
-Subject: [PATCH v4 0/3] mmc: mediatek: Use data tune for CMD line tune 
-Message-ID: <1484988923-1543-1-git-send-email-yong.mao@mediatek.com>
+Date: Sat, 21 Jan 2017 16:55:21 +0800
+Subject: [PATCH v4 1/3] mmc: dt-bindings: update Mediatek MMC bindings
+In-Reply-To: <1484988923-1543-1-git-send-email-yong.mao@mediatek.com>
+References: <1484988923-1543-1-git-send-email-yong.mao@mediatek.com>
+Message-ID: <1484988923-1543-2-git-send-email-yong.mao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-yong mao (3):
-  mmc: dt-bindings: update Mediatek MMC bindings
-  ARM64: dts: mediatek: configure some fixed mmc parameters
-  mmc: mediatek: Use data tune for CMD line tune
+From: yong mao <yong.mao@mediatek.com>
 
- Documentation/devicetree/bindings/mmc/mtk-sd.txt |  12 ++
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts      |   3 +
- drivers/mmc/host/mtk-sd.c                        | 168 ++++++++++++++++++++---
- 3 files changed, 167 insertions(+), 16 deletions(-)
+Add description for mediatek,hs200-cmd-int-delay
+Add description for mediatek,hs400-cmd-int-delay
+Add description for mediatek,hs400-cmd-resp-sel-rising
 
+Signed-off-by: Yong Mao <yong.mao@mediatek.com>
+---
+ Documentation/devicetree/bindings/mmc/mtk-sd.txt |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+index 0120c7f..4182ea3 100644
+--- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
++++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+@@ -21,6 +21,15 @@ Optional properties:
+ - assigned-clocks: PLL of the source clock
+ - assigned-clock-parents: parent of source clock, used for HS400 mode to get 400Mhz source clock
+ - hs400-ds-delay: HS400 DS delay setting
++- mediatek,hs200-cmd-int-delay: HS200 command internal delay setting.
++				This field has total 32 stages.
++				The value is an integer from 0 to 31.
++- mediatek,hs400-cmd-int-delay: HS400 command internal delay setting
++				This field has total 32 stages.
++				The value is an integer from 0 to 31.
++- mediatek,hs400-cmd-resp-sel-rising:  HS400 command response sample selection
++				       If present,HS400 command responses are sampled on rising edges.
++				       If not present,HS400 command responses are sampled on falling edges.
+ 
+ Examples:
+ mmc0: mmc at 11230000 {
+@@ -38,4 +47,7 @@ mmc0: mmc at 11230000 {
+ 	assigned-clocks = <&topckgen CLK_TOP_MSDC50_0_SEL>;
+ 	assigned-clock-parents = <&topckgen CLK_TOP_MSDCPLL_D2>;
+ 	hs400-ds-delay = <0x14015>;
++	mediatek,hs200-cmd-int-delay = <26>;
++	mediatek,hs400-cmd-int-delay = <14>;
++	mediatek,hs400-cmd-resp-sel-rising;
+ };
 -- 
-1.8.1.1.dirty
+1.7.9.5
