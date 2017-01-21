@@ -1,26 +1,19 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Sat, 21 Jan 2017 08:42:48 +0100
-Subject: [PATCH 2/4] clk: samsung: Remove Exynos4415 driver (SoC not
- supported anymore)
-In-Reply-To: <CAGTfZH2Eh67iMb7bBY2ostNUbxmOtQxy=P7ZRSEDzS4=enyMKg@mail.gmail.com>
-References: <20170114123642.15581-1-krzk@kernel.org>
- <CGME20170114123727epcas2p296aae6459c8575d7e5def74f18e5c64d@epcas2p2.samsung.com>
- <20170114123642.15581-3-krzk@kernel.org>
- <c9b51cb6-f798-d41e-afff-f779b963345c@samsung.com>
- <CAGTfZH2Eh67iMb7bBY2ostNUbxmOtQxy=P7ZRSEDzS4=enyMKg@mail.gmail.com>
-Message-ID: <5a1bd63a-2246-a0dc-9f13-2ffcd5f28efa@samsung.com>
+From: yong.mao@mediatek.com (Yong Mao)
+Date: Sat, 21 Jan 2017 16:55:20 +0800
+Subject: [PATCH v4 0/3] mmc: mediatek: Use data tune for CMD line tune 
+Message-ID: <1484988923-1543-1-git-send-email-yong.mao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chanwoo,
+yong mao (3):
+  mmc: dt-bindings: update Mediatek MMC bindings
+  ARM64: dts: mediatek: configure some fixed mmc parameters
+  mmc: mediatek: Use data tune for CMD line tune
 
-On 01/21/2017 06:08 AM, Chanwoo Choi wrote:
-> I add reveiwed-by tag from this patch. But, on you tree, this patch[1] doesn?t
-> include the my reviewed-by tag.
-
-My apologies for this omission, I'll make sure I use patchwork in future
-so no tags are lost. It's already pulled and that commit can't be edited.
+ Documentation/devicetree/bindings/mmc/mtk-sd.txt |  12 ++
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts      |   3 +
+ drivers/mmc/host/mtk-sd.c                        | 168 ++++++++++++++++++++---
+ 3 files changed, 167 insertions(+), 16 deletions(-)
 
 -- 
-Thanks,
-Sylwester
+1.8.1.1.dirty
