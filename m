@@ -1,42 +1,75 @@
-From: cwchoi00@gmail.com (Chanwoo Choi)
-Date: Sat, 21 Jan 2017 14:08:34 +0900
-Subject: [PATCH 2/4] clk: samsung: Remove Exynos4415 driver (SoC not
- supported anymore)
-In-Reply-To: <c9b51cb6-f798-d41e-afff-f779b963345c@samsung.com>
-References: <20170114123642.15581-1-krzk@kernel.org>
- <CGME20170114123727epcas2p296aae6459c8575d7e5def74f18e5c64d@epcas2p2.samsung.com>
- <20170114123642.15581-3-krzk@kernel.org>
- <c9b51cb6-f798-d41e-afff-f779b963345c@samsung.com>
-Message-ID: <CAGTfZH2Eh67iMb7bBY2ostNUbxmOtQxy=P7ZRSEDzS4=enyMKg@mail.gmail.com>
+From: bhumirks@gmail.com (Bhumika Goyal)
+Date: Sat, 21 Jan 2017 11:38:12 +0530
+Subject: [PATCH] net: xilinx: constify net_device_ops structures
+Message-ID: <1484978892-28015-1-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester,
+Declare net_device_ops structures as const as they are only stored in
+the netdev_ops field of a net_device structure. This field is of type
+const, so net_device_ops structures having same properties can be made
+const too.
+Done using Coccinelle:
 
-I add reveiwed-by tag from this patch. But, on you tree, this patch[1] doesn?t
-include the my reviewed-by tag.
+@r1 disable optional_qualifier@
+identifier i;
+position p;
+@@
+static struct net_device_ops i at p={...};
 
-[1] https://git.linuxtv.org/snawrocki/samsung.git/commit/?h=for-v4.11/clk/next&id=cb4ac949ea14416a2d57b7a343bc4b571074e3bd
+@ok1@
+identifier r1.i;
+position p;
+struct net_device ndev;
+@@
+ndev.netdev_ops=&i at p
 
-2017-01-16 19:32 GMT+09:00 Sylwester Nawrocki <s.nawrocki@samsung.com>:
-> On 01/14/2017 01:36 PM, Krzysztof Kozlowski wrote:
->> Support for Exynos4415 is going away because there are no internal nor
->> external users.
->>
->> Since commit 46dcf0ff0de3 ("ARM: dts: exynos: Remove exynos4415.dtsi"),
->> the platform cannot be instantiated so remove also the drivers.
->>
->> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
->
-> Applied, thanks.
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+@bad@
+position p!={r1.p,ok1.p};
+identifier r1.i;
+@@
+i at p
 
+@depends on !bad disable optional_qualifier@
+identifier r1.i;
+@@
++const
+struct net_device_ops i;
 
+File size before:
+   text	   data	    bss	    dec	    hex	filename
+   6201	    744	      0	   6945	   1b21 ethernet/xilinx/xilinx_emaclite.o
 
+File size after:
+   text	   data	    bss	    dec	    hex	filename
+   6745	    192	      0	   6937	   1b19 ethernet/xilinx/xilinx_emaclite.o
+
+Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+---
+ drivers/net/ethernet/xilinx/xilinx_emaclite.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/ethernet/xilinx/xilinx_emaclite.c b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+index 93dc10b..546f569 100644
+--- a/drivers/net/ethernet/xilinx/xilinx_emaclite.c
++++ b/drivers/net/ethernet/xilinx/xilinx_emaclite.c
+@@ -1065,7 +1065,7 @@ static bool get_bool(struct platform_device *ofdev, const char *s)
+ 	}
+ }
+ 
+-static struct net_device_ops xemaclite_netdev_ops;
++static const struct net_device_ops xemaclite_netdev_ops;
+ 
+ /**
+  * xemaclite_of_probe - Probe method for the Emaclite device.
+@@ -1219,7 +1219,7 @@ static int xemaclite_of_remove(struct platform_device *of_dev)
+ }
+ #endif
+ 
+-static struct net_device_ops xemaclite_netdev_ops = {
++static const struct net_device_ops xemaclite_netdev_ops = {
+ 	.ndo_open		= xemaclite_open,
+ 	.ndo_stop		= xemaclite_close,
+ 	.ndo_start_xmit		= xemaclite_send,
 -- 
-Best Regards,
-Chanwoo Choi
-Samsung Electronics
+1.9.1
