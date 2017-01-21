@@ -1,79 +1,60 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 20 Jan 2017 17:00:09 -0800
-Subject: [PATCH v2 04/12] driver: clk: imx: Add clock driver for imx6sll
-In-Reply-To: <AM3PR04MB53027B627AE8CEC6D7D0D1B87780@AM3PR04MB530.eurprd04.prod.outlook.com>
-References: <1482832070-22668-1-git-send-email-ping.bai@nxp.com>
- <1482832070-22668-5-git-send-email-ping.bai@nxp.com>
- <20170110003753.GM17126@codeaurora.org>
- <AM3PR04MB5307CB38AA904535AF8D80D87670@AM3PR04MB530.eurprd04.prod.outlook.com>
- <20170112220536.GP17126@codeaurora.org>
- <AM3PR04MB53027B627AE8CEC6D7D0D1B87780@AM3PR04MB530.eurprd04.prod.outlook.com>
-Message-ID: <20170121010009.GC8801@codeaurora.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 21 Jan 2017 09:10:36 +0800
+Subject: [PATCH v2 00/11] add support for VBUS max current and min voltage
+ limits AXP20X and AXP22X PMICs
+In-Reply-To: <20170112092821.5xkgpsbbsxaz3s7h@lukather>
+References: <20161209110419.28981-1-quentin.schulz@free-electrons.com>
+ <20170112092821.5xkgpsbbsxaz3s7h@lukather>
+Message-ID: <CAGb2v679kG8eisNa=Bmo+o0DVm7xn7x=N9i7H7mB5n_Y2X=qLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13, Jacky Bai wrote:
-> > >
-> > > The reason why we enable these two clks here is in below commit commit
-> > > a5120e89e7e187a91852896f586876c7a2030804
-> > > Author: Peter Chen <peter.chen@freescale.com>
-> > > Date:   Fri Jan 18 10:38:05 2013 +0800
-> > >       ARM i.MX6: change mxs usbphy clock usage
-> > >
-> > 
-> > So can we mark these clks with CLK_IS_CRITICAL flag then instead?
-> > Or are they disabled out of the bootloader?
-> > 
-> 
-> Sure, using 'CLK_IS_CRITICAL'  should be ok for clks_init_on clocks.  But for  USBPHY*_GATE, it is
-> only enabled when CONIG_USB_MXC_PHY is true.  And another concern is if we need to add CLK_IS_CRITICAL
-> flag to clks_init_on clocks, we may need to add new wrapper function to register these critical clock. It is not very good.
+Hi,
 
-Ok so set the critical flag when CONFIG_USB_MXC_PHY is enabled?
-That isn't too hard to do.
+On Thu, Jan 12, 2017 at 5:28 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Fri, Dec 09, 2016 at 12:04:08PM +0100, Quentin Schulz wrote:
+>> The X-Powers AXP209 and AXP20X PMICs are able to set a limit for the
+>> VBUS power supply for both max current and min voltage supplied. This
+>> series of patch adds the possibility to set these limits from sysfs.
+>>
+>> Also, the AXP223 PMIC shares most of its behaviour with the AXP221 but
+>> the former can set the VBUS power supply max current to 100mA, unlike
+>> the latter. The AXP223 VBUS power supply driver used to probe on the
+>> AXP221 compatible. This series of patch introduces a new compatible for
+>> the AXP223 to be able to set the current max limit to 100mA.
+>>
+>> With that new compatible, boards having the AXP223 see their DT updated
+>> to use the VBUS power supply driver with the correct compatible.
+>>
+>> This series of patch also migrates from of_device_is_compatible function
+>> to the data field of of_device_id to identify the compatible used to
+>> probe. This improves the code readability.
+>>
+>> Mostly cosmetic changes in v2 and adding volatile and writeable regs to
+>> AXP20X and AXP22X MFD cells for the VBUS power supply driver.
+>
+> Applied all the DT patches. I also fixed all the prefixes. Please make
+> sure to look at what prefixes are used by a given subsystem next time.
 
-> 
->  > >
-> > > > > +	}
-> > > > > +
-> > > > > +	/* Lower the AHB clock rate before changing the clock source. */
-> > > > > +	clk_set_rate(clks[IMX6SLL_CLK_AHB], 99000000);
-> > > > > +
-> > > > > +	/* Change periph_pre clock to pll2_bus to adjust AXI rate to 264MHz */
-> > > > > +	clk_set_parent(clks[IMX6SLL_CLK_PERIPH_CLK2_SEL],
-> > > > clks[IMX6SLL_CLK_PLL3_USB_OTG]);
-> > > > > +	clk_set_parent(clks[IMX6SLL_CLK_PERIPH],
-> > > > clks[IMX6SLL_CLK_PERIPH_CLK2]);
-> > > > > +	clk_set_parent(clks[IMX6SLL_CLK_PERIPH_PRE],
-> > > > clks[IMX6SLL_CLK_PLL2_BUS]);
-> > > > > +	clk_set_parent(clks[IMX6SLL_CLK_PERIPH],
-> > > > > +clks[IMX6SLL_CLK_PERIPH_PRE]);
-> > > > > +
-> > > > > +	clk_set_rate(clks[IMX6SLL_CLK_AHB], 132000000);
-> > > >
-> > > > assigned-clocks for rates now? Or perhaps we shouldn't be exposing
-> > > > these as clks if they have some sort of complicated rate sequence
-> > > > switch that we can't guarantee with the clk_ops we have today.
-> > >
-> > > These clks will be used by some peripherals, so we need to expose these
-> > clocks.
-> > > And the above parent and rate swith sequence is not very easy to be
-> > > handled in assigned-clocks, So we leave it in this place.
-> > >
-> > 
-> > How do we guarantee that the rate switch doesn't happen later on, requiring
-> > this coordinated sequence of clk operations?
-> > 
-> 
-> This clock sequence is used for increasing the AXI and AHB bus clock rate. In normal
-> use, it is very rarely that we need to change them again. If we really need to change
-> AXI and AHB bus clock later, a similar sequence must be used to do this.
-> 
+I'm not seeing the DT patches. FYI the old DT does not work with the
+new kernel driver updates. Because of the new AXP223 specific compatible
+for the usb-power-supply, the updated mfd driver cannot match the old
+device node, and the probe will fail at
 
-Ok. It feels unsafe, so please make sure no child clocks have the
-CLK_SET_RATE_PARENT flag set so we can't randomly change the rate
-of this clk outside of this init code.
+        if (!of_device_is_available(pdev->dev.of_node))
+                return -ENODEV;
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+I don't see an easy way out of this though. The mfd_cell structure only
+takes one compatible string.
+
+Regards
+ChenYu
+
+> Thanks!
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
