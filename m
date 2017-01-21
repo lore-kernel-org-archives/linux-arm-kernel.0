@@ -1,11 +1,11 @@
 From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Sat, 21 Jan 2017 11:38:12 +0530
-Subject: [PATCH] net: xilinx: constify net_device_ops structures
-Message-ID: <1484978892-28015-1-git-send-email-bhumirks@gmail.com>
+Date: Sat, 21 Jan 2017 12:28:58 +0530
+Subject: [PATCH v2] net: xilinx: constify net_device_ops structure
+Message-ID: <1484981938-29829-1-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Declare net_device_ops structures as const as they are only stored in
+Declare net_device_ops structure as const as it is only stored in
 the netdev_ops field of a net_device structure. This field is of type
 const, so net_device_ops structures having same properties can be made
 const too.
@@ -46,6 +46,9 @@ File size after:
 
 Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
 ---
+Changes in v2:
+* Corrected the commit message.
+
  drivers/net/ethernet/xilinx/xilinx_emaclite.c | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
