@@ -1,58 +1,93 @@
 From: john@metanate.com (John Keeping)
-Date: Sat, 21 Jan 2017 16:31:13 +0000
-Subject: [PATCH v2 11/26] drm/rockchip: dw-mipi-dsi: don't assume buffer is
- aligned
+Date: Sat, 21 Jan 2017 16:31:28 +0000
+Subject: [PATCH v2 26/26] drm/rockchip: dw-mipi-dsi: support read commands
 In-Reply-To: <20170121163128.22240-1-john@metanate.com>
 References: <20170121163128.22240-1-john@metanate.com>
-Message-ID: <20170121163128.22240-12-john@metanate.com>
+Message-ID: <20170121163128.22240-27-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By dereferencing the MIPI command buffer as a u32* we rely on it being
-correctly aligned on ARM, but this may not be the case.  Copy it into a
-stack variable that will be correctly aligned.
+I haven't found any method for getting the length of a response, so this
+just uses the requested rx_len
 
 Signed-off-by: John Keeping <john@metanate.com>
 ---
 Unchanged in v2
 ---
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 54 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 54 insertions(+)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 03fc096fe1bd..ddbc037e7ced 100644
+index f780401e8b5e..f0cb005c6d76 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -607,10 +607,10 @@ static int dw_mipi_dsi_dcs_short_write(struct dw_mipi_dsi *dsi,
- static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
- 				      const struct mipi_dsi_msg *msg)
- {
--	const u32 *tx_buf = msg->tx_buf;
--	int len = msg->tx_len, pld_data_bytes = sizeof(*tx_buf), ret;
+@@ -675,6 +675,54 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
+ 	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, hdr_val);
+ }
+ 
++static int dw_mipi_dsi_dcs_read(struct dw_mipi_dsi *dsi,
++				const struct mipi_dsi_msg *msg)
++{
 +	const u8 *tx_buf = msg->tx_buf;
-+	int len = msg->tx_len, pld_data_bytes = sizeof(u32), ret;
- 	u32 hdr_val = GEN_HDATA(msg->tx_len) | GEN_HTYPE(msg->type);
--	u32 remainder = 0;
-+	u32 remainder;
- 	u32 val;
- 
- 	if (msg->tx_len < 3) {
-@@ -621,12 +621,14 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
- 
- 	while (DIV_ROUND_UP(len, pld_data_bytes)) {
- 		if (len < pld_data_bytes) {
-+			remainder = 0;
- 			memcpy(&remainder, tx_buf, len);
- 			dsi_write(dsi, DSI_GEN_PLD_DATA, remainder);
- 			len = 0;
- 		} else {
--			dsi_write(dsi, DSI_GEN_PLD_DATA, *tx_buf);
--			tx_buf++;
-+			memcpy(&remainder, tx_buf, pld_data_bytes);
-+			dsi_write(dsi, DSI_GEN_PLD_DATA, remainder);
-+			tx_buf += pld_data_bytes;
- 			len -= pld_data_bytes;
- 		}
- 
++	u8 *rx_buf = msg->rx_buf;
++	size_t i;
++	int ret, val;
++
++	dsi_write(dsi, DSI_PCKHDL_CFG, EN_CRC_RX | EN_ECC_RX | EN_BTA);
++	dsi_write(dsi, DSI_GEN_HDR, GEN_HDATA(tx_buf[0]) | GEN_HTYPE(msg->type));
++
++	ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
++				 val, !(val & GEN_RD_CMD_BUSY), 1000,
++				 CMD_PKT_STATUS_TIMEOUT_US);
++	if (ret < 0) {
++		dev_err(dsi->dev, "failed to read command response\n");
++		return ret;
++	}
++
++	for (i = 0; i < msg->rx_len;) {
++		u32 pld = dsi_read(dsi, DSI_GEN_PLD_DATA);
++		while (i < msg->rx_len) {
++			rx_buf[i] = pld & 0xff;
++			pld >>= 8;
++			i++;
++		}
++	}
++
++	return msg->rx_len;
++}
++
++static int dw_mipi_dsi_set_max_return_packet_size(struct dw_mipi_dsi *dsi,
++						  size_t len)
++{
++	u8 val[] = { len & 0xff, (len >> 8) & 0xff };
++	struct mipi_dsi_msg msg = {
++		.channel = dsi->channel,
++		.type = MIPI_DSI_SET_MAXIMUM_RETURN_PACKET_SIZE,
++		.tx_buf = val,
++		.tx_len = 2,
++	};
++
++	if (len > 0xffff)
++		return -EINVAL;
++
++	return dw_mipi_dsi_dcs_short_write(dsi, &msg);
++}
++
+ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
+ 					 const struct mipi_dsi_msg *msg)
+ {
+@@ -692,6 +740,12 @@ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
+ 	case MIPI_DSI_DCS_LONG_WRITE:
+ 		ret = dw_mipi_dsi_dcs_long_write(dsi, msg);
+ 		break;
++	case MIPI_DSI_DCS_READ:
++		ret = dw_mipi_dsi_set_max_return_packet_size(dsi, msg->rx_len);
++		if (ret < 0)
++			return ret;
++		ret = dw_mipi_dsi_dcs_read(dsi, msg);
++		break;
+ 	default:
+ 		dev_err(dsi->dev, "unsupported message type 0x%02x\n",
+ 			msg->type);
 -- 
 2.11.0.197.gb556de5.dirty
