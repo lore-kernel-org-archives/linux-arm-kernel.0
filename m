@@ -1,44 +1,41 @@
 From: jan.kiszka@siemens.com (Jan Kiszka)
-Date: Sat, 21 Jan 2017 10:06:39 +0100
-Subject: [PATCH v3 2/2] spi: pca2xx-pci: Allow MSI
+Date: Sat, 21 Jan 2017 10:06:38 +0100
+Subject: [PATCH v3 1/2] spi: pxa2xx: Prepare for edge-triggered interrupts
 In-Reply-To: <cover.1484989599.git.jan.kiszka@siemens.com>
 References: <cover.1484989599.git.jan.kiszka@siemens.com>
-Message-ID: <21af25da8245335ee5be55b3cb9527ce53c652fa.1484989599.git.jan.kiszka@siemens.com>
+Message-ID: <a72b3c3f593d7ebb8af91e174cd844eb2e0d7c09.1484989599.git.jan.kiszka@siemens.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the core is ready for edge-triggered interrupts, we can safely
-allow the PCI versions that provide this to enable the feature and,
-thus, have less shared interrupts.
+When using the a device with edge-triggered interrupts, such as MSIs,
+the interrupt handler has to ensure that there is a point in time during
+its execution where all interrupts sources are silent so that a new
+event can trigger a new interrupt again.
+
+This is achieved here by disabling all interrupt sources for a moment
+before processing them according to the status register. If a new
+interrupt should have arrived after we read the status, it will now
+re-trigger the interrupt, even in edge mode.
 
 Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
-Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Reviewed-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
+Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- drivers/spi/spi-pxa2xx-pci.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ drivers/spi/spi-pxa2xx.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/spi/spi-pxa2xx-pci.c b/drivers/spi/spi-pxa2xx-pci.c
-index 868452d..869f188 100644
---- a/drivers/spi/spi-pxa2xx-pci.c
-+++ b/drivers/spi/spi-pxa2xx-pci.c
-@@ -227,10 +227,16 @@ static int pxa2xx_spi_pci_probe(struct pci_dev *dev,
- 	ssp = &spi_pdata.ssp;
- 	ssp->phys_base = pci_resource_start(dev, 0);
- 	ssp->mmio_base = pcim_iomap_table(dev)[0];
--	ssp->irq = dev->irq;
- 	ssp->port_id = (c->port_id >= 0) ? c->port_id : dev->devfn;
- 	ssp->type = c->type;
+diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
+index bd843df..47b65d7 100644
+--- a/drivers/spi/spi-pxa2xx.c
++++ b/drivers/spi/spi-pxa2xx.c
+@@ -785,6 +785,9 @@ static irqreturn_t ssp_int(int irq, void *dev_id)
+ 	if (!(status & mask))
+ 		return IRQ_NONE;
  
-+	pci_set_master(dev);
++	pxa2xx_spi_write(drv_data, SSCR1, sccr1_reg & ~drv_data->int_cr1);
++	pxa2xx_spi_write(drv_data, SSCR1, sccr1_reg);
 +
-+	ret = pci_alloc_irq_vectors(dev, 1, 1, PCI_IRQ_ALL_TYPES);
-+	if (ret < 0)
-+		return ret;
-+	ssp->irq = pci_irq_vector(dev, 0);
-+
- 	snprintf(buf, sizeof(buf), "pxa2xx-spi.%d", ssp->port_id);
- 	ssp->clk = clk_register_fixed_rate(&dev->dev, buf , NULL, 0,
- 					   c->max_clk_rate);
+ 	if (!drv_data->master->cur_msg) {
+ 		handle_bad_msg(drv_data);
+ 		/* Never fail */
 -- 
 2.1.4
