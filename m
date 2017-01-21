@@ -1,63 +1,69 @@
 From: john@metanate.com (John Keeping)
-Date: Sat, 21 Jan 2017 16:31:11 +0000
-Subject: [PATCH v2 09/26] drm/rockchip: dw-mipi-dsi: respect message flags
+Date: Sat, 21 Jan 2017 16:31:26 +0000
+Subject: [PATCH v2 24/26] drm/rockchip: dw-mipi-dsi: support non-burst modes
 In-Reply-To: <20170121163128.22240-1-john@metanate.com>
 References: <20170121163128.22240-1-john@metanate.com>
-Message-ID: <20170121163128.22240-10-john@metanate.com>
+Message-ID: <20170121163128.22240-25-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Instead of always sending commands in LP mode, respect the
-MIPI_DSI_MSG_USE_LPM flag to decide how to send each message.  Also
-request acks if MIPI_DSI_MSG_REQ_ACK is set.
 
 Signed-off-by: John Keeping <john@metanate.com>
 ---
 Unchanged in v2
 ---
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 16 +++++++++++++++-
- 1 file changed, 15 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 16 +++++++++-------
+ 1 file changed, 9 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 92dbc3e56603..15d33c3c8cb7 100644
+index 2dafb17e31d2..881bb0c62ca5 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -542,6 +542,19 @@ static int dw_mipi_dsi_host_detach(struct mipi_dsi_host *host,
- 	return 0;
- }
+@@ -82,6 +82,7 @@
+ #define FRAME_BTA_ACK			BIT(14)
+ #define ENABLE_LOW_POWER		(0x3f << 8)
+ #define ENABLE_LOW_POWER_MASK		(0x3f << 8)
++#define VID_MODE_TYPE_NON_BURST_SYNC_EVENTS	0x1
+ #define VID_MODE_TYPE_BURST_SYNC_PULSES		0x2
+ #define VID_MODE_TYPE_MASK			0x3
  
-+static void dw_mipi_message_config(struct dw_mipi_dsi *dsi,
-+				   const struct mipi_dsi_msg *msg)
-+{
-+	u32 val = 0;
-+
-+	if (msg->flags & MIPI_DSI_MSG_REQ_ACK)
-+		val |= EN_ACK_RQST;
-+	if (msg->flags & MIPI_DSI_MSG_USE_LPM)
-+		val |= CMD_MODE_ALL_LP;
-+
-+	dsi_write(dsi, DSI_CMD_MODE_CFG, val);
-+}
-+
- static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
+@@ -286,6 +287,7 @@ struct dw_mipi_dsi {
+ 	u32 format;
+ 	u16 input_div;
+ 	u16 feedback_div;
++	unsigned long mode_flags;
+ 
+ 	const struct dw_mipi_dsi_plat_data *pdata;
+ };
+@@ -548,15 +550,10 @@ static int dw_mipi_dsi_host_attach(struct mipi_dsi_host *host,
+ 		return -EINVAL;
+ 	}
+ 
+-	if (!(device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST) ||
+-	    !(device->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE)) {
+-		dev_err(dsi->dev, "device mode is unsupported\n");
+-		return -EINVAL;
+-	}
+-
+ 	dsi->lanes = device->lanes;
+ 	dsi->channel = device->channel;
+ 	dsi->format = device->format;
++	dsi->mode_flags = device->mode_flags;
+ 	dsi->panel = of_drm_find_panel(device->dev.of_node);
+ 	if (dsi->panel)
+ 		return drm_panel_attach(dsi->panel, &dsi->connector);
+@@ -713,7 +710,12 @@ static void dw_mipi_dsi_video_mode_config(struct dw_mipi_dsi *dsi)
  {
- 	int ret;
-@@ -634,6 +647,8 @@ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
- 	struct dw_mipi_dsi *dsi = host_to_dsi(host);
- 	int ret;
+ 	u32 val;
  
-+	dw_mipi_message_config(dsi, msg);
+-	val = VID_MODE_TYPE_BURST_SYNC_PULSES | ENABLE_LOW_POWER;
++	val = ENABLE_LOW_POWER;
 +
- 	switch (msg->type) {
- 	case MIPI_DSI_DCS_SHORT_WRITE:
- 	case MIPI_DSI_DCS_SHORT_WRITE_PARAM:
-@@ -745,7 +760,6 @@ static void dw_mipi_dsi_command_mode_config(struct dw_mipi_dsi *dsi)
- {
- 	dsi_write(dsi, DSI_TO_CNT_CFG, HSTX_TO_CNT(1000) | LPRX_TO_CNT(1000));
- 	dsi_write(dsi, DSI_BTA_TO_CNT, 0xd00);
--	dsi_write(dsi, DSI_CMD_MODE_CFG, CMD_MODE_ALL_LP);
- 	dsi_write(dsi, DSI_MODE_CFG, ENABLE_CMD_MODE);
- }
++	if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)
++		val |= VID_MODE_TYPE_BURST_SYNC_PULSES;
++	else if (!(dsi->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE))
++		val |= VID_MODE_TYPE_NON_BURST_SYNC_EVENTS;
  
+ 	dsi_write(dsi, DSI_VID_MODE_CFG, val);
+ }
 -- 
 2.11.0.197.gb556de5.dirty
