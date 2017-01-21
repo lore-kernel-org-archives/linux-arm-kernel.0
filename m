@@ -1,40 +1,44 @@
 From: john@metanate.com (John Keeping)
-Date: Sat, 21 Jan 2017 16:31:16 +0000
-Subject: [PATCH v2 14/26] drm/rockchip: dw-mipi-dsi: fix escape clock rate
+Date: Sat, 21 Jan 2017 16:31:14 +0000
+Subject: [PATCH v2 12/26] drm/rockchip: dw-mipi-dsi: prepare panel after phy
+ init
 In-Reply-To: <20170121163128.22240-1-john@metanate.com>
 References: <20170121163128.22240-1-john@metanate.com>
-Message-ID: <20170121163128.22240-15-john@metanate.com>
+Message-ID: <20170121163128.22240-13-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the same calculation as the vendor kernel to derive the escape clock
-speed.
+Some panels need to be configured with commands sent over the MIPI link,
+which they will do in the prepare hook.  Call this after the PHY has
+been initialized so that we are able to send commands to the panel.
 
 Signed-off-by: John Keeping <john@metanate.com>
 ---
 Unchanged in v2
 ---
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 290282e86d16..c2e0ba96e0a0 100644
+index ddbc037e7ced..7ada6d8ed143 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -710,11 +710,13 @@ static void dw_mipi_dsi_disable(struct dw_mipi_dsi *dsi)
+@@ -896,12 +896,14 @@ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
+ 	dw_mipi_dsi_dphy_timing_config(dsi);
+ 	dw_mipi_dsi_dphy_interface_config(dsi);
+ 	dw_mipi_dsi_clear_err(dsi);
+-	if (drm_panel_prepare(dsi->panel))
+-		dev_err(dsi->dev, "failed to prepare panel\n");
  
- static void dw_mipi_dsi_init(struct dw_mipi_dsi *dsi)
- {
-+	u32 esc_clk_division = (dsi->lane_mbps >> 3) / 20 + 1;
+ 	dw_mipi_dsi_phy_init(dsi);
+ 	dw_mipi_dsi_wait_for_two_frames(mode);
+ 
++	dw_mipi_dsi_set_mode(dsi, DW_MIPI_DSI_CMD_MODE);
++	if (drm_panel_prepare(dsi->panel))
++		dev_err(dsi->dev, "failed to prepare panel\n");
 +
- 	dsi_write(dsi, DSI_PWR_UP, RESET);
- 	dsi_write(dsi, DSI_PHY_RSTZ, PHY_DISFORCEPLL | PHY_DISABLECLK
- 		  | PHY_RSTZ | PHY_SHUTDOWNZ);
- 	dsi_write(dsi, DSI_CLKMGR_CFG, TO_CLK_DIVIDSION(10) |
--		  TX_ESC_CLK_DIVIDSION(7));
-+		  TX_ESC_CLK_DIVIDSION(esc_clk_division));
- }
+ 	dw_mipi_dsi_set_mode(dsi, DW_MIPI_DSI_VID_MODE);
+ 	drm_panel_enable(dsi->panel);
  
- static void dw_mipi_dsi_dpi_config(struct dw_mipi_dsi *dsi,
 -- 
 2.11.0.197.gb556de5.dirty
