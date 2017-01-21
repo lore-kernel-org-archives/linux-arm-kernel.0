@@ -1,164 +1,181 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 21 Jan 2017 10:46:00 -0800
-Subject: [PATCH 08/13] Input: touchscreen - Use local variables consistently
+Date: Sat, 21 Jan 2017 10:46:02 -0800
+Subject: [PATCH 10/13] Input: misc - drop unnecessary calls to
+ device_init_wakeup
 In-Reply-To: <1485024365-3368-1-git-send-email-linux@roeck-us.net>
 References: <1485024365-3368-1-git-send-email-linux@roeck-us.net>
-Message-ID: <1485024365-3368-9-git-send-email-linux@roeck-us.net>
+Message-ID: <1485024365-3368-11-git-send-email-linux@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a function declares a variable to access a structure element,
-use it conssistently.
+Calling device_init_wakeup in the remove function is unnecessary since the
+device is going away, and thus won't be able to cause any wakeups under any
+circumstances. Besides, the driver cleanup code already handles the
+necessary cleanup.
 
-The conversion was done automatically with coccinelle using
-the following semantic patch.
+Similar, disabling wakeup in the probe error path is unnecessary, as is
+disabling wakeup in the probe function in the first place.
 
-// Catch function parameters.
-// Handle those first to trigger reformatting.
+Changes were done automatically using the following coccinelle script.
 
+@probe@
+identifier p, probefn;
+declarer name module_platform_driver_probe;
+position pos;
 @@
-identifier d;
-identifier fn;
-identifier svar;
-identifier elem;
-type T;
-identifier i;
-expression e;
-identifier fn;
-expression list es;
-@@
-
-fn(...) {
-  ...
-  T d = &svar->elem;
-<... when != d = e;
-- fn(&svar->elem, es)
-+ fn(d, es)
-...> }
-
-// Now address non-functions and multiple transformations in function
-// parameters.
-
-@@
-identifier d;
-identifier fn;
-identifier svar;
-identifier elem;
-type T;
-identifier i;
-expression e;
-@@
-
-fn(...) {
-  ...
-  T d = &svar->elem;
-<... when != d = e;
 (
-- &svar->elem
-+ d
+  module_platform_driver_probe(p, probefn at pos);
 |
-- svar->elem.i
-+ d->i
+  struct platform_driver p = {
+    .probe = probefn at pos,
+  };
+|
+  struct i2c_driver p = {
+    .probe = probefn at pos,
+  };
+|
+  struct spi_driver p = {
+    .probe = probefn at pos,
+  };
 )
-...> }
+
+@remove@
+identifier p, removefn;
+@@
+
+  struct
+(
+  platform_driver
+|
+  i2c_driver
+|
+  spi_driver
+|
+  hv_driver
+)
+  p = {
+    .remove = \(__exit_p(removefn)\|removefn\),
+  };
+
+@depends on remove@
+identifier remove.removefn;
+@@
+
+removefn(...) {
+<+...
+- device_init_wakeup(...);
+...+>
+}
+
+@depends on probe@
+identifier probe.probefn;
+expression dev;
+@@
+
+probefn(...) {
+<+...
+- device_init_wakeup(..., \(false\|0\));
+  ...+>
+}
 
 Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 ---
- drivers/input/touchscreen/atmel_mxt_ts.c  | 2 +-
- drivers/input/touchscreen/fsl-imx25-tcq.c | 2 +-
- drivers/input/touchscreen/ili210x.c       | 2 +-
- drivers/input/touchscreen/pixcir_i2c_ts.c | 4 ++--
- drivers/input/touchscreen/rohm_bu21023.c  | 3 +--
- drivers/input/touchscreen/s3c2410_ts.c    | 2 +-
- 6 files changed, 7 insertions(+), 8 deletions(-)
+ drivers/input/misc/88pm80x_onkey.c   | 1 -
+ drivers/input/misc/e3x0-button.c     | 1 -
+ drivers/input/misc/gp2ap002a00f.c    | 2 --
+ drivers/input/misc/hisi_powerkey.c   | 2 --
+ drivers/input/misc/pm8941-pwrkey.c   | 1 -
+ drivers/input/misc/pmic8xxx-pwrkey.c | 2 --
+ drivers/input/misc/sirfsoc-onkey.c   | 2 --
+ 7 files changed, 11 deletions(-)
 
-diff --git a/drivers/input/touchscreen/atmel_mxt_ts.c b/drivers/input/touchscreen/atmel_mxt_ts.c
-index e5d185fe69b9..2302aef2b2d4 100644
---- a/drivers/input/touchscreen/atmel_mxt_ts.c
-+++ b/drivers/input/touchscreen/atmel_mxt_ts.c
-@@ -2509,7 +2509,7 @@ static void mxt_debug_init(struct mxt_data *data)
- 		dbg->t37_pages = MXT1386_COLUMNS * MXT1386_PAGES_PER_COLUMN;
- 	else
- 		dbg->t37_pages = DIV_ROUND_UP(data->xsize *
--					      data->info.matrix_ysize *
-+					      info->matrix_ysize *
- 					      sizeof(u16),
- 					      sizeof(dbg->t37_buf->data));
+diff --git a/drivers/input/misc/88pm80x_onkey.c b/drivers/input/misc/88pm80x_onkey.c
+index cf9908f1e5d5..45a09497f680 100644
+--- a/drivers/input/misc/88pm80x_onkey.c
++++ b/drivers/input/misc/88pm80x_onkey.c
+@@ -143,7 +143,6 @@ static int pm80x_onkey_remove(struct platform_device *pdev)
+ {
+ 	struct pm80x_onkey_info *info = platform_get_drvdata(pdev);
  
-diff --git a/drivers/input/touchscreen/fsl-imx25-tcq.c b/drivers/input/touchscreen/fsl-imx25-tcq.c
-index d50ee490c9cc..47fe1f184bbc 100644
---- a/drivers/input/touchscreen/fsl-imx25-tcq.c
-+++ b/drivers/input/touchscreen/fsl-imx25-tcq.c
-@@ -507,7 +507,7 @@ static int mx25_tcq_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct input_dev *idev;
- 	struct mx25_tcq_priv *priv;
--	struct mx25_tsadc *tsadc = dev_get_drvdata(pdev->dev.parent);
-+	struct mx25_tsadc *tsadc = dev_get_drvdata(dev->parent);
- 	struct resource *res;
- 	void __iomem *mem;
- 	int error;
-diff --git a/drivers/input/touchscreen/ili210x.c b/drivers/input/touchscreen/ili210x.c
-index fe4848bd1f4c..91dc5fb34fe1 100644
---- a/drivers/input/touchscreen/ili210x.c
-+++ b/drivers/input/touchscreen/ili210x.c
-@@ -280,7 +280,7 @@ static int ili210x_i2c_probe(struct i2c_client *client,
- 		goto err_remove_sysfs;
- 	}
+-	device_init_wakeup(&pdev->dev, 0);
+ 	pm80x_free_irq(info->pm80x, info->irq, info);
+ 	input_unregister_device(info->idev);
+ 	kfree(info);
+diff --git a/drivers/input/misc/e3x0-button.c b/drivers/input/misc/e3x0-button.c
+index b0b374112db3..1e50314db1ab 100644
+--- a/drivers/input/misc/e3x0-button.c
++++ b/drivers/input/misc/e3x0-button.c
+@@ -126,7 +126,6 @@ static int e3x0_button_probe(struct platform_device *pdev)
  
--	device_init_wakeup(&client->dev, 1);
-+	device_init_wakeup(dev, 1);
+ static int e3x0_button_remove(struct platform_device *pdev)
+ {
+-	device_init_wakeup(&pdev->dev, 0);
+ 	return 0;
+ }
  
- 	dev_dbg(dev,
- 		"ILI210x initialized (IRQ: %d), firmware version %d.%d.%d",
-diff --git a/drivers/input/touchscreen/pixcir_i2c_ts.c b/drivers/input/touchscreen/pixcir_i2c_ts.c
-index 3bb0637d832e..37ff672c7802 100644
---- a/drivers/input/touchscreen/pixcir_i2c_ts.c
-+++ b/drivers/input/touchscreen/pixcir_i2c_ts.c
-@@ -461,7 +461,7 @@ static int pixcir_i2c_ts_probe(struct i2c_client *client,
- 		if (error)
- 			return error;
- 	} else {
--		dev_err(&client->dev, "platform data not defined\n");
-+		dev_err(dev, "platform data not defined\n");
- 		return -EINVAL;
- 	}
+diff --git a/drivers/input/misc/gp2ap002a00f.c b/drivers/input/misc/gp2ap002a00f.c
+index 3bfdfcc20485..c6a29e57b5e4 100644
+--- a/drivers/input/misc/gp2ap002a00f.c
++++ b/drivers/input/misc/gp2ap002a00f.c
+@@ -210,8 +210,6 @@ static int gp2a_remove(struct i2c_client *client)
+ 	struct gp2a_data *dt = i2c_get_clientdata(client);
+ 	const struct gp2a_platform_data *pdata = dt->pdata;
  
-@@ -483,7 +483,7 @@ static int pixcir_i2c_ts_probe(struct i2c_client *client,
- 	input->id.bustype = BUS_I2C;
- 	input->open = pixcir_input_open;
- 	input->close = pixcir_input_close;
--	input->dev.parent = &client->dev;
-+	input->dev.parent = dev;
+-	device_init_wakeup(&client->dev, false);
+-
+ 	free_irq(client->irq, dt);
  
- 	if (pdata) {
- 		input_set_abs_params(input, ABS_MT_POSITION_X, 0, pdata->x_max, 0, 0);
-diff --git a/drivers/input/touchscreen/rohm_bu21023.c b/drivers/input/touchscreen/rohm_bu21023.c
-index 611156a2ef80..eeaf6ff03597 100644
---- a/drivers/input/touchscreen/rohm_bu21023.c
-+++ b/drivers/input/touchscreen/rohm_bu21023.c
-@@ -1189,8 +1189,7 @@ static int rohm_bu21023_i2c_probe(struct i2c_client *client,
- 	error = devm_add_action(dev, rohm_ts_remove_sysfs_group, dev);
- 	if (error) {
- 		rohm_ts_remove_sysfs_group(dev);
--		dev_err(&client->dev,
--			"Failed to add sysfs cleanup action: %d\n",
-+		dev_err(dev, "Failed to add sysfs cleanup action: %d\n",
- 			error);
- 		return error;
- 	}
-diff --git a/drivers/input/touchscreen/s3c2410_ts.c b/drivers/input/touchscreen/s3c2410_ts.c
-index a4a103e1d11b..41d58e88cc8a 100644
---- a/drivers/input/touchscreen/s3c2410_ts.c
-+++ b/drivers/input/touchscreen/s3c2410_ts.c
-@@ -250,7 +250,7 @@ static int s3c2410ts_probe(struct platform_device *pdev)
+ 	input_unregister_device(dt->input);
+diff --git a/drivers/input/misc/hisi_powerkey.c b/drivers/input/misc/hisi_powerkey.c
+index c4c42124a059..baa81dccfc1f 100644
+--- a/drivers/input/misc/hisi_powerkey.c
++++ b/drivers/input/misc/hisi_powerkey.c
+@@ -122,8 +122,6 @@ static int hi65xx_powerkey_probe(struct platform_device *pdev)
  
- 	ts.dev = dev;
+ static int hi65xx_powerkey_remove(struct platform_device *pdev)
+ {
+-	device_init_wakeup(&pdev->dev, 0);
+-
+ 	return 0;
+ }
  
--	info = dev_get_platdata(&pdev->dev);
-+	info = dev_get_platdata(dev);
- 	if (!info) {
- 		dev_err(dev, "no platform data, cannot attach\n");
- 		return -EINVAL;
+diff --git a/drivers/input/misc/pm8941-pwrkey.c b/drivers/input/misc/pm8941-pwrkey.c
+index e317b75357a0..18ad956454f1 100644
+--- a/drivers/input/misc/pm8941-pwrkey.c
++++ b/drivers/input/misc/pm8941-pwrkey.c
+@@ -266,7 +266,6 @@ static int pm8941_pwrkey_remove(struct platform_device *pdev)
+ {
+ 	struct pm8941_pwrkey *pwrkey = platform_get_drvdata(pdev);
+ 
+-	device_init_wakeup(&pdev->dev, 0);
+ 	unregister_reboot_notifier(&pwrkey->reboot_notifier);
+ 
+ 	return 0;
+diff --git a/drivers/input/misc/pmic8xxx-pwrkey.c b/drivers/input/misc/pmic8xxx-pwrkey.c
+index 67aab86048ad..c75be2dd00e7 100644
+--- a/drivers/input/misc/pmic8xxx-pwrkey.c
++++ b/drivers/input/misc/pmic8xxx-pwrkey.c
+@@ -440,8 +440,6 @@ static int pmic8xxx_pwrkey_probe(struct platform_device *pdev)
+ 
+ static int pmic8xxx_pwrkey_remove(struct platform_device *pdev)
+ {
+-	device_init_wakeup(&pdev->dev, 0);
+-
+ 	return 0;
+ }
+ 
+diff --git a/drivers/input/misc/sirfsoc-onkey.c b/drivers/input/misc/sirfsoc-onkey.c
+index ed7237f19539..a2ed0e4fcd0b 100644
+--- a/drivers/input/misc/sirfsoc-onkey.c
++++ b/drivers/input/misc/sirfsoc-onkey.c
+@@ -174,8 +174,6 @@ static int sirfsoc_pwrc_probe(struct platform_device *pdev)
+ 
+ static int sirfsoc_pwrc_remove(struct platform_device *pdev)
+ {
+-	device_init_wakeup(&pdev->dev, 0);
+-
+ 	return 0;
+ }
+ 
 -- 
 2.7.4
