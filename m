@@ -1,48 +1,81 @@
 From: john@metanate.com (John Keeping)
-Date: Sat, 21 Jan 2017 16:31:18 +0000
-Subject: [PATCH v2 16/26] drm/rockchip: dw-mipi-dsi: configure bias and
- bandgap before enable
+Date: Sat, 21 Jan 2017 16:31:20 +0000
+Subject: [PATCH v2 18/26] drm/rockchip: dw-mipi-dsi: properly configure PHY
+ timing
 In-Reply-To: <20170121163128.22240-1-john@metanate.com>
 References: <20170121163128.22240-1-john@metanate.com>
-Message-ID: <20170121163128.22240-17-john@metanate.com>
+Message-ID: <20170121163128.22240-19-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We should configure these functions before enabling them.
+These values are specified as constant time periods but the PHY
+configuration is in terms of the current lane byte clock so using
+constant values guarantees that the timings will be outside the
+specification with some display configurations.
+
+Derive the necessary configuration from the byte clock in order to
+ensure that the PHY configuration is correct.
 
 Signed-off-by: John Keeping <john@metanate.com>
 ---
 Unchanged in v2
 ---
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 36 ++++++++++++++++++++++++++++++----
+ 1 file changed, 32 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 5b3068e9e8db..ce1e6f9a2041 100644
+index cfe7e4ba305c..12432e41971b 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -420,6 +420,11 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
- 	dw_mipi_dsi_phy_write(dsi, 0x18, LOOP_DIV_HIGH_SEL(dsi->feedback_div) |
- 					 HIGH_PROGRAM_EN);
+@@ -383,6 +383,26 @@ static void dw_mipi_dsi_phy_write(struct dw_mipi_dsi *dsi, u8 test_code,
+ 	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_TESTCLK | PHY_UNTESTCLR);
+ }
  
-+	dw_mipi_dsi_phy_write(dsi, 0x22, LOW_PROGRAM_EN |
-+					 BIASEXTR_SEL(BIASEXTR_127_7));
-+	dw_mipi_dsi_phy_write(dsi, 0x22, HIGH_PROGRAM_EN |
-+					 BANDGAP_SEL(BANDGAP_96_10));
++/**
++ * ns2bc - Nanoseconds to byte clock cycles
++ */
++static inline unsigned int ns2bc(struct dw_mipi_dsi *dsi, int ns)
++{
++	unsigned long byte_clk_khz = dsi->lane_mbps * MSEC_PER_SEC / 8;
 +
- 	dw_mipi_dsi_phy_write(dsi, 0x20, POWER_CONTROL | INTERNAL_REG_CURRENT |
- 					 BIAS_BLOCK_ON | BANDGAP_ON);
- 
-@@ -429,10 +434,6 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
++	return (ns * (byte_clk_khz / 1000) + 999) / 1000;
++}
++
++/**
++ * ns2ui - Nanoseconds to UI time periods
++ */
++static inline unsigned int ns2ui(struct dw_mipi_dsi *dsi, int ns)
++{
++	unsigned long byte_clk_khz = dsi->lane_mbps * MSEC_PER_SEC;
++
++	return (ns * (byte_clk_khz / 1000) + 999) / 1000;
++}
++
+ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
+ {
+ 	int ret, testdin, vco, val;
+@@ -434,10 +454,18 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
  					 SETRD_MAX | POWER_MANAGE |
  					 TER_RESISTORS_ON);
  
--	dw_mipi_dsi_phy_write(dsi, 0x22, LOW_PROGRAM_EN |
--					 BIASEXTR_SEL(BIASEXTR_127_7));
--	dw_mipi_dsi_phy_write(dsi, 0x22, HIGH_PROGRAM_EN |
--					 BANDGAP_SEL(BANDGAP_96_10));
+-
+-	dw_mipi_dsi_phy_write(dsi, 0x70, TLP_PROGRAM_EN | 0xf);
+-	dw_mipi_dsi_phy_write(dsi, 0x71, THS_PRE_PROGRAM_EN | 0x55);
+-	dw_mipi_dsi_phy_write(dsi, 0x72, THS_ZERO_PROGRAM_EN | 0xa);
++	dw_mipi_dsi_phy_write(dsi, 0x60, TLP_PROGRAM_EN | ns2bc(dsi, 500));
++	dw_mipi_dsi_phy_write(dsi, 0x61, THS_PRE_PROGRAM_EN | ns2ui(dsi, 40));
++	dw_mipi_dsi_phy_write(dsi, 0x62, THS_ZERO_PROGRAM_EN | ns2bc(dsi, 300));
++	dw_mipi_dsi_phy_write(dsi, 0x63, THS_PRE_PROGRAM_EN | ns2ui(dsi, 100));
++	dw_mipi_dsi_phy_write(dsi, 0x64, BIT(5) | ns2bc(dsi, 100));
++	dw_mipi_dsi_phy_write(dsi, 0x65, BIT(5) | (ns2bc(dsi, 60) + 7));
++
++	dw_mipi_dsi_phy_write(dsi, 0x70, TLP_PROGRAM_EN | ns2bc(dsi, 500));
++	dw_mipi_dsi_phy_write(dsi, 0x71, THS_PRE_PROGRAM_EN | (ns2ui(dsi, 50) + 5));
++	dw_mipi_dsi_phy_write(dsi, 0x72, THS_ZERO_PROGRAM_EN | (ns2bc(dsi, 140) + 2));
++	dw_mipi_dsi_phy_write(dsi, 0x73, THS_PRE_PROGRAM_EN | (ns2ui(dsi, 60) + 8));
++	dw_mipi_dsi_phy_write(dsi, 0x74, BIT(5) | ns2bc(dsi, 100));
  
- 	dw_mipi_dsi_phy_write(dsi, 0x70, TLP_PROGRAM_EN | 0xf);
- 	dw_mipi_dsi_phy_write(dsi, 0x71, THS_PRE_PROGRAM_EN | 0x55);
+ 	dsi_write(dsi, DSI_PHY_RSTZ, PHY_ENFORCEPLL | PHY_ENABLECLK |
+ 				     PHY_UNRSTZ | PHY_UNSHUTDOWNZ);
 -- 
 2.11.0.197.gb556de5.dirty
