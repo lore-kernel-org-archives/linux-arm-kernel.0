@@ -1,18 +1,19 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 20 Jan 2017 16:21:50 -0800
-Subject: [PATCH] clk: imx6: don't restrict LDB mux changes on QuadPlus
-In-Reply-To: <20170113173943.23677-1-l.stach@pengutronix.de>
-References: <20170113173943.23677-1-l.stach@pengutronix.de>
-Message-ID: <20170121002150.GL20800@codeaurora.org>
+Date: Fri, 20 Jan 2017 16:23:48 -0800
+Subject: [PATCH v2 2/3] clk: bcm2835: Register the DSI0/DSI1 pixel clocks.
+In-Reply-To: <20170117203157.23822-2-eric@anholt.net>
+References: <20170117203157.23822-1-eric@anholt.net>
+ <20170117203157.23822-2-eric@anholt.net>
+Message-ID: <20170121002348.GN20800@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13, Lucas Stach wrote:
-> The LDB mux/gate layout has been fixed on QuadPlus, so there is no need
-> to restrict the LDB mux changes on this hardware, as the erratum
-> preventing this from working properly is gone.
+On 01/18, Eric Anholt wrote:
+> The DSI pixel clocks are muxed from clocks generated in the analog phy
+> by the DSI driver.  In order to set them as parents, we need to do the
+> same name lookup dance on them as we do for our root oscillator.
 > 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> Signed-off-by: Eric Anholt <eric@anholt.net>
 > ---
 
 Applied to clk-next
