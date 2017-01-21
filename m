@@ -1,34 +1,38 @@
 From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Sat, 21 Jan 2017 16:41:11 +0530
-Subject: [PATCH 3/4] PCI: Xilinx NWL: Modifying flow handler for legacy
- interrupts
-In-Reply-To: <1484997072-19276-1-git-send-email-bharatku@xilinx.com>
-References: <1484997072-19276-1-git-send-email-bharatku@xilinx.com>
-Message-ID: <1484997072-19276-3-git-send-email-bharatku@xilinx.com>
+Date: Sat, 21 Jan 2017 16:41:09 +0530
+Subject: [PATCH 1/4] PCI: Xilinx NWL: Fix,
+ do not check for legacy status in while loop
+Message-ID: <1484997072-19276-1-git-send-email-bharatku@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Legacy interrupts are level sensitive, so using handle_level_irq
-is more approprate as it is masks interrupts until End point handles
-interrupts and unmasks interrutps after End point handler is executed.
+- The legacy status register value for particular INTx becomes low
+only after DEASSERT_INTx is received.
+- Few End Points take time for sending DEASSERT_INTx, checking
+legacy status register in while loop causes invoking of EP
+handler continuosly until DEASSERT_INTx is received.
 
 Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
 ---
- drivers/pci/host/pcie-xilinx-nwl.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/pci/host/pcie-xilinx-nwl.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
-index e1809f9..50f9c0d 100644
+index 43eaa4a..c8b5a33 100644
 --- a/drivers/pci/host/pcie-xilinx-nwl.c
 +++ b/drivers/pci/host/pcie-xilinx-nwl.c
-@@ -433,7 +433,7 @@ static void nwl_unmask_leg_irq(struct irq_data *data)
- static int nwl_legacy_map(struct irq_domain *domain, unsigned int irq,
- 			  irq_hw_number_t hwirq)
- {
--	irq_set_chip_and_handler(irq, &nwl_leg_irq_chip, handle_simple_irq);
-+	irq_set_chip_and_handler(irq, &nwl_leg_irq_chip, handle_level_irq);
- 	irq_set_chip_data(irq, domain->host_data);
+@@ -342,9 +342,10 @@ static void nwl_pcie_leg_handler(struct irq_desc *desc)
  
- 	return 0;
+ 	chained_irq_enter(chip, desc);
+ 	pcie = irq_desc_get_handler_data(desc);
++	status = nwl_bridge_readl(pcie, MSGF_LEG_STATUS) &
++				  MSGF_LEG_SR_MASKALL;
+ 
+-	while ((status = nwl_bridge_readl(pcie, MSGF_LEG_STATUS) &
+-				MSGF_LEG_SR_MASKALL) != 0) {
++	if (status != 0) {
+ 		for_each_set_bit(bit, &status, INTX_NUM) {
+ 			virq = irq_find_mapping(pcie->legacy_irq_domain,
+ 						bit + 1);
 -- 
 1.7.1
