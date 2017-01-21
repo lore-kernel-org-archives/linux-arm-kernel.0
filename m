@@ -1,41 +1,135 @@
-From: jan.kiszka@siemens.com (Jan Kiszka)
-Date: Sat, 21 Jan 2017 10:06:38 +0100
-Subject: [PATCH v3 1/2] spi: pxa2xx: Prepare for edge-triggered interrupts
-In-Reply-To: <cover.1484989599.git.jan.kiszka@siemens.com>
-References: <cover.1484989599.git.jan.kiszka@siemens.com>
-Message-ID: <a72b3c3f593d7ebb8af91e174cd844eb2e0d7c09.1484989599.git.jan.kiszka@siemens.com>
+From: bhumirks@gmail.com (Bhumika Goyal)
+Date: Sat, 21 Jan 2017 14:59:44 +0530
+Subject: [PATCH] media: platform: constify vb2_ops structures
+Message-ID: <1484990984-16136-1-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using the a device with edge-triggered interrupts, such as MSIs,
-the interrupt handler has to ensure that there is a point in time during
-its execution where all interrupts sources are silent so that a new
-event can trigger a new interrupt again.
+Declare vb2_ops structures as const as they are only stored in
+the ops field of a vb2_queue structure. This field is of type
+const, so vb2_ops structures having same properties can be made
+const too.
+Done using Coccinelle:
 
-This is achieved here by disabling all interrupt sources for a moment
-before processing them according to the status register. If a new
-interrupt should have arrived after we read the status, it will now
-re-trigger the interrupt, even in edge mode.
+@r1 disable optional_qualifier@
+identifier i;
+position p;
+@@
+static struct vb2_ops i at p={...};
 
-Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+@ok1@
+identifier r1.i;
+position p;
+struct sta2x11_vip vip;
+struct vb2_queue q;
+@@
+(
+vip.vb_vidq.ops=&i at p
+|
+q.ops=&i at p
+)
+
+@bad@
+position p!={r1.p,ok1.p};
+identifier r1.i;
+@@
+i at p
+
+@depends on !bad disable optional_qualifier@
+identifier r1.i;
+@@
++const
+struct vb2_ops i;
+
+Cross compiled the media/platform/blackfin/bfin_capture.o file for
+blackfin architecture.
+
+File size before:
+  text	   data	    bss	    dec	    hex	filename
+  6776	    176	      0	   6952	   1b28 platform/blackfin/bfin_capture.o
+
+File size after:
+   text	   data	    bss	    dec	    hex	filename
+   6816	    136	      0	   6952	   1b28 platform/blackfin/bfin_capture.o
+
+File size before:
+   text	   data	    bss	    dec	    hex	filename
+  12852	    456	    272	  13580	   350c platform/davinci/vpif_capture.o
+
+File size after:
+   text	   data	    bss	    dec	    hex	filename
+  12932	    360	    272	  13564	   34fc platform/davinci/vpif_capture.o
+
+File size before:
+   text	   data	    bss	    dec	    hex	filename
+  12285	    360	    276	  12921	   3279 platform/davinci/vpif_display.o
+
+File size after:
+   text	   data	    bss	    dec	    hex	filename
+  12365	    296	    276	  12937	   3289 platform/davinci/vpif_display.o
+
+File size details before and after applying the patch remains the same for
+drivers/media/platform/pxa_camera.o
+
+Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
 ---
- drivers/spi/spi-pxa2xx.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/media/platform/davinci/vpif_capture.c | 2 +-
+ drivers/media/platform/davinci/vpif_display.c | 2 +-
+ drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c  | 2 +-
+ drivers/media/platform/pxa_camera.c           | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
-index bd843df..47b65d7 100644
---- a/drivers/spi/spi-pxa2xx.c
-+++ b/drivers/spi/spi-pxa2xx.c
-@@ -785,6 +785,9 @@ static irqreturn_t ssp_int(int irq, void *dev_id)
- 	if (!(status & mask))
- 		return IRQ_NONE;
+diff --git a/drivers/media/platform/davinci/vpif_capture.c b/drivers/media/platform/davinci/vpif_capture.c
+index f791f5c..54c54d9 100644
+--- a/drivers/media/platform/davinci/vpif_capture.c
++++ b/drivers/media/platform/davinci/vpif_capture.c
+@@ -309,7 +309,7 @@ static void vpif_stop_streaming(struct vb2_queue *vq)
+ 	spin_unlock_irqrestore(&common->irqlock, flags);
+ }
  
-+	pxa2xx_spi_write(drv_data, SSCR1, sccr1_reg & ~drv_data->int_cr1);
-+	pxa2xx_spi_write(drv_data, SSCR1, sccr1_reg);
-+
- 	if (!drv_data->master->cur_msg) {
- 		handle_bad_msg(drv_data);
- 		/* Never fail */
+-static struct vb2_ops video_qops = {
++static const struct vb2_ops video_qops = {
+ 	.queue_setup		= vpif_buffer_queue_setup,
+ 	.buf_prepare		= vpif_buffer_prepare,
+ 	.start_streaming	= vpif_start_streaming,
+diff --git a/drivers/media/platform/davinci/vpif_display.c b/drivers/media/platform/davinci/vpif_display.c
+index e5f1844..9604afd 100644
+--- a/drivers/media/platform/davinci/vpif_display.c
++++ b/drivers/media/platform/davinci/vpif_display.c
+@@ -289,7 +289,7 @@ static void vpif_stop_streaming(struct vb2_queue *vq)
+ 	spin_unlock_irqrestore(&common->irqlock, flags);
+ }
+ 
+-static struct vb2_ops video_qops = {
++static const struct vb2_ops video_qops = {
+ 	.queue_setup		= vpif_buffer_queue_setup,
+ 	.wait_prepare		= vb2_ops_wait_prepare,
+ 	.wait_finish		= vb2_ops_wait_finish,
+diff --git a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+index 13afe48..3038d62 100644
+--- a/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
++++ b/drivers/media/platform/mtk-mdp/mtk_mdp_m2m.c
+@@ -621,7 +621,7 @@ static void mtk_mdp_m2m_buf_queue(struct vb2_buffer *vb)
+ 	v4l2_m2m_buf_queue(ctx->m2m_ctx, to_vb2_v4l2_buffer(vb));
+ }
+ 
+-static struct vb2_ops mtk_mdp_m2m_qops = {
++static const struct vb2_ops mtk_mdp_m2m_qops = {
+ 	.queue_setup	 = mtk_mdp_m2m_queue_setup,
+ 	.buf_prepare	 = mtk_mdp_m2m_buf_prepare,
+ 	.buf_queue	 = mtk_mdp_m2m_buf_queue,
+diff --git a/drivers/media/platform/pxa_camera.c b/drivers/media/platform/pxa_camera.c
+index 929006f..17167d1 100644
+--- a/drivers/media/platform/pxa_camera.c
++++ b/drivers/media/platform/pxa_camera.c
+@@ -1530,7 +1530,7 @@ static void pxac_vb2_stop_streaming(struct vb2_queue *vq)
+ 		pxa_camera_wakeup(pcdev, buf, VB2_BUF_STATE_ERROR);
+ }
+ 
+-static struct vb2_ops pxac_vb2_ops = {
++static const struct vb2_ops pxac_vb2_ops = {
+ 	.queue_setup		= pxac_vb2_queue_setup,
+ 	.buf_init		= pxac_vb2_init,
+ 	.buf_prepare		= pxac_vb2_prepare,
 -- 
-2.1.4
+1.9.1
