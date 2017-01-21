@@ -1,81 +1,71 @@
 From: john@metanate.com (John Keeping)
-Date: Sat, 21 Jan 2017 16:31:20 +0000
-Subject: [PATCH v2 18/26] drm/rockchip: dw-mipi-dsi: properly configure PHY
- timing
+Date: Sat, 21 Jan 2017 16:31:07 +0000
+Subject: [PATCH v2 05/26] drm/rockchip: dw-mipi-dsi: fix command header writes
 In-Reply-To: <20170121163128.22240-1-john@metanate.com>
 References: <20170121163128.22240-1-john@metanate.com>
-Message-ID: <20170121163128.22240-19-john@metanate.com>
+Message-ID: <20170121163128.22240-6-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These values are specified as constant time periods but the PHY
-configuration is in terms of the current lane byte clock so using
-constant values guarantees that the timings will be outside the
-specification with some display configurations.
-
-Derive the necessary configuration from the byte clock in order to
-ensure that the PHY configuration is correct.
+In a couple of places here we use "val" for the value that is about to
+be written to a register but then reuse the same variable for the value
+of a status register before we get around to writing it.  Rename the
+value to be written to so that we write the value we intend to and not
+what we have just read from the status register.
 
 Signed-off-by: John Keeping <john@metanate.com>
+Tested-by: Chris Zhong <zyw@rock-chips.com>
+Reviewed-by: Chris Zhong <zyw@rock-chips.com>
 ---
 Unchanged in v2
 ---
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 36 ++++++++++++++++++++++++++++++----
- 1 file changed, 32 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index cfe7e4ba305c..12432e41971b 100644
+index bd92e58b64f3..4cbbbcb619b7 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -383,6 +383,26 @@ static void dw_mipi_dsi_phy_write(struct dw_mipi_dsi *dsi, u8 test_code,
- 	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_TESTCLK | PHY_UNTESTCLR);
+@@ -542,9 +542,10 @@ static int dw_mipi_dsi_host_detach(struct mipi_dsi_host *host,
+ 	return 0;
  }
  
-+/**
-+ * ns2bc - Nanoseconds to byte clock cycles
-+ */
-+static inline unsigned int ns2bc(struct dw_mipi_dsi *dsi, int ns)
-+{
-+	unsigned long byte_clk_khz = dsi->lane_mbps * MSEC_PER_SEC / 8;
-+
-+	return (ns * (byte_clk_khz / 1000) + 999) / 1000;
-+}
-+
-+/**
-+ * ns2ui - Nanoseconds to UI time periods
-+ */
-+static inline unsigned int ns2ui(struct dw_mipi_dsi *dsi, int ns)
-+{
-+	unsigned long byte_clk_khz = dsi->lane_mbps * MSEC_PER_SEC;
-+
-+	return (ns * (byte_clk_khz / 1000) + 999) / 1000;
-+}
-+
- static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
+-static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 val)
++static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
  {
- 	int ret, testdin, vco, val;
-@@ -434,10 +454,18 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
- 					 SETRD_MAX | POWER_MANAGE |
- 					 TER_RESISTORS_ON);
+ 	int ret;
++	u32 val;
  
--
--	dw_mipi_dsi_phy_write(dsi, 0x70, TLP_PROGRAM_EN | 0xf);
--	dw_mipi_dsi_phy_write(dsi, 0x71, THS_PRE_PROGRAM_EN | 0x55);
--	dw_mipi_dsi_phy_write(dsi, 0x72, THS_ZERO_PROGRAM_EN | 0xa);
-+	dw_mipi_dsi_phy_write(dsi, 0x60, TLP_PROGRAM_EN | ns2bc(dsi, 500));
-+	dw_mipi_dsi_phy_write(dsi, 0x61, THS_PRE_PROGRAM_EN | ns2ui(dsi, 40));
-+	dw_mipi_dsi_phy_write(dsi, 0x62, THS_ZERO_PROGRAM_EN | ns2bc(dsi, 300));
-+	dw_mipi_dsi_phy_write(dsi, 0x63, THS_PRE_PROGRAM_EN | ns2ui(dsi, 100));
-+	dw_mipi_dsi_phy_write(dsi, 0x64, BIT(5) | ns2bc(dsi, 100));
-+	dw_mipi_dsi_phy_write(dsi, 0x65, BIT(5) | (ns2bc(dsi, 60) + 7));
-+
-+	dw_mipi_dsi_phy_write(dsi, 0x70, TLP_PROGRAM_EN | ns2bc(dsi, 500));
-+	dw_mipi_dsi_phy_write(dsi, 0x71, THS_PRE_PROGRAM_EN | (ns2ui(dsi, 50) + 5));
-+	dw_mipi_dsi_phy_write(dsi, 0x72, THS_ZERO_PROGRAM_EN | (ns2bc(dsi, 140) + 2));
-+	dw_mipi_dsi_phy_write(dsi, 0x73, THS_PRE_PROGRAM_EN | (ns2ui(dsi, 60) + 8));
-+	dw_mipi_dsi_phy_write(dsi, 0x74, BIT(5) | ns2bc(dsi, 100));
+ 	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
+ 				 val, !(val & GEN_CMD_FULL), 1000,
+@@ -554,7 +555,7 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 val)
+ 		return ret;
+ 	}
  
- 	dsi_write(dsi, DSI_PHY_RSTZ, PHY_ENFORCEPLL | PHY_ENABLECLK |
- 				     PHY_UNRSTZ | PHY_UNSHUTDOWNZ);
+-	dsi_write(dsi, DSI_GEN_HDR, val);
++	dsi_write(dsi, DSI_GEN_HDR, hdr_val);
+ 
+ 	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
+ 				 val, val & (GEN_CMD_EMPTY | GEN_PLD_W_EMPTY),
+@@ -587,8 +588,9 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
+ {
+ 	const u32 *tx_buf = msg->tx_buf;
+ 	int len = msg->tx_len, pld_data_bytes = sizeof(*tx_buf), ret;
+-	u32 val = GEN_HDATA(msg->tx_len) | GEN_HTYPE(msg->type);
++	u32 hdr_val = GEN_HDATA(msg->tx_len) | GEN_HTYPE(msg->type);
+ 	u32 remainder = 0;
++	u32 val;
+ 
+ 	if (msg->tx_len < 3) {
+ 		dev_err(dsi->dev, "wrong tx buf length %zu for long write\n",
+@@ -617,7 +619,7 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
+ 		}
+ 	}
+ 
+-	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, val);
++	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, hdr_val);
+ }
+ 
+ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
 -- 
 2.11.0.197.gb556de5.dirty
