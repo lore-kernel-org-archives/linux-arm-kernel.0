@@ -1,27 +1,23 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 20 Jan 2017 16:34:58 -0800
-Subject: [PATCH v2 1/3] dt-bindings: mfd: stm32f4: Fix STM32F4_X_CLOCK()
- macro
-In-Reply-To: <1483952833-14704-2-git-send-email-gabriel.fernandez@st.com>
-References: <1483952833-14704-1-git-send-email-gabriel.fernandez@st.com>
- <1483952833-14704-2-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <20170121003458.GW20800@codeaurora.org>
+Date: Fri, 20 Jan 2017 16:37:57 -0800
+Subject: [PATCH 1/4] clk: stm32f7: Add stm32f7 clock DT bindings for
+ STM32F746 boards
+In-Reply-To: <1483711165-17149-2-git-send-email-gabriel.fernandez@st.com>
+References: <1483711165-17149-1-git-send-email-gabriel.fernandez@st.com>
+ <1483711165-17149-2-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <20170121003757.GX20800@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/09, gabriel.fernandez at st.com wrote:
+On 01/06, gabriel.fernandez at st.com wrote:
 > From: Gabriel Fernandez <gabriel.fernandez@st.com>
 > 
-> Macro to select a clock was not correct.
-> 
-> Offset of enable register starts at 0x30, then calculation to select a bit is:
-> (@enable_reg - 0x30) / 4 * 32 + bit_to_select
+> This patch introduces the stm32f7 clock DT bindings.
 > 
 > Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
-> Tested-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
 > ---
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+Applied to clk-stm32f4 because why not
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
