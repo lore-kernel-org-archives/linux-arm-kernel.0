@@ -1,47 +1,49 @@
 From: john@metanate.com (John Keeping)
-Date: Sat, 21 Jan 2017 16:31:08 +0000
-Subject: [PATCH v2 06/26] drm/rockchip: dw-mipi-dsi: fix generic packet status
- check
+Date: Sat, 21 Jan 2017 16:31:21 +0000
+Subject: [PATCH v2 19/26] drm/rockchip: dw-mipi-dsi: improve PLL configuration
 In-Reply-To: <20170121163128.22240-1-john@metanate.com>
 References: <20170121163128.22240-1-john@metanate.com>
-Message-ID: <20170121163128.22240-7-john@metanate.com>
+Message-ID: <20170121163128.22240-20-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We want to check that both the GEN_CMD_EMPTY and GEN_PLD_W_EMPTY bits
-are set so we can't just check "val & mask" because that will be true if
-either bit is set.
+The multiplication ratio for the PLL is required to be even due to the
+use of a "by 2 pre-scaler".  Currently we are likely to end up with an
+odd multiplier even though there is an equivalent set of parameters with
+an even multiplier.
+
+For example, using the 324MHz bit rate with a reference clock of 24MHz
+we end up with M = 27, N = 2 whereas the example in the PHY databook
+gives M = 54, N = 4 for this bit rate and reference clock.
+
+By walking down through the available multiplier instead of up we are
+more likely to hit an even multiplier.  With the above example we do now
+get M = 54, N = 4 as given by the databook.
+
+While doing this, change the loop limits to encode the actual limits on
+the divisor, which are:
+
+	40MHz >= (pllref / N) >= 5MHz
 
 Signed-off-by: John Keeping <john@metanate.com>
 ---
 Unchanged in v2
 ---
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 4cbbbcb619b7..4be1ff3a42bb 100644
+index 12432e41971b..f2320cf1366c 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -545,7 +545,7 @@ static int dw_mipi_dsi_host_detach(struct mipi_dsi_host *host,
- static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
- {
- 	int ret;
--	u32 val;
-+	u32 val, mask;
+@@ -519,7 +519,7 @@ static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi,
+ 	pllref = DIV_ROUND_UP(clk_get_rate(dsi->pllref_clk), USEC_PER_SEC);
+ 	tmp = pllref;
  
- 	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
- 				 val, !(val & GEN_CMD_FULL), 1000,
-@@ -557,8 +557,9 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
- 
- 	dsi_write(dsi, DSI_GEN_HDR, hdr_val);
- 
-+	mask = GEN_CMD_EMPTY | GEN_PLD_W_EMPTY;
- 	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
--				 val, val & (GEN_CMD_EMPTY | GEN_PLD_W_EMPTY),
-+				 val, (val & mask) == mask,
- 				 1000, CMD_PKT_STATUS_TIMEOUT_US);
- 	if (ret < 0) {
- 		dev_err(dsi->dev, "failed to write command FIFO\n");
+-	for (i = 1; i < 6; i++) {
++	for (i = pllref / 5; i > (pllref / 40); i--) {
+ 		pre = pllref / i;
+ 		if ((tmp > (target_mbps % pre)) && (target_mbps / pre < 512)) {
+ 			tmp = target_mbps % pre;
 -- 
 2.11.0.197.gb556de5.dirty
