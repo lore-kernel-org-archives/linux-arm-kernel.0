@@ -1,50 +1,36 @@
 From: yong.mao@mediatek.com (Yong Mao)
-Date: Sat, 21 Jan 2017 16:55:21 +0800
-Subject: [PATCH v4 1/3] mmc: dt-bindings: update Mediatek MMC bindings
+Date: Sat, 21 Jan 2017 16:55:22 +0800
+Subject: [PATCH v4 2/3] ARM64: dts: mediatek: configure some fixed mmc
+ parameters
 In-Reply-To: <1484988923-1543-1-git-send-email-yong.mao@mediatek.com>
 References: <1484988923-1543-1-git-send-email-yong.mao@mediatek.com>
-Message-ID: <1484988923-1543-2-git-send-email-yong.mao@mediatek.com>
+Message-ID: <1484988923-1543-3-git-send-email-yong.mao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: yong mao <yong.mao@mediatek.com>
 
-Add description for mediatek,hs200-cmd-int-delay
-Add description for mediatek,hs400-cmd-int-delay
-Add description for mediatek,hs400-cmd-resp-sel-rising
+configure some fixed mmc parameters
 
 Signed-off-by: Yong Mao <yong.mao@mediatek.com>
+Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
 ---
- Documentation/devicetree/bindings/mmc/mtk-sd.txt |   12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm64/boot/dts/mediatek/mt8173-evb.dts |    3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-index 0120c7f..4182ea3 100644
---- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-+++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-@@ -21,6 +21,15 @@ Optional properties:
- - assigned-clocks: PLL of the source clock
- - assigned-clock-parents: parent of source clock, used for HS400 mode to get 400Mhz source clock
- - hs400-ds-delay: HS400 DS delay setting
-+- mediatek,hs200-cmd-int-delay: HS200 command internal delay setting.
-+				This field has total 32 stages.
-+				The value is an integer from 0 to 31.
-+- mediatek,hs400-cmd-int-delay: HS400 command internal delay setting
-+				This field has total 32 stages.
-+				The value is an integer from 0 to 31.
-+- mediatek,hs400-cmd-resp-sel-rising:  HS400 command response sample selection
-+				       If present,HS400 command responses are sampled on rising edges.
-+				       If not present,HS400 command responses are sampled on falling edges.
- 
- Examples:
- mmc0: mmc at 11230000 {
-@@ -38,4 +47,7 @@ mmc0: mmc at 11230000 {
- 	assigned-clocks = <&topckgen CLK_TOP_MSDC50_0_SEL>;
- 	assigned-clock-parents = <&topckgen CLK_TOP_MSDCPLL_D2>;
- 	hs400-ds-delay = <0x14015>;
-+	mediatek,hs200-cmd-int-delay = <26>;
-+	mediatek,hs400-cmd-int-delay = <14>;
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+index 0ecaad4..1c3634f 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
++++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
+@@ -134,6 +134,9 @@
+ 	bus-width = <8>;
+ 	max-frequency = <50000000>;
+ 	cap-mmc-highspeed;
++	mediatek,hs200-cmd-int-delay=<26>;
++	mediatek,hs400-cmd-int-delay=<14>;
 +	mediatek,hs400-cmd-resp-sel-rising;
- };
+ 	vmmc-supply = <&mt6397_vemc_3v3_reg>;
+ 	vqmmc-supply = <&mt6397_vio18_reg>;
+ 	non-removable;
 -- 
 1.7.9.5
