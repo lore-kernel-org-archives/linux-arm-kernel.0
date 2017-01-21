@@ -1,63 +1,100 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 21 Jan 2017 18:34:47 +0100
-Subject: [PATCH v3 5/7] clk: sunxi-ng: Add sun5i CCU driver
-In-Reply-To: <CAGb2v65uzxu7P3AcnhJJ_rEvT5OL8=d9-jVjU5sWNNqJpkpSRw@mail.gmail.com>
-References: <cover.5df5469d9c7a6233e225a875dca513a03b05e871.1484897383.git-series.maxime.ripard@free-electrons.com>
- <a51d856e896b7fe59a1a544a7de3081688e377ff.1484897383.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v65uzxu7P3AcnhJJ_rEvT5OL8=d9-jVjU5sWNNqJpkpSRw@mail.gmail.com>
-Message-ID: <20170121173447.hjtddypjxr6achyt@lukather>
+From: amurray@embedded-bits.co.uk (Andrew Murray)
+Date: Sat, 21 Jan 2017 17:36:55 +0000
+Subject: [PATCH] ARM: OMAP1/2: clock: Remove unused mpurate cmdline option
+Message-ID: <1485020215-6550-1-git-send-email-amurray@embedded-bits.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The 'mpurate' option, historically used for specifying an initial
+MPU rate at boot, no longer has any effect due to the supporting
+code being removed as it was 'wrong and dangerous' [1].
 
-On Sat, Jan 21, 2017 at 09:34:15AM +0800, Chen-Yu Tsai wrote:
-> On Fri, Jan 20, 2017 at 3:29 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > The Allwinner A10s, A13, R8 and NextThing GR8 are all based on the same
-> > silicon, and all share the same clocks.
-> >
-> > However, they're not packaged in the same way, and therefore not all the
-> > controllers are actually available on all these SoCs.
-> >
-> > Introduce a clock controller driver for all these SoCs with different
-> > compatibles to take that into account.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
+This patch removes the remaining dead code associated with the
+__setup macros to avoid confusion and reduce bloat.
 
-Thanks!
+[1] https://patchwork.kernel.org/patch/5954631/
 
-> > ---
-> >  drivers/clk/sunxi-ng/Kconfig          |   10 +-
-> >  drivers/clk/sunxi-ng/Makefile         |    1 +-
-> >  drivers/clk/sunxi-ng/ccu-sun5i.c      | 1008 ++++++++++++++++++++++++++-
-> >  drivers/clk/sunxi-ng/ccu-sun5i.h      |   67 ++-
-> >  include/dt-bindings/clock/sun5i-ccu.h |  103 +++-
-> >  include/dt-bindings/reset/sun5i-ccu.h |   32 +-
-> 
-> I thought having these 2 in a separate patch would be better for
-> cross tree merges?
+Signed-off-by: Andrew Murray <amurray@embedded-bits.co.uk>
+---
+ arch/arm/mach-omap1/clock.c | 20 --------------------
+ arch/arm/mach-omap1/clock.h |  2 --
+ arch/arm/mach-omap2/clock.c | 20 --------------------
+ 3 files changed, 42 deletions(-)
 
-Not really. This was needed when we had several drivers using it, but
-since we merged all of them, it's not really needed anymore. Having it
-split wouldn't make it easier, because both the DT bits and the
-drivers bits would depend on it.
-
-We don't have much for the sun5i stuff queued for 4.11, so we can just
-have the DT bits merged through the clk tree.
-
-Maxime
-
+diff --git a/arch/arm/mach-omap1/clock.c b/arch/arm/mach-omap1/clock.c
+index 4f5fd4a..43e3e18 100644
+--- a/arch/arm/mach-omap1/clock.c
++++ b/arch/arm/mach-omap1/clock.c
+@@ -720,26 +720,6 @@ EXPORT_SYMBOL(clk_get_parent);
+  * OMAP specific clock functions shared between omap1 and omap2
+  */
+ 
+-int __initdata mpurate;
+-
+-/*
+- * By default we use the rate set by the bootloader.
+- * You can override this with mpurate= cmdline option.
+- */
+-static int __init omap_clk_setup(char *str)
+-{
+-	get_option(&str, &mpurate);
+-
+-	if (!mpurate)
+-		return 1;
+-
+-	if (mpurate < 1000)
+-		mpurate *= 1000000;
+-
+-	return 1;
+-}
+-__setup("mpurate=", omap_clk_setup);
+-
+ /* Used for clocks that always have same value as the parent clock */
+ unsigned long followparent_recalc(struct clk *clk)
+ {
+diff --git a/arch/arm/mach-omap1/clock.h b/arch/arm/mach-omap1/clock.h
+index 1e4918a..f2d1be2 100644
+--- a/arch/arm/mach-omap1/clock.h
++++ b/arch/arm/mach-omap1/clock.h
+@@ -173,8 +173,6 @@ struct clk_functions {
+ 	void		(*clk_disable_unused)(struct clk *clk);
+ };
+ 
+-extern int mpurate;
+-
+ extern int clk_init(struct clk_functions *custom_clocks);
+ extern void clk_preinit(struct clk *clk);
+ extern int clk_register(struct clk *clk);
+diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
+index d058125..d999295 100644
+--- a/arch/arm/mach-omap2/clock.c
++++ b/arch/arm/mach-omap2/clock.c
+@@ -112,26 +112,6 @@ void omap2_init_clk_clkdm(struct clk_hw *hw)
+ 	}
+ }
+ 
+-static int __initdata mpurate;
+-
+-/*
+- * By default we use the rate set by the bootloader.
+- * You can override this with mpurate= cmdline option.
+- */
+-static int __init omap_clk_setup(char *str)
+-{
+-	get_option(&str, &mpurate);
+-
+-	if (!mpurate)
+-		return 1;
+-
+-	if (mpurate < 1000)
+-		mpurate *= 1000000;
+-
+-	return 1;
+-}
+-__setup("mpurate=", omap_clk_setup);
+-
+ /**
+  * omap2_clk_print_new_rates - print summary of current clock tree rates
+  * @hfclkin_ck_name: clk name for the off-chip HF oscillator
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170121/e790e8d0/attachment.sig>
+2.5.0
