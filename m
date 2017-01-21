@@ -1,69 +1,44 @@
 From: john@metanate.com (John Keeping)
-Date: Sat, 21 Jan 2017 16:31:26 +0000
-Subject: [PATCH v2 24/26] drm/rockchip: dw-mipi-dsi: support non-burst modes
+Date: Sat, 21 Jan 2017 16:31:04 +0000
+Subject: [PATCH v2 02/26] drm/rockchip: dw-mipi-dsi: rename commit hook to
+ enable
 In-Reply-To: <20170121163128.22240-1-john@metanate.com>
 References: <20170121163128.22240-1-john@metanate.com>
-Message-ID: <20170121163128.22240-25-john@metanate.com>
+Message-ID: <20170121163128.22240-3-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Rockchip DRM is fully atomic and commit is deprecated for atomic
+drivers.  No changed are needed beyond renaming the function.
 
 Signed-off-by: John Keeping <john@metanate.com>
 ---
 Unchanged in v2
 ---
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 16 +++++++++-------
- 1 file changed, 9 insertions(+), 7 deletions(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 2dafb17e31d2..881bb0c62ca5 100644
+index 8b83ae50c8f3..bbd992299f73 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -82,6 +82,7 @@
- #define FRAME_BTA_ACK			BIT(14)
- #define ENABLE_LOW_POWER		(0x3f << 8)
- #define ENABLE_LOW_POWER_MASK		(0x3f << 8)
-+#define VID_MODE_TYPE_NON_BURST_SYNC_EVENTS	0x1
- #define VID_MODE_TYPE_BURST_SYNC_PULSES		0x2
- #define VID_MODE_TYPE_MASK			0x3
- 
-@@ -286,6 +287,7 @@ struct dw_mipi_dsi {
- 	u32 format;
- 	u16 input_div;
- 	u16 feedback_div;
-+	unsigned long mode_flags;
- 
- 	const struct dw_mipi_dsi_plat_data *pdata;
- };
-@@ -548,15 +550,10 @@ static int dw_mipi_dsi_host_attach(struct mipi_dsi_host *host,
- 		return -EINVAL;
- 	}
- 
--	if (!(device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST) ||
--	    !(device->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE)) {
--		dev_err(dsi->dev, "device mode is unsupported\n");
--		return -EINVAL;
--	}
--
- 	dsi->lanes = device->lanes;
- 	dsi->channel = device->channel;
- 	dsi->format = device->format;
-+	dsi->mode_flags = device->mode_flags;
- 	dsi->panel = of_drm_find_panel(device->dev.of_node);
- 	if (dsi->panel)
- 		return drm_panel_attach(dsi->panel, &dsi->connector);
-@@ -713,7 +710,12 @@ static void dw_mipi_dsi_video_mode_config(struct dw_mipi_dsi *dsi)
- {
- 	u32 val;
- 
--	val = VID_MODE_TYPE_BURST_SYNC_PULSES | ENABLE_LOW_POWER;
-+	val = ENABLE_LOW_POWER;
-+
-+	if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)
-+		val |= VID_MODE_TYPE_BURST_SYNC_PULSES;
-+	else if (!(dsi->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE))
-+		val |= VID_MODE_TYPE_NON_BURST_SYNC_EVENTS;
- 
- 	dsi_write(dsi, DSI_VID_MODE_CFG, val);
+@@ -849,7 +849,7 @@ static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
+ 	clk_disable_unprepare(dsi->pclk);
  }
+ 
+-static void dw_mipi_dsi_encoder_commit(struct drm_encoder *encoder)
++static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
+ {
+ 	struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
+ 	int mux = drm_of_encoder_active_endpoint_id(dsi->dev->of_node, encoder);
+@@ -926,7 +926,7 @@ dw_mipi_dsi_encoder_atomic_check(struct drm_encoder *encoder,
+ 
+ static struct drm_encoder_helper_funcs
+ dw_mipi_dsi_encoder_helper_funcs = {
+-	.commit = dw_mipi_dsi_encoder_commit,
++	.enable = dw_mipi_dsi_encoder_enable,
+ 	.mode_set = dw_mipi_dsi_encoder_mode_set,
+ 	.disable = dw_mipi_dsi_encoder_disable,
+ 	.atomic_check = dw_mipi_dsi_encoder_atomic_check,
 -- 
 2.11.0.197.gb556de5.dirty
