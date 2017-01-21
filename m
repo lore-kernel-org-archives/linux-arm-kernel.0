@@ -1,60 +1,58 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 20 Jan 2017 16:48:19 -0800
-Subject: [PATCHv4 1/5] clk: mvebu: support for 98DX3236 SoC
-In-Reply-To: <20170113091222.7132-2-chris.packham@alliedtelesis.co.nz>
-References: <20170113091222.7132-1-chris.packham@alliedtelesis.co.nz>
- <20170113091222.7132-2-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20170121004819.GA8801@codeaurora.org>
+Date: Fri, 20 Jan 2017 16:52:02 -0800
+Subject: [PATCH v5 1/2] dt-bindings: brcm: clocks: add binding for
+ brcmstb-cpu-clk-div
+In-Reply-To: <20170119002933.7529-2-code@mmayer.net>
+References: <20170119002933.7529-1-code@mmayer.net>
+ <20170119002933.7529-2-code@mmayer.net>
+Message-ID: <20170121005202.GB8801@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/13, Chris Packham wrote:
-> @@ -158,6 +170,14 @@ static const struct coreclk_soc_desc axp_coreclks = {
->  	.num_ratios = ARRAY_SIZE(axp_coreclk_ratios),
->  };
->  
-> +static const struct coreclk_soc_desc mv98dx3236_coreclks = {
-> +	.get_tclk_freq = mv98dx3236_get_tclk_freq,
-> +	.get_cpu_freq = mv98dx3236_get_cpu_freq,
-> +	.get_clk_ratio = NULL,
-> +	.ratios = NULL,
-> +	.num_ratios = 0,
-
-Are these intentionally initialized to 0 explicitly? Otherwise we
-could leave them out and it's all the same.
-
-> +};
+On 01/18, Markus Mayer wrote:
+> diff --git a/Documentation/devicetree/bindings/clock/brcm,brcmstb-cpu-clk-div.txt b/Documentation/devicetree/bindings/clock/brcm,brcmstb-cpu-clk-div.txt
+> new file mode 100644
+> index 0000000..c4acb53
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/brcm,brcmstb-cpu-clk-div.txt
+> @@ -0,0 +1,27 @@
+> +The CPU divider node serves as the sole clock for the CPU complex. It supports
+> +power-of-2 clock division, with a divider of "1" as the default highest-speed
+> +setting.
 > +
->  /*
->   * Clock Gating Control
->   */
-[..]
-> @@ -243,5 +245,30 @@ static void __init of_cpu_clk_setup(struct device_node *node)
->  	iounmap(clock_complex_base);
->  }
->  
-> +/* Use this function to call the generic setup with the correct
-> + * clock operation
-> + */
-> +static void __init of_cpu_clk_setup(struct device_node *node)
-> +{
-> +	_of_cpu_clk_setup(node, &cpu_ops);
-> +}
-> +
->  CLK_OF_DECLARE(armada_xp_cpu_clock, "marvell,armada-xp-cpu-clock",
->  					 of_cpu_clk_setup);
-> +
-> +/* Define the clock and operations for the mv98dx3236 - it cannot perform
-> + * any operations.
-> + */
-> +static const struct clk_ops mv98dx3236_cpu_ops = {
-> +	.recalc_rate = NULL,
-> +	.round_rate = NULL,
-> +	.set_rate = NULL,
+> +Required properties:
+> +- compatible: shall be "brcm,brcmstb-cpu-clk-div"
+> +- reg: address and width of the divider configuration register
+> +- #clock-cells: shall be set to 0
+> +- clocks: phandle of clock provider which provides the source clock
+> +          (this would typically be a "fixed-clock" type PLL)
+> +- div-table: list of (raw_value,divider) ordered pairs that correspond to the
+> +             allowed clock divider settings
+> +- div-shift-width: least-significant bit position and width of divider value
 
-But clk_set_rate() works silently? Why not just register a clk
-provider that returns a NULL pointer? Then there isn't any
-structure to maintain?
+Are these properties used? Please don't put these types of
+details in DT.
+
+> +
+> +Optional properties:
+> +- clock-names: the clock may be named
+> +
+> +Example:
+> +	cpuclkdiv: cpu-clk-div at f03e257c {
+> +		compatible = "brcm,brcmstb-cpu-clk-div";
+> +		reg = <0xf03e257c 0x4>;
+
+This register really looks like some offset in something larger.
+Is there some clock controller? What's the hw block at
+0xf03e2000? Maybe I already asked this.
+
+> +		div-table = <0x00 1>;
+> +		div-shift-width = <0 5>;
+> +		#clock-cells = <0>;
+> +		clocks = <&cpupll>;
+> +		clock-names = "cpupll";
+> +	};
+> 
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
