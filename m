@@ -1,23 +1,23 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 20 Jan 2017 16:30:00 -0800
-Subject: [PATCH] clk: uniphier: continue probing even if some clocks fail
- to register
-In-Reply-To: <1484742679-8373-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1484742679-8373-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20170121003000.GR20800@codeaurora.org>
+Date: Fri, 20 Jan 2017 16:31:14 -0800
+Subject: [PATCH 1/8] clk: renesas: cpg-mssr: Document reset control support
+In-Reply-To: <1484921306-9967-2-git-send-email-geert+renesas@glider.be>
+References: <1484921306-9967-1-git-send-email-geert+renesas@glider.be>
+ <1484921306-9967-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <20170121003114.GS20800@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/18, Masahiro Yamada wrote:
-> Do not let the entire probe function fail even if some clocks fail
-> to register.  Let's continue with succeeded clocks.  This will give
-> the system more chances to boot and allow us to investigate the
-> cause of the failure.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
+On 01/20, Geert Uytterhoeven wrote:
 
-Applied to clk-next
+
+> Document properties needed to use the Reset Control feature of the
+> Renesas Clock Pulse Generator / Module Standby and Software Reset
+> module.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Subject should be "dt-bindings: clock:" ?
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
