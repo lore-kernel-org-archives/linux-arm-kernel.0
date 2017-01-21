@@ -1,79 +1,37 @@
 From: john@metanate.com (John Keeping)
-Date: Sat, 21 Jan 2017 16:31:27 +0000
-Subject: [PATCH v2 25/26] drm/rockchip: dw-mipi-dsi: add reset control
+Date: Sat, 21 Jan 2017 16:31:19 +0000
+Subject: [PATCH v2 17/26] drm/rockchip: dw-mipi-dsi: don't enable PHY PLL
+ until it's configured
 In-Reply-To: <20170121163128.22240-1-john@metanate.com>
 References: <20170121163128.22240-1-john@metanate.com>
-Message-ID: <20170121163128.22240-26-john@metanate.com>
+Message-ID: <20170121163128.22240-18-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-In order to fully reset the state of the MIPI controller we must assert
-this reset.
-
-This is slightly more complicated than it could be in order to maintain
-compatibility with device trees that do not specify the reset property.
 
 Signed-off-by: John Keeping <john@metanate.com>
 ---
 Unchanged in v2
 ---
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 881bb0c62ca5..f780401e8b5e 100644
+index ce1e6f9a2041..cfe7e4ba305c 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -13,6 +13,7 @@
- #include <linux/module.h>
- #include <linux/of_device.h>
- #include <linux/regmap.h>
-+#include <linux/reset.h>
- #include <linux/mfd/syscon.h>
- #include <drm/drm_atomic_helper.h>
- #include <drm/drm_crtc.h>
-@@ -1121,6 +1122,7 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
- 			of_match_device(dw_mipi_dsi_dt_ids, dev);
- 	const struct dw_mipi_dsi_plat_data *pdata = of_id->data;
- 	struct platform_device *pdev = to_platform_device(dev);
-+	struct reset_control *apb_rst;
- 	struct drm_device *drm = data;
- 	struct dw_mipi_dsi *dsi;
- 	struct resource *res;
-@@ -1159,6 +1161,34 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
- 		return ret;
- 	}
+@@ -413,12 +413,12 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
  
-+	/*
-+	 * Note that the reset was not defined in the initial device tree, so
-+	 * we have to be prepared for it not being found.
-+	 */
-+	apb_rst = devm_reset_control_get(dev, "apb");
-+	if (IS_ERR(apb_rst)) {
-+		if (PTR_ERR(apb_rst) == -ENODEV) {
-+			apb_rst = NULL;
-+		} else {
-+			dev_err(dev, "Unable to get reset control: %d\n", ret);
-+			return PTR_ERR(apb_rst);
-+		}
-+	}
-+
-+	if (apb_rst) {
-+		ret = clk_prepare_enable(dsi->pclk);
-+		if (ret) {
-+			dev_err(dev, "%s: Failed to enable pclk\n", __func__);
-+			return ret;
-+		}
-+
-+		reset_control_assert(apb_rst);
-+		usleep_range(10, 20);
-+		reset_control_deassert(apb_rst);
-+
-+		clk_disable_unprepare(dsi->pclk);
-+	}
-+
- 	ret = clk_prepare_enable(dsi->pllref_clk);
- 	if (ret) {
- 		dev_err(dev, "%s: Failed to enable pllref_clk\n", __func__);
+ 	dw_mipi_dsi_phy_write(dsi, 0x44, HSFREQRANGE_SEL(testdin));
+ 
+-	dw_mipi_dsi_phy_write(dsi, 0x19, PLL_LOOP_DIV_EN | PLL_INPUT_DIV_EN);
+ 	dw_mipi_dsi_phy_write(dsi, 0x17, INPUT_DIVIDER(dsi->input_div));
+ 	dw_mipi_dsi_phy_write(dsi, 0x18, LOOP_DIV_LOW_SEL(dsi->feedback_div) |
+ 					 LOW_PROGRAM_EN);
+ 	dw_mipi_dsi_phy_write(dsi, 0x18, LOOP_DIV_HIGH_SEL(dsi->feedback_div) |
+ 					 HIGH_PROGRAM_EN);
++	dw_mipi_dsi_phy_write(dsi, 0x19, PLL_LOOP_DIV_EN | PLL_INPUT_DIV_EN);
+ 
+ 	dw_mipi_dsi_phy_write(dsi, 0x22, LOW_PROGRAM_EN |
+ 					 BIASEXTR_SEL(BIASEXTR_127_7));
 -- 
 2.11.0.197.gb556de5.dirty
