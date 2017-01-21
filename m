@@ -1,71 +1,38 @@
 From: john@metanate.com (John Keeping)
-Date: Sat, 21 Jan 2017 16:31:07 +0000
-Subject: [PATCH v2 05/26] drm/rockchip: dw-mipi-dsi: fix command header writes
+Date: Sat, 21 Jan 2017 16:31:17 +0000
+Subject: [PATCH v2 15/26] drm/rockchip: dw-mipi-dsi: ensure PHY is reset
 In-Reply-To: <20170121163128.22240-1-john@metanate.com>
 References: <20170121163128.22240-1-john@metanate.com>
-Message-ID: <20170121163128.22240-6-john@metanate.com>
+Message-ID: <20170121163128.22240-16-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In a couple of places here we use "val" for the value that is about to
-be written to a register but then reuse the same variable for the value
-of a status register before we get around to writing it.  Rename the
-value to be written to so that we write the value we intend to and not
-what we have just read from the status register.
+Also don't power up the DSI host at this point since this is not
+necessary in order to configure the PHY and we do so later when
+selecting video or command mode.
 
 Signed-off-by: John Keeping <john@metanate.com>
-Tested-by: Chris Zhong <zyw@rock-chips.com>
-Reviewed-by: Chris Zhong <zyw@rock-chips.com>
 ---
 Unchanged in v2
 ---
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index bd92e58b64f3..4cbbbcb619b7 100644
+index c2e0ba96e0a0..5b3068e9e8db 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -542,9 +542,10 @@ static int dw_mipi_dsi_host_detach(struct mipi_dsi_host *host,
- 	return 0;
- }
- 
--static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 val)
-+static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
- {
- 	int ret;
-+	u32 val;
- 
- 	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
- 				 val, !(val & GEN_CMD_FULL), 1000,
-@@ -554,7 +555,7 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 val)
- 		return ret;
+@@ -397,7 +397,10 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
+ 		return testdin;
  	}
  
--	dsi_write(dsi, DSI_GEN_HDR, val);
-+	dsi_write(dsi, DSI_GEN_HDR, hdr_val);
+-	dsi_write(dsi, DSI_PWR_UP, POWERUP);
++	/* Start by clearing PHY state */
++	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_UNTESTCLR);
++	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_TESTCLR);
++	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_UNTESTCLR);
  
- 	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
- 				 val, val & (GEN_CMD_EMPTY | GEN_PLD_W_EMPTY),
-@@ -587,8 +588,9 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
- {
- 	const u32 *tx_buf = msg->tx_buf;
- 	int len = msg->tx_len, pld_data_bytes = sizeof(*tx_buf), ret;
--	u32 val = GEN_HDATA(msg->tx_len) | GEN_HTYPE(msg->type);
-+	u32 hdr_val = GEN_HDATA(msg->tx_len) | GEN_HTYPE(msg->type);
- 	u32 remainder = 0;
-+	u32 val;
- 
- 	if (msg->tx_len < 3) {
- 		dev_err(dsi->dev, "wrong tx buf length %zu for long write\n",
-@@ -617,7 +619,7 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
- 		}
- 	}
- 
--	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, val);
-+	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, hdr_val);
- }
- 
- static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
+ 	dw_mipi_dsi_phy_write(dsi, 0x10, BYPASS_VCO_RANGE |
+ 					 VCO_RANGE_CON_SEL(vco) |
 -- 
 2.11.0.197.gb556de5.dirty
