@@ -1,69 +1,36 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 21 Jan 2017 23:50:50 +0100
-Subject: [PATCH v4 1/8] clk: sunxi-ng: multiplier: Add fractional support
+Date: Sat, 21 Jan 2017 23:50:52 +0100
+Subject: [PATCH v4 3/8] clk: sunxi-ng: mult: Fix minimum in round rate
 In-Reply-To: <cover.04f797fe015b05f19b1d69d0650680baffb27055.1485039043.git-series.maxime.ripard@free-electrons.com>
 References: <cover.04f797fe015b05f19b1d69d0650680baffb27055.1485039043.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <6434f18ff536df321bb315ed3302285046954b51.1485039043.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <cad6b82633303e0fe3b231dce364629bc723a808.1485039043.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some clocks on the earlier SoCs such as the video PLLs are multipliers with
-fractional settings.
+The previous code was always taking 1 as the minimum in it's round_rate
+function, ignoring entirely what was set as minimum in the clock
+definition.
 
-Support those cases.
+Make sure that's not the case anymore.
 
+Fixes: 2beaa601c849 ("clk: sunxi-ng: Implement minimum for multipliers")
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/clk/sunxi-ng/ccu_mult.c | 8 ++++++++
- drivers/clk/sunxi-ng/ccu_mult.h | 2 ++
- 2 files changed, 10 insertions(+), 0 deletions(-)
+ drivers/clk/sunxi-ng/ccu_mult.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/clk/sunxi-ng/ccu_mult.c b/drivers/clk/sunxi-ng/ccu_mult.c
-index 678b6cb49f01..826302464650 100644
+index 8b7ee7baa85b..a52162195e07 100644
 --- a/drivers/clk/sunxi-ng/ccu_mult.c
 +++ b/drivers/clk/sunxi-ng/ccu_mult.c
-@@ -75,6 +75,9 @@ static unsigned long ccu_mult_recalc_rate(struct clk_hw *hw,
- 	unsigned long val;
- 	u32 reg;
+@@ -40,7 +40,7 @@ static unsigned long ccu_mult_round_rate(struct ccu_mux_internal *mux,
+ 	struct ccu_mult *cm = data;
+ 	struct _ccu_mult _cm;
  
-+	if (ccu_frac_helper_is_enabled(&cm->common, &cm->frac))
-+		return ccu_frac_helper_read_rate(&cm->common, &cm->frac);
-+
- 	reg = readl(cm->common.base + cm->common.reg);
- 	val = reg >> cm->mult.shift;
- 	val &= (1 << cm->mult.width) - 1;
-@@ -102,6 +105,11 @@ static int ccu_mult_set_rate(struct clk_hw *hw, unsigned long rate,
- 	unsigned long flags;
- 	u32 reg;
+-	_cm.min = 1;
++	_cm.min = cm->mult.min;
+ 	_cm.max = 1 << cm->mult.width;
+ 	ccu_mult_find_best(parent_rate, rate, &_cm);
  
-+	if (ccu_frac_helper_has_rate(&cm->common, &cm->frac, rate))
-+		return ccu_frac_helper_set_rate(&cm->common, &cm->frac, rate);
-+	else
-+		ccu_frac_helper_disable(&cm->common, &cm->frac);
-+
- 	ccu_mux_helper_adjust_parent_for_prediv(&cm->common, &cm->mux, -1,
- 						&parent_rate);
- 
-diff --git a/drivers/clk/sunxi-ng/ccu_mult.h b/drivers/clk/sunxi-ng/ccu_mult.h
-index c1a2134bdc71..bd2e38b5a32a 100644
---- a/drivers/clk/sunxi-ng/ccu_mult.h
-+++ b/drivers/clk/sunxi-ng/ccu_mult.h
-@@ -2,6 +2,7 @@
- #define _CCU_MULT_H_
- 
- #include "ccu_common.h"
-+#include "ccu_frac.h"
- #include "ccu_mux.h"
- 
- struct ccu_mult_internal {
-@@ -23,6 +24,7 @@ struct ccu_mult_internal {
- struct ccu_mult {
- 	u32			enable;
- 
-+	struct ccu_frac_internal	frac;
- 	struct ccu_mult_internal	mult;
- 	struct ccu_mux_internal	mux;
- 	struct ccu_common	common;
 -- 
 git-series 0.8.11
