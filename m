@@ -1,61 +1,42 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 21 Jan 2017 11:53:08 +0800
-Subject: [PATCH 4/6] rtc: sun6i: Force the mux to the external oscillator
-In-Reply-To: <409c56f0ed1c4b0026ad60cb1218c99fe1686408.1484927680.git-series.maxime.ripard@free-electrons.com>
-References: <cover.180d5ae6bc36ead9625d208824f5cbd7114cf92e.1484927680.git-series.maxime.ripard@free-electrons.com>
- <409c56f0ed1c4b0026ad60cb1218c99fe1686408.1484927680.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v650f-4RZ6RrRBGcmPz8mJ4KbJwTTj6=w3HeSWUZtLAKcw@mail.gmail.com>
+From: cwchoi00@gmail.com (Chanwoo Choi)
+Date: Sat, 21 Jan 2017 14:08:34 +0900
+Subject: [PATCH 2/4] clk: samsung: Remove Exynos4415 driver (SoC not
+ supported anymore)
+In-Reply-To: <c9b51cb6-f798-d41e-afff-f779b963345c@samsung.com>
+References: <20170114123642.15581-1-krzk@kernel.org>
+ <CGME20170114123727epcas2p296aae6459c8575d7e5def74f18e5c64d@epcas2p2.samsung.com>
+ <20170114123642.15581-3-krzk@kernel.org>
+ <c9b51cb6-f798-d41e-afff-f779b963345c@samsung.com>
+Message-ID: <CAGTfZH2Eh67iMb7bBY2ostNUbxmOtQxy=P7ZRSEDzS4=enyMKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Sylwester,
 
-On Fri, Jan 20, 2017 at 11:56 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The internal oscillator is way too inaccurate to do something useful with
-> it. Switch to the external oscillator if it is available.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/rtc/rtc-sun6i.c | 12 ++++++++++++
->  1 file changed, 12 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/rtc/rtc-sun6i.c b/drivers/rtc/rtc-sun6i.c
-> index edd5627da10f..1695fae24cd5 100644
-> --- a/drivers/rtc/rtc-sun6i.c
-> +++ b/drivers/rtc/rtc-sun6i.c
-> @@ -493,6 +493,7 @@ static const struct rtc_class_ops sun6i_rtc_ops = {
->  static int sun6i_rtc_probe(struct platform_device *pdev)
->  {
->         struct sun6i_rtc_dev *chip = sun6i_rtc;
-> +       struct clk *parent;
->         int ret;
->
->         if (!chip)
-> @@ -540,6 +541,17 @@ static int sun6i_rtc_probe(struct platform_device *pdev)
->         /* disable alarm wakeup */
->         writel(0, chip->base + SUN6I_ALARM_CONFIG);
->
-> +       parent = clk_get(&pdev->dev, NULL);
-> +       if (!IS_ERR(parent)) {
-> +               ret = clk_set_parent(chip->losc, parent);
-> +               clk_put(parent);
-> +
-> +               if (ret) {
-> +                       dev_err(&pdev->dev,
-> +                               "Failed to reparent the RTC to the external oscillator\n");
-> +                       return ret;
-> +               }
-> +       }
+I add reveiwed-by tag from this patch. But, on you tree, this patch[1] doesn?t
+include the my reviewed-by tag.
 
-Following what I mentioned in patch 1, maybe it is easier to force
-the mux before the clocks are registered by writing directly to
-the registers? We could also backport the changes to stable?
+[1] https://git.linuxtv.org/snawrocki/samsung.git/commit/?h=for-v4.11/clk/next&id=cb4ac949ea14416a2d57b7a343bc4b571074e3bd
 
-ChenYu
-
->         clk_prepare_enable(chip->losc);
+2017-01-16 19:32 GMT+09:00 Sylwester Nawrocki <s.nawrocki@samsung.com>:
+> On 01/14/2017 01:36 PM, Krzysztof Kozlowski wrote:
+>> Support for Exynos4415 is going away because there are no internal nor
+>> external users.
+>>
+>> Since commit 46dcf0ff0de3 ("ARM: dts: exynos: Remove exynos4415.dtsi"),
+>> the platform cannot be instantiated so remove also the drivers.
+>>
+>> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 >
->         chip->rtc = rtc_device_register("rtc-sun6i", &pdev->dev,
-> --
-> git-series 0.8.11
+> Applied, thanks.
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+
+
+
+-- 
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
