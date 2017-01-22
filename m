@@ -1,93 +1,113 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 22 Jan 2017 13:24:08 +0100
-Subject: [PATCH 22/22] ARM: configs: add a gemini defconfig
-Message-ID: <20170122122408.11158-1-linus.walleij@linaro.org>
+From: christopher.spinrath@rwth-aachen.de (Christopher Spinrath)
+Date: Sun, 22 Jan 2017 13:51:42 +0100
+Subject: [PATCH] ARM: dts: imx6q-utilite-pro: enable 2nd display pipeline
+In-Reply-To: <7b5acaa225ee4e068ae058e8aaf49a44@rwthex-w2-b.rwth-ad.de>
+References: <ec9676f344eb4786a28a3c7b969f0e94@rwthex-s1-b.rwth-ad.de>
+ <88bdfd5321484efc82af4132ac2f0d7e@rwthex-s1-b.rwth-ad.de>
+ <6ed3f695104044f18e98fc9619aab16e@rwthex-s1-b.rwth-ad.de>
+ <17a7f9cea35944288f97735e66859929@rwthex-s1-b.rwth-ad.de>
+ <7b5acaa225ee4e068ae058e8aaf49a44@rwthex-w2-b.rwth-ad.de>
+Message-ID: <913e928974b942d48b18c52e9059321c@rwthex-s1-b.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It makes sense to have a stripped-down defconfig for just Gemini, as
-it is a pretty small platform used in NAS etc, and will use appended
-device tree. It is also quick to compile and test. Hopefully this
-defconfig can be a good base for distributions such as OpenWRT.
+Hi Philipp,
 
-Cc: Janos Laube <janos.dev@gmail.com>
-Cc: Paulius Zaleckas <paulius.zaleckas@gmail.com>
-Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
-Cc: Florian Fainelli <f.fainelli@gmail.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/configs/gemini_defconfig | 63 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
- create mode 100644 arch/arm/configs/gemini_defconfig
+sorry for the late answer; I'm quite busy with other stuff these days.
 
-diff --git a/arch/arm/configs/gemini_defconfig b/arch/arm/configs/gemini_defconfig
-new file mode 100644
-index 000000000000..7f72f733ed32
---- /dev/null
-+++ b/arch/arm/configs/gemini_defconfig
-@@ -0,0 +1,63 @@
-+# CONFIG_LOCALVERSION_AUTO is not set
-+CONFIG_SYSVIPC=y
-+CONFIG_NO_HZ_IDLE=y
-+CONFIG_BSD_PROCESS_ACCT=y
-+CONFIG_USER_NS=y
-+CONFIG_RELAY=y
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_PARTITION_ADVANCED=y
-+CONFIG_ARCH_MULTI_V4=y
-+# CONFIG_ARCH_MULTI_V7 is not set
-+CONFIG_ARCH_GEMINI=y
-+CONFIG_DEBUG_RODATA=y
-+CONFIG_PREEMPT=y
-+CONFIG_AEABI=y
-+CONFIG_CMDLINE="console=ttyS0,115200n8"
-+CONFIG_KEXEC=y
-+CONFIG_BINFMT_MISC=y
-+CONFIG_PM=y
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_DEVTMPFS=y
-+CONFIG_MTD=y
-+CONFIG_MTD_BLOCK=y
-+CONFIG_MTD_CFI=y
-+CONFIG_MTD_CFI_AMDSTD=y
-+CONFIG_MTD_PHYSMAP=y
-+CONFIG_MTD_PHYSMAP_OF=y
-+CONFIG_BLK_DEV_RAM=y
-+CONFIG_BLK_DEV_RAM_SIZE=16384
-+CONFIG_SCSI=y
-+# CONFIG_SCSI_PROC_FS is not set
-+CONFIG_BLK_DEV_SD=y
-+# CONFIG_SCSI_LOWLEVEL is not set
-+# CONFIG_INPUT_MOUSEDEV is not set
-+CONFIG_INPUT_EVDEV=y
-+CONFIG_KEYBOARD_GPIO=y
-+# CONFIG_INPUT_MOUSE is not set
-+# CONFIG_LEGACY_PTYS is not set
-+CONFIG_SERIAL_8250=y
-+CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_NR_UARTS=1
-+CONFIG_SERIAL_8250_RUNTIME_UARTS=1
-+# CONFIG_HW_RANDOM is not set
-+# CONFIG_HWMON is not set
-+CONFIG_USB=y
-+CONFIG_USB_MON=y
-+CONFIG_USB_STORAGE=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_GEMINI=y
-+CONFIG_DMADEVICES=y
-+# CONFIG_DNOTIFY is not set
-+CONFIG_TMPFS=y
-+CONFIG_TMPFS_POSIX_ACL=y
-+CONFIG_ROMFS_FS=y
-+CONFIG_NLS_CODEPAGE_437=y
-+CONFIG_NLS_ISO8859_1=y
-+# CONFIG_ENABLE_WARN_DEPRECATED is not set
-+# CONFIG_ENABLE_MUST_CHECK is not set
-+CONFIG_DEBUG_FS=y
--- 
-2.9.3
+On 01/19/2017 03:34 PM, Philipp Zabel wrote:
+> Hi Christopher,
+>
+> On Wed, 2017-01-18 at 23:20 +0100, Christopher Spinrath wrote:
+>> Hi Philipp,
+>>
+>> turns out I have a question on your comment after all:
+>>
+>> On 01/17/2017 07:35 PM, Christopher Spinrath wrote:
+>>> Hi Philipp,
+>>>
+>>> thanks for the review!
+>>>
+>>> On 01/17/2017 09:57 AM, Philipp Zabel wrote:
+>>>> [...]
+>>>>> +
+>>>>> +    parallel-display {
+>>>>> +        compatible = "fsl,imx-parallel-display";
+>>>>> +        #address-cells = <1>;
+>>>>> +        #size-cells = <0>;
+>>>>> +        pinctrl-names = "default";
+>>>>> +        pinctrl-0 = <&pinctrl_ipu1>;
+>>>>> +
+>>>>> +        interface-pix-fmt = "rgb24";
+>>>>
+>>>> This is not necessary if the connector created by the tpf410 has the
+>>>> correct media bus format set in its display_info structure. This can be
+>>>> done in tfp410_attach, before calling drm_mode_connector_attach_encoder:
+>>>>
+>>>>         u32 bus_format = MEDIA_BUS_FMT_RGB888_1X24;
+>>>>
+>>>>     drm_display_info_set_bus_formats(&dvi->connector.display_info,
+>>>>                      &bus_format, 1);
+>>>>
+>>>> After this is done, the above line should be removed in a follow-up
+>>>> patch.
+>>
+>> On closer inspection the tfp410 can handle rgb12, rgb24, and DVI
+>> formats. Considering this it feels wrong to hardcode the bus format to
+>> rgb24 (isn't it?).
+>
+> That is a good point, I agree. I have some thoughts on this:
+>
+>> So a solution might be to add a property specifying the bus format to
+>> the tfp410 binding. But then we would effectively just move this
+>> property from one node to another. I wonder if this is still desireable...?
+>
+> If this is configurable on both ends, the necessary setting is neither a
+> hardware property of the bridge, nor of the display interface, but
+> rather one of the board specific wiring between the two (if at all).
+>
+> Ideally all possible settings should be known to the drivers and the
+> best format should be negotiated. Note that display_info.bus_formats
+> already is an array of possible bus formats, even though the parallel
+> display driver currently only looks at the first element.
+>
+> If there is no limitation imposed by the wiring, presenting best format
+> first in that array seems reasonable for now.
+
+The tfp410 can be operated either in i2c mode or in dump mode (i2c is 
+not wired up). The Linux driver does only support dump mode so far. (In 
+essence the driver does nothing but the neccesary boilerplate stuff.) 
+While the format can be read and changed neither is possible in the dumb 
+mode. The format is configured by connecting some pins of the chip to 
+ground. So we have to deal with the "otherwise" case below.
+
+> Otherwise I think the links should describe the parallel bus layout,
+> which is specified for the (input) media video interfaces:
+>
+> Documentation/devicetree/bindings/media/video-interfaces.txt
+>
+> Using the
+> 	bus-width = <24>;
+> or
+> 	bus-width = <12>;
+> property the tfp510 driver could choose which bus_formats to add to the
+> display_info.
+
+I see your point that the format is a property of the wiring and, thus, 
+it is better to utilizie the bus-width property in the of graph remote 
+nodes from a modelling point of view.
+
+On the other hand, the parallel-display already has some data on the 
+wiring: the pinctrl settings. This weakens the above reasoning because 
+the information is splitted up. Moreover, a quick grep session revealed 
+that on all arm platforms the format is obtained from the "SoC-side" 
+(read parallel-display) node, if it is dynamic. Is there some effort to 
+change that? (essentially, I'm trying to understand here the 
+justification for the change we are discussing).
+
+Cheers,
+Christopher
+
+> regards
+> Philipp
+>
