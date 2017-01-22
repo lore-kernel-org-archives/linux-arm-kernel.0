@@ -1,35 +1,24 @@
-From: afzal.mohd.ma@gmail.com (afzal mohammed)
-Date: Sun, 22 Jan 2017 08:52:59 +0530
-Subject: [PATCH v2 4/4] ARM: nommu: remove Hivecs configuration is asm
-In-Reply-To: <20170122031652.13074-1-afzal.mohd.ma@gmail.com>
-References: <20170122031652.13074-1-afzal.mohd.ma@gmail.com>
-Message-ID: <20170122032259.13512-1-afzal.mohd.ma@gmail.com>
+From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
+Date: Sun, 22 Jan 2017 08:57:00 +0530
+Subject: [PATCH 1/4] ARM: mmu: decouple VECTORS_BASE from Kconfig
+In-Reply-To: <20170119142424.GZ27312@n2100.armlinux.org.uk>
+References: <20170118203525.6246-1-afzal.mohd.ma@gmail.com>
+ <20170118203739.6400-1-afzal.mohd.ma@gmail.com>
+ <20170119142424.GZ27312@n2100.armlinux.org.uk>
+Message-ID: <20170122032700.GA13580@afzalpc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that exception based address is handled dynamically for
-processors with CP15, remove Hivecs configuration in assembly.
+Hi,
 
-Signed-off-by: afzal mohammed <afzal.mohd.ma@gmail.com>
----
- arch/arm/kernel/head-nommu.S | 5 -----
- 1 file changed, 5 deletions(-)
+On Thu, Jan 19, 2017 at 02:24:24PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Jan 19, 2017 at 02:07:39AM +0530, afzal mohammed wrote:
 
-diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-index 6b4eb27b8758..2e21e08de747 100644
---- a/arch/arm/kernel/head-nommu.S
-+++ b/arch/arm/kernel/head-nommu.S
-@@ -152,11 +152,6 @@ __after_proc_init:
- #ifdef CONFIG_CPU_ICACHE_DISABLE
- 	bic	r0, r0, #CR_I
- #endif
--#ifdef CONFIG_CPU_HIGH_VECTOR
--	orr	r0, r0, #CR_V
--#else
--	bic	r0, r0, #CR_V
--#endif
- 	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
- #elif defined (CONFIG_CPU_V7M)
- 	/* For V7M systems we want to modify the CCR similarly to the SCTLR */
--- 
-2.11.0
+> > +#define VECTORS_BASE		0xffff0000
+> 
+> This should be UL(0xffff0000)
+
+This has been taken care in v2.
+
+Regards
+afzal
