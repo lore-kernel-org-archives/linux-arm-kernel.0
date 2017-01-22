@@ -1,61 +1,103 @@
-From: guochun.mao@mediatek.com (Guochun Mao)
-Date: Sun, 22 Jan 2017 10:36:40 +0800
-Subject: [PATCH v1 2/2] arm: dts: mt2701: add nor flash node
-In-Reply-To: <CAL_Jsq+S-FYy4SmjJ3fWzBugw2zCj5TQkkfUA8QVL7SLJW3E1g@mail.gmail.com>
-References: <d7b866ad-5b2f-62d3-3aa3-6fa42803d625@gmail.com>
- <b850b751-1d8d-0053-cf1f-d5314542e5c3@gmail.com>
- <20170113172825.75d545a3@bbrezillon>
- <86c997be-f500-eaa1-3ba5-d21cff6223b7@gmail.com>
- <20170113175628.1793f433@bbrezillon>
- <0fafcd8d-cf99-de6b-728f-5e3637810b68@gmail.com>
- <20170114092958.022f2fc8@bbrezillon>
- <e7fa1542-f0e2-0e45-23b3-25d6491ae40d@gmail.com>
- <20170116094032.6f471f11@bbrezillon>
- <20170117143650.5db87148@free-electrons.com>
- <20170118222010.ivc6jxpnrumemvdf@rob-hp-laptop>
- <20170119103829.524ce715@free-electrons.com>
- <CAL_Jsq+EyHtC7THLCJcwgtVtVESMOdmi3T3bBxgOqJt6BCtCHQ@mail.gmail.com>
- <20170119091428.598eb987@bbrezillon>
- <CAL_Jsq+S-FYy4SmjJ3fWzBugw2zCj5TQkkfUA8QVL7SLJW3E1g@mail.gmail.com>
-Message-ID: <1485052600.19995.10.camel@mhfsdcap03>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Sun, 22 Jan 2017 10:50:19 +0800
+Subject: [RESEND PATCH 6/6] dt-bindings: phy-mt65xx-usb: add support for
+ mt2712 platform
+In-Reply-To: <20170121200844.k5ivauhws43ac2s2@rob-hp-laptop>
+References: <1484719214-11989-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1484719214-11989-6-git-send-email-chunfeng.yun@mediatek.com>
+ <20170121200844.k5ivauhws43ac2s2@rob-hp-laptop>
+Message-ID: <1485053419.10292.88.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On Thu, 2017-01-19 at 08:18 -0600, Rob Herring wrote:
-> On Thu, Jan 19, 2017 at 2:14 AM, Boris Brezillon
-> > One last question and I'm done: is something like that acceptable?
-> >
-> >         compatible = "<vendor>,<old-soc>","<vendor>,<new-soc>";
-> >
-> > This can happen when someone adds support for an unsupported feature
-> > on a brand new SoC, and then someone else use the same driver for an
-> > older SoC embedding the same IP but still wants to add a new compatible
-> > just in case these 2 IPs appear to be slightly different.
+On Sat, 2017-01-21 at 14:08 -0600, Rob Herring wrote:
+> On Wed, Jan 18, 2017 at 02:00:14PM +0800, Chunfeng Yun wrote:
+> > add a new compatible string for "mt2712", and a new reference clock
+> > for SuperSpeed analog phy;
+> > 
+> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/phy/phy-mt65xx-usb.txt     |   81 +++++++++++++++++---
+> >  1 file changed, 70 insertions(+), 11 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+> > index 33a2b1e..8f91136 100644
+> > --- a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+> > +++ b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+> > @@ -6,19 +6,25 @@ This binding describes a usb3.0 phy for mt65xx platforms of Medaitek SoC.
+> >  Required properties (controller (parent) node):
+> >   - compatible	: should be one of
+> >  		  "mediatek,mt2701-u3phy"
+> > +		  "mediatek,mt2712-u3phy"
+> >  		  "mediatek,mt8173-u3phy"
+> > - - reg		: offset and length of register for phy, exclude port's
+> > -		  register.
+> >   - clocks	: a list of phandle + clock-specifier pairs, one for each
+> >  		  entry in clock-names
+> >   - clock-names	: must contain
+> > -		  "u3phya_ref": for reference clock of usb3.0 analog phy.
+> > +		  "u2ref_clk": 48M reference clock of HighSpeed analog phy.
+> > +		  "u3ref_clk": 26M reference clock of SuperSpeed analog phy,
+> > +			sometimes is 24M, 25M or 27M, depended on platform.
 > 
-> Yes, it's old and new compatible strings in this case and it's newest
-> compatible string first.
+> _clk is redundant.
+remove it
 > 
-> > Here the order of compat strings is no longer following a clear rule
-> > like 'most-specific compatible first' or 'newest IP/SoC version first',
-> > it's completely dependent on the order these IPs were supported in the
-> > OS (Linux). I'm perfectly fine with that BTW, just want to make sure
-> > this is authorized.
+> >  
+> >  Required nodes	: a sub-node is required for each port the controller
+> >  		  provides. Address range information including the usual
+> >  		  'reg' property is used inside these nodes to describe
+> >  		  the controller's topology.
+> >  
+> > +Optional properties (controller (parent) node):
+> > + - reg		: offset and length of register shared by multiple ports,
+> > +		  exclude port's private register. It is needed on mt2701
+> > +		  and mt8173, but not on mt2712.
+> > +
+> >  Required properties (port (child) node):
+> >  - reg		: address and length of the register set for the port.
+> >  - #phy-cells	: should be 1 (See second example)
+> > @@ -31,21 +37,27 @@ Example:
+> >  u3phy: usb-phy at 11290000 {
+> >  	compatible = "mediatek,mt8173-u3phy";
+> >  	reg = <0 0x11290000 0 0x800>;
+> > -	clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
+> > -	clock-names = "u3phya_ref";
+> > +	clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>, <&clk26m>;
+> > +	clock-names = "u2ref_clk", "u3ref_clk";
+> >  	#address-cells = <2>;
+> >  	#size-cells = <2>;
+> >  	ranges;
+> >  	status = "okay";
+> >  
+> > -	phy_port0: port at 11290800 {
+> > -		reg = <0 0x11290800 0 0x800>;
+> > +	u2port0: port at 11290800 {
 > 
-> I guess we should say "newest compatible for IP first" instead. There
-> are some exceptions where we add fallbacks later on, but that falls
-> under the most-specific part.
-> 
-> It's order that the bindings are defined, not Linux support really,
-> but in practice those are the same.
-> 
-> Rob
+> port is for OF graph. This should be usb-phy at ... instead.
+Is there any problems if u2port0's name at addr is the same as its parent's
+(u3phy)?  as following:
+	u3phy: usb-phy at 11290000 {
+		compatible = ...;
+		// no reg property
+		clocks = ...;
+		u2port0: usb-phy at 11290000 {
+			reg = ...;
+	}
 
-Thanks for all your effort for code reviewing.
-Our mt2701-nor's hardware is designed base on mt8713-nor,
-even so, there would be some slight difference.
-If I don't misunderstand your viewpoint in this discussion,
-there's no need to drop mt2701-nor compatible.
-And if not, is there any other suggestion?
+> 
+> > +		reg = <0 0x11290800 0 0x100>;
+> > +		#phy-cells = <1>;
+> > +		status = "okay";
+> > +	};
+> > +
+> > +	u3port0: port at 11290900 {
+> > +		reg = <0 0x11290800 0 0x700>;
+> >  		#phy-cells = <1>;
+> >  		status = "okay";
+> >  	};
+> >  
 
-Thanks.
+> > +            ...
+
+Thank you!
