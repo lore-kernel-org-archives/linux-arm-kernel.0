@@ -1,94 +1,134 @@
-From: guy.shapiro@mobi-wize.com (Guy Shapiro)
-Date: Sun, 22 Jan 2017 13:17:44 +0200
-Subject: imx6ul: power-up using the RTC
-In-Reply-To: <20170120153459.tewyg54dcgqnpz2j@piout.net>
-References: <b516070d-6539-98d1-c832-d79ac89e8d43@mobi-wize.com>
- <20170120121210.gm3wcg4yyvrigpn3@earth>
- <20170120153459.tewyg54dcgqnpz2j@piout.net>
-Message-ID: <089d1044-275a-1fdc-f0d6-f21c1253b0ab@mobi-wize.com>
+From: mzoran@crowfest.net (Michael Zoran)
+Date: Sun, 22 Jan 2017 03:22:53 -0800
+Subject: ARM64: Disabling warnings about deprecated armv8 instructions
+In-Reply-To: <1485083115.1308.10.camel@crowfest.net>
+References: <1485072424.14066.2.camel@crowfest.net>
+ <9647813.NZ2c5cYUSH@localhost> <1485075528.14345.1.camel@crowfest.net>
+ <20170122170523.3b4b1235@xhacker> <1485077887.1308.2.camel@crowfest.net>
+ <CAKv+Gu9gBPenhOBj9G7rrqi3h_oMi3X7qpmsK+SB1dgBtzfKTg@mail.gmail.com>
+ <1485078760.1308.6.camel@crowfest.net>
+ <CAKv+Gu8rM9b2QrkKRVW=7FQLherg9fcv+H+01s+axsN9uZCBmg@mail.gmail.com>
+ <1485083115.1308.10.camel@crowfest.net>
+Message-ID: <1485084173.1308.12.camel@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/01/2017 17:34, Alexandre Belloni wrote:
-> On 20/01/2017 at 13:12:10 +0100, Sebastian Reichel wrote :
->> Hi,
->>
->> On Wed, Jan 18, 2017 at 04:49:11PM +0200, Guy Shapiro wrote:
->>> I'm trying to use the low power RTC of the i.MX6UL to start from
->>> power-off state.
->>>
->>> I started by hopefully running: # echo +30 >
->>> /sys/class/rtc/rtc0/wakealarm && shutdown -h now The system was
->>> powered down, but it didn't come up after 30 seconds as expected.
->>>
->>> So I dug into the datasheet and the source...
->>> To activate the power on alarm, the flags SRTC_ENV, LPTA_EN and LPWUI_EN on
->>> the SNVS_LP Control register (LPCR) should be asserted. The wakeup time
->>> should be written to the SNVS_LP Time alarm register (LPTA). The code that
->>> does this is on drivers/rtc/rtc-snvs.c:snvs_rtc_set_alarm().
->>>
->>> The first problem I found was with the use of the syscon-poweroff driver.
->>> The "Turn off System Power" flag is part of the same register (LPCR). The
->>> current code of syscon-poweroff set the register to the "mask" property from
->>> the device tree on power off, overriding all the existing flags.
->>> After setting the "mask" property on the device tree to 0x6b instead of
->>> 0x60 (asserting the mentioned bits), the system do power up on timer, as
->>> expected.
->>>
->>> However, I didn't like the idea of keeping those flags on even when no one
->>> set the alarm.
->>> As a quick test, I modified the syscon-poweroff driver to ignore the bits
->>> that are not on the mask:
->>>
->>> diff --git a/drivers/power/reset/syscon-poweroff.c
->>> b/drivers/power/reset/syscon-poweroff.c
->>> index b683383..a5da02b 100644
->>> --- a/drivers/power/reset/syscon-poweroff.c
->>> +++ b/drivers/power/reset/syscon-poweroff.c
->>> @@ -33,7 +33,7 @@ static u32 mask;
->>> static void syscon_poweroff(void)
->>> {
->>>         /* Issue the poweroff */
->>> -       regmap_write(map, offset, mask);
->>> +       regmap_update_bits(map, offset, mask, mask);
->>>         mdelay(1000);
->>>
->>>
->>> After applying this fix, the wake up alarm didn't work. Strangely, when I
->>> added some debug prints to investigate the case, it worked again
->>> (sometimes... depends on the exact places I add the prints).
->>> I suspect that some other driver clears the flags during the power down, but
->>> I couldn't find such driver.
->>>
->>> Do you have any clue what code may change this register during the shutdown
->>> process? Any other insights are welcomed as well :)
->> To summarize it looks like this?
->>
->> | regmap_write       | 0x60 | broken                     |
->> | regmap_write       | 0x6b | works stable               |
->> | regmap_update_bits | 0x60 | works only with dbg prints |
->>
->> For me it looks like the debug prints may delay the poweroff driver
->> long enough, that some other driver (rtc?) writes the 0x0b bits.
->>
-> Is snvs_rtc_alarm_irq_enable() waiting long enough? I'd say yes but you
-> never know... You can also use the kernel tracin infrastructure to trace
-> every accesses made to that regmap. That could give you a hint.
->
-> At least you can try a regmap_read before returning from
-> snvs_rtc_alarm_irq_enable() and see whether SNVS_LPCR_LPTA_EN and
-> SNVS_LPCR_LPWUI_EN are still there.
->
-I added a debug print on snvs_rtc_alarm_irq_enable. It reads and prints the
-value of the control register after the write & sync operation.
+On Sun, 2017-01-22 at 03:05 -0800, Michael Zoran wrote:
+> On Sun, 2017-01-22 at 10:54 +0000, Ard Biesheuvel wrote:
+> > Did you try linux32?
+> > 
+> > pi at raspberrypi:~$ uname -a
+> > Linux raspberrypi 4.10.0-rc3-v8+ #3 SMP PREEMPT Sun Jan 15 15:22:12
+> > WET 2017 aarch64 GNU/Linux
+> > pi at raspberrypi:~ $ linux32 uname -a
+> > Linux raspberrypi 4.10.0-rc3-v8+ #3 SMP PREEMPT Sun Jan 15 15:22:12
+> > WET 2017 armv8l GNU/Linux
+> > 
+> > If the app in question cannot deal with the armv8l personality, the
+> > app should be fixed instead.
+> 
+> Thanks, I didn't know about the tool.
+> 
+> I'm looking at the code in arch/arm64/include/asm/elf.h. I'm looking
+> at
+> the COMPAT_SET_PERSONALITY macro.??It appears to be broken.??It
+> seems?
+> like it should have a call to set_personality with PER_LINUX32.??
+> 
+> If I look in include/uapi/linux/personality.h, I see some very
+> interesting things. Quite the complex set of options I would say.
+> 
+> /*
+> ?* Flags for bug emulation.
+> ?*
+> ?* These occupy the top three bytes.
+> ?*/
+> enum {
+> 	UNAME26	=???????????????0x0020000,
+> 	ADDR_NO_RANDOMIZE =?	0x0040000,	/* disable
+> randomization of VA space */
+> 	FDPIC_FUNCPTRS =	0x0080000,	/* userspace function
+> ptrs point to descriptors
+> 						?* (signal handling)
+> 						?*/
+> 	MMAP_PAGE_ZERO =	0x0100000,
+> 	ADDR_COMPAT_LAYOUT =	0x0200000,
+> 	READ_IMPLIES_EXEC =	0x0400000,
+> 	ADDR_LIMIT_32BIT =	0x0800000,
+> 	SHORT_INODE =		0x1000000,
+> 	WHOLE_SECONDS =		0x2000000,
+> 	STICKY_TIMEOUTS	=	0x4000000,
+> 	ADDR_LIMIT_3GB =?	0x8000000,
+> };
+> 
+> /*
+> ?* Security-relevant compatibility flags that must be
+> ?* cleared upon setuid or setgid exec:
+> ?*/
+> #define PER_CLEAR_ON_SETID (READ_IMPLIES_EXEC??| \
+> 			????ADDR_NO_RANDOMIZE??| \
+> 			????ADDR_COMPAT_LAYOUT | \
+> 			????MMAP_PAGE_ZERO)
+> 
+> /*
+> ?* Personality types.
+> ?*
+> ?* These go in the low byte.??Avoid using the top bit, it will
+> ?* conflict with error returns.
+> ?*/
+> enum {
+> 	PER_LINUX =		0x0000,
+> 	PER_LINUX_32BIT =	0x0000 | ADDR_LIMIT_32BIT,
+> 	PER_LINUX_FDPIC =	0x0000 | FDPIC_FUNCPTRS,
+> 	PER_SVR4 =		0x0001 | STICKY_TIMEOUTS |
+> MMAP_PAGE_ZERO,
+> 	PER_SVR3 =		0x0002 | STICKY_TIMEOUTS |
+> SHORT_INODE,
+> 	PER_SCOSVR3 =		0x0003 | STICKY_TIMEOUTS |
+> 					?WHOLE_SECONDS | SHORT_INODE,
+> 	PER_OSR5 =		0x0003 | STICKY_TIMEOUTS |
+> WHOLE_SECONDS,
+> 	PER_WYSEV386 =		0x0004 | STICKY_TIMEOUTS |
+> SHORT_INODE,
+> 	PER_ISCR4 =		0x0005 | STICKY_TIMEOUTS,
+> 	PER_BSD =		0x0006,
+> 	PER_SUNOS =		0x0006 | STICKY_TIMEOUTS,
+> 	PER_XENIX =		0x0007 | STICKY_TIMEOUTS |
+> SHORT_INODE,
+> 	PER_LINUX32 =		0x0008,
+> 	PER_LINUX32_3GB =	0x0008 | ADDR_LIMIT_3GB,
+> 	PER_IRIX32 =		0x0009 | STICKY_TIMEOUTS,/* IRIX5
+> 32-bit */
+> 	PER_IRIXN32 =		0x000a | STICKY_TIMEOUTS,/* IRIX6
+> new 32-bit */
+> 	PER_IRIX64 =		0x000b | STICKY_TIMEOUTS,/* IRIX6
+> 64-bit */
+> 	PER_RISCOS =		0x000c,
+> 	PER_SOLARIS =		0x000d | STICKY_TIMEOUTS,
+> 	PER_UW7 =		0x000e | STICKY_TIMEOUTS |
+> MMAP_PAGE_ZERO,
+> 	PER_OSF4 =		0x000f,			?/*
+> OSF/1 v4 */
+> 	PER_HPUX =		0x0010,
+> 	PER_MASK =		0x00ff,
+> };
+> 
 
-Immediately after the write to /sys/class/rtc/rtc0/wakealarm the
-register value is correct (0x2b).
-However, during the shutdown process the function is called again via the
-rtc_timer_do_work(). I still do not fully understand this flow. This call is
-done with the enable parameter == 1, but my debug print shows 0x29,
-meaning the LPTA_EN bit stays low.
+OK, I got mathematica to load without using the linux32 tool.
 
-My current guess is that the clear of LPTA_EN in snvs_rtc_set_alarm have
-internal race with the afterward bit set.
-I'll try to check this and update.
+I changed the macro to this. 
+
+#define COMPAT_SET_PERSONALITY(ex)					
+\
+({									
+\
+	set_bit(TIF_32BIT, &current->mm->context.flags);		
+\
+	set_thread_flag(TIF_32BIT);					
+\
+	set_personality(current->personality??=
+PER_LINUX32);???????????\
+})
+
+ But I'm not sure that is really the correct set of options.   Why not
+PER_LINUX32_3GB or PER_LINUX_32BIT?
