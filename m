@@ -1,103 +1,69 @@
-From: alexanders83@web.de (Alexander Stein)
-Date: Sun, 22 Jan 2017 12:46:29 +0100
-Subject: ARM64: Disabling warnings about deprecated armv8 instructions
-In-Reply-To: <CAKv+Gu8LU3QjrUa6wMJF3WBNrhx34Pi_0ZUQVfrZy7w7y7237w@mail.gmail.com>
-References: <1485072424.14066.2.camel@crowfest.net>
- <1485075528.14345.1.camel@crowfest.net>
- <CAKv+Gu8LU3QjrUa6wMJF3WBNrhx34Pi_0ZUQVfrZy7w7y7237w@mail.gmail.com>
-Message-ID: <22169925.OhJ0QcnbHM@localhost>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sun, 22 Jan 2017 13:07:53 +0100
+Subject: [PATCH v2 3/3] clk: rockchip: rk3288: make all niu clocks critical
+In-Reply-To: <CAFLEztTwyjqz0-2LriDp2WAyPR-g28RZT3VPA5vfSK5SSHTx8Q@mail.gmail.com>
+References: <1484718161-27702-1-git-send-email-jacob-chen@iotwrt.com>
+ <1484718161-27702-3-git-send-email-jacob-chen@iotwrt.com>
+ <CAFLEztTwyjqz0-2LriDp2WAyPR-g28RZT3VPA5vfSK5SSHTx8Q@mail.gmail.com>
+Message-ID: <4474818.6v0yI33TyK@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- On Sunday, January 22, 2017, 9:09:37 AM CET Ard Biesheuvel wrote:
-> On 22 January 2017 at 08:58, Michael Zoran <mzoran@crowfest.net> wrote:
-> > On Sun, 2017-01-22 at 09:52 +0100, Alexander Stein wrote:
-> >> Hi Michael,
-> >> 
-> >> On Sunday, January 22, 2017, 12:07:04 AM CET Michael Zoran wrote:
-> >> > I'm not sure if this if the correct place to be asking this.   The
-> >> > RPI
-> >> > 3 running ARM64 is slowly reaching the point of being about to
-> >> > seriously run a 32 bit vender OS like Raspbian.  When running
-> >> > Raspbian,
-> >> > I'm seeing a very large number(thousands) of kernel log messages
-> >> > about
-> >> > deprecated instructions especially setend and barrier instuctions.
-> >> > This can be very annoying and is completely filling the kernel log.
-> >> > 
-> >> > I'm considering submitting a patch to add a Kconfig option to
-> >> > disable
-> >> > these warnings with the default being to keep the warnings
-> >> > enabled.  I
-> >> > was wondering if such a patch could be seriously considered.
-> >> 
-> >> Could you please provide an example of those warning an what is
-> >> trigging
-> >> those?
-> >> 
-> >> Thanks and best regards,
-> >> Alexander
+Am Sonntag, 22. Januar 2017, 17:02:17 CET schrieb Jacob Chen:
+> 2017-01-18 13:42 GMT+08:00 Jacob Chen <jacob-chen@iotwrt.com>:
+> > NIU clocks are related to the interconnect and it's important to other
+> > blocks. Since we don't have a driver to handle it, we should always
+> > enable it to avoid casually close.
 > > 
-> > Sure, here is a snipped from dmesg.  I think this is happening because
-> > the entire Raspbian OS is compiled with a custom gcc compiler that is
-> > targeting arm6+VFP.
+> > Make all of them critical,so that we don't have to each clock on its own
+> > once things break.
 > > 
-> > I can double check, but I think the instructions are being emulated in
-> > hardware so they are just filling the log and slowing things down.
+> > Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
+> > ---
 > > 
-> > [10685.558480] cp15barrier_handler: 197896 callbacks suppressed
-> > [10685.558487] "Xorg" (656) uses deprecated CP15 Barrier instruction at
-> > 0xf707fe9c
-> > [10685.558504] "Xorg" (656) uses deprecated CP15 Barrier instruction at
-> > 0xf7015944
-> > [10685.558511] "Xorg" (656) uses deprecated CP15 Barrier instruction at
-> > 0xf7012494
-> > [10685.558518] "Xorg" (656) uses deprecated CP15 Barrier instruction at
-> > 0xf70159b4
-> > [10685.558527] "Xorg" (656) uses deprecated CP15 Barrier instruction at
-> > 0xf7011478
-> > [10685.558533] "Xorg" (656) uses deprecated CP15 Barrier instruction at
-> > 0xf70114e8
-> > [10685.558540] "Xorg" (656) uses deprecated CP15 Barrier instruction at
-> > 0xf7015944
-> > [10685.558547] "Xorg" (656) uses deprecated CP15 Barrier instruction at
-> > 0xf7012494
-> > [10685.558553] "Xorg" (656) uses deprecated CP15 Barrier instruction at
-> > 0xf70159b4
-> > [10685.558560] "Xorg" (656) uses deprecated CP15 Barrier instruction at
-> > 0xf7011478
-> > [10685.559179] compat_setend_handler: 1078 callbacks suppressed
-> > [10685.559188] "systemd-journal" (138) uses deprecated setend
-> > instruction at 0xf76a66f4
-> > [10685.559196] "systemd-journal" (138) uses deprecated setend
-> > instruction at 0xf76a6bd8
-> > [10685.559209] "systemd-journal" (138) uses deprecated setend
-> > instruction at 0xf76a66f4
-> > [10685.559216] "systemd-journal" (138) uses deprecated setend
-> > instruction at 0xf76a6bd8
-> > [10685.559231] "systemd-journal" (138) uses deprecated setend
-> > instruction at 0xf76a66f4
-> > [10685.559237] "systemd-journal" (138) uses deprecated setend
-> > instruction at 0xf76a6bd8
-> > [10685.559246] "systemd-journal" (138) uses deprecated setend
-> > instruction at 0xf76a66f4
-> > [10685.559253] "systemd-journal" (138) uses deprecated setend
-> > instruction at 0xf76a6bd8
-> > [10685.559269] "systemd-journal" (138) uses deprecated setend
-> > instruction at 0xf76a66f4
-> > [10685.559276] "systemd-journal" (138) uses deprecated setend
-> > instruction at 0xf76a6bd8
+> >  drivers/clk/rockchip/clk-rk3288.c | 7 +++++++
+> >  1 file changed, 7 insertions(+)
+> > 
+> > diff --git a/drivers/clk/rockchip/clk-rk3288.c
+> > b/drivers/clk/rockchip/clk-rk3288.c index 3d02aa2..c50386c 100644
+> > --- a/drivers/clk/rockchip/clk-rk3288.c
+> > +++ b/drivers/clk/rockchip/clk-rk3288.c
+> > @@ -808,8 +808,15 @@ static struct rockchip_clk_branch
+> > rk3288_clk_branches[] __initdata = {> 
+> >  static const char *const rk3288_critical_clocks[] __initconst = {
+> >  
+> >         "aclk_cpu",
+> >         "aclk_peri",
+> > 
+> > +       "aclk_peri_niu",
+> > +       "aclk_vio0_niu",
+> > +       "aclk_vio1_niu",
+> > +       "aclk_rga_niu",
+> > 
+> >         "hclk_peri",
+> > 
+> > +       "hclk_vio_niu",
+> > +       "pclk_alive_niu",
+> > 
+> >         "pclk_pd_pmu",
+> > 
+> > +       "pclk_pmu_niu",
+> > 
+> >  };
+> >  
+> >  static void __iomem *rk3288_cru_base;
+> > 
+> > --
+> > 2.7.4
 > 
-> You can disable the emulation by doing
+> I just got an another bug that caused by closed niu clock.
+> Making niu clock always enabled is really useful, it could save me a
+> lot of time.....
 > 
-> echo 2 >/proc/sys/abi/setend
-> echo 2 >/proc/sys/abi/cp15_barrier
+> I just wonder why we don't do that before.  Would it have great impact
+> on power consumption?
 
-This reminds me of /proc/cpu/alignment to detect alignment problems in your 
-application. Although armv6+ can handle unaligned access in most (!) cases you 
-might want to trap thos cases. I would consider this a similar way.
-IMHO raspbian, still supporting raspberry pi 1 (armv6), should silence those 
-warnings.
-
-Best regards,
-Alexander
+The niu clocks so far seemed to rely on the CLK_IGNORE_UNUSED flag. So all was 
+well as long as nothing changed in the clock tree above those and I guess with 
+more supported peripherals, some now make changes to the more common clocks 
+and thus disable the nui clocks by accident.
