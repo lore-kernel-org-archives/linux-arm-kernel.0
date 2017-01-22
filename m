@@ -1,41 +1,68 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Sun, 22 Jan 2017 17:37:28 +0800
-Subject: [PATCH v2 15/26] drm/rockchip: dw-mipi-dsi: ensure PHY is reset
-In-Reply-To: <20170121163128.22240-16-john@metanate.com>
-References: <20170121163128.22240-1-john@metanate.com>
- <20170121163128.22240-16-john@metanate.com>
-Message-ID: <58847D58.5080903@rock-chips.com>
+From: mzoran@crowfest.net (Michael Zoran)
+Date: Sun, 22 Jan 2017 01:38:07 -0800
+Subject: ARM64: Disabling warnings about deprecated armv8 instructions
+In-Reply-To: <20170122170523.3b4b1235@xhacker>
+References: <1485072424.14066.2.camel@crowfest.net>
+ <9647813.NZ2c5cYUSH@localhost>	<1485075528.14345.1.camel@crowfest.net>
+ <20170122170523.3b4b1235@xhacker>
+Message-ID: <1485077887.1308.2.camel@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, 2017-01-22 at 17:05 +0800, Jisheng Zhang wrote:
+> On Sun, 22 Jan 2017 00:58:48 -0800 Michael Zoran wrote:
+> 
+> > On Sun, 2017-01-22 at 09:52 +0100, Alexander Stein wrote:
+> > > Hi Michael,
+> > > 
+> > > On Sunday, January 22, 2017, 12:07:04 AM CET Michael Zoran
+> > > wrote:??
+> > > > I'm not sure if this if the correct place to be asking
+> > > > this.???The
+> > > > RPI
+> > > > 3 running ARM64 is slowly reaching the point of being about to
+> > > > seriously run a 32 bit vender OS like Raspbian.??When running
+> > > > Raspbian,
+> > > > I'm seeing a very large number(thousands) of kernel log
+> > > > messages
+> > > > about
+> > > > deprecated instructions especially setend and barrier
+> > > > instuctions.
+> > > > This can be very annoying and is completely filling the kernel
+> > > > log.
+> > > > 
+> > > > I'm considering submitting a patch to add a Kconfig option to
+> > > > disable
+> > > > these warnings with the default being to keep the warnings
+> > > > enabled.??I
+> > > > was wondering if such a patch could be seriously considered.??
+> > > 
+> > > Could you please provide an example of those warning an what is
+> > > trigging?
+> > > those?
+> > > 
+> > > Thanks and best regards,
+> > > Alexander??
+> > 
+> > Sure, here is a snipped from dmesg.??I think this is happening
+> > because
+> > the entire Raspbian OS is compiled with a custom gcc compiler that
+> > is
+> > targeting arm6+VFP.
+> 
+> IMHO, this is the root cause. I didn't see below warnings from dmesg
+> with
+> armhf debian and ubuntu If the underlying HW is armv8 compatible, it
+> doesn't make sense to target the compiler to armv6
+> 
+> 
 
-Reviewed-by: Chris Zhong <zyw@rock-chips.com>
+Advanced users can install a different OS. Beginners can't and will
+need a single OS image for simple install.
 
-On 01/22/2017 12:31 AM, John Keeping wrote:
-> Also don't power up the DSI host at this point since this is not
-> necessary in order to configure the PHY and we do so later when
-> selecting video or command mode.
->
-> Signed-off-by: John Keeping <john@metanate.com>
-> ---
-> Unchanged in v2
-> ---
->   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 5 ++++-
->   1 file changed, 4 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> index c2e0ba96e0a0..5b3068e9e8db 100644
-> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> @@ -397,7 +397,10 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
->   		return testdin;
->   	}
->   
-> -	dsi_write(dsi, DSI_PWR_UP, POWERUP);
-> +	/* Start by clearing PHY state */
-> +	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_UNTESTCLR);
-> +	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_TESTCLR);
-> +	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_UNTESTCLR);
->   
->   	dw_mipi_dsi_phy_write(dsi, 0x10, BYPASS_VCO_RANGE |
->   					 VCO_RANGE_CON_SEL(vco) |
+Does anybody know if these instructions are detected at runtime?  I'm
+also looking into an issue with Mathmatica due to broken OS detection. 
+It appears that arm64 is currently missing some of the CPU spoofing
+that happens on other architectures...
+
+ 
