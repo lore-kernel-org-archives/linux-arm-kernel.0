@@ -1,54 +1,52 @@
-From: contact@paulk.fr (Paul Kocialkowski)
-Date: Sun, 22 Jan 2017 16:47:53 +0100
-Subject: [PATCH v2 6/6] ARM: tegra: nyan-blaze: Proper pinmux for TPM i2c
-In-Reply-To: <20170122154753.31942-1-contact@paulk.fr>
-References: <20170122154753.31942-1-contact@paulk.fr>
-Message-ID: <20170122154753.31942-6-contact@paulk.fr>
+From: paul.gortmaker@windriver.com (Paul Gortmaker)
+Date: Sun, 22 Jan 2017 11:32:28 -0500
+Subject: [PATCH 04/20] arm: migrate exception table users off module.h and
+ onto extable.h
+In-Reply-To: <20170122163244.11740-1-paul.gortmaker@windriver.com>
+References: <20170122163244.11740-1-paul.gortmaker@windriver.com>
+Message-ID: <20170122163244.11740-5-paul.gortmaker@windriver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jerome Coste <jerome.coste@etu.utc.fr>
+These files were only including module.h for exception table
+related functions.  We've now separated that content out into its
+own file "extable.h" so now move over to that and avoid all the
+extra header content in module.h that we don't really need to compile
+these files.
 
-This corrects the pinmux for accessing the TPM over the i2c line.
-Thus, it allows correctly probing the module, that previously failed with i2c
-errors.
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
 ---
- arch/arm/boot/dts/tegra124-nyan-blaze.dts | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+ arch/arm/mm/extable.c | 2 +-
+ arch/arm/mm/fault.c   | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/tegra124-nyan-blaze.dts b/arch/arm/boot/dts/tegra124-nyan-blaze.dts
-index aca0828115eb..9df25ca5ab83 100644
---- a/arch/arm/boot/dts/tegra124-nyan-blaze.dts
-+++ b/arch/arm/boot/dts/tegra124-nyan-blaze.dts
-@@ -1100,19 +1100,19 @@
- 			};
- 			cam_i2c_scl_pbb1 {
- 				nvidia,pins = "cam_i2c_scl_pbb1";
--				nvidia,function = "rsvd3";
--				nvidia,pull = <TEGRA_PIN_PULL_DOWN>;
--				nvidia,tristate = <TEGRA_PIN_ENABLE>;
--				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
--				nvidia,open-drain = <TEGRA_PIN_DISABLE>;
-+				nvidia,function = "i2c3";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
-+				nvidia,open-drain = <TEGRA_PIN_ENABLE>;
- 			};
- 			cam_i2c_sda_pbb2 {
- 				nvidia,pins = "cam_i2c_sda_pbb2";
--				nvidia,function = "rsvd3";
--				nvidia,pull = <TEGRA_PIN_PULL_DOWN>;
--				nvidia,tristate = <TEGRA_PIN_ENABLE>;
--				nvidia,enable-input = <TEGRA_PIN_DISABLE>;
--				nvidia,open-drain = <TEGRA_PIN_DISABLE>;
-+				nvidia,function = "i2c3";
-+				nvidia,pull = <TEGRA_PIN_PULL_NONE>;
-+				nvidia,tristate = <TEGRA_PIN_DISABLE>;
-+				nvidia,enable-input = <TEGRA_PIN_ENABLE>;
-+				nvidia,open-drain = <TEGRA_PIN_ENABLE>;
- 			};
- 			pbb3 {
- 				nvidia,pins = "pbb3";
+diff --git a/arch/arm/mm/extable.c b/arch/arm/mm/extable.c
+index 312e15e6d00b..f436f7439e46 100644
+--- a/arch/arm/mm/extable.c
++++ b/arch/arm/mm/extable.c
+@@ -1,7 +1,7 @@
+ /*
+  *  linux/arch/arm/mm/extable.c
+  */
+-#include <linux/module.h>
++#include <linux/extable.h>
+ #include <linux/uaccess.h>
+ 
+ int fixup_exception(struct pt_regs *regs)
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index 3a2e678b8d30..94de590db99e 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -8,7 +8,7 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
+-#include <linux/module.h>
++#include <linux/extable.h>
+ #include <linux/signal.h>
+ #include <linux/mm.h>
+ #include <linux/hardirq.h>
 -- 
 2.11.0
