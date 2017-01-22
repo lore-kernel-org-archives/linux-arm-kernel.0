@@ -1,69 +1,153 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 22 Jan 2017 13:07:53 +0100
-Subject: [PATCH v2 3/3] clk: rockchip: rk3288: make all niu clocks critical
-In-Reply-To: <CAFLEztTwyjqz0-2LriDp2WAyPR-g28RZT3VPA5vfSK5SSHTx8Q@mail.gmail.com>
-References: <1484718161-27702-1-git-send-email-jacob-chen@iotwrt.com>
- <1484718161-27702-3-git-send-email-jacob-chen@iotwrt.com>
- <CAFLEztTwyjqz0-2LriDp2WAyPR-g28RZT3VPA5vfSK5SSHTx8Q@mail.gmail.com>
-Message-ID: <4474818.6v0yI33TyK@phil>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 22 Jan 2017 13:15:06 +0100
+Subject: [PATCH 00/22] Conversion of ARMv4 Gemini to DT and multiplatform
+Message-ID: <20170122121506.9995-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Sonntag, 22. Januar 2017, 17:02:17 CET schrieb Jacob Chen:
-> 2017-01-18 13:42 GMT+08:00 Jacob Chen <jacob-chen@iotwrt.com>:
-> > NIU clocks are related to the interconnect and it's important to other
-> > blocks. Since we don't have a driver to handle it, we should always
-> > enable it to avoid casually close.
-> > 
-> > Make all of them critical,so that we don't have to each clock on its own
-> > once things break.
-> > 
-> > Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
-> > ---
-> > 
-> >  drivers/clk/rockchip/clk-rk3288.c | 7 +++++++
-> >  1 file changed, 7 insertions(+)
-> > 
-> > diff --git a/drivers/clk/rockchip/clk-rk3288.c
-> > b/drivers/clk/rockchip/clk-rk3288.c index 3d02aa2..c50386c 100644
-> > --- a/drivers/clk/rockchip/clk-rk3288.c
-> > +++ b/drivers/clk/rockchip/clk-rk3288.c
-> > @@ -808,8 +808,15 @@ static struct rockchip_clk_branch
-> > rk3288_clk_branches[] __initdata = {> 
-> >  static const char *const rk3288_critical_clocks[] __initconst = {
-> >  
-> >         "aclk_cpu",
-> >         "aclk_peri",
-> > 
-> > +       "aclk_peri_niu",
-> > +       "aclk_vio0_niu",
-> > +       "aclk_vio1_niu",
-> > +       "aclk_rga_niu",
-> > 
-> >         "hclk_peri",
-> > 
-> > +       "hclk_vio_niu",
-> > +       "pclk_alive_niu",
-> > 
-> >         "pclk_pd_pmu",
-> > 
-> > +       "pclk_pmu_niu",
-> > 
-> >  };
-> >  
-> >  static void __iomem *rk3288_cru_base;
-> > 
-> > --
-> > 2.7.4
-> 
-> I just got an another bug that caused by closed niu clock.
-> Making niu clock always enabled is really useful, it could save me a
-> lot of time.....
-> 
-> I just wonder why we don't do that before.  Would it have great impact
-> on power consumption?
+I got a Gemini platform from Florian Fainelli over at OpenWRT
+some time back. I finally got around to "future-proofing" the
+platform, which was the idea when he paintakingly sent the box
+over to me.
 
-The niu clocks so far seemed to rely on the CLK_IGNORE_UNUSED flag. So all was 
-well as long as nothing changed in the clock tree above those and I guess with 
-more supported peripherals, some now make changes to the more common clocks 
-and thus disable the nui clocks by accident.
+This is the result: Gemini is converted to device tree and
+multiplatform, all existing drivers are rewritten into their
+proper subsystems and the old board-specific and machine-specific
+code is deleted.
+
+I would ideally like the irqchip, clocksource, gpio, rtc and MTD
+patches (and bindings) to simply be merged into the respective
+subsystem and the remaining ARM/ARM SoC patches funnelled to the
+ARM SoC tree in a single pull request, lock stock and barrel,
+with changes to board files and DTS additions in one go. But I
+guess I could also switch the DTS files to a separate branch.
+
+The OpenWRT tree still have a whole bunch of significant out-of
+tree drivers:
+
+- Watchdog
+- GMAC (ethernet)
+- FOT2G USB EHCI host
+- PATA
+- PCI
+
+But I do not see any big obstacle in porting these over to be
+probed from the device tree and upstreamed on top of this patch
+series. I might tinker with it if I get time.
+
+The out-of-tree code can be found here:
+http://git.openwrt.org/?p=openwrt.git;a=tree;f=target/linux/gemini;h=b74c3d8f0100e2ac8a4d71c4d23c082db2993e63;hb=HEAD
+
+Linus Walleij (22):
+  ARM: gemini: convert to MULTI_IRQ_HANDLER
+  irqchip: DT bindings for Cortina Gemini irqchip
+  irqchip: add a driver for Cortina Gemini
+  clocksource: add DT bindings for Cortina Gemini
+  clocksource: Add driver for the Cortina Gemini
+  gpio: add DT bindings for Cortina Gemini GPIO
+  gpio: Add a driver for Cortina Systems Gemini GPIO
+  rtc: Add device tree probing to the Gemini driver
+  mtd: add DT bindings for the Cortina Systems Gemini Flash
+  mtd: physmap_of: add a hook for Gemini flash probing
+  ARM: dts: add top-level DT bindings for Cortina Gemini
+  ARM: gemini: DT for the Cortina Gemini SoC platforms
+  ARM: dts: add device tree for Gemini SoC and SQ201
+  ARM: dts: add a devicetree for Raidsonic NAS IB-4220-B
+  ARM: dts: add a devicetree for Teltonika RUT1xx
+  ARM: dts: add a devicetree for Wiliboard WBD-111
+  ARM: dts: add a devicetree for Wiliboard WBD-222
+  ARM: gemini: delete all boardfiles
+  ARM: gemini: switch to sparse IRQs
+  ARM: gemini: select ARM_PATCH_PHYS_VIRT and AUTO_ZRELADDR
+  ARM: gemini: convert to ARMv4 multiplatform
+  ARM: configs: add a gemini defconfig
+
+ Documentation/devicetree/bindings/arm/gemini.txt   |  58 +++++
+ .../bindings/gpio/cortina,gemini-gpio.txt          |  24 ++
+ .../cortina,gemini-interrupt-controller.txt        |  22 ++
+ .../bindings/mtd/cortina,gemini-flash.txt          |  24 ++
+ .../devicetree/bindings/rtc/cortina,gemini.txt     |  14 ++
+ .../bindings/timer/cortina,gemini-timer.txt        |  22 ++
+ arch/arm/Kconfig                                   |   9 -
+ arch/arm/boot/dts/Makefile                         |   6 +
+ arch/arm/boot/dts/gemini-nas4220b.dts              |  68 +++++
+ arch/arm/boot/dts/gemini-rut1xx.dts                |  63 +++++
+ arch/arm/boot/dts/gemini-sq201.dts                 |  94 +++++++
+ arch/arm/boot/dts/gemini-wbd111.dts                | 101 ++++++++
+ arch/arm/boot/dts/gemini-wbd222.dts                | 101 ++++++++
+ arch/arm/boot/dts/gemini.dtsi                      |  96 +++++++
+ arch/arm/configs/gemini_defconfig                  |  63 +++++
+ arch/arm/mach-gemini/Kconfig                       |  52 +---
+ arch/arm/mach-gemini/Makefile                      |  15 +-
+ arch/arm/mach-gemini/Makefile.boot                 |   9 -
+ arch/arm/mach-gemini/board-dt.c                    |  62 +++++
+ arch/arm/mach-gemini/board-nas4220b.c              | 106 --------
+ arch/arm/mach-gemini/board-rut1xx.c                |  92 -------
+ arch/arm/mach-gemini/board-wbd111.c                | 133 ----------
+ arch/arm/mach-gemini/board-wbd222.c                | 133 ----------
+ arch/arm/mach-gemini/common.h                      |  33 ---
+ arch/arm/mach-gemini/devices.c                     | 118 ---------
+ arch/arm/mach-gemini/gpio.c                        | 231 -----------------
+ arch/arm/mach-gemini/idle.c                        |  31 ---
+ arch/arm/mach-gemini/include/mach/entry-macro.S    |  33 ---
+ arch/arm/mach-gemini/include/mach/global_reg.h     | 278 ---------------------
+ arch/arm/mach-gemini/include/mach/hardware.h       |  71 ------
+ arch/arm/mach-gemini/include/mach/irqs.h           |  53 ----
+ arch/arm/mach-gemini/include/mach/uncompress.h     |  42 ----
+ arch/arm/mach-gemini/irq.c                         | 105 --------
+ arch/arm/mach-gemini/mm.c                          |  82 ------
+ arch/arm/mach-gemini/reset.c                       |  25 --
+ drivers/clocksource/Kconfig                        |  10 +
+ drivers/clocksource/Makefile                       |   1 +
+ .../time.c => drivers/clocksource/timer-gemini.c   | 168 ++++++++-----
+ drivers/gpio/Kconfig                               |   9 +
+ drivers/gpio/Makefile                              |   1 +
+ drivers/gpio/gpio-gemini.c                         | 236 +++++++++++++++++
+ drivers/irqchip/Makefile                           |   1 +
+ drivers/irqchip/irq-gemini.c                       | 190 ++++++++++++++
+ drivers/mtd/maps/Kconfig                           |  10 +
+ drivers/mtd/maps/Makefile                          |   3 +
+ drivers/mtd/maps/physmap_of.c                      |   9 +-
+ drivers/mtd/maps/physmap_of_gemini.c               | 120 +++++++++
+ drivers/mtd/maps/physmap_of_gemini.h               |  16 ++
+ drivers/rtc/rtc-gemini.c                           |   7 +
+ 49 files changed, 1545 insertions(+), 1705 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/gemini.txt
+ create mode 100644 Documentation/devicetree/bindings/gpio/cortina,gemini-gpio.txt
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/cortina,gemini-interrupt-controller.txt
+ create mode 100644 Documentation/devicetree/bindings/mtd/cortina,gemini-flash.txt
+ create mode 100644 Documentation/devicetree/bindings/rtc/cortina,gemini.txt
+ create mode 100644 Documentation/devicetree/bindings/timer/cortina,gemini-timer.txt
+ create mode 100644 arch/arm/boot/dts/gemini-nas4220b.dts
+ create mode 100644 arch/arm/boot/dts/gemini-rut1xx.dts
+ create mode 100644 arch/arm/boot/dts/gemini-sq201.dts
+ create mode 100644 arch/arm/boot/dts/gemini-wbd111.dts
+ create mode 100644 arch/arm/boot/dts/gemini-wbd222.dts
+ create mode 100644 arch/arm/boot/dts/gemini.dtsi
+ create mode 100644 arch/arm/configs/gemini_defconfig
+ delete mode 100644 arch/arm/mach-gemini/Makefile.boot
+ create mode 100644 arch/arm/mach-gemini/board-dt.c
+ delete mode 100644 arch/arm/mach-gemini/board-nas4220b.c
+ delete mode 100644 arch/arm/mach-gemini/board-rut1xx.c
+ delete mode 100644 arch/arm/mach-gemini/board-wbd111.c
+ delete mode 100644 arch/arm/mach-gemini/board-wbd222.c
+ delete mode 100644 arch/arm/mach-gemini/common.h
+ delete mode 100644 arch/arm/mach-gemini/devices.c
+ delete mode 100644 arch/arm/mach-gemini/gpio.c
+ delete mode 100644 arch/arm/mach-gemini/idle.c
+ delete mode 100644 arch/arm/mach-gemini/include/mach/entry-macro.S
+ delete mode 100644 arch/arm/mach-gemini/include/mach/global_reg.h
+ delete mode 100644 arch/arm/mach-gemini/include/mach/hardware.h
+ delete mode 100644 arch/arm/mach-gemini/include/mach/irqs.h
+ delete mode 100644 arch/arm/mach-gemini/include/mach/uncompress.h
+ delete mode 100644 arch/arm/mach-gemini/irq.c
+ delete mode 100644 arch/arm/mach-gemini/mm.c
+ delete mode 100644 arch/arm/mach-gemini/reset.c
+ rename arch/arm/mach-gemini/time.c => drivers/clocksource/timer-gemini.c (55%)
+ create mode 100644 drivers/gpio/gpio-gemini.c
+ create mode 100644 drivers/irqchip/irq-gemini.c
+ create mode 100644 drivers/mtd/maps/physmap_of_gemini.c
+ create mode 100644 drivers/mtd/maps/physmap_of_gemini.h
+
+-- 
+2.9.3
