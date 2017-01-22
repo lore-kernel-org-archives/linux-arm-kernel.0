@@ -1,68 +1,36 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sun, 22 Jan 2017 19:10:26 +0100
-Subject: [PATCH v4 7/9] ARM64: dts: meson-gxbb-p201: fix ethernet support
+Date: Sun, 22 Jan 2017 19:10:28 +0100
+Subject: [PATCH v4 9/9] ARM64: dts: meson-gx: remove the phy-mode property
+ from meson-gx
 In-Reply-To: <20170122181028.5014-1-martin.blumenstingl@googlemail.com>
 References: <20170120152232.13943-1-martin.blumenstingl@googlemail.com>
  <20170122181028.5014-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20170122181028.5014-8-martin.blumenstingl@googlemail.com>
+Message-ID: <20170122181028.5014-10-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Amlogic's own .dts specifies that the P201 board uses a RMII PHY (with
-the reset GPIO being GPIOZ_14).
-However our P201 board .dts simply inherits the phy-mode setting from
-from meson-gx.dtsi where it defaults to RGMII mode.
-Remove all ethernet settings from meson-gxbb-p20x.dtsi as it only
-specifies the RGMII pins which are only valid for the P200 board.
-Instead we add the ethmac node to the meson-gxbb-p201.dts and configure
-the pinctrl property and the phy-mode for an RMII PHY.
-
-An MDIO node (which would also specify the PHY) is not added since we
-don't know which PHY is being used (and thus which PHY address would
-have to be used).
+The ethmac node has to be configured for each board due to different
+pinctrl nodes for RGMII/RMII. Thus the phy-mode should be specified at
+the same place (= in the board .dts), making it easier to read the board
+.dts file (because the phy-mode is stated explicitly, without requiring
+developers to read all "parent" .dtsi as well).
 
 Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Acked-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts  | 11 +++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi |  6 ------
- 2 files changed, 11 insertions(+), 6 deletions(-)
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts b/arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts
-index 39bb037a3e47..ae3194663d64 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts
-@@ -50,3 +50,14 @@
- 	compatible = "amlogic,p201", "amlogic,meson-gxbb";
- 	model = "Amlogic Meson GXBB P201 Development Board";
- };
-+
-+&ethmac {
-+	status = "okay";
-+	pinctrl-0 = <&eth_rmii_pins>;
-+	pinctrl-names = "default";
-+	phy-mode = "rmii";
-+
-+	snps,reset-gpio = <&gpio GPIOZ_14 0>;
-+	snps,reset-delays-us = <0 10000 1000000>;
-+	snps,reset-active-low;
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-index b6f9d051439c..f10e532557b1 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
-@@ -143,12 +143,6 @@
- 	};
- };
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+index 9212fca6eb94..df10d4507ca9 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+@@ -377,7 +377,6 @@
+ 			       0x0 0xc8834540 0x0 0x4>;
+ 			interrupts = <0 8 1>;
+ 			interrupt-names = "macirq";
+-			phy-mode = "rgmii";
+ 			status = "disabled";
+ 		};
  
--&ethmac {
--	status = "okay";
--	pinctrl-0 = <&eth_rgmii_pins>;
--	pinctrl-names = "default";
--};
--
- &ir {
- 	status = "okay";
- 	pinctrl-0 = <&remote_input_ao_pins>;
 -- 
 2.11.0
