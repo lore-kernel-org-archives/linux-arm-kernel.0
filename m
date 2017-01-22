@@ -1,93 +1,43 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Sun, 22 Jan 2017 10:10:59 +0800
-Subject: [PATCH v7 2/5] usb: chipidea: msm: Configure phy for appropriate
- mode
-In-Reply-To: <20170120185057.16206-3-stephen.boyd@linaro.org>
-References: <20170120185057.16206-1-stephen.boyd@linaro.org>
- <20170120185057.16206-3-stephen.boyd@linaro.org>
-Message-ID: <20170122021059.GA6522@b29397-desktop>
+From: ping.bai@nxp.com (Jacky Bai)
+Date: Sun, 22 Jan 2017 02:14:35 +0000
+Subject: [PATCH v2 04/12] driver: clk: imx: Add clock driver for imx6sll
+In-Reply-To: <20170121010009.GC8801@codeaurora.org>
+References: <1482832070-22668-1-git-send-email-ping.bai@nxp.com>
+ <1482832070-22668-5-git-send-email-ping.bai@nxp.com>
+ <20170110003753.GM17126@codeaurora.org>
+ <AM3PR04MB5307CB38AA904535AF8D80D87670@AM3PR04MB530.eurprd04.prod.outlook.com>
+ <20170112220536.GP17126@codeaurora.org>
+ <AM3PR04MB53027B627AE8CEC6D7D0D1B87780@AM3PR04MB530.eurprd04.prod.outlook.com>
+ <20170121010009.GC8801@codeaurora.org>
+Message-ID: <AM3PR04MB530CDCAC082173FDDDFEEFA87730@AM3PR04MB530.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2017 at 10:50:54AM -0800, Stephen Boyd wrote:
-> When the qcom chipidea controller is used with an extcon, we need
-> to signal device mode or host mode to the phy so it can configure
-> itself for the correct mode. This should be done after the phy is
-> powered up, so that the register writes work correctly. Add in
-> the appropriate phy_set_mode() call here.
+> > > > The reason why we enable these two clks here is in below commit
+> > > > commit
+> > > > a5120e89e7e187a91852896f586876c7a2030804
+> > > > Author: Peter Chen <peter.chen@freescale.com>
+> > > > Date:   Fri Jan 18 10:38:05 2013 +0800
+> > > >       ARM i.MX6: change mxs usbphy clock usage
+> > > >
+> > >
+> > > So can we mark these clks with CLK_IS_CRITICAL flag then instead?
+> > > Or are they disabled out of the bootloader?
+> > >
+> >
+> > Sure, using 'CLK_IS_CRITICAL'  should be ok for clks_init_on clocks.
+> > But for  USBPHY*_GATE, it is only enabled when CONIG_USB_MXC_PHY is
+> > true.  And another concern is if we need to add CLK_IS_CRITICAL flag to
+> clks_init_on clocks, we may need to add new wrapper function to register
+> these critical clock. It is not very good.
 > 
-> To signal the correct state to the qcom glue driver we need to
-> change the ci->role before we do the role switch. Make sure to
-> undo the change if the role switch fails, but otherwise update
-> the state before calling the role start function so that the glue
-> driver knows what state to configure for.
+> Ok so set the critical flag when CONFIG_USB_MXC_PHY is enabled?
+> That isn't too hard to do.
 > 
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> ---
-> 
-> Made this msm specific because of how msm handles phy powerup.
-> 
->  drivers/usb/chipidea/ci.h          | 7 +++++--
->  drivers/usb/chipidea/ci_hdrc_msm.c | 4 ++++
->  2 files changed, 9 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/usb/chipidea/ci.h b/drivers/usb/chipidea/ci.h
-> index 59e22389c10b..18348b0529af 100644
-> --- a/drivers/usb/chipidea/ci.h
-> +++ b/drivers/usb/chipidea/ci.h
-> @@ -268,6 +268,7 @@ static inline struct ci_role_driver *ci_role(struct ci_hdrc *ci)
->  static inline int ci_role_start(struct ci_hdrc *ci, enum ci_role role)
->  {
->  	int ret;
-> +	enum ci_role prev_role;
->  
->  	if (role >= CI_ROLE_END)
->  		return -EINVAL;
-> @@ -275,9 +276,11 @@ static inline int ci_role_start(struct ci_hdrc *ci, enum ci_role role)
->  	if (!ci->roles[role])
->  		return -ENXIO;
->  
-> +	prev_role = ci->role;
-> +	ci->role = role;
->  	ret = ci->roles[role]->start(ci);
-> -	if (!ret)
-> -		ci->role = role;
-> +	if (ret)
-> +		ci->role = prev_role;
->  	return ret;
 
-Sorry, this changes ci->role's life cycle. You may try to get coming
-role at your glue layer code (eg, through usbmode), or add your
-changes at ci_role_start directly if the sequence can make your requirement.
+Ok, thanks, I will address this in V3.
 
-Peter
->  }
->  
-> diff --git a/drivers/usb/chipidea/ci_hdrc_msm.c b/drivers/usb/chipidea/ci_hdrc_msm.c
-> index f1ede7909f54..9c58d13970ca 100644
-> --- a/drivers/usb/chipidea/ci_hdrc_msm.c
-> +++ b/drivers/usb/chipidea/ci_hdrc_msm.c
-> @@ -125,6 +125,10 @@ static int ci_hdrc_msm_notify_event(struct ci_hdrc *ci, unsigned event)
->  			hw_write(ci, OP_USBCMD, HSPHY_SESS_VLD_CTRL,
->  				 HSPHY_SESS_VLD_CTRL);
->  
-> +			if (ci->role == CI_ROLE_GADGET)
-> +				phy_set_mode(ci->phy, PHY_MODE_USB_DEVICE);
-> +			else if (ci->role == CI_ROLE_HOST)
-> +				phy_set_mode(ci->phy, PHY_MODE_USB_HOST);
->  		}
->  		break;
->  	case CI_HDRC_CONTROLLER_STOPPED_EVENT:
-> -- 
-> 2.10.0.297.gf6727b0
-> 
+> > 
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
--- 
-
-Best Regards,
-Peter Chen
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux
+> Foundation Collaborative Project
