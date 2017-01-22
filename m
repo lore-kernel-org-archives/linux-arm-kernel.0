@@ -1,30 +1,58 @@
-From: mzoran@crowfest.net (Michael Zoran)
-Date: Sun, 22 Jan 2017 00:07:04 -0800
-Subject: ARM64: Disabling warnings about deprecated armv8 instructions
-Message-ID: <1485072424.14066.2.camel@crowfest.net>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Sun, 22 Jan 2017 15:59:57 +0800
+Subject: [PATCH v9 0/4] arm64: arch_timer: Add workaround for
+ hisilicon-161010101 erratum
+In-Reply-To: <20170120150428.GC22152@leverpostej>
+References: <1484832916-7248-1-git-send-email-dingtianhong@huawei.com>
+ <20170120150428.GC22152@leverpostej>
+Message-ID: <8818973b-602b-e71f-a12b-3e894aa0e619@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 2017/1/20 23:04, Mark Rutland wrote:
+> On Thu, Jan 19, 2017 at 09:35:12PM +0800, Ding Tianhong wrote:
+>> Ding Tianhong (4):
+>>   arm64: arch_timer: Add device tree binding for hisilicon-161010101
+>>     erratum
+>>   arm64: arch_timer: Introduce a generic erratum handing mechanism for
+>>     fsl-a008585
+>>   arm64: arch_timer: Work around Erratum Hisilicon-161010101
+>>   arm64: arch timer: Add timer erratum property for Hip05-d02 and
+>>     Hip06-d03
+>>
+>>  Documentation/admin-guide/kernel-parameters.txt    |   9 --
+>>  Documentation/arm64/silicon-errata.txt             |  43 +++---
+>>  .../devicetree/bindings/arm/arch_timer.txt         |   6 +
+>>  arch/arm64/boot/dts/hisilicon/hip05.dtsi           |   1 +
+>>  arch/arm64/boot/dts/hisilicon/hip06.dtsi           |   1 +
+>>  arch/arm64/include/asm/arch_timer.h                |  38 ++----
+>>  drivers/clocksource/Kconfig                        |  18 +++
+>>  drivers/clocksource/arm_arch_timer.c               | 150 +++++++++++++++------
+>>  8 files changed, 171 insertions(+), 95 deletions(-)
+>
+> I've picked these up (with a few local cleanups), given that some local
+> testing, and pushed the result to a branch [1] on my git repo.
+>
+> There are likely to be clashes with the arm64 tree (e.g. for
+> silicon-errata.txt), and we're also likely to have more arch timer
+> updates shortly for the GTDT stuff,
 
-I'm not sure if this if the correct place to be asking this.   The RPI
-3 running ARM64 is slowly reaching the point of being about to
-seriously run a 32 bit vender OS like Raspbian.  When running Raspbian,
-I'm seeing a very large number(thousands) of kernel log messages about
-deprecated instructions especially setend and barrier instuctions. 
-This can be very annoying and is completely filling the kernel log.
+Yes, GTDT patches conflict with this patch set but it's easy to
+fix.
 
-I'm considering submitting a patch to add a Kconfig option to disable
-these warnings with the default being to keep the warnings enabled.  I
-was wondering if such a patch could be seriously considered.
+> so I think the best bet is for both
+> arm64 and the clocksource tree to pull that branch for v4.11.
+>
+> Alternatively, we could take this all through the arm64 tree, if the
+> clocksource maintainers are happy with that.
+>
+> Thoughts?
 
-I completely understand thee need for these warnings and the need to
-encourage people to update software, but at the same time some software
-like Raspbian needs to run on a large number of processors with a
-simple install so updating isn't always realistic.  
+GTDT patch set is adding ACPI support for arch timer, and it's
+only used for ARM64 now, in order to handler the conflict easily,
+I think take them all through arm64 tree is better (I was working
+with Fuwei for the GTDT patch set and I hope it's not blocked by
+"who will merge the code"...)
 
-Running a 64 bit kernel with a 32 bit userland is better from a upgrade
-point of view then always running 32 just because they want to not have
-the machine slowed by excessive logging.
-
-Thanks.
+Thanks
+Hanjun
