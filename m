@@ -1,11 +1,11 @@
 From: zyw@rock-chips.com (Chris Zhong)
-Date: Sun, 22 Jan 2017 16:10:36 +0800
-Subject: [PATCH v2 10/26] drm/rockchip: dw-mipi-dsi: only request HS clock
- when required
-In-Reply-To: <20170121163128.22240-11-john@metanate.com>
+Date: Sun, 22 Jan 2017 16:16:48 +0800
+Subject: [PATCH v2 11/26] drm/rockchip: dw-mipi-dsi: don't assume buffer
+ is aligned
+In-Reply-To: <20170121163128.22240-12-john@metanate.com>
 References: <20170121163128.22240-1-john@metanate.com>
- <20170121163128.22240-11-john@metanate.com>
-Message-ID: <588468FC.7030906@rock-chips.com>
+ <20170121163128.22240-12-john@metanate.com>
+Message-ID: <58846A70.5040503@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,53 +13,51 @@ Hi John
 
 Reviewed-by: Chris Zhong <zyw@rock-chips.com>
 
+
 On 01/22/2017 12:31 AM, John Keeping wrote:
-> Requesting the HS clock from the PHY before we initialize it causes an
-> invalid signal to be sent out since the input clock is not yet
-> configured.  The PHY databook suggests only asserting this signal when
-> performing HS transfers, so let's do that.
+> By dereferencing the MIPI command buffer as a u32* we rely on it being
+> correctly aligned on ARM, but this may not be the case.  Copy it into a
+> stack variable that will be correctly aligned.
 >
 > Signed-off-by: John Keeping <john@metanate.com>
 > ---
 > Unchanged in v2
 > ---
->   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 6 ++++--
->   1 file changed, 4 insertions(+), 2 deletions(-)
+>   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 12 +++++++-----
+>   1 file changed, 7 insertions(+), 5 deletions(-)
 >
 > diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> index 15d33c3c8cb7..03fc096fe1bd 100644
+> index 03fc096fe1bd..ddbc037e7ced 100644
 > --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 > +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> @@ -545,13 +545,15 @@ static int dw_mipi_dsi_host_detach(struct mipi_dsi_host *host,
->   static void dw_mipi_message_config(struct dw_mipi_dsi *dsi,
->   				   const struct mipi_dsi_msg *msg)
+> @@ -607,10 +607,10 @@ static int dw_mipi_dsi_dcs_short_write(struct dw_mipi_dsi *dsi,
+>   static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
+>   				      const struct mipi_dsi_msg *msg)
 >   {
-> +	bool lpm = msg->flags & MIPI_DSI_MSG_USE_LPM;
->   	u32 val = 0;
+> -	const u32 *tx_buf = msg->tx_buf;
+> -	int len = msg->tx_len, pld_data_bytes = sizeof(*tx_buf), ret;
+> +	const u8 *tx_buf = msg->tx_buf;
+> +	int len = msg->tx_len, pld_data_bytes = sizeof(u32), ret;
+>   	u32 hdr_val = GEN_HDATA(msg->tx_len) | GEN_HTYPE(msg->type);
+> -	u32 remainder = 0;
+> +	u32 remainder;
+>   	u32 val;
 >   
->   	if (msg->flags & MIPI_DSI_MSG_REQ_ACK)
->   		val |= EN_ACK_RQST;
-> -	if (msg->flags & MIPI_DSI_MSG_USE_LPM)
-> +	if (lpm)
->   		val |= CMD_MODE_ALL_LP;
+>   	if (msg->tx_len < 3) {
+> @@ -621,12 +621,14 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
 >   
-> +	dsi_write(dsi, DSI_LPCLK_CTRL, lpm ? 0 : PHY_TXREQUESTCLKHS);
->   	dsi_write(dsi, DSI_CMD_MODE_CFG, val);
->   }
+>   	while (DIV_ROUND_UP(len, pld_data_bytes)) {
+>   		if (len < pld_data_bytes) {
+> +			remainder = 0;
+>   			memcpy(&remainder, tx_buf, len);
+>   			dsi_write(dsi, DSI_GEN_PLD_DATA, remainder);
+>   			len = 0;
+>   		} else {
+> -			dsi_write(dsi, DSI_GEN_PLD_DATA, *tx_buf);
+> -			tx_buf++;
+> +			memcpy(&remainder, tx_buf, pld_data_bytes);
+> +			dsi_write(dsi, DSI_GEN_PLD_DATA, remainder);
+> +			tx_buf += pld_data_bytes;
+>   			len -= pld_data_bytes;
+>   		}
 >   
-> @@ -693,6 +695,7 @@ static void dw_mipi_dsi_set_mode(struct dw_mipi_dsi *dsi,
->   		dsi_write(dsi, DSI_PWR_UP, RESET);
->   		dsi_write(dsi, DSI_MODE_CFG, ENABLE_VIDEO_MODE);
->   		dw_mipi_dsi_video_mode_config(dsi);
-> +		dsi_write(dsi, DSI_LPCLK_CTRL, PHY_TXREQUESTCLKHS);
->   		dsi_write(dsi, DSI_PWR_UP, POWERUP);
->   	}
->   }
-> @@ -710,7 +713,6 @@ static void dw_mipi_dsi_init(struct dw_mipi_dsi *dsi)
->   		  | PHY_RSTZ | PHY_SHUTDOWNZ);
->   	dsi_write(dsi, DSI_CLKMGR_CFG, TO_CLK_DIVIDSION(10) |
->   		  TX_ESC_CLK_DIVIDSION(7));
-> -	dsi_write(dsi, DSI_LPCLK_CTRL, PHY_TXREQUESTCLKHS);
->   }
->   
->   static void dw_mipi_dsi_dpi_config(struct dw_mipi_dsi *dsi,
