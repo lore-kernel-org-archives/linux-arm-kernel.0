@@ -1,68 +1,118 @@
 From: afzal.mohd.ma@gmail.com (afzal mohammed)
-Date: Sun, 22 Jan 2017 08:46:52 +0530
-Subject: [PATCH v2 0/4] ARM: v7-A !MMU support,
- prepare CONFIG_VECTORS_BASE removal
-Message-ID: <20170122031652.13074-1-afzal.mohd.ma@gmail.com>
+Date: Sun, 22 Jan 2017 08:49:47 +0530
+Subject: [PATCH v2 1/4] ARM: mmu: decouple VECTORS_BASE from Kconfig
+In-Reply-To: <20170122031652.13074-1-afzal.mohd.ma@gmail.com>
+References: <20170122031652.13074-1-afzal.mohd.ma@gmail.com>
+Message-ID: <20170122031947.13242-1-afzal.mohd.ma@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+For MMU configurations, VECTORS_BASE is always 0xffff0000, a macro
+definition will suffice.
 
-ARM core changes to support !MMU Kernel on v7-A MMU processors. This
-series also does the preparation for CONFIG_VECTORS_BASE removal.
+For no-MMU, exception base address is dynamically determined in
+subsequent patches. To preserve bisectability, now make the
+macro applicable for no-MMU scenario too.
 
-Based on the feedback from Russell, it was decided to handle vector
-base dynamically in C for no-MMU & work towards the the goal of
-removing VECTORS_BASE from Kconfig. MMU platform's always have
-exception base address at 0xffff0000, hence a macro was defined and
-it was decoupled from Kconfig. No-MMU CP15 scenario is handled
-dynamically in C. Once vector region setup, used by Cortex-R, is
-made devoid of VECTORS_BASE, it can be removed from Kconfig.
+Thanks to 0-DAY kernel test infrastructure that found the
+bisectability issue. This macro will be restricted to MMU case upon
+dynamically determining exception base address for no-MMU.
 
-This series has been verified over current mainline plus [2] on
-Vybrid Cosmic+, Cortex-M4 - !MMU Kernel and Cortex-A5 - MMU Kernel.
+Once exception address is handled dynamically for no-MMU,
+VECTORS_BASE can be removed from Kconfig.
 
-This series also has been verified over Vladimir's series plus [2] on
-1. Vybrid Cosmic+
- a. Cortex-M4 !MMU Kernel
- b. Cortex-A5 MMU Kernel
- c. Cortex-A5 !MMU Kernel
-2. AM437x IDK
- a. Cortex-A9 MMU Kernel
- b. Cortex-A9 !MMU Kernel
+Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: afzal mohammed <afzal.mohd.ma@gmail.com>
+---
 
-Regards
-afzal
+v2: 
+ Fix bisectability issue on !MMU builds
+ UL suffix on VECTORS_BASE definition
 
+ arch/arm/include/asm/memory.h  | 2 ++
+ arch/arm/mach-berlin/platsmp.c | 3 ++-
+ arch/arm/mm/dump.c             | 5 +++--
+ arch/arm/mm/init.c             | 4 ++--
+ 4 files changed, 9 insertions(+), 5 deletions(-)
 
-v2:
-=> Fix bisectability issue on !MMU builds
-=> UL suffix on VECTORS_BASE definition
-=> Use existing helpers to detect security extensions
-=> Rewrite a CPP step to C for readability
-
-[1] "[RFC v2 PATCH 00/23] Allow NOMMU for MULTIPLATFORM",
-    http://lists.infradead.org/pipermail/linux-arm-kernel/2016-November/470966.html
-    (git://linux-arm.org/linux-vm.git nommu-rfc-v2)
-
-[2] "[PATCH 1/2] ARM: nommu: allow enabling REMAP_VECTORS_TO_RAM"
-    http://lists.infradead.org/pipermail/linux-arm-kernel/2016-December/473593.html
-    (in -next)
-
-afzal mohammed (4):
-  ARM: mmu: decouple VECTORS_BASE from Kconfig
-  ARM: nommu: dynamic exception base address setting
-  ARM: nommu: display vectors base
-  ARM: nommu: remove Hivecs configuration is asm
-
- arch/arm/include/asm/memory.h  |  2 ++
- arch/arm/kernel/head-nommu.S   |  5 ----
- arch/arm/mach-berlin/platsmp.c |  3 ++-
- arch/arm/mm/dump.c             |  5 ++--
- arch/arm/mm/init.c             |  9 ++++++--
- arch/arm/mm/mm.h               |  5 ++--
- arch/arm/mm/nommu.c            | 52 ++++++++++++++++++++++++++++++++++++++++--
- 7 files changed, 67 insertions(+), 14 deletions(-)
-
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 76cbd9c674df..0b5416fe7709 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -111,6 +111,8 @@
+ 
+ #endif /* !CONFIG_MMU */
+ 
++#define VECTORS_BASE		UL(0xffff0000)
++
+ /*
+  * We fix the TCM memories max 32 KiB ITCM resp DTCM at these
+  * locations
+diff --git a/arch/arm/mach-berlin/platsmp.c b/arch/arm/mach-berlin/platsmp.c
+index 93f90688db18..578d41031abf 100644
+--- a/arch/arm/mach-berlin/platsmp.c
++++ b/arch/arm/mach-berlin/platsmp.c
+@@ -15,6 +15,7 @@
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/cp15.h>
++#include <asm/memory.h>
+ #include <asm/smp_plat.h>
+ #include <asm/smp_scu.h>
+ 
+@@ -75,7 +76,7 @@ static void __init berlin_smp_prepare_cpus(unsigned int max_cpus)
+ 	if (!cpu_ctrl)
+ 		goto unmap_scu;
+ 
+-	vectors_base = ioremap(CONFIG_VECTORS_BASE, SZ_32K);
++	vectors_base = ioremap(VECTORS_BASE, SZ_32K);
+ 	if (!vectors_base)
+ 		goto unmap_scu;
+ 
+diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
+index 9fe8e241335c..21192d6eda40 100644
+--- a/arch/arm/mm/dump.c
++++ b/arch/arm/mm/dump.c
+@@ -18,6 +18,7 @@
+ #include <linux/seq_file.h>
+ 
+ #include <asm/fixmap.h>
++#include <asm/memory.h>
+ #include <asm/pgtable.h>
+ 
+ struct addr_marker {
+@@ -31,8 +32,8 @@ static struct addr_marker address_markers[] = {
+ 	{ 0,			"vmalloc() Area" },
+ 	{ VMALLOC_END,		"vmalloc() End" },
+ 	{ FIXADDR_START,	"Fixmap Area" },
+-	{ CONFIG_VECTORS_BASE,	"Vectors" },
+-	{ CONFIG_VECTORS_BASE + PAGE_SIZE * 2, "Vectors End" },
++	{ VECTORS_BASE,	"Vectors" },
++	{ VECTORS_BASE + PAGE_SIZE * 2, "Vectors End" },
+ 	{ -1,			NULL },
+ };
+ 
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 370581aeb871..823e119a5daa 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -27,6 +27,7 @@
+ #include <asm/cp15.h>
+ #include <asm/mach-types.h>
+ #include <asm/memblock.h>
++#include <asm/memory.h>
+ #include <asm/prom.h>
+ #include <asm/sections.h>
+ #include <asm/setup.h>
+@@ -521,8 +522,7 @@ void __init mem_init(void)
+ 			"      .data : 0x%p" " - 0x%p" "   (%4td kB)\n"
+ 			"       .bss : 0x%p" " - 0x%p" "   (%4td kB)\n",
+ 
+-			MLK(UL(CONFIG_VECTORS_BASE), UL(CONFIG_VECTORS_BASE) +
+-				(PAGE_SIZE)),
++			MLK(VECTORS_BASE, VECTORS_BASE + PAGE_SIZE),
+ #ifdef CONFIG_HAVE_TCM
+ 			MLK(DTCM_OFFSET, (unsigned long) dtcm_end),
+ 			MLK(ITCM_OFFSET, (unsigned long) itcm_end),
 -- 
 2.11.0
