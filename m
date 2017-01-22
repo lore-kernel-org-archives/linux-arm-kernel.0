@@ -1,56 +1,49 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Sun, 22 Jan 2017 17:05:23 +0800
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sun, 22 Jan 2017 09:09:37 +0000
 Subject: ARM64: Disabling warnings about deprecated armv8 instructions
 In-Reply-To: <1485075528.14345.1.camel@crowfest.net>
 References: <1485072424.14066.2.camel@crowfest.net>
- <9647813.NZ2c5cYUSH@localhost>	<1485075528.14345.1.camel@crowfest.net>
-Message-ID: <20170122170523.3b4b1235@xhacker>
+ <9647813.NZ2c5cYUSH@localhost>
+ <1485075528.14345.1.camel@crowfest.net>
+Message-ID: <CAKv+Gu8LU3QjrUa6wMJF3WBNrhx34Pi_0ZUQVfrZy7w7y7237w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 22 Jan 2017 00:58:48 -0800 Michael Zoran wrote:
-
+On 22 January 2017 at 08:58, Michael Zoran <mzoran@crowfest.net> wrote:
 > On Sun, 2017-01-22 at 09:52 +0100, Alexander Stein wrote:
-> > Hi Michael,
-> > 
-> > On Sunday, January 22, 2017, 12:07:04 AM CET Michael Zoran wrote:  
-> > > I'm not sure if this if the correct place to be asking this.???The
-> > > RPI
-> > > 3 running ARM64 is slowly reaching the point of being about to
-> > > seriously run a 32 bit vender OS like Raspbian.??When running
-> > > Raspbian,
-> > > I'm seeing a very large number(thousands) of kernel log messages
-> > > about
-> > > deprecated instructions especially setend and barrier instuctions.
-> > > This can be very annoying and is completely filling the kernel log.
-> > > 
-> > > I'm considering submitting a patch to add a Kconfig option to
-> > > disable
-> > > these warnings with the default being to keep the warnings
-> > > enabled.??I
-> > > was wondering if such a patch could be seriously considered.  
-> > 
-> > Could you please provide an example of those warning an what is
-> > trigging?
-> > those?
-> > 
-> > Thanks and best regards,
-> > Alexander  
-> 
+>> Hi Michael,
+>>
+>> On Sunday, January 22, 2017, 12:07:04 AM CET Michael Zoran wrote:
+>> > I'm not sure if this if the correct place to be asking this.   The
+>> > RPI
+>> > 3 running ARM64 is slowly reaching the point of being about to
+>> > seriously run a 32 bit vender OS like Raspbian.  When running
+>> > Raspbian,
+>> > I'm seeing a very large number(thousands) of kernel log messages
+>> > about
+>> > deprecated instructions especially setend and barrier instuctions.
+>> > This can be very annoying and is completely filling the kernel log.
+>> >
+>> > I'm considering submitting a patch to add a Kconfig option to
+>> > disable
+>> > these warnings with the default being to keep the warnings
+>> > enabled.  I
+>> > was wondering if such a patch could be seriously considered.
+>>
+>> Could you please provide an example of those warning an what is
+>> trigging
+>> those?
+>>
+>> Thanks and best regards,
+>> Alexander
+>
 > Sure, here is a snipped from dmesg.  I think this is happening because
 > the entire Raspbian OS is compiled with a custom gcc compiler that is
 > targeting arm6+VFP.
-
-IMHO, this is the root cause. I didn't see below warnings from dmesg with
-armhf debian and ubuntu If the underlying HW is armv8 compatible, it
-doesn't make sense to target the compiler to armv6
-
-Thanks
-
-> 
-> I can double check, but I think the instructions are being emulated in 
+>
+> I can double check, but I think the instructions are being emulated in
 > hardware so they are just filling the log and slowing things down.
-> 
+>
 > [10685.558480] cp15barrier_handler: 197896 callbacks suppressed
 > [10685.558487] "Xorg" (656) uses deprecated CP15 Barrier instruction at
 > 0xf707fe9c
@@ -93,9 +86,9 @@ Thanks
 > instruction at 0xf76a66f4
 > [10685.559276] "systemd-journal" (138) uses deprecated setend
 > instruction at 0xf76a6bd8
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+
+You can disable the emulation by doing
+
+echo 2 >/proc/sys/abi/setend
+echo 2 >/proc/sys/abi/cp15_barrier
