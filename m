@@ -1,12 +1,12 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 22 Jan 2017 13:23:03 +0100
-Subject: [PATCH 15/22] ARM: dts: add a devicetree for Teltonika RUT1xx
-Message-ID: <20170122122303.10813-1-linus.walleij@linaro.org>
+Date: Sun, 22 Jan 2017 13:23:11 +0100
+Subject: [PATCH 16/22] ARM: dts: add a devicetree for Wiliboard WBD-111
+Message-ID: <20170122122311.10862-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This devicetree is simply based on the board file in
-arch/arm/mach-gemini/board-rut1xx.c and contain the
+arch/arm/mach-gemini/board-wbd111.c and contain the
 equivalent platform data, mainly just moving the GPIOs
 from the global numberspace to explicitly reference their
 parent GPIO.
@@ -17,31 +17,33 @@ Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
 Cc: Florian Fainelli <f.fainelli@gmail.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/Makefile          |  1 +
- arch/arm/boot/dts/gemini-rut1xx.dts | 63 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 64 insertions(+)
- create mode 100644 arch/arm/boot/dts/gemini-rut1xx.dts
+ arch/arm/boot/dts/Makefile          |   3 +-
+ arch/arm/boot/dts/gemini-wbd111.dts | 101 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 103 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/gemini-wbd111.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index fb141e11f8ed..517306f28427 100644
+index 517306f28427..144584a83582 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -170,6 +170,7 @@ dtb-$(CONFIG_ARCH_EXYNOS5) += \
- 	exynos5800-peach-pi.dtb
+@@ -171,7 +171,8 @@ dtb-$(CONFIG_ARCH_EXYNOS5) += \
  dtb-$(CONFIG_ARCH_GEMINI) += \
  	gemini-nas4220b.dtb \
-+	gemini-rut1xx.dtb \
- 	gemini-sq201.dtb
+ 	gemini-rut1xx.dtb \
+-	gemini-sq201.dtb
++	gemini-sq201.dtb \
++	gemini-wbd111.dtb
  dtb-$(CONFIG_ARCH_HI3xxx) += \
  	hi3620-hi4511.dtb
-diff --git a/arch/arm/boot/dts/gemini-rut1xx.dts b/arch/arm/boot/dts/gemini-rut1xx.dts
+ dtb-$(CONFIG_ARCH_HIGHBANK) += \
+diff --git a/arch/arm/boot/dts/gemini-wbd111.dts b/arch/arm/boot/dts/gemini-wbd111.dts
 new file mode 100644
-index 000000000000..4807974bbf22
+index 000000000000..d54df914593b
 --- /dev/null
-+++ b/arch/arm/boot/dts/gemini-rut1xx.dts
-@@ -0,0 +1,63 @@
++++ b/arch/arm/boot/dts/gemini-wbd111.dts
+@@ -0,0 +1,101 @@
 +/*
-+ * Device Tree file for Teltonika RUT1xx
++ * Device Tree file for Wiliboard WBD-111
 + */
 +
 +/dts-v1/;
@@ -50,8 +52,8 @@ index 000000000000..4807974bbf22
 +#include <dt-bindings/input/input.h>
 +
 +/ {
-+	model = "Teltonika RUT1xx";
-+	compatible = "teltonika,rut1xx", "cortina,gemini";
++	model = "Wiliboard WBD-111";
++	compatible = "wiliboard,wbd111", "cortina,gemini";
 +	#address-cells = <1>;
 +	#size-cells = <1>;
 +
@@ -70,28 +72,37 @@ index 000000000000..4807974bbf22
 +		#address-cells = <1>;
 +		#size-cells = <0>;
 +
-+		button at 28 {
++		button at 5 {
 +			debounce_interval = <50>;
 +			wakeup-source;
 +			linux,code = <KEY_SETUP>;
-+			label = "Reset to defaults";
-+			gpios = <&gpio1 28 GPIO_ACTIVE_LOW>;
++			label = "reset";
++			gpios = <&gpio0 5 GPIO_ACTIVE_LOW>;
 +		};
 +	};
 +
 +	leds {
 +		compatible = "gpio-leds";
-+		led at 7 {
-+			/* FIXME: add the LED color */
-+			label = "rut1xx::gsm";
-+			gpios = <&gpio0 7 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+		};
-+		led at 31 {
-+			/* FIXME: add the LED color */
-+			label = "rut1xx::power";
-+			gpios = <&gpio0 17 GPIO_ACTIVE_HIGH>;
++
++		led at 1 {
++			label = "wbd111:red:L3";
++			gpios = <&gpio0 1 GPIO_ACTIVE_HIGH>;
 +			default-state = "off";
++		};
++		led at 2 {
++			label = "wbd111:green:L4";
++			gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++		};
++		led at 3 {
++			label = "wbd111:red:L4";
++			gpios = <&gpio0 3 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++		};
++		led at 5 {
++			label = "wbd111:green:L3";
++			gpios = <&gpio0 5 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
 +			linux,default-trigger = "heartbeat";
 +		};
 +	};
@@ -100,7 +111,36 @@ index 000000000000..4807974bbf22
 +		status = "okay";
 +		/* 8MB of flash */
 +		reg = <0x30000000 0x00800000>;
-+		/* TODO: add flash partitions here */
++
++		/* FIXME */
++		partition at 0 {
++			label = "RedBoot";
++			reg = <0x00000000 0x00020000>;
++			read-only;
++		};
++		partition at 20000 {
++			label = "kernel";
++			reg = <0x00020000 0x00100000>;
++		};
++		partition at 120000 {
++			label = "rootfs";
++			reg = <0x00120000 0x006a0000>;
++		};
++		partition at 7c0000 {
++			label = "VCTL";
++			reg = <0x007c0000 0x00010000>;
++			read-only;
++		};
++		partition at 7d0000 {
++			label = "cfg";
++			reg = <0x007d0000 0x00010000>;
++			read-only;
++		};
++		partition at 7e0000 {
++			label = "FIS";
++			reg = <0x007e0000 0x00010000>;
++			read-only;
++		};
 +	};
 +};
 -- 
