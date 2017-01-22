@@ -1,45 +1,43 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Sun, 22 Jan 2017 18:07:38 +0800
-Subject: [PATCH v2 17/26] drm/rockchip: dw-mipi-dsi: don't enable PHY PLL
- until it's configured
-In-Reply-To: <20170121163128.22240-18-john@metanate.com>
-References: <20170121163128.22240-1-john@metanate.com>
- <20170121163128.22240-18-john@metanate.com>
-Message-ID: <5884846A.7040200@rock-chips.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sun, 22 Jan 2017 11:25:26 +0100
+Subject: [PATCH v3 01/15] ARM: pxa: Don't rely on public mmc header to
+ include leds.h
+In-Reply-To: <87a8aleda2.fsf@belgarion.home> (Robert Jarzmik's message of
+ "Fri, 20 Jan 2017 20:34:29 +0100")
+References: <1484313256-25993-1-git-send-email-ulf.hansson@linaro.org>
+ <1484313256-25993-2-git-send-email-ulf.hansson@linaro.org>
+ <87efzydusi.fsf@belgarion.home>
+ <CAPDyKFo=tUu9D5zZnUME_+HFBPEnnjy2taTdFLO9H6jSSgKc5A@mail.gmail.com>
+ <87a8aleda2.fsf@belgarion.home>
+Message-ID: <87y3y3crxl.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi John
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-This patch do the similar thing with 
-https://patchwork.kernel.org/patch/9530405/
-They are changing the phy configuration order, my suggestion is to merge 
-them.
-
-
-On 01/22/2017 12:31 AM, John Keeping wrote:
-> Signed-off-by: John Keeping <john@metanate.com>
-> ---
-> Unchanged in v2
-> ---
->   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
+> Ulf Hansson <ulf.hansson@linaro.org> writes:
 >
-> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> index ce1e6f9a2041..cfe7e4ba305c 100644
-> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> @@ -413,12 +413,12 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
->   
->   	dw_mipi_dsi_phy_write(dsi, 0x44, HSFREQRANGE_SEL(testdin));
->   
-> -	dw_mipi_dsi_phy_write(dsi, 0x19, PLL_LOOP_DIV_EN | PLL_INPUT_DIV_EN);
->   	dw_mipi_dsi_phy_write(dsi, 0x17, INPUT_DIVIDER(dsi->input_div));
->   	dw_mipi_dsi_phy_write(dsi, 0x18, LOOP_DIV_LOW_SEL(dsi->feedback_div) |
->   					 LOW_PROGRAM_EN);
->   	dw_mipi_dsi_phy_write(dsi, 0x18, LOOP_DIV_HIGH_SEL(dsi->feedback_div) |
->   					 HIGH_PROGRAM_EN);
-> +	dw_mipi_dsi_phy_write(dsi, 0x19, PLL_LOOP_DIV_EN | PLL_INPUT_DIV_EN);
->   
->   	dw_mipi_dsi_phy_write(dsi, 0x22, LOW_PROGRAM_EN |
->   					 BIASEXTR_SEL(BIASEXTR_127_7));
+>> On 20 January 2017 at 09:01, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+>>> Ulf Hansson <ulf.hansson@linaro.org> writes:
+>>> So I was wondering how you made the choice of which files you add the include to
+>>> and which you don't touch ?
+>>
+>> By building the pxa_defconfig, see what errors it reports and then fix them.
+>>
+>> Isn't pxa_defconfig building all the variants?
+> Euh actually it should, but it's not.
+
+And actually thanks to a suggestion from Russell to improve my search line, I
+came up with the command line bellow, and perhaps you could fix the others with
+one command line and respin the patch ?
+
+Here it is :
+
+for f in $(grep -l _led arch/arm/mach-pxa/*.c | xargs grep -L linux/leds.h); do
+sed -i '0,/^#include <linux\/[l-m].*>$/{s/\(#include <linux\/[l-m].*\)/#include
+<linux\/leds.h>\n\1/}' $f; done
+
+Cheers.
+
+-- 
+Robert
