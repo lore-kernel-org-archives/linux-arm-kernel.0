@@ -1,63 +1,56 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Sun, 22 Jan 2017 16:16:48 +0800
-Subject: [PATCH v2 11/26] drm/rockchip: dw-mipi-dsi: don't assume buffer
- is aligned
-In-Reply-To: <20170121163128.22240-12-john@metanate.com>
-References: <20170121163128.22240-1-john@metanate.com>
- <20170121163128.22240-12-john@metanate.com>
-Message-ID: <58846A70.5040503@rock-chips.com>
+From: baoyou.xie@linaro.org (Baoyou Xie)
+Date: Sun, 22 Jan 2017 16:16:46 +0800
+Subject: [PATCH v4 1/3] dt: bindings: add documentation for zx2967 family
+ watchdog controller
+Message-ID: <1485073008-26699-1-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi John
+This patch adds dt-binding documentation for zx2967 family
+watchdog controller.
 
-Reviewed-by: Chris Zhong <zyw@rock-chips.com>
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+---
+ .../bindings/watchdog/zte,zx2967-wdt.txt           | 31 ++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/zte,zx2967-wdt.txt
 
-
-On 01/22/2017 12:31 AM, John Keeping wrote:
-> By dereferencing the MIPI command buffer as a u32* we rely on it being
-> correctly aligned on ARM, but this may not be the case.  Copy it into a
-> stack variable that will be correctly aligned.
->
-> Signed-off-by: John Keeping <john@metanate.com>
-> ---
-> Unchanged in v2
-> ---
->   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 12 +++++++-----
->   1 file changed, 7 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> index 03fc096fe1bd..ddbc037e7ced 100644
-> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> @@ -607,10 +607,10 @@ static int dw_mipi_dsi_dcs_short_write(struct dw_mipi_dsi *dsi,
->   static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
->   				      const struct mipi_dsi_msg *msg)
->   {
-> -	const u32 *tx_buf = msg->tx_buf;
-> -	int len = msg->tx_len, pld_data_bytes = sizeof(*tx_buf), ret;
-> +	const u8 *tx_buf = msg->tx_buf;
-> +	int len = msg->tx_len, pld_data_bytes = sizeof(u32), ret;
->   	u32 hdr_val = GEN_HDATA(msg->tx_len) | GEN_HTYPE(msg->type);
-> -	u32 remainder = 0;
-> +	u32 remainder;
->   	u32 val;
->   
->   	if (msg->tx_len < 3) {
-> @@ -621,12 +621,14 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
->   
->   	while (DIV_ROUND_UP(len, pld_data_bytes)) {
->   		if (len < pld_data_bytes) {
-> +			remainder = 0;
->   			memcpy(&remainder, tx_buf, len);
->   			dsi_write(dsi, DSI_GEN_PLD_DATA, remainder);
->   			len = 0;
->   		} else {
-> -			dsi_write(dsi, DSI_GEN_PLD_DATA, *tx_buf);
-> -			tx_buf++;
-> +			memcpy(&remainder, tx_buf, pld_data_bytes);
-> +			dsi_write(dsi, DSI_GEN_PLD_DATA, remainder);
-> +			tx_buf += pld_data_bytes;
->   			len -= pld_data_bytes;
->   		}
->   
+diff --git a/Documentation/devicetree/bindings/watchdog/zte,zx2967-wdt.txt b/Documentation/devicetree/bindings/watchdog/zte,zx2967-wdt.txt
+new file mode 100644
+index 0000000..772403a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/watchdog/zte,zx2967-wdt.txt
+@@ -0,0 +1,31 @@
++ZTE zx2967 Watchdog timer
++
++Required properties:
++
++- compatible : should be one of the following.
++       * zte,zx296718-wdt
++- reg : Specifies base physical address and size of the registers.
++- clocks : Pairs of phandle and specifier referencing the controller's clocks.
++- resets : Reference to the reset controller controlling the watchdog
++           controller.
++
++Optional properties:
++
++- zte,wdt-reset-sysctrl : Directs how to reset system by the watchdog.
++	if we don't want to restart system when watchdog been triggered,
++	it's not required, vice versa.
++	It should include following fields.
++	  * phandle of aon-sysctrl.
++	  * offset of register that be written, should be 0xb0.
++	  * configure value that be written to aon-sysctrl.
++	  * bit mask, corresponding bits will be affected.
++
++Example:
++
++wdt: watchdog at 1465000 {
++	compatible = "zte,zx296718-wdt";
++	reg = <0x1465000 0x1000>;
++	clocks = <&topcrm WDT_WCLK>;
++	resets = <&toprst 35>;
++	zte,wdt-reset-sysctrl = <&aon_sysctrl 0xb0 1 0x115>;
++};
+-- 
+2.7.4
