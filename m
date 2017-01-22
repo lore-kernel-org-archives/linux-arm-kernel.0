@@ -1,79 +1,93 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun, 22 Jan 2017 09:43:20 +0000
+From: mzoran@crowfest.net (Michael Zoran)
+Date: Sun, 22 Jan 2017 01:49:03 -0800
 Subject: ARM64: Disabling warnings about deprecated armv8 instructions
-In-Reply-To: <1485077887.1308.2.camel@crowfest.net>
+In-Reply-To: <CAKv+Gu-fPg50LE0N=GPisq=YSV6TDAOQTG2f6DNPU7sGHZf8Kg@mail.gmail.com>
 References: <1485072424.14066.2.camel@crowfest.net>
- <9647813.NZ2c5cYUSH@localhost>
- <1485075528.14345.1.camel@crowfest.net> <20170122170523.3b4b1235@xhacker>
- <1485077887.1308.2.camel@crowfest.net>
-Message-ID: <CAKv+Gu9gBPenhOBj9G7rrqi3h_oMi3X7qpmsK+SB1dgBtzfKTg@mail.gmail.com>
+ <9647813.NZ2c5cYUSH@localhost> <1485075528.14345.1.camel@crowfest.net>
+ <CAKv+Gu8LU3QjrUa6wMJF3WBNrhx34Pi_0ZUQVfrZy7w7y7237w@mail.gmail.com>
+ <1485077630.1308.0.camel@crowfest.net>
+ <CAKv+Gu-fPg50LE0N=GPisq=YSV6TDAOQTG2f6DNPU7sGHZf8Kg@mail.gmail.com>
+Message-ID: <1485078543.1308.4.camel@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 January 2017 at 09:38, Michael Zoran <mzoran@crowfest.net> wrote:
-> On Sun, 2017-01-22 at 17:05 +0800, Jisheng Zhang wrote:
->> On Sun, 22 Jan 2017 00:58:48 -0800 Michael Zoran wrote:
->>
->> > On Sun, 2017-01-22 at 09:52 +0100, Alexander Stein wrote:
->> > > Hi Michael,
->> > >
->> > > On Sunday, January 22, 2017, 12:07:04 AM CET Michael Zoran
->> > > wrote:
->> > > > I'm not sure if this if the correct place to be asking
->> > > > this.   The
->> > > > RPI
->> > > > 3 running ARM64 is slowly reaching the point of being about to
->> > > > seriously run a 32 bit vender OS like Raspbian.  When running
->> > > > Raspbian,
->> > > > I'm seeing a very large number(thousands) of kernel log
->> > > > messages
->> > > > about
->> > > > deprecated instructions especially setend and barrier
->> > > > instuctions.
->> > > > This can be very annoying and is completely filling the kernel
->> > > > log.
->> > > >
->> > > > I'm considering submitting a patch to add a Kconfig option to
->> > > > disable
->> > > > these warnings with the default being to keep the warnings
->> > > > enabled.  I
->> > > > was wondering if such a patch could be seriously considered.
->> > >
->> > > Could you please provide an example of those warning an what is
->> > > trigging
->> > > those?
->> > >
->> > > Thanks and best regards,
->> > > Alexander
->> >
->> > Sure, here is a snipped from dmesg.  I think this is happening
->> > because
->> > the entire Raspbian OS is compiled with a custom gcc compiler that
->> > is
->> > targeting arm6+VFP.
->>
->> IMHO, this is the root cause. I didn't see below warnings from dmesg
->> with
->> armhf debian and ubuntu If the underlying HW is armv8 compatible, it
->> doesn't make sense to target the compiler to armv6
->>
->>
->
-> Advanced users can install a different OS. Beginners can't and will
-> need a single OS image for simple install.
->
+On Sun, 2017-01-22 at 09:36 +0000, Ard Biesheuvel wrote:
+> On 22 January 2017 at 09:33, Michael Zoran <mzoran@crowfest.net>
+> wrote:
+> > On Sun, 2017-01-22 at 09:09 +0000, Ard Biesheuvel wrote:
+> > > On 22 January 2017 at 08:58, Michael Zoran <mzoran@crowfest.net>
+> > > wrote:
+> > > > On Sun, 2017-01-22 at 09:52 +0100, Alexander Stein wrote:
+> > > > > Hi Michael,
+> > > > > 
+> > > > > On Sunday, January 22, 2017, 12:07:04 AM CET Michael Zoran
+> > > > > wrote:
+> > > > > > I'm not sure if this if the correct place to be asking
+> > > > > > this.???The
+> > > > > > RPI
+> > > > > > 3 running ARM64 is slowly reaching the point of being about
+> > > > > > to
+> > > > > > seriously run a 32 bit vender OS like Raspbian.??When
+> > > > > > running
+> > > > > > Raspbian,
+> > > > > > I'm seeing a very large number(thousands) of kernel log
+> > > > > > messages
+> > > > > > about
+> > > > > > deprecated instructions especially setend and barrier
+> > > > > > instuctions.
+> > > > > > This can be very annoying and is completely filling the
+> > > > > > kernel
+> > > > > > log.
+> > > > > > 
+> > > > > > I'm considering submitting a patch to add a Kconfig option
+> > > > > > to
+> > > > > > disable
+> > > > > > these warnings with the default being to keep the warnings
+> > > > > > enabled.??I
+> > > > > > was wondering if such a patch could be seriously
+> > > > > > considered.
+> > > > > 
+> > > > > Could you please provide an example of those warning an what
+> > > > > is
+> > > > > trigging
+> > > > > those?
+> > > > > 
+> > > > > Thanks and best regards,
+> > > > > Alexander
+> > > > 
+> > > > Sure, here is a snipped from dmesg.??I think this is happening
+> > > > because
+> > > > the entire Raspbian OS is compiled with a custom gcc compiler
+> > > > that
+> > > > is
+> > > > targeting arm6+VFP.
+> > > > 
+> > > > I can double check, but I think the instructions are being
+> > > > emulated
+> > > > in
+> > > > hardware so they are just filling the log and slowing things
+> > > > down.
+> > > > 
+> > > 
+> > > You can disable the emulation by doing
+> > > 
+> > > echo 2 >/proc/sys/abi/setend
+> > > echo 2 >/proc/sys/abi/cp15_barrier
+> > 
+> > I don't want to disable the emulation since I want to run old
+> > binaries.
+> > ???I just want to disable the warning...
+> > 
+> 
+> That is exactly what this does: the A53 can execute these
+> instructions
+> just fine, but due to the fact that they are deprecated by the
+> architecture, they are trapped and emulated by default.
 
-That single OS image can simply test for the presence of
-/proc/sys/abi, and perform the writes if it is there.
+OK, now I understand.
 
-> Does anybody know if these instructions are detected at runtime?
+Sounds like what I want is to turn on hardware emulation when running
+old binaries since collecting data is pointless.  That's kind of part
+of the hardware spoofing I'm looking into.  
 
-What do you mean by 'detected'?
-
-> I'm
-> also looking into an issue with Mathmatica due to broken OS detection.
-> It appears that arm64 is currently missing some of the CPU spoofing
-> that happens on other architectures...
->
-
-Could you elaborate? What do you think should be there that isn't?
+Alot of this seems to be missing on arm64.
