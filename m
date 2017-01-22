@@ -1,31 +1,40 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Sun, 22 Jan 2017 16:41:28 +0000
-Subject: [PATCH -next] ARM: 8641/1: treewide: fix error return code in
- hip04_smp_init()
-Message-ID: <20170122164128.29381-1-weiyj.lk@gmail.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Sun, 22 Jan 2017 17:48:25 +0100
+Subject: [PATCH v3 2/9] ARM64: dts: meson-gxbb-p200: add the ethernet
+ PHY's reset GPIO
+In-Reply-To: <20170120174658.GG25907@lunn.ch>
+References: <20170120132650.9784-1-martin.blumenstingl@googlemail.com>
+ <20170120152232.13943-1-martin.blumenstingl@googlemail.com>
+ <20170120152232.13943-3-martin.blumenstingl@googlemail.com>
+ <20170120162138.GE25907@lunn.ch>
+ <CAFBinCA47Nng_jjxKrWrV_YBHr0bg+7xPaJrVswt_WnZ6wtyjA@mail.gmail.com>
+ <20170120174658.GG25907@lunn.ch>
+Message-ID: <CAFBinCD+7R2cVQ-Dcr=CxRuBBFajCb-QG68ZGpza5VwprCkztQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <weiyongjun1@huawei.com>
+On Fri, Jan 20, 2017 at 6:46 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> On Fri, Jan 20, 2017 at 06:07:20PM +0100, Martin Blumenstingl wrote:
+>> I though that this is good practice - the documentation doesn't say
+>> that it should only be added in specific cases: [0]
+>
+> Agreed, the text should be better, listing when it is appropriate to
+> use.
+>
+>> my intention behind adding the PHY ID was to make it easier to see
+>> which devices uses which PHY. this is especially useful for devices
+>> with RTL8211F PHY (basically all devices with RGMII PHY except the
+>> P200) as these may need similar fixes than [1]
+>
+> I would not say it is wrong to list the PHY ID, it just has
+> consequences if the PHY ever changes.
+thanks for pointing this out again, I'll re-spin this series and
+remove the PHY's "compatible" property from all patches.
+I also sent a patch which hopefully makes the documentation a bit more
+clear: [0]
 
-Fix to return error code -ENODEV from the of_find_compatible_node()
-error handling case instead of 0, as done elsewhere in this function.
+Regards,
+Martin
 
-Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
----
- arch/arm/mach-hisi/platmcpm.c | 2 ++
- 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-hisi/platmcpm.c b/arch/arm/mach-hisi/platmcpm.c
-index a6c1176..f0fff21 100644
---- a/arch/arm/mach-hisi/platmcpm.c
-+++ b/arch/arm/mach-hisi/platmcpm.c
-@@ -279,6 +279,8 @@ static int __init hip04_smp_init(void)
- 					 &hip04_boot_method[0], 4);
- 	if (ret)
- 		goto err;
-+
-+	ret = -ENODEV;
- 	np_sctl = of_find_compatible_node(NULL, NULL, "hisilicon,sysctrl");
- 	if (!np_sctl)
- 		goto err;
+[0] http://marc.info/?l=linux-netdev&m=148510331812986&w=2
