@@ -1,43 +1,42 @@
 From: mhei@heimpold.de (Michael Heimpold)
-Date: Sun, 22 Jan 2017 23:22:40 +0100
-Subject: [PATCH v2 5/9] ARM: dts: add support for I2SE Duckbill 2 boards
+Date: Sun, 22 Jan 2017 23:22:42 +0100
+Subject: [PATCH v2 7/9] ARM: dts: add support for I2SE Duckbill 2 EnOcean
 In-Reply-To: <1485123764-14754-1-git-send-email-mhei@heimpold.de>
 References: <1485123764-14754-1-git-send-email-mhei@heimpold.de>
-Message-ID: <1485123764-14754-6-git-send-email-mhei@heimpold.de>
+Message-ID: <1485123764-14754-8-git-send-email-mhei@heimpold.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This machine is an USB pen drive sized development board,
-based on NXP's i.MX28 CPU. In contrast to the previous
-model "Duckbill", the "Duckbill 2" series has internal
-eMMC storage.
+This machine is based on I2SE's Duckbill 2 board and features a
+EnOcean daugther board based on the popular TCM310 chipset.
+This product is intended to be used for e.g. home automation purposes.
 
 Signed-off-by: Michael Heimpold <mhei@heimpold.de>
 Cc: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- arch/arm/boot/dts/Makefile             |   1 +
- arch/arm/boot/dts/imx28-duckbill-2.dts | 183 +++++++++++++++++++++++++++++++++
- 2 files changed, 184 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx28-duckbill-2.dts
+ arch/arm/boot/dts/Makefile                     |   1 +
+ arch/arm/boot/dts/imx28-duckbill-2-enocean.dts | 220 +++++++++++++++++++++++++
+ 2 files changed, 221 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx28-duckbill-2-enocean.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index f10fe85..fa4664b 100644
+index e0f3f4e..d7fcb4dc 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -475,6 +475,7 @@ dtb-$(CONFIG_ARCH_MXS) += \
- 	imx28-cfa10056.dtb \
- 	imx28-cfa10057.dtb \
+@@ -477,6 +477,7 @@ dtb-$(CONFIG_ARCH_MXS) += \
  	imx28-cfa10058.dtb \
-+	imx28-duckbill-2.dtb \
+ 	imx28-duckbill-2-485.dts \
+ 	imx28-duckbill-2.dtb \
++	imx28-duckbill-2-enocean.dts \
  	imx28-duckbill.dtb \
  	imx28-eukrea-mbmx283lc.dtb \
  	imx28-eukrea-mbmx287lc.dtb \
-diff --git a/arch/arm/boot/dts/imx28-duckbill-2.dts b/arch/arm/boot/dts/imx28-duckbill-2.dts
+diff --git a/arch/arm/boot/dts/imx28-duckbill-2-enocean.dts b/arch/arm/boot/dts/imx28-duckbill-2-enocean.dts
 new file mode 100644
-index 0000000..2510b20
+index 0000000..6e7a71c
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx28-duckbill-2.dts
-@@ -0,0 +1,183 @@
++++ b/arch/arm/boot/dts/imx28-duckbill-2-enocean.dts
+@@ -0,0 +1,220 @@
 +/*
 + * Copyright (C) 2015-2017 I2SE GmbH <info@i2se.com>
 + * Copyright (C) 2016 Michael Heimpold <mhei@heimpold.de>
@@ -52,11 +51,12 @@ index 0000000..2510b20
 +
 +/dts-v1/;
 +#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/input/input.h>
 +#include <dt-bindings/gpio/gpio.h>
 +#include "imx28.dtsi"
 +
 +/ {
-+	model = "I2SE Duckbill 2";
++	model = "I2SE Duckbill 2 EnOcean";
 +	compatible = "i2se,duckbill", "fsl,imx28";
 +
 +	memory {
@@ -125,6 +125,19 @@ index 0000000..2510b20
 +					fsl,pinmux-ids = <
 +						MX28_PAD_SAIF0_MCLK__GPIO_3_20
 +						MX28_PAD_SAIF0_LRCLK__GPIO_3_21
++						MX28_PAD_AUART0_CTS__GPIO_3_2
++						MX28_PAD_I2C0_SCL__GPIO_3_24
++						MX28_PAD_I2C0_SDA__GPIO_3_25
++					>;
++					fsl,drive-strength = <MXS_DRIVE_4mA>;
++					fsl,voltage = <MXS_VOLTAGE_HIGH>;
++					fsl,pull-up = <MXS_PULL_DISABLE>;
++				};
++
++				enocean_button: enocean-button at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						MX28_PAD_AUART0_RTS__GPIO_3_3
 +					>;
 +					fsl,drive-strength = <MXS_DRIVE_4mA>;
 +					fsl,voltage = <MXS_VOLTAGE_HIGH>;
@@ -135,12 +148,6 @@ index 0000000..2510b20
 +
 +		apbx at 80040000 {
 +			lradc at 80050000 {
-+				status = "okay";
-+			};
-+
-+			i2c0: i2c at 80058000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&i2c0_pins_a>;
 +				status = "okay";
 +			};
 +
@@ -218,6 +225,35 @@ index 0000000..2510b20
 +			label = "duckbill:green:status";
 +			gpios = <&gpio3 20 GPIO_ACTIVE_HIGH>;
 +			linux,default-trigger = "heartbeat";
++		};
++
++		enocean-blue {
++			label = "duckbill:blue:enocean";
++			gpios = <&gpio3 24 GPIO_ACTIVE_LOW>;
++		};
++
++		enocean-red {
++			label = "duckbill:red:enocean";
++			gpios = <&gpio3 25 GPIO_ACTIVE_LOW>;
++		};
++
++		enocean-green {
++			label = "duckbill:green:enocean";
++			gpios = <&gpio3 2 GPIO_ACTIVE_LOW>;
++		};
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&enocean_button>;
++
++		enocean {
++			label = "EnOcean";
++			linux,code = <KEY_NEW>;
++			gpios = <&gpio3 3 GPIO_ACTIVE_HIGH>;
 +		};
 +	};
 +};
