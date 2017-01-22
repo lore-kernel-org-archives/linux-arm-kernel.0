@@ -1,40 +1,92 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sun, 22 Jan 2017 17:48:25 +0100
-Subject: [PATCH v3 2/9] ARM64: dts: meson-gxbb-p200: add the ethernet
- PHY's reset GPIO
-In-Reply-To: <20170120174658.GG25907@lunn.ch>
-References: <20170120132650.9784-1-martin.blumenstingl@googlemail.com>
- <20170120152232.13943-1-martin.blumenstingl@googlemail.com>
- <20170120152232.13943-3-martin.blumenstingl@googlemail.com>
- <20170120162138.GE25907@lunn.ch>
- <CAFBinCA47Nng_jjxKrWrV_YBHr0bg+7xPaJrVswt_WnZ6wtyjA@mail.gmail.com>
- <20170120174658.GG25907@lunn.ch>
-Message-ID: <CAFBinCD+7R2cVQ-Dcr=CxRuBBFajCb-QG68ZGpza5VwprCkztQ@mail.gmail.com>
+Date: Sun, 22 Jan 2017 19:10:19 +0100
+Subject: [PATCH v4 0/9] meson-gx: reset RGMII PHYs and configure TX delay
+In-Reply-To: <20170120152232.13943-1-martin.blumenstingl@googlemail.com>
+References: <20170120152232.13943-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20170122181028.5014-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2017 at 6:46 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> On Fri, Jan 20, 2017 at 06:07:20PM +0100, Martin Blumenstingl wrote:
->> I though that this is good practice - the documentation doesn't say
->> that it should only be added in specific cases: [0]
->
-> Agreed, the text should be better, listing when it is appropriate to
-> use.
->
->> my intention behind adding the PHY ID was to make it easier to see
->> which devices uses which PHY. this is especially useful for devices
->> with RTL8211F PHY (basically all devices with RGMII PHY except the
->> P200) as these may need similar fixes than [1]
->
-> I would not say it is wrong to list the PHY ID, it just has
-> consequences if the PHY ever changes.
-thanks for pointing this out again, I'll re-spin this series and
-remove the PHY's "compatible" property from all patches.
-I also sent a patch which hopefully makes the documentation a bit more
-clear: [0]
+This series adds the reset GPIOs for the (external) ethernet PHYs on all
+GXBB boards.
+Additionally it provides a ethernet PHY node which can be used to specify
+PHY-specific properties (this may be required if more boards require the
+"eee-broken-1000t" for the RTL8211F ethernet PHY). To make all board .dts
+consistent I chose to add the PHY node also for boards which don't have a
+RTL8211F PHY.
 
-Regards,
-Martin
+Patch #7 from this series also removes ethernet support for the P200
+board because it was broken anyways and nobody seems to have a board
+available for testing. This was the outcome of the discussion from [0]
+
+Patch #8 was taken from (older versions of) my other series (see [1]):
+"[PATCH net-next v3 0/2] stmmac: dwmac-meson8b: configurable
+RGMII TX delay".
+The binding changes for amlogic,tx-delay-ns were ACK'ed already.
+
+NOTE: This applies on top of Jerome's Odroid-C2 EEE patch [3] and Andreas
+F?rber's series "ARM64: meson: DT cleanups"
+
+Changes since v3:
+- removed "compatible" property from all PHY nodes because that would
+  force the kernel to choose the driver for the PHY with the ID from the
+  .dts (instead of the actual PHY ID) - see [2] for more information
+  (thanks to Andrew Lunn for spotting this). instead the PHY IDs (and
+  names) are added as a comment inside the corresponding .dts files.
+- rebased to apply on top of Andreas F?rber's "ARM64: meson: DT cleanups"
+  series
+
+Changes since v2:
+- fixed patch #2 to really update the P200 board (as it's the P200 which
+  actually uses a Micrel KSZ9031 RGMII PHY). Thanks to Neil Armstrong for
+  spotting this huge mistake!
+- instead of dropping ethernet support for P201 we simply re-configure it
+  to RMII mode (replaces patch #7) without a MDIO node (which keeps PHY
+  auto-scanning enabled). This got Neil Armstrong's ACK off-list already
+
+Changes since v1:
+- do not move the MDIO bus to meson-gx as this disables PHY auto-scanning
+  in the stmmac driver (this drops patch #1 from v1)
+- add the ethernet PHY reset GPIO for nexbox a95x which was forgotten in
+  v1
+- add the ethernet PHY reset GPIO for boards which were added since v1
+  (wetek hub and wetek play2)
+- rebased to apply against the current v4.11/dt64 branch
+- new in v2 (patch #7): disabled ethernet support for the P200 board (see
+  the commit description for more information). this patch is optional
+- new in v2 (patch #9): removed the phy-mode property from meson-gx (see
+  the commit description for more information). this patch is optional
 
 
-[0] http://marc.info/?l=linux-netdev&m=148510331812986&w=2
+[0] http://lists.infradead.org/pipermail/linux-amlogic/2017-January/002053.html
+[1] http://lists.infradead.org/pipermail/linux-amlogic/2016-December/001834.html
+[2] http://marc.info/?l=linux-netdev&m=148510331812986&w=2
+[3] https://git.kernel.org/cgit/linux/kernel/git/khilman/linux-amlogic.git/commit/?h=v4.11/integ&id=5a2288a68582ad3f1b42ed63ae5a3ca54e000965
+
+Martin Blumenstingl (9):
+  ARM64: dts: meson-gxbb-odroidc2: add the ethernet PHY's reset GPIO
+  ARM64: dts: meson-gxbb-p200: add the ethernet PHY's reset GPIO
+  ARM64: dts: meson-gxbb-vega-s95: add the ethernet PHY's reset GPIO
+  ARM64: dts: meson-gxbb-nexbox-a95x: add the ethernet PHY's reset GPIO
+  ARM64: dts: meson-gxbb-wetek-hub: add the ethernet PHY's reset GPIO
+  ARM64: dts: meson-gxbb-wetek-play2: add the ethernet PHY's reset GPIO
+  ARM64: dts: meson-gxbb-p201: fix ethernet support
+  ARM64: dts: amlogic: add the ethernet TX delay configuration
+  ARM64: dts: meson-gx: remove the phy-mode property from meson-gx
+
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi          |  1 -
+ .../boot/dts/amlogic/meson-gxbb-nexbox-a95x.dts    | 16 ++++++++++++++
+ .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts |  7 ++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts    | 25 ++++++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts    | 11 ++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi   |  6 ------
+ .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      | 20 +++++++++++++++++
+ .../boot/dts/amlogic/meson-gxbb-wetek-hub.dts      | 25 ++++++++++++++++++++++
+ .../boot/dts/amlogic/meson-gxbb-wetek-play2.dts    | 25 ++++++++++++++++++++++
+ .../boot/dts/amlogic/meson-gxl-s905d-p230.dts      |  2 ++
+ .../arm64/boot/dts/amlogic/meson-gxm-nexbox-a1.dts |  2 ++
+ arch/arm64/boot/dts/amlogic/meson-gxm-q200.dts     |  2 ++
+ 12 files changed, 135 insertions(+), 7 deletions(-)
+
+-- 
+2.11.0
