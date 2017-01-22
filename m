@@ -1,22 +1,21 @@
 From: mzoran@crowfest.net (Michael Zoran)
-Date: Sun, 22 Jan 2017 01:49:03 -0800
+Date: Sun, 22 Jan 2017 01:52:40 -0800
 Subject: ARM64: Disabling warnings about deprecated armv8 instructions
-In-Reply-To: <CAKv+Gu-fPg50LE0N=GPisq=YSV6TDAOQTG2f6DNPU7sGHZf8Kg@mail.gmail.com>
+In-Reply-To: <CAKv+Gu9gBPenhOBj9G7rrqi3h_oMi3X7qpmsK+SB1dgBtzfKTg@mail.gmail.com>
 References: <1485072424.14066.2.camel@crowfest.net>
  <9647813.NZ2c5cYUSH@localhost> <1485075528.14345.1.camel@crowfest.net>
- <CAKv+Gu8LU3QjrUa6wMJF3WBNrhx34Pi_0ZUQVfrZy7w7y7237w@mail.gmail.com>
- <1485077630.1308.0.camel@crowfest.net>
- <CAKv+Gu-fPg50LE0N=GPisq=YSV6TDAOQTG2f6DNPU7sGHZf8Kg@mail.gmail.com>
-Message-ID: <1485078543.1308.4.camel@crowfest.net>
+ <20170122170523.3b4b1235@xhacker> <1485077887.1308.2.camel@crowfest.net>
+ <CAKv+Gu9gBPenhOBj9G7rrqi3h_oMi3X7qpmsK+SB1dgBtzfKTg@mail.gmail.com>
+Message-ID: <1485078760.1308.6.camel@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2017-01-22 at 09:36 +0000, Ard Biesheuvel wrote:
-> On 22 January 2017 at 09:33, Michael Zoran <mzoran@crowfest.net>
+On Sun, 2017-01-22 at 09:43 +0000, Ard Biesheuvel wrote:
+> On 22 January 2017 at 09:38, Michael Zoran <mzoran@crowfest.net>
 > wrote:
-> > On Sun, 2017-01-22 at 09:09 +0000, Ard Biesheuvel wrote:
-> > > On 22 January 2017 at 08:58, Michael Zoran <mzoran@crowfest.net>
-> > > wrote:
+> > On Sun, 2017-01-22 at 17:05 +0800, Jisheng Zhang wrote:
+> > > On Sun, 22 Jan 2017 00:58:48 -0800 Michael Zoran wrote:
+> > > 
 > > > > On Sun, 2017-01-22 at 09:52 +0100, Alexander Stein wrote:
 > > > > > Hi Michael,
 > > > > > 
@@ -61,33 +60,42 @@ On Sun, 2017-01-22 at 09:36 +0000, Ard Biesheuvel wrote:
 > > > > that
 > > > > is
 > > > > targeting arm6+VFP.
-> > > > 
-> > > > I can double check, but I think the instructions are being
-> > > > emulated
-> > > > in
-> > > > hardware so they are just filling the log and slowing things
-> > > > down.
-> > > > 
 > > > 
-> > > You can disable the emulation by doing
+> > > IMHO, this is the root cause. I didn't see below warnings from
+> > > dmesg
+> > > with
+> > > armhf debian and ubuntu If the underlying HW is armv8 compatible,
+> > > it
+> > > doesn't make sense to target the compiler to armv6
 > > > 
-> > > echo 2 >/proc/sys/abi/setend
-> > > echo 2 >/proc/sys/abi/cp15_barrier
+> > > 
 > > 
-> > I don't want to disable the emulation since I want to run old
-> > binaries.
-> > ???I just want to disable the warning...
+> > Advanced users can install a different OS. Beginners can't and will
+> > need a single OS image for simple install.
 > > 
 > 
-> That is exactly what this does: the A53 can execute these
-> instructions
-> just fine, but due to the fact that they are deprecated by the
-> architecture, they are trapped and emulated by default.
+> That single OS image can simply test for the presence of
+> /proc/sys/abi, and perform the writes if it is there.
+> 
+> > Does anybody know if these instructions are detected at runtime?
+> 
+> What do you mean by 'detected'?
+> 
+> > I'm
+> > also looking into an issue with Mathmatica due to broken OS
+> > detection.
+> > It appears that arm64 is currently missing some of the CPU spoofing
+> > that happens on other architectures...
+> > 
+> 
+> Could you elaborate? What do you think should be there that isn't?
 
-OK, now I understand.
+I'm saying that when running a ELF32 executable, the system needs to
+fake the CPU architecture according to the uname system API and
+/proc/cpuinfo.
 
-Sounds like what I want is to turn on hardware emulation when running
-old binaries since collecting data is pointless.  That's kind of part
-of the hardware spoofing I'm looking into.  
+Today, I run uname -a in Raspbian and I get aarch64.  I want it to
+display arm6l or whatever to get Mathematica to load.
 
-Alot of this seems to be missing on arm64.
+I see some code to make this work on other architectures such as X86,
+but most of this appears to be unimplemented on arm64.
