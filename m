@@ -1,59 +1,71 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 22 Jan 2017 13:20:31 +0800
-Subject: [PATCH v3 3/3] media: rc: add driver for IR remote receiver on
- MT7623 SoC
-In-Reply-To: <1484292939-9454-4-git-send-email-sean.wang@mediatek.com>
-Message-ID: <201701221317.Xq3vNLoc%fengguang.wu@intel.com>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Sun, 22 Jan 2017 14:08:27 +0800
+Subject: [PATCH v2 04/26] drm/rockchip: dw-mipi-dsi: remove mode_set hook
+In-Reply-To: <20170121163128.22240-5-john@metanate.com>
+References: <20170121163128.22240-1-john@metanate.com>
+ <20170121163128.22240-5-john@metanate.com>
+Message-ID: <58844C5B.1090302@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sean,
+Hi John
 
-[auto build test ERROR on robh/for-next]
-[also build test ERROR on v4.10-rc4 next-20170120]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Reviewed-by: Chris Zhong <zyw@rock-chips.com>
 
-url:    https://github.com/0day-ci/linux/commits/sean-wang-mediatek-com/Documentation-devicetree-move-shared-property-used-by-rc-into-a-common-place/20170115-052257
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux.git for-next
-config: sparc64-allyesconfig (attached as .config)
-compiler: sparc64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=sparc64 
 
-All errors (new ones prefixed by >>):
-
-   drivers/media/rc/mtk-cir.c: In function 'mtk_ir_probe':
->> drivers/media/rc/mtk-cir.c:220:11: error: too many arguments to function 'devm_rc_allocate_device'
-     ir->rc = devm_rc_allocate_device(dev, RC_DRIVER_IR_RAW);
-              ^~~~~~~~~~~~~~~~~~~~~~~
-   In file included from drivers/media/rc/mtk-cir.c:22:0:
-   include/media/rc-core.h:213:16: note: declared here
-    struct rc_dev *devm_rc_allocate_device(struct device *dev);
-                   ^~~~~~~~~~~~~~~~~~~~~~~
-
-vim +/devm_rc_allocate_device +220 drivers/media/rc/mtk-cir.c
-
-   214		ir->base = devm_ioremap_resource(dev, res);
-   215		if (IS_ERR(ir->base)) {
-   216			dev_err(dev, "failed to map registers\n");
-   217			return PTR_ERR(ir->base);
-   218		}
-   219	
- > 220		ir->rc = devm_rc_allocate_device(dev, RC_DRIVER_IR_RAW);
-   221		if (!ir->rc) {
-   222			dev_err(dev, "failed to allocate device\n");
-   223			return -ENOMEM;
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 48879 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170122/cb8b30e2/attachment-0001.gz>
+On 01/22/2017 12:31 AM, John Keeping wrote:
+> This is not needed since we can access the mode via the CRTC from the
+> enable hook.  Also remove the "mode" field that is no longer used.
+>
+> Signed-off-by: John Keeping <john@metanate.com>
+> ---
+> New in v2
+> ---
+>   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 13 +------------
+>   1 file changed, 1 insertion(+), 12 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> index cdbd25087e83..bd92e58b64f3 100644
+> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> @@ -286,7 +286,6 @@ struct dw_mipi_dsi {
+>   	u32 format;
+>   	u16 input_div;
+>   	u16 feedback_div;
+> -	struct drm_display_mode *mode;
+>   
+>   	const struct dw_mipi_dsi_plat_data *pdata;
+>   };
+> @@ -816,15 +815,6 @@ static void dw_mipi_dsi_clear_err(struct dw_mipi_dsi *dsi)
+>   	dsi_write(dsi, DSI_INT_MSK1, 0);
+>   }
+>   
+> -static void dw_mipi_dsi_encoder_mode_set(struct drm_encoder *encoder,
+> -					struct drm_display_mode *mode,
+> -					struct drm_display_mode *adjusted_mode)
+> -{
+> -	struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
+> -
+> -	dsi->mode = adjusted_mode;
+> -}
+> -
+>   static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
+>   {
+>   	struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
+> @@ -854,7 +844,7 @@ static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
+>   static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
+>   {
+>   	struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
+> -	struct drm_display_mode *mode = dsi->mode;
+> +	struct drm_display_mode *mode = &encoder->crtc->state->adjusted_mode;
+>   	int mux = drm_of_encoder_active_endpoint_id(dsi->dev->of_node, encoder);
+>   	u32 val;
+>   	int ret;
+> @@ -930,7 +920,6 @@ dw_mipi_dsi_encoder_atomic_check(struct drm_encoder *encoder,
+>   static struct drm_encoder_helper_funcs
+>   dw_mipi_dsi_encoder_helper_funcs = {
+>   	.enable = dw_mipi_dsi_encoder_enable,
+> -	.mode_set = dw_mipi_dsi_encoder_mode_set,
+>   	.disable = dw_mipi_dsi_encoder_disable,
+>   	.atomic_check = dw_mipi_dsi_encoder_atomic_check,
+>   };
