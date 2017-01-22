@@ -1,103 +1,86 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Sun, 22 Jan 2017 10:50:19 +0800
-Subject: [RESEND PATCH 6/6] dt-bindings: phy-mt65xx-usb: add support for
- mt2712 platform
-In-Reply-To: <20170121200844.k5ivauhws43ac2s2@rob-hp-laptop>
-References: <1484719214-11989-1-git-send-email-chunfeng.yun@mediatek.com>
- <1484719214-11989-6-git-send-email-chunfeng.yun@mediatek.com>
- <20170121200844.k5ivauhws43ac2s2@rob-hp-laptop>
-Message-ID: <1485053419.10292.88.camel@mhfsdcap03>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Sun, 22 Jan 2017 11:06:31 +0800
+Subject: [PATCH v2 18/26] drm/rockchip: dw-mipi-dsi: properly configure
+ PHY timing
+In-Reply-To: <20170121163128.22240-19-john@metanate.com>
+References: <20170121163128.22240-1-john@metanate.com>
+ <20170121163128.22240-19-john@metanate.com>
+Message-ID: <588421B7.4000900@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2017-01-21 at 14:08 -0600, Rob Herring wrote:
-> On Wed, Jan 18, 2017 at 02:00:14PM +0800, Chunfeng Yun wrote:
-> > add a new compatible string for "mt2712", and a new reference clock
-> > for SuperSpeed analog phy;
-> > 
-> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> > ---
-> >  .../devicetree/bindings/phy/phy-mt65xx-usb.txt     |   81 +++++++++++++++++---
-> >  1 file changed, 70 insertions(+), 11 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
-> > index 33a2b1e..8f91136 100644
-> > --- a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
-> > +++ b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
-> > @@ -6,19 +6,25 @@ This binding describes a usb3.0 phy for mt65xx platforms of Medaitek SoC.
-> >  Required properties (controller (parent) node):
-> >   - compatible	: should be one of
-> >  		  "mediatek,mt2701-u3phy"
-> > +		  "mediatek,mt2712-u3phy"
-> >  		  "mediatek,mt8173-u3phy"
-> > - - reg		: offset and length of register for phy, exclude port's
-> > -		  register.
-> >   - clocks	: a list of phandle + clock-specifier pairs, one for each
-> >  		  entry in clock-names
-> >   - clock-names	: must contain
-> > -		  "u3phya_ref": for reference clock of usb3.0 analog phy.
-> > +		  "u2ref_clk": 48M reference clock of HighSpeed analog phy.
-> > +		  "u3ref_clk": 26M reference clock of SuperSpeed analog phy,
-> > +			sometimes is 24M, 25M or 27M, depended on platform.
-> 
-> _clk is redundant.
-remove it
-> 
-> >  
-> >  Required nodes	: a sub-node is required for each port the controller
-> >  		  provides. Address range information including the usual
-> >  		  'reg' property is used inside these nodes to describe
-> >  		  the controller's topology.
-> >  
-> > +Optional properties (controller (parent) node):
-> > + - reg		: offset and length of register shared by multiple ports,
-> > +		  exclude port's private register. It is needed on mt2701
-> > +		  and mt8173, but not on mt2712.
-> > +
-> >  Required properties (port (child) node):
-> >  - reg		: address and length of the register set for the port.
-> >  - #phy-cells	: should be 1 (See second example)
-> > @@ -31,21 +37,27 @@ Example:
-> >  u3phy: usb-phy at 11290000 {
-> >  	compatible = "mediatek,mt8173-u3phy";
-> >  	reg = <0 0x11290000 0 0x800>;
-> > -	clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
-> > -	clock-names = "u3phya_ref";
-> > +	clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>, <&clk26m>;
-> > +	clock-names = "u2ref_clk", "u3ref_clk";
-> >  	#address-cells = <2>;
-> >  	#size-cells = <2>;
-> >  	ranges;
-> >  	status = "okay";
-> >  
-> > -	phy_port0: port at 11290800 {
-> > -		reg = <0 0x11290800 0 0x800>;
-> > +	u2port0: port at 11290800 {
-> 
-> port is for OF graph. This should be usb-phy at ... instead.
-Is there any problems if u2port0's name at addr is the same as its parent's
-(u3phy)?  as following:
-	u3phy: usb-phy at 11290000 {
-		compatible = ...;
-		// no reg property
-		clocks = ...;
-		u2port0: usb-phy at 11290000 {
-			reg = ...;
-	}
 
-> 
-> > +		reg = <0 0x11290800 0 0x100>;
-> > +		#phy-cells = <1>;
-> > +		status = "okay";
-> > +	};
-> > +
-> > +	u3port0: port at 11290900 {
-> > +		reg = <0 0x11290800 0 0x700>;
-> >  		#phy-cells = <1>;
-> >  		status = "okay";
-> >  	};
-> >  
 
-> > +            ...
-
-Thank you!
+On 01/22/2017 12:31 AM, John Keeping wrote:
+> These values are specified as constant time periods but the PHY
+> configuration is in terms of the current lane byte clock so using
+> constant values guarantees that the timings will be outside the
+> specification with some display configurations.
+>
+> Derive the necessary configuration from the byte clock in order to
+> ensure that the PHY configuration is correct.
+>
+> Signed-off-by: John Keeping <john@metanate.com>
+> ---
+> Unchanged in v2
+> ---
+>   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 36 ++++++++++++++++++++++++++++++----
+>   1 file changed, 32 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> index cfe7e4ba305c..12432e41971b 100644
+> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> @@ -383,6 +383,26 @@ static void dw_mipi_dsi_phy_write(struct dw_mipi_dsi *dsi, u8 test_code,
+>   	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_TESTCLK | PHY_UNTESTCLR);
+>   }
+>   
+> +/**
+> + * ns2bc - Nanoseconds to byte clock cycles
+> + */
+> +static inline unsigned int ns2bc(struct dw_mipi_dsi *dsi, int ns)
+> +{
+> +	unsigned long byte_clk_khz = dsi->lane_mbps * MSEC_PER_SEC / 8;
+> +
+> +	return (ns * (byte_clk_khz / 1000) + 999) / 1000;
+> +}
+> +
+> +/**
+> + * ns2ui - Nanoseconds to UI time periods
+> + */
+> +static inline unsigned int ns2ui(struct dw_mipi_dsi *dsi, int ns)
+> +{
+> +	unsigned long byte_clk_khz = dsi->lane_mbps * MSEC_PER_SEC;
+> +
+> +	return (ns * (byte_clk_khz / 1000) + 999) / 1000;
+> +}
+> +
+>   static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
+>   {
+>   	int ret, testdin, vco, val;
+> @@ -434,10 +454,18 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
+>   					 SETRD_MAX | POWER_MANAGE |
+>   					 TER_RESISTORS_ON);
+>   
+> -
+> -	dw_mipi_dsi_phy_write(dsi, 0x70, TLP_PROGRAM_EN | 0xf);
+> -	dw_mipi_dsi_phy_write(dsi, 0x71, THS_PRE_PROGRAM_EN | 0x55);
+> -	dw_mipi_dsi_phy_write(dsi, 0x72, THS_ZERO_PROGRAM_EN | 0xa);
+> +	dw_mipi_dsi_phy_write(dsi, 0x60, TLP_PROGRAM_EN | ns2bc(dsi, 500));
+> +	dw_mipi_dsi_phy_write(dsi, 0x61, THS_PRE_PROGRAM_EN | ns2ui(dsi, 40));
+> +	dw_mipi_dsi_phy_write(dsi, 0x62, THS_ZERO_PROGRAM_EN | ns2bc(dsi, 300));
+> +	dw_mipi_dsi_phy_write(dsi, 0x63, THS_PRE_PROGRAM_EN | ns2ui(dsi, 100));
+> +	dw_mipi_dsi_phy_write(dsi, 0x64, BIT(5) | ns2bc(dsi, 100));
+> +	dw_mipi_dsi_phy_write(dsi, 0x65, BIT(5) | (ns2bc(dsi, 60) + 7));
+> +
+> +	dw_mipi_dsi_phy_write(dsi, 0x70, TLP_PROGRAM_EN | ns2bc(dsi, 500));
+> +	dw_mipi_dsi_phy_write(dsi, 0x71, THS_PRE_PROGRAM_EN | (ns2ui(dsi, 50) + 5));
+WARNING: line over 80 characters
+> +	dw_mipi_dsi_phy_write(dsi, 0x72, THS_ZERO_PROGRAM_EN | (ns2bc(dsi, 140) + 2));
+WARNING: line over 80 characters
+> +	dw_mipi_dsi_phy_write(dsi, 0x73, THS_PRE_PROGRAM_EN | (ns2ui(dsi, 60) + 8));
+WARNING: line over 80 characters
+> +	dw_mipi_dsi_phy_write(dsi, 0x74, BIT(5) | ns2bc(dsi, 100));
+>   
+>   	dsi_write(dsi, DSI_PHY_RSTZ, PHY_ENFORCEPLL | PHY_ENABLECLK |
+>   				     PHY_UNRSTZ | PHY_UNSHUTDOWNZ);
