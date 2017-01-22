@@ -1,67 +1,59 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Sun, 22 Jan 2017 15:14:04 +0800
-Subject: [PATCH v2 09/26] drm/rockchip: dw-mipi-dsi: respect message flags
-In-Reply-To: <20170121163128.22240-10-john@metanate.com>
-References: <20170121163128.22240-1-john@metanate.com>
- <20170121163128.22240-10-john@metanate.com>
-Message-ID: <58845BBC.3040105@rock-chips.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Sun, 22 Jan 2017 15:38:47 +0800
+Subject: [PATCH] PCI: rockchip: mark PM functions as __maybe_unused
+In-Reply-To: <20170120162450.3690225-1-arnd@arndb.de>
+References: <20170120162450.3690225-1-arnd@arndb.de>
+Message-ID: <41135715-6f07-9c85-0b78-c66a37607b92@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi John
+Hi Arnd,
 
-Reviewed-by: Chris Zhong <zyw@rock-chips.com>
+On 2017/1/21 0:24, Arnd Bergmann wrote:
+> When CONFIG_PM_SLEEP is disabled, we get harmless build warnings:
+>
+> host/pcie-rockchip.c:1267:12: error: 'rockchip_pcie_resume_noirq' defined but not used [-Werror=unused-function]
+> host/pcie-rockchip.c:1240:12: error: 'rockchip_pcie_suspend_noirq' defined but not used [-Werror=unused-function]
+>
+> Marking both functions as __maybe_unused avoids the warning without
+> the need for #ifdef around them.
 
-On 01/22/2017 12:31 AM, John Keeping wrote:
-> Instead of always sending commands in LP mode, respect the
-> MIPI_DSI_MSG_USE_LPM flag to decide how to send each message.  Also
-> request acks if MIPI_DSI_MSG_REQ_ACK is set.
+Sorry for introducing this warning, and thanks for fixing it.
+
+Acked-by: Shawn Lin <shawn.lin@rock-chips.com>
+
 >
-> Signed-off-by: John Keeping <john@metanate.com>
+> Fixes: 013dd3d5e183 ("PCI: rockchip: Add system PM support")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
-> Unchanged in v2
-> ---
->   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 16 +++++++++++++++-
->   1 file changed, 15 insertions(+), 1 deletion(-)
+>  drivers/pci/host/pcie-rockchip.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 >
-> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> index 92dbc3e56603..15d33c3c8cb7 100644
-> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> @@ -542,6 +542,19 @@ static int dw_mipi_dsi_host_detach(struct mipi_dsi_host *host,
->   	return 0;
->   }
->   
-> +static void dw_mipi_message_config(struct dw_mipi_dsi *dsi,
-> +				   const struct mipi_dsi_msg *msg)
-> +{
-> +	u32 val = 0;
-> +
-> +	if (msg->flags & MIPI_DSI_MSG_REQ_ACK)
-> +		val |= EN_ACK_RQST;
-> +	if (msg->flags & MIPI_DSI_MSG_USE_LPM)
-> +		val |= CMD_MODE_ALL_LP;
-> +
-> +	dsi_write(dsi, DSI_CMD_MODE_CFG, val);
-> +}
-> +
->   static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
->   {
->   	int ret;
-> @@ -634,6 +647,8 @@ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
->   	struct dw_mipi_dsi *dsi = host_to_dsi(host);
->   	int ret;
->   
-> +	dw_mipi_message_config(dsi, msg);
-> +
->   	switch (msg->type) {
->   	case MIPI_DSI_DCS_SHORT_WRITE:
->   	case MIPI_DSI_DCS_SHORT_WRITE_PARAM:
-> @@ -745,7 +760,6 @@ static void dw_mipi_dsi_command_mode_config(struct dw_mipi_dsi *dsi)
->   {
->   	dsi_write(dsi, DSI_TO_CNT_CFG, HSTX_TO_CNT(1000) | LPRX_TO_CNT(1000));
->   	dsi_write(dsi, DSI_BTA_TO_CNT, 0xd00);
-> -	dsi_write(dsi, DSI_CMD_MODE_CFG, CMD_MODE_ALL_LP);
->   	dsi_write(dsi, DSI_MODE_CFG, ENABLE_CMD_MODE);
->   }
->   
+> diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
+> index 0d6e8ee5b017..b975116d2b03 100644
+> --- a/drivers/pci/host/pcie-rockchip.c
+> +++ b/drivers/pci/host/pcie-rockchip.c
+> @@ -1237,7 +1237,7 @@ static int rockchip_pcie_wait_l2(struct rockchip_pcie *rockchip)
+>  	return 0;
+>  }
+>
+> -static int rockchip_pcie_suspend_noirq(struct device *dev)
+> +static int __maybe_unused rockchip_pcie_suspend_noirq(struct device *dev)
+>  {
+>  	struct rockchip_pcie *rockchip = dev_get_drvdata(dev);
+>  	int ret;
+> @@ -1264,7 +1264,7 @@ static int rockchip_pcie_suspend_noirq(struct device *dev)
+>  	return ret;
+>  }
+>
+> -static int rockchip_pcie_resume_noirq(struct device *dev)
+> +static int __maybe_unused rockchip_pcie_resume_noirq(struct device *dev)
+>  {
+>  	struct rockchip_pcie *rockchip = dev_get_drvdata(dev);
+>  	int err;
+>
+
+
+-- 
+Best Regards
+Shawn Lin
