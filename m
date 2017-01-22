@@ -1,42 +1,41 @@
 From: zyw@rock-chips.com (Chris Zhong)
-Date: Sun, 22 Jan 2017 17:37:18 +0800
-Subject: [PATCH v2 14/26] drm/rockchip: dw-mipi-dsi: fix escape clock rate
-In-Reply-To: <20170121163128.22240-15-john@metanate.com>
+Date: Sun, 22 Jan 2017 17:37:28 +0800
+Subject: [PATCH v2 15/26] drm/rockchip: dw-mipi-dsi: ensure PHY is reset
+In-Reply-To: <20170121163128.22240-16-john@metanate.com>
 References: <20170121163128.22240-1-john@metanate.com>
- <20170121163128.22240-15-john@metanate.com>
-Message-ID: <58847D4E.9020002@rock-chips.com>
+ <20170121163128.22240-16-john@metanate.com>
+Message-ID: <58847D58.5080903@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
 
 Reviewed-by: Chris Zhong <zyw@rock-chips.com>
 
 On 01/22/2017 12:31 AM, John Keeping wrote:
-> Use the same calculation as the vendor kernel to derive the escape clock
-> speed.
+> Also don't power up the DSI host at this point since this is not
+> necessary in order to configure the PHY and we do so later when
+> selecting video or command mode.
 >
 > Signed-off-by: John Keeping <john@metanate.com>
 > ---
 > Unchanged in v2
 > ---
->   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 4 +++-
->   1 file changed, 3 insertions(+), 1 deletion(-)
+>   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 5 ++++-
+>   1 file changed, 4 insertions(+), 1 deletion(-)
 >
 > diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> index 290282e86d16..c2e0ba96e0a0 100644
+> index c2e0ba96e0a0..5b3068e9e8db 100644
 > --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 > +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> @@ -710,11 +710,13 @@ static void dw_mipi_dsi_disable(struct dw_mipi_dsi *dsi)
+> @@ -397,7 +397,10 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
+>   		return testdin;
+>   	}
 >   
->   static void dw_mipi_dsi_init(struct dw_mipi_dsi *dsi)
->   {
-> +	u32 esc_clk_division = (dsi->lane_mbps >> 3) / 20 + 1;
-> +
->   	dsi_write(dsi, DSI_PWR_UP, RESET);
->   	dsi_write(dsi, DSI_PHY_RSTZ, PHY_DISFORCEPLL | PHY_DISABLECLK
->   		  | PHY_RSTZ | PHY_SHUTDOWNZ);
->   	dsi_write(dsi, DSI_CLKMGR_CFG, TO_CLK_DIVIDSION(10) |
-> -		  TX_ESC_CLK_DIVIDSION(7));
-> +		  TX_ESC_CLK_DIVIDSION(esc_clk_division));
->   }
+> -	dsi_write(dsi, DSI_PWR_UP, POWERUP);
+> +	/* Start by clearing PHY state */
+> +	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_UNTESTCLR);
+> +	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_TESTCLR);
+> +	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_UNTESTCLR);
 >   
->   static void dw_mipi_dsi_dpi_config(struct dw_mipi_dsi *dsi,
+>   	dw_mipi_dsi_phy_write(dsi, 0x10, BYPASS_VCO_RANGE |
+>   					 VCO_RANGE_CON_SEL(vco) |
