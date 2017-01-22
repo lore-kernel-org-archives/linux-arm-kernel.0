@@ -1,41 +1,35 @@
 From: contact@paulk.fr (Paul Kocialkowski)
-Date: Sun, 22 Jan 2017 16:47:48 +0100
-Subject: [PATCH v2 1/6] ARM: tegra: nyan: Use proper IRQ type definitions
-Message-ID: <20170122154753.31942-1-contact@paulk.fr>
+Date: Sun, 22 Jan 2017 16:47:49 +0100
+Subject: [PATCH v2 2/6] ARM: tegra: nyan: Use external control for bq24735
+ charger
+In-Reply-To: <20170122154753.31942-1-contact@paulk.fr>
+References: <20170122154753.31942-1-contact@paulk.fr>
+Message-ID: <20170122154753.31942-2-contact@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This switches a few interrupt definitions that were using
-GPIO_ACTIVE_HIGH as IRQ type, which is invalid.
+Nyan boards come with an embedded controller that controls when to
+enable and disable the charge. Thus, it should not be left up to the
+kernel to handle that.
 
-This is mostly a cosmetic change, that doesn't affect any driver.
+Using the ti,external-control property allows specifying this use-case.
 
 Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
 ---
- arch/arm/boot/dts/tegra124-nyan.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/tegra124-nyan.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/boot/dts/tegra124-nyan.dtsi b/arch/arm/boot/dts/tegra124-nyan.dtsi
-index eabfa655a3cd..ef430aa30152 100644
+index ef430aa30152..5cf987b5401e 100644
 --- a/arch/arm/boot/dts/tegra124-nyan.dtsi
 +++ b/arch/arm/boot/dts/tegra124-nyan.dtsi
-@@ -65,7 +65,7 @@
- 			compatible = "maxim,max98090";
- 			reg = <0x10>;
- 			interrupt-parent = <&gpio>;
--			interrupts = <TEGRA_GPIO(H, 4) GPIO_ACTIVE_HIGH>;
-+			interrupts = <TEGRA_GPIO(H, 4) IRQ_TYPE_EDGE_FALLING>;
- 		};
- 
- 		temperature-sensor at 4c {
-@@ -331,7 +331,7 @@
- 					reg = <0x9>;
- 					interrupt-parent = <&gpio>;
- 					interrupts = <TEGRA_GPIO(J, 0)
--							GPIO_ACTIVE_HIGH>;
-+							IRQ_TYPE_EDGE_BOTH>;
+@@ -335,6 +335,7 @@
  					ti,ac-detect-gpios = <&gpio
  							TEGRA_GPIO(J, 0)
  							GPIO_ACTIVE_HIGH>;
++					ti,external-control;
+ 				};
+ 
+ 				battery: sbs-battery at b {
 -- 
 2.11.0
