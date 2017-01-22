@@ -1,120 +1,81 @@
 From: afzal.mohd.ma@gmail.com (afzal mohammed)
-Date: Sun, 22 Jan 2017 08:50:50 +0530
-Subject: [PATCH v2 2/4] ARM: nommu: dynamic exception base address setting
+Date: Sun, 22 Jan 2017 08:52:12 +0530
+Subject: [PATCH v2 3/4] ARM: nommu: display vectors base
 In-Reply-To: <20170122031652.13074-1-afzal.mohd.ma@gmail.com>
 References: <20170122031652.13074-1-afzal.mohd.ma@gmail.com>
-Message-ID: <20170122032050.13344-1-afzal.mohd.ma@gmail.com>
+Message-ID: <20170122032212.13456-1-afzal.mohd.ma@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No-MMU dynamic exception base address configuration on CP15
-processors. In the case of low vectors, decision based on whether
-security extensions are enabled & whether remap vectors to RAM
-CONFIG option is selected.
-
-For no-MMU without CP15, current default value of 0x0 is retained.
+The exception base address is now dynamically estimated for no-MMU,
+display it. As it is the case, now limit VECTORS_BASE usage to MMU
+scenario.
 
 Signed-off-by: afzal mohammed <afzal.mohd.ma@gmail.com>
 ---
 
 v2:
- Use existing helpers to detect security extensions
- Rewrite a CPP step to C for readability
+ A change to accomodate bisectability resolution on patch 1/4
 
- arch/arm/mm/nommu.c | 52 ++++++++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 50 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/memory.h | 4 ++--
+ arch/arm/mm/init.c            | 5 +++++
+ arch/arm/mm/mm.h              | 5 +++--
+ 3 files changed, 10 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
-index 2740967727e2..20ac52579952 100644
---- a/arch/arm/mm/nommu.c
-+++ b/arch/arm/mm/nommu.c
-@@ -11,6 +11,7 @@
- #include <linux/kernel.h>
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 0b5416fe7709..9ae474bf84fc 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -83,6 +83,8 @@
+ #define IOREMAP_MAX_ORDER	24
+ #endif
  
- #include <asm/cacheflush.h>
-+#include <asm/cp15.h>
- #include <asm/sections.h>
- #include <asm/page.h>
- #include <asm/setup.h>
-@@ -22,6 +23,8 @@
++#define VECTORS_BASE		UL(0xffff0000)
++
+ #else /* CONFIG_MMU */
  
- #include "mm.h"
+ /*
+@@ -111,8 +113,6 @@
  
-+unsigned long vectors_base;
-+
- #ifdef CONFIG_ARM_MPU
- struct mpu_rgn_info mpu_rgn_info;
+ #endif /* !CONFIG_MMU */
  
-@@ -278,15 +281,60 @@ static void sanity_check_meminfo_mpu(void) {}
- static void __init mpu_setup(void) {}
- #endif /* CONFIG_ARM_MPU */
+-#define VECTORS_BASE		UL(0xffff0000)
+-
+ /*
+  * We fix the TCM memories max 32 KiB ITCM resp DTCM at these
+  * locations
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 823e119a5daa..9c68e3aba87c 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -522,7 +522,12 @@ void __init mem_init(void)
+ 			"      .data : 0x%p" " - 0x%p" "   (%4td kB)\n"
+ 			"       .bss : 0x%p" " - 0x%p" "   (%4td kB)\n",
  
-+#ifdef CONFIG_CPU_CP15
-+#ifdef CONFIG_CPU_HIGH_VECTOR
-+static unsigned long __init setup_vectors_base(void)
-+{
-+	unsigned long reg = get_cr();
++#ifdef CONFIG_MMU
+ 			MLK(VECTORS_BASE, VECTORS_BASE + PAGE_SIZE),
++#else
++			MLK(vectors_base, vectors_base + PAGE_SIZE),
++#endif
 +
-+	set_cr(reg | CR_V);
-+	return 0xffff0000;
-+}
-+#else /* CONFIG_CPU_HIGH_VECTOR */
-+/* Write exception base address to VBAR */
-+static inline void set_vbar(unsigned long val)
-+{
-+	asm("mcr p15, 0, %0, c12, c0, 0" : : "r" (val) : "cc");
-+}
-+
-+/*
-+ * Security extensions, bits[7:4], permitted values,
-+ * 0b0000 - not implemented, 0b0001/0b0010 - implemented
-+ */
-+static inline bool security_extensions_enabled(void)
-+{
-+	return !!cpuid_feature_extract(CPUID_EXT_PFR1, 4);
-+}
-+
-+static unsigned long __init setup_vectors_base(void)
-+{
-+	unsigned long base = 0, reg = get_cr();
-+
-+	set_cr(reg & ~CR_V);
-+	if (security_extensions_enabled()) {
-+		if (IS_ENABLED(CONFIG_REMAP_VECTORS_TO_RAM))
-+			base = CONFIG_DRAM_BASE;
-+		set_vbar(base);
-+	} else if (IS_ENABLED(CONFIG_REMAP_VECTORS_TO_RAM)) {
-+		if (CONFIG_DRAM_BASE != 0)
-+			pr_err("Security extensions not enabled, vectors cannot be remapped to RAM, vectors base will be 0x00000000\n");
-+	}
-+
-+	return base;
-+}
-+#endif /* CONFIG_CPU_HIGH_VECTOR */
-+#endif /* CONFIG_CPU_CP15 */
-+
- void __init arm_mm_memblock_reserve(void)
- {
- #ifndef CONFIG_CPU_V7M
-+	vectors_base = IS_ENABLED(CONFIG_CPU_CP15) ? setup_vectors_base() : 0;
- 	/*
- 	 * Register the exception vector page.
- 	 * some architectures which the DRAM is the exception vector to trap,
- 	 * alloc_page breaks with error, although it is not NULL, but "0."
- 	 */
--	memblock_reserve(CONFIG_VECTORS_BASE, 2 * PAGE_SIZE);
-+	memblock_reserve(vectors_base, 2 * PAGE_SIZE);
- #else /* ifndef CONFIG_CPU_V7M */
- 	/*
- 	 * There is no dedicated vector page on V7-M. So nothing needs to be
-@@ -310,7 +358,7 @@ void __init sanity_check_meminfo(void)
-  */
- void __init paging_init(const struct machine_desc *mdesc)
- {
--	early_trap_init((void *)CONFIG_VECTORS_BASE);
-+	early_trap_init((void *)vectors_base);
- 	mpu_setup();
- 	bootmem_init();
- }
+ #ifdef CONFIG_HAVE_TCM
+ 			MLK(DTCM_OFFSET, (unsigned long) dtcm_end),
+ 			MLK(ITCM_OFFSET, (unsigned long) itcm_end),
+diff --git a/arch/arm/mm/mm.h b/arch/arm/mm/mm.h
+index ce727d47275c..546f09437fca 100644
+--- a/arch/arm/mm/mm.h
++++ b/arch/arm/mm/mm.h
+@@ -79,8 +79,9 @@ struct static_vm {
+ extern struct list_head static_vmlist;
+ extern struct static_vm *find_static_vm_vaddr(void *vaddr);
+ extern __init void add_static_vm_early(struct static_vm *svm);
+-
+-#endif
++#else /* CONFIG_MMU */
++extern unsigned long vectors_base;
++#endif /* CONFIG_MMU */
+ 
+ #ifdef CONFIG_ZONE_DMA
+ extern phys_addr_t arm_dma_limit;
 -- 
 2.11.0
