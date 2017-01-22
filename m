@@ -1,73 +1,61 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Sun, 22 Jan 2017 10:14:58 +0800
-Subject: [PATCH v11 2/8] power: add power sequence library
-In-Reply-To: <CAJZ5v0h09A2XWLEk7v9XPe+4fP7HDr6AqZzBmvBi_V5nhLoiRw@mail.gmail.com>
-References: <1483596119-27508-1-git-send-email-peter.chen@nxp.com>
- <1483596119-27508-3-git-send-email-peter.chen@nxp.com>
- <20170107085456.w5dhm7qadqa6tc7v@kozik-lap>
- <20170110070240.GA29454@b29397-desktop>
- <20170120075239.GC21013@b29397-desktop>
- <CAJZ5v0h09A2XWLEk7v9XPe+4fP7HDr6AqZzBmvBi_V5nhLoiRw@mail.gmail.com>
-Message-ID: <20170122021458.GB6522@b29397-desktop>
+From: guochun.mao@mediatek.com (Guochun Mao)
+Date: Sun, 22 Jan 2017 10:36:40 +0800
+Subject: [PATCH v1 2/2] arm: dts: mt2701: add nor flash node
+In-Reply-To: <CAL_Jsq+S-FYy4SmjJ3fWzBugw2zCj5TQkkfUA8QVL7SLJW3E1g@mail.gmail.com>
+References: <d7b866ad-5b2f-62d3-3aa3-6fa42803d625@gmail.com>
+ <b850b751-1d8d-0053-cf1f-d5314542e5c3@gmail.com>
+ <20170113172825.75d545a3@bbrezillon>
+ <86c997be-f500-eaa1-3ba5-d21cff6223b7@gmail.com>
+ <20170113175628.1793f433@bbrezillon>
+ <0fafcd8d-cf99-de6b-728f-5e3637810b68@gmail.com>
+ <20170114092958.022f2fc8@bbrezillon>
+ <e7fa1542-f0e2-0e45-23b3-25d6491ae40d@gmail.com>
+ <20170116094032.6f471f11@bbrezillon>
+ <20170117143650.5db87148@free-electrons.com>
+ <20170118222010.ivc6jxpnrumemvdf@rob-hp-laptop>
+ <20170119103829.524ce715@free-electrons.com>
+ <CAL_Jsq+EyHtC7THLCJcwgtVtVESMOdmi3T3bBxgOqJt6BCtCHQ@mail.gmail.com>
+ <20170119091428.598eb987@bbrezillon>
+ <CAL_Jsq+S-FYy4SmjJ3fWzBugw2zCj5TQkkfUA8QVL7SLJW3E1g@mail.gmail.com>
+Message-ID: <1485052600.19995.10.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2017 at 11:21:27AM +0100, Rafael J. Wysocki wrote:
-> On Fri, Jan 20, 2017 at 8:52 AM, Peter Chen <hzpeterchen@gmail.com> wrote:
-> > On Tue, Jan 10, 2017 at 03:02:41PM +0800, Peter Chen wrote:
-> >> On Sat, Jan 07, 2017 at 10:54:56AM +0200, Krzysztof Kozlowski wrote:
-> >> > On Thu, Jan 05, 2017 at 02:01:53PM +0800, Peter Chen wrote:
-> >> > > We have an well-known problem that the device needs to do some power
-> >> > > sequence before it can be recognized by related host, the typical
-> >> > > example like hard-wired mmc devices and usb devices.
-> >> > >
-> >> > > This power sequence is hard to be described at device tree and handled by
-> >> > > related host driver, so we have created a common power sequence
-> >> > > library to cover this requirement. The core code has supplied
-> >> > > some common helpers for host driver, and individual power sequence
-> >> > > libraries handle kinds of power sequence for devices. The pwrseq
-> >> > > librares always need to allocate extra instance for compatible
-> >> > > string match.
-> >> > >
-> >> > > pwrseq_generic is intended for general purpose of power sequence, which
-> >> > > handles gpios and clocks currently, and can cover other controls in
-> >> > > future. The host driver just needs to call of_pwrseq_on/of_pwrseq_off
-> >> > > if only one power sequence is needed, else call of_pwrseq_on_list
-> >> > > /of_pwrseq_off_list instead (eg, USB hub driver).
-> >> > >
-> >> > > For new power sequence library, it can add its compatible string
-> >> > > to pwrseq_of_match_table, then the pwrseq core will match it with
-> >> > > DT's, and choose this library at runtime.
-> >> > >
-> >> > > Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> >> > > Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
-> >> > > Tested-by Joshua Clayton <stillcompiling@gmail.com>
-> >> > > Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
-> >> > > Tested-by: Matthias Kaehlcke <mka@chromium.org>
-> >> >
-> >> > Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
-> >> > Tested on Odroid U3 (reset sequence for LAN9730):
-> >> > Tested-by: Krzysztof Kozlowski <krzk@kernel.org>
-> >> >
-> >>
-> >> A nice ping...
-> >>
+Hi,
+On Thu, 2017-01-19 at 08:18 -0600, Rob Herring wrote:
+> On Thu, Jan 19, 2017 at 2:14 AM, Boris Brezillon
+> > One last question and I'm done: is something like that acceptable?
 > >
-> > Rafael, would you please review it? This series was discussed about
-> > half a year, and many people need it, I hope it can be in v4.11-rc1,
-> > thanks.
+> >         compatible = "<vendor>,<old-soc>","<vendor>,<new-soc>";
+> >
+> > This can happen when someone adds support for an unsupported feature
+> > on a brand new SoC, and then someone else use the same driver for an
+> > older SoC embedding the same IP but still wants to add a new compatible
+> > just in case these 2 IPs appear to be slightly different.
 > 
-> I'm travelling now
-> (http://marc.info/?l=linux-pm&m=148410629024194&w=2) and (as stated in
-> this message) I'll get to the patches when I'm back home.
+> Yes, it's old and new compatible strings in this case and it's newest
+> compatible string first.
 > 
-> There is a good chance for your code to go into 4.11-rc1 if the review
-> comments so far have been addressed.
+> > Here the order of compat strings is no longer following a clear rule
+> > like 'most-specific compatible first' or 'newest IP/SoC version first',
+> > it's completely dependent on the order these IPs were supported in the
+> > OS (Linux). I'm perfectly fine with that BTW, just want to make sure
+> > this is authorized.
 > 
+> I guess we should say "newest compatible for IP first" instead. There
+> are some exceptions where we add fallbacks later on, but that falls
+> under the most-specific part.
+> 
+> It's order that the bindings are defined, not Linux support really,
+> but in practice those are the same.
+> 
+> Rob
 
-Thanks, Rafael. I think I have addressed all your comments.
+Thanks for all your effort for code reviewing.
+Our mt2701-nor's hardware is designed base on mt8713-nor,
+even so, there would be some slight difference.
+If I don't misunderstand your viewpoint in this discussion,
+there's no need to drop mt2701-nor compatible.
+And if not, is there any other suggestion?
 
--- 
-
-Best Regards,
-Peter Chen
+Thanks.
