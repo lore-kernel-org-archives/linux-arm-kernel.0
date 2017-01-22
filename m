@@ -1,144 +1,55 @@
-From: mzoran@crowfest.net (Michael Zoran)
-Date: Sun, 22 Jan 2017 04:21:02 -0800
-Subject: ARM64: Disabling warnings about deprecated armv8 instructions
-In-Reply-To: <22169925.OhJ0QcnbHM@localhost>
-References: <1485072424.14066.2.camel@crowfest.net>
- <1485075528.14345.1.camel@crowfest.net>
- <CAKv+Gu8LU3QjrUa6wMJF3WBNrhx34Pi_0ZUQVfrZy7w7y7237w@mail.gmail.com>
- <22169925.OhJ0QcnbHM@localhost>
-Message-ID: <1485087662.1518.1.camel@crowfest.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 22 Jan 2017 13:18:30 +0100
+Subject: [PATCH 06/22] gpio: add DT bindings for Cortina Gemini GPIO
+Message-ID: <20170122121830.10336-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2017-01-22 at 12:46 +0100, Alexander Stein wrote:
-> ?On Sunday, January 22, 2017, 9:09:37 AM CET Ard Biesheuvel wrote:
-> > On 22 January 2017 at 08:58, Michael Zoran <mzoran@crowfest.net>
-> > wrote:
-> > > On Sun, 2017-01-22 at 09:52 +0100, Alexander Stein wrote:
-> > > > Hi Michael,
-> > > > 
-> > > > On Sunday, January 22, 2017, 12:07:04 AM CET Michael Zoran
-> > > > wrote:
-> > > > > I'm not sure if this if the correct place to be asking
-> > > > > this.???The
-> > > > > RPI
-> > > > > 3 running ARM64 is slowly reaching the point of being about
-> > > > > to
-> > > > > seriously run a 32 bit vender OS like Raspbian.??When running
-> > > > > Raspbian,
-> > > > > I'm seeing a very large number(thousands) of kernel log
-> > > > > messages
-> > > > > about
-> > > > > deprecated instructions especially setend and barrier
-> > > > > instuctions.
-> > > > > This can be very annoying and is completely filling the
-> > > > > kernel log.
-> > > > > 
-> > > > > I'm considering submitting a patch to add a Kconfig option to
-> > > > > disable
-> > > > > these warnings with the default being to keep the warnings
-> > > > > enabled.??I
-> > > > > was wondering if such a patch could be seriously considered.
-> > > > 
-> > > > Could you please provide an example of those warning an what is
-> > > > trigging
-> > > > those?
-> > > > 
-> > > > Thanks and best regards,
-> > > > Alexander
-> > > 
-> > > Sure, here is a snipped from dmesg.??I think this is happening
-> > > because
-> > > the entire Raspbian OS is compiled with a custom gcc compiler
-> > > that is
-> > > targeting arm6+VFP.
-> > > 
-> > > I can double check, but I think the instructions are being
-> > > emulated in
-> > > hardware so they are just filling the log and slowing things
-> > > down.
-> > > 
-> > > [10685.558480] cp15barrier_handler: 197896 callbacks suppressed
-> > > [10685.558487] "Xorg" (656) uses deprecated CP15 Barrier
-> > > instruction at
-> > > 0xf707fe9c
-> > > [10685.558504] "Xorg" (656) uses deprecated CP15 Barrier
-> > > instruction at
-> > > 0xf7015944
-> > > [10685.558511] "Xorg" (656) uses deprecated CP15 Barrier
-> > > instruction at
-> > > 0xf7012494
-> > > [10685.558518] "Xorg" (656) uses deprecated CP15 Barrier
-> > > instruction at
-> > > 0xf70159b4
-> > > [10685.558527] "Xorg" (656) uses deprecated CP15 Barrier
-> > > instruction at
-> > > 0xf7011478
-> > > [10685.558533] "Xorg" (656) uses deprecated CP15 Barrier
-> > > instruction at
-> > > 0xf70114e8
-> > > [10685.558540] "Xorg" (656) uses deprecated CP15 Barrier
-> > > instruction at
-> > > 0xf7015944
-> > > [10685.558547] "Xorg" (656) uses deprecated CP15 Barrier
-> > > instruction at
-> > > 0xf7012494
-> > > [10685.558553] "Xorg" (656) uses deprecated CP15 Barrier
-> > > instruction at
-> > > 0xf70159b4
-> > > [10685.558560] "Xorg" (656) uses deprecated CP15 Barrier
-> > > instruction at
-> > > 0xf7011478
-> > > [10685.559179] compat_setend_handler: 1078 callbacks suppressed
-> > > [10685.559188] "systemd-journal" (138) uses deprecated setend
-> > > instruction at 0xf76a66f4
-> > > [10685.559196] "systemd-journal" (138) uses deprecated setend
-> > > instruction at 0xf76a6bd8
-> > > [10685.559209] "systemd-journal" (138) uses deprecated setend
-> > > instruction at 0xf76a66f4
-> > > [10685.559216] "systemd-journal" (138) uses deprecated setend
-> > > instruction at 0xf76a6bd8
-> > > [10685.559231] "systemd-journal" (138) uses deprecated setend
-> > > instruction at 0xf76a66f4
-> > > [10685.559237] "systemd-journal" (138) uses deprecated setend
-> > > instruction at 0xf76a6bd8
-> > > [10685.559246] "systemd-journal" (138) uses deprecated setend
-> > > instruction at 0xf76a66f4
-> > > [10685.559253] "systemd-journal" (138) uses deprecated setend
-> > > instruction at 0xf76a6bd8
-> > > [10685.559269] "systemd-journal" (138) uses deprecated setend
-> > > instruction at 0xf76a66f4
-> > > [10685.559276] "systemd-journal" (138) uses deprecated setend
-> > > instruction at 0xf76a6bd8
-> > 
-> > You can disable the emulation by doing
-> > 
-> > echo 2 >/proc/sys/abi/setend
-> > echo 2 >/proc/sys/abi/cp15_barrier
-> 
-> This reminds me of /proc/cpu/alignment to detect alignment problems
-> in your?
-> application. Although armv6+ can handle unaligned access in most (!)
-> cases you?
-> might want to trap thos cases. I would consider this a similar way.
-> IMHO raspbian, still supporting raspberry pi 1 (armv6), should
-> silence those?
-> warnings.
-> 
-> Best regards,
-> Alexander
-> 
+This adds fairly standard DT bindings for the Cortina Systems
+Gemini GPIO controller.
 
-Thanks, but I see multiple ways this could be solved which is partially
-why I sent out the initial e-mail.
+Cc: Janos Laube <janos.dev@gmail.com>
+Cc: Paulius Zaleckas <paulius.zaleckas@gmail.com>
+Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: devicetree at vger.kernel.org
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+Note to self: just apply this to the GPIO tree when discussion is over.
+---
+ .../bindings/gpio/cortina,gemini-gpio.txt          | 24 ++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gpio/cortina,gemini-gpio.txt
 
-Here are just a few of the options.
-1. Add a .config option to silence the warnings.
-2. Detect the binary type to detectermine if it should be silenced.
-3. #ifdef out the complaining code in downstream sources.
-4. Have various distributions write to /proc/sys/abi/* at system boot.
-
-The list is probably endless.
-
-And I think this is closely related to the other topic of setting the
-linux personality based on detection of the binary.
+diff --git a/Documentation/devicetree/bindings/gpio/cortina,gemini-gpio.txt b/Documentation/devicetree/bindings/gpio/cortina,gemini-gpio.txt
+new file mode 100644
+index 000000000000..5c9246c054e5
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/cortina,gemini-gpio.txt
+@@ -0,0 +1,24 @@
++Cortina Systems Gemini GPIO Controller
++
++Required properties:
++
++- compatible : Must be "cortina,gemini-gpio"
++- reg : Should contain registers location and length
++- interrupts : Should contain the interrupt line for the GPIO block
++- gpio-controller : marks this as a GPIO controller
++- #gpio-cells : Should be 2, see gpio/gpio.txt
++- interrupt-controller : marks this as an interrupt controller
++- #interrupt-cells : a standard two-cell interrupt flag, see
++  interrupt-controller/interrupts.txt
++
++Example:
++
++gpio at 4d000000 {
++	compatible = "cortina,gemini-gpio";
++	reg = <0x4d000000 0x100>;
++	interrupts = <22 IRQ_TYPE_LEVEL_HIGH>;
++	gpio-controller;
++	#gpio-cells = <2>;
++	interrupt-controller;
++	#interrupt-cells = <2>;
++};
+-- 
+2.9.3
