@@ -1,12 +1,12 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 22 Jan 2017 13:23:11 +0100
-Subject: [PATCH 16/22] ARM: dts: add a devicetree for Wiliboard WBD-111
-Message-ID: <20170122122311.10862-1-linus.walleij@linaro.org>
+Date: Sun, 22 Jan 2017 13:23:23 +0100
+Subject: [PATCH 17/22] ARM: dts: add a devicetree for Wiliboard WBD-222
+Message-ID: <20170122122323.10912-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This devicetree is simply based on the board file in
-arch/arm/mach-gemini/board-wbd111.c and contain the
+arch/arm/mach-gemini/board-wbd222.c and contain the
 equivalent platform data, mainly just moving the GPIOs
 from the global numberspace to explicitly reference their
 parent GPIO.
@@ -18,32 +18,32 @@ Cc: Florian Fainelli <f.fainelli@gmail.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
  arch/arm/boot/dts/Makefile          |   3 +-
- arch/arm/boot/dts/gemini-wbd111.dts | 101 ++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/gemini-wbd222.dts | 101 ++++++++++++++++++++++++++++++++++++
  2 files changed, 103 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/gemini-wbd111.dts
+ create mode 100644 arch/arm/boot/dts/gemini-wbd222.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 517306f28427..144584a83582 100644
+index 144584a83582..52d1cfbaa1da 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -171,7 +171,8 @@ dtb-$(CONFIG_ARCH_EXYNOS5) += \
- dtb-$(CONFIG_ARCH_GEMINI) += \
+@@ -172,7 +172,8 @@ dtb-$(CONFIG_ARCH_GEMINI) += \
  	gemini-nas4220b.dtb \
  	gemini-rut1xx.dtb \
--	gemini-sq201.dtb
-+	gemini-sq201.dtb \
-+	gemini-wbd111.dtb
+ 	gemini-sq201.dtb \
+-	gemini-wbd111.dtb
++	gemini-wbd111.dtb \
++	gemini-wbd222.dtb
  dtb-$(CONFIG_ARCH_HI3xxx) += \
  	hi3620-hi4511.dtb
  dtb-$(CONFIG_ARCH_HIGHBANK) += \
-diff --git a/arch/arm/boot/dts/gemini-wbd111.dts b/arch/arm/boot/dts/gemini-wbd111.dts
+diff --git a/arch/arm/boot/dts/gemini-wbd222.dts b/arch/arm/boot/dts/gemini-wbd222.dts
 new file mode 100644
-index 000000000000..d54df914593b
+index 000000000000..47ac6c6762c5
 --- /dev/null
-+++ b/arch/arm/boot/dts/gemini-wbd111.dts
++++ b/arch/arm/boot/dts/gemini-wbd222.dts
 @@ -0,0 +1,101 @@
 +/*
-+ * Device Tree file for Wiliboard WBD-111
++ * Device Tree file for Wiliboard WBD-222
 + */
 +
 +/dts-v1/;
@@ -52,8 +52,8 @@ index 000000000000..d54df914593b
 +#include <dt-bindings/input/input.h>
 +
 +/ {
-+	model = "Wiliboard WBD-111";
-+	compatible = "wiliboard,wbd111", "cortina,gemini";
++	model = "Wiliboard WBD-222";
++	compatible = "wiliboard,wbd222", "cortina,gemini";
 +	#address-cells = <1>;
 +	#size-cells = <1>;
 +
