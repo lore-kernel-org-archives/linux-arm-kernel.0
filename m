@@ -1,15 +1,17 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 22 Jan 2017 13:23:23 +0100
-Subject: [PATCH 17/22] ARM: dts: add a devicetree for Wiliboard WBD-222
-Message-ID: <20170122122323.10912-1-linus.walleij@linaro.org>
+Date: Sun, 22 Jan 2017 13:23:31 +0100
+Subject: [PATCH 18/22] ARM: gemini: delete all boardfiles
+Message-ID: <20170122122331.10961-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This devicetree is simply based on the board file in
-arch/arm/mach-gemini/board-wbd222.c and contain the
-equivalent platform data, mainly just moving the GPIOs
-from the global numberspace to explicitly reference their
-parent GPIO.
+Delete the Gemini boardfiles: we have corresponding, fully-featured
+device trees for all these boards. Delete the referenced include
+files. Delete the local config symbols, especially one for
+"swapped memory", as all supported boards have swapped memory, and
+would a new board be supported this is likely not the right way
+to achieve it anyways. Only the Kconfig options in the central
+arch/arm/Kconfig remains.
 
 Cc: Janos Laube <janos.dev@gmail.com>
 Cc: Paulius Zaleckas <paulius.zaleckas@gmail.com>
@@ -17,131 +19,1791 @@ Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
 Cc: Florian Fainelli <f.fainelli@gmail.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/Makefile          |   3 +-
- arch/arm/boot/dts/gemini-wbd222.dts | 101 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 103 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/gemini-wbd222.dts
+ arch/arm/Kconfig                               |   2 -
+ arch/arm/mach-gemini/Kconfig                   |  40 ----
+ arch/arm/mach-gemini/Makefile                  |  15 +-
+ arch/arm/mach-gemini/Makefile.boot             |   6 -
+ arch/arm/mach-gemini/board-nas4220b.c          | 106 ----------
+ arch/arm/mach-gemini/board-rut1xx.c            |  92 --------
+ arch/arm/mach-gemini/board-wbd111.c            | 133 ------------
+ arch/arm/mach-gemini/board-wbd222.c            | 133 ------------
+ arch/arm/mach-gemini/common.h                  |  33 ---
+ arch/arm/mach-gemini/devices.c                 | 118 -----------
+ arch/arm/mach-gemini/gpio.c                    | 231 --------------------
+ arch/arm/mach-gemini/include/mach/global_reg.h | 278 -------------------------
+ arch/arm/mach-gemini/irq.c                     | 120 -----------
+ arch/arm/mach-gemini/mm.c                      |  82 --------
+ arch/arm/mach-gemini/reset.c                   |  25 ---
+ arch/arm/mach-gemini/time.c                    | 239 ---------------------
+ 16 files changed, 2 insertions(+), 1651 deletions(-)
+ delete mode 100644 arch/arm/mach-gemini/Kconfig
+ delete mode 100644 arch/arm/mach-gemini/board-nas4220b.c
+ delete mode 100644 arch/arm/mach-gemini/board-rut1xx.c
+ delete mode 100644 arch/arm/mach-gemini/board-wbd111.c
+ delete mode 100644 arch/arm/mach-gemini/board-wbd222.c
+ delete mode 100644 arch/arm/mach-gemini/common.h
+ delete mode 100644 arch/arm/mach-gemini/devices.c
+ delete mode 100644 arch/arm/mach-gemini/gpio.c
+ delete mode 100644 arch/arm/mach-gemini/include/mach/global_reg.h
+ delete mode 100644 arch/arm/mach-gemini/irq.c
+ delete mode 100644 arch/arm/mach-gemini/mm.c
+ delete mode 100644 arch/arm/mach-gemini/reset.c
+ delete mode 100644 arch/arm/mach-gemini/time.c
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 144584a83582..52d1cfbaa1da 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -172,7 +172,8 @@ dtb-$(CONFIG_ARCH_GEMINI) += \
- 	gemini-nas4220b.dtb \
- 	gemini-rut1xx.dtb \
- 	gemini-sq201.dtb \
--	gemini-wbd111.dtb
-+	gemini-wbd111.dtb \
-+	gemini-wbd222.dtb
- dtb-$(CONFIG_ARCH_HI3xxx) += \
- 	hi3620-hi4511.dtb
- dtb-$(CONFIG_ARCH_HIGHBANK) += \
-diff --git a/arch/arm/boot/dts/gemini-wbd222.dts b/arch/arm/boot/dts/gemini-wbd222.dts
-new file mode 100644
-index 000000000000..47ac6c6762c5
---- /dev/null
-+++ b/arch/arm/boot/dts/gemini-wbd222.dts
-@@ -0,0 +1,101 @@
-+/*
-+ * Device Tree file for Wiliboard WBD-222
-+ */
-+
-+/dts-v1/;
-+
-+#include "gemini.dtsi"
-+#include <dt-bindings/input/input.h>
-+
-+/ {
-+	model = "Wiliboard WBD-222";
-+	compatible = "wiliboard,wbd222", "cortina,gemini";
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+
-+	memory { /* 128 MB */
-+		device_type = "memory";
-+		reg = <0x00000000 0x8000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200n8";
-+		stdout-path = &uart0;
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		button at 5 {
-+			debounce_interval = <50>;
-+			wakeup-source;
-+			linux,code = <KEY_SETUP>;
-+			label = "reset";
-+			gpios = <&gpio0 5 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		led at 1 {
-+			label = "wbd111:red:L3";
-+			gpios = <&gpio0 1 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+		led at 2 {
-+			label = "wbd111:green:L4";
-+			gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+		led at 3 {
-+			label = "wbd111:red:L4";
-+			gpios = <&gpio0 3 GPIO_ACTIVE_HIGH>;
-+			default-state = "off";
-+		};
-+		led at 5 {
-+			label = "wbd111:green:L3";
-+			gpios = <&gpio0 5 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+
-+	flash at 30000000 {
-+		status = "okay";
-+		/* 8MB of flash */
-+		reg = <0x30000000 0x00800000>;
-+
-+		/* FIXME */
-+		partition at 0 {
-+			label = "RedBoot";
-+			reg = <0x00000000 0x00020000>;
-+			read-only;
-+		};
-+		partition at 20000 {
-+			label = "kernel";
-+			reg = <0x00020000 0x00100000>;
-+		};
-+		partition at 120000 {
-+			label = "rootfs";
-+			reg = <0x00120000 0x006a0000>;
-+		};
-+		partition at 7c0000 {
-+			label = "VCTL";
-+			reg = <0x007c0000 0x00010000>;
-+			read-only;
-+		};
-+		partition at 7d0000 {
-+			label = "cfg";
-+			reg = <0x007d0000 0x00010000>;
-+			read-only;
-+		};
-+		partition at 7e0000 {
-+			label = "FIS";
-+			reg = <0x007e0000 0x00010000>;
-+			read-only;
-+		};
-+	};
-+};
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index b4a42d599e2c..1b01eb5e2cea 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -751,8 +751,6 @@ source "arch/arm/mach-ep93xx/Kconfig"
+ 
+ source "arch/arm/mach-footbridge/Kconfig"
+ 
+-source "arch/arm/mach-gemini/Kconfig"
+-
+ source "arch/arm/mach-highbank/Kconfig"
+ 
+ source "arch/arm/mach-hisi/Kconfig"
+diff --git a/arch/arm/mach-gemini/Kconfig b/arch/arm/mach-gemini/Kconfig
+deleted file mode 100644
+index 6f066ee4bf24..000000000000
+--- a/arch/arm/mach-gemini/Kconfig
++++ /dev/null
+@@ -1,40 +0,0 @@
+-if ARCH_GEMINI
+-
+-menu "Cortina Systems Gemini Implementations"
+-
+-config MACH_NAS4220B
+-	bool "Raidsonic NAS-4220-B"
+-	select GEMINI_MEM_SWAP
+-	help
+-	  Say Y here if you intend to run this kernel on a
+-	  Raidsonic NAS-4220-B.
+-
+-config MACH_RUT100
+-	bool "Teltonika RUT100"
+-	select GEMINI_MEM_SWAP
+-	help
+-	  Say Y here if you intend to run this kernel on a
+-	  Teltonika 3G Router RUT100.
+-
+-config MACH_WBD111
+-	bool "Wiliboard WBD-111"
+-	select GEMINI_MEM_SWAP
+-	help
+-	  Say Y here if you intend to run this kernel on a
+-	  Wiliboard WBD-111.
+-
+-config MACH_WBD222
+-        bool "Wiliboard WBD-222"
+-        select GEMINI_MEM_SWAP
+-        help
+-          Say Y here if you intend to run this kernel on a
+-          Wiliboard WBD-222.
+-
+-endmenu
+-
+-config GEMINI_MEM_SWAP
+-	bool "Gemini memory is swapped"
+-	help
+-	  Say Y here if Gemini memory is swapped by bootloader.
+-
+-endif
+diff --git a/arch/arm/mach-gemini/Makefile b/arch/arm/mach-gemini/Makefile
+index 11f07fb6ec3d..30c5acffe948 100644
+--- a/arch/arm/mach-gemini/Makefile
++++ b/arch/arm/mach-gemini/Makefile
+@@ -1,13 +1,2 @@
+-#
+-# Makefile for the linux kernel.
+-#
+-
+-# Object file lists.
+-
+-obj-y			:= irq.o mm.o time.o devices.o gpio.o idle.o reset.o board-dt.o
+-
+-# Board-specific support
+-obj-$(CONFIG_MACH_NAS4220B)	+= board-nas4220b.o
+-obj-$(CONFIG_MACH_RUT100)	+= board-rut1xx.o
+-obj-$(CONFIG_MACH_WBD111)	+= board-wbd111.o
+-obj-$(CONFIG_MACH_WBD222)	+= board-wbd222.o
++# Makefile for Cortina systems Gemini
++obj-y			:= idle.o board-dt.o
+diff --git a/arch/arm/mach-gemini/Makefile.boot b/arch/arm/mach-gemini/Makefile.boot
+index 683f52b20e3d..760a0efe7580 100644
+--- a/arch/arm/mach-gemini/Makefile.boot
++++ b/arch/arm/mach-gemini/Makefile.boot
+@@ -1,9 +1,3 @@
+-ifeq ($(CONFIG_GEMINI_MEM_SWAP),y)
+    zreladdr-y	+= 0x00008000
+ params_phys-y	:= 0x00000100
+ initrd_phys-y	:= 0x00800000
+-else
+-   zreladdr-y	+= 0x10008000
+-params_phys-y	:= 0x10000100
+-initrd_phys-y	:= 0x10800000
+-endif
+diff --git a/arch/arm/mach-gemini/board-nas4220b.c b/arch/arm/mach-gemini/board-nas4220b.c
+deleted file mode 100644
+index 18b12796acf9..000000000000
+--- a/arch/arm/mach-gemini/board-nas4220b.c
++++ /dev/null
+@@ -1,106 +0,0 @@
+-/*
+- *  Support for Raidsonic NAS-4220-B
+- *
+- *  Copyright (C) 2009 Janos Laube <janos.dev@gmail.com>
+- *
+- * based on rut1xx.c
+- *  Copyright (C) 2008 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/leds.h>
+-#include <linux/input.h>
+-#include <linux/gpio_keys.h>
+-#include <linux/io.h>
+-
+-#include <asm/setup.h>
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/time.h>
+-
+-#include <mach/hardware.h>
+-#include <mach/global_reg.h>
+-
+-#include "common.h"
+-
+-static struct gpio_led ib4220b_leds[] = {
+-	{
+-		.name			= "nas4220b:orange:hdd",
+-		.default_trigger	= "none",
+-		.gpio			= 60,
+-	},
+-	{
+-		.name			= "nas4220b:green:os",
+-		.default_trigger	= "heartbeat",
+-		.gpio			= 62,
+-	},
+-};
+-
+-static struct gpio_led_platform_data ib4220b_leds_data = {
+-	.num_leds	= ARRAY_SIZE(ib4220b_leds),
+-	.leds		= ib4220b_leds,
+-};
+-
+-static struct platform_device ib4220b_led_device = {
+-	.name	= "leds-gpio",
+-	.id	= -1,
+-	.dev	= {
+-		.platform_data = &ib4220b_leds_data,
+-	},
+-};
+-
+-static struct gpio_keys_button ib4220b_keys[] = {
+-	{
+-		.code		= KEY_SETUP,
+-		.gpio		= 61,
+-		.active_low	= 1,
+-		.desc		= "Backup Button",
+-		.type		= EV_KEY,
+-	},
+-	{
+-		.code		= KEY_RESTART,
+-		.gpio		= 63,
+-		.active_low	= 1,
+-		.desc		= "Softreset Button",
+-		.type		= EV_KEY,
+-	},
+-};
+-
+-static struct gpio_keys_platform_data ib4220b_keys_data = {
+-	.buttons	= ib4220b_keys,
+-	.nbuttons	= ARRAY_SIZE(ib4220b_keys),
+-};
+-
+-static struct platform_device ib4220b_key_device = {
+-	.name	= "gpio-keys",
+-	.id	= -1,
+-	.dev	= {
+-		.platform_data = &ib4220b_keys_data,
+-	},
+-};
+-
+-static void __init ib4220b_init(void)
+-{
+-	gemini_gpio_init();
+-	platform_register_uart();
+-	platform_register_pflash(SZ_16M, NULL, 0);
+-	platform_device_register(&ib4220b_led_device);
+-	platform_device_register(&ib4220b_key_device);
+-	platform_register_rtc();
+-}
+-
+-MACHINE_START(NAS4220B, "Raidsonic NAS IB-4220-B")
+-	.atag_offset	= 0x100,
+-	.map_io		= gemini_map_io,
+-	.init_irq	= gemini_init_irq,
+-	.init_time	= gemini_timer_init,
+-	.init_machine	= ib4220b_init,
+-	.restart	= gemini_restart,
+-MACHINE_END
+diff --git a/arch/arm/mach-gemini/board-rut1xx.c b/arch/arm/mach-gemini/board-rut1xx.c
+deleted file mode 100644
+index 7a675f88ffd6..000000000000
+--- a/arch/arm/mach-gemini/board-rut1xx.c
++++ /dev/null
+@@ -1,92 +0,0 @@
+-/*
+- *  Support for Teltonika RUT1xx
+- *
+- *  Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/leds.h>
+-#include <linux/input.h>
+-#include <linux/gpio_keys.h>
+-#include <linux/sizes.h>
+-
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/time.h>
+-
+-#include "common.h"
+-
+-static struct gpio_keys_button rut1xx_keys[] = {
+-	{
+-		.code		= KEY_SETUP,
+-		.gpio		= 60,
+-		.active_low	= 1,
+-		.desc		= "Reset to defaults",
+-		.type		= EV_KEY,
+-	},
+-};
+-
+-static struct gpio_keys_platform_data rut1xx_keys_data = {
+-	.buttons	= rut1xx_keys,
+-	.nbuttons	= ARRAY_SIZE(rut1xx_keys),
+-};
+-
+-static struct platform_device rut1xx_keys_device = {
+-	.name	= "gpio-keys",
+-	.id	= -1,
+-	.dev	= {
+-		.platform_data = &rut1xx_keys_data,
+-	},
+-};
+-
+-static struct gpio_led rut100_leds[] = {
+-	{
+-		.name			= "Power",
+-		.default_trigger	= "heartbeat",
+-		.gpio			= 17,
+-	},
+-	{
+-		.name			= "GSM",
+-		.default_trigger	= "default-on",
+-		.gpio			= 7,
+-		.active_low		= 1,
+-	},
+-};
+-
+-static struct gpio_led_platform_data rut100_leds_data = {
+-	.num_leds	= ARRAY_SIZE(rut100_leds),
+-	.leds		= rut100_leds,
+-};
+-
+-static struct platform_device rut1xx_leds = {
+-	.name	= "leds-gpio",
+-	.id	= -1,
+-	.dev	= {
+-		.platform_data = &rut100_leds_data,
+-	},
+-};
+-
+-static void __init rut1xx_init(void)
+-{
+-	gemini_gpio_init();
+-	platform_register_uart();
+-	platform_register_pflash(SZ_8M, NULL, 0);
+-	platform_device_register(&rut1xx_leds);
+-	platform_device_register(&rut1xx_keys_device);
+-	platform_register_rtc();
+-}
+-
+-MACHINE_START(RUT100, "Teltonika RUT100")
+-	.atag_offset	= 0x100,
+-	.map_io		= gemini_map_io,
+-	.init_irq	= gemini_init_irq,
+-	.init_time	= gemini_timer_init,
+-	.init_machine	= rut1xx_init,
+-	.restart	= gemini_restart,
+-MACHINE_END
+diff --git a/arch/arm/mach-gemini/board-wbd111.c b/arch/arm/mach-gemini/board-wbd111.c
+deleted file mode 100644
+index 14c56f3f0ec2..000000000000
+--- a/arch/arm/mach-gemini/board-wbd111.c
++++ /dev/null
+@@ -1,133 +0,0 @@
+-/*
+- *  Support for Wiliboard WBD-111
+- *
+- *  Copyright (C) 2009 Imre Kaloz <kaloz@openwrt.org>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/leds.h>
+-#include <linux/input.h>
+-#include <linux/skbuff.h>
+-#include <linux/gpio_keys.h>
+-#include <linux/mtd/mtd.h>
+-#include <linux/mtd/partitions.h>
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/time.h>
+-
+-
+-#include "common.h"
+-
+-static struct gpio_keys_button wbd111_keys[] = {
+-	{
+-		.code		= KEY_SETUP,
+-		.gpio		= 5,
+-		.active_low	= 1,
+-		.desc		= "reset",
+-		.type		= EV_KEY,
+-	},
+-};
+-
+-static struct gpio_keys_platform_data wbd111_keys_data = {
+-	.buttons	= wbd111_keys,
+-	.nbuttons	= ARRAY_SIZE(wbd111_keys),
+-};
+-
+-static struct platform_device wbd111_keys_device = {
+-	.name	= "gpio-keys",
+-	.id	= -1,
+-	.dev	= {
+-		.platform_data = &wbd111_keys_data,
+-	},
+-};
+-
+-static struct gpio_led wbd111_leds[] = {
+-	{
+-		.name			= "L3red",
+-		.gpio			= 1,
+-	},
+-	{
+-		.name			= "L4green",
+-		.gpio			= 2,
+-	},
+-	{
+-		.name			= "L4red",
+-		.gpio			= 3,
+-	},
+-	{
+-		.name			= "L3green",
+-		.gpio			= 5,
+-	},
+-};
+-
+-static struct gpio_led_platform_data wbd111_leds_data = {
+-	.num_leds	= ARRAY_SIZE(wbd111_leds),
+-	.leds		= wbd111_leds,
+-};
+-
+-static struct platform_device wbd111_leds_device = {
+-	.name	= "leds-gpio",
+-	.id	= -1,
+-	.dev	= {
+-		.platform_data = &wbd111_leds_data,
+-	},
+-};
+-
+-static struct mtd_partition wbd111_partitions[] = {
+-	{
+-		.name		= "RedBoot",
+-		.offset		= 0,
+-		.size		= 0x020000,
+-		.mask_flags	= MTD_WRITEABLE,
+-	} , {
+-		.name		= "kernel",
+-		.offset		= 0x020000,
+-		.size		= 0x100000,
+-	} , {
+-		.name		= "rootfs",
+-		.offset		= 0x120000,
+-		.size		= 0x6a0000,
+-	} , {
+-		.name		= "VCTL",
+-		.offset		= 0x7c0000,
+-		.size		= 0x010000,
+-		.mask_flags	= MTD_WRITEABLE,
+-	} , {
+-		.name		= "cfg",
+-		.offset		= 0x7d0000,
+-		.size		= 0x010000,
+-		.mask_flags	= MTD_WRITEABLE,
+-	} , {
+-		.name		= "FIS",
+-		.offset		= 0x7e0000,
+-		.size		= 0x010000,
+-		.mask_flags	= MTD_WRITEABLE,
+-	}
+-};
+-#define wbd111_num_partitions  ARRAY_SIZE(wbd111_partitions)
+-
+-static void __init wbd111_init(void)
+-{
+-	gemini_gpio_init();
+-	platform_register_uart();
+-	platform_register_pflash(SZ_8M, wbd111_partitions,
+-				 wbd111_num_partitions);
+-	platform_device_register(&wbd111_leds_device);
+-	platform_device_register(&wbd111_keys_device);
+-	platform_register_rtc();
+-}
+-
+-MACHINE_START(WBD111, "Wiliboard WBD-111")
+-	.atag_offset	= 0x100,
+-	.map_io		= gemini_map_io,
+-	.init_irq	= gemini_init_irq,
+-	.init_time	= gemini_timer_init,
+-	.init_machine	= wbd111_init,
+-	.restart	= gemini_restart,
+-MACHINE_END
+diff --git a/arch/arm/mach-gemini/board-wbd222.c b/arch/arm/mach-gemini/board-wbd222.c
+deleted file mode 100644
+index 6070282ce243..000000000000
+--- a/arch/arm/mach-gemini/board-wbd222.c
++++ /dev/null
+@@ -1,133 +0,0 @@
+-/*
+- *  Support for Wiliboard WBD-222
+- *
+- *  Copyright (C) 2009 Imre Kaloz <kaloz@openwrt.org>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/platform_device.h>
+-#include <linux/leds.h>
+-#include <linux/input.h>
+-#include <linux/skbuff.h>
+-#include <linux/gpio_keys.h>
+-#include <linux/mtd/mtd.h>
+-#include <linux/mtd/partitions.h>
+-#include <asm/mach-types.h>
+-#include <asm/mach/arch.h>
+-#include <asm/mach/time.h>
+-
+-
+-#include "common.h"
+-
+-static struct gpio_keys_button wbd222_keys[] = {
+-	{
+-		.code		= KEY_SETUP,
+-		.gpio		= 5,
+-		.active_low	= 1,
+-		.desc		= "reset",
+-		.type		= EV_KEY,
+-	},
+-};
+-
+-static struct gpio_keys_platform_data wbd222_keys_data = {
+-	.buttons	= wbd222_keys,
+-	.nbuttons	= ARRAY_SIZE(wbd222_keys),
+-};
+-
+-static struct platform_device wbd222_keys_device = {
+-	.name	= "gpio-keys",
+-	.id	= -1,
+-	.dev	= {
+-		.platform_data = &wbd222_keys_data,
+-	},
+-};
+-
+-static struct gpio_led wbd222_leds[] = {
+-	{
+-		.name			= "L3red",
+-		.gpio			= 1,
+-	},
+-	{
+-		.name			= "L4green",
+-		.gpio			= 2,
+-	},
+-	{
+-		.name			= "L4red",
+-		.gpio			= 3,
+-	},
+-	{
+-		.name			= "L3green",
+-		.gpio			= 5,
+-	},
+-};
+-
+-static struct gpio_led_platform_data wbd222_leds_data = {
+-	.num_leds	= ARRAY_SIZE(wbd222_leds),
+-	.leds		= wbd222_leds,
+-};
+-
+-static struct platform_device wbd222_leds_device = {
+-	.name	= "leds-gpio",
+-	.id	= -1,
+-	.dev	= {
+-		.platform_data = &wbd222_leds_data,
+-	},
+-};
+-
+-static struct mtd_partition wbd222_partitions[] = {
+-	{
+-		.name		= "RedBoot",
+-		.offset		= 0,
+-		.size		= 0x020000,
+-		.mask_flags	= MTD_WRITEABLE,
+-	} , {
+-		.name		= "kernel",
+-		.offset		= 0x020000,
+-		.size		= 0x100000,
+-	} , {
+-		.name		= "rootfs",
+-		.offset		= 0x120000,
+-		.size		= 0x6a0000,
+-	} , {
+-		.name		= "VCTL",
+-		.offset		= 0x7c0000,
+-		.size		= 0x010000,
+-		.mask_flags	= MTD_WRITEABLE,
+-	} , {
+-		.name		= "cfg",
+-		.offset		= 0x7d0000,
+-		.size		= 0x010000,
+-		.mask_flags	= MTD_WRITEABLE,
+-	} , {
+-		.name		= "FIS",
+-		.offset		= 0x7e0000,
+-		.size		= 0x010000,
+-		.mask_flags	= MTD_WRITEABLE,
+-	}
+-};
+-#define wbd222_num_partitions  ARRAY_SIZE(wbd222_partitions)
+-
+-static void __init wbd222_init(void)
+-{
+-	gemini_gpio_init();
+-	platform_register_uart();
+-	platform_register_pflash(SZ_8M, wbd222_partitions,
+-		wbd222_num_partitions);
+-	platform_device_register(&wbd222_leds_device);
+-	platform_device_register(&wbd222_keys_device);
+-	platform_register_rtc();
+-}
+-
+-MACHINE_START(WBD222, "Wiliboard WBD-222")
+-	.atag_offset	= 0x100,
+-	.map_io		= gemini_map_io,
+-	.init_irq	= gemini_init_irq,
+-	.init_time	= gemini_timer_init,
+-	.init_machine	= wbd222_init,
+-	.restart	= gemini_restart,
+-MACHINE_END
+diff --git a/arch/arm/mach-gemini/common.h b/arch/arm/mach-gemini/common.h
+deleted file mode 100644
+index dd883698ff7e..000000000000
+--- a/arch/arm/mach-gemini/common.h
++++ /dev/null
+@@ -1,33 +0,0 @@
+-/*
+- * Common Gemini architecture functions
+- *
+- * Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-
+-#ifndef __GEMINI_COMMON_H__
+-#define __GEMINI_COMMON_H__
+-
+-#include <linux/reboot.h>
+-
+-struct mtd_partition;
+-
+-extern void gemini_map_io(void);
+-extern void gemini_init_irq(void);
+-extern void gemini_timer_init(void);
+-extern void gemini_gpio_init(void);
+-extern void platform_register_rtc(void);
+-
+-/* Common platform devices registration functions */
+-extern int platform_register_uart(void);
+-extern int platform_register_pflash(unsigned int size,
+-				    struct mtd_partition *parts,
+-				    unsigned int nr_parts);
+-
+-extern void gemini_restart(enum reboot_mode mode, const char *cmd);
+-
+-#endif /* __GEMINI_COMMON_H__ */
+diff --git a/arch/arm/mach-gemini/devices.c b/arch/arm/mach-gemini/devices.c
+deleted file mode 100644
+index 5cff29818b73..000000000000
+--- a/arch/arm/mach-gemini/devices.c
++++ /dev/null
+@@ -1,118 +0,0 @@
+-/*
+- * Common devices definition for Gemini
+- *
+- * Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/io.h>
+-#include <linux/platform_device.h>
+-#include <linux/serial_8250.h>
+-#include <linux/mtd/physmap.h>
+-
+-#include <mach/irqs.h>
+-#include <mach/hardware.h>
+-#include <mach/global_reg.h>
+-
+-static struct plat_serial8250_port serial_platform_data[] = {
+-	{
+-		.membase	= (void *)IO_ADDRESS(GEMINI_UART_BASE),
+-		.mapbase	= GEMINI_UART_BASE,
+-		.irq		= IRQ_UART,
+-		.uartclk	= UART_CLK,
+-		.regshift	= 2,
+-		.iotype		= UPIO_MEM,
+-		.type		= PORT_16550A,
+-		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_FIXED_TYPE,
+-	},
+-	{},
+-};
+-
+-static struct platform_device serial_device = {
+-	.name	= "serial8250",
+-	.id	= PLAT8250_DEV_PLATFORM,
+-	.dev	= {
+-		.platform_data = serial_platform_data,
+-	},
+-};
+-
+-int platform_register_uart(void)
+-{
+-	return platform_device_register(&serial_device);
+-}
+-
+-static struct resource flash_resource = {
+-	.start	= GEMINI_FLASH_BASE,
+-	.flags	= IORESOURCE_MEM,
+-};
+-
+-static struct physmap_flash_data pflash_platform_data = {};
+-
+-static struct platform_device pflash_device = {
+-	.name	= "physmap-flash",
+-	.id	= 0,
+-	.dev 	= {
+-		.platform_data = &pflash_platform_data,
+-	},
+-	.resource = &flash_resource,
+-	.num_resources = 1,
+-};
+-
+-int platform_register_pflash(unsigned int size, struct mtd_partition *parts,
+-			     unsigned int nr_parts)
+-{
+-	unsigned int reg;
+-
+-	reg = __raw_readl(IO_ADDRESS(GEMINI_GLOBAL_BASE) + GLOBAL_STATUS);
+-
+-	if ((reg & FLASH_TYPE_MASK) != FLASH_TYPE_PARALLEL)
+-		return -ENXIO;
+-
+-	if (reg & FLASH_WIDTH_16BIT)
+-		pflash_platform_data.width = 2;
+-	else
+-		pflash_platform_data.width = 1;
+-
+-	/* enable parallel flash pins and disable others */
+-	reg = __raw_readl(IO_ADDRESS(GEMINI_GLOBAL_BASE) + GLOBAL_MISC_CTRL);
+-	reg &= ~PFLASH_PADS_DISABLE;
+-	reg |= SFLASH_PADS_DISABLE | NAND_PADS_DISABLE;
+-	__raw_writel(reg, IO_ADDRESS(GEMINI_GLOBAL_BASE) + GLOBAL_MISC_CTRL);
+-
+-	flash_resource.end = flash_resource.start + size - 1;
+-
+-	pflash_platform_data.parts = parts;
+-	pflash_platform_data.nr_parts = nr_parts;
+-
+-	return platform_device_register(&pflash_device);
+-}
+-
+-static struct resource gemini_rtc_resources[] = {
+-	[0] = {
+-		.start  = GEMINI_RTC_BASE,
+-		.end    = GEMINI_RTC_BASE + 0x24,
+-		.flags  = IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start  = IRQ_RTC,
+-		.end    = IRQ_RTC,
+-		.flags  = IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device gemini_rtc_device = {
+-	.name		= "rtc-gemini",
+-	.id		= 0,
+-	.num_resources	= ARRAY_SIZE(gemini_rtc_resources),
+-	.resource	= gemini_rtc_resources,
+-};
+-
+-int __init platform_register_rtc(void)
+-{
+-	return platform_device_register(&gemini_rtc_device);
+-}
+-
+diff --git a/arch/arm/mach-gemini/gpio.c b/arch/arm/mach-gemini/gpio.c
+deleted file mode 100644
+index 469a76ea0459..000000000000
+--- a/arch/arm/mach-gemini/gpio.c
++++ /dev/null
+@@ -1,231 +0,0 @@
+-/*
+- * Gemini gpiochip and interrupt routines
+- *
+- * Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+- *
+- * Based on plat-mxc/gpio.c:
+- *  MXC GPIO support. (c) 2008 Daniel Mack <daniel@caiaq.de>
+- *  Copyright 2008 Juergen Beisert, kernel at pengutronix.de
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/io.h>
+-#include <linux/irq.h>
+-#include <linux/gpio/driver.h>
+-
+-#include <mach/hardware.h>
+-#include <mach/irqs.h>
+-
+-#define GPIO_BASE(x)		IO_ADDRESS(GEMINI_GPIO_BASE(x))
+-#define irq_to_gpio(x)		((x) - GPIO_IRQ_BASE)
+-
+-/* GPIO registers definition */
+-#define GPIO_DATA_OUT		0x0
+-#define GPIO_DATA_IN		0x4
+-#define GPIO_DIR		0x8
+-#define GPIO_DATA_SET		0x10
+-#define GPIO_DATA_CLR		0x14
+-#define GPIO_PULL_EN		0x18
+-#define GPIO_PULL_TYPE		0x1C
+-#define GPIO_INT_EN		0x20
+-#define GPIO_INT_STAT		0x24
+-#define GPIO_INT_MASK		0x2C
+-#define GPIO_INT_CLR		0x30
+-#define GPIO_INT_TYPE		0x34
+-#define GPIO_INT_BOTH_EDGE	0x38
+-#define GPIO_INT_LEVEL		0x3C
+-#define GPIO_DEBOUNCE_EN	0x40
+-#define GPIO_DEBOUNCE_PRESCALE	0x44
+-
+-#define GPIO_PORT_NUM		3
+-
+-static void _set_gpio_irqenable(void __iomem *base, unsigned int index,
+-				int enable)
+-{
+-	unsigned int reg;
+-
+-	reg = __raw_readl(base + GPIO_INT_EN);
+-	reg = (reg & (~(1 << index))) | (!!enable << index);
+-	__raw_writel(reg, base + GPIO_INT_EN);
+-}
+-
+-static void gpio_ack_irq(struct irq_data *d)
+-{
+-	unsigned int gpio = irq_to_gpio(d->irq);
+-	void __iomem *base = GPIO_BASE(gpio / 32);
+-
+-	__raw_writel(1 << (gpio % 32), base + GPIO_INT_CLR);
+-}
+-
+-static void gpio_mask_irq(struct irq_data *d)
+-{
+-	unsigned int gpio = irq_to_gpio(d->irq);
+-	void __iomem *base = GPIO_BASE(gpio / 32);
+-
+-	_set_gpio_irqenable(base, gpio % 32, 0);
+-}
+-
+-static void gpio_unmask_irq(struct irq_data *d)
+-{
+-	unsigned int gpio = irq_to_gpio(d->irq);
+-	void __iomem *base = GPIO_BASE(gpio / 32);
+-
+-	_set_gpio_irqenable(base, gpio % 32, 1);
+-}
+-
+-static int gpio_set_irq_type(struct irq_data *d, unsigned int type)
+-{
+-	unsigned int gpio = irq_to_gpio(d->irq);
+-	unsigned int gpio_mask = 1 << (gpio % 32);
+-	void __iomem *base = GPIO_BASE(gpio / 32);
+-	unsigned int reg_both, reg_level, reg_type;
+-
+-	reg_type = __raw_readl(base + GPIO_INT_TYPE);
+-	reg_level = __raw_readl(base + GPIO_INT_LEVEL);
+-	reg_both = __raw_readl(base + GPIO_INT_BOTH_EDGE);
+-
+-	switch (type) {
+-	case IRQ_TYPE_EDGE_BOTH:
+-		reg_type &= ~gpio_mask;
+-		reg_both |= gpio_mask;
+-		break;
+-	case IRQ_TYPE_EDGE_RISING:
+-		reg_type &= ~gpio_mask;
+-		reg_both &= ~gpio_mask;
+-		reg_level &= ~gpio_mask;
+-		break;
+-	case IRQ_TYPE_EDGE_FALLING:
+-		reg_type &= ~gpio_mask;
+-		reg_both &= ~gpio_mask;
+-		reg_level |= gpio_mask;
+-		break;
+-	case IRQ_TYPE_LEVEL_HIGH:
+-		reg_type |= gpio_mask;
+-		reg_level &= ~gpio_mask;
+-		break;
+-	case IRQ_TYPE_LEVEL_LOW:
+-		reg_type |= gpio_mask;
+-		reg_level |= gpio_mask;
+-		break;
+-	default:
+-		return -EINVAL;
+-	}
+-
+-	__raw_writel(reg_type, base + GPIO_INT_TYPE);
+-	__raw_writel(reg_level, base + GPIO_INT_LEVEL);
+-	__raw_writel(reg_both, base + GPIO_INT_BOTH_EDGE);
+-
+-	gpio_ack_irq(d);
+-
+-	return 0;
+-}
+-
+-static void gpio_irq_handler(struct irq_desc *desc)
+-{
+-	unsigned int port = (unsigned int)irq_desc_get_handler_data(desc);
+-	unsigned int gpio_irq_no, irq_stat;
+-
+-	irq_stat = __raw_readl(GPIO_BASE(port) + GPIO_INT_STAT);
+-
+-	gpio_irq_no = GPIO_IRQ_BASE + port * 32;
+-	for (; irq_stat != 0; irq_stat >>= 1, gpio_irq_no++) {
+-
+-		if ((irq_stat & 1) == 0)
+-			continue;
+-
+-		generic_handle_irq(gpio_irq_no);
+-	}
+-}
+-
+-static struct irq_chip gpio_irq_chip = {
+-	.name = "GPIO",
+-	.irq_ack = gpio_ack_irq,
+-	.irq_mask = gpio_mask_irq,
+-	.irq_unmask = gpio_unmask_irq,
+-	.irq_set_type = gpio_set_irq_type,
+-};
+-
+-static void _set_gpio_direction(struct gpio_chip *chip, unsigned offset,
+-				int dir)
+-{
+-	void __iomem *base = GPIO_BASE(offset / 32);
+-	unsigned int reg;
+-
+-	reg = __raw_readl(base + GPIO_DIR);
+-	if (dir)
+-		reg |= 1 << (offset % 32);
+-	else
+-		reg &= ~(1 << (offset % 32));
+-	__raw_writel(reg, base + GPIO_DIR);
+-}
+-
+-static void gemini_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+-{
+-	void __iomem *base = GPIO_BASE(offset / 32);
+-
+-	if (value)
+-		__raw_writel(1 << (offset % 32), base + GPIO_DATA_SET);
+-	else
+-		__raw_writel(1 << (offset % 32), base + GPIO_DATA_CLR);
+-}
+-
+-static int gemini_gpio_get(struct gpio_chip *chip, unsigned offset)
+-{
+-	void __iomem *base = GPIO_BASE(offset / 32);
+-
+-	return (__raw_readl(base + GPIO_DATA_IN) >> (offset % 32)) & 1;
+-}
+-
+-static int gemini_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
+-{
+-	_set_gpio_direction(chip, offset, 0);
+-	return 0;
+-}
+-
+-static int gemini_gpio_direction_output(struct gpio_chip *chip, unsigned offset,
+-					int value)
+-{
+-	_set_gpio_direction(chip, offset, 1);
+-	gemini_gpio_set(chip, offset, value);
+-	return 0;
+-}
+-
+-static struct gpio_chip gemini_gpio_chip = {
+-	.label			= "Gemini",
+-	.direction_input	= gemini_gpio_direction_input,
+-	.get			= gemini_gpio_get,
+-	.direction_output	= gemini_gpio_direction_output,
+-	.set			= gemini_gpio_set,
+-	.base			= 0,
+-	.ngpio			= GPIO_PORT_NUM * 32,
+-};
+-
+-void __init gemini_gpio_init(void)
+-{
+-	int i, j;
+-
+-	for (i = 0; i < GPIO_PORT_NUM; i++) {
+-		/* disable, unmask and clear all interrupts */
+-		__raw_writel(0x0, GPIO_BASE(i) + GPIO_INT_EN);
+-		__raw_writel(0x0, GPIO_BASE(i) + GPIO_INT_MASK);
+-		__raw_writel(~0x0, GPIO_BASE(i) + GPIO_INT_CLR);
+-
+-		for (j = GPIO_IRQ_BASE + i * 32;
+-		     j < GPIO_IRQ_BASE + (i + 1) * 32; j++) {
+-			irq_set_chip_and_handler(j, &gpio_irq_chip,
+-						 handle_edge_irq);
+-			irq_clear_status_flags(j, IRQ_NOREQUEST);
+-		}
+-
+-		irq_set_chained_handler_and_data(IRQ_GPIO(i), gpio_irq_handler,
+-						 (void *)i);
+-	}
+-
+-	BUG_ON(gpiochip_add_data(&gemini_gpio_chip, NULL));
+-}
+diff --git a/arch/arm/mach-gemini/include/mach/global_reg.h b/arch/arm/mach-gemini/include/mach/global_reg.h
+deleted file mode 100644
+index de7ff7e849fc..000000000000
+--- a/arch/arm/mach-gemini/include/mach/global_reg.h
++++ /dev/null
+@@ -1,278 +0,0 @@
+-/*
+- *  This file contains the hardware definitions for Gemini.
+- *
+- *  Copyright (C) 2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-#ifndef __MACH_GLOBAL_REG_H
+-#define __MACH_GLOBAL_REG_H
+-
+-/* Global Word ID Register*/
+-#define GLOBAL_ID			0x00
+-
+-#define CHIP_ID(reg)			((reg) >> 8)
+-#define CHIP_REVISION(reg)		((reg) & 0xFF)
+-
+-/* Global Status Register */
+-#define GLOBAL_STATUS			0x04
+-
+-#define CPU_BIG_ENDIAN			(1 << 31)
+-#define PLL_OSC_30M			(1 << 30)	/* else 60MHz */
+-
+-#define OPERATION_MODE_MASK		(0xF << 26)
+-#define OPM_IDDQ			(0xF << 26)
+-#define OPM_NAND			(0xE << 26)
+-#define OPM_RING			(0xD << 26)
+-#define OPM_DIRECT_BOOT			(0xC << 26)
+-#define OPM_USB1_PHY_TEST		(0xB << 26)
+-#define OPM_USB0_PHY_TEST		(0xA << 26)
+-#define OPM_SATA1_PHY_TEST		(0x9 << 26)
+-#define OPM_SATA0_PHY_TEST		(0x8 << 26)
+-#define OPM_ICE_ARM			(0x7 << 26)
+-#define OPM_ICE_FARADAY			(0x6 << 26)
+-#define OPM_PLL_BYPASS			(0x5 << 26)
+-#define OPM_DEBUG			(0x4 << 26)
+-#define OPM_BURN_IN			(0x3 << 26)
+-#define OPM_MBIST			(0x2 << 26)
+-#define OPM_SCAN			(0x1 << 26)
+-#define OPM_REAL			(0x0 << 26)
+-
+-#define FLASH_TYPE_MASK			(0x3 << 24)
+-#define FLASH_TYPE_NAND_2K		(0x3 << 24)
+-#define FLASH_TYPE_NAND_512		(0x2 << 24)
+-#define FLASH_TYPE_PARALLEL		(0x1 << 24)
+-#define FLASH_TYPE_SERIAL		(0x0 << 24)
+-/* if parallel */
+-#define FLASH_WIDTH_16BIT		(1 << 23)	/* else 8 bit */
+-/* if serial */
+-#define FLASH_ATMEL			(1 << 23)	/* else STM */
+-
+-#define FLASH_SIZE_MASK			(0x3 << 21)
+-#define NAND_256M			(0x3 << 21)	/* and more */
+-#define NAND_128M			(0x2 << 21)
+-#define NAND_64M			(0x1 << 21)
+-#define NAND_32M			(0x0 << 21)
+-#define ATMEL_16M			(0x3 << 21)	/* and more */
+-#define ATMEL_8M			(0x2 << 21)
+-#define ATMEL_4M_2M			(0x1 << 21)
+-#define ATMEL_1M			(0x0 << 21)	/* and less */
+-#define STM_32M				(1 << 22)	/* and more */
+-#define STM_16M				(0 << 22)	/* and less */
+-
+-#define FLASH_PARALLEL_HIGH_PIN_CNT	(1 << 20)	/* else low pin cnt */
+-
+-#define CPU_AHB_RATIO_MASK		(0x3 << 18)
+-#define CPU_AHB_1_1			(0x0 << 18)
+-#define CPU_AHB_3_2			(0x1 << 18)
+-#define CPU_AHB_24_13			(0x2 << 18)
+-#define CPU_AHB_2_1			(0x3 << 18)
+-
+-#define REG_TO_AHB_SPEED(reg)		((((reg) >> 15) & 0x7) * 10 + 130)
+-#define AHB_SPEED_TO_REG(x)		((((x - 130)) / 10) << 15)
+-
+-/* it is posible to override some settings, use >> OVERRIDE_xxxx_SHIFT */
+-#define OVERRIDE_FLASH_TYPE_SHIFT	16
+-#define OVERRIDE_FLASH_WIDTH_SHIFT	16
+-#define OVERRIDE_FLASH_SIZE_SHIFT	16
+-#define OVERRIDE_CPU_AHB_RATIO_SHIFT	15
+-#define OVERRIDE_AHB_SPEED_SHIFT	15
+-
+-/* Global PLL Control Register */
+-#define GLOBAL_PLL_CTRL			0x08
+-
+-#define PLL_BYPASS			(1 << 31)
+-#define PLL_POWER_DOWN			(1 << 8)
+-#define PLL_CONTROL_Q			(0x1F << 0)
+-
+-/* Global Soft Reset Control Register */
+-#define GLOBAL_RESET			0x0C
+-
+-#define RESET_GLOBAL			(1 << 31)
+-#define RESET_CPU1			(1 << 30)
+-#define RESET_TVE			(1 << 28)
+-#define RESET_SATA1			(1 << 27)
+-#define RESET_SATA0			(1 << 26)
+-#define RESET_CIR			(1 << 25)
+-#define RESET_EXT_DEV			(1 << 24)
+-#define RESET_WD			(1 << 23)
+-#define RESET_GPIO2			(1 << 22)
+-#define RESET_GPIO1			(1 << 21)
+-#define RESET_GPIO0			(1 << 20)
+-#define RESET_SSP			(1 << 19)
+-#define RESET_UART			(1 << 18)
+-#define RESET_TIMER			(1 << 17)
+-#define RESET_RTC			(1 << 16)
+-#define RESET_INT1			(1 << 15)
+-#define RESET_INT0			(1 << 14)
+-#define RESET_LCD			(1 << 13)
+-#define RESET_LPC			(1 << 12)
+-#define RESET_APB			(1 << 11)
+-#define RESET_DMA			(1 << 10)
+-#define RESET_USB1			(1 << 9)
+-#define RESET_USB0			(1 << 8)
+-#define RESET_PCI			(1 << 7)
+-#define RESET_GMAC1			(1 << 6)
+-#define RESET_GMAC0			(1 << 5)
+-#define RESET_SECURITY			(1 << 4)
+-#define RESET_RAID			(1 << 3)
+-#define RESET_IDE			(1 << 2)
+-#define RESET_FLASH			(1 << 1)
+-#define RESET_DRAM			(1 << 0)
+-
+-/* Global IO Pad Driving Capability Control Register */
+-#define GLOBAL_IO_DRIVING_CTRL		0x10
+-
+-#define DRIVING_CURRENT_MASK		0x3
+-
+-/* here 00-4mA, 01-8mA, 10-12mA, 11-16mA */
+-#define GPIO1_PADS_31_28_SHIFT		28
+-#define GPIO0_PADS_31_16_SHIFT		26
+-#define GPIO0_PADS_15_0_SHIFT		24
+-#define PCI_AND_EXT_RESET_PADS_SHIFT	22
+-#define IDE_PADS_SHIFT			20
+-#define GMAC1_PADS_SHIFT		18
+-#define GMAC0_PADS_SHIFT		16
+-/* DRAM is not in mA and poorly documented */
+-#define DRAM_CLOCK_PADS_SHIFT		8
+-#define DRAM_DATA_PADS_SHIFT		4
+-#define DRAM_CONTROL_PADS_SHIFT		0
+-
+-/* Global IO Pad Slew Rate Control Register */
+-#define GLOBAL_IO_SLEW_RATE_CTRL	0x14
+-
+-#define GPIO1_PADS_31_28_SLOW		(1 << 10)
+-#define GPIO0_PADS_31_16_SLOW		(1 << 9)
+-#define GPIO0_PADS_15_0_SLOW		(1 << 8)
+-#define PCI_PADS_SLOW			(1 << 7)
+-#define IDE_PADS_SLOW			(1 << 6)
+-#define GMAC1_PADS_SLOW			(1 << 5)
+-#define GMAC0_PADS_SLOW			(1 << 4)
+-#define DRAM_CLOCK_PADS_SLOW		(1 << 1)
+-#define DRAM_IO_PADS_SLOW		(1 << 0)
+-
+-/*
+- * General skew control defines
+- * 16 steps, each step is around 0.2ns
+- */
+-#define SKEW_MASK			0xF
+-
+-/* Global IDE PAD Skew Control Register */
+-#define GLOBAL_IDE_SKEW_CTRL		0x18
+-
+-#define IDE1_HOST_STROBE_DELAY_SHIFT	28
+-#define IDE1_DEVICE_STROBE_DELAY_SHIFT	24
+-#define IDE1_OUTPUT_IO_SKEW_SHIFT	20
+-#define IDE1_INPUT_IO_SKEW_SHIFT	16
+-#define IDE0_HOST_STROBE_DELAY_SHIFT	12
+-#define IDE0_DEVICE_STROBE_DELAY_SHIFT	8
+-#define IDE0_OUTPUT_IO_SKEW_SHIFT	4
+-#define IDE0_INPUT_IO_SKEW_SHIFT	0
+-
+-/* Global GMAC Control Pad Skew Control Register */
+-#define GLOBAL_GMAC_CTRL_SKEW_CTRL	0x1C
+-
+-#define GMAC1_TXC_SKEW_SHIFT		28
+-#define GMAC1_TXEN_SKEW_SHIFT		24
+-#define GMAC1_RXC_SKEW_SHIFT		20
+-#define GMAC1_RXDV_SKEW_SHIFT		16
+-#define GMAC0_TXC_SKEW_SHIFT		12
+-#define GMAC0_TXEN_SKEW_SHIFT		8
+-#define GMAC0_RXC_SKEW_SHIFT		4
+-#define GMAC0_RXDV_SKEW_SHIFT		0
+-
+-/* Global GMAC0 Data PAD Skew Control Register */
+-#define GLOBAL_GMAC0_DATA_SKEW_CTRL	0x20
+-/* Global GMAC1 Data PAD Skew Control Register */
+-#define GLOBAL_GMAC1_DATA_SKEW_CTRL	0x24
+-
+-#define GMAC_TXD_SKEW_SHIFT(x)		(((x) * 4) + 16)
+-#define GMAC_RXD_SKEW_SHIFT(x)		((x) * 4)
+-
+-/* CPU has two AHB busses. */
+-
+-/* Global Arbitration0 Control Register */
+-#define GLOBAL_ARBITRATION0_CTRL	0x28
+-
+-#define BOOT_CONTROLLER_HIGH_PRIO	(1 << 3)
+-#define DMA_BUS1_HIGH_PRIO		(1 << 2)
+-#define CPU0_HIGH_PRIO			(1 << 0)
+-
+-/* Global Arbitration1 Control Register */
+-#define GLOBAL_ARBITRATION1_CTRL	0x2C
+-
+-#define TVE_HIGH_PRIO			(1 << 9)
+-#define PCI_HIGH_PRIO			(1 << 8)
+-#define USB1_HIGH_PRIO			(1 << 7)
+-#define USB0_HIGH_PRIO			(1 << 6)
+-#define GMAC1_HIGH_PRIO			(1 << 5)
+-#define GMAC0_HIGH_PRIO			(1 << 4)
+-#define SECURITY_HIGH_PRIO		(1 << 3)
+-#define RAID_HIGH_PRIO			(1 << 2)
+-#define IDE_HIGH_PRIO			(1 << 1)
+-#define DMA_BUS2_HIGH_PRIO		(1 << 0)
+-
+-/* Common bits for both arbitration registers */
+-#define BURST_LENGTH_SHIFT		16
+-#define BURST_LENGTH_MASK		(0x3F << 16)
+-
+-/* Miscellaneous Control Register */
+-#define GLOBAL_MISC_CTRL		0x30
+-
+-#define MEMORY_SPACE_SWAP		(1 << 31)
+-#define USB1_PLUG_MINIB			(1 << 30) /* else plug is mini-A */
+-#define USB0_PLUG_MINIB			(1 << 29)
+-#define GMAC_GMII			(1 << 28)
+-#define GMAC_1_ENABLE			(1 << 27)
+-/* TODO: define ATA/SATA bits */
+-#define USB1_VBUS_ON			(1 << 23)
+-#define USB0_VBUS_ON			(1 << 22)
+-#define APB_CLKOUT_ENABLE		(1 << 21)
+-#define TVC_CLKOUT_ENABLE		(1 << 20)
+-#define EXT_CLKIN_ENABLE		(1 << 19)
+-#define PCI_66MHZ			(1 << 18) /* else 33 MHz */
+-#define PCI_CLKOUT_ENABLE		(1 << 17)
+-#define LPC_CLKOUT_ENABLE		(1 << 16)
+-#define USB1_WAKEUP_ON			(1 << 15)
+-#define USB0_WAKEUP_ON			(1 << 14)
+-/* TODO: define PCI idle detect bits */
+-#define TVC_PADS_ENABLE			(1 << 9)
+-#define SSP_PADS_ENABLE			(1 << 8)
+-#define LCD_PADS_ENABLE			(1 << 7)
+-#define LPC_PADS_ENABLE			(1 << 6)
+-#define PCI_PADS_ENABLE			(1 << 5)
+-#define IDE_PADS_ENABLE			(1 << 4)
+-#define DRAM_PADS_POWER_DOWN		(1 << 3)
+-#define NAND_PADS_DISABLE		(1 << 2)
+-#define PFLASH_PADS_DISABLE		(1 << 1)
+-#define SFLASH_PADS_DISABLE		(1 << 0)
+-
+-/* Global Clock Control Register */
+-#define GLOBAL_CLOCK_CTRL		0x34
+-
+-#define POWER_STATE_G0			(1 << 31)
+-#define POWER_STATE_S1			(1 << 30) /* else it is S3/S4 state */
+-#define SECURITY_APB_AHB		(1 << 29)
+-/* else Security APB clk will be 0.75xAHB */
+-/* TODO: TVC clock divider */
+-#define PCI_CLKRUN_ENABLE		(1 << 16)
+-#define BOOT_CLK_DISABLE		(1 << 13)
+-#define TVC_CLK_DISABLE			(1 << 12)
+-#define FLASH_CLK_DISABLE		(1 << 11)
+-#define DDR_CLK_DISABLE			(1 << 10)
+-#define PCI_CLK_DISABLE			(1 << 9)
+-#define IDE_CLK_DISABLE			(1 << 8)
+-#define USB1_CLK_DISABLE		(1 << 7)
+-#define USB0_CLK_DISABLE		(1 << 6)
+-#define SATA1_CLK_DISABLE		(1 << 5)
+-#define SATA0_CLK_DISABLE		(1 << 4)
+-#define GMAC1_CLK_DISABLE		(1 << 3)
+-#define GMAC0_CLK_DISABLE		(1 << 2)
+-#define SECURITY_CLK_DISABLE		(1 << 1)
+-
+-/* TODO: other registers definitions if needed */
+-
+-#endif /* __MACH_GLOBAL_REG_H */
+diff --git a/arch/arm/mach-gemini/irq.c b/arch/arm/mach-gemini/irq.c
+deleted file mode 100644
+index 37d52e372456..000000000000
+--- a/arch/arm/mach-gemini/irq.c
++++ /dev/null
+@@ -1,120 +0,0 @@
+-/*
+- *  Interrupt routines for Gemini
+- *
+- *  Copyright (C) 2001-2006 Storlink, Corp.
+- *  Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-#include <linux/init.h>
+-#include <linux/io.h>
+-#include <linux/ioport.h>
+-#include <linux/stddef.h>
+-#include <linux/list.h>
+-#include <linux/sched.h>
+-#include <linux/cpu.h>
+-
+-#include <asm/exception.h>
+-#include <asm/irq.h>
+-#include <asm/mach/irq.h>
+-#include <asm/system_misc.h>
+-#include <mach/hardware.h>
+-
+-#define IRQ_SOURCE(base_addr)	(base_addr + 0x00)
+-#define IRQ_MASK(base_addr)	(base_addr + 0x04)
+-#define IRQ_CLEAR(base_addr)	(base_addr + 0x08)
+-#define IRQ_TMODE(base_addr)	(base_addr + 0x0C)
+-#define IRQ_TLEVEL(base_addr)	(base_addr + 0x10)
+-#define IRQ_STATUS(base_addr)	(base_addr + 0x14)
+-#define FIQ_SOURCE(base_addr)	(base_addr + 0x20)
+-#define FIQ_MASK(base_addr)	(base_addr + 0x24)
+-#define FIQ_CLEAR(base_addr)	(base_addr + 0x28)
+-#define FIQ_TMODE(base_addr)	(base_addr + 0x2C)
+-#define FIQ_LEVEL(base_addr)	(base_addr + 0x30)
+-#define FIQ_STATUS(base_addr)	(base_addr + 0x34)
+-
+-static void gemini_ack_irq(struct irq_data *d)
+-{
+-	__raw_writel(1 << d->irq, IRQ_CLEAR(IO_ADDRESS(GEMINI_INTERRUPT_BASE)));
+-}
+-
+-static void gemini_mask_irq(struct irq_data *d)
+-{
+-	unsigned int mask;
+-
+-	mask = __raw_readl(IRQ_MASK(IO_ADDRESS(GEMINI_INTERRUPT_BASE)));
+-	mask &= ~(1 << d->irq);
+-	__raw_writel(mask, IRQ_MASK(IO_ADDRESS(GEMINI_INTERRUPT_BASE)));
+-}
+-
+-static void gemini_unmask_irq(struct irq_data *d)
+-{
+-	unsigned int mask;
+-
+-	mask = __raw_readl(IRQ_MASK(IO_ADDRESS(GEMINI_INTERRUPT_BASE)));
+-	mask |= (1 << d->irq);
+-	__raw_writel(mask, IRQ_MASK(IO_ADDRESS(GEMINI_INTERRUPT_BASE)));
+-}
+-
+-static struct irq_chip gemini_irq_chip = {
+-	.name		= "INTC",
+-	.irq_ack	= gemini_ack_irq,
+-	.irq_mask	= gemini_mask_irq,
+-	.irq_unmask	= gemini_unmask_irq,
+-};
+-
+-
+-asmlinkage void __exception_irq_entry gemini_handle_irq(struct pt_regs *regs)
+-{
+-	int irq;
+-	unsigned status;
+-
+-	while ((status = __raw_readl(IRQ_STATUS(IO_ADDRESS(GEMINI_INTERRUPT_BASE))))) {
+-		irq = ffs(status) - 1;
+-		handle_domain_irq(NULL, irq, regs);
+-	}
+-}
+-
+-static struct resource irq_resource = {
+-	.name	= "irq_handler",
+-	.start	= GEMINI_INTERRUPT_BASE,
+-	.end	= FIQ_STATUS(GEMINI_INTERRUPT_BASE) + 4,
+-};
+-
+-void __init gemini_init_irq(void)
+-{
+-	unsigned int i, mode = 0, level = 0;
+-
+-	/*
+-	 * Disable the idle handler by default since it is buggy
+-	 * For more info see arch/arm/mach-gemini/idle.c
+-	 */
+-	cpu_idle_poll_ctrl(true);
+-
+-	request_resource(&iomem_resource, &irq_resource);
+-
+-	for (i = 0; i < NR_IRQS; i++) {
+-		irq_set_chip(i, &gemini_irq_chip);
+-		if((i >= IRQ_TIMER1 && i <= IRQ_TIMER3) || (i >= IRQ_SERIRQ0 && i <= IRQ_SERIRQ1)) {
+-			irq_set_handler(i, handle_edge_irq);
+-			mode |= 1 << i;
+-			level |= 1 << i;
+-		} else {			
+-			irq_set_handler(i, handle_level_irq);
+-		}
+-		irq_clear_status_flags(i, IRQ_NOREQUEST | IRQ_NOPROBE);
+-	}
+-
+-	/* Disable all interrupts */
+-	__raw_writel(0, IRQ_MASK(IO_ADDRESS(GEMINI_INTERRUPT_BASE)));
+-	__raw_writel(0, FIQ_MASK(IO_ADDRESS(GEMINI_INTERRUPT_BASE)));
+-
+-	/* Set interrupt mode */
+-	__raw_writel(mode, IRQ_TMODE(IO_ADDRESS(GEMINI_INTERRUPT_BASE)));
+-	__raw_writel(level, IRQ_TLEVEL(IO_ADDRESS(GEMINI_INTERRUPT_BASE)));
+-
+-	set_handle_irq(gemini_handle_irq);
+-}
+diff --git a/arch/arm/mach-gemini/mm.c b/arch/arm/mach-gemini/mm.c
+deleted file mode 100644
+index 2c2cd284bb6a..000000000000
+--- a/arch/arm/mach-gemini/mm.c
++++ /dev/null
+@@ -1,82 +0,0 @@
+-/*
+- *  Static mappings for Gemini
+- *
+- *  Copyright (C) 2001-2006 Storlink, Corp.
+- *  Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-#include <linux/mm.h>
+-#include <linux/init.h>
+-
+-#include <asm/mach/map.h>
+-
+-#include <mach/hardware.h>
+-
+-/* Page table mapping for I/O region */
+-static struct map_desc gemini_io_desc[] __initdata = {
+-	{
+-		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_GLOBAL_BASE),
+-		.pfn		=__phys_to_pfn(GEMINI_GLOBAL_BASE),
+-		.length		= SZ_512K,
+-		.type 		= MT_DEVICE,
+-	}, {
+-		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_UART_BASE),
+-		.pfn		= __phys_to_pfn(GEMINI_UART_BASE),
+-		.length		= SZ_512K,
+-		.type 		= MT_DEVICE,
+-	}, {
+-		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_TIMER_BASE),
+-		.pfn		= __phys_to_pfn(GEMINI_TIMER_BASE),
+-		.length		= SZ_512K,
+-		.type 		= MT_DEVICE,
+-	}, {
+-		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_INTERRUPT_BASE),
+-		.pfn		= __phys_to_pfn(GEMINI_INTERRUPT_BASE),
+-		.length		= SZ_512K,
+-		.type 		= MT_DEVICE,
+-	}, {
+-		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_POWER_CTRL_BASE),
+-		.pfn		= __phys_to_pfn(GEMINI_POWER_CTRL_BASE),
+-		.length		= SZ_512K,
+-		.type 		= MT_DEVICE,
+-	}, {
+-		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_GPIO_BASE(0)),
+-		.pfn		= __phys_to_pfn(GEMINI_GPIO_BASE(0)),
+-		.length		= SZ_512K,
+-		.type 		= MT_DEVICE,
+-	}, {
+-		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_GPIO_BASE(1)),
+-		.pfn		= __phys_to_pfn(GEMINI_GPIO_BASE(1)),
+-		.length		= SZ_512K,
+-		.type 		= MT_DEVICE,
+-	}, {
+-		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_GPIO_BASE(2)),
+-		.pfn		= __phys_to_pfn(GEMINI_GPIO_BASE(2)),
+-		.length		= SZ_512K,
+-		.type 		= MT_DEVICE,
+-	}, {
+-		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_FLASH_CTRL_BASE),
+-		.pfn		= __phys_to_pfn(GEMINI_FLASH_CTRL_BASE),
+-		.length		= SZ_512K,
+-		.type 		= MT_DEVICE,
+-	}, {
+-		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_DRAM_CTRL_BASE),
+-		.pfn		= __phys_to_pfn(GEMINI_DRAM_CTRL_BASE),
+-		.length		= SZ_512K,
+-		.type 		= MT_DEVICE,
+-	}, {
+-		.virtual	= (unsigned long)IO_ADDRESS(GEMINI_GENERAL_DMA_BASE),
+-		.pfn		= __phys_to_pfn(GEMINI_GENERAL_DMA_BASE),
+-		.length		= SZ_512K,
+-		.type 		= MT_DEVICE,
+-	},
+-};
+-
+-void __init gemini_map_io(void)
+-{
+-	iotable_init(gemini_io_desc, ARRAY_SIZE(gemini_io_desc));
+-}
+diff --git a/arch/arm/mach-gemini/reset.c b/arch/arm/mach-gemini/reset.c
+deleted file mode 100644
+index 21a6d6d4f9c4..000000000000
+--- a/arch/arm/mach-gemini/reset.c
++++ /dev/null
+@@ -1,25 +0,0 @@
+-/*
+- *  Copyright (C) 2001-2006 Storlink, Corp.
+- *  Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-#ifndef __MACH_SYSTEM_H
+-#define __MACH_SYSTEM_H
+-
+-#include <linux/io.h>
+-#include <mach/hardware.h>
+-#include <mach/global_reg.h>
+-
+-#include "common.h"
+-
+-void gemini_restart(enum reboot_mode mode, const char *cmd)
+-{
+-	__raw_writel(RESET_GLOBAL | RESET_CPU1,
+-		     IO_ADDRESS(GEMINI_GLOBAL_BASE) + GLOBAL_RESET);
+-}
+-
+-#endif /* __MACH_SYSTEM_H */
+diff --git a/arch/arm/mach-gemini/time.c b/arch/arm/mach-gemini/time.c
+deleted file mode 100644
+index f5f18df5aacd..000000000000
+--- a/arch/arm/mach-gemini/time.c
++++ /dev/null
+@@ -1,239 +0,0 @@
+-/*
+- *  Copyright (C) 2001-2006 Storlink, Corp.
+- *  Copyright (C) 2008-2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- */
+-#include <linux/interrupt.h>
+-#include <linux/irq.h>
+-#include <linux/io.h>
+-#include <mach/hardware.h>
+-#include <mach/global_reg.h>
+-#include <asm/mach/time.h>
+-#include <linux/clockchips.h>
+-#include <linux/clocksource.h>
+-#include <linux/sched_clock.h>
+-
+-/*
+- * Register definitions for the timers
+- */
+-
+-#define TIMER1_BASE		GEMINI_TIMER_BASE
+-#define TIMER2_BASE		(GEMINI_TIMER_BASE + 0x10)
+-#define TIMER3_BASE		(GEMINI_TIMER_BASE + 0x20)
+-
+-#define TIMER_COUNT(BASE)	(IO_ADDRESS(BASE) + 0x00)
+-#define TIMER_LOAD(BASE)	(IO_ADDRESS(BASE) + 0x04)
+-#define TIMER_MATCH1(BASE)	(IO_ADDRESS(BASE) + 0x08)
+-#define TIMER_MATCH2(BASE)	(IO_ADDRESS(BASE) + 0x0C)
+-#define TIMER_CR		(IO_ADDRESS(GEMINI_TIMER_BASE) + 0x30)
+-#define TIMER_INTR_STATE	(IO_ADDRESS(GEMINI_TIMER_BASE) + 0x34)
+-#define TIMER_INTR_MASK		(IO_ADDRESS(GEMINI_TIMER_BASE) + 0x38)
+-
+-#define TIMER_1_CR_ENABLE	(1 << 0)
+-#define TIMER_1_CR_CLOCK	(1 << 1)
+-#define TIMER_1_CR_INT		(1 << 2)
+-#define TIMER_2_CR_ENABLE	(1 << 3)
+-#define TIMER_2_CR_CLOCK	(1 << 4)
+-#define TIMER_2_CR_INT		(1 << 5)
+-#define TIMER_3_CR_ENABLE	(1 << 6)
+-#define TIMER_3_CR_CLOCK	(1 << 7)
+-#define TIMER_3_CR_INT		(1 << 8)
+-#define TIMER_1_CR_UPDOWN	(1 << 9)
+-#define TIMER_2_CR_UPDOWN	(1 << 10)
+-#define TIMER_3_CR_UPDOWN	(1 << 11)
+-#define TIMER_DEFAULT_FLAGS	(TIMER_1_CR_UPDOWN | \
+-				 TIMER_3_CR_ENABLE | \
+-				 TIMER_3_CR_UPDOWN)
+-
+-#define TIMER_1_INT_MATCH1	(1 << 0)
+-#define TIMER_1_INT_MATCH2	(1 << 1)
+-#define TIMER_1_INT_OVERFLOW	(1 << 2)
+-#define TIMER_2_INT_MATCH1	(1 << 3)
+-#define TIMER_2_INT_MATCH2	(1 << 4)
+-#define TIMER_2_INT_OVERFLOW	(1 << 5)
+-#define TIMER_3_INT_MATCH1	(1 << 6)
+-#define TIMER_3_INT_MATCH2	(1 << 7)
+-#define TIMER_3_INT_OVERFLOW	(1 << 8)
+-#define TIMER_INT_ALL_MASK	0x1ff
+-
+-
+-static unsigned int tick_rate;
+-
+-static u64 notrace gemini_read_sched_clock(void)
+-{
+-	return readl(TIMER_COUNT(TIMER3_BASE));
+-}
+-
+-static int gemini_timer_set_next_event(unsigned long cycles,
+-				       struct clock_event_device *evt)
+-{
+-	u32 cr;
+-
+-	/* Setup the match register */
+-	cr = readl(TIMER_COUNT(TIMER1_BASE));
+-	writel(cr + cycles, TIMER_MATCH1(TIMER1_BASE));
+-	if (readl(TIMER_COUNT(TIMER1_BASE)) - cr > cycles)
+-		return -ETIME;
+-
+-	return 0;
+-}
+-
+-static int gemini_timer_shutdown(struct clock_event_device *evt)
+-{
+-	u32 cr;
+-
+-	/*
+-	 * Disable also for oneshot: the set_next() call will arm the timer
+-	 * instead.
+-	 */
+-	/* Stop timer and interrupt. */
+-	cr = readl(TIMER_CR);
+-	cr &= ~(TIMER_1_CR_ENABLE | TIMER_1_CR_INT);
+-	writel(cr, TIMER_CR);
+-
+-	/* Setup counter start from 0 */
+-	writel(0, TIMER_COUNT(TIMER1_BASE));
+-	writel(0, TIMER_LOAD(TIMER1_BASE));
+-
+-	/* enable interrupt */
+-	cr = readl(TIMER_INTR_MASK);
+-	cr &= ~(TIMER_1_INT_OVERFLOW | TIMER_1_INT_MATCH2);
+-	cr |= TIMER_1_INT_MATCH1;
+-	writel(cr, TIMER_INTR_MASK);
+-
+-	/* start the timer */
+-	cr = readl(TIMER_CR);
+-	cr |= TIMER_1_CR_ENABLE;
+-	writel(cr, TIMER_CR);
+-
+-	return 0;
+-}
+-
+-static int gemini_timer_set_periodic(struct clock_event_device *evt)
+-{
+-	u32 period = DIV_ROUND_CLOSEST(tick_rate, HZ);
+-	u32 cr;
+-
+-	/* Stop timer and interrupt */
+-	cr = readl(TIMER_CR);
+-	cr &= ~(TIMER_1_CR_ENABLE | TIMER_1_CR_INT);
+-	writel(cr, TIMER_CR);
+-
+-	/* Setup timer to fire at 1/HT intervals. */
+-	cr = 0xffffffff - (period - 1);
+-	writel(cr, TIMER_COUNT(TIMER1_BASE));
+-	writel(cr, TIMER_LOAD(TIMER1_BASE));
+-
+-	/* enable interrupt on overflow */
+-	cr = readl(TIMER_INTR_MASK);
+-	cr &= ~(TIMER_1_INT_MATCH1 | TIMER_1_INT_MATCH2);
+-	cr |= TIMER_1_INT_OVERFLOW;
+-	writel(cr, TIMER_INTR_MASK);
+-
+-	/* Start the timer */
+-	cr = readl(TIMER_CR);
+-	cr |= TIMER_1_CR_ENABLE;
+-	cr |= TIMER_1_CR_INT;
+-	writel(cr, TIMER_CR);
+-
+-	return 0;
+-}
+-
+-/* Use TIMER1 as clock event */
+-static struct clock_event_device gemini_clockevent = {
+-	.name			= "TIMER1",
+-	/* Reasonably fast and accurate clock event */
+-	.rating			= 300,
+-	.shift                  = 32,
+-	.features		= CLOCK_EVT_FEAT_PERIODIC |
+-				  CLOCK_EVT_FEAT_ONESHOT,
+-	.set_next_event		= gemini_timer_set_next_event,
+-	.set_state_shutdown	= gemini_timer_shutdown,
+-	.set_state_periodic	= gemini_timer_set_periodic,
+-	.set_state_oneshot	= gemini_timer_shutdown,
+-	.tick_resume		= gemini_timer_shutdown,
+-};
+-
+-/*
+- * IRQ handler for the timer
+- */
+-static irqreturn_t gemini_timer_interrupt(int irq, void *dev_id)
+-{
+-	struct clock_event_device *evt = &gemini_clockevent;
+-
+-	evt->event_handler(evt);
+-	return IRQ_HANDLED;
+-}
+-
+-static struct irqaction gemini_timer_irq = {
+-	.name		= "Gemini Timer Tick",
+-	.flags		= IRQF_TIMER,
+-	.handler	= gemini_timer_interrupt,
+-};
+-
+-/*
+- * Set up timer interrupt, and return the current time in seconds.
+- */
+-void __init gemini_timer_init(void)
+-{
+-	u32 reg_v;
+-
+-	reg_v = readl(IO_ADDRESS(GEMINI_GLOBAL_BASE + GLOBAL_STATUS));
+-	tick_rate = REG_TO_AHB_SPEED(reg_v) * 1000000;
+-
+-	printk(KERN_INFO "Bus: %dMHz", tick_rate / 1000000);
+-
+-	tick_rate /= 6;		/* APB bus run AHB*(1/6) */
+-
+-	switch(reg_v & CPU_AHB_RATIO_MASK) {
+-	case CPU_AHB_1_1:
+-		printk(KERN_CONT "(1/1)\n");
+-		break;
+-	case CPU_AHB_3_2:
+-		printk(KERN_CONT "(3/2)\n");
+-		break;
+-	case CPU_AHB_24_13:
+-		printk(KERN_CONT "(24/13)\n");
+-		break;
+-	case CPU_AHB_2_1:
+-		printk(KERN_CONT "(2/1)\n");
+-		break;
+-	}
+-
+-	/*
+-	 * Reset the interrupt mask and status
+-	 */
+-	writel(TIMER_INT_ALL_MASK, TIMER_INTR_MASK);
+-	writel(0, TIMER_INTR_STATE);
+-	writel(TIMER_DEFAULT_FLAGS, TIMER_CR);
+-
+-	/*
+-	 * Setup free-running clocksource timer (interrupts
+-	 * disabled.)
+-	 */
+-	writel(0, TIMER_COUNT(TIMER3_BASE));
+-	writel(0, TIMER_LOAD(TIMER3_BASE));
+-	writel(0, TIMER_MATCH1(TIMER3_BASE));
+-	writel(0, TIMER_MATCH2(TIMER3_BASE));
+-	clocksource_mmio_init(TIMER_COUNT(TIMER3_BASE),
+-			      "gemini_clocksource", tick_rate,
+-			      300, 32, clocksource_mmio_readl_up);
+-	sched_clock_register(gemini_read_sched_clock, 32, tick_rate);
+-
+-	/*
+-	 * Setup clockevent timer (interrupt-driven.)
+-	*/
+-	writel(0, TIMER_COUNT(TIMER1_BASE));
+-	writel(0, TIMER_LOAD(TIMER1_BASE));
+-	writel(0, TIMER_MATCH1(TIMER1_BASE));
+-	writel(0, TIMER_MATCH2(TIMER1_BASE));
+-	setup_irq(IRQ_TIMER1, &gemini_timer_irq);
+-	gemini_clockevent.cpumask = cpumask_of(0);
+-	clockevents_config_and_register(&gemini_clockevent, tick_rate,
+-					1, 0xffffffff);
+-
+-}
 -- 
 2.9.3
