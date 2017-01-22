@@ -1,58 +1,65 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Sun, 22 Jan 2017 15:59:57 +0800
-Subject: [PATCH v9 0/4] arm64: arch_timer: Add workaround for
- hisilicon-161010101 erratum
-In-Reply-To: <20170120150428.GC22152@leverpostej>
-References: <1484832916-7248-1-git-send-email-dingtianhong@huawei.com>
- <20170120150428.GC22152@leverpostej>
-Message-ID: <8818973b-602b-e71f-a12b-3e894aa0e619@linaro.org>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Sun, 22 Jan 2017 16:10:36 +0800
+Subject: [PATCH v2 10/26] drm/rockchip: dw-mipi-dsi: only request HS clock
+ when required
+In-Reply-To: <20170121163128.22240-11-john@metanate.com>
+References: <20170121163128.22240-1-john@metanate.com>
+ <20170121163128.22240-11-john@metanate.com>
+Message-ID: <588468FC.7030906@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/1/20 23:04, Mark Rutland wrote:
-> On Thu, Jan 19, 2017 at 09:35:12PM +0800, Ding Tianhong wrote:
->> Ding Tianhong (4):
->>   arm64: arch_timer: Add device tree binding for hisilicon-161010101
->>     erratum
->>   arm64: arch_timer: Introduce a generic erratum handing mechanism for
->>     fsl-a008585
->>   arm64: arch_timer: Work around Erratum Hisilicon-161010101
->>   arm64: arch timer: Add timer erratum property for Hip05-d02 and
->>     Hip06-d03
->>
->>  Documentation/admin-guide/kernel-parameters.txt    |   9 --
->>  Documentation/arm64/silicon-errata.txt             |  43 +++---
->>  .../devicetree/bindings/arm/arch_timer.txt         |   6 +
->>  arch/arm64/boot/dts/hisilicon/hip05.dtsi           |   1 +
->>  arch/arm64/boot/dts/hisilicon/hip06.dtsi           |   1 +
->>  arch/arm64/include/asm/arch_timer.h                |  38 ++----
->>  drivers/clocksource/Kconfig                        |  18 +++
->>  drivers/clocksource/arm_arch_timer.c               | 150 +++++++++++++++------
->>  8 files changed, 171 insertions(+), 95 deletions(-)
->
-> I've picked these up (with a few local cleanups), given that some local
-> testing, and pushed the result to a branch [1] on my git repo.
->
-> There are likely to be clashes with the arm64 tree (e.g. for
-> silicon-errata.txt), and we're also likely to have more arch timer
-> updates shortly for the GTDT stuff,
+Hi John
 
-Yes, GTDT patches conflict with this patch set but it's easy to
-fix.
+Reviewed-by: Chris Zhong <zyw@rock-chips.com>
 
-> so I think the best bet is for both
-> arm64 and the clocksource tree to pull that branch for v4.11.
+On 01/22/2017 12:31 AM, John Keeping wrote:
+> Requesting the HS clock from the PHY before we initialize it causes an
+> invalid signal to be sent out since the input clock is not yet
+> configured.  The PHY databook suggests only asserting this signal when
+> performing HS transfers, so let's do that.
 >
-> Alternatively, we could take this all through the arm64 tree, if the
-> clocksource maintainers are happy with that.
+> Signed-off-by: John Keeping <john@metanate.com>
+> ---
+> Unchanged in v2
+> ---
+>   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 6 ++++--
+>   1 file changed, 4 insertions(+), 2 deletions(-)
 >
-> Thoughts?
-
-GTDT patch set is adding ACPI support for arch timer, and it's
-only used for ARM64 now, in order to handler the conflict easily,
-I think take them all through arm64 tree is better (I was working
-with Fuwei for the GTDT patch set and I hope it's not blocked by
-"who will merge the code"...)
-
-Thanks
-Hanjun
+> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> index 15d33c3c8cb7..03fc096fe1bd 100644
+> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> @@ -545,13 +545,15 @@ static int dw_mipi_dsi_host_detach(struct mipi_dsi_host *host,
+>   static void dw_mipi_message_config(struct dw_mipi_dsi *dsi,
+>   				   const struct mipi_dsi_msg *msg)
+>   {
+> +	bool lpm = msg->flags & MIPI_DSI_MSG_USE_LPM;
+>   	u32 val = 0;
+>   
+>   	if (msg->flags & MIPI_DSI_MSG_REQ_ACK)
+>   		val |= EN_ACK_RQST;
+> -	if (msg->flags & MIPI_DSI_MSG_USE_LPM)
+> +	if (lpm)
+>   		val |= CMD_MODE_ALL_LP;
+>   
+> +	dsi_write(dsi, DSI_LPCLK_CTRL, lpm ? 0 : PHY_TXREQUESTCLKHS);
+>   	dsi_write(dsi, DSI_CMD_MODE_CFG, val);
+>   }
+>   
+> @@ -693,6 +695,7 @@ static void dw_mipi_dsi_set_mode(struct dw_mipi_dsi *dsi,
+>   		dsi_write(dsi, DSI_PWR_UP, RESET);
+>   		dsi_write(dsi, DSI_MODE_CFG, ENABLE_VIDEO_MODE);
+>   		dw_mipi_dsi_video_mode_config(dsi);
+> +		dsi_write(dsi, DSI_LPCLK_CTRL, PHY_TXREQUESTCLKHS);
+>   		dsi_write(dsi, DSI_PWR_UP, POWERUP);
+>   	}
+>   }
+> @@ -710,7 +713,6 @@ static void dw_mipi_dsi_init(struct dw_mipi_dsi *dsi)
+>   		  | PHY_RSTZ | PHY_SHUTDOWNZ);
+>   	dsi_write(dsi, DSI_CLKMGR_CFG, TO_CLK_DIVIDSION(10) |
+>   		  TX_ESC_CLK_DIVIDSION(7));
+> -	dsi_write(dsi, DSI_LPCLK_CTRL, PHY_TXREQUESTCLKHS);
+>   }
+>   
+>   static void dw_mipi_dsi_dpi_config(struct dw_mipi_dsi *dsi,
