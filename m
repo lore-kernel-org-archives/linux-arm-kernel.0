@@ -1,26 +1,26 @@
 From: contact@paulk.fr (Paul Kocialkowski)
-Date: Sun, 22 Jan 2017 16:47:52 +0100
-Subject: [PATCH v2 5/6] ARM: tegra: nyan-big: Proper pinmux for TPM i2c
+Date: Sun, 22 Jan 2017 16:47:53 +0100
+Subject: [PATCH v2 6/6] ARM: tegra: nyan-blaze: Proper pinmux for TPM i2c
 In-Reply-To: <20170122154753.31942-1-contact@paulk.fr>
 References: <20170122154753.31942-1-contact@paulk.fr>
-Message-ID: <20170122154753.31942-5-contact@paulk.fr>
+Message-ID: <20170122154753.31942-6-contact@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+From: Jerome Coste <jerome.coste@etu.utc.fr>
 
 This corrects the pinmux for accessing the TPM over the i2c line.
 Thus, it allows correctly probing the module, that previously failed with i2c
 errors.
-
-Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
 ---
- arch/arm/boot/dts/tegra124-nyan-big.dts | 20 ++++++++++----------
+ arch/arm/boot/dts/tegra124-nyan-blaze.dts | 20 ++++++++++----------
  1 file changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/tegra124-nyan-big.dts b/arch/arm/boot/dts/tegra124-nyan-big.dts
-index f12ece9b76a6..03eedf86dc48 100644
---- a/arch/arm/boot/dts/tegra124-nyan-big.dts
-+++ b/arch/arm/boot/dts/tegra124-nyan-big.dts
-@@ -1103,19 +1103,19 @@
+diff --git a/arch/arm/boot/dts/tegra124-nyan-blaze.dts b/arch/arm/boot/dts/tegra124-nyan-blaze.dts
+index aca0828115eb..9df25ca5ab83 100644
+--- a/arch/arm/boot/dts/tegra124-nyan-blaze.dts
++++ b/arch/arm/boot/dts/tegra124-nyan-blaze.dts
+@@ -1100,19 +1100,19 @@
  			};
  			cam_i2c_scl_pbb1 {
  				nvidia,pins = "cam_i2c_scl_pbb1";
