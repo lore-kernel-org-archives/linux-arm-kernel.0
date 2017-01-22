@@ -1,56 +1,65 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sun, 22 Jan 2017 15:32:44 +0100
-Subject: [PATCH 0/6] rtc: sun6i: Fix the RTC accuracy
-In-Reply-To: <cover.180d5ae6bc36ead9625d208824f5cbd7114cf92e.1484927680.git-series.maxime.ripard@free-electrons.com>
+Date: Sun, 22 Jan 2017 15:44:14 +0100
+Subject: [PATCH 4/6] rtc: sun6i: Force the mux to the external oscillator
+In-Reply-To: <CAGb2v650f-4RZ6RrRBGcmPz8mJ4KbJwTTj6=w3HeSWUZtLAKcw@mail.gmail.com>
 References: <cover.180d5ae6bc36ead9625d208824f5cbd7114cf92e.1484927680.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <20170122143244.n2d4fpxnt62tkwtt@piout.net>
+ <409c56f0ed1c4b0026ad60cb1218c99fe1686408.1484927680.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v650f-4RZ6RrRBGcmPz8mJ4KbJwTTj6=w3HeSWUZtLAKcw@mail.gmail.com>
+Message-ID: <20170122144414.fvir5la7cgocxfqn@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/01/2017 at 16:56:37 +0100, Maxime Ripard wrote :
+On 21/01/2017 at 11:53:08 +0800, Chen-Yu Tsai wrote :
 > Hi,
 > 
-> The RTC used in the A31 and later SoC has an accuracy issue, which is
-> already significant even after a couple of hours.
+> On Fri, Jan 20, 2017 at 11:56 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > The internal oscillator is way too inaccurate to do something useful with
+> > it. Switch to the external oscillator if it is available.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/rtc/rtc-sun6i.c | 12 ++++++++++++
+> >  1 file changed, 12 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/drivers/rtc/rtc-sun6i.c b/drivers/rtc/rtc-sun6i.c
+> > index edd5627da10f..1695fae24cd5 100644
+> > --- a/drivers/rtc/rtc-sun6i.c
+> > +++ b/drivers/rtc/rtc-sun6i.c
+> > @@ -493,6 +493,7 @@ static const struct rtc_class_ops sun6i_rtc_ops = {
+> >  static int sun6i_rtc_probe(struct platform_device *pdev)
+> >  {
+> >         struct sun6i_rtc_dev *chip = sun6i_rtc;
+> > +       struct clk *parent;
+> >         int ret;
+> >
+> >         if (!chip)
+> > @@ -540,6 +541,17 @@ static int sun6i_rtc_probe(struct platform_device *pdev)
+> >         /* disable alarm wakeup */
+> >         writel(0, chip->base + SUN6I_ALARM_CONFIG);
+> >
+> > +       parent = clk_get(&pdev->dev, NULL);
+> > +       if (!IS_ERR(parent)) {
+> > +               ret = clk_set_parent(chip->losc, parent);
+> > +               clk_put(parent);
+> > +
+> > +               if (ret) {
+> > +                       dev_err(&pdev->dev,
+> > +                               "Failed to reparent the RTC to the external oscillator\n");
+> > +                       return ret;
+> > +               }
+> > +       }
 > 
-> This is due to the fact that the oscillator used by default is an internal
-> and very inaccurate one.
-> 
-> A first attempt at fixing that by switching to the external oscillator was
-> done in the patch "rtc: sun6i: Switch to the external oscillator". However,
-> it turned out to be problematic since it was tracked properly in the clock
-> framework, which might lead to some clocks being disabled, even though
-> their devices were not notified.
-> 
-> This is a second attempt, this time by making it part of the CCF. It
-> turned out to be a bit more complicated than one would expect since the mux
-> found inside the RTC also controls one of the input of the main clock unit.
-> Therefore, it needs to be probed before the main clock unit driver.
-> 
-> Let me know what you think,
-> Maxime
-> 
-> Maxime Ripard (6):
->   rtc: sun6i: Expose the 32kHz oscillator
->   rtc: sun6i: Add some locking
->   rtc: sun6i: Disable the build as a module
->   rtc: sun6i: Force the mux to the external oscillator
->   ARM: sun8i: a23/a33: Enable the real LOSC and use it
->   ARM: sun8i: a23/a33: Add the oscillators accuracy
+> Following what I mentioned in patch 1, maybe it is easier to force
+> the mux before the clocks are registered by writing directly to
+> the registers? We could also backport the changes to stable?
 > 
 
-As Chen-Yu mentioned, maybe you can reorder some patches so they can go
-in stable.
+I'd say that the risk to break existing platforms is low enough to
+backport that patch to stable.
+Maxime as you are certainly the one that will handle the potential
+breakage, I'll let you choose what you want to do.
 
->  Documentation/devicetree/bindings/rtc/sun6i-rtc.txt |   8 +-
->  arch/arm/boot/dts/sun8i-a23-a33.dtsi                |  15 +-
->  drivers/rtc/Kconfig                                 |   2 +-
->  drivers/rtc/rtc-sun6i.c                             | 189 +++++++++++--
->  4 files changed, 181 insertions(+), 33 deletions(-)
-> 
-> base-commit: 99cef370ac9939df2aeb16c96d07e842b2fa8201
-> -- 
-> git-series 0.8.11
 
 -- 
 Alexandre Belloni, Free Electrons
