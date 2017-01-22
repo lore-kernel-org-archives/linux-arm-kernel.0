@@ -1,60 +1,61 @@
 From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Sun, 22 Jan 2017 22:05:25 +0100
-Subject: [PATCH 0/3] meson-gx: add pwm_AO_ab
-Message-ID: <20170122210528.892-1-martin.blumenstingl@googlemail.com>
+Date: Sun, 22 Jan 2017 22:05:27 +0100
+Subject: [PATCH 2/3] pinctrl: meson: meson-gxl: add the pwm_ao_b pin
+In-Reply-To: <20170122210528.892-1-martin.blumenstingl@googlemail.com>
+References: <20170122210528.892-1-martin.blumenstingl@googlemail.com>
+Message-ID: <20170122210528.892-3-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds support for the PWM controller in the AO domain.
-pinctrl support for GXBB already exists (in both, pinctrl-meson-gxbb.c
-and meson-gxbb.dtsi). This patch adds at least the pwm_ao_b pin for
-GXL and GXM - these are not documented in Amlogic's kernel, so I had
-to borrow the magic numbers from the Khadas VIM kernel (released under
-the GPL): [0]
+This adds support for the pwm_ao_b pin. Unfortunately the registers for
+the pwm_ao pins are not documented at all. The source for the pwm_ao_b
+pin from this patch is the Khadas VIM GPL kernel source, which sets bit
+3 and unsets bits 4 and 31 to enable the PWM LEDs.
 
-The bits for pwm_AO_a_pins are unknown at the time of writing, but these
-can still be added later.
+Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+---
+ drivers/pinctrl/meson/pinctrl-meson-gxl.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-I have successfully tested this on my GXL S905X based Khadas VIM board
-with the following .dts snippets (the PWM LED can simply be dimmed
-through sysfs):
-	&pwm_AO_ab {
-		status = "okay";
-		pinctrl-0 = <&pwm_ao_b_pins>;
-		pinctrl-names = "default";
-		clocks = <&clkc CLKID_FCLK_DIV4>;
-		clock-names = "clkin0";
-	};
-
-	pwmleds {
-		compatible = "pwm-leds";
-
-		power {
-			label = "vim:red:power";
-			pwms = <&pwm_AO_ab 1 7812500 0>;
-			max-brightness = <255>;
-		};
-	};
-
-(if anyone is interested in more of my Khadas VIM patches - these are
-still work-in-progress, which is why I have not sent them yet - can
-take a look at this: [1])
-
-NOTE: The .dts changes from this series are based on top of my SAR ADC
-patches.
-
-[0] https://github.com/khadas/linux/blob/94602ef5562978a8d8b5c7770c113074a714dbdb/drivers/amlogic/led/led_trigger_breathe.c#L75
-[1] https://github.com/xdarklight/linux/commits/meson-gx-integration-4.11-20170122
-
-Martin Blumenstingl (3):
-  ARM64: dts: meson-gx: add the missing pwm_AO_ab node
-  pinctrl: meson: meson-gxl: add the pwm_ao_b pin
-  ARM64: dts: meson-gxl: add the pwm_ao_b pin
-
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi  | 7 +++++++
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi | 7 +++++++
- drivers/pinctrl/meson/pinctrl-meson-gxl.c  | 8 ++++++++
- 3 files changed, 22 insertions(+)
-
+diff --git a/drivers/pinctrl/meson/pinctrl-meson-gxl.c b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
+index 25694f7094c7..6ff321a7366d 100644
+--- a/drivers/pinctrl/meson/pinctrl-meson-gxl.c
++++ b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
+@@ -222,6 +222,8 @@ static const unsigned int uart_rts_ao_b_pins[]	= { PIN(GPIOAO_3, 0) };
+ 
+ static const unsigned int remote_input_ao_pins[] = {PIN(GPIOAO_7, 0) };
+ 
++static const unsigned int pwm_ao_b_pins[]	= { PIN(GPIOAO_9, 0) };
++
+ static struct meson_pmx_group meson_gxl_periphs_groups[] = {
+ 	GPIO_GROUP(GPIOZ_0, EE_OFF),
+ 	GPIO_GROUP(GPIOZ_1, EE_OFF),
+@@ -418,6 +420,7 @@ static struct meson_pmx_group meson_gxl_aobus_groups[] = {
+ 	GROUP(uart_cts_ao_b,	0,	8),
+ 	GROUP(uart_rts_ao_b,	0,	7),
+ 	GROUP(remote_input_ao,	0,	0),
++	GROUP(pwm_ao_b,		0,	3),
+ };
+ 
+ static const char * const gpio_periphs_groups[] = {
+@@ -523,6 +526,10 @@ static const char * const remote_input_ao_groups[] = {
+ 	"remote_input_ao",
+ };
+ 
++static const char * const pwm_ao_b_groups[] = {
++	"pwm_ao_b",
++};
++
+ static struct meson_pmx_func meson_gxl_periphs_functions[] = {
+ 	FUNCTION(gpio_periphs),
+ 	FUNCTION(emmc),
+@@ -544,6 +551,7 @@ static struct meson_pmx_func meson_gxl_aobus_functions[] = {
+ 	FUNCTION(uart_ao),
+ 	FUNCTION(uart_ao_b),
+ 	FUNCTION(remote_input_ao),
++	FUNCTION(pwm_ao_b),
+ };
+ 
+ static struct meson_bank meson_gxl_periphs_banks[] = {
 -- 
 2.11.0
