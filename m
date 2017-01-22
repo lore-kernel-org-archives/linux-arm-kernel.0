@@ -1,13 +1,13 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun, 22 Jan 2017 22:41:49 +0900
-Subject: [GIT PULL] ARM: dts: uniphier: UniPhier DT updates for v4.11
-Message-ID: <CAK7LNAR154DLd-u50zSMTYkUN9HQtpQcnH3hGQQ69FohZp+6bA@mail.gmail.com>
+Date: Sun, 22 Jan 2017 22:47:14 +0900
+Subject: [GIT PULL] arm64: dts: uniphier: UniPhier DT updates (64bit) for v4.11
+Message-ID: <CAK7LNAQNW8P-gJzjvpU-C8=8OvbzHSwWTnGJ59-UNhxfoCC+NQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd, Olof,
 
-Here are UniPhier DT (32bit) updates for the v4.11 merge window.
+Here are UniPhier DT (64bit) updates for the v4.11 merge window.
 Please pull!
 
 The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
@@ -17,26 +17,27 @@ The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 are available in the git repository at:
 
   git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
-tags/uniphier-dt-v4.11
+tags/uniphier-dt64-v4.11
 
-for you to fetch changes up to 74b51465c02fe08f5f1e2a83d84e831e93ae8f52:
+for you to fetch changes up to 3a93cc261a29bde973a5ac9a9800c12ce362f5a1:
 
-  ARM: dts: uniphier: add SD pin-mux node (2017-01-22 22:21:54 +0900)
+  arm64: dts: uniphier: add eMMC controller node for LD11/LD20
+(2017-01-22 21:12:42 +0900)
 
 ----------------------------------------------------------------
-UniPhier ARM SoC DT updates for v4.11
+UniPhier ARM64 SoC DT updates for v4.11
 
-- Add eMMC, SD pin-mux nodes
+- Add an SD reset controller node for LD11 SoC
+- Add an eMMC controller node for LD11/LD20 SoC
 
 ----------------------------------------------------------------
 Masahiro Yamada (2):
-      ARM: dts: uniphier: add eMMC pin-mux node
-      ARM: dts: uniphier: add SD pin-mux node
+      arm64: dts: uniphier: add SD-ctrl node for LD11 SoC
+      arm64: dts: uniphier: add eMMC controller node for LD11/LD20
 
- arch/arm/boot/dts/uniphier-pinctrl.dtsi | 18 +++++++++++++++++-
- 1 file changed, 17 insertions(+), 1 deletion(-)
-
-
+ arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 21 +++++++++++++++++++++
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi | 10 ++++++++++
+ 2 files changed, 31 insertions(+)
 
 -- 
 Best Regards
