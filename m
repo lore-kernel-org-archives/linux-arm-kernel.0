@@ -1,59 +1,30 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Sun, 22 Jan 2017 15:38:47 +0800
-Subject: [PATCH] PCI: rockchip: mark PM functions as __maybe_unused
-In-Reply-To: <20170120162450.3690225-1-arnd@arndb.de>
-References: <20170120162450.3690225-1-arnd@arndb.de>
-Message-ID: <41135715-6f07-9c85-0b78-c66a37607b92@rock-chips.com>
+From: mzoran@crowfest.net (Michael Zoran)
+Date: Sun, 22 Jan 2017 00:07:04 -0800
+Subject: ARM64: Disabling warnings about deprecated armv8 instructions
+Message-ID: <1485072424.14066.2.camel@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi,
 
-On 2017/1/21 0:24, Arnd Bergmann wrote:
-> When CONFIG_PM_SLEEP is disabled, we get harmless build warnings:
->
-> host/pcie-rockchip.c:1267:12: error: 'rockchip_pcie_resume_noirq' defined but not used [-Werror=unused-function]
-> host/pcie-rockchip.c:1240:12: error: 'rockchip_pcie_suspend_noirq' defined but not used [-Werror=unused-function]
->
-> Marking both functions as __maybe_unused avoids the warning without
-> the need for #ifdef around them.
+I'm not sure if this if the correct place to be asking this.   The RPI
+3 running ARM64 is slowly reaching the point of being about to
+seriously run a 32 bit vender OS like Raspbian.  When running Raspbian,
+I'm seeing a very large number(thousands) of kernel log messages about
+deprecated instructions especially setend and barrier instuctions. 
+This can be very annoying and is completely filling the kernel log.
 
-Sorry for introducing this warning, and thanks for fixing it.
+I'm considering submitting a patch to add a Kconfig option to disable
+these warnings with the default being to keep the warnings enabled.  I
+was wondering if such a patch could be seriously considered.
 
-Acked-by: Shawn Lin <shawn.lin@rock-chips.com>
+I completely understand thee need for these warnings and the need to
+encourage people to update software, but at the same time some software
+like Raspbian needs to run on a large number of processors with a
+simple install so updating isn't always realistic.  
 
->
-> Fixes: 013dd3d5e183 ("PCI: rockchip: Add system PM support")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/pci/host/pcie-rockchip.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/pci/host/pcie-rockchip.c b/drivers/pci/host/pcie-rockchip.c
-> index 0d6e8ee5b017..b975116d2b03 100644
-> --- a/drivers/pci/host/pcie-rockchip.c
-> +++ b/drivers/pci/host/pcie-rockchip.c
-> @@ -1237,7 +1237,7 @@ static int rockchip_pcie_wait_l2(struct rockchip_pcie *rockchip)
->  	return 0;
->  }
->
-> -static int rockchip_pcie_suspend_noirq(struct device *dev)
-> +static int __maybe_unused rockchip_pcie_suspend_noirq(struct device *dev)
->  {
->  	struct rockchip_pcie *rockchip = dev_get_drvdata(dev);
->  	int ret;
-> @@ -1264,7 +1264,7 @@ static int rockchip_pcie_suspend_noirq(struct device *dev)
->  	return ret;
->  }
->
-> -static int rockchip_pcie_resume_noirq(struct device *dev)
-> +static int __maybe_unused rockchip_pcie_resume_noirq(struct device *dev)
->  {
->  	struct rockchip_pcie *rockchip = dev_get_drvdata(dev);
->  	int err;
->
+Running a 64 bit kernel with a 32 bit userland is better from a upgrade
+point of view then always running 32 just because they want to not have
+the machine slowed by excessive logging.
 
-
--- 
-Best Regards
-Shawn Lin
+Thanks.
