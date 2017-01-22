@@ -1,86 +1,98 @@
 From: zyw@rock-chips.com (Chris Zhong)
-Date: Sun, 22 Jan 2017 11:06:31 +0800
-Subject: [PATCH v2 18/26] drm/rockchip: dw-mipi-dsi: properly configure
- PHY timing
-In-Reply-To: <20170121163128.22240-19-john@metanate.com>
+Date: Sun, 22 Jan 2017 11:08:53 +0800
+Subject: [PATCH v2 26/26] drm/rockchip: dw-mipi-dsi: support read commands
+In-Reply-To: <20170121163128.22240-27-john@metanate.com>
 References: <20170121163128.22240-1-john@metanate.com>
- <20170121163128.22240-19-john@metanate.com>
-Message-ID: <588421B7.4000900@rock-chips.com>
+ <20170121163128.22240-27-john@metanate.com>
+Message-ID: <58842245.6000103@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
+Hi John
 
 On 01/22/2017 12:31 AM, John Keeping wrote:
-> These values are specified as constant time periods but the PHY
-> configuration is in terms of the current lane byte clock so using
-> constant values guarantees that the timings will be outside the
-> specification with some display configurations.
->
-> Derive the necessary configuration from the byte clock in order to
-> ensure that the PHY configuration is correct.
+> I haven't found any method for getting the length of a response, so this
+> just uses the requested rx_len
 >
 > Signed-off-by: John Keeping <john@metanate.com>
 > ---
 > Unchanged in v2
 > ---
->   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 36 ++++++++++++++++++++++++++++++----
->   1 file changed, 32 insertions(+), 4 deletions(-)
+>   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 54 ++++++++++++++++++++++++++++++++++
+>   1 file changed, 54 insertions(+)
 >
 > diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> index cfe7e4ba305c..12432e41971b 100644
+> index f780401e8b5e..f0cb005c6d76 100644
 > --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 > +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> @@ -383,6 +383,26 @@ static void dw_mipi_dsi_phy_write(struct dw_mipi_dsi *dsi, u8 test_code,
->   	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_TESTCLK | PHY_UNTESTCLR);
+> @@ -675,6 +675,54 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
+>   	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, hdr_val);
 >   }
 >   
-> +/**
-> + * ns2bc - Nanoseconds to byte clock cycles
-> + */
-> +static inline unsigned int ns2bc(struct dw_mipi_dsi *dsi, int ns)
+> +static int dw_mipi_dsi_dcs_read(struct dw_mipi_dsi *dsi,
+> +				const struct mipi_dsi_msg *msg)
 > +{
-> +	unsigned long byte_clk_khz = dsi->lane_mbps * MSEC_PER_SEC / 8;
+> +	const u8 *tx_buf = msg->tx_buf;
+> +	u8 *rx_buf = msg->rx_buf;
+> +	size_t i;
+> +	int ret, val;
 > +
-> +	return (ns * (byte_clk_khz / 1000) + 999) / 1000;
+> +	dsi_write(dsi, DSI_PCKHDL_CFG, EN_CRC_RX | EN_ECC_RX | EN_BTA);
+> +	dsi_write(dsi, DSI_GEN_HDR, GEN_HDATA(tx_buf[0]) | GEN_HTYPE(msg->type));
+
+WARNING: line over 80 characters
+
+> +
+> +	ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
+> +				 val, !(val & GEN_RD_CMD_BUSY), 1000,
+> +				 CMD_PKT_STATUS_TIMEOUT_US);
+> +	if (ret < 0) {
+> +		dev_err(dsi->dev, "failed to read command response\n");
+> +		return ret;
+> +	}
+> +
+> +	for (i = 0; i < msg->rx_len;) {
+> +		u32 pld = dsi_read(dsi, DSI_GEN_PLD_DATA);
+> +		while (i < msg->rx_len) {
+> +			rx_buf[i] = pld & 0xff;
+> +			pld >>= 8;
+> +			i++;
+> +		}
+> +	}
+> +
+> +	return msg->rx_len;
 > +}
 > +
-> +/**
-> + * ns2ui - Nanoseconds to UI time periods
-> + */
-> +static inline unsigned int ns2ui(struct dw_mipi_dsi *dsi, int ns)
+> +static int dw_mipi_dsi_set_max_return_packet_size(struct dw_mipi_dsi *dsi,
+> +						  size_t len)
 > +{
-> +	unsigned long byte_clk_khz = dsi->lane_mbps * MSEC_PER_SEC;
+> +	u8 val[] = { len & 0xff, (len >> 8) & 0xff };
+> +	struct mipi_dsi_msg msg = {
+> +		.channel = dsi->channel,
+> +		.type = MIPI_DSI_SET_MAXIMUM_RETURN_PACKET_SIZE,
+> +		.tx_buf = val,
+> +		.tx_len = 2,
+> +	};
 > +
-> +	return (ns * (byte_clk_khz / 1000) + 999) / 1000;
+> +	if (len > 0xffff)
+> +		return -EINVAL;
+> +
+> +	return dw_mipi_dsi_dcs_short_write(dsi, &msg);
 > +}
 > +
->   static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
+>   static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
+>   					 const struct mipi_dsi_msg *msg)
 >   {
->   	int ret, testdin, vco, val;
-> @@ -434,10 +454,18 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
->   					 SETRD_MAX | POWER_MANAGE |
->   					 TER_RESISTORS_ON);
->   
-> -
-> -	dw_mipi_dsi_phy_write(dsi, 0x70, TLP_PROGRAM_EN | 0xf);
-> -	dw_mipi_dsi_phy_write(dsi, 0x71, THS_PRE_PROGRAM_EN | 0x55);
-> -	dw_mipi_dsi_phy_write(dsi, 0x72, THS_ZERO_PROGRAM_EN | 0xa);
-> +	dw_mipi_dsi_phy_write(dsi, 0x60, TLP_PROGRAM_EN | ns2bc(dsi, 500));
-> +	dw_mipi_dsi_phy_write(dsi, 0x61, THS_PRE_PROGRAM_EN | ns2ui(dsi, 40));
-> +	dw_mipi_dsi_phy_write(dsi, 0x62, THS_ZERO_PROGRAM_EN | ns2bc(dsi, 300));
-> +	dw_mipi_dsi_phy_write(dsi, 0x63, THS_PRE_PROGRAM_EN | ns2ui(dsi, 100));
-> +	dw_mipi_dsi_phy_write(dsi, 0x64, BIT(5) | ns2bc(dsi, 100));
-> +	dw_mipi_dsi_phy_write(dsi, 0x65, BIT(5) | (ns2bc(dsi, 60) + 7));
-> +
-> +	dw_mipi_dsi_phy_write(dsi, 0x70, TLP_PROGRAM_EN | ns2bc(dsi, 500));
-> +	dw_mipi_dsi_phy_write(dsi, 0x71, THS_PRE_PROGRAM_EN | (ns2ui(dsi, 50) + 5));
-WARNING: line over 80 characters
-> +	dw_mipi_dsi_phy_write(dsi, 0x72, THS_ZERO_PROGRAM_EN | (ns2bc(dsi, 140) + 2));
-WARNING: line over 80 characters
-> +	dw_mipi_dsi_phy_write(dsi, 0x73, THS_PRE_PROGRAM_EN | (ns2ui(dsi, 60) + 8));
-WARNING: line over 80 characters
-> +	dw_mipi_dsi_phy_write(dsi, 0x74, BIT(5) | ns2bc(dsi, 100));
->   
->   	dsi_write(dsi, DSI_PHY_RSTZ, PHY_ENFORCEPLL | PHY_ENABLECLK |
->   				     PHY_UNRSTZ | PHY_UNSHUTDOWNZ);
+> @@ -692,6 +740,12 @@ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
+>   	case MIPI_DSI_DCS_LONG_WRITE:
+>   		ret = dw_mipi_dsi_dcs_long_write(dsi, msg);
+>   		break;
+> +	case MIPI_DSI_DCS_READ:
+> +		ret = dw_mipi_dsi_set_max_return_packet_size(dsi, msg->rx_len);
+> +		if (ret < 0)
+> +			return ret;
+> +		ret = dw_mipi_dsi_dcs_read(dsi, msg);
+> +		break;
+>   	default:
+>   		dev_err(dsi->dev, "unsupported message type 0x%02x\n",
+>   			msg->type);
