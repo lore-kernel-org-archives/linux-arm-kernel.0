@@ -1,38 +1,13 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 22 Jan 2017 13:22:36 +0100
-Subject: [PATCH 12/22] ARM: gemini: DT for the Cortina Gemini SoC platforms
-Message-ID: <20170122122236.10665-1-linus.walleij@linaro.org>
+Date: Sun, 22 Jan 2017 13:22:46 +0100
+Subject: [PATCH 13/22] ARM: dts: add device tree for Gemini SoC and SQ201
+Message-ID: <20170122122246.10714-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds initial and compulsory device tree support to the
-Gemini ARMv4 platform.
-
-We are selecting a bunch of "absolute minimals" for getting a working
-system up with just device tree:
-
-- We select USE_OF for natural reasons or nothing works.
-
-- We select CLKSRC_OF and GEMINI_TIMER so we get timekeeping from
-  the clocksource.
-
-- We select GPIO_GEMINI because these are used as irqchips, and
-  for a generic driver it is not reasonable for those to have to
-  select every possible irqchip in the world to work, the platform
-  should simply provide the available irqchips.
-
-- We select a UART that can be exprected to work with
-  SERIAL_OF_PLATFORM which is the name for an 8250 OF-probed
-  serial port.
-
-- We select the syscon-based reset controller: it's not fun when
-  "reboot" doesn't work because of Kconfig, so we just select
-  POWER_RESET and POWER_RESET_SYSCON.
-
-- We perhaps a bit controversiallt select ARM_APPENDED_DTB, because
-  this platform is using the ancient RedBoot, and can *NOT* be
-  expected to upgrade its bootloaders. Appended device tree is
-  simply how these devices have to work with device tree.
+This adds a device tree for the Gemini SoC and the ITian
+Square One SQ201 board that has been my testing target
+for Gemini device tree support.
 
 Cc: Janos Laube <janos.dev@gmail.com>
 Cc: Paulius Zaleckas <paulius.zaleckas@gmail.com>
@@ -40,92 +15,227 @@ Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
 Cc: Florian Fainelli <f.fainelli@gmail.com>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/Kconfig                |  8 ++++++++
- arch/arm/mach-gemini/Makefile   |  2 +-
- arch/arm/mach-gemini/board-dt.c | 38 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 47 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/mach-gemini/board-dt.c
+ arch/arm/boot/dts/Makefile         |  2 +
+ arch/arm/boot/dts/gemini-sq201.dts | 94 +++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/gemini.dtsi      | 96 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 192 insertions(+)
+ create mode 100644 arch/arm/boot/dts/gemini-sq201.dts
+ create mode 100644 arch/arm/boot/dts/gemini.dtsi
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 63e61bf5aab0..b4a42d599e2c 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -355,11 +355,19 @@ config ARM_SINGLE_ARMV7M
- 
- config ARCH_GEMINI
- 	bool "Cortina Systems Gemini"
-+	select ARM_APPENDED_DTB # Old Redboot bootloaders deployed
- 	select CLKSRC_MMIO
-+	select CLKSRC_OF
- 	select CPU_FA526
-+	select GEMINI_TIMER
- 	select GENERIC_CLOCKEVENTS
-+	select GPIO_GEMINI
- 	select GPIOLIB
- 	select MULTI_IRQ_HANDLER
-+	select POWER_RESET
-+	select POWER_RESET_SYSCON
-+	select SERIAL_OF_PLATFORM
-+	select USE_OF
- 	help
- 	  Support for the Cortina Systems Gemini family SoCs
- 
-diff --git a/arch/arm/mach-gemini/Makefile b/arch/arm/mach-gemini/Makefile
-index 7963a77be637..11f07fb6ec3d 100644
---- a/arch/arm/mach-gemini/Makefile
-+++ b/arch/arm/mach-gemini/Makefile
-@@ -4,7 +4,7 @@
- 
- # Object file lists.
- 
--obj-y			:= irq.o mm.o time.o devices.o gpio.o idle.o reset.o
-+obj-y			:= irq.o mm.o time.o devices.o gpio.o idle.o reset.o board-dt.o
- 
- # Board-specific support
- obj-$(CONFIG_MACH_NAS4220B)	+= board-nas4220b.o
-diff --git a/arch/arm/mach-gemini/board-dt.c b/arch/arm/mach-gemini/board-dt.c
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index cccdbcb557b6..10edd72a6f3d 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -168,6 +168,8 @@ dtb-$(CONFIG_ARCH_EXYNOS5) += \
+ 	exynos5440-sd5v1.dtb \
+ 	exynos5440-ssdk5440.dtb \
+ 	exynos5800-peach-pi.dtb
++dtb-$(CONFIG_ARCH_GEMINI) += \
++	gemini-sq201.dtb
+ dtb-$(CONFIG_ARCH_HI3xxx) += \
+ 	hi3620-hi4511.dtb
+ dtb-$(CONFIG_ARCH_HIGHBANK) += \
+diff --git a/arch/arm/boot/dts/gemini-sq201.dts b/arch/arm/boot/dts/gemini-sq201.dts
 new file mode 100644
-index 000000000000..2983246d9c63
+index 000000000000..1fd87d6a880f
 --- /dev/null
-+++ b/arch/arm/mach-gemini/board-dt.c
-@@ -0,0 +1,38 @@
++++ b/arch/arm/boot/dts/gemini-sq201.dts
+@@ -0,0 +1,94 @@
 +/*
-+ * Gemini Device Tree boot support
++ * Device Tree file for ITian Square One SQ201 NAS
 + */
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
 +
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
++/dts-v1/;
 +
-+/* Can we just use CONFIG_DEBUG_UART_PHYS and CONFIG_DEBUG_UART_VIRT? */
-+#define GEMINI_UART_BASE 0x42000000
-+#define GEMINI_UART_VBASE 0xf4200000
++#include "gemini.dtsi"
++#include <dt-bindings/input/input.h>
 +
-+/* This is needed for LL-debug/earlyprintk/debug-macro.S */
-+static struct map_desc gemini_io_desc[] __initdata = {
-+	{
-+		.virtual = GEMINI_UART_VBASE,
-+		.pfn = __phys_to_pfn(GEMINI_UART_BASE),
-+		.length = SZ_4K,
-+		.type = MT_DEVICE,
-+	},
++/ {
++	model = "ITian Square One SQ201";
++	compatible = "itian,sq201", "cortina,gemini";
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	memory { /* 128 MB */
++		device_type = "memory";
++		reg = <0x00000000 0x8000000>;
++	};
++
++	chosen {
++		bootargs = "console=ttyS0,115200n8";
++		stdout-path = &uart0;
++	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		button at 18 {
++			debounce_interval = <50>;
++			wakeup-source;
++			linux,code = <KEY_SETUP>;
++			label = "factory reset";
++			gpios = <&gpio0 18 GPIO_ACTIVE_LOW>;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		led at 20 {
++			label = "sq201:green:info";
++			gpios = <&gpio0 20 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++			linux,default-trigger = "heartbeat";
++		};
++		led at 31 {
++			label = "sq201:green:usb";
++			gpios = <&gpio0 31 GPIO_ACTIVE_HIGH>;
++			default-state = "off";
++			linux,default-trigger = "usb-host";
++		};
++	};
++
++	flash at 30000000 {
++		status = "okay";
++		/* 16MB of flash */
++		reg = <0x30000000 0x01000000>;
++
++		partition at 0 {
++			label = "RedBoot";
++			reg = <0x00000000 0x00120000>;
++			read-only;
++		};
++		partition at 120000 {
++			label = "Kernel";
++			reg = <0x00120000 0x00200000>;
++		};
++		partition at 320000 {
++			label = "Ramdisk";
++			reg = <0x00320000 0x00600000>;
++		};
++		partition at 920000 {
++			label = "Application";
++			reg = <0x00920000 0x00600000>;
++		};
++		partition at f20000 {
++			label = "VCTL";
++			reg = <0x00f20000 0x00020000>;
++			read-only;
++		};
++		partition at f40000 {
++			label = "CurConf";
++			reg = <0x00f40000 0x000a0000>;
++			read-only;
++		};
++		partition at fe0000 {
++			label = "FIS directory";
++			reg = <0x00fe0000 0x00020000>;
++			read-only;
++		};
++	};
 +};
+diff --git a/arch/arm/boot/dts/gemini.dtsi b/arch/arm/boot/dts/gemini.dtsi
+new file mode 100644
+index 000000000000..19c93cfbeae3
+--- /dev/null
++++ b/arch/arm/boot/dts/gemini.dtsi
+@@ -0,0 +1,96 @@
++/*
++ * Device Tree file for Cortina systems Gemini SoC
++ */
 +
-+static void __init gemini_map_io(void)
-+{
-+	iotable_init(gemini_io_desc, ARRAY_SIZE(gemini_io_desc));
-+}
++/include/ "skeleton.dtsi"
 +
-+static const char *gemini_board_compat[] = {
-+	"cortina,gemini",
-+	NULL,
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	interrupt-parent = <&intcon>;
++
++	flash at 30000000 {
++		compatible = "cortina,gemini-flash", "cfi-flash";
++		syscon = <&syscon>;
++		bank-width = <2>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		status = "disabled";
++	};
++
++	syscon: syscon at 40000000 {
++		compatible = "cortina,gemini-syscon", "syscon", "simple-mfd";
++		reg = <0x40000000 0x1000>;
++
++		syscon-reboot {
++			compatible = "syscon-reboot";
++			regmap = <&syscon>;
++			/* GLOBAL_RESET register */
++			offset = <0x0c>;
++			/* RESET_GLOBAL | RESET_CPU1 */
++			mask = <0xC0000000>;
++		};
++	};
++
++	timer at 43000000 {
++		compatible = "cortina,gemini-timer";
++		reg = <0x43000000 0x1000>;
++		interrupt-parent = <&intcon>;
++		interrupts = <14 IRQ_TYPE_EDGE_RISING>, /* Timer 1 */
++			   <15 IRQ_TYPE_EDGE_RISING>, /* Timer 2 */
++			   <16 IRQ_TYPE_EDGE_RISING>; /* Timer 3 */
++		syscon = <&syscon>;
++	};
++
++	uart0: serial at 42000000 {
++		compatible = "ns16550a";
++		reg = <0x42000000 0x100>;
++		clock-frequency = <48000000>;
++		interrupts = <18 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++	};
++
++	rtc at 45000000 {
++		compatible = "cortina,gemini-rtc";
++		reg = <0x45000000 0x100>;
++		interrupts = <17 IRQ_TYPE_LEVEL_HIGH>;
++	};
++
++	intcon: interrupt-controller at 48000000 {
++		compatible = "cortina,gemini-interrupt-controller";
++		reg = <0x48000000 0x1000>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++	};
++
++	gpio0: gpio at 4d000000 {
++		compatible = "cortina,gemini-gpio";
++		reg = <0x4d000000 0x100>;
++		interrupts = <22 IRQ_TYPE_LEVEL_HIGH>;
++		gpio-controller;
++		#gpio-cells = <2>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++	};
++
++	gpio1: gpio at 4e000000 {
++		compatible = "cortina,gemini-gpio";
++		reg = <0x4e000000 0x100>;
++		interrupts = <23 IRQ_TYPE_LEVEL_HIGH>;
++		gpio-controller;
++		#gpio-cells = <2>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++	};
++
++	gpio2: gpio at 4f000000 {
++		compatible = "cortina,gemini-gpio";
++		reg = <0x4f000000 0x100>;
++		interrupts = <24 IRQ_TYPE_LEVEL_HIGH>;
++		gpio-controller;
++		#gpio-cells = <2>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++	};
 +};
-+
-+DT_MACHINE_START(GEMINI_DT, "Gemini (Device Tree)")
-+	.map_io		= gemini_map_io,
-+	.dt_compat	= gemini_board_compat,
-+MACHINE_END
 -- 
 2.9.3
