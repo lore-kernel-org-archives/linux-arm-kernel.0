@@ -1,56 +1,146 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 23 Jan 2017 18:09:41 +0100
-Subject: [PATCH v4 9/9] clocksource/drivers/rockchip_timer: implement
- clocksource timer
-In-Reply-To: <1480436092-10728-10-git-send-email-al.kochet@gmail.com>
-References: <1480343486-25539-1-git-send-email-al.kochet@gmail.com>
- <1480436092-10728-1-git-send-email-al.kochet@gmail.com>
- <1480436092-10728-10-git-send-email-al.kochet@gmail.com>
-Message-ID: <2966820.3ediQCxqSR@diego>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 23 Jan 2017 09:10:05 -0800
+Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
+In-Reply-To: <20170123144031.GA7870@amd>
+References: <20170123124058.GA17134@amd> <20170123141331.GA11402@amd>
+ <da1f1b45-3ae5-ffe8-62c6-9ec7c3a1505b@roeck-us.net>
+ <20170123144031.GA7870@amd>
+Message-ID: <20170123171005.GA23924@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 29. November 2016, 19:14:52 CET schrieb Alexander Kochetkov:
-> The clock supplying the arm-global-timer on the rk3188 is coming from the
-> the cpu clock itself and thus changes its rate everytime cpufreq adjusts
-> the cpu frequency making this timer unsuitable as a stable clocksource
-> and sched clock.
+On Mon, Jan 23, 2017 at 03:40:31PM +0100, Pavel Machek wrote:
+> On Mon 2017-01-23 06:31:31, Guenter Roeck wrote:
+> > On 01/23/2017 06:19 AM, Pavel Machek wrote:
+> > >Hi!
+> > >
+> > >>It seems that battery driver stopped working on N900 between -rc4 and
+> > >>-rc5.
+> > >
+> > >pavel at amd:/data/l/linux-n900$ git bisect log
+> > ># bad: [41f283973653dc44af47585fa79fb6da6ffdc2e2] Merge
+> > >/data//l/clean-cg into mini-v4.10
+> > ># good: [4f8d9925eb1de1ec1c4183164f1bc7b01f5ae185] It seems mainline
+> > >-rc4 did have a fix for the sound issue. Use that one.
+> > >git bisect start 'mini-v4.10'
+> > >'4f8d9925eb1de1ec1c4183164f1bc7b01f5ae185'
+> > ># good: [e90665a5d38b17fdbe484a85fbba917a7006522d] Merge tag
+> > >'ceph-for-4.10-rc5' of git://github.com/ceph/ceph-client
+> > >git bisect good e90665a5d38b17fdbe484a85fbba917a7006522d
+> > ># good: [83fd57a740bb19286959b3085eb93532f3e7ef2c] Merge tag
+> > >'powerpc-4.10-2' of
+> > >git://git.kernel.org/pub/scm/linux/kernel/git/powerpc/linux
+> > >git bisect good 83fd57a740bb19286959b3085eb93532f3e7ef2c
+> > ># good: [c497f8d17246720afe680ea1a8fa6e48e75af852] Merge tag
+> > >'usb-4.10-rc5' of
+> > >git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb
+> > >git bisect good c497f8d17246720afe680ea1a8fa6e48e75af852
+> > ># bad: [bb6c01c2dde67b165cf7c808b0f00677b6f94b96] Merge branch
+> > >'for-rc' of git://git.kernel.org/pub/scm/linux/kernel/git/rzhang/linux
+> > >git bisect bad bb6c01c2dde67b165cf7c808b0f00677b6f94b96
+> > ># good: [18591add41ec9558ce0e32ef88626c18cc70c686] thermal: rockchip:
+> > >handle set_trips without the trip points
+> > >git bisect good 18591add41ec9558ce0e32ef88626c18cc70c686
+> > ># bad: [f53345e8cf027d03187b9417f1f8883c516e1a5b] thermal: core: move
+> > >tz->device.groups cleanup to thermal_release
+> > >git bisect bad f53345e8cf027d03187b9417f1f8883c516e1a5b
+> > ># bad: [7611fb68062f8d7f416f3272894d1edf7bbff29c] thermal:
+> > >thermal_hwmon: Convert to hwmon_device_register_with_info()
+> > >git bisect bad 7611fb68062f8d7f416f3272894d1edf7bbff29c
+> > ># first bad commit: [7611fb68062f8d7f416f3272894d1edf7bbff29c]
+> > >thermal: thermal_hwmon: Convert to hwmon_device_register_with_info()
+> > >pavel at amd:/data/l/linux-n900$
+> > >
+> > >pavel at amd:/data/l/linux-n900$ git bisect log
+> > ># bad: [41f283973653dc44af47585fa79fb6da6ffdc2e2] Merge
+> > >/data//l/clean-cg into mini-v4.10
+> > ># good: [4f8d9925eb1de1ec1c4183164f1bc7b01f5ae185] It seems mainline
+> > >-rc4 did have a fix for the sound issue. Use that one.
+> > >git bisect start 'mini-v4.10'
+> > >'4f8d9925eb1de1ec1c4183164f1bc7b01f5ae185'
+> > ># good: [e90665a5d38b17fdbe484a85fbba917a7006522d] Merge tag
+> > >'ceph-for-4.10-rc5' of git://github.com/ceph/ceph-client
+> > >git bisect good e90665a5d38b17fdbe484a85fbba917a7006522d
+> > ># good: [83fd57a740bb19286959b3085eb93532f3e7ef2c] Merge tag
+> > >'powerpc-4.10-2' of
+> > >git://git.kernel.org/pub/scm/linux/kernel/git/powerpc/linux
+> > >git bisect good 83fd57a740bb19286959b3085eb93532f3e7ef2c
+> > ># good: [c497f8d17246720afe680ea1a8fa6e48e75af852] Merge tag
+> > >'usb-4.10-rc5' of
+> > >git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb
+> > >git bisect good c497f8d17246720afe680ea1a8fa6e48e75af852
+> > ># bad: [bb6c01c2dde67b165cf7c808b0f00677b6f94b96] Merge branch
+> > >'for-rc' of git://git.kernel.org/pub/scm/linux/kernel/git/rzhang/linux
+> > >git bisect bad bb6c01c2dde67b165cf7c808b0f00677b6f94b96
+> > ># good: [18591add41ec9558ce0e32ef88626c18cc70c686] thermal: rockchip:
+> > >handle set_trips without the trip points
+> > >git bisect good 18591add41ec9558ce0e32ef88626c18cc70c686
+> > ># bad: [f53345e8cf027d03187b9417f1f8883c516e1a5b] thermal: core: move
+> > >tz->device.groups cleanup to thermal_release
+> > >git bisect bad f53345e8cf027d03187b9417f1f8883c516e1a5b
+> > ># bad: [7611fb68062f8d7f416f3272894d1edf7bbff29c] thermal:
+> > >thermal_hwmon: Convert to hwmon_device_register_with_info()
+> > >git bisect bad 7611fb68062f8d7f416f3272894d1edf7bbff29c
+> > ># first bad commit: [7611fb68062f8d7f416f3272894d1edf7bbff29c]
+> > >thermal: thermal_hwmon: Convert to hwmon_device_register_with_info()
+> > >pavel at amd:/data/l/linux-n900$
+> > >
+> > >7611fb68062f8d7f416f3272894d1edf7bbff29c is the first bad commit
+> > >commit 7611fb68062f8d7f416f3272894d1edf7bbff29c
+> > >Author: Fabio Estevam <fabio.estevam@nxp.com>
+> > >Date:   Tue Dec 27 15:31:49 2016 -0200
+> > >
+> > >    thermal: thermal_hwmon: Convert to
+> > >    hwmon_device_register_with_info()
+> > >
+> > >    Booting Linux on a mx6q based board leads to the following
+> > >    warning:
+> > >
+> > >    (NULL device *): hwmon_device_register() is deprecated. Please
+> > >    convert the
+> > >        driver to use hwmon_device_register_with_info().
+> > >
+> > >    ,so do as suggested.
+> > >
+> > >    Also, this results in the core taking care of creating the 'name'
+> > >        attribute, so drop the code doing that from the thermal
+> > >        driver.
+> > >
+> > > Suggested-by: Guenter Roeck <linux@roeck-us.net>
+> > > Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> > > Signed-off-by: Zhang Rui <rui.zhang@intel.com>
+> > >
+> > >:040000 040000 b3f6095ab53677277c2f9d75cb6430afb6825765
+> > >156a18e983a22b8ae43c7b312a4e1c63017f0e26 M	drivers
+> > >
+> > >I'll try to revert it on the top of v4.10-rc5 now... and yes, it fixes
+> > >the issue.
+> > >
+> > >Any idea what went wrong and how to fix that?
+> > >
+> > >Anyway as we are at -rc5 and this is warning fix that caused a
+> > >regression on different hardware... it should be reverted.
+> > >
+> > Agreed.
+> > 
+> > What exactly does "stopped working" mean ? That might help understanding
+> > what went wrong.
 > 
-> The rk3188, rk3288 and following socs share a separate timer block already
-> handled by the rockchip-timer driver. Therefore adapt this driver to also
-> be able to act as clocksource and sched clock on rk3188.
+> /sys files related to battery no longer appear. I beieve this has
+> something to do with it:
 > 
-> In order to test clocksource you can run following commands and check
-> how much time it take in real. On rk3188 it take about ~45 seconds.
+> [    2.374877] of_get_named_gpiod_flags: parsed 'reset-gpios' property
+> of node '/ocp at 68000000/spi at 48098000/tsc2005 at 0[0]' - status (0)
+> [    2.375946] input: TSC2005 touchscreen as
+> /devices/platform/68000000.ocp/48098000.spi/spi_master/spi1/spi1.0/input/input5
+> [    2.392120] rx51-battery: probe of n900-battery failed with error
+> -22
+> [    2.399902] omap_hsmmc 4809c000.mmc: GPIO lookup for consumer cd
 > 
->     cpufreq-set -f 1.6GHZ
->     date; sleep 60; date
-> 
-> In order to use the patch you need to declare two timers in the dts
-> file. The first timer will be initialized as clockevent provider
-> and the second one as clocksource. The clockevent must be from
-> alive subsystem as it used as backup for the local timers at sleep
-> time.
-> 
-> The patch does not break compatibility with older device tree files.
-> The older device tree files contain only one timer. The timer
-> will be initialized as clockevent, as expected.
-> 
-> rk3288 (and probably anything newer) is irrelevant to this patch,
-> as it has the arch timer interface. This patch may be usefull
-> for Cortex-A9/A5 based parts.
-> 
-> Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
 
-[...]
+Only problem I can imagine is that power_supply_register() fails registering
+the thermal zone, which in turn would suggest that the offending patch might
+not work at all, at least not under some circumstances. So it should
+definitely be reverted until we figure out the problem.
 
-> @@ -120,13 +161,46 @@ static irqreturn_t rk_timer_interrupt(int irq, void
-> *dev_id) return IRQ_HANDLED;
->  }
-> 
-> +static cycle_t rk_timer_clocksource_read(struct clocksource *cs)
-^^
-../drivers/clocksource/rockchip_timer.c:164:8: error: unknown type name ?cycle_t?
- static cycle_t rk_timer_clocksource_read(struct clocksource *cs)
-
-looks like something in clocksources changed since november
+Guenter
