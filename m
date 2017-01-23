@@ -1,47 +1,97 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 23 Jan 2017 11:58:42 +0100
-Subject: [PATCH v3 0/13] arm64: allwinner: a64: Enable MMC support
-In-Reply-To: <cover.a06ce1672d7a72ee7f9bbca46fdd223edd6b2313.1484585798.git-series.maxime.ripard@free-electrons.com>
-References: <cover.a06ce1672d7a72ee7f9bbca46fdd223edd6b2313.1484585798.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <20170123105842.37q23ecxecrjr6so@lukather>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 23 Jan 2017 12:00:04 +0100
+Subject: [PATCH v3 00/24] i.MX Media Driver
+In-Reply-To: <5d23d244-aa0e-401c-24a9-07f28acf1563@xs4all.nl>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <c6e98327-7e2c-f34a-2d23-af7b236de441@xs4all.nl>
+ <1484929911.2897.70.camel@pengutronix.de>
+ <3fb68686-9447-2d8a-e2d2-005e4138cd43@gmail.com>
+ <5d23d244-aa0e-401c-24a9-07f28acf1563@xs4all.nl>
+Message-ID: <1485169204.2874.57.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+On Fri, 2017-01-20 at 21:39 +0100, Hans Verkuil wrote:
+[...]
+> > There is a VDIC entity in the i.MX IPU that performs de-interlacing with
+> > hardware filters for motion compensation. Some of the motion compensation
+> > modes ("low" and "medium" motion) require that the VDIC receive video
+> > frame fields from memory buffers (dedicated dma channels in the
+> > IPU are used to transfer those buffers into the VDIC).
+> > 
+> > So one option to support those modes would be to pass the raw buffers
+> > from a camera sensor up to userspace to a capture device, and then pass
+> > them back to the VDIC for de-interlacing using a mem2mem device.
+> > 
+> > Philipp and I are both in agreement that, since userland is not interested
+> > in the intermediate interlaced buffers in this case, but only the final
+> > result (motion compensated, de-interlaced frames), it is more efficient
+> > to provide a media link that allows passing those intermediate frames
+> > directly from a camera source pad to VDIC sink pad, without having
+> > to route them through userspace.
+> > 
+> > So in order to support that, I've implemented a simple FIFO dma buffer
+> > queue in the driver to allow passing video buffers directly from a source
+> > to a sink. It is modeled loosely off the vb2 state machine and API, but
+> > simpler (for instance it only allows contiguous, cache-coherent buffers).
+> > 
+> > This is where Philipp has an argument, that this should be done with a
+> > new API in videobuf2.
 
-On Mon, Jan 16, 2017 at 05:56:50PM +0100, Maxime Ripard wrote:
-> Hi,
-> 
-> Here is a new attempt at getting the MMC controllers running, following the
-> work done by Andre.
-> 
-> This has been tested on a board with one SDIO device (a Marvell WiFi chip)
-> and a Kingston eMMC with 1.8V IOs.
-> 
-> For SDIO, the HS DDR mode works just fine. That serie also enables the
-> SDR104 mode to work on the devices that are capable of this.
-> 
-> For the eMMC, HS200 with the voltage switch works. HS400 doesn't at the
-> moment, but since it's significantly more complex, and at the same time
-> Allwinner recommends to limit its frequency to 100MHz, this doesn't have
-> any benefits. If there's any at some point, this can be added later.
+That is one part of the argument. I'm glad to understand now that we
+agree about this.
 
-Unless you have objections, I'd really like this to be in
-4.11. There's a bunch of things where I'm not entirely sure
-(especially the clock gating part), it would be great if you could
-have a look.
+> > And I'm actually in total agreement with that. I definitely agree that there
+> > should be a mechanism in the media framework that allows passing video
+> > buffers from a source pad to a sink pad using a software queue, with no
+> > involvement from userland.
 
-Thanks!
-Maxime
+That is the other part of the argument. I do not agree that these
+software queue "links" should be presented to userspace as media pad
+links between two entities of a media device. 
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170123/6bce5cda/attachment-0001.sig>
+First, that would limit the links to subdevices contained in the same
+media graph, while this should work between any two capture and output
+queues of different devices.
+Assume for example, we want to encode the captured, deinterlaced video
+to h.264 with the coda VPU driver. A software queue link could be
+established between the CSI capture and the VDIC deinterlacer input,
+just as between the VDIC deinterlacer output and the coda VPU input.
+Technically, there would be no difference between those two linked
+capture/output queue pairs. But the coda driver is a completely separate
+mem2mem device. And since it is not part of the i.MX media graph, there
+is no entity pad to link to.
+Or assume there is an USB analog capture device that produces interlaced
+frames. I think it should be possible to connect its capture queue to
+the VDIC deinterlacer output queue just the same way as linking the CSI
+to the VDIC (in software queue mode).
+
+Second, the subdevice pad formats describe wire formats, not memory
+formats. The user might want to choose between 4:2:2 and 4:2:0
+subsampled YUV formats for the intermediate buffer, for example,
+depending on memory bandwidth constraints and quality requirements. This
+is impossible with the media entity / subdevice pad links.
+
+I think an interface where userspace configures the capture and output
+queues via v4l2 API, passes dma buffers around from one to the other
+queue, and then puts both queues into a free running mode would be a
+much better fit for this mechanism.
+
+> > My only disagreement is when this should be implemented. I think it is
+> > fine to keep my custom implementation of this in the driver for now. Once
+> > an extension of vb2 is ready to support this feature, it would be fairly
+> > straightforward to strip out my custom implementation and go with the
+> > new API.
+> 
+> For a staging driver this isn't necessary, as long as it is documented in
+> the TODO file that this needs to be fixed before it can be moved out of
+> staging. The whole point of staging is that there is still work to be
+> done in the driver, after all :-)
+
+Absolutely. The reason I am arguing against merging the mem2mem media
+control links so vehemently is that I am convinced the userspace
+interface is wrong, and I am afraid that even though in staging, it
+might become established.
+
+regards
+Philipp
