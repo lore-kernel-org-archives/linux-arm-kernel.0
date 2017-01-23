@@ -1,45 +1,60 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 23 Jan 2017 15:44:16 +0000
-Subject: [PATCH] KVM: arm/arm64: Remove struct vgic_irq pending field
-In-Reply-To: <20170123133951.10329-1-christoffer.dall@linaro.org>
-References: <20170123133951.10329-1-christoffer.dall@linaro.org>
-Message-ID: <ef1d4338-8348-74a7-390d-dcc60fc47607@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 23 Jan 2017 09:49:31 -0600
+Subject: [PATCH v5 01/14] devicetree: bindings: add bindings for ahci-da850
+In-Reply-To: <5615fb6b-af26-c2fb-1f97-416548a9faaf@ti.com>
+References: <1484911325-23425-1-git-send-email-bgolaszewski@baylibre.com>
+ <1484911325-23425-2-git-send-email-bgolaszewski@baylibre.com>
+ <5615fb6b-af26-c2fb-1f97-416548a9faaf@ti.com>
+Message-ID: <20170123154931.zyrcg5grqvia435t@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/01/17 13:39, Christoffer Dall wrote:
-> One of the goals behind the VGIC redesign was to get rid of cached or
-> intermediate state in the data structures, but we decided to allow
-> ourselves to precompute the pending value of an IRQ based on the line
-> level and pending latch state.  However, this has now become difficult
-> to base proper GICv3 save/restore on, because there is a potential to
-> modify the pending state without knowing if an interrupt is edge or
-> level configured.
+On Fri, Jan 20, 2017 at 07:02:08PM +0530, Sekhar Nori wrote:
+> Hi Rob,
 > 
-> See the following post and related message for more background:
-> https://lists.cs.columbia.edu/pipermail/kvmarm/2017-January/023195.html
+> On Friday 20 January 2017 04:51 PM, Bartosz Golaszewski wrote:
+> > Add DT bindings for the TI DA850 AHCI SATA controller.
+> > 
+> > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 > 
-> This commit gets rid of the precomputed pending field in favor of a
-> function that calculates the value when needed, irq_is_pending().
-> 
-> The soft_pending field is renamed to pending_latch to represent that
-> this latch is the equivalent hardware latch which gets manipulated by
-> the input signal for edge-triggered interrupts and when writing to the
-> SPENDR/CPENDR registers.
-> 
-> After this commit save/restore code should be able to simply restore the
-> pending_latch state, line_level state, and config state in any order and
-> get the desired result.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Could you ack this binding?
 
-I admit having lost a few brain cells looking at this patch, and I can't
-prove it wrong! ;-) I like the fact that it now provides a safe
-abstraction to the pending state, and that there is exactly *one* place
-where line_level is evaluated.
+First I'm seeing it that I recall and v5? That either means the DT list 
+wasn't copied or new versions are being sent out faster than can be 
+reviewed. Sending new versions puts you at the back of the queue.
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> Thanks,
+> Sekhar
+> 
+> > ---
+> >  Documentation/devicetree/bindings/ata/ahci-da850.txt | 15 +++++++++++++++
+> >  1 file changed, 15 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/ata/ahci-da850.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/ata/ahci-da850.txt b/Documentation/devicetree/bindings/ata/ahci-da850.txt
+> > new file mode 100644
+> > index 0000000..268fe87
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/ata/ahci-da850.txt
+> > @@ -0,0 +1,15 @@
+> > +Device tree binding for the TI DA850 AHCI SATA Controller
+> > +---------------------------------------------------------
+> > +
+> > +Required properties:
+> > +  - compatible: must be "ti,da850-ahci"
+> > +  - reg: physical base addresses and sizes of the controller's register areas
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Need to state how many and what the regions are.
+
+> > +  - interrupts: interrupt specifier (refer to the interrupt binding)
+> > +
+> > +Example:
+> > +
+> > +	sata: sata at 218000 {
+> > +		compatible = "ti,da850-ahci";
+> > +		reg = <0x218000 0x2000>, <0x22c018 0x4>;
+> > +		interrupts = <67>;
+> > +	};
+> > 
+> 
