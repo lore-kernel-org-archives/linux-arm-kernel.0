@@ -1,25 +1,47 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 23 Jan 2017 14:44:32 -0600
-Subject: [PATCH v4 1/3] Documentation: dt-bindings: add the Amlogic Meson
- SAR ADC documentation
-In-Reply-To: <20170122181714.6259-2-martin.blumenstingl@googlemail.com>
-References: <20170122181714.6259-1-martin.blumenstingl@googlemail.com>
- <20170122181714.6259-2-martin.blumenstingl@googlemail.com>
-Message-ID: <20170123204432.2lkh3zlgzmwye3hj@rob-hp-laptop>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Mon, 23 Jan 2017 12:48:48 -0800
+Subject: [PATCH v3 0/3] OF phandle nexus support + GPIO nexus
+Message-ID: <20170123204851.12808-1-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 22, 2017 at 07:17:12PM +0100, Martin Blumenstingl wrote:
-> This adds the devicetree binding documentation for the SAR ADC found in
-> Amlogic Meson SoCs.
-> Currently only the GXBB, GXL and GXM SoCs are supported.
-> 
-> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-> Tested-by: Neil Armstrong <narmstrong@baylibre.com>
-> Reviewed-by: Andreas F?rber <afaerber@suse.de>
-> ---
->  .../bindings/iio/adc/amlogic,meson-saradc.txt      | 32 ++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iio/adc/amlogic,meson-saradc.txt
+This is one small chunk of work related to DT overlays for expansion
+boards. It would be good to have a way to expose #<list>-cells types of
+providers through a connector in a standard way. So we introduce a way
+to make "nexus" nodes for these types of properties to remap the consumer
+number space to the other side of the connector's number space. It's
+basically a copy of the interrupt nexus implementation, but without
+the address space matching design and interrupt-parent walking.
 
-Acked-by: Rob Herring <robh@kernel.org>
+The first patch implements a generic method to do this, and the second patch
+adds a unit test for it. The third patch is more of an example than anything
+else. It shows how we would modify frameworks to use the new API.
+
+Changes since v2:
+ * Picked up Linus' ack on the gpio core patch
+ * Made const stack arrays static (Rob Herring)
+ * Used of_property_read_u32() instead of open coding (Rob Herring)
+
+Changes since v1:
+ * Addition of optional pass-thru parameter
+ * Reduction of strings passed to 1 instead of 3 (or 4 now)
+ * Updated gpio patch for the new function signature
+ * Updated test-case for new funciton signature and pass-thru parameter
+ * Updated kernel-doc to be correct and highlighted difference between
+   this API and of_parse_phandle_with_args()
+
+Stephen Boyd (3):
+  of: Support parsing phandle argument lists through a nexus node
+  of: unittest: Add phandle remapping test
+  gpio: Support gpio nexus dt bindings
+
+ drivers/gpio/gpiolib-of.c                   |   4 +-
+ drivers/of/base.c                           | 184 ++++++++++++++++++++++++++++
+ drivers/of/unittest-data/testcases.dts      |  11 ++
+ drivers/of/unittest-data/tests-phandle.dtsi |  25 ++++
+ drivers/of/unittest.c                       | 120 ++++++++++++++++++
+ include/linux/of.h                          |  12 ++
+ 6 files changed, 354 insertions(+), 2 deletions(-)
+
+-- 
+2.10.0.297.gf6727b0
