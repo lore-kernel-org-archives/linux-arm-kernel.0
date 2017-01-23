@@ -1,37 +1,52 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 23 Jan 2017 11:14:11 +0100
-Subject: [PATCH 4/8] clk: renesas: cpg-mssr: Add support for reset control
-In-Reply-To: <20170120220302.GA20610@bigcity.dyn.berto.se>
-References: <1484921306-9967-1-git-send-email-geert+renesas@glider.be>
- <1484921306-9967-5-git-send-email-geert+renesas@glider.be>
- <20170120220302.GA20610@bigcity.dyn.berto.se>
-Message-ID: <CAMuHMdUu=FwygW168GLVp2JtKbbB_R2wQLzq_3_TxLiu5ww6kA@mail.gmail.com>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Mon, 23 Jan 2017 10:16:04 +0000
+Subject: [PATCH v10 7/8] arm/arm64: vgic: Implement
+ KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO ioctl
+In-Reply-To: <20170120195338.GH13531@cbox>
+References: <1480576187-5012-1-git-send-email-vijay.kilari@gmail.com>
+ <1480576187-5012-8-git-send-email-vijay.kilari@gmail.com>
+ <20170120195338.GH13531@cbox>
+Message-ID: <CAFEAcA8bZUPC2YTBYTVY3oB4MJFJcKOgT77PN3vkp5gPjVRPgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Niklas,
+On 20 January 2017 at 19:53, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> So last time we had a discussion about whether or not the API should
+> support any random order of restoring the registers, but I cannot see
+> how we can support that, because how can we tell the difference between
+> the following two scenarios without knowing if an interrupt is
+> edge-triggered or level triggered:
+>
+>   (1) Clearing the line_level for an edge-triggered interrupt after
+>       having set it to pending, which means it should stay pending.
 
-On Fri, Jan 20, 2017 at 11:03 PM, Niklas S?derlund
-<niklas.soderlund@ragnatech.se> wrote:
-> Nice patch! It took me a while to understand why you didn't need to read
-> the register before writing to it in cpg_mssr_deassert() :-)
+This is userspace doing:
+ * set pending-latch to 1
+ * set linelevel to 0
 
-Yeah, deassertion and assertion are asymmetrical.
+right? The pending state is pending-latch | (linelevel & ~edge_trigger),
+and you can recalculate that when userspace updates either of the
+pending-latch state or linelevel. (It will be temporarily wrong
+before userspace has told the kernel about all the state, but
+that's fine because we won't try to run the VM until we've finished
+loading everything.)
 
-Note that on older (not yet supported) SH/R-Mobile parts, there are no
-reset clear registers, and deassertion is symmetrical.
+>   (2) Clearing the line_level for a level-triggered interrupt when the
+>       state is already pending for some reason, but the soft_pending
+>       (latch) state is not set, in which case the pending state should
+>       be removed.
 
-> Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+This is userspace doing
+ * set pending-latch to 0
+ * set line_level to 0
 
-Thanks!
+and thus the pending state goes to 0 (same calculation as above).
 
-Gr{oetje,eeting}s,
+pending is always a pure logical function of pending-latch,
+linelevel and edge-trigger bits, so as long as you recalculate
+it at the right time then it shouldn't matter which order userspace
+tells you about the three things in.
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+thanks
+-- PMM
