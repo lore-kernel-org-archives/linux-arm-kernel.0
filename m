@@ -1,74 +1,82 @@
 From: zyw@rock-chips.com (Chris Zhong)
-Date: Mon, 23 Jan 2017 08:49:22 +0800
-Subject: [PATCH v2 20/26] drm/rockchip: dw-mipi-dsi: use specific poll
- helper
-In-Reply-To: <20170121163128.22240-21-john@metanate.com>
+Date: Mon, 23 Jan 2017 09:38:54 +0800
+Subject: [PATCH v2 19/26] drm/rockchip: dw-mipi-dsi: improve PLL
+ configuration
+In-Reply-To: <20170121163128.22240-20-john@metanate.com>
 References: <20170121163128.22240-1-john@metanate.com>
- <20170121163128.22240-21-john@metanate.com>
-Message-ID: <58855312.7020207@rock-chips.com>
+ <20170121163128.22240-20-john@metanate.com>
+Message-ID: <58855EAE.2010704@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Reviewed-by: Chris Zhong <zyw@rock-chips.com>
+Hi John
 
 On 01/22/2017 12:31 AM, John Keeping wrote:
-> As the documentation for readx_poll_timeout says, we want to use the
-> specialized macro for readl rather than using the generic version
-> directly.
+> The multiplication ratio for the PLL is required to be even due to the
+> use of a "by 2 pre-scaler".  Currently we are likely to end up with an
+> odd multiplier even though there is an equivalent set of parameters with
+> an even multiplier.
+>
+> For example, using the 324MHz bit rate with a reference clock of 24MHz
+> we end up with M = 27, N = 2 whereas the example in the PHY databook
+> gives M = 54, N = 4 for this bit rate and reference clock.
+>
+> By walking down through the available multiplier instead of up we are
+> more likely to hit an even multiplier.  With the above example we do now
+> get M = 54, N = 4 as given by the databook.
+>
+> While doing this, change the loop limits to encode the actual limits on
+> the divisor, which are:
+>
+> 	40MHz >= (pllref / N) >= 5MHz
+
+This formula is limit for N, but we still can not guarantee to get an 
+even M.
+Do you think we should do a check for M.
+such as:
+if (m % 2)
+     continue;
+...
+     for (i = pllref / 5; i > (pllref / 40); i--) {
+         pre = pllref / i;
+         if ((tmp > (target_mbps % pre)) && (target_mbps / pre < 512)) {
+             tmp = target_mbps % pre;
+             n = i;
+             m = target_mbps / pre;
+             if (m % 2)
+                 continue;
+         }
+         if (tmp == 0)
+             break;
+     }
+
+if (m % 2)
+     m++;
+
+     dsi->lane_mbps = pllref / n * m;
+     dsi->input_div = n;
+     dsi->feedback_div = m;
+
+
+
 >
 > Signed-off-by: John Keeping <john@metanate.com>
 > ---
 > Unchanged in v2
 > ---
->   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 10 +++++-----
->   1 file changed, 5 insertions(+), 5 deletions(-)
+>   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
 >
 > diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> index f2320cf1366c..3e19693ae59b 100644
+> index 12432e41971b..f2320cf1366c 100644
 > --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 > +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> @@ -471,14 +471,14 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
->   				     PHY_UNRSTZ | PHY_UNSHUTDOWNZ);
+> @@ -519,7 +519,7 @@ static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi,
+>   	pllref = DIV_ROUND_UP(clk_get_rate(dsi->pllref_clk), USEC_PER_SEC);
+>   	tmp = pllref;
 >   
->   
-> -	ret = readx_poll_timeout(readl, dsi->base + DSI_PHY_STATUS,
-> +	ret = readl_poll_timeout(dsi->base + DSI_PHY_STATUS,
->   				 val, val & LOCK, 1000, PHY_STATUS_TIMEOUT_US);
->   	if (ret < 0) {
->   		dev_err(dsi->dev, "failed to wait for phy lock state\n");
->   		return ret;
->   	}
->   
-> -	ret = readx_poll_timeout(readl, dsi->base + DSI_PHY_STATUS,
-> +	ret = readl_poll_timeout(dsi->base + DSI_PHY_STATUS,
->   				 val, val & STOP_STATE_CLK_LANE, 1000,
->   				 PHY_STATUS_TIMEOUT_US);
->   	if (ret < 0) {
-> @@ -594,7 +594,7 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
->   	int ret;
->   	u32 val, mask;
->   
-> -	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
-> +	ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
->   				 val, !(val & GEN_CMD_FULL), 1000,
->   				 CMD_PKT_STATUS_TIMEOUT_US);
->   	if (ret < 0) {
-> @@ -605,7 +605,7 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
->   	dsi_write(dsi, DSI_GEN_HDR, hdr_val);
->   
->   	mask = GEN_CMD_EMPTY | GEN_PLD_W_EMPTY;
-> -	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
-> +	ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
->   				 val, (val & mask) == mask,
->   				 1000, CMD_PKT_STATUS_TIMEOUT_US);
->   	if (ret < 0) {
-> @@ -664,7 +664,7 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
->   			len -= pld_data_bytes;
->   		}
->   
-> -		ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
-> +		ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
->   					 val, !(val & GEN_PLD_W_FULL), 1000,
->   					 CMD_PKT_STATUS_TIMEOUT_US);
->   		if (ret < 0) {
+> -	for (i = 1; i < 6; i++) {
+> +	for (i = pllref / 5; i > (pllref / 40); i--) {
+>   		pre = pllref / i;
+>   		if ((tmp > (target_mbps % pre)) && (target_mbps / pre < 512)) {
+>   			tmp = target_mbps % pre;
