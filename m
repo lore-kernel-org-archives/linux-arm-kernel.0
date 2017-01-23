@@ -1,21 +1,21 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 23 Jan 2017 14:59:01 +0800
-Subject: [PATCH] ARM: imx: hide unused variable in #ifdef
-In-Reply-To: <20170110130154.2994705-1-arnd@arndb.de>
-References: <20170110130154.2994705-1-arnd@arndb.de>
-Message-ID: <20170123065859.GF5662@dragon>
+Date: Mon, 23 Jan 2017 15:02:58 +0800
+Subject: [PATCH v2 1/1] ARM: dts: add Armadeus Systems OPOS6UL and
+ OPOS6ULDEV support
+In-Reply-To: <1484055173-29943-1-git-send-email-sebastien.szymanski@armadeus.com>
+References: <1484055173-29943-1-git-send-email-sebastien.szymanski@armadeus.com>
+Message-ID: <20170123070256.GG5662@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 01:19:05PM +0100, Arnd Bergmann wrote:
-> A bugfix added a new local variable that is only used inside of an #ifdef
-> section, and unused if CONFIG_PERF_EVENTS is disabled:
+On Tue, Jan 10, 2017 at 02:32:53PM +0100, S?bastien Szymanski wrote:
+> OPOS6UL is an i.MX6UL based SoM.
+> OPOS6ULDev is a carrier board for the OPOS6UL SoM.
 > 
-> arch/arm/mach-imx/mmdc.c:63:25: warning: 'cpuhp_mmdc_state' defined but not used [-Wunused-variable]
+> For more details see:
+> http://www.opossom.com/english/products-processor_boards-opos6ul.html
+> http://www.opossom.com/english/products-development_boards-opos6ul_dev.html
 > 
-> This moves the variable down inside that same ifdef.
-> 
-> Fixes: a051f220d6b9 ("ARM/imx/mmcd: Fix broken cpu hotplug handling")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
 
 Applied, thanks.
