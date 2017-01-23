@@ -1,16 +1,34 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 23 Jan 2017 15:38:03 +0800
-Subject: [PATCH] ARM: dts: vf610-zii-dev: add EEPROM entry to Rev C
-In-Reply-To: <20170112230620.1735-1-vivien.didelot@savoirfairelinux.com>
-References: <20170112230620.1735-1-vivien.didelot@savoirfairelinux.com>
-Message-ID: <20170123073801.GK5662@dragon>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Sun, 22 Jan 2017 23:43:47 -0800
+Subject: [PATCH] ARM: tegra: paz00: fix __initdata placement
+Message-ID: <20170123074347.GA29804@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2017 at 06:06:20PM -0500, Vivien Didelot wrote:
-> The ZII Dev Rev C board has EEPROMs hanging the 88E6390 Ethernet switch
-> chips. Add an "eeprom-length" property to allow access from ethtool.
-> 
-> Signed-off-by: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
+To have expected effect the __initdata attribute should go after variable
+name and before initializer.`
 
-Applied, thanks.
+Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+---
+ arch/arm/mach-tegra/board-paz00.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
+index 7478f6fb3664..ea6bff404161 100644
+--- a/arch/arm/mach-tegra/board-paz00.c
++++ b/arch/arm/mach-tegra/board-paz00.c
+@@ -23,7 +23,7 @@
+ 
+ #include "board.h"
+ 
+-static struct property_entry __initdata wifi_rfkill_prop[] = {
++static struct property_entry wifi_rfkill_prop[] __initdata = {
+ 	PROPERTY_ENTRY_STRING("name", "wifi_rfkill"),
+ 	PROPERTY_ENTRY_STRING("type", "wlan"),
+ 	{ },
+-- 
+2.11.0.483.g087da7b7c-goog
+
+
+-- 
+Dmitry
