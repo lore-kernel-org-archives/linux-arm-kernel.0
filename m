@@ -1,89 +1,142 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Mon, 23 Jan 2017 16:32:43 -0600
-Subject: [PATCH v14 4/6] arm64: pmu: Detect multiple generic PMUs and append
- counter
+Date: Mon, 23 Jan 2017 16:32:41 -0600
+Subject: [PATCH v14 2/6] arm64: pmu: Cache PMU interrupt numbers from MADT
+ parse
 In-Reply-To: <1485210765-9422-1-git-send-email-jeremy.linton@arm.com>
 References: <1485210765-9422-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <1485210765-9422-5-git-send-email-jeremy.linton@arm.com>
+Message-ID: <1485210765-9422-3-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In heterogeneous CPU systems its likely that there are multiple
-PMU types. If a system is using the generic armv8_pmuv3 rather
-than a PMU with a hard-coded set of events then we want to uniquely
-identify each PMU in /sys. We do this by appending an "_x" to the
-pmu name. This then creates PMUs like, "armv8_pmuv3" and
-"armv8_pmuv3_1", "armv8_pmuv3_2" for a system with 3 PMU types.
+From: Mark Salter <msalter@redhat.com>
 
+In the case of ACPI, the PMU IRQ information is contained in the
+MADT table. Also, since the PMU does not exist as a device in the
+ACPI DSDT table, it is necessary to create a platform device so
+that the appropriate driver probing is triggered. Since the platform
+device creation needs to happen after the CPU's have been started, and
+the MADT parsing needs to happen before, we save off the interrupt
+numbers discovered during the parsing.
+
+Signed-off-by: Mark Salter <msalter@redhat.com>
 Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- arch/arm64/kernel/perf_event.c |  2 +-
- drivers/perf/arm_pmu.c         | 20 ++++++++++++++++++++
- include/linux/perf/arm_pmu.h   |  1 +
- 3 files changed, 22 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/smp.c      |  5 +++++
+ drivers/perf/Kconfig         |  4 ++++
+ drivers/perf/Makefile        |  1 +
+ drivers/perf/arm_pmu_acpi.c  | 36 ++++++++++++++++++++++++++++++++++++
+ include/linux/perf/arm_pmu.h |  7 +++++++
+ 5 files changed, 53 insertions(+)
+ create mode 100644 drivers/perf/arm_pmu_acpi.c
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 57ae9d9..0fbd7ef 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -1002,7 +1002,7 @@ static void armv8_pmu_init(struct arm_pmu *cpu_pmu)
- static int armv8_pmuv3_init(struct arm_pmu *cpu_pmu)
- {
- 	armv8_pmu_init(cpu_pmu);
--	cpu_pmu->name			= "armv8_pmuv3";
-+	cpu_pmu->name			= ARMV8_PMUV3_DESCRIPTION;
- 	cpu_pmu->map_event		= armv8_pmuv3_map_event;
- 	cpu_pmu->attr_groups[ARMPMU_ATTR_GROUP_EVENTS] =
- 		&armv8_pmuv3_events_attr_group;
-diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index 37e241f..85566f6 100644
---- a/drivers/perf/arm_pmu.c
-+++ b/drivers/perf/arm_pmu.c
-@@ -1035,6 +1035,7 @@ int arm_pmu_device_probe(struct platform_device *pdev,
- 			 const struct of_device_id *of_table,
- 			 const struct pmu_probe_info *probe_table)
- {
-+	static int duplicate_pmus;
- 	const struct of_device_id *of_id;
- 	const int (*init_fn)(struct arm_pmu *);
- 	struct device_node *node = pdev->dev.of_node;
-@@ -1075,6 +1076,25 @@ int arm_pmu_device_probe(struct platform_device *pdev,
- 		goto out_free;
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index cb87234..789587d 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -37,6 +37,7 @@
+ #include <linux/completion.h>
+ #include <linux/of.h>
+ #include <linux/irq_work.h>
++#include <linux/perf/arm_pmu.h>
+ 
+ #include <asm/alternative.h>
+ #include <asm/atomic.h>
+@@ -551,6 +552,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
+ 		}
+ 		bootcpu_valid = true;
+ 		early_map_cpu_to_node(0, acpi_numa_get_nid(0, hwid));
++		arm_pmu_parse_acpi(0, processor);
+ 		return;
  	}
  
-+	/*
-+	 * if this pmu declaration is a generic pmu and we have
-+	 * previously found a generic pmu on this platform
-+	 * then append a PMU number to the pmu name. This avoids
-+	 * changing the names of PMUs that are specific to a class
-+	 * of CPUs. The assumption is that if we match a specific PMU
-+	 * then it's unique, and another PMU in the system will match
-+	 * a different entry rather than needing the _number to
-+	 * assure its unique.
-+	 */
-+	if (!strcmp(pmu->name, ARMV8_PMUV3_DESCRIPTION)) {
-+		if (duplicate_pmus) {
-+			pmu->name = kasprintf(GFP_KERNEL, "%s_%d",
-+					      pmu->name, duplicate_pmus);
-+			if (!pmu->name)
-+				goto out_free;
-+		}
-+		duplicate_pmus++;
-+	}
+@@ -571,6 +573,9 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
+ 	 */
+ 	acpi_set_mailbox_entry(cpu_count, processor);
  
- 	ret = cpu_pmu_init(pmu);
- 	if (ret)
++	/* get PMU irq info */
++	arm_pmu_parse_acpi(cpu_count, processor);
++
+ 	early_map_cpu_to_node(cpu_count, acpi_numa_get_nid(cpu_count, hwid));
+ 
+ 	cpu_count++;
+diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
+index 4d5c5f9..697df05 100644
+--- a/drivers/perf/Kconfig
++++ b/drivers/perf/Kconfig
+@@ -19,4 +19,8 @@ config XGENE_PMU
+         help
+           Say y if you want to use APM X-Gene SoC performance monitors.
+ 
++config ARM_PMU_ACPI
++	def_bool y
++	depends on ARM_PMU && ACPI
++
+ endmenu
+diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
+index b116e98..d1d7762 100644
+--- a/drivers/perf/Makefile
++++ b/drivers/perf/Makefile
+@@ -1,2 +1,3 @@
+ obj-$(CONFIG_ARM_PMU) += arm_pmu.o
+ obj-$(CONFIG_XGENE_PMU) += xgene_pmu.o
++obj-$(CONFIG_ARM_PMU_ACPI) += arm_pmu_acpi.o
+diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
+new file mode 100644
+index 0000000..becc861
+--- /dev/null
++++ b/drivers/perf/arm_pmu_acpi.c
+@@ -0,0 +1,36 @@
++/*
++ * ARM ACPI PMU support
++ *
++ * Copyright (C) 2015 Red Hat Inc.
++ * Author: Mark Salter <msalter@redhat.com>
++ *
++ * This work is licensed under the terms of the GNU GPL, version 2.  See
++ * the COPYING file in the top-level directory.
++ *
++ */
++
++#include <asm/cpu.h>
++#include <linux/acpi.h>
++#include <linux/irq.h>
++
++struct pmu_irq {
++	int  gsi;
++	int  trigger;
++	bool used;
++};
++
++static struct pmu_irq pmu_irqs[NR_CPUS];
++
++/*
++ * Called from acpi_map_gic_cpu_interface()'s MADT parsing during boot.
++ * This routine saves off the GSI's and their trigger state for use when we are
++ * ready to build the PMU platform device.
++ */
++void __init arm_pmu_parse_acpi(int cpu, struct acpi_madt_generic_interrupt *gic)
++{
++	pmu_irqs[cpu].gsi = gic->performance_interrupt;
++	if (gic->flags & ACPI_MADT_PERFORMANCE_IRQ_MODE)
++		pmu_irqs[cpu].trigger = ACPI_EDGE_SENSITIVE;
++	else
++		pmu_irqs[cpu].trigger = ACPI_LEVEL_SENSITIVE;
++}
 diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
-index df1ba55..42b5edb 100644
+index 8462da2..df1ba55 100644
 --- a/include/linux/perf/arm_pmu.h
 +++ b/include/linux/perf/arm_pmu.h
-@@ -161,6 +161,7 @@ int arm_pmu_device_probe(struct platform_device *pdev,
- 			 const struct pmu_probe_info *probe_table);
- 
- #define ARMV8_PMU_PDEV_NAME "armv8-pmu"
-+#define ARMV8_PMUV3_DESCRIPTION "armv8_pmuv3"
+@@ -164,4 +164,11 @@ int arm_pmu_device_probe(struct platform_device *pdev,
  
  #endif /* CONFIG_ARM_PMU */
  
++#ifdef CONFIG_ARM_PMU_ACPI
++struct acpi_madt_generic_interrupt;
++void arm_pmu_parse_acpi(int cpu, struct acpi_madt_generic_interrupt *gic);
++#else
++#define arm_pmu_parse_acpi(a, b) do { } while (0)
++#endif /* CONFIG_ARM_PMU_ACPI */
++
+ #endif /* __ARM_PMU_H__ */
 -- 
 2.7.4
