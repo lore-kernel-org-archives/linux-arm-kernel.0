@@ -1,73 +1,34 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 23 Jan 2017 09:39:54 +0000
-Subject: [PATCH 03/22] irqchip: add a driver for Cortina Gemini
-In-Reply-To: <20170122121624.10147-1-linus.walleij@linaro.org>
-References: <20170122121624.10147-1-linus.walleij@linaro.org>
-Message-ID: <c7e28b3c-a1fa-9069-e947-9021467f668e@arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 23 Jan 2017 10:42:05 +0100
+Subject: [PATCH 0/4] ARM/arm64: dts: renesas: Link ARM GIC to clock and
+ clock domain
+In-Reply-To: <CAMuHMdVbr3gCMJpvcJbD0C4p8FikMM3s5zmjkVXNskhk7-P7Tw@mail.gmail.com>
+References: <1484657360-13101-1-git-send-email-geert+renesas@glider.be>
+ <20170123092330.GF31651@verge.net.au>
+ <CAMuHMdVbr3gCMJpvcJbD0C4p8FikMM3s5zmjkVXNskhk7-P7Tw@mail.gmail.com>
+Message-ID: <20170123094204.GJ31651@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-On 22/01/17 12:16, Linus Walleij wrote:
-> As a part of transitioning the Gemini platform to device tree we
-> create this clean, device-tree-only irqchip driver.
+On Mon, Jan 23, 2017 at 10:26:34AM +0100, Geert Uytterhoeven wrote:
+> Hi Simon,
 > 
-> Cc: Janos Laube <janos.dev@gmail.com>
-> Cc: Paulius Zaleckas <paulius.zaleckas@gmail.com>
-> Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
-> Cc: Florian Fainelli <f.fainelli@gmail.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> irqchip maintainers: please just apply this when you feel pleased
-> with it. These portions are functionally orthogonal to the series,
-> it is just in a series for context.
-> ---
-
-[...]
-
-> +int __init gemini_of_init_irq(struct device_node *node,
-> +			      struct device_node *parent)
-> +{
-> +	struct gemini_irq_data *g = &girq;
-> +	unsigned int i;
-> +
-> +	/*
-> +	 * Disable the idle handler by default since it is buggy
-> +	 * For more info see arch/arm/mach-gemini/idle.c
-> +	 */
-> +	cpu_idle_poll_ctrl(true);
-> +
-> +	g->base = of_iomap(node, 0);
-> +	WARN(!g->base, "unable to map gemini irq registers\n");
-> +
-> +	/* Disable all interrupts */
-> +	writel(0, IRQ_MASK(g->base));
-> +	writel(0, FIQ_MASK(g->base));
-> +
-> +	g->domain = irq_domain_add_simple(node, GEMINI_NUM_IRQS, 0,
-> +					  &gemini_irqdomain_ops, g);
-> +	/* Map all IRQs */
-> +	for (i = 0; i < GEMINI_NUM_IRQS; i++)
-> +		irq_create_mapping(g->domain, i);
-
-Why is this needed? I can see it being useful while converting the
-platform to DT, but as you seem to kill the old code altogether, this
-can probably go.
-
-> +
-> +	set_handle_irq(gemini_irqchip_handle_irq);
-> +
-> +	return 0;
-> +}
-> +IRQCHIP_DECLARE(gemini, "cortina,gemini-interrupt-controller",
-> +		gemini_of_init_irq);
+> On Mon, Jan 23, 2017 at 10:23 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Tue, Jan 17, 2017 at 01:49:16PM +0100, Geert Uytterhoeven wrote:
+> >> This patch series improves the topology description in DT of the ARM GIC
+> >> on Renesas SoCs using the CPG/MSSR bindings (R-Car Gen3 and RZ/G).
+> >> It links the GIC to its module clock, and adds it to the SYSC "always
+> >> on" PM Domain.
+> >>
+> >> Note that currently the GIC-400 driver doesn't support module clocks nor
+> >> Runtime PM, so this must be handled as a critical clock.
+> >> As the CPG/MSSR driver, unlike the legacy MSTP driver, is already aware
+> >> of critical clocks, this series can be applied right now.
+> >
+> > does the note above imply that "[PATCH 0/2] clk: renesas: Use
+> > CLK_IS_CRITICAL to handle critical clocks" is a dependency of this series?
 > 
+> No, the note says (using different wording) that there is no such dependency.
 
-Otherwise, looks good to me.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Thanks, I see that now.
+I have queued up these changes.
