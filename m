@@ -1,45 +1,52 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 23 Jan 2017 21:29:15 +0530
-Subject: [PATCH RESEND 2/2] ARM: da850: add the nand dev_id to the clock
- lookup table
-In-Reply-To: <CAMpxmJUcPQJw3YKEtmnqMnW1OqEH1mz3hosYJc2arK65Qwkz+Q@mail.gmail.com>
-References: <1484301626-30345-1-git-send-email-bgolaszewski@baylibre.com>
- <1484301626-30345-3-git-send-email-bgolaszewski@baylibre.com>
- <0650f8ff-07f7-db06-ca3c-84eed7edb24e@ti.com>
- <8052f538-8573-c362-129c-a2ca6a64850e@ti.com>
- <CAMpxmJUcPQJw3YKEtmnqMnW1OqEH1mz3hosYJc2arK65Qwkz+Q@mail.gmail.com>
-Message-ID: <ca65a02c-a067-9a4a-af7d-98bace48c5fd@ti.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 23 Jan 2017 17:06:50 +0100
+Subject: [PATCH] KVM: arm/arm64: Remove struct vgic_irq pending field
+In-Reply-To: <ef1d4338-8348-74a7-390d-dcc60fc47607@arm.com>
+References: <20170123133951.10329-1-christoffer.dall@linaro.org>
+ <ef1d4338-8348-74a7-390d-dcc60fc47607@arm.com>
+Message-ID: <20170123160650.GF15850@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 23 January 2017 09:02 PM, Bartosz Golaszewski wrote:
-> 2017-01-23 16:17 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
->> On Friday 20 January 2017 07:16 PM, Sekhar Nori wrote:
->>> On Friday 13 January 2017 03:30 PM, Bartosz Golaszewski wrote:
->>>> The aemif driver can now access struct of_dev_auxdata (using platform
->>>> data).
->>>>
->>>> Add the device id to the clock lookup table for the nand clock and
->>>> create a separate lookup table for aemif subnodes.
->>>>
->>>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->>>
->>> Applied to v4.11/soc
->>
->> I forgot that this has a build dependency with 1/2. Instead of creating
->> a dependency with Greg's tree, I think I will send it for v4.12. This is
->> a clean-up and does not add a new feature from a user's perspective so I
->> hope thats okay.
->>
->> Thanks,
->> Sekhar
+On Mon, Jan 23, 2017 at 03:44:16PM +0000, Marc Zyngier wrote:
+> On 23/01/17 13:39, Christoffer Dall wrote:
+> > One of the goals behind the VGIC redesign was to get rid of cached or
+> > intermediate state in the data structures, but we decided to allow
+> > ourselves to precompute the pending value of an IRQ based on the line
+> > level and pending latch state.  However, this has now become difficult
+> > to base proper GICv3 save/restore on, because there is a potential to
+> > modify the pending state without knowing if an interrupt is edge or
+> > level configured.
+> > 
+> > See the following post and related message for more background:
+> > https://lists.cs.columbia.edu/pipermail/kvmarm/2017-January/023195.html
+> > 
+> > This commit gets rid of the precomputed pending field in favor of a
+> > function that calculates the value when needed, irq_is_pending().
+> > 
+> > The soft_pending field is renamed to pending_latch to represent that
+> > this latch is the equivalent hardware latch which gets manipulated by
+> > the input signal for edge-triggered interrupts and when writing to the
+> > SPENDR/CPENDR registers.
+> > 
+> > After this commit save/restore code should be able to simply restore the
+> > pending_latch state, line_level state, and config state in any order and
+> > get the desired result.
+> > 
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > 
-> Hi Sekhar,
+> I admit having lost a few brain cells looking at this patch, and I can't
+> prove it wrong! ;-) I like the fact that it now provides a safe
+> abstraction to the pending state, and that there is exactly *one* place
+> where line_level is evaluated.
 > 
-> Greg picked up both patches - 1/2 is already in char-misc-next[1].
+> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+> 
 
-Alright. I did not notice any merge conflicts between this and what I
-plan to queue so I guess we are okay.
+Thanks!
 
-Thanks
-Sekhar
+I suppose looking at this again, I don't need the
+"irq_set_pending_latch()" indirection but I can just set this variable
+directly.  What do you think?  Would it be cleaner?
+
+-Christoffer
