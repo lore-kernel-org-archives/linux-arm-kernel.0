@@ -1,137 +1,21 @@
-From: amurray@embedded-bits.co.uk (Andrew Murray)
-Date: Mon, 23 Jan 2017 19:51:31 +0000
-Subject: [PATCH] ARM: OMAP1/2: clock: Remove unused mpurate cmdline option
-In-Reply-To: <20170123151055.GQ7403@atomide.com>
-References: <1485020215-6550-1-git-send-email-amurray@embedded-bits.co.uk>
- <20170123151055.GQ7403@atomide.com>
-Message-ID: <CAPcvp5FQ90KroisJE1Hp4yx8Hz07ev_YyNgxEGtgAEUYDd1nsw@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 23 Jan 2017 13:55:07 -0600
+Subject: [PATCH v4 1/3] dt: bindings: add documentation for zx2967 family
+ watchdog controller
+In-Reply-To: <1485073008-26699-1-git-send-email-baoyou.xie@linaro.org>
+References: <1485073008-26699-1-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <20170123195507.swr4tk3zkpq7gzg3@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 January 2017 at 15:10, Tony Lindgren <tony@atomide.com> wrote:
-> * Andrew Murray <amurray@embedded-bits.co.uk> [170121 09:38]:
->> The 'mpurate' option, historically used for specifying an initial
->> MPU rate at boot, no longer has any effect due to the supporting
->> code being removed as it was 'wrong and dangerous' [1].
->>
->> This patch removes the remaining dead code associated with the
->> __setup macros to avoid confusion and reduce bloat.
->>
->> [1] https://patchwork.kernel.org/patch/5954631/
->
-> Yeah AFAIK this is unused for mach-omap2. Adding Aaro to
-> Cc for mach-omap1 in case there might be issues with this
-> patch.
+On Sun, Jan 22, 2017 at 04:16:46PM +0800, Baoyou Xie wrote:
+> This patch adds dt-binding documentation for zx2967 family
+> watchdog controller.
+> 
+> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+> ---
+>  .../bindings/watchdog/zte,zx2967-wdt.txt           | 31 ++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/watchdog/zte,zx2967-wdt.txt
 
-I've also noticed that omap2_clk_print_new_rates in
-arch/arm/mach-omap2/clock.c is also unused - this was previously used
-to print the new clock rates upon change after use of mpurate.
-
-I'll update the patch to include the removal of this function as well
-- unless you have any objections.
-
-Thanks,
-
-Andrew Murray
-
->
->
->> Signed-off-by: Andrew Murray <amurray@embedded-bits.co.uk>
->> ---
->>  arch/arm/mach-omap1/clock.c | 20 --------------------
->>  arch/arm/mach-omap1/clock.h |  2 --
->>  arch/arm/mach-omap2/clock.c | 20 --------------------
->>  3 files changed, 42 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap1/clock.c b/arch/arm/mach-omap1/clock.c
->> index 4f5fd4a..43e3e18 100644
->> --- a/arch/arm/mach-omap1/clock.c
->> +++ b/arch/arm/mach-omap1/clock.c
->> @@ -720,26 +720,6 @@ EXPORT_SYMBOL(clk_get_parent);
->>   * OMAP specific clock functions shared between omap1 and omap2
->>   */
->>
->> -int __initdata mpurate;
->> -
->> -/*
->> - * By default we use the rate set by the bootloader.
->> - * You can override this with mpurate= cmdline option.
->> - */
->> -static int __init omap_clk_setup(char *str)
->> -{
->> -     get_option(&str, &mpurate);
->> -
->> -     if (!mpurate)
->> -             return 1;
->> -
->> -     if (mpurate < 1000)
->> -             mpurate *= 1000000;
->> -
->> -     return 1;
->> -}
->> -__setup("mpurate=", omap_clk_setup);
->> -
->>  /* Used for clocks that always have same value as the parent clock */
->>  unsigned long followparent_recalc(struct clk *clk)
->>  {
->> diff --git a/arch/arm/mach-omap1/clock.h b/arch/arm/mach-omap1/clock.h
->> index 1e4918a..f2d1be2 100644
->> --- a/arch/arm/mach-omap1/clock.h
->> +++ b/arch/arm/mach-omap1/clock.h
->> @@ -173,8 +173,6 @@ struct clk_functions {
->>       void            (*clk_disable_unused)(struct clk *clk);
->>  };
->>
->> -extern int mpurate;
->> -
->>  extern int clk_init(struct clk_functions *custom_clocks);
->>  extern void clk_preinit(struct clk *clk);
->>  extern int clk_register(struct clk *clk);
->> diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
->> index d058125..d999295 100644
->> --- a/arch/arm/mach-omap2/clock.c
->> +++ b/arch/arm/mach-omap2/clock.c
->> @@ -112,26 +112,6 @@ void omap2_init_clk_clkdm(struct clk_hw *hw)
->>       }
->>  }
->>
->> -static int __initdata mpurate;
->> -
->> -/*
->> - * By default we use the rate set by the bootloader.
->> - * You can override this with mpurate= cmdline option.
->> - */
->> -static int __init omap_clk_setup(char *str)
->> -{
->> -     get_option(&str, &mpurate);
->> -
->> -     if (!mpurate)
->> -             return 1;
->> -
->> -     if (mpurate < 1000)
->> -             mpurate *= 1000000;
->> -
->> -     return 1;
->> -}
->> -__setup("mpurate=", omap_clk_setup);
->> -
->>  /**
->>   * omap2_clk_print_new_rates - print summary of current clock tree rates
->>   * @hfclkin_ck_name: clk name for the off-chip HF oscillator
->> --
->> 2.5.0
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
--- 
-
-Andrew Murray
-Witekio UK
+Acked-by: Rob Herring <robh@kernel.org>
