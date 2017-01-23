@@ -1,35 +1,35 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Mon, 23 Jan 2017 18:00:55 +0100
-Subject: [PATCH v6 13/14] ARM: dts: da850: add the SATA node
+Date: Mon, 23 Jan 2017 18:00:56 +0100
+Subject: [PATCH v6 14/14] ARM: dts: da850-lcdk: enable the SATA node
 In-Reply-To: <1485190856-4711-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1485190856-4711-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1485190856-4711-14-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1485190856-4711-15-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the SATA node to the da850 device tree.
+Enable the SATA node for da850-lcdk. We omit the pinctrl property on
+purpose - the muxed SATA pins are not hooked up to anything
+SATA-related on the lcdk.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/boot/dts/da850.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/boot/dts/da850-lcdk.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 104155d..3b5fd41e 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -403,6 +403,12 @@
- 			phy-names = "usb-phy";
- 			status = "disabled";
- 		};
-+		sata: sata at 218000 {
-+			compatible = "ti,da850-ahci";
-+			reg = <0x218000 0x2000>, <0x22c018 0x4>;
-+			interrupts = <67>;
-+			status = "disabled";
-+		};
- 		mdio: mdio at 224000 {
- 			compatible = "ti,davinci_mdio";
- 			#address-cells = <1>;
+diff --git a/arch/arm/boot/dts/da850-lcdk.dts b/arch/arm/boot/dts/da850-lcdk.dts
+index afcb482..fbeee3c 100644
+--- a/arch/arm/boot/dts/da850-lcdk.dts
++++ b/arch/arm/boot/dts/da850-lcdk.dts
+@@ -105,6 +105,10 @@
+ 	status = "okay";
+ };
+ 
++&sata {
++	status = "okay";
++};
++
+ &mdio {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mdio_pins>;
 -- 
 2.9.3
