@@ -1,54 +1,114 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 23 Jan 2017 17:46:34 +0000
-Subject: [PATCH v29 4/9] arm64: kdump: implement machine_crash_shutdown()
-In-Reply-To: <20170112120111.GE1771@arm.com>
-References: <20161228043347.27358-1-takahiro.akashi@linaro.org>
- <20161228043605.27470-3-takahiro.akashi@linaro.org>
- <20170110113248.GC21598@arm.com>
- <20170111063626.GE20972@linaro.org>
- <20170111105405.GF12388@arm.com>
- <20170112042143.GF20972@linaro.org> <20170112120111.GE1771@arm.com>
-Message-ID: <20170123174633.GF28914@arm.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Mon, 23 Jan 2017 12:48:41 -0500
+Subject: [PATCH v3 3/5] drm/rockchip/dsi: remove mode_valid function
+In-Reply-To: <1484907051-7159-4-git-send-email-zyw@rock-chips.com>
+References: <1484907051-7159-1-git-send-email-zyw@rock-chips.com>
+ <1484907051-7159-4-git-send-email-zyw@rock-chips.com>
+Message-ID: <20170123174841.GB25789@trickycodes.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 12, 2017 at 12:01:11PM +0000, Will Deacon wrote:
-> On Thu, Jan 12, 2017 at 01:21:44PM +0900, AKASHI Takahiro wrote:
-> > On Wed, Jan 11, 2017 at 10:54:05AM +0000, Will Deacon wrote:
-> > > On Wed, Jan 11, 2017 at 03:36:28PM +0900, AKASHI Takahiro wrote:
-> > > > On Tue, Jan 10, 2017 at 11:32:48AM +0000, Will Deacon wrote:
-> > > > > On Wed, Dec 28, 2016 at 01:36:01PM +0900, AKASHI Takahiro wrote:
-> > > > > > @@ -22,6 +25,7 @@
-> > > > > >  extern const unsigned char arm64_relocate_new_kernel[];
-> > > > > >  extern const unsigned long arm64_relocate_new_kernel_size;
-> > > > > >  
-> > > > > > +static bool in_crash_kexec;
-> > > > > 
-> > > > > Do you actually need this bool? Why not call kexec_crash_loaded() instead?
-> > > > 
-> > > > The two have different meanings:
-> > > > "in_crash_kexec" indicates that kdump is taking place, while
-> > > > kexec_crash_loaded() tells us only whether crash dump kernel has been
-> > > > loaded or not.
-> > > > 
-> > > > It is crucial to distinguish them especially for machine_kexec()
-> > > > which can be called on normal kexec even if kdump has been set up.
-> > > 
-> > > Ah, I see. So how about just doing:
-> > > 
-> > >   if (kimage == kexec_crash_image)
-> > > 
-> > > in machine_kexec?
-> > 
-> > Yeah, it should work.
-> > Do you want to merge the following hunk,
-> > or expect that I will re-send the whole patch series
-> > (with other changes if any)?
+On Fri, Jan 20, 2017 at 06:10:49PM +0800, Chris Zhong wrote:
+> The MIPI DSI do not need check the validity of resolution, the max
+> resolution should depend VOP. Hence, remove rk3288_mipi_dsi_mode_valid
+> here.
+
+Does vop actually enforce this, though? I see that mode_config.max_width is
+4096, but there is no bounds checking in mode_fixup().
+
+The connector is currently rejecting everything greater than 2047. So I think
+you're going to regress behavior here.
+
+Sean
+
+
 > 
-> Thanks, I'll fold it in and shout if I run into any problems. My plan is
-> to queue this for 4.11.
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> ---
+> 
+> Changes in v3: None
+> 
+>  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 39 ----------------------------------
+>  1 file changed, 39 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> index a93ce97..6f0e252 100644
+> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> @@ -278,8 +278,6 @@ struct dw_mipi_dsi_plat_data {
+>  	u32 grf_dsi0_mode;
+>  	u32 grf_dsi0_mode_reg;
+>  	unsigned int max_data_lanes;
+> -	enum drm_mode_status (*mode_valid)(struct drm_connector *connector,
+> -					   struct drm_display_mode *mode);
+>  };
+>  
+>  struct dw_mipi_dsi {
+> @@ -1081,23 +1079,8 @@ static int dw_mipi_dsi_connector_get_modes(struct drm_connector *connector)
+>  	return drm_panel_get_modes(dsi->panel);
+>  }
+>  
+> -static enum drm_mode_status dw_mipi_dsi_mode_valid(
+> -					struct drm_connector *connector,
+> -					struct drm_display_mode *mode)
+> -{
+> -	struct dw_mipi_dsi *dsi = con_to_dsi(connector);
+> -
+> -	enum drm_mode_status mode_status = MODE_OK;
+> -
+> -	if (dsi->pdata->mode_valid)
+> -		mode_status = dsi->pdata->mode_valid(connector, mode);
+> -
+> -	return mode_status;
+> -}
+> -
+>  static struct drm_connector_helper_funcs dw_mipi_dsi_connector_helper_funcs = {
+>  	.get_modes = dw_mipi_dsi_connector_get_modes,
+> -	.mode_valid = dw_mipi_dsi_mode_valid,
+>  };
+>  
+>  static void dw_mipi_dsi_drm_connector_destroy(struct drm_connector *connector)
+> @@ -1168,33 +1151,11 @@ static int rockchip_mipi_parse_dt(struct dw_mipi_dsi *dsi)
+>  	return 0;
+>  }
+>  
+> -static enum drm_mode_status rk3288_mipi_dsi_mode_valid(
+> -					struct drm_connector *connector,
+> -					struct drm_display_mode *mode)
+> -{
+> -	/*
+> -	 * The VID_PKT_SIZE field in the DSI_VID_PKT_CFG
+> -	 * register is 11-bit.
+> -	 */
+> -	if (mode->hdisplay > 0x7ff)
+> -		return MODE_BAD_HVALUE;
+> -
+> -	/*
+> -	 * The V_ACTIVE_LINES field in the DSI_VTIMING_CFG
+> -	 * register is 11-bit.
+> -	 */
+> -	if (mode->vdisplay > 0x7ff)
+> -		return MODE_BAD_VVALUE;
+> -
+> -	return MODE_OK;
+> -}
+> -
+>  static struct dw_mipi_dsi_plat_data rk3288_mipi_dsi_drv_data = {
+>  	.dsi0_en_bit = RK3288_DSI0_SEL_VOP_LIT,
+>  	.dsi1_en_bit = RK3288_DSI1_SEL_VOP_LIT,
+>  	.grf_switch_reg = RK3288_GRF_SOC_CON6,
+>  	.max_data_lanes = 4,
+> -	.mode_valid = rk3288_mipi_dsi_mode_valid,
+>  };
+>  
+>  static struct dw_mipi_dsi_plat_data rk3399_mipi_dsi_drv_data = {
+> -- 
+> 2.6.3
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
-Given the DT discussion with Mark, I assume you'll post a new version with
-this rolled in.
-
-Will
+-- 
+Sean Paul, Software Engineer, Google / Chromium OS
