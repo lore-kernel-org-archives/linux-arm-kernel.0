@@ -1,67 +1,24 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Mon, 23 Jan 2017 13:51:26 +0200
-Subject: usb: gadget: Kernel panic (NULL pointer dereference) when using
- fsl_udc2_core on i.MX31 PDK
-In-Reply-To: <f984e50b-0e64-88ef-2f53-b8da2a62daf0@gmail.com>
-References: <f984e50b-0e64-88ef-2f53-b8da2a62daf0@gmail.com>
-Message-ID: <87k29m6lkx.fsf@linux.intel.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 23 Jan 2017 12:54:11 +0100
+Subject: linux-4.10-rc5/drivers/char/xilinx_hwicap/buffer_icap.c: 2 *
+ pointless local variables ?
+In-Reply-To: <VI1PR08MB1022BE7B66F95FEA77412DDD9C720@VI1PR08MB1022.eurprd08.prod.outlook.com>
+References: <VI1PR08MB1022BE7B66F95FEA77412DDD9C720@VI1PR08MB1022.eurprd08.prod.outlook.com>
+Message-ID: <534e45bf-8a2c-85e4-e18e-0c95a9f97e40@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 23.1.2017 12:39, David Binderman wrote:
+> 
+> Hello there,
+> 
+> [linux-4.10-rc5/drivers/char/xilinx_hwicap/buffer_icap.c:301]: (style) Variable 'num_writes' is modified but its new value is never used.
+> [linux-4.10-rc5/drivers/char/xilinx_hwicap/buffer_icap.c:356]: (style) Variable 'read_count' is modified but its new value is never used.
+> 
+> Suggest either use these local variables in some way or delete them.
+> 
 
-Hi,
+I have sent patch which removes them.
 
-Magnus Lilja <lilja.magnus@gmail.com> writes:
-> Hi
->
-> I tried the fsl_udc_core gadget driver on the i.MX31 PDK board and got a 
-> kernel panic (NULL pointer dereference) when connecting the USB cable. I 
-> had the g_serial module loaded as well.
->
-> The NULL pointer panic comes from gadget/udc/core.c 
-> usb_gadget_giveback_request() which calls req->complete() and in some 
-> cases req->complete is NULL.
->
-> Commit 304f7e5e1d08 ("usb: gadget: Refactor request completion") changed 
-> fsl_udc2_core.c (and several other files) and in fsl_udc2_core.c a check 
-> that req->complete is non-NULL was removed:
->
-> --- a/drivers/usb/gadget/udc/fsl_udc_core.c
-> +++ b/drivers/usb/gadget/udc/fsl_udc_core.c
-> @@ -197,10 +197,8 @@ __acquires(ep->udc->lock)
->          ep->stopped = 1;
->
->          spin_unlock(&ep->udc->lock);
-> -       /* complete() is from gadget layer,
-> -        * eg fsg->bulk_in_complete() */
-> -       if (req->req.complete)
-> -               req->req.complete(&ep->ep, &req->req);
-> +
-> +       usb_gadget_giveback_request(&ep->ep, &req->req);
->
->          spin_lock(&ep->udc->lock);
->          ep->stopped = stopped;
->
-> If I re-introduce the check (either in fsl_udc_core.c or core.c) at 
-> least USB gadget operation using g_serial seems to work just fine.
->
-> I don't know the logic in detail to understand whether this is a proper 
-> fix or if there is some other more problem with the fls_udc_core driver. 
-> Does anyone have input in this matter?
->
-> I can produce a proper patch that fixes this problem by re-introducing 
-> the check (in either fsl_udc_core.c or core.c) if that is a proper 
-> solution and I can also assist in testing other fixes to the problem.
-
-->complete() is supposed to be mandatory. Which gadget do you have that
-->doesn't set ->complete() to a valid function pointer?
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170123/6f63a215/attachment.sig>
+Thanks,
+Michal
