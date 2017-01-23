@@ -1,30 +1,37 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 23 Jan 2017 18:10:06 +0800
-Subject: [PATCH 1/1] ARM: dts: imx6dl: fix GPIO4 range
-In-Reply-To: <1484734191-18556-1-git-send-email-sebastien.szymanski@armadeus.com>
-References: <1484734191-18556-1-git-send-email-sebastien.szymanski@armadeus.com>
-Message-ID: <20170123101004.GQ5662@dragon>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 23 Jan 2017 11:14:11 +0100
+Subject: [PATCH 4/8] clk: renesas: cpg-mssr: Add support for reset control
+In-Reply-To: <20170120220302.GA20610@bigcity.dyn.berto.se>
+References: <1484921306-9967-1-git-send-email-geert+renesas@glider.be>
+ <1484921306-9967-5-git-send-email-geert+renesas@glider.be>
+ <20170120220302.GA20610@bigcity.dyn.berto.se>
+Message-ID: <CAMuHMdUu=FwygW168GLVp2JtKbbB_R2wQLzq_3_TxLiu5ww6kA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2017 at 11:09:51AM +0100, S?bastien Szymanski wrote:
-> GPIO4_11 is on pin 152(MX6DL_PAD_KEY_ROW2) and not on pin
-> 151(MX6DL_PAD_KEY_ROW1).
-> 
-> I found the error while booting a mainline kernel on APF6S SoM and
-> noticed the following message:
-> 
-> [    2.609337] imx6dl-pinctrl 20e0000.iomuxc: pin MX6DL_PAD_KEY_ROW1
-> already requested by 20a8000.gpio:105; cannot claim for 20a8000.gpio:107
-> [    2.621884] imx6dl-pinctrl 20e0000.iomuxc: pin-151 (20a8000.gpio:107)
-> status -22
-> [    2.629303] spi_imx 2008000.ecspi: Can't get CS GPIO 107
-> 
-> With this patch, the message is gone and spi_imx driver probes correctly.
-> 
-> Fixes: bb728d662bed ("ARM: dts: add gpio-ranges property to iMX GPIO
-> controllers")
-> 
-> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
+Hi Niklas,
 
-Applied, thanks.
+On Fri, Jan 20, 2017 at 11:03 PM, Niklas S?derlund
+<niklas.soderlund@ragnatech.se> wrote:
+> Nice patch! It took me a while to understand why you didn't need to read
+> the register before writing to it in cpg_mssr_deassert() :-)
+
+Yeah, deassertion and assertion are asymmetrical.
+
+Note that on older (not yet supported) SH/R-Mobile parts, there are no
+reset clear registers, and deassertion is symmetrical.
+
+> Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+
+Thanks!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
