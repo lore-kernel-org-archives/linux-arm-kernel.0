@@ -1,53 +1,69 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 23 Jan 2017 13:34:04 +0100
-Subject: [PATCH 1/2] dt-bindings: gpu: Add Mali Utgard bindings
-In-Reply-To: <CAL_JsqL5fYVvCRgui9NQVEM+=gkGUnf7-D9KHK9YTtJyfGy3Ew@mail.gmail.com>
-References: <20170116132424.7038-1-maxime.ripard@free-electrons.com>
- <CALAqxLV=5ZCu8=rDUFHS9148DxzrqeTipsueA7F4i3t-mcWr=A@mail.gmail.com>
- <20170120091608.ijdhpeq2t5no75rc@lukather>
- <CAL_JsqL5fYVvCRgui9NQVEM+=gkGUnf7-D9KHK9YTtJyfGy3Ew@mail.gmail.com>
-Message-ID: <20170123123404.hb3ktetkn773tno4@lukather>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 23 Jan 2017 12:34:05 +0000
+Subject: [PATCH/RFC 1/2] arm64: mm: Silently allow devices lacking IOMMU
+ group
+In-Reply-To: <148517353630.18128.12799811817831597628.sendpatchset@little-apple>
+References: <148517349585.18128.10696161017872202809.sendpatchset@little-apple>
+ <148517353630.18128.12799811817831597628.sendpatchset@little-apple>
+Message-ID: <66c082c6-da2e-9765-0db8-e0ba2c5bd501@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Magnus,
 
-On Fri, Jan 20, 2017 at 08:15:21AM -0600, Rob Herring wrote:
-> > The only thing that might be vendor specific would be the (optional)
-> > declaration of the mali_gpu_device_data structure. As far as I know,
-> > there's two things of importance there:
-> >   - the list of the valid OPPs in order to do DVFS, but that could be
-> >     made generic too using the operating-points binding
-> >
-> >   - And the valid area for the buffers for the fbdev blobs (fb_start,
-> >     fb_size and shared_mem_size). I'm not entirely happy with this one
-> >     so far (which is also why I've not pushed it). We'd need to come
-> >     up with a way to get the base address and size of the CMA region
-> >     backing the framebuffer allocation, but I haven't find any trivial
-> >     way to do so, so for now I just hardcoded it. Worst case scenario,
-> >     we can hardcode values based on the compatible.
+On 23/01/17 12:12, Magnus Damm wrote:
+> From: Magnus Damm <damm+renesas@opensource.se>
 > 
-> memory-region property?
+> Consider failure of iommu_get_domain_for_dev() as non-critical and
+> get rid of the warning printout. This allows IOMMU properties to be
+> included in the DTB even though the kernel is configured with
+> CONFIG_IOMMU_API=n or in case a particular IOMMU driver refuses to
+> enable IOMMU support for a certain slave device and returns error
+> from the ->add_device() callback.
+> 
+> This is only a cosmetic change that removes console warning printouts.
 
-That might do it, however those buffers usually are allocated by the
-display engine, and not the GPU device. Even if we declare a reserved
-memory region and use memory-region in the GPU node, chances are that
-buffers allocated for the display may not be in that region (for
-example if it's using the default CMA pool).
+The warning is there for a reason - at this point, we *expected* the
+device to be using an IOMMU for DMA, so a failure is significant. Rather
+than masking genuine failures in other cases because your case
+deliberately breaks that expectation, simply change the expectation -
+i.e. rather than letting of_xlate() succeed then failing add_device()
+later, reject the of_xlate() call up-front such that the DMA layer never
+gets told about the IOMMU in the first place.
 
-Unless we create a memory region for the default CMA pool?
+Robin.
 
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170123/baa0c2b3/attachment.sig>
+> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+> ---
+> 
+>  arch/arm64/mm/dma-mapping.c |   10 +++++++++-
+>  1 file changed, 9 insertions(+), 1 deletion(-)
+> 
+> --- 0001/arch/arm64/mm/dma-mapping.c
+> +++ work/arch/arm64/mm/dma-mapping.c	2017-01-23 20:54:40.060607110 +0900
+> @@ -827,11 +827,19 @@ static bool do_iommu_attach(struct devic
+>  	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+>  
+>  	/*
+> +	 * In case IOMMU support is excluded from the kernel or if the device
+> +	 * is not hooked up to any IOMMU group then be silent and keep the
+> +	 * old dma_ops.
+> +	 */
+> +	if (!domain)
+> +		return false;
+> +
+> +	/*
+>  	 * If the IOMMU driver has the DMA domain support that we require,
+>  	 * then the IOMMU core will have already configured a group for this
+>  	 * device, and allocated the default domain for that group.
+>  	 */
+> -	if (!domain || iommu_dma_init_domain(domain, dma_base, size, dev)) {
+> +	if (iommu_dma_init_domain(domain, dma_base, size, dev)) {
+>  		pr_warn("Failed to set up IOMMU for device %s; retaining platform DMA ops\n",
+>  			dev_name(dev));
+>  		return false;
+> _______________________________________________
+> iommu mailing list
+> iommu at lists.linux-foundation.org
+> https://lists.linuxfoundation.org/mailman/listinfo/iommu
+> 
