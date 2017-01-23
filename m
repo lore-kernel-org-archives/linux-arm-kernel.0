@@ -1,54 +1,59 @@
 From: john@phrozen.org (John Crispin)
-Date: Mon, 23 Jan 2017 12:29:28 +0100
-Subject: [PATCH 09/16] arm: dts: add nand nodes to the mt7623.dtsi file
-In-Reply-To: <1485170975-51813-1-git-send-email-john@phrozen.org>
-References: <1485170975-51813-1-git-send-email-john@phrozen.org>
-Message-ID: <1485170975-51813-10-git-send-email-john@phrozen.org>
+Date: Mon, 23 Jan 2017 12:29:19 +0100
+Subject: [PATCH 00/16] arm: dts: extend mt7623 support
+Message-ID: <1485170975-51813-1-git-send-email-john@phrozen.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add NAND/EEC nodes to the mt7623.dtsi file.
+This series extends the dts files used for booting mt7623 base boards.
+Since support for mt7623 was added around v4.6, many new drivers have
+been accepted upstream. The contained patches add several of these to
+the devicetree.
 
-Signed-off-by: John Crispin <john@phrozen.org>
----
- arch/arm/boot/dts/mt7623.dtsi |   25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+Additionally the series does a bit of refactoring. MTK/WCN pointed out
+that the evaluation board is infact a reference design and asked the the
+evb files be renamed to rfb.
 
-diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
-index c8f38e1..240f382 100644
---- a/arch/arm/boot/dts/mt7623.dtsi
-+++ b/arch/arm/boot/dts/mt7623.dtsi
-@@ -293,6 +293,31 @@
- 		status = "disabled";
- 	};
- 
-+	nandc: nfi at 1100d000 {
-+		compatible = "mediatek,mt7623-nfc",
-+			     "mediatek,mt2701-nfc";
-+		reg = <0 0x1100d000 0 0x1000>;
-+		interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_LOW>;
-+		power-domains = <&scpsys MT2701_POWER_DOMAIN_IFR_MSC>;
-+		clocks = <&pericfg CLK_PERI_NFI>,
-+			 <&pericfg CLK_PERI_NFI_PAD>;
-+		clock-names = "nfi_clk", "pad_clk";
-+		status = "disabled";
-+		ecc-engine = <&bch>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
-+	bch: ecc at 1100e000 {
-+		compatible = "mediatek,mt7623-ecc",
-+			     "mediatek,mt2701-ecc";
-+		reg = <0 0x1100e000 0 0x1000>;
-+		interrupts = <GIC_SPI 55 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&pericfg CLK_PERI_NFI_ECC>;
-+		clock-names = "nfiecc_clk";
-+		status = "disabled";
-+	};
-+
- 	hifsys: syscon at 1a000000 {
- 		compatible = "mediatek,mt7623-hifsys",
- 			     "mediatek,mt2701-hifsys",
+As with all of the current ARM bases MTK silicon, these boards also have
+a PMIC. Instead of adding the nodes to all of the dts files, we add an
+intermediate dtsi file that contains the required nodes. This allows us
+to reduce the size of the top most dts files.
+
+The RFB comes in various versions and asiarf has even done a crowdfunder
+to sell them. We should try to reduce the duplication. This series adds
+a common dtsi file for these boards. This results in the topmost dts files
+only needing to specify the compatible string, MTD nodes and ethernet setup.
+
+John Crispin (16):
+  arm: dts: add clock controller device nodes
+  arm: dts: add subsystem clock controller device nodes
+  arm: dts: add power domain controller device node
+  arm: dts: add clock-frequency to the a7 timer node to mt7623.dtsi
+  arm: dts: add pinctrl nodes to the mt7623 dtsi file
+  arm: dts: add pmic nodes to the mt7623 dtsi file
+  arm: dts: add i2c nodes to the mt7623.dtsi file
+  arm: dts: add spi nodes to the mt7623.dtsi file
+  arm: dts: add nand nodes to the mt7623.dtsi file
+  arm: dts: add mmc nodes to the mt7623.dtsi file
+  arm: dts: add usb nodes to the mt7623.dtsi file
+  arm: dts: add mt7623-mt6323.dtsi file
+  arm: dts: rename mt7623-evb.dts to arch/arm/boot/dts/mt7623n-rfb.dtsi
+  arm: dts: cleanup the mt7623n rfb uart nodes
+  arm: dts: enable the usb device on the mt7623n rfb
+  arm: dts: enable the nand device on the mt7623n nand rfb
+
+ Documentation/devicetree/bindings/arm/mediatek.txt |    4 +-
+ arch/arm/boot/dts/Makefile                         |    2 +-
+ arch/arm/boot/dts/mt7623-evb.dts                   |   33 ---
+ arch/arm/boot/dts/mt7623-mt6323.dtsi               |  273 ++++++++++++++++++
+ arch/arm/boot/dts/mt7623.dtsi                      |  297 +++++++++++++++++++-
+ arch/arm/boot/dts/mt7623n-rfb-nand.dts             |  109 +++++++
+ arch/arm/boot/dts/mt7623n-rfb.dtsi                 |   61 ++++
+ 7 files changed, 730 insertions(+), 49 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/mt7623-evb.dts
+ create mode 100644 arch/arm/boot/dts/mt7623-mt6323.dtsi
+ create mode 100644 arch/arm/boot/dts/mt7623n-rfb-nand.dts
+ create mode 100644 arch/arm/boot/dts/mt7623n-rfb.dtsi
+
 -- 
 1.7.10.4
