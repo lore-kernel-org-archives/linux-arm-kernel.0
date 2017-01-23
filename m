@@ -1,56 +1,148 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Mon, 23 Jan 2017 21:53:11 +0530
-Subject: [PATCH V6 06/11] drivers: platform: Configure dma operations at
- probe time
-References: <1484939748-31591-1-git-send-email-sricharan@codeaurora.org>
- <1484939748-31591-7-git-send-email-sricharan@codeaurora.org>
- <20170123120729.GB12593@red-moon>
-Message-ID: <009701d27595$01e24a70$05a6df50$@codeaurora.org>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 23 Jan 2017 10:26:18 -0600
+Subject: [PATCH 1/4] dt-bindings: add multidomain support to i.MX GPC DT
+ binding
+In-Reply-To: <20170120155225.31905-2-l.stach@pengutronix.de>
+References: <20170120155225.31905-1-l.stach@pengutronix.de>
+ <20170120155225.31905-2-l.stach@pengutronix.de>
+Message-ID: <20170123162618.tohyqu5wluhrcmvd@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
-
->>[+bjorn]
->>
->>On Sat, Jan 21, 2017 at 12:45:43AM +0530, Sricharan R wrote:
->>> Configuring DMA ops at probe time will allow deferring device probe when
->>> the IOMMU isn't available yet. The dma_configure for the device is
->>> now called from the generic device_attach callback just before the
->>> bus/driver probe is called. This way, configuring the DMA ops for the
->>> device would be called at the same place for all bus_types, hence the
->>> deferred probing mechanism should work for all buses as well.
->>>
->>> pci_bus_add_devices    (platform/amba)(_device_create/driver_register)
->>>        |                         |
->>> pci_bus_add_device     (device_add/driver_register)
->>>        |                         |
->>> device_attach           device_initial_probe
->>>        |                         |
->>> __device_attach_driver    __device_attach_driver
->>>        |
->>> driver_probe_device
->>>        |
->>> really_probe
->>>        |
->>> dma_configure
->>>
->>> Similarly on the device/driver_unregister path __device_release_driver is
->>> called which inturn calls dma_deconfigure.
->>>
->>> This patch changes the dma ops configuration time to probe time for
->>> both OF and ACPI based devices.
->>
->>For all device types, inclusive of PCI, so please you have to:
->>
->>- Update the $SUBJECT
->>- Copy linux-pci at vger.kernel.org
->>- Copy linux-acpi at vger.kernel org (on the series)
+On Fri, Jan 20, 2017 at 04:52:22PM +0100, Lucas Stach wrote:
+> This adds a new binding for the Freescale i.MX GPC block, which allows
+> to describe multiple power domains in a more natural way. The driver
+> will continue to support the old binding for existing DTBs, but new
+> features like the additional domains present on i.MX6SX will only be
+> usable with the new binding.
 >
->Sure, i will just see till tomorrow for any further comments and
->repost with $SUBJECT modified and the lists
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  .../devicetree/bindings/power/fsl,imx-gpc.txt      | 81 ++++++++++++++--------
+>  1 file changed, 54 insertions(+), 27 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+> index 65cc0345747d..e5b660018d63 100644
+> --- a/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+> +++ b/Documentation/devicetree/bindings/power/fsl,imx-gpc.txt
+> @@ -1,22 +1,41 @@
+>  Freescale i.MX General Power Controller
+>  =======================================
+>  
+> -The i.MX6Q General Power Control (GPC) block contains DVFS load tracking
+> -counters and Power Gating Control (PGC) for the CPU and PU (GPU/VPU) power
+> -domains.
+> +The i.MX6 General Power Control (GPC) block contains DVFS load tracking
+> +counters and Power Gating Control (PGC).
+>  
+>  Required properties:
+>  - compatible: Should be "fsl,imx6q-gpc" or "fsl,imx6sl-gpc"
+>  - reg: should be register base and length as documented in the
+>    datasheet
+> -- interrupts: Should contain GPC interrupt request 1
+> -- pu-supply: Link to the LDO regulator powering the PU power domain
+> -- clocks: Clock phandles to devices in the PU power domain that need
+> -	  to be enabled during domain power-up for reset propagation.
+> -- #power-domain-cells: Should be 1, see below:
+> +- interrupts: Should contain one interrupt specifier for the GPC interrupt
+> +- clocks: Must contain an entry for each entry in clock-names.
+> +  See Documentation/devicetree/bindings/clocks/clock-bindings.txt for details.
+> +- clock-names: Must include the following entries:
+> +  - ipg
+> +- pgc: a list of child nodes describing the SoC power domains controlled by the
+> +  power gating controller.
 
-Infact just reposted with $SUB updated and the additional lists.
+pgc is a node, not a property. Call it 'power-domains' instead.
 
-Regards,
- Sricharan
+>  
+> -The gpc node is a power-controller as documented by the generic power domain
+> -bindings in Documentation/devicetree/bindings/power/power_domain.txt.
+> +The power domains are generic power domain providers as documented in
+> +Documentation/devicetree/bindings/power/power_domain.txt. They are described as
+> +subnodes of the GPC and should contain the following
+> +
+> +Required properties:
+> +- reg: the DOMAIN_INDEX as used by the client devices to refer to this
+> +  power domain
+> +  The following DOMAIN_INDEX values are valid for i.MX6Q:
+> +  ARM_DOMAIN     0
+> +  PU_DOMAIN      1
+> +  The following additional DOMAIN_INDEX value is valid for i.MX6SL:
+> +  DISPLAY_DOMAIN 2
+> +
+> +- #power-domain-cells: Should be 0
+> +
+> +Optional properties:
+> +- clocks: a number of phandles to clocks that need to be enabled during domain
+> +  power-up sequencing to ensure reset propagation into devices located inside
+> +  this power domain
+> +- domain-supply: a phandle to the regulator powering this domain
+
+'power-supply' is more common for when we don't really have a name.
+
+>  Example:
+>  
+> @@ -25,14 +44,29 @@ Example:
+>  		reg = <0x020dc000 0x4000>;
+>  		interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>,
+>  			     <0 90 IRQ_TYPE_LEVEL_HIGH>;
+> -		pu-supply = <&reg_pu>;
+> -		clocks = <&clks IMX6QDL_CLK_GPU3D_CORE>,
+> -			 <&clks IMX6QDL_CLK_GPU3D_SHADER>,
+> -			 <&clks IMX6QDL_CLK_GPU2D_CORE>,
+> -			 <&clks IMX6QDL_CLK_GPU2D_AXI>,
+> -			 <&clks IMX6QDL_CLK_OPENVG_AXI>,
+> -			 <&clks IMX6QDL_CLK_VPU_AXI>;
+> -		#power-domain-cells = <1>;
+> +		clocks = <&clks IMX6QDL_CLK_IPG>;
+> +		clock-names = "ipg";
+> +		
+> +		pgc {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			power-domain at 0 {
+> +				reg = <0>;
+> +				#power-domain-cells = <0>;
+> +			};
+> +			pd_pu: power-domain at 1 {
+> +				reg = <1>;
+> +				#power-domain-cells = <0>;
+> +				domain-supply = <&reg_pu>;
+> +				clocks = <&clks IMX6QDL_CLK_GPU3D_CORE>,
+> +				         <&clks IMX6QDL_CLK_GPU3D_SHADER>,
+> +				         <&clks IMX6QDL_CLK_GPU2D_CORE>,
+> +				         <&clks IMX6QDL_CLK_GPU2D_AXI>,
+> +				         <&clks IMX6QDL_CLK_OPENVG_AXI>,
+> +				         <&clks IMX6QDL_CLK_VPU_AXI>;
+> +			};
+> +		};
+>  	};
+>  
+>  
+> @@ -40,20 +74,13 @@ Specifying power domain for IP modules
+>  ======================================
+>  
+>  IP cores belonging to a power domain should contain a 'power-domains' property
+> -that is a phandle pointing to the gpc device node and a DOMAIN_INDEX specifying
+> -the power domain the device belongs to.
+> +that is a phandle pointing to the power domain the device belongs to.
+>  
+>  Example of a device that is part of the PU power domain:
+>  
+>  	vpu: vpu at 02040000 {
+>  		reg = <0x02040000 0x3c000>;
+>  		/* ... */
+> -		power-domains = <&gpc 1>;
+> +		power-domains = <&pd_pu>;
+>  		/* ... */
+>  	};
+> -
+> -The following DOMAIN_INDEX values are valid for i.MX6Q:
+> -ARM_DOMAIN     0
+> -PU_DOMAIN      1
+> -The following additional DOMAIN_INDEX value is valid for i.MX6SL:
+> -DISPLAY_DOMAIN 2
+> -- 
+> 2.11.0
+> 
