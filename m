@@ -1,58 +1,27 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 23 Jan 2017 10:20:02 +0100
-Subject: arm64: dts: mt8173: add node for thermal calibration
-In-Reply-To: <CAGS+omA=aip76=8CcGY7gPUrHj9eLLem=8MBziz99fVDq86zPQ@mail.gmail.com>
-References: <1484286771-35913-1-git-send-email-dawei.chien@mediatek.com>
- <CAGS+omA=aip76=8CcGY7gPUrHj9eLLem=8MBziz99fVDq86zPQ@mail.gmail.com>
-Message-ID: <f33ae1e4-ff12-7468-67e4-5e5b28dd67bb@gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 23 Jan 2017 10:23:31 +0100
+Subject: [PATCH 0/4] ARM/arm64: dts: renesas: Link ARM GIC to clock and
+ clock domain
+In-Reply-To: <1484657360-13101-1-git-send-email-geert+renesas@glider.be>
+References: <1484657360-13101-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20170123092330.GF31651@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jan 17, 2017 at 01:49:16PM +0100, Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
+> 
+> This patch series improves the topology description in DT of the ARM GIC
+> on Renesas SoCs using the CPG/MSSR bindings (R-Car Gen3 and RZ/G).
+> It links the GIC to its module clock, and adds it to the SYSC "always
+> on" PM Domain.
+> 
+> Note that currently the GIC-400 driver doesn't support module clocks nor
+> Runtime PM, so this must be handled as a critical clock.
+> As the CPG/MSSR driver, unlike the legacy MSTP driver, is already aware
+> of critical clocks, this series can be applied right now.
 
+Hi Geert,
 
-On 01/13/2017 09:51 AM, Daniel Kurtz wrote:
-> On Fri, Jan 13, 2017 at 1:52 PM, Dawei Chien <dawei.chien@mediatek.com> wrote:
->>
->> From: "dawei.chien at mediatek.com" <dawei.chien@mediatek.com>
->>
->> Add this for supporting thermal calibration by e-fuse data.
->>
->> Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
->
-> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
->
-
-applied, thanks
-
->> ---
->>  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 7 +++++++
->>  1 file changed, 7 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> index 12e7027..adfac1e 100644
->> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
->> @@ -401,6 +401,11 @@
->>                 efuse: efuse at 10206000 {
->>                         compatible = "mediatek,mt8173-efuse";
->>                         reg = <0 0x10206000 0 0x1000>;
->> +                       #address-cells = <1>;
->> +                       #size-cells = <1>;
->> +                       thermal_calibration: calib at 528 {
->> +                               reg = <0x528 0xc>;
->> +                       };
->>                 };
->>
->>                 apmixedsys: clock-controller at 10209000 {
->> @@ -574,6 +579,8 @@
->>                         resets = <&pericfg MT8173_PERI_THERM_SW_RST>;
->>                         mediatek,auxadc = <&auxadc>;
->>                         mediatek,apmixedsys = <&apmixedsys>;
->> +                       nvmem-cells = <&thermal_calibration>;
->> +                       nvmem-cell-names = "calibration-data";
->>                 };
->>
->>                 nor_flash: spi at 1100d000 {
->> --
->> 1.9.1
->>
+does the note above imply that "[PATCH 0/2] clk: renesas: Use
+CLK_IS_CRITICAL to handle critical clocks" is a dependency of this series?
