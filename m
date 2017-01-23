@@ -1,120 +1,36 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 23 Jan 2017 15:12:56 +0800
-Subject: [PATCH v2 1/3] ARM: dts: udoo_neo: Add UDOO Neo USB OTG1 and
- OTG2 support
-In-Reply-To: <1484843405-14892-1-git-send-email-breno.lima@nxp.com>
-References: <1484843405-14892-1-git-send-email-breno.lima@nxp.com>
-Message-ID: <20170123071255.GH5662@dragon>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 23 Jan 2017 15:09:23 +0800
+Subject: [RESEND PATCH] usb: chipidea: usb2: delete the redundant setting
+ default DMA mask code
+Message-ID: <20170123070923.2770-1-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 02:30:03PM -0200, Breno Lima wrote:
-> Add support for micro USB (OTG1) and USB Host (OTG2) for UDOO Neo board.
-> 
-> Tested on a UDOO Neo Full board by mounting a mass storage device
-> on both ports.
-> 
-> Signed-off-by: Breno Lima <breno.lima@nxp.com>
-> ---
-> Changes since v1:
-> - imx6-usb-charger-detection property removed.
-> 
->  arch/arm/boot/dts/imx6sx-udoo-neo.dtsi | 59 ++++++++++++++++++++++++++++++++++
->  1 file changed, 59 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
-> index 2b65d26..e9d0596 100644
-> --- a/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
-> +++ b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
-> @@ -75,6 +75,28 @@
->  		regulator-max-microvolt = <3300000>;
->  		regulator-boot-on;
->  	};
-> +
-> +	reg_usb_otg1_vbus: usb-otg1-vbus {
+Similar as commit 2b2fe36def08 ("usb: chipidea: imx: delete the
+redundant setting default DMA mask code"), the ci_hdrc_usb2 platform
+device is also created by device tree, the default DMA mask should be
+already set by of_dma_configure when the device are created. So delete
+the redundant code at driver.
 
-Please name fixed regulators like:
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/usb/chipidea/ci_hdrc_usb2.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-	reg_xxx: regulator-xxx {
-		...
-	};
-
-Shawn
-
-> +		compatible = "regulator-fixed";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_otg1_reg>;
-> +		regulator-name = "usb_otg1_vbus";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		gpio = <&gpio1 9 GPIO_ACTIVE_HIGH>;
-> +		enable-active-high;
-> +	};
-> +
-> +	reg_usb_otg2_vbus: usb-otg2-vbus {
-> +		compatible = "regulator-fixed";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_otg2_reg>;
-> +		regulator-name = "usb_otg2_vbus";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		gpio = <&gpio4 12 GPIO_ACTIVE_HIGH>;
-> +		enable-active-high;
-> +	};
->  };
->  
->  &cpu0 {
-> @@ -241,6 +263,28 @@
->  			<MX6SX_PAD_CSI_DATA07__UART6_CTS_B	0x1b0b1>;
->  	};
->  
-> +	pinctrl_otg1_reg: otg1grp {
-> +		fsl,pins =
-> +			<MX6SX_PAD_GPIO1_IO09__GPIO1_IO_9        0x10b0>;
-> +	};
-> +
-> +
-> +	pinctrl_otg2_reg: otg2grp {
-> +		fsl,pins =
-> +			<MX6SX_PAD_NAND_RE_B__GPIO4_IO_12        0x10b0>;
-> +	};
-> +
-> +	pinctrl_usb_otg1: usbotg1grp {
-> +		fsl,pins =
-> +			<MX6SX_PAD_GPIO1_IO10__ANATOP_OTG1_ID    0x17059>,
-> +			<MX6SX_PAD_GPIO1_IO08__USB_OTG1_OC       0x10b0>;
-> +	};
-> +
-> +	pinctrl_usb_otg2: usbot2ggrp {
-> +		fsl,pins =
-> +			<MX6SX_PAD_QSPI1A_DATA0__USB_OTG2_OC     0x10b0>;
-> +	};
-> +
->  	pinctrl_usdhc2: usdhc2grp {
->  		fsl,pins =
->  			<MX6SX_PAD_SD2_CMD__USDHC2_CMD		0x17059>,
-> @@ -280,6 +324,21 @@
->  	status = "disabled";
->  };
->  
-> +&usbotg1 { /* J2 micro USB port */
-> +	vbus-supply = <&reg_usb_otg1_vbus>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usb_otg1>;
-> +	status = "okay";
-> +};
-> +
-> +&usbotg2 { /* J3 host USB port */
-> +	vbus-supply = <&reg_usb_otg2_vbus>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usb_otg2>;
-> +	dr_mode = "host";
-> +	status = "okay";
-> +};
-> +
->  &usdhc2 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_usdhc2>;
-> -- 
-> 2.7.4
-> 
+diff --git a/drivers/usb/chipidea/ci_hdrc_usb2.c b/drivers/usb/chipidea/ci_hdrc_usb2.c
+index 4456d2cf80ff..d162cc0bb8ce 100644
+--- a/drivers/usb/chipidea/ci_hdrc_usb2.c
++++ b/drivers/usb/chipidea/ci_hdrc_usb2.c
+@@ -74,10 +74,6 @@ static int ci_hdrc_usb2_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
+-	ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32));
+-	if (ret)
+-		goto clk_err;
+-
+ 	ci_pdata->name = dev_name(dev);
+ 
+ 	priv->ci_pdev = ci_hdrc_add_device(dev, pdev->resource,
+-- 
+2.11.0
