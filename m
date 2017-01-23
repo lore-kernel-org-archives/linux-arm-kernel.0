@@ -1,93 +1,107 @@
 From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Mon, 23 Jan 2017 17:32:19 +0100
-Subject: [PATCH 1/7] MFD: add bindings for STM32 DFSDM driver
+Date: Mon, 23 Jan 2017 17:32:23 +0100
+Subject: [PATCH 5/7] ASoC: dmaengine_pcm: add copy support
 In-Reply-To: <1485189145-29576-1-git-send-email-arnaud.pouliquen@st.com>
 References: <1485189145-29576-1-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <1485189145-29576-2-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <1485189145-29576-6-git-send-email-arnaud.pouliquen@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add bindings information for STM32 Digital Filter for Sigma Delta modulators MFD driver
+From: olivier moysan <olivier.moysan@st.com>
 
+Add copy support in pcm damengine operations.
+This allows to pre/post process samples (apply shift, mask ...)
+for playback/capture to support hardware contrains.
+
+Signed-off-by: olivier moysan <omoysan.stm32@gmail.com>
 Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 ---
- .../devicetree/bindings/mfd/stm32-dfsdm.txt        | 68 ++++++++++++++++++++++
- 1 file changed, 68 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/stm32-dfsdm.txt
+ include/sound/dmaengine_pcm.h         |  3 +++
+ sound/soc/soc-generic-dmaengine-pcm.c | 37 +++++++++++++++++++++++++++++++++--
+ 2 files changed, 38 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mfd/stm32-dfsdm.txt b/Documentation/devicetree/bindings/mfd/stm32-dfsdm.txt
-new file mode 100644
-index 0000000..e0b45ee
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/stm32-dfsdm.txt
-@@ -0,0 +1,68 @@
-+STMicroelectronics STM32 Digital Filter for Sigma Delta Modulator (DFSDM)
-+ulti-function device.
+diff --git a/include/sound/dmaengine_pcm.h b/include/sound/dmaengine_pcm.h
+index 67be244..9d7bce8 100644
+--- a/include/sound/dmaengine_pcm.h
++++ b/include/sound/dmaengine_pcm.h
+@@ -137,6 +137,9 @@ struct snd_dmaengine_pcm_config {
+ 	int (*prepare_slave_config)(struct snd_pcm_substream *substream,
+ 			struct snd_pcm_hw_params *params,
+ 			struct dma_slave_config *slave_config);
++	int (*copy)(struct snd_pcm_substream *substream, int channel,
++		    snd_pcm_uframes_t pos,
++		    void __user *buf, snd_pcm_uframes_t count);
+ 	struct dma_chan *(*compat_request_channel)(
+ 			struct snd_soc_pcm_runtime *rtd,
+ 			struct snd_pcm_substream *substream);
+diff --git a/sound/soc/soc-generic-dmaengine-pcm.c b/sound/soc/soc-generic-dmaengine-pcm.c
+index 6cef397..bd8332ce 100644
+--- a/sound/soc/soc-generic-dmaengine-pcm.c
++++ b/sound/soc/soc-generic-dmaengine-pcm.c
+@@ -329,6 +329,16 @@ static snd_pcm_uframes_t dmaengine_pcm_pointer(
+ 		return snd_dmaengine_pcm_pointer(substream);
+ }
+ 
++int dmaengine_pcm_copy(struct snd_pcm_substream *substream, int channel,
++		       snd_pcm_uframes_t pos, void __user *buf,
++		       snd_pcm_uframes_t count)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct dmaengine_pcm *pcm = soc_platform_to_pcm(rtd->platform);
 +
-+The STM32 DFSDM device is a multifunction device that handles the DFSDM IP.
++	return pcm->config->copy(substream, channel, pos, buf, count);
++}
 +
-+The DFSDM IP allows to add processing on Sigma Delta ADC based on SinC filters.
-+For this, a pool of m filters can be connected to a pool of n channels.
-+For STM32H7 : m = 4, n = 8.
+ static const struct snd_pcm_ops dmaengine_pcm_ops = {
+ 	.open		= dmaengine_pcm_open,
+ 	.close		= snd_dmaengine_pcm_close,
+@@ -339,6 +349,17 @@ static snd_pcm_uframes_t dmaengine_pcm_pointer(
+ 	.pointer	= dmaengine_pcm_pointer,
+ };
+ 
++static const struct snd_pcm_ops dmaengine_pcm_ops_with_cpy = {
++	.open		= dmaengine_pcm_open,
++	.close		= snd_dmaengine_pcm_close,
++	.ioctl		= snd_pcm_lib_ioctl,
++	.hw_params	= dmaengine_pcm_hw_params,
++	.hw_free	= snd_pcm_lib_free_pages,
++	.trigger	= snd_dmaengine_pcm_trigger,
++	.pointer	= dmaengine_pcm_pointer,
++	.copy		= dmaengine_pcm_copy,
++};
 +
-+Each channel n is assigned to the SPI or Manchester interface n or n + 1.
-+Channels 0 to 2 can also be connected to ADC IP instance 1 to 3.
-+Filtering result is stored in a left aligned register, with 8 LSB reserved for
-+the input channel ID.
+ static const struct snd_soc_platform_driver dmaengine_pcm_platform = {
+ 	.component_driver = {
+ 		.probe_order = SND_SOC_COMP_ORDER_LATE,
+@@ -347,6 +368,14 @@ static snd_pcm_uframes_t dmaengine_pcm_pointer(
+ 	.pcm_new	= dmaengine_pcm_new,
+ };
+ 
++static const struct snd_soc_platform_driver dmaengine_pcm_platform_with_cpy = {
++	.component_driver = {
++		.probe_order = SND_SOC_COMP_ORDER_LATE,
++	},
++	.ops		= &dmaengine_pcm_ops_with_cpy,
++	.pcm_new	= dmaengine_pcm_new,
++};
 +
-+Each filter instance supports two contexts to manage conversions, each one has
-+its own configurable sequence and trigger:
-+- regular conversion: used for single or continuous conversion.
-+- injected conversions: used for triggered conversion.
-+
-+Interfaces supported:
-+- sigma delta ADCs trough IIO framework.
-+- PDM microphones through ASoC framework.
-+
-+Required properties:
-+- compatible:	Must be "st,stm32h7-dfsdm".
-+- reg:		Specifies the DFSDM block register address and length.
-+- interrupts:	IRQ lines connected to each DFSDM filter instance.
-+- clocks:	IP and serial interfaces clocking. Should be set according
-+		to rcc clock ID and "clock-names".
-+- clock-names:	Input clock name "dfsdm_clk" must be defined,
-+		"audio_clk" is optional. If defined CLKOUT is based on the audio
-+		clock, else "dfsdm_clk" is used.
-+
-+Optional properties:
-+- st,clkout-freq: clkout clock frequency (Hz).This clock must be set according
-+		  to "clock" property. Frequency must be a multiple of the rcc
-+		  clock frequency. If not, clkout frequency will not be
-+		  accurate.
-+- pinctrl-names:  set to "default".
-+- pinctrl-0:	  List of phandles pointing to pin configuration nodes for DFSDM
-+		  module.
-+		  For Pinctrl properties see ../pinctrl/pinctrl-bindings.txt
-+Example :
-+	dfsdm: dfsdm at 4400D000 {
-+		compatible = "st,stm32h7-dfsdm";
-+		reg = <0x40017000 0x400>;
-+		interrupts = <110>, <111>, <112>, <113>;
-+		clocks = <&timer_clk>;
-+		clock-names = "dfsdm_clk";
-+		pinctrl-0 = <&dfsdm_ch0 &dfsdm_ch1>;
-+		pinctrl-names = "default";
-+		st,clkout-freq = <2480000>;
-+
-+		iio_dfsdm0: iio-dfsdm at 0 {
-+			compatible = "st,stm32-dfsdm-adc";
-+			#io-channel-cells = <1>;
-+			reg = <0>;
-+			status = "disabled";
-+		};
-+		dai_dfsdm0: dfsdm-audio at 0 {
-+			compatible = "st,stm32-dfsdm-audio";
-+			#sound-dai-cells = <0>;
-+			reg = <0>;
-+			dmas = <&dmamux1 101 0x400 0x00>;
-+			dma-names = "rx";
-+			status = "disabled";
-+		};
-+	};
+ static const char * const dmaengine_pcm_dma_channel_names[] = {
+ 	[SNDRV_PCM_STREAM_PLAYBACK] = "tx",
+ 	[SNDRV_PCM_STREAM_CAPTURE] = "rx",
+@@ -439,8 +468,12 @@ int snd_dmaengine_pcm_register(struct device *dev,
+ 	if (ret)
+ 		goto err_free_dma;
+ 
+-	ret = snd_soc_add_platform(dev, &pcm->platform,
+-		&dmaengine_pcm_platform);
++	if (config && config->copy)
++		ret = snd_soc_add_platform(dev, &pcm->platform,
++					   &dmaengine_pcm_platform_with_cpy);
++	else
++		ret = snd_soc_add_platform(dev, &pcm->platform,
++					   &dmaengine_pcm_platform);
+ 	if (ret)
+ 		goto err_free_dma;
+ 
 -- 
 1.9.1
