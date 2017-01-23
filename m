@@ -1,58 +1,120 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Mon, 23 Jan 2017 15:12:05 +0800
-Subject: [PATCH v2 22/26] drm/rockchip: vop: test for P{H,V}SYNC
-In-Reply-To: <20170121163128.22240-23-john@metanate.com>
-References: <20170121163128.22240-1-john@metanate.com>
- <20170121163128.22240-23-john@metanate.com>
-Message-ID: <5885ACC5.5090108@rock-chips.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 23 Jan 2017 15:12:56 +0800
+Subject: [PATCH v2 1/3] ARM: dts: udoo_neo: Add UDOO Neo USB OTG1 and
+ OTG2 support
+In-Reply-To: <1484843405-14892-1-git-send-email-breno.lima@nxp.com>
+References: <1484843405-14892-1-git-send-email-breno.lima@nxp.com>
+Message-ID: <20170123071255.GH5662@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017?01?22? 00:31, John Keeping wrote:
-> When connected to the MIPI DSI output, we need to use N{H,V}SYNC for the
-> internal connection but these flags are meaningless for DSI panels.
-> Switch the test so that we do not set the P{H,V}SYNC bits unless the
-> mode requires it.
->
-> Signed-off-by: John Keeping <john@metanate.com>
+On Thu, Jan 19, 2017 at 02:30:03PM -0200, Breno Lima wrote:
+> Add support for micro USB (OTG1) and USB Host (OTG2) for UDOO Neo board.
+> 
+> Tested on a UDOO Neo Full board by mounting a mass storage device
+> on both ports.
+> 
+> Signed-off-by: Breno Lima <breno.lima@nxp.com>
 > ---
-> Unchanged in v2
-> ---
->   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 4 ++--
->   1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> index c7eba305c488..67aefc6d4e9a 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> @@ -933,8 +933,8 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
->   	}
->   
->   	pin_pol = 0x8;
-> -	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_NHSYNC) ? 0 : 1;
-> -	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_NVSYNC) ? 0 : (1 << 1);
-> +	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_PHSYNC) ? 1 : 0;
-> +	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_PVSYNC) ? (1 << 1) : 0;
+> Changes since v1:
+> - imx6-usb-charger-detection property removed.
+> 
+>  arch/arm/boot/dts/imx6sx-udoo-neo.dtsi | 59 ++++++++++++++++++++++++++++++++++
+>  1 file changed, 59 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
+> index 2b65d26..e9d0596 100644
+> --- a/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
+> +++ b/arch/arm/boot/dts/imx6sx-udoo-neo.dtsi
+> @@ -75,6 +75,28 @@
+>  		regulator-max-microvolt = <3300000>;
+>  		regulator-boot-on;
+>  	};
+> +
+> +	reg_usb_otg1_vbus: usb-otg1-vbus {
 
-I'm confuse that why SYNC flags have N and P on drm, they are same meaning.
+Please name fixed regulators like:
 
-If no one configure display mode's flags, I don't know which one is 
-correct, N or P? it's a problem.
-Does anyone can answer it?
+	reg_xxx: regulator-xxx {
+		...
+	};
 
-For this patch, it may effect non-sync flags mode on other connector's 
-behavior,
-but seems mostly display mode has sync flags except mipi dsi connector, 
-I think feed mipi's requirement would be better.
+Shawn
 
-So it's no problem  on my side.
-
-Reviewed-by: Mark Yao <mark.yao@rock-chips.com>
-
->   	VOP_CTRL_SET(vop, pin_pol, pin_pol);
->   
->   	switch (s->output_type) {
-
-
--- 
-?ark Yao
+> +		compatible = "regulator-fixed";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_otg1_reg>;
+> +		regulator-name = "usb_otg1_vbus";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		gpio = <&gpio1 9 GPIO_ACTIVE_HIGH>;
+> +		enable-active-high;
+> +	};
+> +
+> +	reg_usb_otg2_vbus: usb-otg2-vbus {
+> +		compatible = "regulator-fixed";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_otg2_reg>;
+> +		regulator-name = "usb_otg2_vbus";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		gpio = <&gpio4 12 GPIO_ACTIVE_HIGH>;
+> +		enable-active-high;
+> +	};
+>  };
+>  
+>  &cpu0 {
+> @@ -241,6 +263,28 @@
+>  			<MX6SX_PAD_CSI_DATA07__UART6_CTS_B	0x1b0b1>;
+>  	};
+>  
+> +	pinctrl_otg1_reg: otg1grp {
+> +		fsl,pins =
+> +			<MX6SX_PAD_GPIO1_IO09__GPIO1_IO_9        0x10b0>;
+> +	};
+> +
+> +
+> +	pinctrl_otg2_reg: otg2grp {
+> +		fsl,pins =
+> +			<MX6SX_PAD_NAND_RE_B__GPIO4_IO_12        0x10b0>;
+> +	};
+> +
+> +	pinctrl_usb_otg1: usbotg1grp {
+> +		fsl,pins =
+> +			<MX6SX_PAD_GPIO1_IO10__ANATOP_OTG1_ID    0x17059>,
+> +			<MX6SX_PAD_GPIO1_IO08__USB_OTG1_OC       0x10b0>;
+> +	};
+> +
+> +	pinctrl_usb_otg2: usbot2ggrp {
+> +		fsl,pins =
+> +			<MX6SX_PAD_QSPI1A_DATA0__USB_OTG2_OC     0x10b0>;
+> +	};
+> +
+>  	pinctrl_usdhc2: usdhc2grp {
+>  		fsl,pins =
+>  			<MX6SX_PAD_SD2_CMD__USDHC2_CMD		0x17059>,
+> @@ -280,6 +324,21 @@
+>  	status = "disabled";
+>  };
+>  
+> +&usbotg1 { /* J2 micro USB port */
+> +	vbus-supply = <&reg_usb_otg1_vbus>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usb_otg1>;
+> +	status = "okay";
+> +};
+> +
+> +&usbotg2 { /* J3 host USB port */
+> +	vbus-supply = <&reg_usb_otg2_vbus>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usb_otg2>;
+> +	dr_mode = "host";
+> +	status = "okay";
+> +};
+> +
+>  &usdhc2 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_usdhc2>;
+> -- 
+> 2.7.4
+> 
