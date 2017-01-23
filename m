@@ -1,52 +1,147 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Mon, 23 Jan 2017 10:16:04 +0000
-Subject: [PATCH v10 7/8] arm/arm64: vgic: Implement
- KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO ioctl
-In-Reply-To: <20170120195338.GH13531@cbox>
-References: <1480576187-5012-1-git-send-email-vijay.kilari@gmail.com>
- <1480576187-5012-8-git-send-email-vijay.kilari@gmail.com>
- <20170120195338.GH13531@cbox>
-Message-ID: <CAFEAcA8bZUPC2YTBYTVY3oB4MJFJcKOgT77PN3vkp5gPjVRPgA@mail.gmail.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Mon, 23 Jan 2017 15:52:28 +0530
+Subject: [PATCH] ARM: OMAP2+: Remove duplicate definition of
+ omap_test_timeout
+In-Reply-To: <20170120185151.1630-1-tony@atomide.com>
+References: <20170120185151.1630-1-tony@atomide.com>
+Message-ID: <130610aa-ed1a-b363-fac5-6aaaf4d8e930@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 January 2017 at 19:53, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> So last time we had a discussion about whether or not the API should
-> support any random order of restoring the registers, but I cannot see
-> how we can support that, because how can we tell the difference between
-> the following two scenarios without knowing if an interrupt is
-> edge-triggered or level triggered:
->
->   (1) Clearing the line_level for an edge-triggered interrupt after
->       having set it to pending, which means it should stay pending.
++ Tero,
 
-This is userspace doing:
- * set pending-latch to 1
- * set linelevel to 0
+On Saturday 21 January 2017 12:21 AM, Tony Lindgren wrote:
+> We have the same defined already in common.h.
 
-right? The pending state is pending-latch | (linelevel & ~edge_trigger),
-and you can recalculate that when userspace updates either of the
-pending-latch state or linelevel. (It will be temporarily wrong
-before userspace has told the kernel about all the state, but
-that's fine because we won't try to run the VM until we've finished
-loading everything.)
 
->   (2) Clearing the line_level for a level-triggered interrupt when the
->       state is already pending for some reason, but the soft_pending
->       (latch) state is not set, in which case the pending state should
->       be removed.
+This is reverting what has been introduced in this[1] series. Probably
+Tero can comment more here.
 
-This is userspace doing
- * set pending-latch to 0
- * set line_level to 0
+[1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg102131.html
 
-and thus the pending state goes to 0 (same calculation as above).
+Thanks and regards,
+Lokesh
 
-pending is always a pure logical function of pending-latch,
-linelevel and edge-trigger bits, so as long as you recalculate
-it at the right time then it shouldn't matter which order userspace
-tells you about the three things in.
-
-thanks
--- PMM
+> 
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  arch/arm/mach-omap2/cm2xxx.c                |  1 +
+>  arch/arm/mach-omap2/cm33xx.c                |  1 +
+>  arch/arm/mach-omap2/cm3xxx.c                |  1 +
+>  arch/arm/mach-omap2/cminst44xx.c            |  1 +
+>  arch/arm/mach-omap2/powerdomains3xxx_data.c |  1 +
+>  arch/arm/mach-omap2/prcm-common.h           | 22 ----------------------
+>  arch/arm/mach-omap2/prm2xxx_3xxx.c          |  1 +
+>  arch/arm/mach-omap2/prm33xx.c               |  1 +
+>  8 files changed, 7 insertions(+), 22 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/cm2xxx.c b/arch/arm/mach-omap2/cm2xxx.c
+> --- a/arch/arm/mach-omap2/cm2xxx.c
+> +++ b/arch/arm/mach-omap2/cm2xxx.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/err.h>
+>  #include <linux/io.h>
+>  
+> +#include "common.h"
+>  #include "prm2xxx.h"
+>  #include "cm.h"
+>  #include "cm2xxx.h"
+> diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
+> --- a/arch/arm/mach-omap2/cm33xx.c
+> +++ b/arch/arm/mach-omap2/cm33xx.c
+> @@ -22,6 +22,7 @@
+>  #include <linux/err.h>
+>  #include <linux/io.h>
+>  
+> +#include "common.h"
+>  #include "clockdomain.h"
+>  #include "cm.h"
+>  #include "cm33xx.h"
+> diff --git a/arch/arm/mach-omap2/cm3xxx.c b/arch/arm/mach-omap2/cm3xxx.c
+> --- a/arch/arm/mach-omap2/cm3xxx.c
+> +++ b/arch/arm/mach-omap2/cm3xxx.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/err.h>
+>  #include <linux/io.h>
+>  
+> +#include "common.h"
+>  #include "prm2xxx_3xxx.h"
+>  #include "cm.h"
+>  #include "cm3xxx.h"
+> diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
+> --- a/arch/arm/mach-omap2/cminst44xx.c
+> +++ b/arch/arm/mach-omap2/cminst44xx.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/err.h>
+>  #include <linux/io.h>
+>  
+> +#include "common.h"
+>  #include "clockdomain.h"
+>  #include "cm.h"
+>  #include "cm1_44xx.h"
+> diff --git a/arch/arm/mach-omap2/powerdomains3xxx_data.c b/arch/arm/mach-omap2/powerdomains3xxx_data.c
+> --- a/arch/arm/mach-omap2/powerdomains3xxx_data.c
+> +++ b/arch/arm/mach-omap2/powerdomains3xxx_data.c
+> @@ -14,6 +14,7 @@
+>  #include <linux/kernel.h>
+>  #include <linux/init.h>
+>  #include <linux/bug.h>
+> +#include <linux/delay.h>
+>  
+>  #include "soc.h"
+>  #include "powerdomain.h"
+> diff --git a/arch/arm/mach-omap2/prcm-common.h b/arch/arm/mach-omap2/prcm-common.h
+> --- a/arch/arm/mach-omap2/prcm-common.h
+> +++ b/arch/arm/mach-omap2/prcm-common.h
+> @@ -434,28 +434,6 @@
+>  #define MAX_IOPAD_LATCH_TIME			100
+>  # ifndef __ASSEMBLER__
+>  
+> -#include <linux/delay.h>
+> -
+> -/**
+> - * omap_test_timeout - busy-loop, testing a condition
+> - * @cond: condition to test until it evaluates to true
+> - * @timeout: maximum number of microseconds in the timeout
+> - * @index: loop index (integer)
+> - *
+> - * Loop waiting for @cond to become true or until at least @timeout
+> - * microseconds have passed.  To use, define some integer @index in the
+> - * calling code.  After running, if @index == @timeout, then the loop has
+> - * timed out.
+> - */
+> -#define omap_test_timeout(cond, timeout, index)			\
+> -({								\
+> -	for (index = 0; index < timeout; index++) {		\
+> -		if (cond)					\
+> -			break;					\
+> -		udelay(1);					\
+> -	}							\
+> -})
+> -
+>  /**
+>   * struct omap_prcm_irq - describes a PRCM interrupt bit
+>   * @name: a short name describing the interrupt type, e.g. "wkup" or "io"
+> diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+> --- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
+> +++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/err.h>
+>  #include <linux/io.h>
+>  
+> +#include "common.h"
+>  #include "powerdomain.h"
+>  #include "prm2xxx_3xxx.h"
+>  #include "prm-regbits-24xx.h"
+> diff --git a/arch/arm/mach-omap2/prm33xx.c b/arch/arm/mach-omap2/prm33xx.c
+> --- a/arch/arm/mach-omap2/prm33xx.c
+> +++ b/arch/arm/mach-omap2/prm33xx.c
+> @@ -19,6 +19,7 @@
+>  #include <linux/err.h>
+>  #include <linux/io.h>
+>  
+> +#include "common.h"
+>  #include "powerdomain.h"
+>  #include "prm33xx.h"
+>  #include "prm-regbits-33xx.h"
+> 
