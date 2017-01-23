@@ -1,59 +1,45 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 23 Jan 2017 16:40:46 +0100
-Subject: [PATCH v4 2/9] ARM: dts: rockchip: update compatible property
- for rk3228 timer
-In-Reply-To: <1480436092-10728-3-git-send-email-al.kochet@gmail.com>
-References: <1480343486-25539-1-git-send-email-al.kochet@gmail.com>
- <1480436092-10728-1-git-send-email-al.kochet@gmail.com>
- <1480436092-10728-3-git-send-email-al.kochet@gmail.com>
-Message-ID: <20170123154046.GF2166@mai>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 23 Jan 2017 15:44:16 +0000
+Subject: [PATCH] KVM: arm/arm64: Remove struct vgic_irq pending field
+In-Reply-To: <20170123133951.10329-1-christoffer.dall@linaro.org>
+References: <20170123133951.10329-1-christoffer.dall@linaro.org>
+Message-ID: <ef1d4338-8348-74a7-390d-dcc60fc47607@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 29, 2016 at 07:14:45PM +0300, Alexander Kochetkov wrote:
-> Property set to '"rockchip,rk3228-timer", "rockchip,rk3288-timer"'
-> to match devicetree bindings.
+On 23/01/17 13:39, Christoffer Dall wrote:
+> One of the goals behind the VGIC redesign was to get rid of cached or
+> intermediate state in the data structures, but we decided to allow
+> ourselves to precompute the pending value of an IRQ based on the line
+> level and pending latch state.  However, this has now become difficult
+> to base proper GICv3 save/restore on, because there is a potential to
+> modify the pending state without knowing if an interrupt is edge or
+> level configured.
 > 
-> Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
-> ---
->  arch/arm/boot/dts/rk3228-evb.dts |    4 ++++
->  1 file changed, 4 insertions(+)
+> See the following post and related message for more background:
+> https://lists.cs.columbia.edu/pipermail/kvmarm/2017-January/023195.html
 > 
-> diff --git a/arch/arm/boot/dts/rk3228-evb.dts b/arch/arm/boot/dts/rk3228-evb.dts
-> index 904668e..38eab87 100644
-> --- a/arch/arm/boot/dts/rk3228-evb.dts
-> +++ b/arch/arm/boot/dts/rk3228-evb.dts
-> @@ -70,3 +70,7 @@
->  &uart2 {
->  	status = "okay";
->  };
-> +
-> +&timer {
-> +	compatible = "rockchip,rk3228-timer", "rockchip,rk3288-timer";
-> +};
+> This commit gets rid of the precomputed pending field in favor of a
+> function that calculates the value when needed, irq_is_pending().
+> 
+> The soft_pending field is renamed to pending_latch to represent that
+> this latch is the equivalent hardware latch which gets manipulated by
+> the input signal for edge-triggered interrupts and when writing to the
+> SPENDR/CPENDR registers.
+> 
+> After this commit save/restore code should be able to simply restore the
+> pending_latch state, line_level state, and config state in any order and
+> get the desired result.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-I'm not sure this is correct, to which timer &timer will refer ?
+I admit having lost a few brain cells looking at this patch, and I can't
+prove it wrong! ;-) I like the fact that it now provides a safe
+abstraction to the pending state, and that there is exactly *one* place
+where line_level is evaluated.
 
-        timer {
-                compatible = "arm,armv7-timer";
-		...
-	}
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-        timer: timer at 110c0000 {
-                compatible = "rockchip,rk3288-timer";
-		...
-	}
-
-Why not change the compatible string in the timer definition in rk322x.dtsi ?
-
-Same comment for the other patches doing these changes.
-
-  -- Daniel
-
+	M.
 -- 
-
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Jazz is not dead. It just smells funny...
