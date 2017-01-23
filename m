@@ -1,56 +1,102 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 23 Jan 2017 11:41:45 +0100
-Subject: [PATCH v2 0/7] rtc: sun6i: Fix the RTC accuracy
-Message-ID: <cover.6bd4d4760c24d09845ad09c212fcd487d78da5ad.1485168100.git-series.maxime.ripard@free-electrons.com>
+Date: Mon, 23 Jan 2017 11:41:47 +0100
+Subject: [PATCH v2 2/7] rtc: sun6i: Add some locking
+In-Reply-To: <cover.6bd4d4760c24d09845ad09c212fcd487d78da5ad.1485168100.git-series.maxime.ripard@free-electrons.com>
+References: <cover.6bd4d4760c24d09845ad09c212fcd487d78da5ad.1485168100.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <a8798639a0c79c7b2b8e4deb412573f5a68e6d0a.1485168100.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Some registers have a read-modify-write access pattern that are not atomic.
 
-The RTC used in the A31 and later SoC has an accuracy issue, which is
-already significant even after a couple of hours.
+Add some locking to prevent from concurrent accesses.
 
-This is due to the fact that the oscillator used by default is an internal
-and very inaccurate one.
+Cc: stable at vger.kernel.org
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/rtc/rtc-sun6i.c | 17 +++++++++++++++--
+ 1 file changed, 15 insertions(+), 2 deletions(-)
 
-A first attempt at fixing that by switching to the external oscillator was
-done in the patch "rtc: sun6i: Switch to the external oscillator". However,
-it turned out to be problematic since it was tracked properly in the clock
-framework, which might lead to some clocks being disabled, even though
-their devices were not notified.
-
-This is a second attempt, this time by making it part of the CCF. It
-turned out to be a bit more complicated than one would expect since the mux
-found inside the RTC also controls one of the input of the main clock unit.
-Therefore, it needs to be probed before the main clock unit driver.
-
-Let me know what you think,
-Maxime
-
-Changes from v1:
-  - Force the muxing to the external oscillator even for old DT
-  - Make the patches a bit more stable friendly
-  - Change the bindings to have a cell of 1, to account for the external
-    output of the oscillator
-  - Split the driver remove() removal into a separate patch and switched to
-    devm
-  - Reordered the patches
-
-Maxime Ripard (7):
-  rtc: sun6i: Disable the build as a module
-  rtc: sun6i: Add some locking
-  rtc: sun6i: Switch to the external oscillator
-  rtc: sun6i: Expose the 32kHz oscillator
-  rtc: sun6i: Switch to devm_rtc_device_register
-  ARM: sun8i: a23/a33: Enable the real LOSC and use it
-  ARM: sun8i: a23/a33: Add the oscillators accuracy
-
- Documentation/devicetree/bindings/rtc/sun6i-rtc.txt |  10 +-
- arch/arm/boot/dts/sun8i-a23-a33.dtsi                |  15 +-
- drivers/rtc/Kconfig                                 |   2 +-
- drivers/rtc/rtc-sun6i.c                             | 182 ++++++++++---
- 4 files changed, 174 insertions(+), 35 deletions(-)
-
-base-commit: 99cef370ac9939df2aeb16c96d07e842b2fa8201
+diff --git a/drivers/rtc/rtc-sun6i.c b/drivers/rtc/rtc-sun6i.c
+index a6136cb99851..5527f5eb597b 100644
+--- a/drivers/rtc/rtc-sun6i.c
++++ b/drivers/rtc/rtc-sun6i.c
+@@ -114,13 +114,17 @@ struct sun6i_rtc_dev {
+ 	void __iomem *base;
+ 	int irq;
+ 	unsigned long alarm;
++
++	spinlock_t lock;
+ };
+ 
+ static irqreturn_t sun6i_rtc_alarmirq(int irq, void *id)
+ {
+ 	struct sun6i_rtc_dev *chip = (struct sun6i_rtc_dev *) id;
++	irqreturn_t ret = IRQ_NONE;
+ 	u32 val;
+ 
++	spin_lock(&chip->lock);
+ 	val = readl(chip->base + SUN6I_ALRM_IRQ_STA);
+ 
+ 	if (val & SUN6I_ALRM_IRQ_STA_CNT_IRQ_PEND) {
+@@ -129,10 +133,11 @@ static irqreturn_t sun6i_rtc_alarmirq(int irq, void *id)
+ 
+ 		rtc_update_irq(chip->rtc, 1, RTC_AF | RTC_IRQF);
+ 
+-		return IRQ_HANDLED;
++		ret = IRQ_HANDLED;
+ 	}
++	spin_unlock(&chip->lock);
+ 
+-	return IRQ_NONE;
++	return ret;
+ }
+ 
+ static void sun6i_rtc_setaie(int to, struct sun6i_rtc_dev *chip)
+@@ -140,6 +145,7 @@ static void sun6i_rtc_setaie(int to, struct sun6i_rtc_dev *chip)
+ 	u32 alrm_val = 0;
+ 	u32 alrm_irq_val = 0;
+ 	u32 alrm_wake_val = 0;
++	unsigned long flags;
+ 
+ 	if (to) {
+ 		alrm_val = SUN6I_ALRM_EN_CNT_EN;
+@@ -150,9 +156,11 @@ static void sun6i_rtc_setaie(int to, struct sun6i_rtc_dev *chip)
+ 		       chip->base + SUN6I_ALRM_IRQ_STA);
+ 	}
+ 
++	spin_lock_irqsave(&chip->lock, flags);
+ 	writel(alrm_val, chip->base + SUN6I_ALRM_EN);
+ 	writel(alrm_irq_val, chip->base + SUN6I_ALRM_IRQ_EN);
+ 	writel(alrm_wake_val, chip->base + SUN6I_ALARM_CONFIG);
++	spin_unlock_irqrestore(&chip->lock, flags);
+ }
+ 
+ static int sun6i_rtc_gettime(struct device *dev, struct rtc_time *rtc_tm)
+@@ -191,11 +199,15 @@ static int sun6i_rtc_gettime(struct device *dev, struct rtc_time *rtc_tm)
+ static int sun6i_rtc_getalarm(struct device *dev, struct rtc_wkalrm *wkalrm)
+ {
+ 	struct sun6i_rtc_dev *chip = dev_get_drvdata(dev);
++	unsigned long flags;
+ 	u32 alrm_st;
+ 	u32 alrm_en;
+ 
++	spin_lock_irqsave(&chip->lock, flags);
+ 	alrm_en = readl(chip->base + SUN6I_ALRM_IRQ_EN);
+ 	alrm_st = readl(chip->base + SUN6I_ALRM_IRQ_STA);
++	spin_unlock_irqrestore(&chip->lock, flags);
++
+ 	wkalrm->enabled = !!(alrm_en & SUN6I_ALRM_EN_CNT_EN);
+ 	wkalrm->pending = !!(alrm_st & SUN6I_ALRM_EN_CNT_EN);
+ 	rtc_time_to_tm(chip->alarm, &wkalrm->time);
+@@ -356,6 +368,7 @@ static int sun6i_rtc_probe(struct platform_device *pdev)
+ 	chip = devm_kzalloc(&pdev->dev, sizeof(*chip), GFP_KERNEL);
+ 	if (!chip)
+ 		return -ENOMEM;
++	spin_lock_init(&rtc->lock);
+ 
+ 	platform_set_drvdata(pdev, chip);
+ 	chip->dev = &pdev->dev;
 -- 
 git-series 0.8.11
