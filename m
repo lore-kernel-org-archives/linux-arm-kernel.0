@@ -1,29 +1,34 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 23 Jan 2017 10:46:46 -0800
-Subject: [PATCH 00/18] ARM64: meson: DT cleanups
-In-Reply-To: <20170120222118.21476-1-afaerber@suse.de> ("Andreas
- =?utf-8?Q?F=C3=A4rber=22's?=
- message of "Fri, 20 Jan 2017 23:21:00 +0100")
-References: <20170120222118.21476-1-afaerber@suse.de>
-Message-ID: <m2bmux397t.fsf@baylibre.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 23 Jan 2017 18:54:19 +0000
+Subject: [PATCH v20 00/17] acpi, clocksource: add GTDT driver and GTDT
+ support in arm_arch_timer
+In-Reply-To: <20170118132541.8989-1-fu.wei@linaro.org>
+References: <20170118132541.8989-1-fu.wei@linaro.org>
+Message-ID: <20170123185418.GA961@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andreas F?rber <afaerber@suse.de> writes:
+Hi,
 
-> Hello,
->
-> This series fixes several cosmetic issues, on top of v4.11/dt64 branch.
->
-> Patches 3-5 rename a node, the rest should all be non-functional changes.
+On Wed, Jan 18, 2017 at 09:25:24PM +0800, fu.wei at linaro.org wrote:
+> From: Fu Wei <fu.wei@linaro.org>
+> 
+> This patchset:
+>     (1)Preparation for adding GTDT support in arm_arch_timer:
+>         1. Clean up printk() usage
+>         2. Rename the type macros
+>         3. Rename the PPI enum & enum values
+>         4. Move the type macro and PPI enum into the header file
+>         5. Add new enum for SPIs
+>         6. Rework PPI determination;
 
-Can you respin patches 1-9 with minor comments addressed and
-acks/reviews collected and I'll apply those.
+I've taken these few patches onto a preliminary/unstable branch [1].
 
-> Patches 10-18 could be squashed if desired.
+I haven't had the time to take a look at the rest of the series yet. I
+intend to go over that tomorrow, picking what I can, and leaving
+feedback for anything that will need rework.
 
-I'm less sure about these as I tend to agree with Rob that this is just
-needless churn.  If you want to resend those separately, making your
-arguments, I'll merge it if you convice the DT maintainers. :)
+Thanks,
+Mark.
 
-Kevin
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arch-timer/updates
