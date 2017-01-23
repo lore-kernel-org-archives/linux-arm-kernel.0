@@ -1,53 +1,31 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Mon, 23 Jan 2017 07:02:52 -0800
-Subject: [PATCH 3/3] PCI: imx6: Add code to support i.MX7D
-In-Reply-To: <20170123145204.5lablvhf7m2hf3na@rob-hp-laptop>
-References: <20170119163631.10668-1-andrew.smirnov@gmail.com>
- <20170119163631.10668-4-andrew.smirnov@gmail.com>
- <20170123145204.5lablvhf7m2hf3na@rob-hp-laptop>
-Message-ID: <CAHQ1cqEFS-XEfm7=QP6hCLARan3eQ5VT6Ucq3HPsCzYoodHqtA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 23 Jan 2017 07:06:48 -0800
+Subject: [PATCH] ARM: OMAP2+: Remove duplicate definition of
+ omap_test_timeout
+In-Reply-To: <97761042-4a61-9abe-8b6f-a306936cb513@ti.com>
+References: <20170120185151.1630-1-tony@atomide.com>
+ <130610aa-ed1a-b363-fac5-6aaaf4d8e930@ti.com>
+ <97761042-4a61-9abe-8b6f-a306936cb513@ti.com>
+Message-ID: <20170123150648.GP7403@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2017 at 6:52 AM, Rob Herring <robh@kernel.org> wrote:
-> On Thu, Jan 19, 2017 at 08:36:31AM -0800, Andrey Smirnov wrote:
->> Add various bits of code needed to support i.MX7D variant of the IP.
->>
->> Cc: yurovsky at gmail.com
->> Cc: Richard Zhu <hongxing.zhu@nxp.com>
->> Cc: Lucas Stach <l.stach@pengutronix.de>
->> Cc: Bjorn Helgaas <bhelgaas@google.com>
->> Cc: Fabio Estevam <festevam@gmail.com>
->> Cc: Shawn Guo <shawnguo@kernel.org>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Lee Jones <lee.jones@linaro.org>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: devicetree at vger.kernel.org
->> Cc: linux-kernel at vger.kernel.org
->> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
->> ---
->>  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |   6 +-
->>  drivers/pci/host/pci-imx6.c                        | 188 ++++++++++++++++++---
->>  include/linux/mfd/syscon/imx7-gpc.h                |  18 ++
->>  include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
->>  include/linux/mfd/syscon/imx7-src.h                |  18 ++
->>  5 files changed, 208 insertions(+), 26 deletions(-)
->>  create mode 100644 include/linux/mfd/syscon/imx7-gpc.h
->>  create mode 100644 include/linux/mfd/syscon/imx7-src.h
->>
->> diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
->> index 83aeb1f..20b9382 100644
->> --- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
->> +++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
->> @@ -4,7 +4,8 @@ This PCIe host controller is based on the Synopsis Designware PCIe IP
->>  and thus inherits all the common properties defined in designware-pcie.txt.
->>
->>  Required properties:
->> -- compatible: "fsl,imx6q-pcie", "fsl,imx6sx-pcie", "fsl,imx6qp-pcie"
->> +- compatible: "fsl,imx6q-pcie", "fsl,imx6sx-pcie",
->> +           "fsl,imx6qp-pcie", "fsl,imx7d-pcie"
->
-> Please reformat to one valid combination per line.
+* Tero Kristo <t-kristo@ti.com> [170123 05:45]:
+> On 23/01/17 12:22, Lokesh Vutla wrote:
+> > + Tero,
+> > 
+> > On Saturday 21 January 2017 12:21 AM, Tony Lindgren wrote:
+> > > We have the same defined already in common.h.
+> > 
+> > 
+> > This is reverting what has been introduced in this[1] series. Probably
+> > Tero can comment more here.
+> 
+> Yeah, the point of introducing that was to get rid of common.h include from
+> the prcm files. See commit 250e27ee950bf67ceeb812eb4c8f2fea58d3e2b6.
 
-Noted for v2, thanks.
+OK let's forget it for now then.
+
+Regards,
+
+Tony
