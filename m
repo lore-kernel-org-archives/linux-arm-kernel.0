@@ -1,53 +1,73 @@
-From: xuwei5@hisilicon.com (Wei Xu)
-Date: Mon, 23 Jan 2017 14:03:27 +0000
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 23 Jan 2017 14:13:31 +0000
 Subject: [V2 2/2] arm64: dts: Add dts files for Hisilicon Hi3660 SoC
-In-Reply-To: <20170123134656.GC16286@leverpostej>
+In-Reply-To: <1484034915-48879-2-git-send-email-puck.chen@hisilicon.com>
 References: <1484034915-48879-1-git-send-email-puck.chen@hisilicon.com>
  <1484034915-48879-2-git-send-email-puck.chen@hisilicon.com>
- <20170123134656.GC16286@leverpostej>
-Message-ID: <58860D2F.6070007@hisilicon.com>
+Message-ID: <1f003ff0-656d-6d2f-20e3-9f9e7010e236@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
 
-On 2017/1/23 13:46, Mark Rutland wrote:
-> On Tue, Jan 10, 2017 at 03:55:15PM +0800, Chen Feng wrote:
->> +	memory at 0 {
->> +		device_type = "memory";
->> +		reg = <0x0 0x00400000 0x0 0xbfe00000>;
->> +	};
-> 
-> The unit-address here is incorrect. The base address of this memory is
-> not zero.
-> 
->> +	timer {
->> +		compatible = "arm,armv8-timer";
->> +		interrupt-parent = <&gic>;
->> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
->> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
->> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
->> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
->> +		clock-frequency = <1920000>;
->> +	};
-> 
-> This clock-frequency property should not be required; please remove it.
-> 
-> Your FW should program CNTFRQ_EL0 with the timer frequency.
 
-Thanks!
-
-Hi Chen Feng,
-
-Can you send out the v3 to address above comments?
-And I will pick up it soon.
-
-Best Regards,
-Wei
-
+On 10/01/17 07:55, Chen Feng wrote:
+> Add initial dtsi file to support Hisilicon Hi3660 SoC with
+> support of Octal core CPUs in two clusters(4 * A53 & 4 * A73).
 > 
-> Thanks,
-> Mark.
+> Also add dts file to support HiKey960 development board which
+> based on Hi3660 SoC.
+> The output console is earlycon "earlycon=pl011,0xfdf05000".
+> And the con_init uart5 with a fixed clock, which already
+> configured at bootloader.
 > 
-> .
+> When clock is available, the uart5 will be modified.
 > 
+> Tested on HiKey960 Board.
+> 
+> Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
+> ---
+>  arch/arm64/boot/dts/hisilicon/Makefile            |   1 +
+>  arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts |  34 +++++
+>  arch/arm64/boot/dts/hisilicon/hi3660.dtsi         | 156 ++++++++++++++++++++++
+>  3 files changed, 191 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+>  create mode 100644 arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+> 
+
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+> new file mode 100644
+> index 0000000..7f9805c
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+> @@ -0,0 +1,156 @@
+> +/*
+> + * dts file for Hisilicon Hi3660 SoC
+> + *
+> + * Copyright (C) 2016, Hisilicon Ltd.
+> + */
+> +
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +
+> +/ {
+> +	compatible = "hisilicon,hi3660";
+> +	interrupt-parent = <&gic>;
+> +	#address-cells = <2>;
+> +	#size-cells = <2>;
+> +
+> +	psci {
+> +		compatible = "arm,psci-0.2";
+> +		method = "smc";
+> +	};
+
+[...]
+
+> +
+> +		cpu0: cpu at 0 {
+> +			compatible = "arm,armv8";
+
+You can add more specific compatibles as you mentioned this SoC contains
+Cortex A53 & A73.
+
+-- 
+Regards,
+Sudeep
