@@ -1,74 +1,28 @@
-From: lilja.magnus@gmail.com (Magnus Lilja)
-Date: Mon, 23 Jan 2017 18:34:51 +0100
-Subject: usb: gadget: Kernel panic (NULL pointer dereference) when using
- fsl_udc2_core on i.MX31 PDK
-In-Reply-To: <87k29m6lkx.fsf@linux.intel.com>
-References: <f984e50b-0e64-88ef-2f53-b8da2a62daf0@gmail.com>
- <87k29m6lkx.fsf@linux.intel.com>
-Message-ID: <CAM=E1R4EMEEq1wnHxjLLJMLaXCM=EDFo1JDacHKGq6DUtqA9Nw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 23 Jan 2017 17:39:58 +0000
+Subject: [PATCH v2 2/2] iommu/dma: Implement PCI allocation optimisation
+In-Reply-To: <db8af3d98f2a717c51d007c9c36d3b8eb1acd9a1.1484572209.git.robin.murphy@arm.com>
+References: <d899aa686e7c8cb45142fa6785aa539ef3b88dec.1484572209.git.robin.murphy@arm.com>
+ <db8af3d98f2a717c51d007c9c36d3b8eb1acd9a1.1484572209.git.robin.murphy@arm.com>
+Message-ID: <20170123173957.GD28914@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Mon, Jan 16, 2017 at 01:24:55PM +0000, Robin Murphy wrote:
+> Whilst PCI devices may have 64-bit DMA masks, they still benefit from
+> using 32-bit addresses wherever possible in order to avoid DAC (PCI) or
+> longer address packets (PCIe), which may incur a performance overhead.
+> Implement the same optimisation as other allocators by trying to get a
+> 32-bit address first, only falling back to the full mask if that fails.
+> 
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  drivers/iommu/dma-iommu.c | 21 +++++++++++++++------
+>  1 file changed, 15 insertions(+), 6 deletions(-)
 
-On 23 January 2017 at 12:51, Felipe Balbi <balbi@kernel.org> wrote:
->
-> Hi,
->
-> Magnus Lilja <lilja.magnus@gmail.com> writes:
->> Hi
->>
->> I tried the fsl_udc_core gadget driver on the i.MX31 PDK board and got a
->> kernel panic (NULL pointer dereference) when connecting the USB cable. I
->> had the g_serial module loaded as well.
->>
->> The NULL pointer panic comes from gadget/udc/core.c
->> usb_gadget_giveback_request() which calls req->complete() and in some
->> cases req->complete is NULL.
->>
->> Commit 304f7e5e1d08 ("usb: gadget: Refactor request completion") changed
->> fsl_udc2_core.c (and several other files) and in fsl_udc2_core.c a check
->> that req->complete is non-NULL was removed:
->>
->> --- a/drivers/usb/gadget/udc/fsl_udc_core.c
->> +++ b/drivers/usb/gadget/udc/fsl_udc_core.c
->> @@ -197,10 +197,8 @@ __acquires(ep->udc->lock)
->>          ep->stopped = 1;
->>
->>          spin_unlock(&ep->udc->lock);
->> -       /* complete() is from gadget layer,
->> -        * eg fsg->bulk_in_complete() */
->> -       if (req->req.complete)
->> -               req->req.complete(&ep->ep, &req->req);
->> +
->> +       usb_gadget_giveback_request(&ep->ep, &req->req);
->>
->>          spin_lock(&ep->udc->lock);
->>          ep->stopped = stopped;
->>
->> If I re-introduce the check (either in fsl_udc_core.c or core.c) at
->> least USB gadget operation using g_serial seems to work just fine.
->>
->> I don't know the logic in detail to understand whether this is a proper
->> fix or if there is some other more problem with the fls_udc_core driver.
->> Does anyone have input in this matter?
->>
->> I can produce a proper patch that fixes this problem by re-introducing
->> the check (in either fsl_udc_core.c or core.c) if that is a proper
->> solution and I can also assist in testing other fixes to the problem.
->
-> ->complete() is supposed to be mandatory. Which gadget do you have that
-> ->doesn't set ->complete() to a valid function pointer?
+Looks good to me, and has the added benefit of getting PCI ethernet
+working on Juno when using the SMMU. Unintended side-effect, but:
 
-I'm modprobing g_serial so the following modules are loaded (using my patch):
+Acked-by: Will Deacon <will.deacon@arm.com>
 
-~ # lsmod
-usb_f_acm
-u_serial
-g_serial
-libcomposite
-configfs
-fsl_usb2_udc
-
-
-Regards, Magnus
+Will
