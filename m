@@ -1,74 +1,56 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Mon, 23 Jan 2017 21:48:13 +0530
-Subject: [PATCH V7 11/11] ACPI/IORT: Remove linker section for IORT entries
- probing
-In-Reply-To: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
-References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1485188293-20263-12-git-send-email-sricharan@codeaurora.org>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Mon, 23 Jan 2017 21:53:11 +0530
+Subject: [PATCH V6 06/11] drivers: platform: Configure dma operations at
+ probe time
+References: <1484939748-31591-1-git-send-email-sricharan@codeaurora.org>
+ <1484939748-31591-7-git-send-email-sricharan@codeaurora.org>
+ <20170123120729.GB12593@red-moon>
+Message-ID: <009701d27595$01e24a70$05a6df50$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Hi Lorenzo,
 
-The IORT linker section introduced by commit 34ceea275f62
-("ACPI/IORT: Introduce linker section for IORT entries probing")
-was needed to make sure SMMU drivers are registered (and therefore
-probed) in the kernel before devices using the SMMU have a chance
-to probe in turn.
+>>[+bjorn]
+>>
+>>On Sat, Jan 21, 2017 at 12:45:43AM +0530, Sricharan R wrote:
+>>> Configuring DMA ops at probe time will allow deferring device probe when
+>>> the IOMMU isn't available yet. The dma_configure for the device is
+>>> now called from the generic device_attach callback just before the
+>>> bus/driver probe is called. This way, configuring the DMA ops for the
+>>> device would be called at the same place for all bus_types, hence the
+>>> deferred probing mechanism should work for all buses as well.
+>>>
+>>> pci_bus_add_devices    (platform/amba)(_device_create/driver_register)
+>>>        |                         |
+>>> pci_bus_add_device     (device_add/driver_register)
+>>>        |                         |
+>>> device_attach           device_initial_probe
+>>>        |                         |
+>>> __device_attach_driver    __device_attach_driver
+>>>        |
+>>> driver_probe_device
+>>>        |
+>>> really_probe
+>>>        |
+>>> dma_configure
+>>>
+>>> Similarly on the device/driver_unregister path __device_release_driver is
+>>> called which inturn calls dma_deconfigure.
+>>>
+>>> This patch changes the dma ops configuration time to probe time for
+>>> both OF and ACPI based devices.
+>>
+>>For all device types, inclusive of PCI, so please you have to:
+>>
+>>- Update the $SUBJECT
+>>- Copy linux-pci at vger.kernel.org
+>>- Copy linux-acpi at vger.kernel org (on the series)
+>
+>Sure, i will just see till tomorrow for any further comments and
+>repost with $SUBJECT modified and the lists
 
-Through the introduction of deferred IOMMU configuration the linker
-section based IORT probing infrastructure is not needed any longer, in
-that device/SMMU probe dependencies are managed through the probe
-deferral mechanism, making the IORT linker section infrastructure
-unused, so that it can be removed.
+Infact just reposted with $SUB updated and the additional lists.
 
-Remove the unused IORT linker section probing infrastructure
-from the kernel to complete the ACPI IORT IOMMU configure probe
-deferral mechanism implementation.
-
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: Sricharan R <sricharan@codeaurora.org>
----
- drivers/acpi/arm64/iort.c         | 2 --
- include/asm-generic/vmlinux.lds.h | 1 -
- include/linux/acpi_iort.h         | 3 ---
- 3 files changed, 6 deletions(-)
-
-diff --git a/drivers/acpi/arm64/iort.c b/drivers/acpi/arm64/iort.c
-index d01bae8..ac45623 100644
---- a/drivers/acpi/arm64/iort.c
-+++ b/drivers/acpi/arm64/iort.c
-@@ -992,6 +992,4 @@ void __init acpi_iort_init(void)
- 	}
- 
- 	iort_init_platform_devices();
--
--	acpi_probe_device_table(iort);
- }
-diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-index 0968d13..9faa26c 100644
---- a/include/asm-generic/vmlinux.lds.h
-+++ b/include/asm-generic/vmlinux.lds.h
-@@ -566,7 +566,6 @@
- 	IRQCHIP_OF_MATCH_TABLE()					\
- 	ACPI_PROBE_TABLE(irqchip)					\
- 	ACPI_PROBE_TABLE(clksrc)					\
--	ACPI_PROBE_TABLE(iort)						\
- 	EARLYCON_TABLE()
- 
- #define INIT_TEXT							\
-diff --git a/include/linux/acpi_iort.h b/include/linux/acpi_iort.h
-index 77e0809..f167e1d04 100644
---- a/include/linux/acpi_iort.h
-+++ b/include/linux/acpi_iort.h
-@@ -52,7 +52,4 @@ const struct iommu_ops *iort_iommu_configure(struct device *dev)
- { return NULL; }
- #endif
- 
--#define IORT_ACPI_DECLARE(name, table_id, fn)		\
--	ACPI_DECLARE_PROBE_ENTRY(iort, name, table_id, 0, NULL, 0, fn)
--
- #endif /* __ACPI_IORT_H__ */
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Regards,
+ Sricharan
