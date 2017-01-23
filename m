@@ -1,27 +1,44 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 23 Jan 2017 10:28:03 +0100
-Subject: [PATCH] ARM: shmobile: r8a7779: marzen: Fix sata device status
-In-Reply-To: <8b298878-672b-74fe-5196-99f8620889ac@cogentembedded.com>
-References: <1484585813-22534-1-git-send-email-geert+renesas@glider.be>
- <8b298878-672b-74fe-5196-99f8620889ac@cogentembedded.com>
-Message-ID: <20170123092803.GG31651@verge.net.au>
+Date: Mon, 23 Jan 2017 10:35:33 +0100
+Subject: [PATCH] ARM: shmobile: rcar-gen2: Add more register documentation
+In-Reply-To: <CAMuHMdWzsLANJBHzw8kcf0zEWRCJxr5w2nBzgkSutq=rNftMsw@mail.gmail.com>
+References: <1484917448-8320-1-git-send-email-geert+renesas@glider.be>
+ <9d12d719-0866-a454-88e2-d51a695085cd@cogentembedded.com>
+ <CAMuHMdWzsLANJBHzw8kcf0zEWRCJxr5w2nBzgkSutq=rNftMsw@mail.gmail.com>
+Message-ID: <20170123093532.GI31651@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2017 at 08:06:02PM +0300, Sergei Shtylyov wrote:
-> On 01/16/2017 07:56 PM, Geert Uytterhoeven wrote:
+On Mon, Jan 23, 2017 at 10:11:20AM +0100, Geert Uytterhoeven wrote:
+> Hi Sergei,
 > 
-> >Device nodes representing I/O devices should be marked disabled in the
-> >SoC-specific DTS, and overridden by board-specific DTSes where needed.
+> On Fri, Jan 20, 2017 at 5:21 PM, Sergei Shtylyov
+> <sergei.shtylyov@cogentembedded.com> wrote:
+> > On 01/20/2017 04:04 PM, Geert Uytterhoeven wrote:
 > >
-> >Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >> ---
+> >>  arch/arm/mach-shmobile/pm-rcar-gen2.c | 40
+> >> +++++++++++++++++++++++++----------
+> >>  1 file changed, 29 insertions(+), 11 deletions(-)
+> >>
+> >> diff --git a/arch/arm/mach-shmobile/pm-rcar-gen2.c
+> >> b/arch/arm/mach-shmobile/pm-rcar-gen2.c
+> >> index dd9ac366868f4336..6ed9aa19c4d34766 100644
+> >> --- a/arch/arm/mach-shmobile/pm-rcar-gen2.c
+> >> +++ b/arch/arm/mach-shmobile/pm-rcar-gen2.c
+> >> @@ -20,14 +20,30 @@
+> >
+> > [...]
+> >>
+> >> +static inline u32 phys_to_sbar(phys_addr_t addr)
+> >> +{
+> >> +       return (((addr) >> 8) & 0xfffffc00);
+> >
+> >
+> >   It's not a macro -- innermost parens not needed...
 > 
->    Simon, I'm seeing this commit in the 'devel' branch but not seeing the
-> new tag containing it... forgot to tag/push?
+> Thanks, outermost neither ;-)
 
-Hi Sergei,
-
-sorry for not responding earlier, I have been ill.
-
-Yes you are correct, I forgot to push.
-renesas-devel-20170117-v4.10-rc4 should be there now.
+Geert, I'm assuming you will respin this.
+Let me know if that is not the case.
