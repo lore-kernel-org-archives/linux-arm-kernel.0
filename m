@@ -1,29 +1,51 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Mon, 23 Jan 2017 20:02:46 +0100
-Subject: [PATCH v4 0/9] meson-gx: reset RGMII PHYs and configure TX delay
-In-Reply-To: <m24m0p38sk.fsf@baylibre.com>
-References: <20170120152232.13943-1-martin.blumenstingl@googlemail.com>
- <20170122181028.5014-1-martin.blumenstingl@googlemail.com>
- <m24m0p38sk.fsf@baylibre.com>
-Message-ID: <CAFBinCCoQpidWA9yTEBQ1rEomd33Sqouo3h86b2gmWHh5fcRag@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 23 Jan 2017 11:10:18 -0800
+Subject: [PATCH 2/3] pinctrl: meson: meson-gxl: add the pwm_ao_b pin
+In-Reply-To: <20170122210528.892-3-martin.blumenstingl@googlemail.com> (Martin
+ Blumenstingl's message of "Sun, 22 Jan 2017 22:05:27 +0100")
+References: <20170122210528.892-1-martin.blumenstingl@googlemail.com>
+ <20170122210528.892-3-martin.blumenstingl@googlemail.com>
+Message-ID: <m2sho91tk5.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2017 at 7:55 PM, Kevin Hilman <khilman@baylibre.com> wrote:
-> Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
+
+> This adds support for the pwm_ao_b pin. Unfortunately the registers for
+> the pwm_ao pins are not documented at all. The source for the pwm_ao_b
+> pin from this patch is the Khadas VIM GPL kernel source, which sets bit
+> 3 and unsets bits 4 and 31 to enable the PWM LEDs.
 >
->> This series adds the reset GPIOs for the (external) ethernet PHYs on all
->> GXBB boards.
->> Additionally it provides a ethernet PHY node which can be used to specify
->> PHY-specific properties (this may be required if more boards require the
->> "eee-broken-1000t" for the RTL8211F ethernet PHY). To make all board .dts
->> consistent I chose to add the PHY node also for boards which don't have a
->> RTL8211F PHY.
->>
->> Patch #7 from this series also removes ethernet support for the P200
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> ---
+>  drivers/pinctrl/meson/pinctrl-meson-gxl.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 >
-> I think you mean P201 here, right?
-indeed, that's a left-over of my P200 / P201 mixup in v2 - please ignore this :(
-I should have dropped that sentence completely since it's a lie in v3
-(v3 states in changes since v2: "instead of dropping ethernet support
-for P201 we simply re-configure it to RMII mode")
+> diff --git a/drivers/pinctrl/meson/pinctrl-meson-gxl.c b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
+> index 25694f7094c7..6ff321a7366d 100644
+> --- a/drivers/pinctrl/meson/pinctrl-meson-gxl.c
+> +++ b/drivers/pinctrl/meson/pinctrl-meson-gxl.c
+> @@ -222,6 +222,8 @@ static const unsigned int uart_rts_ao_b_pins[]	= { PIN(GPIOAO_3, 0) };
+>  
+>  static const unsigned int remote_input_ao_pins[] = {PIN(GPIOAO_7, 0) };
+>  
+> +static const unsigned int pwm_ao_b_pins[]	= { PIN(GPIOAO_9, 0) };
+> +
+
+Hmm, the S905 public data sheet[1] shows this as GPIOAO_13.
+
+>  static struct meson_pmx_group meson_gxl_periphs_groups[] = {
+>  	GPIO_GROUP(GPIOZ_0, EE_OFF),
+>  	GPIO_GROUP(GPIOZ_1, EE_OFF),
+> @@ -418,6 +420,7 @@ static struct meson_pmx_group meson_gxl_aobus_groups[] = {
+>  	GROUP(uart_cts_ao_b,	0,	8),
+>  	GROUP(uart_rts_ao_b,	0,	7),
+>  	GROUP(remote_input_ao,	0,	0),
+> +	GROUP(pwm_ao_b,		0,	3),
+>  };
+
+but it does show as ao_reg[3].
+
+Kevin
+
+[1] http://dn.odroid.com/S905/DataSheet/S905_Public_Datasheet_V1.1.4.pdf
