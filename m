@@ -1,40 +1,27 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 23 Jan 2017 10:26:34 +0100
-Subject: [PATCH 0/4] ARM/arm64: dts: renesas: Link ARM GIC to clock and
- clock domain
-In-Reply-To: <20170123092330.GF31651@verge.net.au>
-References: <1484657360-13101-1-git-send-email-geert+renesas@glider.be>
- <20170123092330.GF31651@verge.net.au>
-Message-ID: <CAMuHMdVbr3gCMJpvcJbD0C4p8FikMM3s5zmjkVXNskhk7-P7Tw@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 23 Jan 2017 10:28:03 +0100
+Subject: [PATCH] ARM: shmobile: r8a7779: marzen: Fix sata device status
+In-Reply-To: <8b298878-672b-74fe-5196-99f8620889ac@cogentembedded.com>
+References: <1484585813-22534-1-git-send-email-geert+renesas@glider.be>
+ <8b298878-672b-74fe-5196-99f8620889ac@cogentembedded.com>
+Message-ID: <20170123092803.GG31651@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Wed, Jan 18, 2017 at 08:06:02PM +0300, Sergei Shtylyov wrote:
+> On 01/16/2017 07:56 PM, Geert Uytterhoeven wrote:
+> 
+> >Device nodes representing I/O devices should be marked disabled in the
+> >SoC-specific DTS, and overridden by board-specific DTSes where needed.
+> >
+> >Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> 
+>    Simon, I'm seeing this commit in the 'devel' branch but not seeing the
+> new tag containing it... forgot to tag/push?
 
-On Mon, Jan 23, 2017 at 10:23 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Tue, Jan 17, 2017 at 01:49:16PM +0100, Geert Uytterhoeven wrote:
->> This patch series improves the topology description in DT of the ARM GIC
->> on Renesas SoCs using the CPG/MSSR bindings (R-Car Gen3 and RZ/G).
->> It links the GIC to its module clock, and adds it to the SYSC "always
->> on" PM Domain.
->>
->> Note that currently the GIC-400 driver doesn't support module clocks nor
->> Runtime PM, so this must be handled as a critical clock.
->> As the CPG/MSSR driver, unlike the legacy MSTP driver, is already aware
->> of critical clocks, this series can be applied right now.
->
-> does the note above imply that "[PATCH 0/2] clk: renesas: Use
-> CLK_IS_CRITICAL to handle critical clocks" is a dependency of this series?
+Hi Sergei,
 
-No, the note says (using different wording) that there is no such dependency.
+sorry for not responding earlier, I have been ill.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Yes you are correct, I forgot to push.
+renesas-devel-20170117-v4.10-rc4 should be there now.
