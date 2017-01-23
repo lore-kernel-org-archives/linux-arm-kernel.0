@@ -1,50 +1,53 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Mon, 23 Jan 2017 23:01:35 +0800
-Subject: [PATCH 0/8] update mediatek crypto driver
-In-Reply-To: <1484890875-57105-1-git-send-email-ryder.lee@mediatek.com>
-References: <1484890875-57105-1-git-send-email-ryder.lee@mediatek.com>
-Message-ID: <20170123150135.GH20806@gondor.apana.org.au>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Mon, 23 Jan 2017 07:02:52 -0800
+Subject: [PATCH 3/3] PCI: imx6: Add code to support i.MX7D
+In-Reply-To: <20170123145204.5lablvhf7m2hf3na@rob-hp-laptop>
+References: <20170119163631.10668-1-andrew.smirnov@gmail.com>
+ <20170119163631.10668-4-andrew.smirnov@gmail.com>
+ <20170123145204.5lablvhf7m2hf3na@rob-hp-laptop>
+Message-ID: <CAHQ1cqEFS-XEfm7=QP6hCLARan3eQ5VT6Ucq3HPsCzYoodHqtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2017 at 01:41:07PM +0800, Ryder Lee wrote:
-> Hi,
-> 
-> This series of patches is a global rework of the mtk driver.
-> Fix bug - incomplete DMA data transfer when SG buffer dst.len != src.len
-> 
-> It also updates some part of the code to make them more generic. For
-> instance the crypto request queue management supports both async block
-> cipher and AEAD requests, which allows us to add support the the GCM mode.
-> GMAC mode is not supported yet.
-> 
-> Current implementation was validated using the tcrypt
-> module running modes:
-> - 10: ecb(aes), cbc(aes), ctr(aes), rfc3686(ctr(aes))
-> - 35: gcm(aes)
-> - 2,6,11,12: sha1, sha2 family
-> 
-> tcrypt speed test was run with modes:
-> - 211: rfc4106(gcm(aes)), gcm(aes)
-> - 500: ecb(aes), cbc(aes), ctr(aes), rfc3686(ctr(aes))
-> - 403 ~ 406: sha1, sha2 family
-> 
-> IxChariot multiple pairs throughput 24 hours test:
-> - IPSec VPN
-> - MACSec
-> 
-> Ryder Lee (8):
->   crypto: mediatek - move HW control data to transformation context
->   crypto: mediatek - fix incorrect data transfer result
->   crypto: mediatek - make crypto request queue management more generic
->   crypto: mediatek - rework crypto request completion
->   crypto: mediatek - regroup functions by usage
->   crypto: mediatek - fix typo and indentation
->   crypto: mediatek - add support to CTR mode
->   crypto: mediatek - add support to GCM mode
+On Mon, Jan 23, 2017 at 6:52 AM, Rob Herring <robh@kernel.org> wrote:
+> On Thu, Jan 19, 2017 at 08:36:31AM -0800, Andrey Smirnov wrote:
+>> Add various bits of code needed to support i.MX7D variant of the IP.
+>>
+>> Cc: yurovsky at gmail.com
+>> Cc: Richard Zhu <hongxing.zhu@nxp.com>
+>> Cc: Lucas Stach <l.stach@pengutronix.de>
+>> Cc: Bjorn Helgaas <bhelgaas@google.com>
+>> Cc: Fabio Estevam <festevam@gmail.com>
+>> Cc: Shawn Guo <shawnguo@kernel.org>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Cc: Lee Jones <lee.jones@linaro.org>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: devicetree at vger.kernel.org
+>> Cc: linux-kernel at vger.kernel.org
+>> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+>> ---
+>>  .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |   6 +-
+>>  drivers/pci/host/pci-imx6.c                        | 188 ++++++++++++++++++---
+>>  include/linux/mfd/syscon/imx7-gpc.h                |  18 ++
+>>  include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
+>>  include/linux/mfd/syscon/imx7-src.h                |  18 ++
+>>  5 files changed, 208 insertions(+), 26 deletions(-)
+>>  create mode 100644 include/linux/mfd/syscon/imx7-gpc.h
+>>  create mode 100644 include/linux/mfd/syscon/imx7-src.h
+>>
+>> diff --git a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+>> index 83aeb1f..20b9382 100644
+>> --- a/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+>> +++ b/Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt
+>> @@ -4,7 +4,8 @@ This PCIe host controller is based on the Synopsis Designware PCIe IP
+>>  and thus inherits all the common properties defined in designware-pcie.txt.
+>>
+>>  Required properties:
+>> -- compatible: "fsl,imx6q-pcie", "fsl,imx6sx-pcie", "fsl,imx6qp-pcie"
+>> +- compatible: "fsl,imx6q-pcie", "fsl,imx6sx-pcie",
+>> +           "fsl,imx6qp-pcie", "fsl,imx7d-pcie"
+>
+> Please reformat to one valid combination per line.
 
-All applied.  Thanks.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Noted for v2, thanks.
