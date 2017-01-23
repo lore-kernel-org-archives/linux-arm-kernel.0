@@ -1,33 +1,112 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Mon, 23 Jan 2017 19:32:18 +0100
-Subject: [PATCH 3/3] ARM64: dts: meson-gxm-rbox-pro: Add board compatible
- string
-In-Reply-To: <m2h94p3aee.fsf@baylibre.com>
-References: <20170117030611.23827-2-afaerber@suse.de>
- <20170117225459.4438-1-afaerber@suse.de>
- <20170117225459.4438-3-afaerber@suse.de> <m2h94p3aee.fsf@baylibre.com>
-Message-ID: <7244aa99-e122-b0c8-98e2-94e72c7600a4@suse.de>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 23 Jan 2017 19:33:08 +0100
+Subject: [PATCH] KVM: arm/arm64: Remove struct vgic_irq pending field
+In-Reply-To: <CAFEAcA8yde+mkOac_Zu2CRpWeiuOL3veVhpRwze50pykQSj0-g@mail.gmail.com>
+References: <20170123133951.10329-1-christoffer.dall@linaro.org>
+ <CAFEAcA8yde+mkOac_Zu2CRpWeiuOL3veVhpRwze50pykQSj0-g@mail.gmail.com>
+Message-ID: <20170123183308.GG15850@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 23.01.2017 um 19:21 schrieb Kevin Hilman:
-> Andreas F?rber <afaerber@suse.de> writes:
+On Mon, Jan 23, 2017 at 04:30:52PM +0000, Peter Maydell wrote:
+> On 23 January 2017 at 13:39, Christoffer Dall
+> <christoffer.dall@linaro.org> wrote:
 > 
->> Cc: ada at kingnoval.com
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->> ---
->>  To be squashed in v2.
+> I don't think this is wrong, but maybe it's a revealed cleanup
+> that this patch permits:
 > 
-> FYI, since you mention v2 here, i'll wait on this series and assume
-> you'll update it on top of your cleanup series.
+> > diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+> > index e6b03fd..76d7d75 100644
+> > --- a/virt/kvm/arm/vgic/vgic-v3.c
+> > +++ b/virt/kvm/arm/vgic/vgic-v3.c
+> > @@ -94,7 +94,7 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
+> >                 /* Edge is the only case where we preserve the pending bit */
+> >                 if (irq->config == VGIC_CONFIG_EDGE &&
+> >                     (val & ICH_LR_PENDING_BIT)) {
+> > -                       irq->pending = true;
+> > +                       irq_set_pending_latch(irq, true);
+> >
+> >                         if (vgic_irq_is_sgi(intid) &&
+> >                             model == KVM_DEV_TYPE_ARM_VGIC_V2) {
+> > @@ -111,9 +111,7 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
+> >                  */
+> >                 if (irq->config == VGIC_CONFIG_LEVEL) {
+> >                         if (!(val & ICH_LR_PENDING_BIT))
+> > -                               irq->soft_pending = false;
+> > -
+> > -                       irq->pending = irq->line_level || irq->soft_pending;
+> > +                               irq_set_pending_latch(irq, false);
+> >                 }
+> >
+> >                 spin_unlock(&irq->irq_lock);
+> > @@ -127,11 +125,11 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
+> >         u32 model = vcpu->kvm->arch.vgic.vgic_model;
+> >         u64 val = irq->intid;
+> >
+> > -       if (irq->pending) {
+> > +       if (irq_is_pending(irq)) {
+> >                 val |= ICH_LR_PENDING_BIT;
+> >
+> >                 if (irq->config == VGIC_CONFIG_EDGE)
+> > -                       irq->pending = false;
+> > +                       irq_set_pending_latch(irq, false);
+> >
+> >                 if (vgic_irq_is_sgi(irq->intid) &&
+> >                     model == KVM_DEV_TYPE_ARM_VGIC_V2) {
+> > @@ -141,7 +139,7 @@ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
+> >                         val |= (src - 1) << GICH_LR_PHYSID_CPUID_SHIFT;
+> >                         irq->source &= ~(1 << (src - 1));
+> >                         if (irq->source)
+> > -                               irq->pending = true;
+> > +                               irq_set_pending_latch(irq, true);
+> >                 }
+> >         }
+> 
+> For edge-triggered irqs:
+>  * when we populate the LR we clear the pending latch
+>  * when we extract the info from the LRs we set the
+>    pending latch again if the LR pending bit is still set
+> For level-triggered irqs:
+>  * we don't clear the pending latch on populate, but
+>  * when we extract the info from the LRs we clear
+>    the pending latch if the LR pending bit isn't set
+> 
+> These seem to be pretty much the same effect except
+> for the value of the pending-latch while the interrupt
+> is in the LR. Do they actually need to be different
+> now we've cleaned up the handling of the latch state?
 
-Yes, I am waiting on the board documentation cleanup to be merged before
-I rebase though. The others shouldn't matter here.
+This is a very good question.  I think we have to clear the latch state
+when populating the LR for edge-triggeres irqs, because otherwise we
+wouldn't be able to track if we see another edge putting the irq back
+into pending while the guest is running.
 
-Regards,
-Andreas
+Assuming I'm right, the only question is if we can clear the latch state
+when populatin a level-triggered irq to an LR.  I didn't want to do
+that, because I wanted to only do that when I was sure that the guest
+had acked the interrupt.  If we relax that, and enter with (line_level
+&& pending_latch) and exit with the still LR pending, we should obviouly
+set the pending_latch again, but how do we distinguish this at the
+fold_lr time from entering with (line_level && !pending_latch)?
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Therefore I think we have to stick with the current setup.
+
+> 
+> (Architecturally the pending_latch state should be
+> cleared when the interrupt is acknowledged, but I
+> don't know which of the populate and fold steps is
+> the right place for that.)
+> 
+
+Neither really.  I've never liked this part of the GIC VE, because
+there's really no way to be correct here.  Another VCPU could set the
+latch state after the target VCPU acked the virtual IRQ, and that new
+write from the other VCPU would be lost.  In practice, it probably
+doesn't matter, but I still don't like it.
+
+So I still think the best we can do is the EOI maintanance interrupt,
+and derive that if the LR is no longer pending, the VM must have acked
+it, and therefore we clear the state.
+
+Thanks,
+-Christoffer
