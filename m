@@ -1,60 +1,155 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 23 Jan 2017 14:42:05 +0100
-Subject: [PATCH v10 7/8] arm/arm64: vgic: Implement
- KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO ioctl
-In-Reply-To: <CAFEAcA9Odatt_JUshMXnBiq0DyO7LEN=yCWnjwHPyO8uj2tJNw@mail.gmail.com>
-References: <1480576187-5012-1-git-send-email-vijay.kilari@gmail.com>
- <1480576187-5012-8-git-send-email-vijay.kilari@gmail.com>
- <20170120195338.GH13531@cbox>
- <CAFEAcA8bZUPC2YTBYTVY3oB4MJFJcKOgT77PN3vkp5gPjVRPgA@mail.gmail.com>
- <20170123110639.GA15850@cbox>
- <CAFEAcA9Odatt_JUshMXnBiq0DyO7LEN=yCWnjwHPyO8uj2tJNw@mail.gmail.com>
-Message-ID: <20170123134205.GE15850@cbox>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 23 Jan 2017 15:43:59 +0200
+Subject: [PATCH] ARM: OMAP2+: Remove duplicate definition of
+ omap_test_timeout
+In-Reply-To: <130610aa-ed1a-b363-fac5-6aaaf4d8e930@ti.com>
+References: <20170120185151.1630-1-tony@atomide.com>
+ <130610aa-ed1a-b363-fac5-6aaaf4d8e930@ti.com>
+Message-ID: <97761042-4a61-9abe-8b6f-a306936cb513@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2017 at 11:41:41AM +0000, Peter Maydell wrote:
-> On 23 January 2017 at 11:06, Christoffer Dall
-> <christoffer.dall@linaro.org> wrote:
-> > ok, I think you're right that it can be done this way, but it has the
-> > unfortunate consequence of having to change a lot of the implementation.
-> >
-> > The reason is that we store the latch state in two different variables,
-> > depening on whether it's an edge- or level-triggered interrupts.
-> >
-> > We use the irq->pending field for the computed result (using above
-> > calculaiton) for level interrupts based on irq->line_level and
-> > irq->soft_pending.  soft_pending is the latch state for level interrupts
-> > only.
-> >
-> > For edge triggered interrupts the computed result and the latch state
-> > are alway the same (right?) so we we only use the irq->pending field for
-> > that.
-> >
-> > But unless I didn't have enough coffee this morning, this only works if
-> > you have a-priori knowledge of which interrupts are level and which are
-> > edge.  When this is not the case, as in the case of order-free
-> > save/restore, then I think the only solution is to rework the logic so
-> > that the soft_pending field is used for the latch state for both edge
-> > and level interrupts, and the pending field is just the internal
-> > computed value.
-> 
-> I *think* you could fudge it by saying "when the config changes
-> from edge to level, copy the current irq->pending into irq->soft_pending".
-> Then you can always read the latch state (it's soft_pending
-> if level, otherwise pending), and writing it is "set both if
-> level, just irq->pending if edge". That in turn gives you enough
-> information I think to cope with restores of all of (config,
-> level, pending-latch) in any order. It feels a bit fragile, though.
+On 23/01/17 12:22, Lokesh Vutla wrote:
+> + Tero,
+>
+> On Saturday 21 January 2017 12:21 AM, Tony Lindgren wrote:
+>> We have the same defined already in common.h.
+>
+>
+> This is reverting what has been introduced in this[1] series. Probably
+> Tero can comment more here.
 
-Right, thanks for working this out.  I agree it's fragile and I cannot
-seem to easily convince myself it would be correct, so I sent out a
-patch to get rid of the pending cached state which should simplify the
-save/restore patches as well.
+Yeah, the point of introducing that was to get rid of common.h include 
+from the prcm files. See commit 250e27ee950bf67ceeb812eb4c8f2fea58d3e2b6.
 
-Assuming the other VGIC suspects don't object to that, I suggest we base
-these patches on top of that one and see if we can convince ourselves
-that it's correct then.
+-Tero
 
-Thanks,
--Christoffer
+>
+> [1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg102131.html
+>
+> Thanks and regards,
+> Lokesh
+>
+>>
+>> Signed-off-by: Tony Lindgren <tony@atomide.com>
+>> ---
+>>  arch/arm/mach-omap2/cm2xxx.c                |  1 +
+>>  arch/arm/mach-omap2/cm33xx.c                |  1 +
+>>  arch/arm/mach-omap2/cm3xxx.c                |  1 +
+>>  arch/arm/mach-omap2/cminst44xx.c            |  1 +
+>>  arch/arm/mach-omap2/powerdomains3xxx_data.c |  1 +
+>>  arch/arm/mach-omap2/prcm-common.h           | 22 ----------------------
+>>  arch/arm/mach-omap2/prm2xxx_3xxx.c          |  1 +
+>>  arch/arm/mach-omap2/prm33xx.c               |  1 +
+>>  8 files changed, 7 insertions(+), 22 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/cm2xxx.c b/arch/arm/mach-omap2/cm2xxx.c
+>> --- a/arch/arm/mach-omap2/cm2xxx.c
+>> +++ b/arch/arm/mach-omap2/cm2xxx.c
+>> @@ -18,6 +18,7 @@
+>>  #include <linux/err.h>
+>>  #include <linux/io.h>
+>>
+>> +#include "common.h"
+>>  #include "prm2xxx.h"
+>>  #include "cm.h"
+>>  #include "cm2xxx.h"
+>> diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
+>> --- a/arch/arm/mach-omap2/cm33xx.c
+>> +++ b/arch/arm/mach-omap2/cm33xx.c
+>> @@ -22,6 +22,7 @@
+>>  #include <linux/err.h>
+>>  #include <linux/io.h>
+>>
+>> +#include "common.h"
+>>  #include "clockdomain.h"
+>>  #include "cm.h"
+>>  #include "cm33xx.h"
+>> diff --git a/arch/arm/mach-omap2/cm3xxx.c b/arch/arm/mach-omap2/cm3xxx.c
+>> --- a/arch/arm/mach-omap2/cm3xxx.c
+>> +++ b/arch/arm/mach-omap2/cm3xxx.c
+>> @@ -18,6 +18,7 @@
+>>  #include <linux/err.h>
+>>  #include <linux/io.h>
+>>
+>> +#include "common.h"
+>>  #include "prm2xxx_3xxx.h"
+>>  #include "cm.h"
+>>  #include "cm3xxx.h"
+>> diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
+>> --- a/arch/arm/mach-omap2/cminst44xx.c
+>> +++ b/arch/arm/mach-omap2/cminst44xx.c
+>> @@ -21,6 +21,7 @@
+>>  #include <linux/err.h>
+>>  #include <linux/io.h>
+>>
+>> +#include "common.h"
+>>  #include "clockdomain.h"
+>>  #include "cm.h"
+>>  #include "cm1_44xx.h"
+>> diff --git a/arch/arm/mach-omap2/powerdomains3xxx_data.c b/arch/arm/mach-omap2/powerdomains3xxx_data.c
+>> --- a/arch/arm/mach-omap2/powerdomains3xxx_data.c
+>> +++ b/arch/arm/mach-omap2/powerdomains3xxx_data.c
+>> @@ -14,6 +14,7 @@
+>>  #include <linux/kernel.h>
+>>  #include <linux/init.h>
+>>  #include <linux/bug.h>
+>> +#include <linux/delay.h>
+>>
+>>  #include "soc.h"
+>>  #include "powerdomain.h"
+>> diff --git a/arch/arm/mach-omap2/prcm-common.h b/arch/arm/mach-omap2/prcm-common.h
+>> --- a/arch/arm/mach-omap2/prcm-common.h
+>> +++ b/arch/arm/mach-omap2/prcm-common.h
+>> @@ -434,28 +434,6 @@
+>>  #define MAX_IOPAD_LATCH_TIME			100
+>>  # ifndef __ASSEMBLER__
+>>
+>> -#include <linux/delay.h>
+>> -
+>> -/**
+>> - * omap_test_timeout - busy-loop, testing a condition
+>> - * @cond: condition to test until it evaluates to true
+>> - * @timeout: maximum number of microseconds in the timeout
+>> - * @index: loop index (integer)
+>> - *
+>> - * Loop waiting for @cond to become true or until at least @timeout
+>> - * microseconds have passed.  To use, define some integer @index in the
+>> - * calling code.  After running, if @index == @timeout, then the loop has
+>> - * timed out.
+>> - */
+>> -#define omap_test_timeout(cond, timeout, index)			\
+>> -({								\
+>> -	for (index = 0; index < timeout; index++) {		\
+>> -		if (cond)					\
+>> -			break;					\
+>> -		udelay(1);					\
+>> -	}							\
+>> -})
+>> -
+>>  /**
+>>   * struct omap_prcm_irq - describes a PRCM interrupt bit
+>>   * @name: a short name describing the interrupt type, e.g. "wkup" or "io"
+>> diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+>> --- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
+>> +++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
+>> @@ -16,6 +16,7 @@
+>>  #include <linux/err.h>
+>>  #include <linux/io.h>
+>>
+>> +#include "common.h"
+>>  #include "powerdomain.h"
+>>  #include "prm2xxx_3xxx.h"
+>>  #include "prm-regbits-24xx.h"
+>> diff --git a/arch/arm/mach-omap2/prm33xx.c b/arch/arm/mach-omap2/prm33xx.c
+>> --- a/arch/arm/mach-omap2/prm33xx.c
+>> +++ b/arch/arm/mach-omap2/prm33xx.c
+>> @@ -19,6 +19,7 @@
+>>  #include <linux/err.h>
+>>  #include <linux/io.h>
+>>
+>> +#include "common.h"
+>>  #include "powerdomain.h"
+>>  #include "prm33xx.h"
+>>  #include "prm-regbits-33xx.h"
+>>
