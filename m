@@ -1,247 +1,181 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Mon, 23 Jan 2017 14:51:05 -0800
-Subject: [PATCH v8 2/3] fpga manager: Add cyclone-ps-spi driver for Altera
- FPGAs
-In-Reply-To: <cover.1485211400.git.stillcompiling@gmail.com>
-References: <cover.1485211400.git.stillcompiling@gmail.com>
-Message-ID: <85b65ffea4dfac05d3c235a3aa035f3676876123.1485211400.git.stillcompiling@gmail.com>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Mon, 23 Jan 2017 15:08:48 -0800
+Subject: [PATCH v3 00/24] i.MX Media Driver
+In-Reply-To: <1485169204.2874.57.camel@pengutronix.de>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <c6e98327-7e2c-f34a-2d23-af7b236de441@xs4all.nl>
+ <1484929911.2897.70.camel@pengutronix.de>
+ <3fb68686-9447-2d8a-e2d2-005e4138cd43@gmail.com>
+ <5d23d244-aa0e-401c-24a9-07f28acf1563@xs4all.nl>
+ <1485169204.2874.57.camel@pengutronix.de>
+Message-ID: <ce2d1851-8a2e-ea0b-25b8-be6649b1ebaf@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cyclone-ps-spi loads FPGA firmware over spi, using the "passive serial"
-interface on Altera Cyclone FPGAS.
 
-This is one of the simpler ways to set up an FPGA at runtime.
-The signal interface is close to unidirectional spi with lsb first.
 
-Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
----
- drivers/fpga/Kconfig          |   7 ++
- drivers/fpga/Makefile         |   1 +
- drivers/fpga/cyclone-ps-spi.c | 185 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 193 insertions(+)
- create mode 100644 drivers/fpga/cyclone-ps-spi.c
+On 01/23/2017 03:00 AM, Philipp Zabel wrote:
+> On Fri, 2017-01-20 at 21:39 +0100, Hans Verkuil wrote:
+> [...]
+>>> There is a VDIC entity in the i.MX IPU that performs de-interlacing with
+>>> hardware filters for motion compensation. Some of the motion compensation
+>>> modes ("low" and "medium" motion) require that the VDIC receive video
+>>> frame fields from memory buffers (dedicated dma channels in the
+>>> IPU are used to transfer those buffers into the VDIC).
+>>>
+>>> So one option to support those modes would be to pass the raw buffers
+>>> from a camera sensor up to userspace to a capture device, and then pass
+>>> them back to the VDIC for de-interlacing using a mem2mem device.
+>>>
+>>> Philipp and I are both in agreement that, since userland is not interested
+>>> in the intermediate interlaced buffers in this case, but only the final
+>>> result (motion compensated, de-interlaced frames), it is more efficient
+>>> to provide a media link that allows passing those intermediate frames
+>>> directly from a camera source pad to VDIC sink pad, without having
+>>> to route them through userspace.
+>>>
+>>> So in order to support that, I've implemented a simple FIFO dma buffer
+>>> queue in the driver to allow passing video buffers directly from a source
+>>> to a sink. It is modeled loosely off the vb2 state machine and API, but
+>>> simpler (for instance it only allows contiguous, cache-coherent buffers).
+>>>
+>>> This is where Philipp has an argument, that this should be done with a
+>>> new API in videobuf2.
+> That is one part of the argument. I'm glad to understand now that we
+> agree about this.
+>
+>>> And I'm actually in total agreement with that. I definitely agree that there
+>>> should be a mechanism in the media framework that allows passing video
+>>> buffers from a source pad to a sink pad using a software queue, with no
+>>> involvement from userland.
+> That is the other part of the argument. I do not agree that these
+> software queue "links" should be presented to userspace as media pad
+> links between two entities of a media device.
+> First, that would limit the links to subdevices contained in the same
+> media graph, while this should work between any two capture and output
+> queues of different devices.
 
-diff --git a/drivers/fpga/Kconfig b/drivers/fpga/Kconfig
-index ce861a2..e6c032d 100644
---- a/drivers/fpga/Kconfig
-+++ b/drivers/fpga/Kconfig
-@@ -20,6 +20,13 @@ config FPGA_REGION
- 	  FPGA Regions allow loading FPGA images under control of
- 	  the Device Tree.
- 
-+config FPGA_MGR_CYCLONE_PS_SPI
-+	tristate "Altera Cyclone FPGA Passive Serial over SPI"
-+	depends on SPI
-+	help
-+	  FPGA manager driver support for Altera Cyclone using the
-+	  passive serial interface over SPI
-+
- config FPGA_MGR_SOCFPGA
- 	tristate "Altera SOCFPGA FPGA Manager"
- 	depends on ARCH_SOCFPGA || COMPILE_TEST
-diff --git a/drivers/fpga/Makefile b/drivers/fpga/Makefile
-index 8df07bc..a112bef 100644
---- a/drivers/fpga/Makefile
-+++ b/drivers/fpga/Makefile
-@@ -6,6 +6,7 @@
- obj-$(CONFIG_FPGA)			+= fpga-mgr.o
- 
- # FPGA Manager Drivers
-+obj-$(CONFIG_FPGA_MGR_CYCLONE_PS_SPI)	+= cyclone-ps-spi.o
- obj-$(CONFIG_FPGA_MGR_SOCFPGA)		+= socfpga.o
- obj-$(CONFIG_FPGA_MGR_SOCFPGA_A10)	+= socfpga-a10.o
- obj-$(CONFIG_FPGA_MGR_ZYNQ_FPGA)	+= zynq-fpga.o
-diff --git a/drivers/fpga/cyclone-ps-spi.c b/drivers/fpga/cyclone-ps-spi.c
-new file mode 100644
-index 0000000..56c3853
---- /dev/null
-+++ b/drivers/fpga/cyclone-ps-spi.c
-@@ -0,0 +1,185 @@
-+/**
-+ * Altera Cyclone Passive Serial SPI Driver
-+ *
-+ *  Copyright (c) 2017 United Western Technologies, Corporation
-+ *
-+ *  Joshua Clayton <stillcompiling@gmail.com>
-+ *
-+ * Manage Altera FPGA firmware that is loaded over spi using the passive
-+ * serial configuration method.
-+ * Firmware must be in binary "rbf" format.
-+ * Works on Cyclone V. Should work on cyclone series.
-+ * May work on other Altera FPGAs.
-+ *
-+ */
-+
-+#include <linux/bitrev.h>
-+#include <linux/delay.h>
-+#include <linux/fpga/fpga-mgr.h>
-+#include <linux/gpio/consumer.h>
-+#include <linux/module.h>
-+#include <linux/of_gpio.h>
-+#include <linux/spi/spi.h>
-+#include <linux/sizes.h>
-+
-+#define FPGA_RESET_TIME		50   /* time in usecs to trigger FPGA config */
-+#define FPGA_MIN_DELAY		50   /* min usecs to wait for config status */
-+#define FPGA_MAX_DELAY		1000 /* max usecs to wait for config status */
-+
-+struct cyclonespi_conf {
-+	struct gpio_desc *config;
-+	struct gpio_desc *status;
-+	struct spi_device *spi;
-+};
-+
-+static const struct of_device_id of_ef_match[] = {
-+	{ .compatible = "altr,fpga-passive-serial", },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, of_ef_match);
-+
-+static enum fpga_mgr_states cyclonespi_state(struct fpga_manager *mgr)
-+{
-+	struct cyclonespi_conf *conf = (struct cyclonespi_conf *)mgr->priv;
-+
-+	if (gpiod_get_value(conf->status))
-+		return FPGA_MGR_STATE_RESET;
-+
-+	return FPGA_MGR_STATE_UNKNOWN;
-+}
-+
-+static int cyclonespi_write_init(struct fpga_manager *mgr,
-+				 struct fpga_image_info *info,
-+				 const char *buf, size_t count)
-+{
-+	struct cyclonespi_conf *conf = (struct cyclonespi_conf *)mgr->priv;
-+	int i;
-+
-+	if (info->flags & FPGA_MGR_PARTIAL_RECONFIG) {
-+		dev_err(&mgr->dev, "Partial reconfiguration not supported.\n");
-+		return -EINVAL;
-+	}
-+
-+	gpiod_set_value(conf->config, 1);
-+	usleep_range(FPGA_RESET_TIME, FPGA_RESET_TIME + 20);
-+	if (!gpiod_get_value(conf->status)) {
-+		dev_err(&mgr->dev, "Status pin failed to show a reset\n");
-+		return -EIO;
-+	}
-+
-+	gpiod_set_value(conf->config, 0);
-+	for (i = 0; i < (FPGA_MAX_DELAY / FPGA_MIN_DELAY); i++) {
-+		usleep_range(FPGA_MIN_DELAY, FPGA_MIN_DELAY + 20);
-+		if (!gpiod_get_value(conf->status))
-+			return 0;
-+	}
-+
-+	dev_err(&mgr->dev, "Status pin not ready.\n");
-+	return -EIO;
-+}
-+
-+static void rev_buf(char *buf, size_t len)
-+{
-+	const char *fw_end = (buf + len);
-+
-+	/* set buffer to lsb first */
-+	while (buf < fw_end) {
-+		*buf = bitrev8(*buf);
-+		buf++;
-+	}
-+}
-+
-+static int cyclonespi_write(struct fpga_manager *mgr, const char *buf,
-+			    size_t count)
-+{
-+	struct cyclonespi_conf *conf = (struct cyclonespi_conf *)mgr->priv;
-+	const char *fw_data = buf;
-+	const char *fw_data_end = fw_data + count;
-+
-+	while (fw_data < fw_data_end) {
-+		int ret;
-+		size_t stride = min(fw_data_end - fw_data, SZ_4K);
-+
-+		rev_buf(fw_data, stride);
-+		ret = spi_write(conf->spi, fw_data, stride);
-+		if (ret) {
-+			dev_err(&mgr->dev, "spi error in firmware write: %d\n",
-+				ret);
-+			return ret;
-+		}
-+		fw_data += stride;
-+	}
-+
-+	return 0;
-+}
-+
-+static int cyclonespi_write_complete(struct fpga_manager *mgr,
-+				     struct fpga_image_info *info)
-+{
-+	struct cyclonespi_conf *conf = (struct cyclonespi_conf *)mgr->priv;
-+
-+	if (gpiod_get_value(conf->status)) {
-+		dev_err(&mgr->dev, "Error during configuration.\n");
-+		return -EIO;
-+	}
-+
-+	return 0;
-+}
-+
-+static const struct fpga_manager_ops cyclonespi_ops = {
-+	.state = cyclonespi_state,
-+	.write_init = cyclonespi_write_init,
-+	.write = cyclonespi_write,
-+	.write_complete = cyclonespi_write_complete,
-+};
-+
-+static int cyclonespi_probe(struct spi_device *spi)
-+{
-+	struct cyclonespi_conf *conf = devm_kzalloc(&spi->dev, sizeof(*conf),
-+						    GFP_KERNEL);
-+
-+	if (!conf)
-+		return -ENOMEM;
-+
-+	conf->spi = spi;
-+	conf->config = devm_gpiod_get(&spi->dev, "nconfig", GPIOD_OUT_HIGH);
-+	if (IS_ERR(conf->config)) {
-+		dev_err(&spi->dev, "Failed to get config gpio: %ld\n",
-+			PTR_ERR(conf->config));
-+		return PTR_ERR(conf->config);
-+	}
-+
-+	conf->status = devm_gpiod_get(&spi->dev, "nstat", GPIOD_IN);
-+	if (IS_ERR(conf->status)) {
-+		dev_err(&spi->dev, "Failed to get status gpio: %ld\n",
-+			PTR_ERR(conf->status));
-+		return PTR_ERR(conf->status);
-+	}
-+
-+	return fpga_mgr_register(&spi->dev,
-+				 "Altera Cyclone PS SPI FPGA Manager",
-+				 &cyclonespi_ops, conf);
-+}
-+
-+static int cyclonespi_remove(struct spi_device *spi)
-+{
-+	fpga_mgr_unregister(&spi->dev);
-+
-+	return 0;
-+}
-+
-+static struct spi_driver cyclonespi_driver = {
-+	.driver = {
-+		.name = "cyclone-ps-spi",
-+		.owner = THIS_MODULE,
-+		.of_match_table = of_match_ptr(of_ef_match),
-+	},
-+	.probe = cyclonespi_probe,
-+	.remove = cyclonespi_remove,
-+};
-+
-+module_spi_driver(cyclonespi_driver)
-+
-+MODULE_LICENSE("GPL");
-+MODULE_AUTHOR("Joshua Clayton <stillcompiling@gmail.com>");
-+MODULE_DESCRIPTION("Module to load Altera FPGA firmware over spi");
--- 
-2.9.3
+It sounds like we are talking about two different new proposed features.
+
+My proposal is to implement a software buffer queue between pads.
+Beyond enabling the link between pads using the existing media controller
+API, userspace is not involved after that. The fact that this link is 
+accomplished
+with a software buffer queue is not known, and doesn't need to be known,
+by userspace.
+
+Your proposal, if I have it right, is to allow linking two v4l2 device 
+vb2 queues
+(i.e. /dev/videoX -> /dev/videoY), using a new user level API, in a free-run
+mode such that v4l2 buffers get passed from one device's vb2 queue to the
+other without requiring the v4l2 user program to actively forward those 
+buffers.
+
+There isn't anything that would preclude one from the other, they can
+both exist. But they are different ideas. One implements software queues
+at the _pad level_ and is opaque to userspace, the other links queues
+at the _device level_ using a new user API, but once the link is 
+established,
+also does not require any involvement from userspace.
+
+What I'm saying is we can do _both_.
+
+
+> Assume for example, we want to encode the captured, deinterlaced video
+> to h.264 with the coda VPU driver. A software queue link could be
+> established between the CSI capture and the VDIC deinterlacer input,
+
+That's already available in the media graph. By linking CSI and
+VDIC entities. The capture device will then already be providing
+de-interlaced video, and ...
+
+> just as between the VDIC deinterlacer output and the coda VPU input.
+> Technically, there would be no difference between those two linked
+> capture/output queue pairs. But the coda driver is a completely separate
+> mem2mem device. And since it is not part of the i.MX media graph, there
+> is no entity pad to link to.
+
+your free-run queue linking could then be used to link the (already)
+de-interlaced stream to the coda device for h.264 encode.
+
+The other idea would be to eventually make the coda device part of
+the media graph as an entity. Then this link would instead be via pads.
+
+> Or assume there is an USB analog capture device that produces interlaced
+> frames. I think it should be possible to connect its capture queue to
+> the VDIC deinterlacer output queue just the same way as linking the CSI
+> to the VDIC (in software queue mode).
+
+Right, for devices that are outside the i.MX media graph, such as a USB
+capture device (or coda), access to the i.MX entities such as the VDIC would
+require an i.MX mem2mem device with media links to the VDIC. The USB
+capture device would forward its captured frames to mem2mem (maybe
+using your free-run vb2 queue linking idea):
+
+usb device -> i.mx mem2mem device -> VDIC entity -> i.mx mem2mem device
+
+
+
+> Second, the subdevice pad formats describe wire formats, not memory
+> formats. The user might want to choose between 4:2:2 and 4:2:0
+> subsampled YUV formats for the intermediate buffer, for example,
+> depending on memory bandwidth constraints and quality requirements. This
+> is impossible with the media entity / subdevice pad links.
+
+It's true that there are currently no defined planar media bus
+pixel formats. We just need to add new definitions for them. Once
+that is done, the media driver will support planar YUV formats
+simply by adding the new codes to imx_media_formats[].
+
+Perhaps this gets to the root of the issue.
+
+Is the media bus concept an abstract one, or is the media bus
+intended to represent actual physical buses (as the lack of planar
+media bus formats would imply)?
+
+Can we break with the physical-bus-only idea if that is the case, and
+loosen the definition of a media bus to mean the passage of media
+data from one pad to another by whatever means?
+
+In my view the idea of a physical bus at the sensor makes sense, but
+beyond that, keeping that restriction limits how data can pass between
+pads.
+
+Hans, any input here?
+
+If this is really anathema, then I'm willing to remove the software queues
+between pads, but it will be giving up some functionality in the media 
+driver.
+It would also mean splitting the VDIC in two. The VDIC entity would be 
+limited
+to only one motion compensation mode, and the full functionality would have
+to be added somewhere else. Currently all functionality of the VDIC is
+implemented in a single media entity.
+
+> I think an interface where userspace configures the capture and output
+> queues via v4l2 API, passes dma buffers around from one to the other
+> queue, and then puts both queues into a free running mode would be a
+> much better fit for this mechanism.
+
+As I said, I see these as two different ideas that can both be
+implemented.
+
+>>> My only disagreement is when this should be implemented. I think it is
+>>> fine to keep my custom implementation of this in the driver for now. Once
+>>> an extension of vb2 is ready to support this feature, it would be fairly
+>>> straightforward to strip out my custom implementation and go with the
+>>> new API.
+>> For a staging driver this isn't necessary, as long as it is documented in
+>> the TODO file that this needs to be fixed before it can be moved out of
+>> staging. The whole point of staging is that there is still work to be
+>> done in the driver, after all :-)
+> Absolutely. The reason I am arguing against merging the mem2mem media
+> control links so vehemently is that I am convinced the userspace
+> interface is wrong, and I am afraid that even though in staging, it
+> might become established.
+
+I don't believe there is anything wrong with the userspace interface,
+In fact it hasn't even changed. The fact two pads are passing memory
+buffers is "under the hood".
+
+Steve
