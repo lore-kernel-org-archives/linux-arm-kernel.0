@@ -1,25 +1,49 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Mon, 23 Jan 2017 22:58:37 +0800
-Subject: [PATCH] crypto: arm64/aes-blk - honour iv_out requirement in CBC
- and CTR modes
-In-Reply-To: <1484660789-7036-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1484660789-7036-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20170123145837.GC20806@gondor.apana.org.au>
+Date: Mon, 23 Jan 2017 23:01:35 +0800
+Subject: [PATCH 0/8] update mediatek crypto driver
+In-Reply-To: <1484890875-57105-1-git-send-email-ryder.lee@mediatek.com>
+References: <1484890875-57105-1-git-send-email-ryder.lee@mediatek.com>
+Message-ID: <20170123150135.GH20806@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 01:46:29PM +0000, Ard Biesheuvel wrote:
-> Update the ARMv8 Crypto Extensions and the plain NEON AES implementations
-> in CBC and CTR modes to return the next IV back to the skcipher API client.
-> This is necessary for chaining to work correctly.
+On Fri, Jan 20, 2017 at 01:41:07PM +0800, Ryder Lee wrote:
+> Hi,
 > 
-> Note that for CTR, this is only done if the request is a round multiple of
-> the block size, since otherwise, chaining is impossible anyway.
+> This series of patches is a global rework of the mtk driver.
+> Fix bug - incomplete DMA data transfer when SG buffer dst.len != src.len
 > 
-> Cc: <stable@vger.kernel.org> # v3.16+
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> It also updates some part of the code to make them more generic. For
+> instance the crypto request queue management supports both async block
+> cipher and AEAD requests, which allows us to add support the the GCM mode.
+> GMAC mode is not supported yet.
+> 
+> Current implementation was validated using the tcrypt
+> module running modes:
+> - 10: ecb(aes), cbc(aes), ctr(aes), rfc3686(ctr(aes))
+> - 35: gcm(aes)
+> - 2,6,11,12: sha1, sha2 family
+> 
+> tcrypt speed test was run with modes:
+> - 211: rfc4106(gcm(aes)), gcm(aes)
+> - 500: ecb(aes), cbc(aes), ctr(aes), rfc3686(ctr(aes))
+> - 403 ~ 406: sha1, sha2 family
+> 
+> IxChariot multiple pairs throughput 24 hours test:
+> - IPSec VPN
+> - MACSec
+> 
+> Ryder Lee (8):
+>   crypto: mediatek - move HW control data to transformation context
+>   crypto: mediatek - fix incorrect data transfer result
+>   crypto: mediatek - make crypto request queue management more generic
+>   crypto: mediatek - rework crypto request completion
+>   crypto: mediatek - regroup functions by usage
+>   crypto: mediatek - fix typo and indentation
+>   crypto: mediatek - add support to CTR mode
+>   crypto: mediatek - add support to GCM mode
 
-Patch applied.  Thanks.
+All applied.  Thanks.
 -- 
 Email: Herbert Xu <herbert@gondor.apana.org.au>
 Home Page: http://gondor.apana.org.au/~herbert/
