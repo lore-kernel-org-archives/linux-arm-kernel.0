@@ -1,21 +1,28 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 23 Jan 2017 15:02:58 +0800
-Subject: [PATCH v2 1/1] ARM: dts: add Armadeus Systems OPOS6UL and
- OPOS6ULDEV support
-In-Reply-To: <1484055173-29943-1-git-send-email-sebastien.szymanski@armadeus.com>
-References: <1484055173-29943-1-git-send-email-sebastien.szymanski@armadeus.com>
-Message-ID: <20170123070256.GG5662@dragon>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 23 Jan 2017 15:05:45 +0800
+Subject: [RESEND PATCH] usb: chipidea: delete an useless header include
+Message-ID: <20170123070545.2714-1-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 02:32:53PM +0100, S?bastien Szymanski wrote:
-> OPOS6UL is an i.MX6UL based SoM.
-> OPOS6ULDev is a carrier board for the OPOS6UL SoM.
-> 
-> For more details see:
-> http://www.opossom.com/english/products-processor_boards-opos6ul.html
-> http://www.opossom.com/english/products-development_boards-opos6ul_dev.html
-> 
-> Signed-off-by: S?bastien Szymanski <sebastien.szymanski@armadeus.com>
+<linux/phy.h> is for net phy drivers, we don't need it.
 
-Applied, thanks.
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/usb/chipidea/core.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/drivers/usb/chipidea/core.c b/drivers/usb/chipidea/core.c
+index 3dbb4a21ab44..77078083e9fb 100644
+--- a/drivers/usb/chipidea/core.c
++++ b/drivers/usb/chipidea/core.c
+@@ -62,7 +62,6 @@
+ #include <linux/usb/chipidea.h>
+ #include <linux/usb/of.h>
+ #include <linux/of.h>
+-#include <linux/phy.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/usb/ehci_def.h>
+ 
+-- 
+2.11.0
