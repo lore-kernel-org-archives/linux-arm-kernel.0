@@ -1,147 +1,87 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Mon, 23 Jan 2017 15:52:28 +0530
-Subject: [PATCH] ARM: OMAP2+: Remove duplicate definition of
- omap_test_timeout
-In-Reply-To: <20170120185151.1630-1-tony@atomide.com>
-References: <20170120185151.1630-1-tony@atomide.com>
-Message-ID: <130610aa-ed1a-b363-fac5-6aaaf4d8e930@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 23 Jan 2017 10:23:15 +0000
+Subject: [PATCH v29 3/9] arm64: kdump: reserve memory for crash dump kernel
+In-Reply-To: <20170123095145.GA23406@linaro.org>
+References: <20161228043347.27358-1-takahiro.akashi@linaro.org>
+ <20161228043605.27470-2-takahiro.akashi@linaro.org>
+ <20170112150926.GA12249@leverpostej>
+ <20170113081617.GI20972@linaro.org>
+ <20170113113914.GB26804@leverpostej>
+ <20170117082043.GM20972@linaro.org>
+ <20170117115441.GC11939@leverpostej>
+ <20170119094941.GP20972@linaro.org>
+ <20170119112850.GD11176@leverpostej>
+ <20170123095145.GA23406@linaro.org>
+Message-ID: <20170123102314.GA16286@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Tero,
-
-On Saturday 21 January 2017 12:21 AM, Tony Lindgren wrote:
-> We have the same defined already in common.h.
-
-
-This is reverting what has been introduced in this[1] series. Probably
-Tero can comment more here.
-
-[1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg102131.html
-
-Thanks and regards,
-Lokesh
-
+On Mon, Jan 23, 2017 at 06:51:46PM +0900, AKASHI Takahiro wrote:
+> Mark,
 > 
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  arch/arm/mach-omap2/cm2xxx.c                |  1 +
->  arch/arm/mach-omap2/cm33xx.c                |  1 +
->  arch/arm/mach-omap2/cm3xxx.c                |  1 +
->  arch/arm/mach-omap2/cminst44xx.c            |  1 +
->  arch/arm/mach-omap2/powerdomains3xxx_data.c |  1 +
->  arch/arm/mach-omap2/prcm-common.h           | 22 ----------------------
->  arch/arm/mach-omap2/prm2xxx_3xxx.c          |  1 +
->  arch/arm/mach-omap2/prm33xx.c               |  1 +
->  8 files changed, 7 insertions(+), 22 deletions(-)
+> On Thu, Jan 19, 2017 at 11:28:50AM +0000, Mark Rutland wrote:
+> > On Thu, Jan 19, 2017 at 06:49:42PM +0900, AKASHI Takahiro wrote:
+> > > On Tue, Jan 17, 2017 at 11:54:42AM +0000, Mark Rutland wrote:
+> > > > On Tue, Jan 17, 2017 at 05:20:44PM +0900, AKASHI Takahiro wrote:
+> > > > > On Fri, Jan 13, 2017 at 11:39:15AM +0000, Mark Rutland wrote:
+
+> > > > I don't think we have much code useful for unmapping. We could re-use 
+> > > > create_mapping_late for this, passing a set of prot bits that means the
+> > > > entries are invalid (e.g. have a PAGE_KERNEL_INVALID).
+> > > 
+> > > Do you really think that we should totally invalidate mmu entries?
+> > > I guess that, given proper cache & TLB flush operations, RO attribute is
+> > > good enough for memory consistency, no?
+> > > (None accesses the region, as I said, except in the case of re-loading
+> > > crash dump kernel though.)
+> > 
+> > My worry is that the first kernel and kdump kernel may map (portions of)
+> > the region with potentially confliciting memory attributes. So it would
+> > be necessary to completely unmap the region.
 > 
-> diff --git a/arch/arm/mach-omap2/cm2xxx.c b/arch/arm/mach-omap2/cm2xxx.c
-> --- a/arch/arm/mach-omap2/cm2xxx.c
-> +++ b/arch/arm/mach-omap2/cm2xxx.c
-> @@ -18,6 +18,7 @@
->  #include <linux/err.h>
->  #include <linux/io.h>
->  
-> +#include "common.h"
->  #include "prm2xxx.h"
->  #include "cm.h"
->  #include "cm2xxx.h"
-> diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
-> --- a/arch/arm/mach-omap2/cm33xx.c
-> +++ b/arch/arm/mach-omap2/cm33xx.c
-> @@ -22,6 +22,7 @@
->  #include <linux/err.h>
->  #include <linux/io.h>
->  
-> +#include "common.h"
->  #include "clockdomain.h"
->  #include "cm.h"
->  #include "cm33xx.h"
-> diff --git a/arch/arm/mach-omap2/cm3xxx.c b/arch/arm/mach-omap2/cm3xxx.c
-> --- a/arch/arm/mach-omap2/cm3xxx.c
-> +++ b/arch/arm/mach-omap2/cm3xxx.c
-> @@ -18,6 +18,7 @@
->  #include <linux/err.h>
->  #include <linux/io.h>
->  
-> +#include "common.h"
->  #include "prm2xxx_3xxx.h"
->  #include "cm.h"
->  #include "cm3xxx.h"
-> diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
-> --- a/arch/arm/mach-omap2/cminst44xx.c
-> +++ b/arch/arm/mach-omap2/cminst44xx.c
-> @@ -21,6 +21,7 @@
->  #include <linux/err.h>
->  #include <linux/io.h>
->  
-> +#include "common.h"
->  #include "clockdomain.h"
->  #include "cm.h"
->  #include "cm1_44xx.h"
-> diff --git a/arch/arm/mach-omap2/powerdomains3xxx_data.c b/arch/arm/mach-omap2/powerdomains3xxx_data.c
-> --- a/arch/arm/mach-omap2/powerdomains3xxx_data.c
-> +++ b/arch/arm/mach-omap2/powerdomains3xxx_data.c
-> @@ -14,6 +14,7 @@
->  #include <linux/kernel.h>
->  #include <linux/init.h>
->  #include <linux/bug.h>
-> +#include <linux/delay.h>
->  
->  #include "soc.h"
->  #include "powerdomain.h"
-> diff --git a/arch/arm/mach-omap2/prcm-common.h b/arch/arm/mach-omap2/prcm-common.h
-> --- a/arch/arm/mach-omap2/prcm-common.h
-> +++ b/arch/arm/mach-omap2/prcm-common.h
-> @@ -434,28 +434,6 @@
->  #define MAX_IOPAD_LATCH_TIME			100
->  # ifndef __ASSEMBLER__
->  
-> -#include <linux/delay.h>
-> -
-> -/**
-> - * omap_test_timeout - busy-loop, testing a condition
-> - * @cond: condition to test until it evaluates to true
-> - * @timeout: maximum number of microseconds in the timeout
-> - * @index: loop index (integer)
-> - *
-> - * Loop waiting for @cond to become true or until at least @timeout
-> - * microseconds have passed.  To use, define some integer @index in the
-> - * calling code.  After running, if @index == @timeout, then the loop has
-> - * timed out.
-> - */
-> -#define omap_test_timeout(cond, timeout, index)			\
-> -({								\
-> -	for (index = 0; index < timeout; index++) {		\
-> -		if (cond)					\
-> -			break;					\
-> -		udelay(1);					\
-> -	}							\
-> -})
-> -
->  /**
->   * struct omap_prcm_irq - describes a PRCM interrupt bit
->   * @name: a short name describing the interrupt type, e.g. "wkup" or "io"
-> diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-> --- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
-> +++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
-> @@ -16,6 +16,7 @@
->  #include <linux/err.h>
->  #include <linux/io.h>
->  
-> +#include "common.h"
->  #include "powerdomain.h"
->  #include "prm2xxx_3xxx.h"
->  #include "prm-regbits-24xx.h"
-> diff --git a/arch/arm/mach-omap2/prm33xx.c b/arch/arm/mach-omap2/prm33xx.c
-> --- a/arch/arm/mach-omap2/prm33xx.c
-> +++ b/arch/arm/mach-omap2/prm33xx.c
-> @@ -19,6 +19,7 @@
->  #include <linux/err.h>
->  #include <linux/io.h>
->  
-> +#include "common.h"
->  #include "powerdomain.h"
->  #include "prm33xx.h"
->  #include "prm-regbits-33xx.h"
+> I think that this can happen only if the second kernel boots up,
+> leaving non-crashed cpus still running for some reason.
+
+Yes. I was considering a kdump case where a secondary was stuck in the
+first kernel.
+
+> > You raise a good point that this would also mean we need to perform some
+> > cache maintenance, which makes that a little more painful. We'd need a
+> > sequence like:
+> > 
+> > * Unmap the region
+> > * TLB invalidation
+> > * Remap the region with non-cacheable attributes
+> > * Cache maintenance
+> > * Unmap the region
+> > * TLB invalidation
 > 
+> I don't get why we need to remap the region and do cache
+> maintenance here. Please elaborate a bit more?
+
+I think I was wrong, and we don't need to. Sorry about that.
+
+My thought was that to ensure that there aren't stale lines with
+differing attributes, we'd need to do a clean+invalidate while the
+caches are guaranteed to not allocate anything furthe. Hence, we'd need
+to use a non-cacheable mapping to perform the clean+invalidate.
+
+However, I now think that so long as we unmap the range, this shouldn't
+matter. The new kernel can perform the maintenance if it wishes to use
+different attributes, similarly to what the first kernel must do per the
+boot protocol.
+
+> My current implementation of arch_kexec_protect_crashkres() is:
+> 
+>         kexec_segment_flush(kexec_crash_image);
+>         create_mapping_late(crashk_res.start, ..., __pgprot(0));
+>                                                 or PAGE_KERNEL_INVALID
+>         flush_tlb_all();
+> 
+> kexec_segment_flush() will eventually do dcache-flush for all the modified
+> data in crash dump kernel memory.
+
+I now think this should be fine, per the above.
+
+Thanks,
+Mark.
