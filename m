@@ -1,46 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 23 Jan 2017 10:39:58 +0000
-Subject: [PATCH v9 0/4] arm64: arch_timer: Add workaround for
- hisilicon-161010101 erratum
-In-Reply-To: <20170120150428.GC22152@leverpostej>
-References: <1484832916-7248-1-git-send-email-dingtianhong@huawei.com>
- <20170120150428.GC22152@leverpostej>
-Message-ID: <20170123103958.GC4622@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 23 Jan 2017 11:41:46 +0100
+Subject: [PATCH v2 1/7] rtc: sun6i: Disable the build as a module
+In-Reply-To: <cover.6bd4d4760c24d09845ad09c212fcd487d78da5ad.1485168100.git-series.maxime.ripard@free-electrons.com>
+References: <cover.6bd4d4760c24d09845ad09c212fcd487d78da5ad.1485168100.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <ad6de80f5065d8aa1ac7babca05e5f19b6038820.1485168100.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2017 at 03:04:28PM +0000, Mark Rutland wrote:
-> On Thu, Jan 19, 2017 at 09:35:12PM +0800, Ding Tianhong wrote:
-> > Ding Tianhong (4):
-> >   arm64: arch_timer: Add device tree binding for hisilicon-161010101
-> >     erratum
-> >   arm64: arch_timer: Introduce a generic erratum handing mechanism for
-> >     fsl-a008585
-> >   arm64: arch_timer: Work around Erratum Hisilicon-161010101
-> >   arm64: arch timer: Add timer erratum property for Hip05-d02 and
-> >     Hip06-d03
-> > 
-> >  Documentation/admin-guide/kernel-parameters.txt    |   9 --
-> >  Documentation/arm64/silicon-errata.txt             |  43 +++---
-> >  .../devicetree/bindings/arm/arch_timer.txt         |   6 +
-> >  arch/arm64/boot/dts/hisilicon/hip05.dtsi           |   1 +
-> >  arch/arm64/boot/dts/hisilicon/hip06.dtsi           |   1 +
-> >  arch/arm64/include/asm/arch_timer.h                |  38 ++----
-> >  drivers/clocksource/Kconfig                        |  18 +++
-> >  drivers/clocksource/arm_arch_timer.c               | 150 +++++++++++++++------
-> >  8 files changed, 171 insertions(+), 95 deletions(-)
-> 
-> I've picked these up (with a few local cleanups), given that some local
-> testing, and pushed the result to a branch [1] on my git repo.
-> 
-> There are likely to be clashes with the arm64 tree (e.g. for
-> silicon-errata.txt), and we're also likely to have more arch timer
-> updates shortly for the GTDT stuff, so I think the best bet is for both
-> arm64 and the clocksource tree to pull that branch for v4.11.
-> 
-> Alternatively, we could take this all through the arm64 tree, if the
-> clocksource maintainers are happy with that.
+Since we have to provide the clock very early on, the RTC driver cannot be
+built as a module. Make sure that won't happen.
 
-Fine by me, but I'd need at least Daniel's ack before taking these.
+Cc: stable at vger.kernel.org
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/rtc/Kconfig     | 2 +-
+ drivers/rtc/rtc-sun6i.c | 7 +------
+ 2 files changed, 2 insertions(+), 7 deletions(-)
 
-Will
+diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+index c93c5a8fba32..53e35c138ff3 100644
+--- a/drivers/rtc/Kconfig
++++ b/drivers/rtc/Kconfig
+@@ -1434,7 +1434,7 @@ config RTC_DRV_SUN4V
+ 	  based RTC on SUN4V systems.
+ 
+ config RTC_DRV_SUN6I
+-	tristate "Allwinner A31 RTC"
++	bool "Allwinner A31 RTC"
+ 	default MACH_SUN6I || MACH_SUN8I || COMPILE_TEST
+ 	depends on ARCH_SUNXI
+ 	help
+diff --git a/drivers/rtc/rtc-sun6i.c b/drivers/rtc/rtc-sun6i.c
+index c169a2cd4727..a6136cb99851 100644
+--- a/drivers/rtc/rtc-sun6i.c
++++ b/drivers/rtc/rtc-sun6i.c
+@@ -439,9 +439,4 @@ static struct platform_driver sun6i_rtc_driver = {
+ 		.of_match_table = sun6i_rtc_dt_ids,
+ 	},
+ };
+-
+-module_platform_driver(sun6i_rtc_driver);
+-
+-MODULE_DESCRIPTION("sun6i RTC driver");
+-MODULE_AUTHOR("Chen-Yu Tsai <wens@csie.org>");
+-MODULE_LICENSE("GPL");
++builtin_platform_driver(sun6i_rtc_driver);
+-- 
+git-series 0.8.11
