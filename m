@@ -1,44 +1,26 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Mon, 23 Jan 2017 17:57:22 +0100
-Subject: [PATCH 04/18] ARM64: dts: meson-gxbb-p20x: Fix Wifi node name
-In-Reply-To: <20170123165018.w4jkyckyrltfyhz3@rob-hp-laptop>
-References: <20170120222118.21476-1-afaerber@suse.de>
- <20170120222118.21476-5-afaerber@suse.de>
- <20170123165018.w4jkyckyrltfyhz3@rob-hp-laptop>
-Message-ID: <0f610d70-1fa1-56fe-cf11-4aea5ea1df7b@suse.de>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 23 Jan 2017 18:00:02 +0100
+Subject: [PATCH v2 4/9] ARM: dts: imx28-duckbill: enable spi, i2c and uart
+ pins
+In-Reply-To: <1485123764-14754-5-git-send-email-mhei@heimpold.de>
+References: <1485123764-14754-1-git-send-email-mhei@heimpold.de>
+ <1485123764-14754-5-git-send-email-mhei@heimpold.de>
+Message-ID: <96eabd96-64a6-7fbc-bb4b-223244358a42@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 23.01.2017 um 17:50 schrieb Rob Herring:
-> On Fri, Jan 20, 2017 at 11:21:04PM +0100, Andreas F?rber wrote:
->> bcrmf -> brcmf
->>
->> Fixes: ab3943fe57a2 ("ARM64: dts: meson-gxbb: Add P20x Wifi SDIO support")
->> Cc: Neil Armstrong <narmstrong@baylibre.com>
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->> ---
->>  arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
->> index 4a96e0f6f926..5183c5ce90c6 100644
->> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
->> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
->> @@ -193,7 +193,7 @@
->>  	vmmc-supply = <&vddao_3v3>;
->>  	vqmmc-supply = <&vddio_boot>;
->>  
->> -	brcmf: bcrmf at 1 {
->> +	brcmf: brcmf at 1 {
-> 
-> wifi at 1
+Hi,
 
-Good point.
+Am 22.01.2017 um 23:22 schrieb Michael Heimpold:
+> While at tweak some more settings for the default product:
+> - enable lradc
+> - adjust USB dr mode
+> - add default triggers for LEDs
+> - get rid of regulators simple-bus container
+> - adjust phy reset duration
 
-Regards,
-Andreas
+since the subject line suggests something different as the actual
+complete patch does, this needs to be changed.
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+@Shawn, @Fabio: Do we need a single patch for every point or is it
+possible to squash some?
