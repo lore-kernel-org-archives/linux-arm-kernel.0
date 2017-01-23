@@ -1,81 +1,107 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Mon, 23 Jan 2017 19:36:08 +0100
-Subject: [PATCH 01/18] Documentation: devicetree: amlogic: Reorder boards
-In-Reply-To: <20170123164831.ux2kkofq7xf2whnp@rob-hp-laptop>
-References: <20170120222118.21476-1-afaerber@suse.de>
- <20170120222118.21476-2-afaerber@suse.de>
- <20170123164831.ux2kkofq7xf2whnp@rob-hp-laptop>
-Message-ID: <31ca7ebb-6101-891f-e8c4-298635d1979e@suse.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 23 Jan 2017 18:37:27 +0000
+Subject: [PATCH 2/4] PCI: Xilinx NWL: Modifying irq chip for legacy
+ interrupts
+In-Reply-To: <1484997072-19276-2-git-send-email-bharatku@xilinx.com>
+References: <1484997072-19276-1-git-send-email-bharatku@xilinx.com>
+ <1484997072-19276-2-git-send-email-bharatku@xilinx.com>
+Message-ID: <1ac7a4bb-26b6-7a4b-9bf1-030d87e6f8e6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 23.01.2017 um 17:48 schrieb Rob Herring:
-> On Fri, Jan 20, 2017 at 11:21:01PM +0100, Andreas F?rber wrote:
->> Enforce groupment by SoCs and order alphabetically within the group
->> (with some exceptions). This should facilitate adding new boards.
->>
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
->> ---
->>  Documentation/devicetree/bindings/arm/amlogic.txt | 19 +++++++++++++------
->>  1 file changed, 13 insertions(+), 6 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
->> index c246cd2730d9..b03d23c9ea78 100644
->> --- a/Documentation/devicetree/bindings/arm/amlogic.txt
->> +++ b/Documentation/devicetree/bindings/arm/amlogic.txt
->> @@ -29,23 +29,30 @@ Boards with the Amlogic Meson GXM S912 SoC shall have the following properties:
->>    Required root node property:
->>      compatible: "amlogic,s912", "amlogic,meson-gxm";
->>  
->> -Board compatible values:
->> +Board compatible values (grouped by SoC):
+On 21/01/17 11:11, Bharat Kumar Gogada wrote:
+> - Few wifi end points which only support legacy interrupts,
+> performs hardware reset functionalities after disabling interrupts
+> by invoking disable_irq and then re-enable using enable_irq, they
+> enable hardware interrupts first and then virtual irq line later.
+> - The legacy irq line goes low only after DEASSERT_INTx is
+> received.As the legacy irq line is high immediately after hardware
+> interrupts are enabled but virq of EP is still in disabled state
+> and EP handler is never executed resulting no DEASSERT_INTx.If dummy
+> irq chip is used, interrutps are not masked and system is
+> hanging with CPU stall.
+> - Adding irq chip functions instead of dummy irq chip for legacy
+> interrupts.
 > 
-> ...and alphabetical order within each SoC.
-
-...except for pro, meta, telos, which are in increasing feature set
-order - should we reorder them, or ignore but still write alphabetical?
-
-Regards,
-Andreas
-
+> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+> ---
+>  drivers/pci/host/pcie-xilinx-nwl.c |   36 +++++++++++++++++++++++++++++++++++-
+>  1 files changed, 35 insertions(+), 1 deletions(-)
 > 
->> +
->>    - "geniatech,atv1200" (Meson6)
->> +
->>    - "minix,neo-x8" (Meson8)
->> -  - "tronfy,mxq" (Meson8b)
->> +
->>    - "hardkernel,odroid-c1" (Meson8b)
->> +  - "tronfy,mxq" (Meson8b)
->> +
->> +  - "amlogic,p200" (Meson gxbb)
->> +  - "amlogic,p201" (Meson gxbb)
->> +  - "hardkernel,odroid-c2" (Meson gxbb)
->> +  - "nexbox,a95x" (Meson gxbb or Meson gxl s905x)
->>    - "tronsmart,vega-s95-pro", "tronsmart,vega-s95" (Meson gxbb)
->>    - "tronsmart,vega-s95-meta", "tronsmart,vega-s95" (Meson gxbb)
->>    - "tronsmart,vega-s95-telos", "tronsmart,vega-s95" (Meson gxbb)
->> -  - "hardkernel,odroid-c2" (Meson gxbb)
->> -  - "amlogic,p200" (Meson gxbb)
->> -  - "amlogic,p201" (Meson gxbb)
->>    - "wetek,hub" (Meson gxbb)
->>    - "wetek,play2" (Meson gxbb)
->> +
->>    - "amlogic,p212" (Meson gxl s905x)
->> +
->>    - "amlogic,p230" (Meson gxl s905d)
->>    - "amlogic,p231" (Meson gxl s905d)
->> +
->>    - "amlogic,q200" (Meson gxm s912)
->>    - "amlogic,q201" (Meson gxm s912)
->> -  - "nexbox,a95x" (Meson gxbb or Meson gxl s905x)
->>    - "nexbox,a1" (Meson gxm s912)
->> -- 
->> 2.10.2
->>
+> diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
+> index c8b5a33..e1809f9 100644
+> --- a/drivers/pci/host/pcie-xilinx-nwl.c
+> +++ b/drivers/pci/host/pcie-xilinx-nwl.c
+> @@ -396,10 +396,44 @@ static void nwl_pcie_msi_handler_low(struct irq_desc *desc)
+>  	chained_irq_exit(chip, desc);
+>  }
+>  
+> +static void nwl_mask_leg_irq(struct irq_data *data)
+> +{
+> +	struct irq_desc *desc = irq_to_desc(data->irq);
+> +	struct nwl_pcie *pcie;
+> +	unsigned int mask = 0;
 
+No need for this initialization. And if the function you're passing that
+to takes a u32, why isn't that a u32 too?
 
+> +
+> +	pcie = irq_desc_get_chip_data(desc);
+> +	mask = 1 << (data->hwirq - 1);
+> +	nwl_bridge_writel(pcie, ((u32)MSGF_LEG_SR_MASKALL & (~mask)),
+> +			  MSGF_LEG_MASK);
+
+Erm. This looks completely bogus. Let's say I mask INTA:
+
+	mask = 1 << 0;
+	nwl_bridge_writel(pcie, INTD|INTC|INTB, ...);
+
+Now, in a separate context, I decide to mask INTB:
+
+	mask = 1 << 1;
+	nwl_bridge_writel(pcie, INTD|INTC|INTA, ...);
+
+unmasking INTA in the process. Probably not what you intended.
+
+> +
+> +}
+> +
+> +static void nwl_unmask_leg_irq(struct irq_data *data)
+> +{
+> +	struct irq_desc *desc = irq_to_desc(data->irq);
+> +	struct nwl_pcie *pcie;
+> +	unsigned int mask = 0;
+> +
+> +	pcie = irq_desc_get_chip_data(desc);
+> +	mask = 1 << (data->hwirq - 1);
+> +	nwl_bridge_writel(pcie, ((u32)MSGF_LEG_SR_MASKALL | mask),
+> +			  MSGF_LEG_MASK);
+
+Same issue.
+
+> +
+> +}
+> +
+> +static struct irq_chip nwl_leg_irq_chip = {
+> +	.name = "nwl_pcie:legacy",
+> +	.irq_enable = nwl_unmask_leg_irq,
+> +	.irq_disable = nwl_mask_leg_irq,
+> +	.irq_mask = nwl_mask_leg_irq,
+> +	.irq_unmask = nwl_unmask_leg_irq,
+> +};
+> +
+>  static int nwl_legacy_map(struct irq_domain *domain, unsigned int irq,
+>  			  irq_hw_number_t hwirq)
+>  {
+> -	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
+> +	irq_set_chip_and_handler(irq, &nwl_leg_irq_chip, handle_simple_irq);
+>  	irq_set_chip_data(irq, domain->host_data);
+>  
+>  	return 0;
+> 
+
+Thanks,
+
+	M.
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Jazz is not dead. It just smells funny...
