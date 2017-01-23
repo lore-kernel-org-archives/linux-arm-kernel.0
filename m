@@ -1,75 +1,81 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 23 Jan 2017 19:34:47 +0100
-Subject: [PATCH] KVM: arm/arm64: Remove struct vgic_irq pending field
-In-Reply-To: <154ecb7e-457d-ea56-4ae2-c2b37c951a8a@arm.com>
-References: <20170123133951.10329-1-christoffer.dall@linaro.org>
- <154ecb7e-457d-ea56-4ae2-c2b37c951a8a@arm.com>
-Message-ID: <20170123183447.GH15850@cbox>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Mon, 23 Jan 2017 19:36:08 +0100
+Subject: [PATCH 01/18] Documentation: devicetree: amlogic: Reorder boards
+In-Reply-To: <20170123164831.ux2kkofq7xf2whnp@rob-hp-laptop>
+References: <20170120222118.21476-1-afaerber@suse.de>
+ <20170120222118.21476-2-afaerber@suse.de>
+ <20170123164831.ux2kkofq7xf2whnp@rob-hp-laptop>
+Message-ID: <31ca7ebb-6101-891f-e8c4-298635d1979e@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2017 at 05:57:05PM +0000, Andre Przywara wrote:
-> Hi Christoffer,
+Am 23.01.2017 um 17:48 schrieb Rob Herring:
+> On Fri, Jan 20, 2017 at 11:21:01PM +0100, Andreas F?rber wrote:
+>> Enforce groupment by SoCs and order alphabetically within the group
+>> (with some exceptions). This should facilitate adding new boards.
+>>
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>> ---
+>>  Documentation/devicetree/bindings/arm/amlogic.txt | 19 +++++++++++++------
+>>  1 file changed, 13 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/amlogic.txt b/Documentation/devicetree/bindings/arm/amlogic.txt
+>> index c246cd2730d9..b03d23c9ea78 100644
+>> --- a/Documentation/devicetree/bindings/arm/amlogic.txt
+>> +++ b/Documentation/devicetree/bindings/arm/amlogic.txt
+>> @@ -29,23 +29,30 @@ Boards with the Amlogic Meson GXM S912 SoC shall have the following properties:
+>>    Required root node property:
+>>      compatible: "amlogic,s912", "amlogic,meson-gxm";
+>>  
+>> -Board compatible values:
+>> +Board compatible values (grouped by SoC):
 > 
-> On 23/01/17 13:39, Christoffer Dall wrote:
-> > One of the goals behind the VGIC redesign was to get rid of cached or
-> > intermediate state in the data structures, but we decided to allow
-> > ourselves to precompute the pending value of an IRQ based on the line
-> > level and pending latch state.  However, this has now become difficult
-> > to base proper GICv3 save/restore on, because there is a potential to
-> > modify the pending state without knowing if an interrupt is edge or
-> > level configured.
-> > 
-> > See the following post and related message for more background:
-> > https://lists.cs.columbia.edu/pipermail/kvmarm/2017-January/023195.html
-> > 
-> > This commit gets rid of the precomputed pending field in favor of a
-> > function that calculates the value when needed, irq_is_pending().
-> > 
-> > The soft_pending field is renamed to pending_latch to represent that
-> > this latch is the equivalent hardware latch which gets manipulated by
-> > the input signal for edge-triggered interrupts and when writing to the
-> > SPENDR/CPENDR registers.
-> > 
-> > After this commit save/restore code should be able to simply restore the
-> > pending_latch state, line_level state, and config state in any order and
-> > get the desired result.
-> 
-> In general I like this very much and am wondering why we didn't come up
-> with this earlier. But I guess we were so subscribed to our "cached
-> pending" bit.
-> 
-> So I checked several cases, tested some logic equations and drew the
-> state diagrams for the "before" and "after" case, but I couldn't find a
-> reason why this wouldn't work.
-> 
-> I also think you can get rid of the irq_set_pending_latch() wrapper and
-> assign the value directly, as I don't see any reason to hide the fact
-> that it's indeed a simple assignment and nothing magic behind this
-> function. Also it would make the diff a bit easier to read.
+> ...and alphabetical order within each SoC.
 
-Agreed.  Once we have agreement about if we should cleanup clearing the
-latch state, I'll respin with that and add you and Marc's RB tags with
-the changed version.
+...except for pro, meta, telos, which are in increasing feature set
+order - should we reorder them, or ignore but still write alphabetical?
+
+Regards,
+Andreas
 
 > 
-> But apart from that:
-> 
-> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
-> 
-> 
-> I also gave this a quick test on the Juno and the Midway with both
-> kvmtool and QEMU and they survived some basic testing.
-> 
-> I need to check a GICv3 machine tomorrow, but I don't expect any
-> differences here.
-> 
+>> +
+>>    - "geniatech,atv1200" (Meson6)
+>> +
+>>    - "minix,neo-x8" (Meson8)
+>> -  - "tronfy,mxq" (Meson8b)
+>> +
+>>    - "hardkernel,odroid-c1" (Meson8b)
+>> +  - "tronfy,mxq" (Meson8b)
+>> +
+>> +  - "amlogic,p200" (Meson gxbb)
+>> +  - "amlogic,p201" (Meson gxbb)
+>> +  - "hardkernel,odroid-c2" (Meson gxbb)
+>> +  - "nexbox,a95x" (Meson gxbb or Meson gxl s905x)
+>>    - "tronsmart,vega-s95-pro", "tronsmart,vega-s95" (Meson gxbb)
+>>    - "tronsmart,vega-s95-meta", "tronsmart,vega-s95" (Meson gxbb)
+>>    - "tronsmart,vega-s95-telos", "tronsmart,vega-s95" (Meson gxbb)
+>> -  - "hardkernel,odroid-c2" (Meson gxbb)
+>> -  - "amlogic,p200" (Meson gxbb)
+>> -  - "amlogic,p201" (Meson gxbb)
+>>    - "wetek,hub" (Meson gxbb)
+>>    - "wetek,play2" (Meson gxbb)
+>> +
+>>    - "amlogic,p212" (Meson gxl s905x)
+>> +
+>>    - "amlogic,p230" (Meson gxl s905d)
+>>    - "amlogic,p231" (Meson gxl s905d)
+>> +
+>>    - "amlogic,q200" (Meson gxm s912)
+>>    - "amlogic,q201" (Meson gxm s912)
+>> -  - "nexbox,a95x" (Meson gxbb or Meson gxl s905x)
+>>    - "nexbox,a1" (Meson gxm s912)
+>> -- 
+>> 2.10.2
+>>
 
-Thanks.
 
-I tested this, including GICv2 migration on Mustang, and was going to do
-GICv3 testing and 32-bit testin tomorrow, but I'm quite happy to hear
-you gave it a spin on a 32-bit platform already.
-
-
--Christoffer
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
