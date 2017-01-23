@@ -1,172 +1,53 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Mon, 23 Jan 2017 09:20:02 +0100
-Subject: [PATCH v13 2/5] tee: generic TEE subsystem
-In-Reply-To: <8436100.O3a8W3D0ph@wuerfel>
-References: <1479480700-554-1-git-send-email-jens.wiklander@linaro.org>
- <5825882.vZRDMrBMkW@wuerfel> <20170119164541.GA22094@jax>
- <8436100.O3a8W3D0ph@wuerfel>
-Message-ID: <20170123082001.GA1910@jax>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 23 Jan 2017 09:21:30 +0100
+Subject: [PATCH] pinctrl: sunxi: Don't enforce bias disable (for now)
+Message-ID: <20170123082130.15558-1-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2017 at 05:47:40PM +0100, Arnd Bergmann wrote:
-> On Thursday, January 19, 2017 5:45:43 PM CET Jens Wiklander wrote:
-> > 
-> > On Wed, Jan 18, 2017 at 09:19:25PM +0100, Arnd Bergmann wrote:
-> > > On Friday, November 18, 2016 3:51:37 PM CET Jens Wiklander wrote:
-> > > > Initial patch for generic TEE subsystem.
-> > > > This subsystem provides:
-> > > > * Registration/un-registration of TEE drivers.
-> > > > * Shared memory between normal world and secure world.
-> > > > * Ioctl interface for interaction with user space.
-> > > > * Sysfs implementation_id of TEE driver
-> > > > 
-> > > > A TEE (Trusted Execution Environment) driver is a driver that interfaces
-> > > > with a trusted OS running in some secure environment, for example,
-> > > > TrustZone on ARM cpus, or a separate secure co-processor etc.
-> > > > 
-> > > > The TEE subsystem can serve a TEE driver for a Global Platform compliant
-> > > > TEE, but it's not limited to only Global Platform TEEs.
-> > > > 
-> > > > This patch builds on other similar implementations trying to solve
-> > > > the same problem:
-> > > > * "optee_linuxdriver" by among others
-> > > >   Jean-michel DELORME<jean-michel.delorme@st.com> and
-> > > >   Emmanuel MICHEL <emmanuel.michel@st.com>
-> > > > * "Generic TrustZone Driver" by Javier Gonz?lez <javier@javigon.com>
-> > > 
-> > > Can you give an example for a system that would contain more than one
-> > > TEE? I see that you support dynamic registration, and it's clear that
-> > > there can be more than one type of TEE, but why would one have more
-> > > than one at a time, and why not more than 32?
-> > 
-> > I know that ST has systems where there's one TEE in TrustZone and
-> > another TEE on a separate secure co-processor. If you have several TEEs
-> > it's probably because they have different capabilities (performance
-> > versus level of security). Just going beyond two or three different
-> > levels of security with different TEEs sounds a bit extreme, so a
-> > maximum of 32 or 16 should be fairly safe. If it turns out I'm wrong in
-> > this assumption it's not that hard to correct it.
-> 
-> Ok
-> 
-> > > 
-> > > > +	if (copy_from_user(&arg, uarg, sizeof(arg)))
-> > > > +		return -EFAULT;
-> > > > +
-> > > > +	if (sizeof(arg) + TEE_IOCTL_PARAM_SIZE(arg.num_params) != buf.buf_len)
-> > > > +		return -EINVAL;
-> > > > +
-> > > > +	if (arg.num_params) {
-> > > > +		params = kcalloc(arg.num_params, sizeof(struct tee_param),
-> > > > +				 GFP_KERNEL);
-> > > > +		if (!params)
-> > > > +			return -ENOMEM;
-> > > 
-> > > It would be good to have an upper bound on the number of parameters
-> > > to limit the size of the memory allocation here.
-> > 
-> > This is already limited due to:
-> > 
-> > The test with: buf.buf_len > TEE_MAX_ARG_SIZE
-> > 
-> > And then another test that the number of parameters matches the buffer size
-> > with: sizeof(arg) + TEE_IOCTL_PARAM_SIZE(arg.num_params) != buf.buf_len
-> 
-> Ok, makes sense.
-> 
-> > > 
-> > > > +/**
-> > > > + * struct tee_ioctl_param - parameter
-> > > > + * @attr: attributes
-> > > > + * @memref: a memory reference
-> > > > + * @value: a value
-> > > > + *
-> > > > + * @attr & TEE_PARAM_ATTR_TYPE_MASK indicates if memref or value is used in
-> > > > + * the union. TEE_PARAM_ATTR_TYPE_VALUE_* indicates value and
-> > > > + * TEE_PARAM_ATTR_TYPE_MEMREF_* indicates memref. TEE_PARAM_ATTR_TYPE_NONE
-> > > > + * indicates that none of the members are used.
-> > > > + */
-> > > > +struct tee_ioctl_param {
-> > > > +	__u64 attr;
-> > > > +	union {
-> > > > +		struct tee_ioctl_param_memref memref;
-> > > > +		struct tee_ioctl_param_value value;
-> > > > +	} u;
-> > > > +};
-> > > > +
-> > > > +#define TEE_IOCTL_UUID_LEN		16
-> > > > +
-> > > 
-> > > Having a union in an ioctl argument seems odd. Have you considered
-> > > using two different ioctl command numbers depending on the type?
-> > 
-> > struct tee_ioctl_param is used as an array and some parameters can be
-> > memrefs while other are values.
-> 
-> Got it. I still think it's a bit awkward on the user ABI side.
-> I also see that (unlike the in-kernel interface) tee_ioctl_param_memref
-> and tee_ioctl_param_value are both defined in terms of three __u64
-> members.
+Commit 07fe64ba213f ("pinctrl: sunxi: Handle bias disable") actually
+enforced enforced the disabling of the pull up/down resistors instead of
+ignoring it like it was done before.
 
-Actually the last member of struct tee_ioctl_param_memref is an __s64,
-but that doesn't matter much one just have to be a little careful.
+This was part of a wider rework to switch to the generic pinconf bindings,
+and was meant to be merged together with DT patches that were switching to
+it, and removing what was considered default values by both the binding and
+the boards. This included no bias on a pin.
 
-> 
-> How about simply using one format here and making this
-> 
-> struct tee_ioctl_param {
->    __u64 attr;
->    __u64 a;
->    __u64 b;
->    __u64 c;
-> };
-> 
-> Given that you need a wrapper to set the pointer in memref anyway?
-> 
-> Having an ioctl with a variable number of variable type arguments
-> is really a weakness of the ABI, but I don't see a good way around
-> it either, the above would just make it slightly more direct.
+However, those DT patches were delayed to 4.11, which would be fine only
+for a significant number boards having the bias setup wrong, which in turns
+break the MMC on those boards (and possibly other devices too).
 
-OK, I'll change.
+In order to avoid conflicts as much as possible, bring back the old
+behaviour for 4.10, and we'll revert that commit once all the DT bits will
+have landed.
 
-> 
-> > > > +/**
-> > > > + * struct tee_iocl_supp_send_arg - Send a response to a received request
-> > > > + * @ret:	[out] return value
-> > > > + * @num_params	[in] number of parameters following this struct
-> > > > + */
-> > > > +struct tee_iocl_supp_send_arg {
-> > > > +	__u32 ret;
-> > > > +	__u32 num_params;
-> > > > +	/*
-> > > > +	 * this struct is 8 byte aligned since the 'struct tee_ioctl_param'
-> > > > +	 * which follows requires 8 byte alignment.
-> > > > +	 *
-> > > > +	 * Commented out element used to visualize the layout dynamic part
-> > > > +	 * of the struct. This field is not available at all if
-> > > > +	 * num_params == 0.
-> > > > +	 *
-> > > > +	 * struct tee_ioctl_param params[num_params];
-> > > > +	 */
-> > > > +} __aligned(8);
-> > > 
-> > > I'd make that 
-> > > 
-> > > 	struct tee_ioctl_param params[0];
-> > > 
-> > > as wel here, as I also commented in patch 3 that has a similar structure.
-> > 
-> > I'm concerned that this may cause warnings when compiling for user space
-> > depending on compiler and options. Am I too cautious here?
-> 
-> See https://gcc.gnu.org/onlinedocs/gcc/Zero-Length.html
-> 
-> I actually misremembered it and the syntax I listed is GCC specific,
-> but C99 allows "flexible arrays". I think there is no problem relying
-> on C99 here, we already rely on C99 features elsewhere in headers.
+Tested-by: Priit Laes <plaes@plaes.org>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+Hi Linus,
 
-OK, I'll change.
+This is intended as a fix for 4.10.
 
-Thanks,
-Jens
+Thanks!
+Maxime
+
+ drivers/pinctrl/sunxi/pinctrl-sunxi.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/drivers/pinctrl/sunxi/pinctrl-sunxi.c b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+index 0eb51e33cb1b..207a8de4e1ed 100644
+--- a/drivers/pinctrl/sunxi/pinctrl-sunxi.c
++++ b/drivers/pinctrl/sunxi/pinctrl-sunxi.c
+@@ -564,8 +564,7 @@ static int sunxi_pconf_group_set(struct pinctrl_dev *pctldev,
+ 			val = arg / 10 - 1;
+ 			break;
+ 		case PIN_CONFIG_BIAS_DISABLE:
+-			val = 0;
+-			break;
++			continue;
+ 		case PIN_CONFIG_BIAS_PULL_UP:
+ 			if (arg == 0)
+ 				return -EINVAL;
+-- 
+2.11.0
