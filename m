@@ -1,107 +1,171 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 23 Jan 2017 12:08:41 +0100
-Subject: [PATCH v3 00/24] i.MX Media Driver
-In-Reply-To: <1485169204.2874.57.camel@pengutronix.de>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 23 Jan 2017 12:13:26 +0100
+Subject: [PATCH v3 16/24] media: Add i.MX media core driver
+In-Reply-To: <e38feca9-ed6f-8288-e006-768d6ba2fe5a@gmail.com>
 References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <c6e98327-7e2c-f34a-2d23-af7b236de441@xs4all.nl>
- <1484929911.2897.70.camel@pengutronix.de>
- <3fb68686-9447-2d8a-e2d2-005e4138cd43@gmail.com>
- <5d23d244-aa0e-401c-24a9-07f28acf1563@xs4all.nl>
- <1485169204.2874.57.camel@pengutronix.de>
-Message-ID: <2b6ae556-df48-6b6b-87f1-d092eba586b9@xs4all.nl>
+ <1483755102-24785-17-git-send-email-steve_longerbeam@mentor.com>
+ <1484320822.31475.96.camel@pengutronix.de>
+ <a94025b4-c4dd-de51-572e-d2615a7246e4@gmail.com>
+ <1484574468.8415.136.camel@pengutronix.de>
+ <e38feca9-ed6f-8288-e006-768d6ba2fe5a@gmail.com>
+Message-ID: <1485170006.2874.63.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/2017 12:00 PM, Philipp Zabel wrote:
-> On Fri, 2017-01-20 at 21:39 +0100, Hans Verkuil wrote:
-> [...]
->>> There is a VDIC entity in the i.MX IPU that performs de-interlacing with
->>> hardware filters for motion compensation. Some of the motion compensation
->>> modes ("low" and "medium" motion) require that the VDIC receive video
->>> frame fields from memory buffers (dedicated dma channels in the
->>> IPU are used to transfer those buffers into the VDIC).
->>>
->>> So one option to support those modes would be to pass the raw buffers
->>> from a camera sensor up to userspace to a capture device, and then pass
->>> them back to the VDIC for de-interlacing using a mem2mem device.
->>>
->>> Philipp and I are both in agreement that, since userland is not interested
->>> in the intermediate interlaced buffers in this case, but only the final
->>> result (motion compensated, de-interlaced frames), it is more efficient
->>> to provide a media link that allows passing those intermediate frames
->>> directly from a camera source pad to VDIC sink pad, without having
->>> to route them through userspace.
->>>
->>> So in order to support that, I've implemented a simple FIFO dma buffer
->>> queue in the driver to allow passing video buffers directly from a source
->>> to a sink. It is modeled loosely off the vb2 state machine and API, but
->>> simpler (for instance it only allows contiguous, cache-coherent buffers).
->>>
->>> This is where Philipp has an argument, that this should be done with a
->>> new API in videobuf2.
-> 
-> That is one part of the argument. I'm glad to understand now that we
-> agree about this.
-> 
->>> And I'm actually in total agreement with that. I definitely agree that there
->>> should be a mechanism in the media framework that allows passing video
->>> buffers from a source pad to a sink pad using a software queue, with no
->>> involvement from userland.
-> 
-> That is the other part of the argument. I do not agree that these
-> software queue "links" should be presented to userspace as media pad
-> links between two entities of a media device. 
-> 
-> First, that would limit the links to subdevices contained in the same
-> media graph, while this should work between any two capture and output
-> queues of different devices.
-> Assume for example, we want to encode the captured, deinterlaced video
-> to h.264 with the coda VPU driver. A software queue link could be
-> established between the CSI capture and the VDIC deinterlacer input,
-> just as between the VDIC deinterlacer output and the coda VPU input.
-> Technically, there would be no difference between those two linked
-> capture/output queue pairs. But the coda driver is a completely separate
-> mem2mem device. And since it is not part of the i.MX media graph, there
-> is no entity pad to link to.
-> Or assume there is an USB analog capture device that produces interlaced
-> frames. I think it should be possible to connect its capture queue to
-> the VDIC deinterlacer output queue just the same way as linking the CSI
-> to the VDIC (in software queue mode).
-> 
-> Second, the subdevice pad formats describe wire formats, not memory
-> formats. The user might want to choose between 4:2:2 and 4:2:0
-> subsampled YUV formats for the intermediate buffer, for example,
-> depending on memory bandwidth constraints and quality requirements. This
-> is impossible with the media entity / subdevice pad links.
-> 
-> I think an interface where userspace configures the capture and output
-> queues via v4l2 API, passes dma buffers around from one to the other
-> queue, and then puts both queues into a free running mode would be a
-> much better fit for this mechanism.
-> 
->>> My only disagreement is when this should be implemented. I think it is
->>> fine to keep my custom implementation of this in the driver for now. Once
->>> an extension of vb2 is ready to support this feature, it would be fairly
->>> straightforward to strip out my custom implementation and go with the
->>> new API.
->>
->> For a staging driver this isn't necessary, as long as it is documented in
->> the TODO file that this needs to be fixed before it can be moved out of
->> staging. The whole point of staging is that there is still work to be
->> done in the driver, after all :-)
-> 
-> Absolutely. The reason I am arguing against merging the mem2mem media
-> control links so vehemently is that I am convinced the userspace
-> interface is wrong, and I am afraid that even though in staging, it
-> might become established.
+Hi Steve,
 
-As long as it is mentioned in the TODO, and ideally in the Kconfig as well,
-then I'm fine with it.
+On Sun, 2017-01-22 at 18:31 -0800, Steve Longerbeam wrote:
+> 
+> On 01/16/2017 05:47 AM, Philipp Zabel wrote:
+> > On Sat, 2017-01-14 at 14:46 -0800, Steve Longerbeam wrote:
+> > [...]
+> >>>> +Unprocessed Video Capture:
+> >>>> +--------------------------
+> >>>> +
+> >>>> +Send frames directly from sensor to camera interface, with no
+> >>>> +conversions:
+> >>>> +
+> >>>> +-> ipu_smfc -> camif
+> >>> I'd call this capture interface, this is not just for cameras. Or maybe
+> >>> idmac if you want to mirror hardware names?
+> >> Camif is so named because it is the V4L2 user interface for video
+> >> capture. I suppose it could be named "capif", but that doesn't role
+> >> off the tongue quite as well.
+> > Agreed, capif sounds weird. I find camif a bit confusing though, because
+> > Samsung S3C has a camera interface that is actually called "CAMIF".
+> 
+> how about simply "capture" ?
 
-The big advantage of being in the kernel is that it is much easier to start
-providing fixes, improvements, etc. If you use a staging driver you know
-that there is no guarantee whatsoever with respect to stable ABI/APIs.
+That sounds good to me.
 
-Regards,
+[...]
+> > Chapter 37.4.2.3 "FCW & FCR - Format converter write and read" in the
+> > IDMAC chapter states that all internal submodules only work on 8-bit per
+> > component formats with four components: YUVA or RGBA.
+> 
+> Right, the "direct" IPU internal (that do not transfer buffers to/from
+> memory via IDMAC channels) should only allow the IPU internal
+> formats YUVA and RGBA. I get you now.
+> 
+> The "direct" pads now only accept MEDIA_BUS_FMT_AYUV8_1X32 and
+> MEDIA_BUS_FMT_ARGB8888_1X32.
+> 
+> Those pads are:
+> 
+> ipu_csi:1
+> ipu_vdic:1
+> ipu_ic_prp:0
+> ipu_ic_prp:1
+> ipu_ic_prpenc:0
+> ipu_ic_prpenc:1
+> ipu_ic_prpvf:0
+> ipu_ic_prpvf:1
 
-	Hans
+Yes, that is what I meant. The csi:1 can then be extended to support
+additional expanded/packed/raw formats for the SMFC->memory path.
+
+> >> There does not appear to be support in the FSU for linking a write channel
+> >> to the VDIC read channels (8, 9, 10) according to VDI_SRC_SEL field. There
+> >> is support for the direct link from CSI (which I am using), but that's
+> >> not an
+> >> IDMAC channel link.
+> >>
+> >> There is a PRP_SRC_SEL field, with linking from IDMAC (SMFC) channels
+> >> 0..2 (and 3? it's not clear, and not clear whether this includes channel 1).
+> > As I read it, that is 0 and 2 only, no idea why. But since there are
+> > only 2 CSIs, that shouldn't be a problem.
+> 
+> ipu_csi1 is now transferring on IDMAC/SMFC channel 2 (ipu_csi0 still
+> at channel 0).
+
+Ok.
+
+> >>>> +static const u32 power_off_seq[] = {
+> >>>> +	IMX_MEDIA_GRP_ID_IC_PP,
+> >>>> +	IMX_MEDIA_GRP_ID_IC_PRPVF,
+> >>>> +	IMX_MEDIA_GRP_ID_IC_PRPENC,
+> >>>> +	IMX_MEDIA_GRP_ID_SMFC,
+> >>>> +	IMX_MEDIA_GRP_ID_CSI,
+> >>>> +	IMX_MEDIA_GRP_ID_VIDMUX,
+> >>>> +	IMX_MEDIA_GRP_ID_SENSOR,
+> >>>> +	IMX_MEDIA_GRP_ID_CSI2,
+> >>>> +};
+> >>> This seems somewhat arbitrary. Why is a power sequence needed?
+> >> The CSI-2 receiver must be powered up before the sensor, that's the
+> >> only requirement IIRC. The others have no s_power requirement. So I
+> >> can probably change this to power up in the frontend -> backend order
+> >> (IC_PP to sensor). And vice-versa for power off.
+> > Yes, I think that should work (see below).
+> 
+> Actually there are problems using this, see below.
+[...]
+> >>>> +EXPORT_SYMBOL_GPL(imx_media_pipeline_set_power);
+> >>> This should really be handled by v4l2_pipeline_pm_use.
+> >> I thought about this earlier, but v4l2_pipeline_pm_use() seems to be
+> >> doing some other stuff that bothered me, at least that's what I remember.
+> >> I will revisit this.
+> > I have used it with a tc358743 -> mipi-csi2 pipeline, it didn't cause
+> > any problems. It would be better to reuse and, if necessary, fix the
+> > existing infrastructure where available.
+> 
+> I tried this API, by switching to v4l2_pipeline_pm_use() in camif 
+> open/release,
+> and switched to v4l2_pipeline_link_notify() instead of 
+> imx_media_link_notify()
+> in the media driver's media_device_ops.
+> 
+> This API assumes the video device has an open file handle while the media
+> links are being established. This doesn't work for me, I want to be able to
+> establish the links using 'media-ctl -l', and that won't work unless 
+> there is an
+> open file handle on the video capture device node.
+> 
+> Also, I looked into calling v4l2_pipeline_pm_use() during 
+> imx_media_link_notify(),
+> instead of imx_media_pipeline_set_power(). Again there are problems with 
+> that.
+> 
+> First, v4l2_pipeline_pm_use() acquires the graph mutex, so it can't be 
+> called inside
+> link_notify which already acquires that lock. The header for this 
+> function also
+> clearly states it should only be called in open/release.
+
+So why not call it in open/release then?
+
+> Second, ignoring the above locking issue for a moment, 
+> v4l2_pipeline_pm_use()
+> will call s_power on the sensor _first_, then the mipi csi-2 s_power, 
+> when executing
+> media-ctl -l '"ov5640 1-003c":0 -> "imx6-mipi-csi2":0[1]'. Which is the 
+> wrong order.
+> In my version which enforces the correct power on order, the mipi csi-2 
+> s_power
+> is called first in that link setup, followed by the sensor.
+
+I don't understand why you want to power up subdevs as soon as the links
+are established. Shouldn't that rather be done for all subdevices in the
+pipeline when the corresponding capture device is opened?
+It seems to me that powering up the pipeline should be the last step
+before userspace actually starts the capture.
+
+[...]
+> >>>> +	/* there must be at least one CSI in first IPU */
+> >>> Why?
+> >> Well yeah, imx-media doesn't necessarily need a CSI if things
+> >> like the VDIC or post-processor are being used by an output
+> >> overlay pipeline, for example. I'll fix this.
+> > I haven't even thought that far, but there could be boards with only a
+> > parallel sensor connected to IPU2 CSI1 and IPU1 disabled for power
+> > saving reasons.
+> 
+> done! A very simple change to imx_media_add_internal_subdevs(),
+> and now no CSI's are necessary, but the remaining IPU internal entities
+> are loaded and linked just fine without them, so for example with no
+> CSI's in IPU2, the VDIC entity in IPU2 is still present in the graph and
+> could still be used in the future by a mem2mem device for instance.
+
+Excellent, thanks.
+
+regards
+Philipp
