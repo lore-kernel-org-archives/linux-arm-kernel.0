@@ -1,161 +1,114 @@
 From: john@phrozen.org (John Crispin)
-Date: Mon, 23 Jan 2017 12:29:32 +0100
-Subject: [PATCH 13/16] arm: dts: rename mt7623-evb.dts to
- arch/arm/boot/dts/mt7623n-rfb.dtsi
+Date: Mon, 23 Jan 2017 12:29:35 +0100
+Subject: [PATCH 16/16] arm: dts: enable the nand device on the mt7623n nand rfb
 In-Reply-To: <1485170975-51813-1-git-send-email-john@phrozen.org>
 References: <1485170975-51813-1-git-send-email-john@phrozen.org>
-Message-ID: <1485170975-51813-14-git-send-email-john@phrozen.org>
+Message-ID: <1485170975-51813-17-git-send-email-john@phrozen.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are 2 versions of the SoC. MT7623N is almost identical to MT7623A
-but has some additional multimedia features. The reference boards are
-available as NAND or MMC and might have a different ethernet setup. In
-order to reduce the duplication of devicetree code we add an intermediate
-dtsi file for these reference boards. Additionally MTK/WCN pointed out,
-that the EVB is yet another board and the board in question is infact the
-RFB. Take this into account while renaming the files.
+Enable the nand device and setup pinmux on the mt7632m rfb with nand
+support.
 
- Signed-off-by: John Crispin <john@phrozen.org>
+Signed-off-by: John Crispin <john@phrozen.org>
 ---
- Documentation/devicetree/bindings/arm/mediatek.txt |    4 +--
- arch/arm/boot/dts/Makefile                         |    2 +-
- arch/arm/boot/dts/mt7623-evb.dts                   |   33 --------------------
- arch/arm/boot/dts/mt7623n-rfb-nand.dts             |   21 +++++++++++++
- arch/arm/boot/dts/mt7623n-rfb.dtsi                 |   29 +++++++++++++++++
- 5 files changed, 53 insertions(+), 36 deletions(-)
- delete mode 100644 arch/arm/boot/dts/mt7623-evb.dts
- create mode 100644 arch/arm/boot/dts/mt7623n-rfb-nand.dts
- create mode 100644 arch/arm/boot/dts/mt7623n-rfb.dtsi
+ arch/arm/boot/dts/mt7623n-rfb-nand.dts |   88 ++++++++++++++++++++++++++++++++
+ 1 file changed, 88 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
-index c860b24..71149cb 100644
---- a/Documentation/devicetree/bindings/arm/mediatek.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek.txt
-@@ -38,9 +38,9 @@ Supported boards:
- - Evaluation board for MT6795(Helio X10):
-     Required root node properties:
-       - compatible = "mediatek,mt6795-evb", "mediatek,mt6795";
--- Evaluation board for MT7623:
-+- Reference  board for MT7623N with NAND:
-     Required root node properties:
--      - compatible = "mediatek,mt7623-evb", "mediatek,mt7623";
-+      - compatible = "mediatek,mt7623n-rfb-nand", "mediatek,mt7623";
- - MTK mt8127 tablet moose EVB:
-     Required root node properties:
-       - compatible = "mediatek,mt8127-moose", "mediatek,mt8127";
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index cccdbcb..9735c2c 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -976,7 +976,7 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += \
- 	mt6580-evbp1.dtb \
- 	mt6589-aquaris5.dtb \
- 	mt6592-evb.dtb \
--	mt7623-evb.dtb \
-+	mt7623n-rfb-nand.dtb \
- 	mt8127-moose.dtb \
- 	mt8135-evbp1.dtb
- dtb-$(CONFIG_ARCH_ZX) += zx296702-ad1.dtb
-diff --git a/arch/arm/boot/dts/mt7623-evb.dts b/arch/arm/boot/dts/mt7623-evb.dts
-deleted file mode 100644
-index 58ed038..0000000
---- a/arch/arm/boot/dts/mt7623-evb.dts
-+++ /dev/null
-@@ -1,33 +0,0 @@
--/*
-- * Copyright (c) 2016 MediaTek Inc.
-- * Author: John Crispin <blogic@openwrt.org>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
--
--/dts-v1/;
--#include "mt7623-mt6323.dtsi"
--
--/ {
--	model = "MediaTek MT7623 evaluation board";
--	compatible = "mediatek,mt7623-evb", "mediatek,mt7623";
--
--	chosen {
--		stdout-path = &uart2;
--	};
--
--	memory {
--		reg = <0 0x80000000 0 0x40000000>;
--	};
--};
--
--&uart2 {
--	status = "okay";
--};
 diff --git a/arch/arm/boot/dts/mt7623n-rfb-nand.dts b/arch/arm/boot/dts/mt7623n-rfb-nand.dts
-new file mode 100644
-index 0000000..436d51c
---- /dev/null
+index 436d51c..9356095 100644
+--- a/arch/arm/boot/dts/mt7623n-rfb-nand.dts
 +++ b/arch/arm/boot/dts/mt7623n-rfb-nand.dts
-@@ -0,0 +1,21 @@
-+/*
-+ * Copyright (c) 2016 MediaTek Inc.
-+ * Author: John Crispin <blogic@openwrt.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
+@@ -19,3 +19,91 @@
+ 	model = "MediaTek MT7623N NAND reference board";
+ 	compatible = "mediatek,mt7623n-rfb-nand", "mediatek,mt7623";
+ };
 +
-+/dts-v1/;
-+#include "mt7623n-rfb.dtsi"
++&pio {
++	nand_pins_default: nanddefault {
++		pins_dat {
++			pinmux = <MT7623_PIN_111_MSDC0_DAT7_FUNC_NLD7>,
++				 <MT7623_PIN_112_MSDC0_DAT6_FUNC_NLD6>,
++				 <MT7623_PIN_114_MSDC0_DAT4_FUNC_NLD4>,
++				 <MT7623_PIN_118_MSDC0_DAT3_FUNC_NLD3>,
++				 <MT7623_PIN_121_MSDC0_DAT0_FUNC_NLD0>,
++				 <MT7623_PIN_120_MSDC0_DAT1_FUNC_NLD1>,
++				 <MT7623_PIN_113_MSDC0_DAT5_FUNC_NLD5>,
++				 <MT7623_PIN_115_MSDC0_RSTB_FUNC_NLD8>,
++				 <MT7623_PIN_119_MSDC0_DAT2_FUNC_NLD2>;
++			input-enable;
++			drive-strength = <MTK_DRIVE_8mA>;
++			bias-pull-up;
++		};
 +
-+/ {
-+	model = "MediaTek MT7623N NAND reference board";
-+	compatible = "mediatek,mt7623n-rfb-nand", "mediatek,mt7623";
-+};
-diff --git a/arch/arm/boot/dts/mt7623n-rfb.dtsi b/arch/arm/boot/dts/mt7623n-rfb.dtsi
-new file mode 100644
-index 0000000..d46390e
---- /dev/null
-+++ b/arch/arm/boot/dts/mt7623n-rfb.dtsi
-@@ -0,0 +1,29 @@
-+/*
-+ * Copyright (c) 2016 MediaTek Inc.
-+ * Author: John Crispin <blogic@openwrt.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
++		pins_we {
++			pinmux = <MT7623_PIN_117_MSDC0_CLK_FUNC_NWEB>;
++			drive-strength = <MTK_DRIVE_8mA>;
++			bias-pull-up = <MTK_PUPD_SET_R1R0_10>;
++		};
 +
-+#include "mt7623-mt6323.dtsi"
-+
-+/ {
-+	chosen {
-+		stdout-path = &uart2;
-+	};
-+
-+	memory {
-+		reg = <0 0x80000000 0 0x40000000>;
++		pins_ale {
++			pinmux = <MT7623_PIN_116_MSDC0_CMD_FUNC_NALE>;
++			drive-strength = <MTK_DRIVE_8mA>;
++			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
++		};
 +	};
 +};
 +
-+&uart2 {
++&nandc {
++	status = "okay";
++	pinctrl-names = "default";
++	pinctrl-0 = <&nand_pins_default>;
++	nand at 0 {
++		reg = <0>;
++		spare_per_sector = <64>;
++		nand-ecc-mode = "hw";
++		nand-ecc-strength = <12>;
++		nand-ecc-step-size = <1024>;
++		partitions {
++			compatible = "fixed-partitions";
++			#address-cells = <1>;
++			#size-cells = <1>;
++
++			partition at 0 {
++				label = "preloader";
++				reg = <0x0 0x40000>;
++			};
++
++			partition at 40000 {
++				label = "uboot";
++				reg = <0x40000 0x80000>;
++			};
++
++			partition at C0000 {
++				label = "uboot-env";
++				reg = <0xC0000 0x40000>;
++			};
++
++			partition at 140000 {
++				label = "bootimg";
++				reg = <0x140000 0x2000000>;
++			};
++
++			partition at 2140000 {
++				label = "recovery";
++				reg = <0x2140000 0x2000000>;
++			};
++
++			partition at 4140000 {
++				label = "rootfs";
++				reg = <0x4140000 0x1000000>;
++			};
++
++			partition at 5140000 {
++				label = "usrdata";
++				reg = <0x5140000 0x1000000>;
++			};
++		};
++	};
++};
++
++&bch {
 +	status = "okay";
 +};
 -- 
