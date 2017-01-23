@@ -1,46 +1,72 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 23 Jan 2017 14:10:36 +0800
-Subject: [PATCH v2 00/12] Add basic code support for imx6sll
-In-Reply-To: <1482832070-22668-1-git-send-email-ping.bai@nxp.com>
-References: <1482832070-22668-1-git-send-email-ping.bai@nxp.com>
-Message-ID: <20170123061034.GE5662@dragon>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Mon, 23 Jan 2017 14:11:13 +0800
+Subject: [PATCH v2 24/26] drm/rockchip: dw-mipi-dsi: support non-burst
+ modes
+In-Reply-To: <20170121163128.22240-25-john@metanate.com>
+References: <20170121163128.22240-1-john@metanate.com>
+ <20170121163128.22240-25-john@metanate.com>
+Message-ID: <58859E81.3060606@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 27, 2016 at 05:47:38PM +0800, Bai Ping wrote:
-> The i.MX 6SoloLiteLite application processors are NXP's
-> latest additions to a growing family of multimedia-focused
-> products offering high-performance processing optimized for
-> lowest power consumption. The i.MX 6SoloLiteLite processors
-> feature NXP's advanced implementation of the ARM Cortex-A9 core,
-> which can be interfaced with LPDDR3 and LPDDR2 DRAM memory devices.
-> 
-> i.MX6SLL is a new SOC of the i.MX6 family, shares many common modules,
-> so most of the MSL code can be resued from i.MX6 serious SOC.
-> 
-> 
-> change for V2:
->     -  address comments in dts and dtsi from Fabio.
->     -  split the doc update into two patch, fix typo.
->     -  address comments in clock driver, add necessary 'const'qualifier.
-> 
-> Bai Ping (12):
->   ARM: imx: Add basic msl support for imx6sll
->   driver: clocksource: add gpt timer for imx6sll
->   Document: dt: binding: imx: update clock doc for imx6sll
->   driver: clk: imx: Add clock driver for imx6sll
->   Document: dt: binding: imx: update pinctrl doc for imx6sll
->   driver: pinctrl: imx: Add pinctrl driver support for imx6sll
->   ARM: dts: imx: Add basic dtsi for imx6sll
->   ARM: dts: imx: Add imx6sll EVK board dts support
->   ARM: debug: Add low level debug support for imx6sll
->   ARM: imx: Add suspend/resume support for imx6sll
->   ARM: imx: correct i.mx6sll dram io low power mode
->   ARM: configs: enable imx6sll support in defconfig
+Reviewed-by: Chris Zhong <zyw@rock-chips.com>
 
-I do not think you need to necessarily put them into a series, since
-they will go through different sub-system maintainers.  If there are
-dependencies between them, you should manage to get the prerequisite
-parts get merged first.
-
-Shawn
+On 01/22/2017 12:31 AM, John Keeping wrote:
+> Signed-off-by: John Keeping <john@metanate.com>
+> ---
+> Unchanged in v2
+> ---
+>   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 16 +++++++++-------
+>   1 file changed, 9 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> index 2dafb17e31d2..881bb0c62ca5 100644
+> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> @@ -82,6 +82,7 @@
+>   #define FRAME_BTA_ACK			BIT(14)
+>   #define ENABLE_LOW_POWER		(0x3f << 8)
+>   #define ENABLE_LOW_POWER_MASK		(0x3f << 8)
+> +#define VID_MODE_TYPE_NON_BURST_SYNC_EVENTS	0x1
+>   #define VID_MODE_TYPE_BURST_SYNC_PULSES		0x2
+>   #define VID_MODE_TYPE_MASK			0x3
+>   
+> @@ -286,6 +287,7 @@ struct dw_mipi_dsi {
+>   	u32 format;
+>   	u16 input_div;
+>   	u16 feedback_div;
+> +	unsigned long mode_flags;
+>   
+>   	const struct dw_mipi_dsi_plat_data *pdata;
+>   };
+> @@ -548,15 +550,10 @@ static int dw_mipi_dsi_host_attach(struct mipi_dsi_host *host,
+>   		return -EINVAL;
+>   	}
+>   
+> -	if (!(device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST) ||
+> -	    !(device->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE)) {
+> -		dev_err(dsi->dev, "device mode is unsupported\n");
+> -		return -EINVAL;
+> -	}
+> -
+>   	dsi->lanes = device->lanes;
+>   	dsi->channel = device->channel;
+>   	dsi->format = device->format;
+> +	dsi->mode_flags = device->mode_flags;
+>   	dsi->panel = of_drm_find_panel(device->dev.of_node);
+>   	if (dsi->panel)
+>   		return drm_panel_attach(dsi->panel, &dsi->connector);
+> @@ -713,7 +710,12 @@ static void dw_mipi_dsi_video_mode_config(struct dw_mipi_dsi *dsi)
+>   {
+>   	u32 val;
+>   
+> -	val = VID_MODE_TYPE_BURST_SYNC_PULSES | ENABLE_LOW_POWER;
+> +	val = ENABLE_LOW_POWER;
+> +
+> +	if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)
+> +		val |= VID_MODE_TYPE_BURST_SYNC_PULSES;
+> +	else if (!(dsi->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE))
+> +		val |= VID_MODE_TYPE_NON_BURST_SYNC_EVENTS;
+>   
+>   	dsi_write(dsi, DSI_VID_MODE_CFG, val);
+>   }
