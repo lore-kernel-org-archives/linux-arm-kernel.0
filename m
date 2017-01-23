@@ -1,71 +1,62 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 23 Jan 2017 21:12:25 +0900
-Subject: [PATCH/RFC 2/2] iommu/ipmmu-vmsa: Opt-in slave devices based on ES
- version
-In-Reply-To: <148517349585.18128.10696161017872202809.sendpatchset@little-apple>
-References: <148517349585.18128.10696161017872202809.sendpatchset@little-apple>
-Message-ID: <148517354599.18128.1970642879780864733.sendpatchset@little-apple>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 23 Jan 2017 13:26:08 +0100
+Subject: [PATCH] serial: xuartps: Enable uart loopback mode
+Message-ID: <db906bd31d3db0e29d87cd545e4c4e9096106bcc.1485174366.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm+renesas@opensource.se>
+From: Yasir-Khan <yasir_khan@mentor.com>
 
-Match on r8a7795 ES2 and enable a certain DMA controller.
-In other cases the IPMMU driver remains disabled.
+This patch adds xilinx uart loopback support by modifying the
+cdns_uart_set_mctrl function to handle the switch to loopback mode.
+After this patch, the loopback mode can be enabled/disabled by
+setting/clearing the TIOCM_LOOP modem bit via TIOCMBIS/TIOCMBIC
+ioctls respectively.
 
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Signed-off-by: Yasir-Khan <yasir_khan@mentor.com>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
 
- drivers/iommu/ipmmu-vmsa.c |   24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ drivers/tty/serial/xilinx_uartps.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
---- 0001/drivers/iommu/ipmmu-vmsa.c
-+++ work/drivers/iommu/ipmmu-vmsa.c	2017-01-23 20:57:02.620607110 +0900
-@@ -23,6 +23,7 @@
- #include <linux/platform_device.h>
- #include <linux/sizes.h>
- #include <linux/slab.h>
-+#include <linux/sys_soc.h>
+diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+index dd4c02fa4820..ad77d0ed0c46 100644
+--- a/drivers/tty/serial/xilinx_uartps.c
++++ b/drivers/tty/serial/xilinx_uartps.c
+@@ -93,6 +93,7 @@
+ #define CDNS_UART_MR_CLKSEL		0x00000001  /* Pre-scalar selection */
+ #define CDNS_UART_MR_CHMODE_L_LOOP	0x00000200  /* Local loop back mode */
+ #define CDNS_UART_MR_CHMODE_NORM	0x00000000  /* Normal mode */
++#define CDNS_UART_MR_CHMODE_MASK	0x00000300  /* Mask for mode bits */
  
- #if defined(CONFIG_ARM) && !defined(CONFIG_IOMMU_DMA)
- #include <asm/dma-iommu.h>
-@@ -1002,16 +1003,39 @@ static void ipmmu_domain_free_dma(struct
- 	}
+ #define CDNS_UART_MR_STOPMODE_2_BIT	0x00000080  /* 2 stop bits */
+ #define CDNS_UART_MR_STOPMODE_1_BIT	0x00000000  /* 1 stop bit */
+@@ -998,17 +999,25 @@ static unsigned int cdns_uart_get_mctrl(struct uart_port *port)
+ static void cdns_uart_set_mctrl(struct uart_port *port, unsigned int mctrl)
+ {
+ 	u32 val;
++	u32 mode_reg;
+ 
+ 	val = readl(port->membase + CDNS_UART_MODEMCR);
++	mode_reg = readl(port->membase + CDNS_UART_MR);
+ 
+ 	val &= ~(CDNS_UART_MODEMCR_RTS | CDNS_UART_MODEMCR_DTR);
++	mode_reg &= ~CDNS_UART_MR_CHMODE_MASK;
+ 
+ 	if (mctrl & TIOCM_RTS)
+ 		val |= CDNS_UART_MODEMCR_RTS;
+ 	if (mctrl & TIOCM_DTR)
+ 		val |= CDNS_UART_MODEMCR_DTR;
++	if (mctrl & TIOCM_LOOP)
++		mode_reg |= CDNS_UART_MR_CHMODE_L_LOOP;
++	else
++		mode_reg |= CDNS_UART_MR_CHMODE_NORM;
+ 
+ 	writel(val, port->membase + CDNS_UART_MODEMCR);
++	writel(mode_reg, port->membase + CDNS_UART_MR);
  }
  
-+static const struct soc_device_attribute r8a7795es2[] = {
-+	{ .soc_id = "r8a7795", .revision = "ES2.*" },
-+	{ /* sentinel */ }
-+};
-+
-+static int ipmmu_slave_whitelist(struct device *dev)
-+{
-+	/* Opt-in slave devices based on SoC and ES version */
-+	if (soc_device_match(r8a7795es2)) {
-+		if (!strcmp(dev_name(dev), "e7310000.dma-controller"))
-+			return 0;
-+	}
-+
-+	/* By default, do not allow use of IPMMU */
-+	return -ENODEV;
-+}
-+
- static int ipmmu_add_device_dma(struct device *dev)
- {
- 	struct ipmmu_vmsa_archdata *archdata = dev->archdata.iommu;
- 	struct iommu_group *group;
-+	int ret;
- 
- 	/* only accept devices with iommus property */
- 	if (of_count_phandle_with_args(dev->of_node, "iommus",
- 				       "#iommu-cells") < 0)
- 		return -ENODEV;
- 
-+	/* opt-in devices based on SoC and ES version */
-+	ret = ipmmu_slave_whitelist(dev);
-+	if (ret)
-+		return ret;
-+
- 	group = iommu_group_get_for_dev(dev);
- 	if (IS_ERR(group))
- 		return PTR_ERR(group);
+ #ifdef CONFIG_CONSOLE_POLL
+-- 
+1.9.1
