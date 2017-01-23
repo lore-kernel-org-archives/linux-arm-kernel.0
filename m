@@ -1,76 +1,57 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 23 Jan 2017 10:41:22 -0700
-Subject: [PATCH 1/3] coresight: fix kernel panic caused by invalid CPU
+Date: Mon, 23 Jan 2017 10:41:23 -0700
+Subject: [PATCH 2/3] coresight: etm4x: Fix enabling of cycle accurate tracing
+ in perf.
 In-Reply-To: <1485193284-31636-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1485193284-31636-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1485193284-31636-2-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1485193284-31636-3-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wang Nan <wangnan0@huawei.com>
+From: Mike Leach <mike.leach@linaro.org>
 
-Commit d52c9750f150 ("coresight: reset "enable_sink" flag when need be")
-caused a kernel panic because of the using of an invalid value: after
-'for_each_cpu(cpu, mask)', value of local variable 'cpu' become invalid,
-causes following 'cpu_to_node' access invalid memory area.
+Using perf record 'cyclacc' option in cs_etm event was not setting up cycle
+accurate trace correctly.
 
-This patch brings the deleted 'cpu = cpumask_first(mask)' back.
+Corrects bit set in TRCCONFIGR to enable cycle accurate trace.
+Programs TRCCCCTLR with a valid threshold value as required by ETMv4 spec.
 
-Panic log:
-
- $ perf record -e cs_etm// ls
-
- Unable to handle kernel paging request at virtual address fffe801804af4f10
- pgd = ffff8017ce031600
- [fffe801804af4f10] *pgd=0000000000000000, *pud=0000000000000000
- Internal error: Oops: 96000004 [#1] SMP
- Modules linked in:
- CPU: 33 PID: 1619 Comm: perf Not tainted 4.7.1+ #16
- Hardware name: Huawei Taishan 2280 /CH05TEVBA, BIOS 1.10 11/24/2016
- task: ffff8017cb0c8400 ti: ffff8017cb154000 task.ti: ffff8017cb154000
- PC is at tmc_alloc_etf_buffer+0x60/0xd4
- LR is at tmc_alloc_etf_buffer+0x44/0xd4
- pc : [<ffff000008633df8>] lr : [<ffff000008633ddc>] pstate: 60000145
- sp : ffff8017cb157b40
- x29: ffff8017cb157b40 x28: 0000000000000000
- ...skip...
- 7a60: ffff000008c64dc8 0000000000000006 0000000000000253 ffffffffffffffff
- 7a80: 0000000000000000 0000000000000000 ffff0000080872cc 0000000000000001
- [<ffff000008633df8>] tmc_alloc_etf_buffer+0x60/0xd4
- [<ffff000008632b9c>] etm_setup_aux+0x1dc/0x1e8
- [<ffff00000816eed4>] rb_alloc_aux+0x2b0/0x338
- [<ffff00000816a5e4>] perf_mmap+0x414/0x568
- [<ffff0000081ab694>] mmap_region+0x324/0x544
- [<ffff0000081abbe8>] do_mmap+0x334/0x3e0
- [<ffff000008191150>] vm_mmap_pgoff+0xa4/0xc8
- [<ffff0000081a9a30>] SyS_mmap_pgoff+0xb0/0x22c
- [<ffff0000080872e4>] sys_mmap+0x18/0x28
- [<ffff0000080843f0>] el0_svc_naked+0x24/0x28
- Code: 912040a5 d0001c00 f873d821 911c6000 (b8656822)
- ---[ end trace 98933da8f92b0c9a ]---
-
-Signed-off-by: Wang Nan <wangnan0@huawei.com>
-Cc: Xia Kaixu <xiakaixu@huawei.com>
-Cc: Li Zefan <lizefan@huawei.com>
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Mike Leach <mike.leach@linaro.org>
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm-perf.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/hwtracing/coresight/coresight-etm4x.c | 7 +++++--
+ drivers/hwtracing/coresight/coresight-etm4x.h | 1 +
+ 2 files changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
-index 17741969026e..26cfac3e6de7 100644
---- a/drivers/hwtracing/coresight/coresight-etm-perf.c
-+++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
-@@ -242,6 +242,7 @@ static void *etm_setup_aux(int event_cpu, void **pages,
- 	if (!sink_ops(sink)->alloc_buffer)
- 		goto err;
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index 031480f2c34d..f432febdda49 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -216,8 +216,11 @@ static int etm4_parse_event_config(struct etmv4_drvdata *drvdata,
+ 		goto out;
  
-+	cpu = cpumask_first(mask);
- 	/* Get the AUX specific data from the sink buffer */
- 	event_data->snk_config =
- 			sink_ops(sink)->alloc_buffer(sink, cpu, pages,
+ 	/* Go from generic option to ETMv4 specifics */
+-	if (attr->config & BIT(ETM_OPT_CYCACC))
+-		config->cfg |= ETMv4_MODE_CYCACC;
++	if (attr->config & BIT(ETM_OPT_CYCACC)) {
++		config->cfg |= BIT(4);
++		/* TRM: Must program this for cycacc to work */
++		config->ccctlr = ETM_CYC_THRESHOLD_DEFAULT;
++	}
+ 	if (attr->config & BIT(ETM_OPT_TS))
+ 		config->cfg |= ETMv4_MODE_TIMESTAMP;
+ 
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.h b/drivers/hwtracing/coresight/coresight-etm4x.h
+index ba8d3f86de21..b3b5ea7b7fb3 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.h
++++ b/drivers/hwtracing/coresight/coresight-etm4x.h
+@@ -146,6 +146,7 @@
+ #define ETM_ARCH_V4			0x40
+ #define ETMv4_SYNC_MASK			0x1F
+ #define ETM_CYC_THRESHOLD_MASK		0xFFF
++#define ETM_CYC_THRESHOLD_DEFAULT       0x100
+ #define ETMv4_EVENT_MASK		0xFF
+ #define ETM_CNTR_MAX_VAL		0xFFFF
+ #define ETM_TRACEID_MASK		0x3f
 -- 
 2.7.4
