@@ -1,118 +1,64 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 23 Jan 2017 07:10:56 -0800
-Subject: [PATCH] ARM: OMAP1/2: clock: Remove unused mpurate cmdline option
-In-Reply-To: <1485020215-6550-1-git-send-email-amurray@embedded-bits.co.uk>
-References: <1485020215-6550-1-git-send-email-amurray@embedded-bits.co.uk>
-Message-ID: <20170123151055.GQ7403@atomide.com>
+From: linux-kernel-dev@beckhoff.com (linux-kernel-dev at beckhoff.com)
+Date: Mon, 23 Jan 2017 16:14:59 +0100
+Subject: [RFC] ARM: dts: imx53-qsb-common: fix FEC pinmux config
+Message-ID: <20170123151459.29691-1-linux-kernel-dev@beckhoff.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Andrew Murray <amurray@embedded-bits.co.uk> [170121 09:38]:
-> The 'mpurate' option, historically used for specifying an initial
-> MPU rate at boot, no longer has any effect due to the supporting
-> code being removed as it was 'wrong and dangerous' [1].
-> 
-> This patch removes the remaining dead code associated with the
-> __setup macros to avoid confusion and reduce bloat.
-> 
-> [1] https://patchwork.kernel.org/patch/5954631/
+From: Patrick Bruenn <p.bruenn@beckhoff.com>
 
-Yeah AFAIK this is unused for mach-omap2. Adding Aaro to
-Cc for mach-omap1 in case there might be issues with this
-patch.
+The pinmux configuration in device tree is different from manual
+muxing in <u-boot>/board/freescale/mx53loco/mx53loco.c
+It seems the device tree configuration is never used by any kernel
+driver and the correct setting, preconfigured by u-boot, was never
+overwritten. So this issue never showed up anywhere.
 
-Regards,
+---
+I stumbled upon this difference, while adding the imx53 based CX9020
+Embedded PC to u-boot bootloader. "New" boards are encouraged to use
+device tree for pinmuxing in u-boot, so I tried to reuse
+imx53-qsb-common.dtsi for that. That failed with a high packet loss on
+the fec_mxc device. With the attached patch that device tree based
+pinmuxing seems successful in u-boot. My suggestion is to apply it to
+imx53-qsb-common.dtsi, too. That will help other "late adopters" and
+prevent similar issues, in case any kernel driver starts using this
+pinmux configurations.
 
-Tony
+Signed-off-by: Patrick Bruenn <p.bruenn@beckhoff.com>
+---
+ arch/arm/boot/dts/imx53-qsb-common.dtsi | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
-
-> Signed-off-by: Andrew Murray <amurray@embedded-bits.co.uk>
-> ---
->  arch/arm/mach-omap1/clock.c | 20 --------------------
->  arch/arm/mach-omap1/clock.h |  2 --
->  arch/arm/mach-omap2/clock.c | 20 --------------------
->  3 files changed, 42 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap1/clock.c b/arch/arm/mach-omap1/clock.c
-> index 4f5fd4a..43e3e18 100644
-> --- a/arch/arm/mach-omap1/clock.c
-> +++ b/arch/arm/mach-omap1/clock.c
-> @@ -720,26 +720,6 @@ EXPORT_SYMBOL(clk_get_parent);
->   * OMAP specific clock functions shared between omap1 and omap2
->   */
->  
-> -int __initdata mpurate;
-> -
-> -/*
-> - * By default we use the rate set by the bootloader.
-> - * You can override this with mpurate= cmdline option.
-> - */
-> -static int __init omap_clk_setup(char *str)
-> -{
-> -	get_option(&str, &mpurate);
-> -
-> -	if (!mpurate)
-> -		return 1;
-> -
-> -	if (mpurate < 1000)
-> -		mpurate *= 1000000;
-> -
-> -	return 1;
-> -}
-> -__setup("mpurate=", omap_clk_setup);
-> -
->  /* Used for clocks that always have same value as the parent clock */
->  unsigned long followparent_recalc(struct clk *clk)
->  {
-> diff --git a/arch/arm/mach-omap1/clock.h b/arch/arm/mach-omap1/clock.h
-> index 1e4918a..f2d1be2 100644
-> --- a/arch/arm/mach-omap1/clock.h
-> +++ b/arch/arm/mach-omap1/clock.h
-> @@ -173,8 +173,6 @@ struct clk_functions {
->  	void		(*clk_disable_unused)(struct clk *clk);
->  };
->  
-> -extern int mpurate;
-> -
->  extern int clk_init(struct clk_functions *custom_clocks);
->  extern void clk_preinit(struct clk *clk);
->  extern int clk_register(struct clk *clk);
-> diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-> index d058125..d999295 100644
-> --- a/arch/arm/mach-omap2/clock.c
-> +++ b/arch/arm/mach-omap2/clock.c
-> @@ -112,26 +112,6 @@ void omap2_init_clk_clkdm(struct clk_hw *hw)
->  	}
->  }
->  
-> -static int __initdata mpurate;
-> -
-> -/*
-> - * By default we use the rate set by the bootloader.
-> - * You can override this with mpurate= cmdline option.
-> - */
-> -static int __init omap_clk_setup(char *str)
-> -{
-> -	get_option(&str, &mpurate);
-> -
-> -	if (!mpurate)
-> -		return 1;
-> -
-> -	if (mpurate < 1000)
-> -		mpurate *= 1000000;
-> -
-> -	return 1;
-> -}
-> -__setup("mpurate=", omap_clk_setup);
-> -
->  /**
->   * omap2_clk_print_new_rates - print summary of current clock tree rates
->   * @hfclkin_ck_name: clk name for the off-chip HF oscillator
-> -- 
-> 2.5.0
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+diff --git a/arch/arm/boot/dts/imx53-qsb-common.dtsi b/arch/arm/boot/dts/imx53-qsb-common.dtsi
+index c05e7cfd0cbc..40b3e31935d0 100644
+--- a/arch/arm/boot/dts/imx53-qsb-common.dtsi
++++ b/arch/arm/boot/dts/imx53-qsb-common.dtsi
+@@ -215,16 +215,16 @@
+ 
+ 		pinctrl_fec: fecgrp {
+ 			fsl,pins = <
+-				MX53_PAD_FEC_MDC__FEC_MDC		0x80000000
+-				MX53_PAD_FEC_MDIO__FEC_MDIO		0x80000000
+-				MX53_PAD_FEC_REF_CLK__FEC_TX_CLK	0x80000000
+-				MX53_PAD_FEC_RX_ER__FEC_RX_ER		0x80000000
+-				MX53_PAD_FEC_CRS_DV__FEC_RX_DV		0x80000000
+-				MX53_PAD_FEC_RXD1__FEC_RDATA_1		0x80000000
+-				MX53_PAD_FEC_RXD0__FEC_RDATA_0		0x80000000
+-				MX53_PAD_FEC_TX_EN__FEC_TX_EN		0x80000000
+-				MX53_PAD_FEC_TXD1__FEC_TDATA_1		0x80000000
+-				MX53_PAD_FEC_TXD0__FEC_TDATA_0		0x80000000
++				MX53_PAD_FEC_MDC__FEC_MDC		0x4
++				MX53_PAD_FEC_MDIO__FEC_MDIO		0x1fc
++				MX53_PAD_FEC_REF_CLK__FEC_TX_CLK	0x180
++				MX53_PAD_FEC_RX_ER__FEC_RX_ER		0x180
++				MX53_PAD_FEC_CRS_DV__FEC_RX_DV		0x180
++				MX53_PAD_FEC_RXD1__FEC_RDATA_1		0x180
++				MX53_PAD_FEC_RXD0__FEC_RDATA_0		0x180
++				MX53_PAD_FEC_TX_EN__FEC_TX_EN		0x4
++				MX53_PAD_FEC_TXD1__FEC_TDATA_1		0x4
++				MX53_PAD_FEC_TXD0__FEC_TDATA_0		0x4
+ 			>;
+ 		};
+ 
+-- 
+2.11.0
