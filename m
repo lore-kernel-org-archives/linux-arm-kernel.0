@@ -1,52 +1,70 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 23 Jan 2017 17:06:50 +0100
-Subject: [PATCH] KVM: arm/arm64: Remove struct vgic_irq pending field
-In-Reply-To: <ef1d4338-8348-74a7-390d-dcc60fc47607@arm.com>
-References: <20170123133951.10329-1-christoffer.dall@linaro.org>
- <ef1d4338-8348-74a7-390d-dcc60fc47607@arm.com>
-Message-ID: <20170123160650.GF15850@cbox>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 23 Jan 2017 17:12:28 +0100
+Subject: [PATCH v4 2/9] ARM: dts: rockchip: update compatible property for
+ rk3228 timer
+In-Reply-To: <20170123154046.GF2166@mai>
+References: <1480343486-25539-1-git-send-email-al.kochet@gmail.com>
+ <1480436092-10728-3-git-send-email-al.kochet@gmail.com>
+ <20170123154046.GF2166@mai>
+Message-ID: <4475824.nuxyXyzqsG@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2017 at 03:44:16PM +0000, Marc Zyngier wrote:
-> On 23/01/17 13:39, Christoffer Dall wrote:
-> > One of the goals behind the VGIC redesign was to get rid of cached or
-> > intermediate state in the data structures, but we decided to allow
-> > ourselves to precompute the pending value of an IRQ based on the line
-> > level and pending latch state.  However, this has now become difficult
-> > to base proper GICv3 save/restore on, because there is a potential to
-> > modify the pending state without knowing if an interrupt is edge or
-> > level configured.
+Am Montag, 23. Januar 2017, 16:40:46 CET schrieb Daniel Lezcano:
+> On Tue, Nov 29, 2016 at 07:14:45PM +0300, Alexander Kochetkov wrote:
+> > Property set to '"rockchip,rk3228-timer", "rockchip,rk3288-timer"'
+> > to match devicetree bindings.
 > > 
-> > See the following post and related message for more background:
-> > https://lists.cs.columbia.edu/pipermail/kvmarm/2017-January/023195.html
+> > Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
+> > ---
 > > 
-> > This commit gets rid of the precomputed pending field in favor of a
-> > function that calculates the value when needed, irq_is_pending().
+> >  arch/arm/boot/dts/rk3228-evb.dts |    4 ++++
+> >  1 file changed, 4 insertions(+)
 > > 
-> > The soft_pending field is renamed to pending_latch to represent that
-> > this latch is the equivalent hardware latch which gets manipulated by
-> > the input signal for edge-triggered interrupts and when writing to the
-> > SPENDR/CPENDR registers.
+> > diff --git a/arch/arm/boot/dts/rk3228-evb.dts
+> > b/arch/arm/boot/dts/rk3228-evb.dts index 904668e..38eab87 100644
+> > --- a/arch/arm/boot/dts/rk3228-evb.dts
+> > +++ b/arch/arm/boot/dts/rk3228-evb.dts
+> > @@ -70,3 +70,7 @@
 > > 
-> > After this commit save/restore code should be able to simply restore the
-> > pending_latch state, line_level state, and config state in any order and
-> > get the desired result.
+> >  &uart2 {
+> >  
+> >  	status = "okay";
+> >  
+> >  };
 > > 
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > +
+> > +&timer {
+> > +	compatible = "rockchip,rk3228-timer", "rockchip,rk3288-timer";
+> > +};
 > 
-> I admit having lost a few brain cells looking at this patch, and I can't
-> prove it wrong! ;-) I like the fact that it now provides a safe
-> abstraction to the pending state, and that there is exactly *one* place
-> where line_level is evaluated.
+> I'm not sure this is correct, to which timer &timer will refer ?
 > 
-> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+>         timer {
+>                 compatible = "arm,armv7-timer";
+> 		...
+> 	}
 > 
+>         timer: timer at 110c0000 {
+>                 compatible = "rockchip,rk3288-timer";
+> 		...
+> 	}
+> 
+> Why not change the compatible string in the timer definition in rk322x.dtsi
+> ?
+> 
+> Same comment for the other patches doing these changes.
 
-Thanks!
+I think Alexander didn't know which timer name to use.
+Both the rk3228 and rk3229 are so similar that so far no-one has seen any 
+difference and thus they really share the whole rk322x.dtsi file.
 
-I suppose looking at this again, I don't need the
-"irq_set_pending_latch()" indirection but I can just set this variable
-directly.  What do you think?  Would it be cleaner?
+On the other hand compatibles are supposed to be explicit, so a rk322x-timer 
+compatible is not allowed.
 
--Christoffer
+
+But as the socs are soooo similar, I'd suggest just using the rk3228-timer 
+compatible in the rk322x.dtsi and not changing individual board files.
+Similar to what Daniel suggested.
+
+Heiko
