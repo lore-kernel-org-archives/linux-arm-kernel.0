@@ -1,53 +1,54 @@
-From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Mon, 23 Jan 2017 19:13:06 +0300
-Subject: [PATCH v4 2/9] ARM: dts: rockchip: update compatible property for
- rk3228 timer
-In-Reply-To: <20170123154046.GF2166@mai>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 23 Jan 2017 17:14:22 +0100
+Subject: [PATCH v4 5/9] ARM: dts: rockchip: disable arm-global-timer for
+ rk3188
+In-Reply-To: <1480436092-10728-6-git-send-email-al.kochet@gmail.com>
 References: <1480343486-25539-1-git-send-email-al.kochet@gmail.com>
  <1480436092-10728-1-git-send-email-al.kochet@gmail.com>
- <1480436092-10728-3-git-send-email-al.kochet@gmail.com>
- <20170123154046.GF2166@mai>
-Message-ID: <FD75C944-4CE5-4393-8E49-79E47101D77F@gmail.com>
+ <1480436092-10728-6-git-send-email-al.kochet@gmail.com>
+Message-ID: <1513239.YT6aWj25Ep@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Daniel!
-
-:
-> +
-> +&timer {
-> +	compatible = "rockchip,rk3228-timer", "rockchip,rk3288-timer";
-> +};
-
-> 23 ???. 2017 ?., ? 18:40, Daniel Lezcano <daniel.lezcano@linaro.org> ???????(?):
+Am Dienstag, 29. November 2016, 19:14:48 CET schrieb Alexander Kochetkov:
+> arm-global-timer can provide clockevents, clocksource and shed_clock. But
+> on rk3188 platform it provide only clocksource and shed_clock. clockevents
+> from  arm-global-timer is not used by kernel because there is another
+> clockevent provider with higher rating (smp-twd).
 > 
-> I'm not sure this is correct, to which timer &timer will refer ?
+> My commit from the series implement clocksource and shed_clock using
+> rockchip_timer. But sched clock from rk_timer is not selected by kernel
+> due to lower frequency than arm-global-timer, and clocksource from
+> rk_timer is not selected by kernel due to lower rating than
+> arm-global-timer. And I don't want to increase clocksource rating
+> because ratings greater 300 used for high frequency clocksources.
 > 
->        timer {
->                compatible = "arm,armv7-timer";
-> 		...
-> 	}
+> clocksource and shed_clock is quite unstable, because their rate depends
+> on cpu frequency. So disable arm-global-timer and use clocksource and
+> sched_clock from rockchip_timer.
+
+That commit message is hard to understand in its entirety, but this last 
+paragraph is essentially enough to describe the problem. So maybe you could 
+shorten that somehow.
+
+
+Heiko
+
+
+> Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
+> ---
+>  arch/arm/boot/dts/rk3188.dtsi |    1 +
+>  1 file changed, 1 insertion(+)
 > 
->        timer: timer at 110c0000 {
->                compatible = "rockchip,rk3288-timer";
-> 		...
-> 	}
-
-The block '&timer { ?}' change compatible string for 'timer: timer at 110c0000? timer'. It refers to it using ?timer:? label.
-'arm,armv7-timer? has ?timer? node name without label and cannot be addressed in underline dts files.
-
-> Why not change the compatible string in the timer definition in rk322x.dtsi ?
-
-Initially my patch series was for rk3188 only. I declared rk3188 timer using rk3228 compatible string[1].
-Heiko reviewed the series and suggest[2] to use another ?compatible=? binding for rk3188. And
-suggest[3] to update rockchip,rk-timer.txt bindings, like mmc/rockchip-dw-mshc.txt does.
-So I updated rockchip,rk-timer.txt. rk322x family has has two parts rk3228 and rk3229. So I replaced
-rk322x to rk3228 and rk3229 and updated dts file to match bindings.
-
-[1] http://lists.infradead.org/pipermail/linux-rockchip/2016-November/013152.html
-[2] http://lists.infradead.org/pipermail/linux-rockchip/2016-November/013174.html
-[3] http://lists.infradead.org/pipermail/linux-rockchip/2016-November/013174.html
-
-> Same comment for the other patches doing these changes.
+> diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
+> index 0dc52fe..44da3d42 100644
+> --- a/arch/arm/boot/dts/rk3188.dtsi
+> +++ b/arch/arm/boot/dts/rk3188.dtsi
+> @@ -546,6 +546,7 @@
 > 
->  -- Daniel
+>  &global_timer {
+>  	interrupts = <GIC_PPI 11 0xf04>;
+> +	status = "disabled";
+>  };
+> 
+>  &local_timer {
