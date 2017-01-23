@@ -1,571 +1,942 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 23 Jan 2017 10:11:43 +0530
-Subject: [PATCH V2 03/12] PM / OPP: Return opp_table from dev_pm_opp_set_*()
- routines
+Date: Mon, 23 Jan 2017 10:11:47 +0530
+Subject: [PATCH V2 07/12] PM / OPP: Update OPP users to put reference
 In-Reply-To: <cover.1485146406.git.viresh.kumar@linaro.org>
 References: <cover.1485146406.git.viresh.kumar@linaro.org>
-Message-ID: <82ace2a9075930f713aa3cf943ae26a8a755bed9.1485146406.git.viresh.kumar@linaro.org>
+Message-ID: <7fa4a831810fb7c6fdf7619686caed02765a34cc.1485146406.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have proper kernel reference infrastructure in place for OPP
-tables, use it to guarantee that the OPP table isn't freed while being
-used by the callers of dev_pm_opp_set_*() APIs.
+This patch updates dev_pm_opp_find_freq_*() routines to get a reference
+to the OPPs returned by them.
 
-Make them all return the pointer to the OPP table after taking its
-reference and put the reference back with dev_pm_opp_put_*() APIs.
+Also updates the users of dev_pm_opp_find_freq_*() routines to call
+dev_pm_opp_put() after they are done using the OPPs.
 
-Now that the OPP table wouldn't get freed while these routines are
-executing after dev_pm_opp_get_opp_table() is called, there is no need
-to take opp_table_lock. Drop them as well.
+As it is guaranteed the that OPPs wouldn't get freed while being used,
+the RCU read side locking present with the users isn't required anymore.
+Drop it as well.
 
-Remove the rcu specific comments from these routines as they aren't
-relevant anymore.
+This patch also updates all users of devfreq_recommended_opp() which was
+returning an OPP received from the OPP core.
 
-Note that prototypes of dev_pm_opp_{set|put}_regulators() were already
-updated by another patch.
+Note that some of the OPP core routines have gained
+rcu_read_{lock|unlock}() calls, as those still use RCU specific APIs
+within them.
 
 Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com> [Devfreq]
 ---
- drivers/base/power/opp/core.c | 243 +++++++++---------------------------------
- drivers/cpufreq/sti-cpufreq.c |  13 +--
- include/linux/pm_opp.h        |  35 +++---
- 3 files changed, 74 insertions(+), 217 deletions(-)
+ arch/arm/mach-omap2/pm.c             |   5 +-
+ drivers/base/power/opp/core.c        | 114 +++++++++++++++++++----------------
+ drivers/base/power/opp/cpu.c         |  22 ++-----
+ drivers/clk/tegra/clk-dfll.c         |  17 ++----
+ drivers/cpufreq/exynos5440-cpufreq.c |   5 +-
+ drivers/cpufreq/imx6q-cpufreq.c      |  10 +--
+ drivers/cpufreq/mt8173-cpufreq.c     |   8 +--
+ drivers/cpufreq/omap-cpufreq.c       |   4 +-
+ drivers/devfreq/devfreq.c            |  14 ++---
+ drivers/devfreq/exynos-bus.c         |  14 ++---
+ drivers/devfreq/governor_passive.c   |   4 +-
+ drivers/devfreq/rk3399_dmc.c         |  16 ++---
+ drivers/devfreq/tegra-devfreq.c      |   4 +-
+ drivers/thermal/cpu_cooling.c        |  11 +---
+ drivers/thermal/devfreq_cooling.c    |  15 ++---
+ 15 files changed, 110 insertions(+), 153 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+index 76b0454ddc49..0598630c1778 100644
+--- a/arch/arm/mach-omap2/pm.c
++++ b/arch/arm/mach-omap2/pm.c
+@@ -130,17 +130,16 @@ static int __init omap2_set_init_voltage(char *vdd_name, char *clk_name,
+ 	freq = clk_get_rate(clk);
+ 	clk_put(clk);
+ 
+-	rcu_read_lock();
+ 	opp = dev_pm_opp_find_freq_ceil(dev, &freq);
+ 	if (IS_ERR(opp)) {
+-		rcu_read_unlock();
+ 		pr_err("%s: unable to find boot up OPP for vdd_%s\n",
+ 			__func__, vdd_name);
+ 		goto exit;
+ 	}
+ 
+ 	bootup_volt = dev_pm_opp_get_voltage(opp);
+-	rcu_read_unlock();
++	dev_pm_opp_put(opp);
++
+ 	if (!bootup_volt) {
+ 		pr_err("%s: unable to find voltage corresponding to the bootup OPP for vdd_%s\n",
+ 		       __func__, vdd_name);
 diff --git a/drivers/base/power/opp/core.c b/drivers/base/power/opp/core.c
-index ccc0d8913fd0..1af349ab630e 100644
+index 9870ee54d708..a6efa818029a 100644
 --- a/drivers/base/power/opp/core.c
 +++ b/drivers/base/power/opp/core.c
-@@ -974,18 +974,6 @@ static void _remove_opp_table(struct opp_table *opp_table)
- 	if (!list_empty(&opp_table->opp_list))
- 		return;
+@@ -40,6 +40,8 @@ do {									\
+ 			 "opp_table_lock protection");			\
+ } while (0)
  
--	if (opp_table->supported_hw)
--		return;
--
--	if (opp_table->prop_name)
--		return;
--
--	if (opp_table->regulators)
--		return;
--
--	if (opp_table->set_opp)
--		return;
--
- 	dev_pm_opp_put_opp_table_unlocked(opp_table);
- }
- 
-@@ -1277,27 +1265,16 @@ int _opp_add_v1(struct opp_table *opp_table, struct device *dev,
-  * specify the hierarchy of versions it supports. OPP layer will then enable
-  * OPPs, which are available for those versions, based on its 'opp-supported-hw'
-  * property.
-- *
-- * Locking: The internal opp_table and opp structures are RCU protected.
-- * Hence this function internally uses RCU updater strategy with mutex locks
-- * to keep the integrity of the internal data structures. Callers should ensure
-- * that this function is *NOT* called under RCU protection or in contexts where
-- * mutex cannot be locked.
-  */
--int dev_pm_opp_set_supported_hw(struct device *dev, const u32 *versions,
--				unsigned int count)
-+struct opp_table *dev_pm_opp_set_supported_hw(struct device *dev,
-+			const u32 *versions, unsigned int count)
- {
- 	struct opp_table *opp_table;
--	int ret = 0;
--
--	/* Hold our table modification lock here */
--	mutex_lock(&opp_table_lock);
-+	int ret;
- 
--	opp_table = _add_opp_table(dev);
--	if (!opp_table) {
--		ret = -ENOMEM;
--		goto unlock;
--	}
-+	opp_table = dev_pm_opp_get_opp_table(dev);
-+	if (!opp_table)
-+		return ERR_PTR(-ENOMEM);
- 
- 	/* Make sure there are no concurrent readers while updating opp_table */
- 	WARN_ON(!list_empty(&opp_table->opp_list));
-@@ -1318,65 +1295,40 @@ int dev_pm_opp_set_supported_hw(struct device *dev, const u32 *versions,
- 	}
- 
- 	opp_table->supported_hw_count = count;
--	mutex_unlock(&opp_table_lock);
--	return 0;
++static void dev_pm_opp_get(struct dev_pm_opp *opp);
 +
-+	return opp_table;
- 
- err:
--	_remove_opp_table(opp_table);
--unlock:
--	mutex_unlock(&opp_table_lock);
-+	dev_pm_opp_put_opp_table(opp_table);
- 
--	return ret;
-+	return ERR_PTR(ret);
- }
- EXPORT_SYMBOL_GPL(dev_pm_opp_set_supported_hw);
- 
- /**
-  * dev_pm_opp_put_supported_hw() - Releases resources blocked for supported hw
-- * @dev: Device for which supported-hw has to be put.
-+ * @opp_table: OPP table returned by dev_pm_opp_set_supported_hw().
-  *
-  * This is required only for the V2 bindings, and is called for a matching
-  * dev_pm_opp_set_supported_hw(). Until this is called, the opp_table structure
-  * will not be freed.
-- *
-- * Locking: The internal opp_table and opp structures are RCU protected.
-- * Hence this function internally uses RCU updater strategy with mutex locks
-- * to keep the integrity of the internal data structures. Callers should ensure
-- * that this function is *NOT* called under RCU protection or in contexts where
-- * mutex cannot be locked.
-  */
--void dev_pm_opp_put_supported_hw(struct device *dev)
-+void dev_pm_opp_put_supported_hw(struct opp_table *opp_table)
+ static struct opp_device *_find_opp_dev(const struct device *dev,
+ 					struct opp_table *opp_table)
  {
--	struct opp_table *opp_table;
--
--	/* Hold our table modification lock here */
--	mutex_lock(&opp_table_lock);
--
--	/* Check for existing table for 'dev' first */
--	opp_table = _find_opp_table(dev);
--	if (IS_ERR(opp_table)) {
--		dev_err(dev, "Failed to find opp_table: %ld\n",
--			PTR_ERR(opp_table));
--		goto unlock;
--	}
--
- 	/* Make sure there are no concurrent readers while updating opp_table */
- 	WARN_ON(!list_empty(&opp_table->opp_list));
+@@ -94,21 +96,13 @@ struct opp_table *_find_opp_table(struct device *dev)
+  * return 0
+  *
+  * This is useful only for devices with single power supply.
+- *
+- * Locking: This function must be called under rcu_read_lock(). opp is a rcu
+- * protected pointer. This means that opp which could have been fetched by
+- * opp_find_freq_{exact,ceil,floor} functions is valid as long as we are
+- * under RCU lock. The pointer returned by the opp_find_freq family must be
+- * used in the same section as the usage of this function with the pointer
+- * prior to unlocking with rcu_read_unlock() to maintain the integrity of the
+- * pointer.
+  */
+ unsigned long dev_pm_opp_get_voltage(struct dev_pm_opp *opp)
+ {
+ 	struct dev_pm_opp *tmp_opp;
+ 	unsigned long v = 0;
  
- 	if (!opp_table->supported_hw) {
--		dev_err(dev, "%s: Doesn't have supported hardware list\n",
--			__func__);
--		goto unlock;
-+		pr_err("%s: Doesn't have supported hardware list\n",
-+		       __func__);
-+		return;
+-	opp_rcu_lockdep_assert();
++	rcu_read_lock();
+ 
+ 	tmp_opp = rcu_dereference(opp);
+ 	if (IS_ERR_OR_NULL(tmp_opp))
+@@ -116,6 +110,7 @@ unsigned long dev_pm_opp_get_voltage(struct dev_pm_opp *opp)
+ 	else
+ 		v = tmp_opp->supplies[0].u_volt;
+ 
++	rcu_read_unlock();
+ 	return v;
+ }
+ EXPORT_SYMBOL_GPL(dev_pm_opp_get_voltage);
+@@ -126,21 +121,13 @@ EXPORT_SYMBOL_GPL(dev_pm_opp_get_voltage);
+  *
+  * Return: frequency in hertz corresponding to the opp, else
+  * return 0
+- *
+- * Locking: This function must be called under rcu_read_lock(). opp is a rcu
+- * protected pointer. This means that opp which could have been fetched by
+- * opp_find_freq_{exact,ceil,floor} functions is valid as long as we are
+- * under RCU lock. The pointer returned by the opp_find_freq family must be
+- * used in the same section as the usage of this function with the pointer
+- * prior to unlocking with rcu_read_unlock() to maintain the integrity of the
+- * pointer.
+  */
+ unsigned long dev_pm_opp_get_freq(struct dev_pm_opp *opp)
+ {
+ 	struct dev_pm_opp *tmp_opp;
+ 	unsigned long f = 0;
+ 
+-	opp_rcu_lockdep_assert();
++	rcu_read_lock();
+ 
+ 	tmp_opp = rcu_dereference(opp);
+ 	if (IS_ERR_OR_NULL(tmp_opp) || !tmp_opp->available)
+@@ -148,6 +135,7 @@ unsigned long dev_pm_opp_get_freq(struct dev_pm_opp *opp)
+ 	else
+ 		f = tmp_opp->rate;
+ 
++	rcu_read_unlock();
+ 	return f;
+ }
+ EXPORT_SYMBOL_GPL(dev_pm_opp_get_freq);
+@@ -161,20 +149,13 @@ EXPORT_SYMBOL_GPL(dev_pm_opp_get_freq);
+  * quickly. Running on them for longer times may overheat the chip.
+  *
+  * Return: true if opp is turbo opp, else false.
+- *
+- * Locking: This function must be called under rcu_read_lock(). opp is a rcu
+- * protected pointer. This means that opp which could have been fetched by
+- * opp_find_freq_{exact,ceil,floor} functions is valid as long as we are
+- * under RCU lock. The pointer returned by the opp_find_freq family must be
+- * used in the same section as the usage of this function with the pointer
+- * prior to unlocking with rcu_read_unlock() to maintain the integrity of the
+- * pointer.
+  */
+ bool dev_pm_opp_is_turbo(struct dev_pm_opp *opp)
+ {
+ 	struct dev_pm_opp *tmp_opp;
++	bool turbo;
+ 
+-	opp_rcu_lockdep_assert();
++	rcu_read_lock();
+ 
+ 	tmp_opp = rcu_dereference(opp);
+ 	if (IS_ERR_OR_NULL(tmp_opp) || !tmp_opp->available) {
+@@ -182,7 +163,10 @@ bool dev_pm_opp_is_turbo(struct dev_pm_opp *opp)
+ 		return false;
  	}
  
- 	kfree(opp_table->supported_hw);
- 	opp_table->supported_hw = NULL;
- 	opp_table->supported_hw_count = 0;
- 
--	/* Try freeing opp_table if this was the last blocking resource */
--	_remove_opp_table(opp_table);
--
--unlock:
--	mutex_unlock(&opp_table_lock);
-+	dev_pm_opp_put_opp_table(opp_table);
+-	return tmp_opp->turbo;
++	turbo = tmp_opp->turbo;
++
++	rcu_read_unlock();
++	return turbo;
  }
- EXPORT_SYMBOL_GPL(dev_pm_opp_put_supported_hw);
+ EXPORT_SYMBOL_GPL(dev_pm_opp_is_turbo);
  
-@@ -1389,26 +1341,15 @@ EXPORT_SYMBOL_GPL(dev_pm_opp_put_supported_hw);
-  * specify the extn to be used for certain property names. The properties to
-  * which the extension will apply are opp-microvolt and opp-microamp. OPP core
-  * should postfix the property name with -<name> while looking for them.
-- *
-- * Locking: The internal opp_table and opp structures are RCU protected.
-- * Hence this function internally uses RCU updater strategy with mutex locks
-- * to keep the integrity of the internal data structures. Callers should ensure
-- * that this function is *NOT* called under RCU protection or in contexts where
-- * mutex cannot be locked.
+@@ -410,11 +394,8 @@ EXPORT_SYMBOL_GPL(dev_pm_opp_get_opp_count);
+  * This provides a mechanism to enable an opp which is not available currently
+  * or the opposite as well.
+  *
+- * Locking: This function must be called under rcu_read_lock(). opp is a rcu
+- * protected pointer. The reason for the same is that the opp pointer which is
+- * returned will remain valid for use with opp_get_{voltage, freq} only while
+- * under the locked area. The pointer returned must be used prior to unlocking
+- * with rcu_read_unlock() to maintain the integrity of the pointer.
++ * The callers are required to call dev_pm_opp_put() for the returned OPP after
++ * use.
   */
--int dev_pm_opp_set_prop_name(struct device *dev, const char *name)
-+struct opp_table *dev_pm_opp_set_prop_name(struct device *dev, const char *name)
+ struct dev_pm_opp *dev_pm_opp_find_freq_exact(struct device *dev,
+ 					      unsigned long freq,
+@@ -423,13 +404,14 @@ struct dev_pm_opp *dev_pm_opp_find_freq_exact(struct device *dev,
+ 	struct opp_table *opp_table;
+ 	struct dev_pm_opp *temp_opp, *opp = ERR_PTR(-ERANGE);
+ 
+-	opp_rcu_lockdep_assert();
++	rcu_read_lock();
+ 
+ 	opp_table = _find_opp_table(dev);
+ 	if (IS_ERR(opp_table)) {
+ 		int r = PTR_ERR(opp_table);
+ 
+ 		dev_err(dev, "%s: OPP table not found (%d)\n", __func__, r);
++		rcu_read_unlock();
+ 		return ERR_PTR(r);
+ 	}
+ 
+@@ -437,10 +419,15 @@ struct dev_pm_opp *dev_pm_opp_find_freq_exact(struct device *dev,
+ 		if (temp_opp->available == available &&
+ 				temp_opp->rate == freq) {
+ 			opp = temp_opp;
++
++			/* Increment the reference count of OPP */
++			dev_pm_opp_get(opp);
+ 			break;
+ 		}
+ 	}
+ 
++	rcu_read_unlock();
++
+ 	return opp;
+ }
+ EXPORT_SYMBOL_GPL(dev_pm_opp_find_freq_exact);
+@@ -454,6 +441,9 @@ static noinline struct dev_pm_opp *_find_freq_ceil(struct opp_table *opp_table,
+ 		if (temp_opp->available && temp_opp->rate >= *freq) {
+ 			opp = temp_opp;
+ 			*freq = opp->rate;
++
++			/* Increment the reference count of OPP */
++			dev_pm_opp_get(opp);
+ 			break;
+ 		}
+ 	}
+@@ -476,29 +466,33 @@ static noinline struct dev_pm_opp *_find_freq_ceil(struct opp_table *opp_table,
+  * ERANGE:	no match found for search
+  * ENODEV:	if device not found in list of registered devices
+  *
+- * Locking: This function must be called under rcu_read_lock(). opp is a rcu
+- * protected pointer. The reason for the same is that the opp pointer which is
+- * returned will remain valid for use with opp_get_{voltage, freq} only while
+- * under the locked area. The pointer returned must be used prior to unlocking
+- * with rcu_read_unlock() to maintain the integrity of the pointer.
++ * The callers are required to call dev_pm_opp_put() for the returned OPP after
++ * use.
+  */
+ struct dev_pm_opp *dev_pm_opp_find_freq_ceil(struct device *dev,
+ 					     unsigned long *freq)
  {
  	struct opp_table *opp_table;
--	int ret = 0;
 -
--	/* Hold our table modification lock here */
--	mutex_lock(&opp_table_lock);
-+	int ret;
+-	opp_rcu_lockdep_assert();
++	struct dev_pm_opp *opp;
  
--	opp_table = _add_opp_table(dev);
--	if (!opp_table) {
--		ret = -ENOMEM;
--		goto unlock;
--	}
-+	opp_table = dev_pm_opp_get_opp_table(dev);
-+	if (!opp_table)
-+		return ERR_PTR(-ENOMEM);
- 
- 	/* Make sure there are no concurrent readers while updating opp_table */
- 	WARN_ON(!list_empty(&opp_table->opp_list));
-@@ -1427,63 +1368,37 @@ int dev_pm_opp_set_prop_name(struct device *dev, const char *name)
- 		goto err;
+ 	if (!dev || !freq) {
+ 		dev_err(dev, "%s: Invalid argument freq=%p\n", __func__, freq);
+ 		return ERR_PTR(-EINVAL);
  	}
  
--	mutex_unlock(&opp_table_lock);
--	return 0;
-+	return opp_table;
++	rcu_read_lock();
++
+ 	opp_table = _find_opp_table(dev);
+-	if (IS_ERR(opp_table))
++	if (IS_ERR(opp_table)) {
++		rcu_read_unlock();
+ 		return ERR_CAST(opp_table);
++	}
++
++	opp = _find_freq_ceil(opp_table, freq);
  
- err:
--	_remove_opp_table(opp_table);
--unlock:
--	mutex_unlock(&opp_table_lock);
-+	dev_pm_opp_put_opp_table(opp_table);
- 
--	return ret;
-+	return ERR_PTR(ret);
+-	return _find_freq_ceil(opp_table, freq);
++	rcu_read_unlock();
++
++	return opp;
  }
- EXPORT_SYMBOL_GPL(dev_pm_opp_set_prop_name);
+ EXPORT_SYMBOL_GPL(dev_pm_opp_find_freq_ceil);
  
- /**
-  * dev_pm_opp_put_prop_name() - Releases resources blocked for prop-name
-- * @dev: Device for which the prop-name has to be put.
-+ * @opp_table: OPP table returned by dev_pm_opp_set_prop_name().
+@@ -517,11 +511,8 @@ EXPORT_SYMBOL_GPL(dev_pm_opp_find_freq_ceil);
+  * ERANGE:	no match found for search
+  * ENODEV:	if device not found in list of registered devices
   *
-  * This is required only for the V2 bindings, and is called for a matching
-  * dev_pm_opp_set_prop_name(). Until this is called, the opp_table structure
-  * will not be freed.
-- *
-- * Locking: The internal opp_table and opp structures are RCU protected.
-- * Hence this function internally uses RCU updater strategy with mutex locks
-- * to keep the integrity of the internal data structures. Callers should ensure
-- * that this function is *NOT* called under RCU protection or in contexts where
-- * mutex cannot be locked.
+- * Locking: This function must be called under rcu_read_lock(). opp is a rcu
+- * protected pointer. The reason for the same is that the opp pointer which is
+- * returned will remain valid for use with opp_get_{voltage, freq} only while
+- * under the locked area. The pointer returned must be used prior to unlocking
+- * with rcu_read_unlock() to maintain the integrity of the pointer.
++ * The callers are required to call dev_pm_opp_put() for the returned OPP after
++ * use.
   */
--void dev_pm_opp_put_prop_name(struct device *dev)
-+void dev_pm_opp_put_prop_name(struct opp_table *opp_table)
+ struct dev_pm_opp *dev_pm_opp_find_freq_floor(struct device *dev,
+ 					      unsigned long *freq)
+@@ -529,16 +520,18 @@ struct dev_pm_opp *dev_pm_opp_find_freq_floor(struct device *dev,
+ 	struct opp_table *opp_table;
+ 	struct dev_pm_opp *temp_opp, *opp = ERR_PTR(-ERANGE);
+ 
+-	opp_rcu_lockdep_assert();
+-
+ 	if (!dev || !freq) {
+ 		dev_err(dev, "%s: Invalid argument freq=%p\n", __func__, freq);
+ 		return ERR_PTR(-EINVAL);
+ 	}
+ 
++	rcu_read_lock();
++
+ 	opp_table = _find_opp_table(dev);
+-	if (IS_ERR(opp_table))
++	if (IS_ERR(opp_table)) {
++		rcu_read_unlock();
+ 		return ERR_CAST(opp_table);
++	}
+ 
+ 	list_for_each_entry_rcu(temp_opp, &opp_table->opp_list, node) {
+ 		if (temp_opp->available) {
+@@ -549,6 +542,12 @@ struct dev_pm_opp *dev_pm_opp_find_freq_floor(struct device *dev,
+ 				opp = temp_opp;
+ 		}
+ 	}
++
++	/* Increment the reference count of OPP */
++	if (!IS_ERR(opp))
++		dev_pm_opp_get(opp);
++	rcu_read_unlock();
++
+ 	if (!IS_ERR(opp))
+ 		*freq = opp->rate;
+ 
+@@ -736,6 +735,8 @@ int dev_pm_opp_set_rate(struct device *dev, unsigned long target_freq)
+ 		ret = PTR_ERR(opp);
+ 		dev_err(dev, "%s: failed to find OPP for freq %lu (%d)\n",
+ 			__func__, freq, ret);
++		if (!IS_ERR(old_opp))
++			dev_pm_opp_put(old_opp);
+ 		rcu_read_unlock();
+ 		return ret;
+ 	}
+@@ -747,6 +748,9 @@ int dev_pm_opp_set_rate(struct device *dev, unsigned long target_freq)
+ 
+ 	/* Only frequency scaling */
+ 	if (!regulators) {
++		dev_pm_opp_put(opp);
++		if (!IS_ERR(old_opp))
++			dev_pm_opp_put(old_opp);
+ 		rcu_read_unlock();
+ 		return _generic_set_opp_clk_only(dev, clk, old_freq, freq);
+ 	}
+@@ -772,6 +776,9 @@ int dev_pm_opp_set_rate(struct device *dev, unsigned long target_freq)
+ 	data->new_opp.rate = freq;
+ 	memcpy(data->new_opp.supplies, opp->supplies, size);
+ 
++	dev_pm_opp_put(opp);
++	if (!IS_ERR(old_opp))
++		dev_pm_opp_put(old_opp);
+ 	rcu_read_unlock();
+ 
+ 	return set_opp(data);
+@@ -967,6 +974,11 @@ static void _opp_kref_release(struct kref *kref)
+ 	dev_pm_opp_put_opp_table(opp_table);
+ }
+ 
++static void dev_pm_opp_get(struct dev_pm_opp *opp)
++{
++	kref_get(&opp->kref);
++}
++
+ void dev_pm_opp_put(struct dev_pm_opp *opp)
  {
--	struct opp_table *opp_table;
--
--	/* Hold our table modification lock here */
--	mutex_lock(&opp_table_lock);
--
--	/* Check for existing table for 'dev' first */
--	opp_table = _find_opp_table(dev);
--	if (IS_ERR(opp_table)) {
--		dev_err(dev, "Failed to find opp_table: %ld\n",
--			PTR_ERR(opp_table));
--		goto unlock;
--	}
--
- 	/* Make sure there are no concurrent readers while updating opp_table */
- 	WARN_ON(!list_empty(&opp_table->opp_list));
- 
- 	if (!opp_table->prop_name) {
--		dev_err(dev, "%s: Doesn't have a prop-name\n", __func__);
--		goto unlock;
-+		pr_err("%s: Doesn't have a prop-name\n", __func__);
-+		return;
- 	}
- 
- 	kfree(opp_table->prop_name);
- 	opp_table->prop_name = NULL;
- 
--	/* Try freeing opp_table if this was the last blocking resource */
--	_remove_opp_table(opp_table);
--
--unlock:
--	mutex_unlock(&opp_table_lock);
-+	dev_pm_opp_put_opp_table(opp_table);
- }
- EXPORT_SYMBOL_GPL(dev_pm_opp_put_prop_name);
- 
-@@ -1530,12 +1445,6 @@ static void _free_set_opp_data(struct opp_table *opp_table)
-  * well.
+ 	kref_put_mutex(&opp->kref, _opp_kref_release, &opp->opp_table->lock);
+diff --git a/drivers/base/power/opp/cpu.c b/drivers/base/power/opp/cpu.c
+index 8c3434bdb26d..adef788862d5 100644
+--- a/drivers/base/power/opp/cpu.c
++++ b/drivers/base/power/opp/cpu.c
+@@ -42,11 +42,6 @@
   *
-  * This must be called before any OPPs are initialized for the device.
+  * WARNING: It is  important for the callers to ensure refreshing their copy of
+  * the table if any of the mentioned functions have been invoked in the interim.
 - *
 - * Locking: The internal opp_table and opp structures are RCU protected.
-- * Hence this function internally uses RCU updater strategy with mutex locks
-- * to keep the integrity of the internal data structures. Callers should ensure
-- * that this function is *NOT* called under RCU protection or in contexts where
-- * mutex cannot be locked.
+- * Since we just use the regular accessor functions to access the internal data
+- * structures, we use RCU read lock inside this function. As a result, users of
+- * this function DONOT need to use explicit locks for invoking.
   */
- struct opp_table *dev_pm_opp_set_regulators(struct device *dev,
- 					    const char * const names[],
-@@ -1545,13 +1454,9 @@ struct opp_table *dev_pm_opp_set_regulators(struct device *dev,
- 	struct regulator *reg;
- 	int ret, i;
+ int dev_pm_opp_init_cpufreq_table(struct device *dev,
+ 				  struct cpufreq_frequency_table **table)
+@@ -56,19 +51,13 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
+ 	int i, max_opps, ret = 0;
+ 	unsigned long rate;
  
--	mutex_lock(&opp_table_lock);
+-	rcu_read_lock();
 -
--	opp_table = _add_opp_table(dev);
--	if (!opp_table) {
--		ret = -ENOMEM;
--		goto unlock;
+ 	max_opps = dev_pm_opp_get_opp_count(dev);
+-	if (max_opps <= 0) {
+-		ret = max_opps ? max_opps : -ENODATA;
+-		goto out;
 -	}
-+	opp_table = dev_pm_opp_get_opp_table(dev);
-+	if (!opp_table)
-+		return ERR_PTR(-ENOMEM);
++	if (max_opps <= 0)
++		return max_opps ? max_opps : -ENODATA;
  
- 	/* This should be called before OPPs are initialized */
- 	if (WARN_ON(!list_empty(&opp_table->opp_list))) {
-@@ -1593,7 +1498,6 @@ struct opp_table *dev_pm_opp_set_regulators(struct device *dev,
+ 	freq_table = kcalloc((max_opps + 1), sizeof(*freq_table), GFP_ATOMIC);
+-	if (!freq_table) {
+-		ret = -ENOMEM;
+-		goto out;
+-	}
++	if (!freq_table)
++		return -ENOMEM;
+ 
+ 	for (i = 0, rate = 0; i < max_opps; i++, rate++) {
+ 		/* find next rate */
+@@ -83,6 +72,8 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
+ 		/* Is Boost/turbo opp ? */
+ 		if (dev_pm_opp_is_turbo(opp))
+ 			freq_table[i].flags = CPUFREQ_BOOST_FREQ;
++
++		dev_pm_opp_put(opp);
+ 	}
+ 
+ 	freq_table[i].driver_data = i;
+@@ -91,7 +82,6 @@ int dev_pm_opp_init_cpufreq_table(struct device *dev,
+ 	*table = &freq_table[0];
+ 
+ out:
+-	rcu_read_unlock();
  	if (ret)
- 		goto free_regulators;
+ 		kfree(freq_table);
  
--	mutex_unlock(&opp_table_lock);
- 	return opp_table;
+diff --git a/drivers/clk/tegra/clk-dfll.c b/drivers/clk/tegra/clk-dfll.c
+index f010562534eb..2c44aeb0b97c 100644
+--- a/drivers/clk/tegra/clk-dfll.c
++++ b/drivers/clk/tegra/clk-dfll.c
+@@ -633,16 +633,12 @@ static int find_lut_index_for_rate(struct tegra_dfll *td, unsigned long rate)
+ 	struct dev_pm_opp *opp;
+ 	int i, uv;
  
- free_regulators:
-@@ -1604,9 +1508,7 @@ struct opp_table *dev_pm_opp_set_regulators(struct device *dev,
- 	opp_table->regulators = NULL;
- 	opp_table->regulator_count = 0;
- err:
--	_remove_opp_table(opp_table);
--unlock:
--	mutex_unlock(&opp_table_lock);
-+	dev_pm_opp_put_opp_table(opp_table);
- 
- 	return ERR_PTR(ret);
- }
-@@ -1615,22 +1517,14 @@ EXPORT_SYMBOL_GPL(dev_pm_opp_set_regulators);
- /**
-  * dev_pm_opp_put_regulators() - Releases resources blocked for regulator
-  * @opp_table: OPP table returned from dev_pm_opp_set_regulators().
-- *
-- * Locking: The internal opp_table and opp structures are RCU protected.
-- * Hence this function internally uses RCU updater strategy with mutex locks
-- * to keep the integrity of the internal data structures. Callers should ensure
-- * that this function is *NOT* called under RCU protection or in contexts where
-- * mutex cannot be locked.
-  */
- void dev_pm_opp_put_regulators(struct opp_table *opp_table)
- {
- 	int i;
- 
--	mutex_lock(&opp_table_lock);
+-	rcu_read_lock();
 -
- 	if (!opp_table->regulators) {
- 		pr_err("%s: Doesn't have regulators set\n", __func__);
--		goto unlock;
-+		return;
- 	}
- 
- 	/* Make sure there are no concurrent readers while updating opp_table */
-@@ -1645,11 +1539,7 @@ void dev_pm_opp_put_regulators(struct opp_table *opp_table)
- 	opp_table->regulators = NULL;
- 	opp_table->regulator_count = 0;
- 
--	/* Try freeing opp_table if this was the last blocking resource */
--	_remove_opp_table(opp_table);
--
--unlock:
--	mutex_unlock(&opp_table_lock);
-+	dev_pm_opp_put_opp_table(opp_table);
- }
- EXPORT_SYMBOL_GPL(dev_pm_opp_put_regulators);
- 
-@@ -1662,29 +1552,19 @@ EXPORT_SYMBOL_GPL(dev_pm_opp_put_regulators);
-  * regulators per device), instead of the generic OPP set rate helper.
-  *
-  * This must be called before any OPPs are initialized for the device.
-- *
-- * Locking: The internal opp_table and opp structures are RCU protected.
-- * Hence this function internally uses RCU updater strategy with mutex locks
-- * to keep the integrity of the internal data structures. Callers should ensure
-- * that this function is *NOT* called under RCU protection or in contexts where
-- * mutex cannot be locked.
-  */
--int dev_pm_opp_register_set_opp_helper(struct device *dev,
-+struct opp_table *dev_pm_opp_register_set_opp_helper(struct device *dev,
- 			int (*set_opp)(struct dev_pm_set_opp_data *data))
- {
- 	struct opp_table *opp_table;
- 	int ret;
- 
- 	if (!set_opp)
--		return -EINVAL;
--
--	mutex_lock(&opp_table_lock);
-+		return ERR_PTR(-EINVAL);
- 
--	opp_table = _add_opp_table(dev);
--	if (!opp_table) {
--		ret = -ENOMEM;
--		goto unlock;
+ 	opp = dev_pm_opp_find_freq_ceil(td->soc->dev, &rate);
+-	if (IS_ERR(opp)) {
+-		rcu_read_unlock();
++	if (IS_ERR(opp))
+ 		return PTR_ERR(opp);
 -	}
-+	opp_table = dev_pm_opp_get_opp_table(dev);
-+	if (!opp_table)
-+		return ERR_PTR(-ENOMEM);
+-	uv = dev_pm_opp_get_voltage(opp);
  
- 	/* This should be called before OPPs are initialized */
- 	if (WARN_ON(!list_empty(&opp_table->opp_list))) {
-@@ -1700,47 +1580,28 @@ int dev_pm_opp_register_set_opp_helper(struct device *dev,
+-	rcu_read_unlock();
++	uv = dev_pm_opp_get_voltage(opp);
++	dev_pm_opp_put(opp);
  
- 	opp_table->set_opp = set_opp;
+ 	for (i = 0; i < td->i2c_lut_size; i++) {
+ 		if (regulator_list_voltage(td->vdd_reg, td->i2c_lut[i]) == uv)
+@@ -1440,8 +1436,6 @@ static int dfll_build_i2c_lut(struct tegra_dfll *td)
+ 	struct dev_pm_opp *opp;
+ 	int lut;
  
--	mutex_unlock(&opp_table_lock);
--	return 0;
-+	return opp_table;
+-	rcu_read_lock();
+-
+ 	rate = ULONG_MAX;
+ 	opp = dev_pm_opp_find_freq_floor(td->soc->dev, &rate);
+ 	if (IS_ERR(opp)) {
+@@ -1449,6 +1443,7 @@ static int dfll_build_i2c_lut(struct tegra_dfll *td)
+ 		goto out;
+ 	}
+ 	v_max = dev_pm_opp_get_voltage(opp);
++	dev_pm_opp_put(opp);
  
- err:
--	_remove_opp_table(opp_table);
--unlock:
--	mutex_unlock(&opp_table_lock);
-+	dev_pm_opp_put_opp_table(opp_table);
+ 	v = td->soc->cvb->min_millivolts * 1000;
+ 	lut = find_vdd_map_entry_exact(td, v);
+@@ -1465,6 +1460,8 @@ static int dfll_build_i2c_lut(struct tegra_dfll *td)
+ 		if (v_opp <= td->soc->cvb->min_millivolts * 1000)
+ 			td->dvco_rate_min = dev_pm_opp_get_freq(opp);
  
--	return ret;
-+	return ERR_PTR(ret);
++		dev_pm_opp_put(opp);
++
+ 		for (;;) {
+ 			v += max(1, (v_max - v) / (MAX_DFLL_VOLTAGES - j));
+ 			if (v >= v_opp)
+@@ -1496,8 +1493,6 @@ static int dfll_build_i2c_lut(struct tegra_dfll *td)
+ 		ret = 0;
+ 
+ out:
+-	rcu_read_unlock();
+-
+ 	return ret;
  }
- EXPORT_SYMBOL_GPL(dev_pm_opp_register_set_opp_helper);
+ 
+diff --git a/drivers/cpufreq/exynos5440-cpufreq.c b/drivers/cpufreq/exynos5440-cpufreq.c
+index c0f3373706f4..9180d34cc9fc 100644
+--- a/drivers/cpufreq/exynos5440-cpufreq.c
++++ b/drivers/cpufreq/exynos5440-cpufreq.c
+@@ -118,12 +118,10 @@ static int init_div_table(void)
+ 	unsigned int tmp, clk_div, ema_div, freq, volt_id;
+ 	struct dev_pm_opp *opp;
+ 
+-	rcu_read_lock();
+ 	cpufreq_for_each_entry(pos, freq_tbl) {
+ 		opp = dev_pm_opp_find_freq_exact(dvfs_info->dev,
+ 					pos->frequency * 1000, true);
+ 		if (IS_ERR(opp)) {
+-			rcu_read_unlock();
+ 			dev_err(dvfs_info->dev,
+ 				"failed to find valid OPP for %u KHZ\n",
+ 				pos->frequency);
+@@ -140,6 +138,7 @@ static int init_div_table(void)
+ 
+ 		/* Calculate EMA */
+ 		volt_id = dev_pm_opp_get_voltage(opp);
++
+ 		volt_id = (MAX_VOLTAGE - volt_id) / VOLTAGE_STEP;
+ 		if (volt_id < PMIC_HIGH_VOLT) {
+ 			ema_div = (CPUEMA_HIGH << P0_7_CPUEMA_SHIFT) |
+@@ -157,9 +156,9 @@ static int init_div_table(void)
+ 
+ 		__raw_writel(tmp, dvfs_info->base + XMU_PMU_P0_7 + 4 *
+ 						(pos - freq_tbl));
++		dev_pm_opp_put(opp);
+ 	}
+ 
+-	rcu_read_unlock();
+ 	return 0;
+ }
+ 
+diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+index ef1fa8145419..7719b02e04f5 100644
+--- a/drivers/cpufreq/imx6q-cpufreq.c
++++ b/drivers/cpufreq/imx6q-cpufreq.c
+@@ -53,16 +53,15 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+ 	freq_hz = new_freq * 1000;
+ 	old_freq = clk_get_rate(arm_clk) / 1000;
+ 
+-	rcu_read_lock();
+ 	opp = dev_pm_opp_find_freq_ceil(cpu_dev, &freq_hz);
+ 	if (IS_ERR(opp)) {
+-		rcu_read_unlock();
+ 		dev_err(cpu_dev, "failed to find OPP for %ld\n", freq_hz);
+ 		return PTR_ERR(opp);
+ 	}
+ 
+ 	volt = dev_pm_opp_get_voltage(opp);
+-	rcu_read_unlock();
++	dev_pm_opp_put(opp);
++
+ 	volt_old = regulator_get_voltage(arm_reg);
+ 
+ 	dev_dbg(cpu_dev, "%u MHz, %ld mV --> %u MHz, %ld mV\n",
+@@ -321,14 +320,15 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+ 	 * freq_table initialised from OPP is therefore sorted in the
+ 	 * same order.
+ 	 */
+-	rcu_read_lock();
+ 	opp = dev_pm_opp_find_freq_exact(cpu_dev,
+ 				  freq_table[0].frequency * 1000, true);
+ 	min_volt = dev_pm_opp_get_voltage(opp);
++	dev_pm_opp_put(opp);
+ 	opp = dev_pm_opp_find_freq_exact(cpu_dev,
+ 				  freq_table[--num].frequency * 1000, true);
+ 	max_volt = dev_pm_opp_get_voltage(opp);
+-	rcu_read_unlock();
++	dev_pm_opp_put(opp);
++
+ 	ret = regulator_set_voltage_time(arm_reg, min_volt, max_volt);
+ 	if (ret > 0)
+ 		transition_latency += ret * 1000;
+diff --git a/drivers/cpufreq/mt8173-cpufreq.c b/drivers/cpufreq/mt8173-cpufreq.c
+index 643f43179df1..ab25b1235a5e 100644
+--- a/drivers/cpufreq/mt8173-cpufreq.c
++++ b/drivers/cpufreq/mt8173-cpufreq.c
+@@ -232,16 +232,14 @@ static int mtk_cpufreq_set_target(struct cpufreq_policy *policy,
+ 
+ 	freq_hz = freq_table[index].frequency * 1000;
+ 
+-	rcu_read_lock();
+ 	opp = dev_pm_opp_find_freq_ceil(cpu_dev, &freq_hz);
+ 	if (IS_ERR(opp)) {
+-		rcu_read_unlock();
+ 		pr_err("cpu%d: failed to find OPP for %ld\n",
+ 		       policy->cpu, freq_hz);
+ 		return PTR_ERR(opp);
+ 	}
+ 	vproc = dev_pm_opp_get_voltage(opp);
+-	rcu_read_unlock();
++	dev_pm_opp_put(opp);
+ 
+ 	/*
+ 	 * If the new voltage or the intermediate voltage is higher than the
+@@ -411,16 +409,14 @@ static int mtk_cpu_dvfs_info_init(struct mtk_cpu_dvfs_info *info, int cpu)
+ 
+ 	/* Search a safe voltage for intermediate frequency. */
+ 	rate = clk_get_rate(inter_clk);
+-	rcu_read_lock();
+ 	opp = dev_pm_opp_find_freq_ceil(cpu_dev, &rate);
+ 	if (IS_ERR(opp)) {
+-		rcu_read_unlock();
+ 		pr_err("failed to get intermediate opp for cpu%d\n", cpu);
+ 		ret = PTR_ERR(opp);
+ 		goto out_free_opp_table;
+ 	}
+ 	info->intermediate_voltage = dev_pm_opp_get_voltage(opp);
+-	rcu_read_unlock();
++	dev_pm_opp_put(opp);
+ 
+ 	info->cpu_dev = cpu_dev;
+ 	info->proc_reg = proc_reg;
+diff --git a/drivers/cpufreq/omap-cpufreq.c b/drivers/cpufreq/omap-cpufreq.c
+index 376e63ca94e8..71e81bbf031b 100644
+--- a/drivers/cpufreq/omap-cpufreq.c
++++ b/drivers/cpufreq/omap-cpufreq.c
+@@ -63,16 +63,14 @@ static int omap_target(struct cpufreq_policy *policy, unsigned int index)
+ 	freq = ret;
+ 
+ 	if (mpu_reg) {
+-		rcu_read_lock();
+ 		opp = dev_pm_opp_find_freq_ceil(mpu_dev, &freq);
+ 		if (IS_ERR(opp)) {
+-			rcu_read_unlock();
+ 			dev_err(mpu_dev, "%s: unable to find MPU OPP for %d\n",
+ 				__func__, new_freq);
+ 			return -EINVAL;
+ 		}
+ 		volt = dev_pm_opp_get_voltage(opp);
+-		rcu_read_unlock();
++		dev_pm_opp_put(opp);
+ 		tol = volt * OPP_TOLERANCE / 100;
+ 		volt_old = regulator_get_voltage(mpu_reg);
+ 	}
+diff --git a/drivers/devfreq/devfreq.c b/drivers/devfreq/devfreq.c
+index a545c0fee6e1..253525ea17af 100644
+--- a/drivers/devfreq/devfreq.c
++++ b/drivers/devfreq/devfreq.c
+@@ -111,18 +111,16 @@ static void devfreq_set_freq_table(struct devfreq *devfreq)
+ 		return;
+ 	}
+ 
+-	rcu_read_lock();
+ 	for (i = 0, freq = 0; i < profile->max_state; i++, freq++) {
+ 		opp = dev_pm_opp_find_freq_ceil(devfreq->dev.parent, &freq);
+ 		if (IS_ERR(opp)) {
+ 			devm_kfree(devfreq->dev.parent, profile->freq_table);
+ 			profile->max_state = 0;
+-			rcu_read_unlock();
+ 			return;
+ 		}
++		dev_pm_opp_put(opp);
+ 		profile->freq_table[i] = freq;
+ 	}
+-	rcu_read_unlock();
+ }
  
  /**
-  * dev_pm_opp_register_put_opp_helper() - Releases resources blocked for
-  *					   set_opp helper
-- * @dev: Device for which custom set_opp helper has to be cleared.
-+ * @opp_table: OPP table returned from dev_pm_opp_register_set_opp_helper().
+@@ -1112,17 +1110,16 @@ static ssize_t available_frequencies_show(struct device *d,
+ 	ssize_t count = 0;
+ 	unsigned long freq = 0;
+ 
+-	rcu_read_lock();
+ 	do {
+ 		opp = dev_pm_opp_find_freq_ceil(dev, &freq);
+ 		if (IS_ERR(opp))
+ 			break;
+ 
++		dev_pm_opp_put(opp);
+ 		count += scnprintf(&buf[count], (PAGE_SIZE - count - 2),
+ 				   "%lu ", freq);
+ 		freq++;
+ 	} while (1);
+-	rcu_read_unlock();
+ 
+ 	/* Truncate the trailing space */
+ 	if (count)
+@@ -1224,11 +1221,8 @@ subsys_initcall(devfreq_init);
+  * @freq:	The frequency given to target function
+  * @flags:	Flags handed from devfreq framework.
   *
-- * Locking: The internal opp_table and opp structures are RCU protected.
-- * Hence this function internally uses RCU updater strategy with mutex locks
-- * to keep the integrity of the internal data structures. Callers should ensure
-- * that this function is *NOT* called under RCU protection or in contexts where
-- * mutex cannot be locked.
-+ * Release resources blocked for platform specific set_opp helper.
+- * Locking: This function must be called under rcu_read_lock(). opp is a rcu
+- * protected pointer. The reason for the same is that the opp pointer which is
+- * returned will remain valid for use with opp_get_{voltage, freq} only while
+- * under the locked area. The pointer returned must be used prior to unlocking
+- * with rcu_read_unlock() to maintain the integrity of the pointer.
++ * The callers are required to call dev_pm_opp_put() for the returned OPP after
++ * use.
   */
--void dev_pm_opp_register_put_opp_helper(struct device *dev)
-+void dev_pm_opp_register_put_opp_helper(struct opp_table *opp_table)
- {
--	struct opp_table *opp_table;
--
--	mutex_lock(&opp_table_lock);
--
--	/* Check for existing table for 'dev' first */
--	opp_table = _find_opp_table(dev);
--	if (IS_ERR(opp_table)) {
--		dev_err(dev, "Failed to find opp_table: %ld\n",
--			PTR_ERR(opp_table));
--		goto unlock;
+ struct dev_pm_opp *devfreq_recommended_opp(struct device *dev,
+ 					   unsigned long *freq,
+diff --git a/drivers/devfreq/exynos-bus.c b/drivers/devfreq/exynos-bus.c
+index 9af86f46fbec..c6d850cddd98 100644
+--- a/drivers/devfreq/exynos-bus.c
++++ b/drivers/devfreq/exynos-bus.c
+@@ -103,18 +103,17 @@ static int exynos_bus_target(struct device *dev, unsigned long *freq, u32 flags)
+ 	int ret = 0;
+ 
+ 	/* Get new opp-bus instance according to new bus clock */
+-	rcu_read_lock();
+ 	new_opp = devfreq_recommended_opp(dev, freq, flags);
+ 	if (IS_ERR(new_opp)) {
+ 		dev_err(dev, "failed to get recommended opp instance\n");
+-		rcu_read_unlock();
+ 		return PTR_ERR(new_opp);
+ 	}
+ 
+ 	new_freq = dev_pm_opp_get_freq(new_opp);
+ 	new_volt = dev_pm_opp_get_voltage(new_opp);
++	dev_pm_opp_put(new_opp);
++
+ 	old_freq = bus->curr_freq;
+-	rcu_read_unlock();
+ 
+ 	if (old_freq == new_freq)
+ 		return 0;
+@@ -214,17 +213,16 @@ static int exynos_bus_passive_target(struct device *dev, unsigned long *freq,
+ 	int ret = 0;
+ 
+ 	/* Get new opp-bus instance according to new bus clock */
+-	rcu_read_lock();
+ 	new_opp = devfreq_recommended_opp(dev, freq, flags);
+ 	if (IS_ERR(new_opp)) {
+ 		dev_err(dev, "failed to get recommended opp instance\n");
+-		rcu_read_unlock();
+ 		return PTR_ERR(new_opp);
+ 	}
+ 
+ 	new_freq = dev_pm_opp_get_freq(new_opp);
++	dev_pm_opp_put(new_opp);
++
+ 	old_freq = bus->curr_freq;
+-	rcu_read_unlock();
+ 
+ 	if (old_freq == new_freq)
+ 		return 0;
+@@ -358,16 +356,14 @@ static int exynos_bus_parse_of(struct device_node *np,
+ 
+ 	rate = clk_get_rate(bus->clk);
+ 
+-	rcu_read_lock();
+ 	opp = devfreq_recommended_opp(dev, &rate, 0);
+ 	if (IS_ERR(opp)) {
+ 		dev_err(dev, "failed to find dev_pm_opp\n");
+-		rcu_read_unlock();
+ 		ret = PTR_ERR(opp);
+ 		goto err_opp;
+ 	}
+ 	bus->curr_freq = dev_pm_opp_get_freq(opp);
+-	rcu_read_unlock();
++	dev_pm_opp_put(opp);
+ 
+ 	return 0;
+ 
+diff --git a/drivers/devfreq/governor_passive.c b/drivers/devfreq/governor_passive.c
+index 9ef46e2592c4..bd452236dba4 100644
+--- a/drivers/devfreq/governor_passive.c
++++ b/drivers/devfreq/governor_passive.c
+@@ -59,14 +59,14 @@ static int devfreq_passive_get_target_freq(struct devfreq *devfreq,
+ 	 * list of parent device. Because in this case, *freq is temporary
+ 	 * value which is decided by ondemand governor.
+ 	 */
+-	rcu_read_lock();
+ 	opp = devfreq_recommended_opp(parent_devfreq->dev.parent, freq, 0);
+-	rcu_read_unlock();
+ 	if (IS_ERR(opp)) {
+ 		ret = PTR_ERR(opp);
+ 		goto out;
+ 	}
+ 
++	dev_pm_opp_put(opp);
++
+ 	/*
+ 	 * Get the OPP table's index of decided freqeuncy by governor
+ 	 * of parent device.
+diff --git a/drivers/devfreq/rk3399_dmc.c b/drivers/devfreq/rk3399_dmc.c
+index 27d2f349b53c..40a2499730fc 100644
+--- a/drivers/devfreq/rk3399_dmc.c
++++ b/drivers/devfreq/rk3399_dmc.c
+@@ -91,17 +91,13 @@ static int rk3399_dmcfreq_target(struct device *dev, unsigned long *freq,
+ 	unsigned long target_volt, target_rate;
+ 	int err;
+ 
+-	rcu_read_lock();
+ 	opp = devfreq_recommended_opp(dev, freq, flags);
+-	if (IS_ERR(opp)) {
+-		rcu_read_unlock();
++	if (IS_ERR(opp))
+ 		return PTR_ERR(opp);
 -	}
+ 
+ 	target_rate = dev_pm_opp_get_freq(opp);
+ 	target_volt = dev_pm_opp_get_voltage(opp);
 -
- 	if (!opp_table->set_opp) {
--		dev_err(dev, "%s: Doesn't have custom set_opp helper set\n",
--			__func__);
--		goto unlock;
-+		pr_err("%s: Doesn't have custom set_opp helper set\n",
-+		       __func__);
-+		return;
+-	rcu_read_unlock();
++	dev_pm_opp_put(opp);
+ 
+ 	if (dmcfreq->rate == target_rate)
+ 		return 0;
+@@ -422,15 +418,13 @@ static int rk3399_dmcfreq_probe(struct platform_device *pdev)
+ 
+ 	data->rate = clk_get_rate(data->dmc_clk);
+ 
+-	rcu_read_lock();
+ 	opp = devfreq_recommended_opp(dev, &data->rate, 0);
+-	if (IS_ERR(opp)) {
+-		rcu_read_unlock();
++	if (IS_ERR(opp))
+ 		return PTR_ERR(opp);
+-	}
++
+ 	data->rate = dev_pm_opp_get_freq(opp);
+ 	data->volt = dev_pm_opp_get_voltage(opp);
+-	rcu_read_unlock();
++	dev_pm_opp_put(opp);
+ 
+ 	rk3399_devfreq_dmc_profile.initial_freq = data->rate;
+ 
+diff --git a/drivers/devfreq/tegra-devfreq.c b/drivers/devfreq/tegra-devfreq.c
+index fe9dce0245bf..214fff96fa4a 100644
+--- a/drivers/devfreq/tegra-devfreq.c
++++ b/drivers/devfreq/tegra-devfreq.c
+@@ -487,15 +487,13 @@ static int tegra_devfreq_target(struct device *dev, unsigned long *freq,
+ 	struct dev_pm_opp *opp;
+ 	unsigned long rate = *freq * KHZ;
+ 
+-	rcu_read_lock();
+ 	opp = devfreq_recommended_opp(dev, &rate, flags);
+ 	if (IS_ERR(opp)) {
+-		rcu_read_unlock();
+ 		dev_err(dev, "Failed to find opp for %lu KHz\n", *freq);
+ 		return PTR_ERR(opp);
  	}
+ 	rate = dev_pm_opp_get_freq(opp);
+-	rcu_read_unlock();
++	dev_pm_opp_put(opp);
  
- 	/* Make sure there are no concurrent readers while updating opp_table */
-@@ -1748,11 +1609,7 @@ void dev_pm_opp_register_put_opp_helper(struct device *dev)
+ 	clk_set_min_rate(tegra->emc_clock, rate);
+ 	clk_set_rate(tegra->emc_clock, 0);
+diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
+index 9ce0e9eef923..85fdbf762fa0 100644
+--- a/drivers/thermal/cpu_cooling.c
++++ b/drivers/thermal/cpu_cooling.c
+@@ -297,8 +297,6 @@ static int build_dyn_power_table(struct cpufreq_cooling_device *cpufreq_device,
+ 	if (!power_table)
+ 		return -ENOMEM;
  
- 	opp_table->set_opp = NULL;
- 
--	/* Try freeing opp_table if this was the last blocking resource */
--	_remove_opp_table(opp_table);
+-	rcu_read_lock();
 -
--unlock:
--	mutex_unlock(&opp_table_lock);
-+	dev_pm_opp_put_opp_table(opp_table);
- }
- EXPORT_SYMBOL_GPL(dev_pm_opp_register_put_opp_helper);
+ 	for (freq = 0, i = 0;
+ 	     opp = dev_pm_opp_find_freq_ceil(dev, &freq), !IS_ERR(opp);
+ 	     freq++, i++) {
+@@ -306,13 +304,13 @@ static int build_dyn_power_table(struct cpufreq_cooling_device *cpufreq_device,
+ 		u64 power;
  
-diff --git a/drivers/cpufreq/sti-cpufreq.c b/drivers/cpufreq/sti-cpufreq.c
-index b366e6d830ea..a7db9011d5fe 100644
---- a/drivers/cpufreq/sti-cpufreq.c
-+++ b/drivers/cpufreq/sti-cpufreq.c
-@@ -160,6 +160,7 @@ static int sti_cpufreq_set_opp_info(void)
- 	int pcode, substrate, major, minor;
- 	int ret;
- 	char name[MAX_PCODE_NAME_LEN];
-+	struct opp_table *opp_table;
+ 		if (i >= num_opps) {
+-			rcu_read_unlock();
+ 			ret = -EAGAIN;
+ 			goto free_power_table;
+ 		}
  
- 	reg_fields = sti_cpufreq_match();
- 	if (!reg_fields) {
-@@ -211,20 +212,20 @@ static int sti_cpufreq_set_opp_info(void)
+ 		freq_mhz = freq / 1000000;
+ 		voltage_mv = dev_pm_opp_get_voltage(opp) / 1000;
++		dev_pm_opp_put(opp);
  
- 	snprintf(name, MAX_PCODE_NAME_LEN, "pcode%d", pcode);
- 
--	ret = dev_pm_opp_set_prop_name(dev, name);
--	if (ret) {
-+	opp_table = dev_pm_opp_set_prop_name(dev, name);
-+	if (IS_ERR(opp_table)) {
- 		dev_err(dev, "Failed to set prop name\n");
--		return ret;
-+		return PTR_ERR(opp_table);
+ 		/*
+ 		 * Do the multiplication with MHz and millivolt so as
+@@ -328,8 +326,6 @@ static int build_dyn_power_table(struct cpufreq_cooling_device *cpufreq_device,
+ 		power_table[i].power = power;
  	}
  
- 	version[0] = BIT(major);
- 	version[1] = BIT(minor);
- 	version[2] = BIT(substrate);
- 
--	ret = dev_pm_opp_set_supported_hw(dev, version, VERSION_ELEMENTS);
--	if (ret) {
-+	opp_table = dev_pm_opp_set_supported_hw(dev, version, VERSION_ELEMENTS);
-+	if (IS_ERR(opp_table)) {
- 		dev_err(dev, "Failed to set supported hardware\n");
--		return ret;
-+		return PTR_ERR(opp_table);
+-	rcu_read_unlock();
+-
+ 	if (i != num_opps) {
+ 		ret = PTR_ERR(opp);
+ 		goto free_power_table;
+@@ -433,13 +429,10 @@ static int get_static_power(struct cpufreq_cooling_device *cpufreq_device,
+ 		return 0;
  	}
  
- 	dev_dbg(dev, "pcode: %d major: %d minor: %d substrate: %d\n",
-diff --git a/include/linux/pm_opp.h b/include/linux/pm_opp.h
-index d867c6b25f9a..99787cbcaab2 100644
---- a/include/linux/pm_opp.h
-+++ b/include/linux/pm_opp.h
-@@ -114,15 +114,14 @@ int dev_pm_opp_disable(struct device *dev, unsigned long freq);
- int dev_pm_opp_register_notifier(struct device *dev, struct notifier_block *nb);
- int dev_pm_opp_unregister_notifier(struct device *dev, struct notifier_block *nb);
+-	rcu_read_lock();
+-
+ 	opp = dev_pm_opp_find_freq_exact(cpufreq_device->cpu_dev, freq_hz,
+ 					 true);
+ 	voltage = dev_pm_opp_get_voltage(opp);
+-
+-	rcu_read_unlock();
++	dev_pm_opp_put(opp);
  
--int dev_pm_opp_set_supported_hw(struct device *dev, const u32 *versions,
--				unsigned int count);
--void dev_pm_opp_put_supported_hw(struct device *dev);
--int dev_pm_opp_set_prop_name(struct device *dev, const char *name);
--void dev_pm_opp_put_prop_name(struct device *dev);
-+struct opp_table *dev_pm_opp_set_supported_hw(struct device *dev, const u32 *versions, unsigned int count);
-+void dev_pm_opp_put_supported_hw(struct opp_table *opp_table);
-+struct opp_table *dev_pm_opp_set_prop_name(struct device *dev, const char *name);
-+void dev_pm_opp_put_prop_name(struct opp_table *opp_table);
- struct opp_table *dev_pm_opp_set_regulators(struct device *dev, const char * const names[], unsigned int count);
- void dev_pm_opp_put_regulators(struct opp_table *opp_table);
--int dev_pm_opp_register_set_opp_helper(struct device *dev, int (*set_opp)(struct dev_pm_set_opp_data *data));
--void dev_pm_opp_register_put_opp_helper(struct device *dev);
-+struct opp_table *dev_pm_opp_register_set_opp_helper(struct device *dev, int (*set_opp)(struct dev_pm_set_opp_data *data));
-+void dev_pm_opp_register_put_opp_helper(struct opp_table *opp_table);
- int dev_pm_opp_set_rate(struct device *dev, unsigned long target_freq);
- int dev_pm_opp_set_sharing_cpus(struct device *cpu_dev, const struct cpumask *cpumask);
- int dev_pm_opp_get_sharing_cpus(struct device *cpu_dev, struct cpumask *cpumask);
-@@ -224,29 +223,29 @@ static inline int dev_pm_opp_unregister_notifier(struct device *dev, struct noti
- 	return -ENOTSUPP;
- }
+ 	if (voltage == 0) {
+ 		dev_warn_ratelimited(cpufreq_device->cpu_dev,
+diff --git a/drivers/thermal/devfreq_cooling.c b/drivers/thermal/devfreq_cooling.c
+index 5a737fd5f1aa..ba7a5cd994dc 100644
+--- a/drivers/thermal/devfreq_cooling.c
++++ b/drivers/thermal/devfreq_cooling.c
+@@ -113,15 +113,15 @@ static int partition_enable_opps(struct devfreq_cooling_device *dfc,
+ 		unsigned int freq = dfc->freq_table[i];
+ 		bool want_enable = i >= cdev_state ? true : false;
  
--static inline int dev_pm_opp_set_supported_hw(struct device *dev,
--					      const u32 *versions,
--					      unsigned int count)
-+static inline struct opp_table *dev_pm_opp_set_supported_hw(struct device *dev,
-+							    const u32 *versions,
-+							    unsigned int count)
- {
--	return -ENOTSUPP;
-+	return ERR_PTR(-ENOTSUPP);
- }
+-		rcu_read_lock();
+ 		opp = dev_pm_opp_find_freq_exact(dev, freq, !want_enable);
+-		rcu_read_unlock();
  
--static inline void dev_pm_opp_put_supported_hw(struct device *dev) {}
-+static inline void dev_pm_opp_put_supported_hw(struct opp_table *opp_table) {}
+ 		if (PTR_ERR(opp) == -ERANGE)
+ 			continue;
+ 		else if (IS_ERR(opp))
+ 			return PTR_ERR(opp);
  
--static inline int dev_pm_opp_register_set_opp_helper(struct device *dev,
-+static inline struct opp_table *dev_pm_opp_register_set_opp_helper(struct device *dev,
- 			int (*set_opp)(struct dev_pm_set_opp_data *data))
- {
--	return -ENOTSUPP;
-+	return ERR_PTR(-ENOTSUPP);
- }
++		dev_pm_opp_put(opp);
++
+ 		if (want_enable)
+ 			ret = dev_pm_opp_enable(dev, freq);
+ 		else
+@@ -221,15 +221,12 @@ get_static_power(struct devfreq_cooling_device *dfc, unsigned long freq)
+ 	if (!dfc->power_ops->get_static_power)
+ 		return 0;
  
--static inline void dev_pm_opp_register_put_opp_helper(struct device *dev) {}
-+static inline void dev_pm_opp_register_put_opp_helper(struct opp_table *opp_table) {}
+-	rcu_read_lock();
+-
+ 	opp = dev_pm_opp_find_freq_exact(dev, freq, true);
+ 	if (IS_ERR(opp) && (PTR_ERR(opp) == -ERANGE))
+ 		opp = dev_pm_opp_find_freq_exact(dev, freq, false);
  
--static inline int dev_pm_opp_set_prop_name(struct device *dev, const char *name)
-+static inline struct opp_table *dev_pm_opp_set_prop_name(struct device *dev, const char *name)
- {
--	return -ENOTSUPP;
-+	return ERR_PTR(-ENOTSUPP);
- }
+ 	voltage = dev_pm_opp_get_voltage(opp) / 1000; /* mV */
+-
+-	rcu_read_unlock();
++	dev_pm_opp_put(opp);
  
--static inline void dev_pm_opp_put_prop_name(struct device *dev) {}
-+static inline void dev_pm_opp_put_prop_name(struct opp_table *opp_table) {}
+ 	if (voltage == 0) {
+ 		dev_warn_ratelimited(dev,
+@@ -412,18 +409,14 @@ static int devfreq_cooling_gen_tables(struct devfreq_cooling_device *dfc)
+ 		unsigned long power_dyn, voltage;
+ 		struct dev_pm_opp *opp;
  
- static inline struct opp_table *dev_pm_opp_set_regulators(struct device *dev, const char * const names[], unsigned int count)
- {
+-		rcu_read_lock();
+-
+ 		opp = dev_pm_opp_find_freq_floor(dev, &freq);
+ 		if (IS_ERR(opp)) {
+-			rcu_read_unlock();
+ 			ret = PTR_ERR(opp);
+ 			goto free_tables;
+ 		}
+ 
+ 		voltage = dev_pm_opp_get_voltage(opp) / 1000; /* mV */
+-
+-		rcu_read_unlock();
++		dev_pm_opp_put(opp);
+ 
+ 		if (dfc->power_ops) {
+ 			power_dyn = get_dynamic_power(dfc, freq, voltage);
 -- 
 2.7.1.410.g6faf27b
