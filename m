@@ -1,47 +1,110 @@
 From: john@phrozen.org (John Crispin)
-Date: Mon, 23 Jan 2017 12:29:31 +0100
-Subject: [PATCH 12/16] arm: dts: add mt7623-mt6323.dtsi file
+Date: Mon, 23 Jan 2017 12:29:32 +0100
+Subject: [PATCH 13/16] arm: dts: rename mt7623-evb.dts to
+ arch/arm/boot/dts/mt7623n-rfb.dtsi
 In-Reply-To: <1485170975-51813-1-git-send-email-john@phrozen.org>
 References: <1485170975-51813-1-git-send-email-john@phrozen.org>
-Message-ID: <1485170975-51813-13-git-send-email-john@phrozen.org>
+Message-ID: <1485170975-51813-14-git-send-email-john@phrozen.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MediaTek produces various PMICs. Which one is used depends on the actual
-circuit design. Instead of adding the correct PMIC node to every dts file
-we instead add a new intermediate dtsi file which adds the PMIC node.
-Additionally we also add the phandles for the regulators to various nodes.
+There are 2 versions of the SoC. MT7623N is almost identical to MT7623A
+but has some additional multimedia features. The reference boards are
+available as NAND or MMC and might have a different ethernet setup. In
+order to reduce the duplication of devicetree code we add an intermediate
+dtsi file for these reference boards. Additionally MTK/WCN pointed out,
+that the EVB is yet another board and the board in question is infact the
+RFB. Take this into account while renaming the files.
 
-Signed-off-by: John Crispin <john@phrozen.org>
+ Signed-off-by: John Crispin <john@phrozen.org>
 ---
- arch/arm/boot/dts/mt7623-evb.dts     |    2 +-
- arch/arm/boot/dts/mt7623-mt6323.dtsi |  273 ++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/mt7623.dtsi        |    8 +-
- 3 files changed, 278 insertions(+), 5 deletions(-)
- create mode 100644 arch/arm/boot/dts/mt7623-mt6323.dtsi
+ Documentation/devicetree/bindings/arm/mediatek.txt |    4 +--
+ arch/arm/boot/dts/Makefile                         |    2 +-
+ arch/arm/boot/dts/mt7623-evb.dts                   |   33 --------------------
+ arch/arm/boot/dts/mt7623n-rfb-nand.dts             |   21 +++++++++++++
+ arch/arm/boot/dts/mt7623n-rfb.dtsi                 |   29 +++++++++++++++++
+ 5 files changed, 53 insertions(+), 36 deletions(-)
+ delete mode 100644 arch/arm/boot/dts/mt7623-evb.dts
+ create mode 100644 arch/arm/boot/dts/mt7623n-rfb-nand.dts
+ create mode 100644 arch/arm/boot/dts/mt7623n-rfb.dtsi
 
+diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
+index c860b24..71149cb 100644
+--- a/Documentation/devicetree/bindings/arm/mediatek.txt
++++ b/Documentation/devicetree/bindings/arm/mediatek.txt
+@@ -38,9 +38,9 @@ Supported boards:
+ - Evaluation board for MT6795(Helio X10):
+     Required root node properties:
+       - compatible = "mediatek,mt6795-evb", "mediatek,mt6795";
+-- Evaluation board for MT7623:
++- Reference  board for MT7623N with NAND:
+     Required root node properties:
+-      - compatible = "mediatek,mt7623-evb", "mediatek,mt7623";
++      - compatible = "mediatek,mt7623n-rfb-nand", "mediatek,mt7623";
+ - MTK mt8127 tablet moose EVB:
+     Required root node properties:
+       - compatible = "mediatek,mt8127-moose", "mediatek,mt8127";
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index cccdbcb..9735c2c 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -976,7 +976,7 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += \
+ 	mt6580-evbp1.dtb \
+ 	mt6589-aquaris5.dtb \
+ 	mt6592-evb.dtb \
+-	mt7623-evb.dtb \
++	mt7623n-rfb-nand.dtb \
+ 	mt8127-moose.dtb \
+ 	mt8135-evbp1.dtb
+ dtb-$(CONFIG_ARCH_ZX) += zx296702-ad1.dtb
 diff --git a/arch/arm/boot/dts/mt7623-evb.dts b/arch/arm/boot/dts/mt7623-evb.dts
-index a9ee2d6..58ed038 100644
+deleted file mode 100644
+index 58ed038..0000000
 --- a/arch/arm/boot/dts/mt7623-evb.dts
-+++ b/arch/arm/boot/dts/mt7623-evb.dts
-@@ -13,7 +13,7 @@
-  */
- 
- /dts-v1/;
--#include "mt7623.dtsi"
-+#include "mt7623-mt6323.dtsi"
- 
- / {
- 	model = "MediaTek MT7623 evaluation board";
-diff --git a/arch/arm/boot/dts/mt7623-mt6323.dtsi b/arch/arm/boot/dts/mt7623-mt6323.dtsi
++++ /dev/null
+@@ -1,33 +0,0 @@
+-/*
+- * Copyright (c) 2016 MediaTek Inc.
+- * Author: John Crispin <blogic@openwrt.org>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- */
+-
+-/dts-v1/;
+-#include "mt7623-mt6323.dtsi"
+-
+-/ {
+-	model = "MediaTek MT7623 evaluation board";
+-	compatible = "mediatek,mt7623-evb", "mediatek,mt7623";
+-
+-	chosen {
+-		stdout-path = &uart2;
+-	};
+-
+-	memory {
+-		reg = <0 0x80000000 0 0x40000000>;
+-	};
+-};
+-
+-&uart2 {
+-	status = "okay";
+-};
+diff --git a/arch/arm/boot/dts/mt7623n-rfb-nand.dts b/arch/arm/boot/dts/mt7623n-rfb-nand.dts
 new file mode 100644
-index 0000000..88ab818
+index 0000000..436d51c
 --- /dev/null
-+++ b/arch/arm/boot/dts/mt7623-mt6323.dtsi
-@@ -0,0 +1,273 @@
++++ b/arch/arm/boot/dts/mt7623n-rfb-nand.dts
+@@ -0,0 +1,21 @@
 +/*
 + * Copyright (c) 2016 MediaTek Inc.
-+ * Author: John Crispin <john@phrozen.org>
++ * Author: John Crispin <blogic@openwrt.org>
 + *
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -53,295 +116,47 @@ index 0000000..88ab818
 + * GNU General Public License for more details.
 + */
 +
-+#include "mt7623.dtsi"
++/dts-v1/;
++#include "mt7623n-rfb.dtsi"
 +
-+&cpu0 {
-+	proc-supply = <&mt6323_vproc_reg>;
++/ {
++	model = "MediaTek MT7623N NAND reference board";
++	compatible = "mediatek,mt7623n-rfb-nand", "mediatek,mt7623";
 +};
+diff --git a/arch/arm/boot/dts/mt7623n-rfb.dtsi b/arch/arm/boot/dts/mt7623n-rfb.dtsi
+new file mode 100644
+index 0000000..d46390e
+--- /dev/null
++++ b/arch/arm/boot/dts/mt7623n-rfb.dtsi
+@@ -0,0 +1,29 @@
++/*
++ * Copyright (c) 2016 MediaTek Inc.
++ * Author: John Crispin <blogic@openwrt.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-+&cpu1 {
-+	proc-supply = <&mt6323_vproc_reg>;
-+};
++#include "mt7623-mt6323.dtsi"
 +
-+&cpu2 {
-+	proc-supply = <&mt6323_vproc_reg>;
-+};
++/ {
++	chosen {
++		stdout-path = &uart2;
++	};
 +
-+&cpu3 {
-+	proc-supply = <&mt6323_vproc_reg>;
-+};
-+
-+&pwrap {
-+	pmic: mt6323 {
-+		compatible = "mediatek,mt6323";
-+		interrupt-parent = <&pio>;
-+		interrupts = <150 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+
-+		mt6323regulator: mt6323regulator{
-+			compatible = "mediatek,mt6323-regulator";
-+
-+			mt6323_vproc_reg: buck_vproc{
-+				regulator-name = "vproc";
-+				regulator-min-microvolt = < 700000>;
-+				regulator-max-microvolt = <1350000>;
-+				regulator-ramp-delay = <12500>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vsys_reg: buck_vsys{
-+				regulator-name = "vsys";
-+				regulator-min-microvolt = <1400000>;
-+				regulator-max-microvolt = <2987500>;
-+				regulator-ramp-delay = <25000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vpa_reg: buck_vpa{
-+				regulator-name = "vpa";
-+				regulator-min-microvolt = < 500000>;
-+				regulator-max-microvolt = <3650000>;
-+			};
-+
-+			mt6323_vtcxo_reg: ldo_vtcxo{
-+				regulator-name = "vtcxo";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-enable-ramp-delay = <90>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vcn28_reg: ldo_vcn28{
-+				regulator-name = "vcn28";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-enable-ramp-delay = <185>;
-+			};
-+
-+			mt6323_vcn33_bt_reg: ldo_vcn33_bt{
-+				regulator-name = "vcn33_bt";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3600000>;
-+				regulator-enable-ramp-delay = <185>;
-+			};
-+
-+			mt6323_vcn33_wifi_reg: ldo_vcn33_wifi{
-+				regulator-name = "vcn33_wifi";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3600000>;
-+				regulator-enable-ramp-delay = <185>;
-+			};
-+
-+			mt6323_va_reg: ldo_va{
-+				regulator-name = "va";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-enable-ramp-delay = <216>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vcama_reg: ldo_vcama{
-+				regulator-name = "vcama";
-+				regulator-min-microvolt = <1500000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+
-+			mt6323_vio28_reg: ldo_vio28{
-+				regulator-name = "vio28";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-enable-ramp-delay = <216>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vusb_reg: ldo_vusb{
-+				regulator-name = "vusb";
-+				regulator-min-microvolt = <3300000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <216>;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vmc_reg: ldo_vmc{
-+				regulator-name = "vmc";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <36>;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vmch_reg: ldo_vmch{
-+				regulator-name = "vmch";
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <36>;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vemc3v3_reg: ldo_vemc3v3{
-+				regulator-name = "vemc3v3";
-+				regulator-min-microvolt = <3000000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <36>;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vgp1_reg: ldo_vgp1{
-+				regulator-name = "vgp1";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+
-+			mt6323_vgp2_reg: ldo_vgp2{
-+				regulator-name = "vgp2";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+
-+			mt6323_vgp3_reg: ldo_vgp3{
-+				regulator-name = "vgp3";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+
-+			mt6323_vcn18_reg: ldo_vcn18{
-+				regulator-name = "vcn18";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+
-+			mt6323_vsim1_reg: ldo_vsim1{
-+				regulator-name = "vsim1";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+
-+			mt6323_vsim2_reg: ldo_vsim2{
-+				regulator-name = "vsim2";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+
-+			mt6323_vrtc_reg: ldo_vrtc{
-+				regulator-name = "vrtc";
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vcamaf_reg: ldo_vcamaf{
-+				regulator-name = "vcamaf";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+
-+			mt6323_vibr_reg: ldo_vibr{
-+				regulator-name = "vibr";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-enable-ramp-delay = <36>;
-+			};
-+
-+			mt6323_vrf18_reg: ldo_vrf18{
-+				regulator-name = "vrf18";
-+				regulator-min-microvolt = <1825000>;
-+				regulator-max-microvolt = <1825000>;
-+				regulator-enable-ramp-delay = <187>;
-+			};
-+
-+			mt6323_vm_reg: ldo_vm{
-+				regulator-name = "vm";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-enable-ramp-delay = <216>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vio18_reg: ldo_vio18{
-+				regulator-name = "vio18";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-enable-ramp-delay = <216>;
-+				regulator-always-on;
-+				regulator-boot-on;
-+			};
-+
-+			mt6323_vcamd_reg: ldo_vcamd{
-+				regulator-name = "vcamd";
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+
-+			mt6323_vcamio_reg: ldo_vcamio{
-+				regulator-name = "vcamio";
-+				regulator-min-microvolt = <1800000>;
-+				regulator-max-microvolt = <1800000>;
-+				regulator-enable-ramp-delay = <216>;
-+			};
-+		};
++	memory {
++		reg = <0 0x80000000 0 0x40000000>;
 +	};
 +};
 +
-+&usb1 {
-+	vusb33-supply = <&mt6323_vusb_reg>;
++&uart2 {
++	status = "okay";
 +};
-+
-+&mmc0 {
-+	vmmc-supply = <&mt6323_vemc3v3_reg>;
-+	vqmmc-supply = <&mt6323_vio18_reg>;
-+};
-+
-+&mmc1 {
-+	vmmc-supply = <&mt6323_vmch_reg>;
-+	vqmmc-supply = <&mt6323_vmc_reg>;
-+};
-diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
-index 540f70c..b256ff51 100644
---- a/arch/arm/boot/dts/mt7623.dtsi
-+++ b/arch/arm/boot/dts/mt7623.dtsi
-@@ -30,22 +30,22 @@
- 		#size-cells = <0>;
- 		enable-method = "mediatek,mt6589-smp";
- 
--		cpu at 0 {
-+		cpu0: cpu at 0 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a7";
- 			reg = <0x0>;
- 		};
--		cpu at 1 {
-+		cpu1: cpu at 1 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a7";
- 			reg = <0x1>;
- 		};
--		cpu at 2 {
-+		cpu2: cpu at 2 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a7";
- 			reg = <0x2>;
- 		};
--		cpu at 3 {
-+		cpu3: cpu at 3 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a7";
- 			reg = <0x3>;
 -- 
 1.7.10.4
