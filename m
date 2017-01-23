@@ -1,110 +1,70 @@
-From: john@metanate.com (John Keeping)
-Date: Mon, 23 Jan 2017 12:49:25 +0000
-Subject: [PATCH v2 19/26] drm/rockchip: dw-mipi-dsi: improve PLL
- configuration
-In-Reply-To: <58855EAE.2010704@rock-chips.com>
-References: <20170121163128.22240-1-john@metanate.com>
- <20170121163128.22240-20-john@metanate.com>
- <58855EAE.2010704@rock-chips.com>
-Message-ID: <20170123124925.4fa10fc2.john@metanate.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 23 Jan 2017 13:50:18 +0100
+Subject: [PATCH/RFC 2/2] iommu/ipmmu-vmsa: Opt-in slave devices based on
+ ES version
+In-Reply-To: <148517354599.18128.1970642879780864733.sendpatchset@little-apple>
+References: <148517349585.18128.10696161017872202809.sendpatchset@little-apple>
+ <148517354599.18128.1970642879780864733.sendpatchset@little-apple>
+Message-ID: <CAMuHMdWyV4DWN5pKsp+Z6C0MhZF5fKch4T1g1_Hbk3oxrR6_zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+Hi Magnus,
 
-On Mon, 23 Jan 2017 09:38:54 +0800, Chris Zhong wrote:
-> On 01/22/2017 12:31 AM, John Keeping wrote:
-> > The multiplication ratio for the PLL is required to be even due to the
-> > use of a "by 2 pre-scaler".  Currently we are likely to end up with an
-> > odd multiplier even though there is an equivalent set of parameters with
-> > an even multiplier.
-> >
-> > For example, using the 324MHz bit rate with a reference clock of 24MHz
-> > we end up with M = 27, N = 2 whereas the example in the PHY databook
-> > gives M = 54, N = 4 for this bit rate and reference clock.
-> >
-> > By walking down through the available multiplier instead of up we are
-> > more likely to hit an even multiplier.  With the above example we do now
-> > get M = 54, N = 4 as given by the databook.
-> >
-> > While doing this, change the loop limits to encode the actual limits on
-> > the divisor, which are:
-> >
-> > 	40MHz >= (pllref / N) >= 5MHz  
-> 
-> This formula is limit for N, but we still can not guarantee to get an 
-> even M.
-> Do you think we should do a check for M.
-> such as:
-> if (m % 2)
->      continue;
-> ...
->      for (i = pllref / 5; i > (pllref / 40); i--) {
->          pre = pllref / i;
->          if ((tmp > (target_mbps % pre)) && (target_mbps / pre < 512)) {
->              tmp = target_mbps % pre;
->              n = i;
->              m = target_mbps / pre;
->              if (m % 2)
->                  continue;
->          }
->          if (tmp == 0)
->              break;
->      }
-> 
-> if (m % 2)
->      m++;
-> 
->      dsi->lane_mbps = pllref / n * m;
->      dsi->input_div = n;
->      dsi->feedback_div = m;
+On Mon, Jan 23, 2017 at 1:12 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
+> From: Magnus Damm <damm+renesas@opensource.se>
+>
+> Match on r8a7795 ES2 and enable a certain DMA controller.
+> In other cases the IPMMU driver remains disabled.
+>
+> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+> ---
+>
+>  drivers/iommu/ipmmu-vmsa.c |   24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+>
+> --- 0001/drivers/iommu/ipmmu-vmsa.c
+> +++ work/drivers/iommu/ipmmu-vmsa.c     2017-01-23 20:57:02.620607110 +0900
+> @@ -23,6 +23,7 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/sizes.h>
+>  #include <linux/slab.h>
+> +#include <linux/sys_soc.h>
+>
+>  #if defined(CONFIG_ARM) && !defined(CONFIG_IOMMU_DMA)
+>  #include <asm/dma-iommu.h>
+> @@ -1002,16 +1003,39 @@ static void ipmmu_domain_free_dma(struct
+>         }
+>  }
+>
+> +static const struct soc_device_attribute r8a7795es2[] = {
+> +       { .soc_id = "r8a7795", .revision = "ES2.*" },
+> +       { /* sentinel */ }
+> +};
+> +
+> +static int ipmmu_slave_whitelist(struct device *dev)
+> +{
+> +       /* Opt-in slave devices based on SoC and ES version */
+> +       if (soc_device_match(r8a7795es2)) {
+> +               if (!strcmp(dev_name(dev), "e7310000.dma-controller"))
+> +                       return 0;
+> +       }
 
-Yes, I agree that there should be a check for M, but I'm not sure if
-the version above is sufficient.  The "m % 2" check inside the loop
-means that we don't break immediately when tmp=0 but then we are
-guaranteed to break next time without having modified n, m because now
-tmp=0 so "tmp > (target_mbps % pre)" is always false and we just hit the
-"if (tmp == 0) break" case next time.
+I have two comments about the construct above:
+  1. IPMMU will be disabled on all non-r8a7795 SoCs.
+     Is that what you want?
+  2. Usually we match on the old broken versions instead (e.g. against
+     "ES1.*"), as (1) it marks more clearly support for old SoCs, and
+                (2) it makes it easier to remove the check later when these
+                    old SoCs are deemed extinct later.
 
-Given that the descending loop already means that if we can hit "tmp"
-exactly we are more likely to do so with a bigger N and even M, I think
-it might be better to just fix M after the loop like:
+Gr{oetje,eeting}s,
 
-	if (m % 2) {
-		if (m < 256 && (n * 2) <= (pllref / 5)) {
-			n *= 2;
-			m *= 2;
-		} else {
-			m++;
-		}
-	}
+                        Geert
 
-but I haven't thought about this too carefully.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-For this series, I'd rather either keep this patch as it is or drop it
-in favour of a more comprehensive solution.  I don't want to block the
-other fixes waiting for a perfect fix here and we can always improve
-this further with a follow-up patch.
-
-> > Signed-off-by: John Keeping <john@metanate.com>
-> > ---
-> > Unchanged in v2
-> > ---
-> >   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 2 +-
-> >   1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > index 12432e41971b..f2320cf1366c 100644
-> > --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > @@ -519,7 +519,7 @@ static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi,
-> >   	pllref = DIV_ROUND_UP(clk_get_rate(dsi->pllref_clk), USEC_PER_SEC);
-> >   	tmp = pllref;
-> >   
-> > -	for (i = 1; i < 6; i++) {
-> > +	for (i = pllref / 5; i > (pllref / 40); i--) {
-> >   		pre = pllref / i;
-> >   		if ((tmp > (target_mbps % pre)) && (target_mbps / pre < 512)) {
-> >   			tmp = target_mbps % pre;  
-> 
-> 
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
