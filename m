@@ -1,64 +1,38 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 23 Jan 2017 08:43:09 +0000
-Subject: [PATCH v9 0/4] arm64: arch_timer: Add workaround for
- hisilicon-161010101 erratum
-In-Reply-To: <56554f95-b51d-abc7-8ac0-7f561728375a@huawei.com>
-References: <1484832916-7248-1-git-send-email-dingtianhong@huawei.com>
- <20170120150428.GC22152@leverpostej>
- <56554f95-b51d-abc7-8ac0-7f561728375a@huawei.com>
-Message-ID: <ab7479dd-e3b3-1aa1-afcc-dce04fbc46cb@arm.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 23 Jan 2017 09:55:11 +0100
+Subject: [PATCH 04/18] ARM64: dts: meson-gxbb-p20x: Fix Wifi node name
+In-Reply-To: <20170120222118.21476-5-afaerber@suse.de>
+References: <20170120222118.21476-1-afaerber@suse.de>
+ <20170120222118.21476-5-afaerber@suse.de>
+Message-ID: <c61607a4-8c95-8061-e445-8fb5edeaf648@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/01/17 07:36, Ding Tianhong wrote:
+On 01/20/2017 11:21 PM, Andreas F?rber wrote:
+> bcrmf -> brcmf
 > 
+> Fixes: ab3943fe57a2 ("ARM64: dts: meson-gxbb: Add P20x Wifi SDIO support")
+> Cc: Neil Armstrong <narmstrong@baylibre.com>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> On 2017/1/20 23:04, Mark Rutland wrote:
->> On Thu, Jan 19, 2017 at 09:35:12PM +0800, Ding Tianhong wrote:
->>> Ding Tianhong (4):
->>>   arm64: arch_timer: Add device tree binding for hisilicon-161010101
->>>     erratum
->>>   arm64: arch_timer: Introduce a generic erratum handing mechanism for
->>>     fsl-a008585
->>>   arm64: arch_timer: Work around Erratum Hisilicon-161010101
->>>   arm64: arch timer: Add timer erratum property for Hip05-d02 and
->>>     Hip06-d03
->>>
->>>  Documentation/admin-guide/kernel-parameters.txt    |   9 --
->>>  Documentation/arm64/silicon-errata.txt             |  43 +++---
->>>  .../devicetree/bindings/arm/arch_timer.txt         |   6 +
->>>  arch/arm64/boot/dts/hisilicon/hip05.dtsi           |   1 +
->>>  arch/arm64/boot/dts/hisilicon/hip06.dtsi           |   1 +
->>>  arch/arm64/include/asm/arch_timer.h                |  38 ++----
->>>  drivers/clocksource/Kconfig                        |  18 +++
->>>  drivers/clocksource/arm_arch_timer.c               | 150 +++++++++++++++------
->>>  8 files changed, 171 insertions(+), 95 deletions(-)
->>
->> I've picked these up (with a few local cleanups), given that some local
->> testing, and pushed the result to a branch [1] on my git repo.
->>
->> There are likely to be clashes with the arm64 tree (e.g. for
->> silicon-errata.txt), and we're also likely to have more arch timer
->> updates shortly for the GTDT stuff, so I think the best bet is for both
->> arm64 and the clocksource tree to pull that branch for v4.11.
->>
->> Alternatively, we could take this all through the arm64 tree, if the
->> clocksource maintainers are happy with that.
->>
->> Thoughts?
->>
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+> index 4a96e0f6f926..5183c5ce90c6 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+> @@ -193,7 +193,7 @@
+>  	vmmc-supply = <&vddao_3v3>;
+>  	vqmmc-supply = <&vddio_boot>;
+>  
+> -	brcmf: bcrmf at 1 {
+> +	brcmf: brcmf at 1 {
+>  		reg = <1>;
+>  		compatible = "brcm,bcm4329-fmac";
+>  	};
 > 
-> Hi Mark:
-> > It is really a great milestone now, Thanks for the help, and I will
-> still wait for Marc's new opinion for this version, hoping no need to
-> change anything else. :)
 
-I'm working directly with Mark, and any change I feel necessary will go
-directly on top of Mark's branch (as far as I'm concerned, these patches
-are now in a "frozen" state).
+Good catch !
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
