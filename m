@@ -1,57 +1,53 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 23 Jan 2017 08:04:17 -0600
-Subject: [RESEND PATCH 6/6] dt-bindings: phy-mt65xx-usb: add support for
- mt2712 platform
-In-Reply-To: <1485053419.10292.88.camel@mhfsdcap03>
-References: <1484719214-11989-1-git-send-email-chunfeng.yun@mediatek.com>
- <1484719214-11989-6-git-send-email-chunfeng.yun@mediatek.com>
- <20170121200844.k5ivauhws43ac2s2@rob-hp-laptop>
- <1485053419.10292.88.camel@mhfsdcap03>
-Message-ID: <CAL_JsqJkJwwfqq6ezyNiQXyefR8V=q6_hOUPVmssEGs_pdxhuA@mail.gmail.com>
+From: xuwei5@hisilicon.com (Wei Xu)
+Date: Mon, 23 Jan 2017 14:03:27 +0000
+Subject: [V2 2/2] arm64: dts: Add dts files for Hisilicon Hi3660 SoC
+In-Reply-To: <20170123134656.GC16286@leverpostej>
+References: <1484034915-48879-1-git-send-email-puck.chen@hisilicon.com>
+ <1484034915-48879-2-git-send-email-puck.chen@hisilicon.com>
+ <20170123134656.GC16286@leverpostej>
+Message-ID: <58860D2F.6070007@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 21, 2017 at 8:50 PM, Chunfeng Yun <chunfeng.yun@mediatek.com> wrote:
-> On Sat, 2017-01-21 at 14:08 -0600, Rob Herring wrote:
->> On Wed, Jan 18, 2017 at 02:00:14PM +0800, Chunfeng Yun wrote:
->> > add a new compatible string for "mt2712", and a new reference clock
->> > for SuperSpeed analog phy;
->> >
->> > Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
->> > ---
->> >  .../devicetree/bindings/phy/phy-mt65xx-usb.txt     |   81 +++++++++++++++++---
->> >  1 file changed, 70 insertions(+), 11 deletions(-)
+Hi Mark,
 
-[...]
+On 2017/1/23 13:46, Mark Rutland wrote:
+> On Tue, Jan 10, 2017 at 03:55:15PM +0800, Chen Feng wrote:
+>> +	memory at 0 {
+>> +		device_type = "memory";
+>> +		reg = <0x0 0x00400000 0x0 0xbfe00000>;
+>> +	};
+> 
+> The unit-address here is incorrect. The base address of this memory is
+> not zero.
+> 
+>> +	timer {
+>> +		compatible = "arm,armv8-timer";
+>> +		interrupt-parent = <&gic>;
+>> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
+>> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
+>> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
+>> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
+>> +		clock-frequency = <1920000>;
+>> +	};
+> 
+> This clock-frequency property should not be required; please remove it.
+> 
+> Your FW should program CNTFRQ_EL0 with the timer frequency.
 
->> > @@ -31,21 +37,27 @@ Example:
->> >  u3phy: usb-phy at 11290000 {
->> >     compatible = "mediatek,mt8173-u3phy";
->> >     reg = <0 0x11290000 0 0x800>;
->> > -   clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
->> > -   clock-names = "u3phya_ref";
->> > +   clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>, <&clk26m>;
->> > +   clock-names = "u2ref_clk", "u3ref_clk";
->> >     #address-cells = <2>;
->> >     #size-cells = <2>;
->> >     ranges;
->> >     status = "okay";
->> >
->> > -   phy_port0: port at 11290800 {
->> > -           reg = <0 0x11290800 0 0x800>;
->> > +   u2port0: port at 11290800 {
->>
->> port is for OF graph. This should be usb-phy at ... instead.
-> Is there any problems if u2port0's name at addr is the same as its parent's
-> (u3phy)?  as following:
->         u3phy: usb-phy at 11290000 {
->                 compatible = ...;
->                 // no reg property
->                 clocks = ...;
->                 u2port0: usb-phy at 11290000 {
->                         reg = ...;
->         }
+Thanks!
 
-No problem, that is fine.
+Hi Chen Feng,
 
-Rob
+Can you send out the v3 to address above comments?
+And I will pick up it soon.
+
+Best Regards,
+Wei
+
+> 
+> Thanks,
+> Mark.
+> 
+> .
+> 
