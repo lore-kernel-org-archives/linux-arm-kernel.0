@@ -1,60 +1,49 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 23 Jan 2017 09:49:31 -0600
-Subject: [PATCH v5 01/14] devicetree: bindings: add bindings for ahci-da850
-In-Reply-To: <5615fb6b-af26-c2fb-1f97-416548a9faaf@ti.com>
-References: <1484911325-23425-1-git-send-email-bgolaszewski@baylibre.com>
- <1484911325-23425-2-git-send-email-bgolaszewski@baylibre.com>
- <5615fb6b-af26-c2fb-1f97-416548a9faaf@ti.com>
-Message-ID: <20170123154931.zyrcg5grqvia435t@rob-hp-laptop>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 23 Jan 2017 15:56:13 +0000
+Subject: [PATCH v2 1/2] dt-bindings: arm,
+ gic: Fix binding example for a virt-capable GIC
+In-Reply-To: <1485186974-13678-1-git-send-email-marc.zyngier@arm.com>
+References: <1485186974-13678-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1485186974-13678-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2017 at 07:02:08PM +0530, Sekhar Nori wrote:
-> Hi Rob,
-> 
-> On Friday 20 January 2017 04:51 PM, Bartosz Golaszewski wrote:
-> > Add DT bindings for the TI DA850 AHCI SATA controller.
-> > 
-> > Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-> 
-> Could you ack this binding?
+The joys of copy/paste: the example of a virtualization capable GIC
+in the DT binding was wrong, and propagated to dozens of platforms.
+By having a GICC region that is only 4kB (instead of 8kB), we
+end-up not being able to access the GICC_DIR register which is on
+the second page.
 
-First I'm seeing it that I recall and v5? That either means the DT list 
-wasn't copied or new versions are being sent out faster than can be 
-reviewed. Sending new versions puts you at the back of the queue.
+Oh well. Let's fix the source of the crap before tackling individual
+offenders. While we're at it, also fix the compatibility string to
+mention "arm,gic-400", which is the name of the actual implementation
+of the GICv2 spec.
 
-> 
-> Thanks,
-> Sekhar
-> 
-> > ---
-> >  Documentation/devicetree/bindings/ata/ahci-da850.txt | 15 +++++++++++++++
-> >  1 file changed, 15 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/ata/ahci-da850.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/ata/ahci-da850.txt b/Documentation/devicetree/bindings/ata/ahci-da850.txt
-> > new file mode 100644
-> > index 0000000..268fe87
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/ata/ahci-da850.txt
-> > @@ -0,0 +1,15 @@
-> > +Device tree binding for the TI DA850 AHCI SATA Controller
-> > +---------------------------------------------------------
-> > +
-> > +Required properties:
-> > +  - compatible: must be "ti,da850-ahci"
-> > +  - reg: physical base addresses and sizes of the controller's register areas
+Acked-by: Tony Lindgren <tony@atomide.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Need to state how many and what the regions are.
-
-> > +  - interrupts: interrupt specifier (refer to the interrupt binding)
-> > +
-> > +Example:
-> > +
-> > +	sata: sata at 218000 {
-> > +		compatible = "ti,da850-ahci";
-> > +		reg = <0x218000 0x2000>, <0x22c018 0x4>;
-> > +		interrupts = <67>;
-> > +	};
-> > 
-> 
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt b/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
+index 5393e2a..a3d51ed 100644
+--- a/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
++++ b/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
+@@ -107,11 +107,11 @@ Required properties:
+ Example:
+ 
+ 	interrupt-controller at 2c001000 {
+-		compatible = "arm,cortex-a15-gic";
++		compatible = "arm,gic-400";
+ 		#interrupt-cells = <3>;
+ 		interrupt-controller;
+ 		reg = <0x2c001000 0x1000>,
+-		      <0x2c002000 0x1000>,
++		      <0x2c002000 0x2000>,
+ 		      <0x2c004000 0x2000>,
+ 		      <0x2c006000 0x2000>;
+ 		interrupts = <1 9 0xf04>;
+-- 
+2.1.4
