@@ -1,229 +1,370 @@
-From: mike.looijmans@topic.nl (Mike Looijmans)
-Date: Mon, 23 Jan 2017 08:26:09 +0100
-Subject: [PATCH v6 2/3] dmaeninge: xilinx_dma: Fix bug in multiple frame
- stores scenario in vdma
-In-Reply-To: <1484372155-19423-3-git-send-email-appanad@xilinx.com>
-References: <1484372155-19423-1-git-send-email-appanad@xilinx.com>
- <1484372155-19423-3-git-send-email-appanad@xilinx.com>
-Message-ID: <296cffff-3847-4217-bd94-ac72fe044f73@topic.nl>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 23 Jan 2017 15:27:18 +0800
+Subject: [PATCH v4 3/3] arm64: dts: freescale: ls2088a: Add DTS support
+ for FSL's LS2088A SoC
+In-Reply-To: <1484114979-4664-4-git-send-email-abhimanyu.saini@nxp.com>
+References: <1484114979-4664-1-git-send-email-abhimanyu.saini@nxp.com>
+ <1484114979-4664-4-git-send-email-abhimanyu.saini@nxp.com>
+Message-ID: <20170123072715.GJ5662@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-?On 14-01-17 06:35, Kedareswara rao Appana wrote:
-> When VDMA is configured for more than one frame in the h/w.
-> For example h/w is configured for n number of frames, user
-> Submits n number of frames and triggered the DMA using issue_pending API.
->
-> In the current driver flow we are submitting one frame at a time,
-> But we should submit all the n number of frames at one time
-> As the h/w is configured for n number of frames.
-
-The hardware can always handle a single frame submission, by using the "park" 
-bit. This would make a good "cyclic" implementation too (using vdma as 
-framebuffer).
-
-It could also handle all cases for "k" frames where n%k==0 (n is a multiple of 
-k) by simply replicating the frame pointers.
-
->
-> This patch fixes this issue.
->
-> Acked-by: Rob Herring <robh@kernel.org>
-> Reviewed-by: Jose Abreu <joabreu@synopsys.com>
-> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+On Wed, Jan 11, 2017 at 11:39:39AM +0530, Abhimanyu Saini wrote:
+> This patch adds the device tree support for FSL LS2088A SoC based on
+> ARMv8 architecture.
+> 
+> Following levels of DTSI/DTS files have been created for the LS2088A
+> SoC family:
+> 
+>      - fsl-ls2088a.dtsi:
+>             DTS-Include file for FSL LS2088A SoC.
+> 
+>      - fsl-ls2088a-qds.dts:
+>             DTS file for FSL LS2088A QDS board.
+> 
+>      - fsl-ls2088a-rdb.dts:
+>             DTS file for FSL LS2088A RDB board.
+> 
+> Signed-off-by: Priyanka Jain <priyanka.jain@nxp.com>
+> Signed-off-by: Ashish Kumar <ashish.kumar@nxp.com>
+> Signed-off-by: Abhimanyu Saini <abhimanyu.saini@nxp.com>
 > ---
-> Changes for v6:
-> ---> Added Rob Acked-by
-> ---> Updated commit message as suggested by Vinod.
-> Changes for v5:
-> ---> Updated xlnx,fstore-config property to xlnx,fstore-enable
->      and updated description as suggested by Rob.
 > Changes for v4:
-> ---> Add Check for framestore configuration on Transmit case as well
->      as suggested by Jose Abreu.
-> ---> Modified the dev_dbg checks to dev_warn checks as suggested
->      by Jose Abreu.
-> Changes for v3:
-> ---> Added Checks for frame store configuration. If frame store
->      Configuration is not present at the h/w level and user
->      Submits less frames added debug prints in the driver as relevant.
+> 	- Incorporated Shawn's comments by reorganizing
+>           DTSI, moving all include definations to the top
+> 	- add missing files
 > Changes for v2:
-> ---> Fixed race conditions in the driver as suggested by Jose Abreu
-> ---> Fixed unnecessray if else checks in the vdma_start_transfer
->      as suggested by Laurent Pinchart.
->
->  .../devicetree/bindings/dma/xilinx/xilinx_dma.txt  |  2 +
->  drivers/dma/xilinx/xilinx_dma.c                    | 78 +++++++++++++++-------
->  2 files changed, 57 insertions(+), 23 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-> index a2b8bfa..e951c09 100644
-> --- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-> +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-> @@ -66,6 +66,8 @@ Optional child node properties:
->  Optional child node properties for VDMA:
->  - xlnx,genlock-mode: Tells Genlock synchronization is
->  	enabled/disabled in hardware.
-> +- xlnx,fstore-enable: boolean; if defined, it indicates that controller
-> +	supports frame store configuration.
->  Optional child node properties for AXI DMA:
->  -dma-channels: Number of dma channels in child node.
->
-> diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-> index 5eeea57..edb5b71 100644
-> --- a/drivers/dma/xilinx/xilinx_dma.c
-> +++ b/drivers/dma/xilinx/xilinx_dma.c
-> @@ -322,6 +322,7 @@ struct xilinx_dma_tx_descriptor {
->   * @genlock: Support genlock mode
->   * @err: Channel has errors
->   * @idle: Check for channel idle
-> + * @has_fstoreen: Check for frame store configuration
->   * @tasklet: Cleanup work after irq
->   * @config: Device configuration info
->   * @flush_on_fsync: Flush on Frame sync
-> @@ -353,6 +354,7 @@ struct xilinx_dma_chan {
->  	bool genlock;
->  	bool err;
->  	bool idle;
-> +	bool has_fstoreen;
->  	struct tasklet_struct tasklet;
->  	struct xilinx_vdma_config config;
->  	bool flush_on_fsync;
-> @@ -990,6 +992,27 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
->  	if (list_empty(&chan->pending_list))
->  		return;
->
-> +	/*
-> +	 * Note: When VDMA is built with default h/w configuration
-> +	 * User should submit frames upto H/W configured.
-> +	 * If users submits less than h/w configured
-> +	 * VDMA engine tries to write to a invalid location
-> +	 * Results undefined behaviour/memory corruption.
-> +	 *
-> +	 * If user would like to submit frames less than h/w capable
-> +	 * On S2MM side please enable debug info 13 at the h/w level
-> +	 * On MM2S side please enable debug info 6 at the h/w level
-> +	 * It will allows the frame buffers numbers to be modified at runtime.
-> +	 */
-> +	if (!chan->has_fstoreen &&
-> +	     chan->desc_pendingcount < chan->num_frms) {
-> +		dev_warn(chan->dev, "Frame Store Configuration is not enabled at the\n");
-> +		dev_warn(chan->dev, "H/w level enable Debug info 13 or 6 at the h/w level\n");
-> +		dev_warn(chan->dev, "OR Submit the frames upto h/w Capable\n\r");
+> 	- reorganize LS2088A device tree to use common
+> 	  nodes from LS2080A device trees.
+> 
+>  arch/arm64/boot/dts/freescale/Makefile            |   2 +
+>  arch/arm64/boot/dts/freescale/fsl-ls2088a-qds.dts |  65 +++++++++
+>  arch/arm64/boot/dts/freescale/fsl-ls2088a-rdb.dts |  65 +++++++++
+>  arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi    | 153 ++++++++++++++++++++++
+>  4 files changed, 285 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls2088a-qds.dts
+>  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls2088a-rdb.dts
+>  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
+> 
+> diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
+> index 6602718..854868e 100644
+> --- a/arch/arm64/boot/dts/freescale/Makefile
+> +++ b/arch/arm64/boot/dts/freescale/Makefile
+> @@ -5,6 +5,8 @@ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1046a-rdb.dtb
+>  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-qds.dtb
+>  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-rdb.dtb
+>  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
+> +dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-qds.dtb
+> +dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2088a-rdb.dtb
+>   
+>  always		:= $(dtb-y)
+>  subdir-y	:= $(dts-dirs)
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2088a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls2088a-qds.dts
+> new file mode 100644
+> index 0000000..a48145a
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2088a-qds.dts
+> @@ -0,0 +1,65 @@
+> +/*
+> + * Device Tree file for Freescale LS2088A QDS Board.
+> + *
+> + * Copyright (C) 2016-17, Freescale Semiconductor
+> + *
+> + * Abhimanyu Saini <abhimanyu.saini@nxp.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPLv2 or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This library is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This library is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
 > +
-> +		return;
-> +	}
+> +/dts-v1/;
 > +
->  	desc = list_first_entry(&chan->pending_list,
->  				struct xilinx_dma_tx_descriptor, node);
->  	tail_desc = list_last_entry(&chan->pending_list,
-> @@ -1052,25 +1075,38 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
->  	if (chan->has_sg) {
->  		dma_ctrl_write(chan, XILINX_DMA_REG_TAILDESC,
->  				tail_segment->phys);
-> +		list_splice_tail_init(&chan->pending_list, &chan->active_list);
-> +		chan->desc_pendingcount = 0;
->  	} else {
->  		struct xilinx_vdma_tx_segment *segment, *last = NULL;
-> -		int i = 0;
-> +		int i = 0, j = 0;
->
->  		if (chan->desc_submitcount < chan->num_frms)
->  			i = chan->desc_submitcount;
->
-> -		list_for_each_entry(segment, &desc->segments, node) {
-> -			if (chan->ext_addr)
-> -				vdma_desc_write_64(chan,
-> -					XILINX_VDMA_REG_START_ADDRESS_64(i++),
-> -					segment->hw.buf_addr,
-> -					segment->hw.buf_addr_msb);
-> -			else
-> -				vdma_desc_write(chan,
-> -					XILINX_VDMA_REG_START_ADDRESS(i++),
-> -					segment->hw.buf_addr);
-> -
-> -			last = segment;
-> +		for (j = 0; j < chan->num_frms; ) {
-> +			list_for_each_entry(segment, &desc->segments, node) {
-> +				if (chan->ext_addr)
-> +					vdma_desc_write_64(chan,
-> +					  XILINX_VDMA_REG_START_ADDRESS_64(i++),
-> +					  segment->hw.buf_addr,
-> +					  segment->hw.buf_addr_msb);
-> +				else
-> +					vdma_desc_write(chan,
-> +					    XILINX_VDMA_REG_START_ADDRESS(i++),
-> +					    segment->hw.buf_addr);
+> +#include "fsl-ls2088a.dtsi"
+
+Shouldn't you include fsl-ls208xa-qds.dtsi here as well?
+
+Shawn
+
 > +
-> +				last = segment;
-> +			}
-> +			list_del(&desc->node);
-> +			list_add_tail(&desc->node, &chan->active_list);
-> +			j++;
-> +			if (list_empty(&chan->pending_list) ||
-> +			    (i == chan->num_frms))
-> +				break;
-> +			desc = list_first_entry(&chan->pending_list,
-> +						struct xilinx_dma_tx_descriptor,
-> +						node);
->  		}
->
->  		if (!last)
-> @@ -1081,20 +1117,14 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
->  		vdma_desc_write(chan, XILINX_DMA_REG_FRMDLY_STRIDE,
->  				last->hw.stride);
->  		vdma_desc_write(chan, XILINX_DMA_REG_VSIZE, last->hw.vsize);
-> -	}
->
-> -	chan->idle = false;
-> -	if (!chan->has_sg) {
-> -		list_del(&desc->node);
-> -		list_add_tail(&desc->node, &chan->active_list);
-> -		chan->desc_submitcount++;
-> -		chan->desc_pendingcount--;
-> +		chan->desc_submitcount += j;
-> +		chan->desc_pendingcount -= j;
->  		if (chan->desc_submitcount == chan->num_frms)
->  			chan->desc_submitcount = 0;
-> -	} else {
-> -		list_splice_tail_init(&chan->pending_list, &chan->active_list);
-> -		chan->desc_pendingcount = 0;
->  	}
+> +/ {
+> +	model = "Freescale Layerscape 2088A QDS Board";
+> +	compatible = "fsl,ls2088a-qds", "fsl,ls2088a";
 > +
-> +	chan->idle = false;
->  }
->
->  /**
-> @@ -1342,6 +1372,7 @@ static int xilinx_dma_reset(struct xilinx_dma_chan *chan)
->
->  	chan->err = false;
->  	chan->idle = true;
-> +	chan->desc_submitcount = 0;
->
->  	return err;
->  }
-> @@ -2320,6 +2351,7 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
->  	has_dre = of_property_read_bool(node, "xlnx,include-dre");
->
->  	chan->genlock = of_property_read_bool(node, "xlnx,genlock-mode");
-> +	chan->has_fstoreen = of_property_read_bool(node, "xlnx,fstore-enable");
->
->  	err = of_property_read_u32(node, "xlnx,datawidth", &value);
->  	if (err) {
->
-
-
-
-Kind regards,
-
-Mike Looijmans
-System Expert
-
-TOPIC Products
-Materiaalweg 4, NL-5681 RJ Best
-Postbus 440, NL-5680 AK Best
-Telefoon: +31 (0) 499 33 69 79
-E-mail: mike.looijmans at topicproducts.com
-Website: www.topicproducts.com
-
-Please consider the environment before printing this e-mail
+> +	aliases {
+> +		serial0 = &serial0;
+> +		serial1 = &serial1;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial0:115200n8";
+> +	};
+> +};
+> +
+> +#include "fsl-ls208xa-qds.dtsi"
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2088a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls2088a-rdb.dts
+> new file mode 100644
+> index 0000000..cc8c068
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2088a-rdb.dts
+> @@ -0,0 +1,65 @@
+> +/*
+> + * Device Tree file for Freescale LS2088A RDB Board.
+> + *
+> + * Copyright (C) 2016-17, Freescale Semiconductor
+> + *
+> + * Abhimanyu Saini <abhimanyu.saini@nxp.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPLv2 or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This library is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This library is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "fsl-ls2088a.dtsi"
+> +
+> +/ {
+> +	model = "Freescale Layerscape 2088A RDB Board";
+> +	compatible = "fsl,ls2088a-rdb", "fsl,ls2088a";
+> +
+> +	aliases {
+> +		serial0 = &serial0;
+> +		serial1 = &serial1;
+> +	};
+> +
+> +	chosen {
+> +		stdout-path = "serial1:115200n8";
+> +	};
+> +};
+> +
+> +#include "fsl-ls208xa-rdb.dtsi"
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
+> new file mode 100644
+> index 0000000..b418fca
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2088a.dtsi
+> @@ -0,0 +1,153 @@
+> +/*
+> + * Device Tree Include file for Freescale Layerscape-2088A family SoC.
+> + *
+> + * Copyright (C) 2016-17, Freescale Semiconductor
+> + *
+> + * Abhimanyu Saini <abhimanyu.saini@nxp.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPLv2 or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This library is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This library is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +#include "fsl-ls208xa.dtsi"
+> +
+> +&cpu {
+> +	cpu0: cpu at 0 {
+> +		device_type = "cpu";
+> +		compatible = "arm,cortex-a72";
+> +		reg = <0x0>;
+> +		clocks = <&clockgen 1 0>;
+> +		next-level-cache = <&cluster0_l2>;
+> +		#cooling-cells = <2>;
+> +	};
+> +
+> +	cpu1: cpu at 1 {
+> +		device_type = "cpu";
+> +		compatible = "arm,cortex-a72";
+> +		reg = <0x1>;
+> +		clocks = <&clockgen 1 0>;
+> +		next-level-cache = <&cluster0_l2>;
+> +	};
+> +
+> +	cpu2: cpu at 100 {
+> +		device_type = "cpu";
+> +		compatible = "arm,cortex-a72";
+> +		reg = <0x100>;
+> +		clocks = <&clockgen 1 1>;
+> +		next-level-cache = <&cluster1_l2>;
+> +		#cooling-cells = <2>;
+> +	};
+> +
+> +	cpu3: cpu at 101 {
+> +		device_type = "cpu";
+> +		compatible = "arm,cortex-a72";
+> +		reg = <0x101>;
+> +		clocks = <&clockgen 1 1>;
+> +		next-level-cache = <&cluster1_l2>;
+> +	};
+> +
+> +	cpu4: cpu at 200 {
+> +		device_type = "cpu";
+> +		compatible = "arm,cortex-a72";
+> +		reg = <0x200>;
+> +		clocks = <&clockgen 1 2>;
+> +		next-level-cache = <&cluster2_l2>;
+> +		#cooling-cells = <2>;
+> +	};
+> +
+> +	cpu5: cpu at 201 {
+> +		device_type = "cpu";
+> +		compatible = "arm,cortex-a72";
+> +		reg = <0x201>;
+> +		clocks = <&clockgen 1 2>;
+> +		next-level-cache = <&cluster2_l2>;
+> +	};
+> +
+> +	cpu6: cpu at 300 {
+> +		device_type = "cpu";
+> +		compatible = "arm,cortex-a72";
+> +		reg = <0x300>;
+> +		clocks = <&clockgen 1 3>;
+> +		next-level-cache = <&cluster3_l2>;
+> +		#cooling-cells = <2>;
+> +	};
+> +
+> +	cpu7: cpu at 301 {
+> +		device_type = "cpu";
+> +		compatible = "arm,cortex-a72";
+> +		reg = <0x301>;
+> +		clocks = <&clockgen 1 3>;
+> +		next-level-cache = <&cluster3_l2>;
+> +	};
+> +
+> +	cluster0_l2: l2-cache0 {
+> +		compatible = "cache";
+> +	};
+> +
+> +	cluster1_l2: l2-cache1 {
+> +		compatible = "cache";
+> +	};
+> +
+> +	cluster2_l2: l2-cache2 {
+> +		compatible = "cache";
+> +	};
+> +
+> +	cluster3_l2: l2-cache3 {
+> +		compatible = "cache";
+> +	};
+> +};
+> +
+> +&pcie1 {
+> +	ranges = <0x81000000 0x0 0x00000000 0x20 0x00010000 0x0 0x00010000
+> +		  0x82000000 0x0 0x40000000 0x20 0x40000000 0x0 0x40000000>;
+> +};
+> +
+> +&pcie2 {
+> +	ranges = <0x81000000 0x0 0x00000000 0x28 0x00010000 0x0 0x00010000
+> +		  0x82000000 0x0 0x40000000 0x28 0x40000000 0x0 0x40000000>;
+> +};
+> +
+> +&pcie3 {
+> +	ranges = <0x81000000 0x0 0x00000000 0x30 0x00010000 0x0 0x00010000
+> +		  0x82000000 0x0 0x40000000 0x30 0x40000000 0x0 0x40000000>;
+> +};
+> +
+> +&pcie4 {
+> +	ranges = <0x81000000 0x0 0x00000000 0x38 0x00010000 0x0 0x00010000
+> +		  0x82000000 0x0 0x40000000 0x38 0x40000000 0x0 0x40000000>;
+> +};
+> -- 
+> 1.9.1
+> 
