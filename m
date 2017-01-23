@@ -1,35 +1,24 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 23 Jan 2017 13:46:57 +0000
-Subject: [V2 2/2] arm64: dts: Add dts files for Hisilicon Hi3660 SoC
-In-Reply-To: <1484034915-48879-2-git-send-email-puck.chen@hisilicon.com>
-References: <1484034915-48879-1-git-send-email-puck.chen@hisilicon.com>
- <1484034915-48879-2-git-send-email-puck.chen@hisilicon.com>
-Message-ID: <20170123134656.GC16286@leverpostej>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 23 Jan 2017 14:59:42 +0100
+Subject: [PATCH] tcb_clksrc: Use 32 bit tcb as sched_clock
+In-Reply-To: <20170111135059.21318-1-david.engraf@sysgo.com>
+References: <20170111135059.21318-1-david.engraf@sysgo.com>
+Message-ID: <20170123135942.GC2166@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 10, 2017 at 03:55:15PM +0800, Chen Feng wrote:
-> +	memory at 0 {
-> +		device_type = "memory";
-> +		reg = <0x0 0x00400000 0x0 0xbfe00000>;
-> +	};
+On Wed, Jan 11, 2017 at 02:50:59PM +0100, David Engraf wrote:
+> On newer boards the TC can be read as single 32 bit value without locking.
+> Thus the clock can be used as reference for sched_clock which is much more
+> accurate than the jiffies implementation.
+> 
+> Tested on a Atmel SAMA5D2 board.
+> 
+> Signed-off-by: David Engraf <david.engraf@sysgo.com>
+> ---
 
-The unit-address here is incorrect. The base address of this memory is
-not zero.
+Nicolas,
 
-> +	timer {
-> +		compatible = "arm,armv8-timer";
-> +		interrupt-parent = <&gic>;
-> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
-> +		clock-frequency = <1920000>;
-> +	};
+if you agree I will take this change.
 
-This clock-frequency property should not be required; please remove it.
-
-Your FW should program CNTFRQ_EL0 with the timer frequency.
-
-Thanks,
-Mark.
+  -- Daniel
