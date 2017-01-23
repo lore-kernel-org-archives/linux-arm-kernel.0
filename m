@@ -1,115 +1,67 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 23 Jan 2017 15:00:45 +0100
-Subject: [PATCH v2 1/2] dt-bindings: gpu: Add Mali Utgard bindings
-Message-ID: <a4d90de597cfcfab5fddeeb538505774a980818b.1485180017.git-series.maxime.ripard@free-electrons.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 23 Jan 2017 08:01:01 -0600
+Subject: [PATCH 1/3] ARM: dts: Add support for phyCORE-AM335x PCM-953
+ carrier board
+In-Reply-To: <1485167232.3082.9.camel@phytec.de>
+References: <1484831270-7251-1-git-send-email-t.remmet@phytec.de>
+ <20170121205345.oij67ai5d7q7k74d@rob-hp-laptop>
+ <1485167232.3082.9.camel@phytec.de>
+Message-ID: <CAL_JsqKV6dqZpSouiUHmy6nF-cL2U08_jOAzdWByF4HBmPS_5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM Mali Utgard GPU family is embedded into a number of SoCs from
-Allwinner, Amlogic, Mediatek or Rockchip.
+On Mon, Jan 23, 2017 at 4:27 AM, Teresa Remmet <t.remmet@phytec.de> wrote:
+> Hello Rob,
+>
+> Am Samstag, den 21.01.2017, 14:53 -0600 schrieb Rob Herring:
+>> On Thu, Jan 19, 2017 at 02:07:48PM +0100, Teresa Remmet wrote:
+>> >
+>> > The phyCORE-AM335x development kit is a combination of the
+>> > phyCORE-AM335x SoM and a PCM-953 carrier board. The features
+>> > of the PCM-953 are:
+>> > * ETH phy on carrier board: 1x RGMII
+>> > * 1x CAN
+>> > * Up to 4x UART
+>> > * USB0 (otg)
+>> > * USB1 (host)
+>> > * SD slot
+>> > * User gpio-keys
+>> > * User LEDs
+>> >
+>> > Signed-off-by: Teresa Remmet <t.remmet@phytec.de>
+>> > Reviewed-by: Wadim Egorov <w.egorov@phytec.de>
+>> > ---
+>> >  .../devicetree/bindings/arm/omap/omap.txt          |   3 +
+>> >  arch/arm/boot/dts/Makefile                         |   1 +
+>> >  arch/arm/boot/dts/am335x-pcm-953.dtsi              | 303
+>> > +++++++++++++++++++++
+>> >  arch/arm/boot/dts/am335x-phycore-rdk.dts           |  27 ++
+>> >  4 files changed, 334 insertions(+)
+>> >  create mode 100644 arch/arm/boot/dts/am335x-pcm-953.dtsi
+>> >  create mode 100644 arch/arm/boot/dts/am335x-phycore-rdk.dts
+>> [...]
+>>
+>> >
+>> > +   user_leds: user_leds {
+>> > +           compatible = "gpio-leds";
+>> > +   };
+>> > +
+>> > +   user_buttons: user_buttons {
+>> > +           compatible = "gpio-keys";
+>> > +   };
+>> With only a compatible, I don't think there's much gain to split
+>> these 2
+>> nodes. Otherwse,
+>
+> whould it be ok to open up the root node again below? Or should I
+> better move the nodes up? Which does mess up the order then. We
+> orinented here on the am335x-pepper.dts. They also only keep the
+> compatibles in the root node.
 
-Add a binding for the GPU of that family.
+The order is not important. It is silly to have the same node twice in
+the same file. Someone should fix am335x-pepper.dts, too.
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+The split is generally what is chip specific and board specific, but
+this is all board specific.
 
----
-
-Changes from v1:
-  - Dropped the arm,mali-utgard compatible
-  - Made the clocks mandatory
-  - Added Linus Walleij Reviewed-by, and the ST compatible for the Mali
----
- Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt | 79 ++++++++-
- 1 file changed, 79 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-
-diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-new file mode 100644
-index 000000000000..ba0edcdd1b00
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
-@@ -0,0 +1,79 @@
-+ARM Mali Utgard GPU
-+===================
-+
-+Required properties:
-+  - compatible
-+    * Must be one of the following:
-+      + "arm,mali-300"
-+      + "arm,mali-400"
-+      + "arm,mali-450"
-+    * And, optionally, one of the vendor specific compatible:
-+      + allwinner,sun4i-a10-mali
-+      + allwinner,sun7i-a20-mali
-+
-+  - reg: Physical base address and length of the GPU registers
-+
-+  - interrupts: an entry for each entry in interrupt-names.
-+    See ../interrupt-controller/interrupts.txt for details.
-+
-+  - interrupt-names:
-+    * ppX: Pixel Processor X interrupt (X from 0 to 7)
-+    * ppmmuX: Pixel Processor X MMU interrupt (X from 0 to 7)
-+    * pp: Pixel Processor broadcast interrupt (mali-450 only)
-+    * gp: Geometry Processor interrupt
-+    * gpmmu: Geometry Processor MMU interrupt
-+
-+  - clocks: an entry for each entry in clock-names
-+  - clock-names:
-+    * bus: bus clock for the GPU
-+    * core: clock driving the GPU itself
-+
-+Optional properties:
-+  - interrupt-names and interrupts:
-+    * pmu: Power Management Unit interrupt, if implemented in hardware
-+
-+Vendor-specific bindings
-+------------------------
-+
-+The Mali GPU is integrated very differently from one SoC to
-+another. In order to accomodate those differences, you have the option
-+to specify one more vendor-specific compatible, among:
-+
-+  - allwinner,sun4i-a10-mali
-+    Required properties:
-+      * resets: phandle to the reset line for the GPU
-+
-+  - allwinner,sun7i-a20-mali
-+    Required properties:
-+      * resets: phandle to the reset line for the GPU
-+
-+  - stericsson,db8500-mali
-+    Required properties:
-+      * interrupt-names and interrupts:
-+        + combined: combined interrupt of all of the above lines
-+
-+Example:
-+
-+mali: gpu at 01c40000 {
-+	compatible = "allwinner,sun7i-a20-mali", "arm,mali-400";
-+	reg = <0x01c40000 0x10000>;
-+	interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>,
-+		     <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
-+	interrupt-names = "gp",
-+			  "gpmmu",
-+			  "pp0",
-+			  "ppmmu0",
-+			  "pp1",
-+			  "ppmmu1",
-+			  "pmu";
-+	clocks = <&ccu CLK_BUS_GPU>, <&ccu CLK_GPU>;
-+	clock-names = "bus", "core";
-+	resets = <&ccu RST_BUS_GPU>;
-+};
-+
-+
-
-base-commit: 49def1853334396f948dcb4cedb9347abb318df5
--- 
-git-series 0.8.11
+Rob
