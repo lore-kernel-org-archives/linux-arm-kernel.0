@@ -1,56 +1,32 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 23 Jan 2017 23:40:27 +0100
-Subject: [PATCH v9 0/4] arm64: arch_timer: Add workaround for
- hisilicon-161010101 erratum
-In-Reply-To: <20170123103958.GC4622@arm.com>
-References: <1484832916-7248-1-git-send-email-dingtianhong@huawei.com>
- <20170120150428.GC22152@leverpostej> <20170123103958.GC4622@arm.com>
-Message-ID: <efbf6061-6408-b46e-8b37-b0182d69030f@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 23 Jan 2017 14:44:54 -0800
+Subject: v4.9 to v4.10 regression: oops when USB cable is plugged in.
+In-Reply-To: <20170123222537.GA11543@amd>
+References: <20170123222537.GA11543@amd>
+Message-ID: <20170123224454.GY7403@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/01/2017 11:39, Will Deacon wrote:
-> On Fri, Jan 20, 2017 at 03:04:28PM +0000, Mark Rutland wrote:
->> On Thu, Jan 19, 2017 at 09:35:12PM +0800, Ding Tianhong wrote:
->>> Ding Tianhong (4):
->>>   arm64: arch_timer: Add device tree binding for hisilicon-161010101
->>>     erratum
->>>   arm64: arch_timer: Introduce a generic erratum handing mechanism for
->>>     fsl-a008585
->>>   arm64: arch_timer: Work around Erratum Hisilicon-161010101
->>>   arm64: arch timer: Add timer erratum property for Hip05-d02 and
->>>     Hip06-d03
->>>
->>>  Documentation/admin-guide/kernel-parameters.txt    |   9 --
->>>  Documentation/arm64/silicon-errata.txt             |  43 +++---
->>>  .../devicetree/bindings/arm/arch_timer.txt         |   6 +
->>>  arch/arm64/boot/dts/hisilicon/hip05.dtsi           |   1 +
->>>  arch/arm64/boot/dts/hisilicon/hip06.dtsi           |   1 +
->>>  arch/arm64/include/asm/arch_timer.h                |  38 ++----
->>>  drivers/clocksource/Kconfig                        |  18 +++
->>>  drivers/clocksource/arm_arch_timer.c               | 150 +++++++++++++++------
->>>  8 files changed, 171 insertions(+), 95 deletions(-)
->>
->> I've picked these up (with a few local cleanups), given that some local
->> testing, and pushed the result to a branch [1] on my git repo.
->>
->> There are likely to be clashes with the arm64 tree (e.g. for
->> silicon-errata.txt), and we're also likely to have more arch timer
->> updates shortly for the GTDT stuff, so I think the best bet is for both
->> arm64 and the clocksource tree to pull that branch for v4.11.
->>
->> Alternatively, we could take this all through the arm64 tree, if the
->> clocksource maintainers are happy with that.
-> 
-> Fine by me, but I'd need at least Daniel's ack before taking these.
+* Pavel Machek <pavel@ucw.cz> [170123 14:26]:
+> [25392.239837] Unhandled fault: external abort on non-linefetch (0x1028) at 0xfa0ab060
+> [25392.239868] pgd = c0004000
+> [25392.239898] [fa0ab060] *pgd=48011452(bad)
+> [25392.239929] Internal error: : 1028 [#1] ARM
+> [25392.239929] Modules linked in:
+> [25392.239959] CPU: 0 PID: 24322 Comm: kworker/0:1 Not tainted 4.10.0-rc5-142127-g41f2839-dirty #222
+> [25392.239990] Hardware name: Nokia RX-51 board
+> [25392.240020] Workqueue: events musb_irq_work
+> [25392.240051] task: cd44d5c0 task.stack: cd308000
+> [25392.240051] PC is at musb_default_readb+0x0/0xc
+> [25392.240081] LR is at musb_irq_work+0x1c/0x1b0
 
-Ok, I will have a look at them tomorrow.
+OK I'm pretty sure the patch I posted few days ago fixes
+this. Can you please test patch "[PATCH] usb: musb: Fix
+external abort on non-linefetch for musb_irq_work()"?
 
-  -- Daniel
+I was able to hit that only once so far, do you hit it
+every time with your built-in g_ether .config?
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+Regards,
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Tony
