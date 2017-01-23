@@ -1,44 +1,29 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 23 Jan 2017 18:38:26 +0000
-Subject: [PATCH 3/4] PCI: Xilinx NWL: Modifying flow handler for legacy
- interrupts
-In-Reply-To: <1484997072-19276-3-git-send-email-bharatku@xilinx.com>
-References: <1484997072-19276-1-git-send-email-bharatku@xilinx.com>
- <1484997072-19276-3-git-send-email-bharatku@xilinx.com>
-Message-ID: <bab088a5-ed6d-1d9d-b38f-0a271c2bc766@arm.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 23 Jan 2017 10:46:46 -0800
+Subject: [PATCH 00/18] ARM64: meson: DT cleanups
+In-Reply-To: <20170120222118.21476-1-afaerber@suse.de> ("Andreas
+ =?utf-8?Q?F=C3=A4rber=22's?=
+ message of "Fri, 20 Jan 2017 23:21:00 +0100")
+References: <20170120222118.21476-1-afaerber@suse.de>
+Message-ID: <m2bmux397t.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/01/17 11:11, Bharat Kumar Gogada wrote:
-> Legacy interrupts are level sensitive, so using handle_level_irq
-> is more approprate as it is masks interrupts until End point handles
-> interrupts and unmasks interrutps after End point handler is executed.
-> 
-> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-> ---
->  drivers/pci/host/pcie-xilinx-nwl.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
-> index e1809f9..50f9c0d 100644
-> --- a/drivers/pci/host/pcie-xilinx-nwl.c
-> +++ b/drivers/pci/host/pcie-xilinx-nwl.c
-> @@ -433,7 +433,7 @@ static void nwl_unmask_leg_irq(struct irq_data *data)
->  static int nwl_legacy_map(struct irq_domain *domain, unsigned int irq,
->  			  irq_hw_number_t hwirq)
->  {
-> -	irq_set_chip_and_handler(irq, &nwl_leg_irq_chip, handle_simple_irq);
-> +	irq_set_chip_and_handler(irq, &nwl_leg_irq_chip, handle_level_irq);
->  	irq_set_chip_data(irq, domain->host_data);
->  
->  	return 0;
-> 
+Andreas F?rber <afaerber@suse.de> writes:
 
-Please merge this patch and the following one in patch #2. There is no
-need for going through equally broken intermediate steps.
+> Hello,
+>
+> This series fixes several cosmetic issues, on top of v4.11/dt64 branch.
+>
+> Patches 3-5 rename a node, the rest should all be non-functional changes.
 
-Thanks,
+Can you respin patches 1-9 with minor comments addressed and
+acks/reviews collected and I'll apply those.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> Patches 10-18 could be squashed if desired.
+
+I'm less sure about these as I tend to agree with Rob that this is just
+needless churn.  If you want to resend those separately, making your
+arguments, I'll merge it if you convice the DT maintainers. :)
+
+Kevin
