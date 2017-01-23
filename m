@@ -1,67 +1,37 @@
-From: roy.pledge@nxp.com (Roy Pledge)
-Date: Mon, 23 Jan 2017 19:24:59 +0000
-Subject: [PATCH 06/10] soc/qbman: Add ARM equivalent for
- flush_dcache_range()
-References: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
- <1484779180-1344-7-git-send-email-roy.pledge@nxp.com>
- <20170118231206.GT27312@n2100.armlinux.org.uk>
- <VI1PR0401MB2430DA6BD2F857C30EC86A50917F0@VI1PR0401MB2430.eurprd04.prod.outlook.com>
-Message-ID: <HE1PR0401MB263638F320470CA216990BCC86720@HE1PR0401MB2636.eurprd04.prod.outlook.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 23 Jan 2017 21:25:16 +0200
+Subject: [PATCH] ARM: OMAP2+: Remove duplicate definition of
+ omap_test_timeout
+In-Reply-To: <20170123150648.GP7403@atomide.com>
+References: <20170120185151.1630-1-tony@atomide.com>
+ <130610aa-ed1a-b363-fac5-6aaaf4d8e930@ti.com>
+ <97761042-4a61-9abe-8b6f-a306936cb513@ti.com>
+ <20170123150648.GP7403@atomide.com>
+Message-ID: <5647a354-8abb-2cf8-3c52-8b930126968e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/18/2017 6:36 PM, Scott Wood wrote:
-> On 01/18/2017 05:12 PM, Russell King - ARM Linux wrote:
->> On Wed, Jan 18, 2017 at 05:39:36PM -0500, Roy Pledge wrote:
->>> From: Claudiu Manoil <claudiu.manoil@nxp.com>
+On 23/01/17 17:06, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [170123 05:45]:
+>> On 23/01/17 12:22, Lokesh Vutla wrote:
+>>> + Tero,
 >>>
->>> Signed-off-by: Madalin Bucur <madalin.bucur@nxp.com>
->>> Signed-off-by: Claudiu Manoil <claudiu.manoil@nxp.com>
->>> Signed-off-by: Roy Pledge <roy.pledge@nxp.com>
->>> ---
->>>  drivers/soc/fsl/qbman/qman_ccsr.c |    6 ++++++
->>>  1 file changed, 6 insertions(+)
+>>> On Saturday 21 January 2017 12:21 AM, Tony Lindgren wrote:
+>>>> We have the same defined already in common.h.
 >>>
->>> diff --git a/drivers/soc/fsl/qbman/qman_ccsr.c b/drivers/soc/fsl/qbman/qman_ccsr.c
->>> index 43feaa9..67ae073 100644
->>> --- a/drivers/soc/fsl/qbman/qman_ccsr.c
->>> +++ b/drivers/soc/fsl/qbman/qman_ccsr.c
->>> @@ -446,8 +446,14 @@ static int zero_priv_mem(struct device *dev, struct device_node *node,
->>>  		return -ENOMEM;
->>>  
->>>  	memset(tmpp, 0, sz);
->>> +#ifdef CONFIG_PPC
->>>  	flush_dcache_range((unsigned long)tmpp,
->>>  			   (unsigned long)tmpp + sz);
->>> +#elif defined(CONFIG_ARM)
->>> +	__cpuc_flush_dcache_area(tmpp, sz);
->> Please do not fiddle about under the covers, there be dragons there.
+>>>
+>>> This is reverting what has been introduced in this[1] series. Probably
+>>> Tero can comment more here.
 >>
->> It looks to me like you're trying to use __cpuc_flush_dcache_area()
->> on an area that's been ioremap()'d, which is a waste of CPU cycles.
->> ioremap()'d areas are mapped as "device" memory type, which means
->> the region isn't even cached.  So I don't think this is necessary.
-> It is mapped cachable, via memremap() (see patch 1/10).  This is RAM
-> that the device uses, non-coherently, for its own purposes (but requires
-> software to clear it first).
+>> Yeah, the point of introducing that was to get rid of common.h include from
+>> the prcm files. See commit 250e27ee950bf67ceeb812eb4c8f2fea58d3e2b6.
 >
-> Is there a non-"under the covers" way to say "flush this region" without
-> the arch second-guessing whether it really needs to be flushed?
-Any advice on how to resolve this? I looked into trying to do a
-non-cacheable mapping of the
-memory so that the flush wouldn't be required but the ioremap code
-prevents mapping normal
-memory in this way.  The QMan device requiresthis memory to be zeroed at
-startup. Because the device
-does non coherent reads and writes to the memory we must ensure that any
-cache in the CPU cluster(s)
-is flushed in order to prevent a future castout from overwriting data.
-This happened before on PPC
-platforms and made for some very unfun debug session trying to
-understand what was causing the failure.
+> OK let's forget it for now then.
 
-Roy
+This work has been delayed by a great deal due to pending hwmod 
+transition though....
 
-> -Scott
->
->
+Part of this may happen with the introduction of the genpd usage for 
+clkdms/pwrdms actually.
+
+-Tero
