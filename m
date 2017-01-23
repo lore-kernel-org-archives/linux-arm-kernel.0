@@ -1,11 +1,10 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 23 Jan 2017 12:15:42 +0000
-Subject: [PATCH 2/4] Documentation: devicetree: Add LED subnode binding
- for MT6323 PMIC
-In-Reply-To: <1485143685-11808-3-git-send-email-sean.wang@mediatek.com>
+Date: Mon, 23 Jan 2017 12:16:11 +0000
+Subject: [PATCH 4/4] mfd: mt6397: Add MT6323 LED support into MT6397 driver
+In-Reply-To: <1485143685-11808-5-git-send-email-sean.wang@mediatek.com>
 References: <1485143685-11808-1-git-send-email-sean.wang@mediatek.com>
- <1485143685-11808-3-git-send-email-sean.wang@mediatek.com>
-Message-ID: <20170123121542.GN16020@dell>
+ <1485143685-11808-5-git-send-email-sean.wang@mediatek.com>
+Message-ID: <20170123121611.GO16020@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,31 +12,32 @@ On Mon, 23 Jan 2017, sean.wang at mediatek.com wrote:
 
 > From: Sean Wang <sean.wang@mediatek.com>
 > 
-> This patch adds documentation for devicetree bindings
-> for LED support as the subnode of MT6323 PMIC
+> Add compatible string as "mt6323-led" that will make
+> the OF core spawn child devices for the LED subnode
+> of that MT6323 MFD device.
 > 
 > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 > ---
->  Documentation/devicetree/bindings/mfd/mt6397.txt | 4 ++++
+>  drivers/mfd/mt6397-core.c | 4 ++++
 >  1 file changed, 4 insertions(+)
 
 Applied, thanks.
 
-> diff --git a/Documentation/devicetree/bindings/mfd/mt6397.txt b/Documentation/devicetree/bindings/mfd/mt6397.txt
-> index 949c85f..c568d52 100644
-> --- a/Documentation/devicetree/bindings/mfd/mt6397.txt
-> +++ b/Documentation/devicetree/bindings/mfd/mt6397.txt
-> @@ -34,6 +34,10 @@ Optional subnodes:
->  - clk
->  	Required properties:
->  		- compatible: "mediatek,mt6397-clk"
-> +- led
-> +	Required properties:
-> +		- compatible: "mediatek,mt6323-led"
-> +	see Documentation/devicetree/bindings/leds/leds-mt6323.txt
+> diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
+> index e14d8b0..8e601c8 100644
+> --- a/drivers/mfd/mt6397-core.c
+> +++ b/drivers/mfd/mt6397-core.c
+> @@ -48,6 +48,10 @@
+>  		.name = "mt6323-regulator",
+>  		.of_compatible = "mediatek,mt6323-regulator"
+>  	},
+> +	{
+> +		.name = "mt6323-led",
+> +		.of_compatible = "mediatek,mt6323-led"
+> +	},
+>  };
 >  
->  Example:
->  	pwrap: pwrap at 1000f000 {
+>  static const struct mfd_cell mt6397_devs[] = {
 
 -- 
 Lee Jones
