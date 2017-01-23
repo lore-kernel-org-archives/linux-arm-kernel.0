@@ -1,79 +1,92 @@
-From: john@phrozen.org (John Crispin)
-Date: Mon, 23 Jan 2017 12:32:35 +0100
-Subject: [PATCH 00/16] arm: dts: extend mt7623 support
-In-Reply-To: <1485170975-51813-1-git-send-email-john@phrozen.org>
-References: <1485170975-51813-1-git-send-email-john@phrozen.org>
-Message-ID: <1187ee6f-e929-de5d-344b-2d20e36adff0@phrozen.org>
+From: vijay.kilari@gmail.com (Vijay Kilari)
+Date: Mon, 23 Jan 2017 17:03:55 +0530
+Subject: [PATCH v10 8/8] arm/arm64: Documentation: Update arm-vgic-v3.txt
+In-Reply-To: <20170123112019.GC15850@cbox>
+References: <1480576187-5012-1-git-send-email-vijay.kilari@gmail.com>
+ <1480576187-5012-9-git-send-email-vijay.kilari@gmail.com>
+ <7d82df18-debd-72e7-af6e-3816b8aaee85@redhat.com>
+ <20170120195722.GJ13531@cbox>
+ <CALicx6twCMrK8gb=zR1wt1eH-eiPDyA3=BnLPFy=22O5wW52ew@mail.gmail.com>
+ <20170123112019.GC15850@cbox>
+Message-ID: <CALicx6vqdLvbYmbdQkqUns_v1O+RGq0EYpOEMNJAiBWTigM1Qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jan 23, 2017 at 4:50 PM, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> On Mon, Jan 23, 2017 at 04:22:39PM +0530, Vijay Kilari wrote:
+>> Hi Christoffer,
+>>
+>> In the document,
+>>
+>>     The mpidr field is used to specify which
+>>     redistributor is accessed.  The mpidr is ignored for the distributor.
+>>
+>> We still rely on MPIDR for KVM_DEV_ARM_VGIC_GRP_DIST_REGS to fetch
+>> vcpu info. So don't we need to remove this restriction?.
+>> Or force to use vcpu[0]?
+>
+> Does the data we return ever change if you supply a diferent MPIDR and
+> access a distributor register?  If not (and I don't think it should),
+> then the API is properly defined but the internal implementation should
+> not rely on the value provided by user space.
 
+Data does not change. However the common uaccess code expects vcpu.
 
-On 23/01/2017 12:29, John Crispin wrote:
-> This series extends the dts files used for booting mt7623 base boards.
-> Since support for mt7623 was added around v4.6, many new drivers have
-> been accepted upstream. The contained patches add several of these to
-> the devicetree.
-> 
-> Additionally the series does a bit of refactoring. MTK/WCN pointed out
-> that the evaluation board is infact a reference design and asked the the
-> evb files be renamed to rfb.
-> 
-> As with all of the current ARM bases MTK silicon, these boards also have
-> a PMIC. Instead of adding the nodes to all of the dts files, we add an
-> intermediate dtsi file that contains the required nodes. This allows us
-> to reduce the size of the top most dts files.
-> 
-> The RFB comes in various versions and asiarf has even done a crowdfunder
-> to sell them. We should try to reduce the duplication. This series adds
-> a common dtsi file for these boards. This results in the topmost dts files
-> only needing to specify the compatible string, MTD nodes and ethernet setup.
-> 
-
-Hi,
-
-i have a 2nd series in the making which makes the following things work,
-just in case anyone else is also working on this, let me know so that we
-don't duplicate any of the work.
-
-* pcie
-* cpufreq
-* mt7623a RFB
-* ethernet
-* spi-nor
-* PWM
-
-	John
-
-
-> John Crispin (16):
->   arm: dts: add clock controller device nodes
->   arm: dts: add subsystem clock controller device nodes
->   arm: dts: add power domain controller device node
->   arm: dts: add clock-frequency to the a7 timer node to mt7623.dtsi
->   arm: dts: add pinctrl nodes to the mt7623 dtsi file
->   arm: dts: add pmic nodes to the mt7623 dtsi file
->   arm: dts: add i2c nodes to the mt7623.dtsi file
->   arm: dts: add spi nodes to the mt7623.dtsi file
->   arm: dts: add nand nodes to the mt7623.dtsi file
->   arm: dts: add mmc nodes to the mt7623.dtsi file
->   arm: dts: add usb nodes to the mt7623.dtsi file
->   arm: dts: add mt7623-mt6323.dtsi file
->   arm: dts: rename mt7623-evb.dts to arch/arm/boot/dts/mt7623n-rfb.dtsi
->   arm: dts: cleanup the mt7623n rfb uart nodes
->   arm: dts: enable the usb device on the mt7623n rfb
->   arm: dts: enable the nand device on the mt7623n nand rfb
-> 
->  Documentation/devicetree/bindings/arm/mediatek.txt |    4 +-
->  arch/arm/boot/dts/Makefile                         |    2 +-
->  arch/arm/boot/dts/mt7623-evb.dts                   |   33 ---
->  arch/arm/boot/dts/mt7623-mt6323.dtsi               |  273 ++++++++++++++++++
->  arch/arm/boot/dts/mt7623.dtsi                      |  297 +++++++++++++++++++-
->  arch/arm/boot/dts/mt7623n-rfb-nand.dts             |  109 +++++++
->  arch/arm/boot/dts/mt7623n-rfb.dtsi                 |   61 ++++
->  7 files changed, 730 insertions(+), 49 deletions(-)
->  delete mode 100644 arch/arm/boot/dts/mt7623-evb.dts
->  create mode 100644 arch/arm/boot/dts/mt7623-mt6323.dtsi
->  create mode 100644 arch/arm/boot/dts/mt7623n-rfb-nand.dts
->  create mode 100644 arch/arm/boot/dts/mt7623n-rfb.dtsi
-> 
+>
+> Thanks,
+> -Christoffer
+>
+>>
+>> On Sat, Jan 21, 2017 at 1:27 AM, Christoffer Dall
+>> <christoffer.dall@linaro.org> wrote:
+>> > On Fri, Dec 16, 2016 at 01:18:09PM +0100, Auger Eric wrote:
+>> >> Hi Vijaya,
+>> >>
+>> >> On 01/12/2016 08:09, vijay.kilari at gmail.com wrote:
+>> >> > From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+>> >> >
+>> >> > Update error code returned for Invalid CPU interface register
+>> >> > value and access in AArch32 mode.
+>> >> >
+>> >> > Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+>> >> > ---
+>> >> >  Documentation/virtual/kvm/devices/arm-vgic-v3.txt | 9 ++++++++-
+>> >> >  1 file changed, 8 insertions(+), 1 deletion(-)
+>> >> >
+>> >> > diff --git a/Documentation/virtual/kvm/devices/arm-vgic-v3.txt b/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
+>> >> > index 9348b3c..0f29850 100644
+>> >> > --- a/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
+>> >> > +++ b/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
+>> >> > @@ -142,10 +142,12 @@ Groups:
+>> >> >      KVM_DEV_ARM_VGIC_CPU_SYSREGS accesses the CPU interface registers for the
+>> >> >      CPU specified by the mpidr field.
+>> >> >
+>> >> > +    CPU interface registers access is not implemented for AArch32 mode.
+>> >> > +    Error -ENXIO is returned when accessed in AArch32 mode.
+>> >> >    Errors:
+>> >> >      -ENXIO: Getting or setting this register is not yet supported
+>> >> >      -EBUSY: VCPU is running
+>> >> > -    -EINVAL: Invalid mpidr supplied
+>> >> > +    -EINVAL: Invalid mpidr or register value supplied
+>> >> >
+>> >> >
+>> >> >    KVM_DEV_ARM_VGIC_GRP_NR_IRQS
+>> >> > @@ -193,6 +195,11 @@ Groups:
+>> >> >
+>> >> >     Bit[n] indicates the status for interrupt vINTID + n.
+>> >> >
+>> >> > +   Getting or setting the level info for an edge-triggered interrupt is
+>> >> > +   not guaranteed to work.
+>> >> I don't get this statement. is the API applicable to edge triggered IRQs?
+>> >>
+>> >
+>> > I guess this could be clarified to "is ignored", but with the earlier
+>> > implementation you might be able to get away with doing
+>> > "line_level=x; config=LEVEL;", but you could then at the same time break
+>> > something with edge-triggered IRQs, so...
+>> >
+>> >
+>> > Thanks for looking at this in detail.
+>> >
+>> > -Christoffer
