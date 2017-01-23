@@ -1,37 +1,22 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Mon, 23 Jan 2017 11:54:45 +0800
-Subject: [PATCH 4/4] mfd: mt6397: Add MT6323 LED support into MT6397 driver
-In-Reply-To: <1485143685-11808-1-git-send-email-sean.wang@mediatek.com>
-References: <1485143685-11808-1-git-send-email-sean.wang@mediatek.com>
-Message-ID: <1485143685-11808-5-git-send-email-sean.wang@mediatek.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 23 Jan 2017 12:27:54 +0800
+Subject: [PATCH v4 3/8] clk: sunxi-ng: mult: Fix minimum in round rate
+In-Reply-To: <cad6b82633303e0fe3b231dce364629bc723a808.1485039043.git-series.maxime.ripard@free-electrons.com>
+References: <cover.04f797fe015b05f19b1d69d0650680baffb27055.1485039043.git-series.maxime.ripard@free-electrons.com>
+ <cad6b82633303e0fe3b231dce364629bc723a808.1485039043.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v64W+mo3ByDmD7i_tuXVr+mXd0zqY1gvkPT-hrZsV-BqxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+On Sun, Jan 22, 2017 at 6:50 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The previous code was always taking 1 as the minimum in it's round_rate
+> function, ignoring entirely what was set as minimum in the clock
+> definition.
+>
+> Make sure that's not the case anymore.
+>
+> Fixes: 2beaa601c849 ("clk: sunxi-ng: Implement minimum for multipliers")
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Add compatible string as "mt6323-led" that will make
-the OF core spawn child devices for the LED subnode
-of that MT6323 MFD device.
-
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
----
- drivers/mfd/mt6397-core.c | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/drivers/mfd/mt6397-core.c b/drivers/mfd/mt6397-core.c
-index e14d8b0..8e601c8 100644
---- a/drivers/mfd/mt6397-core.c
-+++ b/drivers/mfd/mt6397-core.c
-@@ -48,6 +48,10 @@
- 		.name = "mt6323-regulator",
- 		.of_compatible = "mediatek,mt6323-regulator"
- 	},
-+	{
-+		.name = "mt6323-led",
-+		.of_compatible = "mediatek,mt6323-led"
-+	},
- };
- 
- static const struct mfd_cell mt6397_devs[] = {
--- 
-1.9.1
+Acked-by: Chen-Yu Tsai <wens@csie.org>
