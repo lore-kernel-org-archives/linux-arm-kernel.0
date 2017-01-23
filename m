@@ -1,155 +1,35 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 23 Jan 2017 15:43:59 +0200
-Subject: [PATCH] ARM: OMAP2+: Remove duplicate definition of
- omap_test_timeout
-In-Reply-To: <130610aa-ed1a-b363-fac5-6aaaf4d8e930@ti.com>
-References: <20170120185151.1630-1-tony@atomide.com>
- <130610aa-ed1a-b363-fac5-6aaaf4d8e930@ti.com>
-Message-ID: <97761042-4a61-9abe-8b6f-a306936cb513@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 23 Jan 2017 13:46:57 +0000
+Subject: [V2 2/2] arm64: dts: Add dts files for Hisilicon Hi3660 SoC
+In-Reply-To: <1484034915-48879-2-git-send-email-puck.chen@hisilicon.com>
+References: <1484034915-48879-1-git-send-email-puck.chen@hisilicon.com>
+ <1484034915-48879-2-git-send-email-puck.chen@hisilicon.com>
+Message-ID: <20170123134656.GC16286@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/01/17 12:22, Lokesh Vutla wrote:
-> + Tero,
->
-> On Saturday 21 January 2017 12:21 AM, Tony Lindgren wrote:
->> We have the same defined already in common.h.
->
->
-> This is reverting what has been introduced in this[1] series. Probably
-> Tero can comment more here.
+On Tue, Jan 10, 2017 at 03:55:15PM +0800, Chen Feng wrote:
+> +	memory at 0 {
+> +		device_type = "memory";
+> +		reg = <0x0 0x00400000 0x0 0xbfe00000>;
+> +	};
 
-Yeah, the point of introducing that was to get rid of common.h include 
-from the prcm files. See commit 250e27ee950bf67ceeb812eb4c8f2fea58d3e2b6.
+The unit-address here is incorrect. The base address of this memory is
+not zero.
 
--Tero
+> +	timer {
+> +		compatible = "arm,armv8-timer";
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
+> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
+> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
+> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
+> +		clock-frequency = <1920000>;
+> +	};
 
->
-> [1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg102131.html
->
-> Thanks and regards,
-> Lokesh
->
->>
->> Signed-off-by: Tony Lindgren <tony@atomide.com>
->> ---
->>  arch/arm/mach-omap2/cm2xxx.c                |  1 +
->>  arch/arm/mach-omap2/cm33xx.c                |  1 +
->>  arch/arm/mach-omap2/cm3xxx.c                |  1 +
->>  arch/arm/mach-omap2/cminst44xx.c            |  1 +
->>  arch/arm/mach-omap2/powerdomains3xxx_data.c |  1 +
->>  arch/arm/mach-omap2/prcm-common.h           | 22 ----------------------
->>  arch/arm/mach-omap2/prm2xxx_3xxx.c          |  1 +
->>  arch/arm/mach-omap2/prm33xx.c               |  1 +
->>  8 files changed, 7 insertions(+), 22 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/cm2xxx.c b/arch/arm/mach-omap2/cm2xxx.c
->> --- a/arch/arm/mach-omap2/cm2xxx.c
->> +++ b/arch/arm/mach-omap2/cm2xxx.c
->> @@ -18,6 +18,7 @@
->>  #include <linux/err.h>
->>  #include <linux/io.h>
->>
->> +#include "common.h"
->>  #include "prm2xxx.h"
->>  #include "cm.h"
->>  #include "cm2xxx.h"
->> diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
->> --- a/arch/arm/mach-omap2/cm33xx.c
->> +++ b/arch/arm/mach-omap2/cm33xx.c
->> @@ -22,6 +22,7 @@
->>  #include <linux/err.h>
->>  #include <linux/io.h>
->>
->> +#include "common.h"
->>  #include "clockdomain.h"
->>  #include "cm.h"
->>  #include "cm33xx.h"
->> diff --git a/arch/arm/mach-omap2/cm3xxx.c b/arch/arm/mach-omap2/cm3xxx.c
->> --- a/arch/arm/mach-omap2/cm3xxx.c
->> +++ b/arch/arm/mach-omap2/cm3xxx.c
->> @@ -18,6 +18,7 @@
->>  #include <linux/err.h>
->>  #include <linux/io.h>
->>
->> +#include "common.h"
->>  #include "prm2xxx_3xxx.h"
->>  #include "cm.h"
->>  #include "cm3xxx.h"
->> diff --git a/arch/arm/mach-omap2/cminst44xx.c b/arch/arm/mach-omap2/cminst44xx.c
->> --- a/arch/arm/mach-omap2/cminst44xx.c
->> +++ b/arch/arm/mach-omap2/cminst44xx.c
->> @@ -21,6 +21,7 @@
->>  #include <linux/err.h>
->>  #include <linux/io.h>
->>
->> +#include "common.h"
->>  #include "clockdomain.h"
->>  #include "cm.h"
->>  #include "cm1_44xx.h"
->> diff --git a/arch/arm/mach-omap2/powerdomains3xxx_data.c b/arch/arm/mach-omap2/powerdomains3xxx_data.c
->> --- a/arch/arm/mach-omap2/powerdomains3xxx_data.c
->> +++ b/arch/arm/mach-omap2/powerdomains3xxx_data.c
->> @@ -14,6 +14,7 @@
->>  #include <linux/kernel.h>
->>  #include <linux/init.h>
->>  #include <linux/bug.h>
->> +#include <linux/delay.h>
->>
->>  #include "soc.h"
->>  #include "powerdomain.h"
->> diff --git a/arch/arm/mach-omap2/prcm-common.h b/arch/arm/mach-omap2/prcm-common.h
->> --- a/arch/arm/mach-omap2/prcm-common.h
->> +++ b/arch/arm/mach-omap2/prcm-common.h
->> @@ -434,28 +434,6 @@
->>  #define MAX_IOPAD_LATCH_TIME			100
->>  # ifndef __ASSEMBLER__
->>
->> -#include <linux/delay.h>
->> -
->> -/**
->> - * omap_test_timeout - busy-loop, testing a condition
->> - * @cond: condition to test until it evaluates to true
->> - * @timeout: maximum number of microseconds in the timeout
->> - * @index: loop index (integer)
->> - *
->> - * Loop waiting for @cond to become true or until at least @timeout
->> - * microseconds have passed.  To use, define some integer @index in the
->> - * calling code.  After running, if @index == @timeout, then the loop has
->> - * timed out.
->> - */
->> -#define omap_test_timeout(cond, timeout, index)			\
->> -({								\
->> -	for (index = 0; index < timeout; index++) {		\
->> -		if (cond)					\
->> -			break;					\
->> -		udelay(1);					\
->> -	}							\
->> -})
->> -
->>  /**
->>   * struct omap_prcm_irq - describes a PRCM interrupt bit
->>   * @name: a short name describing the interrupt type, e.g. "wkup" or "io"
->> diff --git a/arch/arm/mach-omap2/prm2xxx_3xxx.c b/arch/arm/mach-omap2/prm2xxx_3xxx.c
->> --- a/arch/arm/mach-omap2/prm2xxx_3xxx.c
->> +++ b/arch/arm/mach-omap2/prm2xxx_3xxx.c
->> @@ -16,6 +16,7 @@
->>  #include <linux/err.h>
->>  #include <linux/io.h>
->>
->> +#include "common.h"
->>  #include "powerdomain.h"
->>  #include "prm2xxx_3xxx.h"
->>  #include "prm-regbits-24xx.h"
->> diff --git a/arch/arm/mach-omap2/prm33xx.c b/arch/arm/mach-omap2/prm33xx.c
->> --- a/arch/arm/mach-omap2/prm33xx.c
->> +++ b/arch/arm/mach-omap2/prm33xx.c
->> @@ -19,6 +19,7 @@
->>  #include <linux/err.h>
->>  #include <linux/io.h>
->>
->> +#include "common.h"
->>  #include "powerdomain.h"
->>  #include "prm33xx.h"
->>  #include "prm-regbits-33xx.h"
->>
+This clock-frequency property should not be required; please remove it.
+
+Your FW should program CNTFRQ_EL0 with the timer frequency.
+
+Thanks,
+Mark.
