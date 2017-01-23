@@ -1,86 +1,89 @@
 From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Mon, 23 Jan 2017 17:32:21 +0100
-Subject: [PATCH 3/7] IIO: add bindings for STM32 DFSDM ADC driver
-In-Reply-To: <1485189145-29576-1-git-send-email-arnaud.pouliquen@st.com>
-References: <1485189145-29576-1-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <1485189145-29576-4-git-send-email-arnaud.pouliquen@st.com>
+Date: Mon, 23 Jan 2017 17:32:18 +0100
+Subject: [PATCH 0/7] Add STM32 DFSDM support
+Message-ID: <1485189145-29576-1-git-send-email-arnaud.pouliquen@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation of device tree bindings for the
-STM32 DFSDM ADC.
+This patch-set handles the Digital Filter for Sigma Delta modulators IP on STM32 platforms.
+DFSDM IP allows PDM microphone capture and sigma delta ADC conversion.
 
-Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
----
- .../bindings/iio/adc/st,stm32-dfsdm-adc.txt        | 60 ++++++++++++++++++++++
- 1 file changed, 60 insertions(+)
+Those two features are mixed into the registers of the same hardware block which lead to introduce a multifunction 
+driver on the top of them to be able to share the registers.
+
+for This, MFD exports an API based on  get/configure/start/stop/release mechanisms.
+
+Two kind of resources are handled by the MFD driver.
+- The filters: 
+	- 4 instances available for L4 and H7
+        - composed with a SInC filter and an integrator 
+- The transceivers or channels
+	- 8 instances available for L4 and H7
+        - can be connected to
+        	serial transceivers (SPI or Manchester mode)
+                internal parallel transceivers (from memory or internal ADC)
+        -  associated  monitoring: analog watchdog, short circuit detector, extreme detector  
+           (monitoring support will be part of a specific patch-set)) 
+
+Principle OF the DFSDM IP is to connect one or several channels to a filter to process Sigma delta ADC or PDM microphone data.
+
+Two types of child devices can de declared:
+IIO for the management of Sigma Delta ADC conversion.
+ASoC for PDM microphone audio capture.
+
+For details on IP and use case examples please refer to this document:
+http://www.st.com/content/ccc/resource/training/technical/product_training/96/b6/2b/ea/72/3f/4e/d5/STM32L4_System_DFSDM.pdf/files/STM32L4_System_DFSDM.pdf/jcr:content/translations/en.STM32L4_System_DFSDM.pdf
+
+Remark:
+    For audio part a patch is proposed to update core part to add copy support in soc_dmaengine_pcm.
+    Rational is that output data register in DFSDM contains audio sample on 24 MSB + channel ID on the 8 LSB.
+    Proposal is to allow to register a copy ops in soc_dmaengine_pcm to be able to perform post-processing.
+    Back up if not accepted can be to create a pcm_engine in stm32 driver.
+ 
+Not part of this patch-set, but should come as add-on patches:
+- IIO management of Analog watchdog, short-circuit detection and clock absence detector, with associated IRQs management.
+- IIO trigger and buffer management.  
+
+Arnaud Pouliquen (6):
+  MFD: add bindings for STM32 DFSDM driver
+  MFD: add STM32 DFSDM support
+  IIO: add bindings for STM32 DFSDM ADC driver
+  IIO: add STM32 DFSDM ADC support
+  ASoC: add bindings for STM32 DFSDM driver
+  ASoC: add STM32 DFSDM support
+
+olivier moysan (1):
+  ASoC: dmaengine_pcm: add copy support
+
+ .../bindings/iio/adc/st,stm32-dfsdm-adc.txt        |   60 ++
+ .../devicetree/bindings/mfd/stm32-dfsdm.txt        |   68 ++
+ .../devicetree/bindings/sound/st,sm32-adfsdm.txt   |   84 ++
+ drivers/iio/adc/Kconfig                            |    9 +
+ drivers/iio/adc/Makefile                           |    1 +
+ drivers/iio/adc/stm32-dfsdm-adc.c                  |  676 +++++++++++++
+ drivers/mfd/Kconfig                                |   11 +
+ drivers/mfd/Makefile                               |    2 +
+ drivers/mfd/stm32-dfsdm-reg.h                      |  220 +++++
+ drivers/mfd/stm32-dfsdm.c                          | 1044 ++++++++++++++++++++
+ include/linux/mfd/stm32-dfsdm.h                    |  324 ++++++
+ include/sound/dmaengine_pcm.h                      |    3 +
+ sound/soc/Kconfig                                  |    1 +
+ sound/soc/Makefile                                 |    1 +
+ sound/soc/soc-generic-dmaengine-pcm.c              |   37 +-
+ sound/soc/stm/Kconfig                              |   10 +
+ sound/soc/stm/Makefile                             |    2 +
+ sound/soc/stm/stm32_adfsdm.c                       |  686 +++++++++++++
+ 18 files changed, 3237 insertions(+), 2 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt 
+ create mode 100644 Documentation/devicetree/bindings/mfd/stm32-dfsdm.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/st,sm32-adfsdm.txt
+ create mode 100644 drivers/iio/adc/stm32-dfsdm-adc.c
+ create mode 100644 drivers/mfd/stm32-dfsdm-reg.h
+ create mode 100644 drivers/mfd/stm32-dfsdm.c
+ create mode 100644 include/linux/mfd/stm32-dfsdm.h
+ create mode 100644 sound/soc/stm/Kconfig
+ create mode 100644 sound/soc/stm/Makefile
+ create mode 100644 sound/soc/stm/stm32_adfsdm.c
 
-diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt  b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt 
-new file mode 100644
-index 0000000..c156bcb
---- /dev/null
-+++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt 	
-@@ -0,0 +1,60 @@
-+STMicroelectronics STM32 DFSDM ADC device driver
-+
-+STM32 DFSDM ADC is a sigma delta analog-to-digital converter.
-+It has to be declared in device-tree as a subnode of the DFSDM mfd node.
-+
-+It has several multiplexed input channels. Conversions can be performed
-+in single, scan or discontinuous mode. Conversions can be launched in software
-+or using hardware triggers.
-+Each instance of the driver uses one filter instance handle by the DFSDM mfd
-+driver.
-+
-+DFSDM also offers extra features:
-+-The analog watchdog feature allows the application to detect if the
-+ input voltage goes beyond the user-defined, higher or lower thresholds.
-+-The short circuit detection allows allows the application to detect if the
-+ input is in CC.
-+-The clock absence detection allows application to detect if SPI input is clocked.
-+
-+Required properties:
-+- compatible:	Must be "st,stm32-dfsdm-adc".
-+- reg:		Specifies the DFSDM filter instance.
-+- #io-channel-cells = <1>: See the IIO bindings section "IIO consumers".
-+- st,adc-channels:	List of single-ended channels muxed for this ADC.
-+- st,adc-channel-names:	List of single-ended channels Name.
-+
-+Optional properties:
-+- st,adc-channel-types:	Single-ended channel input type. Default value is 0.
-+			- 0: SPI with data on rising edge (default)
-+			- 1: SPI with data on falling edge
-+			- 2: manchester codec, rising edage = logic 0
-+			- 3: manchester codec, rising edage = logic 1
-+- st,adc-channel-clk-src: Conversion clock source. default value is 1.
-+			  - 0: External SPI clocl (CLKIN x)
-+			  - 1: internal SPI clock (CLKOUT) (default)
-+			  - 2: internal SPI clock divided by 2 (falling edge).
-+			  - 2: internal SPI clock divided by 2 (rising edge).
-+- st,adc-alt-channel: 	  must be defined if Two ADCs are connected on same SPI
-+			  input.
-+			  If not set channel n is connected to SPI input n.
-+			  If set channel n is connected to SPI input n + 1.
-+
-+Example:
-+	dfsdm: dfsdm at 4400D000 {
-+		iio_dfsdm0: iio-dfsdm at 0 {
-+			compatible = "st,stm32-dfsdm-adc";
-+			#io-channel-cells = <1>;
-+			reg = <0>;
-+			st,adc-channels = <1>;
-+			st,adc-channel-names = "in0";
-+		};
-+		iio_dfsdm1: iio-dfsdm at 1 {
-+			compatible = "st,stm32-dfsdm-adc";
-+			#io-channel-cells = <1>;
-+			reg = <1>;
-+			st,adc-channels = <1>;
-+			st,adc-channel-names = "in1";
-+			st,adc-channel-types = <1>;
-+			st,adc-alt-channel = <1>;
-+		};
-+	};
 -- 
 1.9.1
