@@ -1,34 +1,22 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 23 Jan 2017 10:42:05 +0100
-Subject: [PATCH 0/4] ARM/arm64: dts: renesas: Link ARM GIC to clock and
- clock domain
-In-Reply-To: <CAMuHMdVbr3gCMJpvcJbD0C4p8FikMM3s5zmjkVXNskhk7-P7Tw@mail.gmail.com>
-References: <1484657360-13101-1-git-send-email-geert+renesas@glider.be>
- <20170123092330.GF31651@verge.net.au>
- <CAMuHMdVbr3gCMJpvcJbD0C4p8FikMM3s5zmjkVXNskhk7-P7Tw@mail.gmail.com>
-Message-ID: <20170123094204.GJ31651@verge.net.au>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 23 Jan 2017 17:45:48 +0800
+Subject: [PATCH v2 1/3] ARM: dts: imx6qdl: Fix "ERROR: code indent should
+ use tabs where possible"
+In-Reply-To: <1484867375-22411-1-git-send-email-jagan@openedev.com>
+References: <1484867375-22411-1-git-send-email-jagan@openedev.com>
+Message-ID: <20170123094547.GN5662@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2017 at 10:26:34AM +0100, Geert Uytterhoeven wrote:
-> Hi Simon,
+On Fri, Jan 20, 2017 at 12:09:33AM +0100, Jagan Teki wrote:
+> From: Jagan Teki <jagan@amarulasolutions.com>
 > 
-> On Mon, Jan 23, 2017 at 10:23 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Tue, Jan 17, 2017 at 01:49:16PM +0100, Geert Uytterhoeven wrote:
-> >> This patch series improves the topology description in DT of the ARM GIC
-> >> on Renesas SoCs using the CPG/MSSR bindings (R-Car Gen3 and RZ/G).
-> >> It links the GIC to its module clock, and adds it to the SYSC "always
-> >> on" PM Domain.
-> >>
-> >> Note that currently the GIC-400 driver doesn't support module clocks nor
-> >> Runtime PM, so this must be handled as a critical clock.
-> >> As the CPG/MSSR driver, unlike the legacy MSTP driver, is already aware
-> >> of critical clocks, this series can be applied right now.
-> >
-> > does the note above imply that "[PATCH 0/2] clk: renesas: Use
-> > CLK_IS_CRITICAL to handle critical clocks" is a dependency of this series?
+> Fixed code indent tabs in respetcive imx6qdl dtsi files and
+> also add space on imx6qdl-icore-rqs.dtsi on usdhc bus-width nodes.
 > 
-> No, the note says (using different wording) that there is no such dependency.
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 
-Thanks, I see that now.
-I have queued up these changes.
+Okay.  I replaced v1 series with this version.
+
+Shawn
