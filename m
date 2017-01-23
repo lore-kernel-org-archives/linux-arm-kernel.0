@@ -1,97 +1,138 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 23 Jan 2017 12:00:04 +0100
-Subject: [PATCH v3 00/24] i.MX Media Driver
-In-Reply-To: <5d23d244-aa0e-401c-24a9-07f28acf1563@xs4all.nl>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <c6e98327-7e2c-f34a-2d23-af7b236de441@xs4all.nl>
- <1484929911.2897.70.camel@pengutronix.de>
- <3fb68686-9447-2d8a-e2d2-005e4138cd43@gmail.com>
- <5d23d244-aa0e-401c-24a9-07f28acf1563@xs4all.nl>
-Message-ID: <1485169204.2874.57.camel@pengutronix.de>
+From: yt.shen@mediatek.com (YT Shen)
+Date: Mon, 23 Jan 2017 19:05:13 +0800
+Subject: [PATCH v12 00/12] MT2701 DRM support
+Message-ID: <1485169525-22163-1-git-send-email-yt.shen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-01-20 at 21:39 +0100, Hans Verkuil wrote:
-[...]
-> > There is a VDIC entity in the i.MX IPU that performs de-interlacing with
-> > hardware filters for motion compensation. Some of the motion compensation
-> > modes ("low" and "medium" motion) require that the VDIC receive video
-> > frame fields from memory buffers (dedicated dma channels in the
-> > IPU are used to transfer those buffers into the VDIC).
-> > 
-> > So one option to support those modes would be to pass the raw buffers
-> > from a camera sensor up to userspace to a capture device, and then pass
-> > them back to the VDIC for de-interlacing using a mem2mem device.
-> > 
-> > Philipp and I are both in agreement that, since userland is not interested
-> > in the intermediate interlaced buffers in this case, but only the final
-> > result (motion compensated, de-interlaced frames), it is more efficient
-> > to provide a media link that allows passing those intermediate frames
-> > directly from a camera source pad to VDIC sink pad, without having
-> > to route them through userspace.
-> > 
-> > So in order to support that, I've implemented a simple FIFO dma buffer
-> > queue in the driver to allow passing video buffers directly from a source
-> > to a sink. It is modeled loosely off the vb2 state machine and API, but
-> > simpler (for instance it only allows contiguous, cache-coherent buffers).
-> > 
-> > This is where Philipp has an argument, that this should be done with a
-> > new API in videobuf2.
+This is MT2701 DRM support PATCH v12, based on 4.10-rc1.
+We add DSI interrupt control, transfer function for MIPI DSI panel support.
+Most codes are the same, except some register changed.
 
-That is one part of the argument. I'm glad to understand now that we
-agree about this.
+For example:
+ - DISP_OVL address offset changed, color format definition changed.
+ - DISP_RDMA fifo size changed.
+ - DISP_COLOR offset changed.
+ - MIPI_TX setting changed.
 
-> > And I'm actually in total agreement with that. I definitely agree that there
-> > should be a mechanism in the media framework that allows passing video
-> > buffers from a source pad to a sink pad using a software queue, with no
-> > involvement from userland.
+We add a new component DDP_COMPONENT_BLS, and the connections are updated.
+OVL -> RDMA -> COLOR -> BLS -> DSI
+RDMA -> DPI
+And we have shadow register support in MT2701.
 
-That is the other part of the argument. I do not agree that these
-software queue "links" should be presented to userspace as media pad
-links between two entities of a media device. 
+Changes since v11:
+- Update mtk_dsi_poweron() and mtk_output_dsi_enable() to symmetric flow
 
-First, that would limit the links to subdevices contained in the same
-media graph, while this should work between any two capture and output
-queues of different devices.
-Assume for example, we want to encode the captured, deinterlaced video
-to h.264 with the coda VPU driver. A software queue link could be
-established between the CSI capture and the VDIC deinterlacer input,
-just as between the VDIC deinterlacer output and the coda VPU input.
-Technically, there would be no difference between those two linked
-capture/output queue pairs. But the coda driver is a completely separate
-mem2mem device. And since it is not part of the i.MX media graph, there
-is no entity pad to link to.
-Or assume there is an USB analog capture device that produces interlaced
-frames. I think it should be possible to connect its capture queue to
-the VDIC deinterlacer output queue just the same way as linking the CSI
-to the VDIC (in software queue mode).
+Changes since v10:
+- Add binding descriptions for newly added bindings
+- Remove color data pointer from generic mtk_ddp_comp
+- Remove "drm/mediatek: add mipi_tx data rate check" from the patch series
+- Remove "drm/mediatek: add dsi ulp mode control" from the patch series
+- Update descriptions for "drm/mediatek: add non-continuous clock mode and EOT packet control"
+- Fix DSI disable flow
 
-Second, the subdevice pad formats describe wire formats, not memory
-formats. The user might want to choose between 4:2:2 and 4:2:0
-subsampled YUV formats for the intermediate buffer, for example,
-depending on memory bandwidth constraints and quality requirements. This
-is impossible with the media entity / subdevice pad links.
+Changes since v9:
+- Split DSI patches into smaller parts
+- Use a real linux errno for return value
+- Add error handling in mtk_output_dsi_enable()
+- Remove unused changes and redundant delays
+- Add helpers and macros for configuration
+- Combine "drm/mediatek: rename macros, add chip prefix" and "drm/mediatek: add *driver_data for different hardware setting"
 
-I think an interface where userspace configures the capture and output
-queues via v4l2 API, passes dma buffers around from one to the other
-queue, and then puts both queues into a free running mode would be a
-much better fit for this mechanism.
+Changes since v8:
+- enable 3 DSI interrupts only
+- move mtk_dsi_wait_for_irq_done() to the patch of irq control
+- use the name BLS in DRM driver part
+- move BLS declaration to a separate patch
+- update mtk_dsi_switch_to_cmd_mode()
+- update mtk_output_dsi_enable() and mtk_output_dsi_disable()
 
-> > My only disagreement is when this should be implemented. I think it is
-> > fine to keep my custom implementation of this in the driver for now. Once
-> > an extension of vb2 is ready to support this feature, it would be fairly
-> > straightforward to strip out my custom implementation and go with the
-> > new API.
-> 
-> For a staging driver this isn't necessary, as long as it is documented in
-> the TODO file that this needs to be fixed before it can be moved out of
-> staging. The whole point of staging is that there is still work to be
-> done in the driver, after all :-)
+Changes since v7:
+- Remove redundant codes
+- Move the definition of DDP_COMPONENT_BLS to patch of "drm/mediatek: update display module connections"
+- Move _dsi_irq_wait_queue into platform driver data
+- Move mtk_dsi_irq_data_clear() to patch of "drm/mediatek: add dsi interrupt control"
+- Add more descriptions in the commit messages
 
-Absolutely. The reason I am arguing against merging the mem2mem media
-control links so vehemently is that I am convinced the userspace
-interface is wrong, and I am afraid that even though in staging, it
-might become established.
+Changes since v6:
+- Change data type of irq_data to u32
+- Rewrite mtk_dsi_host_transfer() for simplify
+- Move some MIPI_TX config to patch of "drm/mediatek: add *driver_data for different hardware settings".
+- Remove device tree from this patch series
 
-regards
-Philipp
+Changes since v5:
+- Remove DPI device tree and compatible string
+- Use one wait queue to handle interrupt status
+- Update the interrupt check flow and DSI_INT_ALL_BITS
+- Use same function for host read/write command
+- various fixes
+
+Changes since v4:
+- Add messages when timeout in mtk_disp_mutex_acquire()
+- Add descriptions for DISP_REG_MUTEX registers
+- Move connection settings for display modules to a separate patch
+- Remove 'mt2701-disp-wdma' because it is unused
+- Move cleaning up and renaming to a separate patch
+- Use wait_event_interruptible_timeout() to replace polling
+- Remove irq_num from mtk_dsi structure
+- Remove redundant and debug codes
+
+Changes since v3:
+- Add DSI support for MIPI DSI panels
+- Update BLS binding to PWM nodes
+- Remove ufoe device nodes
+- Remove redundant parentheses
+- Remove global variable initialization
+
+Changes since v2:
+- Rename mtk_ddp_mux_sel to mtk_ddp_sout_sel
+- Update mt2701_mtk_ddp_ext components
+- Changed to prefix naming
+- Reorder the patch series
+- Use of_device_get_match_data() to get driver private data
+- Use iopoll macros to implement mtk_disp_mutex_acquire()
+- Removed empty device tree nodes
+
+Changes since v1:
+- Removed BLS bindings and codes, which belong to pwm driver
+- Moved mtk_disp_mutex_acquire() just before mtk_crtc_ddp_config()
+- Split patch into smaller parts
+- Added const keyword to constant structure
+- Removed codes for special memory align
+
+Thanks,
+yt.shen
+
+YT Shen (10):
+  dt-bindings: display: mediatek: update supported chips
+  drm/mediatek: add helpers for coverting from the generic components
+  drm/mediatek: add *driver_data for different hardware settings
+  drm/mediatek: add shadow register support
+  drm/mediatek: add BLS component
+  drm/mediatek: update display module connections
+  drm/mediatek: cleaning up and refine
+  drm/mediatek: add non-continuous clock mode and EOT packet control
+  drm/mediatek: update DSI sub driver flow for sending commands to panel
+  drm/mediatek: add support for Mediatek SoC MT2701
+
+shaoming chen (2):
+  drm/mediatek: add dsi interrupt control
+  drm/mediatek: add dsi transfer function
+
+ .../bindings/display/mediatek/mediatek,disp.txt    |   2 +
+ .../bindings/display/mediatek/mediatek,dsi.txt     |   2 +
+ drivers/gpu/drm/mediatek/mtk_disp_ovl.c            |  64 ++-
+ drivers/gpu/drm/mediatek/mtk_disp_rdma.c           |  39 +-
+ drivers/gpu/drm/mediatek/mtk_drm_crtc.c            |  75 +--
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c             | 138 +++--
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.h             |   2 +
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c        |  69 ++-
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h        |   2 +
+ drivers/gpu/drm/mediatek/mtk_drm_drv.c             |  54 +-
+ drivers/gpu/drm/mediatek/mtk_drm_drv.h             |   9 +
+ drivers/gpu/drm/mediatek/mtk_dsi.c                 | 575 ++++++++++++++++-----
+ drivers/gpu/drm/mediatek/mtk_mipi_tx.c             |  38 +-
+ 13 files changed, 829 insertions(+), 240 deletions(-)
+
+-- 
+1.9.1
