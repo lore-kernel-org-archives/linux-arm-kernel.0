@@ -1,300 +1,374 @@
-From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Mon, 23 Jan 2017 22:56:04 +0530
-Subject: [PATCH] usb: gadget: udc: constify usb_ep_ops structures
-Message-ID: <1485192364-2840-1-git-send-email-bhumirks@gmail.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Mon, 23 Jan 2017 12:30:06 -0500
+Subject: [PATCH v3 2/5] drm/rockchip/dsi: dw-mipi: support RK3399 mipi dsi
+In-Reply-To: <1484907051-7159-3-git-send-email-zyw@rock-chips.com>
+References: <1484907051-7159-1-git-send-email-zyw@rock-chips.com>
+ <1484907051-7159-3-git-send-email-zyw@rock-chips.com>
+Message-ID: <20170123173006.GA25789@trickycodes.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Declare usb_ep_ops structures as const as they are only stored in the
-ops field of an usb_ep structure. This field is of type const, so
-usb_ep_ops structures having this property can be made const too.
-Done using Coccinelle( A smaller version of the script)
+On Fri, Jan 20, 2017 at 06:10:48PM +0800, Chris Zhong wrote:
+> The vopb/vopl switch register of RK3399 mipi is different from RK3288,
+> the default setting for mipi dsi mode is different too, so add a
+> of_device_id structure to distinguish them, and make sure set the
+> correct mode before mipi phy init.
+> 
 
-@r disable optional_qualifier@
-identifier i;
-position p;
-@@
-static struct usb_ep_ops i at p={...};
+Hi Chris,
+There are a bunch of unrelated changes in this patch. Can you please split out
+the whitespace/const changes into a separate clean-up patch so it's easier to
+see the meaningful changes?
 
-@ok@
-identifier r.i;
-position p;
-struct mv_ep a;
-struct mv_u3d_ep b;
-struct omap_ep c;
+More comments below.
 
-@@
-(
-a.ep.ops=&i at p;
-|
-b.ep.ops=&i at p;
-|
-c.ep.ops=&i at p;
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+> ---
+> 
+> Changes in v3:
+> - base on John Keeping's patch series
+> 
+>  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 101 ++++++++++++++++++++++++---------
+>  1 file changed, 74 insertions(+), 27 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> index 45af890..a93ce97 100644
+> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> @@ -29,9 +29,17 @@
+>  
+>  #define DRIVER_NAME    "dw-mipi-dsi"
+>  
+> -#define GRF_SOC_CON6                    0x025c
+> -#define DSI0_SEL_VOP_LIT                (1 << 6)
+> -#define DSI1_SEL_VOP_LIT                (1 << 9)
+> +#define RK3288_GRF_SOC_CON6		0x025c
+> +#define RK3288_DSI0_SEL_VOP_LIT		BIT(6)
+> +#define RK3288_DSI1_SEL_VOP_LIT		BIT(9)
+> +
+> +#define RK3399_GRF_SOC_CON19		0x6250
+> +#define RK3399_DSI0_SEL_VOP_LIT		BIT(0)
+> +#define RK3399_DSI1_SEL_VOP_LIT		BIT(4)
+> +
+> +/* disable turnrequest, turndisable, forcetxstopmode, forcerxmode */
+> +#define RK3399_GRF_SOC_CON22		0x6258
+> +#define RK3399_GRF_DSI_MODE		0xffff0000
+>  
+>  #define DSI_VERSION			0x00
+>  #define DSI_PWR_UP			0x04
+> @@ -149,7 +157,6 @@
+>  #define LPRX_TO_CNT(p)			((p) & 0xffff)
+>  
+>  #define DSI_BTA_TO_CNT			0x8c
+> -
 
-)
+Unrelated whitespace change
 
-@bad@
-position p!={r.p,ok.p};
-identifier r.i;
-@@
-i at p
+>  #define DSI_LPCLK_CTRL			0x94
+>  #define AUTO_CLKLANE_CTRL		BIT(1)
+>  #define PHY_TXREQUESTCLKHS		BIT(0)
+> @@ -215,11 +222,11 @@
+>  
+>  #define HSFREQRANGE_SEL(val)	(((val) & 0x3f) << 1)
+>  
+> -#define INPUT_DIVIDER(val)	((val - 1) & 0x7f)
+> +#define INPUT_DIVIDER(val)	(((val) - 1) & 0x7f)
 
-@depends on !bad disable optional_qualifier@
-identifier r.i;
-@@
-+const
-struct usb_ep_ops i;
+Unrelated change
 
-File size details before and after applying  the patch.
-First line of every .o file shows the file size before patching and
-second line shows the file size after patching.
+>  #define LOW_PROGRAM_EN		0
+>  #define HIGH_PROGRAM_EN		BIT(7)
+> -#define LOOP_DIV_LOW_SEL(val)	((val - 1) & 0x1f)
+> -#define LOOP_DIV_HIGH_SEL(val)	(((val - 1) >> 5) & 0x1f)
+> +#define LOOP_DIV_LOW_SEL(val)	(((val) - 1) & 0x1f)
+> +#define LOOP_DIV_HIGH_SEL(val)	((((val) - 1) >> 5) & 0x1f)
 
-  text	   data	    bss	    dec	    hex	filename
+This change doesn't adversely affect other platforms?
 
-   7782	    384	      8	   8174	   1fee	usb/gadget/udc/fotg210-udc.o
-   7878	    296	      8	   8182	   1ff6	usb/gadget/udc/fotg210-udc.o
+>  #define PLL_LOOP_DIV_EN		BIT(5)
+>  #define PLL_INPUT_DIV_EN	BIT(4)
+>  
+> @@ -265,6 +272,11 @@ enum {
+>  };
+>  
+>  struct dw_mipi_dsi_plat_data {
+> +	u32 dsi0_en_bit;
+> +	u32 dsi1_en_bit;
+> +	u32 grf_switch_reg;
+> +	u32 grf_dsi0_mode;
+> +	u32 grf_dsi0_mode_reg;
+>  	unsigned int max_data_lanes;
+>  	enum drm_mode_status (*mode_valid)(struct drm_connector *connector,
+>  					   struct drm_display_mode *mode);
+> @@ -281,6 +293,7 @@ struct dw_mipi_dsi {
+>  
+>  	struct clk *pllref_clk;
+>  	struct clk *pclk;
+> +	struct clk *phy_cfg_clk;
+>  
+>  	unsigned int lane_mbps; /* per lane */
+>  	u32 channel;
+> @@ -356,6 +369,7 @@ static inline struct dw_mipi_dsi *encoder_to_dsi(struct drm_encoder *encoder)
+>  {
+>  	return container_of(encoder, struct dw_mipi_dsi, encoder);
+>  }
+> +
+>  static inline void dsi_write(struct dw_mipi_dsi *dsi, u32 reg, u32 val)
+>  {
+>  	writel(val, dsi->base + reg);
+> @@ -367,7 +381,7 @@ static inline u32 dsi_read(struct dw_mipi_dsi *dsi, u32 reg)
+>  }
+>  
+>  static void dw_mipi_dsi_phy_write(struct dw_mipi_dsi *dsi, u8 test_code,
+> -				 u8 test_data)
+> +				  u8 test_data)
 
-  17866	    992	     40	  18898	   49d2	usb/gadget/udc/fsl_udc_core.o
-  17954	    896	     40	  18890	   49ca	usb/gadget/udc/fsl_udc_core.o
+Unrelated whitespace change
 
-   9646	    288	      8	   9942	   26d6	usb/gadget/udc/fusb300_udc.o
-   9742	    192	      8	   9942	   26d6	usb/gadget/udc/fusb300_udc.o
+>  {
+>  	/*
+>  	 * With the falling edge on TESTCLK, the TESTDIN[7:0] signal content
+> @@ -426,6 +440,14 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
+>  	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_TESTCLR);
+>  	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_UNTESTCLR);
+>  
+> +	if (!IS_ERR(dsi->phy_cfg_clk)) {
+> +		ret = clk_prepare_enable(dsi->phy_cfg_clk);
+> +		if (ret) {
+> +			dev_err(dsi->dev, "Failed to enable phy_cfg_clk\n");
+> +			return ret;
+> +		}
+> +	}
+> +
+>  	dw_mipi_dsi_phy_write(dsi, 0x10, BYPASS_VCO_RANGE |
+>  					 VCO_RANGE_CON_SEL(vco) |
+>  					 VCO_IN_CAP_CON_LOW |
+> @@ -474,22 +496,23 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
+>  	dsi_write(dsi, DSI_PHY_RSTZ, PHY_ENFORCEPLL | PHY_ENABLECLK |
+>  				     PHY_UNRSTZ | PHY_UNSHUTDOWNZ);
+>  
+> -
+>  	ret = readl_poll_timeout(dsi->base + DSI_PHY_STATUS,
+>  				 val, val & LOCK, 1000, PHY_STATUS_TIMEOUT_US);
+>  	if (ret < 0) {
+>  		dev_err(dsi->dev, "failed to wait for phy lock state\n");
+> -		return ret;
+> +		goto phy_init_end;
+>  	}
+>  
+>  	ret = readl_poll_timeout(dsi->base + DSI_PHY_STATUS,
+>  				 val, val & STOP_STATE_CLK_LANE, 1000,
+>  				 PHY_STATUS_TIMEOUT_US);
+> -	if (ret < 0) {
+> +	if (ret < 0)
+>  		dev_err(dsi->dev,
+>  			"failed to wait for phy clk lane stop state\n");
+> -		return ret;
+> -	}
+> +
+> +phy_init_end:
+> +	if (!IS_ERR(dsi->phy_cfg_clk))
+> +		clk_disable_unprepare(dsi->phy_cfg_clk);
+>  
+>  	return ret;
+>  }
+> @@ -548,7 +571,7 @@ static int dw_mipi_dsi_host_attach(struct mipi_dsi_host *host,
+>  
+>  	if (device->lanes > dsi->pdata->max_data_lanes) {
+>  		dev_err(dsi->dev, "the number of data lanes(%u) is too many\n",
+> -				device->lanes);
+> +			device->lanes);
 
-  12752	    416	      8	  13176	   3378	drivers/usb/gadget/udc/goku_udc.o
-  12832	    328	      8	  13168	   3370	drivers/usb/gadget/udc/goku_udc.o
+Unrelated whitespace change
 
-  16541	   1696	      8	  18245	   4745	drivers/usb/gadget/udc/gr_udc.o
-  16637	   1600	      8	  18245	   4745	drivers/usb/gadget/udc/gr_udc.o
+>  		return -EINVAL;
+>  	}
+>  
+> @@ -936,8 +959,8 @@ static void dw_mipi_dsi_clear_err(struct dw_mipi_dsi *dsi)
+>  }
+>  
+>  static void dw_mipi_dsi_encoder_mode_set(struct drm_encoder *encoder,
+> -					struct drm_display_mode *mode,
+> -					struct drm_display_mode *adjusted_mode)
+> +					 struct drm_display_mode *mode,
+> +					 struct drm_display_mode *adjusted_mode)
 
-  15798	    288	     16	  16102	   3ee6	drivers/usb/gadget/udc/m66592-udc.o
-  15894	    192	     16	  16102	   3ee6	drivers/usb/gadget/udc/m66592-udc.o
+Unrelated whitespace change
 
-  17751	   3808	     16	  21575	   5447	usb/gadget/udc/mv_u3d_core.o
-  17839	   3712	     16	  21567	   543f	usb/gadget/udc/mv_u3d_core.o
+>  {
+>  	struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
+>  
+> @@ -965,6 +988,7 @@ static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
+>  static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
+>  {
+>  	struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
+> +	const struct dw_mipi_dsi_plat_data *pdata = dsi->pdata;
+>  	int mux = drm_of_encoder_active_endpoint_id(dsi->dev->of_node, encoder);
+>  	u32 val;
+>  
+> @@ -985,6 +1009,10 @@ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
+>  	dw_mipi_dsi_dphy_interface_config(dsi);
+>  	dw_mipi_dsi_clear_err(dsi);
+>  
+> +	if (pdata->grf_dsi0_mode_reg)
+> +		regmap_write(dsi->grf_regmap, pdata->grf_dsi0_mode_reg,
+> +			     pdata->grf_dsi0_mode);
+> +
+>  	dw_mipi_dsi_phy_init(dsi);
+>  	dw_mipi_dsi_wait_for_two_frames(dsi);
+>  
+> @@ -998,11 +1026,11 @@ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
+>  	clk_disable_unprepare(dsi->pclk);
+>  
+>  	if (mux)
+> -		val = DSI0_SEL_VOP_LIT | (DSI0_SEL_VOP_LIT << 16);
+> +		val = pdata->dsi0_en_bit | (pdata->dsi0_en_bit << 16);
+>  	else
+> -		val = DSI0_SEL_VOP_LIT << 16;
+> +		val = pdata->dsi0_en_bit << 16;
+>  
+> -	regmap_write(dsi->grf_regmap, GRF_SOC_CON6, val);
+> +	regmap_write(dsi->grf_regmap, pdata->grf_switch_reg, val);
+>  	dev_dbg(dsi->dev, "vop %s output to dsi0\n", (mux) ? "LIT" : "BIG");
+>  }
+>  
+> @@ -1034,7 +1062,7 @@ dw_mipi_dsi_encoder_atomic_check(struct drm_encoder *encoder,
+>  	return 0;
+>  }
+>  
+> -static struct drm_encoder_helper_funcs
+> +static const struct drm_encoder_helper_funcs
+>  dw_mipi_dsi_encoder_helper_funcs = {
+>  	.enable = dw_mipi_dsi_encoder_enable,
+>  	.mode_set = dw_mipi_dsi_encoder_mode_set,
+> @@ -1042,7 +1070,7 @@ dw_mipi_dsi_encoder_helper_funcs = {
+>  	.atomic_check = dw_mipi_dsi_encoder_atomic_check,
+>  };
+>  
+> -static struct drm_encoder_funcs dw_mipi_dsi_encoder_funcs = {
+> +static const struct drm_encoder_funcs dw_mipi_dsi_encoder_funcs = {
+>  	.destroy = drm_encoder_cleanup,
+>  };
+>  
+> @@ -1078,7 +1106,7 @@ static void dw_mipi_dsi_drm_connector_destroy(struct drm_connector *connector)
+>  	drm_connector_cleanup(connector);
+>  }
+>  
+> -static struct drm_connector_funcs dw_mipi_dsi_atomic_connector_funcs = {
+> +static const struct drm_connector_funcs dw_mipi_dsi_atomic_connector_funcs = {
 
-  17348	   1112	     24	  18484	   4834	usb/gadget/udc/mv_udc_core.o
-  17436	   1016	     24	  18476	   482c	usb/gadget/udc/mv_udc_core.o
+These 3 const changes are unrelated to the patch
 
-  25990	   2620	     13	  28623	   6fcf	drivers/usb/gadget/udc/net2272.o
-  26086	   2524	     13	  28623	   6fcf	drivers/usb/gadget/udc/net2272.o
+>  	.dpms = drm_atomic_helper_connector_dpms,
+>  	.fill_modes = drm_helper_probe_single_connector_modes,
+>  	.destroy = dw_mipi_dsi_drm_connector_destroy,
+> @@ -1088,7 +1116,7 @@ static struct drm_connector_funcs dw_mipi_dsi_atomic_connector_funcs = {
+>  };
+>  
+>  static int dw_mipi_dsi_register(struct drm_device *drm,
+> -				      struct dw_mipi_dsi *dsi)
+> +				struct dw_mipi_dsi *dsi)
 
-  18409	   7312	      8	  25729	   6481	drivers/usb/gadget/udc/pxa27x_udc.o
-  18505	   7208	      8	  25721	   6479	drivers/usb/gadget/udc/pxa27x_udc.o
+Unrelated whitespace change
 
-  18644	    288	     16	  18948	   4a04	usb/gadget/udc/r8a66597-udc.o
-  18740	    192	     16	  18948	   4a04	usb/gadget/udc/r8a66597-udc.o
+>  {
+>  	struct drm_encoder *encoder = &dsi->encoder;
+>  	struct drm_connector *connector = &dsi->connector;
+> @@ -1109,14 +1137,14 @@ static int dw_mipi_dsi_register(struct drm_device *drm,
+>  	drm_encoder_helper_add(&dsi->encoder,
+>  			       &dw_mipi_dsi_encoder_helper_funcs);
+>  	ret = drm_encoder_init(drm, &dsi->encoder, &dw_mipi_dsi_encoder_funcs,
+> -			 DRM_MODE_ENCODER_DSI, NULL);
+> +			       DRM_MODE_ENCODER_DSI, NULL);
 
-Files: drivers/usb/gadget/udc/{s3c-hsudc.o/omap_udc.o/fsl_qe_udc.o} did
-not complie.
+Unrelated whitespace change
 
-Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
----
- drivers/usb/gadget/udc/fotg210-udc.c  | 2 +-
- drivers/usb/gadget/udc/fsl_qe_udc.c   | 2 +-
- drivers/usb/gadget/udc/fsl_udc_core.c | 2 +-
- drivers/usb/gadget/udc/fusb300_udc.c  | 2 +-
- drivers/usb/gadget/udc/goku_udc.c     | 2 +-
- drivers/usb/gadget/udc/gr_udc.c       | 2 +-
- drivers/usb/gadget/udc/m66592-udc.c   | 2 +-
- drivers/usb/gadget/udc/mv_u3d_core.c  | 2 +-
- drivers/usb/gadget/udc/mv_udc_core.c  | 2 +-
- drivers/usb/gadget/udc/net2272.c      | 4 ++--
- drivers/usb/gadget/udc/omap_udc.c     | 2 +-
- drivers/usb/gadget/udc/pxa27x_udc.c   | 2 +-
- drivers/usb/gadget/udc/r8a66597-udc.c | 2 +-
- drivers/usb/gadget/udc/s3c-hsudc.c    | 2 +-
- 14 files changed, 15 insertions(+), 15 deletions(-)
+>  	if (ret) {
+>  		dev_err(dev, "Failed to initialize encoder with drm\n");
+>  		return ret;
+>  	}
+>  
+>  	drm_connector_helper_add(connector,
+> -			&dw_mipi_dsi_connector_helper_funcs);
+> +				 &dw_mipi_dsi_connector_helper_funcs);
 
-diff --git a/drivers/usb/gadget/udc/fotg210-udc.c b/drivers/usb/gadget/udc/fotg210-udc.c
-index 6ba122c..966637d 100644
---- a/drivers/usb/gadget/udc/fotg210-udc.c
-+++ b/drivers/usb/gadget/udc/fotg210-udc.c
-@@ -527,7 +527,7 @@ static void fotg210_ep_fifo_flush(struct usb_ep *_ep)
- {
- }
- 
--static struct usb_ep_ops fotg210_ep_ops = {
-+static const struct usb_ep_ops fotg210_ep_ops = {
- 	.enable		= fotg210_ep_enable,
- 	.disable	= fotg210_ep_disable,
- 
-diff --git a/drivers/usb/gadget/udc/fsl_qe_udc.c b/drivers/usb/gadget/udc/fsl_qe_udc.c
-index 4fff51b..303328ce 100644
---- a/drivers/usb/gadget/udc/fsl_qe_udc.c
-+++ b/drivers/usb/gadget/udc/fsl_qe_udc.c
-@@ -1847,7 +1847,7 @@ static int qe_ep_set_halt(struct usb_ep *_ep, int value)
- 	return status;
- }
- 
--static struct usb_ep_ops qe_ep_ops = {
-+static const struct usb_ep_ops qe_ep_ops = {
- 	.enable = qe_ep_enable,
- 	.disable = qe_ep_disable,
- 
-diff --git a/drivers/usb/gadget/udc/fsl_udc_core.c b/drivers/usb/gadget/udc/fsl_udc_core.c
-index 71094e4..f518727 100644
---- a/drivers/usb/gadget/udc/fsl_udc_core.c
-+++ b/drivers/usb/gadget/udc/fsl_udc_core.c
-@@ -1118,7 +1118,7 @@ static void fsl_ep_fifo_flush(struct usb_ep *_ep)
- 	} while (fsl_readl(&dr_regs->endptstatus) & bits);
- }
- 
--static struct usb_ep_ops fsl_ep_ops = {
-+static const struct usb_ep_ops fsl_ep_ops = {
- 	.enable = fsl_ep_enable,
- 	.disable = fsl_ep_disable,
- 
-diff --git a/drivers/usb/gadget/udc/fusb300_udc.c b/drivers/usb/gadget/udc/fusb300_udc.c
-index 42ff308..e0c1b00 100644
---- a/drivers/usb/gadget/udc/fusb300_udc.c
-+++ b/drivers/usb/gadget/udc/fusb300_udc.c
-@@ -518,7 +518,7 @@ static void fusb300_fifo_flush(struct usb_ep *_ep)
- {
- }
- 
--static struct usb_ep_ops fusb300_ep_ops = {
-+static const struct usb_ep_ops fusb300_ep_ops = {
- 	.enable		= fusb300_enable,
- 	.disable	= fusb300_disable,
- 
-diff --git a/drivers/usb/gadget/udc/goku_udc.c b/drivers/usb/gadget/udc/goku_udc.c
-index 5107987..8433c22 100644
---- a/drivers/usb/gadget/udc/goku_udc.c
-+++ b/drivers/usb/gadget/udc/goku_udc.c
-@@ -968,7 +968,7 @@ static void goku_fifo_flush(struct usb_ep *_ep)
- 		command(regs, COMMAND_FIFO_CLEAR, ep->num);
- }
- 
--static struct usb_ep_ops goku_ep_ops = {
-+static const struct usb_ep_ops goku_ep_ops = {
- 	.enable		= goku_ep_enable,
- 	.disable	= goku_ep_disable,
- 
-diff --git a/drivers/usb/gadget/udc/gr_udc.c b/drivers/usb/gadget/udc/gr_udc.c
-index b16f8af..1f99411 100644
---- a/drivers/usb/gadget/udc/gr_udc.c
-+++ b/drivers/usb/gadget/udc/gr_udc.c
-@@ -1841,7 +1841,7 @@ static void gr_fifo_flush(struct usb_ep *_ep)
- 	spin_unlock(&ep->dev->lock);
- }
- 
--static struct usb_ep_ops gr_ep_ops = {
-+static const struct usb_ep_ops gr_ep_ops = {
- 	.enable		= gr_ep_enable,
- 	.disable	= gr_ep_disable,
- 
-diff --git a/drivers/usb/gadget/udc/m66592-udc.c b/drivers/usb/gadget/udc/m66592-udc.c
-index de3e034..46ce7bc 100644
---- a/drivers/usb/gadget/udc/m66592-udc.c
-+++ b/drivers/usb/gadget/udc/m66592-udc.c
-@@ -1436,7 +1436,7 @@ static void m66592_fifo_flush(struct usb_ep *_ep)
- 	spin_unlock_irqrestore(&ep->m66592->lock, flags);
- }
- 
--static struct usb_ep_ops m66592_ep_ops = {
-+static const struct usb_ep_ops m66592_ep_ops = {
- 	.enable		= m66592_enable,
- 	.disable	= m66592_disable,
- 
-diff --git a/drivers/usb/gadget/udc/mv_u3d_core.c b/drivers/usb/gadget/udc/mv_u3d_core.c
-index 8d726bd..d365449 100644
---- a/drivers/usb/gadget/udc/mv_u3d_core.c
-+++ b/drivers/usb/gadget/udc/mv_u3d_core.c
-@@ -995,7 +995,7 @@ static int mv_u3d_ep_set_wedge(struct usb_ep *_ep)
- 	return mv_u3d_ep_set_halt_wedge(_ep, 1, 1);
- }
- 
--static struct usb_ep_ops mv_u3d_ep_ops = {
-+static const struct usb_ep_ops mv_u3d_ep_ops = {
- 	.enable		= mv_u3d_ep_enable,
- 	.disable	= mv_u3d_ep_disable,
- 
-diff --git a/drivers/usb/gadget/udc/mv_udc_core.c b/drivers/usb/gadget/udc/mv_udc_core.c
-index d82a91b..27ebb0d 100644
---- a/drivers/usb/gadget/udc/mv_udc_core.c
-+++ b/drivers/usb/gadget/udc/mv_udc_core.c
-@@ -946,7 +946,7 @@ static int mv_ep_set_wedge(struct usb_ep *_ep)
- 	return mv_ep_set_halt_wedge(_ep, 1, 1);
- }
- 
--static struct usb_ep_ops mv_ep_ops = {
-+static const struct usb_ep_ops mv_ep_ops = {
- 	.enable		= mv_ep_enable,
- 	.disable	= mv_ep_disable,
- 
-diff --git a/drivers/usb/gadget/udc/net2272.c b/drivers/usb/gadget/udc/net2272.c
-index 078c91d..7dc0102 100644
---- a/drivers/usb/gadget/udc/net2272.c
-+++ b/drivers/usb/gadget/udc/net2272.c
-@@ -181,7 +181,7 @@ static void net2272_dequeue_all(struct net2272_ep *);
- static int net2272_kick_dma(struct net2272_ep *, struct net2272_request *);
- static int net2272_fifo_status(struct usb_ep *);
- 
--static struct usb_ep_ops net2272_ep_ops;
-+static const struct usb_ep_ops net2272_ep_ops;
- 
- /*---------------------------------------------------------------------------*/
- 
-@@ -1067,7 +1067,7 @@ net2272_fifo_flush(struct usb_ep *_ep)
- 	net2272_ep_write(ep, EP_STAT1, 1 << BUFFER_FLUSH);
- }
- 
--static struct usb_ep_ops net2272_ep_ops = {
-+static const struct usb_ep_ops net2272_ep_ops = {
- 	.enable        = net2272_enable,
- 	.disable       = net2272_disable,
- 
-diff --git a/drivers/usb/gadget/udc/omap_udc.c b/drivers/usb/gadget/udc/omap_udc.c
-index a8709f9..f05ba68 100644
---- a/drivers/usb/gadget/udc/omap_udc.c
-+++ b/drivers/usb/gadget/udc/omap_udc.c
-@@ -1112,7 +1112,7 @@ static int omap_ep_set_halt(struct usb_ep *_ep, int value)
- 	return status;
- }
- 
--static struct usb_ep_ops omap_ep_ops = {
-+static const struct usb_ep_ops omap_ep_ops = {
- 	.enable		= omap_ep_enable,
- 	.disable	= omap_ep_disable,
- 
-diff --git a/drivers/usb/gadget/udc/pxa27x_udc.c b/drivers/usb/gadget/udc/pxa27x_udc.c
-index 7fa60f5..e1335ad 100644
---- a/drivers/usb/gadget/udc/pxa27x_udc.c
-+++ b/drivers/usb/gadget/udc/pxa27x_udc.c
-@@ -1473,7 +1473,7 @@ static int pxa_ep_disable(struct usb_ep *_ep)
- 	return 0;
- }
- 
--static struct usb_ep_ops pxa_ep_ops = {
-+static const struct usb_ep_ops pxa_ep_ops = {
- 	.enable		= pxa_ep_enable,
- 	.disable	= pxa_ep_disable,
- 
-diff --git a/drivers/usb/gadget/udc/r8a66597-udc.c b/drivers/usb/gadget/udc/r8a66597-udc.c
-index f2c8862..118ad70 100644
---- a/drivers/usb/gadget/udc/r8a66597-udc.c
-+++ b/drivers/usb/gadget/udc/r8a66597-udc.c
-@@ -1706,7 +1706,7 @@ static void r8a66597_fifo_flush(struct usb_ep *_ep)
- 	spin_unlock_irqrestore(&ep->r8a66597->lock, flags);
- }
- 
--static struct usb_ep_ops r8a66597_ep_ops = {
-+static const struct usb_ep_ops r8a66597_ep_ops = {
- 	.enable		= r8a66597_enable,
- 	.disable	= r8a66597_disable,
- 
-diff --git a/drivers/usb/gadget/udc/s3c-hsudc.c b/drivers/usb/gadget/udc/s3c-hsudc.c
-index 82a9e2a..42587b7 100644
---- a/drivers/usb/gadget/udc/s3c-hsudc.c
-+++ b/drivers/usb/gadget/udc/s3c-hsudc.c
-@@ -954,7 +954,7 @@ static int s3c_hsudc_dequeue(struct usb_ep *_ep, struct usb_request *_req)
- 	return 0;
- }
- 
--static struct usb_ep_ops s3c_hsudc_ep_ops = {
-+static const struct usb_ep_ops s3c_hsudc_ep_ops = {
- 	.enable = s3c_hsudc_ep_enable,
- 	.disable = s3c_hsudc_ep_disable,
- 	.alloc_request = s3c_hsudc_alloc_request,
+Unrelated whitespace change
+
+>  
+>  	drm_connector_init(drm, &dsi->connector,
+>  			   &dw_mipi_dsi_atomic_connector_funcs,
+> @@ -1162,21 +1190,36 @@ static enum drm_mode_status rk3288_mipi_dsi_mode_valid(
+>  }
+>  
+>  static struct dw_mipi_dsi_plat_data rk3288_mipi_dsi_drv_data = {
+> +	.dsi0_en_bit = RK3288_DSI0_SEL_VOP_LIT,
+> +	.dsi1_en_bit = RK3288_DSI1_SEL_VOP_LIT,
+> +	.grf_switch_reg = RK3288_GRF_SOC_CON6,
+>  	.max_data_lanes = 4,
+>  	.mode_valid = rk3288_mipi_dsi_mode_valid,
+>  };
+>  
+> +static struct dw_mipi_dsi_plat_data rk3399_mipi_dsi_drv_data = {
+> +	.dsi0_en_bit = RK3399_DSI0_SEL_VOP_LIT,
+> +	.dsi1_en_bit = RK3399_DSI1_SEL_VOP_LIT,
+> +	.grf_switch_reg = RK3399_GRF_SOC_CON19,
+> +	.grf_dsi0_mode = RK3399_GRF_DSI_MODE,
+> +	.grf_dsi0_mode_reg = RK3399_GRF_SOC_CON22,
+> +	.max_data_lanes = 4,
+> +};
+> +
+>  static const struct of_device_id dw_mipi_dsi_dt_ids[] = {
+>  	{
+>  	 .compatible = "rockchip,rk3288-mipi-dsi",
+>  	 .data = &rk3288_mipi_dsi_drv_data,
+> +	}, {
+> +	 .compatible = "rockchip,rk3399-mipi-dsi",
+> +	 .data = &rk3399_mipi_dsi_drv_data,
+>  	},
+>  	{ /* sentinel */ }
+>  };
+>  MODULE_DEVICE_TABLE(of, dw_mipi_dsi_dt_ids);
+>  
+>  static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
+> -			     void *data)
+> +			    void *data)
+
+Unrelated whitespace change
+
+>  {
+>  	const struct of_device_id *of_id =
+>  			of_match_device(dw_mipi_dsi_dt_ids, dev);
+> @@ -1249,6 +1292,10 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
+>  		clk_disable_unprepare(dsi->pclk);
+>  	}
+>  
+> +	dsi->phy_cfg_clk = devm_clk_get(dev, "phy_cfg");
+> +	if (IS_ERR(dsi->phy_cfg_clk))
+> +		dev_dbg(dev, "have not phy_cfg_clk\n");
+> +
+>  	ret = clk_prepare_enable(dsi->pllref_clk);
+>  	if (ret) {
+>  		dev_err(dev, "%s: Failed to enable pllref_clk\n", __func__);
+> @@ -1280,7 +1327,7 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
+>  }
+>  
+>  static void dw_mipi_dsi_unbind(struct device *dev, struct device *master,
+> -	void *data)
+> +			       void *data)
+
+Unrelated whitespace change
+
+>  {
+>  	struct dw_mipi_dsi *dsi = dev_get_drvdata(dev);
+>  
+> -- 
+> 2.6.3
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+
 -- 
-2.7.4
+Sean Paul, Software Engineer, Google / Chromium OS
