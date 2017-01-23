@@ -1,85 +1,48 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 23 Jan 2017 10:01:14 +0000
-Subject: [PATCH V7 04/10] arm64: exception: handle Synchronous External
- Abort
-In-Reply-To: <a2b1bcad-8d07-4d9d-a9ff-8a56814a8285@codeaurora.org>
-References: <1484244924-24786-1-git-send-email-tbaicar@codeaurora.org>
- <1484244924-24786-5-git-send-email-tbaicar@codeaurora.org>
- <587DF279.1010402@arm.com>
- <e8c0151e-2087-d49c-42fc-906755aca052@codeaurora.org>
- <5880FD8A.2000405@arm.com>
- <a2b1bcad-8d07-4d9d-a9ff-8a56814a8285@codeaurora.org>
-Message-ID: <5885D46A.7000304@arm.com>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Mon, 23 Jan 2017 11:04:22 +0100
+Subject: [PATCH] ARM: tegra: paz00: fix __initdata placement
+In-Reply-To: <20170123074347.GA29804@dtor-ws>
+References: <20170123074347.GA29804@dtor-ws>
+Message-ID: <4072003.S1IBmddlP7@fb07-iapwap2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
+Hello Dmitry,
 
-On 20/01/17 20:35, Baicar, Tyler wrote:
-> On 1/19/2017 10:55 AM, James Morse wrote:
->> On 18/01/17 23:26, Baicar, Tyler wrote:
->>> On 1/17/2017 3:31 AM, James Morse wrote:
->>>> On 12/01/17 18:15, Tyler Baicar wrote:
->>>>> +    info.si_addr  = (void __user *)addr;
->>>> addr here was read from FAR_EL1, but for some of the classes of exception you
->>>> have listed below this register isn't updated with the faulting address.
->>>>
->>>> The ARM-ARM version 'k' in D1.10.5 "Summary of registers on faults taken to an
->>>> Exception level that is using Aarch64" has:
->>>>> The architecture permits that the FAR_ELx is UNKNOWN for Synchronous External
->>>>> Aborts other than Synchronous External Aborts on Translation Table Walks. In
->>>>> this case, the ISS.FnV bit returned in ESR_ELx  indicates whether FAR_ELx is
->>>>> valid.
->>>> This is a problem if we get 'synchronous external abort' or 'synchronous parity
->>>> error' while a user space process was running.
->>> It looks like this would just cause an incorrect address to be printed in the
->>> above pr_err.
->>> Unless I'm missing something, I don't see arm64_notify_die or anything that gets
->>> called from
->>> there using the info.si_addr variable.
->> I may be misreading something here...
->>
->> This patch has:
->>>     info.si_addr  = (void __user *)addr;
->>>     arm64_notify_die("", regs, &info, esr);
->>  From arch/arm64/kernel/traps.c:arm64_notify_die():
->>>     if (user_mode(regs)) {
->>>         current->thread.fault_address = 0;
->>>         current->thread.fault_code = err;
->>>         force_sig_info(info->si_signo, info, current);
->>>     }
->> So if the SEA interrupted userspace, we put maybe-unknown addr into
->> force_sig_info() to deliver a signal to user space. User-space then gets a copy
->> of the info struct containing the maybe-unknown addr.
->>
->> I think this is an existing bug, but if we are separating the synchronous
->> external aborts from the generic do_bad handler, we should probably check the
->> FnV bit. (I think we should still print it out)
->>
->>
->>> What do you suggest I do here? The firmware should be reporting the physical and
->>> virtual
->>> address information if it is available in the HEST entry that the kernel will
->>> parse.
->> Its not just firmware that may trigger this, other SoCs may use it for parity or
->> ECC errors, and they may not always have a valid address in FAR_EL1.
->>
->> I think we should check the FnV bit in the esr variable and set info.si_addr to
->> 0 if the addr we have isn't valid:
->> 'For some implementations, the value of si_addr may be inaccurate.' [0]
+Am Sonntag, 22. Januar 2017, 23:43:47 CET schrieb Dmitry Torokhov:
+> To have expected effect the __initdata attribute should go after variable
+> name and before initializer.`
+> 
+> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> ---
+>  arch/arm/mach-tegra/board-paz00.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-tegra/board-paz00.c
+> b/arch/arm/mach-tegra/board-paz00.c index 7478f6fb3664..ea6bff404161 100644
+> --- a/arch/arm/mach-tegra/board-paz00.c
+> +++ b/arch/arm/mach-tegra/board-paz00.c
+> @@ -23,7 +23,7 @@
+> 
+>  #include "board.h"
+> 
+> -static struct property_entry __initdata wifi_rfkill_prop[] = {
+> +static struct property_entry wifi_rfkill_prop[] __initdata = {
+>  	PROPERTY_ENTRY_STRING("name", "wifi_rfkill"),
+>  	PROPERTY_ENTRY_STRING("type", "wlan"),
+>  	{ },
 
-> Okay, that makes sense, we don't want userspace to be notified with an incorrect
-> address.
-> I will add the check to verify it's valid. Which bit in the ESR is the FnV bit?
-> I'm not finding
-> the bit breakdown of the ISS that shows it.
+you are right according to the documentation, but objdump -s always shows that 
+it gets put into the .rodata section. So this patch has no effect, because 
+result is always same (and wrong). It's also possible that I'm doing something 
+wrong :-) Btw, there are hundreds of such __initdata misplacement in the 
+kernel.
 
-The bits in ISS vary depending on the EC, so a little digging is required.
-"D7.2.27 ESR_ELx, Exception Syndrome Register (ELx)" lists the EC values, from
-there 'Instruction Abort' and 'Data Abort' both list FnV as bit 10. Version 'k'
-of the ARM-ARM has this on pages D7-1953 to D7-1956.
-
-
-Thanks,
-
-James
+Marc
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170123/9ac10752/attachment.sig>
