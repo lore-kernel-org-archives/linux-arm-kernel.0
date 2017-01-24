@@ -1,68 +1,74 @@
-From: sergio.prado@e-labworks.com (Sergio Prado)
-Date: Tue, 24 Jan 2017 16:49:32 -0200
-Subject: [PATCH v3 1/2] dt-bindings: mmc: add DT binding for S3C24XX
- MMC/SD/SDIO controller
-In-Reply-To: <20170118223816.nccyc7aoa7succsi@rob-hp-laptop>
-References: <1484319953-6479-1-git-send-email-sergio.prado@e-labworks.com>
- <1484319953-6479-2-git-send-email-sergio.prado@e-labworks.com>
- <20170118223816.nccyc7aoa7succsi@rob-hp-laptop>
-Message-ID: <20170124184932.GA20814@sprado-desktop>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 24 Jan 2017 18:39:51 +0000
+Subject: Applied "spi: pxa2xx: Prepare for edge-triggered interrupts" to the
+ spi tree
+In-Reply-To: <7e5fb21d-35bd-6ac3-9e6f-cffed656997f@siemens.com>
+Message-ID: <E1cW60V-0006nH-NO@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2017 at 04:38:16PM -0600, Rob Herring wrote:
-> On Fri, Jan 13, 2017 at 01:05:52PM -0200, Sergio Prado wrote:
-> > +This file documents differences between the core mmc properties described by
-> > +mmc.txt and the properties used by the Samsung S3C24XX MMC/SD/SDIO controller
-> > +implementation.
-> > +
-> > +Required SoC Specific Properties:
-> > +- compatible: should be one of the following
-> > +  - "samsung,s3c2410-sdi": for controllers compatible with s3c2410
-> > +  - "samsung,s3c2412-sdi": for controllers compatible with s3c2412
-> > +  - "samsung,s3c2440-sdi": for controllers compatible with s3c2440
-> > +- clocks: Should reference the controller clock
-> > +- clock-names: Should contain "sdi"
-> 
-> You are missing things from the example.
+The patch
 
-Properties "compatible", "clocks" and "clock-names" are documented.
+   spi: pxa2xx: Prepare for edge-triggered interrupts
 
-Properties "bus-width", "cd-gpios" and "wp-gpios" are documented in
-mmc.txt as I described before the example. Should I describe them again?
+has been applied to the spi tree at
 
-Do I need to document common properties like "pinctrl-names",
-"pinctrl-0", "reg" and "interrupts"?
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
 
-> 
-> > +
-> > +Example:
-> > +	mmc0: mmc at 5a000000 {
-> > +		compatible = "samsung,s3c2440-sdi";
-> > +		pinctrl-names = "default";
-> > +		pinctrl-0 = <&sdi_pins>;
-> > +		reg = <0x5a000000 0x100000>;
-> > +		interrupts = <0 0 21 3>;
-> > +		clocks = <&clocks PCLK_SDI>;
-> > +		clock-names = "sdi";
-> > +		bus-width = <4>;
-> > +		cd-gpios = <&gpg 8 GPIO_ACTIVE_LOW>;
-> > +		wp-gpios = <&gph 8 GPIO_ACTIVE_LOW>;
-> > +	};
-> > +
-> > +	Note: This example shows both SoC specific and board specific properties
-> > +	in a single device node. The properties can be actually be separated
-> > +	into SoC specific node and board specific node.
-> 
-> The source structure is not relavent to the binding.
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
-OK.
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
-> 
-> Rob
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
 
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From e51e9b93049f624c179bab2c651995bca22b5bb7 Mon Sep 17 00:00:00 2001
+From: Jan Kiszka <jan.kiszka@siemens.com>
+Date: Sat, 21 Jan 2017 10:06:38 +0100
+Subject: [PATCH] spi: pxa2xx: Prepare for edge-triggered interrupts
+
+When using the a device with edge-triggered interrupts, such as MSIs,
+the interrupt handler has to ensure that there is a point in time during
+its execution where all interrupts sources are silent so that a new
+event can trigger a new interrupt again.
+
+This is achieved here by disabling all interrupt sources for a moment
+before processing them according to the status register. If a new
+interrupt should have arrived after we read the status, it will now
+re-trigger the interrupt, even in edge mode.
+
+Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/spi/spi-pxa2xx.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/spi/spi-pxa2xx.c b/drivers/spi/spi-pxa2xx.c
+index 8c65bc1823f3..06ade434c083 100644
+--- a/drivers/spi/spi-pxa2xx.c
++++ b/drivers/spi/spi-pxa2xx.c
+@@ -785,6 +785,9 @@ static irqreturn_t ssp_int(int irq, void *dev_id)
+ 	if (!(status & mask))
+ 		return IRQ_NONE;
+ 
++	pxa2xx_spi_write(drv_data, SSCR1, sccr1_reg & ~drv_data->int_cr1);
++	pxa2xx_spi_write(drv_data, SSCR1, sccr1_reg);
++
+ 	if (!drv_data->master->cur_msg) {
+ 		handle_bad_msg(drv_data);
+ 		/* Never fail */
 -- 
-Sergio Prado
-Embedded Labworks
-Office: +55 11 2628-3461
-Mobile: +55 11 97123-3420
+2.11.0
