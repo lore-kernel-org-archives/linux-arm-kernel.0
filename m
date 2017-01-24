@@ -1,92 +1,42 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 24 Jan 2017 12:02:01 +0100
-Subject: [PATCH 2/2] arm64: kvm: upgrade csselr and ccsidr to 64-bit values
-In-Reply-To: <de64fbcb-8e0d-b2b9-38b4-59f033a6cf6b@arm.com>
-References: <1484909410-11673-1-git-send-email-sudeep.holla@arm.com>
- <1484909410-11673-2-git-send-email-sudeep.holla@arm.com>
- <20170123210859.GJ15850@cbox>
- <fe2bde22-63dc-3abf-5870-21360b16bf6b@arm.com>
- <20170124103041.GK15850@cbox>
- <de64fbcb-8e0d-b2b9-38b4-59f033a6cf6b@arm.com>
-Message-ID: <20170124110201.GN15850@cbox>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 24 Jan 2017 11:03:48 +0000
+Subject: [V3 3/3] dt-bindings: Add a support cpu type for cortex-a73
+In-Reply-To: <1485248249-117383-3-git-send-email-puck.chen@hisilicon.com>
+References: <1485248249-117383-1-git-send-email-puck.chen@hisilicon.com>
+ <1485248249-117383-3-git-send-email-puck.chen@hisilicon.com>
+Message-ID: <20170124110347.GC6277@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2017 at 10:55:24AM +0000, Sudeep Holla wrote:
+On Tue, Jan 24, 2017 at 04:57:29PM +0800, Chen Feng wrote:
+> Add arm cpu type cortex-a73
 > 
-> 
-> On 24/01/17 10:30, Christoffer Dall wrote:
-> > On Tue, Jan 24, 2017 at 10:15:38AM +0000, Sudeep Holla wrote:
-> >>
-> >>
-> >> On 23/01/17 21:08, Christoffer Dall wrote:
-> >>> On Fri, Jan 20, 2017 at 10:50:10AM +0000, Sudeep Holla wrote:
-> >>>> csselr and ccsidr are treated as 64-bit values already elsewhere in the
-> >>>> kernel. It also aligns well with the architecture extensions that allow
-> >>>> 64-bit format for ccsidr.
-> >>>>
-> >>>> This patch upgrades the existing accesses to csselr and ccsidr from
-> >>>> 32-bit to 64-bit in preparation to add support to those extensions.
-> >>>>
-> >>>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> >>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> >>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> >>>> ---
-> >>>>  arch/arm64/kvm/sys_regs.c | 18 +++++++++---------
-> >>>>  1 file changed, 9 insertions(+), 9 deletions(-)
-> >>>>
-> >>>> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> >>>> index 5dca1f10340f..a3559a8a2b0c 100644
-> >>>> --- a/arch/arm64/kvm/sys_regs.c
-> >>>> +++ b/arch/arm64/kvm/sys_regs.c
-> >>
-> >> [..]
-> >>
-> >>>> @@ -2004,8 +2004,8 @@ static int demux_c15_get(u64 id, void __user *uaddr)
-> >>>>  
-> >>>>  static int demux_c15_set(u64 id, void __user *uaddr)
-> >>>>  {
-> >>>> -	u32 val, newval;
-> >>>> -	u32 __user *uval = uaddr;
-> >>>> +	u64 val, newval;
-> >>>> +	u64 __user *uval = uaddr;
-> >>>
-> >>> Doesn't converting these uval pointers to u64 cause us to break the ABI
-> >>> as we'll now be reading/writing 64-bit values to userspace with the
-> >>> get_user and put_user following the declarations?
-> >>>
-> >>
-> >> Yes, I too have similar concern. IIUC it is always read via kvm_one_reg
-> >> structure. I could not find any specific user for this register to cross
-> >> check.
-> >>
-> > 
-> > Not sure it matters which interface we get the userspace pointer from?
-> > 
-> 
-> Agreed.
-> 
-> > This patch is definitely changing the write from a 32-bit write to a
-> > 64-bit write and there's a specific check prior to the put_user() call
-> > which checks that userspace intended a 32-bit value and presumably
-> > provided a 32-bit pointer.
-> > 
-> 
-> I see you point, I missed to see that check(just to be sure KVM_REG_SIZE
-> check right ?).
+> Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
 
-yes.
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
+Mark.
 
+> ---
+>  Documentation/devicetree/bindings/arm/cpus.txt | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> > So I think the only way to return 64-bit AArch32 system register values
-> > to userspace (if that is the intention) is to define a new ID for 64-bit
-> > CCSIDR registers and handle them separately.
-> > 
+> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+> index a1bcfee..d748774 100644
+> --- a/Documentation/devicetree/bindings/arm/cpus.txt
+> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+> @@ -158,6 +158,7 @@ nodes to be present and contain the properties described below.
+>  			    "arm,cortex-a53"
+>  			    "arm,cortex-a57"
+>  			    "arm,cortex-a72"
+> +			    "arm,cortex-a73"
+>  			    "arm,cortex-m0"
+>  			    "arm,cortex-m0+"
+>  			    "arm,cortex-m1"
+> -- 
+> 1.9.1
 > 
-> I will add KVM_REG_ARM_DEMUX_ID_CCSIDR_64B or something similar.
-> Thanks for the review.
-> 
-
-Cool, thanks.
--Christoffer
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
