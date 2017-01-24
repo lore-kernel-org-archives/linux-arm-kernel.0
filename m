@@ -1,189 +1,114 @@
 From: zyw@rock-chips.com (Chris Zhong)
-Date: Tue, 24 Jan 2017 10:38:02 +0800
-Subject: [PATCH v4 2/6] drm/rockchip/dsi: dw-mipi: support RK3399 mipi dsi
-In-Reply-To: <1485225486-669-1-git-send-email-zyw@rock-chips.com>
-References: <1485225486-669-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <1485225486-669-3-git-send-email-zyw@rock-chips.com>
+Date: Tue, 24 Jan 2017 10:42:17 +0800
+Subject: [PATCH v2 19/26] drm/rockchip: dw-mipi-dsi: improve PLL
+ configuration
+In-Reply-To: <20170123124925.4fa10fc2.john@metanate.com>
+References: <20170121163128.22240-1-john@metanate.com>
+ <20170121163128.22240-20-john@metanate.com> <58855EAE.2010704@rock-chips.com>
+ <20170123124925.4fa10fc2.john@metanate.com>
+Message-ID: <5886BF09.6090301@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The vopb/vopl switch register of RK3399 mipi is different from RK3288,
-the default setting for mipi dsi mode is different too, so add a
-of_device_id structure to distinguish them, and make sure set the
-correct mode before mipi phy init.
 
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
 
----
+On 01/23/2017 08:49 PM, John Keeping wrote:
+> Hi Chris,
+>
+> On Mon, 23 Jan 2017 09:38:54 +0800, Chris Zhong wrote:
+>> On 01/22/2017 12:31 AM, John Keeping wrote:
+>>> The multiplication ratio for the PLL is required to be even due to the
+>>> use of a "by 2 pre-scaler".  Currently we are likely to end up with an
+>>> odd multiplier even though there is an equivalent set of parameters with
+>>> an even multiplier.
+>>>
+>>> For example, using the 324MHz bit rate with a reference clock of 24MHz
+>>> we end up with M = 27, N = 2 whereas the example in the PHY databook
+>>> gives M = 54, N = 4 for this bit rate and reference clock.
+>>>
+>>> By walking down through the available multiplier instead of up we are
+>>> more likely to hit an even multiplier.  With the above example we do now
+>>> get M = 54, N = 4 as given by the databook.
+>>>
+>>> While doing this, change the loop limits to encode the actual limits on
+>>> the divisor, which are:
+>>>
+>>> 	40MHz >= (pllref / N) >= 5MHz
+>> This formula is limit for N, but we still can not guarantee to get an
+>> even M.
+>> Do you think we should do a check for M.
+>> such as:
+>> if (m % 2)
+>>       continue;
+>> ...
+>>       for (i = pllref / 5; i > (pllref / 40); i--) {
+>>           pre = pllref / i;
+>>           if ((tmp > (target_mbps % pre)) && (target_mbps / pre < 512)) {
+>>               tmp = target_mbps % pre;
+>>               n = i;
+>>               m = target_mbps / pre;
+>>               if (m % 2)
+>>                   continue;
+>>           }
+>>           if (tmp == 0)
+>>               break;
+>>       }
+>>
+>> if (m % 2)
+>>       m++;
+>>
+>>       dsi->lane_mbps = pllref / n * m;
+>>       dsi->input_div = n;
+>>       dsi->feedback_div = m;
+> Yes, I agree that there should be a check for M, but I'm not sure if
+> the version above is sufficient.  The "m % 2" check inside the loop
+> means that we don't break immediately when tmp=0 but then we are
+> guaranteed to break next time without having modified n, m because now
+> tmp=0 so "tmp > (target_mbps % pre)" is always false and we just hit the
+> "if (tmp == 0) break" case next time.
+>
+> Given that the descending loop already means that if we can hit "tmp"
+> exactly we are more likely to do so with a bigger N and even M, I think
+> it might be better to just fix M after the loop like:
+>
+> 	if (m % 2) {
+> 		if (m < 256 && (n * 2) <= (pllref / 5)) {
+> 			n *= 2;
+> 			m *= 2;
+> 		} else {
+> 			m++;
+> 		}
+> 	}
+>
+> but I haven't thought about this too carefully.
+>
+> For this series, I'd rather either keep this patch as it is or drop it
+> in favour of a more comprehensive solution.  I don't want to block the
+> other fixes waiting for a perfect fix here and we can always improve
+> this further with a follow-up patch.
+Agree, We can improve the whole formula in the future.
 
-Changes in v4:
-- remove the unrelated change
-
-Changes in v3:
-- base on John Keeping's patch series
-
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 68 +++++++++++++++++++++++++++++-----
- 1 file changed, 58 insertions(+), 10 deletions(-)
-
-diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 45af890..b7b67be 100644
---- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-+++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -29,9 +29,17 @@
- 
- #define DRIVER_NAME    "dw-mipi-dsi"
- 
--#define GRF_SOC_CON6                    0x025c
--#define DSI0_SEL_VOP_LIT                (1 << 6)
--#define DSI1_SEL_VOP_LIT                (1 << 9)
-+#define RK3288_GRF_SOC_CON6		0x025c
-+#define RK3288_DSI0_SEL_VOP_LIT		BIT(6)
-+#define RK3288_DSI1_SEL_VOP_LIT		BIT(9)
-+
-+#define RK3399_GRF_SOC_CON19		0x6250
-+#define RK3399_DSI0_SEL_VOP_LIT		BIT(0)
-+#define RK3399_DSI1_SEL_VOP_LIT		BIT(4)
-+
-+/* disable turnrequest, turndisable, forcetxstopmode, forcerxmode */
-+#define RK3399_GRF_SOC_CON22		0x6258
-+#define RK3399_GRF_DSI_MODE		0xffff0000
- 
- #define DSI_VERSION			0x00
- #define DSI_PWR_UP			0x04
-@@ -265,6 +273,11 @@ enum {
- };
- 
- struct dw_mipi_dsi_plat_data {
-+	u32 dsi0_en_bit;
-+	u32 dsi1_en_bit;
-+	u32 grf_switch_reg;
-+	u32 grf_dsi0_mode;
-+	u32 grf_dsi0_mode_reg;
- 	unsigned int max_data_lanes;
- 	enum drm_mode_status (*mode_valid)(struct drm_connector *connector,
- 					   struct drm_display_mode *mode);
-@@ -281,6 +294,7 @@ struct dw_mipi_dsi {
- 
- 	struct clk *pllref_clk;
- 	struct clk *pclk;
-+	struct clk *phy_cfg_clk;
- 
- 	unsigned int lane_mbps; /* per lane */
- 	u32 channel;
-@@ -426,6 +440,14 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
- 	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_TESTCLR);
- 	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_UNTESTCLR);
- 
-+	if (!IS_ERR(dsi->phy_cfg_clk)) {
-+		ret = clk_prepare_enable(dsi->phy_cfg_clk);
-+		if (ret) {
-+			dev_err(dsi->dev, "Failed to enable phy_cfg_clk\n");
-+			return ret;
-+		}
-+	}
-+
- 	dw_mipi_dsi_phy_write(dsi, 0x10, BYPASS_VCO_RANGE |
- 					 VCO_RANGE_CON_SEL(vco) |
- 					 VCO_IN_CAP_CON_LOW |
-@@ -479,17 +501,19 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
- 				 val, val & LOCK, 1000, PHY_STATUS_TIMEOUT_US);
- 	if (ret < 0) {
- 		dev_err(dsi->dev, "failed to wait for phy lock state\n");
--		return ret;
-+		goto phy_init_end;
- 	}
- 
- 	ret = readl_poll_timeout(dsi->base + DSI_PHY_STATUS,
- 				 val, val & STOP_STATE_CLK_LANE, 1000,
- 				 PHY_STATUS_TIMEOUT_US);
--	if (ret < 0) {
-+	if (ret < 0)
- 		dev_err(dsi->dev,
- 			"failed to wait for phy clk lane stop state\n");
--		return ret;
--	}
-+
-+phy_init_end:
-+	if (!IS_ERR(dsi->phy_cfg_clk))
-+		clk_disable_unprepare(dsi->phy_cfg_clk);
- 
- 	return ret;
- }
-@@ -965,6 +989,7 @@ static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
- static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
- {
- 	struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
-+	const struct dw_mipi_dsi_plat_data *pdata = dsi->pdata;
- 	int mux = drm_of_encoder_active_endpoint_id(dsi->dev->of_node, encoder);
- 	u32 val;
- 
-@@ -985,6 +1010,10 @@ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
- 	dw_mipi_dsi_dphy_interface_config(dsi);
- 	dw_mipi_dsi_clear_err(dsi);
- 
-+	if (pdata->grf_dsi0_mode_reg)
-+		regmap_write(dsi->grf_regmap, pdata->grf_dsi0_mode_reg,
-+			     pdata->grf_dsi0_mode);
-+
- 	dw_mipi_dsi_phy_init(dsi);
- 	dw_mipi_dsi_wait_for_two_frames(dsi);
- 
-@@ -998,11 +1027,11 @@ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
- 	clk_disable_unprepare(dsi->pclk);
- 
- 	if (mux)
--		val = DSI0_SEL_VOP_LIT | (DSI0_SEL_VOP_LIT << 16);
-+		val = pdata->dsi0_en_bit | (pdata->dsi0_en_bit << 16);
- 	else
--		val = DSI0_SEL_VOP_LIT << 16;
-+		val = pdata->dsi0_en_bit << 16;
- 
--	regmap_write(dsi->grf_regmap, GRF_SOC_CON6, val);
-+	regmap_write(dsi->grf_regmap, pdata->grf_switch_reg, val);
- 	dev_dbg(dsi->dev, "vop %s output to dsi0\n", (mux) ? "LIT" : "BIG");
- }
- 
-@@ -1162,14 +1191,29 @@ static enum drm_mode_status rk3288_mipi_dsi_mode_valid(
- }
- 
- static struct dw_mipi_dsi_plat_data rk3288_mipi_dsi_drv_data = {
-+	.dsi0_en_bit = RK3288_DSI0_SEL_VOP_LIT,
-+	.dsi1_en_bit = RK3288_DSI1_SEL_VOP_LIT,
-+	.grf_switch_reg = RK3288_GRF_SOC_CON6,
- 	.max_data_lanes = 4,
- 	.mode_valid = rk3288_mipi_dsi_mode_valid,
- };
- 
-+static struct dw_mipi_dsi_plat_data rk3399_mipi_dsi_drv_data = {
-+	.dsi0_en_bit = RK3399_DSI0_SEL_VOP_LIT,
-+	.dsi1_en_bit = RK3399_DSI1_SEL_VOP_LIT,
-+	.grf_switch_reg = RK3399_GRF_SOC_CON19,
-+	.grf_dsi0_mode = RK3399_GRF_DSI_MODE,
-+	.grf_dsi0_mode_reg = RK3399_GRF_SOC_CON22,
-+	.max_data_lanes = 4,
-+};
-+
- static const struct of_device_id dw_mipi_dsi_dt_ids[] = {
- 	{
- 	 .compatible = "rockchip,rk3288-mipi-dsi",
- 	 .data = &rk3288_mipi_dsi_drv_data,
-+	}, {
-+	 .compatible = "rockchip,rk3399-mipi-dsi",
-+	 .data = &rk3399_mipi_dsi_drv_data,
- 	},
- 	{ /* sentinel */ }
- };
-@@ -1249,6 +1293,10 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
- 		clk_disable_unprepare(dsi->pclk);
- 	}
- 
-+	dsi->phy_cfg_clk = devm_clk_get(dev, "phy_cfg");
-+	if (IS_ERR(dsi->phy_cfg_clk))
-+		dev_dbg(dev, "have not phy_cfg_clk\n");
-+
- 	ret = clk_prepare_enable(dsi->pllref_clk);
- 	if (ret) {
- 		dev_err(dev, "%s: Failed to enable pllref_clk\n", __func__);
--- 
-2.6.3
+>
+>>> Signed-off-by: John Keeping <john@metanate.com>
+>>> ---
+>>> Unchanged in v2
+>>> ---
+>>>    drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 2 +-
+>>>    1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+>>> index 12432e41971b..f2320cf1366c 100644
+>>> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+>>> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+>>> @@ -519,7 +519,7 @@ static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi,
+>>>    	pllref = DIV_ROUND_UP(clk_get_rate(dsi->pllref_clk), USEC_PER_SEC);
+>>>    	tmp = pllref;
+>>>    
+>>> -	for (i = 1; i < 6; i++) {
+>>> +	for (i = pllref / 5; i > (pllref / 40); i--) {
+>>>    		pre = pllref / i;
+>>>    		if ((tmp > (target_mbps % pre)) && (target_mbps / pre < 512)) {
+>>>    			tmp = target_mbps % pre;
+>>
+>
+>
