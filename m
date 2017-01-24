@@ -1,39 +1,74 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 24 Jan 2017 14:00:20 +0000
-Subject: [RFC 4/4] irqchip, gicv3-its: Add HiSilicon acpi based erratum
- data.
-In-Reply-To: <58875C45.50108@huawei.com>
-References: <588626A5.7090603@huawei.com>
- <58875C45.50108@huawei.com>
-Message-ID: <20170124140019.GC7572@leverpostej>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 24 Jan 2017 14:07:56 +0000
+Subject: pcie-designware: Incorrect programming of msi address register on
+ some setups.
+Message-ID: <922851d0-a847-762a-5067-88c92d416d58@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2017 at 01:53:09PM +0000, Shameerali Kolothum Thodi wrote:
-> This enables the acpi based workaround for HiSilicon erratum 161010801.
-> 
-> Signed-off-by: shameer <shameerali.kolothum.thodi@huawei.com>
-> ---
->  drivers/irqchip/irq-gic-v3-its.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 9fa12b7..d0f5099 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -1868,7 +1868,10 @@ struct acpi_madt_its_quirks {
-> 
->  /*Upadate as per the board OEM ID and TABLE ID*/
->  struct acpi_madt_its_quirks acpi_its_quirks[] __initdata = {
-> -
-> +#ifdef CONFIG_HISILICON_ERRATUM_161010801
-> +	{"HISI  ", "HIP06   ", 0, 0, "hisilicon,erratum-161010801"},
-> +	{"HISI  ", "HIP07   ", 0, 0, "hisilicon,erratum-161010801"},
-> +#endif
->  };
+Hi,
 
-Similarly to the arch timer patch, NAK to bodging ACPI match data to DT
-property names.
+Recently I hit a bug with pcie-designware driver with triggers a board 
+reboot, this is my analysis so far on the issue. Issue is because 
+designware driver is programming msi address which is above 32 address 
+space eventhough one of the pcie endpoint indicated that it does not 
+support 64 bit msi addresses.
+
+My setup is arm64 board DB820c with 3 root complexes, and the system has 
+memory which spans across 4GB address space.
+First root complex is connected to a WLAN Chip (QCA6174) only supports 
+32 bit addresses.
+Second one is connected to a Ethernet Controller (ATL1c)
+
+value of MSI control register aka PCI_MSI_FLAGS (0x2) for device QCA6174 
+is 0x106
+value of MSI control register aka PCI_MSI_FLAGS (0x2) for device ATL1C 
+is 0x80
+
+Now the problem is that on Synopsis IP, the MSI address register is 
+programmed at two places
+1> one at controller config dbi address space itself in 
+PCIE_MSI_ADDR_LO(0x820)  & PCIE_MSI_ADDR_HI (0x824)
+
+2> at PCI_MSI_ADDRESS_LO (0x2) and PCI_MSI_ADDRESS_HI of the device cfg.
+
+If step 1 allocates msi address which is above 32 bit address space, 
+then step 2 would truncate it to 32 bit address if it discovers endpoint 
+which does not support 64 bit msi address.
+Then if endpoint tries to read/write this address as part of MSI 
+mechanism it would fault and crash system.
+
+Am not sure how we can solve this correctly because we do not know about 
+endpoints at step 1. On the other hand if we can force step 1 to 
+allocate addresses with in 32 bit address space than it would work for 
+both 32 bit and 64 bit.
+
+Has anyone hit this issue before?
+Do we already have a solution?
+Any suggestions?
+
+Below ugly Hack is what Am using to workaround this issue on my platform 
+  but am not sure how this will influence other platforms.
+
+---------------------------->cut<-------------------------------
+diff --git a/drivers/pci/host/pcie-designware.c 
+b/drivers/pci/host/pcie-designware.c
+index 4a81b72..d694e66 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -286,9 +286,8 @@ void dw_pcie_msi_init(struct pcie_port *pp)
+  {
+         u64 msi_target;
+
+-       pp->msi_data = __get_free_pages(GFP_KERNEL, 0);
++       pp->msi_data = __get_free_pages(GFP_KERNEL | GFP_DMA, 0);
+         msi_target = virt_to_phys((void *)pp->msi_data);
+
+         /* program the msi_data */
+         dw_pcie_wr_own_conf(pp, PCIE_MSI_ADDR_LO, 4,
+                             (u32)(msi_target & 0xffffffff));
+---------------------------->cut<-------------------------------
+
 
 Thanks,
-Mark.
+srini
