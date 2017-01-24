@@ -1,125 +1,89 @@
-From: lilja.magnus@gmail.com (Magnus Lilja)
-Date: Tue, 24 Jan 2017 19:40:21 +0100
-Subject: usb: gadget: Kernel panic (NULL pointer dereference) when using
- fsl_udc2_core on i.MX31 PDK
-In-Reply-To: <877f5k9ui7.fsf@linux.intel.com>
-References: <f984e50b-0e64-88ef-2f53-b8da2a62daf0@gmail.com>
- <87k29m6lkx.fsf@linux.intel.com>
- <CAM=E1R4EMEEq1wnHxjLLJMLaXCM=EDFo1JDacHKGq6DUtqA9Nw@mail.gmail.com>
- <87efzsdelq.fsf@linux.intel.com>
- <CAM=E1R7i5y2SXiswk8f5dzoJyqYXUOxK9Hivv+ZS56mP6HC8uA@mail.gmail.com>
- <87ziigbuev.fsf@linux.intel.com>
- <CAM=E1R7U4GP52z_wE0yMpkEYBB7KpiWSWXG28xQMM61wtzJygw@mail.gmail.com>
- <877f5k9ui7.fsf@linux.intel.com>
-Message-ID: <CAM=E1R6tv9HjZTZSx3bgrpqA5U_05CFA0SdkB6a5nNyvLVC+Ug@mail.gmail.com>
+From: tbaicar@codeaurora.org (Baicar, Tyler)
+Date: Tue, 24 Jan 2017 11:41:38 -0700
+Subject: [PATCH V7 04/10] arm64: exception: handle Synchronous External
+ Abort
+In-Reply-To: <5885D46A.7000304@arm.com>
+References: <1484244924-24786-1-git-send-email-tbaicar@codeaurora.org>
+ <1484244924-24786-5-git-send-email-tbaicar@codeaurora.org>
+ <587DF279.1010402@arm.com>
+ <e8c0151e-2087-d49c-42fc-906755aca052@codeaurora.org>
+ <5880FD8A.2000405@arm.com>
+ <a2b1bcad-8d07-4d9d-a9ff-8a56814a8285@codeaurora.org>
+ <5885D46A.7000304@arm.com>
+Message-ID: <4ee2633d-e4a9-6237-4298-4454e7d268ad@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 January 2017 at 19:34, Felipe Balbi <balbi@kernel.org> wrote:
+On 1/23/2017 3:01 AM, James Morse wrote:
+> Hi Tyler,
 >
-> Hi,
->
-> Magnus Lilja <lilja.magnus@gmail.com> writes:
->>> Magnus Lilja <lilja.magnus@gmail.com> writes:
->>>>> Magnus Lilja <lilja.magnus@gmail.com> writes:
->>>>>>>> I tried the fsl_udc_core gadget driver on the i.MX31 PDK board and got a
->>>>>>>> kernel panic (NULL pointer dereference) when connecting the USB cable. I
->>>>>>>> had the g_serial module loaded as well.
->>>>>>>>
->>>>>>>> The NULL pointer panic comes from gadget/udc/core.c
->>>>>>>> usb_gadget_giveback_request() which calls req->complete() and in some
->>>>>>>> cases req->complete is NULL.
->>>>>>>>
->>>>>>>> Commit 304f7e5e1d08 ("usb: gadget: Refactor request completion") changed
->>>>>>>> fsl_udc2_core.c (and several other files) and in fsl_udc2_core.c a check
->>>>>>>> that req->complete is non-NULL was removed:
->>>>>>>>
->>>>>>>> --- a/drivers/usb/gadget/udc/fsl_udc_core.c
->>>>>>>> +++ b/drivers/usb/gadget/udc/fsl_udc_core.c
->>>>>>>> @@ -197,10 +197,8 @@ __acquires(ep->udc->lock)
->>>>>>>>          ep->stopped = 1;
->>>>>>>>
->>>>>>>>          spin_unlock(&ep->udc->lock);
->>>>>>>> -       /* complete() is from gadget layer,
->>>>>>>> -        * eg fsg->bulk_in_complete() */
->>>>>>>> -       if (req->req.complete)
->>>>>>>> -               req->req.complete(&ep->ep, &req->req);
->>>>>>>> +
->>>>>>>> +       usb_gadget_giveback_request(&ep->ep, &req->req);
->>>>>>>>
->>>>>>>>          spin_lock(&ep->udc->lock);
->>>>>>>>          ep->stopped = stopped;
->>>>>>>>
->>>>>>>> If I re-introduce the check (either in fsl_udc_core.c or core.c) at
->>>>>>>> least USB gadget operation using g_serial seems to work just fine.
->>>>>>>>
->>>>>>>> I don't know the logic in detail to understand whether this is a proper
->>>>>>>> fix or if there is some other more problem with the fls_udc_core driver.
->>>>>>>> Does anyone have input in this matter?
->>>>>>>>
->>>>>>>> I can produce a proper patch that fixes this problem by re-introducing
->>>>>>>> the check (in either fsl_udc_core.c or core.c) if that is a proper
->>>>>>>> solution and I can also assist in testing other fixes to the problem.
->>>>>>>
->>>>>>> ->complete() is supposed to be mandatory. Which gadget do you have that
->>>>>>> ->doesn't set ->complete() to a valid function pointer?
->>>>>>
->>>>>> I'm modprobing g_serial so the following modules are loaded (using my patch):
->>>>>>
->>>>>> ~ # lsmod
->>>>>> usb_f_acm
->>>>>> u_serial
->>>>>> g_serial
->>>>>> libcomposite
->>>>>> configfs
->>>>>> fsl_usb2_udc
+> On 20/01/17 20:35, Baicar, Tyler wrote:
+>> On 1/19/2017 10:55 AM, James Morse wrote:
+>>> On 18/01/17 23:26, Baicar, Tyler wrote:
+>>>> On 1/17/2017 3:31 AM, James Morse wrote:
+>>>>> On 12/01/17 18:15, Tyler Baicar wrote:
+>>>>>> +    info.si_addr  = (void __user *)addr;
+>>>>> addr here was read from FAR_EL1, but for some of the classes of exception you
+>>>>> have listed below this register isn't updated with the faulting address.
 >>>>>
->>>>> okay, can you figure out which request is coming without ->complete()
->>>>> set? To which endpoint is this request being queued? It would be nice to
->>>>> know these details. Maybe this is an old bug which ought to be fixed.
->>>>
->>>> Sure, I can try figure that out. Any input to make the debug of the
->>>> faster is appreciated if you have any.
+>>>>> The ARM-ARM version 'k' in D1.10.5 "Summary of registers on faults taken to an
+>>>>> Exception level that is using Aarch64" has:
+>>>>>> The architecture permits that the FAR_ELx is UNKNOWN for Synchronous External
+>>>>>> Aborts other than Synchronous External Aborts on Translation Table Walks. In
+>>>>>> this case, the ISS.FnV bit returned in ESR_ELx  indicates whether FAR_ELx is
+>>>>>> valid.
+>>>>> This is a problem if we get 'synchronous external abort' or 'synchronous parity
+>>>>> error' while a user space process was running.
+>>>> It looks like this would just cause an incorrect address to be printed in the
+>>>> above pr_err.
+>>>> Unless I'm missing something, I don't see arm64_notify_die or anything that gets
+>>>> called from
+>>>> there using the info.si_addr variable.
+>>> I may be misreading something here...
 >>>
->>> well, the easiest way is to add something like:
+>>> This patch has:
+>>>>      info.si_addr  = (void __user *)addr;
+>>>>      arm64_notify_die("", regs, &info, esr);
+>>>   From arch/arm64/kernel/traps.c:arm64_notify_die():
+>>>>      if (user_mode(regs)) {
+>>>>          current->thread.fault_address = 0;
+>>>>          current->thread.fault_code = err;
+>>>>          force_sig_info(info->si_signo, info, current);
+>>>>      }
+>>> So if the SEA interrupted userspace, we put maybe-unknown addr into
+>>> force_sig_info() to deliver a signal to user space. User-space then gets a copy
+>>> of the info struct containing the maybe-unknown addr.
 >>>
->>>         if (!req->complete)
->>>                 dump_stack();
+>>> I think this is an existing bug, but if we are separating the synchronous
+>>> external aborts from the generic do_bad handler, we should probably check the
+>>> FnV bit. (I think we should still print it out)
 >>>
->>> to fsl udc driver. Then you would know who queued the request without
->>> ->complete. A slightly better approach would be to:
 >>>
->>> if (WARN(!req->complete,
->>>         "%s: queueing request without ->complete\n", ep->name))
->>>         return;
+>>>> What do you suggest I do here? The firmware should be reporting the physical and
+>>>> virtual
+>>>> address information if it is available in the HEST entry that the kernel will
+>>>> parse.
+>>> Its not just firmware that may trigger this, other SoCs may use it for parity or
+>>> ECC errors, and they may not always have a valid address in FAR_EL1.
 >>>
->>> Or something like that.
->>
->> Well, I think I found it.
->>
->> fsl_udc_core.c:ep0_prime_status() sets req->req.complete = NULL before
->> it queues a transfer and my printk()'s indicate that this is indeed
->> the offending function.
->>
->> fsl_udc_core.c:ch9getstatus() also sets complete to NULL but in my
->> tests right now I haven't seen that one.
->>
->> So it's an internal problem in the fsl_udc_core.c file.
->
-> seems like it. It's rather odd that fsl_udc doesn't wanna know about
-> completion of Status stage. Oh well, I guess in this case it doesn't
-> matter if you add a complete function or reinstate the previous check
-> for valid complete.
->
-> If you decide to reinstate the check, please add a comment above the
-> check explaining that fsl_udc itself queues requests with NULL
-> ->complete().
->
-> I must say, however, that I would suggest adding a complete callback
-> since that will help us BUG with NULL pointer deref on bad gadget
-> drivers ;-)
+>>> I think we should check the FnV bit in the esr variable and set info.si_addr to
+>>> 0 if the addr we have isn't valid:
+>>> 'For some implementations, the value of si_addr may be inaccurate.' [0]
+>> Okay, that makes sense, we don't want userspace to be notified with an incorrect
+>> address.
+>> I will add the check to verify it's valid. Which bit in the ESR is the FnV bit?
+>> I'm not finding
+>> the bit breakdown of the ISS that shows it.
+> The bits in ISS vary depending on the EC, so a little digging is required.
+> "D7.2.27 ESR_ELx, Exception Syndrome Register (ELx)" lists the EC values, from
+> there 'Instruction Abort' and 'Data Abort' both list FnV as bit 10. Version 'k'
+> of the ARM-ARM has this on pages D7-1953 to D7-1956.
+Got it! I'll add the check for this in my next patchset.
 
-I can do that. Such a complete() callback function would be a no-op
-then I assume (with a comment in it why it is a no-op).
+Thanks,
+Tyler
 
-Regards, Magnus
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
