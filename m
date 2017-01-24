@@ -1,57 +1,90 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 24 Jan 2017 10:15:38 +0000
-Subject: [PATCH 2/2] arm64: kvm: upgrade csselr and ccsidr to 64-bit values
-In-Reply-To: <20170123210859.GJ15850@cbox>
-References: <1484909410-11673-1-git-send-email-sudeep.holla@arm.com>
- <1484909410-11673-2-git-send-email-sudeep.holla@arm.com>
- <20170123210859.GJ15850@cbox>
-Message-ID: <fe2bde22-63dc-3abf-5870-21360b16bf6b@arm.com>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Tue, 24 Jan 2017 10:19:26 +0000
+Subject: [PATCH 2/4] PCI: Xilinx NWL: Modifying irq chip for legacy
+ interrupts
+In-Reply-To: <1ac7a4bb-26b6-7a4b-9bf1-030d87e6f8e6@arm.com>
+References: <1484997072-19276-1-git-send-email-bharatku@xilinx.com>
+ <1484997072-19276-2-git-send-email-bharatku@xilinx.com>
+ <1ac7a4bb-26b6-7a4b-9bf1-030d87e6f8e6@arm.com>
+Message-ID: <8520D5D51A55D047800579B094147198263CCFB4@XAP-PVEXMBX02.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 23/01/17 21:08, Christoffer Dall wrote:
-> On Fri, Jan 20, 2017 at 10:50:10AM +0000, Sudeep Holla wrote:
->> csselr and ccsidr are treated as 64-bit values already elsewhere in the
->> kernel. It also aligns well with the architecture extensions that allow
->> 64-bit format for ccsidr.
->>
->> This patch upgrades the existing accesses to csselr and ccsidr from
->> 32-bit to 64-bit in preparation to add support to those extensions.
->>
->> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->> ---
->>  arch/arm64/kvm/sys_regs.c | 18 +++++++++---------
->>  1 file changed, 9 insertions(+), 9 deletions(-)
->>
->> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
->> index 5dca1f10340f..a3559a8a2b0c 100644
->> --- a/arch/arm64/kvm/sys_regs.c
->> +++ b/arch/arm64/kvm/sys_regs.c
-
-[..]
-
->> @@ -2004,8 +2004,8 @@ static int demux_c15_get(u64 id, void __user *uaddr)
->>  
->>  static int demux_c15_set(u64 id, void __user *uaddr)
->>  {
->> -	u32 val, newval;
->> -	u32 __user *uval = uaddr;
->> +	u64 val, newval;
->> +	u64 __user *uval = uaddr;
+ > On 21/01/17 11:11, Bharat Kumar Gogada wrote:
+> > - Few wifi end points which only support legacy interrupts,
+> > performs hardware reset functionalities after disabling interrupts
+> > by invoking disable_irq and then re-enable using enable_irq, they
+> > enable hardware interrupts first and then virtual irq line later.
+> > - The legacy irq line goes low only after DEASSERT_INTx is
+> > received.As the legacy irq line is high immediately after hardware
+> > interrupts are enabled but virq of EP is still in disabled state
+> > and EP handler is never executed resulting no DEASSERT_INTx.If dummy
+> > irq chip is used, interrutps are not masked and system is
+> > hanging with CPU stall.
+> > - Adding irq chip functions instead of dummy irq chip for legacy
+> > interrupts.
+> >
+> > Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+> > ---
+> >  drivers/pci/host/pcie-xilinx-nwl.c |   36
+> +++++++++++++++++++++++++++++++++++-
+> >  1 files changed, 35 insertions(+), 1 deletions(-)
+> >
+> > diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-
+> nwl.c
+> > index c8b5a33..e1809f9 100644
+> > --- a/drivers/pci/host/pcie-xilinx-nwl.c
+> > +++ b/drivers/pci/host/pcie-xilinx-nwl.c
+> > @@ -396,10 +396,44 @@ static void nwl_pcie_msi_handler_low(struct
+> irq_desc *desc)
+> >  	chained_irq_exit(chip, desc);
+> >  }
+> >
+> > +static void nwl_mask_leg_irq(struct irq_data *data)
+> > +{
+> > +	struct irq_desc *desc = irq_to_desc(data->irq);
+> > +	struct nwl_pcie *pcie;
+> > +	unsigned int mask = 0;
 > 
-> Doesn't converting these uval pointers to u64 cause us to break the ABI
-> as we'll now be reading/writing 64-bit values to userspace with the
-> get_user and put_user following the declarations?
+> No need for this initialization. And if the function you're passing that
+> to takes a u32, why isn't that a u32 too?
 > 
+> > +
+> > +	pcie = irq_desc_get_chip_data(desc);
+> > +	mask = 1 << (data->hwirq - 1);
+> > +	nwl_bridge_writel(pcie, ((u32)MSGF_LEG_SR_MASKALL & (~mask)),
+> > +			  MSGF_LEG_MASK);
+> 
+> Erm. This looks completely bogus. Let's say I mask INTA:
+> 
+> 	mask = 1 << 0;
+> 	nwl_bridge_writel(pcie, INTD|INTC|INTB, ...);
+> 
+> Now, in a separate context, I decide to mask INTB:
+> 
+> 	mask = 1 << 1;
+> 	nwl_bridge_writel(pcie, INTD|INTC|INTA, ...);
+> 
+> unmasking INTA in the process. Probably not what you intended.
+> 
+Agreed, will do it in next patch.
+> > +
+> > +}
+> > +
+> > +static void nwl_unmask_leg_irq(struct irq_data *data)
+> > +{
+> > +	struct irq_desc *desc = irq_to_desc(data->irq);
+> > +	struct nwl_pcie *pcie;
+> > +	unsigned int mask = 0;
+> > +
+> > +	pcie = irq_desc_get_chip_data(desc);
+> > +	mask = 1 << (data->hwirq - 1);
+> > +	nwl_bridge_writel(pcie, ((u32)MSGF_LEG_SR_MASKALL | mask),
+> > +			  MSGF_LEG_MASK);
+> 
+> Same issue.
+> 
+Agreed, will do it in next patch.
 
-Yes, I too have similar concern. IIUC it is always read via kvm_one_reg
-structure. I could not find any specific user for this register to cross
-check.
-
--- 
-Regards,
-Sudeep
+Thanks & Regards,
+Bharat
