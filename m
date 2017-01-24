@@ -1,138 +1,167 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 24 Jan 2017 08:37:20 +0100
-Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
-In-Reply-To: <20170124070639.GA5068@rzhang1-surface>
-References: <20170123124058.GA17134@amd> <20170123141331.GA11402@amd>
- <da1f1b45-3ae5-ffe8-62c6-9ec7c3a1505b@roeck-us.net>
- <20170123144031.GA7870@amd> <20170123232654.GA19342@amd>
- <20170123234912.GA2460@roeck-us.net>
- <20170124070639.GA5068@rzhang1-surface>
-Message-ID: <20170124073720.GB5603@amd>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 24 Jan 2017 08:40:37 +0100
+Subject: [PATCH V7 00/11] IOMMU probe deferral support
+In-Reply-To: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
+References: <CGME20170123161926epcas2p1cf464a2978d89d0c1fdd2f7cc6d38317@epcas2p1.samsung.com>
+ <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <440d69c3-8be9-7729-ff11-10657cc864f0@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2017-01-24 15:06:39, Zhang Rui wrote:
-> On Mon, Jan 23, 2017 at 03:49:12PM -0800, Guenter Roeck wrote:
-> > On Tue, Jan 24, 2017 at 12:26:54AM +0100, Pavel Machek wrote:
-> > > Hi!
-> > > 
-> > > > > >I'll try to revert it on the top of v4.10-rc5 now... and yes, it fixes
-> > > > > >the issue.
-> > > > > >
-> > > > > >Any idea what went wrong and how to fix that?
-> > > > > >
-> > > > > >Anyway as we are at -rc5 and this is warning fix that caused a
-> > > > > >regression on different hardware... it should be reverted.
-> > > > > >
-> > > > > Agreed.
-> > > > > 
-> > > > > What exactly does "stopped working" mean ? That might help understanding
-> > > > > what went wrong.
-> > > > 
-> > > > /sys files related to battery no longer appear. I beieve this has
-> > > > something to do with it:
-> > > > 
-> > > > [    2.374877] of_get_named_gpiod_flags: parsed 'reset-gpios' property
-> > > > of node '/ocp at 68000000/spi at 48098000/tsc2005 at 0[0]' - status (0)
-> > > > [    2.375946] input: TSC2005 touchscreen as
-> > > > /devices/platform/68000000.ocp/48098000.spi/spi_master/spi1/spi1.0/input/input5
-> > > > [    2.392120] rx51-battery: probe of n900-battery failed with error
-> > > > -22
-> > > 
-> > > Mystery solved:
-> > > 
-> > > diff --git a/drivers/hwmon/hwmon.c b/drivers/hwmon/hwmon.c
-> > > index 3932f92..fe5ec82 100644
-> > > --- a/drivers/hwmon/hwmon.c
-> > > +++ b/drivers/hwmon/hwmon.c
-> > > @@ -545,8 +545,10 @@ __hwmon_device_register(struct device *dev, const char *name, void *drvdata,
-> > >  	int i, j, err, id;
-> > >  
-> > >  	/* Do not accept invalid characters in hwmon name attribute */
-> > > -	if (name && (!strlen(name) || strpbrk(name, "-* \t\n")))
-> > > +	if (name && (!strlen(name) || strpbrk(name, "-* \t\n"))) {
-> > > +		printk("hwmon: Invalid character detected: %s\n", name);
-> > >  		return ERR_PTR(-EINVAL);
-> > > +	}
-> > >  
-> > >  	id = ida_simple_get(&hwmon_ida, 0, 0, GFP_KERNEL);
-> > >  	if (id < 0)
-> > > 
-> > > 
-> > > pavel at n900:~$ dmesg | grep -5 Invalid
-> > > [    0.829650] of_get_named_gpiod_flags: parsed 'gpio-reset' property
-> > > of node '/ocp at 68000000/i2c at 48072000/tlv320aic3x at 19[0]' - status (0)
-> > > [    0.833831] tsl2563 2-0029: model 7, rev. 0
-> > > [    0.837768] of_get_named_gpiod_flags: parsed 'enable-gpio' property
-> > > of node '/ocp at 68000000/i2c at 48072000/lp5523 at 32[0]' - status (0)
-> > > [    1.921417] omap_i2c 48072000.i2c: controller timed out
-> > > [    2.056823] lp5523x 2-0032: lp5523 Programmable led chip found
-> > > [    2.064147] hwmon: Invalid character detected: bq27200-0
-> > 
-> > So the problem is really that the thermal driver needs to create a valid name.
-> >
-> Right.
-> 
-> Before reverting, can you please try if this patch works or not?
+Hi Sricharan
 
-Not really. Revert now. Sorry.
+On 2017-01-23 17:18, Sricharan R wrote:
+> This series calls the dma ops configuration for the devices
+> at a generic place so that it works for all busses.
+> The dma_configure_ops for a device is now called during
+> the device_attach callback just before the probe of the
+> bus/driver is called. Similarly dma_deconfigure is called during
+> device/driver_detach path.
+>
+> pci_bus_add_devices    (platform/amba)(_device_create/driver_register)
+>         |                         |
+> pci_bus_add_device     (device_add/driver_register)
+>         |                         |
+> device_attach           device_initial_probe
+>         |                         |
+> __device_attach_driver    __device_attach_driver
+>         |
+> driver_probe_device
+>         |
+> really_probe
+>         |
+> dma_configure
+>
+> Similarly on the device/driver_unregister path __device_release_driver is
+> called which inturn calls dma_deconfigure.
+>
+> Took the reworked patches [2] from Robin's branch and
+> rebased on top of Lorenzo's ACPI IORT ARM support series [3].
+>
+> * Tested with platform and pci devices for probe deferral
+>    and reprobe on arm64 based platform.
+> * Need help for testing with ACPI.
 
-Are you sure? This does not look equivalent to me at all.
+Once again:
 
-"name" file handling moved from drivers to the core, which added some
-crazy checks what name can contain. Even if this "works", what is the
-expected effect on the "name" file?
+Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-								Pavel
+Works fine on Exynos machines (both, ARM and ARM64 based). This patchset is
+urgently needed as more and more stuff depends on it and cannot be easily
+workarounded without nasty hacks (for example pending runtime PM changes
+for clocks and power domains integration for Exynos 5433).
 
-> thanks,
-> rui
-> 
-> >From 79320ea3721314ec29ed6cdd6987ff922b11d6f9 Mon Sep 17 00:00:00 2001
-> From: Zhang Rui <rui.zhang@intel.com>
-> Date: Tue, 24 Jan 2017 14:11:03 +0800
-> Subject: [PATCH] thermal: fix parameter when registering hwmon
-> 
-> commit 7611fb68062f ("thermal: thermal_hwmon: Convert to
-> hwmon_device_register_with_info()") converts thermal core to use
-> hwmon_device_register_with_info() to register to hwmon instead of
-> deprecated hwmon_device_register().
-> But at the same time, the name of the hwmon device created is changed to
-> the thermal zone device name in this commit, which may contain
-> incompatible characters for hwmon.
-> 
-> Fixes it by using exactly the same parameters as before this commit.
-> 
-> Fixes: 7611fb68062f ("thermal: thermal_hwmon: Convert to hwmon_devce_register_with_info()")
-> Reported-by: Pavel Machek <pavel@ucw.cz>
-> Signed-off-by: Zhang Rui <rui.zhang@intel.com>
-> ---
->  drivers/thermal/thermal_hwmon.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/thermal/thermal_hwmon.c b/drivers/thermal/thermal_hwmon.c
-> index c4a508a..0c6789f 100644
-> --- a/drivers/thermal/thermal_hwmon.c
-> +++ b/drivers/thermal/thermal_hwmon.c
-> @@ -157,8 +157,8 @@ int thermal_add_hwmon_sysfs(struct thermal_zone_device *tz)
->  
->  	INIT_LIST_HEAD(&hwmon->tz_list);
->  	strlcpy(hwmon->type, tz->type, THERMAL_NAME_LENGTH);
-> -	hwmon->device = hwmon_device_register_with_info(NULL, hwmon->type,
-> -							hwmon, NULL, NULL);
-> +	hwmon->device = hwmon_device_register_with_info(NULL, NULL, NULL,
-> +							NULL, NULL);
->  	if (IS_ERR(hwmon->device)) {
->  		result = PTR_ERR(hwmon->device);
->  		goto free_mem;
+Is there a chance to have it merged to v4.11?
 
+> Previous post of this series [6].
+>
+>   [V7]
+>       * Updated the subject and commit log for patch #6 as per
+>         comments from Lorenzo. No functional changes.
+>
+>   [V6]
+>       * Fixed a bug in dma_configure function pointed out by
+>         Robin.
+>       * Reordered the patches as per comments from Robin and
+>         Lorenzo.
+>       * Added Tags.
+>
+>   [V5]
+>       * Reworked the pci configuration code hanging outside and
+>         pushed it to dma_configure as in PATCH#5,6,7.
+>         Also added a couple of patches that Lorenzo provided for
+>         correcting the Probe deferring mechanism in case of
+>         ACPI devices from here [5].
+>
+>   [V4]
+>       * Took the reworked patches [2] from Robin's branch and
+>         rebased on top of Lorenzo's ACPI IORT ARM support series [3].
+>
+>       * Added the patches for moving the dma ops configuration of
+>         acpi based devices to probe time as well.
+>   [V3]
+>       * Removed the patch to split dma_masks/dma_ops configuration
+>         separately based on review comments that both masks and ops are
+>         required only during the device probe time.
+>
+>       * Reworked the series based on Generic DT bindings series.
+>
+>       * Added call to iommu's remove_device in the cleanup path for arm and
+>         arm64.
+>
+>       * Removed the notifier trick in arm64 to handle early device
+>         registration.
+>
+>       * Added reset of dma_ops in cleanup path for arm based on comments.
+>
+>       * Fixed the pci_iommu_configure path and tested with PCI device as
+>         well.
+>   
+>       * Fixed a bug to return the correct iommu_ops from patch 7 [4] in
+>         last post.
+>
+>       * Fixed few other cosmetic comments.
+>    
+>   [V2]
+>       * Updated the Initial post to call dma_configure/deconfigure from
+>         generic code
+>   
+>       * Added iommu add_device callback from of_iommu_configure path
+>
+>   [V1]
+>       * Initial post from Laurent Pinchart [1]
+>
+> [1] http://lists.linuxfoundation.org/pipermail/iommu/2015-May/013016.html
+> [2] http://www.linux-arm.org/git?p=linux-rm.git;a=shortlog;h=refs/heads/iommu/defer
+> [3] https://lkml.org/lkml/2016/11/21/141
+> [4] https://www.mail-archive.com/iommu at lists.linux-foundation.org/msg13940.html
+> [5] git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git iommu/probe-deferral
+> [6] https://www.spinics.net/lists/arm-kernel/msg556546.html
+>
+> Laurent Pinchart (3):
+>    of: dma: Move range size workaround to of_dma_get_range()
+>    of: dma: Make of_dma_deconfigure() public
+>    iommu: of: Handle IOMMU lookup failure with deferred probing or error
+>
+> Lorenzo Pieralisi (2):
+>    ACPI/IORT: Add function to check SMMUs drivers presence
+>    ACPI/IORT: Remove linker section for IORT entries probing
+>
+> Robin Murphy (3):
+>    iommu/of: Refactor of_iommu_configure() for error handling
+>    iommu/of: Prepare for deferred IOMMU configuration
+>    iommu/arm-smmu: Clean up early-probing workarounds
+>
+> Sricharan R (3):
+>    of/acpi: Configure dma operations at probe time for platform/amba/pci bus devices
+>    drivers: acpi: Handle IOMMU lookup failure with deferred probing or
+>      error
+>    arm64: dma-mapping: Remove the notifier trick to handle early setting
+>      of dma_ops
+>
+>   arch/arm64/mm/dma-mapping.c       | 132 ++++----------------------------------
+>   drivers/acpi/arm64/iort.c         |  40 +++++++++++-
+>   drivers/acpi/glue.c               |   5 --
+>   drivers/acpi/scan.c               |   7 +-
+>   drivers/base/dd.c                 |   9 +++
+>   drivers/base/dma-mapping.c        |  41 ++++++++++++
+>   drivers/iommu/arm-smmu-v3.c       |  46 +------------
+>   drivers/iommu/arm-smmu.c          |  58 +++--------------
+>   drivers/iommu/of_iommu.c          | 114 +++++++++++++++++++++++---------
+>   drivers/of/address.c              |  20 +++++-
+>   drivers/of/device.c               |  36 ++++++-----
+>   drivers/of/platform.c             |  10 +--
+>   drivers/pci/probe.c               |  28 --------
+>   include/acpi/acpi_bus.h           |   2 +-
+>   include/asm-generic/vmlinux.lds.h |   1 -
+>   include/linux/acpi.h              |   7 +-
+>   include/linux/acpi_iort.h         |   3 -
+>   include/linux/dma-mapping.h       |   3 +
+>   include/linux/of_device.h         |  10 ++-
+>   19 files changed, 252 insertions(+), 320 deletions(-)
+>
+
+Best regards
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170124/d40ba625/attachment.sig>
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
