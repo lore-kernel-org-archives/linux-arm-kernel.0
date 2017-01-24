@@ -1,122 +1,177 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
-Date: Tue, 24 Jan 2017 16:51:39 +0000
-Subject: [RFC 2/4] irqchip, gicv3-its:Workaround for HiSilicon erratum
- 161010801
-In-Reply-To: <b0c5f312-d515-fea0-7390-9b5de56927c3@arm.com>
-References: <5886262C.6070108@huawei.com> <58875B0D.4080303@huawei.com>
- <aa915b29-453f-6817-500f-1c6b457c0368@arm.com>
- <5f303abc-209b-3828-ca8c-4ec0977f89ea@arm.com>
- <5FC3163CFD30C246ABAA99954A238FA8174AC552@lhreml504-mbs>
- <9764b04c-f610-ecca-e4ee-021d16371d7d@arm.com>
- <5FC3163CFD30C246ABAA99954A238FA8174AC5FC@lhreml504-mbs>
- <df0b6b06-cf44-3ddf-c4f0-e0cc24399f61@arm.com>
- <b0c5f312-d515-fea0-7390-9b5de56927c3@arm.com>
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA8174ACA05@lhreml504-mbs>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 24 Jan 2017 17:54:38 +0100
+Subject: [PATCH 3/4] soc/imx: add new GPC driver
+In-Reply-To: <20170124124954.GT5662@dragon>
+References: <20170120155225.31905-1-l.stach@pengutronix.de>
+ <20170120155225.31905-4-l.stach@pengutronix.de>
+ <20170124124954.GT5662@dragon>
+Message-ID: <1485276878.2894.24.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Shawn,
 
+thanks for the review.
 
-> -----Original Message-----
-> From: Robin Murphy [mailto:robin.murphy at arm.com]
-> Sent: Tuesday, January 24, 2017 4:43 PM
-> To: Marc Zyngier; Shameerali Kolothum Thodi; mark.rutland at arm.com;
-> will.deacon at arm.com; eric.auger at redhat.com
-> Cc: linux-arm-kernel at lists.infradead.org; Linuxarm; linux-
-> kernel at vger.kernel.org; devicetree at vger.kernel.org; John Garry;
-> Guohanjun (Hanjun Guo)
-> Subject: Re: [RFC 2/4] irqchip, gicv3-its:Workaround for HiSilicon
-> erratum 161010801
+Am Dienstag, den 24.01.2017, 20:49 +0800 schrieb Shawn Guo:
+> On Fri, Jan 20, 2017 at 04:52:24PM +0100, Lucas Stach wrote:
+> > This is an almost complete re-write of the previous GPC power gating control
+> > code found in the IMX architecture code. It supports both the old and the new
+> > DT binding, allowing more domains to be added later and generally makes the
+> > driver easier to extend, while keeping compatibility with existing DTBs.
 > 
-> On 24/01/17 16:29, Marc Zyngier wrote:
-> > On 24/01/17 16:14, Shameerali Kolothum Thodi wrote:
-> >>>>>> Let's contemplate this for a moment. If we're on the affected
-> >>>>>> ITS,
-> >>>>> we're
-> >>>>>> using the physical address of the GITS_TRANSLATER register. What
-> >>>>>> guarantees that this is not going to conflict with an IOVA that
-> >>>>>> DMA
-> >>>>> is
-> >>>>>> going to use? From looking at these patches, my feeling is "not
-> >>>>> much".
-> >>>>>>
-> >>>>>> So if I'm right, you're opening the door to some interesting
-> >>>>>> memory corruption if the two regions ever intersect.
-> >>>>>>
-> >>>>>> Robin, what do you think?
-> >>>>>
-> >>>>> Yup. Unless the ITS physical address is actually reserved from
-> the
-> >>>>> IOVA domain, it's still free to be allocated for DMA mappings,
-> and
-> >>> if
-> >>>>> that ever happens then you'll get odd bits of data landing in the
-> >>> ITS
-> >>>>> instead of RAM, and maybe even locked-up devices or worse if the
-> >>>>> doorbell gives back decode errors on read attempts. It's
-> >>>>> essentially the exact same problem as we have with memory-mapped
-> >>>>> PCI windows,
-> >>> and
-> >>>>> needs to be solved in the same fashion, i.e. between the SMMU and
-> >>> the
-> >>>>> IOMMU-DMA code.
-> >>>>
-> >>>> Is this something that can incorporated in Eric's latest patch
-> >>> series[1]?
-> >>>> It does mentions reserved regions can be:
-> >>>> - directly mapped regions
-> >>>> - regions that cannot be iommu mapped (PCI host bridge windows,
-> >>>> ...)
-> >>>> - MSI regions (because they belong to another address space or
-> >>> because
-> >>>>   they are not translated by the IOMMU and need special handling)
-> >>>>
-> >>>> Though I am not clear our case comes under "the MSI regions that
-> >>>> are not translated by the IOMMU and need special handling" or not.
-> >>>
-> >>> Well, given that in your case, the IOMMU never sees the MSI write,
-> >>> it definitely falls into the "not translated" category.
-> >>>
-> >>> As for handling it on top of Eric's series, that's probably the
-> most
-> >>> reasonable thing to do, which also means that none of this should
-> >>> appear in the ITS driver. Robin seems to have an idea on how to
-> >>> approach this.
-> >>
-> >> Ok. Thanks for that Marc/Robin.
-> >>
-> >> But I am not sure we can get away with ITS driver. Because current
-> >> vfio patch series[1] treats GICV3 ITS as irq safe and is setting
-> >> IRQ_DOMAIN_FLAG_MSI_REMAP in ITS driver. But this is not the case
-> >> with our ITS.
-> >
-> > The ITS itself is perfectly safe, as it does perform device isolation
-> > just fine (at least as far as I can tell from this bug description).
-> >
-> > There is two things we need to take care of:
-> > - When the device is used on the host, the hardwired MSI region must
-> > be excluded from the DMA IOVA allocator, and the
-> > iommu_dma_map_msi_msg() call becomes a NOP.
-> > - When the device is assigned to VFIO, the MSI region must be exposed
-> > to userspace through /sys so that it knows that the guest RAM cannot
-> > alias with this region (or face the corruption we've talked about
-> above).
-> >
-> > None of that actually involves the ITS. Eric's stuff has some of the
-> > initial infrastructure, but there is of course more to it. I'll let
-> > Robin chime in and correct me if I've missed something (very likely).
+> Shouldn't we generally wrap the commit log around column 72?
 > 
-> That's pretty much it. Once Eric's patches for the iommu_resv_regions
-> interface have been merged, I'm planning to convert IOMMU-DMA over to
-> using those instead of the internal PCI-specific hook it currently has.
-> Then we would simply need the SMMU driver to expose this hardwired MSI
-> region where necessary so that IOMMU-DMA can directly insert 1:1
-> iommu_dma_msi_page entries to cover it up-front in
-> iommu_dma_init_domain().
-> 
-Thanks for the details. Just wondering how this 1:1 map regions 
-will be specified. I suppose this can be a DT property to SMMU driver.
-Is there anything available in ACPI table for this?
+I don't see why we should wrap commit messages earlier than the actual
+code, but I think thats mostly an issue of personal preference.
 
-Thanks,
-Shameer
+> > 
+> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > ---
+> >  drivers/soc/Makefile     |   1 +
+> >  drivers/soc/imx/Makefile |   1 +
+> >  drivers/soc/imx/gpc.c    | 480 +++++++++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 482 insertions(+)
+> >  create mode 100644 drivers/soc/imx/Makefile
+> >  create mode 100644 drivers/soc/imx/gpc.c
+
+[...]
+> > +static struct platform_driver imx_pgc_power_domain_driver = {
+> > +	.driver = {
+> > +		.name = "imx-pgc-pd",
+> > +	},
+> > +	.probe = imx_pgc_power_domain_probe,
+> > +	.remove = imx_pgc_power_domain_remove,
+> 
+> Not sure how .remove hook is going to be useful for a
+> builtin_platform_driver.
+> 
+There is nothing preventing a manual unbind/bind on a builtin driver.
+But yes, this is mostly future proofing right now.
+
+[...]
+> > +static int imx_gpc_old_dt_init(struct device *dev, struct regmap *regmap)
+> > +{
+> > +	struct imx_pm_domain *domain;
+> > +	int i, ret;
+> > +
+> > +	for (i = 0; i < 2; i++) {
+> > +		domain = &imx_gpc_domains[i];
+> > +		domain->regmap = regmap;
+> > +		domain->ipg_rate_mhz = 33;
+> 
+> I see it's being 66MHz in the existing driver code.  What's the reason
+> behind this change?
+> 
+Thanks for the catch. This should stay at 66MHz.
+
+> > +
+> > +		if (i == 1) {
+> > +			domain->supply = devm_regulator_get(dev, "pu");
+> > +			if (IS_ERR(domain->supply))
+> > +				return PTR_ERR(domain->supply);;
+> > +
+> > +			ret = imx_pgc_get_clocks(dev, domain);
+> > +			if (ret)
+> > +				goto clk_err;
+> > +
+> > +			domain->base.power_on(&domain->base);
+> > +		}
+> > +	}
+> > +
+> > +	for (i = 0; i < 2; i++)
+> > +		pm_genpd_init(&imx_gpc_domains[i].base, NULL, false);
+> > +
+> > +	if (IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS)) {
+> > +		ret = of_genpd_add_provider_onecell(dev->of_node,
+> > +						    &imx_gpc_onecell_data);
+> > +		if (ret)
+> > +			goto genpd_err;
+> > +	}
+> > +
+> > +	return 0;
+> > +
+> > +genpd_err:
+> > +	pm_genpd_remove(&imx_gpc_domains[1].base);
+> > +	imx_pgc_put_clocks(&imx_gpc_domains[1]);
+> > +clk_err:
+> > +	pm_genpd_remove(&imx_gpc_domains[0].base);
+> 
+> I do not think that imx_gpc_domains[0].base is already registered on
+> clk_err path.
+> 
+Um right, this seems to be a leftover from an earlier version.
+
+> > +
+> > +	return ret;
+> > +}
+> > +
+> > +static int imx_gpc_probe(struct platform_device *pdev)
+> > +{
+> > +	const struct of_device_id *of_id =
+> > +			of_match_device(imx_gpc_dt_ids, &pdev->dev);
+> > +	const struct imx_gpc_dt_data *of_id_data = of_id->data;
+> > +	struct device_node *pgc_node;
+> > +	struct regmap *regmap;
+> > +	struct resource *res;
+> > +	void __iomem *base;
+> > +	int ret;
+> > +
+> > +	pgc_node = of_get_child_by_name(pdev->dev.of_node, "pgc");
+> > +
+> > +	/* bail out if DT too old and doesn't provide the necessary info */
+> > +	if (!of_property_read_bool(pdev->dev.of_node, "#power-domain-cells") &&
+> > +	    !pgc_node)
+> > +		return 0;
+> > +
+> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +	base = devm_ioremap_resource(&pdev->dev, res);
+> > +	if (IS_ERR(base))
+> > +		return PTR_ERR(base);
+> > +
+> > +	regmap = devm_regmap_init_mmio_clk(&pdev->dev, NULL, base,
+> > +					   &imx_gpc_regmap_config);
+> > +	if (IS_ERR(regmap)) {
+> > +		ret = PTR_ERR(regmap);
+> > +		dev_err(&pdev->dev, "failed to init regmap: %d\n",
+> > +			ret);
+> > +		return ret;
+> > +	}
+> > +
+> > +	if (!pgc_node) {
+> > +		/* old DT layout is only supported for mx6q aka 2 domains */
+> > +		if (of_id_data->num_domains != 2) {
+> > +			dev_err(&pdev->dev, "could not find pgc DT node\n");
+> > +			return -ENODEV;
+> > +		}
+> > +
+> > +		ret = imx_gpc_old_dt_init(&pdev->dev, regmap);
+> > +		if (ret)
+> > +			return ret;
+> > +	} else {
+> > +		struct imx_pm_domain *domain;
+> > +		struct platform_device *pd_pdev;
+> > +		struct device_node *np;
+> > +		struct clk *ipg_clk;
+> > +		unsigned int ipg_rate_mhz;
+> > +		int domain_index;
+> > +
+> > +		ipg_clk = devm_clk_get(&pdev->dev, "ipg");
+> > +		if (IS_ERR(ipg_clk))
+> > +			return PTR_ERR(ipg_clk);
+> > +		ipg_rate_mhz = clk_get_rate(ipg_clk) / 1000000;
+> > +
+> > +		for_each_child_of_node(pgc_node, np) {
+> > +			ret = of_property_read_u32(np, "reg", &domain_index);
+> > +			if (ret) {
+> > +				of_node_put(np);
+> > +				return ret;
+> > +			}
+> 
+> Should we have a check here to ensure that domain_index doesn't exceed
+> imx_gpc_domains[] array size?
+
+Yes.
+
+Regards,
+Lucas
