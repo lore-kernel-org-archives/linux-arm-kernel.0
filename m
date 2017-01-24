@@ -1,74 +1,105 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Tue, 24 Jan 2017 14:07:56 +0000
-Subject: pcie-designware: Incorrect programming of msi address register on
- some setups.
-Message-ID: <922851d0-a847-762a-5067-88c92d416d58@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 24 Jan 2017 14:11:25 +0000
+Subject: [RFC 2/4] irqchip, gicv3-its:Workaround for HiSilicon erratum
+ 161010801
+In-Reply-To: <58875B0D.4080303@huawei.com>
+References: <5886262C.6070108@huawei.com> <58875B0D.4080303@huawei.com>
+Message-ID: <aa915b29-453f-6817-500f-1c6b457c0368@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
++ Robin,
 
-Recently I hit a bug with pcie-designware driver with triggers a board 
-reboot, this is my analysis so far on the issue. Issue is because 
-designware driver is programming msi address which is above 32 address 
-space eventhough one of the pcie endpoint indicated that it does not 
-support 64 bit msi addresses.
+On 24/01/17 13:47, Shameerali Kolothum Thodi wrote:
+> The HiSilicon erratum 161010801 describes the limitation of certain
+> HiSilicon platforms to support the SMMU mappings for MSI transactions.
+> 
+> On these platforms GICv3 ITS translator is presented with the deviceID
+> by extending the MSI payload data to 64 bits to include the deviceID.
+> Hence, the PCIe controller on this platforms has to differentiate the
+> MSI payload against other DMA payload and has to modify the MSI payload.
+> This basically makes it difficult for this platforms to have a SMMU
+> translation for MSI. Also these platforms doesn't have a proper IIDR
+> register to use the existing IIDR based quirk mechanism.
+> 
+> This workaround based on the devicetree binding property, supports
+> bypassing the SMMU for the MSI transactions on this platforms.
+> 
+> Signed-off-by: shameer <shameerali.kolothum.thodi@huawei.com>
+> ---
+>  arch/arm64/Kconfig               | 15 ++++++++++++
+>  drivers/irqchip/irq-gic-common.h |  1 +
+>  drivers/irqchip/irq-gic-v3-its.c | 52 +++++++++++++++++++++++++++++++++++++++-
+>  3 files changed, 67 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 0ae0427..8d600b0 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -485,6 +485,21 @@ config CAVIUM_ERRATUM_27456
+> 
+>  	  If unsure, say Y.
+> 
+> +config HISILICON_ERRATUM_161010801
+> +	bool "HiSilicon erratum 161010801"
+> +	default y
+> +	help
+> +	  Enable workaround for erratum 161010801.
+> +
+> +	  This implements a gicv3-its errata workaround for HiSilicon
+> +	  platforms Hip05/Hip07. These platforms cannot support the MSI
+> +	  interrupt remapping and MSI transaction has to be bypassed by SMMU.
+> +
+> +	  The fix is to avoid calling the remapping hook into the SMMU
+> +	  driver from the its_irq_compose_msi_msg().
+> +
+> +	  If unsure, say Y.
+> +
+>  endmenu
+> 
+> 
+> diff --git a/drivers/irqchip/irq-gic-common.h b/drivers/irqchip/irq-gic-common.h
+> index 205e5fd..de0385a 100644
+> --- a/drivers/irqchip/irq-gic-common.h
+> +++ b/drivers/irqchip/irq-gic-common.h
+> @@ -26,6 +26,7 @@ struct gic_quirk {
+>  	void (*init)(void *data);
+>  	u32 iidr;
+>  	u32 mask;
+> +	const char *erratum;
+>  };
+> 
+>  int gic_configure_irq(unsigned int irq, unsigned int type,
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index f471939..0a326f6 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -44,6 +44,7 @@
+>  #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING		(1ULL << 0)
+>  #define ITS_FLAGS_WORKAROUND_CAVIUM_22375	(1ULL << 1)
+>  #define ITS_FLAGS_WORKAROUND_CAVIUM_23144	(1ULL << 2)
+> +#define ITS_FLAGS_WORKAROUND_HISILICON_161010801	(1ULL << 3)
+> 
+>  #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
+> 
+> @@ -659,7 +660,8 @@ static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
+>  	msg->address_hi		= upper_32_bits(addr);
+>  	msg->data		= its_get_event_id(d);
+> 
+> -	iommu_dma_map_msi_msg(d->irq, msg);
+> +	if (!(its->flags & ITS_FLAGS_WORKAROUND_HISILICON_161010801))
+> +		iommu_dma_map_msi_msg(d->irq, msg);
 
-My setup is arm64 board DB820c with 3 root complexes, and the system has 
-memory which spans across 4GB address space.
-First root complex is connected to a WLAN Chip (QCA6174) only supports 
-32 bit addresses.
-Second one is connected to a Ethernet Controller (ATL1c)
+Let's contemplate this for a moment. If we're on the affected ITS, we're
+using the physical address of the GITS_TRANSLATER register. What
+guarantees that this is not going to conflict with an IOVA that DMA is
+going to use? From looking at these patches, my feeling is "not much".
 
-value of MSI control register aka PCI_MSI_FLAGS (0x2) for device QCA6174 
-is 0x106
-value of MSI control register aka PCI_MSI_FLAGS (0x2) for device ATL1C 
-is 0x80
+So if I'm right, you're opening the door to some interesting memory
+corruption if the two regions ever intersect.
 
-Now the problem is that on Synopsis IP, the MSI address register is 
-programmed at two places
-1> one at controller config dbi address space itself in 
-PCIE_MSI_ADDR_LO(0x820)  & PCIE_MSI_ADDR_HI (0x824)
+Robin, what do you think?
 
-2> at PCI_MSI_ADDRESS_LO (0x2) and PCI_MSI_ADDRESS_HI of the device cfg.
-
-If step 1 allocates msi address which is above 32 bit address space, 
-then step 2 would truncate it to 32 bit address if it discovers endpoint 
-which does not support 64 bit msi address.
-Then if endpoint tries to read/write this address as part of MSI 
-mechanism it would fault and crash system.
-
-Am not sure how we can solve this correctly because we do not know about 
-endpoints at step 1. On the other hand if we can force step 1 to 
-allocate addresses with in 32 bit address space than it would work for 
-both 32 bit and 64 bit.
-
-Has anyone hit this issue before?
-Do we already have a solution?
-Any suggestions?
-
-Below ugly Hack is what Am using to workaround this issue on my platform 
-  but am not sure how this will influence other platforms.
-
----------------------------->cut<-------------------------------
-diff --git a/drivers/pci/host/pcie-designware.c 
-b/drivers/pci/host/pcie-designware.c
-index 4a81b72..d694e66 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -286,9 +286,8 @@ void dw_pcie_msi_init(struct pcie_port *pp)
-  {
-         u64 msi_target;
-
--       pp->msi_data = __get_free_pages(GFP_KERNEL, 0);
-+       pp->msi_data = __get_free_pages(GFP_KERNEL | GFP_DMA, 0);
-         msi_target = virt_to_phys((void *)pp->msi_data);
-
-         /* program the msi_data */
-         dw_pcie_wr_own_conf(pp, PCIE_MSI_ADDR_LO, 4,
-                             (u32)(msi_target & 0xffffffff));
----------------------------->cut<-------------------------------
-
-
-Thanks,
-srini
+	M.
+-- 
+Jazz is not dead. It just smells funny...
