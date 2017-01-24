@@ -1,100 +1,42 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 24 Jan 2017 16:42:37 +0000
-Subject: [RFC 2/4] irqchip, gicv3-its:Workaround for HiSilicon erratum
- 161010801
-In-Reply-To: <df0b6b06-cf44-3ddf-c4f0-e0cc24399f61@arm.com>
-References: <5886262C.6070108@huawei.com> <58875B0D.4080303@huawei.com>
- <aa915b29-453f-6817-500f-1c6b457c0368@arm.com>
- <5f303abc-209b-3828-ca8c-4ec0977f89ea@arm.com>
- <5FC3163CFD30C246ABAA99954A238FA8174AC552@lhreml504-mbs>
- <9764b04c-f610-ecca-e4ee-021d16371d7d@arm.com>
- <5FC3163CFD30C246ABAA99954A238FA8174AC5FC@lhreml504-mbs>
- <df0b6b06-cf44-3ddf-c4f0-e0cc24399f61@arm.com>
-Message-ID: <b0c5f312-d515-fea0-7390-9b5de56927c3@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 24 Jan 2017 17:47:06 +0100
+Subject: [PATCH v5 0/2] Add support for the ethernet switch on the
+ ESPRESSObin
+In-Reply-To: <20170120.141705.1390880809796992457.davem@davemloft.net> (David
+ Miller's message of "Fri, 20 Jan 2017 14:17:05 -0500 (EST)")
+References: <20170119214934.27442-1-gregory.clement@free-electrons.com>
+ <20170120.141705.1390880809796992457.davem@davemloft.net>
+Message-ID: <87r33s2ynp.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/01/17 16:29, Marc Zyngier wrote:
-> On 24/01/17 16:14, Shameerali Kolothum Thodi wrote:
->>>>>> Let's contemplate this for a moment. If we're on the affected ITS,
->>>>> we're
->>>>>> using the physical address of the GITS_TRANSLATER register. What
->>>>>> guarantees that this is not going to conflict with an IOVA that DMA
->>>>> is
->>>>>> going to use? From looking at these patches, my feeling is "not
->>>>> much".
->>>>>>
->>>>>> So if I'm right, you're opening the door to some interesting memory
->>>>>> corruption if the two regions ever intersect.
->>>>>>
->>>>>> Robin, what do you think?
->>>>>
->>>>> Yup. Unless the ITS physical address is actually reserved from the
->>>>> IOVA domain, it's still free to be allocated for DMA mappings, and
->>> if
->>>>> that ever happens then you'll get odd bits of data landing in the
->>> ITS
->>>>> instead of RAM, and maybe even locked-up devices or worse if the
->>>>> doorbell gives back decode errors on read attempts. It's essentially
->>>>> the exact same problem as we have with memory-mapped PCI windows,
->>> and
->>>>> needs to be solved in the same fashion, i.e. between the SMMU and
->>> the
->>>>> IOMMU-DMA code.
->>>>
->>>> Is this something that can incorporated in Eric's latest patch
->>> series[1]?
->>>> It does mentions reserved regions can be:
->>>> - directly mapped regions
->>>> - regions that cannot be iommu mapped (PCI host bridge windows, ...)
->>>> - MSI regions (because they belong to another address space or
->>> because
->>>>   they are not translated by the IOMMU and need special handling)
->>>>
->>>> Though I am not clear our case comes under "the MSI regions that are
->>>> not translated by the IOMMU and need special handling" or not.
->>>
->>> Well, given that in your case, the IOMMU never sees the MSI write, it
->>> definitely falls into the "not translated" category.
->>>
->>> As for handling it on top of Eric's series, that's probably the most
->>> reasonable thing to do, which also means that none of this should
->>> appear in the ITS driver. Robin seems to have an idea on how to
->>> approach this.
->>
->> Ok. Thanks for that Marc/Robin.
->>
->> But I am not sure we can get away with ITS driver. Because current vfio
->> patch series[1] treats GICV3 ITS as irq safe and is setting 
->> IRQ_DOMAIN_FLAG_MSI_REMAP in ITS driver. But this is not the case with
->> our ITS. 
-> 
-> The ITS itself is perfectly safe, as it does perform device isolation
-> just fine (at least as far as I can tell from this bug description).
-> 
-> There is two things we need to take care of:
-> - When the device is used on the host, the hardwired MSI region must be
-> excluded from the DMA IOVA allocator, and the iommu_dma_map_msi_msg()
-> call becomes a NOP.
-> - When the device is assigned to VFIO, the MSI region must be exposed to
-> userspace through /sys so that it knows that the guest RAM cannot alias
-> with this region (or face the corruption we've talked about above).
-> 
-> None of that actually involves the ITS. Eric's stuff has some of the
-> initial infrastructure, but there is of course more to it. I'll let
-> Robin chime in and correct me if I've missed something (very likely).
+Hi David,
+ 
+ On ven., janv. 20 2017, David Miller <davem@davemloft.net> wrote:
 
-That's pretty much it. Once Eric's patches for the iommu_resv_regions
-interface have been merged, I'm planning to convert IOMMU-DMA over to
-using those instead of the internal PCI-specific hook it currently has.
-Then we would simply need the SMMU driver to expose this hardwired MSI
-region where necessary so that IOMMU-DMA can directly insert 1:1
-iommu_dma_msi_page entries to cover it up-front in iommu_dma_init_domain().
+> From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Date: Thu, 19 Jan 2017 22:49:32 +0100
+>
+>> I created a new family for this switch and filled the ops structure
+>> by selecting which seems the more appropriate functions. I rebased
+>> the series on net-next/master which allowed me to benefit to the
+>> eeprom functions introduced for the 6390.
+>
+> It looks like there will be at least one more respin of this series,
+> specifically to remove the new family as Vivien seems to object to
+> this.
 
-Robin.
+I am about to send a new version. However about removing the new family,
+I thought that with the confirmation from Andrew we could keep it.
 
-> 
-> Thanks,
-> 
-> 	M.
-> 
+Vivien could you confirm this?
+
+Thanks,
+
+Gregory
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
