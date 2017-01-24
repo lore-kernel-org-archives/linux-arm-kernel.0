@@ -1,94 +1,51 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 24 Jan 2017 10:01:07 +0000
-Subject: [PATCH] KVM: arm/arm64: Remove struct vgic_irq pending field
-In-Reply-To: <20170123183447.GH15850@cbox>
-References: <20170123133951.10329-1-christoffer.dall@linaro.org>
- <154ecb7e-457d-ea56-4ae2-c2b37c951a8a@arm.com> <20170123183447.GH15850@cbox>
-Message-ID: <1dc74e05-b72f-7b98-0d67-8cbde732e83b@arm.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Tue, 24 Jan 2017 11:01:33 +0100
+Subject: v4.9 to v4.10 regression: oops when USB cable is plugged in.
+In-Reply-To: <20170124091817.GA29246@amd>
+References: <20170123222537.GA11543@amd> <20170123224454.GY7403@atomide.com>
+ <20170124091817.GA29246@amd>
+Message-ID: <20170124100133.GA21079@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
-
-On 23/01/17 18:34, Christoffer Dall wrote:
-> On Mon, Jan 23, 2017 at 05:57:05PM +0000, Andre Przywara wrote:
->> Hi Christoffer,
->>
->> On 23/01/17 13:39, Christoffer Dall wrote:
->>> One of the goals behind the VGIC redesign was to get rid of cached or
->>> intermediate state in the data structures, but we decided to allow
->>> ourselves to precompute the pending value of an IRQ based on the line
->>> level and pending latch state.  However, this has now become difficult
->>> to base proper GICv3 save/restore on, because there is a potential to
->>> modify the pending state without knowing if an interrupt is edge or
->>> level configured.
->>>
->>> See the following post and related message for more background:
->>> https://lists.cs.columbia.edu/pipermail/kvmarm/2017-January/023195.html
->>>
->>> This commit gets rid of the precomputed pending field in favor of a
->>> function that calculates the value when needed, irq_is_pending().
->>>
->>> The soft_pending field is renamed to pending_latch to represent that
->>> this latch is the equivalent hardware latch which gets manipulated by
->>> the input signal for edge-triggered interrupts and when writing to the
->>> SPENDR/CPENDR registers.
->>>
->>> After this commit save/restore code should be able to simply restore the
->>> pending_latch state, line_level state, and config state in any order and
->>> get the desired result.
->>
->> In general I like this very much and am wondering why we didn't come up
->> with this earlier. But I guess we were so subscribed to our "cached
->> pending" bit.
->>
->> So I checked several cases, tested some logic equations and drew the
->> state diagrams for the "before" and "after" case, but I couldn't find a
->> reason why this wouldn't work.
->>
->> I also think you can get rid of the irq_set_pending_latch() wrapper and
->> assign the value directly, as I don't see any reason to hide the fact
->> that it's indeed a simple assignment and nothing magic behind this
->> function. Also it would make the diff a bit easier to read.
+On Tuesday 24 January 2017 10:18:17 Pavel Machek wrote:
+> Hi!
+> On Mon 2017-01-23 14:44:54, Tony Lindgren wrote:
+> > * Pavel Machek <pavel@ucw.cz> [170123 14:26]:
+> > > [25392.239837] Unhandled fault: external abort on non-linefetch (0x1028) at 0xfa0ab060
+> > > [25392.239868] pgd = c0004000
+> > > [25392.239898] [fa0ab060] *pgd=48011452(bad)
+> > > [25392.239929] Internal error: : 1028 [#1] ARM
+> > > [25392.239929] Modules linked in:
+> > > [25392.239959] CPU: 0 PID: 24322 Comm: kworker/0:1 Not tainted 4.10.0-rc5-142127-g41f2839-dirty #222
+> > > [25392.239990] Hardware name: Nokia RX-51 board
+> > > [25392.240020] Workqueue: events musb_irq_work
+> > > [25392.240051] task: cd44d5c0 task.stack: cd308000
+> > > [25392.240051] PC is at musb_default_readb+0x0/0xc
+> > > [25392.240081] LR is at musb_irq_work+0x1c/0x1b0
+> > 
+> > OK I'm pretty sure the patch I posted few days ago fixes
+> > this. Can you please test patch "[PATCH] usb: musb: Fix
+> > external abort on non-linefetch for musb_irq_work()"?
 > 
-> Agreed.  Once we have agreement about if we should cleanup clearing the
-> latch state, I'll respin with that and add you and Marc's RB tags with
-> the changed version.
+> Can I get the copy of the patch?
 > 
->>
->> But apart from that:
->>
->> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
->>
->>
->> I also gave this a quick test on the Juno and the Midway with both
->> kvmtool and QEMU and they survived some basic testing.
->>
->> I need to check a GICv3 machine tomorrow, but I don't expect any
->> differences here.
->>
+> http://www.spinics.net/lists/linux-usb/msg152542.html
 > 
-> Thanks.
+> ...but it is html mangled with no obvious way to unmangle it.
+
+Another place when caller of pm_runtime_get_sync forgot to check return
+value? This is not first time I see this problem related to Nokia N900!
+
+In past I already suggested to use gcc attribute for pm_runtime_get_sync
+to issue warning when caller does not check return value.
+
+> > I was able to hit that only once so far, do you hit it
+> > every time with your built-in g_ether .config?
 > 
-> I tested this, including GICv2 migration on Mustang, and was going to do
-> GICv3 testing and 32-bit testin tomorrow, but I'm quite happy to hear
-> you gave it a spin on a 32-bit platform already.
+> I get it "way too often", like once a day. I don't yet know how to hit
+> it reliably :-(.
 
-OK, so a GICv3 machine survived over night testing, resulting in some 10
-millions of interrupts of every kind (LPIs, edge SPIs, some 100,000
-level SPIs (UART only), SGIs, PPIs).
-Same on a Juno, no LPIs there of course, but also millions of interrupts
-working fine over night.
-
-So:
-
-Tested-by: Andre Przywara <andre.przywara@arm.com>
-
-So this was just Linux as a guest, which - at least last time I checked
-- doesn't use GIC_DIST_SET_PENDING or GIC_DIST_CLEAR_PENDING registers
-too much (if at all under normal load).
-I think we should add some tests to kvm-unit-tests to actually trigger
-this code explicitly.
-
-Cheers,
-Andre.
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
