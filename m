@@ -1,23 +1,17 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Tue, 24 Jan 2017 08:03:49 +0200
-Subject: [linux-sunxi] [PATCH 00/11] clk: sunxi-ng: Add support for A80
- CCUs
-In-Reply-To: <20170124023230.3990-1-wens@csie.org>
-References: <20170124023230.3990-1-wens@csie.org>
-Message-ID: <1485237829.10979.1.camel@plaes.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 24 Jan 2017 14:22:24 +0800
+Subject: ARM: i.MX7: Fix LPSR specific iomux pins
+In-Reply-To: <20170119090924.19636-1-s.hauer@pengutronix.de>
+References: <20170119090924.19636-1-s.hauer@pengutronix.de>
+Message-ID: <20170124062222.GR5662@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-01-24 at 10:32 +0800, Chen-Yu Tsai wrote:
-> Hi everyone,
+On Thu, Jan 19, 2017 at 10:09:20AM +0100, Sascha Hauer wrote:
+> Sascha Hauer (4):
+>       ARM: dts: imx7s-warp: Fix watchdog pinmux
+>       ARM: dts: imx7d-sdp: Fix watchdog and pwm pinmux
+>       ARM: dts: imx7d-cl-som: Fix OTG power pinctrl
+>       ARM: dts: imx7: Add "LPSR" to LPSR iomux pin names
 
-Hi!
-
-Thanks for working on that!
-
-You might want to bump the copyright year starting from patch 5. 
-
-[...]
-
-P?ikest,
-Priit Laes
+Applied all, thanks.
