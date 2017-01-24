@@ -1,35 +1,36 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 24 Jan 2017 13:43:07 +0000
-Subject: [PATCH 5/8] ARM: dts: STiH410-b2260: Identify the UART RTS line
+Date: Tue, 24 Jan 2017 13:43:09 +0000
+Subject: [PATCH 7/8] ARM: dts: STiH407-family: Use new Pinctrl groups
 In-Reply-To: <20170124134310.27512-1-lee.jones@linaro.org>
 References: <20170124134310.27512-1-lee.jones@linaro.org>
-Message-ID: <20170124134310.27512-6-lee.jones@linaro.org>
+Message-ID: <20170124134310.27512-8-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When hardware flow-control is disabled, manual toggling of the UART's
-reset line (RTS) using userland applications (e.g. stty) is not
-possible, since the ASC IP does not provide this functionality in the
-same was as some other IPs do.  Thus, we have to do this manually.
-This patch configures the UART RTS line as a GPIO for manipulation
-within the UART driver when HW flow-control is not enabled.
+Having just defined some new Pinctrl groups for when when HW flow-
+control is {en,dis}abled, let's reference them for use within the
+driver.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/stih410-b2260.dts | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/stih407-family.dtsi | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/stih410-b2260.dts b/arch/arm/boot/dts/stih410-b2260.dts
-index 06b0696..fa16aba 100644
---- a/arch/arm/boot/dts/stih410-b2260.dts
-+++ b/arch/arm/boot/dts/stih410-b2260.dts
-@@ -63,6 +63,7 @@
- 		uart0: serial at 9830000 {
- 			label = "LS-UART0";
- 			status = "okay";
-+			rts-gpios = <&pio17 3 GPIO_ACTIVE_LOW>;
- 		};
+diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+index c8b2944..9789978 100644
+--- a/arch/arm/boot/dts/stih407-family.dtsi
++++ b/arch/arm/boot/dts/stih407-family.dtsi
+@@ -222,8 +222,9 @@
+ 			compatible = "st,asc";
+ 			reg = <0x9830000 0x2c>;
+ 			interrupts = <GIC_SPI 122 IRQ_TYPE_NONE>;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_serial0>;
++			pinctrl-names = "default", "manual-rts";
++			pinctrl-0 = <&pinctrl_serial0_flowctrl>;
++			pinctrl-1 = <&pinctrl_serial0>;
+ 			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
  
- 		/* Low speed expansion connector */
+ 			status = "disabled";
 -- 
 2.10.2
