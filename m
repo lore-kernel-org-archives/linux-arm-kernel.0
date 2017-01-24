@@ -1,119 +1,71 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Tue, 24 Jan 2017 16:11:31 +0100
-Subject: [RFC PATCH v1] ARM: Import tango4_defconfig
-Message-ID: <5c615aa5-678e-63b8-ecae-f5f0bd8a6f2c@sigmadesigns.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Tue, 24 Jan 2017 20:42:23 +0530
+Subject: [PATCH 0/5] Implement SMMU passthrough using the default domain
+In-Reply-To: <1484849955-1871-1-git-send-email-will.deacon@arm.com>
+References: <1484849955-1871-1-git-send-email-will.deacon@arm.com>
+Message-ID: <010801d27654$47b7e450$d727acf0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Import minimal defconfig for tango4 boards.
+Hi Will,
 
-Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
----
- arch/arm/configs/tango4_defconfig | 96 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 96 insertions(+)
- create mode 100644 arch/arm/configs/tango4_defconfig
+>Hi all,
+>
+>A number of people have expressed interest in having the SMMU come up in
+>a passthrough configuration, and then allow subsequent translation for
+>things such as VFIO. Rather than do this in each SMMU driver, it's much
+>cleaner to allow the default domain to be configured to be something other
+>than DMA.
+>
+>This patch series implements a command-line option to configure the
+>default domain type. Currently, it supports "dma" and "identity" which
+>is sufficient for the passthrough use-case.
+>
+>Tested on an ARM fastmodel.
+>
+>All feedback welcome,
+>
 
-diff --git a/arch/arm/configs/tango4_defconfig b/arch/arm/configs/tango4_defconfig
-new file mode 100644
-index 000000000000..aab931fc0e03
---- /dev/null
-+++ b/arch/arm/configs/tango4_defconfig
-@@ -0,0 +1,96 @@
-+CONFIG_CROSS_COMPILE="arm-linux-gnueabihf-"
-+# CONFIG_SWAP is not set
-+CONFIG_SYSVIPC=y
-+CONFIG_NO_HZ_IDLE=y
-+CONFIG_HIGH_RES_TIMERS=y
-+# CONFIG_COMPAT_BRK is not set
-+CONFIG_SLAB=y
-+CONFIG_MODULES=y
-+CONFIG_MODULE_UNLOAD=y
-+CONFIG_MODVERSIONS=y
-+CONFIG_ARCH_TANGO=y
-+# CONFIG_ARM_ERRATA_643719 is not set
-+CONFIG_SMP=y
-+CONFIG_PREEMPT=y
-+CONFIG_HZ_300=y
-+CONFIG_AEABI=y
-+CONFIG_HIGHMEM=y
-+# CONFIG_ATAGS is not set
-+CONFIG_ARM_APPENDED_DTB=y
-+CONFIG_ARM_ATAG_DTB_COMPAT=y
-+CONFIG_CMDLINE="console=ttyS0,115200 mem=256M"
-+CONFIG_CPU_FREQ=y
-+CONFIG_CPU_FREQ_GOV_ONDEMAND=y
-+CONFIG_CPUFREQ_DT=y
-+CONFIG_VFP=y
-+CONFIG_NEON=y
-+CONFIG_NET=y
-+CONFIG_PACKET=y
-+CONFIG_UNIX=y
-+CONFIG_INET=y
-+CONFIG_IP_MULTICAST=y
-+CONFIG_IP_PNP=y
-+CONFIG_IP_PNP_DHCP=y
-+# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
-+# CONFIG_INET_XFRM_MODE_TUNNEL is not set
-+# CONFIG_INET_XFRM_MODE_BEET is not set
-+# CONFIG_IPV6 is not set
-+CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+CONFIG_MTD=y
-+CONFIG_MTD_TESTS=m
-+CONFIG_MTD_CMDLINE_PARTS=y
-+CONFIG_MTD_NAND=y
-+CONFIG_MTD_NAND_TANGO=y
-+CONFIG_BLK_DEV_LOOP=y
-+CONFIG_SCSI=y
-+CONFIG_BLK_DEV_SD=y
-+CONFIG_NETDEVICES=y
-+CONFIG_NET_VENDOR_AURORA=y
-+CONFIG_AURORA_NB8800=y
-+CONFIG_AT803X_PHY=y
-+# CONFIG_WLAN is not set
-+# CONFIG_INPUT_MOUSEDEV is not set
-+# CONFIG_INPUT_KEYBOARD is not set
-+# CONFIG_INPUT_MOUSE is not set
-+# CONFIG_SERIO is not set
-+CONFIG_SERIAL_8250=y
-+# CONFIG_SERIAL_8250_DEPRECATED_OPTIONS is not set
-+CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_RT288X=y
-+CONFIG_SERIAL_OF_PLATFORM=y
-+# CONFIG_HW_RANDOM is not set
-+CONFIG_I2C=y
-+CONFIG_I2C_XLR=y
-+CONFIG_GPIOLIB=y
-+CONFIG_THERMAL=y
-+CONFIG_CPU_THERMAL=y
-+CONFIG_TANGO_THERMAL=y
-+CONFIG_WATCHDOG=y
-+CONFIG_TANGOX_WATCHDOG=y
-+CONFIG_FB=y
-+# CONFIG_HID is not set
-+# CONFIG_USB_HID is not set
-+CONFIG_USB=y
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_STORAGE=y
-+CONFIG_USB_CHIPIDEA=y
-+CONFIG_USB_CHIPIDEA_HOST=y
-+CONFIG_MMC=y
-+CONFIG_MMC_SDHCI=y
-+CONFIG_MMC_SDHCI_PLTFM=y
-+CONFIG_MMC_SDHCI_OF_ARASAN=y
-+CONFIG_DMADEVICES=y
-+CONFIG_EXT4_FS=y
-+CONFIG_FUSE_FS=m
-+CONFIG_VFAT_FS=m
-+CONFIG_TMPFS=y
-+CONFIG_NFS_FS=y
-+# CONFIG_NFS_V2 is not set
-+CONFIG_ROOT_NFS=y
-+CONFIG_NLS_CODEPAGE_437=m
-+CONFIG_NLS_ISO8859_1=m
-+CONFIG_NLS_UTF8=m
-+CONFIG_PRINTK_TIME=y
-+# CONFIG_CRYPTO_ECHAINIV is not set
--- 
-2.10.0
+Thanks for this series. We had a case with the GPU.
+The GPU's iommu was setup by kernel and the GPU
+also does dynamic updates for on-the-fly switching between
+process pagetables.  GPU driver was not using DMA domain and
+the GPU's firmware was always expecting to run out  of contextbank
+ '0' (although not correct) , which was not the case after the DMA domain
+was made default  as '0' was getting allocated for DMA domain and
+there were concerns about reusing the DMA domain as well.
+Now with this series, looks there is an way out of that that can be tried.
+
+So should the default domain not be per device specific selectable ?
+
+Regards,
+ Sricharan
+
+
+
+>Will
+>
+>--->8
+>
+>Will Deacon (5):
+>  iommu/arm-smmu: Restrict domain attributes to UNMANAGED domains
+>  iommu/arm-smmu: Install bypass S2CRs for IOMMU_DOMAIN_IDENTITY domains
+>  iommu/arm-smmu-v3: Install bypass STEs for IOMMU_DOMAIN_IDENTITY
+>    domains
+>  arm64: dma-mapping: Only swizzle DMA ops for IOMMU_DOMAIN_DMA
+>  iommu: Allow default domain type to be set on the kernel command line
+>
+> arch/arm64/mm/dma-mapping.c | 17 ++++++++++++-----
+> drivers/iommu/arm-smmu-v3.c | 20 ++++++++++++++++++--
+> drivers/iommu/arm-smmu.c    | 26 +++++++++++++++++++++++---
+> drivers/iommu/iommu.c       | 19 +++++++++++++++++--
+> 4 files changed, 70 insertions(+), 12 deletions(-)
+>
+>--
+>2.1.4
+>
+>
+>_______________________________________________
+>linux-arm-kernel mailing list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
