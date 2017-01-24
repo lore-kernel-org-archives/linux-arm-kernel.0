@@ -1,25 +1,25 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 24 Jan 2017 16:10:57 +0530
-Subject: [PATCH v2] arm: davinci: Make the usb20 clock available to PM
- runtime
-In-Reply-To: <20170124103226.15377-1-abailon@baylibre.com>
-References: <20170124103226.15377-1-abailon@baylibre.com>
-Message-ID: <22d793a6-71db-cbf4-2f76-6539015e285b@ti.com>
+From: guohanjun@huawei.com (Hanjun Guo)
+Date: Tue, 24 Jan 2017 18:39:49 +0800
+Subject: [PATCH 0/2] arch_timer: acpi: Add workaround for hisilicon-161010101
+ erratum
+Message-ID: <1485254391-51551-1-git-send-email-guohanjun@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 January 2017 04:02 PM, Alexandre Bailon wrote:
-> Add usb20 to the list of clock supported by PM runtime.
+From: Hanjun Guo <hanjun.guo@linaro.org>
 
-Patch description does not match contents. You should rather talk about:
-since USB20 subsystem uses just one clock, there is no need of a con_id,
-so we are using NULL.
+Introduce a general quirk framework for arch timer erratum in ACPI,
+which use the oem information in GTDT table for platform specific
+erratums, then add specific handler and data for hisilicon-161010101
+erratum.
 
-Also, "ARM: " prefix should be capitalized .
+Hanjun Guo (2):
+  arm64: arch_timer: acpi: Introduce a generic aquirk framework for
+    erratum
+  arch_timer: acpi: add hisi timer erratum data
 
-> 
-> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
-> Suggested-by: Sekhar Nori <nsekhar@ti.com>
+ drivers/clocksource/arm_arch_timer.c | 58 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 58 insertions(+)
 
-Thanks,
-Sekhar
+-- 
+1.7.12.4
