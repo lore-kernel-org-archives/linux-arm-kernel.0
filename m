@@ -1,154 +1,109 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 24 Jan 2017 13:43:19 +1100
-Subject: linux-next: manual merge of the mfd tree with the arm-soc tree
-Message-ID: <20170124134319.2a6ba85d@canb.auug.org.au>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Tue, 24 Jan 2017 10:54:04 +0800
+Subject: [PATCH v2] drm/mediatek: Support UYVY and YUYV format for overlay
+In-Reply-To: <1485221752.9687.2.camel@mtksdaap41>
+References: <1483079183-38637-1-git-send-email-bibby.hsieh@mediatek.com>
+ <CAGS+omDHrYnUeRybHt+FtmjLS8d6jO-3==DYYCzbuhFZJME_Gg@mail.gmail.com>
+ <1485221752.9687.2.camel@mtksdaap41>
+Message-ID: <CAGS+omAqvoA1jjVpZi6v7r1X6eMgo5Jiaz0CHM9sur1M+M63HQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Tue, Jan 24, 2017 at 9:35 AM, Bibby Hsieh <bibby.hsieh@mediatek.com> wrote:
+>
+> Hi, Daniel,
+>
+> Thanks for your comment.
+>
+> On Tue, 2017-01-03 at 14:27 +0800, Daniel Kurtz wrote:
+> > On Fri, Dec 30, 2016 at 2:26 PM, Bibby Hsieh <bibby.hsieh@mediatek.com> wrote:
+> > >
+> > > MT8173 overlay can support UYVY and YUYV format,
+> > > we add the format in DRM driver.
+> > >
+> > > Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+> > > Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> > > ---
+> > >  drivers/gpu/drm/mediatek/mtk_disp_ovl.c  | 21 +++++++++++++++++++++
+> > >  drivers/gpu/drm/mediatek/mtk_drm_plane.c |  2 ++
+> > >  2 files changed, 23 insertions(+)
+> > >
+> > > diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+> > > index c703102..de05845 100644
+> > > --- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+> > > +++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+> > > @@ -40,10 +40,13 @@
+> > >  #define        OVL_RDMA_MEM_GMC        0x40402020
+> > >
+> > >  #define OVL_CON_BYTE_SWAP      BIT(24)
+> > > +#define OVL_CON_MTX_YUV_TO_RGB (6 << 16)
+> > >  #define OVL_CON_CLRFMT_RGB565  (0 << 12)
+> > >  #define OVL_CON_CLRFMT_RGB888  (1 << 12)
+> > >  #define OVL_CON_CLRFMT_RGBA8888        (2 << 12)
+> > >  #define OVL_CON_CLRFMT_ARGB8888        (3 << 12)
+> > > +#define OVL_CON_CLRFMT_UYVY    (4 << 12)
+> > > +#define OVL_CON_CLRFMT_YUYV    (5 << 12)
+> >
+> > Why not just add " | OVL_CON_MTX_YUV_TO_RGB" here in the definition of
+> > these two constants, instead of adding a helper function?
+> >
+> > >  #define        OVL_CON_AEN             BIT(8)
+> > >  #define        OVL_CON_ALPHA           0xff
+> > >
+> > > @@ -162,6 +165,21 @@ static unsigned int ovl_fmt_convert(unsigned int fmt)
+> > >         case DRM_FORMAT_XBGR8888:
+> > >         case DRM_FORMAT_ABGR8888:
+> > >                 return OVL_CON_CLRFMT_RGBA8888 | OVL_CON_BYTE_SWAP;
+> > > +       case DRM_FORMAT_UYVY:
+> > > +               return OVL_CON_CLRFMT_UYVY;
+> > > +       case DRM_FORMAT_YUYV:
+> > > +               return OVL_CON_CLRFMT_YUYV;
+> > > +       }
+> > > +}
+> How about adding " | OVL_CON_MTX_YUV_TO_RGB" after here in "return
+> OVL_CON_CLRFMT_UYVY" and "return OVL_CON_CLRFMT_YUYV" ??
 
-Today's linux-next merge of the mfd tree got a conflict in:
+Sounds good to me.
 
-  arch/arm/boot/dts/stm32f429.dtsi
-
-between commits:
-
-  3604ef9c8154 ("ARM: dts: stm32: Add ADC support to stm32f429")
-  dd3feb755a4a ("ARM: dts: stm32: Add RTC support for STM32F429 MCU")
-
-from the arm-soc tree and commit:
-
-  9072b6b2ba83 ("ARM: dts: stm32: add Timers driver for stm32f429 MCU")
-
-from the mfd tree.
-
-I fixed it up (see below) and can carry the fix as necessary. This
-is now fixed as far as linux-next is concerned, but any non trivial
-conflicts should be mentioned to your upstream maintainer when your tree
-is submitted for merging.  You may also want to consider cooperating
-with the maintainer of the conflicting tree to minimise any particularly
-complex conflicts.
-
--- 
-Cheers,
-Stephen Rothwell
-
-diff --cc arch/arm/boot/dts/stm32f429.dtsi
-index f05a9d95ef23,b6089351c0d3..000000000000
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@@ -125,20 -218,73 +225,87 @@@
-  			status = "disabled";
-  		};
-  
-+ 		timers7: timers at 40001400 {
-+ 			#address-cells = <1>;
-+ 			#size-cells = <0>;
-+ 			compatible = "st,stm32-timers";
-+ 			reg = <0x40001400 0x400>;
-+ 			clocks = <&rcc 0 133>;
-+ 			clock-names = "int";
-+ 			status = "disabled";
-+ 
-+ 			timer at 6 {
-+ 				compatible = "st,stm32-timer-trigger";
-+ 				reg = <6>;
-+ 				status = "disabled";
-+ 			};
-+ 		};
-+ 
-+ 			timers12: timers at 40001800 {
-+ 			#address-cells = <1>;
-+ 			#size-cells = <0>;
-+ 			compatible = "st,stm32-timers";
-+ 			reg = <0x40001800 0x400>;
-+ 			clocks = <&rcc 0 134>;
-+ 			clock-names = "int";
-+ 			status = "disabled";
-+ 
-+ 			pwm {
-+ 				compatible = "st,stm32-pwm";
-+ 				status = "disabled";
-+ 			};
-+ 
-+ 			timer at 11 {
-+ 				compatible = "st,stm32-timer-trigger";
-+ 				reg = <11>;
-+ 				status = "disabled";
-+ 			};
-+ 		};
-+ 
-+ 		timers13: timers at 40001c00 {
-+ 			#address-cells = <1>;
-+ 			#size-cells = <0>;
-+ 			compatible = "st,stm32-timers";
-+ 			reg = <0x40001C00 0x400>;
-+ 			clocks = <&rcc 0 135>;
-+ 			clock-names = "int";
-+ 			status = "disabled";
-+ 
-+ 			pwm {
-+ 				compatible = "st,stm32-pwm";
-+ 				status = "disabled";
-+ 			};
-+ 		};
-+ 
-+ 		timers14: timers at 40002000 {
-+ 			#address-cells = <1>;
-+ 			#size-cells = <0>;
-+ 			compatible = "st,stm32-timers";
-+ 			reg = <0x40002000 0x400>;
-+ 			clocks = <&rcc 0 136>;
-+ 			clock-names = "int";
-+ 			status = "disabled";
-+ 
-+ 			pwm {
-+ 				compatible = "st,stm32-pwm";
-+ 				status = "disabled";
-+ 			};
-+ 		};
-+ 
- +		rtc: rtc at 40002800 {
- +			compatible = "st,stm32-rtc";
- +			reg = <0x40002800 0x400>;
- +			clocks = <&rcc 1 CLK_RTC>;
- +			clock-names = "ck_rtc";
- +			assigned-clocks = <&rcc 1 CLK_RTC>;
- +			assigned-clock-parents = <&rcc 1 CLK_LSE>;
- +			interrupt-parent = <&exti>;
- +			interrupts = <17 1>;
- +			interrupt-names = "alarm";
- +			st,syscfg = <&pwrcfg>;
- +			status = "disabled";
- +		};
- +
-  		usart2: serial at 40004400 {
-  			compatible = "st,stm32-usart", "st,stm32-uart";
-  			reg = <0x40004400 0x400>;
-@@@ -433,11 -616,20 +693,26 @@@
-  				};
-  			};
-  
- +			adc3_in8_pin: adc at 200 {
- +				pins {
- +					pinmux = <STM32F429_PF10_FUNC_ANALOG>;
- +				};
- +			};
-++
-+ 			pwm1_pins: pwm at 1 {
-+ 				pins {
-+ 					pinmux = <STM32F429_PA8_FUNC_TIM1_CH1>,
-+ 						 <STM32F429_PB13_FUNC_TIM1_CH1N>,
-+ 						 <STM32F429_PB12_FUNC_TIM1_BKIN>;
-+ 				};
-+ 			};
-+ 
-+ 			pwm3_pins: pwm at 3 {
-+ 				pins {
-+ 					pinmux = <STM32F429_PB4_FUNC_TIM3_CH1>,
-+ 						 <STM32F429_PB5_FUNC_TIM3_CH2>;
-+ 				};
-+ 			};
-  		};
-  
-  		rcc: rcc at 40023810 {
+> > > +
+> > > +static bool ovl_yuv_space(unsigned int fmt)
+> > > +{
+> > > +       switch (fmt) {
+> > > +       case DRM_FORMAT_UYVY:
+> > > +       case DRM_FORMAT_YUYV:
+> > > +               return true;
+> > > +       default:
+> > > +               return false;
+> > >         }
+> > >  }
+> > >
+> > > @@ -183,6 +201,9 @@ static void mtk_ovl_layer_config(struct mtk_ddp_comp *comp, unsigned int idx,
+> > >         if (idx != 0)
+> > >                 con |= OVL_CON_AEN | OVL_CON_ALPHA;
+> > >
+> > > +       if (ovl_yuv_space(fmt))
+> > > +               con |= OVL_CON_MTX_YUV_TO_RGB;
+> > > +
+> > >         writel_relaxed(con, comp->regs + DISP_REG_OVL_CON(idx));
+> > >         writel_relaxed(pitch, comp->regs + DISP_REG_OVL_PITCH(idx));
+> > >         writel_relaxed(src_size, comp->regs + DISP_REG_OVL_SRC_SIZE(idx));
+> > > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_plane.c b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
+> > > index c461a23..8c02d1d 100644
+> > > --- a/drivers/gpu/drm/mediatek/mtk_drm_plane.c
+> > > +++ b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
+> > > @@ -28,6 +28,8 @@
+> > >         DRM_FORMAT_XRGB8888,
+> > >         DRM_FORMAT_ARGB8888,
+> > >         DRM_FORMAT_RGB565,
+> > > +       DRM_FORMAT_UYVY,
+> > > +       DRM_FORMAT_YUYV,
+> > >  };
+> > >
+> > >  static void mtk_plane_reset(struct drm_plane *plane)
+> > > --
+> > > 1.9.1
+> > >
+>
+> --
+> Bibby
+>
