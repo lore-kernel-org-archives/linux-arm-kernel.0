@@ -1,93 +1,141 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 24 Jan 2017 06:30:39 -0800
-Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
-In-Reply-To: <20170124141548.GA14489@amd>
-References: <20170123124058.GA17134@amd> <20170123141331.GA11402@amd>
- <da1f1b45-3ae5-ffe8-62c6-9ec7c3a1505b@roeck-us.net>
- <20170123144031.GA7870@amd> <20170123232654.GA19342@amd>
- <20170123234912.GA2460@roeck-us.net> <20170124070639.GA5068@rzhang1-surface>
- <b6d1670c-a83f-55aa-efd1-e52adb297ac6@roeck-us.net>
- <20170124141548.GA14489@amd>
-Message-ID: <44876c3d-158b-ecb3-2ae0-cd7cbf79ed29@roeck-us.net>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Tue, 24 Jan 2017 15:37:03 +0100
+Subject: [PATCH 2/7] iio: adc: stm32: Enable use of stm32 timer triggers
+In-Reply-To: <9826347e-d8e4-2386-cc7a-dd2c4909494b@kernel.org>
+References: <1484832854-6314-1-git-send-email-fabrice.gasnier@st.com>
+ <1484832854-6314-3-git-send-email-fabrice.gasnier@st.com>
+ <9826347e-d8e4-2386-cc7a-dd2c4909494b@kernel.org>
+Message-ID: <6e42a729-3513-5586-13dc-10cf5e90f6a3@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/24/2017 06:15 AM, Pavel Machek wrote:
-> Hi!
->
->>>>>> /sys files related to battery no longer appear. I beieve this has
->>>>>> something to do with it:
->>>>>>
->>>>>> [    2.374877] of_get_named_gpiod_flags: parsed 'reset-gpios' property
->>>>>> of node '/ocp at 68000000/spi at 48098000/tsc2005 at 0[0]' - status (0)
->>>>>> [    2.375946] input: TSC2005 touchscreen as
->>>>>> /devices/platform/68000000.ocp/48098000.spi/spi_master/spi1/spi1.0/input/input5
->>>>>> [    2.392120] rx51-battery: probe of n900-battery failed with error
->>>>>> -22
->>>>>
->>>>> Mystery solved:
->>>>>
->>>>> diff --git a/drivers/hwmon/hwmon.c b/drivers/hwmon/hwmon.c
->>>>> index 3932f92..fe5ec82 100644
->>>>> --- a/drivers/hwmon/hwmon.c
->>>>> +++ b/drivers/hwmon/hwmon.c
->>>>> @@ -545,8 +545,10 @@ __hwmon_device_register(struct device *dev, const char *name, void *drvdata,
->>>>> 	int i, j, err, id;
->>>>>
->>>>> 	/* Do not accept invalid characters in hwmon name attribute */
->>>>> -	if (name && (!strlen(name) || strpbrk(name, "-* \t\n")))
->>>>> +	if (name && (!strlen(name) || strpbrk(name, "-* \t\n"))) {
->>>>> +		printk("hwmon: Invalid character detected: %s\n", name);
->>>>> 		return ERR_PTR(-EINVAL);
->>>>> +	}
->>>>>
->>>>> 	id = ida_simple_get(&hwmon_ida, 0, 0, GFP_KERNEL);
->>>>> 	if (id < 0)
->>>>>
->>>>>
->>>>> pavel at n900:~$ dmesg | grep -5 Invalid
->>>>> [    0.829650] of_get_named_gpiod_flags: parsed 'gpio-reset' property
->>>>> of node '/ocp at 68000000/i2c at 48072000/tlv320aic3x at 19[0]' - status (0)
->>>>> [    0.833831] tsl2563 2-0029: model 7, rev. 0
->>>>> [    0.837768] of_get_named_gpiod_flags: parsed 'enable-gpio' property
->>>>> of node '/ocp at 68000000/i2c at 48072000/lp5523 at 32[0]' - status (0)
->>>>> [    1.921417] omap_i2c 48072000.i2c: controller timed out
->>>>> [    2.056823] lp5523x 2-0032: lp5523 Programmable led chip found
->>>>> [    2.064147] hwmon: Invalid character detected: bq27200-0
->>>>
->>>> So the problem is really that the thermal driver needs to create a valid name.
->>>>
->>> Right.
->>>
->>> Before reverting, can you please try if this patch works or not?
->
->>> diff --git a/drivers/thermal/thermal_hwmon.c b/drivers/thermal/thermal_hwmon.c
->>> index c4a508a..0c6789f 100644
->>> --- a/drivers/thermal/thermal_hwmon.c
->>> +++ b/drivers/thermal/thermal_hwmon.c
->>> @@ -157,8 +157,8 @@ int thermal_add_hwmon_sysfs(struct thermal_zone_device *tz)
->>>
->>> 	INIT_LIST_HEAD(&hwmon->tz_list);
->>> 	strlcpy(hwmon->type, tz->type, THERMAL_NAME_LENGTH);
->>> -	hwmon->device = hwmon_device_register_with_info(NULL, hwmon->type,
->>> -							hwmon, NULL, NULL);
->>> +	hwmon->device = hwmon_device_register_with_info(NULL, NULL, NULL,
->>> +							NULL, NULL);
+On 01/22/2017 01:55 PM, Jonathan Cameron wrote:
+> On 19/01/17 13:34, Fabrice Gasnier wrote:
+>> STM32 ADC has external timer trigger sources. Use stm32 timer triggers
+>> API (e.g. is_stm32_timer_trigger()) with local ADC lookup table to
+>> validate a trigger can be used.
+>> This also provides correct trigger selection value (e.g. extsel).
 >>
->> This is wrong. The name should be converted to a valid name. Otherwise you would
->> still have to provide the name attribute yourself, and the resulting name would
->> still be invalid. A simple fix would be to add
->> 	strreplace(hwmon->type, '-', '_');
->> after strlcpy().
+>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> Looks good. Observations inline.
+>> ---
+>>  drivers/iio/adc/Kconfig     |  2 ++
+>>  drivers/iio/adc/stm32-adc.c | 60 +++++++++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 62 insertions(+)
+>>
+>> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
+>> index 33341f4..9a7b090 100644
+>> --- a/drivers/iio/adc/Kconfig
+>> +++ b/drivers/iio/adc/Kconfig
+>> @@ -447,6 +447,8 @@ config STM32_ADC_CORE
+>>  	depends on OF
+>>  	depends on REGULATOR
+>>  	select IIO_BUFFER
+>> +	select MFD_STM32_TIMERS
+>> +	select IIO_STM32_TIMER_TRIGGER
+>>  	select IIO_TRIGGERED_BUFFER
+>>  	help
+>>  	  Select this option to enable the core driver for STMicroelectronics
+>> diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
+>> index 8d0b74b..30708bc 100644
+>> --- a/drivers/iio/adc/stm32-adc.c
+>> +++ b/drivers/iio/adc/stm32-adc.c
+>> @@ -23,6 +23,7 @@
+>>  #include <linux/delay.h>
+>>  #include <linux/iio/iio.h>
+>>  #include <linux/iio/buffer.h>
+>> +#include <linux/iio/timer/stm32-timer-trigger.h>
+>>  #include <linux/iio/trigger.h>
+>>  #include <linux/iio/trigger_consumer.h>
+>>  #include <linux/iio/triggered_buffer.h>
+>> @@ -122,6 +123,35 @@ enum stm32_adc_exten {
+>>  	STM32_EXTEN_HWTRIG_BOTH_EDGES,
+>>  };
+>>
+>> +/* extsel - trigger mux selection value */
+>> +enum stm32_adc_extsel {
+>> +	STM32_EXT0,
+>> +	STM32_EXT1,
+>> +	STM32_EXT2,
+>> +	STM32_EXT3,
+>> +	STM32_EXT4,
+>> +	STM32_EXT5,
+>> +	STM32_EXT6,
+>> +	STM32_EXT7,
+>> +	STM32_EXT8,
+>> +	STM32_EXT9,
+>> +	STM32_EXT10,
+>> +	STM32_EXT11,
+>> +	STM32_EXT12,
+>> +	STM32_EXT13,
+>> +	STM32_EXT14,
+>> +	STM32_EXT15,
+>> +};
+>> +
+>> +/**
+>> + * struct stm32_adc_trig_info - ADC trigger info
+>> + * @name:		name of the trigger, corresponding to its source
+>> + * @extsel:		trigger selection
+>> + */
+>> +struct stm32_adc_trig_info {
+>> +	const char *name;
+>> +	enum stm32_adc_extsel extsel;
+>> +};
+>>
+>>  /**
+>>   * struct stm32_adc - private data of each ADC IIO instance
+>> @@ -218,6 +248,26 @@ struct stm32_adc_regs {
+>>  	{ STM32F4_ADC_SQR1, STM32F4_SQ16_MASK, STM32F4_SQ16_SHIFT },
+>>  };
+>>
+>> +/* STM32F4 external trigger sources for all instances */
+>> +static struct stm32_adc_trig_info stm32f4_adc_timer_trigs[] = {
+>> +	{ TIM1_CH1, STM32_EXT0 },
+>> +	{ TIM1_CH2, STM32_EXT1 },
+>> +	{ TIM1_CH3, STM32_EXT2 },
+>> +	{ TIM2_CH2, STM32_EXT3 },
+>> +	{ TIM2_CH3, STM32_EXT4 },
+>> +	{ TIM2_CH4, STM32_EXT5 },
+>> +	{ TIM2_TRGO, STM32_EXT6 },
+>> +	{ TIM3_CH1, STM32_EXT7 },
+>> +	{ TIM3_TRGO, STM32_EXT8 },
+>> +	{ TIM4_CH4, STM32_EXT9 },
+>> +	{ TIM5_CH1, STM32_EXT10 },
+>> +	{ TIM5_CH2, STM32_EXT11 },
+>> +	{ TIM5_CH3, STM32_EXT12 },
+>> +	{ TIM8_CH1, STM32_EXT13 },
+>> +	{ TIM8_TRGO, STM32_EXT14 },
+>> +	{}, /* sentinel */
+>> +};
+>> +
+>>  /**
+>>   * STM32 ADC registers access routines
+>>   * @adc: stm32 adc instance
+>> @@ -362,6 +412,16 @@ static int stm32_adc_conf_scan_seq(struct iio_dev *indio_dev,
+>>  static int stm32_adc_get_trig_extsel(struct iio_dev *indio_dev,
+>>  				     struct iio_trigger *trig)
+>>  {
+>> +	int i;
+> Ah. This makes more sense than patch 1 on it's own did.
+>> +
+>> +	/* lookup triggers registered by stm32 timer trigger driver */
+>> +	for (i = 0; stm32f4_adc_timer_trigs[i].name; i++) {
+>> +		if (is_stm32_timer_trigger(trig) &&
+>> +		    !strcmp(stm32f4_adc_timer_trigs[i].name, trig->name)) {
+>> +			return stm32f4_adc_timer_trigs[i].extsel;
+> Good. The combination of the first check and the name match should make this safe
+> against those triggers that can be assigned arbitrary names.
+
+Do you wish I add a comment about it ?
+
+Best Regards,
+Fabrice
+
+>> +		}
+>> +	}
+>> +
+>>  	return -EINVAL;
+>>  }
+>>
+>>
 >
-> Simple, yes. But that will change userland interface. Is it okay thing
-> to do?
-
-Yes, because the old name is invalid. Note that the new API also changes the
-sysfs directory path. But, as mentioned separately, if providing valid
-names is unacceptable for thermal drivers, the thermal subsystem will have
-to stick with the old API (and I may create a patch to make the name attribute
-mandatory for the new API to prevent people from defeating the purpose
-of the conversion by not providing one).
-
-Guenter
