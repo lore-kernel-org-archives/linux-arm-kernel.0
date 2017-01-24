@@ -1,9 +1,9 @@
 From: andy.gross@linaro.org (Andy Gross)
-Date: Tue, 24 Jan 2017 00:48:12 -0600
-Subject: [GIT PULL] Qualcomm Driver Updates for v4.11
+Date: Tue, 24 Jan 2017 00:48:13 -0600
+Subject: [GIT PULL] Qualcomm Device Tree Changes for v4.11
 In-Reply-To: <1485240494-8040-1-git-send-email-andy.gross@linaro.org>
 References: <1485240494-8040-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <1485240494-8040-3-git-send-email-andy.gross@linaro.org>
+Message-ID: <1485240494-8040-4-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,40 +13,61 @@ The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-drivers-for-4.11
+  git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-dts-for-4.11
 
-for you to fetch changes up to a811b420b6c13759540070c0e9541b7cd8569168:
+for you to fetch changes up to 7a5c275fd82185e98969d3370d55b5b5473fc3ba:
 
-  firmware: qcom_scm: Add set remote state API (2017-01-16 23:45:04 -0600)
-
-----------------------------------------------------------------
-Qualcomm ARM Based Driver Updates for v4.11
-
-* Fix issues with SCM compile testing
-* Add SCM set remote state API
-* Mask APQ8064 SCM clock dependency issue
-* Add Qualcomm DMA folder to MAINTAINERS
-* Fix EBI2 dependencies
+  ARM: dts: qcom: Add apq8064 CoreSight components (2017-01-13 12:42:00 -0600)
 
 ----------------------------------------------------------------
-Andy Gross (2):
-      firmware: qcom: scm: Mask APQ8064 core clk dependency
-      firmware: qcom_scm: Add set remote state API
+Qualcomm Device Tree Changes for v4.11
 
-Linus Walleij (1):
-      bus: qcom_ebi2: default y if ARCH_QCOM
+* Add Coresight components for APQ8064
+* Fixup PM8058 nodes
+* Add APQ8060 gyro and accel support
+* Enable SD600 HDMI support
+* Add RIVA supprort for Sony Yuga and SD600
+* Add PM8821 support
+* Add MSM8974 ADSP, USB gadget, SMD, and SMP2P support
+* Fix IPQ8064 clock frequencies
 
-Pramod Gurav (1):
-      MAINTAINERS: Update the files to include the Qualcomm DMA folder
+----------------------------------------------------------------
+Bjorn Andersson (7):
+      ARM: dts: qcom: msm8974: Add USB gadget nodes
+      ARM: dts: msm8974: Add ADSP smp2p and smd nodes
+      ARM: dts: msm8974: Add ADSP PIL node
+      ARM: dts: qcom: apq8064: Add riva-pil node
+      ARM: dts: qcom: apq8064-sony-yuga: Enable riva-pil
+      ARM: dts: qcom: sd600-eval: pm8921_s2 regulator properties
+      ARM: dts: qcom: sd600eval: Enable riva-pil
 
-Stanimir Varbanov (1):
-      firmware: qcom: scm: Add empty functions to help compile testing
+Ivan T. Ivanov (1):
+      ARM: dts: qcom: Add apq8064 CoreSight components
 
- MAINTAINERS                    |  1 +
- drivers/bus/Kconfig            |  1 +
- drivers/firmware/qcom_scm-32.c | 18 ++++++++++++++
- drivers/firmware/qcom_scm-64.c | 16 +++++++++++++
- drivers/firmware/qcom_scm.c    |  8 ++++++-
- drivers/firmware/qcom_scm.h    |  2 ++
- include/linux/qcom_scm.h       | 54 +++++++++++++++++++++++++++++-------------
- 7 files changed, 83 insertions(+), 17 deletions(-)
+Linus Walleij (3):
+      ARM: dts: rename MSM8660/APQ8060 pmicintc to pm8058
+      ARM: dts: reference PM8058 as IRQ parent
+      ARM: dts: Add gyro and accel to APQ8060 Dragonboard
+
+Srinivas Kandagatla (4):
+      ARM: dts: apq8064: add support to pm8821
+      ARM: dts: move hdmi pinctrl out of board file.
+      ARM: dts: sd-600eval: add hdmi support
+      ARM: dts: sd-600eval: enable 1.8v regulator on LS expansion
+
+Stephen Boyd (2):
+      ARM: dts: msm8974: Remove "unused" reserved region
+      arm: dts: qcom: Fix ipq board clock rates
+
+ arch/arm/boot/dts/qcom-apq8060-dragonboard.dts     |  62 ++++-
+ .../arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts |  69 +++++
+ arch/arm/boot/dts/qcom-apq8064-ifc6410.dts         |  22 --
+ arch/arm/boot/dts/qcom-apq8064-pins.dtsi           |  37 +++
+ .../arm/boot/dts/qcom-apq8064-sony-xperia-yuga.dts |   7 +
+ arch/arm/boot/dts/qcom-apq8064.dtsi                | 288 ++++++++++++++++++++-
+ arch/arm/boot/dts/qcom-ipq8064.dtsi                |   4 +-
+ arch/arm/boot/dts/qcom-msm8660-surf.dts            |   2 +-
+ arch/arm/boot/dts/qcom-msm8660.dtsi                |  12 +-
+ .../boot/dts/qcom-msm8974-sony-xperia-honami.dts   |   8 +
+ arch/arm/boot/dts/qcom-msm8974.dtsi                |  96 ++++++-
+ 11 files changed, 560 insertions(+), 47 deletions(-)
