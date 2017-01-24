@@ -1,30 +1,34 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 24 Jan 2017 14:39:41 +0100
-Subject: [PATCH] tcb_clksrc: Use 32 bit tcb as sched_clock
-In-Reply-To: <20170123135942.GC2166@mai>
-References: <20170111135059.21318-1-david.engraf@sysgo.com>
- <20170123135942.GC2166@mai>
-Message-ID: <d93a8708-21e7-ba1f-8422-bf658b388c6a@atmel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 24 Jan 2017 13:43:02 +0000
+Subject: [PATCH 0/8] serial: st-asc: Allow handling of RTS line
+Message-ID: <20170124134310.27512-1-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 23/01/2017 ? 14:59, Daniel Lezcano a ?crit :
-> On Wed, Jan 11, 2017 at 02:50:59PM +0100, David Engraf wrote:
->> On newer boards the TC can be read as single 32 bit value without locking.
->> Thus the clock can be used as reference for sched_clock which is much more
->> accurate than the jiffies implementation.
->>
->> Tested on a Atmel SAMA5D2 board.
->>
->> Signed-off-by: David Engraf <david.engraf@sysgo.com>
->> ---
-> 
-> Nicolas,
-> 
-> if you agree I will take this change.
+When hardware flow-control is disabled, manual toggling of the UART's
+reset line (RTS) using userland applications (e.g. stty) is not
+possible, since the ASC IP does not provide this functionality in the
+same was as some other IPs do.  Thus, we have to do this manually.
 
-Absolutely. I've just added the Ack.
+This set ensures the correct Pinctrl groups are configured and
+obtained for both manual toggling of the RTS line and for the IP to
+take over the lines when HW flow-control is requested by the user.
 
-Thanks for the head-up. Bye,
+Lee Jones (8):
+  serial: st-asc: Ignore the parity error bit if 8-bit mode is enabled
+  serial: st-asc: Provide RTS functionality
+  serial: st-asc: Read in all Pinctrl states
+  serial: st-asc: (De)Register GPIOD and swap Pinctrl profiles
+  ARM: dts: STiH410-b2260: Identify the UART RTS line
+  ARM: dts: STiH407-pinctrl: Add Pinctrl group for HW flow-control
+  ARM: dts: STiH407-family: Use new Pinctrl groups
+  ARM: dts: STiH407-family: Enable HW flow-control
+
+ arch/arm/boot/dts/stih407-family.dtsi  |  7 +--
+ arch/arm/boot/dts/stih407-pinctrl.dtsi | 12 ++++-
+ arch/arm/boot/dts/stih410-b2260.dts    |  1 +
+ drivers/tty/serial/st-asc.c            | 98 +++++++++++++++++++++++++++++++---
+ 4 files changed, 105 insertions(+), 13 deletions(-)
+
 -- 
-Nicolas Ferre
+2.10.2
