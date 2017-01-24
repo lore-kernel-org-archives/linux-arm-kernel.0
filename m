@@ -1,52 +1,92 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 24 Jan 2017 10:18:17 +0100
-Subject: v4.9 to v4.10 regression: oops when USB cable is plugged in.
-In-Reply-To: <20170123224454.GY7403@atomide.com>
-References: <20170123222537.GA11543@amd>
- <20170123224454.GY7403@atomide.com>
-Message-ID: <20170124091817.GA29246@amd>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 24 Jan 2017 14:53:04 +0530
+Subject: [PATCH v7 3/5] phy: Add set_vbus callback
+In-Reply-To: <148520153091.3902.8594314895888325107@sboyd-linaro>
+References: <20170120185057.16206-1-stephen.boyd@linaro.org>
+ <20170120185057.16206-4-stephen.boyd@linaro.org> <5884715D.7050709@ti.com>
+ <148520153091.3902.8594314895888325107@sboyd-linaro>
+Message-ID: <58871CF8.8080109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-On Mon 2017-01-23 14:44:54, Tony Lindgren wrote:
-> * Pavel Machek <pavel@ucw.cz> [170123 14:26]:
-> > [25392.239837] Unhandled fault: external abort on non-linefetch (0x1028) at 0xfa0ab060
-> > [25392.239868] pgd = c0004000
-> > [25392.239898] [fa0ab060] *pgd=48011452(bad)
-> > [25392.239929] Internal error: : 1028 [#1] ARM
-> > [25392.239929] Modules linked in:
-> > [25392.239959] CPU: 0 PID: 24322 Comm: kworker/0:1 Not tainted 4.10.0-rc5-142127-g41f2839-dirty #222
-> > [25392.239990] Hardware name: Nokia RX-51 board
-> > [25392.240020] Workqueue: events musb_irq_work
-> > [25392.240051] task: cd44d5c0 task.stack: cd308000
-> > [25392.240051] PC is at musb_default_readb+0x0/0xc
-> > [25392.240081] LR is at musb_irq_work+0x1c/0x1b0
+Hi,
+
+On Tuesday 24 January 2017 01:28 AM, Stephen Boyd wrote:
+> Quoting Kishon Vijay Abraham I (2017-01-22 00:46:21)
+>> Hi,
+>>
+>> On Saturday 21 January 2017 12:20 AM, Stephen Boyd wrote:
+>>> Some USB PHYs need to be told about vbus changing state
+>>> explicitly. For example the qcom USB HS PHY needs to toggle a bit
+>>> when vbus goes from low to high (VBUSVLDEXT) to cause the
+>>> "session valid" signal to toggle. This signal will pull up D+
+>>> when the phy starts running. If the vbus signal isn't routed to
+>>> the PHY this "session valid" signal won't ever toggle, so we have
+>>> to toggle it explicitly. This callback is used to do that.
+>>>
+>>> Cc: Peter Chen <peter.chen@nxp.com>
+>>> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+>>> ---
+>>>
+>>> New patch
+>>>
+>>>  drivers/phy/phy-core.c  | 15 +++++++++++++++
+>>>  include/linux/phy/phy.h | 10 ++++++++++
+>>>  2 files changed, 25 insertions(+)
+>>>
+>>> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+>>> index a268f4d6f3e9..8b1a6bfa5133 100644
+>>> --- a/drivers/phy/phy-core.c
+>>> +++ b/drivers/phy/phy-core.c
+>>> @@ -357,6 +357,21 @@ int phy_set_mode(struct phy *phy, enum phy_mode mode)
+>>>  }
+>>>  EXPORT_SYMBOL_GPL(phy_set_mode);
+>>>  
+>>> +int phy_set_vbus(struct phy *phy, int on)
+>>> +{
+>>> +     int ret;
+>>> +
+>>> +     if (!phy || !phy->ops->set_vbus)
+>>> +             return 0;
+>>> +
+>>> +     mutex_lock(&phy->mutex);
+>>> +     ret = phy->ops->set_vbus(phy, on);
+>>> +     mutex_unlock(&phy->mutex);
+>>> +
+>>> +     return ret;
+>>> +}
+>>> +EXPORT_SYMBOL_GPL(phy_set_vbus);
+>>> +
+>>>  int phy_reset(struct phy *phy)
+>>>  {
+>>>       int ret;
+>>> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
+>>> index 78bb0d7f6b11..4d1ebde7fb14 100644
+>>> --- a/include/linux/phy/phy.h
+>>> +++ b/include/linux/phy/phy.h
+>>> @@ -36,6 +36,7 @@ enum phy_mode {
+>>>   * @power_on: powering on the phy
+>>>   * @power_off: powering off the phy
+>>>   * @set_mode: set the mode of the phy
+>>> + * @set_vbus: enable/disable vbus in the phy (USB)
+>>>   * @reset: resetting the phy
+>>>   * @owner: the module owner containing the ops
+>>>   */
+>>> @@ -45,6 +46,7 @@ struct phy_ops {
+>>>       int     (*power_on)(struct phy *phy);
+>>>       int     (*power_off)(struct phy *phy);
+>>>       int     (*set_mode)(struct phy *phy, enum phy_mode mode);
+>>> +     int     (*set_vbus)(struct phy *phy, int on);
+>>
+>> please avoid adding usb specific ops in generic phy ops.
+>>
 > 
-> OK I'm pretty sure the patch I posted few days ago fixes
-> this. Can you please test patch "[PATCH] usb: musb: Fix
-> external abort on non-linefetch for musb_irq_work()"?
+> Is there any alternative? Something has to happen here.
+> 
+> The only other thing I can think of is putting back the vbus extcon in
+> the phy driver so it can be notified when vbus is present or not. I can
 
-Can I get the copy of the patch?
+I think extcon should be used here to get vbus notification.
 
-http://www.spinics.net/lists/linux-usb/msg152542.html
-
-...but it is html mangled with no obvious way to unmangle it.
-
-> I was able to hit that only once so far, do you hit it
-> every time with your built-in g_ether .config?
-
-I get it "way too often", like once a day. I don't yet know how to hit
-it reliably :-(.
-
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170124/e8e1c30e/attachment.sig>
+Thanks
+Kishon
