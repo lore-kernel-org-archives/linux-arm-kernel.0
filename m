@@ -1,31 +1,63 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 24 Jan 2017 16:08:31 +0100
-Subject: [PATCH v9 0/4] arm64: arch_timer: Add workaround for
- hisilicon-161010101 erratum
-In-Reply-To: <1484832916-7248-1-git-send-email-dingtianhong@huawei.com>
-References: <1484832916-7248-1-git-send-email-dingtianhong@huawei.com>
-Message-ID: <765699aa-cbc6-67eb-9108-cbf335338e4c@linaro.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 24 Jan 2017 16:09:15 +0100
+Subject: [PATCH v6 2/4] dmaengine: Forward slave device pointer to
+ of_xlate callback
+In-Reply-To: <1485250055-22137-3-git-send-email-m.szyprowski@samsung.com>
+References: <CGME20170124092751eucas1p1411586335ad7083f7fff451212e002a3@eucas1p1.samsung.com>
+ <1485250055-22137-1-git-send-email-m.szyprowski@samsung.com>
+ <1485250055-22137-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CAPDyKFp8rRXsnkJ+XR_rV1JotPAJmC8bb9OwC0e0FP=VsrKrvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/01/2017 14:35, Ding Tianhong wrote:
-> Erratum Hisilicon-161010101 says that the ARM generic timer counter "has the
-> potential to contain an erroneous value when the timer value changes".
-> Accesses to TVAL (both read and write) are also affected due to the implicit counter
-> read.  Accesses to CVAL are not affected.
-> 
-> The workaround is to reread the system count registers until the value of the second
-> read is larger than the first one by less than 32, the system counter can be guaranteed
-> not to return wrong value twice by back-to-back read and the error value is always larger
-> than the correct one by 32. Writes to TVAL are replaced with an equivalent write to CVAL.
+On 24 January 2017 at 10:27, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> Add pointer to slave device to of_dma_xlate to let DMA engine driver
+> to know which slave device is using given DMA channel. This will be
+> later used to implement non-irq-safe runtime PM for DMA engine driver.
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Why not use another clocksource instead of adding a workaround with a
-non negligible overhead and more complexity in the code ?
+[...]
 
+> diff --git a/include/linux/of_dma.h b/include/linux/of_dma.h
+> index b90d8ec57c1f..a0a6c8c17669 100644
+> --- a/include/linux/of_dma.h
+> +++ b/include/linux/of_dma.h
+> @@ -22,7 +22,8 @@ struct of_dma {
+>         struct list_head        of_dma_controllers;
+>         struct device_node      *of_node;
+>         struct dma_chan         *(*of_dma_xlate)
+> -                               (struct of_phandle_args *, struct of_dma *);
+> +                               (struct of_phandle_args *, struct of_dma *,
+> +                                struct device *);
+>         void                    *(*of_dma_route_allocate)
+>                                 (struct of_phandle_args *, struct of_dma *);
+>         struct dma_router       *dma_router;
+> @@ -37,7 +38,7 @@ struct of_dma_filter_info {
+>  #ifdef CONFIG_DMA_OF
+>  extern int of_dma_controller_register(struct device_node *np,
+>                 struct dma_chan *(*of_dma_xlate)
+> -               (struct of_phandle_args *, struct of_dma *),
+> +               (struct of_phandle_args *, struct of_dma *, struct device *),
+>                 void *data);
+>  extern void of_dma_controller_free(struct device_node *np);
+>
+> @@ -47,17 +48,17 @@ extern int of_dma_router_register(struct device_node *np,
+>                 struct dma_router *dma_router);
+>  #define of_dma_router_free of_dma_controller_free
+>
+> -extern struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+> +extern struct dma_chan *of_dma_request_slave_channel(struct device *slave,
+>                                                      const char *name);
 
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+I noticed that this API is being used from sound/soc/sh/rcar/dma.c, so
+I assume this change triggers a compiler error. I guess you want to
+fold in a change dealing with that as well.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+[...]
+
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+
+Kind regards
+Uffe
