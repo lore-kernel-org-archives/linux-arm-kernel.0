@@ -1,85 +1,63 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Tue, 24 Jan 2017 13:49:22 +0530
-Subject: [PATCH/RFC 1/2] arm64: mm: Silently allow devices lacking
- IOMMU	group
-In-Reply-To: <66c082c6-da2e-9765-0db8-e0ba2c5bd501@arm.com>
-References: <148517349585.18128.10696161017872202809.sendpatchset@little-apple>	<148517353630.18128.12799811817831597628.sendpatchset@little-apple>
- <66c082c6-da2e-9765-0db8-e0ba2c5bd501@arm.com>
-Message-ID: <00d901d2761a$95903950$c0b0abf0$@codeaurora.org>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 24 Jan 2017 08:22:49 +0000
+Subject: [PATCH 2/7] MFD: add STM32 DFSDM support
+In-Reply-To: <1485189145-29576-3-git-send-email-arnaud.pouliquen@st.com>
+References: <1485189145-29576-1-git-send-email-arnaud.pouliquen@st.com>
+ <1485189145-29576-3-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <20170124082249.GR16020@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On Mon, 23 Jan 2017, Arnaud Pouliquen wrote:
 
->> Consider failure of iommu_get_domain_for_dev() as non-critical and
->> get rid of the warning printout. This allows IOMMU properties to be
->> included in the DTB even though the kernel is configured with
->> CONFIG_IOMMU_API=n or in case a particular IOMMU driver refuses to
->> enable IOMMU support for a certain slave device and returns error
->> from the ->add_device() callback.
->>
->> This is only a cosmetic change that removes console warning printouts.
->
->The warning is there for a reason - at this point, we *expected* the
->device to be using an IOMMU for DMA, so a failure is significant. Rather
->than masking genuine failures in other cases because your case
->deliberately breaks that expectation, simply change the expectation -
->i.e. rather than letting of_xlate() succeed then failing add_device()
->later, reject the of_xlate() call up-front such that the DMA layer never
->gets told about the IOMMU in the first place.
->
->Robin.
->
+> DFSDM hardware IP can be used at the same time for ADC sigma delta
 
-With the iommu probe deferral patches, this behavior would change
-where the arch_setup_dma_ops would never be called if there is
-an error from xlate or add_device. But also the error value from
-xlate/add_device is returned back and the probe of the device
-would fail for any error. So if there can be cases like above, where
-the xlate/add_device callbacks can return error for specific reasons,
-should only EPROBE_DEFER be considered and rest of the errors
-be filtered out with a WARN probably ?
+Same time as what?
 
-Regards,
- Sricharan
+> conversion and audio PDM microphone.
+> MFD driver is in charge of configuring IP registers and managing IP clocks.
+> For this it exports an API to handles filters and channels resources.
 
+This looks like an ADC driver?  What is it that makes it an MFD?
 
->> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
->> ---
->>
->>  arch/arm64/mm/dma-mapping.c |   10 +++++++++-
->>  1 file changed, 9 insertions(+), 1 deletion(-)
->>
->> --- 0001/arch/arm64/mm/dma-mapping.c
->> +++ work/arch/arm64/mm/dma-mapping.c	2017-01-23 20:54:40.060607110 +0900
->> @@ -827,11 +827,19 @@ static bool do_iommu_attach(struct devic
->>  	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
->>
->>  	/*
->> +	 * In case IOMMU support is excluded from the kernel or if the device
->> +	 * is not hooked up to any IOMMU group then be silent and keep the
->> +	 * old dma_ops.
->> +	 */
->> +	if (!domain)
->> +		return false;
->> +
->> +	/*
->>  	 * If the IOMMU driver has the DMA domain support that we require,
->>  	 * then the IOMMU core will have already configured a group for this
->>  	 * device, and allocated the default domain for that group.
->>  	 */
->> -	if (!domain || iommu_dma_init_domain(domain, dma_base, size, dev)) {
->> +	if (iommu_dma_init_domain(domain, dma_base, size, dev)) {
->>  		pr_warn("Failed to set up IOMMU for device %s; retaining platform DMA ops\n",
->>  			dev_name(dev));
->>  		return false;
->> _______________________________________________
->> iommu mailing list
->> iommu at lists.linux-foundation.org
->> https://lists.linuxfoundation.org/mailman/listinfo/iommu
->>
->
->_______________________________________________
->iommu mailing list
->iommu at lists.linux-foundation.org
->https://lists.linuxfoundation.org/mailman/listinfo/iommu
+> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+> ---
+>  drivers/mfd/Kconfig             |   11 +
+>  drivers/mfd/Makefile            |    2 +
+>  drivers/mfd/stm32-dfsdm-reg.h   |  220 +++++++++
+>  drivers/mfd/stm32-dfsdm.c       | 1044 +++++++++++++++++++++++++++++++++++++++
+>  include/linux/mfd/stm32-dfsdm.h |  324 ++++++++++++
+>  5 files changed, 1601 insertions(+)
+>  create mode 100644 drivers/mfd/stm32-dfsdm-reg.h
+>  create mode 100644 drivers/mfd/stm32-dfsdm.c
+>  create mode 100644 include/linux/mfd/stm32-dfsdm.h
+> 
+> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> index c6df644..4bb660b 100644
+> --- a/drivers/mfd/Kconfig
+> +++ b/drivers/mfd/Kconfig
+> @@ -1607,6 +1607,17 @@ config MFD_STW481X
+>  	  in various ST Microelectronics and ST-Ericsson embedded
+>  	  Nomadik series.
+>  
+> +config MFD_STM32_DFSDM
+> +	tristate "ST Microelectronics STM32 DFSDM"
+> +	depends on (ARCH_STM32 && OF) || COMPILE_TEST
+> +	select MFD_CORE
+> +	select REGMAP
+> +	select REGMAP_MMIO
+> +	help
+> +	  Select this option to enable the STM32 Digital Filter
+> +	  for Sigma Delta Modulators (DFSDM) driver used
+> +	  in various STM32 series.
+> +
+>  menu "Multimedia Capabilities Port drivers"
+>  	depends on ARCH_SA1100
+
+[...]
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
