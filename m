@@ -1,29 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 24 Jan 2017 18:01:09 +0000
-Subject: [PATCH] arm64: kernel: do not mark reserved memory regions as
- IORESOURCE_BUSY
-In-Reply-To: <1485277900-22730-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1485277900-22730-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20170124180109.GK1728@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 24 Jan 2017 10:05:14 -0800
+Subject: [GIT PULL 1/5] non-urgent omap fixes for v4.11 merge window
+Message-ID: <pull-1485274191-192300>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2017 at 05:11:40PM +0000, Ard Biesheuvel wrote:
-> Memory regions marked as NOMAP should not be used for general allocation
-> by the kernel, and should not even be covered by the linear mapping
-> (hence the name). However, drivers or other subsystems (such as ACPI)
-> that access the firmware directly may legally access them, which means
-> it is also reasonable for such drivers to claim them by invoking
-> request_resource(). Currently, this is prevented by the fact that arm64's
-> request_standard_resources() marks reserved regions as IORESOURCE_BUSY.
-> 
-> So drop the IORESOURCE_BUSY flag from these requests.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kernel/setup.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 
-Did you find this my inspection, or has somebody reported a problem?
+  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
 
-Will
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.11/fixes-not-urgent-signed
+
+for you to fetch changes up to 631af44c10f9430163296626c6134db16a4f51fb:
+
+  ARM: OMAP3: Fix SoC detection of OMAP36/37 Family (2017-01-20 10:13:06 -0800)
+
+----------------------------------------------------------------
+Non-urgent fixes for omaps for v4.11 merge window. These all are
+fixes for things that have never worked or have been broken for
+a long time and nobody noticed:
+
+- Fix omap3 off mode pull defines
+
+- Allow multiple pdata quirks instead of just one
+
+- Fix am335x and dm814x scm syscon to probe children too
+
+- Fix compatible for ti81xx to allow use with 8250_omap as well
+
+- Fix 8250_omap on omap5 by adding HWMOD_SWSUP_SIDLE_ACT flag
+
+- Fix SoC detection for omap36/37 SoCs
+
+----------------------------------------------------------------
+Adam Ford (1):
+      ARM: OMAP3: Fix SoC detection of OMAP36/37 Family
+
+Tony Lindgren (4):
+      ARM: dts: Fix omap3 off mode pull defines
+      ARM: OMAP2+: Fix init for multiple quirks for the same SoC
+      ARM: dts: Fix am335x and dm814x scm syscon to probe children
+      ARM: dts: Fix compatible for ti81xx uarts for 8250
+
+Vignesh R (1):
+      ARM: OMAP5: Add HWMOD_SWSUP_SIDLE_ACT flag for UART
+
+ arch/arm/boot/dts/am33xx.dtsi              |  3 ++-
+ arch/arm/boot/dts/dm814x.dtsi              |  9 +++++----
+ arch/arm/boot/dts/dm816x.dtsi              |  6 +++---
+ arch/arm/mach-omap2/id.c                   | 10 +++++++++-
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c |  8 ++++++--
+ arch/arm/mach-omap2/pdata-quirks.c         |  1 -
+ include/dt-bindings/pinctrl/omap.h         |  4 ++--
+ 7 files changed, 27 insertions(+), 14 deletions(-)
