@@ -1,472 +1,359 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Tue, 24 Jan 2017 15:43:56 +0100
-Subject: [PATCH 5/7] iio: adc: stm32: add optional dma support
-In-Reply-To: <8e1e4672-2259-bd84-b646-f24026dcff64@kernel.org>
-References: <1484832854-6314-1-git-send-email-fabrice.gasnier@st.com>
- <1484832854-6314-6-git-send-email-fabrice.gasnier@st.com>
- <8e1e4672-2259-bd84-b646-f24026dcff64@kernel.org>
-Message-ID: <48f9023e-9799-669e-94bd-782a2880a1e7@st.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 24 Jan 2017 06:50:28 -0800
+Subject: [PATCH v5 3/3] watchdog: zx2967: add watchdog controller driver
+ for ZTE's zx2967 family
+In-Reply-To: <1485248322-24299-3-git-send-email-baoyou.xie@linaro.org>
+References: <1485248322-24299-1-git-send-email-baoyou.xie@linaro.org>
+ <1485248322-24299-3-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <35dcd00f-a4bd-a313-0d6f-932a3f5888f0@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/22/2017 02:14 PM, Jonathan Cameron wrote:
-> On 19/01/17 13:34, Fabrice Gasnier wrote:
->> Add optional DMA support to STM32 ADC.
->> Use dma cyclic mode with at least two periods.
->>
->> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> What is the point going forward in supporting non dma buffered reads at all?
-> Is there hardware that doesn't have DMA support?
-
-Hi Jonathan,
-
-Basically no, but there is a limited number of DMA request lines.
-DMA request lines mapping is documented in STM32F4 reference manual
-(DMA1/2 request mapping).
-There may be a situation where user (in dt) assign all DMA channels to
-other IPs. Then only choice would be to fall back using interrupt mode 
-for ADC.
-This is why I'd like to keep support for both interrupt and DMA modes.
-
-> Just strikes me that the driver would be slight simpler if we dropped that
-> support.
+On 01/24/2017 12:58 AM, Baoyou Xie wrote:
+> This patch adds watchdog controller driver for ZTE's zx2967 family.
 >
-> Various comments inline.  Mostly around crossing the boundary to fetch
-> from the IIO specific buffer (indio_dev->buffer).  That should never be
-> used directly as we can have multiple consumers of the datastream so
-> the numbers you get from that may represent only part of what is going on.
+> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+> ---
+>  drivers/watchdog/Kconfig      |  10 ++
+>  drivers/watchdog/Makefile     |   1 +
+>  drivers/watchdog/zx2967_wdt.c | 274 ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 285 insertions(+)
+>  create mode 100644 drivers/watchdog/zx2967_wdt.c
 >
+> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> index acb00b5..05093a2 100644
+> --- a/drivers/watchdog/Kconfig
+> +++ b/drivers/watchdog/Kconfig
+> @@ -714,6 +714,16 @@ config ASPEED_WATCHDOG
+>  	  To compile this driver as a module, choose M here: the
+>  	  module will be called aspeed_wdt.
 >
->> ---
->>  drivers/iio/adc/Kconfig          |   2 +
->>  drivers/iio/adc/stm32-adc-core.c |   1 +
->>  drivers/iio/adc/stm32-adc-core.h |   2 +
->>  drivers/iio/adc/stm32-adc.c      | 209 ++++++++++++++++++++++++++++++++++++---
->>  4 files changed, 202 insertions(+), 12 deletions(-)
->>
->> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
->> index 9a7b090..2a2ef78 100644
->> --- a/drivers/iio/adc/Kconfig
->> +++ b/drivers/iio/adc/Kconfig
->> @@ -444,12 +444,14 @@ config ROCKCHIP_SARADC
->>  config STM32_ADC_CORE
->>  	tristate "STMicroelectronics STM32 adc core"
->>  	depends on ARCH_STM32 || COMPILE_TEST
->> +	depends on HAS_DMA
->>  	depends on OF
->>  	depends on REGULATOR
->>  	select IIO_BUFFER
->>  	select MFD_STM32_TIMERS
->>  	select IIO_STM32_TIMER_TRIGGER
->>  	select IIO_TRIGGERED_BUFFER
->> +	select IRQ_WORK
->>  	help
->>  	  Select this option to enable the core driver for STMicroelectronics
->>  	  STM32 analog-to-digital converter (ADC).
->> diff --git a/drivers/iio/adc/stm32-adc-core.c b/drivers/iio/adc/stm32-adc-core.c
->> index 4214b0c..22b7c93 100644
->> --- a/drivers/iio/adc/stm32-adc-core.c
->> +++ b/drivers/iio/adc/stm32-adc-core.c
->> @@ -201,6 +201,7 @@ static int stm32_adc_probe(struct platform_device *pdev)
->>  	priv->common.base = devm_ioremap_resource(&pdev->dev, res);
->>  	if (IS_ERR(priv->common.base))
->>  		return PTR_ERR(priv->common.base);
->> +	priv->common.phys_base = res->start;
->>
->>  	priv->vref = devm_regulator_get(&pdev->dev, "vref");
->>  	if (IS_ERR(priv->vref)) {
->> diff --git a/drivers/iio/adc/stm32-adc-core.h b/drivers/iio/adc/stm32-adc-core.h
->> index 081fa5f..2ec7abb 100644
->> --- a/drivers/iio/adc/stm32-adc-core.h
->> +++ b/drivers/iio/adc/stm32-adc-core.h
->> @@ -42,10 +42,12 @@
->>  /**
->>   * struct stm32_adc_common - stm32 ADC driver common data (for all instances)
->>   * @base:		control registers base cpu addr
->> + * @phys_base:		control registers base physical addr
->>   * @vref_mv:		vref voltage (mv)
->>   */
->>  struct stm32_adc_common {
->>  	void __iomem			*base;
->> +	phys_addr_t			phys_base;
->>  	int				vref_mv;
->>  };
->>
->> diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
->> index 9753c39..3439f4c 100644
->> --- a/drivers/iio/adc/stm32-adc.c
->> +++ b/drivers/iio/adc/stm32-adc.c
->> @@ -21,6 +21,8 @@
->>
->>  #include <linux/clk.h>
->>  #include <linux/delay.h>
->> +#include <linux/dma-mapping.h>
->> +#include <linux/dmaengine.h>
->>  #include <linux/iio/iio.h>
->>  #include <linux/iio/buffer.h>
->>  #include <linux/iio/timer/stm32-timer-trigger.h>
->> @@ -29,6 +31,7 @@
->>  #include <linux/iio/triggered_buffer.h>
->>  #include <linux/interrupt.h>
->>  #include <linux/io.h>
->> +#include <linux/irq_work.h>
->>  #include <linux/module.h>
->>  #include <linux/platform_device.h>
->>  #include <linux/of.h>
->> @@ -69,6 +72,8 @@
->>  #define STM32F4_EXTSEL_SHIFT		24
->>  #define STM32F4_EXTSEL_MASK		GENMASK(27, 24)
->>  #define STM32F4_EOCS			BIT(10)
->> +#define STM32F4_DDS			BIT(9)
->> +#define STM32F4_DMA			BIT(8)
->>  #define STM32F4_ADON			BIT(0)
->>
->>  /* STM32F4_ADC_SQR1 - bit fields */
->> @@ -165,6 +170,11 @@ struct stm32_adc_trig_info {
->>   * @bufi:		data buffer index
->>   * @num_conv:		expected number of scan conversions
->>   * @exten:		external trigger config (enable/polarity)
->> + * @work:		irq work used to call trigger poll routine
->> + * @dma_chan:		dma channel
->> + * @rx_buf:		dma rx buffer cpu address
->> + * @rx_dma_buf:		dma rx buffer bus address
->> + * @rx_buf_sz:		dma rx buffer size
->>   */
->>  struct stm32_adc {
->>  	struct stm32_adc_common	*common;
->> @@ -177,6 +187,11 @@ struct stm32_adc {
->>  	int			bufi;
->>  	int			num_conv;
->>  	enum stm32_adc_exten	exten;
->> +	struct irq_work		work;
->> +	struct dma_chan		*dma_chan;
->> +	u8			*rx_buf;
->> +	dma_addr_t		rx_dma_buf;
->> +	int			rx_buf_sz;
->>  };
->>
->>  /**
->> @@ -332,10 +347,20 @@ static void stm32_adc_conv_irq_disable(struct stm32_adc *adc)
->>  /**
->>   * stm32_adc_start_conv() - Start conversions for regular channels.
->>   * @adc: stm32 adc instance
->> + *
->> + * Start conversions for regular channels.
->> + * Also take care of normal or DMA mode. DMA is used in circular mode for
->> + * regular conversions, in IIO buffer modes. Rely on rx_buf as raw
->> + * read doesn't use dma, but direct DR read.
->>   */
->>  static void stm32_adc_start_conv(struct stm32_adc *adc)
->>  {
->>  	stm32_adc_set_bits(adc, STM32F4_ADC_CR1, STM32F4_SCAN);
->> +
->> +	if (adc->rx_buf)
->> +		stm32_adc_set_bits(adc, STM32F4_ADC_CR2,
->> +				   STM32F4_DMA | STM32F4_DDS);
->> +
->>  	stm32_adc_set_bits(adc, STM32F4_ADC_CR2, STM32F4_EOCS | STM32F4_ADON);
->>
->>  	/* Wait for Power-up time (tSTAB from datasheet) */
->> @@ -353,6 +378,10 @@ static void stm32_adc_stop_conv(struct stm32_adc *adc)
->>
->>  	stm32_adc_clr_bits(adc, STM32F4_ADC_CR1, STM32F4_SCAN);
->>  	stm32_adc_clr_bits(adc, STM32F4_ADC_CR2, STM32F4_ADON);
->> +
->> +	if (adc->rx_buf)
->> +		stm32_adc_clr_bits(adc, STM32F4_ADC_CR2,
->> +				   STM32F4_DMA | STM32F4_DDS);
->>  }
->>
->>  /**
->> @@ -689,19 +718,138 @@ static int stm32_adc_debugfs_reg_access(struct iio_dev *indio_dev,
->>  	.driver_module = THIS_MODULE,
->>  };
->>
->> +static int stm32_adc_dma_residue(struct stm32_adc *adc)
->> +{
->> +	struct dma_tx_state state;
->> +	enum dma_status status;
->> +
->> +	if (!adc->rx_buf)
->> +		return 0;
->> +
->> +	status = dmaengine_tx_status(adc->dma_chan,
->> +				     adc->dma_chan->cookie,
->> +				     &state);
->> +	if (status == DMA_IN_PROGRESS) {
->> +		/* Residue is size in bytes from end of buffer */
->> +		int i = adc->rx_buf_sz - state.residue;
->> +		int size;
->> +
->> +		/* Return available bytes */
->> +		if (i >= adc->bufi)
->> +			size = i - adc->bufi;
->> +		else
->> +			size = adc->rx_buf_sz - adc->bufi + i;
->> +
->> +		return size;
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->> +static void stm32_adc_dma_irq_work(struct irq_work *work)
->> +{
->> +	struct stm32_adc *adc = container_of(work, struct stm32_adc, work);
->> +	struct iio_dev *indio_dev = iio_priv_to_dev(adc);
->> +
->> +	/**
->> +	 * iio_trigger_poll calls generic_handle_irq(). So, it requires hard
->> +	 * irq context, and cannot be called directly from dma callback,
->> +	 * dma cb has to schedule this work instead.
->> +	 */
->> +	iio_trigger_poll(indio_dev->trig);
-> This is nasty ;)  iio_trigger_poll_chained is your friend. It is missnamed.
-> If you only need to call the threaded part of the pollfunc (and I think you
-> can construct it so you do) then it will call it without needing to bounce
-> back into interrupt context.
+> +config ZX2967_WATCHDOG
+> +	tristate "ZTE zx2967 SoCs watchdog support"
+> +	depends on ARCH_ZX
+> +	select WATCHDOG_CORE
+> +	help
+> +	  Say Y here to include support for the watchdog timer
+> +	  in ZTE zx2967 SoCs.
+> +	  To compile this driver as a module, choose M here: the
+> +	  module will be called zx2967_wdt.
+> +
+>  # AVR32 Architecture
+>
+>  config AT32AP700X_WDT
+> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+> index 0c3d35e..bf2d296 100644
+> --- a/drivers/watchdog/Makefile
+> +++ b/drivers/watchdog/Makefile
+> @@ -82,6 +82,7 @@ obj-$(CONFIG_BCM7038_WDT) += bcm7038_wdt.o
+>  obj-$(CONFIG_ATLAS7_WATCHDOG) += atlas7_wdt.o
+>  obj-$(CONFIG_RENESAS_WDT) += renesas_wdt.o
+>  obj-$(CONFIG_ASPEED_WATCHDOG) += aspeed_wdt.o
+> +obj-$(CONFIG_ZX2967_WATCHDOG) += zx2967_wdt.o
+>
+>  # AVR32 Architecture
+>  obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
+> diff --git a/drivers/watchdog/zx2967_wdt.c b/drivers/watchdog/zx2967_wdt.c
+> new file mode 100644
+> index 0000000..89a7018
+> --- /dev/null
+> +++ b/drivers/watchdog/zx2967_wdt.c
+> @@ -0,0 +1,274 @@
+> +/*
+> + * watchdog driver for ZTE's zx2967 family
+> + *
+> + * Copyright (C) 2017 ZTE Ltd.
+> + *
+> + * Author: Baoyou Xie <baoyou.xie@linaro.org>
+> + *
+> + * License terms: GNU General Public License (GPL) version 2
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/io.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/module.h>
+> +#include <linux/of_address.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regmap.h>
+> +#include <linux/reset.h>
+> +#include <linux/watchdog.h>
+> +
+> +#define ZX2967_WDT_CFG_REG			0x4
+> +#define ZX2967_WDT_LOAD_REG			0x8
+> +#define ZX2967_WDT_REFRESH_REG			0x18
+> +#define ZX2967_WDT_START_REG			0x1c
+> +
+> +#define ZX2967_WDT_REFRESH_MASK			0x3f
+> +
+> +#define ZX2967_WDT_CFG_DIV(n)			((((n) & 0xff) - 1) << 8)
+> +#define ZX2967_WDT_START_EN			0x1
+> +
+> +#define ZX2967_WDT_WRITEKEY			0x12340000
+> +
+> +#define ZX2967_WDT_DIV_DEFAULT			16
+> +#define ZX2967_WDT_DEFAULT_TIMEOUT		32
+> +#define ZX2967_WDT_MIN_TIMEOUT			1
+> +#define ZX2967_WDT_MAX_TIMEOUT			500
 
-I'll look into it :-)
+Why not use the real maximum ? Just wondering.
 
->
->> +}
->> +
->> +static void stm32_adc_dma_buffer_done(void *data)
->> +{
->> +	struct stm32_adc *adc = data;
->> +
->> +	/* invoques iio_trigger_poll() from hard irq context */
->> +	irq_work_queue(&adc->work);
->> +}
->> +
->>  static int stm32_adc_buffer_preenable(struct iio_dev *indio_dev)
->>  {
->>  	struct stm32_adc *adc = iio_priv(indio_dev);
->> +	struct dma_async_tx_descriptor *desc;
->> +	struct dma_slave_config config;
->> +	dma_cookie_t cookie;
->> +	int ret, size, watermark;
->>
->>  	/* Reset adc buffer index */
->>  	adc->bufi = 0;
->>
->> -	/* Allocate adc buffer */
->> -	adc->buffer = kzalloc(indio_dev->scan_bytes, GFP_KERNEL);
->> -	if (!adc->buffer)
->> +	if (!adc->dma_chan) {
->> +		/* Allocate adc buffer */
->> +		adc->buffer = kzalloc(indio_dev->scan_bytes, GFP_KERNEL);
->> +		if (!adc->buffer)
->> +			return -ENOMEM;
->> +
->> +		return 0;
->> +	}
->> +
->> +	/*
->> +	 * Allocate at least twice the buffer size for dma cyclic transfers, so
->> +	 * we can work with at least two dma periods. There should be :
->> +	 * - always one buffer (period) dma is working on
->> +	 * - one buffer (period) driver can push with iio_trigger_poll().
->> +	 */
->> +	size = indio_dev->buffer->bytes_per_datum * indio_dev->buffer->length;
->> +	size = max(indio_dev->scan_bytes * 2, size);
-> Hmm. There is a bit of a weird mix going on here. Firstly, you may have more
-> than one consumer buffer, the one you are checking is only the one directly
-> associated with the IIO userspace interface.
->
-> So scan_bytes is the right value to use for both of these statements.
-> The buffer length is typically not knowable either or relevant here.
-> If you are ultimately going to deal with watermarks there is an interface
-> to guide read sizes based on that but this isn't it.
->
-> So basically device should never know anything at all about the software
-> buffer. All info should pass through the core which knows about all the
-> consumers hanging off this interface (and the demux that is going on to
-> feed them all).
->
-> Some drivers provide additional info to allow the modifying of the
-> precise hardware watermark being used.  That's an acceptable form of
-> 'tweak'.
+> +#define ZX2967_WDT_MAX_COUNT			0xffff
+> +
+> +#define ZX2967_WDT_CLK_FREQ			0x8000
+> +
+> +#define ZX2967_WDT_FLAG_REBOOT_MON		BIT(0)
+> +
+> +struct zx2967_wdt {
+> +	struct watchdog_device	wdt_device;
+> +	void __iomem		*reg_base;
+> +	struct clk		*clock;
+> +};
+> +
+> +static inline u32 zx2967_wdt_readl(struct zx2967_wdt *wdt, u16 reg)
+> +{
+> +	return readl_relaxed(wdt->reg_base + reg);
+> +}
+> +
+> +static inline void zx2967_wdt_writel(struct zx2967_wdt *wdt, u16 reg, u32 val)
+> +{
+> +	writel_relaxed(val | ZX2967_WDT_WRITEKEY, wdt->reg_base + reg);
+> +}
+> +
+> +static void zx2967_wdt_refresh(struct zx2967_wdt *wdt)
+> +{
+> +	u32 val;
+> +
+> +	val = zx2967_wdt_readl(wdt, ZX2967_WDT_REFRESH_REG);
+> +	val ^= ZX2967_WDT_REFRESH_MASK;
+> +	zx2967_wdt_writel(wdt, ZX2967_WDT_REFRESH_REG, val);
+> +}
+> +
+> +static int
+> +zx2967_wdt_set_timeout(struct watchdog_device *wdd, unsigned int timeout)
+> +{
+> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
+> +	unsigned int divisor = ZX2967_WDT_DIV_DEFAULT;
+> +	unsigned int count;
+> +
+> +	count = timeout * ZX2967_WDT_CLK_FREQ;
+> +	if (count > divisor * ZX2967_WDT_MAX_COUNT)
+> +		divisor = DIV_ROUND_UP(count, ZX2967_WDT_MAX_COUNT);
+> +	count = DIV_ROUND_UP(count, divisor);
+> +	zx2967_wdt_writel(wdt, ZX2967_WDT_CFG_REG, ZX2967_WDT_CFG_DIV(divisor));
+> +	zx2967_wdt_writel(wdt, ZX2967_WDT_LOAD_REG, count);
+> +	zx2967_wdt_refresh(wdt);
+> +	wdd->timeout =  (count * divisor) / ZX2967_WDT_CLK_FREQ;
+> +
+> +	return 0;
+> +}
+> +
+> +static void __zx2967_wdt_start(struct zx2967_wdt *wdt)
+> +{
+> +	u32 val;
+> +
+> +	val = zx2967_wdt_readl(wdt, ZX2967_WDT_START_REG);
+> +	val |= ZX2967_WDT_START_EN;
+> +	zx2967_wdt_writel(wdt, ZX2967_WDT_START_REG, val);
+> +}
+> +
+> +static void __zx2967_wdt_stop(struct zx2967_wdt *wdt)
+> +{
+> +	u32 val;
+> +
+> +	val = zx2967_wdt_readl(wdt, ZX2967_WDT_START_REG);
+> +	val &= ~ZX2967_WDT_START_EN;
+> +	zx2967_wdt_writel(wdt, ZX2967_WDT_START_REG, val);
+> +}
+> +
+> +static int zx2967_wdt_start(struct watchdog_device *wdd)
+> +{
+> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
+> +
+> +	zx2967_wdt_set_timeout(wdd, wdd->timeout);
+> +	__zx2967_wdt_start(wdt);
+> +
+> +	return 0;
+> +}
+> +
+> +static int zx2967_wdt_stop(struct watchdog_device *wdd)
+> +{
+> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
+> +
+> +	__zx2967_wdt_stop(wdt);
+> +
+> +	return 0;
+> +}
+> +
+> +static int zx2967_wdt_keepalive(struct watchdog_device *wdd)
+> +{
+> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
+> +
+> +	zx2967_wdt_refresh(wdt);
+> +
+> +	return 0;
+> +}
+> +
+> +#define ZX2967_WDT_OPTIONS \
+> +	(WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE)
+> +static const struct watchdog_info zx2967_wdt_ident = {
+> +	.options          =     ZX2967_WDT_OPTIONS,
 
-I'll follow your guidelines and rework this part. I also had some doubts 
-on this. This is more clear!
+Does that make the code easier to read ? I presonally like being able to grep for
+"options" in the driver to get a glimpse.
 
-Thanks,
-Regards,
-Fabrice
+> +	.firmware_version =	0,
 
->
->> +
->> +	adc->rx_buf = dma_alloc_coherent(adc->dma_chan->device->dev,
->> +					 PAGE_ALIGN(size), &adc->rx_dma_buf,
->> +					 GFP_KERNEL);
->> +	if (!adc->rx_buf)
->>  		return -ENOMEM;
->> +	adc->rx_buf_sz = size;
->> +	watermark = indio_dev->buffer->bytes_per_datum
->> +		* indio_dev->buffer->watermark;
->> +	watermark = max(indio_dev->scan_bytes, watermark);
->> +	watermark = rounddown(watermark, indio_dev->scan_bytes);
->> +
->> +	dev_dbg(&indio_dev->dev, "%s size=%d watermark=%d\n", __func__, size,
->> +		watermark);
->> +
->> +	/* Configure DMA channel to read data register */
->> +	memset(&config, 0, sizeof(config));
->> +	config.src_addr = (dma_addr_t)adc->common->phys_base;
->> +	config.src_addr += adc->offset + STM32F4_ADC_DR;
->> +	config.src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
->> +
->> +	ret = dmaengine_slave_config(adc->dma_chan, &config);
->> +	if (ret)
->> +		goto config_err;
->> +
->> +	/* Prepare a DMA cyclic transaction */
->> +	desc = dmaengine_prep_dma_cyclic(adc->dma_chan,
->> +					 adc->rx_dma_buf,
->> +					 size, watermark,
->> +					 DMA_DEV_TO_MEM,
->> +					 DMA_PREP_INTERRUPT);
->> +	if (!desc) {
->> +		ret = -ENODEV;
->> +		goto config_err;
->> +	}
->> +
->> +	desc->callback = stm32_adc_dma_buffer_done;
->> +	desc->callback_param = adc;
->> +
->> +	cookie = dmaengine_submit(desc);
->> +	if (dma_submit_error(cookie)) {
->> +		ret = dma_submit_error(cookie);
->> +		goto config_err;
->> +	}
->> +
->> +	/* Issue pending DMA requests */
->> +	dma_async_issue_pending(adc->dma_chan);
->>
->>  	return 0;
->> +
->> +config_err:
->> +	dma_free_coherent(adc->dma_chan->device->dev, PAGE_ALIGN(size),
->> +			  adc->rx_buf, adc->rx_dma_buf);
->> +
->> +	return ret;
->>  }
->>
->>  static int stm32_adc_buffer_postenable(struct iio_dev *indio_dev)
->> @@ -719,7 +867,8 @@ static int stm32_adc_buffer_postenable(struct iio_dev *indio_dev)
->>  	if (ret < 0)
->>  		return ret;
->>
->> -	stm32_adc_conv_irq_enable(adc);
->> +	if (!adc->dma_chan)
->> +		stm32_adc_conv_irq_enable(adc);
->>  	stm32_adc_start_conv(adc);
->>
->>  	return 0;
->> @@ -731,7 +880,8 @@ static int stm32_adc_buffer_predisable(struct iio_dev *indio_dev)
->>  	int ret;
->>
->>  	stm32_adc_stop_conv(adc);
->> -	stm32_adc_conv_irq_disable(adc);
->> +	if (!adc->dma_chan)
->> +		stm32_adc_conv_irq_disable(adc);
->>
->>  	ret = iio_triggered_buffer_predisable(indio_dev);
->>  	if (ret < 0)
->> @@ -748,7 +898,16 @@ static int stm32_adc_buffer_postdisable(struct iio_dev *indio_dev)
->>  {
->>  	struct stm32_adc *adc = iio_priv(indio_dev);
->>
->> -	kfree(adc->buffer);
->> +	if (!adc->dma_chan) {
->> +		kfree(adc->buffer);
->> +	} else {
->> +		dmaengine_terminate_all(adc->dma_chan);
->> +		irq_work_sync(&adc->work);
->> +		dma_free_coherent(adc->dma_chan->device->dev,
->> +				  PAGE_ALIGN(adc->rx_buf_sz),
->> +				  adc->rx_buf, adc->rx_dma_buf);
->> +		adc->rx_buf = NULL;
->> +	}
->>  	adc->buffer = NULL;
->>
->>  	return 0;
->> @@ -769,15 +928,31 @@ static irqreturn_t stm32_adc_trigger_handler(int irq, void *p)
->>
->>  	dev_dbg(&indio_dev->dev, "%s bufi=%d\n", __func__, adc->bufi);
->>
->> -	/* reset buffer index */
->> -	adc->bufi = 0;
->> -	iio_push_to_buffers_with_timestamp(indio_dev, adc->buffer,
->> -					   pf->timestamp);
->> +	if (!adc->dma_chan) {
->> +		/* reset buffer index */
->> +		adc->bufi = 0;
->> +		iio_push_to_buffers_with_timestamp(indio_dev, adc->buffer,
->> +						   pf->timestamp);
->> +	} else {
->> +		int residue = stm32_adc_dma_residue(adc);
->> +
->> +		while (residue >= indio_dev->scan_bytes) {
->> +			adc->buffer = (u16 *)&adc->rx_buf[adc->bufi];
->> +			iio_push_to_buffers_with_timestamp(indio_dev,
->> +							   adc->buffer,
->> +							   pf->timestamp);
->> +			residue -= indio_dev->scan_bytes;
->> +			adc->bufi += indio_dev->scan_bytes;
->> +			if (adc->bufi >= adc->rx_buf_sz)
->> +				adc->bufi = 0;
->> +		}
->> +	}
->>
->>  	iio_trigger_notify_done(indio_dev->trig);
->>
->>  	/* re-enable eoc irq */
->> -	stm32_adc_conv_irq_enable(adc);
->> +	if (!adc->dma_chan)
->> +		stm32_adc_conv_irq_enable(adc);
->>
->>  	return IRQ_HANDLED;
->>  }
->> @@ -910,13 +1085,17 @@ static int stm32_adc_probe(struct platform_device *pdev)
->>  	if (ret < 0)
->>  		goto err_clk_disable;
->>
->> +	adc->dma_chan = dma_request_slave_channel(&indio_dev->dev, "rx");
->> +	if (adc->dma_chan)
->> +		init_irq_work(&adc->work, stm32_adc_dma_irq_work);
->> +
->>  	ret = iio_triggered_buffer_setup(indio_dev,
->>  					 &iio_pollfunc_store_time,
->>  					 &stm32_adc_trigger_handler,
->>  					 &stm32_adc_buffer_setup_ops);
->>  	if (ret) {
->>  		dev_err(&pdev->dev, "buffer setup failed\n");
->> -		goto err_clk_disable;
->> +		goto err_dma_disable;
->>  	}
->>
->>  	ret = iio_device_register(indio_dev);
->> @@ -930,6 +1109,10 @@ static int stm32_adc_probe(struct platform_device *pdev)
->>  err_buffer_cleanup:
->>  	iio_triggered_buffer_cleanup(indio_dev);
->>
->> +err_dma_disable:
->> +	if (adc->dma_chan)
->> +		dma_release_channel(adc->dma_chan);
->> +
->>  err_clk_disable:
->>  	clk_disable_unprepare(adc->clk);
->>
->> @@ -943,6 +1126,8 @@ static int stm32_adc_remove(struct platform_device *pdev)
->>
->>  	iio_device_unregister(indio_dev);
->>  	iio_triggered_buffer_cleanup(indio_dev);
->> +	if (adc->dma_chan)
->> +		dma_release_channel(adc->dma_chan);
->>  	clk_disable_unprepare(adc->clk);
->>
->>  	return 0;
->>
+Initializing a static field to 0 is unnecessary.
+
+> +	.identity         =	"zx2967 watchdog",
+> +};
+> +
+> +static struct watchdog_ops zx2967_wdt_ops = {
+> +	.owner = THIS_MODULE,
+> +	.start = zx2967_wdt_start,
+> +	.stop = zx2967_wdt_stop,
+> +	.ping = zx2967_wdt_keepalive,
+> +	.set_timeout = zx2967_wdt_set_timeout,
+> +};
+> +
+> +static void zx2967_wdt_reset_sysctrl(struct device *dev)
+> +{
+> +	int ret;
+> +	void __iomem *regmap;
+> +	unsigned int offset, mask, config;
+> +	struct of_phandle_args out_args;
+> +
+> +	ret = of_parse_phandle_with_fixed_args(dev->of_node,
+> +			"zte,wdt-reset-sysctrl", 3, 0, &out_args);
+> +	if (ret)
+> +		return;
+> +
+> +	offset = out_args.args[0];
+> +	config = out_args.args[1];
+> +	mask = out_args.args[2];
+> +
+> +	regmap = syscon_node_to_regmap(out_args.np);
+> +	if (IS_ERR(regmap))
+> +		return;
+> +
+> +	regmap_update_bits(regmap, offset, mask, config);
+
+Another comment suggested adding
+	of_node_put(out_args.np);
+here.
+
+> +}
+> +
+> +static int zx2967_wdt_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct zx2967_wdt *wdt;
+> +	struct resource *base;
+> +	int ret;
+> +	struct reset_control *rstc;
+> +
+> +	wdt = devm_kzalloc(dev, sizeof(*wdt), GFP_KERNEL);
+> +	if (!wdt)
+> +		return -ENOMEM;
+> +
+> +	platform_set_drvdata(pdev, wdt);
+> +
+> +	wdt->wdt_device.info = &zx2967_wdt_ident;
+> +	wdt->wdt_device.ops = &zx2967_wdt_ops;
+> +	wdt->wdt_device.timeout = ZX2967_WDT_DEFAULT_TIMEOUT;
+> +	wdt->wdt_device.max_timeout = ZX2967_WDT_MAX_TIMEOUT;
+> +	wdt->wdt_device.min_timeout = ZX2967_WDT_MIN_TIMEOUT;
+> +	wdt->wdt_device.parent = &pdev->dev;
+> +
+> +	base = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	wdt->reg_base = devm_ioremap_resource(dev, base);
+> +	if (IS_ERR(wdt->reg_base)) {
+> +		dev_err(dev, "ioremap failed\n");
+> +		return PTR_ERR(wdt->reg_base);
+> +	}
+> +
+> +	zx2967_wdt_reset_sysctrl(dev);
+> +
+> +	wdt->clock = devm_clk_get(dev, NULL);
+> +	if (IS_ERR(wdt->clock)) {
+> +		dev_err(dev, "failed to find watchdog clock source\n");
+> +		return PTR_ERR(wdt->clock);
+> +	}
+> +
+> +	ret = clk_prepare_enable(wdt->clock);
+> +	if (ret < 0) {
+> +		dev_err(dev, "failed to enable clock\n");
+> +		return ret;
+> +	}
+> +	clk_set_rate(wdt->clock, ZX2967_WDT_CLK_FREQ);
+> +
+> +	rstc = devm_reset_control_get(dev, NULL);
+> +	if (IS_ERR(rstc)) {
+> +		dev_err(dev, "failed to get rstc");
+> +		ret = PTR_ERR(rstc);
+> +		goto fail_get_reset_control;
+> +	}
+> +
+> +	reset_control_assert(rstc);
+> +	mdelay(10);
+> +	reset_control_deassert(rstc);
+> +
+> +	watchdog_set_drvdata(&wdt->wdt_device, wdt);
+> +	watchdog_set_nowayout(&wdt->wdt_device, WATCHDOG_NOWAYOUT);
+
+A call to watchdog_init_timeout() may be valuable here to catch
+timeout values from devicetree. Otherwise, displaying the selected timeout
+below (which is a constant) doesn't really add much value.
+
+> +
+> +	ret = watchdog_register_device(&wdt->wdt_device);
+> +	if (ret)
+> +		goto fail_register;
+> +
+> +	dev_info(dev, "watchdog enabled (timeout=%d sec, nowayout=%d)",
+> +		 wdt->wdt_device.timeout, WATCHDOG_NOWAYOUT);
+> +
+> +	return 0;
+> +
+> +fail_register:
+> +	watchdog_unregister_device(&wdt->wdt_device);
+
+As asked before - why try to unregister if the registration failed ?
+
+> +fail_get_reset_control:
+> +	clk_disable_unprepare(wdt->clock);
+> +	return ret;
+> +}
+> +
+> +static int zx2967_wdt_remove(struct platform_device *pdev)
+> +{
+> +	struct zx2967_wdt *wdt = platform_get_drvdata(pdev);
+> +
+> +	watchdog_unregister_device(&wdt->wdt_device);
+> +	clk_disable_unprepare(wdt->clock);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id zx2967_wdt_match[] = {
+> +	{ .compatible = "zte,zx296718-wdt", },
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, zx2967_wdt_match);
+> +
+> +static struct platform_driver zx2967_wdt_driver = {
+> +	.probe		= zx2967_wdt_probe,
+> +	.remove		= zx2967_wdt_remove,
+> +	.driver		= {
+> +		.name	= "zx2967-wdt",
+> +		.of_match_table	= of_match_ptr(zx2967_wdt_match),
+> +	},
+> +};
+> +module_platform_driver(zx2967_wdt_driver);
+> +
+> +MODULE_AUTHOR("Baoyou Xie <baoyou.xie@linaro.org>");
+> +MODULE_DESCRIPTION("ZTE zx2967 Watchdog Device Driver");
+> +MODULE_LICENSE("GPL v2");
 >
