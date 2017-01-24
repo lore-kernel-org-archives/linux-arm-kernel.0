@@ -1,191 +1,119 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 24 Jan 2017 16:10:08 +0100
-Subject: [PATCH v6 1/4] dmaengine: pl330: remove pdata based initialization
-In-Reply-To: <1485250055-22137-2-git-send-email-m.szyprowski@samsung.com>
-References: <CGME20170124092750eucas1p1127947314c9ad7eed297c1b6739110cb@eucas1p1.samsung.com>
- <1485250055-22137-1-git-send-email-m.szyprowski@samsung.com>
- <1485250055-22137-2-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CAPDyKFptqP5fYDwvx4h+RbHhH6WDZ3Kw5hOtaa_SSECRktstdA@mail.gmail.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Tue, 24 Jan 2017 16:11:31 +0100
+Subject: [RFC PATCH v1] ARM: Import tango4_defconfig
+Message-ID: <5c615aa5-678e-63b8-ecae-f5f0bd8a6f2c@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 January 2017 at 10:27, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
-> This driver is now used only on platforms which support device tree, so
-> it is safe to remove legacy platform data based initialization code.
->
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> For plat-samsung:
-> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+Import minimal defconfig for tango4 boards.
 
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+---
+ arch/arm/configs/tango4_defconfig | 96 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 96 insertions(+)
+ create mode 100644 arch/arm/configs/tango4_defconfig
 
-Kind regards
-Uffe
-
-> ---
->  arch/arm/plat-samsung/devs.c |  1 -
->  drivers/dma/pl330.c          | 42 ++++++++----------------------------------
->  include/linux/amba/pl330.h   | 35 -----------------------------------
->  3 files changed, 8 insertions(+), 70 deletions(-)
->  delete mode 100644 include/linux/amba/pl330.h
->
-> diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
-> index 03fac123676d..dc269d9143bc 100644
-> --- a/arch/arm/plat-samsung/devs.c
-> +++ b/arch/arm/plat-samsung/devs.c
-> @@ -10,7 +10,6 @@
->   * published by the Free Software Foundation.
->  */
->
-> -#include <linux/amba/pl330.h>
->  #include <linux/kernel.h>
->  #include <linux/types.h>
->  #include <linux/interrupt.h>
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index 7539f73df9e0..78be12b45a45 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -22,7 +22,6 @@
->  #include <linux/dma-mapping.h>
->  #include <linux/dmaengine.h>
->  #include <linux/amba/bus.h>
-> -#include <linux/amba/pl330.h>
->  #include <linux/scatterlist.h>
->  #include <linux/of.h>
->  #include <linux/of_dma.h>
-> @@ -2076,18 +2075,6 @@ static void pl330_tasklet(unsigned long data)
->         }
->  }
->
-> -bool pl330_filter(struct dma_chan *chan, void *param)
-> -{
-> -       u8 *peri_id;
-> -
-> -       if (chan->device->dev->driver != &pl330_driver.drv)
-> -               return false;
-> -
-> -       peri_id = chan->private;
-> -       return *peri_id == (unsigned long)param;
-> -}
-> -EXPORT_SYMBOL(pl330_filter);
-> -
->  static struct dma_chan *of_dma_pl330_xlate(struct of_phandle_args *dma_spec,
->                                                 struct of_dma *ofdma)
->  {
-> @@ -2832,7 +2819,6 @@ static int __maybe_unused pl330_resume(struct device *dev)
->  static int
->  pl330_probe(struct amba_device *adev, const struct amba_id *id)
->  {
-> -       struct dma_pl330_platdata *pdat;
->         struct pl330_config *pcfg;
->         struct pl330_dmac *pl330;
->         struct dma_pl330_chan *pch, *_p;
-> @@ -2842,8 +2828,6 @@ static int __maybe_unused pl330_resume(struct device *dev)
->         int num_chan;
->         struct device_node *np = adev->dev.of_node;
->
-> -       pdat = dev_get_platdata(&adev->dev);
-> -
->         ret = dma_set_mask_and_coherent(&adev->dev, DMA_BIT_MASK(32));
->         if (ret)
->                 return ret;
-> @@ -2856,7 +2840,7 @@ static int __maybe_unused pl330_resume(struct device *dev)
->         pd = &pl330->ddma;
->         pd->dev = &adev->dev;
->
-> -       pl330->mcbufsz = pdat ? pdat->mcbuf_sz : 0;
-> +       pl330->mcbufsz = 0;
->
->         /* get quirk */
->         for (i = 0; i < ARRAY_SIZE(of_quirks); i++)
-> @@ -2900,10 +2884,7 @@ static int __maybe_unused pl330_resume(struct device *dev)
->         INIT_LIST_HEAD(&pd->channels);
->
->         /* Initialize channel parameters */
-> -       if (pdat)
-> -               num_chan = max_t(int, pdat->nr_valid_peri, pcfg->num_chan);
-> -       else
-> -               num_chan = max_t(int, pcfg->num_peri, pcfg->num_chan);
-> +       num_chan = max_t(int, pcfg->num_peri, pcfg->num_chan);
->
->         pl330->num_peripherals = num_chan;
->
-> @@ -2915,11 +2896,8 @@ static int __maybe_unused pl330_resume(struct device *dev)
->
->         for (i = 0; i < num_chan; i++) {
->                 pch = &pl330->peripherals[i];
-> -               if (!adev->dev.of_node)
-> -                       pch->chan.private = pdat ? &pdat->peri_id[i] : NULL;
-> -               else
-> -                       pch->chan.private = adev->dev.of_node;
->
-> +               pch->chan.private = adev->dev.of_node;
->                 INIT_LIST_HEAD(&pch->submitted_list);
->                 INIT_LIST_HEAD(&pch->work_list);
->                 INIT_LIST_HEAD(&pch->completed_list);
-> @@ -2932,15 +2910,11 @@ static int __maybe_unused pl330_resume(struct device *dev)
->                 list_add_tail(&pch->chan.device_node, &pd->channels);
->         }
->
-> -       if (pdat) {
-> -               pd->cap_mask = pdat->cap_mask;
-> -       } else {
-> -               dma_cap_set(DMA_MEMCPY, pd->cap_mask);
-> -               if (pcfg->num_peri) {
-> -                       dma_cap_set(DMA_SLAVE, pd->cap_mask);
-> -                       dma_cap_set(DMA_CYCLIC, pd->cap_mask);
-> -                       dma_cap_set(DMA_PRIVATE, pd->cap_mask);
-> -               }
-> +       dma_cap_set(DMA_MEMCPY, pd->cap_mask);
-> +       if (pcfg->num_peri) {
-> +               dma_cap_set(DMA_SLAVE, pd->cap_mask);
-> +               dma_cap_set(DMA_CYCLIC, pd->cap_mask);
-> +               dma_cap_set(DMA_PRIVATE, pd->cap_mask);
->         }
->
->         pd->device_alloc_chan_resources = pl330_alloc_chan_resources;
-> diff --git a/include/linux/amba/pl330.h b/include/linux/amba/pl330.h
-> deleted file mode 100644
-> index fe93758e8403..000000000000
-> --- a/include/linux/amba/pl330.h
-> +++ /dev/null
-> @@ -1,35 +0,0 @@
-> -/* linux/include/linux/amba/pl330.h
-> - *
-> - * Copyright (C) 2010 Samsung Electronics Co. Ltd.
-> - *     Jaswinder Singh <jassi.brar@samsung.com>
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License as published by
-> - * the Free Software Foundation; either version 2 of the License, or
-> - * (at your option) any later version.
-> - */
-> -
-> -#ifndef        __AMBA_PL330_H_
-> -#define        __AMBA_PL330_H_
-> -
-> -#include <linux/dmaengine.h>
-> -
-> -struct dma_pl330_platdata {
-> -       /*
-> -        * Number of valid peripherals connected to DMAC.
-> -        * This may be different from the value read from
-> -        * CR0, as the PL330 implementation might have 'holes'
-> -        * in the peri list or the peri could also be reached
-> -        * from another DMAC which the platform prefers.
-> -        */
-> -       u8 nr_valid_peri;
-> -       /* Array of valid peripherals */
-> -       u8 *peri_id;
-> -       /* Operational capabilities */
-> -       dma_cap_mask_t cap_mask;
-> -       /* Bytes to allocate for MC buffer */
-> -       unsigned mcbuf_sz;
-> -};
-> -
-> -extern bool pl330_filter(struct dma_chan *chan, void *param);
-> -#endif /* __AMBA_PL330_H_ */
-> --
-> 1.9.1
->
+diff --git a/arch/arm/configs/tango4_defconfig b/arch/arm/configs/tango4_defconfig
+new file mode 100644
+index 000000000000..aab931fc0e03
+--- /dev/null
++++ b/arch/arm/configs/tango4_defconfig
+@@ -0,0 +1,96 @@
++CONFIG_CROSS_COMPILE="arm-linux-gnueabihf-"
++# CONFIG_SWAP is not set
++CONFIG_SYSVIPC=y
++CONFIG_NO_HZ_IDLE=y
++CONFIG_HIGH_RES_TIMERS=y
++# CONFIG_COMPAT_BRK is not set
++CONFIG_SLAB=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++CONFIG_MODVERSIONS=y
++CONFIG_ARCH_TANGO=y
++# CONFIG_ARM_ERRATA_643719 is not set
++CONFIG_SMP=y
++CONFIG_PREEMPT=y
++CONFIG_HZ_300=y
++CONFIG_AEABI=y
++CONFIG_HIGHMEM=y
++# CONFIG_ATAGS is not set
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_ARM_ATAG_DTB_COMPAT=y
++CONFIG_CMDLINE="console=ttyS0,115200 mem=256M"
++CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_GOV_ONDEMAND=y
++CONFIG_CPUFREQ_DT=y
++CONFIG_VFP=y
++CONFIG_NEON=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_MULTICAST=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_IPV6 is not set
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_MTD=y
++CONFIG_MTD_TESTS=m
++CONFIG_MTD_CMDLINE_PARTS=y
++CONFIG_MTD_NAND=y
++CONFIG_MTD_NAND_TANGO=y
++CONFIG_BLK_DEV_LOOP=y
++CONFIG_SCSI=y
++CONFIG_BLK_DEV_SD=y
++CONFIG_NETDEVICES=y
++CONFIG_NET_VENDOR_AURORA=y
++CONFIG_AURORA_NB8800=y
++CONFIG_AT803X_PHY=y
++# CONFIG_WLAN is not set
++# CONFIG_INPUT_MOUSEDEV is not set
++# CONFIG_INPUT_KEYBOARD is not set
++# CONFIG_INPUT_MOUSE is not set
++# CONFIG_SERIO is not set
++CONFIG_SERIAL_8250=y
++# CONFIG_SERIAL_8250_DEPRECATED_OPTIONS is not set
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_RT288X=y
++CONFIG_SERIAL_OF_PLATFORM=y
++# CONFIG_HW_RANDOM is not set
++CONFIG_I2C=y
++CONFIG_I2C_XLR=y
++CONFIG_GPIOLIB=y
++CONFIG_THERMAL=y
++CONFIG_CPU_THERMAL=y
++CONFIG_TANGO_THERMAL=y
++CONFIG_WATCHDOG=y
++CONFIG_TANGOX_WATCHDOG=y
++CONFIG_FB=y
++# CONFIG_HID is not set
++# CONFIG_USB_HID is not set
++CONFIG_USB=y
++CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_CHIPIDEA=y
++CONFIG_USB_CHIPIDEA_HOST=y
++CONFIG_MMC=y
++CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_PLTFM=y
++CONFIG_MMC_SDHCI_OF_ARASAN=y
++CONFIG_DMADEVICES=y
++CONFIG_EXT4_FS=y
++CONFIG_FUSE_FS=m
++CONFIG_VFAT_FS=m
++CONFIG_TMPFS=y
++CONFIG_NFS_FS=y
++# CONFIG_NFS_V2 is not set
++CONFIG_ROOT_NFS=y
++CONFIG_NLS_CODEPAGE_437=m
++CONFIG_NLS_ISO8859_1=m
++CONFIG_NLS_UTF8=m
++CONFIG_PRINTK_TIME=y
++# CONFIG_CRYPTO_ECHAINIV is not set
+-- 
+2.10.0
