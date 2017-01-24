@@ -1,41 +1,55 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 24 Jan 2017 16:30:19 +0100
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 24 Jan 2017 15:33:51 +0000
 Subject: [PATCH] drivers: firmware: psci: Use __pa_symbol for cpu_resume
-Message-ID: <1485271819-2977-1-git-send-email-geert+renesas@glider.be>
+In-Reply-To: <1485271819-2977-1-git-send-email-geert+renesas@glider.be>
+References: <1485271819-2977-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20170124153351.GF7572@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If CONFIG_DEBUG_VIRTUAL=y, during s2ram:
+On Tue, Jan 24, 2017 at 04:30:19PM +0100, Geert Uytterhoeven wrote:
+> If CONFIG_DEBUG_VIRTUAL=y, during s2ram:
+> 
+>     virt_to_phys used for non-linear address: ffffff80085db280 (cpu_resume+0x0/0x20)
+>     ------------[ cut here ]------------
+>     WARNING: CPU: 0 PID: 1628 at arch/arm64/mm/physaddr.c:14 __virt_to_phys+0x28/0x60
+>     ...
+>     [<ffffff800809abb4>] __virt_to_phys+0x28/0x60
+>     [<ffffff80084a0c38>] psci_system_suspend+0x20/0x44
+>     [<ffffff8008095b28>] cpu_suspend+0x3c/0x68
+>     [<ffffff80084a0b48>] psci_system_suspend_enter+0x18/0x20
+>     [<ffffff80080ea3e0>] suspend_devices_and_enter+0x3f8/0x7e8
+>     [<ffffff80080ead14>] pm_suspend+0x544/0x5f4
+> 
+> Fixes: 1a08e3d9e0ac4577 ("drivers: firmware: psci: Use __pa_symbol for kernel symbol")
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-    virt_to_phys used for non-linear address: ffffff80085db280 (cpu_resume+0x0/0x20)
-    ------------[ cut here ]------------
-    WARNING: CPU: 0 PID: 1628 at arch/arm64/mm/physaddr.c:14 __virt_to_phys+0x28/0x60
-    ...
-    [<ffffff800809abb4>] __virt_to_phys+0x28/0x60
-    [<ffffff80084a0c38>] psci_system_suspend+0x20/0x44
-    [<ffffff8008095b28>] cpu_suspend+0x3c/0x68
-    [<ffffff80084a0b48>] psci_system_suspend_enter+0x18/0x20
-    [<ffffff80080ea3e0>] suspend_devices_and_enter+0x3f8/0x7e8
-    [<ffffff80080ead14>] pm_suspend+0x544/0x5f4
+Argh, I should have spotted this. :(
 
-Fixes: 1a08e3d9e0ac4577 ("drivers: firmware: psci: Use __pa_symbol for kernel symbol")
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- drivers/firmware/psci.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Acked-by: Mark Rutland <mark.rutland@arm.com>
 
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index 66a8793f3b3793ff..493a56a4cfc4a836 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -419,7 +419,7 @@ int psci_cpu_suspend_enter(unsigned long index)
- static int psci_system_suspend(unsigned long unused)
- {
- 	return invoke_psci_fn(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND),
--			      virt_to_phys(cpu_resume), 0, 0);
-+			      __pa_symbol(cpu_resume), 0, 0);
- }
- 
- static int psci_system_suspend_enter(suspend_state_t state)
--- 
-1.9.1
+This should go via the arm64 tree -- Will, could you pick this up? 
+
+Thanks,
+Mark.
+
+> ---
+>  drivers/firmware/psci.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+> index 66a8793f3b3793ff..493a56a4cfc4a836 100644
+> --- a/drivers/firmware/psci.c
+> +++ b/drivers/firmware/psci.c
+> @@ -419,7 +419,7 @@ int psci_cpu_suspend_enter(unsigned long index)
+>  static int psci_system_suspend(unsigned long unused)
+>  {
+>  	return invoke_psci_fn(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND),
+> -			      virt_to_phys(cpu_resume), 0, 0);
+> +			      __pa_symbol(cpu_resume), 0, 0);
+>  }
+>  
+>  static int psci_system_suspend_enter(suspend_state_t state)
+> -- 
+> 1.9.1
+> 
