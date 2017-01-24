@@ -1,524 +1,116 @@
-From: jic23@jic23.retrosnub.co.uk (Jonathan Cameron)
-Date: Tue, 24 Jan 2017 18:25:59 +0000
-Subject: [PATCH 5/7] iio: adc: stm32: add optional dma support
-In-Reply-To: <48f9023e-9799-669e-94bd-782a2880a1e7@st.com>
-References: <1484832854-6314-1-git-send-email-fabrice.gasnier@st.com>
- <1484832854-6314-6-git-send-email-fabrice.gasnier@st.com>
- <8e1e4672-2259-bd84-b646-f24026dcff64@kernel.org>
- <48f9023e-9799-669e-94bd-782a2880a1e7@st.com>
-Message-ID: <1325A4A4-C87B-4B47-A23A-5DEFE6DE5F7E@jic23.retrosnub.co.uk>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 24 Jan 2017 10:27:01 -0800
+Subject: [PATCH] ARM: tegra: paz00: fix __initdata placement
+In-Reply-To: <20170123162428.GB2043@ulmo.ba.sec>
+References: <20170123074347.GA29804@dtor-ws> <4072003.S1IBmddlP7@fb07-iapwap2>
+ <20170123162428.GB2043@ulmo.ba.sec>
+Message-ID: <20170124182701.GD27969@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jan 23, 2017 at 05:24:28PM +0100, Thierry Reding wrote:
+> On Mon, Jan 23, 2017 at 11:04:22AM +0100, Marc Dietrich wrote:
+> > Hello Dmitry,
+> > 
+> > Am Sonntag, 22. Januar 2017, 23:43:47 CET schrieb Dmitry Torokhov:
+> > > To have expected effect the __initdata attribute should go after variable
+> > > name and before initializer.`
+> > > 
+> > > Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> > > ---
+> > >  arch/arm/mach-tegra/board-paz00.c | 2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > 
+> > > diff --git a/arch/arm/mach-tegra/board-paz00.c
+> > > b/arch/arm/mach-tegra/board-paz00.c index 7478f6fb3664..ea6bff404161 100644
+> > > --- a/arch/arm/mach-tegra/board-paz00.c
+> > > +++ b/arch/arm/mach-tegra/board-paz00.c
+> > > @@ -23,7 +23,7 @@
+> > > 
+> > >  #include "board.h"
+> > > 
+> > > -static struct property_entry __initdata wifi_rfkill_prop[] = {
+> > > +static struct property_entry wifi_rfkill_prop[] __initdata = {
+> > >  	PROPERTY_ENTRY_STRING("name", "wifi_rfkill"),
+> > >  	PROPERTY_ENTRY_STRING("type", "wlan"),
+> > >  	{ },
+> > 
+> > you are right according to the documentation, but objdump -s always shows that 
+> > it gets put into the .rodata section. So this patch has no effect, because 
+> > result is always same (and wrong). It's also possible that I'm doing something 
+> > wrong :-) Btw, there are hundreds of such __initdata misplacement in the 
+> > kernel.
+> 
+> Hmm... I get this:
+> 
+> 	$ objdump -t build/tegra20/arch/arm/mach-tegra/board-paz00.o
+> 
+> 	build/tegra20/arch/arm/mach-tegra/board-paz00.o:     file format
+> 	elf32-little
+> 
+> 	SYMBOL TABLE:
+> 	00000000 l    df *ABS*  00000000 board-paz00.c
+> 	00000000 l    d  .text  00000000 .text
+> 	00000000 l    d  .data  00000000 .data
+> 	00000000 l    d  .bss   00000000 .bss
+> 	00000000 l    d  .init.text     00000000 .init.text
+> 	00000000 l       .init.text     00000000 $a
+> 	00000000 l       .data  00000000 .LANCHOR1
+> 	00000000 l       .init.data     00000000 .LANCHOR0
+> 	00000000 l    d  .ARM.extab.init.text   00000000 .ARM.extab.init.text
+> 	00000000 l    d  .ARM.exidx.init.text   00000000 .ARM.exidx.init.text
+> 	00000000 l       .ARM.exidx.init.text   00000000 $d
+> 	00000000 l       .data  00000000 $d
+> 	00000000 l     O .data  000001c8 wifi_rfkill_device
+> 	000001c8 l     O .data  00000048 wifi_gpio_lookup
+> 	00000000 l    d  .rodata.str1.4 00000000 .rodata.str1.4
+> 	00000000 l       .rodata.str1.4 00000000 $d
+> 	00000000 l    d  .init.data     00000000 .init.data
+> 	00000000 l       .init.data     00000000 $d
+> 	00000000 l     O .init.data     00000048 wifi_rfkill_prop
+> 	00000000 l    d  .debug_frame   00000000 .debug_frame
+> 	00000010 l       .debug_frame   00000000 $d
+> 	00000000 l    d  .debug_info    00000000 .debug_info
+> 	00000000 l    d  .debug_abbrev  00000000 .debug_abbrev
+> 	00000000 l    d  .debug_aranges 00000000 .debug_aranges
+> 	00000000 l    d  .debug_ranges  00000000 .debug_ranges
+> 	00000000 l    d  .debug_line    00000000 .debug_line
+> 	00000000 l    d  .debug_str     00000000 .debug_str
+> 	00000000 l    d  .note.GNU-stack        00000000 .note.GNU-stack
+> 	00000000 l    d  .comment       00000000 .comment
+> 	00000000 l    d  .ARM.attributes        00000000 .ARM.attributes
+> 	00000000 g     F .init.text     00000030 tegra_paz00_wifikill_init
+> 	00000000         *UND*  00000000 platform_device_add_properties
+> 	00000000         *UND*  00000000 gpiod_add_lookup_table
+> 	00000000         *UND*  00000000 platform_device_register
+> 	00000000         *UND*  00000000 __aeabi_unwind_cpp_pr0
+> 
+> So it correctly ends up in .init.data for me. And it does so with or
+> without the patch. GCCs documentation doesn't seem to say where exactly
+> these attributes need to be put, though the examples given all have the
+> attribute right before the =.
+> 
+> Oh... interestingly checkpatch does seem to have a check for this now,
+> and it does recommend that __initdata be placed after wifi_rfkill_prop,
+> so I'm going to apply this.
 
+Ah, so I mis-remembered the rules and it seems that it does not really
+matter if __initdata goes before or after variable name, it can't go
+between "struct" and its name. From that checkpatch change introducing
+the check:
 
-On 24 January 2017 14:43:56 GMT+00:00, Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
->On 01/22/2017 02:14 PM, Jonathan Cameron wrote:
->> On 19/01/17 13:34, Fabrice Gasnier wrote:
->>> Add optional DMA support to STM32 ADC.
->>> Use dma cyclic mode with at least two periods.
->>>
->>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->> What is the point going forward in supporting non dma buffered reads
->at all?
->> Is there hardware that doesn't have DMA support?
->
->Hi Jonathan,
->
->Basically no, but there is a limited number of DMA request lines.
->DMA request lines mapping is documented in STM32F4 reference manual
->(DMA1/2 request mapping).
->There may be a situation where user (in dt) assign all DMA channels to
->other IPs. Then only choice would be to fall back using interrupt mode 
->for ADC.
->This is why I'd like to keep support for both interrupt and DMA modes.
-Ah. Fair enough.  Thanks for the explanation. Perhaps a note in the patch description
-would give us something to point at in future or even something in the bonding docs?
->
->> Just strikes me that the driver would be slight simpler if we dropped
->that
->> support.
->>
->> Various comments inline.  Mostly around crossing the boundary to
->fetch
->> from the IIO specific buffer (indio_dev->buffer).  That should never
->be
->> used directly as we can have multiple consumers of the datastream so
->> the numbers you get from that may represent only part of what is
->going on.
->>
->>
->>> ---
->>>  drivers/iio/adc/Kconfig          |   2 +
->>>  drivers/iio/adc/stm32-adc-core.c |   1 +
->>>  drivers/iio/adc/stm32-adc-core.h |   2 +
->>>  drivers/iio/adc/stm32-adc.c      | 209
->++++++++++++++++++++++++++++++++++++---
->>>  4 files changed, 202 insertions(+), 12 deletions(-)
->>>
->>> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
->>> index 9a7b090..2a2ef78 100644
->>> --- a/drivers/iio/adc/Kconfig
->>> +++ b/drivers/iio/adc/Kconfig
->>> @@ -444,12 +444,14 @@ config ROCKCHIP_SARADC
->>>  config STM32_ADC_CORE
->>>  	tristate "STMicroelectronics STM32 adc core"
->>>  	depends on ARCH_STM32 || COMPILE_TEST
->>> +	depends on HAS_DMA
->>>  	depends on OF
->>>  	depends on REGULATOR
->>>  	select IIO_BUFFER
->>>  	select MFD_STM32_TIMERS
->>>  	select IIO_STM32_TIMER_TRIGGER
->>>  	select IIO_TRIGGERED_BUFFER
->>> +	select IRQ_WORK
->>>  	help
->>>  	  Select this option to enable the core driver for
->STMicroelectronics
->>>  	  STM32 analog-to-digital converter (ADC).
->>> diff --git a/drivers/iio/adc/stm32-adc-core.c
->b/drivers/iio/adc/stm32-adc-core.c
->>> index 4214b0c..22b7c93 100644
->>> --- a/drivers/iio/adc/stm32-adc-core.c
->>> +++ b/drivers/iio/adc/stm32-adc-core.c
->>> @@ -201,6 +201,7 @@ static int stm32_adc_probe(struct
->platform_device *pdev)
->>>  	priv->common.base = devm_ioremap_resource(&pdev->dev, res);
->>>  	if (IS_ERR(priv->common.base))
->>>  		return PTR_ERR(priv->common.base);
->>> +	priv->common.phys_base = res->start;
->>>
->>>  	priv->vref = devm_regulator_get(&pdev->dev, "vref");
->>>  	if (IS_ERR(priv->vref)) {
->>> diff --git a/drivers/iio/adc/stm32-adc-core.h
->b/drivers/iio/adc/stm32-adc-core.h
->>> index 081fa5f..2ec7abb 100644
->>> --- a/drivers/iio/adc/stm32-adc-core.h
->>> +++ b/drivers/iio/adc/stm32-adc-core.h
->>> @@ -42,10 +42,12 @@
->>>  /**
->>>   * struct stm32_adc_common - stm32 ADC driver common data (for all
->instances)
->>>   * @base:		control registers base cpu addr
->>> + * @phys_base:		control registers base physical addr
->>>   * @vref_mv:		vref voltage (mv)
->>>   */
->>>  struct stm32_adc_common {
->>>  	void __iomem			*base;
->>> +	phys_addr_t			phys_base;
->>>  	int				vref_mv;
->>>  };
->>>
->>> diff --git a/drivers/iio/adc/stm32-adc.c
->b/drivers/iio/adc/stm32-adc.c
->>> index 9753c39..3439f4c 100644
->>> --- a/drivers/iio/adc/stm32-adc.c
->>> +++ b/drivers/iio/adc/stm32-adc.c
->>> @@ -21,6 +21,8 @@
->>>
->>>  #include <linux/clk.h>
->>>  #include <linux/delay.h>
->>> +#include <linux/dma-mapping.h>
->>> +#include <linux/dmaengine.h>
->>>  #include <linux/iio/iio.h>
->>>  #include <linux/iio/buffer.h>
->>>  #include <linux/iio/timer/stm32-timer-trigger.h>
->>> @@ -29,6 +31,7 @@
->>>  #include <linux/iio/triggered_buffer.h>
->>>  #include <linux/interrupt.h>
->>>  #include <linux/io.h>
->>> +#include <linux/irq_work.h>
->>>  #include <linux/module.h>
->>>  #include <linux/platform_device.h>
->>>  #include <linux/of.h>
->>> @@ -69,6 +72,8 @@
->>>  #define STM32F4_EXTSEL_SHIFT		24
->>>  #define STM32F4_EXTSEL_MASK		GENMASK(27, 24)
->>>  #define STM32F4_EOCS			BIT(10)
->>> +#define STM32F4_DDS			BIT(9)
->>> +#define STM32F4_DMA			BIT(8)
->>>  #define STM32F4_ADON			BIT(0)
->>>
->>>  /* STM32F4_ADC_SQR1 - bit fields */
->>> @@ -165,6 +170,11 @@ struct stm32_adc_trig_info {
->>>   * @bufi:		data buffer index
->>>   * @num_conv:		expected number of scan conversions
->>>   * @exten:		external trigger config (enable/polarity)
->>> + * @work:		irq work used to call trigger poll routine
->>> + * @dma_chan:		dma channel
->>> + * @rx_buf:		dma rx buffer cpu address
->>> + * @rx_dma_buf:		dma rx buffer bus address
->>> + * @rx_buf_sz:		dma rx buffer size
->>>   */
->>>  struct stm32_adc {
->>>  	struct stm32_adc_common	*common;
->>> @@ -177,6 +187,11 @@ struct stm32_adc {
->>>  	int			bufi;
->>>  	int			num_conv;
->>>  	enum stm32_adc_exten	exten;
->>> +	struct irq_work		work;
->>> +	struct dma_chan		*dma_chan;
->>> +	u8			*rx_buf;
->>> +	dma_addr_t		rx_dma_buf;
->>> +	int			rx_buf_sz;
->>>  };
->>>
->>>  /**
->>> @@ -332,10 +347,20 @@ static void stm32_adc_conv_irq_disable(struct
->stm32_adc *adc)
->>>  /**
->>>   * stm32_adc_start_conv() - Start conversions for regular channels.
->>>   * @adc: stm32 adc instance
->>> + *
->>> + * Start conversions for regular channels.
->>> + * Also take care of normal or DMA mode. DMA is used in circular
->mode for
->>> + * regular conversions, in IIO buffer modes. Rely on rx_buf as raw
->>> + * read doesn't use dma, but direct DR read.
->>>   */
->>>  static void stm32_adc_start_conv(struct stm32_adc *adc)
->>>  {
->>>  	stm32_adc_set_bits(adc, STM32F4_ADC_CR1, STM32F4_SCAN);
->>> +
->>> +	if (adc->rx_buf)
->>> +		stm32_adc_set_bits(adc, STM32F4_ADC_CR2,
->>> +				   STM32F4_DMA | STM32F4_DDS);
->>> +
->>>  	stm32_adc_set_bits(adc, STM32F4_ADC_CR2, STM32F4_EOCS |
->STM32F4_ADON);
->>>
->>>  	/* Wait for Power-up time (tSTAB from datasheet) */
->>> @@ -353,6 +378,10 @@ static void stm32_adc_stop_conv(struct
->stm32_adc *adc)
->>>
->>>  	stm32_adc_clr_bits(adc, STM32F4_ADC_CR1, STM32F4_SCAN);
->>>  	stm32_adc_clr_bits(adc, STM32F4_ADC_CR2, STM32F4_ADON);
->>> +
->>> +	if (adc->rx_buf)
->>> +		stm32_adc_clr_bits(adc, STM32F4_ADC_CR2,
->>> +				   STM32F4_DMA | STM32F4_DDS);
->>>  }
->>>
->>>  /**
->>> @@ -689,19 +718,138 @@ static int
->stm32_adc_debugfs_reg_access(struct iio_dev *indio_dev,
->>>  	.driver_module = THIS_MODULE,
->>>  };
->>>
->>> +static int stm32_adc_dma_residue(struct stm32_adc *adc)
->>> +{
->>> +	struct dma_tx_state state;
->>> +	enum dma_status status;
->>> +
->>> +	if (!adc->rx_buf)
->>> +		return 0;
->>> +
->>> +	status = dmaengine_tx_status(adc->dma_chan,
->>> +				     adc->dma_chan->cookie,
->>> +				     &state);
->>> +	if (status == DMA_IN_PROGRESS) {
->>> +		/* Residue is size in bytes from end of buffer */
->>> +		int i = adc->rx_buf_sz - state.residue;
->>> +		int size;
->>> +
->>> +		/* Return available bytes */
->>> +		if (i >= adc->bufi)
->>> +			size = i - adc->bufi;
->>> +		else
->>> +			size = adc->rx_buf_sz - adc->bufi + i;
->>> +
->>> +		return size;
->>> +	}
->>> +
->>> +	return 0;
->>> +}
->>> +
->>> +static void stm32_adc_dma_irq_work(struct irq_work *work)
->>> +{
->>> +	struct stm32_adc *adc = container_of(work, struct stm32_adc,
->work);
->>> +	struct iio_dev *indio_dev = iio_priv_to_dev(adc);
->>> +
->>> +	/**
->>> +	 * iio_trigger_poll calls generic_handle_irq(). So, it requires
->hard
->>> +	 * irq context, and cannot be called directly from dma callback,
->>> +	 * dma cb has to schedule this work instead.
->>> +	 */
->>> +	iio_trigger_poll(indio_dev->trig);
->> This is nasty ;)  iio_trigger_poll_chained is your friend. It is
->missnamed.
->> If you only need to call the threaded part of the pollfunc (and I
->think you
->> can construct it so you do) then it will call it without needing to
->bounce
->> back into interrupt context.
->
->I'll look into it :-)
->
->>
->>> +}
->>> +
->>> +static void stm32_adc_dma_buffer_done(void *data)
->>> +{
->>> +	struct stm32_adc *adc = data;
->>> +
->>> +	/* invoques iio_trigger_poll() from hard irq context */
->>> +	irq_work_queue(&adc->work);
->>> +}
->>> +
->>>  static int stm32_adc_buffer_preenable(struct iio_dev *indio_dev)
->>>  {
->>>  	struct stm32_adc *adc = iio_priv(indio_dev);
->>> +	struct dma_async_tx_descriptor *desc;
->>> +	struct dma_slave_config config;
->>> +	dma_cookie_t cookie;
->>> +	int ret, size, watermark;
->>>
->>>  	/* Reset adc buffer index */
->>>  	adc->bufi = 0;
->>>
->>> -	/* Allocate adc buffer */
->>> -	adc->buffer = kzalloc(indio_dev->scan_bytes, GFP_KERNEL);
->>> -	if (!adc->buffer)
->>> +	if (!adc->dma_chan) {
->>> +		/* Allocate adc buffer */
->>> +		adc->buffer = kzalloc(indio_dev->scan_bytes, GFP_KERNEL);
->>> +		if (!adc->buffer)
->>> +			return -ENOMEM;
->>> +
->>> +		return 0;
->>> +	}
->>> +
->>> +	/*
->>> +	 * Allocate at least twice the buffer size for dma cyclic
->transfers, so
->>> +	 * we can work with at least two dma periods. There should be :
->>> +	 * - always one buffer (period) dma is working on
->>> +	 * - one buffer (period) driver can push with iio_trigger_poll().
->>> +	 */
->>> +	size = indio_dev->buffer->bytes_per_datum *
->indio_dev->buffer->length;
->>> +	size = max(indio_dev->scan_bytes * 2, size);
->> Hmm. There is a bit of a weird mix going on here. Firstly, you may
->have more
->> than one consumer buffer, the one you are checking is only the one
->directly
->> associated with the IIO userspace interface.
->>
->> So scan_bytes is the right value to use for both of these statements.
->> The buffer length is typically not knowable either or relevant here.
->> If you are ultimately going to deal with watermarks there is an
->interface
->> to guide read sizes based on that but this isn't it.
->>
->> So basically device should never know anything at all about the
->software
->> buffer. All info should pass through the core which knows about all
->the
->> consumers hanging off this interface (and the demux that is going on
->to
->> feed them all).
->>
->> Some drivers provide additional info to allow the modifying of the
->> precise hardware watermark being used.  That's an acceptable form of
->> 'tweak'.
->
->I'll follow your guidelines and rework this part. I also had some
->doubts 
->on this. This is more clear!
->
->Thanks,
->Regards,
->Fabrice
->
->>
->>> +
->>> +	adc->rx_buf = dma_alloc_coherent(adc->dma_chan->device->dev,
->>> +					 PAGE_ALIGN(size), &adc->rx_dma_buf,
->>> +					 GFP_KERNEL);
->>> +	if (!adc->rx_buf)
->>>  		return -ENOMEM;
->>> +	adc->rx_buf_sz = size;
->>> +	watermark = indio_dev->buffer->bytes_per_datum
->>> +		* indio_dev->buffer->watermark;
->>> +	watermark = max(indio_dev->scan_bytes, watermark);
->>> +	watermark = rounddown(watermark, indio_dev->scan_bytes);
->>> +
->>> +	dev_dbg(&indio_dev->dev, "%s size=%d watermark=%d\n", __func__,
->size,
->>> +		watermark);
->>> +
->>> +	/* Configure DMA channel to read data register */
->>> +	memset(&config, 0, sizeof(config));
->>> +	config.src_addr = (dma_addr_t)adc->common->phys_base;
->>> +	config.src_addr += adc->offset + STM32F4_ADC_DR;
->>> +	config.src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
->>> +
->>> +	ret = dmaengine_slave_config(adc->dma_chan, &config);
->>> +	if (ret)
->>> +		goto config_err;
->>> +
->>> +	/* Prepare a DMA cyclic transaction */
->>> +	desc = dmaengine_prep_dma_cyclic(adc->dma_chan,
->>> +					 adc->rx_dma_buf,
->>> +					 size, watermark,
->>> +					 DMA_DEV_TO_MEM,
->>> +					 DMA_PREP_INTERRUPT);
->>> +	if (!desc) {
->>> +		ret = -ENODEV;
->>> +		goto config_err;
->>> +	}
->>> +
->>> +	desc->callback = stm32_adc_dma_buffer_done;
->>> +	desc->callback_param = adc;
->>> +
->>> +	cookie = dmaengine_submit(desc);
->>> +	if (dma_submit_error(cookie)) {
->>> +		ret = dma_submit_error(cookie);
->>> +		goto config_err;
->>> +	}
->>> +
->>> +	/* Issue pending DMA requests */
->>> +	dma_async_issue_pending(adc->dma_chan);
->>>
->>>  	return 0;
->>> +
->>> +config_err:
->>> +	dma_free_coherent(adc->dma_chan->device->dev, PAGE_ALIGN(size),
->>> +			  adc->rx_buf, adc->rx_dma_buf);
->>> +
->>> +	return ret;
->>>  }
->>>
->>>  static int stm32_adc_buffer_postenable(struct iio_dev *indio_dev)
->>> @@ -719,7 +867,8 @@ static int stm32_adc_buffer_postenable(struct
->iio_dev *indio_dev)
->>>  	if (ret < 0)
->>>  		return ret;
->>>
->>> -	stm32_adc_conv_irq_enable(adc);
->>> +	if (!adc->dma_chan)
->>> +		stm32_adc_conv_irq_enable(adc);
->>>  	stm32_adc_start_conv(adc);
->>>
->>>  	return 0;
->>> @@ -731,7 +880,8 @@ static int stm32_adc_buffer_predisable(struct
->iio_dev *indio_dev)
->>>  	int ret;
->>>
->>>  	stm32_adc_stop_conv(adc);
->>> -	stm32_adc_conv_irq_disable(adc);
->>> +	if (!adc->dma_chan)
->>> +		stm32_adc_conv_irq_disable(adc);
->>>
->>>  	ret = iio_triggered_buffer_predisable(indio_dev);
->>>  	if (ret < 0)
->>> @@ -748,7 +898,16 @@ static int stm32_adc_buffer_postdisable(struct
->iio_dev *indio_dev)
->>>  {
->>>  	struct stm32_adc *adc = iio_priv(indio_dev);
->>>
->>> -	kfree(adc->buffer);
->>> +	if (!adc->dma_chan) {
->>> +		kfree(adc->buffer);
->>> +	} else {
->>> +		dmaengine_terminate_all(adc->dma_chan);
->>> +		irq_work_sync(&adc->work);
->>> +		dma_free_coherent(adc->dma_chan->device->dev,
->>> +				  PAGE_ALIGN(adc->rx_buf_sz),
->>> +				  adc->rx_buf, adc->rx_dma_buf);
->>> +		adc->rx_buf = NULL;
->>> +	}
->>>  	adc->buffer = NULL;
->>>
->>>  	return 0;
->>> @@ -769,15 +928,31 @@ static irqreturn_t
->stm32_adc_trigger_handler(int irq, void *p)
->>>
->>>  	dev_dbg(&indio_dev->dev, "%s bufi=%d\n", __func__, adc->bufi);
->>>
->>> -	/* reset buffer index */
->>> -	adc->bufi = 0;
->>> -	iio_push_to_buffers_with_timestamp(indio_dev, adc->buffer,
->>> -					   pf->timestamp);
->>> +	if (!adc->dma_chan) {
->>> +		/* reset buffer index */
->>> +		adc->bufi = 0;
->>> +		iio_push_to_buffers_with_timestamp(indio_dev, adc->buffer,
->>> +						   pf->timestamp);
->>> +	} else {
->>> +		int residue = stm32_adc_dma_residue(adc);
->>> +
->>> +		while (residue >= indio_dev->scan_bytes) {
->>> +			adc->buffer = (u16 *)&adc->rx_buf[adc->bufi];
->>> +			iio_push_to_buffers_with_timestamp(indio_dev,
->>> +							   adc->buffer,
->>> +							   pf->timestamp);
->>> +			residue -= indio_dev->scan_bytes;
->>> +			adc->bufi += indio_dev->scan_bytes;
->>> +			if (adc->bufi >= adc->rx_buf_sz)
->>> +				adc->bufi = 0;
->>> +		}
->>> +	}
->>>
->>>  	iio_trigger_notify_done(indio_dev->trig);
->>>
->>>  	/* re-enable eoc irq */
->>> -	stm32_adc_conv_irq_enable(adc);
->>> +	if (!adc->dma_chan)
->>> +		stm32_adc_conv_irq_enable(adc);
->>>
->>>  	return IRQ_HANDLED;
->>>  }
->>> @@ -910,13 +1085,17 @@ static int stm32_adc_probe(struct
->platform_device *pdev)
->>>  	if (ret < 0)
->>>  		goto err_clk_disable;
->>>
->>> +	adc->dma_chan = dma_request_slave_channel(&indio_dev->dev, "rx");
->>> +	if (adc->dma_chan)
->>> +		init_irq_work(&adc->work, stm32_adc_dma_irq_work);
->>> +
->>>  	ret = iio_triggered_buffer_setup(indio_dev,
->>>  					 &iio_pollfunc_store_time,
->>>  					 &stm32_adc_trigger_handler,
->>>  					 &stm32_adc_buffer_setup_ops);
->>>  	if (ret) {
->>>  		dev_err(&pdev->dev, "buffer setup failed\n");
->>> -		goto err_clk_disable;
->>> +		goto err_dma_disable;
->>>  	}
->>>
->>>  	ret = iio_device_register(indio_dev);
->>> @@ -930,6 +1109,10 @@ static int stm32_adc_probe(struct
->platform_device *pdev)
->>>  err_buffer_cleanup:
->>>  	iio_triggered_buffer_cleanup(indio_dev);
->>>
->>> +err_dma_disable:
->>> +	if (adc->dma_chan)
->>> +		dma_release_channel(adc->dma_chan);
->>> +
->>>  err_clk_disable:
->>>  	clk_disable_unprepare(adc->clk);
->>>
->>> @@ -943,6 +1126,8 @@ static int stm32_adc_remove(struct
->platform_device *pdev)
->>>
->>>  	iio_device_unregister(indio_dev);
->>>  	iio_triggered_buffer_cleanup(indio_dev);
->>> +	if (adc->dma_chan)
->>> +		dma_release_channel(adc->dma_chan);
->>>  	clk_disable_unprepare(adc->clk);
->>>
->>>  	return 0;
->>>
->>
->--
->To unsubscribe from this list: send the line "unsubscribe linux-iio" in
->the body of a message to majordomo at vger.kernel.org
->More majordomo info at  http://vger.kernel.org/majordomo-info.html
+    static struct __initdata samsung_pll_clock exynos4_plls[nr_plls] = { 
+
+    does NOT put exynos4_plls in the .initdata section.  The __initdata marker
+    can be virtually anywhere on the line, EXCEPT right after "struct".  The
+    preferred location is before the "=" sign if there is one, or before the
+    trailing ";" otherwise.
+
+so if you are applying it you might want to change the wording as to the
+effect of "making checkpatch happy" which wasn't my intention, but was
+the outcome ;)
+
+Thanks.
 
 -- 
-Sent from my Android device with K-9 Mail. Please excuse my brevity.
+Dmitry
