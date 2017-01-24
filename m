@@ -1,107 +1,348 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 24 Jan 2017 16:10:08 +0000
-Subject: [PATCH v2 2/2] vring: Force use of DMA API for ARM-based systems
-In-Reply-To: <20170124180542-mutt-send-email-mst@kernel.org>
-References: <20170113172154.GL3253@arm.com>
- <20170113201933-mutt-send-email-mst@kernel.org>
- <20170116104028.GA1510@arm.com>
- <20170116161639-mutt-send-email-mst@kernel.org>
- <20170116142103.GF1510@arm.com>
- <20170116162225-mutt-send-email-mst@kernel.org>
- <20170116143408.GG1510@arm.com>
- <20170119234852-mutt-send-email-mst@kernel.org>
- <20170120103332.GA1277@arm.com>
- <5ad8ce42-a469-7417-d2c5-58cc0da89e8d@arm.com>
- <20170124180542-mutt-send-email-mst@kernel.org>
-Message-ID: <0dd38b20-33fe-f912-cf1b-8328c53734a5@arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 24 Jan 2017 09:12:27 -0700
+Subject: [PATCH v5 3/3] watchdog: zx2967: add watchdog controller driver
+ for ZTE's zx2967 family
+In-Reply-To: <1485248322-24299-3-git-send-email-baoyou.xie@linaro.org>
+References: <1485248322-24299-1-git-send-email-baoyou.xie@linaro.org>
+ <1485248322-24299-3-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <20170124161227.GA14385@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/01/17 16:06, Michael S. Tsirkin wrote:
-> On Tue, Jan 24, 2017 at 04:04:11PM +0000, Marc Zyngier wrote:
->> On 20/01/17 10:33, Will Deacon wrote:
->>> From 213bad7fdb8e4f45a7724be169cda292bbb50d2b Mon Sep 17 00:00:00 2001
->>> From: Will Deacon <will.deacon@arm.com>
->>> Date: Tue, 20 Dec 2016 12:12:49 +0000
->>> Subject: [PATCH] vring: Force use of DMA API for ARM-based systems with legacy
->>>  devices
->>>
->>> Booting Linux on an ARM fastmodel containing an SMMU emulation results
->>> in an unexpected I/O page fault from the legacy virtio-blk PCI device:
->>>
->>> [    1.211721] arm-smmu-v3 2b400000.smmu: event 0x10 received:
->>> [    1.211800] arm-smmu-v3 2b400000.smmu:	0x00000000fffff010
->>> [    1.211880] arm-smmu-v3 2b400000.smmu:	0x0000020800000000
->>> [    1.211959] arm-smmu-v3 2b400000.smmu:	0x00000008fa081002
->>> [    1.212075] arm-smmu-v3 2b400000.smmu:	0x0000000000000000
->>> [    1.212155] arm-smmu-v3 2b400000.smmu: event 0x10 received:
->>> [    1.212234] arm-smmu-v3 2b400000.smmu:	0x00000000fffff010
->>> [    1.212314] arm-smmu-v3 2b400000.smmu:	0x0000020800000000
->>> [    1.212394] arm-smmu-v3 2b400000.smmu:	0x00000008fa081000
->>> [    1.212471] arm-smmu-v3 2b400000.smmu:	0x0000000000000000
->>>
->>> <system hangs failing to read partition table>
->>>
->>> This is because the legacy virtio-blk device is behind an SMMU, so we
->>> have consequently swizzled its DMA ops and configured the SMMU to
->>> translate accesses. This then requires the vring code to use the DMA API
->>> to establish translations, otherwise all transactions will result in
->>> fatal faults and termination.
->>>
->>> Given that ARM-based systems only see an SMMU if one is really present
->>> (the topology is all described by firmware tables such as device-tree or
->>> IORT), then we can safely use the DMA API for all legacy virtio devices.
->>> Modern devices can advertise the prescense of an IOMMU using the
->>> VIRTIO_F_IOMMU_PLATFORM feature flag.
->>>
->>> Cc: Andy Lutomirski <luto@kernel.org>
->>> Cc: Michael S. Tsirkin <mst@redhat.com>
->>> Cc: <stable@vger.kernel.org>
->>> Fixes: 876945dbf649 ("arm64: Hook up IOMMU dma_ops")
->>> Signed-off-by: Will Deacon <will.deacon@arm.com>
->>> ---
->>>  drivers/virtio/virtio_ring.c | 7 +++++++
->>>  1 file changed, 7 insertions(+)
->>>
->>> diff --git a/drivers/virtio/virtio_ring.c b/drivers/virtio/virtio_ring.c
->>> index 409aeaa49246..7e38ed79c3fc 100644
->>> --- a/drivers/virtio/virtio_ring.c
->>> +++ b/drivers/virtio/virtio_ring.c
->>> @@ -159,6 +159,13 @@ static bool vring_use_dma_api(struct virtio_device *vdev)
->>>  	if (xen_domain())
->>>  		return true;
->>>  
->>> +	/*
->>> +	 * On ARM-based machines, the DMA ops will do the right thing,
->>> +	 * so always use them with legacy devices.
->>> +	 */
->>> +	if (IS_ENABLED(CONFIG_ARM) || IS_ENABLED(CONFIG_ARM64))
->>> +		return !virtio_has_feature(vdev, VIRTIO_F_VERSION_1);
->>> +
->>>  	return false;
->>>  }
->>>  
->>>
->>
->> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->>
->> Any chance this fix (or anything with similar effects) gets applied
->> sometime soon? I cannot use the model without using a similar
->> workaround:
->>
->> http://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/commit/?h=kvm-arm64/gicv4-wip&id=622ff1190890c0ae60d57e76a7c2f3e6fb27e25d
->>
->> and I suspect that other users of the same system are carrying their own
->> version of the fix. Something in mainline would be infinitely better.
->>
->> Thanks,
->>
->> 	M.
+On Tue, Jan 24, 2017 at 04:58:42PM +0800, Baoyou Xie wrote:
+> This patch adds watchdog controller driver for ZTE's zx2967 family.
 > 
-> I'll merge this in the next pull.
+> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+> ---
+>  drivers/watchdog/Kconfig      |  10 ++
+>  drivers/watchdog/Makefile     |   1 +
+>  drivers/watchdog/zx2967_wdt.c | 274 ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 285 insertions(+)
+>  create mode 100644 drivers/watchdog/zx2967_wdt.c
+> 
+> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> index acb00b5..05093a2 100644
+> --- a/drivers/watchdog/Kconfig
+> +++ b/drivers/watchdog/Kconfig
+> @@ -714,6 +714,16 @@ config ASPEED_WATCHDOG
+>  	  To compile this driver as a module, choose M here: the
+>  	  module will be called aspeed_wdt.
+>  
+> +config ZX2967_WATCHDOG
+> +	tristate "ZTE zx2967 SoCs watchdog support"
+> +	depends on ARCH_ZX
+> +	select WATCHDOG_CORE
+> +	help
+> +	  Say Y here to include support for the watchdog timer
+> +	  in ZTE zx2967 SoCs.
+> +	  To compile this driver as a module, choose M here: the
+> +	  module will be called zx2967_wdt.
+> +
+>  # AVR32 Architecture
+>  
+>  config AT32AP700X_WDT
+> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+> index 0c3d35e..bf2d296 100644
+> --- a/drivers/watchdog/Makefile
+> +++ b/drivers/watchdog/Makefile
+> @@ -82,6 +82,7 @@ obj-$(CONFIG_BCM7038_WDT) += bcm7038_wdt.o
+>  obj-$(CONFIG_ATLAS7_WATCHDOG) += atlas7_wdt.o
+>  obj-$(CONFIG_RENESAS_WDT) += renesas_wdt.o
+>  obj-$(CONFIG_ASPEED_WATCHDOG) += aspeed_wdt.o
+> +obj-$(CONFIG_ZX2967_WATCHDOG) += zx2967_wdt.o
+>  
+>  # AVR32 Architecture
+>  obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
+> diff --git a/drivers/watchdog/zx2967_wdt.c b/drivers/watchdog/zx2967_wdt.c
+> new file mode 100644
+> index 0000000..89a7018
+> --- /dev/null
+> +++ b/drivers/watchdog/zx2967_wdt.c
+> @@ -0,0 +1,274 @@
+> +/*
+> + * watchdog driver for ZTE's zx2967 family
+> + *
+> + * Copyright (C) 2017 ZTE Ltd.
+> + *
+> + * Author: Baoyou Xie <baoyou.xie@linaro.org>
+> + *
+> + * License terms: GNU General Public License (GPL) version 2
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/io.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/module.h>
+> +#include <linux/of_address.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regmap.h>
+> +#include <linux/reset.h>
+> +#include <linux/watchdog.h>
+> +
+> +#define ZX2967_WDT_CFG_REG			0x4
+> +#define ZX2967_WDT_LOAD_REG			0x8
+> +#define ZX2967_WDT_REFRESH_REG			0x18
+> +#define ZX2967_WDT_START_REG			0x1c
+> +
+> +#define ZX2967_WDT_REFRESH_MASK			0x3f
+> +
+> +#define ZX2967_WDT_CFG_DIV(n)			((((n) & 0xff) - 1) << 8)
+> +#define ZX2967_WDT_START_EN			0x1
+> +
+> +#define ZX2967_WDT_WRITEKEY			0x12340000
+> +
+> +#define ZX2967_WDT_DIV_DEFAULT			16
+> +#define ZX2967_WDT_DEFAULT_TIMEOUT		32
+> +#define ZX2967_WDT_MIN_TIMEOUT			1
+> +#define ZX2967_WDT_MAX_TIMEOUT			500
+> +#define ZX2967_WDT_MAX_COUNT			0xffff
+> +
+> +#define ZX2967_WDT_CLK_FREQ			0x8000
+> +
+> +#define ZX2967_WDT_FLAG_REBOOT_MON		BIT(0)
+> +
+> +struct zx2967_wdt {
+> +	struct watchdog_device	wdt_device;
+> +	void __iomem		*reg_base;
+> +	struct clk		*clock;
+> +};
+> +
+> +static inline u32 zx2967_wdt_readl(struct zx2967_wdt *wdt, u16 reg)
+> +{
+> +	return readl_relaxed(wdt->reg_base + reg);
+> +}
+> +
+> +static inline void zx2967_wdt_writel(struct zx2967_wdt *wdt, u16 reg, u32 val)
+> +{
+> +	writel_relaxed(val | ZX2967_WDT_WRITEKEY, wdt->reg_base + reg);
+> +}
+> +
+> +static void zx2967_wdt_refresh(struct zx2967_wdt *wdt)
+> +{
+> +	u32 val;
+> +
+> +	val = zx2967_wdt_readl(wdt, ZX2967_WDT_REFRESH_REG);
+> +	val ^= ZX2967_WDT_REFRESH_MASK;
+> +	zx2967_wdt_writel(wdt, ZX2967_WDT_REFRESH_REG, val);
+> +}
+> +
+> +static int
+> +zx2967_wdt_set_timeout(struct watchdog_device *wdd, unsigned int timeout)
+> +{
+> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
+> +	unsigned int divisor = ZX2967_WDT_DIV_DEFAULT;
+> +	unsigned int count;
+> +
+> +	count = timeout * ZX2967_WDT_CLK_FREQ;
+> +	if (count > divisor * ZX2967_WDT_MAX_COUNT)
+> +		divisor = DIV_ROUND_UP(count, ZX2967_WDT_MAX_COUNT);
+> +	count = DIV_ROUND_UP(count, divisor);
+> +	zx2967_wdt_writel(wdt, ZX2967_WDT_CFG_REG, ZX2967_WDT_CFG_DIV(divisor));
+> +	zx2967_wdt_writel(wdt, ZX2967_WDT_LOAD_REG, count);
+> +	zx2967_wdt_refresh(wdt);
+> +	wdd->timeout =  (count * divisor) / ZX2967_WDT_CLK_FREQ;
+> +
+> +	return 0;
+> +}
+> +
+> +static void __zx2967_wdt_start(struct zx2967_wdt *wdt)
+> +{
+> +	u32 val;
+> +
+> +	val = zx2967_wdt_readl(wdt, ZX2967_WDT_START_REG);
+> +	val |= ZX2967_WDT_START_EN;
+> +	zx2967_wdt_writel(wdt, ZX2967_WDT_START_REG, val);
+> +}
+> +
+> +static void __zx2967_wdt_stop(struct zx2967_wdt *wdt)
+> +{
+> +	u32 val;
+> +
+> +	val = zx2967_wdt_readl(wdt, ZX2967_WDT_START_REG);
+> +	val &= ~ZX2967_WDT_START_EN;
+> +	zx2967_wdt_writel(wdt, ZX2967_WDT_START_REG, val);
+> +}
+> +
+> +static int zx2967_wdt_start(struct watchdog_device *wdd)
+> +{
+> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
+> +
+> +	zx2967_wdt_set_timeout(wdd, wdd->timeout);
+> +	__zx2967_wdt_start(wdt);
+> +
+> +	return 0;
+> +}
+> +
+> +static int zx2967_wdt_stop(struct watchdog_device *wdd)
+> +{
+> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
+> +
+> +	__zx2967_wdt_stop(wdt);
+> +
+> +	return 0;
+> +}
+> +
+> +static int zx2967_wdt_keepalive(struct watchdog_device *wdd)
+> +{
+> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
+> +
+> +	zx2967_wdt_refresh(wdt);
+> +
+> +	return 0;
+> +}
+> +
+> +#define ZX2967_WDT_OPTIONS \
+> +	(WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE)
+> +static const struct watchdog_info zx2967_wdt_ident = {
+> +	.options          =     ZX2967_WDT_OPTIONS,
+> +	.firmware_version =	0,
+> +	.identity         =	"zx2967 watchdog",
+> +};
+> +
+> +static struct watchdog_ops zx2967_wdt_ops = {
+> +	.owner = THIS_MODULE,
+> +	.start = zx2967_wdt_start,
+> +	.stop = zx2967_wdt_stop,
+> +	.ping = zx2967_wdt_keepalive,
+> +	.set_timeout = zx2967_wdt_set_timeout,
+> +};
+> +
+> +static void zx2967_wdt_reset_sysctrl(struct device *dev)
+> +{
+> +	int ret;
+> +	void __iomem *regmap;
+> +	unsigned int offset, mask, config;
+> +	struct of_phandle_args out_args;
+> +
+> +	ret = of_parse_phandle_with_fixed_args(dev->of_node,
+> +			"zte,wdt-reset-sysctrl", 3, 0, &out_args);
 
-Awesome, thanks a lot.
+Go read the comment I made on your V4 post.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> +	if (ret)
+> +		return;
+> +
+> +	offset = out_args.args[0];
+> +	config = out_args.args[1];
+> +	mask = out_args.args[2];
+> +
+> +	regmap = syscon_node_to_regmap(out_args.np);
+> +	if (IS_ERR(regmap))
+> +		return;
+> +
+> +	regmap_update_bits(regmap, offset, mask, config);
+> +}
+> +
+> +static int zx2967_wdt_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct zx2967_wdt *wdt;
+> +	struct resource *base;
+> +	int ret;
+> +	struct reset_control *rstc;
+> +
+> +	wdt = devm_kzalloc(dev, sizeof(*wdt), GFP_KERNEL);
+> +	if (!wdt)
+> +		return -ENOMEM;
+> +
+> +	platform_set_drvdata(pdev, wdt);
+> +
+> +	wdt->wdt_device.info = &zx2967_wdt_ident;
+> +	wdt->wdt_device.ops = &zx2967_wdt_ops;
+> +	wdt->wdt_device.timeout = ZX2967_WDT_DEFAULT_TIMEOUT;
+> +	wdt->wdt_device.max_timeout = ZX2967_WDT_MAX_TIMEOUT;
+> +	wdt->wdt_device.min_timeout = ZX2967_WDT_MIN_TIMEOUT;
+> +	wdt->wdt_device.parent = &pdev->dev;
+> +
+> +	base = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	wdt->reg_base = devm_ioremap_resource(dev, base);
+> +	if (IS_ERR(wdt->reg_base)) {
+> +		dev_err(dev, "ioremap failed\n");
+> +		return PTR_ERR(wdt->reg_base);
+> +	}
+> +
+> +	zx2967_wdt_reset_sysctrl(dev);
+> +
+> +	wdt->clock = devm_clk_get(dev, NULL);
+> +	if (IS_ERR(wdt->clock)) {
+> +		dev_err(dev, "failed to find watchdog clock source\n");
+> +		return PTR_ERR(wdt->clock);
+> +	}
+> +
+> +	ret = clk_prepare_enable(wdt->clock);
+> +	if (ret < 0) {
+> +		dev_err(dev, "failed to enable clock\n");
+> +		return ret;
+> +	}
+> +	clk_set_rate(wdt->clock, ZX2967_WDT_CLK_FREQ);
+> +
+> +	rstc = devm_reset_control_get(dev, NULL);
+> +	if (IS_ERR(rstc)) {
+> +		dev_err(dev, "failed to get rstc");
+> +		ret = PTR_ERR(rstc);
+> +		goto fail_get_reset_control;
+> +	}
+> +
+> +	reset_control_assert(rstc);
+> +	mdelay(10);
+> +	reset_control_deassert(rstc);
+
+Still no explanation as to why we need to have a busy loop here.  I suggest you
+take a look at:
+
+https://www.kernel.org/doc/Documentation/timers/timers-howto.txt
+
+
+> +
+> +	watchdog_set_drvdata(&wdt->wdt_device, wdt);
+> +	watchdog_set_nowayout(&wdt->wdt_device, WATCHDOG_NOWAYOUT);
+> +
+> +	ret = watchdog_register_device(&wdt->wdt_device);
+> +	if (ret)
+> +		goto fail_register;
+> +
+> +	dev_info(dev, "watchdog enabled (timeout=%d sec, nowayout=%d)",
+> +		 wdt->wdt_device.timeout, WATCHDOG_NOWAYOUT);
+> +
+> +	return 0;
+> +
+> +fail_register:
+> +	watchdog_unregister_device(&wdt->wdt_device);
+> +fail_get_reset_control:
+> +	clk_disable_unprepare(wdt->clock);
+> +	return ret;
+> +}
+> +
+> +static int zx2967_wdt_remove(struct platform_device *pdev)
+> +{
+> +	struct zx2967_wdt *wdt = platform_get_drvdata(pdev);
+> +
+> +	watchdog_unregister_device(&wdt->wdt_device);
+> +	clk_disable_unprepare(wdt->clock);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id zx2967_wdt_match[] = {
+> +	{ .compatible = "zte,zx296718-wdt", },
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, zx2967_wdt_match);
+> +
+> +static struct platform_driver zx2967_wdt_driver = {
+> +	.probe		= zx2967_wdt_probe,
+> +	.remove		= zx2967_wdt_remove,
+> +	.driver		= {
+> +		.name	= "zx2967-wdt",
+> +		.of_match_table	= of_match_ptr(zx2967_wdt_match),
+> +	},
+> +};
+> +module_platform_driver(zx2967_wdt_driver);
+> +
+> +MODULE_AUTHOR("Baoyou Xie <baoyou.xie@linaro.org>");
+> +MODULE_DESCRIPTION("ZTE zx2967 Watchdog Device Driver");
+> +MODULE_LICENSE("GPL v2");
+> -- 
+> 2.7.4
+> 
