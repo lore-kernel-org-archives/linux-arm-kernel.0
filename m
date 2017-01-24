@@ -1,27 +1,53 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 24 Jan 2017 17:50:08 +0000
-Subject: [PATCH] regulator: pfuze100: add supply name to regulators
-In-Reply-To: <20170124165920.16309-1-l.stach@pengutronix.de>
-References: <20170124165920.16309-1-l.stach@pengutronix.de>
-Message-ID: <20170124175008.pryuc3saq4pcf3uj@sirena.org.uk>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 24 Jan 2017 17:55:32 +0000
+Subject: [PATCH V7 05/10] acpi: apei: handle SEA notification type for
+ ARMv8
+In-Reply-To: <8b9d254a-5450-d841-baf7-5819a88043e4@codeaurora.org>
+References: <1484244924-24786-1-git-send-email-tbaicar@codeaurora.org>
+ <1484244924-24786-6-git-send-email-tbaicar@codeaurora.org>
+ <587F80A7.10008@arm.com>
+ <3de443d7-2c68-f179-daae-bc8f851470b7@codeaurora.org>
+ <5880FDFC.7060304@arm.com>
+ <8b9d254a-5450-d841-baf7-5819a88043e4@codeaurora.org>
+Message-ID: <58879514.1020501@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2017 at 05:59:20PM +0100, Lucas Stach wrote:
+Hi Tyler,
 
-> The devicetree binding states that the regulators are described by the
-> generic regulator binding, so the input supply can just use the generic
-> "vin" name.
+On 20/01/17 20:58, Baicar, Tyler wrote:
+> On 1/19/2017 10:57 AM, James Morse wrote:
+>> On 18/01/17 23:51, Baicar, Tyler wrote:
+>>> On 1/18/2017 7:50 AM, James Morse wrote:
+>>>> On 12/01/17 18:15, Tyler Baicar wrote:
+>>>>> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
 
-No, there's no generic "vin" name.  The input name for the supply should
-be the same as the input name that is specified in the datasheet for the
-device so that these regulators are consistent with other devices and
-it's easier for people to put together DTs for their systems without
-having to guess what the driver author did with the supplies.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170124/c9ff20a3/attachment.sig>
+>> There are two other things that need changing to make the in_nmi() code path
+>> work on arm64.
+>> Always reserve the virtual-address-space forcing GHES_IOREMAP_PAGES to be 2
+>> regardless of CONFIG_HAVE_ACPI_APEI_NMI. This is almost revert of
+>> 594c7255dce7a13cac50cf2470cc56e2c3b0494e (but that did a few other things too).
+
+> Looks simple enough, should I force it to 2 in all cases, or add a check for
+> CONFIG_HAVE_ACPI_APEI_SEA
+> similar to the check for CONFIG_HAVE_ACPI_APEI_NMI?
+
+Its just address space not actual memory it is reserving right? I think just
+reserve two pages all the time to save eye-sore #ifdefs!
+
+
+>> We also need to fix ghes_ioremap_pfn_nmi() to use arch_apei_get_mem_attribute()
+>> and not assume PAGE_KERNEL.
+
+> So just change the call to ioremap_page_range to:
+> 
+> ioremap_page_range(vaddr, vaddr + PAGE_SIZE, pfn << PAGE_SHIFT,
+> arch_apei_get_mem_attribute());
+
+(you need to give arch_apei_get_mem_attribute() the address...) copying whatever
+ghes_ioremap_pfn_irq() does a few lines down is probably best.
+
+
+Thanks,
+
+James
