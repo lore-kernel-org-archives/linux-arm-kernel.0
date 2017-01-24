@@ -1,22 +1,59 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 24 Jan 2017 21:07:24 -0200
-Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
-In-Reply-To: <20170124224610.GA27340@amd>
-References: <20170123141331.GA11402@amd>
- <da1f1b45-3ae5-ffe8-62c6-9ec7c3a1505b@roeck-us.net>
- <20170123144031.GA7870@amd> <20170123232654.GA19342@amd>
- <20170123234912.GA2460@roeck-us.net>
- <20170124070639.GA5068@rzhang1-surface> <20170124073720.GB5603@amd>
- <88c94ea6-abe2-0f20-337e-e9ee00c883d8@roeck-us.net>
- <20170124175800.GA15070@amd>
- <20170124184526.GA25056@roeck-us.net> <20170124224610.GA27340@amd>
-Message-ID: <CAOMZO5AFZy6YFrE0P-xDXX5BCfWYHAC34VyyX85H5Wr+1O59jA@mail.gmail.com>
+From: spjoshi@codeaurora.org (Sarangdhar Joshi)
+Date: Tue, 24 Jan 2017 15:13:00 -0800
+Subject: [RFC][PATCH 1/2] remoteproc: Reduce asynchronous request_firmware to
+ auto-boot only
+Message-ID: <1485299581-30476-1-git-send-email-spjoshi@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2017 at 8:46 PM, Pavel Machek <pavel@ucw.cz> wrote:
+The rproc_add_virtio_devices() requests firmware asynchronously and
+triggers boot if the auto_boot flag is set. However, this
+asynchronous call seems to be redundant for non auto-boot scenario
+since the rproc_boot() would call request_firmware() anyways. Move
+the auto_boot check to rproc_add() so that a redundant call to
+_request_firmware can be avoided for non auto-boot case.
 
-> It is an ugly regression and it is -rc5 time. Actually not your
-> problem, but Fabio Estevam or Zhang Rui has to deal with it soon.
+Signed-off-by: Sarangdhar Joshi <spjoshi@codeaurora.org>
+---
 
-I have already sent the revert and it was acked-by you and Guenter.
+I'm requesting RFC on this patch since I'm not aware of any scenario
+where we might need asynchronous firmware loading for non auto-boot case.
+
+ drivers/remoteproc/remoteproc_core.c | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
+index f58e634..16242b0 100644
+--- a/drivers/remoteproc/remoteproc_core.c
++++ b/drivers/remoteproc/remoteproc_core.c
+@@ -970,9 +970,7 @@ static void rproc_fw_config_virtio(const struct firmware *fw, void *context)
+ {
+ 	struct rproc *rproc = context;
+ 
+-	/* if rproc is marked always-on, request it to boot */
+-	if (rproc->auto_boot)
+-		rproc_boot(rproc);
++	rproc_boot(rproc);
+ 
+ 	release_firmware(fw);
+ }
+@@ -1286,9 +1284,13 @@ int rproc_add(struct rproc *rproc)
+ 
+ 	/* create debugfs entries */
+ 	rproc_create_debug_dir(rproc);
+-	ret = rproc_add_virtio_devices(rproc);
+-	if (ret < 0)
+-		return ret;
++
++	/* if rproc is marked always-on, request it to boot */
++	if (rproc->auto_boot) {
++		ret = rproc_add_virtio_devices(rproc);
++		if (ret < 0)
++			return ret;
++	}
+ 
+ 	/* expose to rproc_get_by_phandle users */
+ 	mutex_lock(&rproc_list_mutex);
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
