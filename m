@@ -1,120 +1,105 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 24 Jan 2017 11:32:40 +0100
-Subject: [PATCH/RFC 2/2] iommu/ipmmu-vmsa: Opt-in slave devices based on
- ES version
-In-Reply-To: <CANqRtoQayo4_nBuTN--6kt4JRGW7VM-6vMvb8AX22bO=MG8-9g@mail.gmail.com>
-References: <148517349585.18128.10696161017872202809.sendpatchset@little-apple>
- <148517354599.18128.1970642879780864733.sendpatchset@little-apple>
- <CAMuHMdWyV4DWN5pKsp+Z6C0MhZF5fKch4T1g1_Hbk3oxrR6_zw@mail.gmail.com>
- <CANqRtoQayo4_nBuTN--6kt4JRGW7VM-6vMvb8AX22bO=MG8-9g@mail.gmail.com>
-Message-ID: <CAMuHMdULA66ZQrBQC6Fp9LGfDxh3AboBL_ZA+EThqAaRa5iM+Q@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 24 Jan 2017 11:39:20 +0100
+Subject: [PATCH] KVM: arm/arm64: Remove struct vgic_irq pending field
+In-Reply-To: <1dc74e05-b72f-7b98-0d67-8cbde732e83b@arm.com>
+References: <20170123133951.10329-1-christoffer.dall@linaro.org>
+ <154ecb7e-457d-ea56-4ae2-c2b37c951a8a@arm.com>
+ <20170123183447.GH15850@cbox>
+ <1dc74e05-b72f-7b98-0d67-8cbde732e83b@arm.com>
+Message-ID: <20170124103920.GL15850@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
+On Tue, Jan 24, 2017 at 10:01:07AM +0000, Andre Przywara wrote:
+> Hi Christoffer,
+> 
+> On 23/01/17 18:34, Christoffer Dall wrote:
+> > On Mon, Jan 23, 2017 at 05:57:05PM +0000, Andre Przywara wrote:
+> >> Hi Christoffer,
+> >>
+> >> On 23/01/17 13:39, Christoffer Dall wrote:
+> >>> One of the goals behind the VGIC redesign was to get rid of cached or
+> >>> intermediate state in the data structures, but we decided to allow
+> >>> ourselves to precompute the pending value of an IRQ based on the line
+> >>> level and pending latch state.  However, this has now become difficult
+> >>> to base proper GICv3 save/restore on, because there is a potential to
+> >>> modify the pending state without knowing if an interrupt is edge or
+> >>> level configured.
+> >>>
+> >>> See the following post and related message for more background:
+> >>> https://lists.cs.columbia.edu/pipermail/kvmarm/2017-January/023195.html
+> >>>
+> >>> This commit gets rid of the precomputed pending field in favor of a
+> >>> function that calculates the value when needed, irq_is_pending().
+> >>>
+> >>> The soft_pending field is renamed to pending_latch to represent that
+> >>> this latch is the equivalent hardware latch which gets manipulated by
+> >>> the input signal for edge-triggered interrupts and when writing to the
+> >>> SPENDR/CPENDR registers.
+> >>>
+> >>> After this commit save/restore code should be able to simply restore the
+> >>> pending_latch state, line_level state, and config state in any order and
+> >>> get the desired result.
+> >>
+> >> In general I like this very much and am wondering why we didn't come up
+> >> with this earlier. But I guess we were so subscribed to our "cached
+> >> pending" bit.
+> >>
+> >> So I checked several cases, tested some logic equations and drew the
+> >> state diagrams for the "before" and "after" case, but I couldn't find a
+> >> reason why this wouldn't work.
+> >>
+> >> I also think you can get rid of the irq_set_pending_latch() wrapper and
+> >> assign the value directly, as I don't see any reason to hide the fact
+> >> that it's indeed a simple assignment and nothing magic behind this
+> >> function. Also it would make the diff a bit easier to read.
+> > 
+> > Agreed.  Once we have agreement about if we should cleanup clearing the
+> > latch state, I'll respin with that and add you and Marc's RB tags with
+> > the changed version.
+> > 
+> >>
+> >> But apart from that:
+> >>
+> >> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+> >>
+> >>
+> >> I also gave this a quick test on the Juno and the Midway with both
+> >> kvmtool and QEMU and they survived some basic testing.
+> >>
+> >> I need to check a GICv3 machine tomorrow, but I don't expect any
+> >> differences here.
+> >>
+> > 
+> > Thanks.
+> > 
+> > I tested this, including GICv2 migration on Mustang, and was going to do
+> > GICv3 testing and 32-bit testin tomorrow, but I'm quite happy to hear
+> > you gave it a spin on a 32-bit platform already.
+> 
+> OK, so a GICv3 machine survived over night testing, resulting in some 10
+> millions of interrupts of every kind (LPIs, edge SPIs, some 100,000
+> level SPIs (UART only), SGIs, PPIs).
+> Same on a Juno, no LPIs there of course, but also millions of interrupts
+> working fine over night.
+> 
+> So:
+> 
+> Tested-by: Andre Przywara <andre.przywara@arm.com>
 
-On Tue, Jan 24, 2017 at 10:38 AM, Magnus Damm <magnus.damm@gmail.com> wrote:
-> On Mon, Jan 23, 2017 at 9:50 PM, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
->> On Mon, Jan 23, 2017 at 1:12 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
->>> From: Magnus Damm <damm+renesas@opensource.se>
->>>
->>> Match on r8a7795 ES2 and enable a certain DMA controller.
->>> In other cases the IPMMU driver remains disabled.
->>>
->>> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
->>> ---
->>>
->>>  drivers/iommu/ipmmu-vmsa.c |   24 ++++++++++++++++++++++++
->>>  1 file changed, 24 insertions(+)
->>>
->>> --- 0001/drivers/iommu/ipmmu-vmsa.c
->>> +++ work/drivers/iommu/ipmmu-vmsa.c     2017-01-23 20:57:02.620607110 +0900
->>> @@ -23,6 +23,7 @@
->>>  #include <linux/platform_device.h>
->>>  #include <linux/sizes.h>
->>>  #include <linux/slab.h>
->>> +#include <linux/sys_soc.h>
->>>
->>>  #if defined(CONFIG_ARM) && !defined(CONFIG_IOMMU_DMA)
->>>  #include <asm/dma-iommu.h>
->>> @@ -1002,16 +1003,39 @@ static void ipmmu_domain_free_dma(struct
->>>         }
->>>  }
->>>
->>> +static const struct soc_device_attribute r8a7795es2[] = {
->>> +       { .soc_id = "r8a7795", .revision = "ES2.*" },
->>> +       { /* sentinel */ }
->>> +};
->>> +
->>> +static int ipmmu_slave_whitelist(struct device *dev)
->>> +{
->>> +       /* Opt-in slave devices based on SoC and ES version */
->>> +       if (soc_device_match(r8a7795es2)) {
->>> +               if (!strcmp(dev_name(dev), "e7310000.dma-controller"))
->>> +                       return 0;
->>> +       }
->>
->> I have two comments about the construct above:
->>   1. IPMMU will be disabled on all non-r8a7795 SoCs.
->>      Is that what you want?
->
-> Sort of. This patch is just an example to stir up some discussion
-> about this topic. I realize this code as-is changes R-Car Gen2
-> behavior (that is merged upstream) so perhaps we should keep devices
-> enabled for those SoCs.
+Thanks, I'll respin this with the trivial changes and add yours and
+Marc's tested and reviewed by tags.
 
-Indeed.
-Note that we don't have any "iommus" in upstream R-Car Gen2 DTSes.
+> 
+> So this was just Linux as a guest, which - at least last time I checked
+> - doesn't use GIC_DIST_SET_PENDING or GIC_DIST_CLEAR_PENDING registers
+> too much (if at all under normal load).
+> I think we should add some tests to kvm-unit-tests to actually trigger
+> this code explicitly.
+> 
 
->>   2. Usually we match on the old broken versions instead (e.g. against
->>      "ES1.*"), as (1) it marks more clearly support for old SoCs, and
->>                 (2) it makes it easier to remove the check later when these
->>                     old SoCs are deemed extinct later.
->
-> Right, if I understand correctly then you're saying opt-out might be
-> better instead of opt-in. In case of IPMMU and R-Car Gen3 I believe it
-> might be less work to use opt-in rather than excluding not-yet-working
-> stuff. =)
+Yeah, we probably should.  But I'm not going to for the purposes of
+merging this patch.
 
-Unfortunately that may be true :-(
-
-> With this series I would like to propose to disconnect the DT
-> integration timing from the enablement of IPMMU support for slave
-> devices. If we can enable the IPMMU in DT early on we can reduce
-> potential out-of-tree IPMMU enablement DT patches. So with the DT
-> bindings fixed and accurate data sheet we can merge DT bits ahead of
-> enablement time. And then use run time logic to determine what to
-> enable based on test results.
->
-> As you are aware, currently we have used the presence of "iommus" in
-> DT to determine if a device is going to be enabled or not. So if the
-> IPMMU Kconfig bits enable the IPMMU driver and the "iommus" DT
-> property tie a certain slave device to the IPMMU then we will make use
-> of IPMMU for a certain device. Currently we assume it will work on all
-> ES versions that use that particular DTB.
->
-> However ES specific hardware errata together with a wide range of ES
-> versions for r8a7795 and r8a7796 (and whatever SoCs and ES versions
-> that comes next) makes it difficult to use DT like above to enable
-> stuff seemingly on one ES version without potentially breaking other
-> ES versions. I would like to share DT files between the ES versions as
-> much as possible but still only enable IPMMU support for devices that
-> are known to work.
->
-> Let me know if you think it makes sense to enable DT in a different
-> way than my proposal.
-
-That makes perfect sense to me: DT describes (ideal production) hardware,
-and errata are handled in C code and tables.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+-Christoffer
