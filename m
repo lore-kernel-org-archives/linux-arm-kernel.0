@@ -1,75 +1,84 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 24 Jan 2017 21:50:59 +0800
-Subject: [PATCH 2/2] arch_timer: acpi: add hisi timer erratum data
-In-Reply-To: <20170124105717.GB6277@leverpostej>
-References: <1485254391-51551-1-git-send-email-guohanjun@huawei.com>
- <1485254391-51551-3-git-send-email-guohanjun@huawei.com>
- <20170124105717.GB6277@leverpostej>
-Message-ID: <58875BC3.4090101@linaro.org>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Tue, 24 Jan 2017 14:00:52 +0000
+Subject: [PATCH 1/4] PCI: Xilinx NWL: Fix, do not check for legacy
+ status in while loop
+In-Reply-To: <0def9067-5c35-f7fe-8e15-bab70d479d1e@arm.com>
+References: <1484997072-19276-1-git-send-email-bharatku@xilinx.com>
+ <ec10b089-acc5-7764-6346-9dc1869d05c7@arm.com>
+ <8520D5D51A55D047800579B094147198263CCF96@XAP-PVEXMBX02.xlnx.xilinx.com>
+ <0def9067-5c35-f7fe-8e15-bab70d479d1e@arm.com>
+Message-ID: <8520D5D51A55D047800579B094147198263CD2C7@XAP-PVEXMBX02.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/24/2017 06:57 PM, Mark Rutland wrote:
-> On Tue, Jan 24, 2017 at 06:39:51PM +0800, Hanjun Guo wrote:
->> From: Hanjun Guo <hanjun.guo@linaro.org>
->>
->> Add hisilicon timer specific erratum fixes.
->>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> ---
->>   drivers/clocksource/arm_arch_timer.c | 22 ++++++++++++++++++++++
->>   1 file changed, 22 insertions(+)
->>
->> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
->> index 80d6f76..3e62a09 100644
->> --- a/drivers/clocksource/arm_arch_timer.c
->> +++ b/drivers/clocksource/arm_arch_timer.c
->> @@ -1156,10 +1156,32 @@ struct gtdt_arch_timer_fixup {
->>   	void *context;
->>   };
->>
->> +#ifdef CONFIG_HISILICON_ERRATUM_161010101
->> +static void __init hisi_erratum_workaroud_enable(void *context)
->> +{
->> +	int i;
->> +
->> +	for (i = 0; i < ARRAY_SIZE(ool_workarounds); i++) {
->> +		if (!strcmp(context, ool_workarounds[i].id)) {
->> +			timer_unstable_counter_workaround = &ool_workarounds[i];
->> +			static_branch_enable(&arch_timer_read_ool_enabled);
->> +			pr_info("arch_timer: Enabling workaround for %s\n",
->> +				timer_unstable_counter_workaround->id);
->> +			break;
->> +		}
->> +	}
->> +}
->> +#endif
->> +
->>   /* note: this needs to be updated according to the doc of OEM ID
->>    * and TABLE ID for different board.
->>    */
->>   static struct gtdt_arch_timer_fixup arch_timer_quirks[] __initdata = {
->> +#ifdef CONFIG_HISILICON_ERRATUM_161010101
->> +	{"HISI  ", "HIP05   ", 0, &hisi_erratum_workaroud_enable, "hisilicon,erratum-161010101"},
->> +	{"HISI  ", "HIP06   ", 0, &hisi_erratum_workaroud_enable, "hisilicon,erratum-161010101"},
->> +	{"HISI  ", "HIP07   ", 0, &hisi_erratum_workaroud_enable, "hisilicon,erratum-161010101"},
->> +#endif
->>   };
->
-> NAK. This duplicates logic unnecessarily (for enabling the workaround),
-> and (ab)uses the id, which was intended to be specific to DT (since it
-> is a DT property name).
->
-> We should split the matching from the particular workaround (and
-> enabling thereof), so that we can go straight from ACPI match to
-> workaround (without having to use the DT id in this manner), and don't
-> have to duplicate the logic to enable the workaround.
+> On 24/01/17 10:15, Bharat Kumar Gogada wrote:
+> >> On 21/01/17 11:11, Bharat Kumar Gogada wrote:
+> >>> - The legacy status register value for particular INTx becomes low
+> >>> only after DEASSERT_INTx is received.
+> >>> - Few End Points take time for sending DEASSERT_INTx, checking
+> >>> legacy status register in while loop causes invoking of EP handler
+> >>> continuosly until DEASSERT_INTx is received.
+> >>>
+> >>> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+> >>> ---
+> >>>  drivers/pci/host/pcie-xilinx-nwl.c |    5 +++--
+> >>>  1 files changed, 3 insertions(+), 2 deletions(-)
+> >>>
+> >>> diff --git a/drivers/pci/host/pcie-xilinx-nwl.c
+> >>> b/drivers/pci/host/pcie-xilinx-nwl.c
+> >>> index 43eaa4a..c8b5a33 100644
+> >>> --- a/drivers/pci/host/pcie-xilinx-nwl.c
+> >>> +++ b/drivers/pci/host/pcie-xilinx-nwl.c
+> >>> @@ -342,9 +342,10 @@ static void nwl_pcie_leg_handler(struct
+> >>> irq_desc
+> >>> *desc)
+> >>>
+> >>>  	chained_irq_enter(chip, desc);
+> >>>  	pcie = irq_desc_get_handler_data(desc);
+> >>> +	status = nwl_bridge_readl(pcie, MSGF_LEG_STATUS) &
+> >>> +				  MSGF_LEG_SR_MASKALL;
+> >>>
+> >>> -	while ((status = nwl_bridge_readl(pcie, MSGF_LEG_STATUS) &
+> >>> -				MSGF_LEG_SR_MASKALL) != 0) {
+> >>> +	if (status != 0) {
+> >>>  		for_each_set_bit(bit, &status, INTX_NUM) {
+> >>>  			virq = irq_find_mapping(pcie->legacy_irq_domain,
+> >>>  						bit + 1);
+> >>>
+> >>
+> >> But even if you only handle the interrupt once, it is still asserted,
+> >> right? You exit the low-level exception handler, only to take the
+> >> interrupt immediately again. So what is the gain here?
+> >>
+> > Whenever masking of INTx happens (like as in my next patch[PATCH
+> > 2/4]), the irq line goes low, but  status bit will be set until DEASSERT_INTx
+> comes.
+> > In this scenario if it is always in while loop, even though line went
+> > low it will not be seen until DEASSERT_INTx, unnecessarily invoking EP
+> > driver. so instead of while loop using if condition so that this change in line is
+> noticed.
+> 
+> But what guarantees that you will observe this DEASSERT if you return to the
+> interrupted context early? From what I understand, your interrupt flow is the
+> following:
+> 
+> 
+> 	read status
+> 	mask
+> 	handler
+> 	unmask
+> 
+> If the EP takes time to send a deassert after the handler has poked it and the
+> interrupt is still active, then the only thing that this patch buys you is that by
+> returning to the interrupted context, you waste a lot of cycles, giving the device
+> a chance to send its deassert. But that's just luck. Plug this on a fast CPU, and
+> the same issue will resurface.
+> 
 
-maybe we can add ACPI quirk matching information in
-struct arch_timer_erratum_workaround, then reuse the
-code for both ACPI and DT, but it needs further cleanup
-to support multi platforms sharing the same erratum in
-ACPI way.
+Agreed, will leave it as it is.
 
-Thanks
-Hanjun
+Thanks & Regards,
+Bharat
+
+
+ 
