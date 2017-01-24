@@ -1,75 +1,54 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 24 Jan 2017 21:31:59 +0100
-Subject: [PATCH net-next v6 1/4] net: dsa: mv88e6xxx: Don't forbid MDIO
- I/Os for PHY addr >= num_of_ports
-In-Reply-To: <7665c54a8da0d4338d5935ab272952ea6547d815.1485288602.git-series.gregory.clement@free-electrons.com>
- (Gregory CLEMENT's message of "Tue, 24 Jan 2017 21:10:23 +0100")
-References: <cover.b0e18efe751186768e720c341693117fdd4d3c16.1485288602.git-series.gregory.clement@free-electrons.com>
- <cover.b0e18efe751186768e720c341693117fdd4d3c16.1485288602.git-series.gregory.clement@free-electrons.com>
- <7665c54a8da0d4338d5935ab272952ea6547d815.1485288602.git-series.gregory.clement@free-electrons.com>
-Message-ID: <87inp42o8w.fsf@free-electrons.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 24 Jan 2017 12:40:11 -0800
+Subject: [PATCH 6/9] power_supply: wm97xx_battery: use
+ power_supply_get_drvdata
+In-Reply-To: <87h94odic0.fsf@belgarion.home>
+References: <1477510907-23495-1-git-send-email-robert.jarzmik@free.fr>
+ <1477510907-23495-7-git-send-email-robert.jarzmik@free.fr>
+ <CAOi56cVk17w6C6msnT88c0Zh1OgLM=FbZAw32MzLRatjFraYhg@mail.gmail.com>
+ <87h94odic0.fsf@belgarion.home>
+Message-ID: <20170124204011.GH27969@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
- 
- On mar., janv. 24 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
+On Tue, Jan 24, 2017 at 08:31:59AM +0100, Robert Jarzmik wrote:
+> Kevin Hilman <khilman@kernel.org> writes:
+> 
+> > Hello,
+> >
+> > On Wed, Oct 26, 2016 at 12:41 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> >> As the power supply framework provides a way to store and retrieve
+> >> private supply data, use it.
+> >>
+> >> In the process, change the platform data for wm97xx_battery from a
+> >> container of a single struct wm97xx_batt_pdata to the direct point to wm97xx_batt_pdata.
+> >>
+> >> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> >
+> > kernelci.org has been reporting that the tegra20-iris board has been
+> > failing in -next since next-20161123[1], and also in mainline
+> > v4.10-rc.  I finally took the time to bisect, and it pointed to this
+> > patch.  I verified that reverting $SUBJECT patch[2] on top of
+> > v4.10-rc5 fixes the problem.
+> >
+> > Kevin
+> >
+> > [1] https://kernelci.org/boot/id/5879a3fe59b5141534f6c3ac/
+> > [2] in mainline as commit: 6480af4915d6 power_supply: wm97xx_battery:
+> > use power_supply_get_drvdata
+> 
+> Hi Kevin,
+> 
+> There is a fix posted in here :
+> https://patchwork.kernel.org/patch/9499231/
+> 
+> I don't know if it's related, as I have no Oops signature nor any data to be
+> able to help further.
 
-> From: Romain Perier <romain.perier@free-electrons.com>
->
-> Some Marvell ethernet switches have internal ethernet transceivers with
-> hardcoded phy addresses. These addresses can be greater than the number
-> of ports or its value might be different than the associated port number.
-> This is for example the case for MV88E6341 that has 6 ports and internal
-> Port 1 to Port4 PHYs mapped at SMI addresses from 0x11 to 0x14.
->
-> This commits fixes the issue by removing the condition in MDIO callbacks.
->
-> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
-> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
-This flag is missing:
-Reviewed-by: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
+I picked up the patch from patchwork and will send it on to Linus in the
+next day or so.
 
-Actually I added during an interactive rebase, but I had to abort it
-and it was lost.
-
-Gregory
-
-
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  drivers/net/dsa/mv88e6xxx/chip.c | 6 ------
->  1 file changed, 6 deletions(-)
->
-> diff --git a/drivers/net/dsa/mv88e6xxx/chip.c b/drivers/net/dsa/mv88e6xxx/chip.c
-> index c7e08e13bb54..7d942f8a42a7 100644
-> --- a/drivers/net/dsa/mv88e6xxx/chip.c
-> +++ b/drivers/net/dsa/mv88e6xxx/chip.c
-> @@ -2882,9 +2882,6 @@ static int mv88e6xxx_mdio_read(struct mii_bus *bus, int phy, int reg)
->  	u16 val;
->  	int err;
->  
-> -	if (phy >= mv88e6xxx_num_ports(chip))
-> -		return 0xffff;
-> -
->  	mutex_lock(&chip->reg_lock);
->  	err = mv88e6xxx_phy_read(chip, phy, reg, &val);
->  	mutex_unlock(&chip->reg_lock);
-> @@ -2897,9 +2894,6 @@ static int mv88e6xxx_mdio_write(struct mii_bus *bus, int phy, int reg, u16 val)
->  	struct mv88e6xxx_chip *chip = bus->priv;
->  	int err;
->  
-> -	if (phy >= mv88e6xxx_num_ports(chip))
-> -		return 0xffff;
-> -
->  	mutex_lock(&chip->reg_lock);
->  	err = mv88e6xxx_phy_write(chip, phy, reg, val);
->  	mutex_unlock(&chip->reg_lock);
-> -- 
-> git-series 0.9.1
+Thanks.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Dmitry
