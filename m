@@ -1,81 +1,27 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 24 Jan 2017 17:59:20 +0100
-Subject: [PATCH] regulator: pfuze100: add supply name to regulators
-Message-ID: <20170124165920.16309-1-l.stach@pengutronix.de>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 24 Jan 2017 17:02:38 +0000
+Subject: Need information for iommu grouping support
+In-Reply-To: <E6F4274F7BEC774AAA4E7A98618BCFAE144292@XAP-PVEXMBX01.xlnx.xilinx.com>
+References: <E6F4274F7BEC774AAA4E7A98618BCFAE144292@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <95445387-1fa4-7836-2f54-4be5d8f871e7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The devicetree binding states that the regulators are described by the
-generic regulator binding, so the input supply can just use the generic
-"vin" name.
+On 24/01/17 12:09, Bhargav Shah wrote:
+> Hi,
+> From the following link I see that some work is in progress regarding to iommu grouping.
+> http://iommu.linux-foundation.narkive.com/RqAfNRwi/question-about-arm-smmu
+> 
+> Are there any code check-ins for this implementation ?
 
-This allows to attach the regulators to their supplies, making the
-regulator tree more useful.
+Yes, since 4.9, devices sharing the same Stream ID will automatically be
+grouped together and work correctly. If you have devices with multiple
+Stream IDs that can be matched unambiguously in a single SMR by masking,
+you can now use that too.
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
- drivers/regulator/pfuze100-regulator.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+Robin.
 
-diff --git a/drivers/regulator/pfuze100-regulator.c b/drivers/regulator/pfuze100-regulator.c
-index cb18b5c4f2db..94fbfa5c6de1 100644
---- a/drivers/regulator/pfuze100-regulator.c
-+++ b/drivers/regulator/pfuze100-regulator.c
-@@ -164,6 +164,7 @@ static struct regulator_ops pfuze100_swb_regulator_ops = {
- 	[_chip ## _ ## _name] = {	\
- 		.desc = {	\
- 			.name = #_name,	\
-+			.supply_name = "vin",	\
- 			.n_voltages = 1,	\
- 			.ops = &pfuze100_fixed_regulator_ops,	\
- 			.type = REGULATOR_VOLTAGE,	\
-@@ -179,6 +180,7 @@ static struct regulator_ops pfuze100_swb_regulator_ops = {
- 	[_chip ## _ ## _name] = {	\
- 		.desc = {	\
- 			.name = #_name,\
-+			.supply_name = "vin",	\
- 			.n_voltages = ((max) - (min)) / (step) + 1,	\
- 			.ops = &pfuze100_sw_regulator_ops,	\
- 			.type = REGULATOR_VOLTAGE,	\
-@@ -197,6 +199,7 @@ static struct regulator_ops pfuze100_swb_regulator_ops = {
- 	[_chip ## _ ##  _name] = {	\
- 		.desc = {	\
- 			.name = #_name,	\
-+			.supply_name = "vin",	\
- 			.n_voltages = ARRAY_SIZE(voltages),	\
- 			.ops = &pfuze100_swb_regulator_ops,	\
- 			.type = REGULATOR_VOLTAGE,	\
-@@ -214,6 +217,7 @@ static struct regulator_ops pfuze100_swb_regulator_ops = {
- 	[_chip ## _ ## _name] = {	\
- 		.desc = {	\
- 			.name = #_name,	\
-+			.supply_name = "vin",	\
- 			.n_voltages = ((max) - (min)) / (step) + 1,	\
- 			.ops = &pfuze100_ldo_regulator_ops,	\
- 			.type = REGULATOR_VOLTAGE,	\
-@@ -233,6 +237,7 @@ static struct regulator_ops pfuze100_swb_regulator_ops = {
- #define PFUZE3000_VCC_REG(_chip, _name, base, min, max, step)	{	\
- 	.desc = {	\
- 		.name = #_name,	\
-+		.supply_name = "vin",	\
- 		.n_voltages = ((max) - (min)) / (step) + 1,	\
- 		.ops = &pfuze100_ldo_regulator_ops,	\
- 		.type = REGULATOR_VOLTAGE,	\
-@@ -253,6 +258,7 @@ static struct regulator_ops pfuze100_swb_regulator_ops = {
- #define PFUZE3000_SW2_REG(_chip, _name, base, min, max, step)	{	\
- 	.desc = {	\
- 		.name = #_name,\
-+		.supply_name = "vin",	\
- 		.n_voltages = ((max) - (min)) / (step) + 1,	\
- 		.ops = &pfuze100_sw_regulator_ops,	\
- 		.type = REGULATOR_VOLTAGE,	\
-@@ -270,6 +276,7 @@ static struct regulator_ops pfuze100_swb_regulator_ops = {
- #define PFUZE3000_SW3_REG(_chip, _name, base, min, max, step)	{	\
- 	.desc = {	\
- 		.name = #_name,\
-+		.supply_name = "vin",	\
- 		.n_voltages = ((max) - (min)) / (step) + 1,	\
- 		.ops = &pfuze100_sw_regulator_ops,	\
- 		.type = REGULATOR_VOLTAGE,	\
--- 
-2.11.0
+> 
+> Thank you,
+> Bhargav Shah 
+> 
