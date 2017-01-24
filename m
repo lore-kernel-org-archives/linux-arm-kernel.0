@@ -1,99 +1,89 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Tue, 24 Jan 2017 01:31:28 -0800
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Tue, 24 Jan 2017 10:37:19 +0100
 Subject: [PATCH V9] thermal: bcm2835: add thermal driver for bcm2835 soc
-In-Reply-To: <060918B6-A773-46A5-8D10-C9F6BBA6D3F1@martin.sperl.org>
+In-Reply-To: <20170124092645.GA3651@localhost.localdomain>
 References: <1483808145-6206-1-git-send-email-kernel@martin.sperl.org>
  <20170120041400.GA24617@localhost.localdomain>
- <060918B6-A773-46A5-8D10-C9F6BBA6D3F1@martin.sperl.org>
-Message-ID: <20170124093127.GB3651@localhost.localdomain>
+ <20170120042323.GA6651@localhost.localdomain>
+ <D349C10C-C929-40A4-86BF-7F6E834DB613@martin.sperl.org>
+ <20170124092645.GA3651@localhost.localdomain>
+Message-ID: <20F6A8E3-F181-4B42-AC29-E681749FAD2A@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Martin,
 
-On Fri, Jan 20, 2017 at 08:54:07AM +0100, kernel at martin.sperl.org wrote:
+> On 24.01.2017, at 10:26, Eduardo Valentin <edubezval@gmail.com> wrote:
 > 
-> > On 20.01.2017, at 05:14, Eduardo Valentin <edubezval@gmail.com> wrote:
-> > 
-> > Hello Martin,
-> > 
-> > On Sat, Jan 07, 2017 at 04:55:45PM +0000, kernel at martin.sperl.org wrote:
-> >> From: Martin Sperl <kernel@martin.sperl.org>
-> >> 
-> >> Add basic thermal driver for bcm2835 SOC.
-> >> 
-> >> This driver currently relies on the firmware setting up the
-> >> tsense HW block and does not set it up itself.
-> >> 
-> >> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
-> >> Acked-by: Eric Anholt <eric@anholt.net>
-> >> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
-> >> 
-> > 
-> > <cut>
-> > 
-> >> +
-> >> +static const struct of_device_id bcm2835_thermal_of_match_table[] = {
-> >> +	{
-> >> +		.compatible = "brcm,bcm2835-thermal",
-> >> +		.data = &(struct bcm2835_thermal_info) {
-> >> +			.offset = 407000,
-> >> +			.slope = -538,
-> >> +			.trip_temp = 80000
-> >> +		}
-> >> +	},
-> >> +	{
-> >> +		.compatible = "brcm,bcm2836-thermal",
-> >> +		.data = &(struct bcm2835_thermal_info) {
-> >> +			.offset = 407000,
-> >> +			.slope = -538,
-> >> +			.trip_temp = 80000
-> >> +		}
-> >> +	},
-> >> +	{
-> >> +		.compatible = "brcm,bcm2837-thermal",
-> >> +		.data = &(struct bcm2835_thermal_info) {
-> >> +			/* the bcm2837 needs adjustment of +5C */
-> >> +			.offset = 407000 + 5000,
-> >> +			.slope = -538,
-> >> +			.trip_temp = 80000
-> >> +		}
-> >> +	},
-> >> +	{},
-> > 
-> > Just for the same of clarification, is there anything preventing this
-> > driver of using of-thermal API? the above data (slope, offset, and
-> > trip_temps) would be in DT the place where they are supposed to be,
-> > instead of code.
-> > 
+> Hello Martin,
 > 
-> As the DT changes, that only define compatible strings, have already gone
-> in without any such properties set, we need to define defaults for the 
-> slope/offset and trip_temp values.
+> On Fri, Jan 20, 2017 at 09:43:02AM +0100, kernel at martin.sperl.org wrote:
+>> 
+>>> On 20.01.2017, at 05:23, Eduardo Valentin <edubezval@gmail.com> wrote:
+>>> 
+>>> On Thu, Jan 19, 2017 at 08:14:02PM -0800, Eduardo Valentin wrote:
+>>>> Hello Martin,
+>>>> 
+>>>> On Sat, Jan 07, 2017 at 04:55:45PM +0000, kernel at martin.sperl.org wrote:
+>>>>> From: Martin Sperl <kernel@martin.sperl.org>
+>>>>> 
+>>>>> Add basic thermal driver for bcm2835 SOC.
+>>>>> 
+>>>>> This driver currently relies on the firmware setting up the
+>>>>> tsense HW block and does not set it up itself.
+>>>>> 
+>>>>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+>>>>> Acked-by: Eric Anholt <eric@anholt.net>
+>>>>> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+>>>>> 
+>>>> 
+>>>> <cut>
+>>> 
+>>> 
+>>> Also, I am getting this warn from sparse:
+>>> drivers/thermal/bcm2835_thermal.c:110:16: warning: cast truncates bits
+>>> from constant value (3ffffffffff00 becomes ffffff00)
+>>> drivers/thermal/bcm2835_thermal.c:134:16: warning: cast truncates bits
+>>> from constant value (3ffffffffff becomes ffffffff)
+>>> 
+>>> Have you seen this?
+>> 
+>> No, I have not checked sparse.
+>> 
+>> These values are defined via GENMASK on line 47 and 57 respectively
+>> and should actually compute to the following values:
+>>  for line 110 (line 47 has the define):
+>>    GENMASK(BCM2835_TS_TSENSCTL_THOLD_BITS +     \
+>>            BCM2835_TS_TSENSCTL_THOLD_SHIFT - 1, \
+>>            BCM2835_TS_TSENSCTL_THOLD_SHIFT)
+>>    = GENMASK(10 + 8 - 1, 8) 
+>>    = GENMASK(17, 8)
+>>    = (((~0UL) << (8)) & (~0UL >> (32 - 1 - (10 + 8 - 1))))
+>>    = 0x3ff00
+>>  for line 134 (line 57 has the define):
+>>    GENMASK(BCM2835_TS_TSENSCTL_THOLD_BITS +     \
+>>            BCM2835_TS_TSENSCTL_THOLD_SHIFT - 1, \
+>>            BCM2835_TS_TSENSCTL_THOLD_SHIFT)
+>>    = GENMASK(10 + 0 - 1, 0)
+>>    = GENMASK(9, 0)
+>>    = (((~0UL) << (0)) & (~0UL >> (32 - 1 - (10 + 0 - 1))))
+>>    = 0x003ff
+>> 
+>> Note that the preprocessor expansions have been verified by
+>> looking at the preprocessed driver source
+>> (drivers/thermal/bcm2835_thermal.i)
 > 
-
-These properties won't go into the same node you are referring to. They
-go into the thermal-zone node you would create, which would then refer
-to the node you referred (already merged). Therefore, I do not see
-anything blocking a proper of-thermal usage to cover for the above data.
-
-> I guess (for newer SOC) you still can use the values in the DT,
-> as (I guess) these are parsed and set in thermal_zone_device_register
-> after the defaults are set in thermal_zone_params.
-
-Not sure what you meant here, but these values, when correctly used in
-DT, they would come as part of the thermal_zone_params and in the
-thermal trips of the thermal zones, as the of-thermal code with already
-deal with those for you.
-
-Please have a look at:
-a. Documentation/devicetree/bindings/thermal/thermal.txt
-b. drivers/thermal/of-thermal.c
-
-And let me know if you see anything that would prevent this driver of
-using the correct API to describe hardware data with DT.
-
-BR,
-
+> OK then.
 > 
-> Martin
+>> 
+>> I wonder why sparse is computing these GENMASK values as:
+>> 0x3ffffffffff00 and 0x3ffffffffff
+> 
+> In the case you can confirm that the values are correct, I believe this
+> could be a false positive report on sparse, in this case.
+
+The correct values are the ones in my email: 0x3ff00 and 0x003ff
+
+The ones reported by sparse (0x3ffffffffff00 and 0x3ffffffffff) are 
+not calculated correctly - to me it looks as if it is possibly some
+sort of 64 bit issue of sparse in conjunction with the generic macro
+GENMASK.
