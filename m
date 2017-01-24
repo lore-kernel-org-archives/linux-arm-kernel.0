@@ -1,69 +1,58 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 24 Jan 2017 08:57:51 +0100
-Subject: [PATCH v3 01/15] ARM: pxa: Don't rely on public mmc header to
- include leds.h
-In-Reply-To: <87y3y3crxl.fsf@belgarion.home>
-References: <1484313256-25993-1-git-send-email-ulf.hansson@linaro.org>
- <1484313256-25993-2-git-send-email-ulf.hansson@linaro.org>
- <87efzydusi.fsf@belgarion.home>
- <CAPDyKFo=tUu9D5zZnUME_+HFBPEnnjy2taTdFLO9H6jSSgKc5A@mail.gmail.com>
- <87a8aleda2.fsf@belgarion.home> <87y3y3crxl.fsf@belgarion.home>
-Message-ID: <CAPDyKFrxD+62MaytiYn1ROM08+wWdTXT8vcmJRs5pMDELD574g@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 24 Jan 2017 08:55:01 +0100
+Subject: [PATCH 4.9 061/130] clocksource/exynos_mct: Clear interrupt when cpu
+ is shut down
+In-Reply-To: <20170124075534.905042535@linuxfoundation.org>
+References: <20170124075534.905042535@linuxfoundation.org>
+Message-ID: <20170124075537.439363186@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 January 2017 at 11:25, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> Robert Jarzmik <robert.jarzmik@free.fr> writes:
->
->> Ulf Hansson <ulf.hansson@linaro.org> writes:
->>
->>> On 20 January 2017 at 09:01, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
->>>> Ulf Hansson <ulf.hansson@linaro.org> writes:
->>>> So I was wondering how you made the choice of which files you add the include to
->>>> and which you don't touch ?
->>>
->>> By building the pxa_defconfig, see what errors it reports and then fix them.
->>>
->>> Isn't pxa_defconfig building all the variants?
->> Euh actually it should, but it's not.
->
-> And actually thanks to a suggestion from Russell to improve my search line, I
-> came up with the command line bellow, and perhaps you could fix the others with
-> one command line and respin the patch ?
->
-> Here it is :
->
-> for f in $(grep -l _led arch/arm/mach-pxa/*.c | xargs grep -L linux/leds.h); do
-> sed -i '0,/^#include <linux\/[l-m].*>$/{s/\(#include <linux\/[l-m].*\)/#include
-> <linux\/leds.h>\n\1/}' $f; done
->
-> Cheers.
+4.9-stable review patch.  If anyone has any objections, please let me know.
 
-Robert, thanks for helping out!
+------------------
 
-While running the above command-line, the following files becomes changed:
+From: Joonyoung Shim <jy0922.shim@samsung.com>
 
-arch/arm/mach-pxa/zylonite_pxa300.c
-arch/arm/mach-pxa/zylonite_pxa320.c
-arch/arm/mach-pxa/palmld.c
-arch/arm/mach-pxa/palmtc.c
-arch/arm/mach-pxa/ezx.c
-arch/arm/mach-pxa/em-x270.c
-arch/arm/mach-pxa/hx4700.c
-arch/arm/mach-pxa/magician.c
-arch/arm/mach-pxa/palmtreo.c
-arch/arm/mach-pxa/corgi_pm.c
-arch/arm/mach-pxa/spitz_pm.c
-arch/arm/mach-pxa/tosa.c
-arch/arm/mach-pxa/z2.c
+commit bc7c36eedb0c7004aa06c2afc3c5385adada8fa3 upstream.
 
-However, already by building pxa_defconfig, I have verified that these
-files are being build successfully without any changes needed.
+When a CPU goes offline a potentially pending timer interrupt is not
+cleared. When the CPU comes online again then the pending interrupt is
+delivered before the per cpu clockevent device is initialized. As a
+consequence the tick interrupt handler dereferences a NULL pointer.
 
-Because of that, I am not sure I would like to make any additional
-changes as a part of this series. I think it's easier if you later on
-deal with that as clean-ups via your pxa tree instead, does that make
-sense to you as well?
+[   51.251378] Unable to handle kernel NULL pointer dereference at virtual address 00000040
+[   51.289348] task: ee942d00 task.stack: ee960000
+[   51.293861] PC is at tick_periodic+0x38/0xb0
+[   51.298102] LR is at tick_handle_periodic+0x1c/0x90
 
-Kind regards
-Uffe
+Clear the pending interrupt in the cpu dying path.
+
+Fixes: 56a94f13919c ("clocksource: exynos_mct: Avoid blocking calls in the cpu hotplug notifier")
+Reported-by: Seung-Woo Kim <sw0312.kim@samsung.com>
+Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+Cc: linux-samsung-soc at vger.kernel.org
+Cc: cw00.choi at samsung.com
+Cc: daniel.lezcano at linaro.org
+Cc: javier at osg.samsung.com
+Cc: kgene at kernel.org
+Cc: krzk at kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Link: http://lkml.kernel.org/r/1484628876-22065-1-git-send-email-jy0922.shim at samsung.com
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+---
+ drivers/clocksource/exynos_mct.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -495,6 +495,7 @@ static int exynos4_mct_dying_cpu(unsigne
+ 	if (mct_int_type == MCT_INT_SPI) {
+ 		if (evt->irq != -1)
+ 			disable_irq_nosync(evt->irq);
++		exynos4_mct_write(0x1, mevt->base + MCT_L_INT_CSTAT_OFFSET);
+ 	} else {
+ 		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
+ 	}
