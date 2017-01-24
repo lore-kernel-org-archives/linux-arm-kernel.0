@@ -1,93 +1,58 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 24 Jan 2017 16:55:00 +0900
-Subject: [PATCH v29 3/9] arm64: kdump: reserve memory for crash dump kernel
-In-Reply-To: <20170123102314.GA16286@leverpostej>
-References: <20161228043605.27470-2-takahiro.akashi@linaro.org>
- <20170112150926.GA12249@leverpostej>
- <20170113081617.GI20972@linaro.org>
- <20170113113914.GB26804@leverpostej>
- <20170117082043.GM20972@linaro.org>
- <20170117115441.GC11939@leverpostej>
- <20170119094941.GP20972@linaro.org>
- <20170119112850.GD11176@leverpostej>
- <20170123095145.GA23406@linaro.org>
- <20170123102314.GA16286@leverpostej>
-Message-ID: <20170124075458.GC23406@linaro.org>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 24 Jan 2017 08:55:35 +0100
+Subject: [PATCH 4.4 25/42] clocksource/exynos_mct: Clear interrupt when cpu is
+ shut down
+In-Reply-To: <20170124075509.299412838@linuxfoundation.org>
+References: <20170124075509.299412838@linuxfoundation.org>
+Message-ID: <20170124075510.367397946@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2017 at 10:23:15AM +0000, Mark Rutland wrote:
-> On Mon, Jan 23, 2017 at 06:51:46PM +0900, AKASHI Takahiro wrote:
-> > Mark,
-> > 
-> > On Thu, Jan 19, 2017 at 11:28:50AM +0000, Mark Rutland wrote:
-> > > On Thu, Jan 19, 2017 at 06:49:42PM +0900, AKASHI Takahiro wrote:
-> > > > On Tue, Jan 17, 2017 at 11:54:42AM +0000, Mark Rutland wrote:
-> > > > > On Tue, Jan 17, 2017 at 05:20:44PM +0900, AKASHI Takahiro wrote:
-> > > > > > On Fri, Jan 13, 2017 at 11:39:15AM +0000, Mark Rutland wrote:
-> 
-> > > > > I don't think we have much code useful for unmapping. We could re-use 
-> > > > > create_mapping_late for this, passing a set of prot bits that means the
-> > > > > entries are invalid (e.g. have a PAGE_KERNEL_INVALID).
-> > > > 
-> > > > Do you really think that we should totally invalidate mmu entries?
-> > > > I guess that, given proper cache & TLB flush operations, RO attribute is
-> > > > good enough for memory consistency, no?
-> > > > (None accesses the region, as I said, except in the case of re-loading
-> > > > crash dump kernel though.)
-> > > 
-> > > My worry is that the first kernel and kdump kernel may map (portions of)
-> > > the region with potentially confliciting memory attributes. So it would
-> > > be necessary to completely unmap the region.
-> > 
-> > I think that this can happen only if the second kernel boots up,
-> > leaving non-crashed cpus still running for some reason.
-> 
-> Yes. I was considering a kdump case where a secondary was stuck in the
-> first kernel.
-> 
-> > > You raise a good point that this would also mean we need to perform some
-> > > cache maintenance, which makes that a little more painful. We'd need a
-> > > sequence like:
-> > > 
-> > > * Unmap the region
-> > > * TLB invalidation
-> > > * Remap the region with non-cacheable attributes
-> > > * Cache maintenance
-> > > * Unmap the region
-> > > * TLB invalidation
-> > 
-> > I don't get why we need to remap the region and do cache
-> > maintenance here. Please elaborate a bit more?
-> 
-> I think I was wrong, and we don't need to. Sorry about that.
-> 
-> My thought was that to ensure that there aren't stale lines with
-> differing attributes, we'd need to do a clean+invalidate while the
-> caches are guaranteed to not allocate anything furthe. Hence, we'd need
-> to use a non-cacheable mapping to perform the clean+invalidate.
-> 
-> However, I now think that so long as we unmap the range, this shouldn't
-> matter. The new kernel can perform the maintenance if it wishes to use
-> different attributes, similarly to what the first kernel must do per the
-> boot protocol.
-> 
-> > My current implementation of arch_kexec_protect_crashkres() is:
-> > 
-> >         kexec_segment_flush(kexec_crash_image);
-> >         create_mapping_late(crashk_res.start, ..., __pgprot(0));
-> >                                                 or PAGE_KERNEL_INVALID
-> >         flush_tlb_all();
-> > 
-> > kexec_segment_flush() will eventually do dcache-flush for all the modified
-> > data in crash dump kernel memory.
-> 
-> I now think this should be fine, per the above.
+4.4-stable review patch.  If anyone has any objections, please let me know.
 
-OK.
-I think that now I can see a light of the goal :)
+------------------
 
--Takahiro AKASHI
+From: Joonyoung Shim <jy0922.shim@samsung.com>
 
-> Thanks,
-> Mark.
+commit bc7c36eedb0c7004aa06c2afc3c5385adada8fa3 upstream.
+
+When a CPU goes offline a potentially pending timer interrupt is not
+cleared. When the CPU comes online again then the pending interrupt is
+delivered before the per cpu clockevent device is initialized. As a
+consequence the tick interrupt handler dereferences a NULL pointer.
+
+[   51.251378] Unable to handle kernel NULL pointer dereference at virtual address 00000040
+[   51.289348] task: ee942d00 task.stack: ee960000
+[   51.293861] PC is at tick_periodic+0x38/0xb0
+[   51.298102] LR is at tick_handle_periodic+0x1c/0x90
+
+Clear the pending interrupt in the cpu dying path.
+
+Fixes: 56a94f13919c ("clocksource: exynos_mct: Avoid blocking calls in the cpu hotplug notifier")
+Reported-by: Seung-Woo Kim <sw0312.kim@samsung.com>
+Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+Cc: linux-samsung-soc at vger.kernel.org
+Cc: cw00.choi at samsung.com
+Cc: daniel.lezcano at linaro.org
+Cc: javier at osg.samsung.com
+Cc: kgene at kernel.org
+Cc: krzk at kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Link: http://lkml.kernel.org/r/1484628876-22065-1-git-send-email-jy0922.shim at samsung.com
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+---
+ drivers/clocksource/exynos_mct.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -482,6 +482,7 @@ static void exynos4_local_timer_stop(str
+ 	if (mct_int_type == MCT_INT_SPI) {
+ 		if (evt->irq != -1)
+ 			disable_irq_nosync(evt->irq);
++		exynos4_mct_write(0x1, mevt->base + MCT_L_INT_CSTAT_OFFSET);
+ 	} else {
+ 		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
+ 	}
