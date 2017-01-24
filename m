@@ -1,335 +1,94 @@
-From: baoyou.xie@linaro.org (Baoyou Xie)
-Date: Tue, 24 Jan 2017 16:58:42 +0800
-Subject: [PATCH v5 3/3] watchdog: zx2967: add watchdog controller driver for
- ZTE's zx2967 family
-In-Reply-To: <1485248322-24299-1-git-send-email-baoyou.xie@linaro.org>
-References: <1485248322-24299-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <1485248322-24299-3-git-send-email-baoyou.xie@linaro.org>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 24 Jan 2017 10:01:07 +0000
+Subject: [PATCH] KVM: arm/arm64: Remove struct vgic_irq pending field
+In-Reply-To: <20170123183447.GH15850@cbox>
+References: <20170123133951.10329-1-christoffer.dall@linaro.org>
+ <154ecb7e-457d-ea56-4ae2-c2b37c951a8a@arm.com> <20170123183447.GH15850@cbox>
+Message-ID: <1dc74e05-b72f-7b98-0d67-8cbde732e83b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds watchdog controller driver for ZTE's zx2967 family.
+Hi Christoffer,
 
-Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
----
- drivers/watchdog/Kconfig      |  10 ++
- drivers/watchdog/Makefile     |   1 +
- drivers/watchdog/zx2967_wdt.c | 274 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 285 insertions(+)
- create mode 100644 drivers/watchdog/zx2967_wdt.c
+On 23/01/17 18:34, Christoffer Dall wrote:
+> On Mon, Jan 23, 2017 at 05:57:05PM +0000, Andre Przywara wrote:
+>> Hi Christoffer,
+>>
+>> On 23/01/17 13:39, Christoffer Dall wrote:
+>>> One of the goals behind the VGIC redesign was to get rid of cached or
+>>> intermediate state in the data structures, but we decided to allow
+>>> ourselves to precompute the pending value of an IRQ based on the line
+>>> level and pending latch state.  However, this has now become difficult
+>>> to base proper GICv3 save/restore on, because there is a potential to
+>>> modify the pending state without knowing if an interrupt is edge or
+>>> level configured.
+>>>
+>>> See the following post and related message for more background:
+>>> https://lists.cs.columbia.edu/pipermail/kvmarm/2017-January/023195.html
+>>>
+>>> This commit gets rid of the precomputed pending field in favor of a
+>>> function that calculates the value when needed, irq_is_pending().
+>>>
+>>> The soft_pending field is renamed to pending_latch to represent that
+>>> this latch is the equivalent hardware latch which gets manipulated by
+>>> the input signal for edge-triggered interrupts and when writing to the
+>>> SPENDR/CPENDR registers.
+>>>
+>>> After this commit save/restore code should be able to simply restore the
+>>> pending_latch state, line_level state, and config state in any order and
+>>> get the desired result.
+>>
+>> In general I like this very much and am wondering why we didn't come up
+>> with this earlier. But I guess we were so subscribed to our "cached
+>> pending" bit.
+>>
+>> So I checked several cases, tested some logic equations and drew the
+>> state diagrams for the "before" and "after" case, but I couldn't find a
+>> reason why this wouldn't work.
+>>
+>> I also think you can get rid of the irq_set_pending_latch() wrapper and
+>> assign the value directly, as I don't see any reason to hide the fact
+>> that it's indeed a simple assignment and nothing magic behind this
+>> function. Also it would make the diff a bit easier to read.
+> 
+> Agreed.  Once we have agreement about if we should cleanup clearing the
+> latch state, I'll respin with that and add you and Marc's RB tags with
+> the changed version.
+> 
+>>
+>> But apart from that:
+>>
+>> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+>>
+>>
+>> I also gave this a quick test on the Juno and the Midway with both
+>> kvmtool and QEMU and they survived some basic testing.
+>>
+>> I need to check a GICv3 machine tomorrow, but I don't expect any
+>> differences here.
+>>
+> 
+> Thanks.
+> 
+> I tested this, including GICv2 migration on Mustang, and was going to do
+> GICv3 testing and 32-bit testin tomorrow, but I'm quite happy to hear
+> you gave it a spin on a 32-bit platform already.
 
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index acb00b5..05093a2 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -714,6 +714,16 @@ config ASPEED_WATCHDOG
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called aspeed_wdt.
- 
-+config ZX2967_WATCHDOG
-+	tristate "ZTE zx2967 SoCs watchdog support"
-+	depends on ARCH_ZX
-+	select WATCHDOG_CORE
-+	help
-+	  Say Y here to include support for the watchdog timer
-+	  in ZTE zx2967 SoCs.
-+	  To compile this driver as a module, choose M here: the
-+	  module will be called zx2967_wdt.
-+
- # AVR32 Architecture
- 
- config AT32AP700X_WDT
-diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-index 0c3d35e..bf2d296 100644
---- a/drivers/watchdog/Makefile
-+++ b/drivers/watchdog/Makefile
-@@ -82,6 +82,7 @@ obj-$(CONFIG_BCM7038_WDT) += bcm7038_wdt.o
- obj-$(CONFIG_ATLAS7_WATCHDOG) += atlas7_wdt.o
- obj-$(CONFIG_RENESAS_WDT) += renesas_wdt.o
- obj-$(CONFIG_ASPEED_WATCHDOG) += aspeed_wdt.o
-+obj-$(CONFIG_ZX2967_WATCHDOG) += zx2967_wdt.o
- 
- # AVR32 Architecture
- obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
-diff --git a/drivers/watchdog/zx2967_wdt.c b/drivers/watchdog/zx2967_wdt.c
-new file mode 100644
-index 0000000..89a7018
---- /dev/null
-+++ b/drivers/watchdog/zx2967_wdt.c
-@@ -0,0 +1,274 @@
-+/*
-+ * watchdog driver for ZTE's zx2967 family
-+ *
-+ * Copyright (C) 2017 ZTE Ltd.
-+ *
-+ * Author: Baoyou Xie <baoyou.xie@linaro.org>
-+ *
-+ * License terms: GNU General Public License (GPL) version 2
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/io.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+#include <linux/reset.h>
-+#include <linux/watchdog.h>
-+
-+#define ZX2967_WDT_CFG_REG			0x4
-+#define ZX2967_WDT_LOAD_REG			0x8
-+#define ZX2967_WDT_REFRESH_REG			0x18
-+#define ZX2967_WDT_START_REG			0x1c
-+
-+#define ZX2967_WDT_REFRESH_MASK			0x3f
-+
-+#define ZX2967_WDT_CFG_DIV(n)			((((n) & 0xff) - 1) << 8)
-+#define ZX2967_WDT_START_EN			0x1
-+
-+#define ZX2967_WDT_WRITEKEY			0x12340000
-+
-+#define ZX2967_WDT_DIV_DEFAULT			16
-+#define ZX2967_WDT_DEFAULT_TIMEOUT		32
-+#define ZX2967_WDT_MIN_TIMEOUT			1
-+#define ZX2967_WDT_MAX_TIMEOUT			500
-+#define ZX2967_WDT_MAX_COUNT			0xffff
-+
-+#define ZX2967_WDT_CLK_FREQ			0x8000
-+
-+#define ZX2967_WDT_FLAG_REBOOT_MON		BIT(0)
-+
-+struct zx2967_wdt {
-+	struct watchdog_device	wdt_device;
-+	void __iomem		*reg_base;
-+	struct clk		*clock;
-+};
-+
-+static inline u32 zx2967_wdt_readl(struct zx2967_wdt *wdt, u16 reg)
-+{
-+	return readl_relaxed(wdt->reg_base + reg);
-+}
-+
-+static inline void zx2967_wdt_writel(struct zx2967_wdt *wdt, u16 reg, u32 val)
-+{
-+	writel_relaxed(val | ZX2967_WDT_WRITEKEY, wdt->reg_base + reg);
-+}
-+
-+static void zx2967_wdt_refresh(struct zx2967_wdt *wdt)
-+{
-+	u32 val;
-+
-+	val = zx2967_wdt_readl(wdt, ZX2967_WDT_REFRESH_REG);
-+	val ^= ZX2967_WDT_REFRESH_MASK;
-+	zx2967_wdt_writel(wdt, ZX2967_WDT_REFRESH_REG, val);
-+}
-+
-+static int
-+zx2967_wdt_set_timeout(struct watchdog_device *wdd, unsigned int timeout)
-+{
-+	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
-+	unsigned int divisor = ZX2967_WDT_DIV_DEFAULT;
-+	unsigned int count;
-+
-+	count = timeout * ZX2967_WDT_CLK_FREQ;
-+	if (count > divisor * ZX2967_WDT_MAX_COUNT)
-+		divisor = DIV_ROUND_UP(count, ZX2967_WDT_MAX_COUNT);
-+	count = DIV_ROUND_UP(count, divisor);
-+	zx2967_wdt_writel(wdt, ZX2967_WDT_CFG_REG, ZX2967_WDT_CFG_DIV(divisor));
-+	zx2967_wdt_writel(wdt, ZX2967_WDT_LOAD_REG, count);
-+	zx2967_wdt_refresh(wdt);
-+	wdd->timeout =  (count * divisor) / ZX2967_WDT_CLK_FREQ;
-+
-+	return 0;
-+}
-+
-+static void __zx2967_wdt_start(struct zx2967_wdt *wdt)
-+{
-+	u32 val;
-+
-+	val = zx2967_wdt_readl(wdt, ZX2967_WDT_START_REG);
-+	val |= ZX2967_WDT_START_EN;
-+	zx2967_wdt_writel(wdt, ZX2967_WDT_START_REG, val);
-+}
-+
-+static void __zx2967_wdt_stop(struct zx2967_wdt *wdt)
-+{
-+	u32 val;
-+
-+	val = zx2967_wdt_readl(wdt, ZX2967_WDT_START_REG);
-+	val &= ~ZX2967_WDT_START_EN;
-+	zx2967_wdt_writel(wdt, ZX2967_WDT_START_REG, val);
-+}
-+
-+static int zx2967_wdt_start(struct watchdog_device *wdd)
-+{
-+	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
-+
-+	zx2967_wdt_set_timeout(wdd, wdd->timeout);
-+	__zx2967_wdt_start(wdt);
-+
-+	return 0;
-+}
-+
-+static int zx2967_wdt_stop(struct watchdog_device *wdd)
-+{
-+	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
-+
-+	__zx2967_wdt_stop(wdt);
-+
-+	return 0;
-+}
-+
-+static int zx2967_wdt_keepalive(struct watchdog_device *wdd)
-+{
-+	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
-+
-+	zx2967_wdt_refresh(wdt);
-+
-+	return 0;
-+}
-+
-+#define ZX2967_WDT_OPTIONS \
-+	(WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE)
-+static const struct watchdog_info zx2967_wdt_ident = {
-+	.options          =     ZX2967_WDT_OPTIONS,
-+	.firmware_version =	0,
-+	.identity         =	"zx2967 watchdog",
-+};
-+
-+static struct watchdog_ops zx2967_wdt_ops = {
-+	.owner = THIS_MODULE,
-+	.start = zx2967_wdt_start,
-+	.stop = zx2967_wdt_stop,
-+	.ping = zx2967_wdt_keepalive,
-+	.set_timeout = zx2967_wdt_set_timeout,
-+};
-+
-+static void zx2967_wdt_reset_sysctrl(struct device *dev)
-+{
-+	int ret;
-+	void __iomem *regmap;
-+	unsigned int offset, mask, config;
-+	struct of_phandle_args out_args;
-+
-+	ret = of_parse_phandle_with_fixed_args(dev->of_node,
-+			"zte,wdt-reset-sysctrl", 3, 0, &out_args);
-+	if (ret)
-+		return;
-+
-+	offset = out_args.args[0];
-+	config = out_args.args[1];
-+	mask = out_args.args[2];
-+
-+	regmap = syscon_node_to_regmap(out_args.np);
-+	if (IS_ERR(regmap))
-+		return;
-+
-+	regmap_update_bits(regmap, offset, mask, config);
-+}
-+
-+static int zx2967_wdt_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct zx2967_wdt *wdt;
-+	struct resource *base;
-+	int ret;
-+	struct reset_control *rstc;
-+
-+	wdt = devm_kzalloc(dev, sizeof(*wdt), GFP_KERNEL);
-+	if (!wdt)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, wdt);
-+
-+	wdt->wdt_device.info = &zx2967_wdt_ident;
-+	wdt->wdt_device.ops = &zx2967_wdt_ops;
-+	wdt->wdt_device.timeout = ZX2967_WDT_DEFAULT_TIMEOUT;
-+	wdt->wdt_device.max_timeout = ZX2967_WDT_MAX_TIMEOUT;
-+	wdt->wdt_device.min_timeout = ZX2967_WDT_MIN_TIMEOUT;
-+	wdt->wdt_device.parent = &pdev->dev;
-+
-+	base = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	wdt->reg_base = devm_ioremap_resource(dev, base);
-+	if (IS_ERR(wdt->reg_base)) {
-+		dev_err(dev, "ioremap failed\n");
-+		return PTR_ERR(wdt->reg_base);
-+	}
-+
-+	zx2967_wdt_reset_sysctrl(dev);
-+
-+	wdt->clock = devm_clk_get(dev, NULL);
-+	if (IS_ERR(wdt->clock)) {
-+		dev_err(dev, "failed to find watchdog clock source\n");
-+		return PTR_ERR(wdt->clock);
-+	}
-+
-+	ret = clk_prepare_enable(wdt->clock);
-+	if (ret < 0) {
-+		dev_err(dev, "failed to enable clock\n");
-+		return ret;
-+	}
-+	clk_set_rate(wdt->clock, ZX2967_WDT_CLK_FREQ);
-+
-+	rstc = devm_reset_control_get(dev, NULL);
-+	if (IS_ERR(rstc)) {
-+		dev_err(dev, "failed to get rstc");
-+		ret = PTR_ERR(rstc);
-+		goto fail_get_reset_control;
-+	}
-+
-+	reset_control_assert(rstc);
-+	mdelay(10);
-+	reset_control_deassert(rstc);
-+
-+	watchdog_set_drvdata(&wdt->wdt_device, wdt);
-+	watchdog_set_nowayout(&wdt->wdt_device, WATCHDOG_NOWAYOUT);
-+
-+	ret = watchdog_register_device(&wdt->wdt_device);
-+	if (ret)
-+		goto fail_register;
-+
-+	dev_info(dev, "watchdog enabled (timeout=%d sec, nowayout=%d)",
-+		 wdt->wdt_device.timeout, WATCHDOG_NOWAYOUT);
-+
-+	return 0;
-+
-+fail_register:
-+	watchdog_unregister_device(&wdt->wdt_device);
-+fail_get_reset_control:
-+	clk_disable_unprepare(wdt->clock);
-+	return ret;
-+}
-+
-+static int zx2967_wdt_remove(struct platform_device *pdev)
-+{
-+	struct zx2967_wdt *wdt = platform_get_drvdata(pdev);
-+
-+	watchdog_unregister_device(&wdt->wdt_device);
-+	clk_disable_unprepare(wdt->clock);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id zx2967_wdt_match[] = {
-+	{ .compatible = "zte,zx296718-wdt", },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, zx2967_wdt_match);
-+
-+static struct platform_driver zx2967_wdt_driver = {
-+	.probe		= zx2967_wdt_probe,
-+	.remove		= zx2967_wdt_remove,
-+	.driver		= {
-+		.name	= "zx2967-wdt",
-+		.of_match_table	= of_match_ptr(zx2967_wdt_match),
-+	},
-+};
-+module_platform_driver(zx2967_wdt_driver);
-+
-+MODULE_AUTHOR("Baoyou Xie <baoyou.xie@linaro.org>");
-+MODULE_DESCRIPTION("ZTE zx2967 Watchdog Device Driver");
-+MODULE_LICENSE("GPL v2");
--- 
-2.7.4
+OK, so a GICv3 machine survived over night testing, resulting in some 10
+millions of interrupts of every kind (LPIs, edge SPIs, some 100,000
+level SPIs (UART only), SGIs, PPIs).
+Same on a Juno, no LPIs there of course, but also millions of interrupts
+working fine over night.
+
+So:
+
+Tested-by: Andre Przywara <andre.przywara@arm.com>
+
+So this was just Linux as a guest, which - at least last time I checked
+- doesn't use GIC_DIST_SET_PENDING or GIC_DIST_CLEAR_PENDING registers
+too much (if at all under normal load).
+I think we should add some tests to kvm-unit-tests to actually trigger
+this code explicitly.
+
+Cheers,
+Andre.
