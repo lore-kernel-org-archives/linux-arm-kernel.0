@@ -1,81 +1,182 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 24 Jan 2017 11:07:09 +0000
-Subject: [PATCH 1/4] PCI: Xilinx NWL: Fix, do not check for legacy status
- in while loop
-In-Reply-To: <8520D5D51A55D047800579B094147198263CCF96@XAP-PVEXMBX02.xlnx.xilinx.com>
-References: <1484997072-19276-1-git-send-email-bharatku@xilinx.com>
- <ec10b089-acc5-7764-6346-9dc1869d05c7@arm.com>
- <8520D5D51A55D047800579B094147198263CCF96@XAP-PVEXMBX02.xlnx.xilinx.com>
-Message-ID: <0def9067-5c35-f7fe-8e15-bab70d479d1e@arm.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Tue, 24 Jan 2017 16:45:20 +0530
+Subject: [PATCH V7 00/11] IOMMU probe deferral support
+In-Reply-To: <440d69c3-8be9-7729-ff11-10657cc864f0@samsung.com>
+References: <CGME20170123161926epcas2p1cf464a2978d89d0c1fdd2f7cc6d38317@epcas2p1.samsung.com>
+ <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
+ <440d69c3-8be9-7729-ff11-10657cc864f0@samsung.com>
+Message-ID: <00fa01d27633$2b468fe0$81d3afa0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/01/17 10:15, Bharat Kumar Gogada wrote:
->> On 21/01/17 11:11, Bharat Kumar Gogada wrote:
->>> - The legacy status register value for particular INTx becomes low
->>> only after DEASSERT_INTx is received.
->>> - Few End Points take time for sending DEASSERT_INTx, checking legacy
->>> status register in while loop causes invoking of EP handler
->>> continuosly until DEASSERT_INTx is received.
->>>
->>> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
->>> ---
->>>  drivers/pci/host/pcie-xilinx-nwl.c |    5 +++--
->>>  1 files changed, 3 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/pci/host/pcie-xilinx-nwl.c
->>> b/drivers/pci/host/pcie-xilinx-nwl.c
->>> index 43eaa4a..c8b5a33 100644
->>> --- a/drivers/pci/host/pcie-xilinx-nwl.c
->>> +++ b/drivers/pci/host/pcie-xilinx-nwl.c
->>> @@ -342,9 +342,10 @@ static void nwl_pcie_leg_handler(struct irq_desc
->>> *desc)
->>>
->>>  	chained_irq_enter(chip, desc);
->>>  	pcie = irq_desc_get_handler_data(desc);
->>> +	status = nwl_bridge_readl(pcie, MSGF_LEG_STATUS) &
->>> +				  MSGF_LEG_SR_MASKALL;
->>>
->>> -	while ((status = nwl_bridge_readl(pcie, MSGF_LEG_STATUS) &
->>> -				MSGF_LEG_SR_MASKALL) != 0) {
->>> +	if (status != 0) {
->>>  		for_each_set_bit(bit, &status, INTX_NUM) {
->>>  			virq = irq_find_mapping(pcie->legacy_irq_domain,
->>>  						bit + 1);
->>>
+Hi Marek,
+
+>On 2017-01-23 17:18, Sricharan R wrote:
+>> This series calls the dma ops configuration for the devices
+>> at a generic place so that it works for all busses.
+>> The dma_configure_ops for a device is now called during
+>> the device_attach callback just before the probe of the
+>> bus/driver is called. Similarly dma_deconfigure is called during
+>> device/driver_detach path.
 >>
->> But even if you only handle the interrupt once, it is still asserted, right? You exit
->> the low-level exception handler, only to take the interrupt immediately again. So
->> what is the gain here?
+>> pci_bus_add_devices    (platform/amba)(_device_create/driver_register)
+>>         |                         |
+>> pci_bus_add_device     (device_add/driver_register)
+>>         |                         |
+>> device_attach           device_initial_probe
+>>         |                         |
+>> __device_attach_driver    __device_attach_driver
+>>         |
+>> driver_probe_device
+>>         |
+>> really_probe
+>>         |
+>> dma_configure
 >>
-> Whenever masking of INTx happens (like as in my next patch[PATCH 2/4]), the irq line goes low,
-> but  status bit will be set until DEASSERT_INTx comes.
-> In this scenario if it is always in while loop, even though line went low it will not be seen 
-> until DEASSERT_INTx, unnecessarily invoking EP driver. so instead of while loop  
-> using if condition so that this change in line is noticed.
+>> Similarly on the device/driver_unregister path __device_release_driver is
+>> called which inturn calls dma_deconfigure.
+>>
+>> Took the reworked patches [2] from Robin's branch and
+>> rebased on top of Lorenzo's ACPI IORT ARM support series [3].
+>>
+>> * Tested with platform and pci devices for probe deferral
+>>    and reprobe on arm64 based platform.
+>> * Need help for testing with ACPI.
+>
+>Once again:
+>
+>Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>
+>Works fine on Exynos machines (both, ARM and ARM64 based). This patchset is
+>urgently needed as more and more stuff depends on it and cannot be easily
+>workarounded without nasty hacks (for example pending runtime PM changes
+>for clocks and power domains integration for Exynos 5433).
+>
 
-But what guarantees that you will observe this DEASSERT if you return to
-the interrupted context early? From what I understand, your interrupt
-flow is the following:
+Ok, Thanks for the testing once again.
 
+>Is there a chance to have it merged to v4.11?
+>
 
-	read status
-	mask
-	handler
-	unmask
+Ya, hoping that this time it would get through.
 
-If the EP takes time to send a deassert after the handler has poked it
-and the interrupt is still active, then the only thing that this patch
-buys you is that by returning to the interrupted context, you waste a
-lot of cycles, giving the device a chance to send its deassert. But
-that's just luck. Plug this on a fast CPU, and the same issue will
-resurface.
+Regards,
+ Sricharan
 
-It could also just hide a driver bug where the write acknowledging the
-interrupt has been posted, but has not taken effect yet.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>> Previous post of this series [6].
+>>
+>>   [V7]
+>>       * Updated the subject and commit log for patch #6 as per
+>>         comments from Lorenzo. No functional changes.
+>>
+>>   [V6]
+>>       * Fixed a bug in dma_configure function pointed out by
+>>         Robin.
+>>       * Reordered the patches as per comments from Robin and
+>>         Lorenzo.
+>>       * Added Tags.
+>>
+>>   [V5]
+>>       * Reworked the pci configuration code hanging outside and
+>>         pushed it to dma_configure as in PATCH#5,6,7.
+>>         Also added a couple of patches that Lorenzo provided for
+>>         correcting the Probe deferring mechanism in case of
+>>         ACPI devices from here [5].
+>>
+>>   [V4]
+>>       * Took the reworked patches [2] from Robin's branch and
+>>         rebased on top of Lorenzo's ACPI IORT ARM support series [3].
+>>
+>>       * Added the patches for moving the dma ops configuration of
+>>         acpi based devices to probe time as well.
+>>   [V3]
+>>       * Removed the patch to split dma_masks/dma_ops configuration
+>>         separately based on review comments that both masks and ops are
+>>         required only during the device probe time.
+>>
+>>       * Reworked the series based on Generic DT bindings series.
+>>
+>>       * Added call to iommu's remove_device in the cleanup path for arm and
+>>         arm64.
+>>
+>>       * Removed the notifier trick in arm64 to handle early device
+>>         registration.
+>>
+>>       * Added reset of dma_ops in cleanup path for arm based on comments.
+>>
+>>       * Fixed the pci_iommu_configure path and tested with PCI device as
+>>         well.
+>>
+>>       * Fixed a bug to return the correct iommu_ops from patch 7 [4] in
+>>         last post.
+>>
+>>       * Fixed few other cosmetic comments.
+>>
+>>   [V2]
+>>       * Updated the Initial post to call dma_configure/deconfigure from
+>>         generic code
+>>
+>>       * Added iommu add_device callback from of_iommu_configure path
+>>
+>>   [V1]
+>>       * Initial post from Laurent Pinchart [1]
+>>
+>> [1] http://lists.linuxfoundation.org/pipermail/iommu/2015-May/013016.html
+>> [2] http://www.linux-arm.org/git?p=linux-rm.git;a=shortlog;h=refs/heads/iommu/defer
+>> [3] https://lkml.org/lkml/2016/11/21/141
+>> [4] https://www.mail-archive.com/iommu at lists.linux-foundation.org/msg13940.html
+>> [5] git://git.kernel.org/pub/scm/linux/kernel/git/lpieralisi/linux.git iommu/probe-deferral
+>> [6] https://www.spinics.net/lists/arm-kernel/msg556546.html
+>>
+>> Laurent Pinchart (3):
+>>    of: dma: Move range size workaround to of_dma_get_range()
+>>    of: dma: Make of_dma_deconfigure() public
+>>    iommu: of: Handle IOMMU lookup failure with deferred probing or error
+>>
+>> Lorenzo Pieralisi (2):
+>>    ACPI/IORT: Add function to check SMMUs drivers presence
+>>    ACPI/IORT: Remove linker section for IORT entries probing
+>>
+>> Robin Murphy (3):
+>>    iommu/of: Refactor of_iommu_configure() for error handling
+>>    iommu/of: Prepare for deferred IOMMU configuration
+>>    iommu/arm-smmu: Clean up early-probing workarounds
+>>
+>> Sricharan R (3):
+>>    of/acpi: Configure dma operations at probe time for platform/amba/pci bus devices
+>>    drivers: acpi: Handle IOMMU lookup failure with deferred probing or
+>>      error
+>>    arm64: dma-mapping: Remove the notifier trick to handle early setting
+>>      of dma_ops
+>>
+>>   arch/arm64/mm/dma-mapping.c       | 132 ++++----------------------------------
+>>   drivers/acpi/arm64/iort.c         |  40 +++++++++++-
+>>   drivers/acpi/glue.c               |   5 --
+>>   drivers/acpi/scan.c               |   7 +-
+>>   drivers/base/dd.c                 |   9 +++
+>>   drivers/base/dma-mapping.c        |  41 ++++++++++++
+>>   drivers/iommu/arm-smmu-v3.c       |  46 +------------
+>>   drivers/iommu/arm-smmu.c          |  58 +++--------------
+>>   drivers/iommu/of_iommu.c          | 114 +++++++++++++++++++++++---------
+>>   drivers/of/address.c              |  20 +++++-
+>>   drivers/of/device.c               |  36 ++++++-----
+>>   drivers/of/platform.c             |  10 +--
+>>   drivers/pci/probe.c               |  28 --------
+>>   include/acpi/acpi_bus.h           |   2 +-
+>>   include/asm-generic/vmlinux.lds.h |   1 -
+>>   include/linux/acpi.h              |   7 +-
+>>   include/linux/acpi_iort.h         |   3 -
+>>   include/linux/dma-mapping.h       |   3 +
+>>   include/linux/of_device.h         |  10 ++-
+>>   19 files changed, 252 insertions(+), 320 deletions(-)
+>>
+>
+>Best regards
+>--
+>Marek Szyprowski, PhD
+>Samsung R&D Institute Poland
+>
+>--
+>To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+>the body of a message to majordomo at vger.kernel.org
+>More majordomo info at  http://vger.kernel.org/majordomo-info.html
