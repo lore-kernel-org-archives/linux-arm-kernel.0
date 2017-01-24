@@ -1,34 +1,19 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 24 Jan 2017 13:43:10 +0000
-Subject: [PATCH 8/8] ARM: dts: STiH407-family: Enable HW flow-control
-In-Reply-To: <20170124134310.27512-1-lee.jones@linaro.org>
-References: <20170124134310.27512-1-lee.jones@linaro.org>
-Message-ID: <20170124134310.27512-9-lee.jones@linaro.org>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Tue, 24 Jan 2017 21:48:35 +0800
+Subject: [PATCH v3 1/3] ARM: dts: udoo_neo: Add UDOO Neo USB OTG1 and
+ OTG2 support
+In-Reply-To: <1485203214-29608-1-git-send-email-breno.lima@nxp.com>
+References: <1485203214-29608-1-git-send-email-breno.lima@nxp.com>
+Message-ID: <20170124134833.GZ5662@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hardware flow-control capability must be specified at a platform
-level in order to inform the ASC driver that the platform is capable
-(i.e. are the lines wired up, etc).  STiH4{07,10} devices are indeed
-capable, so let's provide the property.
+On Mon, Jan 23, 2017 at 06:26:52PM -0200, Breno Lima wrote:
+> Add support for micro USB (OTG1) and USB Host (OTG2) for UDOO Neo board.
+> 
+> Tested on a UDOO Neo Full board by mounting a mass storage device
+> on both ports.
+> 
+> Signed-off-by: Breno Lima <breno.lima@nxp.com>
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/stih407-family.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-index 9789978..7ada8ea 100644
---- a/arch/arm/boot/dts/stih407-family.dtsi
-+++ b/arch/arm/boot/dts/stih407-family.dtsi
-@@ -226,7 +226,7 @@
- 			pinctrl-0 = <&pinctrl_serial0_flowctrl>;
- 			pinctrl-1 = <&pinctrl_serial0>;
- 			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
--
-+			st,hw-flow-control;
- 			status = "disabled";
- 		};
- 
--- 
-2.10.2
+Applied, thanks.
