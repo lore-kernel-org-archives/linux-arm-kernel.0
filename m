@@ -1,38 +1,59 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 24 Jan 2017 20:57:12 +0100
-Subject: [PATCH v5 0/2] Add support for the ethernet switch on the
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 24 Jan 2017 21:10:22 +0100
+Subject: [PATCH net-next v6 0/4] Add support for the ethernet switch on the
  ESPRESSObin
-In-Reply-To: <87r33s2ynp.fsf@free-electrons.com>
-References: <20170119214934.27442-1-gregory.clement@free-electrons.com>
- <20170120.141705.1390880809796992457.davem@davemloft.net>
- <87r33s2ynp.fsf@free-electrons.com>
-Message-ID: <20170124195712.GS10895@lunn.ch>
+Message-ID: <cover.b0e18efe751186768e720c341693117fdd4d3c16.1485288602.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2017 at 05:47:06PM +0100, Gregory CLEMENT wrote:
-> Hi David,
->  
->  On ven., janv. 20 2017, David Miller <davem@davemloft.net> wrote:
-> 
-> > From: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> > Date: Thu, 19 Jan 2017 22:49:32 +0100
-> >
-> >> I created a new family for this switch and filled the ops structure
-> >> by selecting which seems the more appropriate functions. I rebased
-> >> the series on net-next/master which allowed me to benefit to the
-> >> eeprom functions introduced for the 6390.
-> >
-> > It looks like there will be at least one more respin of this series,
-> > specifically to remove the new family as Vivien seems to object to
-> > this.
-> 
-> I am about to send a new version. However about removing the new family,
-> I thought that with the confirmation from Andrew we could keep it.
+Hi,
 
-Hi Gregory
+This set of patches adds support for the Marvell Ethernet Topaz switch
+family (88E6141/88E6341) which is found on the ESPRESSObin. With this
+series the network is usable on this board.
 
-Yes, keep it. It will hopefully be short lived, but it is needed at
-the moment.
+I rebased the series again on the very last net-next/master which
+allowed me this time to benefit to the temperature support introduced
+by Andrew Lunn.
 
-    Andrew
+I still do not have a datasheet about the PHY embedded in the switch
+but thanks to the help of Andrew I was able to retrieve the PHY
+ID. Then, by using the 88E1510 operations I was able to get temperature
+with credible values.
+
+In this series I also added the support of the 88E6141 which is
+actually the switch on the boards I tested. The difference with the
+88E6341, is the absence of the TCAM on the 88E6141, however I don't
+think this feature is used in the driver, so currently for Linux there
+is no difference except the switch ID.
+
+Thanks,
+
+Gregory
+
+Changelog:
+
+v5 -> v6:
+- rebased on net-next/master (d140199af510)
+- Fix the redundant check on mv88e6xxx_6341_family (reported by Julia
+  Lawall)
+- Add support for the 88E6141
+- Move support for temperature sensor in the phy part
+
+Gregory CLEMENT (3):
+  net: dsa: mv88e6xxx: Add support for ethernet switch 88E6341
+  net: dsa: mv88e6xxx: Add support for ethernet switch 88E6141
+  phy: marvell: Add support for the PHY embedded in the topaz switch
+
+Romain Perier (1):
+  net: dsa: mv88e6xxx: Don't forbid MDIO I/Os for PHY addr >= num_of_ports
+
+ drivers/net/dsa/mv88e6xxx/chip.c      | 102 ++++++++++++++++++++++++---
+ drivers/net/dsa/mv88e6xxx/mv88e6xxx.h |  21 +++++-
+ drivers/net/phy/marvell.c             |  21 ++++++-
+ include/linux/marvell_phy.h           |   1 +-
+ 4 files changed, 135 insertions(+), 10 deletions(-)
+
+base-commit: 1d0ec6626e558f9eb0043352745c02c42ff13a11
+-- 
+git-series 0.9.1
