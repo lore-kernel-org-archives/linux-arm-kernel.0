@@ -1,70 +1,73 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 24 Jan 2017 11:30:41 +0100
-Subject: [PATCH 2/2] arm64: kvm: upgrade csselr and ccsidr to 64-bit values
-In-Reply-To: <fe2bde22-63dc-3abf-5870-21360b16bf6b@arm.com>
-References: <1484909410-11673-1-git-send-email-sudeep.holla@arm.com>
- <1484909410-11673-2-git-send-email-sudeep.holla@arm.com>
- <20170123210859.GJ15850@cbox>
- <fe2bde22-63dc-3abf-5870-21360b16bf6b@arm.com>
-Message-ID: <20170124103041.GK15850@cbox>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 24 Jan 2017 11:31:18 +0100
+Subject: [PATCH v1 2/2] arm: dts: mt2701: add nor flash node
+In-Reply-To: <1485052600.19995.10.camel@mhfsdcap03>
+References: <d7b866ad-5b2f-62d3-3aa3-6fa42803d625@gmail.com>
+ <b850b751-1d8d-0053-cf1f-d5314542e5c3@gmail.com>
+ <20170113172825.75d545a3@bbrezillon>
+ <86c997be-f500-eaa1-3ba5-d21cff6223b7@gmail.com>
+ <20170113175628.1793f433@bbrezillon>
+ <0fafcd8d-cf99-de6b-728f-5e3637810b68@gmail.com>
+ <20170114092958.022f2fc8@bbrezillon>
+ <e7fa1542-f0e2-0e45-23b3-25d6491ae40d@gmail.com>
+ <20170116094032.6f471f11@bbrezillon>
+ <20170117143650.5db87148@free-electrons.com>
+ <20170118222010.ivc6jxpnrumemvdf@rob-hp-laptop>
+ <20170119103829.524ce715@free-electrons.com>
+ <CAL_Jsq+EyHtC7THLCJcwgtVtVESMOdmi3T3bBxgOqJt6BCtCHQ@mail.gmail.com>
+ <20170119091428.598eb987@bbrezillon>
+ <CAL_Jsq+S-FYy4SmjJ3fWzBugw2zCj5TQkkfUA8QVL7SLJW3E1g@mail.gmail.com>
+ <1485052600.19995.10.camel@mhfsdcap03>
+Message-ID: <20170124113118.304a860c@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2017 at 10:15:38AM +0000, Sudeep Holla wrote:
-> 
-> 
-> On 23/01/17 21:08, Christoffer Dall wrote:
-> > On Fri, Jan 20, 2017 at 10:50:10AM +0000, Sudeep Holla wrote:
-> >> csselr and ccsidr are treated as 64-bit values already elsewhere in the
-> >> kernel. It also aligns well with the architecture extensions that allow
-> >> 64-bit format for ccsidr.
-> >>
-> >> This patch upgrades the existing accesses to csselr and ccsidr from
-> >> 32-bit to 64-bit in preparation to add support to those extensions.
-> >>
-> >> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> >> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> >> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> >> ---
-> >>  arch/arm64/kvm/sys_regs.c | 18 +++++++++---------
-> >>  1 file changed, 9 insertions(+), 9 deletions(-)
-> >>
-> >> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> >> index 5dca1f10340f..a3559a8a2b0c 100644
-> >> --- a/arch/arm64/kvm/sys_regs.c
-> >> +++ b/arch/arm64/kvm/sys_regs.c
-> 
-> [..]
-> 
-> >> @@ -2004,8 +2004,8 @@ static int demux_c15_get(u64 id, void __user *uaddr)
-> >>  
-> >>  static int demux_c15_set(u64 id, void __user *uaddr)
-> >>  {
-> >> -	u32 val, newval;
-> >> -	u32 __user *uval = uaddr;
-> >> +	u64 val, newval;
-> >> +	u64 __user *uval = uaddr;
+On Sun, 22 Jan 2017 10:36:40 +0800
+Guochun Mao <guochun.mao@mediatek.com> wrote:
+
+> Hi,
+> On Thu, 2017-01-19 at 08:18 -0600, Rob Herring wrote:
+> > On Thu, Jan 19, 2017 at 2:14 AM, Boris Brezillon  
+> > > One last question and I'm done: is something like that acceptable?
+> > >
+> > >         compatible = "<vendor>,<old-soc>","<vendor>,<new-soc>";
+> > >
+> > > This can happen when someone adds support for an unsupported feature
+> > > on a brand new SoC, and then someone else use the same driver for an
+> > > older SoC embedding the same IP but still wants to add a new compatible
+> > > just in case these 2 IPs appear to be slightly different.  
 > > 
-> > Doesn't converting these uval pointers to u64 cause us to break the ABI
-> > as we'll now be reading/writing 64-bit values to userspace with the
-> > get_user and put_user following the declarations?
+> > Yes, it's old and new compatible strings in this case and it's newest
+> > compatible string first.
+> >   
+> > > Here the order of compat strings is no longer following a clear rule
+> > > like 'most-specific compatible first' or 'newest IP/SoC version first',
+> > > it's completely dependent on the order these IPs were supported in the
+> > > OS (Linux). I'm perfectly fine with that BTW, just want to make sure
+> > > this is authorized.  
 > > 
+> > I guess we should say "newest compatible for IP first" instead. There
+> > are some exceptions where we add fallbacks later on, but that falls
+> > under the most-specific part.
+> > 
+> > It's order that the bindings are defined, not Linux support really,
+> > but in practice those are the same.
+> > 
+> > Rob  
 > 
-> Yes, I too have similar concern. IIUC it is always read via kvm_one_reg
-> structure. I could not find any specific user for this register to cross
-> check.
-> 
+> Thanks for all your effort for code reviewing.
+> Our mt2701-nor's hardware is designed base on mt8713-nor,
+> even so, there would be some slight difference.
+> If I don't misunderstand your viewpoint in this discussion,
+> there's no need to drop mt2701-nor compatible.
 
-Not sure it matters which interface we get the userspace pointer from?
+No, just update the documentation as suggested by Rob.
 
-This patch is definitely changing the write from a 32-bit write to a
-64-bit write and there's a specific check prior to the put_user() call
-which checks that userspace intended a 32-bit value and presumably
-provided a 32-bit pointer.
+> And if not, is there any other suggestion?
 
-So I think the only way to return 64-bit AArch32 system register values
-to userspace (if that is the intention) is to define a new ID for 64-bit
-CCSIDR registers and handle them separately.
+Nope, and my apologies for being so insistent on something I obviously
+misunderstood.
 
-Thanks,
--Christoffer
+Regards,
+
+Boris
