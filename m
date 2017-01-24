@@ -1,37 +1,23 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Tue, 24 Jan 2017 14:12:45 +0800
-Subject: [PATCH] drm/mediatek: hdmi: Filter interlaced resolutions
-In-Reply-To: <1485234604-19889-1-git-send-email-bibby.hsieh@mediatek.com>
-References: <1485234604-19889-1-git-send-email-bibby.hsieh@mediatek.com>
-Message-ID: <1485238365.30572.5.camel@mtksdaap41>
+From: plaes@plaes.org (Priit Laes)
+Date: Tue, 24 Jan 2017 08:03:49 +0200
+Subject: [linux-sunxi] [PATCH 00/11] clk: sunxi-ng: Add support for A80
+ CCUs
+In-Reply-To: <20170124023230.3990-1-wens@csie.org>
+References: <20170124023230.3990-1-wens@csie.org>
+Message-ID: <1485237829.10979.1.camel@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Bibby:
+On Tue, 2017-01-24 at 10:32 +0800, Chen-Yu Tsai wrote:
+> Hi everyone,
 
-On Tue, 2017-01-24 at 13:10 +0800, Bibby Hsieh wrote:
-> Current Mediatek DRM driver does not support interlaced mode, and
-> will hang if such resolution is used: Filter those to prevent
-> kernel hangs, until the DRM driver is fixed properly.
-> 
-> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+Hi!
 
-Acked-by: CK Hu <ck.hu@mediatek.com>
+Thanks for working on that!
 
-> ---
->  drivers/gpu/drm/mediatek/mtk_hdmi.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_hdmi.c b/drivers/gpu/drm/mediatek/mtk_hdmi.c
-> index 0e8c4d9..e33678d 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_hdmi.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_hdmi.c
-> @@ -1244,6 +1244,8 @@ static int mtk_hdmi_conn_mode_valid(struct drm_connector *conn,
->  			return MODE_BAD;
->  	}
->  
-> +	if (mode->flags & DRM_MODE_FLAG_INTERLACE)
-> +		return MODE_NO_INTERLACE;
->  	if (mode->clock < 27000)
->  		return MODE_CLOCK_LOW;
->  	if (mode->clock > 297000)
+You might want to bump the copyright year starting from patch 5. 
+
+[...]
+
+P?ikest,
+Priit Laes
