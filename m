@@ -1,92 +1,81 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 24 Jan 2017 14:53:04 +0530
-Subject: [PATCH v7 3/5] phy: Add set_vbus callback
-In-Reply-To: <148520153091.3902.8594314895888325107@sboyd-linaro>
-References: <20170120185057.16206-1-stephen.boyd@linaro.org>
- <20170120185057.16206-4-stephen.boyd@linaro.org> <5884715D.7050709@ti.com>
- <148520153091.3902.8594314895888325107@sboyd-linaro>
-Message-ID: <58871CF8.8080109@ti.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Tue, 24 Jan 2017 01:26:48 -0800
+Subject: [PATCH V9] thermal: bcm2835: add thermal driver for bcm2835 soc
+In-Reply-To: <D349C10C-C929-40A4-86BF-7F6E834DB613@martin.sperl.org>
+References: <1483808145-6206-1-git-send-email-kernel@martin.sperl.org>
+ <20170120041400.GA24617@localhost.localdomain>
+ <20170120042323.GA6651@localhost.localdomain>
+ <D349C10C-C929-40A4-86BF-7F6E834DB613@martin.sperl.org>
+Message-ID: <20170124092645.GA3651@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Martin,
 
-On Tuesday 24 January 2017 01:28 AM, Stephen Boyd wrote:
-> Quoting Kishon Vijay Abraham I (2017-01-22 00:46:21)
->> Hi,
->>
->> On Saturday 21 January 2017 12:20 AM, Stephen Boyd wrote:
->>> Some USB PHYs need to be told about vbus changing state
->>> explicitly. For example the qcom USB HS PHY needs to toggle a bit
->>> when vbus goes from low to high (VBUSVLDEXT) to cause the
->>> "session valid" signal to toggle. This signal will pull up D+
->>> when the phy starts running. If the vbus signal isn't routed to
->>> the PHY this "session valid" signal won't ever toggle, so we have
->>> to toggle it explicitly. This callback is used to do that.
->>>
->>> Cc: Peter Chen <peter.chen@nxp.com>
->>> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
->>> ---
->>>
->>> New patch
->>>
->>>  drivers/phy/phy-core.c  | 15 +++++++++++++++
->>>  include/linux/phy/phy.h | 10 ++++++++++
->>>  2 files changed, 25 insertions(+)
->>>
->>> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
->>> index a268f4d6f3e9..8b1a6bfa5133 100644
->>> --- a/drivers/phy/phy-core.c
->>> +++ b/drivers/phy/phy-core.c
->>> @@ -357,6 +357,21 @@ int phy_set_mode(struct phy *phy, enum phy_mode mode)
->>>  }
->>>  EXPORT_SYMBOL_GPL(phy_set_mode);
->>>  
->>> +int phy_set_vbus(struct phy *phy, int on)
->>> +{
->>> +     int ret;
->>> +
->>> +     if (!phy || !phy->ops->set_vbus)
->>> +             return 0;
->>> +
->>> +     mutex_lock(&phy->mutex);
->>> +     ret = phy->ops->set_vbus(phy, on);
->>> +     mutex_unlock(&phy->mutex);
->>> +
->>> +     return ret;
->>> +}
->>> +EXPORT_SYMBOL_GPL(phy_set_vbus);
->>> +
->>>  int phy_reset(struct phy *phy)
->>>  {
->>>       int ret;
->>> diff --git a/include/linux/phy/phy.h b/include/linux/phy/phy.h
->>> index 78bb0d7f6b11..4d1ebde7fb14 100644
->>> --- a/include/linux/phy/phy.h
->>> +++ b/include/linux/phy/phy.h
->>> @@ -36,6 +36,7 @@ enum phy_mode {
->>>   * @power_on: powering on the phy
->>>   * @power_off: powering off the phy
->>>   * @set_mode: set the mode of the phy
->>> + * @set_vbus: enable/disable vbus in the phy (USB)
->>>   * @reset: resetting the phy
->>>   * @owner: the module owner containing the ops
->>>   */
->>> @@ -45,6 +46,7 @@ struct phy_ops {
->>>       int     (*power_on)(struct phy *phy);
->>>       int     (*power_off)(struct phy *phy);
->>>       int     (*set_mode)(struct phy *phy, enum phy_mode mode);
->>> +     int     (*set_vbus)(struct phy *phy, int on);
->>
->> please avoid adding usb specific ops in generic phy ops.
->>
+On Fri, Jan 20, 2017 at 09:43:02AM +0100, kernel at martin.sperl.org wrote:
 > 
-> Is there any alternative? Something has to happen here.
+> > On 20.01.2017, at 05:23, Eduardo Valentin <edubezval@gmail.com> wrote:
+> > 
+> > On Thu, Jan 19, 2017 at 08:14:02PM -0800, Eduardo Valentin wrote:
+> >> Hello Martin,
+> >> 
+> >> On Sat, Jan 07, 2017 at 04:55:45PM +0000, kernel at martin.sperl.org wrote:
+> >>> From: Martin Sperl <kernel@martin.sperl.org>
+> >>> 
+> >>> Add basic thermal driver for bcm2835 SOC.
+> >>> 
+> >>> This driver currently relies on the firmware setting up the
+> >>> tsense HW block and does not set it up itself.
+> >>> 
+> >>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+> >>> Acked-by: Eric Anholt <eric@anholt.net>
+> >>> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+> >>> 
+> >> 
+> >> <cut>
+> > 
+> > 
+> > Also, I am getting this warn from sparse:
+> > drivers/thermal/bcm2835_thermal.c:110:16: warning: cast truncates bits
+> > from constant value (3ffffffffff00 becomes ffffff00)
+> > drivers/thermal/bcm2835_thermal.c:134:16: warning: cast truncates bits
+> > from constant value (3ffffffffff becomes ffffffff)
+> > 
+> > Have you seen this?
 > 
-> The only other thing I can think of is putting back the vbus extcon in
-> the phy driver so it can be notified when vbus is present or not. I can
+> No, I have not checked sparse.
+> 
+> These values are defined via GENMASK on line 47 and 57 respectively
+> and should actually compute to the following values:
+>   for line 110 (line 47 has the define):
+>     GENMASK(BCM2835_TS_TSENSCTL_THOLD_BITS +     \
+>             BCM2835_TS_TSENSCTL_THOLD_SHIFT - 1, \
+>             BCM2835_TS_TSENSCTL_THOLD_SHIFT)
+>     = GENMASK(10 + 8 - 1, 8) 
+>     = GENMASK(17, 8)
+>     = (((~0UL) << (8)) & (~0UL >> (32 - 1 - (10 + 8 - 1))))
+>     = 0x3ff00
+>   for line 134 (line 57 has the define):
+>     GENMASK(BCM2835_TS_TSENSCTL_THOLD_BITS +     \
+>             BCM2835_TS_TSENSCTL_THOLD_SHIFT - 1, \
+>             BCM2835_TS_TSENSCTL_THOLD_SHIFT)
+>     = GENMASK(10 + 0 - 1, 0)
+>     = GENMASK(9, 0)
+>     = (((~0UL) << (0)) & (~0UL >> (32 - 1 - (10 + 0 - 1))))
+>     = 0x003ff
+> 
+> Note that the preprocessor expansions have been verified by
+> looking at the preprocessed driver source
+> (drivers/thermal/bcm2835_thermal.i)
 
-I think extcon should be used here to get vbus notification.
+OK then.
 
-Thanks
-Kishon
+> 
+> I wonder why sparse is computing these GENMASK values as:
+> 0x3ffffffffff00 and 0x3ffffffffff
+
+In the case you can confirm that the values are correct, I believe this
+could be a false positive report on sparse, in this case.
+
+> 
+> Martin
