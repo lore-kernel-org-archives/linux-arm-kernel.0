@@ -1,88 +1,70 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 24 Jan 2017 11:26:06 +0100
-Subject: [PATCH v3] arm: dts: mt2701: Add thermal device node.
-In-Reply-To: <1484645049-4477-2-git-send-email-erin.lo@mediatek.com>
-References: <1484645049-4477-1-git-send-email-erin.lo@mediatek.com>
- <1484645049-4477-2-git-send-email-erin.lo@mediatek.com>
-Message-ID: <50d4ca10-cf7a-84d4-1e8c-fdcbbe2f7145@gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 24 Jan 2017 11:30:41 +0100
+Subject: [PATCH 2/2] arm64: kvm: upgrade csselr and ccsidr to 64-bit values
+In-Reply-To: <fe2bde22-63dc-3abf-5870-21360b16bf6b@arm.com>
+References: <1484909410-11673-1-git-send-email-sudeep.holla@arm.com>
+ <1484909410-11673-2-git-send-email-sudeep.holla@arm.com>
+ <20170123210859.GJ15850@cbox>
+ <fe2bde22-63dc-3abf-5870-21360b16bf6b@arm.com>
+Message-ID: <20170124103041.GK15850@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jan 24, 2017 at 10:15:38AM +0000, Sudeep Holla wrote:
+> 
+> 
+> On 23/01/17 21:08, Christoffer Dall wrote:
+> > On Fri, Jan 20, 2017 at 10:50:10AM +0000, Sudeep Holla wrote:
+> >> csselr and ccsidr are treated as 64-bit values already elsewhere in the
+> >> kernel. It also aligns well with the architecture extensions that allow
+> >> 64-bit format for ccsidr.
+> >>
+> >> This patch upgrades the existing accesses to csselr and ccsidr from
+> >> 32-bit to 64-bit in preparation to add support to those extensions.
+> >>
+> >> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> >> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> >> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> >> ---
+> >>  arch/arm64/kvm/sys_regs.c | 18 +++++++++---------
+> >>  1 file changed, 9 insertions(+), 9 deletions(-)
+> >>
+> >> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> >> index 5dca1f10340f..a3559a8a2b0c 100644
+> >> --- a/arch/arm64/kvm/sys_regs.c
+> >> +++ b/arch/arm64/kvm/sys_regs.c
+> 
+> [..]
+> 
+> >> @@ -2004,8 +2004,8 @@ static int demux_c15_get(u64 id, void __user *uaddr)
+> >>  
+> >>  static int demux_c15_set(u64 id, void __user *uaddr)
+> >>  {
+> >> -	u32 val, newval;
+> >> -	u32 __user *uval = uaddr;
+> >> +	u64 val, newval;
+> >> +	u64 __user *uval = uaddr;
+> > 
+> > Doesn't converting these uval pointers to u64 cause us to break the ABI
+> > as we'll now be reading/writing 64-bit values to userspace with the
+> > get_user and put_user following the declarations?
+> > 
+> 
+> Yes, I too have similar concern. IIUC it is always read via kvm_one_reg
+> structure. I could not find any specific user for this register to cross
+> check.
+> 
 
+Not sure it matters which interface we get the userspace pointer from?
 
-On 01/17/2017 10:24 AM, Erin Lo wrote:
-> From: Dawei Chien <dawei.chien@mediatek.com>
->
-> Add thermal controller device nodes for MT2701.
->
-> Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
-> Signed-off-by: Erin Lo <erin.lo@mediatek.com>
-> ---
->  arch/arm/boot/dts/mt2701.dtsi | 43 +++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 43 insertions(+)
->
+This patch is definitely changing the write from a 32-bit write to a
+64-bit write and there's a specific check prior to the put_user() call
+which checks that userspace intended a 32-bit value and presumably
+provided a 32-bit pointer.
 
-Applied, thanks
+So I think the only way to return 64-bit AArch32 system register values
+to userspace (if that is the intention) is to define a new ID for 64-bit
+CCSIDR registers and handle them separately.
 
-> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-> index 4cfec57..26a88cb 100644
-> --- a/arch/arm/boot/dts/mt2701.dtsi
-> +++ b/arch/arm/boot/dts/mt2701.dtsi
-> @@ -89,6 +89,36 @@
->  		clock-output-names = "rtc32k";
->  	};
->
-> +	thermal-zones {
-> +		cpu_thermal: cpu_thermal {
-> +			polling-delay-passive = <1000>; /* milliseconds */
-> +			polling-delay = <1000>; /* milliseconds */
-> +
-> +			thermal-sensors = <&thermal 0>;
-> +			sustainable-power = <1000>;
-> +
-> +			trips {
-> +				threshold: trip-point at 0 {
-> +					temperature = <68000>;
-> +					hysteresis = <2000>;
-> +					type = "passive";
-> +				};
-> +
-> +				target: trip-point at 1 {
-> +					temperature = <85000>;
-> +					hysteresis = <2000>;
-> +					type = "passive";
-> +				};
-> +
-> +				cpu_crit: cpu_crit at 0 {
-> +					temperature = <115000>;
-> +					hysteresis = <2000>;
-> +					type = "critical";
-> +				};
-> +			};
-> +		};
-> +	};
-> +
->  	timer {
->  		compatible = "arm,armv7-timer";
->  		interrupt-parent = <&gic>;
-> @@ -270,6 +300,19 @@
->  		status = "disabled";
->  	};
->
-> +	thermal: thermal at 1100b000 {
-> +		#thermal-sensor-cells = <0>;
-> +		compatible = "mediatek,mt2701-thermal";
-> +		reg = <0 0x1100b000 0 0x1000>;
-> +		interrupts = <GIC_SPI 70 IRQ_TYPE_LEVEL_LOW>;
-> +		clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
-> +		clock-names = "therm", "auxadc";
-> +		resets = <&pericfg MT2701_PERI_THERM_SW_RST>;
-> +		reset-names = "therm";
-> +		mediatek,auxadc = <&auxadc>;
-> +		mediatek,apmixedsys = <&apmixedsys>;
-> +	};
-> +
->  	nandc: nfi at 1100d000 {
->  		compatible = "mediatek,mt2701-nfc";
->  		reg = <0 0x1100d000 0 0x1000>;
->
+Thanks,
+-Christoffer
