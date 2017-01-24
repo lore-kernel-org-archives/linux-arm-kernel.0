@@ -1,78 +1,124 @@
-From: lilja.magnus@gmail.com (Magnus Lilja)
-Date: Tue, 24 Jan 2017 10:41:26 +0100
-Subject: usb: gadget: Kernel panic (NULL pointer dereference) when using
- fsl_udc2_core on i.MX31 PDK
-In-Reply-To: <87efzsdelq.fsf@linux.intel.com>
-References: <f984e50b-0e64-88ef-2f53-b8da2a62daf0@gmail.com>
- <87k29m6lkx.fsf@linux.intel.com>
- <CAM=E1R4EMEEq1wnHxjLLJMLaXCM=EDFo1JDacHKGq6DUtqA9Nw@mail.gmail.com>
- <87efzsdelq.fsf@linux.intel.com>
-Message-ID: <CAM=E1R7i5y2SXiswk8f5dzoJyqYXUOxK9Hivv+ZS56mP6HC8uA@mail.gmail.com>
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Tue, 24 Jan 2017 10:52:43 +0100
+Subject: [PATCH V9] thermal: bcm2835: add thermal driver for bcm2835 soc
+In-Reply-To: <20170124093127.GB3651@localhost.localdomain>
+References: <1483808145-6206-1-git-send-email-kernel@martin.sperl.org>
+ <20170120041400.GA24617@localhost.localdomain>
+ <060918B6-A773-46A5-8D10-C9F6BBA6D3F1@martin.sperl.org>
+ <20170124093127.GB3651@localhost.localdomain>
+Message-ID: <0452720A-5914-469B-9EF7-0581CF1B5478@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 January 2017 at 09:52, Felipe Balbi <balbi@kernel.org> wrote:
->
-> Hi,
->
-> Magnus Lilja <lilja.magnus@gmail.com> writes:
->>>> I tried the fsl_udc_core gadget driver on the i.MX31 PDK board and got a
->>>> kernel panic (NULL pointer dereference) when connecting the USB cable. I
->>>> had the g_serial module loaded as well.
->>>>
->>>> The NULL pointer panic comes from gadget/udc/core.c
->>>> usb_gadget_giveback_request() which calls req->complete() and in some
->>>> cases req->complete is NULL.
->>>>
->>>> Commit 304f7e5e1d08 ("usb: gadget: Refactor request completion") changed
->>>> fsl_udc2_core.c (and several other files) and in fsl_udc2_core.c a check
->>>> that req->complete is non-NULL was removed:
->>>>
->>>> --- a/drivers/usb/gadget/udc/fsl_udc_core.c
->>>> +++ b/drivers/usb/gadget/udc/fsl_udc_core.c
->>>> @@ -197,10 +197,8 @@ __acquires(ep->udc->lock)
->>>>          ep->stopped = 1;
->>>>
->>>>          spin_unlock(&ep->udc->lock);
->>>> -       /* complete() is from gadget layer,
->>>> -        * eg fsg->bulk_in_complete() */
->>>> -       if (req->req.complete)
->>>> -               req->req.complete(&ep->ep, &req->req);
+
+> On 24.01.2017, at 10:31, Eduardo Valentin <edubezval@gmail.com> wrote:
+> 
+> Hello Martin,
+> 
+> On Fri, Jan 20, 2017 at 08:54:07AM +0100, kernel at martin.sperl.org wrote:
+>> 
+>>> On 20.01.2017, at 05:14, Eduardo Valentin <edubezval@gmail.com> wrote:
+>>> 
+>>> Hello Martin,
+>>> 
+>>> On Sat, Jan 07, 2017 at 04:55:45PM +0000, kernel at martin.sperl.org wrote:
+>>>> From: Martin Sperl <kernel@martin.sperl.org>
+>>>> 
+>>>> Add basic thermal driver for bcm2835 SOC.
+>>>> 
+>>>> This driver currently relies on the firmware setting up the
+>>>> tsense HW block and does not set it up itself.
+>>>> 
+>>>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+>>>> Acked-by: Eric Anholt <eric@anholt.net>
+>>>> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+>>>> 
+>>> 
+>>> <cut>
+>>> 
 >>>> +
->>>> +       usb_gadget_giveback_request(&ep->ep, &req->req);
->>>>
->>>>          spin_lock(&ep->udc->lock);
->>>>          ep->stopped = stopped;
->>>>
->>>> If I re-introduce the check (either in fsl_udc_core.c or core.c) at
->>>> least USB gadget operation using g_serial seems to work just fine.
->>>>
->>>> I don't know the logic in detail to understand whether this is a proper
->>>> fix or if there is some other more problem with the fls_udc_core driver.
->>>> Does anyone have input in this matter?
->>>>
->>>> I can produce a proper patch that fixes this problem by re-introducing
->>>> the check (in either fsl_udc_core.c or core.c) if that is a proper
->>>> solution and I can also assist in testing other fixes to the problem.
->>>
->>> ->complete() is supposed to be mandatory. Which gadget do you have that
->>> ->doesn't set ->complete() to a valid function pointer?
->>
->> I'm modprobing g_serial so the following modules are loaded (using my patch):
->>
->> ~ # lsmod
->> usb_f_acm
->> u_serial
->> g_serial
->> libcomposite
->> configfs
->> fsl_usb2_udc
->
-> okay, can you figure out which request is coming without ->complete()
-> set? To which endpoint is this request being queued? It would be nice to
-> know these details. Maybe this is an old bug which ought to be fixed.
+>>>> +static const struct of_device_id bcm2835_thermal_of_match_table[] = {
+>>>> +	{
+>>>> +		.compatible = "brcm,bcm2835-thermal",
+>>>> +		.data = &(struct bcm2835_thermal_info) {
+>>>> +			.offset = 407000,
+>>>> +			.slope = -538,
+>>>> +			.trip_temp = 80000
+>>>> +		}
+>>>> +	},
+>>>> +	{
+>>>> +		.compatible = "brcm,bcm2836-thermal",
+>>>> +		.data = &(struct bcm2835_thermal_info) {
+>>>> +			.offset = 407000,
+>>>> +			.slope = -538,
+>>>> +			.trip_temp = 80000
+>>>> +		}
+>>>> +	},
+>>>> +	{
+>>>> +		.compatible = "brcm,bcm2837-thermal",
+>>>> +		.data = &(struct bcm2835_thermal_info) {
+>>>> +			/* the bcm2837 needs adjustment of +5C */
+>>>> +			.offset = 407000 + 5000,
+>>>> +			.slope = -538,
+>>>> +			.trip_temp = 80000
+>>>> +		}
+>>>> +	},
+>>>> +	{},
+>>> 
+>>> Just for the same of clarification, is there anything preventing this
+>>> driver of using of-thermal API? the above data (slope, offset, and
+>>> trip_temps) would be in DT the place where they are supposed to be,
+>>> instead of code.
+>>> 
+>> 
+>> As the DT changes, that only define compatible strings, have already gone
+>> in without any such properties set, we need to define defaults for the 
+>> slope/offset and trip_temp values.
+>> 
+> 
+> These properties won't go into the same node you are referring to. They
+> go into the thermal-zone node you would create, which would then refer
+> to the node you referred (already merged). Therefore, I do not see
+> anything blocking a proper of-thermal usage to cover for the above data.
+> 
+>> I guess (for newer SOC) you still can use the values in the DT,
+>> as (I guess) these are parsed and set in thermal_zone_device_register
+>> after the defaults are set in thermal_zone_params.
+> 
+> Not sure what you meant here, but these values, when correctly used in
+> DT, they would come as part of the thermal_zone_params and in the
+> thermal trips of the thermal zones, as the of-thermal code with already
+> deal with those for you.
+> 
+> Please have a look at:
+> a. Documentation/devicetree/bindings/thermal/thermal.txt
+> b. drivers/thermal/of-thermal.c
+> 
+> And let me know if you see anything that would prevent this driver of
+> using the correct API to describe hardware data with DT.
 
-Sure, I can try figure that out. Any input to make the debug of the
-faster is appreciated if you have any.
 
-Regards, Magnus
+I guess you miss my point:
+The argument is that we have DT in the 4.10.0-rc2 kernel right now that
+look like this:
+                thermal at 7e212000 {
+                        compatible = "brcm,bcm2835-thermal";
+                        clocks = <0x6 0x1b>;
+                        status = "okay";
+                        reg = <0x7e212000 0x8>;
+                }
+so we still need to be compatible with those without any extra defines.
+
+Hence we need to define those slopes and offsets in the driver itself
+to stay compatible with those older device-trees.
+
+As for if it works with the framework - I have to admit I do not
+have the slightest clue - it looks way to complicated for the soc right
+now.
+
+As a note: afaiu the trip_temp register is the temperature at which the
+soc will reboot on its own - similar to a watchdog, but for temperatures.
+(main reason for the assumption is because there is no interrupt that
+can get assigned a handler to catch this situation).
+
+Martin
