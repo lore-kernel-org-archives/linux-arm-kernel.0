@@ -1,102 +1,108 @@
-From: bibby.hsieh@mediatek.com (Bibby Hsieh)
-Date: Tue, 24 Jan 2017 09:35:52 +0800
-Subject: [PATCH v2] drm/mediatek: Support UYVY and YUYV format for overlay
-In-Reply-To: <CAGS+omDHrYnUeRybHt+FtmjLS8d6jO-3==DYYCzbuhFZJME_Gg@mail.gmail.com>
-References: <1483079183-38637-1-git-send-email-bibby.hsieh@mediatek.com>
- <CAGS+omDHrYnUeRybHt+FtmjLS8d6jO-3==DYYCzbuhFZJME_Gg@mail.gmail.com>
-Message-ID: <1485221752.9687.2.camel@mtksdaap41>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Mon, 23 Jan 2017 17:38:33 -0800
+Subject: [PATCH v3 16/24] media: Add i.MX media core driver
+In-Reply-To: <1485170006.2874.63.camel@pengutronix.de>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <1483755102-24785-17-git-send-email-steve_longerbeam@mentor.com>
+ <1484320822.31475.96.camel@pengutronix.de>
+ <a94025b4-c4dd-de51-572e-d2615a7246e4@gmail.com>
+ <1484574468.8415.136.camel@pengutronix.de>
+ <e38feca9-ed6f-8288-e006-768d6ba2fe5a@gmail.com>
+ <1485170006.2874.63.camel@pengutronix.de>
+Message-ID: <481289bb-424f-4ac4-66f1-7e1b4a0b7065@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Daniel,
 
-Thanks for your comment.
 
-On Tue, 2017-01-03 at 14:27 +0800, Daniel Kurtz wrote:
-> On Fri, Dec 30, 2016 at 2:26 PM, Bibby Hsieh <bibby.hsieh@mediatek.com> wrote:
-> >
-> > MT8173 overlay can support UYVY and YUYV format,
-> > we add the format in DRM driver.
-> >
-> > Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
-> > Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
-> > ---
-> >  drivers/gpu/drm/mediatek/mtk_disp_ovl.c  | 21 +++++++++++++++++++++
-> >  drivers/gpu/drm/mediatek/mtk_drm_plane.c |  2 ++
-> >  2 files changed, 23 insertions(+)
-> >
-> > diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-> > index c703102..de05845 100644
-> > --- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-> > +++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
-> > @@ -40,10 +40,13 @@
-> >  #define        OVL_RDMA_MEM_GMC        0x40402020
-> >
-> >  #define OVL_CON_BYTE_SWAP      BIT(24)
-> > +#define OVL_CON_MTX_YUV_TO_RGB (6 << 16)
-> >  #define OVL_CON_CLRFMT_RGB565  (0 << 12)
-> >  #define OVL_CON_CLRFMT_RGB888  (1 << 12)
-> >  #define OVL_CON_CLRFMT_RGBA8888        (2 << 12)
-> >  #define OVL_CON_CLRFMT_ARGB8888        (3 << 12)
-> > +#define OVL_CON_CLRFMT_UYVY    (4 << 12)
-> > +#define OVL_CON_CLRFMT_YUYV    (5 << 12)
-> 
-> Why not just add " | OVL_CON_MTX_YUV_TO_RGB" here in the definition of
-> these two constants, instead of adding a helper function?
-> 
-> >  #define        OVL_CON_AEN             BIT(8)
-> >  #define        OVL_CON_ALPHA           0xff
-> >
-> > @@ -162,6 +165,21 @@ static unsigned int ovl_fmt_convert(unsigned int fmt)
-> >         case DRM_FORMAT_XBGR8888:
-> >         case DRM_FORMAT_ABGR8888:
-> >                 return OVL_CON_CLRFMT_RGBA8888 | OVL_CON_BYTE_SWAP;
-> > +       case DRM_FORMAT_UYVY:
-> > +               return OVL_CON_CLRFMT_UYVY;
-> > +       case DRM_FORMAT_YUYV:
-> > +               return OVL_CON_CLRFMT_YUYV;
-> > +       }
-> > +}
-How about adding " | OVL_CON_MTX_YUV_TO_RGB" after here in "return
-OVL_CON_CLRFMT_UYVY" and "return OVL_CON_CLRFMT_YUYV" ??
-> > +
-> > +static bool ovl_yuv_space(unsigned int fmt)
-> > +{
-> > +       switch (fmt) {
-> > +       case DRM_FORMAT_UYVY:
-> > +       case DRM_FORMAT_YUYV:
-> > +               return true;
-> > +       default:
-> > +               return false;
-> >         }
-> >  }
-> >
-> > @@ -183,6 +201,9 @@ static void mtk_ovl_layer_config(struct mtk_ddp_comp *comp, unsigned int idx,
-> >         if (idx != 0)
-> >                 con |= OVL_CON_AEN | OVL_CON_ALPHA;
-> >
-> > +       if (ovl_yuv_space(fmt))
-> > +               con |= OVL_CON_MTX_YUV_TO_RGB;
-> > +
-> >         writel_relaxed(con, comp->regs + DISP_REG_OVL_CON(idx));
-> >         writel_relaxed(pitch, comp->regs + DISP_REG_OVL_PITCH(idx));
-> >         writel_relaxed(src_size, comp->regs + DISP_REG_OVL_SRC_SIZE(idx));
-> > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_plane.c b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
-> > index c461a23..8c02d1d 100644
-> > --- a/drivers/gpu/drm/mediatek/mtk_drm_plane.c
-> > +++ b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
-> > @@ -28,6 +28,8 @@
-> >         DRM_FORMAT_XRGB8888,
-> >         DRM_FORMAT_ARGB8888,
-> >         DRM_FORMAT_RGB565,
-> > +       DRM_FORMAT_UYVY,
-> > +       DRM_FORMAT_YUYV,
-> >  };
-> >
-> >  static void mtk_plane_reset(struct drm_plane *plane)
-> > --
-> > 1.9.1
-> >
+On 01/23/2017 03:13 AM, Philipp Zabel wrote:
+> Hi Steve,
+>
+> On Sun, 2017-01-22 at 18:31 -0800, Steve Longerbeam wrote:
+>> On 01/16/2017 05:47 AM, Philipp Zabel wrote:
+>>> On Sat, 2017-01-14 at 14:46 -0800, Steve Longerbeam wrote:
+>>> [...]
+>>>>>> +Unprocessed Video Capture:
+>>>>>> +--------------------------
+>>>>>> +
+>>>>>> +Send frames directly from sensor to camera interface, with no
+>>>>>> +conversions:
+>>>>>> +
+>>>>>> +-> ipu_smfc -> camif
+>>>>> I'd call this capture interface, this is not just for cameras. Or maybe
+>>>>> idmac if you want to mirror hardware names?
+>>>> Camif is so named because it is the V4L2 user interface for video
+>>>> capture. I suppose it could be named "capif", but that doesn't role
+>>>> off the tongue quite as well.
+>>> Agreed, capif sounds weird. I find camif a bit confusing though, because
+>>> Samsung S3C has a camera interface that is actually called "CAMIF".
+>> how about simply "capture" ?
+> That sounds good to me.
 
--- 
-Bibby
+done.
+
+>
+>>>>> This should really be handled by v4l2_pipeline_pm_use.
+>>>> I thought about this earlier, but v4l2_pipeline_pm_use() seems to be
+>>>> doing some other stuff that bothered me, at least that's what I remember.
+>>>> I will revisit this.
+>>> I have used it with a tc358743 -> mipi-csi2 pipeline, it didn't cause
+>>> any problems. It would be better to reuse and, if necessary, fix the
+>>> existing infrastructure where available.
+>> I tried this API, by switching to v4l2_pipeline_pm_use() in camif
+>> open/release,
+>> and switched to v4l2_pipeline_link_notify() instead of
+>> imx_media_link_notify()
+>> in the media driver's media_device_ops.
+>>
+>> This API assumes the video device has an open file handle while the media
+>> links are being established. This doesn't work for me, I want to be able to
+>> establish the links using 'media-ctl -l', and that won't work unless
+>> there is an
+>> open file handle on the video capture device node.
+>>
+>> Also, I looked into calling v4l2_pipeline_pm_use() during
+>> imx_media_link_notify(),
+>> instead of imx_media_pipeline_set_power(). Again there are problems with
+>> that.
+>>
+>> First, v4l2_pipeline_pm_use() acquires the graph mutex, so it can't be
+>> called inside
+>> link_notify which already acquires that lock. The header for this
+>> function also
+>> clearly states it should only be called in open/release.
+> So why not call it in open/release then?
+
+er, see above (?)
+
+>
+>> Second, ignoring the above locking issue for a moment,
+>> v4l2_pipeline_pm_use()
+>> will call s_power on the sensor _first_, then the mipi csi-2 s_power,
+>> when executing
+>> media-ctl -l '"ov5640 1-003c":0 -> "imx6-mipi-csi2":0[1]'. Which is the
+>> wrong order.
+>> In my version which enforces the correct power on order, the mipi csi-2
+>> s_power
+>> is called first in that link setup, followed by the sensor.
+> I don't understand why you want to power up subdevs as soon as the links
+> are established.
+
+Because that is the precedence, all other media drivers do pipeline
+power on/off at link_notify. And v4l2_pipeline_link_notify() was written
+as a link_notify method.
+
+>   Shouldn't that rather be done for all subdevices in the
+> pipeline when the corresponding capture device is opened?
+
+that won't work. There's no guarantee the links will be established
+at capture device open time.
+
+> It seems to me that powering up the pipeline should be the last step
+> before userspace actually starts the capture.
+
+Well, I'm ok with moving pipeline power on/off to start/stop streaming.
+I would actually prefer to do it then, I only chose at link_notify because
+of precedence. I'll look into it.
+
+Steve
