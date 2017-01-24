@@ -1,58 +1,70 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 24 Jan 2017 12:49:00 -0800
-Subject: [PATCH 00/22] Conversion of ARMv4 Gemini to DT and multiplatform
-In-Reply-To: <CACRpkdY1A8QbKVV0-ZFeH-n0zYpmJkoGj5vA0Ov-DDhBTJf5_w@mail.gmail.com>
-References: <20170122121506.9995-1-linus.walleij@linaro.org>
- <8e705d3a-ff99-23b2-c4c9-2edccf134cac@gmail.com>
- <CACRpkdbdsNU6pOcewyZw_jpXzXvm_aj0FURY7Ty5FkT227iZ=Q@mail.gmail.com>
- <alpine.LNX.2.00.1701241734140.2736@T420s>
- <CACRpkdY1A8QbKVV0-ZFeH-n0zYpmJkoGj5vA0Ov-DDhBTJf5_w@mail.gmail.com>
-Message-ID: <6a6f3b79-18d7-3243-6a5c-2dc9a3755aa9@gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 24 Jan 2017 21:55:08 +0100
+Subject: [PATCH net-next v6 4/4] phy: marvell: Add support for the PHY
+ embedded in the topaz switch
+In-Reply-To: <20170124202847.GV10895@lunn.ch> (Andrew Lunn's message of "Tue,
+ 24 Jan 2017 21:28:47 +0100")
+References: <cover.b0e18efe751186768e720c341693117fdd4d3c16.1485288602.git-series.gregory.clement@free-electrons.com>
+ <f8526f4a5d99223fc90fe5579b4958eaa0950a3a.1485288602.git-series.gregory.clement@free-electrons.com>
+ <20170124202847.GV10895@lunn.ch>
+Message-ID: <87efzs2n6b.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/24/2017 12:47 PM, Linus Walleij wrote:
-> Hans, Florian et al: does any of you have a copy of the kernel source
-> dump(s) from Teltonika, Raidsonic or Wiliboard?
-> 
-> Would be nice to have the stuff that vendors are using.
-> 
-> On Tue, Jan 24, 2017 at 6:24 PM, Hans Ulli Kroll
-> <ulli.kroll@googlemail.com> wrote:
-> 
->> AFAICR
->> This is a dual GMAC !
->>
->> They are two different base address for each GMAC and one shared
->> base address for both of them.
->> This is all in one address space which remaps the driver.
->>
->> And to make it worse two interrupt lines, one of them is also shared.
->>
->> Any ideas to "convert" this into DT ??
->> Because I think it's impossible to split both GMAC interfaces ??
-> 
-> Sounds odd.  Yeah hardware.h lists this:
-> 
-> #define GEMINI_TOE_BASE         0x60000000
-> #define GEMINI_GMAC0_BASE       0x6000A000
-> #define GEMINI_GMAC1_BASE       0x6000E000
-> 
-> I guess one approach is to make a driver handling all of it in one,
-> let it ioremap all regions and support one or two GMACs on the same
-> TOE. More complex solutions is to share the TOE using
-> syscons regmap mechanism but it looks cumbersome.
-> 
-> {
->    compatible = "cortina,genesis-gmac-ethernet";
->    reg = <0x60000000 0xa000>, <0x6000a000 0x4000>, <0x6000e000 0x4000>;
->    interrupts = <1 IRQ_TYPE_LEVEL_HIGH>, <2 IRQ_TYPE_LEVEL_HIGH>;
-> }
-> 
-> Or something like that?
+Hi Andrew,
+ 
+ On mar., janv. 24 2017, Andrew Lunn <andrew@lunn.ch> wrote:
 
-I'd recommend looking at how mv643xx_eth does it, there are shared and
-individual portions of the register set in there, with concepts of
-"ports" which result in network device instances.
+> On Tue, Jan 24, 2017 at 09:10:26PM +0100, Gregory CLEMENT wrote:
+>> The PHY with the ID 0x1410C00
+>
+> :-(
+>
+> I don't have a better reference, but
+> Linux/Documentation/devicetree/bindings/net/phy.txt says:
+>
+>  22   If the phy's identifier is known then the list may contain an entry
+>  23   of the form: "ethernet-phy-idAAAA.BBBB" where
+>  24      AAAA - The value of the 16 bit Phy Identifier 1 register as
+>  25             4 hex digits. This is the chip vendor OUI bits 3:18
+>  26      BBBB - The value of the 16 bit Phy Identifier 2 register as
+>  27             4 hex digits. This is the chip vendor OUI bits 19:24,
+>  28             followed by 10 bits of a vendor specific ID.
+>
+> So the lower 10 bits of 0x1410C00 are 0. So we know it is a Marvell
+> PHY from the OUI, but the vendor specific bits are all 0.
+
+In your previous email you mention a value of 0x01410000, so when I saw
+the "C00" at the end I was happy and I didn't look for further.
+
+>
+> Please take a look at:
+>
+> https://marc.info/?l=linux-netdev&m=148495522620757&w=1
+>
+> and
+>
+> https://marc.info/?l=linux-netdev&m=148495510320714&w=1
+>
+> Maybe i should submit these two independently, so you can extend it
+> for the 88E6341 family.
+
+Please do it :)
+
+The feedback from Florian and Vivian was good about it so I see no
+reason to not apply them.
+
+Add me in CC so I will now when to rebase my series.
+
+Thanks,
+
+Gregory
+
+>
+>     Andrew
+
 -- 
-Florian
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
