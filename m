@@ -1,107 +1,146 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 24 Jan 2017 11:54:51 -0800
-Subject: [GIT PULL] Immutable branch between MFD, ARM, IIO and PWM due for
- the v4.10 merge window
-In-Reply-To: <20170124081244.GP16020@dell>
-References: <1484903709-11650-1-git-send-email-benjamin.gaignard@st.com>
- <20170123121222.GJ16020@dell>
- <CAOesGMhx6ZWekgW01-7GRcMiWtAohcfGdcu1FhkP=bTfsjBCmQ@mail.gmail.com>
- <20170124081244.GP16020@dell>
-Message-ID: <CAOesGMhauUd0mPuUsRZnEWrAfQZj3Di_YwvxtD1rXr7B9fgqdw@mail.gmail.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Tue, 24 Jan 2017 13:56:46 -0600
+Subject: [PATCH v14 0/6] Enable PMUs in ACPI systems
+In-Reply-To: <CAFpQJXXKf_c6kddG-5ueH50CAr7Q=SEGZSUUtmJootuxc4-cvg@mail.gmail.com>
+References: <1485210765-9422-1-git-send-email-jeremy.linton@arm.com>
+ <CAFpQJXXKf_c6kddG-5ueH50CAr7Q=SEGZSUUtmJootuxc4-cvg@mail.gmail.com>
+Message-ID: <8641f678-99da-e1af-6c53-70cde77ab74b@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2017 at 12:12 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Mon, 23 Jan 2017, Olof Johansson wrote:
->> On Mon, Jan 23, 2017 at 4:12 AM, Lee Jones <lee.jones@linaro.org> wrote:
->> > Arm, IIO and PWM Maintainers,
->> >
->> > Enjoy!
->> >
->> > The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
->> >
->> >   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
->> >
->> > are available in the git repository at:
->> >
->> >   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git ib-mfd-arm-iio-pwm-v4.10
->> >
->> > for you to fetch changes up to 94df449273475980a39f1bf47f1e3d2b07ce6577:
->> >
->> >   ARM: dts: stm32: Enable pwm1 and pwm3 for stm32f469-disco (2017-01-23 12:06:28 +0000)
->> >
->> > ----------------------------------------------------------------
->> > Immutable branch between MFD, ARM, IIO and PWM due for the v4.10 merge window
->> >
->> > ----------------------------------------------------------------
->> > Benjamin Gaignard (8):
->> >       dt-bindings: mfd: Add bindings for STM32 Timers driver
->> >       mfd: Add STM32 Timers driver
->> >       dt-bindings: pwm: Add STM32 bindings
->> >       pwm: Add driver for STM32 plaftorm
->> >       iio: Add bindings for STM32 timer trigger driver
->> >       iio: Add STM32 timer trigger driver
->> >       ARM: dts: stm32: add Timers driver for stm32f429 MCU
->> >       ARM: dts: stm32: Enable pwm1 and pwm3 for stm32f469-disco
->> >
->> >  .../ABI/testing/sysfs-bus-iio-timer-stm32          |  29 ++
->> >  .../bindings/iio/timer/stm32-timer-trigger.txt     |  23 ++
->> >  .../devicetree/bindings/mfd/stm32-timers.txt       |  46 +++
->> >  .../devicetree/bindings/pwm/pwm-stm32.txt          |  35 ++
->> >  arch/arm/boot/dts/stm32f429.dtsi                   | 275 ++++++++++++++
->> >  arch/arm/boot/dts/stm32f469-disco.dts              |  28 ++
->> >  drivers/iio/trigger/Kconfig                        |   9 +
->> >  drivers/iio/trigger/Makefile                       |   1 +
->> >  drivers/iio/trigger/stm32-timer-trigger.c          | 342 ++++++++++++++++++
->> >  drivers/mfd/Kconfig                                |  11 +
->> >  drivers/mfd/Makefile                               |   2 +
->> >  drivers/mfd/stm32-timers.c                         |  80 +++++
->> >  drivers/pwm/Kconfig                                |   9 +
->> >  drivers/pwm/Makefile                               |   1 +
->> >  drivers/pwm/pwm-stm32.c                            | 398 +++++++++++++++++++++
->> >  include/linux/iio/timer/stm32-timer-trigger.h      |  62 ++++
->> >  include/linux/mfd/stm32-timers.h                   |  71 ++++
->> >  17 files changed, 1422 insertions(+)
->> >  create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-timer-stm32
->> >  create mode 100644 Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
->> >  create mode 100644 Documentation/devicetree/bindings/mfd/stm32-timers.txt
->> >  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32.txt
->> >  create mode 100644 drivers/iio/trigger/stm32-timer-trigger.c
->> >  create mode 100644 drivers/mfd/stm32-timers.c
->> >  create mode 100644 drivers/pwm/pwm-stm32.c
->> >  create mode 100644 include/linux/iio/timer/stm32-timer-trigger.h
->> >  create mode 100644 include/linux/mfd/stm32-timers.h
->>
->> May I ask why you're creating an immutable branch of all this contents?
->>
->> We should get the dts/dtsi contents like usual from any maintainer;
->> just the DT updates in a branch.
->>
->> Sometimes (but less and less due to us discouraging the use) we need
->> an immutable branch that includes dt-include updates. But I don't see
->> any of those in this contents.
->>
->> I.e. I guess I can see the need between mfd and downstream trees
->> (iio/pwm), but not the DTS contents at this time. Or am I missing
->> something here?
+Hi,
+
+On 01/24/2017 12:46 AM, Ganapatrao Kulkarni wrote:
+> Hi Jeremy,
 >
-> I agree with you.  However, since one of the STM32 Maintainers Acked
-> the DTS patches, and the other one hasn't been heard from for months,
-> I took that to mean he wanted me to apply and take them through the
-> MFD tree.
+> do you have any public git branch to try these patches?
+
+No, not at this time, sorry...
+
+
+
 >
-> A misunderstanding or misaction perhaps, but this is the normal
-> assumption.
-
-It seems to be a misunderstanding in this case, since there are other
-additions in the stm32 tree this release cycle so we should only pick
-up DTS changes through our tree.
-
-By now, I think it should be pretty well known that we nearly never
-want DTS contents merged through any other tree. Ever.
-
-So, please revoke your branch and take those out. We'll take them
-through the normal flow. Thanks!
-
-
--Olof
+> thanks
+> Ganapat
+>
+> On Tue, Jan 24, 2017 at 4:02 AM, Jeremy Linton <jeremy.linton@arm.com> wrote:
+>> This patch expands and reworks the patches published by Mark Salter
+>> in order to clean up a few of the previous review comments, as well as
+>> add support for newer CPUs and big/little configurations.
+>>
+>> v14:
+>> - drop rename patch requested for v6
+>> - Shuffle couple include lines from one patch to a later
+>>   patch.
+>>
+>> v13:
+>> - Correct int/bool conversion bug in pmu_acpi_init()
+>>   created during v10 code shuffle
+>>
+>> v12:
+>> - Rebase to 4.10
+>> - Removed lock in the hotplug path.
+>>
+>> v11:
+>> - Add is_smp() check to read_specific_cpuid() for arch/arm. Update
+>>   c_show() and various routines in arm_pmu_acpi() to use the macro.
+>> - Moved the duplicate "generic" pmu detection code into its own
+>>   patch and hoist it into arm_pmu_device_probe() so it works
+>>   for DT based systems as well.
+>>
+>> v10:
+>> - Rebase to 4.9
+>> - Rework the arm_perf_start_cpu changes to support the 4.9 hotplug
+>>   changes.
+>> - Remove the call to acpi_register_gsi() from the cpu online code path.
+>>   Instead the GSI's are registered during the initcall. This changes
+>>   the error handling a bit because we now try to clean up the
+>>   previously registered GSIs in a couple important places. This
+>>   was also a result of the rebase.
+>> - Dropped the MIDR partnumber usage, its no longer necessary to
+>>   differentiate by only the partnum, so this helps to clarify the code
+>>   a bit.
+>> - Shuffle some code around and rename a few variables.
+>> - Added a few comments to hopefully clarify some questions people have
+>>   previously had about unused MADT entries, skipping processing cores
+>>   with MIDR=0, etc.
+>>
+>> v9:
+>> - Add/cleanup an additional hotplug patch I've had sitting around. This
+>>   patch brings the ACPI PMU mostly on par with the DT functionality with
+>>   respect to having CPUs offline during boot. This should help clarify
+>>   some of the code structuring.
+>> - Cleanup the list of PMU types early if we fail to allocate memory for an
+>>   additional pmu type.
+>>
+>> v8:
+>> - Rebase to 4.8rc4
+>> - Assorted minor comment/hunk placement/etc tweaks per Punit Agrawal
+>>
+>> v7:
+>> - Rebase to 4.8rc3
+>> - Remove cpu affinity sysfs entry. While providing a CPU mask for
+>>   ARMv8 PMU's is really helpful in big/little environments, reworking
+>>   the PMU code to support the cpumask attribute for !arm64 PMUs is out
+>>   of the scope of this patch set.
+>> - Fix CPU miscount problem where an alloc failure followed by successfully
+>>   allocating the structure can result in under counting the CPUs associated
+>>   with the PMU. This bug was created in v6 with the conversion to a linked
+>>   list.
+>> - Remove initial platform device creation code by Mark Salter, and re-squash
+>>   multiple platform device creation code together with helper routines.
+>>   Other minor tweakage.
+>>
+>> v6:
+>> - Added cpu affinity sysfs entry
+>> - Converted pmu_types array, to linked list
+>> - Restrict use of the armv8_pmu_probe_table to ACPI systems
+>> - Rename MADT parsing routines in smp.c
+>> - Convert sysfs PMU name to use index rather than partnum
+>> - Remove pr_devel statements
+>> - Other Minor cleanups
+>> - Add Partial Ack-by Will Deacon
+>>
+>> v5:
+>> - Remove list of CPU types for ACPI systems. We now match a generic
+>>   event list, and use the PMCIED[01] to select events which exist on
+>>   the given PMU. This avoids the need to update the kernel every time
+>>   a new CPU is released.
+>> - Update the maintainers list to include the new file.
+>>
+>> v4:
+>> - Correct build issues with ARM (!ARM64) kernels.
+>> - Add ThunderX to list of PMU types.
+>>
+>>
+>> Jeremy Linton (5):
+>>   arm: arm64: Add routine to determine cpuid of other cpus
+>>   arm: arm64: pmu: Assign platform PMU CPU affinity
+>>   arm64: pmu: Detect multiple generic PMUs and append counter
+>>   arm64: pmu: Detect and enable multiple PMUs in an ACPI system
+>>   arm: pmu: Add PMU definitions for cores not initially online
+>>
+>> Mark Salter (1):
+>>   arm64: pmu: Cache PMU interrupt numbers from MADT parse
+>>
+>>  arch/arm/include/asm/cputype.h   |   4 +
+>>  arch/arm/kernel/setup.c          |   2 +-
+>>  arch/arm64/include/asm/cputype.h |   3 +
+>>  arch/arm64/kernel/perf_event.c   |   2 +-
+>>  arch/arm64/kernel/smp.c          |   5 +
+>>  drivers/perf/Kconfig             |   4 +
+>>  drivers/perf/Makefile            |   1 +
+>>  drivers/perf/arm_pmu.c           | 103 +++++++++++++--
+>>  drivers/perf/arm_pmu_acpi.c      | 271 +++++++++++++++++++++++++++++++++++++++
+>>  include/linux/perf/arm_pmu.h     |  12 ++
+>>  10 files changed, 393 insertions(+), 14 deletions(-)
+>>  create mode 100644 drivers/perf/arm_pmu_acpi.c
+>>
+>> --
+>> 2.7.4
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
