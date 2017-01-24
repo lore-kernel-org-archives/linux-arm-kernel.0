@@ -1,194 +1,305 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 24 Jan 2017 17:49:58 +0900
-Subject: [PATCH v30 04/11] arm64: mm: allow for unmapping memory region from
- kernel mapping
+Date: Tue, 24 Jan 2017 17:50:00 +0900
+Subject: [PATCH v30 06/11] arm64: kdump: implement machine_crash_shutdown()
 In-Reply-To: <20170124084638.3770-1-takahiro.akashi@linaro.org>
 References: <20170124084638.3770-1-takahiro.akashi@linaro.org>
-Message-ID: <20170124085004.3892-3-takahiro.akashi@linaro.org>
+Message-ID: <20170124085004.3892-5-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current implementation of create_mapping_late() is only allowed
-to modify permission attributes (read-only or read-write) against
-the existing kernel mapping.
+Primary kernel calls machine_crash_shutdown() to shut down non-boot cpus
+and save registers' status in per-cpu ELF notes before starting crash
+dump kernel. See kernel_kexec().
+Even if not all secondary cpus have shut down, we do kdump anyway.
 
-In this patch, PAGE_KERNEL_INVALID protection attribute is introduced.
-We will now be able to invalidate (or unmap) some part of the existing
-kernel mapping by specifying PAGE_KERNEL_INVALID to create_mapping_late().
-
-This feature will be used in a suceeding kdump patch to protect
-the memory reserved for crash dump kernel once after loaded.
+As we don't have to make non-boot(crashed) cpus offline (to preserve
+correct status of cpus at crash dump) before shutting down, this patch
+also adds a variant of smp_send_stop().
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Reviewed-by: James Morse <james.morse@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/include/asm/mmu.h           |  2 ++
- arch/arm64/include/asm/pgtable-hwdef.h |  2 ++
- arch/arm64/include/asm/pgtable-prot.h  |  1 +
- arch/arm64/include/asm/pgtable.h       |  4 ++++
- arch/arm64/mm/mmu.c                    | 29 ++++++++++++++++++++---------
- 5 files changed, 29 insertions(+), 9 deletions(-)
+ arch/arm64/include/asm/hardirq.h  |  2 +-
+ arch/arm64/include/asm/kexec.h    | 42 +++++++++++++++++++++++++-
+ arch/arm64/include/asm/smp.h      |  2 ++
+ arch/arm64/kernel/machine_kexec.c | 55 +++++++++++++++++++++++++++++++---
+ arch/arm64/kernel/smp.c           | 63 +++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 158 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index 47619411f0ff..a6c1367527bc 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -36,6 +36,8 @@ extern void init_mem_pgprot(void);
- extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
- 			       unsigned long virt, phys_addr_t size,
- 			       pgprot_t prot, bool page_mappings_only);
-+extern void create_mapping_late(phys_addr_t phys, unsigned long virt,
-+				phys_addr_t size, pgprot_t prot);
- extern void *fixmap_remap_fdt(phys_addr_t dt_phys);
+diff --git a/arch/arm64/include/asm/hardirq.h b/arch/arm64/include/asm/hardirq.h
+index 8740297dac77..1473fc2f7ab7 100644
+--- a/arch/arm64/include/asm/hardirq.h
++++ b/arch/arm64/include/asm/hardirq.h
+@@ -20,7 +20,7 @@
+ #include <linux/threads.h>
+ #include <asm/irq.h>
  
- #endif
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index eb0c2bd90de9..e66efec31ca9 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -119,6 +119,7 @@
- #define PUD_TABLE_BIT		(_AT(pgdval_t, 1) << 1)
- #define PUD_TYPE_MASK		(_AT(pgdval_t, 3) << 0)
- #define PUD_TYPE_SECT		(_AT(pgdval_t, 1) << 0)
-+#define PUD_VALID		PUD_TYPE_SECT
+-#define NR_IPI	6
++#define NR_IPI	7
  
- /*
-  * Level 2 descriptor (PMD).
-@@ -128,6 +129,7 @@
- #define PMD_TYPE_TABLE		(_AT(pmdval_t, 3) << 0)
- #define PMD_TYPE_SECT		(_AT(pmdval_t, 1) << 0)
- #define PMD_TABLE_BIT		(_AT(pmdval_t, 1) << 1)
-+#define PMD_VALID		PMD_TYPE_SECT
- 
- /*
-  * Section
-diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
-index 2142c7726e76..945d84cd5df7 100644
---- a/arch/arm64/include/asm/pgtable-prot.h
-+++ b/arch/arm64/include/asm/pgtable-prot.h
-@@ -54,6 +54,7 @@
- #define PAGE_KERNEL_ROX		__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
- #define PAGE_KERNEL_EXEC	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE)
- #define PAGE_KERNEL_EXEC_CONT	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_CONT)
-+#define PAGE_KERNEL_INVALID	__pgprot(0)
- 
- #define PAGE_HYP		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_HYP_XN)
- #define PAGE_HYP_EXEC		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY)
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index ffbb9a520563..1904a7c07018 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -364,6 +364,8 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
- 
- #define pmd_bad(pmd)		(!(pmd_val(pmd) & PMD_TABLE_BIT))
- 
-+#define pmd_valid(pmd)		(!!(pmd_val(pmd) & PMD_VALID))
+ typedef struct {
+ 	unsigned int __softirq_pending;
+diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
+index 04744dc5fb61..f40ace1fa21a 100644
+--- a/arch/arm64/include/asm/kexec.h
++++ b/arch/arm64/include/asm/kexec.h
+@@ -40,7 +40,47 @@
+ static inline void crash_setup_regs(struct pt_regs *newregs,
+ 				    struct pt_regs *oldregs)
+ {
+-	/* Empty routine needed to avoid build errors. */
++	if (oldregs) {
++		memcpy(newregs, oldregs, sizeof(*newregs));
++	} else {
++		u64 tmp1, tmp2;
 +
- #define pmd_table(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
- 				 PMD_TYPE_TABLE)
- #define pmd_sect(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
-@@ -428,6 +430,7 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
- 
- #define pud_none(pud)		(!pud_val(pud))
- #define pud_bad(pud)		(!(pud_val(pud) & PUD_TABLE_BIT))
-+#define pud_valid(pud)		(!!(pud_val(pud) & PUD_VALID))
- #define pud_present(pud)	(pud_val(pud))
- 
- static inline void set_pud(pud_t *pudp, pud_t pud)
-@@ -481,6 +484,7 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
- 
- #define pgd_none(pgd)		(!pgd_val(pgd))
- #define pgd_bad(pgd)		(!(pgd_val(pgd) & 2))
-+#define pgd_valid(pgd)		(!!(pgd_val(pgd) & 1))
- #define pgd_present(pgd)	(pgd_val(pgd))
- 
- static inline void set_pgd(pgd_t *pgdp, pgd_t pgd)
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 17243e43184e..9c7adcce8e4e 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -133,7 +133,8 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 		 * Set the contiguous bit for the subsequent group of PTEs if
- 		 * its size and alignment are appropriate.
- 		 */
--		if (((addr | PFN_PHYS(pfn)) & ~CONT_PTE_MASK) == 0) {
-+		if ((pgprot_val(prot) & PTE_VALID) &&
-+		    (((addr | PFN_PHYS(pfn)) & ~CONT_PTE_MASK) == 0)) {
- 			if (end - addr >= CONT_PTE_SIZE && !page_mappings_only)
- 				__prot = __pgprot(pgprot_val(prot) | PTE_CONT);
- 			else
-@@ -147,7 +148,8 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 		 * After the PTE entry has been populated once, we
- 		 * only allow updates to the permission attributes.
- 		 */
--		BUG_ON(!pgattr_change_is_safe(pte_val(old_pte), pte_val(*pte)));
-+		BUG_ON(pte_valid(old_pte) && pte_valid(*pte) &&
-+		       !pgattr_change_is_safe(pte_val(old_pte), pte_val(*pte)));
- 
- 	} while (pte++, addr += PAGE_SIZE, addr != end);
- 
-@@ -190,7 +192,8 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
- 			 * Set the contiguous bit for the subsequent group of
- 			 * PMDs if its size and alignment are appropriate.
- 			 */
--			if (((addr | phys) & ~CONT_PMD_MASK) == 0) {
-+			if ((pgprot_val(prot) | PMD_VALID) &&
-+			    ((addr | phys) & ~CONT_PMD_MASK) == 0) {
- 				if (end - addr >= CONT_PMD_SIZE)
- 					__prot = __pgprot(pgprot_val(prot) |
- 							  PTE_CONT);
-@@ -203,7 +206,8 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
- 			 * After the PMD entry has been populated once, we
- 			 * only allow updates to the permission attributes.
- 			 */
--			BUG_ON(!pgattr_change_is_safe(pmd_val(old_pmd),
-+			BUG_ON(pmd_valid(old_pmd) && pmd_valid(*pmd) &&
-+			       !pgattr_change_is_safe(pmd_val(old_pmd),
- 						      pmd_val(*pmd)));
- 		} else {
- 			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
-@@ -263,7 +267,8 @@ static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
- 			 * After the PUD entry has been populated once, we
- 			 * only allow updates to the permission attributes.
- 			 */
--			BUG_ON(!pgattr_change_is_safe(pud_val(old_pud),
-+			BUG_ON(pud_valid(old_pud) && pud_valid(*pud) &&
-+			       !pgattr_change_is_safe(pud_val(old_pud),
- 						      pud_val(*pud)));
- 		} else {
- 			alloc_init_pmd(pud, addr, next, phys, prot,
-@@ -344,8 +349,8 @@ void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
- 			     pgd_pgtable_alloc, page_mappings_only);
++		__asm__ __volatile__ (
++			"stp	 x0,   x1, [%2, #16 *  0]\n"
++			"stp	 x2,   x3, [%2, #16 *  1]\n"
++			"stp	 x4,   x5, [%2, #16 *  2]\n"
++			"stp	 x6,   x7, [%2, #16 *  3]\n"
++			"stp	 x8,   x9, [%2, #16 *  4]\n"
++			"stp	x10,  x11, [%2, #16 *  5]\n"
++			"stp	x12,  x13, [%2, #16 *  6]\n"
++			"stp	x14,  x15, [%2, #16 *  7]\n"
++			"stp	x16,  x17, [%2, #16 *  8]\n"
++			"stp	x18,  x19, [%2, #16 *  9]\n"
++			"stp	x20,  x21, [%2, #16 * 10]\n"
++			"stp	x22,  x23, [%2, #16 * 11]\n"
++			"stp	x24,  x25, [%2, #16 * 12]\n"
++			"stp	x26,  x27, [%2, #16 * 13]\n"
++			"stp	x28,  x29, [%2, #16 * 14]\n"
++			"mov	 %0,  sp\n"
++			"stp	x30,  %0,  [%2, #16 * 15]\n"
++
++			"/* faked current PSTATE */\n"
++			"mrs	 %0, CurrentEL\n"
++			"mrs	 %1, SPSEL\n"
++			"orr	 %0, %0, %1\n"
++			"mrs	 %1, DAIF\n"
++			"orr	 %0, %0, %1\n"
++			"mrs	 %1, NZCV\n"
++			"orr	 %0, %0, %1\n"
++			/* pc */
++			"adr	 %1, 1f\n"
++		"1:\n"
++			"stp	 %1, %0,   [%2, #16 * 16]\n"
++			: "=&r" (tmp1), "=&r" (tmp2)
++			: "r" (newregs)
++			: "memory"
++		);
++	}
  }
  
--static void create_mapping_late(phys_addr_t phys, unsigned long virt,
--				  phys_addr_t size, pgprot_t prot)
-+void create_mapping_late(phys_addr_t phys, unsigned long virt,
-+			 phys_addr_t size, pgprot_t prot)
- {
- 	if (virt < VMALLOC_START) {
- 		pr_warn("BUG: not creating mapping for %pa@0x%016lx - outside kernel range\n",
-@@ -791,14 +796,20 @@ int __init arch_ioremap_pmd_supported(void)
- int pud_set_huge(pud_t *pud, phys_addr_t phys, pgprot_t prot)
- {
- 	BUG_ON(phys & ~PUD_MASK);
--	set_pud(pud, __pud(phys | PUD_TYPE_SECT | pgprot_val(mk_sect_prot(prot))));
-+	set_pud(pud, __pud(phys |
-+			   ((pgprot_val(prot) & PUD_VALID) ?
-+					PUD_TYPE_SECT : 0) |
-+			   pgprot_val(mk_sect_prot(prot))));
- 	return 1;
+ #endif /* __ASSEMBLY__ */
+diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
+index d050d720a1b4..cea009f2657d 100644
+--- a/arch/arm64/include/asm/smp.h
++++ b/arch/arm64/include/asm/smp.h
+@@ -148,6 +148,8 @@ static inline void cpu_panic_kernel(void)
+  */
+ bool cpus_are_stuck_in_kernel(void);
+ 
++extern void smp_send_crash_stop(void);
++
+ #endif /* ifndef __ASSEMBLY__ */
+ 
+ #endif /* ifndef __ASM_SMP_H */
+diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+index f7938fecf3ff..d56ea8c805a8 100644
+--- a/arch/arm64/kernel/machine_kexec.c
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -9,6 +9,9 @@
+  * published by the Free Software Foundation.
+  */
+ 
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/kernel.h>
+ #include <linux/kexec.h>
+ #include <linux/smp.h>
+ 
+@@ -161,7 +164,8 @@ void machine_kexec(struct kimage *kimage)
+ 	/*
+ 	 * New cpus may have become stuck_in_kernel after we loaded the image.
+ 	 */
+-	BUG_ON(cpus_are_stuck_in_kernel() || (num_online_cpus() > 1));
++	BUG_ON((cpus_are_stuck_in_kernel() || (num_online_cpus() > 1)) &&
++			!WARN_ON(kimage == kexec_crash_image));
+ 
+ 	reboot_code_buffer_phys = page_to_phys(kimage->control_code_page);
+ 
+@@ -200,15 +204,58 @@ void machine_kexec(struct kimage *kimage)
+ 	 * relocation is complete.
+ 	 */
+ 
+-	cpu_soft_restart(1, reboot_code_buffer_phys, kimage->head,
+-		kimage->start, 0);
++	cpu_soft_restart(kimage != kexec_crash_image,
++		reboot_code_buffer_phys, kimage->head, kimage->start, 0);
+ 
+ 	BUG(); /* Should never get here. */
  }
  
- int pmd_set_huge(pmd_t *pmd, phys_addr_t phys, pgprot_t prot)
++static void machine_kexec_mask_interrupts(void)
++{
++	unsigned int i;
++	struct irq_desc *desc;
++
++	for_each_irq_desc(i, desc) {
++		struct irq_chip *chip;
++		int ret;
++
++		chip = irq_desc_get_chip(desc);
++		if (!chip)
++			continue;
++
++		/*
++		 * First try to remove the active state. If this
++		 * fails, try to EOI the interrupt.
++		 */
++		ret = irq_set_irqchip_state(i, IRQCHIP_STATE_ACTIVE, false);
++
++		if (ret && irqd_irq_inprogress(&desc->irq_data) &&
++		    chip->irq_eoi)
++			chip->irq_eoi(&desc->irq_data);
++
++		if (chip->irq_mask)
++			chip->irq_mask(&desc->irq_data);
++
++		if (chip->irq_disable && !irqd_irq_disabled(&desc->irq_data))
++			chip->irq_disable(&desc->irq_data);
++	}
++}
++
++/**
++ * machine_crash_shutdown - shutdown non-crashing cpus and save registers
++ */
+ void machine_crash_shutdown(struct pt_regs *regs)
  {
- 	BUG_ON(phys & ~PMD_MASK);
--	set_pmd(pmd, __pmd(phys | PMD_TYPE_SECT | pgprot_val(mk_sect_prot(prot))));
-+	set_pmd(pmd, __pmd(phys |
-+			   ((pgprot_val(prot) & PMD_VALID) ?
-+					PMD_TYPE_SECT : 0) |
-+			   pgprot_val(mk_sect_prot(prot))));
- 	return 1;
+-	/* Empty routine needed to avoid build errors. */
++	local_irq_disable();
++
++	/* shutdown non-crashing cpus */
++	smp_send_crash_stop();
++
++	/* for crashing cpu */
++	crash_save_cpu(regs, smp_processor_id());
++	machine_kexec_mask_interrupts();
++
++	pr_info("Starting crashdump kernel...\n");
  }
  
+ void arch_kexec_protect_crashkres(void)
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index cb87234cfcf2..446c6d48f8ec 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -37,6 +37,7 @@
+ #include <linux/completion.h>
+ #include <linux/of.h>
+ #include <linux/irq_work.h>
++#include <linux/kexec.h>
+ 
+ #include <asm/alternative.h>
+ #include <asm/atomic.h>
+@@ -74,6 +75,7 @@ enum ipi_msg_type {
+ 	IPI_RESCHEDULE,
+ 	IPI_CALL_FUNC,
+ 	IPI_CPU_STOP,
++	IPI_CPU_CRASH_STOP,
+ 	IPI_TIMER,
+ 	IPI_IRQ_WORK,
+ 	IPI_WAKEUP
+@@ -753,6 +755,7 @@ static const char *ipi_types[NR_IPI] __tracepoint_string = {
+ 	S(IPI_RESCHEDULE, "Rescheduling interrupts"),
+ 	S(IPI_CALL_FUNC, "Function call interrupts"),
+ 	S(IPI_CPU_STOP, "CPU stop interrupts"),
++	S(IPI_CPU_CRASH_STOP, "CPU stop (for crash dump) interrupts"),
+ 	S(IPI_TIMER, "Timer broadcast interrupts"),
+ 	S(IPI_IRQ_WORK, "IRQ work interrupts"),
+ 	S(IPI_WAKEUP, "CPU wake-up interrupts"),
+@@ -827,6 +830,29 @@ static void ipi_cpu_stop(unsigned int cpu)
+ 		cpu_relax();
+ }
+ 
++#ifdef CONFIG_KEXEC_CORE
++static atomic_t waiting_for_crash_ipi;
++#endif
++
++static void ipi_cpu_crash_stop(unsigned int cpu, struct pt_regs *regs)
++{
++#ifdef CONFIG_KEXEC_CORE
++	crash_save_cpu(regs, cpu);
++
++	atomic_dec(&waiting_for_crash_ipi);
++
++	local_irq_disable();
++
++#ifdef CONFIG_HOTPLUG_CPU
++	if (cpu_ops[cpu]->cpu_die)
++		cpu_ops[cpu]->cpu_die(cpu);
++#endif
++
++	/* just in case */
++	cpu_park_loop();
++#endif
++}
++
+ /*
+  * Main handler for inter-processor interrupts
+  */
+@@ -857,6 +883,15 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+ 		irq_exit();
+ 		break;
+ 
++	case IPI_CPU_CRASH_STOP:
++		if (IS_ENABLED(CONFIG_KEXEC_CORE)) {
++			irq_enter();
++			ipi_cpu_crash_stop(cpu, regs);
++
++			unreachable();
++		}
++		break;
++
+ #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
+ 	case IPI_TIMER:
+ 		irq_enter();
+@@ -929,6 +964,34 @@ void smp_send_stop(void)
+ 			   cpumask_pr_args(cpu_online_mask));
+ }
+ 
++#ifdef CONFIG_KEXEC_CORE
++void smp_send_crash_stop(void)
++{
++	cpumask_t mask;
++	unsigned long timeout;
++
++	if (num_online_cpus() == 1)
++		return;
++
++	cpumask_copy(&mask, cpu_online_mask);
++	cpumask_clear_cpu(smp_processor_id(), &mask);
++
++	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
++
++	pr_crit("SMP: stopping secondary CPUs\n");
++	smp_cross_call(&mask, IPI_CPU_CRASH_STOP);
++
++	/* Wait up to one second for other CPUs to stop */
++	timeout = USEC_PER_SEC;
++	while ((atomic_read(&waiting_for_crash_ipi) > 0) && timeout--)
++		udelay(1);
++
++	if (atomic_read(&waiting_for_crash_ipi) > 0)
++		pr_warning("SMP: failed to stop secondary CPUs %*pbl\n",
++			   cpumask_pr_args(cpu_online_mask));
++}
++#endif
++
+ /*
+  * not supported here
+  */
 -- 
 2.11.0
