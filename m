@@ -1,73 +1,58 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 24 Jan 2017 11:31:18 +0100
-Subject: [PATCH v1 2/2] arm: dts: mt2701: add nor flash node
-In-Reply-To: <1485052600.19995.10.camel@mhfsdcap03>
-References: <d7b866ad-5b2f-62d3-3aa3-6fa42803d625@gmail.com>
- <b850b751-1d8d-0053-cf1f-d5314542e5c3@gmail.com>
- <20170113172825.75d545a3@bbrezillon>
- <86c997be-f500-eaa1-3ba5-d21cff6223b7@gmail.com>
- <20170113175628.1793f433@bbrezillon>
- <0fafcd8d-cf99-de6b-728f-5e3637810b68@gmail.com>
- <20170114092958.022f2fc8@bbrezillon>
- <e7fa1542-f0e2-0e45-23b3-25d6491ae40d@gmail.com>
- <20170116094032.6f471f11@bbrezillon>
- <20170117143650.5db87148@free-electrons.com>
- <20170118222010.ivc6jxpnrumemvdf@rob-hp-laptop>
- <20170119103829.524ce715@free-electrons.com>
- <CAL_Jsq+EyHtC7THLCJcwgtVtVESMOdmi3T3bBxgOqJt6BCtCHQ@mail.gmail.com>
- <20170119091428.598eb987@bbrezillon>
- <CAL_Jsq+S-FYy4SmjJ3fWzBugw2zCj5TQkkfUA8QVL7SLJW3E1g@mail.gmail.com>
- <1485052600.19995.10.camel@mhfsdcap03>
-Message-ID: <20170124113118.304a860c@bbrezillon>
+From: abailon@baylibre.com (Alexandre Bailon)
+Date: Tue, 24 Jan 2017 11:32:26 +0100
+Subject: [PATCH v2] arm: davinci: Make the usb20 clock available to PM runtime
+Message-ID: <20170124103226.15377-1-abailon@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 22 Jan 2017 10:36:40 +0800
-Guochun Mao <guochun.mao@mediatek.com> wrote:
+Add usb20 to the list of clock supported by PM runtime.
 
-> Hi,
-> On Thu, 2017-01-19 at 08:18 -0600, Rob Herring wrote:
-> > On Thu, Jan 19, 2017 at 2:14 AM, Boris Brezillon  
-> > > One last question and I'm done: is something like that acceptable?
-> > >
-> > >         compatible = "<vendor>,<old-soc>","<vendor>,<new-soc>";
-> > >
-> > > This can happen when someone adds support for an unsupported feature
-> > > on a brand new SoC, and then someone else use the same driver for an
-> > > older SoC embedding the same IP but still wants to add a new compatible
-> > > just in case these 2 IPs appear to be slightly different.  
-> > 
-> > Yes, it's old and new compatible strings in this case and it's newest
-> > compatible string first.
-> >   
-> > > Here the order of compat strings is no longer following a clear rule
-> > > like 'most-specific compatible first' or 'newest IP/SoC version first',
-> > > it's completely dependent on the order these IPs were supported in the
-> > > OS (Linux). I'm perfectly fine with that BTW, just want to make sure
-> > > this is authorized.  
-> > 
-> > I guess we should say "newest compatible for IP first" instead. There
-> > are some exceptions where we add fallbacks later on, but that falls
-> > under the most-specific part.
-> > 
-> > It's order that the bindings are defined, not Linux support really,
-> > but in practice those are the same.
-> > 
-> > Rob  
-> 
-> Thanks for all your effort for code reviewing.
-> Our mt2701-nor's hardware is designed base on mt8713-nor,
-> even so, there would be some slight difference.
-> If I don't misunderstand your viewpoint in this discussion,
-> there's no need to drop mt2701-nor compatible.
+Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+Suggested-by: Sekhar Nori <nsekhar@ti.com>
+---
+ arch/arm/mach-davinci/da830.c     | 2 +-
+ arch/arm/mach-davinci/da850.c     | 2 +-
+ arch/arm/mach-davinci/usb-da8xx.c | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-No, just update the documentation as suggested by Rob.
-
-> And if not, is there any other suggestion?
-
-Nope, and my apologies for being so insistent on something I obviously
-misunderstood.
-
-Regards,
-
-Boris
+diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
+index 073c458..2cfd9d7 100644
+--- a/arch/arm/mach-davinci/da830.c
++++ b/arch/arm/mach-davinci/da830.c
+@@ -412,7 +412,7 @@ static struct clk_lookup da830_clks[] = {
+ 	CLK("davinci-mcasp.0",	NULL,		&mcasp0_clk),
+ 	CLK("davinci-mcasp.1",	NULL,		&mcasp1_clk),
+ 	CLK("davinci-mcasp.2",	NULL,		&mcasp2_clk),
+-	CLK("musb-da8xx",	"usb20",	&usb20_clk),
++	CLK("musb-da8xx",	NULL,		&usb20_clk),
+ 	CLK(NULL,		"aemif",	&aemif_clk),
+ 	CLK(NULL,		"aintc",	&aintc_clk),
+ 	CLK(NULL,		"secu_mgr",	&secu_mgr_clk),
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index 9780829..5fe32ae 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -559,7 +559,7 @@ static struct clk_lookup da850_clks[] = {
+ 	CLK("ti-aemif",		NULL,		&aemif_clk),
+ 	CLK("davinci-nand.0",	"aemif",	&aemif_nand_clk),
+ 	CLK("ohci-da8xx",	"usb11",	&usb11_clk),
+-	CLK("musb-da8xx",	"usb20",	&usb20_clk),
++	CLK("musb-da8xx",	NULL,		&usb20_clk),
+ 	CLK("spi_davinci.0",	NULL,		&spi0_clk),
+ 	CLK("spi_davinci.1",	NULL,		&spi1_clk),
+ 	CLK("vpif",		NULL,		&vpif_clk),
+diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
+index 9a6af0b..9b66768 100644
+--- a/arch/arm/mach-davinci/usb-da8xx.c
++++ b/arch/arm/mach-davinci/usb-da8xx.c
+@@ -275,7 +275,7 @@ int __init da8xx_register_usb20_phy_clk(bool use_usb_refclkin)
+ 	struct clk *parent;
+ 	int ret;
+ 
+-	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
++	usb20_clk = clk_get(&da8xx_usb20_dev.dev, NULL);
+ 	ret = PTR_ERR_OR_ZERO(usb20_clk);
+ 	if (ret)
+ 		return ret;
+-- 
+2.10.2
