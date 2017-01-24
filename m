@@ -1,54 +1,53 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 24 Jan 2017 12:40:11 -0800
-Subject: [PATCH 6/9] power_supply: wm97xx_battery: use
- power_supply_get_drvdata
-In-Reply-To: <87h94odic0.fsf@belgarion.home>
-References: <1477510907-23495-1-git-send-email-robert.jarzmik@free.fr>
- <1477510907-23495-7-git-send-email-robert.jarzmik@free.fr>
- <CAOi56cVk17w6C6msnT88c0Zh1OgLM=FbZAw32MzLRatjFraYhg@mail.gmail.com>
- <87h94odic0.fsf@belgarion.home>
-Message-ID: <20170124204011.GH27969@dtor-ws>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 24 Jan 2017 21:47:35 +0100
+Subject: [PATCH 00/22] Conversion of ARMv4 Gemini to DT and multiplatform
+In-Reply-To: <alpine.LNX.2.00.1701241734140.2736@T420s>
+References: <20170122121506.9995-1-linus.walleij@linaro.org>
+ <8e705d3a-ff99-23b2-c4c9-2edccf134cac@gmail.com>
+ <CACRpkdbdsNU6pOcewyZw_jpXzXvm_aj0FURY7Ty5FkT227iZ=Q@mail.gmail.com>
+ <alpine.LNX.2.00.1701241734140.2736@T420s>
+Message-ID: <CACRpkdY1A8QbKVV0-ZFeH-n0zYpmJkoGj5vA0Ov-DDhBTJf5_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2017 at 08:31:59AM +0100, Robert Jarzmik wrote:
-> Kevin Hilman <khilman@kernel.org> writes:
-> 
-> > Hello,
-> >
-> > On Wed, Oct 26, 2016 at 12:41 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> >> As the power supply framework provides a way to store and retrieve
-> >> private supply data, use it.
-> >>
-> >> In the process, change the platform data for wm97xx_battery from a
-> >> container of a single struct wm97xx_batt_pdata to the direct point to wm97xx_batt_pdata.
-> >>
-> >> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> >
-> > kernelci.org has been reporting that the tegra20-iris board has been
-> > failing in -next since next-20161123[1], and also in mainline
-> > v4.10-rc.  I finally took the time to bisect, and it pointed to this
-> > patch.  I verified that reverting $SUBJECT patch[2] on top of
-> > v4.10-rc5 fixes the problem.
-> >
-> > Kevin
-> >
-> > [1] https://kernelci.org/boot/id/5879a3fe59b5141534f6c3ac/
-> > [2] in mainline as commit: 6480af4915d6 power_supply: wm97xx_battery:
-> > use power_supply_get_drvdata
-> 
-> Hi Kevin,
-> 
-> There is a fix posted in here :
-> https://patchwork.kernel.org/patch/9499231/
-> 
-> I don't know if it's related, as I have no Oops signature nor any data to be
-> able to help further.
+Hans, Florian et al: does any of you have a copy of the kernel source
+dump(s) from Teltonika, Raidsonic or Wiliboard?
 
-I picked up the patch from patchwork and will send it on to Linus in the
-next day or so.
+Would be nice to have the stuff that vendors are using.
 
-Thanks.
+On Tue, Jan 24, 2017 at 6:24 PM, Hans Ulli Kroll
+<ulli.kroll@googlemail.com> wrote:
 
--- 
-Dmitry
+> AFAICR
+> This is a dual GMAC !
+>
+> They are two different base address for each GMAC and one shared
+> base address for both of them.
+> This is all in one address space which remaps the driver.
+>
+> And to make it worse two interrupt lines, one of them is also shared.
+>
+> Any ideas to "convert" this into DT ??
+> Because I think it's impossible to split both GMAC interfaces ??
+
+Sounds odd.  Yeah hardware.h lists this:
+
+#define GEMINI_TOE_BASE         0x60000000
+#define GEMINI_GMAC0_BASE       0x6000A000
+#define GEMINI_GMAC1_BASE       0x6000E000
+
+I guess one approach is to make a driver handling all of it in one,
+let it ioremap all regions and support one or two GMACs on the same
+TOE. More complex solutions is to share the TOE using
+syscons regmap mechanism but it looks cumbersome.
+
+{
+   compatible = "cortina,genesis-gmac-ethernet";
+   reg = <0x60000000 0xa000>, <0x6000a000 0x4000>, <0x6000e000 0x4000>;
+   interrupts = <1 IRQ_TYPE_LEVEL_HIGH>, <2 IRQ_TYPE_LEVEL_HIGH>;
+}
+
+Or something like that?
+
+Yours,
+Linus Walleij
