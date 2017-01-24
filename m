@@ -1,44 +1,93 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Tue, 24 Jan 2017 09:27:44 -0500
-Subject: [PATCH v3 2/5] arm64: Work around Falkor erratum 1003
-In-Reply-To: <20170112161214.GB12583@leverpostej>
-References: <20170111144118.17062-1-cov@codeaurora.org>
- <20170111144118.17062-2-cov@codeaurora.org>
- <20170111180627.GG20288@e104818-lin.cambridge.arm.com>
- <278a45c0-bd49-b8a2-63ae-80ad851bab9b@arm.com>
- <20170111184052.GE29247@leverpostej>
- <20170112154548.twj2ktbfzbsarzbc@localhost>
- <20170112161214.GB12583@leverpostej>
-Message-ID: <ab7d621e-0ba2-f113-22fc-2866f9cba5f5@codeaurora.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 24 Jan 2017 06:30:39 -0800
+Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
+In-Reply-To: <20170124141548.GA14489@amd>
+References: <20170123124058.GA17134@amd> <20170123141331.GA11402@amd>
+ <da1f1b45-3ae5-ffe8-62c6-9ec7c3a1505b@roeck-us.net>
+ <20170123144031.GA7870@amd> <20170123232654.GA19342@amd>
+ <20170123234912.GA2460@roeck-us.net> <20170124070639.GA5068@rzhang1-surface>
+ <b6d1670c-a83f-55aa-efd1-e52adb297ac6@roeck-us.net>
+ <20170124141548.GA14489@amd>
+Message-ID: <44876c3d-158b-ecb3-2ae0-cd7cbf79ed29@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/2017 11:12 AM, Mark Rutland wrote:
-> On Thu, Jan 12, 2017 at 03:45:48PM +0000, Catalin Marinas wrote:
->> On Wed, Jan 11, 2017 at 06:40:52PM +0000, Mark Rutland wrote:
-> 
->>> Likewise, I beleive we may need to modify cpu_set_reserved_ttbr0().
+On 01/24/2017 06:15 AM, Pavel Machek wrote:
+> Hi!
+>
+>>>>>> /sys files related to battery no longer appear. I beieve this has
+>>>>>> something to do with it:
+>>>>>>
+>>>>>> [    2.374877] of_get_named_gpiod_flags: parsed 'reset-gpios' property
+>>>>>> of node '/ocp at 68000000/spi at 48098000/tsc2005 at 0[0]' - status (0)
+>>>>>> [    2.375946] input: TSC2005 touchscreen as
+>>>>>> /devices/platform/68000000.ocp/48098000.spi/spi_master/spi1/spi1.0/input/input5
+>>>>>> [    2.392120] rx51-battery: probe of n900-battery failed with error
+>>>>>> -22
+>>>>>
+>>>>> Mystery solved:
+>>>>>
+>>>>> diff --git a/drivers/hwmon/hwmon.c b/drivers/hwmon/hwmon.c
+>>>>> index 3932f92..fe5ec82 100644
+>>>>> --- a/drivers/hwmon/hwmon.c
+>>>>> +++ b/drivers/hwmon/hwmon.c
+>>>>> @@ -545,8 +545,10 @@ __hwmon_device_register(struct device *dev, const char *name, void *drvdata,
+>>>>> 	int i, j, err, id;
+>>>>>
+>>>>> 	/* Do not accept invalid characters in hwmon name attribute */
+>>>>> -	if (name && (!strlen(name) || strpbrk(name, "-* \t\n")))
+>>>>> +	if (name && (!strlen(name) || strpbrk(name, "-* \t\n"))) {
+>>>>> +		printk("hwmon: Invalid character detected: %s\n", name);
+>>>>> 		return ERR_PTR(-EINVAL);
+>>>>> +	}
+>>>>>
+>>>>> 	id = ida_simple_get(&hwmon_ida, 0, 0, GFP_KERNEL);
+>>>>> 	if (id < 0)
+>>>>>
+>>>>>
+>>>>> pavel at n900:~$ dmesg | grep -5 Invalid
+>>>>> [    0.829650] of_get_named_gpiod_flags: parsed 'gpio-reset' property
+>>>>> of node '/ocp at 68000000/i2c at 48072000/tlv320aic3x at 19[0]' - status (0)
+>>>>> [    0.833831] tsl2563 2-0029: model 7, rev. 0
+>>>>> [    0.837768] of_get_named_gpiod_flags: parsed 'enable-gpio' property
+>>>>> of node '/ocp at 68000000/i2c at 48072000/lp5523 at 32[0]' - status (0)
+>>>>> [    1.921417] omap_i2c 48072000.i2c: controller timed out
+>>>>> [    2.056823] lp5523x 2-0032: lp5523 Programmable led chip found
+>>>>> [    2.064147] hwmon: Invalid character detected: bq27200-0
+>>>>
+>>>> So the problem is really that the thermal driver needs to create a valid name.
+>>>>
+>>> Right.
+>>>
+>>> Before reverting, can you please try if this patch works or not?
+>
+>>> diff --git a/drivers/thermal/thermal_hwmon.c b/drivers/thermal/thermal_hwmon.c
+>>> index c4a508a..0c6789f 100644
+>>> --- a/drivers/thermal/thermal_hwmon.c
+>>> +++ b/drivers/thermal/thermal_hwmon.c
+>>> @@ -157,8 +157,8 @@ int thermal_add_hwmon_sysfs(struct thermal_zone_device *tz)
+>>>
+>>> 	INIT_LIST_HEAD(&hwmon->tz_list);
+>>> 	strlcpy(hwmon->type, tz->type, THERMAL_NAME_LENGTH);
+>>> -	hwmon->device = hwmon_device_register_with_info(NULL, hwmon->type,
+>>> -							hwmon, NULL, NULL);
+>>> +	hwmon->device = hwmon_device_register_with_info(NULL, NULL, NULL,
+>>> +							NULL, NULL);
 >>
->> This may be fine if my assumptions about this erratum are correct. In
->> the cpu_set_reserved_ttbr0() case we set TTBR0_EL1 to a table without
->> any entries, so no new entries could be tagged with the old ASID.
-> 
-> For some reason, I was under the impression that the issue was old table
-> entries being allocated to the new ASID. Looking over the series again,
-> it's not clear to me precisely which cases can occur.
-> 
-> It would be good to see that clarified.
+>> This is wrong. The name should be converted to a valid name. Otherwise you would
+>> still have to provide the name attribute yourself, and the resulting name would
+>> still be invalid. A simple fix would be to add
+>> 	strreplace(hwmon->type, '-', '_');
+>> after strlcpy().
+>
+> Simple, yes. But that will change userland interface. Is it okay thing
+> to do?
 
-I'll add more general background the commit message in the next revision
-and I've also asked directly about this. The answer is that page table
-entries using the new translation table base address will be allocated
-into the TLB using the old ASID. If employing the workaround, it's
-possible for page table entries using the new translation table base
-to be allocated into the TLB using the reserved ASID.
+Yes, because the old name is invalid. Note that the new API also changes the
+sysfs directory path. But, as mentioned separately, if providing valid
+names is unacceptable for thermal drivers, the thermal subsystem will have
+to stick with the old API (and I may create a patch to make the name attribute
+mandatory for the new API to prevent people from defeating the purpose
+of the conversion by not providing one).
 
-Cov
-
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
-Aurora Forum, a Linux Foundation Collaborative Project.
+Guenter
