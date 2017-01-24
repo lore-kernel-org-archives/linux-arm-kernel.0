@@ -1,72 +1,112 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 25 Jan 2017 06:00:59 +0800
-Subject: [PATCH 4/8] serial: st-asc: (De)Register GPIOD and swap Pinctrl
- profiles
-In-Reply-To: <20170124134310.27512-5-lee.jones@linaro.org>
-Message-ID: <201701250500.AYU14KMP%fengguang.wu@intel.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Tue, 24 Jan 2017 17:03:59 -0500
+Subject: [PATCH v3 3/5] arm64: Create and use __tlbi_dsb() macros
+In-Reply-To: <20170113161209.GI3253@arm.com>
+References: <20170111144118.17062-1-cov@codeaurora.org>
+ <20170111144118.17062-3-cov@codeaurora.org> <20170112165852.GH13843@arm.com>
+ <8f8057f5-d33f-15b3-de9f-6e718c23e97d@codeaurora.org>
+ <20170113161209.GI3253@arm.com>
+Message-ID: <968e0d85-164d-36ff-8f00-bee6ff2e875e@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+Hi Will,
 
-[auto build test ERROR on tty/tty-testing]
-[also build test ERROR on v4.10-rc5 next-20170124]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+On 01/13/2017 11:12 AM, Will Deacon wrote:
+> On Fri, Jan 13, 2017 at 10:12:36AM -0500, Christopher Covington wrote:
+>> On 01/12/2017 11:58 AM, Will Deacon wrote:
+>>> On Wed, Jan 11, 2017 at 09:41:16AM -0500, Christopher Covington wrote:
+>>>> +#define __tlbi_asm_dsb(as, op, attr, ...) do {				       \
+>>>> +		__TLBI_FOR(op, ##__VA_ARGS__)				       \
+>>>> +			asm (__TLBI_INSTR(op, ##__VA_ARGS__)		       \
+>>>> +			__TLBI_IO(op, ##__VA_ARGS__));			       \
+>>>> +		asm volatile (	     as			"\ndsb " #attr "\n"    \
+>>>> +		: : : "memory"); } while (0)
+>>>> +
+>>>> +#define __tlbi_dsb(...)	__tlbi_asm_dsb("", ##__VA_ARGS__)
+>>>
+>>> I can't deny that this is cool, but ultimately it's completely unreadable.
+>>> What I was thinking you'd do would be make __tlbi expand to:
+>>>
+>>>   tlbi
+>>>   dsb
+>>>   tlbi
+>>>   dsb
+>>>
+>>> for Falkor, and:
+>>>
+>>>   tlbi
+>>>   nop
+>>>   nop
+>>>   nop
+>>>
+>>> for everybody else.
 
-url:    https://github.com/0day-ci/linux/commits/Lee-Jones/serial-st-asc-Allow-handling-of-RTS-line/20170125-014618
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git tty-testing
-config: alpha-allyesconfig (attached as .config)
-compiler: alpha-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=alpha 
+I've implemented this (minus the last dsb / nop) in the next revision.
 
-All errors (new ones prefixed by >>):
+>> Thanks for the suggestion. So would __tlbi take a dsb sharability argument in
+>> your proposal? Or would it be communicated in some other fashion, maybe inferred
+>> from the tlbi argument? Or would the workaround dsbs all be the worst/broadest
+>> case?
+> 
+> I think always using inner-shareable should be ok. If you wanted to optimise
+> this, you'd want to avoid the workaround altogether for non-shareable
+> invalidation, but that's fairly rare and I doubt you'd be able to measure
+> the impact.
 
-   drivers/tty/serial/st-asc.c: In function 'asc_set_termios':
->> drivers/tty/serial/st-asc.c:568:4: error: implicit declaration of function 'pinctrl_select_state' [-Werror=implicit-function-declaration]
-       pinctrl_select_state(ascport->pinctrl,
-       ^~~~~~~~~~~~~~~~~~~~
-   drivers/tty/serial/st-asc.c: In function 'asc_init_port':
-   drivers/tty/serial/st-asc.c:755:21: error: implicit declaration of function 'devm_pinctrl_get' [-Werror=implicit-function-declaration]
-     ascport->pinctrl = devm_pinctrl_get(&pdev->dev);
-                        ^~~~~~~~~~~~~~~~
-   drivers/tty/serial/st-asc.c:755:19: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-     ascport->pinctrl = devm_pinctrl_get(&pdev->dev);
-                      ^
-   drivers/tty/serial/st-asc.c:762:3: error: implicit declaration of function 'pinctrl_lookup_state' [-Werror=implicit-function-declaration]
-      pinctrl_lookup_state(ascport->pinctrl, "default");
-      ^~~~~~~~~~~~~~~~~~~~
-   drivers/tty/serial/st-asc.c:761:27: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-     ascport->states[DEFAULT] =
-                              ^
-   drivers/tty/serial/st-asc.c:771:30: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-     ascport->states[MANUAL_RTS] =
-                                 ^
-   cc1: some warnings being treated as errors
+I did not originally notice that Shanker's original workaround implementation
+unnecessarily applies the workaround to non-shareable invalidations. They're
+not affected by the erratum. But as you say, it's simpler to modify __tlbi for
+all cases. I'm not currently worried about that performance impact.
 
-vim +/pinctrl_select_state +568 drivers/tty/serial/st-asc.c
+>>> Wouldn't that localise this change sufficiently that you wouldn't need
+>>> to change all the callers and encode the looping in your cpp macros?
+>>>
+>>> I realise you get an extra dsb in some places with that change, but I'd
+>>> like to see numbers for the impact of that on top of the workaround. If
+>>> it's an issue, then an alternative sequence would be:
+>>>
+>>>   tlbi
+>>>   dsb
+>>>   tlbi
+>>>
+>>> and you'd rely on the existing dsb to complete that.
+>>>
+>>> Having said that, I don't understand how your current loop code works
+>>> when the workaround is applied. AFAICT, you end up emitting something
+>>> like:
+>>>
+>>> dsb ishst
+>>> for i in 0 to n
+>>> 	tlbi va+i
+>>> dsb
+>>> tlbi va+n
+>>> dsb
+>>>
+>>> which looks wrong to me. Am I misreading something here?
+>>
+>> You're right, I am off by 1 << (PAGE_SHIFT - 12) here. I would need to
+>> increment, compare, not take the loop branch (regular for loop stuff),
+>> then decrement (missing) and perform TLB invalidation again (present but
+>> using incorrect value).
+> 
+> It also strikes me as odd that you only need one extra TLBI after the loop
+> has finished, as opposed to a tlbi; dsb; tlbi loop body (which is what you'd
+> get if you modified __tlbi as I suggest).
+> 
+> Is it sufficient to have one extra TLBI after the loop and, if so, is the
+> performance impact of my suggestion therefore unacceptable?
 
-   562	
-   563			/* If flow-control selected, stop handling RTS manually */
-   564			if (ascport->rts) {
-   565				devm_gpiod_put(port->dev, ascport->rts);
-   566				ascport->rts = NULL;
-   567	
- > 568				pinctrl_select_state(ascport->pinctrl,
-   569						     ascport->states[DEFAULT]);
-   570			}
-   571		} else {
+One is sufficient according to the errata documentation. I've described that
+aspect in the commit message of the next revision.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 48646 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/9d6f2e44/attachment-0001.gz>
+I've suggested colleagues follow up regarding performance. But reliable
+functionality comes first.
+
+Thanks,
+Cov
+
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
+Aurora Forum, a Linux Foundation Collaborative Project.
