@@ -1,105 +1,126 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 24 Jan 2017 14:11:25 +0000
-Subject: [RFC 2/4] irqchip, gicv3-its:Workaround for HiSilicon erratum
- 161010801
-In-Reply-To: <58875B0D.4080303@huawei.com>
-References: <5886262C.6070108@huawei.com> <58875B0D.4080303@huawei.com>
-Message-ID: <aa915b29-453f-6817-500f-1c6b457c0368@arm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 24 Jan 2017 06:10:49 -0800
+Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
+In-Reply-To: <20170124070639.GA5068@rzhang1-surface>
+References: <20170123124058.GA17134@amd> <20170123141331.GA11402@amd>
+ <da1f1b45-3ae5-ffe8-62c6-9ec7c3a1505b@roeck-us.net>
+ <20170123144031.GA7870@amd> <20170123232654.GA19342@amd>
+ <20170123234912.GA2460@roeck-us.net> <20170124070639.GA5068@rzhang1-surface>
+Message-ID: <b6d1670c-a83f-55aa-efd1-e52adb297ac6@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Robin,
-
-On 24/01/17 13:47, Shameerali Kolothum Thodi wrote:
-> The HiSilicon erratum 161010801 describes the limitation of certain
-> HiSilicon platforms to support the SMMU mappings for MSI transactions.
-> 
-> On these platforms GICv3 ITS translator is presented with the deviceID
-> by extending the MSI payload data to 64 bits to include the deviceID.
-> Hence, the PCIe controller on this platforms has to differentiate the
-> MSI payload against other DMA payload and has to modify the MSI payload.
-> This basically makes it difficult for this platforms to have a SMMU
-> translation for MSI. Also these platforms doesn't have a proper IIDR
-> register to use the existing IIDR based quirk mechanism.
-> 
-> This workaround based on the devicetree binding property, supports
-> bypassing the SMMU for the MSI transactions on this platforms.
-> 
-> Signed-off-by: shameer <shameerali.kolothum.thodi@huawei.com>
+On 01/23/2017 11:06 PM, Zhang Rui wrote:
+> On Mon, Jan 23, 2017 at 03:49:12PM -0800, Guenter Roeck wrote:
+>> On Tue, Jan 24, 2017 at 12:26:54AM +0100, Pavel Machek wrote:
+>>> Hi!
+>>>
+>>>>>> I'll try to revert it on the top of v4.10-rc5 now... and yes, it fixes
+>>>>>> the issue.
+>>>>>>
+>>>>>> Any idea what went wrong and how to fix that?
+>>>>>>
+>>>>>> Anyway as we are at -rc5 and this is warning fix that caused a
+>>>>>> regression on different hardware... it should be reverted.
+>>>>>>
+>>>>> Agreed.
+>>>>>
+>>>>> What exactly does "stopped working" mean ? That might help understanding
+>>>>> what went wrong.
+>>>>
+>>>> /sys files related to battery no longer appear. I beieve this has
+>>>> something to do with it:
+>>>>
+>>>> [    2.374877] of_get_named_gpiod_flags: parsed 'reset-gpios' property
+>>>> of node '/ocp at 68000000/spi at 48098000/tsc2005 at 0[0]' - status (0)
+>>>> [    2.375946] input: TSC2005 touchscreen as
+>>>> /devices/platform/68000000.ocp/48098000.spi/spi_master/spi1/spi1.0/input/input5
+>>>> [    2.392120] rx51-battery: probe of n900-battery failed with error
+>>>> -22
+>>>
+>>> Mystery solved:
+>>>
+>>> diff --git a/drivers/hwmon/hwmon.c b/drivers/hwmon/hwmon.c
+>>> index 3932f92..fe5ec82 100644
+>>> --- a/drivers/hwmon/hwmon.c
+>>> +++ b/drivers/hwmon/hwmon.c
+>>> @@ -545,8 +545,10 @@ __hwmon_device_register(struct device *dev, const char *name, void *drvdata,
+>>>  	int i, j, err, id;
+>>>
+>>>  	/* Do not accept invalid characters in hwmon name attribute */
+>>> -	if (name && (!strlen(name) || strpbrk(name, "-* \t\n")))
+>>> +	if (name && (!strlen(name) || strpbrk(name, "-* \t\n"))) {
+>>> +		printk("hwmon: Invalid character detected: %s\n", name);
+>>>  		return ERR_PTR(-EINVAL);
+>>> +	}
+>>>
+>>>  	id = ida_simple_get(&hwmon_ida, 0, 0, GFP_KERNEL);
+>>>  	if (id < 0)
+>>>
+>>>
+>>> pavel at n900:~$ dmesg | grep -5 Invalid
+>>> [    0.829650] of_get_named_gpiod_flags: parsed 'gpio-reset' property
+>>> of node '/ocp at 68000000/i2c at 48072000/tlv320aic3x at 19[0]' - status (0)
+>>> [    0.833831] tsl2563 2-0029: model 7, rev. 0
+>>> [    0.837768] of_get_named_gpiod_flags: parsed 'enable-gpio' property
+>>> of node '/ocp at 68000000/i2c at 48072000/lp5523 at 32[0]' - status (0)
+>>> [    1.921417] omap_i2c 48072000.i2c: controller timed out
+>>> [    2.056823] lp5523x 2-0032: lp5523 Programmable led chip found
+>>> [    2.064147] hwmon: Invalid character detected: bq27200-0
+>>
+>> So the problem is really that the thermal driver needs to create a valid name.
+>>
+> Right.
+>
+> Before reverting, can you please try if this patch works or not?
+>
+> thanks,
+> rui
+>
+>>From 79320ea3721314ec29ed6cdd6987ff922b11d6f9 Mon Sep 17 00:00:00 2001
+> From: Zhang Rui <rui.zhang@intel.com>
+> Date: Tue, 24 Jan 2017 14:11:03 +0800
+> Subject: [PATCH] thermal: fix parameter when registering hwmon
+>
+> commit 7611fb68062f ("thermal: thermal_hwmon: Convert to
+> hwmon_device_register_with_info()") converts thermal core to use
+> hwmon_device_register_with_info() to register to hwmon instead of
+> deprecated hwmon_device_register().
+> But at the same time, the name of the hwmon device created is changed to
+> the thermal zone device name in this commit, which may contain
+> incompatible characters for hwmon.
+>
+> Fixes it by using exactly the same parameters as before this commit.
+>
+> Fixes: 7611fb68062f ("thermal: thermal_hwmon: Convert to hwmon_devce_register_with_info()")
+> Reported-by: Pavel Machek <pavel@ucw.cz>
+> Signed-off-by: Zhang Rui <rui.zhang@intel.com>
 > ---
->  arch/arm64/Kconfig               | 15 ++++++++++++
->  drivers/irqchip/irq-gic-common.h |  1 +
->  drivers/irqchip/irq-gic-v3-its.c | 52 +++++++++++++++++++++++++++++++++++++++-
->  3 files changed, 67 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 0ae0427..8d600b0 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -485,6 +485,21 @@ config CAVIUM_ERRATUM_27456
-> 
->  	  If unsure, say Y.
-> 
-> +config HISILICON_ERRATUM_161010801
-> +	bool "HiSilicon erratum 161010801"
-> +	default y
-> +	help
-> +	  Enable workaround for erratum 161010801.
-> +
-> +	  This implements a gicv3-its errata workaround for HiSilicon
-> +	  platforms Hip05/Hip07. These platforms cannot support the MSI
-> +	  interrupt remapping and MSI transaction has to be bypassed by SMMU.
-> +
-> +	  The fix is to avoid calling the remapping hook into the SMMU
-> +	  driver from the its_irq_compose_msi_msg().
-> +
-> +	  If unsure, say Y.
-> +
->  endmenu
-> 
-> 
-> diff --git a/drivers/irqchip/irq-gic-common.h b/drivers/irqchip/irq-gic-common.h
-> index 205e5fd..de0385a 100644
-> --- a/drivers/irqchip/irq-gic-common.h
-> +++ b/drivers/irqchip/irq-gic-common.h
-> @@ -26,6 +26,7 @@ struct gic_quirk {
->  	void (*init)(void *data);
->  	u32 iidr;
->  	u32 mask;
-> +	const char *erratum;
->  };
-> 
->  int gic_configure_irq(unsigned int irq, unsigned int type,
-> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index f471939..0a326f6 100644
-> --- a/drivers/irqchip/irq-gic-v3-its.c
-> +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -44,6 +44,7 @@
->  #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING		(1ULL << 0)
->  #define ITS_FLAGS_WORKAROUND_CAVIUM_22375	(1ULL << 1)
->  #define ITS_FLAGS_WORKAROUND_CAVIUM_23144	(1ULL << 2)
-> +#define ITS_FLAGS_WORKAROUND_HISILICON_161010801	(1ULL << 3)
-> 
->  #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
-> 
-> @@ -659,7 +660,8 @@ static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
->  	msg->address_hi		= upper_32_bits(addr);
->  	msg->data		= its_get_event_id(d);
-> 
-> -	iommu_dma_map_msi_msg(d->irq, msg);
-> +	if (!(its->flags & ITS_FLAGS_WORKAROUND_HISILICON_161010801))
-> +		iommu_dma_map_msi_msg(d->irq, msg);
+>  drivers/thermal/thermal_hwmon.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/thermal/thermal_hwmon.c b/drivers/thermal/thermal_hwmon.c
+> index c4a508a..0c6789f 100644
+> --- a/drivers/thermal/thermal_hwmon.c
+> +++ b/drivers/thermal/thermal_hwmon.c
+> @@ -157,8 +157,8 @@ int thermal_add_hwmon_sysfs(struct thermal_zone_device *tz)
+>
+>  	INIT_LIST_HEAD(&hwmon->tz_list);
+>  	strlcpy(hwmon->type, tz->type, THERMAL_NAME_LENGTH);
+> -	hwmon->device = hwmon_device_register_with_info(NULL, hwmon->type,
+> -							hwmon, NULL, NULL);
+> +	hwmon->device = hwmon_device_register_with_info(NULL, NULL, NULL,
+> +							NULL, NULL);
 
-Let's contemplate this for a moment. If we're on the affected ITS, we're
-using the physical address of the GITS_TRANSLATER register. What
-guarantees that this is not going to conflict with an IOVA that DMA is
-going to use? From looking at these patches, my feeling is "not much".
+This is wrong. The name should be converted to a valid name. Otherwise you would
+still have to provide the name attribute yourself, and the resulting name would
+still be invalid. A simple fix would be to add
+	strreplace(hwmon->type, '-', '_');
+after strlcpy().
 
-So if I'm right, you're opening the door to some interesting memory
-corruption if the two regions ever intersect.
+Guenter
 
-Robin, what do you think?
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>  	if (IS_ERR(hwmon->device)) {
+>  		result = PTR_ERR(hwmon->device);
+>  		goto free_mem;
+>
