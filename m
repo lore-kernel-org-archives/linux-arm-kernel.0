@@ -1,132 +1,118 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Tue, 24 Jan 2017 10:08:16 +0100
-Subject: [PATCH] ARM: tegra: paz00: fix __initdata placement
-In-Reply-To: <20170123162428.GB2043@ulmo.ba.sec>
-References: <20170123074347.GA29804@dtor-ws> <4072003.S1IBmddlP7@fb07-iapwap2>
- <20170123162428.GB2043@ulmo.ba.sec>
-Message-ID: <3638459.E7Mh7VRDt6@fb07-iapwap2>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 24 Jan 2017 09:15:45 +0000
+Subject: [PATCH v3 3/13] mmc: sunxi: Always set signal delay to 0 for A64
+In-Reply-To: <CAPDyKFoatUWz0AwY6e73OCguDx70B1B5OAoPUYX-JDPsru+aZw@mail.gmail.com>
+References: <cover.a06ce1672d7a72ee7f9bbca46fdd223edd6b2313.1484585798.git-series.maxime.ripard@free-electrons.com>
+ <67fd7dad745b49bb8edb7391655eaddf6f35160e.1484585798.git-series.maxime.ripard@free-electrons.com>
+ <CAPDyKFoatUWz0AwY6e73OCguDx70B1B5OAoPUYX-JDPsru+aZw@mail.gmail.com>
+Message-ID: <b09f2ee5-77b3-eb2e-d749-d76a310bf1b0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Thierry,
+Hi Ulf,
 
-Am Montag, 23. Januar 2017, 17:24:28 CET schrieb Thierry Reding:
-> On Mon, Jan 23, 2017 at 11:04:22AM +0100, Marc Dietrich wrote:
-> > Hello Dmitry,
-> > 
-> > Am Sonntag, 22. Januar 2017, 23:43:47 CET schrieb Dmitry Torokhov:
-> > > To have expected effect the __initdata attribute should go after
-> > > variable
-> > > name and before initializer.`
-> > > 
-> > > Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> > > ---
-> > > 
-> > >  arch/arm/mach-tegra/board-paz00.c | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > 
-> > > diff --git a/arch/arm/mach-tegra/board-paz00.c
-> > > b/arch/arm/mach-tegra/board-paz00.c index 7478f6fb3664..ea6bff404161
-> > > 100644
-> > > --- a/arch/arm/mach-tegra/board-paz00.c
-> > > +++ b/arch/arm/mach-tegra/board-paz00.c
-> > > @@ -23,7 +23,7 @@
-> > > 
-> > >  #include "board.h"
-> > > 
-> > > -static struct property_entry __initdata wifi_rfkill_prop[] = {
-> > > +static struct property_entry wifi_rfkill_prop[] __initdata = {
-> > > 
-> > >  	PROPERTY_ENTRY_STRING("name", "wifi_rfkill"),
-> > >  	PROPERTY_ENTRY_STRING("type", "wlan"),
-> > >  	{ },
-> > 
-> > you are right according to the documentation, but objdump -s always shows
-> > that it gets put into the .rodata section. So this patch has no effect,
-> > because result is always same (and wrong). It's also possible that I'm
-> > doing something wrong :-) Btw, there are hundreds of such __initdata
-> > misplacement in the kernel.
+On 24/01/17 08:16, Ulf Hansson wrote:
+> On 16 January 2017 at 17:56, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+>> Experience have shown that the using the  autocalibration could severely
+>> degrade the performances of the MMC bus.
+>>
+>> Allwinner is using in its BSP a delay set to 0 for all the modes but HS400.
+>> Remove the calibration code for now, and add comments to document our
+>> findings.
 > 
-> Hmm... I get this:
+> So doesn't this break some platforms using HS400? Or are you saying
+> those are already broken?
+
+This is a sunxi specific calibration routine, which was introduced
+lately (e1b8dfd1b1c6) to be used by the Allwinner's enhanced MMC
+controller. This is only used by devices using the sun50i-a64-mmc
+compatible, of which this series introduces the first user.
+
+So there is no way this can regress in any way, since the code wasn't
+actually used before.
+
+Cheers,
+Andre.
+
 > 
-> 	$ objdump -t build/tegra20/arch/arm/mach-tegra/board-paz00.o
-> 
-> 	build/tegra20/arch/arm/mach-tegra/board-paz00.o:     file format
-> 	elf32-little
-> 
-> 	SYMBOL TABLE:
-> 	00000000 l    df *ABS*  00000000 board-paz00.c
-> 	00000000 l    d  .text  00000000 .text
-> 	00000000 l    d  .data  00000000 .data
-> 	00000000 l    d  .bss   00000000 .bss
-> 	00000000 l    d  .init.text     00000000 .init.text
-> 	00000000 l       .init.text     00000000 $a
-> 	00000000 l       .data  00000000 .LANCHOR1
-> 	00000000 l       .init.data     00000000 .LANCHOR0
-> 	00000000 l    d  .ARM.extab.init.text   00000000 .ARM.extab.init.text
-> 	00000000 l    d  .ARM.exidx.init.text   00000000 .ARM.exidx.init.text
-> 	00000000 l       .ARM.exidx.init.text   00000000 $d
-> 	00000000 l       .data  00000000 $d
-> 	00000000 l     O .data  000001c8 wifi_rfkill_device
-> 	000001c8 l     O .data  00000048 wifi_gpio_lookup
-> 	00000000 l    d  .rodata.str1.4 00000000 .rodata.str1.4
-> 	00000000 l       .rodata.str1.4 00000000 $d
-> 	00000000 l    d  .init.data     00000000 .init.data
-> 	00000000 l       .init.data     00000000 $d
-> 	00000000 l     O .init.data     00000048 wifi_rfkill_prop
-> 	00000000 l    d  .debug_frame   00000000 .debug_frame
-> 	00000010 l       .debug_frame   00000000 $d
-> 	00000000 l    d  .debug_info    00000000 .debug_info
-> 	00000000 l    d  .debug_abbrev  00000000 .debug_abbrev
-> 	00000000 l    d  .debug_aranges 00000000 .debug_aranges
-> 	00000000 l    d  .debug_ranges  00000000 .debug_ranges
-> 	00000000 l    d  .debug_line    00000000 .debug_line
-> 	00000000 l    d  .debug_str     00000000 .debug_str
-> 	00000000 l    d  .note.GNU-stack        00000000 .note.GNU-stack
-> 	00000000 l    d  .comment       00000000 .comment
-> 	00000000 l    d  .ARM.attributes        00000000 .ARM.attributes
-> 	00000000 g     F .init.text     00000030 tegra_paz00_wifikill_init
-> 	00000000         *UND*  00000000 platform_device_add_properties
-> 	00000000         *UND*  00000000 gpiod_add_lookup_table
-> 	00000000         *UND*  00000000 platform_device_register
-> 	00000000         *UND*  00000000 __aeabi_unwind_cpp_pr0
-> 
-> So it correctly ends up in .init.data for me. And it does so with or
-> without the patch. GCCs documentation doesn't seem to say where exactly
-> these attributes need to be put, though the examples given all have the
-> attribute right before the =.
-
-ok, objdump -s is maybe not appropriate to display such things.
-
-Contents of section .init.data:
- 0000 2c000000 0c000000 00010000 00000000  ,...............
- 0010 34000000 00000000 40000000 05000000  4....... at .......
- 0020 00010000 00000000 48000000 00000000  ........H.......
- 0030 00000000 00000000 00000000 00000000  ................
- 0040 00000000 00000000                    ........        
-Contents of section .rodata.str1.4:
- 0000 72666b69 6c6c5f67 70696f00 74656772  rfkill_gpio.tegr
- 0010 612d6770 696f0000 72657365 74000000  a-gpio..reset...
- 0020 73687574 646f776e 00000000 6e616d65  shutdown....name
- 0030 00000000 77696669 5f72666b 696c6c00  ....wifi_rfkill.
- 0040 74797065 00000000 776c616e 00        type....wlan.   
-
-In fact, .init.data seems to contain relocations to .rodata.str1.4, which "-s" 
-does not resolve.
- 
-> Oh... interestingly checkpatch does seem to have a check for this now,
-> and it does recommend that __initdata be placed after wifi_rfkill_prop,
-> so I'm going to apply this.
-
-Btw, where is your tree for 4.11? git.kernel.org shows no action since 
-November. Please also include https://patchwork.ozlabs.org/patch/704367/ if 
-you haven't done yet. I forgot to add a #stable tag for 4.9 and 4.10.
-
-Marc
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170124/c090af50/attachment.sig>
+>>
+>> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> ---
+>>  drivers/mmc/host/sunxi-mmc.c | 50 ++++++++++++-------------------------
+>>  1 file changed, 17 insertions(+), 33 deletions(-)
+>>
+>> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+>> index 019f95e8e7c5..b9c8a62bc212 100644
+>> --- a/drivers/mmc/host/sunxi-mmc.c
+>> +++ b/drivers/mmc/host/sunxi-mmc.c
+>> @@ -683,41 +683,19 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
+>>
+>>  static int sunxi_mmc_calibrate(struct sunxi_mmc_host *host, int reg_off)
+>>  {
+>> -       u32 reg = readl(host->reg_base + reg_off);
+>> -       u32 delay;
+>> -       unsigned long timeout;
+>> -
+>>         if (!host->cfg->can_calibrate)
+>>                 return 0;
+>>
+>> -       reg &= ~(SDXC_CAL_DL_MASK << SDXC_CAL_DL_SW_SHIFT);
+>> -       reg &= ~SDXC_CAL_DL_SW_EN;
+>> -
+>> -       writel(reg | SDXC_CAL_START, host->reg_base + reg_off);
+>> -
+>> -       dev_dbg(mmc_dev(host->mmc), "calibration started\n");
+>> -
+>> -       timeout = jiffies + HZ * SDXC_CAL_TIMEOUT;
+>> -
+>> -       while (!((reg = readl(host->reg_base + reg_off)) & SDXC_CAL_DONE)) {
+>> -               if (time_before(jiffies, timeout))
+>> -                       cpu_relax();
+>> -               else {
+>> -                       reg &= ~SDXC_CAL_START;
+>> -                       writel(reg, host->reg_base + reg_off);
+>> -
+>> -                       return -ETIMEDOUT;
+>> -               }
+>> -       }
+>> -
+>> -       delay = (reg >> SDXC_CAL_DL_SHIFT) & SDXC_CAL_DL_MASK;
+>> -
+>> -       reg &= ~SDXC_CAL_START;
+>> -       reg |= (delay << SDXC_CAL_DL_SW_SHIFT) | SDXC_CAL_DL_SW_EN;
+>> -
+>> -       writel(reg, host->reg_base + reg_off);
+>> -
+>> -       dev_dbg(mmc_dev(host->mmc), "calibration ended, reg is 0x%x\n", reg);
+>> +       /*
+>> +        * FIXME:
+>> +        * This is not clear how the calibration is supposed to work
+>> +        * yet. The best rate have been obtained by simply setting the
+>> +        * delay to 0, as Allwinner does in its BSP.
+>> +        *
+>> +        * The only mode that doesn't have such a delay is HS400, that
+>> +        * is in itself a TODO.
+>> +        */
+>> +       writel(SDXC_CAL_DL_SW_EN, host->reg_base + reg_off);
+>>
+>>         return 0;
+>>  }
+>> @@ -809,7 +787,13 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+>>         if (ret)
+>>                 return ret;
+>>
+>> -       /* TODO: enable calibrate on sdc2 SDXC_REG_DS_DL_REG of A64 */
+>> +       /*
+>> +        * FIXME:
+>> +        *
+>> +        * In HS400 we'll also need to calibrate the data strobe
+>> +        * signal. This should only happen on the MMC2 controller (at
+>> +        * least on the A64).
+>> +        */
+>>
+>>         return sunxi_mmc_oclk_onoff(host, 1);
+>>  }
+>> --
+>> git-series 0.8.11
