@@ -1,154 +1,117 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Tue, 24 Jan 2017 15:41:24 +0100
-Subject: [PATCH 3/7] iio: adc: stm32: add trigger polarity extended
- attribute
-In-Reply-To: <17e5b8ba-0ef3-34eb-aa30-a899f87616f7@kernel.org>
-References: <1484832854-6314-1-git-send-email-fabrice.gasnier@st.com>
- <1484832854-6314-4-git-send-email-fabrice.gasnier@st.com>
- <17e5b8ba-0ef3-34eb-aa30-a899f87616f7@kernel.org>
-Message-ID: <e78b51ed-5257-b60d-74a7-962fa0f92699@st.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 24 Jan 2017 14:41:59 +0000
+Subject: [RFC 2/4] irqchip, gicv3-its:Workaround for HiSilicon erratum
+ 161010801
+In-Reply-To: <aa915b29-453f-6817-500f-1c6b457c0368@arm.com>
+References: <5886262C.6070108@huawei.com> <58875B0D.4080303@huawei.com>
+ <aa915b29-453f-6817-500f-1c6b457c0368@arm.com>
+Message-ID: <5f303abc-209b-3828-ca8c-4ec0977f89ea@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 01/22/2017 01:58 PM, Jonathan Cameron wrote:
-> On 19/01/17 13:34, Fabrice Gasnier wrote:
->> Define extended attribute so that user may choose rising, falling or both
->> edges for external trigger sources.
->> Default to rising edge in case it isn't set.
+On 24/01/17 14:11, Marc Zyngier wrote:
+> + Robin,
+> 
+> On 24/01/17 13:47, Shameerali Kolothum Thodi wrote:
+>> The HiSilicon erratum 161010801 describes the limitation of certain
+>> HiSilicon platforms to support the SMMU mappings for MSI transactions.
 >>
->> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-> Creates a custom attibute.  Documentation please!
-> /Documentation/ABI/testing/sysfs-bus-iio-stm32 or similar.
-
-Ok, I'll add something like:
-Documentation/ABI/testing/sysfs-bus-iio-adc-stm32:
-
-+What:		/sys/bus/iio/devices/triggerX/trigger_polarity
-+KernelVersion:	4.11
-+Contact:	fabrice.gasnier at st.com
-+Description:
-+		The STM32 ADC can be configured to use external trigger sources
-+		(e.g. timers, pwm or exti gpio). Then, it can be tuned to start
-+		conversions on external trigger by either:
-+		- "rising-edge"
-+		- "falling-edge"
-+		- "both-edges".
-+		Reading returns current trigger polarity.
-+		Writing value before enabling conversions sets trigger polarity.
-
-Best Regards,
-Thanks,
-Fabrice
->
-> The approach seems reasonable, but easier to discuss when it's
-> formally described.
->
-> I'd also not care about characters saved and go with
-> trigger_polarity rather than the short form (unless this you have
-> a good reason for it!)
->
-> Jonathan
+>> On these platforms GICv3 ITS translator is presented with the deviceID
+>> by extending the MSI payload data to 64 bits to include the deviceID.
+>> Hence, the PCIe controller on this platforms has to differentiate the
+>> MSI payload against other DMA payload and has to modify the MSI payload.
+>> This basically makes it difficult for this platforms to have a SMMU
+>> translation for MSI. Also these platforms doesn't have a proper IIDR
+>> register to use the existing IIDR based quirk mechanism.
+>>
+>> This workaround based on the devicetree binding property, supports
+>> bypassing the SMMU for the MSI transactions on this platforms.
+>>
+>> Signed-off-by: shameer <shameerali.kolothum.thodi@huawei.com>
 >> ---
->>  drivers/iio/adc/stm32-adc.c | 51 ++++++++++++++++++++++++++++++++++++++++++++-
->>  1 file changed, 50 insertions(+), 1 deletion(-)
+>>  arch/arm64/Kconfig               | 15 ++++++++++++
+>>  drivers/irqchip/irq-gic-common.h |  1 +
+>>  drivers/irqchip/irq-gic-v3-its.c | 52 +++++++++++++++++++++++++++++++++++++++-
+>>  3 files changed, 67 insertions(+), 1 deletion(-)
 >>
->> diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
->> index 30708bc..9753c39 100644
->> --- a/drivers/iio/adc/stm32-adc.c
->> +++ b/drivers/iio/adc/stm32-adc.c
->> @@ -164,6 +164,7 @@ struct stm32_adc_trig_info {
->>   * @lock:		spinlock
->>   * @bufi:		data buffer index
->>   * @num_conv:		expected number of scan conversions
->> + * @exten:		external trigger config (enable/polarity)
->>   */
->>  struct stm32_adc {
->>  	struct stm32_adc_common	*common;
->> @@ -175,6 +176,7 @@ struct stm32_adc {
->>  	spinlock_t		lock;		/* interrupt lock */
->>  	int			bufi;
->>  	int			num_conv;
->> +	enum stm32_adc_exten	exten;
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 0ae0427..8d600b0 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -485,6 +485,21 @@ config CAVIUM_ERRATUM_27456
+>>
+>>  	  If unsure, say Y.
+>>
+>> +config HISILICON_ERRATUM_161010801
+>> +	bool "HiSilicon erratum 161010801"
+>> +	default y
+>> +	help
+>> +	  Enable workaround for erratum 161010801.
+>> +
+>> +	  This implements a gicv3-its errata workaround for HiSilicon
+>> +	  platforms Hip05/Hip07. These platforms cannot support the MSI
+>> +	  interrupt remapping and MSI transaction has to be bypassed by SMMU.
+>> +
+>> +	  The fix is to avoid calling the remapping hook into the SMMU
+>> +	  driver from the its_irq_compose_msi_msg().
+>> +
+>> +	  If unsure, say Y.
+>> +
+>>  endmenu
+>>
+>>
+>> diff --git a/drivers/irqchip/irq-gic-common.h b/drivers/irqchip/irq-gic-common.h
+>> index 205e5fd..de0385a 100644
+>> --- a/drivers/irqchip/irq-gic-common.h
+>> +++ b/drivers/irqchip/irq-gic-common.h
+>> @@ -26,6 +26,7 @@ struct gic_quirk {
+>>  	void (*init)(void *data);
+>>  	u32 iidr;
+>>  	u32 mask;
+>> +	const char *erratum;
 >>  };
 >>
->>  /**
->> @@ -449,7 +451,9 @@ static int stm32_adc_set_trig(struct iio_dev *indio_dev,
+>>  int gic_configure_irq(unsigned int irq, unsigned int type,
+>> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+>> index f471939..0a326f6 100644
+>> --- a/drivers/irqchip/irq-gic-v3-its.c
+>> +++ b/drivers/irqchip/irq-gic-v3-its.c
+>> @@ -44,6 +44,7 @@
+>>  #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING		(1ULL << 0)
+>>  #define ITS_FLAGS_WORKAROUND_CAVIUM_22375	(1ULL << 1)
+>>  #define ITS_FLAGS_WORKAROUND_CAVIUM_23144	(1ULL << 2)
+>> +#define ITS_FLAGS_WORKAROUND_HISILICON_161010801	(1ULL << 3)
 >>
->>  		/* set trigger source, default to rising edge */
->>  		extsel = ret;
->> -		exten = STM32_EXTEN_HWTRIG_RISING_EDGE;
->> +		if (adc->exten == STM32_EXTEN_SWTRIG)
->> +			adc->exten = STM32_EXTEN_HWTRIG_RISING_EDGE;
->> +		exten = adc->exten;
->>  	}
+>>  #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
 >>
->>  	spin_lock_irqsave(&adc->lock, flags);
->> @@ -463,6 +467,39 @@ static int stm32_adc_set_trig(struct iio_dev *indio_dev,
->>  	return 0;
->>  }
+>> @@ -659,7 +660,8 @@ static void its_irq_compose_msi_msg(struct irq_data *d, struct msi_msg *msg)
+>>  	msg->address_hi		= upper_32_bits(addr);
+>>  	msg->data		= its_get_event_id(d);
 >>
->> +static int stm32_adc_set_trig_pol(struct iio_dev *indio_dev,
->> +				  const struct iio_chan_spec *chan,
->> +				  unsigned int type)
->> +{
->> +	struct stm32_adc *adc = iio_priv(indio_dev);
->> +
->> +	adc->exten = type;
->> +
->> +	return 0;
->> +}
->> +
->> +static int stm32_adc_get_trig_pol(struct iio_dev *indio_dev,
->> +				  const struct iio_chan_spec *chan)
->> +{
->> +	struct stm32_adc *adc = iio_priv(indio_dev);
->> +
->> +	return adc->exten;
->> +}
->> +
->> +static const char * const stm32_trig_pol_items[] = {
->> +	[STM32_EXTEN_SWTRIG] = "swtrig",
->> +	[STM32_EXTEN_HWTRIG_RISING_EDGE] = "rising-edge",
->> +	[STM32_EXTEN_HWTRIG_FALLING_EDGE] = "falling-edge",
->> +	[STM32_EXTEN_HWTRIG_BOTH_EDGES] = "both-edges",
->> +};
->> +
->> +const struct iio_enum stm32_adc_trig_pol = {
->> +	.items = stm32_trig_pol_items,
->> +	.num_items = ARRAY_SIZE(stm32_trig_pol_items),
->> +	.get = stm32_adc_get_trig_pol,
->> +	.set = stm32_adc_set_trig_pol,
->> +};
->> +
->>  /**
->>   * stm32_adc_single_conv() - Performs a single conversion
->>   * @indio_dev: IIO device
->> @@ -745,6 +782,17 @@ static irqreturn_t stm32_adc_trigger_handler(int irq, void *p)
->>  	return IRQ_HANDLED;
->>  }
->>
->> +static const struct iio_chan_spec_ext_info stm32_adc_ext_info[] = {
->> +	IIO_ENUM("trigger_pol", IIO_SHARED_BY_ALL, &stm32_adc_trig_pol),
->> +	{
->> +		.name = "trigger_pol_available",
->> +		.shared = IIO_SHARED_BY_ALL,
->> +		.read = iio_enum_available_read,
->> +		.private = (uintptr_t)&stm32_adc_trig_pol,
->> +	},
->> +	{},
->> +};
->> +
->>  static void stm32_adc_chan_init_one(struct iio_dev *indio_dev,
->>  				    struct iio_chan_spec *chan,
->>  				    const struct stm32_adc_chan_spec *channel,
->> @@ -760,6 +808,7 @@ static void stm32_adc_chan_init_one(struct iio_dev *indio_dev,
->>  	chan->scan_type.sign = 'u';
->>  	chan->scan_type.realbits = 12;
->>  	chan->scan_type.storagebits = 16;
->> +	chan->ext_info = stm32_adc_ext_info;
->>  }
->>
->>  static int stm32_adc_chan_of_init(struct iio_dev *indio_dev)
->>
+>> -	iommu_dma_map_msi_msg(d->irq, msg);
+>> +	if (!(its->flags & ITS_FLAGS_WORKAROUND_HISILICON_161010801))
+>> +		iommu_dma_map_msi_msg(d->irq, msg);
+> 
+> Let's contemplate this for a moment. If we're on the affected ITS, we're
+> using the physical address of the GITS_TRANSLATER register. What
+> guarantees that this is not going to conflict with an IOVA that DMA is
+> going to use? From looking at these patches, my feeling is "not much".
+> 
+> So if I'm right, you're opening the door to some interesting memory
+> corruption if the two regions ever intersect.
 >
+> Robin, what do you think?
+
+Yup. Unless the ITS physical address is actually reserved from the IOVA
+domain, it's still free to be allocated for DMA mappings, and if that
+ever happens then you'll get odd bits of data landing in the ITS instead
+of RAM, and maybe even locked-up devices or worse if the doorbell gives
+back decode errors on read attempts. It's essentially the exact same
+problem as we have with memory-mapped PCI windows, and needs to be
+solved in the same fashion, i.e. between the SMMU and the IOMMU-DMA code.
+
+Robin.
+
+> 
+> 	M.
+> 
