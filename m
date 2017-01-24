@@ -1,118 +1,52 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 24 Jan 2017 09:15:45 +0000
-Subject: [PATCH v3 3/13] mmc: sunxi: Always set signal delay to 0 for A64
-In-Reply-To: <CAPDyKFoatUWz0AwY6e73OCguDx70B1B5OAoPUYX-JDPsru+aZw@mail.gmail.com>
-References: <cover.a06ce1672d7a72ee7f9bbca46fdd223edd6b2313.1484585798.git-series.maxime.ripard@free-electrons.com>
- <67fd7dad745b49bb8edb7391655eaddf6f35160e.1484585798.git-series.maxime.ripard@free-electrons.com>
- <CAPDyKFoatUWz0AwY6e73OCguDx70B1B5OAoPUYX-JDPsru+aZw@mail.gmail.com>
-Message-ID: <b09f2ee5-77b3-eb2e-d749-d76a310bf1b0@arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 24 Jan 2017 10:18:17 +0100
+Subject: v4.9 to v4.10 regression: oops when USB cable is plugged in.
+In-Reply-To: <20170123224454.GY7403@atomide.com>
+References: <20170123222537.GA11543@amd>
+ <20170123224454.GY7403@atomide.com>
+Message-ID: <20170124091817.GA29246@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
-
-On 24/01/17 08:16, Ulf Hansson wrote:
-> On 16 January 2017 at 17:56, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
->> Experience have shown that the using the  autocalibration could severely
->> degrade the performances of the MMC bus.
->>
->> Allwinner is using in its BSP a delay set to 0 for all the modes but HS400.
->> Remove the calibration code for now, and add comments to document our
->> findings.
+Hi!
+On Mon 2017-01-23 14:44:54, Tony Lindgren wrote:
+> * Pavel Machek <pavel@ucw.cz> [170123 14:26]:
+> > [25392.239837] Unhandled fault: external abort on non-linefetch (0x1028) at 0xfa0ab060
+> > [25392.239868] pgd = c0004000
+> > [25392.239898] [fa0ab060] *pgd=48011452(bad)
+> > [25392.239929] Internal error: : 1028 [#1] ARM
+> > [25392.239929] Modules linked in:
+> > [25392.239959] CPU: 0 PID: 24322 Comm: kworker/0:1 Not tainted 4.10.0-rc5-142127-g41f2839-dirty #222
+> > [25392.239990] Hardware name: Nokia RX-51 board
+> > [25392.240020] Workqueue: events musb_irq_work
+> > [25392.240051] task: cd44d5c0 task.stack: cd308000
+> > [25392.240051] PC is at musb_default_readb+0x0/0xc
+> > [25392.240081] LR is at musb_irq_work+0x1c/0x1b0
 > 
-> So doesn't this break some platforms using HS400? Or are you saying
-> those are already broken?
+> OK I'm pretty sure the patch I posted few days ago fixes
+> this. Can you please test patch "[PATCH] usb: musb: Fix
+> external abort on non-linefetch for musb_irq_work()"?
 
-This is a sunxi specific calibration routine, which was introduced
-lately (e1b8dfd1b1c6) to be used by the Allwinner's enhanced MMC
-controller. This is only used by devices using the sun50i-a64-mmc
-compatible, of which this series introduces the first user.
+Can I get the copy of the patch?
 
-So there is no way this can regress in any way, since the code wasn't
-actually used before.
+http://www.spinics.net/lists/linux-usb/msg152542.html
 
-Cheers,
-Andre.
+...but it is html mangled with no obvious way to unmangle it.
 
-> 
->>
->> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
->> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> ---
->>  drivers/mmc/host/sunxi-mmc.c | 50 ++++++++++++-------------------------
->>  1 file changed, 17 insertions(+), 33 deletions(-)
->>
->> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
->> index 019f95e8e7c5..b9c8a62bc212 100644
->> --- a/drivers/mmc/host/sunxi-mmc.c
->> +++ b/drivers/mmc/host/sunxi-mmc.c
->> @@ -683,41 +683,19 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
->>
->>  static int sunxi_mmc_calibrate(struct sunxi_mmc_host *host, int reg_off)
->>  {
->> -       u32 reg = readl(host->reg_base + reg_off);
->> -       u32 delay;
->> -       unsigned long timeout;
->> -
->>         if (!host->cfg->can_calibrate)
->>                 return 0;
->>
->> -       reg &= ~(SDXC_CAL_DL_MASK << SDXC_CAL_DL_SW_SHIFT);
->> -       reg &= ~SDXC_CAL_DL_SW_EN;
->> -
->> -       writel(reg | SDXC_CAL_START, host->reg_base + reg_off);
->> -
->> -       dev_dbg(mmc_dev(host->mmc), "calibration started\n");
->> -
->> -       timeout = jiffies + HZ * SDXC_CAL_TIMEOUT;
->> -
->> -       while (!((reg = readl(host->reg_base + reg_off)) & SDXC_CAL_DONE)) {
->> -               if (time_before(jiffies, timeout))
->> -                       cpu_relax();
->> -               else {
->> -                       reg &= ~SDXC_CAL_START;
->> -                       writel(reg, host->reg_base + reg_off);
->> -
->> -                       return -ETIMEDOUT;
->> -               }
->> -       }
->> -
->> -       delay = (reg >> SDXC_CAL_DL_SHIFT) & SDXC_CAL_DL_MASK;
->> -
->> -       reg &= ~SDXC_CAL_START;
->> -       reg |= (delay << SDXC_CAL_DL_SW_SHIFT) | SDXC_CAL_DL_SW_EN;
->> -
->> -       writel(reg, host->reg_base + reg_off);
->> -
->> -       dev_dbg(mmc_dev(host->mmc), "calibration ended, reg is 0x%x\n", reg);
->> +       /*
->> +        * FIXME:
->> +        * This is not clear how the calibration is supposed to work
->> +        * yet. The best rate have been obtained by simply setting the
->> +        * delay to 0, as Allwinner does in its BSP.
->> +        *
->> +        * The only mode that doesn't have such a delay is HS400, that
->> +        * is in itself a TODO.
->> +        */
->> +       writel(SDXC_CAL_DL_SW_EN, host->reg_base + reg_off);
->>
->>         return 0;
->>  }
->> @@ -809,7 +787,13 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
->>         if (ret)
->>                 return ret;
->>
->> -       /* TODO: enable calibrate on sdc2 SDXC_REG_DS_DL_REG of A64 */
->> +       /*
->> +        * FIXME:
->> +        *
->> +        * In HS400 we'll also need to calibrate the data strobe
->> +        * signal. This should only happen on the MMC2 controller (at
->> +        * least on the A64).
->> +        */
->>
->>         return sunxi_mmc_oclk_onoff(host, 1);
->>  }
->> --
->> git-series 0.8.11
+> I was able to hit that only once so far, do you hit it
+> every time with your built-in g_ether .config?
+
+I get it "way too often", like once a day. I don't yet know how to hit
+it reliably :-(.
+
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170124/e8e1c30e/attachment.sig>
