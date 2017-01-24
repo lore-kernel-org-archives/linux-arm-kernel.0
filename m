@@ -1,89 +1,110 @@
-From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Tue, 24 Jan 2017 10:37:19 +0100
-Subject: [PATCH V9] thermal: bcm2835: add thermal driver for bcm2835 soc
-In-Reply-To: <20170124092645.GA3651@localhost.localdomain>
-References: <1483808145-6206-1-git-send-email-kernel@martin.sperl.org>
- <20170120041400.GA24617@localhost.localdomain>
- <20170120042323.GA6651@localhost.localdomain>
- <D349C10C-C929-40A4-86BF-7F6E834DB613@martin.sperl.org>
- <20170124092645.GA3651@localhost.localdomain>
-Message-ID: <20F6A8E3-F181-4B42-AC29-E681749FAD2A@martin.sperl.org>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 24 Jan 2017 18:38:33 +0900
+Subject: [PATCH/RFC 2/2] iommu/ipmmu-vmsa: Opt-in slave devices based on
+ ES version
+In-Reply-To: <CAMuHMdWyV4DWN5pKsp+Z6C0MhZF5fKch4T1g1_Hbk3oxrR6_zw@mail.gmail.com>
+References: <148517349585.18128.10696161017872202809.sendpatchset@little-apple>
+ <148517354599.18128.1970642879780864733.sendpatchset@little-apple>
+ <CAMuHMdWyV4DWN5pKsp+Z6C0MhZF5fKch4T1g1_Hbk3oxrR6_zw@mail.gmail.com>
+Message-ID: <CANqRtoQayo4_nBuTN--6kt4JRGW7VM-6vMvb8AX22bO=MG8-9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Geert,
 
-> On 24.01.2017, at 10:26, Eduardo Valentin <edubezval@gmail.com> wrote:
-> 
-> Hello Martin,
-> 
-> On Fri, Jan 20, 2017 at 09:43:02AM +0100, kernel at martin.sperl.org wrote:
->> 
->>> On 20.01.2017, at 05:23, Eduardo Valentin <edubezval@gmail.com> wrote:
->>> 
->>> On Thu, Jan 19, 2017 at 08:14:02PM -0800, Eduardo Valentin wrote:
->>>> Hello Martin,
->>>> 
->>>> On Sat, Jan 07, 2017 at 04:55:45PM +0000, kernel at martin.sperl.org wrote:
->>>>> From: Martin Sperl <kernel@martin.sperl.org>
->>>>> 
->>>>> Add basic thermal driver for bcm2835 SOC.
->>>>> 
->>>>> This driver currently relies on the firmware setting up the
->>>>> tsense HW block and does not set it up itself.
->>>>> 
->>>>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
->>>>> Acked-by: Eric Anholt <eric@anholt.net>
->>>>> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
->>>>> 
->>>> 
->>>> <cut>
->>> 
->>> 
->>> Also, I am getting this warn from sparse:
->>> drivers/thermal/bcm2835_thermal.c:110:16: warning: cast truncates bits
->>> from constant value (3ffffffffff00 becomes ffffff00)
->>> drivers/thermal/bcm2835_thermal.c:134:16: warning: cast truncates bits
->>> from constant value (3ffffffffff becomes ffffffff)
->>> 
->>> Have you seen this?
->> 
->> No, I have not checked sparse.
->> 
->> These values are defined via GENMASK on line 47 and 57 respectively
->> and should actually compute to the following values:
->>  for line 110 (line 47 has the define):
->>    GENMASK(BCM2835_TS_TSENSCTL_THOLD_BITS +     \
->>            BCM2835_TS_TSENSCTL_THOLD_SHIFT - 1, \
->>            BCM2835_TS_TSENSCTL_THOLD_SHIFT)
->>    = GENMASK(10 + 8 - 1, 8) 
->>    = GENMASK(17, 8)
->>    = (((~0UL) << (8)) & (~0UL >> (32 - 1 - (10 + 8 - 1))))
->>    = 0x3ff00
->>  for line 134 (line 57 has the define):
->>    GENMASK(BCM2835_TS_TSENSCTL_THOLD_BITS +     \
->>            BCM2835_TS_TSENSCTL_THOLD_SHIFT - 1, \
->>            BCM2835_TS_TSENSCTL_THOLD_SHIFT)
->>    = GENMASK(10 + 0 - 1, 0)
->>    = GENMASK(9, 0)
->>    = (((~0UL) << (0)) & (~0UL >> (32 - 1 - (10 + 0 - 1))))
->>    = 0x003ff
->> 
->> Note that the preprocessor expansions have been verified by
->> looking at the preprocessed driver source
->> (drivers/thermal/bcm2835_thermal.i)
-> 
-> OK then.
-> 
->> 
->> I wonder why sparse is computing these GENMASK values as:
->> 0x3ffffffffff00 and 0x3ffffffffff
-> 
-> In the case you can confirm that the values are correct, I believe this
-> could be a false positive report on sparse, in this case.
+On Mon, Jan 23, 2017 at 9:50 PM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> Hi Magnus,
+>
+> On Mon, Jan 23, 2017 at 1:12 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
+>> From: Magnus Damm <damm+renesas@opensource.se>
+>>
+>> Match on r8a7795 ES2 and enable a certain DMA controller.
+>> In other cases the IPMMU driver remains disabled.
+>>
+>> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+>> ---
+>>
+>>  drivers/iommu/ipmmu-vmsa.c |   24 ++++++++++++++++++++++++
+>>  1 file changed, 24 insertions(+)
+>>
+>> --- 0001/drivers/iommu/ipmmu-vmsa.c
+>> +++ work/drivers/iommu/ipmmu-vmsa.c     2017-01-23 20:57:02.620607110 +0900
+>> @@ -23,6 +23,7 @@
+>>  #include <linux/platform_device.h>
+>>  #include <linux/sizes.h>
+>>  #include <linux/slab.h>
+>> +#include <linux/sys_soc.h>
+>>
+>>  #if defined(CONFIG_ARM) && !defined(CONFIG_IOMMU_DMA)
+>>  #include <asm/dma-iommu.h>
+>> @@ -1002,16 +1003,39 @@ static void ipmmu_domain_free_dma(struct
+>>         }
+>>  }
+>>
+>> +static const struct soc_device_attribute r8a7795es2[] = {
+>> +       { .soc_id = "r8a7795", .revision = "ES2.*" },
+>> +       { /* sentinel */ }
+>> +};
+>> +
+>> +static int ipmmu_slave_whitelist(struct device *dev)
+>> +{
+>> +       /* Opt-in slave devices based on SoC and ES version */
+>> +       if (soc_device_match(r8a7795es2)) {
+>> +               if (!strcmp(dev_name(dev), "e7310000.dma-controller"))
+>> +                       return 0;
+>> +       }
+>
+> I have two comments about the construct above:
+>   1. IPMMU will be disabled on all non-r8a7795 SoCs.
+>      Is that what you want?
 
-The correct values are the ones in my email: 0x3ff00 and 0x003ff
+Sort of. This patch is just an example to stir up some discussion
+about this topic. I realize this code as-is changes R-Car Gen2
+behavior (that is merged upstream) so perhaps we should keep devices
+enabled for those SoCs.
 
-The ones reported by sparse (0x3ffffffffff00 and 0x3ffffffffff) are 
-not calculated correctly - to me it looks as if it is possibly some
-sort of 64 bit issue of sparse in conjunction with the generic macro
-GENMASK.
+>   2. Usually we match on the old broken versions instead (e.g. against
+>      "ES1.*"), as (1) it marks more clearly support for old SoCs, and
+>                 (2) it makes it easier to remove the check later when these
+>                     old SoCs are deemed extinct later.
+
+Right, if I understand correctly then you're saying opt-out might be
+better instead of opt-in. In case of IPMMU and R-Car Gen3 I believe it
+might be less work to use opt-in rather than excluding not-yet-working
+stuff. =)
+
+With this series I would like to propose to disconnect the DT
+integration timing from the enablement of IPMMU support for slave
+devices. If we can enable the IPMMU in DT early on we can reduce
+potential out-of-tree IPMMU enablement DT patches. So with the DT
+bindings fixed and accurate data sheet we can merge DT bits ahead of
+enablement time. And then use run time logic to determine what to
+enable based on test results.
+
+As you are aware, currently we have used the presence of "iommus" in
+DT to determine if a device is going to be enabled or not. So if the
+IPMMU Kconfig bits enable the IPMMU driver and the "iommus" DT
+property tie a certain slave device to the IPMMU then we will make use
+of IPMMU for a certain device. Currently we assume it will work on all
+ES versions that use that particular DTB.
+
+However ES specific hardware errata together with a wide range of ES
+versions for r8a7795 and r8a7796 (and whatever SoCs and ES versions
+that comes next) makes it difficult to use DT like above to enable
+stuff seemingly on one ES version without potentially breaking other
+ES versions. I would like to share DT files between the ES versions as
+much as possible but still only enable IPMMU support for devices that
+are known to work.
+
+Let me know if you think it makes sense to enable DT in a different
+way than my proposal.
+
+I'll have a look at putting the white list code in ->xlate() instead
+of ->add_device().
+
+Thanks for your comments!
+
+Cheers,
+
+/ magnus
