@@ -1,64 +1,95 @@
 From: zyw@rock-chips.com (Chris Zhong)
-Date: Tue, 24 Jan 2017 10:38:00 +0800
-Subject: [PATCH v4 0/6] Rockchip dw-mipi-dsi driver
-Message-ID: <1485225486-669-1-git-send-email-zyw@rock-chips.com>
+Date: Tue, 24 Jan 2017 10:38:04 +0800
+Subject: [PATCH v4 4/6] drm/rockchip/dsi: remove mode_valid function
+In-Reply-To: <1485225486-669-1-git-send-email-zyw@rock-chips.com>
+References: <1485225486-669-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <1485225486-669-5-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all
+The MIPI DSI do not need check the validity of resolution, the max
+resolution should depend VOP. Hence, remove rk3288_mipi_dsi_mode_valid
+here.
 
-This patch serial is for RK3399 MIPI DSI. The MIPI DSI controller of
-RK3399 is almost the same as RK3288, except a little bit of difference
-in phy clock controlling and port id selection register. These patches
-add RK3399 support and the power domain support.
+Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+---
 
-And these patches base on John Keeping's series[0], it fixes many bugs,
-they have been tested on rk3288 evb board.
+Changes in v4: None
+Changes in v3: None
 
-[0]:
-[01/26] https://patchwork.kernel.org/patch/9340213
-[02/26] https://patchwork.kernel.org/patch/9340145
-[03/26] https://patchwork.kernel.org/patch/9340235
-[04/26] https://patchwork.kernel.org/patch/9340123
-[05/26] https://patchwork.kernel.org/patch/9340161
-[06/26] https://patchwork.kernel.org/patch/9340203
-[07/26] https://patchwork.kernel.org/patch/9340229
-[08/26] https://patchwork.kernel.org/patch/9340131
-[09/26] https://patchwork.kernel.org/patch/9340191
-[10/26] https://patchwork.kernel.org/patch/9340175
-[11/26] https://patchwork.kernel.org/patch/9340237
-[12/26] https://patchwork.kernel.org/patch/9340207
-[13/26] https://patchwork.kernel.org/patch/9340233
-[14/26] https://patchwork.kernel.org/patch/9340205
-[15/26] https://patchwork.kernel.org/patch/9340189
-[16/26] https://patchwork.kernel.org/patch/9340143
-[17/26] https://patchwork.kernel.org/patch/9340117
-[18/26] https://patchwork.kernel.org/patch/9340193
-[19/26] https://patchwork.kernel.org/patch/9340151
-[20/26] https://patchwork.kernel.org/patch/9340183
-[23/26] https://patchwork.kernel.org/patch/9340173
-[24/26] https://patchwork.kernel.org/patch/9340251
-[25/26] https://patchwork.kernel.org/patch/9340127
-[26/26] https://patchwork.kernel.org/patch/9340139
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 39 ----------------------------------
+ 1 file changed, 39 deletions(-)
 
-
-Changes in v4:
-- remove the unrelated change
-
-Changes in v3:
-- base on John Keeping's patch series
-
-Chris Zhong (6):
-  dt-bindings: add rk3399 support for dw-mipi-rockchip
-  drm/rockchip/dsi: dw-mipi: support RK3399 mipi dsi
-  drm/rockchip/dsi: dw-mipi: correct the coding style
-  drm/rockchip/dsi: remove mode_valid function
-  dt-bindings: add power domain node for dw-mipi-rockchip
-  drm/rockchip/dsi: add dw-mipi power domain support
-
- .../display/rockchip/dw_mipi_dsi_rockchip.txt      |   7 +-
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c             | 156 ++++++++++++---------
- 2 files changed, 96 insertions(+), 67 deletions(-)
-
+diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+index a93ce97..6f0e252 100644
+--- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
++++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+@@ -278,8 +278,6 @@ struct dw_mipi_dsi_plat_data {
+ 	u32 grf_dsi0_mode;
+ 	u32 grf_dsi0_mode_reg;
+ 	unsigned int max_data_lanes;
+-	enum drm_mode_status (*mode_valid)(struct drm_connector *connector,
+-					   struct drm_display_mode *mode);
+ };
+ 
+ struct dw_mipi_dsi {
+@@ -1081,23 +1079,8 @@ static int dw_mipi_dsi_connector_get_modes(struct drm_connector *connector)
+ 	return drm_panel_get_modes(dsi->panel);
+ }
+ 
+-static enum drm_mode_status dw_mipi_dsi_mode_valid(
+-					struct drm_connector *connector,
+-					struct drm_display_mode *mode)
+-{
+-	struct dw_mipi_dsi *dsi = con_to_dsi(connector);
+-
+-	enum drm_mode_status mode_status = MODE_OK;
+-
+-	if (dsi->pdata->mode_valid)
+-		mode_status = dsi->pdata->mode_valid(connector, mode);
+-
+-	return mode_status;
+-}
+-
+ static struct drm_connector_helper_funcs dw_mipi_dsi_connector_helper_funcs = {
+ 	.get_modes = dw_mipi_dsi_connector_get_modes,
+-	.mode_valid = dw_mipi_dsi_mode_valid,
+ };
+ 
+ static void dw_mipi_dsi_drm_connector_destroy(struct drm_connector *connector)
+@@ -1168,33 +1151,11 @@ static int rockchip_mipi_parse_dt(struct dw_mipi_dsi *dsi)
+ 	return 0;
+ }
+ 
+-static enum drm_mode_status rk3288_mipi_dsi_mode_valid(
+-					struct drm_connector *connector,
+-					struct drm_display_mode *mode)
+-{
+-	/*
+-	 * The VID_PKT_SIZE field in the DSI_VID_PKT_CFG
+-	 * register is 11-bit.
+-	 */
+-	if (mode->hdisplay > 0x7ff)
+-		return MODE_BAD_HVALUE;
+-
+-	/*
+-	 * The V_ACTIVE_LINES field in the DSI_VTIMING_CFG
+-	 * register is 11-bit.
+-	 */
+-	if (mode->vdisplay > 0x7ff)
+-		return MODE_BAD_VVALUE;
+-
+-	return MODE_OK;
+-}
+-
+ static struct dw_mipi_dsi_plat_data rk3288_mipi_dsi_drv_data = {
+ 	.dsi0_en_bit = RK3288_DSI0_SEL_VOP_LIT,
+ 	.dsi1_en_bit = RK3288_DSI1_SEL_VOP_LIT,
+ 	.grf_switch_reg = RK3288_GRF_SOC_CON6,
+ 	.max_data_lanes = 4,
+-	.mode_valid = rk3288_mipi_dsi_mode_valid,
+ };
+ 
+ static struct dw_mipi_dsi_plat_data rk3399_mipi_dsi_drv_data = {
 -- 
 2.6.3
