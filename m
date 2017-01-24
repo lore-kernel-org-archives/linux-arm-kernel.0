@@ -1,74 +1,249 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 24 Jan 2017 17:53:20 +0900
-Subject: [PATCH v30 11/11] Documentation: dt: chosen properties for arm64 kdump
-In-Reply-To: <20170124084638.3770-1-takahiro.akashi@linaro.org>
-References: <20170124084638.3770-1-takahiro.akashi@linaro.org>
-Message-ID: <20170124085320.3973-1-takahiro.akashi@linaro.org>
+From: puck.chen@hisilicon.com (Chen Feng)
+Date: Tue, 24 Jan 2017 16:57:28 +0800
+Subject: [V3 2/3] arm64: dts: Add dts files for Hisilicon Hi3660 SoC
+In-Reply-To: <1485248249-117383-1-git-send-email-puck.chen@hisilicon.com>
+References: <1485248249-117383-1-git-send-email-puck.chen@hisilicon.com>
+Message-ID: <1485248249-117383-2-git-send-email-puck.chen@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: James Morse <james.morse@arm.com>
+Add initial dtsi file to support Hisilicon Hi3660 SoC with
+support of Octal core CPUs in two clusters(4 * A53 & 4 * A73).
 
-Add documentation for DT properties:
-	linux,usable-memory-range
-	linux,elfcorehdr
-used by arm64 kdump. Those decribe the usable memory range for crash dump
-kernel and the elfcorehdr's location within it, respectively.
+Also add dts file to support HiKey960 development board which
+based on Hi3660 SoC.
+The output console is earlycon "earlycon=pl011,0xfdf05000".
+And the con_init uart5 with a fixed clock, which already
+configured at bootloader.
 
-Signed-off-by: James Morse <james.morse@arm.com>
-[takahiro.akashi at linaro.org: added "linux,crashkernel-base" and "-size" ]
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Cc: devicetree at vger.kernel.org
-Cc: Rob Herring <robh+dt@kernel.org>
+When clock is available, the uart5 will be modified.
+
+Tested on HiKey960 Board.
+
+Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
 ---
- Documentation/devicetree/bindings/chosen.txt | 37 ++++++++++++++++++++++++++++
- 1 file changed, 37 insertions(+)
+ arch/arm64/boot/dts/hisilicon/Makefile            |   1 +
+ arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts |  35 +++++
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi         | 160 ++++++++++++++++++++++
+ 3 files changed, 196 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hi3660.dtsi
 
-diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
-index 6ae9d82d4c37..8dc82431acc1 100644
---- a/Documentation/devicetree/bindings/chosen.txt
-+++ b/Documentation/devicetree/bindings/chosen.txt
-@@ -52,3 +52,40 @@ This property is set (currently only on PowerPC, and only needed on
- book3e) by some versions of kexec-tools to tell the new kernel that it
- is being booted by kexec, as the booting environment may differ (e.g.
- a different secondary CPU release mechanism)
+diff --git a/arch/arm64/boot/dts/hisilicon/Makefile b/arch/arm64/boot/dts/hisilicon/Makefile
+index c8b8f80..c3a6c19 100644
+--- a/arch/arm64/boot/dts/hisilicon/Makefile
++++ b/arch/arm64/boot/dts/hisilicon/Makefile
+@@ -1,3 +1,4 @@
++dtb-$(CONFIG_ARCH_HISI) += hi3660-hikey960.dtb
+ dtb-$(CONFIG_ARCH_HISI) += hi6220-hikey.dtb
+ dtb-$(CONFIG_ARCH_HISI) += hip05-d02.dtb
+ dtb-$(CONFIG_ARCH_HISI) += hip06-d03.dtb
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+new file mode 100644
+index 0000000..9ed9e68
+--- /dev/null
++++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
+@@ -0,0 +1,35 @@
++/*
++ * dts file for Hisilicon HiKey960 Development Board
++ *
++ * Copyright (C) 2016, Hisilicon Ltd.
++ *
++ */
 +
-+linux,usable-memory-range
-+-------------------------
++/dts-v1/;
 +
-+This property (arm64 only) holds a base address and size, describing a
-+limited region in which memory may be considered available for use by
-+the kernel. Memory outside of this range is not available for use.
-+
-+This property describes a limitation: memory within this range is only
-+valid when also described through another mechanism that the kernel
-+would otherwise use to determine available memory (e.g. memory nodes
-+or the EFI memory map). Valid memory may be sparse within the range.
-+e.g.
++#include "hi3660.dtsi"
 +
 +/ {
++	model = "HiKey960";
++	compatible = "hisilicon,hi3660";
++
++	aliases {
++		serial5 = &uart5;       /* console UART */
++	};
++
 +	chosen {
-+		linux,usable-memory-range = <0x9 0xf0000000 0x0 0x10000000>;
++		stdout-path = "serial5:115200n8";
++	};
++
++	memory at 0 {
++		device_type = "memory";
++		/* rewrite this at bootloader */
++		reg = <0x0 0x0 0x0 0x0>;
++	};
++
++	soc {
++		uart5: uart at fdf05000 {
++			status = "okay";
++		};
 +	};
 +};
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+new file mode 100644
+index 0000000..3983086
+--- /dev/null
++++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+@@ -0,0 +1,160 @@
++/*
++ * dts file for Hisilicon Hi3660 SoC
++ *
++ * Copyright (C) 2016, Hisilicon Ltd.
++ */
 +
-+The main usage is for crash dump kernel to identify its own usable
-+memory and exclude, at its boot time, any other memory areas that are
-+part of the panicked kernel's memory.
-+
-+linux,elfcorehdr
-+----------------
-+
-+This property (currently used only on arm64) holds the memory range,
-+the address and the size, of the elf core header which mainly describes
-+the panicked kernel's memory layout as PT_LOAD segments of elf format.
-+e.g.
++#include <dt-bindings/interrupt-controller/arm-gic.h>
 +
 +/ {
-+	chosen {
-+		linux,elfcorehdr = <0x9 0xfffff000 0x0 0x800>;
++	compatible = "hisilicon,hi3660";
++	interrupt-parent = <&gic>;
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	psci {
++		compatible = "arm,psci-0.2";
++		method = "smc";
++	};
++
++	cpus {
++		#address-cells = <2>;
++		#size-cells = <0>;
++
++		cpu-map {
++			cluster0 {
++				core0 {
++					cpu = <&cpu0>;
++				};
++				core1 {
++					cpu = <&cpu1>;
++				};
++				core2 {
++					cpu = <&cpu2>;
++				};
++				core3 {
++					cpu = <&cpu3>;
++				};
++			};
++			cluster1 {
++				core0 {
++					cpu = <&cpu4>;
++				};
++				core1 {
++					cpu = <&cpu5>;
++				};
++				core2 {
++					cpu = <&cpu6>;
++				};
++				core3 {
++					cpu = <&cpu7>;
++				};
++			};
++		};
++
++		cpu0: cpu at 0 {
++			compatible = "arm,cortex-a53", "arm,armv8";
++			device_type = "cpu";
++			reg = <0x0 0x0>;
++			enable-method = "psci";
++		};
++
++		cpu1: cpu at 1 {
++			compatible = "arm,cortex-a53", "arm,armv8";
++			device_type = "cpu";
++			reg = <0x0 0x1>;
++			enable-method = "psci";
++		};
++
++		cpu2: cpu at 2 {
++			compatible = "arm,cortex-a53", "arm,armv8";
++			device_type = "cpu";
++			reg = <0x0 0x2>;
++			enable-method = "psci";
++		};
++
++		cpu3: cpu at 3 {
++			compatible = "arm,cortex-a53", "arm,armv8";
++			device_type = "cpu";
++			reg = <0x0 0x3>;
++			enable-method = "psci";
++		};
++
++		cpu4: cpu at 100 {
++			compatible = "arm,cortex-a73", "arm,armv8";
++			device_type = "cpu";
++			reg = <0x0 0x100>;
++			enable-method = "psci";
++		};
++
++		cpu5: cpu at 101 {
++			compatible = "arm,cortex-a73", "arm,armv8";
++			device_type = "cpu";
++			reg = <0x0 0x101>;
++			enable-method = "psci";
++		};
++
++		cpu6: cpu at 102 {
++			compatible = "arm,cortex-a73", "arm,armv8";
++			device_type = "cpu";
++			reg = <0x0 0x102>;
++			enable-method = "psci";
++		};
++
++		cpu7: cpu at 103 {
++			compatible = "arm,cortex-a73", "arm,armv8";
++			device_type = "cpu";
++			reg = <0x0 0x103>;
++			enable-method = "psci";
++		};
++	};
++
++	gic: interrupt-controller at e82b0000 {
++		compatible = "arm,gic-400";
++		reg = <0x0 0xe82b1000 0 0x1000>, /* GICD */
++		      <0x0 0xe82b2000 0 0x2000>, /* GICC */
++		      <0x0 0xe82b4000 0 0x2000>, /* GICH */
++		      <0x0 0xe82b6000 0 0x2000>; /* GICV */
++		#address-cells = <0>;
++		#interrupt-cells = <3>;
++		interrupt-controller;
++		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(8) |
++					 IRQ_TYPE_LEVEL_HIGH)>;
++	};
++
++	timer {
++		compatible = "arm,armv8-timer";
++		interrupt-parent = <&gic>;
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(8) |
++					  IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(8) |
++					  IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(8) |
++					  IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(8) |
++					  IRQ_TYPE_LEVEL_LOW)>;
++	};
++
++	soc {
++		compatible = "simple-bus";
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		fixed_uart5: fixed_19_2M {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <19200000>;
++			clock-output-names = "fixed:uart5";
++		};
++
++		uart5: uart at fdf05000 {
++			compatible = "arm,pl011", "arm,primecell";
++			reg = <0x0 0xfdf05000 0x0 0x1000>;
++			interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&fixed_uart5 &fixed_uart5>;
++			clock-names = "uartclk", "apb_pclk";
++			status = "disabled";
++		};
 +	};
 +};
 -- 
-2.11.0
+1.9.1
