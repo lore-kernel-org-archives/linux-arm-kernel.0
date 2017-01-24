@@ -1,53 +1,57 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Tue, 24 Jan 2017 14:19:34 -0800
-Subject: [PATCH v9 3/3] ARM: dts: imx6q-evi: support cyclone-ps-spi
-In-Reply-To: <cover.1485295905.git.stillcompiling@gmail.com>
-References: <cover.1485295905.git.stillcompiling@gmail.com>
-Message-ID: <8466629f15d8c34be20d574012b0e829680a6393.1485295905.git.stillcompiling@gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 24 Jan 2017 23:39:21 +0100
+Subject: [PATCH 08/16] arm: dts: add spi nodes to the mt7623.dtsi file
+In-Reply-To: <1485170975-51813-9-git-send-email-john@phrozen.org>
+References: <1485170975-51813-1-git-send-email-john@phrozen.org>
+ <1485170975-51813-9-git-send-email-john@phrozen.org>
+Message-ID: <69d73342-d710-5f6d-567b-8e75a84fdb18@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for Altera cyclone V FPGA connected to an spi port
-to the evi devicetree file
 
-Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
----
- arch/arm/boot/dts/imx6q-evi.dts | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6q-evi.dts b/arch/arm/boot/dts/imx6q-evi.dts
-index 79a0bd5..e531bf7 100644
---- a/arch/arm/boot/dts/imx6q-evi.dts
-+++ b/arch/arm/boot/dts/imx6q-evi.dts
-@@ -83,6 +83,15 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_ecspi1 &pinctrl_ecspi1cs>;
- 	status = "okay";
-+
-+	fpga_spi: cyclonespi at 0 {
-+		compatible = "altr,fpga-passive-serial";
-+		spi-max-frequency = <20000000>;
-+		reg = <0>;
-+		pinctrl-0 = <&pinctrl_fpgaspi>;
-+		nconfig-gpios = <&gpio4 9 GPIO_ACTIVE_LOW>;
-+		nstat-gpios = <&gpio4 11 GPIO_ACTIVE_LOW>;
-+	};
- };
- 
- &ecspi3 {
-@@ -316,6 +325,13 @@
- 		>;
- 	};
- 
-+	pinctrl_fpgaspi: fpgaspigrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_ROW1__GPIO4_IO09 0x1b0b0
-+			MX6QDL_PAD_KEY_ROW2__GPIO4_IO11 0x1b0b0
-+		>;
-+	};
-+
- 	pinctrl_gpminand: gpminandgrp {
- 		fsl,pins = <
- 			MX6QDL_PAD_NANDF_CLE__NAND_CLE 0xb0b1
--- 
-2.9.3
+On 01/23/2017 12:29 PM, John Crispin wrote:
+> Add SPI nodes to the mt7623.dtsi file.
+>
+> Signed-off-by: John Crispin <john@phrozen.org>
+> ---
+>  arch/arm/boot/dts/mt7623.dtsi |   12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
+> index 8ac4569..c8f38e1 100644
+> --- a/arch/arm/boot/dts/mt7623.dtsi
+> +++ b/arch/arm/boot/dts/mt7623.dtsi
+> @@ -15,6 +15,7 @@
+>  #include <dt-bindings/interrupt-controller/irq.h>
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include <dt-bindings/clock/mt2701-clk.h>
+> +#include <dt-bindings/phy/phy.h>
+
+Why do you need this include here?
+
+Regards,
+Matthias
+
+>  #include <dt-bindings/pinctrl/mt7623-pinfunc.h>
+>  #include <dt-bindings/power/mt2701-power.h>
+>  #include <dt-bindings/reset/mt2701-resets.h>
+> @@ -281,6 +282,17 @@
+>  		status = "disabled";
+>  	};
+>
+> +	spi: spi at 1100a000 {
+> +		compatible = "mediatek,mt7623-spi",
+> +			     "mediatek,mt6589-spi";
+> +		reg = <0 0x1100a000 0 0x1000>;
+> +		interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&pericfg CLK_PERI_SPI0>;
+> +		clock-names = "main";
+> +
+> +		status = "disabled";
+> +	};
+> +
+>  	hifsys: syscon at 1a000000 {
+>  		compatible = "mediatek,mt7623-hifsys",
+>  			     "mediatek,mt2701-hifsys",
+>
