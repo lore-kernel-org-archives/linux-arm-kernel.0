@@ -1,48 +1,29 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 24 Jan 2017 18:58:01 +0100
-Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
-In-Reply-To: <88c94ea6-abe2-0f20-337e-e9ee00c883d8@roeck-us.net>
-References: <20170123124058.GA17134@amd> <20170123141331.GA11402@amd>
- <da1f1b45-3ae5-ffe8-62c6-9ec7c3a1505b@roeck-us.net>
- <20170123144031.GA7870@amd> <20170123232654.GA19342@amd>
- <20170123234912.GA2460@roeck-us.net>
- <20170124070639.GA5068@rzhang1-surface> <20170124073720.GB5603@amd>
- <88c94ea6-abe2-0f20-337e-e9ee00c883d8@roeck-us.net>
-Message-ID: <20170124175800.GA15070@amd>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 24 Jan 2017 18:01:09 +0000
+Subject: [PATCH] arm64: kernel: do not mark reserved memory regions as
+ IORESOURCE_BUSY
+In-Reply-To: <1485277900-22730-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1485277900-22730-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20170124180109.GK1728@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jan 24, 2017 at 05:11:40PM +0000, Ard Biesheuvel wrote:
+> Memory regions marked as NOMAP should not be used for general allocation
+> by the kernel, and should not even be covered by the linear mapping
+> (hence the name). However, drivers or other subsystems (such as ACPI)
+> that access the firmware directly may legally access them, which means
+> it is also reasonable for such drivers to claim them by invoking
+> request_resource(). Currently, this is prevented by the fact that arm64's
+> request_standard_resources() marks reserved regions as IORESOURCE_BUSY.
+> 
+> So drop the IORESOURCE_BUSY flag from these requests.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/setup.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-> >>Right.
-> >>
-> >>Before reverting, can you please try if this patch works or not?
-> >
-> >Not really. Revert now. Sorry.
-> >
-> >Are you sure? This does not look equivalent to me at all.
-> >
-> >"name" file handling moved from drivers to the core, which added some
-> >crazy checks what name can contain. Even if this "works", what is the
-> >expected effect on the "name" file?
-> >
-> The hwmon name attribute must not include '-', as documented in
-> Documentation/hwmon/sysfs-interface. Is enforcing that 'crazy' ?
-> Maybe in your world, but not in mine.
+Did you find this my inspection, or has somebody reported a problem?
 
-Well, lets revert the patch and then we can discuss what to do with
-the "name" problem.
-
-Unfortunately, code enforces different rules than documentation says,
-and it is all visible to userspace.
-
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170124/c7c57cea/attachment.sig>
+Will
