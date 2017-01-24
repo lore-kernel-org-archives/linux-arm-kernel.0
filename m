@@ -1,39 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 24 Jan 2017 15:58:49 +0000
-Subject: [PATCH] drivers: firmware: psci: Use __pa_symbol for cpu_resume
-In-Reply-To: <20170124153351.GF7572@leverpostej>
-References: <1485271819-2977-1-git-send-email-geert+renesas@glider.be>
- <20170124153351.GF7572@leverpostej>
-Message-ID: <20170124155849.GH1728@arm.com>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Tue, 24 Jan 2017 17:02:24 +0100
+Subject: [PATCH 31/37] misc: Add host side pci driver for pci test
+ function device
+In-Reply-To: <1484216786-17292-32-git-send-email-kishon@ti.com>
+References: <1484216786-17292-1-git-send-email-kishon@ti.com>
+ <1484216786-17292-32-git-send-email-kishon@ti.com>
+Message-ID: <20170124160224.GA23528@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2017 at 03:33:51PM +0000, Mark Rutland wrote:
-> On Tue, Jan 24, 2017 at 04:30:19PM +0100, Geert Uytterhoeven wrote:
-> > If CONFIG_DEBUG_VIRTUAL=y, during s2ram:
-> > 
-> >     virt_to_phys used for non-linear address: ffffff80085db280 (cpu_resume+0x0/0x20)
-> >     ------------[ cut here ]------------
-> >     WARNING: CPU: 0 PID: 1628 at arch/arm64/mm/physaddr.c:14 __virt_to_phys+0x28/0x60
-> >     ...
-> >     [<ffffff800809abb4>] __virt_to_phys+0x28/0x60
-> >     [<ffffff80084a0c38>] psci_system_suspend+0x20/0x44
-> >     [<ffffff8008095b28>] cpu_suspend+0x3c/0x68
-> >     [<ffffff80084a0b48>] psci_system_suspend_enter+0x18/0x20
-> >     [<ffffff80080ea3e0>] suspend_devices_and_enter+0x3f8/0x7e8
-> >     [<ffffff80080ead14>] pm_suspend+0x544/0x5f4
-> > 
-> > Fixes: 1a08e3d9e0ac4577 ("drivers: firmware: psci: Use __pa_symbol for kernel symbol")
-> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> 
-> Argh, I should have spotted this. :(
-> 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> 
-> This should go via the arm64 tree -- Will, could you pick this up? 
+On Thu, Jan 12, 2017 at 03:56:20PM +0530, Kishon Vijay Abraham I wrote:
+> Add PCI endpoint test driver that can verify base address
+> register, legacy interrupt/MSI interrupt and read/write/copy
+> buffers between host and device. The corresponding pci-epf-test
+> function driver should be used on the EP side.
 
-Yup, I'll queue this along with the other __pa_symbol fix.
+Just curious:  what would you think of a text based (e.g. debugfs)
+interface to avoid the need for a userspace tool here?
 
-Cheers,
+> +static const struct pci_device_id pci_endpoint_test_tbl[] = {
+> +	{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCI_ANY_ID) },
+> +	{ }
+> +};
+> +MODULE_DEVICE_TABLE(pci, pci_endpoint_test_tbl);
 
-Will
+Also this looks really odd, and dangerous.  Probing for any
+TI device will bind to all kinds of legit devices.  It would
+be good if you could squeeze out a single id for this device
+out of the TI group responsible for allocating it.  Otherwise
+we might try some other venues, e.g. Red Hat through Qumranet
+has PCI IDs available for virtio, which might have some left
+for other Linux uses.
+
+In general I fear the PCI ID allocation will become a worse
+and worse issue once your framework goes in and we'll grow
+more PCI device models in the kernel.
