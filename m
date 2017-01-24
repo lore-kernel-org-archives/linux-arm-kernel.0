@@ -1,74 +1,115 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 25 Jan 2017 05:28:10 +0800
-Subject: [PATCH 3/8] serial: st-asc: Read in all Pinctrl states
-In-Reply-To: <20170124134310.27512-4-lee.jones@linaro.org>
-Message-ID: <201701250559.iD93QYdx%fengguang.wu@intel.com>
+From: martin@kaiser.cx (Martin Kaiser)
+Date: Tue, 24 Jan 2017 22:33:19 +0100
+Subject: [PATCH] clk: samsung: mark s3c...._clk_sleep_init() as __init
+Message-ID: <1485293599-23581-1-git-send-email-martin@kaiser.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+These functions are called only by other __init functions.
+Compiling for s3c2410 with CONFIG_DEBUG_SECTION_MISMATCH=y,
+I get warnings like
 
-[auto build test ERROR on tty/tty-testing]
-[also build test ERROR on v4.10-rc5 next-20170124]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+WARNING: vmlinux.o(.text+0x198350):
+Section mismatch in reference from the function s3c2410_clk_sleep_init()
+to the (unknown reference) .init.data:(unknown)
 
-url:    https://github.com/0day-ci/linux/commits/Lee-Jones/serial-st-asc-Allow-handling-of-RTS-line/20170125-014618
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git tty-testing
-config: alpha-allyesconfig (attached as .config)
-compiler: alpha-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=alpha 
+Marking the s3c...._clk_sleep() functions as __init fixes this.
 
-All error/warnings (new ones prefixed by >>):
-
-   drivers/tty/serial/st-asc.c: In function 'asc_init_port':
->> drivers/tty/serial/st-asc.c:730:21: error: implicit declaration of function 'devm_pinctrl_get' [-Werror=implicit-function-declaration]
-     ascport->pinctrl = devm_pinctrl_get(&pdev->dev);
-                        ^~~~~~~~~~~~~~~~
->> drivers/tty/serial/st-asc.c:730:19: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-     ascport->pinctrl = devm_pinctrl_get(&pdev->dev);
-                      ^
->> drivers/tty/serial/st-asc.c:737:3: error: implicit declaration of function 'pinctrl_lookup_state' [-Werror=implicit-function-declaration]
-      pinctrl_lookup_state(ascport->pinctrl, "default");
-      ^~~~~~~~~~~~~~~~~~~~
-   drivers/tty/serial/st-asc.c:736:27: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-     ascport->states[DEFAULT] =
-                              ^
-   drivers/tty/serial/st-asc.c:746:30: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
-     ascport->states[MANUAL_RTS] =
-                                 ^
-   cc1: some warnings being treated as errors
-
-vim +/devm_pinctrl_get +730 drivers/tty/serial/st-asc.c
-
-   724		/* ensure that clk rate is correct by enabling the clk */
-   725		clk_prepare_enable(ascport->clk);
-   726		ascport->port.uartclk = clk_get_rate(ascport->clk);
-   727		WARN_ON(ascport->port.uartclk == 0);
-   728		clk_disable_unprepare(ascport->clk);
-   729	
- > 730		ascport->pinctrl = devm_pinctrl_get(&pdev->dev);
-   731		if (IS_ERR(ascport->pinctrl)) {
-   732			ret = PTR_ERR(ascport->pinctrl);
-   733			dev_err(&pdev->dev, "Failed to get Pinctrl: %d\n", ret);
-   734		}
-   735	
-   736		ascport->states[DEFAULT] =
- > 737			pinctrl_lookup_state(ascport->pinctrl, "default");
-   738		if (IS_ERR(ascport->states[DEFAULT])) {
-   739			ret = PTR_ERR(ascport->states[DEFAULT]);
-   740			dev_err(&pdev->dev,
-
+Signed-off-by: Martin Kaiser <martin@kaiser.cx>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 48646 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/1372cacd/attachment-0001.gz>
+ drivers/clk/samsung/clk-s3c2410.c | 4 ++--
+ drivers/clk/samsung/clk-s3c2412.c | 4 ++--
+ drivers/clk/samsung/clk-s3c2443.c | 4 ++--
+ drivers/clk/samsung/clk-s3c64xx.c | 4 ++--
+ 4 files changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/clk/samsung/clk-s3c2410.c b/drivers/clk/samsung/clk-s3c2410.c
+index d7a1e77..e0650c3 100644
+--- a/drivers/clk/samsung/clk-s3c2410.c
++++ b/drivers/clk/samsung/clk-s3c2410.c
+@@ -76,7 +76,7 @@ static struct syscore_ops s3c2410_clk_syscore_ops = {
+ 	.resume = s3c2410_clk_resume,
+ };
+ 
+-static void s3c2410_clk_sleep_init(void)
++static void __init s3c2410_clk_sleep_init(void)
+ {
+ 	s3c2410_save = samsung_clk_alloc_reg_dump(s3c2410_clk_regs,
+ 						ARRAY_SIZE(s3c2410_clk_regs));
+@@ -90,7 +90,7 @@ static void s3c2410_clk_sleep_init(void)
+ 	return;
+ }
+ #else
+-static void s3c2410_clk_sleep_init(void) {}
++static void __init s3c2410_clk_sleep_init(void) {}
+ #endif
+ 
+ PNAME(fclk_p) = { "mpll", "div_slow" };
+diff --git a/drivers/clk/samsung/clk-s3c2412.c b/drivers/clk/samsung/clk-s3c2412.c
+index ec873ee..b8340a4 100644
+--- a/drivers/clk/samsung/clk-s3c2412.c
++++ b/drivers/clk/samsung/clk-s3c2412.c
+@@ -69,7 +69,7 @@ static struct syscore_ops s3c2412_clk_syscore_ops = {
+ 	.resume = s3c2412_clk_resume,
+ };
+ 
+-static void s3c2412_clk_sleep_init(void)
++static void __init s3c2412_clk_sleep_init(void)
+ {
+ 	s3c2412_save = samsung_clk_alloc_reg_dump(s3c2412_clk_regs,
+ 						ARRAY_SIZE(s3c2412_clk_regs));
+@@ -83,7 +83,7 @@ static void s3c2412_clk_sleep_init(void)
+ 	return;
+ }
+ #else
+-static void s3c2412_clk_sleep_init(void) {}
++static void __init s3c2412_clk_sleep_init(void) {}
+ #endif
+ 
+ static struct clk_div_table divxti_d[] = {
+diff --git a/drivers/clk/samsung/clk-s3c2443.c b/drivers/clk/samsung/clk-s3c2443.c
+index 5e24a17..abb935c 100644
+--- a/drivers/clk/samsung/clk-s3c2443.c
++++ b/drivers/clk/samsung/clk-s3c2443.c
+@@ -89,7 +89,7 @@ static struct syscore_ops s3c2443_clk_syscore_ops = {
+ 	.resume = s3c2443_clk_resume,
+ };
+ 
+-static void s3c2443_clk_sleep_init(void)
++static void __init s3c2443_clk_sleep_init(void)
+ {
+ 	s3c2443_save = samsung_clk_alloc_reg_dump(s3c2443_clk_regs,
+ 						ARRAY_SIZE(s3c2443_clk_regs));
+@@ -103,7 +103,7 @@ static void s3c2443_clk_sleep_init(void)
+ 	return;
+ }
+ #else
+-static void s3c2443_clk_sleep_init(void) {}
++static void __init s3c2443_clk_sleep_init(void) {}
+ #endif
+ 
+ PNAME(epllref_p) = { "mpllref", "mpllref", "xti", "ext" };
+diff --git a/drivers/clk/samsung/clk-s3c64xx.c b/drivers/clk/samsung/clk-s3c64xx.c
+index a48bd5f..7306867 100644
+--- a/drivers/clk/samsung/clk-s3c64xx.c
++++ b/drivers/clk/samsung/clk-s3c64xx.c
+@@ -121,7 +121,7 @@ static struct syscore_ops s3c64xx_clk_syscore_ops = {
+ 	.resume = s3c64xx_clk_resume,
+ };
+ 
+-static void s3c64xx_clk_sleep_init(void)
++static void __init s3c64xx_clk_sleep_init(void)
+ {
+ 	s3c64xx_save_common = samsung_clk_alloc_reg_dump(s3c64xx_clk_regs,
+ 						ARRAY_SIZE(s3c64xx_clk_regs));
+@@ -145,7 +145,7 @@ static void s3c64xx_clk_sleep_init(void)
+ 		__func__);
+ }
+ #else
+-static void s3c64xx_clk_sleep_init(void) {}
++static void __init s3c64xx_clk_sleep_init(void) {}
+ #endif
+ 
+ /* List of parent clocks common for all S3C64xx SoCs. */
+-- 
+2.1.4
