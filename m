@@ -1,19 +1,18 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Tue, 24 Jan 2017 18:39:38 +0000
-Subject: Applied "regulator: axp20x: AXP806: Fix dcdcb being set instead of
- dcdce" to the regulator tree
-In-Reply-To: <20170121161142.g4zslhohb6vvcvwd@localhost>
-Message-ID: <E1cW60I-0006ge-Bf@debutante>
+Date: Tue, 24 Jan 2017 18:39:48 +0000
+Subject: Applied "spi: pca2xx-pci: Allow MSI" to the spi tree
+In-Reply-To: <9f5bc54a5842b383dc81fa8586d6774c03d2c452.1484592296.git.jan.kiszka@siemens.com>
+Message-ID: <E1cW60S-0006m9-O2@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   regulator: axp20x: AXP806: Fix dcdcb being set instead of dcdce
+   spi: pca2xx-pci: Allow MSI
 
-has been applied to the regulator tree at
+has been applied to the spi tree at
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git 
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
 
 All being well this means that it will be integrated into the linux-next
 tree (usually sometime in the next 24 hours) and sent to Linus during
@@ -34,36 +33,44 @@ to this mail.
 Thanks,
 Mark
 
->From d0e287a401d9acf67b75180b26e2d62b7d482652 Mon Sep 17 00:00:00 2001
-From: Rask Ingemann Lambertsen <rask@formelder.dk>
-Date: Sat, 21 Jan 2017 17:11:43 +0100
-Subject: [PATCH] regulator: axp20x: AXP806: Fix dcdcb being set instead of
- dcdce
+>From 64e02cb0bdfc7cef0a01e2ad4d567fdc0a74450e Mon Sep 17 00:00:00 2001
+From: Jan Kiszka <jan.kiszka@siemens.com>
+Date: Sat, 21 Jan 2017 10:06:39 +0100
+Subject: [PATCH] spi: pca2xx-pci: Allow MSI
 
-A typo or copy-paste bug means that the register access intended for
-regulator dcdce goes to dcdcb instead. This patch corrects it.
+Now that the core is ready for edge-triggered interrupts, we can safely
+allow the PCI versions that provide this to enable the feature and,
+thus, have less shared interrupts.
 
-Fixes: 2ca342d391e3 (regulator: axp20x: Support AXP806 variant)
-Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
+Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Reviewed-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
-Cc: stable at vger.kernel.org
 ---
- drivers/regulator/axp20x-regulator.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/spi/spi-pxa2xx-pci.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
-index e6a512ebeae2..a3ade9e4ef47 100644
---- a/drivers/regulator/axp20x-regulator.c
-+++ b/drivers/regulator/axp20x-regulator.c
-@@ -272,7 +272,7 @@ static const struct regulator_desc axp806_regulators[] = {
- 			64, AXP806_DCDCD_V_CTRL, 0x3f, AXP806_PWR_OUT_CTRL1,
- 			BIT(3)),
- 	AXP_DESC(AXP806, DCDCE, "dcdce", "vine", 1100, 3400, 100,
--		 AXP806_DCDCB_V_CTRL, 0x1f, AXP806_PWR_OUT_CTRL1, BIT(4)),
-+		 AXP806_DCDCE_V_CTRL, 0x1f, AXP806_PWR_OUT_CTRL1, BIT(4)),
- 	AXP_DESC(AXP806, ALDO1, "aldo1", "aldoin", 700, 3300, 100,
- 		 AXP806_ALDO1_V_CTRL, 0x1f, AXP806_PWR_OUT_CTRL1, BIT(5)),
- 	AXP_DESC(AXP806, ALDO2, "aldo2", "aldoin", 700, 3400, 100,
+diff --git a/drivers/spi/spi-pxa2xx-pci.c b/drivers/spi/spi-pxa2xx-pci.c
+index 868452d8e3e1..869f188b02eb 100644
+--- a/drivers/spi/spi-pxa2xx-pci.c
++++ b/drivers/spi/spi-pxa2xx-pci.c
+@@ -227,10 +227,16 @@ static int pxa2xx_spi_pci_probe(struct pci_dev *dev,
+ 	ssp = &spi_pdata.ssp;
+ 	ssp->phys_base = pci_resource_start(dev, 0);
+ 	ssp->mmio_base = pcim_iomap_table(dev)[0];
+-	ssp->irq = dev->irq;
+ 	ssp->port_id = (c->port_id >= 0) ? c->port_id : dev->devfn;
+ 	ssp->type = c->type;
+ 
++	pci_set_master(dev);
++
++	ret = pci_alloc_irq_vectors(dev, 1, 1, PCI_IRQ_ALL_TYPES);
++	if (ret < 0)
++		return ret;
++	ssp->irq = pci_irq_vector(dev, 0);
++
+ 	snprintf(buf, sizeof(buf), "pxa2xx-spi.%d", ssp->port_id);
+ 	ssp->clk = clk_register_fixed_rate(&dev->dev, buf , NULL, 0,
+ 					   c->max_clk_rate);
 -- 
 2.11.0
