@@ -1,129 +1,72 @@
-From: spjoshi@codeaurora.org (Sarangdhar Joshi)
-Date: Mon, 23 Jan 2017 17:53:19 -0800
-Subject: [PATCH v2 2/2] remoteproc: Drop firmware_loading_complete
-In-Reply-To: <1485222799-20769-1-git-send-email-spjoshi@codeaurora.org>
-References: <1485222799-20769-1-git-send-email-spjoshi@codeaurora.org>
-Message-ID: <1485222799-20769-2-git-send-email-spjoshi@codeaurora.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 24 Jan 2017 10:14:45 +0800
+Subject: [alsa-devel] [PATCH 5/7] ASoC: dmaengine_pcm: add copy support
+In-Reply-To: <1485189145-29576-6-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <201701241000.457WwRYd%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-firmware_loading_complete is used to synchronize operations
-on rproc while asynchronous firmware loading is in progress.
-However, rproc_boot() no longer waits on
-firmware_loading_complete. Hence drop this completion
-variable altogether and handle the race between rproc_del()
-and rproc_boot() using new state RPROC_DELETED.
+Hi olivier,
 
-The request_firmware_nowait() will hold the reference to
-rproc device by using a get_device()/put_device(), so the
-rproc struct will remain valid even when we return from
-rproc_del() before the asynchronous call to
-rproc_fw_config_virtio() completes.
+[auto build test WARNING on iio/togreg]
+[cannot apply to asoc/for-next ljones-mfd/for-mfd-next v4.10-rc5 next-20170123]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-CC: Loic Pallardy <loic.pallardy@st.com>
-CC: Bjorn Andersson <bjorn.andersson@linaro.org>
-Signed-off-by: Sarangdhar Joshi <spjoshi@codeaurora.org>
+url:    https://github.com/0day-ci/linux/commits/Arnaud-Pouliquen/Add-STM32-DFSDM-support/20170124-065537
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/jic23/iio.git togreg
+reproduce: make htmldocs
+
+All warnings (new ones prefixed by >>):
+
+>> include/sound/dmaengine_pcm.h:152: warning: No description found for parameter 'copy'
+   include/sound/compress_driver.h:162: warning: No description found for parameter 'id[64]'
+   include/sound/compress_driver.h:162: warning: No description found for parameter 'proc_root'
+   include/sound/compress_driver.h:162: warning: No description found for parameter 'proc_info_entry'
+   include/sound/core.h:323: warning: No description found for parameter '...'
+   include/sound/core.h:334: warning: No description found for parameter '...'
+   include/sound/core.h:387: warning: No description found for parameter '...'
+
+vim +/copy +152 include/sound/dmaengine_pcm.h
+
+28c4468b Lars-Peter Clausen 2013-04-15  136  struct snd_dmaengine_pcm_config {
+28c4468b Lars-Peter Clausen 2013-04-15  137  	int (*prepare_slave_config)(struct snd_pcm_substream *substream,
+28c4468b Lars-Peter Clausen 2013-04-15  138  			struct snd_pcm_hw_params *params,
+28c4468b Lars-Peter Clausen 2013-04-15  139  			struct dma_slave_config *slave_config);
+553a8492 olivier moysan     2017-01-23  140  	int (*copy)(struct snd_pcm_substream *substream, int channel,
+553a8492 olivier moysan     2017-01-23  141  		    snd_pcm_uframes_t pos,
+553a8492 olivier moysan     2017-01-23  142  		    void __user *buf, snd_pcm_uframes_t count);
+c999836d Lars-Peter Clausen 2013-04-15  143  	struct dma_chan *(*compat_request_channel)(
+c999836d Lars-Peter Clausen 2013-04-15  144  			struct snd_soc_pcm_runtime *rtd,
+c999836d Lars-Peter Clausen 2013-04-15  145  			struct snd_pcm_substream *substream);
+c999836d Lars-Peter Clausen 2013-04-15  146  	dma_filter_fn compat_filter_fn;
+194c7dea Stephen Warren     2013-12-03  147  	struct device *dma_dev;
+194c7dea Stephen Warren     2013-12-03  148  	const char *chan_names[SNDRV_PCM_STREAM_LAST + 1];
+28c4468b Lars-Peter Clausen 2013-04-15  149  
+28c4468b Lars-Peter Clausen 2013-04-15  150  	const struct snd_pcm_hardware *pcm_hardware;
+28c4468b Lars-Peter Clausen 2013-04-15  151  	unsigned int prealloc_buffer_size;
+28c4468b Lars-Peter Clausen 2013-04-15 @152  };
+28c4468b Lars-Peter Clausen 2013-04-15  153  
+28c4468b Lars-Peter Clausen 2013-04-15  154  int snd_dmaengine_pcm_register(struct device *dev,
+28c4468b Lars-Peter Clausen 2013-04-15  155  	const struct snd_dmaengine_pcm_config *config,
+28c4468b Lars-Peter Clausen 2013-04-15  156  	unsigned int flags);
+28c4468b Lars-Peter Clausen 2013-04-15  157  void snd_dmaengine_pcm_unregister(struct device *dev);
+28c4468b Lars-Peter Clausen 2013-04-15  158  
+21585ee8 Lars-Peter Clausen 2013-11-28  159  int devm_snd_dmaengine_pcm_register(struct device *dev,
+21585ee8 Lars-Peter Clausen 2013-11-28  160  	const struct snd_dmaengine_pcm_config *config,
+
+:::::: The code at line 152 was first introduced by commit
+:::::: 28c4468b00a1e55e08cc20117de968f7c6275441 ASoC: Add a generic dmaengine_pcm driver
+
+:::::: TO: Lars-Peter Clausen <lars@metafoo.de>
+:::::: CC: Mark Brown <broonie@opensource.wolfsonmicro.com>
+
 ---
-
-The current patch series is a v2 version of original patch listed at
-https://lkml.org/lkml/2016/12/16/534
-
-Changes from v1:
-
-* Add new RPROC_DELETED state
-* Use the new state RPROC_DELETED to handle race between rproc_del()
-  and rproc_boot()
-
- drivers/remoteproc/remoteproc_core.c | 22 +++++++++++-----------
- include/linux/remoteproc.h           |  2 --
- 2 files changed, 11 insertions(+), 13 deletions(-)
-
-diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-index 78200a7..f58e634 100644
---- a/drivers/remoteproc/remoteproc_core.c
-+++ b/drivers/remoteproc/remoteproc_core.c
-@@ -975,17 +975,12 @@ static void rproc_fw_config_virtio(const struct firmware *fw, void *context)
- 		rproc_boot(rproc);
- 
- 	release_firmware(fw);
--	/* allow rproc_del() contexts, if any, to proceed */
--	complete_all(&rproc->firmware_loading_complete);
- }
- 
- static int rproc_add_virtio_devices(struct rproc *rproc)
- {
- 	int ret;
- 
--	/* rproc_del() calls must wait until async loader completes */
--	init_completion(&rproc->firmware_loading_complete);
--
- 	/*
- 	 * We must retrieve early virtio configuration info from
- 	 * the firmware (e.g. whether to register a virtio device,
-@@ -997,10 +992,8 @@ static int rproc_add_virtio_devices(struct rproc *rproc)
- 	ret = request_firmware_nowait(THIS_MODULE, FW_ACTION_HOTPLUG,
- 				      rproc->firmware, &rproc->dev, GFP_KERNEL,
- 				      rproc, rproc_fw_config_virtio);
--	if (ret < 0) {
-+	if (ret < 0)
- 		dev_err(&rproc->dev, "request_firmware_nowait err: %d\n", ret);
--		complete_all(&rproc->firmware_loading_complete);
--	}
- 
- 	return ret;
- }
-@@ -1097,6 +1090,12 @@ static int __rproc_boot(struct rproc *rproc)
- 		return ret;
- 	}
- 
-+	if (rproc->state == RPROC_DELETED) {
-+		ret = -ENODEV;
-+		dev_err(dev, "can't boot deleted rproc %s\n", rproc->name);
-+		goto unlock_mutex;
-+	}
-+
- 	/* skip the boot process if rproc is already powered up */
- 	if (atomic_inc_return(&rproc->power) > 1) {
- 		ret = 0;
-@@ -1481,14 +1480,15 @@ int rproc_del(struct rproc *rproc)
- 	if (!rproc)
- 		return -EINVAL;
- 
--	/* if rproc is just being registered, wait */
--	wait_for_completion(&rproc->firmware_loading_complete);
--
- 	/* if rproc is marked always-on, rproc_add() booted it */
- 	/* TODO: make sure this works with rproc->power > 1 */
- 	if (rproc->auto_boot)
- 		rproc_shutdown(rproc);
- 
-+	mutex_lock(&rproc->lock);
-+	rproc->state = RPROC_DELETED;
-+	mutex_unlock(&rproc->lock);
-+
- 	rproc_delete_debug_dir(rproc);
- 
- 	/* the rproc is downref'ed as soon as it's removed from the klist */
-diff --git a/include/linux/remoteproc.h b/include/linux/remoteproc.h
-index 25a8c37..26328c4 100644
---- a/include/linux/remoteproc.h
-+++ b/include/linux/remoteproc.h
-@@ -399,7 +399,6 @@ enum rproc_crash_type {
-  * @num_traces: number of trace buffers
-  * @carveouts: list of physically contiguous memory allocations
-  * @mappings: list of iommu mappings we initiated, needed on shutdown
-- * @firmware_loading_complete: marks e/o asynchronous firmware loading
-  * @bootaddr: address of first instruction to boot rproc with (optional)
-  * @rvdevs: list of remote virtio devices
-  * @subdevs: list of subdevices, to following the running state
-@@ -430,7 +429,6 @@ struct rproc {
- 	int num_traces;
- 	struct list_head carveouts;
- 	struct list_head mappings;
--	struct completion firmware_loading_complete;
- 	u32 bootaddr;
- 	struct list_head rvdevs;
- 	struct list_head subdevs;
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 6425 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170124/7b032151/attachment.gz>
