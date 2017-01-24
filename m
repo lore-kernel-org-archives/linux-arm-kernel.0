@@ -1,45 +1,56 @@
 From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Tue, 24 Jan 2017 15:16:36 +0300
-Subject: [PATCH v5 1/8] dt-bindings: clarify compatible property for rockchip
- timers
+Date: Tue, 24 Jan 2017 15:16:42 +0300
+Subject: [PATCH v5 7/8] clocksource/drivers/rockchip_timer: move
+ TIMER_INT_UNMASK out of rk_timer_enable()
 In-Reply-To: <1485260203-14216-1-git-send-email-al.kochet@gmail.com>
 References: <1485260203-14216-1-git-send-email-al.kochet@gmail.com>
-Message-ID: <1485260203-14216-2-git-send-email-al.kochet@gmail.com>
+Message-ID: <1485260203-14216-8-git-send-email-al.kochet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make all properties description in form '"rockchip,<chip>-timer",
-"rockchip,rk3288-timer"' for all chips found in linux kernel.
+This allow to enable timer without enabling interrupts from it.
+As that mode will be used in clocksource implementation.
 
-Suggested-by: Heiko St?bner <heiko@sntech.de>
+This is refactoring step without functional changes.
+
 Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
-Acked-by: Rob Herring <robh@kernel.org>
+Reviwed-by: Heiko St?bner <heiko@sntech.de>
 ---
- .../bindings/timer/rockchip,rk-timer.txt           |   12 +++++++++---
- 1 file changed, 9 insertions(+), 3 deletions(-)
+ drivers/clocksource/rockchip_timer.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt b/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
-index a41b184..16a5f45 100644
---- a/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
-+++ b/Documentation/devicetree/bindings/timer/rockchip,rk-timer.txt
-@@ -1,9 +1,15 @@
- Rockchip rk timer
+diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
+index a17dc61..61c3bb1 100644
+--- a/drivers/clocksource/rockchip_timer.c
++++ b/drivers/clocksource/rockchip_timer.c
+@@ -60,8 +60,7 @@ static inline void rk_timer_disable(struct rk_timer *timer)
  
- Required properties:
--- compatible: shall be one of:
--  "rockchip,rk3288-timer" - for rk3066, rk3036, rk3188, rk322x, rk3288, rk3368
--  "rockchip,rk3399-timer" - for rk3399
-+- compatible: should be:
-+  "rockchip,rk3036-timer", "rockchip,rk3288-timer": for Rockchip RK3036
-+  "rockchip,rk3066-timer", "rockchip,rk3288-timer": for Rockchip RK3066
-+  "rockchip,rk3188-timer", "rockchip,rk3288-timer": for Rockchip RK3188
-+  "rockchip,rk3228-timer", "rockchip,rk3288-timer": for Rockchip RK3228
-+  "rockchip,rk3229-timer", "rockchip,rk3288-timer": for Rockchip RK3229
-+  "rockchip,rk3288-timer": for Rockchip RK3288
-+  "rockchip,rk3368-timer", "rockchip,rk3288-timer": for Rockchip RK3368
-+  "rockchip,rk3399-timer": for Rockchip RK3399
- - reg: base address of the timer register starting with TIMERS CONTROL register
- - interrupts: should contain the interrupts for Timer0
- - clocks : must contain an entry for each entry in clock-names
+ static inline void rk_timer_enable(struct rk_timer *timer, u32 flags)
+ {
+-	writel_relaxed(TIMER_ENABLE | TIMER_INT_UNMASK | flags,
+-		       timer->ctrl);
++	writel_relaxed(TIMER_ENABLE | flags, timer->ctrl);
+ }
+ 
+ static void rk_timer_update_counter(unsigned long cycles,
+@@ -83,7 +82,8 @@ static inline int rk_timer_set_next_event(unsigned long cycles,
+ 
+ 	rk_timer_disable(timer);
+ 	rk_timer_update_counter(cycles, timer);
+-	rk_timer_enable(timer, TIMER_MODE_USER_DEFINED_COUNT);
++	rk_timer_enable(timer, TIMER_MODE_USER_DEFINED_COUNT |
++			       TIMER_INT_UNMASK);
+ 	return 0;
+ }
+ 
+@@ -101,7 +101,7 @@ static int rk_timer_set_periodic(struct clock_event_device *ce)
+ 
+ 	rk_timer_disable(timer);
+ 	rk_timer_update_counter(timer->freq / HZ - 1, timer);
+-	rk_timer_enable(timer, TIMER_MODE_FREE_RUNNING);
++	rk_timer_enable(timer, TIMER_MODE_FREE_RUNNING | TIMER_INT_UNMASK);
+ 	return 0;
+ }
+ 
 -- 
 1.7.9.5
