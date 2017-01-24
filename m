@@ -1,76 +1,61 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 24 Jan 2017 17:24:00 +0000
-Subject: [PATCH v20 08/17] clocksource/drivers/arm_arch_timer: Rework
- counter frequency detection.
-In-Reply-To: <20170118132541.8989-9-fu.wei@linaro.org>
-References: <20170118132541.8989-1-fu.wei@linaro.org>
- <20170118132541.8989-9-fu.wei@linaro.org>
-Message-ID: <20170124172400.GG7572@leverpostej>
+From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
+Date: Tue, 24 Jan 2017 18:24:55 +0100 (CET)
+Subject: [PATCH 00/22] Conversion of ARMv4 Gemini to DT and multiplatform
+In-Reply-To: <CACRpkdbdsNU6pOcewyZw_jpXzXvm_aj0FURY7Ty5FkT227iZ=Q@mail.gmail.com>
+References: <20170122121506.9995-1-linus.walleij@linaro.org>
+ <8e705d3a-ff99-23b2-c4c9-2edccf134cac@gmail.com>
+ <CACRpkdbdsNU6pOcewyZw_jpXzXvm_aj0FURY7Ty5FkT227iZ=Q@mail.gmail.com>
+Message-ID: <alpine.LNX.2.00.1701241734140.2736@T420s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2017 at 09:25:32PM +0800, fu.wei at linaro.org wrote:
-> From: Fu Wei <fu.wei@linaro.org>
+Hi Linus,
+
+thanks for the work converting Gemini to DT.
+
+On Sun, 22 Jan 2017, Linus Walleij wrote:
+
+> On Sun, Jan 22, 2017 at 7:42 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> > On 01/22/2017 04:15 AM, Linus Walleij wrote:
+> >> I got a Gemini platform from Florian Fainelli over at OpenWRT
+> >> some time back. I finally got around to "future-proofing" the
+> >> platform, which was the idea when he paintakingly sent the box
+> >> over to me.
+> >
+> > I would have happily tested that series ;) thanks a lot for making it
+> > happen!
 > 
-> The counter frequency detection call(arch_timer_detect_rate) combines two
-> ways to get counter frequency: system coprocessor register and MMIO timer.
-> But in a specific timer init code, we only need one way to try:
-> getting frequency from MMIO timer register will be needed only when we
-> init MMIO timer; getting frequency from system coprocessor register will
-> be needed only when we init arch timer.
-
-When I mentioned this splitting before, I had mean that we'd completely
-separate the two, with separate mmio_rate and sysreg_rate variables.
-
-The probing logic relying on this is complicated and fragile, and I
-think these patches are complicating that further (though I appreciate
-that's far from the intent).
-
-I believe we need to split the MMIO and sysreg timer code apart
-entirely. I've had a look at that today, though it's been fairly painful
-so far. It appears some platforms may inadvertently be relying on the
-order and manner in which the rates are probed, which is a major
-headache.
-
-I will try to attack that some more tomorrow.
-
-> This patch separates paths to determine frequency:
-> Separate out the MMIO frequency and the sysreg frequency detection call,
-> and use the appropriate one for the counter.
+> There is a git branch here:
+> https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-nomadik.git/log/?h=gemini
 > 
-> Signed-off-by: Fu Wei <fu.wei@linaro.org>
-> ---
->  drivers/clocksource/arm_arch_timer.c | 40 ++++++++++++++++++++++--------------
->  1 file changed, 25 insertions(+), 15 deletions(-)
+> I collect info and instructions to get it running here:
+> https://dflund.se/~triad/krad/gemini/
 > 
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 6484f84..9482481 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -488,23 +488,33 @@ static int arch_timer_starting_cpu(unsigned int cpu)
->  	return 0;
->  }
->  
-> -static void arch_timer_detect_rate(void __iomem *cntbase)
-> +static void __arch_timer_determine_rate(u32 rate)
->  {
-> -	/* Who has more than one independent system counter? */
-> -	if (arch_timer_rate)
-> -		return;
-> +	/* Check the timer frequency. */
-> +	if (!arch_timer_rate) {
-> +		if (rate)
-> +			arch_timer_rate = rate;
-> +		else
-> +			pr_warn("frequency not available\n");
-> +	} else if (rate && arch_timer_rate != rate) {
-> +		pr_warn("got different frequency, keep original.\n");
-> +	}
-> +}
+> >> The OpenWRT tree still have a whole bunch of significant out-of
+> >> tree drivers:
+> >>
+> >> - Watchdog
+> >> - GMAC (ethernet)
+> >
+> > Been wondering about the GMAC driver a little bit, and it does not
+> > appear to be neither a Synopsys/Designware core (although not 100%
+> > sure), nor the ftgmac100 either.
+> >
+> > This submission does appear to be in a good shape:
+> > https://lwn.net/Articles/437889/
+> 
 
-This function should be killed off entirely. We need to be able to fail
-the probe if we cannot determine the rate, and that means we need error
-handling in the ACPI and DT cases anyway.
+AFAICR
+This is a dual GMAC !
 
-Thanks,
-Mark.
+They are two different base address for each GMAC and one shared
+base address for both of them.
+This is all in one address space which remaps the driver.
+
+And to make it worse two interrupt lines, one of them is also shared.
+
+Any ideas to "convert" this into DT ??
+Because I think it's impossible to split both GMAC interfaces ??
+
+Greetings
+Hans Ulli Kroll
