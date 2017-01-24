@@ -1,53 +1,74 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 24 Jan 2017 21:10:23 +0100
-Subject: [PATCH net-next v6 1/4] net: dsa: mv88e6xxx: Don't forbid MDIO I/Os
- for PHY addr >= num_of_ports
+Date: Tue, 24 Jan 2017 21:10:26 +0100
+Subject: [PATCH net-next v6 4/4] phy: marvell: Add support for the PHY
+ embedded in the topaz switch
 In-Reply-To: <cover.b0e18efe751186768e720c341693117fdd4d3c16.1485288602.git-series.gregory.clement@free-electrons.com>
 References: <cover.b0e18efe751186768e720c341693117fdd4d3c16.1485288602.git-series.gregory.clement@free-electrons.com>
-Message-ID: <7665c54a8da0d4338d5935ab272952ea6547d815.1485288602.git-series.gregory.clement@free-electrons.com>
+Message-ID: <f8526f4a5d99223fc90fe5579b4958eaa0950a3a.1485288602.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Romain Perier <romain.perier@free-electrons.com>
+The PHY with the ID 0x1410C00 can be found embedded in the Marvell Topaz
+switches (88E6141/88E6341). It is compatible with the 88E1510 (at least for
+the temperature information), so add support for it, using the 88E1510
+specific functions.
 
-Some Marvell ethernet switches have internal ethernet transceivers with
-hardcoded phy addresses. These addresses can be greater than the number
-of ports or its value might be different than the associated port number.
-This is for example the case for MV88E6341 that has 6 ports and internal
-Port 1 to Port4 PHYs mapped at SMI addresses from 0x11 to 0x14.
-
-This commits fixes the issue by removing the condition in MDIO callbacks.
-
-Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/net/dsa/mv88e6xxx/chip.c | 6 ------
- 1 file changed, 6 deletions(-)
+ drivers/net/phy/marvell.c   | 21 +++++++++++++++++++++
+ include/linux/marvell_phy.h |  1 +
+ 2 files changed, 22 insertions(+)
 
-diff --git a/drivers/net/dsa/mv88e6xxx/chip.c b/drivers/net/dsa/mv88e6xxx/chip.c
-index c7e08e13bb54..7d942f8a42a7 100644
---- a/drivers/net/dsa/mv88e6xxx/chip.c
-+++ b/drivers/net/dsa/mv88e6xxx/chip.c
-@@ -2882,9 +2882,6 @@ static int mv88e6xxx_mdio_read(struct mii_bus *bus, int phy, int reg)
- 	u16 val;
- 	int err;
+diff --git a/drivers/net/phy/marvell.c b/drivers/net/phy/marvell.c
+index 64229976ace1..8b9338a746b8 100644
+--- a/drivers/net/phy/marvell.c
++++ b/drivers/net/phy/marvell.c
+@@ -2141,6 +2141,26 @@ static struct phy_driver marvell_drivers[] = {
+ 		.get_strings = marvell_get_strings,
+ 		.get_stats = marvell_get_stats,
+ 	},
++	{
++		.phy_id = MARVELL_PHY_ID_88E6141,
++		.phy_id_mask = MARVELL_PHY_ID_MASK,
++		.name = "Marvell 88E6141",
++		.probe = m88e1510_probe,
++		.remove = &marvell_remove,
++		.features = PHY_GBIT_FEATURES,
++		.flags = PHY_HAS_INTERRUPT,
++		.config_init = &marvell_config_init,
++		.config_aneg = &m88e1510_config_aneg,
++		.read_status = &marvell_read_status,
++		.ack_interrupt = &marvell_ack_interrupt,
++		.config_intr = &marvell_config_intr,
++		.did_interrupt = &m88e1121_did_interrupt,
++		.resume = &genphy_resume,
++		.suspend = &genphy_suspend,
++		.get_sset_count = marvell_get_sset_count,
++		.get_strings = marvell_get_strings,
++		.get_stats = marvell_get_stats,
++	},
+ };
  
--	if (phy >= mv88e6xxx_num_ports(chip))
--		return 0xffff;
--
- 	mutex_lock(&chip->reg_lock);
- 	err = mv88e6xxx_phy_read(chip, phy, reg, &val);
- 	mutex_unlock(&chip->reg_lock);
-@@ -2897,9 +2894,6 @@ static int mv88e6xxx_mdio_write(struct mii_bus *bus, int phy, int reg, u16 val)
- 	struct mv88e6xxx_chip *chip = bus->priv;
- 	int err;
+ module_phy_driver(marvell_drivers);
+@@ -2159,6 +2179,7 @@ static struct mdio_device_id __maybe_unused marvell_tbl[] = {
+ 	{ MARVELL_PHY_ID_88E1510, MARVELL_PHY_ID_MASK },
+ 	{ MARVELL_PHY_ID_88E1540, MARVELL_PHY_ID_MASK },
+ 	{ MARVELL_PHY_ID_88E3016, MARVELL_PHY_ID_MASK },
++	{ MARVELL_PHY_ID_88E6141, MARVELL_PHY_ID_MASK },
+ 	{ }
+ };
  
--	if (phy >= mv88e6xxx_num_ports(chip))
--		return 0xffff;
--
- 	mutex_lock(&chip->reg_lock);
- 	err = mv88e6xxx_phy_write(chip, phy, reg, val);
- 	mutex_unlock(&chip->reg_lock);
+diff --git a/include/linux/marvell_phy.h b/include/linux/marvell_phy.h
+index a57f0dfb6db7..6f33b73f2044 100644
+--- a/include/linux/marvell_phy.h
++++ b/include/linux/marvell_phy.h
+@@ -5,6 +5,7 @@
+ #define MARVELL_PHY_ID_MASK		0xfffffff0
+ 
+ /* Known PHY IDs */
++#define MARVELL_PHY_ID_88E6141		0x01410c00
+ #define MARVELL_PHY_ID_88E1101		0x01410c60
+ #define MARVELL_PHY_ID_88E1112		0x01410c90
+ #define MARVELL_PHY_ID_88E1111		0x01410cc0
 -- 
 git-series 0.9.1
