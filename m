@@ -1,78 +1,36 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 24 Jan 2017 12:39:19 +0100
-Subject: [PATCH v3 16/24] media: Add i.MX media core driver
-In-Reply-To: <aaefdb64-5d45-a225-f764-b06ebda73264@gmail.com>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-17-git-send-email-steve_longerbeam@mentor.com>
- <1484320822.31475.96.camel@pengutronix.de>
- <2b1d2418-1ad4-6373-cb07-c3aeab48187f@gmail.com>
- <aaefdb64-5d45-a225-f764-b06ebda73264@gmail.com>
-Message-ID: <1485257959.3600.108.camel@pengutronix.de>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Tue, 24 Jan 2017 12:43:40 +0100
+Subject: [PATCH] arm64: Use __pa_symbol for empty_zero_page
+Message-ID: <1485258220-21916-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-01-18 at 17:44 -0800, Steve Longerbeam wrote:
-> 
-> On 01/14/2017 02:42 PM, Steve Longerbeam wrote:
-> >
-> >>> +/* parse inputs property from a sensor node */
-> >>> +static void of_parse_sensor_inputs(struct imx_media_dev *imxmd,
-> >>> +				   struct imx_media_subdev *sensor,
-> >>> +				   struct device_node *sensor_np)
-> >>> +{
-> >>> +	struct imx_media_sensor_input *sinput = &sensor->input;
-> >>> +	int ret, i;
-> >>> +
-> >>> +	for (i = 0; i < IMX_MEDIA_MAX_SENSOR_INPUTS; i++) {
-> >>> +		const char *input_name;
-> >>> +		u32 val;
-> >>> +
-> >>> +		ret = of_property_read_u32_index(sensor_np, "inputs", i, &val);
-> >>> +		if (ret)
-> >>> +			break;
-> >>> +
-> >>> +		sinput->value[i] = val;
-> >>> +
-> >>> +		ret = of_property_read_string_index(sensor_np, "input-names",
-> >>> +						    i, &input_name);
-> >>> +		/*
-> >>> +		 * if input-names not provided, they will be set using
-> >>> +		 * the subdev name once the sensor is known during
-> >>> +		 * async bind
-> >>> +		 */
-> >>> +		if (!ret)
-> >>> +			strncpy(sinput->name[i], input_name,
-> >>> +				sizeof(sinput->name[i]));
-> >>> +	}
-> >>> +
-> >>> +	sinput->num = i;
-> >>> +
-> >>> +	/* if no inputs provided just assume a single input */
-> >>> +	if (sinput->num == 0)
-> >>> +		sinput->num = 1;
-> >>> +}
-> >> This should be parsed by the sensor driver, not imx-media.
-> >
-> > you're probably right. I'll submit a patch for adv7180.c.
-> 
-> Actually, the problem here is that this parses an input routing value to
-> pass to s_routing, and an input name string. There would need to be
-> another subdev callback, maybe enum_imput, that would return this
-> information for the bridge driver, if this info were to be parsed and
-> maintained by the sensor.
-> 
-> But this info should really be known and parsed by the bridge anyway,
-> because as the header for s_routing states,
-> 
-> "An i2c device shouldn't know about whether an input pin is connected
->   to a Composite connector, because on another board or platform it
->   might be connected to something else entirely. The calling driver is
->   responsible for mapping a user-level input to the right pins on the i2c
->   device."
+If CONFIG_DEBUG_VIRTUAL=y and CONFIG_ARM64_SW_TTBR0_PAN=y:
 
-I think this description is for non-DT only, as parsing the DT bindings
-is the obligation of the bound driver, and with that it information it
-can very well know its connections.
+    virt_to_phys used for non-linear address: ffffff8008cc0000 (empty_zero_page+0x0/0x1000)
+    WARNING: CPU: 0 PID: 0 at arch/arm64/mm/physaddr.c:14 __virt_to_phys+0x28/0x60
+    ...
+    [<ffffff800809abb4>] __virt_to_phys+0x28/0x60
+    [<ffffff8008a02600>] setup_arch+0x46c/0x4d4
 
-regards
-Philipp
+Fixes: 2077be6783b5936c ("arm64: Use __pa_symbol for kernel symbols")
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+ arch/arm64/kernel/setup.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 669fc9ff728b227f..b5222094ab52db6f 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -298,7 +298,7 @@ void __init setup_arch(char **cmdline_p)
+ 	 * faults in case uaccess_enable() is inadvertently called by the init
+ 	 * thread.
+ 	 */
+-	init_task.thread_info.ttbr0 = virt_to_phys(empty_zero_page);
++	init_task.thread_info.ttbr0 = __pa_symbol(empty_zero_page);
+ #endif
+ 
+ #ifdef CONFIG_VT
+-- 
+1.9.1
