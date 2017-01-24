@@ -1,69 +1,121 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Tue, 24 Jan 2017 09:54:44 -0500
-Subject: [PATCH v3 2/5] arm64: Work around Falkor erratum 1003
-In-Reply-To: <20170111180627.GG20288@e104818-lin.cambridge.arm.com>
-References: <20170111144118.17062-1-cov@codeaurora.org>
- <20170111144118.17062-2-cov@codeaurora.org>
- <20170111180627.GG20288@e104818-lin.cambridge.arm.com>
-Message-ID: <abe718b7-c832-7748-f043-f9a62d0dd1e4@codeaurora.org>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Tue, 24 Jan 2017 16:02:53 +0100
+Subject: [PATCH v5 5/8] clocksource/drivers/rockchip_timer: split bc_timer
+ into rk_timer and rk_clock_event_device
+In-Reply-To: <1485260203-14216-6-git-send-email-al.kochet@gmail.com>
+References: <1485260203-14216-1-git-send-email-al.kochet@gmail.com>
+ <1485260203-14216-6-git-send-email-al.kochet@gmail.com>
+Message-ID: <3890508.0j97LNriXL@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
-
-On 01/11/2017 01:06 PM, Catalin Marinas wrote:
-> Some minor comments below, nothing fundamental (as long as you say the
-> new sequence doesn't have the speculative TLB load problem I mentioned
-> on a previous version).
-
-This workaround is documented as providing functional correctness for
-both explicit and speculative memory accesses.
-
->> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
->> index 32682be..9ee46df 100644
->> --- a/arch/arm64/mm/proc.S
->> +++ b/arch/arm64/mm/proc.S
->> @@ -23,6 +23,7 @@
->>  #include <asm/assembler.h>
->>  #include <asm/asm-offsets.h>
->>  #include <asm/hwcap.h>
->> +#include <asm/mmu_context.h>
->>  #include <asm/pgtable.h>
->>  #include <asm/pgtable-hwdef.h>
->>  #include <asm/cpufeature.h>
->> @@ -140,6 +141,18 @@ ENDPROC(cpu_do_resume)
->>  ENTRY(cpu_do_switch_mm)
->>  	mmid	x1, x1				// get mm->context.id
->>  	bfi	x0, x1, #48, #16		// set the ASID
->> +#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1003
->> +alternative_if ARM64_WORKAROUND_QCOM_FALKOR_E1003
->> +	mrs     x2, ttbr0_el1
->> +	mov     x3, #FALKOR_RESERVED_ASID
->> +	bfi     x2, x3, #48, #16                // reserved ASID + old BADDR
->> +	msr     ttbr0_el1, x2
->> +	isb
->> +	bfi     x2, x0, #0, #48                 // reserved ASID + new BADDR
->> +	msr     ttbr0_el1, x2
->> +	isb
->> +alternative_else_nop_endif
->> +#endif
->>  	msr	ttbr0_el1, x0			// set TTBR0
->>  	isb
->>  	post_ttbr0_update_workaround
+Am Dienstag, 24. Januar 2017, 15:16:40 CET schrieb Alexander Kochetkov:
+> The patch move ce field out of struct bc_timer into struct
+> rk_clock_event_device and rename struct bc_timer to struct rk_timer.
 > 
-> Please move the above hunk to a pre_ttbr0_update_workaround macro for
-> consistency with post_ttbr0_update_workaround.
+> The main idea for the commit is to exctact low level timer
+> routines from current implementation so they could be
+> reused in the following clocksource implementation commit.
+> 
+> This is refactoring step without functional changes.
+> 
+> Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
+> Reviwed-by: Heiko St?bner <heiko@sntech.de>
 
-How should I deal with inputs to the macro?
+Please don't add Reviewed-by tags without explicit mention of them by 
+reviewers. (Also it's spelled wrong).
 
-A) Use no input parameters and hard code x0 usage
-B) Use a macro input parameter for the new TTBR value (x0)
-C) Something else
+I haven't looked that deeply into the driver itself and the changes made to 
+feel comfortable with a "Reviewed-by".
 
-Thanks,
-Cov
-
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
-Aurora Forum, a Linux Foundation Collaborative Project.
+> ---
+>  drivers/clocksource/rockchip_timer.c |   33
+> ++++++++++++++++++++++----------- 1 file changed, 22 insertions(+), 11
+> deletions(-)
+> 
+> diff --git a/drivers/clocksource/rockchip_timer.c
+> b/drivers/clocksource/rockchip_timer.c index 23e267a..6d68d4c 100644
+> --- a/drivers/clocksource/rockchip_timer.c
+> +++ b/drivers/clocksource/rockchip_timer.c
+> @@ -29,18 +29,28 @@
+>  #define TIMER_MODE_USER_DEFINED_COUNT		(1 << 1)
+>  #define TIMER_INT_UNMASK			(1 << 2)
+> 
+> -struct bc_timer {
+> -	struct clock_event_device ce;
+> +struct rk_timer {
+>  	void __iomem *base;
+>  	void __iomem *ctrl;
+>  	u32 freq;
+>  };
+> 
+> -static struct bc_timer bc_timer;
+> +struct rk_clock_event_device {
+> +	struct clock_event_device ce;
+> +	struct rk_timer timer;
+> +};
+> +
+> +static struct rk_clock_event_device bc_timer;
+> +
+> +static inline struct rk_clock_event_device*
+> +rk_clock_event_device(struct clock_event_device *ce)
+> +{
+> +	return container_of(ce, struct rk_clock_event_device, ce);
+> +}
+> 
+> -static inline struct bc_timer *rk_timer(struct clock_event_device *ce)
+> +static inline struct rk_timer *rk_timer(struct clock_event_device *ce)
+>  {
+> -	return container_of(ce, struct bc_timer, ce);
+> +	return &rk_clock_event_device(ce)->timer;
+>  }
+> 
+>  static inline void __iomem *rk_base(struct clock_event_device *ce)
+> @@ -116,16 +126,17 @@ static irqreturn_t rk_timer_interrupt(int irq, void
+> *dev_id) static int __init rk_timer_init(struct device_node *np, u32
+> ctrl_reg) {
+>  	struct clock_event_device *ce = &bc_timer.ce;
+> +	struct rk_timer *timer = &bc_timer.timer;
+>  	struct clk *timer_clk;
+>  	struct clk *pclk;
+>  	int ret = -EINVAL, irq;
+> 
+> -	bc_timer.base = of_iomap(np, 0);
+> -	if (!bc_timer.base) {
+> +	timer->base = of_iomap(np, 0);
+> +	if (!timer->base) {
+>  		pr_err("Failed to get base address for '%s'\n", TIMER_NAME);
+>  		return -ENXIO;
+>  	}
+> -	bc_timer.ctrl = bc_timer.base + ctrl_reg;
+> +	timer->ctrl = timer->base + ctrl_reg;
+> 
+>  	pclk = of_clk_get_by_name(np, "pclk");
+>  	if (IS_ERR(pclk)) {
+> @@ -153,7 +164,7 @@ static int __init rk_timer_init(struct device_node *np,
+> u32 ctrl_reg) goto out_timer_clk;
+>  	}
+> 
+> -	bc_timer.freq = clk_get_rate(timer_clk);
+> +	timer->freq = clk_get_rate(timer_clk);
+> 
+>  	irq = irq_of_parse_and_map(np, 0);
+>  	if (!irq) {
+> @@ -181,7 +192,7 @@ static int __init rk_timer_init(struct device_node *np,
+> u32 ctrl_reg) goto out_irq;
+>  	}
+> 
+> -	clockevents_config_and_register(ce, bc_timer.freq, 1, UINT_MAX);
+> +	clockevents_config_and_register(ce, timer->freq, 1, UINT_MAX);
+> 
+>  	return 0;
+> 
+> @@ -190,7 +201,7 @@ static int __init rk_timer_init(struct device_node *np,
+> u32 ctrl_reg) out_timer_clk:
+>  	clk_disable_unprepare(pclk);
+>  out_unmap:
+> -	iounmap(bc_timer.base);
+> +	iounmap(timer->base);
+> 
+>  	return ret;
+>  }
