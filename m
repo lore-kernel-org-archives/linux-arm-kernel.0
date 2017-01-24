@@ -1,62 +1,45 @@
-From: abailon@baylibre.com (Alexandre Bailon)
-Date: Tue, 24 Jan 2017 11:22:52 +0100
-Subject: [PATCH v4] ARM: dts: da850: Add the CPPI 4.1 DMA to the USB OTG
- controller
-Message-ID: <20170124102252.15142-1-abailon@baylibre.com>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Tue, 24 Jan 2017 10:25:00 +0000
+Subject: [PATCH 3/4] PCI: Xilinx NWL: Modifying flow handler for legacy
+ interrupts
+In-Reply-To: <bab088a5-ed6d-1d9d-b38f-0a271c2bc766@arm.com>
+References: <1484997072-19276-1-git-send-email-bharatku@xilinx.com>
+ <1484997072-19276-3-git-send-email-bharatku@xilinx.com>
+ <bab088a5-ed6d-1d9d-b38f-0a271c2bc766@arm.com>
+Message-ID: <8520D5D51A55D047800579B094147198263CD002@XAP-PVEXMBX02.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the CPPI 4.1 DMA controller to the USB OTG controller.
+> On 21/01/17 11:11, Bharat Kumar Gogada wrote:
+> > Legacy interrupts are level sensitive, so using handle_level_irq is
+> > more approprate as it is masks interrupts until End point handles
+> > interrupts and unmasks interrutps after End point handler is executed.
+> >
+> > Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+> > ---
+> >  drivers/pci/host/pcie-xilinx-nwl.c |    2 +-
+> >  1 files changed, 1 insertions(+), 1 deletions(-)
+> >
+> > diff --git a/drivers/pci/host/pcie-xilinx-nwl.c
+> > b/drivers/pci/host/pcie-xilinx-nwl.c
+> > index e1809f9..50f9c0d 100644
+> > --- a/drivers/pci/host/pcie-xilinx-nwl.c
+> > +++ b/drivers/pci/host/pcie-xilinx-nwl.c
+> > @@ -433,7 +433,7 @@ static void nwl_unmask_leg_irq(struct irq_data
+> > *data)  static int nwl_legacy_map(struct irq_domain *domain, unsigned int irq,
+> >  			  irq_hw_number_t hwirq)
+> >  {
+> > -	irq_set_chip_and_handler(irq, &nwl_leg_irq_chip, handle_simple_irq);
+> > +	irq_set_chip_and_handler(irq, &nwl_leg_irq_chip, handle_level_irq);
+> >  	irq_set_chip_data(irq, domain->host_data);
+> >
+> >  	return 0;
+> >
+> 
+> Please merge this patch and the following one in patch #2. There is no need for
+> going through equally broken intermediate steps.
+> 
+Agreed, will merge it with second patch. 
 
-Changes since v3:
-- Don't use a wildcard for compatible property.
-
-Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
----
- arch/arm/boot/dts/da850.dtsi | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
-
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 104155d..f4a637a 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -396,12 +396,37 @@
- 		usb0: usb at 200000 {
- 			compatible = "ti,da830-musb";
- 			reg = <0x200000 0x10000>;
-+			ranges;
- 			interrupts = <58>;
- 			interrupt-names = "mc";
- 			dr_mode = "otg";
- 			phys = <&usb_phy 0>;
- 			phy-names = "usb-phy";
- 			status = "disabled";
-+
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			dmas = <&cppi41dma 0 0 &cppi41dma 1 0
-+				&cppi41dma 2 0 &cppi41dma 3 0
-+				&cppi41dma 0 1 &cppi41dma 1 1
-+				&cppi41dma 2 1 &cppi41dma 3 1>;
-+			dma-names =
-+				"rx1", "rx2", "rx3", "rx4",
-+				"tx1", "tx2", "tx3", "tx4";
-+
-+			cppi41dma: dma-controller at 201000 {
-+				compatible = "ti,da830-cppi41";
-+				reg =  <0x201000 0x1000
-+					0x202000 0x1000
-+					0x204000 0x4000>;
-+				reg-names = "controller",
-+					    "scheduler", "queuemgr";
-+				interrupts = <58>;
-+				#dma-cells = <2>;
-+				#dma-channels = <4>;
-+				status = "okay";
-+			};
- 		};
- 		mdio: mdio at 224000 {
- 			compatible = "ti,davinci_mdio";
--- 
-2.10.2
+Thanks & Regards,
+Bharat
