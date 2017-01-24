@@ -1,85 +1,82 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 24 Jan 2017 21:22:41 +0800
-Subject: [PATCH 2/2] arch_timer: acpi: add hisi timer erratum data
-In-Reply-To: <a2ac2a70-09fb-5cec-c090-b8ebde90e24f@arm.com>
-References: <1485254391-51551-1-git-send-email-guohanjun@huawei.com>
- <1485254391-51551-3-git-send-email-guohanjun@huawei.com>
- <20170124105717.GB6277@leverpostej>
- <a2ac2a70-09fb-5cec-c090-b8ebde90e24f@arm.com>
-Message-ID: <58875521.2000002@linaro.org>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Tue, 24 Jan 2017 21:25:19 +0800
+Subject: [PATCH] spi: mediatek: Manually set dma_ops for spi_master device
+Message-ID: <20170124132519.13271-1-djkurtz@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/24/2017 07:32 PM, Marc Zyngier wrote:
-> On 24/01/17 10:57, Mark Rutland wrote:
->> On Tue, Jan 24, 2017 at 06:39:51PM +0800, Hanjun Guo wrote:
->>> From: Hanjun Guo <hanjun.guo@linaro.org>
->>>
->>> Add hisilicon timer specific erratum fixes.
->>>
->>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->>> ---
->>>   drivers/clocksource/arm_arch_timer.c | 22 ++++++++++++++++++++++
->>>   1 file changed, 22 insertions(+)
->>>
->>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
->>> index 80d6f76..3e62a09 100644
->>> --- a/drivers/clocksource/arm_arch_timer.c
->>> +++ b/drivers/clocksource/arm_arch_timer.c
->>> @@ -1156,10 +1156,32 @@ struct gtdt_arch_timer_fixup {
->>>   	void *context;
->>>   };
->>>
->>> +#ifdef CONFIG_HISILICON_ERRATUM_161010101
->>> +static void __init hisi_erratum_workaroud_enable(void *context)
->>> +{
->>> +	int i;
->>> +
->>> +	for (i = 0; i < ARRAY_SIZE(ool_workarounds); i++) {
->>> +		if (!strcmp(context, ool_workarounds[i].id)) {
->>> +			timer_unstable_counter_workaround = &ool_workarounds[i];
->>> +			static_branch_enable(&arch_timer_read_ool_enabled);
->>> +			pr_info("arch_timer: Enabling workaround for %s\n",
->>> +				timer_unstable_counter_workaround->id);
->>> +			break;
->>> +		}
->>> +	}
->>> +}
->>> +#endif
->>> +
->>>   /* note: this needs to be updated according to the doc of OEM ID
->>>    * and TABLE ID for different board.
->>>    */
->>>   static struct gtdt_arch_timer_fixup arch_timer_quirks[] __initdata = {
->>> +#ifdef CONFIG_HISILICON_ERRATUM_161010101
->>> +	{"HISI  ", "HIP05   ", 0, &hisi_erratum_workaroud_enable, "hisilicon,erratum-161010101"},
->>> +	{"HISI  ", "HIP06   ", 0, &hisi_erratum_workaroud_enable, "hisilicon,erratum-161010101"},
->>> +	{"HISI  ", "HIP07   ", 0, &hisi_erratum_workaroud_enable, "hisilicon,erratum-161010101"},
->>> +#endif
->>>   };
->>
->> NAK. This duplicates logic unnecessarily (for enabling the workaround),
->> and (ab)uses the id, which was intended to be specific to DT (since it
->> is a DT property name).
->
-> Agreed, that's properly revolting.
+Back before commit 1dccb598df54 ("arm64: simplify dma_get_ops"), for arm64,
+devices that do not manually set a dma_ops are automatically configured to
+use swiotlb_dma_ops, since this was hard-coded as the global "dma_ops" in
+arm64_dma_init().
 
-I had a bad feeling about duplicating using of DT based ID string
-in ACPI world and it's confirmed :)
+Now, the global "dma_ops" has been removed, and all devices much have
+their dma_ops explicitly set by a call to arch_setup_dma_ops().  If
+arch_setup_dma_ops() is not called, the device is assigned dummy_dma_ops,
+and thus calls to map_sg for such a device will fail (return 0).
 
->
->> We should split the matching from the particular workaround (and
->> enabling thereof), so that we can go straight from ACPI match to
->> workaround (without having to use the DT id in this manner), and don't
->> have to duplicate the logic to enable the workaround.
->>
->> I believe Marc is looking at some rework in this area which may enable
->> this, so please wait for that to appear.
->
-> Yeah, I'm implementing a semi-flexible way to add new quirk types, and
-> the last thing I want to see is two (or more) tables describing the same
-> thing.
+Mediatek SPI uses DMA but does not use a dma channel.  Support for this
+was added by commit c37f45b5f1cd ("spi: support spi without dma channel to
+use can_dma()"), which uses the master_spi dev to DMA map buffers.
 
-Thank you for doing this, I will wait for your patches.
+The master_spi device is not a platform, rather it is created
+in spi_alloc_device(), and its dma_ops are never set.
 
-Hanjun
+Therefore, when the mediatek SPI driver when it does DMA (for large SPI
+transactions > 32 bytes), SPI will use spi_map_buf()->dma_map_sg() to map
+the buffer for use in DMA.  But dma_map_sg()->dma_map_sg_attrs() returns 0,
+because ops->map_sg is dummy_dma_ops->__dummy_map_sg, and hence
+spi_map_buf() returns -ENOMEM (-12).
+
+The solution in this patch is a bit of a hack.  To install dma_ops for
+its spi_master, we call of_dma_configure() during probe and pass in the
+of_node of the spi-mt65xx platform device.
+
+However, by default, of_dma_configure() will set the coherent_dma_mask
+to 0xffffffff.  In fact, using a non-zero dma_mask doesn't actually work
+and causes frequent SPI transaction errors.  To work around this, we
+also explicitly set coherent_dma_mask to 0.
+
+Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+---
+
+I don't know the right place to configure the dma_ops for spi_master.
+It feels like this should actually be done in the spi core, as this might be
+needed by other drivers.
+
+Alternatively, perhaps we should be using master->dev.parent to dma map bufs
+in the "no dma channel case".
+
+And I really don't know why we needed to set the coherent_dma_mask to 0 to
+avoid SPI transaction errors.
+
+Any advice is welcome.
+
+ drivers/spi/spi-mt65xx.c | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
+index 8763eff13d3d..e768835bb67f 100644
+--- a/drivers/spi/spi-mt65xx.c
++++ b/drivers/spi/spi-mt65xx.c
+@@ -20,6 +20,7 @@
+ #include <linux/ioport.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
++#include <linux/of_device.h>
+ #include <linux/of_gpio.h>
+ #include <linux/platform_device.h>
+ #include <linux/platform_data/spi-mt65xx.h>
+@@ -575,6 +576,10 @@ static int mtk_spi_probe(struct platform_device *pdev)
+ 		goto err_put_master;
+ 	}
+ 
++	/* Call of_dma_configure to set up spi_master's dma_ops */
++	of_dma_configure(&master->dev, master->dev.of_node);
++	/* But explicitly set the coherent_dma_mask to 0 */
++	master->dev.coherent_dma_mask = 0;
+ 	if (!pdev->dev.dma_mask)
+ 		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+ 
+-- 
+2.11.0.483.g087da7b7c-goog
