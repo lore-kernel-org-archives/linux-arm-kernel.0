@@ -1,85 +1,70 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 24 Jan 2017 10:55:24 +0000
-Subject: [PATCH 2/2] arm64: kvm: upgrade csselr and ccsidr to 64-bit values
-In-Reply-To: <20170124103041.GK15850@cbox>
-References: <1484909410-11673-1-git-send-email-sudeep.holla@arm.com>
- <1484909410-11673-2-git-send-email-sudeep.holla@arm.com>
- <20170123210859.GJ15850@cbox> <fe2bde22-63dc-3abf-5870-21360b16bf6b@arm.com>
- <20170124103041.GK15850@cbox>
-Message-ID: <de64fbcb-8e0d-b2b9-38b4-59f033a6cf6b@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 24 Jan 2017 10:57:17 +0000
+Subject: [PATCH 2/2] arch_timer: acpi: add hisi timer erratum data
+In-Reply-To: <1485254391-51551-3-git-send-email-guohanjun@huawei.com>
+References: <1485254391-51551-1-git-send-email-guohanjun@huawei.com>
+ <1485254391-51551-3-git-send-email-guohanjun@huawei.com>
+Message-ID: <20170124105717.GB6277@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 24/01/17 10:30, Christoffer Dall wrote:
-> On Tue, Jan 24, 2017 at 10:15:38AM +0000, Sudeep Holla wrote:
->>
->>
->> On 23/01/17 21:08, Christoffer Dall wrote:
->>> On Fri, Jan 20, 2017 at 10:50:10AM +0000, Sudeep Holla wrote:
->>>> csselr and ccsidr are treated as 64-bit values already elsewhere in the
->>>> kernel. It also aligns well with the architecture extensions that allow
->>>> 64-bit format for ccsidr.
->>>>
->>>> This patch upgrades the existing accesses to csselr and ccsidr from
->>>> 32-bit to 64-bit in preparation to add support to those extensions.
->>>>
->>>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->>>> ---
->>>>  arch/arm64/kvm/sys_regs.c | 18 +++++++++---------
->>>>  1 file changed, 9 insertions(+), 9 deletions(-)
->>>>
->>>> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
->>>> index 5dca1f10340f..a3559a8a2b0c 100644
->>>> --- a/arch/arm64/kvm/sys_regs.c
->>>> +++ b/arch/arm64/kvm/sys_regs.c
->>
->> [..]
->>
->>>> @@ -2004,8 +2004,8 @@ static int demux_c15_get(u64 id, void __user *uaddr)
->>>>  
->>>>  static int demux_c15_set(u64 id, void __user *uaddr)
->>>>  {
->>>> -	u32 val, newval;
->>>> -	u32 __user *uval = uaddr;
->>>> +	u64 val, newval;
->>>> +	u64 __user *uval = uaddr;
->>>
->>> Doesn't converting these uval pointers to u64 cause us to break the ABI
->>> as we'll now be reading/writing 64-bit values to userspace with the
->>> get_user and put_user following the declarations?
->>>
->>
->> Yes, I too have similar concern. IIUC it is always read via kvm_one_reg
->> structure. I could not find any specific user for this register to cross
->> check.
->>
+On Tue, Jan 24, 2017 at 06:39:51PM +0800, Hanjun Guo wrote:
+> From: Hanjun Guo <hanjun.guo@linaro.org>
 > 
-> Not sure it matters which interface we get the userspace pointer from?
+> Add hisilicon timer specific erratum fixes.
 > 
-
-Agreed.
-
-> This patch is definitely changing the write from a 32-bit write to a
-> 64-bit write and there's a specific check prior to the put_user() call
-> which checks that userspace intended a 32-bit value and presumably
-> provided a 32-bit pointer.
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> ---
+>  drivers/clocksource/arm_arch_timer.c | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
 > 
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 80d6f76..3e62a09 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -1156,10 +1156,32 @@ struct gtdt_arch_timer_fixup {
+>  	void *context;
+>  };
+>  
+> +#ifdef CONFIG_HISILICON_ERRATUM_161010101
+> +static void __init hisi_erratum_workaroud_enable(void *context)
+> +{
+> +	int i;
+> +
+> +	for (i = 0; i < ARRAY_SIZE(ool_workarounds); i++) {
+> +		if (!strcmp(context, ool_workarounds[i].id)) {
+> +			timer_unstable_counter_workaround = &ool_workarounds[i];
+> +			static_branch_enable(&arch_timer_read_ool_enabled);
+> +			pr_info("arch_timer: Enabling workaround for %s\n",
+> +				timer_unstable_counter_workaround->id);
+> +			break;
+> +		}
+> +	}
+> +}
+> +#endif
+> +
+>  /* note: this needs to be updated according to the doc of OEM ID
+>   * and TABLE ID for different board.
+>   */
+>  static struct gtdt_arch_timer_fixup arch_timer_quirks[] __initdata = {
+> +#ifdef CONFIG_HISILICON_ERRATUM_161010101
+> +	{"HISI  ", "HIP05   ", 0, &hisi_erratum_workaroud_enable, "hisilicon,erratum-161010101"},
+> +	{"HISI  ", "HIP06   ", 0, &hisi_erratum_workaroud_enable, "hisilicon,erratum-161010101"},
+> +	{"HISI  ", "HIP07   ", 0, &hisi_erratum_workaroud_enable, "hisilicon,erratum-161010101"},
+> +#endif
+>  };
 
-I see you point, I missed to see that check(just to be sure KVM_REG_SIZE
-check right ?).
+NAK. This duplicates logic unnecessarily (for enabling the workaround),
+and (ab)uses the id, which was intended to be specific to DT (since it
+is a DT property name).
 
-> So I think the only way to return 64-bit AArch32 system register values
-> to userspace (if that is the intention) is to define a new ID for 64-bit
-> CCSIDR registers and handle them separately.
-> 
+We should split the matching from the particular workaround (and
+enabling thereof), so that we can go straight from ACPI match to
+workaround (without having to use the DT id in this manner), and don't
+have to duplicate the logic to enable the workaround.
 
-I will add KVM_REG_ARM_DEMUX_ID_CCSIDR_64B or something similar.
-Thanks for the review.
+I believe Marc is looking at some rework in this area which may enable
+this, so please wait for that to appear.
 
--- 
-Regards,
-Sudeep
+Thanks,
+Mark.
