@@ -1,105 +1,88 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 24 Jan 2017 11:39:20 +0100
-Subject: [PATCH] KVM: arm/arm64: Remove struct vgic_irq pending field
-In-Reply-To: <1dc74e05-b72f-7b98-0d67-8cbde732e83b@arm.com>
-References: <20170123133951.10329-1-christoffer.dall@linaro.org>
- <154ecb7e-457d-ea56-4ae2-c2b37c951a8a@arm.com>
- <20170123183447.GH15850@cbox>
- <1dc74e05-b72f-7b98-0d67-8cbde732e83b@arm.com>
-Message-ID: <20170124103920.GL15850@cbox>
+From: john@phrozen.org (John Crispin)
+Date: Tue, 24 Jan 2017 11:38:41 +0100
+Subject: [PATCH v1 2/2] arm: dts: mt2701: add nor flash node
+In-Reply-To: <20170124113118.304a860c@bbrezillon>
+References: <d7b866ad-5b2f-62d3-3aa3-6fa42803d625@gmail.com>
+ <b850b751-1d8d-0053-cf1f-d5314542e5c3@gmail.com>
+ <20170113172825.75d545a3@bbrezillon>
+ <86c997be-f500-eaa1-3ba5-d21cff6223b7@gmail.com>
+ <20170113175628.1793f433@bbrezillon>
+ <0fafcd8d-cf99-de6b-728f-5e3637810b68@gmail.com>
+ <20170114092958.022f2fc8@bbrezillon>
+ <e7fa1542-f0e2-0e45-23b3-25d6491ae40d@gmail.com>
+ <20170116094032.6f471f11@bbrezillon>
+ <20170117143650.5db87148@free-electrons.com>
+ <20170118222010.ivc6jxpnrumemvdf@rob-hp-laptop>
+ <20170119103829.524ce715@free-electrons.com>
+ <CAL_Jsq+EyHtC7THLCJcwgtVtVESMOdmi3T3bBxgOqJt6BCtCHQ@mail.gmail.com>
+ <20170119091428.598eb987@bbrezillon>
+ <CAL_Jsq+S-FYy4SmjJ3fWzBugw2zCj5TQkkfUA8QVL7SLJW3E1g@mail.gmail.com>
+ <1485052600.19995.10.camel@mhfsdcap03> <20170124113118.304a860c@bbrezillon>
+Message-ID: <3b86fcfd-9f8a-b324-e164-20582a0b2e40@phrozen.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2017 at 10:01:07AM +0000, Andre Przywara wrote:
-> Hi Christoffer,
-> 
-> On 23/01/17 18:34, Christoffer Dall wrote:
-> > On Mon, Jan 23, 2017 at 05:57:05PM +0000, Andre Przywara wrote:
-> >> Hi Christoffer,
-> >>
-> >> On 23/01/17 13:39, Christoffer Dall wrote:
-> >>> One of the goals behind the VGIC redesign was to get rid of cached or
-> >>> intermediate state in the data structures, but we decided to allow
-> >>> ourselves to precompute the pending value of an IRQ based on the line
-> >>> level and pending latch state.  However, this has now become difficult
-> >>> to base proper GICv3 save/restore on, because there is a potential to
-> >>> modify the pending state without knowing if an interrupt is edge or
-> >>> level configured.
-> >>>
-> >>> See the following post and related message for more background:
-> >>> https://lists.cs.columbia.edu/pipermail/kvmarm/2017-January/023195.html
-> >>>
-> >>> This commit gets rid of the precomputed pending field in favor of a
-> >>> function that calculates the value when needed, irq_is_pending().
-> >>>
-> >>> The soft_pending field is renamed to pending_latch to represent that
-> >>> this latch is the equivalent hardware latch which gets manipulated by
-> >>> the input signal for edge-triggered interrupts and when writing to the
-> >>> SPENDR/CPENDR registers.
-> >>>
-> >>> After this commit save/restore code should be able to simply restore the
-> >>> pending_latch state, line_level state, and config state in any order and
-> >>> get the desired result.
-> >>
-> >> In general I like this very much and am wondering why we didn't come up
-> >> with this earlier. But I guess we were so subscribed to our "cached
-> >> pending" bit.
-> >>
-> >> So I checked several cases, tested some logic equations and drew the
-> >> state diagrams for the "before" and "after" case, but I couldn't find a
-> >> reason why this wouldn't work.
-> >>
-> >> I also think you can get rid of the irq_set_pending_latch() wrapper and
-> >> assign the value directly, as I don't see any reason to hide the fact
-> >> that it's indeed a simple assignment and nothing magic behind this
-> >> function. Also it would make the diff a bit easier to read.
-> > 
-> > Agreed.  Once we have agreement about if we should cleanup clearing the
-> > latch state, I'll respin with that and add you and Marc's RB tags with
-> > the changed version.
-> > 
-> >>
-> >> But apart from that:
-> >>
-> >> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
-> >>
-> >>
-> >> I also gave this a quick test on the Juno and the Midway with both
-> >> kvmtool and QEMU and they survived some basic testing.
-> >>
-> >> I need to check a GICv3 machine tomorrow, but I don't expect any
-> >> differences here.
-> >>
-> > 
-> > Thanks.
-> > 
-> > I tested this, including GICv2 migration on Mustang, and was going to do
-> > GICv3 testing and 32-bit testin tomorrow, but I'm quite happy to hear
-> > you gave it a spin on a 32-bit platform already.
-> 
-> OK, so a GICv3 machine survived over night testing, resulting in some 10
-> millions of interrupts of every kind (LPIs, edge SPIs, some 100,000
-> level SPIs (UART only), SGIs, PPIs).
-> Same on a Juno, no LPIs there of course, but also millions of interrupts
-> working fine over night.
-> 
-> So:
-> 
-> Tested-by: Andre Przywara <andre.przywara@arm.com>
 
-Thanks, I'll respin this with the trivial changes and add yours and
-Marc's tested and reviewed by tags.
 
+On 24/01/2017 11:31, Boris Brezillon wrote:
+> On Sun, 22 Jan 2017 10:36:40 +0800
+> Guochun Mao <guochun.mao@mediatek.com> wrote:
 > 
-> So this was just Linux as a guest, which - at least last time I checked
-> - doesn't use GIC_DIST_SET_PENDING or GIC_DIST_CLEAR_PENDING registers
-> too much (if at all under normal load).
-> I think we should add some tests to kvm-unit-tests to actually trigger
-> this code explicitly.
+>> Hi,
+>> On Thu, 2017-01-19 at 08:18 -0600, Rob Herring wrote:
+>>> On Thu, Jan 19, 2017 at 2:14 AM, Boris Brezillon  
+>>>> One last question and I'm done: is something like that acceptable?
+>>>>
+>>>>         compatible = "<vendor>,<old-soc>","<vendor>,<new-soc>";
+>>>>
+>>>> This can happen when someone adds support for an unsupported feature
+>>>> on a brand new SoC, and then someone else use the same driver for an
+>>>> older SoC embedding the same IP but still wants to add a new compatible
+>>>> just in case these 2 IPs appear to be slightly different.  
+>>>
+>>> Yes, it's old and new compatible strings in this case and it's newest
+>>> compatible string first.
+>>>   
+>>>> Here the order of compat strings is no longer following a clear rule
+>>>> like 'most-specific compatible first' or 'newest IP/SoC version first',
+>>>> it's completely dependent on the order these IPs were supported in the
+>>>> OS (Linux). I'm perfectly fine with that BTW, just want to make sure
+>>>> this is authorized.  
+>>>
+>>> I guess we should say "newest compatible for IP first" instead. There
+>>> are some exceptions where we add fallbacks later on, but that falls
+>>> under the most-specific part.
+>>>
+>>> It's order that the bindings are defined, not Linux support really,
+>>> but in practice those are the same.
+>>>
+>>> Rob  
+>>
+>> Thanks for all your effort for code reviewing.
+>> Our mt2701-nor's hardware is designed base on mt8713-nor,
+>> even so, there would be some slight difference.
+>> If I don't misunderstand your viewpoint in this discussion,
+>> there's no need to drop mt2701-nor compatible.
 > 
+> No, just update the documentation as suggested by Rob.
+> 
+>> And if not, is there any other suggestion?
+> 
+> Nope, and my apologies for being so insistent on something I obviously
+> misunderstood.
+> 
+> Regards,
+> 
+> Boris
 
-Yeah, we probably should.  But I'm not going to for the purposes of
-merging this patch.
 
-Thanks,
--Christoffer
+Hi,
+
+could you please add the mt7623 compat string to the documentation
+aswell while at it ? mt7623/mt2701 are essentially the same and it'll
+safe us time and effort and not cause merge order conflicts. otherwise i
+would need to wait till the mt2701 patch is merged before i can send the
+mt7623 one
+
+Thanks !
+	John
