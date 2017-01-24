@@ -1,124 +1,335 @@
-From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Tue, 24 Jan 2017 10:52:43 +0100
-Subject: [PATCH V9] thermal: bcm2835: add thermal driver for bcm2835 soc
-In-Reply-To: <20170124093127.GB3651@localhost.localdomain>
-References: <1483808145-6206-1-git-send-email-kernel@martin.sperl.org>
- <20170120041400.GA24617@localhost.localdomain>
- <060918B6-A773-46A5-8D10-C9F6BBA6D3F1@martin.sperl.org>
- <20170124093127.GB3651@localhost.localdomain>
-Message-ID: <0452720A-5914-469B-9EF7-0581CF1B5478@martin.sperl.org>
+From: baoyou.xie@linaro.org (Baoyou Xie)
+Date: Tue, 24 Jan 2017 16:58:42 +0800
+Subject: [PATCH v5 3/3] watchdog: zx2967: add watchdog controller driver for
+ ZTE's zx2967 family
+In-Reply-To: <1485248322-24299-1-git-send-email-baoyou.xie@linaro.org>
+References: <1485248322-24299-1-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <1485248322-24299-3-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds watchdog controller driver for ZTE's zx2967 family.
 
-> On 24.01.2017, at 10:31, Eduardo Valentin <edubezval@gmail.com> wrote:
-> 
-> Hello Martin,
-> 
-> On Fri, Jan 20, 2017 at 08:54:07AM +0100, kernel at martin.sperl.org wrote:
->> 
->>> On 20.01.2017, at 05:14, Eduardo Valentin <edubezval@gmail.com> wrote:
->>> 
->>> Hello Martin,
->>> 
->>> On Sat, Jan 07, 2017 at 04:55:45PM +0000, kernel at martin.sperl.org wrote:
->>>> From: Martin Sperl <kernel@martin.sperl.org>
->>>> 
->>>> Add basic thermal driver for bcm2835 SOC.
->>>> 
->>>> This driver currently relies on the firmware setting up the
->>>> tsense HW block and does not set it up itself.
->>>> 
->>>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
->>>> Acked-by: Eric Anholt <eric@anholt.net>
->>>> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
->>>> 
->>> 
->>> <cut>
->>> 
->>>> +
->>>> +static const struct of_device_id bcm2835_thermal_of_match_table[] = {
->>>> +	{
->>>> +		.compatible = "brcm,bcm2835-thermal",
->>>> +		.data = &(struct bcm2835_thermal_info) {
->>>> +			.offset = 407000,
->>>> +			.slope = -538,
->>>> +			.trip_temp = 80000
->>>> +		}
->>>> +	},
->>>> +	{
->>>> +		.compatible = "brcm,bcm2836-thermal",
->>>> +		.data = &(struct bcm2835_thermal_info) {
->>>> +			.offset = 407000,
->>>> +			.slope = -538,
->>>> +			.trip_temp = 80000
->>>> +		}
->>>> +	},
->>>> +	{
->>>> +		.compatible = "brcm,bcm2837-thermal",
->>>> +		.data = &(struct bcm2835_thermal_info) {
->>>> +			/* the bcm2837 needs adjustment of +5C */
->>>> +			.offset = 407000 + 5000,
->>>> +			.slope = -538,
->>>> +			.trip_temp = 80000
->>>> +		}
->>>> +	},
->>>> +	{},
->>> 
->>> Just for the same of clarification, is there anything preventing this
->>> driver of using of-thermal API? the above data (slope, offset, and
->>> trip_temps) would be in DT the place where they are supposed to be,
->>> instead of code.
->>> 
->> 
->> As the DT changes, that only define compatible strings, have already gone
->> in without any such properties set, we need to define defaults for the 
->> slope/offset and trip_temp values.
->> 
-> 
-> These properties won't go into the same node you are referring to. They
-> go into the thermal-zone node you would create, which would then refer
-> to the node you referred (already merged). Therefore, I do not see
-> anything blocking a proper of-thermal usage to cover for the above data.
-> 
->> I guess (for newer SOC) you still can use the values in the DT,
->> as (I guess) these are parsed and set in thermal_zone_device_register
->> after the defaults are set in thermal_zone_params.
-> 
-> Not sure what you meant here, but these values, when correctly used in
-> DT, they would come as part of the thermal_zone_params and in the
-> thermal trips of the thermal zones, as the of-thermal code with already
-> deal with those for you.
-> 
-> Please have a look at:
-> a. Documentation/devicetree/bindings/thermal/thermal.txt
-> b. drivers/thermal/of-thermal.c
-> 
-> And let me know if you see anything that would prevent this driver of
-> using the correct API to describe hardware data with DT.
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+---
+ drivers/watchdog/Kconfig      |  10 ++
+ drivers/watchdog/Makefile     |   1 +
+ drivers/watchdog/zx2967_wdt.c | 274 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 285 insertions(+)
+ create mode 100644 drivers/watchdog/zx2967_wdt.c
 
-
-I guess you miss my point:
-The argument is that we have DT in the 4.10.0-rc2 kernel right now that
-look like this:
-                thermal at 7e212000 {
-                        compatible = "brcm,bcm2835-thermal";
-                        clocks = <0x6 0x1b>;
-                        status = "okay";
-                        reg = <0x7e212000 0x8>;
-                }
-so we still need to be compatible with those without any extra defines.
-
-Hence we need to define those slopes and offsets in the driver itself
-to stay compatible with those older device-trees.
-
-As for if it works with the framework - I have to admit I do not
-have the slightest clue - it looks way to complicated for the soc right
-now.
-
-As a note: afaiu the trip_temp register is the temperature at which the
-soc will reboot on its own - similar to a watchdog, but for temperatures.
-(main reason for the assumption is because there is no interrupt that
-can get assigned a handler to catch this situation).
-
-Martin
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index acb00b5..05093a2 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -714,6 +714,16 @@ config ASPEED_WATCHDOG
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called aspeed_wdt.
+ 
++config ZX2967_WATCHDOG
++	tristate "ZTE zx2967 SoCs watchdog support"
++	depends on ARCH_ZX
++	select WATCHDOG_CORE
++	help
++	  Say Y here to include support for the watchdog timer
++	  in ZTE zx2967 SoCs.
++	  To compile this driver as a module, choose M here: the
++	  module will be called zx2967_wdt.
++
+ # AVR32 Architecture
+ 
+ config AT32AP700X_WDT
+diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+index 0c3d35e..bf2d296 100644
+--- a/drivers/watchdog/Makefile
++++ b/drivers/watchdog/Makefile
+@@ -82,6 +82,7 @@ obj-$(CONFIG_BCM7038_WDT) += bcm7038_wdt.o
+ obj-$(CONFIG_ATLAS7_WATCHDOG) += atlas7_wdt.o
+ obj-$(CONFIG_RENESAS_WDT) += renesas_wdt.o
+ obj-$(CONFIG_ASPEED_WATCHDOG) += aspeed_wdt.o
++obj-$(CONFIG_ZX2967_WATCHDOG) += zx2967_wdt.o
+ 
+ # AVR32 Architecture
+ obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
+diff --git a/drivers/watchdog/zx2967_wdt.c b/drivers/watchdog/zx2967_wdt.c
+new file mode 100644
+index 0000000..89a7018
+--- /dev/null
++++ b/drivers/watchdog/zx2967_wdt.c
+@@ -0,0 +1,274 @@
++/*
++ * watchdog driver for ZTE's zx2967 family
++ *
++ * Copyright (C) 2017 ZTE Ltd.
++ *
++ * Author: Baoyou Xie <baoyou.xie@linaro.org>
++ *
++ * License terms: GNU General Public License (GPL) version 2
++ */
++
++#include <linux/clk.h>
++#include <linux/delay.h>
++#include <linux/io.h>
++#include <linux/mfd/syscon.h>
++#include <linux/module.h>
++#include <linux/of_address.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
++#include <linux/reset.h>
++#include <linux/watchdog.h>
++
++#define ZX2967_WDT_CFG_REG			0x4
++#define ZX2967_WDT_LOAD_REG			0x8
++#define ZX2967_WDT_REFRESH_REG			0x18
++#define ZX2967_WDT_START_REG			0x1c
++
++#define ZX2967_WDT_REFRESH_MASK			0x3f
++
++#define ZX2967_WDT_CFG_DIV(n)			((((n) & 0xff) - 1) << 8)
++#define ZX2967_WDT_START_EN			0x1
++
++#define ZX2967_WDT_WRITEKEY			0x12340000
++
++#define ZX2967_WDT_DIV_DEFAULT			16
++#define ZX2967_WDT_DEFAULT_TIMEOUT		32
++#define ZX2967_WDT_MIN_TIMEOUT			1
++#define ZX2967_WDT_MAX_TIMEOUT			500
++#define ZX2967_WDT_MAX_COUNT			0xffff
++
++#define ZX2967_WDT_CLK_FREQ			0x8000
++
++#define ZX2967_WDT_FLAG_REBOOT_MON		BIT(0)
++
++struct zx2967_wdt {
++	struct watchdog_device	wdt_device;
++	void __iomem		*reg_base;
++	struct clk		*clock;
++};
++
++static inline u32 zx2967_wdt_readl(struct zx2967_wdt *wdt, u16 reg)
++{
++	return readl_relaxed(wdt->reg_base + reg);
++}
++
++static inline void zx2967_wdt_writel(struct zx2967_wdt *wdt, u16 reg, u32 val)
++{
++	writel_relaxed(val | ZX2967_WDT_WRITEKEY, wdt->reg_base + reg);
++}
++
++static void zx2967_wdt_refresh(struct zx2967_wdt *wdt)
++{
++	u32 val;
++
++	val = zx2967_wdt_readl(wdt, ZX2967_WDT_REFRESH_REG);
++	val ^= ZX2967_WDT_REFRESH_MASK;
++	zx2967_wdt_writel(wdt, ZX2967_WDT_REFRESH_REG, val);
++}
++
++static int
++zx2967_wdt_set_timeout(struct watchdog_device *wdd, unsigned int timeout)
++{
++	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
++	unsigned int divisor = ZX2967_WDT_DIV_DEFAULT;
++	unsigned int count;
++
++	count = timeout * ZX2967_WDT_CLK_FREQ;
++	if (count > divisor * ZX2967_WDT_MAX_COUNT)
++		divisor = DIV_ROUND_UP(count, ZX2967_WDT_MAX_COUNT);
++	count = DIV_ROUND_UP(count, divisor);
++	zx2967_wdt_writel(wdt, ZX2967_WDT_CFG_REG, ZX2967_WDT_CFG_DIV(divisor));
++	zx2967_wdt_writel(wdt, ZX2967_WDT_LOAD_REG, count);
++	zx2967_wdt_refresh(wdt);
++	wdd->timeout =  (count * divisor) / ZX2967_WDT_CLK_FREQ;
++
++	return 0;
++}
++
++static void __zx2967_wdt_start(struct zx2967_wdt *wdt)
++{
++	u32 val;
++
++	val = zx2967_wdt_readl(wdt, ZX2967_WDT_START_REG);
++	val |= ZX2967_WDT_START_EN;
++	zx2967_wdt_writel(wdt, ZX2967_WDT_START_REG, val);
++}
++
++static void __zx2967_wdt_stop(struct zx2967_wdt *wdt)
++{
++	u32 val;
++
++	val = zx2967_wdt_readl(wdt, ZX2967_WDT_START_REG);
++	val &= ~ZX2967_WDT_START_EN;
++	zx2967_wdt_writel(wdt, ZX2967_WDT_START_REG, val);
++}
++
++static int zx2967_wdt_start(struct watchdog_device *wdd)
++{
++	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
++
++	zx2967_wdt_set_timeout(wdd, wdd->timeout);
++	__zx2967_wdt_start(wdt);
++
++	return 0;
++}
++
++static int zx2967_wdt_stop(struct watchdog_device *wdd)
++{
++	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
++
++	__zx2967_wdt_stop(wdt);
++
++	return 0;
++}
++
++static int zx2967_wdt_keepalive(struct watchdog_device *wdd)
++{
++	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
++
++	zx2967_wdt_refresh(wdt);
++
++	return 0;
++}
++
++#define ZX2967_WDT_OPTIONS \
++	(WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE)
++static const struct watchdog_info zx2967_wdt_ident = {
++	.options          =     ZX2967_WDT_OPTIONS,
++	.firmware_version =	0,
++	.identity         =	"zx2967 watchdog",
++};
++
++static struct watchdog_ops zx2967_wdt_ops = {
++	.owner = THIS_MODULE,
++	.start = zx2967_wdt_start,
++	.stop = zx2967_wdt_stop,
++	.ping = zx2967_wdt_keepalive,
++	.set_timeout = zx2967_wdt_set_timeout,
++};
++
++static void zx2967_wdt_reset_sysctrl(struct device *dev)
++{
++	int ret;
++	void __iomem *regmap;
++	unsigned int offset, mask, config;
++	struct of_phandle_args out_args;
++
++	ret = of_parse_phandle_with_fixed_args(dev->of_node,
++			"zte,wdt-reset-sysctrl", 3, 0, &out_args);
++	if (ret)
++		return;
++
++	offset = out_args.args[0];
++	config = out_args.args[1];
++	mask = out_args.args[2];
++
++	regmap = syscon_node_to_regmap(out_args.np);
++	if (IS_ERR(regmap))
++		return;
++
++	regmap_update_bits(regmap, offset, mask, config);
++}
++
++static int zx2967_wdt_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct zx2967_wdt *wdt;
++	struct resource *base;
++	int ret;
++	struct reset_control *rstc;
++
++	wdt = devm_kzalloc(dev, sizeof(*wdt), GFP_KERNEL);
++	if (!wdt)
++		return -ENOMEM;
++
++	platform_set_drvdata(pdev, wdt);
++
++	wdt->wdt_device.info = &zx2967_wdt_ident;
++	wdt->wdt_device.ops = &zx2967_wdt_ops;
++	wdt->wdt_device.timeout = ZX2967_WDT_DEFAULT_TIMEOUT;
++	wdt->wdt_device.max_timeout = ZX2967_WDT_MAX_TIMEOUT;
++	wdt->wdt_device.min_timeout = ZX2967_WDT_MIN_TIMEOUT;
++	wdt->wdt_device.parent = &pdev->dev;
++
++	base = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	wdt->reg_base = devm_ioremap_resource(dev, base);
++	if (IS_ERR(wdt->reg_base)) {
++		dev_err(dev, "ioremap failed\n");
++		return PTR_ERR(wdt->reg_base);
++	}
++
++	zx2967_wdt_reset_sysctrl(dev);
++
++	wdt->clock = devm_clk_get(dev, NULL);
++	if (IS_ERR(wdt->clock)) {
++		dev_err(dev, "failed to find watchdog clock source\n");
++		return PTR_ERR(wdt->clock);
++	}
++
++	ret = clk_prepare_enable(wdt->clock);
++	if (ret < 0) {
++		dev_err(dev, "failed to enable clock\n");
++		return ret;
++	}
++	clk_set_rate(wdt->clock, ZX2967_WDT_CLK_FREQ);
++
++	rstc = devm_reset_control_get(dev, NULL);
++	if (IS_ERR(rstc)) {
++		dev_err(dev, "failed to get rstc");
++		ret = PTR_ERR(rstc);
++		goto fail_get_reset_control;
++	}
++
++	reset_control_assert(rstc);
++	mdelay(10);
++	reset_control_deassert(rstc);
++
++	watchdog_set_drvdata(&wdt->wdt_device, wdt);
++	watchdog_set_nowayout(&wdt->wdt_device, WATCHDOG_NOWAYOUT);
++
++	ret = watchdog_register_device(&wdt->wdt_device);
++	if (ret)
++		goto fail_register;
++
++	dev_info(dev, "watchdog enabled (timeout=%d sec, nowayout=%d)",
++		 wdt->wdt_device.timeout, WATCHDOG_NOWAYOUT);
++
++	return 0;
++
++fail_register:
++	watchdog_unregister_device(&wdt->wdt_device);
++fail_get_reset_control:
++	clk_disable_unprepare(wdt->clock);
++	return ret;
++}
++
++static int zx2967_wdt_remove(struct platform_device *pdev)
++{
++	struct zx2967_wdt *wdt = platform_get_drvdata(pdev);
++
++	watchdog_unregister_device(&wdt->wdt_device);
++	clk_disable_unprepare(wdt->clock);
++
++	return 0;
++}
++
++static const struct of_device_id zx2967_wdt_match[] = {
++	{ .compatible = "zte,zx296718-wdt", },
++	{}
++};
++MODULE_DEVICE_TABLE(of, zx2967_wdt_match);
++
++static struct platform_driver zx2967_wdt_driver = {
++	.probe		= zx2967_wdt_probe,
++	.remove		= zx2967_wdt_remove,
++	.driver		= {
++		.name	= "zx2967-wdt",
++		.of_match_table	= of_match_ptr(zx2967_wdt_match),
++	},
++};
++module_platform_driver(zx2967_wdt_driver);
++
++MODULE_AUTHOR("Baoyou Xie <baoyou.xie@linaro.org>");
++MODULE_DESCRIPTION("ZTE zx2967 Watchdog Device Driver");
++MODULE_LICENSE("GPL v2");
+-- 
+2.7.4
