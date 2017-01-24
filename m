@@ -1,58 +1,67 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Tue, 24 Jan 2017 11:06:36 +0530
-Subject: [PATCH v2] initramfs: finish fput() before accessing any binary from
- initramfs
-Message-ID: <20170124053636.30121-1-lokeshvutla@ti.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Tue, 24 Jan 2017 13:40:50 +0800
+Subject: [PATCH v3] drm/mediatek: Support UYVY and YUYV format for overlay
+In-Reply-To: <1485232858-40418-1-git-send-email-bibby.hsieh@mediatek.com>
+References: <1485232858-40418-1-git-send-email-bibby.hsieh@mediatek.com>
+Message-ID: <1485236450.30572.3.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 4a9d4b024a31 ("switch fput to task_work_add") implements a
-schedule_work() for completing fput(), but did not guarantee calling
-__fput() after unpacking initramfs. Because of this, there is a
-possibility that during boot a driver can see ETXTBSY when it tries
-to load a binary from initramfs as fput() is still pending on that
-binary. This patch makes sure that fput() is completed after unpacking
-initramfs.
+Hi, Bibby:
 
-Reported-by: Murali Karicheri <m-karicheri2@ti.com>
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
----
-Link to RFC: https://patchwork.kernel.org/patch/9520539/
-Changes since v1:
-- Moved flush_delayed_fput() before loading default modules.
+On Tue, 2017-01-24 at 12:40 +0800, Bibby Hsieh wrote:
+> MT8173 overlay can support UYVY and YUYV format,
+> we add the format in DRM driver.
+> 
+> Signed-off-by: Bibby Hsieh <bibby.hsieh@mediatek.com>
+> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
 
-Note: Reproduced on TI K2HK EVM. K2HK Queue Manager subsystem driver[1] tries
-to load a firmware from initramfs during boot. Sometimes loading of this
-firmware fails with error ETXTBSY. Digging a bit more observed that
-deny_write_access() is returning ETXTBSY as inode->i_writecount is > 0
-for that file. This is because Unpacking initramfs does a
-get_write_access(from open) but hasn't done put_write_access(from fput)
-as it hasn't been scheduled yet.
+Acked-by: CK Hu <ck.hu@mediatek.com>
 
-[1] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/soc/ti/knav_qmss_queue.c
-
- init/initramfs.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/init/initramfs.c b/init/initramfs.c
-index b32ad7d97ac9..981f286c1d16 100644
---- a/init/initramfs.c
-+++ b/init/initramfs.c
-@@ -18,6 +18,7 @@
- #include <linux/dirent.h>
- #include <linux/syscalls.h>
- #include <linux/utime.h>
-+#include <linux/file.h>
- 
- static ssize_t __init xwrite(int fd, const char *p, size_t count)
- {
-@@ -647,6 +648,7 @@ static int __init populate_rootfs(void)
- 			printk(KERN_EMERG "Initramfs unpacking failed: %s\n", err);
- 		free_initrd();
- #endif
-+		flush_delayed_fput();
- 		/*
- 		 * Try loading default modules from initramfs.  This gives
- 		 * us a chance to load before device_initcalls.
--- 
-2.11.0
+> ---
+>  drivers/gpu/drm/mediatek/mtk_disp_ovl.c  | 7 +++++++
+>  drivers/gpu/drm/mediatek/mtk_drm_plane.c | 2 ++
+>  2 files changed, 9 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+> index c703102..53f2001 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+> @@ -40,10 +40,13 @@
+>  #define	OVL_RDMA_MEM_GMC	0x40402020
+>  
+>  #define OVL_CON_BYTE_SWAP	BIT(24)
+> +#define OVL_CON_MTX_YUV_TO_RGB	(6 << 16)
+>  #define OVL_CON_CLRFMT_RGB565	(0 << 12)
+>  #define OVL_CON_CLRFMT_RGB888	(1 << 12)
+>  #define OVL_CON_CLRFMT_RGBA8888	(2 << 12)
+>  #define OVL_CON_CLRFMT_ARGB8888	(3 << 12)
+> +#define OVL_CON_CLRFMT_UYVY	(4 << 12)
+> +#define OVL_CON_CLRFMT_YUYV	(5 << 12)
+>  #define	OVL_CON_AEN		BIT(8)
+>  #define	OVL_CON_ALPHA		0xff
+>  
+> @@ -162,6 +165,10 @@ static unsigned int ovl_fmt_convert(unsigned int fmt)
+>  	case DRM_FORMAT_XBGR8888:
+>  	case DRM_FORMAT_ABGR8888:
+>  		return OVL_CON_CLRFMT_RGBA8888 | OVL_CON_BYTE_SWAP;
+> +	case DRM_FORMAT_UYVY:
+> +		return OVL_CON_CLRFMT_UYVY | OVL_CON_MTX_YUV_TO_RGB;
+> +	case DRM_FORMAT_YUYV:
+> +		return OVL_CON_CLRFMT_YUYV | OVL_CON_MTX_YUV_TO_RGB;
+>  	}
+>  }
+>  
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_plane.c b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
+> index c461a23..8c02d1d 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_plane.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_plane.c
+> @@ -28,6 +28,8 @@
+>  	DRM_FORMAT_XRGB8888,
+>  	DRM_FORMAT_ARGB8888,
+>  	DRM_FORMAT_RGB565,
+> +	DRM_FORMAT_UYVY,
+> +	DRM_FORMAT_YUYV,
+>  };
+>  
+>  static void mtk_plane_reset(struct drm_plane *plane)
