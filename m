@@ -1,80 +1,75 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 24 Jan 2017 11:36:58 +0000
-Subject: [PATCH 2/7] MFD: add STM32 DFSDM support
-In-Reply-To: <283c0e48-55e2-6516-369d-91dc72d12f73@st.com>
-References: <1485189145-29576-1-git-send-email-arnaud.pouliquen@st.com>
- <1485189145-29576-3-git-send-email-arnaud.pouliquen@st.com>
- <20170124082249.GR16020@dell>
- <283c0e48-55e2-6516-369d-91dc72d12f73@st.com>
-Message-ID: <20170124113658.GW16020@dell>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 24 Jan 2017 12:37:26 +0100
+Subject: [PATCH v3 16/24] media: Add i.MX media core driver
+In-Reply-To: <c6087342-f61f-0b4c-f67e-4239f861e974@mentor.com>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <1483755102-24785-17-git-send-email-steve_longerbeam@mentor.com>
+ <1484320822.31475.96.camel@pengutronix.de>
+ <a94025b4-c4dd-de51-572e-d2615a7246e4@gmail.com>
+ <1484574468.8415.136.camel@pengutronix.de>
+ <e38feca9-ed6f-8288-e006-768d6ba2fe5a@gmail.com>
+ <1485170006.2874.63.camel@pengutronix.de>
+ <481289bb-424f-4ac4-66f1-7e1b4a0b7065@gmail.com>
+ <c6087342-f61f-0b4c-f67e-4239f861e974@mentor.com>
+Message-ID: <1485257846.3600.106.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 Jan 2017, Arnaud Pouliquen wrote:
-> On 01/24/2017 09:22 AM, Lee Jones wrote:
-> > On Mon, 23 Jan 2017, Arnaud Pouliquen wrote:
-> > 
-> >> DFSDM hardware IP can be used at the same time for ADC sigma delta
-> > 
-> > Same time as what?
-> DFSDM is used for ADC acquisition (through IIO) but also PDM microphone
-> capture (through ASOC).
-> > 
-> >> conversion and audio PDM microphone.
-> >> MFD driver is in charge of configuring IP registers and managing IP clocks.
-> >> For this it exports an API to handles filters and channels resources.
-> > 
-> > This looks like an ADC driver?  What is it that makes it an MFD?
-> Yes it a kind of ADC but that supports 2 features audio and iio.
-> So it has to support 2 features based on 2 separate Frameworks.
+Hi Steve,
 
-I'm still unsure why it needs to live in MFD.
-
-By the looks of it, this driver needs to move into IIO and you need to
-call into it from ASoC.
-
-> >> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-> >> ---
-> >>  drivers/mfd/Kconfig             |   11 +
-> >>  drivers/mfd/Makefile            |    2 +
-> >>  drivers/mfd/stm32-dfsdm-reg.h   |  220 +++++++++
-> >>  drivers/mfd/stm32-dfsdm.c       | 1044 +++++++++++++++++++++++++++++++++++++++
-> >>  include/linux/mfd/stm32-dfsdm.h |  324 ++++++++++++
-> >>  5 files changed, 1601 insertions(+)
-> >>  create mode 100644 drivers/mfd/stm32-dfsdm-reg.h
-> >>  create mode 100644 drivers/mfd/stm32-dfsdm.c
-> >>  create mode 100644 include/linux/mfd/stm32-dfsdm.h
-> >>
-> >> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> >> index c6df644..4bb660b 100644
-> >> --- a/drivers/mfd/Kconfig
-> >> +++ b/drivers/mfd/Kconfig
-> >> @@ -1607,6 +1607,17 @@ config MFD_STW481X
-> >>  	  in various ST Microelectronics and ST-Ericsson embedded
-> >>  	  Nomadik series.
-> >>  
-> >> +config MFD_STM32_DFSDM
-> >> +	tristate "ST Microelectronics STM32 DFSDM"
-> >> +	depends on (ARCH_STM32 && OF) || COMPILE_TEST
-> >> +	select MFD_CORE
-> >> +	select REGMAP
-> >> +	select REGMAP_MMIO
-> >> +	help
-> >> +	  Select this option to enable the STM32 Digital Filter
-> >> +	  for Sigma Delta Modulators (DFSDM) driver used
-> >> +	  in various STM32 series.
-> >> +
-> >>  menu "Multimedia Capabilities Port drivers"
-> >>  	depends on ARCH_SA1100
-> > 
-> > [...]
-> > 
+On Mon, 2017-01-23 at 17:45 -0800, Steve Longerbeam wrote:
 > 
-> Regards
-> Arnaud
+> On 01/23/2017 05:38 PM, Steve Longerbeam wrote:
+> >
+> >>
+> >>> Second, ignoring the above locking issue for a moment,
+> >>> v4l2_pipeline_pm_use()
+> >>> will call s_power on the sensor _first_, then the mipi csi-2 s_power,
+> >>> when executing
+> >>> media-ctl -l '"ov5640 1-003c":0 -> "imx6-mipi-csi2":0[1]'. Which is the
+> >>> wrong order.
+> >>> In my version which enforces the correct power on order, the mipi csi-2
+> >>> s_power
+> >>> is called first in that link setup, followed by the sensor.
+> >> I don't understand why you want to power up subdevs as soon as the links
+> >> are established.
+> >
+> > Because that is the precedence, all other media drivers do pipeline
+> > power on/off at link_notify. And v4l2_pipeline_link_notify() was written
+> > as a link_notify method.
+> >
+> >>   Shouldn't that rather be done for all subdevices in the
+> >> pipeline when the corresponding capture device is opened?
+> >
+> > that won't work. There's no guarantee the links will be established
+> > at capture device open time.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+If the device is opened before the links are established, it won't be
+usable anyway. And I think the connected pipeline should be locked in
+place while the video device is opened. Is there any reason to ever open
+the video device and only then start linking entities?
+
+> ugh, maybe v4l2_pipeline_pm_use() would work at open/release. If there are
+> no links yet, it would basically be a no-op. And stream on requires 
+> opening the
+> device, and the pipeline links should be established by then, so this 
+> might be
+> fine, looking into this too.
+
+Thanks for looking into it, at least I had that working for the
+TC358743->MIPI-CSI2 link in my driver.
+
+> >> It seems to me that powering up the pipeline should be the last step
+> >> before userspace actually starts the capture.
+> >
+> > Well, I'm ok with moving pipeline power on/off to start/stop streaming.
+> > I would actually prefer to do it then, I only chose at link_notify 
+> > because of precedence. I'll look into it.
+
+That might be too late, though. I would expect STREAMON/STREAMOFF to be
+a rather fast operation as all the slow preparation could be at open /
+REQBUFS time. Also, there might be sensors that need to be powered on to
+handle the v4l2_ctrl passthrough?
+
+regards
+Philipp
