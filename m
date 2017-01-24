@@ -1,88 +1,25 @@
-From: john@phrozen.org (John Crispin)
-Date: Tue, 24 Jan 2017 11:38:41 +0100
-Subject: [PATCH v1 2/2] arm: dts: mt2701: add nor flash node
-In-Reply-To: <20170124113118.304a860c@bbrezillon>
-References: <d7b866ad-5b2f-62d3-3aa3-6fa42803d625@gmail.com>
- <b850b751-1d8d-0053-cf1f-d5314542e5c3@gmail.com>
- <20170113172825.75d545a3@bbrezillon>
- <86c997be-f500-eaa1-3ba5-d21cff6223b7@gmail.com>
- <20170113175628.1793f433@bbrezillon>
- <0fafcd8d-cf99-de6b-728f-5e3637810b68@gmail.com>
- <20170114092958.022f2fc8@bbrezillon>
- <e7fa1542-f0e2-0e45-23b3-25d6491ae40d@gmail.com>
- <20170116094032.6f471f11@bbrezillon>
- <20170117143650.5db87148@free-electrons.com>
- <20170118222010.ivc6jxpnrumemvdf@rob-hp-laptop>
- <20170119103829.524ce715@free-electrons.com>
- <CAL_Jsq+EyHtC7THLCJcwgtVtVESMOdmi3T3bBxgOqJt6BCtCHQ@mail.gmail.com>
- <20170119091428.598eb987@bbrezillon>
- <CAL_Jsq+S-FYy4SmjJ3fWzBugw2zCj5TQkkfUA8QVL7SLJW3E1g@mail.gmail.com>
- <1485052600.19995.10.camel@mhfsdcap03> <20170124113118.304a860c@bbrezillon>
-Message-ID: <3b86fcfd-9f8a-b324-e164-20582a0b2e40@phrozen.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 24 Jan 2017 16:10:57 +0530
+Subject: [PATCH v2] arm: davinci: Make the usb20 clock available to PM
+ runtime
+In-Reply-To: <20170124103226.15377-1-abailon@baylibre.com>
+References: <20170124103226.15377-1-abailon@baylibre.com>
+Message-ID: <22d793a6-71db-cbf4-2f76-6539015e285b@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tuesday 24 January 2017 04:02 PM, Alexandre Bailon wrote:
+> Add usb20 to the list of clock supported by PM runtime.
 
+Patch description does not match contents. You should rather talk about:
+since USB20 subsystem uses just one clock, there is no need of a con_id,
+so we are using NULL.
 
-On 24/01/2017 11:31, Boris Brezillon wrote:
-> On Sun, 22 Jan 2017 10:36:40 +0800
-> Guochun Mao <guochun.mao@mediatek.com> wrote:
-> 
->> Hi,
->> On Thu, 2017-01-19 at 08:18 -0600, Rob Herring wrote:
->>> On Thu, Jan 19, 2017 at 2:14 AM, Boris Brezillon  
->>>> One last question and I'm done: is something like that acceptable?
->>>>
->>>>         compatible = "<vendor>,<old-soc>","<vendor>,<new-soc>";
->>>>
->>>> This can happen when someone adds support for an unsupported feature
->>>> on a brand new SoC, and then someone else use the same driver for an
->>>> older SoC embedding the same IP but still wants to add a new compatible
->>>> just in case these 2 IPs appear to be slightly different.  
->>>
->>> Yes, it's old and new compatible strings in this case and it's newest
->>> compatible string first.
->>>   
->>>> Here the order of compat strings is no longer following a clear rule
->>>> like 'most-specific compatible first' or 'newest IP/SoC version first',
->>>> it's completely dependent on the order these IPs were supported in the
->>>> OS (Linux). I'm perfectly fine with that BTW, just want to make sure
->>>> this is authorized.  
->>>
->>> I guess we should say "newest compatible for IP first" instead. There
->>> are some exceptions where we add fallbacks later on, but that falls
->>> under the most-specific part.
->>>
->>> It's order that the bindings are defined, not Linux support really,
->>> but in practice those are the same.
->>>
->>> Rob  
->>
->> Thanks for all your effort for code reviewing.
->> Our mt2701-nor's hardware is designed base on mt8713-nor,
->> even so, there would be some slight difference.
->> If I don't misunderstand your viewpoint in this discussion,
->> there's no need to drop mt2701-nor compatible.
-> 
-> No, just update the documentation as suggested by Rob.
-> 
->> And if not, is there any other suggestion?
-> 
-> Nope, and my apologies for being so insistent on something I obviously
-> misunderstood.
-> 
-> Regards,
-> 
-> Boris
+Also, "ARM: " prefix should be capitalized .
 
+> 
+> Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+> Suggested-by: Sekhar Nori <nsekhar@ti.com>
 
-Hi,
-
-could you please add the mt7623 compat string to the documentation
-aswell while at it ? mt7623/mt2701 are essentially the same and it'll
-safe us time and effort and not cause merge order conflicts. otherwise i
-would need to wait till the mt2701 patch is merged before i can send the
-mt7623 one
-
-Thanks !
-	John
+Thanks,
+Sekhar
