@@ -1,7 +1,9 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 24 Jan 2017 10:05:14 -0800
-Subject: [GIT PULL 1/5] non-urgent omap fixes for v4.11 merge window
-Message-ID: <pull-1485274191-192300>
+Date: Tue, 24 Jan 2017 10:05:16 -0800
+Subject: [GIT PULL 3/5] omap wkup_m3_ipc driver changes for v4.11 merge window
+In-Reply-To: <pull-1485274191-192300>
+References: <pull-1485274191-192300>
+Message-ID: <pull-1485274191-192300-3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,47 +13,23 @@ The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.11/fixes-not-urgent-signed
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.11/drivers-signed
 
-for you to fetch changes up to 631af44c10f9430163296626c6134db16a4f51fb:
+for you to fetch changes up to 36cc9fd9ce0fd0e4654890aa347d258616aef5fa:
 
-  ARM: OMAP3: Fix SoC detection of OMAP36/37 Family (2017-01-20 10:13:06 -0800)
-
-----------------------------------------------------------------
-Non-urgent fixes for omaps for v4.11 merge window. These all are
-fixes for things that have never worked or have been broken for
-a long time and nobody noticed:
-
-- Fix omap3 off mode pull defines
-
-- Allow multiple pdata quirks instead of just one
-
-- Fix am335x and dm814x scm syscon to probe children too
-
-- Fix compatible for ti81xx to allow use with 8250_omap as well
-
-- Fix 8250_omap on omap5 by adding HWMOD_SWSUP_SIDLE_ACT flag
-
-- Fix SoC detection for omap36/37 SoCs
+  soc: ti: wkup_m3_ipc: Drop wait from wkup_m3_rproc_boot_thread (2017-01-06 08:37:39 -0800)
 
 ----------------------------------------------------------------
-Adam Ford (1):
-      ARM: OMAP3: Fix SoC detection of OMAP36/37 Family
+Just a single wkup_m3_ipc clean-up for v4.11 merge window.
+We don't currently have anything else for drivers/soc to
+merge, but I'd expect that to change as soon as we can start
+moving PM code into drivers with the recently posted SRAM
+changes. Anyways, sent as a separate pull request to make
+it easy to group the ARM SoC pull requests.
 
-Tony Lindgren (4):
-      ARM: dts: Fix omap3 off mode pull defines
-      ARM: OMAP2+: Fix init for multiple quirks for the same SoC
-      ARM: dts: Fix am335x and dm814x scm syscon to probe children
-      ARM: dts: Fix compatible for ti81xx uarts for 8250
+----------------------------------------------------------------
+Sarangdhar Joshi (1):
+      soc: ti: wkup_m3_ipc: Drop wait from wkup_m3_rproc_boot_thread
 
-Vignesh R (1):
-      ARM: OMAP5: Add HWMOD_SWSUP_SIDLE_ACT flag for UART
-
- arch/arm/boot/dts/am33xx.dtsi              |  3 ++-
- arch/arm/boot/dts/dm814x.dtsi              |  9 +++++----
- arch/arm/boot/dts/dm816x.dtsi              |  6 +++---
- arch/arm/mach-omap2/id.c                   | 10 +++++++++-
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c |  8 ++++++--
- arch/arm/mach-omap2/pdata-quirks.c         |  1 -
- include/dt-bindings/pinctrl/omap.h         |  4 ++--
- 7 files changed, 27 insertions(+), 14 deletions(-)
+ drivers/soc/ti/wkup_m3_ipc.c | 2 --
+ 1 file changed, 2 deletions(-)
