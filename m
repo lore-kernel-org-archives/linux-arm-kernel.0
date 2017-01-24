@@ -1,81 +1,80 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 24 Jan 2017 11:32:16 +0000
-Subject: [PATCH 2/2] arch_timer: acpi: add hisi timer erratum data
-In-Reply-To: <20170124105717.GB6277@leverpostej>
-References: <1485254391-51551-1-git-send-email-guohanjun@huawei.com>
- <1485254391-51551-3-git-send-email-guohanjun@huawei.com>
- <20170124105717.GB6277@leverpostej>
-Message-ID: <a2ac2a70-09fb-5cec-c090-b8ebde90e24f@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 24 Jan 2017 11:36:58 +0000
+Subject: [PATCH 2/7] MFD: add STM32 DFSDM support
+In-Reply-To: <283c0e48-55e2-6516-369d-91dc72d12f73@st.com>
+References: <1485189145-29576-1-git-send-email-arnaud.pouliquen@st.com>
+ <1485189145-29576-3-git-send-email-arnaud.pouliquen@st.com>
+ <20170124082249.GR16020@dell>
+ <283c0e48-55e2-6516-369d-91dc72d12f73@st.com>
+Message-ID: <20170124113658.GW16020@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/01/17 10:57, Mark Rutland wrote:
-> On Tue, Jan 24, 2017 at 06:39:51PM +0800, Hanjun Guo wrote:
->> From: Hanjun Guo <hanjun.guo@linaro.org>
->>
->> Add hisilicon timer specific erratum fixes.
->>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> ---
->>  drivers/clocksource/arm_arch_timer.c | 22 ++++++++++++++++++++++
->>  1 file changed, 22 insertions(+)
->>
->> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
->> index 80d6f76..3e62a09 100644
->> --- a/drivers/clocksource/arm_arch_timer.c
->> +++ b/drivers/clocksource/arm_arch_timer.c
->> @@ -1156,10 +1156,32 @@ struct gtdt_arch_timer_fixup {
->>  	void *context;
->>  };
->>  
->> +#ifdef CONFIG_HISILICON_ERRATUM_161010101
->> +static void __init hisi_erratum_workaroud_enable(void *context)
->> +{
->> +	int i;
->> +
->> +	for (i = 0; i < ARRAY_SIZE(ool_workarounds); i++) {
->> +		if (!strcmp(context, ool_workarounds[i].id)) {
->> +			timer_unstable_counter_workaround = &ool_workarounds[i];
->> +			static_branch_enable(&arch_timer_read_ool_enabled);
->> +			pr_info("arch_timer: Enabling workaround for %s\n",
->> +				timer_unstable_counter_workaround->id);
->> +			break;
->> +		}
->> +	}
->> +}
->> +#endif
->> +
->>  /* note: this needs to be updated according to the doc of OEM ID
->>   * and TABLE ID for different board.
->>   */
->>  static struct gtdt_arch_timer_fixup arch_timer_quirks[] __initdata = {
->> +#ifdef CONFIG_HISILICON_ERRATUM_161010101
->> +	{"HISI  ", "HIP05   ", 0, &hisi_erratum_workaroud_enable, "hisilicon,erratum-161010101"},
->> +	{"HISI  ", "HIP06   ", 0, &hisi_erratum_workaroud_enable, "hisilicon,erratum-161010101"},
->> +	{"HISI  ", "HIP07   ", 0, &hisi_erratum_workaroud_enable, "hisilicon,erratum-161010101"},
->> +#endif
->>  };
+On Tue, 24 Jan 2017, Arnaud Pouliquen wrote:
+> On 01/24/2017 09:22 AM, Lee Jones wrote:
+> > On Mon, 23 Jan 2017, Arnaud Pouliquen wrote:
+> > 
+> >> DFSDM hardware IP can be used at the same time for ADC sigma delta
+> > 
+> > Same time as what?
+> DFSDM is used for ADC acquisition (through IIO) but also PDM microphone
+> capture (through ASOC).
+> > 
+> >> conversion and audio PDM microphone.
+> >> MFD driver is in charge of configuring IP registers and managing IP clocks.
+> >> For this it exports an API to handles filters and channels resources.
+> > 
+> > This looks like an ADC driver?  What is it that makes it an MFD?
+> Yes it a kind of ADC but that supports 2 features audio and iio.
+> So it has to support 2 features based on 2 separate Frameworks.
+
+I'm still unsure why it needs to live in MFD.
+
+By the looks of it, this driver needs to move into IIO and you need to
+call into it from ASoC.
+
+> >> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+> >> ---
+> >>  drivers/mfd/Kconfig             |   11 +
+> >>  drivers/mfd/Makefile            |    2 +
+> >>  drivers/mfd/stm32-dfsdm-reg.h   |  220 +++++++++
+> >>  drivers/mfd/stm32-dfsdm.c       | 1044 +++++++++++++++++++++++++++++++++++++++
+> >>  include/linux/mfd/stm32-dfsdm.h |  324 ++++++++++++
+> >>  5 files changed, 1601 insertions(+)
+> >>  create mode 100644 drivers/mfd/stm32-dfsdm-reg.h
+> >>  create mode 100644 drivers/mfd/stm32-dfsdm.c
+> >>  create mode 100644 include/linux/mfd/stm32-dfsdm.h
+> >>
+> >> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> >> index c6df644..4bb660b 100644
+> >> --- a/drivers/mfd/Kconfig
+> >> +++ b/drivers/mfd/Kconfig
+> >> @@ -1607,6 +1607,17 @@ config MFD_STW481X
+> >>  	  in various ST Microelectronics and ST-Ericsson embedded
+> >>  	  Nomadik series.
+> >>  
+> >> +config MFD_STM32_DFSDM
+> >> +	tristate "ST Microelectronics STM32 DFSDM"
+> >> +	depends on (ARCH_STM32 && OF) || COMPILE_TEST
+> >> +	select MFD_CORE
+> >> +	select REGMAP
+> >> +	select REGMAP_MMIO
+> >> +	help
+> >> +	  Select this option to enable the STM32 Digital Filter
+> >> +	  for Sigma Delta Modulators (DFSDM) driver used
+> >> +	  in various STM32 series.
+> >> +
+> >>  menu "Multimedia Capabilities Port drivers"
+> >>  	depends on ARCH_SA1100
+> > 
+> > [...]
+> > 
 > 
-> NAK. This duplicates logic unnecessarily (for enabling the workaround),
-> and (ab)uses the id, which was intended to be specific to DT (since it
-> is a DT property name).
+> Regards
+> Arnaud
 
-Agreed, that's properly revolting.
-
-> We should split the matching from the particular workaround (and
-> enabling thereof), so that we can go straight from ACPI match to
-> workaround (without having to use the DT id in this manner), and don't
-> have to duplicate the logic to enable the workaround.
-> 
-> I believe Marc is looking at some rework in this area which may enable
-> this, so please wait for that to appear.
-
-Yeah, I'm implementing a semi-flexible way to add new quirk types, and
-the last thing I want to see is two (or more) tables describing the same
-thing.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
