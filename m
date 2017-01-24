@@ -1,76 +1,81 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 24 Jan 2017 17:50:04 +0900
-Subject: [PATCH v30 10/11] Documentation: kdump: describe arm64 port
-In-Reply-To: <20170124084638.3770-1-takahiro.akashi@linaro.org>
-References: <20170124084638.3770-1-takahiro.akashi@linaro.org>
-Message-ID: <20170124085004.3892-9-takahiro.akashi@linaro.org>
+From: balbi@kernel.org (Felipe Balbi)
+Date: Tue, 24 Jan 2017 10:52:33 +0200
+Subject: usb: gadget: Kernel panic (NULL pointer dereference) when using
+ fsl_udc2_core on i.MX31 PDK
+In-Reply-To: <CAM=E1R4EMEEq1wnHxjLLJMLaXCM=EDFo1JDacHKGq6DUtqA9Nw@mail.gmail.com>
+References: <f984e50b-0e64-88ef-2f53-b8da2a62daf0@gmail.com>
+ <87k29m6lkx.fsf@linux.intel.com>
+ <CAM=E1R4EMEEq1wnHxjLLJMLaXCM=EDFo1JDacHKGq6DUtqA9Nw@mail.gmail.com>
+Message-ID: <87efzsdelq.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add arch specific descriptions about kdump usage on arm64 to kdump.txt.
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Reviewed-by: Baoquan He <bhe@redhat.com>
-Acked-by: Dave Young <dyoung@redhat.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
----
- Documentation/kdump/kdump.txt | 16 +++++++++++++++-
- 1 file changed, 15 insertions(+), 1 deletion(-)
+Hi,
 
-diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
-index b0eb27b956d9..615434d81108 100644
---- a/Documentation/kdump/kdump.txt
-+++ b/Documentation/kdump/kdump.txt
-@@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
- a remote system.
- 
- Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
--s390x and arm architectures.
-+s390x, arm and arm64 architectures.
- 
- When the system kernel boots, it reserves a small section of memory for
- the dump-capture kernel. This ensures that ongoing Direct Memory Access
-@@ -249,6 +249,13 @@ Dump-capture kernel config options (Arch Dependent, arm)
- 
-     AUTO_ZRELADDR=y
- 
-+Dump-capture kernel config options (Arch Dependent, arm64)
-+----------------------------------------------------------
-+
-+- Please note that kvm of the dump-capture kernel will not be enabled
-+  on non-VHE systems even if it is configured. This is because the CPU
-+  will not be reset to EL2 on panic.
-+
- Extended crashkernel syntax
- ===========================
- 
-@@ -305,6 +312,8 @@ Boot into System Kernel
-    kernel will automatically locate the crash kernel image within the
-    first 512MB of RAM if X is not given.
- 
-+   On arm64, use "crashkernel=Y[@X]".  Note that the start address of
-+   the kernel, X if explicitly specified, must be aligned to 2MiB (0x200000).
- 
- Load the Dump-capture Kernel
- ============================
-@@ -327,6 +336,8 @@ For s390x:
- 	- Use image or bzImage
- For arm:
- 	- Use zImage
-+For arm64:
-+	- Use vmlinux or Image
- 
- If you are using a uncompressed vmlinux image then use following command
- to load dump-capture kernel.
-@@ -370,6 +381,9 @@ For s390x:
- For arm:
- 	"1 maxcpus=1 reset_devices"
- 
-+For arm64:
-+	"1 maxcpus=1 reset_devices"
-+
- Notes on loading the dump-capture kernel:
- 
- * By default, the ELF headers are stored in ELF64 format to support
+Magnus Lilja <lilja.magnus@gmail.com> writes:
+>>> I tried the fsl_udc_core gadget driver on the i.MX31 PDK board and got a
+>>> kernel panic (NULL pointer dereference) when connecting the USB cable. I
+>>> had the g_serial module loaded as well.
+>>>
+>>> The NULL pointer panic comes from gadget/udc/core.c
+>>> usb_gadget_giveback_request() which calls req->complete() and in some
+>>> cases req->complete is NULL.
+>>>
+>>> Commit 304f7e5e1d08 ("usb: gadget: Refactor request completion") changed
+>>> fsl_udc2_core.c (and several other files) and in fsl_udc2_core.c a check
+>>> that req->complete is non-NULL was removed:
+>>>
+>>> --- a/drivers/usb/gadget/udc/fsl_udc_core.c
+>>> +++ b/drivers/usb/gadget/udc/fsl_udc_core.c
+>>> @@ -197,10 +197,8 @@ __acquires(ep->udc->lock)
+>>>          ep->stopped = 1;
+>>>
+>>>          spin_unlock(&ep->udc->lock);
+>>> -       /* complete() is from gadget layer,
+>>> -        * eg fsg->bulk_in_complete() */
+>>> -       if (req->req.complete)
+>>> -               req->req.complete(&ep->ep, &req->req);
+>>> +
+>>> +       usb_gadget_giveback_request(&ep->ep, &req->req);
+>>>
+>>>          spin_lock(&ep->udc->lock);
+>>>          ep->stopped = stopped;
+>>>
+>>> If I re-introduce the check (either in fsl_udc_core.c or core.c) at
+>>> least USB gadget operation using g_serial seems to work just fine.
+>>>
+>>> I don't know the logic in detail to understand whether this is a proper
+>>> fix or if there is some other more problem with the fls_udc_core driver.
+>>> Does anyone have input in this matter?
+>>>
+>>> I can produce a proper patch that fixes this problem by re-introducing
+>>> the check (in either fsl_udc_core.c or core.c) if that is a proper
+>>> solution and I can also assist in testing other fixes to the problem.
+>>
+>> ->complete() is supposed to be mandatory. Which gadget do you have that
+>> ->doesn't set ->complete() to a valid function pointer?
+>
+> I'm modprobing g_serial so the following modules are loaded (using my patch):
+>
+> ~ # lsmod
+> usb_f_acm
+> u_serial
+> g_serial
+> libcomposite
+> configfs
+> fsl_usb2_udc
+
+okay, can you figure out which request is coming without ->complete()
+set? To which endpoint is this request being queued? It would be nice to
+know these details. Maybe this is an old bug which ought to be fixed.
+
 -- 
-2.11.0
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170124/0826a8cd/attachment.sig>
