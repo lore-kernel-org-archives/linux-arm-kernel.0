@@ -1,38 +1,72 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 24 Jan 2017 18:42:26 -0300
-Subject: [PATCH] [media] exynos-gsc: Avoid spamming the log on VIDIOC_TRY_FMT
-Message-ID: <1485294146-7467-1-git-send-email-javier@osg.samsung.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 25 Jan 2017 06:00:59 +0800
+Subject: [PATCH 4/8] serial: st-asc: (De)Register GPIOD and swap Pinctrl
+ profiles
+In-Reply-To: <20170124134310.27512-5-lee.jones@linaro.org>
+Message-ID: <201701250500.AYU14KMP%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There isn't an ioctl to enum the supported field orders, so a user-space
-application can call VIDIOC_TRY_FMT using different field orders to know
-if one is supported. For example, GStreamer does this so during playback
-dozens of the following messages appear in the kernel log buffer:
+Hi Lee,
 
-[ 442.143393] Not supported field order(4)
+[auto build test ERROR on tty/tty-testing]
+[also build test ERROR on v4.10-rc5 next-20170124]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Instead of printing this as an error, just keep it as debug information.
+url:    https://github.com/0day-ci/linux/commits/Lee-Jones/serial-st-asc-Allow-handling-of-RTS-line/20170125-014618
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git tty-testing
+config: alpha-allyesconfig (attached as .config)
+compiler: alpha-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=alpha 
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+All errors (new ones prefixed by >>):
+
+   drivers/tty/serial/st-asc.c: In function 'asc_set_termios':
+>> drivers/tty/serial/st-asc.c:568:4: error: implicit declaration of function 'pinctrl_select_state' [-Werror=implicit-function-declaration]
+       pinctrl_select_state(ascport->pinctrl,
+       ^~~~~~~~~~~~~~~~~~~~
+   drivers/tty/serial/st-asc.c: In function 'asc_init_port':
+   drivers/tty/serial/st-asc.c:755:21: error: implicit declaration of function 'devm_pinctrl_get' [-Werror=implicit-function-declaration]
+     ascport->pinctrl = devm_pinctrl_get(&pdev->dev);
+                        ^~~~~~~~~~~~~~~~
+   drivers/tty/serial/st-asc.c:755:19: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+     ascport->pinctrl = devm_pinctrl_get(&pdev->dev);
+                      ^
+   drivers/tty/serial/st-asc.c:762:3: error: implicit declaration of function 'pinctrl_lookup_state' [-Werror=implicit-function-declaration]
+      pinctrl_lookup_state(ascport->pinctrl, "default");
+      ^~~~~~~~~~~~~~~~~~~~
+   drivers/tty/serial/st-asc.c:761:27: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+     ascport->states[DEFAULT] =
+                              ^
+   drivers/tty/serial/st-asc.c:771:30: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+     ascport->states[MANUAL_RTS] =
+                                 ^
+   cc1: some warnings being treated as errors
+
+vim +/pinctrl_select_state +568 drivers/tty/serial/st-asc.c
+
+   562	
+   563			/* If flow-control selected, stop handling RTS manually */
+   564			if (ascport->rts) {
+   565				devm_gpiod_put(port->dev, ascport->rts);
+   566				ascport->rts = NULL;
+   567	
+ > 568				pinctrl_select_state(ascport->pinctrl,
+   569						     ascport->states[DEFAULT]);
+   570			}
+   571		} else {
 
 ---
-
- drivers/media/platform/exynos-gsc/gsc-core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
-index 8524fe15fa80..678b600f0500 100644
---- a/drivers/media/platform/exynos-gsc/gsc-core.c
-+++ b/drivers/media/platform/exynos-gsc/gsc-core.c
-@@ -408,7 +408,7 @@ int gsc_try_fmt_mplane(struct gsc_ctx *ctx, struct v4l2_format *f)
- 	if (pix_mp->field == V4L2_FIELD_ANY)
- 		pix_mp->field = V4L2_FIELD_NONE;
- 	else if (pix_mp->field != V4L2_FIELD_NONE) {
--		pr_err("Not supported field order(%d)\n", pix_mp->field);
-+		pr_debug("Not supported field order(%d)\n", pix_mp->field);
- 		return -EINVAL;
- 	}
- 
--- 
-2.7.4
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 48646 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/9d6f2e44/attachment-0001.gz>
