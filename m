@@ -1,42 +1,75 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 24 Jan 2017 21:28:47 +0100
-Subject: [PATCH net-next v6 4/4] phy: marvell: Add support for the PHY
- embedded in the topaz switch
-In-Reply-To: <f8526f4a5d99223fc90fe5579b4958eaa0950a3a.1485288602.git-series.gregory.clement@free-electrons.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 24 Jan 2017 21:31:59 +0100
+Subject: [PATCH net-next v6 1/4] net: dsa: mv88e6xxx: Don't forbid MDIO
+ I/Os for PHY addr >= num_of_ports
+In-Reply-To: <7665c54a8da0d4338d5935ab272952ea6547d815.1485288602.git-series.gregory.clement@free-electrons.com>
+ (Gregory CLEMENT's message of "Tue, 24 Jan 2017 21:10:23 +0100")
 References: <cover.b0e18efe751186768e720c341693117fdd4d3c16.1485288602.git-series.gregory.clement@free-electrons.com>
- <f8526f4a5d99223fc90fe5579b4958eaa0950a3a.1485288602.git-series.gregory.clement@free-electrons.com>
-Message-ID: <20170124202847.GV10895@lunn.ch>
+ <cover.b0e18efe751186768e720c341693117fdd4d3c16.1485288602.git-series.gregory.clement@free-electrons.com>
+ <7665c54a8da0d4338d5935ab272952ea6547d815.1485288602.git-series.gregory.clement@free-electrons.com>
+Message-ID: <87inp42o8w.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2017 at 09:10:26PM +0100, Gregory CLEMENT wrote:
-> The PHY with the ID 0x1410C00
+Hi,
+ 
+ On mar., janv. 24 2017, Gregory CLEMENT <gregory.clement@free-electrons.com> wrote:
 
-:-(
+> From: Romain Perier <romain.perier@free-electrons.com>
+>
+> Some Marvell ethernet switches have internal ethernet transceivers with
+> hardcoded phy addresses. These addresses can be greater than the number
+> of ports or its value might be different than the associated port number.
+> This is for example the case for MV88E6341 that has 6 ports and internal
+> Port 1 to Port4 PHYs mapped at SMI addresses from 0x11 to 0x14.
+>
+> This commits fixes the issue by removing the condition in MDIO callbacks.
+>
+> Signed-off-by: Romain Perier <romain.perier@free-electrons.com>
+> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+This flag is missing:
+Reviewed-by: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
 
-I don't have a better reference, but
-Linux/Documentation/devicetree/bindings/net/phy.txt says:
+Actually I added during an interactive rebase, but I had to abort it
+and it was lost.
 
- 22   If the phy's identifier is known then the list may contain an entry
- 23   of the form: "ethernet-phy-idAAAA.BBBB" where
- 24      AAAA - The value of the 16 bit Phy Identifier 1 register as
- 25             4 hex digits. This is the chip vendor OUI bits 3:18
- 26      BBBB - The value of the 16 bit Phy Identifier 2 register as
- 27             4 hex digits. This is the chip vendor OUI bits 19:24,
- 28             followed by 10 bits of a vendor specific ID.
+Gregory
 
-So the lower 10 bits of 0x1410C00 are 0. So we know it is a Marvell
-PHY from the OUI, but the vendor specific bits are all 0.
 
-Please take a look at:
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  drivers/net/dsa/mv88e6xxx/chip.c | 6 ------
+>  1 file changed, 6 deletions(-)
+>
+> diff --git a/drivers/net/dsa/mv88e6xxx/chip.c b/drivers/net/dsa/mv88e6xxx/chip.c
+> index c7e08e13bb54..7d942f8a42a7 100644
+> --- a/drivers/net/dsa/mv88e6xxx/chip.c
+> +++ b/drivers/net/dsa/mv88e6xxx/chip.c
+> @@ -2882,9 +2882,6 @@ static int mv88e6xxx_mdio_read(struct mii_bus *bus, int phy, int reg)
+>  	u16 val;
+>  	int err;
+>  
+> -	if (phy >= mv88e6xxx_num_ports(chip))
+> -		return 0xffff;
+> -
+>  	mutex_lock(&chip->reg_lock);
+>  	err = mv88e6xxx_phy_read(chip, phy, reg, &val);
+>  	mutex_unlock(&chip->reg_lock);
+> @@ -2897,9 +2894,6 @@ static int mv88e6xxx_mdio_write(struct mii_bus *bus, int phy, int reg, u16 val)
+>  	struct mv88e6xxx_chip *chip = bus->priv;
+>  	int err;
+>  
+> -	if (phy >= mv88e6xxx_num_ports(chip))
+> -		return 0xffff;
+> -
+>  	mutex_lock(&chip->reg_lock);
+>  	err = mv88e6xxx_phy_write(chip, phy, reg, val);
+>  	mutex_unlock(&chip->reg_lock);
+> -- 
+> git-series 0.9.1
 
-https://marc.info/?l=linux-netdev&m=148495522620757&w=1
-
-and
-
-https://marc.info/?l=linux-netdev&m=148495510320714&w=1
-
-Maybe i should submit these two independently, so you can extend it
-for the 88E6341 family.
-
-    Andrew
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
