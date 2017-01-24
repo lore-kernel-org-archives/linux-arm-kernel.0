@@ -1,54 +1,54 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Mon, 23 Jan 2017 16:38:39 -0800
-Subject: [PATCH v8 3/3] ARM: dts: imx6q-evi: support cyclone-ps-spi
-In-Reply-To: <CAOMZO5AmQhjGOa2NaFn0Az4Xnza8jmK=9gpPJpnkmAvN_zxzeA@mail.gmail.com>
-References: <cover.1485211400.git.stillcompiling@gmail.com>
- <c429cec34a880c0d5438091f436a5946a4db3fc0.1485211400.git.stillcompiling@gmail.com>
- <CAOMZO5AmQhjGOa2NaFn0Az4Xnza8jmK=9gpPJpnkmAvN_zxzeA@mail.gmail.com>
-Message-ID: <56ebc91c-18e3-5d55-b8e3-af45ac182a97@gmail.com>
+From: abelvesa@gmail.com (Abel Vesa)
+Date: Tue, 24 Jan 2017 00:43:19 +0000
+Subject: [PATCH] arm: ftrace: Adds support for
+ CONFIG_DYNAMIC_FTRACE_WITH_REGS
+In-Reply-To: <CACh+v5MsC8_qOMYdm1qpduEPVmRG+mgCDibVEfyc3Pzk06V1Eg@mail.gmail.com>
+References: <1481233595-22112-1-git-send-email-abelvesa@linux.com>
+ <20161208224655.GA6319@gce> <20170110155112.GB14894@pathway.suse.cz>
+ <20170112001957.GA5458@nuc>
+ <CACh+v5M-BDru3OyhrROBqPKJuSN=yoxVstN-fqZGh8SU1EHQiw@mail.gmail.com>
+ <CACh+v5MsC8_qOMYdm1qpduEPVmRG+mgCDibVEfyc3Pzk06V1Eg@mail.gmail.com>
+Message-ID: <CAEZQSseKMRnkxEQt4dLSUQfxRk00hJOOe8puA9esVX9JNt_KWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23/2017 04:00 PM, Fabio Estevam wrote:
-> On Mon, Jan 23, 2017 at 8:51 PM, Joshua Clayton
-> <stillcompiling@gmail.com> wrote:
->> Add support for Altera cyclone V FPGA connected to an spi port
->> to the evi devicetree file
->>
->> Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
->> ---
->>  arch/arm/boot/dts/imx6q-evi.dts | 16 ++++++++++++++++
->>  1 file changed, 16 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/imx6q-evi.dts b/arch/arm/boot/dts/imx6q-evi.dts
->> index 24fe093..a0cbb2d 100644
->> --- a/arch/arm/boot/dts/imx6q-evi.dts
->> +++ b/arch/arm/boot/dts/imx6q-evi.dts
->> @@ -82,6 +82,15 @@
->>         pinctrl-names = "default";
->>         pinctrl-0 = <&pinctrl_ecspi1 &pinctrl_ecspi1cs>;
->>         status = "okay";
->> +
->> +       fpga_spi: cyclonespi at 0 {
->> +               compatible = "altr,fpga-passive-serial";
->> +               spi-max-frequency = <20000000>;
->> +               reg = <0>;
->> +               pinctrl-0 = <&pinctrl_fpgaspi>;
->> +               nconfig-gpios = <&gpio4 9 GPIO_ACTIVE_LOW>;
->> +               nstat-gpios = <&gpio4 11 GPIO_ACTIVE_LOW>;
-> Your binding doc says that 'confd-gpios ' is a required property, but
-> you did not put it here.
->
-> Either it is missing here or you should mention that it is optional in
-> the binding doc.
-You're right, Fabio.
-The barebox driver from which I stole the binding had a confd and no nstat.
-I've got an nstat and no confd.
-One or the other is needed to know whether the bitstream was loaded.
+Hi Jean-Jacques,
 
-I can add support for using the confd, but with no way to test it, I forebear.
+Here is the implementation I've made for ftrace_graph_regs_caller:
 
-I guess they should both be optional and a note placed that this driver
-currently uses only the nstat.
+.macro __ftrace_graph_regs_caller
 
-Will change the doc to reflect that.
+       sub     r0, fp, #4                          @ lr of
+instrumented routine (parent)
+
+       @ called from __ftrace_regs_caller
+       ldr     r1, [sp, #56]                       @ instrumented routine (func)
+       mcount_adjust_addr      r1, r1
+
+       sub     r2, r0, #4                          @ frame pointer
+       bl      prepare_ftrace_return
+
+       ldr     lr, [sp, #64]                        @ restore lr from the stack
+       ldmia   sp, {r0-r11, ip, sp}            @ restore r0 through sp
+       ret     ip
+
+.endm
+
+AFAIK, you can still use fp (see the implementation without regs) since
+it is an alternative name for r11. The FRAME_POINTER config options does
+something else entirely and has nothing to do with what we need here.
+
+I tested it but unfortunately, my current setup is with qemu and I don't have
+a real hardware here close to test it properly. Could you please tell me if this
+works on your setup?
+
+Also the way I tested it was to comment out the code that uses the default
+ftrace_graph_caller in ftrace_modify_graph_caller and enforced the usage of
+the one with regs.
+
+I will create a proper patch later today (I need to cleanup some stuff
+first) and
+send it.
+
+Thanks,
+Abel
