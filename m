@@ -1,116 +1,121 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 24 Jan 2017 10:27:01 -0800
-Subject: [PATCH] ARM: tegra: paz00: fix __initdata placement
-In-Reply-To: <20170123162428.GB2043@ulmo.ba.sec>
-References: <20170123074347.GA29804@dtor-ws> <4072003.S1IBmddlP7@fb07-iapwap2>
- <20170123162428.GB2043@ulmo.ba.sec>
-Message-ID: <20170124182701.GD27969@dtor-ws>
+From: balbi@kernel.org (Felipe Balbi)
+Date: Tue, 24 Jan 2017 20:34:56 +0200
+Subject: usb: gadget: Kernel panic (NULL pointer dereference) when using
+ fsl_udc2_core on i.MX31 PDK
+In-Reply-To: <CAM=E1R7U4GP52z_wE0yMpkEYBB7KpiWSWXG28xQMM61wtzJygw@mail.gmail.com>
+References: <f984e50b-0e64-88ef-2f53-b8da2a62daf0@gmail.com>
+ <87k29m6lkx.fsf@linux.intel.com>
+ <CAM=E1R4EMEEq1wnHxjLLJMLaXCM=EDFo1JDacHKGq6DUtqA9Nw@mail.gmail.com>
+ <87efzsdelq.fsf@linux.intel.com>
+ <CAM=E1R7i5y2SXiswk8f5dzoJyqYXUOxK9Hivv+ZS56mP6HC8uA@mail.gmail.com>
+ <87ziigbuev.fsf@linux.intel.com>
+ <CAM=E1R7U4GP52z_wE0yMpkEYBB7KpiWSWXG28xQMM61wtzJygw@mail.gmail.com>
+Message-ID: <877f5k9ui7.fsf@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2017 at 05:24:28PM +0100, Thierry Reding wrote:
-> On Mon, Jan 23, 2017 at 11:04:22AM +0100, Marc Dietrich wrote:
-> > Hello Dmitry,
-> > 
-> > Am Sonntag, 22. Januar 2017, 23:43:47 CET schrieb Dmitry Torokhov:
-> > > To have expected effect the __initdata attribute should go after variable
-> > > name and before initializer.`
-> > > 
-> > > Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> > > ---
-> > >  arch/arm/mach-tegra/board-paz00.c | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > 
-> > > diff --git a/arch/arm/mach-tegra/board-paz00.c
-> > > b/arch/arm/mach-tegra/board-paz00.c index 7478f6fb3664..ea6bff404161 100644
-> > > --- a/arch/arm/mach-tegra/board-paz00.c
-> > > +++ b/arch/arm/mach-tegra/board-paz00.c
-> > > @@ -23,7 +23,7 @@
-> > > 
-> > >  #include "board.h"
-> > > 
-> > > -static struct property_entry __initdata wifi_rfkill_prop[] = {
-> > > +static struct property_entry wifi_rfkill_prop[] __initdata = {
-> > >  	PROPERTY_ENTRY_STRING("name", "wifi_rfkill"),
-> > >  	PROPERTY_ENTRY_STRING("type", "wlan"),
-> > >  	{ },
-> > 
-> > you are right according to the documentation, but objdump -s always shows that 
-> > it gets put into the .rodata section. So this patch has no effect, because 
-> > result is always same (and wrong). It's also possible that I'm doing something 
-> > wrong :-) Btw, there are hundreds of such __initdata misplacement in the 
-> > kernel.
-> 
-> Hmm... I get this:
-> 
-> 	$ objdump -t build/tegra20/arch/arm/mach-tegra/board-paz00.o
-> 
-> 	build/tegra20/arch/arm/mach-tegra/board-paz00.o:     file format
-> 	elf32-little
-> 
-> 	SYMBOL TABLE:
-> 	00000000 l    df *ABS*  00000000 board-paz00.c
-> 	00000000 l    d  .text  00000000 .text
-> 	00000000 l    d  .data  00000000 .data
-> 	00000000 l    d  .bss   00000000 .bss
-> 	00000000 l    d  .init.text     00000000 .init.text
-> 	00000000 l       .init.text     00000000 $a
-> 	00000000 l       .data  00000000 .LANCHOR1
-> 	00000000 l       .init.data     00000000 .LANCHOR0
-> 	00000000 l    d  .ARM.extab.init.text   00000000 .ARM.extab.init.text
-> 	00000000 l    d  .ARM.exidx.init.text   00000000 .ARM.exidx.init.text
-> 	00000000 l       .ARM.exidx.init.text   00000000 $d
-> 	00000000 l       .data  00000000 $d
-> 	00000000 l     O .data  000001c8 wifi_rfkill_device
-> 	000001c8 l     O .data  00000048 wifi_gpio_lookup
-> 	00000000 l    d  .rodata.str1.4 00000000 .rodata.str1.4
-> 	00000000 l       .rodata.str1.4 00000000 $d
-> 	00000000 l    d  .init.data     00000000 .init.data
-> 	00000000 l       .init.data     00000000 $d
-> 	00000000 l     O .init.data     00000048 wifi_rfkill_prop
-> 	00000000 l    d  .debug_frame   00000000 .debug_frame
-> 	00000010 l       .debug_frame   00000000 $d
-> 	00000000 l    d  .debug_info    00000000 .debug_info
-> 	00000000 l    d  .debug_abbrev  00000000 .debug_abbrev
-> 	00000000 l    d  .debug_aranges 00000000 .debug_aranges
-> 	00000000 l    d  .debug_ranges  00000000 .debug_ranges
-> 	00000000 l    d  .debug_line    00000000 .debug_line
-> 	00000000 l    d  .debug_str     00000000 .debug_str
-> 	00000000 l    d  .note.GNU-stack        00000000 .note.GNU-stack
-> 	00000000 l    d  .comment       00000000 .comment
-> 	00000000 l    d  .ARM.attributes        00000000 .ARM.attributes
-> 	00000000 g     F .init.text     00000030 tegra_paz00_wifikill_init
-> 	00000000         *UND*  00000000 platform_device_add_properties
-> 	00000000         *UND*  00000000 gpiod_add_lookup_table
-> 	00000000         *UND*  00000000 platform_device_register
-> 	00000000         *UND*  00000000 __aeabi_unwind_cpp_pr0
-> 
-> So it correctly ends up in .init.data for me. And it does so with or
-> without the patch. GCCs documentation doesn't seem to say where exactly
-> these attributes need to be put, though the examples given all have the
-> attribute right before the =.
-> 
-> Oh... interestingly checkpatch does seem to have a check for this now,
-> and it does recommend that __initdata be placed after wifi_rfkill_prop,
-> so I'm going to apply this.
 
-Ah, so I mis-remembered the rules and it seems that it does not really
-matter if __initdata goes before or after variable name, it can't go
-between "struct" and its name. From that checkpatch change introducing
-the check:
+Hi,
 
-    static struct __initdata samsung_pll_clock exynos4_plls[nr_plls] = { 
+Magnus Lilja <lilja.magnus@gmail.com> writes:
+>> Magnus Lilja <lilja.magnus@gmail.com> writes:
+>>>> Magnus Lilja <lilja.magnus@gmail.com> writes:
+>>>>>>> I tried the fsl_udc_core gadget driver on the i.MX31 PDK board and got a
+>>>>>>> kernel panic (NULL pointer dereference) when connecting the USB cable. I
+>>>>>>> had the g_serial module loaded as well.
+>>>>>>>
+>>>>>>> The NULL pointer panic comes from gadget/udc/core.c
+>>>>>>> usb_gadget_giveback_request() which calls req->complete() and in some
+>>>>>>> cases req->complete is NULL.
+>>>>>>>
+>>>>>>> Commit 304f7e5e1d08 ("usb: gadget: Refactor request completion") changed
+>>>>>>> fsl_udc2_core.c (and several other files) and in fsl_udc2_core.c a check
+>>>>>>> that req->complete is non-NULL was removed:
+>>>>>>>
+>>>>>>> --- a/drivers/usb/gadget/udc/fsl_udc_core.c
+>>>>>>> +++ b/drivers/usb/gadget/udc/fsl_udc_core.c
+>>>>>>> @@ -197,10 +197,8 @@ __acquires(ep->udc->lock)
+>>>>>>>          ep->stopped = 1;
+>>>>>>>
+>>>>>>>          spin_unlock(&ep->udc->lock);
+>>>>>>> -       /* complete() is from gadget layer,
+>>>>>>> -        * eg fsg->bulk_in_complete() */
+>>>>>>> -       if (req->req.complete)
+>>>>>>> -               req->req.complete(&ep->ep, &req->req);
+>>>>>>> +
+>>>>>>> +       usb_gadget_giveback_request(&ep->ep, &req->req);
+>>>>>>>
+>>>>>>>          spin_lock(&ep->udc->lock);
+>>>>>>>          ep->stopped = stopped;
+>>>>>>>
+>>>>>>> If I re-introduce the check (either in fsl_udc_core.c or core.c) at
+>>>>>>> least USB gadget operation using g_serial seems to work just fine.
+>>>>>>>
+>>>>>>> I don't know the logic in detail to understand whether this is a proper
+>>>>>>> fix or if there is some other more problem with the fls_udc_core driver.
+>>>>>>> Does anyone have input in this matter?
+>>>>>>>
+>>>>>>> I can produce a proper patch that fixes this problem by re-introducing
+>>>>>>> the check (in either fsl_udc_core.c or core.c) if that is a proper
+>>>>>>> solution and I can also assist in testing other fixes to the problem.
+>>>>>>
+>>>>>> ->complete() is supposed to be mandatory. Which gadget do you have that
+>>>>>> ->doesn't set ->complete() to a valid function pointer?
+>>>>>
+>>>>> I'm modprobing g_serial so the following modules are loaded (using my patch):
+>>>>>
+>>>>> ~ # lsmod
+>>>>> usb_f_acm
+>>>>> u_serial
+>>>>> g_serial
+>>>>> libcomposite
+>>>>> configfs
+>>>>> fsl_usb2_udc
+>>>>
+>>>> okay, can you figure out which request is coming without ->complete()
+>>>> set? To which endpoint is this request being queued? It would be nice to
+>>>> know these details. Maybe this is an old bug which ought to be fixed.
+>>>
+>>> Sure, I can try figure that out. Any input to make the debug of the
+>>> faster is appreciated if you have any.
+>>
+>> well, the easiest way is to add something like:
+>>
+>>         if (!req->complete)
+>>                 dump_stack();
+>>
+>> to fsl udc driver. Then you would know who queued the request without
+>> ->complete. A slightly better approach would be to:
+>>
+>> if (WARN(!req->complete,
+>>         "%s: queueing request without ->complete\n", ep->name))
+>>         return;
+>>
+>> Or something like that.
+>
+> Well, I think I found it.
+>
+> fsl_udc_core.c:ep0_prime_status() sets req->req.complete = NULL before
+> it queues a transfer and my printk()'s indicate that this is indeed
+> the offending function.
+>
+> fsl_udc_core.c:ch9getstatus() also sets complete to NULL but in my
+> tests right now I haven't seen that one.
+>
+> So it's an internal problem in the fsl_udc_core.c file.
 
-    does NOT put exynos4_plls in the .initdata section.  The __initdata marker
-    can be virtually anywhere on the line, EXCEPT right after "struct".  The
-    preferred location is before the "=" sign if there is one, or before the
-    trailing ";" otherwise.
+seems like it. It's rather odd that fsl_udc doesn't wanna know about
+completion of Status stage. Oh well, I guess in this case it doesn't
+matter if you add a complete function or reinstate the previous check
+for valid complete.
 
-so if you are applying it you might want to change the wording as to the
-effect of "making checkpatch happy" which wasn't my intention, but was
-the outcome ;)
+If you decide to reinstate the check, please add a comment above the
+check explaining that fsl_udc itself queues requests with NULL
+->complete().
 
-Thanks.
+I must say, however, that I would suggest adding a complete callback
+since that will help us BUG with NULL pointer deref on bad gadget
+drivers ;-)
 
 -- 
-Dmitry
+balbi
