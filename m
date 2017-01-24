@@ -1,105 +1,85 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 24 Jan 2017 09:16:12 +0100
-Subject: [PATCH v3 3/13] mmc: sunxi: Always set signal delay to 0 for A64
-In-Reply-To: <67fd7dad745b49bb8edb7391655eaddf6f35160e.1484585798.git-series.maxime.ripard@free-electrons.com>
-References: <cover.a06ce1672d7a72ee7f9bbca46fdd223edd6b2313.1484585798.git-series.maxime.ripard@free-electrons.com>
- <67fd7dad745b49bb8edb7391655eaddf6f35160e.1484585798.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAPDyKFoatUWz0AwY6e73OCguDx70B1B5OAoPUYX-JDPsru+aZw@mail.gmail.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Tue, 24 Jan 2017 13:49:22 +0530
+Subject: [PATCH/RFC 1/2] arm64: mm: Silently allow devices lacking
+ IOMMU	group
+In-Reply-To: <66c082c6-da2e-9765-0db8-e0ba2c5bd501@arm.com>
+References: <148517349585.18128.10696161017872202809.sendpatchset@little-apple>	<148517353630.18128.12799811817831597628.sendpatchset@little-apple>
+ <66c082c6-da2e-9765-0db8-e0ba2c5bd501@arm.com>
+Message-ID: <00d901d2761a$95903950$c0b0abf0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 January 2017 at 17:56, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Experience have shown that the using the  autocalibration could severely
-> degrade the performances of the MMC bus.
->
-> Allwinner is using in its BSP a delay set to 0 for all the modes but HS400.
-> Remove the calibration code for now, and add comments to document our
-> findings.
+Hi Robin,
 
-So doesn't this break some platforms using HS400? Or are you saying
-those are already broken?
+>> Consider failure of iommu_get_domain_for_dev() as non-critical and
+>> get rid of the warning printout. This allows IOMMU properties to be
+>> included in the DTB even though the kernel is configured with
+>> CONFIG_IOMMU_API=n or in case a particular IOMMU driver refuses to
+>> enable IOMMU support for a certain slave device and returns error
+>> from the ->add_device() callback.
+>>
+>> This is only a cosmetic change that removes console warning printouts.
+>
+>The warning is there for a reason - at this point, we *expected* the
+>device to be using an IOMMU for DMA, so a failure is significant. Rather
+>than masking genuine failures in other cases because your case
+>deliberately breaks that expectation, simply change the expectation -
+>i.e. rather than letting of_xlate() succeed then failing add_device()
+>later, reject the of_xlate() call up-front such that the DMA layer never
+>gets told about the IOMMU in the first place.
+>
+>Robin.
+>
 
-Kind regards
-Uffe
+With the iommu probe deferral patches, this behavior would change
+where the arch_setup_dma_ops would never be called if there is
+an error from xlate or add_device. But also the error value from
+xlate/add_device is returned back and the probe of the device
+would fail for any error. So if there can be cases like above, where
+the xlate/add_device callbacks can return error for specific reasons,
+should only EPROBE_DEFER be considered and rest of the errors
+be filtered out with a WARN probably ?
 
+Regards,
+ Sricharan
+
+
+>> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+>> ---
+>>
+>>  arch/arm64/mm/dma-mapping.c |   10 +++++++++-
+>>  1 file changed, 9 insertions(+), 1 deletion(-)
+>>
+>> --- 0001/arch/arm64/mm/dma-mapping.c
+>> +++ work/arch/arm64/mm/dma-mapping.c	2017-01-23 20:54:40.060607110 +0900
+>> @@ -827,11 +827,19 @@ static bool do_iommu_attach(struct devic
+>>  	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+>>
+>>  	/*
+>> +	 * In case IOMMU support is excluded from the kernel or if the device
+>> +	 * is not hooked up to any IOMMU group then be silent and keep the
+>> +	 * old dma_ops.
+>> +	 */
+>> +	if (!domain)
+>> +		return false;
+>> +
+>> +	/*
+>>  	 * If the IOMMU driver has the DMA domain support that we require,
+>>  	 * then the IOMMU core will have already configured a group for this
+>>  	 * device, and allocated the default domain for that group.
+>>  	 */
+>> -	if (!domain || iommu_dma_init_domain(domain, dma_base, size, dev)) {
+>> +	if (iommu_dma_init_domain(domain, dma_base, size, dev)) {
+>>  		pr_warn("Failed to set up IOMMU for device %s; retaining platform DMA ops\n",
+>>  			dev_name(dev));
+>>  		return false;
+>> _______________________________________________
+>> iommu mailing list
+>> iommu at lists.linux-foundation.org
+>> https://lists.linuxfoundation.org/mailman/listinfo/iommu
+>>
 >
-> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/mmc/host/sunxi-mmc.c | 50 ++++++++++++-------------------------
->  1 file changed, 17 insertions(+), 33 deletions(-)
->
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index 019f95e8e7c5..b9c8a62bc212 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -683,41 +683,19 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
->
->  static int sunxi_mmc_calibrate(struct sunxi_mmc_host *host, int reg_off)
->  {
-> -       u32 reg = readl(host->reg_base + reg_off);
-> -       u32 delay;
-> -       unsigned long timeout;
-> -
->         if (!host->cfg->can_calibrate)
->                 return 0;
->
-> -       reg &= ~(SDXC_CAL_DL_MASK << SDXC_CAL_DL_SW_SHIFT);
-> -       reg &= ~SDXC_CAL_DL_SW_EN;
-> -
-> -       writel(reg | SDXC_CAL_START, host->reg_base + reg_off);
-> -
-> -       dev_dbg(mmc_dev(host->mmc), "calibration started\n");
-> -
-> -       timeout = jiffies + HZ * SDXC_CAL_TIMEOUT;
-> -
-> -       while (!((reg = readl(host->reg_base + reg_off)) & SDXC_CAL_DONE)) {
-> -               if (time_before(jiffies, timeout))
-> -                       cpu_relax();
-> -               else {
-> -                       reg &= ~SDXC_CAL_START;
-> -                       writel(reg, host->reg_base + reg_off);
-> -
-> -                       return -ETIMEDOUT;
-> -               }
-> -       }
-> -
-> -       delay = (reg >> SDXC_CAL_DL_SHIFT) & SDXC_CAL_DL_MASK;
-> -
-> -       reg &= ~SDXC_CAL_START;
-> -       reg |= (delay << SDXC_CAL_DL_SW_SHIFT) | SDXC_CAL_DL_SW_EN;
-> -
-> -       writel(reg, host->reg_base + reg_off);
-> -
-> -       dev_dbg(mmc_dev(host->mmc), "calibration ended, reg is 0x%x\n", reg);
-> +       /*
-> +        * FIXME:
-> +        * This is not clear how the calibration is supposed to work
-> +        * yet. The best rate have been obtained by simply setting the
-> +        * delay to 0, as Allwinner does in its BSP.
-> +        *
-> +        * The only mode that doesn't have such a delay is HS400, that
-> +        * is in itself a TODO.
-> +        */
-> +       writel(SDXC_CAL_DL_SW_EN, host->reg_base + reg_off);
->
->         return 0;
->  }
-> @@ -809,7 +787,13 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
->         if (ret)
->                 return ret;
->
-> -       /* TODO: enable calibrate on sdc2 SDXC_REG_DS_DL_REG of A64 */
-> +       /*
-> +        * FIXME:
-> +        *
-> +        * In HS400 we'll also need to calibrate the data strobe
-> +        * signal. This should only happen on the MMC2 controller (at
-> +        * least on the A64).
-> +        */
->
->         return sunxi_mmc_oclk_onoff(host, 1);
->  }
-> --
-> git-series 0.8.11
+>_______________________________________________
+>iommu mailing list
+>iommu at lists.linux-foundation.org
+>https://lists.linuxfoundation.org/mailman/listinfo/iommu
