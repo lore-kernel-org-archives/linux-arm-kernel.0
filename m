@@ -1,110 +1,32 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 24 Jan 2017 18:38:33 +0900
-Subject: [PATCH/RFC 2/2] iommu/ipmmu-vmsa: Opt-in slave devices based on
- ES version
-In-Reply-To: <CAMuHMdWyV4DWN5pKsp+Z6C0MhZF5fKch4T1g1_Hbk3oxrR6_zw@mail.gmail.com>
-References: <148517349585.18128.10696161017872202809.sendpatchset@little-apple>
- <148517354599.18128.1970642879780864733.sendpatchset@little-apple>
- <CAMuHMdWyV4DWN5pKsp+Z6C0MhZF5fKch4T1g1_Hbk3oxrR6_zw@mail.gmail.com>
-Message-ID: <CANqRtoQayo4_nBuTN--6kt4JRGW7VM-6vMvb8AX22bO=MG8-9g@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 24 Jan 2017 10:41:19 +0100
+Subject: [PATCH 2/2] clk: sunxi-ng: a33: Set CLK_SET_RATE_PARENT for the GPU
+In-Reply-To: <53c56d23af099d8a41460d5ac59a2c792c8d050c.1485250845.git-series.maxime.ripard@free-electrons.com>
+References: <53c56d23af099d8a41460d5ac59a2c792c8d050c.1485250845.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <1914af84712092019181807ddb72adfc5b40c6f4.1485250845.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+In order to achieve all the rates asked by the GPU, we might need to change
+the parent frequency.
 
-On Mon, Jan 23, 2017 at 9:50 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> Hi Magnus,
->
-> On Mon, Jan 23, 2017 at 1:12 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
->> From: Magnus Damm <damm+renesas@opensource.se>
->>
->> Match on r8a7795 ES2 and enable a certain DMA controller.
->> In other cases the IPMMU driver remains disabled.
->>
->> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
->> ---
->>
->>  drivers/iommu/ipmmu-vmsa.c |   24 ++++++++++++++++++++++++
->>  1 file changed, 24 insertions(+)
->>
->> --- 0001/drivers/iommu/ipmmu-vmsa.c
->> +++ work/drivers/iommu/ipmmu-vmsa.c     2017-01-23 20:57:02.620607110 +0900
->> @@ -23,6 +23,7 @@
->>  #include <linux/platform_device.h>
->>  #include <linux/sizes.h>
->>  #include <linux/slab.h>
->> +#include <linux/sys_soc.h>
->>
->>  #if defined(CONFIG_ARM) && !defined(CONFIG_IOMMU_DMA)
->>  #include <asm/dma-iommu.h>
->> @@ -1002,16 +1003,39 @@ static void ipmmu_domain_free_dma(struct
->>         }
->>  }
->>
->> +static const struct soc_device_attribute r8a7795es2[] = {
->> +       { .soc_id = "r8a7795", .revision = "ES2.*" },
->> +       { /* sentinel */ }
->> +};
->> +
->> +static int ipmmu_slave_whitelist(struct device *dev)
->> +{
->> +       /* Opt-in slave devices based on SoC and ES version */
->> +       if (soc_device_match(r8a7795es2)) {
->> +               if (!strcmp(dev_name(dev), "e7310000.dma-controller"))
->> +                       return 0;
->> +       }
->
-> I have two comments about the construct above:
->   1. IPMMU will be disabled on all non-r8a7795 SoCs.
->      Is that what you want?
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/clk/sunxi-ng/ccu-sun8i-a33.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Sort of. This patch is just an example to stir up some discussion
-about this topic. I realize this code as-is changes R-Car Gen2
-behavior (that is merged upstream) so perhaps we should keep devices
-enabled for those SoCs.
-
->   2. Usually we match on the old broken versions instead (e.g. against
->      "ES1.*"), as (1) it marks more clearly support for old SoCs, and
->                 (2) it makes it easier to remove the check later when these
->                     old SoCs are deemed extinct later.
-
-Right, if I understand correctly then you're saying opt-out might be
-better instead of opt-in. In case of IPMMU and R-Car Gen3 I believe it
-might be less work to use opt-in rather than excluding not-yet-working
-stuff. =)
-
-With this series I would like to propose to disconnect the DT
-integration timing from the enablement of IPMMU support for slave
-devices. If we can enable the IPMMU in DT early on we can reduce
-potential out-of-tree IPMMU enablement DT patches. So with the DT
-bindings fixed and accurate data sheet we can merge DT bits ahead of
-enablement time. And then use run time logic to determine what to
-enable based on test results.
-
-As you are aware, currently we have used the presence of "iommus" in
-DT to determine if a device is going to be enabled or not. So if the
-IPMMU Kconfig bits enable the IPMMU driver and the "iommus" DT
-property tie a certain slave device to the IPMMU then we will make use
-of IPMMU for a certain device. Currently we assume it will work on all
-ES versions that use that particular DTB.
-
-However ES specific hardware errata together with a wide range of ES
-versions for r8a7795 and r8a7796 (and whatever SoCs and ES versions
-that comes next) makes it difficult to use DT like above to enable
-stuff seemingly on one ES version without potentially breaking other
-ES versions. I would like to share DT files between the ES versions as
-much as possible but still only enable IPMMU support for devices that
-are known to work.
-
-Let me know if you think it makes sense to enable DT in a different
-way than my proposal.
-
-I'll have a look at putting the white list code in ->xlate() instead
-of ->add_device().
-
-Thanks for your comments!
-
-Cheers,
-
-/ magnus
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-a33.c b/drivers/clk/sunxi-ng/ccu-sun8i-a33.c
+index 0d513d2674cb..a7b3c08ed0e2 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-a33.c
++++ b/drivers/clk/sunxi-ng/ccu-sun8i-a33.c
+@@ -468,7 +468,7 @@ static SUNXI_CCU_M_WITH_MUX_TABLE_GATE(drc_clk, "drc",
+ 				       0x180, 0, 4, 24, 3, BIT(31), 0);
+ 
+ static SUNXI_CCU_M_WITH_GATE(gpu_clk, "gpu", "pll-gpu",
+-			     0x1a0, 0, 3, BIT(31), 0);
++			     0x1a0, 0, 3, BIT(31), CLK_SET_RATE_PARENT);
+ 
+ static const char * const ats_parents[] = { "osc24M", "pll-periph" };
+ static SUNXI_CCU_M_WITH_MUX_GATE(ats_clk, "ats", ats_parents,
+-- 
+git-series 0.8.11
