@@ -1,84 +1,39 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Tue, 24 Jan 2017 14:00:52 +0000
-Subject: [PATCH 1/4] PCI: Xilinx NWL: Fix, do not check for legacy
- status in while loop
-In-Reply-To: <0def9067-5c35-f7fe-8e15-bab70d479d1e@arm.com>
-References: <1484997072-19276-1-git-send-email-bharatku@xilinx.com>
- <ec10b089-acc5-7764-6346-9dc1869d05c7@arm.com>
- <8520D5D51A55D047800579B094147198263CCF96@XAP-PVEXMBX02.xlnx.xilinx.com>
- <0def9067-5c35-f7fe-8e15-bab70d479d1e@arm.com>
-Message-ID: <8520D5D51A55D047800579B094147198263CD2C7@XAP-PVEXMBX02.xlnx.xilinx.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 24 Jan 2017 14:00:20 +0000
+Subject: [RFC 4/4] irqchip, gicv3-its: Add HiSilicon acpi based erratum
+ data.
+In-Reply-To: <58875C45.50108@huawei.com>
+References: <588626A5.7090603@huawei.com>
+ <58875C45.50108@huawei.com>
+Message-ID: <20170124140019.GC7572@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On 24/01/17 10:15, Bharat Kumar Gogada wrote:
-> >> On 21/01/17 11:11, Bharat Kumar Gogada wrote:
-> >>> - The legacy status register value for particular INTx becomes low
-> >>> only after DEASSERT_INTx is received.
-> >>> - Few End Points take time for sending DEASSERT_INTx, checking
-> >>> legacy status register in while loop causes invoking of EP handler
-> >>> continuosly until DEASSERT_INTx is received.
-> >>>
-> >>> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-> >>> ---
-> >>>  drivers/pci/host/pcie-xilinx-nwl.c |    5 +++--
-> >>>  1 files changed, 3 insertions(+), 2 deletions(-)
-> >>>
-> >>> diff --git a/drivers/pci/host/pcie-xilinx-nwl.c
-> >>> b/drivers/pci/host/pcie-xilinx-nwl.c
-> >>> index 43eaa4a..c8b5a33 100644
-> >>> --- a/drivers/pci/host/pcie-xilinx-nwl.c
-> >>> +++ b/drivers/pci/host/pcie-xilinx-nwl.c
-> >>> @@ -342,9 +342,10 @@ static void nwl_pcie_leg_handler(struct
-> >>> irq_desc
-> >>> *desc)
-> >>>
-> >>>  	chained_irq_enter(chip, desc);
-> >>>  	pcie = irq_desc_get_handler_data(desc);
-> >>> +	status = nwl_bridge_readl(pcie, MSGF_LEG_STATUS) &
-> >>> +				  MSGF_LEG_SR_MASKALL;
-> >>>
-> >>> -	while ((status = nwl_bridge_readl(pcie, MSGF_LEG_STATUS) &
-> >>> -				MSGF_LEG_SR_MASKALL) != 0) {
-> >>> +	if (status != 0) {
-> >>>  		for_each_set_bit(bit, &status, INTX_NUM) {
-> >>>  			virq = irq_find_mapping(pcie->legacy_irq_domain,
-> >>>  						bit + 1);
-> >>>
-> >>
-> >> But even if you only handle the interrupt once, it is still asserted,
-> >> right? You exit the low-level exception handler, only to take the
-> >> interrupt immediately again. So what is the gain here?
-> >>
-> > Whenever masking of INTx happens (like as in my next patch[PATCH
-> > 2/4]), the irq line goes low, but  status bit will be set until DEASSERT_INTx
-> comes.
-> > In this scenario if it is always in while loop, even though line went
-> > low it will not be seen until DEASSERT_INTx, unnecessarily invoking EP
-> > driver. so instead of while loop using if condition so that this change in line is
-> noticed.
+On Tue, Jan 24, 2017 at 01:53:09PM +0000, Shameerali Kolothum Thodi wrote:
+> This enables the acpi based workaround for HiSilicon erratum 161010801.
 > 
-> But what guarantees that you will observe this DEASSERT if you return to the
-> interrupted context early? From what I understand, your interrupt flow is the
-> following:
+> Signed-off-by: shameer <shameerali.kolothum.thodi@huawei.com>
+> ---
+>  drivers/irqchip/irq-gic-v3-its.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
 > 
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 9fa12b7..d0f5099 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -1868,7 +1868,10 @@ struct acpi_madt_its_quirks {
 > 
-> 	read status
-> 	mask
-> 	handler
-> 	unmask
-> 
-> If the EP takes time to send a deassert after the handler has poked it and the
-> interrupt is still active, then the only thing that this patch buys you is that by
-> returning to the interrupted context, you waste a lot of cycles, giving the device
-> a chance to send its deassert. But that's just luck. Plug this on a fast CPU, and
-> the same issue will resurface.
-> 
+>  /*Upadate as per the board OEM ID and TABLE ID*/
+>  struct acpi_madt_its_quirks acpi_its_quirks[] __initdata = {
+> -
+> +#ifdef CONFIG_HISILICON_ERRATUM_161010801
+> +	{"HISI  ", "HIP06   ", 0, 0, "hisilicon,erratum-161010801"},
+> +	{"HISI  ", "HIP07   ", 0, 0, "hisilicon,erratum-161010801"},
+> +#endif
+>  };
 
-Agreed, will leave it as it is.
+Similarly to the arch timer patch, NAK to bodging ACPI match data to DT
+property names.
 
-Thanks & Regards,
-Bharat
-
-
- 
+Thanks,
+Mark.
