@@ -1,53 +1,48 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 24 Jan 2017 17:55:32 +0000
-Subject: [PATCH V7 05/10] acpi: apei: handle SEA notification type for
- ARMv8
-In-Reply-To: <8b9d254a-5450-d841-baf7-5819a88043e4@codeaurora.org>
-References: <1484244924-24786-1-git-send-email-tbaicar@codeaurora.org>
- <1484244924-24786-6-git-send-email-tbaicar@codeaurora.org>
- <587F80A7.10008@arm.com>
- <3de443d7-2c68-f179-daae-bc8f851470b7@codeaurora.org>
- <5880FDFC.7060304@arm.com>
- <8b9d254a-5450-d841-baf7-5819a88043e4@codeaurora.org>
-Message-ID: <58879514.1020501@arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 24 Jan 2017 18:58:01 +0100
+Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
+In-Reply-To: <88c94ea6-abe2-0f20-337e-e9ee00c883d8@roeck-us.net>
+References: <20170123124058.GA17134@amd> <20170123141331.GA11402@amd>
+ <da1f1b45-3ae5-ffe8-62c6-9ec7c3a1505b@roeck-us.net>
+ <20170123144031.GA7870@amd> <20170123232654.GA19342@amd>
+ <20170123234912.GA2460@roeck-us.net>
+ <20170124070639.GA5068@rzhang1-surface> <20170124073720.GB5603@amd>
+ <88c94ea6-abe2-0f20-337e-e9ee00c883d8@roeck-us.net>
+Message-ID: <20170124175800.GA15070@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
 
-On 20/01/17 20:58, Baicar, Tyler wrote:
-> On 1/19/2017 10:57 AM, James Morse wrote:
->> On 18/01/17 23:51, Baicar, Tyler wrote:
->>> On 1/18/2017 7:50 AM, James Morse wrote:
->>>> On 12/01/17 18:15, Tyler Baicar wrote:
->>>>> diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
+> >>Right.
+> >>
+> >>Before reverting, can you please try if this patch works or not?
+> >
+> >Not really. Revert now. Sorry.
+> >
+> >Are you sure? This does not look equivalent to me at all.
+> >
+> >"name" file handling moved from drivers to the core, which added some
+> >crazy checks what name can contain. Even if this "works", what is the
+> >expected effect on the "name" file?
+> >
+> The hwmon name attribute must not include '-', as documented in
+> Documentation/hwmon/sysfs-interface. Is enforcing that 'crazy' ?
+> Maybe in your world, but not in mine.
 
->> There are two other things that need changing to make the in_nmi() code path
->> work on arm64.
->> Always reserve the virtual-address-space forcing GHES_IOREMAP_PAGES to be 2
->> regardless of CONFIG_HAVE_ACPI_APEI_NMI. This is almost revert of
->> 594c7255dce7a13cac50cf2470cc56e2c3b0494e (but that did a few other things too).
+Well, lets revert the patch and then we can discuss what to do with
+the "name" problem.
 
-> Looks simple enough, should I force it to 2 in all cases, or add a check for
-> CONFIG_HAVE_ACPI_APEI_SEA
-> similar to the check for CONFIG_HAVE_ACPI_APEI_NMI?
+Unfortunately, code enforces different rules than documentation says,
+and it is all visible to userspace.
 
-Its just address space not actual memory it is reserving right? I think just
-reserve two pages all the time to save eye-sore #ifdefs!
-
-
->> We also need to fix ghes_ioremap_pfn_nmi() to use arch_apei_get_mem_attribute()
->> and not assume PAGE_KERNEL.
-
-> So just change the call to ioremap_page_range to:
-> 
-> ioremap_page_range(vaddr, vaddr + PAGE_SIZE, pfn << PAGE_SHIFT,
-> arch_apei_get_mem_attribute());
-
-(you need to give arch_apei_get_mem_attribute() the address...) copying whatever
-ghes_ioremap_pfn_irq() does a few lines down is probably best.
-
-
-Thanks,
-
-James
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170124/c7c57cea/attachment.sig>
