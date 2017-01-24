@@ -1,72 +1,68 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 24 Jan 2017 10:45:26 -0800
-Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
-In-Reply-To: <20170124175800.GA15070@amd>
-References: <20170123124058.GA17134@amd> <20170123141331.GA11402@amd>
- <da1f1b45-3ae5-ffe8-62c6-9ec7c3a1505b@roeck-us.net>
- <20170123144031.GA7870@amd> <20170123232654.GA19342@amd>
- <20170123234912.GA2460@roeck-us.net>
- <20170124070639.GA5068@rzhang1-surface> <20170124073720.GB5603@amd>
- <88c94ea6-abe2-0f20-337e-e9ee00c883d8@roeck-us.net>
- <20170124175800.GA15070@amd>
-Message-ID: <20170124184526.GA25056@roeck-us.net>
+From: sergio.prado@e-labworks.com (Sergio Prado)
+Date: Tue, 24 Jan 2017 16:49:32 -0200
+Subject: [PATCH v3 1/2] dt-bindings: mmc: add DT binding for S3C24XX
+ MMC/SD/SDIO controller
+In-Reply-To: <20170118223816.nccyc7aoa7succsi@rob-hp-laptop>
+References: <1484319953-6479-1-git-send-email-sergio.prado@e-labworks.com>
+ <1484319953-6479-2-git-send-email-sergio.prado@e-labworks.com>
+ <20170118223816.nccyc7aoa7succsi@rob-hp-laptop>
+Message-ID: <20170124184932.GA20814@sprado-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2017 at 06:58:01PM +0100, Pavel Machek wrote:
+On Wed, Jan 18, 2017 at 04:38:16PM -0600, Rob Herring wrote:
+> On Fri, Jan 13, 2017 at 01:05:52PM -0200, Sergio Prado wrote:
+> > +This file documents differences between the core mmc properties described by
+> > +mmc.txt and the properties used by the Samsung S3C24XX MMC/SD/SDIO controller
+> > +implementation.
+> > +
+> > +Required SoC Specific Properties:
+> > +- compatible: should be one of the following
+> > +  - "samsung,s3c2410-sdi": for controllers compatible with s3c2410
+> > +  - "samsung,s3c2412-sdi": for controllers compatible with s3c2412
+> > +  - "samsung,s3c2440-sdi": for controllers compatible with s3c2440
+> > +- clocks: Should reference the controller clock
+> > +- clock-names: Should contain "sdi"
 > 
-> > >>Right.
-> > >>
-> > >>Before reverting, can you please try if this patch works or not?
-> > >
-> > >Not really. Revert now. Sorry.
-> > >
-> > >Are you sure? This does not look equivalent to me at all.
-> > >
-> > >"name" file handling moved from drivers to the core, which added some
-> > >crazy checks what name can contain. Even if this "works", what is the
-> > >expected effect on the "name" file?
-> > >
-> > The hwmon name attribute must not include '-', as documented in
-> > Documentation/hwmon/sysfs-interface. Is enforcing that 'crazy' ?
-> > Maybe in your world, but not in mine.
+> You are missing things from the example.
+
+Properties "compatible", "clocks" and "clock-names" are documented.
+
+Properties "bus-width", "cd-gpios" and "wp-gpios" are documented in
+mmc.txt as I described before the example. Should I describe them again?
+
+Do I need to document common properties like "pinctrl-names",
+"pinctrl-0", "reg" and "interrupts"?
+
 > 
-> Well, lets revert the patch and then we can discuss what to do with
-> the "name" problem.
+> > +
+> > +Example:
+> > +	mmc0: mmc at 5a000000 {
+> > +		compatible = "samsung,s3c2440-sdi";
+> > +		pinctrl-names = "default";
+> > +		pinctrl-0 = <&sdi_pins>;
+> > +		reg = <0x5a000000 0x100000>;
+> > +		interrupts = <0 0 21 3>;
+> > +		clocks = <&clocks PCLK_SDI>;
+> > +		clock-names = "sdi";
+> > +		bus-width = <4>;
+> > +		cd-gpios = <&gpg 8 GPIO_ACTIVE_LOW>;
+> > +		wp-gpios = <&gph 8 GPIO_ACTIVE_LOW>;
+> > +	};
+> > +
+> > +	Note: This example shows both SoC specific and board specific properties
+> > +	in a single device node. The properties can be actually be separated
+> > +	into SoC specific node and board specific node.
 > 
-Not sure what the problem to be discussed is. Please provide details.
+> The source structure is not relavent to the binding.
 
-> Unfortunately, code enforces different rules than documentation says,
+OK.
 
-Please specify your problem with rules vs. documentation. You mean the
-additional checks which also block wildcards and spaces/newline in the
-name ? Are you having a problem with those ? What are those problems ?
-I'll be more than happy to update the documentation if your problem
-is with that mismatch.
-
-To provide some detail: libsensors gets just as confused with wildcards
-and whitespace/newline as it does with '-' in the reported name, which
-is why those are blocked by the new API.
-
-> and it is all visible to userspace.
 > 
-We are talking about a value reported by an attribute, not about an attribute.
-Maybe the ABI Police thinks differently, but I do not count fixing the value
-reported by an attribute as an ABI change.
+> Rob
 
-Effecively, what this enforcement does is to make userspace actually work.
-Ultimately that means, per your standard, that fixing values reported by the
-kernel is not permitted under any circumstances, even if such changes result
-in userspace actually working as intended as a result of that change.
-I would argue that such an enforcement goes a little bit too far.
-
-In addition, there is actually another problem solved by the patch you want to
-have reverted: The current thermal code has another problem, which is that it
-creates the name attribute _after_ registering the hwmon device. The udev event
-for creating the hwmon device thus occurs before its mandatory name attribute
-(and any other attribute, for that matter) exists, meaning that any userspace
-handler acting on it would be completely unpredictable. Now _this_ is a real
-ABI "change", since it fixes a race condition. I guess you are going to argue
-that this isn't permitted either ?
-
-Guenter
+-- 
+Sergio Prado
+Embedded Labworks
+Office: +55 11 2628-3461
+Mobile: +55 11 97123-3420
