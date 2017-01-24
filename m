@@ -1,70 +1,74 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 24 Jan 2017 21:55:08 +0100
-Subject: [PATCH net-next v6 4/4] phy: marvell: Add support for the PHY
- embedded in the topaz switch
-In-Reply-To: <20170124202847.GV10895@lunn.ch> (Andrew Lunn's message of "Tue,
- 24 Jan 2017 21:28:47 +0100")
-References: <cover.b0e18efe751186768e720c341693117fdd4d3c16.1485288602.git-series.gregory.clement@free-electrons.com>
- <f8526f4a5d99223fc90fe5579b4958eaa0950a3a.1485288602.git-series.gregory.clement@free-electrons.com>
- <20170124202847.GV10895@lunn.ch>
-Message-ID: <87efzs2n6b.fsf@free-electrons.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 25 Jan 2017 05:28:10 +0800
+Subject: [PATCH 3/8] serial: st-asc: Read in all Pinctrl states
+In-Reply-To: <20170124134310.27512-4-lee.jones@linaro.org>
+Message-ID: <201701250559.iD93QYdx%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
- 
- On mar., janv. 24 2017, Andrew Lunn <andrew@lunn.ch> wrote:
+Hi Lee,
 
-> On Tue, Jan 24, 2017 at 09:10:26PM +0100, Gregory CLEMENT wrote:
->> The PHY with the ID 0x1410C00
->
-> :-(
->
-> I don't have a better reference, but
-> Linux/Documentation/devicetree/bindings/net/phy.txt says:
->
->  22   If the phy's identifier is known then the list may contain an entry
->  23   of the form: "ethernet-phy-idAAAA.BBBB" where
->  24      AAAA - The value of the 16 bit Phy Identifier 1 register as
->  25             4 hex digits. This is the chip vendor OUI bits 3:18
->  26      BBBB - The value of the 16 bit Phy Identifier 2 register as
->  27             4 hex digits. This is the chip vendor OUI bits 19:24,
->  28             followed by 10 bits of a vendor specific ID.
->
-> So the lower 10 bits of 0x1410C00 are 0. So we know it is a Marvell
-> PHY from the OUI, but the vendor specific bits are all 0.
+[auto build test ERROR on tty/tty-testing]
+[also build test ERROR on v4.10-rc5 next-20170124]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-In your previous email you mention a value of 0x01410000, so when I saw
-the "C00" at the end I was happy and I didn't look for further.
+url:    https://github.com/0day-ci/linux/commits/Lee-Jones/serial-st-asc-Allow-handling-of-RTS-line/20170125-014618
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty.git tty-testing
+config: alpha-allyesconfig (attached as .config)
+compiler: alpha-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=alpha 
 
->
-> Please take a look at:
->
-> https://marc.info/?l=linux-netdev&m=148495522620757&w=1
->
-> and
->
-> https://marc.info/?l=linux-netdev&m=148495510320714&w=1
->
-> Maybe i should submit these two independently, so you can extend it
-> for the 88E6341 family.
+All error/warnings (new ones prefixed by >>):
 
-Please do it :)
+   drivers/tty/serial/st-asc.c: In function 'asc_init_port':
+>> drivers/tty/serial/st-asc.c:730:21: error: implicit declaration of function 'devm_pinctrl_get' [-Werror=implicit-function-declaration]
+     ascport->pinctrl = devm_pinctrl_get(&pdev->dev);
+                        ^~~~~~~~~~~~~~~~
+>> drivers/tty/serial/st-asc.c:730:19: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+     ascport->pinctrl = devm_pinctrl_get(&pdev->dev);
+                      ^
+>> drivers/tty/serial/st-asc.c:737:3: error: implicit declaration of function 'pinctrl_lookup_state' [-Werror=implicit-function-declaration]
+      pinctrl_lookup_state(ascport->pinctrl, "default");
+      ^~~~~~~~~~~~~~~~~~~~
+   drivers/tty/serial/st-asc.c:736:27: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+     ascport->states[DEFAULT] =
+                              ^
+   drivers/tty/serial/st-asc.c:746:30: warning: assignment makes pointer from integer without a cast [-Wint-conversion]
+     ascport->states[MANUAL_RTS] =
+                                 ^
+   cc1: some warnings being treated as errors
 
-The feedback from Florian and Vivian was good about it so I see no
-reason to not apply them.
+vim +/devm_pinctrl_get +730 drivers/tty/serial/st-asc.c
 
-Add me in CC so I will now when to rebase my series.
+   724		/* ensure that clk rate is correct by enabling the clk */
+   725		clk_prepare_enable(ascport->clk);
+   726		ascport->port.uartclk = clk_get_rate(ascport->clk);
+   727		WARN_ON(ascport->port.uartclk == 0);
+   728		clk_disable_unprepare(ascport->clk);
+   729	
+ > 730		ascport->pinctrl = devm_pinctrl_get(&pdev->dev);
+   731		if (IS_ERR(ascport->pinctrl)) {
+   732			ret = PTR_ERR(ascport->pinctrl);
+   733			dev_err(&pdev->dev, "Failed to get Pinctrl: %d\n", ret);
+   734		}
+   735	
+   736		ascport->states[DEFAULT] =
+ > 737			pinctrl_lookup_state(ascport->pinctrl, "default");
+   738		if (IS_ERR(ascport->states[DEFAULT])) {
+   739			ret = PTR_ERR(ascport->states[DEFAULT]);
+   740			dev_err(&pdev->dev,
 
-Thanks,
-
-Gregory
-
->
->     Andrew
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 48646 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/1372cacd/attachment-0001.gz>
