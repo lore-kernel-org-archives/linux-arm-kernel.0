@@ -1,110 +1,107 @@
-From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Wed, 25 Jan 2017 00:52:22 +0530
-Subject: [PATCH] usb: musb: constify musb_hdrc_config structures
-Message-ID: <1485285742-6949-1-git-send-email-bhumirks@gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 24 Jan 2017 11:54:51 -0800
+Subject: [GIT PULL] Immutable branch between MFD, ARM, IIO and PWM due for
+ the v4.10 merge window
+In-Reply-To: <20170124081244.GP16020@dell>
+References: <1484903709-11650-1-git-send-email-benjamin.gaignard@st.com>
+ <20170123121222.GJ16020@dell>
+ <CAOesGMhx6ZWekgW01-7GRcMiWtAohcfGdcu1FhkP=bTfsjBCmQ@mail.gmail.com>
+ <20170124081244.GP16020@dell>
+Message-ID: <CAOesGMhauUd0mPuUsRZnEWrAfQZj3Di_YwvxtD1rXr7B9fgqdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Declare musb_hdrc_config structures as const as they are only stored in
-the config field of a musb_hdrc_platform_data structure. This field is of
-type const, so musb_hdrc_config structures having this property can be
-made const too.
-Done using Coccinelle:
+On Tue, Jan 24, 2017 at 12:12 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Mon, 23 Jan 2017, Olof Johansson wrote:
+>> On Mon, Jan 23, 2017 at 4:12 AM, Lee Jones <lee.jones@linaro.org> wrote:
+>> > Arm, IIO and PWM Maintainers,
+>> >
+>> > Enjoy!
+>> >
+>> > The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+>> >
+>> >   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+>> >
+>> > are available in the git repository at:
+>> >
+>> >   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git ib-mfd-arm-iio-pwm-v4.10
+>> >
+>> > for you to fetch changes up to 94df449273475980a39f1bf47f1e3d2b07ce6577:
+>> >
+>> >   ARM: dts: stm32: Enable pwm1 and pwm3 for stm32f469-disco (2017-01-23 12:06:28 +0000)
+>> >
+>> > ----------------------------------------------------------------
+>> > Immutable branch between MFD, ARM, IIO and PWM due for the v4.10 merge window
+>> >
+>> > ----------------------------------------------------------------
+>> > Benjamin Gaignard (8):
+>> >       dt-bindings: mfd: Add bindings for STM32 Timers driver
+>> >       mfd: Add STM32 Timers driver
+>> >       dt-bindings: pwm: Add STM32 bindings
+>> >       pwm: Add driver for STM32 plaftorm
+>> >       iio: Add bindings for STM32 timer trigger driver
+>> >       iio: Add STM32 timer trigger driver
+>> >       ARM: dts: stm32: add Timers driver for stm32f429 MCU
+>> >       ARM: dts: stm32: Enable pwm1 and pwm3 for stm32f469-disco
+>> >
+>> >  .../ABI/testing/sysfs-bus-iio-timer-stm32          |  29 ++
+>> >  .../bindings/iio/timer/stm32-timer-trigger.txt     |  23 ++
+>> >  .../devicetree/bindings/mfd/stm32-timers.txt       |  46 +++
+>> >  .../devicetree/bindings/pwm/pwm-stm32.txt          |  35 ++
+>> >  arch/arm/boot/dts/stm32f429.dtsi                   | 275 ++++++++++++++
+>> >  arch/arm/boot/dts/stm32f469-disco.dts              |  28 ++
+>> >  drivers/iio/trigger/Kconfig                        |   9 +
+>> >  drivers/iio/trigger/Makefile                       |   1 +
+>> >  drivers/iio/trigger/stm32-timer-trigger.c          | 342 ++++++++++++++++++
+>> >  drivers/mfd/Kconfig                                |  11 +
+>> >  drivers/mfd/Makefile                               |   2 +
+>> >  drivers/mfd/stm32-timers.c                         |  80 +++++
+>> >  drivers/pwm/Kconfig                                |   9 +
+>> >  drivers/pwm/Makefile                               |   1 +
+>> >  drivers/pwm/pwm-stm32.c                            | 398 +++++++++++++++++++++
+>> >  include/linux/iio/timer/stm32-timer-trigger.h      |  62 ++++
+>> >  include/linux/mfd/stm32-timers.h                   |  71 ++++
+>> >  17 files changed, 1422 insertions(+)
+>> >  create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-timer-stm32
+>> >  create mode 100644 Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
+>> >  create mode 100644 Documentation/devicetree/bindings/mfd/stm32-timers.txt
+>> >  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+>> >  create mode 100644 drivers/iio/trigger/stm32-timer-trigger.c
+>> >  create mode 100644 drivers/mfd/stm32-timers.c
+>> >  create mode 100644 drivers/pwm/pwm-stm32.c
+>> >  create mode 100644 include/linux/iio/timer/stm32-timer-trigger.h
+>> >  create mode 100644 include/linux/mfd/stm32-timers.h
+>>
+>> May I ask why you're creating an immutable branch of all this contents?
+>>
+>> We should get the dts/dtsi contents like usual from any maintainer;
+>> just the DT updates in a branch.
+>>
+>> Sometimes (but less and less due to us discouraging the use) we need
+>> an immutable branch that includes dt-include updates. But I don't see
+>> any of those in this contents.
+>>
+>> I.e. I guess I can see the need between mfd and downstream trees
+>> (iio/pwm), but not the DTS contents at this time. Or am I missing
+>> something here?
+>
+> I agree with you.  However, since one of the STM32 Maintainers Acked
+> the DTS patches, and the other one hasn't been heard from for months,
+> I took that to mean he wanted me to apply and take them through the
+> MFD tree.
+>
+> A misunderstanding or misaction perhaps, but this is the normal
+> assumption.
 
-@r disable optional_qualifier@
-identifier x;
-position p;
-@@
-static struct musb_hdrc_config x at p={...};
+It seems to be a misunderstanding in this case, since there are other
+additions in the stm32 tree this release cycle so we should only pick
+up DTS changes through our tree.
 
-@ok@
-struct musb_hdrc_platform_data pdata;
-identifier r.x;
-position p;
-@@
-pdata.config=&x at p;
+By now, I think it should be pretty well known that we nearly never
+want DTS contents merged through any other tree. Ever.
 
-@bad@
-position p != {r.p,ok.p};
-identifier r.x;
-@@
-x at p
+So, please revoke your branch and take those out. We'll take them
+through the normal flow. Thanks!
 
-@depends on !bad disable optional_qualifier@
-identifier r.x;
-@@
-+const
-struct musb_hdrc_config x;
 
-File size before:
-   text	   data	    bss	    dec	    hex	filename
-   1212	    338	      0	   1550	    60e	drivers/usb/musb/jz4740.o
-
-File size after:
-   text	   data	    bss	    dec	    hex	filename
-   1268	    290	      0	   1558	    616	drivers/usb/musb/jz4740.o
-
-File size before:
-   text	   data	    bss	    dec	    hex	filename
-   6151	    333	     16	   6500	   1964	drivers/usb/musb/sunxi.o
-
-File size after:
-   text	   data	    bss	    dec	    hex	filename
-   6215	    269	     16	   6500	   1964	drivers/usb/musb/sunxi.o
-
-File size before:
-   text	   data	    bss	    dec	    hex	filename
-   3668	    864	      0	   4532	   11b4	drivers/usb/musb/ux500.o
-
-File size after:
-   text	   data	    bss	    dec	    hex	filename
-   3724	    808	      0	   4532	   11b4	drivers/usb/musb/ux500.o
-
-Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
----
- drivers/usb/musb/jz4740.c | 2 +-
- drivers/usb/musb/sunxi.c  | 2 +-
- drivers/usb/musb/ux500.c  | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/usb/musb/jz4740.c b/drivers/usb/musb/jz4740.c
-index bc88899..40c68c2 100644
---- a/drivers/usb/musb/jz4740.c
-+++ b/drivers/usb/musb/jz4740.c
-@@ -63,7 +63,7 @@ static struct musb_fifo_cfg jz4740_musb_fifo_cfg[] = {
- { .hw_ep_num = 2, .style = FIFO_TX, .maxpacket = 64, },
- };
- 
--static struct musb_hdrc_config jz4740_musb_config = {
-+static const struct musb_hdrc_config jz4740_musb_config = {
- 	/* Silicon does not implement USB OTG. */
- 	.multipoint = 0,
- 	/* Max EPs scanned, driver will decide which EP can be used. */
-diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
-index d0be0ea..64545de 100644
---- a/drivers/usb/musb/sunxi.c
-+++ b/drivers/usb/musb/sunxi.c
-@@ -645,7 +645,7 @@ static struct musb_fifo_cfg sunxi_musb_mode_cfg[] = {
- 	MUSB_EP_FIFO_SINGLE(5, FIFO_RX, 512),
- };
- 
--static struct musb_hdrc_config sunxi_musb_hdrc_config = {
-+static const struct musb_hdrc_config sunxi_musb_hdrc_config = {
- 	.fifo_cfg       = sunxi_musb_mode_cfg,
- 	.fifo_cfg_size  = ARRAY_SIZE(sunxi_musb_mode_cfg),
- 	.multipoint	= true,
-diff --git a/drivers/usb/musb/ux500.c b/drivers/usb/musb/ux500.c
-index 3eaa4ba..5a57250 100644
---- a/drivers/usb/musb/ux500.c
-+++ b/drivers/usb/musb/ux500.c
-@@ -30,7 +30,7 @@
- 
- #include "musb_core.h"
- 
--static struct musb_hdrc_config ux500_musb_hdrc_config = {
-+static const struct musb_hdrc_config ux500_musb_hdrc_config = {
- 	.multipoint	= true,
- 	.dyn_fifo	= true,
- 	.num_eps	= 16,
--- 
-2.7.4
+-Olof
