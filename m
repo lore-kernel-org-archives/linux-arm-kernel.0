@@ -1,38 +1,110 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 24 Jan 2017 10:59:15 -0800
-Subject: [PATCH net-next v3 06/10] net: dsa: Migrate to device_find_class()
-In-Reply-To: <841dc133-e9af-e7ca-75bf-8371337d6281@gmail.com>
-References: <20170114214713.28109-1-f.fainelli@gmail.com>
- <20170114214713.28109-7-f.fainelli@gmail.com>
- <20170115110628.GF26374@kroah.com>
- <fc247aeb-a8d6-5ba9-c26d-cb057a5ac34d@gmail.com>
- <20170115173949.GA19268@kroah.com>
- <a9ea1f45-b9a5-d840-68e0-9bf9bc7a6598@gmail.com>
- <20170115191632.GD5643@lunn.ch>
- <912e6143-c67a-d909-2a6c-939de79efc5d@gmail.com>
- <20170119142820.GA494@kroah.com> <20170119145315.GD21805@lunn.ch>
- <20170119165155.GH27312@n2100.armlinux.org.uk>
- <841dc133-e9af-e7ca-75bf-8371337d6281@gmail.com>
-Message-ID: <c98f3ff8-9d4e-a007-1fef-130fcf580201@gmail.com>
+From: bhumirks@gmail.com (Bhumika Goyal)
+Date: Wed, 25 Jan 2017 00:52:22 +0530
+Subject: [PATCH] usb: musb: constify musb_hdrc_config structures
+Message-ID: <1485285742-6949-1-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/19/2017 10:12 AM, Florian Fainelli wrote:
-> 
-> Back to the actual code that triggered this discussion, the whole
-> purpose is just a safeguard. Given a device reference, we can assume
-> that it is indeed the backing device for a net_device, and we could do a
-> to_net_device() right away (and crash if someone did not write correct
-> platform_data structures), or, by walking the device tree (the device
-> driver model one) we can make sure it does belong in the proper class
-> and this is indeed what we think it is.
+Declare musb_hdrc_config structures as const as they are only stored in
+the config field of a musb_hdrc_platform_data structure. This field is of
+type const, so musb_hdrc_config structures having this property can be
+made const too.
+Done using Coccinelle:
 
-Greg, did Russell's explanation clarify things, or do you still think
-this is completely bogus and we need to re design the whole thing?
+@r disable optional_qualifier@
+identifier x;
+position p;
+@@
+static struct musb_hdrc_config x at p={...};
 
-Just asking so I can try to resubmit just the preparatory parts or just
-the whole thing.
+@ok@
+struct musb_hdrc_platform_data pdata;
+identifier r.x;
+position p;
+@@
+pdata.config=&x at p;
 
-Thank you
+@bad@
+position p != {r.p,ok.p};
+identifier r.x;
+@@
+x at p
+
+@depends on !bad disable optional_qualifier@
+identifier r.x;
+@@
++const
+struct musb_hdrc_config x;
+
+File size before:
+   text	   data	    bss	    dec	    hex	filename
+   1212	    338	      0	   1550	    60e	drivers/usb/musb/jz4740.o
+
+File size after:
+   text	   data	    bss	    dec	    hex	filename
+   1268	    290	      0	   1558	    616	drivers/usb/musb/jz4740.o
+
+File size before:
+   text	   data	    bss	    dec	    hex	filename
+   6151	    333	     16	   6500	   1964	drivers/usb/musb/sunxi.o
+
+File size after:
+   text	   data	    bss	    dec	    hex	filename
+   6215	    269	     16	   6500	   1964	drivers/usb/musb/sunxi.o
+
+File size before:
+   text	   data	    bss	    dec	    hex	filename
+   3668	    864	      0	   4532	   11b4	drivers/usb/musb/ux500.o
+
+File size after:
+   text	   data	    bss	    dec	    hex	filename
+   3724	    808	      0	   4532	   11b4	drivers/usb/musb/ux500.o
+
+Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+---
+ drivers/usb/musb/jz4740.c | 2 +-
+ drivers/usb/musb/sunxi.c  | 2 +-
+ drivers/usb/musb/ux500.c  | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/usb/musb/jz4740.c b/drivers/usb/musb/jz4740.c
+index bc88899..40c68c2 100644
+--- a/drivers/usb/musb/jz4740.c
++++ b/drivers/usb/musb/jz4740.c
+@@ -63,7 +63,7 @@ static struct musb_fifo_cfg jz4740_musb_fifo_cfg[] = {
+ { .hw_ep_num = 2, .style = FIFO_TX, .maxpacket = 64, },
+ };
+ 
+-static struct musb_hdrc_config jz4740_musb_config = {
++static const struct musb_hdrc_config jz4740_musb_config = {
+ 	/* Silicon does not implement USB OTG. */
+ 	.multipoint = 0,
+ 	/* Max EPs scanned, driver will decide which EP can be used. */
+diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+index d0be0ea..64545de 100644
+--- a/drivers/usb/musb/sunxi.c
++++ b/drivers/usb/musb/sunxi.c
+@@ -645,7 +645,7 @@ static struct musb_fifo_cfg sunxi_musb_mode_cfg[] = {
+ 	MUSB_EP_FIFO_SINGLE(5, FIFO_RX, 512),
+ };
+ 
+-static struct musb_hdrc_config sunxi_musb_hdrc_config = {
++static const struct musb_hdrc_config sunxi_musb_hdrc_config = {
+ 	.fifo_cfg       = sunxi_musb_mode_cfg,
+ 	.fifo_cfg_size  = ARRAY_SIZE(sunxi_musb_mode_cfg),
+ 	.multipoint	= true,
+diff --git a/drivers/usb/musb/ux500.c b/drivers/usb/musb/ux500.c
+index 3eaa4ba..5a57250 100644
+--- a/drivers/usb/musb/ux500.c
++++ b/drivers/usb/musb/ux500.c
+@@ -30,7 +30,7 @@
+ 
+ #include "musb_core.h"
+ 
+-static struct musb_hdrc_config ux500_musb_hdrc_config = {
++static const struct musb_hdrc_config ux500_musb_hdrc_config = {
+ 	.multipoint	= true,
+ 	.dyn_fifo	= true,
+ 	.num_eps	= 16,
 -- 
-Florian
+2.7.4
