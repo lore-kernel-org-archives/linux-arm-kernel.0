@@ -1,87 +1,181 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Tue, 24 Jan 2017 21:19:59 +0800
-Subject: [RFC] ARM: dts: imx53-qsb-common: fix FEC pinmux config
-In-Reply-To: <20170123151459.29691-1-linux-kernel-dev@beckhoff.com>
-References: <20170123151459.29691-1-linux-kernel-dev@beckhoff.com>
-Message-ID: <20170124131958.GX5662@dragon>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 24 Jan 2017 14:22:48 +0100
+Subject: [PATCH] KVM: arm/arm64: vgic: Add debugfs vgic-state file
+In-Reply-To: <524751ae-8e17-f9a0-88c6-95d4614478af@arm.com>
+References: <20170120103330.13858-1-christoffer.dall@linaro.org>
+ <524751ae-8e17-f9a0-88c6-95d4614478af@arm.com>
+Message-ID: <20170124132144.GQ15850@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2017 at 04:14:59PM +0100, linux-kernel-dev at beckhoff.com wrote:
-> From: Patrick Bruenn <p.bruenn@beckhoff.com>
+On Tue, Jan 24, 2017 at 10:23:57AM +0000, Andre Przywara wrote:
+> Hi,
 > 
-> The pinmux configuration in device tree is different from manual
-> muxing in <u-boot>/board/freescale/mx53loco/mx53loco.c
-> It seems the device tree configuration is never used by any kernel
-> driver and the correct setting, preconfigured by u-boot, was never
-> overwritten. So this issue never showed up anywhere.
+> so I gave this patch (adapted to live without the soft_pending state)
+> some testing on my machines (Midway, Juno, GICv3 ITS h/w) and it seemed
+> to work well - at least if one is nice and starts only one process
+> accessing vgic-state (see below). I caught some IRQs red-handed and the
+> output looked plausible.
+> The only comment I have is that "MPIDR" is a misleading header name for
+> that column. It's actually a union with the GICv2 targets field, which
+> is a bitmask of the targetting VCPUs. So the output looks more like a
+> bitmask and not an MPIDR on many machines. But that's just cosmetic.
+> 
+> Just discovered one thing: As soon as a second task is reading the file
+> (with "while [ 1 ]; do cat vgic-state > /dev/null; done &" in the
+> background, for instance), I get this splat on the host:
+> 
+> [60796.007461] Unable to handle kernel NULL pointer dereference at
+> virtual address 00000008
+> [60796.015538] pgd = ffff800974e30000
+> [60796.018952] [00000008] *pgd=00000009f4d0a003[60796.023067] Internal
+> error: Oops: 96000006 [#1] PREEMPT SMP
+> [60796.028588] Modules linked in:
+> [60796.031626] CPU: 3 PID: 5690 Comm: cat Tainted: G        W
+> 4.9.0-00026-ge24503e-dirty #444
+> [60796.040326] Hardware name: ARM Juno development board (r0) (DT)
+> [60796.046190] task: ffff80097231ab00 task.stack: ffff800973894000
+> [60796.052059] PC is at iter_next+0x18/0x80
+> [60796.055946] LR is at debug_next+0x38/0x90
+> [60796.059917] pc : [<ffff0000080c4b38>] lr : [<ffff0000080c4bd8>]
 
-The change is fine.  But the commit log may need to be rewritten,
-because pad config value 0x80000000 is defined as leaving the register
-untouched, i.e. using whatever is in register, reset value or the one
-configured by firmware.  See NO_PAD_CTL in
-Documentation/devicetree/bindings/pinctrl/fsl,imx-pinctrl.txt.
+Turns out it wasn't a difficult fix (patch includes rebase on pending
+change and making the naming slightly less cute).
 
-> 
-> ---
-> I stumbled upon this difference, while adding the imx53 based CX9020
-> Embedded PC to u-boot bootloader. "New" boards are encouraged to use
-> device tree for pinmuxing in u-boot, so I tried to reuse
-> imx53-qsb-common.dtsi for that. That failed with a high packet loss on
-> the fec_mxc device. With the attached patch that device tree based
-> pinmuxing seems successful in u-boot. My suggestion is to apply it to
-> imx53-qsb-common.dtsi, too. That will help other "late adopters" and
-> prevent similar issues, in case any kernel driver starts using this
-> pinmux configurations.
-> 
-> Signed-off-by: Patrick Bruenn <p.bruenn@beckhoff.com>
+The bugfix is in vgic_debug_stop which now checks if the supplied
+pointer is an error pointer.
 
-Your SoB should be put into commit log, i.e. above the first occurrence
-of "---".
 
-Shawn
+diff --git a/virt/kvm/arm/vgic/vgic-debug.c b/virt/kvm/arm/vgic/vgic-debug.c
+index 76e8b11..ec466a6 100644
+--- a/virt/kvm/arm/vgic/vgic-debug.c
++++ b/virt/kvm/arm/vgic/vgic-debug.c
+@@ -70,14 +70,14 @@ static void iter_init(struct kvm *kvm, struct vgic_state_iter *iter,
+ 		iter_next(iter);
+ }
+ 
+-static bool the_end(struct vgic_state_iter *iter)
++static bool end_of_vgic(struct vgic_state_iter *iter)
+ {
+ 	return iter->dist_id > 0 &&
+ 		iter->vcpu_id == iter->nr_cpus &&
+ 		(iter->intid - VGIC_NR_PRIVATE_IRQS) == iter->nr_spis;
+ }
+ 
+-static void *debug_start(struct seq_file *s, loff_t *pos)
++static void *vgic_debug_start(struct seq_file *s, loff_t *pos)
+ {
+ 	struct kvm *kvm = (struct kvm *)s->private;
+ 	struct vgic_state_iter *iter;
+@@ -98,30 +98,37 @@ static void *debug_start(struct seq_file *s, loff_t *pos)
+ 	iter_init(kvm, iter, *pos);
+ 	kvm->arch.vgic.iter = iter;
+ 
+-	if (the_end(iter))
++	if (end_of_vgic(iter))
+ 		iter = NULL;
+ out:
+ 	mutex_unlock(&kvm->lock);
+ 	return iter;
+ }
+ 
+-static void *debug_next(struct seq_file *s, void *v, loff_t *pos)
++static void *vgic_debug_next(struct seq_file *s, void *v, loff_t *pos)
+ {
+ 	struct kvm *kvm = (struct kvm *)s->private;
+ 	struct vgic_state_iter *iter = kvm->arch.vgic.iter;
+ 
+ 	++*pos;
+ 	iter_next(iter);
+-	if (the_end(iter))
++	if (end_of_vgic(iter))
+ 		iter = NULL;
+ 	return iter;
+ }
+ 
+-static void debug_stop(struct seq_file *s, void *v)
++static void vgic_debug_stop(struct seq_file *s, void *v)
+ {
+ 	struct kvm *kvm = (struct kvm *)s->private;
+ 	struct vgic_state_iter *iter;
+ 
++	/*
++	 * If the seq file wasn't properly opened, there's nothing to clearn
++	 * up.
++	 */
++	if (IS_ERR(v))
++		return;
++
+ 	mutex_lock(&kvm->lock);
+ 	iter = kvm->arch.vgic.iter;
+ 	kfree(iter);
+@@ -156,8 +163,8 @@ static void print_header(struct seq_file *s, struct vgic_irq *irq,
+ 	}
+ 
+ 	seq_printf(s, "\n");
+-	seq_printf(s, "%s%2d TYP   ID TGT_ID PLSAEHL     HWID    MPIDR SRC PRI VCPU_ID\n", hdr, id);
+-	seq_printf(s, "----------------------------------------------------------------\n");
++	seq_printf(s, "%s%2d TYP   ID TGT_ID PLAEHL     HWID   TARGET SRC PRI VCPU_ID\n", hdr, id);
++	seq_printf(s, "---------------------------------------------------------------\n");
+ }
+ 
+ static void print_irq_state(struct seq_file *s, struct vgic_irq *irq,
+@@ -176,7 +183,7 @@ static void print_irq_state(struct seq_file *s, struct vgic_irq *irq,
+ 
+ 	seq_printf(s, "       %s %4d "
+ 		      "    %2d "
+-		      "%d%d%d%d%d%d%d "
++		      "%d%d%d%d%d%d "
+ 		      "%8x "
+ 		      "%8x "
+ 		      " %2x "
+@@ -185,9 +192,8 @@ static void print_irq_state(struct seq_file *s, struct vgic_irq *irq,
+ 		      "\n",
+ 			type, irq->intid,
+ 			(irq->target_vcpu) ? irq->target_vcpu->vcpu_id : -1,
+-			irq->pending,
++			irq->pending_latch,
+ 			irq->line_level,
+-			irq->soft_pending,
+ 			irq->active,
+ 			irq->enabled,
+ 			irq->hw,
+@@ -200,7 +206,7 @@ static void print_irq_state(struct seq_file *s, struct vgic_irq *irq,
+ 
+ }
+ 
+-static int debug_show(struct seq_file *s, void *v)
++static int vgic_debug_show(struct seq_file *s, void *v)
+ {
+ 	struct kvm *kvm = (struct kvm *)s->private;
+ 	struct vgic_state_iter *iter = (struct vgic_state_iter *)v;
+@@ -229,17 +235,17 @@ static int debug_show(struct seq_file *s, void *v)
+ 	return 0;
+ }
+ 
+-static struct seq_operations debug_seq_ops = {
+-	.start = debug_start,
+-	.next  = debug_next,
+-	.stop  = debug_stop,
+-	.show  = debug_show
++static struct seq_operations vgic_debug_seq_ops = {
++	.start = vgic_debug_start,
++	.next  = vgic_debug_next,
++	.stop  = vgic_debug_stop,
++	.show  = vgic_debug_show
+ };
+ 
+ static int debug_open(struct inode *inode, struct file *file)
+ {
+ 	int ret;
+-	ret = seq_open(file, &debug_seq_ops);
++	ret = seq_open(file, &vgic_debug_seq_ops);
+ 	if (!ret) {
+ 		struct seq_file *seq;
+ 		/* seq_open will have modified file->private_data */
 
-> ---
->  arch/arm/boot/dts/imx53-qsb-common.dtsi | 20 ++++++++++----------
->  1 file changed, 10 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx53-qsb-common.dtsi b/arch/arm/boot/dts/imx53-qsb-common.dtsi
-> index c05e7cfd0cbc..40b3e31935d0 100644
-> --- a/arch/arm/boot/dts/imx53-qsb-common.dtsi
-> +++ b/arch/arm/boot/dts/imx53-qsb-common.dtsi
-> @@ -215,16 +215,16 @@
->  
->  		pinctrl_fec: fecgrp {
->  			fsl,pins = <
-> -				MX53_PAD_FEC_MDC__FEC_MDC		0x80000000
-> -				MX53_PAD_FEC_MDIO__FEC_MDIO		0x80000000
-> -				MX53_PAD_FEC_REF_CLK__FEC_TX_CLK	0x80000000
-> -				MX53_PAD_FEC_RX_ER__FEC_RX_ER		0x80000000
-> -				MX53_PAD_FEC_CRS_DV__FEC_RX_DV		0x80000000
-> -				MX53_PAD_FEC_RXD1__FEC_RDATA_1		0x80000000
-> -				MX53_PAD_FEC_RXD0__FEC_RDATA_0		0x80000000
-> -				MX53_PAD_FEC_TX_EN__FEC_TX_EN		0x80000000
-> -				MX53_PAD_FEC_TXD1__FEC_TDATA_1		0x80000000
-> -				MX53_PAD_FEC_TXD0__FEC_TDATA_0		0x80000000
-> +				MX53_PAD_FEC_MDC__FEC_MDC		0x4
-> +				MX53_PAD_FEC_MDIO__FEC_MDIO		0x1fc
-> +				MX53_PAD_FEC_REF_CLK__FEC_TX_CLK	0x180
-> +				MX53_PAD_FEC_RX_ER__FEC_RX_ER		0x180
-> +				MX53_PAD_FEC_CRS_DV__FEC_RX_DV		0x180
-> +				MX53_PAD_FEC_RXD1__FEC_RDATA_1		0x180
-> +				MX53_PAD_FEC_RXD0__FEC_RDATA_0		0x180
-> +				MX53_PAD_FEC_TX_EN__FEC_TX_EN		0x4
-> +				MX53_PAD_FEC_TXD1__FEC_TDATA_1		0x4
-> +				MX53_PAD_FEC_TXD0__FEC_TDATA_0		0x4
->  			>;
->  		};
->  
-> -- 
-> 2.11.0
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+I'll send out a v2.
+
+Thanks,
+-Christoffer
