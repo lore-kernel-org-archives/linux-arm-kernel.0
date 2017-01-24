@@ -1,103 +1,83 @@
-From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Tue, 24 Jan 2017 14:32:13 +0100
-Subject: [PATCH 2/7] MFD: add STM32 DFSDM support
-In-Reply-To: <20170124113658.GW16020@dell>
-References: <1485189145-29576-1-git-send-email-arnaud.pouliquen@st.com>
- <1485189145-29576-3-git-send-email-arnaud.pouliquen@st.com>
- <20170124082249.GR16020@dell> <283c0e48-55e2-6516-369d-91dc72d12f73@st.com>
- <20170124113658.GW16020@dell>
-Message-ID: <a1aaaa20-ac00-b182-f1c1-63152be41135@st.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 24 Jan 2017 14:39:10 +0100
+Subject: [PATCH] tcb_clksrc: Use 32 bit tcb as sched_clock
+In-Reply-To: <20170111135059.21318-1-david.engraf@sysgo.com>
+References: <20170111135059.21318-1-david.engraf@sysgo.com>
+Message-ID: <a32d362e-0197-708e-2cee-98a1cd75981d@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 01/24/2017 12:36 PM, Lee Jones wrote:
-> On Tue, 24 Jan 2017, Arnaud Pouliquen wrote:
->> On 01/24/2017 09:22 AM, Lee Jones wrote:
->>> On Mon, 23 Jan 2017, Arnaud Pouliquen wrote:
->>>
->>>> DFSDM hardware IP can be used at the same time for ADC sigma delta
->>>
->>> Same time as what?
->> DFSDM is used for ADC acquisition (through IIO) but also PDM microphone
->> capture (through ASOC).
->>>
->>>> conversion and audio PDM microphone.
->>>> MFD driver is in charge of configuring IP registers and managing IP clocks.
->>>> For this it exports an API to handles filters and channels resources.
->>>
->>> This looks like an ADC driver?  What is it that makes it an MFD?
->> Yes it a kind of ADC but that supports 2 features audio and iio.
->> So it has to support 2 features based on 2 separate Frameworks.
+Le 11/01/2017 ? 14:50, David Engraf a ?crit :
+> On newer boards the TC can be read as single 32 bit value without locking.
+> Thus the clock can be used as reference for sched_clock which is much more
+> accurate than the jiffies implementation.
 > 
-> I'm still unsure why it needs to live in MFD.
+> Tested on a Atmel SAMA5D2 board.
 > 
-> By the looks of it, this driver needs to move into IIO and you need to
-> call into it from ASoC.
+> Signed-off-by: David Engraf <david.engraf@sysgo.com>
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+Thanks,
+
+> ---
+>  drivers/clocksource/tcb_clksrc.c | 16 +++++++++++++++-
+>  1 file changed, 15 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+> index d4ca996..745844e 100644
+> --- a/drivers/clocksource/tcb_clksrc.c
+> +++ b/drivers/clocksource/tcb_clksrc.c
+> @@ -10,6 +10,7 @@
+>  #include <linux/io.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/atmel_tc.h>
+> +#include <linux/sched_clock.h>
+>  
+>  
+>  /*
+> @@ -56,11 +57,16 @@ static u64 tc_get_cycles(struct clocksource *cs)
+>  	return (upper << 16) | lower;
+>  }
+>  
+> -static u64 tc_get_cycles32(struct clocksource *cs)
+> +static u32 tc_get_cv32(void)
+>  {
+>  	return __raw_readl(tcaddr + ATMEL_TC_REG(0, CV));
+>  }
+>  
+> +static u64 tc_get_cycles32(struct clocksource *cs)
+> +{
+> +	return tc_get_cv32();
+> +}
+> +
+>  static struct clocksource clksrc = {
+>  	.name           = "tcb_clksrc",
+>  	.rating         = 200,
+> @@ -69,6 +75,11 @@ static struct clocksource clksrc = {
+>  	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+>  };
+>  
+> +static u64 notrace tc_read_sched_clock(void)
+> +{
+> +	return tc_get_cv32();
+> +}
+> +
+>  #ifdef CONFIG_GENERIC_CLOCKEVENTS
+>  
+>  struct tc_clkevt_device {
+> @@ -339,6 +350,9 @@ static int __init tcb_clksrc_init(void)
+>  		clksrc.read = tc_get_cycles32;
+>  		/* setup ony channel 0 */
+>  		tcb_setup_single_chan(tc, best_divisor_idx);
+> +
+> +		/* register sched_clock on chips with single 32 bit counter */
+> +		sched_clock_register(tc_read_sched_clock, 32, divided_rate);
+>  	} else {
+>  		/* tclib will give us three clocks no matter what the
+>  		 * underlying platform supports.
 > 
 
-I think i introduce confusion by speaking about ADC for audio...
 
-1) IIO handles sigma delta ADCs that can be used as example for motor
-controls. the aim is to get value based on an application request or
-using some triggers.
-example: http://www.ti.com/lit/ds/symlink/ads1202.pdf
-
-2) For audio part, we speak about Digital mems microphones that generate
-PDM format stream. PDM is a continuous real time stream dedicated to
-audio record and must be handled in ASOC ( codec Dmic part driver is
-/sound/soc/codec/dmic.c).
-DMIC example:
-http://www.st.com/content/ccc/resource/technical/document/datasheet/47/bd/d2/13/8d/fd/48/26/DM00121815.pdf/files/DM00121815.pdf/jcr:content/translations/en.DM00121815.pdf
-
-Form my point of view it very strange to handle DMICs in IIO, as it is
-not designed to support audio streams.it is two separate features that
-are not compatible.
-
-Now, from software point of view
-That would means that IIO declares ADCs that it can not expose, because
-DMIC is not IIO standard. But IIO inkern API needs that device is
-declared... So i should define a specific API in IIO for ASOC driver.
-
-
->>>> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
->>>> ---
->>>>  drivers/mfd/Kconfig             |   11 +
->>>>  drivers/mfd/Makefile            |    2 +
->>>>  drivers/mfd/stm32-dfsdm-reg.h   |  220 +++++++++
->>>>  drivers/mfd/stm32-dfsdm.c       | 1044 +++++++++++++++++++++++++++++++++++++++
->>>>  include/linux/mfd/stm32-dfsdm.h |  324 ++++++++++++
->>>>  5 files changed, 1601 insertions(+)
->>>>  create mode 100644 drivers/mfd/stm32-dfsdm-reg.h
->>>>  create mode 100644 drivers/mfd/stm32-dfsdm.c
->>>>  create mode 100644 include/linux/mfd/stm32-dfsdm.h
->>>>
->>>> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
->>>> index c6df644..4bb660b 100644
->>>> --- a/drivers/mfd/Kconfig
->>>> +++ b/drivers/mfd/Kconfig
->>>> @@ -1607,6 +1607,17 @@ config MFD_STW481X
->>>>  	  in various ST Microelectronics and ST-Ericsson embedded
->>>>  	  Nomadik series.
->>>>  
->>>> +config MFD_STM32_DFSDM
->>>> +	tristate "ST Microelectronics STM32 DFSDM"
->>>> +	depends on (ARCH_STM32 && OF) || COMPILE_TEST
->>>> +	select MFD_CORE
->>>> +	select REGMAP
->>>> +	select REGMAP_MMIO
->>>> +	help
->>>> +	  Select this option to enable the STM32 Digital Filter
->>>> +	  for Sigma Delta Modulators (DFSDM) driver used
->>>> +	  in various STM32 series.
->>>> +
->>>>  menu "Multimedia Capabilities Port drivers"
->>>>  	depends on ARCH_SA1100
->>>
->>> [...]
->>>
->>
->> Regards
->> Arnaud
-> 
+-- 
+Nicolas Ferre
