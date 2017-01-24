@@ -1,112 +1,98 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Tue, 24 Jan 2017 17:03:59 -0500
-Subject: [PATCH v3 3/5] arm64: Create and use __tlbi_dsb() macros
-In-Reply-To: <20170113161209.GI3253@arm.com>
-References: <20170111144118.17062-1-cov@codeaurora.org>
- <20170111144118.17062-3-cov@codeaurora.org> <20170112165852.GH13843@arm.com>
- <8f8057f5-d33f-15b3-de9f-6e718c23e97d@codeaurora.org>
- <20170113161209.GI3253@arm.com>
-Message-ID: <968e0d85-164d-36ff-8f00-bee6ff2e875e@codeaurora.org>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Tue, 24 Jan 2017 14:19:31 -0800
+Subject: [PATCH v9 0/3] Altera Cyclone Passive Serial SPI FPGA Manager
+Message-ID: <cover.1485295905.git.stillcompiling@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+>From c429cec34a880c0d5438091f436a5946a4db3fc0 Mon Sep 17 00:00:00 2001
+Message-Id: <cover.1485211400.git.stillcompiling@gmail.com>
+From: Joshua Clayton <stillcompiling@gmail.com>
+Date: Mon, 23 Jan 2017 14:43:20 -0800
+Subject: [PATCH v8 0/3] Altera Cyclone Passive Serial SPI FPGA Manager
 
-On 01/13/2017 11:12 AM, Will Deacon wrote:
-> On Fri, Jan 13, 2017 at 10:12:36AM -0500, Christopher Covington wrote:
->> On 01/12/2017 11:58 AM, Will Deacon wrote:
->>> On Wed, Jan 11, 2017 at 09:41:16AM -0500, Christopher Covington wrote:
->>>> +#define __tlbi_asm_dsb(as, op, attr, ...) do {				       \
->>>> +		__TLBI_FOR(op, ##__VA_ARGS__)				       \
->>>> +			asm (__TLBI_INSTR(op, ##__VA_ARGS__)		       \
->>>> +			__TLBI_IO(op, ##__VA_ARGS__));			       \
->>>> +		asm volatile (	     as			"\ndsb " #attr "\n"    \
->>>> +		: : : "memory"); } while (0)
->>>> +
->>>> +#define __tlbi_dsb(...)	__tlbi_asm_dsb("", ##__VA_ARGS__)
->>>
->>> I can't deny that this is cool, but ultimately it's completely unreadable.
->>> What I was thinking you'd do would be make __tlbi expand to:
->>>
->>>   tlbi
->>>   dsb
->>>   tlbi
->>>   dsb
->>>
->>> for Falkor, and:
->>>
->>>   tlbi
->>>   nop
->>>   nop
->>>   nop
->>>
->>> for everybody else.
+This series adds an FPGA manager for Altera cyclone FPGAs
+that can program them using an spi port and a couple of gpios, using
+Alteras passive serial protocol.
 
-I've implemented this (minus the last dsb / nop) in the next revision.
+Changes from v8:
+- List the confd pin as optional (it is an additional way to confirm
+  the FPGA is done loading, but is not accessible in my hardare)
 
->> Thanks for the suggestion. So would __tlbi take a dsb sharability argument in
->> your proposal? Or would it be communicated in some other fashion, maybe inferred
->> from the tlbi argument? Or would the workaround dsbs all be the worst/broadest
->> case?
-> 
-> I think always using inner-shareable should be ok. If you wanted to optimise
-> this, you'd want to avoid the workaround altogether for non-shareable
-> invalidation, but that's fairly rare and I doubt you'd be able to measure
-> the impact.
+Changes from v7:
+Add Rob Herrings Ack on the bindings change (Thanks!)
+Change const u8* to const char * to make sparse happy
 
-I did not originally notice that Shanker's original workaround implementation
-unnecessarily applies the workaround to non-shareable invalidations. They're
-not affected by the erratum. But as you say, it's simpler to modify __tlbi for
-all cases. I'm not currently worried about that performance impact.
+Changes from v6:
+- moved bitrev8x4() out (I'll submit it in a separate patch set)
+- Changed the dts format to match what is already done in barebox
+  (see https://git.pengutronix.de/cgit/barebox/tree/Documentation/devicetree/bindings/firmware/altr,passive-serial.txt)
+- Changed error message from "Status pin should be low" to "Status
+  pin failed to show a reset" for better clarity
+- Fixed any whitespace problems that had crept in.
 
->>> Wouldn't that localise this change sufficiently that you wouldn't need
->>> to change all the callers and encode the looping in your cpp macros?
->>>
->>> I realise you get an extra dsb in some places with that change, but I'd
->>> like to see numbers for the impact of that on top of the workaround. If
->>> it's an issue, then an alternative sequence would be:
->>>
->>>   tlbi
->>>   dsb
->>>   tlbi
->>>
->>> and you'd rely on the existing dsb to complete that.
->>>
->>> Having said that, I don't understand how your current loop code works
->>> when the workaround is applied. AFAICT, you end up emitting something
->>> like:
->>>
->>> dsb ishst
->>> for i in 0 to n
->>> 	tlbi va+i
->>> dsb
->>> tlbi va+n
->>> dsb
->>>
->>> which looks wrong to me. Am I misreading something here?
->>
->> You're right, I am off by 1 << (PAGE_SHIFT - 12) here. I would need to
->> increment, compare, not take the loop branch (regular for loop stuff),
->> then decrement (missing) and perform TLB invalidation again (present but
->> using incorrect value).
-> 
-> It also strikes me as odd that you only need one extra TLBI after the loop
-> has finished, as opposed to a tlbi; dsb; tlbi loop body (which is what you'd
-> get if you modified __tlbi as I suggest).
-> 
-> Is it sufficient to have one extra TLBI after the loop and, if so, is the
-> performance impact of my suggestion therefore unacceptable?
+Changes from v5:
+- Rebased on next-20161214xi
+- Corrected for FPGA Mgr API change in  write_init() and write_complete()
+- Better describe the device cyclone-ps-spi runs on in the file header.
+- Split the bitrev8x4 patch into generic and arch specific patches...
+- Added AARCH64 and MIPS implementations of bitrev8x4()... they all have to 
+  have an implementation for it to compile cleanly across platforms
+- Added the changes to imx6q-evi.dts to the patch set.
 
-One is sufficient according to the errata documentation. I've described that
-aspect in the commit message of the next revision.
+Changes from v4:
+- Added the needed return statement to __arch_bitrev8x4()
+- Added Rob Herrings ACK for and fix a typo in the commit log of patch 2
 
-I've suggested colleagues follow up regarding performance. But reliable
-functionality comes first.
+Changes from v3:
+- Fixed up the state() function to return the state of the status pin
+  reqested by Alan Tull
+- Switched the pin to ACTIVE_LOW and coresponding logic level, and updated
+  the corresponding documentation. Thanks Rob Herring for pointing out my
+  mistake.
+- Per Rob Herring, switched from "gpio" to "gpios" in dts
 
-Thanks,
-Cov
+Changes from v2:
+- Merged patch 3 and 4 as suggested in review by Moritz Fischer
+- Changed FPGA_MIN_DELAY from 250 to 50 ms is the time advertized by
+  Altera. This now works, as we don't assume it is done
+
+Changes from v1:
+- Changed the name from cyclone-spi-fpga-mgr to cyclone-ps-spi-fpga-mgr
+  This name change was requested by Alan Tull, to be specific about which
+  programming method is being employed on the fpga.
+- Changed the name of the reset-gpio to config-gpio to closer match the
+  way the pins are described in the Altera manual
+- Moved MODULE_LICENCE, _AUTHOR, and _DESCRIPTION to the bottom
+
+- Added a bitrev8x4() function to the bitrev headers and implemented ARM
+ const, runtime, and ARM specific faster versions (This may end up
+ needing to be a standalone patch)
+
+- Moved the bitswapping into cyclonespi_write(), as requested.
+  This falls short of my desired generic lsb first spi support, but is a step
+  in that direction.
+
+- Fixed whitespace problems introduced during refactoring
+
+- Replaced magic number for initial delay with a descriptive macro
+- Poll the fpga to see when it is ready rather than a fixed 1 ms sleep
+
+*** BLURB HERE ***
+
+Joshua Clayton (3):
+  doc: dt: add cyclone-ps-spi binding document
+  fpga manager: Add cyclone-ps-spi driver for Altera FPGAs
+  ARM: dts: imx6q-evi: support cyclone-ps-spi
+
+ .../bindings/fpga/altera-passive-serial.txt        |  29 ++++
+ arch/arm/boot/dts/imx6q-evi.dts                    |  16 ++
+ drivers/fpga/Kconfig                               |   7 +
+ drivers/fpga/Makefile                              |   1 +
+ drivers/fpga/cyclone-ps-spi.c                      | 185 +++++++++++++++++++++
+ 5 files changed, 238 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/fpga/altera-passive-serial.txt
+ create mode 100644 drivers/fpga/cyclone-ps-spi.c
 
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
-Aurora Forum, a Linux Foundation Collaborative Project.
+2.9.3
