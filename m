@@ -1,103 +1,97 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 24 Jan 2017 10:04:10 +0000
-Subject: [PATCH 1/2] arm64: kvm: reuse existing cache type/info related
- macros
-In-Reply-To: <20170123210553.GI15850@cbox>
-References: <1484909410-11673-1-git-send-email-sudeep.holla@arm.com>
- <20170123210553.GI15850@cbox>
-Message-ID: <1cc3e1dd-8acc-e203-da31-474a06e747e9@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 24 Jan 2017 11:03:48 +0100
+Subject: [PATCH v3 2/4] dt-bindings: Add TI SCI PM Domains
+In-Reply-To: <ec2f1697-4c60-fd88-6593-2a69ca7f5c83@ti.com>
+References: <20170104205536.15963-1-d-gerlach@ti.com>
+ <20170104205536.15963-3-d-gerlach@ti.com>
+ <20170109175012.sg7eze7llqq7qevd@rob-hp-laptop>
+ <7bd282d9-df6f-f4c6-1f7f-c8ed81c78af3@ti.com>
+ <CAL_JsqKxU4c=KSn0=xX9kmbk498fhqpiXMeGjcoe8Ah48FAzUg@mail.gmail.com>
+ <3bb89649-fd2a-acc6-6968-e54a00842ce2@ti.com>
+ <CAL_JsqL+L1oHAOv7tLevzbtRFSKRs9J01SgF=HR_vNNqNV+4+Q@mail.gmail.com>
+ <84d7d49b-933b-8b26-f18a-3a5054738cb1@ti.com>
+ <CAL_JsqJ9RitNC7ihC8ckJgV+49kaHk=W9tgdNBSjEfydhQS46A@mail.gmail.com>
+ <0eaa9914-83f1-7716-cf04-1e3dd44df647@ti.com>
+ <4cb25cf9-216f-2e18-f45d-ef7e48fa6c5e@ti.com>
+ <m2ziip2puf.fsf@baylibre.com>
+ <CAL_Jsq+Vp8iYrAUmuSRzeeY_G6CUqFqG6XB6erDxo1RYo3g4=g@mail.gmail.com>
+ <CAPDyKFqzs59N5bc89X-96Fgy9b=_+s8zYmHHshQeDrJCnaqprA@mail.gmail.com>
+ <58821CA2.4050701@ti.com>
+ <CAPDyKFpTyn2isNahywmOOSWiZKov9xsudyWi_i-FejXjC+1AZw@mail.gmail.com>
+ <ec2f1697-4c60-fd88-6593-2a69ca7f5c83@ti.com>
+Message-ID: <CAPDyKFq3zjyubxf3wc1V+F2W3rbnjj4ObFnHFvda+wCs4rBtnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 23/01/17 21:05, Christoffer Dall wrote:
-> On Fri, Jan 20, 2017 at 10:50:09AM +0000, Sudeep Holla wrote:
->> We already have various macros related to cache type and bitfields in
->> CLIDR system register. We can replace some of the hardcoded values
->> here using those existing macros.
+On 23 January 2017 at 21:11, Dave Gerlach <d-gerlach@ti.com> wrote:
+> On 01/20/2017 10:52 AM, Ulf Hansson wrote:
 >>
->> This patch reuses those existing cache type/info related macros and
->> replaces the hardcorded values. It also removes some of the comments
->> that become trivial with the macro names.
+>> [...]
 >>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Christoffer Dall <christoffer.dall@linaro.org>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->> ---
->>  arch/arm64/include/asm/cachetype.h |  7 +++++++
->>  arch/arm64/kernel/cacheinfo.c      |  7 -------
->>  arch/arm64/kvm/sys_regs.c          | 27 +++++++++++++--------------
->>  3 files changed, 20 insertions(+), 21 deletions(-)
+>>>>> Another option is create something new either common or TI SCI
+>>>>> specific. It could be just a table of ids and phandles in the SCI
+>>>>> node. I'm much more comfortable with an isolated property in one node
+>>>>> than something scattered throughout the DT.
+>>>>
+>>>>
+>>>> To me, this seems like the best possible solution.
+>>>>
+>>>> However, perhaps we should also consider the SCPI Generic power domain
+>>>> (drivers/firmware/scpi_pm_domain.c), because I believe it's closely
+>>>> related.
+>>>> To change the power state of a device, this PM domain calls
+>>>> scpi_device_set|get_power_state() (drivers/firmware/arm_scpi.c), which
+>>>> also needs a device id as a parameter. Very similar to our case with
+>>>> the TI SCI domain.
+>>>>
+>>>> Currently these SCPI device ids lacks corresponding DT bindings, so
+>>>> the scpi_pm_domain tries to work around it by assigning ids
+>>>> dynamically at genpd creation time.
+>>>>
+>>>> That makes me wonder, whether we should think of something
+>>>> common/generic?
+>>>
+>>>
+>>> When you say something common/generic, do you mean a better binding for
+>>> genpd,
+>>> or something bigger than that like a new driver? Because I do think a
+>>> phandle
+>>> cell left open for the genpd provider to interpret solves both the scpi
+>>> and
+>>> ti-sci problem we are facing here in the best way. Using generic PM
+>>> domains lets
+>>> us do exactly what we want apart from interpreting the phandle cell with
+>>> our
+>>> driver, and I feel like anything else we try at this point is just going
+>>> to be
+>>> to work around that. Is bringing back genpd xlate something we can
+>>> discuss?
 >>
->> diff --git a/arch/arm64/include/asm/cachetype.h b/arch/arm64/include/asm/cachetype.h
->> index f5588692f1d4..f58b5e3df6b8 100644
->> --- a/arch/arm64/include/asm/cachetype.h
->> +++ b/arch/arm64/include/asm/cachetype.h
->> @@ -39,6 +39,13 @@
->>  
->>  extern unsigned long __icache_flags;
->>  
->> +#define MAX_CACHE_LEVEL			7	/* Max 7 level supported */
->> +/* Ctypen, bits[3(n - 1) + 2 : 3(n - 1)], for n = 1 to 7 */
->> +#define CLIDR_CTYPE_SHIFT(level)	(3 * (level - 1))
->> +#define CLIDR_CTYPE_MASK(level)		(7 << CLIDR_CTYPE_SHIFT(level))
->> +#define CLIDR_CTYPE(clidr, level)	\
->> +	(((clidr) & CLIDR_CTYPE_MASK(level)) >> CLIDR_CTYPE_SHIFT(level))
->> +
->>  /*
->>   * NumSets, bits[27:13] - (Number of sets in cache) - 1
->>   * Associativity, bits[12:3] - (Associativity of cache) - 1
->> diff --git a/arch/arm64/kernel/cacheinfo.c b/arch/arm64/kernel/cacheinfo.c
->> index 3f2250fc391b..a460208b08cf 100644
->> --- a/arch/arm64/kernel/cacheinfo.c
->> +++ b/arch/arm64/kernel/cacheinfo.c
->> @@ -26,13 +26,6 @@
->>  #include <asm/cachetype.h>
->>  #include <asm/processor.h>
->>  
->> -#define MAX_CACHE_LEVEL			7	/* Max 7 level supported */
->> -/* Ctypen, bits[3(n - 1) + 2 : 3(n - 1)], for n = 1 to 7 */
->> -#define CLIDR_CTYPE_SHIFT(level)	(3 * (level - 1))
->> -#define CLIDR_CTYPE_MASK(level)		(7 << CLIDR_CTYPE_SHIFT(level))
->> -#define CLIDR_CTYPE(clidr, level)	\
->> -	(((clidr) & CLIDR_CTYPE_MASK(level)) >> CLIDR_CTYPE_SHIFT(level))
->> -
->>  static inline enum cache_type get_cache_type(int level)
->>  {
->>  	u64 clidr;
->> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
->> index 87e7e6608cd8..5dca1f10340f 100644
->> --- a/arch/arm64/kvm/sys_regs.c
->> +++ b/arch/arm64/kvm/sys_regs.c
->> @@ -21,11 +21,13 @@
->>   */
->>  
->>  #include <linux/bsearch.h>
->> +#include <linux/cacheinfo.h>
->>  #include <linux/kvm_host.h>
->>  #include <linux/mm.h>
->>  #include <linux/uaccess.h>
->>  
->>  #include <asm/cacheflush.h>
->> +#include <asm/cachetype.h>
->>  #include <asm/cputype.h>
->>  #include <asm/debug-monitors.h>
->>  #include <asm/esr.h>
->> @@ -59,7 +61,7 @@
->>  static u32 cache_levels;
->>  
->>  /* CSSELR values; used to index KVM_REG_ARM_DEMUX_ID_CCSIDR */
->> -#define CSSELR_MAX 12
->> +#define CSSELR_MAX 	((MAX_CACHE_LEVEL - 1) >> 1)
-> 
-> Did you mean '<< 1' here?
-> 
+>>
+>> Bringing back xlate, how would that help? Wouldn't that just mean that
+>> you will get one genpd per device? That's not an option, I think we
+>> are all in agreement to that.
+>
+>
+> Sure, perhaps the custom xlate wouldn't be the right way to do it, as we
+> wouldn't be able to associate a device directly to a phandle, at least with
+> how it was implemented before, but I think we can skip that entirely. Does
+> opening up the interpretation of the cells of the 'power-domains' phandle
+> not solve all of these issues? Is that out of the question?
+>
+> genpd_xlate_simple currently just makes sure the args_count of the
+> 'power-domains' phandle was zero and bails if it was not. Why couldn't we
+> remove this check and let the driver interpret it while still using
+> of_genpd_add_provider_simple to register the provider? It's still a 'simple'
+> provider from the perspective of the genpd framework and the actual pm
+> domain mapping will not change, but now the driver can parse the cells and
+> do whatever it needs to, such as reading a device id.
+>
+> I think that's a bit more flexible and will avoid breaking anything that is
+> there today.
 
-Ah right, sorry for the stupid mistake.
+Would you mind providing an example? Perhaps also some code snippets
+dealing with the parsing?
 
--- 
-Regards,
-Sudeep
+Kind regards
+Uffe
