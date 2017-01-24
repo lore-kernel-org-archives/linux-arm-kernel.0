@@ -1,46 +1,78 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 24 Jan 2017 10:41:18 +0100
-Subject: [PATCH 1/2] clk: sunxi-ng: Call divider_round_rate if we only have a
- single parent
-Message-ID: <53c56d23af099d8a41460d5ac59a2c792c8d050c.1485250845.git-series.maxime.ripard@free-electrons.com>
+From: lilja.magnus@gmail.com (Magnus Lilja)
+Date: Tue, 24 Jan 2017 10:41:26 +0100
+Subject: usb: gadget: Kernel panic (NULL pointer dereference) when using
+ fsl_udc2_core on i.MX31 PDK
+In-Reply-To: <87efzsdelq.fsf@linux.intel.com>
+References: <f984e50b-0e64-88ef-2f53-b8da2a62daf0@gmail.com>
+ <87k29m6lkx.fsf@linux.intel.com>
+ <CAM=E1R4EMEEq1wnHxjLLJMLaXCM=EDFo1JDacHKGq6DUtqA9Nw@mail.gmail.com>
+ <87efzsdelq.fsf@linux.intel.com>
+Message-ID: <CAM=E1R7i5y2SXiswk8f5dzoJyqYXUOxK9Hivv+ZS56mP6HC8uA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The divider_get_val function that is used in our determine_rate callback
-doesn't try to change the parent rate at all, while clk_divider_bestdiv,
-used in divider_round_rate, does.
+On 24 January 2017 at 09:52, Felipe Balbi <balbi@kernel.org> wrote:
+>
+> Hi,
+>
+> Magnus Lilja <lilja.magnus@gmail.com> writes:
+>>>> I tried the fsl_udc_core gadget driver on the i.MX31 PDK board and got a
+>>>> kernel panic (NULL pointer dereference) when connecting the USB cable. I
+>>>> had the g_serial module loaded as well.
+>>>>
+>>>> The NULL pointer panic comes from gadget/udc/core.c
+>>>> usb_gadget_giveback_request() which calls req->complete() and in some
+>>>> cases req->complete is NULL.
+>>>>
+>>>> Commit 304f7e5e1d08 ("usb: gadget: Refactor request completion") changed
+>>>> fsl_udc2_core.c (and several other files) and in fsl_udc2_core.c a check
+>>>> that req->complete is non-NULL was removed:
+>>>>
+>>>> --- a/drivers/usb/gadget/udc/fsl_udc_core.c
+>>>> +++ b/drivers/usb/gadget/udc/fsl_udc_core.c
+>>>> @@ -197,10 +197,8 @@ __acquires(ep->udc->lock)
+>>>>          ep->stopped = 1;
+>>>>
+>>>>          spin_unlock(&ep->udc->lock);
+>>>> -       /* complete() is from gadget layer,
+>>>> -        * eg fsg->bulk_in_complete() */
+>>>> -       if (req->req.complete)
+>>>> -               req->req.complete(&ep->ep, &req->req);
+>>>> +
+>>>> +       usb_gadget_giveback_request(&ep->ep, &req->req);
+>>>>
+>>>>          spin_lock(&ep->udc->lock);
+>>>>          ep->stopped = stopped;
+>>>>
+>>>> If I re-introduce the check (either in fsl_udc_core.c or core.c) at
+>>>> least USB gadget operation using g_serial seems to work just fine.
+>>>>
+>>>> I don't know the logic in detail to understand whether this is a proper
+>>>> fix or if there is some other more problem with the fls_udc_core driver.
+>>>> Does anyone have input in this matter?
+>>>>
+>>>> I can produce a proper patch that fixes this problem by re-introducing
+>>>> the check (in either fsl_udc_core.c or core.c) if that is a proper
+>>>> solution and I can also assist in testing other fixes to the problem.
+>>>
+>>> ->complete() is supposed to be mandatory. Which gadget do you have that
+>>> ->doesn't set ->complete() to a valid function pointer?
+>>
+>> I'm modprobing g_serial so the following modules are loaded (using my patch):
+>>
+>> ~ # lsmod
+>> usb_f_acm
+>> u_serial
+>> g_serial
+>> libcomposite
+>> configfs
+>> fsl_usb2_udc
+>
+> okay, can you figure out which request is coming without ->complete()
+> set? To which endpoint is this request being queued? It would be nice to
+> know these details. Maybe this is an old bug which ought to be fixed.
 
-If we have a single parent, call divider_round_rate.
+Sure, I can try figure that out. Any input to make the debug of the
+faster is appreciated if you have any.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/clk/sunxi-ng/ccu_div.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/clk/sunxi-ng/ccu_div.c b/drivers/clk/sunxi-ng/ccu_div.c
-index 8659b4cb6c20..4057e6021aa9 100644
---- a/drivers/clk/sunxi-ng/ccu_div.c
-+++ b/drivers/clk/sunxi-ng/ccu_div.c
-@@ -77,6 +77,18 @@ static int ccu_div_determine_rate(struct clk_hw *hw,
- {
- 	struct ccu_div *cd = hw_to_ccu_div(hw);
- 
-+	if (clk_hw_get_num_parents(hw) == 1) {
-+		req->rate = divider_round_rate(hw, req->rate,
-+					       &req->best_parent_rate,
-+					       cd->div.table,
-+					       cd->div.width,
-+					       cd->div.flags);
-+
-+		req->best_parent_hw = clk_hw_get_parent(hw);
-+
-+		return 0;
-+	}
-+
- 	return ccu_mux_helper_determine_rate(&cd->common, &cd->mux,
- 					     req, ccu_div_round_rate, cd);
- }
-
-base-commit: 9181f40cede22bff9bc7f26830a4562373f30d73
--- 
-git-series 0.8.11
+Regards, Magnus
