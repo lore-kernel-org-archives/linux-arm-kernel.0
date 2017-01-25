@@ -1,170 +1,143 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 25 Jan 2017 18:17:27 +0100
-Subject: [PATCH V7 01/11] iommu/of: Refactor of_iommu_configure() for
- error handling
-In-Reply-To: <1485188293-20263-2-git-send-email-sricharan@codeaurora.org>
-References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
- <1485188293-20263-2-git-send-email-sricharan@codeaurora.org>
-Message-ID: <4388779a-0e83-fadc-83f4-98c46c88d42e@semihalf.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 25 Jan 2017 17:25:06 +0000
+Subject: [PATCH v20 08/17] clocksource/drivers/arm_arch_timer: Rework
+ counter frequency detection.
+In-Reply-To: <CADyBb7sU6DVMk6px0963r8by--U-3k_XjESd88zZMkj7xbywgA@mail.gmail.com>
+References: <20170118132541.8989-1-fu.wei@linaro.org>
+ <20170118132541.8989-9-fu.wei@linaro.org>
+ <20170124172400.GG7572@leverpostej>
+ <CADyBb7sU6DVMk6px0963r8by--U-3k_XjESd88zZMkj7xbywgA@mail.gmail.com>
+Message-ID: <20170125172505.GB29027@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sricharan,
+On Wed, Jan 25, 2017 at 02:46:12PM +0800, Fu Wei wrote:
+> Hi Mark,
 
-On 23.01.2017 17:18, Sricharan R wrote:
-> From: Robin Murphy <robin.murphy@arm.com>
->
-> In preparation for some upcoming cleverness, rework the control flow in
-> of_iommu_configure() to minimise duplication and improve the propogation
-> of errors. It's also as good a time as any to switch over from the
-> now-just-a-compatibility-wrapper of_iommu_get_ops() to using the generic
-> IOMMU instance interface directly.
->
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
->  drivers/iommu/of_iommu.c | 83 +++++++++++++++++++++++++++++++-----------------
->  1 file changed, 53 insertions(+), 30 deletions(-)
->
-> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-> index 0f57ddc..ee49081 100644
-> --- a/drivers/iommu/of_iommu.c
-> +++ b/drivers/iommu/of_iommu.c
-> @@ -96,6 +96,28 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
->  }
->  EXPORT_SYMBOL_GPL(of_get_dma_window);
->
-> +static const struct iommu_ops
-> +*of_iommu_xlate(struct device *dev, struct of_phandle_args *iommu_spec)
-> +{
-> +	const struct iommu_ops *ops;
-> +	struct fwnode_handle *fwnode = &iommu_spec->np->fwnode;
-> +	int err;
-> +
-> +	ops = iommu_get_instance(fwnode);
-> +	if (!ops || !ops->of_xlate)
-> +		return NULL;
-> +
-> +	err = iommu_fwspec_init(dev, &iommu_spec->np->fwnode, ops);
-> +	if (err)
-> +		return ERR_PTR(err);
-> +
-> +	err = ops->of_xlate(dev, iommu_spec);
-> +	if (err)
-> +		return ERR_PTR(err);
-> +
-> +	return ops;
-> +}
-> +
->  static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
->  {
->  	struct of_phandle_args *iommu_spec = data;
-> @@ -105,10 +127,11 @@ static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
->  }
->
->  static const struct iommu_ops
-> -*of_pci_iommu_configure(struct pci_dev *pdev, struct device_node *bridge_np)
-> +*of_pci_iommu_init(struct pci_dev *pdev, struct device_node *bridge_np)
->  {
->  	const struct iommu_ops *ops;
->  	struct of_phandle_args iommu_spec;
-> +	int err;
->
->  	/*
->  	 * Start by tracing the RID alias down the PCI topology as
-> @@ -123,56 +146,56 @@ static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
->  	 * bus into the system beyond, and which IOMMU it ends up at.
->  	 */
->  	iommu_spec.np = NULL;
-> -	if (of_pci_map_rid(bridge_np, iommu_spec.args[0], "iommu-map",
-> -			   "iommu-map-mask", &iommu_spec.np, iommu_spec.args))
-> -		return NULL;
-> +	err = of_pci_map_rid(bridge_np, iommu_spec.args[0], "iommu-map",
-> +			     "iommu-map-mask", &iommu_spec.np,
-> +			     iommu_spec.args);
-> +	if (err)
-> +		return ERR_PTR(err);
->
-> -	ops = of_iommu_get_ops(iommu_spec.np);
-> -	if (!ops || !ops->of_xlate ||
-> -	    iommu_fwspec_init(&pdev->dev, &iommu_spec.np->fwnode, ops) ||
-> -	    ops->of_xlate(&pdev->dev, &iommu_spec))
-> -		ops = NULL;
-> +	ops = of_iommu_xlate(&pdev->dev, &iommu_spec);
->
->  	of_node_put(iommu_spec.np);
->  	return ops;
->  }
->
-> -const struct iommu_ops *of_iommu_configure(struct device *dev,
-> -					   struct device_node *master_np)
-> +static const struct iommu_ops
-> +*of_platform_iommu_init(struct device *dev, struct device_node *np)
->  {
->  	struct of_phandle_args iommu_spec;
-> -	struct device_node *np;
->  	const struct iommu_ops *ops = NULL;
->  	int idx = 0;
->
-> -	if (dev_is_pci(dev))
-> -		return of_pci_iommu_configure(to_pci_dev(dev), master_np);
-> -
->  	/*
->  	 * We don't currently walk up the tree looking for a parent IOMMU.
->  	 * See the `Notes:' section of
->  	 * Documentation/devicetree/bindings/iommu/iommu.txt
->  	 */
-> -	while (!of_parse_phandle_with_args(master_np, "iommus",
-> -					   "#iommu-cells", idx,
-> -					   &iommu_spec)) {
-> -		np = iommu_spec.np;
-> -		ops = of_iommu_get_ops(np);
-> -
-> -		if (!ops || !ops->of_xlate ||
-> -		    iommu_fwspec_init(dev, &np->fwnode, ops) ||
-> -		    ops->of_xlate(dev, &iommu_spec))
-> -			goto err_put_node;
-> -
-> -		of_node_put(np);
-> +	while (!of_parse_phandle_with_args(np, "iommus", "#iommu-cells",
-> +					   idx, &iommu_spec)) {
-> +		ops = of_iommu_xlate(dev, &iommu_spec);
-> +		of_node_put(iommu_spec.np);
->  		idx++;
-> +		if (IS_ERR_OR_NULL(ops))
-> +			break;
->  	}
->
->  	return ops;
-> +}
-> +
-> +const struct iommu_ops *of_iommu_configure(struct device *dev,
-> +					   struct device_node *master_np)
-> +{
-> +	const struct iommu_ops *ops;
-> +
-> +	if (!master_np)
-> +		return NULL;
-> +
-> +	if (dev_is_pci(dev))
-> +		ops = of_pci_iommu_init(to_pci_dev(dev), master_np);
+Hi,
 
-I gave the whole patch set a try on ThunderX. really_probe() is failing 
-on dma_configure()->of_pci_iommu_init() for each PCI device. 
-of_pci_iommu_init() tries to setup firmware stuff via "iommu-map" but 
-ThunderX is using legacy "mmu-masters" binding. We need to take care of 
-that case too.
+> On 25 January 2017 at 01:24, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Wed, Jan 18, 2017 at 09:25:32PM +0800, fu.wei at linaro.org wrote:
+> >> From: Fu Wei <fu.wei@linaro.org>
+> >>
+> >> The counter frequency detection call(arch_timer_detect_rate) combines two
+> >> ways to get counter frequency: system coprocessor register and MMIO timer.
+> >> But in a specific timer init code, we only need one way to try:
+> >> getting frequency from MMIO timer register will be needed only when we
+> >> init MMIO timer; getting frequency from system coprocessor register will
+> >> be needed only when we init arch timer.
+> >
+> > When I mentioned this splitting before, I had mean that we'd completely
+> > separate the two, with separate mmio_rate and sysreg_rate variables.
+> 
+> sorry for misunderstanding.
+> 
+> Are you saying :
+> 
+> diff --git a/drivers/clocksource/arm_arch_timer.c
+> b/drivers/clocksource/arm_arch_timer.c
+> index 663a57a..eec92f6 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -65,7 +65,8 @@ struct arch_timer {
+> 
+>  #define to_arch_timer(e) container_of(e, struct arch_timer, evt)
+> 
+> -static u32 arch_timer_rate;
+> +static u32 arch_timer_sysreg_rate ;
+> +static u32 arch_timer_mmio_rate;
+>  static int arch_timer_ppi[ARCH_TIMER_MAX_TIMER_PPI];
+> 
+>  static struct clock_event_device __percpu *arch_timer_evt;
+> 
+> 
+> But what have I learned From ARMv8 ARM is
+> AArch64 System register CNTFRQ_EL0 is provided so that software can
+> discover the frequency of the system counter.
+> CNTFRQ(in CNTCTLBase and CNTBaseN) is provided so that software can
+> discover the frequency of the system counter.
+> The bit assignments of the registers are identical in the System
+> register interface and in the memory-mapped system level interface.
 
-> +	else
-> +		ops = of_platform_iommu_init(dev, master_np);
->
-> -err_put_node:
-> -	of_node_put(np);
-> -	return NULL;
-> +	return IS_ERR(ops) ? NULL : ops;
->  }
->
->  static int __init of_iommu_init(void)
->
+This means that the bits in the registers have the same meaning.
+
+However, they are separate registers, and must be written separately. A
+write to one does not propagate to the other, and they are not
+guaranteed to contain the same value.
+
+> So I think they both contain the same value : the frequency of the
+> system counter, just in different view, and can be accessed in
+> different ways.
+
+Certainly, in theory, these *should* contain the same value.
+
+Unfortunately, in practice, on several systems, they do not. It is very
+easy to forget to initialise one of these registers correctly, and it's
+possible for some software to work (masking the issue), while other
+software will fail very quickly. I very much suspect we will see the
+same class of issue on ACPI systems.
+
+Consider a system where the sysreg CNTFRQ was correct, but the MMIO
+CNTFRQ contains an erroneous non-zero value.
+
+If we get the frequency out of CNTFRQ_EL0 first, and assign this to
+arch_timer_rate, we won't bother to look at the MMIO registers (which
+could contain erroneous values). If we read an erroneous CNTBaseN.CNTFRQ
+value first, and assign this to arch_timer_rate, we won't look at
+CNTFRQ_EL0.
+
+This is *very* fragile w.r.t. probe order. I don't like the fragility of
+setting a common arch_timer_rate depending on which gets probed first,
+as this masks a bug, which will adversely affect us later.
+
+This is already a problem for DT systems, and I do not want this problem
+to spread to ACPI systems.
+
+For ACPI, the approach I'd personally like to take is to keep the two
+rates separate. Probe the sysreg timer first and subsequently probe the
+MMIO timers. If the MMIO CNTFRQ (of all frames) does not match the
+sysreg CNTFRQ, we log a warning and give up probing the MMIO timers.
+
+For legacy reasons, DT is going to be more complicated, but I believe we
+can apply that approach to ACPI.
+ 
+> So do we really need to separate mmio_rate and sysreg_rate variables?
+> 
+> And for CNTFRQ(in CNTCTLBase and CNTBaseN) , we can NOT access it in
+> Linux kernel (EL1),
+> Because ARMv8 ARM says:
+> In a system that implements both Secure and Non-secure states, this
+> register is only accessible by Secure accesses.
+
+CNTCTLBase.CNTFRQ can only be accessed in secure states. That is clear
+from Table I1-3 in ARM DDI 0487A.k_iss10775). I agree that we cannot
+access this.
+
+For CNT{,EL0}BaseN.CNTFRQ, I am very concerned by the wording in the
+current ARMv8 ARM ARM. This does not match my understanding, nor does it
+match the description in the ARMv7 ARM. I believe this may be a
+documentation error, and I'm chasing that up internally.
+
+Either the currently logic in the driver which attempts to read
+CNT{,EL0}BaseN.CNTFRQ is flawed, or the description in the ARM ARM is
+erroneous.
+
+> That means we still need to get the frequency of the system counter
+> from CNTFRQ_EL0 in MMIO timer code.
+> This have been proved when I tested this driver on foundation model, I
+> got "0" when I access CNTFRQ from Linux kernel (Non-secure EL1)
+
+As mentioned in I3.5.7, the CNTBase{,EL0}N.CNTFRQ values are UNKNOWN out
+of reset, and require configuration by FW.
+
+> So I guess the logic of the original code is
+>  static u32 arch_timer_rate keeps the frequency of the system counter,
+>  no matter where the value comes from.
+> Because  they should be the same value. if we have got the frequency
+> of the system counter(arch_timer_rate != 0), then we don't need to get
+> it again, even in anther way.
+
+Unfortunately, in practice this is not the case. :(
 
 Thanks,
-Tomasz
+Mark.
