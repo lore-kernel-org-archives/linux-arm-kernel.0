@@ -1,59 +1,200 @@
-From: jpannell@marvell.com (Jon Pannell)
-Date: Wed, 25 Jan 2017 18:58:25 +0000
-Subject: [PATCH net-next v6 2/4] net: dsa: mv88e6xxx: Add support for
- ethernet switch 88E6341
-In-Reply-To: <8760l3375t.fsf@free-electrons.com>
-References: <cover.b0e18efe751186768e720c341693117fdd4d3c16.1485288602.git-series.gregory.clement@free-electrons.com>
- <bb6e3987ee942277e99c78d1f28112d8b4ecb744.1485288602.git-series.gregory.clement@free-electrons.com>
- <20170125020249.GB24034@lunn.ch> <8760l3375t.fsf@free-electrons.com>
-Message-ID: <39e62380a498403d94961d066a8bba6b@SC-EXCH01.marvell.com>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Wed, 25 Jan 2017 11:10:41 -0800
+Subject: [PATCH v3 22/24] media: imx: Add MIPI CSI-2 OV5640 sensor subdev
+ driver
+In-Reply-To: <738ab8c3-83ed-cba9-77f4-6c91006d0a18@xs4all.nl>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <1483755102-24785-23-git-send-email-steve_longerbeam@mentor.com>
+ <738ab8c3-83ed-cba9-77f4-6c91006d0a18@xs4all.nl>
+Message-ID: <62785fbc-74d9-1924-ba85-ce3f06b5b047@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding Bob Bernstein
-
-Jon Pannell
 
 
------Original Message-----
-From: Gregory CLEMENT [mailto:gregory.clement at free-electrons.com] 
-Sent: Tuesday, January 24, 2017 11:56 PM
-To: Andrew Lunn <andrew@lunn.ch>
-Cc: Vivien Didelot <vivien.didelot@savoirfairelinux.com>; Florian Fainelli <f.fainelli@gmail.com>; netdev at vger.kernel.org; linux-kernel at vger.kernel.org; David S. Miller <davem@davemloft.net>; Jason Cooper <jason@lakedaemon.net>; Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>; Thomas Petazzoni <thomas.petazzoni@free-electrons.com>; linux-arm-kernel at lists.infradead.org; Nadav Haklai <nadavh@marvell.com>; Wilson Ding <dingwei@marvell.com>; Kostya Porotchkin <kostap@marvell.com>; Joe Zhou <shjzhou@marvell.com>; Jon Pannell <jpannell@marvell.com>
-Subject: Re: [PATCH net-next v6 2/4] net: dsa: mv88e6xxx: Add support for ethernet switch 88E6341
+On 01/20/2017 06:48 AM, Hans Verkuil wrote:
+> On 01/07/2017 03:11 AM, Steve Longerbeam wrote:
+>> +
+>> +	/* cached control settings */
+>> +	int ctrl_cache[OV5640_MAX_CONTROLS];
+> This is just duplicating the cached value in the control framework. I think this can be dropped.
 
-Hi Andrew,
- 
- On mer., janv. 25 2017, Andrew Lunn <andrew@lunn.ch> wrote:
-
->> +	[MV88E6341] = {
->> +		.prod_num = PORT_SWITCH_ID_PROD_NUM_6341,
->> +		.family = MV88E6XXX_FAMILY_6341,
->> +		.name = "Marvell 88E6341",
->> +		.num_databases = 4096,
->> +		.num_ports = 6,
->> +		.port_base_addr = 0x10,
->> +		.global1_addr = 0x1b,
->> +		.age_time_coeff = 15000,
->
-> Hi Gregory
->
-> Please could you check this timer in the datasheet. There is currently 
-> a bug in the mv88e6390 support code. I also set it to 15s. But in fact 
-> it is 3.75 seconds. The 6341 might also use 3.75 seconds.
-
-When I read your series I also thought about it and indeed it is 3.75 seconds. I will fix it.
-
-Thanks,
-
-Gregory
-
+done, see below.
 
 >
->    Thanks
-> 	Andrew
+>> +
+>> +static struct ov5640_control ov5640_ctrls[] = {
+>> +	{
+>> +		.set = ov5640_set_agc,
+>> +		.ctrl = {
+>> +			.id = V4L2_CID_AUTOGAIN,
+>> +			.name = "Auto Gain/Exposure Control",
+>> +			.minimum = 0,
+>> +			.maximum = 1,
+>> +			.step = 1,
+>> +			.default_value = 1,
+>> +			.type = V4L2_CTRL_TYPE_BOOLEAN,
+>> +		},
+>> +	}, {
+>> +		.set = ov5640_set_exposure,
+>> +		.ctrl = {
+>> +			.id = V4L2_CID_EXPOSURE,
+>> +			.name = "Exposure",
+>> +			.minimum = 0,
+>> +			.maximum = 65535,
+>> +			.step = 1,
+>> +			.default_value = 0,
+>> +			.type = V4L2_CTRL_TYPE_INTEGER,
+>> +		},
+>> +	}, {
+>> +		.set = ov5640_set_gain,
+>> +		.ctrl = {
+>> +			.id = V4L2_CID_GAIN,
+>> +			.name = "Gain",
+>> +			.minimum = 0,
+>> +			.maximum = 1023,
+>> +			.step = 1,
+>> +			.default_value = 0,
+>> +			.type = V4L2_CTRL_TYPE_INTEGER,
+>> +		},
+>> +	}, {
+>> +		.set = ov5640_set_hue,
+>> +		.ctrl = {
+>> +			.id = V4L2_CID_HUE,
+>> +			.name = "Hue",
+>> +			.minimum = 0,
+>> +			.maximum = 359,
+>> +			.step = 1,
+>> +			.default_value = 0,
+>> +			.type = V4L2_CTRL_TYPE_INTEGER,
+>> +		},
+>> +	}, {
+>> +		.set = ov5640_set_contrast,
+>> +		.ctrl = {
+>> +			.id = V4L2_CID_CONTRAST,
+>> +			.name = "Contrast",
+>> +			.minimum = 0,
+>> +			.maximum = 255,
+>> +			.step = 1,
+>> +			.default_value = 0,
+>> +			.type = V4L2_CTRL_TYPE_INTEGER,
+>> +		},
+>> +	}, {
+>> +		.set = ov5640_set_saturation,
+>> +		.ctrl = {
+>> +			.id = V4L2_CID_SATURATION,
+>> +			.name = "Saturation",
+>> +			.minimum = 0,
+>> +			.maximum = 255,
+>> +			.step = 1,
+>> +			.default_value = 64,
+>> +			.type = V4L2_CTRL_TYPE_INTEGER,
+>> +		},
+>> +	}, {
+>> +		.set = ov5640_set_awb,
+>> +		.ctrl = {
+>> +			.id = V4L2_CID_AUTO_WHITE_BALANCE,
+>> +			.name = "Auto White Balance",
+>> +			.minimum = 0,
+>> +			.maximum = 1,
+>> +			.step = 1,
+>> +			.default_value = 1,
+>> +			.type = V4L2_CTRL_TYPE_BOOLEAN,
+>> +		},
+>> +	}, {
+>> +		.set = ov5640_set_red_balance,
+>> +		.ctrl = {
+>> +			.id = V4L2_CID_RED_BALANCE,
+>> +			.name = "Red Balance",
+>> +			.minimum = 0,
+>> +			.maximum = 4095,
+>> +			.step = 1,
+>> +			.default_value = 0,
+>> +			.type = V4L2_CTRL_TYPE_INTEGER,
+>> +		},
+>> +	}, {
+>> +		.set = ov5640_set_blue_balance,
+>> +		.ctrl = {
+>> +			.id = V4L2_CID_BLUE_BALANCE,
+>> +			.name = "Blue Balance",
+>> +			.minimum = 0,
+>> +			.maximum = 4095,
+>> +			.step = 1,
+>> +			.default_value = 0,
+>> +			.type = V4L2_CTRL_TYPE_INTEGER,
+>> +		},
+>> +	},
+>> +};
+>> +#define OV5640_NUM_CONTROLS ARRAY_SIZE(ov5640_ctrls)
+> This should use v4l2_ctrl_new_std() instead of this array.
+> Just put a switch on ctrl->id in s_ctrl, and each case calls the corresponding
+> set function.
 
---
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux development, consulting, training and support.
-http://free-electrons.com
+In this case, because there are lots of controls, my preference is to use
+table lookup rather than a large switch statement. However I did remove
+.name and .type from the table entries, leaving only .def, .min, .max, .step
+as required to pass to v4l2_ctrl_new_std(). Also converted to 'struct 
+v4l2_ctrl_config'
+in the table.
+
+
+>
+>> +
+>> +static int ov5640_restore_ctrls(struct ov5640_dev *sensor)
+>> +{
+>> +	struct ov5640_control *c;
+>> +	int i;
+>> +
+>> +	for (i = 0; i < OV5640_NUM_CONTROLS; i++) {
+>> +		c = &ov5640_ctrls[i];
+>> +		c->set(sensor, sensor->ctrl_cache[i]);
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+> This does the same as v4l2_ctrl_handler_setup() if I understand the code correctly.
+
+yes thanks. I remember looking at this and thinking 
+v4l2_ctrl_handler_setup()
+was setting up the default values rather than the current values, but 
+after a
+re-read it does look to be restoring the current values, which is 
+exactly what
+is needed here.
+
+>> +
+>> +static int ov5640_init_controls(struct ov5640_dev *sensor)
+>> +{
+>> +	struct ov5640_control *c;
+>> +	int i;
+>> +
+>> +	v4l2_ctrl_handler_init(&sensor->ctrl_hdl, OV5640_NUM_CONTROLS);
+>> +
+>> +	for (i = 0; i < OV5640_NUM_CONTROLS; i++) {
+>> +		c = &ov5640_ctrls[i];
+>> +
+>> +		v4l2_ctrl_new_std(&sensor->ctrl_hdl, &ov5640_ctrl_ops,
+>> +				  c->ctrl.id, c->ctrl.minimum, c->ctrl.maximum,
+>> +				  c->ctrl.step, c->ctrl.default_value);
+>> +	}
+> As mentioned, just drop the ov5640_ctrls array and call v4l2_ctr_new_std for each
+> control you're adding.
+
+if really pressed I can be persuaded to use a switch statement and call
+v4l2_ctrl_new_std() multiple times, but I don't any problem with using
+a table.
+
+>> +
+>> +module_i2c_driver(ov5640_i2c_driver);
+>> +
+>> +MODULE_AUTHOR("Freescale Semiconductor, Inc.");
+>> +MODULE_AUTHOR("Steve Longerbeam <steve_longerbeam@mentor.com>");
+>> +MODULE_DESCRIPTION("OV5640 MIPI Camera Subdev Driver");
+>> +MODULE_LICENSE("GPL");
+>> +MODULE_VERSION("1.0");
+>>
+> Same comments apply to the next patch, so I won't repeat them.
+
+done, I've made the same mods to the ov5642 subdev.
+
+Steve
