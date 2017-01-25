@@ -1,72 +1,64 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 25 Jan 2017 10:15:02 +0100
-Subject: [PATCH v2 3/4] clk: renesas: cpg-mssr: Rename cpg_mssr_priv.mstp_lock
-In-Reply-To: <1485335703-27184-1-git-send-email-geert+renesas@glider.be>
-References: <1485335703-27184-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1485335703-27184-4-git-send-email-geert+renesas@glider.be>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Wed, 25 Jan 2017 10:47:45 +0100
+Subject: [PATCH v14 3/5] tee: add OP-TEE driver
+In-Reply-To: <20170124125330.GA30998@jax>
+References: <1484744296-30003-1-git-send-email-jens.wiklander@linaro.org>
+ <8183743.bSJXZpMh95@wuerfel> <20170123090852.GB1910@jax>
+ <5564439.UZohRc66aK@wuerfel> <20170124125330.GA30998@jax>
+Message-ID: <20170125094744.GA7121@jax>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The spinlock is used to protect Read-Modify-Write register accesses,
-which won't be limited to SMSTPCR register accesses.
+On Tue, Jan 24, 2017 at 01:53:30PM +0100, Jens Wiklander wrote:
+> On Mon, Jan 23, 2017 at 05:16:15PM +0100, Arnd Bergmann wrote:
+> > On Monday, January 23, 2017 10:08:53 AM CET Jens Wiklander wrote:
+> > > On Fri, Jan 20, 2017 at 05:57:51PM +0100, Arnd Bergmann wrote:
+> > > > On Thursday, January 19, 2017 3:56:23 PM CET Jens Wiklander wrote:
+> > > > > On Wed, Jan 18, 2017 at 05:28:17PM +0100, Arnd Bergmann wrote:
+> > 
+> > > > > Does the platform devices really need cleaning? I mean
+> > > > > of_platform_default_populate_init() creates a bunch of platform devices
+> > > > > which are just left there even if unused. Here we're doing the same
+> > > > > thing except that we're doing it for a specific node in the DT.
+> > > > 
+> > > > I think it will work if you don't clean them up, but it feels wrong
+> > > > to have a loadable module that creates devices when loaded but doesn't
+> > > > remove them when unloaded.
+> > > > 
+> > > > This could be done differently by having the device creation done in
+> > > > one driver and the the user of that device in another driver, but I
+> > > > think just killing off the device achieves the same in a simpler way.
+> > > 
+> > > I see your point. My final concern here is that with device we got
+> > > entries in sysfs and uevents that could be used to automatically start
+> > > the correct supplicant. Different drivers are likely to require
+> > > different supplicants. Starting the correct supplicant based on uevents
+> > > is a quite elegant solution which I'm not sure how to support when
+> > > skipping devices. Perhaps I could create an object below
+> > > <sysfs>/firmware/tee ?
+> > 
+> > Putting the objects somewhere other than /sys/devices sounds good, yes.
+> > This would also help with TEE implementations that might get probed
+> > differently.
+> > 
+> > I think the natural place would be /sys/class/tee/, as we normally
+> > require something in /sys/class anyway to support the character
+> > device.
+> > 
+> > /sys/firmware/tee/ sounds less fitting, as there other TEE implementations
+> > are not necessarily firmware based, as you point out. 
+> > /sys/firmware/op-tee certainly makes sense for anything that is specific
+> > to OP-TEE in particular, while /sys/class/tee would be for anything
+> > that uses the ioctl interface. This part is particularly important to
+> > get right from the start, just like the ioctls themselves we can't make
+> > incompatible changes here later once there are users relying on the
+> > upstream kernel interfaces.
+> 
+> /sys/class/tee/ sounds good, I'll use that. It's more or less what we
+> also have today.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
----
-v2:
-  - Add Acked-by.
----
- drivers/clk/renesas/renesas-cpg-mssr.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+I'm sorry, it seems a struct device has to be used in order to put stuff
+under /sys/class/tee/. Or am I missing something?
 
-diff --git a/drivers/clk/renesas/renesas-cpg-mssr.c b/drivers/clk/renesas/renesas-cpg-mssr.c
-index eb8534e5ebf3007d..f1161a585c57e433 100644
---- a/drivers/clk/renesas/renesas-cpg-mssr.c
-+++ b/drivers/clk/renesas/renesas-cpg-mssr.c
-@@ -98,7 +98,7 @@
-  *
-  * @dev: CPG/MSSR device
-  * @base: CPG/MSSR register block base address
-- * @mstp_lock: protects writes to SMSTPCR
-+ * @rmw_lock: protects RMW register accesses
-  * @clks: Array containing all Core and Module Clocks
-  * @num_core_clks: Number of Core Clocks in clks[]
-  * @num_mod_clks: Number of Module Clocks in clks[]
-@@ -107,7 +107,7 @@
- struct cpg_mssr_priv {
- 	struct device *dev;
- 	void __iomem *base;
--	spinlock_t mstp_lock;
-+	spinlock_t rmw_lock;
- 
- 	struct clk **clks;
- 	unsigned int num_core_clks;
-@@ -144,7 +144,7 @@ static int cpg_mstp_clock_endisable(struct clk_hw *hw, bool enable)
- 
- 	dev_dbg(dev, "MSTP %u%02u/%pC %s\n", reg, bit, hw->clk,
- 		enable ? "ON" : "OFF");
--	spin_lock_irqsave(&priv->mstp_lock, flags);
-+	spin_lock_irqsave(&priv->rmw_lock, flags);
- 
- 	value = readl(priv->base + SMSTPCR(reg));
- 	if (enable)
-@@ -153,7 +153,7 @@ static int cpg_mstp_clock_endisable(struct clk_hw *hw, bool enable)
- 		value |= bitmask;
- 	writel(value, priv->base + SMSTPCR(reg));
- 
--	spin_unlock_irqrestore(&priv->mstp_lock, flags);
-+	spin_unlock_irqrestore(&priv->rmw_lock, flags);
- 
- 	if (!enable)
- 		return 0;
-@@ -550,7 +550,7 @@ static int __init cpg_mssr_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	priv->dev = dev;
--	spin_lock_init(&priv->mstp_lock);
-+	spin_lock_init(&priv->rmw_lock);
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	priv->base = devm_ioremap_resource(dev, res);
--- 
-1.9.1
+Thanks,
+Jens
