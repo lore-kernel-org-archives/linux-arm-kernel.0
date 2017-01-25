@@ -1,46 +1,58 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 24 Jan 2017 18:43:21 -0800
-Subject: [PATCH v5 3/3] watchdog: zx2967: add watchdog controller driver
- for ZTE's zx2967 family
-In-Reply-To: <CA+DQWky4---=gRipAR=NqajvwYV2QQQWbztTpPJS5oaL4D6QaQ@mail.gmail.com>
-References: <1485248322-24299-1-git-send-email-baoyou.xie@linaro.org>
- <1485248322-24299-3-git-send-email-baoyou.xie@linaro.org>
- <35dcd00f-a4bd-a313-0d6f-932a3f5888f0@roeck-us.net>
- <CA+DQWky4---=gRipAR=NqajvwYV2QQQWbztTpPJS5oaL4D6QaQ@mail.gmail.com>
-Message-ID: <74bfcbb3-a9ce-8228-77d3-db4defa79df5@roeck-us.net>
+From: baoyou.xie@linaro.org (Baoyou Xie)
+Date: Wed, 25 Jan 2017 10:44:47 +0800
+Subject: [PATCH v6 1/3] dt: bindings: add documentation for zx2967 family
+ watchdog controller
+Message-ID: <1485312289-18354-1-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/24/2017 06:16 PM, Baoyou Xie wrote:
->
-[ ... ]
->         +
->         +       ret = of_parse_phandle_with_fixed_args(dev->of_node,
->         +                       "zte,wdt-reset-sysctrl", 3, 0, &out_args);
->         +       if (ret)
->         +               return;
->         +
->         +       offset = out_args.args[0];
->         +       config = out_args.args[1];
->         +       mask = out_args.args[2];
->         +
->         +       regmap = syscon_node_to_regmap(out_args.np <http://out_args.np>);
->         +       if (IS_ERR(regmap))
->         +               return;
->         +
->         +       regmap_update_bits(regmap, offset, mask, config);
->
->
->     Another comment suggested adding
->             of_node_put(out_args.np <http://out_args.np>);
->     here.
->
->
-> is it really? most of the driver that call this function don't call of_node_put. but it seems harmless to call of_node_put.
->
->
-Even if everyone else is doing things wrong, that doesn't mean
-that you should do the same, nor is it a good idea to use it
-as argument.
+This patch adds dt-binding documentation for zx2967 family
+watchdog controller.
 
-Guenter
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ .../bindings/watchdog/zte,zx2967-wdt.txt           | 32 ++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/zte,zx2967-wdt.txt
+
+diff --git a/Documentation/devicetree/bindings/watchdog/zte,zx2967-wdt.txt b/Documentation/devicetree/bindings/watchdog/zte,zx2967-wdt.txt
+new file mode 100644
+index 0000000..06ce677
+--- /dev/null
++++ b/Documentation/devicetree/bindings/watchdog/zte,zx2967-wdt.txt
+@@ -0,0 +1,32 @@
++ZTE zx2967 Watchdog timer
++
++Required properties:
++
++- compatible : should be one of the following.
++       * zte,zx296718-wdt
++- reg : Specifies base physical address and size of the registers.
++- clocks : Pairs of phandle and specifier referencing the controller's clocks.
++- resets : Reference to the reset controller controlling the watchdog
++           controller.
++
++Optional properties:
++
++- timeout-sec : Contains the watchdog timeout in seconds.
++- zte,wdt-reset-sysctrl : Directs how to reset system by the watchdog.
++	if we don't want to restart system when watchdog been triggered,
++	it's not required, vice versa.
++	It should include following fields.
++	  * phandle of aon-sysctrl.
++	  * offset of register that be written, should be 0xb0.
++	  * configure value that be written to aon-sysctrl.
++	  * bit mask, corresponding bits will be affected.
++
++Example:
++
++wdt: watchdog at 1465000 {
++	compatible = "zte,zx296718-wdt";
++	reg = <0x1465000 0x1000>;
++	clocks = <&topcrm WDT_WCLK>;
++	resets = <&toprst 35>;
++	zte,wdt-reset-sysctrl = <&aon_sysctrl 0xb0 1 0x115>;
++};
+-- 
+2.7.4
