@@ -1,232 +1,125 @@
 From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 25 Jan 2017 10:52:30 -0500
-Subject: [PATCH v4 2/4] arm64: Work around Falkor erratum 1003
+Date: Wed, 25 Jan 2017 10:52:32 -0500
+Subject: [PATCH v4 4/4] arm64: Work around Falkor erratum 1009
 In-Reply-To: <20170125155232.10277-1-cov@codeaurora.org>
 References: <20170125155232.10277-1-cov@codeaurora.org>
-Message-ID: <20170125155232.10277-2-cov@codeaurora.org>
+Message-ID: <20170125155232.10277-4-cov@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Qualcomm Datacenter Technologies Falkor v1 CPU may allocate TLB entries
-using an incorrect ASID when TTBRx_EL1 is being updated. When the erratum
-is triggered, page table entries using the new translation table base
-address (BADDR) will be allocated into the TLB using the old ASID. All
-circumstances leading to the incorrect ASID being cached in the TLB arise
-when software writes TTBRx_EL1[ASID] and TTBRx_EL1[BADDR], a memory
-operation is in the process of performing a translation using the specific
-TTBRx_EL1 being written, and the memory operation uses a translation table
-descriptor designated as non-global. EL2 and EL3 code changing the EL1&0
-ASID is not subject to this erratum because hardware is prohibited from
-performing translations from an out-of-context translation regime.
-
-Consider the following pseudo code.
-
-  write new BADDR and ASID values to TTBRx_EL1
-
-Replacing the above sequence with the one below will ensure that no TLB
-entries with an incorrect ASID are used by software.
-
-  write reserved value to TTBRx_EL1[ASID]
-  ISB
-  write new value to TTBRx_EL1[BADDR]
-  ISB
-  write new value to TTBRx_EL1[ASID]
-  ISB
-
-When the above sequence is used, page table entries using the new BADDR
-value may still be incorrectly allocated into the TLB using the reserved
-ASID. Yet this will not reduce functionality, since TLB entries incorrectly
-tagged with the reserved ASID will never be hit by a later instruction.
+During a TLB invalidate sequence targeting the inner shareable domain,
+Falkor may prematurely complete the DSB before all loads and stores using
+the old translation are observed. Instruction fetches are not subject to
+the conditions of this erratum. If the original code sequence includes
+multiple TLB invalidate instructions followed by a single DSB, onle one of
+the TLB instructions needs to be repeated to work around this erratum.
+While the erratum only applies to cases in which the TLBI specifies the
+inner-shareable domain (*IS form of TLBI) and the DSB is ISH form or
+stronger (OSH, SYS), this changes applies the workaround overabundantly--
+to local TLBI, DSB NSH sequences as well--for simplicity.
 
 Based on work by Shanker Donthineni <shankerd@codeaurora.org>
 
 Signed-off-by: Christopher Covington <cov@codeaurora.org>
 ---
  Documentation/arm64/silicon-errata.txt |  1 +
- arch/arm64/Kconfig                     | 11 +++++++++++
- arch/arm64/include/asm/assembler.h     | 23 +++++++++++++++++++++++
+ arch/arm64/Kconfig                     | 10 ++++++++++
  arch/arm64/include/asm/cpucaps.h       |  3 ++-
- arch/arm64/include/asm/mmu_context.h   |  8 +++++++-
+ arch/arm64/include/asm/tlbflush.h      | 18 +++++++++++++++---
  arch/arm64/kernel/cpu_errata.c         |  7 +++++++
- arch/arm64/mm/context.c                | 11 +++++++++++
- arch/arm64/mm/proc.S                   |  1 +
- 8 files changed, 63 insertions(+), 2 deletions(-)
+ 5 files changed, 35 insertions(+), 4 deletions(-)
 
 diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-index 405da11fc3e4..e090415a97d3 100644
+index e090415a97d3..d1ccd5f479ae 100644
 --- a/Documentation/arm64/silicon-errata.txt
 +++ b/Documentation/arm64/silicon-errata.txt
-@@ -63,3 +63,4 @@ stable kernels.
- | Cavium         | ThunderX SMMUv2 | #27704          | N/A		       |
+@@ -64,3 +64,4 @@ stable kernels.
  |                |                 |                 |                         |
  | Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585     |
-+| Qualcomm       | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003|
+ | Qualcomm       | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003|
++| Qualcomm       | Falkor v1       | E1009           | QCOM_FALKOR_ERRATUM_1009|
 diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 111742126897..366c7d4d1cc5 100644
+index 366c7d4d1cc5..69b73cbdc6b7 100644
 --- a/arch/arm64/Kconfig
 +++ b/arch/arm64/Kconfig
-@@ -479,6 +479,17 @@ config CAVIUM_ERRATUM_27456
+@@ -490,6 +490,16 @@ config QCOM_FALKOR_ERRATUM_1003
  
  	  If unsure, say Y.
  
-+config QCOM_FALKOR_ERRATUM_1003
-+	bool "Falkor E1003: Incorrect translation due to ASID change"
++config QCOM_FALKOR_ERRATUM_1009
++	bool "Falkor E1009: Prematurely complete a DSB after a TLBI"
 +	default y
 +	help
-+	  On Falkor v1, an incorrect ASID may be cached in the TLB when ASID
-+	  and BADDR are changed together in TTBRx_EL1. The workaround for this
-+	  issue is to use a reserved ASID in cpu_do_switch_mm() before
-+	  switching to the new ASID.
++	  Falkor CPU may prematurely complete a DSB following a TLBI xxIS
++	  invalidate maintenance operation. Repeat the TLBI operation one
++	  more time to fix the issue.
 +
 +	  If unsure, say Y.
 +
  endmenu
  
  
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index 3a4301163e04..1b67c3782d00 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -25,6 +25,7 @@
- 
- #include <asm/asm-offsets.h>
- #include <asm/cpufeature.h>
-+#include <asm/mmu_context.h>
- #include <asm/page.h>
- #include <asm/pgtable-hwdef.h>
- #include <asm/ptrace.h>
-@@ -441,6 +442,28 @@ alternative_endif
- 	.endm
- 
- /*
-+ * Errata workaround prior to TTBR0_EL1 update
-+ *
-+ * 	val:	TTBR value with new BADDR, preserved
-+ * 	tmp0:	temporary register, clobbered
-+ * 	tmp1:	other temporary register, clobbered
-+ */
-+	.macro	pre_ttbr0_update_workaround, val, tmp0, tmp1
-+#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1003
-+alternative_if ARM64_WORKAROUND_QCOM_FALKOR_E1003
-+	mrs	\tmp0, ttbr0_el1
-+	mov	\tmp1, #FALKOR_RESERVED_ASID
-+	bfi	\tmp0, \tmp1, #48, #16		// reserved ASID + old BADDR
-+	msr	ttbr0_el1, \tmp0
-+	isb
-+	bfi	\tmp0, \val, #0, #48		// reserved ASID + new BADDR
-+	msr	ttbr0_el1, \tmp0
-+	isb
-+alternative_else_nop_endif
-+#endif
-+	.endm
-+
-+/*
-  * Errata workaround post TTBR0_EL1 update.
-  */
- 	.macro	post_ttbr0_update_workaround
 diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index 4174f09678c4..5aaf7eede432 100644
+index 5aaf7eede432..55bcd02e4a3f 100644
 --- a/arch/arm64/include/asm/cpucaps.h
 +++ b/arch/arm64/include/asm/cpucaps.h
-@@ -35,7 +35,8 @@
- #define ARM64_HYP_OFFSET_LOW			14
+@@ -36,7 +36,8 @@
  #define ARM64_MISMATCHED_CACHE_LINE_SIZE	15
  #define ARM64_HAS_NO_FPSIMD			16
-+#define ARM64_WORKAROUND_QCOM_FALKOR_E1003	17
+ #define ARM64_WORKAROUND_QCOM_FALKOR_E1003	17
++#define ARM64_WORKAROUND_REPEAT_TLBI		18
  
--#define ARM64_NCAPS				17
-+#define ARM64_NCAPS				18
+-#define ARM64_NCAPS				18
++#define ARM64_NCAPS				19
  
  #endif /* __ASM_CPUCAPS_H */
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index 0363fe80455c..9632b0508037 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -19,6 +19,10 @@
- #ifndef __ASM_MMU_CONTEXT_H
- #define __ASM_MMU_CONTEXT_H
- 
-+#define FALKOR_RESERVED_ASID	1
+diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+index deab52374119..fc434f421c7b 100644
+--- a/arch/arm64/include/asm/tlbflush.h
++++ b/arch/arm64/include/asm/tlbflush.h
+@@ -36,9 +36,21 @@
+  * not. The macros handles invoking the asm with or without the
+  * register argument as appropriate.
+  */
+-#define __TLBI_0(op, arg)		asm ("tlbi " #op)
+-#define __TLBI_1(op, arg)		asm ("tlbi " #op ", %0" : : "r" (arg))
+-#define __TLBI_N(op, arg, n, ...)	__TLBI_##n(op, arg)
++#define __TLBI_0(op, arg) asm volatile ("tlbi " #op "\n"		       \
++			    ALTERNATIVE("nop\n		nop",		       \
++					"dsb ish\n	tlbi " #op,	       \
++					ARM64_WORKAROUND_REPEAT_TLBI,	       \
++					CONFIG_QCOM_FALKOR_ERRATUM_1009)       \
++			    : : )
 +
-+#ifndef __ASSEMBLY__
++#define __TLBI_1(op, arg) asm volatile ("tlbi " #op ", %0\n"		       \
++			    ALTERNATIVE("nop\n		nop",		       \
++					"dsb ish\n	tlbi " #op ", %0",     \
++					ARM64_WORKAROUND_REPEAT_TLBI,	       \
++					CONFIG_QCOM_FALKOR_ERRATUM_1009)       \
++			    : : "r" (arg))
 +
- #include <linux/compiler.h>
- #include <linux/sched.h>
++#define __TLBI_N(op, arg, n, ...) __TLBI_##n(op, arg)
  
-@@ -220,4 +224,6 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
+ #define __tlbi(op, ...)		__TLBI_N(op, ##__VA_ARGS__, 1, 0)
  
- void verify_cpu_asid_bits(void);
- 
--#endif
-+#endif /* !__ASSEMBLY__ */
-+
-+#endif /* !__ASM_MMU_CONTEXT_H */
 diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index b75e917aac46..787b5422c559 100644
+index 787b5422c559..e644364b5351 100644
 --- a/arch/arm64/kernel/cpu_errata.c
 +++ b/arch/arm64/kernel/cpu_errata.c
-@@ -130,6 +130,13 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 		.def_scope = SCOPE_LOCAL_CPU,
- 		.enable = cpu_enable_trap_ctr_access,
+@@ -137,6 +137,13 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 		MIDR_RANGE(MIDR_QCOM_FALKOR_V1, 0x00, 0x00),
  	},
-+#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1003
+ #endif
++#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1009
 +	{
-+		.desc = "Qualcomm Falkor erratum 1003",
-+		.capability = ARM64_WORKAROUND_QCOM_FALKOR_E1003,
++		.desc = "Qualcomm Falkor erratum 1009",
++		.capability = ARM64_WORKAROUND_REPEAT_TLBI,
 +		MIDR_RANGE(MIDR_QCOM_FALKOR_V1, 0x00, 0x00),
 +	},
 +#endif
  	{
  	}
  };
-diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
-index 4c63cb154859..67df38184903 100644
---- a/arch/arm64/mm/context.c
-+++ b/arch/arm64/mm/context.c
-@@ -79,6 +79,13 @@ void verify_cpu_asid_bits(void)
- 	}
- }
- 
-+static void set_reserved_asid_bits(void)
-+{
-+	if (IS_ENABLED(CONFIG_QCOM_FALKOR_ERRATUM_1003) &&
-+	    cpus_have_cap(ARM64_WORKAROUND_QCOM_FALKOR_E1003))
-+		__set_bit(FALKOR_RESERVED_ASID, asid_map);
-+}
-+
- static void flush_context(unsigned int cpu)
- {
- 	int i;
-@@ -87,6 +94,8 @@ static void flush_context(unsigned int cpu)
- 	/* Update the list of reserved ASIDs and the ASID bitmap. */
- 	bitmap_clear(asid_map, 0, NUM_USER_ASIDS);
- 
-+	set_reserved_asid_bits();
-+
- 	/*
- 	 * Ensure the generation bump is observed before we xchg the
- 	 * active_asids.
-@@ -244,6 +253,8 @@ static int asids_init(void)
- 		panic("Failed to allocate bitmap for %lu ASIDs\n",
- 		      NUM_USER_ASIDS);
- 
-+	set_reserved_asid_bits();
-+
- 	pr_info("ASID allocator initialised with %lu entries\n", NUM_USER_ASIDS);
- 	return 0;
- }
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 32682be978e0..cd4d53d7e458 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -138,6 +138,7 @@ ENDPROC(cpu_do_resume)
-  *	- pgd_phys - physical address of new TTB
-  */
- ENTRY(cpu_do_switch_mm)
-+	pre_ttbr0_update_workaround x0, x1, x2
- 	mmid	x1, x1				// get mm->context.id
- 	bfi	x0, x1, #48, #16		// set the ASID
- 	msr	ttbr0_el1, x0			// set TTBR0
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
 Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora
