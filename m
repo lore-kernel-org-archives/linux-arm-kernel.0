@@ -1,85 +1,78 @@
 From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 25 Jan 2017 10:38:01 -0500
-Subject: [PATCH v20 08/17] clocksource/drivers/arm_arch_timer: Rework
- counter frequency detection.
-In-Reply-To: <CADyBb7sU6DVMk6px0963r8by--U-3k_XjESd88zZMkj7xbywgA@mail.gmail.com>
-References: <20170118132541.8989-1-fu.wei@linaro.org>
- <20170118132541.8989-9-fu.wei@linaro.org> <20170124172400.GG7572@leverpostej>
- <CADyBb7sU6DVMk6px0963r8by--U-3k_XjESd88zZMkj7xbywgA@mail.gmail.com>
-Message-ID: <e62c6f73-16e0-2764-126f-b8ed6adc3489@codeaurora.org>
+Date: Wed, 25 Jan 2017 10:49:36 -0500
+Subject: [PATCH] arm64: skip register_cpufreq_notifier on ACPI-based
+ systems
+In-Reply-To: <20170125120306.GC8093@e106622-lin>
+References: <1485304992-26888-1-git-send-email-pprakash@codeaurora.org>
+ <20170125120306.GC8093@e106622-lin>
+Message-ID: <bbc37634-f087-feef-dacd-77c5adb9ed04@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fu,
-
-On 01/25/2017 01:46 AM, Fu Wei wrote:
-> Hi Mark,
+On 01/25/2017 07:03 AM, Juri Lelli wrote:
+> Hi,
 > 
-> On 25 January 2017 at 01:24, Mark Rutland <mark.rutland@arm.com> wrote:
->> On Wed, Jan 18, 2017 at 09:25:32PM +0800, fu.wei at linaro.org wrote:
->>> From: Fu Wei <fu.wei@linaro.org>
->>>
->>> The counter frequency detection call(arch_timer_detect_rate) combines two
->>> ways to get counter frequency: system coprocessor register and MMIO timer.
->>> But in a specific timer init code, we only need one way to try:
->>> getting frequency from MMIO timer register will be needed only when we
->>> init MMIO timer; getting frequency from system coprocessor register will
->>> be needed only when we init arch timer.
+> On 24/01/17 17:43, Prashanth Prakash wrote:
+>> On ACPI based systems where the topology is setup using the API
+>> store_cpu_topology, at the moment we do not have necessary code
+>> to handle a cpufreq notifier, thus resulting in a crash.
 >>
->> When I mentioned this splitting before, I had mean that we'd completely
->> separate the two, with separate mmio_rate and sysreg_rate variables.
-> 
-> sorry for misunderstanding.
-> 
-> Are you saying :
-> 
-> diff --git a/drivers/clocksource/arm_arch_timer.c
-> b/drivers/clocksource/arm_arch_timer.c
-> index 663a57a..eec92f6 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -65,7 +65,8 @@ struct arch_timer {
-> 
->  #define to_arch_timer(e) container_of(e, struct arch_timer, evt)
-> 
-> -static u32 arch_timer_rate;
-> +static u32 arch_timer_sysreg_rate ;
-> +static u32 arch_timer_mmio_rate;
->  static int arch_timer_ppi[ARCH_TIMER_MAX_TIMER_PPI];
-> 
->  static struct clock_event_device __percpu *arch_timer_evt;
-> 
-> 
-> But what have I learned From ARMv8 ARM is
-> AArch64 System register CNTFRQ_EL0 is provided so that software can
-> discover the frequency of the system counter.
-> CNTFRQ(in CNTCTLBase and CNTBaseN) is provided so that software can
-> discover the frequency of the system counter.
-> The bit assignments of the registers are identical in the System
-> register interface and in the memory-mapped system level interface.
-> So I think they both contain the same value : the frequency of the
-> system counter, just in different view, and can be accessed in
-> different ways.
-> 
-> So do we really need to separate mmio_rate and sysreg_rate variables?
-> 
-> And for CNTFRQ(in CNTCTLBase and CNTBaseN) , we can NOT access it in
-> Linux kernel (EL1),
-> Because ARMv8 ARM says:
-> In a system that implements both Secure and Non-secure states, this
-> register is only accessible by Secure accesses.
-> That means we still need to get the frequency of the system counter
-> from CNTFRQ_EL0 in MMIO timer code.
-> This have been proved when I tested this driver on foundation model, I
-> got "0" when I access CNTFRQ from Linux kernel (Non-secure EL1)
+>> Skip register_cpufreq_notifier if raw_capacity is not allocated
+>> as part of topology initialization.
+>>
+>> Stack:
+>>         init_cpu_capacity_callback+0xb4/0x1c8
+>>         notifier_call_chain+0x5c/0xa0
+>>         __blocking_notifier_call_chain+0x58/0xa0
+>>         blocking_notifier_call_chain+0x3c/0x50
+>>         cpufreq_set_policy+0xe4/0x328
+>>         cpufreq_init_policy+0x80/0x100
+>>         cpufreq_online+0x418/0x710
+>>         cpufreq_add_dev+0x118/0x180
+>>         subsys_interface_register+0xa4/0xf8
+>>         cpufreq_register_driver+0x1c0/0x298
+>>         cppc_cpufreq_init+0xdc/0x1000 [cppc_cpufreq]
+>>         do_one_initcall+0x5c/0x168
+>>         do_init_module+0x64/0x1e4
+>>         load_module+0x130c/0x14d0
+>>         SyS_finit_module+0x108/0x120
+>>         el0_svc_naked+0x24/0x28
+>>
+>> Patch that added support for popultaing cpu capacity for DT:
+>> https://patchwork.codeaurora.org/patch/98353/
 
-That sounds like a firmware problem. Firmware in EL3 is supposed to write
-the value into CNTFRQ. If you're not currently using any firmware, I'd
-recommend the bootwrapper on models/simulators/emulators.
+In other words,
 
-http://git.kernel.org/cgit/linux/kernel/git/mark/boot-wrapper-aarch64.git/tree/arch/aarch64/boot.S#n48
+Fixes: 7202bde8b7ae ("arm64: parse cpu capacity-dmips-mhz from DT")
 
-Cheers,
+>> Signed-off-by: Prashanth Prakash <pprakash@codeaurora.org>
+>> ---
+>>  arch/arm64/kernel/topology.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+>> index 23e9e13..3f175ce 100644
+>> --- a/arch/arm64/kernel/topology.c
+>> +++ b/arch/arm64/kernel/topology.c
+>> @@ -209,7 +209,7 @@ static void normalize_cpu_capacity(void)
+>>  
+>>  static int __init register_cpufreq_notifier(void)
+>>  {
+>> -	if (cap_parsing_failed)
+>> +	if (cap_parsing_failed || !raw_capacity)
+> 
+> Looks good. I couldn't really test it to check if it fixes your problem
+> (I assume it does), but it doesn't seem to introduce regressions on my
+> boxes.
+
+Are you testing on QEMU or Fast Models? I was under the impression that the
+former had ACPI support. For the latter, wouldn't it be nice to have ACPI
+support in the bootwrapper. Out of curiosity, is Mark's bootwrapper
+repository on kernel.org the best one to use these days?
+
+http://git.kernel.org/cgit/linux/kernel/git/mark/boot-wrapper-aarch64.git/
+
+Thanks,
 Cov
 
 -- 
