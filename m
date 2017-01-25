@@ -1,57 +1,66 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 25 Jan 2017 12:50:31 +0100
-Subject: [PATCH 7/7] mfd: exynos-lpass: Add runtime PM support
-In-Reply-To: <1485345031-2948-1-git-send-email-m.szyprowski@samsung.com>
-References: <1485345031-2948-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170125115105eucas1p1e7191cf0be871c254dd09477ca7f9e1a@eucas1p1.samsung.com>
-Message-ID: <1485345031-2948-8-git-send-email-m.szyprowski@samsung.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 25 Jan 2017 03:51:07 -0800
+Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
+In-Reply-To: <20170125111233.GB3912@amd>
+References: <20170123141331.GA11402@amd>
+ <da1f1b45-3ae5-ffe8-62c6-9ec7c3a1505b@roeck-us.net>
+ <20170123144031.GA7870@amd> <20170123232654.GA19342@amd>
+ <20170123234912.GA2460@roeck-us.net> <20170124070639.GA5068@rzhang1-surface>
+ <20170124073720.GB5603@amd>
+ <88c94ea6-abe2-0f20-337e-e9ee00c883d8@roeck-us.net>
+ <20170124175800.GA15070@amd> <20170124184526.GA25056@roeck-us.net>
+ <20170125111233.GB3912@amd>
+Message-ID: <d5321db7-fc74-fe36-812b-1918a2ac3fc0@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert exisitng lpass-suspend/resume callbacks into runtime PM callbacks.
-This way Exynos LPASS driver will be ready for use with power domains
-enabled. LPASS will be runtime resumed/suspended as a result of its child
-devices runtime PM transitions.
+On 01/25/2017 03:12 AM, Pavel Machek wrote:
+> Hi!
+>
+>>>>>> Right.
+>>>>>>
+>>>>>> Before reverting, can you please try if this patch works or not?
+>>>>>
+>>>>> Not really. Revert now. Sorry.
+>>>>>
+>>>>> Are you sure? This does not look equivalent to me at all.
+>>>>>
+>>>>> "name" file handling moved from drivers to the core, which added some
+>>>>> crazy checks what name can contain. Even if this "works", what is the
+>>>>> expected effect on the "name" file?
+>>>>>
+>>>> The hwmon name attribute must not include '-', as documented in
+>>>> Documentation/hwmon/sysfs-interface. Is enforcing that 'crazy' ?
+>>>> Maybe in your world, but not in mine.
+>>>
+>>> Well, lets revert the patch and then we can discuss what to do with
+>>> the "name" problem.
+>
+> Ok, so the patch is on the way in. What to do next?
+>
+> pavel at n900:/sys/class/hwmon$ cat hwmon0/name
+> bq27200-0
+> pavel at n900:/sys/class/hwmon$ cat hwmon1/name
+> rx51-battery
+>
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- drivers/mfd/exynos-lpass.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+The 'name' parameter will be mandatory for hwmon_device_register_with_groups()
+and hwmon_device_register_with_info() starting with v4.11, and the API
+documentation will be updated to list all invalid characters.
 
-diff --git a/drivers/mfd/exynos-lpass.c b/drivers/mfd/exynos-lpass.c
-index 44d8ea1a978b..d383b2f6f207 100644
---- a/drivers/mfd/exynos-lpass.c
-+++ b/drivers/mfd/exynos-lpass.c
-@@ -22,6 +22,7 @@
- #include <linux/of.h>
- #include <linux/of_platform.h>
- #include <linux/platform_device.h>
-+#include <linux/pm_runtime.h>
- #include <linux/regmap.h>
- #include <linux/types.h>
- 
-@@ -132,6 +133,8 @@ static int exynos_lpass_probe(struct platform_device *pdev)
- 	}
- 
- 	platform_set_drvdata(pdev, lpass);
-+	pm_runtime_set_active(dev);
-+	pm_runtime_enable(dev);
- 	exynos_lpass_enable(lpass);
- 
- 	return of_platform_populate(dev->of_node, NULL, NULL, dev);
-@@ -155,8 +158,11 @@ static int __maybe_unused exynos_lpass_resume(struct device *dev)
- 	return 0;
- }
- 
--static SIMPLE_DEV_PM_OPS(lpass_pm_ops, exynos_lpass_suspend,
--					exynos_lpass_resume);
-+static const struct dev_pm_ops lpass_pm_ops = {
-+	SET_RUNTIME_PM_OPS(exynos_lpass_suspend, exynos_lpass_resume, NULL)
-+	SET_LATE_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
-+				     pm_runtime_force_resume)
-+};
- 
- static const struct of_device_id exynos_lpass_of_match[] = {
- 	{ .compatible = "samsung,exynos5433-lpass" },
--- 
-1.9.1
+The thermal subsystem doesn't play well when it comes to hwmon userspace
+interaction (generating and removing sensor attributes dynamically
+messes up pretty much everything, and generating the name attribute after
+hwmon registration for sure messes up any udev listener). libsensors gets
+confused by '-' in the 'name' attribute. libsensors also doesn't expect
+sensor attributes to be dynamically generated and removed, and may
+react unpredictably if they are. This all means that any existing users
+of hwmon devices created by the thermal subsystem will most likely not
+use libsensors nor udev listeners. At the same time, it seems to be quite
+important at least to you that the '-' in the name is retained.
+
+Given all that, maybe thermal should just stick with the deprecated API
+and accept the deprecated warning message (or maybe drop hwmon support
+altogether).
+
+Guenter
