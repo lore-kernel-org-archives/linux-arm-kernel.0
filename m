@@ -1,39 +1,142 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 25 Jan 2017 15:46:58 -0800
-Subject: [PATCH] perf: xgene: Include module.h
-Message-ID: <20170125234658.12071-1-sboyd@codeaurora.org>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 26 Jan 2017 08:47:05 +0900
+Subject: [PATCH v2] clk: samsung: mark s3c...._clk_sleep_init() as __init
+In-Reply-To: <1485380545-24815-1-git-send-email-martin@kaiser.cx>
+References: <1485293599-23581-1-git-send-email-martin@kaiser.cx>
+ <CGME20170125214354epcas3p2715bf71d3c8d56aefe881f95fb4aef1d@epcas3p2.samsung.com>
+ <1485380545-24815-1-git-send-email-martin@kaiser.cx>
+Message-ID: <588938F9.9070907@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I ran into a build error when I disabled CONFIG_ACPI and tried to
-compile this driver:
+Hi Martin,
 
-drivers/perf/xgene_pmu.c:1242:1: warning: data definition has no type or storage class
- MODULE_DEVICE_TABLE(of, xgene_pmu_of_match);
- ^
-drivers/perf/xgene_pmu.c:1242:1: error: type defaults to 'int' in declaration of 'MODULE_DEVICE_TABLE' [-Werror=implicit-int]
+The v2 patch is missing my reviewed-by tag[1].
+[1] https://patchwork.kernel.org/patch/9535993/
 
-Include module.h for the MODULE_DEVICE_TABLE macro that's
-implicitly included through ACPI.
+Again, I add my reviewed-by tag.
 
-Cc: Tai Nguyen <ttnguyen@apm.com>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/perf/xgene_pmu.c | 1 +
- 1 file changed, 1 insertion(+)
+Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
 
-diff --git a/drivers/perf/xgene_pmu.c b/drivers/perf/xgene_pmu.c
-index a8ac4bcef2c0..fb3281962a6d 100644
---- a/drivers/perf/xgene_pmu.c
-+++ b/drivers/perf/xgene_pmu.c
-@@ -20,6 +20,7 @@
-  */
- 
- #include <linux/acpi.h>
-+#include <linux/module.h>
- #include <linux/clk.h>
- #include <linux/cpumask.h>
- #include <linux/interrupt.h>
+
+On 2017? 01? 26? 06:42, martin at kaiser.cx wrote:
+> From: Martin Kaiser <martin@kaiser.cx>
+> 
+> These functions are referencing s3c...._clk_regs[], which are marked as
+> __initdata. When compiling with CONFIG_DEBUG_SECTION_MISMATCH=y, this
+> produces warnings like
+> 
+> WARNING: vmlinux.o(.text+0x198350):
+> Section mismatch in reference from the function s3c2410_clk_sleep_init()
+> to the (unknown reference) .init.data:(unknown)
+> 
+> Mark the s3c...._clk_sleep_init() functions as __init in
+> order to fix this.
+> 
+> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
+> ---
+> v2:
+> Fix the commit message, describe what the problem really is.
+> (Thanks, Krzysztof)
+> 
+>  drivers/clk/samsung/clk-s3c2410.c |    4 ++--
+>  drivers/clk/samsung/clk-s3c2412.c |    4 ++--
+>  drivers/clk/samsung/clk-s3c2443.c |    4 ++--
+>  drivers/clk/samsung/clk-s3c64xx.c |    4 ++--
+>  4 files changed, 8 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/clk/samsung/clk-s3c2410.c b/drivers/clk/samsung/clk-s3c2410.c
+> index d7a1e77..e0650c3 100644
+> --- a/drivers/clk/samsung/clk-s3c2410.c
+> +++ b/drivers/clk/samsung/clk-s3c2410.c
+> @@ -76,7 +76,7 @@ static void s3c2410_clk_resume(void)
+>  	.resume = s3c2410_clk_resume,
+>  };
+>  
+> -static void s3c2410_clk_sleep_init(void)
+> +static void __init s3c2410_clk_sleep_init(void)
+>  {
+>  	s3c2410_save = samsung_clk_alloc_reg_dump(s3c2410_clk_regs,
+>  						ARRAY_SIZE(s3c2410_clk_regs));
+> @@ -90,7 +90,7 @@ static void s3c2410_clk_sleep_init(void)
+>  	return;
+>  }
+>  #else
+> -static void s3c2410_clk_sleep_init(void) {}
+> +static void __init s3c2410_clk_sleep_init(void) {}
+>  #endif
+>  
+>  PNAME(fclk_p) = { "mpll", "div_slow" };
+> diff --git a/drivers/clk/samsung/clk-s3c2412.c b/drivers/clk/samsung/clk-s3c2412.c
+> index ec873ee..b8340a4 100644
+> --- a/drivers/clk/samsung/clk-s3c2412.c
+> +++ b/drivers/clk/samsung/clk-s3c2412.c
+> @@ -69,7 +69,7 @@ static void s3c2412_clk_resume(void)
+>  	.resume = s3c2412_clk_resume,
+>  };
+>  
+> -static void s3c2412_clk_sleep_init(void)
+> +static void __init s3c2412_clk_sleep_init(void)
+>  {
+>  	s3c2412_save = samsung_clk_alloc_reg_dump(s3c2412_clk_regs,
+>  						ARRAY_SIZE(s3c2412_clk_regs));
+> @@ -83,7 +83,7 @@ static void s3c2412_clk_sleep_init(void)
+>  	return;
+>  }
+>  #else
+> -static void s3c2412_clk_sleep_init(void) {}
+> +static void __init s3c2412_clk_sleep_init(void) {}
+>  #endif
+>  
+>  static struct clk_div_table divxti_d[] = {
+> diff --git a/drivers/clk/samsung/clk-s3c2443.c b/drivers/clk/samsung/clk-s3c2443.c
+> index 5e24a17..abb935c 100644
+> --- a/drivers/clk/samsung/clk-s3c2443.c
+> +++ b/drivers/clk/samsung/clk-s3c2443.c
+> @@ -89,7 +89,7 @@ static void s3c2443_clk_resume(void)
+>  	.resume = s3c2443_clk_resume,
+>  };
+>  
+> -static void s3c2443_clk_sleep_init(void)
+> +static void __init s3c2443_clk_sleep_init(void)
+>  {
+>  	s3c2443_save = samsung_clk_alloc_reg_dump(s3c2443_clk_regs,
+>  						ARRAY_SIZE(s3c2443_clk_regs));
+> @@ -103,7 +103,7 @@ static void s3c2443_clk_sleep_init(void)
+>  	return;
+>  }
+>  #else
+> -static void s3c2443_clk_sleep_init(void) {}
+> +static void __init s3c2443_clk_sleep_init(void) {}
+>  #endif
+>  
+>  PNAME(epllref_p) = { "mpllref", "mpllref", "xti", "ext" };
+> diff --git a/drivers/clk/samsung/clk-s3c64xx.c b/drivers/clk/samsung/clk-s3c64xx.c
+> index a48bd5f..7306867 100644
+> --- a/drivers/clk/samsung/clk-s3c64xx.c
+> +++ b/drivers/clk/samsung/clk-s3c64xx.c
+> @@ -121,7 +121,7 @@ static void s3c64xx_clk_resume(void)
+>  	.resume = s3c64xx_clk_resume,
+>  };
+>  
+> -static void s3c64xx_clk_sleep_init(void)
+> +static void __init s3c64xx_clk_sleep_init(void)
+>  {
+>  	s3c64xx_save_common = samsung_clk_alloc_reg_dump(s3c64xx_clk_regs,
+>  						ARRAY_SIZE(s3c64xx_clk_regs));
+> @@ -145,7 +145,7 @@ static void s3c64xx_clk_sleep_init(void)
+>  		__func__);
+>  }
+>  #else
+> -static void s3c64xx_clk_sleep_init(void) {}
+> +static void __init s3c64xx_clk_sleep_init(void) {}
+>  #endif
+>  
+>  /* List of parent clocks common for all S3C64xx SoCs. */
+> 
+
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Best Regards,
+Chanwoo Choi
+Samsung Electronics
