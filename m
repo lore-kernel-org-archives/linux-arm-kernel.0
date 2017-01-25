@@ -1,62 +1,55 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 25 Jan 2017 11:02:15 +0000
-Subject: [STLinux Kernel] [PATCH 1/8] serial: st-asc: Ignore the parity
- error bit if 8-bit mode is enabled
-In-Reply-To: <20170124134310.27512-2-lee.jones@linaro.org>
-References: <20170124134310.27512-1-lee.jones@linaro.org>
- <20170124134310.27512-2-lee.jones@linaro.org>
-Message-ID: <20170125110215.GC5680@griffinp-ThinkPad-X1-Carbon-2nd>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 25 Jan 2017 12:02:46 +0100
+Subject: [PATCH v2 3/6] ARM: tegra: nyan-big: Include compatible
+ revisions for proper detection
+In-Reply-To: <20170122154753.31942-3-contact@paulk.fr>
+References: <20170122154753.31942-1-contact@paulk.fr>
+ <20170122154753.31942-3-contact@paulk.fr>
+Message-ID: <20170125110246.GD9344@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 Jan 2017, Lee Jones wrote:
-
-> The datasheet states:
+On Sun, Jan 22, 2017 at 04:47:50PM +0100, Paul Kocialkowski wrote:
+> Depthcharge (the payload used with cros devices) will attempt to detect
+> boards using their revision. This includes all the known revisions for
+> the nyan-big board so that the dtb can be selected preferably.
 > 
-> "If the MODE field selects an 8-bit frame then this [parity error] bit
->  is undefined. Software should ignore this bit when reading 8-bit frames."
+> Defining compatibly revisions allows depthcharge to select the kernel
+> via the revision it detects instead of using the default kernel. This
+> allows having a FIT image with multiple kernels for multiple devices.
 > 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-
-Acked-by: Peter Griffin <peter.griffin@linaro.org>
-
+> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
 > ---
->  drivers/tty/serial/st-asc.c | 16 +++++++++++++---
->  1 file changed, 13 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
-> index 379e5bd..69e6232 100644
-> --- a/drivers/tty/serial/st-asc.c
-> +++ b/drivers/tty/serial/st-asc.c
-> @@ -287,9 +287,19 @@ static void asc_transmit_chars(struct uart_port *port)
->  static void asc_receive_chars(struct uart_port *port)
->  {
->  	struct tty_port *tport = &port->state->port;
-> -	unsigned long status;
-> +	unsigned long status, mode;
->  	unsigned long c = 0;
->  	char flag;
-> +	bool ignore_pe = false;
-> +
-> +	/*
-> +	 * Datasheet states: If the MODE field selects an 8-bit frame then
-> +	 * this [parity error] bit is undefined. Software should ignore this
-> +	 * bit when reading 8-bit frames.
-> +	 */
-> +	mode = asc_in(port, ASC_CTL) & ASC_CTL_MODE_MSK;
-> +	if (mode == ASC_CTL_MODE_8BIT || mode == ASC_CTL_MODE_8BIT_PAR)
-> +		ignore_pe = true;
+>  arch/arm/boot/dts/tegra124-nyan-big.dts | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+
+I've applied this, with a small change, see below.
+
+> diff --git a/arch/arm/boot/dts/tegra124-nyan-big.dts b/arch/arm/boot/dts/tegra124-nyan-big.dts
+> index 67d7cfb32541..f12ece9b76a6 100644
+> --- a/arch/arm/boot/dts/tegra124-nyan-big.dts
+> +++ b/arch/arm/boot/dts/tegra124-nyan-big.dts
+> @@ -6,7 +6,12 @@
 >  
->  	if (port->irq_wake)
->  		pm_wakeup_event(tport->tty->dev, 0);
-> @@ -299,8 +309,8 @@ static void asc_receive_chars(struct uart_port *port)
->  		flag = TTY_NORMAL;
->  		port->icount.rx++;
->  
-> -		if ((c & (ASC_RXBUF_FE | ASC_RXBUF_PE)) ||
-> -			status & ASC_STA_OE) {
-> +		if (status & ASC_STA_OE || c & ASC_RXBUF_FE ||
-> +		    (c & ASC_RXBUF_PE && !ignore_pe)) {
->  
->  			if (c & ASC_RXBUF_FE) {
->  				if (c == (ASC_RXBUF_FE | ASC_RXBUF_DUMMY_RX)) {
+>  / {
+>  	model = "Acer Chromebook 13 CB5-311";
+> -	compatible = "google,nyan-big", "nvidia,tegra124";
+> +	compatible = "google,nyan-big-rev7", "google,nyan-big-rev6",
+> +			"google,nyan-big-rev5", "google,nyan-big-rev4",
+> +			"google,nyan-big-rev3", "google,nyan-big-rev2",
+> +			"google,nyan-big-rev5", "google,nyan-big-rev4",
+
+This line is the same as two lines above, so I've removed this one. I've
+also used slightly different padding (two tabs and align to the first
+string in the first line with spaces) to make it consistent with other
+string lists in the file.
+
+Thanks,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/785e4e29/attachment.sig>
