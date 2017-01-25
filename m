@@ -1,40 +1,83 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Wed, 25 Jan 2017 12:25:03 +0100
-Subject: [PATCH 1/2] security: Change name of CONFIG_DEBUG_RODATA
-In-Reply-To: <20170119105646.GA11176@leverpostej>
-References: <1484789346-21012-1-git-send-email-labbott@redhat.com>
- <1484789346-21012-2-git-send-email-labbott@redhat.com>
- <20170119105646.GA11176@leverpostej>
-Message-ID: <4116b91a-4fb5-414d-5fd5-36be151c600c@redhat.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Wed, 25 Jan 2017 11:24:59 +0000
+Subject: [STLinux Kernel] [PATCH 4/8] serial: st-asc: (De)Register GPIOD
+ and swap Pinctrl profiles
+In-Reply-To: <20170124134310.27512-5-lee.jones@linaro.org>
+References: <20170124134310.27512-1-lee.jones@linaro.org>
+ <20170124134310.27512-5-lee.jones@linaro.org>
+Message-ID: <20170125112459.GF5680@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/19/2017 11:56 AM, Mark Rutland wrote:
-> Hi Laura,
->
-> On Wed, Jan 18, 2017 at 05:29:05PM -0800, Laura Abbott wrote:
->>
->> Despite the word 'debug' in CONFIG_DEBUG_RODATA, this kernel option
->> provides key security features that are to be expected on a modern
->> system. Change the name to CONFIG_HARDENED_PAGE_MAPPINGS which more
->> accurately describes what this option is intended to do.
->
-> This generally sounds good. Thanks for attacking this!
->
-> On the bikeshedding front, *maybe* it would be nice to mention
-> permissions in the name, something like STRICT_KERNEL_RWX. That might
-> also prevent the reading of 'hardened' as 'optional overhead'.
->
-> That said, the proposed name is fine by me -- I'm happy so long as
-> 'DEBUG' goes.
->
+Hi Lee,
 
-(Apologies for the delay, my SMTP was set up incorrectly so my
-messages didn't actually get sent out)
+On Tue, 24 Jan 2017, Lee Jones wrote:
 
-I like that better since it's describing specifically what the config
-should be setting as opposed to something more vague. That might fit
-better with what Pavel was suggesting as well.
+> When hardware flow-control is disabled, manual toggling of the UART's
+> reset line (RTS) using userland applications (e.g. stty) is not
+> possible, since the ASC IP does not provide this functionality in the
+> same was as some other IPs do.  Thus, we have to do this manually.
+> 
+> This patch ensures that when HW flow-control is disabled the RTS/CTS
+> lines are free to be registered via the GPIO API.  It also ensures
+> any registered GPIO lines are unregistered when HW flow-control is
+> requested, allowing the IP to control them automatically.
 
-Thanks,
-Laura
+Apart from my comment in previous mail about switching the meaning of
+default & manual-rts groupings. It seems like a neat solution.
+
+Acked-by: Peter Griffin <peter.griffin@linaro.org>
+
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/tty/serial/st-asc.c | 27 ++++++++++++++++++++++++++-
+>  1 file changed, 26 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
+> index 03801ed..2c4b5f5 100644
+> --- a/drivers/tty/serial/st-asc.c
+> +++ b/drivers/tty/serial/st-asc.c
+> @@ -512,6 +512,8 @@ static void asc_set_termios(struct uart_port *port, struct ktermios *termios,
+>  			    struct ktermios *old)
+>  {
+>  	struct asc_port *ascport = to_asc_port(port);
+> +	struct device_node *np = port->dev->of_node;
+> +	struct gpio_desc *gpiod;
+>  	unsigned int baud;
+>  	u32 ctrl_val;
+>  	tcflag_t cflag;
+> @@ -555,9 +557,32 @@ static void asc_set_termios(struct uart_port *port, struct ktermios *termios,
+>  		ctrl_val |= ASC_CTL_PARITYODD;
+>  
+>  	/* hardware flow control */
+> -	if ((cflag & CRTSCTS))
+> +	if ((cflag & CRTSCTS)) {
+>  		ctrl_val |= ASC_CTL_CTSENABLE;
+>  
+> +		/* If flow-control selected, stop handling RTS manually */
+> +		if (ascport->rts) {
+> +			devm_gpiod_put(port->dev, ascport->rts);
+> +			ascport->rts = NULL;
+> +
+> +			pinctrl_select_state(ascport->pinctrl,
+> +					     ascport->states[DEFAULT]);
+> +		}
+> +	} else {
+> +		/* If flow-control disabled, it's safe to handle RTS manually */
+> +		if (!ascport->rts && ascport->states[MANUAL_RTS]) {
+> +			pinctrl_select_state(ascport->pinctrl,
+> +					     ascport->states[MANUAL_RTS]);
+> +
+> +			gpiod =	devm_get_gpiod_from_child(port->dev, "rts",
+> +							  &np->fwnode);
+> +			if (!IS_ERR(gpiod)) {
+> +				gpiod_direction_output(gpiod, 0);
+> +				ascport->rts = gpiod;
+> +			}
+> +		}
+> +	}
+> +
+>  	if ((baud < 19200) && !ascport->force_m1) {
+>  		asc_out(port, ASC_BAUDRATE, (port->uartclk / (16 * baud)));
+>  	} else {
