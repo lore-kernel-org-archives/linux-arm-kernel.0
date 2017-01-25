@@ -1,133 +1,40 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Wed, 25 Jan 2017 12:51:59 +0200
-Subject: usb: gadget: Kernel panic (NULL pointer dereference) when using
- fsl_udc2_core on i.MX31 PDK
-In-Reply-To: <CAM=E1R6tv9HjZTZSx3bgrpqA5U_05CFA0SdkB6a5nNyvLVC+Ug@mail.gmail.com>
-References: <f984e50b-0e64-88ef-2f53-b8da2a62daf0@gmail.com>
- <87k29m6lkx.fsf@linux.intel.com>
- <CAM=E1R4EMEEq1wnHxjLLJMLaXCM=EDFo1JDacHKGq6DUtqA9Nw@mail.gmail.com>
- <87efzsdelq.fsf@linux.intel.com>
- <CAM=E1R7i5y2SXiswk8f5dzoJyqYXUOxK9Hivv+ZS56mP6HC8uA@mail.gmail.com>
- <87ziigbuev.fsf@linux.intel.com>
- <CAM=E1R7U4GP52z_wE0yMpkEYBB7KpiWSWXG28xQMM61wtzJygw@mail.gmail.com>
- <877f5k9ui7.fsf@linux.intel.com>
- <CAM=E1R6tv9HjZTZSx3bgrpqA5U_05CFA0SdkB6a5nNyvLVC+Ug@mail.gmail.com>
-Message-ID: <871svrbeeo.fsf@linux.intel.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Wed, 25 Jan 2017 11:53:06 +0100
+Subject: [PATCH] clk: meson8b: fix clk81 register address
+Message-ID: <1485341586-2929-1-git-send-email-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+During meson8b clock probe, clk81 register address is fixed twice.
+First using the meson8b_clk_gates array, then by directly changing
+meson8b_clk81 register.
 
-Hi,
+As a result meson8b_clk81.reg = HHI_MPEG_CLK_CNTL + clk_base + clk_base.
 
-Magnus Lilja <lilja.magnus@gmail.com> writes:
->>>>>>>>> I tried the fsl_udc_core gadget driver on the i.MX31 PDK board and got a
->>>>>>>>> kernel panic (NULL pointer dereference) when connecting the USB cable. I
->>>>>>>>> had the g_serial module loaded as well.
->>>>>>>>>
->>>>>>>>> The NULL pointer panic comes from gadget/udc/core.c
->>>>>>>>> usb_gadget_giveback_request() which calls req->complete() and in some
->>>>>>>>> cases req->complete is NULL.
->>>>>>>>>
->>>>>>>>> Commit 304f7e5e1d08 ("usb: gadget: Refactor request completion") changed
->>>>>>>>> fsl_udc2_core.c (and several other files) and in fsl_udc2_core.c a check
->>>>>>>>> that req->complete is non-NULL was removed:
->>>>>>>>>
->>>>>>>>> --- a/drivers/usb/gadget/udc/fsl_udc_core.c
->>>>>>>>> +++ b/drivers/usb/gadget/udc/fsl_udc_core.c
->>>>>>>>> @@ -197,10 +197,8 @@ __acquires(ep->udc->lock)
->>>>>>>>>          ep->stopped = 1;
->>>>>>>>>
->>>>>>>>>          spin_unlock(&ep->udc->lock);
->>>>>>>>> -       /* complete() is from gadget layer,
->>>>>>>>> -        * eg fsg->bulk_in_complete() */
->>>>>>>>> -       if (req->req.complete)
->>>>>>>>> -               req->req.complete(&ep->ep, &req->req);
->>>>>>>>> +
->>>>>>>>> +       usb_gadget_giveback_request(&ep->ep, &req->req);
->>>>>>>>>
->>>>>>>>>          spin_lock(&ep->udc->lock);
->>>>>>>>>          ep->stopped = stopped;
->>>>>>>>>
->>>>>>>>> If I re-introduce the check (either in fsl_udc_core.c or core.c) at
->>>>>>>>> least USB gadget operation using g_serial seems to work just fine.
->>>>>>>>>
->>>>>>>>> I don't know the logic in detail to understand whether this is a proper
->>>>>>>>> fix or if there is some other more problem with the fls_udc_core driver.
->>>>>>>>> Does anyone have input in this matter?
->>>>>>>>>
->>>>>>>>> I can produce a proper patch that fixes this problem by re-introducing
->>>>>>>>> the check (in either fsl_udc_core.c or core.c) if that is a proper
->>>>>>>>> solution and I can also assist in testing other fixes to the problem.
->>>>>>>>
->>>>>>>> ->complete() is supposed to be mandatory. Which gadget do you have that
->>>>>>>> ->doesn't set ->complete() to a valid function pointer?
->>>>>>>
->>>>>>> I'm modprobing g_serial so the following modules are loaded (using my patch):
->>>>>>>
->>>>>>> ~ # lsmod
->>>>>>> usb_f_acm
->>>>>>> u_serial
->>>>>>> g_serial
->>>>>>> libcomposite
->>>>>>> configfs
->>>>>>> fsl_usb2_udc
->>>>>>
->>>>>> okay, can you figure out which request is coming without ->complete()
->>>>>> set? To which endpoint is this request being queued? It would be nice to
->>>>>> know these details. Maybe this is an old bug which ought to be fixed.
->>>>>
->>>>> Sure, I can try figure that out. Any input to make the debug of the
->>>>> faster is appreciated if you have any.
->>>>
->>>> well, the easiest way is to add something like:
->>>>
->>>>         if (!req->complete)
->>>>                 dump_stack();
->>>>
->>>> to fsl udc driver. Then you would know who queued the request without
->>>> ->complete. A slightly better approach would be to:
->>>>
->>>> if (WARN(!req->complete,
->>>>         "%s: queueing request without ->complete\n", ep->name))
->>>>         return;
->>>>
->>>> Or something like that.
->>>
->>> Well, I think I found it.
->>>
->>> fsl_udc_core.c:ep0_prime_status() sets req->req.complete = NULL before
->>> it queues a transfer and my printk()'s indicate that this is indeed
->>> the offending function.
->>>
->>> fsl_udc_core.c:ch9getstatus() also sets complete to NULL but in my
->>> tests right now I haven't seen that one.
->>>
->>> So it's an internal problem in the fsl_udc_core.c file.
->>
->> seems like it. It's rather odd that fsl_udc doesn't wanna know about
->> completion of Status stage. Oh well, I guess in this case it doesn't
->> matter if you add a complete function or reinstate the previous check
->> for valid complete.
->>
->> If you decide to reinstate the check, please add a comment above the
->> check explaining that fsl_udc itself queues requests with NULL
->> ->complete().
->>
->> I must say, however, that I would suggest adding a complete callback
->> since that will help us BUG with NULL pointer deref on bad gadget
->> drivers ;-)
->
-> I can do that. Such a complete() callback function would be a no-op
-> then I assume (with a comment in it why it is a no-op).
+Fixed by just removing the second fixup.
 
-that's right :-)
+Fixes: e31a1900c1ff ("meson: clk: Add support for clock gates")
+Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+---
+ Patch based on khilman/linux-amlogic.git master branch.
 
+ I don't have a meson8b HW so this patch so this patch has not been
+ tested on real HW.
+
+ drivers/clk/meson/meson8b.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/drivers/clk/meson/meson8b.c b/drivers/clk/meson/meson8b.c
+index 3f1be46cbb33..888494d4fb8a 100644
+--- a/drivers/clk/meson/meson8b.c
++++ b/drivers/clk/meson/meson8b.c
+@@ -607,7 +607,6 @@ static int meson8b_clkc_probe(struct platform_device *pdev)
+ 	/* Populate the base address for the MPEG clks */
+ 	meson8b_mpeg_clk_sel.reg = clk_base + (u32)meson8b_mpeg_clk_sel.reg;
+ 	meson8b_mpeg_clk_div.reg = clk_base + (u32)meson8b_mpeg_clk_div.reg;
+-	meson8b_clk81.reg = clk_base + (u32)meson8b_clk81.reg;
+ 
+ 	/* Populate base address for gates */
+ 	for (i = 0; i < ARRAY_SIZE(meson8b_clk_gates); i++)
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/908fb890/attachment.sig>
+2.7.4
