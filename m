@@ -1,47 +1,52 @@
 From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Wed, 25 Jan 2017 12:26:10 +0800
-Subject: [PATCH] arm64: kernel: do not mark reserved memory regions as
- IORESOURCE_BUSY
-In-Reply-To: <CAKv+Gu9FV7pz8A+Hevq-FVYvrvkigqRBJDTRWA1c=UenTxLz8Q@mail.gmail.com>
-References: <1485277900-22730-1-git-send-email-ard.biesheuvel@linaro.org>
- <20170124180109.GK1728@arm.com>
- <CAKv+Gu9FV7pz8A+Hevq-FVYvrvkigqRBJDTRWA1c=UenTxLz8Q@mail.gmail.com>
-Message-ID: <711feb52-313b-965f-e404-7c9f657c8451@linaro.org>
+Date: Wed, 25 Jan 2017 12:33:18 +0800
+Subject: [PATCH V7 00/11] IOMMU probe deferral support
+In-Reply-To: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
+References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
+Message-ID: <dc2a024b-2378-3a67-f098-8f2b42982766@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/1/25 2:13, Ard Biesheuvel wrote:
-> On 24 January 2017 at 18:01, Will Deacon <will.deacon@arm.com> wrote:
->> On Tue, Jan 24, 2017 at 05:11:40PM +0000, Ard Biesheuvel wrote:
->>> Memory regions marked as NOMAP should not be used for general allocation
->>> by the kernel, and should not even be covered by the linear mapping
->>> (hence the name). However, drivers or other subsystems (such as ACPI)
->>> that access the firmware directly may legally access them, which means
->>> it is also reasonable for such drivers to claim them by invoking
->>> request_resource(). Currently, this is prevented by the fact that arm64's
->>> request_standard_resources() marks reserved regions as IORESOURCE_BUSY.
->>>
->>> So drop the IORESOURCE_BUSY flag from these requests.
->>>
->>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>> ---
->>>  arch/arm64/kernel/setup.c | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> Did you find this my inspection, or has somebody reported a problem?
->>
+On 2017/1/24 0:18, Sricharan R wrote:
+> This series calls the dma ops configuration for the devices
+> at a generic place so that it works for all busses.
+> The dma_configure_ops for a device is now called during
+> the device_attach callback just before the probe of the
+> bus/driver is called. Similarly dma_deconfigure is called during
+> device/driver_detach path.
 >
-> Hanjun (whom I forgot to cc) reported an issue with the ACPI EINJ
-> (error injection) code, which may call request_resource() on UEFI
-> reserved regions.
+> pci_bus_add_devices    (platform/amba)(_device_create/driver_register)
+>        |                         |
+> pci_bus_add_device     (device_add/driver_register)
+>        |                         |
+> device_attach           device_initial_probe
+>        |                         |
+> __device_attach_driver    __device_attach_driver
+>        |
+> driver_probe_device
+>        |
+> really_probe
+>        |
+> dma_configure
+>
+> Similarly on the device/driver_unregister path __device_release_driver is
+> called which inturn calls dma_deconfigure.
+>
+> Took the reworked patches [2] from Robin's branch and
+> rebased on top of Lorenzo's ACPI IORT ARM support series [3].
+>
+> * Tested with platform and pci devices for probe deferral
+>   and reprobe on arm64 based platform.
+> * Need help for testing with ACPI.
 
-Yes, we were testing ACPI error ejection thought the register region,
-the register region is reported by firmware in EINJ table which
-the table is marked as reserved, then in the kernel will failed to
-request the memory region because all the reserved memory block is
-set to IORESOURCE_BUSY before this patch.
+Cherry picked this patch set with no conflict with my platform
+msi patches, and test it on Hisilicon D03 (ARM64 platform with
+SMMUv3) with ACPI, it boots ok as before and the native NIC and
+SAS (platform devices) are working properly.
 
-Tested this patch and error ejecting works OK.
+for ACPI and the core code changes:
+
+Tested-by: Hanjun Guo <hanjun.guo@linaro.org>
 
 Thanks
 Hanjun
