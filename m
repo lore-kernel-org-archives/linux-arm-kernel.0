@@ -1,42 +1,65 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 25 Jan 2017 11:10:56 +0000
-Subject: [PATCH v2 5/6] ARM: tegra: nyan-big: Proper pinmux for TPM i2c
-In-Reply-To: <20170125110644.GF9344@ulmo.ba.sec>
-References: <20170122154753.31942-1-contact@paulk.fr>
- <20170122154753.31942-5-contact@paulk.fr> <20170125110644.GF9344@ulmo.ba.sec>
-Message-ID: <2710b1a1-eab5-0a0d-657f-e6bc9b5cefaa@nvidia.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 25 Jan 2017 12:12:33 +0100
+Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
+In-Reply-To: <20170124184526.GA25056@roeck-us.net>
+References: <20170123141331.GA11402@amd>
+ <da1f1b45-3ae5-ffe8-62c6-9ec7c3a1505b@roeck-us.net>
+ <20170123144031.GA7870@amd> <20170123232654.GA19342@amd>
+ <20170123234912.GA2460@roeck-us.net>
+ <20170124070639.GA5068@rzhang1-surface> <20170124073720.GB5603@amd>
+ <88c94ea6-abe2-0f20-337e-e9ee00c883d8@roeck-us.net>
+ <20170124175800.GA15070@amd> <20170124184526.GA25056@roeck-us.net>
+Message-ID: <20170125111233.GB3912@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi!
 
-On 25/01/17 11:06, Thierry Reding wrote:
-> * PGP Signed by an unknown key
-> 
-> On Sun, Jan 22, 2017 at 04:47:52PM +0100, Paul Kocialkowski wrote:
->> This corrects the pinmux for accessing the TPM over the i2c line.
->> Thus, it allows correctly probing the module, that previously failed with i2c
->> errors.
->>
->> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
->> ---
->>  arch/arm/boot/dts/tegra124-nyan-big.dts | 20 ++++++++++----------
->>  1 file changed, 10 insertions(+), 10 deletions(-)
-> 
-> I've applied an s/i2c/I2C/ in the commit message and applied this. Can
-> you also make sure that these changes go into the nyan-big configuration
-> of the tegra-pinmux-scripts[0]? I know Stephen wants to keep those in
-> sync with the DTS.
-> 
-> Thanks,
-> Thierry
-> 
-> [0]: https://github.com/NVIDIA/tegra-pinmux-scripts
+> > > >>Right.
+> > > >>
+> > > >>Before reverting, can you please try if this patch works or not?
+> > > >
+> > > >Not really. Revert now. Sorry.
+> > > >
+> > > >Are you sure? This does not look equivalent to me at all.
+> > > >
+> > > >"name" file handling moved from drivers to the core, which added some
+> > > >crazy checks what name can contain. Even if this "works", what is the
+> > > >expected effect on the "name" file?
+> > > >
+> > > The hwmon name attribute must not include '-', as documented in
+> > > Documentation/hwmon/sysfs-interface. Is enforcing that 'crazy' ?
+> > > Maybe in your world, but not in mine.
+> > 
+> > Well, lets revert the patch and then we can discuss what to do with
+> > the "name" problem.
 
-Looks like it has already been changed ...
+Ok, so the patch is on the way in. What to do next?
 
-https://github.com/NVIDIA/tegra-pinmux-scripts/commit/5049f75b3099515ffb7f064dcf23568c17aecb01
+pavel at n900:/sys/class/hwmon$ cat hwmon0/name
+bq27200-0
+pavel at n900:/sys/class/hwmon$ cat hwmon1/name
+rx51-battery
 
-Jon
+> To provide some detail: libsensors gets just as confused with wildcards
+> and whitespace/newline as it does with '-' in the reported name, which
+> is why those are blocked by the new API.
 
+Ok... Question is "does someone actually use hwmon*/name on N900"? If
+so, we can't change it, but it is well possible that noone is.
+
+Next question is .. are there other drivers affected? Do we want to do
+'-' -> '_' in the core or somewhere in the drivers? We might want to
+do the change in early in 4.11 and see what breaks....
+
+									Pavel
 -- 
-nvpublic
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/3056248c/attachment.sig>
