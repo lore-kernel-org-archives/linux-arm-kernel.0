@@ -1,55 +1,193 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 25 Jan 2017 19:30:00 +0200
-Subject: [PATCH 1/7] soc: samsung: pmu: Add dummy support for Exynos5433
- SoC
-In-Reply-To: <1485345031-2948-2-git-send-email-m.szyprowski@samsung.com>
-References: <1485345031-2948-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170125115102eucas1p187f817f967c18a640098cf29268238d2@eucas1p1.samsung.com>
- <1485345031-2948-2-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20170125173000.nj7bp3f4wjeoie3q@kozik-lap>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 25 Jan 2017 17:35:53 +0000
+Subject: [PATCH V7 01/11] iommu/of: Refactor of_iommu_configure() for
+ error handling
+In-Reply-To: <4388779a-0e83-fadc-83f4-98c46c88d42e@semihalf.com>
+References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
+ <1485188293-20263-2-git-send-email-sricharan@codeaurora.org>
+ <4388779a-0e83-fadc-83f4-98c46c88d42e@semihalf.com>
+Message-ID: <c7bad124-d9f2-0ddf-168f-0b1950d3e1ed@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2017 at 12:50:25PM +0100, Marek Szyprowski wrote:
-> Add compatible for Exynos5433 SoC, so the driver will bind and let other
-> drivers to use PMU regmap.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  drivers/soc/samsung/exynos-pmu.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
+Hi Tomasz,
 
-Makes sense but please also add a check in exynos_sys_powerdown_conf() for
-!pmu_data or a comment for that. For current architecture, this will not
-happen but you are adding different usage thus forcing reader to find the
-dependencies on his own (dependecies are already spread all over for ARMv7).
-
-Best regards,
-Krzysztof
-
-> diff --git a/drivers/soc/samsung/exynos-pmu.c b/drivers/soc/samsung/exynos-pmu.c
-> index 813df6e7292d..effb8a8a78c6 100644
-> --- a/drivers/soc/samsung/exynos-pmu.c
-> +++ b/drivers/soc/samsung/exynos-pmu.c
-> @@ -90,6 +90,8 @@ void exynos_sys_powerdown_conf(enum sys_powerdown mode)
->  	}, {
->  		.compatible = "samsung,exynos5420-pmu",
->  		.data = &exynos5420_pmu_data,
-> +	}, {
-> +		.compatible = "samsung,exynos5433-pmu",
->  	},
->  	{ /*sentinel*/ },
->  };
-> @@ -122,7 +124,7 @@ static int exynos_pmu_probe(struct platform_device *pdev)
->  	pmu_context->dev = dev;
->  	pmu_context->pmu_data = of_device_get_match_data(dev);
->  
-> -	if (pmu_context->pmu_data->pmu_init)
-> +	if (pmu_context->pmu_data && pmu_context->pmu_data->pmu_init)
->  		pmu_context->pmu_data->pmu_init();
->  
->  	platform_set_drvdata(pdev, pmu_context);
-> -- 
-> 1.9.1
+On 25/01/17 17:17, Tomasz Nowicki wrote:
+> Hi Sricharan,
 > 
+> On 23.01.2017 17:18, Sricharan R wrote:
+>> From: Robin Murphy <robin.murphy@arm.com>
+>>
+>> In preparation for some upcoming cleverness, rework the control flow in
+>> of_iommu_configure() to minimise duplication and improve the propogation
+>> of errors. It's also as good a time as any to switch over from the
+>> now-just-a-compatibility-wrapper of_iommu_get_ops() to using the generic
+>> IOMMU instance interface directly.
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>  drivers/iommu/of_iommu.c | 83
+>> +++++++++++++++++++++++++++++++-----------------
+>>  1 file changed, 53 insertions(+), 30 deletions(-)
+>>
+>> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+>> index 0f57ddc..ee49081 100644
+>> --- a/drivers/iommu/of_iommu.c
+>> +++ b/drivers/iommu/of_iommu.c
+>> @@ -96,6 +96,28 @@ int of_get_dma_window(struct device_node *dn, const
+>> char *prefix, int index,
+>>  }
+>>  EXPORT_SYMBOL_GPL(of_get_dma_window);
+>>
+>> +static const struct iommu_ops
+>> +*of_iommu_xlate(struct device *dev, struct of_phandle_args *iommu_spec)
+>> +{
+>> +    const struct iommu_ops *ops;
+>> +    struct fwnode_handle *fwnode = &iommu_spec->np->fwnode;
+>> +    int err;
+>> +
+>> +    ops = iommu_get_instance(fwnode);
+>> +    if (!ops || !ops->of_xlate)
+>> +        return NULL;
+>> +
+>> +    err = iommu_fwspec_init(dev, &iommu_spec->np->fwnode, ops);
+>> +    if (err)
+>> +        return ERR_PTR(err);
+>> +
+>> +    err = ops->of_xlate(dev, iommu_spec);
+>> +    if (err)
+>> +        return ERR_PTR(err);
+>> +
+>> +    return ops;
+>> +}
+>> +
+>>  static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
+>>  {
+>>      struct of_phandle_args *iommu_spec = data;
+>> @@ -105,10 +127,11 @@ static int __get_pci_rid(struct pci_dev *pdev,
+>> u16 alias, void *data)
+>>  }
+>>
+>>  static const struct iommu_ops
+>> -*of_pci_iommu_configure(struct pci_dev *pdev, struct device_node
+>> *bridge_np)
+>> +*of_pci_iommu_init(struct pci_dev *pdev, struct device_node *bridge_np)
+>>  {
+>>      const struct iommu_ops *ops;
+>>      struct of_phandle_args iommu_spec;
+>> +    int err;
+>>
+>>      /*
+>>       * Start by tracing the RID alias down the PCI topology as
+>> @@ -123,56 +146,56 @@ static int __get_pci_rid(struct pci_dev *pdev,
+>> u16 alias, void *data)
+>>       * bus into the system beyond, and which IOMMU it ends up at.
+>>       */
+>>      iommu_spec.np = NULL;
+>> -    if (of_pci_map_rid(bridge_np, iommu_spec.args[0], "iommu-map",
+>> -               "iommu-map-mask", &iommu_spec.np, iommu_spec.args))
+>> -        return NULL;
+>> +    err = of_pci_map_rid(bridge_np, iommu_spec.args[0], "iommu-map",
+>> +                 "iommu-map-mask", &iommu_spec.np,
+>> +                 iommu_spec.args);
+>> +    if (err)
+>> +        return ERR_PTR(err);
+>>
+>> -    ops = of_iommu_get_ops(iommu_spec.np);
+>> -    if (!ops || !ops->of_xlate ||
+>> -        iommu_fwspec_init(&pdev->dev, &iommu_spec.np->fwnode, ops) ||
+>> -        ops->of_xlate(&pdev->dev, &iommu_spec))
+>> -        ops = NULL;
+>> +    ops = of_iommu_xlate(&pdev->dev, &iommu_spec);
+>>
+>>      of_node_put(iommu_spec.np);
+>>      return ops;
+>>  }
+>>
+>> -const struct iommu_ops *of_iommu_configure(struct device *dev,
+>> -                       struct device_node *master_np)
+>> +static const struct iommu_ops
+>> +*of_platform_iommu_init(struct device *dev, struct device_node *np)
+>>  {
+>>      struct of_phandle_args iommu_spec;
+>> -    struct device_node *np;
+>>      const struct iommu_ops *ops = NULL;
+>>      int idx = 0;
+>>
+>> -    if (dev_is_pci(dev))
+>> -        return of_pci_iommu_configure(to_pci_dev(dev), master_np);
+>> -
+>>      /*
+>>       * We don't currently walk up the tree looking for a parent IOMMU.
+>>       * See the `Notes:' section of
+>>       * Documentation/devicetree/bindings/iommu/iommu.txt
+>>       */
+>> -    while (!of_parse_phandle_with_args(master_np, "iommus",
+>> -                       "#iommu-cells", idx,
+>> -                       &iommu_spec)) {
+>> -        np = iommu_spec.np;
+>> -        ops = of_iommu_get_ops(np);
+>> -
+>> -        if (!ops || !ops->of_xlate ||
+>> -            iommu_fwspec_init(dev, &np->fwnode, ops) ||
+>> -            ops->of_xlate(dev, &iommu_spec))
+>> -            goto err_put_node;
+>> -
+>> -        of_node_put(np);
+>> +    while (!of_parse_phandle_with_args(np, "iommus", "#iommu-cells",
+>> +                       idx, &iommu_spec)) {
+>> +        ops = of_iommu_xlate(dev, &iommu_spec);
+>> +        of_node_put(iommu_spec.np);
+>>          idx++;
+>> +        if (IS_ERR_OR_NULL(ops))
+>> +            break;
+>>      }
+>>
+>>      return ops;
+>> +}
+>> +
+>> +const struct iommu_ops *of_iommu_configure(struct device *dev,
+>> +                       struct device_node *master_np)
+>> +{
+>> +    const struct iommu_ops *ops;
+>> +
+>> +    if (!master_np)
+>> +        return NULL;
+>> +
+>> +    if (dev_is_pci(dev))
+>> +        ops = of_pci_iommu_init(to_pci_dev(dev), master_np);
+> 
+> I gave the whole patch set a try on ThunderX. really_probe() is failing
+> on dma_configure()->of_pci_iommu_init() for each PCI device.
+
+When you say "failing", do you mean cleanly, or with a crash? I've
+managed to hit __of_match_node() dereferencing NULL from
+of_iommu_xlate() in a horribly complicated chain of events, which I'm
+trying to figure out now, and I wonder if the two might be related.
+
+> of_pci_iommu_init() tries to setup firmware stuff via "iommu-map" but
+> ThunderX is using legacy "mmu-masters" binding. We need to take care of
+> that case too.
+
+That is by design. The "mmu-masters" binding is ARM-SMMU-specific and
+will continue to provide the same level of DMA ops support it always has
+(for which there really are practical implementation reasons, it's not
+just an arbitrary "encourage people to move to the generic bindings"
+decision).
+
+Robin.
+
+>> +    else
+>> +        ops = of_platform_iommu_init(dev, master_np);
+>>
+>> -err_put_node:
+>> -    of_node_put(np);
+>> -    return NULL;
+>> +    return IS_ERR(ops) ? NULL : ops;
+>>  }
+>>
+>>  static int __init of_iommu_init(void)
+>>
+> 
+> Thanks,
+> Tomasz
