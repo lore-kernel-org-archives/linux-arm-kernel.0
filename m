@@ -1,42 +1,32 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
-Date: Wed, 25 Jan 2017 10:30:00 +0000
-Subject: [RFC 2/4] irqchip, gicv3-its:Workaround for HiSilicon erratum
- 161010801
-In-Reply-To: <20170124141505.GD7572@leverpostej>
-References: <5886262C.6070108@huawei.com> <58875B0D.4080303@huawei.com>
- <20170124141505.GD7572@leverpostej>
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA8174ACF59@lhreml504-mbs>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 25 Jan 2017 10:39:17 +0000
+Subject: [PATCH v2 0/2] efi/arm64: add vmlinux link to PE/COFF debug table
+Message-ID: <1485340759-28975-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Much like GNU debug links, PE/COFF binaries can carry the path on the build
+host to the binary containing the debugging symbols. Since the kernel binary
+is loaded by UEFI at an a priori unknown offset in the 1:1 mapping of physical
+memory, having this information is useful for the debugger automation to find
+the file and the offset, and load the symbols automatically.
 
+So if we have debugging symbols to begin with (CONFIG_DEBUG_INFO=y), add the
+absolute path to vmlinux to the PE/COFF debug table.
 
-> -----Original Message-----
-> From: Mark Rutland [mailto:mark.rutland at arm.com]
-> Sent: Tuesday, January 24, 2017 2:15 PM
-> To: Shameerali Kolothum Thodi
-> Cc: marc.zyngier at arm.com; will.deacon at arm.com; linux-arm-
-> kernel at lists.infradead.org; Linuxarm; linux-kernel at vger.kernel.org;
-> devicetree at vger.kernel.org; John Garry; Guohanjun (Hanjun Guo);
-> robin.murphy at arm.com
-> Subject: Re: [RFC 2/4] irqchip, gicv3-its:Workaround for HiSilicon
-> erratum 161010801
-sounds like this will have severe implications for virtualization.
-> 
-> > Also these platforms doesn't have a proper IIDR
-> > register to use the existing IIDR based quirk mechanism.
-> 
-> What exactly is wrong with the IIDR on these platforms? That sounds
-> like
-> an erratum as of itself.
-> 
-> What precise value do reads of the IIDR return? Or do reads result in
-> other erroneous behaviour?
+v2: rebase onto v4.10-rc
+    use strip rather than objcopy for first pass (#1)
+    move debug table inside #ifdef CONFIG_EFI region in head.S (#2)
 
-As far as I know, there is no erroneous behavior while reading.  But the
-IIDR JEP106 identity code is 0 on these platforms, hence not much of use.
+Ard Biesheuvel (2):
+  efi: libstub: Preserve .debug sections after absolute relocation check
+  arm64: efi: add vmlinux debug link to the Image binary
 
-This will be corrected in next revision of hw.
+ arch/arm64/kernel/Makefile            |  4 +++
+ arch/arm64/kernel/head.S              | 34 +++++++++++++++++++-
+ arch/arm64/kernel/image.h             |  3 ++
+ drivers/firmware/efi/libstub/Makefile | 24 +++++++++-----
+ 4 files changed, 56 insertions(+), 9 deletions(-)
 
-Thanks,
-Shameer
+-- 
+2.7.4
