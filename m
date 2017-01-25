@@ -1,65 +1,181 @@
-From: yankejian@huawei.com (Yankejian (Hackim Yim))
-Date: Wed, 25 Jan 2017 15:19:22 +0800
-Subject: [patch] {1620} net: hns3: add dcb cap flag in init sequence
-In-Reply-To: <1485329200-64453-1-git-send-email-yankejian@huawei.com>
-References: <1485329200-64453-1-git-send-email-yankejian@huawei.com>
-Message-ID: <5888517A.1020105@huawei.com>
+From: hekuang@huawei.com (He Kuang)
+Date: Wed, 25 Jan 2017 07:23:11 +0000
+Subject: [PATCH 2/2 v2] perf tools: Enable bpf prologue for arm64
+In-Reply-To: <20170124190908.GG10340@kernel.org>
+References: <20170124190908.GG10340@kernel.org>
+Message-ID: <20170125072311.22922-1-hekuang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-it is misoperation, please ignore. sorry to interrupt you!
+Since HAVE_KPROBES can be enabled in arm64, this patch introduces
+regs_query_register_offset() to convert register name to offset for
+arm64, so the BPF prologue feature is ready to use.
 
+This patch also changes the 'dwarfnum' to 'offset' in register table,
+so the related functions are consistent with x86.
 
-On 2017/1/25 15:26, Kejian Yan wrote:
-> If enable DCB feature, we need to add the capacity, and the current
-> procedure cannot setting the dcb because of no capacity flag and every
-> ops interface will implement by the capicity flag is enable.
->
-> Signed-off-by: Kejian Yan <yankejian@huawei.com>
-> ---
->  drivers/net/ethernet/hisilicon/hns3/hns3pf/hclge_main.c | 6 ++++--
->  drivers/net/ethernet/hisilicon/hns3/hns3pf/hclge_tm.c   | 5 +++++
->  2 files changed, 9 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/net/ethernet/hisilicon/hns3/hns3pf/hclge_main.c b/drivers/net/ethernet/hisilicon/hns3/hns3pf/hclge_main.c
-> index 26b9b46..fffe781 100644
-> --- a/drivers/net/ethernet/hisilicon/hns3/hns3pf/hclge_main.c
-> +++ b/drivers/net/ethernet/hisilicon/hns3/hns3pf/hclge_main.c
-> @@ -314,12 +314,14 @@ static int hclge_configure(struct hclge_dev *hdev)
->  		hdev->tx_sch_mode = HCLGE_FLAG_TC_BASE_SCH_MODE;
->  #ifdef CONFIG_HNS3_DCB
->  		hdev->dcbx_cap = DCB_CAP_DCBX_VER_CEE |
-> -			DCB_CAP_DCBX_VER_IEEE;
-> +			DCB_CAP_DCBX_VER_IEEE | DCB_CAP_DCBX_HOST;
-> +		hdev->flag |= HCLGE_FLAG_DCB_CAPABLE;
->  #endif /* #ifdef CONFIG_HNS3_DCB */
->  	} else {
->  		hdev->tx_sch_mode = HCLGE_FLAG_VNET_BASE_SCH_MODE;
->  #ifdef CONFIG_HNS3_DCB
-> -		hdev->dcbx_cap = DCB_CAP_DCBX_VER_IEEE;
-> +		hdev->dcbx_cap = DCB_CAP_DCBX_VER_IEEE | DCB_CAP_DCBX_HOST;
-> +		hdev->flag |= HCLGE_FLAG_DCB_CAPABLE;
->  #endif /* #ifdef CONFIG_HNS3_DCB */
->  	}
->  
-> diff --git a/drivers/net/ethernet/hisilicon/hns3/hns3pf/hclge_tm.c b/drivers/net/ethernet/hisilicon/hns3/hns3pf/hclge_tm.c
-> index 903c413..6b00982 100644
-> --- a/drivers/net/ethernet/hisilicon/hns3/hns3pf/hclge_tm.c
-> +++ b/drivers/net/ethernet/hisilicon/hns3/hns3pf/hclge_tm.c
-> @@ -687,6 +687,11 @@ static void hclge_tm_tc_info_init(struct hclge_dev *hdev)
->  	hdev->dcb_info_tmp.num_tc = hdev->dcb_info.num_tc;
->  	memcpy(hdev->dcb_info_tmp.tc_info, hdev->dcb_info.tc_info,
->  	       HNAE3_MAX_TC * sizeof(*hdev->dcb_info.tc_info));
-> +
-> +	if (hdev->dcb_info.num_tc > 1)
-> +		hdev->flag |= HCLGE_FLAG_DCB_ENABLE;
-> +	else
-> +		hdev->flag &= ~HCLGE_FLAG_DCB_ENABLE;
->  }
->  
->  static void hclge_tm_pg_info_init(struct hclge_dev *hdev)
+Signed-off-by: He Kuang <hekuang@huawei.com>
+---
+ tools/perf/arch/arm64/Makefile          |   1 +
+ tools/perf/arch/arm64/util/dwarf-regs.c | 124 ++++++++++++++++++--------------
+ 2 files changed, 72 insertions(+), 53 deletions(-)
 
-
+diff --git a/tools/perf/arch/arm64/Makefile b/tools/perf/arch/arm64/Makefile
+index 18b1351..eebe1ec 100644
+--- a/tools/perf/arch/arm64/Makefile
++++ b/tools/perf/arch/arm64/Makefile
+@@ -2,3 +2,4 @@ ifndef NO_DWARF
+ PERF_HAVE_DWARF_REGS := 1
+ endif
+ PERF_HAVE_JITDUMP := 1
++PERF_HAVE_ARCH_REGS_QUERY_REGISTER_OFFSET := 1
+diff --git a/tools/perf/arch/arm64/util/dwarf-regs.c b/tools/perf/arch/arm64/util/dwarf-regs.c
+index d49efeb..5ec62a4 100644
+--- a/tools/perf/arch/arm64/util/dwarf-regs.c
++++ b/tools/perf/arch/arm64/util/dwarf-regs.c
+@@ -9,72 +9,90 @@
+  */
+ 
+ #include <stddef.h>
++#include <linux/ptrace.h> /* for struct user_pt_regs */
++#include <errno.h> /* for EINVAL */
++#include <string.h> /* for strcmp */
++#include <linux/ptrace.h> /* for struct user_pt_regs */
+ #include <dwarf-regs.h>
+ 
+-struct pt_regs_dwarfnum {
++struct pt_regs_offset {
+ 	const char *name;
+-	unsigned int dwarfnum;
++	int offset;
+ };
+ 
+-#define STR(s) #s
+-#define REG_DWARFNUM_NAME(r, num) {.name = r, .dwarfnum = num}
+-#define GPR_DWARFNUM_NAME(num) \
+-	{.name = STR(%x##num), .dwarfnum = num}
+-#define REG_DWARFNUM_END {.name = NULL, .dwarfnum = 0}
+-
+ /*
+  * Reference:
+  * http://infocenter.arm.com/help/topic/com.arm.doc.ihi0057b/IHI0057B_aadwarf64.pdf
+  */
+-static const struct pt_regs_dwarfnum regdwarfnum_table[] = {
+-	GPR_DWARFNUM_NAME(0),
+-	GPR_DWARFNUM_NAME(1),
+-	GPR_DWARFNUM_NAME(2),
+-	GPR_DWARFNUM_NAME(3),
+-	GPR_DWARFNUM_NAME(4),
+-	GPR_DWARFNUM_NAME(5),
+-	GPR_DWARFNUM_NAME(6),
+-	GPR_DWARFNUM_NAME(7),
+-	GPR_DWARFNUM_NAME(8),
+-	GPR_DWARFNUM_NAME(9),
+-	GPR_DWARFNUM_NAME(10),
+-	GPR_DWARFNUM_NAME(11),
+-	GPR_DWARFNUM_NAME(12),
+-	GPR_DWARFNUM_NAME(13),
+-	GPR_DWARFNUM_NAME(14),
+-	GPR_DWARFNUM_NAME(15),
+-	GPR_DWARFNUM_NAME(16),
+-	GPR_DWARFNUM_NAME(17),
+-	GPR_DWARFNUM_NAME(18),
+-	GPR_DWARFNUM_NAME(19),
+-	GPR_DWARFNUM_NAME(20),
+-	GPR_DWARFNUM_NAME(21),
+-	GPR_DWARFNUM_NAME(22),
+-	GPR_DWARFNUM_NAME(23),
+-	GPR_DWARFNUM_NAME(24),
+-	GPR_DWARFNUM_NAME(25),
+-	GPR_DWARFNUM_NAME(26),
+-	GPR_DWARFNUM_NAME(27),
+-	GPR_DWARFNUM_NAME(28),
+-	GPR_DWARFNUM_NAME(29),
+-	REG_DWARFNUM_NAME("%lr", 30),
+-	REG_DWARFNUM_NAME("%sp", 31),
+-	REG_DWARFNUM_END,
++#define REG_OFFSET_NAME(r, num) {.name = "%" #r,			\
++			.offset = offsetof(struct user_pt_regs, regs[num])}
++#define REG_OFFSET_END {.name = NULL, .offset = 0}
++#define GPR_OFFSET_NAME(r) \
++	{.name = "%x" #r, .offset = offsetof(struct user_pt_regs, regs[r])}
++
++/* This table is for reverse searching for the offset or register
++ * names in aarch64_regstr_tbl[].
++ */
++static const struct pt_regs_offset regoffset_table[] = {
++	GPR_OFFSET_NAME(0),
++	GPR_OFFSET_NAME(1),
++	GPR_OFFSET_NAME(2),
++	GPR_OFFSET_NAME(3),
++	GPR_OFFSET_NAME(4),
++	GPR_OFFSET_NAME(5),
++	GPR_OFFSET_NAME(6),
++	GPR_OFFSET_NAME(7),
++	GPR_OFFSET_NAME(8),
++	GPR_OFFSET_NAME(9),
++	GPR_OFFSET_NAME(10),
++	GPR_OFFSET_NAME(11),
++	GPR_OFFSET_NAME(12),
++	GPR_OFFSET_NAME(13),
++	GPR_OFFSET_NAME(14),
++	GPR_OFFSET_NAME(15),
++	GPR_OFFSET_NAME(16),
++	GPR_OFFSET_NAME(17),
++	GPR_OFFSET_NAME(18),
++	GPR_OFFSET_NAME(19),
++	GPR_OFFSET_NAME(20),
++	GPR_OFFSET_NAME(21),
++	GPR_OFFSET_NAME(22),
++	GPR_OFFSET_NAME(23),
++	GPR_OFFSET_NAME(24),
++	GPR_OFFSET_NAME(25),
++	GPR_OFFSET_NAME(26),
++	GPR_OFFSET_NAME(27),
++	GPR_OFFSET_NAME(28),
++	GPR_OFFSET_NAME(29),
++	REG_OFFSET_NAME(lr, 30),
++	REG_OFFSET_NAME(sp, 31),
++	REG_OFFSET_END,
+ };
+ 
++/* Minus 1 for the ending REG_OFFSET_END */
++#define ARCH_MAX_REGS ((sizeof(regoffset_table) /		\
++			sizeof(regoffset_table[0])) - 1)
++
++/* Return architecture dependent register string (for kprobe-tracer) */
++const char *get_arch_regstr(unsigned int n)
++{
++	return (n < ARCH_MAX_REGS) ? regoffset_table[n].name : NULL;
++}
++
++/* Reuse code from arch/arm64/kernel/ptrace.c */
+ /**
+- * get_arch_regstr() - lookup register name from it's DWARF register number
+- * @n:	the DWARF register number
++ * regs_query_register_offset() - query register offset from its name
++ * @name:	the name of a register
+  *
+- * get_arch_regstr() returns the name of the register in struct
+- * regdwarfnum_table from it's DWARF register number. If the register is not
+- * found in the table, this returns NULL;
++ * regs_query_register_offset() returns the offset of a register in struct
++ * user_pt_regs from its name. If the name is invalid, this returns -EINVAL;
+  */
+-const char *get_arch_regstr(unsigned int n)
++int regs_query_register_offset(const char *name)
+ {
+-	const struct pt_regs_dwarfnum *roff;
+-	for (roff = regdwarfnum_table; roff->name != NULL; roff++)
+-		if (roff->dwarfnum == n)
+-			return roff->name;
+-	return NULL;
++	const struct pt_regs_offset *roff;
++
++	for (roff = regoffset_table; roff->name != NULL; roff++)
++		if (!strcmp(roff->name, name))
++			return roff->offset;
++	return -EINVAL;
+ }
 -- 
-MBR,
-Yankejian (Hackim Yim)
+1.8.5.2
