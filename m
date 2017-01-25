@@ -1,73 +1,49 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Wed, 25 Jan 2017 23:49:02 +0200
-Subject: [PATCH v2] arm64: dma-mapping: Fix dma_mapping_error() when
- bypassing SWIOTLB
-In-Reply-To: <840027acb4750542003dff17b4a8902ba8972754.1485368348.git.robin.murphy@arm.com>
-References: <20170124225200.a7qioswpxzh6agvd@raspberrypi-2.musicnaut.iki.fi>
- <840027acb4750542003dff17b4a8902ba8972754.1485368348.git.robin.murphy@arm.com>
-Message-ID: <20170125214902.3lui3mvq2yze4n3x@raspberrypi-3.musicnaut.iki.fi>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 25 Jan 2017 23:24:33 +0100
+Subject: [PATCH] ARM: decompressor: add strlen prototype
+Message-ID: <20170125222442.1244908-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The decompress.c file contains a declaration for strstr() so we can
+include some compression library code.
 
-On Wed, Jan 25, 2017 at 06:31:31PM +0000, Robin Murphy wrote:
-> When bypassing SWIOTLB on small-memory systems, we need to avoid calling
-> into swiotlb_dma_mapping_error() in exactly the same way as we avoid
-> swiotlb_dma_supported(), because the former also relies on SWIOTLB state
-> being initialised.
-> 
-> Under the assumptions for which we skip SWIOTLB, dma_map_{single,page}()
-> will only ever return the DMA-offset-adjusted physical address of the
-> page passed in, thus we can report success unconditionally.
-> 
-> Fixes: b67a8b29df7e ("arm64: mm: only initialize swiotlb when necessary")
-> CC: stable at vger.kernel.org
-> CC: Jisheng Zhang <jszhang@marvell.com>
-> Reported-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+With the updated LZ4 implementation, we run into the same problem again
+for strlen():
 
-Tested-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+In file included from ../include/linux/rcupdate.h:40:0,
+                 from ../include/linux/srcu.h:33,
+                 from ../include/linux/notifier.h:15,
+                 from ../include/linux/memory_hotplug.h:6,
+                 from ../include/linux/mmzone.h:749,
+                 from ../include/linux/gfp.h:5,
+                 from ../include/linux/kmod.h:22,
+                 from ../include/linux/module.h:13,
+                 from ../arch/arm/boot/compressed/../../../../lib/lz4/lz4_decompress.c:39,
+                 from ../arch/arm/boot/compressed/../../../../lib/decompress_unlz4.c:13,
+                 from ../arch/arm/boot/compressed/decompress.c:55:
+include/linux/cpumask.h: In function 'cpumask_parse':
+include/linux/cpumask.h:592:53: error: implicit declaration of function 'strlen';did you mean 'strstr'? [-Werror=implicit-function-declaration]
 
-Thanks,
+This adds another declaration to work around the new problem.
 
-A.
+Fixes: ce83d9ab80d6 ("lib: update LZ4 compressor module")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/boot/compressed/decompress.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-> ---
-> 
-> v2: Get the return value the right way round this time... After some
->     careful reasoning it really is that simple.
-> 
->  arch/arm64/mm/dma-mapping.c | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> index e04082700bb1..1ffb7d5d299a 100644
-> --- a/arch/arm64/mm/dma-mapping.c
-> +++ b/arch/arm64/mm/dma-mapping.c
-> @@ -352,6 +352,13 @@ static int __swiotlb_dma_supported(struct device *hwdev, u64 mask)
->  	return 1;
->  }
->  
-> +static int __swiotlb_dma_mapping_error(struct device *hwdev, dma_addr_t addr)
-> +{
-> +	if (swiotlb)
-> +		return swiotlb_dma_mapping_error(hwdev, addr);
-> +	return 0;
-> +}
-> +
->  static struct dma_map_ops swiotlb_dma_ops = {
->  	.alloc = __dma_alloc,
->  	.free = __dma_free,
-> @@ -366,7 +373,7 @@ static struct dma_map_ops swiotlb_dma_ops = {
->  	.sync_sg_for_cpu = __swiotlb_sync_sg_for_cpu,
->  	.sync_sg_for_device = __swiotlb_sync_sg_for_device,
->  	.dma_supported = __swiotlb_dma_supported,
-> -	.mapping_error = swiotlb_dma_mapping_error,
-> +	.mapping_error = __swiotlb_dma_mapping_error,
->  };
->  
->  static int __init atomic_pool_init(void)
-> -- 
-> 2.11.0.dirty
-> 
+diff --git a/arch/arm/boot/compressed/decompress.c b/arch/arm/boot/compressed/decompress.c
+index a0765e7ed6c7..ea7832702a8f 100644
+--- a/arch/arm/boot/compressed/decompress.c
++++ b/arch/arm/boot/compressed/decompress.c
+@@ -32,6 +32,7 @@ extern void error(char *);
+ 
+ /* Not needed, but used in some headers pulled in by decompressors */
+ extern char * strstr(const char * s1, const char *s2);
++extern size_t strlen(const char *s);
+ 
+ #ifdef CONFIG_KERNEL_GZIP
+ #include "../../../../lib/decompress_inflate.c"
+-- 
+2.9.0
