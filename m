@@ -1,27 +1,25 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 25 Jan 2017 22:04:34 +0200
-Subject: [PATCH 7/7] mfd: exynos-lpass: Add runtime PM support
-In-Reply-To: <1485345031-2948-8-git-send-email-m.szyprowski@samsung.com>
-References: <1485345031-2948-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170125115105eucas1p1e7191cf0be871c254dd09477ca7f9e1a@eucas1p1.samsung.com>
- <1485345031-2948-8-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20170125200434.zhyjhffyftp4cfth@kozik-lap>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 25 Jan 2017 21:25:05 +0100
+Subject: [PATCH v10 2/5] i2c: Add STM32F4 I2C driver
+In-Reply-To: <1484832316-5594-3-git-send-email-cedric.madianga@gmail.com>
+References: <1484832316-5594-1-git-send-email-cedric.madianga@gmail.com>
+ <1484832316-5594-3-git-send-email-cedric.madianga@gmail.com>
+Message-ID: <20170125202505.4acldm2wla3sqfsp@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2017 at 12:50:31PM +0100, Marek Szyprowski wrote:
-> Convert exisitng lpass-suspend/resume callbacks into runtime PM callbacks.
-> This way Exynos LPASS driver will be ready for use with power domains
-> enabled. LPASS will be runtime resumed/suspended as a result of its child
-> devices runtime PM transitions.
+On Thu, Jan 19, 2017 at 02:25:13PM +0100, M'boumba Cedric Madianga wrote:
+> This patch adds support for the STM32F4 I2C controller.
 > 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  drivers/mfd/exynos-lpass.c | 10 ++++++++--
->  1 file changed, 8 insertions(+), 2 deletions(-)
-> 
+> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
 
-Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+Applied to for-next with Uwe's ack (which looked more like a review to
+me, but well...), thanks to all involved for keeping at it!
 
-Best regards,
-Krzysztof
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/0f06d05f/attachment.sig>
