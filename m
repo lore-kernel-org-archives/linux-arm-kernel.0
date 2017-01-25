@@ -1,55 +1,49 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 25 Jan 2017 12:02:46 +0100
-Subject: [PATCH v2 3/6] ARM: tegra: nyan-big: Include compatible
- revisions for proper detection
-In-Reply-To: <20170122154753.31942-3-contact@paulk.fr>
+From: contact@paulk.fr (Paul Kocialkowski)
+Date: Wed, 25 Jan 2017 12:01:55 +0100
+Subject: [PATCH v2 2/6] ARM: tegra: nyan: Use external control for
+ bq24735 charger
+In-Reply-To: <20170125105940.GC9344@ulmo.ba.sec>
 References: <20170122154753.31942-1-contact@paulk.fr>
- <20170122154753.31942-3-contact@paulk.fr>
-Message-ID: <20170125110246.GD9344@ulmo.ba.sec>
+ <20170122154753.31942-2-contact@paulk.fr>
+ <20170125105940.GC9344@ulmo.ba.sec>
+Message-ID: <1485342115.1224.0.camel@paulk.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 22, 2017 at 04:47:50PM +0100, Paul Kocialkowski wrote:
-> Depthcharge (the payload used with cros devices) will attempt to detect
-> boards using their revision. This includes all the known revisions for
-> the nyan-big board so that the dtb can be selected preferably.
+Le mercredi 25 janvier 2017 ? 11:59 +0100, Thierry Reding a ?crit?:
+> On Sun, Jan 22, 2017 at 04:47:49PM +0100, Paul Kocialkowski wrote:
+> > Nyan boards come with an embedded controller that controls when to
+> > enable and disable the charge. Thus, it should not be left up to the
+> > kernel to handle that.
+> > 
+> > Using the ti,external-control property allows specifying this use-case.
+> > 
+> > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+> > ---
+> > ?arch/arm/boot/dts/tegra124-nyan.dtsi | 1 +
+> > ?1 file changed, 1 insertion(+)
 > 
-> Defining compatibly revisions allows depthcharge to select the kernel
-> via the revision it detects instead of using the default kernel. This
-> allows having a FIT image with multiple kernels for multiple devices.
-> 
-> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
-> ---
->  arch/arm/boot/dts/tegra124-nyan-big.dts | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
+> Is the ti,ac-detect-gpios property still useful in that case? I guess it
+> would still allow to monitor whether or not a charger is connected, even
+> if the EC determines that it shouldn't charge.
 
-I've applied this, with a small change, see below.
+Yes, this is mostly what the bq24735 is used for in nyan devices: reporting
+connection and disconnection events.
 
-> diff --git a/arch/arm/boot/dts/tegra124-nyan-big.dts b/arch/arm/boot/dts/tegra124-nyan-big.dts
-> index 67d7cfb32541..f12ece9b76a6 100644
-> --- a/arch/arm/boot/dts/tegra124-nyan-big.dts
-> +++ b/arch/arm/boot/dts/tegra124-nyan-big.dts
-> @@ -6,7 +6,12 @@
->  
->  / {
->  	model = "Acer Chromebook 13 CB5-311";
-> -	compatible = "google,nyan-big", "nvidia,tegra124";
-> +	compatible = "google,nyan-big-rev7", "google,nyan-big-rev6",
-> +			"google,nyan-big-rev5", "google,nyan-big-rev4",
-> +			"google,nyan-big-rev3", "google,nyan-big-rev2",
-> +			"google,nyan-big-rev5", "google,nyan-big-rev4",
+> Anyway, I've applied this.
 
-This line is the same as two lines above, so I've removed this one. I've
-also used slightly different padding (two tabs and align to the first
-string in the first line with spaces) to make it consistent with other
-string lists in the file.
+Thanks!
 
-Thanks,
-Thierry
+-- 
+Paul Kocialkowski, developer of free digital technology at the lower levels
+
+Website: https://www.paulk.fr/
+Coding blog: https://code.paulk.fr/
+Git repositories: https://git.paulk.fr/ https://git.code.paulk.fr/
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/785e4e29/attachment.sig>
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/63ff1be2/attachment-0001.sig>
