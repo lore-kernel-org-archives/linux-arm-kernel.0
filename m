@@ -1,29 +1,42 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 25 Jan 2017 10:31:45 +0100
-Subject: [PATCH] ARM: dts: tegra: =?utf-8?Q?Fix?=
- =?utf-8?Q?_missing_card_detection_in_Trimslice_=C2=B5SD?= card slot
-In-Reply-To: <20170122211747.exirq4nvb2xj6dk6@localhost>
-References: <20170122211747.exirq4nvb2xj6dk6@localhost>
-Message-ID: <20170125093145.GF13025@ulmo.ba.sec>
+From: labbott@redhat.com (Laura Abbott)
+Date: Wed, 25 Jan 2017 10:30:00 +0100
+Subject: [PATCH] arm64: Use __pa_symbol for empty_zero_page
+In-Reply-To: <1485258220-21916-1-git-send-email-geert+renesas@glider.be>
+References: <1485258220-21916-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <ce01d0cb-79a2-def8-8de0-d4ca3980e8e8@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 22, 2017 at 10:17:48PM +0100, Rask Ingemann Lambertsen wrote:
-> Card insertion and removal currently goes undetected. AFAIK there's no
-> way to generate interrupts on card changes in this slot, so use polling.
-> 
-> Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
+On 01/24/2017 12:43 PM, Geert Uytterhoeven wrote:
+> If CONFIG_DEBUG_VIRTUAL=y and CONFIG_ARM64_SW_TTBR0_PAN=y:
+>
+>     virt_to_phys used for non-linear address: ffffff8008cc0000 (empty_zero_page+0x0/0x1000)
+>     WARNING: CPU: 0 PID: 0 at arch/arm64/mm/physaddr.c:14 __virt_to_phys+0x28/0x60
+>     ...
+>     [<ffffff800809abb4>] __virt_to_phys+0x28/0x60
+>     [<ffffff8008a02600>] setup_arch+0x46c/0x4d4
+>
+> Fixes: 2077be6783b5936c ("arm64: Use __pa_symbol for kernel symbols")
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > ---
->  arch/arm/boot/dts/tegra20-trimslice.dts | 1 +
->  1 file changed, 1 insertion(+)
+>  arch/arm64/kernel/setup.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index 669fc9ff728b227f..b5222094ab52db6f 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -298,7 +298,7 @@ void __init setup_arch(char **cmdline_p)
+>  	 * faults in case uaccess_enable() is inadvertently called by the init
+>  	 * thread.
+>  	 */
+> -	init_task.thread_info.ttbr0 = virt_to_phys(empty_zero_page);
+> +	init_task.thread_info.ttbr0 = __pa_symbol(empty_zero_page);
+>  #endif
+>
+>  #ifdef CONFIG_VT
+>
 
-Applied, thanks.
+(thought I sent this yesterday but SMTP was not set correctly)
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/d5e289bd/attachment.sig>
+Acked-by: Laura Abbott <labbott@redhat.com>
