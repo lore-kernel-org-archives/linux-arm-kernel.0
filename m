@@ -1,181 +1,178 @@
-From: hekuang@huawei.com (He Kuang)
-Date: Wed, 25 Jan 2017 07:23:11 +0000
-Subject: [PATCH 2/2 v2] perf tools: Enable bpf prologue for arm64
-In-Reply-To: <20170124190908.GG10340@kernel.org>
-References: <20170124190908.GG10340@kernel.org>
-Message-ID: <20170125072311.22922-1-hekuang@huawei.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Wed, 25 Jan 2017 15:23:32 +0800
+Subject: [PATCH v20 08/17] clocksource/drivers/arm_arch_timer: Rework
+ counter frequency detection.
+In-Reply-To: <CADyBb7sU6DVMk6px0963r8by--U-3k_XjESd88zZMkj7xbywgA@mail.gmail.com>
+References: <20170118132541.8989-1-fu.wei@linaro.org>
+ <20170118132541.8989-9-fu.wei@linaro.org>
+ <20170124172400.GG7572@leverpostej>
+ <CADyBb7sU6DVMk6px0963r8by--U-3k_XjESd88zZMkj7xbywgA@mail.gmail.com>
+Message-ID: <CADyBb7tgsvi=7-mv29pJCTpLzsF_NedwAdObm0NEnYQPGuX5iw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since HAVE_KPROBES can be enabled in arm64, this patch introduces
-regs_query_register_offset() to convert register name to offset for
-arm64, so the BPF prologue feature is ready to use.
+Hi Mark,
 
-This patch also changes the 'dwarfnum' to 'offset' in register table,
-so the related functions are consistent with x86.
+On 25 January 2017 at 14:46, Fu Wei <fu.wei@linaro.org> wrote:
+> Hi Mark,
+>
+> On 25 January 2017 at 01:24, Mark Rutland <mark.rutland@arm.com> wrote:
+>> On Wed, Jan 18, 2017 at 09:25:32PM +0800, fu.wei at linaro.org wrote:
+>>> From: Fu Wei <fu.wei@linaro.org>
+>>>
+>>> The counter frequency detection call(arch_timer_detect_rate) combines two
+>>> ways to get counter frequency: system coprocessor register and MMIO timer.
+>>> But in a specific timer init code, we only need one way to try:
+>>> getting frequency from MMIO timer register will be needed only when we
+>>> init MMIO timer; getting frequency from system coprocessor register will
+>>> be needed only when we init arch timer.
+>>
+>> When I mentioned this splitting before, I had mean that we'd completely
+>> separate the two, with separate mmio_rate and sysreg_rate variables.
+>
+> sorry for misunderstanding.
+>
+> Are you saying :
+>
+> diff --git a/drivers/clocksource/arm_arch_timer.c
+> b/drivers/clocksource/arm_arch_timer.c
+> index 663a57a..eec92f6 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -65,7 +65,8 @@ struct arch_timer {
+>
+>  #define to_arch_timer(e) container_of(e, struct arch_timer, evt)
+>
+> -static u32 arch_timer_rate;
+> +static u32 arch_timer_sysreg_rate ;
+> +static u32 arch_timer_mmio_rate;
+>  static int arch_timer_ppi[ARCH_TIMER_MAX_TIMER_PPI];
+>
+>  static struct clock_event_device __percpu *arch_timer_evt;
+>
+>
+> But what have I learned From ARMv8 ARM is
+> AArch64 System register CNTFRQ_EL0 is provided so that software can
+> discover the frequency of the system counter.
+> CNTFRQ(in CNTCTLBase and CNTBaseN) is provided so that software can
+> discover the frequency of the system counter.
+> The bit assignments of the registers are identical in the System
+> register interface and in the memory-mapped system level interface.
+> So I think they both contain the same value : the frequency of the
+> system counter, just in different view, and can be accessed in
+> different ways.
+>
+> So do we really need to separate mmio_rate and sysreg_rate variables?
+>
+> And for CNTFRQ(in CNTCTLBase and CNTBaseN) , we can NOT access it in
+> Linux kernel (EL1),
+> Because ARMv8 ARM says:
+> In a system that implements both Secure and Non-secure states, this
+> register is only accessible by Secure accesses.
+> That means we still need to get the frequency of the system counter
+> from CNTFRQ_EL0 in MMIO timer code.
+> This have been proved when I tested this driver on foundation model, I
+> got "0" when I access CNTFRQ from Linux kernel (Non-secure EL1)
+>
+> So I guess the logic of the original code is
+>  static u32 arch_timer_rate keeps the frequency of the system counter,
+>  no matter where the value comes from.
+> Because  they should be the same value. if we have got the frequency
+> of the system counter(arch_timer_rate != 0), then we don't need to get
+> it again, even in anther way.
 
-Signed-off-by: He Kuang <hekuang@huawei.com>
----
- tools/perf/arch/arm64/Makefile          |   1 +
- tools/perf/arch/arm64/util/dwarf-regs.c | 124 ++++++++++++++++++--------------
- 2 files changed, 72 insertions(+), 53 deletions(-)
+*IF*  the above is right,
+For ARM32, boot with dtb,  the original logic and this patch work well.
+For ARM64, boot with dtb,  if MMIO timer is probed first, and there is
+not "clock-frequency" in the node. MMIO timer can't get  the
+frequency. Because we will get "0" when we access CNTFRQ from Linux
+kernel (Non-secure EL1), that means the original logic and this patch
+won't work. To fix this issue, we need to get  the frequency  from
+sysreg CNTFRQ_EL0.
+For ARM64, boot with ACPI, the original logic and this patch work
+well, because we always probe arch_timer first.
 
-diff --git a/tools/perf/arch/arm64/Makefile b/tools/perf/arch/arm64/Makefile
-index 18b1351..eebe1ec 100644
---- a/tools/perf/arch/arm64/Makefile
-+++ b/tools/perf/arch/arm64/Makefile
-@@ -2,3 +2,4 @@ ifndef NO_DWARF
- PERF_HAVE_DWARF_REGS := 1
- endif
- PERF_HAVE_JITDUMP := 1
-+PERF_HAVE_ARCH_REGS_QUERY_REGISTER_OFFSET := 1
-diff --git a/tools/perf/arch/arm64/util/dwarf-regs.c b/tools/perf/arch/arm64/util/dwarf-regs.c
-index d49efeb..5ec62a4 100644
---- a/tools/perf/arch/arm64/util/dwarf-regs.c
-+++ b/tools/perf/arch/arm64/util/dwarf-regs.c
-@@ -9,72 +9,90 @@
-  */
- 
- #include <stddef.h>
-+#include <linux/ptrace.h> /* for struct user_pt_regs */
-+#include <errno.h> /* for EINVAL */
-+#include <string.h> /* for strcmp */
-+#include <linux/ptrace.h> /* for struct user_pt_regs */
- #include <dwarf-regs.h>
- 
--struct pt_regs_dwarfnum {
-+struct pt_regs_offset {
- 	const char *name;
--	unsigned int dwarfnum;
-+	int offset;
- };
- 
--#define STR(s) #s
--#define REG_DWARFNUM_NAME(r, num) {.name = r, .dwarfnum = num}
--#define GPR_DWARFNUM_NAME(num) \
--	{.name = STR(%x##num), .dwarfnum = num}
--#define REG_DWARFNUM_END {.name = NULL, .dwarfnum = 0}
--
- /*
-  * Reference:
-  * http://infocenter.arm.com/help/topic/com.arm.doc.ihi0057b/IHI0057B_aadwarf64.pdf
-  */
--static const struct pt_regs_dwarfnum regdwarfnum_table[] = {
--	GPR_DWARFNUM_NAME(0),
--	GPR_DWARFNUM_NAME(1),
--	GPR_DWARFNUM_NAME(2),
--	GPR_DWARFNUM_NAME(3),
--	GPR_DWARFNUM_NAME(4),
--	GPR_DWARFNUM_NAME(5),
--	GPR_DWARFNUM_NAME(6),
--	GPR_DWARFNUM_NAME(7),
--	GPR_DWARFNUM_NAME(8),
--	GPR_DWARFNUM_NAME(9),
--	GPR_DWARFNUM_NAME(10),
--	GPR_DWARFNUM_NAME(11),
--	GPR_DWARFNUM_NAME(12),
--	GPR_DWARFNUM_NAME(13),
--	GPR_DWARFNUM_NAME(14),
--	GPR_DWARFNUM_NAME(15),
--	GPR_DWARFNUM_NAME(16),
--	GPR_DWARFNUM_NAME(17),
--	GPR_DWARFNUM_NAME(18),
--	GPR_DWARFNUM_NAME(19),
--	GPR_DWARFNUM_NAME(20),
--	GPR_DWARFNUM_NAME(21),
--	GPR_DWARFNUM_NAME(22),
--	GPR_DWARFNUM_NAME(23),
--	GPR_DWARFNUM_NAME(24),
--	GPR_DWARFNUM_NAME(25),
--	GPR_DWARFNUM_NAME(26),
--	GPR_DWARFNUM_NAME(27),
--	GPR_DWARFNUM_NAME(28),
--	GPR_DWARFNUM_NAME(29),
--	REG_DWARFNUM_NAME("%lr", 30),
--	REG_DWARFNUM_NAME("%sp", 31),
--	REG_DWARFNUM_END,
-+#define REG_OFFSET_NAME(r, num) {.name = "%" #r,			\
-+			.offset = offsetof(struct user_pt_regs, regs[num])}
-+#define REG_OFFSET_END {.name = NULL, .offset = 0}
-+#define GPR_OFFSET_NAME(r) \
-+	{.name = "%x" #r, .offset = offsetof(struct user_pt_regs, regs[r])}
-+
-+/* This table is for reverse searching for the offset or register
-+ * names in aarch64_regstr_tbl[].
-+ */
-+static const struct pt_regs_offset regoffset_table[] = {
-+	GPR_OFFSET_NAME(0),
-+	GPR_OFFSET_NAME(1),
-+	GPR_OFFSET_NAME(2),
-+	GPR_OFFSET_NAME(3),
-+	GPR_OFFSET_NAME(4),
-+	GPR_OFFSET_NAME(5),
-+	GPR_OFFSET_NAME(6),
-+	GPR_OFFSET_NAME(7),
-+	GPR_OFFSET_NAME(8),
-+	GPR_OFFSET_NAME(9),
-+	GPR_OFFSET_NAME(10),
-+	GPR_OFFSET_NAME(11),
-+	GPR_OFFSET_NAME(12),
-+	GPR_OFFSET_NAME(13),
-+	GPR_OFFSET_NAME(14),
-+	GPR_OFFSET_NAME(15),
-+	GPR_OFFSET_NAME(16),
-+	GPR_OFFSET_NAME(17),
-+	GPR_OFFSET_NAME(18),
-+	GPR_OFFSET_NAME(19),
-+	GPR_OFFSET_NAME(20),
-+	GPR_OFFSET_NAME(21),
-+	GPR_OFFSET_NAME(22),
-+	GPR_OFFSET_NAME(23),
-+	GPR_OFFSET_NAME(24),
-+	GPR_OFFSET_NAME(25),
-+	GPR_OFFSET_NAME(26),
-+	GPR_OFFSET_NAME(27),
-+	GPR_OFFSET_NAME(28),
-+	GPR_OFFSET_NAME(29),
-+	REG_OFFSET_NAME(lr, 30),
-+	REG_OFFSET_NAME(sp, 31),
-+	REG_OFFSET_END,
- };
- 
-+/* Minus 1 for the ending REG_OFFSET_END */
-+#define ARCH_MAX_REGS ((sizeof(regoffset_table) /		\
-+			sizeof(regoffset_table[0])) - 1)
-+
-+/* Return architecture dependent register string (for kprobe-tracer) */
-+const char *get_arch_regstr(unsigned int n)
-+{
-+	return (n < ARCH_MAX_REGS) ? regoffset_table[n].name : NULL;
-+}
-+
-+/* Reuse code from arch/arm64/kernel/ptrace.c */
- /**
-- * get_arch_regstr() - lookup register name from it's DWARF register number
-- * @n:	the DWARF register number
-+ * regs_query_register_offset() - query register offset from its name
-+ * @name:	the name of a register
-  *
-- * get_arch_regstr() returns the name of the register in struct
-- * regdwarfnum_table from it's DWARF register number. If the register is not
-- * found in the table, this returns NULL;
-+ * regs_query_register_offset() returns the offset of a register in struct
-+ * user_pt_regs from its name. If the name is invalid, this returns -EINVAL;
-  */
--const char *get_arch_regstr(unsigned int n)
-+int regs_query_register_offset(const char *name)
- {
--	const struct pt_regs_dwarfnum *roff;
--	for (roff = regdwarfnum_table; roff->name != NULL; roff++)
--		if (roff->dwarfnum == n)
--			return roff->name;
--	return NULL;
-+	const struct pt_regs_offset *roff;
-+
-+	for (roff = regoffset_table; roff->name != NULL; roff++)
-+		if (!strcmp(roff->name, name))
-+			return roff->offset;
-+	return -EINVAL;
- }
+So *IF* I understand it correctly, May I suggest that we only get  the
+frequency from sysreg CNTFRQ_EL0 in this driver?
+I think that can simplify the code and avoid the issue when we boot
+ARM64 with dtb.
+
+Again,  please correct me if I misunderstand something.  :-)  Great
+thanks for your help!
+
+>
+> But  the above is just my thought, and I believe you're the expert of
+> ARM. So please correct me if I misunderstand something.  :-)
+>
+> Thanks!
+>>
+>> The probing logic relying on this is complicated and fragile, and I
+>> think these patches are complicating that further (though I appreciate
+>> that's far from the intent).
+>>
+>> I believe we need to split the MMIO and sysreg timer code apart
+>> entirely. I've had a look at that today, though it's been fairly painful
+>> so far. It appears some platforms may inadvertently be relying on the
+>> order and manner in which the rates are probed, which is a major
+>> headache.
+>>
+>> I will try to attack that some more tomorrow.
+>>
+>>> This patch separates paths to determine frequency:
+>>> Separate out the MMIO frequency and the sysreg frequency detection call,
+>>> and use the appropriate one for the counter.
+>>>
+>>> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+>>> ---
+>>>  drivers/clocksource/arm_arch_timer.c | 40 ++++++++++++++++++++++--------------
+>>>  1 file changed, 25 insertions(+), 15 deletions(-)
+>>>
+>>> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+>>> index 6484f84..9482481 100644
+>>> --- a/drivers/clocksource/arm_arch_timer.c
+>>> +++ b/drivers/clocksource/arm_arch_timer.c
+>>> @@ -488,23 +488,33 @@ static int arch_timer_starting_cpu(unsigned int cpu)
+>>>       return 0;
+>>>  }
+>>>
+>>> -static void arch_timer_detect_rate(void __iomem *cntbase)
+>>> +static void __arch_timer_determine_rate(u32 rate)
+>>>  {
+>>> -     /* Who has more than one independent system counter? */
+>>> -     if (arch_timer_rate)
+>>> -             return;
+>>> +     /* Check the timer frequency. */
+>>> +     if (!arch_timer_rate) {
+>>> +             if (rate)
+>>> +                     arch_timer_rate = rate;
+>>> +             else
+>>> +                     pr_warn("frequency not available\n");
+>>> +     } else if (rate && arch_timer_rate != rate) {
+>>> +             pr_warn("got different frequency, keep original.\n");
+>>> +     }
+>>> +}
+>>
+>> This function should be killed off entirely. We need to be able to fail
+>> the probe if we cannot determine the rate, and that means we need error
+>> handling in the ACPI and DT cases anyway.
+>>
+>> Thanks,
+>> Mark.
+>
+>
+>
+> --
+> Best regards,
+>
+> Fu Wei
+> Software Engineer
+> Red Hat
+
+
+
 -- 
-1.8.5.2
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
