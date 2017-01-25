@@ -1,58 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 25 Jan 2017 11:53:05 +0000
-Subject: [PATCH v2 2/2] arm64: efi: add vmlinux debug link to the Image
- binary
-In-Reply-To: <1485340759-28975-3-git-send-email-ard.biesheuvel@linaro.org>
-References: <1485340759-28975-1-git-send-email-ard.biesheuvel@linaro.org>
- <1485340759-28975-3-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20170125115305.GA29027@leverpostej>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Wed, 25 Jan 2017 11:54:26 +0000
+Subject: [STLinux Kernel] [PATCH 7/8] ARM: dts: STiH407-family: Use new
+ Pinctrl groups
+In-Reply-To: <20170124134310.27512-8-lee.jones@linaro.org>
+References: <20170124134310.27512-1-lee.jones@linaro.org>
+ <20170124134310.27512-8-lee.jones@linaro.org>
+Message-ID: <20170125115426.GH5680@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2017 at 10:39:19AM +0000, Ard Biesheuvel wrote:
-> When building with debugging symbols, take the absolute path to the
-> vmlinux binary and add it to the special PE/COFF debug table entry.
+Hi Lee,
+
+On Tue, 24 Jan 2017, Lee Jones wrote:
+
+> Having just defined some new Pinctrl groups for when when HW flow-
+> control is {en,dis}abled, let's reference them for use within the
+> driver.
 > 
-> These entries are used internally by EDK2 based* debug builds of UEFI
-> to populate the DebugImageInfo table, which can be used by debuggers
-> as well as by the OS itself to retrieve information about all loaded
-> PE/COFF executables. This is highly useful for source level debugging
-> of the UEFI stub.
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Does that mean EFI_IMAGE_DEBUG_DIRECTORY_ENTRY and friends are
-EDK2-specific?
+Same as previous comment, your enabling hw flow control for all
+stih407 family boards. I've not checked the schematics for them
+but as hw flow control is dependent on board wiring, IMO this
+should be added in board specific file.
 
-Or just that the way EDK2 happens to use those is EDK2-specific?
+regards,
 
-> * for AArch64, this probably means all of them
-> 
-> Cc: Matt Fleming <matt@codeblueprint.co.uk>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Peter.
+
 > ---
->  arch/arm64/kernel/Makefile |  4 +++
->  arch/arm64/kernel/head.S   | 34 +++++++++++++++++++-
->  arch/arm64/kernel/image.h  |  3 ++
->  3 files changed, 40 insertions(+), 1 deletion(-)
-
-> +efi_debug_table:
-> +	// EFI_IMAGE_DEBUG_DIRECTORY_ENTRY
-> +	.long	0			// Characteristics
-> +	.long	0			// TimeDateStamp
-> +	.short	0			// MajorVersion
-> +	.short	0			// MinorVersion
-> +	.long	2			// Type == EFI_IMAGE_DEBUG_TYPE_CODEVIEW
-
-> +ENTRY(efi_debug_entry)
-> +	// EFI_IMAGE_DEBUG_CODEVIEW_NB10_ENTRY
-> +	.long	0x3031424E		// Signature
-
-Certainly not a blocker for this, but this reminds me that it would be
-nice to de-magic the EFI constants used by the stub.
-
-I took a stab a while back [1], for the existing definitions, but that
-fell by the wayside.
-
-Thanks,
-Mark.
-
-[1] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git efi-stub/definitions
+>  arch/arm/boot/dts/stih407-family.dtsi | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+> index c8b2944..9789978 100644
+> --- a/arch/arm/boot/dts/stih407-family.dtsi
+> +++ b/arch/arm/boot/dts/stih407-family.dtsi
+> @@ -222,8 +222,9 @@
+>  			compatible = "st,asc";
+>  			reg = <0x9830000 0x2c>;
+>  			interrupts = <GIC_SPI 122 IRQ_TYPE_NONE>;
+> -			pinctrl-names = "default";
+> -			pinctrl-0 = <&pinctrl_serial0>;
+> +			pinctrl-names = "default", "manual-rts";
+> +			pinctrl-0 = <&pinctrl_serial0_flowctrl>;
+> +			pinctrl-1 = <&pinctrl_serial0>;
+>  			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
+>  
+>  			status = "disabled";
