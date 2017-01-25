@@ -1,214 +1,218 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 25 Jan 2017 11:45:06 +0530
-Subject: [PATCH v6 2/3] dmaeninge: xilinx_dma: Fix bug in multiple frame
- stores scenario in vdma
-In-Reply-To: <1484372155-19423-3-git-send-email-appanad@xilinx.com>
-References: <1484372155-19423-1-git-send-email-appanad@xilinx.com>
- <1484372155-19423-3-git-send-email-appanad@xilinx.com>
-Message-ID: <20170125061506.GA3573@localhost>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Wed, 25 Jan 2017 14:35:11 +0800
+Subject: [xlnx:master 117/163] drivers/gpu/drm/xylon/xylon_crtc.c:224:3:
+ error: implicit declaration of function 'drm_vblank_put'
+Message-ID: <201701251407.oYPtcBDe%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 14, 2017 at 11:05:54AM +0530, Kedareswara rao Appana wrote:
-> When VDMA is configured for more than one frame in the h/w.
-> For example h/w is configured for n number of frames, user
-> Submits n number of frames and triggered the DMA using issue_pending API.
-> 
-> In the current driver flow we are submitting one frame at a time,
-> But we should submit all the n number of frames at one time
-> As the h/w is configured for n number of frames.
+tree:   https://github.com/Xilinx/linux-xlnx master
+head:   a96b8d2e1c9b37de51590b63bcce63a4036e760a
+commit: 15add85f47f37fde03343fb06bb7240dc61155e6 [117/163] Merge tag 'v4.8' into master
+config: i386-allmodconfig (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        git checkout 15add85f47f37fde03343fb06bb7240dc61155e6
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-Is there a specific reason why you continue to start lines with Title cases, I
-have already told you to not do that last time!
+All error/warnings (new ones prefixed by >>):
 
-> 
-> This patch fixes this issue.
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
-> Reviewed-by: Jose Abreu <joabreu@synopsys.com>
-> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-> ---
-> Changes for v6:
-> ---> Added Rob Acked-by
-> ---> Updated commit message as suggested by Vinod.
-> Changes for v5:
-> ---> Updated xlnx,fstore-config property to xlnx,fstore-enable
->      and updated description as suggested by Rob.
-> Changes for v4:
-> ---> Add Check for framestore configuration on Transmit case as well
->      as suggested by Jose Abreu.
-> ---> Modified the dev_dbg checks to dev_warn checks as suggested
->      by Jose Abreu.
-> Changes for v3:
-> ---> Added Checks for frame store configuration. If frame store
->      Configuration is not present at the h/w level and user
->      Submits less frames added debug prints in the driver as relevant.
-> Changes for v2:
-> ---> Fixed race conditions in the driver as suggested by Jose Abreu
-> ---> Fixed unnecessray if else checks in the vdma_start_transfer
->      as suggested by Laurent Pinchart.
-> 
->  .../devicetree/bindings/dma/xilinx/xilinx_dma.txt  |  2 +
->  drivers/dma/xilinx/xilinx_dma.c                    | 78 +++++++++++++++-------
->  2 files changed, 57 insertions(+), 23 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-> index a2b8bfa..e951c09 100644
-> --- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-> +++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_dma.txt
-> @@ -66,6 +66,8 @@ Optional child node properties:
->  Optional child node properties for VDMA:
->  - xlnx,genlock-mode: Tells Genlock synchronization is
->  	enabled/disabled in hardware.
-> +- xlnx,fstore-enable: boolean; if defined, it indicates that controller
-> +	supports frame store configuration.
->  Optional child node properties for AXI DMA:
->  -dma-channels: Number of dma channels in child node.
->  
-> diff --git a/drivers/dma/xilinx/xilinx_dma.c b/drivers/dma/xilinx/xilinx_dma.c
-> index 5eeea57..edb5b71 100644
-> --- a/drivers/dma/xilinx/xilinx_dma.c
-> +++ b/drivers/dma/xilinx/xilinx_dma.c
-> @@ -322,6 +322,7 @@ struct xilinx_dma_tx_descriptor {
->   * @genlock: Support genlock mode
->   * @err: Channel has errors
->   * @idle: Check for channel idle
-> + * @has_fstoreen: Check for frame store configuration
->   * @tasklet: Cleanup work after irq
->   * @config: Device configuration info
->   * @flush_on_fsync: Flush on Frame sync
-> @@ -353,6 +354,7 @@ struct xilinx_dma_chan {
->  	bool genlock;
->  	bool err;
->  	bool idle;
-> +	bool has_fstoreen;
->  	struct tasklet_struct tasklet;
->  	struct xilinx_vdma_config config;
->  	bool flush_on_fsync;
-> @@ -990,6 +992,27 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
->  	if (list_empty(&chan->pending_list))
->  		return;
->  
-> +	/*
-> +	 * Note: When VDMA is built with default h/w configuration
-> +	 * User should submit frames upto H/W configured.
-> +	 * If users submits less than h/w configured
-> +	 * VDMA engine tries to write to a invalid location
-> +	 * Results undefined behaviour/memory corruption.
-> +	 *
-> +	 * If user would like to submit frames less than h/w capable
-> +	 * On S2MM side please enable debug info 13 at the h/w level
-> +	 * On MM2S side please enable debug info 6 at the h/w level
-> +	 * It will allows the frame buffers numbers to be modified at runtime.
-> +	 */
-> +	if (!chan->has_fstoreen &&
-> +	     chan->desc_pendingcount < chan->num_frms) {
-> +		dev_warn(chan->dev, "Frame Store Configuration is not enabled at the\n");
-> +		dev_warn(chan->dev, "H/w level enable Debug info 13 or 6 at the h/w level\n");
-> +		dev_warn(chan->dev, "OR Submit the frames upto h/w Capable\n\r");
-> +
-> +		return;
-> +	}
-> +
->  	desc = list_first_entry(&chan->pending_list,
->  				struct xilinx_dma_tx_descriptor, node);
->  	tail_desc = list_last_entry(&chan->pending_list,
-> @@ -1052,25 +1075,38 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
->  	if (chan->has_sg) {
->  		dma_ctrl_write(chan, XILINX_DMA_REG_TAILDESC,
->  				tail_segment->phys);
-> +		list_splice_tail_init(&chan->pending_list, &chan->active_list);
-> +		chan->desc_pendingcount = 0;
->  	} else {
->  		struct xilinx_vdma_tx_segment *segment, *last = NULL;
-> -		int i = 0;
-> +		int i = 0, j = 0;
->  
->  		if (chan->desc_submitcount < chan->num_frms)
->  			i = chan->desc_submitcount;
->  
-> -		list_for_each_entry(segment, &desc->segments, node) {
-> -			if (chan->ext_addr)
-> -				vdma_desc_write_64(chan,
-> -					XILINX_VDMA_REG_START_ADDRESS_64(i++),
-> -					segment->hw.buf_addr,
-> -					segment->hw.buf_addr_msb);
-> -			else
-> -				vdma_desc_write(chan,
-> -					XILINX_VDMA_REG_START_ADDRESS(i++),
-> -					segment->hw.buf_addr);
-> -
-> -			last = segment;
-> +		for (j = 0; j < chan->num_frms; ) {
-> +			list_for_each_entry(segment, &desc->segments, node) {
-> +				if (chan->ext_addr)
-> +					vdma_desc_write_64(chan,
-> +					  XILINX_VDMA_REG_START_ADDRESS_64(i++),
-> +					  segment->hw.buf_addr,
-> +					  segment->hw.buf_addr_msb);
-> +				else
-> +					vdma_desc_write(chan,
-> +					    XILINX_VDMA_REG_START_ADDRESS(i++),
-> +					    segment->hw.buf_addr);
-> +
-> +				last = segment;
-> +			}
-> +			list_del(&desc->node);
-> +			list_add_tail(&desc->node, &chan->active_list);
-> +			j++;
-> +			if (list_empty(&chan->pending_list) ||
-> +			    (i == chan->num_frms))
-> +				break;
-> +			desc = list_first_entry(&chan->pending_list,
-> +						struct xilinx_dma_tx_descriptor,
-> +						node);
->  		}
->  
->  		if (!last)
-> @@ -1081,20 +1117,14 @@ static void xilinx_vdma_start_transfer(struct xilinx_dma_chan *chan)
->  		vdma_desc_write(chan, XILINX_DMA_REG_FRMDLY_STRIDE,
->  				last->hw.stride);
->  		vdma_desc_write(chan, XILINX_DMA_REG_VSIZE, last->hw.vsize);
-> -	}
->  
-> -	chan->idle = false;
-> -	if (!chan->has_sg) {
-> -		list_del(&desc->node);
-> -		list_add_tail(&desc->node, &chan->active_list);
-> -		chan->desc_submitcount++;
-> -		chan->desc_pendingcount--;
-> +		chan->desc_submitcount += j;
-> +		chan->desc_pendingcount -= j;
->  		if (chan->desc_submitcount == chan->num_frms)
->  			chan->desc_submitcount = 0;
-> -	} else {
-> -		list_splice_tail_init(&chan->pending_list, &chan->active_list);
-> -		chan->desc_pendingcount = 0;
->  	}
-> +
-> +	chan->idle = false;
->  }
->  
->  /**
-> @@ -1342,6 +1372,7 @@ static int xilinx_dma_reset(struct xilinx_dma_chan *chan)
->  
->  	chan->err = false;
->  	chan->idle = true;
-> +	chan->desc_submitcount = 0;
->  
->  	return err;
->  }
-> @@ -2320,6 +2351,7 @@ static int xilinx_dma_chan_probe(struct xilinx_dma_device *xdev,
->  	has_dre = of_property_read_bool(node, "xlnx,include-dre");
->  
->  	chan->genlock = of_property_read_bool(node, "xlnx,genlock-mode");
-> +	chan->has_fstoreen = of_property_read_bool(node, "xlnx,fstore-enable");
->  
->  	err = of_property_read_u32(node, "xlnx,datawidth", &value);
->  	if (err) {
-> -- 
-> 2.1.2
-> 
+   drivers/gpu/drm/xylon/xylon_crtc.c: In function 'xylon_drm_crtc_cancel_page_flip':
+>> drivers/gpu/drm/xylon/xylon_crtc.c:223:14: error: 'struct drm_pending_event' has no member named 'destroy'
+      event->base.destroy(&event->base);
+                 ^
+>> drivers/gpu/drm/xylon/xylon_crtc.c:224:3: error: implicit declaration of function 'drm_vblank_put' [-Werror=implicit-function-declaration]
+      drm_vblank_put(dev, 0);
+      ^~~~~~~~~~~~~~
+   drivers/gpu/drm/xylon/xylon_crtc.c: In function 'xylon_drm_crtc_vblank_handler':
+>> drivers/gpu/drm/xylon/xylon_crtc.c:339:3: error: implicit declaration of function 'drm_send_vblank_event' [-Werror=implicit-function-declaration]
+      drm_send_vblank_event(dev, 0, event);
+      ^~~~~~~~~~~~~~~~~~~~~
+   cc1: some warnings being treated as errors
+--
+   drivers/media/i2c/adv7511.c: In function 'adv7511_set_rgb_quantization_mode':
+>> drivers/media/i2c/adv7511.c:434:9: warning: 'return' with a value, in function returning void
+     return 0;
+            ^
+   drivers/media/i2c/adv7511.c:429:13: note: declared here
+    static void adv7511_set_rgb_quantization_mode(struct v4l2_subdev *sd, struct v4l2_ctrl *ctrl)
+                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c:31:8: error: type defaults to 'int' in declaration of 'DEFINE_DMA_ATTRS' [-Werror=implicit-int]
+    static DEFINE_DMA_ATTRS(dma_attrs_wc);
+           ^~~~~~~~~~~~~~~~
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c:31:1: warning: parameter names (without types) in function declaration
+    static DEFINE_DMA_ATTRS(dma_attrs_wc);
+    ^~~~~~
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c: In function 'mali_mem_os_get_table_page':
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c:357:22: error: 'dma_attrs_wc' undeclared (first use in this function)
+            GFP_KERNEL, &dma_attrs_wc);
+                         ^~~~~~~~~~~~
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c:357:22: note: each undeclared identifier is reported only once for each function it appears in
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c: In function 'mali_mem_os_release_table_page':
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c:396:12: error: 'dma_attrs_wc' undeclared (first use in this function)
+              &dma_attrs_wc);
+               ^~~~~~~~~~~~
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c: In function 'mali_mem_os_page_table_pool_free':
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c:449:50: error: 'dma_attrs_wc' undeclared (first use in this function)
+              virt_arr[i], (dma_addr_t)phys_arr[i], &dma_attrs_wc);
+                                                     ^~~~~~~~~~~~
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c: In function 'mali_mem_os_init':
+>> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c:599:2: error: implicit declaration of function 'dma_set_attr' [-Werror=implicit-function-declaration]
+     dma_set_attr(DMA_ATTR_WRITE_COMBINE, &dma_attrs_wc);
+     ^~~~~~~~~~~~
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c:599:40: error: 'dma_attrs_wc' undeclared (first use in this function)
+     dma_set_attr(DMA_ATTR_WRITE_COMBINE, &dma_attrs_wc);
+                                           ^~~~~~~~~~~~
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c: At top level:
+   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c:31:8: warning: 'DEFINE_DMA_ATTRS' declared 'static' but never defined [-Wunused-function]
+    static DEFINE_DMA_ATTRS(dma_attrs_wc);
+           ^~~~~~~~~~~~~~~~
+   cc1: some warnings being treated as errors
 
--- 
-~Vinod
+vim +/drm_vblank_put +224 drivers/gpu/drm/xylon/xylon_crtc.c
+
+e8c87b41 Davor Joja   2014-03-24  217  	unsigned long flags;
+e8c87b41 Davor Joja   2014-03-24  218  
+e8c87b41 Davor Joja   2014-03-24  219  	spin_lock_irqsave(&dev->event_lock, flags);
+e8c87b41 Davor Joja   2014-03-24  220  	event = crtc->event;
+e8c87b41 Davor Joja   2014-03-24  221  	if (event && (event->base.file_priv == file)) {
+e8c87b41 Davor Joja   2014-03-24  222  		crtc->event = NULL;
+e8c87b41 Davor Joja   2014-03-24 @223  		event->base.destroy(&event->base);
+e8c87b41 Davor Joja   2014-03-24 @224  		drm_vblank_put(dev, 0);
+e8c87b41 Davor Joja   2014-03-24  225  	}
+e8c87b41 Davor Joja   2014-03-24  226  	spin_unlock_irqrestore(&dev->event_lock, flags);
+e8c87b41 Davor Joja   2014-03-24  227  }
+e8c87b41 Davor Joja   2014-03-24  228  
+e8c87b41 Davor Joja   2014-03-24  229  static int xylon_drm_crtc_page_flip(struct drm_crtc *base_crtc,
+e8c87b41 Davor Joja   2014-03-24  230  				    struct drm_framebuffer *fb,
+e8c87b41 Davor Joja   2014-03-24  231  				    struct drm_pending_vblank_event *event,
+e8c87b41 Davor Joja   2014-03-24  232  				    u32 page_flip_flags)
+e8c87b41 Davor Joja   2014-03-24  233  {
+e8c87b41 Davor Joja   2014-03-24  234  	struct drm_device *dev = base_crtc->dev;
+e8c87b41 Davor Joja   2014-03-24  235  	struct xylon_drm_crtc *crtc = to_xylon_crtc(base_crtc);
+e8c87b41 Davor Joja   2014-03-24  236  	unsigned long flags;
+e8c87b41 Davor Joja   2014-03-24  237  	int ret;
+e8c87b41 Davor Joja   2014-03-24  238  
+e8c87b41 Davor Joja   2014-03-24  239  	spin_lock_irqsave(&dev->event_lock, flags);
+e8c87b41 Davor Joja   2014-03-24  240  	if (crtc->event != NULL) {
+e8c87b41 Davor Joja   2014-03-24  241  		spin_unlock_irqrestore(&dev->event_lock, flags);
+e8c87b41 Davor Joja   2014-03-24  242  		return -EBUSY;
+e8c87b41 Davor Joja   2014-03-24  243  	}
+e8c87b41 Davor Joja   2014-03-24  244  	spin_unlock_irqrestore(&dev->event_lock, flags);
+e8c87b41 Davor Joja   2014-03-24  245  
+0c49ff42 Davor Joja   2014-11-18  246  	ret = xylon_drm_plane_fb_set(base_crtc->primary, fb,
+e8c87b41 Davor Joja   2014-03-24  247  				     0, 0,
+e8c87b41 Davor Joja   2014-03-24  248  				     base_crtc->hwmode.hdisplay,
+e8c87b41 Davor Joja   2014-03-24  249  				     base_crtc->hwmode.vdisplay,
+e8c87b41 Davor Joja   2014-03-24  250  				     base_crtc->x, base_crtc->y,
+e8c87b41 Davor Joja   2014-03-24  251  				     base_crtc->hwmode.hdisplay,
+e8c87b41 Davor Joja   2014-03-24  252  				     base_crtc->hwmode.vdisplay);
+e8c87b41 Davor Joja   2014-03-24  253  	if (ret) {
+e8c87b41 Davor Joja   2014-03-24  254  		DRM_ERROR("failed mode set plane\n");
+e8c87b41 Davor Joja   2014-03-24  255  		return ret;
+e8c87b41 Davor Joja   2014-03-24  256  	}
+e8c87b41 Davor Joja   2014-03-24  257  
+0c49ff42 Davor Joja   2014-11-18  258  	xylon_drm_plane_commit(base_crtc->primary);
+e8c87b41 Davor Joja   2014-03-24  259  
+b2f5a183 Davor Joja   2014-09-15  260  	base_crtc->primary->fb = fb;
+e8c87b41 Davor Joja   2014-03-24  261  
+e8c87b41 Davor Joja   2014-03-24  262  	if (event) {
+e8c87b41 Davor Joja   2014-03-24  263  		event->pipe = 0;
+15add85f Michal Simek 2017-01-24  264  		drm_crtc_vblank_get(0);
+e8c87b41 Davor Joja   2014-03-24  265  		spin_lock_irqsave(&dev->event_lock, flags);
+e8c87b41 Davor Joja   2014-03-24  266  		crtc->event = event;
+e8c87b41 Davor Joja   2014-03-24  267  		spin_unlock_irqrestore(&dev->event_lock, flags);
+e8c87b41 Davor Joja   2014-03-24  268  	}
+e8c87b41 Davor Joja   2014-03-24  269  
+e8c87b41 Davor Joja   2014-03-24  270  	return 0;
+e8c87b41 Davor Joja   2014-03-24  271  }
+e8c87b41 Davor Joja   2014-03-24  272  
+e8c87b41 Davor Joja   2014-03-24  273  static int xylon_drm_crtc_set_property(struct drm_crtc *base_crtc,
+e8c87b41 Davor Joja   2014-03-24  274  				       struct drm_property *property,
+e99d4bb3 Davor Joja   2014-06-23  275  				       u64 value)
+e8c87b41 Davor Joja   2014-03-24  276  {
+e8c87b41 Davor Joja   2014-03-24  277  	struct xylon_drm_crtc *crtc = to_xylon_crtc(base_crtc);
+e99d4bb3 Davor Joja   2014-06-23  278  	struct xylon_drm_crtc_properties *props = &crtc->properties;
+e8c87b41 Davor Joja   2014-03-24  279  	struct xylon_drm_plane_op op;
+e99d4bb3 Davor Joja   2014-06-23  280  	u32 val = (u32)value;
+cb225630 Davor Joja   2014-07-11  281  	s64 x = -1;
+cb225630 Davor Joja   2014-07-11  282  	s64 y = -1;
+e99d4bb3 Davor Joja   2014-06-23  283  
+e99d4bb3 Davor Joja   2014-06-23  284  	if (property == props->bg_color) {
+e99d4bb3 Davor Joja   2014-06-23  285  		op.id = XYLON_DRM_PLANE_OP_ID_BACKGROUND_COLOR;
+e99d4bb3 Davor Joja   2014-06-23  286  		op.param = val;
+e99d4bb3 Davor Joja   2014-06-23  287  	} else if (property == props->layer_update) {
+e99d4bb3 Davor Joja   2014-06-23  288  		xylon_cvc_ctrl(crtc->cvc, LOGICVC_LAYER_UPDATE,
+e99d4bb3 Davor Joja   2014-06-23  289  			       (bool)val);
+e99d4bb3 Davor Joja   2014-06-23  290  	} else if (property == props->pixel_data_polarity) {
+e99d4bb3 Davor Joja   2014-06-23  291  		xylon_cvc_ctrl(crtc->cvc, LOGICVC_PIXEL_DATA_INVERT,
+e99d4bb3 Davor Joja   2014-06-23  292  			       (bool)val);
+e99d4bb3 Davor Joja   2014-06-23  293  	} else if (property == props->pixel_data_trigger) {
+e99d4bb3 Davor Joja   2014-06-23  294  		xylon_cvc_ctrl(crtc->cvc, LOGICVC_PIXEL_DATA_TRIGGER_INVERT,
+e99d4bb3 Davor Joja   2014-06-23  295  			       (bool)val);
+e8c87b41 Davor Joja   2014-03-24  296  	} else {
+e8c87b41 Davor Joja   2014-03-24  297  		return -EINVAL;
+e8c87b41 Davor Joja   2014-03-24  298  	}
+e8c87b41 Davor Joja   2014-03-24  299  
+cb225630 Davor Joja   2014-07-11  300  	if (x > -1 && y > -1) {
+0c49ff42 Davor Joja   2014-11-18  301  		if (xylon_drm_plane_fb_set(base_crtc->primary,
+b2f5a183 Davor Joja   2014-09-15  302  					   base_crtc->primary->fb,
+cb225630 Davor Joja   2014-07-11  303  					   (u32)x, (u32)y,
+cb225630 Davor Joja   2014-07-11  304  					   base_crtc->hwmode.hdisplay - x,
+cb225630 Davor Joja   2014-07-11  305  					   base_crtc->hwmode.vdisplay - y,
+cb225630 Davor Joja   2014-07-11  306  					   base_crtc->x, base_crtc->y,
+cb225630 Davor Joja   2014-07-11  307  					   base_crtc->hwmode.hdisplay - x,
+cb225630 Davor Joja   2014-07-11  308  					   base_crtc->hwmode.vdisplay - y))
+cb225630 Davor Joja   2014-07-11  309  			DRM_ERROR("failed set position\n");
+cb225630 Davor Joja   2014-07-11  310  		else
+0c49ff42 Davor Joja   2014-11-18  311  			xylon_drm_plane_commit(base_crtc->primary);
+cb225630 Davor Joja   2014-07-11  312  	} else {
+0c49ff42 Davor Joja   2014-11-18  313  		xylon_drm_plane_op(base_crtc->primary, &op);
+cb225630 Davor Joja   2014-07-11  314  	}
+e8c87b41 Davor Joja   2014-03-24  315  
+e8c87b41 Davor Joja   2014-03-24  316  	return 0;
+e8c87b41 Davor Joja   2014-03-24  317  }
+e8c87b41 Davor Joja   2014-03-24  318  
+e8c87b41 Davor Joja   2014-03-24  319  static struct drm_crtc_funcs xylon_drm_crtc_funcs = {
+e8c87b41 Davor Joja   2014-03-24  320  	.destroy = xylon_drm_crtc_destroy,
+e8c87b41 Davor Joja   2014-03-24  321  	.set_config = drm_crtc_helper_set_config,
+e8c87b41 Davor Joja   2014-03-24  322  	.page_flip = xylon_drm_crtc_page_flip,
+e8c87b41 Davor Joja   2014-03-24  323  	.set_property = xylon_drm_crtc_set_property,
+e8c87b41 Davor Joja   2014-03-24  324  };
+e8c87b41 Davor Joja   2014-03-24  325  
+e8c87b41 Davor Joja   2014-03-24  326  static void xylon_drm_crtc_vblank_handler(struct drm_crtc *base_crtc)
+e8c87b41 Davor Joja   2014-03-24  327  {
+e8c87b41 Davor Joja   2014-03-24  328  	struct drm_device *dev = base_crtc->dev;
+e8c87b41 Davor Joja   2014-03-24  329  	struct drm_pending_vblank_event *event;
+e8c87b41 Davor Joja   2014-03-24  330  	struct xylon_drm_crtc *crtc = to_xylon_crtc(base_crtc);
+e8c87b41 Davor Joja   2014-03-24  331  	unsigned long flags;
+e8c87b41 Davor Joja   2014-03-24  332  
+e8c87b41 Davor Joja   2014-03-24  333  	drm_handle_vblank(dev, 0);
+e8c87b41 Davor Joja   2014-03-24  334  
+e8c87b41 Davor Joja   2014-03-24  335  	spin_lock_irqsave(&dev->event_lock, flags);
+e8c87b41 Davor Joja   2014-03-24  336  	event = crtc->event;
+e8c87b41 Davor Joja   2014-03-24  337  	crtc->event = NULL;
+e8c87b41 Davor Joja   2014-03-24  338  	if (event) {
+e8c87b41 Davor Joja   2014-03-24 @339  		drm_send_vblank_event(dev, 0, event);
+e8c87b41 Davor Joja   2014-03-24  340  		drm_vblank_put(dev, 0);
+e8c87b41 Davor Joja   2014-03-24  341  	}
+e8c87b41 Davor Joja   2014-03-24  342  	spin_unlock_irqrestore(&dev->event_lock, flags);
+
+:::::: The code at line 224 was first introduced by commit
+:::::: e8c87b415c98ef5f5ceecbe62cc53f956cd9cd94 gpu: drm: xylon: Add a crtc support
+
+:::::: TO: Davor Joja <davorjoja@logicbricks.com>
+:::::: CC: Michal Simek <michal.simek@xilinx.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 56166 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/2fc7e489/attachment-0001.gz>
