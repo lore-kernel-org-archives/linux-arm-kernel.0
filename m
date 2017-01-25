@@ -1,85 +1,38 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 25 Jan 2017 11:13:57 +0100
-Subject: [PATCH v6 2/4] dmaengine: Forward slave device pointer to of_xlate
- callback
-In-Reply-To: <CAPDyKFp8rRXsnkJ+XR_rV1JotPAJmC8bb9OwC0e0FP=VsrKrvg@mail.gmail.com>
-References: <CGME20170124092751eucas1p1411586335ad7083f7fff451212e002a3@eucas1p1.samsung.com>
- <1485250055-22137-1-git-send-email-m.szyprowski@samsung.com>
- <1485250055-22137-3-git-send-email-m.szyprowski@samsung.com>
- <CAPDyKFp8rRXsnkJ+XR_rV1JotPAJmC8bb9OwC0e0FP=VsrKrvg@mail.gmail.com>
-Message-ID: <40e8364c-660e-6555-2a61-1ea9d66f1172@samsung.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 25 Jan 2017 11:17:21 +0100
+Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
+In-Reply-To: <1485322192.2461.4.camel@intel.com>
+References: <20170123232654.GA19342@amd> <20170123234912.GA2460@roeck-us.net>
+ <20170124070639.GA5068@rzhang1-surface> <20170124073720.GB5603@amd>
+ <88c94ea6-abe2-0f20-337e-e9ee00c883d8@roeck-us.net>
+ <20170124175800.GA15070@amd> <20170124184526.GA25056@roeck-us.net>
+ <20170124224610.GA27340@amd>
+ <CAOMZO5AFZy6YFrE0P-xDXX5BCfWYHAC34VyyX85H5Wr+1O59jA@mail.gmail.com>
+ <1485322192.2461.4.camel@intel.com>
+Message-ID: <20170125101721.GA3912@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+On Wed 2017-01-25 13:29:52, Zhang Rui wrote:
+> On Tue, 2017-01-24 at 21:07 -0200, Fabio Estevam wrote:
+> > On Tue, Jan 24, 2017 at 8:46 PM, Pavel Machek <pavel@ucw.cz> wrote:
+> > 
+> > > 
+> > > It is an ugly regression and it is -rc5 time. Actually not your
+> > > problem, but Fabio Estevam or Zhang Rui has to deal with it soon.
+> > I have already sent the revert and it was acked-by you and Guenter.
+> 
+> Revert patch has been applied and queued for next -rc.
 
-On 2017-01-24 16:09, Ulf Hansson wrote:
-> On 24 January 2017 at 10:27, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
->> Add pointer to slave device to of_dma_xlate to let DMA engine driver
->> to know which slave device is using given DMA channel. This will be
->> later used to implement non-irq-safe runtime PM for DMA engine driver.
->>
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> [...]
->
->> diff --git a/include/linux/of_dma.h b/include/linux/of_dma.h
->> index b90d8ec57c1f..a0a6c8c17669 100644
->> --- a/include/linux/of_dma.h
->> +++ b/include/linux/of_dma.h
->> @@ -22,7 +22,8 @@ struct of_dma {
->>          struct list_head        of_dma_controllers;
->>          struct device_node      *of_node;
->>          struct dma_chan         *(*of_dma_xlate)
->> -                               (struct of_phandle_args *, struct of_dma *);
->> +                               (struct of_phandle_args *, struct of_dma *,
->> +                                struct device *);
->>          void                    *(*of_dma_route_allocate)
->>                                  (struct of_phandle_args *, struct of_dma *);
->>          struct dma_router       *dma_router;
->> @@ -37,7 +38,7 @@ struct of_dma_filter_info {
->>   #ifdef CONFIG_DMA_OF
->>   extern int of_dma_controller_register(struct device_node *np,
->>                  struct dma_chan *(*of_dma_xlate)
->> -               (struct of_phandle_args *, struct of_dma *),
->> +               (struct of_phandle_args *, struct of_dma *, struct device *),
->>                  void *data);
->>   extern void of_dma_controller_free(struct device_node *np);
->>
->> @@ -47,17 +48,17 @@ extern int of_dma_router_register(struct device_node *np,
->>                  struct dma_router *dma_router);
->>   #define of_dma_router_free of_dma_controller_free
->>
->> -extern struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
->> +extern struct dma_chan *of_dma_request_slave_channel(struct device *slave,
->>                                                       const char *name);
-> I noticed that this API is being used from sound/soc/sh/rcar/dma.c, so
-> I assume this change triggers a compiler error. I guess you want to
-> fold in a change dealing with that as well.
-
-Right. Thanks for pointing this.
-
-I didn't expect that of_dma_request_slave_channel() is used outside 
-drivers/dma,
-especially in such a creative way as in sh/rcar driver. I will change a 
-function
-signature to:
-
-of_dma_request_slave_channel(struct device *slave, struct device_node 
-*np, const char *name)
-
-then, as there is no direct relation between device and of node pointer, 
-from
-which rcar driver extracts the dma channel data.
-
-I would also expect that zero-day build robot will complain about missing
-sh/rcar driver update, but I didn't get any message from it.
-
-> [...]
->
-> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
-
-Best regards
+Thanks!
+									Pavel
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/1a8a5cd5/attachment-0001.sig>
