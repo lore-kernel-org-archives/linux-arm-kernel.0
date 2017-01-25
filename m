@@ -1,54 +1,88 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 25 Jan 2017 10:15:00 +0100
-Subject: [PATCH v2 1/4] dt-bindings: clock: renesas: cpg-mssr: Document reset
- control support
-In-Reply-To: <1485335703-27184-1-git-send-email-geert+renesas@glider.be>
-References: <1485335703-27184-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1485335703-27184-2-git-send-email-geert+renesas@glider.be>
+Date: Wed, 25 Jan 2017 10:02:13 +0100
+Subject: [PATCH v2] ARM: shmobile: rcar-gen2: Add more register documentation
+Message-ID: <1485334933-26809-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Document properties needed to use the Reset Control feature of the
-Renesas Clock Pulse Generator / Module Standby and Software Reset
-module.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
 v2:
-  - Change oneline summary to refer to dt-bindings.
+  - Remove unneeded parentheses in phys_to_sbar().
 ---
- Documentation/devicetree/bindings/clock/renesas,cpg-mssr.txt | 6 ++++++
- 1 file changed, 6 insertions(+)
+ arch/arm/mach-shmobile/pm-rcar-gen2.c | 40 +++++++++++++++++++++++++----------
+ 1 file changed, 29 insertions(+), 11 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/renesas,cpg-mssr.txt b/Documentation/devicetree/bindings/clock/renesas,cpg-mssr.txt
-index c469194129536332..f4f944d813081857 100644
---- a/Documentation/devicetree/bindings/clock/renesas,cpg-mssr.txt
-+++ b/Documentation/devicetree/bindings/clock/renesas,cpg-mssr.txt
-@@ -42,6 +42,10 @@ Required Properties:
- 	Domain bindings in
- 	Documentation/devicetree/bindings/power/power_domain.txt.
+diff --git a/arch/arm/mach-shmobile/pm-rcar-gen2.c b/arch/arm/mach-shmobile/pm-rcar-gen2.c
+index dd9ac366868f4336..0178da7ace82dcbd 100644
+--- a/arch/arm/mach-shmobile/pm-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/pm-rcar-gen2.c
+@@ -20,14 +20,30 @@
  
-+  - #reset-cells: Must be 1
-+      - The single reset specifier cell must be the module number, as defined
-+	in the datasheet.
+ /* RST */
+ #define RST		0xe6160000
+-#define CA15BAR		0x0020
+-#define CA7BAR		0x0030
+-#define CA15RESCNT	0x0040
+-#define CA7RESCNT	0x0044
++
++#define CA15BAR		0x0020		/* CA15 Boot Address Register */
++#define CA7BAR		0x0030		/* CA7 Boot Address Register */
++#define CA15RESCNT	0x0040		/* CA15 Reset Control Register */
++#define CA7RESCNT	0x0044		/* CA7 Reset Control Register */
++
++/* SYS Boot Address Register */
++#define SBAR_BAREN	BIT(4)		/* SBAR is valid */
++
++/* Reset Control Registers */
++#define CA15RESCNT_CODE	0xa5a50000
++#define CA15RESCNT_CPUS	0xf		/* CPU0-3 */
++#define CA7RESCNT_CODE	0x5a5a0000
++#define CA7RESCNT_CPUS	0xf		/* CPU0-3 */
 +
  
- Examples
- --------
-@@ -55,6 +59,7 @@ Examples
- 		clock-names = "extal", "extalr";
- 		#clock-cells = <2>;
- 		#power-domain-cells = <0>;
-+		#reset-cells = <1>;
- 	};
+ /* On-chip RAM */
+ #define ICRAM1		0xe63c0000	/* Inter Connect RAM1 (4 KiB) */
  
++static inline u32 phys_to_sbar(phys_addr_t addr)
++{
++	return (addr >> 8) & 0xfffffc00;
++}
++
+ /* SYSC */
+ #define SYSCIER 0x0c
+ #define SYSCIMR 0x10
+@@ -82,22 +98,24 @@ void __init rcar_gen2_pm_init(void)
  
-@@ -69,5 +74,6 @@ Examples
- 		dmas = <&dmac1 0x13>, <&dmac1 0x12>;
- 		dma-names = "tx", "rx";
- 		power-domains = <&cpg>;
-+		resets = <&cpg 310>;
- 		status = "disabled";
- 	};
+ 	/* setup reset vectors */
+ 	p = ioremap_nocache(RST, 0x63);
+-	bar = (boot_vector_addr >> 8) & 0xfffffc00;
++	bar = phys_to_sbar(boot_vector_addr);
+ 	if (has_a15) {
+ 		writel_relaxed(bar, p + CA15BAR);
+-		writel_relaxed(bar | 0x10, p + CA15BAR);
++		writel_relaxed(bar | SBAR_BAREN, p + CA15BAR);
+ 
+ 		/* de-assert reset for CA15 CPUs */
+-		writel_relaxed((readl_relaxed(p + CA15RESCNT) & ~0x0f) |
+-				0xa5a50000, p + CA15RESCNT);
++		writel_relaxed((readl_relaxed(p + CA15RESCNT) &
++				~CA15RESCNT_CPUS) | CA15RESCNT_CODE,
++			       p + CA15RESCNT);
+ 	}
+ 	if (has_a7) {
+ 		writel_relaxed(bar, p + CA7BAR);
+-		writel_relaxed(bar | 0x10, p + CA7BAR);
++		writel_relaxed(bar | SBAR_BAREN, p + CA7BAR);
+ 
+ 		/* de-assert reset for CA7 CPUs */
+-		writel_relaxed((readl_relaxed(p + CA7RESCNT) & ~0x0f) |
+-				0x5a5a0000, p + CA7RESCNT);
++		writel_relaxed((readl_relaxed(p + CA7RESCNT) &
++				~CA7RESCNT_CPUS) | CA7RESCNT_CODE,
++			       p + CA7RESCNT);
+ 	}
+ 	iounmap(p);
+ 
 -- 
 1.9.1
