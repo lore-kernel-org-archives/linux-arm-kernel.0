@@ -1,218 +1,248 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Wed, 25 Jan 2017 14:35:11 +0800
-Subject: [xlnx:master 117/163] drivers/gpu/drm/xylon/xylon_crtc.c:224:3:
- error: implicit declaration of function 'drm_vblank_put'
-Message-ID: <201701251407.oYPtcBDe%fengguang.wu@intel.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 25 Jan 2017 15:37:00 +0900
+Subject: [PATCH v30 04/11] arm64: mm: allow for unmapping memory region
+ from kernel mapping
+In-Reply-To: <d83e9567-8d4b-a714-071c-bc134c1f681f@redhat.com>
+References: <20170124084638.3770-1-takahiro.akashi@linaro.org>
+ <20170124085004.3892-3-takahiro.akashi@linaro.org>
+ <d83e9567-8d4b-a714-071c-bc134c1f681f@redhat.com>
+Message-ID: <20170125063659.GD23406@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://github.com/Xilinx/linux-xlnx master
-head:   a96b8d2e1c9b37de51590b63bcce63a4036e760a
-commit: 15add85f47f37fde03343fb06bb7240dc61155e6 [117/163] Merge tag 'v4.8' into master
-config: i386-allmodconfig (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        git checkout 15add85f47f37fde03343fb06bb7240dc61155e6
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+On Tue, Jan 24, 2017 at 05:02:20PM +0530, Pratyush Anand wrote:
+> 
+> 
+> On Tuesday 24 January 2017 02:19 PM, AKASHI Takahiro wrote:
+> >The current implementation of create_mapping_late() is only allowed
+> >to modify permission attributes (read-only or read-write) against
+> >the existing kernel mapping.
+> >
+> >In this patch, PAGE_KERNEL_INVALID protection attribute is introduced.
+> >We will now be able to invalidate (or unmap) some part of the existing
+> >kernel mapping by specifying PAGE_KERNEL_INVALID to create_mapping_late().
+> >
+> >This feature will be used in a suceeding kdump patch to protect
+> >the memory reserved for crash dump kernel once after loaded.
+> >
+> >Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> >---
+> > arch/arm64/include/asm/mmu.h           |  2 ++
+> > arch/arm64/include/asm/pgtable-hwdef.h |  2 ++
+> > arch/arm64/include/asm/pgtable-prot.h  |  1 +
+> > arch/arm64/include/asm/pgtable.h       |  4 ++++
+> > arch/arm64/mm/mmu.c                    | 29 ++++++++++++++++++++---------
+> > 5 files changed, 29 insertions(+), 9 deletions(-)
+> >
+> >diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+> >index 47619411f0ff..a6c1367527bc 100644
+> >--- a/arch/arm64/include/asm/mmu.h
+> >+++ b/arch/arm64/include/asm/mmu.h
+> >@@ -36,6 +36,8 @@ extern void init_mem_pgprot(void);
+> > extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+> > 			       unsigned long virt, phys_addr_t size,
+> > 			       pgprot_t prot, bool page_mappings_only);
+> >+extern void create_mapping_late(phys_addr_t phys, unsigned long virt,
+> >+				phys_addr_t size, pgprot_t prot);
+> > extern void *fixmap_remap_fdt(phys_addr_t dt_phys);
+> >
+> > #endif
+> >diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+> >index eb0c2bd90de9..e66efec31ca9 100644
+> >--- a/arch/arm64/include/asm/pgtable-hwdef.h
+> >+++ b/arch/arm64/include/asm/pgtable-hwdef.h
+> >@@ -119,6 +119,7 @@
+> > #define PUD_TABLE_BIT		(_AT(pgdval_t, 1) << 1)
+> > #define PUD_TYPE_MASK		(_AT(pgdval_t, 3) << 0)
+> > #define PUD_TYPE_SECT		(_AT(pgdval_t, 1) << 0)
+> >+#define PUD_VALID		PUD_TYPE_SECT
+> >
+> > /*
+> >  * Level 2 descriptor (PMD).
+> >@@ -128,6 +129,7 @@
+> > #define PMD_TYPE_TABLE		(_AT(pmdval_t, 3) << 0)
+> > #define PMD_TYPE_SECT		(_AT(pmdval_t, 1) << 0)
+> > #define PMD_TABLE_BIT		(_AT(pmdval_t, 1) << 1)
+> >+#define PMD_VALID		PMD_TYPE_SECT
+> >
+> > /*
+> >  * Section
+> >diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
+> >index 2142c7726e76..945d84cd5df7 100644
+> >--- a/arch/arm64/include/asm/pgtable-prot.h
+> >+++ b/arch/arm64/include/asm/pgtable-prot.h
+> >@@ -54,6 +54,7 @@
+> > #define PAGE_KERNEL_ROX		__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
+> > #define PAGE_KERNEL_EXEC	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE)
+> > #define PAGE_KERNEL_EXEC_CONT	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_CONT)
+> >+#define PAGE_KERNEL_INVALID	__pgprot(0)
+> >
+> > #define PAGE_HYP		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_HYP_XN)
+> > #define PAGE_HYP_EXEC		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY)
+> >diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> >index ffbb9a520563..1904a7c07018 100644
+> >--- a/arch/arm64/include/asm/pgtable.h
+> >+++ b/arch/arm64/include/asm/pgtable.h
+> >@@ -364,6 +364,8 @@ extern pgprot_t phys_mem_access_prot(struct file *file, unsigned long pfn,
+> >
+> > #define pmd_bad(pmd)		(!(pmd_val(pmd) & PMD_TABLE_BIT))
+> >
+> >+#define pmd_valid(pmd)		(!!(pmd_val(pmd) & PMD_VALID))
+> >+
+> > #define pmd_table(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
+> > 				 PMD_TYPE_TABLE)
+> > #define pmd_sect(pmd)		((pmd_val(pmd) & PMD_TYPE_MASK) == \
+> >@@ -428,6 +430,7 @@ static inline phys_addr_t pmd_page_paddr(pmd_t pmd)
+> >
+> > #define pud_none(pud)		(!pud_val(pud))
+> > #define pud_bad(pud)		(!(pud_val(pud) & PUD_TABLE_BIT))
+> >+#define pud_valid(pud)		(!!(pud_val(pud) & PUD_VALID))
+> 
+> This will break compilation for CONFIG_PGTABLE_LEVELS <= 2
 
-All error/warnings (new ones prefixed by >>):
+Ah, yes. A quick fix is as follows:
 
-   drivers/gpu/drm/xylon/xylon_crtc.c: In function 'xylon_drm_crtc_cancel_page_flip':
->> drivers/gpu/drm/xylon/xylon_crtc.c:223:14: error: 'struct drm_pending_event' has no member named 'destroy'
-      event->base.destroy(&event->base);
-                 ^
->> drivers/gpu/drm/xylon/xylon_crtc.c:224:3: error: implicit declaration of function 'drm_vblank_put' [-Werror=implicit-function-declaration]
-      drm_vblank_put(dev, 0);
-      ^~~~~~~~~~~~~~
-   drivers/gpu/drm/xylon/xylon_crtc.c: In function 'xylon_drm_crtc_vblank_handler':
->> drivers/gpu/drm/xylon/xylon_crtc.c:339:3: error: implicit declaration of function 'drm_send_vblank_event' [-Werror=implicit-function-declaration]
-      drm_send_vblank_event(dev, 0, event);
-      ^~~~~~~~~~~~~~~~~~~~~
-   cc1: some warnings being treated as errors
---
-   drivers/media/i2c/adv7511.c: In function 'adv7511_set_rgb_quantization_mode':
->> drivers/media/i2c/adv7511.c:434:9: warning: 'return' with a value, in function returning void
-     return 0;
-            ^
-   drivers/media/i2c/adv7511.c:429:13: note: declared here
-    static void adv7511_set_rgb_quantization_mode(struct v4l2_subdev *sd, struct v4l2_ctrl *ctrl)
-                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
---
->> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c:31:8: error: type defaults to 'int' in declaration of 'DEFINE_DMA_ATTRS' [-Werror=implicit-int]
-    static DEFINE_DMA_ATTRS(dma_attrs_wc);
-           ^~~~~~~~~~~~~~~~
->> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c:31:1: warning: parameter names (without types) in function declaration
-    static DEFINE_DMA_ATTRS(dma_attrs_wc);
-    ^~~~~~
-   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c: In function 'mali_mem_os_get_table_page':
->> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c:357:22: error: 'dma_attrs_wc' undeclared (first use in this function)
-            GFP_KERNEL, &dma_attrs_wc);
-                         ^~~~~~~~~~~~
-   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c:357:22: note: each undeclared identifier is reported only once for each function it appears in
-   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c: In function 'mali_mem_os_release_table_page':
-   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c:396:12: error: 'dma_attrs_wc' undeclared (first use in this function)
-              &dma_attrs_wc);
-               ^~~~~~~~~~~~
-   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c: In function 'mali_mem_os_page_table_pool_free':
-   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c:449:50: error: 'dma_attrs_wc' undeclared (first use in this function)
-              virt_arr[i], (dma_addr_t)phys_arr[i], &dma_attrs_wc);
-                                                     ^~~~~~~~~~~~
-   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c: In function 'mali_mem_os_init':
->> drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c:599:2: error: implicit declaration of function 'dma_set_attr' [-Werror=implicit-function-declaration]
-     dma_set_attr(DMA_ATTR_WRITE_COMBINE, &dma_attrs_wc);
-     ^~~~~~~~~~~~
-   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c:599:40: error: 'dma_attrs_wc' undeclared (first use in this function)
-     dma_set_attr(DMA_ATTR_WRITE_COMBINE, &dma_attrs_wc);
-                                           ^~~~~~~~~~~~
-   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c: At top level:
-   drivers/staging/mali/DX910-SW-99002-r5p1-01rel0/driver/src/devicedrv/mali/linux/mali_memory_os_alloc.c:31:8: warning: 'DEFINE_DMA_ATTRS' declared 'static' but never defined [-Wunused-function]
-    static DEFINE_DMA_ATTRS(dma_attrs_wc);
-           ^~~~~~~~~~~~~~~~
-   cc1: some warnings being treated as errors
+===8<===
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 1904a7c07018..dc11d4bf332c 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -467,6 +467,8 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
+ 
+ #else
+ 
++#define pud_valid(pud)		(1)
++
+ #define pud_page_paddr(pud)	({ BUILD_BUG(); 0; })
+ 
+ /* Match pmd_offset folding in <asm/generic/pgtable-nopmd.h> */
+@@ -520,6 +522,8 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
+ 
+ #else
+ 
++#define pgd_valid(pgd)		(1)
++
+ #define pgd_page_paddr(pgd)	({ BUILD_BUG(); 0;})
+ 
+ /* Match pud_offset folding in <asm/generic/pgtable-nopud.h> */
+===>8===
 
-vim +/drm_vblank_put +224 drivers/gpu/drm/xylon/xylon_crtc.c
+Now I've confirmed that it compiles under the configuration with
+    * 4KB page x 39, 48-bit address space
+    * 64KB page x 42, 48-bit address space
+and also verified a crash dump image for 64KB x 42/48b cases.
 
-e8c87b41 Davor Joja   2014-03-24  217  	unsigned long flags;
-e8c87b41 Davor Joja   2014-03-24  218  
-e8c87b41 Davor Joja   2014-03-24  219  	spin_lock_irqsave(&dev->event_lock, flags);
-e8c87b41 Davor Joja   2014-03-24  220  	event = crtc->event;
-e8c87b41 Davor Joja   2014-03-24  221  	if (event && (event->base.file_priv == file)) {
-e8c87b41 Davor Joja   2014-03-24  222  		crtc->event = NULL;
-e8c87b41 Davor Joja   2014-03-24 @223  		event->base.destroy(&event->base);
-e8c87b41 Davor Joja   2014-03-24 @224  		drm_vblank_put(dev, 0);
-e8c87b41 Davor Joja   2014-03-24  225  	}
-e8c87b41 Davor Joja   2014-03-24  226  	spin_unlock_irqrestore(&dev->event_lock, flags);
-e8c87b41 Davor Joja   2014-03-24  227  }
-e8c87b41 Davor Joja   2014-03-24  228  
-e8c87b41 Davor Joja   2014-03-24  229  static int xylon_drm_crtc_page_flip(struct drm_crtc *base_crtc,
-e8c87b41 Davor Joja   2014-03-24  230  				    struct drm_framebuffer *fb,
-e8c87b41 Davor Joja   2014-03-24  231  				    struct drm_pending_vblank_event *event,
-e8c87b41 Davor Joja   2014-03-24  232  				    u32 page_flip_flags)
-e8c87b41 Davor Joja   2014-03-24  233  {
-e8c87b41 Davor Joja   2014-03-24  234  	struct drm_device *dev = base_crtc->dev;
-e8c87b41 Davor Joja   2014-03-24  235  	struct xylon_drm_crtc *crtc = to_xylon_crtc(base_crtc);
-e8c87b41 Davor Joja   2014-03-24  236  	unsigned long flags;
-e8c87b41 Davor Joja   2014-03-24  237  	int ret;
-e8c87b41 Davor Joja   2014-03-24  238  
-e8c87b41 Davor Joja   2014-03-24  239  	spin_lock_irqsave(&dev->event_lock, flags);
-e8c87b41 Davor Joja   2014-03-24  240  	if (crtc->event != NULL) {
-e8c87b41 Davor Joja   2014-03-24  241  		spin_unlock_irqrestore(&dev->event_lock, flags);
-e8c87b41 Davor Joja   2014-03-24  242  		return -EBUSY;
-e8c87b41 Davor Joja   2014-03-24  243  	}
-e8c87b41 Davor Joja   2014-03-24  244  	spin_unlock_irqrestore(&dev->event_lock, flags);
-e8c87b41 Davor Joja   2014-03-24  245  
-0c49ff42 Davor Joja   2014-11-18  246  	ret = xylon_drm_plane_fb_set(base_crtc->primary, fb,
-e8c87b41 Davor Joja   2014-03-24  247  				     0, 0,
-e8c87b41 Davor Joja   2014-03-24  248  				     base_crtc->hwmode.hdisplay,
-e8c87b41 Davor Joja   2014-03-24  249  				     base_crtc->hwmode.vdisplay,
-e8c87b41 Davor Joja   2014-03-24  250  				     base_crtc->x, base_crtc->y,
-e8c87b41 Davor Joja   2014-03-24  251  				     base_crtc->hwmode.hdisplay,
-e8c87b41 Davor Joja   2014-03-24  252  				     base_crtc->hwmode.vdisplay);
-e8c87b41 Davor Joja   2014-03-24  253  	if (ret) {
-e8c87b41 Davor Joja   2014-03-24  254  		DRM_ERROR("failed mode set plane\n");
-e8c87b41 Davor Joja   2014-03-24  255  		return ret;
-e8c87b41 Davor Joja   2014-03-24  256  	}
-e8c87b41 Davor Joja   2014-03-24  257  
-0c49ff42 Davor Joja   2014-11-18  258  	xylon_drm_plane_commit(base_crtc->primary);
-e8c87b41 Davor Joja   2014-03-24  259  
-b2f5a183 Davor Joja   2014-09-15  260  	base_crtc->primary->fb = fb;
-e8c87b41 Davor Joja   2014-03-24  261  
-e8c87b41 Davor Joja   2014-03-24  262  	if (event) {
-e8c87b41 Davor Joja   2014-03-24  263  		event->pipe = 0;
-15add85f Michal Simek 2017-01-24  264  		drm_crtc_vblank_get(0);
-e8c87b41 Davor Joja   2014-03-24  265  		spin_lock_irqsave(&dev->event_lock, flags);
-e8c87b41 Davor Joja   2014-03-24  266  		crtc->event = event;
-e8c87b41 Davor Joja   2014-03-24  267  		spin_unlock_irqrestore(&dev->event_lock, flags);
-e8c87b41 Davor Joja   2014-03-24  268  	}
-e8c87b41 Davor Joja   2014-03-24  269  
-e8c87b41 Davor Joja   2014-03-24  270  	return 0;
-e8c87b41 Davor Joja   2014-03-24  271  }
-e8c87b41 Davor Joja   2014-03-24  272  
-e8c87b41 Davor Joja   2014-03-24  273  static int xylon_drm_crtc_set_property(struct drm_crtc *base_crtc,
-e8c87b41 Davor Joja   2014-03-24  274  				       struct drm_property *property,
-e99d4bb3 Davor Joja   2014-06-23  275  				       u64 value)
-e8c87b41 Davor Joja   2014-03-24  276  {
-e8c87b41 Davor Joja   2014-03-24  277  	struct xylon_drm_crtc *crtc = to_xylon_crtc(base_crtc);
-e99d4bb3 Davor Joja   2014-06-23  278  	struct xylon_drm_crtc_properties *props = &crtc->properties;
-e8c87b41 Davor Joja   2014-03-24  279  	struct xylon_drm_plane_op op;
-e99d4bb3 Davor Joja   2014-06-23  280  	u32 val = (u32)value;
-cb225630 Davor Joja   2014-07-11  281  	s64 x = -1;
-cb225630 Davor Joja   2014-07-11  282  	s64 y = -1;
-e99d4bb3 Davor Joja   2014-06-23  283  
-e99d4bb3 Davor Joja   2014-06-23  284  	if (property == props->bg_color) {
-e99d4bb3 Davor Joja   2014-06-23  285  		op.id = XYLON_DRM_PLANE_OP_ID_BACKGROUND_COLOR;
-e99d4bb3 Davor Joja   2014-06-23  286  		op.param = val;
-e99d4bb3 Davor Joja   2014-06-23  287  	} else if (property == props->layer_update) {
-e99d4bb3 Davor Joja   2014-06-23  288  		xylon_cvc_ctrl(crtc->cvc, LOGICVC_LAYER_UPDATE,
-e99d4bb3 Davor Joja   2014-06-23  289  			       (bool)val);
-e99d4bb3 Davor Joja   2014-06-23  290  	} else if (property == props->pixel_data_polarity) {
-e99d4bb3 Davor Joja   2014-06-23  291  		xylon_cvc_ctrl(crtc->cvc, LOGICVC_PIXEL_DATA_INVERT,
-e99d4bb3 Davor Joja   2014-06-23  292  			       (bool)val);
-e99d4bb3 Davor Joja   2014-06-23  293  	} else if (property == props->pixel_data_trigger) {
-e99d4bb3 Davor Joja   2014-06-23  294  		xylon_cvc_ctrl(crtc->cvc, LOGICVC_PIXEL_DATA_TRIGGER_INVERT,
-e99d4bb3 Davor Joja   2014-06-23  295  			       (bool)val);
-e8c87b41 Davor Joja   2014-03-24  296  	} else {
-e8c87b41 Davor Joja   2014-03-24  297  		return -EINVAL;
-e8c87b41 Davor Joja   2014-03-24  298  	}
-e8c87b41 Davor Joja   2014-03-24  299  
-cb225630 Davor Joja   2014-07-11  300  	if (x > -1 && y > -1) {
-0c49ff42 Davor Joja   2014-11-18  301  		if (xylon_drm_plane_fb_set(base_crtc->primary,
-b2f5a183 Davor Joja   2014-09-15  302  					   base_crtc->primary->fb,
-cb225630 Davor Joja   2014-07-11  303  					   (u32)x, (u32)y,
-cb225630 Davor Joja   2014-07-11  304  					   base_crtc->hwmode.hdisplay - x,
-cb225630 Davor Joja   2014-07-11  305  					   base_crtc->hwmode.vdisplay - y,
-cb225630 Davor Joja   2014-07-11  306  					   base_crtc->x, base_crtc->y,
-cb225630 Davor Joja   2014-07-11  307  					   base_crtc->hwmode.hdisplay - x,
-cb225630 Davor Joja   2014-07-11  308  					   base_crtc->hwmode.vdisplay - y))
-cb225630 Davor Joja   2014-07-11  309  			DRM_ERROR("failed set position\n");
-cb225630 Davor Joja   2014-07-11  310  		else
-0c49ff42 Davor Joja   2014-11-18  311  			xylon_drm_plane_commit(base_crtc->primary);
-cb225630 Davor Joja   2014-07-11  312  	} else {
-0c49ff42 Davor Joja   2014-11-18  313  		xylon_drm_plane_op(base_crtc->primary, &op);
-cb225630 Davor Joja   2014-07-11  314  	}
-e8c87b41 Davor Joja   2014-03-24  315  
-e8c87b41 Davor Joja   2014-03-24  316  	return 0;
-e8c87b41 Davor Joja   2014-03-24  317  }
-e8c87b41 Davor Joja   2014-03-24  318  
-e8c87b41 Davor Joja   2014-03-24  319  static struct drm_crtc_funcs xylon_drm_crtc_funcs = {
-e8c87b41 Davor Joja   2014-03-24  320  	.destroy = xylon_drm_crtc_destroy,
-e8c87b41 Davor Joja   2014-03-24  321  	.set_config = drm_crtc_helper_set_config,
-e8c87b41 Davor Joja   2014-03-24  322  	.page_flip = xylon_drm_crtc_page_flip,
-e8c87b41 Davor Joja   2014-03-24  323  	.set_property = xylon_drm_crtc_set_property,
-e8c87b41 Davor Joja   2014-03-24  324  };
-e8c87b41 Davor Joja   2014-03-24  325  
-e8c87b41 Davor Joja   2014-03-24  326  static void xylon_drm_crtc_vblank_handler(struct drm_crtc *base_crtc)
-e8c87b41 Davor Joja   2014-03-24  327  {
-e8c87b41 Davor Joja   2014-03-24  328  	struct drm_device *dev = base_crtc->dev;
-e8c87b41 Davor Joja   2014-03-24  329  	struct drm_pending_vblank_event *event;
-e8c87b41 Davor Joja   2014-03-24  330  	struct xylon_drm_crtc *crtc = to_xylon_crtc(base_crtc);
-e8c87b41 Davor Joja   2014-03-24  331  	unsigned long flags;
-e8c87b41 Davor Joja   2014-03-24  332  
-e8c87b41 Davor Joja   2014-03-24  333  	drm_handle_vblank(dev, 0);
-e8c87b41 Davor Joja   2014-03-24  334  
-e8c87b41 Davor Joja   2014-03-24  335  	spin_lock_irqsave(&dev->event_lock, flags);
-e8c87b41 Davor Joja   2014-03-24  336  	event = crtc->event;
-e8c87b41 Davor Joja   2014-03-24  337  	crtc->event = NULL;
-e8c87b41 Davor Joja   2014-03-24  338  	if (event) {
-e8c87b41 Davor Joja   2014-03-24 @339  		drm_send_vblank_event(dev, 0, event);
-e8c87b41 Davor Joja   2014-03-24  340  		drm_vblank_put(dev, 0);
-e8c87b41 Davor Joja   2014-03-24  341  	}
-e8c87b41 Davor Joja   2014-03-24  342  	spin_unlock_irqrestore(&dev->event_lock, flags);
+> > #define pud_present(pud)	(pud_val(pud))
+> >
+> > static inline void set_pud(pud_t *pudp, pud_t pud)
+> >@@ -481,6 +484,7 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
+> >
+> > #define pgd_none(pgd)		(!pgd_val(pgd))
+> > #define pgd_bad(pgd)		(!(pgd_val(pgd) & 2))
+> >+#define pgd_valid(pgd)		(!!(pgd_val(pgd) & 1))
+> 
+> This has not been used anywhere.
 
-:::::: The code at line 224 was first introduced by commit
-:::::: e8c87b415c98ef5f5ceecbe62cc53f956cd9cd94 gpu: drm: xylon: Add a crtc support
+Well, this patch actually also breaks ptdump (debugfs/kernel_page_tables)
+as a descriptor can be non-zero yet invalid after applying this patch.
+Once it is accepted, I will post another patch which will fix the issue.
+pgd_valid() is used in that patch.
 
-:::::: TO: Davor Joja <davorjoja@logicbricks.com>
-:::::: CC: Michal Simek <michal.simek@xilinx.com>
+Thanks,
+-Takahiro AKASHI
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 56166 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/2fc7e489/attachment-0001.gz>
+> > #define pgd_present(pgd)	(pgd_val(pgd))
+> >
+> > static inline void set_pgd(pgd_t *pgdp, pgd_t pgd)
+> >diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> >index 17243e43184e..9c7adcce8e4e 100644
+> >--- a/arch/arm64/mm/mmu.c
+> >+++ b/arch/arm64/mm/mmu.c
+> >@@ -133,7 +133,8 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+> > 		 * Set the contiguous bit for the subsequent group of PTEs if
+> > 		 * its size and alignment are appropriate.
+> > 		 */
+> >-		if (((addr | PFN_PHYS(pfn)) & ~CONT_PTE_MASK) == 0) {
+> >+		if ((pgprot_val(prot) & PTE_VALID) &&
+> >+		    (((addr | PFN_PHYS(pfn)) & ~CONT_PTE_MASK) == 0)) {
+> > 			if (end - addr >= CONT_PTE_SIZE && !page_mappings_only)
+> > 				__prot = __pgprot(pgprot_val(prot) | PTE_CONT);
+> > 			else
+> >@@ -147,7 +148,8 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+> > 		 * After the PTE entry has been populated once, we
+> > 		 * only allow updates to the permission attributes.
+> > 		 */
+> >-		BUG_ON(!pgattr_change_is_safe(pte_val(old_pte), pte_val(*pte)));
+> >+		BUG_ON(pte_valid(old_pte) && pte_valid(*pte) &&
+> >+		       !pgattr_change_is_safe(pte_val(old_pte), pte_val(*pte)));
+> >
+> > 	} while (pte++, addr += PAGE_SIZE, addr != end);
+> >
+> >@@ -190,7 +192,8 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+> > 			 * Set the contiguous bit for the subsequent group of
+> > 			 * PMDs if its size and alignment are appropriate.
+> > 			 */
+> >-			if (((addr | phys) & ~CONT_PMD_MASK) == 0) {
+> >+			if ((pgprot_val(prot) | PMD_VALID) &&
+> >+			    ((addr | phys) & ~CONT_PMD_MASK) == 0) {
+> > 				if (end - addr >= CONT_PMD_SIZE)
+> > 					__prot = __pgprot(pgprot_val(prot) |
+> > 							  PTE_CONT);
+> >@@ -203,7 +206,8 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+> > 			 * After the PMD entry has been populated once, we
+> > 			 * only allow updates to the permission attributes.
+> > 			 */
+> >-			BUG_ON(!pgattr_change_is_safe(pmd_val(old_pmd),
+> >+			BUG_ON(pmd_valid(old_pmd) && pmd_valid(*pmd) &&
+> >+			       !pgattr_change_is_safe(pmd_val(old_pmd),
+> > 						      pmd_val(*pmd)));
+> > 		} else {
+> > 			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
+> >@@ -263,7 +267,8 @@ static void alloc_init_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
+> > 			 * After the PUD entry has been populated once, we
+> > 			 * only allow updates to the permission attributes.
+> > 			 */
+> >-			BUG_ON(!pgattr_change_is_safe(pud_val(old_pud),
+> >+			BUG_ON(pud_valid(old_pud) && pud_valid(*pud) &&
+> >+			       !pgattr_change_is_safe(pud_val(old_pud),
+> > 						      pud_val(*pud)));
+> > 		} else {
+> > 			alloc_init_pmd(pud, addr, next, phys, prot,
+> >@@ -344,8 +349,8 @@ void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+> > 			     pgd_pgtable_alloc, page_mappings_only);
+> > }
+> >
+> >-static void create_mapping_late(phys_addr_t phys, unsigned long virt,
+> >-				  phys_addr_t size, pgprot_t prot)
+> >+void create_mapping_late(phys_addr_t phys, unsigned long virt,
+> >+			 phys_addr_t size, pgprot_t prot)
+> > {
+> > 	if (virt < VMALLOC_START) {
+> > 		pr_warn("BUG: not creating mapping for %pa at 0x%016lx - outside kernel range\n",
+> >@@ -791,14 +796,20 @@ int __init arch_ioremap_pmd_supported(void)
+> > int pud_set_huge(pud_t *pud, phys_addr_t phys, pgprot_t prot)
+> > {
+> > 	BUG_ON(phys & ~PUD_MASK);
+> >-	set_pud(pud, __pud(phys | PUD_TYPE_SECT | pgprot_val(mk_sect_prot(prot))));
+> >+	set_pud(pud, __pud(phys |
+> >+			   ((pgprot_val(prot) & PUD_VALID) ?
+> >+					PUD_TYPE_SECT : 0) |
+> >+			   pgprot_val(mk_sect_prot(prot))));
+> > 	return 1;
+> > }
+> >
+> > int pmd_set_huge(pmd_t *pmd, phys_addr_t phys, pgprot_t prot)
+> > {
+> > 	BUG_ON(phys & ~PMD_MASK);
+> >-	set_pmd(pmd, __pmd(phys | PMD_TYPE_SECT | pgprot_val(mk_sect_prot(prot))));
+> >+	set_pmd(pmd, __pmd(phys |
+> >+			   ((pgprot_val(prot) & PMD_VALID) ?
+> >+					PMD_TYPE_SECT : 0) |
+> >+			   pgprot_val(mk_sect_prot(prot))));
+> > 	return 1;
+> > }
+> >
+> >
+> 
+> 
+> ~Pratyush
