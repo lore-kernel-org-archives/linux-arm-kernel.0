@@ -1,83 +1,36 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 25 Jan 2017 11:24:59 +0000
-Subject: [STLinux Kernel] [PATCH 4/8] serial: st-asc: (De)Register GPIOD
- and swap Pinctrl profiles
-In-Reply-To: <20170124134310.27512-5-lee.jones@linaro.org>
-References: <20170124134310.27512-1-lee.jones@linaro.org>
- <20170124134310.27512-5-lee.jones@linaro.org>
-Message-ID: <20170125112459.GF5680@griffinp-ThinkPad-X1-Carbon-2nd>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 25 Jan 2017 12:28:20 +0100
+Subject: USB/swiotlb failure on arm64/RPi3
+In-Reply-To: <20170124225200.a7qioswpxzh6agvd@raspberrypi-2.musicnaut.iki.fi>
+References: <20170124225200.a7qioswpxzh6agvd@raspberrypi-2.musicnaut.iki.fi>
+Message-ID: <18757304.xCyYfrPYKi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
-
-On Tue, 24 Jan 2017, Lee Jones wrote:
-
-> When hardware flow-control is disabled, manual toggling of the UART's
-> reset line (RTS) using userland applications (e.g. stty) is not
-> possible, since the ASC IP does not provide this functionality in the
-> same was as some other IPs do.  Thus, we have to do this manually.
+On Wednesday, January 25, 2017 12:52:00 AM CET Aaro Koskinen wrote:
 > 
-> This patch ensures that when HW flow-control is disabled the RTS/CTS
-> lines are free to be registered via the GPIO API.  It also ensures
-> any registered GPIO lines are unregistered when HW flow-control is
-> requested, allowing the IP to control them automatically.
-
-Apart from my comment in previous mail about switching the meaning of
-default & manual-rts groupings. It seems like a neat solution.
-
-Acked-by: Peter Griffin <peter.griffin@linaro.org>
-
+> Boot hangs and I/O does not recover.
 > 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/tty/serial/st-asc.c | 27 ++++++++++++++++++++++++++-
->  1 file changed, 26 insertions(+), 1 deletion(-)
+> I first suspected the dwc2 driver, but the cause turns out to be DMA
+> mapping error in usb_hcd_map_urb_for_dma(). This will cause usb_sg_wait()
+> to loop forever trying to re-try. On RPi3 dma_mapping_error() is:
+
+Do you know why usb_hcd_map_urb_for_dma() fails here? Are we running
+out of swiotlb bounce buffer space, or is there some other problem?
+
+> int
+> swiotlb_dma_mapping_error(struct device *hwdev, dma_addr_t dma_addr)
+> {
+>         return (dma_addr == phys_to_dma(hwdev, io_tlb_overflow_buffer));
+> }
 > 
-> diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
-> index 03801ed..2c4b5f5 100644
-> --- a/drivers/tty/serial/st-asc.c
-> +++ b/drivers/tty/serial/st-asc.c
-> @@ -512,6 +512,8 @@ static void asc_set_termios(struct uart_port *port, struct ktermios *termios,
->  			    struct ktermios *old)
->  {
->  	struct asc_port *ascport = to_asc_port(port);
-> +	struct device_node *np = port->dev->of_node;
-> +	struct gpio_desc *gpiod;
->  	unsigned int baud;
->  	u32 ctrl_val;
->  	tcflag_t cflag;
-> @@ -555,9 +557,32 @@ static void asc_set_termios(struct uart_port *port, struct ktermios *termios,
->  		ctrl_val |= ASC_CTL_PARITYODD;
->  
->  	/* hardware flow control */
-> -	if ((cflag & CRTSCTS))
-> +	if ((cflag & CRTSCTS)) {
->  		ctrl_val |= ASC_CTL_CTSENABLE;
->  
-> +		/* If flow-control selected, stop handling RTS manually */
-> +		if (ascport->rts) {
-> +			devm_gpiod_put(port->dev, ascport->rts);
-> +			ascport->rts = NULL;
-> +
-> +			pinctrl_select_state(ascport->pinctrl,
-> +					     ascport->states[DEFAULT]);
-> +		}
-> +	} else {
-> +		/* If flow-control disabled, it's safe to handle RTS manually */
-> +		if (!ascport->rts && ascport->states[MANUAL_RTS]) {
-> +			pinctrl_select_state(ascport->pinctrl,
-> +					     ascport->states[MANUAL_RTS]);
-> +
-> +			gpiod =	devm_get_gpiod_from_child(port->dev, "rts",
-> +							  &np->fwnode);
-> +			if (!IS_ERR(gpiod)) {
-> +				gpiod_direction_output(gpiod, 0);
-> +				ascport->rts = gpiod;
-> +			}
-> +		}
-> +	}
-> +
->  	if ((baud < 19200) && !ascport->force_m1) {
->  		asc_out(port, ASC_BAUDRATE, (port->uartclk / (16 * baud)));
->  	} else {
+> On arm64, swiotlb is not initialized by default, so io_tlb_overflow_buffer
+> is 0. But phys_to_dma(hwdev, 0) should be a valid DMA address and not
+> be rejected. I tested this by initializing io_tlb_overflow_buffer with
+> INVALID_PHYS_ADDR, and then the boot passes and system runs fine.
+> 
+> Any ideas how this should be fixed properly?
+
+Why is swiotlb not initialized?
+
+	Arnd
