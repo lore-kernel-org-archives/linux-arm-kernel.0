@@ -1,32 +1,34 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 25 Jan 2017 21:50:44 +0100
-Subject: [PATCH] i2c: mv64xxx: add suspend/resume support
-In-Reply-To: <1482422042-30201-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1482422042-30201-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20170125205043.ze3m3wrjovajbps4@ninjato>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Wed, 25 Jan 2017 14:51:47 -0600
+Subject: [PATCH] ARM: dts: watchdog0 cannot reliably trigger reset
+Message-ID: <1485377507-12045-1-git-send-email-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 22, 2016 at 04:54:02PM +0100, Thomas Petazzoni wrote:
-> From: Grzegorz Jaszczyk <jaz@semihalf.com>
-> 
-> This commit implements suspend/resume support in the mv64xxx I2C
-> controller driver. There is no need to implement a ->suspend() hook, as
-> calling mv64xxx_i2c_hw_init() at ->resume() time is enough.
-> 
-> Signed-off-by: Grzegorz Jaszczyk <jaz@semihalf.com>
-> Reviewed-by: Nadav Haklai <nadavh@marvell.com>
-> Reviewed-by: Lior Amsalem <alior@marvell.com>
-> Tested-by: Lior Amsalem <alior@marvell.com>
-> [Thomas: switch to dev_pm_ops, fix build warning when !PM.]
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+On the Arria10, because of hardware bug, watchdog0 cannot reliably trigger
+a reset to the CPU. The workaround would be to use watchdog1 instead.
 
-Applied to for-next, thanks!
+Also for watchdog1, there is a dependency on the bootloader to enable the
+boot_clk source to be from the cb_intosc_hs_clk/2, versus from EOSC1. This
+corresponds to the (SWCTRLBTCLKEN & SWCTRLBTCLKSEL) bits enabled in the
+control register in the clock manager module of Arria10.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/b5c65e38/attachment.sig>
+Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
+---
+ arch/arm/boot/dts/socfpga_arria10_socdk.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi b/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
+index 4c99c99..c57e6ce 100644
+--- a/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
++++ b/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
+@@ -160,6 +160,6 @@
+ 	status = "okay";
+ };
+ 
+-&watchdog0 {
++&watchdog1 {
+ 	status = "okay";
+ };
+-- 
+2.7.4
