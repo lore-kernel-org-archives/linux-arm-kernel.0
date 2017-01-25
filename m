@@ -1,88 +1,36 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 25 Jan 2017 11:03:57 +0000
-Subject: [STLinux Kernel] [PATCH 2/8] serial: st-asc: Provide RTS
- functionality
-In-Reply-To: <20170124134310.27512-3-lee.jones@linaro.org>
-References: <20170124134310.27512-1-lee.jones@linaro.org>
- <20170124134310.27512-3-lee.jones@linaro.org>
-Message-ID: <20170125110357.GD5680@griffinp-ThinkPad-X1-Carbon-2nd>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 25 Jan 2017 12:06:44 +0100
+Subject: [PATCH v2 5/6] ARM: tegra: nyan-big: Proper pinmux for TPM i2c
+In-Reply-To: <20170122154753.31942-5-contact@paulk.fr>
+References: <20170122154753.31942-1-contact@paulk.fr>
+ <20170122154753.31942-5-contact@paulk.fr>
+Message-ID: <20170125110644.GF9344@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 Jan 2017, Lee Jones wrote:
-
-> Until this point, it has not been possible for userland serial
-> applications (e.g. stty) to toggle the UART RTS line.  This can
-> be useful with certain configurations. For example, when using
-> a Mezzanine on a Linaro 96board, RTS line is used to take the
-> on-board microcontroller in and out of reset.
+On Sun, Jan 22, 2017 at 04:47:52PM +0100, Paul Kocialkowski wrote:
+> This corrects the pinmux for accessing the TPM over the i2c line.
+> Thus, it allows correctly probing the module, that previously failed with i2c
+> errors.
 > 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-
-Acked-by: Peter Griffin <peter.griffin@linaro.org>
-
+> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
 > ---
->  drivers/tty/serial/st-asc.c | 27 +++++++++++++++++++++++----
->  1 file changed, 23 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
-> index 69e6232..397df50 100644
-> --- a/drivers/tty/serial/st-asc.c
-> +++ b/drivers/tty/serial/st-asc.c
-> @@ -30,6 +30,7 @@
->  #include <linux/of_platform.h>
->  #include <linux/serial_core.h>
->  #include <linux/clk.h>
-> +#include <linux/gpio/consumer.h>
->  
->  #define DRIVER_NAME "st-asc"
->  #define ASC_SERIAL_NAME "ttyAS"
-> @@ -38,6 +39,7 @@
->  
->  struct asc_port {
->  	struct uart_port port;
-> +	struct gpio_desc *rts;
->  	struct clk *clk;
->  	unsigned int hw_flow_control:1;
->  	unsigned int force_m1:1;
-> @@ -391,12 +393,27 @@ static unsigned int asc_tx_empty(struct uart_port *port)
->  
->  static void asc_set_mctrl(struct uart_port *port, unsigned int mctrl)
->  {
-> +	struct asc_port *ascport = to_asc_port(port);
-> +
->  	/*
-> -	 * This routine is used for seting signals of: DTR, DCD, CTS/RTS
-> -	 * We use ASC's hardware for CTS/RTS, so don't need any for that.
-> -	 * Some boards have DTR and DCD implemented using PIO pins,
-> -	 * code to do this should be hooked in here.
-> +	 * This routine is used for seting signals of: DTR, DCD, CTS and RTS.
-> +	 * We use ASC's hardware for CTS/RTS when hardware flow-control is
-> +	 * enabled, however if the RTS line is required for another purpose,
-> +	 * commonly controlled using HUP from userspace, then we need to toggle
-> +	 * it manually, using GPIO.
-> +	 *
-> +	 * Some boards also have DTR and DCD implemented using PIO pins, code to
-> +	 * do this should be hooked in here.
->  	 */
-> +
-> +	if (!ascport->rts)
-> +		return;
-> +
-> +	/* If HW flow-control is enabled, we can't fiddle with the RTS line */
-> +	if (asc_in(port, ASC_CTL) & ASC_CTL_CTSENABLE)
-> +		return;
-> +
-> +	gpiod_set_value(ascport->rts, mctrl & TIOCM_RTS);
->  }
->  
->  static unsigned int asc_get_mctrl(struct uart_port *port)
-> @@ -726,6 +743,8 @@ static struct asc_port *asc_of_get_asc_port(struct platform_device *pdev)
->  							"st,hw-flow-control");
->  	asc_ports[id].force_m1 =  of_property_read_bool(np, "st,force_m1");
->  	asc_ports[id].port.line = id;
-> +	asc_ports[id].rts = NULL;
-> +
->  	return &asc_ports[id];
->  }
->  
+>  arch/arm/boot/dts/tegra124-nyan-big.dts | 20 ++++++++++----------
+>  1 file changed, 10 insertions(+), 10 deletions(-)
+
+I've applied an s/i2c/I2C/ in the commit message and applied this. Can
+you also make sure that these changes go into the nyan-big configuration
+of the tegra-pinmux-scripts[0]? I know Stephen wants to keep those in
+sync with the DTS.
+
+Thanks,
+Thierry
+
+[0]: https://github.com/NVIDIA/tegra-pinmux-scripts
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/48b08ba2/attachment.sig>
