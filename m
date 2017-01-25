@@ -1,62 +1,31 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 25 Jan 2017 12:54:52 +0000
-Subject: [PATCH] arm64: dma-mapping: Fix dma_mapping_error() when
- bypassing SWIOTLB
-In-Reply-To: <CAK8P3a1qVsUSFCOKpbtVu0_uYb3qhzRr8edZxjrMaHnbgjmcBA@mail.gmail.com>
-References: <20170124225200.a7qioswpxzh6agvd@raspberrypi-2.musicnaut.iki.fi>
- <9e74b2f91b0b4b649a898db47225e5ea3b6a0417.1485345401.git.robin.murphy@arm.com>
- <1485347826.2306.3.camel@crowfest.net>
- <CAK8P3a1qVsUSFCOKpbtVu0_uYb3qhzRr8edZxjrMaHnbgjmcBA@mail.gmail.com>
-Message-ID: <81482ad2-331a-df33-66a2-f5fedc0bd7bb@arm.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Wed, 25 Jan 2017 14:12:38 +0100
+Subject: [PATCH v7 2/4] dmaengine: Forward slave device pointer to
+ of_xlate callback
+In-Reply-To: <1485340088-25481-3-git-send-email-m.szyprowski@samsung.com>
+References: <1485340088-25481-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170125102824eucas1p1cf027184286131ff628eb7113c3f9e60@eucas1p1.samsung.com>
+ <1485340088-25481-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <26397455-1237-2a66-acf8-215aacc7c9ce@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/01/17 12:51, Arnd Bergmann wrote:
-> On Wed, Jan 25, 2017 at 1:37 PM, Michael Zoran <mzoran@crowfest.net> wrote:
->> On Wed, 2017-01-25 at 12:03 +0000, Robin Murphy wrote:
->>> hen bypassing SWIOTLB on small-memory systems, we need to avoid
->>> calling
->>> into swiotlb_dma_mapping_error() in exactly the same way as we avoid
->>> swiotlb_dma_supported(), because the former also relies on SWIOTLB
->>> state
->>> being initialised.
->>
->> I didn't submit the initial ARM64 port of the RPI 3, so I don't know
->> much about this.  But from a third personal point of view, this seems
->> to side step the main issue here.
-> 
-> I think Robin's approach is fixing exactly the right part of the code.
-> 
->> From an ARM64 subsystem point of view, what exactly is the
->> correct/recommended method for ensuring the mm subsystem is initialized
->> correctly?
-> 
-> It is initialized correctly, the bug was calling the wrong helper when swiotlb
-> is not used because we determined that we don't need it.
-> 
-> One concern from inspection:
-> 
->> +static int __swiotlb_dma_mapping_error(struct device *hwdev, dma_addr_t addr)
->> +{
->> +       if (swiotlb)
->> +               return swiotlb_dma_mapping_error(hwdev, addr);
->> +       return 1;
->> +}
-> 
-> Shouldn't that be
-> 
->      return addr == DMA_ERROR_CODE;
-> 
-> in the last line? Otherwise any addr is interpreted as an error, which
-> seems wrong. Maybe I'm missing something obvious here.
+On 01/25/2017 11:28 AM, Marek Szyprowski wrote:
+> Add pointer to slave device to of_dma_xlate to let DMA engine driver
+> to know which slave device is using given DMA channel. This will be
+> later used to implement non-irq-safe runtime PM for DMA engine driver.
 
-Aw crap, copy/paste/brain error - thanks.
+of_dma_xlate() is used to translate from a OF phandle and a specifier to a
+DMA channel. On one hand this does not necessarily mean that the channel is
+actually going to be used by the slave that called the xlate function.
+Modifying the driver state when a lookup of the channel is done is a
+layering violation. And this approach is also missing a way to disassociate
+a slave from a DMA channel, e.g. when it is no longer used.
 
-I'll have a nice strong cup of tea, actually engage thinking mode, and
-respin...
+On the other hand there are other mechanisms to translate between some kind
+of firmware handle to a DMA channel which are completely ignored here.
 
-Robin.
-
-> 
->     Arnd
-> 
+So this approach does not work. This is something that needs to be done at
+the dmaengine level, not a the firmware resource translation level. And it
+needs a matching method that is called when the channel is disassociated
+from a device, when the device no longer uses the DMA channel.
