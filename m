@@ -1,19 +1,17 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 25 Jan 2017 20:39:43 +0100
-Subject: [PATCH v4 3/4] arm64: Use __tlbi() macros in KVM code
-In-Reply-To: <20170125155232.10277-3-cov@codeaurora.org>
-References: <20170125155232.10277-1-cov@codeaurora.org>
- <20170125155232.10277-3-cov@codeaurora.org>
-Message-ID: <20170125193943.GW15850@cbox>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 25 Jan 2017 14:43:24 -0500 (EST)
+Subject: [PATCH 0/2] More ethtool support and BGX configuration changes
+In-Reply-To: <1485345984-28163-1-git-send-email-sunil.kovvuri@gmail.com>
+References: <1485345984-28163-1-git-send-email-sunil.kovvuri@gmail.com>
+Message-ID: <20170125.144324.534728451505782300.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2017 at 10:52:31AM -0500, Christopher Covington wrote:
-> Refactor the KVM code to use the __tlbi macros, which will allow an errata
-> workaround that repeats tlbi dsb sequences to only change one location.
-> This is not intended to change the generated assembly and comparing before
-> and after vmlinux objdump shows no functional changes.
-> 
-> Signed-off-by: Christopher Covington <cov@codeaurora.org>
+From: sunil.kovvuri@gmail.com
+Date: Wed, 25 Jan 2017 17:36:22 +0530
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> These patches adds support to set queue sizes from ethtool and changes 
+> the way serdes lane configuration is done by BGX driver on 81/83xx 
+> platforms.
+
+Series applied, thanks.
