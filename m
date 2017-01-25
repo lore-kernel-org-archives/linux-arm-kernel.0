@@ -1,96 +1,175 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 25 Jan 2017 17:59:43 +0000
-Subject: [PATCH] spi: mediatek: Manually set dma_ops for spi_master device
-In-Reply-To: <CAGS+omBV3o1hergAjU3_9ok5NTmk8Z315zo3yW9jU_jA+reZCQ@mail.gmail.com>
-References: <20170124132519.13271-1-djkurtz@chromium.org>
- <b1180920-8ead-40e8-6155-8510226e719b@arm.com>
- <CAGS+omBV3o1hergAjU3_9ok5NTmk8Z315zo3yW9jU_jA+reZCQ@mail.gmail.com>
-Message-ID: <0548db75-042b-4bef-02db-767ea9ccd7e4@arm.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 25 Jan 2017 19:13:20 +0100
+Subject: [PATCH V7 01/11] iommu/of: Refactor of_iommu_configure() for
+ error handling
+In-Reply-To: <c7bad124-d9f2-0ddf-168f-0b1950d3e1ed@arm.com>
+References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
+ <1485188293-20263-2-git-send-email-sricharan@codeaurora.org>
+ <4388779a-0e83-fadc-83f4-98c46c88d42e@semihalf.com>
+ <c7bad124-d9f2-0ddf-168f-0b1950d3e1ed@arm.com>
+Message-ID: <b350f6d3-dd33-10c4-94ae-a3a7ba5e938a@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/01/17 10:24, Daniel Kurtz wrote:
-> Hi Robin,
-> 
-> On Tue, Jan 24, 2017 at 11:14 PM, Robin Murphy <robin.murphy@arm.com> wrote:
->> Hi Dan,
-> 
-> [snip...]
-> 
->>> And I really don't know why we needed to set the coherent_dma_mask to 0 to
->>> avoid SPI transaction errors.
+Hi Robin,
+
+On 25.01.2017 18:35, Robin Murphy wrote:
+> Hi Tomasz,
+>
+> On 25/01/17 17:17, Tomasz Nowicki wrote:
+>> Hi Sricharan,
 >>
->> Following what I mentioned above, "git grep dma_alloc drivers/spi" makes
->> it seem like coherent DMA isn't used anywhere relevant, which is rather
->> puzzling. Unless of course somewhere along the line somebody's done the
->> dev->dma_mask = &dev->dma_coherent_mask hack, with the result that
->> writing one mask hits both, making *all* DMA fail and big transfers fall
->> back to PIO.
-> 
-> You mean this last line?
-> 
->>> @@ -575,6 +576,10 @@ static int mtk_spi_probe(struct platform_device *pdev)
->>>               goto err_put_master;
->>>       }
+>> On 23.01.2017 17:18, Sricharan R wrote:
+>>> From: Robin Murphy <robin.murphy@arm.com>
 >>>
->>> +     /* Call of_dma_configure to set up spi_master's dma_ops */
->>> +     of_dma_configure(&master->dev, master->dev.of_node);
->>> +     /* But explicitly set the coherent_dma_mask to 0 */
->>> +     master->dev.coherent_dma_mask = 0;
->>>       if (!pdev->dev.dma_mask)
->>>               pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
->                                   ^^^^^
+>>> In preparation for some upcoming cleverness, rework the control flow in
+>>> of_iommu_configure() to minimise duplication and improve the propogation
+>>> of errors. It's also as good a time as any to switch over from the
+>>> now-just-a-compatibility-wrapper of_iommu_get_ops() to using the generic
+>>> IOMMU instance interface directly.
+>>>
+>>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>>> ---
+>>>  drivers/iommu/of_iommu.c | 83
+>>> +++++++++++++++++++++++++++++++-----------------
+>>>  1 file changed, 53 insertions(+), 30 deletions(-)
+>>>
+>>> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+>>> index 0f57ddc..ee49081 100644
+>>> --- a/drivers/iommu/of_iommu.c
+>>> +++ b/drivers/iommu/of_iommu.c
+>>> @@ -96,6 +96,28 @@ int of_get_dma_window(struct device_node *dn, const
+>>> char *prefix, int index,
+>>>  }
+>>>  EXPORT_SYMBOL_GPL(of_get_dma_window);
+>>>
+>>> +static const struct iommu_ops
+>>> +*of_iommu_xlate(struct device *dev, struct of_phandle_args *iommu_spec)
+>>> +{
+>>> +    const struct iommu_ops *ops;
+>>> +    struct fwnode_handle *fwnode = &iommu_spec->np->fwnode;
+>>> +    int err;
+>>> +
+>>> +    ops = iommu_get_instance(fwnode);
+>>> +    if (!ops || !ops->of_xlate)
+>>> +        return NULL;
+>>> +
+>>> +    err = iommu_fwspec_init(dev, &iommu_spec->np->fwnode, ops);
+>>> +    if (err)
+>>> +        return ERR_PTR(err);
+>>> +
+>>> +    err = ops->of_xlate(dev, iommu_spec);
+>>> +    if (err)
+>>> +        return ERR_PTR(err);
+>>> +
+>>> +    return ops;
+>>> +}
+>>> +
+>>>  static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
+>>>  {
+>>>      struct of_phandle_args *iommu_spec = data;
+>>> @@ -105,10 +127,11 @@ static int __get_pci_rid(struct pci_dev *pdev,
+>>> u16 alias, void *data)
+>>>  }
+>>>
+>>>  static const struct iommu_ops
+>>> -*of_pci_iommu_configure(struct pci_dev *pdev, struct device_node
+>>> *bridge_np)
+>>> +*of_pci_iommu_init(struct pci_dev *pdev, struct device_node *bridge_np)
+>>>  {
+>>>      const struct iommu_ops *ops;
+>>>      struct of_phandle_args iommu_spec;
+>>> +    int err;
+>>>
+>>>      /*
+>>>       * Start by tracing the RID alias down the PCI topology as
+>>> @@ -123,56 +146,56 @@ static int __get_pci_rid(struct pci_dev *pdev,
+>>> u16 alias, void *data)
+>>>       * bus into the system beyond, and which IOMMU it ends up at.
+>>>       */
+>>>      iommu_spec.np = NULL;
+>>> -    if (of_pci_map_rid(bridge_np, iommu_spec.args[0], "iommu-map",
+>>> -               "iommu-map-mask", &iommu_spec.np, iommu_spec.args))
+>>> -        return NULL;
+>>> +    err = of_pci_map_rid(bridge_np, iommu_spec.args[0], "iommu-map",
+>>> +                 "iommu-map-mask", &iommu_spec.np,
+>>> +                 iommu_spec.args);
+>>> +    if (err)
+>>> +        return ERR_PTR(err);
+>>>
+>>> -    ops = of_iommu_get_ops(iommu_spec.np);
+>>> -    if (!ops || !ops->of_xlate ||
+>>> -        iommu_fwspec_init(&pdev->dev, &iommu_spec.np->fwnode, ops) ||
+>>> -        ops->of_xlate(&pdev->dev, &iommu_spec))
+>>> -        ops = NULL;
+>>> +    ops = of_iommu_xlate(&pdev->dev, &iommu_spec);
+>>>
+>>>      of_node_put(iommu_spec.np);
+>>>      return ops;
+>>>  }
+>>>
+>>> -const struct iommu_ops *of_iommu_configure(struct device *dev,
+>>> -                       struct device_node *master_np)
+>>> +static const struct iommu_ops
+>>> +*of_platform_iommu_init(struct device *dev, struct device_node *np)
+>>>  {
+>>>      struct of_phandle_args iommu_spec;
+>>> -    struct device_node *np;
+>>>      const struct iommu_ops *ops = NULL;
+>>>      int idx = 0;
+>>>
+>>> -    if (dev_is_pci(dev))
+>>> -        return of_pci_iommu_configure(to_pci_dev(dev), master_np);
+>>> -
+>>>      /*
+>>>       * We don't currently walk up the tree looking for a parent IOMMU.
+>>>       * See the `Notes:' section of
+>>>       * Documentation/devicetree/bindings/iommu/iommu.txt
+>>>       */
+>>> -    while (!of_parse_phandle_with_args(master_np, "iommus",
+>>> -                       "#iommu-cells", idx,
+>>> -                       &iommu_spec)) {
+>>> -        np = iommu_spec.np;
+>>> -        ops = of_iommu_get_ops(np);
+>>> -
+>>> -        if (!ops || !ops->of_xlate ||
+>>> -            iommu_fwspec_init(dev, &np->fwnode, ops) ||
+>>> -            ops->of_xlate(dev, &iommu_spec))
+>>> -            goto err_put_node;
+>>> -
+>>> -        of_node_put(np);
+>>> +    while (!of_parse_phandle_with_args(np, "iommus", "#iommu-cells",
+>>> +                       idx, &iommu_spec)) {
+>>> +        ops = of_iommu_xlate(dev, &iommu_spec);
+>>> +        of_node_put(iommu_spec.np);
+>>>          idx++;
+>>> +        if (IS_ERR_OR_NULL(ops))
+>>> +            break;
+>>>      }
+>>>
+>>>      return ops;
+>>> +}
+>>> +
+>>> +const struct iommu_ops *of_iommu_configure(struct device *dev,
+>>> +                       struct device_node *master_np)
+>>> +{
+>>> +    const struct iommu_ops *ops;
+>>> +
+>>> +    if (!master_np)
+>>> +        return NULL;
+>>> +
+>>> +    if (dev_is_pci(dev))
+>>> +        ops = of_pci_iommu_init(to_pci_dev(dev), master_np);
+>> I gave the whole patch set a try on ThunderX. really_probe() is failing
+>> on dma_configure()->of_pci_iommu_init() for each PCI device.
+> When you say "failing", do you mean cleanly, or with a crash? I've
+> managed to hit __of_match_node() dereferencing NULL from
+> of_iommu_xlate() in a horribly complicated chain of events, which I'm
+> trying to figure out now, and I wonder if the two might be related.
+>
 
-Ha, I totally failed to spot that!
+Cleanly, of_pci_iommu_init()->of_pci_map_rid() can't find "iommu-map" 
+property for my case. Probably not related to your crash.
 
-> As predicted, setting the dma_mask = 0 causes "all DMA to fail".  In
-> particular, dma_capable() always returns false, so
-> swiotlb_map_sg_attrs() takes the map_single() path, instead of just
-> assigning:
-> 
->    sg->dma_address = dev_addr;
-> 
-> swiotlb_map_sg_attrs(struct device *hwdev, struct scatterlist *sgl, int nelems,
->                      enum dma_data_direction dir, unsigned long attrs)
-> {
->         struct scatterlist *sg;
->         int i;
-> 
->         BUG_ON(dir == DMA_NONE);
-> 
->         for_each_sg(sgl, sg, nelems, i) {
->                 phys_addr_t paddr = sg_phys(sg);
->                 dma_addr_t dev_addr = phys_to_dma(hwdev, paddr);
-> 
->                 if (swiotlb_force == SWIOTLB_FORCE ||
->                     !dma_capable(hwdev, dev_addr, sg->length)) {
->                         phys_addr_t map = map_single(hwdev, sg_phys(sg),
->                                                      sg->length, dir, attrs);
->                         ...
->                         }
->                         sg->dma_address = phys_to_dma(hwdev, map);
->                 } else
->                         sg->dma_address = dev_addr;
->                 sg_dma_len(sg) = sg->length;
->         }
->         return nelems;
-> }
-> 
-> So, I think this means that the only reason the MTK SPI driver ever
-> worked before was that it was tested on an older kernel, so the
-> spi_master was defaulting to swiotlb_dma_ops with a 0 dma_mask, and
-> therefore it was using SWIOTLB bounce buffers (via 'map_single'), and
-> not actually ever doing real DMA.
-
-Well, it's still "real DMA" if the device is able to slurp data out of
-the bounce buffer. That suggests there might be some mismatch between
-the default DMA mask it's getting given and the actual hardware
-capability (i.e. the bounce buffer happens to fall somewhere accessible,
-but other addresses may not be) - is crazy 33-bit mode involved here?
-
-Robin.
-
-> I'm in a bit over my head here, any suggestions on how to fix this?
-> 
-> -Dan
-> 
+Thanks,
+Tomasz
