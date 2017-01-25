@@ -1,52 +1,88 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 25 Jan 2017 15:35:34 +0000
-Subject: [PATCH 0/8] serial: st-asc: Allow handling of RTS line
-In-Reply-To: <20170125100722.GB17954@kroah.com>
-References: <20170124134310.27512-1-lee.jones@linaro.org>
- <20170125100722.GB17954@kroah.com>
-Message-ID: <20170125153534.GB19242@dell>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 25 Jan 2017 10:38:01 -0500
+Subject: [PATCH v20 08/17] clocksource/drivers/arm_arch_timer: Rework
+ counter frequency detection.
+In-Reply-To: <CADyBb7sU6DVMk6px0963r8by--U-3k_XjESd88zZMkj7xbywgA@mail.gmail.com>
+References: <20170118132541.8989-1-fu.wei@linaro.org>
+ <20170118132541.8989-9-fu.wei@linaro.org> <20170124172400.GG7572@leverpostej>
+ <CADyBb7sU6DVMk6px0963r8by--U-3k_XjESd88zZMkj7xbywgA@mail.gmail.com>
+Message-ID: <e62c6f73-16e0-2764-126f-b8ed6adc3489@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Jan 2017, Greg KH wrote:
+Hi Fu,
 
-> On Tue, Jan 24, 2017 at 01:43:02PM +0000, Lee Jones wrote:
-> > When hardware flow-control is disabled, manual toggling of the UART's
-> > reset line (RTS) using userland applications (e.g. stty) is not
-> > possible, since the ASC IP does not provide this functionality in the
-> > same was as some other IPs do.  Thus, we have to do this manually.
-> > 
-> > This set ensures the correct Pinctrl groups are configured and
-> > obtained for both manual toggling of the RTS line and for the IP to
-> > take over the lines when HW flow-control is requested by the user.
-> > 
-> > Lee Jones (8):
-> >   serial: st-asc: Ignore the parity error bit if 8-bit mode is enabled
-> >   serial: st-asc: Provide RTS functionality
-> >   serial: st-asc: Read in all Pinctrl states
-> >   serial: st-asc: (De)Register GPIOD and swap Pinctrl profiles
-> >   ARM: dts: STiH410-b2260: Identify the UART RTS line
-> >   ARM: dts: STiH407-pinctrl: Add Pinctrl group for HW flow-control
-> >   ARM: dts: STiH407-family: Use new Pinctrl groups
-> >   ARM: dts: STiH407-family: Enable HW flow-control
-> > 
-> >  arch/arm/boot/dts/stih407-family.dtsi  |  7 +--
-> >  arch/arm/boot/dts/stih407-pinctrl.dtsi | 12 ++++-
-> >  arch/arm/boot/dts/stih410-b2260.dts    |  1 +
-> >  drivers/tty/serial/st-asc.c            | 98 +++++++++++++++++++++++++++++++---
-> >  4 files changed, 105 insertions(+), 13 deletions(-)
-> > 
+On 01/25/2017 01:46 AM, Fu Wei wrote:
+> Hi Mark,
 > 
-> I'll ignore this series due to the kbuild problems :(
+> On 25 January 2017 at 01:24, Mark Rutland <mark.rutland@arm.com> wrote:
+>> On Wed, Jan 18, 2017 at 09:25:32PM +0800, fu.wei at linaro.org wrote:
+>>> From: Fu Wei <fu.wei@linaro.org>
+>>>
+>>> The counter frequency detection call(arch_timer_detect_rate) combines two
+>>> ways to get counter frequency: system coprocessor register and MMIO timer.
+>>> But in a specific timer init code, we only need one way to try:
+>>> getting frequency from MMIO timer register will be needed only when we
+>>> init MMIO timer; getting frequency from system coprocessor register will
+>>> be needed only when we init arch timer.
+>>
+>> When I mentioned this splitting before, I had mean that we'd completely
+>> separate the two, with separate mmio_rate and sysreg_rate variables.
+> 
+> sorry for misunderstanding.
+> 
+> Are you saying :
+> 
+> diff --git a/drivers/clocksource/arm_arch_timer.c
+> b/drivers/clocksource/arm_arch_timer.c
+> index 663a57a..eec92f6 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -65,7 +65,8 @@ struct arch_timer {
+> 
+>  #define to_arch_timer(e) container_of(e, struct arch_timer, evt)
+> 
+> -static u32 arch_timer_rate;
+> +static u32 arch_timer_sysreg_rate ;
+> +static u32 arch_timer_mmio_rate;
+>  static int arch_timer_ppi[ARCH_TIMER_MAX_TIMER_PPI];
+> 
+>  static struct clock_event_device __percpu *arch_timer_evt;
+> 
+> 
+> But what have I learned From ARMv8 ARM is
+> AArch64 System register CNTFRQ_EL0 is provided so that software can
+> discover the frequency of the system counter.
+> CNTFRQ(in CNTCTLBase and CNTBaseN) is provided so that software can
+> discover the frequency of the system counter.
+> The bit assignments of the registers are identical in the System
+> register interface and in the memory-mapped system level interface.
+> So I think they both contain the same value : the frequency of the
+> system counter, just in different view, and can be accessed in
+> different ways.
+> 
+> So do we really need to separate mmio_rate and sysreg_rate variables?
+> 
+> And for CNTFRQ(in CNTCTLBase and CNTBaseN) , we can NOT access it in
+> Linux kernel (EL1),
+> Because ARMv8 ARM says:
+> In a system that implements both Secure and Non-secure states, this
+> register is only accessible by Secure accesses.
+> That means we still need to get the frequency of the system counter
+> from CNTFRQ_EL0 in MMIO timer code.
+> This have been proved when I tested this driver on foundation model, I
+> got "0" when I access CNTFRQ from Linux kernel (Non-secure EL1)
 
-It's strange.
+That sounds like a firmware problem. Firmware in EL3 is supposed to write
+the value into CNTFRQ. If you're not currently using any firmware, I'd
+recommend the bootwrapper on models/simulators/emulators.
 
-These didn't happen locally ... and aiaiai was also happy.
+http://git.kernel.org/cgit/linux/kernel/git/mark/boot-wrapper-aarch64.git/tree/arch/aarch64/boot.S#n48
 
-Nevertheless, I will fix-up and resend.
+Cheers,
+Cov
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
+Aurora Forum, a Linux Foundation Collaborative Project.
