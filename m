@@ -1,175 +1,143 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 25 Jan 2017 19:13:20 +0100
-Subject: [PATCH V7 01/11] iommu/of: Refactor of_iommu_configure() for
- error handling
-In-Reply-To: <c7bad124-d9f2-0ddf-168f-0b1950d3e1ed@arm.com>
-References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
- <1485188293-20263-2-git-send-email-sricharan@codeaurora.org>
- <4388779a-0e83-fadc-83f4-98c46c88d42e@semihalf.com>
- <c7bad124-d9f2-0ddf-168f-0b1950d3e1ed@arm.com>
-Message-ID: <b350f6d3-dd33-10c4-94ae-a3a7ba5e938a@semihalf.com>
+From: jic23@jic23.retrosnub.co.uk (Jonathan Cameron)
+Date: Wed, 25 Jan 2017 18:23:33 +0000
+Subject: [GIT PULL] Immutable branch between MFD, ARM,
+ IIO and PWM due for the v4.10 merge window
+In-Reply-To: <20170125100858.GA16202@dell>
+References: <1484903709-11650-1-git-send-email-benjamin.gaignard@st.com>
+ <20170123121222.GJ16020@dell>
+ <CAOesGMhx6ZWekgW01-7GRcMiWtAohcfGdcu1FhkP=bTfsjBCmQ@mail.gmail.com>
+ <20170124081244.GP16020@dell>
+ <CAOesGMhauUd0mPuUsRZnEWrAfQZj3Di_YwvxtD1rXr7B9fgqdw@mail.gmail.com>
+ <20170125100858.GA16202@dell>
+Message-ID: <DC96044D-44CE-4D3E-92B2-1C1C73E45FFA@jic23.retrosnub.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
 
-On 25.01.2017 18:35, Robin Murphy wrote:
-> Hi Tomasz,
+
+On 25 January 2017 10:08:58 GMT+00:00, Lee Jones <lee.jones@linaro.org> wrote:
+>Jonathan, Thierry,
 >
-> On 25/01/17 17:17, Tomasz Nowicki wrote:
->> Hi Sricharan,
->>
->> On 23.01.2017 17:18, Sricharan R wrote:
->>> From: Robin Murphy <robin.murphy@arm.com>
->>>
->>> In preparation for some upcoming cleverness, rework the control flow in
->>> of_iommu_configure() to minimise duplication and improve the propogation
->>> of errors. It's also as good a time as any to switch over from the
->>> now-just-a-compatibility-wrapper of_iommu_get_ops() to using the generic
->>> IOMMU instance interface directly.
->>>
->>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->>> ---
->>>  drivers/iommu/of_iommu.c | 83
->>> +++++++++++++++++++++++++++++++-----------------
->>>  1 file changed, 53 insertions(+), 30 deletions(-)
->>>
->>> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
->>> index 0f57ddc..ee49081 100644
->>> --- a/drivers/iommu/of_iommu.c
->>> +++ b/drivers/iommu/of_iommu.c
->>> @@ -96,6 +96,28 @@ int of_get_dma_window(struct device_node *dn, const
->>> char *prefix, int index,
->>>  }
->>>  EXPORT_SYMBOL_GPL(of_get_dma_window);
->>>
->>> +static const struct iommu_ops
->>> +*of_iommu_xlate(struct device *dev, struct of_phandle_args *iommu_spec)
->>> +{
->>> +    const struct iommu_ops *ops;
->>> +    struct fwnode_handle *fwnode = &iommu_spec->np->fwnode;
->>> +    int err;
->>> +
->>> +    ops = iommu_get_instance(fwnode);
->>> +    if (!ops || !ops->of_xlate)
->>> +        return NULL;
->>> +
->>> +    err = iommu_fwspec_init(dev, &iommu_spec->np->fwnode, ops);
->>> +    if (err)
->>> +        return ERR_PTR(err);
->>> +
->>> +    err = ops->of_xlate(dev, iommu_spec);
->>> +    if (err)
->>> +        return ERR_PTR(err);
->>> +
->>> +    return ops;
->>> +}
->>> +
->>>  static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
->>>  {
->>>      struct of_phandle_args *iommu_spec = data;
->>> @@ -105,10 +127,11 @@ static int __get_pci_rid(struct pci_dev *pdev,
->>> u16 alias, void *data)
->>>  }
->>>
->>>  static const struct iommu_ops
->>> -*of_pci_iommu_configure(struct pci_dev *pdev, struct device_node
->>> *bridge_np)
->>> +*of_pci_iommu_init(struct pci_dev *pdev, struct device_node *bridge_np)
->>>  {
->>>      const struct iommu_ops *ops;
->>>      struct of_phandle_args iommu_spec;
->>> +    int err;
->>>
->>>      /*
->>>       * Start by tracing the RID alias down the PCI topology as
->>> @@ -123,56 +146,56 @@ static int __get_pci_rid(struct pci_dev *pdev,
->>> u16 alias, void *data)
->>>       * bus into the system beyond, and which IOMMU it ends up at.
->>>       */
->>>      iommu_spec.np = NULL;
->>> -    if (of_pci_map_rid(bridge_np, iommu_spec.args[0], "iommu-map",
->>> -               "iommu-map-mask", &iommu_spec.np, iommu_spec.args))
->>> -        return NULL;
->>> +    err = of_pci_map_rid(bridge_np, iommu_spec.args[0], "iommu-map",
->>> +                 "iommu-map-mask", &iommu_spec.np,
->>> +                 iommu_spec.args);
->>> +    if (err)
->>> +        return ERR_PTR(err);
->>>
->>> -    ops = of_iommu_get_ops(iommu_spec.np);
->>> -    if (!ops || !ops->of_xlate ||
->>> -        iommu_fwspec_init(&pdev->dev, &iommu_spec.np->fwnode, ops) ||
->>> -        ops->of_xlate(&pdev->dev, &iommu_spec))
->>> -        ops = NULL;
->>> +    ops = of_iommu_xlate(&pdev->dev, &iommu_spec);
->>>
->>>      of_node_put(iommu_spec.np);
->>>      return ops;
->>>  }
->>>
->>> -const struct iommu_ops *of_iommu_configure(struct device *dev,
->>> -                       struct device_node *master_np)
->>> +static const struct iommu_ops
->>> +*of_platform_iommu_init(struct device *dev, struct device_node *np)
->>>  {
->>>      struct of_phandle_args iommu_spec;
->>> -    struct device_node *np;
->>>      const struct iommu_ops *ops = NULL;
->>>      int idx = 0;
->>>
->>> -    if (dev_is_pci(dev))
->>> -        return of_pci_iommu_configure(to_pci_dev(dev), master_np);
->>> -
->>>      /*
->>>       * We don't currently walk up the tree looking for a parent IOMMU.
->>>       * See the `Notes:' section of
->>>       * Documentation/devicetree/bindings/iommu/iommu.txt
->>>       */
->>> -    while (!of_parse_phandle_with_args(master_np, "iommus",
->>> -                       "#iommu-cells", idx,
->>> -                       &iommu_spec)) {
->>> -        np = iommu_spec.np;
->>> -        ops = of_iommu_get_ops(np);
->>> -
->>> -        if (!ops || !ops->of_xlate ||
->>> -            iommu_fwspec_init(dev, &np->fwnode, ops) ||
->>> -            ops->of_xlate(dev, &iommu_spec))
->>> -            goto err_put_node;
->>> -
->>> -        of_node_put(np);
->>> +    while (!of_parse_phandle_with_args(np, "iommus", "#iommu-cells",
->>> +                       idx, &iommu_spec)) {
->>> +        ops = of_iommu_xlate(dev, &iommu_spec);
->>> +        of_node_put(iommu_spec.np);
->>>          idx++;
->>> +        if (IS_ERR_OR_NULL(ops))
->>> +            break;
->>>      }
->>>
->>>      return ops;
->>> +}
->>> +
->>> +const struct iommu_ops *of_iommu_configure(struct device *dev,
->>> +                       struct device_node *master_np)
->>> +{
->>> +    const struct iommu_ops *ops;
->>> +
->>> +    if (!master_np)
->>> +        return NULL;
->>> +
->>> +    if (dev_is_pci(dev))
->>> +        ops = of_pci_iommu_init(to_pci_dev(dev), master_np);
->> I gave the whole patch set a try on ThunderX. really_probe() is failing
->> on dma_configure()->of_pci_iommu_init() for each PCI device.
-> When you say "failing", do you mean cleanly, or with a crash? I've
-> managed to hit __of_match_node() dereferencing NULL from
-> of_iommu_xlate() in a horribly complicated chain of events, which I'm
-> trying to figure out now, and I wonder if the two might be related.
+>On Tue, 24 Jan 2017, Olof Johansson wrote:
+>> On Tue, Jan 24, 2017 at 12:12 AM, Lee Jones <lee.jones@linaro.org>
+>wrote:
+>> > On Mon, 23 Jan 2017, Olof Johansson wrote:
+>> >> On Mon, Jan 23, 2017 at 4:12 AM, Lee Jones <lee.jones@linaro.org>
+>wrote:
+>> >> > Arm, IIO and PWM Maintainers,
+>> >> >
+>> >> > Enjoy!
+>> >> >
+>> >> > The following changes since commit
+>7ce7d89f48834cefece7804d38fc5d85382edf77:
+>> >> >
+>> >> >   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+>> >> >
+>> >> > are available in the git repository at:
+>> >> >
+>> >> >   git://git.kernel.org/pub/scm/linux/kernel/git/lee/mfd.git
+>ib-mfd-arm-iio-pwm-v4.10
+>> >> >
+>> >> > for you to fetch changes up to
+>94df449273475980a39f1bf47f1e3d2b07ce6577:
+>> >> >
+>> >> >   ARM: dts: stm32: Enable pwm1 and pwm3 for stm32f469-disco
+>(2017-01-23 12:06:28 +0000)
+>> >> >
+>> >> > ----------------------------------------------------------------
+>> >> > Immutable branch between MFD, ARM, IIO and PWM due for the v4.10
+>merge window
+>> >> >
+>> >> > ----------------------------------------------------------------
+>> >> > Benjamin Gaignard (8):
+>> >> >       dt-bindings: mfd: Add bindings for STM32 Timers driver
+>> >> >       mfd: Add STM32 Timers driver
+>> >> >       dt-bindings: pwm: Add STM32 bindings
+>> >> >       pwm: Add driver for STM32 plaftorm
+>> >> >       iio: Add bindings for STM32 timer trigger driver
+>> >> >       iio: Add STM32 timer trigger driver
+>> >> >       ARM: dts: stm32: add Timers driver for stm32f429 MCU
+>> >> >       ARM: dts: stm32: Enable pwm1 and pwm3 for stm32f469-disco
+>> >> >
+>> >> >  .../ABI/testing/sysfs-bus-iio-timer-stm32          |  29 ++
+>> >> >  .../bindings/iio/timer/stm32-timer-trigger.txt     |  23 ++
+>> >> >  .../devicetree/bindings/mfd/stm32-timers.txt       |  46 +++
+>> >> >  .../devicetree/bindings/pwm/pwm-stm32.txt          |  35 ++
+>> >> >  arch/arm/boot/dts/stm32f429.dtsi                   | 275
+>++++++++++++++
+>> >> >  arch/arm/boot/dts/stm32f469-disco.dts              |  28 ++
+>> >> >  drivers/iio/trigger/Kconfig                        |   9 +
+>> >> >  drivers/iio/trigger/Makefile                       |   1 +
+>> >> >  drivers/iio/trigger/stm32-timer-trigger.c          | 342
+>++++++++++++++++++
+>> >> >  drivers/mfd/Kconfig                                |  11 +
+>> >> >  drivers/mfd/Makefile                               |   2 +
+>> >> >  drivers/mfd/stm32-timers.c                         |  80 +++++
+>> >> >  drivers/pwm/Kconfig                                |   9 +
+>> >> >  drivers/pwm/Makefile                               |   1 +
+>> >> >  drivers/pwm/pwm-stm32.c                            | 398
+>+++++++++++++++++++++
+>> >> >  include/linux/iio/timer/stm32-timer-trigger.h      |  62 ++++
+>> >> >  include/linux/mfd/stm32-timers.h                   |  71 ++++
+>> >> >  17 files changed, 1422 insertions(+)
+>> >> >  create mode 100644
+>Documentation/ABI/testing/sysfs-bus-iio-timer-stm32
+>> >> >  create mode 100644
+>Documentation/devicetree/bindings/iio/timer/stm32-timer-trigger.txt
+>> >> >  create mode 100644
+>Documentation/devicetree/bindings/mfd/stm32-timers.txt
+>> >> >  create mode 100644
+>Documentation/devicetree/bindings/pwm/pwm-stm32.txt
+>> >> >  create mode 100644 drivers/iio/trigger/stm32-timer-trigger.c
+>> >> >  create mode 100644 drivers/mfd/stm32-timers.c
+>> >> >  create mode 100644 drivers/pwm/pwm-stm32.c
+>> >> >  create mode 100644
+>include/linux/iio/timer/stm32-timer-trigger.h
+>> >> >  create mode 100644 include/linux/mfd/stm32-timers.h
+>> >>
+>> >> May I ask why you're creating an immutable branch of all this
+>contents?
+>> >>
+>> >> We should get the dts/dtsi contents like usual from any
+>maintainer;
+>> >> just the DT updates in a branch.
+>> >>
+>> >> Sometimes (but less and less due to us discouraging the use) we
+>need
+>> >> an immutable branch that includes dt-include updates. But I don't
+>see
+>> >> any of those in this contents.
+>> >>
+>> >> I.e. I guess I can see the need between mfd and downstream trees
+>> >> (iio/pwm), but not the DTS contents at this time. Or am I missing
+>> >> something here?
+>> >
+>> > I agree with you.  However, since one of the STM32 Maintainers
+>Acked
+>> > the DTS patches, and the other one hasn't been heard from for
+>months,
+>> > I took that to mean he wanted me to apply and take them through the
+>> > MFD tree.
+>> >
+>> > A misunderstanding or misaction perhaps, but this is the normal
+>> > assumption.
+>> 
+>> It seems to be a misunderstanding in this case, since there are other
+>> additions in the stm32 tree this release cycle so we should only pick
+>> up DTS changes through our tree.
+>> 
+>> By now, I think it should be pretty well known that we nearly never
+>> want DTS contents merged through any other tree. Ever.
+>> 
+>> So, please revoke your branch and take those out. We'll take them
+>> through the normal flow. Thanks!
 >
+>That okay with you?
+Bit late from me but fine. I tend to only pull in these branches when stuff to go on top turns up.
+Not happened with this set yet!
 
-Cleanly, of_pci_iommu_init()->of_pci_map_rid() can't find "iommu-map" 
-property for my case. Probably not related to your crash.
 
-Thanks,
-Tomasz
+J
+
+-- 
+Sent from my Android device with K-9 Mail. Please excuse my brevity.
