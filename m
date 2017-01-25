@@ -1,103 +1,36 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 25 Jan 2017 11:21:42 +0000
-Subject: [STLinux Kernel] [PATCH 3/8] serial: st-asc: Read in all Pinctrl
- states
-In-Reply-To: <20170124134310.27512-4-lee.jones@linaro.org>
-References: <20170124134310.27512-1-lee.jones@linaro.org>
- <20170124134310.27512-4-lee.jones@linaro.org>
-Message-ID: <20170125112142.GE5680@griffinp-ThinkPad-X1-Carbon-2nd>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 25 Jan 2017 12:04:13 +0100
+Subject: [PATCH v2 4/6] ARM: tegra: nyan-blaze: Include compatible
+ revisions for proper detection
+In-Reply-To: <20170122154753.31942-4-contact@paulk.fr>
+References: <20170122154753.31942-1-contact@paulk.fr>
+ <20170122154753.31942-4-contact@paulk.fr>
+Message-ID: <20170125110413.GE9344@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
-
-On Tue, 24 Jan 2017, Lee Jones wrote:
-
-> There are now 2 possible separate/different Pinctrl states which can
-> be provided from platform data.  One which encompasses the lines
-> required for HW flow-control (CTS/RTS) and another which does not
-> specify these lines, such that they can be used via GPIO mechanisms
-> for manually toggling (i.e. from a request by `stty`).
+On Sun, Jan 22, 2017 at 04:47:51PM +0100, Paul Kocialkowski wrote:
+> Depthcharge (the payload used with cros devices) will attempt to detect
+> boards using their revision. This includes all the known revisions for
+> the nyan-blaze board so that the dtb can be selected preferably.
 > 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> Defining compatibly revisions allows depthcharge to select the kernel
+> via the revision it detects instead of using the default kernel. This
+> allows having a FIT image with multiple kernels for multiple devices.
+> 
+> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
 > ---
->  drivers/tty/serial/st-asc.c | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
-> 
-> diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
-> index 397df50..03801ed 100644
-> --- a/drivers/tty/serial/st-asc.c
-> +++ b/drivers/tty/serial/st-asc.c
-> @@ -37,10 +37,16 @@
->  #define ASC_FIFO_SIZE 16
->  #define ASC_MAX_PORTS 8
->  
-> +/* Pinctrl states */
-> +#define DEFAULT		0
-> +#define MANUAL_RTS	1
+>  arch/arm/boot/dts/tegra124-nyan-blaze.dts | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
 
-Nit: Would be better to have them aligned.
+Applied, with the same padding adjustments as 3/6.
 
-> +
->  struct asc_port {
->  	struct uart_port port;
->  	struct gpio_desc *rts;
->  	struct clk *clk;
-> +	struct pinctrl *pinctrl;
-> +	struct pinctrl_state *states[2];
->  	unsigned int hw_flow_control:1;
->  	unsigned int force_m1:1;
->  };
-> @@ -694,6 +700,7 @@ static int asc_init_port(struct asc_port *ascport,
->  {
->  	struct uart_port *port = &ascport->port;
->  	struct resource *res;
-> +	int ret;
->  
->  	port->iotype	= UPIO_MEM;
->  	port->flags	= UPF_BOOT_AUTOCONF;
-> @@ -720,6 +727,27 @@ static int asc_init_port(struct asc_port *ascport,
->  	WARN_ON(ascport->port.uartclk == 0);
->  	clk_disable_unprepare(ascport->clk);
->  
-> +	ascport->pinctrl = devm_pinctrl_get(&pdev->dev);
-> +	if (IS_ERR(ascport->pinctrl)) {
-> +		ret = PTR_ERR(ascport->pinctrl);
-> +		dev_err(&pdev->dev, "Failed to get Pinctrl: %d\n", ret);
-> +	}
-> +
-> +	ascport->states[DEFAULT] =
-> +		pinctrl_lookup_state(ascport->pinctrl, "default");
-> +	if (IS_ERR(ascport->states[DEFAULT])) {
-> +		ret = PTR_ERR(ascport->states[DEFAULT]);
-> +		dev_err(&pdev->dev,
-> +			"Failed to look up Pinctrl state 'default': %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	/* "manual-rts" state is optional */
-> +	ascport->states[MANUAL_RTS] =
-> +		pinctrl_lookup_state(ascport->pinctrl, "manual-rts");
-> +	if (IS_ERR(ascport->states[MANUAL_RTS]))
-> +		ascport->states[MANUAL_RTS] = NULL;
-> +
-
-The different pinctrl states looks like a neat solution to the problem.
-
-My only concern here is that 'default' state is implying a hw-flow-control
-pinmux config, and manual-rts is implying what is the current upstream
-'default' pinmux config.
-
-Which maybe ok if you update all uarts, but currently only serial0
-is updated. So the other uarts current 'default' is actually the same as serial0
-'manual-rts' grouping, which conceptually is odd.
-
-Would it not be better to make 'manual-rts' the default state? As that aligns
-to what is currently already the default for the other UARTS? And then make
-hw-flow-control the optional state for serial0?
-
-That also has the advantage that 'default' has the same meaning with older DT's.
-
-regards,
-
-Peter.
+Thanks,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/90b79ae5/attachment.sig>
