@@ -1,166 +1,69 @@
-From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
-Date: Wed, 25 Jan 2017 17:36:24 +0530
-Subject: [PATCH 2/2] net: thunderx: Leave serdes lane config on 81/83xx to
- firmware
-In-Reply-To: <1485345984-28163-1-git-send-email-sunil.kovvuri@gmail.com>
-References: <1485345984-28163-1-git-send-email-sunil.kovvuri@gmail.com>
-Message-ID: <1485345984-28163-3-git-send-email-sunil.kovvuri@gmail.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Wed, 25 Jan 2017 13:09:18 +0100
+Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
+In-Reply-To: <20170125111233.GB3912@amd>
+References: <da1f1b45-3ae5-ffe8-62c6-9ec7c3a1505b@roeck-us.net>
+ <20170123144031.GA7870@amd> <20170123232654.GA19342@amd>
+ <20170123234912.GA2460@roeck-us.net>
+ <20170124070639.GA5068@rzhang1-surface> <20170124073720.GB5603@amd>
+ <88c94ea6-abe2-0f20-337e-e9ee00c883d8@roeck-us.net>
+ <20170124175800.GA15070@amd> <20170124184526.GA25056@roeck-us.net>
+ <20170125111233.GB3912@amd>
+Message-ID: <20170125120918.GA7936@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Goutham <sgoutham@cavium.com>
+On Wednesday 25 January 2017 12:12:33 Pavel Machek wrote:
+> Hi!
+> 
+> > > > >>Right.
+> > > > >>
+> > > > >>Before reverting, can you please try if this patch works or not?
+> > > > >
+> > > > >Not really. Revert now. Sorry.
+> > > > >
+> > > > >Are you sure? This does not look equivalent to me at all.
+> > > > >
+> > > > >"name" file handling moved from drivers to the core, which added some
+> > > > >crazy checks what name can contain. Even if this "works", what is the
+> > > > >expected effect on the "name" file?
+> > > > >
+> > > > The hwmon name attribute must not include '-', as documented in
+> > > > Documentation/hwmon/sysfs-interface. Is enforcing that 'crazy' ?
+> > > > Maybe in your world, but not in mine.
+> > > 
+> > > Well, lets revert the patch and then we can discuss what to do with
+> > > the "name" problem.
+> 
+> Ok, so the patch is on the way in. What to do next?
+> 
+> pavel at n900:/sys/class/hwmon$ cat hwmon0/name
+> bq27200-0
+> pavel at n900:/sys/class/hwmon$ cat hwmon1/name
+> rx51-battery
+> 
+> > To provide some detail: libsensors gets just as confused with wildcards
+> > and whitespace/newline as it does with '-' in the reported name, which
+> > is why those are blocked by the new API.
+> 
+> Ok... Question is "does someone actually use hwmon*/name on N900"? If
+> so, we can't change it, but it is well possible that noone is.
 
-For DLMs and SLMs on 80/81/83xx, many lane configurations
-across different boards are coming up. Also kernel doesn't have
-any way to identify board type/info and since firmware does,
-just get rid of figuring out lane to serdes config and take
-whatever has been programmed by low level firmware.
+IIRC hwmon is used on Nokia N900.
 
-Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
----
- drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 95 +++++------------------
- 1 file changed, 18 insertions(+), 77 deletions(-)
+But I have not seen hwmon devices for bq27200 and rx51-battery yet.
+Those are power supply driver and auto-exporting them also via hwmon is
+something new, right? If yes, then we can use any name for those new
+hwmon devices as they cannot break userspace... as there is no userspace
+application for them.
 
-diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-index 2f85b64..dfb2bad 100644
---- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-+++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-@@ -894,17 +894,15 @@ static void bgx_print_qlm_mode(struct bgx *bgx, u8 lmacid)
- 	struct device *dev = &bgx->pdev->dev;
- 	struct lmac *lmac;
- 	char str[20];
--	u8 dlm;
- 
--	if (lmacid > bgx->max_lmac)
-+	if (!bgx->is_dlm && lmacid)
- 		return;
- 
- 	lmac = &bgx->lmac[lmacid];
--	dlm = (lmacid / 2) + (bgx->bgx_id * 2);
- 	if (!bgx->is_dlm)
- 		sprintf(str, "BGX%d QLM mode", bgx->bgx_id);
- 	else
--		sprintf(str, "BGX%d DLM%d mode", bgx->bgx_id, dlm);
-+		sprintf(str, "BGX%d LMAC%d mode", bgx->bgx_id, lmacid);
- 
- 	switch (lmac->lmac_type) {
- 	case BGX_MODE_SGMII:
-@@ -990,7 +988,6 @@ static void lmac_set_training(struct bgx *bgx, struct lmac *lmac, int lmacid)
- static void bgx_set_lmac_config(struct bgx *bgx, u8 idx)
- {
- 	struct lmac *lmac;
--	struct lmac *olmac;
- 	u64 cmr_cfg;
- 	u8 lmac_type;
- 	u8 lane_to_sds;
-@@ -1010,62 +1007,26 @@ static void bgx_set_lmac_config(struct bgx *bgx, u8 idx)
- 		return;
- 	}
- 
--	/* On 81xx BGX can be split across 2 DLMs
--	 * firmware programs lmac_type of LMAC0 and LMAC2
-+	/* For DLMs or SLMs on 80/81/83xx so many lane configurations
-+	 * are possible and vary across boards. Also Kernel doesn't have
-+	 * any way to identify board type/info and since firmware does,
-+	 * just take lmac type and serdes lane config as is.
- 	 */
--	if ((idx == 0) || (idx == 2)) {
--		cmr_cfg = bgx_reg_read(bgx, idx, BGX_CMRX_CFG);
--		lmac_type = (u8)((cmr_cfg >> 8) & 0x07);
--		lane_to_sds = (u8)(cmr_cfg & 0xFF);
--		/* Check if config is not reset value */
--		if ((lmac_type == 0) && (lane_to_sds == 0xE4))
--			lmac->lmac_type = BGX_MODE_INVALID;
--		else
--			lmac->lmac_type = lmac_type;
--		lmac_set_training(bgx, lmac, lmac->lmacid);
--		lmac_set_lane2sds(bgx, lmac);
--
--		olmac = &bgx->lmac[idx + 1];
--		/*  Check if other LMAC on the same DLM is already configured by
--		 *  firmware, if so use the same config or else set as same, as
--		 *  that of LMAC 0/2.
--		 *  This check is needed as on 80xx only one lane of each of the
--		 *  DLM of BGX0 is used, so have to rely on firmware for
--		 *  distingushing 80xx from 81xx.
--		 */
--		cmr_cfg = bgx_reg_read(bgx, idx + 1, BGX_CMRX_CFG);
--		lmac_type = (u8)((cmr_cfg >> 8) & 0x07);
--		lane_to_sds = (u8)(cmr_cfg & 0xFF);
--		if ((lmac_type == 0) && (lane_to_sds == 0xE4)) {
--			olmac->lmac_type = lmac->lmac_type;
--			lmac_set_lane2sds(bgx, olmac);
--		} else {
--			olmac->lmac_type = lmac_type;
--			olmac->lane_to_sds = lane_to_sds;
--		}
--		lmac_set_training(bgx, olmac, olmac->lmacid);
--	}
--}
--
--static bool is_dlm0_in_bgx_mode(struct bgx *bgx)
--{
--	struct lmac *lmac;
--
--	if (!bgx->is_dlm)
--		return true;
--
--	lmac = &bgx->lmac[0];
--	if (lmac->lmac_type == BGX_MODE_INVALID)
--		return false;
--
--	return true;
-+	cmr_cfg = bgx_reg_read(bgx, idx, BGX_CMRX_CFG);
-+	lmac_type = (u8)((cmr_cfg >> 8) & 0x07);
-+	lane_to_sds = (u8)(cmr_cfg & 0xFF);
-+	/* Check if config is reset value */
-+	if ((lmac_type == 0) && (lane_to_sds == 0xE4))
-+		lmac->lmac_type = BGX_MODE_INVALID;
-+	else
-+		lmac->lmac_type = lmac_type;
-+	lmac->lane_to_sds = lane_to_sds;
-+	lmac_set_training(bgx, lmac, lmac->lmacid);
- }
- 
- static void bgx_get_qlm_mode(struct bgx *bgx)
- {
- 	struct lmac *lmac;
--	struct lmac *lmac01;
--	struct lmac *lmac23;
- 	u8  idx;
- 
- 	/* Init all LMAC's type to invalid */
-@@ -1081,29 +1042,9 @@ static void bgx_get_qlm_mode(struct bgx *bgx)
- 	if (bgx->lmac_count > bgx->max_lmac)
- 		bgx->lmac_count = bgx->max_lmac;
- 
--	for (idx = 0; idx < bgx->max_lmac; idx++)
--		bgx_set_lmac_config(bgx, idx);
--
--	if (!bgx->is_dlm || bgx->is_rgx) {
--		bgx_print_qlm_mode(bgx, 0);
--		return;
--	}
--
--	if (bgx->lmac_count) {
--		bgx_print_qlm_mode(bgx, 0);
--		bgx_print_qlm_mode(bgx, 2);
--	}
--
--	/* If DLM0 is not in BGX mode then LMAC0/1 have
--	 * to be configured with serdes lanes of DLM1
--	 */
--	if (is_dlm0_in_bgx_mode(bgx) || (bgx->lmac_count > 2))
--		return;
- 	for (idx = 0; idx < bgx->lmac_count; idx++) {
--		lmac01 = &bgx->lmac[idx];
--		lmac23 = &bgx->lmac[idx + 2];
--		lmac01->lmac_type = lmac23->lmac_type;
--		lmac01->lane_to_sds = lmac23->lane_to_sds;
-+		bgx_set_lmac_config(bgx, idx);
-+		bgx_print_qlm_mode(bgx, idx);
- 	}
- }
- 
+> Next question is .. are there other drivers affected? Do we want to do
+> '-' -> '_' in the core or somewhere in the drivers? We might want to
+> do the change in early in 4.11 and see what breaks....
+
+IIRC hwmon core does not accept '-' for a long time (maybe all 4.x
+versions?).
+
 -- 
-2.7.4
+Pali Roh?r
+pali.rohar at gmail.com
