@@ -1,193 +1,50 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 25 Jan 2017 17:35:53 +0000
-Subject: [PATCH V7 01/11] iommu/of: Refactor of_iommu_configure() for
- error handling
-In-Reply-To: <4388779a-0e83-fadc-83f4-98c46c88d42e@semihalf.com>
-References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
- <1485188293-20263-2-git-send-email-sricharan@codeaurora.org>
- <4388779a-0e83-fadc-83f4-98c46c88d42e@semihalf.com>
-Message-ID: <c7bad124-d9f2-0ddf-168f-0b1950d3e1ed@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 25 Jan 2017 17:36:11 +0000
+Subject: [PATCH v20 08/17] clocksource/drivers/arm_arch_timer: Rework
+ counter frequency detection.
+In-Reply-To: <e62c6f73-16e0-2764-126f-b8ed6adc3489@codeaurora.org>
+References: <20170118132541.8989-1-fu.wei@linaro.org>
+ <20170118132541.8989-9-fu.wei@linaro.org>
+ <20170124172400.GG7572@leverpostej>
+ <CADyBb7sU6DVMk6px0963r8by--U-3k_XjESd88zZMkj7xbywgA@mail.gmail.com>
+ <e62c6f73-16e0-2764-126f-b8ed6adc3489@codeaurora.org>
+Message-ID: <20170125173516.GA25470@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On Wed, Jan 25, 2017 at 10:38:01AM -0500, Christopher Covington wrote:
+> On 01/25/2017 01:46 AM, Fu Wei wrote:
+> > On 25 January 2017 at 01:24, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> On Wed, Jan 18, 2017 at 09:25:32PM +0800, fu.wei at linaro.org wrote:
+> >>> From: Fu Wei <fu.wei@linaro.org>
 
-On 25/01/17 17:17, Tomasz Nowicki wrote:
-> Hi Sricharan,
+> > And for CNTFRQ(in CNTCTLBase and CNTBaseN) , we can NOT access it in
+> > Linux kernel (EL1),
+> > Because ARMv8 ARM says:
+> > In a system that implements both Secure and Non-secure states, this
+> > register is only accessible by Secure accesses.
+> > That means we still need to get the frequency of the system counter
+> > from CNTFRQ_EL0 in MMIO timer code.
+> > This have been proved when I tested this driver on foundation model, I
+> > got "0" when I access CNTFRQ from Linux kernel (Non-secure EL1)
 > 
-> On 23.01.2017 17:18, Sricharan R wrote:
->> From: Robin Murphy <robin.murphy@arm.com>
->>
->> In preparation for some upcoming cleverness, rework the control flow in
->> of_iommu_configure() to minimise duplication and improve the propogation
->> of errors. It's also as good a time as any to switch over from the
->> now-just-a-compatibility-wrapper of_iommu_get_ops() to using the generic
->> IOMMU instance interface directly.
->>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>  drivers/iommu/of_iommu.c | 83
->> +++++++++++++++++++++++++++++++-----------------
->>  1 file changed, 53 insertions(+), 30 deletions(-)
->>
->> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
->> index 0f57ddc..ee49081 100644
->> --- a/drivers/iommu/of_iommu.c
->> +++ b/drivers/iommu/of_iommu.c
->> @@ -96,6 +96,28 @@ int of_get_dma_window(struct device_node *dn, const
->> char *prefix, int index,
->>  }
->>  EXPORT_SYMBOL_GPL(of_get_dma_window);
->>
->> +static const struct iommu_ops
->> +*of_iommu_xlate(struct device *dev, struct of_phandle_args *iommu_spec)
->> +{
->> +    const struct iommu_ops *ops;
->> +    struct fwnode_handle *fwnode = &iommu_spec->np->fwnode;
->> +    int err;
->> +
->> +    ops = iommu_get_instance(fwnode);
->> +    if (!ops || !ops->of_xlate)
->> +        return NULL;
->> +
->> +    err = iommu_fwspec_init(dev, &iommu_spec->np->fwnode, ops);
->> +    if (err)
->> +        return ERR_PTR(err);
->> +
->> +    err = ops->of_xlate(dev, iommu_spec);
->> +    if (err)
->> +        return ERR_PTR(err);
->> +
->> +    return ops;
->> +}
->> +
->>  static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
->>  {
->>      struct of_phandle_args *iommu_spec = data;
->> @@ -105,10 +127,11 @@ static int __get_pci_rid(struct pci_dev *pdev,
->> u16 alias, void *data)
->>  }
->>
->>  static const struct iommu_ops
->> -*of_pci_iommu_configure(struct pci_dev *pdev, struct device_node
->> *bridge_np)
->> +*of_pci_iommu_init(struct pci_dev *pdev, struct device_node *bridge_np)
->>  {
->>      const struct iommu_ops *ops;
->>      struct of_phandle_args iommu_spec;
->> +    int err;
->>
->>      /*
->>       * Start by tracing the RID alias down the PCI topology as
->> @@ -123,56 +146,56 @@ static int __get_pci_rid(struct pci_dev *pdev,
->> u16 alias, void *data)
->>       * bus into the system beyond, and which IOMMU it ends up at.
->>       */
->>      iommu_spec.np = NULL;
->> -    if (of_pci_map_rid(bridge_np, iommu_spec.args[0], "iommu-map",
->> -               "iommu-map-mask", &iommu_spec.np, iommu_spec.args))
->> -        return NULL;
->> +    err = of_pci_map_rid(bridge_np, iommu_spec.args[0], "iommu-map",
->> +                 "iommu-map-mask", &iommu_spec.np,
->> +                 iommu_spec.args);
->> +    if (err)
->> +        return ERR_PTR(err);
->>
->> -    ops = of_iommu_get_ops(iommu_spec.np);
->> -    if (!ops || !ops->of_xlate ||
->> -        iommu_fwspec_init(&pdev->dev, &iommu_spec.np->fwnode, ops) ||
->> -        ops->of_xlate(&pdev->dev, &iommu_spec))
->> -        ops = NULL;
->> +    ops = of_iommu_xlate(&pdev->dev, &iommu_spec);
->>
->>      of_node_put(iommu_spec.np);
->>      return ops;
->>  }
->>
->> -const struct iommu_ops *of_iommu_configure(struct device *dev,
->> -                       struct device_node *master_np)
->> +static const struct iommu_ops
->> +*of_platform_iommu_init(struct device *dev, struct device_node *np)
->>  {
->>      struct of_phandle_args iommu_spec;
->> -    struct device_node *np;
->>      const struct iommu_ops *ops = NULL;
->>      int idx = 0;
->>
->> -    if (dev_is_pci(dev))
->> -        return of_pci_iommu_configure(to_pci_dev(dev), master_np);
->> -
->>      /*
->>       * We don't currently walk up the tree looking for a parent IOMMU.
->>       * See the `Notes:' section of
->>       * Documentation/devicetree/bindings/iommu/iommu.txt
->>       */
->> -    while (!of_parse_phandle_with_args(master_np, "iommus",
->> -                       "#iommu-cells", idx,
->> -                       &iommu_spec)) {
->> -        np = iommu_spec.np;
->> -        ops = of_iommu_get_ops(np);
->> -
->> -        if (!ops || !ops->of_xlate ||
->> -            iommu_fwspec_init(dev, &np->fwnode, ops) ||
->> -            ops->of_xlate(dev, &iommu_spec))
->> -            goto err_put_node;
->> -
->> -        of_node_put(np);
->> +    while (!of_parse_phandle_with_args(np, "iommus", "#iommu-cells",
->> +                       idx, &iommu_spec)) {
->> +        ops = of_iommu_xlate(dev, &iommu_spec);
->> +        of_node_put(iommu_spec.np);
->>          idx++;
->> +        if (IS_ERR_OR_NULL(ops))
->> +            break;
->>      }
->>
->>      return ops;
->> +}
->> +
->> +const struct iommu_ops *of_iommu_configure(struct device *dev,
->> +                       struct device_node *master_np)
->> +{
->> +    const struct iommu_ops *ops;
->> +
->> +    if (!master_np)
->> +        return NULL;
->> +
->> +    if (dev_is_pci(dev))
->> +        ops = of_pci_iommu_init(to_pci_dev(dev), master_np);
+> That sounds like a firmware problem. Firmware in EL3 is supposed to write
+> the value into CNTFRQ.
+
+Definitely. FW *should* program the CNTFRQ_EL0 CPU registers and any
+MMIO CNTFRQ registers.
+
+> If you're not currently using any firmware, I'd
+> recommend the bootwrapper on models/simulators/emulators.
 > 
-> I gave the whole patch set a try on ThunderX. really_probe() is failing
-> on dma_configure()->of_pci_iommu_init() for each PCI device.
+> http://git.kernel.org/cgit/linux/kernel/git/mark/boot-wrapper-aarch64.git/tree/arch/aarch64/boot.S#n48
 
-When you say "failing", do you mean cleanly, or with a crash? I've
-managed to hit __of_match_node() dereferencing NULL from
-of_iommu_xlate() in a horribly complicated chain of events, which I'm
-trying to figure out now, and I wonder if the two might be related.
+Unfortunately, the boot-wrapper only programs the CNTFRQ_EL0 CPU system
+registers, and does not program any MMIO CNTFRQ registers.
 
-> of_pci_iommu_init() tries to setup firmware stuff via "iommu-map" but
-> ThunderX is using legacy "mmu-masters" binding. We need to take care of
-> that case too.
+IIRC the models it was originally written for didn't have any (and we
+had no DT binding until far later...). Luckily the model DTs do not
+expose any MMIO timer addresses to the kernel currently.
 
-That is by design. The "mmu-masters" binding is ARM-SMMU-specific and
-will continue to provide the same level of DMA ops support it always has
-(for which there really are practical implementation reasons, it's not
-just an arbitrary "encourage people to move to the generic bindings"
-decision).
-
-Robin.
-
->> +    else
->> +        ops = of_platform_iommu_init(dev, master_np);
->>
->> -err_put_node:
->> -    of_node_put(np);
->> -    return NULL;
->> +    return IS_ERR(ops) ? NULL : ops;
->>  }
->>
->>  static int __init of_iommu_init(void)
->>
-> 
-> Thanks,
-> Tomasz
+Thanks,
+Mark.
