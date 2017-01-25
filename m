@@ -1,64 +1,85 @@
-From: prabhakar.csengg@gmail.com (Lad, Prabhakar)
-Date: Wed, 25 Jan 2017 10:08:34 +0000
-Subject: [PATCH] media: platform: constify vb2_ops structures
-In-Reply-To: <1484990984-16136-1-git-send-email-bhumirks@gmail.com>
-References: <1484990984-16136-1-git-send-email-bhumirks@gmail.com>
-Message-ID: <CA+V-a8scvMreQDdftDsP3B75ENSMu+OaUM0tUD-c1NPSZnznDg@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 25 Jan 2017 11:13:57 +0100
+Subject: [PATCH v6 2/4] dmaengine: Forward slave device pointer to of_xlate
+ callback
+In-Reply-To: <CAPDyKFp8rRXsnkJ+XR_rV1JotPAJmC8bb9OwC0e0FP=VsrKrvg@mail.gmail.com>
+References: <CGME20170124092751eucas1p1411586335ad7083f7fff451212e002a3@eucas1p1.samsung.com>
+ <1485250055-22137-1-git-send-email-m.szyprowski@samsung.com>
+ <1485250055-22137-3-git-send-email-m.szyprowski@samsung.com>
+ <CAPDyKFp8rRXsnkJ+XR_rV1JotPAJmC8bb9OwC0e0FP=VsrKrvg@mail.gmail.com>
+Message-ID: <40e8364c-660e-6555-2a61-1ea9d66f1172@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Ulf,
 
-Thanks for the patch.
+On 2017-01-24 16:09, Ulf Hansson wrote:
+> On 24 January 2017 at 10:27, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+>> Add pointer to slave device to of_dma_xlate to let DMA engine driver
+>> to know which slave device is using given DMA channel. This will be
+>> later used to implement non-irq-safe runtime PM for DMA engine driver.
+>>
+>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> [...]
+>
+>> diff --git a/include/linux/of_dma.h b/include/linux/of_dma.h
+>> index b90d8ec57c1f..a0a6c8c17669 100644
+>> --- a/include/linux/of_dma.h
+>> +++ b/include/linux/of_dma.h
+>> @@ -22,7 +22,8 @@ struct of_dma {
+>>          struct list_head        of_dma_controllers;
+>>          struct device_node      *of_node;
+>>          struct dma_chan         *(*of_dma_xlate)
+>> -                               (struct of_phandle_args *, struct of_dma *);
+>> +                               (struct of_phandle_args *, struct of_dma *,
+>> +                                struct device *);
+>>          void                    *(*of_dma_route_allocate)
+>>                                  (struct of_phandle_args *, struct of_dma *);
+>>          struct dma_router       *dma_router;
+>> @@ -37,7 +38,7 @@ struct of_dma_filter_info {
+>>   #ifdef CONFIG_DMA_OF
+>>   extern int of_dma_controller_register(struct device_node *np,
+>>                  struct dma_chan *(*of_dma_xlate)
+>> -               (struct of_phandle_args *, struct of_dma *),
+>> +               (struct of_phandle_args *, struct of_dma *, struct device *),
+>>                  void *data);
+>>   extern void of_dma_controller_free(struct device_node *np);
+>>
+>> @@ -47,17 +48,17 @@ extern int of_dma_router_register(struct device_node *np,
+>>                  struct dma_router *dma_router);
+>>   #define of_dma_router_free of_dma_controller_free
+>>
+>> -extern struct dma_chan *of_dma_request_slave_channel(struct device_node *np,
+>> +extern struct dma_chan *of_dma_request_slave_channel(struct device *slave,
+>>                                                       const char *name);
+> I noticed that this API is being used from sound/soc/sh/rcar/dma.c, so
+> I assume this change triggers a compiler error. I guess you want to
+> fold in a change dealing with that as well.
 
-On Sat, Jan 21, 2017 at 9:29 AM, Bhumika Goyal <bhumirks@gmail.com> wrote:
-> Declare vb2_ops structures as const as they are only stored in
-> the ops field of a vb2_queue structure. This field is of type
-> const, so vb2_ops structures having same properties can be made
-> const too.
-> Done using Coccinelle:
->
-> @r1 disable optional_qualifier@
-> identifier i;
-> position p;
-> @@
-> static struct vb2_ops i at p={...};
->
-> @ok1@
-> identifier r1.i;
-> position p;
-> struct sta2x11_vip vip;
-> struct vb2_queue q;
-> @@
-> (
-> vip.vb_vidq.ops=&i at p
-> |
-> q.ops=&i at p
-> )
->
-> @bad@
-> position p!={r1.p,ok1.p};
-> identifier r1.i;
-> @@
-> i at p
->
-> @depends on !bad disable optional_qualifier@
-> identifier r1.i;
-> @@
-> +const
-> struct vb2_ops i;
->
-> Cross compiled the media/platform/blackfin/bfin_capture.o file for
-> blackfin architecture.
->
-> File size before:
->   text     data     bss     dec     hex filename
->   6776      176       0    6952    1b28 platform/blackfin/bfin_capture.o
->
-The description doesnt match the changes. Can you please split the
-patches separately one for vpif_capture.c and vpif_display.c,
-one for mtk_mdp_m2m.c and lastly for pxa_camera.c .
+Right. Thanks for pointing this.
 
+I didn't expect that of_dma_request_slave_channel() is used outside 
+drivers/dma,
+especially in such a creative way as in sh/rcar driver. I will change a 
+function
+signature to:
 
-Cheers,
---Prabhakar Lad
+of_dma_request_slave_channel(struct device *slave, struct device_node 
+*np, const char *name)
+
+then, as there is no direct relation between device and of node pointer, 
+from
+which rcar driver extracts the dma channel data.
+
+I would also expect that zero-day build robot will complain about missing
+sh/rcar driver update, but I didn't get any message from it.
+
+> [...]
+>
+> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
