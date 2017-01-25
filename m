@@ -1,61 +1,44 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 25 Jan 2017 18:31:31 +0000
-Subject: [PATCH v2] arm64: dma-mapping: Fix dma_mapping_error() when bypassing
- SWIOTLB
-In-Reply-To: <20170124225200.a7qioswpxzh6agvd@raspberrypi-2.musicnaut.iki.fi>
-References: <20170124225200.a7qioswpxzh6agvd@raspberrypi-2.musicnaut.iki.fi>
-Message-ID: <840027acb4750542003dff17b4a8902ba8972754.1485368348.git.robin.murphy@arm.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 25 Jan 2017 13:33:39 -0500
+Subject: [PATCH] PCI: enable extended tags support for PCIe endpoints
+In-Reply-To: <34f2e149-3bb1-6af2-a9f5-fbe5a050fe31@codeaurora.org>
+References: <1474769434-5756-1-git-send-email-okaya@codeaurora.org>
+ <420a9a23-79f8-41d8-c44f-b53f5000c957@codeaurora.org>
+ <20161111205801.GC9868@bhelgaas-glaptop.roam.corp.google.com>
+ <34f2e149-3bb1-6af2-a9f5-fbe5a050fe31@codeaurora.org>
+Message-ID: <84d599dc-e371-7273-4bda-feb9c9eb8014@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When bypassing SWIOTLB on small-memory systems, we need to avoid calling
-into swiotlb_dma_mapping_error() in exactly the same way as we avoid
-swiotlb_dma_supported(), because the former also relies on SWIOTLB state
-being initialised.
+On 1/25/2017 12:49 PM, Sinan Kaya wrote:
+> Hi Bjorn,
+> 
+> On 11/11/2016 3:58 PM, Bjorn Helgaas wrote:
+>>> Is there any other feedback?
+>> If this were completely safe to enable for every device that supported
+>> it, why would there be an enable bit in Device Control?
+>>
+>> I don't know anything about extended tags, but it worries me a little
+>> when there's a "go-fast" switch and no explanation about when and why
+>> we might need to go slow.
+>>
 
-Under the assumptions for which we skip SWIOTLB, dma_map_{single,page}()
-will only ever return the DMA-offset-adjusted physical address of the
-page passed in, thus we can report success unconditionally.
+I tried to answer your question in the new commit message. All PCIe completers
+are required to support 8 bit tags. 
 
-Fixes: b67a8b29df7e ("arm64: mm: only initialize swiotlb when necessary")
-CC: stable at vger.kernel.org
-CC: Jisheng Zhang <jszhang@marvell.com>
-Reported-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+Generation of 8 bit tags is optional. That's why, there is a supported and an
+enable/disable bit.
 
-v2: Get the return value the right way round this time... After some
-    careful reasoning it really is that simple.
+> 
+> I have v2 posted. Do you feel like applying to linux-next to get some testing
+> exposure or do you want to tie it to some DMI so that we enable it only on
+> recent HW?
+> 
+> Sinan
+> 
 
- arch/arm64/mm/dma-mapping.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index e04082700bb1..1ffb7d5d299a 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -352,6 +352,13 @@ static int __swiotlb_dma_supported(struct device *hwdev, u64 mask)
- 	return 1;
- }
- 
-+static int __swiotlb_dma_mapping_error(struct device *hwdev, dma_addr_t addr)
-+{
-+	if (swiotlb)
-+		return swiotlb_dma_mapping_error(hwdev, addr);
-+	return 0;
-+}
-+
- static struct dma_map_ops swiotlb_dma_ops = {
- 	.alloc = __dma_alloc,
- 	.free = __dma_free,
-@@ -366,7 +373,7 @@ static struct dma_map_ops swiotlb_dma_ops = {
- 	.sync_sg_for_cpu = __swiotlb_sync_sg_for_cpu,
- 	.sync_sg_for_device = __swiotlb_sync_sg_for_device,
- 	.dma_supported = __swiotlb_dma_supported,
--	.mapping_error = swiotlb_dma_mapping_error,
-+	.mapping_error = __swiotlb_dma_mapping_error,
- };
- 
- static int __init atomic_pool_init(void)
 -- 
-2.11.0.dirty
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
