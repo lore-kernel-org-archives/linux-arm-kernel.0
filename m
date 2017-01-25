@@ -1,70 +1,66 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 25 Jan 2017 12:00:44 +0000
-Subject: [PATCH v2 2/2] arm64: efi: add vmlinux debug link to the Image
- binary
-In-Reply-To: <20170125115305.GA29027@leverpostej>
-References: <1485340759-28975-1-git-send-email-ard.biesheuvel@linaro.org>
- <1485340759-28975-3-git-send-email-ard.biesheuvel@linaro.org>
- <20170125115305.GA29027@leverpostej>
-Message-ID: <CAKv+Gu-GQAQU2Ety+rBvZ-9VbUHe+jQQosFJ-63UTQ7pPHHh0Q@mail.gmail.com>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Wed, 25 Jan 2017 12:03:06 +0000
+Subject: [PATCH] arm64: skip register_cpufreq_notifier on ACPI-based
+ systems
+In-Reply-To: <1485304992-26888-1-git-send-email-pprakash@codeaurora.org>
+References: <1485304992-26888-1-git-send-email-pprakash@codeaurora.org>
+Message-ID: <20170125120306.GC8093@e106622-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 January 2017 at 11:53, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Jan 25, 2017 at 10:39:19AM +0000, Ard Biesheuvel wrote:
->> When building with debugging symbols, take the absolute path to the
->> vmlinux binary and add it to the special PE/COFF debug table entry.
->>
->> These entries are used internally by EDK2 based* debug builds of UEFI
->> to populate the DebugImageInfo table, which can be used by debuggers
->> as well as by the OS itself to retrieve information about all loaded
->> PE/COFF executables. This is highly useful for source level debugging
->> of the UEFI stub.
->
-> Does that mean EFI_IMAGE_DEBUG_DIRECTORY_ENTRY and friends are
-> EDK2-specific?
->
-> Or just that the way EDK2 happens to use those is EDK2-specific?
->
+Hi,
 
-Those values are defined by the PE/COFF spec, and I assume that a
-CodeView type entry in the debug table usually contains a NUL
-terminated string as well, given that the EDK2 crowd is very
-Wintel-heavy.
+On 24/01/17 17:43, Prashanth Prakash wrote:
+> On ACPI based systems where the topology is setup using the API
+> store_cpu_topology, at the moment we do not have necessary code
+> to handle a cpufreq notifier, thus resulting in a crash.
+> 
+> Skip register_cpufreq_notifier if raw_capacity is not allocated
+> as part of topology initialization.
+> 
+> Stack:
+>         init_cpu_capacity_callback+0xb4/0x1c8
+>         notifier_call_chain+0x5c/0xa0
+>         __blocking_notifier_call_chain+0x58/0xa0
+>         blocking_notifier_call_chain+0x3c/0x50
+>         cpufreq_set_policy+0xe4/0x328
+>         cpufreq_init_policy+0x80/0x100
+>         cpufreq_online+0x418/0x710
+>         cpufreq_add_dev+0x118/0x180
+>         subsys_interface_register+0xa4/0xf8
+>         cpufreq_register_driver+0x1c0/0x298
+>         cppc_cpufreq_init+0xdc/0x1000 [cppc_cpufreq]
+>         do_one_initcall+0x5c/0x168
+>         do_init_module+0x64/0x1e4
+>         load_module+0x130c/0x14d0
+>         SyS_finit_module+0x108/0x120
+>         el0_svc_naked+0x24/0x28
+> 
+> Patch that added support for popultaing cpu capacity for DT:
+> https://patchwork.codeaurora.org/patch/98353/
+> 
+> Signed-off-by: Prashanth Prakash <pprakash@codeaurora.org>
+> ---
+>  arch/arm64/kernel/topology.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+> index 23e9e13..3f175ce 100644
+> --- a/arch/arm64/kernel/topology.c
+> +++ b/arch/arm64/kernel/topology.c
+> @@ -209,7 +209,7 @@ static void normalize_cpu_capacity(void)
+>  
+>  static int __init register_cpufreq_notifier(void)
+>  {
+> -	if (cap_parsing_failed)
+> +	if (cap_parsing_failed || !raw_capacity)
 
-The significance of mentioning EDK2 here was that I thought that the
-DebugImageInfo table was a PI construct rather than something
-described in the UEFI spec. But looking more carefully, it seems that
-this table is in fact a UEFI construct, so I should probably drop this
-mention from the commit log
+Looks good. I couldn't really test it to check if it fixes your problem
+(I assume it does), but it doesn't seem to introduce regressions on my
+boxes.
 
->> * for AArch64, this probably means all of them
->>
->> Cc: Matt Fleming <matt@codeblueprint.co.uk>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/kernel/Makefile |  4 +++
->>  arch/arm64/kernel/head.S   | 34 +++++++++++++++++++-
->>  arch/arm64/kernel/image.h  |  3 ++
->>  3 files changed, 40 insertions(+), 1 deletion(-)
->
->> +efi_debug_table:
->> +     // EFI_IMAGE_DEBUG_DIRECTORY_ENTRY
->> +     .long   0                       // Characteristics
->> +     .long   0                       // TimeDateStamp
->> +     .short  0                       // MajorVersion
->> +     .short  0                       // MinorVersion
->> +     .long   2                       // Type == EFI_IMAGE_DEBUG_TYPE_CODEVIEW
->
->> +ENTRY(efi_debug_entry)
->> +     // EFI_IMAGE_DEBUG_CODEVIEW_NB10_ENTRY
->> +     .long   0x3031424E              // Signature
->
-> Certainly not a blocker for this, but this reminds me that it would be
-> nice to de-magic the EFI constants used by the stub.
->
-> I took a stab a while back [1], for the existing definitions, but that
-> fell by the wayside.
->
+Reviewed-by: Juri Lelli <juri.lelli@arm.com>
 
-Good point.
+Thanks,
+
+- Juri
