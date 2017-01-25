@@ -1,153 +1,170 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 25 Jan 2017 10:59:00 -0600
-Subject: [PATCH v3 2/4] dt-bindings: Add TI SCI PM Domains
-In-Reply-To: <CAPDyKFq3zjyubxf3wc1V+F2W3rbnjj4ObFnHFvda+wCs4rBtnw@mail.gmail.com>
-References: <20170104205536.15963-1-d-gerlach@ti.com>
- <20170104205536.15963-3-d-gerlach@ti.com>
- <20170109175012.sg7eze7llqq7qevd@rob-hp-laptop>
- <7bd282d9-df6f-f4c6-1f7f-c8ed81c78af3@ti.com>
- <CAL_JsqKxU4c=KSn0=xX9kmbk498fhqpiXMeGjcoe8Ah48FAzUg@mail.gmail.com>
- <3bb89649-fd2a-acc6-6968-e54a00842ce2@ti.com>
- <CAL_JsqL+L1oHAOv7tLevzbtRFSKRs9J01SgF=HR_vNNqNV+4+Q@mail.gmail.com>
- <84d7d49b-933b-8b26-f18a-3a5054738cb1@ti.com>
- <CAL_JsqJ9RitNC7ihC8ckJgV+49kaHk=W9tgdNBSjEfydhQS46A@mail.gmail.com>
- <0eaa9914-83f1-7716-cf04-1e3dd44df647@ti.com>
- <4cb25cf9-216f-2e18-f45d-ef7e48fa6c5e@ti.com> <m2ziip2puf.fsf@baylibre.com>
- <CAL_Jsq+Vp8iYrAUmuSRzeeY_G6CUqFqG6XB6erDxo1RYo3g4=g@mail.gmail.com>
- <CAPDyKFqzs59N5bc89X-96Fgy9b=_+s8zYmHHshQeDrJCnaqprA@mail.gmail.com>
- <58821CA2.4050701@ti.com>
- <CAPDyKFpTyn2isNahywmOOSWiZKov9xsudyWi_i-FejXjC+1AZw@mail.gmail.com>
- <ec2f1697-4c60-fd88-6593-2a69ca7f5c83@ti.com>
- <CAPDyKFq3zjyubxf3wc1V+F2W3rbnjj4ObFnHFvda+wCs4rBtnw@mail.gmail.com>
-Message-ID: <23936395-d653-56c8-13f9-6dfeb6e9257b@ti.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 25 Jan 2017 18:17:27 +0100
+Subject: [PATCH V7 01/11] iommu/of: Refactor of_iommu_configure() for
+ error handling
+In-Reply-To: <1485188293-20263-2-git-send-email-sricharan@codeaurora.org>
+References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
+ <1485188293-20263-2-git-send-email-sricharan@codeaurora.org>
+Message-ID: <4388779a-0e83-fadc-83f4-98c46c88d42e@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/24/2017 04:03 AM, Ulf Hansson wrote:
-> On 23 January 2017 at 21:11, Dave Gerlach <d-gerlach@ti.com> wrote:
->> On 01/20/2017 10:52 AM, Ulf Hansson wrote:
->>>
->>> [...]
->>>
->>>>>> Another option is create something new either common or TI SCI
->>>>>> specific. It could be just a table of ids and phandles in the SCI
->>>>>> node. I'm much more comfortable with an isolated property in one node
->>>>>> than something scattered throughout the DT.
->>>>>
->>>>>
->>>>> To me, this seems like the best possible solution.
->>>>>
->>>>> However, perhaps we should also consider the SCPI Generic power domain
->>>>> (drivers/firmware/scpi_pm_domain.c), because I believe it's closely
->>>>> related.
->>>>> To change the power state of a device, this PM domain calls
->>>>> scpi_device_set|get_power_state() (drivers/firmware/arm_scpi.c), which
->>>>> also needs a device id as a parameter. Very similar to our case with
->>>>> the TI SCI domain.
->>>>>
->>>>> Currently these SCPI device ids lacks corresponding DT bindings, so
->>>>> the scpi_pm_domain tries to work around it by assigning ids
->>>>> dynamically at genpd creation time.
->>>>>
->>>>> That makes me wonder, whether we should think of something
->>>>> common/generic?
->>>>
->>>>
->>>> When you say something common/generic, do you mean a better binding for
->>>> genpd,
->>>> or something bigger than that like a new driver? Because I do think a
->>>> phandle
->>>> cell left open for the genpd provider to interpret solves both the scpi
->>>> and
->>>> ti-sci problem we are facing here in the best way. Using generic PM
->>>> domains lets
->>>> us do exactly what we want apart from interpreting the phandle cell with
->>>> our
->>>> driver, and I feel like anything else we try at this point is just going
->>>> to be
->>>> to work around that. Is bringing back genpd xlate something we can
->>>> discuss?
->>>
->>>
->>> Bringing back xlate, how would that help? Wouldn't that just mean that
->>> you will get one genpd per device? That's not an option, I think we
->>> are all in agreement to that.
->>
->>
->> Sure, perhaps the custom xlate wouldn't be the right way to do it, as we
->> wouldn't be able to associate a device directly to a phandle, at least with
->> how it was implemented before, but I think we can skip that entirely. Does
->> opening up the interpretation of the cells of the 'power-domains' phandle
->> not solve all of these issues? Is that out of the question?
->>
->> genpd_xlate_simple currently just makes sure the args_count of the
->> 'power-domains' phandle was zero and bails if it was not. Why couldn't we
->> remove this check and let the driver interpret it while still using
->> of_genpd_add_provider_simple to register the provider? It's still a 'simple'
->> provider from the perspective of the genpd framework and the actual pm
->> domain mapping will not change, but now the driver can parse the cells and
->> do whatever it needs to, such as reading a device id.
->>
->> I think that's a bit more flexible and will avoid breaking anything that is
->> there today.
+Hi Sricharan,
+
+On 23.01.2017 17:18, Sricharan R wrote:
+> From: Robin Murphy <robin.murphy@arm.com>
 >
-> Would you mind providing an example? Perhaps also some code snippets
-> dealing with the parsing?
-
-So again the goal of this is to move the ti,sci-id value back to 
-power-domains phandle instead of having a separate property, so that 
-would be step one in the DT. Then in the power-domains node change 
-#power-domain-cells to one. And then from there, the only change to the 
-genpd framework is this:
-
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index a5e1262b964b..b82e61f0bcfa 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -1603,8 +1603,6 @@ static struct generic_pm_domain genpd_xlate_simple
-                                       struct of_phandle_args *genpdspec,
-                                       void *data)
-  {
--       if (genpdspec->args_count != 0)
--               return ERR_PTR(-EINVAL);
-         return data;
-  }
-
-
-because genpd_xlate_simple only checks that the phandle is zero so that 
-it can fail if it is not, but there's no functional reason it needs to 
-do this. The genpd framework works as it did before no matter what the 
-cells are set to if using of_genpd_add_provider_simple. Then in the 
-attach_dev callback inside the ti_sci_pm_domains driver instead of doing
-
-	ret = of_property_read_u32(np, "ti,sci-id", &idx);
-
-to read the ti,sc-id for a device into idx we can now do:
-
-        ret = of_parse_phandle_with_args(np, "power-domains",
-                                    "#power-domain-cells", 0, &pd_args);
-        idx = pd_args.args[0];
-
-or even simpler from within our driver
-
-	ret = of_property_read_u32_index(np, "power-domains", 1, &idx);
-
-To read the value into idx.
-
-This requires minimal changes to the genpd framework and gives the 
-option for the driver to interpret the cell manually when using a simple 
-provider. The genpd framework still uses the phandle just to get the 
-power-domain device and the cells are left entirely up to the driver to 
-interpret, but if desired you could still use the genpd onecell driver 
-for a specific use of the phandle cell, or use it with zero cells.
-
-I can send out an updated series if there are no major objections, or 
-just to start discussion there.
-
-Regards,
-Dave
-
+> In preparation for some upcoming cleverness, rework the control flow in
+> of_iommu_configure() to minimise duplication and improve the propogation
+> of errors. It's also as good a time as any to switch over from the
+> now-just-a-compatibility-wrapper of_iommu_get_ops() to using the generic
+> IOMMU instance interface directly.
 >
-> Kind regards
-> Uffe
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+>  drivers/iommu/of_iommu.c | 83 +++++++++++++++++++++++++++++++-----------------
+>  1 file changed, 53 insertions(+), 30 deletions(-)
 >
+> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+> index 0f57ddc..ee49081 100644
+> --- a/drivers/iommu/of_iommu.c
+> +++ b/drivers/iommu/of_iommu.c
+> @@ -96,6 +96,28 @@ int of_get_dma_window(struct device_node *dn, const char *prefix, int index,
+>  }
+>  EXPORT_SYMBOL_GPL(of_get_dma_window);
+>
+> +static const struct iommu_ops
+> +*of_iommu_xlate(struct device *dev, struct of_phandle_args *iommu_spec)
+> +{
+> +	const struct iommu_ops *ops;
+> +	struct fwnode_handle *fwnode = &iommu_spec->np->fwnode;
+> +	int err;
+> +
+> +	ops = iommu_get_instance(fwnode);
+> +	if (!ops || !ops->of_xlate)
+> +		return NULL;
+> +
+> +	err = iommu_fwspec_init(dev, &iommu_spec->np->fwnode, ops);
+> +	if (err)
+> +		return ERR_PTR(err);
+> +
+> +	err = ops->of_xlate(dev, iommu_spec);
+> +	if (err)
+> +		return ERR_PTR(err);
+> +
+> +	return ops;
+> +}
+> +
+>  static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
+>  {
+>  	struct of_phandle_args *iommu_spec = data;
+> @@ -105,10 +127,11 @@ static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
+>  }
+>
+>  static const struct iommu_ops
+> -*of_pci_iommu_configure(struct pci_dev *pdev, struct device_node *bridge_np)
+> +*of_pci_iommu_init(struct pci_dev *pdev, struct device_node *bridge_np)
+>  {
+>  	const struct iommu_ops *ops;
+>  	struct of_phandle_args iommu_spec;
+> +	int err;
+>
+>  	/*
+>  	 * Start by tracing the RID alias down the PCI topology as
+> @@ -123,56 +146,56 @@ static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
+>  	 * bus into the system beyond, and which IOMMU it ends up at.
+>  	 */
+>  	iommu_spec.np = NULL;
+> -	if (of_pci_map_rid(bridge_np, iommu_spec.args[0], "iommu-map",
+> -			   "iommu-map-mask", &iommu_spec.np, iommu_spec.args))
+> -		return NULL;
+> +	err = of_pci_map_rid(bridge_np, iommu_spec.args[0], "iommu-map",
+> +			     "iommu-map-mask", &iommu_spec.np,
+> +			     iommu_spec.args);
+> +	if (err)
+> +		return ERR_PTR(err);
+>
+> -	ops = of_iommu_get_ops(iommu_spec.np);
+> -	if (!ops || !ops->of_xlate ||
+> -	    iommu_fwspec_init(&pdev->dev, &iommu_spec.np->fwnode, ops) ||
+> -	    ops->of_xlate(&pdev->dev, &iommu_spec))
+> -		ops = NULL;
+> +	ops = of_iommu_xlate(&pdev->dev, &iommu_spec);
+>
+>  	of_node_put(iommu_spec.np);
+>  	return ops;
+>  }
+>
+> -const struct iommu_ops *of_iommu_configure(struct device *dev,
+> -					   struct device_node *master_np)
+> +static const struct iommu_ops
+> +*of_platform_iommu_init(struct device *dev, struct device_node *np)
+>  {
+>  	struct of_phandle_args iommu_spec;
+> -	struct device_node *np;
+>  	const struct iommu_ops *ops = NULL;
+>  	int idx = 0;
+>
+> -	if (dev_is_pci(dev))
+> -		return of_pci_iommu_configure(to_pci_dev(dev), master_np);
+> -
+>  	/*
+>  	 * We don't currently walk up the tree looking for a parent IOMMU.
+>  	 * See the `Notes:' section of
+>  	 * Documentation/devicetree/bindings/iommu/iommu.txt
+>  	 */
+> -	while (!of_parse_phandle_with_args(master_np, "iommus",
+> -					   "#iommu-cells", idx,
+> -					   &iommu_spec)) {
+> -		np = iommu_spec.np;
+> -		ops = of_iommu_get_ops(np);
+> -
+> -		if (!ops || !ops->of_xlate ||
+> -		    iommu_fwspec_init(dev, &np->fwnode, ops) ||
+> -		    ops->of_xlate(dev, &iommu_spec))
+> -			goto err_put_node;
+> -
+> -		of_node_put(np);
+> +	while (!of_parse_phandle_with_args(np, "iommus", "#iommu-cells",
+> +					   idx, &iommu_spec)) {
+> +		ops = of_iommu_xlate(dev, &iommu_spec);
+> +		of_node_put(iommu_spec.np);
+>  		idx++;
+> +		if (IS_ERR_OR_NULL(ops))
+> +			break;
+>  	}
+>
+>  	return ops;
+> +}
+> +
+> +const struct iommu_ops *of_iommu_configure(struct device *dev,
+> +					   struct device_node *master_np)
+> +{
+> +	const struct iommu_ops *ops;
+> +
+> +	if (!master_np)
+> +		return NULL;
+> +
+> +	if (dev_is_pci(dev))
+> +		ops = of_pci_iommu_init(to_pci_dev(dev), master_np);
+
+I gave the whole patch set a try on ThunderX. really_probe() is failing 
+on dma_configure()->of_pci_iommu_init() for each PCI device. 
+of_pci_iommu_init() tries to setup firmware stuff via "iommu-map" but 
+ThunderX is using legacy "mmu-masters" binding. We need to take care of 
+that case too.
+
+> +	else
+> +		ops = of_platform_iommu_init(dev, master_np);
+>
+> -err_put_node:
+> -	of_node_put(np);
+> -	return NULL;
+> +	return IS_ERR(ops) ? NULL : ops;
+>  }
+>
+>  static int __init of_iommu_init(void)
+>
+
+Thanks,
+Tomasz
