@@ -1,46 +1,163 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Jan 2017 23:31:34 +0100
-Subject: [PATCH] pwm: fix undefined behavior in stm32_pwm_apply
-Message-ID: <20170125223155.1388582-1-arnd@arndb.de>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 25 Jan 2017 16:32:54 -0600
+Subject: [PATCH v3 2/4] dt-bindings: Add TI SCI PM Domains
+In-Reply-To: <23936395-d653-56c8-13f9-6dfeb6e9257b@ti.com>
+References: <20170104205536.15963-1-d-gerlach@ti.com>
+ <20170104205536.15963-3-d-gerlach@ti.com>
+ <20170109175012.sg7eze7llqq7qevd@rob-hp-laptop>
+ <7bd282d9-df6f-f4c6-1f7f-c8ed81c78af3@ti.com>
+ <CAL_JsqKxU4c=KSn0=xX9kmbk498fhqpiXMeGjcoe8Ah48FAzUg@mail.gmail.com>
+ <3bb89649-fd2a-acc6-6968-e54a00842ce2@ti.com>
+ <CAL_JsqL+L1oHAOv7tLevzbtRFSKRs9J01SgF=HR_vNNqNV+4+Q@mail.gmail.com>
+ <84d7d49b-933b-8b26-f18a-3a5054738cb1@ti.com>
+ <CAL_JsqJ9RitNC7ihC8ckJgV+49kaHk=W9tgdNBSjEfydhQS46A@mail.gmail.com>
+ <0eaa9914-83f1-7716-cf04-1e3dd44df647@ti.com>
+ <4cb25cf9-216f-2e18-f45d-ef7e48fa6c5e@ti.com>
+ <m2ziip2puf.fsf@baylibre.com>
+ <CAL_Jsq+Vp8iYrAUmuSRzeeY_G6CUqFqG6XB6erDxo1RYo3g4=g@mail.gmail.com>
+ <CAPDyKFqzs59N5bc89X-96Fgy9b=_+s8zYmHHshQeDrJCnaqprA@mail.gmail.com>
+ <58821CA2.4050701@ti.com>
+ <CAPDyKFpTyn2isNahywmOOSWiZKov9xsudyWi_i-FejXjC+1AZw@mail.gmail.com>
+ <ec2f1697-4c60-fd88-6593-2a69ca7f5c83@ti.com>
+ <CAPDyKFq3zjyubxf3wc1V+F2W3rbnjj4ObFnHFvda+wCs4rBtnw@mail.gmail.com>
+ <23936395-d653-56c8-13f9-6dfeb6e9257b@ti.com>
+Message-ID: <CAL_Jsq+9oEJJtHC4Gp_mWy_wJMLXsv2jgqKCMK8jm1MSWT-LRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The stm32_pwm_apply randomly sets the polarity or doesn't,
-as pointed out by this gcc warning:
+On Wed, Jan 25, 2017 at 10:59 AM, Dave Gerlach <d-gerlach@ti.com> wrote:
+> On 01/24/2017 04:03 AM, Ulf Hansson wrote:
+>>
+>> On 23 January 2017 at 21:11, Dave Gerlach <d-gerlach@ti.com> wrote:
+>>>
+>>> On 01/20/2017 10:52 AM, Ulf Hansson wrote:
+>>>>
+>>>>
+>>>> [...]
+>>>>
+>>>>>>> Another option is create something new either common or TI SCI
+>>>>>>> specific. It could be just a table of ids and phandles in the SCI
+>>>>>>> node. I'm much more comfortable with an isolated property in one node
+>>>>>>> than something scattered throughout the DT.
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> To me, this seems like the best possible solution.
+>>>>>>
+>>>>>> However, perhaps we should also consider the SCPI Generic power domain
+>>>>>> (drivers/firmware/scpi_pm_domain.c), because I believe it's closely
+>>>>>> related.
+>>>>>> To change the power state of a device, this PM domain calls
+>>>>>> scpi_device_set|get_power_state() (drivers/firmware/arm_scpi.c), which
+>>>>>> also needs a device id as a parameter. Very similar to our case with
+>>>>>> the TI SCI domain.
+>>>>>>
+>>>>>> Currently these SCPI device ids lacks corresponding DT bindings, so
+>>>>>> the scpi_pm_domain tries to work around it by assigning ids
+>>>>>> dynamically at genpd creation time.
+>>>>>>
+>>>>>> That makes me wonder, whether we should think of something
+>>>>>> common/generic?
+>>>>>
+>>>>>
+>>>>>
+>>>>> When you say something common/generic, do you mean a better binding for
+>>>>> genpd,
+>>>>> or something bigger than that like a new driver? Because I do think a
+>>>>> phandle
+>>>>> cell left open for the genpd provider to interpret solves both the scpi
+>>>>> and
+>>>>> ti-sci problem we are facing here in the best way. Using generic PM
+>>>>> domains lets
+>>>>> us do exactly what we want apart from interpreting the phandle cell
+>>>>> with
+>>>>> our
+>>>>> driver, and I feel like anything else we try at this point is just
+>>>>> going
+>>>>> to be
+>>>>> to work around that. Is bringing back genpd xlate something we can
+>>>>> discuss?
+>>>>
+>>>>
+>>>>
+>>>> Bringing back xlate, how would that help? Wouldn't that just mean that
+>>>> you will get one genpd per device? That's not an option, I think we
+>>>> are all in agreement to that.
+>>>
+>>>
+>>>
+>>> Sure, perhaps the custom xlate wouldn't be the right way to do it, as we
+>>> wouldn't be able to associate a device directly to a phandle, at least
+>>> with
+>>> how it was implemented before, but I think we can skip that entirely.
+>>> Does
+>>> opening up the interpretation of the cells of the 'power-domains' phandle
+>>> not solve all of these issues? Is that out of the question?
+>>>
+>>> genpd_xlate_simple currently just makes sure the args_count of the
+>>> 'power-domains' phandle was zero and bails if it was not. Why couldn't we
+>>> remove this check and let the driver interpret it while still using
+>>> of_genpd_add_provider_simple to register the provider? It's still a
+>>> 'simple'
+>>> provider from the perspective of the genpd framework and the actual pm
+>>> domain mapping will not change, but now the driver can parse the cells
+>>> and
+>>> do whatever it needs to, such as reading a device id.
+>>>
+>>> I think that's a bit more flexible and will avoid breaking anything that
+>>> is
+>>> there today.
+>>
+>>
+>> Would you mind providing an example? Perhaps also some code snippets
+>> dealing with the parsing?
+>
+>
+> So again the goal of this is to move the ti,sci-id value back to
+> power-domains phandle instead of having a separate property, so that would
+> be step one in the DT. Then in the power-domains node change
+> #power-domain-cells to one. And then from there, the only change to the
+> genpd framework is this:
 
-drivers/pwm/pwm-stm32.c: In function 'stm32_pwm_apply':
-drivers/pwm/pwm-stm32.c:204:33: error: 'curstate.polarity' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+I'd still like to understand how the ID is used in order to understand
+if as a power-domain cell is appropriate. I think the test is this: is
+the ID meaningful to (or defined by) the device or the power domain
+controller? The former should be a property in the device node. The
+latter should be phandle args.
 
-I assume it was meant to compare the new state to the current
-state rather than an uninitialized stack variable, so let's
-do that instead.
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index a5e1262b964b..b82e61f0bcfa 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -1603,8 +1603,6 @@ static struct generic_pm_domain genpd_xlate_simple
+>                                       struct of_phandle_args *genpdspec,
+>                                       void *data)
+>  {
+> -       if (genpdspec->args_count != 0)
+> -               return ERR_PTR(-EINVAL);
+>         return data;
+>  }
+>
+>
+> because genpd_xlate_simple only checks that the phandle is zero so that it
+> can fail if it is not, but there's no functional reason it needs to do this.
+> The genpd framework works as it did before no matter what the cells are set
+> to if using of_genpd_add_provider_simple. Then in the attach_dev callback
+> inside the ti_sci_pm_domains driver instead of doing
+>
+>         ret = of_property_read_u32(np, "ti,sci-id", &idx);
+>
+> to read the ti,sc-id for a device into idx we can now do:
+>
+>        ret = of_parse_phandle_with_args(np, "power-domains",
+>                                    "#power-domain-cells", 0, &pd_args);
+>        idx = pd_args.args[0];
+>
+> or even simpler from within our driver
+>
+>         ret = of_property_read_u32_index(np, "power-domains", 1, &idx);
 
-Fixes: bafffb6e7bd1 ("pwm: Add driver for STM32 plaftorm")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/pwm/pwm-stm32.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+This you should not be doing. The client driver shouldn't care how
+many cells or what their values are.
 
-diff --git a/drivers/pwm/pwm-stm32.c b/drivers/pwm/pwm-stm32.c
-index ce6232ebefe1..6139512aab7b 100644
---- a/drivers/pwm/pwm-stm32.c
-+++ b/drivers/pwm/pwm-stm32.c
-@@ -189,7 +189,6 @@ static void stm32_pwm_disable(struct stm32_pwm *priv, int ch)
- static int stm32_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
- 			   struct pwm_state *state)
- {
--	struct pwm_state curstate;
- 	bool enabled;
- 	struct stm32_pwm *priv = to_stm32_pwm_dev(chip);
- 	int ret;
-@@ -201,7 +200,7 @@ static int stm32_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
- 		return 0;
- 	}
- 
--	if (state->polarity != curstate.polarity)
-+	if (state->polarity != pwm->state.polarity)
- 		stm32_pwm_set_polarity(priv, pwm->hwpwm, state->polarity);
- 
- 	ret = stm32_pwm_config(priv, pwm->hwpwm,
--- 
-2.9.0
+Rob
