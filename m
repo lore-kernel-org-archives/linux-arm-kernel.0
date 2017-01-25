@@ -1,47 +1,63 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 25 Jan 2017 14:48:24 +0100
-Subject: [GIT PULL] arm64: mediatek: dts changes for v4.11
-Message-ID: <943b4e63-d2bc-0b9c-f4a7-4689f2ac48ea@gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 25 Jan 2017 14:51:24 +0100
+Subject: [PATCH 1/2] security: Change name of CONFIG_DEBUG_RODATA
+In-Reply-To: <fca01775-9640-8783-a657-a9e6cf0c3e0a@redhat.com>
+References: <1484789346-21012-1-git-send-email-labbott@redhat.com>
+ <1484789346-21012-2-git-send-email-labbott@redhat.com>
+ <20170119075341.GA14530@amd>
+ <fca01775-9640-8783-a657-a9e6cf0c3e0a@redhat.com>
+Message-ID: <20170125135124.GA20896@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, hi Olof,
+On Wed 2017-01-25 12:21:05, Laura Abbott wrote:
+> On 01/19/2017 08:53 AM, Pavel Machek wrote:
+> >On Wed 2017-01-18 17:29:05, Laura Abbott wrote:
+> >>
+> >>Despite the word 'debug' in CONFIG_DEBUG_RODATA, this kernel option
+> >>provides key security features that are to be expected on a modern
+> >>system. Change the name to CONFIG_HARDENED_PAGE_MAPPINGS which more
+> >>accurately describes what this option is intended to do.
+> >
+> >I think this is bad change. CONFIG_DEBUG_RODATA is describing what it
+> >does, CONFIG_HARDENED_PAGE_MAPPINGS is advertising.
+> >
+> >We don't do advertising, and we don't force people to re-answer the
+> >config questions without good reason.
+> >
+> >CONFIG_HARDENED_RODATA might fix the first problem, but not the second
+> >one.
+> >
+> >								Pavel
+> >								
+> 
+> (Apologies, my SMTP was set up incorrectly so my response didn't
+> actually get sent out)
+> 
+> CONFIG_DEBUG_RODATA isn't describing what it does though. It misses
+> that this config may handle much more than just rodata. I think
+> Mark Rutland's suggestion of STRICT_KERNEL_RWX might be more
+> descriptive.
 
-Please merge the following changes for 64-bit dts files.
+CONFIG_BUG=y
+CONFIG_LBDAF=y
+CONFIG_PM_OPP=y
 
-Thanks,
-Matthias
+..it is config option. It is not description of the feature. People
+are living with that config option for a while. I'd keep it.
 
----
+Maybe you can go from CONFIG_DEBUG_RODATA to CONFIG_RODATA... (but
+you'll still have people re-answer config option.)
 
-The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 
-   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
-
-are available in the git repository at:
-
-   https://github.com/mbgg/linux-mediatek.git tags/v4.10-next-dts
-
-for you to fetch changes up to 6de18454e06f4eb9c0c7008d3999cd1d0b289d42:
-
-   arm64: dts: mt8173: add node for thermal calibration (2017-01-23 
-10:18:13 +0100)
-
-----------------------------------------------------------------
-For mt8173:
-- set mm_sel clock to 400 MHz to support 4K HDMI
-- adjust power efficiency between the little and big cores
-- add a node for thermal calibration via e-fuse data
-
-----------------------------------------------------------------
-Bibby Hsieh (1):
-       arm64: dts: mt8173: add mmsel clocks for 4K support
-
-Daniel Kurtz (1):
-       arm64: dts: mt8173: Fix cpu_thermal cooling-maps contributions
-
-dawei.chien at mediatek.com (1):
-       arm64: dts: mt8173: add node for thermal calibration
-
-  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 13 +++++++++++--
-  1 file changed, 11 insertions(+), 2 deletions(-)
+								Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/14a3cd4f/attachment-0001.sig>
