@@ -1,65 +1,73 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 25 Jan 2017 12:12:33 +0100
-Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
-In-Reply-To: <20170124184526.GA25056@roeck-us.net>
-References: <20170123141331.GA11402@amd>
- <da1f1b45-3ae5-ffe8-62c6-9ec7c3a1505b@roeck-us.net>
- <20170123144031.GA7870@amd> <20170123232654.GA19342@amd>
- <20170123234912.GA2460@roeck-us.net>
- <20170124070639.GA5068@rzhang1-surface> <20170124073720.GB5603@amd>
- <88c94ea6-abe2-0f20-337e-e9ee00c883d8@roeck-us.net>
- <20170124175800.GA15070@amd> <20170124184526.GA25056@roeck-us.net>
-Message-ID: <20170125111233.GB3912@amd>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 25 Jan 2017 12:14:58 +0100
+Subject: [PATCH v2 3/6] ARM: tegra: nyan-big: Include compatible
+ revisions for proper detection
+In-Reply-To: <1485342488.1224.3.camel@paulk.fr>
+References: <20170122154753.31942-1-contact@paulk.fr>
+ <20170122154753.31942-3-contact@paulk.fr>
+ <20170125110246.GD9344@ulmo.ba.sec>
+ <1485342488.1224.3.camel@paulk.fr>
+Message-ID: <20170125111458.GH9344@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > > >>Right.
-> > > >>
-> > > >>Before reverting, can you please try if this patch works or not?
-> > > >
-> > > >Not really. Revert now. Sorry.
-> > > >
-> > > >Are you sure? This does not look equivalent to me at all.
-> > > >
-> > > >"name" file handling moved from drivers to the core, which added some
-> > > >crazy checks what name can contain. Even if this "works", what is the
-> > > >expected effect on the "name" file?
-> > > >
-> > > The hwmon name attribute must not include '-', as documented in
-> > > Documentation/hwmon/sysfs-interface. Is enforcing that 'crazy' ?
-> > > Maybe in your world, but not in mine.
+On Wed, Jan 25, 2017 at 12:08:08PM +0100, Paul Kocialkowski wrote:
+> Le mercredi 25 janvier 2017 ? 12:02 +0100, Thierry Reding a ?crit?:
+> > On Sun, Jan 22, 2017 at 04:47:50PM +0100, Paul Kocialkowski wrote:
+> > > Depthcharge (the payload used with cros devices) will attempt to detect
+> > > boards using their revision. This includes all the known revisions for
+> > > the nyan-big board so that the dtb can be selected preferably.
+> > > 
+> > > Defining compatibly revisions allows depthcharge to select the kernel
+> > > via the revision it detects instead of using the default kernel. This
+> > > allows having a FIT image with multiple kernels for multiple devices.
+> > > 
+> > > Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+> > > ---
+> > > ?arch/arm/boot/dts/tegra124-nyan-big.dts | 7 ++++++-
+> > > ?1 file changed, 6 insertions(+), 1 deletion(-)
 > > 
-> > Well, lets revert the patch and then we can discuss what to do with
-> > the "name" problem.
+> > I've applied this, with a small change, see below.
+> > 
+> > > diff --git a/arch/arm/boot/dts/tegra124-nyan-big.dts
+> > > b/arch/arm/boot/dts/tegra124-nyan-big.dts
+> > > index 67d7cfb32541..f12ece9b76a6 100644
+> > > --- a/arch/arm/boot/dts/tegra124-nyan-big.dts
+> > > +++ b/arch/arm/boot/dts/tegra124-nyan-big.dts
+> > > @@ -6,7 +6,12 @@
+> > > ?
+> > > ?/ {
+> > > ?	model = "Acer Chromebook 13 CB5-311";
+> > > -	compatible = "google,nyan-big", "nvidia,tegra124";
+> > > +	compatible = "google,nyan-big-rev7", "google,nyan-big-rev6",
+> > > +			"google,nyan-big-rev5", "google,nyan-big-rev4",
+> > > +			"google,nyan-big-rev3", "google,nyan-big-rev2",
+> > > +			"google,nyan-big-rev5", "google,nyan-big-rev4",
+> > 
+> > This line is the same as two lines above, so I've removed this one. I've
+> > also used slightly different padding (two tabs and align to the first
+> > string in the first line with spaces) to make it consistent with other
+> > string lists in the file.
+> 
+> Oops, sorry I missed that last faulty line. Actually, it should have contained:
+> "google,nyan-blaze-rev1", "google,nyan-blaze-rev0";
+> 
+> instead so that all revision, from 7 down to 0 are covered.
+> 
+> Should I make another patch on top to fix that?
 
-Ok, so the patch is on the way in. What to do next?
+Here's what I've put into Tegra's for-next, that has all the necessary
+revisions, doesn't it?
 
-pavel at n900:/sys/class/hwmon$ cat hwmon0/name
-bq27200-0
-pavel at n900:/sys/class/hwmon$ cat hwmon1/name
-rx51-battery
+	https://git.kernel.org/cgit/linux/kernel/git/tegra/linux.git/commit/?h=for-next&id=bfa3c0d4e8ba8eff525d34dbde0e76a98ebfbade
 
-> To provide some detail: libsensors gets just as confused with wildcards
-> and whitespace/newline as it does with '-' in the reported name, which
-> is why those are blocked by the new API.
+If so, no need for another patch.
 
-Ok... Question is "does someone actually use hwmon*/name on N900"? If
-so, we can't change it, but it is well possible that noone is.
-
-Next question is .. are there other drivers affected? Do we want to do
-'-' -> '_' in the core or somewhere in the drivers? We might want to
-do the change in early in 4.11 and see what breaks....
-
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/3056248c/attachment.sig>
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/a6c8532a/attachment.sig>
