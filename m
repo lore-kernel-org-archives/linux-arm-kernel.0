@@ -1,106 +1,352 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 25 Jan 2017 17:23:16 +0100
-Subject: [PATCH 0/2] Fix incorrect warning from dma-debug
-In-Reply-To: <57305A4B.70401@arm.com>
-References: <1462705196-10857-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <57305A4B.70401@arm.com>
-Message-ID: <CAMuHMdUnznBCt=V5_PgTaXM5JAZjBvZK-44bahUx+7NFg+f0rA@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 25 Jan 2017 09:23:46 -0700
+Subject: [PATCH v6 3/3] watchdog: zx2967: add watchdog controller driver
+ for ZTE's zx2967 family
+In-Reply-To: <1485312289-18354-3-git-send-email-baoyou.xie@linaro.org>
+References: <1485312289-18354-1-git-send-email-baoyou.xie@linaro.org>
+ <1485312289-18354-3-git-send-email-baoyou.xie@linaro.org>
+Message-ID: <20170125162346.GA591@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On Wed, Jan 25, 2017 at 10:44:49AM +0800, Baoyou Xie wrote:
+> This patch adds watchdog controller driver for ZTE's zx2967 family.
+> 
+> Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+> ---
+>  drivers/watchdog/Kconfig      |  10 ++
+>  drivers/watchdog/Makefile     |   1 +
+>  drivers/watchdog/zx2967_wdt.c | 276 ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 287 insertions(+)
+>  create mode 100644 drivers/watchdog/zx2967_wdt.c
+> 
+> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> index acb00b5..05093a2 100644
+> --- a/drivers/watchdog/Kconfig
+> +++ b/drivers/watchdog/Kconfig
+> @@ -714,6 +714,16 @@ config ASPEED_WATCHDOG
+>  	  To compile this driver as a module, choose M here: the
+>  	  module will be called aspeed_wdt.
+>  
+> +config ZX2967_WATCHDOG
+> +	tristate "ZTE zx2967 SoCs watchdog support"
+> +	depends on ARCH_ZX
+> +	select WATCHDOG_CORE
+> +	help
+> +	  Say Y here to include support for the watchdog timer
+> +	  in ZTE zx2967 SoCs.
+> +	  To compile this driver as a module, choose M here: the
+> +	  module will be called zx2967_wdt.
+> +
+>  # AVR32 Architecture
+>  
+>  config AT32AP700X_WDT
+> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+> index 0c3d35e..bf2d296 100644
+> --- a/drivers/watchdog/Makefile
+> +++ b/drivers/watchdog/Makefile
+> @@ -82,6 +82,7 @@ obj-$(CONFIG_BCM7038_WDT) += bcm7038_wdt.o
+>  obj-$(CONFIG_ATLAS7_WATCHDOG) += atlas7_wdt.o
+>  obj-$(CONFIG_RENESAS_WDT) += renesas_wdt.o
+>  obj-$(CONFIG_ASPEED_WATCHDOG) += aspeed_wdt.o
+> +obj-$(CONFIG_ZX2967_WATCHDOG) += zx2967_wdt.o
+>  
+>  # AVR32 Architecture
+>  obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
+> diff --git a/drivers/watchdog/zx2967_wdt.c b/drivers/watchdog/zx2967_wdt.c
+> new file mode 100644
+> index 0000000..8278471
+> --- /dev/null
+> +++ b/drivers/watchdog/zx2967_wdt.c
+> @@ -0,0 +1,276 @@
+> +/*
+> + * watchdog driver for ZTE's zx2967 family
+> + *
+> + * Copyright (C) 2017 ZTE Ltd.
+> + *
+> + * Author: Baoyou Xie <baoyou.xie@linaro.org>
+> + *
+> + * License terms: GNU General Public License (GPL) version 2
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/delay.h>
+> +#include <linux/io.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/module.h>
+> +#include <linux/of_address.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regmap.h>
+> +#include <linux/reset.h>
+> +#include <linux/watchdog.h>
+> +
+> +#define ZX2967_WDT_CFG_REG			0x4
+> +#define ZX2967_WDT_LOAD_REG			0x8
+> +#define ZX2967_WDT_REFRESH_REG			0x18
+> +#define ZX2967_WDT_START_REG			0x1c
+> +
+> +#define ZX2967_WDT_REFRESH_MASK			0x3f
+> +
+> +#define ZX2967_WDT_CFG_DIV(n)			((((n) & 0xff) - 1) << 8)
+> +#define ZX2967_WDT_START_EN			0x1
+> +
+> +#define ZX2967_WDT_WRITEKEY			0x12340000
+> +
+> +#define ZX2967_WDT_DIV_DEFAULT			16
+> +#define ZX2967_WDT_DEFAULT_TIMEOUT		32
+> +#define ZX2967_WDT_MIN_TIMEOUT			1
+> +#define ZX2967_WDT_MAX_TIMEOUT			524
+> +#define ZX2967_WDT_MAX_COUNT			0xffff
+> +
+> +#define ZX2967_WDT_CLK_FREQ			0x8000
+> +
+> +#define ZX2967_WDT_FLAG_REBOOT_MON		BIT(0)
+> +
+> +struct zx2967_wdt {
+> +	struct watchdog_device	wdt_device;
+> +	void __iomem		*reg_base;
+> +	struct clk		*clock;
+> +};
+> +
+> +static inline u32 zx2967_wdt_readl(struct zx2967_wdt *wdt, u16 reg)
+> +{
+> +	return readl_relaxed(wdt->reg_base + reg);
+> +}
+> +
+> +static inline void zx2967_wdt_writel(struct zx2967_wdt *wdt, u16 reg, u32 val)
+> +{
+> +	writel_relaxed(val | ZX2967_WDT_WRITEKEY, wdt->reg_base + reg);
+> +}
+> +
+> +static void zx2967_wdt_refresh(struct zx2967_wdt *wdt)
+> +{
+> +	u32 val;
+> +
+> +	val = zx2967_wdt_readl(wdt, ZX2967_WDT_REFRESH_REG);
+> +	val ^= ZX2967_WDT_REFRESH_MASK;
+> +	zx2967_wdt_writel(wdt, ZX2967_WDT_REFRESH_REG, val);
+> +}
+> +
+> +static int
+> +zx2967_wdt_set_timeout(struct watchdog_device *wdd, unsigned int timeout)
+> +{
+> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
+> +	unsigned int divisor = ZX2967_WDT_DIV_DEFAULT;
+> +	unsigned int count;
+> +
+> +	count = timeout * ZX2967_WDT_CLK_FREQ;
+> +	if (count > divisor * ZX2967_WDT_MAX_COUNT)
+> +		divisor = DIV_ROUND_UP(count, ZX2967_WDT_MAX_COUNT);
+> +	count = DIV_ROUND_UP(count, divisor);
+> +	zx2967_wdt_writel(wdt, ZX2967_WDT_CFG_REG, ZX2967_WDT_CFG_DIV(divisor));
+> +	zx2967_wdt_writel(wdt, ZX2967_WDT_LOAD_REG, count);
+> +	zx2967_wdt_refresh(wdt);
+> +	wdd->timeout =  (count * divisor) / ZX2967_WDT_CLK_FREQ;
+> +
+> +	return 0;
+> +}
+> +
+> +static void __zx2967_wdt_start(struct zx2967_wdt *wdt)
+> +{
+> +	u32 val;
+> +
+> +	val = zx2967_wdt_readl(wdt, ZX2967_WDT_START_REG);
+> +	val |= ZX2967_WDT_START_EN;
+> +	zx2967_wdt_writel(wdt, ZX2967_WDT_START_REG, val);
+> +}
+> +
+> +static void __zx2967_wdt_stop(struct zx2967_wdt *wdt)
+> +{
+> +	u32 val;
+> +
+> +	val = zx2967_wdt_readl(wdt, ZX2967_WDT_START_REG);
+> +	val &= ~ZX2967_WDT_START_EN;
+> +	zx2967_wdt_writel(wdt, ZX2967_WDT_START_REG, val);
+> +}
+> +
+> +static int zx2967_wdt_start(struct watchdog_device *wdd)
+> +{
+> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
+> +
+> +	zx2967_wdt_set_timeout(wdd, wdd->timeout);
+> +	__zx2967_wdt_start(wdt);
+> +
+> +	return 0;
+> +}
+> +
+> +static int zx2967_wdt_stop(struct watchdog_device *wdd)
+> +{
+> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
+> +
+> +	__zx2967_wdt_stop(wdt);
+> +
+> +	return 0;
+> +}
+> +
+> +static int zx2967_wdt_keepalive(struct watchdog_device *wdd)
+> +{
+> +	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
+> +
+> +	zx2967_wdt_refresh(wdt);
+> +
+> +	return 0;
+> +}
+> +
+> +#define ZX2967_WDT_OPTIONS \
+> +	(WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE)
+> +static const struct watchdog_info zx2967_wdt_ident = {
+> +	.options          =     ZX2967_WDT_OPTIONS,
+> +	.identity         =	"zx2967 watchdog",
+> +};
+> +
+> +static struct watchdog_ops zx2967_wdt_ops = {
+> +	.owner = THIS_MODULE,
+> +	.start = zx2967_wdt_start,
+> +	.stop = zx2967_wdt_stop,
+> +	.ping = zx2967_wdt_keepalive,
+> +	.set_timeout = zx2967_wdt_set_timeout,
+> +};
+> +
+> +static void zx2967_wdt_reset_sysctrl(struct device *dev)
+> +{
+> +	int ret;
+> +	void __iomem *regmap;
+> +	unsigned int offset, mask, config;
+> +	struct of_phandle_args out_args;
+> +
+> +	ret = of_parse_phandle_with_fixed_args(dev->of_node,
+> +			"zte,wdt-reset-sysctrl", 3, 0, &out_args);
+> +	if (ret)
+> +		return;
+> +
+> +	offset = out_args.args[0];
+> +	config = out_args.args[1];
+> +	mask = out_args.args[2];
+> +
+> +	regmap = syscon_node_to_regmap(out_args.np);
+> +	if (IS_ERR(regmap)) {
+> +		of_node_put(out_args.np);
+> +		return;
+> +	}
+> +
+> +	regmap_update_bits(regmap, offset, mask, config);
+> +	of_node_put(out_args.np);
+> +}
+> +
+> +static int zx2967_wdt_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct zx2967_wdt *wdt;
+> +	struct resource *base;
+> +	int ret;
+> +	struct reset_control *rstc;
+> +
+> +	wdt = devm_kzalloc(dev, sizeof(*wdt), GFP_KERNEL);
+> +	if (!wdt)
+> +		return -ENOMEM;
+> +
+> +	platform_set_drvdata(pdev, wdt);
+> +
+> +	wdt->wdt_device.info = &zx2967_wdt_ident;
+> +	wdt->wdt_device.ops = &zx2967_wdt_ops;
+> +	wdt->wdt_device.timeout = ZX2967_WDT_DEFAULT_TIMEOUT;
+> +	wdt->wdt_device.max_timeout = ZX2967_WDT_MAX_TIMEOUT;
+> +	wdt->wdt_device.min_timeout = ZX2967_WDT_MIN_TIMEOUT;
+> +	wdt->wdt_device.parent = &pdev->dev;
+> +
+> +	base = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	wdt->reg_base = devm_ioremap_resource(dev, base);
+> +	if (IS_ERR(wdt->reg_base)) {
+> +		dev_err(dev, "ioremap failed\n");
+> +		return PTR_ERR(wdt->reg_base);
+> +	}
+> +
+> +	zx2967_wdt_reset_sysctrl(dev);
+> +
+> +	wdt->clock = devm_clk_get(dev, NULL);
+> +	if (IS_ERR(wdt->clock)) {
+> +		dev_err(dev, "failed to find watchdog clock source\n");
+> +		return PTR_ERR(wdt->clock);
+> +	}
+> +
+> +	ret = clk_prepare_enable(wdt->clock);
+> +	if (ret < 0) {
+> +		dev_err(dev, "failed to enable clock\n");
+> +		return ret;
+> +	}
+> +	clk_set_rate(wdt->clock, ZX2967_WDT_CLK_FREQ);
+> +
+> +	rstc = devm_reset_control_get(dev, NULL);
+> +	if (IS_ERR(rstc)) {
+> +		dev_err(dev, "failed to get rstc");
+> +		ret = PTR_ERR(rstc);
+> +		goto err;
+> +	}
+> +
+> +	reset_control_assert(rstc);
+> +	usleep_range(500, 20000);
 
-On Mon, May 9, 2016 at 11:37 AM, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 08/05/16 11:59, Niklas S?derlund wrote:
->> While using CONFIG_DMA_API_DEBUG i came across this warning which I
->> think is a false positive. As shown dma_sync_single_for_device() are
->> called from the dma_map_single() call path. This triggers the warning
->> since the dma-debug code have not yet been made aware of the mapping.
->
-> Almost right ;) The thing being mapped (the SPI device's buffer) and the
-> thing being synced (the IOMMU's PTE) are entirely unrelated. Due to the
-> current of_iommu_init() setup, the IOMMU is probed long before
-> dma_debug_init() gets called, therefore DMA debug is missing entries for
-> some of the initial page table mappings and gets confused when we update
-> them later.
+Alright, I'm officially confused.
 
-I think I've been seeing the same as Niklas since quite a while.
-Finally I had a deeper look, and it looks like there is a bug somewhere,
-causing the wrong IOMMU PTE to be synced.
+First and foremost you still haven't provided an explanation as to why this is
+required.  Second, in your previous submission you had:
 
->> I try to solve this by introducing __dma_sync_single_for_device() which
->> do not call into the dma-debug code. I'm no expert and this might be a
->> bad way of solving the problem but it allowed me to keep working.
->
-> The simple fix should be to just call dma_debug_init() from a sufficiently
-> earlier initcall level. The best would be to sort out a proper device
-> dependency order to avoid the whole early-IOMMU-creation thing entirely.
+        mdelay(10);
 
-And so I did. After disabling the call to dma_debug_fs_init(), you can call
-dma_debug_init() quite early. But the warning didn't go away:
+That is a busy loop of 10ms.  In this post using usleep_range() is a step in the
+right direction but the min and max values to wait for don't make sense.  Here
+you have 500 and 20000, which is 0.5ms and 20ms.
 
-    ipmmu-vmsa e67b0000.mmu: DMA-API: device driver tries to sync DMA memory
-        it has not allocated [device address=0x000000067bab2ff8] [size=8 bytes]
-    ------------[ cut here ]------------
-    WARNING: CPU: 0 PID: 174 at lib/dma-debug.c:1235 check_sync+0xcc/0x568
-    ...
-    [<ffffff800823a3a4>] check_sync+0xcc/0x568
-    [<ffffff800823a8d0>] debug_dma_sync_single_for_device+0x44/0x4c
-    [<ffffff80082b8d34>] __arm_lpae_set_pte.isra.3+0x6c/0x78
-    [<ffffff80082b977c>] __arm_lpae_map+0x318/0x384
-    [<ffffff80082b9c58>] arm_lpae_map+0xb0/0xc4
-    [<ffffff80082bbc58>] ipmmu_map+0x48/0x58
-    [<ffffff80082b6754>] iommu_map+0x120/0x1fc
-    [<ffffff80082b7bc8>] __iommu_dma_map+0xb8/0xec
-    [<ffffff80082b8514>] iommu_dma_map_page+0x50/0x58
-    [<ffffff8008092d28>] __iommu_map_page+0x54/0x98
-
-So, who allocated that memory?
-
-During early kernel init (before fs_initcall(dma_debug_init)):
-
-    arm-lpae io-pgtable: arm_lpae_alloc_pgtable:652: cfg->ias = 32
-        data->pg_shift = 12 va_bits = 20
-    arm-lpae io-pgtable: arm_lpae_alloc_pgtable:657: data->bits_per_level = 9
-        data->levels = 3 pgd_bits = 2
-    ipmmu-vmsa e67b0000.mmu: __arm_lpae_alloc_pages:224
-        dma_map_single(0xffffffc63bab2000, 32) returned 0x000000067bab2000
-
-Hence 0x67bab2000 is the PGD, which has only 4 entries (32 bytes).
-Call stack:
-
-    [<ffffff80082b9240>] __arm_lpae_alloc_pages.isra.11+0x144/0x1e8
-    [<ffffff80082b93c0>] arm_64_lpae_alloc_pgtable_s1+0xdc/0x118
-    [<ffffff80082b9440>] arm_32_lpae_alloc_pgtable_s1+0x44/0x68
-    [<ffffff80082b8b1c>] alloc_io_pgtable_ops+0x4c/0x80
-    [<ffffff80082bbf28>] ipmmu_attach_device+0xd0/0x3b0
-
-When starting DMA from the device:
-
-    iommu: map: iova 0xfffffff000 pa 0x000000067a555000 size 0x1000 pgsize 4096
-    arm-lpae io-pgtable: __arm_lpae_map:318: iova 0xfffffff000
-        phys 0x000000067a555000 size 4096 lvl 1 ptep 0xffffffc63bab2000
-    arm-lpae io-pgtable: __arm_lpae_map:320: incr. ptep to 0xffffffc63bab2ff8
-    ipmmu-vmsa e67b0000.mmu: __arm_lpae_alloc_pages:224
-        dma_map_single(0xffffffc63a490000, 4096) returned 0x000000067a490000
-    ipmmu-vmsa e67b0000.mmu: DMA-API: device driver tries to sync DMA memory
-        it has not allocated [device address=0x000000067bab2ff8] [size=8 bytes]
-
-__arm_lpae_map() added "ARM_LPAE_LVL_IDX(iova, lvl, data)" == 0xff8 to ptep
-(the PGD base address), but the PGD has only 32 bytes, leading to the warning.
-
-Does my analysis make sense?
-Do you have a clue?
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> +	reset_control_deassert(rstc);
+> +
+> +	watchdog_set_drvdata(&wdt->wdt_device, wdt);
+> +	watchdog_init_timeout(&wdt->wdt_device,
+> +			ZX2967_WDT_DEFAULT_TIMEOUT, dev);
+> +	watchdog_set_nowayout(&wdt->wdt_device, WATCHDOG_NOWAYOUT);
+> +
+> +	ret = watchdog_register_device(&wdt->wdt_device);
+> +	if (ret)
+> +		goto err;
+> +
+> +	dev_info(dev, "watchdog enabled (timeout=%d sec, nowayout=%d)",
+> +		 wdt->wdt_device.timeout, WATCHDOG_NOWAYOUT);
+> +
+> +	return 0;
+> +
+> +err:
+> +	clk_disable_unprepare(wdt->clock);
+> +	return ret;
+> +}
+> +
+> +static int zx2967_wdt_remove(struct platform_device *pdev)
+> +{
+> +	struct zx2967_wdt *wdt = platform_get_drvdata(pdev);
+> +
+> +	watchdog_unregister_device(&wdt->wdt_device);
+> +	clk_disable_unprepare(wdt->clock);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id zx2967_wdt_match[] = {
+> +	{ .compatible = "zte,zx296718-wdt", },
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, zx2967_wdt_match);
+> +
+> +static struct platform_driver zx2967_wdt_driver = {
+> +	.probe		= zx2967_wdt_probe,
+> +	.remove		= zx2967_wdt_remove,
+> +	.driver		= {
+> +		.name	= "zx2967-wdt",
+> +		.of_match_table	= of_match_ptr(zx2967_wdt_match),
+> +	},
+> +};
+> +module_platform_driver(zx2967_wdt_driver);
+> +
+> +MODULE_AUTHOR("Baoyou Xie <baoyou.xie@linaro.org>");
+> +MODULE_DESCRIPTION("ZTE zx2967 Watchdog Device Driver");
+> +MODULE_LICENSE("GPL v2");
+> -- 
+> 2.7.4
+> 
