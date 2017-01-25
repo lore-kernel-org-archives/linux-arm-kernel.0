@@ -1,63 +1,33 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 25 Jan 2017 14:51:24 +0100
-Subject: [PATCH 1/2] security: Change name of CONFIG_DEBUG_RODATA
-In-Reply-To: <fca01775-9640-8783-a657-a9e6cf0c3e0a@redhat.com>
-References: <1484789346-21012-1-git-send-email-labbott@redhat.com>
- <1484789346-21012-2-git-send-email-labbott@redhat.com>
- <20170119075341.GA14530@amd>
- <fca01775-9640-8783-a657-a9e6cf0c3e0a@redhat.com>
-Message-ID: <20170125135124.GA20896@amd>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Wed, 25 Jan 2017 14:03:21 +0000
+Subject: [PATCH -next] pinctrl: samsung: Fix return value check in
+ samsung_pinctrl_get_soc_data()
+Message-ID: <20170125140321.23911-1-weiyj.lk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2017-01-25 12:21:05, Laura Abbott wrote:
-> On 01/19/2017 08:53 AM, Pavel Machek wrote:
-> >On Wed 2017-01-18 17:29:05, Laura Abbott wrote:
-> >>
-> >>Despite the word 'debug' in CONFIG_DEBUG_RODATA, this kernel option
-> >>provides key security features that are to be expected on a modern
-> >>system. Change the name to CONFIG_HARDENED_PAGE_MAPPINGS which more
-> >>accurately describes what this option is intended to do.
-> >
-> >I think this is bad change. CONFIG_DEBUG_RODATA is describing what it
-> >does, CONFIG_HARDENED_PAGE_MAPPINGS is advertising.
-> >
-> >We don't do advertising, and we don't force people to re-answer the
-> >config questions without good reason.
-> >
-> >CONFIG_HARDENED_RODATA might fix the first problem, but not the second
-> >one.
-> >
-> >								Pavel
-> >								
-> 
-> (Apologies, my SMTP was set up incorrectly so my response didn't
-> actually get sent out)
-> 
-> CONFIG_DEBUG_RODATA isn't describing what it does though. It misses
-> that this config may handle much more than just rodata. I think
-> Mark Rutland's suggestion of STRICT_KERNEL_RWX might be more
-> descriptive.
+From: Wei Yongjun <weiyongjun1@huawei.com>
 
-CONFIG_BUG=y
-CONFIG_LBDAF=y
-CONFIG_PM_OPP=y
+In case of error, the function devm_ioremap() returns NULL pointer
+not ERR_PTR(). The IS_ERR() test in the return value check should
+be replaced with NULL test.
 
-..it is config option. It is not description of the feature. People
-are living with that config option for a while. I'd keep it.
+Fixes: 8b1bd11c1f8f ("pinctrl: samsung: Add the support the multiple
+IORESOURCE_MEM for one pin-bank")
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+---
+ drivers/pinctrl/samsung/pinctrl-samsung.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Maybe you can go from CONFIG_DEBUG_RODATA to CONFIG_RODATA... (but
-you'll still have people re-answer config option.)
-
-
-								Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/14a3cd4f/attachment-0001.sig>
+diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
+index 3bc925f..9c03eab 100644
+--- a/drivers/pinctrl/samsung/pinctrl-samsung.c
++++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
+@@ -1009,7 +1009,7 @@ samsung_pinctrl_get_soc_data(struct samsung_pinctrl_drv_data *d,
+ 		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
+ 		virt_base[i] = devm_ioremap(&pdev->dev, res->start,
+ 						resource_size(res));
+-		if (IS_ERR(virt_base[i]))
++		if (!virt_base[i])
+ 			return ERR_PTR(-EIO);
+ 	}
