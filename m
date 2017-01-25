@@ -1,83 +1,154 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Wed, 25 Jan 2017 18:24:12 +0800
-Subject: [PATCH] spi: mediatek: Manually set dma_ops for spi_master device
-In-Reply-To: <b1180920-8ead-40e8-6155-8510226e719b@arm.com>
-References: <20170124132519.13271-1-djkurtz@chromium.org>
- <b1180920-8ead-40e8-6155-8510226e719b@arm.com>
-Message-ID: <CAGS+omBV3o1hergAjU3_9ok5NTmk8Z315zo3yW9jU_jA+reZCQ@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 25 Jan 2017 11:28:04 +0100
+Subject: [PATCH v7 0/4] DMA Engine: switch PL330 driver to non-irq-safe runtime
+ PM
+References: <CGME20170125102822eucas1p29f2605060eb8255a6cf06638c1148ec4@eucas1p2.samsung.com>
+Message-ID: <1485340088-25481-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+Hello,
 
-On Tue, Jan 24, 2017 at 11:14 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> Hi Dan,
+This patchset changes the way the runtime PM is implemented in the PL330 DMA
+engine driver. The main goal of such change is to add support for the audio
+power domain to Exynos5 SoCs (5250, 542x, 5433, probably others) and let
+it to be properly turned off, when no audio is being used. Switching to
+non-irq-safe runtime PM is required to properly let power domain to be
+turned off (irq-safe runtime PM keeps power domain turned on all the time)
+and to integrate with clock controller's runtime PM (this cannot be
+workarounded any other way, PL330 uses clocks from the controller, which
+belongs to the same power domain).
 
-[snip...]
+For more details of the proposed change to the PL330 driver see patch #4.
 
->> And I really don't know why we needed to set the coherent_dma_mask to 0 to
->> avoid SPI transaction errors.
->
-> Following what I mentioned above, "git grep dma_alloc drivers/spi" makes
-> it seem like coherent DMA isn't used anywhere relevant, which is rather
-> puzzling. Unless of course somewhere along the line somebody's done the
-> dev->dma_mask = &dev->dma_coherent_mask hack, with the result that
-> writing one mask hits both, making *all* DMA fail and big transfers fall
-> back to PIO.
+Audio power domain on Exynos5 SoCs contains following hardware modules:
+1. clock controller
+2. pin controller
+3. PL330 DMA controller
+4. I2S audio controller
 
-You mean this last line?
+Patches for adding or fixing runtime PM for each of the above devices is
+handled separately.
 
->> @@ -575,6 +576,10 @@ static int mtk_spi_probe(struct platform_device *pdev)
->>               goto err_put_master;
->>       }
->>
->> +     /* Call of_dma_configure to set up spi_master's dma_ops */
->> +     of_dma_configure(&master->dev, master->dev.of_node);
->> +     /* But explicitly set the coherent_dma_mask to 0 */
->> +     master->dev.coherent_dma_mask = 0;
->>       if (!pdev->dev.dma_mask)
->>               pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
-                                  ^^^^^
+Runtime PM patches for clock controllers is possible and has been proposed
+in the following thread (pending review): "[PATCH v4 0/4] Add runtime PM
+support for clocks (on Exynos SoC example)",
+http://www.spinics.net/lists/arm-kernel/msg550747.html
 
-As predicted, setting the dma_mask = 0 causes "all DMA to fail".  In
-particular, dma_capable() always returns false, so
-swiotlb_map_sg_attrs() takes the map_single() path, instead of just
-assigning:
+Runtime PM support for Exynos pin controller has been posted in the
+following thread: "[PATCH 0/9] Runtime PM for Exynos pin controller driver",
+http://www.spinics.net/lists/arm-kernel/msg550161.html
 
-   sg->dma_address = dev_addr;
+Exynos I2S driver supports runtime PM, but some fixes were needed for it
+and they are already queued to linux-next.
 
-swiotlb_map_sg_attrs(struct device *hwdev, struct scatterlist *sgl, int nelems,
-                     enum dma_data_direction dir, unsigned long attrs)
-{
-        struct scatterlist *sg;
-        int i;
+This patchset is based on linux-next from 25th January 2017 with "dmaengine:
+pl330: fix double lock" patch applied.
 
-        BUG_ON(dir == DMA_NONE);
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
 
-        for_each_sg(sgl, sg, nelems, i) {
-                phys_addr_t paddr = sg_phys(sg);
-                dma_addr_t dev_addr = phys_to_dma(hwdev, paddr);
 
-                if (swiotlb_force == SWIOTLB_FORCE ||
-                    !dma_capable(hwdev, dev_addr, sg->length)) {
-                        phys_addr_t map = map_single(hwdev, sg_phys(sg),
-                                                     sg->length, dir, attrs);
-                        ...
-                        }
-                        sg->dma_address = phys_to_dma(hwdev, map);
-                } else
-                        sg->dma_address = dev_addr;
-                sg_dma_len(sg) = sg->length;
-        }
-        return nelems;
-}
+Changelog:
 
-So, I think this means that the only reason the MTK SPI driver ever
-worked before was that it was tested on an older kernel, so the
-spi_master was defaulting to swiotlb_dma_ops with a 0 dma_mask, and
-therefore it was using SWIOTLB bounce buffers (via 'map_single'), and
-not actually ever doing real DMA.
+v7:
+- added missing of_dma_request_slave_channel API change to sound/soc/sh/rcar
+  driver
+- extended commit message with information about drawbacks of irq-safe
+  runtime pm
+- added Ulf's reviewed-by tags
 
-I'm in a bit over my head here, any suggestions on how to fix this?
+v6: https://www.spinics.net/lists/arm-kernel/msg557377.html
+- fixed pl330 system sleep suspend/resume callbacks, previous implementation
+  incorrectly tried to unprepare clocks unconditionally - after a fix pl330
+  suspend/resume callbacks can be simply replaced by generic
+  pm_runtime_force_{suspend,resume} helpers, what simplifies code even more
 
--Dan
+v5: https://www.spinics.net/lists/arm-kernel/msg555001.html
+- added Acks
+- additional mutex is indeed not needed, rely on dma_list_mutex in dmaengine
+  core, added comment about locking
+
+v4: http://www.spinics.net/lists/dmaengine/msg12329.html
+- rebased onto "dmaengine: pl330: fix double lock" patch:
+  http://www.spinics.net/lists/dmaengine/msg12289.html
+- added a mutex to protect runtime PM links creation/removal to avoid races
+- moved mem2mem channel case handing to pl330_{add,del}_slave_pm_link
+  functions to simplify code and error paths
+
+v3: http://www.spinics.net/lists/dmaengine/msg12245.html
+- removed pl330_filter function as suggested by Arnd Bergmann
+- removed pl330.h from arch/arm/plat-samsung/devs.c
+- fixes some minor style issues pointed by Krzysztof Kozlowski
+
+v2: https://www.spinics.net/lists/arm-kernel/msg552772.html
+- rebased onto linux next-20170109
+- improved patch description
+- separated patch #3 from #4 (storing a pointer to slave device for each
+  DMA channel) as requested by Krzysztof Kozlowski
+
+v1: https://www.spinics.net/lists/arm-kernel/msg550008.html
+- initial version
+
+
+Patch summary:
+
+Marek Szyprowski (4):
+  dmaengine: pl330: remove pdata based initialization
+  dmaengine: Forward slave device pointer to of_xlate callback
+  dmaengine: pl330: Store pointer to slave device
+  dmaengine: pl330: Don't require irq-safe runtime PM
+
+ arch/arm/plat-samsung/devs.c    |   1 -
+ drivers/dma/amba-pl08x.c        |   2 +-
+ drivers/dma/at_hdmac.c          |   4 +-
+ drivers/dma/at_xdmac.c          |   2 +-
+ drivers/dma/bcm2835-dma.c       |   2 +-
+ drivers/dma/coh901318.c         |   2 +-
+ drivers/dma/cppi41.c            |   2 +-
+ drivers/dma/dma-jz4780.c        |   2 +-
+ drivers/dma/dmaengine.c         |   2 +-
+ drivers/dma/dw/platform.c       |   2 +-
+ drivers/dma/edma.c              |   4 +-
+ drivers/dma/fsl-edma.c          |   2 +-
+ drivers/dma/img-mdc-dma.c       |   2 +-
+ drivers/dma/imx-dma.c           |   2 +-
+ drivers/dma/imx-sdma.c          |   2 +-
+ drivers/dma/k3dma.c             |   2 +-
+ drivers/dma/lpc18xx-dmamux.c    |   2 +-
+ drivers/dma/mmp_pdma.c          |   2 +-
+ drivers/dma/mmp_tdma.c          |   2 +-
+ drivers/dma/moxart-dma.c        |   2 +-
+ drivers/dma/mxs-dma.c           |   2 +-
+ drivers/dma/nbpfaxi.c           |   2 +-
+ drivers/dma/of-dma.c            |  19 ++--
+ drivers/dma/pl330.c             | 220 ++++++++++++++++------------------------
+ drivers/dma/pxa_dma.c           |   2 +-
+ drivers/dma/qcom/bam_dma.c      |   2 +-
+ drivers/dma/sh/rcar-dmac.c      |   2 +-
+ drivers/dma/sh/shdma-of.c       |   2 +-
+ drivers/dma/sh/usb-dmac.c       |   2 +-
+ drivers/dma/sirf-dma.c          |   2 +-
+ drivers/dma/st_fdma.c           |   2 +-
+ drivers/dma/ste_dma40.c         |   2 +-
+ drivers/dma/stm32-dma.c         |   2 +-
+ drivers/dma/sun4i-dma.c         |   2 +-
+ drivers/dma/sun6i-dma.c         |   2 +-
+ drivers/dma/tegra20-apb-dma.c   |   2 +-
+ drivers/dma/tegra210-adma.c     |   2 +-
+ drivers/dma/xilinx/xilinx_dma.c |   2 +-
+ drivers/dma/xilinx/zynqmp_dma.c |   2 +-
+ drivers/dma/zx_dma.c            |   2 +-
+ include/linux/amba/pl330.h      |  35 -------
+ include/linux/of_dma.h          |  19 ++--
+ sound/soc/sh/rcar/dma.c         |   5 +-
+ sound/soc/sh/rcar/dvc.c         |   3 +-
+ sound/soc/sh/rcar/rsnd.h        |   3 +-
+ sound/soc/sh/rcar/src.c         |   3 +-
+ sound/soc/sh/rcar/ssi.c         |   3 +-
+ 47 files changed, 158 insertions(+), 231 deletions(-)
+ delete mode 100644 include/linux/amba/pl330.h
+
+-- 
+1.9.1
