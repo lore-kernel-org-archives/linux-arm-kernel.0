@@ -1,72 +1,48 @@
-From: john@phrozen.org (John Crispin)
-Date: Wed, 25 Jan 2017 06:38:40 +0100
-Subject: [PATCH 08/16] arm: dts: add spi nodes to the mt7623.dtsi file
-In-Reply-To: <69d73342-d710-5f6d-567b-8e75a84fdb18@gmail.com>
-References: <1485170975-51813-1-git-send-email-john@phrozen.org>
- <1485170975-51813-9-git-send-email-john@phrozen.org>
- <69d73342-d710-5f6d-567b-8e75a84fdb18@gmail.com>
-Message-ID: <80e1c119-2989-9c82-8d54-551f677613e1@phrozen.org>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Wed, 25 Jan 2017 11:10:53 +0530
+Subject: [PATCH 31/37] misc: Add host side pci driver for pci test
+ function device
+In-Reply-To: <20170124160224.GA23528@infradead.org>
+References: <1484216786-17292-1-git-send-email-kishon@ti.com>
+ <1484216786-17292-32-git-send-email-kishon@ti.com>
+ <20170124160224.GA23528@infradead.org>
+Message-ID: <58883A65.8020306@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On Tuesday 24 January 2017 09:32 PM, Christoph Hellwig wrote:
+> On Thu, Jan 12, 2017 at 03:56:20PM +0530, Kishon Vijay Abraham I wrote:
+>> Add PCI endpoint test driver that can verify base address
+>> register, legacy interrupt/MSI interrupt and read/write/copy
+>> buffers between host and device. The corresponding pci-epf-test
+>> function driver should be used on the EP side.
+> 
+> Just curious:  what would you think of a text based (e.g. debugfs)
+> interface to avoid the need for a userspace tool here?
 
-On 24/01/2017 23:39, Matthias Brugger wrote:
+I felt having a userspace tool gives the flexibility to add more tests
+(iterations, sizes etc..) while the driver can just focus on performing simple
+tests. Say we'd like to perform infinite read/write tests, it's better if the
+userspace tool invokes read/write tests repeatedly instead of that being
+implemented in the driver.
 > 
+>> +static const struct pci_device_id pci_endpoint_test_tbl[] = {
+>> +	{ PCI_DEVICE(PCI_VENDOR_ID_TI, PCI_ANY_ID) },
+>> +	{ }
+>> +};
+>> +MODULE_DEVICE_TABLE(pci, pci_endpoint_test_tbl);
 > 
-> On 01/23/2017 12:29 PM, John Crispin wrote:
->> Add SPI nodes to the mt7623.dtsi file.
->>
->> Signed-off-by: John Crispin <john@phrozen.org>
->> ---
->>  arch/arm/boot/dts/mt7623.dtsi |   12 ++++++++++++
->>  1 file changed, 12 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/mt7623.dtsi
->> b/arch/arm/boot/dts/mt7623.dtsi
->> index 8ac4569..c8f38e1 100644
->> --- a/arch/arm/boot/dts/mt7623.dtsi
->> +++ b/arch/arm/boot/dts/mt7623.dtsi
->> @@ -15,6 +15,7 @@
->>  #include <dt-bindings/interrupt-controller/irq.h>
->>  #include <dt-bindings/interrupt-controller/arm-gic.h>
->>  #include <dt-bindings/clock/mt2701-clk.h>
->> +#include <dt-bindings/phy/phy.h>
-> 
-> Why do you need this include here?
-> 
-> Regards,
-> Matthias
-> 
+> Also this looks really odd, and dangerous.  Probing for any
+> TI device will bind to all kinds of legit devices.  It would
+> be good if you could squeeze out a single id for this device
 
-should be part of the ubs patch. V2 coming up in a tad
+There is actually an id for the device, but I think we'll need an id for every
+function right?
 
-	John
+Having said that the id for the device is better than PCI_ANY_ID. Will fix it
+in my next revision.
 
->>  #include <dt-bindings/pinctrl/mt7623-pinfunc.h>
->>  #include <dt-bindings/power/mt2701-power.h>
->>  #include <dt-bindings/reset/mt2701-resets.h>
->> @@ -281,6 +282,17 @@
->>          status = "disabled";
->>      };
->>
->> +    spi: spi at 1100a000 {
->> +        compatible = "mediatek,mt7623-spi",
->> +                 "mediatek,mt6589-spi";
->> +        reg = <0 0x1100a000 0 0x1000>;
->> +        interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_LOW>;
->> +        clocks = <&pericfg CLK_PERI_SPI0>;
->> +        clock-names = "main";
->> +
->> +        status = "disabled";
->> +    };
->> +
->>      hifsys: syscon at 1a000000 {
->>          compatible = "mediatek,mt7623-hifsys",
->>                   "mediatek,mt2701-hifsys",
->>
-> 
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+Thanks
+Kishon
