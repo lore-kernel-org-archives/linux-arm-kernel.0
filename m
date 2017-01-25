@@ -1,49 +1,46 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Jan 2017 23:24:33 +0100
-Subject: [PATCH] ARM: decompressor: add strlen prototype
-Message-ID: <20170125222442.1244908-1-arnd@arndb.de>
+Date: Wed, 25 Jan 2017 23:31:34 +0100
+Subject: [PATCH] pwm: fix undefined behavior in stm32_pwm_apply
+Message-ID: <20170125223155.1388582-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The decompress.c file contains a declaration for strstr() so we can
-include some compression library code.
+The stm32_pwm_apply randomly sets the polarity or doesn't,
+as pointed out by this gcc warning:
 
-With the updated LZ4 implementation, we run into the same problem again
-for strlen():
+drivers/pwm/pwm-stm32.c: In function 'stm32_pwm_apply':
+drivers/pwm/pwm-stm32.c:204:33: error: 'curstate.polarity' may be used uninitialized in this function [-Werror=maybe-uninitialized]
 
-In file included from ../include/linux/rcupdate.h:40:0,
-                 from ../include/linux/srcu.h:33,
-                 from ../include/linux/notifier.h:15,
-                 from ../include/linux/memory_hotplug.h:6,
-                 from ../include/linux/mmzone.h:749,
-                 from ../include/linux/gfp.h:5,
-                 from ../include/linux/kmod.h:22,
-                 from ../include/linux/module.h:13,
-                 from ../arch/arm/boot/compressed/../../../../lib/lz4/lz4_decompress.c:39,
-                 from ../arch/arm/boot/compressed/../../../../lib/decompress_unlz4.c:13,
-                 from ../arch/arm/boot/compressed/decompress.c:55:
-include/linux/cpumask.h: In function 'cpumask_parse':
-include/linux/cpumask.h:592:53: error: implicit declaration of function 'strlen';did you mean 'strstr'? [-Werror=implicit-function-declaration]
+I assume it was meant to compare the new state to the current
+state rather than an uninitialized stack variable, so let's
+do that instead.
 
-This adds another declaration to work around the new problem.
-
-Fixes: ce83d9ab80d6 ("lib: update LZ4 compressor module")
+Fixes: bafffb6e7bd1 ("pwm: Add driver for STM32 plaftorm")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/boot/compressed/decompress.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/pwm/pwm-stm32.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/compressed/decompress.c b/arch/arm/boot/compressed/decompress.c
-index a0765e7ed6c7..ea7832702a8f 100644
---- a/arch/arm/boot/compressed/decompress.c
-+++ b/arch/arm/boot/compressed/decompress.c
-@@ -32,6 +32,7 @@ extern void error(char *);
+diff --git a/drivers/pwm/pwm-stm32.c b/drivers/pwm/pwm-stm32.c
+index ce6232ebefe1..6139512aab7b 100644
+--- a/drivers/pwm/pwm-stm32.c
++++ b/drivers/pwm/pwm-stm32.c
+@@ -189,7 +189,6 @@ static void stm32_pwm_disable(struct stm32_pwm *priv, int ch)
+ static int stm32_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+ 			   struct pwm_state *state)
+ {
+-	struct pwm_state curstate;
+ 	bool enabled;
+ 	struct stm32_pwm *priv = to_stm32_pwm_dev(chip);
+ 	int ret;
+@@ -201,7 +200,7 @@ static int stm32_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
+ 		return 0;
+ 	}
  
- /* Not needed, but used in some headers pulled in by decompressors */
- extern char * strstr(const char * s1, const char *s2);
-+extern size_t strlen(const char *s);
+-	if (state->polarity != curstate.polarity)
++	if (state->polarity != pwm->state.polarity)
+ 		stm32_pwm_set_polarity(priv, pwm->hwpwm, state->polarity);
  
- #ifdef CONFIG_KERNEL_GZIP
- #include "../../../../lib/decompress_inflate.c"
+ 	ret = stm32_pwm_config(priv, pwm->hwpwm,
 -- 
 2.9.0
