@@ -1,7 +1,7 @@
 From: xuwei5@hisilicon.com (Wei Xu)
-Date: Wed, 25 Jan 2017 16:51:00 +0000
-Subject: [GIT PULL] arm64: dts: hisilicon dts updates for v4.11
-Message-ID: <5888D774.7010007@hisilicon.com>
+Date: Wed, 25 Jan 2017 16:54:30 +0000
+Subject: [GIT PULL] arm64: defconfig: hisilicon config updates for v4.11
+Message-ID: <5888D846.5040504@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,37 +14,30 @@ Best Regards,
 Wei
 
 ---
-
 The following changes since commit a121103c922847ba5010819a3f250f1f7fc84ab8:
 
   Linux 4.10-rc3 (2017-01-08 14:18:17 -0800)
 
 are available in the git repository at:
 
-  git://github.com/hisilicon/linux-hisi.git tags/hisi-arm64-dt-for-4.11
+  git://github.com/hisilicon/linux-hisi.git tags/hisi-defconfig-for-4.11
 
-for you to fetch changes up to 35ca8168133c9c035e32eff10cce94b8e8c279b3:
+for you to fetch changes up to 0f84832fb8f92b06f5e9b33d56836acb340dac53:
 
-  arm64: dts: Add dts files for Hisilicon Hi3660 SoC (2017-01-25 16:08:29 +0000)
-
-----------------------------------------------------------------
-ARM64: DT: Hisilicon SoC DT updates for 4.11
-
-- Add binding for Hi3660 SoC and HiKey960 Board
-- Add binding for ARM Cortex-A73
-- Add dts files for HiKey960 development board
+  arm64: defconfig: Enable NUMA and NUMA_BALANCING (2017-01-20 16:14:26 +0000)
 
 ----------------------------------------------------------------
-Chen Feng (3):
-      document: dt: add binding for Hi3660 SoC
-      dt-bindings: Add a support cpu type for cortex-a73
-      arm64: dts: Add dts files for Hisilicon Hi3660 SoC
+ARM64: hisilicon: defconfig updates for 4.11
 
- Documentation/devicetree/bindings/arm/cpus.txt     |   1 +
- .../bindings/arm/hisilicon/hisilicon.txt           |   4 +
- arch/arm64/boot/dts/hisilicon/Makefile             |   1 +
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts  |  33 +++++
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi          | 160 +++++++++++++++++++++
- 5 files changed, 199 insertions(+)
- create mode 100644 arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
- create mode 100644 arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+- Enable ARM_SMMU_V3 in the arm64 defconfig
+- Enable NUMA and NUMA_BALANCING in the arm64 defconfig
+
+----------------------------------------------------------------
+Kefeng Wang (1):
+      arm64: defconfig: Enable NUMA and NUMA_BALANCING
+
+Zhou Wang (1):
+      arm64: defconfig: enable SMMUv3 config
+
+ arch/arm64/configs/defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
