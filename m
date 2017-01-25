@@ -1,50 +1,38 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 25 Jan 2017 09:26:02 +0100
-Subject: [PATCH v3 1/13] mmc: sunxi: Fix clock frequency change sequence
-In-Reply-To: <CAPDyKFp735=MMm02PKEt2iZmN0Afyp52_g-8hKxpW71hw2RyiQ@mail.gmail.com>
-References: <cover.a06ce1672d7a72ee7f9bbca46fdd223edd6b2313.1484585798.git-series.maxime.ripard@free-electrons.com>
- <6f6b511bce9df86ee43486653ac55df0d135f198.1484585798.git-series.maxime.ripard@free-electrons.com>
- <CAPDyKFp735=MMm02PKEt2iZmN0Afyp52_g-8hKxpW71hw2RyiQ@mail.gmail.com>
-Message-ID: <20170125082602.llunpuqwsimtzkds@lukather>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 25 Jan 2017 10:30:30 +0200
+Subject: [PATCH] clk: samsung: mark s3c...._clk_sleep_init() as __init
+In-Reply-To: <1485293599-23581-1-git-send-email-martin@kaiser.cx>
+References: <1485293599-23581-1-git-send-email-martin@kaiser.cx>
+Message-ID: <CAJKOXPfwj3v2cVU_WieqFFcMBkawuRUr-v4mDNG-FMg0A8=OgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+On Tue, Jan 24, 2017 at 11:33 PM, Martin Kaiser <martin@kaiser.cx> wrote:
+> These functions are called only by other __init functions.
+> Compiling for s3c2410 with CONFIG_DEBUG_SECTION_MISMATCH=y,
+> I get warnings like
+>
+> WARNING: vmlinux.o(.text+0x198350):
+> Section mismatch in reference from the function s3c2410_clk_sleep_init()
+> to the (unknown reference) .init.data:(unknown)
+>
 
-On Tue, Jan 24, 2017 at 09:12:07AM +0100, Ulf Hansson wrote:
-> On 16 January 2017 at 17:56, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > The MMC and SD specifications documents that the clock frequency should
-> > only be changed once gated.
-> 
-> Where?
-> 
-> >
-> > The current code first modifies the parent clock, gates it and then
-> > modifies the internal divider. This means that since the parent clock rate
-> > might be changed, the bus clock might be changed as well before it is
-> > gated, which breaks the specification.
-> >
-> > Move the gating before the parent rate modification.
-> 
-> This all makes perfect sense to me, however I am not sure you need to
-> refer to the spec to justify these changes.
+The code looks okay but the description is not accurate. First, indeed
+the functions are referenced only from other __init. However the real
+problem is - pointed by section mismatch - that non-init functions are
+referencing __initdata. Exactly this is mentioned in the error above.
+Please, refactor the commit message to reflect the real problem.
 
-I can't find it anymore :/
+Best regards,
+Krzysztof
 
-I'll resend that patch reworking the commit log.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/6f675543/attachment.sig>
+> Marking the s3c...._clk_sleep() functions as __init fixes this.
+>
+> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
+> ---
+>  drivers/clk/samsung/clk-s3c2410.c | 4 ++--
+>  drivers/clk/samsung/clk-s3c2412.c | 4 ++--
+>  drivers/clk/samsung/clk-s3c2443.c | 4 ++--
+>  drivers/clk/samsung/clk-s3c64xx.c | 4 ++--
+>  4 files changed, 8 insertions(+), 8 deletions(-)
+>
