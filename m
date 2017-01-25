@@ -1,88 +1,202 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Wed, 25 Jan 2017 10:02:13 +0100
-Subject: [PATCH v2] ARM: shmobile: rcar-gen2: Add more register documentation
-Message-ID: <1485334933-26809-1-git-send-email-geert+renesas@glider.be>
+Date: Wed, 25 Jan 2017 10:15:03 +0100
+Subject: [PATCH v2 4/4] clk: renesas: cpg-mssr: Add support for reset control
+In-Reply-To: <1485335703-27184-1-git-send-email-geert+renesas@glider.be>
+References: <1485335703-27184-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1485335703-27184-5-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add optional support for the Reset Control feature of the Renesas Clock
+Pulse Generator / Module Standby and Software Reset module on R-Car
+Gen2, R-Car Gen3, and RZ/G1 SoCs.
+
+This allows to reset SoC devices using the Reset Controller API.
+
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Philipp Zabel <p.zabel@pengutronix.de>
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+Reviewed-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
 ---
 v2:
-  - Remove unneeded parentheses in phys_to_sbar().
+  - Add Acked-by, Reviewed-by,
+  - Use variable bitmask in all reset operations, to make them more
+    similar.
 ---
- arch/arm/mach-shmobile/pm-rcar-gen2.c | 40 +++++++++++++++++++++++++----------
- 1 file changed, 29 insertions(+), 11 deletions(-)
+ drivers/clk/renesas/renesas-cpg-mssr.c | 126 +++++++++++++++++++++++++++++++++
+ 1 file changed, 126 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/pm-rcar-gen2.c b/arch/arm/mach-shmobile/pm-rcar-gen2.c
-index dd9ac366868f4336..0178da7ace82dcbd 100644
---- a/arch/arm/mach-shmobile/pm-rcar-gen2.c
-+++ b/arch/arm/mach-shmobile/pm-rcar-gen2.c
-@@ -20,14 +20,30 @@
+diff --git a/drivers/clk/renesas/renesas-cpg-mssr.c b/drivers/clk/renesas/renesas-cpg-mssr.c
+index f1161a585c57e433..eadcbd43ff88319b 100644
+--- a/drivers/clk/renesas/renesas-cpg-mssr.c
++++ b/drivers/clk/renesas/renesas-cpg-mssr.c
+@@ -16,6 +16,7 @@
+ #include <linux/clk.h>
+ #include <linux/clk-provider.h>
+ #include <linux/clk/renesas.h>
++#include <linux/delay.h>
+ #include <linux/device.h>
+ #include <linux/init.h>
+ #include <linux/mod_devicetable.h>
+@@ -25,6 +26,7 @@
+ #include <linux/platform_device.h>
+ #include <linux/pm_clock.h>
+ #include <linux/pm_domain.h>
++#include <linux/reset-controller.h>
+ #include <linux/slab.h>
  
- /* RST */
- #define RST		0xe6160000
--#define CA15BAR		0x0020
--#define CA7BAR		0x0030
--#define CA15RESCNT	0x0040
--#define CA7RESCNT	0x0044
-+
-+#define CA15BAR		0x0020		/* CA15 Boot Address Register */
-+#define CA7BAR		0x0030		/* CA7 Boot Address Register */
-+#define CA15RESCNT	0x0040		/* CA15 Reset Control Register */
-+#define CA7RESCNT	0x0044		/* CA7 Reset Control Register */
-+
-+/* SYS Boot Address Register */
-+#define SBAR_BAREN	BIT(4)		/* SBAR is valid */
-+
-+/* Reset Control Registers */
-+#define CA15RESCNT_CODE	0xa5a50000
-+#define CA15RESCNT_CPUS	0xf		/* CPU0-3 */
-+#define CA7RESCNT_CODE	0x5a5a0000
-+#define CA7RESCNT_CPUS	0xf		/* CPU0-3 */
-+
+ #include <dt-bindings/clock/renesas-cpg-mssr.h>
+@@ -96,6 +98,7 @@
+ /**
+  * Clock Pulse Generator / Module Standby and Software Reset Private Data
+  *
++ * @rcdev: Optional reset controller entity
+  * @dev: CPG/MSSR device
+  * @base: CPG/MSSR register block base address
+  * @rmw_lock: protects RMW register accesses
+@@ -105,6 +108,9 @@
+  * @last_dt_core_clk: ID of the last Core Clock exported to DT
+  */
+ struct cpg_mssr_priv {
++#ifdef CONFIG_RESET_CONTROLLER
++	struct reset_controller_dev rcdev;
++#endif
+ 	struct device *dev;
+ 	void __iomem *base;
+ 	spinlock_t rmw_lock;
+@@ -494,6 +500,122 @@ static int __init cpg_mssr_add_clk_domain(struct device *dev,
+ 	return 0;
+ }
  
- /* On-chip RAM */
- #define ICRAM1		0xe63c0000	/* Inter Connect RAM1 (4 KiB) */
- 
-+static inline u32 phys_to_sbar(phys_addr_t addr)
++#ifdef CONFIG_RESET_CONTROLLER
++
++#define rcdev_to_priv(x)	container_of(x, struct cpg_mssr_priv, rcdev)
++
++static int cpg_mssr_reset(struct reset_controller_dev *rcdev,
++			  unsigned long id)
 +{
-+	return (addr >> 8) & 0xfffffc00;
++	struct cpg_mssr_priv *priv = rcdev_to_priv(rcdev);
++	unsigned int reg = id / 32;
++	unsigned int bit = id % 32;
++	u32 bitmask = BIT(bit);
++	unsigned long flags;
++	u32 value;
++
++	dev_dbg(priv->dev, "reset %u%02u\n", reg, bit);
++
++	/* Reset module */
++	spin_lock_irqsave(&priv->rmw_lock, flags);
++	value = readl(priv->base + SRCR(reg));
++	value |= bitmask;
++	writel(value, priv->base + SRCR(reg));
++	spin_unlock_irqrestore(&priv->rmw_lock, flags);
++
++	/* Wait for at least one cycle of the RCLK clock (@ ca. 32 kHz) */
++	udelay(35);
++
++	/* Release module from reset state */
++	writel(bitmask, priv->base + SRSTCLR(reg));
++
++	return 0;
 +}
 +
- /* SYSC */
- #define SYSCIER 0x0c
- #define SYSCIMR 0x10
-@@ -82,22 +98,24 @@ void __init rcar_gen2_pm_init(void)
++static int cpg_mssr_assert(struct reset_controller_dev *rcdev, unsigned long id)
++{
++	struct cpg_mssr_priv *priv = rcdev_to_priv(rcdev);
++	unsigned int reg = id / 32;
++	unsigned int bit = id % 32;
++	u32 bitmask = BIT(bit);
++	unsigned long flags;
++	u32 value;
++
++	dev_dbg(priv->dev, "assert %u%02u\n", reg, bit);
++
++	spin_lock_irqsave(&priv->rmw_lock, flags);
++	value = readl(priv->base + SRCR(reg));
++	value |= bitmask;
++	writel(value, priv->base + SRCR(reg));
++	spin_unlock_irqrestore(&priv->rmw_lock, flags);
++	return 0;
++}
++
++static int cpg_mssr_deassert(struct reset_controller_dev *rcdev,
++			     unsigned long id)
++{
++	struct cpg_mssr_priv *priv = rcdev_to_priv(rcdev);
++	unsigned int reg = id / 32;
++	unsigned int bit = id % 32;
++	u32 bitmask = BIT(bit);
++
++	dev_dbg(priv->dev, "deassert %u%02u\n", reg, bit);
++
++	writel(bitmask, priv->base + SRSTCLR(reg));
++	return 0;
++}
++
++static int cpg_mssr_status(struct reset_controller_dev *rcdev,
++			   unsigned long id)
++{
++	struct cpg_mssr_priv *priv = rcdev_to_priv(rcdev);
++	unsigned int reg = id / 32;
++	unsigned int bit = id % 32;
++	u32 bitmask = BIT(bit);
++
++	return !!(readl(priv->base + SRCR(reg)) & bitmask);
++}
++
++static const struct reset_control_ops cpg_mssr_reset_ops = {
++	.reset = cpg_mssr_reset,
++	.assert = cpg_mssr_assert,
++	.deassert = cpg_mssr_deassert,
++	.status = cpg_mssr_status,
++};
++
++static int cpg_mssr_reset_xlate(struct reset_controller_dev *rcdev,
++				const struct of_phandle_args *reset_spec)
++{
++	struct cpg_mssr_priv *priv = rcdev_to_priv(rcdev);
++	unsigned int unpacked = reset_spec->args[0];
++	unsigned int idx = MOD_CLK_PACK(unpacked);
++
++	if (unpacked % 100 > 31 || idx >= rcdev->nr_resets) {
++		dev_err(priv->dev, "Invalid reset index %u\n", unpacked);
++		return -EINVAL;
++	}
++
++	return idx;
++}
++
++static int cpg_mssr_reset_controller_register(struct cpg_mssr_priv *priv)
++{
++	priv->rcdev.ops = &cpg_mssr_reset_ops;
++	priv->rcdev.of_node = priv->dev->of_node;
++	priv->rcdev.of_reset_n_cells = 1;
++	priv->rcdev.of_xlate = cpg_mssr_reset_xlate;
++	priv->rcdev.nr_resets = priv->num_mod_clks;
++	return devm_reset_controller_register(priv->dev, &priv->rcdev);
++}
++
++#else /* !CONFIG_RESET_CONTROLLER */
++static inline int cpg_mssr_reset_controller_register(struct cpg_mssr_priv *priv)
++{
++	return 0;
++}
++#endif /* !CONFIG_RESET_CONTROLLER */
++
++
+ static const struct of_device_id cpg_mssr_match[] = {
+ #ifdef CONFIG_ARCH_R8A7743
+ 	{
+@@ -591,6 +713,10 @@ static int __init cpg_mssr_probe(struct platform_device *pdev)
+ 	if (error)
+ 		return error;
  
- 	/* setup reset vectors */
- 	p = ioremap_nocache(RST, 0x63);
--	bar = (boot_vector_addr >> 8) & 0xfffffc00;
-+	bar = phys_to_sbar(boot_vector_addr);
- 	if (has_a15) {
- 		writel_relaxed(bar, p + CA15BAR);
--		writel_relaxed(bar | 0x10, p + CA15BAR);
-+		writel_relaxed(bar | SBAR_BAREN, p + CA15BAR);
- 
- 		/* de-assert reset for CA15 CPUs */
--		writel_relaxed((readl_relaxed(p + CA15RESCNT) & ~0x0f) |
--				0xa5a50000, p + CA15RESCNT);
-+		writel_relaxed((readl_relaxed(p + CA15RESCNT) &
-+				~CA15RESCNT_CPUS) | CA15RESCNT_CODE,
-+			       p + CA15RESCNT);
- 	}
- 	if (has_a7) {
- 		writel_relaxed(bar, p + CA7BAR);
--		writel_relaxed(bar | 0x10, p + CA7BAR);
-+		writel_relaxed(bar | SBAR_BAREN, p + CA7BAR);
- 
- 		/* de-assert reset for CA7 CPUs */
--		writel_relaxed((readl_relaxed(p + CA7RESCNT) & ~0x0f) |
--				0x5a5a0000, p + CA7RESCNT);
-+		writel_relaxed((readl_relaxed(p + CA7RESCNT) &
-+				~CA7RESCNT_CPUS) | CA7RESCNT_CODE,
-+			       p + CA7RESCNT);
- 	}
- 	iounmap(p);
++	error = cpg_mssr_reset_controller_register(priv);
++	if (error)
++		return error;
++
+ 	return 0;
+ }
  
 -- 
 1.9.1
