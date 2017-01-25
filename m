@@ -1,35 +1,88 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Jan 2017 12:03:37 +0100
-Subject: [PATCH v14 3/5] tee: add OP-TEE driver
-In-Reply-To: <20170125100252.GA8889@kroah.com>
-References: <1484744296-30003-1-git-send-email-jens.wiklander@linaro.org>
- <8183743.bSJXZpMh95@wuerfel> <20170123090852.GB1910@jax>
- <5564439.UZohRc66aK@wuerfel>
- <20170124125330.GA30998@jax> <20170125094744.GA7121@jax>
- <20170125100252.GA8889@kroah.com>
-Message-ID: <CAK8P3a1OJV4tvE1zxCvpCmXTz8QuxbxivWjkfpPbMQpVikD=Kw@mail.gmail.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Wed, 25 Jan 2017 11:03:57 +0000
+Subject: [STLinux Kernel] [PATCH 2/8] serial: st-asc: Provide RTS
+ functionality
+In-Reply-To: <20170124134310.27512-3-lee.jones@linaro.org>
+References: <20170124134310.27512-1-lee.jones@linaro.org>
+ <20170124134310.27512-3-lee.jones@linaro.org>
+Message-ID: <20170125110357.GD5680@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2017 at 11:02 AM, Greg Kroah-Hartman
-<gregkh@linuxfoundation.org> wrote:
-> On Wed, Jan 25, 2017 at 10:47:45AM +0100, Jens Wiklander wrote:
->> On Tue, Jan 24, 2017 at 01:53:30PM +0100, Jens Wiklander wrote:
->> >
->> > /sys/class/tee/ sounds good, I'll use that. It's more or less what we
->> > also have today.
->>
->> I'm sorry, it seems a struct device has to be used in order to put stuff
->> under /sys/class/tee/. Or am I missing something?
->
-> Nope, that is correct.
+On Tue, 24 Jan 2017, Lee Jones wrote:
 
-But that's a different device: this device represents the "class" of
-device for the
-user space interface, nothing wrong with that. However, we don't need both
-the class device and a platform device that is made up by the optee driver
-for a firmware feature to represent the same entity that we have the
-class device
-for.
+> Until this point, it has not been possible for userland serial
+> applications (e.g. stty) to toggle the UART RTS line.  This can
+> be useful with certain configurations. For example, when using
+> a Mezzanine on a Linaro 96board, RTS line is used to take the
+> on-board microcontroller in and out of reset.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-     Arnd
+Acked-by: Peter Griffin <peter.griffin@linaro.org>
+
+> ---
+>  drivers/tty/serial/st-asc.c | 27 +++++++++++++++++++++++----
+>  1 file changed, 23 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
+> index 69e6232..397df50 100644
+> --- a/drivers/tty/serial/st-asc.c
+> +++ b/drivers/tty/serial/st-asc.c
+> @@ -30,6 +30,7 @@
+>  #include <linux/of_platform.h>
+>  #include <linux/serial_core.h>
+>  #include <linux/clk.h>
+> +#include <linux/gpio/consumer.h>
+>  
+>  #define DRIVER_NAME "st-asc"
+>  #define ASC_SERIAL_NAME "ttyAS"
+> @@ -38,6 +39,7 @@
+>  
+>  struct asc_port {
+>  	struct uart_port port;
+> +	struct gpio_desc *rts;
+>  	struct clk *clk;
+>  	unsigned int hw_flow_control:1;
+>  	unsigned int force_m1:1;
+> @@ -391,12 +393,27 @@ static unsigned int asc_tx_empty(struct uart_port *port)
+>  
+>  static void asc_set_mctrl(struct uart_port *port, unsigned int mctrl)
+>  {
+> +	struct asc_port *ascport = to_asc_port(port);
+> +
+>  	/*
+> -	 * This routine is used for seting signals of: DTR, DCD, CTS/RTS
+> -	 * We use ASC's hardware for CTS/RTS, so don't need any for that.
+> -	 * Some boards have DTR and DCD implemented using PIO pins,
+> -	 * code to do this should be hooked in here.
+> +	 * This routine is used for seting signals of: DTR, DCD, CTS and RTS.
+> +	 * We use ASC's hardware for CTS/RTS when hardware flow-control is
+> +	 * enabled, however if the RTS line is required for another purpose,
+> +	 * commonly controlled using HUP from userspace, then we need to toggle
+> +	 * it manually, using GPIO.
+> +	 *
+> +	 * Some boards also have DTR and DCD implemented using PIO pins, code to
+> +	 * do this should be hooked in here.
+>  	 */
+> +
+> +	if (!ascport->rts)
+> +		return;
+> +
+> +	/* If HW flow-control is enabled, we can't fiddle with the RTS line */
+> +	if (asc_in(port, ASC_CTL) & ASC_CTL_CTSENABLE)
+> +		return;
+> +
+> +	gpiod_set_value(ascport->rts, mctrl & TIOCM_RTS);
+>  }
+>  
+>  static unsigned int asc_get_mctrl(struct uart_port *port)
+> @@ -726,6 +743,8 @@ static struct asc_port *asc_of_get_asc_port(struct platform_device *pdev)
+>  							"st,hw-flow-control");
+>  	asc_ports[id].force_m1 =  of_property_read_bool(np, "st,force_m1");
+>  	asc_ports[id].port.line = id;
+> +	asc_ports[id].rts = NULL;
+> +
+>  	return &asc_ports[id];
+>  }
+>  
