@@ -1,97 +1,172 @@
-From: frowand.list@gmail.com (Frank Rowand)
-Date: Wed, 25 Jan 2017 13:13:23 -0800
-Subject: [PATCH v2] ARM: dts: imx: Pass 'chosen' and 'memory' nodes
-In-Reply-To: <20170119161441.jcctgig7np4v7sam@pengutronix.de>
-References: <1484834566-19845-1-git-send-email-fabio.estevam@nxp.com>
- <20170119141335.kpbrbpbwaovnijjv@pengutronix.de>
- <CAOMZO5AdgM9eFnerLRdYxwE7gsOE5OvkWs6rCR4zta1XmXHj1A@mail.gmail.com>
- <20170119144641.jxj2bqg5uqjol23x@pengutronix.de>
- <20170119145642.GC27312@n2100.armlinux.org.uk>
- <20170119161441.jcctgig7np4v7sam@pengutronix.de>
-Message-ID: <588914F3.7050909@gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Wed, 25 Jan 2017 22:13:43 +0100
+Subject: [PATCH v3 2/4] dt-bindings: Add TI SCI PM Domains
+In-Reply-To: <23936395-d653-56c8-13f9-6dfeb6e9257b@ti.com>
+References: <20170104205536.15963-1-d-gerlach@ti.com>
+ <20170104205536.15963-3-d-gerlach@ti.com>
+ <20170109175012.sg7eze7llqq7qevd@rob-hp-laptop>
+ <7bd282d9-df6f-f4c6-1f7f-c8ed81c78af3@ti.com>
+ <CAL_JsqKxU4c=KSn0=xX9kmbk498fhqpiXMeGjcoe8Ah48FAzUg@mail.gmail.com>
+ <3bb89649-fd2a-acc6-6968-e54a00842ce2@ti.com>
+ <CAL_JsqL+L1oHAOv7tLevzbtRFSKRs9J01SgF=HR_vNNqNV+4+Q@mail.gmail.com>
+ <84d7d49b-933b-8b26-f18a-3a5054738cb1@ti.com>
+ <CAL_JsqJ9RitNC7ihC8ckJgV+49kaHk=W9tgdNBSjEfydhQS46A@mail.gmail.com>
+ <0eaa9914-83f1-7716-cf04-1e3dd44df647@ti.com>
+ <4cb25cf9-216f-2e18-f45d-ef7e48fa6c5e@ti.com>
+ <m2ziip2puf.fsf@baylibre.com>
+ <CAL_Jsq+Vp8iYrAUmuSRzeeY_G6CUqFqG6XB6erDxo1RYo3g4=g@mail.gmail.com>
+ <CAPDyKFqzs59N5bc89X-96Fgy9b=_+s8zYmHHshQeDrJCnaqprA@mail.gmail.com>
+ <58821CA2.4050701@ti.com>
+ <CAPDyKFpTyn2isNahywmOOSWiZKov9xsudyWi_i-FejXjC+1AZw@mail.gmail.com>
+ <ec2f1697-4c60-fd88-6593-2a69ca7f5c83@ti.com>
+ <CAPDyKFq3zjyubxf3wc1V+F2W3rbnjj4ObFnHFvda+wCs4rBtnw@mail.gmail.com>
+ <23936395-d653-56c8-13f9-6dfeb6e9257b@ti.com>
+Message-ID: <CAPDyKFp6heJ0c=iKT1VYm4uGf04RehJ=vVyNHQu5aC-vNLHvVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/19/17 08:14, Uwe Kleine-K?nig wrote:
-> On Thu, Jan 19, 2017 at 02:56:42PM +0000, Russell King - ARM Linux wrote:
->> On Thu, Jan 19, 2017 at 03:46:41PM +0100, Uwe Kleine-K?nig wrote:
->>> On Thu, Jan 19, 2017 at 12:35:40PM -0200, Fabio Estevam wrote:
->>>> Hi Uwe,
->>>>
->>>> On Thu, Jan 19, 2017 at 12:13 PM, Uwe Kleine-K?nig
->>>> <u.kleine-koenig@pengutronix.de> wrote:
->>>>
->>>>> Would it be nice to add a comment about why this was added? Something to
->>>>> prevent a cleanup like "remove empty nodes and invalid memory
->>>>> configurations".
->>>>
->>>> Do you mean something like this?
->>>>
->>>> /* "chosen" and "memory" nodes are mandatory */
->>>> chosen {};
->>>> memory { device_type = "memory"; reg = <0 0>; };
+On 25 January 2017 at 17:59, Dave Gerlach <d-gerlach@ti.com> wrote:
+> On 01/24/2017 04:03 AM, Ulf Hansson wrote:
+>>
+>> On 23 January 2017 at 21:11, Dave Gerlach <d-gerlach@ti.com> wrote:
 >>>
->>> Not very helpful comment. Something like:
+>>> On 01/20/2017 10:52 AM, Ulf Hansson wrote:
+>>>>
+>>>>
+>>>> [...]
+>>>>
+>>>>>>> Another option is create something new either common or TI SCI
+>>>>>>> specific. It could be just a table of ids and phandles in the SCI
+>>>>>>> node. I'm much more comfortable with an isolated property in one node
+>>>>>>> than something scattered throughout the DT.
+>>>>>>
+>>>>>>
+>>>>>>
+>>>>>> To me, this seems like the best possible solution.
+>>>>>>
+>>>>>> However, perhaps we should also consider the SCPI Generic power domain
+>>>>>> (drivers/firmware/scpi_pm_domain.c), because I believe it's closely
+>>>>>> related.
+>>>>>> To change the power state of a device, this PM domain calls
+>>>>>> scpi_device_set|get_power_state() (drivers/firmware/arm_scpi.c), which
+>>>>>> also needs a device id as a parameter. Very similar to our case with
+>>>>>> the TI SCI domain.
+>>>>>>
+>>>>>> Currently these SCPI device ids lacks corresponding DT bindings, so
+>>>>>> the scpi_pm_domain tries to work around it by assigning ids
+>>>>>> dynamically at genpd creation time.
+>>>>>>
+>>>>>> That makes me wonder, whether we should think of something
+>>>>>> common/generic?
+>>>>>
+>>>>>
+>>>>>
+>>>>> When you say something common/generic, do you mean a better binding for
+>>>>> genpd,
+>>>>> or something bigger than that like a new driver? Because I do think a
+>>>>> phandle
+>>>>> cell left open for the genpd provider to interpret solves both the scpi
+>>>>> and
+>>>>> ti-sci problem we are facing here in the best way. Using generic PM
+>>>>> domains lets
+>>>>> us do exactly what we want apart from interpreting the phandle cell
+>>>>> with
+>>>>> our
+>>>>> driver, and I feel like anything else we try at this point is just
+>>>>> going
+>>>>> to be
+>>>>> to work around that. Is bringing back genpd xlate something we can
+>>>>> discuss?
+>>>>
+>>>>
+>>>>
+>>>> Bringing back xlate, how would that help? Wouldn't that just mean that
+>>>> you will get one genpd per device? That's not an option, I think we
+>>>> are all in agreement to that.
 >>>
->>> 	/*
->>> 	 * The decompressor relies on a pre-existing chosen node to be
->>> 	 * available to insert the command line and merge other ATAGS
->>> 	 * info.
->>> 	 */
 >>>
->>> Is it difficult to fix the decompressor?
+>>>
+>>> Sure, perhaps the custom xlate wouldn't be the right way to do it, as we
+>>> wouldn't be able to associate a device directly to a phandle, at least
+>>> with
+>>> how it was implemented before, but I think we can skip that entirely.
+>>> Does
+>>> opening up the interpretation of the cells of the 'power-domains' phandle
+>>> not solve all of these issues? Is that out of the question?
+>>>
+>>> genpd_xlate_simple currently just makes sure the args_count of the
+>>> 'power-domains' phandle was zero and bails if it was not. Why couldn't we
+>>> remove this check and let the driver interpret it while still using
+>>> of_genpd_add_provider_simple to register the provider? It's still a
+>>> 'simple'
+>>> provider from the perspective of the genpd framework and the actual pm
+>>> domain mapping will not change, but now the driver can parse the cells
+>>> and
+>>> do whatever it needs to, such as reading a device id.
+>>>
+>>> I think that's a bit more flexible and will avoid breaking anything that
+>>> is
+>>> there today.
 >>
->> ... and that comment would be wrong.  Yes, the decompressor relies on it,
->> as do some uboot versions.
-> 
-> Good that we talked about this, otherwise I would have removed that once
-> the decompressor is fixed. So the comment must be
-> 
-> 	/*
-> 	 * The decompressor and also some versions of U-Boot rely on a
-> 	 * pre-existing /chosen node to be available to insert the
-> 	 * command line and merge other ATAGS info.
-> 	 * Also for U-Boot there must be a pre-existing /memory node.
-> 	 */
->  
->>> I didn't understood the breakage regarding the memory node good enough
->>> to suggest a comment for that.
 >>
->> A missing memory node appears to prevent some uboot versions supplying
->> any kind of memory layout to the kernel, which then causes the kernel to
->> crash very early during boot.
->>
->> Again, this is not using appended DTB - this is using a separately loaded
->> DTB in uboot.  uboot fails to update the dtb if these nodes are missing.
->>
->> Frankly, I think the original change (removing the skeleton.dtsi include)
->> was misguided and needs to be reverted - the change is imho built upon an
->> incorrect assumption that nothing in skeleton.dtsi is required.  That's
->> clearly false.
-> 
-> I tend to agree as I assume it's not only U-Boot on i.MX but on all ARM
-> platforms.
-> 
-> Best regards
-> Uwe
-> 
+>> Would you mind providing an example? Perhaps also some code snippets
+>> dealing with the parsing?
+>
+>
+> So again the goal of this is to move the ti,sci-id value back to
+> power-domains phandle instead of having a separate property, so that would
+> be step one in the DT. Then in the power-domains node change
+> #power-domain-cells to one. And then from there, the only change to the
+> genpd framework is this:
+>
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index a5e1262b964b..b82e61f0bcfa 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -1603,8 +1603,6 @@ static struct generic_pm_domain genpd_xlate_simple
+>                                       struct of_phandle_args *genpdspec,
+>                                       void *data)
+>  {
+> -       if (genpdspec->args_count != 0)
+> -               return ERR_PTR(-EINVAL);
+>         return data;
+>  }
+>
+>
+> because genpd_xlate_simple only checks that the phandle is zero so that it
+> can fail if it is not, but there's no functional reason it needs to do this.
+> The genpd framework works as it did before no matter what the cells are set
+> to if using of_genpd_add_provider_simple. Then in the attach_dev callback
+> inside the ti_sci_pm_domains driver instead of doing
+>
+>         ret = of_property_read_u32(np, "ti,sci-id", &idx);
+>
+> to read the ti,sc-id for a device into idx we can now do:
+>
+>        ret = of_parse_phandle_with_args(np, "power-domains",
+>                                    "#power-domain-cells", 0, &pd_args);
+>        idx = pd_args.args[0];
+>
+> or even simpler from within our driver
+>
+>         ret = of_property_read_u32_index(np, "power-domains", 1, &idx);
+>
+> To read the value into idx.
+>
+> This requires minimal changes to the genpd framework and gives the option
+> for the driver to interpret the cell manually when using a simple provider.
+> The genpd framework still uses the phandle just to get the power-domain
+> device and the cells are left entirely up to the driver to interpret, but if
+> desired you could still use the genpd onecell driver for a specific use of
+> the phandle cell, or use it with zero cells.
+>
+> I can send out an updated series if there are no major objections, or just
+> to start discussion there.
 
-Adding back the chosen nodes is a bandaid that papers over the actual bug
-in the decompressor.
+Ok, this seems to work! I am ready to review! :-)
 
-A comment about Fabio's attempt to fix the decompressor noted a possible
-issue with the method taken to fix the problem, but then the discussion
-of fixing the decompressor was dropped and v3 of the patch to add chosen
-into a bunch of .dtsi files was applied by Shawn.
+Of course, don't forget to update the existing DT doc for the power
+domain bindings.
 
-Can someone please help Fabio to create a correct patch to fix the
-decompressor?
-
-Note that the ePAPR v1.1 does require at least one memory node in
-section 3.1, so the portion of v3 of the patch that adds a memory
-node is valid in terms of following the standard, not just a U-boot
-requirement.
-
-Thanks,
-
-Frank
+Kind regards
+Uffe
