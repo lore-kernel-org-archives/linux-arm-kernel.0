@@ -1,31 +1,61 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 25 Jan 2017 22:03:32 +0100
-Subject: [PATCH v10 2/5] i2c: Add STM32F4 I2C driver
-In-Reply-To: <20170125202505.4acldm2wla3sqfsp@ninjato>
-References: <1484832316-5594-1-git-send-email-cedric.madianga@gmail.com>
- <1484832316-5594-3-git-send-email-cedric.madianga@gmail.com>
- <20170125202505.4acldm2wla3sqfsp@ninjato>
-Message-ID: <20170125210332.nnou2yavyztulual@pengutronix.de>
+From: lilja.magnus@gmail.com (Magnus Lilja)
+Date: Wed, 25 Jan 2017 22:07:59 +0100
+Subject: [PATCH] usb: gadget: udc: fsl: Add missing complete function.
+Message-ID: <1485378479-30345-1-git-send-email-lilja.magnus@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Wolfram,
+Commit 304f7e5e1d08 ("usb: gadget: Refactor request completion")
+removed check if req->req.complete is non-NULL, resulting in a NULL
+pointer derefence and a kernel panic.
+This patch adds an empty complete function instead of re-introducing
+the req->req.complete check.
 
-On Wed, Jan 25, 2017 at 09:25:05PM +0100, Wolfram Sang wrote:
-> On Thu, Jan 19, 2017 at 02:25:13PM +0100, M'boumba Cedric Madianga wrote:
-> > This patch adds support for the STM32F4 I2C controller.
-> > 
-> > Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-> 
-> Applied to for-next with Uwe's ack (which looked more like a review to
-> me, but well...), thanks to all involved for keeping at it!
+Fixes: 304f7e5e1d08 ("usb: gadget: Refactor request completion")
 
-I thought about calling it a review, but as I didn't look in detail over
-the last version, I degraded it to an ack on purpose.
+Signed-off-by: Magnus Lilja <lilja.magnus@gmail.com>
+Cc: <stable@vger.kernel.org> # 3.18+
+---
+This patch is the result of the discussion in
+https://marc.info/?t=148468819700001&r=1&w=2
+---
+ drivers/usb/gadget/udc/fsl_udc_core.c | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
-Best regards
-Uwe
-
+diff --git a/drivers/usb/gadget/udc/fsl_udc_core.c b/drivers/usb/gadget/udc/fsl_udc_core.c
+index 71094e4..55c7553 100644
+--- a/drivers/usb/gadget/udc/fsl_udc_core.c
++++ b/drivers/usb/gadget/udc/fsl_udc_core.c
+@@ -1248,6 +1248,12 @@ static const struct usb_gadget_ops fsl_gadget_ops = {
+ 	.udc_stop = fsl_udc_stop,
+ };
+ 
++/*
++ * Empty complete function used by this driver to fill in the req->complete
++ * field when creating a request since the complete field is mandatory.
++ */
++static void fsl_noop_complete(struct usb_ep *ep, struct usb_request *req) { }
++
+ /* Set protocol stall on ep0, protocol stall will automatically be cleared
+    on new transaction */
+ static void ep0stall(struct fsl_udc *udc)
+@@ -1282,7 +1288,7 @@ static int ep0_prime_status(struct fsl_udc *udc, int direction)
+ 	req->req.length = 0;
+ 	req->req.status = -EINPROGRESS;
+ 	req->req.actual = 0;
+-	req->req.complete = NULL;
++	req->req.complete = fsl_noop_complete;
+ 	req->dtd_count = 0;
+ 
+ 	ret = usb_gadget_map_request(&ep->udc->gadget, &req->req, ep_is_in(ep));
+@@ -1365,7 +1371,7 @@ static void ch9getstatus(struct fsl_udc *udc, u8 request_type, u16 value,
+ 	req->req.length = 2;
+ 	req->req.status = -EINPROGRESS;
+ 	req->req.actual = 0;
+-	req->req.complete = NULL;
++	req->req.complete = fsl_noop_complete;
+ 	req->dtd_count = 0;
+ 
+ 	ret = usb_gadget_map_request(&ep->udc->gadget, &req->req, ep_is_in(ep));
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.7.4
