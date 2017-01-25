@@ -1,337 +1,342 @@
-From: baoyou.xie@linaro.org (Baoyou Xie)
-Date: Wed, 25 Jan 2017 10:44:49 +0800
-Subject: [PATCH v6 3/3] watchdog: zx2967: add watchdog controller driver for
- ZTE's zx2967 family
-In-Reply-To: <1485312289-18354-1-git-send-email-baoyou.xie@linaro.org>
-References: <1485312289-18354-1-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <1485312289-18354-3-git-send-email-baoyou.xie@linaro.org>
+From: frowand.list@gmail.com (Frank Rowand)
+Date: Tue, 24 Jan 2017 19:10:05 -0800
+Subject: [PATCH v3] ARM: dts: imx: Pass 'chosen' and 'memory' nodes
+In-Reply-To: <1485190450-29153-1-git-send-email-festevam@gmail.com>
+References: <1485190450-29153-1-git-send-email-festevam@gmail.com>
+Message-ID: <5888170D.9080009@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds watchdog controller driver for ZTE's zx2967 family.
+Adding devicetree list.
 
-Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
----
- drivers/watchdog/Kconfig      |  10 ++
- drivers/watchdog/Makefile     |   1 +
- drivers/watchdog/zx2967_wdt.c | 276 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 287 insertions(+)
- create mode 100644 drivers/watchdog/zx2967_wdt.c
-
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index acb00b5..05093a2 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -714,6 +714,16 @@ config ASPEED_WATCHDOG
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called aspeed_wdt.
- 
-+config ZX2967_WATCHDOG
-+	tristate "ZTE zx2967 SoCs watchdog support"
-+	depends on ARCH_ZX
-+	select WATCHDOG_CORE
-+	help
-+	  Say Y here to include support for the watchdog timer
-+	  in ZTE zx2967 SoCs.
-+	  To compile this driver as a module, choose M here: the
-+	  module will be called zx2967_wdt.
-+
- # AVR32 Architecture
- 
- config AT32AP700X_WDT
-diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-index 0c3d35e..bf2d296 100644
---- a/drivers/watchdog/Makefile
-+++ b/drivers/watchdog/Makefile
-@@ -82,6 +82,7 @@ obj-$(CONFIG_BCM7038_WDT) += bcm7038_wdt.o
- obj-$(CONFIG_ATLAS7_WATCHDOG) += atlas7_wdt.o
- obj-$(CONFIG_RENESAS_WDT) += renesas_wdt.o
- obj-$(CONFIG_ASPEED_WATCHDOG) += aspeed_wdt.o
-+obj-$(CONFIG_ZX2967_WATCHDOG) += zx2967_wdt.o
- 
- # AVR32 Architecture
- obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
-diff --git a/drivers/watchdog/zx2967_wdt.c b/drivers/watchdog/zx2967_wdt.c
-new file mode 100644
-index 0000000..8278471
---- /dev/null
-+++ b/drivers/watchdog/zx2967_wdt.c
-@@ -0,0 +1,276 @@
-+/*
-+ * watchdog driver for ZTE's zx2967 family
-+ *
-+ * Copyright (C) 2017 ZTE Ltd.
-+ *
-+ * Author: Baoyou Xie <baoyou.xie@linaro.org>
-+ *
-+ * License terms: GNU General Public License (GPL) version 2
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+#include <linux/io.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/regmap.h>
-+#include <linux/reset.h>
-+#include <linux/watchdog.h>
-+
-+#define ZX2967_WDT_CFG_REG			0x4
-+#define ZX2967_WDT_LOAD_REG			0x8
-+#define ZX2967_WDT_REFRESH_REG			0x18
-+#define ZX2967_WDT_START_REG			0x1c
-+
-+#define ZX2967_WDT_REFRESH_MASK			0x3f
-+
-+#define ZX2967_WDT_CFG_DIV(n)			((((n) & 0xff) - 1) << 8)
-+#define ZX2967_WDT_START_EN			0x1
-+
-+#define ZX2967_WDT_WRITEKEY			0x12340000
-+
-+#define ZX2967_WDT_DIV_DEFAULT			16
-+#define ZX2967_WDT_DEFAULT_TIMEOUT		32
-+#define ZX2967_WDT_MIN_TIMEOUT			1
-+#define ZX2967_WDT_MAX_TIMEOUT			524
-+#define ZX2967_WDT_MAX_COUNT			0xffff
-+
-+#define ZX2967_WDT_CLK_FREQ			0x8000
-+
-+#define ZX2967_WDT_FLAG_REBOOT_MON		BIT(0)
-+
-+struct zx2967_wdt {
-+	struct watchdog_device	wdt_device;
-+	void __iomem		*reg_base;
-+	struct clk		*clock;
-+};
-+
-+static inline u32 zx2967_wdt_readl(struct zx2967_wdt *wdt, u16 reg)
-+{
-+	return readl_relaxed(wdt->reg_base + reg);
-+}
-+
-+static inline void zx2967_wdt_writel(struct zx2967_wdt *wdt, u16 reg, u32 val)
-+{
-+	writel_relaxed(val | ZX2967_WDT_WRITEKEY, wdt->reg_base + reg);
-+}
-+
-+static void zx2967_wdt_refresh(struct zx2967_wdt *wdt)
-+{
-+	u32 val;
-+
-+	val = zx2967_wdt_readl(wdt, ZX2967_WDT_REFRESH_REG);
-+	val ^= ZX2967_WDT_REFRESH_MASK;
-+	zx2967_wdt_writel(wdt, ZX2967_WDT_REFRESH_REG, val);
-+}
-+
-+static int
-+zx2967_wdt_set_timeout(struct watchdog_device *wdd, unsigned int timeout)
-+{
-+	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
-+	unsigned int divisor = ZX2967_WDT_DIV_DEFAULT;
-+	unsigned int count;
-+
-+	count = timeout * ZX2967_WDT_CLK_FREQ;
-+	if (count > divisor * ZX2967_WDT_MAX_COUNT)
-+		divisor = DIV_ROUND_UP(count, ZX2967_WDT_MAX_COUNT);
-+	count = DIV_ROUND_UP(count, divisor);
-+	zx2967_wdt_writel(wdt, ZX2967_WDT_CFG_REG, ZX2967_WDT_CFG_DIV(divisor));
-+	zx2967_wdt_writel(wdt, ZX2967_WDT_LOAD_REG, count);
-+	zx2967_wdt_refresh(wdt);
-+	wdd->timeout =  (count * divisor) / ZX2967_WDT_CLK_FREQ;
-+
-+	return 0;
-+}
-+
-+static void __zx2967_wdt_start(struct zx2967_wdt *wdt)
-+{
-+	u32 val;
-+
-+	val = zx2967_wdt_readl(wdt, ZX2967_WDT_START_REG);
-+	val |= ZX2967_WDT_START_EN;
-+	zx2967_wdt_writel(wdt, ZX2967_WDT_START_REG, val);
-+}
-+
-+static void __zx2967_wdt_stop(struct zx2967_wdt *wdt)
-+{
-+	u32 val;
-+
-+	val = zx2967_wdt_readl(wdt, ZX2967_WDT_START_REG);
-+	val &= ~ZX2967_WDT_START_EN;
-+	zx2967_wdt_writel(wdt, ZX2967_WDT_START_REG, val);
-+}
-+
-+static int zx2967_wdt_start(struct watchdog_device *wdd)
-+{
-+	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
-+
-+	zx2967_wdt_set_timeout(wdd, wdd->timeout);
-+	__zx2967_wdt_start(wdt);
-+
-+	return 0;
-+}
-+
-+static int zx2967_wdt_stop(struct watchdog_device *wdd)
-+{
-+	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
-+
-+	__zx2967_wdt_stop(wdt);
-+
-+	return 0;
-+}
-+
-+static int zx2967_wdt_keepalive(struct watchdog_device *wdd)
-+{
-+	struct zx2967_wdt *wdt = watchdog_get_drvdata(wdd);
-+
-+	zx2967_wdt_refresh(wdt);
-+
-+	return 0;
-+}
-+
-+#define ZX2967_WDT_OPTIONS \
-+	(WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE)
-+static const struct watchdog_info zx2967_wdt_ident = {
-+	.options          =     ZX2967_WDT_OPTIONS,
-+	.identity         =	"zx2967 watchdog",
-+};
-+
-+static struct watchdog_ops zx2967_wdt_ops = {
-+	.owner = THIS_MODULE,
-+	.start = zx2967_wdt_start,
-+	.stop = zx2967_wdt_stop,
-+	.ping = zx2967_wdt_keepalive,
-+	.set_timeout = zx2967_wdt_set_timeout,
-+};
-+
-+static void zx2967_wdt_reset_sysctrl(struct device *dev)
-+{
-+	int ret;
-+	void __iomem *regmap;
-+	unsigned int offset, mask, config;
-+	struct of_phandle_args out_args;
-+
-+	ret = of_parse_phandle_with_fixed_args(dev->of_node,
-+			"zte,wdt-reset-sysctrl", 3, 0, &out_args);
-+	if (ret)
-+		return;
-+
-+	offset = out_args.args[0];
-+	config = out_args.args[1];
-+	mask = out_args.args[2];
-+
-+	regmap = syscon_node_to_regmap(out_args.np);
-+	if (IS_ERR(regmap)) {
-+		of_node_put(out_args.np);
-+		return;
-+	}
-+
-+	regmap_update_bits(regmap, offset, mask, config);
-+	of_node_put(out_args.np);
-+}
-+
-+static int zx2967_wdt_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct zx2967_wdt *wdt;
-+	struct resource *base;
-+	int ret;
-+	struct reset_control *rstc;
-+
-+	wdt = devm_kzalloc(dev, sizeof(*wdt), GFP_KERNEL);
-+	if (!wdt)
-+		return -ENOMEM;
-+
-+	platform_set_drvdata(pdev, wdt);
-+
-+	wdt->wdt_device.info = &zx2967_wdt_ident;
-+	wdt->wdt_device.ops = &zx2967_wdt_ops;
-+	wdt->wdt_device.timeout = ZX2967_WDT_DEFAULT_TIMEOUT;
-+	wdt->wdt_device.max_timeout = ZX2967_WDT_MAX_TIMEOUT;
-+	wdt->wdt_device.min_timeout = ZX2967_WDT_MIN_TIMEOUT;
-+	wdt->wdt_device.parent = &pdev->dev;
-+
-+	base = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	wdt->reg_base = devm_ioremap_resource(dev, base);
-+	if (IS_ERR(wdt->reg_base)) {
-+		dev_err(dev, "ioremap failed\n");
-+		return PTR_ERR(wdt->reg_base);
-+	}
-+
-+	zx2967_wdt_reset_sysctrl(dev);
-+
-+	wdt->clock = devm_clk_get(dev, NULL);
-+	if (IS_ERR(wdt->clock)) {
-+		dev_err(dev, "failed to find watchdog clock source\n");
-+		return PTR_ERR(wdt->clock);
-+	}
-+
-+	ret = clk_prepare_enable(wdt->clock);
-+	if (ret < 0) {
-+		dev_err(dev, "failed to enable clock\n");
-+		return ret;
-+	}
-+	clk_set_rate(wdt->clock, ZX2967_WDT_CLK_FREQ);
-+
-+	rstc = devm_reset_control_get(dev, NULL);
-+	if (IS_ERR(rstc)) {
-+		dev_err(dev, "failed to get rstc");
-+		ret = PTR_ERR(rstc);
-+		goto err;
-+	}
-+
-+	reset_control_assert(rstc);
-+	usleep_range(500, 20000);
-+	reset_control_deassert(rstc);
-+
-+	watchdog_set_drvdata(&wdt->wdt_device, wdt);
-+	watchdog_init_timeout(&wdt->wdt_device,
-+			ZX2967_WDT_DEFAULT_TIMEOUT, dev);
-+	watchdog_set_nowayout(&wdt->wdt_device, WATCHDOG_NOWAYOUT);
-+
-+	ret = watchdog_register_device(&wdt->wdt_device);
-+	if (ret)
-+		goto err;
-+
-+	dev_info(dev, "watchdog enabled (timeout=%d sec, nowayout=%d)",
-+		 wdt->wdt_device.timeout, WATCHDOG_NOWAYOUT);
-+
-+	return 0;
-+
-+err:
-+	clk_disable_unprepare(wdt->clock);
-+	return ret;
-+}
-+
-+static int zx2967_wdt_remove(struct platform_device *pdev)
-+{
-+	struct zx2967_wdt *wdt = platform_get_drvdata(pdev);
-+
-+	watchdog_unregister_device(&wdt->wdt_device);
-+	clk_disable_unprepare(wdt->clock);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id zx2967_wdt_match[] = {
-+	{ .compatible = "zte,zx296718-wdt", },
-+	{}
-+};
-+MODULE_DEVICE_TABLE(of, zx2967_wdt_match);
-+
-+static struct platform_driver zx2967_wdt_driver = {
-+	.probe		= zx2967_wdt_probe,
-+	.remove		= zx2967_wdt_remove,
-+	.driver		= {
-+		.name	= "zx2967-wdt",
-+		.of_match_table	= of_match_ptr(zx2967_wdt_match),
-+	},
-+};
-+module_platform_driver(zx2967_wdt_driver);
-+
-+MODULE_AUTHOR("Baoyou Xie <baoyou.xie@linaro.org>");
-+MODULE_DESCRIPTION("ZTE zx2967 Watchdog Device Driver");
-+MODULE_LICENSE("GPL v2");
--- 
-2.7.4
+On 01/23/17 08:54, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
+> 
+> Commit 7f107887d199 ("ARM: dts: imx: Remove skeleton.dtsi") causes boot
+> issues when the bootloader does not create a 'chosen' node if such node
+> is not present in the dtb.
+> 
+> The reason for the boot failure is well explained by Javier Martinez
+> Canillas: "the decompressor relies on a pre-existing chosen node to be
+> available to insert the command line and merge other ATAGS info."
+> 
+> , so pass an empty 'chosen' node to fix the boot problem.
+> 
+> This issue has been seen in the kernelci reports with Barebox as
+> bootloader.
+> 
+> Also pass the 'memory' node in order to fix boot issues on the SolidRun
+> iMX6 platforms.
+> 
+> Fixes: 7f107887d199 ("ARM: dts: imx: Remove skeleton.dtsi")
+> Reported-by: kernelci.org bot <bot@kernelci.org>
+> Reported-by: Russell King <rmk+kernel@armlinux.org.uk>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> ---
+> Changes since v2:
+> - Add a text explaining why 'memory' and 'chosen' are needed to prevent
+> future cleanups (Uwe).
+> 
+>  arch/arm/boot/dts/imx1.dtsi    | 8 ++++++++
+>  arch/arm/boot/dts/imx23.dtsi   | 8 ++++++++
+>  arch/arm/boot/dts/imx25.dtsi   | 8 ++++++++
+>  arch/arm/boot/dts/imx27.dtsi   | 8 ++++++++
+>  arch/arm/boot/dts/imx28.dtsi   | 8 ++++++++
+>  arch/arm/boot/dts/imx31.dtsi   | 8 ++++++++
+>  arch/arm/boot/dts/imx35.dtsi   | 8 ++++++++
+>  arch/arm/boot/dts/imx50.dtsi   | 8 ++++++++
+>  arch/arm/boot/dts/imx51.dtsi   | 8 ++++++++
+>  arch/arm/boot/dts/imx53.dtsi   | 8 ++++++++
+>  arch/arm/boot/dts/imx6qdl.dtsi | 8 ++++++++
+>  arch/arm/boot/dts/imx6sl.dtsi  | 8 ++++++++
+>  arch/arm/boot/dts/imx6sx.dtsi  | 8 ++++++++
+>  arch/arm/boot/dts/imx6ul.dtsi  | 8 ++++++++
+>  arch/arm/boot/dts/imx7s.dtsi   | 8 ++++++++
+>  15 files changed, 120 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx1.dtsi b/arch/arm/boot/dts/imx1.dtsi
+> index dd3de38..38d712b 100644
+> --- a/arch/arm/boot/dts/imx1.dtsi
+> +++ b/arch/arm/boot/dts/imx1.dtsi
+> @@ -18,6 +18,14 @@
+>  / {
+>  	#address-cells = <1>;
+>  	#size-cells = <1>;
+> +	/*
+> +	 * The decompressor and also some bootloaders rely on a
+> +	 * pre-existing /chosen node to be available to insert the
+> +	 * command line and merge other ATAGS info.
+> +	 * Also for U-Boot there must be a pre-existing /memory node.
+> +	 */
+> +	chosen {};
+> +	memory { device_type = "memory"; reg = <0 0>; };
+>  
+>  	aliases {
+>  		gpio0 = &gpio1;
+> diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+> index 96eae64..10d57f9 100644
+> --- a/arch/arm/boot/dts/imx23.dtsi
+> +++ b/arch/arm/boot/dts/imx23.dtsi
+> @@ -16,6 +16,14 @@
+>  	#size-cells = <1>;
+>  
+>  	interrupt-parent = <&icoll>;
+> +	/*
+> +	 * The decompressor and also some bootloaders rely on a
+> +	 * pre-existing /chosen node to be available to insert the
+> +	 * command line and merge other ATAGS info.
+> +	 * Also for U-Boot there must be a pre-existing /memory node.
+> +	 */
+> +	chosen {};
+> +	memory { device_type = "memory"; reg = <0 0>; };
+>  
+>  	aliases {
+>  		gpio0 = &gpio0;
+> diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+> index 213d86e..e0ba550 100644
+> --- a/arch/arm/boot/dts/imx25.dtsi
+> +++ b/arch/arm/boot/dts/imx25.dtsi
+> @@ -14,6 +14,14 @@
+>  / {
+>  	#address-cells = <1>;
+>  	#size-cells = <1>;
+> +	/*
+> +	 * The decompressor and also some bootloaders rely on a
+> +	 * pre-existing /chosen node to be available to insert the
+> +	 * command line and merge other ATAGS info.
+> +	 * Also for U-Boot there must be a pre-existing /memory node.
+> +	 */
+> +	chosen {};
+> +	memory { device_type = "memory"; reg = <0 0>; };
+>  
+>  	aliases {
+>  		ethernet0 = &fec;
+> diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+> index 6a7cb9e..15d85f1 100644
+> --- a/arch/arm/boot/dts/imx27.dtsi
+> +++ b/arch/arm/boot/dts/imx27.dtsi
+> @@ -19,6 +19,14 @@
+>  / {
+>  	#address-cells = <1>;
+>  	#size-cells = <1>;
+> +	/*
+> +	 * The decompressor and also some bootloaders rely on a
+> +	 * pre-existing /chosen node to be available to insert the
+> +	 * command line and merge other ATAGS info.
+> +	 * Also for U-Boot there must be a pre-existing /memory node.
+> +	 */
+> +	chosen {};
+> +	memory { device_type = "memory"; reg = <0 0>; };
+>  
+>  	aliases {
+>  		ethernet0 = &fec;
+> diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
+> index 905bdb5..148fcf4 100644
+> --- a/arch/arm/boot/dts/imx28.dtsi
+> +++ b/arch/arm/boot/dts/imx28.dtsi
+> @@ -17,6 +17,14 @@
+>  	#size-cells = <1>;
+>  
+>  	interrupt-parent = <&icoll>;
+> +	/*
+> +	 * The decompressor and also some bootloaders rely on a
+> +	 * pre-existing /chosen node to be available to insert the
+> +	 * command line and merge other ATAGS info.
+> +	 * Also for U-Boot there must be a pre-existing /memory node.
+> +	 */
+> +	chosen {};
+> +	memory { device_type = "memory"; reg = <0 0>; };
+>  
+>  	aliases {
+>  		ethernet0 = &mac0;
+> diff --git a/arch/arm/boot/dts/imx31.dtsi b/arch/arm/boot/dts/imx31.dtsi
+> index c0a5d5f..a720314 100644
+> --- a/arch/arm/boot/dts/imx31.dtsi
+> +++ b/arch/arm/boot/dts/imx31.dtsi
+> @@ -12,6 +12,14 @@
+>  / {
+>  	#address-cells = <1>;
+>  	#size-cells = <1>;
+> +	/*
+> +	 * The decompressor and also some bootloaders rely on a
+> +	 * pre-existing /chosen node to be available to insert the
+> +	 * command line and merge other ATAGS info.
+> +	 * Also for U-Boot there must be a pre-existing /memory node.
+> +	 */
+> +	chosen {};
+> +	memory { device_type = "memory"; reg = <0 0>; };
+>  
+>  	aliases {
+>  		serial0 = &uart1;
+> diff --git a/arch/arm/boot/dts/imx35.dtsi b/arch/arm/boot/dts/imx35.dtsi
+> index 6f7b943..6d5e6a6 100644
+> --- a/arch/arm/boot/dts/imx35.dtsi
+> +++ b/arch/arm/boot/dts/imx35.dtsi
+> @@ -13,6 +13,14 @@
+>  / {
+>  	#address-cells = <1>;
+>  	#size-cells = <1>;
+> +	/*
+> +	 * The decompressor and also some bootloaders rely on a
+> +	 * pre-existing /chosen node to be available to insert the
+> +	 * command line and merge other ATAGS info.
+> +	 * Also for U-Boot there must be a pre-existing /memory node.
+> +	 */
+> +	chosen {};
+> +	memory { device_type = "memory"; reg = <0 0>; };
+>  
+>  	aliases {
+>  		ethernet0 = &fec;
+> diff --git a/arch/arm/boot/dts/imx50.dtsi b/arch/arm/boot/dts/imx50.dtsi
+> index fe0221e..ceae909 100644
+> --- a/arch/arm/boot/dts/imx50.dtsi
+> +++ b/arch/arm/boot/dts/imx50.dtsi
+> @@ -17,6 +17,14 @@
+>  / {
+>  	#address-cells = <1>;
+>  	#size-cells = <1>;
+> +	/*
+> +	 * The decompressor and also some bootloaders rely on a
+> +	 * pre-existing /chosen node to be available to insert the
+> +	 * command line and merge other ATAGS info.
+> +	 * Also for U-Boot there must be a pre-existing /memory node.
+> +	 */
+> +	chosen {};
+> +	memory { device_type = "memory"; reg = <0 0>; };
+>  
+>  	aliases {
+>  		ethernet0 = &fec;
+> diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+> index 33526ca..1ee1d54 100644
+> --- a/arch/arm/boot/dts/imx51.dtsi
+> +++ b/arch/arm/boot/dts/imx51.dtsi
+> @@ -19,6 +19,14 @@
+>  / {
+>  	#address-cells = <1>;
+>  	#size-cells = <1>;
+> +	/*
+> +	 * The decompressor and also some bootloaders rely on a
+> +	 * pre-existing /chosen node to be available to insert the
+> +	 * command line and merge other ATAGS info.
+> +	 * Also for U-Boot there must be a pre-existing /memory node.
+> +	 */
+> +	chosen {};
+> +	memory { device_type = "memory"; reg = <0 0>; };
+>  
+>  	aliases {
+>  		ethernet0 = &fec;
+> diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+> index ca51dc0..2e516f4 100644
+> --- a/arch/arm/boot/dts/imx53.dtsi
+> +++ b/arch/arm/boot/dts/imx53.dtsi
+> @@ -19,6 +19,14 @@
+>  / {
+>  	#address-cells = <1>;
+>  	#size-cells = <1>;
+> +	/*
+> +	 * The decompressor and also some bootloaders rely on a
+> +	 * pre-existing /chosen node to be available to insert the
+> +	 * command line and merge other ATAGS info.
+> +	 * Also for U-Boot there must be a pre-existing /memory node.
+> +	 */
+> +	chosen {};
+> +	memory { device_type = "memory"; reg = <0 0>; };
+>  
+>  	aliases {
+>  		ethernet0 = &fec;
+> diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+> index 89b834f..e7d30f4 100644
+> --- a/arch/arm/boot/dts/imx6qdl.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+> @@ -16,6 +16,14 @@
+>  / {
+>  	#address-cells = <1>;
+>  	#size-cells = <1>;
+> +	/*
+> +	 * The decompressor and also some bootloaders rely on a
+> +	 * pre-existing /chosen node to be available to insert the
+> +	 * command line and merge other ATAGS info.
+> +	 * Also for U-Boot there must be a pre-existing /memory node.
+> +	 */
+> +	chosen {};
+> +	memory { device_type = "memory"; reg = <0 0>; };
+>  
+>  	aliases {
+>  		ethernet0 = &fec;
+> diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
+> index 19cbd87..cc9572e 100644
+> --- a/arch/arm/boot/dts/imx6sl.dtsi
+> +++ b/arch/arm/boot/dts/imx6sl.dtsi
+> @@ -14,6 +14,14 @@
+>  / {
+>  	#address-cells = <1>;
+>  	#size-cells = <1>;
+> +	/*
+> +	 * The decompressor and also some bootloaders rely on a
+> +	 * pre-existing /chosen node to be available to insert the
+> +	 * command line and merge other ATAGS info.
+> +	 * Also for U-Boot there must be a pre-existing /memory node.
+> +	 */
+> +	chosen {};
+> +	memory { device_type = "memory"; reg = <0 0>; };
+>  
+>  	aliases {
+>  		ethernet0 = &fec;
+> diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+> index 10f3330..dd4ec85 100644
+> --- a/arch/arm/boot/dts/imx6sx.dtsi
+> +++ b/arch/arm/boot/dts/imx6sx.dtsi
+> @@ -15,6 +15,14 @@
+>  / {
+>  	#address-cells = <1>;
+>  	#size-cells = <1>;
+> +	/*
+> +	 * The decompressor and also some bootloaders rely on a
+> +	 * pre-existing /chosen node to be available to insert the
+> +	 * command line and merge other ATAGS info.
+> +	 * Also for U-Boot there must be a pre-existing /memory node.
+> +	 */
+> +	chosen {};
+> +	memory { device_type = "memory"; reg = <0 0>; };
+>  
+>  	aliases {
+>  		can0 = &flexcan1;
+> diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
+> index 0f69a3f..bdc31f5 100644
+> --- a/arch/arm/boot/dts/imx6ul.dtsi
+> +++ b/arch/arm/boot/dts/imx6ul.dtsi
+> @@ -15,6 +15,14 @@
+>  / {
+>  	#address-cells = <1>;
+>  	#size-cells = <1>;
+> +	/*
+> +	 * The decompressor and also some bootloaders rely on a
+> +	 * pre-existing /chosen node to be available to insert the
+> +	 * command line and merge other ATAGS info.
+> +	 * Also for U-Boot there must be a pre-existing /memory node.
+> +	 */
+> +	chosen {};
+> +	memory { device_type = "memory"; reg = <0 0>; };
+>  
+>  	aliases {
+>  		ethernet0 = &fec1;
+> diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+> index 8db1eb9..5d3a43b 100644
+> --- a/arch/arm/boot/dts/imx7s.dtsi
+> +++ b/arch/arm/boot/dts/imx7s.dtsi
+> @@ -50,6 +50,14 @@
+>  / {
+>  	#address-cells = <1>;
+>  	#size-cells = <1>;
+> +	/*
+> +	 * The decompressor and also some bootloaders rely on a
+> +	 * pre-existing /chosen node to be available to insert the
+> +	 * command line and merge other ATAGS info.
+> +	 * Also for U-Boot there must be a pre-existing /memory node.
+> +	 */
+> +	chosen {};
+> +	memory { device_type = "memory"; reg = <0 0>; };
+>  
+>  	aliases {
+>  		gpio0 = &gpio1;
+> 
