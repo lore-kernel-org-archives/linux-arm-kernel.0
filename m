@@ -1,66 +1,125 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 25 Jan 2017 03:51:07 -0800
-Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
-In-Reply-To: <20170125111233.GB3912@amd>
-References: <20170123141331.GA11402@amd>
- <da1f1b45-3ae5-ffe8-62c6-9ec7c3a1505b@roeck-us.net>
- <20170123144031.GA7870@amd> <20170123232654.GA19342@amd>
- <20170123234912.GA2460@roeck-us.net> <20170124070639.GA5068@rzhang1-surface>
- <20170124073720.GB5603@amd>
- <88c94ea6-abe2-0f20-337e-e9ee00c883d8@roeck-us.net>
- <20170124175800.GA15070@amd> <20170124184526.GA25056@roeck-us.net>
- <20170125111233.GB3912@amd>
-Message-ID: <d5321db7-fc74-fe36-812b-1918a2ac3fc0@roeck-us.net>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 25 Jan 2017 12:53:10 +0100
+Subject: [PATCH v5 0/4] Add runtime PM support for clocks (on Exynos SoC
+ example)
+References: <CGME20170125115327eucas1p172866fa87417f59f1dea60185d6d8b60@eucas1p1.samsung.com>
+Message-ID: <1485345194-3196-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25/2017 03:12 AM, Pavel Machek wrote:
-> Hi!
->
->>>>>> Right.
->>>>>>
->>>>>> Before reverting, can you please try if this patch works or not?
->>>>>
->>>>> Not really. Revert now. Sorry.
->>>>>
->>>>> Are you sure? This does not look equivalent to me at all.
->>>>>
->>>>> "name" file handling moved from drivers to the core, which added some
->>>>> crazy checks what name can contain. Even if this "works", what is the
->>>>> expected effect on the "name" file?
->>>>>
->>>> The hwmon name attribute must not include '-', as documented in
->>>> Documentation/hwmon/sysfs-interface. Is enforcing that 'crazy' ?
->>>> Maybe in your world, but not in mine.
->>>
->>> Well, lets revert the patch and then we can discuss what to do with
->>> the "name" problem.
->
-> Ok, so the patch is on the way in. What to do next?
->
-> pavel at n900:/sys/class/hwmon$ cat hwmon0/name
-> bq27200-0
-> pavel at n900:/sys/class/hwmon$ cat hwmon1/name
-> rx51-battery
->
+Dear All,
 
-The 'name' parameter will be mandatory for hwmon_device_register_with_groups()
-and hwmon_device_register_with_info() starting with v4.11, and the API
-documentation will be updated to list all invalid characters.
+This patchset adds runtime PM support to common clock framework. This is an
+attempt to implement support for clock controllers, which belongs to a power
+domain. This approach works surprisingly well on Exynos 5433 SoC, what allowed
+us to solve various freeze/crash issues related to power management.
 
-The thermal subsystem doesn't play well when it comes to hwmon userspace
-interaction (generating and removing sensor attributes dynamically
-messes up pretty much everything, and generating the name attribute after
-hwmon registration for sure messes up any udev listener). libsensors gets
-confused by '-' in the 'name' attribute. libsensors also doesn't expect
-sensor attributes to be dynamically generated and removed, and may
-react unpredictably if they are. This all means that any existing users
-of hwmon devices created by the thermal subsystem will most likely not
-use libsensors nor udev listeners. At the same time, it seems to be quite
-important at least to you that the '-' in the name is retained.
+The main idea behind this patchset is to keep clock's controller power domain
+enabled every time when at least one of its clock is enabled or access to its
+registers is being made. Clock controller driver (clock provider) can
+supply a struct device pointer, which is the used by clock core for tracking and
+managing clock's controller runtime pm state. Each clk_prepare() operation will
+first call pm_runtime_get_sync() on the supplied device, while clk_unprepare()
+will do pm_runtime_put() at the end.
 
-Given all that, maybe thermal should just stick with the deprecated API
-and accept the deprecated warning message (or maybe drop hwmon support
-altogether).
+This runtime PM feature has been tested with Exynos4412 (not included in this
+patchset) and Exynos5433 clocks drivers. Both have some clocks, which belongs to
+respective power domains and need special handling during power on/off
+procedures. Till now it wasn't handled at all, what caused various problems.
 
-Guenter
+Patches for clocks drivers change the way the clock provider is initialized.
+Instead of CLK_OF_DECLARE based initialization, a complete platform device driver
+infrastructure is being used. This is needed to let driver to use runtime PM
+feature and integrate with generic power domains. The side-effect of this change
+is a delay in clock provider registeration during system boot, so early
+initialized drivers might get EPROBEDEFER error when requesting their clocks.
+This is an issue for IOMMU drivers, so this patchset will be fully functional
+once the deferred probe for IOMMU will be merged. v7 of the IOMMU deferred probe
+support has been posted two days ago:
+https://www.spinics.net/lists/arm-kernel/msg557110.html
+
+Patches are based on linux-next from 25th January 2017.
+
+This is a part of a larger task, which goal is to add support for power
+domains on Exynos5433 SoCs / TM2 boards. All patches needed to get it
+working have been pushed to the following git repo:
+https://git.linaro.org/people/marek.szyprowski/linux-srpol.git v4.10-next-tm2-pd
+
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
+
+
+Changelog:
+
+v5:
+- rebased onto next-20170125 kernel release
+- added two more calls to runtime PM in clock's core:
+	1. clk_recalc() should ensure active runtime pm state, because it might
+	   read registers (in case of dividers) to calculate the rate
+	2. clk_register() also needs to ensure active runtime pm state to read
+	   initial rate and status of the clocks
+- more fixes in Exynos5433 clocks drivers:
+	1. PLL in DISP CMU must be enabled for suspend
+	2. guard clocks registration with pm_runtime_get_sync/pm_runtime_put to
+	   avoid turning the power domain on and off many times for no good
+	   reason (registering each clock will call pm_runtime_get_sync(), then
+	   pm_runtime_put, what in turn might disable power domain)
+- still waiting for a review...
+
+v4: http://www.spinics.net/lists/arm-kernel/msg550747.html
+- Removed patch for Exynos4412 clocks from the patchset. DT bindings for power
+  domain for ISP sub-controller needs more discussion. It will be handled
+  separately when the runtime PM for clocks feature gets merged.
+- Added patch with runtime PM support for Exynos AudioSS clock controller driver
+  (needed to enable audio power domain on Exynos5 series).
+- Fixes in Exynos5433 driver:
+	1. added missing clock for Audio CMU
+	2. added support for FSYS CMU
+	3. improved support for DISP CMU (thanks to Andrzej Hajda for
+	   investigating that).
+- Rebased onto v4.10-rc1
+- Waiting for a review...
+
+v3: http://www.spinics.net/lists/arm-kernel/msg538122.html
+- Removed CLK_RUNTIME_PM flag, core now simply checks if runtime pm is enabled
+  for the provided device during clock registration as suggested by Ulf
+- Simplified code for exynos4412 isp clock driver registration
+- Resolved some other minor issues pointed by Ulf clk core code
+- Rebased onto v4.9-rc1 and new version of IOMMU deferred probe patchset
+
+v2: https://www.spinics.net/lists/arm-kernel/msg532798.html
+- Simplified clk_pm_runtime_get/put functions, removed workaround for devices
+  with disabled runtime pm. Such workaround is no longer needed since commit
+  4d23a5e84806b202d9231929c9507ef7cf7a0185 ("PM / Domains: Allow runtime PM
+  during system PM phases").
+- Added CLK_RUNTIME_PM flag to indicate clocks, for which clock core should
+  call runtime pm functions. This solves problem with clocks, for which struct
+  device is already registered, but no runtime pm is enabled.
+- Extended commit messages according to Ulf suggestions.
+- Fixed some style issues pointed by Barlomiej.
+
+v1: http://www.spinics.net/lists/arm-kernel/msg528128.html
+- initial version
+
+
+Patch summary:
+
+Marek Szyprowski (4):
+  clk: Add support for runtime PM
+  clk: samsung: Add support for runtime PM
+  clk: samsung: exynos5433: Add runtime PM support
+  clk: samsung: exynos-audss: Use runtime PM
+
+ .../devicetree/bindings/clock/clk-exynos-audss.txt |   6 +
+ .../devicetree/bindings/clock/exynos5433-clock.txt |  16 +
+ drivers/clk/clk.c                                  | 132 ++++++-
+ drivers/clk/samsung/clk-exynos-audss.c             |  62 +--
+ drivers/clk/samsung/clk-exynos5433.c               | 422 ++++++++++++++++-----
+ drivers/clk/samsung/clk-pll.c                      |   2 +-
+ drivers/clk/samsung/clk.c                          |  12 +-
+ drivers/clk/samsung/clk.h                          |   7 +
+ 8 files changed, 527 insertions(+), 132 deletions(-)
+
+-- 
+1.9.1
