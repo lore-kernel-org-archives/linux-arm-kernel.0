@@ -1,41 +1,29 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Wed, 25 Jan 2017 09:35:50 +0900
-Subject: [PATCH] clk: samsung: mark s3c...._clk_sleep_init() as __init
-In-Reply-To: <1485293599-23581-1-git-send-email-martin@kaiser.cx>
-References: <CGME20170124213354epcas2p48cd7596378462562c66017fe39774bb0@epcas2p4.samsung.com>
- <1485293599-23581-1-git-send-email-martin@kaiser.cx>
-Message-ID: <5887F2E6.7060205@samsung.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 25 Jan 2017 03:02:49 +0100
+Subject: [PATCH net-next v6 2/4] net: dsa: mv88e6xxx: Add support for
+ ethernet switch 88E6341
+In-Reply-To: <bb6e3987ee942277e99c78d1f28112d8b4ecb744.1485288602.git-series.gregory.clement@free-electrons.com>
+References: <cover.b0e18efe751186768e720c341693117fdd4d3c16.1485288602.git-series.gregory.clement@free-electrons.com>
+ <bb6e3987ee942277e99c78d1f28112d8b4ecb744.1485288602.git-series.gregory.clement@free-electrons.com>
+Message-ID: <20170125020249.GB24034@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Martin,
+> +	[MV88E6341] = {
+> +		.prod_num = PORT_SWITCH_ID_PROD_NUM_6341,
+> +		.family = MV88E6XXX_FAMILY_6341,
+> +		.name = "Marvell 88E6341",
+> +		.num_databases = 4096,
+> +		.num_ports = 6,
+> +		.port_base_addr = 0x10,
+> +		.global1_addr = 0x1b,
+> +		.age_time_coeff = 15000,
 
-On 2017? 01? 25? 06:33, Martin Kaiser wrote:
-> These functions are called only by other __init functions.
-> Compiling for s3c2410 with CONFIG_DEBUG_SECTION_MISMATCH=y,
-> I get warnings like
-> 
-> WARNING: vmlinux.o(.text+0x198350):
-> Section mismatch in reference from the function s3c2410_clk_sleep_init()
-> to the (unknown reference) .init.data:(unknown)
-> 
-> Marking the s3c...._clk_sleep() functions as __init fixes this.
-> 
-> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
-> ---
->  drivers/clk/samsung/clk-s3c2410.c | 4 ++--
->  drivers/clk/samsung/clk-s3c2412.c | 4 ++--
->  drivers/clk/samsung/clk-s3c2443.c | 4 ++--
->  drivers/clk/samsung/clk-s3c64xx.c | 4 ++--
->  4 files changed, 8 insertions(+), 8 deletions(-)
+Hi Gregory
 
+Please could you check this timer in the datasheet. There is currently
+a bug in the mv88e6390 support code. I also set it to 15s. But in fact
+it is 3.75 seconds. The 6341 might also use 3.75 seconds.
 
-Looks good to me.
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
-
-[snip]
-
--- 
-Best Regards,
-Chanwoo Choi
-Samsung Electronics
+   Thanks
+	Andrew
