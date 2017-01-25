@@ -1,61 +1,65 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Wed, 25 Jan 2017 12:37:14 +0100
-Subject: [PATCH 1/2] security: Change name of CONFIG_DEBUG_RODATA
-In-Reply-To: <20170119113305.GB5110@osiris>
-References: <1484789346-21012-1-git-send-email-labbott@redhat.com>
- <1484789346-21012-2-git-send-email-labbott@redhat.com>
- <20170119105646.GA11176@leverpostej> <20170119113305.GB5110@osiris>
-Message-ID: <fe23dcb6-196b-96bc-f801-c3bb7db6d708@redhat.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Wed, 25 Jan 2017 11:40:02 +0000
+Subject: [STLinux Kernel] [PATCH 8/8] ARM: dts: STiH407-family: Enable HW
+ flow-control
+In-Reply-To: <20170125105912.GA5680@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <20170124134310.27512-1-lee.jones@linaro.org>
+ <20170124134310.27512-9-lee.jones@linaro.org>
+ <20170125105912.GA5680@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <20170125114002.GG5680@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/19/2017 12:33 PM, Heiko Carstens wrote:
-> On Thu, Jan 19, 2017 at 10:56:46AM +0000, Mark Rutland wrote:
->>> +config HARDENED_PAGE_MAPPINGS
->>> +	bool "Mark kernel mappings with stricter permissions (RO/W^X)"
->>> +	default y
->>> +	depends on ARCH_HAS_HARDENED_MAPPINGS
->>> +	help
->>> +          If this is set, kernel text and rodata memory will be made read-only,
->>> +	  and non-text memory will be made non-executable. This provides
->>> +	  protection against certain security attacks (e.g. executing the heap
->>> +	  or modifying text).
->>> +
->>> +	  Unless your system has known restrictions or performance issues, it
->>> +	  is recommended to say Y here.
->>
->> It's somewhat unfortunate that this means the feature is no longer
->> mandatory on arm64 (and s390+x86). We have a boot-time switch to turn
->> the protections off, so I was hoping we could make this mandatory on all
->> architectures with support.
->>
->> It would be good to see if we could make this mandatory for arm and
->> parisc, or if it really needs to be optional for either of those.
->
-> Looks like the config option is a no-op on parisc just like it is on
-> s390. Irrelavant of the config option at least on s390 the page tables for
-> kernel text and rodata will be read-only anyway.
->
-> This works since ages and I don't see a reason why this should be
-> changed. Also trying to disable this with the "rodata=" command line option
-> does not work at least on s390, and I guess this is true for parisc as
-> well.
->
-> The only thing implemented with CONFIG_DEBUG_RODATA on both architectures
-> is to emit a message that states memory has been protected
-> (mark_rodata_ro).
-> This just avoids a wrong "Kernel memory protection disabled." message.
->
-> So yes, I'd really like to keep this option mandatory.
->
+On Wed, 25 Jan 2017, Peter Griffin wrote:
 
-(Apologies, my SMTP server was set up incorrectly so this didn't get
-sent out when I thought it did)
+> Hi Lee,
+> 
+> On Tue, 24 Jan 2017, Lee Jones wrote:
+> 
+> > Hardware flow-control capability must be specified at a platform
+> > level in order to inform the ASC driver that the platform is capable
+> > (i.e. are the lines wired up, etc).  STiH4{07,10} devices are indeed
+> > capable, so let's provide the property.
+> > 
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  arch/arm/boot/dts/stih407-family.dtsi | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+> > index 9789978..7ada8ea 100644
+> > --- a/arch/arm/boot/dts/stih407-family.dtsi
+> > +++ b/arch/arm/boot/dts/stih407-family.dtsi
+> > @@ -226,7 +226,7 @@
+> >  			pinctrl-0 = <&pinctrl_serial0_flowctrl>;
+> >  			pinctrl-1 = <&pinctrl_serial0>;
+> >  			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
+> > -
+> > +			st,hw-flow-control;
+> 
+> There is a generic serial binding for this already. As this ST property
+> hasn't been used upstream, it seems like it would be worth dropping it
+> and switching to the generic uart-has-rtscts one.
+> 
+> See Documentation/devicetree/bindings/serial/serial.txt
+> 
+>   - uart-has-rtscts: The presence of this property indicates that the
+>     UART has dedicated lines for RTS/CTS hardware flow control, and that
+>     they are available for use (wired and enabled by pinmux configuration).
+>     This depends on both the UART hardware and the board wiring.
+>     Note that this property is mutually-exclusive with "cts-gpios" and
+>     "rts-gpios" above.
 
-Okay, that's useful to know. I think I'm going to add a
-'select HARDENED_MAPPINGS' (or whatever it gets changed to) to arches
-that were previously def_bool. This is a slight Kconfig semantic change
-but as has been pointed out we now have the command line option.
+Thinking some more this generic binding definition is a bit restrictive,
+particularly the "Note that this property is mutually-exclusive with "cts-gpios"
+and "rts-gpios"" part.
 
-Thanks,
-Laura
+As with this series we will have dynamic on-the-fly changing from hw flow
+control to gpio control for other configs which the HW IP doesn't support.
+
+IMO the uart-has-rtscts definition should be updated to reflect that they can
+be used together in certain circumstances.
+
+regards,
+
+Peter.
