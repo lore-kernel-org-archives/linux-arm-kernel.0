@@ -1,34 +1,25 @@
-From: dinguyen@kernel.org (Dinh Nguyen)
-Date: Wed, 25 Jan 2017 14:51:47 -0600
-Subject: [PATCH] ARM: dts: watchdog0 cannot reliably trigger reset
-Message-ID: <1485377507-12045-1-git-send-email-dinguyen@kernel.org>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Wed, 25 Jan 2017 22:02:19 +0100
+Subject: [PATCH v10 3/5] ARM: dts: stm32: Add I2C1 support for STM32F429
+ SoC
+In-Reply-To: <20170125202548.7fyjxo6zwdemg74d@ninjato>
+References: <1484832316-5594-1-git-send-email-cedric.madianga@gmail.com>
+ <1484832316-5594-4-git-send-email-cedric.madianga@gmail.com>
+ <20170125202548.7fyjxo6zwdemg74d@ninjato>
+Message-ID: <CAOAejn21AZohgE6dLGoaGBk=KHEOzOmeQPZGJ+XHAvn=2r99TA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the Arria10, because of hardware bug, watchdog0 cannot reliably trigger
-a reset to the CPU. The workaround would be to use watchdog1 instead.
+2017-01-25 21:25 GMT+01:00 Wolfram Sang <wsa@the-dreams.de>:
+> On Thu, Jan 19, 2017 at 02:25:14PM +0100, M'boumba Cedric Madianga wrote:
+>> This patch adds I2C1 support for STM32F429 SoC
+>>
+>> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
+>> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+>
+> Note that patches 3-5 should go via stm-tree or arm-soc. Rather not i2c.
 
-Also for watchdog1, there is a dependency on the bootloader to enable the
-boot_clk source to be from the cb_intosc_hs_clk/2, versus from EOSC1. This
-corresponds to the (SWCTRLBTCLKEN & SWCTRLBTCLKSEL) bits enabled in the
-control register in the clock manager module of Arria10.
+Ok fine.
+These patches will be applied in STM32 git tree.
 
-Signed-off-by: Dinh Nguyen <dinguyen@kernel.org>
----
- arch/arm/boot/dts/socfpga_arria10_socdk.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi b/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
-index 4c99c99..c57e6ce 100644
---- a/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
-+++ b/arch/arm/boot/dts/socfpga_arria10_socdk.dtsi
-@@ -160,6 +160,6 @@
- 	status = "okay";
- };
- 
--&watchdog0 {
-+&watchdog1 {
- 	status = "okay";
- };
--- 
-2.7.4
+Thanks
