@@ -1,29 +1,45 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 25 Jan 2017 09:11:13 +0100
-Subject: [PATCH] ARM: tegra: paz00: fix __initdata placement
-In-Reply-To: <20170123074347.GA29804@dtor-ws>
-References: <20170123074347.GA29804@dtor-ws>
-Message-ID: <20170125081113.GD13025@ulmo.ba.sec>
+From: oss@buserror.net (Scott Wood)
+Date: Wed, 25 Jan 2017 02:19:21 -0600
+Subject: [PATCH 1/3] dt-bindings: qoriq-clock: Add coreclk
+Message-ID: <1485332363-8434-1-git-send-email-oss@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 22, 2017 at 11:43:47PM -0800, Dmitry Torokhov wrote:
-> To have expected effect the __initdata attribute should go after variable
-> name and before initializer.`
-> 
-> Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> ---
->  arch/arm/mach-tegra/board-paz00.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+ls1012a has separate input root clocks for core PLLs versus the platform
+PLL, with the latter described as sysclk in the hw docs.
 
-Applied with an updated commit message.
+Update the qoriq-clock binding to allow a second input clock, named
+"coreclk".  If present, this clock will be used for the core PLLs.
 
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/df9c6362/attachment.sig>
+Signed-off-by: Scott Wood <oss@buserror.net>
+Cc: devicetree at vger.kernel.org
+---
+ Documentation/devicetree/bindings/clock/qoriq-clock.txt | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/clock/qoriq-clock.txt b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
+index df9cb5a..97a9666 100644
+--- a/Documentation/devicetree/bindings/clock/qoriq-clock.txt
++++ b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
+@@ -55,6 +55,11 @@ Optional properties:
+ - clocks: If clock-frequency is not specified, sysclk may be provided
+ 	as an input clock.  Either clock-frequency or clocks must be
+ 	provided.
++	A second input clock, called "coreclk", may be provided if
++	core PLLs are based on a different input clock from the
++	platform PLL.
++- clock-names: Required if a coreclk is present.  Valid names are
++	"sysclk" and "coreclk".
+ 
+ 2. Clock Provider
+ 
+@@ -71,6 +76,7 @@ second cell is the clock index for the specified type.
+ 	2	hwaccel		index (n in CLKCGnHWACSR)
+ 	3	fman		0 for fm1, 1 for fm2
+ 	4	platform pll	0=pll, 1=pll/2, 2=pll/3, 3=pll/4
++	5	coreclk		must be 0
+ 
+ 3. Example
+ 
+-- 
+2.7.4
