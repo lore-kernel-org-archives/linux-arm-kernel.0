@@ -1,34 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 Jan 2017 22:20:09 +0100
-Subject: [PATCH 06/10] soc/qbman: Add ARM equivalent for
- flush_dcache_range()
-In-Reply-To: <HE1PR0401MB263638F320470CA216990BCC86720@HE1PR0401MB2636.eurprd04.prod.outlook.com>
-References: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
- <VI1PR0401MB2430DA6BD2F857C30EC86A50917F0@VI1PR0401MB2430.eurprd04.prod.outlook.com>
- <HE1PR0401MB263638F320470CA216990BCC86720@HE1PR0401MB2636.eurprd04.prod.outlook.com>
-Message-ID: <5414359.8GMja3pNrI@wuerfel>
+Date: Wed, 25 Jan 2017 22:22:37 +0100
+Subject: [PATCH] ARM64: enable CONFIG_KEYS_COMPAT in Kconfig
+In-Reply-To: <1485190992-86476-1-git-send-email-bilal.amarni@gmail.com>
+References: <1485190992-86476-1-git-send-email-bilal.amarni@gmail.com>
+Message-ID: <6063453.l76hsdyeRH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, January 23, 2017 7:24:59 PM CET Roy Pledge wrote:
-> > Is there a non-"under the covers" way to say "flush this region" without
-> > the arch second-guessing whether it really needs to be flushed?
-> Any advice on how to resolve this? I looked into trying to do a
-> non-cacheable mapping of the
-> memory so that the flush wouldn't be required but the ioremap code
-> prevents mapping normal
-> memory in this way.  The QMan device requiresthis memory to be zeroed at
-> startup. Because the device
-> does non coherent reads and writes to the memory we must ensure that any
-> cache in the CPU cluster(s)
-> is flushed in order to prevent a future castout from overwriting data.
-> This happened before on PPC
-> platforms and made for some very unfun debug session trying to
-> understand what was causing the failure.
+On Monday, January 23, 2017 6:03:12 PM CET Bilal Amarni wrote:
+> Currently in 32-bit userspace calling the keyctl syscall returns an ENOSYS error.
+> 
+> This makes sure the compatibility wrapper is registered.
+> 
+> Signed-off-by: Bilal Amarni <bilal.amarni@gmail.com>
 
-If this is normal RAM, you should be able to just write zeroes, and then
-do a dma_map_single() for initialization. Are there any other requirements
-what to do with the memory later, is it used for communication at all,
-or just required to be zero?
+While this looks technically correct, it doesn't seem very nice to the
+other 64-bit architectures that may also be missing this.
+
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 1117421..d76f70b 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -1030,6 +1030,10 @@ config SYSVIPC_COMPAT
+>         def_bool y
+>         depends on COMPAT && SYSVIPC
+>  
+> +config KEYS_COMPAT
+> +       def_bool y
+> +       depends on COMPAT && KEYS
+> +
+
+I see four copies of this in existing architectures, but none for
+mips, parisc or tile. How about just moving this next to CONFIG_KEYS?
 
 	Arnd
