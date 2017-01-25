@@ -1,29 +1,72 @@
-From: rui.zhang@intel.com (Zhang Rui)
-Date: Wed, 25 Jan 2017 13:29:52 +0800
-Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
-In-Reply-To: <CAOMZO5AFZy6YFrE0P-xDXX5BCfWYHAC34VyyX85H5Wr+1O59jA@mail.gmail.com>
-References: <20170123141331.GA11402@amd>
- <da1f1b45-3ae5-ffe8-62c6-9ec7c3a1505b@roeck-us.net>
- <20170123144031.GA7870@amd> <20170123232654.GA19342@amd>
- <20170123234912.GA2460@roeck-us.net>
- <20170124070639.GA5068@rzhang1-surface> <20170124073720.GB5603@amd>
- <88c94ea6-abe2-0f20-337e-e9ee00c883d8@roeck-us.net>
- <20170124175800.GA15070@amd> <20170124184526.GA25056@roeck-us.net>
- <20170124224610.GA27340@amd>
- <CAOMZO5AFZy6YFrE0P-xDXX5BCfWYHAC34VyyX85H5Wr+1O59jA@mail.gmail.com>
-Message-ID: <1485322192.2461.4.camel@intel.com>
+From: john@phrozen.org (John Crispin)
+Date: Wed, 25 Jan 2017 06:38:40 +0100
+Subject: [PATCH 08/16] arm: dts: add spi nodes to the mt7623.dtsi file
+In-Reply-To: <69d73342-d710-5f6d-567b-8e75a84fdb18@gmail.com>
+References: <1485170975-51813-1-git-send-email-john@phrozen.org>
+ <1485170975-51813-9-git-send-email-john@phrozen.org>
+ <69d73342-d710-5f6d-567b-8e75a84fdb18@gmail.com>
+Message-ID: <80e1c119-2989-9c82-8d54-551f677613e1@phrozen.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-01-24 at 21:07 -0200, Fabio Estevam wrote:
-> On Tue, Jan 24, 2017 at 8:46 PM, Pavel Machek <pavel@ucw.cz> wrote:
+
+
+On 24/01/2017 23:39, Matthias Brugger wrote:
 > 
-> > 
-> > It is an ugly regression and it is -rc5 time. Actually not your
-> > problem, but Fabio Estevam or Zhang Rui has to deal with it soon.
-> I have already sent the revert and it was acked-by you and Guenter.
+> 
+> On 01/23/2017 12:29 PM, John Crispin wrote:
+>> Add SPI nodes to the mt7623.dtsi file.
+>>
+>> Signed-off-by: John Crispin <john@phrozen.org>
+>> ---
+>>  arch/arm/boot/dts/mt7623.dtsi |   12 ++++++++++++
+>>  1 file changed, 12 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/mt7623.dtsi
+>> b/arch/arm/boot/dts/mt7623.dtsi
+>> index 8ac4569..c8f38e1 100644
+>> --- a/arch/arm/boot/dts/mt7623.dtsi
+>> +++ b/arch/arm/boot/dts/mt7623.dtsi
+>> @@ -15,6 +15,7 @@
+>>  #include <dt-bindings/interrupt-controller/irq.h>
+>>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>>  #include <dt-bindings/clock/mt2701-clk.h>
+>> +#include <dt-bindings/phy/phy.h>
+> 
+> Why do you need this include here?
+> 
+> Regards,
+> Matthias
+> 
 
-Revert patch has been applied and queued for next -rc.
+should be part of the ubs patch. V2 coming up in a tad
 
-thanks,
-rui
+	John
+
+>>  #include <dt-bindings/pinctrl/mt7623-pinfunc.h>
+>>  #include <dt-bindings/power/mt2701-power.h>
+>>  #include <dt-bindings/reset/mt2701-resets.h>
+>> @@ -281,6 +282,17 @@
+>>          status = "disabled";
+>>      };
+>>
+>> +    spi: spi at 1100a000 {
+>> +        compatible = "mediatek,mt7623-spi",
+>> +                 "mediatek,mt6589-spi";
+>> +        reg = <0 0x1100a000 0 0x1000>;
+>> +        interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_LOW>;
+>> +        clocks = <&pericfg CLK_PERI_SPI0>;
+>> +        clock-names = "main";
+>> +
+>> +        status = "disabled";
+>> +    };
+>> +
+>>      hifsys: syscon at 1a000000 {
+>>          compatible = "mediatek,mt7623-hifsys",
+>>                   "mediatek,mt2701-hifsys",
+>>
+> 
+> _______________________________________________
+> Linux-mediatek mailing list
+> Linux-mediatek at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-mediatek
