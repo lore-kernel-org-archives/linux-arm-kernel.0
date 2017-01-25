@@ -1,38 +1,54 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 25 Jan 2017 11:59:40 +0100
-Subject: [PATCH v2 2/6] ARM: tegra: nyan: Use external control for
- bq24735 charger
-In-Reply-To: <20170122154753.31942-2-contact@paulk.fr>
-References: <20170122154753.31942-1-contact@paulk.fr>
- <20170122154753.31942-2-contact@paulk.fr>
-Message-ID: <20170125105940.GC9344@ulmo.ba.sec>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Wed, 25 Jan 2017 11:01:12 +0000
+Subject: [STLinux Kernel] [PATCH 6/8] ARM: dts: STiH407-pinctrl: Add
+ Pinctrl group for HW flow-control
+In-Reply-To: <20170124134310.27512-7-lee.jones@linaro.org>
+References: <20170124134310.27512-1-lee.jones@linaro.org>
+ <20170124134310.27512-7-lee.jones@linaro.org>
+Message-ID: <20170125110112.GB5680@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 22, 2017 at 04:47:49PM +0100, Paul Kocialkowski wrote:
-> Nyan boards come with an embedded controller that controls when to
-> enable and disable the charge. Thus, it should not be left up to the
-> kernel to handle that.
+Hi Lee,
+
+On Tue, 24 Jan 2017, Lee Jones wrote:
+
+> Each serial port which supports HW flow-control should have 2 Pinctrl
+> groups.  Once for when HW flow-control is in progress, where the IP
+
+Nit: Once?
+
+> will take over controlling the lines and another group which enables
+> the lines to be toggled using GPIO mechanisms.
 > 
-> Using the ti,external-control property allows specifying this use-case.
-> 
-> Signed-off-by: Paul Kocialkowski <contact@paulk.fr>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+
+Acked-by: Peter Griffin <peter.griffin@linaro.org>
+
 > ---
->  arch/arm/boot/dts/tegra124-nyan.dtsi | 1 +
->  1 file changed, 1 insertion(+)
-
-Is the ti,ac-detect-gpios property still useful in that case? I guess it
-would still allow to monitor whether or not a charger is connected, even
-if the EC determines that it shouldn't charge.
-
-Anyway, I've applied this.
-
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/74d69b75/attachment-0001.sig>
+>  arch/arm/boot/dts/stih407-pinctrl.dtsi | 12 ++++++++++--
+>  1 file changed, 10 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
+> index daab16b..fbb7f86 100644
+> --- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
+> +++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
+> @@ -465,8 +465,16 @@
+>  			serial0 {
+>  				pinctrl_serial0: serial0-0 {
+>  					st,pins {
+> -						tx = <&pio17 0 ALT1 OUT>;
+> -						rx = <&pio17 1 ALT1 IN>;
+> +						tx =  <&pio17 0 ALT1 OUT>;
+> +						rx =  <&pio17 1 ALT1 IN>;
+> +					};
+> +				};
+> +				pinctrl_serial0_flowctrl: serial0-0_flowctrl {
+> +					st,pins {
+> +						tx =  <&pio17 0 ALT1 OUT>;
+> +						rx =  <&pio17 1 ALT1 IN>;
+> +						cts = <&pio17 2 ALT1 IN>;
+> +						rts = <&pio17 3 ALT1 OUT>;
+>  					};
+>  				};
+>  			};
