@@ -1,28 +1,127 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 25 Jan 2017 19:38:43 +0200
-Subject: [PATCH 2/7] pinctrl: samsung: Ensure that pad retention is
- disabled on driver init
-In-Reply-To: <1485345031-2948-3-git-send-email-m.szyprowski@samsung.com>
-References: <1485345031-2948-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170125115102eucas1p180bbbdbcc09381051ab86bed6cfad5d0@eucas1p1.samsung.com>
- <1485345031-2948-3-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20170125173843.veihl4hcm5iagmno@kozik-lap>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Wed, 25 Jan 2017 18:43:23 +0100
+Subject: [PATCH v2] ARM: Import tango4_defconfig
+In-Reply-To: <CAK8P3a2ySbZRt5R3VBG=B-aAYM5XzxVSEBn=jHU2__nW=-or9A@mail.gmail.com>
+References: <5c615aa5-678e-63b8-ecae-f5f0bd8a6f2c@sigmadesigns.com>
+ <4729631.76bAWajetU@wuerfel>
+ <9bbc2fa7-fce4-73c2-898e-a2f780e55d1f@sigmadesigns.com>
+ <CAK8P3a2ySbZRt5R3VBG=B-aAYM5XzxVSEBn=jHU2__nW=-or9A@mail.gmail.com>
+Message-ID: <da9967c4-05e0-8617-08b3-e15d602d4ab9@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2017 at 12:50:26PM +0100, Marek Szyprowski wrote:
-> When pin controller device is a part of power domain, there is no guarantee
-> that the power domain was not turned off and then on during boot process
-> before probing of the pin control driver. If it happened, then pin control
-> driver should ensure that pad retention is turned off during its probe call.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  drivers/pinctrl/samsung/pinctrl-exynos.c | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
+Import a minimal defconfig for tango4 boards.
 
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+---
+diff from v1
+  drop CONFIG_CROSS_COMPILE and CONFIG_CMDLINE
 
-Best regards,
-Krzysztof
+Anything else sticking out? :-)
+---
+ arch/arm/configs/tango4_defconfig | 94 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 94 insertions(+)
+ create mode 100644 arch/arm/configs/tango4_defconfig
+
+diff --git a/arch/arm/configs/tango4_defconfig b/arch/arm/configs/tango4_defconfig
+new file mode 100644
+index 000000000000..68725d4eae45
+--- /dev/null
++++ b/arch/arm/configs/tango4_defconfig
+@@ -0,0 +1,94 @@
++# CONFIG_SWAP is not set
++CONFIG_SYSVIPC=y
++CONFIG_NO_HZ_IDLE=y
++CONFIG_HIGH_RES_TIMERS=y
++# CONFIG_COMPAT_BRK is not set
++CONFIG_SLAB=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++CONFIG_MODVERSIONS=y
++CONFIG_ARCH_TANGO=y
++# CONFIG_ARM_ERRATA_643719 is not set
++CONFIG_SMP=y
++CONFIG_PREEMPT=y
++CONFIG_HZ_300=y
++CONFIG_AEABI=y
++CONFIG_HIGHMEM=y
++# CONFIG_ATAGS is not set
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_ARM_ATAG_DTB_COMPAT=y
++CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_GOV_ONDEMAND=y
++CONFIG_CPUFREQ_DT=y
++CONFIG_VFP=y
++CONFIG_NEON=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_MULTICAST=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++# CONFIG_INET_XFRM_MODE_TRANSPORT is not set
++# CONFIG_INET_XFRM_MODE_TUNNEL is not set
++# CONFIG_INET_XFRM_MODE_BEET is not set
++# CONFIG_IPV6 is not set
++CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_MTD=y
++CONFIG_MTD_TESTS=m
++CONFIG_MTD_CMDLINE_PARTS=y
++CONFIG_MTD_NAND=y
++CONFIG_MTD_NAND_TANGO=y
++CONFIG_BLK_DEV_LOOP=y
++CONFIG_SCSI=y
++CONFIG_BLK_DEV_SD=y
++CONFIG_NETDEVICES=y
++CONFIG_NET_VENDOR_AURORA=y
++CONFIG_AURORA_NB8800=y
++CONFIG_AT803X_PHY=y
++# CONFIG_WLAN is not set
++# CONFIG_INPUT_MOUSEDEV is not set
++# CONFIG_INPUT_KEYBOARD is not set
++# CONFIG_INPUT_MOUSE is not set
++# CONFIG_SERIO is not set
++CONFIG_SERIAL_8250=y
++# CONFIG_SERIAL_8250_DEPRECATED_OPTIONS is not set
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_8250_RT288X=y
++CONFIG_SERIAL_OF_PLATFORM=y
++# CONFIG_HW_RANDOM is not set
++CONFIG_I2C=y
++CONFIG_I2C_XLR=y
++CONFIG_GPIOLIB=y
++CONFIG_THERMAL=y
++CONFIG_CPU_THERMAL=y
++CONFIG_TANGO_THERMAL=y
++CONFIG_WATCHDOG=y
++CONFIG_TANGOX_WATCHDOG=y
++CONFIG_FB=y
++# CONFIG_HID is not set
++# CONFIG_USB_HID is not set
++CONFIG_USB=y
++CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_CHIPIDEA=y
++CONFIG_USB_CHIPIDEA_HOST=y
++CONFIG_MMC=y
++CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_PLTFM=y
++CONFIG_MMC_SDHCI_OF_ARASAN=y
++CONFIG_DMADEVICES=y
++CONFIG_EXT4_FS=y
++CONFIG_FUSE_FS=m
++CONFIG_VFAT_FS=m
++CONFIG_TMPFS=y
++CONFIG_NFS_FS=y
++# CONFIG_NFS_V2 is not set
++CONFIG_ROOT_NFS=y
++CONFIG_NLS_CODEPAGE_437=m
++CONFIG_NLS_ISO8859_1=m
++CONFIG_NLS_UTF8=m
++CONFIG_PRINTK_TIME=y
++# CONFIG_CRYPTO_ECHAINIV is not set
+-- 
+2.10.0
