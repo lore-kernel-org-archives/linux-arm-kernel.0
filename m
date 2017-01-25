@@ -1,63 +1,50 @@
 From: rob.rice@broadcom.com (Rob Rice)
-Date: Wed, 25 Jan 2017 11:44:46 -0500
-Subject: [PATCH v3 0/3] Add Broadcom SPU Crypto Driver
-Message-ID: <1485362689-11294-1-git-send-email-rob.rice@broadcom.com>
+Date: Wed, 25 Jan 2017 11:44:47 -0500
+Subject: [PATCH v3 1/3] crypto: brcm: DT documentation for Broadcom SPU
+ hardware
+In-Reply-To: <1485362689-11294-1-git-send-email-rob.rice@broadcom.com>
+References: <1485362689-11294-1-git-send-email-rob.rice@broadcom.com>
+Message-ID: <1485362689-11294-2-git-send-email-rob.rice@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes in v3:
-- rebase to 4.10-rc3 in cryptodev-2.6 tree
-- in bindings doc, list all valid compatibility strings
-- rename DT nodes "crypto" rather than "spu-crypto"
-- include a separate DT node for each SPU hardware block. Previously,
- there was a single SPU node listing a register range for each
- hw block.
-- select hash algos in Kconfig. Driver HMAC implementation uses hash
- sw algos for inner and outer hashes.
-- Fix crash for AES CCM decrypt when AAD and data are both empty
+Device tree documentation for Broadcom Secure Processing Unit
+(SPU) crypto hardware.
 
-Change in v2:
-- select CRYPTO_DES in Kconfig
-
-The Broadcom SPU crypto driver provides access to SPU hardware
-for symmetric crypto offload. The driver supports ablkcipher,
-ahash, and aead operations. The driver supports several
-Broadcom SoCs with different revisions of the SPU hardware.
-The driver supports SPU-M and SPU2 hardware revisions, and
-a couple versions of each hw revision, each version with minor
-differences.
-
-Rob Rice (3):
-  crypto: brcm: DT documentation for Broadcom SPU hardware
-  crypto: brcm: Add Broadcom SPU driver
-  arm64: dts: ns2: Add Broadcom SPU driver DT entry.
-
- .../devicetree/bindings/crypto/brcm,spu-crypto.txt |   22 +
- arch/arm64/boot/dts/broadcom/ns2.dtsi              |   24 +
- drivers/crypto/Kconfig                             |   15 +
- drivers/crypto/Makefile                            |    2 +
- drivers/crypto/bcm/Makefile                        |   15 +
- drivers/crypto/bcm/cipher.c                        | 4955 ++++++++++++++++++++
- drivers/crypto/bcm/cipher.h                        |  475 ++
- drivers/crypto/bcm/spu.c                           | 1252 +++++
- drivers/crypto/bcm/spu.h                           |  288 ++
- drivers/crypto/bcm/spu2.c                          | 1402 ++++++
- drivers/crypto/bcm/spu2.h                          |  228 +
- drivers/crypto/bcm/spum.h                          |  174 +
- drivers/crypto/bcm/util.c                          |  581 +++
- drivers/crypto/bcm/util.h                          |  116 +
- 14 files changed, 9549 insertions(+)
+Signed-off-by: Steve Lin <steven.lin1@broadcom.com>
+Signed-off-by: Rob Rice <rob.rice@broadcom.com>
+---
+ .../devicetree/bindings/crypto/brcm,spu-crypto.txt | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt
- create mode 100644 drivers/crypto/bcm/Makefile
- create mode 100644 drivers/crypto/bcm/cipher.c
- create mode 100644 drivers/crypto/bcm/cipher.h
- create mode 100644 drivers/crypto/bcm/spu.c
- create mode 100644 drivers/crypto/bcm/spu.h
- create mode 100644 drivers/crypto/bcm/spu2.c
- create mode 100644 drivers/crypto/bcm/spu2.h
- create mode 100644 drivers/crypto/bcm/spum.h
- create mode 100644 drivers/crypto/bcm/util.c
- create mode 100644 drivers/crypto/bcm/util.h
 
+diff --git a/Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt b/Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt
+new file mode 100644
+index 0000000..29b6007
+--- /dev/null
++++ b/Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt
+@@ -0,0 +1,22 @@
++The Broadcom Secure Processing Unit (SPU) hardware supports symmetric
++cryptographic offload for Broadcom SoCs. A SoC may have multiple SPU hardware
++blocks.
++
++Required properties:
++- compatible: Should be one of the following:
++  brcm,spum-crypto - for devices with SPU-M hardware
++  brcm,spu2-crypto - for devices with SPU2 hardware
++  brcm,spu2-v2-crypto - for devices with enhanced SPU2 hardware features like SHA3
++  and Rabin Fingerprint support
++  brcm,spum-nsp-crypto - for the Northstar Plus variant of the SPU-M hardware
++
++- reg: Should contain SPU registers location and length.
++- mboxes: The mailbox channel to be used to communicate with the SPU.
++  Mailbox channels correspond to DMA rings on the device.
++
++Example:
++	crypto at 612d0000 {
++		compatible = "brcm,spum-crypto";
++		reg = <0 0x612d0000 0 0x900>;
++		mboxes = <&pdc0 0>;
++	};
 -- 
 2.1.0
