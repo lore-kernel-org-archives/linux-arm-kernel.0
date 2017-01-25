@@ -1,47 +1,34 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Wed, 25 Jan 2017 10:30:16 +0100
-Subject: [PATCH] drivers: firmware: psci: Use __pa_symbol for cpu_resume
-In-Reply-To: <1485271819-2977-1-git-send-email-geert+renesas@glider.be>
-References: <1485271819-2977-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <7231fdec-7582-b330-fa8d-db194effa622@redhat.com>
+From: harinikatakamlinux@gmail.com (Harini Katakam)
+Date: Wed, 25 Jan 2017 15:07:55 +0530
+Subject: [PATCH net-next v2] macb: Common code to enable ptp support for
+ MACB/GEM
+In-Reply-To: <88d4aee3-cc38-b271-3f52-a28e5af7bdac@atmel.com>
+References: <1484841375-11420-1-git-send-email-andrei.pistirica@microchip.com>
+ <9bc6b112-f79c-58e4-7d2b-718ee07ff3a1@atmel.com>
+ <88d4aee3-cc38-b271-3f52-a28e5af7bdac@atmel.com>
+Message-ID: <CAFcVECJML0bPvituu4LFRjhXgPkQcgeJ5hY64pg_XfR7uDwuxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/24/2017 04:30 PM, Geert Uytterhoeven wrote:
-> If CONFIG_DEBUG_VIRTUAL=y, during s2ram:
->
->     virt_to_phys used for non-linear address: ffffff80085db280 (cpu_resume+0x0/0x20)
->     ------------[ cut here ]------------
->     WARNING: CPU: 0 PID: 1628 at arch/arm64/mm/physaddr.c:14 __virt_to_phys+0x28/0x60
->     ...
->     [<ffffff800809abb4>] __virt_to_phys+0x28/0x60
->     [<ffffff80084a0c38>] psci_system_suspend+0x20/0x44
->     [<ffffff8008095b28>] cpu_suspend+0x3c/0x68
->     [<ffffff80084a0b48>] psci_system_suspend_enter+0x18/0x20
->     [<ffffff80080ea3e0>] suspend_devices_and_enter+0x3f8/0x7e8
->     [<ffffff80080ead14>] pm_suspend+0x544/0x5f4
->
-> Fixes: 1a08e3d9e0ac4577 ("drivers: firmware: psci: Use __pa_symbol for kernel symbol")
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
->  drivers/firmware/psci.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> index 66a8793f3b3793ff..493a56a4cfc4a836 100644
-> --- a/drivers/firmware/psci.c
-> +++ b/drivers/firmware/psci.c
-> @@ -419,7 +419,7 @@ int psci_cpu_suspend_enter(unsigned long index)
->  static int psci_system_suspend(unsigned long unused)
->  {
->  	return invoke_psci_fn(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND),
-> -			      virt_to_phys(cpu_resume), 0, 0);
-> +			      __pa_symbol(cpu_resume), 0, 0);
->  }
->
->  static int psci_system_suspend_enter(suspend_state_t state)
->
+On Wed, Jan 25, 2017 at 2:56 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> Le 19/01/2017 ? 17:07, Nicolas Ferre a ?crit :
+>> Le 19/01/2017 ? 08:56, Andrei Pistirica a ?crit :
+>>> This patch does the following:
+>>> - MACB/GEM-PTP interface
+>>> - registers and bitfields for TSU
+>>> - capability flags to enable PTP per platform basis
+>>>
+>>> Signed-off-by: Andrei Pistirica <andrei.pistirica@microchip.com>
+>>
+>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-(thought I sent this yesterday but SMTP was not set correctly)
+Reviewed-by: Harini Katakam <harinik@xilinx.com>
 
-Acked-by: Laura Abbott <labbott@redhat.com>
+>
+> Harini or Rafal, do you plan to review this patch and add your
+> "Reviewed-by" tags? It can be useful to make this support move forward.
+
+Sure, reviewed and working with it, meant to add tag :)
+
+Regards,
+Harini
