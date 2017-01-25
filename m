@@ -1,102 +1,78 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 25 Jan 2017 10:17:36 +0100
-Subject: [PATCH v3 8/13] arm64: allwinner: a64: Add MMC nodes
-In-Reply-To: <20170116191641.GA11718@Red>
-References: <cover.a06ce1672d7a72ee7f9bbca46fdd223edd6b2313.1484585798.git-series.maxime.ripard@free-electrons.com>
- <ac77b9e25e7633886822cd1f1ebafd5985751ae4.1484585798.git-series.maxime.ripard@free-electrons.com>
- <20170116191641.GA11718@Red>
-Message-ID: <20170125091736.drdon6yjyjwngtja@lukather>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 25 Jan 2017 09:23:17 +0000
+Subject: [PATCH v2 1/2] PCI: Xilinx NWL: Modifying irq chip for legacy
+ interrupts
+In-Reply-To: <1485334353-26815-1-git-send-email-bharatku@xilinx.com>
+References: <1485334353-26815-1-git-send-email-bharatku@xilinx.com>
+Message-ID: <a5ec5158-a8ac-26a9-37f2-91307a2320ba@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Corentin,
+The subject line is not very descriptive. How about "Enforce level
+triggering for legacy interrupts"?
 
-On Mon, Jan 16, 2017 at 08:16:41PM +0100, Corentin Labbe wrote:
-> On Mon, Jan 16, 2017 at 05:56:58PM +0100, Maxime Ripard wrote:
-> > From: Andre Przywara <andre.przywara@arm.com>
-> > 
-> > The A64 has 3 MMC controllers, one of them being especially targeted to
-> > eMMC. Among other things, it has a data strobe signal and a 8 bits data
-> > width.
-> > 
-> > The two other are more usual controllers that will have a 4 bits width at
-> > most and no data strobe signal, which limits it to more usual SD or MMC
-> > peripherals.
-> > 
-> > Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 39 ++++++++++++++++++++-
-> >  1 file changed, 39 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> > index 99b6bb1e141c..143e9706438f 100644
-> > --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-> > @@ -299,6 +299,45 @@
-> >  			#size-cells = <0>;
-> >  		};
-> >  
-> > +		mmc0: mmc at 1c0f000 {
-> > +			compatible = "allwinner,sun50i-a64-mmc";
-> > +			reg = <0x01c0f000 0x1000>;
-> > +			clocks = <&ccu CLK_BUS_MMC0>, <&ccu CLK_MMC0>;
-> > +			clock-names = "ahb", "mmc";
-> > +			resets = <&ccu RST_BUS_MMC0>;
-> > +			reset-names = "ahb";
-> > +			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
-> > +			status = "disabled";
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +		};
-> > +
-> > +		mmc1: mmc at 1c10000 {
-> > +			compatible = "allwinner,sun50i-a64-mmc";
-> > +			reg = <0x01c10000 0x1000>;
-> > +			clocks = <&ccu CLK_BUS_MMC1>, <&ccu CLK_MMC1>;
-> > +			clock-names = "ahb", "mmc";
-> > +			resets = <&ccu RST_BUS_MMC1>;
-> > +			reset-names = "ahb";
-> > +			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
-> > +			status = "disabled";
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +		};
-> > +
-> > +		mmc2: mmc at 1c11000 {
-> > +			compatible = "allwinner,sun50i-a64-emmc";
-> > +			reg = <0x01c11000 0x1000>;
-> > +			clocks = <&ccu CLK_BUS_MMC2>, <&ccu CLK_MMC2>;
-> > +			clock-names = "ahb", "mmc";
-> > +			resets = <&ccu RST_BUS_MMC2>;
-> > +			reset-names = "ahb";
-> > +			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
-> > +			status = "disabled";
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +		};
-> > +
-> >  		gic: interrupt-controller at 1c81000 {
-> >  			compatible = "arm,gic-400";
-> >  			reg = <0x01c81000 0x1000>,
+On 25/01/17 08:52, Bharat Kumar Gogada wrote:
+> - Few wifi end points which only support legacy interrupts,
+> performs hardware reset functionalities after disabling interrupts
+> by invoking disable_irq and then re-enable using enable_irq, they
+> enable hardware interrupts first and then virtual irq line later.
+> - The legacy irq line goes low only after DEASSERT_INTx is
+> received.As the legacy irq line is high immediately after hardware
+> interrupts are enabled but virq of EP is still in disabled state
+> and EP handler is never executed resulting no DEASSERT_INTx.If dummy
+> irq chip is used, interrutps are not masked and system is
+
+                    interrupts
+
+> hanging with CPU stall.
+> - Adding irq chip functions instead of dummy irq chip for legacy
+> interrupts.
+> - Legacy interrupts are level sensitive, so using handle_level_irq
+> is more appropriate as it is masks interrupts until End point handles
+> interrupts and unmasks interrutps after End point handler is executed.
+
+                         interrupts
+
 > 
-> Hello
+> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+> ---
+>  drivers/pci/host/pcie-xilinx-nwl.c | 36 +++++++++++++++++++++++++++++++++++-
+>  1 file changed, 35 insertions(+), 1 deletion(-)
 > 
-> It seems that mmc node is after i2c at 1c2b400 so not in address order.
+> diff --git a/drivers/pci/host/pcie-xilinx-nwl.c b/drivers/pci/host/pcie-xilinx-nwl.c
+> index 43eaa4a..6ac3e1d 100644
+> --- a/drivers/pci/host/pcie-xilinx-nwl.c
+> +++ b/drivers/pci/host/pcie-xilinx-nwl.c
+> @@ -395,10 +395,44 @@ static void nwl_pcie_msi_handler_low(struct irq_desc *desc)
+>  	chained_irq_exit(chip, desc);
+>  }
+>  
+> +static void nwl_mask_leg_irq(struct irq_data *data)
+> +{
+> +	struct irq_desc *desc = irq_to_desc(data->irq);
+> +	struct nwl_pcie *pcie;
+> +	u32 mask;
+> +	u32 val;
+> +
+> +	pcie = irq_desc_get_chip_data(desc);
+> +	mask = 1 << (data->hwirq - 1);
+> +	val = nwl_bridge_readl(pcie, MSGF_LEG_MASK);
+> +	nwl_bridge_writel(pcie, (val & (~mask)), MSGF_LEG_MASK);
 
-You're right, I'll fix this in the v3.
+Oh please! Think of the following:
 
-Thanks!
-Maxime
+	cpu0	cpu1
+	read
+		read
+		write
+	write
 
+How can you make this reliable if you don't have any form of mutual
+exclusion that spans both mask and unmask, and ensures the atomicity of
+the RMW sequence?
+
+Thanks,
+
+	M.
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/b21e783c/attachment.sig>
+Jazz is not dead. It just smells funny...
