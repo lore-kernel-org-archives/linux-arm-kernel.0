@@ -1,49 +1,62 @@
-From: joerg.krause@embedded.rocks (=?ISO-8859-1?Q?J=F6rg?= Krause)
-Date: Wed, 25 Jan 2017 13:54:37 +0100
-Subject: Still having noise issues when recording sound on i.MX28
-Message-ID: <1485348877.16373.7.camel@embedded.rocks>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 25 Jan 2017 12:54:52 +0000
+Subject: [PATCH] arm64: dma-mapping: Fix dma_mapping_error() when
+ bypassing SWIOTLB
+In-Reply-To: <CAK8P3a1qVsUSFCOKpbtVu0_uYb3qhzRr8edZxjrMaHnbgjmcBA@mail.gmail.com>
+References: <20170124225200.a7qioswpxzh6agvd@raspberrypi-2.musicnaut.iki.fi>
+ <9e74b2f91b0b4b649a898db47225e5ea3b6a0417.1485345401.git.robin.murphy@arm.com>
+ <1485347826.2306.3.camel@crowfest.net>
+ <CAK8P3a1qVsUSFCOKpbtVu0_uYb3qhzRr8edZxjrMaHnbgjmcBA@mail.gmail.com>
+Message-ID: <81482ad2-331a-df33-66a2-f5fedc0bd7bb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 25/01/17 12:51, Arnd Bergmann wrote:
+> On Wed, Jan 25, 2017 at 1:37 PM, Michael Zoran <mzoran@crowfest.net> wrote:
+>> On Wed, 2017-01-25 at 12:03 +0000, Robin Murphy wrote:
+>>> hen bypassing SWIOTLB on small-memory systems, we need to avoid
+>>> calling
+>>> into swiotlb_dma_mapping_error() in exactly the same way as we avoid
+>>> swiotlb_dma_supported(), because the former also relies on SWIOTLB
+>>> state
+>>> being initialised.
+>>
+>> I didn't submit the initial ARM64 port of the RPI 3, so I don't know
+>> much about this.  But from a third personal point of view, this seems
+>> to side step the main issue here.
+> 
+> I think Robin's approach is fixing exactly the right part of the code.
+> 
+>> From an ARM64 subsystem point of view, what exactly is the
+>> correct/recommended method for ensuring the mm subsystem is initialized
+>> correctly?
+> 
+> It is initialized correctly, the bug was calling the wrong helper when swiotlb
+> is not used because we determined that we don't need it.
+> 
+> One concern from inspection:
+> 
+>> +static int __swiotlb_dma_mapping_error(struct device *hwdev, dma_addr_t addr)
+>> +{
+>> +       if (swiotlb)
+>> +               return swiotlb_dma_mapping_error(hwdev, addr);
+>> +       return 1;
+>> +}
+> 
+> Shouldn't that be
+> 
+>      return addr == DMA_ERROR_CODE;
+> 
+> in the last line? Otherwise any addr is interpreted as an error, which
+> seems wrong. Maybe I'm missing something obvious here.
 
-I am working on a custom i.MX28 based board using mainline Linux 4.9.
-The hardware design is based on the i.MX28-EVK: SAIF0 is used for
-playback, SAIF1 for record, and SAIF0 is the master of SAIF1:
+Aw crap, copy/paste/brain error - thanks.
 
-&saif0 {
-????????pinctrl-names = "default";
-????????pinctrl-0 = <&saif0_pins_a>;
-????????status = "okay";
-};
+I'll have a nice strong cup of tea, actually engage thinking mode, and
+respin...
 
-&saif1 {
-????????pinctrl-names = "default";
-????????pinctrl-0 = <&saif1_pins_a>;
-????????fsl,saif-master = <&saif0>;
-????????status = "okay";
-};
+Robin.
 
-The test application is to start recording after boot-up with arecord,
-and playback the recorded sound with aplay. Mostly, the result is
-pretty good, but occasionally, the result contains noise. Furthermore,
-the noise varies, sometimes I still can hear some samples of the
-original sound, sometimes it's all garbage.
-
-I verified that the codec, a WM8731, works properly, by connecting the
-I2S interface to a seperate codec, where the DATA OUT pin of the WM8731
-is connected to the second codecs DATA IN pin. The output of the second
-codec does not contain any noise. So, it is not a codec problem, but
-most probably a syncing issue with SAIF0 and SAIF1.
-
-I have noticed the thread "noise issues when recording sound on i.MX28"
-[1] opened by Uwe Kleine-K?nig, but it seems the problem was not
-resolved, right?
-
-Is anyone facing the same problem? Has anyone found a solution for this
-using the mainline kernel?
-
-[1] https://www.spinics.net/lists/arm-kernel/msg477349.html
-
-Best regards,
-J?rg Krause
+> 
+>     Arnd
+> 
