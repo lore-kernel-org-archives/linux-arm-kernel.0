@@ -1,56 +1,25 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 25 Jan 2017 12:03:51 +0000
-Subject: [PATCH] arm64: dma-mapping: Fix dma_mapping_error() when bypassing
- SWIOTLB
-In-Reply-To: <20170124225200.a7qioswpxzh6agvd@raspberrypi-2.musicnaut.iki.fi>
-References: <20170124225200.a7qioswpxzh6agvd@raspberrypi-2.musicnaut.iki.fi>
-Message-ID: <9e74b2f91b0b4b649a898db47225e5ea3b6a0417.1485345401.git.robin.murphy@arm.com>
+From: sunil.kovvuri@gmail.com (sunil.kovvuri at gmail.com)
+Date: Wed, 25 Jan 2017 17:36:22 +0530
+Subject: [PATCH 0/2] More ethtool support and BGX configuration changes
+Message-ID: <1485345984-28163-1-git-send-email-sunil.kovvuri@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When bypassing SWIOTLB on small-memory systems, we need to avoid calling
-into swiotlb_dma_mapping_error() in exactly the same way as we avoid
-swiotlb_dma_supported(), because the former also relies on SWIOTLB state
-being initialised.
+From: Sunil Goutham <sgoutham@cavium.com>
 
-Fixes: b67a8b29df7e ("arm64: mm: only initialize swiotlb when necessary")
-CC: stable at vger.kernel.org
-CC: Jisheng Zhang <jszhang@marvell.com>
-Reported-by: Aaro Koskinen <aaro.koskinen@iki.fi>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+These patches adds support to set queue sizes from ethtool and changes 
+the way serdes lane configuration is done by BGX driver on 81/83xx 
+platforms.
 
-Not a SWIOTLB problem :)
+Sunil Goutham (2):
+  net: thunderx: Support to configure queue sizes from ethtool
+  net: thunderx: Leave serdes lane config on 81/83xx to firmware
 
- arch/arm64/mm/dma-mapping.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ .../net/ethernet/cavium/thunder/nicvf_ethtool.c    | 39 ++++++++-
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c | 19 ++++-
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.h | 16 +++-
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c  | 95 ++++------------------
+ 4 files changed, 83 insertions(+), 86 deletions(-)
 
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index e04082700bb1..0ea94c782382 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -352,6 +352,13 @@ static int __swiotlb_dma_supported(struct device *hwdev, u64 mask)
- 	return 1;
- }
- 
-+static int __swiotlb_dma_mapping_error(struct device *hwdev, dma_addr_t addr)
-+{
-+	if (swiotlb)
-+		return swiotlb_dma_mapping_error(hwdev, addr);
-+	return 1;
-+}
-+
- static struct dma_map_ops swiotlb_dma_ops = {
- 	.alloc = __dma_alloc,
- 	.free = __dma_free,
-@@ -366,7 +373,7 @@ static struct dma_map_ops swiotlb_dma_ops = {
- 	.sync_sg_for_cpu = __swiotlb_sync_sg_for_cpu,
- 	.sync_sg_for_device = __swiotlb_sync_sg_for_device,
- 	.dma_supported = __swiotlb_dma_supported,
--	.mapping_error = swiotlb_dma_mapping_error,
-+	.mapping_error = __swiotlb_dma_mapping_error,
- };
- 
- static int __init atomic_pool_init(void)
 -- 
-2.11.0.dirty
+2.7.4
