@@ -1,66 +1,56 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Wed, 25 Jan 2017 12:03:06 +0000
-Subject: [PATCH] arm64: skip register_cpufreq_notifier on ACPI-based
- systems
-In-Reply-To: <1485304992-26888-1-git-send-email-pprakash@codeaurora.org>
-References: <1485304992-26888-1-git-send-email-pprakash@codeaurora.org>
-Message-ID: <20170125120306.GC8093@e106622-lin>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 25 Jan 2017 12:03:51 +0000
+Subject: [PATCH] arm64: dma-mapping: Fix dma_mapping_error() when bypassing
+ SWIOTLB
+In-Reply-To: <20170124225200.a7qioswpxzh6agvd@raspberrypi-2.musicnaut.iki.fi>
+References: <20170124225200.a7qioswpxzh6agvd@raspberrypi-2.musicnaut.iki.fi>
+Message-ID: <9e74b2f91b0b4b649a898db47225e5ea3b6a0417.1485345401.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+When bypassing SWIOTLB on small-memory systems, we need to avoid calling
+into swiotlb_dma_mapping_error() in exactly the same way as we avoid
+swiotlb_dma_supported(), because the former also relies on SWIOTLB state
+being initialised.
 
-On 24/01/17 17:43, Prashanth Prakash wrote:
-> On ACPI based systems where the topology is setup using the API
-> store_cpu_topology, at the moment we do not have necessary code
-> to handle a cpufreq notifier, thus resulting in a crash.
-> 
-> Skip register_cpufreq_notifier if raw_capacity is not allocated
-> as part of topology initialization.
-> 
-> Stack:
->         init_cpu_capacity_callback+0xb4/0x1c8
->         notifier_call_chain+0x5c/0xa0
->         __blocking_notifier_call_chain+0x58/0xa0
->         blocking_notifier_call_chain+0x3c/0x50
->         cpufreq_set_policy+0xe4/0x328
->         cpufreq_init_policy+0x80/0x100
->         cpufreq_online+0x418/0x710
->         cpufreq_add_dev+0x118/0x180
->         subsys_interface_register+0xa4/0xf8
->         cpufreq_register_driver+0x1c0/0x298
->         cppc_cpufreq_init+0xdc/0x1000 [cppc_cpufreq]
->         do_one_initcall+0x5c/0x168
->         do_init_module+0x64/0x1e4
->         load_module+0x130c/0x14d0
->         SyS_finit_module+0x108/0x120
->         el0_svc_naked+0x24/0x28
-> 
-> Patch that added support for popultaing cpu capacity for DT:
-> https://patchwork.codeaurora.org/patch/98353/
-> 
-> Signed-off-by: Prashanth Prakash <pprakash@codeaurora.org>
-> ---
->  arch/arm64/kernel/topology.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
-> index 23e9e13..3f175ce 100644
-> --- a/arch/arm64/kernel/topology.c
-> +++ b/arch/arm64/kernel/topology.c
-> @@ -209,7 +209,7 @@ static void normalize_cpu_capacity(void)
->  
->  static int __init register_cpufreq_notifier(void)
->  {
-> -	if (cap_parsing_failed)
-> +	if (cap_parsing_failed || !raw_capacity)
+Fixes: b67a8b29df7e ("arm64: mm: only initialize swiotlb when necessary")
+CC: stable at vger.kernel.org
+CC: Jisheng Zhang <jszhang@marvell.com>
+Reported-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
 
-Looks good. I couldn't really test it to check if it fixes your problem
-(I assume it does), but it doesn't seem to introduce regressions on my
-boxes.
+Not a SWIOTLB problem :)
 
-Reviewed-by: Juri Lelli <juri.lelli@arm.com>
+ arch/arm64/mm/dma-mapping.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-Thanks,
-
-- Juri
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index e04082700bb1..0ea94c782382 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -352,6 +352,13 @@ static int __swiotlb_dma_supported(struct device *hwdev, u64 mask)
+ 	return 1;
+ }
+ 
++static int __swiotlb_dma_mapping_error(struct device *hwdev, dma_addr_t addr)
++{
++	if (swiotlb)
++		return swiotlb_dma_mapping_error(hwdev, addr);
++	return 1;
++}
++
+ static struct dma_map_ops swiotlb_dma_ops = {
+ 	.alloc = __dma_alloc,
+ 	.free = __dma_free,
+@@ -366,7 +373,7 @@ static struct dma_map_ops swiotlb_dma_ops = {
+ 	.sync_sg_for_cpu = __swiotlb_sync_sg_for_cpu,
+ 	.sync_sg_for_device = __swiotlb_sync_sg_for_device,
+ 	.dma_supported = __swiotlb_dma_supported,
+-	.mapping_error = swiotlb_dma_mapping_error,
++	.mapping_error = __swiotlb_dma_mapping_error,
+ };
+ 
+ static int __init atomic_pool_init(void)
+-- 
+2.11.0.dirty
