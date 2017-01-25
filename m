@@ -1,24 +1,27 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 25 Jan 2017 12:34:29 +0000
-Subject: [PATCH] spi: mediatek: Manually set dma_ops for spi_master device
-In-Reply-To: <CAGS+omBV3o1hergAjU3_9ok5NTmk8Z315zo3yW9jU_jA+reZCQ@mail.gmail.com>
-References: <20170124132519.13271-1-djkurtz@chromium.org>
- <b1180920-8ead-40e8-6155-8510226e719b@arm.com>
- <CAGS+omBV3o1hergAjU3_9ok5NTmk8Z315zo3yW9jU_jA+reZCQ@mail.gmail.com>
-Message-ID: <20170125123429.dj4zln2kukuw3omx@sirena.org.uk>
+From: mzoran@crowfest.net (Michael Zoran)
+Date: Wed, 25 Jan 2017 04:37:06 -0800
+Subject: [PATCH] arm64: dma-mapping: Fix dma_mapping_error() when
+ bypassing SWIOTLB
+In-Reply-To: <9e74b2f91b0b4b649a898db47225e5ea3b6a0417.1485345401.git.robin.murphy@arm.com>
+References: <20170124225200.a7qioswpxzh6agvd@raspberrypi-2.musicnaut.iki.fi>
+ <9e74b2f91b0b4b649a898db47225e5ea3b6a0417.1485345401.git.robin.murphy@arm.com>
+Message-ID: <1485347826.2306.3.camel@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2017 at 06:24:12PM +0800, Daniel Kurtz wrote:
+On Wed, 2017-01-25 at 12:03 +0000, Robin Murphy wrote:
+> hen bypassing SWIOTLB on small-memory systems, we need to avoid
+> calling
+> into swiotlb_dma_mapping_error() in exactly the same way as we avoid
+> swiotlb_dma_supported(), because the former also relies on SWIOTLB
+> state
+> being initialised.
+> 
 
-> I'm in a bit over my head here, any suggestions on how to fix this?
+I didn't submit the initial ARM64 port of the RPI 3, so I don't know
+much about this.  But from a third personal point of view, this seems
+to side step the main issue here.
 
-As both Robin and I said the driver should be using the platform device
-which physically exists rather than the virtual master device.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/b6c4bea8/attachment-0001.sig>
+>From an ARM64 subsystem point of view, what exactly is the
+correct/recommended method for ensuring the mm subsystem is initialized
+correctly?
