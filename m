@@ -1,40 +1,45 @@
 From: labbott@redhat.com (Laura Abbott)
-Date: Wed, 25 Jan 2017 10:30:00 +0100
-Subject: [PATCH] arm64: Use __pa_symbol for empty_zero_page
-In-Reply-To: <1485258220-21916-1-git-send-email-geert+renesas@glider.be>
-References: <1485258220-21916-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <ce01d0cb-79a2-def8-8de0-d4ca3980e8e8@redhat.com>
+Date: Wed, 25 Jan 2017 10:30:16 +0100
+Subject: [PATCH] drivers: firmware: psci: Use __pa_symbol for cpu_resume
+In-Reply-To: <1485271819-2977-1-git-send-email-geert+renesas@glider.be>
+References: <1485271819-2977-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <7231fdec-7582-b330-fa8d-db194effa622@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/24/2017 12:43 PM, Geert Uytterhoeven wrote:
-> If CONFIG_DEBUG_VIRTUAL=y and CONFIG_ARM64_SW_TTBR0_PAN=y:
+On 01/24/2017 04:30 PM, Geert Uytterhoeven wrote:
+> If CONFIG_DEBUG_VIRTUAL=y, during s2ram:
 >
->     virt_to_phys used for non-linear address: ffffff8008cc0000 (empty_zero_page+0x0/0x1000)
->     WARNING: CPU: 0 PID: 0 at arch/arm64/mm/physaddr.c:14 __virt_to_phys+0x28/0x60
+>     virt_to_phys used for non-linear address: ffffff80085db280 (cpu_resume+0x0/0x20)
+>     ------------[ cut here ]------------
+>     WARNING: CPU: 0 PID: 1628 at arch/arm64/mm/physaddr.c:14 __virt_to_phys+0x28/0x60
 >     ...
 >     [<ffffff800809abb4>] __virt_to_phys+0x28/0x60
->     [<ffffff8008a02600>] setup_arch+0x46c/0x4d4
+>     [<ffffff80084a0c38>] psci_system_suspend+0x20/0x44
+>     [<ffffff8008095b28>] cpu_suspend+0x3c/0x68
+>     [<ffffff80084a0b48>] psci_system_suspend_enter+0x18/0x20
+>     [<ffffff80080ea3e0>] suspend_devices_and_enter+0x3f8/0x7e8
+>     [<ffffff80080ead14>] pm_suspend+0x544/0x5f4
 >
-> Fixes: 2077be6783b5936c ("arm64: Use __pa_symbol for kernel symbols")
+> Fixes: 1a08e3d9e0ac4577 ("drivers: firmware: psci: Use __pa_symbol for kernel symbol")
 > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > ---
->  arch/arm64/kernel/setup.c | 2 +-
+>  drivers/firmware/psci.c | 2 +-
 >  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index 669fc9ff728b227f..b5222094ab52db6f 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -298,7 +298,7 @@ void __init setup_arch(char **cmdline_p)
->  	 * faults in case uaccess_enable() is inadvertently called by the init
->  	 * thread.
->  	 */
-> -	init_task.thread_info.ttbr0 = virt_to_phys(empty_zero_page);
-> +	init_task.thread_info.ttbr0 = __pa_symbol(empty_zero_page);
->  #endif
+> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+> index 66a8793f3b3793ff..493a56a4cfc4a836 100644
+> --- a/drivers/firmware/psci.c
+> +++ b/drivers/firmware/psci.c
+> @@ -419,7 +419,7 @@ int psci_cpu_suspend_enter(unsigned long index)
+>  static int psci_system_suspend(unsigned long unused)
+>  {
+>  	return invoke_psci_fn(PSCI_FN_NATIVE(1_0, SYSTEM_SUSPEND),
+> -			      virt_to_phys(cpu_resume), 0, 0);
+> +			      __pa_symbol(cpu_resume), 0, 0);
+>  }
 >
->  #ifdef CONFIG_VT
+>  static int psci_system_suspend_enter(suspend_state_t state)
 >
 
 (thought I sent this yesterday but SMTP was not set correctly)
