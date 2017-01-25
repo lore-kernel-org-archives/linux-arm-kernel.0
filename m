@@ -1,52 +1,38 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 25 Jan 2017 15:36:31 +0000
-Subject: [PATCH 3/3] arm/arm64: KVM: Get rid of KVM_MEMSLOT_INCOHERENT
-In-Reply-To: <1485358591-12278-1-git-send-email-marc.zyngier@arm.com>
-References: <1485358591-12278-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1485358591-12278-4-git-send-email-marc.zyngier@arm.com>
+Date: Wed, 25 Jan 2017 15:36:28 +0000
+Subject: [PATCH 0/3] Fix cache flushing when mapping at stage-2
+Message-ID: <1485358591-12278-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KVM_MEMSLOT_INCOHERENT is not used anymore, as we've killed its
-only use in the arm/arm64 MMU code. Let's remove the last artifacts.
+When we fault in a page, we flush it to the PoC (Point of Coherency)
+if the faulting vcpu has its own caches off, so that it can observe
+the page we just brought it.
+    
+But if the vcpu has its caches on, we skip that step. Bad things
+happen when *another* vcpu tries to access that page with its own
+caches disabled. At that point, there is no garantee that the data has
+made it to the PoC, and we access stale data.
+    
+The obvious fix is to always flush to PoC when a page is faulted in,
+no matter what the state of the vcpu is.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kvm/mmu.c       | 9 ---------
- include/linux/kvm_host.h | 1 -
- 2 files changed, 10 deletions(-)
+This leads to additional cleanups, removing the code that was forcing
+read-only memslots to be flushed to PoC as well (since the flushing is
+now unconditional). Only the first patch is critical, and deserves a
+Cc to stable.
 
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 5cc35080..962616f 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -1876,15 +1876,6 @@ void kvm_arch_free_memslot(struct kvm *kvm, struct kvm_memory_slot *free,
- int kvm_arch_create_memslot(struct kvm *kvm, struct kvm_memory_slot *slot,
- 			    unsigned long npages)
- {
--	/*
--	 * Readonly memslots are not incoherent with the caches by definition,
--	 * but in practice, they are used mostly to emulate ROMs or NOR flashes
--	 * that the guest may consider devices and hence map as uncached.
--	 * To prevent incoherency issues in these cases, tag all readonly
--	 * regions as incoherent.
--	 */
--	if (slot->flags & KVM_MEM_READONLY)
--		slot->flags |= KVM_MEMSLOT_INCOHERENT;
- 	return 0;
- }
- 
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index 1c5190d..cda457b 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -45,7 +45,6 @@
-  * include/linux/kvm_h.
-  */
- #define KVM_MEMSLOT_INVALID	(1UL << 16)
--#define KVM_MEMSLOT_INCOHERENT	(1UL << 17)
- 
- /* Two fragments for cross MMIO pages. */
- #define KVM_MAX_MMIO_FRAGMENTS	2
+Marc Zyngier (3):
+  arm/arm64: KVM: Enforce unconditional flush to PoC when mapping to
+    stage-2
+  arm/arm64: KVM: Stop propagating cacheability status of a faulted page
+  arm/arm64: KVM: Get rid of KVM_MEMSLOT_INCOHERENT
+
+ arch/arm/include/asm/kvm_mmu.h   | 12 ++----------
+ arch/arm/kvm/mmu.c               | 20 ++++----------------
+ arch/arm64/include/asm/kvm_mmu.h |  6 ++----
+ include/linux/kvm_host.h         |  1 -
+ 4 files changed, 8 insertions(+), 31 deletions(-)
+
 -- 
 2.1.4
