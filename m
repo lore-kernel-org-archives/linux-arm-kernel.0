@@ -1,36 +1,55 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 25 Jan 2017 22:25:00 +0100
-Subject: [PATCH net-next v3 06/10] net: dsa: Migrate to device_find_class()
-In-Reply-To: <c98f3ff8-9d4e-a007-1fef-130fcf580201@gmail.com>
-References: <fc247aeb-a8d6-5ba9-c26d-cb057a5ac34d@gmail.com>
- <20170115173949.GA19268@kroah.com>
- <a9ea1f45-b9a5-d840-68e0-9bf9bc7a6598@gmail.com>
- <20170115191632.GD5643@lunn.ch>
- <912e6143-c67a-d909-2a6c-939de79efc5d@gmail.com>
- <20170119142820.GA494@kroah.com> <20170119145315.GD21805@lunn.ch>
- <20170119165155.GH27312@n2100.armlinux.org.uk>
- <841dc133-e9af-e7ca-75bf-8371337d6281@gmail.com>
- <c98f3ff8-9d4e-a007-1fef-130fcf580201@gmail.com>
-Message-ID: <20170125212500.GA6052@kroah.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 26 Jan 2017 00:42:17 +0300
+Subject: [PATCH v2] ARM: dts: r8a7791: link DU to VSPDs
+In-Reply-To: <1529351.Fac5N2tKoF@wasted.cogentembedded.com>
+References: <1529351.Fac5N2tKoF@wasted.cogentembedded.com>
+Message-ID: <2492577.tBEnW0tCHD@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2017 at 10:59:15AM -0800, Florian Fainelli wrote:
-> On 01/19/2017 10:12 AM, Florian Fainelli wrote:
-> > 
-> > Back to the actual code that triggered this discussion, the whole
-> > purpose is just a safeguard. Given a device reference, we can assume
-> > that it is indeed the backing device for a net_device, and we could do a
-> > to_net_device() right away (and crash if someone did not write correct
-> > platform_data structures), or, by walking the device tree (the device
-> > driver model one) we can make sure it does belong in the proper class
-> > and this is indeed what we think it is.
-> 
-> Greg, did Russell's explanation clarify things, or do you still think
-> this is completely bogus and we need to re design the whole thing?
-> 
-> Just asking so I can try to resubmit just the preparatory parts or just
-> the whole thing.
+Add the "vsps" property to the DU device node in order to link this node to
+the VSPD nodes.
 
-Sorry, I haven't gotten back to this, it's lower on my list.  Should try
-to get to it tomorrow...
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+---
+Changes in version 2:
+- rebased the patch.
+
+This patch is against the 'renesas-devel-20170125-v4.10-rc5' of Simon Horman's
+'renesas.git' repo.  It's  only meaningful if the DRM driver patches I've just
+posted are applied.
+
+ arch/arm/boot/dts/r8a7791.dtsi |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+Index: renesas/arch/arm/boot/dts/r8a7791.dtsi
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7791.dtsi
++++ renesas/arch/arm/boot/dts/r8a7791.dtsi
+@@ -992,7 +992,7 @@
+ 		power-domains = <&sysc R8A7791_PD_ALWAYS_ON>;
+ 	};
+ 
+-	vsp1 at fe930000 {
++	vspd0: vsp1 at fe930000 {
+ 		compatible = "renesas,vsp1";
+ 		reg = <0 0xfe930000 0 0x8000>;
+ 		interrupts = <GIC_SPI 246 IRQ_TYPE_LEVEL_HIGH>;
+@@ -1000,7 +1000,7 @@
+ 		power-domains = <&sysc R8A7791_PD_ALWAYS_ON>;
+ 	};
+ 
+-	vsp1 at fe938000 {
++	vspd1: vsp1 at fe938000 {
+ 		compatible = "renesas,vsp1";
+ 		reg = <0 0xfe938000 0 0x8000>;
+ 		interrupts = <GIC_SPI 247 IRQ_TYPE_LEVEL_HIGH>;
+@@ -1019,6 +1019,7 @@
+ 			 <&mstp7_clks R8A7791_CLK_DU1>,
+ 			 <&mstp7_clks R8A7791_CLK_LVDS0>;
+ 		clock-names = "du.0", "du.1", "lvds.0";
++		vsps = <&vspd0 &vspd1>;
+ 		status = "disabled";
+ 
+ 		ports {
