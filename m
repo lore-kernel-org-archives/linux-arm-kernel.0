@@ -1,13 +1,13 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Wed, 25 Jan 2017 14:46:56 +0100
-Subject: [GIT PULL] arm: mediatek: dts changes for v4.11
-Message-ID: <82e017a8-ade7-b16f-740c-6c106f2f8049@gmail.com>
+Date: Wed, 25 Jan 2017 14:48:24 +0100
+Subject: [GIT PULL] arm64: mediatek: dts changes for v4.11
+Message-ID: <943b4e63-d2bc-0b9c-f4a7-4689f2ac48ea@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd, hi Olof,
 
-Please merge the following changes for 32-bit dts files.
+Please merge the following changes for 64-bit dts files.
 
 Thanks,
 Matthias
@@ -20,53 +20,28 @@ The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 
 are available in the git repository at:
 
-   https://github.com/mbgg/linux-mediatek.git tags/v4.10-next-dts32
+   https://github.com/mbgg/linux-mediatek.git tags/v4.10-next-dts
 
-for you to fetch changes up to e348dc74f798c2df31c685bf0c814396f4f3b735:
+for you to fetch changes up to 6de18454e06f4eb9c0c7008d3999cd1d0b289d42:
 
-   arm: dts: mt2701: Add thermal device node. (2017-01-24 11:24:35 +0100)
-
-----------------------------------------------------------------
-Lots of updates for mt2701:
-Rearrange the dt nodes and fix unit address for pincontroler
-Add nodes for:
-- clock controller subsystems
-- scpsys controller
-- iommu and smi
-- spi
-- nand
-- auxadc
-- thermal controller and zones
-
-Email address updated for mt7623 devicetree files.
+   arm64: dts: mt8173: add node for thermal calibration (2017-01-23 
+10:18:13 +0100)
 
 ----------------------------------------------------------------
-Dawei Chien (1):
-       arm: dts: mt2701: Add thermal device node.
+For mt8173:
+- set mm_sel clock to 400 MHz to support 4K HDMI
+- adjust power efficiency between the little and big cores
+- add a node for thermal calibration via e-fuse data
 
-Honghui Zhang (1):
-       ARM: dts: mt2701: add iommu/smi dtsi node for mt2701
+----------------------------------------------------------------
+Bibby Hsieh (1):
+       arm64: dts: mt8173: add mmsel clocks for 4K support
 
-James Liao (3):
-       arm: dts: mt2701: Sort DT nodes by register address
-       arm: dts: mt2701: Add subsystem clock controller device nodes
-       arm: dts: mt2701: Add power domain controller device node
+Daniel Kurtz (1):
+       arm64: dts: mt8173: Fix cpu_thermal cooling-maps contributions
 
-John Crispin (1):
-       ARM: dts: mediatek: update my email address
+dawei.chien at mediatek.com (1):
+       arm64: dts: mt8173: add node for thermal calibration
 
-Leilk Liu (1):
-       arm: dts: mt2701: Add spi device node
-
-Xiaolei Li (1):
-       arm: dts: mt2701: Add nand device node
-
-Zhiyong Tao (1):
-       arm: dts: mt2701: Add auxadc device node.
-
-  arch/arm/boot/dts/mt2701-evb.dts |  54 +++++++++
-  arch/arm/boot/dts/mt2701.dtsi    | 247 
-++++++++++++++++++++++++++++++++++++---
-  arch/arm/boot/dts/mt7623-evb.dts |   2 +-
-  arch/arm/boot/dts/mt7623.dtsi    |   2 +-
-  4 files changed, 285 insertions(+), 20 deletions(-)
+  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 13 +++++++++++--
+  1 file changed, 11 insertions(+), 2 deletions(-)
