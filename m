@@ -1,65 +1,187 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 25 Jan 2017 11:40:02 +0000
-Subject: [STLinux Kernel] [PATCH 8/8] ARM: dts: STiH407-family: Enable HW
- flow-control
-In-Reply-To: <20170125105912.GA5680@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <20170124134310.27512-1-lee.jones@linaro.org>
- <20170124134310.27512-9-lee.jones@linaro.org>
- <20170125105912.GA5680@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <20170125114002.GG5680@griffinp-ThinkPad-X1-Carbon-2nd>
+From: labbott@redhat.com (Laura Abbott)
+Date: Wed, 25 Jan 2017 12:44:14 +0100
+Subject: [PATCH 2/2] security: Change name of CONFIG_DEBUG_SET_MODULE_RONX
+In-Reply-To: <5005f110-2279-9ac7-c9c5-1894b8f6387d@arm.com>
+References: <1484789346-21012-1-git-send-email-labbott@redhat.com>
+ <1484789346-21012-3-git-send-email-labbott@redhat.com>
+ <5005f110-2279-9ac7-c9c5-1894b8f6387d@arm.com>
+Message-ID: <c7182933-b255-78a1-178b-798262035272@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Jan 2017, Peter Griffin wrote:
+On 01/19/2017 12:43 PM, Robin Murphy wrote:
+> Hi Laura,
+>
+> On 19/01/17 01:29, Laura Abbott wrote:
+>>
+>> Despite the word 'debug' in CONFIG_DEBUG_SET_MODULE_RONX, this kernel
+>> option provides key security features that are to be expected on a
+>> modern system. Change the name to CONFIG_HARDENED_MODULE_MAPPINGS which
+>> more accurately describes what this option is intended to do.
+>>
+>> Signed-off-by: Laura Abbott <labbott@redhat.com>
+>> ---
+>
+> [...]
+>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index 09aff28..ef852e4 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -8,6 +8,7 @@ config ARM
+>>  	select ARCH_HAVE_CUSTOM_GPIO_H
+>>  	select ARCH_HAS_GCOV_PROFILE_ALL
+>>  	select ARCH_HAS_HARDENED_MAPPINGS if MMU && !XIP_KERNEL
+>> +	select ARCH_HAS_HARDENED_MODULE_MAPPINGS if MMU
+>>  	select ARCH_MIGHT_HAVE_PC_PARPORT
+>>  	select ARCH_SUPPORTS_ATOMIC_RMW
+>>  	select ARCH_USE_BUILTIN_BSWAP
+>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+>> index d83f7c3..426d271 100644
+>> --- a/arch/arm/Kconfig.debug
+>> +++ b/arch/arm/Kconfig.debug
+>> @@ -1738,17 +1738,6 @@ config PID_IN_CONTEXTIDR
+>>  	  additional instructions during context switch. Say Y here only if you
+>>  	  are planning to use hardware trace tools with this kernel.
+>>
+>> -config DEBUG_SET_MODULE_RONX
+>> -	bool "Set loadable kernel module data as NX and text as RO"
+>> -	depends on MODULES && MMU
+>> -	---help---
+>> -	  This option helps catch unintended modifications to loadable
+>> -	  kernel module's text and read-only data. It also prevents execution
+>> -	  of module data. Such protection may interfere with run-time code
+>> -	  patching and dynamic kernel tracing - and they might also protect
+>> -	  against certain classes of kernel exploits.
+>> -	  If in doubt, say "N".
+>> -
+>>  source "drivers/hwtracing/coresight/Kconfig"
+>>
+>>  endmenu
+>
+> [...]
+>
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -12,6 +12,7 @@ config ARM64
+>>  	select ARCH_HAS_GCOV_PROFILE_ALL
+>>  	select ARCH_HAS_GIGANTIC_PAGE
+>>  	select ARCH_HAS_HARDENED_MAPPINGS
+>> +	select ARCH_HAS_HARDENED_MODULE_MAPPINGS
+>>  	select ARCH_HAS_KCOV
+>>  	select ARCH_HAS_SG_CHAIN
+>>  	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+>> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+>> index a26d27f..1eebe1f 100644
+>> --- a/arch/arm64/Kconfig.debug
+>> +++ b/arch/arm64/Kconfig.debug
+>> @@ -71,17 +71,6 @@ config DEBUG_WX
+>>
+>>  	  If in doubt, say "Y".
+>>
+>> -config DEBUG_SET_MODULE_RONX
+>> -	bool "Set loadable kernel module data as NX and text as RO"
+>> -	depends on MODULES
+>> -	default y
+>> -	help
+>> -	  Is this is set, kernel module text and rodata will be made read-only.
+>> -	  This is to help catch accidental or malicious attempts to change the
+>> -	  kernel's executable code.
+>> -
+>> -	  If in doubt, say Y.
+>> -
+>>  config DEBUG_ALIGN_RODATA
+>>  	depends on ARCH_HAS_HARDENED_MAPPINGS
+>>  	bool "Align linker sections up to SECTION_SIZE"
+>
+> [...]
+>
+>> --- a/arch/s390/Kconfig
+>> +++ b/arch/s390/Kconfig
+>> @@ -69,6 +69,7 @@ config S390
+>>  	select ARCH_HAS_GCOV_PROFILE_ALL
+>>  	select ARCH_HAS_GIGANTIC_PAGE
+>>  	select ARCH_HAS_HARDENED_MAPPINGS
+>> +	select ARCH_HAS_HARDENED_MODULE_MAPPINGS
+>>  	select ARCH_HAS_KCOV
+>>  	select ARCH_HAS_SG_CHAIN
+>>  	select ARCH_HAS_UBSAN_SANITIZE_ALL
+>> diff --git a/arch/s390/Kconfig.debug b/arch/s390/Kconfig.debug
+>> index 26c5d5be..57f8ea9 100644
+>> --- a/arch/s390/Kconfig.debug
+>> +++ b/arch/s390/Kconfig.debug
+>> @@ -17,7 +17,4 @@ config S390_PTDUMP
+>>  	  kernel.
+>>  	  If in doubt, say "N"
+>>
+>> -config DEBUG_SET_MODULE_RONX
+>> -	def_bool y
+>> -	depends on MODULES
+>>  endmenu
+>> diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
+>> index 9d80cd8..38ce850 100644
+>> --- a/arch/x86/Kconfig
+>> +++ b/arch/x86/Kconfig
+>> @@ -51,6 +51,7 @@ config X86
+>>  	select ARCH_HAS_FAST_MULTIPLIER
+>>  	select ARCH_HAS_GCOV_PROFILE_ALL
+>>  	select ARCH_HAS_HARDENED_MAPPINGS
+>> +	select ARCH_HAS_HARDENED_MODULE_MAPPINGS
+>>  	select ARCH_HAS_KCOV			if X86_64
+>>  	select ARCH_HAS_MMIO_FLUSH
+>>  	select ARCH_HAS_PMEM_API		if X86_64
+>> diff --git a/arch/x86/Kconfig.debug b/arch/x86/Kconfig.debug
+>> index 67eec55..69cdd0b 100644
+>> --- a/arch/x86/Kconfig.debug
+>> +++ b/arch/x86/Kconfig.debug
+>> @@ -109,17 +109,6 @@ config DEBUG_WX
+>>
+>>  	  If in doubt, say "Y".
+>>
+>> -config DEBUG_SET_MODULE_RONX
+>> -	bool "Set loadable kernel module data as NX and text as RO"
+>> -	depends on MODULES
+>> -	---help---
+>> -	  This option helps catch unintended modifications to loadable
+>> -	  kernel module's text and read-only data. It also prevents execution
+>> -	  of module data. Such protection may interfere with run-time code
+>> -	  patching and dynamic kernel tracing - and they might also protect
+>> -	  against certain classes of kernel exploits.
+>> -	  If in doubt, say "N".
+>> -
+>>  config DEBUG_NX_TEST
+>>  	tristate "Testcase for the NX non-executable stack feature"
+>>  	depends on DEBUG_KERNEL && m
+>
+> [...]
+>
+>> --- a/security/Kconfig
+>> +++ b/security/Kconfig
+>> @@ -174,6 +174,22 @@ config HARDENED_PAGE_MAPPINGS
+>>  	  Unless your system has known restrictions or performance issues, it
+>>  	  is recommended to say Y here.
+>>
+>> +config ARCH_HAS_HARDENED_MODULE_MAPPINGS
+>> +	def_bool n
+>> +
+>> +config HARDENED_MODULE_MAPPINGS
+>> +	bool "Mark module mappings with stricter permissions (RO/W^X)"
+>> +	default y
+>> +	depends on ARCH_HAS_HARDENED_MODULE_MAPPINGS
+>
+> It would seem that this ends up losing the previous dependency on
+> MODULES - is that intentional?
+>
+> Robin.
+>
 
-> Hi Lee,
-> 
-> On Tue, 24 Jan 2017, Lee Jones wrote:
-> 
-> > Hardware flow-control capability must be specified at a platform
-> > level in order to inform the ASC driver that the platform is capable
-> > (i.e. are the lines wired up, etc).  STiH4{07,10} devices are indeed
-> > capable, so let's provide the property.
-> > 
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  arch/arm/boot/dts/stih407-family.dtsi | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-> > index 9789978..7ada8ea 100644
-> > --- a/arch/arm/boot/dts/stih407-family.dtsi
-> > +++ b/arch/arm/boot/dts/stih407-family.dtsi
-> > @@ -226,7 +226,7 @@
-> >  			pinctrl-0 = <&pinctrl_serial0_flowctrl>;
-> >  			pinctrl-1 = <&pinctrl_serial0>;
-> >  			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
-> > -
-> > +			st,hw-flow-control;
-> 
-> There is a generic serial binding for this already. As this ST property
-> hasn't been used upstream, it seems like it would be worth dropping it
-> and switching to the generic uart-has-rtscts one.
-> 
-> See Documentation/devicetree/bindings/serial/serial.txt
-> 
->   - uart-has-rtscts: The presence of this property indicates that the
->     UART has dedicated lines for RTS/CTS hardware flow control, and that
->     they are available for use (wired and enabled by pinmux configuration).
->     This depends on both the UART hardware and the board wiring.
->     Note that this property is mutually-exclusive with "cts-gpios" and
->     "rts-gpios" above.
+(Apologies, my SMTP was set up incorrectly so this didn't actually
+get sent out when I thought it did)
 
-Thinking some more this generic binding definition is a bit restrictive,
-particularly the "Note that this property is mutually-exclusive with "cts-gpios"
-and "rts-gpios"" part.
+No, good catch. I missed re-adding that when doing the refactoring.
 
-As with this series we will have dynamic on-the-fly changing from hw flow
-control to gpio control for other configs which the HW IP doesn't support.
+Thanks,
+Laura
 
-IMO the uart-has-rtscts definition should be updated to reflect that they can
-be used together in certain circumstances.
-
-regards,
-
-Peter.
+>>
+>
