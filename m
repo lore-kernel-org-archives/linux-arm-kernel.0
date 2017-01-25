@@ -1,91 +1,36 @@
 From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 25 Jan 2017 22:24:09 +0100
-Subject: [PATCH] usb: musb: constify musb_hdrc_config structures
-In-Reply-To: <20170125165815.GA5318@uda0271908>
-References: <1485285742-6949-1-git-send-email-bhumirks@gmail.com>
- <20170125165815.GA5318@uda0271908>
-Message-ID: <20170125212409.GC5496@kroah.com>
+Date: Wed, 25 Jan 2017 22:25:00 +0100
+Subject: [PATCH net-next v3 06/10] net: dsa: Migrate to device_find_class()
+In-Reply-To: <c98f3ff8-9d4e-a007-1fef-130fcf580201@gmail.com>
+References: <fc247aeb-a8d6-5ba9-c26d-cb057a5ac34d@gmail.com>
+ <20170115173949.GA19268@kroah.com>
+ <a9ea1f45-b9a5-d840-68e0-9bf9bc7a6598@gmail.com>
+ <20170115191632.GD5643@lunn.ch>
+ <912e6143-c67a-d909-2a6c-939de79efc5d@gmail.com>
+ <20170119142820.GA494@kroah.com> <20170119145315.GD21805@lunn.ch>
+ <20170119165155.GH27312@n2100.armlinux.org.uk>
+ <841dc133-e9af-e7ca-75bf-8371337d6281@gmail.com>
+ <c98f3ff8-9d4e-a007-1fef-130fcf580201@gmail.com>
+Message-ID: <20170125212500.GA6052@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2017 at 10:58:15AM -0600, Bin Liu wrote:
-> On Wed, Jan 25, 2017 at 12:52:22AM +0530, Bhumika Goyal wrote:
-> > Declare musb_hdrc_config structures as const as they are only stored in
-> > the config field of a musb_hdrc_platform_data structure. This field is of
-> > type const, so musb_hdrc_config structures having this property can be
-> > made const too.
-> > Done using Coccinelle:
+On Tue, Jan 24, 2017 at 10:59:15AM -0800, Florian Fainelli wrote:
+> On 01/19/2017 10:12 AM, Florian Fainelli wrote:
 > > 
-> > @r disable optional_qualifier@
-> > identifier x;
-> > position p;
-> > @@
-> > static struct musb_hdrc_config x at p={...};
-> > 
-> > @ok@
-> > struct musb_hdrc_platform_data pdata;
-> > identifier r.x;
-> > position p;
-> > @@
-> > pdata.config=&x at p;
-> > 
-> > @bad@
-> > position p != {r.p,ok.p};
-> > identifier r.x;
-> > @@
-> > x at p
-> > 
-> > @depends on !bad disable optional_qualifier@
-> > identifier r.x;
-> > @@
-> > +const
-> > struct musb_hdrc_config x;
-> > 
-> > File size before:
-> >    text	   data	    bss	    dec	    hex	filename
-> >    1212	    338	      0	   1550	    60e	drivers/usb/musb/jz4740.o
-> > 
-> > File size after:
-> >    text	   data	    bss	    dec	    hex	filename
-> >    1268	    290	      0	   1558	    616	drivers/usb/musb/jz4740.o
-> > 
-> > File size before:
-> >    text	   data	    bss	    dec	    hex	filename
-> >    6151	    333	     16	   6500	   1964	drivers/usb/musb/sunxi.o
-> > 
-> > File size after:
-> >    text	   data	    bss	    dec	    hex	filename
-> >    6215	    269	     16	   6500	   1964	drivers/usb/musb/sunxi.o
-> > 
-> > File size before:
-> >    text	   data	    bss	    dec	    hex	filename
-> >    3668	    864	      0	   4532	   11b4	drivers/usb/musb/ux500.o
-> > 
-> > File size after:
-> >    text	   data	    bss	    dec	    hex	filename
-> >    3724	    808	      0	   4532	   11b4	drivers/usb/musb/ux500.o
-> > 
-> > Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+> > Back to the actual code that triggered this discussion, the whole
+> > purpose is just a safeguard. Given a device reference, we can assume
+> > that it is indeed the backing device for a net_device, and we could do a
+> > to_net_device() right away (and crash if someone did not write correct
+> > platform_data structures), or, by walking the device tree (the device
+> > driver model one) we can make sure it does belong in the proper class
+> > and this is indeed what we think it is.
 > 
-> Hi Greg,
+> Greg, did Russell's explanation clarify things, or do you still think
+> this is completely bogus and we need to re design the whole thing?
 > 
-> Why you don't want this patch go through my tree? Now it causes me tree
-> rebase failed. It should be easy to fix, but just wanted to learn your
-> rules.
+> Just asking so I can try to resubmit just the preparatory parts or just
+> the whole thing.
 
-What are you rebasing?  And why?  Just send me patches, I can merge them
-when they come in just fine.
-
-Normally yes, I do wait for these to go through your tree, but it was
-just so simple, and obvious, and in a bunch of others from the author,
-that I figured I could just take it as-is.
-
-sorry if it caused you problems, but you might want to look at your
-development process if it is.  You should always be able to handle other
-people changing files in your area at any point in time.  Kernel
-maintainership is not "no one else can ever touch this!" type of
-development, you have to be able to handle stuff like this easily.
-
-thanks,
-
-greg k-h
+Sorry, I haven't gotten back to this, it's lower on my list.  Should try
+to get to it tomorrow...
