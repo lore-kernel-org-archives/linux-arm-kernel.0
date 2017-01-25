@@ -1,33 +1,59 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 25 Jan 2017 12:09:33 +0100
-Subject: [PATCH v2 6/6] ARM: tegra: nyan-blaze: Proper pinmux for TPM i2c
-In-Reply-To: <20170122154753.31942-6-contact@paulk.fr>
-References: <20170122154753.31942-1-contact@paulk.fr>
- <20170122154753.31942-6-contact@paulk.fr>
-Message-ID: <20170125110933.GG9344@ulmo.ba.sec>
+From: abailon@baylibre.com (Alexandre Bailon)
+Date: Wed, 25 Jan 2017 12:09:35 +0100
+Subject: [PATCH v3] ARM: davinci: Make the usb20 clock available to PM runtime
+Message-ID: <20170125110935.20247-1-abailon@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 22, 2017 at 04:47:53PM +0100, Paul Kocialkowski wrote:
-> From: Jerome Coste <jerome.coste@etu.utc.fr>
-> 
-> This corrects the pinmux for accessing the TPM over the i2c line.
-> Thus, it allows correctly probing the module, that previously failed with i2c
-> errors.
+Since USB20 subsystem uses just one clock, there is no need of a con_id,
+so we are using NULL.
 
-This is missing a Signed-off-by: from Jerome and you (since you
-forwarded the patch). I've added those since I assume that that was
-intended and your both willing to provide it.
+Signed-off-by: Alexandre Bailon <abailon@baylibre.com>
+Suggested-by: Sekhar Nori <nsekhar@ti.com>
+---
+ arch/arm/mach-davinci/da830.c     | 2 +-
+ arch/arm/mach-davinci/da850.c     | 2 +-
+ arch/arm/mach-davinci/usb-da8xx.c | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-Other than that, same substitution for "i2c" -> "I2C" as on 5/6, and
-please also make sure this change gets into the pinmux configurations.
-
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/c9b564c3/attachment-0001.sig>
+diff --git a/arch/arm/mach-davinci/da830.c b/arch/arm/mach-davinci/da830.c
+index 073c458..2cfd9d7 100644
+--- a/arch/arm/mach-davinci/da830.c
++++ b/arch/arm/mach-davinci/da830.c
+@@ -412,7 +412,7 @@ static struct clk_lookup da830_clks[] = {
+ 	CLK("davinci-mcasp.0",	NULL,		&mcasp0_clk),
+ 	CLK("davinci-mcasp.1",	NULL,		&mcasp1_clk),
+ 	CLK("davinci-mcasp.2",	NULL,		&mcasp2_clk),
+-	CLK("musb-da8xx",	"usb20",	&usb20_clk),
++	CLK("musb-da8xx",	NULL,		&usb20_clk),
+ 	CLK(NULL,		"aemif",	&aemif_clk),
+ 	CLK(NULL,		"aintc",	&aintc_clk),
+ 	CLK(NULL,		"secu_mgr",	&secu_mgr_clk),
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index 9780829..5fe32ae 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -559,7 +559,7 @@ static struct clk_lookup da850_clks[] = {
+ 	CLK("ti-aemif",		NULL,		&aemif_clk),
+ 	CLK("davinci-nand.0",	"aemif",	&aemif_nand_clk),
+ 	CLK("ohci-da8xx",	"usb11",	&usb11_clk),
+-	CLK("musb-da8xx",	"usb20",	&usb20_clk),
++	CLK("musb-da8xx",	NULL,		&usb20_clk),
+ 	CLK("spi_davinci.0",	NULL,		&spi0_clk),
+ 	CLK("spi_davinci.1",	NULL,		&spi1_clk),
+ 	CLK("vpif",		NULL,		&vpif_clk),
+diff --git a/arch/arm/mach-davinci/usb-da8xx.c b/arch/arm/mach-davinci/usb-da8xx.c
+index 9a6af0b..9b66768 100644
+--- a/arch/arm/mach-davinci/usb-da8xx.c
++++ b/arch/arm/mach-davinci/usb-da8xx.c
+@@ -275,7 +275,7 @@ int __init da8xx_register_usb20_phy_clk(bool use_usb_refclkin)
+ 	struct clk *parent;
+ 	int ret;
+ 
+-	usb20_clk = clk_get(&da8xx_usb20_dev.dev, "usb20");
++	usb20_clk = clk_get(&da8xx_usb20_dev.dev, NULL);
+ 	ret = PTR_ERR_OR_ZERO(usb20_clk);
+ 	if (ret)
+ 		return ret;
+-- 
+2.10.2
