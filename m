@@ -1,56 +1,61 @@
 From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Wed, 25 Jan 2017 16:41:57 +0800
-Subject: [PATCH 4/4] rtc: sunxi: using devm_rtc_device_register helper
+Date: Wed, 25 Jan 2017 16:41:55 +0800
+Subject: [PATCH 2/4] rtc: st-lpc: using devm_rtc_device_register helper
 In-Reply-To: <1485333717-47536-1-git-send-email-wangkefeng.wang@huawei.com>
 References: <1485333717-47536-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1485333717-47536-4-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1485333717-47536-2-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Using devm_rtc_device_register() helper to simplify code.
 
+Cc: Patrice Chotard <patrice.chotard@st.com>
 Cc: Alessandro Zummo <a.zummo@towertech.it>
 Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 ---
- drivers/rtc/rtc-sunxi.c | 14 ++------------
- 1 file changed, 2 insertions(+), 12 deletions(-)
+ drivers/rtc/rtc-st-lpc.c | 15 ++-------------
+ 1 file changed, 2 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/rtc/rtc-sunxi.c b/drivers/rtc/rtc-sunxi.c
-index abada60..6fba5ae 100644
---- a/drivers/rtc/rtc-sunxi.c
-+++ b/drivers/rtc/rtc-sunxi.c
-@@ -481,8 +481,8 @@ static int sunxi_rtc_probe(struct platform_device *pdev)
- 	writel(SUNXI_ALRM_IRQ_STA_CNT_IRQ_PEND, chip->base +
- 			SUNXI_ALRM_IRQ_STA);
+diff --git a/drivers/rtc/rtc-st-lpc.c b/drivers/rtc/rtc-st-lpc.c
+index 74c0a33..4f81124 100644
+--- a/drivers/rtc/rtc-st-lpc.c
++++ b/drivers/rtc/rtc-st-lpc.c
+@@ -272,8 +272,8 @@ static int st_rtc_probe(struct platform_device *pdev)
+ 		st_rtc_set_time(&pdev->dev, &tm_check);
+ 	}
  
--	chip->rtc = rtc_device_register("rtc-sunxi", &pdev->dev,
--			&sunxi_rtc_ops, THIS_MODULE);
-+	chip->rtc = devm_rtc_device_register(&pdev->dev, "rtc-sunxi",
-+					     &sunxi_rtc_ops, THIS_MODULE);
- 	if (IS_ERR(chip->rtc)) {
- 		dev_err(&pdev->dev, "unable to register device\n");
- 		return PTR_ERR(chip->rtc);
-@@ -493,18 +493,8 @@ static int sunxi_rtc_probe(struct platform_device *pdev)
+-	rtc->rtc_dev = rtc_device_register("st-lpc-rtc", &pdev->dev,
+-					   &st_rtc_ops, THIS_MODULE);
++	rtc->rtc_dev = devm_rtc_device_register(&pdev->dev, "st-lpc-rtc",
++						&st_rtc_ops, THIS_MODULE);
+ 	if (IS_ERR(rtc->rtc_dev)) {
+ 		clk_disable_unprepare(rtc->clk);
+ 		return PTR_ERR(rtc->rtc_dev);
+@@ -282,16 +282,6 @@ static int st_rtc_probe(struct platform_device *pdev)
  	return 0;
  }
  
--static int sunxi_rtc_remove(struct platform_device *pdev)
+-static int st_rtc_remove(struct platform_device *pdev)
 -{
--	struct sunxi_rtc_dev *chip = platform_get_drvdata(pdev);
+-	struct st_rtc *rtc = platform_get_drvdata(pdev);
 -
--	rtc_device_unregister(chip->rtc);
+-	if (likely(rtc->rtc_dev))
+-		rtc_device_unregister(rtc->rtc_dev);
 -
 -	return 0;
 -}
 -
- static struct platform_driver sunxi_rtc_driver = {
- 	.probe		= sunxi_rtc_probe,
--	.remove		= sunxi_rtc_remove,
- 	.driver		= {
- 		.name		= "sunxi-rtc",
- 		.of_match_table = sunxi_rtc_dt_ids,
+ #ifdef CONFIG_PM_SLEEP
+ static int st_rtc_suspend(struct device *dev)
+ {
+@@ -344,7 +334,6 @@ static int st_rtc_resume(struct device *dev)
+ 		.of_match_table = st_rtc_match,
+ 	},
+ 	.probe = st_rtc_probe,
+-	.remove = st_rtc_remove,
+ };
+ 
+ module_platform_driver(st_rtc_platform_driver);
 -- 
 1.7.12.4
