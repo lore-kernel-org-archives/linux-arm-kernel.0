@@ -1,29 +1,119 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 25 Jan 2017 03:02:49 +0100
-Subject: [PATCH net-next v6 2/4] net: dsa: mv88e6xxx: Add support for
- ethernet switch 88E6341
-In-Reply-To: <bb6e3987ee942277e99c78d1f28112d8b4ecb744.1485288602.git-series.gregory.clement@free-electrons.com>
-References: <cover.b0e18efe751186768e720c341693117fdd4d3c16.1485288602.git-series.gregory.clement@free-electrons.com>
- <bb6e3987ee942277e99c78d1f28112d8b4ecb744.1485288602.git-series.gregory.clement@free-electrons.com>
-Message-ID: <20170125020249.GB24034@lunn.ch>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Tue, 24 Jan 2017 18:07:55 -0800
+Subject: [PATCH v3 13/24] platform: add video-multiplexer subdevice driver
+In-Reply-To: <1485259368.3600.126.camel@pengutronix.de>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <1483755102-24785-14-git-send-email-steve_longerbeam@mentor.com>
+ <b7695d77-4078-f171-d592-ff679e28b8e0@xs4all.nl>
+ <1485259368.3600.126.camel@pengutronix.de>
+Message-ID: <651d7b40-e87d-05ce-ae4d-256b0c1b28f7@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +	[MV88E6341] = {
-> +		.prod_num = PORT_SWITCH_ID_PROD_NUM_6341,
-> +		.family = MV88E6XXX_FAMILY_6341,
-> +		.name = "Marvell 88E6341",
-> +		.num_databases = 4096,
-> +		.num_ports = 6,
-> +		.port_base_addr = 0x10,
-> +		.global1_addr = 0x1b,
-> +		.age_time_coeff = 15000,
 
-Hi Gregory
 
-Please could you check this timer in the datasheet. There is currently
-a bug in the mv88e6390 support code. I also set it to 15s. But in fact
-it is 3.75 seconds. The 6341 might also use 3.75 seconds.
+On 01/24/2017 04:02 AM, Philipp Zabel wrote:
+> Hi Hans,
+>
+> On Fri, 2017-01-20 at 15:03 +0100, Hans Verkuil wrote:
+>> <snip>
+>>> +
+>>> +int vidsw_g_mbus_config(struct v4l2_subdev *sd, struct v4l2_mbus_config *cfg)
+>>> +{
+>>> +	struct vidsw *vidsw = v4l2_subdev_to_vidsw(sd);
+>>> +	struct media_pad *pad;
+>>> +	int ret;
+>>> +
+>>> +	if (vidsw->active == -1) {
+>>> +		dev_err(sd->dev, "no configuration for inactive mux\n");
+>>> +		return -EINVAL;
+>>> +	}
+>>> +
+>>> +	/*
+>>> +	 * Retrieve media bus configuration from the entity connected to the
+>>> +	 * active input
+>>> +	 */
+>>> +	pad = media_entity_remote_pad(&vidsw->pads[vidsw->active]);
+>>> +	if (pad) {
+>>> +		sd = media_entity_to_v4l2_subdev(pad->entity);
+>>> +		ret = v4l2_subdev_call(sd, video, g_mbus_config, cfg);
+>>> +		if (ret == -ENOIOCTLCMD)
+>>> +			pad = NULL;
+>>> +		else if (ret < 0) {
+>>> +			dev_err(sd->dev, "failed to get source configuration\n");
+>>> +			return ret;
+>>> +		}
+>>> +	}
+>>> +	if (!pad) {
+>>> +		/* Mirror the input side on the output side */
+>>> +		cfg->type = vidsw->endpoint[vidsw->active].bus_type;
+>>> +		if (cfg->type == V4L2_MBUS_PARALLEL ||
+>>> +		    cfg->type == V4L2_MBUS_BT656)
+>>> +			cfg->flags = vidsw->endpoint[vidsw->active].bus.parallel.flags;
+>>> +	}
+>>> +
+>>> +	return 0;
+>>> +}
+>> I am not certain this op is needed at all. In the current kernel this op is only
+>> used by soc_camera, pxa_camera and omap3isp (somewhat dubious). Normally this
+>> information should come from the device tree and there should be no need for this op.
+>>
+>> My (tentative) long-term plan was to get rid of this op.
+>>
+>> If you don't need it, then I recommend it is removed.
 
-   Thanks
-	Andrew
+Hi Hans, the imx-media driver was only calling g_mbus_config to the camera
+sensor, and it was doing that to determine the sensor's bus type. This info
+was already available from parsing a v4l2_of_endpoint from the sensor node.
+So it was simple to remove the g_mbus_config calls, and instead rely on the
+parsed sensor v4l2_of_endpoint.
+
+> We currently use this to make the CSI capture interface understand
+> whether its source from the MIPI CSI-2 or from the parallel bus. That is
+> probably something that should be fixed, but I'm not quite sure how.
+>
+> The Synopsys DesignWare MIPI CSI-2 reciever turns the incoming MIPI
+> CSI-2 signal into a 32-bit parallel pixel bus plus some signals for the
+> MIPI specific metadata (virtual channel, data type).
+>
+> Then the CSI2IPU gasket turns this input bus into four separate parallel
+> 16-bit pixel buses plus an 8-bit "mct_di" bus for each of them, that
+> carries the MIPI metadata. The incoming data is split into the four
+> outputs according to the MIPI virtual channel.
+>
+> Two of these 16-bit + 8-bit parallel buses are routed through a
+> multiplexer before finally arriving at the CSI on the other side.
+>
+> We need to configure the CSI to either use or ignore the data from the
+> 8-bit mct_di bus depending on whether the source of the mux is
+> configured to the MIPI CSI-2 receiver / CSI2IPU gasket, or to a parallel
+> input.
+
+Philipp, from my experience, the CSI_MIPI_DI register (configured
+by ipu_csi_set_mipi_datatype()) can only be given a virtual channel 0,
+otherwise no data is received from the MIPI CSI-2 sensor, regardless
+of the virtual channel the sensor is transmitting over.
+
+So it seems the info on the 8-bit mct_di buses generated by the CSI2IPU
+gasket are ignored by the CSI's, at least the virtual channel number is
+ignored.
+
+For example, if the sensor is transmitting on vc 1, the gasket routes
+the sensor data to the parallel bus to CSI1. But if CSI_MIPI_DI on CSI1
+is written with vc 1, no data is received.
+
+Steve
+
+>
+> Currently we let g_mbus_config pretend that even the internal 32-bit +
+> metadata and 16-bit + 8-bit metadata parallel buses are of type
+> V4L2_MBUS_CSI so that the CSI can ask the mux, which propagates to the
+> CSI-2 receiver, if connected.
+>
+> Without g_mbus_config we'd need to get that information from somewhere
+> else. One possibility would be to extend MEDIA_BUS formats to describe
+> these "parallelized MIPI data" buses separately.
+>
+> regards
+> Philipp
+>
