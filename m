@@ -1,61 +1,27 @@
-From: lilja.magnus@gmail.com (Magnus Lilja)
-Date: Wed, 25 Jan 2017 22:07:59 +0100
-Subject: [PATCH] usb: gadget: udc: fsl: Add missing complete function.
-Message-ID: <1485378479-30345-1-git-send-email-lilja.magnus@gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 25 Jan 2017 22:09:19 +0100
+Subject: [PATCH v2] i2c: i2c-cadence: Initialize configuration before
+ probing devices
+In-Reply-To: <1484578178-3165-1-git-send-email-mike.looijmans@topic.nl>
+References: <1484578178-3165-1-git-send-email-mike.looijmans@topic.nl>
+Message-ID: <20170125210919.x2fwb4lbfuqzyw5p@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 304f7e5e1d08 ("usb: gadget: Refactor request completion")
-removed check if req->req.complete is non-NULL, resulting in a NULL
-pointer derefence and a kernel panic.
-This patch adds an empty complete function instead of re-introducing
-the req->req.complete check.
+On Mon, Jan 16, 2017 at 03:49:38PM +0100, Mike Looijmans wrote:
+> The cadence I2C driver calls cdns_i2c_writereg(..) to setup a workaround
+> in the controller, but did so after calling i2c_add_adapter() which starts
+> probing devices on the bus. Change the order so that the configuration is
+> completely finished before using the adapter.
+> 
+> Signed-off-by: Mike Looijmans <mike.looijmans@topic.nl>
 
-Fixes: 304f7e5e1d08 ("usb: gadget: Refactor request completion")
+Applied to for-current, thanks!
 
-Signed-off-by: Magnus Lilja <lilja.magnus@gmail.com>
-Cc: <stable@vger.kernel.org> # 3.18+
----
-This patch is the result of the discussion in
-https://marc.info/?t=148468819700001&r=1&w=2
----
- drivers/usb/gadget/udc/fsl_udc_core.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/usb/gadget/udc/fsl_udc_core.c b/drivers/usb/gadget/udc/fsl_udc_core.c
-index 71094e4..55c7553 100644
---- a/drivers/usb/gadget/udc/fsl_udc_core.c
-+++ b/drivers/usb/gadget/udc/fsl_udc_core.c
-@@ -1248,6 +1248,12 @@ static const struct usb_gadget_ops fsl_gadget_ops = {
- 	.udc_stop = fsl_udc_stop,
- };
- 
-+/*
-+ * Empty complete function used by this driver to fill in the req->complete
-+ * field when creating a request since the complete field is mandatory.
-+ */
-+static void fsl_noop_complete(struct usb_ep *ep, struct usb_request *req) { }
-+
- /* Set protocol stall on ep0, protocol stall will automatically be cleared
-    on new transaction */
- static void ep0stall(struct fsl_udc *udc)
-@@ -1282,7 +1288,7 @@ static int ep0_prime_status(struct fsl_udc *udc, int direction)
- 	req->req.length = 0;
- 	req->req.status = -EINPROGRESS;
- 	req->req.actual = 0;
--	req->req.complete = NULL;
-+	req->req.complete = fsl_noop_complete;
- 	req->dtd_count = 0;
- 
- 	ret = usb_gadget_map_request(&ep->udc->gadget, &req->req, ep_is_in(ep));
-@@ -1365,7 +1371,7 @@ static void ch9getstatus(struct fsl_udc *udc, u8 request_type, u16 value,
- 	req->req.length = 2;
- 	req->req.status = -EINPROGRESS;
- 	req->req.actual = 0;
--	req->req.complete = NULL;
-+	req->req.complete = fsl_noop_complete;
- 	req->dtd_count = 0;
- 
- 	ret = usb_gadget_map_request(&ep->udc->gadget, &req->req, ep_is_in(ep));
--- 
-2.7.4
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170125/ad4b8124/attachment.sig>
