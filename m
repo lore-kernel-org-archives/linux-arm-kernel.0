@@ -1,34 +1,75 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Thu, 26 Jan 2017 14:39:23 +0200
-Subject: [PATCH v5 06/12] mmc: sdhci-xenon: Add Marvell Xenon SDHC core
- functionality
-In-Reply-To: <CAPDyKFrwxix4zY4a1x9u6jh_gPfKTsaLnD8b8crum=pc5CN3AA@mail.gmail.com>
-References: <cover.8527229dae6c124f24c5e637430c2cdc86f80392.1484154449.git-series.gregory.clement@free-electrons.com>
- <3546f143091c121face8ecbcbf7f6a4c41d2cec7.1484154449.git-series.gregory.clement@free-electrons.com>
- <CAPDyKFrwxix4zY4a1x9u6jh_gPfKTsaLnD8b8crum=pc5CN3AA@mail.gmail.com>
-Message-ID: <2e67332d-d8c3-fd24-1f81-72675a09927a@intel.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 26 Jan 2017 12:52:49 +0000
+Subject: [PATCH v2] arm64: dma-mapping: Fix dma_mapping_error() when
+ bypassing SWIOTLB
+In-Reply-To: <840027acb4750542003dff17b4a8902ba8972754.1485368348.git.robin.murphy@arm.com>
+References: <20170124225200.a7qioswpxzh6agvd@raspberrypi-2.musicnaut.iki.fi>
+ <840027acb4750542003dff17b4a8902ba8972754.1485368348.git.robin.murphy@arm.com>
+Message-ID: <20170126125249.GG14167@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/01/17 12:50, Ulf Hansson wrote:
-> On 11 January 2017 at 18:19, Gregory CLEMENT
-> <gregory.clement@free-electrons.com> wrote:
->> +                       priv->init_card_type = MMC_TYPE_MMC;
->> +                       mmc->caps |= MMC_CAP_NONREMOVABLE;
->> +
->> +                       /*
->> +                        * Force to clear BUS_TEST to
->> +                        * skip bus_test_pre and bus_test_post
->> +                        */
->> +                       mmc->caps &= ~MMC_CAP_BUS_WIDTH_TEST;
->> +                       mmc->caps2 |= MMC_CAP2_HC_ERASE_SZ |
+On Wed, Jan 25, 2017 at 06:31:31PM +0000, Robin Murphy wrote:
+> When bypassing SWIOTLB on small-memory systems, we need to avoid calling
+> into swiotlb_dma_mapping_error() in exactly the same way as we avoid
+> swiotlb_dma_supported(), because the former also relies on SWIOTLB state
+> being initialised.
 > 
-> This cap is a bit strange. It was added several years ago by Adrian
-> Hunter, but I am wondering about the reason to why it's needed.
+> Under the assumptions for which we skip SWIOTLB, dma_map_{single,page}()
+> will only ever return the DMA-offset-adjusted physical address of the
+> page passed in, thus we can report success unconditionally.
 > 
+> Fixes: b67a8b29df7e ("arm64: mm: only initialize swiotlb when necessary")
+> CC: stable at vger.kernel.org
+> CC: Jisheng Zhang <jszhang@marvell.com>
+> Reported-by: Aaro Koskinen <aaro.koskinen@iki.fi>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+> 
+> v2: Get the return value the right way round this time... After some
+>     careful reasoning it really is that simple.
+> 
+>  arch/arm64/mm/dma-mapping.c | 9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index e04082700bb1..1ffb7d5d299a 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -352,6 +352,13 @@ static int __swiotlb_dma_supported(struct device *hwdev, u64 mask)
+>  	return 1;
+>  }
+>  
+> +static int __swiotlb_dma_mapping_error(struct device *hwdev, dma_addr_t addr)
+> +{
+> +	if (swiotlb)
+> +		return swiotlb_dma_mapping_error(hwdev, addr);
+> +	return 0;
+> +}
 
-MMC_CAP2_HC_ERASE_SZ relates to EXT-CSD ERASE_GROUP_DEF.
+I was about to apply this, but I'm really uncomfortable with the way that
+we call into swiotlb without initialising it. For example, if somebody
+passes swiotlb=noforce on the command line and all of our memory is
+DMA-able, then we don't call swiotlb_init but we will leave the DMA ops
+intact. On a dma_map_page, we then end up in swiotlb_map_page. If, for
+some reason or another, dma_capable fails (perhaps the address is out of
+range), then we call map_single which will return SWIOTLB_MAP_ERROR
+and subsequently phys_to_dma(dev, io_tlb_overflow_buffer);, which is
+exactly what swiotlb_dma_mapping_error checks for. Except it won't get the
+chance, because our swiotlb variable is false.
 
-I think it was added to enable people to choose whether they wanted a large
-or small erase granularity.  That probably doesn't matter if the card
-supports TRIM.
+I can see three ways to resolve this:
+
+1. Revert the hack that skips SWIOTLB initialisation and pay the 64m price
+   (but this is configurable on the cmdline).
+
+2. Keep the hack, but instead of skipping initialisation altogether,
+   automatically adjust the bounce buffer size to a single entry. This
+   shouldn't ever get used, but will allow the error paths to work.
+
+3. We bite the bullet and implement some non-swiotlb DMA ops for the case
+   when SWIOTLB is not used.
+
+Thoughts?
+
+Will
