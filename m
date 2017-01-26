@@ -1,36 +1,43 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Thu, 26 Jan 2017 23:48:58 +0800
-Subject: [PATCH v2 8/9] ASoC: sunxi: allow the analog codec driver to be built
- on ARM64
-In-Reply-To: <20170126154859.55855-1-icenowy@aosc.xyz>
-References: <20170126154859.55855-1-icenowy@aosc.xyz>
-Message-ID: <20170126154859.55855-9-icenowy@aosc.xyz>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 26 Jan 2017 16:54:06 +0100
+Subject: [PATCH v3 01/13] soc: samsung: pmu: Provide global function to
+ get PMU regmap
+In-Reply-To: <3ba1504d-5874-b09b-1ad8-6cda4851f113@samsung.com>
+References: <CGME20170119134904eucas1p153a1d5b2ff9826c88293b6a8fe5140bc@eucas1p1.samsung.com>
+ <1484833733-16082-1-git-send-email-m.szyprowski@samsung.com>
+ <1484833733-16082-2-git-send-email-m.szyprowski@samsung.com>
+ <CACRpkdYyOgpAhAY=7QrXiEB2oDgs0azt_Tb80iO4vjzk1obemQ@mail.gmail.com>
+ <3ba1504d-5874-b09b-1ad8-6cda4851f113@samsung.com>
+Message-ID: <CACRpkdY597rtiW9hk66njtcQRB=YSHThcbuhM0PkQ_yU=a6kXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the 64-bit Allwinner H5 SoC has the same analog codec part (also the
-same digital part) as H3, enable the driver to be built on ARM64
-Allwinner platform, so that it can be used on H5.
+On Thu, Jan 26, 2017 at 11:22 AM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
-New patch in v2.
+> syscon_regmap_lookup_by_compatible() requires to have a compatible string
+> hardcoded in the client driver. This might be used, but will require to have
+> (and maintain) a duplicated list of PMU compatibles in pin control driver.
+> There is a little problem with exynos4212 and exynos4412, which have same
+> pinctrl compatible (samsung,exynos4x12-pinctrl), but separate PMU
+> compatibles
 
- sound/soc/sunxi/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I actually used this approach with the ARM reference designs:
+drivers/mtd/maps/physmap_of_versatile.c
+drivers/video/fbdev/amba-clcd-versatile.c
 
-diff --git a/sound/soc/sunxi/Kconfig b/sound/soc/sunxi/Kconfig
-index 6c344e16aca4..49b71719c9b9 100644
---- a/sound/soc/sunxi/Kconfig
-+++ b/sound/soc/sunxi/Kconfig
-@@ -11,7 +11,7 @@ config SND_SUN4I_CODEC
- 
- config SND_SUN8I_CODEC_ANALOG
- 	tristate "Allwinner sun8i Codec Analog Controls Support"
--	depends on MACH_SUN8I || COMPILE_TEST
-+	depends on MACH_SUN8I || (ARM64 && ARCH_SUNXI) || COMPILE_TEST
- 	select REGMAP
- 	help
- 	  Say Y or M if you want to add support for the analog controls for
--- 
-2.11.0
+It made sense to me, because for each compatible I anyways
+needed the .data field to distinguish between the different
+system controllers, because they are of course all slightly
+idiomatic.
+
+I guess in your case you can distinguish how to use the syscon
+by the pinctrl compatible instead.
+
+Oh well.
+
+I guess I'm OK with this then. I'll try to pull it in and see what
+happens.
+
+Yours,
+Linus Walleij
