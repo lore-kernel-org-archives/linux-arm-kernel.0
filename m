@@ -1,50 +1,56 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 26 Jan 2017 11:11:03 +0100
-Subject: [PATCH 1/7] ARM: dts: r8a7779, marzen: Fix sata device status
+Date: Thu, 26 Jan 2017 11:11:06 +0100
+Subject: [PATCH 4/7] ARM: dts: r7s72100: add ostm clock to device tree
 In-Reply-To: <cover.1485425227.git.horms+renesas@verge.net.au>
 References: <cover.1485425227.git.horms+renesas@verge.net.au>
-Message-ID: <e8aa6811ca9547bc82baa6ed44c38dde01fb0d86.1485425227.git.horms+renesas@verge.net.au>
+Message-ID: <cfddd3db08f619bf0c1764b3103caedb6793bc48.1485425227.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Chris Brandt <chris.brandt@renesas.com>
 
-Device nodes representing I/O devices should be marked disabled in the
-SoC-specific DTS, and overridden by board-specific DTSes where needed.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7779-marzen.dts | 4 ++++
- arch/arm/boot/dts/r8a7779.dtsi       | 1 +
- 2 files changed, 5 insertions(+)
+ arch/arm/boot/dts/r7s72100.dtsi            | 9 +++++++++
+ include/dt-bindings/clock/r7s72100-clock.h | 4 ++++
+ 2 files changed, 13 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7779-marzen.dts b/arch/arm/boot/dts/r8a7779-marzen.dts
-index 676151b70185..89c5b24a3d03 100644
---- a/arch/arm/boot/dts/r8a7779-marzen.dts
-+++ b/arch/arm/boot/dts/r8a7779-marzen.dts
-@@ -216,6 +216,10 @@
- 	};
- };
+diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
+index 3dd427d68c83..d5946df29222 100644
+--- a/arch/arm/boot/dts/r7s72100.dtsi
++++ b/arch/arm/boot/dts/r7s72100.dtsi
+@@ -108,6 +108,15 @@
+ 			clock-output-names = "scif0", "scif1", "scif2", "scif3", "scif4", "scif5", "scif6", "scif7";
+ 		};
  
-+&sata {
-+	status = "okay";
-+};
++		mstp5_clks: mstp5_clks at fcfe0428 {
++			#clock-cells = <1>;
++			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
++			reg = <0xfcfe0428 4>;
++			clocks = <&p0_clk>, <&p0_clk>;
++			clock-indices = <R7S72100_CLK_OSTM0 R7S72100_CLK_OSTM1>;
++			clock-output-names = "ostm0", "ostm1";
++		};
 +
- &scif2 {
- 	pinctrl-0 = <&scif2_pins>;
- 	pinctrl-names = "default";
-diff --git a/arch/arm/boot/dts/r8a7779.dtsi b/arch/arm/boot/dts/r8a7779.dtsi
-index f47a0edc26d4..ae2d9a9c65af 100644
---- a/arch/arm/boot/dts/r8a7779.dtsi
-+++ b/arch/arm/boot/dts/r8a7779.dtsi
-@@ -347,6 +347,7 @@
- 		interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp1_clks R8A7779_CLK_SATA>;
- 		power-domains = <&sysc R8A7779_PD_ALWAYS_ON>;
-+		status = "disabled";
- 	};
+ 		mstp7_clks: mstp7_clks at fcfe0430 {
+ 			#clock-cells = <1>;
+ 			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
+diff --git a/include/dt-bindings/clock/r7s72100-clock.h b/include/dt-bindings/clock/r7s72100-clock.h
+index 29e01ed10e74..ce09915c298f 100644
+--- a/include/dt-bindings/clock/r7s72100-clock.h
++++ b/include/dt-bindings/clock/r7s72100-clock.h
+@@ -25,6 +25,10 @@
+ #define R7S72100_CLK_SCIF6	1
+ #define R7S72100_CLK_SCIF7	0
  
- 	sdhi0: sd at ffe4c000 {
++/* MSTP5 */
++#define R7S72100_CLK_OSTM0	1
++#define R7S72100_CLK_OSTM1	0
++
+ /* MSTP7 */
+ #define R7S72100_CLK_ETHER	4
+ 
 -- 
 2.7.0.rc3.207.g0ac5344
