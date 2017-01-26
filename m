@@ -1,49 +1,33 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 26 Jan 2017 23:10:49 +0530
-Subject: [PATCH v6 05/14] ARM: davinci: da850: add con_id for the SATA
- clock
-In-Reply-To: <93a3bbb3-2d9f-bc38-c7b4-5eb3325d985d@ti.com>
-References: <1485190856-4711-1-git-send-email-bgolaszewski@baylibre.com>
- <1485190856-4711-6-git-send-email-bgolaszewski@baylibre.com>
- <93a3bbb3-2d9f-bc38-c7b4-5eb3325d985d@ti.com>
-Message-ID: <645778dd-6727-abd0-3dd9-a7e0d5aa4983@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 26 Jan 2017 17:48:17 +0000
+Subject: [PATCH 5/5] iommu: Allow default domain type to be set on the
+ kernel command line
+In-Reply-To: <20170126171555.GD27598@8bytes.org>
+References: <1484849955-1871-1-git-send-email-will.deacon@arm.com>
+ <1484849955-1871-6-git-send-email-will.deacon@arm.com>
+ <20170126171555.GD27598@8bytes.org>
+Message-ID: <20170126174816.GO14167@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 26 January 2017 10:26 PM, Grygorii Strashko wrote:
+On Thu, Jan 26, 2017 at 06:15:55PM +0100, Joerg Roedel wrote:
+> On Thu, Jan 19, 2017 at 06:19:15PM +0000, Will Deacon wrote:
+> > Rather than modify each IOMMU driver to provide different semantics for
+> > DMA domains, instead we introduce a command line parameter that can be
+> > used to change the type of the default domain. Passthrough can then be
+> > specified using "iommu.default_domain=identity" on the kernel command
+> > line.
 > 
-> 
-> On 01/23/2017 11:00 AM, Bartosz Golaszewski wrote:
->> The ahci-da850 SATA driver is now capable of retrieving clocks by
->> con_id. Add the connection id for the sysclk2-derived SATA clock.
->>
->> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
->> ---
->>  arch/arm/mach-davinci/da850.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
->> index 1d873d1..dbf1daa 100644
->> --- a/arch/arm/mach-davinci/da850.c
->> +++ b/arch/arm/mach-davinci/da850.c
->> @@ -571,7 +571,7 @@ static struct clk_lookup da850_clks[] = {
->>  	CLK("spi_davinci.0",	NULL,		&spi0_clk),
->>  	CLK("spi_davinci.1",	NULL,		&spi1_clk),
->>  	CLK("vpif",		NULL,		&vpif_clk),
->> -	CLK("ahci_da850",		NULL,		&sata_clk),
->> +	CLK("ahci_da850",	"sata",		&sata_clk),
-> 
-> I'm worry a bit - wouldn't this cause future problems with PM runtime
->  (if it will be the case)?
-> 
-> If this is functional clock - shouldn't it be "fck" to 
-> follow PM domain con_id list for davinci?  (arch/arm/mach-davinci/pm_domain.c) 
+> I like the general idea of this, but the above is a terrible name for a
+> kernel commandline-parameter. The x86 iommus support iommu=pt which is
+> pretty much the same as this patch does.
 
-I agree with Grygorii. Calling this clock "fck" will make it easy to
-convert the DA850 AHCI driver to use pm_runtime at a future date (no
-mach-davinci changes should be needed).
+Happy to bikeshed the name ;)
 
-Sorry about not spotting this earlier.
+> How about something like "iommu.passthrough=0/1"? And please add the
+> parameter to the kernel documentation too.
 
-Thanks,
-Sekhar
+Sure, if you think that the identity domain is the only thing we'll ever
+want to set (so far, it's the only thing people have asked me for).
+
+Will
