@@ -1,79 +1,36 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 26 Jan 2017 17:51:32 -0500
-Subject: [PATCH] PCI/ASPM: reconfigure ASPM following hotplug
-Message-ID: <1485471092-16906-1-git-send-email-okaya@codeaurora.org>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Thu, 26 Jan 2017 22:52:53 +0000
+Subject: [PATCHv3 4/5] arm: mvebu: Add device tree for 98DX3236 SoCs
+References: <20170105033641.6212-1-chris.packham@alliedtelesis.co.nz>
+ <20170106041517.9589-1-chris.packham@alliedtelesis.co.nz>
+ <20170106041517.9589-5-chris.packham@alliedtelesis.co.nz>
+ <87inp1zwlg.fsf@free-electrons.com>
+ <cca41061129f4378bfd41a66c8eb71e1@svr-chch-ex1.atlnz.lc>
+Message-ID: <ebe3bda3918548af8c98936703353e37@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the operating system is booted with the default ASPM policy,
-the current code is determining the ASPM policy by querying the
-enable/disable states from ASPM registers.
+On 27/01/17 09:24, Chris Packham wrote:
+> On 27/01/17 04:10, Gregory CLEMENT wrote:
+>>> +		internal-regs {
+>
+> [snip]
+>
+>>> +
+>>> +		dfx-registers {
+>> node label
+>>
+>
+> [snip]
+>
+>>> +		switch {
+>> node label
+>>
+>
+> These are peers to the internal-regs, i.e. parts of the SoC with
+> mappable windows in the address space. Do they really need a label?
+> Their subnodes absolutely need (and have) labels.
+>
 
-In the case of hotplug removal, the ASPM registers get cleared by
-calling the exit function.
-
-An insertion following remove reads incorrect policy as disabled
-even though ASPM was enabled during boot.
-
-Adding a flag to the struct pci_dev and saving the power up policy
-in the bridge to be reused during hotplug insertion. Bridge's enable
-counter is used as a switch to determine when to use saved value.
-
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/pci/pcie/aspm.c | 13 ++++++++++---
- include/linux/pci.h     |  1 +
- 2 files changed, 11 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/pci/pcie/aspm.c b/drivers/pci/pcie/aspm.c
-index 17ac1dc..32b8a86 100644
---- a/drivers/pci/pcie/aspm.c
-+++ b/drivers/pci/pcie/aspm.c
-@@ -338,7 +338,9 @@ static void pcie_aspm_check_latency(struct pci_dev *endpoint)
- 	}
- }
- 
--static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
-+static
-+void pcie_aspm_cap_init(struct pci_dev *pdev, struct pcie_link_state *link,
-+			int blacklist)
- {
- 	struct pci_dev *child, *parent = link->pdev;
- 	struct pci_bus *linkbus = parent->subordinate;
-@@ -398,7 +400,12 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
- 	link->latency_dw.l1 = calc_l1_latency(dwreg.latency_encoding_l1);
- 
- 	/* Save default state */
--	link->aspm_default = link->aspm_enabled;
-+	if (!atomic_read(&pdev->enable_cnt)) {
-+		link->aspm_default = link->aspm_enabled;
-+		pdev->aspm_default = link->aspm_default;
-+	} else {
-+		link->aspm_default = pdev->aspm_default;
-+	}
- 
- 	/* Setup initial capable state. Will be updated later */
- 	link->aspm_capable = link->aspm_support;
-@@ -599,7 +606,7 @@ void pcie_aspm_init_link_state(struct pci_dev *pdev)
- 	 * upstream links also because capable state of them can be
- 	 * update through pcie_aspm_cap_init().
- 	 */
--	pcie_aspm_cap_init(link, blacklist);
-+	pcie_aspm_cap_init(pdev, link, blacklist);
- 
- 	/* Setup initial Clock PM state */
- 	pcie_clkpm_cap_init(link, blacklist);
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index e2d1a12..d0ecde6 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -316,6 +316,7 @@ struct pci_dev {
- 	unsigned int	hotplug_user_indicators:1; /* SlotCtl indicators
- 						      controlled exclusively by
- 						      user sysfs */
-+	unsigned int	aspm_default;	/* aspm policy set by BIOS */
- 	unsigned int	d3_delay;	/* D3->D0 transition time in ms */
- 	unsigned int	d3cold_delay;	/* D3cold->D0 transition time in ms */
- 
--- 
-1.9.1
+Actually the pci-controller is in the same category and that has a label 
+so I'll add one.
