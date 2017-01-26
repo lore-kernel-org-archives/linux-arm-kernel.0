@@ -1,56 +1,39 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 26 Jan 2017 11:11:06 +0100
-Subject: [PATCH 4/7] ARM: dts: r7s72100: add ostm clock to device tree
+Date: Thu, 26 Jan 2017 11:11:05 +0100
+Subject: [PATCH 3/7] ARM: dts: r8a7745: Link ARM GIC to clock and clock domain
 In-Reply-To: <cover.1485425227.git.horms+renesas@verge.net.au>
 References: <cover.1485425227.git.horms+renesas@verge.net.au>
-Message-ID: <cfddd3db08f619bf0c1764b3103caedb6793bc48.1485425227.git.horms+renesas@verge.net.au>
+Message-ID: <db017f399639f68827edc954205803272ef20b24.1485425227.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Brandt <chris.brandt@renesas.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Link the ARM GIC to the INTC-SYS module clock, and add it to the SYSC
+"always-on" PM Domain, so it can be power managed using that clock.
+
+Note that currently the GIC-400 driver doesn't support module clocks nor
+Runtime PM, so this must be handled as a critical clock.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r7s72100.dtsi            | 9 +++++++++
- include/dt-bindings/clock/r7s72100-clock.h | 4 ++++
- 2 files changed, 13 insertions(+)
+ arch/arm/boot/dts/r8a7745.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
-index 3dd427d68c83..d5946df29222 100644
---- a/arch/arm/boot/dts/r7s72100.dtsi
-+++ b/arch/arm/boot/dts/r7s72100.dtsi
-@@ -108,6 +108,15 @@
- 			clock-output-names = "scif0", "scif1", "scif2", "scif3", "scif4", "scif5", "scif6", "scif7";
+diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
+index 2f60c3cb9117..a81dcc82e2ea 100644
+--- a/arch/arm/boot/dts/r8a7745.dtsi
++++ b/arch/arm/boot/dts/r8a7745.dtsi
+@@ -60,6 +60,9 @@
+ 			      <0 0xf1006000 0 0x2000>;
+ 			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(2) |
+ 						 IRQ_TYPE_LEVEL_HIGH)>;
++			clocks = <&cpg CPG_MOD 408>;
++			clock-names = "clk";
++			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
  		};
  
-+		mstp5_clks: mstp5_clks at fcfe0428 {
-+			#clock-cells = <1>;
-+			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
-+			reg = <0xfcfe0428 4>;
-+			clocks = <&p0_clk>, <&p0_clk>;
-+			clock-indices = <R7S72100_CLK_OSTM0 R7S72100_CLK_OSTM1>;
-+			clock-output-names = "ostm0", "ostm1";
-+		};
-+
- 		mstp7_clks: mstp7_clks at fcfe0430 {
- 			#clock-cells = <1>;
- 			compatible = "renesas,r7s72100-mstp-clocks", "renesas,cpg-mstp-clocks";
-diff --git a/include/dt-bindings/clock/r7s72100-clock.h b/include/dt-bindings/clock/r7s72100-clock.h
-index 29e01ed10e74..ce09915c298f 100644
---- a/include/dt-bindings/clock/r7s72100-clock.h
-+++ b/include/dt-bindings/clock/r7s72100-clock.h
-@@ -25,6 +25,10 @@
- #define R7S72100_CLK_SCIF6	1
- #define R7S72100_CLK_SCIF7	0
- 
-+/* MSTP5 */
-+#define R7S72100_CLK_OSTM0	1
-+#define R7S72100_CLK_OSTM1	0
-+
- /* MSTP7 */
- #define R7S72100_CLK_ETHER	4
- 
+ 		irqc: interrupt-controller at e61c0000 {
 -- 
 2.7.0.rc3.207.g0ac5344
