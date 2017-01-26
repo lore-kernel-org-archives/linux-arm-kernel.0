@@ -1,256 +1,60 @@
-From: vijay.kilari@gmail.com (vijay.kilari at gmail.com)
-Date: Thu, 26 Jan 2017 19:50:52 +0530
-Subject: [PATCH v11 7/8] arm/arm64: vgic: Implement
- KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO ioctl
-In-Reply-To: <1485440453-10597-1-git-send-email-vijay.kilari@gmail.com>
-References: <1485440453-10597-1-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <1485440453-10597-8-git-send-email-vijay.kilari@gmail.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Thu, 26 Jan 2017 15:27:01 +0100
+Subject: [PATCH] clk: meson8b: fix clk81 register address
+In-Reply-To: <1485341586-2929-1-git-send-email-jbrunet@baylibre.com>
+References: <1485341586-2929-1-git-send-email-jbrunet@baylibre.com>
+Message-ID: <1485440821.2442.8.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+On Wed, 2017-01-25 at 11:53 +0100, Jerome Brunet wrote:
+> During meson8b clock probe, clk81 register address is fixed twice.
+> First using the meson8b_clk_gates array, then by directly changing
+> meson8b_clk81 register.
+> 
+> As a result meson8b_clk81.reg = HHI_MPEG_CLK_CNTL + clk_base +
+> clk_base.
+> 
+> Fixed by just removing the second fixup.
+> 
+> Fixes: e31a1900c1ff ("meson: clk: Add support for clock gates")
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> ---
+> ?Patch based on khilman/linux-amlogic.git master branch.
+> 
+> ?I don't have a meson8b HW so this patch so this patch has not been
+> ?tested on real HW.
 
-Userspace requires to store and restore of line_level for
-level triggered interrupts using ioctl KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO.
+I got my hands on an odroidc1 and I have been to test this.
+With clk_base @ 0xf0965000:
 
-Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
----
- arch/arm/include/uapi/asm/kvm.h     |  6 +++++
- arch/arm64/include/uapi/asm/kvm.h   |  6 +++++
- virt/kvm/arm/vgic/vgic-kvm-device.c | 45 ++++++++++++++++++++++++++++++-
- virt/kvm/arm/vgic/vgic-mmio-v3.c    | 14 ++++++++++
- virt/kvm/arm/vgic/vgic-mmio.c       | 54 +++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-mmio.h       |  5 ++++
- virt/kvm/arm/vgic/vgic.h            |  2 ++
- 7 files changed, 131 insertions(+), 1 deletion(-)
+* without the patch:
+clk81.reg =?0xe12ca174
 
-diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-index 7a3e537..6ebd3e6 100644
---- a/arch/arm/include/uapi/asm/kvm.h
-+++ b/arch/arm/include/uapi/asm/kvm.h
-@@ -191,6 +191,12 @@ struct kvm_arch_memory_slot {
- #define KVM_DEV_ARM_VGIC_GRP_CTRL       4
- #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
- #define KVM_DEV_ARM_VGIC_GRP_CPU_SYSREGS 6
-+#define KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO  7
-+#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT	10
-+#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK \
-+			(0x3fffffULL << KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT)
-+#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK 0x3ff
-+#define VGIC_LEVEL_INFO_LINE_LEVEL	0
- 
- #define   KVM_DEV_ARM_VGIC_CTRL_INIT    0
- 
-diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-index be379d7..c286035 100644
---- a/arch/arm64/include/uapi/asm/kvm.h
-+++ b/arch/arm64/include/uapi/asm/kvm.h
-@@ -211,6 +211,12 @@ struct kvm_arch_memory_slot {
- #define KVM_DEV_ARM_VGIC_GRP_CTRL	4
- #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
- #define KVM_DEV_ARM_VGIC_GRP_CPU_SYSREGS 6
-+#define KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO  7
-+#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT	10
-+#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK \
-+			(0x3fffffULL << KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT)
-+#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK	0x3ff
-+#define VGIC_LEVEL_INFO_LINE_LEVEL	0
- 
- #define   KVM_DEV_ARM_VGIC_CTRL_INIT	0
- 
-diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-index b30372b..d181d2b 100644
---- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-+++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-@@ -512,6 +512,21 @@ static int vgic_v3_attr_regs_access(struct kvm_device *dev,
- 						  regid, reg);
- 		break;
- 	}
-+	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
-+		unsigned int info, intid;
-+
-+		info = (attr->attr & KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK) >>
-+			KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT;
-+		if (info == VGIC_LEVEL_INFO_LINE_LEVEL) {
-+			intid = attr->attr &
-+				KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK;
-+			ret = vgic_v3_line_level_info_uaccess(vcpu, is_write,
-+							      intid, reg);
-+		} else {
-+			ret = -EINVAL;
-+		}
-+		break;
-+	}
- 	default:
- 		ret = -EINVAL;
- 		break;
-@@ -554,6 +569,17 @@ static int vgic_v3_set_attr(struct kvm_device *dev,
- 
- 		return vgic_v3_attr_regs_access(dev, attr, &reg, true);
- 	}
-+	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
-+		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-+		u64 reg;
-+		u32 tmp32;
-+
-+		if (get_user(tmp32, uaddr))
-+			return -EFAULT;
-+
-+		reg = tmp32;
-+		return vgic_v3_attr_regs_access(dev, attr, &reg, true);
-+	}
- 	}
- 	return -ENXIO;
- }
-@@ -589,8 +615,18 @@ static int vgic_v3_get_attr(struct kvm_device *dev,
- 			return ret;
- 		return put_user(reg, uaddr);
- 	}
--	}
-+	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
-+		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-+		u64 reg;
-+		u32 tmp32;
- 
-+		ret = vgic_v3_attr_regs_access(dev, attr, &reg, false);
-+		if (ret)
-+			return ret;
-+		tmp32 = reg;
-+		return put_user(tmp32, uaddr);
-+	}
-+	}
- 	return -ENXIO;
- }
- 
-@@ -611,6 +647,13 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
- 		return vgic_v3_has_attr_regs(dev, attr);
- 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
- 		return 0;
-+	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
-+		if (((attr->attr & KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK) >>
-+		      KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT) ==
-+		      VGIC_LEVEL_INFO_LINE_LEVEL)
-+			return 0;
-+		break;
-+	}
- 	case KVM_DEV_ARM_VGIC_GRP_CTRL:
- 		switch (attr->attr) {
- 		case KVM_DEV_ARM_VGIC_CTRL_INIT:
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-index 549ae45..6afb3b4 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-@@ -803,3 +803,17 @@ int vgic_v3_redist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
- 	else
- 		return vgic_uaccess(vcpu, &rd_dev, is_write, offset, val);
- }
-+
-+int vgic_v3_line_level_info_uaccess(struct kvm_vcpu *vcpu, bool is_write,
-+				    u32 intid, u64 *val)
-+{
-+	if (intid % 32)
-+		return -EINVAL;
-+
-+	if (is_write)
-+		vgic_write_irq_line_level_info(vcpu, intid, *val);
-+	else
-+		*val = vgic_read_irq_line_level_info(vcpu, intid);
-+
-+	return 0;
-+}
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index 1d1886e..3654b4c 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -362,6 +362,60 @@ void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
- 	}
- }
- 
-+u64 vgic_read_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid)
-+{
-+	int i;
-+	u64 val = 0;
-+	int nr_irqs = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
-+
-+	for (i = 0; i < 32; i++) {
-+		struct vgic_irq *irq;
-+
-+		if ((intid + i) < VGIC_NR_SGIS || (intid + i) >= nr_irqs)
-+			continue;
-+
-+		irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+		if (irq->config == VGIC_CONFIG_LEVEL && irq->line_level)
-+			val |= (1U << i);
-+
-+		vgic_put_irq(vcpu->kvm, irq);
-+	}
-+
-+	return val;
-+}
-+
-+void vgic_write_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid,
-+				    const u64 val)
-+{
-+	int i;
-+	int nr_irqs = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
-+
-+	for (i = 0; i < 32; i++) {
-+		struct vgic_irq *irq;
-+		bool new_level;
-+
-+		if ((intid + i) < VGIC_NR_SGIS || (intid + i) >= nr_irqs)
-+			continue;
-+
-+		irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		/*
-+		 * Line level is set irrespective of irq type
-+		 * (level or edge) to avoid dependency that VM should
-+		 * restore irq config before line level.
-+		 */
-+		new_level = !!(val & (1U << i));
-+		spin_lock(&irq->irq_lock);
-+		irq->line_level = new_level;
-+		if (new_level)
-+			vgic_queue_irq_unlock(vcpu->kvm, irq);
-+		else
-+			spin_unlock(&irq->irq_lock);
-+
-+		vgic_put_irq(vcpu->kvm, irq);
-+	}
-+}
-+
- static int match_region(const void *key, const void *elt)
- {
- 	const unsigned int offset = (unsigned long)key;
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-index 7b30296..98bb566 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.h
-+++ b/virt/kvm/arm/vgic/vgic-mmio.h
-@@ -177,6 +177,11 @@ void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
- int vgic_uaccess(struct kvm_vcpu *vcpu, struct vgic_io_device *dev,
- 		 bool is_write, int offset, u32 *val);
- 
-+u64 vgic_read_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid);
-+
-+void vgic_write_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid,
-+				    const u64 val);
-+
- unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
- 
- unsigned int vgic_v3_init_dist_iodev(struct vgic_io_device *dev);
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index a5a45f6..db28f7c 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -164,6 +164,8 @@ int vgic_v3_cpu_sysregs_uaccess(struct kvm_vcpu *vcpu, bool is_write,
- 			 u64 id, u64 *val);
- int vgic_v3_has_cpu_sysregs_attr(struct kvm_vcpu *vcpu, bool is_write, u64 id,
- 				u64 *reg);
-+int vgic_v3_line_level_info_uaccess(struct kvm_vcpu *vcpu, bool is_write,
-+				    u32 intid, u64 *val);
- int kvm_register_vgic_device(unsigned long type);
- void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
--- 
-1.9.1
+* with the patch:
+clk81.reg = 0xf0965174 (expected result)
+
+In the past, we probably did not see this because clk81 is the mother
+of all the other clock gate around the SoC so it is very likely that u-
+boot opened this gate for us.
+
+> 
+> ?drivers/clk/meson/meson8b.c | 1 -
+> ?1 file changed, 1 deletion(-)
+> 
+> diff --git a/drivers/clk/meson/meson8b.c
+> b/drivers/clk/meson/meson8b.c
+> index 3f1be46cbb33..888494d4fb8a 100644
+> --- a/drivers/clk/meson/meson8b.c
+> +++ b/drivers/clk/meson/meson8b.c
+> @@ -607,7 +607,6 @@ static int meson8b_clkc_probe(struct
+> platform_device *pdev)
+> ?	/* Populate the base address for the MPEG clks */
+> ?	meson8b_mpeg_clk_sel.reg = clk_base +
+> (u32)meson8b_mpeg_clk_sel.reg;
+> ?	meson8b_mpeg_clk_div.reg = clk_base +
+> (u32)meson8b_mpeg_clk_div.reg;
+> -	meson8b_clk81.reg = clk_base + (u32)meson8b_clk81.reg;
+> ?
+> ?	/* Populate base address for gates */
+> ?	for (i = 0; i < ARRAY_SIZE(meson8b_clk_gates); i++)
