@@ -1,29 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Jan 2017 00:23:54 +0100
-Subject: [PATCH 12/22] ARM: gemini: DT for the Cortina Gemini SoC platforms
-In-Reply-To: <20170122122236.10665-1-linus.walleij@linaro.org>
-References: <20170122122236.10665-1-linus.walleij@linaro.org>
-Message-ID: <2789599.hfgAbXaEmE@wuerfel>
+From: kraxel@redhat.com (Gerd Hoffmann)
+Date: Fri, 27 Jan 2017 00:37:17 +0100
+Subject: [PATCH 04/13] mmc: bcm2835: add bcm2835_check_data_error
+In-Reply-To: <1485473846-24537-1-git-send-email-kraxel@redhat.com>
+References: <1485473846-24537-1-git-send-email-kraxel@redhat.com>
+Message-ID: <1485473846-24537-5-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, January 22, 2017 1:22:36 PM CET Linus Walleij wrote:
-> +
-> +/* Can we just use CONFIG_DEBUG_UART_PHYS and CONFIG_DEBUG_UART_VIRT? */
-> +#define GEMINI_UART_BASE 0x42000000
-> +#define GEMINI_UART_VBASE 0xf4200000
-> +
-> +/* This is needed for LL-debug/earlyprintk/debug-macro.S */
-> +static struct map_desc gemini_io_desc[] __initdata = {
-> +       {
-> +               .virtual = GEMINI_UART_VBASE,
-> +               .pfn = __phys_to_pfn(GEMINI_UART_BASE),
-> +               .length = SZ_4K,
-> +               .type = MT_DEVICE,
-> +       },
-> +};
+Factor out common code.
 
-I don't see why using CONFIG_DEBUG_UART_PHYS / CONFIG_DEBUG_UART_VIRT shouldn't
-work here. Have you tried it?
+Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
+---
+ drivers/mmc/host/bcm2835.c | 30 ++++++++++++------------------
+ 1 file changed, 12 insertions(+), 18 deletions(-)
 
-	Arnd
+diff --git a/drivers/mmc/host/bcm2835.c b/drivers/mmc/host/bcm2835.c
+index 6f9fb12..d25b85a 100644
+--- a/drivers/mmc/host/bcm2835.c
++++ b/drivers/mmc/host/bcm2835.c
+@@ -951,6 +951,16 @@ static void bcm2835_timeout(unsigned long data)
+ 	spin_unlock_irqrestore(&host->lock, flags);
+ }
+ 
++static void bcm2835_check_data_error(struct bcm2835_host *host, u32 intmask)
++{
++	if (!host->data)
++		return;
++	if (intmask & (SDHSTS_CRC16_ERROR | SDHSTS_FIFO_ERROR))
++		host->data->error = -EILSEQ;
++	if (intmask & SDHSTS_REW_TIME_OUT)
++		host->data->error = -ETIMEDOUT;
++}
++
+ static void bcm2835_busy_irq(struct bcm2835_host *host, u32 intmask)
+ {
+ 	struct device *dev = &host->pdev->dev;
+@@ -1007,15 +1017,7 @@ static void bcm2835_data_irq(struct bcm2835_host *host, u32 intmask)
+ 	if (!host->data)
+ 		return;
+ 
+-	if (intmask & (SDHSTS_CRC16_ERROR |
+-		       SDHSTS_FIFO_ERROR |
+-		       SDHSTS_REW_TIME_OUT)) {
+-		if (intmask & (SDHSTS_CRC16_ERROR |
+-			       SDHSTS_FIFO_ERROR))
+-			host->data->error = -EILSEQ;
+-		else
+-			host->data->error = -ETIMEDOUT;
+-	}
++	bcm2835_check_data_error(host, intmask);
+ 
+ 	if (host->data->error) {
+ 		bcm2835_finish_data(host);
+@@ -1043,15 +1045,7 @@ static void bcm2835_block_irq(struct bcm2835_host *host, u32 intmask)
+ 		return;
+ 	}
+ 
+-	if (intmask & (SDHSTS_CRC16_ERROR |
+-		       SDHSTS_FIFO_ERROR |
+-		       SDHSTS_REW_TIME_OUT)) {
+-		if (intmask & (SDHSTS_CRC16_ERROR |
+-			       SDHSTS_FIFO_ERROR))
+-			host->data->error = -EILSEQ;
+-		else
+-			host->data->error = -ETIMEDOUT;
+-	}
++	bcm2835_check_data_error(host, intmask);
+ 
+ 	if (!host->dma_desc) {
+ 		WARN_ON(!host->blocks);
+-- 
+1.8.3.1
