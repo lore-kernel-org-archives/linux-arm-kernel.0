@@ -1,44 +1,87 @@
 From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Fri, 27 Jan 2017 00:37:16 +0100
-Subject: [PATCH 03/13] mmc: bcm2835: add bcm2835_threaded_irq
+Date: Fri, 27 Jan 2017 00:37:25 +0100
+Subject: [PATCH 12/13] mmc: bcm2835: move timeout to thread context
 In-Reply-To: <1485473846-24537-1-git-send-email-kraxel@redhat.com>
 References: <1485473846-24537-1-git-send-email-kraxel@redhat.com>
-Message-ID: <1485473846-24537-4-git-send-email-kraxel@redhat.com>
+Message-ID: <1485473846-24537-13-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
 ---
- drivers/mmc/host/bcm2835.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+ drivers/mmc/host/bcm2835.c | 22 +++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/mmc/host/bcm2835.c b/drivers/mmc/host/bcm2835.c
-index ffb9140..6f9fb12 100644
+index fc2d02f..82caddc 100644
 --- a/drivers/mmc/host/bcm2835.c
 +++ b/drivers/mmc/host/bcm2835.c
-@@ -1105,6 +1105,11 @@ static irqreturn_t bcm2835_irq(int irq, void *dev_id)
- 	return result;
+@@ -147,7 +147,7 @@ struct bcm2835_host {
+ 	u32			pio_timeout;	/* In jiffies */
+ 	int			clock;		/* Current clock speed */
+ 	unsigned int		max_clk;	/* Max possible freq */
+-	struct timer_list	timer;		/* Timer for timeouts */
++	struct delayed_work     timeout_work;   /* Timer for timeouts */
+ 	struct sg_mapping_iter	sg_miter;	/* SG state for PIO */
+ 	unsigned int		blocks;		/* remaining PIO blocks */
+ 	int			irq;		/* Device IRQ */
+@@ -669,12 +669,11 @@ bool bcm2835_send_command(struct bcm2835_host *host,
+ 		return false;
+ 	}
+ 
+-	timeout = jiffies;
+ 	if (!cmd->data && cmd->busy_timeout > 9000)
+-		timeout += DIV_ROUND_UP(cmd->busy_timeout, 1000) * HZ + HZ;
++		timeout = DIV_ROUND_UP(cmd->busy_timeout, 1000) * HZ + HZ;
+ 	else
+-		timeout += 10 * HZ;
+-	mod_timer(&host->timer, timeout);
++		timeout = 10 * HZ;
++	schedule_delayed_work(&host->timeout_work, timeout);
+ 
+ 	host->cmd = cmd;
+ 
+@@ -912,9 +911,11 @@ static void bcm2835_finish_command(struct bcm2835_host *host)
+ 	}
  }
  
-+static irqreturn_t bcm2835_threaded_irq(int irq, void *dev_id)
-+{
-+	return IRQ_HANDLED;
-+}
-+
- void bcm2835_set_clock(struct bcm2835_host *host, unsigned int clock)
+-static void bcm2835_timeout(unsigned long data)
++static void bcm2835_timeout(struct work_struct *work)
  {
- 	int div = 0; /* Initialized for compiler warning */
-@@ -1405,8 +1410,9 @@ int bcm2835_add_host(struct bcm2835_host *host)
+-	struct bcm2835_host *host = (struct bcm2835_host *)data;
++	struct delayed_work *d = to_delayed_work(work);
++	struct bcm2835_host *host =
++		container_of(d, struct bcm2835_host, timeout_work);
+ 	struct device *dev = &host->pdev->dev;
  
- 	bcm2835_reset_internal(host);
+ 	mutex_lock(&host->mutex);
+@@ -1303,7 +1304,7 @@ static void bcm2835_finish_request(struct bcm2835_host *host)
+ 	struct dma_chan *terminate_chan = NULL;
+ 	struct mmc_request *mrq;
  
--	ret = request_irq(host->irq, bcm2835_irq, 0 /*IRQF_SHARED*/,
--			  mmc_hostname(mmc), host);
-+	ret = request_threaded_irq(host->irq, bcm2835_irq,
-+				   bcm2835_threaded_irq,
-+				   0, mmc_hostname(mmc), host);
- 	if (ret) {
- 		dev_err(dev, "failed to request IRQ %d: %d\n",
- 			host->irq, ret);
+-	del_timer(&host->timer);
++	cancel_delayed_work(&host->timeout_work);
+ 
+ 	mrq = host->mrq;
+ 
+@@ -1387,8 +1388,7 @@ int bcm2835_add_host(struct bcm2835_host *host)
+ 	/* report supported voltage ranges */
+ 	mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
+ 
+-	setup_timer(&host->timer, bcm2835_timeout,
+-		    (unsigned long)host);
++	INIT_DELAYED_WORK(&host->timeout_work, bcm2835_timeout);
+ 
+ 	/* Set interrupt enables */
+ 	host->hcfg = SDHCFG_BUSY_IRPT_EN;
+@@ -1523,7 +1523,7 @@ static int bcm2835_remove(struct platform_device *pdev)
+ 
+ 	free_irq(host->irq, host);
+ 
+-	del_timer_sync(&host->timer);
++	cancel_delayed_work_sync(&host->timeout_work);
+ 
+ 	mmc_free_host(host->mmc);
+ 	platform_set_drvdata(pdev, NULL);
 -- 
 1.8.3.1
