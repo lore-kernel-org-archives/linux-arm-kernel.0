@@ -1,30 +1,26 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 26 Jan 2017 09:52:26 +0100
-Subject: [PATCH 1/5] arm64: defconfig: Enable SH Mobile I2C controller
-In-Reply-To: <1485420750-12701-1-git-send-email-horms+renesas@verge.net.au>
-References: <1485420750-12701-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1485420750-12701-2-git-send-email-horms+renesas@verge.net.au>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 26 Jan 2017 10:04:25 +0100
+Subject: [PATCH v3 04/13] pinctrl: samsung: Document Exynos3250 SoC support
+In-Reply-To: <1484833733-16082-5-git-send-email-m.szyprowski@samsung.com>
+References: <CGME20170119134906eucas1p28eaf30c782d33b5a36afe31a89613123@eucas1p2.samsung.com>
+ <1484833733-16082-1-git-send-email-m.szyprowski@samsung.com>
+ <1484833733-16082-5-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CACRpkdY1F-DyKmi0T0wdUG7xdqt134mWvUj+UMYtY6jJF1knbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable SH Mobile I2C controller for use on R-Car Gen3 SoCs.
+On Thu, Jan 19, 2017 at 2:48 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+> Add missing compatible id for Exynos3250 SoC to device tree docs.
+> Exynos pin control driver supports it since commit d97f5b9804bfcdc1
+> ("pinctrl: exynos: Add driver data for Exynos3250").
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 869dded0f09f..92a3ee26c6fd 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -245,6 +245,7 @@ CONFIG_I2C_MESON=y
- CONFIG_I2C_MV64XXX=y
- CONFIG_I2C_QUP=y
- CONFIG_I2C_RK3X=y
-+CONFIG_I2C_SH_MOBILE=y
- CONFIG_I2C_TEGRA=y
- CONFIG_I2C_UNIPHIER_F=y
- CONFIG_I2C_RCAR=y
--- 
-2.7.0.rc3.207.g0ac5344
+Patch applied.
+
+Yours,
+Linus Walleij
