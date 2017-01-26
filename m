@@ -1,39 +1,30 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 26 Jan 2017 21:38:46 +0200
-Subject: [PATCH 1/2] soc: samsung: pmu: Remove unused and duplicated
- defines
-In-Reply-To: <20251f7e-310a-223e-3a35-7df5bc30352a@samsung.com>
-References: <CGME20170125193513epcas4p3630dd48974bedbe07a74a21d11500fe1@epcas4p3.samsung.com>
- <20170125193452.31768-1-krzk@kernel.org>
- <20251f7e-310a-223e-3a35-7df5bc30352a@samsung.com>
-Message-ID: <20170126193846.hbo6a5yvbp3opfs4@kozik-lap>
+Date: Thu, 26 Jan 2017 21:48:11 +0200
+Subject: [PATCH v2 3/8] pinctrl: samsung: Add support for pad retention
+ control for Exynos5433 SoCs
+In-Reply-To: <1485419634-28331-4-git-send-email-m.szyprowski@samsung.com>
+References: <1485419634-28331-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170126083402eucas1p187d3d31f62544fc46fae99fc5f74dbfe@eucas1p1.samsung.com>
+ <1485419634-28331-4-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20170126194811.rori5j5hmclniqig@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 08:15:42AM +0100, Marek Szyprowski wrote:
-> Hi Krzysztof,
+On Thu, Jan 26, 2017 at 09:33:49AM +0100, Marek Szyprowski wrote:
+> This patch adds support for retention control for Exynos5433 SoCs. Three
+> groups of pins has been defined for retention control: common shared group
+> for ALIVE, CPIF, eSE, FINGER, IMEM, NFC, PERIC, TOUCH pin banks and
+> separate control for FSYS and AUD pin banks, for which PMU retention
+> registers match whole banks.
 > 
-> 
-> On 2017-01-25 20:34, Krzysztof Kozlowski wrote:
-> > The exynos-regs-pmu.h was never a complete list of PMU registers.  It
-> > contained a lot of holes for registers which are not used.  However, a
-> > lot of unused defines came with porting the code from vendor kernel.
-> > 
-> > Few of defines were also duplicated.
-> > 
-> > Remove them so the file will be slightly smaller.
-> > 
-> > Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> 
-> Thanks for the cleanup!
-> 
-> If you are touching this, you may also want to unify multiple headers for
-> the Exynos PMU regs:
-> include/linux/soc/samsung/exynos-regs-pmu.h
-> linux/mfd/syscon/exynos4-pmu.h
-> linux/mfd/syscon/exynos5-pmu.h
->
-Sure, I'll take a look at these as well. Thanks for a hint.
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  drivers/pinctrl/samsung/pinctrl-exynos.c    | 58 +++++++++++++++++++++++++++++
+>  include/linux/soc/samsung/exynos-regs-pmu.h | 16 ++++++++
+>  2 files changed, 74 insertions(+)
+>  		.eint_gpio_init = exynos_eint_gpio_init,
+
+Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 
 Best regards,
 Krzysztof
