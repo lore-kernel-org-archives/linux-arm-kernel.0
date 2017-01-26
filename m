@@ -1,131 +1,184 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Thu, 26 Jan 2017 14:32:21 +0100
-Subject: [PATCH 08/22] power: supply: add AC power supply driver for
- AXP20X and AXP22X PMICs
-In-Reply-To: <20170117030013.g5xhlmrxpthyfewa@earth>
-References: <20170102163723.7939-1-quentin.schulz@free-electrons.com>
- <20170102163723.7939-9-quentin.schulz@free-electrons.com>
- <20170117030013.g5xhlmrxpthyfewa@earth>
-Message-ID: <6a3edb64-8ea9-cb14-b826-d6e8e2c4c4b7@free-electrons.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 26 Jan 2017 13:48:14 +0000
+Subject: [PATCH V11 2/3] ACPI: Add support for ResourceSource/IRQ domain
+ mapping
+In-Reply-To: <6275442.KC3JtHKUN3@aspire.rjw.lan>
+References: <1484879660-1960-1-git-send-email-agustinv@codeaurora.org>
+ <CAHp75VeYxfuMuaZCMk+MYdxLTs7cCa6j6M7Ot3XnwMmeHP7kBA@mail.gmail.com>
+ <20170126101521.GA10324@red-moon>
+ <6275442.KC3JtHKUN3@aspire.rjw.lan>
+Message-ID: <20170126134814.GA1194@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sebastian,
-
-On 17/01/2017 04:00, Sebastian Reichel wrote:
-> Hi Quentin,
+On Thu, Jan 26, 2017 at 11:43:43AM +0100, Rafael J. Wysocki wrote:
+> On Thursday, January 26, 2017 10:15:21 AM Lorenzo Pieralisi wrote:
+> > On Thu, Jan 26, 2017 at 03:01:18AM +0200, Andy Shevchenko wrote:
+> > > On Fri, Jan 20, 2017 at 4:34 AM, Agustin Vega-Frias
+> > > <agustinv@codeaurora.org> wrote:
+> > > > ACPI extended IRQ resources may contain a ResourceSource to specify
+> > > > an alternate interrupt controller. Introduce acpi_irq_get and use it
+> > > > to implement ResourceSource/IRQ domain mapping.
+> > > >
+> > > > The new API is similar to of_irq_get and allows re-initialization
+> > > > of a platform resource from the ACPI extended IRQ resource, and
+> > > > provides proper behavior for probe deferral when the domain is not
+> > > > yet present when called.
+> > > 
+> > > > +static struct fwnode_handle *
+> > > > +acpi_get_irq_source_fwhandle(const struct acpi_resource_source *source)
+> > > > +{
+> > > > +       struct fwnode_handle *result = NULL;
+> > > > +       struct acpi_device *device;
+> > > > +       struct acpi_hardware_id *hwid;
+> > > > +       struct acpi_device_id *devid;
+> > > > +       acpi_handle handle;
+> > > > +       acpi_status status;
+> > > > +
+> > > > +       if (!source->string_length)
+> > > > +               return acpi_gsi_domain_id;
+> > > > +
+> > > > +       status = acpi_get_handle(NULL, source->string_ptr, &handle);
+> > > > +       if (WARN_ON(ACPI_FAILURE(status)))
+> > > > +               return NULL;
+> > > > +
+> > > > +       device = acpi_bus_get_acpi_device(handle);
+> > > > +       if (WARN_ON(!device))
+> > > > +               return NULL;
+> > > > +
+> > > 
+> > > > +       list_for_each_entry(hwid, &device->pnp.ids, list) {
+> > > 
+> > > > +               for (devid = &__dsdt_irqchip_acpi_probe_table;
+> > > > +                    devid < &__dsdt_irqchip_acpi_probe_table_end; devid++) {
+> > > > +                       if (devid->id && !strcmp(devid->id, hwid->id)) {
+> > > > +                               result = &device->fwnode;
+> > > > +                               break;
+> > > > +                       }
+> > > > +               }
+> > > 
+> > > Looks like a candidate for linker table API. (I recommend to Cc Luis
+> > > for this part)
+> > 
+> > This linker table entry scheme is just an optimization and should
+> > not gate the series.
+> > 
+> > > > +       }
+> > > 
+> > > > +/**
+> > > > + * acpi_irq_parse_one_match - Handle a matching IRQ resource.
+> > > > + * @fwnode: matching fwnode
+> > > > + * @hwirq: hardware IRQ number
+> > > > + * @triggering: triggering attributes of hwirq
+> > > > + * @polarity: polarity attributes of hwirq
+> > > > + * @polarity: polarity attributes of hwirq
+> > > > + * @shareable: shareable attributes of hwirq
+> > > > + * @ctx: acpi_irq_parse_one_ctx updated by this function
+> > > > + *
+> > > > + * Description:
+> > > > + * Handle a matching IRQ resource by populating the given ctx with
+> > > > + * the information passed.
+> > > > + */
+> > > > +static inline void acpi_irq_parse_one_match(struct fwnode_handle *fwnode,
+> > > > +                                           u32 hwirq, u8 triggering,
+> > > > +                                           u8 polarity, u8 shareable,
+> > > > +                                           struct acpi_irq_parse_one_ctx *ctx)
+> > > > +{
+> > > 
+> > > > +       if (!fwnode)
+> > > > +               return;
+> > > 
+> > > > +       ctx->rc = 0;
+> > > 
+> > > Perhaps ctx->rc = fwnode ? 0 : -EINVAL; ?
+> > > 
+> > > > +       *ctx->res_flags = acpi_dev_irq_flags(triggering, polarity, shareable);
+> > > > +       ctx->fwspec->fwnode = fwnode;
+> > > > +       ctx->fwspec->param[0] = hwirq;
+> > > > +       ctx->fwspec->param[1] = acpi_dev_get_irq_type(triggering, polarity);
+> > > > +       ctx->fwspec->param_count = 2;
+> > > > +}
+> > > 
+> > > > +int acpi_irq_get(acpi_handle handle, unsigned int index, struct resource *res)
+> > > > +{
+> > > > +       struct irq_fwspec fwspec;
+> > > > +       struct irq_domain *domain;
+> > > > +       unsigned long flags;
+> > > > +       int rc;
+> > > > +
+> > > > +       rc = acpi_irq_parse_one(handle, index, &fwspec, &flags);
+> > > > +       if (rc)
+> > > > +               return rc;
+> > > > +
+> > > > +       domain = irq_find_matching_fwnode(fwspec.fwnode, DOMAIN_BUS_ANY);
+> > > > +       if (!domain)
+> > > > +               return -EPROBE_DEFER;
+> > > > +
+> > > > +       rc = irq_create_fwspec_mapping(&fwspec);
+> > > > +       if (rc <= 0)
+> > > 
+> > > Is rc = 0 an error?
+> > 
+> > Yes.
+> > 
+> > > > +               return -EINVAL;
+> > > > +
+> > > > +       res->start = rc;
+> > > > +       res->end = rc;
+> > > > +       res->flags = flags;
+> > > > +
+> > > > +       return 0;
+> > > > +}
+> > > > +EXPORT_SYMBOL_GPL(acpi_irq_get);
+> > > 
+> > > > --- a/drivers/base/platform.c
+> > > > +++ b/drivers/base/platform.c
+> > > > @@ -102,6 +102,14 @@ int platform_get_irq(struct platform_device *dev, unsigned int num)
+> > > 
+> > > >         r = platform_get_resource(dev, IORESOURCE_IRQ, num);
+> > > > +       if (r && r->flags & IORESOURCE_DISABLED && has_acpi_companion(&dev->dev)) {
+> > > > +               int ret;
+> > > > +
+> > > > +               ret = acpi_irq_get(ACPI_HANDLE(&dev->dev), num, r);
+> > > > +               if (ret)
+> > > > +                       return ret;
+> > > > +       }
+> > > 
+> > > > +#ifdef CONFIG_ACPI_GENERIC_GSI
+> > > 
+> > > #if IS_ENABLED()
+> > > 
+> > > > +int acpi_irq_get(acpi_handle handle, unsigned int index, struct resource *res);
+> > > > +#else
+> > > > +static inline int acpi_irq_get(acpi_handle handle, unsigned int index,
+> > > > +                              struct resource *res)
+> > > 
+> > > Perhaps
+> > > 
+> > > static inline
+> > > int ...
+> > 
+> > It is late -rc5 and notwithstanding cosmetics changes, can we make
+> > progress with this patch series or not please ?
 > 
-> The driver looks mostly fine. I do have a two comments, though.
+> Yes, we can.
 > 
-> On Mon, Jan 02, 2017 at 05:37:08PM +0100, Quentin Schulz wrote:
->> [...]
->>
->> +static int axp20x_ac_power_probe(struct platform_device *pdev)
->> +{
->> +	static const char * const axp20x_irq_names[] = { "ACIN_PLUGIN",
->> +		"ACIN_REMOVAL", NULL };
->>
->> +	static const char * const *irq_names;
->> +	const struct power_supply_desc *ac_power_desc;
->> +	int i, irq, ret;
->> +
->> +	if (!of_device_is_available(pdev->dev.of_node))
->> +		return -ENODEV;
->> +
->> +	if (!axp20x) {
->> +		dev_err(&pdev->dev, "Parent drvdata not set\n");
->> +		return -EINVAL;
->> +	}
+> I've just returned from travels and have not had the time to look at things in
+> detail yet.
 > 
-> axp20x will no longer be needed after implementing below
-> comments.
-> 
->> [...]
->> +	irq_names = axp20x_irq_names;
-> 
-> Just rename axp20x_irq_names into irq_names, since its only used
-> here.
-> 
->> [...]
->>
->> +	power->np = pdev->dev.of_node;
-> 
-> This can be dropped, it's not used at all.
-> 
->> +	power->regmap = axp20x->regmap;
-> 
-> power->regmap = dev_get_regmap(pdev->dev.parent, NULL);
-> 
+> I sent a notice about my travel in advance specifically so people didn't expect
+> me to respond while I was traveling, but obviously everybody simply ignored it
+> and went ahead with their lives.  And then I get messages like this which
+> doesn't make me happy at all.
 
-ACK on everything above.
+I had to ask given that there are other series that depend on it and
+that this code will eventually have to go via a tree that is not ACPI,
+so that will require some coordination and it is getting late in the
+cycle, that's all my message was meant for, apologies.
 
->> [...]
->> +	/* Request irqs after registering, as irqs may trigger immediately */
->> +	for (i = 0; irq_names[i]; i++) {
->> +		irq = platform_get_irq_byname(pdev, irq_names[i]);
->> +		if (irq < 0) {
->> +			dev_warn(&pdev->dev, "No IRQ for %s: %d\n",
->> +				 irq_names[i], irq);
->> +			continue;
->> +		}
->> +		irq = regmap_irq_get_virq(axp20x->regmap_irqc, irq);
-> 
-> The mapping should actually happen in the mfd driver, so that
-> the platform resource contains a valid irq.
-> 
+> I will start processing things shortly, but there is a backlog I need to work
+> through and this one may not be the first item in it.
 
-I've come with this solution:
+Ok no problems then, thank you !
 
-------------------------------------------------------------------------
-diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index 012c064..117eacb 100644
---- a/drivers/mfd/axp20x.c
-+++ b/drivers/mfd/axp20x.c
-@@ -882,7 +882,7 @@ EXPORT_SYMBOL(axp20x_match_device);
-
- int axp20x_device_probe(struct axp20x_dev *axp20x)
- {
--	int ret;
-+	int ret, irq_base;
-
- 	ret = regmap_add_irq_chip(axp20x->regmap, axp20x->irq,
- 				  IRQF_ONESHOT | IRQF_SHARED, -1,
-@@ -893,8 +893,9 @@ int axp20x_device_probe(struct axp20x_dev *axp20x)
- 		return ret;
- 	}
-
-+	irq_base = regmap_irq_chip_get_base(axp20x->regmap_irqc);
- 	ret = mfd_add_devices(axp20x->dev, -1, axp20x->cells,
--			      axp20x->nr_cells, NULL, 0, NULL);
-+			      axp20x->nr_cells, NULL, irq_base, NULL);
-
- 	if (ret) {
- 		dev_err(axp20x->dev, "failed to add MFD devices: %d\n", ret);
-------------------------------------------------------------------------
-
-However, this implies that all cells added by the mfd driver which are
-requesting irqs will need to be changed in the same commit to remove the
-regmap_irq_get_virq calls. If we don't modify the drivers, they will
-purely fail to request the irqs.
-
-The impacted drivers are the following:
-
- - drivers/extcon/extcon-axp288.c
- - drivers/input/misc/axp20x-pek.c
- - drivers/power/supply/axp20x_usb_power.c
- - drivers/power/supply/axp288_charger.c
- - drivers/power/supply/axp288_fuel_gauge.c
-
-Is it really worth to do such a cleanup? I'm assuming that impacting
-four different subsystems at the same time might require a bit of time
-to make the patch into the kernel. I don't see also another way than
-doing one single patch for all changes since the changes in the mfd
-driver will break all aforementioned drivers.
-
-Thanks,
-Quentin
-
--- 
-Quentin Schulz, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Lorenzo
