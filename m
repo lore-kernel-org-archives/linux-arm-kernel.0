@@ -1,62 +1,157 @@
 From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Thu, 26 Jan 2017 02:47:09 +0200
-Subject: [PATCH V11 1/3] ACPI: Generic GSI: Do not attempt to map non-GSI
- IRQs during bus scan
-In-Reply-To: <1484879660-1960-2-git-send-email-agustinv@codeaurora.org>
+Date: Thu, 26 Jan 2017 03:01:18 +0200
+Subject: [PATCH V11 2/3] ACPI: Add support for ResourceSource/IRQ domain
+ mapping
+In-Reply-To: <1484879660-1960-3-git-send-email-agustinv@codeaurora.org>
 References: <1484879660-1960-1-git-send-email-agustinv@codeaurora.org>
- <1484879660-1960-2-git-send-email-agustinv@codeaurora.org>
-Message-ID: <CAHp75VdTnjupjzWyc27JPi_wUsd=+q-4FuzRV=WvjfSe1HdoKQ@mail.gmail.com>
+ <1484879660-1960-3-git-send-email-agustinv@codeaurora.org>
+Message-ID: <CAHp75VeYxfuMuaZCMk+MYdxLTs7cCa6j6M7Ot3XnwMmeHP7kBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, Jan 20, 2017 at 4:34 AM, Agustin Vega-Frias
 <agustinv@codeaurora.org> wrote:
-> ACPI extended IRQ resources may contain a Resource Source field to specify
-> an alternate interrupt controller, attempting to map them as GSIs is
-> incorrect, so just disable the platform resource.
+> ACPI extended IRQ resources may contain a ResourceSource to specify
+> an alternate interrupt controller. Introduce acpi_irq_get and use it
+> to implement ResourceSource/IRQ domain mapping.
 >
-> Since this field is currently ignored, we make this change conditional
-> on CONFIG_ACPI_GENERIC_GSI to keep the current behavior on x86 platforms,
-> in case some existing ACPI tables are using this incorrectly.
+> The new API is similar to of_irq_get and allows re-initialization
+> of a platform resource from the ACPI extended IRQ resource, and
+> provides proper behavior for probe deferral when the domain is not
+> yet present when called.
 
-> @@ -43,6 +43,19 @@ static inline bool acpi_iospace_resource_valid(struct resource *res)
->  acpi_iospace_resource_valid(struct resource *res) { return true; }
->  #endif
->
+> +static struct fwnode_handle *
+> +acpi_get_irq_source_fwhandle(const struct acpi_resource_source *source)
+> +{
+> +       struct fwnode_handle *result = NULL;
+> +       struct acpi_device *device;
+> +       struct acpi_hardware_id *hwid;
+> +       struct acpi_device_id *devid;
+> +       acpi_handle handle;
+> +       acpi_status status;
+> +
+> +       if (!source->string_length)
+> +               return acpi_gsi_domain_id;
+> +
+> +       status = acpi_get_handle(NULL, source->string_ptr, &handle);
+> +       if (WARN_ON(ACPI_FAILURE(status)))
+> +               return NULL;
+> +
+> +       device = acpi_bus_get_acpi_device(handle);
+> +       if (WARN_ON(!device))
+> +               return NULL;
+> +
+
+> +       list_for_each_entry(hwid, &device->pnp.ids, list) {
+
+> +               for (devid = &__dsdt_irqchip_acpi_probe_table;
+> +                    devid < &__dsdt_irqchip_acpi_probe_table_end; devid++) {
+> +                       if (devid->id && !strcmp(devid->id, hwid->id)) {
+> +                               result = &device->fwnode;
+> +                               break;
+> +                       }
+> +               }
+
+Looks like a candidate for linker table API. (I recommend to Cc Luis
+for this part)
+
+> +       }
+
+> +/**
+> + * acpi_irq_parse_one_match - Handle a matching IRQ resource.
+> + * @fwnode: matching fwnode
+> + * @hwirq: hardware IRQ number
+> + * @triggering: triggering attributes of hwirq
+> + * @polarity: polarity attributes of hwirq
+> + * @polarity: polarity attributes of hwirq
+> + * @shareable: shareable attributes of hwirq
+> + * @ctx: acpi_irq_parse_one_ctx updated by this function
+> + *
+> + * Description:
+> + * Handle a matching IRQ resource by populating the given ctx with
+> + * the information passed.
+> + */
+> +static inline void acpi_irq_parse_one_match(struct fwnode_handle *fwnode,
+> +                                           u32 hwirq, u8 triggering,
+> +                                           u8 polarity, u8 shareable,
+> +                                           struct acpi_irq_parse_one_ctx *ctx)
+> +{
+
+> +       if (!fwnode)
+> +               return;
+
+> +       ctx->rc = 0;
+
+Perhaps ctx->rc = fwnode ? 0 : -EINVAL; ?
+
+> +       *ctx->res_flags = acpi_dev_irq_flags(triggering, polarity, shareable);
+> +       ctx->fwspec->fwnode = fwnode;
+> +       ctx->fwspec->param[0] = hwirq;
+> +       ctx->fwspec->param[1] = acpi_dev_get_irq_type(triggering, polarity);
+> +       ctx->fwspec->param_count = 2;
+> +}
+
+> +int acpi_irq_get(acpi_handle handle, unsigned int index, struct resource *res)
+> +{
+> +       struct irq_fwspec fwspec;
+> +       struct irq_domain *domain;
+> +       unsigned long flags;
+> +       int rc;
+> +
+> +       rc = acpi_irq_parse_one(handle, index, &fwspec, &flags);
+> +       if (rc)
+> +               return rc;
+> +
+> +       domain = irq_find_matching_fwnode(fwspec.fwnode, DOMAIN_BUS_ANY);
+> +       if (!domain)
+> +               return -EPROBE_DEFER;
+> +
+> +       rc = irq_create_fwspec_mapping(&fwspec);
+> +       if (rc <= 0)
+
+Is rc = 0 an error?
+
+> +               return -EINVAL;
+> +
+> +       res->start = rc;
+> +       res->end = rc;
+> +       res->flags = flags;
+> +
+> +       return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(acpi_irq_get);
+
+> --- a/drivers/base/platform.c
+> +++ b/drivers/base/platform.c
+> @@ -102,6 +102,14 @@ int platform_get_irq(struct platform_device *dev, unsigned int num)
+
+>         r = platform_get_resource(dev, IORESOURCE_IRQ, num);
+> +       if (r && r->flags & IORESOURCE_DISABLED && has_acpi_companion(&dev->dev)) {
+> +               int ret;
+> +
+> +               ret = acpi_irq_get(ACPI_HANDLE(&dev->dev), num, r);
+> +               if (ret)
+> +                       return ret;
+> +       }
+
 > +#ifdef CONFIG_ACPI_GENERIC_GSI
 
-#if IS_ENABLED() ?
+#if IS_ENABLED()
 
-> +static inline bool is_gsi(struct acpi_resource_extended_irq *ext_irq)
-> +{
-> +       return ext_irq->resource_source.string_length == 0 &&
-> +              ext_irq->producer_consumer == ACPI_CONSUMER;
-> +}
+> +int acpi_irq_get(acpi_handle handle, unsigned int index, struct resource *res);
 > +#else
-> +static inline bool is_gsi(struct acpi_resource_extended_irq *ext_irq)
+> +static inline int acpi_irq_get(acpi_handle handle, unsigned int index,
+> +                              struct resource *res)
+
+Perhaps
+
+static inline
+int ...
+
 > +{
-> +       return true;
+> +       return -EINVAL;
 > +}
 > +#endif
-> +
->  static bool acpi_dev_resource_len_valid(u64 start, u64 end, u64 len, bool io)
->  {
->         u64 reslen = end - start + 1;
-> @@ -470,9 +483,12 @@ bool acpi_dev_resource_interrupt(struct acpi_resource *ares, int index,
->                         acpi_dev_irqresource_disabled(res, 0);
->                         return false;
->                 }
-> -               acpi_dev_get_irqresource(res, ext_irq->interrupts[index],
-
-> +               if (is_gsi(ext_irq))
-> +                       acpi_dev_get_irqresource(res, ext_irq->interrupts[index],
->                                          ext_irq->triggering, ext_irq->polarity,
->                                          ext_irq->sharable, false);
-> +               else
-> +                       acpi_dev_irqresource_disabled(res, 0);
-
-And why not to create a helper called acpi_dev_get_gsi_irqresource()
-instead of that one?
 
 -- 
 With Best Regards,
