@@ -1,57 +1,118 @@
 From: rask@formelder.dk (Rask Ingemann Lambertsen)
-Date: Thu, 26 Jan 2017 22:24:40 +0100 (CET)
-Subject: [PATCH 2/5] DT: mfd: axp20x: Add binding for the AXP808
+Date: Thu, 26 Jan 2017 22:25:40 +0100 (CET)
+Subject: [PATCH 3/5] mfd: axp20x: Add support for the AXP808 PMIC
 In-Reply-To: <cover.1485456003.git.rask@formelder.dk>
 References: <cover.1485456003.git.rask@formelder.dk>
-Message-ID: <abb27901379a19a11608fd37254e1a8f7fa1b199.1485456006.git.rask@formelder.dk>
+Message-ID: <e1d6d6acfaa95e214b6baa73a7edeaa8e6af3670.1485456006.git.rask@formelder.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP808 does not support address space extension, but is otherwise
-identical to the AXP806, including the chip ID, so add a compatible
-string for it to the binding.
+The X-Powers AXP808 is a PMIC which, like the very similar AXP806, is
+used on boards featuring Allwinner's A80 SoC. Unlike the AXP806, it
+doesn't support address space extension and its associated registers,
+but the two are otherwise identical (including the chip ID).
+
+This patch adds support for the interrupts on the AXP808 and enables
+the regulator sub-device. The next patch in the series adds the actual
+regulator support.
 
 Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
 ---
- Documentation/devicetree/bindings/mfd/axp20x.txt | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ drivers/mfd/axp20x-rsb.c   |  1 +
+ drivers/mfd/axp20x.c       | 28 ++++++++++++++++++++++++++++
+ include/linux/mfd/axp20x.h |  1 +
+ 3 files changed, 30 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-index 86ae540..8195b06 100644
---- a/Documentation/devicetree/bindings/mfd/axp20x.txt
-+++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-@@ -7,12 +7,13 @@ axp209 (X-Powers)
- axp221 (X-Powers)
- axp223 (X-Powers)
- axp806 (X-Powers)
-+axp808 (X-Powers)
- axp809 (X-Powers)
+diff --git a/drivers/mfd/axp20x-rsb.c b/drivers/mfd/axp20x-rsb.c
+index a732cb5..96ea2e9 100644
+--- a/drivers/mfd/axp20x-rsb.c
++++ b/drivers/mfd/axp20x-rsb.c
+@@ -62,6 +62,7 @@ static int axp20x_rsb_remove(struct sunxi_rsb_device *rdev)
+ static const struct of_device_id axp20x_rsb_of_match[] = {
+ 	{ .compatible = "x-powers,axp223", .data = (void *)AXP223_ID },
+ 	{ .compatible = "x-powers,axp806", .data = (void *)AXP806_ID },
++	{ .compatible = "x-powers,axp808", .data = (void *)AXP808_ID },
+ 	{ .compatible = "x-powers,axp809", .data = (void *)AXP809_ID },
+ 	{ },
+ };
+diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+index 25115fe..2d3383e 100644
+--- a/drivers/mfd/axp20x.c
++++ b/drivers/mfd/axp20x.c
+@@ -41,6 +41,7 @@ static const char * const axp20x_model_names[] = {
+ 	"AXP223",
+ 	"AXP288",
+ 	"AXP806",
++	"AXP808",
+ 	"AXP809",
+ };
  
- Required properties:
- - compatible: "x-powers,axp152", "x-powers,axp202", "x-powers,axp209",
- 	      "x-powers,axp221", "x-powers,axp223", "x-powers,axp806",
--	      "x-powers,axp809"
-+	      "x-powers,axp808", "x-powers,axp809"
- - reg: The I2C slave address or RSB hardware address for the AXP chip
- - interrupt-parent: The parent interrupt controller
- - interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
-@@ -87,7 +88,7 @@ LDO_IO1		: LDO		: ips-supply		: GPIO 1
- RTC_LDO		: LDO		: ips-supply		: always on
- DRIVEVBUS	: Enable output	: drivevbus-supply	: external regulator
+@@ -148,6 +149,13 @@ static const struct regmap_range axp806_writeable_ranges[] = {
+ 	regmap_reg_range(AXP806_REG_ADDR_EXT, AXP806_REG_ADDR_EXT),
+ };
  
--AXP806 regulators, type, and corresponding input supply names:
-+AXP806/AXP808 regulators, type, and corresponding input supply names:
++static const struct regmap_range axp808_writeable_ranges[] = {
++	regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_DATACACHE(3)),
++	regmap_reg_range(AXP806_PWR_OUT_CTRL1, AXP806_CLDO3_V_CTRL),
++	regmap_reg_range(AXP20X_IRQ1_EN, AXP20X_IRQ2_EN),
++	regmap_reg_range(AXP20X_IRQ1_STATE, AXP20X_IRQ2_STATE),
++};
++
+ static const struct regmap_range axp806_volatile_ranges[] = {
+ 	regmap_reg_range(AXP20X_IRQ1_STATE, AXP20X_IRQ2_STATE),
+ };
+@@ -162,6 +170,11 @@ static const struct regmap_access_table axp806_volatile_table = {
+ 	.n_yes_ranges	= ARRAY_SIZE(axp806_volatile_ranges),
+ };
  
- Regulator	  Type		  Supply Name		  Notes
- ---------	  ----		  -----------		  -----
-@@ -108,7 +109,7 @@ CLDO2		: LDO		: cldoin-supply		: shared supply
- CLDO3		: LDO		: cldoin-supply		: shared supply
- SW		: On/Off Switch : swin-supply
++static const struct regmap_access_table axp808_writeable_table = {
++	.yes_ranges	= axp808_writeable_ranges,
++	.n_yes_ranges	= ARRAY_SIZE(axp808_writeable_ranges),
++};
++
+ static struct resource axp152_pek_resources[] = {
+ 	DEFINE_RES_IRQ_NAMED(AXP152_IRQ_PEK_RIS_EDGE, "PEK_DBR"),
+ 	DEFINE_RES_IRQ_NAMED(AXP152_IRQ_PEK_FAL_EDGE, "PEK_DBF"),
+@@ -320,6 +333,15 @@ static const struct regmap_config axp806_regmap_config = {
+ 	.cache_type	= REGCACHE_RBTREE,
+ };
  
--Additionally, the AXP806 DC-DC regulators support poly-phase arrangements
-+Additionally, the AXP806/AXP808 DC-DC regulators support poly-phase arrangements
- for higher output current. The possible groupings are: A+B, A+B+C, D+E.
++static const struct regmap_config axp808_regmap_config = {
++	.reg_bits	= 8,
++	.val_bits	= 8,
++	.wr_table	= &axp808_writeable_table,
++	.volatile_table	= &axp806_volatile_table,
++	.max_register	= AXP806_VREF_TEMP_WARN_L,
++	.cache_type	= REGCACHE_RBTREE,
++};
++
+ #define INIT_REGMAP_IRQ(_variant, _irq, _off, _mask)			\
+ 	[_variant##_IRQ_##_irq] = { .reg_offset = (_off), .mask = BIT(_mask) }
  
- AXP809 regulators, type, and corresponding input supply names:
+@@ -842,6 +864,12 @@ int axp20x_match_device(struct axp20x_dev *axp20x)
+ 		axp20x->regmap_cfg = &axp806_regmap_config;
+ 		axp20x->regmap_irq_chip = &axp806_regmap_irq_chip;
+ 		break;
++	case AXP808_ID:
++		axp20x->nr_cells = ARRAY_SIZE(axp806_cells);
++		axp20x->cells = axp806_cells;
++		axp20x->regmap_cfg = &axp808_regmap_config;
++		axp20x->regmap_irq_chip = &axp806_regmap_irq_chip;
++		break;
+ 	case AXP809_ID:
+ 		axp20x->nr_cells = ARRAY_SIZE(axp809_cells);
+ 		axp20x->cells = axp809_cells;
+diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+index 0aa4ef7..b9b7eae 100644
+--- a/include/linux/mfd/axp20x.h
++++ b/include/linux/mfd/axp20x.h
+@@ -21,6 +21,7 @@ enum {
+ 	AXP223_ID,
+ 	AXP288_ID,
+ 	AXP806_ID,
++	AXP808_ID,
+ 	AXP809_ID,
+ 	NR_AXP20X_VARIANTS,
+ };
 -- 
 2.10.2
