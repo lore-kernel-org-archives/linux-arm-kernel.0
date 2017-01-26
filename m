@@ -1,56 +1,99 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 26 Jan 2017 09:52:29 +0100
-Subject: [PATCH 4/5] arm64: dts: r8a7795: Add I2C for DVFS core to dtsi
-In-Reply-To: <1485420750-12701-1-git-send-email-horms+renesas@verge.net.au>
-References: <1485420750-12701-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1485420750-12701-5-git-send-email-horms+renesas@verge.net.au>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 26 Jan 2017 10:06:00 +0100
+Subject: [PATCH v4 7/13] mmc: sunxi: Add more debug informations
+In-Reply-To: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
+References: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <97cb930c7287da4db2948f2da8e69484dc7cc2e9.1485421557.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
+Add a bit more debug messages that can be helpful when debugging the clock
+setup.
 
-This patch adds I2C for DVFS device support for R8A7795 SoC.
+Also fill the actual_clock field in struct mmc_host to report properly the
+current frequency in debugfs.
 
-Signed-off-by: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
-Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
-Signed-off-by: Dien Pham <dien.pham.ry@rvc.renesas.com>
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ drivers/mmc/host/sunxi-mmc.c | 23 +++++++++++++++++++----
+ 1 file changed, 19 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index eac4f29aa5cd..fe266bb3d913 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -25,6 +25,7 @@
- 		i2c4 = &i2c4;
- 		i2c5 = &i2c5;
- 		i2c6 = &i2c6;
-+		i2c7 = &i2c_dvfs;
- 	};
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index f0f6922bca8a..6ffcd2838272 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -661,6 +661,9 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
+ 	unsigned long expire = jiffies + msecs_to_jiffies(750);
+ 	u32 rval;
  
- 	psci {
-@@ -793,6 +794,19 @@
- 			status = "disabled";
- 		};
- 
-+		i2c_dvfs: i2c at e60b0000 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "renesas,iic-r8a7795",
-+				     "renesas,rcar-gen3-iic",
-+				     "renesas,rmobile-iic";
-+			reg = <0 0xe60b0000 0 0x425>;
-+			interrupts = <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 926>;
-+			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
++	dev_dbg(mmc_dev(host->mmc), "%sabling the clock\n",
++		oclk_en ? "en" : "dis");
 +
- 		i2c0: i2c at e6500000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
+ 	rval = mmc_readl(host, REG_CLKCR);
+ 	rval &= ~(SDXC_CARD_CLOCK_ON | SDXC_LOW_POWER_ON | SDXC_MASK_DATA0);
+ 
+@@ -737,6 +740,7 @@ static int sunxi_mmc_clk_set_phase(struct sunxi_mmc_host *host,
+ 			index = SDXC_CLK_50M_DDR;
+ 		}
+ 	} else {
++		dev_dbg(mmc_dev(host->mmc), "Invalid clock... returning\n");
+ 		return -EINVAL;
+ 	}
+ 
+@@ -749,6 +753,7 @@ static int sunxi_mmc_clk_set_phase(struct sunxi_mmc_host *host,
+ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+ 				  struct mmc_ios *ios)
+ {
++	struct mmc_host *mmc = host->mmc;
+ 	long rate;
+ 	u32 rval, clock = ios->clock;
+ 	int ret;
+@@ -757,6 +762,9 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+ 	if (ret)
+ 		return ret;
+ 
++	/* Our clock is gated now */
++	mmc->actual_clock = 0;
++
+ 	if (!ios->clock)
+ 		return 0;
+ 
+@@ -767,17 +775,17 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+ 
+ 	rate = clk_round_rate(host->clk_mmc, clock);
+ 	if (rate < 0) {
+-		dev_err(mmc_dev(host->mmc), "error rounding clk to %d: %ld\n",
++		dev_err(mmc_dev(mmc), "error rounding clk to %d: %ld\n",
+ 			clock, rate);
+ 		return rate;
+ 	}
+-	dev_dbg(mmc_dev(host->mmc), "setting clk to %d, rounded %ld\n",
++	dev_dbg(mmc_dev(mmc), "setting clk to %d, rounded %ld\n",
+ 		clock, rate);
+ 
+ 	/* setting clock rate */
+ 	ret = clk_set_rate(host->clk_mmc, rate);
+ 	if (ret) {
+-		dev_err(mmc_dev(host->mmc), "error setting clk to %ld: %d\n",
++		dev_err(mmc_dev(mmc), "error setting clk to %ld: %d\n",
+ 			rate, ret);
+ 		return ret;
+ 	}
+@@ -812,7 +820,14 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+ 	 * least on the A64).
+ 	 */
+ 
+-	return sunxi_mmc_oclk_onoff(host, 1);
++	ret = sunxi_mmc_oclk_onoff(host, 1);
++	if (ret)
++		return ret;
++
++	/* And we just enabled our clock back */
++	mmc->actual_clock = rate;
++
++	return 0;
+ }
+ 
+ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 -- 
-2.7.0.rc3.207.g0ac5344
+git-series 0.8.11
