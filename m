@@ -1,61 +1,38 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 26 Jan 2017 10:05:59 +0100
-Subject: [PATCH v4 6/13] mmc: sunxi: Add EMMC (MMC2) controller compatible
-In-Reply-To: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
-References: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <716c1509042ce282db7e6190092f7aa767a74f03.1485421557.git-series.maxime.ripard@free-electrons.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 26 Jan 2017 09:52:30 +0100
+Subject: [PATCH 5/5] arm64: dts: r8a7795-salvator-x: Enable I2C for DVFS device
+In-Reply-To: <1485420750-12701-1-git-send-email-horms+renesas@verge.net.au>
+References: <1485420750-12701-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1485420750-12701-6-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MMC2 controller on the A64 is kind of a special beast.
+From: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
 
-While the general controller design is the same than the other MMC
-controllers in the SoC, it also has a bunch of features and changes that
-prevent it to be driven in the same way.
+This patch enables I2C for DVFS device for for Salvator-X board on
+R8A7795 SoC.
 
-It has for example a different bus width limit, a different maximum
-frequency, and, for some reason, the maximum buffer size of a DMA
-descriptor.
-
-Add a new compatible specifically for this controller.
-
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/mmc/host/sunxi-mmc.c | 8 ++++++++
- 1 file changed, 8 insertions(+), 0 deletions(-)
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index 6bbe61397b7c..f0f6922bca8a 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -5,6 +5,7 @@
-  * (C) Copyright 2013-2014 O2S GmbH <www.o2s.ch>
-  * (C) Copyright 2013-2014 David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
-  * (C) Copyright 2013-2014 Hans de Goede <hdegoede@redhat.com>
-+ * (C) Copyright 2017 Sootech SA
-  *
-  * This program is free software; you can redistribute it and/or
-  * modify it under the terms of the GNU General Public License as
-@@ -1096,12 +1097,19 @@ static const struct sunxi_mmc_cfg sun50i_a64_cfg = {
- 	.needs_new_timings = true,
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+index 51ef8bbaa33e..ff8bb5bd675f 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+@@ -486,6 +486,10 @@
+ 	clock-frequency = <22579200>;
  };
  
-+static const struct sunxi_mmc_cfg sun50i_a64_emmc_cfg = {
-+	.idma_des_size_bits = 13,
-+	.clk_delays = NULL,
-+	.can_calibrate = true,
++&i2c_dvfs {
++	status = "okay";
 +};
 +
- static const struct of_device_id sunxi_mmc_of_match[] = {
- 	{ .compatible = "allwinner,sun4i-a10-mmc", .data = &sun4i_a10_cfg },
- 	{ .compatible = "allwinner,sun5i-a13-mmc", .data = &sun5i_a13_cfg },
- 	{ .compatible = "allwinner,sun7i-a20-mmc", .data = &sun7i_a20_cfg },
- 	{ .compatible = "allwinner,sun9i-a80-mmc", .data = &sun9i_a80_cfg },
- 	{ .compatible = "allwinner,sun50i-a64-mmc", .data = &sun50i_a64_cfg },
-+	{ .compatible = "allwinner,sun50i-a64-emmc", .data = &sun50i_a64_emmc_cfg },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, sunxi_mmc_of_match);
+ &avb {
+ 	pinctrl-0 = <&avb_pins>;
+ 	pinctrl-names = "default";
 -- 
-git-series 0.8.11
+2.7.0.rc3.207.g0ac5344
