@@ -1,33 +1,39 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 26 Jan 2017 11:11:09 +0100
-Subject: [PATCH 7/7] ARM: dts: r7s72100: add power-domains to mmcif
-In-Reply-To: <cover.1485425227.git.horms+renesas@verge.net.au>
-References: <cover.1485425227.git.horms+renesas@verge.net.au>
-Message-ID: <5786ac14239a0809ca13e6a6f77147e6bb04aa29.1485425227.git.horms+renesas@verge.net.au>
+Date: Thu, 26 Jan 2017 11:11:18 +0100
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v4.11
+Message-ID: <cover.1485425385.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Brandt <chris.brandt@renesas.com>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
-Reported-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r7s72100.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+Please consider these second round of Renesas ARM based SoC updates for v4.11.
 
-diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
-index 74e684f3c1c7..b8aa256bd515 100644
---- a/arch/arm/boot/dts/r7s72100.dtsi
-+++ b/arch/arm/boot/dts/r7s72100.dtsi
-@@ -475,6 +475,7 @@
- 			      GIC_SPI 269 IRQ_TYPE_LEVEL_HIGH
- 			      GIC_SPI 267 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp8_clks R7S72100_CLK_MMCIF>;
-+		power-domains = <&cpg_clocks>;
- 		reg-io-width = <4>;
- 		bus-width = <8>;
- 		status = "disabled";
--- 
-2.7.0.rc3.207.g0ac5344
+This pull request is based on the previous round of
+such requests, tagged as renesas-soc-for-v4.11,
+which you have already pulled.
+
+
+The following changes since commit 70def3e53694a65c5583fb5f411491a5074bab18:
+
+  ARM: shmobile: rcar-gen2: Remove unused rcar_gen2_read_mode_pins() (2017-01-03 10:50:45 +0100)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v4.11
+
+for you to fetch changes up to aa7f39d51e33555fc45645c08bc74a74e22b166f:
+
+  ARM: shmobile: rcar-gen2: Add more register documentation (2017-01-25 11:28:28 +0100)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC Updates for v4.11
+
+* Add more register documentation to R-Car Gen2 PM
+
+----------------------------------------------------------------
+Geert Uytterhoeven (1):
+      ARM: shmobile: rcar-gen2: Add more register documentation
+
+ arch/arm/mach-shmobile/pm-rcar-gen2.c | 40 +++++++++++++++++++++++++----------
+ 1 file changed, 29 insertions(+), 11 deletions(-)
