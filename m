@@ -1,122 +1,57 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 26 Jan 2017 11:14:05 +0100
-Subject: [PATCH 06/11] clk: sunxi-ng: Add A80 USB CCU
-In-Reply-To: <20170124023230.3990-7-wens@csie.org>
-References: <20170124023230.3990-1-wens@csie.org>
- <20170124023230.3990-7-wens@csie.org>
-Message-ID: <20170126101405.npxzp2bmto5oeyex@lukather>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 26 Jan 2017 11:13:45 +0100
+Subject: [PATCH 4/5] arm64: dts: r8a7795: Add I2C for DVFS core to dtsi
+In-Reply-To: <1485420750-12701-5-git-send-email-horms+renesas@verge.net.au>
+References: <1485420750-12701-1-git-send-email-horms+renesas@verge.net.au>
+ <1485420750-12701-5-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdW1Okdf-D1yUCehQ9WFqCXO_t4y-Yk0sodhFL1E2FLG8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jan 26, 2017 at 9:52 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> From: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
+>
+> This patch adds I2C for DVFS device support for R8A7795 SoC.
+>
+> Signed-off-by: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
+> Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+> Signed-off-by: Dien Pham <dien.pham.ry@rvc.renesas.com>
+> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-On Tue, Jan 24, 2017 at 10:32:25AM +0800, Chen-Yu Tsai wrote:
-> Add support for the USB clock controls found on the A80.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  .../devicetree/bindings/clock/sun9i-usb.txt        |  24 ++++
->  drivers/clk/sunxi-ng/Makefile                      |   1 +
->  drivers/clk/sunxi-ng/ccu-sun9i-a80-usb.c           | 144 +++++++++++++++++++++
->  drivers/clk/sunxi-ng/ccu-sun9i-a80-usb.h           |  25 ++++
->  include/dt-bindings/clock/sun9i-a80-usb.h          |  59 +++++++++
->  include/dt-bindings/reset/sun9i-a80-usb.h          |  56 ++++++++
->  6 files changed, 309 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/sun9i-usb.txt
->  create mode 100644 drivers/clk/sunxi-ng/ccu-sun9i-a80-usb.c
->  create mode 100644 drivers/clk/sunxi-ng/ccu-sun9i-a80-usb.h
->  create mode 100644 include/dt-bindings/clock/sun9i-a80-usb.h
->  create mode 100644 include/dt-bindings/reset/sun9i-a80-usb.h
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/sun9i-usb.txt b/Documentation/devicetree/bindings/clock/sun9i-usb.txt
-> new file mode 100644
-> index 000000000000..c2d38626eaaa
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/sun9i-usb.txt
-> @@ -0,0 +1,24 @@
-> +Allwinner A80 USB Clock Control Binding
-> +------------------------------------
-> +
-> +Required properties :
-> +- compatible: must contain one of the following compatibles:
-> +		- "allwinner,sun9i-a80-usb-clocks"
-> +
-> +- reg: Must contain the registers base address and length
-> +- clocks: phandle to the clocks feeding the USB subsystem. Two are needed:
-> +  - "bus": the bus clock for the whole USB subsystem
-> +  - "hosc": the high frequency oscillator (usually at 24MHz)
-> +- clock-names: Must contain the clock names described just above
-> +- #clock-cells : must contain 1
-> +- #reset-cells : must contain 1
-> +
-> +Example:
-> +usb_clocks: clock at 00a08000 {
-> +	compatible = "allwinner,sun9i-a80-usb-clks";
-> +	reg = <0x00a08000 0x8>;
-> +	clocks = <&ccu CLK_BUS_USB>, <&osc24M>;
-> +	clock-names = "bus", "hosc";
-> +	#clock-cells = <1>;
-> +	#reset-cells = <1>;
-> +};
-> diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-> index 126bb7c1c3f7..8f37ef7fb67d 100644
-> --- a/drivers/clk/sunxi-ng/Makefile
-> +++ b/drivers/clk/sunxi-ng/Makefile
-> @@ -26,3 +26,4 @@ obj-$(CONFIG_SUN8I_A33_CCU)	+= ccu-sun8i-a33.o
->  obj-$(CONFIG_SUN8I_H3_CCU)	+= ccu-sun8i-h3.o
->  obj-$(CONFIG_SUN8I_V3S_CCU)	+= ccu-sun8i-v3s.o
->  obj-$(CONFIG_SUN9I_A80_CCU)	+= ccu-sun9i-a80.o
-> +obj-$(CONFIG_SUN9I_A80_CCU)	+= ccu-sun9i-a80-usb.o
-> diff --git a/drivers/clk/sunxi-ng/ccu-sun9i-a80-usb.c b/drivers/clk/sunxi-ng/ccu-sun9i-a80-usb.c
-> new file mode 100644
-> index 000000000000..1d76f24f7df3
-> --- /dev/null
-> +++ b/drivers/clk/sunxi-ng/ccu-sun9i-a80-usb.c
-> @@ -0,0 +1,144 @@
-> +/*
-> + * Copyright (c) 2016 Chen-Yu Tsai. All rights reserved.
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/of_address.h>
-> +#include <linux/platform_device.h>
-> +
-> +#include "ccu_common.h"
-> +#include "ccu_gate.h"
-> +#include "ccu_reset.h"
-> +
-> +#include "ccu-sun9i-a80-usb.h"
-> +
-> +static SUNXI_CCU_GATE(bus_hci0_clk, "bus-hci0", "bus-usb", 0x0, BIT(1), 0);
-> +static SUNXI_CCU_GATE(usb_ohci0_clk, "usb-ohci0", "osc24M", 0x0, BIT(2), 0);
-> +static SUNXI_CCU_GATE(bus_hci1_clk, "bus-hci1", "bus-usb", 0x0, BIT(3), 0);
-> +static SUNXI_CCU_GATE(bus_hci2_clk, "bus-hci2", "bus-usb", 0x0, BIT(5), 0);
-> +static SUNXI_CCU_GATE(usb_ohci2_clk, "usb-ohci2", "osc24M", 0x0, BIT(6), 0);
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-In the current !sunxi-ng driver, there's a clock at offset 4, did you
-forget it?
+> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
 
-Thanks,
-Maxime
+> @@ -793,6 +794,19 @@
+>                         status = "disabled";
+>                 };
+>
+> +               i2c_dvfs: i2c at e60b0000 {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +                       compatible = "renesas,iic-r8a7795",
+> +                                    "renesas,rcar-gen3-iic",
+> +                                    "renesas,rmobile-iic";
+> +                       reg = <0 0xe60b0000 0 0x425>;
+> +                       interrupts = <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>;
+> +                       clocks = <&cpg CPG_MOD 926>;
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170126/4690ddb2/attachment-0001.sig>
+Same comment about dmas/dma-names.
+
+> +                       power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+> +                       status = "disabled";
+> +               };
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
