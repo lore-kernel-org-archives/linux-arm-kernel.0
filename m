@@ -1,104 +1,122 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 26 Jan 2017 15:20:47 +0000
-Subject: [PATCH v2] arm64: dma-mapping: Fix dma_mapping_error() when
- bypassing SWIOTLB
-In-Reply-To: <20170126125249.GG14167@arm.com>
-References: <20170124225200.a7qioswpxzh6agvd@raspberrypi-2.musicnaut.iki.fi>
- <840027acb4750542003dff17b4a8902ba8972754.1485368348.git.robin.murphy@arm.com>
- <20170126125249.GG14167@arm.com>
-Message-ID: <18eae1fb-4a3c-c230-4491-8d376468975c@arm.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Thu, 26 Jan 2017 20:54:12 +0530
+Subject: [PATCH v8 0/3] Support qcom's HSIC USB and rewrite USB2 HS support
+In-Reply-To: <20170125223245.2688-1-stephen.boyd@linaro.org>
+References: <20170125223245.2688-1-stephen.boyd@linaro.org>
+Message-ID: <588A149C.6020207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/01/17 12:52, Will Deacon wrote:
-> On Wed, Jan 25, 2017 at 06:31:31PM +0000, Robin Murphy wrote:
->> When bypassing SWIOTLB on small-memory systems, we need to avoid calling
->> into swiotlb_dma_mapping_error() in exactly the same way as we avoid
->> swiotlb_dma_supported(), because the former also relies on SWIOTLB state
->> being initialised.
->>
->> Under the assumptions for which we skip SWIOTLB, dma_map_{single,page}()
->> will only ever return the DMA-offset-adjusted physical address of the
->> page passed in, thus we can report success unconditionally.
->>
->> Fixes: b67a8b29df7e ("arm64: mm: only initialize swiotlb when necessary")
->> CC: stable at vger.kernel.org
->> CC: Jisheng Zhang <jszhang@marvell.com>
->> Reported-by: Aaro Koskinen <aaro.koskinen@iki.fi>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> ---
->>
->> v2: Get the return value the right way round this time... After some
->>     careful reasoning it really is that simple.
->>
->>  arch/arm64/mm/dma-mapping.c | 9 ++++++++-
->>  1 file changed, 8 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
->> index e04082700bb1..1ffb7d5d299a 100644
->> --- a/arch/arm64/mm/dma-mapping.c
->> +++ b/arch/arm64/mm/dma-mapping.c
->> @@ -352,6 +352,13 @@ static int __swiotlb_dma_supported(struct device *hwdev, u64 mask)
->>  	return 1;
->>  }
->>  
->> +static int __swiotlb_dma_mapping_error(struct device *hwdev, dma_addr_t addr)
->> +{
->> +	if (swiotlb)
->> +		return swiotlb_dma_mapping_error(hwdev, addr);
->> +	return 0;
->> +}
+
+
+On Thursday 26 January 2017 04:02 AM, Stephen Boyd wrote:
+> This patch series continues the usb chipidea rewrite for 
+> Qualcommm platforms. I've dropped the patches that were applied
+> to Peter's tree for chipidea. Now the phy drivers are left,
+> along with the patch to call phy_set_mode() at the right place.
 > 
-> I was about to apply this, but I'm really uncomfortable with the way that
-> we call into swiotlb without initialising it. For example, if somebody
-> passes swiotlb=noforce on the command line and all of our memory is
-> DMA-able, then we don't call swiotlb_init but we will leave the DMA ops
-> intact. On a dma_map_page, we then end up in swiotlb_map_page. If, for
-> some reason or another, dma_capable fails (perhaps the address is out of
-> range), then we call map_single which will return SWIOTLB_MAP_ERROR
-> and subsequently phys_to_dma(dev, io_tlb_overflow_buffer);, which is
-> exactly what swiotlb_dma_mapping_error checks for. Except it won't get the
-> chance, because our swiotlb variable is false.
+> I've left the HSIC phy driver here, because it wasn't merged in
+> the last round. Nothing has changed in that driver, so I believe
+> it is ready to be merged now. The chipidea patch is independent and
+> can be merged without causing any dependency with the phy tree.
 
-Right. Or to look at it another way (in isolation), this patch as-is at
-least moves us from a real observed problem to a theoretical problem
-involving a theoretical device :P
+merged the phy patches. Please send a patch updating the MAINTAINERS for the
+phy driver.
 
-However, I do agree that skirting danger by calling into uninitialised
-SWIOTLB state on the assumption that it 'should' be OK is grotty as
-hell, and having had a closer look I found another sweet nugget - if
-someone calls dma_alloc_coherent() in non-blocking context, for a
-sufficiently large order that the initial __get_free_pages() call from
-swiotlb_alloc_coherent() fails (hey, small-memory systems *are* going to
-suffer fragmentation), then we'll end up poking around in yet more
-uninitialised internals trying to allocate out of the non-existent
-bounce buffer.
-
-> I can see three ways to resolve this:
+Thanks
+Kishon
 > 
-> 1. Revert the hack that skips SWIOTLB initialisation and pay the 64m price
->    (but this is configurable on the cmdline).
+> Patches based on v4.10-rc1 + first 22 patches from v5. Full
+> branch is here[1].
 > 
-> 2. Keep the hack, but instead of skipping initialisation altogether,
->    automatically adjust the bounce buffer size to a single entry. This
->    shouldn't ever get used, but will allow the error paths to work.
-
-Since the hack's been present in two kernel releases already, one of
-them long-term stable, I suspect 2 is the only viable option of those,
-although it does look to require juggling two different SWIOTLB init
-functions, which appears fiddly at a glance.
-
-> 3. We bite the bullet and implement some non-swiotlb DMA ops for the case
->    when SWIOTLB is not used.
-
-I'd already started thinking along those lines in the process of writing
-this patch - I'm happy to take that on, although it might be a wee bit
-tight for 4.11 now.
-
-Robin.
-
+> Changes from v7:
+>  * Dropped set_vbus() callback (Kishon)
+>  * Made phy_set_mode() generic and moved into ci_platform_configure() (Peter)
 > 
-> Thoughts?
+> Changes from v6:
+>  * Dropped first 22 applied patches
+>  * Rewrote phy_set_mode() patch to be msm specific
+>  * New set_vbus() callback in phy framework
+>  * Updated HS phy driver for set_vbus() callback
 > 
-> Will
+> Changes from v5:
+>  * Replaced "Emulate OTGSC interrupt enable path" patch with a patch
+>    from Peter
+>  * Updated HS phy driver to support set_mode callback to handle pullup
+>  * New patch to set the mode to device or host in chipidea udc pullup
+>    function to toggle the pullup for HS mode
+>  * New patch to drop lock around event_notify callback to avoid lockdep
+>    issues
+>  * Removal of extcon usage from HS phy driver
+>  * Picked up acks from Heikki and Peter on ULPI core patch
+> 
+> Changes from v4:
+>  * Picked up Acks from Rob
+>  * Updated HS phy init sequence DT property to restrict it to offsets
+> 
+> Changes from v3:
+>  * Picked up Acks from Peter
+>  * Updated extcon consolidation patch per Peter's comments
+>  * Folded in simplification from Heikki for ULPI DT matching
+> 
+> Changes from v2:
+>  * Added SoC specific compatibles in phy bindings
+>  * Dropped AVVIS patch for OTG statemachine
+>  * New patch to consolidate extcon handlers
+>  * Picked up Acks from Peter
+>  * Rebased onto v4.8-rc1
+>  * Reworked ULPI OF code to look at vid == 0 instead of pid == 0
+>  * Dropped ULPI bindings for vid and pid overrides
+> 
+> Changes from v1:
+>  * Reworked ULPI device probing to keep using vendor/product ids that
+>    come from DT if needed and falls back to OF style match when product id
+>    is 0
+>  * PHY init later patch was rejected so that moved to a quirk flag and
+>    the msm wrapper started managing the phy on/off
+>  * Updated clk requirements for HSIC phy in binding doc
+>  * Added optional clk in wrapper for "housekeeping" found on older qcom
+>    platforms
+>  * Bug fix to OTGSC polling function
+>  * Changed runtime PM patch to set as active instead of get/put
+> 
+> TODO:
+>  * DMA fails on arm64 so we need something like [2] to make it work.
+>  * The db410c needs a driver to toggle the onboard switch to connect
+>    the usb hub instead of micro port when the usb cable is disconnected.
+>    I've sent a patch set for this[3], which needs some further
+>    discussion/development. The current plan is to reintroduce the usb
+>    mux framework.
+>  * apq8064 platforms need a vbus regulator to really use otg and I haven't
+>    tried out the RPM based regulators yet
+>  * The HSIC phy on the apq8074 dragonboard is connected to a usb4604
+>    device which requires the i2c driver to probe and send an i2c
+>    sequence before the HSIC controller enumerates or HSIC doesn't work.
+>    Right now I have a hack to force the controller to probe defer
+>    once so that usb4604 probes first. This needs a more proper solution
+>    like having the DT describe a linkage between the controller and
+>    the usb device so we can enforce probe ordering. My current plan
+>    is to use DT graphs/endpoints for this.
+> 
+> [1] https://git.linaro.org/people/stephen.boyd/linux.git/log/?h=usb-hsic-8074
+> [2] https://patchwork.kernel.org/patch/9319527/
+> [3] https://lkml.kernel.org/r/20160914014246.31847-1-stephen.boyd at linaro.org
+> 
+> Stephen Boyd (3):
+>   usb: chipidea: Configure phy for appropriate mode
+>   phy: Add support for Qualcomm's USB HSIC phy
+>   phy: Add support for Qualcomm's USB HS phy
+> 
+>  .../devicetree/bindings/phy/qcom,usb-hs-phy.txt    |  84 ++++++
+>  .../devicetree/bindings/phy/qcom,usb-hsic-phy.txt  |  65 +++++
+>  drivers/phy/Kconfig                                |  15 ++
+>  drivers/phy/Makefile                               |   2 +
+>  drivers/phy/phy-qcom-usb-hs.c                      | 296 +++++++++++++++++++++
+>  drivers/phy/phy-qcom-usb-hsic.c                    | 160 +++++++++++
+>  drivers/usb/chipidea/core.c                        |  20 +-
+>  7 files changed, 636 insertions(+), 6 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/phy/qcom,usb-hs-phy.txt
+>  create mode 100644 Documentation/devicetree/bindings/phy/qcom,usb-hsic-phy.txt
+>  create mode 100644 drivers/phy/phy-qcom-usb-hs.c
+>  create mode 100644 drivers/phy/phy-qcom-usb-hsic.c
 > 
