@@ -1,33 +1,28 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 26 Jan 2017 17:48:17 +0000
-Subject: [PATCH 5/5] iommu: Allow default domain type to be set on the
- kernel command line
-In-Reply-To: <20170126171555.GD27598@8bytes.org>
+Date: Thu, 26 Jan 2017 17:57:13 +0000
+Subject: [PATCH 1/5] iommu/arm-smmu: Restrict domain attributes to
+ UNMANAGED domains
+In-Reply-To: <20170126170329.GB27598@8bytes.org>
 References: <1484849955-1871-1-git-send-email-will.deacon@arm.com>
- <1484849955-1871-6-git-send-email-will.deacon@arm.com>
- <20170126171555.GD27598@8bytes.org>
-Message-ID: <20170126174816.GO14167@arm.com>
+ <1484849955-1871-2-git-send-email-will.deacon@arm.com>
+ <20170126170329.GB27598@8bytes.org>
+Message-ID: <20170126175712.GP14167@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 06:15:55PM +0100, Joerg Roedel wrote:
-> On Thu, Jan 19, 2017 at 06:19:15PM +0000, Will Deacon wrote:
-> > Rather than modify each IOMMU driver to provide different semantics for
-> > DMA domains, instead we introduce a command line parameter that can be
-> > used to change the type of the default domain. Passthrough can then be
-> > specified using "iommu.default_domain=identity" on the kernel command
-> > line.
+On Thu, Jan 26, 2017 at 06:03:30PM +0100, Joerg Roedel wrote:
+> On Thu, Jan 19, 2017 at 06:19:11PM +0000, Will Deacon wrote:
+> > The ARM SMMU drivers provide a DOMAIN_ATTR_NESTING domain attribute,
+> > which allows callers of the IOMMU API to request that the page table
+> > for a domain is installed at stage-2, if supported by the hardware.
+> > 
+> > Since setting this attribute only makes sense for UNMANAGED domains,
+> > this patch returns -ENODEV if the domain_{get,set}_attr operations are
+> > called on other domain types.
 > 
-> I like the general idea of this, but the above is a terrible name for a
-> kernel commandline-parameter. The x86 iommus support iommu=pt which is
-> pretty much the same as this patch does.
+> Isn't -EINVAL more suitable here? In the end the domain passed in is
+> invalid because it does not support attributes, no?
 
-Happy to bikeshed the name ;)
-
-> How about something like "iommu.passthrough=0/1"? And please add the
-> parameter to the kernel documentation too.
-
-Sure, if you think that the identity domain is the only thing we'll ever
-want to set (so far, it's the only thing people have asked me for).
+Sure, I can change that.
 
 Will
