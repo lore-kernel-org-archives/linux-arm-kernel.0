@@ -1,36 +1,27 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 26 Jan 2017 17:04:48 +0000
-Subject: [PATCH] arm64: skip register_cpufreq_notifier on ACPI-based
- systems
-In-Reply-To: <bbc37634-f087-feef-dacd-77c5adb9ed04@codeaurora.org>
-References: <1485304992-26888-1-git-send-email-pprakash@codeaurora.org>
- <20170125120306.GC8093@e106622-lin>
- <bbc37634-f087-feef-dacd-77c5adb9ed04@codeaurora.org>
-Message-ID: <20170126170447.GE25871@leverpostej>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Thu, 26 Jan 2017 18:06:09 +0100
+Subject: [PATCH 1/5] iommu/arm-smmu: Restrict domain attributes to
+ UNMANAGED domains
+In-Reply-To: <89d795b9-a6d7-7f41-705c-b918ee66ebf0@arm.com>
+References: <1484849955-1871-1-git-send-email-will.deacon@arm.com>
+ <1484849955-1871-2-git-send-email-will.deacon@arm.com>
+ <89d795b9-a6d7-7f41-705c-b918ee66ebf0@arm.com>
+Message-ID: <20170126170609.GC27598@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2017 at 10:49:36AM -0500, Christopher Covington wrote:
+On Thu, Jan 19, 2017 at 06:41:34PM +0000, Robin Murphy wrote:
+> For the sake of discussion, would it make sense to enforce this in
+> domain_set_attr() itself? The intersection of drivers providing these
+> callbacks and drivers supporting anything other than unmanaged domains
+> is currently these two below, so it clearly wouldn't break anything to
+> put this check in core code today. Looking forward, is there likely to
+> be any plausible situation where users of a managed domain would be
+> legitimate in mucking about with its attrs, on any platform?
 
-> Are you testing on QEMU or Fast Models? I was under the impression that the
-> former had ACPI support. For the latter, wouldn't it be nice to have ACPI
-> support in the bootwrapper.
+No, this belongs in driver code. I am pretty certain there will be a use
+for attributes in unmanaged domains at some point. Crazy things happen
+all the time :)
 
-One goal of the boot wrapper is to be as simple as reasonably possible.
-ACPI support in the boot wrapper would be far from trivial, at minimum
-requiring EFI support (requiring either a whole reimplementation, or
-work to make EDK2 run atop of the boot wrapper).
 
-Given that it is already possible to use ARM Trusted Firmware and EDK2
-in a model environment, and this can already be used to handover ACPI
-tables, one would be served better by those.
-
-> Out of curiosity, is Mark's bootwrapper repository on kernel.org the
-> best one to use these days?
-> 
-> http://git.kernel.org/cgit/linux/kernel/git/mark/boot-wrapper-aarch64.git/
-
-That is the canonical repo these days, yes.
-
-Thanks,
-Mark.
+	Joerg
