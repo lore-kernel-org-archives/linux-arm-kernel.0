@@ -1,28 +1,62 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 26 Jan 2017 10:56:15 +0100
-Subject: [PATCH 1/5] arm64: defconfig: Enable SH Mobile I2C controller
-In-Reply-To: <1485420750-12701-2-git-send-email-horms+renesas@verge.net.au>
-References: <1485420750-12701-1-git-send-email-horms+renesas@verge.net.au>
- <1485420750-12701-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdUmc0rEO1CgmodxZcrugeVVk6Mr-rWZBdEKseghJTE=_Q@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 26 Jan 2017 10:57:33 +0100
+Subject: [PATCH 04/11] clk: sunxi-ng: Support separately grouped PLL lock
+ status register
+In-Reply-To: <20170124023230.3990-5-wens@csie.org>
+References: <20170124023230.3990-1-wens@csie.org>
+ <20170124023230.3990-5-wens@csie.org>
+Message-ID: <20170126095733.azlzxmz63vxajlen@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 9:52 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Enable SH Mobile I2C controller for use on R-Car Gen3 SoCs.
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Hi,
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+On Tue, Jan 24, 2017 at 10:32:23AM +0800, Chen-Yu Tsai wrote:
+> On the Allwinner A80 SoC, the PLL lock status indicators are grouped
+> together in a separate register, as opposed to being scattered in each
+> PLL's configuration register.
+> 
+> Add a flag to support this.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  drivers/clk/sunxi-ng/ccu_common.c | 8 ++++++--
+>  drivers/clk/sunxi-ng/ccu_common.h | 2 ++
+>  2 files changed, 8 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/sunxi-ng/ccu_common.c b/drivers/clk/sunxi-ng/ccu_common.c
+> index 51d4bac97ab3..3fd0c3331aff 100644
+> --- a/drivers/clk/sunxi-ng/ccu_common.c
+> +++ b/drivers/clk/sunxi-ng/ccu_common.c
+> @@ -25,13 +25,17 @@ static DEFINE_SPINLOCK(ccu_lock);
+>  
+>  void ccu_helper_wait_for_lock(struct ccu_common *common, u32 lock)
+>  {
+> +	void __iomem *addr;
+>  	u32 reg;
+>  
+>  	if (!lock)
+>  		return;
+>  
+> -	WARN_ON(readl_relaxed_poll_timeout(common->base + common->reg, reg,
+> -					   reg & lock, 100, 70000));
+> +	addr = common->base + common->reg;
+> +	if (common->features & CCU_FEATURE_LOCK_REG)
+> +		addr = common->base + common->lock_reg;
 
-Gr{oetje,eeting}s,
+I'd rather have an else here (but it's really just a nitpick).
 
-                        Geert
+Thanks,
+Maxime
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170126/155f0328/attachment.sig>
