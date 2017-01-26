@@ -1,40 +1,28 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 26 Jan 2017 10:50:57 +0100
-Subject: [PATCH v2 0/8] Pad retentions support for Exynos5433
-In-Reply-To: <1485419634-28331-1-git-send-email-m.szyprowski@samsung.com>
-References: <CGME20170126083401eucas1p20b4794fe46ccf2189bf734f0d8e3c536@eucas1p2.samsung.com>
- <1485419634-28331-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CACRpkdawiAp3xqVd7J5ZAd2dQ=X09DGybyw0EVp=07w8-ccKfA@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 26 Jan 2017 10:53:22 +0100
+Subject: [PATCH v2 5/9] of: Add vendor prefix for Netron DY
+In-Reply-To: <20160906144620.6322-6-maxime.ripard@free-electrons.com>
+References: <20160906144620.6322-1-maxime.ripard@free-electrons.com>
+ <20160906144620.6322-6-maxime.ripard@free-electrons.com>
+Message-ID: <20170126095322.GD3613@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 9:33 AM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
+On Tue, Sep 06, 2016 at 04:46:16PM +0200, Maxime Ripard wrote:
+> Netron DY is a brand of LCD panels found on SBCs and tablets.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
-> Patches in this patchset depends on each other. They are order in such a
-> way to make the changes bisectable.
->
-> Patch #3 has runtime dependency on #1.
-> Patch #5 has runtime dependency on #3.
-> Patch #6 has runtime dependency on #4.
->
-> This patchset also directly depends on the "Move pad retention control to
-> Exynos pin controller driver" patchset:
-> https://www.spinics.net/lists/arm-kernel/msg556074.html
+Applied, thanks.
 
-Do we *have* to merge it runtime-bisectably?
-
-I'm asking because we need a huge immutable branch
-(I guess in the MFD subsystem) to deal with that.
-
-It'd be great if I could just apply the pinctrl patches in
-isolation, then Lee applies the MFD patches in isolation,
-everything compiles in isolation but maye just work once both
-pinctrl and MFD are merged upstream, as in linux-next
-or Torvalds' tree.
-
-That is one of the reasons why using a system-agnostic
-syscon regmap lookup is so good, BTW.
-
-Yours,
-Linus Walleij
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170126/af99bfd6/attachment.sig>
