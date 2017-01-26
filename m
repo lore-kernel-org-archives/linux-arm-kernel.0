@@ -1,44 +1,56 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 26 Jan 2017 10:06:05 +0100
-Subject: [PATCH v4 12/13] arm64: allwinner: a64: add UART1 pin nodes
-In-Reply-To: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
-References: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <4c3bab1dc2b6d900b4bab76181a08eae8a27a785.1485421557.git-series.maxime.ripard@free-electrons.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 26 Jan 2017 09:52:29 +0100
+Subject: [PATCH 4/5] arm64: dts: r8a7795: Add I2C for DVFS core to dtsi
+In-Reply-To: <1485420750-12701-1-git-send-email-horms+renesas@verge.net.au>
+References: <1485420750-12701-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1485420750-12701-5-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andre Przywara <andre.przywara@arm.com>
+From: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
 
-On many boards UART1 connects to a Bluetooth chip, so add the pinctrl
-nodes for the only pins providing access to that UART. That includes
-those pins for hardware flow control (RTS/CTS).
+This patch adds I2C for DVFS device support for R8A7795 SoC.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
+Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+Signed-off-by: Dien Pham <dien.pham.ry@rvc.renesas.com>
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+), 0 deletions(-)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index cb3e0cf2191a..d27b17f807d0 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -276,6 +276,16 @@
- 				pins = "PB8", "PB9";
- 				function = "uart0";
- 			};
-+
-+			uart1_pins: uart1_pins {
-+				pins = "PG6", "PG7";
-+				function = "uart1";
-+			};
-+
-+			uart1_rts_cts_pins: uart1_rts_cts_pins {
-+				pins = "PG8", "PG9";
-+				function = "uart1";
-+			};
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index eac4f29aa5cd..fe266bb3d913 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -25,6 +25,7 @@
+ 		i2c4 = &i2c4;
+ 		i2c5 = &i2c5;
+ 		i2c6 = &i2c6;
++		i2c7 = &i2c_dvfs;
+ 	};
+ 
+ 	psci {
+@@ -793,6 +794,19 @@
+ 			status = "disabled";
  		};
  
- 		uart0: serial at 1c28000 {
++		i2c_dvfs: i2c at e60b0000 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "renesas,iic-r8a7795",
++				     "renesas,rcar-gen3-iic",
++				     "renesas,rmobile-iic";
++			reg = <0 0xe60b0000 0 0x425>;
++			interrupts = <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 926>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			status = "disabled";
++		};
++
+ 		i2c0: i2c at e6500000 {
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
 -- 
-git-series 0.8.11
+2.7.0.rc3.207.g0ac5344
