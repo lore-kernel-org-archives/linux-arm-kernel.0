@@ -1,29 +1,29 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 26 Jan 2017 16:58:31 +0100
-Subject: [PATCH v3 REBASED 13/13] pinctrl: samsung: Replace syscore ops
- with standard platform device pm_ops
-In-Reply-To: <1485422967-30643-10-git-send-email-m.szyprowski@samsung.com>
-References: <CACRpkdY_SpqfyTTqSP5+a1k1LDf_5w77UXo=EognmOzWBz2c-Q@mail.gmail.com>
- <CGME20170126093003eucas1p1e63fcbad90361f6ccf90fe07da897823@eucas1p1.samsung.com>
- <1485422967-30643-1-git-send-email-m.szyprowski@samsung.com>
- <1485422967-30643-10-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CACRpkdZM_eu-1vKaT0ijqvXDp=QnLoA=r3fU0Rs7CT58hWnFNw@mail.gmail.com>
+Date: Thu, 26 Jan 2017 16:59:45 +0100
+Subject: [GIT PULL] soc: samsung: Drivers for v4.11
+In-Reply-To: <20170120181343.12570-1-krzk@kernel.org>
+References: <20170120181343.12570-1-krzk@kernel.org>
+Message-ID: <CACRpkdboB+-n6BFPACKCr6VoHtq9W53YcUBBer3jgyyRcnN+Xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 10:29 AM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
+On Fri, Jan 20, 2017 at 7:13 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
 
-> Once the dependency on PMU driver (for pad retention control) has been
-> removed, there is no reason to use syscore_ops based suspend/resume.
-> This patch replaces it with standard platform device pm_ops based solution.
+> The following changes since commit 0c744ea4f77d72b3dcebb7a8f2684633ec79be88:
 >
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
-> Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
+>   Linux 4.10-rc2 (2017-01-01 14:31:53 -0800)
+>
+> are available in the git repository at:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git samsung-drivers-soc-pmu-4.11
 
-Patch applied after pulling in Krzysztof's branch and
-applying 11 & 12 again.
+OK I pulled it and applied the final three patches from Marek
+on top.
+
+Grrr I was based in v4.10-rc1, well I could easily merge in v4.10-rc2
+so no big deal.
+
+Let's see if it survives linux-next.
 
 Yours,
 Linus Walleij
