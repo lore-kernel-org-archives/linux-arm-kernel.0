@@ -1,26 +1,55 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 26 Jan 2017 10:05:29 +0100
-Subject: [PATCH v3 05/13] pinctrl: samsung: Remove messages for failed
- memory allocation
-In-Reply-To: <1484833733-16082-6-git-send-email-m.szyprowski@samsung.com>
-References: <CGME20170119134906eucas1p1561fd3b8174bfcf148d4f1f417bc6223@eucas1p1.samsung.com>
- <1484833733-16082-1-git-send-email-m.szyprowski@samsung.com>
- <1484833733-16082-6-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CACRpkdb+YYC3+JjspvP5b1Tb4_v7RVpL91ZTiHNZ5iaWJa-jDw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 26 Jan 2017 10:05:57 +0100
+Subject: [PATCH v4 4/13] mmc: sunxi: Enable the new timings for the A64 MMC
+ controllers
+In-Reply-To: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
+References: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <d6dfbf595cb99709877e7e57595125ce0b783ff6.1485421557.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 2:48 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
+The A64 MMC controllers need to set a "new timings" bit when a new rate is
+set.
 
-> Memory subsystem already prints message about failed memory
-> allocation, there is no need to do it in the drivers.
->
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
-> Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
+The actual meaning of that bit is not clear yet, but not setting it leads
+to some corner-case issues, like the CMD53 failing, which is used to
+implement SDIO packet aggregation.
 
-Patch applied.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/mmc/host/sunxi-mmc.c | 6 ++++++
+ 1 file changed, 6 insertions(+), 0 deletions(-)
 
-Yours,
-Linus Walleij
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index b9c8a62bc212..51d6388a194e 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -253,6 +253,8 @@ struct sunxi_mmc_cfg {
+ 
+ 	/* does the IP block support autocalibration? */
+ 	bool can_calibrate;
++
++	bool needs_new_timings;
+ };
+ 
+ struct sunxi_mmc_host {
+@@ -779,6 +781,9 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+ 	}
+ 	mmc_writel(host, REG_CLKCR, rval);
+ 
++	if (host->cfg->needs_new_timings)
++		mmc_writel(host, REG_SD_NTSR, SDXC_2X_TIMING_MODE);
++
+ 	ret = sunxi_mmc_clk_set_phase(host, ios, rate);
+ 	if (ret)
+ 		return ret;
+@@ -1076,6 +1081,7 @@ static const struct sunxi_mmc_cfg sun50i_a64_cfg = {
+ 	.idma_des_size_bits = 16,
+ 	.clk_delays = NULL,
+ 	.can_calibrate = true,
++	.needs_new_timings = true,
+ };
+ 
+ static const struct of_device_id sunxi_mmc_of_match[] = {
+-- 
+git-series 0.8.11
