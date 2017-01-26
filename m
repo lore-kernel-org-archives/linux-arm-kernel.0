@@ -1,51 +1,47 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 26 Jan 2017 09:33:47 +0100
-Subject: [PATCH v2 1/8] soc: samsung: pmu: Add dummy support for Exynos5433 SoC
+Date: Thu, 26 Jan 2017 09:33:48 +0100
+Subject: [PATCH v2 2/8] pinctrl: samsung: Ensure that pad retention is disabled
+ on driver init
 In-Reply-To: <1485419634-28331-1-git-send-email-m.szyprowski@samsung.com>
 References: <1485419634-28331-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170126083401eucas1p24b0f04c62332e0b6e446ecca83145bc5@eucas1p2.samsung.com>
-Message-ID: <1485419634-28331-2-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170126083401eucas1p289b69e3694b91e83983cd6e09aa7053c@eucas1p2.samsung.com>
+Message-ID: <1485419634-28331-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add compatible for Exynos5433 SoC, so the driver will bind and let other
-drivers to use PMU regmap.
+When pin controller device is a part of power domain, there is no guarantee
+that the power domain was not turned off and then on during boot process
+before probing of the pin control driver. If it happened, then pin control
+driver should ensure that pad retention is turned off during its probe call.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- drivers/soc/samsung/exynos-pmu.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ drivers/pinctrl/samsung/pinctrl-exynos.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/soc/samsung/exynos-pmu.c b/drivers/soc/samsung/exynos-pmu.c
-index 813df6e7292d..56d9244ff981 100644
---- a/drivers/soc/samsung/exynos-pmu.c
-+++ b/drivers/soc/samsung/exynos-pmu.c
-@@ -44,7 +44,7 @@ void exynos_sys_powerdown_conf(enum sys_powerdown mode)
- 	unsigned int i;
- 	const struct exynos_pmu_data *pmu_data;
+diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
+index 63e51b56a22a..fa3802970570 100644
+--- a/drivers/pinctrl/samsung/pinctrl-exynos.c
++++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
+@@ -777,6 +777,7 @@ static void exynos_retention_disable(struct samsung_pinctrl_drv_data *drvdata)
+ {
+ 	struct samsung_retention_ctrl *ctrl;
+ 	struct regmap *pmu_regs;
++	int i;
  
--	if (!pmu_context)
-+	if (!pmu_context || !pmu_context->pmu_data)
- 		return;
+ 	ctrl = devm_kzalloc(drvdata->dev, sizeof(*ctrl), GFP_KERNEL);
+ 	if (!ctrl)
+@@ -794,6 +795,10 @@ static void exynos_retention_disable(struct samsung_pinctrl_drv_data *drvdata)
+ 	ctrl->enable = exynos_retention_enable;
+ 	ctrl->disable = exynos_retention_disable;
  
- 	pmu_data = pmu_context->pmu_data;
-@@ -90,6 +90,8 @@ void exynos_sys_powerdown_conf(enum sys_powerdown mode)
- 	}, {
- 		.compatible = "samsung,exynos5420-pmu",
- 		.data = &exynos5420_pmu_data,
-+	}, {
-+		.compatible = "samsung,exynos5433-pmu",
- 	},
- 	{ /*sentinel*/ },
- };
-@@ -122,7 +124,7 @@ static int exynos_pmu_probe(struct platform_device *pdev)
- 	pmu_context->dev = dev;
- 	pmu_context->pmu_data = of_device_get_match_data(dev);
++	/* Ensure that retention is disabled on driver init */
++	for (i = 0; i < ctrl->nr_regs; i++)
++		regmap_write(pmu_regs, ctrl->regs[i], ctrl->value);
++
+ 	return ctrl;
+ }
  
--	if (pmu_context->pmu_data->pmu_init)
-+	if (pmu_context->pmu_data && pmu_context->pmu_data->pmu_init)
- 		pmu_context->pmu_data->pmu_init();
- 
- 	platform_set_drvdata(pdev, pmu_context);
 -- 
 1.9.1
