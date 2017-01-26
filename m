@@ -1,35 +1,218 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Thu, 26 Jan 2017 23:48:57 +0800
-Subject: [PATCH v2 7/9] dmaengine: sun6i: allow build on ARM64 platforms
- (sun50i)
+Date: Thu, 26 Jan 2017 23:48:59 +0800
+Subject: [PATCH v2 9/9] arm64: dts: sunxi: add support for the Orange Pi PC 2
+ board
 In-Reply-To: <20170126154859.55855-1-icenowy@aosc.xyz>
 References: <20170126154859.55855-1-icenowy@aosc.xyz>
-Message-ID: <20170126154859.55855-8-icenowy@aosc.xyz>
+Message-ID: <20170126154859.55855-10-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As 64-bot Allwinner H5 SoC has the same DMA engine with H3, the DMA
-driver should be allowed to be built for ARM64, in order to make it work on H5.
+From: Andre Przywara <andre.przywara@arm.com>
 
+The Orange Pi PC 2 is a typical single board computer using the
+Allwinner H5 SoC. Apart from the usual suspects it features three
+separately driven USB ports and a Gigabit Ethernet port.
+Also it has a SPI NOR flash soldered, from which the board can boot
+from. This enables the SBC to behave like a "real computer" with
+built-in firmware.
+
+Add the board specific .dts file, which includes the H5 .dtsi and
+enables the peripherals that we support so far.
+
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+[Icenowy: dropped all GPIO pinctrl nodes, change red LED gpio]
 Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
-New patch in v2, as H3 codec support is added between v1 and v2.
+Changes in v2:
+- Dropped all GPIO pinctrl nodes.
+- Changed red LED gpio to the correct one.
+- Added audio codec configuration copied from Orange Pi PC.
 
- drivers/dma/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/boot/dts/allwinner/Makefile             |   1 +
+ .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  | 164 +++++++++++++++++++++
+ 2 files changed, 165 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
 
-diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index 0d6a96ee9fc7..d01d59812cf3 100644
---- a/drivers/dma/Kconfig
-+++ b/drivers/dma/Kconfig
-@@ -157,7 +157,7 @@ config DMA_SUN4I
+diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
+index 1e29a5ae8282..b26bb46b934c 100644
+--- a/arch/arm64/boot/dts/allwinner/Makefile
++++ b/arch/arm64/boot/dts/allwinner/Makefile
+@@ -1,4 +1,5 @@
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
++dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
  
- config DMA_SUN6I
- 	tristate "Allwinner A31 SoCs DMA support"
--	depends on MACH_SUN6I || MACH_SUN8I || COMPILE_TEST
-+	depends on MACH_SUN6I || MACH_SUN8I || (ARM64 && ARCH_SUNXI) || COMPILE_TEST
- 	depends on RESET_CONTROLLER
- 	select DMA_ENGINE
- 	select DMA_VIRTUAL_CHANNELS
+ always		:= $(dtb-y)
+ subdir-y	:= $(dts-dirs)
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
+new file mode 100644
+index 000000000000..79784cba806c
+--- /dev/null
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
+@@ -0,0 +1,164 @@
++/*
++ * Copyright (C) 2016 ARM Ltd.
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "sun50i-h5.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/pinctrl/sun4i-a10.h>
++
++/ {
++	model = "Xunlong Orange Pi PC 2";
++	compatible = "xunlong,orangepi-pc2", "allwinner,sun50i-h5";
++
++	reg_vcc3v3: vcc3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		pwr_led {
++			label = "orangepi:green:pwr";
++			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
++			default-state = "on";
++		};
++
++		status_led {
++			label = "orangepi:red:status";
++			gpios = <&pio 0 20 GPIO_ACTIVE_HIGH>;
++		};
++	};
++
++	r_gpio_keys {
++		compatible = "gpio-keys";
++
++		sw4 {
++			label = "sw4";
++			linux,code = <BTN_0>;
++			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
++
++&codec {
++	allwinner,audio-routing =
++		"Line Out", "LINEOUT",
++		"MIC1", "Mic",
++		"Mic",  "MBIAS";
++	status = "okay";
++};
++
++&ehci1 {
++	status = "okay";
++};
++
++&ehci2 {
++	status = "okay";
++};
++
++&ehci3 {
++	status = "okay";
++};
++
++&ir {
++	pinctrl-names = "default";
++	pinctrl-0 = <&ir_pins_a>;
++	status = "okay";
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
++	cd-inverted;
++	status = "okay";
++};
++
++&ohci1 {
++	status = "okay";
++};
++
++&ohci2 {
++	status = "okay";
++};
++
++&ohci3 {
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_pins>;
++	status = "disabled";
++};
++
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart2_pins>;
++	status = "disabled";
++};
++
++&usbphy {
++	/* USB VBUS is always on */
++	status = "okay";
++};
 -- 
 2.11.0
