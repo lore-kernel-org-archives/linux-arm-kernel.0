@@ -1,47 +1,57 @@
-From: jonathan.richardson@broadcom.com (Jonathan Richardson)
-Date: Wed, 25 Jan 2017 18:04:17 -0800
-Subject: [PATCH v3 4/4] ARM: dts: Enable Broadcom iProc mailbox controller
-In-Reply-To: <32cbeb0b-d27a-58ac-654d-4eadf0cceec7@gmail.com>
-References: <1485390422-3984-1-git-send-email-jonathan.richardson@broadcom.com>
- <1485390422-3984-5-git-send-email-jonathan.richardson@broadcom.com>
- <32cbeb0b-d27a-58ac-654d-4eadf0cceec7@gmail.com>
-Message-ID: <7c607ba3-bda6-013f-a519-1c47eab778f0@broadcom.com>
+From: ttnguyen@apm.com (Tai Tri Nguyen)
+Date: Wed, 25 Jan 2017 18:13:31 -0800
+Subject: [PATCH] perf: xgene: Include module.h
+In-Reply-To: <20170125234658.12071-1-sboyd@codeaurora.org>
+References: <20170125234658.12071-1-sboyd@codeaurora.org>
+Message-ID: <CACgAJHzQtnLnNamP28Sq_PENU8s7hWYiXLoCbLMLx9-0rU_bwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Stephen,
 
+On Wed, Jan 25, 2017 at 3:46 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> I ran into a build error when I disabled CONFIG_ACPI and tried to
+> compile this driver:
 
-On 17-01-25 04:27 PM, Florian Fainelli wrote:
-> On 01/25/2017 04:27 PM, Jonathan Richardson wrote:
->> Add node for iProc mailbox controller and enable.
->>
->> Reviewed-by: Jonathan Richardson <jonathan.richardson@broadcom.com>
->> Reviewed-by: Shreesha Rajashekar <shreesha.rajashekar@broadcom.com>
->> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
->> Tested-by: Jonathan Richardson <jonathan.richardson@broadcom.com>
->> Reviewed-by: Vikram Prakash <vikram.prakash@broadcom.com>
->> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
->> Signed-off-by: Jonathan Richardson <jonathan.richardson@broadcom.com>
->> ---
->>  arch/arm/boot/dts/bcm-cygnus.dtsi | 6 ++++++
->>  1 file changed, 6 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
->> index cf02271..606e11a 100644
->> --- a/arch/arm/boot/dts/bcm-cygnus.dtsi
->> +++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
->> @@ -121,6 +121,12 @@
->>  			      <0x0301d24c 0x2c>;
->>  		};
->>  
->> +		mailbox: mailbox at 03024024 {
->> +			compatible = "brcm,iproc-mailbox";
->> +			reg = <0x03024024 0x8>;
->> +			#mbox-cells = <1>;
->> +		};
-> Can you squash this change with the previous one? It seems to me like
-> you are just removing the interrupt properties, and updating the reg
-> property to be only 0x8 bytes.
+I tried kernel 4.9 and couldn't reproduce the issue.
+What is the kernel version you are seeing the compilation issue?
+
+Regards
+Tai
+
 >
-> Thank you
-And removing the interrupt controller properties from the mailbox controller. I don't mind squashing it if there are no objections.
+> drivers/perf/xgene_pmu.c:1242:1: warning: data definition has no type or storage class
+>  MODULE_DEVICE_TABLE(of, xgene_pmu_of_match);
+>  ^
+> drivers/perf/xgene_pmu.c:1242:1: error: type defaults to 'int' in declaration of 'MODULE_DEVICE_TABLE' [-Werror=implicit-int]
+>
+> Include module.h for the MODULE_DEVICE_TABLE macro that's
+> implicitly included through ACPI.
+>
+> Cc: Tai Nguyen <ttnguyen@apm.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  drivers/perf/xgene_pmu.c | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/perf/xgene_pmu.c b/drivers/perf/xgene_pmu.c
+> index a8ac4bcef2c0..fb3281962a6d 100644
+> --- a/drivers/perf/xgene_pmu.c
+> +++ b/drivers/perf/xgene_pmu.c
+> @@ -20,6 +20,7 @@
+>   */
+>
+>  #include <linux/acpi.h>
+> +#include <linux/module.h>
+>  #include <linux/clk.h>
+>  #include <linux/cpumask.h>
+>  #include <linux/interrupt.h>
+> --
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
+>
+
+
+
+-- 
+Tai
