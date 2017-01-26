@@ -1,87 +1,84 @@
 From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Fri, 27 Jan 2017 00:37:25 +0100
-Subject: [PATCH 12/13] mmc: bcm2835: move timeout to thread context
+Date: Fri, 27 Jan 2017 00:37:18 +0100
+Subject: [PATCH 05/13] mmc: bcm2835: call bcm2835_block_irq from irqthread
 In-Reply-To: <1485473846-24537-1-git-send-email-kraxel@redhat.com>
 References: <1485473846-24537-1-git-send-email-kraxel@redhat.com>
-Message-ID: <1485473846-24537-13-git-send-email-kraxel@redhat.com>
+Message-ID: <1485473846-24537-6-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
 ---
- drivers/mmc/host/bcm2835.c | 22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
+ drivers/mmc/host/bcm2835.c | 31 ++++++++++++++++++++++---------
+ 1 file changed, 22 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/mmc/host/bcm2835.c b/drivers/mmc/host/bcm2835.c
-index fc2d02f..82caddc 100644
+index d25b85a..8270c76 100644
 --- a/drivers/mmc/host/bcm2835.c
 +++ b/drivers/mmc/host/bcm2835.c
-@@ -147,7 +147,7 @@ struct bcm2835_host {
- 	u32			pio_timeout;	/* In jiffies */
- 	int			clock;		/* Current clock speed */
- 	unsigned int		max_clk;	/* Max possible freq */
--	struct timer_list	timer;		/* Timer for timeouts */
-+	struct delayed_work     timeout_work;   /* Timer for timeouts */
- 	struct sg_mapping_iter	sg_miter;	/* SG state for PIO */
- 	unsigned int		blocks;		/* remaining PIO blocks */
- 	int			irq;		/* Device IRQ */
-@@ -669,12 +669,11 @@ bool bcm2835_send_command(struct bcm2835_host *host,
- 		return false;
- 	}
+@@ -168,6 +168,9 @@ struct bcm2835_host {
+ 	bool			use_busy:1;	/* Wait for busy interrupt */
+ 	bool			use_sbc:1;	/* Send CMD23 */
  
--	timeout = jiffies;
- 	if (!cmd->data && cmd->busy_timeout > 9000)
--		timeout += DIV_ROUND_UP(cmd->busy_timeout, 1000) * HZ + HZ;
-+		timeout = DIV_ROUND_UP(cmd->busy_timeout, 1000) * HZ + HZ;
- 	else
--		timeout += 10 * HZ;
--	mod_timer(&host->timer, timeout);
-+		timeout = 10 * HZ;
-+	schedule_delayed_work(&host->timeout_work, timeout);
- 
- 	host->cmd = cmd;
- 
-@@ -912,9 +911,11 @@ static void bcm2835_finish_command(struct bcm2835_host *host)
++	/* for threaded irq handler */
++	bool                    irq_block;
++
+ 	/* DMA part */
+ 	struct dma_chan		*dma_chan_rx;
+ 	struct dma_chan		*dma_chan_tx;
+@@ -1035,18 +1038,13 @@ static void bcm2835_data_irq(struct bcm2835_host *host, u32 intmask)
  	}
  }
  
--static void bcm2835_timeout(unsigned long data)
-+static void bcm2835_timeout(struct work_struct *work)
+-static void bcm2835_block_irq(struct bcm2835_host *host, u32 intmask)
++static void bcm2835_block_irq(struct bcm2835_host *host)
  {
--	struct bcm2835_host *host = (struct bcm2835_host *)data;
-+	struct delayed_work *d = to_delayed_work(work);
-+	struct bcm2835_host *host =
-+		container_of(d, struct bcm2835_host, timeout_work);
- 	struct device *dev = &host->pdev->dev;
+-	if (!host->data) {
+-		dev_err(&host->pdev->dev,
+-			"got block interrupt 0x%08x even though no data operation was in progress.\n",
+-			(unsigned int)intmask);
++	if (WARN_ON(!host->data)) {
+ 		bcm2835_dumpregs(host);
+ 		return;
+ 	}
  
- 	mutex_lock(&host->mutex);
-@@ -1303,7 +1304,7 @@ static void bcm2835_finish_request(struct bcm2835_host *host)
- 	struct dma_chan *terminate_chan = NULL;
- 	struct mmc_request *mrq;
+-	bcm2835_check_data_error(host, intmask);
+-
+ 	if (!host->dma_desc) {
+ 		WARN_ON(!host->blocks);
+ 		if (host->data->error || (--host->blocks == 0))
+@@ -1075,8 +1073,9 @@ static irqreturn_t bcm2835_irq(int irq, void *dev_id)
+ 	       host->ioaddr + SDHSTS);
  
--	del_timer(&host->timer);
-+	cancel_delayed_work(&host->timeout_work);
+ 	if (intmask & SDHSTS_BLOCK_IRPT) {
+-		bcm2835_block_irq(host, intmask);
+-		result = IRQ_HANDLED;
++		bcm2835_check_data_error(host, intmask);
++		host->irq_block = true;
++		result = IRQ_WAKE_THREAD;
+ 	}
  
- 	mrq = host->mrq;
+ 	if (intmask & SDHSTS_BUSY_IRPT) {
+@@ -1101,6 +1100,20 @@ static irqreturn_t bcm2835_irq(int irq, void *dev_id)
  
-@@ -1387,8 +1388,7 @@ int bcm2835_add_host(struct bcm2835_host *host)
- 	/* report supported voltage ranges */
- 	mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
+ static irqreturn_t bcm2835_threaded_irq(int irq, void *dev_id)
+ {
++	struct bcm2835_host *host = dev_id;
++	unsigned long flags;
++	bool block;
++
++	spin_lock_irqsave(&host->lock, flags);
++
++	block = host->irq_block;
++	host->irq_block = false;
++
++	if (block)
++		bcm2835_block_irq(host);
++
++	spin_unlock_irqrestore(&host->lock, flags);
++
+ 	return IRQ_HANDLED;
+ }
  
--	setup_timer(&host->timer, bcm2835_timeout,
--		    (unsigned long)host);
-+	INIT_DELAYED_WORK(&host->timeout_work, bcm2835_timeout);
- 
- 	/* Set interrupt enables */
- 	host->hcfg = SDHCFG_BUSY_IRPT_EN;
-@@ -1523,7 +1523,7 @@ static int bcm2835_remove(struct platform_device *pdev)
- 
- 	free_irq(host->irq, host);
- 
--	del_timer_sync(&host->timer);
-+	cancel_delayed_work_sync(&host->timeout_work);
- 
- 	mmc_free_host(host->mmc);
- 	platform_set_drvdata(pdev, NULL);
 -- 
 1.8.3.1
