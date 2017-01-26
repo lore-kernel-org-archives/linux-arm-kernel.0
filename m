@@ -1,33 +1,37 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 26 Jan 2017 18:18:58 +0100
-Subject: [PATCH 0/5] Implement SMMU passthrough using the default domain
-In-Reply-To: <010801d27654$47b7e450$d727acf0$@codeaurora.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 26 Jan 2017 17:26:32 +0000
+Subject: [PATCH 5/5] iommu: Allow default domain type to be set on the
+ kernel command line
+In-Reply-To: <20170126171555.GD27598@8bytes.org>
 References: <1484849955-1871-1-git-send-email-will.deacon@arm.com>
- <010801d27654$47b7e450$d727acf0$@codeaurora.org>
-Message-ID: <20170126171857.GE27598@8bytes.org>
+ <1484849955-1871-6-git-send-email-will.deacon@arm.com>
+ <20170126171555.GD27598@8bytes.org>
+Message-ID: <5717f26c-44ee-2057-e7dc-8dca42e3cd88@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2017 at 08:42:23PM +0530, Sricharan wrote:
-> Thanks for this series. We had a case with the GPU.
-> The GPU's iommu was setup by kernel and the GPU
-> also does dynamic updates for on-the-fly switching between
-> process pagetables.  GPU driver was not using DMA domain and
-> the GPU's firmware was always expecting to run out  of contextbank
->  '0' (although not correct) , which was not the case after the DMA domain
-> was made default  as '0' was getting allocated for DMA domain and
-> there were concerns about reusing the DMA domain as well.
-> Now with this series, looks there is an way out of that that can be tried.
+On 26/01/17 17:15, Joerg Roedel wrote:
+> On Thu, Jan 19, 2017 at 06:19:15PM +0000, Will Deacon wrote:
+>> Rather than modify each IOMMU driver to provide different semantics for
+>> DMA domains, instead we introduce a command line parameter that can be
+>> used to change the type of the default domain. Passthrough can then be
+>> specified using "iommu.default_domain=identity" on the kernel command
+>> line.
 > 
-> So should the default domain not be per device specific selectable ?
+> I like the general idea of this, but the above is a terrible name for a
+> kernel commandline-parameter. The x86 iommus support iommu=pt which is
+> pretty much the same as this patch does.
 
-Note that iommu-drivers can request direct-mapping for any given device
-on its initializtion. This is used on x86 for devices that need a 1-1
-mapping for some reason.
+Indeed, I was keen on making "iommu=pt" also do this default domain
+switch itself so we wouldn't need a new option - it didn't *appear* that
+that would break the AMD driver (as the only other default domain user
+supporting identity domains) but I may have overlooked something.
 
-Also device drivers can use the iommu-api and assign their own domain to
-a device, which allows them to manage the dma address space on their
-own.
+Robin.
 
-
-	Joerg
+> How about something like "iommu.passthrough=0/1"? And please add the
+> parameter to the kernel documentation too.
+> 
+> 
+> 	Joerg
+> 
