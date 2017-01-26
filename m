@@ -1,84 +1,22 @@
-From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Fri, 27 Jan 2017 00:37:18 +0100
-Subject: [PATCH 05/13] mmc: bcm2835: call bcm2835_block_irq from irqthread
-In-Reply-To: <1485473846-24537-1-git-send-email-kraxel@redhat.com>
-References: <1485473846-24537-1-git-send-email-kraxel@redhat.com>
-Message-ID: <1485473846-24537-6-git-send-email-kraxel@redhat.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 26 Jan 2017 15:44:21 -0800
+Subject: [PATCH] clk: gxbb: fix CLKID_ETH defined twice
+In-Reply-To: <1485446749-12679-1-git-send-email-jbrunet@baylibre.com>
+References: <1485446749-12679-1-git-send-email-jbrunet@baylibre.com>
+Message-ID: <20170126234421.GG8801@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
----
- drivers/mmc/host/bcm2835.c | 31 ++++++++++++++++++++++---------
- 1 file changed, 22 insertions(+), 9 deletions(-)
+On 01/26, Jerome Brunet wrote:
+> CLKID_ETH is define in the dt-bindings but has not be commented out in the
+> clock driver. Just do it now.
+> 
+> Fixes: 738f66d3211d ("clk: gxbb: add AmLogic GXBB clk controller driver")
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> ---
 
-diff --git a/drivers/mmc/host/bcm2835.c b/drivers/mmc/host/bcm2835.c
-index d25b85a..8270c76 100644
---- a/drivers/mmc/host/bcm2835.c
-+++ b/drivers/mmc/host/bcm2835.c
-@@ -168,6 +168,9 @@ struct bcm2835_host {
- 	bool			use_busy:1;	/* Wait for busy interrupt */
- 	bool			use_sbc:1;	/* Send CMD23 */
- 
-+	/* for threaded irq handler */
-+	bool                    irq_block;
-+
- 	/* DMA part */
- 	struct dma_chan		*dma_chan_rx;
- 	struct dma_chan		*dma_chan_tx;
-@@ -1035,18 +1038,13 @@ static void bcm2835_data_irq(struct bcm2835_host *host, u32 intmask)
- 	}
- }
- 
--static void bcm2835_block_irq(struct bcm2835_host *host, u32 intmask)
-+static void bcm2835_block_irq(struct bcm2835_host *host)
- {
--	if (!host->data) {
--		dev_err(&host->pdev->dev,
--			"got block interrupt 0x%08x even though no data operation was in progress.\n",
--			(unsigned int)intmask);
-+	if (WARN_ON(!host->data)) {
- 		bcm2835_dumpregs(host);
- 		return;
- 	}
- 
--	bcm2835_check_data_error(host, intmask);
--
- 	if (!host->dma_desc) {
- 		WARN_ON(!host->blocks);
- 		if (host->data->error || (--host->blocks == 0))
-@@ -1075,8 +1073,9 @@ static irqreturn_t bcm2835_irq(int irq, void *dev_id)
- 	       host->ioaddr + SDHSTS);
- 
- 	if (intmask & SDHSTS_BLOCK_IRPT) {
--		bcm2835_block_irq(host, intmask);
--		result = IRQ_HANDLED;
-+		bcm2835_check_data_error(host, intmask);
-+		host->irq_block = true;
-+		result = IRQ_WAKE_THREAD;
- 	}
- 
- 	if (intmask & SDHSTS_BUSY_IRPT) {
-@@ -1101,6 +1100,20 @@ static irqreturn_t bcm2835_irq(int irq, void *dev_id)
- 
- static irqreturn_t bcm2835_threaded_irq(int irq, void *dev_id)
- {
-+	struct bcm2835_host *host = dev_id;
-+	unsigned long flags;
-+	bool block;
-+
-+	spin_lock_irqsave(&host->lock, flags);
-+
-+	block = host->irq_block;
-+	host->irq_block = false;
-+
-+	if (block)
-+		bcm2835_block_irq(host);
-+
-+	spin_unlock_irqrestore(&host->lock, flags);
-+
- 	return IRQ_HANDLED;
- }
- 
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+
 -- 
-1.8.3.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
