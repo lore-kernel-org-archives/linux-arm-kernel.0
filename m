@@ -1,30 +1,28 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 26 Jan 2017 21:57:46 +0200
-Subject: [PATCH v2 3/8] pinctrl: samsung: Add support for pad retention
- control for Exynos5433 SoCs
-In-Reply-To: <1485419634-28331-4-git-send-email-m.szyprowski@samsung.com>
+Date: Thu, 26 Jan 2017 22:08:23 +0200
+Subject: [PATCH v2 4/8] arm64: dts: exynos: Add clocks to Exynos5433
+ LPASS module
+In-Reply-To: <1485419634-28331-5-git-send-email-m.szyprowski@samsung.com>
 References: <1485419634-28331-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170126083402eucas1p187d3d31f62544fc46fae99fc5f74dbfe@eucas1p1.samsung.com>
- <1485419634-28331-4-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20170126195746.gjx7fp3ovz5nqd76@kozik-lap>
+ <CGME20170126083403eucas1p1ad75fe027047dc240b9afd651c7713a5@eucas1p1.samsung.com>
+ <1485419634-28331-5-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20170126200823.eh6f6qubawawrtuy@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 09:33:49AM +0100, Marek Szyprowski wrote:
-> This patch adds support for retention control for Exynos5433 SoCs. Three
-> groups of pins has been defined for retention control: common shared group
-> for ALIVE, CPIF, eSE, FINGER, IMEM, NFC, PERIC, TOUCH pin banks and
-> separate control for FSYS and AUD pin banks, for which PMU retention
-> registers match whole banks.
+On Thu, Jan 26, 2017 at 09:33:50AM +0100, Marek Szyprowski wrote:
+> Exynos5433 LPASS module requires some clocks for proper operation with
+> power domain.
 > 
 > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > ---
->  drivers/pinctrl/samsung/pinctrl-exynos.c    | 58 +++++++++++++++++++++++++++++
->  include/linux/soc/samsung/exynos-regs-pmu.h | 16 ++++++++
->  2 files changed, 74 insertions(+)
+>  arch/arm64/boot/dts/exynos/exynos5433.dtsi | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
 
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+Thanks, applied to the same branch as other Exynos5433 changes. I can
+provide a tag with it, just give me a couple of days. Anyway it will be
+good if dependencies like this enter v4.11.
 
 Best regards,
 Krzysztof
