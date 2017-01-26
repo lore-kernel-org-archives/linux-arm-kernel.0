@@ -1,65 +1,41 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 26 Jan 2017 11:49:52 +0100
-Subject: [PATCH v5 05/12] dt: bindings: Add bindings for Marvell Xenon SD
- Host Controller
-In-Reply-To: <89c95d0084da6ad7132caa54ca66eb619d8a5090.1484154449.git-series.gregory.clement@free-electrons.com>
-References: <cover.8527229dae6c124f24c5e637430c2cdc86f80392.1484154449.git-series.gregory.clement@free-electrons.com>
- <89c95d0084da6ad7132caa54ca66eb619d8a5090.1484154449.git-series.gregory.clement@free-electrons.com>
-Message-ID: <CAPDyKFrCxk37uVZ4wM-=iwX3-Cn9j+uh1KneJoopVzia2nKTVA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 26 Jan 2017 11:51:08 +0100
+Subject: [PATCH v2 6/9] drm/panel: Add Netron DY E231732
+In-Reply-To: <20170126095456.GE3613@ulmo.ba.sec>
+References: <20160906144620.6322-1-maxime.ripard@free-electrons.com>
+ <20160906144620.6322-7-maxime.ripard@free-electrons.com>
+ <20170126095456.GE3613@ulmo.ba.sec>
+Message-ID: <20170126105108.sdj6tieo6bnht2zg@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 January 2017 at 18:19, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> From: Hu Ziji <huziji@marvell.com>
->
-> Marvell Xenon SDHC can support eMMC/SD/SDIO.
-> Add Xenon-specific properties.
-> Also add properties for Xenon PHY setting.
->
-> Signed-off-by: Hu Ziji <huziji@marvell.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+On Thu, Jan 26, 2017 at 10:54:56AM +0100, Thierry Reding wrote:
+> On Tue, Sep 06, 2016 at 04:46:17PM +0200, Maxime Ripard wrote:
+> > The E231732 is a 7" panel with a resolution of 800x480.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/gpu/drm/panel/panel-simple.c | 26 ++++++++++++++++++++++++++
+> >  1 file changed, 26 insertions(+)
+> 
+> This is missing a device tree binding, but since this is a simple one I
+> added it. The commit message also says the resolution is 800x480, which
+> conflicts with what's in the display mode definition, so I've also
+> fixed that up while at it.
 
-An overall comment. Please run a spell-checking as I noticed some
-simple errors that needs to be fixed.
+Sorry for that :/
 
-Optional Properties:
-> +- mmccard:
-> +  mmccard child node must be provided when current SDHC is for eMMC.
-> +  Xenon SDHC often can support both SD and eMMC. This child node indicates that
-> +  current SDHC is for eMMC card. Thus Xenon eMMC specific configuration and
-> +  operations can be enabled prior to eMMC init sequence.
-> +  Please refer to Documentation/devicetree/bindings/mmc/mmc-card.txt.
-> +  This child node should not be set if current Xenon SDHC is for SD/SDIO.
-> +
-> +- bus-width:
-> +  When 8-bit data bus width is in use for eMMC, this property should be
-> +  explicitly provided and set as 8.
-> +  It is optional when data bus width is 4-bit or 1-bit.
-> +
-> +- mmc-ddr-1_8v:
-> +  Select this property when eMMC HS DDR is supported on SDHC side.
-> +
-> +- mmc-hs400-1_8v:
-> +  Select this property when eMMC HS400 is supported on SDHC side.
+Thanks a lot,
+Maxime
 
-All the above properties is already specified as common mmc bindings.
-Let's not do that again, but instead just refer to mmc.txt as how
-other documentations looks like.
-
-> +
-> +- no-1-8-v:
-> +  Select this property when 1.8V signaling voltage supply is unavailable.
-> +  When this property is enabled, both mmc-ddr-1_8v and mmc-hs400-1_8v should be
-> +  cleared.
-
-Please don't use this sdhci property, unless really needed.
-
-Perhaps you can elaborate exactly why it makes sense for your case. Or
-perhaps we already discussed this, in either case, please re-fresh my
-mind.
-
-[...]
-
-Kind regards
-Uffe
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170126/2081a192/attachment.sig>
