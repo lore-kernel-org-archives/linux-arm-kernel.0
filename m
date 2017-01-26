@@ -1,60 +1,49 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu, 26 Jan 2017 15:27:01 +0100
-Subject: [PATCH] clk: meson8b: fix clk81 register address
-In-Reply-To: <1485341586-2929-1-git-send-email-jbrunet@baylibre.com>
-References: <1485341586-2929-1-git-send-email-jbrunet@baylibre.com>
-Message-ID: <1485440821.2442.8.camel@baylibre.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Thu, 26 Jan 2017 15:28:34 +0100
+Subject: [PATCH v2 6/7] ARM: dts: stm32: Enable dma by default on stm32f4 adc
+In-Reply-To: <1485440915-30119-1-git-send-email-fabrice.gasnier@st.com>
+References: <1485440915-30119-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1485440915-30119-7-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-01-25 at 11:53 +0100, Jerome Brunet wrote:
-> During meson8b clock probe, clk81 register address is fixed twice.
-> First using the meson8b_clk_gates array, then by directly changing
-> meson8b_clk81 register.
-> 
-> As a result meson8b_clk81.reg = HHI_MPEG_CLK_CNTL + clk_base +
-> clk_base.
-> 
-> Fixed by just removing the second fixup.
-> 
-> Fixes: e31a1900c1ff ("meson: clk: Add support for clock gates")
-> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> ---
-> ?Patch based on khilman/linux-amlogic.git master branch.
-> 
-> ?I don't have a meson8b HW so this patch so this patch has not been
-> ?tested on real HW.
+Configure STM32F4 ADC to use dma by default.
 
-I got my hands on an odroidc1 and I have been to test this.
-With clk_base @ 0xf0965000:
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+ arch/arm/boot/dts/stm32f429.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-* without the patch:
-clk81.reg =?0xe12ca174
-
-* with the patch:
-clk81.reg = 0xf0965174 (expected result)
-
-In the past, we probably did not see this because clk81 is the mother
-of all the other clock gate around the SoC so it is very likely that u-
-boot opened this gate for us.
-
-> 
-> ?drivers/clk/meson/meson8b.c | 1 -
-> ?1 file changed, 1 deletion(-)
-> 
-> diff --git a/drivers/clk/meson/meson8b.c
-> b/drivers/clk/meson/meson8b.c
-> index 3f1be46cbb33..888494d4fb8a 100644
-> --- a/drivers/clk/meson/meson8b.c
-> +++ b/drivers/clk/meson/meson8b.c
-> @@ -607,7 +607,6 @@ static int meson8b_clkc_probe(struct
-> platform_device *pdev)
-> ?	/* Populate the base address for the MPEG clks */
-> ?	meson8b_mpeg_clk_sel.reg = clk_base +
-> (u32)meson8b_mpeg_clk_sel.reg;
-> ?	meson8b_mpeg_clk_div.reg = clk_base +
-> (u32)meson8b_mpeg_clk_div.reg;
-> -	meson8b_clk81.reg = clk_base + (u32)meson8b_clk81.reg;
-> ?
-> ?	/* Populate base address for gates */
-> ?	for (i = 0; i < ARRAY_SIZE(meson8b_clk_gates); i++)
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index 8bf650d..ab42b58 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -416,6 +416,8 @@
+ 				clocks = <&rcc 0 168>;
+ 				interrupt-parent = <&adc>;
+ 				interrupts = <0>;
++				dmas = <&dma2 0 0 0x400 0x0>;
++				dma-names = "rx";
+ 				status = "disabled";
+ 			};
+ 
+@@ -426,6 +428,8 @@
+ 				clocks = <&rcc 0 169>;
+ 				interrupt-parent = <&adc>;
+ 				interrupts = <1>;
++				dmas = <&dma2 3 1 0x400 0x0>;
++				dma-names = "rx";
+ 				status = "disabled";
+ 			};
+ 
+@@ -436,6 +440,8 @@
+ 				clocks = <&rcc 0 170>;
+ 				interrupt-parent = <&adc>;
+ 				interrupts = <2>;
++				dmas = <&dma2 1 2 0x400 0x0>;
++				dma-names = "rx";
+ 				status = "disabled";
+ 			};
+ 		};
+-- 
+1.9.1
