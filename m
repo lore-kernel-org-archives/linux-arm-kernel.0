@@ -1,57 +1,40 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 26 Jan 2017 11:13:45 +0100
-Subject: [PATCH 4/5] arm64: dts: r8a7795: Add I2C for DVFS core to dtsi
-In-Reply-To: <1485420750-12701-5-git-send-email-horms+renesas@verge.net.au>
-References: <1485420750-12701-1-git-send-email-horms+renesas@verge.net.au>
- <1485420750-12701-5-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdW1Okdf-D1yUCehQ9WFqCXO_t4y-Yk0sodhFL1E2FLG8g@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 26 Jan 2017 11:15:29 +0100
+Subject: [PATCH 10/11] arm64: dts: allwinner: Remove no longer used
+ pinctrl/sun4i-a10.h header
+In-Reply-To: <20170124023230.3990-11-wens@csie.org>
+References: <20170124023230.3990-1-wens@csie.org>
+ <20170124023230.3990-11-wens@csie.org>
+Message-ID: <20170126101529.j3fuku4hyy3pbge3@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 9:52 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> From: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
->
-> This patch adds I2C for DVFS device support for R8A7795 SoC.
->
-> Signed-off-by: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
-> Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
-> Signed-off-by: Dien Pham <dien.pham.ry@rvc.renesas.com>
-> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+On Tue, Jan 24, 2017 at 10:32:29AM +0800, Chen-Yu Tsai wrote:
+> All dts files for the sunxi platform have been switched to the generic
+> pinconf bindings. As a result, the sunxi specific pinctrl macros are
+> no longer used.
+> 
+> Remove the #include entry with the following command:
+> 
+>     sed -i -e '/pinctrl\/sun4i-a10.h/D' \
+> 	arch/arm64/boot/dts/allwinner/*.dts?
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Applied, thanks!
 
-> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+Maybe we should also remove the header entirely?
 
-> @@ -793,6 +794,19 @@
->                         status = "disabled";
->                 };
->
-> +               i2c_dvfs: i2c at e60b0000 {
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +                       compatible = "renesas,iic-r8a7795",
-> +                                    "renesas,rcar-gen3-iic",
-> +                                    "renesas,rmobile-iic";
-> +                       reg = <0 0xe60b0000 0 0x425>;
-> +                       interrupts = <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>;
-> +                       clocks = <&cpg CPG_MOD 926>;
+Maxime
 
-Same comment about dmas/dma-names.
-
-> +                       power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
-> +                       status = "disabled";
-> +               };
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170126/4695a9d3/attachment.sig>
