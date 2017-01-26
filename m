@@ -1,43 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 26 Jan 2017 16:54:06 +0100
-Subject: [PATCH v3 01/13] soc: samsung: pmu: Provide global function to
- get PMU regmap
-In-Reply-To: <3ba1504d-5874-b09b-1ad8-6cda4851f113@samsung.com>
-References: <CGME20170119134904eucas1p153a1d5b2ff9826c88293b6a8fe5140bc@eucas1p1.samsung.com>
- <1484833733-16082-1-git-send-email-m.szyprowski@samsung.com>
- <1484833733-16082-2-git-send-email-m.szyprowski@samsung.com>
- <CACRpkdYyOgpAhAY=7QrXiEB2oDgs0azt_Tb80iO4vjzk1obemQ@mail.gmail.com>
- <3ba1504d-5874-b09b-1ad8-6cda4851f113@samsung.com>
-Message-ID: <CACRpkdY597rtiW9hk66njtcQRB=YSHThcbuhM0PkQ_yU=a6kXw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 26 Jan 2017 15:57:25 +0000
+Subject: [PATCH] arm64: skip register_cpufreq_notifier on ACPI-based
+ systems
+In-Reply-To: <20170126155229.GB1194@red-moon>
+References: <1485304992-26888-1-git-send-email-pprakash@codeaurora.org>
+ <20170126121811.GD14167@arm.com> <20170126155229.GB1194@red-moon>
+Message-ID: <20170126155724.GI14167@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 11:22 AM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
+On Thu, Jan 26, 2017 at 03:52:29PM +0000, Lorenzo Pieralisi wrote:
+> On Thu, Jan 26, 2017 at 12:18:11PM +0000, Will Deacon wrote:
+> > [adding Sudeep and Lorenzo for comment]
+> > 
+> > On Tue, Jan 24, 2017 at 05:43:12PM -0700, Prashanth Prakash wrote:
+> > > On ACPI based systems where the topology is setup using the API
+> > > store_cpu_topology, at the moment we do not have necessary code
+> > > to handle a cpufreq notifier, thus resulting in a crash.
+> > 
+> > What is the "necessary code" that we're missing? Wouldn't it be better
+> > to add that, or explicitly avoid the cpufreq notifier registration if
+> > we're using ACPI?
+> 
+> Necessary code is, in DT, code parsing bindings to provide capacity
+> values and allocate the raw_capacity array; there is no ACPI counterpart
+> for those bindings (well..there is a byte length field in the GICC MADT
+> entry "Processor Power Efficiency Class" but as far as I understand,
+> currently, it would be more reliable as a random seed than a useful
+> capacity scale, I just do not know why it is there) so the whole CPUfreq
+> notifier thing is basically useless when booting with ACPI.
 
-> syscon_regmap_lookup_by_compatible() requires to have a compatible string
-> hardcoded in the client driver. This might be used, but will require to have
-> (and maintain) a duplicated list of PMU compatibles in pin control driver.
-> There is a little problem with exynos4212 and exynos4412, which have same
-> pinctrl compatible (samsung,exynos4x12-pinctrl), but separate PMU
-> compatibles
+Ok, thanks for the explanation.
 
-I actually used this approach with the ARM reference designs:
-drivers/mtd/maps/physmap_of_versatile.c
-drivers/video/fbdev/amba-clcd-versatile.c
+> How about using (or put the ACPI bit in a separate line with a
+> comment):
+> 
+> 	if (!acpi_disabled || cap_parsing_failed)
+> 
+> to prevent registering the CPUfreq notifier ? Using raw_capacity check
+> this patch achieves the same in a much more opaque way (you will have to
+> include <linux/acpi.h> to make use of acpi_disabled).
 
-It made sense to me, because for each compatible I anyways
-needed the .data field to distinguish between the different
-system controllers, because they are of course all slightly
-idiomatic.
+That looks good to me. If somebody sends a v2, I can apply it for 4.11.
 
-I guess in your case you can distinguish how to use the syscon
-by the pinctrl compatible instead.
+Thanks,
 
-Oh well.
-
-I guess I'm OK with this then. I'll try to pull it in and see what
-happens.
-
-Yours,
-Linus Walleij
+Will
