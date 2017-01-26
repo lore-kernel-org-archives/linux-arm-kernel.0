@@ -1,54 +1,26 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 26 Jan 2017 21:04:18 +0530
-Subject: [PATCH v2 0/4] USB support for Broadcom NSP SoC
-In-Reply-To: <1484669670-4201-1-git-send-email-yendapally.reddy@broadcom.com>
-References: <1484669670-4201-1-git-send-email-yendapally.reddy@broadcom.com>
-Message-ID: <588A16FA.50507@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 26 Jan 2017 16:34:32 +0100
+Subject: [PATCH v3 REBASED 09/13] pinctrl: samsung: Use generic
+ of_device_get_match_data helper
+In-Reply-To: <1485422967-30643-6-git-send-email-m.szyprowski@samsung.com>
+References: <CACRpkdY_SpqfyTTqSP5+a1k1LDf_5w77UXo=EognmOzWBz2c-Q@mail.gmail.com>
+ <CGME20170126093001eucas1p23c2d5d589a0490fc19dde1be37250a00@eucas1p2.samsung.com>
+ <1485422967-30643-1-git-send-email-m.szyprowski@samsung.com>
+ <1485422967-30643-6-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CACRpkdahMLvmiYym+M++awpJq_j2p2Ce2zYYTMzEw2soz72gDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jan 26, 2017 at 10:29 AM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
 
+> Replace custom code with generic helper.
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
 
-On Tuesday 17 January 2017 09:44 PM, Yendapally Reddy Dhananjaya Reddy wrote:
-> This patch set contains the usb support for Broadcom NSP SoC. The
-> usb3 phy is internal to the SoC and is accessed through mdio interface.
-> The mdio interface can be used to access either internal usb3 phy or
-> external ethernet phy using a multiplexer.
-> 
-> The first patch provides the documentation details for usb3 phy. The
-> second patch provides the changes to the mdio bus driver. The third
-> patch provides the phy driver and fourth patch provides the enable
-> method for usb.
+Patch applied.
 
-merged the 1st and 4th patch to linux-phy.
-
-Thanks
-Kishon
-
-> 
-> This patch series has been tested on NSP bcm958625HR board.
-> This patch series is based on v4.10.0-rc3 and is available from
-> github-repo: https://github.com/Broadcom/cygnus-linux.git
-> branch:nsp-usb-v2
-> 
-> Changes in v2:
-> * Remove separate nsp mux driver as suggested by Andrew Lunn
-> * Addressed comments from Scott and Rob
-> 
-> Yendapally Reddy Dhananjaya Reddy (4):
->   dt-bindings: phy: Add documentation for NSP USB3 PHY
->   net: phy: Initialize mdio clock at probe function
->   phy: Add USB3 PHY support for Broadcom NSP SoC
->   arm: dts: nsp: Add USB nodes to device tree
-> 
->  .../devicetree/bindings/phy/brcm,nsp-usb3-phy.txt  |  39 +++++
->  arch/arm/boot/dts/bcm-nsp.dtsi                     |  56 +++++++
->  arch/arm/boot/dts/bcm958625k.dts                   |  16 ++
->  drivers/net/phy/mdio-bcm-iproc.c                   |   6 +-
->  drivers/phy/Kconfig                                |   8 +
->  drivers/phy/Makefile                               |   1 +
->  drivers/phy/phy-bcm-nsp-usb3.c                     | 176 +++++++++++++++++++++
->  7 files changed, 298 insertions(+), 4 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/phy/brcm,nsp-usb3-phy.txt
->  create mode 100644 drivers/phy/phy-bcm-nsp-usb3.c
-> 
+Yours,
+Linus Walleij
