@@ -1,101 +1,69 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 26 Jan 2017 09:33:52 +0100
-Subject: [PATCH v2 6/8] mfd: exynos-lpass: Add support for clocks
+Date: Thu, 26 Jan 2017 09:33:54 +0100
+Subject: [PATCH v2 8/8] mfd: exynos-lpass: Add runtime PM support
 In-Reply-To: <1485419634-28331-1-git-send-email-m.szyprowski@samsung.com>
 References: <1485419634-28331-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170126083404eucas1p132ce7a0792505367f6a001f21e9d1632@eucas1p1.samsung.com>
-Message-ID: <1485419634-28331-7-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170126083406eucas1p20148fa4f3ca70d333400c806dd490aef@eucas1p2.samsung.com>
+Message-ID: <1485419634-28331-9-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos LPASS requires some clocks to be enabled to make any access to its
-registers. This patch adds code for handling such clocks. For current set
-of registers it is enough to keep sfr0_ctrl clock enabled. Till now it
-worked only because those clocks were enabled by bootloader and driver
-probe() happened before they were disabled by clock core because of lack
-of users. Handling those clocks is also needed to make it possible to
-enable support for audio power domain.
-
-This patch requires adding sfr0_ctrl clock to device tree.
+Convert exisitng lpass-suspend/resume callbacks into runtime PM callbacks.
+This way Exynos LPASS driver will be ready for use with power domains
+enabled. LPASS will be runtime resumed/suspended as a result of its child
+devices runtime PM transitions.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- .../devicetree/bindings/mfd/samsung,exynos5433-lpass.txt       |  6 ++++++
- drivers/mfd/exynos-lpass.c                                     | 10 ++++++++++
- 2 files changed, 16 insertions(+)
+ drivers/mfd/exynos-lpass.c | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mfd/samsung,exynos5433-lpass.txt b/Documentation/devicetree/bindings/mfd/samsung,exynos5433-lpass.txt
-index a8deaee82c44..df664018c148 100644
---- a/Documentation/devicetree/bindings/mfd/samsung,exynos5433-lpass.txt
-+++ b/Documentation/devicetree/bindings/mfd/samsung,exynos5433-lpass.txt
-@@ -5,6 +5,10 @@ Required properties:
-  - compatible		: "samsung,exynos5433-lpass"
-  - reg			: should contain the LPASS top SFR region location
- 			  and size
-+ - clock-names		: should contain following required clocks: "sfr0_ctrl"
-+ - clocks		: should contain clock specifiers of all clocks, which
-+			  input names have been specified in clock-names
-+			  property, in same order.
-  - #address-cells	: should be 1
-  - #size-cells		: should be 1
-  - ranges		: must be present
-@@ -24,6 +28,8 @@ Example:
- audio-subsystem {
- 	compatible = "samsung,exynos5433-lpass";
- 	reg = <0x11400000 0x100>, <0x11500000 0x08>;
-+	clocks = <&cmu_aud CLK_PCLK_SFR0_CTRL>;
-+	clock-names = "sfr0_ctrl";
- 	#address-cells = <1>;
- 	#size-cells = <1>;
- 	ranges;
 diff --git a/drivers/mfd/exynos-lpass.c b/drivers/mfd/exynos-lpass.c
-index 17915daa2e80..be264988bdc9 100644
+index 9dbbedad916f..6d735e22acda 100644
 --- a/drivers/mfd/exynos-lpass.c
 +++ b/drivers/mfd/exynos-lpass.c
-@@ -14,6 +14,7 @@
-  * only version 2 as published by the Free Software Foundation.
-  */
+@@ -22,6 +22,7 @@
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
++#include <linux/pm_runtime.h>
+ #include <linux/regmap.h>
+ #include <linux/types.h>
  
-+#include <linux/clk.h>
- #include <linux/delay.h>
- #include <linux/io.h>
- #include <linux/module.h>
-@@ -52,6 +53,7 @@
- struct exynos_lpass {
- 	/* pointer to the LPASS TOP regmap */
- 	struct regmap *top;
-+	struct clk *sfr0_clk;
- };
+@@ -132,6 +133,8 @@ static int exynos_lpass_probe(struct platform_device *pdev)
+ 	}
  
- static void exynos_lpass_core_sw_reset(struct exynos_lpass *lpass, int mask)
-@@ -71,6 +73,8 @@ static void exynos_lpass_core_sw_reset(struct exynos_lpass *lpass, int mask)
+ 	platform_set_drvdata(pdev, lpass);
++	pm_runtime_set_active(dev);
++	pm_runtime_enable(dev);
+ 	exynos_lpass_enable(lpass);
  
- static void exynos_lpass_enable(struct exynos_lpass *lpass)
+ 	return of_platform_populate(dev->of_node, NULL, NULL, dev);
+@@ -141,7 +144,9 @@ static int exynos_lpass_remove(struct platform_device *pdev)
  {
-+	clk_prepare_enable(lpass->sfr0_clk);
-+
- 	/* Unmask SFR, DMA and I2S interrupt */
- 	regmap_write(lpass->top, SFR_LPASS_INTR_CA5_MASK,
- 		     LPASS_INTR_SFR | LPASS_INTR_DMA | LPASS_INTR_I2S);
-@@ -88,6 +92,8 @@ static void exynos_lpass_disable(struct exynos_lpass *lpass)
- 	/* Mask any unmasked IP interrupt sources */
- 	regmap_write(lpass->top, SFR_LPASS_INTR_CPU_MASK, 0);
- 	regmap_write(lpass->top, SFR_LPASS_INTR_CA5_MASK, 0);
-+
-+	clk_disable_unprepare(lpass->sfr0_clk);
+ 	struct exynos_lpass *lpass = platform_get_drvdata(pdev);
+ 
+-	exynos_lpass_disable(lpass);
++	pm_runtime_disable(&pdev->dev);
++	if (!pm_runtime_status_suspended(&pdev->dev))
++		exynos_lpass_disable(lpass);
+ 	regmap_exit(lpass->top);
+ 
+ 	return 0;
+@@ -165,8 +170,11 @@ static int __maybe_unused exynos_lpass_resume(struct device *dev)
+ 	return 0;
  }
  
- static const struct regmap_config exynos_lpass_reg_conf = {
-@@ -114,6 +120,10 @@ static int exynos_lpass_probe(struct platform_device *pdev)
- 	if (IS_ERR(base_top))
- 		return PTR_ERR(base_top);
+-static SIMPLE_DEV_PM_OPS(lpass_pm_ops, exynos_lpass_suspend,
+-					exynos_lpass_resume);
++static const struct dev_pm_ops lpass_pm_ops = {
++	SET_RUNTIME_PM_OPS(exynos_lpass_suspend, exynos_lpass_resume, NULL)
++	SET_LATE_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
++				     pm_runtime_force_resume)
++};
  
-+	lpass->sfr0_clk = devm_clk_get(dev, "sfr0_ctrl");
-+	if (IS_ERR(lpass->sfr0_clk))
-+		return PTR_ERR(lpass->sfr0_clk);
-+
- 	lpass->top = regmap_init_mmio(dev, base_top,
- 					&exynos_lpass_reg_conf);
- 	if (IS_ERR(lpass->top)) {
+ static const struct of_device_id exynos_lpass_of_match[] = {
+ 	{ .compatible = "samsung,exynos5433-lpass" },
 -- 
 1.9.1
