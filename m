@@ -1,52 +1,49 @@
-From: pprakash@codeaurora.org (Prakash, Prashanth)
-Date: Thu, 26 Jan 2017 10:31:18 -0700
-Subject: [PATCH] arm64: skip register_cpufreq_notifier on ACPI-based
- systems
-In-Reply-To: <20170126155724.GI14167@arm.com>
-References: <1485304992-26888-1-git-send-email-pprakash@codeaurora.org>
- <20170126121811.GD14167@arm.com> <20170126155229.GB1194@red-moon>
- <20170126155724.GI14167@arm.com>
-Message-ID: <9fe8918e-ba2c-80c4-ce47-d7408cd0943f@codeaurora.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 26 Jan 2017 23:10:49 +0530
+Subject: [PATCH v6 05/14] ARM: davinci: da850: add con_id for the SATA
+ clock
+In-Reply-To: <93a3bbb3-2d9f-bc38-c7b4-5eb3325d985d@ti.com>
+References: <1485190856-4711-1-git-send-email-bgolaszewski@baylibre.com>
+ <1485190856-4711-6-git-send-email-bgolaszewski@baylibre.com>
+ <93a3bbb3-2d9f-bc38-c7b4-5eb3325d985d@ti.com>
+Message-ID: <645778dd-6727-abd0-3dd9-a7e0d5aa4983@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 1/26/2017 8:57 AM, Will Deacon wrote:
-> On Thu, Jan 26, 2017 at 03:52:29PM +0000, Lorenzo Pieralisi wrote:
->> On Thu, Jan 26, 2017 at 12:18:11PM +0000, Will Deacon wrote:
->>> [adding Sudeep and Lorenzo for comment]
->>>
->>> On Tue, Jan 24, 2017 at 05:43:12PM -0700, Prashanth Prakash wrote:
->>>> On ACPI based systems where the topology is setup using the API
->>>> store_cpu_topology, at the moment we do not have necessary code
->>>> to handle a cpufreq notifier, thus resulting in a crash.
->>> What is the "necessary code" that we're missing? Wouldn't it be better
->>> to add that, or explicitly avoid the cpufreq notifier registration if
->>> we're using ACPI?
->> Necessary code is, in DT, code parsing bindings to provide capacity
->> values and allocate the raw_capacity array; there is no ACPI counterpart
->> for those bindings (well..there is a byte length field in the GICC MADT
->> entry "Processor Power Efficiency Class" but as far as I understand,
->> currently, it would be more reliable as a random seed than a useful
->> capacity scale, I just do not know why it is there) so the whole CPUfreq
->> notifier thing is basically useless when booting with ACPI.
-> Ok, thanks for the explanation.
->
->> How about using (or put the ACPI bit in a separate line with a
->> comment):
+On Thursday 26 January 2017 10:26 PM, Grygorii Strashko wrote:
+> 
+> 
+> On 01/23/2017 11:00 AM, Bartosz Golaszewski wrote:
+>> The ahci-da850 SATA driver is now capable of retrieving clocks by
+>> con_id. Add the connection id for the sysclk2-derived SATA clock.
 >>
->> 	if (!acpi_disabled || cap_parsing_failed)
+>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>> ---
+>>  arch/arm/mach-davinci/da850.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
 >>
->> to prevent registering the CPUfreq notifier ? Using raw_capacity check
->> this patch achieves the same in a much more opaque way (you will have to
->> include <linux/acpi.h> to make use of acpi_disabled).
-> That looks good to me. If somebody sends a v2, I can apply it for 4.11.
+>> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+>> index 1d873d1..dbf1daa 100644
+>> --- a/arch/arm/mach-davinci/da850.c
+>> +++ b/arch/arm/mach-davinci/da850.c
+>> @@ -571,7 +571,7 @@ static struct clk_lookup da850_clks[] = {
+>>  	CLK("spi_davinci.0",	NULL,		&spi0_clk),
+>>  	CLK("spi_davinci.1",	NULL,		&spi1_clk),
+>>  	CLK("vpif",		NULL,		&vpif_clk),
+>> -	CLK("ahci_da850",		NULL,		&sata_clk),
+>> +	CLK("ahci_da850",	"sata",		&sata_clk),
+> 
+> I'm worry a bit - wouldn't this cause future problems with PM runtime
+>  (if it will be the case)?
+> 
+> If this is functional clock - shouldn't it be "fck" to 
+> follow PM domain con_id list for davinci?  (arch/arm/mach-davinci/pm_domain.c) 
 
-Thanks for the inputs. I will post v2 in next couple of hours.
+I agree with Grygorii. Calling this clock "fck" will make it easy to
+convert the DA850 AHCI driver to use pm_runtime at a future date (no
+mach-davinci changes should be needed).
 
-Any chances this can make it to one of the 4-10 release candidates as it results
-in a panic without this change?
+Sorry about not spotting this earlier.
 
---
 Thanks,
-Prashanth
+Sekhar
