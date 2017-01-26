@@ -1,63 +1,44 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Thu, 26 Jan 2017 15:28:35 +0100
-Subject: [PATCH v2 7/7] ARM: dts: stm32: Enable pwm1 and pwm3 on
- stm32f429i-eval
+Date: Thu, 26 Jan 2017 15:28:32 +0100
+Subject: [PATCH v2 4/7] Documentation: dt: iio: stm32-adc: optional dma support
 In-Reply-To: <1485440915-30119-1-git-send-email-fabrice.gasnier@st.com>
 References: <1485440915-30119-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1485440915-30119-8-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1485440915-30119-5-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define and enable pwm1 and pwm3, timers1 & 3 trigger outputs on
-on stm32f429i-eval board.
+STM32 ADC can use dma. Add dt documentation for optional dma support.
 
 Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
-Changes in v2:
-- Fix typo
-- Sort phandles
----
- arch/arm/boot/dts/stm32429i-eval.dts | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stm32429i-eval.dts b/arch/arm/boot/dts/stm32429i-eval.dts
-index 2181220..507ee9d 100644
---- a/arch/arm/boot/dts/stm32429i-eval.dts
-+++ b/arch/arm/boot/dts/stm32429i-eval.dts
-@@ -157,6 +157,34 @@
- 	};
- };
+diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+index 49ed82e..5dfc88e 100644
+--- a/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
++++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-adc.txt
+@@ -53,6 +53,11 @@ Required properties:
+ - #io-channel-cells = <1>: See the IIO bindings section "IIO consumers" in
+   Documentation/devicetree/bindings/iio/iio-bindings.txt
  
-+&timers1 {
-+	status = "okay";
++Optional properties:
++- dmas: Phandle to dma channel for this ADC instance.
++  See ../../dma/dma.txt for details.
++- dma-names: Must be "rx" when dmas property is being used.
 +
-+	pwm {
-+		pinctrl-0 = <&pwm1_pins>;
-+		pinctrl-names = "default";
-+		status = "okay";
-+	};
-+
-+	timer at 0 {
-+		status = "okay";
-+	};
-+};
-+
-+&timers3 {
-+	status = "okay";
-+
-+	pwm {
-+		pinctrl-0 = <&pwm3_pins>;
-+		pinctrl-names = "default";
-+		status = "okay";
-+	};
-+
-+	timer at 2 {
-+		status = "okay";
-+	};
-+};
-+
- &usart1 {
- 	pinctrl-0 = <&usart1_pins_a>;
- 	pinctrl-names = "default";
+ Example:
+ 	adc: adc at 40012000 {
+ 		compatible = "st,stm32f4-adc-core";
+@@ -77,6 +82,8 @@ Example:
+ 			interrupt-parent = <&adc>;
+ 			interrupts = <0>;
+ 			st,adc-channels = <8>;
++			dmas = <&dma2 0 0 0x400 0x0>;
++			dma-names = "rx";
+ 		};
+ 		...
+ 		other adc child nodes follow...
 -- 
 1.9.1
