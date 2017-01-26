@@ -1,33 +1,36 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 26 Jan 2017 10:20:25 +0100
-Subject: [GIT PULL] soc: samsung: Drivers for v4.11
-In-Reply-To: <CACRpkdZebsd5MfARWL2WbKkAuXfjEe6p_k5tYwPFF6kSsCXDdQ@mail.gmail.com>
-References: <20170120181343.12570-1-krzk@kernel.org>
- <CGME20170126091313epcas3p4034ef54af813082ceb26f5213bb97a1c@epcas3p4.samsung.com>
- <CACRpkdZebsd5MfARWL2WbKkAuXfjEe6p_k5tYwPFF6kSsCXDdQ@mail.gmail.com>
-Message-ID: <4be96fae-6790-d281-61dc-f7e7cde9efb7@samsung.com>
+Date: Thu, 26 Jan 2017 10:29:20 +0100
+Subject: [PATCH v3 REBASED 06/13] pinctrl: samsung: Fix
+ samsung_pinctrl_create_functions return value
+In-Reply-To: <1485422967-30643-1-git-send-email-m.szyprowski@samsung.com>
+References: <CACRpkdY_SpqfyTTqSP5+a1k1LDf_5w77UXo=EognmOzWBz2c-Q@mail.gmail.com>
+ <1485422967-30643-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170126092959eucas1p28ac04e5c3b9c4ae882047c93a57d3a4e@eucas1p2.samsung.com>
+Message-ID: <1485422967-30643-3-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Return proper error code in case of memory allocation failure.
 
-On 2017-01-26 10:13, Linus Walleij wrote:
-> On Fri, Jan 20, 2017 at 7:13 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->
->> Few changes in Exynos PMU driver including one that is needed by pinctrl
->> driver for runtime PM. We want to move forward with the RPM for our drivers
->> while keeping still DT ABI.
->>
->> This tag is also for Linus Walleij to pull - base for pinctrl changes.
-> Do I need it? I.e. will my branch not compile without this, or is this
-> just a runtime problem?
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
+---
+ drivers/pinctrl/samsung/pinctrl-samsung.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-"[PATCH v3 11/13] pinctrl: samsung: Move retention control from 
-mach-exynos to the
-pinctrl driver" has compile time dependency on the changes included in 
-that tag.
-
-Best regards
+diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
+index b11e67e85460..10b3fd826231 100644
+--- a/drivers/pinctrl/samsung/pinctrl-samsung.c
++++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
+@@ -751,7 +751,7 @@ static struct samsung_pmx_func *samsung_pinctrl_create_functions(
+ 	functions = devm_kzalloc(dev, func_cnt * sizeof(*functions),
+ 					GFP_KERNEL);
+ 	if (!functions)
+-		return ERR_PTR(-EINVAL);
++		return ERR_PTR(-ENOMEM);
+ 	func = functions;
+ 
+ 	/*
 -- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+1.9.1
