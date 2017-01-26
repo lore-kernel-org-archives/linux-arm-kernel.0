@@ -1,55 +1,61 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 26 Jan 2017 10:05:57 +0100
-Subject: [PATCH v4 4/13] mmc: sunxi: Enable the new timings for the A64 MMC
- controllers
+Date: Thu, 26 Jan 2017 10:05:59 +0100
+Subject: [PATCH v4 6/13] mmc: sunxi: Add EMMC (MMC2) controller compatible
 In-Reply-To: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
 References: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <d6dfbf595cb99709877e7e57595125ce0b783ff6.1485421557.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <716c1509042ce282db7e6190092f7aa767a74f03.1485421557.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A64 MMC controllers need to set a "new timings" bit when a new rate is
-set.
+The MMC2 controller on the A64 is kind of a special beast.
 
-The actual meaning of that bit is not clear yet, but not setting it leads
-to some corner-case issues, like the CMD53 failing, which is used to
-implement SDIO packet aggregation.
+While the general controller design is the same than the other MMC
+controllers in the SoC, it also has a bunch of features and changes that
+prevent it to be driven in the same way.
 
+It has for example a different bus width limit, a different maximum
+frequency, and, for some reason, the maximum buffer size of a DMA
+descriptor.
+
+Add a new compatible specifically for this controller.
+
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/mmc/host/sunxi-mmc.c | 6 ++++++
- 1 file changed, 6 insertions(+), 0 deletions(-)
+ drivers/mmc/host/sunxi-mmc.c | 8 ++++++++
+ 1 file changed, 8 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index b9c8a62bc212..51d6388a194e 100644
+index 6bbe61397b7c..f0f6922bca8a 100644
 --- a/drivers/mmc/host/sunxi-mmc.c
 +++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -253,6 +253,8 @@ struct sunxi_mmc_cfg {
- 
- 	/* does the IP block support autocalibration? */
- 	bool can_calibrate;
-+
-+	bool needs_new_timings;
+@@ -5,6 +5,7 @@
+  * (C) Copyright 2013-2014 O2S GmbH <www.o2s.ch>
+  * (C) Copyright 2013-2014 David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
+  * (C) Copyright 2013-2014 Hans de Goede <hdegoede@redhat.com>
++ * (C) Copyright 2017 Sootech SA
+  *
+  * This program is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU General Public License as
+@@ -1096,12 +1097,19 @@ static const struct sunxi_mmc_cfg sun50i_a64_cfg = {
+ 	.needs_new_timings = true,
  };
  
- struct sunxi_mmc_host {
-@@ -779,6 +781,9 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 	}
- 	mmc_writel(host, REG_CLKCR, rval);
- 
-+	if (host->cfg->needs_new_timings)
-+		mmc_writel(host, REG_SD_NTSR, SDXC_2X_TIMING_MODE);
++static const struct sunxi_mmc_cfg sun50i_a64_emmc_cfg = {
++	.idma_des_size_bits = 13,
++	.clk_delays = NULL,
++	.can_calibrate = true,
++};
 +
- 	ret = sunxi_mmc_clk_set_phase(host, ios, rate);
- 	if (ret)
- 		return ret;
-@@ -1076,6 +1081,7 @@ static const struct sunxi_mmc_cfg sun50i_a64_cfg = {
- 	.idma_des_size_bits = 16,
- 	.clk_delays = NULL,
- 	.can_calibrate = true,
-+	.needs_new_timings = true,
- };
- 
  static const struct of_device_id sunxi_mmc_of_match[] = {
+ 	{ .compatible = "allwinner,sun4i-a10-mmc", .data = &sun4i_a10_cfg },
+ 	{ .compatible = "allwinner,sun5i-a13-mmc", .data = &sun5i_a13_cfg },
+ 	{ .compatible = "allwinner,sun7i-a20-mmc", .data = &sun7i_a20_cfg },
+ 	{ .compatible = "allwinner,sun9i-a80-mmc", .data = &sun9i_a80_cfg },
+ 	{ .compatible = "allwinner,sun50i-a64-mmc", .data = &sun50i_a64_cfg },
++	{ .compatible = "allwinner,sun50i-a64-emmc", .data = &sun50i_a64_emmc_cfg },
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, sunxi_mmc_of_match);
 -- 
 git-series 0.8.11
