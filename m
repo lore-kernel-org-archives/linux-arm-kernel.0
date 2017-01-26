@@ -1,52 +1,32 @@
 From: rask@formelder.dk (Rask Ingemann Lambertsen)
-Date: Thu, 26 Jan 2017 22:22:42 +0100 (CET)
-Subject: [PATCH 0/5] arm: sun9i: Support AXP808 PMIC and Sunchip CX-A99 board
-Message-ID: <cover.1485456003.git.rask@formelder.dk>
+Date: Thu, 26 Jan 2017 22:23:41 +0100 (CET)
+Subject: [PATCH 1/5] DT: mfd: axp20x: Add AXP806 to list of current AXP20x
+ family members
+In-Reply-To: <cover.1485456003.git.rask@formelder.dk>
+References: <cover.1485456003.git.rask@formelder.dk>
+Message-ID: <abdfbac9a5f363ab6d338dd66d8fb138741f71c7.1485456005.git.rask@formelder.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series add support for the Sunchip CX-A99 board, which is used in
-a few media players, making it the third device with an Allwinner A80 SoC
-to be supported. The board uses the X-Powers AXP808 PMIC which this patch
-series also adds support for.
+An entry for the AXP806 was forgotten, so add one.
 
-Patch 1 adds a documentation line which was forgotten when device tree
-bindings for the axp20x family were updated for the AXP806 PMIC. A line
-immediately below the missing line will be inserted by patch 2, so I'm
-including patch 1 in this series to avoid conflicts between patches.
+Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
+Fixes: 204ae2963e10 ("mfd: axp20x: Add bindings for AXP806 PMIC")
+---
+ Documentation/devicetree/bindings/mfd/axp20x.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Patch 2 adds the AXP808 to the axp20x device tree bindings.
-
-Patch 3 adds support for the AXP808 to the axp20x MFD driver.
-
-Patch 4 adds support for the AXP808 to the axp20x regulator driver.
-
-Patch 5 add the device tree for the Sunchip CX-A99 board. This patch is v5 of
-the only remaining patch from v4 of the patch series posted back in August.
-Support for the AXP808 has made major improvements possible, notably Wifi.
-
-Before trying out this patch series, you must also apply the patch
-"regulator: axp20x: AXP806: Fix dcdcb being set instead of dcdce" [1]
-to avoid damage to the DRAM chips through over-voltage.
-
-[1] https://patchwork.kernel.org/patch/9530319/
-
-Rask Ingemann Lambertsen (5):
-  DT: mfd: axp20x: Add AXP806 to list of current AXP20x family members
-  DT: mfd: axp20x: Add binding for the AXP808
-  mfd: axp20x: Add support for the AXP808 PMIC
-  regulator: axp20x: Add support for the AXP808 PMIC
-  ARM: dts: sun9i: Initial support for the Sunchip CX-A99 board
-
- Documentation/devicetree/bindings/mfd/axp20x.txt |   8 +-
- arch/arm/boot/dts/Makefile                       |   3 +-
- arch/arm/boot/dts/sun9i-a80-cx-a99.dts           | 413 +++++++++++++++++++++++
- drivers/mfd/axp20x-rsb.c                         |   1 +
- drivers/mfd/axp20x.c                             |  28 ++
- drivers/regulator/axp20x-regulator.c             |   7 +-
- include/linux/mfd/axp20x.h                       |   1 +
- 7 files changed, 455 insertions(+), 6 deletions(-)
- create mode 100644 arch/arm/boot/dts/sun9i-a80-cx-a99.dts
-
+diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+index 8f3ad9a..86ae540 100644
+--- a/Documentation/devicetree/bindings/mfd/axp20x.txt
++++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+@@ -6,6 +6,7 @@ axp202 (X-Powers)
+ axp209 (X-Powers)
+ axp221 (X-Powers)
+ axp223 (X-Powers)
++axp806 (X-Powers)
+ axp809 (X-Powers)
+ 
+ Required properties:
 -- 
 2.10.2
