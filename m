@@ -1,25 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 26 Jan 2017 10:06:17 +0100
-Subject: [PATCH v3 06/13] pinctrl: samsung: Fix
- samsung_pinctrl_create_functions return value
-In-Reply-To: <1484833733-16082-7-git-send-email-m.szyprowski@samsung.com>
-References: <CGME20170119134907eucas1p126b668fe7e8054da6c4233d3ab345ba5@eucas1p1.samsung.com>
- <1484833733-16082-1-git-send-email-m.szyprowski@samsung.com>
- <1484833733-16082-7-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CACRpkdZZ9Qb994Cj4Du+9wHy2_SQvpOCpWYmJr1ks+DyUwyunA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 26 Jan 2017 10:05:55 +0100
+Subject: [PATCH v4 2/13] mmc: sunxi: Gate the clock when rate is 0
+In-Reply-To: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
+References: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <fa9886d81af2415a6b83e9ff68bb5ebd430d4425.1485421557.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 2:48 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
+The MMC core assumes that the code will gate the clock when the bus
+frequency is set to 0, which we've been ignoring so far.
 
-> Return proper error code in case of memory allocation failure.
->
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
-> Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
+Handle that.
 
-Patch applied.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/mmc/host/sunxi-mmc.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-Yours,
-Linus Walleij
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index ab4324e6eb74..019f95e8e7c5 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -765,6 +765,9 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+ 	if (ret)
+ 		return ret;
+ 
++	if (!ios->clock)
++		return 0;
++
+ 	/* 8 bit DDR requires a higher module clock */
+ 	if (ios->timing == MMC_TIMING_MMC_DDR52 &&
+ 	    ios->bus_width == MMC_BUS_WIDTH_8)
+@@ -882,7 +885,7 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	mmc_writel(host, REG_GCTRL, rval);
+ 
+ 	/* set up clock */
+-	if (ios->clock && ios->power_mode) {
++	if (ios->power_mode) {
+ 		host->ferror = sunxi_mmc_clk_set_rate(host, ios);
+ 		/* Android code had a usleep_range(50000, 55000); here */
+ 	}
+-- 
+git-series 0.8.11
