@@ -1,122 +1,66 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 26 Jan 2017 20:54:12 +0530
-Subject: [PATCH v8 0/3] Support qcom's HSIC USB and rewrite USB2 HS support
-In-Reply-To: <20170125223245.2688-1-stephen.boyd@linaro.org>
-References: <20170125223245.2688-1-stephen.boyd@linaro.org>
-Message-ID: <588A149C.6020207@ti.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 26 Jan 2017 16:28:11 +0100
+Subject: [PATCH v4 1/2] power: reset: add linkstation-reset driver
+In-Reply-To: <20170119044327.j3d2rlpn5va3iw37@earth> (Sebastian Reichel's
+ message of "Thu, 19 Jan 2017 05:43:28 +0100")
+References: <20161227070611.14852-1-rogershimizu@gmail.com>
+ <20170107150451.17912-1-rogershimizu@gmail.com>
+ <20170107150451.17912-2-rogershimizu@gmail.com>
+ <CAEQ9gEkoKc0Yv+kLYGWgHZZW92u0tW8E9U0eT7ZhAx79yKxzLQ@mail.gmail.com>
+ <20170119044327.j3d2rlpn5va3iw37@earth>
+Message-ID: <8760l1zvqs.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Roger,
+ 
+ On jeu., janv. 19 2017, Sebastian Reichel <sre@kernel.org> wrote:
+
+> Hi Roger,
+>
+> On Wed, Jan 18, 2017 at 09:08:13PM +0900, Roger Shimizu wrote:
+>> On Sun, Jan 8, 2017 at 12:04 AM, Roger Shimizu <rogershimizu@gmail.com> wrote:
+>> > Buffalo Linkstation / KuroBox and their variants need magic command
+>> > sending to UART1 to power-off.
+>> >
+>> > Power driver linkstation-reset implements the magic command and I/O
+>> > routine, which come from files listed below:
+>> >   - arch/arm/mach-orion5x/kurobox_pro-setup.c
+>> >   - arch/arm/mach-orion5x/terastation_pro2-setup.c
+>> 
+>> I think there's not much concern regarding to this series.
+>> Could you kindly help to apply this patch?
+>
+> Well you dropped the DT binding, but still introduce new DT
+> properties. Since they are not documented without the binding
+> I won't merge this. DT binding documentation is not optional.
+> In other words: NAK on the binding effectively means NAK on
+> the driver in its current state.
+>
+> If you want to see this merged rebase it to Rob's generic
+> serial bindings [0] and help to support him getting everything
+> into mainline ASAP. Currently the feedback seems to be quite
+> positive, so I hope to see it merged for 4.11.
+>
+> [0] https://lwn.net/Articles/711794/ (current proposal from 2 days
+> ago)
+
+What is te status for your series?
+
+Do you plan sending a new version soon?
+
+Gregory
 
 
-On Thursday 26 January 2017 04:02 AM, Stephen Boyd wrote:
-> This patch series continues the usb chipidea rewrite for 
-> Qualcommm platforms. I've dropped the patches that were applied
-> to Peter's tree for chipidea. Now the phy drivers are left,
-> along with the patch to call phy_set_mode() at the right place.
-> 
-> I've left the HSIC phy driver here, because it wasn't merged in
-> the last round. Nothing has changed in that driver, so I believe
-> it is ready to be merged now. The chipidea patch is independent and
-> can be merged without causing any dependency with the phy tree.
+>
+> -- Sebastian
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-merged the phy patches. Please send a patch updating the MAINTAINERS for the
-phy driver.
-
-Thanks
-Kishon
-> 
-> Patches based on v4.10-rc1 + first 22 patches from v5. Full
-> branch is here[1].
-> 
-> Changes from v7:
->  * Dropped set_vbus() callback (Kishon)
->  * Made phy_set_mode() generic and moved into ci_platform_configure() (Peter)
-> 
-> Changes from v6:
->  * Dropped first 22 applied patches
->  * Rewrote phy_set_mode() patch to be msm specific
->  * New set_vbus() callback in phy framework
->  * Updated HS phy driver for set_vbus() callback
-> 
-> Changes from v5:
->  * Replaced "Emulate OTGSC interrupt enable path" patch with a patch
->    from Peter
->  * Updated HS phy driver to support set_mode callback to handle pullup
->  * New patch to set the mode to device or host in chipidea udc pullup
->    function to toggle the pullup for HS mode
->  * New patch to drop lock around event_notify callback to avoid lockdep
->    issues
->  * Removal of extcon usage from HS phy driver
->  * Picked up acks from Heikki and Peter on ULPI core patch
-> 
-> Changes from v4:
->  * Picked up Acks from Rob
->  * Updated HS phy init sequence DT property to restrict it to offsets
-> 
-> Changes from v3:
->  * Picked up Acks from Peter
->  * Updated extcon consolidation patch per Peter's comments
->  * Folded in simplification from Heikki for ULPI DT matching
-> 
-> Changes from v2:
->  * Added SoC specific compatibles in phy bindings
->  * Dropped AVVIS patch for OTG statemachine
->  * New patch to consolidate extcon handlers
->  * Picked up Acks from Peter
->  * Rebased onto v4.8-rc1
->  * Reworked ULPI OF code to look at vid == 0 instead of pid == 0
->  * Dropped ULPI bindings for vid and pid overrides
-> 
-> Changes from v1:
->  * Reworked ULPI device probing to keep using vendor/product ids that
->    come from DT if needed and falls back to OF style match when product id
->    is 0
->  * PHY init later patch was rejected so that moved to a quirk flag and
->    the msm wrapper started managing the phy on/off
->  * Updated clk requirements for HSIC phy in binding doc
->  * Added optional clk in wrapper for "housekeeping" found on older qcom
->    platforms
->  * Bug fix to OTGSC polling function
->  * Changed runtime PM patch to set as active instead of get/put
-> 
-> TODO:
->  * DMA fails on arm64 so we need something like [2] to make it work.
->  * The db410c needs a driver to toggle the onboard switch to connect
->    the usb hub instead of micro port when the usb cable is disconnected.
->    I've sent a patch set for this[3], which needs some further
->    discussion/development. The current plan is to reintroduce the usb
->    mux framework.
->  * apq8064 platforms need a vbus regulator to really use otg and I haven't
->    tried out the RPM based regulators yet
->  * The HSIC phy on the apq8074 dragonboard is connected to a usb4604
->    device which requires the i2c driver to probe and send an i2c
->    sequence before the HSIC controller enumerates or HSIC doesn't work.
->    Right now I have a hack to force the controller to probe defer
->    once so that usb4604 probes first. This needs a more proper solution
->    like having the DT describe a linkage between the controller and
->    the usb device so we can enforce probe ordering. My current plan
->    is to use DT graphs/endpoints for this.
-> 
-> [1] https://git.linaro.org/people/stephen.boyd/linux.git/log/?h=usb-hsic-8074
-> [2] https://patchwork.kernel.org/patch/9319527/
-> [3] https://lkml.kernel.org/r/20160914014246.31847-1-stephen.boyd at linaro.org
-> 
-> Stephen Boyd (3):
->   usb: chipidea: Configure phy for appropriate mode
->   phy: Add support for Qualcomm's USB HSIC phy
->   phy: Add support for Qualcomm's USB HS phy
-> 
->  .../devicetree/bindings/phy/qcom,usb-hs-phy.txt    |  84 ++++++
->  .../devicetree/bindings/phy/qcom,usb-hsic-phy.txt  |  65 +++++
->  drivers/phy/Kconfig                                |  15 ++
->  drivers/phy/Makefile                               |   2 +
->  drivers/phy/phy-qcom-usb-hs.c                      | 296 +++++++++++++++++++++
->  drivers/phy/phy-qcom-usb-hsic.c                    | 160 +++++++++++
->  drivers/usb/chipidea/core.c                        |  20 +-
->  7 files changed, 636 insertions(+), 6 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/phy/qcom,usb-hs-phy.txt
->  create mode 100644 Documentation/devicetree/bindings/phy/qcom,usb-hsic-phy.txt
->  create mode 100644 drivers/phy/phy-qcom-usb-hs.c
->  create mode 100644 drivers/phy/phy-qcom-usb-hsic.c
-> 
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
