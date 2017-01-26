@@ -1,41 +1,39 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 26 Jan 2017 07:58:09 +0200
-Subject: [PATCH v2] clk: samsung: mark s3c...._clk_sleep_init() as __init
-In-Reply-To: <1485380545-24815-1-git-send-email-martin@kaiser.cx>
-References: <1485293599-23581-1-git-send-email-martin@kaiser.cx>
- <1485380545-24815-1-git-send-email-martin@kaiser.cx>
-Message-ID: <20170126055809.fa2vgn54b7uk7wy5@kozik-lap>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 26 Jan 2017 08:15:42 +0100
+Subject: [PATCH 1/2] soc: samsung: pmu: Remove unused and duplicated
+ defines
+In-Reply-To: <20170125193452.31768-1-krzk@kernel.org>
+References: <CGME20170125193513epcas4p3630dd48974bedbe07a74a21d11500fe1@epcas4p3.samsung.com>
+ <20170125193452.31768-1-krzk@kernel.org>
+Message-ID: <20251f7e-310a-223e-3a35-7df5bc30352a@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2017 at 10:42:25PM +0100, martin at kaiser.cx wrote:
-> From: Martin Kaiser <martin@kaiser.cx>
-> 
-> These functions are referencing s3c...._clk_regs[], which are marked as
-> __initdata. When compiling with CONFIG_DEBUG_SECTION_MISMATCH=y, this
-> produces warnings like
-> 
-> WARNING: vmlinux.o(.text+0x198350):
-> Section mismatch in reference from the function s3c2410_clk_sleep_init()
-> to the (unknown reference) .init.data:(unknown)
-> 
-> Mark the s3c...._clk_sleep_init() functions as __init in
-> order to fix this.
-> 
-> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
-> ---
-> v2:
-> Fix the commit message, describe what the problem really is.
-> (Thanks, Krzysztof)
-> 
->  drivers/clk/samsung/clk-s3c2410.c |    4 ++--
->  drivers/clk/samsung/clk-s3c2412.c |    4 ++--
->  drivers/clk/samsung/clk-s3c2443.c |    4 ++--
->  drivers/clk/samsung/clk-s3c64xx.c |    4 ++--
->  4 files changed, 8 insertions(+), 8 deletions(-)
-> 
+Hi Krzysztof,
 
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-Best regards,
-Krzysztof
+On 2017-01-25 20:34, Krzysztof Kozlowski wrote:
+> The exynos-regs-pmu.h was never a complete list of PMU registers.  It
+> contained a lot of holes for registers which are not used.  However, a
+> lot of unused defines came with porting the code from vendor kernel.
+>
+> Few of defines were also duplicated.
+>
+> Remove them so the file will be slightly smaller.
+>
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+
+Thanks for the cleanup!
+
+If you are touching this, you may also want to unify multiple headers for
+the Exynos PMU regs:
+include/linux/soc/samsung/exynos-regs-pmu.h
+linux/mfd/syscon/exynos4-pmu.h
+linux/mfd/syscon/exynos5-pmu.h
+
+ > [...]
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
