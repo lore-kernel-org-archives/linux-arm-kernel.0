@@ -1,36 +1,110 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 26 Jan 2017 10:29:18 +0100
-Subject: [PATCH v3 REBASED 04/13] pinctrl: samsung: Document Exynos3250 SoC
- support
-In-Reply-To: <CACRpkdY_SpqfyTTqSP5+a1k1LDf_5w77UXo=EognmOzWBz2c-Q@mail.gmail.com>
+Date: Thu, 26 Jan 2017 10:29:21 +0100
+Subject: [PATCH v3 REBASED 07/13] pinctrl: samsung: Add missing initconst
+ annotation
+In-Reply-To: <1485422967-30643-1-git-send-email-m.szyprowski@samsung.com>
 References: <CACRpkdY_SpqfyTTqSP5+a1k1LDf_5w77UXo=EognmOzWBz2c-Q@mail.gmail.com>
- <CGME20170126092958eucas1p283f0ac46709ec4e72ecc6fc09735aade@eucas1p2.samsung.com>
-Message-ID: <1485422967-30643-1-git-send-email-m.szyprowski@samsung.com>
+ <1485422967-30643-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170126093000eucas1p249774814b7dd40bc6e90488fd2a11445@eucas1p2.samsung.com>
+Message-ID: <1485422967-30643-4-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing compatible id for Exynos3250 SoC to device tree docs.
-Exynos pin control driver supports it since commit d97f5b9804bfcdc1
-("pinctrl: exynos: Add driver data for Exynos3250").
+Exynos5433 support has been added in parallel to adding initconst
+annotation to most of the init data structures, so add those
+annotations also to Exynos5433 structures.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/pinctrl/samsung/pinctrl-exynos.c | 22 +++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
-index 1baf19eecabf..5e00a21de2bf 100644
---- a/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/samsung-pinctrl.txt
-@@ -13,6 +13,7 @@ Required Properties:
-   - "samsung,s3c2450-pinctrl": for S3C2450-compatible pin-controller,
-   - "samsung,s3c64xx-pinctrl": for S3C64xx-compatible pin-controller,
-   - "samsung,s5pv210-pinctrl": for S5PV210-compatible pin-controller,
-+  - "samsung,exynos3250-pinctrl": for Exynos3250 compatible pin-controller.
-   - "samsung,exynos4210-pinctrl": for Exynos4210 compatible pin-controller.
-   - "samsung,exynos4x12-pinctrl": for Exynos4x12 compatible pin-controller.
-   - "samsung,exynos5250-pinctrl": for Exynos5250 compatible pin-controller.
+diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
+index 37b48301661b..53baafdad51b 100644
+--- a/drivers/pinctrl/samsung/pinctrl-exynos.c
++++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
+@@ -1255,7 +1255,7 @@ static void exynos_pinctrl_resume(struct samsung_pinctrl_drv_data *drvdata)
+ };
+ 
+ /* pin banks of exynos5433 pin-controller - ALIVE */
+-static const struct samsung_pin_bank_data exynos5433_pin_banks0[] = {
++static const struct samsung_pin_bank_data exynos5433_pin_banks0[] __initconst = {
+ 	EXYNOS_PIN_BANK_EINTW(8, 0x000, "gpa0", 0x00),
+ 	EXYNOS_PIN_BANK_EINTW(8, 0x020, "gpa1", 0x04),
+ 	EXYNOS_PIN_BANK_EINTW(8, 0x040, "gpa2", 0x08),
+@@ -1268,28 +1268,28 @@ static void exynos_pinctrl_resume(struct samsung_pinctrl_drv_data *drvdata)
+ };
+ 
+ /* pin banks of exynos5433 pin-controller - AUD */
+-static const struct samsung_pin_bank_data exynos5433_pin_banks1[] = {
++static const struct samsung_pin_bank_data exynos5433_pin_banks1[] __initconst = {
+ 	EXYNOS_PIN_BANK_EINTG(7, 0x000, "gpz0", 0x00),
+ 	EXYNOS_PIN_BANK_EINTG(4, 0x020, "gpz1", 0x04),
+ };
+ 
+ /* pin banks of exynos5433 pin-controller - CPIF */
+-static const struct samsung_pin_bank_data exynos5433_pin_banks2[] = {
++static const struct samsung_pin_bank_data exynos5433_pin_banks2[] __initconst = {
+ 	EXYNOS_PIN_BANK_EINTG(2, 0x000, "gpv6", 0x00),
+ };
+ 
+ /* pin banks of exynos5433 pin-controller - eSE */
+-static const struct samsung_pin_bank_data exynos5433_pin_banks3[] = {
++static const struct samsung_pin_bank_data exynos5433_pin_banks3[] __initconst = {
+ 	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj2", 0x00),
+ };
+ 
+ /* pin banks of exynos5433 pin-controller - FINGER */
+-static const struct samsung_pin_bank_data exynos5433_pin_banks4[] = {
++static const struct samsung_pin_bank_data exynos5433_pin_banks4[] __initconst = {
+ 	EXYNOS_PIN_BANK_EINTG(4, 0x000, "gpd5", 0x00),
+ };
+ 
+ /* pin banks of exynos5433 pin-controller - FSYS */
+-static const struct samsung_pin_bank_data exynos5433_pin_banks5[] = {
++static const struct samsung_pin_bank_data exynos5433_pin_banks5[] __initconst = {
+ 	EXYNOS_PIN_BANK_EINTG(6, 0x000, "gph1", 0x00),
+ 	EXYNOS_PIN_BANK_EINTG(7, 0x020, "gpr4", 0x04),
+ 	EXYNOS_PIN_BANK_EINTG(5, 0x040, "gpr0", 0x08),
+@@ -1299,17 +1299,17 @@ static void exynos_pinctrl_resume(struct samsung_pinctrl_drv_data *drvdata)
+ };
+ 
+ /* pin banks of exynos5433 pin-controller - IMEM */
+-static const struct samsung_pin_bank_data exynos5433_pin_banks6[] = {
++static const struct samsung_pin_bank_data exynos5433_pin_banks6[] __initconst = {
+ 	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpf0", 0x00),
+ };
+ 
+ /* pin banks of exynos5433 pin-controller - NFC */
+-static const struct samsung_pin_bank_data exynos5433_pin_banks7[] = {
++static const struct samsung_pin_bank_data exynos5433_pin_banks7[] __initconst = {
+ 	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj0", 0x00),
+ };
+ 
+ /* pin banks of exynos5433 pin-controller - PERIC */
+-static const struct samsung_pin_bank_data exynos5433_pin_banks8[] = {
++static const struct samsung_pin_bank_data exynos5433_pin_banks8[] __initconst = {
+ 	EXYNOS_PIN_BANK_EINTG(6, 0x000, "gpv7", 0x00),
+ 	EXYNOS_PIN_BANK_EINTG(5, 0x020, "gpb0", 0x04),
+ 	EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpc0", 0x08),
+@@ -1330,7 +1330,7 @@ static void exynos_pinctrl_resume(struct samsung_pinctrl_drv_data *drvdata)
+ };
+ 
+ /* pin banks of exynos5433 pin-controller - TOUCH */
+-static const struct samsung_pin_bank_data exynos5433_pin_banks9[] = {
++static const struct samsung_pin_bank_data exynos5433_pin_banks9[] __initconst = {
+ 	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj1", 0x00),
+ };
+ 
+@@ -1338,7 +1338,7 @@ static void exynos_pinctrl_resume(struct samsung_pinctrl_drv_data *drvdata)
+  * Samsung pinctrl driver data for Exynos5433 SoC. Exynos5433 SoC includes
+  * ten gpio/pin-mux/pinconfig controllers.
+  */
+-const struct samsung_pin_ctrl exynos5433_pin_ctrl[] = {
++const struct samsung_pin_ctrl exynos5433_pin_ctrl[] __initconst = {
+ 	{
+ 		/* pin-controller instance 0 data */
+ 		.pin_banks	= exynos5433_pin_banks0,
 -- 
 1.9.1
