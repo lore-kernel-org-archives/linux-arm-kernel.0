@@ -1,69 +1,52 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 26 Jan 2017 10:05:53 +0100
-Subject: [PATCH v4 0/13] arm64: allwinner: a64: Enable MMC support
-Message-ID: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
+Date: Thu, 26 Jan 2017 10:05:54 +0100
+Subject: [PATCH v4 1/13] mmc: sunxi: Fix clock frequency change sequence
+In-Reply-To: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
+References: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <3093a9ddc7e4194a6d9082ad86cd1dcc2a304854.1485421557.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The SD specification documents that the clock frequency should only be
+changed once gated (Section 3.2.3 - SD Clock Frequency Change Sequence).
 
-Here is a new attempt at getting the MMC controllers running, following the
-work done by Andre.
+The current code first modifies the parent clock, gates it and then
+modifies the internal divider. This means that since the parent clock rate
+might be changed, the bus clock might be changed as well before it is
+gated, which breaks the specification.
 
-This has been tested on a board with one SDIO device (a Marvell WiFi chip)
-and a Kingston eMMC with 1.8V IOs.
+Move the gating before the parent rate modification.
 
-For SDIO, the HS DDR mode works just fine. That serie also enables the
-SDR104 mode to work on the devices that are capable of this.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/mmc/host/sunxi-mmc.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-For the eMMC, HS200 with the voltage switch works. HS400 doesn't at the
-moment, but since it's significantly more complex, and at the same time
-Allwinner recommends to limit its frequency to 100MHz, this doesn't have
-any benefits. If there's any at some point, this can be added later.
-
-Let me know what you think,
-Maxime
-
-Changes from v3:
-  - Reordered the MMC nodes
-  - Added the specification section the first commit log
-  - Supported mmc->actual_rate
-  - Clarified a bit what we (don't) know about DATA0
-
-Changes from v2:
-  - Enabled SDR104, limited the frequency to 150MHz. 200MHz was too high.
-  - Added more fixes to the gating and frequency rate change sequence
-  - Added one more patch to mask DATA0 when updating the clock that was
-    needed to get SDR104 to run
-  - Added the patches to enable it on a few boards done by Andre
-  - Amended the comments as suggested by Andre.
-  - Added some tags
-
-Andre Przywara (4):
-  arm64: allwinner: a64: Add MMC nodes
-  arm64: allwinner: pine64: add MMC support
-  arm64: allwinner: a64: add UART1 pin nodes
-  arm64: allwinner: add BananaPi-M64 support
-
-Maxime Ripard (9):
-  mmc: sunxi: Fix clock frequency change sequence
-  mmc: sunxi: Gate the clock when rate is 0
-  mmc: sunxi: Always set signal delay to 0 for A64
-  mmc: sunxi: Enable the new timings for the A64 MMC controllers
-  mmc: sunxi: Mask DATA0 when updating the clock
-  mmc: sunxi: Add EMMC (MMC2) controller compatible
-  mmc: sunxi: Add more debug informations
-  arm64: allwinner: a64: Add MMC pinctrl nodes
-  arm64: allwinner: a64: Increase the MMC max frequency
-
- arch/arm64/boot/dts/allwinner/Makefile                    |   1 +-
- arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 120 +++++++-
- arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts       |  20 +-
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi             |  77 ++++-
- drivers/mmc/host/sunxi-mmc.c                              | 114 ++++---
- 5 files changed, 289 insertions(+), 43 deletions(-)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-
-base-commit: bc34c1af0a280e27eafe3f86b9ad87fe0c9ea715
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index b1d1303389a7..ab4324e6eb74 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -761,6 +761,10 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+ 	u32 rval, clock = ios->clock;
+ 	int ret;
+ 
++	ret = sunxi_mmc_oclk_onoff(host, 0);
++	if (ret)
++		return ret;
++
+ 	/* 8 bit DDR requires a higher module clock */
+ 	if (ios->timing == MMC_TIMING_MMC_DDR52 &&
+ 	    ios->bus_width == MMC_BUS_WIDTH_8)
+@@ -783,10 +787,6 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+ 		return ret;
+ 	}
+ 
+-	ret = sunxi_mmc_oclk_onoff(host, 0);
+-	if (ret)
+-		return ret;
+-
+ 	/* clear internal divider */
+ 	rval = mmc_readl(host, REG_CLKCR);
+ 	rval &= ~0xff;
 -- 
 git-series 0.8.11
