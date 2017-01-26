@@ -1,63 +1,69 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 26 Jan 2017 10:06:03 +0100
-Subject: [PATCH v4 10/13] arm64: allwinner: a64: Increase the MMC max frequency
-In-Reply-To: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
-References: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <dee0dc8e1d98698231738b10fbe79cdf6d5e4c36.1485421557.git-series.maxime.ripard@free-electrons.com>
+Date: Thu, 26 Jan 2017 10:05:53 +0100
+Subject: [PATCH v4 0/13] arm64: allwinner: a64: Enable MMC support
+Message-ID: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The eMMC controller seem to have a maximum frequency of 200MHz, while the
-regular MMC controllers are capped at 150MHz.
+Hi,
 
-Since older SoCs cannot go that high, we cannot change the default maximum
-frequency, but fortunately for us we have a property for that in the DT.
+Here is a new attempt at getting the MMC controllers running, following the
+work done by Andre.
 
-This also has the side effect of allowing to use the MMC HS200 and SD
-SDR104 modes for the boards that support it (with either 1.2v or 1.8v IOs).
+This has been tested on a board with one SDIO device (a Marvell WiFi chip)
+and a Kingston eMMC with 1.8V IOs.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+For SDIO, the HS DDR mode works just fine. That serie also enables the
+SDR104 mode to work on the devices that are capable of this.
 
-arm64: allwinner: a64: Limit MMC0 and MMC1 rates to 150MHz
+For the eMMC, HS200 with the voltage switch works. HS400 doesn't at the
+moment, but since it's significantly more complex, and at the same time
+Allwinner recommends to limit its frequency to 100MHz, this doesn't have
+any benefits. If there's any at some point, this can be added later.
 
-Trying to set the bus to 200MHz on MMC1 when doing SDIO is failing.
-Allwinner sets the maximum for this bus to 150MHz, so enforce that limit.
+Let me know what you think,
+Maxime
 
-This hasn't been tested with MMC0, but the documented limit is the same,
-and I expect the behaviour to be the same.
+Changes from v3:
+  - Reordered the MMC nodes
+  - Added the specification section the first commit log
+  - Supported mmc->actual_rate
+  - Clarified a bit what we (don't) know about DATA0
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 3 +++
- 1 file changed, 3 insertions(+), 0 deletions(-)
+Changes from v2:
+  - Enabled SDR104, limited the frequency to 150MHz. 200MHz was too high.
+  - Added more fixes to the gating and frequency rate change sequence
+  - Added one more patch to mask DATA0 when updating the clock that was
+    needed to get SDR104 to run
+  - Added the patches to enable it on a few boards done by Andre
+  - Amended the comments as suggested by Andre.
+  - Added some tags
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 7b79c319ad3c..cb3e0cf2191a 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -130,6 +130,7 @@
- 			resets = <&ccu RST_BUS_MMC0>;
- 			reset-names = "ahb";
- 			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
-+			max-frequency = <150000000>;
- 			status = "disabled";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -143,6 +144,7 @@
- 			resets = <&ccu RST_BUS_MMC1>;
- 			reset-names = "ahb";
- 			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
-+			max-frequency = <150000000>;
- 			status = "disabled";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -156,6 +158,7 @@
- 			resets = <&ccu RST_BUS_MMC2>;
- 			reset-names = "ahb";
- 			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
-+			max-frequency = <200000000>;
- 			status = "disabled";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
+Andre Przywara (4):
+  arm64: allwinner: a64: Add MMC nodes
+  arm64: allwinner: pine64: add MMC support
+  arm64: allwinner: a64: add UART1 pin nodes
+  arm64: allwinner: add BananaPi-M64 support
+
+Maxime Ripard (9):
+  mmc: sunxi: Fix clock frequency change sequence
+  mmc: sunxi: Gate the clock when rate is 0
+  mmc: sunxi: Always set signal delay to 0 for A64
+  mmc: sunxi: Enable the new timings for the A64 MMC controllers
+  mmc: sunxi: Mask DATA0 when updating the clock
+  mmc: sunxi: Add EMMC (MMC2) controller compatible
+  mmc: sunxi: Add more debug informations
+  arm64: allwinner: a64: Add MMC pinctrl nodes
+  arm64: allwinner: a64: Increase the MMC max frequency
+
+ arch/arm64/boot/dts/allwinner/Makefile                    |   1 +-
+ arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 120 +++++++-
+ arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts       |  20 +-
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi             |  77 ++++-
+ drivers/mmc/host/sunxi-mmc.c                              | 114 ++++---
+ 5 files changed, 289 insertions(+), 43 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+
+base-commit: bc34c1af0a280e27eafe3f86b9ad87fe0c9ea715
 -- 
 git-series 0.8.11
