@@ -1,71 +1,63 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 26 Jan 2017 10:06:04 +0100
-Subject: [PATCH v4 11/13] arm64: allwinner: pine64: add MMC support
+Date: Thu, 26 Jan 2017 10:06:03 +0100
+Subject: [PATCH v4 10/13] arm64: allwinner: a64: Increase the MMC max frequency
 In-Reply-To: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
 References: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <b11557dbfbfa706605359ba334ffd13ba48946d8.1485421557.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <dee0dc8e1d98698231738b10fbe79cdf6d5e4c36.1485421557.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andre Przywara <andre.przywara@arm.com>
+The eMMC controller seem to have a maximum frequency of 200MHz, while the
+regular MMC controllers are capped at 150MHz.
 
-All Pine64 boards connect an micro-SD card slot to the first MMC
-controller.
-Enable the respective DT node and specify the (always-on) regulator
-and card-detect pin.
-As a micro-SD slot does not feature a write-protect switch, we disable
-this feature.
+Since older SoCs cannot go that high, we cannot change the default maximum
+frequency, but fortunately for us we have a property for that in the DT.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+This also has the side effect of allowing to use the MMC HS200 and SD
+SDR104 modes for the boards that support it (with either 1.2v or 1.8v IOs).
+
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+arm64: allwinner: a64: Limit MMC0 and MMC1 rates to 150MHz
+
+Trying to set the bus to 200MHz on MMC1 when doing SDIO is failing.
+Allwinner sets the maximum for this bus to 150MHz, so enforce that limit.
+
+This hasn't been tested with MMC0, but the documented limit is the same,
+and I expect the behaviour to be the same.
+
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 20 ++++++++++++++-
- 1 file changed, 20 insertions(+), 0 deletions(-)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 3 +++
+ 1 file changed, 3 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-index cf9105179bcb..c680ed385da3 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-@@ -44,6 +44,8 @@
- 
- #include "sun50i-a64.dtsi"
- 
-+#include <dt-bindings/gpio/gpio.h>
-+
- / {
- 	model = "Pine64";
- 	compatible = "pine64,pine64", "allwinner,sun50i-a64";
-@@ -55,6 +57,13 @@
- 	chosen {
- 		stdout-path = "serial0:115200n8";
- 	};
-+
-+	reg_vcc3v3: vcc3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
- };
- 
- &ehci1 {
-@@ -71,6 +80,17 @@
- 	bias-pull-up;
- };
- 
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
-+	cd-inverted;
-+	disable-wp;
-+	bus-width = <4>;
-+	status = "okay";
-+};
-+
- &ohci1 {
- 	status = "okay";
- };
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index 7b79c319ad3c..cb3e0cf2191a 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -130,6 +130,7 @@
+ 			resets = <&ccu RST_BUS_MMC0>;
+ 			reset-names = "ahb";
+ 			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
++			max-frequency = <150000000>;
+ 			status = "disabled";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -143,6 +144,7 @@
+ 			resets = <&ccu RST_BUS_MMC1>;
+ 			reset-names = "ahb";
+ 			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
++			max-frequency = <150000000>;
+ 			status = "disabled";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+@@ -156,6 +158,7 @@
+ 			resets = <&ccu RST_BUS_MMC2>;
+ 			reset-names = "ahb";
+ 			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
++			max-frequency = <200000000>;
+ 			status = "disabled";
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
 -- 
 git-series 0.8.11
