@@ -1,99 +1,77 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 26 Jan 2017 10:06:00 +0100
-Subject: [PATCH v4 7/13] mmc: sunxi: Add more debug informations
+Date: Thu, 26 Jan 2017 10:06:01 +0100
+Subject: [PATCH v4 8/13] arm64: allwinner: a64: Add MMC nodes
 In-Reply-To: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
 References: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <97cb930c7287da4db2948f2da8e69484dc7cc2e9.1485421557.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <a8a23bfa7d131a149c3cefb69737439aeb2572b5.1485421557.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a bit more debug messages that can be helpful when debugging the clock
-setup.
+From: Andre Przywara <andre.przywara@arm.com>
 
-Also fill the actual_clock field in struct mmc_host to report properly the
-current frequency in debugfs.
+The A64 has 3 MMC controllers, one of them being especially targeted to
+eMMC. Among other things, it has a data strobe signal and a 8 bits data
+width.
 
+The two other are more usual controllers that will have a 4 bits width at
+most and no data strobe signal, which limits it to more usual SD or MMC
+peripherals.
+
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/mmc/host/sunxi-mmc.c | 23 +++++++++++++++++++----
- 1 file changed, 19 insertions(+), 4 deletions(-)
+ arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 39 ++++++++++++++++++++-
+ 1 file changed, 39 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index f0f6922bca8a..6ffcd2838272 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -661,6 +661,9 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
- 	unsigned long expire = jiffies + msecs_to_jiffies(750);
- 	u32 rval;
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+index 99b6bb1e141c..d0ee7abe3b87 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+@@ -122,6 +122,45 @@
+ 		#size-cells = <1>;
+ 		ranges;
  
-+	dev_dbg(mmc_dev(host->mmc), "%sabling the clock\n",
-+		oclk_en ? "en" : "dis");
++		mmc0: mmc at 1c0f000 {
++			compatible = "allwinner,sun50i-a64-mmc";
++			reg = <0x01c0f000 0x1000>;
++			clocks = <&ccu CLK_BUS_MMC0>, <&ccu CLK_MMC0>;
++			clock-names = "ahb", "mmc";
++			resets = <&ccu RST_BUS_MMC0>;
++			reset-names = "ahb";
++			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
 +
- 	rval = mmc_readl(host, REG_CLKCR);
- 	rval &= ~(SDXC_CARD_CLOCK_ON | SDXC_LOW_POWER_ON | SDXC_MASK_DATA0);
- 
-@@ -737,6 +740,7 @@ static int sunxi_mmc_clk_set_phase(struct sunxi_mmc_host *host,
- 			index = SDXC_CLK_50M_DDR;
- 		}
- 	} else {
-+		dev_dbg(mmc_dev(host->mmc), "Invalid clock... returning\n");
- 		return -EINVAL;
- 	}
- 
-@@ -749,6 +753,7 @@ static int sunxi_mmc_clk_set_phase(struct sunxi_mmc_host *host,
- static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 				  struct mmc_ios *ios)
- {
-+	struct mmc_host *mmc = host->mmc;
- 	long rate;
- 	u32 rval, clock = ios->clock;
- 	int ret;
-@@ -757,6 +762,9 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 	if (ret)
- 		return ret;
- 
-+	/* Our clock is gated now */
-+	mmc->actual_clock = 0;
++		mmc1: mmc at 1c10000 {
++			compatible = "allwinner,sun50i-a64-mmc";
++			reg = <0x01c10000 0x1000>;
++			clocks = <&ccu CLK_BUS_MMC1>, <&ccu CLK_MMC1>;
++			clock-names = "ahb", "mmc";
++			resets = <&ccu RST_BUS_MMC1>;
++			reset-names = "ahb";
++			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
 +
- 	if (!ios->clock)
- 		return 0;
- 
-@@ -767,17 +775,17 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 
- 	rate = clk_round_rate(host->clk_mmc, clock);
- 	if (rate < 0) {
--		dev_err(mmc_dev(host->mmc), "error rounding clk to %d: %ld\n",
-+		dev_err(mmc_dev(mmc), "error rounding clk to %d: %ld\n",
- 			clock, rate);
- 		return rate;
- 	}
--	dev_dbg(mmc_dev(host->mmc), "setting clk to %d, rounded %ld\n",
-+	dev_dbg(mmc_dev(mmc), "setting clk to %d, rounded %ld\n",
- 		clock, rate);
- 
- 	/* setting clock rate */
- 	ret = clk_set_rate(host->clk_mmc, rate);
- 	if (ret) {
--		dev_err(mmc_dev(host->mmc), "error setting clk to %ld: %d\n",
-+		dev_err(mmc_dev(mmc), "error setting clk to %ld: %d\n",
- 			rate, ret);
- 		return ret;
- 	}
-@@ -812,7 +820,14 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 	 * least on the A64).
- 	 */
- 
--	return sunxi_mmc_oclk_onoff(host, 1);
-+	ret = sunxi_mmc_oclk_onoff(host, 1);
-+	if (ret)
-+		return ret;
++		mmc2: mmc at 1c11000 {
++			compatible = "allwinner,sun50i-a64-emmc";
++			reg = <0x01c11000 0x1000>;
++			clocks = <&ccu CLK_BUS_MMC2>, <&ccu CLK_MMC2>;
++			clock-names = "ahb", "mmc";
++			resets = <&ccu RST_BUS_MMC2>;
++			reset-names = "ahb";
++			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
++			status = "disabled";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
 +
-+	/* And we just enabled our clock back */
-+	mmc->actual_clock = rate;
-+
-+	return 0;
- }
- 
- static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 		usb_otg: usb at 01c19000 {
+ 			compatible = "allwinner,sun8i-a33-musb";
+ 			reg = <0x01c19000 0x0400>;
 -- 
 git-series 0.8.11
