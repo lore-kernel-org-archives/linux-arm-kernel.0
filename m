@@ -1,222 +1,77 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Thu, 26 Jan 2017 17:07:47 +0100
-Subject: [PATCH v3 02/12] crypto: atmel-sha: update request queue management
- to make it more generic
-In-Reply-To: <cover.1485443478.git.cyrille.pitchen@atmel.com>
-References: <cover.1485443478.git.cyrille.pitchen@atmel.com>
-Message-ID: <d77b7be8a15e66da87e294a62549b21854c97e02.1485443478.git.cyrille.pitchen@atmel.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Fri, 27 Jan 2017 00:21:53 +0800
+Subject: [PATCH 1/2] spi: When no dma_chan map buffers with spi_master's
+ parent
+Message-ID: <20170126162154.124287-1-djkurtz@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is a transitional patch. It splits the atmel_sha_handle_queue()
-function. Now atmel_sha_handle_queue() only manages the request queue and
-calls a new .start() hook from the atmel_sha_ctx structure.
-This hook allows to implement different kind of requests still handled by
-a single queue.
+Back before commit 1dccb598df54 ("arm64: simplify dma_get_ops"), for
+arm64, devices for which dma_ops were not explicitly set were automatically
+configured to use swiotlb_dma_ops, since this was hard-coded as the
+global "dma_ops" in arm64_dma_init().
 
-Also when the req parameter of atmel_sha_handle_queue() refers to the very
-same request as the one returned by crypto_dequeue_request(), the queue
-management now gives a chance to this crypto request to be handled
-synchronously, hence reducing latencies. The .start() hook returns 0 if
-the crypto request was handled synchronously and -EINPROGRESS if the
-crypto request still need to be handled asynchronously.
+Now that global "dma_ops" has been removed, all devices much have their
+dma_ops explicitly set by a call to arch_setup_dma_ops(), otherwise the
+device is assigned dummy_dma_ops, and thus calls to map_sg for such a
+device will fail (return 0).
 
-Besides, the new .is_async member of the atmel_sha_dev structure helps
-tagging this asynchronous state. Indeed, the req->base.complete() callback
-should not be called if the crypto request is handled synchronously.
+Mediatek SPI uses DMA but does not use a dma channel.  Support for this
+was added by commit c37f45b5f1cd ("spi: support spi without dma channel
+to use can_dma()"), which uses the master_spi dev to DMA map buffers.
 
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+The master_spi device is not a platform device, rather it is created
+in spi_alloc_device(), and therefore its dma_ops are never set.
+
+Therefore, when the mediatek SPI driver when it does DMA (for large SPI
+transactions > 32 bytes), SPI will use spi_map_buf()->dma_map_sg() to
+map the buffer for use in DMA.  But dma_map_sg()->dma_map_sg_attrs() returns
+0, because ops->map_sg is dummy_dma_ops->__dummy_map_sg, and hence
+spi_map_buf() returns -ENOMEM (-12).
+
+Fix this by using the real spi_master's parent device which should be a
+real physical device with DMA properties.
+
+Signed-off-by: Daniel Kurtz <djkurtz@chromium.org>
+Fixes: c37f45b5f1cd ("spi: support spi without dma channel to use can_dma()")
+Cc: Leilk Liu <leilk.liu@mediatek.com>
 ---
- drivers/crypto/atmel-sha.c | 74 +++++++++++++++++++++++++++++++++-------------
- 1 file changed, 54 insertions(+), 20 deletions(-)
+ drivers/spi/spi.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/crypto/atmel-sha.c b/drivers/crypto/atmel-sha.c
-index 33a36e667547..2dbed8bb8d26 100644
---- a/drivers/crypto/atmel-sha.c
-+++ b/drivers/crypto/atmel-sha.c
-@@ -105,8 +105,11 @@ struct atmel_sha_reqctx {
- 	u8 buffer[SHA_BUFFER_LEN + SHA512_BLOCK_SIZE] __aligned(sizeof(u32));
- };
+diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
+index 656dd3e3220c..f4d412e48e1c 100644
+--- a/drivers/spi/spi.c
++++ b/drivers/spi/spi.c
+@@ -805,12 +805,12 @@ static int __spi_map_msg(struct spi_master *master, struct spi_message *msg)
+ 	if (master->dma_tx)
+ 		tx_dev = master->dma_tx->device->dev;
+ 	else
+-		tx_dev = &master->dev;
++		tx_dev = master->dev.parent;
  
-+typedef int (*atmel_sha_fn_t)(struct atmel_sha_dev *);
-+
- struct atmel_sha_ctx {
- 	struct atmel_sha_dev	*dd;
-+	atmel_sha_fn_t		start;
+ 	if (master->dma_rx)
+ 		rx_dev = master->dma_rx->device->dev;
+ 	else
+-		rx_dev = &master->dev;
++		rx_dev = master->dev.parent;
  
- 	unsigned long		flags;
- };
-@@ -134,6 +137,7 @@ struct atmel_sha_dev {
- 	unsigned long		flags;
- 	struct crypto_queue	queue;
- 	struct ahash_request	*req;
-+	bool			is_async;
+ 	list_for_each_entry(xfer, &msg->transfers, transfer_list) {
+ 		if (!master->can_dma(master, msg->spi, xfer))
+@@ -852,12 +852,12 @@ static int __spi_unmap_msg(struct spi_master *master, struct spi_message *msg)
+ 	if (master->dma_tx)
+ 		tx_dev = master->dma_tx->device->dev;
+ 	else
+-		tx_dev = &master->dev;
++		tx_dev = master->dev.parent;
  
- 	struct atmel_sha_dma	dma_lch_in;
+ 	if (master->dma_rx)
+ 		rx_dev = master->dma_rx->device->dev;
+ 	else
+-		rx_dev = &master->dev;
++		rx_dev = master->dev.parent;
  
-@@ -163,6 +167,24 @@ static inline void atmel_sha_write(struct atmel_sha_dev *dd,
- 	writel_relaxed(value, dd->io_base + offset);
- }
- 
-+static inline int atmel_sha_complete(struct atmel_sha_dev *dd, int err)
-+{
-+	struct ahash_request *req = dd->req;
-+
-+	dd->flags &= ~(SHA_FLAGS_BUSY | SHA_FLAGS_FINAL | SHA_FLAGS_CPU |
-+		       SHA_FLAGS_DMA_READY | SHA_FLAGS_OUTPUT_READY);
-+
-+	clk_disable(dd->iclk);
-+
-+	if (dd->is_async && req->base.complete)
-+		req->base.complete(&req->base, err);
-+
-+	/* handle new request */
-+	tasklet_schedule(&dd->queue_task);
-+
-+	return err;
-+}
-+
- static size_t atmel_sha_append_sg(struct atmel_sha_reqctx *ctx)
- {
- 	size_t count;
-@@ -474,6 +496,8 @@ static void atmel_sha_dma_callback(void *data)
- {
- 	struct atmel_sha_dev *dd = data;
- 
-+	dd->is_async = true;
-+
- 	/* dma_lch_in - completed - wait DATRDY */
- 	atmel_sha_write(dd, SHA_IER, SHA_INT_DATARDY);
- }
-@@ -509,7 +533,7 @@ static int atmel_sha_xmit_dma(struct atmel_sha_dev *dd, dma_addr_t dma_addr1,
- 			DMA_MEM_TO_DEV, DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
- 	}
- 	if (!in_desc)
--		return -EINVAL;
-+		atmel_sha_complete(dd, -EINVAL);
- 
- 	in_desc->callback = atmel_sha_dma_callback;
- 	in_desc->callback_param = dd;
-@@ -566,7 +590,7 @@ static int atmel_sha_xmit_dma_map(struct atmel_sha_dev *dd,
- 	if (dma_mapping_error(dd->dev, ctx->dma_addr)) {
- 		dev_err(dd->dev, "dma %u bytes error\n", ctx->buflen +
- 				ctx->block_size);
--		return -EINVAL;
-+		atmel_sha_complete(dd, -EINVAL);
- 	}
- 
- 	ctx->flags &= ~SHA_FLAGS_SG;
-@@ -657,7 +681,7 @@ static int atmel_sha_update_dma_start(struct atmel_sha_dev *dd)
- 		if (dma_mapping_error(dd->dev, ctx->dma_addr)) {
- 			dev_err(dd->dev, "dma %u bytes error\n",
- 				ctx->buflen + ctx->block_size);
--			return -EINVAL;
-+			atmel_sha_complete(dd, -EINVAL);
- 		}
- 
- 		if (length == 0) {
-@@ -671,7 +695,7 @@ static int atmel_sha_update_dma_start(struct atmel_sha_dev *dd)
- 			if (!dma_map_sg(dd->dev, ctx->sg, 1,
- 				DMA_TO_DEVICE)) {
- 					dev_err(dd->dev, "dma_map_sg  error\n");
--					return -EINVAL;
-+					atmel_sha_complete(dd, -EINVAL);
- 			}
- 
- 			ctx->flags |= SHA_FLAGS_SG;
-@@ -685,7 +709,7 @@ static int atmel_sha_update_dma_start(struct atmel_sha_dev *dd)
- 
- 	if (!dma_map_sg(dd->dev, ctx->sg, 1, DMA_TO_DEVICE)) {
- 		dev_err(dd->dev, "dma_map_sg  error\n");
--		return -EINVAL;
-+		atmel_sha_complete(dd, -EINVAL);
- 	}
- 
- 	ctx->flags |= SHA_FLAGS_SG;
-@@ -843,16 +867,7 @@ static void atmel_sha_finish_req(struct ahash_request *req, int err)
- 	}
- 
- 	/* atomic operation is not needed here */
--	dd->flags &= ~(SHA_FLAGS_BUSY | SHA_FLAGS_FINAL | SHA_FLAGS_CPU |
--			SHA_FLAGS_DMA_READY | SHA_FLAGS_OUTPUT_READY);
--
--	clk_disable(dd->iclk);
--
--	if (req->base.complete)
--		req->base.complete(&req->base, err);
--
--	/* handle new request */
--	tasklet_schedule(&dd->queue_task);
-+	(void)atmel_sha_complete(dd, err);
- }
- 
- static int atmel_sha_hw_init(struct atmel_sha_dev *dd)
-@@ -893,8 +908,9 @@ static int atmel_sha_handle_queue(struct atmel_sha_dev *dd,
- 				  struct ahash_request *req)
- {
- 	struct crypto_async_request *async_req, *backlog;
--	struct atmel_sha_reqctx *ctx;
-+	struct atmel_sha_ctx *ctx;
- 	unsigned long flags;
-+	bool start_async;
- 	int err = 0, ret = 0;
- 
- 	spin_lock_irqsave(&dd->lock, flags);
-@@ -919,9 +935,22 @@ static int atmel_sha_handle_queue(struct atmel_sha_dev *dd,
- 	if (backlog)
- 		backlog->complete(backlog, -EINPROGRESS);
- 
--	req = ahash_request_cast(async_req);
--	dd->req = req;
--	ctx = ahash_request_ctx(req);
-+	ctx = crypto_tfm_ctx(async_req->tfm);
-+
-+	dd->req = ahash_request_cast(async_req);
-+	start_async = (dd->req != req);
-+	dd->is_async = start_async;
-+
-+	/* WARNING: ctx->start() MAY change dd->is_async. */
-+	err = ctx->start(dd);
-+	return (start_async) ? ret : err;
-+}
-+
-+static int atmel_sha_start(struct atmel_sha_dev *dd)
-+{
-+	struct ahash_request *req = dd->req;
-+	struct atmel_sha_reqctx *ctx = ahash_request_ctx(req);
-+	int err;
- 
- 	dev_dbg(dd->dev, "handling new req, op: %lu, nbytes: %d\n",
- 						ctx->op, req->nbytes);
-@@ -947,7 +976,7 @@ static int atmel_sha_handle_queue(struct atmel_sha_dev *dd,
- 
- 	dev_dbg(dd->dev, "exit, err: %d\n", err);
- 
--	return ret;
-+	return err;
- }
- 
- static int atmel_sha_enqueue(struct ahash_request *req, unsigned int op)
-@@ -1043,8 +1072,11 @@ static int atmel_sha_import(struct ahash_request *req, const void *in)
- 
- static int atmel_sha_cra_init(struct crypto_tfm *tfm)
- {
-+	struct atmel_sha_ctx *ctx = crypto_tfm_ctx(tfm);
-+
- 	crypto_ahash_set_reqsize(__crypto_ahash_cast(tfm),
- 				 sizeof(struct atmel_sha_reqctx));
-+	ctx->start = atmel_sha_start;
- 
- 	return 0;
- }
-@@ -1188,6 +1220,8 @@ static void atmel_sha_done_task(unsigned long data)
- 	struct atmel_sha_dev *dd = (struct atmel_sha_dev *)data;
- 	int err = 0;
- 
-+	dd->is_async = true;
-+
- 	if (SHA_FLAGS_CPU & dd->flags) {
- 		if (SHA_FLAGS_OUTPUT_READY & dd->flags) {
- 			dd->flags &= ~SHA_FLAGS_OUTPUT_READY;
+ 	list_for_each_entry(xfer, &msg->transfers, transfer_list) {
+ 		if (!master->can_dma(master, msg->spi, xfer))
 -- 
-2.7.4
+2.11.0.483.g087da7b7c-goog
