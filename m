@@ -1,26 +1,36 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Thu, 26 Jan 2017 18:03:30 +0100
-Subject: [PATCH 1/5] iommu/arm-smmu: Restrict domain attributes to
- UNMANAGED domains
-In-Reply-To: <1484849955-1871-2-git-send-email-will.deacon@arm.com>
-References: <1484849955-1871-1-git-send-email-will.deacon@arm.com>
- <1484849955-1871-2-git-send-email-will.deacon@arm.com>
-Message-ID: <20170126170329.GB27598@8bytes.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 26 Jan 2017 17:04:48 +0000
+Subject: [PATCH] arm64: skip register_cpufreq_notifier on ACPI-based
+ systems
+In-Reply-To: <bbc37634-f087-feef-dacd-77c5adb9ed04@codeaurora.org>
+References: <1485304992-26888-1-git-send-email-pprakash@codeaurora.org>
+ <20170125120306.GC8093@e106622-lin>
+ <bbc37634-f087-feef-dacd-77c5adb9ed04@codeaurora.org>
+Message-ID: <20170126170447.GE25871@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 06:19:11PM +0000, Will Deacon wrote:
-> The ARM SMMU drivers provide a DOMAIN_ATTR_NESTING domain attribute,
-> which allows callers of the IOMMU API to request that the page table
-> for a domain is installed at stage-2, if supported by the hardware.
+On Wed, Jan 25, 2017 at 10:49:36AM -0500, Christopher Covington wrote:
+
+> Are you testing on QEMU or Fast Models? I was under the impression that the
+> former had ACPI support. For the latter, wouldn't it be nice to have ACPI
+> support in the bootwrapper.
+
+One goal of the boot wrapper is to be as simple as reasonably possible.
+ACPI support in the boot wrapper would be far from trivial, at minimum
+requiring EFI support (requiring either a whole reimplementation, or
+work to make EDK2 run atop of the boot wrapper).
+
+Given that it is already possible to use ARM Trusted Firmware and EDK2
+in a model environment, and this can already be used to handover ACPI
+tables, one would be served better by those.
+
+> Out of curiosity, is Mark's bootwrapper repository on kernel.org the
+> best one to use these days?
 > 
-> Since setting this attribute only makes sense for UNMANAGED domains,
-> this patch returns -ENODEV if the domain_{get,set}_attr operations are
-> called on other domain types.
+> http://git.kernel.org/cgit/linux/kernel/git/mark/boot-wrapper-aarch64.git/
 
-Isn't -EINVAL more suitable here? In the end the domain passed in is
-invalid because it does not support attributes, no?
+That is the canonical repo these days, yes.
 
-
-
-	Joerg
+Thanks,
+Mark.
