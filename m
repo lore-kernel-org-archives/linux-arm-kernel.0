@@ -1,53 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 26 Jan 2017 11:20:37 +0100
-Subject: [PATCH v3 11/13] pinctrl: samsung: Move retention control from
- mach-exynos to the pinctrl driver
-In-Reply-To: <CACRpkdapMKpsGVbbvJvXBtYGJCANYUOqMox=083+Lf6LkApmTw@mail.gmail.com>
-References: <CGME20170119134909eucas1p11a7638a4b9bf69b00458189ba9c1bb90@eucas1p1.samsung.com>
- <2d9ad2d4-c2f8-ef6b-2504-1337db0da178@samsung.com>
- <CACRpkdapMKpsGVbbvJvXBtYGJCANYUOqMox=083+Lf6LkApmTw@mail.gmail.com>
-Message-ID: <4644060.byZRaiX1kn@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 26 Jan 2017 11:21:45 +0100
+Subject: [PATCH 09/11] ARM: dts: sunxi: Remove no longer used
+ pinctrl/sun4i-a10.h header
+In-Reply-To: <20170124023230.3990-10-wens@csie.org>
+References: <20170124023230.3990-1-wens@csie.org>
+ <20170124023230.3990-10-wens@csie.org>
+Message-ID: <20170126102145.35dfx6q6lpxdt72c@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, January 26, 2017 10:46:25 AM CET Linus Walleij wrote:
-> On Thu, Jan 26, 2017 at 10:13 AM, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
-> > On 2017-01-26 10:10, Linus Walleij wrote:
-> >> On Thu, Jan 19, 2017 at 2:48 PM, Marek Szyprowski
-> >> <m.szyprowski@samsung.com> wrote:
-> >>>
-> >>> This patch moves pad retention control from PMU driver to Exynos pin
-> >>> controller driver. This helps to avoid possible ordering and logical
-> >>> dependencies between machine, PMU and pin control code. Till now it
-> >>> worked fine only because sys_ops for PMU and pin controller were called
-> >>> in registration order.
-> >>> This is also a preparation for adding new features to Exynos pin
-> >>> controller driver, like runtime power management and suspending
-> >>> individual pin controllers, which might be a part of some power domain.
-> >>>
-> >>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> >>> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
-> >>> Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
-> >>> ---
-> >>>   arch/arm/mach-exynos/suspend.c           |  64 --------------
-> >>>   drivers/pinctrl/samsung/pinctrl-exynos.c | 145
-> >>> +++++++++++++++++++++++++++++++
-> >>
-> >> This makes all kind of sense, but I would ideally like an ACK
-> >> from the ARM SoC maintainer(s): Arnd, Olof, are you OK with
-> >> this?
-
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-> > Isn't enough to have Krzysztof's (Exynos SoC maintainer) 'reviewed-by' tag?
-> > I assume that 'reviewed-by' also includes 'acked-by'.
+On Tue, Jan 24, 2017 at 10:32:28AM +0800, Chen-Yu Tsai wrote:
+> All dts files for the sunxi platform have been switched to the generic
+> pinconf bindings. As a result, the sunxi specific pinctrl macros are
+> no longer used.
 > 
-> If the SoC maintainers are too stressed to answer in reasonable time
-> or I just get randomly bored of waiting yes, I usually apply it anyway.
+> Remove the #include entry with the following command:
 > 
-> Just want to give them a heads-up essentially.
+>     sed -i -e '/pinctrl\/sun4i-a10.h/D' arch/arm/boot/dts/sun?i*.*
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Agreed, that is a reasonable strategy.
+Applied, thanks
 
-	Arnd
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170126/0f4f6fe6/attachment-0001.sig>
