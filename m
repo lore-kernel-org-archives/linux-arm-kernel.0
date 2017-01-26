@@ -1,47 +1,79 @@
-From: hkallweit1@gmail.com (Heiner Kallweit)
-Date: Thu, 26 Jan 2017 23:12:38 +0100
-Subject: [PATCH] mmc: meson-gx: add support for HS400 mode
-Message-ID: <f7f325ec-6099-7f51-5bb4-24ac24073ee7@gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 26 Jan 2017 17:51:32 -0500
+Subject: [PATCH] PCI/ASPM: reconfigure ASPM following hotplug
+Message-ID: <1485471092-16906-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for HS400 mode.
+When the operating system is booted with the default ASPM policy,
+the current code is determining the ASPM policy by querying the
+enable/disable states from ASPM registers.
 
-Successfully tested on a Odroid C2 (S905 GXBB).
+In the case of hotplug removal, the ASPM registers get cleared by
+calling the exit function.
 
-Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
+An insertion following remove reads incorrect policy as disabled
+even though ASPM was enabled during boot.
+
+Adding a flag to the struct pci_dev and saving the power up policy
+in the bridge to be reused during hotplug insertion. Bridge's enable
+counter is used as a switch to determine when to use saved value.
+
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/mmc/host/meson-gx-mmc.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ drivers/pci/pcie/aspm.c | 13 ++++++++++---
+ include/linux/pci.h     |  1 +
+ 2 files changed, 11 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
-index 030425be..be45d57d 100644
---- a/drivers/mmc/host/meson-gx-mmc.c
-+++ b/drivers/mmc/host/meson-gx-mmc.c
-@@ -83,6 +83,7 @@
- #define   CFG_RC_CC_MASK 0xf
- #define   CFG_STOP_CLOCK BIT(22)
- #define   CFG_CLK_ALWAYS_ON BIT(18)
-+#define   CFG_CHK_DS BIT(20)
- #define   CFG_AUTO_CLK BIT(23)
+diff --git a/drivers/pci/pcie/aspm.c b/drivers/pci/pcie/aspm.c
+index 17ac1dc..32b8a86 100644
+--- a/drivers/pci/pcie/aspm.c
++++ b/drivers/pci/pcie/aspm.c
+@@ -338,7 +338,9 @@ static void pcie_aspm_check_latency(struct pci_dev *endpoint)
+ 	}
+ }
  
- #define SD_EMMC_STATUS 0x48
-@@ -412,6 +413,16 @@ static void meson_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 	val &= ~(CFG_RC_CC_MASK << CFG_RC_CC_SHIFT);
- 	val |= ilog2(SD_EMMC_CFG_CMD_GAP) << CFG_RC_CC_SHIFT;
+-static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
++static
++void pcie_aspm_cap_init(struct pci_dev *pdev, struct pcie_link_state *link,
++			int blacklist)
+ {
+ 	struct pci_dev *child, *parent = link->pdev;
+ 	struct pci_bus *linkbus = parent->subordinate;
+@@ -398,7 +400,12 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
+ 	link->latency_dw.l1 = calc_l1_latency(dwreg.latency_encoding_l1);
  
-+	val &= ~CFG_DDR;
-+	if (ios->timing == MMC_TIMING_UHS_DDR50 ||
-+	    ios->timing == MMC_TIMING_MMC_DDR52 ||
-+	    ios->timing == MMC_TIMING_MMC_HS400)
-+		val |= CFG_DDR;
-+
-+	val &= ~CFG_CHK_DS;
-+	if (ios->timing == MMC_TIMING_MMC_HS400)
-+		val |= CFG_CHK_DS;
-+
- 	writel(val, host->regs + SD_EMMC_CFG);
+ 	/* Save default state */
+-	link->aspm_default = link->aspm_enabled;
++	if (!atomic_read(&pdev->enable_cnt)) {
++		link->aspm_default = link->aspm_enabled;
++		pdev->aspm_default = link->aspm_default;
++	} else {
++		link->aspm_default = pdev->aspm_default;
++	}
  
- 	if (val != orig)
+ 	/* Setup initial capable state. Will be updated later */
+ 	link->aspm_capable = link->aspm_support;
+@@ -599,7 +606,7 @@ void pcie_aspm_init_link_state(struct pci_dev *pdev)
+ 	 * upstream links also because capable state of them can be
+ 	 * update through pcie_aspm_cap_init().
+ 	 */
+-	pcie_aspm_cap_init(link, blacklist);
++	pcie_aspm_cap_init(pdev, link, blacklist);
+ 
+ 	/* Setup initial Clock PM state */
+ 	pcie_clkpm_cap_init(link, blacklist);
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index e2d1a12..d0ecde6 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -316,6 +316,7 @@ struct pci_dev {
+ 	unsigned int	hotplug_user_indicators:1; /* SlotCtl indicators
+ 						      controlled exclusively by
+ 						      user sysfs */
++	unsigned int	aspm_default;	/* aspm policy set by BIOS */
+ 	unsigned int	d3_delay;	/* D3->D0 transition time in ms */
+ 	unsigned int	d3cold_delay;	/* D3cold->D0 transition time in ms */
+ 
 -- 
-2.11.0
+1.9.1
