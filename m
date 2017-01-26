@@ -1,142 +1,46 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 26 Jan 2017 08:47:05 +0900
-Subject: [PATCH v2] clk: samsung: mark s3c...._clk_sleep_init() as __init
-In-Reply-To: <1485380545-24815-1-git-send-email-martin@kaiser.cx>
-References: <1485293599-23581-1-git-send-email-martin@kaiser.cx>
- <CGME20170125214354epcas3p2715bf71d3c8d56aefe881f95fb4aef1d@epcas3p2.samsung.com>
- <1485380545-24815-1-git-send-email-martin@kaiser.cx>
-Message-ID: <588938F9.9070907@samsung.com>
+From: jonathan.richardson@broadcom.com (Jonathan Richardson)
+Date: Wed, 25 Jan 2017 16:26:58 -0800
+Subject: [PATCH v3 0/4] Add support for Broadcom iProc mailbox controller
+Message-ID: <1485390422-3984-1-git-send-email-jonathan.richardson@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Martin,
+This patch set contains mailbox support for Broadcom iProc based SoC's. The
+mailbox controller handles all communication with a Cortex-M0 MCU processor that
+provides support for power, clock, and reset management.
 
-The v2 patch is missing my reviewed-by tag[1].
-[1] https://patchwork.kernel.org/patch/9535993/
+The patch set enables the mailbox controller for Cygnus and also interrupt
+support for the Cygnus CRMU GPIO driver which requires use of the M0 processor.
 
-Again, I add my reviewed-by tag.
+Changes from v2:
+ - Fixed binding to remove leading 0 (Rob's comment). Also added more detail as
+   suggested by Jassi.
+ - Added changelog to dt binding and enable dts commits.
+ - Changed year in copyright in bcm_iproc_mailbox.h.
+ - Changes to bcm-cygnus.dtsi were prematurely merged into the mainline after
+   Rob acked the DT changes but Jassi suggested changes to the mailbox driver.
+   The result was that the mailbox controller node and changes to the crmu gpio
+   driver to enable interrupt handling were incorrectly added to the dtsi. A
+   commit is included in this patchset to revert those changes. Enabling
+   interrupt handling in the the crmu gpio driver will be introduced when the
+   interrupt controller driver is added to provide mailbox interrupt support.
 
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+Jonathan Richardson (4):
+  dt-bindings: Document Broadcom iProc mailbox controller driver
+  mailbox: Add iProc mailbox controller driver
+  ARM: dts: Remove Broadcom iProc mailbox controller node
+  ARM: dts: Enable Broadcom iProc mailbox controller
 
-
-On 2017? 01? 26? 06:42, martin at kaiser.cx wrote:
-> From: Martin Kaiser <martin@kaiser.cx>
-> 
-> These functions are referencing s3c...._clk_regs[], which are marked as
-> __initdata. When compiling with CONFIG_DEBUG_SECTION_MISMATCH=y, this
-> produces warnings like
-> 
-> WARNING: vmlinux.o(.text+0x198350):
-> Section mismatch in reference from the function s3c2410_clk_sleep_init()
-> to the (unknown reference) .init.data:(unknown)
-> 
-> Mark the s3c...._clk_sleep_init() functions as __init in
-> order to fix this.
-> 
-> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
-> ---
-> v2:
-> Fix the commit message, describe what the problem really is.
-> (Thanks, Krzysztof)
-> 
->  drivers/clk/samsung/clk-s3c2410.c |    4 ++--
->  drivers/clk/samsung/clk-s3c2412.c |    4 ++--
->  drivers/clk/samsung/clk-s3c2443.c |    4 ++--
->  drivers/clk/samsung/clk-s3c64xx.c |    4 ++--
->  4 files changed, 8 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/clk/samsung/clk-s3c2410.c b/drivers/clk/samsung/clk-s3c2410.c
-> index d7a1e77..e0650c3 100644
-> --- a/drivers/clk/samsung/clk-s3c2410.c
-> +++ b/drivers/clk/samsung/clk-s3c2410.c
-> @@ -76,7 +76,7 @@ static void s3c2410_clk_resume(void)
->  	.resume = s3c2410_clk_resume,
->  };
->  
-> -static void s3c2410_clk_sleep_init(void)
-> +static void __init s3c2410_clk_sleep_init(void)
->  {
->  	s3c2410_save = samsung_clk_alloc_reg_dump(s3c2410_clk_regs,
->  						ARRAY_SIZE(s3c2410_clk_regs));
-> @@ -90,7 +90,7 @@ static void s3c2410_clk_sleep_init(void)
->  	return;
->  }
->  #else
-> -static void s3c2410_clk_sleep_init(void) {}
-> +static void __init s3c2410_clk_sleep_init(void) {}
->  #endif
->  
->  PNAME(fclk_p) = { "mpll", "div_slow" };
-> diff --git a/drivers/clk/samsung/clk-s3c2412.c b/drivers/clk/samsung/clk-s3c2412.c
-> index ec873ee..b8340a4 100644
-> --- a/drivers/clk/samsung/clk-s3c2412.c
-> +++ b/drivers/clk/samsung/clk-s3c2412.c
-> @@ -69,7 +69,7 @@ static void s3c2412_clk_resume(void)
->  	.resume = s3c2412_clk_resume,
->  };
->  
-> -static void s3c2412_clk_sleep_init(void)
-> +static void __init s3c2412_clk_sleep_init(void)
->  {
->  	s3c2412_save = samsung_clk_alloc_reg_dump(s3c2412_clk_regs,
->  						ARRAY_SIZE(s3c2412_clk_regs));
-> @@ -83,7 +83,7 @@ static void s3c2412_clk_sleep_init(void)
->  	return;
->  }
->  #else
-> -static void s3c2412_clk_sleep_init(void) {}
-> +static void __init s3c2412_clk_sleep_init(void) {}
->  #endif
->  
->  static struct clk_div_table divxti_d[] = {
-> diff --git a/drivers/clk/samsung/clk-s3c2443.c b/drivers/clk/samsung/clk-s3c2443.c
-> index 5e24a17..abb935c 100644
-> --- a/drivers/clk/samsung/clk-s3c2443.c
-> +++ b/drivers/clk/samsung/clk-s3c2443.c
-> @@ -89,7 +89,7 @@ static void s3c2443_clk_resume(void)
->  	.resume = s3c2443_clk_resume,
->  };
->  
-> -static void s3c2443_clk_sleep_init(void)
-> +static void __init s3c2443_clk_sleep_init(void)
->  {
->  	s3c2443_save = samsung_clk_alloc_reg_dump(s3c2443_clk_regs,
->  						ARRAY_SIZE(s3c2443_clk_regs));
-> @@ -103,7 +103,7 @@ static void s3c2443_clk_sleep_init(void)
->  	return;
->  }
->  #else
-> -static void s3c2443_clk_sleep_init(void) {}
-> +static void __init s3c2443_clk_sleep_init(void) {}
->  #endif
->  
->  PNAME(epllref_p) = { "mpllref", "mpllref", "xti", "ext" };
-> diff --git a/drivers/clk/samsung/clk-s3c64xx.c b/drivers/clk/samsung/clk-s3c64xx.c
-> index a48bd5f..7306867 100644
-> --- a/drivers/clk/samsung/clk-s3c64xx.c
-> +++ b/drivers/clk/samsung/clk-s3c64xx.c
-> @@ -121,7 +121,7 @@ static void s3c64xx_clk_resume(void)
->  	.resume = s3c64xx_clk_resume,
->  };
->  
-> -static void s3c64xx_clk_sleep_init(void)
-> +static void __init s3c64xx_clk_sleep_init(void)
->  {
->  	s3c64xx_save_common = samsung_clk_alloc_reg_dump(s3c64xx_clk_regs,
->  						ARRAY_SIZE(s3c64xx_clk_regs));
-> @@ -145,7 +145,7 @@ static void s3c64xx_clk_sleep_init(void)
->  		__func__);
->  }
->  #else
-> -static void s3c64xx_clk_sleep_init(void) {}
-> +static void __init s3c64xx_clk_sleep_init(void) {}
->  #endif
->  
->  /* List of parent clocks common for all S3C64xx SoCs. */
-> 
-
+ .../bindings/mailbox/brcm,iproc-mailbox.txt        |  18 ++
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |   8 +-
+ drivers/mailbox/Kconfig                            |  10 ++
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/bcm-iproc-mailbox.c                | 199 +++++++++++++++++++++
+ include/linux/mailbox/bcm_iproc_mailbox.h          |  32 ++++
+ 6 files changed, 262 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,iproc-mailbox.txt
+ create mode 100644 drivers/mailbox/bcm-iproc-mailbox.c
+ create mode 100644 include/linux/mailbox/bcm_iproc_mailbox.h
 
 -- 
-Best Regards,
-Chanwoo Choi
-Samsung Electronics
+1.9.1
