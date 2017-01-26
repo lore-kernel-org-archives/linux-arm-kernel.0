@@ -1,36 +1,40 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Thu, 26 Jan 2017 16:42:44 +0000
-Subject: [RFC PATCH v6 6/7] ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class
- cpus
-In-Reply-To: <1485448965-32855-1-git-send-email-vladimir.murzin@arm.com>
-References: <1485448965-32855-1-git-send-email-vladimir.murzin@arm.com>
-Message-ID: <1485448965-32855-7-git-send-email-vladimir.murzin@arm.com>
+From: dtor@chromium.org (Dmitry Torokhov)
+Date: Thu, 26 Jan 2017 08:42:20 -0800
+Subject: [PATCH 2/2] spi: mediatek: Only do dma for 4-byte aligned buffers
+In-Reply-To: <20170126162154.124287-2-djkurtz@chromium.org>
+References: <20170126162154.124287-1-djkurtz@chromium.org>
+ <20170126162154.124287-2-djkurtz@chromium.org>
+Message-ID: <CAE_wzQ_kC4nc28VU-msZkMAnChtkY6uWiSWFv8x4BHh3B7RJXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now, we have dedicated non-cacheable region for consistent DMA
-operations. However, that region can still be marked as bufferable by
-MPU, so it'd be safer to have barriers by default.
+Hi Daniel,
 
-Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-Tested-by: Andras Szemzo <sza@esh.hu>
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
- arch/arm/mm/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Thu, Jan 26, 2017 at 8:21 AM, Daniel Kurtz <djkurtz@chromium.org> wrote:
+> Mediatek SPI DMA only works when tx and rx buffer addresses are 4-byte
+> aligned.
+>
+> Unaligned DMA transactions appeared to work previously, since we the
+> spi core was incorrectly using the spi_master device for dma, which
+> had a 0 dma_mask, and therefore the swiotlb dma map operations were
+> falling back to using bounce buffers.  Since each DMA transaction would
+> use its own buffer, the mapped starting address of each transaction was
+> always aligned.  When doing real DMA, the mapped address will share the
+> alignment of the raw tx/rx buffer provided by the SPI user, which may or
+> may not be aligned.
+>
+> If a buffer is not aligned, we cannot use DMA, and must use FIFO based
+> transaction instead.
 
-diff --git a/arch/arm/mm/Kconfig b/arch/arm/mm/Kconfig
-index 0b79f12..64a1465c 100644
---- a/arch/arm/mm/Kconfig
-+++ b/arch/arm/mm/Kconfig
-@@ -1029,7 +1029,7 @@ config ARM_L1_CACHE_SHIFT
- 
- config ARM_DMA_MEM_BUFFERABLE
- 	bool "Use non-cacheable memory for DMA" if (CPU_V6 || CPU_V6K) && !CPU_V7
--	default y if CPU_V6 || CPU_V6K || CPU_V7
-+	default y if CPU_V6 || CPU_V6K || CPU_V7 || CPU_V7M
- 	help
- 	  Historically, the kernel has used strongly ordered mappings to
- 	  provide DMA coherent memory.  With the advent of ARMv7, mapping
--- 
-2.0.0
+>From spi.h:
+
+/**
+ * struct spi_transfer - a read/write buffer pair
+ * @tx_buf: data to be written (dma-safe memory), or NULL
+ * @rx_buf: data to be read (dma-safe memory), or NULL
+
+DMA-safe memory is ___cacheline_aligned, so it appears to be user (of
+the SPI) error providing "bad" memory for transfers.
+
+Thanks,
+Dmitry
