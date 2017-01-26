@@ -1,28 +1,46 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Thu, 26 Jan 2017 22:35:37 +0200
-Subject: [PATCH v2] arm64: dma-mapping: Fix dma_mapping_error() when
- bypassing SWIOTLB
-In-Reply-To: <18eae1fb-4a3c-c230-4491-8d376468975c@arm.com>
-References: <20170124225200.a7qioswpxzh6agvd@raspberrypi-2.musicnaut.iki.fi>
- <840027acb4750542003dff17b4a8902ba8972754.1485368348.git.robin.murphy@arm.com>
- <20170126125249.GG14167@arm.com>
- <18eae1fb-4a3c-c230-4491-8d376468975c@arm.com>
-Message-ID: <20170126203537.d5mxdhmswfrihvoc@raspberrypi-3.musicnaut.iki.fi>
+From: jonathan.richardson@broadcom.com (Jonathan Richardson)
+Date: Thu, 26 Jan 2017 12:37:59 -0800
+Subject: [PATCH v4 0/3] Add support for Broadcom iProc mailbox controller
+Message-ID: <1485463082-27067-1-git-send-email-jonathan.richardson@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch set contains mailbox support for Broadcom iProc based SoC's. The
+mailbox controller handles all communication with a Cortex-M0 MCU processor that
+provides support for power, clock, and reset management. The mailbox controller
+for Cygnus is enabled in DT.
 
-On Thu, Jan 26, 2017 at 03:20:47PM +0000, Robin Murphy wrote:
-> hell, and having had a closer look I found another sweet nugget - if
-> someone calls dma_alloc_coherent() in non-blocking context, for a
-> sufficiently large order that the initial __get_free_pages() call from
-> swiotlb_alloc_coherent() fails (hey, small-memory systems *are* going to
-> suffer fragmentation), then we'll end up poking around in yet more
-> uninitialised internals trying to allocate out of the non-existent
-> bounce buffer.
+Changes from v3:
+ - DT changes merged into one commit.
 
-I think this shouldn't happen anymore after 524dabe1c68e ("arm64: Fix
-swiotlb fallback allocation").
+Changes from v2:
+ - Fixed binding to remove leading 0 (Rob's comment). Also added more detail as
+   suggested by Jassi.
+ - Added changelog to dt binding and enable dts commits.
+ - Changed year in copyright in bcm_iproc_mailbox.h.
+ - Changes to bcm-cygnus.dtsi were prematurely merged into the mainline after
+   Rob acked the DT changes but Jassi suggested changes to the mailbox driver.
+   The result was that the mailbox controller node and changes to the crmu gpio
+   driver to enable interrupt handling were incorrectly added to the dtsi. A
+   commit is included in this patchset to revert those changes. Enabling
+   interrupt handling in the the crmu gpio driver will be introduced when the
+   interrupt controller driver is added to provide mailbox interrupt support.
 
-A.
+Jonathan Richardson (3):
+  dt-bindings: Document Broadcom iProc mailbox controller driver
+  mailbox: Add iProc mailbox controller driver
+  ARM: dts: Enable Broadcom iProc mailbox controller
+
+ .../bindings/mailbox/brcm,iproc-mailbox.txt        |  18 ++
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |   8 +-
+ drivers/mailbox/Kconfig                            |  10 ++
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/bcm-iproc-mailbox.c                | 199 +++++++++++++++++++++
+ include/linux/mailbox/bcm_iproc_mailbox.h          |  32 ++++
+ 6 files changed, 262 insertions(+), 7 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,iproc-mailbox.txt
+ create mode 100644 drivers/mailbox/bcm-iproc-mailbox.c
+ create mode 100644 include/linux/mailbox/bcm_iproc_mailbox.h
+
+-- 
+1.9.1
