@@ -1,38 +1,25 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 26 Jan 2017 09:52:30 +0100
-Subject: [PATCH 5/5] arm64: dts: r8a7795-salvator-x: Enable I2C for DVFS device
-In-Reply-To: <1485420750-12701-1-git-send-email-horms+renesas@verge.net.au>
-References: <1485420750-12701-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1485420750-12701-6-git-send-email-horms+renesas@verge.net.au>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 26 Jan 2017 10:06:17 +0100
+Subject: [PATCH v3 06/13] pinctrl: samsung: Fix
+ samsung_pinctrl_create_functions return value
+In-Reply-To: <1484833733-16082-7-git-send-email-m.szyprowski@samsung.com>
+References: <CGME20170119134907eucas1p126b668fe7e8054da6c4233d3ab345ba5@eucas1p1.samsung.com>
+ <1484833733-16082-1-git-send-email-m.szyprowski@samsung.com>
+ <1484833733-16082-7-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CACRpkdZZ9Qb994Cj4Du+9wHy2_SQvpOCpWYmJr1ks+DyUwyunA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
+On Thu, Jan 19, 2017 at 2:48 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
 
-This patch enables I2C for DVFS device for for Salvator-X board on
-R8A7795 SoC.
+> Return proper error code in case of memory allocation failure.
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
 
-Signed-off-by: Keita Kobayashi <keita.kobayashi.ym@renesas.com>
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+Patch applied.
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-index 51ef8bbaa33e..ff8bb5bd675f 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-@@ -486,6 +486,10 @@
- 	clock-frequency = <22579200>;
- };
- 
-+&i2c_dvfs {
-+	status = "okay";
-+};
-+
- &avb {
- 	pinctrl-0 = <&avb_pins>;
- 	pinctrl-names = "default";
--- 
-2.7.0.rc3.207.g0ac5344
+Yours,
+Linus Walleij
