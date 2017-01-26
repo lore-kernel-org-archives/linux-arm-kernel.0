@@ -1,114 +1,74 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 26 Jan 2017 17:08:08 +0900
-Subject: [PATCH v30 04/11] arm64: mm: allow for unmapping memory region
- from kernel mapping
-In-Reply-To: <5888C924.9080100@arm.com>
-References: <20170124084638.3770-1-takahiro.akashi@linaro.org>
- <20170124085004.3892-3-takahiro.akashi@linaro.org>
- <5888C924.9080100@arm.com>
-Message-ID: <20170126080807.GF23406@linaro.org>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 26 Jan 2017 09:33:46 +0100
+Subject: [PATCH v2 0/8] Pad retentions support for Exynos5433
+References: <CGME20170126083401eucas1p20b4794fe46ccf2189bf734f0d8e3c536@eucas1p2.samsung.com>
+Message-ID: <1485419634-28331-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2017 at 03:49:56PM +0000, James Morse wrote:
-> Hi Akashi,
-> 
-> On 24/01/17 08:49, AKASHI Takahiro wrote:
-> > The current implementation of create_mapping_late() is only allowed
-> > to modify permission attributes (read-only or read-write) against
-> > the existing kernel mapping.
-> > 
-> > In this patch, PAGE_KERNEL_INVALID protection attribute is introduced.
-> > We will now be able to invalidate (or unmap) some part of the existing
-> 
-> Can we stick to calling this 'unmap', otherwise 'invalidate this page range'
-> becomes ambiguous, cache maintenance or page-table manipulation?!
+Hello,
 
-Sure.
-I hesitated to use "unmap" because we don't free any of descriptor table
-pages here, but who notice the differences.
+This patchset is a first step to add support for all power domains on
+Exynos5433 SoCs. This patchset contains patches for Exynos pin control
+driver and Exynos LPASS MFD driver, which are needed to make the
+platform ready for adding power domains support.
 
-> 
-> > kernel mapping by specifying PAGE_KERNEL_INVALID to create_mapping_late().
-> > 
-> > This feature will be used in a suceeding kdump patch to protect
-> > the memory reserved for crash dump kernel once after loaded.
-> 
-> > diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> > index 17243e43184e..9c7adcce8e4e 100644
-> > --- a/arch/arm64/mm/mmu.c
-> > +++ b/arch/arm64/mm/mmu.c
-> > @@ -190,7 +192,8 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
-> >  			 * Set the contiguous bit for the subsequent group of
-> >  			 * PMDs if its size and alignment are appropriate.
-> >  			 */
-> > -			if (((addr | phys) & ~CONT_PMD_MASK) == 0) {
-> 
-> > +			if ((pgprot_val(prot) | PMD_VALID) &&
-> 
-> & PMD_VALID?
+Patches in this patchset depends on each other. They are order in such a
+way to make the changes bisectable.
 
-Shame on me.
+Patch #3 has runtime dependency on #1.
+Patch #5 has runtime dependency on #3.
+Patch #6 has runtime dependency on #4.
 
-> 
-> > +			    ((addr | phys) & ~CONT_PMD_MASK) == 0) {
-> >  				if (end - addr >= CONT_PMD_SIZE)
-> >  					__prot = __pgprot(pgprot_val(prot) |
-> >  							  PTE_CONT);
-> > @@ -203,7 +206,8 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
-> >  			 * After the PMD entry has been populated once, we
-> >  			 * only allow updates to the permission attributes.
-> >  			 */
-> > -			BUG_ON(!pgattr_change_is_safe(pmd_val(old_pmd),
-> > +			BUG_ON(pmd_valid(old_pmd) && pmd_valid(*pmd) &&
-> > +			       !pgattr_change_is_safe(pmd_val(old_pmd),
-> >  						      pmd_val(*pmd)));
-> 
-> Could you add PTE_VALID checks to pgattr_change_is_safe() instead of at every
-> call? I think (old == 0 || new == 0) is probably doing something similar.
+This patchset also directly depends on the "Move pad retention control to
+Exynos pin controller driver" patchset:
+https://www.spinics.net/lists/arm-kernel/msg556074.html
 
-Good catch :)
+Patches have been generated on top of linux-next from 25th January 2017.
 
-> 
-> >  		} else {
-> >  			alloc_init_pte(pmd, addr, next, __phys_to_pfn(phys),
-> > @@ -791,14 +796,20 @@ int __init arch_ioremap_pmd_supported(void)
-> >  int pud_set_huge(pud_t *pud, phys_addr_t phys, pgprot_t prot)
-> >  {
-> >  	BUG_ON(phys & ~PUD_MASK);
-> > -	set_pud(pud, __pud(phys | PUD_TYPE_SECT | pgprot_val(mk_sect_prot(prot))));
-> > +	set_pud(pud, __pud(phys |
-> > +			   ((pgprot_val(prot) & PUD_VALID) ?
-> > +					PUD_TYPE_SECT : 0) |
-> > +			   pgprot_val(mk_sect_prot(prot))));
-> 
-> This looks complicated. Is this equivalent?:
->
-> >    prot = mk_sect_prot(prot);
-> >    if (pgprot_val(prot) & PUD_VALID)
-> >        prot |= PUD_TYPE_SECT;
-> >
-> >    set_pud(pud, __pud(phys | pgprot_val(prot)));
+This is a part of a larger task, which goal is to add support for power
+domains on Exynos5433 SoCs / TM2 boards. All patches needed to get it
+working have been pushed to the following git repo:
+https://git.linaro.org/people/marek.szyprowski/linux-srpol.git v4.10-next-tm2-pd
 
-Yeah, I just wanted to keep it simple,
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
 
-> 
-> Given you defined PUD_VALID as being PUD_TYPE_SECT, I think you can then reduce
-> it to:
-> >    set_pud(pud, __pud(phys | pgprot_val(mk_sect_prot(prot))));
-> 
-> It looks like mk_sect_prot() doesn't touch the valid bit so all this is doing is
-> clearing the table bit making it a section and keeping the valid bit from the
-> caller.
 
-but this seems to be too much optimized because, even without my patch,
-this change is applicable. The intention of the original code would be
-to make sure the entry be a pud-level descriptor whatever given "prot" is.
+Changelog:
+v2:
+- fixed issues pointed by Krzysztof Kozlowski:
+  1. added more checks to Exynos PMU driver for NULL drvdata
+  2. reused EXYNOS_WAKEUP_FROM_LOWPWR in retention data for Exynos5433
+  3. converted lpass driver to devm_clk_get
+  4. added missing ->remove callback to lpass driver
 
--Takahiro AKASHI
+v1: https://lkml.org/lkml/2017/1/25/214
+- initial version
 
-> 
-> Thanks,
-> 
-> James
-> 
+
+Patch summary:
+
+Marek Szyprowski (8):
+  soc: samsung: pmu: Add dummy support for Exynos5433 SoC
+  pinctrl: samsung: Ensure that pad retention is disabled on driver init
+  pinctrl: samsung: Add support for pad retention control for Exynos5433
+    SoCs
+  arm64: dts: exynos: Add clocks to Exynos5433 LPASS module
+  mfd: exynos-lpass: Remove pad retention control
+  mfd: exynos-lpass: Add support for clocks
+  mfd: exynos-lpass: Add missing remove() function
+  mfd: exynos-lpass: Add runtime PM support
+
+ .../bindings/mfd/samsung,exynos5433-lpass.txt      |  8 ++-
+ arch/arm64/boot/dts/exynos/exynos5433.dtsi         |  2 +
+ drivers/mfd/exynos-lpass.c                         | 48 ++++++++++-------
+ drivers/pinctrl/samsung/pinctrl-exynos.c           | 63 ++++++++++++++++++++++
+ drivers/soc/samsung/exynos-pmu.c                   |  6 ++-
+ include/linux/mfd/syscon/exynos5-pmu.h             |  3 --
+ include/linux/soc/samsung/exynos-regs-pmu.h        | 16 ++++++
+ 7 files changed, 121 insertions(+), 25 deletions(-)
+
+-- 
+1.9.1
