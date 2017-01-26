@@ -1,43 +1,52 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 26 Jan 2017 10:44:25 +0100
-Subject: [GIT PULL] soc: samsung: Drivers for v4.11
-In-Reply-To: <4be96fae-6790-d281-61dc-f7e7cde9efb7@samsung.com>
-References: <20170120181343.12570-1-krzk@kernel.org>
- <CGME20170126091313epcas3p4034ef54af813082ceb26f5213bb97a1c@epcas3p4.samsung.com>
- <CACRpkdZebsd5MfARWL2WbKkAuXfjEe6p_k5tYwPFF6kSsCXDdQ@mail.gmail.com>
- <4be96fae-6790-d281-61dc-f7e7cde9efb7@samsung.com>
-Message-ID: <CACRpkdbKfojW-adLDL5Y7UQNps9H=5NpwWnYOzC5xBo9Bq1RJg@mail.gmail.com>
+Date: Thu, 26 Jan 2017 10:46:25 +0100
+Subject: [PATCH v3 11/13] pinctrl: samsung: Move retention control from
+ mach-exynos to the pinctrl driver
+In-Reply-To: <2d9ad2d4-c2f8-ef6b-2504-1337db0da178@samsung.com>
+References: <CGME20170119134909eucas1p11a7638a4b9bf69b00458189ba9c1bb90@eucas1p1.samsung.com>
+ <1484833733-16082-1-git-send-email-m.szyprowski@samsung.com>
+ <1484833733-16082-12-git-send-email-m.szyprowski@samsung.com>
+ <CACRpkdYc7u6Q4CW7a2ECsDkfUkiDJq_zk--RvKwz2i-XW0xHLQ@mail.gmail.com>
+ <2d9ad2d4-c2f8-ef6b-2504-1337db0da178@samsung.com>
+Message-ID: <CACRpkdapMKpsGVbbvJvXBtYGJCANYUOqMox=083+Lf6LkApmTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 10:20 AM, Marek Szyprowski
+On Thu, Jan 26, 2017 at 10:13 AM, Marek Szyprowski
 <m.szyprowski@samsung.com> wrote:
-> Hi Linus,
->
-> On 2017-01-26 10:13, Linus Walleij wrote:
->>
->> On Fri, Jan 20, 2017 at 7:13 PM, Krzysztof Kozlowski <krzk@kernel.org>
->> wrote:
->>
->>> Few changes in Exynos PMU driver including one that is needed by pinctrl
->>> driver for runtime PM. We want to move forward with the RPM for our
->>> drivers
->>> while keeping still DT ABI.
+> On 2017-01-26 10:10, Linus Walleij wrote:
+>> On Thu, Jan 19, 2017 at 2:48 PM, Marek Szyprowski
+>> <m.szyprowski@samsung.com> wrote:
 >>>
->>> This tag is also for Linus Walleij to pull - base for pinctrl changes.
+>>> This patch moves pad retention control from PMU driver to Exynos pin
+>>> controller driver. This helps to avoid possible ordering and logical
+>>> dependencies between machine, PMU and pin control code. Till now it
+>>> worked fine only because sys_ops for PMU and pin controller were called
+>>> in registration order.
+>>> This is also a preparation for adding new features to Exynos pin
+>>> controller driver, like runtime power management and suspending
+>>> individual pin controllers, which might be a part of some power domain.
+>>>
+>>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+>>> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+>>> Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
+>>> ---
+>>>   arch/arm/mach-exynos/suspend.c           |  64 --------------
+>>>   drivers/pinctrl/samsung/pinctrl-exynos.c | 145
+>>> +++++++++++++++++++++++++++++++
 >>
->> Do I need it? I.e. will my branch not compile without this, or is this
->> just a runtime problem?
+>> This makes all kind of sense, but I would ideally like an ACK
+>> from the ARM SoC maintainer(s): Arnd, Olof, are you OK with
+>> this?
 >
 >
-> "[PATCH v3 11/13] pinctrl: samsung: Move retention control from mach-exynos
-> to the
-> pinctrl driver" has compile time dependency on the changes included in that
-> tag.
+> Isn't enough to have Krzysztof's (Exynos SoC maintainer) 'reviewed-by' tag?
+> I assume that 'reviewed-by' also includes 'acked-by'.
 
-Is that because of the custom syscon regmap lookup function?
+If the SoC maintainers are too stressed to answer in reasonable time
+or I just get randomly bored of waiting yes, I usually apply it anyway.
 
-I just complained about that in a separate mail ;)
+Just want to give them a heads-up essentially.
 
 Yours,
 Linus Walleij
