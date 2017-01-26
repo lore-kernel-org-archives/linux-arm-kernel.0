@@ -1,52 +1,56 @@
-From: scott.wood@nxp.com (Scott Wood)
-Date: Thu, 26 Jan 2017 05:08:43 +0000
-Subject: [PATCH 06/10] soc/qbman: Add ARM equivalent for
- flush_dcache_range()
-References: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
- <VI1PR0401MB2430DA6BD2F857C30EC86A50917F0@VI1PR0401MB2430.eurprd04.prod.outlook.com>
- <HE1PR0401MB263638F320470CA216990BCC86720@HE1PR0401MB2636.eurprd04.prod.outlook.com>
- <5414359.8GMja3pNrI@wuerfel>
-Message-ID: <VI1PR0401MB24303C4A5C0042005E17F1A391770@VI1PR0401MB2430.eurprd04.prod.outlook.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 25 Jan 2017 21:24:27 -0800
+Subject: [PATCH 2/2] clk: imx7d: Add the IPG root clock
+In-Reply-To: <1484762037-10737-2-git-send-email-fabio.estevam@nxp.com>
+References: <1484762037-10737-1-git-send-email-fabio.estevam@nxp.com>
+ <1484762037-10737-2-git-send-email-fabio.estevam@nxp.com>
+Message-ID: <CAOi56cUrAyqV3e1zW+UGNRfGaueJr9yH1md3DPJT6vVM_zfpTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25/2017 03:20 PM, Arnd Bergmann wrote:
-> On Monday, January 23, 2017 7:24:59 PM CET Roy Pledge wrote:
->>> Is there a non-"under the covers" way to say "flush this region" without
->>> the arch second-guessing whether it really needs to be flushed?
->> Any advice on how to resolve this? I looked into trying to do a
->> non-cacheable mapping of the
->> memory so that the flush wouldn't be required but the ioremap code
->> prevents mapping normal
->> memory in this way.  The QMan device requiresthis memory to be zeroed at
->> startup. Because the device
->> does non coherent reads and writes to the memory we must ensure that any
->> cache in the CPU cluster(s)
->> is flushed in order to prevent a future castout from overwriting data.
->> This happened before on PPC
->> platforms and made for some very unfun debug session trying to
->> understand what was causing the failure.
-> 
-> If this is normal RAM, you should be able to just write zeroes, and then
-> do a dma_map_single() for initialization.
+Hi Fabio,
 
-The DMA API on PPC currently has no way of knowing that the device
-accesses this memory incoherently.
+On Wed, Jan 18, 2017 at 9:53 AM, Fabio Estevam <fabio.estevam@nxp.com> wrote:
+> Add an entry for the IMX7D_IPG_ROOT clock.
+>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-If that were somehow fixed, we still couldn't use dma_map_single() as it
-doesn't accept virtual addresses that come from memremap() or similar
-dynamic mappings.  We'd have to convert the physical address to an array
-of struct pages and pass each one to dma_map_page().
+kernelci.org started detecting boot failures on imx7s-warp in
+next-20160124[1], and I bisected it down to this patch, which is in
+linux-next as commit dde08302c083.
 
-And even if we did all that, there would still be other manual cache
-manipulation left in this driver, to deal with its cacheable register
-interface.
+I verified that reverting that commit on top of next-20160124 gets
+imx7s-warp booting again.
 
-> Are there any other requirements
-> what to do with the memory later, is it used for communication at all,
-> or just required to be zero?
+Kevin
 
-It just needs to be zeroed before the device begins using it for
-internal storage.
+P.S.  Thanks for the donation of the imx7s-warp board, which allows us
+to catch these failures early.  :)
 
--Scott
+[1] https://kernelci.org/boot/id/588747e959b514e08213d106/
+
+> ---
+>  drivers/clk/imx/clk-imx7d.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
+> index ae1d31b..1705f44 100644
+> --- a/drivers/clk/imx/clk-imx7d.c
+> +++ b/drivers/clk/imx/clk-imx7d.c
+> @@ -788,7 +788,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
+>         clks[IMX7D_WRCLK_ROOT_DIV] = imx_clk_divider2("wrclk_post_div", "wrclk_pre_div", base + 0xbd00, 0, 6);
+>         clks[IMX7D_CLKO1_ROOT_DIV] = imx_clk_divider2("clko1_post_div", "clko1_pre_div", base + 0xbd80, 0, 6);
+>         clks[IMX7D_CLKO2_ROOT_DIV] = imx_clk_divider2("clko2_post_div", "clko2_pre_div", base + 0xbe00, 0, 6);
+> -
+> +       clks[IMX7D_IPG_ROOT_CLK] = imx_clk_divider2("ipg_root_clk", "ahb_root_clk", base + 0x9080, 0, 2);
+>         clks[IMX7D_ARM_A7_ROOT_CLK] = imx_clk_gate4("arm_a7_root_clk", "arm_a7_div", base + 0x4000, 0);
+>         clks[IMX7D_ARM_M4_ROOT_CLK] = imx_clk_gate4("arm_m4_root_clk", "arm_m4_div", base + 0x4010, 0);
+>         clks[IMX7D_ARM_M0_ROOT_CLK] = imx_clk_gate4("arm_m0_root_clk", "arm_m0_div", base + 0x4020, 0);
+> --
+> 2.7.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
