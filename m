@@ -1,51 +1,57 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 26 Jan 2017 11:03:47 +0100
-Subject: [linux-sunxi] [PATCH 1/2] drivers: pinctrl: add driver for
- Allwinner H5 SoC
-In-Reply-To: <20170119174144.hiw7lmvdh2tzxtd7@lukather>
-References: <20161223125001.1176-1-icenowy@aosc.xyz>
- <1280f095-ab03-93f8-14d2-99d13ba1ce55@arm.com>
- <CACRpkdYQhfid3VRcaj=7as_+Zg=pX3Svp9FJ_W_Ft8nVuoZqKQ@mail.gmail.com>
- <20170105224210.wfinfucbpkkd44om@lukather>
- <38fe3491-457a-f0c5-54fb-9defdcd45045@arm.com>
- <20170116163124.c5gusyd3j3goivnf@lukather>
- <87a535d3-1170-c388-ce7d-4921e69f4cab@arm.com>
- <20170119174144.hiw7lmvdh2tzxtd7@lukather>
-Message-ID: <CACRpkdbTaekF=VYP6-tjotTSYgVFtayM7A=eSu_=JGWEiZpczQ@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 26 Jan 2017 11:07:24 +0100
+Subject: [PATCH 2/5] arm64: dts: r8a7796: Add I2C for DVFS device node
+In-Reply-To: <1485420750-12701-3-git-send-email-horms+renesas@verge.net.au>
+References: <1485420750-12701-1-git-send-email-horms+renesas@verge.net.au>
+ <1485420750-12701-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdXSriucRXVACQoGx0S8CX0sXPmuWvAQy0+RP9PY-z7U3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 6:41 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-
-> That's not true anymore. And while it's true that it reduces the
-> amount of maintainance on the kernel side and more on the DT side. And
-> from what you're constantly saying, the thing we can't plan on fixing
-> / upgrading is the DT, while the kernel is easy to change.
+On Thu, Jan 26, 2017 at 9:52 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> From: Dien Pham <dien.pham.ry@rvc.renesas.com>
 >
-> Which means that if we ever want to fix a non-upgradable DT, the only
-> way to do that would be to add quirks fixing it in the kernel
-> itself. Adding more maintainance burden to the kernel.
+> This patch adds I2C for DVFS device node for R8A7796 SoC.
+>
+> Signed-off-by: Dien Pham <dien.pham.ry@rvc.renesas.com>
+> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-This is a good argument to not put groups and functions into the
-DT at all. If the following propositions hold:
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-- Functions and group definitions will contain bugs
+> --- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
 
-- Those bugs will need to be fixed by changing the buggy
-  definitions
+> @@ -269,6 +270,19 @@
+>                         #power-domain-cells = <1>;
+>                 };
+>
+> +               i2c_dvfs: i2c at e60b0000 {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +                       compatible = "renesas,iic-r8a7796",
+> +                                    "renesas,rcar-gen3-iic",
+> +                                    "renesas,rmobile-iic";
+> +                       reg = <0 0xe60b0000 0 0x425>;
+> +                       interrupts = <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>;
+> +                       clocks = <&cpg CPG_MOD 926>;
 
-- It is hard to change the DTB, it is easy to change the zImage
+You may want to add dmas/dma-names.
+That can be done later, though.
 
-Then by logical deduction the definitions should be in the kernel
-to minimize maintenance burden.
+> +                       power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
+> +                       status = "disabled";
+> +               };
+> +
 
-There is a pattern amongst firmware people that they think that
-they always get the group and function definitions right on first
-try. As long as there are humans involved in the process, this
-stance is provedly wrong, just use git log and you will see how
-much of such bugs we fix, even in drivers and DTSes produced
-by the vendors themselves.
+Gr{oetje,eeting}s,
 
-Yours,
-Linus Walleij
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
