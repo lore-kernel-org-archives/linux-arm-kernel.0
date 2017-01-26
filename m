@@ -1,72 +1,46 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 26 Jan 2017 18:39:42 +0900
-Subject: [PATCH] iopoll: include <linux/ktime.h> instead of
- <linux/hrtimer.h>
-In-Reply-To: <CAK7LNARt_yDHJo4XW_ENt=nH10En10crJPV8oMc=G04WmRG6Bg@mail.gmail.com>
-References: <1481679225-10885-1-git-send-email-yamada.masahiro@socionext.com>
- <CAK7LNARt_yDHJo4XW_ENt=nH10En10crJPV8oMc=G04WmRG6Bg@mail.gmail.com>
-Message-ID: <CAK7LNASv39D0QVjZvo7ub8k5XugOuYXw-_5ZbVA2EbdvvSPnHA@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 26 Jan 2017 10:43:19 +0100
+Subject: [GIT PULL] pxa for v4.11
+Message-ID: <87bmuub1hk.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.
 
-2017-01-23 18:54 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> Hi.
->
-> 2016-12-14 10:33 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
->> The timer APIs this header needs are ktime_get(), ktime_add_us(),
->> and ktime_compare().  So, including <linux/ktime.h> seems enough.
->> This commit will cut unnecessary header file parsing.
->>
->> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->
->
-> No comment for this patch?
->
-> Will,
-> Could you check this patch, please?
+Hello Arnd, Kevin, Olof,
 
+Please consider this pull request for pxa 4.11 cycle, which is a very tiny one.
 
+The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 
+  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
 
-This patch was picked up by Andrew Morton
-and it is now in linux-next.
+are available in the git repository at:
 
-Thank you, Andrew!
+  https://github.com/rjarzmik/linux.git tags/pxa-for-4.11
 
+for you to fetch changes up to d9bd264596b9ec364990ab64c8cc1792586425e3:
 
+  MAINTAINERS: transfer maintainership for the EZX platform (2017-01-26 09:52:51 +0100)
 
+----------------------------------------------------------------
+This is the pxa changes for v4.11 cycle.
 
->>
->> I was not quite sure whom I should send this patch to.
->> I am sending this to Will Deacon because commit 54c523127bcc
->> ("iopoll: Introduce memory-mapped IO polling macros") was applied
->> by him.
->>
->>
->>  include/linux/iopoll.h | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/include/linux/iopoll.h b/include/linux/iopoll.h
->> index 1c30014..d29e1e2 100644
->> --- a/include/linux/iopoll.h
->> +++ b/include/linux/iopoll.h
->> @@ -17,7 +17,7 @@
->>
->>  #include <linux/kernel.h>
->>  #include <linux/types.h>
->> -#include <linux/hrtimer.h>
->> +#include <linux/ktime.h>
->>  #include <linux/delay.h>
->>  #include <linux/errno.h>
->>  #include <linux/io.h>
->> --
->> 2.7.4
+This cycle is a minor fixes one, covering :
+ - build fixes from Arnd, mainly include related
+ - transfer of maintainance of Motorala phone to Robert
 
+----------------------------------------------------------------
+Arnd Bergmann (2):
+      ARM: pxa: ezx: fix a910 camera data
+      ARM: pxa: include linux/leds.h
 
+Stefan Schmidt (1):
+      MAINTAINERS: transfer maintainership for the EZX platform
 
+ MAINTAINERS             |  8 ++-----
+ arch/arm/mach-pxa/ezx.c | 56 ++++++++++++++++++++++++++-----------------------
+ arch/arm/mach-pxa/idp.c |  1 +
+ 3 files changed, 33 insertions(+), 32 deletions(-)
 
 -- 
-Best Regards
-Masahiro Yamada
+Robert
