@@ -1,32 +1,57 @@
 From: rask@formelder.dk (Rask Ingemann Lambertsen)
-Date: Thu, 26 Jan 2017 22:23:41 +0100 (CET)
-Subject: [PATCH 1/5] DT: mfd: axp20x: Add AXP806 to list of current AXP20x
- family members
+Date: Thu, 26 Jan 2017 22:24:40 +0100 (CET)
+Subject: [PATCH 2/5] DT: mfd: axp20x: Add binding for the AXP808
 In-Reply-To: <cover.1485456003.git.rask@formelder.dk>
 References: <cover.1485456003.git.rask@formelder.dk>
-Message-ID: <abdfbac9a5f363ab6d338dd66d8fb138741f71c7.1485456005.git.rask@formelder.dk>
+Message-ID: <abb27901379a19a11608fd37254e1a8f7fa1b199.1485456006.git.rask@formelder.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An entry for the AXP806 was forgotten, so add one.
+The AXP808 does not support address space extension, but is otherwise
+identical to the AXP806, including the chip ID, so add a compatible
+string for it to the binding.
 
 Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
-Fixes: 204ae2963e10 ("mfd: axp20x: Add bindings for AXP806 PMIC")
 ---
- Documentation/devicetree/bindings/mfd/axp20x.txt | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/mfd/axp20x.txt | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-index 8f3ad9a..86ae540 100644
+index 86ae540..8195b06 100644
 --- a/Documentation/devicetree/bindings/mfd/axp20x.txt
 +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-@@ -6,6 +6,7 @@ axp202 (X-Powers)
- axp209 (X-Powers)
+@@ -7,12 +7,13 @@ axp209 (X-Powers)
  axp221 (X-Powers)
  axp223 (X-Powers)
-+axp806 (X-Powers)
+ axp806 (X-Powers)
++axp808 (X-Powers)
  axp809 (X-Powers)
  
  Required properties:
+ - compatible: "x-powers,axp152", "x-powers,axp202", "x-powers,axp209",
+ 	      "x-powers,axp221", "x-powers,axp223", "x-powers,axp806",
+-	      "x-powers,axp809"
++	      "x-powers,axp808", "x-powers,axp809"
+ - reg: The I2C slave address or RSB hardware address for the AXP chip
+ - interrupt-parent: The parent interrupt controller
+ - interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
+@@ -87,7 +88,7 @@ LDO_IO1		: LDO		: ips-supply		: GPIO 1
+ RTC_LDO		: LDO		: ips-supply		: always on
+ DRIVEVBUS	: Enable output	: drivevbus-supply	: external regulator
+ 
+-AXP806 regulators, type, and corresponding input supply names:
++AXP806/AXP808 regulators, type, and corresponding input supply names:
+ 
+ Regulator	  Type		  Supply Name		  Notes
+ ---------	  ----		  -----------		  -----
+@@ -108,7 +109,7 @@ CLDO2		: LDO		: cldoin-supply		: shared supply
+ CLDO3		: LDO		: cldoin-supply		: shared supply
+ SW		: On/Off Switch : swin-supply
+ 
+-Additionally, the AXP806 DC-DC regulators support poly-phase arrangements
++Additionally, the AXP806/AXP808 DC-DC regulators support poly-phase arrangements
+ for higher output current. The possible groupings are: A+B, A+B+C, D+E.
+ 
+ AXP809 regulators, type, and corresponding input supply names:
 -- 
 2.10.2
