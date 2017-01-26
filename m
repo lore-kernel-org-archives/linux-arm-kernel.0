@@ -1,58 +1,121 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 26 Jan 2017 09:44:03 +0100
-Subject: [PATCH 4/7] arm64: dts: exynos: Add clocks to Exynos5433 LPASS
- module
-In-Reply-To: <CAJKOXPdb4vBP_kZDgy1CJ-6WHdpU5+NKygoCNZuiCyh3MvpR9Q@mail.gmail.com>
-References: <1485345031-2948-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170125115103eucas1p1d0e446fa6e998da257e3c17922a00d7f@eucas1p1.samsung.com>
- <1485345031-2948-5-git-send-email-m.szyprowski@samsung.com>
- <20170125195022.yiqxnfted2vw4owh@kozik-lap>
- <2eabe488-1e58-4320-6d6f-f7844ee06998@samsung.com>
- <CAJKOXPdb4vBP_kZDgy1CJ-6WHdpU5+NKygoCNZuiCyh3MvpR9Q@mail.gmail.com>
-Message-ID: <627ea264-535d-2c89-3987-02b8620d9328@samsung.com>
+From: hs.liao@mediatek.com (Horng-Shyang Liao)
+Date: Thu, 26 Jan 2017 16:37:13 +0800
+Subject: [PATCH v20 2/4] mailbox: mediatek: Add Mediatek CMDQ driver
+In-Reply-To: <CABb+yY23TUB8NpmpiO=cCmVFAVJMqKPfGgX14j+_Yj7tJvMOuQ@mail.gmail.com>
+References: <1483499169-16329-1-git-send-email-hs.liao@mediatek.com>
+ <1483499169-16329-3-git-send-email-hs.liao@mediatek.com>
+ <CABb+yY23TUB8NpmpiO=cCmVFAVJMqKPfGgX14j+_Yj7tJvMOuQ@mail.gmail.com>
+Message-ID: <1485419833.990.1.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+Hi Jassi,
 
-On 2017-01-26 09:40, Krzysztof Kozlowski wrote:
-> On Thu, Jan 26, 2017 at 9:18 AM, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
->> On 2017-01-25 20:50, Krzysztof Kozlowski wrote:
->>> On Wed, Jan 25, 2017 at 12:50:28PM +0100, Marek Szyprowski wrote:
->>>> Exynos5433 LPASS module requires some clocks for proper operation with
->>>> power domain.
->>>>
->>>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>>> ---
->>>>    arch/arm64/boot/dts/exynos/exynos5433.dtsi | 2 ++
->>>>    1 file changed, 2 insertions(+)
->>>>
->>>> diff --git a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
->>>> b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
->>>> index 57c7bbeb65a7..16072c1c3ed3 100644
->>>> --- a/arch/arm64/boot/dts/exynos/exynos5433.dtsi
->>>> +++ b/arch/arm64/boot/dts/exynos/exynos5433.dtsi
->>>> @@ -1494,6 +1494,8 @@
->>>>                  audio-subsystem at 11400000 {
->>>>                          compatible = "samsung,exynos5433-lpass";
->>>>                          reg = <0x11400000 0x100>, <0x11500000 0x08>;
->>>> +                       clocks = <&cmu_aud CLK_PCLK_SFR0_CTRL>;
->>>> +                       clock-names = "sfr0_ctrl";
->>> You wrote that 6/7 depends on this. I prefer not to take DTS changes if
->>> the corresponding user (driver) is still under discussion because the
->>> bindings might change. I'll take it when bindings got acked or accepted.
->>
->> Well, audio support in 4.9 is still not functional due to missing other
->> patches to ALSA SoC, so nothing will break as for now if we manage to get
->> this into v4.10.
-> Get this into v4.10? So this needs some additional explanation in the
-> commit message why this is a fix. Probably one more sentence would be
-> enough. Or did you mean v4.11?
+On Thu, 2017-01-26 at 10:08 +0530, Jassi Brar wrote:
+> On Wed, Jan 4, 2017 at 8:36 AM, HS Liao <hs.liao@mediatek.com> wrote:
+> 
+> > diff --git a/drivers/mailbox/mtk-cmdq-mailbox.c b/drivers/mailbox/mtk-cmdq-mailbox.c
+> > new file mode 100644
+> > index 0000000..747bcd3
+> > --- /dev/null
+> > +++ b/drivers/mailbox/mtk-cmdq-mailbox.c
+> 
+> ...
+> 
+> > +static void cmdq_task_exec(struct cmdq_pkt *pkt, struct cmdq_thread *thread)
+> > +{
+> > +       struct cmdq *cmdq;
+> > +       struct cmdq_task *task;
+> > +       unsigned long curr_pa, end_pa;
+> > +
+> > +       cmdq = dev_get_drvdata(thread->chan->mbox->dev);
+> > +
+> > +       /* Client should not flush new tasks if suspended. */
+> > +       WARN_ON(cmdq->suspended);
+> > +
+> > +       task = kzalloc(sizeof(*task), GFP_ATOMIC);
+> > +       task->cmdq = cmdq;
+> > +       INIT_LIST_HEAD(&task->list_entry);
+> > +       task->pa_base = dma_map_single(cmdq->mbox.dev, pkt->va_base,
+> > +                                      pkt->cmd_buf_size, DMA_TO_DEVICE);
+> >
+> You seem to parse the requests and responses, that should ideally be
+> done in client driver.
+> Also, we are here in atomic context, can you move it in client driver
+> (before the spin_lock)?
+> Maybe by adding a new 'pa_base' member as well in 'cmdq_pkt'.
 
-Yes, I meant v4.11.
+will do
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+> ....
+> > +
+> > +       cmdq->mbox.num_chans = CMDQ_THR_MAX_COUNT;
+> > +       cmdq->mbox.ops = &cmdq_mbox_chan_ops;
+> > +       cmdq->mbox.of_xlate = cmdq_xlate;
+> > +
+> > +       /* make use of TXDONE_BY_ACK */
+> > +       cmdq->mbox.txdone_irq = false;
+> > +       cmdq->mbox.txdone_poll = false;
+> > +
+> > +       for (i = 0; i < ARRAY_SIZE(cmdq->thread); i++) {
+> >
+> You mean  i < CMDQ_THR_MAX_COUNT
+
+will do
+
+> > +               cmdq->thread[i].base = cmdq->base + CMDQ_THR_BASE +
+> > +                               CMDQ_THR_SIZE * i;
+> > +               INIT_LIST_HEAD(&cmdq->thread[i].task_busy_list);
+> >
+> You seem the queue mailbox requests in this controller driver? why not
+> use the mailbox api for that?
+> 
+> > +               init_timer(&cmdq->thread[i].timeout);
+> > +               cmdq->thread[i].timeout.function = cmdq_thread_handle_timeout;
+> > +               cmdq->thread[i].timeout.data = (unsigned long)&cmdq->thread[i];
+> >
+> Here again... you seem to ignore the polling mechanism provided by the
+> mailbox api, and implement your own.
+
+The queue is used to record the tasks which are flushed into CMDQ
+hardware (GCE). We are handling time critical tasks, so we have to
+queue them in GCE rather than a software queue (e.g. mailbox buffer).
+Let me use display as an example. Many display tasks are flushed into
+CMDQ to wait next vsync event. When vsync event is triggered by display
+hardware, GCE needs to process all flushed tasks "within vblank" to
+prevent garbage on screen. This is all done by GCE (without CPU)
+to fulfill time critical requirement. After GCE finish its work,
+it will generate interrupts, and then CMDQ driver will let clients know
+which tasks are done.
+
+We have discussed the similar thing before.
+Please take a look at the following link,
+especially from 2016/10/5 to.2016/10/11 about tx_done.
+https://patchwork.kernel.org/patch/9312953/
+
+> > diff --git a/include/linux/mailbox/mtk-cmdq-mailbox.h b/include/linux/mailbox/mtk-cmdq-mailbox.h
+> > new file mode 100644
+> > index 0000000..3433c64
+> > --- /dev/null
+> > +++ b/include/linux/mailbox/mtk-cmdq-mailbox.h
+> ....
+> > +
+> > +struct cmdq_pkt {
+> > +       void                    *va_base;
+> >
+> maybe add 'pa_base' here so you don't have to do dma_map_single() in send_data
+
+will do
+
+> > +       size_t                  cmd_buf_size; /* command occupied size */
+> > +       size_t                  buf_size; /* real buffer size */
+> > +       struct cmdq_task_cb     cb;
+> > +};
+> > +
+> > +#endif /* __MTK_CMDQ_MAILBOX_H__ */
+> > --
+> > 1.9.1
+> >
+
+Thanks,
+HS
