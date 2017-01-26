@@ -1,62 +1,51 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 26 Jan 2017 10:57:33 +0100
-Subject: [PATCH 04/11] clk: sunxi-ng: Support separately grouped PLL lock
- status register
-In-Reply-To: <20170124023230.3990-5-wens@csie.org>
-References: <20170124023230.3990-1-wens@csie.org>
- <20170124023230.3990-5-wens@csie.org>
-Message-ID: <20170126095733.azlzxmz63vxajlen@lukather>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 26 Jan 2017 11:03:47 +0100
+Subject: [linux-sunxi] [PATCH 1/2] drivers: pinctrl: add driver for
+ Allwinner H5 SoC
+In-Reply-To: <20170119174144.hiw7lmvdh2tzxtd7@lukather>
+References: <20161223125001.1176-1-icenowy@aosc.xyz>
+ <1280f095-ab03-93f8-14d2-99d13ba1ce55@arm.com>
+ <CACRpkdYQhfid3VRcaj=7as_+Zg=pX3Svp9FJ_W_Ft8nVuoZqKQ@mail.gmail.com>
+ <20170105224210.wfinfucbpkkd44om@lukather>
+ <38fe3491-457a-f0c5-54fb-9defdcd45045@arm.com>
+ <20170116163124.c5gusyd3j3goivnf@lukather>
+ <87a535d3-1170-c388-ce7d-4921e69f4cab@arm.com>
+ <20170119174144.hiw7lmvdh2tzxtd7@lukather>
+Message-ID: <CACRpkdbTaekF=VYP6-tjotTSYgVFtayM7A=eSu_=JGWEiZpczQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jan 19, 2017 at 6:41 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
 
-On Tue, Jan 24, 2017 at 10:32:23AM +0800, Chen-Yu Tsai wrote:
-> On the Allwinner A80 SoC, the PLL lock status indicators are grouped
-> together in a separate register, as opposed to being scattered in each
-> PLL's configuration register.
-> 
-> Add a flag to support this.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  drivers/clk/sunxi-ng/ccu_common.c | 8 ++++++--
->  drivers/clk/sunxi-ng/ccu_common.h | 2 ++
->  2 files changed, 8 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/clk/sunxi-ng/ccu_common.c b/drivers/clk/sunxi-ng/ccu_common.c
-> index 51d4bac97ab3..3fd0c3331aff 100644
-> --- a/drivers/clk/sunxi-ng/ccu_common.c
-> +++ b/drivers/clk/sunxi-ng/ccu_common.c
-> @@ -25,13 +25,17 @@ static DEFINE_SPINLOCK(ccu_lock);
->  
->  void ccu_helper_wait_for_lock(struct ccu_common *common, u32 lock)
->  {
-> +	void __iomem *addr;
->  	u32 reg;
->  
->  	if (!lock)
->  		return;
->  
-> -	WARN_ON(readl_relaxed_poll_timeout(common->base + common->reg, reg,
-> -					   reg & lock, 100, 70000));
-> +	addr = common->base + common->reg;
-> +	if (common->features & CCU_FEATURE_LOCK_REG)
-> +		addr = common->base + common->lock_reg;
+> That's not true anymore. And while it's true that it reduces the
+> amount of maintainance on the kernel side and more on the DT side. And
+> from what you're constantly saying, the thing we can't plan on fixing
+> / upgrading is the DT, while the kernel is easy to change.
+>
+> Which means that if we ever want to fix a non-upgradable DT, the only
+> way to do that would be to add quirks fixing it in the kernel
+> itself. Adding more maintainance burden to the kernel.
 
-I'd rather have an else here (but it's really just a nitpick).
+This is a good argument to not put groups and functions into the
+DT at all. If the following propositions hold:
 
-Thanks,
-Maxime
+- Functions and group definitions will contain bugs
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170126/155f0328/attachment.sig>
+- Those bugs will need to be fixed by changing the buggy
+  definitions
+
+- It is hard to change the DTB, it is easy to change the zImage
+
+Then by logical deduction the definitions should be in the kernel
+to minimize maintenance burden.
+
+There is a pattern amongst firmware people that they think that
+they always get the group and function definitions right on first
+try. As long as there are humans involved in the process, this
+stance is provedly wrong, just use git log and you will see how
+much of such bugs we fix, even in drivers and DTSes produced
+by the vendors themselves.
+
+Yours,
+Linus Walleij
