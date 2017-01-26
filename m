@@ -1,28 +1,49 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 26 Jan 2017 22:08:23 +0200
-Subject: [PATCH v2 4/8] arm64: dts: exynos: Add clocks to Exynos5433
- LPASS module
-In-Reply-To: <1485419634-28331-5-git-send-email-m.szyprowski@samsung.com>
-References: <1485419634-28331-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170126083403eucas1p1ad75fe027047dc240b9afd651c7713a5@eucas1p1.samsung.com>
- <1485419634-28331-5-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20170126200823.eh6f6qubawawrtuy@kozik-lap>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Thu, 26 Jan 2017 20:07:47 +0000
+Subject: [PATCHv3 4/5] arm: mvebu: Add device tree for 98DX3236 SoCs
+References: <20170105033641.6212-1-chris.packham@alliedtelesis.co.nz>
+ <20170106041517.9589-1-chris.packham@alliedtelesis.co.nz>
+ <20170106041517.9589-5-chris.packham@alliedtelesis.co.nz>
+ <87inp1zwlg.fsf@free-electrons.com>
+Message-ID: <3493169361fe445ba971951b40360301@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 09:33:50AM +0100, Marek Szyprowski wrote:
-> Exynos5433 LPASS module requires some clocks for proper operation with
-> power domain.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  arch/arm64/boot/dts/exynos/exynos5433.dtsi | 2 ++
->  1 file changed, 2 insertions(+)
-> 
+On 27/01/17 04:10, Gregory CLEMENT wrote:
+> Hi Chris,
+>
+>  On ven., janv. 06 2017, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
+>
+>> The Marvell 98DX3236, 98DX3336, 98DX4521 and variants are switch ASICs
+>> with integrated CPUs. They are similar to the Armada XP SoCs but have
+>> different I/O interfaces.
+>
+> Before sending a new version I have a few remarks:
+>
+>
 
-Thanks, applied to the same branch as other Exynos5433 changes. I can
-provide a tag with it, just give me a couple of days. Anyway it will be
-good if dependencies like this enter v4.11.
+[snip]
 
-Best regards,
-Krzysztof
+I'll update the dtsi files to use the node labels and correct the 
+commends as requested
+
+>
+> Why the following node is not part of the dtsi?
+>
+> Gregory
+>
+>> +			resume at 20980 {
+>> +				compatible = "marvell,98dx3336-resume-ctrl";
+>> +				reg = <0x20980 0x10>;
+>> +			};
+>> +		};
+>> +	};
+
+The 98DX9236 has a single ARMv7 core. As such this resume control isn't 
+present on it. The 98DX3336 and 98DX4521 have dual ARMv7 cores and this 
+is used to boot the second core (SMP support is a little different 
+compared to Armada-XP).
+
+In other words {98DX3336, 98DX4521} = 98DX9236 + an additional core. At 
+the switch packet processor level there are more differences but as far 
+as the kernel is concerned the only real difference is the number of cores.
