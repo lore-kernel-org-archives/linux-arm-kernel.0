@@ -1,55 +1,47 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 26 Jan 2017 10:29:22 +0100
-Subject: [PATCH v3 REBASED 08/13] pinctrl: samsung: Remove dead code
-In-Reply-To: <1485422967-30643-1-git-send-email-m.szyprowski@samsung.com>
-References: <CACRpkdY_SpqfyTTqSP5+a1k1LDf_5w77UXo=EognmOzWBz2c-Q@mail.gmail.com>
- <1485422967-30643-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170126093000eucas1p2090613930c07a90f42e1b7b48584e012@eucas1p2.samsung.com>
-Message-ID: <1485422967-30643-5-git-send-email-m.szyprowski@samsung.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 26 Jan 2017 18:34:21 +0900
+Subject: [PATCH] arm64: defconfig: enable CONFIG_MMC_SDHCI_CADENCE
+In-Reply-To: <1482718493-6792-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1482718493-6792-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK7LNAR8_Aom6qZyOEV7Kd2AC_UTW3yHL_-u=6ubOBGRNhyrmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-'enable' parameter has been removed a while ago, so all code for handling
-it can be simply removed.
+Hi Arnd, Olof,
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
-Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
----
- drivers/pinctrl/samsung/pinctrl-samsung.c | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
-index 10b3fd826231..2803ae57f373 100644
---- a/drivers/pinctrl/samsung/pinctrl-samsung.c
-+++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
-@@ -350,7 +350,7 @@ static void pin_to_reg_bank(struct samsung_pinctrl_drv_data *drvdata,
- 
- /* enable or disable a pinmux function */
- static void samsung_pinmux_setup(struct pinctrl_dev *pctldev, unsigned selector,
--					unsigned group, bool enable)
-+					unsigned group)
- {
- 	struct samsung_pinctrl_drv_data *drvdata;
- 	const struct samsung_pin_bank_type *type;
-@@ -380,8 +380,7 @@ static void samsung_pinmux_setup(struct pinctrl_dev *pctldev, unsigned selector,
- 
- 	data = readl(reg + type->reg_offset[PINCFG_TYPE_FUNC]);
- 	data &= ~(mask << shift);
--	if (enable)
--		data |= func->val << shift;
-+	data |= func->val << shift;
- 	writel(data, reg + type->reg_offset[PINCFG_TYPE_FUNC]);
- 
- 	spin_unlock_irqrestore(&bank->slock, flags);
-@@ -392,7 +391,7 @@ static int samsung_pinmux_set_mux(struct pinctrl_dev *pctldev,
- 				  unsigned selector,
- 				  unsigned group)
- {
--	samsung_pinmux_setup(pctldev, selector, group, true);
-+	samsung_pinmux_setup(pctldev, selector, group);
- 	return 0;
- }
- 
+2016-12-26 11:14 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> Enable the Cadence SD/SDIO/eMMC controller.  This is used on
+> Socionext UniPhier SoC family.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+
+
+Can you pick up this for ASOC, please?
+
+
+>
+>  arch/arm64/configs/defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index 0888cab..23045b4 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -384,6 +384,7 @@ CONFIG_MMC_SDHCI_ACPI=y
+>  CONFIG_MMC_SDHCI_PLTFM=y
+>  CONFIG_MMC_SDHCI_OF_ARASAN=y
+>  CONFIG_MMC_SDHCI_OF_ESDHC=y
+> +CONFIG_MMC_SDHCI_CADENCE=y
+>  CONFIG_MMC_SDHCI_TEGRA=y
+>  CONFIG_MMC_SDHCI_MSM=y
+>  CONFIG_MMC_SPI=y
+> --
+> 2.7.4
+>
+
+
+
 -- 
-1.9.1
+Best Regards
+Masahiro Yamada
