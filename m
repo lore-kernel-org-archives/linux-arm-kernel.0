@@ -1,45 +1,84 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 26 Jan 2017 14:19:53 +0100
-Subject: [PATCH v4 0/9] Implement clocksource for rockchip SoC using
- rockchip timer
-In-Reply-To: <F4C90577-1F45-47A0-A532-7AC581825279@gmail.com>
-References: <1480343486-25539-1-git-send-email-al.kochet@gmail.com>
- <E6DD9335-0D2D-47CB-8098-5F96C2E08139@gmail.com>
- <20170123144744.GE2166@mai> <1793912.WfGyM7qEjy@diego>
- <58B283B0-02F6-4342-A6D2-7E082E04863E@gmail.com>
- <20170123175740.GI2166@mai>
- <F4C90577-1F45-47A0-A532-7AC581825279@gmail.com>
-Message-ID: <20170126131953.GI2021@mai>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 26 Jan 2017 14:19:59 +0100
+Subject: [PATCH 1/3] arm/arm64: KVM: Enforce unconditional flush to PoC
+ when mapping to stage-2
+In-Reply-To: <1485358591-12278-2-git-send-email-marc.zyngier@arm.com>
+References: <1485358591-12278-1-git-send-email-marc.zyngier@arm.com>
+ <1485358591-12278-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20170126131959.GX15850@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 02:08:45PM +0300, Alexander Kochetkov wrote:
-> Hello Daniel!
+On Wed, Jan 25, 2017 at 03:36:29PM +0000, Marc Zyngier wrote:
+> When we fault in a page, we flush it to the PoC (Point of Coherency)
+> if the faulting vcpu has its own caches off, so that it can observe
+> the page we just brought it.
 > 
-> Sorry for bothering you. Just let you know that I sent v5 here:
-> http://lists.infradead.org/pipermail/linux-rockchip/2017-January/thread.html#13812
+> But if the vcpu has its caches on, we skip that step. Bad things
+> happen when *another* vcpu tries to access that page with its own
+> caches disabled. At that point, there is no garantee that the
+> data has made it to the PoC, and we access stale data.
 > 
-> Because previous series was somehow missed in your inbox.
+> The obvious fix is to always flush to PoC when a page is faulted
+> in, no matter what the state of the vcpu is.
 > 
-> Heiko don?t want to add  "Reviewed-by? to my patches. Could you please
-> apply the patches without the tag.
+> Cc: stable at vger.kernel.org
+> Fixes: 2d58b733c876 ("arm64: KVM: force cache clean on page fault when caches are off")
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+
+> ---
+>  arch/arm/include/asm/kvm_mmu.h   | 9 +--------
+>  arch/arm64/include/asm/kvm_mmu.h | 3 +--
+>  2 files changed, 2 insertions(+), 10 deletions(-)
 > 
-> Let me know is all ok with series now? Or may be I have to do something else?
-
-Alexander,
-
-I think you misinterpreted Heiko's comment. He just want to take the time to
-review the driver in details and add himself the reviewed-by tag which is
-usually the procedure. I have to review the driver also.
-
-Meanwile you can have a look at https://lkml.org/lkml/2017/1/25/236
-
-
-
--- 
-
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+> index 74a44727..a58bbaa 100644
+> --- a/arch/arm/include/asm/kvm_mmu.h
+> +++ b/arch/arm/include/asm/kvm_mmu.h
+> @@ -150,18 +150,12 @@ static inline void __coherent_cache_guest_page(struct kvm_vcpu *vcpu,
+>  	 * and iterate over the range.
+>  	 */
+>  
+> -	bool need_flush = !vcpu_has_cache_enabled(vcpu) || ipa_uncached;
+> -
+>  	VM_BUG_ON(size & ~PAGE_MASK);
+>  
+> -	if (!need_flush && !icache_is_pipt())
+> -		goto vipt_cache;
+> -
+>  	while (size) {
+>  		void *va = kmap_atomic_pfn(pfn);
+>  
+> -		if (need_flush)
+> -			kvm_flush_dcache_to_poc(va, PAGE_SIZE);
+> +		kvm_flush_dcache_to_poc(va, PAGE_SIZE);
+>  
+>  		if (icache_is_pipt())
+>  			__cpuc_coherent_user_range((unsigned long)va,
+> @@ -173,7 +167,6 @@ static inline void __coherent_cache_guest_page(struct kvm_vcpu *vcpu,
+>  		kunmap_atomic(va);
+>  	}
+>  
+> -vipt_cache:
+>  	if (!icache_is_pipt() && !icache_is_vivt_asid_tagged()) {
+>  		/* any kind of VIPT cache */
+>  		__flush_icache_all();
+> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+> index 6f72fe8..6d22017 100644
+> --- a/arch/arm64/include/asm/kvm_mmu.h
+> +++ b/arch/arm64/include/asm/kvm_mmu.h
+> @@ -241,8 +241,7 @@ static inline void __coherent_cache_guest_page(struct kvm_vcpu *vcpu,
+>  {
+>  	void *va = page_address(pfn_to_page(pfn));
+>  
+> -	if (!vcpu_has_cache_enabled(vcpu) || ipa_uncached)
+> -		kvm_flush_dcache_to_poc(va, size);
+> +	kvm_flush_dcache_to_poc(va, size);
+>  
+>  	if (!icache_is_aliasing()) {		/* PIPT */
+>  		flush_icache_range((unsigned long)va,
+> -- 
+> 2.1.4
+> 
