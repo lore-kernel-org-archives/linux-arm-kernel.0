@@ -1,33 +1,27 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 26 Jan 2017 17:07:47 +0000
-Subject: [PATCH] spi: mediatek: Manually set dma_ops for spi_master device
-In-Reply-To: <CAGS+omC-LnTx9Qt4Cv+7u-Oh=4syZy_mA-FqF8bUzN0DQmgAig@mail.gmail.com>
-References: <20170124132519.13271-1-djkurtz@chromium.org>
- <b1180920-8ead-40e8-6155-8510226e719b@arm.com>
- <CAGS+omBV3o1hergAjU3_9ok5NTmk8Z315zo3yW9jU_jA+reZCQ@mail.gmail.com>
- <0548db75-042b-4bef-02db-767ea9ccd7e4@arm.com>
- <CAGS+omDexcrnWL6v4bAQ3K2QSHKcwCs-WRCC+BUbGbXgVYbK9w@mail.gmail.com>
- <CAE_wzQ8ChZtLait3WWin1nyRY5CQCzs8VHTeAcP8y2DqSGmb7Q@mail.gmail.com>
- <CAGS+omC-LnTx9Qt4Cv+7u-Oh=4syZy_mA-FqF8bUzN0DQmgAig@mail.gmail.com>
-Message-ID: <20170126170747.r6gegu3buqeedp54@sirena.org.uk>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Thu, 26 Jan 2017 18:15:55 +0100
+Subject: [PATCH 5/5] iommu: Allow default domain type to be set on the
+ kernel command line
+In-Reply-To: <1484849955-1871-6-git-send-email-will.deacon@arm.com>
+References: <1484849955-1871-1-git-send-email-will.deacon@arm.com>
+ <1484849955-1871-6-git-send-email-will.deacon@arm.com>
+Message-ID: <20170126171555.GD27598@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2017 at 12:52:15AM +0800, Daniel Kurtz wrote:
-> On Fri, Jan 27, 2017 at 12:35 AM, Dmitry Torokhov <dtor@chromium.org> wrote:
+On Thu, Jan 19, 2017 at 06:19:15PM +0000, Will Deacon wrote:
+> Rather than modify each IOMMU driver to provide different semantics for
+> DMA domains, instead we introduce a command line parameter that can be
+> used to change the type of the default domain. Passthrough can then be
+> specified using "iommu.default_domain=identity" on the kernel command
+> line.
 
-> > Nobody doing DMA likes unaligned buffers. In fact, memory used for DMA
-> > must be cacheline aligned, or you going to have trouble. What
-> > component supplies unaligned buffers to SPI core for transfers?
+I like the general idea of this, but the above is a terrible name for a
+kernel commandline-parameter. The x86 iommus support iommu=pt which is
+pretty much the same as this patch does.
 
-> cros-ec-spi
+How about something like "iommu.passthrough=0/1"? And please add the
+parameter to the kernel documentation too.
 
-That needs fixing then - I keep thinking we should add a warning to the
-core for this, especially now we do DMA mapping in the core.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170126/e9fe70d0/attachment.sig>
+
+	Joerg
