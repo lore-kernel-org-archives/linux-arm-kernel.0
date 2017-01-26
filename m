@@ -1,43 +1,111 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 26 Jan 2017 17:27:54 +0100
-Subject: [GIT PULL] ARM: at91: dt for 4.11 #2
-Message-ID: <20170126162754.rn2kj6ecser5tzyq@piout.net>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Fri, 27 Jan 2017 00:29:05 +0800
+Subject: [PATCH] spi: mediatek: Manually set dma_ops for spi_master device
+In-Reply-To: <0548db75-042b-4bef-02db-767ea9ccd7e4@arm.com>
+References: <20170124132519.13271-1-djkurtz@chromium.org>
+ <b1180920-8ead-40e8-6155-8510226e719b@arm.com>
+ <CAGS+omBV3o1hergAjU3_9ok5NTmk8Z315zo3yW9jU_jA+reZCQ@mail.gmail.com>
+ <0548db75-042b-4bef-02db-767ea9ccd7e4@arm.com>
+Message-ID: <CAGS+omDexcrnWL6v4bAQ3K2QSHKcwCs-WRCC+BUbGbXgVYbK9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Robin,
 
-Two non urgent fixes for 4.11 that could hopefully be backported as far
-back as possible to make kernelci (and our users) happy.
+On Thu, Jan 26, 2017 at 1:59 AM, Robin Murphy <robin.murphy@arm.com> wrote:
+>
+> On 25/01/17 10:24, Daniel Kurtz wrote:
+> > Hi Robin,
+> >
+> > On Tue, Jan 24, 2017 at 11:14 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> >> Hi Dan,
+> >
+> > [snip...]
+> >
+> >>> And I really don't know why we needed to set the coherent_dma_mask to 0 to
+> >>> avoid SPI transaction errors.
+> >>
+> >> Following what I mentioned above, "git grep dma_alloc drivers/spi" makes
+> >> it seem like coherent DMA isn't used anywhere relevant, which is rather
+> >> puzzling. Unless of course somewhere along the line somebody's done the
+> >> dev->dma_mask = &dev->dma_coherent_mask hack, with the result that
+> >> writing one mask hits both, making *all* DMA fail and big transfers fall
+> >> back to PIO.
+> >
+> > You mean this last line?
+> >
+> >>> @@ -575,6 +576,10 @@ static int mtk_spi_probe(struct platform_device *pdev)
+> >>>               goto err_put_master;
+> >>>       }
+> >>>
+> >>> +     /* Call of_dma_configure to set up spi_master's dma_ops */
+> >>> +     of_dma_configure(&master->dev, master->dev.of_node);
+> >>> +     /* But explicitly set the coherent_dma_mask to 0 */
+> >>> +     master->dev.coherent_dma_mask = 0;
+> >>>       if (!pdev->dev.dma_mask)
+> >>>               pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+> >                                   ^^^^^
+>
+> Ha, I totally failed to spot that!
+>
+> > As predicted, setting the dma_mask = 0 causes "all DMA to fail".  In
+> > particular, dma_capable() always returns false, so
+> > swiotlb_map_sg_attrs() takes the map_single() path, instead of just
+> > assigning:
+> >
+> >    sg->dma_address = dev_addr;
+> >
+> > swiotlb_map_sg_attrs(struct device *hwdev, struct scatterlist *sgl, int nelems,
+> >                      enum dma_data_direction dir, unsigned long attrs)
+> > {
+> >         struct scatterlist *sg;
+> >         int i;
+> >
+> >         BUG_ON(dir == DMA_NONE);
+> >
+> >         for_each_sg(sgl, sg, nelems, i) {
+> >                 phys_addr_t paddr = sg_phys(sg);
+> >                 dma_addr_t dev_addr = phys_to_dma(hwdev, paddr);
+> >
+> >                 if (swiotlb_force == SWIOTLB_FORCE ||
+> >                     !dma_capable(hwdev, dev_addr, sg->length)) {
+> >                         phys_addr_t map = map_single(hwdev, sg_phys(sg),
+> >                                                      sg->length, dir, attrs);
+> >                         ...
+> >                         }
+> >                         sg->dma_address = phys_to_dma(hwdev, map);
+> >                 } else
+> >                         sg->dma_address = dev_addr;
+> >                 sg_dma_len(sg) = sg->length;
+> >         }
+> >         return nelems;
+> > }
+> >
+> > So, I think this means that the only reason the MTK SPI driver ever
+> > worked before was that it was tested on an older kernel, so the
+> > spi_master was defaulting to swiotlb_dma_ops with a 0 dma_mask, and
+> > therefore it was using SWIOTLB bounce buffers (via 'map_single'), and
+> > not actually ever doing real DMA.
+>
+> Well, it's still "real DMA" if the device is able to slurp data out of
+> the bounce buffer. That suggests there might be some mismatch between
+> the default DMA mask it's getting given and the actual hardware
+> capability (i.e. the bounce buffer happens to fall somewhere accessible,
+> but other addresses may not be) - is crazy 33-bit mode involved here?
 
-The following changes since commit 21dd0ece34c2a07432a1cd0bbcb4815ce2b49173:
+AFAICT, the Mediatek SPI does not have a 33-bit mode.  The Mediatek
+SPI DMA registers are only 32-bits wide, so the default 0xffffffff
+dma_mask is correct.  For larger addresses, swiotlb properly falls
+back to using a bounce buffer.
 
-  ARM: dts: at91: add devicetree for the Axentia TSE-850 (2017-01-10 16:16:33 +0100)
+However, I did discover what the real problem was.  The Mediatek SPI
+DMA does not like un-aligned addresses.
+Teaching the driver to use the FIFO even for large buffers, and
+forcing un-aligned buffers to use the FIFO makes the SPI very
+reliable:
 
-are available in the git repository at:
+https://patchwork.kernel.org/patch/9539735/
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.11-dt2
+Thanks for your help!
 
-for you to fetch changes up to 78162d48466d23c45a784034630c5928af631e3d:
-
-  ARM: dts: at91: Enable DMA on sama5d2_xplained console (2017-01-23 00:33:43 +0100)
-
-----------------------------------------------------------------
-DT for 4.11 #2:
-
- - Enable the DMA on sama5d2 and sama5d4 xplained to fix an issue seen by
- kernelci
-
-----------------------------------------------------------------
-Alexandre Belloni (2):
-      ARM: dts: at91: Enable DMA on sama5d4_xplained console
-      ARM: dts: at91: Enable DMA on sama5d2_xplained console
-
- arch/arm/boot/dts/at91-sama5d2_xplained.dts | 2 ++
- arch/arm/boot/dts/at91-sama5d4_xplained.dts | 2 ++
- 2 files changed, 4 insertions(+)
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+-Dan
