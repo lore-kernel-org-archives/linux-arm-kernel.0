@@ -1,33 +1,156 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 26 Jan 2017 19:23:25 +0800
-Subject: [PATCH 10/11] arm64: dts: allwinner: Remove no longer used
- pinctrl/sun4i-a10.h header
-In-Reply-To: <20170126101529.j3fuku4hyy3pbge3@lukather>
-References: <20170124023230.3990-1-wens@csie.org>
- <20170124023230.3990-11-wens@csie.org>
- <20170126101529.j3fuku4hyy3pbge3@lukather>
-Message-ID: <CAGb2v66cQoPQzd6W1D8bZ5hSURfGP3icJjeoo1mNk2ccG9B2vw@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 26 Jan 2017 20:28:12 +0900
+Subject: [PATCH v30 05/11] arm64: kdump: protect crash dump kernel memory
+In-Reply-To: <5888E262.4050208@arm.com>
+References: <20170124084638.3770-1-takahiro.akashi@linaro.org>
+ <20170124085004.3892-4-takahiro.akashi@linaro.org>
+ <5888E262.4050208@arm.com>
+Message-ID: <20170126112811.GG23406@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 6:15 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> On Tue, Jan 24, 2017 at 10:32:29AM +0800, Chen-Yu Tsai wrote:
->> All dts files for the sunxi platform have been switched to the generic
->> pinconf bindings. As a result, the sunxi specific pinctrl macros are
->> no longer used.
->>
->> Remove the #include entry with the following command:
->>
->>     sed -i -e '/pinctrl\/sun4i-a10.h/D' \
->>       arch/arm64/boot/dts/allwinner/*.dts?
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->
-> Applied, thanks!
->
-> Maybe we should also remove the header entirely?
+James,
 
-I don't know. What do we do about deprecated bindings?
+I will try to revisit your comments later, but quick replies now
 
-ChenYu
+On Wed, Jan 25, 2017 at 05:37:38PM +0000, James Morse wrote:
+> Hi Akashi,
+> 
+> On 24/01/17 08:49, AKASHI Takahiro wrote:
+> > To protect the memory reserved for crash dump kernel once after loaded,
+> > arch_kexec_protect_crashres/unprotect_crashres() are meant to deal with
+> > permissions of the corresponding kernel mappings.
+> > 
+> > We also have to
+> > - put the region in an isolated mapping, and
+> > - move copying kexec's control_code_page to machine_kexec_prepare()
+> > so that the region will be completely read-only after loading.
+> 
+> 
+> > Note that the region must reside in linear mapping and have corresponding
+> > page structures in order to be potentially freed by shrinking it through
+> > /sys/kernel/kexec_crash_size.
+> 
+> Nasty! Presumably you have to build the crash region out of individual page
+> mappings,
+
+This might be an alternative, but
+
+> so that they can be returned to the slab-allocator one page at a time,
+> and still be able to set/clear the valid bits on the remaining chunk.
+> (I don't see how that happens in this patch)
+
+As far as shrinking feature is concerned, I believe, crash_shrink_memory(),
+which eventually calls free_reserved_page(), will take care of all the things
+to do. I can see increased number of "MemFree" in /proc/meminfo.
+(Please note that the region is memblock_reserve()'d at boot time.)
+
+> debug_pagealloc has to do this too so it can flip the valid bits one page at a
+> time. You could change the debug_pagealloc_enabled() value passed in at the top
+> __create_pgd_mapping() level to be a needs_per_page_mapping(addr, size) test
+> that happens as we build the linear map. (This would save the 3 extra calls to
+> __create_pgd_mapping() in __map_memblock())
+> 
+> I'm glad to see you can't resize the region if a crash kernel is loaded!
+> 
+> This secretly-unmapped is the sort of thing that breaks hibernate, it blindly
+> assumes pfn_valid() means it can access the page if it wants to. Setting
+> PG_Reserved is a quick way to trick it out of doing this, but that would leave
+> the crash kernel region un-initialised after resume, while kexec_crash_image
+> still has a value.
+
+Ouch, I didn't notice this issue.
+
+> I think the best fix for this is to forbid hibernate if kexec_crash_loaded()
+> arguing these are mutually-exclusive features, and the protect crash-dump
+> feature exists to prevent things like hibernate corrupting the crash region.
+
+This restriction is really painful.
+Is there any hibernation hook that will be invoked before suspending and
+after resuming? If so, arch_kexec_unprotect_crashkres()/protect_crashkres()
+will be able to be called.
+
+Or if "read-only (without unmapping)" approach would be acceptable, 
+those two features might be no longer mutually-exclusive.
+
+> 
+> 
+> > diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+> > index bc96c8a7fc79..f7938fecf3ff 100644
+> > --- a/arch/arm64/kernel/machine_kexec.c
+> > +++ b/arch/arm64/kernel/machine_kexec.c
+> > @@ -159,32 +171,20 @@ void machine_kexec(struct kimage *kimage)
+> >  		kimage->control_code_page);
+> >  	pr_debug("%s:%d: reboot_code_buffer_phys:  %pa\n", __func__, __LINE__,
+> >  		&reboot_code_buffer_phys);
+> > -	pr_debug("%s:%d: reboot_code_buffer:       %p\n", __func__, __LINE__,
+> > -		reboot_code_buffer);
+> >  	pr_debug("%s:%d: relocate_new_kernel:      %p\n", __func__, __LINE__,
+> >  		arm64_relocate_new_kernel);
+> >  	pr_debug("%s:%d: relocate_new_kernel_size: 0x%lx(%lu) bytes\n",
+> >  		__func__, __LINE__, arm64_relocate_new_kernel_size,
+> >  		arm64_relocate_new_kernel_size);
+> >  
+> > -	/*
+> > -	 * Copy arm64_relocate_new_kernel to the reboot_code_buffer for use
+> > -	 * after the kernel is shut down.
+> > -	 */
+> > -	memcpy(reboot_code_buffer, arm64_relocate_new_kernel,
+> > -		arm64_relocate_new_kernel_size);
+> > -
+> > -	/* Flush the reboot_code_buffer in preparation for its execution. */
+> > -	__flush_dcache_area(reboot_code_buffer, arm64_relocate_new_kernel_size);
+> > -	flush_icache_range((uintptr_t)reboot_code_buffer,
+> > -		arm64_relocate_new_kernel_size);
+> 
+> 
+> 
+> > -	/* Flush the kimage list and its buffers. */
+> > -	kexec_list_flush(kimage);
+> > +	if (kimage != kexec_crash_image) {
+> > +		/* Flush the kimage list and its buffers. */
+> > +		kexec_list_flush(kimage);
+> >  
+> > -	/* Flush the new image if already in place. */
+> > -	if (kimage->head & IND_DONE)
+> > -		kexec_segment_flush(kimage);
+> > +		/* Flush the new image if already in place. */
+> > +		if (kimage->head & IND_DONE)
+> > +			kexec_segment_flush(kimage);
+> > +	}
+> 
+> So for kdump we cleaned the kimage->segment[i].mem regions in
+> arch_kexec_protect_crashkres(), so don't need to do it here.
+
+Correct.
+
+> What about the kimage->head[i] array of list entries that were cleaned by
+> kexec_list_flush()? Now we don't clean that for kdump either, but we do pass it
+> arm64_relocate_new_kernel() at the end of this function:
+> > cpu_soft_restart(1, reboot_code_buffer_phys, kimage->head, kimage_start, 0);
+
+Kimage->head holds a list of memory regions that are overlapped
+between the primary kernel and the secondary kernel, but in kedump case,
+the whole memory is isolated and the list should be empty.
+
+That is why kexec_list_flush() is skipped here, but yes,
+"kimage->head" might better be cleaned anyway.
+(I believe, from the past discussions, that cache coherency is still
+maintained in kdump case though.)
+
+> Can we test the IND_DONE_BIT of kimage->head, so that we know that
+> arm64_relocate_new_kernel() won't try to walk the unclean list?
+> Alternatively we could call kexec_list_flush() in arch_kexec_protect_crashkres()
+> too.
+
+So call kexec_list_flush() in machine_kexec() either in kexec or kdump.
+
+Thanks,
+-Takahiro AKASHI
+
+> 
+> 
+> Thanks,
+> 
+> James
+> 
