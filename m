@@ -1,56 +1,71 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 26 Jan 2017 12:16:18 +0000
-Subject: [PATCH] pwm: fix undefined behavior in stm32_pwm_apply
-In-Reply-To: <20170125223155.1388582-1-arnd@arndb.de>
-References: <20170125223155.1388582-1-arnd@arndb.de>
-Message-ID: <20170126121618.s66oob576faozd6z@dell>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 26 Jan 2017 12:18:11 +0000
+Subject: [PATCH] arm64: skip register_cpufreq_notifier on ACPI-based
+ systems
+In-Reply-To: <1485304992-26888-1-git-send-email-pprakash@codeaurora.org>
+References: <1485304992-26888-1-git-send-email-pprakash@codeaurora.org>
+Message-ID: <20170126121811.GD14167@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Jan 2017, Arnd Bergmann wrote:
+[adding Sudeep and Lorenzo for comment]
 
-> The stm32_pwm_apply randomly sets the polarity or doesn't,
-> as pointed out by this gcc warning:
+On Tue, Jan 24, 2017 at 05:43:12PM -0700, Prashanth Prakash wrote:
+> On ACPI based systems where the topology is setup using the API
+> store_cpu_topology, at the moment we do not have necessary code
+> to handle a cpufreq notifier, thus resulting in a crash.
+
+What is the "necessary code" that we're missing? Wouldn't it be better
+to add that, or explicitly avoid the cpufreq notifier registration if
+we're using ACPI?
+
+Will
+
+
+> Skip register_cpufreq_notifier if raw_capacity is not allocated
+> as part of topology initialization.
 > 
-> drivers/pwm/pwm-stm32.c: In function 'stm32_pwm_apply':
-> drivers/pwm/pwm-stm32.c:204:33: error: 'curstate.polarity' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+> Stack:
+>         init_cpu_capacity_callback+0xb4/0x1c8
+>         notifier_call_chain+0x5c/0xa0
+>         __blocking_notifier_call_chain+0x58/0xa0
+>         blocking_notifier_call_chain+0x3c/0x50
+>         cpufreq_set_policy+0xe4/0x328
+>         cpufreq_init_policy+0x80/0x100
+>         cpufreq_online+0x418/0x710
+>         cpufreq_add_dev+0x118/0x180
+>         subsys_interface_register+0xa4/0xf8
+>         cpufreq_register_driver+0x1c0/0x298
+>         cppc_cpufreq_init+0xdc/0x1000 [cppc_cpufreq]
+>         do_one_initcall+0x5c/0x168
+>         do_init_module+0x64/0x1e4
+>         load_module+0x130c/0x14d0
+>         SyS_finit_module+0x108/0x120
+>         el0_svc_naked+0x24/0x28
 > 
-> I assume it was meant to compare the new state to the current
-> state rather than an uninitialized stack variable, so let's
-> do that instead.
+> Patch that added support for popultaing cpu capacity for DT:
+> https://patchwork.codeaurora.org/patch/98353/
 > 
-> Fixes: bafffb6e7bd1 ("pwm: Add driver for STM32 plaftorm")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Prashanth Prakash <pprakash@codeaurora.org>
 > ---
->  drivers/pwm/pwm-stm32.c | 3 +--
->  1 file changed, 1 insertion(+), 2 deletions(-)
-
-Fix from the author already applied.
-
-> diff --git a/drivers/pwm/pwm-stm32.c b/drivers/pwm/pwm-stm32.c
-> index ce6232ebefe1..6139512aab7b 100644
-> --- a/drivers/pwm/pwm-stm32.c
-> +++ b/drivers/pwm/pwm-stm32.c
-> @@ -189,7 +189,6 @@ static void stm32_pwm_disable(struct stm32_pwm *priv, int ch)
->  static int stm32_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
->  			   struct pwm_state *state)
+>  arch/arm64/kernel/topology.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kernel/topology.c b/arch/arm64/kernel/topology.c
+> index 23e9e13..3f175ce 100644
+> --- a/arch/arm64/kernel/topology.c
+> +++ b/arch/arm64/kernel/topology.c
+> @@ -209,7 +209,7 @@ static void normalize_cpu_capacity(void)
+>  
+>  static int __init register_cpufreq_notifier(void)
 >  {
-> -	struct pwm_state curstate;
->  	bool enabled;
->  	struct stm32_pwm *priv = to_stm32_pwm_dev(chip);
->  	int ret;
-> @@ -201,7 +200,7 @@ static int stm32_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
->  		return 0;
->  	}
+> -	if (cap_parsing_failed)
+> +	if (cap_parsing_failed || !raw_capacity)
+>  		return -EINVAL;
 >  
-> -	if (state->polarity != curstate.polarity)
-> +	if (state->polarity != pwm->state.polarity)
->  		stm32_pwm_set_polarity(priv, pwm->hwpwm, state->polarity);
->  
->  	ret = stm32_pwm_config(priv, pwm->hwpwm,
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+>  	if (!alloc_cpumask_var(&cpus_to_visit, GFP_KERNEL)) {
+> -- 
+> Qualcomm Datacenter Technologies on behalf of Qualcomm Technologies, Inc.
+> Qualcomm Technologies, Inc. is a member of the
+> Code Aurora Forum, a Linux Foundation Collaborative Project.
+> 
