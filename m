@@ -1,44 +1,62 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Thu, 26 Jan 2017 17:38:27 +0100
-Subject: [PATCH v2 1/2] Documentation: mtk-quadspi: update DT bindings
-In-Reply-To: <1485315515-29942-2-git-send-email-guochun.mao@mediatek.com>
-References: <1485315515-29942-1-git-send-email-guochun.mao@mediatek.com>
- <1485315515-29942-2-git-send-email-guochun.mao@mediatek.com>
-Message-ID: <bca4628c-b203-9464-5810-152facdc4a66@atmel.com>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Thu, 26 Jan 2017 16:42:40 +0000
+Subject: [RFC PATCH v6 2/7] dma: Add simple dma_noop_mmap
+In-Reply-To: <1485448965-32855-1-git-send-email-vladimir.murzin@arm.com>
+References: <1485448965-32855-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <1485448965-32855-3-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 25/01/2017 ? 04:38, Guochun Mao a ?crit :
-> Add "mediatek,mt2701-nor" for nor flash node's compatible.
-> 
-> Signed-off-by: Guochun Mao <guochun.mao@mediatek.com>
-> ---
->  .../devicetree/bindings/mtd/mtk-quadspi.txt        |    8 +++++++-
->  1 file changed, 7 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> index fb314f0..5ded66a 100644
-> --- a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> +++ b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> @@ -1,7 +1,13 @@
->  * Serial NOR flash controller for MTK MT81xx (and similar)
->  
->  Required properties:
-> -- compatible: 	  should be "mediatek,mt8173-nor";
-> +- compatible: 	  The possible values are:
-> +		  "mediatek,mt2701-nor"
-> +		  "mediatek,mt7623-nor"
-> +		  "mediatek,mt8173-nor"
-> +		  For mt8173, compatible should be "mediatek,mt8173-nor".
-> +		  For every other SoC, should contain both the SoC-specific compatible string
-> +		  and "mediatek,mt8173-nor".
->  - reg: 		  physical base address and length of the controller's register
->  - clocks: 	  the phandle of the clocks needed by the nor controller
->  - clock-names: 	  the names of the clocks
-> 
+This patch adds a simple implementation of mmap to dma_noop_ops.
 
-Rob, is it ok for you if I take this patch in the spi-nor tree?
+Cc: Joerg Roedel <jroedel@suse.de>
+Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+Reported-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Tested-by: Andras Szemzo <sza@esh.hu>
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+ lib/dma-noop.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-Best regards,
-
-Cyrille
+diff --git a/lib/dma-noop.c b/lib/dma-noop.c
+index a14eee5..70504eb 100644
+--- a/lib/dma-noop.c
++++ b/lib/dma-noop.c
+@@ -66,6 +66,26 @@ static int dma_noop_supported(struct device *dev, u64 mask)
+ 	return 1;
+ }
+ 
++static int dma_noop_mmap(struct device *dev, struct vm_area_struct *vma,
++			 void *cpu_addr, dma_addr_t dma_addr, size_t size,
++			 unsigned long attrs)
++{
++	unsigned long user_count = vma_pages(vma);
++	unsigned long count = PAGE_ALIGN(size) >> PAGE_SHIFT;
++	unsigned long pfn = page_to_pfn(virt_to_page(cpu_addr));
++	unsigned long off = vma->vm_pgoff;
++	int ret = -ENXIO;
++
++	if (off < count && user_count <= (count - off)) {
++		ret = remap_pfn_range(vma, vma->vm_start,
++				      pfn + off,
++				      user_count << PAGE_SHIFT,
++				      vma->vm_page_prot);
++	}
++
++	return ret;
++}
++
+ struct dma_map_ops dma_noop_ops = {
+ 	.alloc			= dma_noop_alloc,
+ 	.free			= dma_noop_free,
+@@ -73,6 +93,7 @@ struct dma_map_ops dma_noop_ops = {
+ 	.map_sg			= dma_noop_map_sg,
+ 	.mapping_error		= dma_noop_mapping_error,
+ 	.dma_supported		= dma_noop_supported,
++	.mmap			= dma_noop_mmap,
+ };
+ 
+ EXPORT_SYMBOL(dma_noop_ops);
+-- 
+2.0.0
