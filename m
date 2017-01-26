@@ -1,51 +1,19 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 26 Jan 2017 18:37:16 +0900
-Subject: [PATCH 1/2] arm64: defconfig: enable CONFIG_MTD_BLOCK
-In-Reply-To: <1482249893-14988-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1482249893-14988-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK7LNAQLeo_T5mPKffRXDRewZOrYijgSa4-Mjg_hiN64pLFZ1Q@mail.gmail.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 26 Jan 2017 10:27:43 +0100
+Subject: [PATCH 5/7] mfd: exynos-lpass: Remove pad retention control
+In-Reply-To: <1485345031-2948-6-git-send-email-m.szyprowski@samsung.com>
+References: <1485345031-2948-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170125115104eucas1p219f763cea7fdb2dfea092d1f2a28fc31@eucas1p2.samsung.com>
+ <1485345031-2948-6-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <fc87bf0b-b746-8ad8-ade9-fbebec1acb19@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+On 01/25/2017 12:50 PM, Marek Szyprowski wrote:
+> Pad retention should be controlled from pin control driver, so remove it
+> from Exynos LPASS driver. After this change, no more access to PMU regmap
+> is needed, so remove also the code for handling PMU regmap.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-2016-12-21 1:04 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> Enable the block layer support for MTD devices.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-
-Please check this series, and pick it up for ASOC if it looks good.
-
-Thanks,
-
-
->
->  arch/arm64/configs/defconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index 869dded..32d73ab 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -143,6 +143,7 @@ CONFIG_DEVTMPFS=y
->  CONFIG_DEVTMPFS_MOUNT=y
->  CONFIG_DMA_CMA=y
->  CONFIG_MTD=y
-> +CONFIG_MTD_BLOCK=y
->  CONFIG_MTD_M25P80=y
->  CONFIG_MTD_SPI_NOR=y
->  CONFIG_BLK_DEV_LOOP=y
-> --
-> 2.7.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
