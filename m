@@ -1,90 +1,162 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 26 Jan 2017 11:11:20 +0100
-Subject: [PATCH] ARM: shmobile: rcar-gen2: Add more register documentation
-In-Reply-To: <cover.1485425385.git.horms+renesas@verge.net.au>
-References: <cover.1485425385.git.horms+renesas@verge.net.au>
-Message-ID: <aa7f39d51e33555fc45645c08bc74a74e22b166f.1485425385.git.horms+renesas@verge.net.au>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 26 Jan 2017 10:15:21 +0000
+Subject: [PATCH V11 2/3] ACPI: Add support for ResourceSource/IRQ domain
+ mapping
+In-Reply-To: <CAHp75VeYxfuMuaZCMk+MYdxLTs7cCa6j6M7Ot3XnwMmeHP7kBA@mail.gmail.com>
+References: <1484879660-1960-1-git-send-email-agustinv@codeaurora.org>
+ <1484879660-1960-3-git-send-email-agustinv@codeaurora.org>
+ <CAHp75VeYxfuMuaZCMk+MYdxLTs7cCa6j6M7Ot3XnwMmeHP7kBA@mail.gmail.com>
+Message-ID: <20170126101521.GA10324@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+On Thu, Jan 26, 2017 at 03:01:18AM +0200, Andy Shevchenko wrote:
+> On Fri, Jan 20, 2017 at 4:34 AM, Agustin Vega-Frias
+> <agustinv@codeaurora.org> wrote:
+> > ACPI extended IRQ resources may contain a ResourceSource to specify
+> > an alternate interrupt controller. Introduce acpi_irq_get and use it
+> > to implement ResourceSource/IRQ domain mapping.
+> >
+> > The new API is similar to of_irq_get and allows re-initialization
+> > of a platform resource from the ACPI extended IRQ resource, and
+> > provides proper behavior for probe deferral when the domain is not
+> > yet present when called.
+> 
+> > +static struct fwnode_handle *
+> > +acpi_get_irq_source_fwhandle(const struct acpi_resource_source *source)
+> > +{
+> > +       struct fwnode_handle *result = NULL;
+> > +       struct acpi_device *device;
+> > +       struct acpi_hardware_id *hwid;
+> > +       struct acpi_device_id *devid;
+> > +       acpi_handle handle;
+> > +       acpi_status status;
+> > +
+> > +       if (!source->string_length)
+> > +               return acpi_gsi_domain_id;
+> > +
+> > +       status = acpi_get_handle(NULL, source->string_ptr, &handle);
+> > +       if (WARN_ON(ACPI_FAILURE(status)))
+> > +               return NULL;
+> > +
+> > +       device = acpi_bus_get_acpi_device(handle);
+> > +       if (WARN_ON(!device))
+> > +               return NULL;
+> > +
+> 
+> > +       list_for_each_entry(hwid, &device->pnp.ids, list) {
+> 
+> > +               for (devid = &__dsdt_irqchip_acpi_probe_table;
+> > +                    devid < &__dsdt_irqchip_acpi_probe_table_end; devid++) {
+> > +                       if (devid->id && !strcmp(devid->id, hwid->id)) {
+> > +                               result = &device->fwnode;
+> > +                               break;
+> > +                       }
+> > +               }
+> 
+> Looks like a candidate for linker table API. (I recommend to Cc Luis
+> for this part)
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/pm-rcar-gen2.c | 40 +++++++++++++++++++++++++----------
- 1 file changed, 29 insertions(+), 11 deletions(-)
+This linker table entry scheme is just an optimization and should
+not gate the series.
 
-diff --git a/arch/arm/mach-shmobile/pm-rcar-gen2.c b/arch/arm/mach-shmobile/pm-rcar-gen2.c
-index dd9ac366868f..0178da7ace82 100644
---- a/arch/arm/mach-shmobile/pm-rcar-gen2.c
-+++ b/arch/arm/mach-shmobile/pm-rcar-gen2.c
-@@ -20,14 +20,30 @@
- 
- /* RST */
- #define RST		0xe6160000
--#define CA15BAR		0x0020
--#define CA7BAR		0x0030
--#define CA15RESCNT	0x0040
--#define CA7RESCNT	0x0044
-+
-+#define CA15BAR		0x0020		/* CA15 Boot Address Register */
-+#define CA7BAR		0x0030		/* CA7 Boot Address Register */
-+#define CA15RESCNT	0x0040		/* CA15 Reset Control Register */
-+#define CA7RESCNT	0x0044		/* CA7 Reset Control Register */
-+
-+/* SYS Boot Address Register */
-+#define SBAR_BAREN	BIT(4)		/* SBAR is valid */
-+
-+/* Reset Control Registers */
-+#define CA15RESCNT_CODE	0xa5a50000
-+#define CA15RESCNT_CPUS	0xf		/* CPU0-3 */
-+#define CA7RESCNT_CODE	0x5a5a0000
-+#define CA7RESCNT_CPUS	0xf		/* CPU0-3 */
-+
- 
- /* On-chip RAM */
- #define ICRAM1		0xe63c0000	/* Inter Connect RAM1 (4 KiB) */
- 
-+static inline u32 phys_to_sbar(phys_addr_t addr)
-+{
-+	return (addr >> 8) & 0xfffffc00;
-+}
-+
- /* SYSC */
- #define SYSCIER 0x0c
- #define SYSCIMR 0x10
-@@ -82,22 +98,24 @@ void __init rcar_gen2_pm_init(void)
- 
- 	/* setup reset vectors */
- 	p = ioremap_nocache(RST, 0x63);
--	bar = (boot_vector_addr >> 8) & 0xfffffc00;
-+	bar = phys_to_sbar(boot_vector_addr);
- 	if (has_a15) {
- 		writel_relaxed(bar, p + CA15BAR);
--		writel_relaxed(bar | 0x10, p + CA15BAR);
-+		writel_relaxed(bar | SBAR_BAREN, p + CA15BAR);
- 
- 		/* de-assert reset for CA15 CPUs */
--		writel_relaxed((readl_relaxed(p + CA15RESCNT) & ~0x0f) |
--				0xa5a50000, p + CA15RESCNT);
-+		writel_relaxed((readl_relaxed(p + CA15RESCNT) &
-+				~CA15RESCNT_CPUS) | CA15RESCNT_CODE,
-+			       p + CA15RESCNT);
- 	}
- 	if (has_a7) {
- 		writel_relaxed(bar, p + CA7BAR);
--		writel_relaxed(bar | 0x10, p + CA7BAR);
-+		writel_relaxed(bar | SBAR_BAREN, p + CA7BAR);
- 
- 		/* de-assert reset for CA7 CPUs */
--		writel_relaxed((readl_relaxed(p + CA7RESCNT) & ~0x0f) |
--				0x5a5a0000, p + CA7RESCNT);
-+		writel_relaxed((readl_relaxed(p + CA7RESCNT) &
-+				~CA7RESCNT_CPUS) | CA7RESCNT_CODE,
-+			       p + CA7RESCNT);
- 	}
- 	iounmap(p);
- 
--- 
-2.7.0.rc3.207.g0ac5344
+> > +       }
+> 
+> > +/**
+> > + * acpi_irq_parse_one_match - Handle a matching IRQ resource.
+> > + * @fwnode: matching fwnode
+> > + * @hwirq: hardware IRQ number
+> > + * @triggering: triggering attributes of hwirq
+> > + * @polarity: polarity attributes of hwirq
+> > + * @polarity: polarity attributes of hwirq
+> > + * @shareable: shareable attributes of hwirq
+> > + * @ctx: acpi_irq_parse_one_ctx updated by this function
+> > + *
+> > + * Description:
+> > + * Handle a matching IRQ resource by populating the given ctx with
+> > + * the information passed.
+> > + */
+> > +static inline void acpi_irq_parse_one_match(struct fwnode_handle *fwnode,
+> > +                                           u32 hwirq, u8 triggering,
+> > +                                           u8 polarity, u8 shareable,
+> > +                                           struct acpi_irq_parse_one_ctx *ctx)
+> > +{
+> 
+> > +       if (!fwnode)
+> > +               return;
+> 
+> > +       ctx->rc = 0;
+> 
+> Perhaps ctx->rc = fwnode ? 0 : -EINVAL; ?
+> 
+> > +       *ctx->res_flags = acpi_dev_irq_flags(triggering, polarity, shareable);
+> > +       ctx->fwspec->fwnode = fwnode;
+> > +       ctx->fwspec->param[0] = hwirq;
+> > +       ctx->fwspec->param[1] = acpi_dev_get_irq_type(triggering, polarity);
+> > +       ctx->fwspec->param_count = 2;
+> > +}
+> 
+> > +int acpi_irq_get(acpi_handle handle, unsigned int index, struct resource *res)
+> > +{
+> > +       struct irq_fwspec fwspec;
+> > +       struct irq_domain *domain;
+> > +       unsigned long flags;
+> > +       int rc;
+> > +
+> > +       rc = acpi_irq_parse_one(handle, index, &fwspec, &flags);
+> > +       if (rc)
+> > +               return rc;
+> > +
+> > +       domain = irq_find_matching_fwnode(fwspec.fwnode, DOMAIN_BUS_ANY);
+> > +       if (!domain)
+> > +               return -EPROBE_DEFER;
+> > +
+> > +       rc = irq_create_fwspec_mapping(&fwspec);
+> > +       if (rc <= 0)
+> 
+> Is rc = 0 an error?
+
+Yes.
+
+> > +               return -EINVAL;
+> > +
+> > +       res->start = rc;
+> > +       res->end = rc;
+> > +       res->flags = flags;
+> > +
+> > +       return 0;
+> > +}
+> > +EXPORT_SYMBOL_GPL(acpi_irq_get);
+> 
+> > --- a/drivers/base/platform.c
+> > +++ b/drivers/base/platform.c
+> > @@ -102,6 +102,14 @@ int platform_get_irq(struct platform_device *dev, unsigned int num)
+> 
+> >         r = platform_get_resource(dev, IORESOURCE_IRQ, num);
+> > +       if (r && r->flags & IORESOURCE_DISABLED && has_acpi_companion(&dev->dev)) {
+> > +               int ret;
+> > +
+> > +               ret = acpi_irq_get(ACPI_HANDLE(&dev->dev), num, r);
+> > +               if (ret)
+> > +                       return ret;
+> > +       }
+> 
+> > +#ifdef CONFIG_ACPI_GENERIC_GSI
+> 
+> #if IS_ENABLED()
+> 
+> > +int acpi_irq_get(acpi_handle handle, unsigned int index, struct resource *res);
+> > +#else
+> > +static inline int acpi_irq_get(acpi_handle handle, unsigned int index,
+> > +                              struct resource *res)
+> 
+> Perhaps
+> 
+> static inline
+> int ...
+
+It is late -rc5 and notwithstanding cosmetics changes, can we make
+progress with this patch series or not please ?
+
+Thanks,
+Lorenzo
