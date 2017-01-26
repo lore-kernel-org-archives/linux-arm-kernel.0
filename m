@@ -1,32 +1,28 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Thu, 26 Jan 2017 10:54:56 +0100
-Subject: [PATCH v2 6/9] drm/panel: Add Netron DY E231732
-In-Reply-To: <20160906144620.6322-7-maxime.ripard@free-electrons.com>
-References: <20160906144620.6322-1-maxime.ripard@free-electrons.com>
- <20160906144620.6322-7-maxime.ripard@free-electrons.com>
-Message-ID: <20170126095456.GE3613@ulmo.ba.sec>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 26 Jan 2017 10:56:15 +0100
+Subject: [PATCH 1/5] arm64: defconfig: Enable SH Mobile I2C controller
+In-Reply-To: <1485420750-12701-2-git-send-email-horms+renesas@verge.net.au>
+References: <1485420750-12701-1-git-send-email-horms+renesas@verge.net.au>
+ <1485420750-12701-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdUmc0rEO1CgmodxZcrugeVVk6Mr-rWZBdEKseghJTE=_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 06, 2016 at 04:46:17PM +0200, Maxime Ripard wrote:
-> The E231732 is a 7" panel with a resolution of 800x480.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/gpu/drm/panel/panel-simple.c | 26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
+On Thu, Jan 26, 2017 at 9:52 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Enable SH Mobile I2C controller for use on R-Car Gen3 SoCs.
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-This is missing a device tree binding, but since this is a simple one I
-added it. The commit message also says the resolution is 800x480, which
-conflicts with what's in the display mode definition, so I've also
-fixed that up while at it.
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170126/f0e87c0b/attachment.sig>
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
