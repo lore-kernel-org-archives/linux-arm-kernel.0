@@ -1,39 +1,47 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 26 Jan 2017 11:11:04 +0100
-Subject: [PATCH 2/7] ARM: dts: r8a7743: Link ARM GIC to clock and clock domain
+Date: Thu, 26 Jan 2017 11:11:07 +0100
+Subject: [PATCH 5/7] ARM: dts: r7s72100: add ostm to device tree
 In-Reply-To: <cover.1485425227.git.horms+renesas@verge.net.au>
 References: <cover.1485425227.git.horms+renesas@verge.net.au>
-Message-ID: <7add1da17ac8d5c4a2ecc967843ca5b55ce35fa6.1485425227.git.horms+renesas@verge.net.au>
+Message-ID: <69b5c6dceaa138859f03ca20e3adca7ddec6bae7.1485425227.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Chris Brandt <chris.brandt@renesas.com>
 
-Link the ARM GIC to the INTC-SYS module clock, and add it to the SYSC
-"always-on" PM Domain, so it can be power managed using that clock.
-
-Note that currently the GIC-400 driver doesn't support module clocks nor
-Runtime PM, so this must be handled as a critical clock.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7743.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/r7s72100.dtsi | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
-index 0956125597fd..40d2cdede702 100644
---- a/arch/arm/boot/dts/r8a7743.dtsi
-+++ b/arch/arm/boot/dts/r8a7743.dtsi
-@@ -60,6 +60,9 @@
- 			      <0 0xf1006000 0 0x2000>;
- 			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(2) |
- 						 IRQ_TYPE_LEVEL_HIGH)>;
-+			clocks = <&cpg CPG_MOD 408>;
-+			clock-names = "clk";
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
- 		};
- 
- 		irqc: interrupt-controller at e61c0000 {
+diff --git a/arch/arm/boot/dts/r7s72100.dtsi b/arch/arm/boot/dts/r7s72100.dtsi
+index d5946df29222..74e684f3c1c7 100644
+--- a/arch/arm/boot/dts/r7s72100.dtsi
++++ b/arch/arm/boot/dts/r7s72100.dtsi
+@@ -505,4 +505,22 @@
+ 		cap-sdio-irq;
+ 		status = "disabled";
+ 	};
++
++	ostm0: timer at fcfec000 {
++		compatible = "renesas,r7s72100-ostm", "renesas,ostm";
++		reg = <0xfcfec000 0x30>;
++		interrupts = <GIC_SPI 102 IRQ_TYPE_EDGE_RISING>;
++		clocks = <&mstp5_clks R7S72100_CLK_OSTM0>;
++		power-domains = <&cpg_clocks>;
++		status = "disabled";
++	};
++
++	ostm1: timer at fcfec400 {
++		compatible = "renesas,r7s72100-ostm", "renesas,ostm";
++		reg = <0xfcfec400 0x30>;
++		interrupts = <GIC_SPI 103 IRQ_TYPE_EDGE_RISING>;
++		clocks = <&mstp5_clks R7S72100_CLK_OSTM1>;
++		power-domains = <&cpg_clocks>;
++		status = "disabled";
++	};
+ };
 -- 
 2.7.0.rc3.207.g0ac5344
