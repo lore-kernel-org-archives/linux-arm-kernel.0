@@ -1,41 +1,134 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 26 Jan 2017 08:11:40 -0800
-Subject: [PATCH v2 1/3] ARM: dts: Add support for phyCORE-AM335x PCM-953
- carrier board
-In-Reply-To: <1485252576-36955-1-git-send-email-t.remmet@phytec.de>
-References: <1485252576-36955-1-git-send-email-t.remmet@phytec.de>
-Message-ID: <20170126161140.GR7403@atomide.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Thu, 26 Jan 2017 17:07:52 +0100
+Subject: [PATCH v3 07/12] crypto: atmel-sha: add atmel_sha_cpu_start()
+In-Reply-To: <cover.1485443478.git.cyrille.pitchen@atmel.com>
+References: <cover.1485443478.git.cyrille.pitchen@atmel.com>
+Message-ID: <14bce182b9defe7bb4a41507901566825bc18b89.1485443478.git.cyrille.pitchen@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Teresa Remmet <t.remmet@phytec.de> [170124 02:10]:
-> The phyCORE-AM335x development kit is a combination of the
-> phyCORE-AM335x SoM and a PCM-953 carrier board. The features
-> of the PCM-953 are:
-> * ETH phy on carrier board: 1x RGMII
-> * 1x CAN
-> * Up to 4x UART
-> * USB0 (otg)
-> * USB1 (host)
-> * SD slot
-> * User gpio-keys
-> * User LEDs
-> 
-> Signed-off-by: Teresa Remmet <t.remmet@phytec.de>
-> Reviewed-by: Wadim Egorov <w.egorov@phytec.de>
-> Acked-by: Rob Herring <robh@kernel.org>
-> ---
-> Changes in v2:
-> - moved gpio-keys, gpio-leds and regulators nodes to root node
-> - moved muxing of gpio-keys and gpio-leds
-> - removed not needed compatible "simple-bus"
-> - fixed unit address of ethernet phy node
-> - removed redundant status properties
-> - added Acked-by: Rob Herring <robh@kernel.org>
+This patch adds a simple function to perform data transfer with PIO, hence
+handled by the CPU.
 
-Applying this into omap-for-v4.11/dt thanks. The defconfig changes
-I already applied into omap-for-v4.11/defconfig.
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+---
+ drivers/crypto/atmel-sha.c | 90 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 90 insertions(+)
 
-Regards,
-
-Tony
+diff --git a/drivers/crypto/atmel-sha.c b/drivers/crypto/atmel-sha.c
+index be0d72cf4352..58d9ca8ac0f2 100644
+--- a/drivers/crypto/atmel-sha.c
++++ b/drivers/crypto/atmel-sha.c
+@@ -64,6 +64,8 @@
+ #define SHA_FLAGS_ERROR		BIT(23)
+ #define SHA_FLAGS_PAD		BIT(24)
+ #define SHA_FLAGS_RESTORE	BIT(25)
++#define SHA_FLAGS_IDATAR0	BIT(26)
++#define SHA_FLAGS_WAIT_DATARDY	BIT(27)
+ 
+ #define SHA_OP_UPDATE	1
+ #define SHA_OP_FINAL	2
+@@ -141,6 +143,7 @@ struct atmel_sha_dev {
+ 	struct ahash_request	*req;
+ 	bool			is_async;
+ 	atmel_sha_fn_t		resume;
++	atmel_sha_fn_t		cpu_transfer_complete;
+ 
+ 	struct atmel_sha_dma	dma_lch_in;
+ 
+@@ -1317,6 +1320,93 @@ static irqreturn_t atmel_sha_irq(int irq, void *dev_id)
+ 	return IRQ_NONE;
+ }
+ 
++
++/* CPU transfer functions */
++
++static int atmel_sha_cpu_transfer(struct atmel_sha_dev *dd)
++{
++	struct ahash_request *req = dd->req;
++	struct atmel_sha_reqctx *ctx = ahash_request_ctx(req);
++	const u32 *words = (const u32 *)ctx->buffer;
++	size_t i, num_words;
++	u32 isr, din, din_inc;
++
++	din_inc = (ctx->flags & SHA_FLAGS_IDATAR0) ? 0 : 1;
++	for (;;) {
++		/* Write data into the Input Data Registers. */
++		num_words = DIV_ROUND_UP(ctx->bufcnt, sizeof(u32));
++		for (i = 0, din = 0; i < num_words; ++i, din += din_inc)
++			atmel_sha_write(dd, SHA_REG_DIN(din), words[i]);
++
++		ctx->offset += ctx->bufcnt;
++		ctx->total -= ctx->bufcnt;
++
++		if (!ctx->total)
++			break;
++
++		/*
++		 * Prepare next block:
++		 * Fill ctx->buffer now with the next data to be written into
++		 * IDATARx: it gives time for the SHA hardware to process
++		 * the current data so the SHA_INT_DATARDY flag might be set
++		 * in SHA_ISR when polling this register at the beginning of
++		 * the next loop.
++		 */
++		ctx->bufcnt = min_t(size_t, ctx->block_size, ctx->total);
++		scatterwalk_map_and_copy(ctx->buffer, ctx->sg,
++					 ctx->offset, ctx->bufcnt, 0);
++
++		/* Wait for hardware to be ready again. */
++		isr = atmel_sha_read(dd, SHA_ISR);
++		if (!(isr & SHA_INT_DATARDY)) {
++			/* Not ready yet. */
++			dd->resume = atmel_sha_cpu_transfer;
++			atmel_sha_write(dd, SHA_IER, SHA_INT_DATARDY);
++			return -EINPROGRESS;
++		}
++	}
++
++	if (unlikely(!(ctx->flags & SHA_FLAGS_WAIT_DATARDY)))
++		return dd->cpu_transfer_complete(dd);
++
++	return atmel_sha_wait_for_data_ready(dd, dd->cpu_transfer_complete);
++}
++
++static int atmel_sha_cpu_start(struct atmel_sha_dev *dd,
++			       struct scatterlist *sg,
++			       unsigned int len,
++			       bool idatar0_only,
++			       bool wait_data_ready,
++			       atmel_sha_fn_t resume)
++{
++	struct ahash_request *req = dd->req;
++	struct atmel_sha_reqctx *ctx = ahash_request_ctx(req);
++
++	if (!len)
++		return resume(dd);
++
++	ctx->flags &= ~(SHA_FLAGS_IDATAR0 | SHA_FLAGS_WAIT_DATARDY);
++
++	if (idatar0_only)
++		ctx->flags |= SHA_FLAGS_IDATAR0;
++
++	if (wait_data_ready)
++		ctx->flags |= SHA_FLAGS_WAIT_DATARDY;
++
++	ctx->sg = sg;
++	ctx->total = len;
++	ctx->offset = 0;
++
++	/* Prepare the first block to be written. */
++	ctx->bufcnt = min_t(size_t, ctx->block_size, ctx->total);
++	scatterwalk_map_and_copy(ctx->buffer, ctx->sg,
++				 ctx->offset, ctx->bufcnt, 0);
++
++	dd->cpu_transfer_complete = resume;
++	return atmel_sha_cpu_transfer(dd);
++}
++
++
+ static void atmel_sha_unregister_algs(struct atmel_sha_dev *dd)
+ {
+ 	int i;
+-- 
+2.7.4
