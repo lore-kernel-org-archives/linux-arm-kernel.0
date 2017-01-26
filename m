@@ -1,32 +1,66 @@
-From: dtor@chromium.org (Dmitry Torokhov)
-Date: Thu, 26 Jan 2017 09:26:13 -0800
-Subject: [PATCH] spi: mediatek: Manually set dma_ops for spi_master device
-In-Reply-To: <20170126170747.r6gegu3buqeedp54@sirena.org.uk>
-References: <20170124132519.13271-1-djkurtz@chromium.org>
- <b1180920-8ead-40e8-6155-8510226e719b@arm.com>
- <CAGS+omBV3o1hergAjU3_9ok5NTmk8Z315zo3yW9jU_jA+reZCQ@mail.gmail.com>
- <0548db75-042b-4bef-02db-767ea9ccd7e4@arm.com>
- <CAGS+omDexcrnWL6v4bAQ3K2QSHKcwCs-WRCC+BUbGbXgVYbK9w@mail.gmail.com>
- <CAE_wzQ8ChZtLait3WWin1nyRY5CQCzs8VHTeAcP8y2DqSGmb7Q@mail.gmail.com>
- <CAGS+omC-LnTx9Qt4Cv+7u-Oh=4syZy_mA-FqF8bUzN0DQmgAig@mail.gmail.com>
- <20170126170747.r6gegu3buqeedp54@sirena.org.uk>
-Message-ID: <CAE_wzQ-an3v_32E+JFzTQMKXf=J6BVGf56QZKL+YCV=mZk6-LA@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 26 Jan 2017 09:27:00 -0800
+Subject: [PATCH v2 0/4] USB support for Broadcom NSP SoC
+In-Reply-To: <588A16FA.50507@ti.com>
+References: <1484669670-4201-1-git-send-email-yendapally.reddy@broadcom.com>
+ <588A16FA.50507@ti.com>
+Message-ID: <241009ca-4b34-b160-2de1-4752d3ff114b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 9:07 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Fri, Jan 27, 2017 at 12:52:15AM +0800, Daniel Kurtz wrote:
->> On Fri, Jan 27, 2017 at 12:35 AM, Dmitry Torokhov <dtor@chromium.org> wrote:
->
->> > Nobody doing DMA likes unaligned buffers. In fact, memory used for DMA
->> > must be cacheline aligned, or you going to have trouble. What
->> > component supplies unaligned buffers to SPI core for transfers?
->
->> cros-ec-spi
->
-> That needs fixing then - I keep thinking we should add a warning to the
-> core for this, especially now we do DMA mapping in the core.
+On 01/26/2017 07:34 AM, Kishon Vijay Abraham I wrote:
+> 
+> 
+> On Tuesday 17 January 2017 09:44 PM, Yendapally Reddy Dhananjaya Reddy wrote:
+>> This patch set contains the usb support for Broadcom NSP SoC. The
+>> usb3 phy is internal to the SoC and is accessed through mdio interface.
+>> The mdio interface can be used to access either internal usb3 phy or
+>> external ethernet phy using a multiplexer.
+>>
+>> The first patch provides the documentation details for usb3 phy. The
+>> second patch provides the changes to the mdio bus driver. The third
+>> patch provides the phy driver and fourth patch provides the enable
+>> method for usb.
+> 
+> merged the 1st and 4th patch to linux-phy.
 
-OTOH the full buffer used by cros ec *is* DMA-safe (allocated with
-kmalloc), it is that cors ec uses it at offset while transferring data
-piece by piece. Do we want to support this?
+You mean 1st and 3rd here, right? 4th is a Device Tree change that I
+should take, and Patch 2 should be merged by David.
+
+What branch in your tree should we be looking at?
+
+> 
+> Thanks
+> Kishon
+> 
+>>
+>> This patch series has been tested on NSP bcm958625HR board.
+>> This patch series is based on v4.10.0-rc3 and is available from
+>> github-repo: https://github.com/Broadcom/cygnus-linux.git
+>> branch:nsp-usb-v2
+>>
+>> Changes in v2:
+>> * Remove separate nsp mux driver as suggested by Andrew Lunn
+>> * Addressed comments from Scott and Rob
+>>
+>> Yendapally Reddy Dhananjaya Reddy (4):
+>>   dt-bindings: phy: Add documentation for NSP USB3 PHY
+>>   net: phy: Initialize mdio clock at probe function
+>>   phy: Add USB3 PHY support for Broadcom NSP SoC
+>>   arm: dts: nsp: Add USB nodes to device tree
+>>
+>>  .../devicetree/bindings/phy/brcm,nsp-usb3-phy.txt  |  39 +++++
+>>  arch/arm/boot/dts/bcm-nsp.dtsi                     |  56 +++++++
+>>  arch/arm/boot/dts/bcm958625k.dts                   |  16 ++
+>>  drivers/net/phy/mdio-bcm-iproc.c                   |   6 +-
+>>  drivers/phy/Kconfig                                |   8 +
+>>  drivers/phy/Makefile                               |   1 +
+>>  drivers/phy/phy-bcm-nsp-usb3.c                     | 176 +++++++++++++++++++++
+>>  7 files changed, 298 insertions(+), 4 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/phy/brcm,nsp-usb3-phy.txt
+>>  create mode 100644 drivers/phy/phy-bcm-nsp-usb3.c
+>>
+
+
+-- 
+Florian
