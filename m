@@ -1,39 +1,33 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 26 Jan 2017 15:54:25 -0800
-Subject: [PATCH 2/2] clk: imx7d: Add the IPG root clock
-In-Reply-To: <CAOMZO5CTrO2kEgxg=-KamZb5HXEoy18T0yDDxGQ4b9oscjU2_A@mail.gmail.com>
-References: <1484762037-10737-1-git-send-email-fabio.estevam@nxp.com>
- <1484762037-10737-2-git-send-email-fabio.estevam@nxp.com>
- <CAOi56cUrAyqV3e1zW+UGNRfGaueJr9yH1md3DPJT6vVM_zfpTA@mail.gmail.com>
- <CAOMZO5CTrO2kEgxg=-KamZb5HXEoy18T0yDDxGQ4b9oscjU2_A@mail.gmail.com>
-Message-ID: <20170126235425.GH8801@codeaurora.org>
+Date: Thu, 26 Jan 2017 15:57:45 -0800
+Subject: [PATCH] clk: meson8b: fix clk81 register address
+In-Reply-To: <1485341586-2929-1-git-send-email-jbrunet@baylibre.com>
+References: <1485341586-2929-1-git-send-email-jbrunet@baylibre.com>
+Message-ID: <20170126235745.GI8801@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/26, Fabio Estevam wrote:
-> Hi Kevin,
+On 01/25, Jerome Brunet wrote:
+> During meson8b clock probe, clk81 register address is fixed twice.
+> First using the meson8b_clk_gates array, then by directly changing
+> meson8b_clk81 register.
 > 
-> On Thu, Jan 26, 2017 at 3:24 AM, Kevin Hilman <khilman@baylibre.com> wrote:
-> > Hi Fabio,
-> >
-> > On Wed, Jan 18, 2017 at 9:53 AM, Fabio Estevam <fabio.estevam@nxp.com> wrote:
-> >> Add an entry for the IMX7D_IPG_ROOT clock.
-> >>
-> >> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
-> >
-> > kernelci.org started detecting boot failures on imx7s-warp in
-> > next-20160124[1], and I bisected it down to this patch, which is in
-> > linux-next as commit dde08302c083.
-> >
-> > I verified that reverting that commit on top of next-20160124 gets
-> > imx7s-warp booting again.
+> As a result meson8b_clk81.reg = HHI_MPEG_CLK_CNTL + clk_base + clk_base.
 > 
-> Thanks for the report.
+> Fixed by just removing the second fixup.
 > 
-> Stephen, could you please drop this patch from your tree? I will
-> investigate the issue.
+> Fixes: e31a1900c1ff ("meson: clk: Add support for clock gates")
+> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> ---
+>  Patch based on khilman/linux-amlogic.git master branch.
 
-Sure. I've dropped this patch.
+The problem isn't introduced there though?
+
+> 
+>  I don't have a meson8b HW so this patch so this patch has not been
+>  tested on real HW.
+
+Applied to clk-next.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
