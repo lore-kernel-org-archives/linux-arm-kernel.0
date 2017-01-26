@@ -1,75 +1,93 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Wed, 25 Jan 2017 21:51:41 -0600
-Subject: [RESEND PATCH v2] irqchip/gicv3-its: Enable cacheable attribute
- Read-allocate hints
-Message-ID: <1485402701-30650-1-git-send-email-shankerd@codeaurora.org>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 26 Jan 2017 10:08:21 +0530
+Subject: [PATCH v20 2/4] mailbox: mediatek: Add Mediatek CMDQ driver
+In-Reply-To: <1483499169-16329-3-git-send-email-hs.liao@mediatek.com>
+References: <1483499169-16329-1-git-send-email-hs.liao@mediatek.com>
+ <1483499169-16329-3-git-send-email-hs.liao@mediatek.com>
+Message-ID: <CABb+yY23TUB8NpmpiO=cCmVFAVJMqKPfGgX14j+_Yj7tJvMOuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Read-allocation hints are not enabled for both the GIC-ITS and GICR
-tables. This forces the hardware to always read the table contents
-from an external memory (DDR) which is slow compared to cache memory.
-Most of the tables are often read by hardware. So, it's better to
-enable Read-allocate hints in addition to Write-allocate hints in
-order to improve the GICR_PEND, GICR_PROP, Collection, Device, and
-vCPU tables lookup time.
+On Wed, Jan 4, 2017 at 8:36 AM, HS Liao <hs.liao@mediatek.com> wrote:
 
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
----
-This patch has been verified on Centriq 2400 server platform.
+> diff --git a/drivers/mailbox/mtk-cmdq-mailbox.c b/drivers/mailbox/mtk-cmdq-mailbox.c
+> new file mode 100644
+> index 0000000..747bcd3
+> --- /dev/null
+> +++ b/drivers/mailbox/mtk-cmdq-mailbox.c
 
- drivers/irqchip/irq-gic-v3-its.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+...
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 69b040f..3cffcca 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -960,7 +960,7 @@ static bool its_parse_baser_device(struct its_node *its, struct its_baser *baser
- 				   u32 psz, u32 *order)
- {
- 	u64 esz = GITS_BASER_ENTRY_SIZE(its_read_baser(its, baser));
--	u64 val = GITS_BASER_InnerShareable | GITS_BASER_WaWb;
-+	u64 val = GITS_BASER_InnerShareable | GITS_BASER_RaWaWb;
- 	u32 ids = its->device_ids;
- 	u32 new_order = *order;
- 	bool indirect = false;
-@@ -1025,7 +1025,7 @@ static int its_alloc_tables(struct its_node *its)
- 	u64 typer = gic_read_typer(its->base + GITS_TYPER);
- 	u32 ids = GITS_TYPER_DEVBITS(typer);
- 	u64 shr = GITS_BASER_InnerShareable;
--	u64 cache = GITS_BASER_WaWb;
-+	u64 cache = GITS_BASER_RaWaWb;
- 	u32 psz = SZ_64K;
- 	int err, i;
- 
-@@ -1122,7 +1122,7 @@ static void its_cpu_init_lpis(void)
- 	/* set PROPBASE */
- 	val = (page_to_phys(gic_rdists->prop_page) |
- 	       GICR_PROPBASER_InnerShareable |
--	       GICR_PROPBASER_WaWb |
-+	       GICR_PROPBASER_RaWaWb |
- 	       ((LPI_NRBITS - 1) & GICR_PROPBASER_IDBITS_MASK));
- 
- 	gicr_write_propbaser(val, rbase + GICR_PROPBASER);
-@@ -1147,7 +1147,7 @@ static void its_cpu_init_lpis(void)
- 	/* set PENDBASE */
- 	val = (page_to_phys(pend_page) |
- 	       GICR_PENDBASER_InnerShareable |
--	       GICR_PENDBASER_WaWb);
-+	       GICR_PENDBASER_RaWaWb);
- 
- 	gicr_write_pendbaser(val, rbase + GICR_PENDBASER);
- 	tmp = gicr_read_pendbaser(rbase + GICR_PENDBASER);
-@@ -1711,7 +1711,7 @@ static int __init its_probe_one(struct resource *res,
- 		goto out_free_tables;
- 
- 	baser = (virt_to_phys(its->cmd_base)	|
--		 GITS_CBASER_WaWb		|
-+		 GITS_CBASER_RaWaWb		|
- 		 GITS_CBASER_InnerShareable	|
- 		 (ITS_CMD_QUEUE_SZ / SZ_4K - 1)	|
- 		 GITS_CBASER_VALID);
--- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+> +static void cmdq_task_exec(struct cmdq_pkt *pkt, struct cmdq_thread *thread)
+> +{
+> +       struct cmdq *cmdq;
+> +       struct cmdq_task *task;
+> +       unsigned long curr_pa, end_pa;
+> +
+> +       cmdq = dev_get_drvdata(thread->chan->mbox->dev);
+> +
+> +       /* Client should not flush new tasks if suspended. */
+> +       WARN_ON(cmdq->suspended);
+> +
+> +       task = kzalloc(sizeof(*task), GFP_ATOMIC);
+> +       task->cmdq = cmdq;
+> +       INIT_LIST_HEAD(&task->list_entry);
+> +       task->pa_base = dma_map_single(cmdq->mbox.dev, pkt->va_base,
+> +                                      pkt->cmd_buf_size, DMA_TO_DEVICE);
+>
+You seem to parse the requests and responses, that should ideally be
+done in client driver.
+Also, we are here in atomic context, can you move it in client driver
+(before the spin_lock)?
+Maybe by adding a new 'pa_base' member as well in 'cmdq_pkt'.
+
+....
+> +
+> +       cmdq->mbox.num_chans = CMDQ_THR_MAX_COUNT;
+> +       cmdq->mbox.ops = &cmdq_mbox_chan_ops;
+> +       cmdq->mbox.of_xlate = cmdq_xlate;
+> +
+> +       /* make use of TXDONE_BY_ACK */
+> +       cmdq->mbox.txdone_irq = false;
+> +       cmdq->mbox.txdone_poll = false;
+> +
+> +       for (i = 0; i < ARRAY_SIZE(cmdq->thread); i++) {
+>
+You mean  i < CMDQ_THR_MAX_COUNT
+
+> +               cmdq->thread[i].base = cmdq->base + CMDQ_THR_BASE +
+> +                               CMDQ_THR_SIZE * i;
+> +               INIT_LIST_HEAD(&cmdq->thread[i].task_busy_list);
+>
+You seem the queue mailbox requests in this controller driver? why not
+use the mailbox api for that?
+
+> +               init_timer(&cmdq->thread[i].timeout);
+> +               cmdq->thread[i].timeout.function = cmdq_thread_handle_timeout;
+> +               cmdq->thread[i].timeout.data = (unsigned long)&cmdq->thread[i];
+>
+Here again... you seem to ignore the polling mechanism provided by the
+mailbox api, and implement your own.
+
+
+> diff --git a/include/linux/mailbox/mtk-cmdq-mailbox.h b/include/linux/mailbox/mtk-cmdq-mailbox.h
+> new file mode 100644
+> index 0000000..3433c64
+> --- /dev/null
+> +++ b/include/linux/mailbox/mtk-cmdq-mailbox.h
+....
+> +
+> +struct cmdq_pkt {
+> +       void                    *va_base;
+>
+maybe add 'pa_base' here so you don't have to do dma_map_single() in send_data
+
+> +       size_t                  cmd_buf_size; /* command occupied size */
+> +       size_t                  buf_size; /* real buffer size */
+> +       struct cmdq_task_cb     cb;
+> +};
+> +
+> +#endif /* __MTK_CMDQ_MAILBOX_H__ */
+> --
+> 1.9.1
+>
