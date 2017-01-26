@@ -1,29 +1,30 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 26 Jan 2017 21:57:06 +0200
-Subject: [PATCH v2 1/8] soc: samsung: pmu: Add dummy support for
- Exynos5433 SoC
-In-Reply-To: <1485419634-28331-2-git-send-email-m.szyprowski@samsung.com>
+Date: Thu, 26 Jan 2017 21:57:46 +0200
+Subject: [PATCH v2 3/8] pinctrl: samsung: Add support for pad retention
+ control for Exynos5433 SoCs
+In-Reply-To: <1485419634-28331-4-git-send-email-m.szyprowski@samsung.com>
 References: <1485419634-28331-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170126083401eucas1p24b0f04c62332e0b6e446ecca83145bc5@eucas1p2.samsung.com>
- <1485419634-28331-2-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20170126195706.an4ykk3bamvews6d@kozik-lap>
+ <CGME20170126083402eucas1p187d3d31f62544fc46fae99fc5f74dbfe@eucas1p1.samsung.com>
+ <1485419634-28331-4-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20170126195746.gjx7fp3ovz5nqd76@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 09:33:47AM +0100, Marek Szyprowski wrote:
-> Add compatible for Exynos5433 SoC, so the driver will bind and let other
-> drivers to use PMU regmap.
+On Thu, Jan 26, 2017 at 09:33:49AM +0100, Marek Szyprowski wrote:
+> This patch adds support for retention control for Exynos5433 SoCs. Three
+> groups of pins has been defined for retention control: common shared group
+> for ALIVE, CPIF, eSE, FINGER, IMEM, NFC, PERIC, TOUCH pin banks and
+> separate control for FSYS and AUD pin banks, for which PMU retention
+> registers match whole banks.
 > 
 > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 > ---
->  drivers/soc/samsung/exynos-pmu.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
+>  drivers/pinctrl/samsung/pinctrl-exynos.c    | 58 +++++++++++++++++++++++++++++
+>  include/linux/soc/samsung/exynos-regs-pmu.h | 16 ++++++++
+>  2 files changed, 74 insertions(+)
 > 
 
-Thanks, applied.
-
-I already have some PMU patches on separate branch (and tag), so this
-lands on top of it.
+Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 
 Best regards,
 Krzysztof
