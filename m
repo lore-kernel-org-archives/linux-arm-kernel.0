@@ -1,104 +1,111 @@
-From: bilal.amarni@gmail.com (Bilal Amarni)
-Date: Thu, 26 Jan 2017 14:27:23 +0100
-Subject: [PATCH] security/keys: add CONFIG_KEYS_COMPAT to Kconfig
-In-Reply-To: <201701262036.mMS7eB5U%fengguang.wu@intel.com>
-References: <201701262036.mMS7eB5U%fengguang.wu@intel.com>
-Message-ID: <1485437243-9349-1-git-send-email-bilal.amarni@gmail.com>
+From: b-liu@ti.com (Bin Liu)
+Date: Thu, 26 Jan 2017 07:31:17 -0600
+Subject: [PATCH] usb: musb: constify musb_hdrc_config structures
+In-Reply-To: <20170125212409.GC5496@kroah.com>
+References: <1485285742-6949-1-git-send-email-bhumirks@gmail.com>
+ <20170125165815.GA5318@uda0271908>
+ <20170125212409.GC5496@kroah.com>
+Message-ID: <20170126133117.GA21144@uda0271908>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_KEYS_COMPAT is defined in arch-specific Kconfigs and is missing for
-several 64-bit architectures : arm64, mips, parisc, tile.
+On Wed, Jan 25, 2017 at 10:24:09PM +0100, Greg KH wrote:
+> On Wed, Jan 25, 2017 at 10:58:15AM -0600, Bin Liu wrote:
+> > On Wed, Jan 25, 2017 at 12:52:22AM +0530, Bhumika Goyal wrote:
+> > > Declare musb_hdrc_config structures as const as they are only stored in
+> > > the config field of a musb_hdrc_platform_data structure. This field is of
+> > > type const, so musb_hdrc_config structures having this property can be
+> > > made const too.
+> > > Done using Coccinelle:
+> > > 
+> > > @r disable optional_qualifier@
+> > > identifier x;
+> > > position p;
+> > > @@
+> > > static struct musb_hdrc_config x at p={...};
+> > > 
+> > > @ok@
+> > > struct musb_hdrc_platform_data pdata;
+> > > identifier r.x;
+> > > position p;
+> > > @@
+> > > pdata.config=&x at p;
+> > > 
+> > > @bad@
+> > > position p != {r.p,ok.p};
+> > > identifier r.x;
+> > > @@
+> > > x at p
+> > > 
+> > > @depends on !bad disable optional_qualifier@
+> > > identifier r.x;
+> > > @@
+> > > +const
+> > > struct musb_hdrc_config x;
+> > > 
+> > > File size before:
+> > >    text	   data	    bss	    dec	    hex	filename
+> > >    1212	    338	      0	   1550	    60e	drivers/usb/musb/jz4740.o
+> > > 
+> > > File size after:
+> > >    text	   data	    bss	    dec	    hex	filename
+> > >    1268	    290	      0	   1558	    616	drivers/usb/musb/jz4740.o
+> > > 
+> > > File size before:
+> > >    text	   data	    bss	    dec	    hex	filename
+> > >    6151	    333	     16	   6500	   1964	drivers/usb/musb/sunxi.o
+> > > 
+> > > File size after:
+> > >    text	   data	    bss	    dec	    hex	filename
+> > >    6215	    269	     16	   6500	   1964	drivers/usb/musb/sunxi.o
+> > > 
+> > > File size before:
+> > >    text	   data	    bss	    dec	    hex	filename
+> > >    3668	    864	      0	   4532	   11b4	drivers/usb/musb/ux500.o
+> > > 
+> > > File size after:
+> > >    text	   data	    bss	    dec	    hex	filename
+> > >    3724	    808	      0	   4532	   11b4	drivers/usb/musb/ux500.o
+> > > 
+> > > Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+> > 
+> > Hi Greg,
+> > 
+> > Why you don't want this patch go through my tree? Now it causes me tree
+> > rebase failed. It should be easy to fix, but just wanted to learn your
+> > rules.
+> 
+> What are you rebasing?  And why?  Just send me patches, I can merge them
+> when they come in just fine.
 
-At the moment and for those architectures, calling in 32-bit userspace the
-keyctl syscall would return an ENOSYS error.
+I was rebasing my -next branch, which hosts all musb patches for next
+merge window, to your usb-next branch. I regularly keep my branches up
+to date to ensure the patches I send to you don't cause any surprise.
 
-This patch moves the CONFIG_KEYS_COMPAT option to security/keys/Kconfig, to
-make sure the compatibility wrapper is registered by default for any 64-bit
-architecture as long as it is configured with CONFIG_COMPAT.
+> 
+> Normally yes, I do wait for these to go through your tree, but it was
+> just so simple, and obvious, and in a bunch of others from the author,
+> that I figured I could just take it as-is.
+> 
+> sorry if it caused you problems, but you might want to look at your
 
-Signed-off-by: Bilal Amarni <bilal.amarni@gmail.com>
----
- arch/powerpc/Kconfig  | 5 -----
- arch/s390/Kconfig     | 3 ---
- arch/sparc/Kconfig    | 3 ---
- arch/x86/Kconfig      | 4 ----
- security/keys/Kconfig | 4 ++++
- 5 files changed, 4 insertions(+), 15 deletions(-)
+It is not a problem at all, the merge conflict is one of the simplest to
+fix. I just wanted to learn your maintenance policy, to avoid me cause
+any problem to you, as the couple glitches just happened in the past
+months.
 
-diff --git a/arch/powerpc/Kconfig b/arch/powerpc/Kconfig
-index a8ee573..5947ea2 100644
---- a/arch/powerpc/Kconfig
-+++ b/arch/powerpc/Kconfig
-@@ -1128,11 +1128,6 @@ source "arch/powerpc/Kconfig.debug"
- 
- source "security/Kconfig"
- 
--config KEYS_COMPAT
--	bool
--	depends on COMPAT && KEYS
--	default y
--
- source "crypto/Kconfig"
- 
- config PPC_LIB_RHEAP
-diff --git a/arch/s390/Kconfig b/arch/s390/Kconfig
-index c6722112..633f553 100644
---- a/arch/s390/Kconfig
-+++ b/arch/s390/Kconfig
-@@ -362,9 +362,6 @@ config COMPAT
- config SYSVIPC_COMPAT
- 	def_bool y if COMPAT && SYSVIPC
- 
--config KEYS_COMPAT
--	def_bool y if COMPAT && KEYS
--
- config SMP
- 	def_bool y
- 	prompt "Symmetric multi-processing support"
-diff --git a/arch/sparc/Kconfig b/arch/sparc/Kconfig
-index cf4034c..2b07f0a 100644
---- a/arch/sparc/Kconfig
-+++ b/arch/sparc/Kconfig
-@@ -571,9 +571,6 @@ config SYSVIPC_COMPAT
- 	depends on COMPAT && SYSVIPC
- 	default y
- 
--config KEYS_COMPAT
--	def_bool y if COMPAT && KEYS
--
- endmenu
- 
- source "net/Kconfig"
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index e487493..f93b6ba 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -2768,10 +2768,6 @@ config COMPAT_FOR_U64_ALIGNMENT
- config SYSVIPC_COMPAT
- 	def_bool y
- 	depends on SYSVIPC
--
--config KEYS_COMPAT
--	def_bool y
--	depends on KEYS
- endif
- 
- endmenu
-diff --git a/security/keys/Kconfig b/security/keys/Kconfig
-index d942c7c..f44d8be 100644
---- a/security/keys/Kconfig
-+++ b/security/keys/Kconfig
-@@ -20,6 +20,10 @@ config KEYS
- 
- 	  If you are unsure as to whether this is required, answer N.
- 
-+config KEYS_COMPAT
-+	def_bool y
-+	depends on COMPAT && KEYS
-+
- config PERSISTENT_KEYRINGS
- 	bool "Enable register of persistent per-UID keyrings"
- 	depends on KEYS
--- 
-2.7.2
+> development process if it is.  You should always be able to handle other
+> people changing files in your area at any point in time.  Kernel
+
+I understand it is common in kernel development.
+
+> maintainership is not "no one else can ever touch this!" type of
+> development, you have to be able to handle stuff like this easily.
+
+I do expect merge conflict. If the $subject patch went through my tree,
+the similar merge error could happen too (just in the opposite way).  It
+was that I was rebasing my branch and about to pick the $subject patch,
+and didn't expect this merge conflict in rebase, so asked.
+
+Regards,
+-Bin.
