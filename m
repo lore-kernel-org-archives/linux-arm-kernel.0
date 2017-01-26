@@ -1,66 +1,52 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 26 Jan 2017 09:27:00 -0800
-Subject: [PATCH v2 0/4] USB support for Broadcom NSP SoC
-In-Reply-To: <588A16FA.50507@ti.com>
-References: <1484669670-4201-1-git-send-email-yendapally.reddy@broadcom.com>
- <588A16FA.50507@ti.com>
-Message-ID: <241009ca-4b34-b160-2de1-4752d3ff114b@gmail.com>
+From: pprakash@codeaurora.org (Prakash, Prashanth)
+Date: Thu, 26 Jan 2017 10:31:18 -0700
+Subject: [PATCH] arm64: skip register_cpufreq_notifier on ACPI-based
+ systems
+In-Reply-To: <20170126155724.GI14167@arm.com>
+References: <1485304992-26888-1-git-send-email-pprakash@codeaurora.org>
+ <20170126121811.GD14167@arm.com> <20170126155229.GB1194@red-moon>
+ <20170126155724.GI14167@arm.com>
+Message-ID: <9fe8918e-ba2c-80c4-ce47-d7408cd0943f@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/26/2017 07:34 AM, Kishon Vijay Abraham I wrote:
-> 
-> 
-> On Tuesday 17 January 2017 09:44 PM, Yendapally Reddy Dhananjaya Reddy wrote:
->> This patch set contains the usb support for Broadcom NSP SoC. The
->> usb3 phy is internal to the SoC and is accessed through mdio interface.
->> The mdio interface can be used to access either internal usb3 phy or
->> external ethernet phy using a multiplexer.
->>
->> The first patch provides the documentation details for usb3 phy. The
->> second patch provides the changes to the mdio bus driver. The third
->> patch provides the phy driver and fourth patch provides the enable
->> method for usb.
-> 
-> merged the 1st and 4th patch to linux-phy.
 
-You mean 1st and 3rd here, right? 4th is a Device Tree change that I
-should take, and Patch 2 should be merged by David.
+On 1/26/2017 8:57 AM, Will Deacon wrote:
+> On Thu, Jan 26, 2017 at 03:52:29PM +0000, Lorenzo Pieralisi wrote:
+>> On Thu, Jan 26, 2017 at 12:18:11PM +0000, Will Deacon wrote:
+>>> [adding Sudeep and Lorenzo for comment]
+>>>
+>>> On Tue, Jan 24, 2017 at 05:43:12PM -0700, Prashanth Prakash wrote:
+>>>> On ACPI based systems where the topology is setup using the API
+>>>> store_cpu_topology, at the moment we do not have necessary code
+>>>> to handle a cpufreq notifier, thus resulting in a crash.
+>>> What is the "necessary code" that we're missing? Wouldn't it be better
+>>> to add that, or explicitly avoid the cpufreq notifier registration if
+>>> we're using ACPI?
+>> Necessary code is, in DT, code parsing bindings to provide capacity
+>> values and allocate the raw_capacity array; there is no ACPI counterpart
+>> for those bindings (well..there is a byte length field in the GICC MADT
+>> entry "Processor Power Efficiency Class" but as far as I understand,
+>> currently, it would be more reliable as a random seed than a useful
+>> capacity scale, I just do not know why it is there) so the whole CPUfreq
+>> notifier thing is basically useless when booting with ACPI.
+> Ok, thanks for the explanation.
+>
+>> How about using (or put the ACPI bit in a separate line with a
+>> comment):
+>>
+>> 	if (!acpi_disabled || cap_parsing_failed)
+>>
+>> to prevent registering the CPUfreq notifier ? Using raw_capacity check
+>> this patch achieves the same in a much more opaque way (you will have to
+>> include <linux/acpi.h> to make use of acpi_disabled).
+> That looks good to me. If somebody sends a v2, I can apply it for 4.11.
 
-What branch in your tree should we be looking at?
+Thanks for the inputs. I will post v2 in next couple of hours.
 
-> 
-> Thanks
-> Kishon
-> 
->>
->> This patch series has been tested on NSP bcm958625HR board.
->> This patch series is based on v4.10.0-rc3 and is available from
->> github-repo: https://github.com/Broadcom/cygnus-linux.git
->> branch:nsp-usb-v2
->>
->> Changes in v2:
->> * Remove separate nsp mux driver as suggested by Andrew Lunn
->> * Addressed comments from Scott and Rob
->>
->> Yendapally Reddy Dhananjaya Reddy (4):
->>   dt-bindings: phy: Add documentation for NSP USB3 PHY
->>   net: phy: Initialize mdio clock at probe function
->>   phy: Add USB3 PHY support for Broadcom NSP SoC
->>   arm: dts: nsp: Add USB nodes to device tree
->>
->>  .../devicetree/bindings/phy/brcm,nsp-usb3-phy.txt  |  39 +++++
->>  arch/arm/boot/dts/bcm-nsp.dtsi                     |  56 +++++++
->>  arch/arm/boot/dts/bcm958625k.dts                   |  16 ++
->>  drivers/net/phy/mdio-bcm-iproc.c                   |   6 +-
->>  drivers/phy/Kconfig                                |   8 +
->>  drivers/phy/Makefile                               |   1 +
->>  drivers/phy/phy-bcm-nsp-usb3.c                     | 176 +++++++++++++++++++++
->>  7 files changed, 298 insertions(+), 4 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/phy/brcm,nsp-usb3-phy.txt
->>  create mode 100644 drivers/phy/phy-bcm-nsp-usb3.c
->>
+Any chances this can make it to one of the 4-10 release candidates as it results
+in a panic without this change?
 
-
--- 
-Florian
+--
+Thanks,
+Prashanth
