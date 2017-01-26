@@ -1,162 +1,122 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 26 Jan 2017 10:15:21 +0000
-Subject: [PATCH V11 2/3] ACPI: Add support for ResourceSource/IRQ domain
- mapping
-In-Reply-To: <CAHp75VeYxfuMuaZCMk+MYdxLTs7cCa6j6M7Ot3XnwMmeHP7kBA@mail.gmail.com>
-References: <1484879660-1960-1-git-send-email-agustinv@codeaurora.org>
- <1484879660-1960-3-git-send-email-agustinv@codeaurora.org>
- <CAHp75VeYxfuMuaZCMk+MYdxLTs7cCa6j6M7Ot3XnwMmeHP7kBA@mail.gmail.com>
-Message-ID: <20170126101521.GA10324@red-moon>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 26 Jan 2017 11:14:05 +0100
+Subject: [PATCH 06/11] clk: sunxi-ng: Add A80 USB CCU
+In-Reply-To: <20170124023230.3990-7-wens@csie.org>
+References: <20170124023230.3990-1-wens@csie.org>
+ <20170124023230.3990-7-wens@csie.org>
+Message-ID: <20170126101405.npxzp2bmto5oeyex@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 03:01:18AM +0200, Andy Shevchenko wrote:
-> On Fri, Jan 20, 2017 at 4:34 AM, Agustin Vega-Frias
-> <agustinv@codeaurora.org> wrote:
-> > ACPI extended IRQ resources may contain a ResourceSource to specify
-> > an alternate interrupt controller. Introduce acpi_irq_get and use it
-> > to implement ResourceSource/IRQ domain mapping.
-> >
-> > The new API is similar to of_irq_get and allows re-initialization
-> > of a platform resource from the ACPI extended IRQ resource, and
-> > provides proper behavior for probe deferral when the domain is not
-> > yet present when called.
-> 
-> > +static struct fwnode_handle *
-> > +acpi_get_irq_source_fwhandle(const struct acpi_resource_source *source)
-> > +{
-> > +       struct fwnode_handle *result = NULL;
-> > +       struct acpi_device *device;
-> > +       struct acpi_hardware_id *hwid;
-> > +       struct acpi_device_id *devid;
-> > +       acpi_handle handle;
-> > +       acpi_status status;
-> > +
-> > +       if (!source->string_length)
-> > +               return acpi_gsi_domain_id;
-> > +
-> > +       status = acpi_get_handle(NULL, source->string_ptr, &handle);
-> > +       if (WARN_ON(ACPI_FAILURE(status)))
-> > +               return NULL;
-> > +
-> > +       device = acpi_bus_get_acpi_device(handle);
-> > +       if (WARN_ON(!device))
-> > +               return NULL;
-> > +
-> 
-> > +       list_for_each_entry(hwid, &device->pnp.ids, list) {
-> 
-> > +               for (devid = &__dsdt_irqchip_acpi_probe_table;
-> > +                    devid < &__dsdt_irqchip_acpi_probe_table_end; devid++) {
-> > +                       if (devid->id && !strcmp(devid->id, hwid->id)) {
-> > +                               result = &device->fwnode;
-> > +                               break;
-> > +                       }
-> > +               }
-> 
-> Looks like a candidate for linker table API. (I recommend to Cc Luis
-> for this part)
+Hi,
 
-This linker table entry scheme is just an optimization and should
-not gate the series.
+On Tue, Jan 24, 2017 at 10:32:25AM +0800, Chen-Yu Tsai wrote:
+> Add support for the USB clock controls found on the A80.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  .../devicetree/bindings/clock/sun9i-usb.txt        |  24 ++++
+>  drivers/clk/sunxi-ng/Makefile                      |   1 +
+>  drivers/clk/sunxi-ng/ccu-sun9i-a80-usb.c           | 144 +++++++++++++++++++++
+>  drivers/clk/sunxi-ng/ccu-sun9i-a80-usb.h           |  25 ++++
+>  include/dt-bindings/clock/sun9i-a80-usb.h          |  59 +++++++++
+>  include/dt-bindings/reset/sun9i-a80-usb.h          |  56 ++++++++
+>  6 files changed, 309 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/sun9i-usb.txt
+>  create mode 100644 drivers/clk/sunxi-ng/ccu-sun9i-a80-usb.c
+>  create mode 100644 drivers/clk/sunxi-ng/ccu-sun9i-a80-usb.h
+>  create mode 100644 include/dt-bindings/clock/sun9i-a80-usb.h
+>  create mode 100644 include/dt-bindings/reset/sun9i-a80-usb.h
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/sun9i-usb.txt b/Documentation/devicetree/bindings/clock/sun9i-usb.txt
+> new file mode 100644
+> index 000000000000..c2d38626eaaa
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/sun9i-usb.txt
+> @@ -0,0 +1,24 @@
+> +Allwinner A80 USB Clock Control Binding
+> +------------------------------------
+> +
+> +Required properties :
+> +- compatible: must contain one of the following compatibles:
+> +		- "allwinner,sun9i-a80-usb-clocks"
+> +
+> +- reg: Must contain the registers base address and length
+> +- clocks: phandle to the clocks feeding the USB subsystem. Two are needed:
+> +  - "bus": the bus clock for the whole USB subsystem
+> +  - "hosc": the high frequency oscillator (usually at 24MHz)
+> +- clock-names: Must contain the clock names described just above
+> +- #clock-cells : must contain 1
+> +- #reset-cells : must contain 1
+> +
+> +Example:
+> +usb_clocks: clock at 00a08000 {
+> +	compatible = "allwinner,sun9i-a80-usb-clks";
+> +	reg = <0x00a08000 0x8>;
+> +	clocks = <&ccu CLK_BUS_USB>, <&osc24M>;
+> +	clock-names = "bus", "hosc";
+> +	#clock-cells = <1>;
+> +	#reset-cells = <1>;
+> +};
+> diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
+> index 126bb7c1c3f7..8f37ef7fb67d 100644
+> --- a/drivers/clk/sunxi-ng/Makefile
+> +++ b/drivers/clk/sunxi-ng/Makefile
+> @@ -26,3 +26,4 @@ obj-$(CONFIG_SUN8I_A33_CCU)	+= ccu-sun8i-a33.o
+>  obj-$(CONFIG_SUN8I_H3_CCU)	+= ccu-sun8i-h3.o
+>  obj-$(CONFIG_SUN8I_V3S_CCU)	+= ccu-sun8i-v3s.o
+>  obj-$(CONFIG_SUN9I_A80_CCU)	+= ccu-sun9i-a80.o
+> +obj-$(CONFIG_SUN9I_A80_CCU)	+= ccu-sun9i-a80-usb.o
+> diff --git a/drivers/clk/sunxi-ng/ccu-sun9i-a80-usb.c b/drivers/clk/sunxi-ng/ccu-sun9i-a80-usb.c
+> new file mode 100644
+> index 000000000000..1d76f24f7df3
+> --- /dev/null
+> +++ b/drivers/clk/sunxi-ng/ccu-sun9i-a80-usb.c
+> @@ -0,0 +1,144 @@
+> +/*
+> + * Copyright (c) 2016 Chen-Yu Tsai. All rights reserved.
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/of_address.h>
+> +#include <linux/platform_device.h>
+> +
+> +#include "ccu_common.h"
+> +#include "ccu_gate.h"
+> +#include "ccu_reset.h"
+> +
+> +#include "ccu-sun9i-a80-usb.h"
+> +
+> +static SUNXI_CCU_GATE(bus_hci0_clk, "bus-hci0", "bus-usb", 0x0, BIT(1), 0);
+> +static SUNXI_CCU_GATE(usb_ohci0_clk, "usb-ohci0", "osc24M", 0x0, BIT(2), 0);
+> +static SUNXI_CCU_GATE(bus_hci1_clk, "bus-hci1", "bus-usb", 0x0, BIT(3), 0);
+> +static SUNXI_CCU_GATE(bus_hci2_clk, "bus-hci2", "bus-usb", 0x0, BIT(5), 0);
+> +static SUNXI_CCU_GATE(usb_ohci2_clk, "usb-ohci2", "osc24M", 0x0, BIT(6), 0);
 
-> > +       }
-> 
-> > +/**
-> > + * acpi_irq_parse_one_match - Handle a matching IRQ resource.
-> > + * @fwnode: matching fwnode
-> > + * @hwirq: hardware IRQ number
-> > + * @triggering: triggering attributes of hwirq
-> > + * @polarity: polarity attributes of hwirq
-> > + * @polarity: polarity attributes of hwirq
-> > + * @shareable: shareable attributes of hwirq
-> > + * @ctx: acpi_irq_parse_one_ctx updated by this function
-> > + *
-> > + * Description:
-> > + * Handle a matching IRQ resource by populating the given ctx with
-> > + * the information passed.
-> > + */
-> > +static inline void acpi_irq_parse_one_match(struct fwnode_handle *fwnode,
-> > +                                           u32 hwirq, u8 triggering,
-> > +                                           u8 polarity, u8 shareable,
-> > +                                           struct acpi_irq_parse_one_ctx *ctx)
-> > +{
-> 
-> > +       if (!fwnode)
-> > +               return;
-> 
-> > +       ctx->rc = 0;
-> 
-> Perhaps ctx->rc = fwnode ? 0 : -EINVAL; ?
-> 
-> > +       *ctx->res_flags = acpi_dev_irq_flags(triggering, polarity, shareable);
-> > +       ctx->fwspec->fwnode = fwnode;
-> > +       ctx->fwspec->param[0] = hwirq;
-> > +       ctx->fwspec->param[1] = acpi_dev_get_irq_type(triggering, polarity);
-> > +       ctx->fwspec->param_count = 2;
-> > +}
-> 
-> > +int acpi_irq_get(acpi_handle handle, unsigned int index, struct resource *res)
-> > +{
-> > +       struct irq_fwspec fwspec;
-> > +       struct irq_domain *domain;
-> > +       unsigned long flags;
-> > +       int rc;
-> > +
-> > +       rc = acpi_irq_parse_one(handle, index, &fwspec, &flags);
-> > +       if (rc)
-> > +               return rc;
-> > +
-> > +       domain = irq_find_matching_fwnode(fwspec.fwnode, DOMAIN_BUS_ANY);
-> > +       if (!domain)
-> > +               return -EPROBE_DEFER;
-> > +
-> > +       rc = irq_create_fwspec_mapping(&fwspec);
-> > +       if (rc <= 0)
-> 
-> Is rc = 0 an error?
-
-Yes.
-
-> > +               return -EINVAL;
-> > +
-> > +       res->start = rc;
-> > +       res->end = rc;
-> > +       res->flags = flags;
-> > +
-> > +       return 0;
-> > +}
-> > +EXPORT_SYMBOL_GPL(acpi_irq_get);
-> 
-> > --- a/drivers/base/platform.c
-> > +++ b/drivers/base/platform.c
-> > @@ -102,6 +102,14 @@ int platform_get_irq(struct platform_device *dev, unsigned int num)
-> 
-> >         r = platform_get_resource(dev, IORESOURCE_IRQ, num);
-> > +       if (r && r->flags & IORESOURCE_DISABLED && has_acpi_companion(&dev->dev)) {
-> > +               int ret;
-> > +
-> > +               ret = acpi_irq_get(ACPI_HANDLE(&dev->dev), num, r);
-> > +               if (ret)
-> > +                       return ret;
-> > +       }
-> 
-> > +#ifdef CONFIG_ACPI_GENERIC_GSI
-> 
-> #if IS_ENABLED()
-> 
-> > +int acpi_irq_get(acpi_handle handle, unsigned int index, struct resource *res);
-> > +#else
-> > +static inline int acpi_irq_get(acpi_handle handle, unsigned int index,
-> > +                              struct resource *res)
-> 
-> Perhaps
-> 
-> static inline
-> int ...
-
-It is late -rc5 and notwithstanding cosmetics changes, can we make
-progress with this patch series or not please ?
+In the current !sunxi-ng driver, there's a clock at offset 4, did you
+forget it?
 
 Thanks,
-Lorenzo
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170126/4690ddb2/attachment-0001.sig>
