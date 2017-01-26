@@ -1,26 +1,71 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 26 Jan 2017 10:04:25 +0100
-Subject: [PATCH v3 04/13] pinctrl: samsung: Document Exynos3250 SoC support
-In-Reply-To: <1484833733-16082-5-git-send-email-m.szyprowski@samsung.com>
-References: <CGME20170119134906eucas1p28eaf30c782d33b5a36afe31a89613123@eucas1p2.samsung.com>
- <1484833733-16082-1-git-send-email-m.szyprowski@samsung.com>
- <1484833733-16082-5-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CACRpkdY1F-DyKmi0T0wdUG7xdqt134mWvUj+UMYtY6jJF1knbQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 26 Jan 2017 10:06:04 +0100
+Subject: [PATCH v4 11/13] arm64: allwinner: pine64: add MMC support
+In-Reply-To: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
+References: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <b11557dbfbfa706605359ba334ffd13ba48946d8.1485421557.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 2:48 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
+From: Andre Przywara <andre.przywara@arm.com>
 
-> Add missing compatible id for Exynos3250 SoC to device tree docs.
-> Exynos pin control driver supports it since commit d97f5b9804bfcdc1
-> ("pinctrl: exynos: Add driver data for Exynos3250").
->
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
-> Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
+All Pine64 boards connect an micro-SD card slot to the first MMC
+controller.
+Enable the respective DT node and specify the (always-on) regulator
+and card-detect pin.
+As a micro-SD slot does not feature a write-protect switch, we disable
+this feature.
 
-Patch applied.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts | 20 ++++++++++++++-
+ 1 file changed, 20 insertions(+), 0 deletions(-)
 
-Yours,
-Linus Walleij
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+index cf9105179bcb..c680ed385da3 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+@@ -44,6 +44,8 @@
+ 
+ #include "sun50i-a64.dtsi"
+ 
++#include <dt-bindings/gpio/gpio.h>
++
+ / {
+ 	model = "Pine64";
+ 	compatible = "pine64,pine64", "allwinner,sun50i-a64";
+@@ -55,6 +57,13 @@
+ 	chosen {
+ 		stdout-path = "serial0:115200n8";
+ 	};
++
++	reg_vcc3v3: vcc3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
+ };
+ 
+ &ehci1 {
+@@ -71,6 +80,17 @@
+ 	bias-pull-up;
+ };
+ 
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins>;
++	vmmc-supply = <&reg_vcc3v3>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
++	cd-inverted;
++	disable-wp;
++	bus-width = <4>;
++	status = "okay";
++};
++
+ &ohci1 {
+ 	status = "okay";
+ };
+-- 
+git-series 0.8.11
