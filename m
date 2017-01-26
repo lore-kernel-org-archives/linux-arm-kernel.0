@@ -1,110 +1,145 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 26 Jan 2017 10:29:21 +0100
-Subject: [PATCH v3 REBASED 07/13] pinctrl: samsung: Add missing initconst
- annotation
+Date: Thu, 26 Jan 2017 10:29:24 +0100
+Subject: [PATCH v3 REBASED 10/13] pinctrl: samsung: Add infrastructure for
+ pin-bank retention control
 In-Reply-To: <1485422967-30643-1-git-send-email-m.szyprowski@samsung.com>
 References: <CACRpkdY_SpqfyTTqSP5+a1k1LDf_5w77UXo=EognmOzWBz2c-Q@mail.gmail.com>
  <1485422967-30643-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170126093000eucas1p249774814b7dd40bc6e90488fd2a11445@eucas1p2.samsung.com>
-Message-ID: <1485422967-30643-4-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170126093001eucas1p2531400b718191fd5fadd71d9f0c83597@eucas1p2.samsung.com>
+Message-ID: <1485422967-30643-7-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos5433 support has been added in parallel to adding initconst
-annotation to most of the init data structures, so add those
-annotations also to Exynos5433 structures.
+Pad retention control after suspend/resume cycle should be done from pin
+controller driver instead of PMU (power management unit) driver to avoid
+possible ordering and logical dependencies. Till now it worked fine only
+because PMU driver registered its sys_ops after pin controller.
+
+This patch adds infrastructure to handle pad retention during pin control
+driver resume.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- drivers/pinctrl/samsung/pinctrl-exynos.c | 22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
+ drivers/pinctrl/samsung/pinctrl-samsung.c | 12 +++++++++
+ drivers/pinctrl/samsung/pinctrl-samsung.h | 42 +++++++++++++++++++++++++++++++
+ 2 files changed, 54 insertions(+)
 
-diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
-index 37b48301661b..53baafdad51b 100644
---- a/drivers/pinctrl/samsung/pinctrl-exynos.c
-+++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
-@@ -1255,7 +1255,7 @@ static void exynos_pinctrl_resume(struct samsung_pinctrl_drv_data *drvdata)
+diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
+index 59f99ea7e65b..021abd7221f8 100644
+--- a/drivers/pinctrl/samsung/pinctrl-samsung.c
++++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
+@@ -1060,6 +1060,13 @@ static int samsung_pinctrl_probe(struct platform_device *pdev)
+ 	if (res)
+ 		drvdata->irq = res->start;
+ 
++	if (ctrl->retention_data) {
++		drvdata->retention_ctrl = ctrl->retention_data->init(drvdata,
++							  ctrl->retention_data);
++		if (IS_ERR(drvdata->retention_ctrl))
++			return PTR_ERR(drvdata->retention_ctrl);
++	}
++
+ 	ret = samsung_gpiolib_register(pdev, drvdata);
+ 	if (ret)
+ 		return ret;
+@@ -1126,6 +1133,8 @@ static void samsung_pinctrl_suspend_dev(
+ 
+ 	if (drvdata->suspend)
+ 		drvdata->suspend(drvdata);
++	if (drvdata->retention_ctrl && drvdata->retention_ctrl->enable)
++		drvdata->retention_ctrl->enable(drvdata);
+ }
+ 
+ /**
+@@ -1173,6 +1182,9 @@ static void samsung_pinctrl_resume_dev(struct samsung_pinctrl_drv_data *drvdata)
+ 			if (widths[type])
+ 				writel(bank->pm_save[type], reg + offs[type]);
+ 	}
++
++	if (drvdata->retention_ctrl && drvdata->retention_ctrl->disable)
++		drvdata->retention_ctrl->disable(drvdata);
+ }
+ 
+ /**
+diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.h b/drivers/pinctrl/samsung/pinctrl-samsung.h
+index 6f7ce7539a00..515a61035e54 100644
+--- a/drivers/pinctrl/samsung/pinctrl-samsung.h
++++ b/drivers/pinctrl/samsung/pinctrl-samsung.h
+@@ -185,10 +185,48 @@ struct samsung_pin_bank {
  };
  
- /* pin banks of exynos5433 pin-controller - ALIVE */
--static const struct samsung_pin_bank_data exynos5433_pin_banks0[] = {
-+static const struct samsung_pin_bank_data exynos5433_pin_banks0[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTW(8, 0x000, "gpa0", 0x00),
- 	EXYNOS_PIN_BANK_EINTW(8, 0x020, "gpa1", 0x04),
- 	EXYNOS_PIN_BANK_EINTW(8, 0x040, "gpa2", 0x08),
-@@ -1268,28 +1268,28 @@ static void exynos_pinctrl_resume(struct samsung_pinctrl_drv_data *drvdata)
- };
+ /**
++ * struct samsung_retention_data: runtime pin-bank retention control data.
++ * @regs: array of PMU registers to control pad retention.
++ * @nr_regs: number of registers in @regs array.
++ * @value: value to store to registers to turn off retention.
++ * @refcnt: atomic counter if retention control affects more than one bank.
++ * @priv: retention control code private data
++ * @enable: platform specific callback to enter retention mode.
++ * @disable: platform specific callback to exit retention mode.
++ **/
++struct samsung_retention_ctrl {
++	const u32	*regs;
++	int		nr_regs;
++	u32		value;
++	atomic_t	*refcnt;
++	void		*priv;
++	void		(*enable)(struct samsung_pinctrl_drv_data *);
++	void		(*disable)(struct samsung_pinctrl_drv_data *);
++};
++
++/**
++ * struct samsung_retention_data: represent a pin-bank retention control data.
++ * @regs: array of PMU registers to control pad retention.
++ * @nr_regs: number of registers in @regs array.
++ * @value: value to store to registers to turn off retention.
++ * @refcnt: atomic counter if retention control affects more than one bank.
++ * @init: platform specific callback to initialize retention control.
++ **/
++struct samsung_retention_data {
++	const u32	*regs;
++	int		nr_regs;
++	u32		value;
++	atomic_t	*refcnt;
++	struct samsung_retention_ctrl *(*init)(struct samsung_pinctrl_drv_data *,
++					const struct samsung_retention_data *);
++};
++
++/**
+  * struct samsung_pin_ctrl: represent a pin controller.
+  * @pin_banks: list of pin banks included in this controller.
+  * @nr_banks: number of pin banks.
+  * @nr_ext_resources: number of the extra base address for pin banks.
++ * @retention_data: configuration data for retention control.
+  * @eint_gpio_init: platform specific callback to setup the external gpio
+  *	interrupts for the controller.
+  * @eint_wkup_init: platform specific callback to setup the external wakeup
+@@ -198,6 +236,7 @@ struct samsung_pin_ctrl {
+ 	const struct samsung_pin_bank_data *pin_banks;
+ 	u32		nr_banks;
+ 	int		nr_ext_resources;
++	const struct samsung_retention_data *retention_data;
  
- /* pin banks of exynos5433 pin-controller - AUD */
--static const struct samsung_pin_bank_data exynos5433_pin_banks1[] = {
-+static const struct samsung_pin_bank_data exynos5433_pin_banks1[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(7, 0x000, "gpz0", 0x00),
- 	EXYNOS_PIN_BANK_EINTG(4, 0x020, "gpz1", 0x04),
- };
- 
- /* pin banks of exynos5433 pin-controller - CPIF */
--static const struct samsung_pin_bank_data exynos5433_pin_banks2[] = {
-+static const struct samsung_pin_bank_data exynos5433_pin_banks2[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(2, 0x000, "gpv6", 0x00),
- };
- 
- /* pin banks of exynos5433 pin-controller - eSE */
--static const struct samsung_pin_bank_data exynos5433_pin_banks3[] = {
-+static const struct samsung_pin_bank_data exynos5433_pin_banks3[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj2", 0x00),
- };
- 
- /* pin banks of exynos5433 pin-controller - FINGER */
--static const struct samsung_pin_bank_data exynos5433_pin_banks4[] = {
-+static const struct samsung_pin_bank_data exynos5433_pin_banks4[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(4, 0x000, "gpd5", 0x00),
- };
- 
- /* pin banks of exynos5433 pin-controller - FSYS */
--static const struct samsung_pin_bank_data exynos5433_pin_banks5[] = {
-+static const struct samsung_pin_bank_data exynos5433_pin_banks5[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(6, 0x000, "gph1", 0x00),
- 	EXYNOS_PIN_BANK_EINTG(7, 0x020, "gpr4", 0x04),
- 	EXYNOS_PIN_BANK_EINTG(5, 0x040, "gpr0", 0x08),
-@@ -1299,17 +1299,17 @@ static void exynos_pinctrl_resume(struct samsung_pinctrl_drv_data *drvdata)
- };
- 
- /* pin banks of exynos5433 pin-controller - IMEM */
--static const struct samsung_pin_bank_data exynos5433_pin_banks6[] = {
-+static const struct samsung_pin_bank_data exynos5433_pin_banks6[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpf0", 0x00),
- };
- 
- /* pin banks of exynos5433 pin-controller - NFC */
--static const struct samsung_pin_bank_data exynos5433_pin_banks7[] = {
-+static const struct samsung_pin_bank_data exynos5433_pin_banks7[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj0", 0x00),
- };
- 
- /* pin banks of exynos5433 pin-controller - PERIC */
--static const struct samsung_pin_bank_data exynos5433_pin_banks8[] = {
-+static const struct samsung_pin_bank_data exynos5433_pin_banks8[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(6, 0x000, "gpv7", 0x00),
- 	EXYNOS_PIN_BANK_EINTG(5, 0x020, "gpb0", 0x04),
- 	EXYNOS_PIN_BANK_EINTG(8, 0x040, "gpc0", 0x08),
-@@ -1330,7 +1330,7 @@ static void exynos_pinctrl_resume(struct samsung_pinctrl_drv_data *drvdata)
- };
- 
- /* pin banks of exynos5433 pin-controller - TOUCH */
--static const struct samsung_pin_bank_data exynos5433_pin_banks9[] = {
-+static const struct samsung_pin_bank_data exynos5433_pin_banks9[] __initconst = {
- 	EXYNOS_PIN_BANK_EINTG(3, 0x000, "gpj1", 0x00),
- };
- 
-@@ -1338,7 +1338,7 @@ static void exynos_pinctrl_resume(struct samsung_pinctrl_drv_data *drvdata)
-  * Samsung pinctrl driver data for Exynos5433 SoC. Exynos5433 SoC includes
-  * ten gpio/pin-mux/pinconfig controllers.
+ 	int		(*eint_gpio_init)(struct samsung_pinctrl_drv_data *);
+ 	int		(*eint_wkup_init)(struct samsung_pinctrl_drv_data *);
+@@ -219,6 +258,7 @@ struct samsung_pin_ctrl {
+  * @nr_function: number of such pin functions.
+  * @pin_base: starting system wide pin number.
+  * @nr_pins: number of pins supported by the controller.
++ * @retention_ctrl: retention control runtime data.
   */
--const struct samsung_pin_ctrl exynos5433_pin_ctrl[] = {
-+const struct samsung_pin_ctrl exynos5433_pin_ctrl[] __initconst = {
- 	{
- 		/* pin-controller instance 0 data */
- 		.pin_banks	= exynos5433_pin_banks0,
+ struct samsung_pinctrl_drv_data {
+ 	struct list_head		node;
+@@ -238,6 +278,8 @@ struct samsung_pinctrl_drv_data {
+ 	unsigned int			pin_base;
+ 	unsigned int			nr_pins;
+ 
++	struct samsung_retention_ctrl	*retention_ctrl;
++
+ 	void (*suspend)(struct samsung_pinctrl_drv_data *);
+ 	void (*resume)(struct samsung_pinctrl_drv_data *);
+ };
 -- 
 1.9.1
