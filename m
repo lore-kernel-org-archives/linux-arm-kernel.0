@@ -1,40 +1,34 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 26 Jan 2017 11:15:29 +0100
-Subject: [PATCH 10/11] arm64: dts: allwinner: Remove no longer used
- pinctrl/sun4i-a10.h header
-In-Reply-To: <20170124023230.3990-11-wens@csie.org>
-References: <20170124023230.3990-1-wens@csie.org>
- <20170124023230.3990-11-wens@csie.org>
-Message-ID: <20170126101529.j3fuku4hyy3pbge3@lukather>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 26 Jan 2017 11:14:47 +0100
+Subject: [PATCH 3/5] arm64: dts: r8a7796: salvator-x: Add I2C for DVFS
+ device support
+In-Reply-To: <1485420750-12701-4-git-send-email-horms+renesas@verge.net.au>
+References: <1485420750-12701-1-git-send-email-horms+renesas@verge.net.au>
+ <1485420750-12701-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdVJ5VBREjqx9NAqXx2MjguN0GLFrvtQHV4Kogd2bBE3hA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2017 at 10:32:29AM +0800, Chen-Yu Tsai wrote:
-> All dts files for the sunxi platform have been switched to the generic
-> pinconf bindings. As a result, the sunxi specific pinctrl macros are
-> no longer used.
-> 
-> Remove the #include entry with the following command:
-> 
->     sed -i -e '/pinctrl\/sun4i-a10.h/D' \
-> 	arch/arm64/boot/dts/allwinner/*.dts?
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+On Thu, Jan 26, 2017 at 9:52 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> From: Dien Pham <dien.pham.ry@rvc.renesas.com>
+>
+> This patch adds support of I2C for DVFS device for Salvator-X board on
+> R8A7796 SoC.
+>
+> Signed-off-by: Dien Pham <dien.pham.ry@rvc.renesas.com>
+> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Applied, thanks!
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Maybe we should also remove the header entirely?
+Gr{oetje,eeting}s,
 
-Maxime
+                        Geert
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170126/4695a9d3/attachment.sig>
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
