@@ -1,62 +1,144 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 26 Jan 2017 10:29:23 +0100
-Subject: [PATCH v3 REBASED 09/13] pinctrl: samsung: Use generic
- of_device_get_match_data helper
+Date: Thu, 26 Jan 2017 10:29:26 +0100
+Subject: [PATCH v3 REBASED 12/13] pinctrl: samsung: Move retention control from
+ mach-s5pv210 to the pinctrl driver
 In-Reply-To: <1485422967-30643-1-git-send-email-m.szyprowski@samsung.com>
 References: <CACRpkdY_SpqfyTTqSP5+a1k1LDf_5w77UXo=EognmOzWBz2c-Q@mail.gmail.com>
  <1485422967-30643-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170126093001eucas1p23c2d5d589a0490fc19dde1be37250a00@eucas1p2.samsung.com>
-Message-ID: <1485422967-30643-6-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170126093002eucas1p242ce2fc9c907f515d60e353076bf8214@eucas1p2.samsung.com>
+Message-ID: <1485422967-30643-9-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace custom code with generic helper.
+This patch moves pad retention control from S5PV210 machine code to
+Exynos pin controller driver. This helps to avoid possible ordering
+and logical dependencies between machine and pin control code. Till
+now it worked fine only because sys_ops for machine code and pin
+controller were called in registration order.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
+For mach-s5pv210:
+Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- drivers/pinctrl/samsung/pinctrl-samsung.c | 8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+ arch/arm/mach-s5pv210/pm.c               |  7 ----
+ arch/arm/mach-s5pv210/regs-clock.h       |  4 ---
+ drivers/pinctrl/samsung/pinctrl-exynos.c | 56 ++++++++++++++++++++++++++++++++
+ 3 files changed, 56 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
-index 2803ae57f373..59f99ea7e65b 100644
---- a/drivers/pinctrl/samsung/pinctrl-samsung.c
-+++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
-@@ -27,6 +27,7 @@
- #include <linux/err.h>
- #include <linux/gpio.h>
- #include <linux/irqdomain.h>
-+#include <linux/of_device.h>
- #include <linux/spinlock.h>
- #include <linux/syscore_ops.h>
- 
-@@ -955,15 +956,12 @@ static int samsung_gpiolib_unregister(struct platform_device *pdev,
- 	return 0;
+diff --git a/arch/arm/mach-s5pv210/pm.c b/arch/arm/mach-s5pv210/pm.c
+index 21b4b13c5ab7..7d69666de5ba 100644
+--- a/arch/arm/mach-s5pv210/pm.c
++++ b/arch/arm/mach-s5pv210/pm.c
+@@ -155,13 +155,6 @@ static void s5pv210_suspend_finish(void)
+  */
+ static void s5pv210_pm_resume(void)
+ {
+-	u32 tmp;
+-
+-	tmp = __raw_readl(S5P_OTHERS);
+-	tmp |= (S5P_OTHERS_RET_IO | S5P_OTHERS_RET_CF |\
+-		S5P_OTHERS_RET_MMC | S5P_OTHERS_RET_UART);
+-	__raw_writel(tmp , S5P_OTHERS);
+-
+ 	s3c_pm_do_restore_core(s5pv210_core_save, ARRAY_SIZE(s5pv210_core_save));
  }
  
--static const struct of_device_id samsung_pinctrl_dt_match[];
--
- /* retrieve the soc specific data */
- static const struct samsung_pin_ctrl *
- samsung_pinctrl_get_soc_data(struct samsung_pinctrl_drv_data *d,
- 			     struct platform_device *pdev)
- {
- 	int id;
--	const struct of_device_id *match;
- 	struct device_node *node = pdev->dev.of_node;
- 	struct device_node *np;
- 	const struct samsung_pin_bank_data *bdata;
-@@ -978,8 +976,8 @@ static int samsung_gpiolib_unregister(struct platform_device *pdev,
- 		dev_err(&pdev->dev, "failed to get alias id\n");
- 		return ERR_PTR(-ENOENT);
- 	}
--	match = of_match_node(samsung_pinctrl_dt_match, node);
--	ctrl = (struct samsung_pin_ctrl *)match->data + id;
-+	ctrl = of_device_get_match_data(&pdev->dev);
-+	ctrl += id;
+diff --git a/arch/arm/mach-s5pv210/regs-clock.h b/arch/arm/mach-s5pv210/regs-clock.h
+index 4640f0f03c12..fb3eb77412db 100644
+--- a/arch/arm/mach-s5pv210/regs-clock.h
++++ b/arch/arm/mach-s5pv210/regs-clock.h
+@@ -188,10 +188,6 @@
+ #define S5P_SLEEP_CFG_USBOSC_EN		(1 << 1)
  
- 	d->suspend = ctrl->suspend;
- 	d->resume = ctrl->resume;
+ /* OTHERS Resgister */
+-#define S5P_OTHERS_RET_IO		(1 << 31)
+-#define S5P_OTHERS_RET_CF		(1 << 30)
+-#define S5P_OTHERS_RET_MMC		(1 << 29)
+-#define S5P_OTHERS_RET_UART		(1 << 28)
+ #define S5P_OTHERS_USB_SIG_MASK		(1 << 16)
+ 
+ /* S5P_DAC_CONTROL */
+diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
+index c81df3c843c3..f16f52ab4912 100644
+--- a/drivers/pinctrl/samsung/pinctrl-exynos.c
++++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
+@@ -24,6 +24,7 @@
+ #include <linux/irqdomain.h>
+ #include <linux/irq.h>
+ #include <linux/irqchip/chained_irq.h>
++#include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/io.h>
+ #include <linux/slab.h>
+@@ -632,6 +633,60 @@ static void exynos_pinctrl_resume(struct samsung_pinctrl_drv_data *drvdata)
+ 			exynos_pinctrl_resume_bank(drvdata, bank);
+ }
+ 
++/* Retention control for S5PV210 are located at the end of clock controller */
++#define S5P_OTHERS 0xE000
++
++#define S5P_OTHERS_RET_IO		(1 << 31)
++#define S5P_OTHERS_RET_CF		(1 << 30)
++#define S5P_OTHERS_RET_MMC		(1 << 29)
++#define S5P_OTHERS_RET_UART		(1 << 28)
++
++static void s5pv210_retention_disable(struct samsung_pinctrl_drv_data *drvdata)
++{
++	void *clk_base = drvdata->retention_ctrl->priv;
++	u32 tmp;
++
++	tmp = __raw_readl(clk_base + S5P_OTHERS);
++	tmp |= (S5P_OTHERS_RET_IO | S5P_OTHERS_RET_CF | S5P_OTHERS_RET_MMC |
++		S5P_OTHERS_RET_UART);
++	__raw_writel(tmp, clk_base + S5P_OTHERS);
++}
++
++static struct samsung_retention_ctrl *
++s5pv210_retention_init(struct samsung_pinctrl_drv_data *drvdata,
++		       const struct samsung_retention_data *data)
++{
++	struct samsung_retention_ctrl *ctrl;
++	struct device_node *np;
++	void *clk_base;
++
++	ctrl = devm_kzalloc(drvdata->dev, sizeof(*ctrl), GFP_KERNEL);
++	if (!ctrl)
++		return ERR_PTR(-ENOMEM);
++
++	np = of_find_compatible_node(NULL, NULL, "samsung,s5pv210-clock");
++	if (!np) {
++		pr_err("%s: failed to find clock controller DT node\n",
++			__func__);
++		return ERR_PTR(-ENODEV);
++	}
++
++	clk_base = of_iomap(np, 0);
++	if (!clk_base) {
++		pr_err("%s: failed to map clock registers\n", __func__);
++		return ERR_PTR(-EINVAL);
++	}
++
++	ctrl->priv = clk_base;
++	ctrl->disable = s5pv210_retention_disable;
++
++	return ctrl;
++}
++
++static const struct samsung_retention_data s5pv210_retention_data __initconst = {
++	.init	 = s5pv210_retention_init,
++};
++
+ /* pin banks of s5pv210 pin-controller */
+ static const struct samsung_pin_bank_data s5pv210_pin_bank[] __initconst = {
+ 	EXYNOS_PIN_BANK_EINTG(8, 0x000, "gpa0", 0x00),
+@@ -679,6 +734,7 @@ static void exynos_pinctrl_resume(struct samsung_pinctrl_drv_data *drvdata)
+ 		.eint_wkup_init = exynos_eint_wkup_init,
+ 		.suspend	= exynos_pinctrl_suspend,
+ 		.resume		= exynos_pinctrl_resume,
++		.retention_data	= &s5pv210_retention_data,
+ 	},
+ };
+ 
 -- 
 1.9.1
