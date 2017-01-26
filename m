@@ -1,37 +1,32 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 26 Jan 2017 17:26:32 +0000
-Subject: [PATCH 5/5] iommu: Allow default domain type to be set on the
- kernel command line
-In-Reply-To: <20170126171555.GD27598@8bytes.org>
-References: <1484849955-1871-1-git-send-email-will.deacon@arm.com>
- <1484849955-1871-6-git-send-email-will.deacon@arm.com>
- <20170126171555.GD27598@8bytes.org>
-Message-ID: <5717f26c-44ee-2057-e7dc-8dca42e3cd88@arm.com>
+From: dtor@chromium.org (Dmitry Torokhov)
+Date: Thu, 26 Jan 2017 09:26:13 -0800
+Subject: [PATCH] spi: mediatek: Manually set dma_ops for spi_master device
+In-Reply-To: <20170126170747.r6gegu3buqeedp54@sirena.org.uk>
+References: <20170124132519.13271-1-djkurtz@chromium.org>
+ <b1180920-8ead-40e8-6155-8510226e719b@arm.com>
+ <CAGS+omBV3o1hergAjU3_9ok5NTmk8Z315zo3yW9jU_jA+reZCQ@mail.gmail.com>
+ <0548db75-042b-4bef-02db-767ea9ccd7e4@arm.com>
+ <CAGS+omDexcrnWL6v4bAQ3K2QSHKcwCs-WRCC+BUbGbXgVYbK9w@mail.gmail.com>
+ <CAE_wzQ8ChZtLait3WWin1nyRY5CQCzs8VHTeAcP8y2DqSGmb7Q@mail.gmail.com>
+ <CAGS+omC-LnTx9Qt4Cv+7u-Oh=4syZy_mA-FqF8bUzN0DQmgAig@mail.gmail.com>
+ <20170126170747.r6gegu3buqeedp54@sirena.org.uk>
+Message-ID: <CAE_wzQ-an3v_32E+JFzTQMKXf=J6BVGf56QZKL+YCV=mZk6-LA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/01/17 17:15, Joerg Roedel wrote:
-> On Thu, Jan 19, 2017 at 06:19:15PM +0000, Will Deacon wrote:
->> Rather than modify each IOMMU driver to provide different semantics for
->> DMA domains, instead we introduce a command line parameter that can be
->> used to change the type of the default domain. Passthrough can then be
->> specified using "iommu.default_domain=identity" on the kernel command
->> line.
-> 
-> I like the general idea of this, but the above is a terrible name for a
-> kernel commandline-parameter. The x86 iommus support iommu=pt which is
-> pretty much the same as this patch does.
+On Thu, Jan 26, 2017 at 9:07 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Fri, Jan 27, 2017 at 12:52:15AM +0800, Daniel Kurtz wrote:
+>> On Fri, Jan 27, 2017 at 12:35 AM, Dmitry Torokhov <dtor@chromium.org> wrote:
+>
+>> > Nobody doing DMA likes unaligned buffers. In fact, memory used for DMA
+>> > must be cacheline aligned, or you going to have trouble. What
+>> > component supplies unaligned buffers to SPI core for transfers?
+>
+>> cros-ec-spi
+>
+> That needs fixing then - I keep thinking we should add a warning to the
+> core for this, especially now we do DMA mapping in the core.
 
-Indeed, I was keen on making "iommu=pt" also do this default domain
-switch itself so we wouldn't need a new option - it didn't *appear* that
-that would break the AMD driver (as the only other default domain user
-supporting identity domains) but I may have overlooked something.
-
-Robin.
-
-> How about something like "iommu.passthrough=0/1"? And please add the
-> parameter to the kernel documentation too.
-> 
-> 
-> 	Joerg
-> 
+OTOH the full buffer used by cros ec *is* DMA-safe (allocated with
+kmalloc), it is that cors ec uses it at offset while transferring data
+piece by piece. Do we want to support this?
