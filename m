@@ -1,45 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 26 Jan 2017 18:11:17 +0000
-Subject: [PATCH V2] arm64: skip register_cpufreq_notifier on ACPI-based
- systems
-In-Reply-To: <1485454112-4823-1-git-send-email-pprakash@codeaurora.org>
-References: <1485454112-4823-1-git-send-email-pprakash@codeaurora.org>
-Message-ID: <20170126181116.GT14167@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 26 Jan 2017 18:26:17 +0000
+Subject: [PATCH v2 2/2] arm64: efi: add vmlinux debug link to the Image
+ binary
+In-Reply-To: <CAKv+Gu-GQAQU2Ety+rBvZ-9VbUHe+jQQosFJ-63UTQ7pPHHh0Q@mail.gmail.com>
+References: <1485340759-28975-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1485340759-28975-3-git-send-email-ard.biesheuvel@linaro.org>
+ <20170125115305.GA29027@leverpostej>
+ <CAKv+Gu-GQAQU2Ety+rBvZ-9VbUHe+jQQosFJ-63UTQ7pPHHh0Q@mail.gmail.com>
+Message-ID: <20170126182453.GA24043@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 11:08:32AM -0700, Prashanth Prakash wrote:
-> On ACPI based systems where the topology is setup using the API
-> store_cpu_topology, at the moment we do not have necessary code
-> to parse cpu capacity and handle cpufreq notifier, thus
-> resulting in a kernel panic.
+On Wed, Jan 25, 2017 at 12:00:44PM +0000, Ard Biesheuvel wrote:
+> On 25 January 2017 at 11:53, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Wed, Jan 25, 2017 at 10:39:19AM +0000, Ard Biesheuvel wrote:
+> >> When building with debugging symbols, take the absolute path to the
+> >> vmlinux binary and add it to the special PE/COFF debug table entry.
+> >>
+> >> These entries are used internally by EDK2 based* debug builds of UEFI
+> >> to populate the DebugImageInfo table, which can be used by debuggers
+> >> as well as by the OS itself to retrieve information about all loaded
+> >> PE/COFF executables. This is highly useful for source level debugging
+> >> of the UEFI stub.
+> >
+> > Does that mean EFI_IMAGE_DEBUG_DIRECTORY_ENTRY and friends are
+> > EDK2-specific?
+> >
+> > Or just that the way EDK2 happens to use those is EDK2-specific?
 > 
-> Stack:
->         init_cpu_capacity_callback+0xb4/0x1c8
->         notifier_call_chain+0x5c/0xa0
->         __blocking_notifier_call_chain+0x58/0xa0
->         blocking_notifier_call_chain+0x3c/0x50
->         cpufreq_set_policy+0xe4/0x328
->         cpufreq_init_policy+0x80/0x100
->         cpufreq_online+0x418/0x710
->         cpufreq_add_dev+0x118/0x180
->         subsys_interface_register+0xa4/0xf8
->         cpufreq_register_driver+0x1c0/0x298
->         cppc_cpufreq_init+0xdc/0x1000 [cppc_cpufreq]
->         do_one_initcall+0x5c/0x168
->         do_init_module+0x64/0x1e4
->         load_module+0x130c/0x14d0
->         SyS_finit_module+0x108/0x120
->         el0_svc_naked+0x24/0x28
-> 
-> Fixes: 7202bde8b7ae ("arm64: parse cpu capacity-dmips-mhz from DT")
-> Signed-off-by: Prashanth Prakash <pprakash@codeaurora.org>
-> ---
->  arch/arm64/kernel/topology.c | 8 +++++++-
->  1 file changed, 7 insertions(+), 1 deletion(-)
+> Those values are defined by the PE/COFF spec, and I assume that a
+> CodeView type entry in the debug table usually contains a NUL
+> terminated string as well, given that the EDK2 crowd is very
+> Wintel-heavy.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+So we don't actually have a definition of the format of a CodeView
+entry, and we're guessing?
 
-Catalin -- this resolves a panic, so please take it for 4.10
+That does feel a little scary, especially given the fields are named
+"Unknown". :(
 
-Will
+> The significance of mentioning EDK2 here was that I thought that the
+> DebugImageInfo table was a PI construct rather than something
+> described in the UEFI spec. But looking more carefully, it seems that
+> this table is in fact a UEFI construct, so I should probably drop this
+> mention from the commit log
+
+That would probably be for the best, yes.
+
+Thanks,
+Mark.
