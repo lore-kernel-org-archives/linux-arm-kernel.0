@@ -1,39 +1,30 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Thu, 26 Jan 2017 14:05:03 -0800
-Subject: [PATCH 3/4] i.MX: GPC: Use IRQCHIP_DECLARE_DRIVER
-In-Reply-To: <20170126220504.4796-1-andrew.smirnov@gmail.com>
-References: <20170126220504.4796-1-andrew.smirnov@gmail.com>
-Message-ID: <20170126220504.4796-3-andrew.smirnov@gmail.com>
+From: hkallweit1@gmail.com (Heiner Kallweit)
+Date: Thu, 26 Jan 2017 23:09:01 +0100
+Subject: [PATCH] mmc: meson-gx: set max block count to 256
+Message-ID: <82cf7861-5cf8-302d-5354-435282d95619@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use IRQCHIP_DECLARE_DRIVER instead of Use IRQCHIP_DECLARE to allow
-'imx_gpc_driver' to be probed in addition to irqchip initialized by
-imx_gpc_init().
+So far max_blk_count isn't set what results in a default of value 8
+to be used (PAGE_SIZE / block size).
+Set max_blk_count to 256 as used in the uboot driver.
 
-Cc: yurovsky at gmail.com
-Cc: Shawn Guo <shawnguo@kernel.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
 ---
- arch/arm/mach-imx/gpc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/mmc/host/meson-gx-mmc.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
-index 1dc2a34..8f0d19b 100644
---- a/arch/arm/mach-imx/gpc.c
-+++ b/arch/arm/mach-imx/gpc.c
-@@ -279,7 +279,7 @@ static int __init imx_gpc_init(struct device_node *node,
+diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
+index 3308b5b6..030425be 100644
+--- a/drivers/mmc/host/meson-gx-mmc.c
++++ b/drivers/mmc/host/meson-gx-mmc.c
+@@ -799,6 +799,7 @@ static int meson_mmc_probe(struct platform_device *pdev)
+ 		goto free_host;
+ 	}
  
- 	return 0;
- }
--IRQCHIP_DECLARE(imx_gpc, "fsl,imx6q-gpc", imx_gpc_init);
-+IRQCHIP_DECLARE_DRIVER(imx_gpc, "fsl,imx6q-gpc", imx_gpc_init);
++	mmc->max_blk_count = 256;
+ 	mmc->ops = &meson_mmc_ops;
+ 	mmc_add_host(mmc);
  
- void __init imx_gpc_check_dt(void)
- {
 -- 
-2.9.3
+2.11.0
