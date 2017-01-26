@@ -1,57 +1,59 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 26 Jan 2017 11:07:24 +0100
-Subject: [PATCH 2/5] arm64: dts: r8a7796: Add I2C for DVFS device node
-In-Reply-To: <1485420750-12701-3-git-send-email-horms+renesas@verge.net.au>
-References: <1485420750-12701-1-git-send-email-horms+renesas@verge.net.au>
- <1485420750-12701-3-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdXSriucRXVACQoGx0S8CX0sXPmuWvAQy0+RP9PY-z7U3g@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 26 Jan 2017 11:11:05 +0100
+Subject: [GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for v4.11
+Message-ID: <cover.1485425227.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 9:52 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> From: Dien Pham <dien.pham.ry@rvc.renesas.com>
->
-> This patch adds I2C for DVFS device node for R8A7796 SoC.
->
-> Signed-off-by: Dien Pham <dien.pham.ry@rvc.renesas.com>
-> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Please consider these second round of Renesas ARM based SoC DT updates for v4.11.
 
-> --- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+This pull request is based on the previous round of
+such requests, tagged as renesas-dt-for-v4.11,
+which you have already pulled.
 
-> @@ -269,6 +270,19 @@
->                         #power-domain-cells = <1>;
->                 };
->
-> +               i2c_dvfs: i2c at e60b0000 {
-> +                       #address-cells = <1>;
-> +                       #size-cells = <0>;
-> +                       compatible = "renesas,iic-r8a7796",
-> +                                    "renesas,rcar-gen3-iic",
-> +                                    "renesas,rmobile-iic";
-> +                       reg = <0 0xe60b0000 0 0x425>;
-> +                       interrupts = <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>;
-> +                       clocks = <&cpg CPG_MOD 926>;
 
-You may want to add dmas/dma-names.
-That can be done later, though.
+The following changes since commit 654450baf2afba86cf328e1849ccac61ec4630af:
 
-> +                       power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-> +                       status = "disabled";
-> +               };
-> +
+  ARM: dts: r8a7790: Use R-Car Gen 2 fallback binding for msiof nodes (2017-01-03 10:47:05 +0100)
 
-Gr{oetje,eeting}s,
+are available in the git repository at:
 
-                        Geert
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt2-for-v4.11
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+for you to fetch changes up to 5786ac14239a0809ca13e6a6f77147e6bb04aa29:
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+  ARM: dts: r7s72100: add power-domains to mmcif (2017-01-25 11:32:02 +0100)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM Based SoC DT Updates for v4.11
+
+Enhancements:
+* Add power-domains to mmcif on r7s72100 SoC
+* Add OSTM to rskrza1/r7s72100
+* Link ARM GIC to clock and clock domain on r8a774[35] SoCs
+
+Clean-up:
+* Correct SATA device status on r8a7779/marzen
+
+----------------------------------------------------------------
+Chris Brandt (4):
+      ARM: dts: r7s72100: add ostm clock to device tree
+      ARM: dts: r7s72100: add ostm to device tree
+      ARM: dts: rskrza1: add ostm DT support
+      ARM: dts: r7s72100: add power-domains to mmcif
+
+Geert Uytterhoeven (3):
+      ARM: dts: r8a7779, marzen: Fix sata device status
+      ARM: dts: r8a7743: Link ARM GIC to clock and clock domain
+      ARM: dts: r8a7745: Link ARM GIC to clock and clock domain
+
+ arch/arm/boot/dts/r7s72100-rskrza1.dts     |  8 ++++++++
+ arch/arm/boot/dts/r7s72100.dtsi            | 28 ++++++++++++++++++++++++++++
+ arch/arm/boot/dts/r8a7743.dtsi             |  3 +++
+ arch/arm/boot/dts/r8a7745.dtsi             |  3 +++
+ arch/arm/boot/dts/r8a7779-marzen.dts       |  4 ++++
+ arch/arm/boot/dts/r8a7779.dtsi             |  1 +
+ include/dt-bindings/clock/r7s72100-clock.h |  4 ++++
+ 7 files changed, 51 insertions(+)
