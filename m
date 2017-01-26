@@ -1,79 +1,33 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 26 Jan 2017 10:05:58 +0100
-Subject: [PATCH v4 5/13] mmc: sunxi: Mask DATA0 when updating the clock
-In-Reply-To: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
-References: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <bbba06b3db0c50e6d90a96a2e8b7faf1c545ea77.1485421557.git-series.maxime.ripard@free-electrons.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 26 Jan 2017 10:08:49 +0100
+Subject: [PATCH v3 07/13] pinctrl: samsung: Add missing initconst
+ annotation
+In-Reply-To: <1484833733-16082-8-git-send-email-m.szyprowski@samsung.com>
+References: <CGME20170119134907eucas1p14be6b994bddf37f8baca669a66acc1d4@eucas1p1.samsung.com>
+ <1484833733-16082-1-git-send-email-m.szyprowski@samsung.com>
+ <1484833733-16082-8-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CACRpkdY_SpqfyTTqSP5+a1k1LDf_5w77UXo=EognmOzWBz2c-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A64 MMC controllers need DATA0 to be masked while updating the clock,
-otherwise any subsequent command will result in a timeout.
+On Thu, Jan 19, 2017 at 2:48 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
 
-It's not really clear at this point what DATA0 is exactly, but this
-behaviour is present in Allwinner's tree, and has been suggested by
-Allwinner engineers as fixes for the timeout.
+> Exynos5433 support has been added in parallel to adding initconst
+> annotation to most of the init data structures, so add those
+> annotations also to Exynos5433 structures.
+>
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Acked-by: Tomasz Figa <tomasz.figa@gmail.com>
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/mmc/host/sunxi-mmc.c | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+This fails to apply to the pinctrl tree "devel" branch.
 
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index 51d6388a194e..6bbe61397b7c 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -101,6 +101,7 @@
- 	(SDXC_SOFT_RESET | SDXC_FIFO_RESET | SDXC_DMA_RESET)
- 
- /* clock control bits */
-+#define SDXC_MASK_DATA0			BIT(31)
- #define SDXC_CARD_CLOCK_ON		BIT(16)
- #define SDXC_LOW_POWER_ON		BIT(17)
- 
-@@ -254,6 +255,9 @@ struct sunxi_mmc_cfg {
- 	/* does the IP block support autocalibration? */
- 	bool can_calibrate;
- 
-+	/* Does DATA0 needs to be masked while the clock is updated */
-+	bool mask_data0;
-+
- 	bool needs_new_timings;
- };
- 
-@@ -657,10 +661,12 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
- 	u32 rval;
- 
- 	rval = mmc_readl(host, REG_CLKCR);
--	rval &= ~(SDXC_CARD_CLOCK_ON | SDXC_LOW_POWER_ON);
-+	rval &= ~(SDXC_CARD_CLOCK_ON | SDXC_LOW_POWER_ON | SDXC_MASK_DATA0);
- 
- 	if (oclk_en)
- 		rval |= SDXC_CARD_CLOCK_ON;
-+	if (host->cfg->mask_data0)
-+		rval |= SDXC_MASK_DATA0;
- 
- 	mmc_writel(host, REG_CLKCR, rval);
- 
-@@ -680,6 +686,11 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
- 		return -EIO;
- 	}
- 
-+	if (host->cfg->mask_data0) {
-+		rval = mmc_readl(host, REG_CLKCR);
-+		mmc_writel(host, REG_CLKCR, rval & ~SDXC_MASK_DATA0);
-+	}
-+
- 	return 0;
- }
- 
-@@ -1081,6 +1092,7 @@ static const struct sunxi_mmc_cfg sun50i_a64_cfg = {
- 	.idma_des_size_bits = 16,
- 	.clk_delays = NULL,
- 	.can_calibrate = true,
-+	.mask_data0 = true,
- 	.needs_new_timings = true,
- };
- 
--- 
-git-series 0.8.11
+I guess I have other Samsung patches on the branch colliding
+with this.
+
+Can you please rebase this and the following patches on this
+branch and resend?
+https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-pinctrl.git/log/?h=devel
+
+Yours,
+Linus Walleij
