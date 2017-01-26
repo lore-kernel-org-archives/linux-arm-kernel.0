@@ -1,92 +1,39 @@
-From: hkallweit1@gmail.com (Heiner Kallweit)
-Date: Thu, 26 Jan 2017 23:03:13 +0100
-Subject: [PATCH 3/3] mmc: meson-gx: improve meson_mmc_clk_set
-Message-ID: <49d47535-6008-e1df-3baa-4f0590344a89@gmail.com>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Thu, 26 Jan 2017 14:05:03 -0800
+Subject: [PATCH 3/4] i.MX: GPC: Use IRQCHIP_DECLARE_DRIVER
+In-Reply-To: <20170126220504.4796-1-andrew.smirnov@gmail.com>
+References: <20170126220504.4796-1-andrew.smirnov@gmail.com>
+Message-ID: <20170126220504.4796-3-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes are quite small, therefore I combined them in
-one patch. If you'd prefer to separate the changes just let me know.
+Use IRQCHIP_DECLARE_DRIVER instead of Use IRQCHIP_DECLARE to allow
+'imx_gpc_driver' to be probed in addition to irqchip initialized by
+imx_gpc_init().
 
-- ret doesn't need to be initialized with 0
-- use standard !clk_rate notation to check for a zero value
-- If clk_rate is zero we return here. Therefore all further checks
-  in this function for clk_rate != 0 are not needed.
-- switch from dev_warn to dev_err if the clock can't be set
-- If due to clock source and available divider values the requested
-  frequency isn't matched exactly (always the case if requested
-  frequency is 52 MHz), then just print the differing values as
-  debug message and not as warning.
-- Also remove ret from the message as it is always 0.
-- In the case of actual frequency not exactly matching the requested
-  one set mmc->actual_clock to the requested frequency.
-  So far mmc->actual_clock wasn't set at all in this case.
-
-Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
+Cc: yurovsky at gmail.com
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 ---
- drivers/mmc/host/meson-gx-mmc.c | 36 +++++++++++++++++++-----------------
- 1 file changed, 19 insertions(+), 17 deletions(-)
+ arch/arm/mach-imx/gpc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
-index 41c54e02..3308b5b6 100644
---- a/drivers/mmc/host/meson-gx-mmc.c
-+++ b/drivers/mmc/host/meson-gx-mmc.c
-@@ -179,7 +179,7 @@ struct sd_emmc_desc {
- static int meson_mmc_clk_set(struct meson_host *host, unsigned long clk_rate)
- {
- 	struct mmc_host *mmc = host->mmc;
--	int ret = 0;
-+	int ret;
- 	u32 cfg;
+diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
+index 1dc2a34..8f0d19b 100644
+--- a/arch/arm/mach-imx/gpc.c
++++ b/arch/arm/mach-imx/gpc.c
+@@ -279,7 +279,7 @@ static int __init imx_gpc_init(struct device_node *node,
  
- 	if (clk_rate) {
-@@ -202,29 +202,31 @@ static int meson_mmc_clk_set(struct meson_host *host, unsigned long clk_rate)
- 	dev_dbg(host->dev, "change clock rate %u -> %lu\n",
- 		mmc->actual_clock, clk_rate);
- 
--	if (clk_rate == 0) {
-+	if (!clk_rate) {
- 		mmc->actual_clock = 0;
- 		return 0;
- 	}
- 
- 	ret = clk_set_rate(host->cfg_div_clk, clk_rate);
--	if (ret)
--		dev_warn(host->dev, "Unable to set cfg_div_clk to %lu. ret=%d\n",
--			 clk_rate, ret);
--	else if (clk_rate && clk_rate != clk_get_rate(host->cfg_div_clk))
--		dev_warn(host->dev, "divider requested rate %lu != actual rate %lu: ret=%d\n",
--			 clk_rate, clk_get_rate(host->cfg_div_clk), ret);
--	else
--		mmc->actual_clock = clk_rate;
--
--	/* (re)start clock, if non-zero */
--	if (!ret && clk_rate) {
--		cfg = readl(host->regs + SD_EMMC_CFG);
--		cfg &= ~CFG_STOP_CLOCK;
--		writel(cfg, host->regs + SD_EMMC_CFG);
-+	if (ret) {
-+		dev_err(host->dev, "Unable to set cfg_div_clk to %lu. ret=%d\n",
-+			clk_rate, ret);
-+		return ret;
- 	}
- 
--	return ret;
-+	if (clk_rate != clk_get_rate(host->cfg_div_clk))
-+		dev_dbg(host->dev,
-+			"divider requested rate %lu != actual rate %lu\n",
-+			clk_rate, clk_get_rate(host->cfg_div_clk));
-+
-+	mmc->actual_clock = clk_rate;
-+
-+	/* (re)start clock */
-+	cfg = readl(host->regs + SD_EMMC_CFG);
-+	cfg &= ~CFG_STOP_CLOCK;
-+	writel(cfg, host->regs + SD_EMMC_CFG);
-+
-+	return 0;
+ 	return 0;
  }
+-IRQCHIP_DECLARE(imx_gpc, "fsl,imx6q-gpc", imx_gpc_init);
++IRQCHIP_DECLARE_DRIVER(imx_gpc, "fsl,imx6q-gpc", imx_gpc_init);
  
- /*
+ void __init imx_gpc_check_dt(void)
+ {
 -- 
-2.11.0
+2.9.3
