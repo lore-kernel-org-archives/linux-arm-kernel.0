@@ -1,178 +1,506 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Thu, 26 Jan 2017 09:09:35 -0600
-Subject: [PATCH v3 2/4] dt-bindings: Add TI SCI PM Domains
-In-Reply-To: <CAL_Jsq+9oEJJtHC4Gp_mWy_wJMLXsv2jgqKCMK8jm1MSWT-LRg@mail.gmail.com>
-References: <20170104205536.15963-1-d-gerlach@ti.com>
- <7bd282d9-df6f-f4c6-1f7f-c8ed81c78af3@ti.com>
- <CAL_JsqKxU4c=KSn0=xX9kmbk498fhqpiXMeGjcoe8Ah48FAzUg@mail.gmail.com>
- <3bb89649-fd2a-acc6-6968-e54a00842ce2@ti.com>
- <CAL_JsqL+L1oHAOv7tLevzbtRFSKRs9J01SgF=HR_vNNqNV+4+Q@mail.gmail.com>
- <84d7d49b-933b-8b26-f18a-3a5054738cb1@ti.com>
- <CAL_JsqJ9RitNC7ihC8ckJgV+49kaHk=W9tgdNBSjEfydhQS46A@mail.gmail.com>
- <0eaa9914-83f1-7716-cf04-1e3dd44df647@ti.com>
- <4cb25cf9-216f-2e18-f45d-ef7e48fa6c5e@ti.com> <m2ziip2puf.fsf@baylibre.com>
- <CAL_Jsq+Vp8iYrAUmuSRzeeY_G6CUqFqG6XB6erDxo1RYo3g4=g@mail.gmail.com>
- <CAPDyKFqzs59N5bc89X-96Fgy9b=_+s8zYmHHshQeDrJCnaqprA@mail.gmail.com>
- <58821CA2.4050701@ti.com>
- <CAPDyKFpTyn2isNahywmOOSWiZKov9xsudyWi_i-FejXjC+1AZw@mail.gmail.com>
- <ec2f1697-4c60-fd88-6593-2a69ca7f5c83@ti.com>
- <CAPDyKFq3zjyubxf3wc1V+F2W3rbnjj4ObFnHFvda+wCs4rBtnw@mail.gmail.com>
- <23936395-d653-56c8-13f9-6dfeb6e9257b@ti.com>
- <CAL_Jsq+9oEJJtHC4Gp_mWy_wJMLXsv2jgqKCMK8jm1MSWT-LRg@mail.gmail.com>
-Message-ID: <fec2e1b2-df90-e9ba-4925-ecdc12d696b9@ti.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 26 Jan 2017 16:09:47 +0100
+Subject: [PATCHv3 4/5] arm: mvebu: Add device tree for 98DX3236 SoCs
+In-Reply-To: <20170106041517.9589-5-chris.packham@alliedtelesis.co.nz> (Chris
+ Packham's message of "Fri, 6 Jan 2017 17:15:01 +1300")
+References: <20170105033641.6212-1-chris.packham@alliedtelesis.co.nz>
+ <20170106041517.9589-1-chris.packham@alliedtelesis.co.nz>
+ <20170106041517.9589-5-chris.packham@alliedtelesis.co.nz>
+Message-ID: <87inp1zwlg.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25/2017 04:32 PM, Rob Herring wrote:
-> On Wed, Jan 25, 2017 at 10:59 AM, Dave Gerlach <d-gerlach@ti.com> wrote:
->> On 01/24/2017 04:03 AM, Ulf Hansson wrote:
->>>
->>> On 23 January 2017 at 21:11, Dave Gerlach <d-gerlach@ti.com> wrote:
->>>>
->>>> On 01/20/2017 10:52 AM, Ulf Hansson wrote:
->>>>>
->>>>>
->>>>> [...]
->>>>>
->>>>>>>> Another option is create something new either common or TI SCI
->>>>>>>> specific. It could be just a table of ids and phandles in the SCI
->>>>>>>> node. I'm much more comfortable with an isolated property in one node
->>>>>>>> than something scattered throughout the DT.
->>>>>>>
->>>>>>>
->>>>>>>
->>>>>>> To me, this seems like the best possible solution.
->>>>>>>
->>>>>>> However, perhaps we should also consider the SCPI Generic power domain
->>>>>>> (drivers/firmware/scpi_pm_domain.c), because I believe it's closely
->>>>>>> related.
->>>>>>> To change the power state of a device, this PM domain calls
->>>>>>> scpi_device_set|get_power_state() (drivers/firmware/arm_scpi.c), which
->>>>>>> also needs a device id as a parameter. Very similar to our case with
->>>>>>> the TI SCI domain.
->>>>>>>
->>>>>>> Currently these SCPI device ids lacks corresponding DT bindings, so
->>>>>>> the scpi_pm_domain tries to work around it by assigning ids
->>>>>>> dynamically at genpd creation time.
->>>>>>>
->>>>>>> That makes me wonder, whether we should think of something
->>>>>>> common/generic?
->>>>>>
->>>>>>
->>>>>>
->>>>>> When you say something common/generic, do you mean a better binding for
->>>>>> genpd,
->>>>>> or something bigger than that like a new driver? Because I do think a
->>>>>> phandle
->>>>>> cell left open for the genpd provider to interpret solves both the scpi
->>>>>> and
->>>>>> ti-sci problem we are facing here in the best way. Using generic PM
->>>>>> domains lets
->>>>>> us do exactly what we want apart from interpreting the phandle cell
->>>>>> with
->>>>>> our
->>>>>> driver, and I feel like anything else we try at this point is just
->>>>>> going
->>>>>> to be
->>>>>> to work around that. Is bringing back genpd xlate something we can
->>>>>> discuss?
->>>>>
->>>>>
->>>>>
->>>>> Bringing back xlate, how would that help? Wouldn't that just mean that
->>>>> you will get one genpd per device? That's not an option, I think we
->>>>> are all in agreement to that.
->>>>
->>>>
->>>>
->>>> Sure, perhaps the custom xlate wouldn't be the right way to do it, as we
->>>> wouldn't be able to associate a device directly to a phandle, at least
->>>> with
->>>> how it was implemented before, but I think we can skip that entirely.
->>>> Does
->>>> opening up the interpretation of the cells of the 'power-domains' phandle
->>>> not solve all of these issues? Is that out of the question?
->>>>
->>>> genpd_xlate_simple currently just makes sure the args_count of the
->>>> 'power-domains' phandle was zero and bails if it was not. Why couldn't we
->>>> remove this check and let the driver interpret it while still using
->>>> of_genpd_add_provider_simple to register the provider? It's still a
->>>> 'simple'
->>>> provider from the perspective of the genpd framework and the actual pm
->>>> domain mapping will not change, but now the driver can parse the cells
->>>> and
->>>> do whatever it needs to, such as reading a device id.
->>>>
->>>> I think that's a bit more flexible and will avoid breaking anything that
->>>> is
->>>> there today.
->>>
->>>
->>> Would you mind providing an example? Perhaps also some code snippets
->>> dealing with the parsing?
->>
->>
->> So again the goal of this is to move the ti,sci-id value back to
->> power-domains phandle instead of having a separate property, so that would
->> be step one in the DT. Then in the power-domains node change
->> #power-domain-cells to one. And then from there, the only change to the
->> genpd framework is this:
->
-> I'd still like to understand how the ID is used in order to understand
-> if as a power-domain cell is appropriate. I think the test is this: is
-> the ID meaningful to (or defined by) the device or the power domain
-> controller? The former should be a property in the device node. The
-> latter should be phandle args.
+Hi Chris,
+ 
+ On ven., janv. 06 2017, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
 
-The device itself doesn't care about the ID or ever need to know what it is. The 
-power domain controller is the only user of the ID. The power domain controller 
-needs the ID for a specific device to be able to turn it on, so during probe of 
-each device the power-domain controller makes this association which is why I 
-included it in each device node, so I think it fits as a phandle arg based on 
-your test.
+> The Marvell 98DX3236, 98DX3336, 98DX4521 and variants are switch ASICs
+> with integrated CPUs. They are similar to the Armada XP SoCs but have
+> different I/O interfaces.
 
->
->> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
->> index a5e1262b964b..b82e61f0bcfa 100644
->> --- a/drivers/base/power/domain.c
->> +++ b/drivers/base/power/domain.c
->> @@ -1603,8 +1603,6 @@ static struct generic_pm_domain genpd_xlate_simple
->>                                       struct of_phandle_args *genpdspec,
->>                                       void *data)
->>  {
->> -       if (genpdspec->args_count != 0)
->> -               return ERR_PTR(-EINVAL);
->>         return data;
->>  }
->>
->>
->> because genpd_xlate_simple only checks that the phandle is zero so that it
->> can fail if it is not, but there's no functional reason it needs to do this.
->> The genpd framework works as it did before no matter what the cells are set
->> to if using of_genpd_add_provider_simple. Then in the attach_dev callback
->> inside the ti_sci_pm_domains driver instead of doing
->>
->>         ret = of_property_read_u32(np, "ti,sci-id", &idx);
->>
->> to read the ti,sc-id for a device into idx we can now do:
->>
->>        ret = of_parse_phandle_with_args(np, "power-domains",
->>                                    "#power-domain-cells", 0, &pd_args);
->>        idx = pd_args.args[0];
->>
->> or even simpler from within our driver
->>
->>         ret = of_property_read_u32_index(np, "power-domains", 1, &idx);
->
-> This you should not be doing. The client driver shouldn't care how
-> many cells or what their values are.
+Before sending a new version I have a few remarks:
 
-Client drivers in other places use xlate functions, like in the drivers/reset 
-framework, to interpret the cells. Is doing it this way really that different?
 
-Regards,
-Dave
+> diff --git a/arch/arm/boot/dts/armada-xp-98dx3236.dtsi b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
+> new file mode 100644
+> index 000000000000..4b7b2fe3b682
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
+> @@ -0,0 +1,254 @@
+> +/*
+> + * Device Tree Include file for Marvell 98dx3236 family SoC
+> + *
+> + * Copyright (C) 2016 Allied Telesis Labs
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
 
+There are few characters missing in the licence text, have a look on:
+http://git.infradead.org/linux-mvebu.git/commitdiff/24f0b6fe52d21b5c59c4e948daae2234a39a25b2?hp=7ce7d89f48834cefece7804d38fc5d85382edf77
+
+
+
+> + *
+> + * Contains definitions specific to the 98dx3236 SoC that are not
+> + * common to all Armada XP SoCs.
+> + */
+> +
+> +#include "armada-xp.dtsi"
+> +
+> +/ {
+> +	model = "Marvell 98DX3236 SoC";
+> +	compatible = "marvell,armadaxp-98dx3236", "marvell,armadaxp", "marvell,armada-370-xp";
+> +
+> +	aliases {
+> +		gpio0 = &gpio0;
+> +		gpio1 = &gpio1;
+> +		gpio2 = &gpio2;
+> +	};
+> +
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		enable-method = "marvell,98dx3236-smp";
+> +
+> +		cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "marvell,sheeva-v7";
+> +			reg = <0>;
+> +			clocks = <&cpuclk 0>;
+> +			clock-latency = <1000000>;
+> +		};
+> +	};
+> +
+> +	soc {
+> +		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
+> +			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+> +			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000
+> +			  MBUS_ID(0x03, 0x00) 0 0 0xa8000000 0x4000000
+> +			  MBUS_ID(0x08, 0x00) 0 0 0xac000000 0x100000>;
+> +
+> +		/*
+> +		 * 98DX3236 has 1 x1 PCIe unit Gen2.0: One unit can be
+The comment had been cut
+
+> +		 */
+> +		pcie-controller {
+
+Please use a node label here as we have done in:
+
+http://git.infradead.org/linux-mvebu.git/commitdiff/11f7135bb9dbe7ae3bb9a125e6123d4096a7e69e?hp=e72996b80d53b9b7616c8b68304ce4c422b4ddd1
+
+Also use an address:
+http://git.infradead.org/linux-mvebu.git/commitdiff/007d05d898050ffc70fd2737896528c5069f7269
+
+
+
+> +			compatible = "marvell,armada-xp-pcie";
+> +			status = "disabled";
+> +			device_type = "pci";
+> +
+> +			#address-cells = <3>;
+> +			#size-cells = <2>;
+> +
+> +			msi-parent = <&mpic>;
+> +			bus-range = <0x00 0xff>;
+> +
+> +			ranges =
+> +			       <0x82000000 0 0x40000 MBUS_ID(0xf0, 0x01) 0x40000 0 0x00002000   /* Port 0.0 registers */
+> +				0x82000000 0x1 0       MBUS_ID(0x04, 0xe8) 0 1 0 /* Port 0.0 MEM */
+> +				0x81000000 0x1 0       MBUS_ID(0x04, 0xe0) 0 1 0 /* Port 0.0 IO  */
+> +				0x82000000 0x2 0       MBUS_ID(0x04, 0xd8) 0 1 0 /* Port 0.1 MEM */>;
+> +
+> +			pcie at 1,0 {
+node label
+
+> +				device_type = "pci";
+> +				assigned-addresses = <0x82000800 0 0x40000 0 0x2000>;
+> +				reg = <0x0800 0 0 0 0>;
+> +				#address-cells = <3>;
+> +				#size-cells = <2>;
+> +				#interrupt-cells = <1>;
+> +				ranges = <0x82000000 0 0 0x82000000 0x1 0 1 0
+> +					  0x81000000 0 0 0x81000000 0x1 0 1 0>;
+> +				interrupt-map-mask = <0 0 0 0>;
+> +				interrupt-map = <0 0 0 0 &mpic 58>;
+> +				marvell,pcie-port = <0>;
+> +				marvell,pcie-lane = <0>;
+> +				clocks = <&gateclk 5>;
+> +				status = "disabled";
+> +			};
+> +		};
+> +
+> +		internal-regs {
+> +			coreclk: mvebu-sar at 18230 {
+> +				compatible = "marvell,mv98dx3236-core-clock";
+> +			};
+> +
+> +			cpuclk: clock-complex at 18700 {
+> +				compatible = "marvell,mv98dx3236-cpu-clock";
+> +			};
+> +
+> +			corediv-clock at 18740 {
+> +				status = "disabled";
+> +			};
+> +
+> +			xor at 60900 {
+> +				status = "disabled";
+> +			};
+> +
+> +			crypto at 90000 {
+> +				status = "disabled";
+> +			};
+> +
+> +			xor at f0900 {
+> +				status = "disabled";
+> +			};
+> +
+> +			xor at f0800 {
+> +				compatible = "marvell,orion-xor";
+> +				reg = <0xf0800 0x100
+> +				       0xf0a00 0x100>;
+> +				clocks = <&gateclk 22>;
+> +				status = "okay";
+> +
+> +				xor10 {
+> +					interrupts = <51>;
+> +					dmacap,memcpy;
+> +					dmacap,xor;
+> +				};
+> +				xor11 {
+> +					interrupts = <52>;
+> +					dmacap,memcpy;
+> +					dmacap,xor;
+> +					dmacap,memset;
+> +				};
+> +			};
+> +
+> +			gpio0: gpio at 18100 {
+> +				compatible = "marvell,orion-gpio";
+> +				reg = <0x18100 0x40>;
+> +				ngpios = <32>;
+> +				gpio-controller;
+> +				#gpio-cells = <2>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <2>;
+> +				interrupts = <82>, <83>, <84>, <85>;
+> +			};
+> +
+> +			/* does not exist */
+> +			gpio1: gpio at 18140 {
+> +				compatible = "marvell,orion-gpio";
+> +				reg = <0x18140 0x40>;
+> +				status = "disabled";
+> +			};
+> +
+> +			gpio2: gpio at 18180 { /* rework some properties */
+> +				compatible = "marvell,orion-gpio";
+> +				reg = <0x18180 0x40>;
+> +				ngpios = <1>; /* only gpio #32 */
+> +				gpio-controller;
+> +				#gpio-cells = <2>;
+> +				interrupt-controller;
+> +				#interrupt-cells = <2>;
+> +				interrupts = <87>;
+> +			};
+> +
+> +			nand: nand at d0000 {
+> +				clocks = <&dfx_coredivclk 0>;
+> +			};
+> +		};
+> +
+> +		dfx-registers {
+node label
+
+> +			compatible = "simple-bus";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges = <0 MBUS_ID(0x08, 0x00) 0 0x100000>;
+> +
+> +                        dfx_coredivclk: corediv-clock at f8268 {
+> +                                compatible = "marvell,mv98dx3236-corediv-clock";
+> +                                reg = <0xf8268 0xc>;
+> +                                #clock-cells = <1>;
+> +                                clocks = <&mainpll>;
+> +                                clock-output-names = "nand";
+> +                        };
+> +
+> +			dfx: dfx at 0 {
+> +				compatible = "marvell,dfx-server";
+> +				reg = <0 0x100000>;
+> +			};
+> +		};
+> +
+> +		switch {
+node label
+
+> +			compatible = "simple-bus";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges = <0 MBUS_ID(0x03, 0x00) 0 0x100000>;
+> +
+> +			pp0: packet-processor at 0 {
+> +				compatible = "marvell,prestera-98dx3236";
+> +				reg = <0 0x4000000>;
+> +				interrupts = <33>, <34>, <35>;
+> +				dfx = <&dfx>;
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +&pinctrl {
+> +	compatible = "marvell,98dx3236-pinctrl";
+> +
+> +	spi0_pins: spi0-pins {
+> +		marvell,pins = "mpp0", "mpp1",
+> +			       "mpp2", "mpp3";
+> +		marvell,function = "spi0";
+> +	};
+> +};
+> +
+> +&sdio {
+> +	status = "disabled";
+> +};
+> +
+> +&crypto_sram0 {
+> +	status = "disabled";
+> +};
+> +
+> +&crypto_sram1 {
+> +	status = "disabled";
+> +};
+
+same comments for the following device tree, in general you can refer to
+this series:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2016-November/468585.html
+
+
+> diff --git a/arch/arm/boot/dts/armada-xp-98dx3336.dtsi b/arch/arm/boot/dts/armada-xp-98dx3336.dtsi
+> new file mode 100644
+> index 000000000000..a9b0f47f8df9
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/armada-xp-98dx3336.dtsi
+> @@ -0,0 +1,76 @@
+> +/*
+> + * Device Tree Include file for Marvell 98dx3336 family SoC
+> + *
+> + * Copyright (C) 2016 Allied Telesis Labs
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + *
+> + * Contains definitions specific to the 98dx3336 SoC that are not
+> + * common to all Armada XP SoCs.
+> + */
+> +
+> +#include "armada-xp-98dx3236.dtsi"
+> +
+> +/ {
+> +	model = "Marvell 98DX3336 SoC";
+> +	compatible = "marvell,armadaxp-98dx3336", "marvell,armadaxp-98dx3236", "marvell,armadaxp", "marvell,armada-370-xp";
+> +
+> +	cpus {
+> +		cpu at 1 {
+> +			device_type = "cpu";
+> +			compatible = "marvell,sheeva-v7";
+> +			reg = <1>;
+> +			clocks = <&cpuclk 1>;
+> +			clock-latency = <1000000>;
+> +		};
+> +	};
+> +
+> +	soc {
+> +		internal-regs {
+
+
+Why the following node is not part of the dtsi?
+
+Gregory
+
+> +			resume at 20980 {
+> +				compatible = "marvell,98dx3336-resume-ctrl";
+> +				reg = <0x20980 0x10>;
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +&pp0 {
+> +	compatible = "marvell,prestera-98dx3336";
+> +};
+> diff --git a/arch/arm/boot/dts/armada-xp-98dx4251.dtsi b/arch/arm/boot/dts/armada-xp-98dx4251.dtsi
+> new file mode 100644
+> index 000000000000..446e6e65ec59
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/armada-xp-98dx4251.dtsi
+> @@ -0,0 +1,90 @@
+> +/*
+> + * Device Tree Include file for Marvell 98dx4521 family SoC
+> + *
+> + * Copyright (C) 2016 Allied Telesis Labs
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + *
+> + * Contains definitions specific to the 98dx4521 SoC that are not
+> + * common to all Armada XP SoCs.
+> + */
+> +
+> +#include "armada-xp-98dx3236.dtsi"
+> +
+> +/ {
+> +	model = "Marvell 98DX4251 SoC";
+> +	compatible = "marvell,armadaxp-98dx4521", "marvell,armadaxp-98dx3236", "marvell,armadaxp", "marvell,armada-370-xp";
+> +
+> +	cpus {
+> +		cpu at 1 {
+> +			device_type = "cpu";
+> +			compatible = "marvell,sheeva-v7";
+> +			reg = <1>;
+> +			clocks = <&cpuclk 1>;
+> +			clock-latency = <1000000>;
+> +		};
+> +	};
+> +
+> +	soc {
+> +		internal-regs {
+> +			resume at 20980 {
+> +				compatible = "marvell,98dx3336-resume-ctrl";
+> +				reg = <0x20980 0x10>;
+> +			};
+> +		};
+> +	};
+> +};
+> +
+> +&sdio {
+> +	status = "okay";
+> +};
+> +
+> +&pinctrl {
+> +	compatible = "marvell,98dx4251-pinctrl";
+> +
+> +	sdio_pins: sdio-pins {
+> +		marvell,pins = "mpp5", "mpp6", "mpp7",
+> +			       "mpp8", "mpp9", "mpp10";
+> +		marvell,function = "sd0";
+> +	};
+> +};
+> +
+> +&pp0 {
+> +	compatible = "marvell,prestera-98dx4251";
+> +};
+> -- 
+> 2.11.0.24.ge6920cf
 >
-> Rob
->
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
