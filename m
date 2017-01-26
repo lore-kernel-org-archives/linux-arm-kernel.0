@@ -1,48 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 26 Jan 2017 12:21:31 +0000
-Subject: [PATCH] perf: xgene: Include module.h
-In-Reply-To: <CACgAJHweQP7FTMHWJbW7YzfBKqbUAg+0v=aaTUK9qLs+EfyTqQ@mail.gmail.com>
-References: <20170125234658.12071-1-sboyd@codeaurora.org>
- <CACgAJHweQP7FTMHWJbW7YzfBKqbUAg+0v=aaTUK9qLs+EfyTqQ@mail.gmail.com>
-Message-ID: <20170126122131.GF14167@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 26 Jan 2017 20:30:49 +0800
+Subject: [PATCH] regulator: constify regulator_ops structures
+In-Reply-To: <1485427668-2816-1-git-send-email-bhumirks@gmail.com>
+Message-ID: <201701262050.ENVMjmGT%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2017 at 07:29:30PM -0800, Tai Tri Nguyen wrote:
-> On Wed, Jan 25, 2017 at 3:46 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > I ran into a build error when I disabled CONFIG_ACPI and tried to
-> > compile this driver:
-> >
-> > drivers/perf/xgene_pmu.c:1242:1: warning: data definition has no type or storage class
-> >  MODULE_DEVICE_TABLE(of, xgene_pmu_of_match);
-> >  ^
-> > drivers/perf/xgene_pmu.c:1242:1: error: type defaults to 'int' in declaration of 'MODULE_DEVICE_TABLE' [-Werror=implicit-int]
-> >
-> > Include module.h for the MODULE_DEVICE_TABLE macro that's
-> > implicitly included through ACPI.
-> >
-> > Cc: Tai Nguyen <ttnguyen@apm.com>
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > ---
-> >  drivers/perf/xgene_pmu.c | 1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> > diff --git a/drivers/perf/xgene_pmu.c b/drivers/perf/xgene_pmu.c
-> > index a8ac4bcef2c0..fb3281962a6d 100644
-> > --- a/drivers/perf/xgene_pmu.c
-> > +++ b/drivers/perf/xgene_pmu.c
-> > @@ -20,6 +20,7 @@
-> >   */
-> >
-> >  #include <linux/acpi.h>
-> > +#include <linux/module.h>
-> 
-> Please fix alphabetic order of the include file.
-> 
-> Tested-by: Tai Nguyen <ttnguyen@apm.com>
+Hi Bhumika,
 
-I've picked this up with the includes put in the correct order.
+[auto build test ERROR on regulator/for-next]
+[cannot apply to v4.10-rc5 next-20170125]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Thanks,
+url:    https://github.com/0day-ci/linux/commits/Bhumika-Goyal/regulator-constify-regulator_ops-structures/20170126-185451
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git for-next
+config: x86_64-randconfig-s2-01261858 (attached as .config)
+compiler: gcc-4.4 (Debian 4.4.7-8) 4.4.7
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-Will
+All errors (new ones prefixed by >>):
+
+   drivers/regulator/anatop-regulator.c: In function 'anatop_regulator_probe':
+>> drivers/regulator/anatop-regulator.c:310: error: assignment of read-only variable 'anatop_rops'
+   drivers/regulator/anatop-regulator.c:311: error: assignment of read-only variable 'anatop_rops'
+   drivers/regulator/anatop-regulator.c:312: error: assignment of read-only variable 'anatop_rops'
+
+vim +/anatop_rops +310 drivers/regulator/anatop-regulator.c
+
+ca7734ad Andrey Smirnov 2017-01-10  304  		u32 enable_bit;
+ca7734ad Andrey Smirnov 2017-01-10  305  
+605ebd35 Philipp Zabel  2014-02-11  306  		rdesc->ops = &anatop_rops;
+ca7734ad Andrey Smirnov 2017-01-10  307  
+ca7734ad Andrey Smirnov 2017-01-10  308  		if (!of_property_read_u32(np, "anatop-enable-bit",
+ca7734ad Andrey Smirnov 2017-01-10  309  					  &enable_bit)) {
+ca7734ad Andrey Smirnov 2017-01-10 @310  			anatop_rops.enable  = regulator_enable_regmap;
+ca7734ad Andrey Smirnov 2017-01-10  311  			anatop_rops.disable = regulator_disable_regmap;
+ca7734ad Andrey Smirnov 2017-01-10  312  			anatop_rops.is_enabled = regulator_is_enabled_regmap;
+ca7734ad Andrey Smirnov 2017-01-10  313  
+
+:::::: The code at line 310 was first introduced by commit
+:::::: ca7734ad77b4ffb83a03c80b8d64d40c7ef49263 regulator: anatop: Add support for "anatop-enable-bit"
+
+:::::: TO: Andrey Smirnov <andrew.smirnov@gmail.com>
+:::::: CC: Mark Brown <broonie@kernel.org>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 20822 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170126/69c88127/attachment-0001.gz>
