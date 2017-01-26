@@ -1,55 +1,43 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 26 Jan 2017 23:46:32 +0800
-Subject: [GIT PULL] i.MX fixes for 4.10, 3rd round
-Message-ID: <20170126154630.GE5662@dragon>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 26 Jan 2017 16:47:03 +0100
+Subject: [PATCH v2 0/8] Pad retentions support for Exynos5433
+In-Reply-To: <CAJKOXPd+WYyB4KbX2XN_Y615KR8AMZW8A+uV+6vU_AN3u+QCaA@mail.gmail.com>
+References: <CGME20170126083401eucas1p20b4794fe46ccf2189bf734f0d8e3c536@eucas1p2.samsung.com>
+ <1485419634-28331-1-git-send-email-m.szyprowski@samsung.com>
+ <CACRpkdawiAp3xqVd7J5ZAd2dQ=X09DGybyw0EVp=07w8-ccKfA@mail.gmail.com>
+ <CAJKOXPd+WYyB4KbX2XN_Y615KR8AMZW8A+uV+6vU_AN3u+QCaA@mail.gmail.com>
+Message-ID: <CACRpkdaDynGgTZeXxwxDPpVvL3or54zFjRwjx+yG_F7vee6-sQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 37530e74609a28ae3a3b51e7685fe54a00b1e2f2:
+On Thu, Jan 26, 2017 at 3:32 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> On Thu, Jan 26, 2017 at 11:50 AM, Linus Walleij
+> <linus.walleij@linaro.org> wrote:
+>> On Thu, Jan 26, 2017 at 9:33 AM, Marek Szyprowski
+>> <m.szyprowski@samsung.com> wrote:
+>>
+>>> Patches in this patchset depends on each other. They are order in such a
+>>> way to make the changes bisectable.
+>>>
+>>> Patch #3 has runtime dependency on #1.
+>>> Patch #5 has runtime dependency on #3.
+>>> Patch #6 has runtime dependency on #4.
+>>>
+>>> This patchset also directly depends on the "Move pad retention control to
+>>> Exynos pin controller driver" patchset:
+>>> https://www.spinics.net/lists/arm-kernel/msg556074.html
+>>
+>> Do we *have* to merge it runtime-bisectably?
+>>
+>> I'm asking because we need a huge immutable branch
+>> (I guess in the MFD subsystem) to deal with that.
+>
+> It helps a lot with finding introduced issues, so I think yes - we
+> want it runtime-bisectable. The board has already support in mainline
+> so it is not theoretical runtime...
 
-  ARM: dts: imx6qdl-nitrogen6_som2: fix sgtl5000 pinctrl init (2017-01-10 10:51:14 +0800)
+OK I just wait for an immutable branch to pull for this to work
+out then.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.10-3
-
-for you to fetch changes up to a971c5545c3d45a1e33fda6e57913bb75aaa20c9:
-
-  ARM: dts: imx: Pass 'chosen' and 'memory' nodes (2017-01-24 21:24:28 +0800)
-
-----------------------------------------------------------------
-i.MX fixes for 4.10, 3rd round:
- - Fix a 'defined but not used' warning in MMDC driver when
-   CONFIG_PERF_EVENTS is disabled.
- - Fix i.MX6DL device tree GPIO4_11 range setting.
- - A bandaid fix for boot failure found on a couple of platforms due to
-   missing 'chosen' and 'memory' node.
-
-----------------------------------------------------------------
-Arnd Bergmann (1):
-      ARM: imx: hide unused variable in #ifdef
-
-Fabio Estevam (1):
-      ARM: dts: imx: Pass 'chosen' and 'memory' nodes
-
-S?bastien Szymanski (1):
-      ARM: dts: imx6dl: fix GPIO4 range
-
- arch/arm/boot/dts/imx1.dtsi    | 8 ++++++++
- arch/arm/boot/dts/imx23.dtsi   | 8 ++++++++
- arch/arm/boot/dts/imx25.dtsi   | 8 ++++++++
- arch/arm/boot/dts/imx27.dtsi   | 8 ++++++++
- arch/arm/boot/dts/imx28.dtsi   | 8 ++++++++
- arch/arm/boot/dts/imx31.dtsi   | 8 ++++++++
- arch/arm/boot/dts/imx35.dtsi   | 8 ++++++++
- arch/arm/boot/dts/imx50.dtsi   | 8 ++++++++
- arch/arm/boot/dts/imx51.dtsi   | 8 ++++++++
- arch/arm/boot/dts/imx53.dtsi   | 8 ++++++++
- arch/arm/boot/dts/imx6dl.dtsi  | 2 +-
- arch/arm/boot/dts/imx6qdl.dtsi | 8 ++++++++
- arch/arm/boot/dts/imx6sl.dtsi  | 8 ++++++++
- arch/arm/boot/dts/imx6sx.dtsi  | 8 ++++++++
- arch/arm/boot/dts/imx6ul.dtsi  | 8 ++++++++
- arch/arm/boot/dts/imx7s.dtsi   | 8 ++++++++
- arch/arm/mach-imx/mmdc.c       | 2 +-
- 17 files changed, 122 insertions(+), 2 deletions(-)
+Yours,
+Linus Walleij
