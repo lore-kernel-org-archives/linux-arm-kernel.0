@@ -1,173 +1,127 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 27 Jan 2017 14:13:28 -0600
-Subject: [PATCH 13/16] arm: dts: rename mt7623-evb.dts to
- arch/arm/boot/dts/mt7623n-rfb.dtsi
-In-Reply-To: <1485170975-51813-14-git-send-email-john@phrozen.org>
-References: <1485170975-51813-1-git-send-email-john@phrozen.org>
- <1485170975-51813-14-git-send-email-john@phrozen.org>
-Message-ID: <20170127201328.gao42m5hsaeaq4bz@rob-hp-laptop>
+Date: Fri, 27 Jan 2017 14:19:13 -0600
+Subject: [PATCH v2 1/2] dt-bindings: gpu: Add Mali Utgard bindings
+In-Reply-To: <a4d90de597cfcfab5fddeeb538505774a980818b.1485180017.git-series.maxime.ripard@free-electrons.com>
+References: <a4d90de597cfcfab5fddeeb538505774a980818b.1485180017.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <20170127201913.jjhdw57jmxifqpxa@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2017 at 12:29:32PM +0100, John Crispin wrote:
-> There are 2 versions of the SoC. MT7623N is almost identical to MT7623A
-> but has some additional multimedia features. The reference boards are
-> available as NAND or MMC and might have a different ethernet setup. In
-> order to reduce the duplication of devicetree code we add an intermediate
-> dtsi file for these reference boards. Additionally MTK/WCN pointed out,
-> that the EVB is yet another board and the board in question is infact the
-> RFB. Take this into account while renaming the files.
+On Mon, Jan 23, 2017 at 03:00:45PM +0100, Maxime Ripard wrote:
+> The ARM Mali Utgard GPU family is embedded into a number of SoCs from
+> Allwinner, Amlogic, Mediatek or Rockchip.
 > 
->  Signed-off-by: John Crispin <john@phrozen.org>
+> Add a binding for the GPU of that family.
+> 
+> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
 > ---
->  Documentation/devicetree/bindings/arm/mediatek.txt |    4 +--
->  arch/arm/boot/dts/Makefile                         |    2 +-
->  arch/arm/boot/dts/mt7623-evb.dts                   |   33 --------------------
->  arch/arm/boot/dts/mt7623n-rfb-nand.dts             |   21 +++++++++++++
->  arch/arm/boot/dts/mt7623n-rfb.dtsi                 |   29 +++++++++++++++++
->  5 files changed, 53 insertions(+), 36 deletions(-)
->  delete mode 100644 arch/arm/boot/dts/mt7623-evb.dts
->  create mode 100644 arch/arm/boot/dts/mt7623n-rfb-nand.dts
->  create mode 100644 arch/arm/boot/dts/mt7623n-rfb.dtsi
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/mediatek.txt b/Documentation/devicetree/bindings/arm/mediatek.txt
-> index c860b24..71149cb 100644
-> --- a/Documentation/devicetree/bindings/arm/mediatek.txt
-> +++ b/Documentation/devicetree/bindings/arm/mediatek.txt
-> @@ -38,9 +38,9 @@ Supported boards:
->  - Evaluation board for MT6795(Helio X10):
->      Required root node properties:
->        - compatible = "mediatek,mt6795-evb", "mediatek,mt6795";
-> -- Evaluation board for MT7623:
-> +- Reference  board for MT7623N with NAND:
->      Required root node properties:
-> -      - compatible = "mediatek,mt7623-evb", "mediatek,mt7623";
-> +      - compatible = "mediatek,mt7623n-rfb-nand", "mediatek,mt7623";
-
-Seems like we should have mt7623n as a compatible.
-
->  - MTK mt8127 tablet moose EVB:
->      Required root node properties:
->        - compatible = "mediatek,mt8127-moose", "mediatek,mt8127";
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index cccdbcb..9735c2c 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -976,7 +976,7 @@ dtb-$(CONFIG_ARCH_MEDIATEK) += \
->  	mt6580-evbp1.dtb \
->  	mt6589-aquaris5.dtb \
->  	mt6592-evb.dtb \
-> -	mt7623-evb.dtb \
-> +	mt7623n-rfb-nand.dtb \
->  	mt8127-moose.dtb \
->  	mt8135-evbp1.dtb
->  dtb-$(CONFIG_ARCH_ZX) += zx296702-ad1.dtb
-> diff --git a/arch/arm/boot/dts/mt7623-evb.dts b/arch/arm/boot/dts/mt7623-evb.dts
-> deleted file mode 100644
-> index 58ed038..0000000
-> --- a/arch/arm/boot/dts/mt7623-evb.dts
-> +++ /dev/null
-> @@ -1,33 +0,0 @@
-> -/*
-> - * Copyright (c) 2016 MediaTek Inc.
-> - * Author: John Crispin <blogic@openwrt.org>
-> - *
-> - * This program is free software; you can redistribute it and/or modify
-> - * it under the terms of the GNU General Public License version 2 as
-> - * published by the Free Software Foundation.
-> - *
-> - * This program is distributed in the hope that it will be useful,
-> - * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> - * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> - * GNU General Public License for more details.
-> - */
-> -
-> -/dts-v1/;
-> -#include "mt7623-mt6323.dtsi"
-> -
-> -/ {
-> -	model = "MediaTek MT7623 evaluation board";
-> -	compatible = "mediatek,mt7623-evb", "mediatek,mt7623";
-> -
-> -	chosen {
-> -		stdout-path = &uart2;
-> -	};
-> -
-> -	memory {
-> -		reg = <0 0x80000000 0 0x40000000>;
-> -	};
-> -};
-> -
-> -&uart2 {
-> -	status = "okay";
-> -};
-> diff --git a/arch/arm/boot/dts/mt7623n-rfb-nand.dts b/arch/arm/boot/dts/mt7623n-rfb-nand.dts
+> Changes from v1:
+>   - Dropped the arm,mali-utgard compatible
+>   - Made the clocks mandatory
+>   - Added Linus Walleij Reviewed-by, and the ST compatible for the Mali
+> ---
+>  Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt | 79 ++++++++-
+>  1 file changed, 79 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
 > new file mode 100644
-> index 0000000..436d51c
+> index 000000000000..ba0edcdd1b00
 > --- /dev/null
-> +++ b/arch/arm/boot/dts/mt7623n-rfb-nand.dts
-> @@ -0,0 +1,21 @@
-> +/*
-> + * Copyright (c) 2016 MediaTek Inc.
-> + * Author: John Crispin <blogic@openwrt.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
+> +++ b/Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
+> @@ -0,0 +1,79 @@
+> +ARM Mali Utgard GPU
+> +===================
 > +
-> +/dts-v1/;
-> +#include "mt7623n-rfb.dtsi"
-> +
-> +/ {
-> +	model = "MediaTek MT7623N NAND reference board";
-> +	compatible = "mediatek,mt7623n-rfb-nand", "mediatek,mt7623";
-> +};
-> diff --git a/arch/arm/boot/dts/mt7623n-rfb.dtsi b/arch/arm/boot/dts/mt7623n-rfb.dtsi
-> new file mode 100644
-> index 0000000..d46390e
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/mt7623n-rfb.dtsi
-> @@ -0,0 +1,29 @@
-> +/*
-> + * Copyright (c) 2016 MediaTek Inc.
-> + * Author: John Crispin <blogic@openwrt.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include "mt7623-mt6323.dtsi"
-> +
-> +/ {
-> +	chosen {
-> +		stdout-path = &uart2;
-> +	};
-> +
-> +	memory {
+> +Required properties:
+> +  - compatible
+> +    * Must be one of the following:
+> +      + "arm,mali-300"
+> +      + "arm,mali-400"
+> +      + "arm,mali-450"
+> +    * And, optionally, one of the vendor specific compatible:
+> +      + allwinner,sun4i-a10-mali
+> +      + allwinner,sun7i-a20-mali
 
-Unless it can change:
+And stericsson,db8500-mali?
 
-memory at 80000000
+> +
+> +  - reg: Physical base address and length of the GPU registers
+> +
+> +  - interrupts: an entry for each entry in interrupt-names.
+> +    See ../interrupt-controller/interrupts.txt for details.
+> +
+> +  - interrupt-names:
+> +    * ppX: Pixel Processor X interrupt (X from 0 to 7)
+> +    * ppmmuX: Pixel Processor X MMU interrupt (X from 0 to 7)
+> +    * pp: Pixel Processor broadcast interrupt (mali-450 only)
+> +    * gp: Geometry Processor interrupt
+> +    * gpmmu: Geometry Processor MMU interrupt
+> +
+> +  - clocks: an entry for each entry in clock-names
+> +  - clock-names:
+> +    * bus: bus clock for the GPU
+> +    * core: clock driving the GPU itself
 
-> +		reg = <0 0x80000000 0 0x40000000>;
-> +	};
+assigned-clocks?
+
+> +
+> +Optional properties:
+> +  - interrupt-names and interrupts:
+> +    * pmu: Power Management Unit interrupt, if implemented in hardware
+> +
+> +Vendor-specific bindings
+> +------------------------
+> +
+> +The Mali GPU is integrated very differently from one SoC to
+> +another. In order to accomodate those differences, you have the option
+> +to specify one more vendor-specific compatible, among:
+> +
+> +  - allwinner,sun4i-a10-mali
+> +    Required properties:
+> +      * resets: phandle to the reset line for the GPU
+> +
+> +  - allwinner,sun7i-a20-mali
+> +    Required properties:
+> +      * resets: phandle to the reset line for the GPU
+> +
+> +  - stericsson,db8500-mali
+> +    Required properties:
+> +      * interrupt-names and interrupts:
+> +        + combined: combined interrupt of all of the above lines
+> +
+> +Example:
+> +
+> +mali: gpu at 01c40000 {
+
+Drop the leading 0.
+
+> +	compatible = "allwinner,sun7i-a20-mali", "arm,mali-400";
+> +	reg = <0x01c40000 0x10000>;
+> +	interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>,
+> +		     <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>,
+> +		     <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>,
+> +		     <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
+> +		     <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>,
+> +		     <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>,
+> +		     <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
+> +	interrupt-names = "gp",
+> +			  "gpmmu",
+> +			  "pp0",
+> +			  "ppmmu0",
+> +			  "pp1",
+> +			  "ppmmu1",
+> +			  "pmu";
+> +	clocks = <&ccu CLK_BUS_GPU>, <&ccu CLK_GPU>;
+> +	clock-names = "bus", "core";
+> +	resets = <&ccu RST_BUS_GPU>;
 > +};
 > +
-> +&uart2 {
-> +	status = "okay";
-> +};
+> +
+> 
+> base-commit: 49def1853334396f948dcb4cedb9347abb318df5
 > -- 
-> 1.7.10.4
-> 
+> git-series 0.8.11
