@@ -1,24 +1,67 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 27 Jan 2017 14:43:01 +0000
-Subject: [PATCH v4 2/4] arm64: Work around Falkor erratum 1003
-In-Reply-To: <20170127143848.GA25899@leverpostej>
-References: <20170125155232.10277-1-cov@codeaurora.org>
- <20170125155232.10277-2-cov@codeaurora.org>
- <20170127143848.GA25899@leverpostej>
-Message-ID: <20170127144301.GA29507@leverpostej>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Fri, 27 Jan 2017 14:44:32 +0000
+Subject: [PATCH] mmc: core/mmci: restore pre/post_req behaviour
+In-Reply-To: <20170127140454.7990-1-linus.walleij@linaro.org>
+References: <20170127140454.7990-1-linus.walleij@linaro.org>
+Message-ID: <1f63461b-e4c0-93fb-f30f-73147c72e33b@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2017 at 02:38:49PM +0000, Mark Rutland wrote:
 
-> IMPORTANT NOTICE: The contents of this email and any attachments are
-> confidential and may also be privileged. If you are not the intended
-> recipient, please notify the sender immediately and do not disclose
-> the contents to any other person, use it for any purpose, or store or
-> copy the information in any medium. Thank you.
 
-Urrgh; I used the wrong mail configuration.
+On 27/01/17 14:04, Linus Walleij wrote:
+> commit 64b12a68a9f74bb32d8efd7af1ad8a2ba02fc884
+> "mmc: core: fix prepared requests while doing bkops"
+> is fixing a bug in the wrong way. A bug in the MMCI
+> device driver is fixed by amending the MMC core.
+>
+> Thinking about it: what the pre- and post-callbacks
+> are doing is to essentially map and unmap SG lists
+> for DMA transfers. Why would we not be able to do that
+> just because a BKOPS command is sent inbetween?
+> Having to unprepare/prepare the next asynchronous
+> request for DMA seems wrong.
+>
+> Looking the backtrace in that commit we can see what
+> the real problem actually is:
+>
+> mmci_data_irq() is calling mmci_dma_unmap() twice
+> which is goung to call arm_dma_unmap_sg() twice
+> and v7_dma_inv_range() twice for the same sglist
+> and that will crash.
+>
+> This happens because a request is prepared, then
+> a BKOPS is sent. The IRQ completing the BKOPS command
+> goes through mmci_data_irq() and thinks that a DMA
+> operation has just been completed because
+> dma_inprogress() reports true. It then proceeds to
+> unmap the sglist.
+>
+> But that was wrong! dma_inprogress() should NOT be
+> true because no DMA was actually in progress! We had
+> just prepared the sglist, and the DMA channel
+> dma_current has been configured, but NOT started!
+>
+> Because of this, the sglist is already unmapped when
+> we get our actual data completion IRQ, and we are
+> unmapping the sglist once more, and we get this crash.
+>
+> Therefore, we need to revert this solution pushing
+> the problem to the core and causing problems, and
+> instead augment the implementation such that
+> dma_inprogress() only reports true if some DMA has
+> actually been started.
+>
+> After this we can keep the request prepared during the
+> BKOPS and we need not unprepare/reprepare it.
 
-Please ignore the above from the prior email.
+Thanks for detailed explanation and fixing it properly.
 
-Mark.
+Tested it on IFC6410.
+
+>
+> Fixes: 64b12a68a9f7 ("mmc: core: fix prepared requests while doing bkops")
+> Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+
+Tested-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
