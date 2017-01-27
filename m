@@ -1,33 +1,22 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 26 Jan 2017 15:57:45 -0800
-Subject: [PATCH] clk: meson8b: fix clk81 register address
-In-Reply-To: <1485341586-2929-1-git-send-email-jbrunet@baylibre.com>
-References: <1485341586-2929-1-git-send-email-jbrunet@baylibre.com>
-Message-ID: <20170126235745.GI8801@codeaurora.org>
+Date: Thu, 26 Jan 2017 16:12:54 -0800
+Subject: [PATCH 2/2] clk: sunxi-ng: a33: Set CLK_SET_RATE_PARENT for the
+ GPU
+In-Reply-To: <1914af84712092019181807ddb72adfc5b40c6f4.1485250845.git-series.maxime.ripard@free-electrons.com>
+References: <53c56d23af099d8a41460d5ac59a2c792c8d050c.1485250845.git-series.maxime.ripard@free-electrons.com>
+ <1914af84712092019181807ddb72adfc5b40c6f4.1485250845.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <20170127001254.GR8801@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/25, Jerome Brunet wrote:
-> During meson8b clock probe, clk81 register address is fixed twice.
-> First using the meson8b_clk_gates array, then by directly changing
-> meson8b_clk81 register.
+On 01/24, Maxime Ripard wrote:
+> In order to achieve all the rates asked by the GPU, we might need to change
+> the parent frequency.
 > 
-> As a result meson8b_clk81.reg = HHI_MPEG_CLK_CNTL + clk_base + clk_base.
-> 
-> Fixed by just removing the second fixup.
-> 
-> Fixes: e31a1900c1ff ("meson: clk: Add support for clock gates")
-> Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > ---
->  Patch based on khilman/linux-amlogic.git master branch.
 
-The problem isn't introduced there though?
-
-> 
->  I don't have a meson8b HW so this patch so this patch has not been
->  tested on real HW.
-
-Applied to clk-next.
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
