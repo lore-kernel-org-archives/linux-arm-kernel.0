@@ -1,61 +1,63 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 27 Jan 2017 11:03:04 +0000
-Subject: [STLinux Kernel] [PATCH 7/8] ARM: dts: STiH407-family: Use new
- Pinctrl groups
-In-Reply-To: <20170125115426.GH5680@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <20170124134310.27512-1-lee.jones@linaro.org>
- <20170124134310.27512-8-lee.jones@linaro.org>
- <20170125115426.GH5680@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <20170127110304.qitnkupjqe42tby7@dell>
+From: rafalo@cadence.com (Rafal Ozieblo)
+Date: Fri, 27 Jan 2017 11:06:33 +0000
+Subject: [PATCH net-next v2] macb: Common code to enable ptp support for
+ MACB/GEM
+In-Reply-To: <779c1540-f4da-90ee-1fa1-c94339a892aa@atmel.com>
+References: <1484841375-11420-1-git-send-email-andrei.pistirica@microchip.com>
+ <BN3PR07MB25160FCBCF19918C495F43B4C9770@BN3PR07MB2516.namprd07.prod.outlook.com>
+ <CAFcVECLuWM65zXJWtMcwijZ1ZbtH0pvKnTUR=SJagPGHEr9amg@mail.gmail.com>
+ <BN3PR07MB25163747E1520E4CE1C6164FC9760@BN3PR07MB2516.namprd07.prod.outlook.com>
+ <779c1540-f4da-90ee-1fa1-c94339a892aa@atmel.com>
+Message-ID: <BN3PR07MB2516525EBCC11BE7E5AC3ADBC9760@BN3PR07MB2516.namprd07.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Jan 2017, Peter Griffin wrote:
+>-----Original Message-----
+>From: Nicolas Ferre [mailto:nicolas.ferre at atmel.com] 
+>Sent: 27 stycznia 2017 11:28
+>Subject: Re: [PATCH net-next v2] macb: Common code to enable ptp support for MACB/GEM
+>
+>Le 27/01/2017 ? 11:26, Rafal Ozieblo a ?crit :
+>>> -----Original Message-----
+>>> From: Harini Katakam [mailto:harinikatakamlinux at gmail.com] 
+>>> Sent: 27 stycznia 2017 06:43
+>>> Subject: Re: [PATCH net-next v2] macb: Common code to enable ptp support for MACB/GEM
+>>>
+>>> Hi Rafal,
+>>>
+>>> On Thu, Jan 26, 2017 at 8:45 PM, Rafal Ozieblo <rafalo@cadence.com> wrote:
+>>>>> -----Original Message-----
+>>>>> From: Andrei Pistirica [mailto:andrei.pistirica at microchip.com]
+>>>>> Sent: 19 stycznia 2017 16:56
+>>>>> Subject: [PATCH net-next v2] macb: Common code to enable ptp support for MACB/GEM
+>>>>>
+>>>>>
+>>>>> +static inline bool gem_has_ptp(struct macb *bp)
+>>>>> +{
+>>>>> +     return !!(bp->caps & MACB_CAPS_GEM_HAS_PTP);
+>>>>> +}
+>>>> Why don't you use hardware capabilities here? Would it be better to read it from hardware instead adding it to many configuration?
+>>>
+>>> If you are referring to TSU bit in DCFG5, then we will be relying on
+>>> Cadence IP's information irrespective of the SoC capability
+>>> and whether the PTP support was adequate.
+>>> I think the capability approach gives better control and
+>>> it is not really much to add.
+>>>
+>>> Regards,
+>>> Harini
+>>>
+>> Yes, I'm referring to TSU bit.
+>> What if SoC contains multiple Cadence GEMs, some with PTP support and others without?
+>
+>Simply define different DT compatibility strings and we're good.
 
-> Hi Lee,
-> 
-> On Tue, 24 Jan 2017, Lee Jones wrote:
-> 
-> > Having just defined some new Pinctrl groups for when when HW flow-
-> > control is {en,dis}abled, let's reference them for use within the
-> > driver.
-> > 
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> Same as previous comment, your enabling hw flow control for all
-> stih407 family boards. I've not checked the schematics for them
-> but as hw flow control is dependent on board wiring, IMO this
-> should be added in board specific file.
+What with GEM on PCI ? There is no DT.
 
-Fair shout.
-
-On the B2120 UART0 is hooked up to the Smart Card Reader.
-
-Will fix.
-
-> > ---
-> >  arch/arm/boot/dts/stih407-family.dtsi | 5 +++--
-> >  1 file changed, 3 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-> > index c8b2944..9789978 100644
-> > --- a/arch/arm/boot/dts/stih407-family.dtsi
-> > +++ b/arch/arm/boot/dts/stih407-family.dtsi
-> > @@ -222,8 +222,9 @@
-> >  			compatible = "st,asc";
-> >  			reg = <0x9830000 0x2c>;
-> >  			interrupts = <GIC_SPI 122 IRQ_TYPE_NONE>;
-> > -			pinctrl-names = "default";
-> > -			pinctrl-0 = <&pinctrl_serial0>;
-> > +			pinctrl-names = "default", "manual-rts";
-> > +			pinctrl-0 = <&pinctrl_serial0_flowctrl>;
-> > +			pinctrl-1 = <&pinctrl_serial0>;
-> >  			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
-> >  
-> >  			status = "disabled";
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+>> Relevant will be checking both, hardware capabilities and SoC capabilities from "caps" field.
+>> 
+>
+>
+>-- 
+>Nicolas Ferre
+>
