@@ -1,9 +1,9 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 27 Jan 2017 10:21:19 +0100
-Subject: [GIT PULL 2/4] ARM: tegra: Core SoC changes for v4.11-rc1
+Date: Fri, 27 Jan 2017 10:21:21 +0100
+Subject: [GIT PULL 4/4] arm64: tegra: Device tree changes for v4.11-rc1
 In-Reply-To: <20170127092121.21570-1-thierry.reding@gmail.com>
 References: <20170127092121.21570-1-thierry.reding@gmail.com>
-Message-ID: <20170127092121.21570-2-thierry.reding@gmail.com>
+Message-ID: <20170127092121.21570-4-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,24 +15,27 @@ The following changes since commit 0c744ea4f77d72b3dcebb7a8f2684633ec79be88:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.11-soc
+  git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.11-arm64-dt
 
-for you to fetch changes up to ed0a27ef6411b22c75ae596ca2722dd7b621bcd0:
+for you to fetch changes up to 7bcf266462da736ae4b42d5c73cd5dc0da540772:
 
-  ARM: tegra: paz00: Fix __initdata placement (2017-01-25 09:09:32 +0100)
+  arm64: tegra: Use symbolic reset identifiers (2017-01-27 10:13:24 +0100)
 
 Thanks,
 Thierry
 
 ----------------------------------------------------------------
-ARM: tegra: Core SoC changes for v4.11-rc1
+arm64: tegra: Device tree changes for v4.11-rc1
 
-This contains a single cleanup patch for the placement of the __initdata
-annotation, as suggested by checkpatch.
+This contains three patches that reintroduce symbolic identifiers for
+clocks, resets and mailboxes. These had been converted to literals in
+the v4.10 release to avoid complicated dependencies between branches.
 
 ----------------------------------------------------------------
-Dmitry Torokhov (1):
-      ARM: tegra: paz00: Fix __initdata placement
+Thierry Reding (3):
+      arm64: tegra: Use symbolic HSP identifiers
+      arm64: tegra: Use symbolic clock identifiers
+      arm64: tegra: Use symbolic reset identifiers
 
- arch/arm/mach-tegra/board-paz00.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/boot/dts/nvidia/tegra186.dtsi | 86 +++++++++++++++++---------------
+ 1 file changed, 45 insertions(+), 41 deletions(-)
