@@ -1,57 +1,72 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 27 Jan 2017 18:19:51 +0000
-Subject: [PATCH V7 01/11] iommu/of: Refactor of_iommu_configure() for
- error handling
-In-Reply-To: <009901d278c7$34fee230$9efca690$@codeaurora.org>
-References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
- <1485188293-20263-2-git-send-email-sricharan@codeaurora.org>
- <4388779a-0e83-fadc-83f4-98c46c88d42e@semihalf.com>
- <c7bad124-d9f2-0ddf-168f-0b1950d3e1ed@arm.com>
- <009901d278c7$34fee230$9efca690$@codeaurora.org>
-Message-ID: <d27f04da-7d34-9640-1639-790d0732ed93@arm.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 27 Jan 2017 10:23:07 -0800
+Subject: [PATCH 01/13] mmc: bcm2835: add bcm2835_read_wait_sdcmd
+In-Reply-To: <1485504250.19754.22.camel@redhat.com>
+References: <1485473846-24537-1-git-send-email-kraxel@redhat.com>
+ <1485473846-24537-2-git-send-email-kraxel@redhat.com>
+ <30bf98f0-c893-d306-ab79-3ba741790919@gmail.com>
+ <1485504250.19754.22.camel@redhat.com>
+Message-ID: <b08c276b-706f-3bd3-828d-fe4ee0ae971b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/01/17 18:00, Sricharan wrote:
-> Hi Robin,
-> 
-> [..]
-> 
->>>> +const struct iommu_ops *of_iommu_configure(struct device *dev,
->>>> +                       struct device_node *master_np)
->>>> +{
->>>> +    const struct iommu_ops *ops;
->>>> +
->>>> +    if (!master_np)
->>>> +        return NULL;
->>>> +
->>>> +    if (dev_is_pci(dev))
->>>> +        ops = of_pci_iommu_init(to_pci_dev(dev), master_np);
->>>
->>> I gave the whole patch set a try on ThunderX. really_probe() is failing
->>> on dma_configure()->of_pci_iommu_init() for each PCI device.
+On 01/27/2017 12:04 AM, Gerd Hoffmann wrote:
+> On Do, 2017-01-26 at 15:51 -0800, Florian Fainelli wrote:
+>> On 01/26/2017 03:37 PM, Gerd Hoffmann wrote:
+>>> Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
 >>
->> When you say "failing", do you mean cleanly, or with a crash? I've
->> managed to hit __of_match_node() dereferencing NULL from
->> of_iommu_xlate() in a horribly complicated chain of events, which I'm
->> trying to figure out now, and I wonder if the two might be related.
+>> Few things with your submission:
+>>
+>> - if you send more than one patch, a cover letter is a welcome to
+>> explain your changes
 > 
-> Sorry that there is crash still. __of_match_node seems to checking
-> for NULL arguments , feels like some invalid pointer was passed in.
-> Is there any particular sequence to try for this ?
+> There actually is a cover letter.  The git-send-email "cccmd =
+> scripts/get_maintainer.pl" hook doesn't work for the cover letter though
+> because it isn't a patch.  I've hand-picked some people who
+> touched/reviewed the driver before to the git-send-email command line,
+> but everybody else got the patches only.
+> 
+> Anyone has a good solution for this btw?
 
-Ah, I did figure it out - it wasn't actually a NULL dereference, but an
-unmapped address. Turns out __iommu_of_table is in initdata, so any
-driver probing after init, connected to an unprobed IOMMU (in this case
-disabled in DT), trips over trying to match the now-freed table. I'm
-working on the fix - technically the bug's in my patch (#2) anyway ;)
+Do a dry run against all patches, collect the cclist in a file, and have
+a script that outputs one line, something like this:
 
-Robin.
+./scripts/get_maintainer.pl patches/*.patch > cclist
+
+cclist.sh:
+
+#!/bin/sh
+cat $(dirname $0)/cclist
+
+git send-email --cc-cmd=cclist.sh patches/*.patch
 
 > 
-> Regards,
->  Sricharan
+>> - try to provide commit messages for things that are not obvious (in
+>> fact, most maintainers actually request commit messages even for trivial
+>> things)
 > 
+> The driver is out of tree still, these are cleanups Ulf Hansson asked
+> for last time the driver was submitted.
 > 
+> Full set of patches:
+>   https://www.kraxel.org/cgit/linux/log/?h=bcm2837-sdhost-cleanup
 > 
+> Plan for upstream merge is to actually squash all the incremental
+> cleanups, but for now I kept them as separate changes.  I think this
+> makes it easier to spot mistakes and it'll also help in case there are
+> regressions b/c you can bisect things.
 > 
+>> - have not we switched to the iproc SDHCI driver, or is this for the
+>> other SDIO connected peripherals here?
+> 
+> The 2835 has two SD controllers: The Arasan SDHCI controller that we
+> currently use (iproc drives that one), and a custom SD controller.
+> 
+> This is a driver for the custom one.  Has better performance than the
+> sdhci controller (according to Eric Anholt).  For the rpi3 switching to
+> this driver has the additional advantage that we can use the iproc
+> driver driver to handle the wifi.
+
+OK
+-- 
+Florian
