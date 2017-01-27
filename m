@@ -1,77 +1,61 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 27 Jan 2017 11:49:32 +0100
-Subject: [PATCH] arm64: dts: marvell: add generic-ahci compatibles for
- CP110 ahci
-In-Reply-To: <E1cS72h-0004nc-Rr@rmk-PC.armlinux.org.uk> (Russell King's
- message of "Fri, 13 Jan 2017 18:57:39 +0000")
-References: <E1cS72h-0004nc-Rr@rmk-PC.armlinux.org.uk>
-Message-ID: <878tpwydz7.fsf@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Jan 2017 10:52:45 +0000
+Subject: [PATCH] crypto: arm64/crc32 - detect crc32 support in assembler
+In-Reply-To: <CAKv+Gu8P3U6_u7FdRFSdDL9jdKaJQuqHbrQ-7Qu900f8R1voZw@mail.gmail.com>
+References: <20170127104039.29351-1-mbrugger@suse.com>
+ <CAKv+Gu8P3U6_u7FdRFSdDL9jdKaJQuqHbrQ-7Qu900f8R1voZw@mail.gmail.com>
+Message-ID: <20170127105244.GF21144@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
- 
- On ven., janv. 13 2017, Russell King <rmk+kernel@armlinux.org.uk> wrote:
+On Fri, Jan 27, 2017 at 10:43:16AM +0000, Ard Biesheuvel wrote:
+> On 27 January 2017 at 10:40, Matthias Brugger <mbrugger@suse.com> wrote:
+> > Older compilers may not be able to detect the crc32 extended cpu type.
+> 
+> What do you mean 'detect'? Could you describe the failure in more detail
+> please?
+> 
+> > Anyway only inline assembler code is used, which gets passed to the
+> > assembler. This patch moves the crc detection to the assembler.
+> >
+> > Suggested-by: Alexander Graf <agraf@suse.de>
+> > Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+> > ---
+> >  arch/arm64/crypto/Makefile      | 2 --
+> >  arch/arm64/crypto/crc32-arm64.c | 3 +++
+> >  2 files changed, 3 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
+> > index aa8888d7b744..0d779dac75cd 100644
+> > --- a/arch/arm64/crypto/Makefile
+> > +++ b/arch/arm64/crypto/Makefile
+> > @@ -48,8 +48,6 @@ CFLAGS_aes-glue-ce.o  := -DUSE_V8_CRYPTO_EXTENSIONS
+> >
+> >  obj-$(CONFIG_CRYPTO_CRC32_ARM64) += crc32-arm64.o
+> >
+> > -CFLAGS_crc32-arm64.o   := -mcpu=generic+crc
+> > -
+> >  $(obj)/aes-glue-%.o: $(src)/aes-glue.c FORCE
+> >         $(call if_changed_rule,cc_o_c)
+> >
+> > diff --git a/arch/arm64/crypto/crc32-arm64.c b/arch/arm64/crypto/crc32-arm64.c
+> > index 6a37c3c6b11d..10f5dd075323 100644
+> > --- a/arch/arm64/crypto/crc32-arm64.c
+> > +++ b/arch/arm64/crypto/crc32-arm64.c
+> > @@ -29,6 +29,9 @@ MODULE_AUTHOR("Yazen Ghannam <yazen.ghannam@linaro.org>");
+> >  MODULE_DESCRIPTION("CRC32 and CRC32C using optional ARMv8 instructions");
+> >  MODULE_LICENSE("GPL v2");
+> >
+> > +/* Request crc extension capabilities from the assembler */
+> > +asm(".arch_extension crc");
+> > +
+> 
+> Will should confirm, but I think this is a recent feature in GAS for
+> AArch64, so this may break older toolchains as well.
 
-> Testing with an Armada 8040 board shows that adding the generic-ahci
-> compatible to the CP110 AHCI nodes gets us working AHCI on the board.
-> A previous patch series posted by Thomas Petazzoni was retracted when
-> it was realised that the IP was supposed to be, and is, compatible
-> with the standard register layout.
->
-> Add this compatible.
+Yes, the .arch_extension directive isn't universally supported by AArch64
+gas so we can't rely on it unconditionally. The best bet is to check for
+the support and, if it's not present, then disable whatever feature relies
+on it. See the lseinstr variable in Makefile.
 
-
-Applied on mvebu/dt64
-
-(not that it didn't apply cleanly on the mainline because in mainline we
-don't use yet the ICU for the interrupt)
-
-Thanks,
-
-Gregory
-
->
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
->  arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 3 ++-
->  arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 3 ++-
->  2 files changed, 4 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> index 464b491c7291..65ad781d7910 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-> @@ -128,7 +128,8 @@
->  			};
->  
->  			cpm_sata0: sata at 540000 {
-> -				compatible = "marvell,armada-8k-ahci";
-> +				compatible = "marvell,armada-8k-ahci",
-> +					     "generic-ahci";
->  				reg = <0x540000 0x30000>;
->  				interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
->  				clocks = <&cpm_syscon0 1 15>;
-> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> index b10f4781d8fb..168d667d50a3 100644
-> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
-> @@ -128,7 +128,8 @@
->  			};
->  
->  			cps_sata0: sata at 540000 {
-> -				compatible = "marvell,armada-8k-ahci";
-> +				compatible = "marvell,armada-8k-ahci",
-> +					     "generic-ahci";
->  				reg = <0x540000 0x30000>;
->  				interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
->  				clocks = <&cps_syscon0 1 15>;
-> -- 
-> 2.7.4
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Will
