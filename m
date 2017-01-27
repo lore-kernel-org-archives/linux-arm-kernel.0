@@ -1,36 +1,73 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Thu, 26 Jan 2017 20:04:54 -0500
-Subject: [RFC v2 04/10] KVM: arm/arm64: Add the EL1 physical timer context
+Date: Thu, 26 Jan 2017 20:04:59 -0500
+Subject: [RFC v2 09/10] KVM: arm64: Add the EL1 physical timer access handler
 In-Reply-To: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
 References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1485479100-4966-5-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1485479100-4966-10-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the EL1 physical timer context.
+KVM traps on the EL1 phys timer accesses from VMs, but it doesn't handle
+those traps. This results in terminating VMs. Instead, set a handler for
+the EL1 phys timer access, and inject an undefined exception as an
+intermediate step.
 
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 ---
- include/kvm/arm_arch_timer.h | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/kvm/sys_regs.c | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index d921d20..69f648b 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -40,6 +40,7 @@ struct arch_timer_context {
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 87e7e66..fd9e747 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -820,6 +820,30 @@ static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 	  CRm((0b1100 | (((n) >> 3) & 0x3))), Op2(((n) & 0x7)),		\
+ 	  access_pmu_evtyper, reset_unknown, (PMEVTYPER0_EL0 + n), }
  
- struct arch_timer_cpu {
- 	struct arch_timer_context	vtimer;
-+	struct arch_timer_context	ptimer;
++static bool access_cntp_tval(struct kvm_vcpu *vcpu,
++		struct sys_reg_params *p,
++		const struct sys_reg_desc *r)
++{
++	kvm_inject_undefined(vcpu);
++	return true;
++}
++
++static bool access_cntp_ctl(struct kvm_vcpu *vcpu,
++		struct sys_reg_params *p,
++		const struct sys_reg_desc *r)
++{
++	kvm_inject_undefined(vcpu);
++	return true;
++}
++
++static bool access_cntp_cval(struct kvm_vcpu *vcpu,
++		struct sys_reg_params *p,
++		const struct sys_reg_desc *r)
++{
++	kvm_inject_undefined(vcpu);
++	return true;
++}
++
+ /*
+  * Architected system registers.
+  * Important: Must be sorted ascending by Op0, Op1, CRn, CRm, Op2
+@@ -1029,6 +1053,16 @@ static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1101), CRm(0b0000), Op2(0b011),
+ 	  NULL, reset_unknown, TPIDRRO_EL0 },
  
- 	/* Background timer used when the guest is not running */
- 	struct hrtimer			timer;
-@@ -77,4 +78,5 @@ bool kvm_timer_should_fire(struct kvm_vcpu *vcpu,
- void kvm_timer_init_vhe(void);
- 
- #define vcpu_vtimer(v)	(&(v)->arch.timer_cpu.vtimer)
-+#define vcpu_ptimer(v)	(&(v)->arch.timer_cpu.ptimer)
- #endif
++	/* CNTP_TVAL_EL0 */
++	{ Op0(0b11), Op1(0b011), CRn(0b1110), CRm(0b0010), Op2(0b000),
++	  access_cntp_tval },
++	/* CNTP_CTL_EL0 */
++	{ Op0(0b11), Op1(0b011), CRn(0b1110), CRm(0b0010), Op2(0b001),
++	  access_cntp_ctl },
++	/* CNTP_CVAL_EL0 */
++	{ Op0(0b11), Op1(0b011), CRn(0b1110), CRm(0b0010), Op2(0b010),
++	  access_cntp_cval },
++
+ 	/* PMEVCNTRn_EL0 */
+ 	PMU_PMEVCNTR_EL0(0),
+ 	PMU_PMEVCNTR_EL0(1),
 -- 
 1.9.1
