@@ -1,97 +1,34 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 27 Jan 2017 22:05:09 +0200
-Subject: [PATCH 3/4] phy: exynos-mipi-video: Use consistent method to address
- phy registers
-In-Reply-To: <20170127200510.4444-1-krzk@kernel.org>
-References: <20170127200510.4444-1-krzk@kernel.org>
-Message-ID: <20170127200510.4444-4-krzk@kernel.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 27 Jan 2017 21:05:32 +0100
+Subject: [PATCH v2 8/9] ASoC: sunxi: allow the analog codec driver to be
+ built on ARM64
+In-Reply-To: <20170126154859.55855-9-icenowy@aosc.xyz>
+References: <20170126154859.55855-1-icenowy@aosc.xyz>
+ <20170126154859.55855-9-icenowy@aosc.xyz>
+Message-ID: <20170127200532.pemk36hwyzkun3i5@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos4 MIPI phy registers are defined with macro calculating the offset
-for given phyN.  Use the same method for Exynos5420 to be consistent.
+On Thu, Jan 26, 2017 at 11:48:58PM +0800, Icenowy Zheng wrote:
+> As the 64-bit Allwinner H5 SoC has the same analog codec part (also the
+> same digital part) as H3, enable the driver to be built on ARM64
+> Allwinner platform, so that it can be used on H5.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- drivers/phy/phy-exynos-mipi-video.c         | 20 ++++++++++----------
- include/linux/soc/samsung/exynos-regs-pmu.h |  4 +---
- 2 files changed, 11 insertions(+), 13 deletions(-)
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-diff --git a/drivers/phy/phy-exynos-mipi-video.c b/drivers/phy/phy-exynos-mipi-video.c
-index d7fe1f8c3ac8..acef1d92691e 100644
---- a/drivers/phy/phy-exynos-mipi-video.c
-+++ b/drivers/phy/phy-exynos-mipi-video.c
-@@ -110,46 +110,46 @@ static const struct mipi_phy_device_desc exynos5420_mipi_phy = {
- 			/* EXYNOS_MIPI_PHY_ID_CSIS0 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_DSIM0,
- 			.enable_val = EXYNOS5_PHY_ENABLE,
--			.enable_reg = EXYNOS5420_MIPI_PHY0_CONTROL,
-+			.enable_reg = EXYNOS5420_MIPI_PHY_CONTROL(0),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
- 			.resetn_val = EXYNOS5_MIPI_PHY_S_RESETN,
--			.resetn_reg = EXYNOS5420_MIPI_PHY0_CONTROL,
-+			.resetn_reg = EXYNOS5420_MIPI_PHY_CONTROL(0),
- 			.resetn_map = EXYNOS_MIPI_REGMAP_PMU,
- 		}, {
- 			/* EXYNOS_MIPI_PHY_ID_DSIM0 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_CSIS0,
- 			.enable_val = EXYNOS5_PHY_ENABLE,
--			.enable_reg = EXYNOS5420_MIPI_PHY0_CONTROL,
-+			.enable_reg = EXYNOS5420_MIPI_PHY_CONTROL(0),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
- 			.resetn_val = EXYNOS5_MIPI_PHY_M_RESETN,
--			.resetn_reg = EXYNOS5420_MIPI_PHY0_CONTROL,
-+			.resetn_reg = EXYNOS5420_MIPI_PHY_CONTROL(0),
- 			.resetn_map = EXYNOS_MIPI_REGMAP_PMU,
- 		}, {
- 			/* EXYNOS_MIPI_PHY_ID_CSIS1 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_DSIM1,
- 			.enable_val = EXYNOS5_PHY_ENABLE,
--			.enable_reg = EXYNOS5420_MIPI_PHY1_CONTROL,
-+			.enable_reg = EXYNOS5420_MIPI_PHY_CONTROL(1),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
- 			.resetn_val = EXYNOS5_MIPI_PHY_S_RESETN,
--			.resetn_reg = EXYNOS5420_MIPI_PHY1_CONTROL,
-+			.resetn_reg = EXYNOS5420_MIPI_PHY_CONTROL(1),
- 			.resetn_map = EXYNOS_MIPI_REGMAP_PMU,
- 		}, {
- 			/* EXYNOS_MIPI_PHY_ID_DSIM1 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_CSIS1,
- 			.enable_val = EXYNOS5_PHY_ENABLE,
--			.enable_reg = EXYNOS5420_MIPI_PHY1_CONTROL,
-+			.enable_reg = EXYNOS5420_MIPI_PHY_CONTROL(1),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
- 			.resetn_val = EXYNOS5_MIPI_PHY_M_RESETN,
--			.resetn_reg = EXYNOS5420_MIPI_PHY1_CONTROL,
-+			.resetn_reg = EXYNOS5420_MIPI_PHY_CONTROL(1),
- 			.resetn_map = EXYNOS_MIPI_REGMAP_PMU,
- 		}, {
- 			/* EXYNOS_MIPI_PHY_ID_CSIS2 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_NONE,
- 			.enable_val = EXYNOS5_PHY_ENABLE,
--			.enable_reg = EXYNOS5420_MIPI_PHY2_CONTROL,
-+			.enable_reg = EXYNOS5420_MIPI_PHY_CONTROL(2),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
- 			.resetn_val = EXYNOS5_MIPI_PHY_S_RESETN,
--			.resetn_reg = EXYNOS5420_MIPI_PHY2_CONTROL,
-+			.resetn_reg = EXYNOS5420_MIPI_PHY_CONTROL(2),
- 			.resetn_map = EXYNOS_MIPI_REGMAP_PMU,
- 		},
- 	},
-diff --git a/include/linux/soc/samsung/exynos-regs-pmu.h b/include/linux/soc/samsung/exynos-regs-pmu.h
-index d861e757bef8..6dbd65012ccd 100644
---- a/include/linux/soc/samsung/exynos-regs-pmu.h
-+++ b/include/linux/soc/samsung/exynos-regs-pmu.h
-@@ -505,9 +505,7 @@
- 	((EXYNOS5420_KFC_CORE_RESET0 | EXYNOS5420_KFC_ETM_RESET0) << (_nr))
- 
- #define EXYNOS5420_USBDRD1_PHY_CONTROL				0x0708
--#define EXYNOS5420_MIPI_PHY0_CONTROL				0x0714
--#define EXYNOS5420_MIPI_PHY1_CONTROL				0x0718
--#define EXYNOS5420_MIPI_PHY2_CONTROL				0x071C
-+#define EXYNOS5420_MIPI_PHY_CONTROL(n)				(0x0714 + (n) * 4)
- #define EXYNOS5420_DPTX_PHY_CONTROL				0x0728
- #define EXYNOS5420_ARM_CORE2_SYS_PWR_REG			0x1020
- #define EXYNOS5420_DIS_IRQ_ARM_CORE2_LOCAL_SYS_PWR_REG		0x1024
+Thanks,
+Maxime
+
 -- 
-2.9.3
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170127/82707ab0/attachment.sig>
