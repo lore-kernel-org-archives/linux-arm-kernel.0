@@ -1,64 +1,59 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 27 Jan 2017 20:06:51 +0100
+Date: Fri, 27 Jan 2017 20:12:47 +0100
 Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
-In-Reply-To: <37154fca-5cfd-7f65-0f9b-14b979a094e6@roeck-us.net>
+In-Reply-To: <20170127172039.GA2498@roeck-us.net>
 References: <20170124175800.GA15070@amd> <20170124184526.GA25056@roeck-us.net>
  <20170125111233.GB3912@amd> <20170125120918.GA7936@pali>
  <1485481030.2469.15.camel@intel.com>
  <a6ce0873-9164-a965-a3e1-9eaaaec2201f@roeck-us.net>
  <1485488382.2469.27.camel@intel.com>
  <9146145b-7e21-c4de-a9cd-dad7bc74ee7a@roeck-us.net>
- <20170127111626.GB5335@amd>
- <37154fca-5cfd-7f65-0f9b-14b979a094e6@roeck-us.net>
-Message-ID: <20170127190651.GB20571@amd>
+ <1485528033.2469.61.camel@intel.com>
+ <20170127172039.GA2498@roeck-us.net>
+Message-ID: <20170127191247.GC20571@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 2017-01-27 06:13:43, Guenter Roeck wrote:
-> On 01/27/2017 03:16 AM, Pavel Machek wrote:
-> >Hi!
-> >
-> >>>>That sounds like fun. Changing bq27200-0 to bq27200_0 is Forbidden by
-> >>>>the ABI Police, but taking the entire device away is ok.
-> >
-> >Changing bq27200-0 to bq27200_0 is forbidden in -rc6 time. If you
-> >believe noone depends on the name, argue your case, and it might be
-> >possible to change it in -rc0.
-> >
-> >If someone uses the name, they care about the device, and you can't
-> >take it away.
-> >
-> >>>No. IMO, it depends on if the interface is used or not.
-> >>>If hwmon I/F is used, we can not take it away, nor change its name.
-> >>
-> >>Even if the use doesn't depend on that name ?
-> >
-> >If the use doesn't depend on the name, you may get away with changing
-> >the name. (But not in -rc6.)
-> >
-> >>>If thermal zone I/F is used, we can not change it's 'type' name to be
-> >>>compatible with new hwmon API.
-> >>
-> >>You mean you can not fix the name to be compatible with libsensors.
-> >>
-> >>Makes me wonder if there shouldn't be a rule that exploits must not
-> >>be fixed if already exploited.
-> >
-> >That is not useful argumentation.
+On Fri 2017-01-27 09:20:39, Guenter Roeck wrote:
+> On Fri, Jan 27, 2017 at 10:40:33PM +0800, Zhang Rui wrote:
+> > > > 
+> > > > If thermal zone I/F is used, we can not change it's 'type' name to
+> > > > be
+> > > > compatible with new hwmon API.
+> > > > 
+> > > You mean you can not fix the name to be compatible with libsensors.
+> > > 
+> > 
+> > We can try to convert it to a libsensor-compatible string, either for
+> > hwmon only, or for both thermal and hwmon. But this is an ABI change,
+> > right?
 > 
-> Oh, but it is. Providing a valid name is a bug fix for me. For you it is
-> an ABI change. So the ultimate question is what counts as an ABI change
-> and what counts as a bug fix.
+> Let's go back to the basics.
+> 
+> Fact is that the thermal subsystem registers hwmon devices with 'name'
+> attributes which violate the documented hardware monitoring ABI.
+> I think we can consider this undisputed.
+> 
+> The rest is pretty much all opinion.
+> 
+> Is a change in a driver to stop violating a documented ABI an ABI change
+> or a bug fix ? In other words, does a driver violating a documented ABI
+> make that ABI violation part of the ABI ?
 
-You may not fix bugs if it breaks someone's configuration. Now,
-obviously security is something we can't sacrifice. But if docs don't
-match the code.. we fix the docs, not the code.
+It can be both. But "no regressions" takes precedence over
+"documentation".
 
-Do you want to call me? I'll give you cellphone number.
+> Quite interesting questions. My take is that it is a bug fix, others
+> apparently have the strong opinion that potential users of such an ABI
+> violation have priority, and that a violation of a documented ABI _does_
+> make this violation part of the ABI.
+
+"Potential" users you can work around. "Real" users are problem.
+
+And yes, I have strong opinion about release candidates. Outside that,
+see my next mail.
 
 									Pavel
-
-
 -- 
 (english) http://www.livejournal.com/~pavelmachek
 (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
@@ -68,4 +63,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 181 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170127/08e5cc4e/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170127/45c7f31f/attachment.sig>
