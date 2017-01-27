@@ -1,38 +1,34 @@
-From: john@phrozen.org (John Crispin)
-Date: Fri, 27 Jan 2017 06:00:26 +0100
-Subject: [PATCH 0/2] clk: mediatek: add missing ethernet reset definition
-In-Reply-To: <20170127001441.GS8801@codeaurora.org>
-References: <1485175707-58528-1-git-send-email-john@phrozen.org>
- <20170127001441.GS8801@codeaurora.org>
-Message-ID: <6803ef87-fb22-075c-bee1-3c0adb8e297d@phrozen.org>
+From: harinikatakamlinux@gmail.com (Harini Katakam)
+Date: Fri, 27 Jan 2017 11:12:43 +0530
+Subject: [PATCH net-next v2] macb: Common code to enable ptp support for
+ MACB/GEM
+In-Reply-To: <BN3PR07MB25160FCBCF19918C495F43B4C9770@BN3PR07MB2516.namprd07.prod.outlook.com>
+References: <1484841375-11420-1-git-send-email-andrei.pistirica@microchip.com>
+ <BN3PR07MB25160FCBCF19918C495F43B4C9770@BN3PR07MB2516.namprd07.prod.outlook.com>
+Message-ID: <CAFcVECLuWM65zXJWtMcwijZ1ZbtH0pvKnTUR=SJagPGHEr9amg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Rafal,
 
-
-On 27/01/2017 01:14, Stephen Boyd wrote:
-> On 01/23, John Crispin wrote:
->> When the clk code for mt2701 was merged, we forgot to add the reset
->> controller of the ethernet subsystem. This series adds the missing code
->> and header files required to reference the bits from within a devicetree
->> file.
+On Thu, Jan 26, 2017 at 8:45 PM, Rafal Ozieblo <rafalo@cadence.com> wrote:
+>> -----Original Message-----
+>> From: Andrei Pistirica [mailto:andrei.pistirica at microchip.com]
+>> Sent: 19 stycznia 2017 16:56
+>> Subject: [PATCH net-next v2] macb: Common code to enable ptp support for MACB/GEM
 >>
->> John Crispin (2):
->>   clk: mediatek: add mt2701 ethernet reset
->>   reset: mediatek: Add MT2701 ethsys reset controller include file
 >>
->>  drivers/clk/mediatek/clk-mt2701-eth.c     |    2 ++
->>  include/dt-bindings/reset/mt2701-resets.h |    7 +++++++
-> 
-> Any planned DT users in the next merge window? Should I put this
-> into a topic branch? Do you want a clk maintainer ack? At the
-> least we need someone like James to ack this first.
-> 
+>> +static inline bool gem_has_ptp(struct macb *bp)
+>> +{
+>> +     return !!(bp->caps & MACB_CAPS_GEM_HAS_PTP);
+>> +}
+> Why don't you use hardware capabilities here? Would it be better to read it from hardware instead adding it to many configuration?
 
-Hi Stephen,
+If you are referring to TSU bit in DCFG5, then we will be relying on
+Cadence IP's information irrespective of the SoC capability
+and whether the PTP support was adequate.
+I think the capability approach gives better control and
+it is not really much to add.
 
-the addition of the dtsi snippets for the ethernet core is pending due
-to this patch. getting it into v4.11 would be geat so that i can sent
-dtsi changes during the next merge window.
-
-	John
+Regards,
+Harini
