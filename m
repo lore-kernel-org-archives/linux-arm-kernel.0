@@ -1,49 +1,58 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 27 Jan 2017 12:22:54 +0000
-Subject: [PATCH] iommu: Better document the IOMMU_PRIV flag
-In-Reply-To: <1483709296-32761-2-git-send-email-sricharan@codeaurora.org>
-References: <1483709296-32761-1-git-send-email-sricharan@codeaurora.org>
- <1483709296-32761-2-git-send-email-sricharan@codeaurora.org>
-Message-ID: <edc67cc1775f3bafb6895346184e8042fd881ba4.1485519627.git.robin.murphy@arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 27 Jan 2017 13:25:42 +0100
+Subject: [PATCH 2/3] pinctrl: dt-bindings: samsung: Add Exynos7 specific
+ pinctrl macro definitions
+In-Reply-To: <20170118141935.eu7wmki7jnjdarkw@kozik-lap>
+References: <1484718141-28785-1-git-send-email-pankaj.dubey@samsung.com>
+ <CGME20170118054002epcas5p3b08e2f419976e17a3c584d64776810fd@epcas5p3.samsung.com>
+ <1484718141-28785-3-git-send-email-pankaj.dubey@samsung.com>
+ <20170118141935.eu7wmki7jnjdarkw@kozik-lap>
+Message-ID: <7a0d543f-37e8-98e9-15b4-7d3f808f8516@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a fairly subtle thing - let's make sure it's described as
-clearly as possible to avoid potential misunderstandings.
+On 01/18/2017 03:19 PM, Krzysztof Kozlowski wrote:
+> On Wed, Jan 18, 2017 at 11:12:20AM +0530, Pankaj Dubey wrote:
+>> Exynos7 SoC pinctrl configurations are similar to existing Exynos4/5 except
+>> for FSYS1 pinctrl drive strengths. So adding Exynos7 specific FSYS1 blocks
+>> pinctrl driver strength related macros which will be used in Exynos7
+>> DTSi files.
+>>
+>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+>> ---
+>>  include/dt-bindings/pinctrl/samsung.h | 8 ++++++++
+>>  1 file changed, 8 insertions(+)
+>>
+> 
+> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+> 
+> I will need this header, so Sylwester if it is okay with you, could you
+> provide a tag with it (or ack it)?
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
-Having another look through the IOMMU_PRIV series, I wasn't convinced
-that the original comment was really all that helpful - I'm happy for
-this to be squashed in if you like.
+I don't have pinctrl/samsung git tree, Linus applies patches directly.
 
-Robin.
-
- include/linux/iommu.h | 11 +++++++----
- 1 file changed, 7 insertions(+), 4 deletions(-)
-
-diff --git a/include/linux/iommu.h b/include/linux/iommu.h
-index 69e2417a2965..3c830e153069 100644
---- a/include/linux/iommu.h
-+++ b/include/linux/iommu.h
-@@ -32,10 +32,13 @@
- #define IOMMU_NOEXEC	(1 << 3)
- #define IOMMU_MMIO	(1 << 4) /* e.g. things like MSI doorbells */
- /*
-- * This is to make the IOMMU API setup privileged
-- * mapppings accessible by the master only at higher
-- * privileged execution level and inaccessible at
-- * less privileged levels.
-+ * Where the bus hardware includes a privilege level as part of its access type
-+ * markings, and certain devices are capable of issuing transactions marked as
-+ * either 'supervisor' or 'user', the IOMMU_PRIV flag requests that the other
-+ * given permission flags only apply to accesses@the higher privilege level,
-+ * and that unprivileged transactions should have as little access as possible.
-+ * This would usually imply the same permissions as kernel mappings on the CPU,
-+ * if the IOMMU page table format is equivalent.
-  */
- #define IOMMU_PRIV	(1 << 5)
- 
 -- 
-2.11.0.dirty
+Regards,
+Sylwester
+
+> diff --git a/include/dt-bindings/pinctrl/samsung.h
+b/include/dt-bindings/pinctrl/samsung.h
+> index 6276eb7..3f1d583 100644
+> --- a/include/dt-bindings/pinctrl/samsung.h
+> +++ b/include/dt-bindings/pinctrl/samsung.h
+> @@ -54,4 +54,12 @@
+>  #define EXYNOS_PIN_FUNC_6		6
+>  #define EXYNOS_PIN_FUNC_F		0xf
+>
+> +/* Drive strengths for Exynos7 FSYS1 block */
+> +#define EXYNOS7_FSYS1_PIN_DRV_LV1	0
+> +#define EXYNOS7_FSYS1_PIN_DRV_LV2	4
+> +#define EXYNOS7_FSYS1_PIN_DRV_LV3	2
+> +#define EXYNOS7_FSYS1_PIN_DRV_LV4	6
+> +#define EXYNOS7_FSYS1_PIN_DRV_LV5	1
+> +#define EXYNOS7_FSYS1_PIN_DRV_LV6	5
+> +
+>  #endif /* __DT_BINDINGS_PINCTRL_SAMSUNG_H__ */
+> -- 2.7.4
