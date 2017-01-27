@@ -1,71 +1,50 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 27 Jan 2017 11:29:12 +0000
-Subject: [STLinux Kernel] [PATCH 7/8] ARM: dts: STiH407-family: Use new
- Pinctrl groups
-In-Reply-To: <20170127110304.qitnkupjqe42tby7@dell>
-References: <20170124134310.27512-1-lee.jones@linaro.org>
- <20170124134310.27512-8-lee.jones@linaro.org>
- <20170125115426.GH5680@griffinp-ThinkPad-X1-Carbon-2nd>
- <20170127110304.qitnkupjqe42tby7@dell>
-Message-ID: <20170127112912.isoir2bfhhc4wihn@dell>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 27 Jan 2017 11:31:04 +0000
+Subject: [PATCH V2] arm64: skip register_cpufreq_notifier on ACPI-based
+ systems
+In-Reply-To: <20170126181116.GT14167@arm.com>
+References: <1485454112-4823-1-git-send-email-pprakash@codeaurora.org>
+ <20170126181116.GT14167@arm.com>
+Message-ID: <20170127113103.GC27424@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 Jan 2017, Lee Jones wrote:
-
-> On Wed, 25 Jan 2017, Peter Griffin wrote:
-> 
-> > Hi Lee,
+On Thu, Jan 26, 2017 at 06:11:17PM +0000, Will Deacon wrote:
+> On Thu, Jan 26, 2017 at 11:08:32AM -0700, Prashanth Prakash wrote:
+> > On ACPI based systems where the topology is setup using the API
+> > store_cpu_topology, at the moment we do not have necessary code
+> > to parse cpu capacity and handle cpufreq notifier, thus
+> > resulting in a kernel panic.
 > > 
-> > On Tue, 24 Jan 2017, Lee Jones wrote:
+> > Stack:
+> >         init_cpu_capacity_callback+0xb4/0x1c8
+> >         notifier_call_chain+0x5c/0xa0
+> >         __blocking_notifier_call_chain+0x58/0xa0
+> >         blocking_notifier_call_chain+0x3c/0x50
+> >         cpufreq_set_policy+0xe4/0x328
+> >         cpufreq_init_policy+0x80/0x100
+> >         cpufreq_online+0x418/0x710
+> >         cpufreq_add_dev+0x118/0x180
+> >         subsys_interface_register+0xa4/0xf8
+> >         cpufreq_register_driver+0x1c0/0x298
+> >         cppc_cpufreq_init+0xdc/0x1000 [cppc_cpufreq]
+> >         do_one_initcall+0x5c/0x168
+> >         do_init_module+0x64/0x1e4
+> >         load_module+0x130c/0x14d0
+> >         SyS_finit_module+0x108/0x120
+> >         el0_svc_naked+0x24/0x28
 > > 
-> > > Having just defined some new Pinctrl groups for when when HW flow-
-> > > control is {en,dis}abled, let's reference them for use within the
-> > > driver.
-> > > 
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > 
-> > Same as previous comment, your enabling hw flow control for all
-> > stih407 family boards. I've not checked the schematics for them
-> > but as hw flow control is dependent on board wiring, IMO this
-> > should be added in board specific file.
+> > Fixes: 7202bde8b7ae ("arm64: parse cpu capacity-dmips-mhz from DT")
+> > Signed-off-by: Prashanth Prakash <pprakash@codeaurora.org>
+> > ---
+> >  arch/arm64/kernel/topology.c | 8 +++++++-
+> >  1 file changed, 7 insertions(+), 1 deletion(-)
 > 
-> Fair shout.
+> Acked-by: Will Deacon <will.deacon@arm.com>
 > 
-> On the B2120 UART0 is hooked up to the Smart Card Reader.
-> 
-> Will fix.
+> Catalin -- this resolves a panic, so please take it for 4.10
 
-Actually, the comment above is in regards to the st,hw-flow-control
-property [8/8].  The UART0 Pinctrl settings here are correct for all
-supported STiH407-family boards.
-
-Will not fix.
-
-> > > ---
-> > >  arch/arm/boot/dts/stih407-family.dtsi | 5 +++--
-> > >  1 file changed, 3 insertions(+), 2 deletions(-)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-> > > index c8b2944..9789978 100644
-> > > --- a/arch/arm/boot/dts/stih407-family.dtsi
-> > > +++ b/arch/arm/boot/dts/stih407-family.dtsi
-> > > @@ -222,8 +222,9 @@
-> > >  			compatible = "st,asc";
-> > >  			reg = <0x9830000 0x2c>;
-> > >  			interrupts = <GIC_SPI 122 IRQ_TYPE_NONE>;
-> > > -			pinctrl-names = "default";
-> > > -			pinctrl-0 = <&pinctrl_serial0>;
-> > > +			pinctrl-names = "default", "manual-rts";
-> > > +			pinctrl-0 = <&pinctrl_serial0_flowctrl>;
-> > > +			pinctrl-1 = <&pinctrl_serial0>;
-> > >  			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
-> > >  
-> > >  			status = "disabled";
-> 
+Applied. Thanks.
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Catalin
