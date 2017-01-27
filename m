@@ -1,21 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Jan 2017 16:47:25 +0100
-Subject: [GIT PULL] i.MX fixes for 4.10, 3rd round
-In-Reply-To: <20170126154630.GE5662@dragon>
-References: <20170126154630.GE5662@dragon>
-Message-ID: <3053667.BlQ2AN0t29@wuerfel>
+From: codekipper@gmail.com (codekipper at gmail.com)
+Date: Fri, 27 Jan 2017 16:48:05 +0100
+Subject: [linux-sunxi][PATCH 0/3] Enable SPDIF on the Beelink X2
+Message-ID: <20170127154808.19229-1-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, January 26, 2017 11:46:32 PM CET Shawn Guo wrote:
-> i.MX fixes for 4.10, 3rd round:
->  - Fix a 'defined but not used' warning in MMDC driver when
->    CONFIG_PERF_EVENTS is disabled.
->  - Fix i.MX6DL device tree GPIO4_11 range setting.
->  - A bandaid fix for boot failure found on a couple of platforms due to
->    missing 'chosen' and 'memory' node.
-> 
+From: Marcus Cooper <codekipper@gmail.com>
 
-Pulled into fixes, thanks!
+Hi All,
 
-	Arnd
+here is the patchset required to get SPDIF working on the Beelink X2
+which is a H3 based STB.
+
+BR,
+CK
+
+Marcus Cooper (3):
+  ARM: dts: sun8i-h3: Add SPDIF TX pin to the H3
+  ARM: dts: sun8i-h3: Add the SPDIF block to the H3
+  ARM: dts: sun8i-h3: Add SPDIF to the Beelink X2
+
+ arch/arm/boot/dts/sun8i-h3-beelink-x2.dts | 24 ++++++++++++++++++++++++
+ arch/arm/boot/dts/sun8i-h3.dtsi           | 18 ++++++++++++++++++
+ 2 files changed, 42 insertions(+)
+
+-- 
+2.11.0
