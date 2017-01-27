@@ -1,66 +1,44 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 27 Jan 2017 16:12:24 +0100
-Subject: [PATCH v5 06/12] mmc: sdhci-xenon: Add Marvell Xenon SDHC core
- functionality
-In-Reply-To: <2e67332d-d8c3-fd24-1f81-72675a09927a@intel.com>
-References: <cover.8527229dae6c124f24c5e637430c2cdc86f80392.1484154449.git-series.gregory.clement@free-electrons.com>
- <3546f143091c121face8ecbcbf7f6a4c41d2cec7.1484154449.git-series.gregory.clement@free-electrons.com>
- <CAPDyKFrwxix4zY4a1x9u6jh_gPfKTsaLnD8b8crum=pc5CN3AA@mail.gmail.com>
- <2e67332d-d8c3-fd24-1f81-72675a09927a@intel.com>
-Message-ID: <CAPDyKFqbjeKCHp40PALydquxdF-qBk156+iOS9TYYsquJ7fK7w@mail.gmail.com>
+From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
+Date: Fri, 27 Jan 2017 16:20:42 +0100
+Subject: [PATCH] ASoC: mt8173-max98090: remove the call to
+ snd_soc_jack_add_pins.
+Message-ID: <20170127152042.7631-1-enric.balletbo@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 January 2017 at 13:39, Adrian Hunter <adrian.hunter@intel.com> wrote:
-> On 26/01/17 12:50, Ulf Hansson wrote:
->> On 11 January 2017 at 18:19, Gregory CLEMENT
->> <gregory.clement@free-electrons.com> wrote:
->>> +                       priv->init_card_type = MMC_TYPE_MMC;
->>> +                       mmc->caps |= MMC_CAP_NONREMOVABLE;
->>> +
->>> +                       /*
->>> +                        * Force to clear BUS_TEST to
->>> +                        * skip bus_test_pre and bus_test_post
->>> +                        */
->>> +                       mmc->caps &= ~MMC_CAP_BUS_WIDTH_TEST;
->>> +                       mmc->caps2 |= MMC_CAP2_HC_ERASE_SZ |
->>
->> This cap is a bit strange. It was added several years ago by Adrian
->> Hunter, but I am wondering about the reason to why it's needed.
->>
->
-> MMC_CAP2_HC_ERASE_SZ relates to EXT-CSD ERASE_GROUP_DEF.
->
-> I think it was added to enable people to choose whether they wanted a large
-> or small erase granularity.  That probably doesn't matter if the card
-> supports TRIM.
->
+The snd_soc_card_jack_new function can call snd_soc_jack_add_pins for
+you, so pass directly the pins struct when you create the new jack.
 
-Huh, the erase/trim/discard code in the mmc core is really hairy. :-)
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+---
+ sound/soc/mediatek/mt8173/mt8173-max98090.c | 14 ++++----------
+ 1 file changed, 4 insertions(+), 10 deletions(-)
 
-In mmc_calc_max_discard() the following code/comment exists:
-
-/*
- * Without erase_group_def set, MMC erase timeout depends on clock
- * frequence which can change.  In that case, the best choice is
- * just the preferred erase size.
- */
-if (mmc_card_mmc(card) && !(card->ext_csd.erase_group_def & 1))
-     return card->pref_erase;
-
-
-This makes me wonder.
-
-So, when we haven't enabled the high capacity erase groups in the
-EXT_CSD register (ext_csd.erase_group_def), we will use the pref_erase
-size.
-
-In the other case, as when having MMC_CAP2_HC_ERASE_SZ set (which will
-set ext_csd.erase_group_def),  we will instead  do some calculations
-to find out the max discards.
-
-Are you saying that these calculations doesn't matter much - or are
-you saying that we always want to do them?
-
-Kind regards
-Uffe
+diff --git a/sound/soc/mediatek/mt8173/mt8173-max98090.c b/sound/soc/mediatek/mt8173/mt8173-max98090.c
+index 5524a2c..46c8e6a 100644
+--- a/sound/soc/mediatek/mt8173/mt8173-max98090.c
++++ b/sound/soc/mediatek/mt8173/mt8173-max98090.c
+@@ -79,17 +79,11 @@ static int mt8173_max98090_init(struct snd_soc_pcm_runtime *runtime)
+ 
+ 	/* enable jack detection */
+ 	ret = snd_soc_card_jack_new(card, "Headphone", SND_JACK_HEADPHONE,
+-				    &mt8173_max98090_jack, NULL, 0);
++				    &mt8173_max98090_jack,
++				    mt8173_max98090_jack_pins,
++				    ARRAY_SIZE(mt8173_max98090_jack_pins));
+ 	if (ret) {
+-		dev_err(card->dev, "Can't snd_soc_jack_new %d\n", ret);
+-		return ret;
+-	}
+-
+-	ret = snd_soc_jack_add_pins(&mt8173_max98090_jack,
+-				    ARRAY_SIZE(mt8173_max98090_jack_pins),
+-				    mt8173_max98090_jack_pins);
+-	if (ret) {
+-		dev_err(card->dev, "Can't snd_soc_jack_add_pins %d\n", ret);
++		dev_err(card->dev, "Can't create a new Jack %d\n", ret);
+ 		return ret;
+ 	}
+ 
+-- 
+2.9.3
