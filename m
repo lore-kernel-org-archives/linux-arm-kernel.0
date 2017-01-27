@@ -1,68 +1,38 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 27 Jan 2017 22:55:12 +0100
-Subject: v4.9 to v4.10 regression: oops when USB cable is plugged in.
-In-Reply-To: <20170124145127.GC7403@atomide.com>
-References: <20170123222537.GA11543@amd> <20170123224454.GY7403@atomide.com>
- <20170124091817.GA29246@amd> <20170124100133.GA21079@pali>
- <20170124145127.GC7403@atomide.com>
-Message-ID: <20170127215512.GG20571@amd>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 27 Jan 2017 16:03:57 -0600
+Subject: [PATCH V6 3/5] OF: Add missing I/O range exception for
+ indirect-IO  devices
+In-Reply-To: <1485241525-201782-4-git-send-email-yuanzhichang@hisilicon.com>
+References: <1485241525-201782-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1485241525-201782-4-git-send-email-yuanzhichang@hisilicon.com>
+Message-ID: <20170127220357.3lpavvyeymlhvlfg@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> > > Can I get the copy of the patch?
-> > > 
-> > > http://www.spinics.net/lists/linux-usb/msg152542.html
-> > > 
-> > > ...but it is html mangled with no obvious way to unmangle it.
+On Tue, Jan 24, 2017 at 03:05:23PM +0800, zhichang.yuan wrote:
+> There are some special ISA/LPC devices that work on a specific I/O range where
+> it is not correct to specify a 'ranges' property in DTS parent node as cpu
+> addresses translated from DTS node are only for memory space on some
+> architectures, such as Arm64. Without the parent 'ranges' property, current
+> of_translate_address() return an error.
+> Here we add special handlings for this case.
+> During the OF address translation, some checkings will be perfromed to
+> identify whether the device node is registered as indirect-IO. If yes, the I/O
+> translation will be done in a different way from that one of PCI MMIO.
+> In this way, the I/O 'reg' property of the special ISA/LPC devices will be
+> parsed correctly.
 > 
-> Bounced it to you. FYI, patchwork.kernel.org should have it too, the
-> "mbox" option there works the best.
+> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
+> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Thanks, applied. Problem did not reappear so far.
+Shouldn't this be Reviewed-by?
 
-> > > > I was able to hit that only once so far, do you hit it
-> > > > every time with your built-in g_ether .config?
-> > > 
-> > > I get it "way too often", like once a day. I don't yet know how to hit
-> > > it reliably :-(.
+Otherwise, looks fine to me.
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+> ---
+>  drivers/of/address.c | 87 ++++++++++++++++++++++++++++++++++++++++++----------
+>  1 file changed, 71 insertions(+), 16 deletions(-)
 > 
-> OK, well let's hope the patch linked above fixes it. At some point the
-> number of musb fixes should just start going down if I'm predicting right :)
-
-Fingers crossed :-).
-
-> Anyways, hitting these issues during late -rc cycle is too late. We
-> really should have some n900 usability testing for core features with
-> Linux next on at least weekly basis.
-
-Ok, I can try. But so far even -rc1 is a lot of fun. But... I consider
-phone calls core feature of a phone. I'd very much like to get that to
-work. Unfortunately, that means real-time audio, and a lot of
-fun. Plus, as it is touchscreen device, it needs a GUI. 
-
-> I've noticed that testing with Linux next is way less effort than chasing
-> bugs every -rc cycle when it's too late. For about past four months or so
-> next has been usable for me with only occasional minor issues that get
-> fixed within a day or two.
-
-Well, I am carrying some patches... but maybe mainline is now good
-enough to be useable without them?
-
-No promises. I really should find more time for N900
-development. Hmm. Or more developers. Where are all those Eudyptula
-Challenge people when you need them?
-
-Best regards,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170127/a1c3359f/attachment.sig>
