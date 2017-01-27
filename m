@@ -1,73 +1,68 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Thu, 26 Jan 2017 20:04:59 -0500
-Subject: [RFC v2 09/10] KVM: arm64: Add the EL1 physical timer access handler
+Date: Thu, 26 Jan 2017 20:04:56 -0500
+Subject: [RFC v2 06/10] KVM: arm/arm64: Update the physical timer interrupt
+ level
 In-Reply-To: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
 References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1485479100-4966-10-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1485479100-4966-7-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KVM traps on the EL1 phys timer accesses from VMs, but it doesn't handle
-those traps. This results in terminating VMs. Instead, set a handler for
-the EL1 phys timer access, and inject an undefined exception as an
-intermediate step.
+Now that we maintain the EL1 physical timer register states of VMs,
+update the physical timer interrupt level along with the virtual one.
+
+Note that the emulated EL1 physical timer is not mapped to any hardware
+timer, so we call a proper vgic function.
 
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 ---
- arch/arm64/kvm/sys_regs.c | 34 ++++++++++++++++++++++++++++++++++
- 1 file changed, 34 insertions(+)
+ virt/kvm/arm/arch_timer.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 87e7e66..fd9e747 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -820,6 +820,30 @@ static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	  CRm((0b1100 | (((n) >> 3) & 0x3))), Op2(((n) & 0x7)),		\
- 	  access_pmu_evtyper, reset_unknown, (PMEVTYPER0_EL0 + n), }
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 0f6e935..3b6bd50 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -180,6 +180,21 @@ static void kvm_timer_update_mapped_irq(struct kvm_vcpu *vcpu, bool new_level,
+ 	WARN_ON(ret);
+ }
  
-+static bool access_cntp_tval(struct kvm_vcpu *vcpu,
-+		struct sys_reg_params *p,
-+		const struct sys_reg_desc *r)
++static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
++				 struct arch_timer_context *timer)
 +{
-+	kvm_inject_undefined(vcpu);
-+	return true;
-+}
++	int ret;
 +
-+static bool access_cntp_ctl(struct kvm_vcpu *vcpu,
-+		struct sys_reg_params *p,
-+		const struct sys_reg_desc *r)
-+{
-+	kvm_inject_undefined(vcpu);
-+	return true;
-+}
++	BUG_ON(!vgic_initialized(vcpu->kvm));
 +
-+static bool access_cntp_cval(struct kvm_vcpu *vcpu,
-+		struct sys_reg_params *p,
-+		const struct sys_reg_desc *r)
-+{
-+	kvm_inject_undefined(vcpu);
-+	return true;
++	timer->irq.level = new_level;
++	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->irq.irq,
++				   timer->irq.level);
++	ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id, timer->irq.irq,
++				  timer->irq.level);
++	WARN_ON(ret);
 +}
 +
  /*
-  * Architected system registers.
-  * Important: Must be sorted ascending by Op0, Op1, CRn, CRm, Op2
-@@ -1029,6 +1053,16 @@ static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	{ Op0(0b11), Op1(0b011), CRn(0b1101), CRm(0b0000), Op2(0b011),
- 	  NULL, reset_unknown, TPIDRRO_EL0 },
+  * Check if there was a change in the timer state (should we raise or lower
+  * the line level to the GIC).
+@@ -188,6 +203,7 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
++	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
  
-+	/* CNTP_TVAL_EL0 */
-+	{ Op0(0b11), Op1(0b011), CRn(0b1110), CRm(0b0010), Op2(0b000),
-+	  access_cntp_tval },
-+	/* CNTP_CTL_EL0 */
-+	{ Op0(0b11), Op1(0b011), CRn(0b1110), CRm(0b0010), Op2(0b001),
-+	  access_cntp_ctl },
-+	/* CNTP_CVAL_EL0 */
-+	{ Op0(0b11), Op1(0b011), CRn(0b1110), CRm(0b0010), Op2(0b010),
-+	  access_cntp_cval },
+ 	/*
+ 	 * If userspace modified the timer registers via SET_ONE_REG before
+@@ -201,6 +217,10 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
+ 	if (kvm_timer_should_fire(vcpu, vtimer) != vtimer->irq.level)
+ 		kvm_timer_update_mapped_irq(vcpu, !vtimer->irq.level, vtimer);
+ 
++	/* The emulated EL1 physical timer irq is not mapped to hardware */
++	if (kvm_timer_should_fire(vcpu, ptimer) != ptimer->irq.level)
++		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
 +
- 	/* PMEVCNTRn_EL0 */
- 	PMU_PMEVCNTR_EL0(0),
- 	PMU_PMEVCNTR_EL0(1),
+ 	return 0;
+ }
+ 
 -- 
 1.9.1
