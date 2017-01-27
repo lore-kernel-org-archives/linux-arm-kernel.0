@@ -1,64 +1,57 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Fri, 27 Jan 2017 10:16:44 -0800
-Subject: [PATCH 3/4] i.MX: GPC: Use IRQCHIP_DECLARE_DRIVER
-In-Reply-To: <1485510840.28751.26.camel@pengutronix.de>
-References: <20170126220504.4796-1-andrew.smirnov@gmail.com>
- <20170126220504.4796-3-andrew.smirnov@gmail.com>
- <1485510840.28751.26.camel@pengutronix.de>
-Message-ID: <CAHQ1cqFt7EY=YjeaNRVm+Wu+rtP=ahMR=UqFEf1epLyRy8z_SQ@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 27 Jan 2017 18:19:51 +0000
+Subject: [PATCH V7 01/11] iommu/of: Refactor of_iommu_configure() for
+ error handling
+In-Reply-To: <009901d278c7$34fee230$9efca690$@codeaurora.org>
+References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
+ <1485188293-20263-2-git-send-email-sricharan@codeaurora.org>
+ <4388779a-0e83-fadc-83f4-98c46c88d42e@semihalf.com>
+ <c7bad124-d9f2-0ddf-168f-0b1950d3e1ed@arm.com>
+ <009901d278c7$34fee230$9efca690$@codeaurora.org>
+Message-ID: <d27f04da-7d34-9640-1639-790d0732ed93@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2017 at 1:54 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> Hi Andrey,
->
-> Am Donnerstag, den 26.01.2017, 14:05 -0800 schrieb Andrey Smirnov:
->> Use IRQCHIP_DECLARE_DRIVER instead of Use IRQCHIP_DECLARE to allow
->> 'imx_gpc_driver' to be probed in addition to irqchip initialized by
->> imx_gpc_init().
+On 27/01/17 18:00, Sricharan wrote:
+> Hi Robin,
+> 
+> [..]
+> 
+>>>> +const struct iommu_ops *of_iommu_configure(struct device *dev,
+>>>> +                       struct device_node *master_np)
+>>>> +{
+>>>> +    const struct iommu_ops *ops;
+>>>> +
+>>>> +    if (!master_np)
+>>>> +        return NULL;
+>>>> +
+>>>> +    if (dev_is_pci(dev))
+>>>> +        ops = of_pci_iommu_init(to_pci_dev(dev), master_np);
+>>>
+>>> I gave the whole patch set a try on ThunderX. really_probe() is failing
+>>> on dma_configure()->of_pci_iommu_init() for each PCI device.
 >>
->> Cc: yurovsky at gmail.com
->> Cc: Shawn Guo <shawnguo@kernel.org>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Cc: Jason Cooper <jason@lakedaemon.net>
->> Cc: Marc Zyngier <marc.zyngier@arm.com>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
->> ---
->>  arch/arm/mach-imx/gpc.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
->> index 1dc2a34..8f0d19b 100644
->> --- a/arch/arm/mach-imx/gpc.c
->> +++ b/arch/arm/mach-imx/gpc.c
->> @@ -279,7 +279,7 @@ static int __init imx_gpc_init(struct device_node *node,
->>
->>       return 0;
->>  }
->> -IRQCHIP_DECLARE(imx_gpc, "fsl,imx6q-gpc", imx_gpc_init);
->> +IRQCHIP_DECLARE_DRIVER(imx_gpc, "fsl,imx6q-gpc", imx_gpc_init);
->>
->>  void __init imx_gpc_check_dt(void)
->>  {
->
-> I don't see the other patches from the series on the list, so commenting
-> here: You might want to take a look at my GPC rework series, it has a
-> much nicer binding for the power domains, that you might want to use for
-> the GPCv2 also.
+>> When you say "failing", do you mean cleanly, or with a crash? I've
+>> managed to hit __of_match_node() dereferencing NULL from
+>> of_iommu_xlate() in a horribly complicated chain of events, which I'm
+>> trying to figure out now, and I wonder if the two might be related.
+> 
+> Sorry that there is crash still. __of_match_node seems to checking
+> for NULL arguments , feels like some invalid pointer was passed in.
+> Is there any particular sequence to try for this ?
 
-I messed up distribution list of my original patches, sorry. OK, I'll
-take a look.
+Ah, I did figure it out - it wasn't actually a NULL dereference, but an
+unmapped address. Turns out __iommu_of_table is in initdata, so any
+driver probing after init, connected to an unprobed IOMMU (in this case
+disabled in DT), trips over trying to match the now-freed table. I'm
+working on the fix - technically the bug's in my patch (#2) anyway ;)
 
->
-> Additionally I think the power domain stuff doesn't belong into the
-> irqchip driver, but rather in a separate driver in drivers/soc like it
-> is done in my series.
->
-> I'll send out an updated version of this series today and you might
-> consider basing your GPCv2 on top of that.
+Robin.
 
-Please CC me on it if you haven't sent the patches already.
-
-Thanks,
-Andrey Smirnov
+> 
+> Regards,
+>  Sricharan
+> 
+> 
+> 
+> 
