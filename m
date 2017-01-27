@@ -1,56 +1,25 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 27 Jan 2017 10:54:00 +0100
-Subject: [PATCH 3/4] i.MX: GPC: Use IRQCHIP_DECLARE_DRIVER
-In-Reply-To: <20170126220504.4796-3-andrew.smirnov@gmail.com>
-References: <20170126220504.4796-1-andrew.smirnov@gmail.com>
- <20170126220504.4796-3-andrew.smirnov@gmail.com>
-Message-ID: <1485510840.28751.26.camel@pengutronix.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 27 Jan 2017 15:28:55 +0530
+Subject: [PATCH v6 05/14] ARM: davinci: da850: add con_id for the SATA
+ clock
+In-Reply-To: <CAMpxmJXq-XZBhO3j=bHpfU2QjJ+6kiYcozS7-pVu3W4juNTVBw@mail.gmail.com>
+References: <1485190856-4711-1-git-send-email-bgolaszewski@baylibre.com>
+ <1485190856-4711-6-git-send-email-bgolaszewski@baylibre.com>
+ <93a3bbb3-2d9f-bc38-c7b4-5eb3325d985d@ti.com>
+ <645778dd-6727-abd0-3dd9-a7e0d5aa4983@ti.com>
+ <CAMpxmJXq-XZBhO3j=bHpfU2QjJ+6kiYcozS7-pVu3W4juNTVBw@mail.gmail.com>
+Message-ID: <135d0aac-11a3-e71a-4f39-82bdb2afea39@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrey,
-
-Am Donnerstag, den 26.01.2017, 14:05 -0800 schrieb Andrey Smirnov:
-> Use IRQCHIP_DECLARE_DRIVER instead of Use IRQCHIP_DECLARE to allow
-> 'imx_gpc_driver' to be probed in addition to irqchip initialized by
-> imx_gpc_init().
+On Friday 27 January 2017 03:25 PM, Bartosz Golaszewski wrote:
+> Hi Sekhar,
 > 
-> Cc: yurovsky at gmail.com
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
-> ---
->  arch/arm/mach-imx/gpc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
-> index 1dc2a34..8f0d19b 100644
-> --- a/arch/arm/mach-imx/gpc.c
-> +++ b/arch/arm/mach-imx/gpc.c
-> @@ -279,7 +279,7 @@ static int __init imx_gpc_init(struct device_node *node,
->  
->  	return 0;
->  }
-> -IRQCHIP_DECLARE(imx_gpc, "fsl,imx6q-gpc", imx_gpc_init);
-> +IRQCHIP_DECLARE_DRIVER(imx_gpc, "fsl,imx6q-gpc", imx_gpc_init);
->  
->  void __init imx_gpc_check_dt(void)
->  {
+> I'll wait with sending v7 until we get an ack from Rob for the
+> ahci-da850 bindings, so that we don't fall to the bottom of the review
+> queue again.
 
-I don't see the other patches from the series on the list, so commenting
-here: You might want to take a look at my GPC rework series, it has a
-much nicer binding for the power domains, that you might want to use for
-the GPCv2 also.
-
-Additionally I think the power domain stuff doesn't belong into the
-irqchip driver, but rather in a separate driver in drivers/soc like it
-is done in my series.
-
-I'll send out an updated version of this series today and you might
-consider basing your GPCv2 on top of that.
+Yes, makes sense.
 
 Regards,
-Lucas
+Sekhar
