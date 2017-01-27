@@ -1,100 +1,162 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 27 Jan 2017 22:38:39 +0100
-Subject: [PATCH v5 7/13] mmc: sunxi: Add more debug informations
+Date: Fri, 27 Jan 2017 22:38:45 +0100
+Subject: [PATCH v5 13/13] arm64: allwinner: add BananaPi-M64 support
 In-Reply-To: <cover.6f3d82744628848e2182720c35f13e87e8b62258.1485553113.git-series.maxime.ripard@free-electrons.com>
 References: <cover.6f3d82744628848e2182720c35f13e87e8b62258.1485553113.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <b73d3b355cd937d572d2ca3292b4dfb2bea217e4.1485553113.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <9f33d1668f7552bc1e0c8fde92110648eba80659.1485553113.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a bit more debug messages that can be helpful when debugging the clock
-setup.
+From: Andre Przywara <andre.przywara@arm.com>
 
-Also fill the actual_clock field in struct mmc_host to report properly the
-current frequency in debugfs.
+The Banana Pi M64 board is a typical single board computer based on the
+Allwinner A64 SoC. Aside from the usual peripherals it features eMMC
+storage, which is connected to the 8-bit capable SDHC2 controller.
+Also it has a soldered WiFi/Bluetooth chip, so we enable UART1 and SDHC1
+as those two interfaces are connected to it.
 
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Tested-by: Florian Vaussard <florian.vaussard@heig-vd.ch>
 ---
- drivers/mmc/host/sunxi-mmc.c | 23 +++++++++++++++++++----
- 1 file changed, 19 insertions(+), 4 deletions(-)
+ arch/arm64/boot/dts/allwinner/Makefile                    |   1 +-
+ arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 120 +++++++-
+ 2 files changed, 121 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
 
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index f0f6922bca8a..6ffcd2838272 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -661,6 +661,9 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
- 	unsigned long expire = jiffies + msecs_to_jiffies(750);
- 	u32 rval;
+diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
+index 1e29a5ae8282..bc6f342be59f 100644
+--- a/arch/arm64/boot/dts/allwinner/Makefile
++++ b/arch/arm64/boot/dts/allwinner/Makefile
+@@ -1,3 +1,4 @@
++dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
  
-+	dev_dbg(mmc_dev(host->mmc), "%sabling the clock\n",
-+		oclk_en ? "en" : "dis");
+ always		:= $(dtb-y)
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+new file mode 100644
+index 000000000000..6872135d7f84
+--- /dev/null
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+@@ -0,0 +1,120 @@
++/*
++ * Copyright (c) 2016 ARM Ltd.
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
- 	rval = mmc_readl(host, REG_CLKCR);
- 	rval &= ~(SDXC_CARD_CLOCK_ON | SDXC_LOW_POWER_ON | SDXC_MASK_DATA0);
- 
-@@ -737,6 +740,7 @@ static int sunxi_mmc_clk_set_phase(struct sunxi_mmc_host *host,
- 			index = SDXC_CLK_50M_DDR;
- 		}
- 	} else {
-+		dev_dbg(mmc_dev(host->mmc), "Invalid clock... returning\n");
- 		return -EINVAL;
- 	}
- 
-@@ -749,6 +753,7 @@ static int sunxi_mmc_clk_set_phase(struct sunxi_mmc_host *host,
- static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 				  struct mmc_ios *ios)
- {
-+	struct mmc_host *mmc = host->mmc;
- 	long rate;
- 	u32 rval, clock = ios->clock;
- 	int ret;
-@@ -757,6 +762,9 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 	if (ret)
- 		return ret;
- 
-+	/* Our clock is gated now */
-+	mmc->actual_clock = 0;
++/dts-v1/;
 +
- 	if (!ios->clock)
- 		return 0;
- 
-@@ -767,17 +775,17 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 
- 	rate = clk_round_rate(host->clk_mmc, clock);
- 	if (rate < 0) {
--		dev_err(mmc_dev(host->mmc), "error rounding clk to %d: %ld\n",
-+		dev_err(mmc_dev(mmc), "error rounding clk to %d: %ld\n",
- 			clock, rate);
- 		return rate;
- 	}
--	dev_dbg(mmc_dev(host->mmc), "setting clk to %d, rounded %ld\n",
-+	dev_dbg(mmc_dev(mmc), "setting clk to %d, rounded %ld\n",
- 		clock, rate);
- 
- 	/* setting clock rate */
- 	ret = clk_set_rate(host->clk_mmc, rate);
- 	if (ret) {
--		dev_err(mmc_dev(host->mmc), "error setting clk to %ld: %d\n",
-+		dev_err(mmc_dev(mmc), "error setting clk to %ld: %d\n",
- 			rate, ret);
- 		return ret;
- 	}
-@@ -812,7 +820,14 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 	 * least on the A64).
- 	 */
- 
--	return sunxi_mmc_oclk_onoff(host, 1);
-+	ret = sunxi_mmc_oclk_onoff(host, 1);
-+	if (ret)
-+		return ret;
++#include "sun50i-a64.dtsi"
 +
-+	/* And we just enabled our clock back */
-+	mmc->actual_clock = rate;
++#include <dt-bindings/gpio/gpio.h>
 +
-+	return 0;
- }
- 
- static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
++/ {
++	model = "BananaPi-M64";
++	compatible = "sinovoip,bananapi-m64", "allwinner,sun50i-a64";
++
++	aliases {
++		serial0 = &uart0;
++		serial1 = &uart1;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	reg_vcc3v3: vcc3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++};
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins>;
++	status = "okay";
++};
++
++&i2c1_pins {
++	bias-pull-up;
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins>;
++	vmmc-supply = <&reg_vcc3v3>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
++	cd-inverted;
++	disable-wp;
++	bus-width = <4>;
++	status = "okay";
++};
++
++&mmc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc1_pins>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	non-removable;
++	status = "okay";
++};
++
++&mmc2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc2_pins>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <8>;
++	non-removable;
++	cap-mmc-hw-reset;
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
++	status = "okay";
++};
 -- 
 git-series 0.8.11
