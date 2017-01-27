@@ -1,35 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Jan 2017 17:44:14 +0100
-Subject: [PATCH 1/3] arm: hisi: add ARCH_MULTI_V5 support
-In-Reply-To: <7bfc8ca6-696b-a1f4-cf9a-e928112ecf35@hisilicon.com>
-References: <20161017120705.3726-1-wenpan@hisilicon.com>
- <20161017120705.3726-2-wenpan@hisilicon.com>
- <5893354.6MrIxqzRoI@wuerfel>
- <2fcf5a5f-8935-c4f0-a034-c8a72dc2be0f@hisilicon.com>
- <fb89c03e-ea67-d339-b222-6f0e08988563@gmail.com>
- <cfecdd06-90c4-6e9c-30cb-59b1ee70e8a5@hisilicon.com>
- <59a9b91c-d7be-cf3a-d461-252cb493d61c@gmail.com>
- <7bfc8ca6-696b-a1f4-cf9a-e928112ecf35@hisilicon.com>
-Message-ID: <CAK8P3a1vqokx60vVHd8fiidJ-vPdphk1QOi=w-PkeOJ+1bq1zw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Jan 2017 16:46:21 +0000
+Subject: [GIT PULL] iommu: IOMMU_PRIV support for 4.11
+Message-ID: <20170127164621.GB10758@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2017 at 2:47 AM, Jiancheng Xue
-<xuejiancheng@hisilicon.com> wrote:
-> On 2016/12/15 4:06, Marty Plummer wrote:
+Hi Joerg,
 
->>>
->> I have no objections. It looks like it might make my job a bit easier in
->> the end. I need to go ahead and rebase my patches anyways and fix up
->> earlier concerns raised about them, so go right ahead.
->>
-> Hi Arnd,
->
-> Could this patch be accepted?  Any further comments will be appreciated.
+Please pull the following IOMMU changes for 4.11. These patches from
+Sricharan add support for "privileged" IOMMU mappings, which are useful
+with master devices that support transactions at different privilege
+levels and want to control the permissions independently.
 
-Sorry this is going so slowly. The patch is fine, please work with Wei Xu to
-have it merged into 4.11. My only concern was whether it conflicted with Marty's
-work, but since he has no objections and has not posted a new version of
-his patches in a while, there is no problem.
+Cheers,
 
-    Arnd
+Will
+
+--->8
+
+The following changes since commit a121103c922847ba5010819a3f250f1f7fc84ab8:
+
+  Linux 4.10-rc3 (2017-01-08 14:18:17 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git iommu/iommu-priv
+
+for you to fetch changes up to fa8c57db44068a77903d9688382b461a836eee68:
+
+  iommu: Better document the IOMMU_PRIV flag (2017-01-27 13:49:35 +0000)
+
+----------------------------------------------------------------
+Jeremy Gebben (1):
+      iommu/io-pgtable-arm: add support for the IOMMU_PRIV flag
+
+Mitchel Humpherys (4):
+      iommu: add IOMMU_PRIV attribute
+      common: DMA-mapping: add DMA_ATTR_PRIVILEGED attribute
+      arm64/dma-mapping: Implement DMA_ATTR_PRIVILEGED
+      dmaengine: pl330: Make sure microcode is privileged
+
+Robin Murphy (3):
+      iommu/io-pgtable-arm-v7s: Add support for the IOMMU_PRIV flag
+      Revert "iommu/arm-smmu: Set PRIVCFG in stage 1 STEs"
+      iommu: Better document the IOMMU_PRIV flag
+
+Sricharan R (2):
+      arm/dma-mapping: Implement DMA_ATTR_PRIVILEGED
+      iommu/arm-smmu: Set privileged attribute to 'default' instead of 'unprivileged'
+
+ Documentation/DMA-attributes.txt   | 10 +++++++
+ arch/arm/mm/dma-mapping.c          | 60 +++++++++++++++++++-------------------
+ arch/arm64/mm/dma-mapping.c        |  6 ++--
+ drivers/dma/pl330.c                |  5 ++--
+ drivers/iommu/arm-smmu-v3.c        |  7 +----
+ drivers/iommu/arm-smmu.c           |  2 +-
+ drivers/iommu/dma-iommu.c          | 12 ++++++--
+ drivers/iommu/io-pgtable-arm-v7s.c |  6 +++-
+ drivers/iommu/io-pgtable-arm.c     |  5 +++-
+ include/linux/dma-iommu.h          |  3 +-
+ include/linux/dma-mapping.h        |  7 +++++
+ include/linux/iommu.h              | 10 +++++++
+ 12 files changed, 85 insertions(+), 48 deletions(-)
