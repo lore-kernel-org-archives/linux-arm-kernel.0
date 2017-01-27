@@ -1,33 +1,35 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 27 Jan 2017 10:10:36 +0100
-Subject: [PATCH 1/2] memory: atmel-ebi: Fix the test to enable generic SMC
- logic
-In-Reply-To: <1485508237-30178-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1485508237-30178-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1485508237-30178-2-git-send-email-boris.brezillon@free-electrons.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 27 Jan 2017 10:14:24 +0100
+Subject: [PATCH 2/9] arm64: dts: r8a7795: Add missing power-domains property
+ for sata
+In-Reply-To: <cover.1485508214.git.horms+renesas@verge.net.au>
+References: <cover.1485508214.git.horms+renesas@verge.net.au>
+Message-ID: <2cab226c345378b3cff652a9c8232f5070d31216.1485508214.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We should test the apply value and not the ret one here.
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Fixes: 6a4ec4cd0888 ("memory: add Atmel EBI (External Bus Interface) driver")
+This went unnoticed as the sata_rcar driver doesn't support Runtime PM
+yet, but manages module clocks manually.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/memory/atmel-ebi.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/memory/atmel-ebi.c b/drivers/memory/atmel-ebi.c
-index 1eaaa2be8ff2..2c4c9a1978bc 100644
---- a/drivers/memory/atmel-ebi.c
-+++ b/drivers/memory/atmel-ebi.c
-@@ -503,7 +503,7 @@ static int at91_ebi_dev_setup(struct at91_ebi *ebi, struct device_node *np,
- 		 * Attach the EBI device to the generic SMC logic if at least
- 		 * one "atmel,smc-" property is present.
- 		 */
--		if (ebi->ebi_csa && ret)
-+		if (ebi->ebi_csa && apply)
- 			regmap_field_update_bits(ebi->ebi_csa,
- 						 BIT(cs), 0);
- 	}
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 972e379c0596..026a16ac41b4 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -1148,6 +1148,7 @@
+ 			reg = <0 0xee300000 0 0x1fff>;
+ 			interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 815>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+ 			status = "disabled";
+ 		};
+ 
 -- 
-2.7.4
+2.7.0.rc3.207.g0ac5344
