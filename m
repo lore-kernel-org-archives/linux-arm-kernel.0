@@ -1,30 +1,36 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 27 Jan 2017 16:35:21 +0000
-Subject: [PATCH] arm64: handle sys and undef traps consistently
-In-Reply-To: <1485533738-30062-1-git-send-email-mark.rutland@arm.com>
-References: <1485533738-30062-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20170127163521.GF27424@e104818-lin.cambridge.arm.com>
+From: patrice.chotard@st.com (Patrice CHOTARD)
+Date: Fri, 27 Jan 2017 16:39:25 +0000
+Subject: [GIT PULL] STi DT update for v4.11 round 2
+Message-ID: <f5af2119-21ac-7116-5109-1a8837f87cfb@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2017 at 04:15:38PM +0000, Mark Rutland wrote:
-> If an EL0 instruction in the SYS class triggers an exception, do_sysintr
-> looks for a sys64_hook matching the instruction, and if none is found,
-> injects a SIGILL. This mirrors what we do for undefined instruction
-> encodings in do_undefinstr, where we look for an undef_hook matching the
-> instruction, and if none is found, inject a SIGILL.
-> 
-> Over time, new SYS instruction encodings may be allocated. Prior to
-> allocation, exceptions resulting from these would be handled by
-> do_undefinstr, whereas after allocation these may be handled by
-> do_sysintr.
-> 
-> To ensure that we have consistent behaviour if and when this happens, it
-> would be beneficial to have do_sysinstr fall back to do_undefinstr.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Suzuki Poulose <suzuki.poulose@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
+Hi Arnd, Kevin, Olof
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+PLease consider this second round of STi dts update for v4.11 :
+
+The following changes since commit 2016ead446b98c42dffd9b6c03ce813e5cb3b810:
+
+   ARM: dts: STiH407-family: Supply Mailbox properties to delta RProc 
+(2017-01-12 17:23:39 +0100)
+
+are available in the git repository at:
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git 
+tags/sti-dt-for-v4.11-round2
+
+for you to fetch changes up to bda0f85acb1a2a3b670e983607940d6b73b1fc73:
+
+   ARM: dts: STiH407-family: Add missing pwm irq (2017-01-27 17:28:16 +0100)
+
+----------------------------------------------------------------
+STi DT fix:
+
+Add missing interrupt node to properly probe the pwm device.
+
+----------------------------------------------------------------
+Lionel Debieve (1):
+       ARM: dts: STiH407-family: Add missing pwm irq
+
+  arch/arm/boot/dts/stih407-family.dtsi | 1 +
+  1 file changed, 1 insertion(+)
