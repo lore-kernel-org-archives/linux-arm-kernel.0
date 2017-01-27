@@ -1,37 +1,35 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 27 Jan 2017 21:10:30 +0100
-Subject: [linux-sunxi][PATCH 0/3] Enable SPDIF on the Beelink X2
-In-Reply-To: <20170127154808.19229-1-codekipper@gmail.com>
-References: <20170127154808.19229-1-codekipper@gmail.com>
-Message-ID: <20170127201030.mal5c34ctgpwtd6v@lukather>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Fri, 27 Jan 2017 17:10:46 -0300
+Subject: [PATCH] ARM: dts: exynos: Increase MFC left reserved memory region
+ size
+Message-ID: <1485547846-12778-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2017 at 04:48:05PM +0100, codekipper at gmail.com wrote:
-> From: Marcus Cooper <codekipper@gmail.com>
-> 
-> Hi All,
-> 
-> here is the patchset required to get SPDIF working on the Beelink X2
-> which is a H3 based STB.
-> 
-> BR,
-> CK
+The sizes of the MFC reserved memory regions for CMA are 16 MiB for the
+left bank and 8 MiB for the right bank. But this isn't enough to decode
+high resolution videos so increase the size for the left bank to 36 MiB
+which is enough for 1080p (1920x1080).
 
-Merged all three, but this could have been in your earlier patch for
-that board.
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-Thanks,
-Maxime
+---
 
+ arch/arm/boot/dts/exynos-mfc-reserved-memory.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/exynos-mfc-reserved-memory.dtsi b/arch/arm/boot/dts/exynos-mfc-reserved-memory.dtsi
+index f78c14c82e17..25186ac4188d 100644
+--- a/arch/arm/boot/dts/exynos-mfc-reserved-memory.dtsi
++++ b/arch/arm/boot/dts/exynos-mfc-reserved-memory.dtsi
+@@ -17,7 +17,7 @@
+ 		mfc_left: region_mfc_left {
+ 			compatible = "shared-dma-pool";
+ 			no-map;
+-			size = <0x1000000>;
++			size = <0x2400000>;
+ 			alignment = <0x100000>;
+ 		};
+ 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170127/0f157ba3/attachment-0001.sig>
+2.7.4
