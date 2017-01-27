@@ -1,32 +1,45 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 27 Jan 2017 16:59:14 +0100
-Subject: [PATCH v2 7/9] dmaengine: sun6i: allow build on ARM64 platforms
- (sun50i)
-In-Reply-To: <20170126154859.55855-8-icenowy@aosc.xyz>
-References: <20170126154859.55855-1-icenowy@aosc.xyz>
- <20170126154859.55855-8-icenowy@aosc.xyz>
-Message-ID: <20170127155914.fwbssmehlgwf5q7j@lukather>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 27 Jan 2017 17:04:33 +0100
+Subject: [PATCH 2/4] mmc: bcm2835: Add new driver for the internal SD
+ controller.
+In-Reply-To: <CAPDyKFoWyZaRLhuBnFfJupxRnUvq-JWczS7ObjAGat056MCEyw@mail.gmail.com>
+References: <1485516989-1072-1-git-send-email-kraxel@redhat.com>
+ <1485516989-1072-3-git-send-email-kraxel@redhat.com>
+ <CAPDyKFoWyZaRLhuBnFfJupxRnUvq-JWczS7ObjAGat056MCEyw@mail.gmail.com>
+Message-ID: <ec09cd58-6613-82d7-60a9-7a7c2d9ae673@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 11:48:57PM +0800, Icenowy Zheng wrote:
-> As 64-bot Allwinner H5 SoC has the same DMA engine with H3, the DMA
-> driver should be allowed to be built for ARM64, in order to make it work on H5.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+Am 27.01.2017 um 16:27 schrieb Ulf Hansson:
+> On 27 January 2017 at 12:36, Gerd Hoffmann <kraxel@redhat.com> wrote:
+>> From: Eric Anholt <eric@anholt.net>
+>>
+>> The 2835 has two SD controllers:  The Arasan SDHCI controller (supported
+>> by the iproc driver) and a custom SD controller.  This patch adds a
+>> driver for the custom SD controller.
+>>
+>> The custom controller runs faster, and driving the sdcard with the
+>> custom controller also allows to drive the rpi3 wifi with the iproc
+>> driver.
+>>
+> I don't understand this relationship. Is this somewhat configurable in runtime?
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Thanks,
-Maxime
+The configuration is done by devicetree via pin muxing. AFAIK both SD
+controller are available on the same pins (2 pin groups = pin 22 to 27 +
+pin 48 to 53). So it's possible to use both SD controllers at the same
+time with different pin groups. This is necessary to use Wifi via SDIO
+on the RPi 3 while the other controller handles SD card with the rootfs.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170127/5091fa26/attachment.sig>
+>
+> Is the WIFI module a removable SDIO card?
+
+No
+
+>  So you can decide which
+> controller that is best suited to use?
+
+Yes, but it requires also both drivers.
+
+>
+> Kind regards
+> Uffe
