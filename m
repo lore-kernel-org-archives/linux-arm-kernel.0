@@ -1,37 +1,47 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Jan 2017 18:07:47 +0000
-Subject: [PATCH 08/10] perf/core: Add PERF_AUX_FLAG_COLLISION to report
- colliding samples
+Date: Fri, 27 Jan 2017 18:07:49 +0000
+Subject: [PATCH 10/10] dt-bindings: Document devicetree binding for ARM SPE
 In-Reply-To: <1485540470-11469-1-git-send-email-will.deacon@arm.com>
 References: <1485540470-11469-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1485540470-11469-9-git-send-email-will.deacon@arm.com>
+Message-ID: <1485540470-11469-11-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM SPE architecture permits an implementation to ignore a sample
-if the sample is due to be taken whilst another sample is already being
-produced. In this case, it is desirable to report the collision to
-userspace, as they may want to lower the sample period.
+This patch documents the devicetree binding in use for ARM SPE.
 
-This patch adds a PERF_AUX_FLAG_COLLISION flag, so that such events can
-be relayed to userspace.
-
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Rob Herring <robh@kernel.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- include/uapi/linux/perf_event.h | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/arm/spe-pmu.txt | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/spe-pmu.txt
 
-diff --git a/include/uapi/linux/perf_event.h b/include/uapi/linux/perf_event.h
-index c66a485a24ac..68a4e542968e 100644
---- a/include/uapi/linux/perf_event.h
-+++ b/include/uapi/linux/perf_event.h
-@@ -885,6 +885,7 @@ enum perf_callchain_context {
-  */
- #define PERF_AUX_FLAG_TRUNCATED		0x01	/* record was truncated to fit */
- #define PERF_AUX_FLAG_OVERWRITE		0x02	/* snapshot from overwrite mode */
-+#define PERF_AUX_FLAG_COLLISION		0x03	/* sample collided with another */
- 
- #define PERF_FLAG_FD_NO_GROUP		(1UL << 0)
- #define PERF_FLAG_FD_OUTPUT		(1UL << 1)
+diff --git a/Documentation/devicetree/bindings/arm/spe-pmu.txt b/Documentation/devicetree/bindings/arm/spe-pmu.txt
+new file mode 100644
+index 000000000000..93372f2a7df9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/spe-pmu.txt
+@@ -0,0 +1,20 @@
++* ARMv8.2 Statistical Profiling Extension (SPE) Performance Monitor Units (PMU)
++
++ARMv8.2 introduces the optional Statistical Profiling Extension for collecting
++performance sample data using an in-memory trace buffer.
++
++** SPE Required properties:
++
++- compatible : should be one of:
++	       "arm,statistical-profiling-extension-v1"
++
++- interrupts : Exactly 1 PPI must be listed. For heterogeneous systems where
++               SPE is only supported on a subset of the CPUs, please consult
++	       the arm,gic-v3 binding for details on describing a PPI partition.
++
++** Example:
++
++spe-pmu {
++        compatible = "arm,statistical-profiling-extension-v1";
++        interrupts = <GIC_PPI 05 IRQ_TYPE_LEVEL_HIGH &part1>;
++};
 -- 
 2.1.4
