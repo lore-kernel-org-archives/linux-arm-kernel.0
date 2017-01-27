@@ -1,44 +1,30 @@
-From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Fri, 27 Jan 2017 16:20:42 +0100
-Subject: [PATCH] ASoC: mt8173-max98090: remove the call to
- snd_soc_jack_add_pins.
-Message-ID: <20170127152042.7631-1-enric.balletbo@collabora.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 27 Jan 2017 16:27:25 +0100
+Subject: [PATCH 2/4] mmc: bcm2835: Add new driver for the internal SD
+ controller.
+In-Reply-To: <1485516989-1072-3-git-send-email-kraxel@redhat.com>
+References: <1485516989-1072-1-git-send-email-kraxel@redhat.com>
+ <1485516989-1072-3-git-send-email-kraxel@redhat.com>
+Message-ID: <CAPDyKFoWyZaRLhuBnFfJupxRnUvq-JWczS7ObjAGat056MCEyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The snd_soc_card_jack_new function can call snd_soc_jack_add_pins for
-you, so pass directly the pins struct when you create the new jack.
+On 27 January 2017 at 12:36, Gerd Hoffmann <kraxel@redhat.com> wrote:
+> From: Eric Anholt <eric@anholt.net>
+>
+> The 2835 has two SD controllers:  The Arasan SDHCI controller (supported
+> by the iproc driver) and a custom SD controller.  This patch adds a
+> driver for the custom SD controller.
+>
+> The custom controller runs faster, and driving the sdcard with the
+> custom controller also allows to drive the rpi3 wifi with the iproc
+> driver.
+>
 
-Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
----
- sound/soc/mediatek/mt8173/mt8173-max98090.c | 14 ++++----------
- 1 file changed, 4 insertions(+), 10 deletions(-)
+I don't understand this relationship. Is this somewhat configurable in runtime?
 
-diff --git a/sound/soc/mediatek/mt8173/mt8173-max98090.c b/sound/soc/mediatek/mt8173/mt8173-max98090.c
-index 5524a2c..46c8e6a 100644
---- a/sound/soc/mediatek/mt8173/mt8173-max98090.c
-+++ b/sound/soc/mediatek/mt8173/mt8173-max98090.c
-@@ -79,17 +79,11 @@ static int mt8173_max98090_init(struct snd_soc_pcm_runtime *runtime)
- 
- 	/* enable jack detection */
- 	ret = snd_soc_card_jack_new(card, "Headphone", SND_JACK_HEADPHONE,
--				    &mt8173_max98090_jack, NULL, 0);
-+				    &mt8173_max98090_jack,
-+				    mt8173_max98090_jack_pins,
-+				    ARRAY_SIZE(mt8173_max98090_jack_pins));
- 	if (ret) {
--		dev_err(card->dev, "Can't snd_soc_jack_new %d\n", ret);
--		return ret;
--	}
--
--	ret = snd_soc_jack_add_pins(&mt8173_max98090_jack,
--				    ARRAY_SIZE(mt8173_max98090_jack_pins),
--				    mt8173_max98090_jack_pins);
--	if (ret) {
--		dev_err(card->dev, "Can't snd_soc_jack_add_pins %d\n", ret);
-+		dev_err(card->dev, "Can't create a new Jack %d\n", ret);
- 		return ret;
- 	}
- 
--- 
-2.9.3
+Is the WIFI module a removable SDIO card? So you can decide which
+controller that is best suited to use? No?
+
+Kind regards
+Uffe
