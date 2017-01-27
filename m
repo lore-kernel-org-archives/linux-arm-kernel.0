@@ -1,51 +1,39 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 27 Jan 2017 10:15:28 +0100
-Subject: [PATCH v4 1/2] power: reset: add linkstation-reset driver
-In-Reply-To: <CAEQ9gE=+_OMV=J81mCddKsfbSWT3OtAojeg4oBebKg4YjXda=g@mail.gmail.com>
- (Roger Shimizu's message of "Fri, 27 Jan 2017 00:33:07 +0900")
-References: <20161227070611.14852-1-rogershimizu@gmail.com>
- <20170107150451.17912-1-rogershimizu@gmail.com>
- <20170107150451.17912-2-rogershimizu@gmail.com>
- <CAEQ9gEkoKc0Yv+kLYGWgHZZW92u0tW8E9U0eT7ZhAx79yKxzLQ@mail.gmail.com>
- <20170119044327.j3d2rlpn5va3iw37@earth>
- <8760l1zvqs.fsf@free-electrons.com>
- <CAEQ9gE=+_OMV=J81mCddKsfbSWT3OtAojeg4oBebKg4YjXda=g@mail.gmail.com>
-Message-ID: <87o9ysyibz.fsf@free-electrons.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 27 Jan 2017 10:16:52 +0100
+Subject: [PATCH 0/2] memory: atmel-ebi: Fixes
+In-Reply-To: <1485508237-30178-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1485508237-30178-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20170127091652.bwa3tploi66fdyj4@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
- 
- On jeu., janv. 26 2017, Roger Shimizu <rogershimizu@gmail.com> wrote:
-
-> Dear Gregory,
->
-> Thanks for contacting!
->
-> On Fri, Jan 27, 2017 at 12:28 AM, Gregory CLEMENT
-> <gregory.clement@free-electrons.com> wrote:
->>
->> What is te status for your series?
->>
->> Do you plan sending a new version soon?
->
-> I'm still trying/working on it, but seems won't finish it very soon.
-
-OK it is not a problem for me, but just keep in mind that the merge
-window for arm-soc will be close soon.  That means that the dt part
-could be delayed to 4.12.
-
-Gregory
-
-
->
-> Cheers,
-> -- 
-> Roger Shimizu, GMT +9 Tokyo
-> PGP/GPG: 4096R/6C6ACD6417B3ACB1
+On 27/01/2017 at 10:10:35 +0100, Boris Brezillon wrote:
+> Hello,
+> 
+> Here are 2 simple EBI fixes to prepare landing of the Atmel NAND
+> controller driver and bindings rework.
+> 
+> No need to backport them since no one is using the EBI right now.
+> 
+> Nicolas, Alexandre, that'd be great if you could queue it for 4.11
+> since I plan to take the NAND driver rework for 4.12. If that's not
+> possible, I'll probably ask you to let me take these fixes into the
+> NAND tree.
+> 
+> Thanks,
+> 
+> Boris
+> 
+> Boris Brezillon (2):
+>   memory: atmel-ebi: Fix the test to enable generic SMC logic
+>   memory: atmel-ebi: Properly handle multiple reference to the same CS
+> 
+>  drivers/memory/atmel-ebi.c | 48 +++++++++++++++++++++++++++-------------------
+>  1 file changed, 28 insertions(+), 20 deletions(-)
+> 
+Applied, thanks.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
 http://free-electrons.com
