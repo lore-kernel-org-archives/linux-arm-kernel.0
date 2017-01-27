@@ -1,28 +1,30 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 26 Jan 2017 16:14:41 -0800
-Subject: [PATCH 0/2] clk: mediatek: add missing ethernet reset definition
-In-Reply-To: <1485175707-58528-1-git-send-email-john@phrozen.org>
-References: <1485175707-58528-1-git-send-email-john@phrozen.org>
-Message-ID: <20170127001441.GS8801@codeaurora.org>
+Date: Thu, 26 Jan 2017 16:27:50 -0800
+Subject: [PATCH v2] clk: samsung: mark s3c...._clk_sleep_init() as __init
+In-Reply-To: <1485380545-24815-1-git-send-email-martin@kaiser.cx>
+References: <1485293599-23581-1-git-send-email-martin@kaiser.cx>
+ <1485380545-24815-1-git-send-email-martin@kaiser.cx>
+Message-ID: <20170127002750.GC8801@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/23, John Crispin wrote:
-> When the clk code for mt2701 was merged, we forgot to add the reset
-> controller of the ethernet subsystem. This series adds the missing code
-> and header files required to reference the bits from within a devicetree
-> file.
+On 01/25, martin at kaiser.cx wrote:
+> From: Martin Kaiser <martin@kaiser.cx>
 > 
-> John Crispin (2):
->   clk: mediatek: add mt2701 ethernet reset
->   reset: mediatek: Add MT2701 ethsys reset controller include file
+> These functions are referencing s3c...._clk_regs[], which are marked as
+> __initdata. When compiling with CONFIG_DEBUG_SECTION_MISMATCH=y, this
+> produces warnings like
 > 
->  drivers/clk/mediatek/clk-mt2701-eth.c     |    2 ++
->  include/dt-bindings/reset/mt2701-resets.h |    7 +++++++
+> WARNING: vmlinux.o(.text+0x198350):
+> Section mismatch in reference from the function s3c2410_clk_sleep_init()
+> to the (unknown reference) .init.data:(unknown)
+> 
+> Mark the s3c...._clk_sleep_init() functions as __init in
+> order to fix this.
+> 
+> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
 
-Any planned DT users in the next merge window? Should I put this
-into a topic branch? Do you want a clk maintainer ack? At the
-least we need someone like James to ack this first.
+Fixes tag?
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
