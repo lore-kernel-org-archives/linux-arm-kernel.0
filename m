@@ -1,53 +1,41 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 27 Jan 2017 16:41:40 +0000
-Subject: [PATCH] arm64: handle sys and undef traps consistently
-In-Reply-To: <1485533738-30062-1-git-send-email-mark.rutland@arm.com>
-References: <1485533738-30062-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <321fd340-1ab1-f559-4c90-f7c664d3cd33@arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 27 Jan 2017 17:42:01 +0100
+Subject: [PATCH RESEND 2/5] dmaengine: Provide a wrapper for memcpy operations
+In-Reply-To: <1485535324-28393-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1485535324-28393-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1485535324-28393-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/01/17 16:15, Mark Rutland wrote:
-> If an EL0 instruction in the SYS class triggers an exception, do_sysintr
-> looks for a sys64_hook matching the instruction, and if none is found,
-> injects a SIGILL. This mirrors what we do for undefined instruction
-> encodings in do_undefinstr, where we look for an undef_hook matching the
-> instruction, and if none is found, inject a SIGILL.
->
-> Over time, new SYS instruction encodings may be allocated. Prior to
-> allocation, exceptions resulting from these would be handled by
-> do_undefinstr, whereas after allocation these may be handled by
-> do_sysintr.
->
-> To ensure that we have consistent behaviour if and when this happens, it
-> would be beneficial to have do_sysinstr fall back to do_undefinstr.
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Suzuki Poulose <suzuki.poulose@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/kernel/traps.c | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> index 8187229..7c3fc06 100644
-> --- a/arch/arm64/kernel/traps.c
-> +++ b/arch/arm64/kernel/traps.c
-> @@ -531,7 +531,12 @@ asmlinkage void __exception do_sysinstr(unsigned int esr, struct pt_regs *regs)
->  			return;
->  		}
->
-> -	force_signal_inject(SIGILL, ILL_ILLOPC, regs, 0);
-> +	/*
-> +	 * New SYS instructions may previously have been undefined at EL0. Fall
-> +	 * back to our usual undefined instruction handler so that we handle
-> +	 * these consistently.
-> +	 */
-> +	do_undefinstr(regs);
->  }
->
->  long compat_arm_syscall(struct pt_regs *regs);
->
+Almost all ->device_prep_dma_xx() methods have a wrapper defined in
+dmaengine.h. Add one for  ->device_prep_dma_memcpy().
 
-Reviewed-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ include/linux/dmaengine.h | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
+index feee6ec6a13b..533680860865 100644
+--- a/include/linux/dmaengine.h
++++ b/include/linux/dmaengine.h
+@@ -894,6 +894,17 @@ static inline struct dma_async_tx_descriptor *dmaengine_prep_dma_memset(
+ 						    len, flags);
+ }
+ 
++static inline struct dma_async_tx_descriptor *dmaengine_prep_dma_memcpy(
++		struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
++		size_t len, unsigned long flags)
++{
++	if (!chan || !chan->device || !chan->device->device_prep_dma_memcpy)
++		return NULL;
++
++	return chan->device->device_prep_dma_memcpy(chan, dest, src,
++						    len, flags);
++}
++
+ static inline struct dma_async_tx_descriptor *dmaengine_prep_dma_sg(
+ 		struct dma_chan *chan,
+ 		struct scatterlist *dst_sg, unsigned int dst_nents,
+-- 
+2.7.4
