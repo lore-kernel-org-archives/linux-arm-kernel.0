@@ -1,65 +1,59 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 27 Jan 2017 15:15:59 -0600
-Subject: [PATCH 06/11] clk: sunxi-ng: Add A80 USB CCU
-In-Reply-To: <20170124023230.3990-7-wens@csie.org>
-References: <20170124023230.3990-1-wens@csie.org>
- <20170124023230.3990-7-wens@csie.org>
-Message-ID: <20170127211559.ztsauntipyiheopu@rob-hp-laptop>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 27 Jan 2017 22:26:11 +0100
+Subject: [PATCH v4 10/13] arm64: allwinner: a64: Increase the MMC max
+ frequency
+In-Reply-To: <6c6bf169-4b2e-6b55-54db-d21da73a8f6e@heig-vd.ch>
+References: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
+ <dee0dc8e1d98698231738b10fbe79cdf6d5e4c36.1485421557.git-series.maxime.ripard@free-electrons.com>
+ <6c6bf169-4b2e-6b55-54db-d21da73a8f6e@heig-vd.ch>
+Message-ID: <20170127212611.rn2nr4fihshud2qg@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2017 at 10:32:25AM +0800, Chen-Yu Tsai wrote:
-> Add support for the USB clock controls found on the A80.
+On Fri, Jan 27, 2017 at 11:29:53AM +0100, Florian Vaussard wrote:
+> Hi Maxime,
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  .../devicetree/bindings/clock/sun9i-usb.txt        |  24 ++++
->  drivers/clk/sunxi-ng/Makefile                      |   1 +
->  drivers/clk/sunxi-ng/ccu-sun9i-a80-usb.c           | 144 +++++++++++++++++++++
->  drivers/clk/sunxi-ng/ccu-sun9i-a80-usb.h           |  25 ++++
->  include/dt-bindings/clock/sun9i-a80-usb.h          |  59 +++++++++
->  include/dt-bindings/reset/sun9i-a80-usb.h          |  56 ++++++++
->  6 files changed, 309 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/sun9i-usb.txt
->  create mode 100644 drivers/clk/sunxi-ng/ccu-sun9i-a80-usb.c
->  create mode 100644 drivers/clk/sunxi-ng/ccu-sun9i-a80-usb.h
->  create mode 100644 include/dt-bindings/clock/sun9i-a80-usb.h
->  create mode 100644 include/dt-bindings/reset/sun9i-a80-usb.h
+> On 01/26/2017 10:06 AM, Maxime Ripard wrote:
+> > The eMMC controller seem to have a maximum frequency of 200MHz, while the
+> > regular MMC controllers are capped at 150MHz.
+> > 
+> > Since older SoCs cannot go that high, we cannot change the default maximum
+> > frequency, but fortunately for us we have a property for that in the DT.
+> > 
+> > This also has the side effect of allowing to use the MMC HS200 and SD
+> > SDR104 modes for the boards that support it (with either 1.2v or 1.8v IOs).
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > 
+> > arm64: allwinner: a64: Limit MMC0 and MMC1 rates to 150MHz
+> > 
+> > Trying to set the bus to 200MHz on MMC1 when doing SDIO is failing.
+> > Allwinner sets the maximum for this bus to 150MHz, so enforce that limit.
+> > 
+> > This hasn't been tested with MMC0, but the documented limit is the same,
+> > and I expect the behaviour to be the same.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/sun9i-usb.txt b/Documentation/devicetree/bindings/clock/sun9i-usb.txt
-> new file mode 100644
-> index 000000000000..c2d38626eaaa
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/sun9i-usb.txt
-> @@ -0,0 +1,24 @@
-> +Allwinner A80 USB Clock Control Binding
-> +------------------------------------
-> +
-> +Required properties :
-> +- compatible: must contain one of the following compatibles:
-> +		- "allwinner,sun9i-a80-usb-clocks"
-> +
-> +- reg: Must contain the registers base address and length
-> +- clocks: phandle to the clocks feeding the USB subsystem. Two are needed:
-> +  - "bus": the bus clock for the whole USB subsystem
-> +  - "hosc": the high frequency oscillator (usually at 24MHz)
-> +- clock-names: Must contain the clock names described just above
-> +- #clock-cells : must contain 1
-> +- #reset-cells : must contain 1
-> +
-> +Example:
-> +usb_clocks: clock at 00a08000 {
+> I suspect that you are trying to increase your number of Signed-off-by tags by
+> using unfair means :) Otherwise the squashed commit message is probably worth
+> some cleaning.
 
-Drop leading 0s.
+/me hides in a corner...
 
-With that, for the binding:
+The first commit log is the right one, I'll remove the second.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Thanks!
+Maxime
 
-> +	compatible = "allwinner,sun9i-a80-usb-clks";
-> +	reg = <0x00a08000 0x8>;
-> +	clocks = <&ccu CLK_BUS_USB>, <&osc24M>;
-> +	clock-names = "bus", "hosc";
-> +	#clock-cells = <1>;
-> +	#reset-cells = <1>;
-> +};
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170127/75fffc2d/attachment-0001.sig>
