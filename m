@@ -1,42 +1,45 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Fri, 27 Jan 2017 18:21:57 +0100
-Subject: [GIT PULL] STM32 defconfig changes for v4.11 #1
-Message-ID: <a31ac10a-474b-72de-0e28-a3ceaa0c709b@st.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 27 Jan 2017 09:22:25 -0800
+Subject: [PATCH v6 0/5] davinci: VPIF: add DT support
+In-Reply-To: <m2k2aze5xe.fsf@baylibre.com>
+References: <20161207183025.20684-1-khilman@baylibre.com>
+ <d4b0501a-f83a-c8b1-e460-1ba50f68cca7@xs4all.nl>
+ <m2k2aze5xe.fsf@baylibre.com>
+Message-ID: <CAOi56cX362PcE+dS59sGkh-=VMFNv_jaORMbCvxNr+VVUL7-mg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Arnd and Kevin,
+On Fri, Dec 16, 2016 at 4:49 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+> Hans Verkuil <hverkuil@xs4all.nl> writes:
+>
+>> On 07/12/16 19:30, Kevin Hilman wrote:
+>>> Prepare the groundwork for adding DT support for davinci VPIF drivers.
+>>> This series does some fixups/cleanups and then adds the DT binding and
+>>> DT compatible string matching for DT probing.
+>>>
+>>> The controversial part from previous versions around async subdev
+>>> parsing, and specifically hard-coding the input/output routing of
+>>> subdevs, has been left out of this series.  That part can be done as a
+>>> follow-on step after agreement has been reached on the path forward.
+>>> With this version, platforms can still use the VPIF capture/display
+>>> drivers, but must provide platform_data for the subdevs and subdev
+>>> routing.
+>>>
+>>> Tested video capture to memory on da850-lcdk board using composite
+>>> input.
+>>
+>> Other than the comment for the first patch this series looks good.
+>>
+>> So once that's addressed I'll queue it up for 4.11.
+>
+> I've fixed that issue, and sent an update for just that patch in reply
+> to the original.
+>
+> Thanks for the review,
 
-Please consider this first round of STM32 defconfig updates for v4.11:
+Gentle ping on this series.
 
-The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+I'm still not seeing this series yet in linux-next, so am worried it
+might not make it for v4.11.
 
-   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
-
-are available in the git repository at:
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git 
-tags/stm32-defconfig-for-v4.11-1
-
-for you to fetch changes up to 770e96f30cc2e4a363dd8fae2e9028173b1f2af1:
-
-   ARM: configs: stm32: Add RTC support in STM32 defconfig (2017-01-16 
-14:39:49 +0100)
-
-----------------------------------------------------------------
-STM32 defconfig updates for v4.11, round 1.
-
-Highlights:
-----------
-  - Enable ADC
-  - Enable RTC
-
-----------------------------------------------------------------
-Amelie Delaunay (1):
-       ARM: configs: stm32: Add RTC support in STM32 defconfig
-
-Fabrice GASNIER (1):
-       ARM: configs: stm32: enable ADC driver
-
-  arch/arm/configs/stm32_defconfig | 7 +++++++
-  1 file changed, 7 insertions(+)
+Kevin
