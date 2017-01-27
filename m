@@ -1,172 +1,498 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Thu, 26 Jan 2017 16:47:26 -0800
-Subject: [PATCH 3/5] ARM: dts: qcom-msm8974: Add HS usb node and OTG detection
- mechanisms
+Date: Thu, 26 Jan 2017 16:47:27 -0800
+Subject: [PATCH 4/5] ARM: dts: qcom-apq8064: Collapse usb support into one node
 In-Reply-To: <20170127004728.22490-1-stephen.boyd@linaro.org>
 References: <20170127004728.22490-1-stephen.boyd@linaro.org>
-Message-ID: <20170127004728.22490-4-stephen.boyd@linaro.org>
+Message-ID: <20170127004728.22490-5-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This USB controller has two phys, so add them both underneath the
-ULPI bus, but only enable one of them based on the board
-configuration. To get OTG to work, we need to add the id and vbus
-detection info and also populate the regulators for the vbus
-supply.
+We currently have three device nodes for the same USB hardware
+block, as evident by the reuse of the same reg address multiple
+times. Now that the chipidea driver fully supports OTG with the
+MSM wrapper we can collapse the three nodes into one USB device
+node, reflecting the true nature of the hardware.
 
+Since we're here, we also mark the irq trigger flags correctly,
+as IRQ_TYPE_LEVEL_HIGH instead of IRQ_TYPE_NONE.
+
+Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
+Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Cc: Nicolas Dechesne <nicolas.dechesne@linaro.org>
+Cc: John Stultz <john.stultz@linaro.org>
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- arch/arm/boot/dts/qcom-apq8074-dragonboard.dts | 20 +++++++++++
- arch/arm/boot/dts/qcom-msm8974.dtsi            | 49 ++++++++++++++++++++++++++
- arch/arm/boot/dts/qcom-pm8941.dtsi             | 32 ++++++++++++++++-
- 3 files changed, 100 insertions(+), 1 deletion(-)
+ .../arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts |  49 +++----
+ arch/arm/boot/dts/qcom-apq8064-asus-nexus7-flo.dts |  21 +--
+ arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts        |  54 ++++---
+ arch/arm/boot/dts/qcom-apq8064-ifc6410.dts         |  54 ++++---
+ .../arm/boot/dts/qcom-apq8064-sony-xperia-yuga.dts |  16 +--
+ arch/arm/boot/dts/qcom-apq8064.dtsi                | 156 ++++++++++++---------
+ 6 files changed, 170 insertions(+), 180 deletions(-)
 
-diff --git a/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
-index e9ee6dbf81fb..42a95a086c0f 100644
---- a/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
-+++ b/arch/arm/boot/dts/qcom-apq8074-dragonboard.dts
-@@ -57,6 +57,26 @@
- 			};
+diff --git a/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts b/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts
+index 39ae2bc8cb08..eb2d0402c0f8 100644
+--- a/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts
++++ b/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts
+@@ -290,44 +290,37 @@
+ 			target-supply	= <&pm8921_lvs7>;
  		};
  
-+		usb at f9a55000 {
-+			status = "ok";
-+			phys = <&usb_hs2_phy>;
-+			phy-select = <&tcsr 0xb000 1>;
-+			extcon = <&smbb>, <&usb_id>;
-+			vbus-supply = <&chg_otg>;
-+			hnp-disable;
-+			srp-disable;
-+			adp-disable;
+-		/* OTG */
+-		phy at 12500000 {
+-			status		= "okay";
+-			dr_mode		= "peripheral";
+-			vddcx-supply	= <&pm8921_s3>;
+-			v3p3-supply	= <&pm8921_l3>;
+-			v1p8-supply	= <&pm8921_l4>;
+-		};
+-
+-		phy at 12520000 {
+-			status		= "okay";
+-			vddcx-supply	= <&pm8921_s3>;
+-			v3p3-supply	= <&pm8921_l3>;
+-			v1p8-supply	= <&pm8921_l23>;
+-		};
+-
+-		phy at 12530000 {
+-			status		= "okay";
+-			vddcx-supply	= <&pm8921_s3>;
+-			v3p3-supply	= <&pm8921_l3>;
+-			v1p8-supply	= <&pm8921_l23>;
+-		};
+-
+-		gadget at 12500000 {
+-			status = "okay";
+-		};
+-
+-		/* OTG */
+ 		usb at 12500000 {
+ 			status = "okay";
++			dr_mode = "peripheral";
 +			ulpi {
-+				phy at b {
-+					status = "ok";
-+					v3p3-supply = <&pm8941_l24>;
-+					v1p8-supply = <&pm8941_l6>;
-+					extcon = <&smbb>;
-+					qcom,init-seq = /bits/ 8 <0x1 0x63>;
++				phy {
++					v3p3-supply = <&pm8921_l3>;
++					v1p8-supply = <&pm8921_l4>;
 +				};
 +			};
-+		};
-+
- 		pinctrl at fd510000 {
- 			i2c11_pins: i2c11 {
- 				mux {
-diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
-index 6c167c031368..c714c673ea0c 100644
---- a/arch/arm/boot/dts/qcom-msm8974.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
-@@ -511,6 +511,11 @@
- 			reg = <0xfc400000 0x4000>;
  		};
  
-+		tcsr: syscon at fd4a0000 {
-+			compatible = "syscon";
-+			reg = <0xfd4a0000 0x10000>;
-+		};
-+
- 		tcsr_mutex_block: syscon at fd484000 {
- 			compatible = "syscon";
- 			reg = <0xfd484000 0x2000>;
-@@ -618,6 +623,50 @@
+ 		usb at 12520000 {
+ 			status = "okay";
++			dr_mode = "otg";
++			ulpi {
++				phy {
++					v3p3-supply = <&pm8921_l3>;
++					v1p8-supply = <&pm8921_l23>;
++				};
++			};
+ 		};
+ 
+ 		usb at 12530000 {
+ 			status = "okay";
++			dr_mode = "otg";
++			ulpi {
++				phy {
++					v3p3-supply = <&pm8921_l3>;
++					v1p8-supply = <&pm8921_l23>;
++				};
++			};
+ 		};
+ 
+ 		amba {
+diff --git a/arch/arm/boot/dts/qcom-apq8064-asus-nexus7-flo.dts b/arch/arm/boot/dts/qcom-apq8064-asus-nexus7-flo.dts
+index e39440a86739..e5fef32342da 100644
+--- a/arch/arm/boot/dts/qcom-apq8064-asus-nexus7-flo.dts
++++ b/arch/arm/boot/dts/qcom-apq8064-asus-nexus7-flo.dts
+@@ -320,22 +320,15 @@
  			};
  		};
  
-+		otg: usb at f9a55000 {
+-		/* OTG */
+-		phy at 12500000 {
+-			status		= "okay";
+-			vddcx-supply	= <&pm8921_s3>;
+-			v3p3-supply	= <&pm8921_l3>;
+-			v1p8-supply	= <&pm8921_l4>;
+-			dr_mode		= "otg";
+-		};
+-
+-		gadget at 12500000 {
+-			status = "okay";
+-		};
+-
+-		/* OTG */
+ 		usb at 12500000 {
+ 			status = "okay";
++			dr_mode = "otg";
++			ulpi {
++				phy {
++					v3p3-supply = <&pm8921_l3>;
++					v1p8-supply = <&pm8921_l4>;
++				};
++			};
+ 		};
+ 
+ 		amba {
+diff --git a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
+index 35f1d46edded..d7362033a91b 100644
+--- a/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
++++ b/arch/arm/boot/dts/qcom-apq8064-cm-qs600.dts
+@@ -149,43 +149,37 @@
+ 			};
+ 		};
+ 
+-		/* OTG */
+-		usb1_phy: phy at 12500000 {
+-			status		= "okay";
+-			vddcx-supply	= <&pm8921_s3>;
+-			v3p3-supply	= <&pm8921_l3>;
+-			v1p8-supply	= <&pm8921_l4>;
+-		};
+-
+-		usb3_phy: phy at 12520000 {
+-			status		= "okay";
+-			vddcx-supply	= <&pm8921_s3>;
+-			v3p3-supply	= <&pm8921_l3>;
+-			v1p8-supply	= <&pm8921_l23>;
+-		};
+-
+-		usb4_phy: phy at 12530000 {
+-			status		= "okay";
+-			vddcx-supply	= <&pm8921_s3>;
+-			v3p3-supply	= <&pm8921_l3>;
+-			v1p8-supply	= <&pm8921_l23>;
+-		};
+-
+-		gadget1: gadget at 12500000 {
+-			status = "ok";
+-		};
+-
+-		/* OTG */
+-		usb1: usb at 12500000 {
++		usb at 12500000 {
+ 			status = "ok";
++			dr_mode = "otg";
++			ulpi {
++				phy {
++					v3p3-supply = <&pm8921_l3>;
++					v1p8-supply = <&pm8921_l4>;
++				};
++			};
+ 		};
+ 
+-		usb3: usb at 12520000 {
++		usb at 12520000 {
+ 			status = "okay";
++			dr_mode = "host";
++			ulpi {
++				phy {
++					v3p3-supply = <&pm8921_l3>;
++					v1p8-supply = <&pm8921_l23>;
++				};
++			};
+ 		};
+ 
+-		usb4: usb at 12530000 {
++		usb at 12530000 {
+ 			status = "okay";
++			dr_mode = "host";
++			ulpi {
++				phy {
++					v3p3-supply = <&pm8921_l3>;
++					v1p8-supply = <&pm8921_l23>;
++				};
++			};
+ 		};
+ 
+ 		/* on board fixed 3.3v supply */
+diff --git a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+index 3d37cab3b9a9..ec0b16fc48a1 100644
+--- a/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
++++ b/arch/arm/boot/dts/qcom-apq8064-ifc6410.dts
+@@ -262,43 +262,37 @@
+ 			target-supply	= <&pm8921_s4>;
+ 		};
+ 
+-		/* OTG */
+-		usb1_phy: phy at 12500000 {
+-			status		= "okay";
+-			vddcx-supply	= <&pm8921_s3>;
+-			v3p3-supply	= <&pm8921_l3>;
+-			v1p8-supply	= <&pm8921_l4>;
+-		};
+-
+-		usb3_phy: phy at 12520000 {
+-			status		= "okay";
+-			vddcx-supply	= <&pm8921_s3>;
+-			v3p3-supply	= <&pm8921_l3>;
+-			v1p8-supply	= <&pm8921_l23>;
+-		};
+-
+-		usb4_phy: phy at 12530000 {
+-			status		= "okay";
+-			vddcx-supply	= <&pm8921_s3>;
+-			v3p3-supply	= <&pm8921_l3>;
+-			v1p8-supply	= <&pm8921_l23>;
+-		};
+-
+-		gadget1: gadget at 12500000 {
+-			status = "okay";
+-		};
+-
+-		/* OTG */
+-		usb1: usb at 12500000 {
++		usb at 12500000 {
+ 			status = "okay";
++			dr_mode = "otg";
++			ulpi {
++				phy {
++					v3p3-supply = <&pm8921_l3>;
++					v1p8-supply = <&pm8921_l4>;
++				};
++			};
+ 		};
+ 
+-		usb3: usb at 12520000 {
++		usb at 12520000 {
+ 			status = "okay";
++			dr_mode = "host";
++			ulpi {
++				phy {
++					v3p3-supply = <&pm8921_l3>;
++					v1p8-supply = <&pm8921_l23>;
++				};
++			};
+ 		};
+ 
+-		usb4: usb at 12530000 {
++		usb at 12530000 {
+ 			status = "okay";
++			dr_mode = "host";
++			ulpi {
++				phy {
++					v3p3-supply = <&pm8921_l3>;
++					v1p8-supply = <&pm8921_l23>;
++				};
++			};
+ 		};
+ 
+ 		pci at 1b500000 {
+diff --git a/arch/arm/boot/dts/qcom-apq8064-sony-xperia-yuga.dts b/arch/arm/boot/dts/qcom-apq8064-sony-xperia-yuga.dts
+index ebd675ca94b4..e9083542d383 100644
+--- a/arch/arm/boot/dts/qcom-apq8064-sony-xperia-yuga.dts
++++ b/arch/arm/boot/dts/qcom-apq8064-sony-xperia-yuga.dts
+@@ -349,15 +349,15 @@
+ 			};
+ 		};
+ 
+-		phy at 12500000 {
+-			status		= "okay";
+-			vddcx-supply	= <&pm8921_s3>;
+-			v3p3-supply	= <&pm8921_l3>;
+-			v1p8-supply	= <&pm8921_l4>;
+-		};
+-
+-		gadget at 12500000 {
++		usb at 12500000 {
+ 			status = "okay";
++			dr_mode = "otg";
++			ulpi {
++				phy {
++					v3p3-supply = <&pm8921_l3>;
++					v1p8-supply = <&pm8921_l4>;
++				};
++			};
+ 		};
+ 
+ 		gsbi at 1a200000 {
+diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+index 268bd470c865..07b41b41f9ce 100644
+--- a/arch/arm/boot/dts/qcom-apq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+@@ -179,7 +179,7 @@
+ 	};
+ 
+ 	clocks {
+-		cxo_board {
++		cxo_board: cxo_board {
+ 			compatible = "fixed-clock";
+ 			#clock-cells = <0>;
+ 			clock-frequency = <19200000>;
+@@ -191,7 +191,7 @@
+ 			clock-frequency = <27000000>;
+ 		};
+ 
+-		sleep_clk {
++		sleep_clk: sleep_clk {
+ 			compatible = "fixed-clock";
+ 			#clock-cells = <0>;
+ 			clock-frequency = <32768>;
+@@ -848,81 +848,97 @@
+ 			};
+ 		};
+ 
+-		usb1_phy: phy at 12500000 {
+-			compatible	= "qcom,usb-otg-ci";
+-			reg		= <0x12500000 0x400>;
+-			interrupts	= <GIC_SPI 100 IRQ_TYPE_NONE>;
+-			status		= "disabled";
+-
+-			clocks		= <&gcc USB_HS1_XCVR_CLK>,
+-					  <&gcc USB_HS1_H_CLK>;
+-			clock-names	= "core", "iface";
+-
+-			resets		= <&gcc USB_HS1_RESET>;
+-			reset-names	= "link";
+-		};
+-
+-		usb3_phy: phy at 12520000 {
+-			compatible	= "qcom,usb-otg-ci";
+-			reg		= <0x12520000 0x400>;
+-			interrupts	= <GIC_SPI 188 IRQ_TYPE_NONE>;
+-			status		= "disabled";
+-			dr_mode		= "host";
+-
+-			clocks		= <&gcc USB_HS3_XCVR_CLK>,
+-					  <&gcc USB_HS3_H_CLK>;
+-			clock-names	= "core", "iface";
+-
+-			resets		= <&gcc USB_HS3_RESET>;
+-			reset-names	= "link";
+-		};
+-
+-		usb4_phy: phy at 12530000 {
+-			compatible	= "qcom,usb-otg-ci";
+-			reg		= <0x12530000 0x400>;
+-			interrupts	= <GIC_SPI 215 IRQ_TYPE_NONE>;
+-			status		= "disabled";
+-			dr_mode		= "host";
+-
+-			clocks		= <&gcc USB_HS4_XCVR_CLK>,
+-					  <&gcc USB_HS4_H_CLK>;
+-			clock-names	= "core", "iface";
+-
+-			resets		= <&gcc USB_HS4_RESET>;
+-			reset-names	= "link";
+-		};
+-
+-		gadget1: gadget at 12500000 {
+-			compatible	= "qcom,ci-hdrc";
+-			reg		= <0x12500000 0x400>;
+-			status		= "disabled";
+-			dr_mode		= "peripheral";
+-			interrupts	= <GIC_SPI 100 IRQ_TYPE_NONE>;
+-			usb-phy		= <&usb1_phy>;
+-		};
+-
+ 		usb1: usb at 12500000 {
+-			compatible	= "qcom,ehci-host";
+-			reg		= <0x12500000 0x400>;
+-			interrupts	= <GIC_SPI 100 IRQ_TYPE_NONE>;
+-			status		= "disabled";
+-			usb-phy		= <&usb1_phy>;
 +			compatible = "qcom,ci-hdrc";
-+			reg = <0xf9a55000 0x200>,
-+			      <0xf9a55200 0x200>;
-+			interrupts = <GIC_SPI 134 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&gcc GCC_USB_HS_AHB_CLK>,
-+				 <&gcc GCC_USB_HS_SYSTEM_CLK>;
-+			clock-names = "iface", "core";
-+			assigned-clocks = <&gcc GCC_USB_HS_SYSTEM_CLK>;
-+			assigned-clock-rates = <75000000>;
-+			resets = <&gcc GCC_USB_HS_BCR>;
++			reg = <0x12500000 0x200>,
++			      <0x12500200 0x200>;
++			interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&gcc USB_HS1_XCVR_CLK>, <&gcc USB_HS1_H_CLK>;
++			clock-names = "core", "iface";
++			assigned-clocks = <&gcc USB_HS1_XCVR_CLK>;
++			assigned-clock-rates = <60000000>;
++			resets = <&gcc USB_HS1_RESET>;
 +			reset-names = "core";
 +			phy_type = "ulpi";
-+			dr_mode = "otg";
 +			ahb-burst-config = <0>;
++			phys = <&usb_hs1_phy>;
 +			phy-names = "usb-phy";
 +			status = "disabled";
 +			#reset-cells = <1>;
 +
 +			ulpi {
-+				usb_hs1_phy: phy at a {
-+					compatible = "qcom,usb-hs-phy-msm8974",
++				usb_hs1_phy: phy {
++					compatible = "qcom,usb-hs-phy-apq8064",
 +						     "qcom,usb-hs-phy";
 +					#phy-cells = <0>;
-+					clocks = <&xo_board>, <&gcc GCC_USB2A_PHY_SLEEP_CLK>;
-+					clock-names = "ref", "sleep";
-+					resets = <&gcc GCC_USB2A_PHY_BCR>, <&otg 0>;
-+					reset-names = "phy", "por";
-+					status = "disabled";
++					clocks = <&sleep_clk>, <&cxo_board>;
++					clock-names = "sleep", "ref";
++					resets = <&usb1 0>;
++					reset-names = "por";
 +				};
++			};
+ 		};
+ 
+ 		usb3: usb at 12520000 {
+-			compatible	= "qcom,ehci-host";
+-			reg		= <0x12520000 0x400>;
+-			interrupts	= <GIC_SPI 188 IRQ_TYPE_NONE>;
+-			status		= "disabled";
+-			usb-phy		= <&usb3_phy>;
++			compatible = "qcom,ci-hdrc";
++			reg = <0x12520000 0x200>,
++			      <0x12520200 0x200>;
++			interrupts = <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&gcc USB_HS3_XCVR_CLK>, <&gcc USB_HS3_H_CLK>;
++			clock-names = "core", "iface";
++			assigned-clocks = <&gcc USB_HS3_XCVR_CLK>;
++			assigned-clock-rates = <60000000>;
++			resets = <&gcc USB_HS3_RESET>;
++			reset-names = "core";
++			phy_type = "ulpi";
++			ahb-burst-config = <0>;
++			phys = <&usb_hs3_phy>;
++			phy-names = "usb-phy";
++			status = "disabled";
++			#reset-cells = <1>;
 +
-+				usb_hs2_phy: phy at b {
-+					compatible = "qcom,usb-hs-phy-msm8974",
++			ulpi {
++				usb_hs3_phy: phy {
++					compatible = "qcom,usb-hs-phy-apq8064",
 +						     "qcom,usb-hs-phy";
 +					#phy-cells = <0>;
-+					clocks = <&xo_board>, <&gcc GCC_USB2B_PHY_SLEEP_CLK>;
-+					clock-names = "ref", "sleep";
-+					resets = <&gcc GCC_USB2B_PHY_BCR>, <&otg 1>;
-+					reset-names = "phy", "por";
-+					status = "disabled";
++					clocks = <&sleep_clk>, <&cxo_board>;
++					clock-names = "sleep", "ref";
++					resets = <&usb3 0>;
++					reset-names = "por";
 +				};
 +			};
-+		};
-+
- 		rng at f9bff000 {
- 			compatible = "qcom,prng";
- 			reg = <0xf9bff000 0x200>;
-diff --git a/arch/arm/boot/dts/qcom-pm8941.dtsi b/arch/arm/boot/dts/qcom-pm8941.dtsi
-index 6b16b296f0fa..3fc9f34f45bb 100644
---- a/arch/arm/boot/dts/qcom-pm8941.dtsi
-+++ b/arch/arm/boot/dts/qcom-pm8941.dtsi
-@@ -26,7 +26,14 @@
- 			bias-pull-up;
  		};
  
--		charger at 1000 {
-+		usb_id: misc at 900 {
-+			compatible = "qcom,pm8941-misc";
-+			reg = <0x900>;
-+			interrupts = <0x0 0x9 0 IRQ_TYPE_EDGE_BOTH>;
-+			interrupt-names = "usb_id";
-+		};
+ 		usb4: usb at 12530000 {
+-			compatible	= "qcom,ehci-host";
+-			reg		= <0x12530000 0x400>;
+-			interrupts	= <GIC_SPI 215 IRQ_TYPE_NONE>;
+-			status		= "disabled";
+-			usb-phy		= <&usb4_phy>;
++			compatible = "qcom,ci-hdrc";
++			reg = <0x12530000 0x200>,
++			      <0x12530200 0x200>;
++			interrupts = <GIC_SPI 215 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&gcc USB_HS4_XCVR_CLK>, <&gcc USB_HS4_H_CLK>;
++			clock-names = "core", "iface";
++			assigned-clocks = <&gcc USB_HS4_XCVR_CLK>;
++			assigned-clock-rates = <60000000>;
++			resets = <&gcc USB_HS4_RESET>;
++			reset-names = "core";
++			phy_type = "ulpi";
++			ahb-burst-config = <0>;
++			phys = <&usb_hs4_phy>;
++			phy-names = "usb-phy";
++			status = "disabled";
++			#reset-cells = <1>;
 +
-+		smbb: charger at 1000 {
- 			compatible = "qcom,pm8941-charger";
- 			reg = <0x1000>;
- 			interrupts = <0x0 0x10 7 IRQ_TYPE_EDGE_BOTH>,
-@@ -175,5 +182,28 @@
- 
- 			status = "disabled";
++			ulpi {
++				usb_hs4_phy: phy {
++					compatible = "qcom,usb-hs-phy-apq8064",
++						     "qcom,usb-hs-phy";
++					#phy-cells = <0>;
++					clocks = <&sleep_clk>, <&cxo_board>;
++					clock-names = "sleep", "ref";
++					resets = <&usb4 0>;
++					reset-names = "por";
++				};
++			};
  		};
-+
-+		regulators {
-+			compatible = "qcom,pm8941-regulators";
-+			interrupts = <0x1 0x83 0x2 0>, <0x1 0x84 0x2 0>;
-+			interrupt-names = "ocp-5vs1", "ocp-5vs2";
-+			vin_5vs-supply = <&pm8941_5v>;
-+
-+			pm8941_5v: s4 {
-+				regulator-min-microvolt = <5000000>;
-+				regulator-max-microvolt = <5000000>;
-+				regulator-enable-ramp-delay = <500>;
-+			};
-+
-+			pm8941_5vs1: 5vs1 {
-+				regulator-enable-ramp-delay = <1000>;
-+				regulator-pull-down;
-+				regulator-over-current-protection;
-+				qcom,ocp-max-retries = <10>;
-+				qcom,ocp-retry-delay = <30>;
-+				qcom,vs-soft-start-strength = <0>;
-+				regulator-initial-mode = <1>;
-+			};
-+		};
- 	};
- };
+ 
+ 		sata_phy0: phy at 1b400000 {
 -- 
 2.10.0.297.gf6727b0
