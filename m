@@ -1,174 +1,85 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Fri, 27 Jan 2017 09:18:07 +0100
-Subject: [PATCH v11 5/8] arm/arm64: vgic: Introduce VENG0 and VENG1 fields
- to vmcr struct
-In-Reply-To: <1485440453-10597-6-git-send-email-vijay.kilari@gmail.com>
-References: <1485440453-10597-1-git-send-email-vijay.kilari@gmail.com>
- <1485440453-10597-6-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <a557593f-9e95-dc00-6531-872d4e6cc3e7@redhat.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 27 Jan 2017 09:20:17 +0100
+Subject: [PATCH 08/22] power: supply: add AC power supply driver for
+ AXP20X and AXP22X PMICs
+In-Reply-To: <6a3edb64-8ea9-cb14-b826-d6e8e2c4c4b7@free-electrons.com>
+References: <20170102163723.7939-1-quentin.schulz@free-electrons.com>
+ <20170102163723.7939-9-quentin.schulz@free-electrons.com>
+ <20170117030013.g5xhlmrxpthyfewa@earth>
+ <6a3edb64-8ea9-cb14-b826-d6e8e2c4c4b7@free-electrons.com>
+Message-ID: <20170127082017.ffvybk237ku2n5hu@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 26/01/2017 15:20, vijay.kilari at gmail.com wrote:
-> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+On Thu, Jan 26, 2017 at 02:32:21PM +0100, Quentin Schulz wrote:
+> I've come with this solution:
 > 
-> ICC_VMCR_EL2 supports virtual access to ICC_IGRPEN1_EL1.Enable
-> and ICC_IGRPEN0_EL1.Enable fields. Add grpen0 and grpen1 member
-> variables to struct vmcr to support read and write of these fields.
+> ------------------------------------------------------------------------
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index 012c064..117eacb 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -882,7 +882,7 @@ EXPORT_SYMBOL(axp20x_match_device);
 > 
-> Also refactor vgic_set_vmcr and vgic_get_vmcr() code.
-> Drop ICH_VMCR_CTLR_SHIFT and ICH_VMCR_CTLR_MASK macros and instead
-> use ICH_VMCR_EOI* and ICH_VMCR_CBPR* macros.
+>  int axp20x_device_probe(struct axp20x_dev *axp20x)
+>  {
+> -	int ret;
+> +	int ret, irq_base;
 > 
-> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-
-Thanks
-
-Eric
-> ---
->  include/linux/irqchip/arm-gic-v3.h |  2 --
->  virt/kvm/arm/vgic/vgic-mmio-v2.c   | 16 ----------------
->  virt/kvm/arm/vgic/vgic-mmio.c      | 16 ++++++++++++++++
->  virt/kvm/arm/vgic/vgic-v3.c        | 20 ++++++++++++++++++--
->  virt/kvm/arm/vgic/vgic.h           |  5 +++++
->  5 files changed, 39 insertions(+), 20 deletions(-)
-> 
-> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-> index 7f6d904..170e00a 100644
-> --- a/include/linux/irqchip/arm-gic-v3.h
-> +++ b/include/linux/irqchip/arm-gic-v3.h
-> @@ -404,8 +404,6 @@
->  #define ICH_HCR_EN			(1 << 0)
->  #define ICH_HCR_UIE			(1 << 1)
->  
-> -#define ICH_VMCR_CTLR_SHIFT		0
-> -#define ICH_VMCR_CTLR_MASK		(0x21f << ICH_VMCR_CTLR_SHIFT)
->  #define ICH_VMCR_CBPR_SHIFT		4
->  #define ICH_VMCR_CBPR_MASK		(1 << ICH_VMCR_CBPR_SHIFT)
->  #define ICH_VMCR_EOIM_SHIFT		9
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> index fa68dd4..a3ad7ff 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> @@ -213,22 +213,6 @@ static void vgic_mmio_write_sgipends(struct kvm_vcpu *vcpu,
+>  	ret = regmap_add_irq_chip(axp20x->regmap, axp20x->irq,
+>  				  IRQF_ONESHOT | IRQF_SHARED, -1,
+> @@ -893,8 +893,9 @@ int axp20x_device_probe(struct axp20x_dev *axp20x)
+>  		return ret;
 >  	}
->  }
->  
-> -static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
-> -{
-> -	if (kvm_vgic_global_state.type == VGIC_V2)
-> -		vgic_v2_set_vmcr(vcpu, vmcr);
-> -	else
-> -		vgic_v3_set_vmcr(vcpu, vmcr);
-> -}
-> -
-> -static void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
-> -{
-> -	if (kvm_vgic_global_state.type == VGIC_V2)
-> -		vgic_v2_get_vmcr(vcpu, vmcr);
-> -	else
-> -		vgic_v3_get_vmcr(vcpu, vmcr);
-> -}
-> -
->  #define GICC_ARCH_VERSION_V2	0x2
->  
->  /* These are for userland accesses only, there is no guest-facing emulation. */
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-> index 746c8af..1d1886e 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
-> @@ -385,6 +385,22 @@ static int match_region(const void *key, const void *elt)
->  		       sizeof(region[0]), match_region);
->  }
->  
-> +void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
-> +{
-> +	if (kvm_vgic_global_state.type == VGIC_V2)
-> +		vgic_v2_set_vmcr(vcpu, vmcr);
-> +	else
-> +		vgic_v3_set_vmcr(vcpu, vmcr);
-> +}
-> +
-> +void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
-> +{
-> +	if (kvm_vgic_global_state.type == VGIC_V2)
-> +		vgic_v2_get_vmcr(vcpu, vmcr);
-> +	else
-> +		vgic_v3_get_vmcr(vcpu, vmcr);
-> +}
-> +
->  /*
->   * kvm_mmio_read_buf() returns a value in a format where it can be converted
->   * to a byte array and be directly observed as the guest wanted it to appear
-> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> index 679ba93..42ff9c9 100644
-> --- a/virt/kvm/arm/vgic/vgic-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> @@ -175,10 +175,18 @@ void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
->  {
->  	u32 vmcr;
->  
-> -	vmcr  = (vmcrp->ctlr << ICH_VMCR_CTLR_SHIFT) & ICH_VMCR_CTLR_MASK;
-> +	/*
-> +	 * Ignore the FIQen bit, because GIC emulation always implies
-> +	 * SRE=1 which means the vFIQEn bit is also RES1.
-> +	 */
-> +	vmcr = ((vmcrp->ctlr >> ICC_CTLR_EL1_EOImode_SHIFT) <<
-> +		 ICH_VMCR_EOIM_SHIFT) & ICH_VMCR_EOIM_MASK;
-> +	vmcr |= (vmcrp->ctlr << ICH_VMCR_CBPR_SHIFT) & ICH_VMCR_CBPR_MASK;
->  	vmcr |= (vmcrp->abpr << ICH_VMCR_BPR1_SHIFT) & ICH_VMCR_BPR1_MASK;
->  	vmcr |= (vmcrp->bpr << ICH_VMCR_BPR0_SHIFT) & ICH_VMCR_BPR0_MASK;
->  	vmcr |= (vmcrp->pmr << ICH_VMCR_PMR_SHIFT) & ICH_VMCR_PMR_MASK;
-> +	vmcr |= (vmcrp->grpen0 << ICH_VMCR_ENG0_SHIFT) & ICH_VMCR_ENG0_MASK;
-> +	vmcr |= (vmcrp->grpen1 << ICH_VMCR_ENG1_SHIFT) & ICH_VMCR_ENG1_MASK;
->  
->  	vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr = vmcr;
->  }
-> @@ -187,10 +195,18 @@ void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
->  {
->  	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr;
->  
-> -	vmcrp->ctlr = (vmcr & ICH_VMCR_CTLR_MASK) >> ICH_VMCR_CTLR_SHIFT;
-> +	/*
-> +	 * Ignore the FIQen bit, because GIC emulation always implies
-> +	 * SRE=1 which means the vFIQEn bit is also RES1.
-> +	 */
-> +	vmcrp->ctlr = ((vmcr >> ICH_VMCR_EOIM_SHIFT) <<
-> +			ICC_CTLR_EL1_EOImode_SHIFT) & ICC_CTLR_EL1_EOImode_MASK;
-> +	vmcrp->ctlr |= (vmcr & ICH_VMCR_CBPR_MASK) >> ICH_VMCR_CBPR_SHIFT;
->  	vmcrp->abpr = (vmcr & ICH_VMCR_BPR1_MASK) >> ICH_VMCR_BPR1_SHIFT;
->  	vmcrp->bpr  = (vmcr & ICH_VMCR_BPR0_MASK) >> ICH_VMCR_BPR0_SHIFT;
->  	vmcrp->pmr  = (vmcr & ICH_VMCR_PMR_MASK) >> ICH_VMCR_PMR_SHIFT;
-> +	vmcrp->grpen0 = (vmcr & ICH_VMCR_ENG0_MASK) >> ICH_VMCR_ENG0_SHIFT;
-> +	vmcrp->grpen1 = (vmcr & ICH_VMCR_ENG1_MASK) >> ICH_VMCR_ENG1_SHIFT;
->  }
->  
->  #define INITIAL_PENDBASER_VALUE						  \
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index 4505fd4..ecfe1a6 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -65,6 +65,9 @@ struct vgic_vmcr {
->  	u32	abpr;
->  	u32	bpr;
->  	u32	pmr;
-> +	/* Below member variable are valid only for GICv3 */
-> +	u32	grpen0;
-> +	u32	grpen1;
->  };
->  
->  struct vgic_reg_attr {
-> @@ -137,6 +140,8 @@ int vgic_v3_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
->  int vgic_v3_redist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
->  			 int offset, u32 *val);
->  int kvm_register_vgic_device(unsigned long type);
-> +void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-> +void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
->  int vgic_lazy_init(struct kvm *kvm);
->  int vgic_init(struct kvm *kvm);
->  
 > 
+> +	irq_base = regmap_irq_chip_get_base(axp20x->regmap_irqc);
+>  	ret = mfd_add_devices(axp20x->dev, -1, axp20x->cells,
+> -			      axp20x->nr_cells, NULL, 0, NULL);
+> +			      axp20x->nr_cells, NULL, irq_base, NULL);
+> 
+>  	if (ret) {
+>  		dev_err(axp20x->dev, "failed to add MFD devices: %d\n", ret);
+> ------------------------------------------------------------------------
+> 
+> However, this implies that all cells added by the mfd driver which are
+> requesting irqs will need to be changed in the same commit to remove the
+> regmap_irq_get_virq calls. If we don't modify the drivers, they will
+> purely fail to request the irqs.
+> 
+> The impacted drivers are the following:
+> 
+>  - drivers/extcon/extcon-axp288.c
+>  - drivers/input/misc/axp20x-pek.c
+>  - drivers/power/supply/axp20x_usb_power.c
+>  - drivers/power/supply/axp288_charger.c
+>  - drivers/power/supply/axp288_fuel_gauge.c
+> 
+> Is it really worth to do such a cleanup?
+
+Yes. The current behaviour goes against what everyone is expecting
+from the API.
+
+> I'm assuming that impacting four different subsystems at the same
+> time might require a bit of time to make the patch into the
+> kernel. I don't see also another way than doing one single patch for
+> all changes since the changes in the mfd driver will break all
+> aforementioned drivers.
+
+However, I think that can be fixed in a later, independant serie. This
+serie is quite big already and this has been long overdue, so I'd
+really like not to delay it once again because of a dependency on a
+cross-tree cleanup.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170127/88602689/attachment.sig>
