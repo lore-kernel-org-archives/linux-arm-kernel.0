@@ -1,41 +1,26 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 Jan 2017 09:45:06 +0000
-Subject: [PATCH v11 0/8] arm/arm64: vgic: Implement API for vGICv3 live
- migration
-In-Reply-To: <20170126202640.GD15850@cbox>
-References: <1485440453-10597-1-git-send-email-vijay.kilari@gmail.com>
- <20170126202640.GD15850@cbox>
-Message-ID: <9fea1713-7087-7052-5ca6-d9257a6f973a@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Jan 2017 09:53:24 +0000
+Subject: [PATCH v2] arm64: dma-mapping: Fix dma_mapping_error() when
+ bypassing SWIOTLB
+In-Reply-To: <18eae1fb-4a3c-c230-4491-8d376468975c@arm.com>
+References: <20170124225200.a7qioswpxzh6agvd@raspberrypi-2.musicnaut.iki.fi>
+ <840027acb4750542003dff17b4a8902ba8972754.1485368348.git.robin.murphy@arm.com>
+ <20170126125249.GG14167@arm.com>
+ <18eae1fb-4a3c-c230-4491-8d376468975c@arm.com>
+Message-ID: <20170127095324.GB21144@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/01/17 20:26, Christoffer Dall wrote:
-> Hi Vijaya,
+On Thu, Jan 26, 2017 at 03:20:47PM +0000, Robin Murphy wrote:
+> On 26/01/17 12:52, Will Deacon wrote:
+> > 3. We bite the bullet and implement some non-swiotlb DMA ops for the case
+> >    when SWIOTLB is not used.
 > 
-> On Thu, Jan 26, 2017 at 07:50:45PM +0530, vijay.kilari at gmail.com wrote:
->> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
->>
->> This patchset adds API for saving and restoring
->> of VGICv3 registers to support live migration with new vgic feature.
->> This API definition is as per version of VGICv3 specification
->> Documentation/virtual/kvm/devices/arm-vgic-v3.txt
->>
->> The patch 3 & 4 are picked from the Pavel's previous implementation.
->> http://www.spinics.net/lists/kvm/msg122040.html
->>
->> NOTE: Only compilation tested for AArch32. No hardware available to test.
-> 
-> Thanks for the respin.  I've given this a once-over and tested on GICv2
-> against migrations and on GICv3 for this functionality, and it looks
-> good.
-> 
-> It would be good to see a soon respin of the QEMU series as well.
-> 
-> Marc, unless others have objections to this series, I think we can queue
-> this series.
+> I'd already started thinking along those lines in the process of writing
+> this patch - I'm happy to take that on, although it might be a wee bit
+> tight for 4.11 now.
 
-Yup, I'll queue it on top. Thanks everyone for sticking with this series.
+Ok, so I've merged this patch as-is for 4.11 because it is an improvement
+over what we had before. Let's look at using separate ops in the long run.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Will
