@@ -1,102 +1,40 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat, 28 Jan 2017 01:02:24 +0800
-Subject: [PATCH 3/3] MAINTAINERS: Update AT91 entries
-In-Reply-To: <20170127170046.gy3mjsf3hwy5fpfq@piout.net>
-References: <20170127162842.706-1-alexandre.belloni@free-electrons.com>
- <20170127162842.706-3-alexandre.belloni@free-electrons.com>
- <6ad97c20-07ed-0639-9fdb-968946ef943d@atmel.com>
- <A7BBC2CE-1428-421F-AA98-F2B0C0373B05@jcrosoft.com>
- <20170127170046.gy3mjsf3hwy5fpfq@piout.net>
-Message-ID: <A2F6C26B-ABDA-4DAC-94A0-56E27052C2BF@jcrosoft.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 27 Jan 2017 18:06:53 +0100
+Subject: [GIT PULL] ARM: mvebu: soc for v4.11 (#1)
+Message-ID: <87mvecwhxu.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-> On Jan 28, 2017, at 1:00 AM, Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
-> 
-> On 28/01/2017 at 00:51:13 +0800, Jean-Christophe Plagniol-Villard wrote:
->> 	this does not mean I do not follow the ML
->> 
-> 
-> That's not what I'm implying. Many people are following various mailing
-> list without being listed in MAINTAINERS.
-So I?m still maintaining the drivers even there is not much to do today
+Here is the first pull request for soc for mvebu for v4.11.
 
-so no
+Gregory
 
-Best Regards,
-J.
-> 
->> Best Regards,
->> J.
->>> On Jan 28, 2017, at 12:32 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
->>> 
->>> Le 27/01/2017 ? 17:28, Alexandre Belloni a ?crit :
->>>> Jean Christophe has not been active on the mailing lists for a while.
->>>> Remove him from the maintainers
->>>> 
->>>> Also, merge both AT91 pinctrl drivers entries.
->>>> 
->>>> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
->>>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->>> 
->>> Yes:
->>> 
->>> Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
->>> 
->>> Thanks, regards,
->>> 
->>>> ---
->>>> Also, as pointed to by Tomi (https://lkml.org/lkml/2016/9/27/72), emails were
->>>> bouncing for a while
->>>> 
->>>> 
->>>> MAINTAINERS | 8 +-------
->>>> 1 file changed, 1 insertion(+), 7 deletions(-)
->>>> 
->>>> diff --git a/MAINTAINERS b/MAINTAINERS
->>>> index eb9739ec4e92..bfcc70032254 100644
->>>> --- a/MAINTAINERS
->>>> +++ b/MAINTAINERS
->>>> @@ -1093,7 +1093,6 @@ F:	drivers/*/*aspeed*
->>>> ARM/ATMEL AT91RM9200, AT91SAM9 AND SAMA5 SOC SUPPORT
->>>> M:	Nicolas Ferre <nicolas.ferre@microchip.com>
->>>> M:	Alexandre Belloni <alexandre.belloni@free-electrons.com>
->>>> -M:	Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
->>>> L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->>>> W:	http://www.linux4sam.org
->>>> T:	git git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git
->>>> @@ -9704,16 +9703,11 @@ F:	drivers/pinctrl/
->>>> F:	include/linux/pinctrl/
->>>> 
->>>> PIN CONTROLLER - ATMEL AT91
->>>> -M:	Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
->>>> -L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->>>> -S:	Maintained
->>>> -F:	drivers/pinctrl/pinctrl-at91.*
->> Nack
->>>> -
->>>> -PIN CONTROLLER - ATMEL AT91 PIO4
->>>> M:	Ludovic Desroches <ludovic.desroches@microchip.com>
->>>> L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
->>>> L:	linux-gpio at vger.kernel.org
->>>> S:	Supported
->>>> +F:	drivers/pinctrl/pinctrl-at91.*
->>>> F:	drivers/pinctrl/pinctrl-at91-pio4.*
->>>> 
->>>> PIN CONTROLLER - INTEL
->>>> 
->>> 
->>> -- 
->>> Nicolas Ferre
->>> 
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->> 
-> 
-> -- 
-> Alexandre Belloni, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+The following changes since commit 0c744ea4f77d72b3dcebb7a8f2684633ec79be88:
+
+  Linux 4.10-rc2 (2017-01-01 14:31:53 -0800)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-4.11-1
+
+for you to fetch changes up to f2591b993ec95fd8d67c68187f07f30c9d79b38c:
+
+  soc: dove: constify reset_control_ops structures (2017-01-27 17:52:57 +0100)
+
+----------------------------------------------------------------
+mvebu soc for 4.11 (part 1)
+
+Cleanup up on dove pmu and mv78x00 pci
+
+----------------------------------------------------------------
+Arnd Bergmann (1):
+      ARM: mv78xx0: fix possible PCI buffer overflow
+
+Bhumika Goyal (1):
+      soc: dove: constify reset_control_ops structures
+
+ arch/arm/mach-mv78xx0/pcie.c | 2 +-
+ drivers/soc/dove/pmu.c       | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
