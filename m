@@ -1,30 +1,40 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 27 Jan 2017 11:06:22 +0100
-Subject: [PATCH 1/2] arm64: dts: r8a7796: Enable I2C DVFS DMA
-In-Reply-To: <1485511583-21614-1-git-send-email-horms+renesas@verge.net.au>
-References: <1485511583-21614-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1485511583-21614-2-git-send-email-horms+renesas@verge.net.au>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 27 Jan 2017 11:08:32 +0100
+Subject: [PATCH v2] clk: samsung: mark s3c...._clk_sleep_init() as __init
+In-Reply-To: <20170127002750.GC8801@codeaurora.org>
+References: <1485293599-23581-1-git-send-email-martin@kaiser.cx>
+ <1485380545-24815-1-git-send-email-martin@kaiser.cx>
+ <CGME20170127003627epcas3p3dc6a50295e915679c346a6f32cc3c664@epcas3p3.samsung.com>
+ <20170127002750.GC8801@codeaurora.org>
+Message-ID: <2825cb23-0922-c950-f18f-7b9077831e33@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+On 01/27/2017 01:27 AM, Stephen Boyd wrote:
+> On 01/25, martin at kaiser.cx wrote:
+>> From: Martin Kaiser <martin@kaiser.cx>
+>>
+>> These functions are referencing s3c...._clk_regs[], which are marked as
+>> __initdata. When compiling with CONFIG_DEBUG_SECTION_MISMATCH=y, this
+>> produces warnings like
+>>
+>> WARNING: vmlinux.o(.text+0x198350):
+>> Section mismatch in reference from the function s3c2410_clk_sleep_init()
+>> to the (unknown reference) .init.data:(unknown)
+>>
+>> Mark the s3c...._clk_sleep_init() functions as __init in
+>> order to fix this.
+>>
+>> Signed-off-by: Martin Kaiser <martin@kaiser.cx>
+>
+> Fixes tag?
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index c95ad177b097..c8592d05620b 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -280,6 +280,9 @@
- 			interrupts = <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 926>;
- 			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+			dmas = <&dmac1 0x11>, <&dmac1 0x10>,
-+			       <&dmac2 0x11>, <&dmac2 0x10>;
-+			dma-names = "tx", "rx", "tx", "rx";
- 			status = "disabled";
- 		};
- 
+The patch fixes the very first commit adding the driver:
+"ca2e90a clk: samsung: add clock controller driver for s3c2412"
+and it doesn't apply cleanly on top of that commit.
+Still it applies cleanly up to v3.15 so I'll add the tag when
+applying.
+
 -- 
-2.7.0.rc3.207.g0ac5344
+Thanks,
+Sylwester
