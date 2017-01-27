@@ -1,80 +1,45 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 27 Jan 2017 22:38:37 +0100
-Subject: [PATCH v5 5/13] mmc: sunxi: Mask DATA0 when updating the clock
+Date: Fri, 27 Jan 2017 22:38:34 +0100
+Subject: [PATCH v5 2/13] mmc: sunxi: Gate the clock when rate is 0
 In-Reply-To: <cover.6f3d82744628848e2182720c35f13e87e8b62258.1485553113.git-series.maxime.ripard@free-electrons.com>
 References: <cover.6f3d82744628848e2182720c35f13e87e8b62258.1485553113.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <a6930bfcfcd651247b1b9d6a3b6175f4c220bb59.1485553113.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <3f1556a50a445a3a87d0758a5a6f3a0a5cde70b2.1485553113.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A64 MMC controllers need DATA0 to be masked while updating the clock,
-otherwise any subsequent command will result in a timeout.
+The MMC core assumes that the code will gate the clock when the bus
+frequency is set to 0, which we've been ignoring so far.
 
-It's not really clear at this point what DATA0 is exactly, but this
-behaviour is present in Allwinner's tree, and has been suggested by
-Allwinner engineers as fixes for the timeout.
+Handle that.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Tested-by: Florian Vaussard <florian.vaussard@heig-vd.ch>
 ---
- drivers/mmc/host/sunxi-mmc.c | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+ drivers/mmc/host/sunxi-mmc.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index 51d6388a194e..6bbe61397b7c 100644
+index ab4324e6eb74..019f95e8e7c5 100644
 --- a/drivers/mmc/host/sunxi-mmc.c
 +++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -101,6 +101,7 @@
- 	(SDXC_SOFT_RESET | SDXC_FIFO_RESET | SDXC_DMA_RESET)
+@@ -765,6 +765,9 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
+ 	if (ret)
+ 		return ret;
  
- /* clock control bits */
-+#define SDXC_MASK_DATA0			BIT(31)
- #define SDXC_CARD_CLOCK_ON		BIT(16)
- #define SDXC_LOW_POWER_ON		BIT(17)
- 
-@@ -254,6 +255,9 @@ struct sunxi_mmc_cfg {
- 	/* does the IP block support autocalibration? */
- 	bool can_calibrate;
- 
-+	/* Does DATA0 needs to be masked while the clock is updated */
-+	bool mask_data0;
++	if (!ios->clock)
++		return 0;
 +
- 	bool needs_new_timings;
- };
+ 	/* 8 bit DDR requires a higher module clock */
+ 	if (ios->timing == MMC_TIMING_MMC_DDR52 &&
+ 	    ios->bus_width == MMC_BUS_WIDTH_8)
+@@ -882,7 +885,7 @@ static void sunxi_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	mmc_writel(host, REG_GCTRL, rval);
  
-@@ -657,10 +661,12 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
- 	u32 rval;
- 
- 	rval = mmc_readl(host, REG_CLKCR);
--	rval &= ~(SDXC_CARD_CLOCK_ON | SDXC_LOW_POWER_ON);
-+	rval &= ~(SDXC_CARD_CLOCK_ON | SDXC_LOW_POWER_ON | SDXC_MASK_DATA0);
- 
- 	if (oclk_en)
- 		rval |= SDXC_CARD_CLOCK_ON;
-+	if (host->cfg->mask_data0)
-+		rval |= SDXC_MASK_DATA0;
- 
- 	mmc_writel(host, REG_CLKCR, rval);
- 
-@@ -680,6 +686,11 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
- 		return -EIO;
+ 	/* set up clock */
+-	if (ios->clock && ios->power_mode) {
++	if (ios->power_mode) {
+ 		host->ferror = sunxi_mmc_clk_set_rate(host, ios);
+ 		/* Android code had a usleep_range(50000, 55000); here */
  	}
- 
-+	if (host->cfg->mask_data0) {
-+		rval = mmc_readl(host, REG_CLKCR);
-+		mmc_writel(host, REG_CLKCR, rval & ~SDXC_MASK_DATA0);
-+	}
-+
- 	return 0;
- }
- 
-@@ -1081,6 +1092,7 @@ static const struct sunxi_mmc_cfg sun50i_a64_cfg = {
- 	.idma_des_size_bits = 16,
- 	.clk_delays = NULL,
- 	.can_calibrate = true,
-+	.mask_data0 = true,
- 	.needs_new_timings = true,
- };
- 
 -- 
 git-series 0.8.11
