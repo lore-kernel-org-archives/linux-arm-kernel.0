@@ -1,56 +1,31 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 27 Jan 2017 16:38:19 -0600
-Subject: [PATCH 1/3] dt-bindings: qoriq-clock: Add coreclk
-In-Reply-To: <1485332363-8434-1-git-send-email-oss@buserror.net>
-References: <1485332363-8434-1-git-send-email-oss@buserror.net>
-Message-ID: <20170127223819.mzovhnnpths5t5w2@rob-hp-laptop>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Sat, 28 Jan 2017 00:48:33 +0100
+Subject: v4.9 to v4.10 regression: oops when USB cable is plugged in.
+In-Reply-To: <20170127215512.GG20571@amd>
+References: <20170123222537.GA11543@amd> <20170123224454.GY7403@atomide.com>
+ <20170124091817.GA29246@amd> <20170124100133.GA21079@pali>
+ <20170124145127.GC7403@atomide.com> <20170127215512.GG20571@amd>
+Message-ID: <20170127234832.cte4ki4ajwme2b2j@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2017 at 02:19:21AM -0600, Scott Wood wrote:
-> ls1012a has separate input root clocks for core PLLs versus the platform
-> PLL, with the latter described as sysclk in the hw docs.
-> 
-> Update the qoriq-clock binding to allow a second input clock, named
-> "coreclk".  If present, this clock will be used for the core PLLs.
-> 
-> Signed-off-by: Scott Wood <oss@buserror.net>
-> Cc: devicetree at vger.kernel.org
-> ---
->  Documentation/devicetree/bindings/clock/qoriq-clock.txt | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/qoriq-clock.txt b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-> index df9cb5a..97a9666 100644
-> --- a/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-> +++ b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-> @@ -55,6 +55,11 @@ Optional properties:
->  - clocks: If clock-frequency is not specified, sysclk may be provided
->  	as an input clock.  Either clock-frequency or clocks must be
->  	provided.
-> +	A second input clock, called "coreclk", may be provided if
-> +	core PLLs are based on a different input clock from the
-> +	platform PLL.
-> +- clock-names: Required if a coreclk is present.  Valid names are
-> +	"sysclk" and "coreclk".
+Hi,
 
-'clk' part is redundant.
+On Fri, Jan 27, 2017 at 10:55:12PM +0100, Pavel Machek wrote:
+> Ok, I can try. But so far even -rc1 is a lot of fun. But... I consider
+> phone calls core feature of a phone. I'd very much like to get that to
+> work. Unfortunately, that means real-time audio, and a lot of
+> fun. Plus, as it is touchscreen device, it needs a GUI. 
 
->  
->  2. Clock Provider
->  
-> @@ -71,6 +76,7 @@ second cell is the clock index for the specified type.
->  	2	hwaccel		index (n in CLKCGnHWACSR)
->  	3	fman		0 for fm1, 1 for fm2
->  	4	platform pll	0=pll, 1=pll/2, 2=pll/3, 3=pll/4
-> +	5	coreclk		must be 0
->  
->  3. Example
->  
-> -- 
-> 2.7.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Talking about testing - kernelci's n900 is broken?
+
+https://kernelci.org/boot/omap3-n900/
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170128/a414d75b/attachment.sig>
