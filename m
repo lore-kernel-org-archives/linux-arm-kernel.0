@@ -1,29 +1,30 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 27 Jan 2017 11:06:21 +0100
-Subject: [PATCH 0/2] arm64: dts: r8a779[56]: Enable I2C DVFS DMA
-Message-ID: <1485511583-21614-1-git-send-email-horms+renesas@verge.net.au>
+Date: Fri, 27 Jan 2017 11:06:22 +0100
+Subject: [PATCH 1/2] arm64: dts: r8a7796: Enable I2C DVFS DMA
+In-Reply-To: <1485511583-21614-1-git-send-email-horms+renesas@verge.net.au>
+References: <1485511583-21614-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1485511583-21614-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-this series enables DMA for I2C DVFS on the r8a7795 and r8a7796 SoCs.
-I2C DVFS was recently enabled on the salvator-x board for those SoCs.
-
-Base:
-* This series is based on renesas-devel-20170127v2-v4.10-rc5
-
-Dependencies:
-* This series has a run-time dependency on
-  "[PATCH 0/2] clk: renesas: r8a7795/r8a7796: Add IIC-DVFS clock"
-
-Simon Horman (2):
-  arm64: dts: r8a7796: Enable I2C DVFS DMA
-  arm64: dts: r8a7795: Enable I2C DVFS DMA
-
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 3 +++
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm64/boot/dts/renesas/r8a7796.dtsi | 3 +++
- 2 files changed, 6 insertions(+)
+ 1 file changed, 3 insertions(+)
 
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+index c95ad177b097..c8592d05620b 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+@@ -280,6 +280,9 @@
+ 			interrupts = <GIC_SPI 173 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 926>;
+ 			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			dmas = <&dmac1 0x11>, <&dmac1 0x10>,
++			       <&dmac2 0x11>, <&dmac2 0x10>;
++			dma-names = "tx", "rx", "tx", "rx";
+ 			status = "disabled";
+ 		};
+ 
 -- 
 2.7.0.rc3.207.g0ac5344
