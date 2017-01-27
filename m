@@ -1,264 +1,144 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Fri, 27 Jan 2017 09:32:51 +0100
-Subject: [PATCH v11 7/8] arm/arm64: vgic: Implement
- KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO ioctl
-In-Reply-To: <1485440453-10597-8-git-send-email-vijay.kilari@gmail.com>
-References: <1485440453-10597-1-git-send-email-vijay.kilari@gmail.com>
- <1485440453-10597-8-git-send-email-vijay.kilari@gmail.com>
-Message-ID: <682b1b3e-c5ab-6e8a-54b5-fc85317e58d8@redhat.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Fri, 27 Jan 2017 09:35:52 +0100
+Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
+In-Reply-To: <1485488382.2469.27.camel@intel.com>
+References: <20170124070639.GA5068@rzhang1-surface> <20170124073720.GB5603@amd>
+ <88c94ea6-abe2-0f20-337e-e9ee00c883d8@roeck-us.net>
+ <20170124175800.GA15070@amd> <20170124184526.GA25056@roeck-us.net>
+ <20170125111233.GB3912@amd> <20170125120918.GA7936@pali>
+ <1485481030.2469.15.camel@intel.com>
+ <a6ce0873-9164-a965-a3e1-9eaaaec2201f@roeck-us.net>
+ <1485488382.2469.27.camel@intel.com>
+Message-ID: <20170127083552.GA24223@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Friday 27 January 2017 11:39:42 Zhang Rui wrote:
+> On Thu, 2017-01-26 at 18:03 -0800, Guenter Roeck wrote:
+> > On 01/26/2017 05:37 PM, Zhang Rui wrote:
+> > > 
+> > > On Wed, 2017-01-25 at 13:09 +0100, Pali Roh?r wrote:
+> > > > 
+> > > > On Wednesday 25 January 2017 12:12:33 Pavel Machek wrote:
+> > > > > 
+> > > > > 
+> > > > > Hi!
+> > > > > 
+> > > > > > 
+> > > > > > 
+> > > > > > > 
+> > > > > > > 
+> > > > > > > > 
+> > > > > > > > 
+> > > > > > > > > 
+> > > > > > > > > 
+> > > > > > > > > > 
+> > > > > > > > > > 
+> > > > > > > > > > Right.
+> > > > > > > > > > 
+> > > > > > > > > > Before reverting, can you please try if this patch
+> > > > > > > > > > works
+> > > > > > > > > > or not?
+> > > > > > > > > Not really. Revert now. Sorry.
+> > > > > > > > > 
+> > > > > > > > > Are you sure? This does not look equivalent to me at
+> > > > > > > > > all.
+> > > > > > > > > 
+> > > > > > > > > "name" file handling moved from drivers to the core,
+> > > > > > > > > which
+> > > > > > > > > added some
+> > > > > > > > > crazy checks what name can contain. Even if this
+> > > > > > > > > "works",
+> > > > > > > > > what is the
+> > > > > > > > > expected effect on the "name" file?
+> > > > > > > > > 
+> > > > > > > > The hwmon name attribute must not include '-', as
+> > > > > > > > documented
+> > > > > > > > in
+> > > > > > > > Documentation/hwmon/sysfs-interface. Is enforcing that
+> > > > > > > > 'crazy' ?
+> > > > > > > > Maybe in your world, but not in mine.
+> > > > > > > Well, lets revert the patch and then we can discuss what to
+> > > > > > > do
+> > > > > > > with
+> > > > > > > the "name" problem.
+> > > > > Ok, so the patch is on the way in. What to do next?
+> > > > > 
+> > > > > pavel at n900:/sys/class/hwmon$ cat hwmon0/name
+> > > > > bq27200-0
+> > > > > pavel at n900:/sys/class/hwmon$ cat hwmon1/name
+> > > > > rx51-battery
+> > > > > 
+> > > > > > 
+> > > > > > 
+> > > > > > To provide some detail: libsensors gets just as confused with
+> > > > > > wildcards
+> > > > > > and whitespace/newline as it does with '-' in the reported
+> > > > > > name,
+> > > > > > which
+> > > > > > is why those are blocked by the new API.
+> > > > > Ok... Question is "does someone actually use hwmon*/name on
+> > > > > N900"?
+> > > > > If
+> > > > > so, we can't change it, but it is well possible that noone is.
+> > > > IIRC hwmon is used on Nokia N900.
+> > > > 
+> > > > But I have not seen hwmon devices for bq27200 and rx51-battery
+> > > > yet.
+> > > > Those are power supply driver and auto-exporting them also via
+> > > > hwmon
+> > > > is
+> > > > something new, right? If yes, then we can use any name for those
+> > > > new
+> > > > hwmon devices as they cannot break userspace... as there is no
+> > > > userspace
+> > > > application for them.
+> > > > 
+> > > If this is the case, you'd better set
+> > > (struct thermal_zone_params)->no_hwmon when registering the thermal
+> > > zone device, in which case, the hwmon device will not be created.
+> > > 
+> > > In fact, I'd prefer to change tzp->no_hwmon to tzp->hwmon to not
+> > > create
+> > > hwmon I/F by default, and see if there is anyone using it. If yes,
+> > > we
+> > > can set the flag in soc thermal driver, explicitly, at meantime, a
+> > > hwmon compatible name is required.
+> > > 
+> > > But one foreseeable result is that we may get bug reports from end
+> > > user
+> > > that some sensors (acpitz, etc) are gone in 'sensors' output. And
+> > > TBH,
+> > > I'm not quite sure if this can be counted as a regression or not.
+> > > 
+> > That sounds like fun. Changing bq27200-0 to bq27200_0 is Forbidden by
+> > the ABI Police, but taking the entire device away is ok.
+> > 
+> No. IMO, it depends on if the interface is used or not.
+> If hwmon I/F is used, we can not take it away, nor change its name.
+> If thermal zone I/F is used, we can not change it's 'type' name to be
+> compatible with new hwmon API.
 
-On 26/01/2017 15:20, vijay.kilari at gmail.com wrote:
-> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
-> 
-> Userspace requires to store and restore of line_level for
-> level triggered interrupts using ioctl KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO.
-> 
-> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
-> ---
->  arch/arm/include/uapi/asm/kvm.h     |  6 +++++
->  arch/arm64/include/uapi/asm/kvm.h   |  6 +++++
->  virt/kvm/arm/vgic/vgic-kvm-device.c | 45 ++++++++++++++++++++++++++++++-
->  virt/kvm/arm/vgic/vgic-mmio-v3.c    | 14 ++++++++++
->  virt/kvm/arm/vgic/vgic-mmio.c       | 54 +++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic-mmio.h       |  5 ++++
->  virt/kvm/arm/vgic/vgic.h            |  2 ++
->  7 files changed, 131 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-> index 7a3e537..6ebd3e6 100644
-> --- a/arch/arm/include/uapi/asm/kvm.h
-> +++ b/arch/arm/include/uapi/asm/kvm.h
-> @@ -191,6 +191,12 @@ struct kvm_arch_memory_slot {
->  #define KVM_DEV_ARM_VGIC_GRP_CTRL       4
->  #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
->  #define KVM_DEV_ARM_VGIC_GRP_CPU_SYSREGS 6
-> +#define KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO  7
-> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT	10
-> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK \
-> +			(0x3fffffULL << KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT)
-> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK 0x3ff
-> +#define VGIC_LEVEL_INFO_LINE_LEVEL	0
->  
->  #define   KVM_DEV_ARM_VGIC_CTRL_INIT    0
->  
-> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
-> index be379d7..c286035 100644
-> --- a/arch/arm64/include/uapi/asm/kvm.h
-> +++ b/arch/arm64/include/uapi/asm/kvm.h
-> @@ -211,6 +211,12 @@ struct kvm_arch_memory_slot {
->  #define KVM_DEV_ARM_VGIC_GRP_CTRL	4
->  #define KVM_DEV_ARM_VGIC_GRP_REDIST_REGS 5
->  #define KVM_DEV_ARM_VGIC_GRP_CPU_SYSREGS 6
-> +#define KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO  7
-> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT	10
-> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK \
-> +			(0x3fffffULL << KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT)
-> +#define KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK	0x3ff
-> +#define VGIC_LEVEL_INFO_LINE_LEVEL	0
->  
->  #define   KVM_DEV_ARM_VGIC_CTRL_INIT	0
->  
-> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-> index b30372b..d181d2b 100644
-> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-> @@ -512,6 +512,21 @@ static int vgic_v3_attr_regs_access(struct kvm_device *dev,
->  						  regid, reg);
->  		break;
->  	}
-> +	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
-> +		unsigned int info, intid;
-> +
-> +		info = (attr->attr & KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK) >>
-> +			KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT;
-> +		if (info == VGIC_LEVEL_INFO_LINE_LEVEL) {
-> +			intid = attr->attr &
-> +				KVM_DEV_ARM_VGIC_LINE_LEVEL_INTID_MASK;
-> +			ret = vgic_v3_line_level_info_uaccess(vcpu, is_write,
-> +							      intid, reg);
-> +		} else {
-> +			ret = -EINVAL;
-> +		}
-> +		break;
-> +	}
->  	default:
->  		ret = -EINVAL;
->  		break;
-> @@ -554,6 +569,17 @@ static int vgic_v3_set_attr(struct kvm_device *dev,
->  
->  		return vgic_v3_attr_regs_access(dev, attr, &reg, true);
->  	}
-> +	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
-> +		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-> +		u64 reg;
-> +		u32 tmp32;
-> +
-> +		if (get_user(tmp32, uaddr))
-> +			return -EFAULT;
-> +
-> +		reg = tmp32;
-> +		return vgic_v3_attr_regs_access(dev, attr, &reg, true);
-> +	}
->  	}
->  	return -ENXIO;
->  }
-> @@ -589,8 +615,18 @@ static int vgic_v3_get_attr(struct kvm_device *dev,
->  			return ret;
->  		return put_user(reg, uaddr);
->  	}
-> -	}
-> +	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
-> +		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-> +		u64 reg;
-> +		u32 tmp32;
->  
-> +		ret = vgic_v3_attr_regs_access(dev, attr, &reg, false);
-> +		if (ret)
-> +			return ret;
-> +		tmp32 = reg;
-> +		return put_user(tmp32, uaddr);
-> +	}
-> +	}
->  	return -ENXIO;
->  }
->  
-> @@ -611,6 +647,13 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
->  		return vgic_v3_has_attr_regs(dev, attr);
->  	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
->  		return 0;
-> +	case KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO: {
-> +		if (((attr->attr & KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_MASK) >>
-> +		      KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_SHIFT) ==
-> +		      VGIC_LEVEL_INFO_LINE_LEVEL)
-> +			return 0;
-> +		break;
-> +	}
->  	case KVM_DEV_ARM_VGIC_GRP_CTRL:
->  		switch (attr->attr) {
->  		case KVM_DEV_ARM_VGIC_CTRL_INIT:
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> index 549ae45..6afb3b4 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> @@ -803,3 +803,17 @@ int vgic_v3_redist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
->  	else
->  		return vgic_uaccess(vcpu, &rd_dev, is_write, offset, val);
->  }
-> +
-> +int vgic_v3_line_level_info_uaccess(struct kvm_vcpu *vcpu, bool is_write,
-> +				    u32 intid, u64 *val)
-> +{
-> +	if (intid % 32)
-> +		return -EINVAL;
-> +
-> +	if (is_write)
-> +		vgic_write_irq_line_level_info(vcpu, intid, *val);
-> +	else
-> +		*val = vgic_read_irq_line_level_info(vcpu, intid);
-> +
-> +	return 0;
-> +}
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-> index 1d1886e..3654b4c 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
-> @@ -362,6 +362,60 @@ void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
->  	}
->  }
->  
-> +u64 vgic_read_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid)
-> +{
-> +	int i;
-> +	u64 val = 0;
-> +	int nr_irqs = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
-> +
-> +	for (i = 0; i < 32; i++) {
-> +		struct vgic_irq *irq;
-> +
-> +		if ((intid + i) < VGIC_NR_SGIS || (intid + i) >= nr_irqs)
-> +			continue;
-nit: there is vgic_irq_is_sgi and !vgic_valid_spi
-> +
-> +		irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-> +		if (irq->config == VGIC_CONFIG_LEVEL && irq->line_level)
-> +			val |= (1U << i);
-> +
-> +		vgic_put_irq(vcpu->kvm, irq);
-> +	}
-> +
-> +	return val;
-> +}
-> +
-> +void vgic_write_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid,
-> +				    const u64 val)
-> +{
-> +	int i;
-> +	int nr_irqs = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
-> +
-> +	for (i = 0; i < 32; i++) {
-> +		struct vgic_irq *irq;
-> +		bool new_level;
-> +
-> +		if ((intid + i) < VGIC_NR_SGIS || (intid + i) >= nr_irqs)
-nit: same as above
-> +			continue;
-> +
-> +		irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-> +
-> +		/*
-> +		 * Line level is set irrespective of irq type
-> +		 * (level or edge) to avoid dependency that VM should
-> +		 * restore irq config before line level.
-> +		 */
-> +		new_level = !!(val & (1U << i));
-> +		spin_lock(&irq->irq_lock);
-> +		irq->line_level = new_level;
-> +		if (new_level)
-> +			vgic_queue_irq_unlock(vcpu->kvm, irq);
-> +		else
-> +			spin_unlock(&irq->irq_lock);
-> +
-> +		vgic_put_irq(vcpu->kvm, irq);
-> +	}
-> +}
-> +
->  static int match_region(const void *key, const void *elt)
->  {
->  	const unsigned int offset = (unsigned long)key;
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-> index 7b30296..98bb566 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio.h
-> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
-> @@ -177,6 +177,11 @@ void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
->  int vgic_uaccess(struct kvm_vcpu *vcpu, struct vgic_io_device *dev,
->  		 bool is_write, int offset, u32 *val);
->  
-> +u64 vgic_read_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid);
-> +
-> +void vgic_write_irq_line_level_info(struct kvm_vcpu *vcpu, u32 intid,
-> +				    const u64 val);
-> +
->  unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
->  
->  unsigned int vgic_v3_init_dist_iodev(struct vgic_io_device *dev);
-> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-> index a5a45f6..db28f7c 100644
-> --- a/virt/kvm/arm/vgic/vgic.h
-> +++ b/virt/kvm/arm/vgic/vgic.h
-> @@ -164,6 +164,8 @@ int vgic_v3_cpu_sysregs_uaccess(struct kvm_vcpu *vcpu, bool is_write,
->  			 u64 id, u64 *val);
->  int vgic_v3_has_cpu_sysregs_attr(struct kvm_vcpu *vcpu, bool is_write, u64 id,
->  				u64 *reg);
-> +int vgic_v3_line_level_info_uaccess(struct kvm_vcpu *vcpu, bool is_write,
-> +				    u32 intid, u64 *val);
->  int kvm_register_vgic_device(unsigned long type);
->  void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
->  void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-> 
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
+And what about allowing driver (rx51_battery.ko) to set hwmon name to be
+compatible with hwmon policy? Power supply name will be unchanged, but
+hwmon name could be different (it is new API/ABI -- not used by anyone)
+to fit into hwmon subsytem.
 
-Eric
+Or instead allowing driver to set name, what about fixing name in hwmon
+subsystem to be compatible? (By fixing I mean to only fix hwmon name,
+not power supply).
+
+> > Anyway, sounds good to me. No one will use something that isn't
+> > there,
+> > and no one will realize that it could have been there, so I don't
+> > expect
+> > anyone to complain.
+> 
+> Yes, I agree.
+> 
+> thanks,
+> rui
+
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
