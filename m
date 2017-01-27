@@ -1,44 +1,100 @@
-From: rafalo@cadence.com (Rafal Ozieblo)
-Date: Fri, 27 Jan 2017 10:26:14 +0000
-Subject: [PATCH net-next v2] macb: Common code to enable ptp support for
- MACB/GEM
-In-Reply-To: <CAFcVECLuWM65zXJWtMcwijZ1ZbtH0pvKnTUR=SJagPGHEr9amg@mail.gmail.com>
-References: <1484841375-11420-1-git-send-email-andrei.pistirica@microchip.com>
- <BN3PR07MB25160FCBCF19918C495F43B4C9770@BN3PR07MB2516.namprd07.prod.outlook.com>
- <CAFcVECLuWM65zXJWtMcwijZ1ZbtH0pvKnTUR=SJagPGHEr9amg@mail.gmail.com>
-Message-ID: <BN3PR07MB25163747E1520E4CE1C6164FC9760@BN3PR07MB2516.namprd07.prod.outlook.com>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Fri, 27 Jan 2017 11:27:02 +0100
+Subject: [PATCH v3 1/9] mtd:fsl-quadspi:use the property fields of SPI-NOR
+In-Reply-To: <1471505884-33996-1-git-send-email-B56489@freescale.com>
+References: <1471505884-33996-1-git-send-email-B56489@freescale.com>
+Message-ID: <8d47aefc-063e-533e-e988-57d3bd5c25a8@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->-----Original Message-----
->From: Harini Katakam [mailto:harinikatakamlinux at gmail.com] 
->Sent: 27 stycznia 2017 06:43
->Subject: Re: [PATCH net-next v2] macb: Common code to enable ptp support for MACB/GEM
->
->Hi Rafal,
->
->On Thu, Jan 26, 2017 at 8:45 PM, Rafal Ozieblo <rafalo@cadence.com> wrote:
->>> -----Original Message-----
->>> From: Andrei Pistirica [mailto:andrei.pistirica at microchip.com]
->>> Sent: 19 stycznia 2017 16:56
->>> Subject: [PATCH net-next v2] macb: Common code to enable ptp support for MACB/GEM
->>>
->>>
->>> +static inline bool gem_has_ptp(struct macb *bp)
->>> +{
->>> +     return !!(bp->caps & MACB_CAPS_GEM_HAS_PTP);
->>> +}
->> Why don't you use hardware capabilities here? Would it be better to read it from hardware instead adding it to many configuration?
->
->If you are referring to TSU bit in DCFG5, then we will be relying on
->Cadence IP's information irrespective of the SoC capability
->and whether the PTP support was adequate.
->I think the capability approach gives better control and
->it is not really much to add.
->
->Regards,
->Harini
->
-Yes, I'm referring to TSU bit.
-What if SoC contains multiple Cadence GEMs, some with PTP support and others without?
-Relevant will be checking both, hardware capabilities and SoC capabilities from "caps" field.
+Le 18/08/2016 ? 09:37, Yunhui Cui a ?crit :
+> We can get the read/write/erase opcode from the spi nor framework
+> directly. This patch uses the information stored in the SPI-NOR to
+> remove the hardcode in the fsl_qspi_init_lut().
+> 
+> Signed-off-by: Yunhui Cui <B56489@freescale.com>
+> Signed-off-by: Yunhui Cui <yunhui.cui@nxp.com>
+
+Applied to the spi-nor tree
+
+Thanks!
+> ---
+>  drivers/mtd/spi-nor/fsl-quadspi.c | 40 ++++++++++++---------------------------
+>  1 file changed, 12 insertions(+), 28 deletions(-)
+> 
+> diff --git a/drivers/mtd/spi-nor/fsl-quadspi.c b/drivers/mtd/spi-nor/fsl-quadspi.c
+> index 5c82e4e..5ad6402 100644
+> --- a/drivers/mtd/spi-nor/fsl-quadspi.c
+> +++ b/drivers/mtd/spi-nor/fsl-quadspi.c
+> @@ -373,9 +373,13 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+>  	void __iomem *base = q->iobase;
+>  	int rxfifo = q->devtype_data->rxfifo;
+>  	u32 lut_base;
+> -	u8 cmd, addrlen, dummy;
+>  	int i;
+>  
+> +	struct spi_nor *nor = &q->nor[0];
+> +	u8 addrlen = (nor->addr_width == 3) ? ADDR24BIT : ADDR32BIT;
+> +	u8 read_op = nor->read_opcode;
+> +	u8 read_dm = nor->read_dummy;
+> +
+>  	fsl_qspi_unlock_lut(q);
+>  
+>  	/* Clear all the LUT table */
+> @@ -385,20 +389,10 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+>  	/* Quad Read */
+>  	lut_base = SEQID_QUAD_READ * 4;
+>  
+> -	if (q->nor_size <= SZ_16M) {
+> -		cmd = SPINOR_OP_READ_1_1_4;
+> -		addrlen = ADDR24BIT;
+> -		dummy = 8;
+> -	} else {
+> -		/* use the 4-byte address */
+> -		cmd = SPINOR_OP_READ_1_1_4;
+> -		addrlen = ADDR32BIT;
+> -		dummy = 8;
+> -	}
+> -
+> -	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
+> +	qspi_writel(q, LUT0(CMD, PAD1, read_op) | LUT1(ADDR, PAD1, addrlen),
+>  			base + QUADSPI_LUT(lut_base));
+> -	qspi_writel(q, LUT0(DUMMY, PAD1, dummy) | LUT1(FSL_READ, PAD4, rxfifo),
+> +	qspi_writel(q, LUT0(DUMMY, PAD1, read_dm) |
+> +		    LUT1(FSL_READ, PAD4, rxfifo),
+>  			base + QUADSPI_LUT(lut_base + 1));
+>  
+>  	/* Write enable */
+> @@ -409,16 +403,8 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+>  	/* Page Program */
+>  	lut_base = SEQID_PP * 4;
+>  
+> -	if (q->nor_size <= SZ_16M) {
+> -		cmd = SPINOR_OP_PP;
+> -		addrlen = ADDR24BIT;
+> -	} else {
+> -		/* use the 4-byte address */
+> -		cmd = SPINOR_OP_PP;
+> -		addrlen = ADDR32BIT;
+> -	}
+> -
+> -	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
+> +	qspi_writel(q, LUT0(CMD, PAD1, nor->program_opcode) |
+> +		    LUT1(ADDR, PAD1, addrlen),
+>  			base + QUADSPI_LUT(lut_base));
+>  	qspi_writel(q, LUT0(FSL_WRITE, PAD1, 0),
+>  			base + QUADSPI_LUT(lut_base + 1));
+> @@ -432,10 +418,8 @@ static void fsl_qspi_init_lut(struct fsl_qspi *q)
+>  	/* Erase a sector */
+>  	lut_base = SEQID_SE * 4;
+>  
+> -	cmd = q->nor[0].erase_opcode;
+> -	addrlen = q->nor_size <= SZ_16M ? ADDR24BIT : ADDR32BIT;
+> -
+> -	qspi_writel(q, LUT0(CMD, PAD1, cmd) | LUT1(ADDR, PAD1, addrlen),
+> +	qspi_writel(q, LUT0(CMD, PAD1, nor->erase_opcode) |
+> +		    LUT1(ADDR, PAD1, addrlen),
+>  			base + QUADSPI_LUT(lut_base));
+>  
+>  	/* Erase the whole chip */
+> 
