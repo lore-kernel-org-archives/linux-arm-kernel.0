@@ -1,50 +1,108 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 27 Jan 2017 10:28:22 -0800
-Subject: [PATCH] mmc: meson-gx: set max block count to 256
-In-Reply-To: <82cf7861-5cf8-302d-5354-435282d95619@gmail.com> (Heiner
- Kallweit's message of "Thu, 26 Jan 2017 23:09:01 +0100")
-References: <82cf7861-5cf8-302d-5354-435282d95619@gmail.com>
-Message-ID: <m2lgtwuzll.fsf@baylibre.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 27 Jan 2017 19:37:28 +0100
+Subject: [PATCH v2 4/4] ARM: imx6: adopt DT to new GPC binding
+In-Reply-To: <20170127183728.26701-1-l.stach@pengutronix.de>
+References: <20170127183728.26701-1-l.stach@pengutronix.de>
+Message-ID: <20170127183728.26701-4-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiner Kallweit <hkallweit1@gmail.com> writes:
+Adopt the i.MX6Q/DL DT to the new and more flexible GPC binding.
 
-> So far max_blk_count isn't set what results in a default of value 8
-> to be used (PAGE_SIZE / block size).
->
-> Set max_blk_count to 256 as used in the uboot driver.
->
-> Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+v2: adapt to changed domain supply name
+---
+ arch/arm/boot/dts/imx6q.dtsi   |  2 +-
+ arch/arm/boot/dts/imx6qdl.dtsi | 38 +++++++++++++++++++++++++++-----------
+ 2 files changed, 28 insertions(+), 12 deletions(-)
 
-Thanks for the patch. A minor comment below:
-
-> ---
->  drivers/mmc/host/meson-gx-mmc.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
-> index 3308b5b6..030425be 100644
-> --- a/drivers/mmc/host/meson-gx-mmc.c
-> +++ b/drivers/mmc/host/meson-gx-mmc.c
-> @@ -799,6 +799,7 @@ static int meson_mmc_probe(struct platform_device *pdev)
->  		goto free_host;
->  	}
->  
-> +	mmc->max_blk_count = 256;
-
-A step in the right direction, but the # blocks is actually a 9-bit
-field (c.f. length field of cmd_cfg part of descriptor (bits 8:0).
-
-So this should be more like:
-
-	/* blk count is 'length' field of cmd_cfg part of descriptor */
-	mmc->max_blk_count = CMD_CFG_LENGTH_MASK + 1;
-
-I tested that change locally, so after changing that, please resend and
-feel free to add:
-
-Reviewed-by: Kevin Hilman <khilman@baylibre.com>
-Tested-by: Kevin Hilman <khilman@baylibre.com>
-
-Kevin
+diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
+index e9a5d0b8c7b0..dd33849335b2 100644
+--- a/arch/arm/boot/dts/imx6q.dtsi
++++ b/arch/arm/boot/dts/imx6q.dtsi
+@@ -125,7 +125,7 @@
+ 			clocks = <&clks IMX6QDL_CLK_OPENVG_AXI>,
+ 				 <&clks IMX6QDL_CLK_GPU2D_CORE>;
+ 			clock-names = "bus", "core";
+-			power-domains = <&gpc 1>;
++			power-domains = <&pd_pu>;
+ 		};
+ 
+ 		ipu2: ipu at 02800000 {
+diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
+index 53e6e63cbb02..8538b04af097 100644
+--- a/arch/arm/boot/dts/imx6qdl.dtsi
++++ b/arch/arm/boot/dts/imx6qdl.dtsi
+@@ -1,3 +1,4 @@
++
+ /*
+  * Copyright 2011 Freescale Semiconductor, Inc.
+  * Copyright 2011 Linaro Ltd.
+@@ -148,7 +149,7 @@
+ 				 <&clks IMX6QDL_CLK_GPU3D_CORE>,
+ 				 <&clks IMX6QDL_CLK_GPU3D_SHADER>;
+ 			clock-names = "bus", "core", "shader";
+-			power-domains = <&gpc 1>;
++			power-domains = <&pd_pu>;
+ 		};
+ 
+ 		gpu_2d: gpu at 00134000 {
+@@ -158,7 +159,7 @@
+ 			clocks = <&clks IMX6QDL_CLK_GPU2D_AXI>,
+ 				 <&clks IMX6QDL_CLK_GPU2D_CORE>;
+ 			clock-names = "bus", "core";
+-			power-domains = <&gpc 1>;
++			power-domains = <&pd_pu>;
+ 		};
+ 
+ 		timer at 00a00600 {
+@@ -425,7 +426,7 @@
+ 				clocks = <&clks IMX6QDL_CLK_VPU_AXI>,
+ 					 <&clks IMX6QDL_CLK_MMDC_CH0_AXI>;
+ 				clock-names = "per", "ahb";
+-				power-domains = <&gpc 1>;
++				power-domains = <&pd_pu>;
+ 				resets = <&src 1>;
+ 				iram = <&ocram>;
+ 			};
+@@ -788,14 +789,29 @@
+ 				interrupts = <0 89 IRQ_TYPE_LEVEL_HIGH>,
+ 					     <0 90 IRQ_TYPE_LEVEL_HIGH>;
+ 				interrupt-parent = <&intc>;
+-				pu-supply = <&reg_pu>;
+-				clocks = <&clks IMX6QDL_CLK_GPU3D_CORE>,
+-					 <&clks IMX6QDL_CLK_GPU3D_SHADER>,
+-					 <&clks IMX6QDL_CLK_GPU2D_CORE>,
+-					 <&clks IMX6QDL_CLK_GPU2D_AXI>,
+-					 <&clks IMX6QDL_CLK_OPENVG_AXI>,
+-					 <&clks IMX6QDL_CLK_VPU_AXI>;
+-				#power-domain-cells = <1>;
++				clocks = <&clks IMX6QDL_CLK_IPG>;
++				clock-names = "ipg";
++
++				pgc {
++					#address-cells = <1>;
++					#size-cells = <0>;
++
++					power-domain at 0 {
++						reg = <0>;
++						#power-domain-cells = <0>;
++					};
++					pd_pu: power-domain at 1 {
++						reg = <1>;
++						#power-domain-cells = <0>;
++						power-supply = <&reg_pu>;
++						clocks = <&clks IMX6QDL_CLK_GPU3D_CORE>,
++						         <&clks IMX6QDL_CLK_GPU3D_SHADER>,
++						         <&clks IMX6QDL_CLK_GPU2D_CORE>,
++						         <&clks IMX6QDL_CLK_GPU2D_AXI>,
++						         <&clks IMX6QDL_CLK_OPENVG_AXI>,
++						         <&clks IMX6QDL_CLK_VPU_AXI>;
++					};
++				};
+ 			};
+ 
+ 			gpr: iomuxc-gpr at 020e0000 {
+-- 
+2.11.0
