@@ -1,75 +1,71 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 27 Jan 2017 12:29:53 +0100
-Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
-In-Reply-To: <20170125120918.GA7936@pali>
-References: <20170123144031.GA7870@amd> <20170123232654.GA19342@amd>
- <20170123234912.GA2460@roeck-us.net>
- <20170124070639.GA5068@rzhang1-surface> <20170124073720.GB5603@amd>
- <88c94ea6-abe2-0f20-337e-e9ee00c883d8@roeck-us.net>
- <20170124175800.GA15070@amd> <20170124184526.GA25056@roeck-us.net>
- <20170125111233.GB3912@amd> <20170125120918.GA7936@pali>
-Message-ID: <20170127112953.GC5335@amd>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 27 Jan 2017 11:29:12 +0000
+Subject: [STLinux Kernel] [PATCH 7/8] ARM: dts: STiH407-family: Use new
+ Pinctrl groups
+In-Reply-To: <20170127110304.qitnkupjqe42tby7@dell>
+References: <20170124134310.27512-1-lee.jones@linaro.org>
+ <20170124134310.27512-8-lee.jones@linaro.org>
+ <20170125115426.GH5680@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20170127110304.qitnkupjqe42tby7@dell>
+Message-ID: <20170127112912.isoir2bfhhc4wihn@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2017-01-25 13:09:18, Pali Roh?r wrote:
-> On Wednesday 25 January 2017 12:12:33 Pavel Machek wrote:
-> > Hi!
-> > 
-> > > > > >>Right.
-> > > > > >>
-> > > > > >>Before reverting, can you please try if this patch works or not?
-> > > > > >
-> > > > > >Not really. Revert now. Sorry.
-> > > > > >
-> > > > > >Are you sure? This does not look equivalent to me at all.
-> > > > > >
-> > > > > >"name" file handling moved from drivers to the core, which added some
-> > > > > >crazy checks what name can contain. Even if this "works", what is the
-> > > > > >expected effect on the "name" file?
-> > > > > >
-> > > > > The hwmon name attribute must not include '-', as documented in
-> > > > > Documentation/hwmon/sysfs-interface. Is enforcing that 'crazy' ?
-> > > > > Maybe in your world, but not in mine.
-> > > > 
-> > > > Well, lets revert the patch and then we can discuss what to do with
-> > > > the "name" problem.
-> > 
-> > Ok, so the patch is on the way in. What to do next?
-> > 
-> > pavel at n900:/sys/class/hwmon$ cat hwmon0/name
-> > bq27200-0
-> > pavel at n900:/sys/class/hwmon$ cat hwmon1/name
-> > rx51-battery
-> > 
-> > > To provide some detail: libsensors gets just as confused with wildcards
-> > > and whitespace/newline as it does with '-' in the reported name, which
-> > > is why those are blocked by the new API.
-> > 
-> > Ok... Question is "does someone actually use hwmon*/name on N900"? If
-> > so, we can't change it, but it is well possible that noone is.
+On Fri, 27 Jan 2017, Lee Jones wrote:
+
+> On Wed, 25 Jan 2017, Peter Griffin wrote:
 > 
-> IIRC hwmon is used on Nokia N900.
+> > Hi Lee,
+> > 
+> > On Tue, 24 Jan 2017, Lee Jones wrote:
+> > 
+> > > Having just defined some new Pinctrl groups for when when HW flow-
+> > > control is {en,dis}abled, let's reference them for use within the
+> > > driver.
+> > > 
+> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > 
+> > Same as previous comment, your enabling hw flow control for all
+> > stih407 family boards. I've not checked the schematics for them
+> > but as hw flow control is dependent on board wiring, IMO this
+> > should be added in board specific file.
 > 
-> But I have not seen hwmon devices for bq27200 and rx51-battery yet.
-> Those are power supply driver and auto-exporting them also via hwmon is
-> something new, right? If yes, then we can use any name for those new
-> hwmon devices as they cannot break userspace... as there is no userspace
-> application for them.
+> Fair shout.
+> 
+> On the B2120 UART0 is hooked up to the Smart Card Reader.
+> 
+> Will fix.
 
-So maemo does not use that. Good. Nor does my Debian userspace. Hey,
-maybe you can get away with changing that.
+Actually, the comment above is in regards to the st,hw-flow-control
+property [8/8].  The UART0 Pinctrl settings here are correct for all
+supported STiH407-family boards.
 
-Including batteries in hwmon interface seems useful, and I'd keep that.
+Will not fix.
 
-									Pavel
+> > > ---
+> > >  arch/arm/boot/dts/stih407-family.dtsi | 5 +++--
+> > >  1 file changed, 3 insertions(+), 2 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+> > > index c8b2944..9789978 100644
+> > > --- a/arch/arm/boot/dts/stih407-family.dtsi
+> > > +++ b/arch/arm/boot/dts/stih407-family.dtsi
+> > > @@ -222,8 +222,9 @@
+> > >  			compatible = "st,asc";
+> > >  			reg = <0x9830000 0x2c>;
+> > >  			interrupts = <GIC_SPI 122 IRQ_TYPE_NONE>;
+> > > -			pinctrl-names = "default";
+> > > -			pinctrl-0 = <&pinctrl_serial0>;
+> > > +			pinctrl-names = "default", "manual-rts";
+> > > +			pinctrl-0 = <&pinctrl_serial0_flowctrl>;
+> > > +			pinctrl-1 = <&pinctrl_serial0>;
+> > >  			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
+> > >  
+> > >  			status = "disabled";
+> 
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170127/bd2ac369/attachment.sig>
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
