@@ -1,232 +1,174 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 27 Jan 2017 09:17:12 +0100
-Subject: [PATCH 1/2] nvmem: sunxi-sid: add support for H3 and A64's SID
- controller
-In-Reply-To: <20170126113345.33686-1-icenowy@aosc.xyz>
-References: <20170126113345.33686-1-icenowy@aosc.xyz>
-Message-ID: <20170127081712.x2hprtpo2aolungc@lukather>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Fri, 27 Jan 2017 09:18:07 +0100
+Subject: [PATCH v11 5/8] arm/arm64: vgic: Introduce VENG0 and VENG1 fields
+ to vmcr struct
+In-Reply-To: <1485440453-10597-6-git-send-email-vijay.kilari@gmail.com>
+References: <1485440453-10597-1-git-send-email-vijay.kilari@gmail.com>
+ <1485440453-10597-6-git-send-email-vijay.kilari@gmail.com>
+Message-ID: <a557593f-9e95-dc00-6531-872d4e6cc3e7@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Thu, Jan 26, 2017 at 07:33:44PM +0800, Icenowy Zheng wrote:
-> H3 and A64 SoCs have a bigger SID controller, which has its direct read
-> address at 0x200 position in the SID block, not 0x0.
+On 26/01/2017 15:20, vijay.kilari at gmail.com wrote:
+> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
 > 
-> Also, H3 SID controller has some silicon bug that makes the direct read
-> value wrong at first, add code to workaround the bug. (This bug has
-> already been fixed on A64 and later SoCs)
+> ICC_VMCR_EL2 supports virtual access to ICC_IGRPEN1_EL1.Enable
+> and ICC_IGRPEN0_EL1.Enable fields. Add grpen0 and grpen1 member
+> variables to struct vmcr to support read and write of these fields.
 > 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> Also refactor vgic_set_vmcr and vgic_get_vmcr() code.
+> Drop ICH_VMCR_CTLR_SHIFT and ICH_VMCR_CTLR_MASK macros and instead
+> use ICH_VMCR_EOI* and ICH_VMCR_CBPR* macros.
+> 
+> Signed-off-by: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
+
+Thanks
+
+Eric
 > ---
->  .../bindings/nvmem/allwinner,sunxi-sid.txt         |  22 +++-
->  drivers/nvmem/sunxi_sid.c                          | 112 +++++++++++++++++++--
->  2 files changed, 123 insertions(+), 11 deletions(-)
+>  include/linux/irqchip/arm-gic-v3.h |  2 --
+>  virt/kvm/arm/vgic/vgic-mmio-v2.c   | 16 ----------------
+>  virt/kvm/arm/vgic/vgic-mmio.c      | 16 ++++++++++++++++
+>  virt/kvm/arm/vgic/vgic-v3.c        | 20 ++++++++++++++++++--
+>  virt/kvm/arm/vgic/vgic.h           |  5 +++++
+>  5 files changed, 39 insertions(+), 20 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
-> index d543ed3f5363..d7400c415338 100644
-> --- a/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
-> +++ b/Documentation/devicetree/bindings/nvmem/allwinner,sunxi-sid.txt
-> @@ -1,8 +1,16 @@
->  Allwinner sunxi-sid
+> diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+> index 7f6d904..170e00a 100644
+> --- a/include/linux/irqchip/arm-gic-v3.h
+> +++ b/include/linux/irqchip/arm-gic-v3.h
+> @@ -404,8 +404,6 @@
+>  #define ICH_HCR_EN			(1 << 0)
+>  #define ICH_HCR_UIE			(1 << 1)
 >  
->  Required properties:
-> -- compatible: "allwinner,sun4i-a10-sid" or "allwinner,sun7i-a20-sid"
-> -- reg: Should contain registers location and length
-> +- compatible: Should be one of the following (depending on your SoC):
-> +  "allwinner,sun4i-a10-sid"
-> +  "allwinner,sun7i-a20-sid"
-> +  "allwinner,sun8i-h3-sid"
-> +  "allwinner,sun50i-a64-sid"
-> +
-> +- reg: Should contain registers location and registers length, for A10 and A20
-> +  SoCs the length is directly the length of SID; for H3, A64 and newer SoCs
-> +  the length should be the sum of the length of SID and the offset of the value
-> +  (0x200).
->  
->  = Data cells =
->  Are child nodes of qfprom, bindings of which as described in
-> @@ -19,3 +27,13 @@ Example for sun7i:
->  		compatible = "allwinner,sun7i-a20-sid";
->  		reg = <0x01c23800 0x200>
->  	};
-> +
-> +Example for sun8i-h3:
-> +	sid at 01c14000 {
-> +		compatible = "allwinner,sun8i-h3-sid";
-> +		/*
-> +		 * The length of SID on H3 is 0x100 bytes, add the value offset
-> +		 * 0x200, so the total length should be 0x300.
-> +		 */
-> +		reg = <0x01c14000 0x300>;
-
-No, it should be the size of the memory region used and documented for
-that device, ie 1kB (0x400) in the H3 case, just like any other reg
-property.
-
-> +	};
-> diff --git a/drivers/nvmem/sunxi_sid.c b/drivers/nvmem/sunxi_sid.c
-> index 1567ccca8de3..2e327a66a938 100644
-> --- a/drivers/nvmem/sunxi_sid.c
-> +++ b/drivers/nvmem/sunxi_sid.c
-> @@ -20,10 +20,28 @@
->  #include <linux/module.h>
->  #include <linux/nvmem-provider.h>
->  #include <linux/of.h>
-> +#include <linux/of_device.h>
->  #include <linux/platform_device.h>
->  #include <linux/slab.h>
->  #include <linux/random.h>
->  
-> +/* Registers and special values for doing register-based SID readout on H3 */
-> +#define SUN8I_SID_PRCTL		0x40
-> +#define SUN8I_SID_RDKEY		0x60
-> +
-> +#define SUN8I_SID_OP_LOCK	0xAC
-> +#define SUN8I_SID_OFFSET_MASK	0x1FF
-> +#define SUN8I_SID_OFFSET_SHIFT	16
-> +#define SUN8I_SID_LOCK_SHIFT	8
-> +#define SUN8I_SID_READ		BIT(1)
-> +
-> +/*
-> + * For newer SoCs with a larger eFUSE, the bytes beyond the first 16 bytes are
-> + * sparse, which makes it not suitable for adding randomness; legacy SoCs' SID
-> + * have only 16 bytes, so we choose to use at most 16 bytes to add randomness.
-> + */
-> +#define SUNXI_SID_MAX_RANDOMNESS_SIZE	16
-> +
->  static struct nvmem_config econfig = {
->  	.name = "sunxi-sid",
->  	.read_only = true,
-> @@ -32,8 +50,14 @@ static struct nvmem_config econfig = {
->  	.owner = THIS_MODULE,
->  };
->  
-> +struct sunxi_sid_cfg {
-> +	u32	value_offset;
-> +	bool	need_register_readout;
-> +};
-> +
->  struct sunxi_sid {
->  	void __iomem		*base;
-> +	u32			value_offset;
->  };
->  
->  /* We read the entire key, due to a 32 bit read alignment requirement. Since we
-> @@ -46,7 +70,8 @@ static u8 sunxi_sid_read_byte(const struct sunxi_sid *sid,
->  {
->  	u32 sid_key;
->  
-> -	sid_key = ioread32be(sid->base + round_down(offset, 4));
-> +	sid_key = ioread32be(sid->base + sid->value_offset +
-> +			     round_down(offset, 4));
->  	sid_key >>= (offset % 4) * 8;
->  
->  	return sid_key; /* Only return the last byte */
-> @@ -64,26 +89,77 @@ static int sunxi_sid_read(void *context, unsigned int offset,
->  	return 0;
+> -#define ICH_VMCR_CTLR_SHIFT		0
+> -#define ICH_VMCR_CTLR_MASK		(0x21f << ICH_VMCR_CTLR_SHIFT)
+>  #define ICH_VMCR_CBPR_SHIFT		4
+>  #define ICH_VMCR_CBPR_MASK		(1 << ICH_VMCR_CBPR_SHIFT)
+>  #define ICH_VMCR_EOIM_SHIFT		9
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> index fa68dd4..a3ad7ff 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> @@ -213,22 +213,6 @@ static void vgic_mmio_write_sgipends(struct kvm_vcpu *vcpu,
+>  	}
 >  }
 >  
-> +static int sun8i_sid_register_readout(const struct sunxi_sid *sid,
-> +				      const unsigned int word,
-> +				      u32 *out)
+> -static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
+> -{
+> -	if (kvm_vgic_global_state.type == VGIC_V2)
+> -		vgic_v2_set_vmcr(vcpu, vmcr);
+> -	else
+> -		vgic_v3_set_vmcr(vcpu, vmcr);
+> -}
+> -
+> -static void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
+> -{
+> -	if (kvm_vgic_global_state.type == VGIC_V2)
+> -		vgic_v2_get_vmcr(vcpu, vmcr);
+> -	else
+> -		vgic_v3_get_vmcr(vcpu, vmcr);
+> -}
+> -
+>  #define GICC_ARCH_VERSION_V2	0x2
+>  
+>  /* These are for userland accesses only, there is no guest-facing emulation. */
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+> index 746c8af..1d1886e 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+> @@ -385,6 +385,22 @@ static int match_region(const void *key, const void *elt)
+>  		       sizeof(region[0]), match_region);
+>  }
+>  
+> +void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
 > +{
-> +	u32 reg_val;
-> +	unsigned long expire = jiffies + msecs_to_jiffies(250);
-> +
-> +	/* Set word, lock access, and set read command */
-> +	reg_val = (word & SUN8I_SID_OFFSET_MASK)
-> +		  << SUN8I_SID_OFFSET_SHIFT;
-> +	reg_val |= SUN8I_SID_OP_LOCK << SUN8I_SID_LOCK_SHIFT;
-> +	reg_val |= SUN8I_SID_READ;
-> +	writel(reg_val, sid->base + SUN8I_SID_PRCTL);
-> +
-> +	do {
-> +		reg_val = readl(sid->base + SUN8I_SID_PRCTL);
-> +	} while (time_before(jiffies, expire) && (reg_val & SUN8I_SID_READ));
-> +
-> +	if (reg_val & SUN8I_SID_READ)
-> +		return -EIO;
-> +
-> +	if (out)
-> +		*out = readl(sid->base + SUN8I_SID_RDKEY);
-> +	writel(0, sid->base + SUN8I_SID_PRCTL);
-> +	return 0;
+> +	if (kvm_vgic_global_state.type == VGIC_V2)
+> +		vgic_v2_set_vmcr(vcpu, vmcr);
+> +	else
+> +		vgic_v3_set_vmcr(vcpu, vmcr);
 > +}
 > +
->  static int sunxi_sid_probe(struct platform_device *pdev)
+> +void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
+> +{
+> +	if (kvm_vgic_global_state.type == VGIC_V2)
+> +		vgic_v2_get_vmcr(vcpu, vmcr);
+> +	else
+> +		vgic_v3_get_vmcr(vcpu, vmcr);
+> +}
+> +
+>  /*
+>   * kvm_mmio_read_buf() returns a value in a format where it can be converted
+>   * to a byte array and be directly observed as the guest wanted it to appear
+> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+> index 679ba93..42ff9c9 100644
+> --- a/virt/kvm/arm/vgic/vgic-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+> @@ -175,10 +175,18 @@ void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
 >  {
->  	struct device *dev = &pdev->dev;
->  	struct resource *res;
->  	struct nvmem_device *nvmem;
->  	struct sunxi_sid *sid;
-> -	int ret, i, size;
-> +	int ret, i, size, randomness_size;
->  	char *randomness;
-> +	const struct sunxi_sid_cfg *cfg;
+>  	u32 vmcr;
 >  
->  	sid = devm_kzalloc(dev, sizeof(*sid), GFP_KERNEL);
->  	if (!sid)
->  		return -ENOMEM;
+> -	vmcr  = (vmcrp->ctlr << ICH_VMCR_CTLR_SHIFT) & ICH_VMCR_CTLR_MASK;
+> +	/*
+> +	 * Ignore the FIQen bit, because GIC emulation always implies
+> +	 * SRE=1 which means the vFIQEn bit is also RES1.
+> +	 */
+> +	vmcr = ((vmcrp->ctlr >> ICC_CTLR_EL1_EOImode_SHIFT) <<
+> +		 ICH_VMCR_EOIM_SHIFT) & ICH_VMCR_EOIM_MASK;
+> +	vmcr |= (vmcrp->ctlr << ICH_VMCR_CBPR_SHIFT) & ICH_VMCR_CBPR_MASK;
+>  	vmcr |= (vmcrp->abpr << ICH_VMCR_BPR1_SHIFT) & ICH_VMCR_BPR1_MASK;
+>  	vmcr |= (vmcrp->bpr << ICH_VMCR_BPR0_SHIFT) & ICH_VMCR_BPR0_MASK;
+>  	vmcr |= (vmcrp->pmr << ICH_VMCR_PMR_SHIFT) & ICH_VMCR_PMR_MASK;
+> +	vmcr |= (vmcrp->grpen0 << ICH_VMCR_ENG0_SHIFT) & ICH_VMCR_ENG0_MASK;
+> +	vmcr |= (vmcrp->grpen1 << ICH_VMCR_ENG1_SHIFT) & ICH_VMCR_ENG1_MASK;
 >  
-> +	cfg = of_device_get_match_data(dev);
-> +	if (!cfg)
-> +		return -EINVAL;
-> +	sid->value_offset = cfg->value_offset;
-> +
->  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->  	sid->base = devm_ioremap_resource(dev, res);
->  	if (IS_ERR(sid->base))
->  		return PTR_ERR(sid->base);
+>  	vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr = vmcr;
+>  }
+> @@ -187,10 +195,18 @@ void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
+>  {
+>  	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr;
 >  
-> -	size = resource_size(res) - 1;
-> -	econfig.size = resource_size(res);
-> +	size = resource_size(res) - cfg->value_offset;
-> +
-> +	if (cfg->need_register_readout) {
-> +		/*
-> +		 * H3's SID controller have a bug that the value at 0x200
-> +		 * offset is not the correct value when the hardware is reset.
-> +		 * However, after doing a register-based read operation, the
-> +		 * value become right.
-> +		 * Do a full read operation here, but ignore its value
-> +		 * (as it's more fast to read by direct MMIO value than
-> +		 * with registers)
-> +		 */
-> +		for (i = 0; i < (size >> 2); i++) {
-> +			ret = sun8i_sid_register_readout(sid, i, NULL);
-> +			if (ret)
-> +				return ret;
-> +		}
-> +	}
-> +
-> +	econfig.size = size;
->  	econfig.dev = dev;
->  	econfig.reg_read = sunxi_sid_read;
->  	econfig.priv = sid;
-> @@ -91,16 +167,17 @@ static int sunxi_sid_probe(struct platform_device *pdev)
->  	if (IS_ERR(nvmem))
->  		return PTR_ERR(nvmem);
+> -	vmcrp->ctlr = (vmcr & ICH_VMCR_CTLR_MASK) >> ICH_VMCR_CTLR_SHIFT;
+> +	/*
+> +	 * Ignore the FIQen bit, because GIC emulation always implies
+> +	 * SRE=1 which means the vFIQEn bit is also RES1.
+> +	 */
+> +	vmcrp->ctlr = ((vmcr >> ICH_VMCR_EOIM_SHIFT) <<
+> +			ICC_CTLR_EL1_EOImode_SHIFT) & ICC_CTLR_EL1_EOImode_MASK;
+> +	vmcrp->ctlr |= (vmcr & ICH_VMCR_CBPR_MASK) >> ICH_VMCR_CBPR_SHIFT;
+>  	vmcrp->abpr = (vmcr & ICH_VMCR_BPR1_MASK) >> ICH_VMCR_BPR1_SHIFT;
+>  	vmcrp->bpr  = (vmcr & ICH_VMCR_BPR0_MASK) >> ICH_VMCR_BPR0_SHIFT;
+>  	vmcrp->pmr  = (vmcr & ICH_VMCR_PMR_MASK) >> ICH_VMCR_PMR_SHIFT;
+> +	vmcrp->grpen0 = (vmcr & ICH_VMCR_ENG0_MASK) >> ICH_VMCR_ENG0_SHIFT;
+> +	vmcrp->grpen1 = (vmcr & ICH_VMCR_ENG1_MASK) >> ICH_VMCR_ENG1_SHIFT;
+>  }
 >  
-> -	randomness = kzalloc(sizeof(u8) * (size), GFP_KERNEL);
-> +	randomness_size = max(size, SUNXI_SID_MAX_RANDOMNESS_SIZE);
-> +	randomness = kzalloc(sizeof(u8) * (randomness_size), GFP_KERNEL);
-
-Why is that change needed?
-
-Thanks,
-Maxime
-
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170127/93c2de6c/attachment-0001.sig>
+>  #define INITIAL_PENDBASER_VALUE						  \
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index 4505fd4..ecfe1a6 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -65,6 +65,9 @@ struct vgic_vmcr {
+>  	u32	abpr;
+>  	u32	bpr;
+>  	u32	pmr;
+> +	/* Below member variable are valid only for GICv3 */
+> +	u32	grpen0;
+> +	u32	grpen1;
+>  };
+>  
+>  struct vgic_reg_attr {
+> @@ -137,6 +140,8 @@ int vgic_v3_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+>  int vgic_v3_redist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+>  			 int offset, u32 *val);
+>  int kvm_register_vgic_device(unsigned long type);
+> +void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+> +void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+>  int vgic_lazy_init(struct kvm *kvm);
+>  int vgic_init(struct kvm *kvm);
+>  
+> 
