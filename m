@@ -1,157 +1,72 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Thu, 26 Jan 2017 20:04:55 -0500
-Subject: [RFC v2 05/10] KVM: arm/arm64: Initialize the emulated EL1 physical
- timer
-In-Reply-To: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
-References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1485479100-4966-6-git-send-email-jintack@cs.columbia.edu>
+Date: Thu, 26 Jan 2017 20:04:50 -0500
+Subject: [RFC v2 00/10] Provide the EL1 physical timer to the VM
+Message-ID: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initialize the emulated EL1 physical timer with the default irq number.
+The ARM architecture defines the EL1 physical timer and the virtual timer,
+and it is reasonable for an OS to expect to be able to access both.
+However, the current KVM implementation does not provide the EL1 physical
+timer to VMs but terminates VMs on access to the timer.
 
-Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
----
- arch/arm/kvm/reset.c         | 9 ++++++++-
- arch/arm64/kvm/reset.c       | 9 ++++++++-
- include/kvm/arm_arch_timer.h | 3 ++-
- virt/kvm/arm/arch_timer.c    | 9 +++++++--
- 4 files changed, 25 insertions(+), 5 deletions(-)
+This patch series enables VMs to use the EL1 physical timer through
+trap-and-emulate.  The KVM host emulates each EL1 physical timer register
+access and sets up the background timer accordingly.  When the background
+timer expires, the KVM host injects EL1 physical timer interrupts to the
+VM.  Alternatively, it's also possible to allow VMs to access the EL1
+physical timer without trapping.  However, this requires somehow using the
+EL2 physical timer for the Linux host while running the VM instead of the
+EL1 physical timer.  Right now I just implemented trap-and-emulate because
+this was straightforward to do, and I leave it to future work to determine
+if transferring the EL1 physical timer state to the EL2 timer provides any
+performance benefit.
 
-diff --git a/arch/arm/kvm/reset.c b/arch/arm/kvm/reset.c
-index 4b5e802..1da8b2d 100644
---- a/arch/arm/kvm/reset.c
-+++ b/arch/arm/kvm/reset.c
-@@ -37,6 +37,11 @@
- 	.usr_regs.ARM_cpsr = SVC_MODE | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT,
- };
- 
-+static const struct kvm_irq_level cortexa_ptimer_irq = {
-+	{ .irq = 30 },
-+	.level = 1,
-+};
-+
- static const struct kvm_irq_level cortexa_vtimer_irq = {
- 	{ .irq = 27 },
- 	.level = 1,
-@@ -58,6 +63,7 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- {
- 	struct kvm_regs *reset_regs;
- 	const struct kvm_irq_level *cpu_vtimer_irq;
-+	const struct kvm_irq_level *cpu_ptimer_irq;
- 
- 	switch (vcpu->arch.target) {
- 	case KVM_ARM_TARGET_CORTEX_A7:
-@@ -65,6 +71,7 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- 		reset_regs = &cortexa_regs_reset;
- 		vcpu->arch.midr = read_cpuid_id();
- 		cpu_vtimer_irq = &cortexa_vtimer_irq;
-+		cpu_ptimer_irq = &cortexa_ptimer_irq;
- 		break;
- 	default:
- 		return -ENODEV;
-@@ -77,5 +84,5 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- 	kvm_reset_coprocs(vcpu);
- 
- 	/* Reset arch_timer context */
--	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
-+	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq, cpu_ptimer_irq);
- }
-diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
-index e95d4f6..d9e9697 100644
---- a/arch/arm64/kvm/reset.c
-+++ b/arch/arm64/kvm/reset.c
-@@ -46,6 +46,11 @@
- 			COMPAT_PSR_I_BIT | COMPAT_PSR_F_BIT),
- };
- 
-+static const struct kvm_irq_level default_ptimer_irq = {
-+	.irq	= 30,
-+	.level	= 1,
-+};
-+
- static const struct kvm_irq_level default_vtimer_irq = {
- 	.irq	= 27,
- 	.level	= 1,
-@@ -104,6 +109,7 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
- int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- {
- 	const struct kvm_irq_level *cpu_vtimer_irq;
-+	const struct kvm_irq_level *cpu_ptimer_irq;
- 	const struct kvm_regs *cpu_reset;
- 
- 	switch (vcpu->arch.target) {
-@@ -117,6 +123,7 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- 		}
- 
- 		cpu_vtimer_irq = &default_vtimer_irq;
-+		cpu_ptimer_irq = &default_ptimer_irq;
- 		break;
- 	}
- 
-@@ -130,5 +137,5 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
- 	kvm_pmu_vcpu_reset(vcpu);
- 
- 	/* Reset timer */
--	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
-+	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq, cpu_ptimer_irq);
- }
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index 69f648b..a364593 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -59,7 +59,8 @@ struct arch_timer_cpu {
- int kvm_timer_enable(struct kvm_vcpu *vcpu);
- void kvm_timer_init(struct kvm *kvm);
- int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
--			 const struct kvm_irq_level *irq);
-+			 const struct kvm_irq_level *virt_irq,
-+			 const struct kvm_irq_level *phys_irq);
- void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
- void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu);
- void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu);
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index f72005a..0f6e935 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -329,9 +329,11 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
- }
- 
- int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
--			 const struct kvm_irq_level *irq)
-+			 const struct kvm_irq_level *virt_irq,
-+			 const struct kvm_irq_level *phys_irq)
- {
- 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-+	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
- 
- 	/*
- 	 * The vcpu timer irq number cannot be determined in
-@@ -339,7 +341,8 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
- 	 * kvm_vcpu_set_target(). To handle this, we determine
- 	 * vcpu timer irq number when the vcpu is reset.
- 	 */
--	vtimer->irq.irq = irq->irq;
-+	vtimer->irq.irq = virt_irq->irq;
-+	ptimer->irq.irq = phys_irq->irq;
- 
- 	/*
- 	 * The bits in CNTV_CTL are architecturally reset to UNKNOWN for ARMv8
-@@ -348,6 +351,7 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
- 	 * the ARMv7 architecture.
- 	 */
- 	vtimer->cnt_ctl = 0;
-+	ptimer->cnt_ctl = 0;
- 	kvm_timer_update_state(vcpu);
- 
- 	return 0;
-@@ -369,6 +373,7 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 
- 	update_vtimer_cntvoff(vcpu, kvm_phys_timer_read());
-+	vcpu_ptimer(vcpu)->cntvoff = 0;
- 
- 	INIT_WORK(&timer->expired, kvm_timer_inject_irq_work);
- 	hrtimer_init(&timer->timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
+This feature will be useful for any OS that wishes to access the EL1
+physical timer. Nested virtualization is one of those use cases. A nested
+hypervisor running inside a VM would think it has full access to the
+hardware and naturally tries to use the EL1 physical timer as Linux would
+do. Other nested hypervisors may try to use the EL2 physical timer as Xen
+would do, but supporting the EL2 physical timer to the VM is out of scope
+of this patch series. This patch series will make it easy to add the EL2
+timer support in the future, though.
+
+Note that Linux VMs booting in EL1 will be unaffected by this patch series
+and will continue to use only the virtual timer and this patch series will
+therefore not introduce any performance degredation as a result of
+trap-and-emulate.
+
+v1 => v2:
+ - Rebase on kvm-arm-for-4.10-rc4
+ - To make it simple, schedule the background timer for the EL1 physical timer
+   emulation on every entry to the VM and cancel it on exit.
+ - Change timer_context structure to have cntvoff and restore enable field back
+   to arch_timer_cpu structure
+
+Jintack Lim (10):
+  KVM: arm/arm64: Abstract virtual timer context into separate structure
+  KVM: arm/arm64: Move cntvoff to each timer context
+  KVM: arm/arm64: Decouple kvm timer functions from virtual timer
+  KVM: arm/arm64: Add the EL1 physical timer context
+  KVM: arm/arm64: Initialize the emulated EL1 physical timer
+  KVM: arm/arm64: Update the physical timer interrupt level
+  KVM: arm/arm64: Set a background timer to the earliest timer
+    expiration
+  KVM: arm/arm64: Set up a background timer for the physical timer
+    emulation
+  KVM: arm64: Add the EL1 physical timer access handler
+  KVM: arm/arm64: Emulate the EL1 phys timer register access
+
+ arch/arm/include/asm/kvm_host.h   |   6 +-
+ arch/arm/kvm/arm.c                |   3 +-
+ arch/arm/kvm/reset.c              |   9 +-
+ arch/arm64/include/asm/kvm_host.h |   4 +-
+ arch/arm64/kvm/reset.c            |   9 +-
+ arch/arm64/kvm/sys_regs.c         |  60 +++++++++++
+ include/kvm/arm_arch_timer.h      |  39 ++++----
+ virt/kvm/arm/arch_timer.c         | 204 ++++++++++++++++++++++++++++----------
+ virt/kvm/arm/hyp/timer-sr.c       |  13 +--
+ 9 files changed, 261 insertions(+), 86 deletions(-)
+
 -- 
 1.9.1
