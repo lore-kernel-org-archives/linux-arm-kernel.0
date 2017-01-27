@@ -1,276 +1,162 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 27 Jan 2017 22:05:10 +0200
-Subject: [PATCH 4/4] phy: exynos: Use one define for enable bit
-In-Reply-To: <20170127200510.4444-1-krzk@kernel.org>
-References: <20170127200510.4444-1-krzk@kernel.org>
-Message-ID: <20170127200510.4444-5-krzk@kernel.org>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 27 Jan 2017 14:07:02 -0600
+Subject: [PATCH v2, 6/6] dt-bindings: phy-mt65xx-usb: add support for new
+ version phy
+In-Reply-To: <1484900321-26933-6-git-send-email-chunfeng.yun@mediatek.com>
+References: <1484900321-26933-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1484900321-26933-6-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <20170127200702.biyvgzgoq3yxx7yx@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need for separate defines for Exynos4 and Exynos5 phy enable
-bit and MIPI phy reset bits.  In both cases there are the same so
-simplify it.
+On Fri, Jan 20, 2017 at 04:18:41PM +0800, Chunfeng Yun wrote:
+> add a new compatible string for "mt2712", and move reference clock
+> into each port node;
+> 
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> ---
+>  .../devicetree/bindings/phy/phy-mt65xx-usb.txt     |   91 +++++++++++++++++---
+>  1 file changed, 77 insertions(+), 14 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+> index 33a2b1e..1d06604 100644
+> --- a/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+> +++ b/Documentation/devicetree/bindings/phy/phy-mt65xx-usb.txt
+> @@ -6,21 +6,27 @@ This binding describes a usb3.0 phy for mt65xx platforms of Medaitek SoC.
+>  Required properties (controller (parent) node):
+>   - compatible	: should be one of
+>  		  "mediatek,mt2701-u3phy"
+> +		  "mediatek,mt2712-u3phy"
+>  		  "mediatek,mt8173-u3phy"
+> - - reg		: offset and length of register for phy, exclude port's
+> -		  register.
+> - - clocks	: a list of phandle + clock-specifier pairs, one for each
+> -		  entry in clock-names
+> - - clock-names	: must contain
+> -		  "u3phya_ref": for reference clock of usb3.0 analog phy.
+>  
+>  Required nodes	: a sub-node is required for each port the controller
+>  		  provides. Address range information including the usual
+>  		  'reg' property is used inside these nodes to describe
+>  		  the controller's topology.
+>  
+> +Optional properties (controller (parent) node):
+> + - reg		: offset and length of register shared by multiple ports,
 
-This reduces number of defines and allows removal of one header file.
+How is this optional?
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
----
- drivers/phy/phy-exynos-dp-video.c           |  5 ++--
- drivers/phy/phy-exynos-mipi-video.c         | 39 ++++++++++++++---------------
- drivers/phy/phy-exynos5-usbdrd.c            |  5 ++--
- include/linux/mfd/syscon/exynos5-pmu.h      | 24 ------------------
- include/linux/soc/samsung/exynos-regs-pmu.h |  3 ++-
- 5 files changed, 25 insertions(+), 51 deletions(-)
- delete mode 100644 include/linux/mfd/syscon/exynos5-pmu.h
+> +		  exclude port's private register. It is needed on mt2701
+> +		  and mt8173, but not on mt2712.
+> +
+>  Required properties (port (child) node):
+>  - reg		: address and length of the register set for the port.
+> +- clocks	: a list of phandle + clock-specifier pairs, one for each
+> +		  entry in clock-names
+> +- clock-names	: must contain
+> +		  "ref_clk": 48M reference clock for HighSpeed analog phy; and
 
-diff --git a/drivers/phy/phy-exynos-dp-video.c b/drivers/phy/phy-exynos-dp-video.c
-index d72193188980..bb3279dbf88c 100644
---- a/drivers/phy/phy-exynos-dp-video.c
-+++ b/drivers/phy/phy-exynos-dp-video.c
-@@ -14,7 +14,6 @@
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/mfd/syscon.h>
--#include <linux/mfd/syscon/exynos5-pmu.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
- #include <linux/phy/phy.h>
-@@ -37,7 +36,7 @@ static int exynos_dp_video_phy_power_on(struct phy *phy)
- 
- 	/* Disable power isolation on DP-PHY */
- 	return regmap_update_bits(state->regs, state->drvdata->phy_ctrl_offset,
--				  EXYNOS5_PHY_ENABLE, EXYNOS5_PHY_ENABLE);
-+				  EXYNOS4_PHY_ENABLE, EXYNOS4_PHY_ENABLE);
- }
- 
- static int exynos_dp_video_phy_power_off(struct phy *phy)
-@@ -46,7 +45,7 @@ static int exynos_dp_video_phy_power_off(struct phy *phy)
- 
- 	/* Enable power isolation on DP-PHY */
- 	return regmap_update_bits(state->regs, state->drvdata->phy_ctrl_offset,
--				  EXYNOS5_PHY_ENABLE, 0);
-+				  EXYNOS4_PHY_ENABLE, 0);
- }
- 
- static const struct phy_ops exynos_dp_video_phy_ops = {
-diff --git a/drivers/phy/phy-exynos-mipi-video.c b/drivers/phy/phy-exynos-mipi-video.c
-index acef1d92691e..c198886f80a3 100644
---- a/drivers/phy/phy-exynos-mipi-video.c
-+++ b/drivers/phy/phy-exynos-mipi-video.c
-@@ -12,7 +12,6 @@
- #include <linux/err.h>
- #include <linux/io.h>
- #include <linux/kernel.h>
--#include <linux/mfd/syscon/exynos5-pmu.h>
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-@@ -64,7 +63,7 @@ static const struct mipi_phy_device_desc s5pv210_mipi_phy = {
- 		{
- 			/* EXYNOS_MIPI_PHY_ID_CSIS0 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_DSIM0,
--			.enable_val = EXYNOS4_MIPI_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(0),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
- 			.resetn_val = EXYNOS4_MIPI_PHY_SRESETN,
-@@ -73,7 +72,7 @@ static const struct mipi_phy_device_desc s5pv210_mipi_phy = {
- 		}, {
- 			/* EXYNOS_MIPI_PHY_ID_DSIM0 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_CSIS0,
--			.enable_val = EXYNOS4_MIPI_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(0),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
- 			.resetn_val = EXYNOS4_MIPI_PHY_MRESETN,
-@@ -82,7 +81,7 @@ static const struct mipi_phy_device_desc s5pv210_mipi_phy = {
- 		}, {
- 			/* EXYNOS_MIPI_PHY_ID_CSIS1 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_DSIM1,
--			.enable_val = EXYNOS4_MIPI_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(1),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
- 			.resetn_val = EXYNOS4_MIPI_PHY_SRESETN,
-@@ -91,7 +90,7 @@ static const struct mipi_phy_device_desc s5pv210_mipi_phy = {
- 		}, {
- 			/* EXYNOS_MIPI_PHY_ID_DSIM1 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_CSIS1,
--			.enable_val = EXYNOS4_MIPI_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(1),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
- 			.resetn_val = EXYNOS4_MIPI_PHY_MRESETN,
-@@ -109,46 +108,46 @@ static const struct mipi_phy_device_desc exynos5420_mipi_phy = {
- 		{
- 			/* EXYNOS_MIPI_PHY_ID_CSIS0 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_DSIM0,
--			.enable_val = EXYNOS5_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS5420_MIPI_PHY_CONTROL(0),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
--			.resetn_val = EXYNOS5_MIPI_PHY_S_RESETN,
-+			.resetn_val = EXYNOS4_MIPI_PHY_SRESETN,
- 			.resetn_reg = EXYNOS5420_MIPI_PHY_CONTROL(0),
- 			.resetn_map = EXYNOS_MIPI_REGMAP_PMU,
- 		}, {
- 			/* EXYNOS_MIPI_PHY_ID_DSIM0 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_CSIS0,
--			.enable_val = EXYNOS5_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS5420_MIPI_PHY_CONTROL(0),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
--			.resetn_val = EXYNOS5_MIPI_PHY_M_RESETN,
-+			.resetn_val = EXYNOS4_MIPI_PHY_MRESETN,
- 			.resetn_reg = EXYNOS5420_MIPI_PHY_CONTROL(0),
- 			.resetn_map = EXYNOS_MIPI_REGMAP_PMU,
- 		}, {
- 			/* EXYNOS_MIPI_PHY_ID_CSIS1 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_DSIM1,
--			.enable_val = EXYNOS5_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS5420_MIPI_PHY_CONTROL(1),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
--			.resetn_val = EXYNOS5_MIPI_PHY_S_RESETN,
-+			.resetn_val = EXYNOS4_MIPI_PHY_SRESETN,
- 			.resetn_reg = EXYNOS5420_MIPI_PHY_CONTROL(1),
- 			.resetn_map = EXYNOS_MIPI_REGMAP_PMU,
- 		}, {
- 			/* EXYNOS_MIPI_PHY_ID_DSIM1 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_CSIS1,
--			.enable_val = EXYNOS5_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS5420_MIPI_PHY_CONTROL(1),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
--			.resetn_val = EXYNOS5_MIPI_PHY_M_RESETN,
-+			.resetn_val = EXYNOS4_MIPI_PHY_MRESETN,
- 			.resetn_reg = EXYNOS5420_MIPI_PHY_CONTROL(1),
- 			.resetn_map = EXYNOS_MIPI_REGMAP_PMU,
- 		}, {
- 			/* EXYNOS_MIPI_PHY_ID_CSIS2 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_NONE,
--			.enable_val = EXYNOS5_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS5420_MIPI_PHY_CONTROL(2),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
--			.resetn_val = EXYNOS5_MIPI_PHY_S_RESETN,
-+			.resetn_val = EXYNOS4_MIPI_PHY_SRESETN,
- 			.resetn_reg = EXYNOS5420_MIPI_PHY_CONTROL(2),
- 			.resetn_map = EXYNOS_MIPI_REGMAP_PMU,
- 		},
-@@ -172,7 +171,7 @@ static const struct mipi_phy_device_desc exynos5433_mipi_phy = {
- 		{
- 			/* EXYNOS_MIPI_PHY_ID_CSIS0 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_DSIM0,
--			.enable_val = EXYNOS5_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(0),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
- 			.resetn_val = BIT(0),
-@@ -181,7 +180,7 @@ static const struct mipi_phy_device_desc exynos5433_mipi_phy = {
- 		}, {
- 			/* EXYNOS_MIPI_PHY_ID_DSIM0 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_CSIS0,
--			.enable_val = EXYNOS5_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(0),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
- 			.resetn_val = BIT(0),
-@@ -190,7 +189,7 @@ static const struct mipi_phy_device_desc exynos5433_mipi_phy = {
- 		}, {
- 			/* EXYNOS_MIPI_PHY_ID_CSIS1 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_NONE,
--			.enable_val = EXYNOS5_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(1),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
- 			.resetn_val = BIT(1),
-@@ -199,7 +198,7 @@ static const struct mipi_phy_device_desc exynos5433_mipi_phy = {
- 		}, {
- 			/* EXYNOS_MIPI_PHY_ID_DSIM1 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_NONE,
--			.enable_val = EXYNOS5_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(1),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
- 			.resetn_val = BIT(1),
-@@ -208,7 +207,7 @@ static const struct mipi_phy_device_desc exynos5433_mipi_phy = {
- 		}, {
- 			/* EXYNOS_MIPI_PHY_ID_CSIS2 */
- 			.coupled_phy_id = EXYNOS_MIPI_PHY_ID_NONE,
--			.enable_val = EXYNOS5_PHY_ENABLE,
-+			.enable_val = EXYNOS4_PHY_ENABLE,
- 			.enable_reg = EXYNOS4_MIPI_PHY_CONTROL(2),
- 			.enable_map = EXYNOS_MIPI_REGMAP_PMU,
- 			.resetn_val = BIT(0),
-diff --git a/drivers/phy/phy-exynos5-usbdrd.c b/drivers/phy/phy-exynos5-usbdrd.c
-index 7c896d0cda18..7c41daa2c625 100644
---- a/drivers/phy/phy-exynos5-usbdrd.c
-+++ b/drivers/phy/phy-exynos5-usbdrd.c
-@@ -22,7 +22,6 @@
- #include <linux/platform_device.h>
- #include <linux/mutex.h>
- #include <linux/mfd/syscon.h>
--#include <linux/mfd/syscon/exynos5-pmu.h>
- #include <linux/regmap.h>
- #include <linux/regulator/consumer.h>
- #include <linux/soc/samsung/exynos-regs-pmu.h>
-@@ -236,10 +235,10 @@ static void exynos5_usbdrd_phy_isol(struct phy_usb_instance *inst,
- 	if (!inst->reg_pmu)
- 		return;
- 
--	val = on ? 0 : EXYNOS5_PHY_ENABLE;
-+	val = on ? 0 : EXYNOS4_PHY_ENABLE;
- 
- 	regmap_update_bits(inst->reg_pmu, inst->pmu_offset,
--			   EXYNOS5_PHY_ENABLE, val);
-+			   EXYNOS4_PHY_ENABLE, val);
- }
- 
- /*
-diff --git a/include/linux/mfd/syscon/exynos5-pmu.h b/include/linux/mfd/syscon/exynos5-pmu.h
-deleted file mode 100644
-index 6108857ffcca..000000000000
---- a/include/linux/mfd/syscon/exynos5-pmu.h
-+++ /dev/null
-@@ -1,24 +0,0 @@
--/*
-- * Exynos5 SoC series Power Management Unit (PMU) register offsets
-- * and bit definitions.
-- *
-- * Copyright (C) 2014 Samsung Electronics Co., Ltd.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#ifndef _LINUX_MFD_SYSCON_PMU_EXYNOS5_H_
--#define _LINUX_MFD_SYSCON_PMU_EXYNOS5_H_
--
--/* Exynos5 PMU register definitions */
--
--/* Exynos5250 specific register definitions */
--
--/* Exynos5420 specific register definitions */
--
--#define EXYNOS5_PHY_ENABLE			BIT(0)
--#define EXYNOS5_MIPI_PHY_S_RESETN		BIT(1)
--#define EXYNOS5_MIPI_PHY_M_RESETN		BIT(2)
--#endif /* _LINUX_MFD_SYSCON_PMU_EXYNOS5_H_ */
-diff --git a/include/linux/soc/samsung/exynos-regs-pmu.h b/include/linux/soc/samsung/exynos-regs-pmu.h
-index 6dbd65012ccd..b7e961a7a43a 100644
---- a/include/linux/soc/samsung/exynos-regs-pmu.h
-+++ b/include/linux/soc/samsung/exynos-regs-pmu.h
-@@ -52,7 +52,8 @@
- 
- /* MIPI_PHYn_CONTROL, valid for Exynos3250, Exynos4, Exynos5250 and Exynos5433 */
- #define EXYNOS4_MIPI_PHY_CONTROL(n)		(0x0710 + (n) * 4)
--#define EXYNOS4_MIPI_PHY_ENABLE			(1 << 0)
-+/* Phy enable bit, common for all phy registers, not only MIPI */
-+#define EXYNOS4_PHY_ENABLE			(1 << 0)
- #define EXYNOS4_MIPI_PHY_SRESETN		(1 << 1)
- #define EXYNOS4_MIPI_PHY_MRESETN		(1 << 2)
- #define EXYNOS4_MIPI_PHY_RESET_MASK		(3 << 1)
--- 
-2.9.3
+_clk is redundant. Just "ref"
+
+> +			26M reference clock for SuperSpeed analog phy, sometimes is
+> +			24M, 25M or 27M, depended on platform.
+>  - #phy-cells	: should be 1 (See second example)
+>  		  cell after port phandle is phy type from:
+>  			- PHY_TYPE_USB2
+> @@ -31,21 +37,31 @@ Example:
+>  u3phy: usb-phy at 11290000 {
+>  	compatible = "mediatek,mt8173-u3phy";
+>  	reg = <0 0x11290000 0 0x800>;
+> -	clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
+> -	clock-names = "u3phya_ref";
+>  	#address-cells = <2>;
+>  	#size-cells = <2>;
+>  	ranges;
+>  	status = "okay";
+>  
+> -	phy_port0: port at 11290800 {
+> -		reg = <0 0x11290800 0 0x800>;
+> +	u2port0: port at 11290800 {
+> +		reg = <0 0x11290800 0 0x100>;
+> +		clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
+> +		clock-names = "ref_clk";
+>  		#phy-cells = <1>;
+>  		status = "okay";
+>  	};
+>  
+> -	phy_port1: port at 11291000 {
+> -		reg = <0 0x11291000 0 0x800>;
+> +	u3port0: port at 11290900 {
+> +		reg = <0 0x11290800 0 0x700>;
+> +		clocks = <&clk26m>;
+> +		clock-names = "ref_clk";
+> +		#phy-cells = <1>;
+> +		status = "okay";
+> +	};
+> +
+> +	u2port1: port at 11291000 {
+> +		reg = <0 0x11291000 0 0x100>;
+> +		clocks = <&apmixedsys CLK_APMIXED_REF2USB_TX>;
+> +		clock-names = "ref_clk";
+>  		#phy-cells = <1>;
+>  		status = "okay";
+>  	};
+> @@ -64,7 +80,54 @@ Example:
+>  
+>  usb30: usb at 11270000 {
+>  	...
+> -	phys = <&phy_port0 PHY_TYPE_USB3>;
+> -	phy-names = "usb3-0";
+> +	phys = <&u2port0 PHY_TYPE_USB2>, <&u3port0 PHY_TYPE_USB3>;
+> +	phy-names = "usb2-0", "usb3-0";
+>  	...
+>  };
+> +
+> +
+> +Layout differences of banks between mt8173/mt2701 and mt2712
+> +-------------------------------------------------------------
+> +mt8173 and mt2701:
+> +port        offset    bank
+> +shared      0x0000    SPLLC
+> +            0x0100    FMREG
+> +u2 port0    0x0800    U2PHY_COM
+> +u3 port0    0x0900    U3PHYD
+> +            0x0a00    U3PHYD_BANK2
+> +            0x0b00    U3PHYA
+> +            0x0c00    U3PHYA_DA
+> +u2 port1    0x1000    U2PHY_COM
+> +u3 port1    0x1100    U3PHYD
+> +            0x1200    U3PHYD_BANK2
+> +            0x1300    U3PHYA
+> +            0x1400    U3PHYA_DA
+> +u2 port2    0x1800    U2PHY_COM
+> +            ...
+> +
+> +mt2712:
+> +port        offset    bank
+> +u2 port0    0x0000    MISC
+> +            0x0100    FMREG
+> +            0x0300    U2PHY_COM
+> +u3 port0    0x0700    SPLLC
+> +            0x0800    CHIP
+> +            0x0900    U3PHYD
+> +            0x0a00    U3PHYD_BANK2
+> +            0x0b00    U3PHYA
+> +            0x0c00    U3PHYA_DA
+> +u2 port1    0x1000    MISC
+> +            0x1100    FMREG
+> +            0x1300    U2PHY_COM
+> +u3 port1    0x1700    SPLLC
+> +            0x1800    CHIP
+> +            0x1900    U3PHYD
+> +            0x1a00    U3PHYD_BANK2
+> +            0x1b00    U3PHYA
+> +            0x1c00    U3PHYA_DA
+> +u2 port2    0x2000    MISC
+> +            ...
+> +
+> +    SPLLC shared by u3 ports and FMREG shared by u2 ports on
+> +mt8173/mt2701 are put back into each port; a new bank MISC for
+> +u2 ports and CHIP for u3 ports are added on mt2712.
+> -- 
+> 1.7.9.5
+> 
