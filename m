@@ -1,56 +1,43 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 27 Jan 2017 22:38:36 +0100
-Subject: [PATCH v5 4/13] mmc: sunxi: Enable the new timings for the A64 MMC
- controllers
-In-Reply-To: <cover.6f3d82744628848e2182720c35f13e87e8b62258.1485553113.git-series.maxime.ripard@free-electrons.com>
-References: <cover.6f3d82744628848e2182720c35f13e87e8b62258.1485553113.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <4a2be38120cebd8bed2358b19addb0985fe28a61.1485553113.git-series.maxime.ripard@free-electrons.com>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Fri, 27 Jan 2017 16:44:08 -0500
+Subject: [PATCH 1/2] PCI: iproc: allow the MPS to be set
+In-Reply-To: <1485553449-9345-1-git-send-email-jon.mason@broadcom.com>
+References: <1485553449-9345-1-git-send-email-jon.mason@broadcom.com>
+Message-ID: <1485553449-9345-2-git-send-email-jon.mason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A64 MMC controllers need to set a "new timings" bit when a new rate is
-set.
+pcie_bus_configure_settings() needs to be called on each of the root
+ports to allow for the MPS to be configured for all of the children
+devices.
 
-The actual meaning of that bit is not clear yet, but not setting it leads
-to some corner-case issues, like the CMD53 failing, which is used to
-implement SDIO packet aggregation.
-
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Tested-by: Florian Vaussard <florian.vaussard@heig-vd.ch>
+Signed-off-by: Jon Mason <jon.mason@broadcom.com>
 ---
- drivers/mmc/host/sunxi-mmc.c | 6 ++++++
- 1 file changed, 6 insertions(+), 0 deletions(-)
+ drivers/pci/host/pcie-iproc.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index b9c8a62bc212..51d6388a194e 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -253,6 +253,8 @@ struct sunxi_mmc_cfg {
+diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
+index 3ebc025..0f39bd2 100644
+--- a/drivers/pci/host/pcie-iproc.c
++++ b/drivers/pci/host/pcie-iproc.c
+@@ -1205,7 +1205,7 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
+ 	struct device *dev;
+ 	int ret;
+ 	void *sysdata;
+-	struct pci_bus *bus;
++	struct pci_bus *bus, *child;
  
- 	/* does the IP block support autocalibration? */
- 	bool can_calibrate;
+ 	dev = pcie->dev;
+ 
+@@ -1278,6 +1278,9 @@ int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res)
+ 	if (pcie->map_irq)
+ 		pci_fixup_irqs(pci_common_swizzle, pcie->map_irq);
+ 
++	list_for_each_entry(child, &bus->children, node)
++		pcie_bus_configure_settings(child);
 +
-+	bool needs_new_timings;
- };
+ 	pci_bus_add_devices(bus);
  
- struct sunxi_mmc_host {
-@@ -779,6 +781,9 @@ static int sunxi_mmc_clk_set_rate(struct sunxi_mmc_host *host,
- 	}
- 	mmc_writel(host, REG_CLKCR, rval);
- 
-+	if (host->cfg->needs_new_timings)
-+		mmc_writel(host, REG_SD_NTSR, SDXC_2X_TIMING_MODE);
-+
- 	ret = sunxi_mmc_clk_set_phase(host, ios, rate);
- 	if (ret)
- 		return ret;
-@@ -1076,6 +1081,7 @@ static const struct sunxi_mmc_cfg sun50i_a64_cfg = {
- 	.idma_des_size_bits = 16,
- 	.clk_delays = NULL,
- 	.can_calibrate = true,
-+	.needs_new_timings = true,
- };
- 
- static const struct of_device_id sunxi_mmc_of_match[] = {
+ 	return 0;
 -- 
-git-series 0.8.11
+2.7.4
