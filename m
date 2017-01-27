@@ -1,60 +1,62 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 27 Jan 2017 10:43:16 +0000
-Subject: [PATCH] crypto: arm64/crc32 - detect crc32 support in assembler
-In-Reply-To: <20170127104039.29351-1-mbrugger@suse.com>
-References: <20170127104039.29351-1-mbrugger@suse.com>
-Message-ID: <CAKv+Gu8P3U6_u7FdRFSdDL9jdKaJQuqHbrQ-7Qu900f8R1voZw@mail.gmail.com>
+From: jslaby@suse.cz (Jiri Slaby)
+Date: Fri, 27 Jan 2017 11:46:58 +0100
+Subject: [patch added to 3.12-stable] clocksource/exynos_mct: Clear interrupt
+ when cpu is shut down
+In-Reply-To: <20170127104747.24816-1-jslaby@suse.cz>
+References: <20170127104747.24816-1-jslaby@suse.cz>
+Message-ID: <20170127104747.24816-14-jslaby@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathias,
+From: Joonyoung Shim <jy0922.shim@samsung.com>
 
-On 27 January 2017 at 10:40, Matthias Brugger <mbrugger@suse.com> wrote:
-> Older compilers may not be able to detect the crc32 extended cpu type.
+This patch has been added to the 3.12 stable tree. If you have any
+objections, please let us know.
 
-What do you mean 'detect'? Could you describe the failure in more detail please?
+===============
 
-> Anyway only inline assembler code is used, which gets passed to the
-> assembler. This patch moves the crc detection to the assembler.
->
-> Suggested-by: Alexander Graf <agraf@suse.de>
-> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
-> ---
->  arch/arm64/crypto/Makefile      | 2 --
->  arch/arm64/crypto/crc32-arm64.c | 3 +++
->  2 files changed, 3 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
-> index aa8888d7b744..0d779dac75cd 100644
-> --- a/arch/arm64/crypto/Makefile
-> +++ b/arch/arm64/crypto/Makefile
-> @@ -48,8 +48,6 @@ CFLAGS_aes-glue-ce.o  := -DUSE_V8_CRYPTO_EXTENSIONS
->
->  obj-$(CONFIG_CRYPTO_CRC32_ARM64) += crc32-arm64.o
->
-> -CFLAGS_crc32-arm64.o   := -mcpu=generic+crc
-> -
->  $(obj)/aes-glue-%.o: $(src)/aes-glue.c FORCE
->         $(call if_changed_rule,cc_o_c)
->
-> diff --git a/arch/arm64/crypto/crc32-arm64.c b/arch/arm64/crypto/crc32-arm64.c
-> index 6a37c3c6b11d..10f5dd075323 100644
-> --- a/arch/arm64/crypto/crc32-arm64.c
-> +++ b/arch/arm64/crypto/crc32-arm64.c
-> @@ -29,6 +29,9 @@ MODULE_AUTHOR("Yazen Ghannam <yazen.ghannam@linaro.org>");
->  MODULE_DESCRIPTION("CRC32 and CRC32C using optional ARMv8 instructions");
->  MODULE_LICENSE("GPL v2");
->
-> +/* Request crc extension capabilities from the assembler */
-> +asm(".arch_extension crc");
-> +
+commit bc7c36eedb0c7004aa06c2afc3c5385adada8fa3 upstream.
 
-Will should confirm, but I think this is a recent feature in GAS for
-AArch64, so this may break older toolchains as well.
+When a CPU goes offline a potentially pending timer interrupt is not
+cleared. When the CPU comes online again then the pending interrupt is
+delivered before the per cpu clockevent device is initialized. As a
+consequence the tick interrupt handler dereferences a NULL pointer.
 
->  #define CRC32X(crc, value) __asm__("crc32x %w[c], %w[c], %x[v]":[c]"+r"(crc):[v]"r"(value))
->  #define CRC32W(crc, value) __asm__("crc32w %w[c], %w[c], %w[v]":[c]"+r"(crc):[v]"r"(value))
->  #define CRC32H(crc, value) __asm__("crc32h %w[c], %w[c], %w[v]":[c]"+r"(crc):[v]"r"(value))
-> --
-> 2.11.0
->
+[   51.251378] Unable to handle kernel NULL pointer dereference at virtual address 00000040
+[   51.289348] task: ee942d00 task.stack: ee960000
+[   51.293861] PC is at tick_periodic+0x38/0xb0
+[   51.298102] LR is at tick_handle_periodic+0x1c/0x90
+
+Clear the pending interrupt in the cpu dying path.
+
+Fixes: 56a94f13919c ("clocksource: exynos_mct: Avoid blocking calls in the cpu hotplug notifier")
+Reported-by: Seung-Woo Kim <sw0312.kim@samsung.com>
+Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+Cc: linux-samsung-soc at vger.kernel.org
+Cc: cw00.choi at samsung.com
+Cc: daniel.lezcano at linaro.org
+Cc: javier at osg.samsung.com
+Cc: kgene at kernel.org
+Cc: krzk at kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Link: http://lkml.kernel.org/r/1484628876-22065-1-git-send-email-jy0922.shim at samsung.com
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Jiri Slaby <jslaby@suse.cz>
+---
+ drivers/clocksource/exynos_mct.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index af994880be72..26bfe09ce0fb 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -439,6 +439,7 @@ static void exynos4_local_timer_stop(struct mct_clock_event_device *mevt)
+ 	if (mct_int_type == MCT_INT_SPI) {
+ 		if (evt->irq != -1)
+ 			disable_irq_nosync(evt->irq);
++		exynos4_mct_write(0x1, mevt->base + MCT_L_INT_CSTAT_OFFSET);
+ 	} else {
+ 		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
+ 	}
+-- 
+2.11.0
