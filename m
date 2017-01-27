@@ -1,52 +1,121 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 27 Jan 2017 18:07:32 +0100
-Subject: [GIT PULL] ARM: mvebu: dt for v4.11 (#2)
-Message-ID: <87lgtwwhwr.fsf@free-electrons.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 27 Jan 2017 11:07:55 -0600
+Subject: [PATCH] PCI/ASPM: reconfigure ASPM following hotplug
+In-Reply-To: <1485471092-16906-1-git-send-email-okaya@codeaurora.org>
+References: <1485471092-16906-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <20170127170755.GB17251@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Sinan,
 
-Here is the second pull request for dt for mvebu for v4.11.
+On Thu, Jan 26, 2017 at 05:51:32PM -0500, Sinan Kaya wrote:
+> When the operating system is booted with the default ASPM policy,
+> the current code is determining the ASPM policy by querying the
+> enable/disable states from ASPM registers.
+> 
+> In the case of hotplug removal, the ASPM registers get cleared by
+> calling the exit function.
 
-Gregory
+I assume you mean pcie_aspm_exit_link_state().  It'd be easier if you
+were specific about that.
 
-The following changes since commit 7b7db5ab33d2292d9b037cda0c41a795b094d940:
+But I don't know whether this is relevant anyway.  In a surprise
+removal we won't call pcie_aspm_exit_link_state(), will we?
 
-  ARM: dts: turris-omnia: add support for ethernet switch (2017-01-05 13:59:18 +0100)
+> An insertion following remove reads incorrect policy as disabled
+> even though ASPM was enabled during boot.
+> 
+> Adding a flag to the struct pci_dev and saving the power up policy
+> in the bridge to be reused during hotplug insertion. Bridge's enable
+> counter is used as a switch to determine when to use saved value.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/pci/pcie/aspm.c | 13 ++++++++++---
+>  include/linux/pci.h     |  1 +
+>  2 files changed, 11 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/pci/pcie/aspm.c b/drivers/pci/pcie/aspm.c
+> index 17ac1dc..32b8a86 100644
+> --- a/drivers/pci/pcie/aspm.c
+> +++ b/drivers/pci/pcie/aspm.c
+> @@ -338,7 +338,9 @@ static void pcie_aspm_check_latency(struct pci_dev *endpoint)
+>  	}
+>  }
+>  
+> -static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
+> +static
+> +void pcie_aspm_cap_init(struct pci_dev *pdev, struct pcie_link_state *link,
+> +			int blacklist)
+>  {
+>  	struct pci_dev *child, *parent = link->pdev;
+>  	struct pci_bus *linkbus = parent->subordinate;
+> @@ -398,7 +400,12 @@ static void pcie_aspm_cap_init(struct pcie_link_state *link, int blacklist)
+>  	link->latency_dw.l1 = calc_l1_latency(dwreg.latency_encoding_l1);
+>  
+>  	/* Save default state */
+> -	link->aspm_default = link->aspm_enabled;
+> +	if (!atomic_read(&pdev->enable_cnt)) {
+> +		link->aspm_default = link->aspm_enabled;
+> +		pdev->aspm_default = link->aspm_default;
+> +	} else {
+> +		link->aspm_default = pdev->aspm_default;
+> +	}
 
-are available in the git repository at:
+This connection with enable_cnt is too obtuse.  There's no obvious
+connection between enabling the device and computing the default ASPM
+state.
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt-4.11-2
+We're working on the bridge (the upstream end of a link).  If I
+understand correctly, the case of interest here is where the bridge
+stays put and an endpoint below the bridge is removed and re-added.
+Why can't we figure out the policy the same way as when we first
+enumerated the bridge?
 
-for you to fetch changes up to a3fe1d5dce142400945ecdc0d2e91b1645b6ebfa:
+In POLICY_PERFORMANCE and POLICY_POWERSAVE, I assume the original BIOS
+configuration doesn't matter.  Maybe the point here is to remember the
+original BIOS configuration for POLICY_DEFAULT?  If so, the patch
+should mention POLICY_DEFAULT somehow to help the reader connect the
+dots.
 
-  ARM: dts: kirkwood-rd88f6281: Utilize new DSA binding (2017-01-19 23:47:11 +0100)
+>  	/* Setup initial capable state. Will be updated later */
+>  	link->aspm_capable = link->aspm_support;
+> @@ -599,7 +606,7 @@ void pcie_aspm_init_link_state(struct pci_dev *pdev)
+>  	 * upstream links also because capable state of them can be
+>  	 * update through pcie_aspm_cap_init().
+>  	 */
+> -	pcie_aspm_cap_init(link, blacklist);
+> +	pcie_aspm_cap_init(pdev, link, blacklist);
 
-----------------------------------------------------------------
-mvebu dt for 4.11 (part 2)
+I think "link" is always "pdev->link_state", so we should be able to
+pass only "pdev" here, and pcie_aspm_cap_init() could use
+pdev->link_state internally.
 
-Switch device tree files to the new DSA binding
+>  	/* Setup initial Clock PM state */
+>  	pcie_clkpm_cap_init(link, blacklist);
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index e2d1a12..d0ecde6 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -316,6 +316,7 @@ struct pci_dev {
+>  	unsigned int	hotplug_user_indicators:1; /* SlotCtl indicators
+>  						      controlled exclusively by
+>  						      user sysfs */
+> +	unsigned int	aspm_default;	/* aspm policy set by BIOS */
 
-----------------------------------------------------------------
-Florian Fainelli (8):
-      ARM: dts: armada-370-rd: Utilize new DSA binding
-      ARM: dts: armada-385-linksys: Utilize new DSA binding
-      ARM: dts: armada-388-clearfog: Utilize new DSA binding
-      ARM: dts: armada-xp-linksys-mamba: Utilize new DSA binding
-      ARM: dts: kirkwood-dir665: Utilize new DSA binding
-      ARM: dts: kirkwood-linksys-viper: Utilize new DSA binding
-      ARM: dts: kirkwood-mv88f6281gtw-ge: Utilize new DSA binding
-      ARM: dts: kirkwood-rd88f6281: Utilize new DSA binding
+We already have an #ifdef CONFIG_PCIEASPM above, and this should go
+under that.  "aspm" in English text is an acronym and should be
+capitalized, just like "BIOS".
 
- arch/arm/boot/dts/armada-370-rd.dts            | 44 +++++++++++++++++
- arch/arm/boot/dts/armada-385-linksys.dtsi      | 52 ++++++++++++++++++++-
- arch/arm/boot/dts/armada-388-clearfog.dts      | 65 ++++++++++++++++++++++++++
- arch/arm/boot/dts/armada-xp-linksys-mamba.dts  | 53 +++++++++++++++++++++
- arch/arm/boot/dts/kirkwood-dir665.dts          | 49 +++++++++++++++++++
- arch/arm/boot/dts/kirkwood-linksys-viper.dts   | 49 +++++++++++++++++++
- arch/arm/boot/dts/kirkwood-mv88f6281gtw-ge.dts | 49 +++++++++++++++++++
- arch/arm/boot/dts/kirkwood-rd88f6281-a.dts     |  9 ++--
- arch/arm/boot/dts/kirkwood-rd88f6281-z0.dts    | 11 +++++
- arch/arm/boot/dts/kirkwood-rd88f6281.dtsi      | 44 +++++++++++++++++
- 10 files changed, 419 insertions(+), 6 deletions(-)
+>  	unsigned int	d3_delay;	/* D3->D0 transition time in ms */
+>  	unsigned int	d3cold_delay;	/* D3cold->D0 transition time in ms */
+>  
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
