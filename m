@@ -1,48 +1,60 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 27 Jan 2017 17:48:44 +0100
-Subject: [PATCHv5 5/5] arm: mvebu: Add device tree for db-dxbc2 and
- db-xc3-24g4xg boards
-In-Reply-To: <20170127032546.14657-6-chris.packham@alliedtelesis.co.nz> (Chris
- Packham's message of "Fri, 27 Jan 2017 16:25:46 +1300")
-References: <20170127032546.14657-1-chris.packham@alliedtelesis.co.nz>
- <20170127032546.14657-6-chris.packham@alliedtelesis.co.nz>
-Message-ID: <87poj8wis3.fsf@free-electrons.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Fri, 27 Jan 2017 22:28:46 +0530
+Subject: [PATCH] iommu: Better document the IOMMU_PRIV flag
+In-Reply-To: <edc67cc1775f3bafb6895346184e8042fd881ba4.1485519627.git.robin.murphy@arm.com>
+References: <1483709296-32761-1-git-send-email-sricharan@codeaurora.org>
+ <1483709296-32761-2-git-send-email-sricharan@codeaurora.org>
+ <edc67cc1775f3bafb6895346184e8042fd881ba4.1485519627.git.robin.murphy@arm.com>
+Message-ID: <009101d278be$a388b310$ea9a1930$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
- 
- On ven., janv. 27 2017, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
+Hi Robin,
 
-> These boards are Marvell's evaluation boards for the 98DX4251 and
-> 98DX3336 SoCs.
+>-----Original Message-----
+>From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Robin Murphy
+>Sent: Friday, January 27, 2017 5:53 PM
+>To: will.deacon at arm.com
+>Cc: iommu at lists.linux-foundation.org; sricharan at codeaurora.org; linux-arm-kernel at lists.infradead.org
+>Subject: [PATCH] iommu: Better document the IOMMU_PRIV flag
 >
-> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
-> ---
+>This is a fairly subtle thing - let's make sure it's described as
+>clearly as possible to avoid potential misunderstandings.
 >
-> Notes:
->     Changes in v5:
->     - update license text
->     - use node labels
+>Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>---
 >
->  arch/arm/boot/dts/db-dxbc2.dts      | 151 ++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/db-xc3-24g4xg.dts | 142 +++++++++++++++++++++++++++++++++
->  2 files changed, 293 insertions(+)
->  create mode 100644 arch/arm/boot/dts/db-dxbc2.dts
->  create mode 100644 arch/arm/boot/dts/db-xc3-24g4xg.dts
+>Having another look through the IOMMU_PRIV series, I wasn't convinced
+>that the original comment was really all that helpful - I'm happy for
+>this to be squashed in if you like.
+>
+>Robin.
+>
+> include/linux/iommu.h | 11 +++++++----
+> 1 file changed, 7 insertions(+), 4 deletions(-)
+>
+>diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+>index 69e2417a2965..3c830e153069 100644
+>--- a/include/linux/iommu.h
+>+++ b/include/linux/iommu.h
+>@@ -32,10 +32,13 @@
+> #define IOMMU_NOEXEC	(1 << 3)
+> #define IOMMU_MMIO	(1 << 4) /* e.g. things like MSI doorbells */
+> /*
+>- * This is to make the IOMMU API setup privileged
+>- * mapppings accessible by the master only at higher
+>- * privileged execution level and inaccessible at
+>- * less privileged levels.
+>+ * Where the bus hardware includes a privilege level as part of its access type
+>+ * markings, and certain devices are capable of issuing transactions marked as
+>+ * either 'supervisor' or 'user', the IOMMU_PRIV flag requests that the other
+>+ * given permission flags only apply to accesses at the higher privilege level,
+>+ * and that unprivileged transactions should have as little access as possible.
+>+ * This would usually imply the same permissions as kernel mappings on the CPU,
+>+ * if the IOMMU page table format is equivalent.
+>  */
 
-I only noticed it when I applied your patch: could you rename them by
-adding the prefix armada-xp-. The rule we use for naming the dts is to
-start by the SoC it belongs. The main benefit is when we try to have all
-the device tree file of the same SoC we just have to parse the name of
-the files.
+Agree, gives much more insight.
 
-Thanks,
-
-Gregory
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards,
+  Sricharan
