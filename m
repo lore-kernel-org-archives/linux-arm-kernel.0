@@ -1,63 +1,61 @@
-From: rafalo@cadence.com (Rafal Ozieblo)
-Date: Fri, 27 Jan 2017 11:06:33 +0000
-Subject: [PATCH net-next v2] macb: Common code to enable ptp support for
- MACB/GEM
-In-Reply-To: <779c1540-f4da-90ee-1fa1-c94339a892aa@atmel.com>
-References: <1484841375-11420-1-git-send-email-andrei.pistirica@microchip.com>
- <BN3PR07MB25160FCBCF19918C495F43B4C9770@BN3PR07MB2516.namprd07.prod.outlook.com>
- <CAFcVECLuWM65zXJWtMcwijZ1ZbtH0pvKnTUR=SJagPGHEr9amg@mail.gmail.com>
- <BN3PR07MB25163747E1520E4CE1C6164FC9760@BN3PR07MB2516.namprd07.prod.outlook.com>
- <779c1540-f4da-90ee-1fa1-c94339a892aa@atmel.com>
-Message-ID: <BN3PR07MB2516525EBCC11BE7E5AC3ADBC9760@BN3PR07MB2516.namprd07.prod.outlook.com>
+From: jslaby@suse.cz (Jiri Slaby)
+Date: Fri, 27 Jan 2017 11:55:19 +0100
+Subject: [PATCH 3.12 186/235] clocksource/exynos_mct: Clear interrupt when cpu
+ is shut down
+In-Reply-To: <5b46dc789ca2be4046e4e40a131858d386cac741.1485514374.git.jslaby@suse.cz>
+References: <5b46dc789ca2be4046e4e40a131858d386cac741.1485514374.git.jslaby@suse.cz>
+Message-ID: <0d340098985b2c0f72f12c12106b83fd1079a60f.1485514374.git.jslaby@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->-----Original Message-----
->From: Nicolas Ferre [mailto:nicolas.ferre at atmel.com] 
->Sent: 27 stycznia 2017 11:28
->Subject: Re: [PATCH net-next v2] macb: Common code to enable ptp support for MACB/GEM
->
->Le 27/01/2017 ? 11:26, Rafal Ozieblo a ?crit :
->>> -----Original Message-----
->>> From: Harini Katakam [mailto:harinikatakamlinux at gmail.com] 
->>> Sent: 27 stycznia 2017 06:43
->>> Subject: Re: [PATCH net-next v2] macb: Common code to enable ptp support for MACB/GEM
->>>
->>> Hi Rafal,
->>>
->>> On Thu, Jan 26, 2017 at 8:45 PM, Rafal Ozieblo <rafalo@cadence.com> wrote:
->>>>> -----Original Message-----
->>>>> From: Andrei Pistirica [mailto:andrei.pistirica at microchip.com]
->>>>> Sent: 19 stycznia 2017 16:56
->>>>> Subject: [PATCH net-next v2] macb: Common code to enable ptp support for MACB/GEM
->>>>>
->>>>>
->>>>> +static inline bool gem_has_ptp(struct macb *bp)
->>>>> +{
->>>>> +     return !!(bp->caps & MACB_CAPS_GEM_HAS_PTP);
->>>>> +}
->>>> Why don't you use hardware capabilities here? Would it be better to read it from hardware instead adding it to many configuration?
->>>
->>> If you are referring to TSU bit in DCFG5, then we will be relying on
->>> Cadence IP's information irrespective of the SoC capability
->>> and whether the PTP support was adequate.
->>> I think the capability approach gives better control and
->>> it is not really much to add.
->>>
->>> Regards,
->>> Harini
->>>
->> Yes, I'm referring to TSU bit.
->> What if SoC contains multiple Cadence GEMs, some with PTP support and others without?
->
->Simply define different DT compatibility strings and we're good.
+From: Joonyoung Shim <jy0922.shim@samsung.com>
 
-What with GEM on PCI ? There is no DT.
+3.12-stable review patch.  If anyone has any objections, please let me know.
 
->> Relevant will be checking both, hardware capabilities and SoC capabilities from "caps" field.
->> 
->
->
->-- 
->Nicolas Ferre
->
+===============
+
+commit bc7c36eedb0c7004aa06c2afc3c5385adada8fa3 upstream.
+
+When a CPU goes offline a potentially pending timer interrupt is not
+cleared. When the CPU comes online again then the pending interrupt is
+delivered before the per cpu clockevent device is initialized. As a
+consequence the tick interrupt handler dereferences a NULL pointer.
+
+[   51.251378] Unable to handle kernel NULL pointer dereference at virtual address 00000040
+[   51.289348] task: ee942d00 task.stack: ee960000
+[   51.293861] PC is at tick_periodic+0x38/0xb0
+[   51.298102] LR is at tick_handle_periodic+0x1c/0x90
+
+Clear the pending interrupt in the cpu dying path.
+
+Fixes: 56a94f13919c ("clocksource: exynos_mct: Avoid blocking calls in the cpu hotplug notifier")
+Reported-by: Seung-Woo Kim <sw0312.kim@samsung.com>
+Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+Cc: linux-samsung-soc at vger.kernel.org
+Cc: cw00.choi at samsung.com
+Cc: daniel.lezcano at linaro.org
+Cc: javier at osg.samsung.com
+Cc: kgene at kernel.org
+Cc: krzk at kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Link: http://lkml.kernel.org/r/1484628876-22065-1-git-send-email-jy0922.shim at samsung.com
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Jiri Slaby <jslaby@suse.cz>
+---
+ drivers/clocksource/exynos_mct.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+index af994880be72..26bfe09ce0fb 100644
+--- a/drivers/clocksource/exynos_mct.c
++++ b/drivers/clocksource/exynos_mct.c
+@@ -439,6 +439,7 @@ static void exynos4_local_timer_stop(struct mct_clock_event_device *mevt)
+ 	if (mct_int_type == MCT_INT_SPI) {
+ 		if (evt->irq != -1)
+ 			disable_irq_nosync(evt->irq);
++		exynos4_mct_write(0x1, mevt->base + MCT_L_INT_CSTAT_OFFSET);
+ 	} else {
+ 		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
+ 	}
+-- 
+2.11.0
