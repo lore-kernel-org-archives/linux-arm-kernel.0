@@ -1,136 +1,157 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Thu, 26 Jan 2017 20:04:57 -0500
-Subject: [RFC v2 07/10] KVM: arm/arm64: Set a background timer to the earliest
- timer expiration
+Date: Thu, 26 Jan 2017 20:04:55 -0500
+Subject: [RFC v2 05/10] KVM: arm/arm64: Initialize the emulated EL1 physical
+ timer
 In-Reply-To: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
 References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <1485479100-4966-8-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <1485479100-4966-6-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When scheduling a background timer, consider both of the virtual and
-physical timer and pick the earliest expiration time.
+Initialize the emulated EL1 physical timer with the default irq number.
 
 Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 ---
- arch/arm/kvm/arm.c        |  3 ++-
- virt/kvm/arm/arch_timer.c | 55 ++++++++++++++++++++++++++++++++++++-----------
- 2 files changed, 44 insertions(+), 14 deletions(-)
+ arch/arm/kvm/reset.c         | 9 ++++++++-
+ arch/arm64/kvm/reset.c       | 9 ++++++++-
+ include/kvm/arm_arch_timer.h | 3 ++-
+ virt/kvm/arm/arch_timer.c    | 9 +++++++--
+ 4 files changed, 25 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 9a34a3c..9e94f87 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -301,7 +301,8 @@ void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
+diff --git a/arch/arm/kvm/reset.c b/arch/arm/kvm/reset.c
+index 4b5e802..1da8b2d 100644
+--- a/arch/arm/kvm/reset.c
++++ b/arch/arm/kvm/reset.c
+@@ -37,6 +37,11 @@
+ 	.usr_regs.ARM_cpsr = SVC_MODE | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT,
+ };
  
- int kvm_cpu_has_pending_timer(struct kvm_vcpu *vcpu)
++static const struct kvm_irq_level cortexa_ptimer_irq = {
++	{ .irq = 30 },
++	.level = 1,
++};
++
+ static const struct kvm_irq_level cortexa_vtimer_irq = {
+ 	{ .irq = 27 },
+ 	.level = 1,
+@@ -58,6 +63,7 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
  {
--	return kvm_timer_should_fire(vcpu, vcpu_vtimer(vcpu));
-+	return kvm_timer_should_fire(vcpu, vcpu_vtimer(vcpu)) ||
-+		kvm_timer_should_fire(vcpu, vcpu_ptimer(vcpu));
- }
+ 	struct kvm_regs *reset_regs;
+ 	const struct kvm_irq_level *cpu_vtimer_irq;
++	const struct kvm_irq_level *cpu_ptimer_irq;
  
- void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu)
+ 	switch (vcpu->arch.target) {
+ 	case KVM_ARM_TARGET_CORTEX_A7:
+@@ -65,6 +71,7 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ 		reset_regs = &cortexa_regs_reset;
+ 		vcpu->arch.midr = read_cpuid_id();
+ 		cpu_vtimer_irq = &cortexa_vtimer_irq;
++		cpu_ptimer_irq = &cortexa_ptimer_irq;
+ 		break;
+ 	default:
+ 		return -ENODEV;
+@@ -77,5 +84,5 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ 	kvm_reset_coprocs(vcpu);
+ 
+ 	/* Reset arch_timer context */
+-	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
++	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq, cpu_ptimer_irq);
+ }
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index e95d4f6..d9e9697 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -46,6 +46,11 @@
+ 			COMPAT_PSR_I_BIT | COMPAT_PSR_F_BIT),
+ };
+ 
++static const struct kvm_irq_level default_ptimer_irq = {
++	.irq	= 30,
++	.level	= 1,
++};
++
+ static const struct kvm_irq_level default_vtimer_irq = {
+ 	.irq	= 27,
+ 	.level	= 1,
+@@ -104,6 +109,7 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ {
+ 	const struct kvm_irq_level *cpu_vtimer_irq;
++	const struct kvm_irq_level *cpu_ptimer_irq;
+ 	const struct kvm_regs *cpu_reset;
+ 
+ 	switch (vcpu->arch.target) {
+@@ -117,6 +123,7 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ 		}
+ 
+ 		cpu_vtimer_irq = &default_vtimer_irq;
++		cpu_ptimer_irq = &default_ptimer_irq;
+ 		break;
+ 	}
+ 
+@@ -130,5 +137,5 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ 	kvm_pmu_vcpu_reset(vcpu);
+ 
+ 	/* Reset timer */
+-	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
++	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq, cpu_ptimer_irq);
+ }
+diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+index 69f648b..a364593 100644
+--- a/include/kvm/arm_arch_timer.h
++++ b/include/kvm/arm_arch_timer.h
+@@ -59,7 +59,8 @@ struct arch_timer_cpu {
+ int kvm_timer_enable(struct kvm_vcpu *vcpu);
+ void kvm_timer_init(struct kvm *kvm);
+ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+-			 const struct kvm_irq_level *irq);
++			 const struct kvm_irq_level *virt_irq,
++			 const struct kvm_irq_level *phys_irq);
+ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
+ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu);
+ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu);
 diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 3b6bd50..d3925e2 100644
+index f72005a..0f6e935 100644
 --- a/virt/kvm/arm/arch_timer.c
 +++ b/virt/kvm/arm/arch_timer.c
-@@ -119,6 +119,35 @@ static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu,
- 	return 0;
+@@ -329,9 +329,11 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
  }
  
-+static bool kvm_timer_irq_can_fire(struct arch_timer_context *timer_ctx)
-+{
-+	return !(timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_IT_MASK) &&
-+		(timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_ENABLE);
-+}
-+
-+/*
-+ * Returns the earliest expiration time in ns among guest timers.
-+ * Note that it will return 0 if none of timers can fire.
-+ */
-+static u64 kvm_timer_earliest_exp(struct kvm_vcpu *vcpu)
-+{
-+	u64 min_virt = ULLONG_MAX, min_phys = ULLONG_MAX;
-+	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-+	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
-+
-+	if (kvm_timer_irq_can_fire(vtimer))
-+		min_virt = kvm_timer_compute_delta(vcpu, vtimer);
-+
-+	if (kvm_timer_irq_can_fire(ptimer))
-+		min_phys = kvm_timer_compute_delta(vcpu, ptimer);
-+
-+	/* If none of timers can fire, then return 0 */
-+	if ((min_virt == ULLONG_MAX) && (min_phys == ULLONG_MAX))
-+		return 0;
-+
-+	return min(min_virt, min_phys);
-+}
-+
- static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
+ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+-			 const struct kvm_irq_level *irq)
++			 const struct kvm_irq_level *virt_irq,
++			 const struct kvm_irq_level *phys_irq)
  {
- 	struct arch_timer_cpu *timer;
-@@ -133,7 +162,7 @@ static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
- 	 * PoV (NTP on the host may have forced it to expire
- 	 * early). If we should have slept longer, restart it.
- 	 */
--	ns = kvm_timer_compute_delta(vcpu, vcpu_vtimer(vcpu));
-+	ns = kvm_timer_earliest_exp(vcpu);
- 	if (unlikely(ns)) {
- 		hrtimer_forward_now(hrt, ns_to_ktime(ns));
- 		return HRTIMER_RESTART;
-@@ -143,12 +172,6 @@ static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
- 	return HRTIMER_NORESTART;
- }
- 
--static bool kvm_timer_irq_can_fire(struct arch_timer_context *timer_ctx)
--{
--	return !(timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_IT_MASK) &&
--		(timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_ENABLE);
--}
--
- bool kvm_timer_should_fire(struct kvm_vcpu *vcpu,
- 			   struct arch_timer_context *timer_ctx)
- {
-@@ -233,26 +256,32 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
  	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
 +	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
  
- 	BUG_ON(timer_is_armed(timer));
+ 	/*
+ 	 * The vcpu timer irq number cannot be determined in
+@@ -339,7 +341,8 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+ 	 * kvm_vcpu_set_target(). To handle this, we determine
+ 	 * vcpu timer irq number when the vcpu is reset.
+ 	 */
+-	vtimer->irq.irq = irq->irq;
++	vtimer->irq.irq = virt_irq->irq;
++	ptimer->irq.irq = phys_irq->irq;
  
  	/*
--	 * No need to schedule a background timer if the guest timer has
-+	 * No need to schedule a background timer if any guest timer has
- 	 * already expired, because kvm_vcpu_block will return before putting
- 	 * the thread to sleep.
+ 	 * The bits in CNTV_CTL are architecturally reset to UNKNOWN for ARMv8
+@@ -348,6 +351,7 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+ 	 * the ARMv7 architecture.
  	 */
--	if (kvm_timer_should_fire(vcpu, vtimer))
-+	if (kvm_timer_should_fire(vcpu, vtimer) ||
-+	    kvm_timer_should_fire(vcpu, ptimer))
- 		return;
+ 	vtimer->cnt_ctl = 0;
++	ptimer->cnt_ctl = 0;
+ 	kvm_timer_update_state(vcpu);
  
- 	/*
--	 * If the timer is not capable of raising interrupts (disabled or
-+	 * If both timers are not capable of raising interrupts (disabled or
- 	 * masked), then there's no more work for us to do.
- 	 */
--	if (!kvm_timer_irq_can_fire(vtimer))
-+	if (!kvm_timer_irq_can_fire(vtimer) &&
-+	    !kvm_timer_irq_can_fire(ptimer))
- 		return;
+ 	return 0;
+@@ -369,6 +373,7 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
  
--	/*  The timer has not yet expired, schedule a background timer */
--	timer_arm(timer, kvm_timer_compute_delta(vcpu, vtimer));
-+	/*
-+	 * The guest timers have not yet expired, schedule a background timer.
-+	 * Set the earliest expiration time among the guest timers.
-+	 */
-+	timer_arm(timer, kvm_timer_earliest_exp(vcpu));
- }
+ 	update_vtimer_cntvoff(vcpu, kvm_phys_timer_read());
++	vcpu_ptimer(vcpu)->cntvoff = 0;
  
- void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
+ 	INIT_WORK(&timer->expired, kvm_timer_inject_irq_work);
+ 	hrtimer_init(&timer->timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
 -- 
 1.9.1
