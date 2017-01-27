@@ -1,45 +1,30 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 27 Jan 2017 11:26:00 -0500 (EST)
-Subject: [PATCH] Net: ethernet: mediatek - Fix possible NULL derefrence.
-In-Reply-To: <20170127124449.GB13611@Red>
-References: <CGME20170127111947epcas2p14f5ea86f0069142be02339754fda4a55@epcas2p1.samsung.com>
- <1485515980-3814-1-git-send-email-shailendra.v@samsung.com>
- <20170127124449.GB13611@Red>
-Message-ID: <20170127.112600.2185367941561923892.davem@davemloft.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 27 Jan 2017 17:27:54 +0100
+Subject: [PATCH] ARM: ep93xx: Disable TS-72xx watchdog before uncompressing
+In-Reply-To: <633e3405-c66d-0503-2626-36ebb0cfb756@gmail.com>
+References: <20161211191615.13696-1-f.fainelli@gmail.com>
+ <6d58631d-37a2-8362-e9aa-0c360fac4509@gmail.com>
+ <SN1PR0101MB1565EBACEA749241E3FC3169D0910@SN1PR0101MB1565.prod.exchangelabs.com>
+ <633e3405-c66d-0503-2626-36ebb0cfb756@gmail.com>
+Message-ID: <CAK8P3a0dMXHb04w+-Q4fE1ek=uGX=HjODsVU1=gfNoRpGourDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Corentin Labbe <clabbe.montjoie@gmail.com>
-Date: Fri, 27 Jan 2017 13:44:49 +0100
+On Fri, Jan 20, 2017 at 2:05 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> On 12/19/2016 08:08 AM, Hartley Sweeten wrote:
+>> On Sunday, December 18, 2016 7:08 PM, Florian Fainelli wrote:
+>>> Le 12/11/16 ? 11:16, Florian Fainelli a ?crit :
 
-> On Fri, Jan 27, 2017 at 04:49:40PM +0530, Shailendra Verma wrote:
->> of_match_device could return NULL, and so can cause a NULL
->> pointer dereference later.
->> 
->> Signed-off-by: Shailendra Verma <shailendra.v@samsung.com>
->> ---
->>  drivers/net/ethernet/mediatek/mtk_eth_soc.c |    4 ++++
->>  1 file changed, 4 insertions(+)
->> 
->> diff --git a/drivers/net/ethernet/mediatek/mtk_eth_soc.c b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
->> index 4a62ffd..4495b7b 100644
->> --- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
->> +++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
->> @@ -2369,6 +2369,10 @@ static int mtk_probe(struct platform_device *pdev)
->>  	int i;
->>  
->>  	match = of_match_device(of_mtk_match, &pdev->dev);
->> +	if (!match) {
->> +		dev_err(&pdev->dev, "Error: No device match found\n");
->> +		return -ENODEV;
->> +	}
->>  	soc = (struct mtk_soc_data *)match->data;
->>  
->>  	eth = devm_kzalloc(&pdev->dev, sizeof(*eth), GFP_KERNEL);
->> -- 
-> 
-> Hello
-> 
-> You could use of_device_get_match_data() and simplifiy code
+>> Ryan has an old tree on github but it has not been updated since Oct 14, 2013.  I'm
+>> not sure if he is doing any active development at this time.
+>>
+>> This patch will have to go through RMK's patch system or some other tree.
+>
+> Olof, Arnd, Kevin, should I just resent this patch to arm at kernel.org for
+> you to pick it?
 
-Agreed.
+Yes, that would be good. I've added it to my todo folder now, but
+having the patch
+itself there is easier for us.
+
+     Arnd
