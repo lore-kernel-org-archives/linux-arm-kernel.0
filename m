@@ -1,35 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 27 Jan 2017 10:14:31 +0100
-Subject: [PATCH 9/9] arm64: dts: r8a7796: Mark EthernetAVB device node disabled
+Date: Fri, 27 Jan 2017 10:14:28 +0100
+Subject: [PATCH 6/9] arm64: dts: r8a7796: Link ARM GIC to clock and clock
+ domain
 In-Reply-To: <cover.1485508214.git.horms+renesas@verge.net.au>
 References: <cover.1485508214.git.horms+renesas@verge.net.au>
-Message-ID: <7e1c23b94ed7f0d2719795a9828402003de5335d.1485508214.git.horms+renesas@verge.net.au>
+Message-ID: <0bacdbc76b5aad0c109198e0b289d759e0cb9a9b.1485508214.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Device nodes representing I/O devices should be marked disabled in the
-SoC-specific DTS, and overridden by board-specific DTSes where needed.
+Link the ARM GIC to the INTC-AP module clock, and add it to the SYSC
+"always-on" PM Domain, so it can be power managed using that clock.
 
-Fixes: 8e8b9eaef8fb05d9 ("arm64: dts: renesas: r8a7796: Add EthernetAVB instance")
+Note that currently the GIC-400 driver doesn't support module clocks nor
+Runtime PM, so this must be handled as a critical clock.
+
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index 82c5ef1b6065..f7120cdedd0d 100644
+index 67aa0e4fde77..82c5ef1b6065 100644
 --- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -472,6 +472,7 @@
- 			phy-mode = "rgmii-id";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+			status = "disabled";
+@@ -101,6 +101,9 @@
+ 			      <0x0 0xf1060000 0 0x20000>;
+ 			interrupts = <GIC_PPI 9
+ 					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_HIGH)>;
++			clocks = <&cpg CPG_MOD 408>;
++			clock-names = "clk";
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
  		};
  
- 		scif2: serial at e6e88000 {
+ 		timer {
 -- 
 2.7.0.rc3.207.g0ac5344
