@@ -1,167 +1,133 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 27 Jan 2017 17:42:00 +0100
-Subject: [PATCH RESEND 1/5] gpio: Add the devm_get_index_gpiod_from_child()
- helper
+Date: Fri, 27 Jan 2017 17:42:03 +0100
+Subject: [PATCH RESEND 4/5] mtd: nand: atmel: Document the new DT bindings
 In-Reply-To: <1485535324-28393-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1485535324-28393-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1485535324-28393-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1485535324-28393-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-devm_get_gpiod_from_child() currently allows GPIO users to request a GPIO
-that is defined in a child fwnode instead of directly in the device
-fwnode. Extend this API by adding the devm_get_index_gpiod_from_child()
-helpers which does the same except you can also specify an index in case
-the 'xx-gpios' property describe several GPIOs.
+Document the new DT bindings for the Atmel NAND controller and
+deprecate the old ones.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
-I've added a new function instead of modifying the existing
-devm_get_gpiod_from_child() helper to avoid patching all users of this
-function.
-Note that fwnode_get_named_gpiod() has been modified because there's no
-external users.
----
- drivers/gpio/devres.c         | 30 +++++++++++++++++++++++++-----
- drivers/gpio/gpiolib.c        |  9 +++++----
- include/linux/gpio/consumer.h | 15 +++++++++++++--
- 3 files changed, 43 insertions(+), 11 deletions(-)
+ .../devicetree/bindings/mtd/atmel-nand.txt         | 106 ++++++++++++++++++++-
+ 1 file changed, 105 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpio/devres.c b/drivers/gpio/devres.c
-index b760cbbb41d8..4dbab629a05e 100644
---- a/drivers/gpio/devres.c
-+++ b/drivers/gpio/devres.c
-@@ -123,17 +123,20 @@ struct gpio_desc *__must_check devm_gpiod_get_index(struct device *dev,
- EXPORT_SYMBOL(devm_gpiod_get_index);
- 
- /**
-- * devm_get_gpiod_from_child - get a GPIO descriptor from a device's child node
-+ * devm_get_index_gpiod_from_child - get a GPIO descriptor from a device's
-+ *				     child node
-  * @dev:	GPIO consumer
-  * @con_id:	function within the GPIO consumer
-+ * @index:	index of the GPIO to obtain in the consumer
-  * @child:	firmware node (child of @dev)
-  *
-  * GPIO descriptors returned from this function are automatically disposed on
-  * driver detach.
-  */
--struct gpio_desc *devm_get_gpiod_from_child(struct device *dev,
--					    const char *con_id,
--					    struct fwnode_handle *child)
-+struct gpio_desc *devm_get_index_gpiod_from_child(struct device *dev,
-+						  const char *con_id,
-+						  int index,
-+						  struct fwnode_handle *child)
- {
- 	static const char * const suffixes[] = { "gpios", "gpio" };
- 	char prop_name[32]; /* 32 is max size of property name */
-@@ -154,7 +157,7 @@ struct gpio_desc *devm_get_gpiod_from_child(struct device *dev,
- 			snprintf(prop_name, sizeof(prop_name), "%s",
- 							       suffixes[i]);
- 
--		desc = fwnode_get_named_gpiod(child, prop_name);
-+		desc = fwnode_get_named_gpiod(child, prop_name, index);
- 		if (!IS_ERR(desc) || (PTR_ERR(desc) != -ENOENT))
- 			break;
- 	}
-@@ -168,6 +171,23 @@ struct gpio_desc *devm_get_gpiod_from_child(struct device *dev,
- 
- 	return desc;
- }
-+EXPORT_SYMBOL(devm_get_index_gpiod_from_child);
+diff --git a/Documentation/devicetree/bindings/mtd/atmel-nand.txt b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+index 3e7ee99d3949..2a86ef2332dc 100644
+--- a/Documentation/devicetree/bindings/mtd/atmel-nand.txt
++++ b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+@@ -1,4 +1,108 @@
+-Atmel NAND flash
++Atmel NAND flash controller bindings
 +
-+/**
-+ * devm_get_gpiod_from_child - get a GPIO descriptor from a device's child node
-+ * @dev:	GPIO consumer
-+ * @con_id:	function within the GPIO consumer
-+ * @child:	firmware node (child of @dev)
-+ *
-+ * GPIO descriptors returned from this function are automatically disposed on
-+ * driver detach.
-+ */
-+struct gpio_desc *devm_get_gpiod_from_child(struct device *dev,
-+					    const char *con_id,
-+					    struct fwnode_handle *child)
-+{
-+	return devm_get_index_gpiod_from_child(dev, con_id, 0, child);
-+}
- EXPORT_SYMBOL(devm_get_gpiod_from_child);
- 
- /**
-diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-index 86bf3b84ada5..9b7a7734e742 100644
---- a/drivers/gpio/gpiolib.c
-+++ b/drivers/gpio/gpiolib.c
-@@ -3309,6 +3309,7 @@ EXPORT_SYMBOL_GPL(gpiod_get_index);
-  * fwnode_get_named_gpiod - obtain a GPIO from firmware node
-  * @fwnode:	handle of the firmware node
-  * @propname:	name of the firmware property representing the GPIO
-+ * @index:	index of the GPIO to obtain in the consumer
-  *
-  * This function can be used for drivers that get their configuration
-  * from firmware.
-@@ -3320,7 +3321,7 @@ EXPORT_SYMBOL_GPL(gpiod_get_index);
-  * In case of error an ERR_PTR() is returned.
-  */
- struct gpio_desc *fwnode_get_named_gpiod(struct fwnode_handle *fwnode,
--					 const char *propname)
-+					 const char *propname, int index)
- {
- 	struct gpio_desc *desc = ERR_PTR(-ENODEV);
- 	bool active_low = false;
-@@ -3333,8 +3334,8 @@ struct gpio_desc *fwnode_get_named_gpiod(struct fwnode_handle *fwnode,
- 	if (is_of_node(fwnode)) {
- 		enum of_gpio_flags flags;
- 
--		desc = of_get_named_gpiod_flags(to_of_node(fwnode), propname, 0,
--						&flags);
-+		desc = of_get_named_gpiod_flags(to_of_node(fwnode), propname,
-+						index, &flags);
- 		if (!IS_ERR(desc)) {
- 			active_low = flags & OF_GPIO_ACTIVE_LOW;
- 			single_ended = flags & OF_GPIO_SINGLE_ENDED;
-@@ -3342,7 +3343,7 @@ struct gpio_desc *fwnode_get_named_gpiod(struct fwnode_handle *fwnode,
- 	} else if (is_acpi_node(fwnode)) {
- 		struct acpi_gpio_info info;
- 
--		desc = acpi_node_get_gpiod(fwnode, propname, 0, &info);
-+		desc = acpi_node_get_gpiod(fwnode, propname, index, &info);
- 		if (!IS_ERR(desc))
- 			active_low = info.polarity == GPIO_ACTIVE_LOW;
- 	}
-diff --git a/include/linux/gpio/consumer.h b/include/linux/gpio/consumer.h
-index fb0fde686cb1..5b3c025333a6 100644
---- a/include/linux/gpio/consumer.h
-+++ b/include/linux/gpio/consumer.h
-@@ -135,7 +135,11 @@ int desc_to_gpio(const struct gpio_desc *desc);
- struct fwnode_handle;
- 
- struct gpio_desc *fwnode_get_named_gpiod(struct fwnode_handle *fwnode,
--					 const char *propname);
-+					 const char *propname, int index);
-+struct gpio_desc *devm_get_index_gpiod_from_child(struct device *dev,
-+						  const char *con_id,
-+						  int index,
-+						  struct fwnode_handle *child);
- struct gpio_desc *devm_get_gpiod_from_child(struct device *dev,
- 					    const char *con_id,
- 					    struct fwnode_handle *child);
-@@ -412,7 +416,14 @@ static inline int desc_to_gpio(const struct gpio_desc *desc)
- struct fwnode_handle;
- 
- static inline struct gpio_desc *fwnode_get_named_gpiod(
--	struct fwnode_handle *fwnode, const char *propname)
-+	struct fwnode_handle *fwnode, const char *propname, int index)
-+{
-+	return ERR_PTR(-ENOSYS);
-+}
++The NAND flash controller node should be defined under the EBI bus (see
++Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt).
++One or several NAND devices can be defined under this NAND controller.
++The NAND controller might be connected to an ECC engine.
 +
-+static inline struct gpio_desc *devm_get_index_gpiod_from_child(
-+	struct device *dev, const char *con_id, int index,
-+	struct fwnode_handle *child)
- {
- 	return ERR_PTR(-ENOSYS);
- }
++* NAND controller bindings:
++
++Required properties:
++- compatible: should be one of the following
++	"atmel,at91rm9200-nand-controller"
++	"atmel,at91sam9261-nand-controller"
++	"atmel,at91sam9g45-nand-controller"
++	"atmel,sama5d3-nand-controller"
++- ranges: empty ranges property to forward EBI ranges definitions.
++- #address-cells: should be set to 2.
++- #size-cells: should be set to 1.
++- atmel,nfc-io: phandle to the NFC IO block. Only required for sama5d3
++		controllers.
++- atmel,nfc-sram: phandle to the NFC SRAM block. Only required for sama5d3
++		  controllers.
++
++Optional properties:
++- ecc-engine: phandle to the PMECC block. Only meaningful if the SoC embeds
++	      a PMECC engine.
++
++* NAND device/chip bindings:
++
++Required properties:
++- reg: describes the CS lines assigned to the NAND device. If the NAND device
++       exposes multiple CS lines (multi-dies chips), your reg property will
++       contain X tuples of 3 entries.
++       1st entry: the CS line this NAND chip is connected to
++       2nd entry: the base offset of the memory region assigned to this
++		  device (always 0)
++       3rd entry: the memory region size (always 0x800000)
++
++Optional properties:
++- rb-gpios: the GPIO(s) used to check the Ready/Busy status of the NAND.
++- cs-gpios: the GPIO(s) used to control the CS line.
++- det-gpios: the GPIO used to detect if a Smartmedia Card is present.
++- atmel,rb: an integer identifying the native Ready/Busy pin. Only meaningful
++	    on sama5 SoCs.
++
++All generic properties described in
++Documentation/devicetree/bindings/mtd/{common,nand}.txt also apply to the NAND
++device node, and NAND partitions should be defined under the NAND node as
++described in Documentation/devicetree/bindings/mtd/partition.txt.
++
++* ECC engine (PMECC) bindings:
++
++Required properties:
++- compatible: should be one of the following
++	"atmel,at91sam9g45-pmecc"
++	"atmel,sama5d4-pmecc"
++	"atmel,sama5d2-pmecc"
++- reg: should contain 2 register ranges. The first one is pointing to the PMECC
++       block, and the second one to the PMECC_ERRLOC block.
++
++Example:
++
++	pmecc: ecc-engine at ffffc070 {
++		compatible = "atmel,at91sam9g45-pmecc";
++                reg = <0xffffc070 0x490>,
++                      <0xffffc500 0x100>;
++	};
++
++	ebi: ebi at 10000000 {
++		compatible = "atmel,sama5d3-ebi";
++		#address-cells = <2>;
++		#size-cells = <1>;
++		atmel,smc = <&hsmc>;
++		reg = <0x10000000 0x10000000
++		       0x40000000 0x30000000>;
++		ranges = <0x0 0x0 0x10000000 0x10000000
++			  0x1 0x0 0x40000000 0x10000000
++			  0x2 0x0 0x50000000 0x10000000
++			  0x3 0x0 0x60000000 0x10000000>;
++		clocks = <&mck>;
++
++                nand_controller: nand-controller {
++			compatible = "atmel,sama5d3-nand-controller";
++			atmel,nfc-sram = <&nfc_sram>;
++			atmel,nfc-io = <&nfc_io>;
++			ecc-engine = <&pmecc>;
++			#address-cells = <2>;
++			#size-cells = <1>;
++			ranges;
++
++			nand at 3 {
++				reg = <0x3 0x0 0x800000>;
++				atmel,rb = <0>;
++
++				/*
++				 * Put generic NAND/MTD properties and
++				 * subnodes here.
++				 */
++			};
++		};
++	};
++
++-----------------------------------------------------------------------
++
++Deprecated bindings (should not be used in new device trees):
+ 
+ Required properties:
+ - compatible: The possible values are:
 -- 
 2.7.4
