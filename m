@@ -1,9 +1,47 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 26 Jan 2017 20:15:25 -0800
+Date: Thu, 26 Jan 2017 20:28:45 -0800
 Subject: [PATCH] ARM: dts: Add keypad support for droid 4
-Message-ID: <20170127041525.29648-1-tony@atomide.com>
+In-Reply-To: <20170127041525.29648-1-tony@atomide.com>
+References: <20170127041525.29648-1-tony@atomide.com>
+Message-ID: <20170127042844.GU7403@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+* Tony Lindgren <tony@atomide.com> [170126 20:16]:
+> Let's configure the keypad in a way where it's usable out of the
+> box for Linux console use. To do this, let's follow the standard
+> PC keyboard layout for ctrl, shift and alt keys:
+> 
+> Ctrl = what is labeled as shift
+> Alt = what is labeled as SYM
+> Shift = what is lableled as caps lock
+> Meta = what is labled as OK
+> 
+> Who knows where they got the caps lock idea.. Probably from
+> some focus group popularity vote or something.
+> 
+> Note that some other keys don't match the labels either as they
+> don't follow the PC keyboard style. For example we have "shift + ,"
+> produce "<", and "shift + ." produce ">" instead of ";" and ":".
+> 
+> Pretty much Esc is the only key missing. I've used "Meta + 1"
+> produce Esc, and that seems to work OK. But that can be mapped
+> using the standard userspace tools.
+
+Oh looks like KEY_VOLUMEUP is on omap4-keypad, then POWER and
+VOLUMEDOWN must be on the CPCAP.
+
+Updated patch below with KEY_VOLUMEUP added.
+
+Regards,
+
+Tony
+
+8< ------------------------------
+>From tony Mon Sep 17 00:00:00 2001
+From: Tony Lindgren <tony@atomide.com>
+Date: Thu, 26 Jan 2017 16:14:55 -0800
+Subject: [PATCH] ARM: dts: Add keypad support for droid 4
 
 Let's configure the keypad in a way where it's usable out of the
 box for Linux console use. To do this, let's follow the standard
@@ -30,8 +68,8 @@ Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Michael Scott <michael.scott@linaro.org>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/boot/dts/omap4-droid4-xt894.dts | 72 ++++++++++++++++++++++++++++++++
- 1 file changed, 72 insertions(+)
+ arch/arm/boot/dts/omap4-droid4-xt894.dts | 75 ++++++++++++++++++++++++++++++++
+ 1 file changed, 75 insertions(+)
 
 diff --git a/arch/arm/boot/dts/omap4-droid4-xt894.dts b/arch/arm/boot/dts/omap4-droid4-xt894.dts
 --- a/arch/arm/boot/dts/omap4-droid4-xt894.dts
@@ -44,7 +82,7 @@ diff --git a/arch/arm/boot/dts/omap4-droid4-xt894.dts b/arch/arm/boot/dts/omap4-
  #include "omap443x.dtsi"
  
  / {
-@@ -60,6 +61,77 @@
+@@ -60,6 +61,80 @@
  	status = "disabled";
  };
  
@@ -116,6 +154,9 @@ diff --git a/arch/arm/boot/dts/omap4-droid4-xt894.dts b/arch/arm/boot/dts/omap4-
 +	MATRIX_KEY(4, 3, KEY_LEFT)
 +	MATRIX_KEY(5, 3, KEY_DOWN)
 +	MATRIX_KEY(3, 3, KEY_RIGHT)
++
++	/* Side buttons, KEY_VOLUMEDOWN and KEY_PWER are on CPCAP? */
++	MATRIX_KEY(5, 0, KEY_VOLUMEUP)
 +	>;
 +};
 +
