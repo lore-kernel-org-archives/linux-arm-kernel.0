@@ -1,31 +1,56 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 27 Jan 2017 09:55:08 +0200
-Subject: [GIT PULL] soc: samsung: Drivers for v4.11
-In-Reply-To: <CACRpkdboB+-n6BFPACKCr6VoHtq9W53YcUBBer3jgyyRcnN+Xg@mail.gmail.com>
-References: <20170120181343.12570-1-krzk@kernel.org>
- <CACRpkdboB+-n6BFPACKCr6VoHtq9W53YcUBBer3jgyyRcnN+Xg@mail.gmail.com>
-Message-ID: <20170127075508.3bozasyc4dwsfuax@kozik-lap>
+From: kraxel@redhat.com (Gerd Hoffmann)
+Date: Fri, 27 Jan 2017 09:04:10 +0100
+Subject: [PATCH 01/13] mmc: bcm2835: add bcm2835_read_wait_sdcmd
+In-Reply-To: <30bf98f0-c893-d306-ab79-3ba741790919@gmail.com>
+References: <1485473846-24537-1-git-send-email-kraxel@redhat.com>
+ <1485473846-24537-2-git-send-email-kraxel@redhat.com>
+ <30bf98f0-c893-d306-ab79-3ba741790919@gmail.com>
+Message-ID: <1485504250.19754.22.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 04:59:45PM +0100, Linus Walleij wrote:
-> On Fri, Jan 20, 2017 at 7:13 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+On Do, 2017-01-26 at 15:51 -0800, Florian Fainelli wrote:
+> On 01/26/2017 03:37 PM, Gerd Hoffmann wrote:
+> > Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
 > 
-> > The following changes since commit 0c744ea4f77d72b3dcebb7a8f2684633ec79be88:
-> >
-> >   Linux 4.10-rc2 (2017-01-01 14:31:53 -0800)
-> >
-> > are available in the git repository at:
-> >
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git samsung-drivers-soc-pmu-4.11
+> Few things with your submission:
 > 
-> OK I pulled it and applied the final three patches from Marek
-> on top.
-> 
-> Grrr I was based in v4.10-rc1, well I could easily merge in v4.10-rc2
-> so no big deal.
+> - if you send more than one patch, a cover letter is a welcome to
+> explain your changes
 
-Sorry for that but it is all because of broken ARMv8 build at rc1.
+There actually is a cover letter.  The git-send-email "cccmd =
+scripts/get_maintainer.pl" hook doesn't work for the cover letter though
+because it isn't a patch.  I've hand-picked some people who
+touched/reviewed the driver before to the git-send-email command line,
+but everybody else got the patches only.
 
-Thanks for merging,
-Krzysztof
+Anyone has a good solution for this btw?
+
+> - try to provide commit messages for things that are not obvious (in
+> fact, most maintainers actually request commit messages even for trivial
+> things)
+
+The driver is out of tree still, these are cleanups Ulf Hansson asked
+for last time the driver was submitted.
+
+Full set of patches:
+  https://www.kraxel.org/cgit/linux/log/?h=bcm2837-sdhost-cleanup
+
+Plan for upstream merge is to actually squash all the incremental
+cleanups, but for now I kept them as separate changes.  I think this
+makes it easier to spot mistakes and it'll also help in case there are
+regressions b/c you can bisect things.
+
+> - have not we switched to the iproc SDHCI driver, or is this for the
+> other SDIO connected peripherals here?
+
+The 2835 has two SD controllers: The Arasan SDHCI controller that we
+currently use (iproc drives that one), and a custom SD controller.
+
+This is a driver for the custom one.  Has better performance than the
+sdhci controller (according to Eric Anholt).  For the rpi3 switching to
+this driver has the additional advantage that we can use the iproc
+driver driver to handle the wifi.
+
+cheers,
+  Gerd
