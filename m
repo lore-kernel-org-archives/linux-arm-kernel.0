@@ -1,24 +1,28 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 26 Jan 2017 16:12:50 -0800
-Subject: [PATCH 1/2] clk: sunxi-ng: Call divider_round_rate if we only
- have a single parent
-In-Reply-To: <53c56d23af099d8a41460d5ac59a2c792c8d050c.1485250845.git-series.maxime.ripard@free-electrons.com>
-References: <53c56d23af099d8a41460d5ac59a2c792c8d050c.1485250845.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <20170127001250.GQ8801@codeaurora.org>
+Date: Thu, 26 Jan 2017 16:14:41 -0800
+Subject: [PATCH 0/2] clk: mediatek: add missing ethernet reset definition
+In-Reply-To: <1485175707-58528-1-git-send-email-john@phrozen.org>
+References: <1485175707-58528-1-git-send-email-john@phrozen.org>
+Message-ID: <20170127001441.GS8801@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/24, Maxime Ripard wrote:
-> The divider_get_val function that is used in our determine_rate callback
-> doesn't try to change the parent rate at all, while clk_divider_bestdiv,
-> used in divider_round_rate, does.
+On 01/23, John Crispin wrote:
+> When the clk code for mt2701 was merged, we forgot to add the reset
+> controller of the ethernet subsystem. This series adds the missing code
+> and header files required to reference the bits from within a devicetree
+> file.
 > 
-> If we have a single parent, call divider_round_rate.
+> John Crispin (2):
+>   clk: mediatek: add mt2701 ethernet reset
+>   reset: mediatek: Add MT2701 ethsys reset controller include file
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
+>  drivers/clk/mediatek/clk-mt2701-eth.c     |    2 ++
+>  include/dt-bindings/reset/mt2701-resets.h |    7 +++++++
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+Any planned DT users in the next merge window? Should I put this
+into a topic branch? Do you want a clk maintainer ack? At the
+least we need someone like James to ack this first.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
