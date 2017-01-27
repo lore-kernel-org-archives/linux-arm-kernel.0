@@ -1,47 +1,46 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 27 Jan 2017 11:27:21 +0100
-Subject: [PATCH v11 0/8] arm/arm64: vgic: Implement API for vGICv3 live
- migration
-In-Reply-To: <9fea1713-7087-7052-5ca6-d9257a6f973a@arm.com>
-References: <1485440453-10597-1-git-send-email-vijay.kilari@gmail.com>
- <20170126202640.GD15850@cbox>
- <9fea1713-7087-7052-5ca6-d9257a6f973a@arm.com>
-Message-ID: <20170127102721.GA10506@cbox>
+From: kraxel@redhat.com (Gerd Hoffmann)
+Date: Fri, 27 Jan 2017 11:28:32 +0100
+Subject: [PATCH 01/13] mmc: bcm2835: add bcm2835_read_wait_sdcmd
+In-Reply-To: <ff0170ef-2566-1c12-0b27-dccb3bff2e7e@rock-chips.com>
+References: <1485473846-24537-1-git-send-email-kraxel@redhat.com>
+ <1485473846-24537-2-git-send-email-kraxel@redhat.com>
+ <ff0170ef-2566-1c12-0b27-dccb3bff2e7e@rock-chips.com>
+Message-ID: <1485512912.19754.60.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2017 at 09:45:06AM +0000, Marc Zyngier wrote:
-> On 26/01/17 20:26, Christoffer Dall wrote:
-> > Hi Vijaya,
-> > 
-> > On Thu, Jan 26, 2017 at 07:50:45PM +0530, vijay.kilari at gmail.com wrote:
-> >> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
-> >>
-> >> This patchset adds API for saving and restoring
-> >> of VGICv3 registers to support live migration with new vgic feature.
-> >> This API definition is as per version of VGICv3 specification
-> >> Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-> >>
-> >> The patch 3 & 4 are picked from the Pavel's previous implementation.
-> >> http://www.spinics.net/lists/kvm/msg122040.html
-> >>
-> >> NOTE: Only compilation tested for AArch32. No hardware available to test.
-> > 
-> > Thanks for the respin.  I've given this a once-over and tested on GICv2
-> > against migrations and on GICv3 for this functionality, and it looks
+  Hi,
 
-haha, just noticed this.  That's against *regressions* obviously.
-
-
-> > good.
-> > 
-> > It would be good to see a soon respin of the QEMU series as well.
-> > 
-> > Marc, unless others have objections to this series, I think we can queue
-> > this series.
+> > +	for (;;) {
+> > +		value = readl(host->ioaddr + SDCMD);
+> > +		if (!(value & SDCMD_NEW_FLAG))
+> > +			break;
+> > +		if (check_fail && (value & SDCMD_FAIL_FLAG))
+> > +			break;
+> > +		if (time_after(jiffies, end)) {
+> > +			dev_err(dev, "%s: timeout (%d us)\n",
+> > +				__func__, timeout);
+> > +			break;
+> > +		}
+> > +
+> > +		/* if it takes longer reduce poll interval */
+> > +		if (time_after(jiffies, fastpoll))
+> > +			udelay(10);
+> > +		else
+> > +			cpu_relax();
+> > +	}
 > 
-> Yup, I'll queue it on top. Thanks everyone for sticking with this series.
-> 
+> Use readl_poll_timeout intead of open-coding them..
 
-Thanks,
--Christoffer
+Cool.  Didn't know this exists.  Incremental fixup attached.
+
+thanks,
+  Gerd
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-mmc-bcm2835-use-readl_poll_timeout-in-bcm2835_read_w.patch
+Type: text/x-patch
+Size: 2245 bytes
+Desc: 
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170127/320c74c6/attachment.bin>
