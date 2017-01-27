@@ -1,61 +1,105 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 27 Jan 2017 18:25:56 +0100
-Subject: [PATCH v5 05/12] dt: bindings: Add bindings for Marvell Xenon SD
- Host Controller
-In-Reply-To: <CAPDyKFo-hpLd3W0zWykdg0swuciBeL=Cy9cur_0RoG8jApOh3w@mail.gmail.com>
- (Ulf Hansson's message of "Fri, 27 Jan 2017 16:36:36 +0100")
-References: <cover.8527229dae6c124f24c5e637430c2cdc86f80392.1484154449.git-series.gregory.clement@free-electrons.com>
- <89c95d0084da6ad7132caa54ca66eb619d8a5090.1484154449.git-series.gregory.clement@free-electrons.com>
- <CAPDyKFrCxk37uVZ4wM-=iwX3-Cn9j+uh1KneJoopVzia2nKTVA@mail.gmail.com>
- <87fuk4yg1i.fsf@free-electrons.com>
- <CAPDyKFo-hpLd3W0zWykdg0swuciBeL=Cy9cur_0RoG8jApOh3w@mail.gmail.com>
-Message-ID: <87bmuswh23.fsf@free-electrons.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 27 Jan 2017 18:23:27 +0100
+Subject: [PATCH v2 2/3] mm: cma_alloc: allow to specify GFP mask
+In-Reply-To: <20170127172328.18574-1-l.stach@pengutronix.de>
+References: <20170127172328.18574-1-l.stach@pengutronix.de>
+Message-ID: <20170127172328.18574-2-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+Most users of this interface just want to use it with the default
+GFP_KERNEL flags, but for cases where DMA memory is allocated it may
+be called from a different context.
+
+No functional change yet, just passing through the flag to the
+underlying alloc_contig_range function.
+
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+Acked-by: Vlastimil Babka <vbabka@suse.cz>
+Acked-by: Michal Hocko <mhocko@suse.com>
+---
+ arch/powerpc/kvm/book3s_hv_builtin.c | 3 ++-
+ drivers/base/dma-contiguous.c        | 2 +-
+ include/linux/cma.h                  | 3 ++-
+ mm/cma.c                             | 5 +++--
+ mm/cma_debug.c                       | 2 +-
+ 5 files changed, 9 insertions(+), 6 deletions(-)
+
+diff --git a/arch/powerpc/kvm/book3s_hv_builtin.c b/arch/powerpc/kvm/book3s_hv_builtin.c
+index 5bb24be0b346..56a62d97ab2d 100644
+--- a/arch/powerpc/kvm/book3s_hv_builtin.c
++++ b/arch/powerpc/kvm/book3s_hv_builtin.c
+@@ -56,7 +56,8 @@ struct page *kvm_alloc_hpt(unsigned long nr_pages)
+ {
+ 	VM_BUG_ON(order_base_2(nr_pages) < KVM_CMA_CHUNK_ORDER - PAGE_SHIFT);
  
- On ven., janv. 27 2017, Ulf Hansson <ulf.hansson@linaro.org> wrote:
-
->>
->> But I am curious to know why do you think we could use it without any
->> need. Are you aware of some abuse of this property?
->
-> Yes.
->
-
-Actually I was hopping that you point some examples :)
-
-But as you point mmc-ddr-3_3v I found my answers here:
-http://www.spinics.net/lists/linux-mmc/msg38602.html
-
->>
->>>
->>> Perhaps you can elaborate exactly why it makes sense for your case. Or
->>> perhaps we already discussed this, in either case, please re-fresh my
->>> mind.
->>
->> For instance we need it now on the 7040DB board which does not have the
->> 1.8V signal voltage available.
->
-> It it's better to describe what the controller/board support, instead
-> of what it doesn't.
->
-> I think you should be able to use other existing mmc DT bindings
-> (perhaps also you need the brand new "mmc-ddr-3_3v"), instead of the
-> "no-1-8-v".
-
-OK I will try with this one. And if it works, I wonder if it worth
-mentioning it as it is also part of the mmc binding.
-
-Gregory
-
->
-> Kind regards
-> Uffe
-
+-	return cma_alloc(kvm_cma, nr_pages, order_base_2(HPT_ALIGN_PAGES));
++	return cma_alloc(kvm_cma, nr_pages, order_base_2(HPT_ALIGN_PAGES),
++			 GFP_KERNEL);
+ }
+ EXPORT_SYMBOL_GPL(kvm_alloc_hpt);
+ 
+diff --git a/drivers/base/dma-contiguous.c b/drivers/base/dma-contiguous.c
+index e167a1e1bccb..d1a9cbabc627 100644
+--- a/drivers/base/dma-contiguous.c
++++ b/drivers/base/dma-contiguous.c
+@@ -193,7 +193,7 @@ struct page *dma_alloc_from_contiguous(struct device *dev, size_t count,
+ 	if (align > CONFIG_CMA_ALIGNMENT)
+ 		align = CONFIG_CMA_ALIGNMENT;
+ 
+-	return cma_alloc(dev_get_cma_area(dev), count, align);
++	return cma_alloc(dev_get_cma_area(dev), count, align, GFP_KERNEL);
+ }
+ 
+ /**
+diff --git a/include/linux/cma.h b/include/linux/cma.h
+index 6f0a91b37f68..03f32d0bd1d8 100644
+--- a/include/linux/cma.h
++++ b/include/linux/cma.h
+@@ -29,6 +29,7 @@ extern int __init cma_declare_contiguous(phys_addr_t base,
+ extern int cma_init_reserved_mem(phys_addr_t base, phys_addr_t size,
+ 					unsigned int order_per_bit,
+ 					struct cma **res_cma);
+-extern struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align);
++extern struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
++			      gfp_t gfp_mask);
+ extern bool cma_release(struct cma *cma, const struct page *pages, unsigned int count);
+ #endif
+diff --git a/mm/cma.c b/mm/cma.c
+index fbd67d866f67..a33ddfde315d 100644
+--- a/mm/cma.c
++++ b/mm/cma.c
+@@ -362,7 +362,8 @@ int __init cma_declare_contiguous(phys_addr_t base,
+  * This function allocates part of contiguous memory on specific
+  * contiguous memory area.
+  */
+-struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align)
++struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align,
++		       gfp_t gfp_mask)
+ {
+ 	unsigned long mask, offset;
+ 	unsigned long pfn = -1;
+@@ -408,7 +409,7 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align)
+ 		pfn = cma->base_pfn + (bitmap_no << cma->order_per_bit);
+ 		mutex_lock(&cma_mutex);
+ 		ret = alloc_contig_range(pfn, pfn + count, MIGRATE_CMA,
+-					 GFP_KERNEL);
++					 gfp_mask);
+ 		mutex_unlock(&cma_mutex);
+ 		if (ret == 0) {
+ 			page = pfn_to_page(pfn);
+diff --git a/mm/cma_debug.c b/mm/cma_debug.c
+index f8e4b60db167..ffc0c3d0ae64 100644
+--- a/mm/cma_debug.c
++++ b/mm/cma_debug.c
+@@ -138,7 +138,7 @@ static int cma_alloc_mem(struct cma *cma, int count)
+ 	if (!mem)
+ 		return -ENOMEM;
+ 
+-	p = cma_alloc(cma, count, 0);
++	p = cma_alloc(cma, count, 0, GFP_KERNEL);
+ 	if (!p) {
+ 		kfree(mem);
+ 		return -ENOMEM;
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.11.0
