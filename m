@@ -1,43 +1,34 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 27 Jan 2017 22:10:29 +0100
-Subject: [linux-sunxi] Re: [PATCH v2 4/9] arm: dts: sun8i: split
- Allwinner H3 .dtsi
-In-Reply-To: <20170127190239.2MQaUuKh@smtp2o.mail.yandex.net>
-References: <20170127190239.2MQaUuKh@smtp2o.mail.yandex.net>
-Message-ID: <20170127211029.k5ylfhrreqfdn2iz@lukather>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 27 Jan 2017 15:13:48 -0600
+Subject: [PATCH 05/11] clk: sunxi-ng: Add A80 CCU
+In-Reply-To: <20170124023230.3990-6-wens@csie.org>
+References: <20170124023230.3990-1-wens@csie.org>
+ <20170124023230.3990-6-wens@csie.org>
+Message-ID: <20170127211348.quf2mfjf7bp37sqs@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 28, 2017 at 12:02:20AM +0800, Icenowy Zheng wrote:
+On Tue, Jan 24, 2017 at 10:32:24AM +0800, Chen-Yu Tsai wrote:
+> Add support for the main clock unit found in the A80.
 > 
-> 2017?1?27? 23:55? Maxime Ripard <maxime.ripard@free-electrons.com>???
-> >
-> > On Thu, Jan 26, 2017 at 11:48:54PM +0800, Icenowy Zheng wrote: 
-> > > - mmc0: mmc at 01c0f000 { 
-> > > + mmc at 01c0f000 { 
-> >
-> > There's no point in removing the labels, and you can even use the 
-> > label-based syntax to reference them, instead of using the path. 
+> Note that on the A80, some subsystems have separate clock controllers
+> downstream of the main clock unit. These include the MMC, USB, and
+> display engine subsystems.
 > 
-> I think keeping a tree structure in sub dtsi file will make it more
-> pretty and easy to use :-)
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  .../devicetree/bindings/clock/sunxi-ccu.txt        |    1 +
 
-We're already using that syntax for all the DTS, so it won't be less
-pretty than those.
+Acked-by: Rob Herring <robh@kernel.org>
 
-And keeping a tree structure valid is not easier to use than, well,
-not having to keep it.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170127/ae35c7ca/attachment.sig>
+>  drivers/clk/sunxi-ng/Kconfig                       |   10 +
+>  drivers/clk/sunxi-ng/Makefile                      |    1 +
+>  drivers/clk/sunxi-ng/ccu-sun9i-a80.c               | 1223 ++++++++++++++++++++
+>  drivers/clk/sunxi-ng/ccu-sun9i-a80.h               |   57 +
+>  include/dt-bindings/clock/sun9i-a80-ccu.h          |  162 +++
+>  include/dt-bindings/reset/sun9i-a80-ccu.h          |  102 ++
+>  7 files changed, 1556 insertions(+)
+>  create mode 100644 drivers/clk/sunxi-ng/ccu-sun9i-a80.c
+>  create mode 100644 drivers/clk/sunxi-ng/ccu-sun9i-a80.h
+>  create mode 100644 include/dt-bindings/clock/sun9i-a80-ccu.h
+>  create mode 100644 include/dt-bindings/reset/sun9i-a80-ccu.h
