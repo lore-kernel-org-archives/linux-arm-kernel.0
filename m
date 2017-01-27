@@ -1,45 +1,63 @@
 From: codekipper@gmail.com (codekipper at gmail.com)
-Date: Fri, 27 Jan 2017 16:48:07 +0100
-Subject: [linux-sunxi][PATCH 2/3] ARM: dts: sun8i-h3: Add the SPDIF block to
- the H3
+Date: Fri, 27 Jan 2017 16:48:08 +0100
+Subject: [linux-sunxi][PATCH 3/3] ARM: dts: sun8i-h3: Add SPDIF to the Beelink
+ X2
 In-Reply-To: <20170127154808.19229-1-codekipper@gmail.com>
 References: <20170127154808.19229-1-codekipper@gmail.com>
-Message-ID: <20170127154808.19229-3-codekipper@gmail.com>
+Message-ID: <20170127154808.19229-4-codekipper@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marcus Cooper <codekipper@gmail.com>
 
-Add the SPDIF transceiver controller block to the H3 dtsi.
+Enable the S/PDIF transmitter that is present on the Beelink X2 STB.
 
 Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 ---
- arch/arm/boot/dts/sun8i-h3.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/boot/dts/sun8i-h3-beelink-x2.dts | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index 6e250bd9a8a9..48f9a0419b82 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -462,6 +462,19 @@
- 			interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
- 		};
- 
-+		spdif: spdif at 01c21000 {
-+			#sound-dai-cells = <0>;
-+			compatible = "allwinner,sun8i-h3-spdif";
-+			reg = <0x01c21000 0x400>;
-+			interrupts = <GIC_SPI 12 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_SPDIF>, <&ccu CLK_SPDIF>;
-+			resets = <&ccu RST_BUS_SPDIF>;
-+			clock-names = "apb", "spdif";
-+			dmas = <&dma 2>;
-+			dma-names = "tx";
-+			status = "disabled";
+diff --git a/arch/arm/boot/dts/sun8i-h3-beelink-x2.dts b/arch/arm/boot/dts/sun8i-h3-beelink-x2.dts
+index 2a016cd16a27..25b225b7dfd6 100644
+--- a/arch/arm/boot/dts/sun8i-h3-beelink-x2.dts
++++ b/arch/arm/boot/dts/sun8i-h3-beelink-x2.dts
+@@ -81,6 +81,24 @@
+ 		compatible = "mmc-pwrseq-simple";
+ 		reset-gpios = <&r_pio 0 7 GPIO_ACTIVE_LOW>; /* PL7 */
+ 	};
++
++	sound_spdif {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "On-board SPDIF";
++
++		simple-audio-card,cpu {
++			sound-dai = <&spdif>;
 +		};
 +
- 		pwm: pwm at 01c21400 {
- 			compatible = "allwinner,sun8i-h3-pwm";
- 			reg = <0x01c21400 0x8>;
++		simple-audio-card,codec {
++			sound-dai = <&spdif_out>;
++		};
++	};
++
++	spdif_out: spdif-out {
++		#sound-dai-cells = <0>;
++		compatible = "linux,spdif-dit";
++	};
+ };
+ 
+ &ehci1 {
+@@ -124,6 +142,12 @@
+ 	status = "okay";
+ };
+ 
++&spdif {
++	pinctrl-names = "default";
++	pinctrl-0 = <&spdif_tx_pins_a>;
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
 -- 
 2.11.0
