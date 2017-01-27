@@ -1,79 +1,56 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Fri, 27 Jan 2017 16:34:18 -0600
-Subject: [PATCH 1/2] dt-bindings: Document the VC4 DSI module nodes.
-In-Reply-To: <20170124003853.16418-2-eric@anholt.net>
-References: <20170124003853.16418-1-eric@anholt.net>
- <20170124003853.16418-2-eric@anholt.net>
-Message-ID: <CAL_JsqJ=VQSUO5MeHJSCB=_SnmOnA7G1=GhmWYKhjm-47kYV-w@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 27 Jan 2017 16:38:19 -0600
+Subject: [PATCH 1/3] dt-bindings: qoriq-clock: Add coreclk
+In-Reply-To: <1485332363-8434-1-git-send-email-oss@buserror.net>
+References: <1485332363-8434-1-git-send-email-oss@buserror.net>
+Message-ID: <20170127223819.mzovhnnpths5t5w2@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Need to cc DT list if you want it in my queue.
-
-On Mon, Jan 23, 2017 at 6:38 PM, Eric Anholt <eric@anholt.net> wrote:
-> These are part of the vc4 display pipeline.
->
-> Signed-off-by: Eric Anholt <eric@anholt.net>
+On Wed, Jan 25, 2017 at 02:19:21AM -0600, Scott Wood wrote:
+> ls1012a has separate input root clocks for core PLLs versus the platform
+> PLL, with the latter described as sysclk in the hw docs.
+> 
+> Update the qoriq-clock binding to allow a second input clock, named
+> "coreclk".  If present, this clock will be used for the core PLLs.
+> 
+> Signed-off-by: Scott Wood <oss@buserror.net>
+> Cc: devicetree at vger.kernel.org
 > ---
->  .../devicetree/bindings/display/brcm,bcm-vc4.txt   | 35 ++++++++++++++++++++++
->  1 file changed, 35 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt b/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
-> index e2768703ac2b..34c7fddcea39 100644
-> --- a/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
-> +++ b/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
-> @@ -56,6 +56,18 @@ Required properties for V3D:
->  - interrupts:  The interrupt number
->                   See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
->
-> +Required properties for DSI:
-> +- compatible:  Should be "brcm,bcm2835-dsi0" or "brcm,bcm2835-dsi1"
+>  Documentation/devicetree/bindings/clock/qoriq-clock.txt | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/qoriq-clock.txt b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
+> index df9cb5a..97a9666 100644
+> --- a/Documentation/devicetree/bindings/clock/qoriq-clock.txt
+> +++ b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
+> @@ -55,6 +55,11 @@ Optional properties:
+>  - clocks: If clock-frequency is not specified, sysclk may be provided
+>  	as an input clock.  Either clock-frequency or clocks must be
+>  	provided.
+> +	A second input clock, called "coreclk", may be provided if
+> +	core PLLs are based on a different input clock from the
+> +	platform PLL.
+> +- clock-names: Required if a coreclk is present.  Valid names are
+> +	"sysclk" and "coreclk".
 
-Are the blocks different?
+'clk' part is redundant.
 
-> +- reg:         Physical base address and length of the DSI block's registers
-> +- interrupts:  The interrupt number
-> +                 See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
-> +- clocks:      a) phy: The DSI PLL clock feeding the DSI analog PHY
-> +               b) escape: The DSI ESC clock from CPRMAN
-> +               c) pixel: The DSI pixel clock from CPRMAN
-> +- clock-output-names:
-> +               The 3 clocks output from the DSI analog PHY: dsi[01]_byte,
-> +               dsi[01]_ddr2, and dsi[01]_ddr
-> +
->  [1] Documentation/devicetree/bindings/media/video-interfaces.txt
->
->  Example:
-> @@ -99,6 +111,29 @@ dpi: dpi at 7e208000 {
->         };
->  };
->
-> +dsi1: dsi at 7e700000 {
-> +       compatible = "brcm,bcm2835-dsi1";
-> +       reg = <0x7e700000 0x8c>;
-> +       interrupts = <2 12>;
-> +       #address-cells = <1>;
-> +       #size-cells = <0>;
-> +       #clock-cells = <1>;
-> +
-> +       clocks = <&clocks BCM2835_PLLD_DSI1>,
-> +                <&clocks BCM2835_CLOCK_DSI1E>,
-> +                <&clocks BCM2835_CLOCK_DSI1P>;
-> +       clock-names = "phy", "escape", "pixel";
-> +
-> +       clock-output-names = "dsi1_byte", "dsi1_ddr2", "dsi1_ddr";
-> +
-> +       pitouchscreen: panel at 0 {
-> +               compatible = "raspberrypi,touchscreen";
-> +               reg = <0>;
-> +
-> +               <...>
-> +       };
-> +};
-> +
->  vec: vec at 7e806000 {
->         compatible = "brcm,bcm2835-vec";
->         reg = <0x7e806000 0x1000>;
+>  
+>  2. Clock Provider
+>  
+> @@ -71,6 +76,7 @@ second cell is the clock index for the specified type.
+>  	2	hwaccel		index (n in CLKCGnHWACSR)
+>  	3	fman		0 for fm1, 1 for fm2
+>  	4	platform pll	0=pll, 1=pll/2, 2=pll/3, 3=pll/4
+> +	5	coreclk		must be 0
+>  
+>  3. Example
+>  
+> -- 
+> 2.7.4
+> 
 > --
-> 2.11.0
->
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
