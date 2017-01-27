@@ -1,60 +1,87 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 27 Jan 2017 16:13:24 +0000
-Subject: [PATCH v4 0/2] modversions: redefine kcrctab entries as 32-bit
- values
-In-Reply-To: <1485274600-21976-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1485274600-21976-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu8RUVVU=FhK4TT5nHiXtLmB8079GEWfZPq4jid5LQ5a5w@mail.gmail.com>
+From: alexandre.torgue@st.com (Alexandre TORGUE)
+Date: Fri, 27 Jan 2017 17:15:14 +0100
+Subject: [PATCH 1/8] pinctrl: stm32: fix bad location of gpiochip_lock_as_irq
+In-Reply-To: <1485533721-9019-1-git-send-email-alexandre.torgue@st.com>
+References: <1485533721-9019-1-git-send-email-alexandre.torgue@st.com>
+Message-ID: <1485533721-9019-2-git-send-email-alexandre.torgue@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 January 2017 at 16:16, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> This v4 is a followup to [0] 'modversions: redefine kcrctab entries as
-> relative CRC pointers', but since relative CRC pointers do not work in
-> modules, and are actually only needed by powerpc with CONFIG_RELOCATABLE=y,
-> I have made it a Kconfig selectable feature instead.
->
-> Patch #1 introduces the MODULE_REL_CRCS Kconfig symbol, and adds the kbuild
-> handling of it, i.e., modpost, genksyms and kallsyms.
->
-> Patch #2 switches all architectures to 32-bit CRC entries in kcrctab, where
-> all architectures except powerpc with CONFIG_RELOCATABLE=y use absolute ELF
-> symbol references as before.
->
-> v4: make relative CRCs kconfig selectable
->     use absolute CRC symbols in modules regardless of kconfig selection
->     split into two patches
->
-> v3: emit CRCs into .rodata rather than .rodata.modver, given that the latter
->     will be emitted with read-write permissions, making the CRCs end up in a
->     writable module segment.
->
->     fold the modpost fix to ensure that the section address is only substracted
->     from the symbol address when the ELF object in question is fully linked
->     (i.e., ET_DYN or ET_EXEC, and not ET_REL)
->
-> v2: update modpost as well, so that genksyms no longer has to emit symbols
->     for both the actual CRC value and the reference to where it is stored
->     in the image
->
-> [0] http://marc.info/?l=linux-arch&m=148493613415294&w=2
->
-> Ard Biesheuvel (2):
->   kbuild: modversions: add infrastructure for emitting relative CRCs
->   modversions: treat symbol CRCs as 32 bit quantities
->
+Move gpio lock as irq from "domain alloc" callback to "domain activate"
+callback. It will allow to use gpiolib sysfs correctly.
 
-Linus, Andrew,
+Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
 
-I think this code is in good shape now, given that I had to revert the
-full switch to relative CRC references due to the fact many
-architectures don't support that in modules, and so the only arch that
-opts into these relative CRCs is power with CONFIG_RELOCATABLE=y.
-
-I haven't heard any complaints or objections, so perhaps it is time to
-get this queued somewhere.
-
-Andrew, is this something you would be able to pick up? Thanks.
-
-Regards,
-Ard.
+diff --git a/drivers/pinctrl/stm32/pinctrl-stm32.c b/drivers/pinctrl/stm32/pinctrl-stm32.c
+index efc4371..b145431 100644
+--- a/drivers/pinctrl/stm32/pinctrl-stm32.c
++++ b/drivers/pinctrl/stm32/pinctrl-stm32.c
+@@ -236,6 +236,15 @@ static void stm32_gpio_domain_activate(struct irq_domain *d,
+ 	struct stm32_pinctrl *pctl = dev_get_drvdata(bank->gpio_chip.parent);
+ 
+ 	regmap_field_write(pctl->irqmux[irq_data->hwirq], bank->range.id);
++	gpiochip_lock_as_irq(&bank->gpio_chip, irq_data->hwirq);
++}
++
++static void stm32_gpio_domain_deactivate(struct irq_domain *d,
++				       struct irq_data *irq_data)
++{
++	struct stm32_gpio_bank *bank = d->host_data;
++
++	gpiochip_unlock_as_irq(&bank->gpio_chip, irq_data->hwirq);
+ }
+ 
+ static int stm32_gpio_domain_alloc(struct irq_domain *d,
+@@ -243,11 +252,9 @@ static int stm32_gpio_domain_alloc(struct irq_domain *d,
+ 				   unsigned int nr_irqs, void *data)
+ {
+ 	struct stm32_gpio_bank *bank = d->host_data;
+-	struct stm32_pinctrl *pctl = dev_get_drvdata(bank->gpio_chip.parent);
+ 	struct irq_fwspec *fwspec = data;
+ 	struct irq_fwspec parent_fwspec;
+ 	irq_hw_number_t hwirq;
+-	int ret;
+ 
+ 	hwirq = fwspec->param[0];
+ 	parent_fwspec.fwnode = d->parent->fwnode;
+@@ -258,35 +265,15 @@ static int stm32_gpio_domain_alloc(struct irq_domain *d,
+ 	irq_domain_set_hwirq_and_chip(d, virq, hwirq, &stm32_gpio_irq_chip,
+ 				      bank);
+ 
+-	ret = gpiochip_lock_as_irq(&bank->gpio_chip, hwirq);
+-	if (ret) {
+-		dev_err(pctl->dev, "Unable to configure STM32 %s%ld as IRQ\n",
+-			bank->gpio_chip.label, hwirq);
+-		return ret;
+-	}
+-
+-	ret = irq_domain_alloc_irqs_parent(d, virq, nr_irqs, &parent_fwspec);
+-	if (ret)
+-		gpiochip_unlock_as_irq(&bank->gpio_chip, hwirq);
+-
+-	return ret;
+-}
+-
+-static void stm32_gpio_domain_free(struct irq_domain *d, unsigned int virq,
+-				   unsigned int nr_irqs)
+-{
+-	struct stm32_gpio_bank *bank = d->host_data;
+-	struct irq_data *data = irq_get_irq_data(virq);
+-
+-	irq_domain_free_irqs_common(d, virq, nr_irqs);
+-	gpiochip_unlock_as_irq(&bank->gpio_chip, data->hwirq);
++	return irq_domain_alloc_irqs_parent(d, virq, nr_irqs, &parent_fwspec);
+ }
+ 
+ static const struct irq_domain_ops stm32_gpio_domain_ops = {
+ 	.translate      = stm32_gpio_domain_translate,
+ 	.alloc          = stm32_gpio_domain_alloc,
+-	.free           = stm32_gpio_domain_free,
++	.free           = irq_domain_free_irqs_common,
+ 	.activate	= stm32_gpio_domain_activate,
++	.deactivate	= stm32_gpio_domain_deactivate,
+ };
+ 
+ /* Pinctrl functions */
+-- 
+1.9.1
