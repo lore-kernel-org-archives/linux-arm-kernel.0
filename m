@@ -1,69 +1,68 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Fri, 27 Jan 2017 16:52:23 -0500
-Subject: [PATCH v4 2/4] arm64: Work around Falkor erratum 1003
-In-Reply-To: <20170127143848.GA25899@leverpostej>
-References: <20170125155232.10277-1-cov@codeaurora.org>
- <20170125155232.10277-2-cov@codeaurora.org>
- <20170127143848.GA25899@leverpostej>
-Message-ID: <e3343971-9e21-3462-f07b-569b496ab8ad@codeaurora.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 27 Jan 2017 22:55:12 +0100
+Subject: v4.9 to v4.10 regression: oops when USB cable is plugged in.
+In-Reply-To: <20170124145127.GC7403@atomide.com>
+References: <20170123222537.GA11543@amd> <20170123224454.GY7403@atomide.com>
+ <20170124091817.GA29246@amd> <20170124100133.GA21079@pali>
+ <20170124145127.GC7403@atomide.com>
+Message-ID: <20170127215512.GG20571@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi!
 
-On 01/27/2017 09:38 AM, Mark Rutland wrote:
-> On Wed, Jan 25, 2017 at 10:52:30AM -0500, Christopher Covington wrote:
->> The Qualcomm Datacenter Technologies Falkor v1 CPU may allocate TLB entries
->> using an incorrect ASID when TTBRx_EL1 is being updated. When the erratum
->> is triggered, page table entries using the new translation table base
->> address (BADDR) will be allocated into the TLB using the old ASID. All
->> circumstances leading to the incorrect ASID being cached in the TLB arise
->> when software writes TTBRx_EL1[ASID] and TTBRx_EL1[BADDR], a memory
->> operation is in the process of performing a translation using the specific
->> TTBRx_EL1 being written, and the memory operation uses a translation table
->> descriptor designated as non-global. EL2 and EL3 code changing the EL1&0
->> ASID is not subject to this erratum because hardware is prohibited from
->> performing translations from an out-of-context translation regime.
->>
->> Consider the following pseudo code.
->>
->>   write new BADDR and ASID values to TTBRx_EL1
->>
->> Replacing the above sequence with the one below will ensure that no TLB
->> entries with an incorrect ASID are used by software.
->>
->>   write reserved value to TTBRx_EL1[ASID]
->>   ISB
->>   write new value to TTBRx_EL1[BADDR]
->>   ISB
->>   write new value to TTBRx_EL1[ASID]
->>   ISB
->>
->> When the above sequence is used, page table entries using the new BADDR
->> value may still be incorrectly allocated into the TLB using the reserved
->> ASID. Yet this will not reduce functionality, since TLB entries incorrectly
->> tagged with the reserved ASID will never be hit by a later instruction.
+> > > Can I get the copy of the patch?
+> > > 
+> > > http://www.spinics.net/lists/linux-usb/msg152542.html
+> > > 
+> > > ...but it is html mangled with no obvious way to unmangle it.
 > 
-> I agree that there should be no explicit accesses to the VAs for these
-> entries. So tasks should not see erroneous VAs, and we shouldn't see
-> synchronous TLB conflict aborts.
+> Bounced it to you. FYI, patchwork.kernel.org should have it too, the
+> "mbox" option there works the best.
+
+Thanks, applied. Problem did not reappear so far.
+
+> > > > I was able to hit that only once so far, do you hit it
+> > > > every time with your built-in g_ether .config?
+> > > 
+> > > I get it "way too often", like once a day. I don't yet know how to hit
+> > > it reliably :-(.
 > 
-> Regardless, can this allow conflicting TLB entries to be allocated to
-> the reserved ASID? e.g. if one task has a 4K mapping at a given VA, and
-> another has a 2M mapping which covers that VA, can both be allocated
-> into the TLBs under the reserved ASID?
-> 
-> Can that have any effect on asynchronous TLB lookups or page table
-> walks, e.g. for speculated accesses?
+> OK, well let's hope the patch linked above fixes it. At some point the
+> number of musb fixes should just start going down if I'm predicting right :)
 
-A speculative access that inserts an entry into the TLB could
-possibly find the conflict but will not signal it. Does that answer
-your question?
+Fingers crossed :-).
 
-Thanks,
-Cov
+> Anyways, hitting these issues during late -rc cycle is too late. We
+> really should have some n900 usability testing for core features with
+> Linux next on at least weekly basis.
 
+Ok, I can try. But so far even -rc1 is a lot of fun. But... I consider
+phone calls core feature of a phone. I'd very much like to get that to
+work. Unfortunately, that means real-time audio, and a lot of
+fun. Plus, as it is touchscreen device, it needs a GUI. 
+
+> I've noticed that testing with Linux next is way less effort than chasing
+> bugs every -rc cycle when it's too late. For about past four months or so
+> next has been usable for me with only occasional minor issues that get
+> fixed within a day or two.
+
+Well, I am carrying some patches... but maybe mainline is now good
+enough to be useable without them?
+
+No promises. I really should find more time for N900
+development. Hmm. Or more developers. Where are all those Eudyptula
+Challenge people when you need them?
+
+Best regards,
+									Pavel
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
-Aurora Forum, a Linux Foundation Collaborative Project.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170127/a1c3359f/attachment.sig>
