@@ -1,46 +1,75 @@
-From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Fri, 27 Jan 2017 11:28:32 +0100
-Subject: [PATCH 01/13] mmc: bcm2835: add bcm2835_read_wait_sdcmd
-In-Reply-To: <ff0170ef-2566-1c12-0b27-dccb3bff2e7e@rock-chips.com>
-References: <1485473846-24537-1-git-send-email-kraxel@redhat.com>
- <1485473846-24537-2-git-send-email-kraxel@redhat.com>
- <ff0170ef-2566-1c12-0b27-dccb3bff2e7e@rock-chips.com>
-Message-ID: <1485512912.19754.60.camel@redhat.com>
+From: florian.vaussard@heig-vd.ch (Florian Vaussard)
+Date: Fri, 27 Jan 2017 11:29:53 +0100
+Subject: [PATCH v4 10/13] arm64: allwinner: a64: Increase the MMC max
+ frequency
+In-Reply-To: <dee0dc8e1d98698231738b10fbe79cdf6d5e4c36.1485421557.git-series.maxime.ripard@free-electrons.com>
+References: <cover.8d42a39b7bd5143e709979dc42cc47862ebe3728.1485421557.git-series.maxime.ripard@free-electrons.com>
+ <dee0dc8e1d98698231738b10fbe79cdf6d5e4c36.1485421557.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <6c6bf169-4b2e-6b55-54db-d21da73a8f6e@heig-vd.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  Hi,
+Hi Maxime,
 
-> > +	for (;;) {
-> > +		value = readl(host->ioaddr + SDCMD);
-> > +		if (!(value & SDCMD_NEW_FLAG))
-> > +			break;
-> > +		if (check_fail && (value & SDCMD_FAIL_FLAG))
-> > +			break;
-> > +		if (time_after(jiffies, end)) {
-> > +			dev_err(dev, "%s: timeout (%d us)\n",
-> > +				__func__, timeout);
-> > +			break;
-> > +		}
-> > +
-> > +		/* if it takes longer reduce poll interval */
-> > +		if (time_after(jiffies, fastpoll))
-> > +			udelay(10);
-> > +		else
-> > +			cpu_relax();
-> > +	}
+On 01/26/2017 10:06 AM, Maxime Ripard wrote:
+> The eMMC controller seem to have a maximum frequency of 200MHz, while the
+> regular MMC controllers are capped at 150MHz.
 > 
-> Use readl_poll_timeout intead of open-coding them..
+> Since older SoCs cannot go that high, we cannot change the default maximum
+> frequency, but fortunately for us we have a property for that in the DT.
+> 
+> This also has the side effect of allowing to use the MMC HS200 and SD
+> SDR104 modes for the boards that support it (with either 1.2v or 1.8v IOs).
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> arm64: allwinner: a64: Limit MMC0 and MMC1 rates to 150MHz
+> 
+> Trying to set the bus to 200MHz on MMC1 when doing SDIO is failing.
+> Allwinner sets the maximum for this bus to 150MHz, so enforce that limit.
+> 
+> This hasn't been tested with MMC0, but the documented limit is the same,
+> and I expect the behaviour to be the same.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Cool.  Didn't know this exists.  Incremental fixup attached.
+I suspect that you are trying to increase your number of Signed-off-by tags by
+using unfair means :) Otherwise the squashed commit message is probably worth
+some cleaning.
 
-thanks,
-  Gerd
+Best,
+Florian
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-mmc-bcm2835-use-readl_poll_timeout-in-bcm2835_read_w.patch
-Type: text/x-patch
-Size: 2245 bytes
-Desc: 
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170127/320c74c6/attachment.bin>
+> ---
+>  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 3 +++
+>  1 file changed, 3 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> index 7b79c319ad3c..cb3e0cf2191a 100644
+> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
+> @@ -130,6 +130,7 @@
+>  			resets = <&ccu RST_BUS_MMC0>;
+>  			reset-names = "ahb";
+>  			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
+> +			max-frequency = <150000000>;
+>  			status = "disabled";
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> @@ -143,6 +144,7 @@
+>  			resets = <&ccu RST_BUS_MMC1>;
+>  			reset-names = "ahb";
+>  			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
+> +			max-frequency = <150000000>;
+>  			status = "disabled";
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> @@ -156,6 +158,7 @@
+>  			resets = <&ccu RST_BUS_MMC2>;
+>  			reset-names = "ahb";
+>  			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
+> +			max-frequency = <200000000>;
+>  			status = "disabled";
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> 
