@@ -1,54 +1,47 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 27 Jan 2017 11:27:36 +0100
-Subject: [PATCH net-next v2] macb: Common code to enable ptp support for
- MACB/GEM
-In-Reply-To: <BN3PR07MB25163747E1520E4CE1C6164FC9760@BN3PR07MB2516.namprd07.prod.outlook.com>
-References: <1484841375-11420-1-git-send-email-andrei.pistirica@microchip.com>
- <BN3PR07MB25160FCBCF19918C495F43B4C9770@BN3PR07MB2516.namprd07.prod.outlook.com>
- <CAFcVECLuWM65zXJWtMcwijZ1ZbtH0pvKnTUR=SJagPGHEr9amg@mail.gmail.com>
- <BN3PR07MB25163747E1520E4CE1C6164FC9760@BN3PR07MB2516.namprd07.prod.outlook.com>
-Message-ID: <779c1540-f4da-90ee-1fa1-c94339a892aa@atmel.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 27 Jan 2017 11:27:21 +0100
+Subject: [PATCH v11 0/8] arm/arm64: vgic: Implement API for vGICv3 live
+ migration
+In-Reply-To: <9fea1713-7087-7052-5ca6-d9257a6f973a@arm.com>
+References: <1485440453-10597-1-git-send-email-vijay.kilari@gmail.com>
+ <20170126202640.GD15850@cbox>
+ <9fea1713-7087-7052-5ca6-d9257a6f973a@arm.com>
+Message-ID: <20170127102721.GA10506@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 27/01/2017 ? 11:26, Rafal Ozieblo a ?crit :
->> -----Original Message-----
->> From: Harini Katakam [mailto:harinikatakamlinux at gmail.com] 
->> Sent: 27 stycznia 2017 06:43
->> Subject: Re: [PATCH net-next v2] macb: Common code to enable ptp support for MACB/GEM
->>
->> Hi Rafal,
->>
->> On Thu, Jan 26, 2017 at 8:45 PM, Rafal Ozieblo <rafalo@cadence.com> wrote:
->>>> -----Original Message-----
->>>> From: Andrei Pistirica [mailto:andrei.pistirica at microchip.com]
->>>> Sent: 19 stycznia 2017 16:56
->>>> Subject: [PATCH net-next v2] macb: Common code to enable ptp support for MACB/GEM
->>>>
->>>>
->>>> +static inline bool gem_has_ptp(struct macb *bp)
->>>> +{
->>>> +     return !!(bp->caps & MACB_CAPS_GEM_HAS_PTP);
->>>> +}
->>> Why don't you use hardware capabilities here? Would it be better to read it from hardware instead adding it to many configuration?
->>
->> If you are referring to TSU bit in DCFG5, then we will be relying on
->> Cadence IP's information irrespective of the SoC capability
->> and whether the PTP support was adequate.
->> I think the capability approach gives better control and
->> it is not really much to add.
->>
->> Regards,
->> Harini
->>
-> Yes, I'm referring to TSU bit.
-> What if SoC contains multiple Cadence GEMs, some with PTP support and others without?
+On Fri, Jan 27, 2017 at 09:45:06AM +0000, Marc Zyngier wrote:
+> On 26/01/17 20:26, Christoffer Dall wrote:
+> > Hi Vijaya,
+> > 
+> > On Thu, Jan 26, 2017 at 07:50:45PM +0530, vijay.kilari at gmail.com wrote:
+> >> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> >>
+> >> This patchset adds API for saving and restoring
+> >> of VGICv3 registers to support live migration with new vgic feature.
+> >> This API definition is as per version of VGICv3 specification
+> >> Documentation/virtual/kvm/devices/arm-vgic-v3.txt
+> >>
+> >> The patch 3 & 4 are picked from the Pavel's previous implementation.
+> >> http://www.spinics.net/lists/kvm/msg122040.html
+> >>
+> >> NOTE: Only compilation tested for AArch32. No hardware available to test.
+> > 
+> > Thanks for the respin.  I've given this a once-over and tested on GICv2
+> > against migrations and on GICv3 for this functionality, and it looks
 
-Simply define different DT compatibility strings and we're good.
+haha, just noticed this.  That's against *regressions* obviously.
 
-> Relevant will be checking both, hardware capabilities and SoC capabilities from "caps" field.
+
+> > good.
+> > 
+> > It would be good to see a soon respin of the QEMU series as well.
+> > 
+> > Marc, unless others have objections to this series, I think we can queue
+> > this series.
+> 
+> Yup, I'll queue it on top. Thanks everyone for sticking with this series.
 > 
 
-
--- 
-Nicolas Ferre
+Thanks,
+-Christoffer
