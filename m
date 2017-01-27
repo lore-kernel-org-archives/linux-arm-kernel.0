@@ -1,78 +1,80 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 27 Jan 2017 22:38:40 +0100
-Subject: [PATCH v5 8/13] arm64: allwinner: a64: Add MMC nodes
+Date: Fri, 27 Jan 2017 22:38:37 +0100
+Subject: [PATCH v5 5/13] mmc: sunxi: Mask DATA0 when updating the clock
 In-Reply-To: <cover.6f3d82744628848e2182720c35f13e87e8b62258.1485553113.git-series.maxime.ripard@free-electrons.com>
 References: <cover.6f3d82744628848e2182720c35f13e87e8b62258.1485553113.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <a8624d9d73e13fc5f24866300a88572ecf88e51d.1485553113.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <a6930bfcfcd651247b1b9d6a3b6175f4c220bb59.1485553113.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andre Przywara <andre.przywara@arm.com>
+The A64 MMC controllers need DATA0 to be masked while updating the clock,
+otherwise any subsequent command will result in a timeout.
 
-The A64 has 3 MMC controllers, one of them being especially targeted to
-eMMC. Among other things, it has a data strobe signal and a 8 bits data
-width.
+It's not really clear at this point what DATA0 is exactly, but this
+behaviour is present in Allwinner's tree, and has been suggested by
+Allwinner engineers as fixes for the timeout.
 
-The two other are more usual controllers that will have a 4 bits width at
-most and no data strobe signal, which limits it to more usual SD or MMC
-peripherals.
-
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Tested-by: Florian Vaussard <florian.vaussard@heig-vd.ch>
 ---
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi | 39 ++++++++++++++++++++-
- 1 file changed, 39 insertions(+), 0 deletions(-)
+ drivers/mmc/host/sunxi-mmc.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-index 6ec831177b22..d06a4dc93e93 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi
-@@ -121,6 +121,45 @@
- 		#size-cells = <1>;
- 		ranges;
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index 51d6388a194e..6bbe61397b7c 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -101,6 +101,7 @@
+ 	(SDXC_SOFT_RESET | SDXC_FIFO_RESET | SDXC_DMA_RESET)
  
-+		mmc0: mmc at 1c0f000 {
-+			compatible = "allwinner,sun50i-a64-mmc";
-+			reg = <0x01c0f000 0x1000>;
-+			clocks = <&ccu CLK_BUS_MMC0>, <&ccu CLK_MMC0>;
-+			clock-names = "ahb", "mmc";
-+			resets = <&ccu RST_BUS_MMC0>;
-+			reset-names = "ahb";
-+			interrupts = <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
+ /* clock control bits */
++#define SDXC_MASK_DATA0			BIT(31)
+ #define SDXC_CARD_CLOCK_ON		BIT(16)
+ #define SDXC_LOW_POWER_ON		BIT(17)
+ 
+@@ -254,6 +255,9 @@ struct sunxi_mmc_cfg {
+ 	/* does the IP block support autocalibration? */
+ 	bool can_calibrate;
+ 
++	/* Does DATA0 needs to be masked while the clock is updated */
++	bool mask_data0;
 +
-+		mmc1: mmc at 1c10000 {
-+			compatible = "allwinner,sun50i-a64-mmc";
-+			reg = <0x01c10000 0x1000>;
-+			clocks = <&ccu CLK_BUS_MMC1>, <&ccu CLK_MMC1>;
-+			clock-names = "ahb", "mmc";
-+			resets = <&ccu RST_BUS_MMC1>;
-+			reset-names = "ahb";
-+			interrupts = <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
+ 	bool needs_new_timings;
+ };
+ 
+@@ -657,10 +661,12 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
+ 	u32 rval;
+ 
+ 	rval = mmc_readl(host, REG_CLKCR);
+-	rval &= ~(SDXC_CARD_CLOCK_ON | SDXC_LOW_POWER_ON);
++	rval &= ~(SDXC_CARD_CLOCK_ON | SDXC_LOW_POWER_ON | SDXC_MASK_DATA0);
+ 
+ 	if (oclk_en)
+ 		rval |= SDXC_CARD_CLOCK_ON;
++	if (host->cfg->mask_data0)
++		rval |= SDXC_MASK_DATA0;
+ 
+ 	mmc_writel(host, REG_CLKCR, rval);
+ 
+@@ -680,6 +686,11 @@ static int sunxi_mmc_oclk_onoff(struct sunxi_mmc_host *host, u32 oclk_en)
+ 		return -EIO;
+ 	}
+ 
++	if (host->cfg->mask_data0) {
++		rval = mmc_readl(host, REG_CLKCR);
++		mmc_writel(host, REG_CLKCR, rval & ~SDXC_MASK_DATA0);
++	}
 +
-+		mmc2: mmc at 1c11000 {
-+			compatible = "allwinner,sun50i-a64-emmc";
-+			reg = <0x01c11000 0x1000>;
-+			clocks = <&ccu CLK_BUS_MMC2>, <&ccu CLK_MMC2>;
-+			clock-names = "ahb", "mmc";
-+			resets = <&ccu RST_BUS_MMC2>;
-+			reset-names = "ahb";
-+			interrupts = <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
- 		usb_otg: usb at 01c19000 {
- 			compatible = "allwinner,sun8i-a33-musb";
- 			reg = <0x01c19000 0x0400>;
+ 	return 0;
+ }
+ 
+@@ -1081,6 +1092,7 @@ static const struct sunxi_mmc_cfg sun50i_a64_cfg = {
+ 	.idma_des_size_bits = 16,
+ 	.clk_delays = NULL,
+ 	.can_calibrate = true,
++	.mask_data0 = true,
+ 	.needs_new_timings = true,
+ };
+ 
 -- 
 git-series 0.8.11
