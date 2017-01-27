@@ -1,231 +1,659 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 27 Jan 2017 10:42:29 +0100
-Subject: [PATCH 07/11] clk: sunxi-ng: Add A80 Display Engine CCU
-In-Reply-To: <CAGb2v671951p7-QNJh_JHXqCPJMHso8EjER-mBt1sn8j+U+uHg@mail.gmail.com>
-References: <20170124023230.3990-1-wens@csie.org>
- <20170124023230.3990-8-wens@csie.org>
- <20170126103928.3kmvymoafsz5jfjm@lukather>
- <CAGb2v65QLAD4C27NoRHALO=2WzW=DC6OxwCCMhes-N+kWO3_kg@mail.gmail.com>
- <20170127085825.b4mzk47gpczj3dcu@lukather>
- <CAGb2v671951p7-QNJh_JHXqCPJMHso8EjER-mBt1sn8j+U+uHg@mail.gmail.com>
-Message-ID: <20170127094229.x7wyfppeyahqbnti@lukather>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 27 Jan 2017 09:41:37 +0000
+Subject: [PATCH 2/4] crypto: ccm - switch to separate cbcmac driver
+In-Reply-To: <1485451063-11822-3-git-send-email-ard.biesheuvel@linaro.org>
+References: <1485451063-11822-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1485451063-11822-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu8uY7=rVJWUerNiV6zk7tnA7Ke2cCwK7CQ-PNOPK99v6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2017 at 05:26:53PM +0800, Chen-Yu Tsai wrote:
-> On Fri, Jan 27, 2017 at 4:58 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Thu, Jan 26, 2017 at 07:20:22PM +0800, Chen-Yu Tsai wrote:
-> >> On Thu, Jan 26, 2017 at 6:39 PM, Maxime Ripard
-> >> <maxime.ripard@free-electrons.com> wrote:
-> >> > Hi,
-> >> >
-> >> > On Tue, Jan 24, 2017 at 10:32:26AM +0800, Chen-Yu Tsai wrote:
-> >> >> Add support for the display engine clock controls found on the A80.
-> >> >>
-> >> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> >> ---
-> >> >>  .../devicetree/bindings/clock/sun9i-de.txt         |  28 ++
-> >> >>  drivers/clk/sunxi-ng/Makefile                      |   1 +
-> >> >>  drivers/clk/sunxi-ng/ccu-sun9i-a80-de.c            | 283 +++++++++++++++++++++
-> >> >>  drivers/clk/sunxi-ng/ccu-sun9i-a80-de.h            |  33 +++
-> >> >>  include/dt-bindings/clock/sun9i-a80-de.h           |  80 ++++++
-> >> >>  include/dt-bindings/reset/sun9i-a80-de.h           |  58 +++++
-> >> >>  6 files changed, 483 insertions(+)
-> >> >>  create mode 100644 Documentation/devicetree/bindings/clock/sun9i-de.txt
-> >> >>  create mode 100644 drivers/clk/sunxi-ng/ccu-sun9i-a80-de.c
-> >> >>  create mode 100644 drivers/clk/sunxi-ng/ccu-sun9i-a80-de.h
-> >> >>  create mode 100644 include/dt-bindings/clock/sun9i-a80-de.h
-> >> >>  create mode 100644 include/dt-bindings/reset/sun9i-a80-de.h
-> >> >>
-> >> >> diff --git a/Documentation/devicetree/bindings/clock/sun9i-de.txt b/Documentation/devicetree/bindings/clock/sun9i-de.txt
-> >> >> new file mode 100644
-> >> >> index 000000000000..3a5e6df70677
-> >> >> --- /dev/null
-> >> >> +++ b/Documentation/devicetree/bindings/clock/sun9i-de.txt
-> >> >> @@ -0,0 +1,28 @@
-> >> >> +Allwinner A80 Display Engine Clock Control Binding
-> >> >> +------------------------------------
-> >> >> +
-> >> >> +Required properties :
-> >> >> +- compatible: must contain one of the following compatibles:
-> >> >> +             - "allwinner,sun9i-a80-de-clocks"
-> >> >> +
-> >> >> +- reg: Must contain the registers base address and length
-> >> >> +- clocks: phandle to the clocks feeding the display engine subsystem.
-> >> >> +       Three are needed:
-> >> >> +  - "mod": the display engine module clock
-> >> >> +  - "dram": the DRAM bus clock for the system
-> >> >> +  - "bus": the bus clock for the whole display engine subsystem
-> >> >> +- clock-names: Must contain the clock names described just above
-> >> >> +- resets: phandle to the reset control for the display engine subsystem.
-> >> >> +- #clock-cells : must contain 1
-> >> >> +- #reset-cells : must contain 1
-> >> >> +
-> >> >> +Example:
-> >> >> +de_clocks: clock at 03000000 {
-> >> >> +     compatible = "allwinner,sun9i-a80-de-clks";
-> >> >> +     reg = <0x03000000 0x30>;
-> >> >> +     clocks = <&ccu CLK_DE>, <&ccu CLK_SDRAM>, <&ccu CLK_BUS_DE>;
-> >> >> +     clock-names = "mod", "dram", "bus";
-> >> >> +     resets = <&ccu RST_BUS_DE>;
-> >> >> +     #clock-cells = <1>;
-> >> >> +     #reset-cells = <1>;
-> >> >> +};
-> >> >> diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-> >> >> index 8f37ef7fb67d..6feaac0c5600 100644
-> >> >> --- a/drivers/clk/sunxi-ng/Makefile
-> >> >> +++ b/drivers/clk/sunxi-ng/Makefile
-> >> >> @@ -26,4 +26,5 @@ obj-$(CONFIG_SUN8I_A33_CCU) += ccu-sun8i-a33.o
-> >> >>  obj-$(CONFIG_SUN8I_H3_CCU)   += ccu-sun8i-h3.o
-> >> >>  obj-$(CONFIG_SUN8I_V3S_CCU)  += ccu-sun8i-v3s.o
-> >> >>  obj-$(CONFIG_SUN9I_A80_CCU)  += ccu-sun9i-a80.o
-> >> >> +obj-$(CONFIG_SUN9I_A80_CCU)  += ccu-sun9i-a80-de.o
-> >> >>  obj-$(CONFIG_SUN9I_A80_CCU)  += ccu-sun9i-a80-usb.o
-> >> >> diff --git a/drivers/clk/sunxi-ng/ccu-sun9i-a80-de.c b/drivers/clk/sunxi-ng/ccu-sun9i-a80-de.c
-> >> >> new file mode 100644
-> >> >> index 000000000000..3fc27db0a49a
-> >> >> --- /dev/null
-> >> >> +++ b/drivers/clk/sunxi-ng/ccu-sun9i-a80-de.c
-> >> >> @@ -0,0 +1,283 @@
-> >> >> +/*
-> >> >> + * Copyright (c) 2016 Chen-Yu Tsai. All rights reserved.
-> >> >> + *
-> >> >> + * This software is licensed under the terms of the GNU General Public
-> >> >> + * License version 2, as published by the Free Software Foundation, and
-> >> >> + * may be copied, distributed, and modified under those terms.
-> >> >> + *
-> >> >> + * This program is distributed in the hope that it will be useful,
-> >> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >> >> + * GNU General Public License for more details.
-> >> >> + */
-> >> >> +
-> >> >> +#include <linux/clk.h>
-> >> >> +#include <linux/clk-provider.h>
-> >> >> +#include <linux/of_address.h>
-> >> >> +#include <linux/platform_device.h>
-> >> >> +#include <linux/reset.h>
-> >> >> +
-> >> >> +#include "ccu_common.h"
-> >> >> +#include "ccu_div.h"
-> >> >> +#include "ccu_gate.h"
-> >> >> +#include "ccu_reset.h"
-> >> >> +
-> >> >> +#include "ccu-sun9i-a80-de.h"
-> >> >> +
-> >> >> +static SUNXI_CCU_GATE(fe0_clk,               "fe0",          "fe0-div",
-> >> >> +                   0x00, BIT(0), 0);
-> >> >> +static SUNXI_CCU_GATE(fe1_clk,               "fe1",          "fe1-div",
-> >> >> +                   0x00, BIT(1), 0);
-> >> >> +static SUNXI_CCU_GATE(fe2_clk,               "fe2",          "fe2-div",
-> >> >> +                   0x00, BIT(2), 0);
-> >> >> +static SUNXI_CCU_GATE(iep_deu0_clk,  "iep-deu0",     "de",
-> >> >> +                   0x00, BIT(4), 0);
-> >> >> +static SUNXI_CCU_GATE(iep_deu1_clk,  "iep-deu1",     "de",
-> >> >> +                   0x00, BIT(5), 0);
-> >> >> +static SUNXI_CCU_GATE(be0_clk,               "be0",          "be0-div",
-> >> >> +                   0x00, BIT(8), 0);
-> >> >> +static SUNXI_CCU_GATE(be1_clk,               "be1",          "be1-div",
-> >> >> +                   0x00, BIT(9), 0);
-> >> >> +static SUNXI_CCU_GATE(be2_clk,               "be2",          "be2-div",
-> >> >> +                   0x00, BIT(10), 0);
-> >> >> +static SUNXI_CCU_GATE(iep_drc0_clk,  "iep-drc0",     "de",
-> >> >> +                   0x00, BIT(12), 0);
-> >> >> +static SUNXI_CCU_GATE(iep_drc1_clk,  "iep-drc1",     "de",
-> >> >> +                   0x00, BIT(13), 0);
-> >> >> +static SUNXI_CCU_GATE(merge_clk,     "merge",        "de",
-> >> >> +                   0x00, BIT(20), 0);
-> >> >> +
-> >> >> +static SUNXI_CCU_GATE(dram_fe0_clk,  "dram-fe0",     "sdram",
-> >> >> +                   0x04, BIT(0), 0);
-> >> >> +static SUNXI_CCU_GATE(dram_fe1_clk,  "dram-fe1",     "sdram",
-> >> >> +                   0x04, BIT(1), 0);
-> >> >> +static SUNXI_CCU_GATE(dram_fe2_clk,  "dram-fe2",     "sdram",
-> >> >> +                   0x04, BIT(2), 0);
-> >> >> +static SUNXI_CCU_GATE(dram_deu0_clk, "dram-deu0",    "sdram",
-> >> >> +                   0x04, BIT(4), 0);
-> >> >> +static SUNXI_CCU_GATE(dram_deu1_clk, "dram-deu1",    "sdram",
-> >> >> +                   0x04, BIT(5), 0);
-> >> >> +static SUNXI_CCU_GATE(dram_be0_clk,  "dram-be0",     "sdram",
-> >> >> +                   0x04, BIT(8), 0);
-> >> >> +static SUNXI_CCU_GATE(dram_be1_clk,  "dram-be1",     "sdram",
-> >> >> +                   0x04, BIT(9), 0);
-> >> >> +static SUNXI_CCU_GATE(dram_be2_clk,  "dram-be2",     "sdram",
-> >> >> +                   0x04, BIT(10), 0);
-> >> >> +static SUNXI_CCU_GATE(dram_drc0_clk, "dram-drc0",    "sdram",
-> >> >> +                   0x04, BIT(12), 0);
-> >> >> +static SUNXI_CCU_GATE(dram_drc1_clk, "dram-drc1",    "sdram",
-> >> >> +                   0x04, BIT(13), 0);
-> >> >> +
-> >> >> +static SUNXI_CCU_GATE(bus_fe0_clk,   "bus-fe0",      "bus-de",
-> >> >> +                   0x08, BIT(0), 0);
-> >> >> +static SUNXI_CCU_GATE(bus_fe1_clk,   "bus-fe1",      "bus-de",
-> >> >> +                   0x08, BIT(1), 0);
-> >> >> +static SUNXI_CCU_GATE(bus_fe2_clk,   "bus-fe2",      "bus-de",
-> >> >> +                   0x08, BIT(2), 0);
-> >> >> +static SUNXI_CCU_GATE(bus_deu0_clk,  "bus-deu0",     "bus-de",
-> >> >> +                   0x08, BIT(4), 0);
-> >> >> +static SUNXI_CCU_GATE(bus_deu1_clk,  "bus-deu1",     "bus-de",
-> >> >> +                   0x08, BIT(5), 0);
-> >> >> +static SUNXI_CCU_GATE(bus_be0_clk,   "bus-be0",      "bus-de",
-> >> >> +                   0x08, BIT(8), 0);
-> >> >> +static SUNXI_CCU_GATE(bus_be1_clk,   "bus-be1",      "bus-de",
-> >> >> +                   0x08, BIT(9), 0);
-> >> >> +static SUNXI_CCU_GATE(bus_be2_clk,   "bus-be2",      "bus-de",
-> >> >> +                   0x08, BIT(10), 0);
-> >> >> +static SUNXI_CCU_GATE(bus_drc0_clk,  "bus-drc0",     "bus-de",
-> >> >> +                   0x08, BIT(12), 0);
-> >> >> +static SUNXI_CCU_GATE(bus_drc1_clk,  "bus-drc1",     "bus-de",
-> >> >> +                   0x08, BIT(13), 0);
-> >> >> +
-> >> >> +static SUNXI_CCU_M(fe0_div_clk, "fe0-div", "de", 0x20, 0, 4, 0);
-> >> >> +static SUNXI_CCU_M(fe1_div_clk, "fe1-div", "de", 0x20, 4, 4, 0);
-> >> >> +static SUNXI_CCU_M(fe2_div_clk, "fe2-div", "de", 0x20, 8, 4, 0);
-> >> >> +static SUNXI_CCU_M(be0_div_clk, "be0-div", "de", 0x20, 16, 4, 0);
-> >> >> +static SUNXI_CCU_M(be1_div_clk, "be1-div", "de", 0x20, 20, 4, 0);
-> >> >> +static SUNXI_CCU_M(be2_div_clk, "be2-div", "de", 0x20, 24, 4, 0);
-> >> >
-> >> > I couldn't find any documentation for this CCU.
-> >>
-> >> I dug this up in the released Allwinner kernel.
-> >>
-> >> > What are those clocks for, and how the display engine should be using
-> >> > (ie, which one is it expecting to drive / ungate / etc.)
-> >>
-> >> Allwinner basically put all DE-related clock controls into a
-> >> separate module. In here, as the names above suggest, we have
-> >> bus gates, dram gates, and module clocks for each part of the
-> >> display pipeline. As with older SoCs that have DE 1.0, each
-> >> module should ungate and use the clocks related to them.
-> >>
-> >> I'll put something like the above in the commit message.
-> >
-> > So the module clocks are a combination of a divider and a clock?
-> 
-> Correct. Some have dividers, some don't.
-> 
-> > And I'm guessing the reason you separated them is because they belong
-> > in a different register.
-> 
-> Correct. Trying to support them within one clock would be a big
-> deviation from what sunxi-ng currently supports. I left the
-> divider clocks at the end of the list, and aren't exported to
-> dt either. So if we really want to get rid of those intermediate
-> divider clocks, we can do so later without affecting the exposed
-> interface.
+On 26 January 2017 at 17:17, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> Update the generic CCM driver to defer CBC-MAC processing to a
+> dedicated CBC-MAC ahash transform rather than open coding this
+> transform (and much of the associated scatterwalk plumbing) in
+> the CCM driver itself.
+>
+> This cleans up the code considerably, but more importantly, it allows
+> the use of alternative CBC-MAC implementations that don't suffer from
+> performance degradation due to significant setup time (e.g., the NEON
+> based AES code needs to load the entire S-box into SIMD registers, which
+> cannot be amortized over the entire input when using the AES cipher
+> directly)
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  crypto/Kconfig |   1 +
+>  crypto/ccm.c   | 373 +++++++++++++-------
+>  2 files changed, 238 insertions(+), 136 deletions(-)
+>
+> diff --git a/crypto/Kconfig b/crypto/Kconfig
+> index 160f08e721cc..e8269d1b0282 100644
+> --- a/crypto/Kconfig
+> +++ b/crypto/Kconfig
+> @@ -263,6 +263,7 @@ comment "Authenticated Encryption with Associated Data"
+>  config CRYPTO_CCM
+>         tristate "CCM support"
+>         select CRYPTO_CTR
+> +       select CRYPTO_HASH
+>         select CRYPTO_AEAD
+>         help
+>           Support for Counter with CBC MAC. Required for IPsec.
+> diff --git a/crypto/ccm.c b/crypto/ccm.c
+> index 26b924d1e582..635f11fc52e7 100644
+> --- a/crypto/ccm.c
+> +++ b/crypto/ccm.c
+> @@ -11,6 +11,7 @@
+>   */
+>
+>  #include <crypto/internal/aead.h>
+> +#include <crypto/internal/hash.h>
+>  #include <crypto/internal/skcipher.h>
+>  #include <crypto/scatterwalk.h>
+>  #include <linux/err.h>
+> @@ -23,11 +24,11 @@
+>
+>  struct ccm_instance_ctx {
+>         struct crypto_skcipher_spawn ctr;
+> -       struct crypto_spawn cipher;
+> +       struct crypto_ahash_spawn mac;
+>  };
+>
+>  struct crypto_ccm_ctx {
+> -       struct crypto_cipher *cipher;
+> +       struct crypto_ahash *mac;
+>         struct crypto_skcipher *ctr;
+>  };
+>
+> @@ -44,7 +45,6 @@ struct crypto_rfc4309_req_ctx {
+>
+>  struct crypto_ccm_req_priv_ctx {
+>         u8 odata[16];
+> -       u8 idata[16];
+>         u8 auth_tag[16];
+>         u32 ilen;
 
-That works for me, thanks!
-Maxime
+This is unused now.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170127/1841e28a/attachment.sig>
+>         u32 flags;
+> @@ -53,6 +53,15 @@ struct crypto_ccm_req_priv_ctx {
+>         struct skcipher_request skreq;
+>  };
+>
+> +struct cbcmac_tfm_ctx {
+> +       struct crypto_cipher *child;
+> +};
+> +
+> +struct cbcmac_desc_ctx {
+> +       unsigned int len;
+> +       u8 dg[];
+> +};
+> +
+>  static inline struct crypto_ccm_req_priv_ctx *crypto_ccm_reqctx(
+>         struct aead_request *req)
+>  {
+> @@ -84,7 +93,7 @@ static int crypto_ccm_setkey(struct crypto_aead *aead, const u8 *key,
+>  {
+>         struct crypto_ccm_ctx *ctx = crypto_aead_ctx(aead);
+>         struct crypto_skcipher *ctr = ctx->ctr;
+> -       struct crypto_cipher *tfm = ctx->cipher;
+> +       struct crypto_ahash *mac = ctx->mac;
+>         int err = 0;
+>
+>         crypto_skcipher_clear_flags(ctr, CRYPTO_TFM_REQ_MASK);
+> @@ -96,11 +105,11 @@ static int crypto_ccm_setkey(struct crypto_aead *aead, const u8 *key,
+>         if (err)
+>                 goto out;
+>
+> -       crypto_cipher_clear_flags(tfm, CRYPTO_TFM_REQ_MASK);
+> -       crypto_cipher_set_flags(tfm, crypto_aead_get_flags(aead) &
+> +       crypto_ahash_clear_flags(mac, CRYPTO_TFM_REQ_MASK);
+> +       crypto_ahash_set_flags(mac, crypto_aead_get_flags(aead) &
+>                                     CRYPTO_TFM_REQ_MASK);
+> -       err = crypto_cipher_setkey(tfm, key, keylen);
+> -       crypto_aead_set_flags(aead, crypto_cipher_get_flags(tfm) &
+> +       err = crypto_ahash_setkey(mac, key, keylen);
+> +       crypto_aead_set_flags(aead, crypto_ahash_get_flags(mac) &
+>                               CRYPTO_TFM_RES_MASK);
+>
+>  out:
+> @@ -167,119 +176,59 @@ static int format_adata(u8 *adata, unsigned int a)
+>         return len;
+>  }
+>
+> -static void compute_mac(struct crypto_cipher *tfm, u8 *data, int n,
+> -                      struct crypto_ccm_req_priv_ctx *pctx)
+> -{
+> -       unsigned int bs = 16;
+> -       u8 *odata = pctx->odata;
+> -       u8 *idata = pctx->idata;
+> -       int datalen, getlen;
+> -
+> -       datalen = n;
+> -
+> -       /* first time in here, block may be partially filled. */
+> -       getlen = bs - pctx->ilen;
+> -       if (datalen >= getlen) {
+> -               memcpy(idata + pctx->ilen, data, getlen);
+> -               crypto_xor(odata, idata, bs);
+> -               crypto_cipher_encrypt_one(tfm, odata, odata);
+> -               datalen -= getlen;
+> -               data += getlen;
+> -               pctx->ilen = 0;
+> -       }
+> -
+> -       /* now encrypt rest of data */
+> -       while (datalen >= bs) {
+> -               crypto_xor(odata, data, bs);
+> -               crypto_cipher_encrypt_one(tfm, odata, odata);
+> -
+> -               datalen -= bs;
+> -               data += bs;
+> -       }
+> -
+> -       /* check and see if there's leftover data that wasn't
+> -        * enough to fill a block.
+> -        */
+> -       if (datalen) {
+> -               memcpy(idata + pctx->ilen, data, datalen);
+> -               pctx->ilen += datalen;
+> -       }
+> -}
+> -
+> -static void get_data_to_compute(struct crypto_cipher *tfm,
+> -                              struct crypto_ccm_req_priv_ctx *pctx,
+> -                              struct scatterlist *sg, unsigned int len)
+> -{
+> -       struct scatter_walk walk;
+> -       u8 *data_src;
+> -       int n;
+> -
+> -       scatterwalk_start(&walk, sg);
+> -
+> -       while (len) {
+> -               n = scatterwalk_clamp(&walk, len);
+> -               if (!n) {
+> -                       scatterwalk_start(&walk, sg_next(walk.sg));
+> -                       n = scatterwalk_clamp(&walk, len);
+> -               }
+> -               data_src = scatterwalk_map(&walk);
+> -
+> -               compute_mac(tfm, data_src, n, pctx);
+> -               len -= n;
+> -
+> -               scatterwalk_unmap(data_src);
+> -               scatterwalk_advance(&walk, n);
+> -               scatterwalk_done(&walk, 0, len);
+> -               if (len)
+> -                       crypto_yield(pctx->flags);
+> -       }
+> -
+> -       /* any leftover needs padding and then encrypted */
+> -       if (pctx->ilen) {
+> -               int padlen;
+> -               u8 *odata = pctx->odata;
+> -               u8 *idata = pctx->idata;
+> -
+> -               padlen = 16 - pctx->ilen;
+> -               memset(idata + pctx->ilen, 0, padlen);
+> -               crypto_xor(odata, idata, 16);
+> -               crypto_cipher_encrypt_one(tfm, odata, odata);
+> -               pctx->ilen = 0;
+> -       }
+> -}
+> -
+>  static int crypto_ccm_auth(struct aead_request *req, struct scatterlist *plain,
+>                            unsigned int cryptlen)
+>  {
+> +       struct crypto_ccm_req_priv_ctx *pctx = crypto_ccm_reqctx(req);
+>         struct crypto_aead *aead = crypto_aead_reqtfm(req);
+>         struct crypto_ccm_ctx *ctx = crypto_aead_ctx(aead);
+> -       struct crypto_ccm_req_priv_ctx *pctx = crypto_ccm_reqctx(req);
+> -       struct crypto_cipher *cipher = ctx->cipher;
+> +       AHASH_REQUEST_ON_STACK(ahreq, ctx->mac);
+>         unsigned int assoclen = req->assoclen;
+> -       u8 *odata = pctx->odata;
+> -       u8 *idata = pctx->idata;
+> -       int err;
+> +       struct scatterlist sg[3];
+> +       u8 odata[16];
+> +       u8 idata[16];
+> +       int ilen, err;
+>
+>         /* format control data for input */
+>         err = format_input(odata, req, cryptlen);
+>         if (err)
+>                 goto out;
+>
+> -       /* encrypt first block to use as start in computing mac  */
+> -       crypto_cipher_encrypt_one(cipher, odata, odata);
+> +       sg_init_table(sg, 3);
+> +       sg_set_buf(&sg[0], odata, 16);
+>
+>         /* format associated data and compute into mac */
+>         if (assoclen) {
+> -               pctx->ilen = format_adata(idata, assoclen);
+> -               get_data_to_compute(cipher, pctx, req->src, req->assoclen);
+> +               ilen = format_adata(idata, assoclen);
+> +               sg_set_buf(&sg[1], idata, ilen);
+> +               sg_chain(sg, 3, req->src);
+>         } else {
+> -               pctx->ilen = 0;
+> +               ilen = 0;
+> +               sg_chain(sg, 2, req->src);
+>         }
+>
+> -       /* compute plaintext into mac */
+> -       if (cryptlen)
+> -               get_data_to_compute(cipher, pctx, plain, cryptlen);
+> +       ahash_request_set_tfm(ahreq, ctx->mac);
+
+
+This needs
+
+diff --git a/crypto/ccm.c b/crypto/ccm.c
+index 635f11fc52e7..016059c0ffdc 100644
+--- a/crypto/ccm.c
++++ b/crypto/ccm.c
+@@ -208,6 +208,7 @@ static int crypto_ccm_auth(struct aead_request
+*req, struct scatterlist *plain,
+        }
+
+        ahash_request_set_tfm(ahreq, ctx->mac);
++       ahash_request_set_callback(ahreq, pctx->flags, NULL, NULL);
+        ahash_request_set_crypt(ahreq, sg, NULL, assoclen + ilen + 16);
+        err = crypto_ahash_init(ahreq);
+        if (err)
+
+here
+
+> +       ahash_request_set_crypt(ahreq, sg, NULL, assoclen + ilen + 16);
+> +       err = crypto_ahash_init(ahreq);
+> +       if (err)
+> +               goto out;
+> +       err = crypto_ahash_update(ahreq);
+> +       if (err)
+> +               goto out;
+>
+> +       /* we need to pad the MAC input to a round multiple of the block size */
+> +       ilen = 16 - (assoclen + ilen) % 16;
+> +       if (ilen < 16) {
+> +               memset(idata, 0, ilen);
+> +               sg_init_table(sg, 2);
+> +               sg_set_buf(&sg[0], idata, ilen);
+> +               sg_chain(sg, 2, plain);
+> +               plain = sg;
+> +               cryptlen += ilen;
+> +       }
+> +
+> +       ahash_request_set_crypt(ahreq, plain, pctx->odata, cryptlen);
+> +       err = crypto_ahash_finup(ahreq);
+>  out:
+>         return err;
+>  }
+> @@ -453,21 +402,21 @@ static int crypto_ccm_init_tfm(struct crypto_aead *tfm)
+>         struct aead_instance *inst = aead_alg_instance(tfm);
+>         struct ccm_instance_ctx *ictx = aead_instance_ctx(inst);
+>         struct crypto_ccm_ctx *ctx = crypto_aead_ctx(tfm);
+> -       struct crypto_cipher *cipher;
+> +       struct crypto_ahash *mac;
+>         struct crypto_skcipher *ctr;
+>         unsigned long align;
+>         int err;
+>
+> -       cipher = crypto_spawn_cipher(&ictx->cipher);
+> -       if (IS_ERR(cipher))
+> -               return PTR_ERR(cipher);
+> +       mac = crypto_spawn_ahash(&ictx->mac);
+> +       if (IS_ERR(mac))
+> +               return PTR_ERR(mac);
+>
+>         ctr = crypto_spawn_skcipher(&ictx->ctr);
+>         err = PTR_ERR(ctr);
+>         if (IS_ERR(ctr))
+> -               goto err_free_cipher;
+> +               goto err_free_mac;
+>
+> -       ctx->cipher = cipher;
+> +       ctx->mac = mac;
+>         ctx->ctr = ctr;
+>
+>         align = crypto_aead_alignmask(tfm);
+> @@ -479,8 +428,8 @@ static int crypto_ccm_init_tfm(struct crypto_aead *tfm)
+>
+>         return 0;
+>
+> -err_free_cipher:
+> -       crypto_free_cipher(cipher);
+> +err_free_mac:
+> +       crypto_free_ahash(mac);
+>         return err;
+>  }
+>
+> @@ -488,7 +437,7 @@ static void crypto_ccm_exit_tfm(struct crypto_aead *tfm)
+>  {
+>         struct crypto_ccm_ctx *ctx = crypto_aead_ctx(tfm);
+>
+> -       crypto_free_cipher(ctx->cipher);
+> +       crypto_free_ahash(ctx->mac);
+>         crypto_free_skcipher(ctx->ctr);
+>  }
+>
+> @@ -496,7 +445,7 @@ static void crypto_ccm_free(struct aead_instance *inst)
+>  {
+>         struct ccm_instance_ctx *ctx = aead_instance_ctx(inst);
+>
+> -       crypto_drop_spawn(&ctx->cipher);
+> +       crypto_drop_ahash(&ctx->mac);
+>         crypto_drop_skcipher(&ctx->ctr);
+>         kfree(inst);
+>  }
+> @@ -505,12 +454,13 @@ static int crypto_ccm_create_common(struct crypto_template *tmpl,
+>                                     struct rtattr **tb,
+>                                     const char *full_name,
+>                                     const char *ctr_name,
+> -                                   const char *cipher_name)
+> +                                   const char *mac_name)
+>  {
+>         struct crypto_attr_type *algt;
+>         struct aead_instance *inst;
+>         struct skcipher_alg *ctr;
+> -       struct crypto_alg *cipher;
+> +       struct crypto_alg *mac_alg;
+> +       struct hash_alg_common *mac;
+>         struct ccm_instance_ctx *ictx;
+>         int err;
+>
+> @@ -521,25 +471,26 @@ static int crypto_ccm_create_common(struct crypto_template *tmpl,
+>         if ((algt->type ^ CRYPTO_ALG_TYPE_AEAD) & algt->mask)
+>                 return -EINVAL;
+>
+> -       cipher = crypto_alg_mod_lookup(cipher_name,  CRYPTO_ALG_TYPE_CIPHER,
+> -                                      CRYPTO_ALG_TYPE_MASK);
+> -       if (IS_ERR(cipher))
+> -               return PTR_ERR(cipher);
+> +       mac_alg = crypto_find_alg(mac_name, &crypto_ahash_type,
+> +                                 CRYPTO_ALG_TYPE_HASH,
+> +                                 CRYPTO_ALG_TYPE_AHASH_MASK |
+> +                                 CRYPTO_ALG_ASYNC);
+> +       if (IS_ERR(mac_alg))
+> +               return PTR_ERR(mac_alg);
+>
+> +       mac = __crypto_hash_alg_common(mac_alg);
+>         err = -EINVAL;
+> -       if (cipher->cra_blocksize != 16)
+> -               goto out_put_cipher;
+> +       if (mac->digestsize != 16)
+> +               goto out_put_mac;
+>
+>         inst = kzalloc(sizeof(*inst) + sizeof(*ictx), GFP_KERNEL);
+>         err = -ENOMEM;
+>         if (!inst)
+> -               goto out_put_cipher;
+> +               goto out_put_mac;
+>
+>         ictx = aead_instance_ctx(inst);
+> -
+> -       err = crypto_init_spawn(&ictx->cipher, cipher,
+> -                               aead_crypto_instance(inst),
+> -                               CRYPTO_ALG_TYPE_MASK);
+> +       err = crypto_init_ahash_spawn(&ictx->mac, mac,
+> +                                     aead_crypto_instance(inst));
+>         if (err)
+>                 goto err_free_inst;
+>
+> @@ -548,7 +499,7 @@ static int crypto_ccm_create_common(struct crypto_template *tmpl,
+>                                    crypto_requires_sync(algt->type,
+>                                                         algt->mask));
+>         if (err)
+> -               goto err_drop_cipher;
+> +               goto err_drop_mac;
+>
+>         ctr = crypto_spawn_skcipher_alg(&ictx->ctr);
+>
+> @@ -564,16 +515,16 @@ static int crypto_ccm_create_common(struct crypto_template *tmpl,
+>         err = -ENAMETOOLONG;
+>         if (snprintf(inst->alg.base.cra_driver_name, CRYPTO_MAX_ALG_NAME,
+>                      "ccm_base(%s,%s)", ctr->base.cra_driver_name,
+> -                    cipher->cra_driver_name) >= CRYPTO_MAX_ALG_NAME)
+> +                    mac->base.cra_driver_name) >= CRYPTO_MAX_ALG_NAME)
+>                 goto err_drop_ctr;
+>
+>         memcpy(inst->alg.base.cra_name, full_name, CRYPTO_MAX_ALG_NAME);
+>
+>         inst->alg.base.cra_flags = ctr->base.cra_flags & CRYPTO_ALG_ASYNC;
+> -       inst->alg.base.cra_priority = (cipher->cra_priority +
+> +       inst->alg.base.cra_priority = (mac->base.cra_priority +
+>                                        ctr->base.cra_priority) / 2;
+>         inst->alg.base.cra_blocksize = 1;
+> -       inst->alg.base.cra_alignmask = cipher->cra_alignmask |
+> +       inst->alg.base.cra_alignmask = mac->base.cra_alignmask |
+>                                        ctr->base.cra_alignmask |
+>                                        (__alignof__(u32) - 1);
+>         inst->alg.ivsize = 16;
+> @@ -593,23 +544,24 @@ static int crypto_ccm_create_common(struct crypto_template *tmpl,
+>         if (err)
+>                 goto err_drop_ctr;
+>
+> -out_put_cipher:
+> -       crypto_mod_put(cipher);
+> +out_put_mac:
+> +       crypto_mod_put(mac_alg);
+>         return err;
+>
+>  err_drop_ctr:
+>         crypto_drop_skcipher(&ictx->ctr);
+> -err_drop_cipher:
+> -       crypto_drop_spawn(&ictx->cipher);
+> +err_drop_mac:
+> +       crypto_drop_ahash(&ictx->mac);
+>  err_free_inst:
+>         kfree(inst);
+> -       goto out_put_cipher;
+> +       goto out_put_mac;
+>  }
+>
+>  static int crypto_ccm_create(struct crypto_template *tmpl, struct rtattr **tb)
+>  {
+>         const char *cipher_name;
+>         char ctr_name[CRYPTO_MAX_ALG_NAME];
+> +       char mac_name[CRYPTO_MAX_ALG_NAME];
+>         char full_name[CRYPTO_MAX_ALG_NAME];
+>
+>         cipher_name = crypto_attr_alg_name(tb[1]);
+> @@ -620,12 +572,16 @@ static int crypto_ccm_create(struct crypto_template *tmpl, struct rtattr **tb)
+>                      cipher_name) >= CRYPTO_MAX_ALG_NAME)
+>                 return -ENAMETOOLONG;
+>
+> +       if (snprintf(mac_name, CRYPTO_MAX_ALG_NAME, "cbcmac(%s)",
+> +                    cipher_name) >= CRYPTO_MAX_ALG_NAME)
+> +               return -ENAMETOOLONG;
+> +
+>         if (snprintf(full_name, CRYPTO_MAX_ALG_NAME, "ccm(%s)", cipher_name) >=
+>             CRYPTO_MAX_ALG_NAME)
+>                 return -ENAMETOOLONG;
+>
+>         return crypto_ccm_create_common(tmpl, tb, full_name, ctr_name,
+> -                                       cipher_name);
+> +                                       mac_name);
+>  }
+>
+>  static struct crypto_template crypto_ccm_tmpl = {
+> @@ -899,14 +855,156 @@ static struct crypto_template crypto_rfc4309_tmpl = {
+>         .module = THIS_MODULE,
+>  };
+>
+> +static int crypto_cbcmac_digest_setkey(struct crypto_shash *parent,
+> +                                    const u8 *inkey, unsigned int keylen)
+> +{
+> +       struct cbcmac_tfm_ctx *ctx = crypto_shash_ctx(parent);
+> +
+> +       return crypto_cipher_setkey(ctx->child, inkey, keylen);
+> +}
+> +
+> +static int crypto_cbcmac_digest_init(struct shash_desc *pdesc)
+> +{
+> +       struct cbcmac_desc_ctx *ctx = shash_desc_ctx(pdesc);
+> +       int bs = crypto_shash_digestsize(pdesc->tfm);
+> +
+> +       memset(ctx->dg, 0, bs);
+> +       ctx->len = 0;
+> +
+> +       return 0;
+> +}
+> +
+> +static int crypto_cbcmac_digest_update(struct shash_desc *pdesc, const u8 *p,
+> +                                      unsigned int len)
+> +{
+> +       struct crypto_shash *parent = pdesc->tfm;
+> +       struct cbcmac_tfm_ctx *tctx = crypto_shash_ctx(parent);
+> +       struct cbcmac_desc_ctx *ctx = shash_desc_ctx(pdesc);
+> +       struct crypto_cipher *tfm = tctx->child;
+> +       int bs = crypto_shash_digestsize(parent);
+> +
+> +       while (len--) {
+> +               ctx->dg[ctx->len++] ^= *p++;
+> +
+> +               if (ctx->len == bs) {
+> +                       crypto_cipher_encrypt_one(tfm, ctx->dg, ctx->dg);
+> +                       ctx->len = 0;
+> +               }
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+> +static int crypto_cbcmac_digest_final(struct shash_desc *pdesc, u8 *out)
+> +{
+> +       struct crypto_shash *parent = pdesc->tfm;
+> +       struct cbcmac_tfm_ctx *tctx = crypto_shash_ctx(parent);
+> +       struct cbcmac_desc_ctx *ctx = shash_desc_ctx(pdesc);
+> +       struct crypto_cipher *tfm = tctx->child;
+> +       int bs = crypto_shash_digestsize(parent);
+> +
+> +       if (ctx->len)
+> +               crypto_cipher_encrypt_one(tfm, out, ctx->dg);
+> +       else
+> +               memcpy(out, ctx->dg, bs);
+> +
+> +       return 0;
+> +}
+> +
+> +static int cbcmac_init_tfm(struct crypto_tfm *tfm)
+> +{
+> +       struct crypto_cipher *cipher;
+> +       struct crypto_instance *inst = (void *)tfm->__crt_alg;
+> +       struct crypto_spawn *spawn = crypto_instance_ctx(inst);
+> +       struct cbcmac_tfm_ctx *ctx = crypto_tfm_ctx(tfm);
+> +
+> +       cipher = crypto_spawn_cipher(spawn);
+> +       if (IS_ERR(cipher))
+> +               return PTR_ERR(cipher);
+> +
+> +       ctx->child = cipher;
+> +
+> +       return 0;
+> +};
+> +
+> +static void cbcmac_exit_tfm(struct crypto_tfm *tfm)
+> +{
+> +       struct cbcmac_tfm_ctx *ctx = crypto_tfm_ctx(tfm);
+> +       crypto_free_cipher(ctx->child);
+> +}
+> +
+> +static int cbcmac_create(struct crypto_template *tmpl, struct rtattr **tb)
+> +{
+> +       struct shash_instance *inst;
+> +       struct crypto_alg *alg;
+> +       int err;
+> +
+> +       err = crypto_check_attr_type(tb, CRYPTO_ALG_TYPE_SHASH);
+> +       if (err)
+> +               return err;
+> +
+> +       alg = crypto_get_attr_alg(tb, CRYPTO_ALG_TYPE_CIPHER,
+> +                                 CRYPTO_ALG_TYPE_MASK);
+> +       if (IS_ERR(alg))
+> +               return PTR_ERR(alg);
+> +
+> +       inst = shash_alloc_instance("cbcmac", alg);
+> +       err = PTR_ERR(inst);
+> +       if (IS_ERR(inst))
+> +               goto out_put_alg;
+> +
+> +       err = crypto_init_spawn(shash_instance_ctx(inst), alg,
+> +                               shash_crypto_instance(inst),
+> +                               CRYPTO_ALG_TYPE_MASK);
+> +       if (err)
+> +               goto out_free_inst;
+> +
+> +       inst->alg.base.cra_priority = alg->cra_priority;
+> +       inst->alg.base.cra_blocksize = 1;
+> +
+> +       inst->alg.digestsize = alg->cra_blocksize;
+> +       inst->alg.descsize = sizeof(struct cbcmac_desc_ctx) +
+> +                            alg->cra_blocksize;
+> +
+> +       inst->alg.base.cra_ctxsize = sizeof(struct cbcmac_tfm_ctx);
+> +       inst->alg.base.cra_init = cbcmac_init_tfm;
+> +       inst->alg.base.cra_exit = cbcmac_exit_tfm;
+> +
+> +       inst->alg.init = crypto_cbcmac_digest_init;
+> +       inst->alg.update = crypto_cbcmac_digest_update;
+> +       inst->alg.final = crypto_cbcmac_digest_final;
+> +       inst->alg.setkey = crypto_cbcmac_digest_setkey;
+> +
+> +       err = shash_register_instance(tmpl, inst);
+> +
+> +out_free_inst:
+> +       if (err)
+> +               shash_free_instance(shash_crypto_instance(inst));
+> +
+> +out_put_alg:
+> +       crypto_mod_put(alg);
+> +       return err;
+> +}
+> +
+> +static struct crypto_template crypto_cbcmac_tmpl = {
+> +       .name = "cbcmac",
+> +       .create = cbcmac_create,
+> +       .free = shash_free_instance,
+> +       .module = THIS_MODULE,
+> +};
+> +
+>  static int __init crypto_ccm_module_init(void)
+>  {
+>         int err;
+>
+> -       err = crypto_register_template(&crypto_ccm_base_tmpl);
+> +       err = crypto_register_template(&crypto_cbcmac_tmpl);
+>         if (err)
+>                 goto out;
+>
+> +       err = crypto_register_template(&crypto_ccm_base_tmpl);
+> +       if (err)
+> +               goto out_undo_cbcmac;
+> +
+>         err = crypto_register_template(&crypto_ccm_tmpl);
+>         if (err)
+>                 goto out_undo_base;
+> @@ -922,6 +1020,8 @@ static int __init crypto_ccm_module_init(void)
+>         crypto_unregister_template(&crypto_ccm_tmpl);
+>  out_undo_base:
+>         crypto_unregister_template(&crypto_ccm_base_tmpl);
+> +out_undo_cbcmac:
+> +       crypto_register_template(&crypto_cbcmac_tmpl);
+>         goto out;
+>  }
+>
+> @@ -930,6 +1030,7 @@ static void __exit crypto_ccm_module_exit(void)
+>         crypto_unregister_template(&crypto_rfc4309_tmpl);
+>         crypto_unregister_template(&crypto_ccm_tmpl);
+>         crypto_unregister_template(&crypto_ccm_base_tmpl);
+> +       crypto_unregister_template(&crypto_cbcmac_tmpl);
+>  }
+>
+>  module_init(crypto_ccm_module_init);
+> --
+> 2.7.4
+>
