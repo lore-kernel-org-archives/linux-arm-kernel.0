@@ -1,35 +1,71 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Fri, 27 Jan 2017 09:54:57 +0100
-Subject: [PATCH v2 24/25] ARM: dts: sun8i: sina33: enable battery power supply
- subnode
+Date: Fri, 27 Jan 2017 09:54:52 +0100
+Subject: [PATCH v2 19/25] iio: adc: axp20x_adc: map battery IIO channels
 In-Reply-To: <20170127085458.18270-1-quentin.schulz@free-electrons.com>
 References: <20170127085458.18270-1-quentin.schulz@free-electrons.com>
-Message-ID: <20170127085458.18270-25-quentin.schulz@free-electrons.com>
+Message-ID: <20170127085458.18270-20-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Sinlinx SinA33 has an AXP223 PMIC and a battery connector, thus, we
-enable the battery power supply subnode in its Device Tree.
+This maps the IIO channels batt_v, batt_chrg_i and batt_dischrg_i
+(respectively exposing the current charging and discharging currents and
+current voltage measures of the battery power supply) to the battery
+power supply driver.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 ---
- arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts | 4 ++++
- 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-index bf53408..2fe9299 100644
---- a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-+++ b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
-@@ -151,6 +151,10 @@
- 	status = "okay";
- };
- 
-+&battery_power_supply {
-+	status = "okay";
+added in v2
+
+ drivers/iio/adc/axp20x_adc.c | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+
+diff --git a/drivers/iio/adc/axp20x_adc.c b/drivers/iio/adc/axp20x_adc.c
+index 14f4ec0..64c7c75 100644
+--- a/drivers/iio/adc/axp20x_adc.c
++++ b/drivers/iio/adc/axp20x_adc.c
+@@ -112,6 +112,34 @@ static struct iio_map axp20x_maps[] = {
+ 		.consumer_dev_name = "axp20x-ac-power-supply",
+ 		.consumer_channel = "acin_i",
+ 		.adc_channel_label = "acin_i",
++	}, {
++		.consumer_dev_name = "axp20x-battery-power-supply",
++		.consumer_channel = "batt_v",
++		.adc_channel_label = "batt_v",
++	}, {
++		.consumer_dev_name = "axp20x-battery-power-supply",
++		.consumer_channel = "batt_chrg_i",
++		.adc_channel_label = "batt_chrg_i",
++	}, {
++		.consumer_dev_name = "axp20x-battery-power-supply",
++		.consumer_channel = "batt_dischrg_i",
++		.adc_channel_label = "batt_dischrg_i",
++	}, { /* sentinel */ }
 +};
 +
- &reg_aldo1 {
- 	regulator-always-on;
- 	regulator-min-microvolt = <3000000>;
++static struct iio_map axp22x_maps[] = {
++	{
++		.consumer_dev_name = "axp20x-battery-power-supply",
++		.consumer_channel = "batt_v",
++		.adc_channel_label = "batt_v",
++	}, {
++		.consumer_dev_name = "axp20x-battery-power-supply",
++		.consumer_channel = "batt_chrg_i",
++		.adc_channel_label = "batt_chrg_i",
++	}, {
++		.consumer_dev_name = "axp20x-battery-power-supply",
++		.consumer_channel = "batt_dischrg_i",
++		.adc_channel_label = "batt_dischrg_i",
+ 	}, { /* sentinel */ }
+ };
+ 
+@@ -479,6 +507,7 @@ static const struct axp_data axp22x_data = {
+ 	.adc_en1_mask = AXP22X_ADC_EN1_MASK,
+ 	.adc_rate = axp22x_adc_rate,
+ 	.adc_en2 = false,
++	.maps = axp22x_maps,
+ };
+ 
+ static const struct of_device_id axp20x_adc_of_match[] = {
 -- 
 2.9.3
