@@ -1,62 +1,77 @@
-From: jslaby@suse.cz (Jiri Slaby)
-Date: Fri, 27 Jan 2017 11:46:58 +0100
-Subject: [patch added to 3.12-stable] clocksource/exynos_mct: Clear interrupt
- when cpu is shut down
-In-Reply-To: <20170127104747.24816-1-jslaby@suse.cz>
-References: <20170127104747.24816-1-jslaby@suse.cz>
-Message-ID: <20170127104747.24816-14-jslaby@suse.cz>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 27 Jan 2017 11:49:32 +0100
+Subject: [PATCH] arm64: dts: marvell: add generic-ahci compatibles for
+ CP110 ahci
+In-Reply-To: <E1cS72h-0004nc-Rr@rmk-PC.armlinux.org.uk> (Russell King's
+ message of "Fri, 13 Jan 2017 18:57:39 +0000")
+References: <E1cS72h-0004nc-Rr@rmk-PC.armlinux.org.uk>
+Message-ID: <878tpwydz7.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joonyoung Shim <jy0922.shim@samsung.com>
+Hi Russell,
+ 
+ On ven., janv. 13 2017, Russell King <rmk+kernel@armlinux.org.uk> wrote:
 
-This patch has been added to the 3.12 stable tree. If you have any
-objections, please let us know.
+> Testing with an Armada 8040 board shows that adding the generic-ahci
+> compatible to the CP110 AHCI nodes gets us working AHCI on the board.
+> A previous patch series posted by Thomas Petazzoni was retracted when
+> it was realised that the IP was supposed to be, and is, compatible
+> with the standard register layout.
+>
+> Add this compatible.
 
-===============
 
-commit bc7c36eedb0c7004aa06c2afc3c5385adada8fa3 upstream.
+Applied on mvebu/dt64
 
-When a CPU goes offline a potentially pending timer interrupt is not
-cleared. When the CPU comes online again then the pending interrupt is
-delivered before the per cpu clockevent device is initialized. As a
-consequence the tick interrupt handler dereferences a NULL pointer.
+(not that it didn't apply cleanly on the mainline because in mainline we
+don't use yet the ICU for the interrupt)
 
-[   51.251378] Unable to handle kernel NULL pointer dereference at virtual address 00000040
-[   51.289348] task: ee942d00 task.stack: ee960000
-[   51.293861] PC is at tick_periodic+0x38/0xb0
-[   51.298102] LR is at tick_handle_periodic+0x1c/0x90
+Thanks,
 
-Clear the pending interrupt in the cpu dying path.
+Gregory
 
-Fixes: 56a94f13919c ("clocksource: exynos_mct: Avoid blocking calls in the cpu hotplug notifier")
-Reported-by: Seung-Woo Kim <sw0312.kim@samsung.com>
-Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
-Cc: linux-samsung-soc at vger.kernel.org
-Cc: cw00.choi at samsung.com
-Cc: daniel.lezcano at linaro.org
-Cc: javier at osg.samsung.com
-Cc: kgene at kernel.org
-Cc: krzk at kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Link: http://lkml.kernel.org/r/1484628876-22065-1-git-send-email-jy0922.shim at samsung.com
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Jiri Slaby <jslaby@suse.cz>
----
- drivers/clocksource/exynos_mct.c | 1 +
- 1 file changed, 1 insertion(+)
+>
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+>  arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi | 3 ++-
+>  arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi  | 3 ++-
+>  2 files changed, 4 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> index 464b491c7291..65ad781d7910 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+> @@ -128,7 +128,8 @@
+>  			};
+>  
+>  			cpm_sata0: sata at 540000 {
+> -				compatible = "marvell,armada-8k-ahci";
+> +				compatible = "marvell,armada-8k-ahci",
+> +					     "generic-ahci";
+>  				reg = <0x540000 0x30000>;
+>  				interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
+>  				clocks = <&cpm_syscon0 1 15>;
+> diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> index b10f4781d8fb..168d667d50a3 100644
+> --- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> +++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+> @@ -128,7 +128,8 @@
+>  			};
+>  
+>  			cps_sata0: sata at 540000 {
+> -				compatible = "marvell,armada-8k-ahci";
+> +				compatible = "marvell,armada-8k-ahci",
+> +					     "generic-ahci";
+>  				reg = <0x540000 0x30000>;
+>  				interrupts = <ICU_GRP_NSR 107 IRQ_TYPE_LEVEL_HIGH>;
+>  				clocks = <&cps_syscon0 1 15>;
+> -- 
+> 2.7.4
+>
 
-diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-index af994880be72..26bfe09ce0fb 100644
---- a/drivers/clocksource/exynos_mct.c
-+++ b/drivers/clocksource/exynos_mct.c
-@@ -439,6 +439,7 @@ static void exynos4_local_timer_stop(struct mct_clock_event_device *mevt)
- 	if (mct_int_type == MCT_INT_SPI) {
- 		if (evt->irq != -1)
- 			disable_irq_nosync(evt->irq);
-+		exynos4_mct_write(0x1, mevt->base + MCT_L_INT_CSTAT_OFFSET);
- 	} else {
- 		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
- 	}
 -- 
-2.11.0
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
