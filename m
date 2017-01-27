@@ -1,45 +1,42 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 27 Jan 2017 17:04:33 +0100
-Subject: [PATCH 2/4] mmc: bcm2835: Add new driver for the internal SD
- controller.
-In-Reply-To: <CAPDyKFoWyZaRLhuBnFfJupxRnUvq-JWczS7ObjAGat056MCEyw@mail.gmail.com>
-References: <1485516989-1072-1-git-send-email-kraxel@redhat.com>
- <1485516989-1072-3-git-send-email-kraxel@redhat.com>
- <CAPDyKFoWyZaRLhuBnFfJupxRnUvq-JWczS7ObjAGat056MCEyw@mail.gmail.com>
-Message-ID: <ec09cd58-6613-82d7-60a9-7a7c2d9ae673@i2se.com>
+From: patrice.chotard@st.com (Patrice CHOTARD)
+Date: Fri, 27 Jan 2017 16:10:10 +0000
+Subject: =?utf-8?B?W0dJVCBQVUxMXSBTVGkgRFQgZml4IGZvciB2NC4xMC1yY3PigIs=?=
+Message-ID: <fec421f0-7515-c80d-3b36-969d63758a8b@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 27.01.2017 um 16:27 schrieb Ulf Hansson:
-> On 27 January 2017 at 12:36, Gerd Hoffmann <kraxel@redhat.com> wrote:
->> From: Eric Anholt <eric@anholt.net>
->>
->> The 2835 has two SD controllers:  The Arasan SDHCI controller (supported
->> by the iproc driver) and a custom SD controller.  This patch adds a
->> driver for the custom SD controller.
->>
->> The custom controller runs faster, and driving the sdcard with the
->> custom controller also allows to drive the rpi3 wifi with the iproc
->> driver.
->>
-> I don't understand this relationship. Is this somewhat configurable in runtime?
+Hi Arnd, Olof, Kevin
 
-The configuration is done by devicetree via pin muxing. AFAIK both SD
-controller are available on the same pins (2 pin groups = pin 22 to 27 +
-pin 48 to 53). So it's possible to use both SD controllers at the same
-time with different pin groups. This is necessary to use Wifi via SDIO
-on the RPi 3 while the other controller handles SD card with the rootfs.
+Please consider this set for inclusion into the next v4.10-rc.
 
->
-> Is the WIFI module a removable SDIO card?
+The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 
-No
+   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
 
->  So you can decide which
-> controller that is best suited to use?
+are available in the git repository at:
 
-Yes, but it requires also both drivers.
+   git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git 
+tags/sti-dt-for-v4.10-rc
 
->
-> Kind regards
-> Uffe
+for you to fetch changes up to 8413299cb3933dade6186bbee8363f190032107e:
+
+   ARM: dts: STiH407-family: set snps,dis_u3_susphy_quirk (2017-01-27 
+16:17:13 +0100)
+
+----------------------------------------------------------------
+
+STi DT fix:
+
+Since v4.10-rc1, xhci is complaining in loop with :
+[ 801.953836] usb usb6-port1: Cannot enable. Maybe the USB cable is bad?
+[ 801.960455] xhci-hcd xhci-hcd.0.auto: Cannot set link state.
+[ 801.966611] usb usb6-port1: cannot disable (err = -32)
+
+Set property "snps,dis_u3_susphy_quirk" in DT fix it.
+
+----------------------------------------------------------------
+Patrice Chotard (1):
+       ARM: dts: STiH407-family: set snps,dis_u3_susphy_quirk
+
+  arch/arm/boot/dts/stih407-family.dtsi | 1 +
+  1 file changed, 1 insertion(+)
