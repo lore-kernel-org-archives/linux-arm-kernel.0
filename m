@@ -1,157 +1,569 @@
-From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Fri, 27 Jan 2017 14:45:49 +0100
-Subject: [PATCH 2/7] MFD: add STM32 DFSDM support
-In-Reply-To: <20170127101545.g53uah57vgfu55o5@dell>
-References: <1485189145-29576-1-git-send-email-arnaud.pouliquen@st.com>
- <1485189145-29576-3-git-send-email-arnaud.pouliquen@st.com>
- <20170124082249.GR16020@dell> <283c0e48-55e2-6516-369d-91dc72d12f73@st.com>
- <20170124113658.GW16020@dell> <a1aaaa20-ac00-b182-f1c1-63152be41135@st.com>
- <20170127101545.g53uah57vgfu55o5@dell>
-Message-ID: <7b3eb38d-4fd1-2006-7423-94f2a7b38b27@st.com>
+From: cristian.birsan@microchip.com (Cristian Birsan)
+Date: Fri, 27 Jan 2017 15:47:15 +0200
+Subject: [PATCH linux-next v2 1/1] usb: gadget: udc: atmel: Update
+ endpoint allocation scheme
+In-Reply-To: <84fe6fa4-7cf7-22cb-b4b7-47e2cb202a68@atmel.com>
+References: <1485182759-17165-1-git-send-email-cristian.birsan@microchip.com>
+ <1485182759-17165-2-git-send-email-cristian.birsan@microchip.com>
+ <84fe6fa4-7cf7-22cb-b4b7-47e2cb202a68@atmel.com>
+Message-ID: <e7d44f0d-d51a-316f-98b1-1582c60f2cac@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+I will send a fixup patch with updates based on the comments received from Nicolas.
 
-
-On 01/27/2017 11:15 AM, Lee Jones wrote:
-> On Tue, 24 Jan 2017, Arnaud Pouliquen wrote:
+On 01/26/2017 05:02 PM, Nicolas Ferre wrote:
+> Le 23/01/2017 ? 15:45, cristian.birsan at microchip.com a ?crit :
+>> From: Cristian Birsan <cristian.birsan@microchip.com>
+>>
+>> Update atmel udc driver with a new enpoint allocation scheme. The data
+>> sheet requires that all endpoints are allocated in order.
 > 
->>
->>
->> On 01/24/2017 12:36 PM, Lee Jones wrote:
->>> On Tue, 24 Jan 2017, Arnaud Pouliquen wrote:
->>>> On 01/24/2017 09:22 AM, Lee Jones wrote:
->>>>> On Mon, 23 Jan 2017, Arnaud Pouliquen wrote:
->>>>>
->>>>>> DFSDM hardware IP can be used at the same time for ADC sigma delta
->>>>>
->>>>> Same time as what?
->>>> DFSDM is used for ADC acquisition (through IIO) but also PDM microphone
->>>> capture (through ASOC).
->>>>>
->>>>>> conversion and audio PDM microphone.
->>>>>> MFD driver is in charge of configuring IP registers and managing IP clocks.
->>>>>> For this it exports an API to handles filters and channels resources.
->>>>>
->>>>> This looks like an ADC driver?  What is it that makes it an MFD?
->>>> Yes it a kind of ADC but that supports 2 features audio and iio.
->>>> So it has to support 2 features based on 2 separate Frameworks.
->>>
->>> I'm still unsure why it needs to live in MFD.
->>>
->>> By the looks of it, this driver needs to move into IIO and you need to
->>> call into it from ASoC.
->>>
->>
->> I think i introduce confusion by speaking about ADC for audio...
->>
->> 1) IIO handles sigma delta ADCs that can be used as example for motor
->> controls. the aim is to get value based on an application request or
->> using some triggers.
->> example: http://www.ti.com/lit/ds/symlink/ads1202.pdf
->>
->> 2) For audio part, we speak about Digital mems microphones that generate
->> PDM format stream. PDM is a continuous real time stream dedicated to
->> audio record and must be handled in ASOC ( codec Dmic part driver is
->> /sound/soc/codec/dmic.c).
->> DMIC example:
->> http://www.st.com/content/ccc/resource/technical/document/datasheet/47/bd/d2/13/8d/fd/48/26/DM00121815.pdf/files/DM00121815.pdf/jcr:content/translations/en.DM00121815.pdf
->>
->> Form my point of view it very strange to handle DMICs in IIO, as it is
->> not designed to support audio streams.it is two separate features that
->> are not compatible.
->>
->> Now, from software point of view
->> That would means that IIO declares ADCs that it can not expose, because
->> DMIC is not IIO standard. But IIO inkern API needs that device is
->> declared
+> Pieces of information from the cover letter could have been added here.
+>
+
+Ack. I'll remove the cover letter.
+
+>> Signed-off-by: Cristian Birsan <cristian.birsan@microchip.com>
+>> ---
+>>  drivers/usb/gadget/udc/Kconfig          |  14 ++
+>>  drivers/usb/gadget/udc/atmel_usba_udc.c | 236 +++++++++++++++++++++++++++-----
+>>  drivers/usb/gadget/udc/atmel_usba_udc.h |  10 +-
+>>  3 files changed, 227 insertions(+), 33 deletions(-)
 > 
->> So i should define a specific API in IIO for ASOC driver.
+> It can be good to run ./scripts/checkpatch.pl --strict as well. It would
+> have told you about some of the alignment and braces issues. I ran it as
+> some the code has looked weird to me once or twice...
 > 
-> Yes, this is what I think you should do.
 > 
-> MFD is not a dumping ground for devices that do not fit anywhere else.
 
-I fully understand that you don't want to create unnecessary MFD devices.
-But In case of DFSDM ,it is really a device that supports 2 features.
-The main evidence is that "ADC acquisition" and "digital microphone"
-features are handled by two separate frameworks.
-So this corresponds to two features that share the same device resources
-(registers, IRQs, clocks).
-Seems that this match with MFD definition.
+Ack.
 
-Now, if IIO and ASOC maintainers are aligned with you proposal, i will
-move MFD part in IIO.
-But in this case, i can not see another way to do it, except a MFD
-driver hidden in IIO?
-
-Here is my analysis of a design in IIO:
-
-Natural way to do this is to consider that ASOC is a customer of IIO so
-use the customer.h API.
-1) As Digital microphone can not be handled by IIO dev interface, i can
-not expose them as an IIO channel, that would be visible by applications
-in /sys/bus/iio/devices/iio
-2) ASOC needs to configure DFSDM filter to match to specific frequencies
-and sample formats requested by users. Not standard IIO interface to do
-this. (on IIO side this is done by attribute file)
-3) audio stream is a real time stream. So for audio quality best is to
-minimize latencies and Xrun. That why transfer as done from HW to
-application using LLI DMA transfers with a minimum of copy. This does
-not match with the IIO inkern API.
- => So seems not possible to use IIO inkern API.
-
-That's means that i would need to create a ST specific include file to
-offer an API to ASoC to handle DFSDM resources linked to the DMIC.
-and to probe ASOc device in IIO one.
-So the solution would be to create something like a sub IIO driver That
-probe and handle some IIO and ASOC devices.
-Ultimately This would correspond to a MFD driver integrated in IIO...
-
-Jonathan, Mark, Please could you share your opinion on this topic?
-
-Regards
-Arnaud
-
+>> diff --git a/drivers/usb/gadget/udc/Kconfig b/drivers/usb/gadget/udc/Kconfig
+>> index 658b8da..4b69f28 100644
+>> --- a/drivers/usb/gadget/udc/Kconfig
+>> +++ b/drivers/usb/gadget/udc/Kconfig
+>> @@ -60,6 +60,20 @@ config USB_ATMEL_USBA
+>>  	  USBA is the integrated high-speed USB Device controller on
+>>  	  the AT32AP700x, some AT91SAM9 and AT91CAP9 processors from Atmel.
+>>  
+>> +	  The fifo_mode parameter is used to select endpoint allocation mode.
+>> +	  fifo_mode = 0 is used to let the driver autoconfigure the endpoints.
+>> +	  In this case 2 banks are allocated for isochronous endpoints and
 > 
->>>>>> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
->>>>>> ---
->>>>>>  drivers/mfd/Kconfig             |   11 +
->>>>>>  drivers/mfd/Makefile            |    2 +
->>>>>>  drivers/mfd/stm32-dfsdm-reg.h   |  220 +++++++++
->>>>>>  drivers/mfd/stm32-dfsdm.c       | 1044 +++++++++++++++++++++++++++++++++++++++
->>>>>>  include/linux/mfd/stm32-dfsdm.h |  324 ++++++++++++
->>>>>>  5 files changed, 1601 insertions(+)
->>>>>>  create mode 100644 drivers/mfd/stm32-dfsdm-reg.h
->>>>>>  create mode 100644 drivers/mfd/stm32-dfsdm.c
->>>>>>  create mode 100644 include/linux/mfd/stm32-dfsdm.h
->>>>>>
->>>>>> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
->>>>>> index c6df644..4bb660b 100644
->>>>>> --- a/drivers/mfd/Kconfig
->>>>>> +++ b/drivers/mfd/Kconfig
->>>>>> @@ -1607,6 +1607,17 @@ config MFD_STW481X
->>>>>>  	  in various ST Microelectronics and ST-Ericsson embedded
->>>>>>  	  Nomadik series.
->>>>>>  
->>>>>> +config MFD_STM32_DFSDM
->>>>>> +	tristate "ST Microelectronics STM32 DFSDM"
->>>>>> +	depends on (ARCH_STM32 && OF) || COMPILE_TEST
->>>>>> +	select MFD_CORE
->>>>>> +	select REGMAP
->>>>>> +	select REGMAP_MMIO
->>>>>> +	help
->>>>>> +	  Select this option to enable the STM32 Digital Filter
->>>>>> +	  for Sigma Delta Modulators (DFSDM) driver used
->>>>>> +	  in various STM32 series.
->>>>>> +
->>>>>>  menu "Multimedia Capabilities Port drivers"
->>>>>>  	depends on ARCH_SA1100
->>>>>
->>>>> [...]
->>>>>
->>>>
->>>> Regards
->>>> Arnaud
->>>
+> You mean that 2 banks can do isochronous xfers if needed, but they can
+> do other types as well, right? So maybe rephrase the sentence.
+> 
+
+For fifo_mode = 0 (autoconfigure case) the driver allocates 2 banks only for
+isochronous endpoints as required by the reference manual. For other endpoints
+it will allocate only 1 bank because it cannot know in advance the number of
+endpoints and the size of them, especially if the configfs is used to create
+the gadget. The idea is to support as many endpoints as we can in this mode.
+
+>> +	  only one bank is allocated for the rest of the endpoints.
+>> +
+>> +	  fifo_mode = 1 is a generic maximum fifo size (1024 bytes) configuration
+>> +	  allowing the usage of ep1 - ep6
+>> +
+>> +	  fifo_mode = 2 is a generic performance maximum fifo size (1024 bytes)
+>> +	  configuration allowing the usage of ep1 - ep3
+>> +
+>> +	  fifo_mode = 3 is a balanced performance configuration allowing the
+>> +	  the usage of ep1 - ep8
+>> +
+>>  config USB_BCM63XX_UDC
+>>  	tristate "Broadcom BCM63xx Peripheral Controller"
+>>  	depends on BCM63XX
+>> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+>> index 12c7687..11bbce2 100644
+>> --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
+>> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+>> @@ -20,6 +20,7 @@
+>>  #include <linux/mfd/syscon.h>
+>>  #include <linux/platform_device.h>
+>>  #include <linux/regmap.h>
+>> +#include <linux/ctype.h>
+>>  #include <linux/usb/ch9.h>
+>>  #include <linux/usb/gadget.h>
+>>  #include <linux/usb/atmel_usba_udc.h>
+>> @@ -318,6 +319,91 @@ static inline void usba_cleanup_debugfs(struct usba_udc *udc)
+>>  }
+>>  #endif
+>>  
+>> +static ushort fifo_mode;
+>> +
+>> +/* "modprobe ... fifo_mode=1" etc */
+> 
+> No need for this comment.
+>
+ 
+Ack. I'll remove it.
+
+>> +module_param(fifo_mode, ushort, 0x0);
+>> +MODULE_PARM_DESC(fifo_mode, "Endpoint configuration mode");
+>> +
+>> +/* mode 0 - uses autoconfig */
+>> +
+>> +/* mode 1 - fits in 8KB, generic max fifo configuration */
+>> +static struct usba_fifo_cfg mode_1_cfg[] = {
+>> +{ .hw_ep_num = 0, .fifo_size = 64,	.nr_banks = 1, },
+>> +{ .hw_ep_num = 1, .fifo_size = 1024,	.nr_banks = 2, },
+>> +{ .hw_ep_num = 2, .fifo_size = 1024,	.nr_banks = 1, },
+>> +{ .hw_ep_num = 3, .fifo_size = 1024,	.nr_banks = 1, },
+>> +{ .hw_ep_num = 4, .fifo_size = 1024,	.nr_banks = 1, },
+>> +{ .hw_ep_num = 5, .fifo_size = 1024,	.nr_banks = 1, },
+>> +{ .hw_ep_num = 6, .fifo_size = 1024,	.nr_banks = 1, },
+>> +};
+>> +
+>> +/* mode 2 - fits in 8KB, performance max fifo configuration */
+>> +static struct usba_fifo_cfg mode_2_cfg[] = {
+>> +{ .hw_ep_num = 0, .fifo_size = 64,	.nr_banks = 1, },
+>> +{ .hw_ep_num = 1, .fifo_size = 1024,	.nr_banks = 3, },
+>> +{ .hw_ep_num = 2, .fifo_size = 1024,	.nr_banks = 2, },
+>> +{ .hw_ep_num = 3, .fifo_size = 1024,	.nr_banks = 2, },
+>> +};
+>> +
+>> +/* mode 3 - fits in 8KB, mixed fifo configuration */
+>> +static struct usba_fifo_cfg mode_3_cfg[] = {
+>> +{ .hw_ep_num = 0, .fifo_size = 64,	.nr_banks = 1, },
+>> +{ .hw_ep_num = 1, .fifo_size = 1024,	.nr_banks = 2, },
+>> +{ .hw_ep_num = 2, .fifo_size = 512,	.nr_banks = 2, },
+>> +{ .hw_ep_num = 3, .fifo_size = 512,	.nr_banks = 2, },
+>> +{ .hw_ep_num = 4, .fifo_size = 512,	.nr_banks = 2, },
+>> +{ .hw_ep_num = 5, .fifo_size = 512,	.nr_banks = 2, },
+>> +{ .hw_ep_num = 6, .fifo_size = 512,	.nr_banks = 2, },
+>> +};
+>> +
+>> +/* mode 4 - fits in 8KB, custom fifo configuration */
+>> +static struct usba_fifo_cfg mode_4_cfg[] = {
+>> +{ .hw_ep_num = 0, .fifo_size = 64,	.nr_banks = 1, },
+>> +{ .hw_ep_num = 1, .fifo_size = 512,	.nr_banks = 2, },
+>> +{ .hw_ep_num = 2, .fifo_size = 512,	.nr_banks = 2, },
+>> +{ .hw_ep_num = 3, .fifo_size = 8,	.nr_banks = 2, },
+>> +{ .hw_ep_num = 4, .fifo_size = 512,	.nr_banks = 2, },
+>> +{ .hw_ep_num = 5, .fifo_size = 512,	.nr_banks = 2, },
+>> +{ .hw_ep_num = 6, .fifo_size = 16,	.nr_banks = 2, },
+>> +{ .hw_ep_num = 7, .fifo_size = 8,	.nr_banks = 2, },
+>> +{ .hw_ep_num = 8, .fifo_size = 8,	.nr_banks = 2, },
+>> +};
+>> +/* Add additional configurations here */
+>> +
+>> +int usba_config_fifo_table(struct usba_udc *udc)
+> 
+> Isn't is static?
+> 
+
+Ack. I'm going to make it static.
+
+>> +{
+>> +	int n;
+>> +
+>> +	switch (fifo_mode) {
+>> +	default:
+>> +		fifo_mode = 0;
+>> +	case 0:
+>> +		udc->fifo_cfg = NULL;
+>> +		n = 0;
+>> +		break;
+>> +	case 1:
+>> +		udc->fifo_cfg = mode_1_cfg;
+>> +		n = ARRAY_SIZE(mode_1_cfg);
+>> +		break;
+>> +	case 2:
+>> +		udc->fifo_cfg = mode_2_cfg;
+>> +		n = ARRAY_SIZE(mode_2_cfg);
+>> +		break;
+>> +	case 3:
+>> +		udc->fifo_cfg = mode_3_cfg;
+>> +		n = ARRAY_SIZE(mode_3_cfg);
+>> +		break;
+>> +	case 4:
+>> +		udc->fifo_cfg = mode_4_cfg;
+>> +		n = ARRAY_SIZE(mode_4_cfg);
+>> +		break;
+>> +	}
+>> +	DBG(DBG_HW, "Setup fifo_mode %d\n", fifo_mode);
+>> +
+>> +	return n;
+>> +}
+>> +
+>>  static inline u32 usba_int_enb_get(struct usba_udc *udc)
+>>  {
+>>  	return udc->int_enb_cache;
+>> @@ -543,24 +629,17 @@ usba_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
+>>  	ep->is_isoc = 0;
+>>  	ep->is_in = 0;
+>>  
+>> -	if (maxpacket <= 8)
+>> -		ept_cfg = USBA_BF(EPT_SIZE, USBA_EPT_SIZE_8);
+>> -	else
+>> -		/* LSB is bit 1, not 0 */
+>> -		ept_cfg = USBA_BF(EPT_SIZE, fls(maxpacket - 1) - 3);
+>> -
+>> -	DBG(DBG_HW, "%s: EPT_SIZE = %lu (maxpacket = %lu)\n",
+>> +	DBG(DBG_ERR, "%s: EPT_CFG = 0x%lx (maxpacket = %lu)\n",
+>>  			ep->ep.name, ept_cfg, maxpacket);
+>>  
+>>  	if (usb_endpoint_dir_in(desc)) {
+>>  		ep->is_in = 1;
+>> -		ept_cfg |= USBA_EPT_DIR_IN;
+>> +		ep->ept_cfg |= USBA_EPT_DIR_IN;
+>>  	}
+>>  
+>>  	switch (usb_endpoint_type(desc)) {
+>>  	case USB_ENDPOINT_XFER_CONTROL:
+>> -		ept_cfg |= USBA_BF(EPT_TYPE, USBA_EPT_TYPE_CONTROL);
+>> -		ept_cfg |= USBA_BF(BK_NUMBER, USBA_BK_NUMBER_ONE);
+>> +		ep->ept_cfg |= USBA_BF(EPT_TYPE, USBA_EPT_TYPE_CONTROL);
+>>  		break;
+>>  	case USB_ENDPOINT_XFER_ISOC:
+>>  		if (!ep->can_isoc) {
+>> @@ -578,24 +657,15 @@ usba_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
+>>  			return -EINVAL;
+>>  
+>>  		ep->is_isoc = 1;
+>> -		ept_cfg |= USBA_BF(EPT_TYPE, USBA_EPT_TYPE_ISO);
+>> +		ep->ept_cfg |= USBA_BF(EPT_TYPE, USBA_EPT_TYPE_ISO);
+>> +		ep->ept_cfg |= USBA_BF(NB_TRANS, nr_trans);
+>>  
+>> -		/*
+>> -		 * Do triple-buffering on high-bandwidth iso endpoints.
+>> -		 */
+>> -		if (nr_trans > 1 && ep->nr_banks == 3)
+>> -			ept_cfg |= USBA_BF(BK_NUMBER, USBA_BK_NUMBER_TRIPLE);
+>> -		else
+>> -			ept_cfg |= USBA_BF(BK_NUMBER, USBA_BK_NUMBER_DOUBLE);
+>> -		ept_cfg |= USBA_BF(NB_TRANS, nr_trans);
+>>  		break;
+>>  	case USB_ENDPOINT_XFER_BULK:
+>> -		ept_cfg |= USBA_BF(EPT_TYPE, USBA_EPT_TYPE_BULK);
+>> -		ept_cfg |= USBA_BF(BK_NUMBER, USBA_BK_NUMBER_DOUBLE);
+>> +		ep->ept_cfg |= USBA_BF(EPT_TYPE, USBA_EPT_TYPE_BULK);
+>>  		break;
+>>  	case USB_ENDPOINT_XFER_INT:
+>> -		ept_cfg |= USBA_BF(EPT_TYPE, USBA_EPT_TYPE_INT);
+>> -		ept_cfg |= USBA_BF(BK_NUMBER, USBA_BK_NUMBER_DOUBLE);
+>> +		ep->ept_cfg |= USBA_BF(EPT_TYPE, USBA_EPT_TYPE_INT);
+>>  		break;
+>>  	}
+>>  
+>> @@ -604,7 +674,7 @@ usba_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
+>>  	ep->ep.desc = desc;
+>>  	ep->ep.maxpacket = maxpacket;
+>>  
+>> -	usba_ep_writel(ep, CFG, ept_cfg);
+>> +	usba_ep_writel(ep, CFG, ep->ept_cfg);
+>>  	usba_ep_writel(ep, CTL_ENB, USBA_EPT_ENABLE);
+>>  
+>>  	if (ep->can_dma) {
+>> @@ -1006,12 +1076,81 @@ static int atmel_usba_start(struct usb_gadget *gadget,
+>>  		struct usb_gadget_driver *driver);
+>>  static int atmel_usba_stop(struct usb_gadget *gadget);
+>>  
+>> +static struct usb_ep *atmel_usba_match_ep(
+> 
+> I find the indentation of this funciton wreird...
+> 
+>> +		struct usb_gadget		*gadget,
+> 
+> No need for a tab here and align with open parenthesis,
+> 
+
+Ack.
+
+>> +		struct usb_endpoint_descriptor	*desc,
+>> +		struct usb_ss_ep_comp_descriptor *ep_comp
+>> +)
+> 
+> This parenthesis seems weird to me: put it after the last parameter.
+>
+
+Ack.
+ 
+>> +{
+>> +	struct usb_ep	*_ep;
+>> +	struct usba_ep *ep;
+>> +
+>> +	/* Look at endpoints until an unclaimed one looks usable */
+>> +	list_for_each_entry(_ep, &gadget->ep_list, ep_list) {
+>> +		if (usb_gadget_ep_match_desc(gadget, _ep, desc, ep_comp))
+>> +			goto found_ep;
+>> +	}
+>> +	/* Fail */
+>> +	return NULL;
+>> +
+>> +found_ep:
+>> +
+>> +	if (fifo_mode == 0) {
+>> +		/* Optimize hw fifo size based on ep type and other info */
+>> +		ep = to_usba_ep(_ep);
+>> +
+>> +		switch (usb_endpoint_type(desc)) {
+>> +
+>> +		case USB_ENDPOINT_XFER_CONTROL:
+>> +			break;
+>> +
+>> +		case USB_ENDPOINT_XFER_ISOC:
+>> +			ep->fifo_size = 1024;
+>> +			ep->nr_banks = 2;
+>> +			break;
+>> +
+>> +		case USB_ENDPOINT_XFER_BULK:
+>> +			ep->fifo_size = 512;
+>> +			ep->nr_banks = 1;
+>> +			break;
+>> +
+>> +		case USB_ENDPOINT_XFER_INT:
+>> +			if (desc->wMaxPacketSize == 0)
+>> +				ep->fifo_size =
+>> +				    roundup_pow_of_two(_ep->maxpacket_limit);
+>> +			else
+>> +				ep->fifo_size =
+>> +				    roundup_pow_of_two(le16_to_cpu(desc->wMaxPacketSize));
+>> +			ep->nr_banks = 1;
+>> +			break;
+>> +		}
+>> +
+>> +		/* It might be a little bit late to set this */
+> 
+> Is it too late or not? This comment is frightening... We may need some
+> feedback from the USB guys here...
+>
+
+If someone from USB can comment a bit on this topic I will be grateful.
+
+The idea here is to optimize the endpoint size used by usb gadgets even if they are created
+at runtime using configfs. Calling usb_ep_set_maxpacket_limit() in probe is too early for
+the size of the endpoint used by the above gadget function to be known. Setting this
+value here it might be a bit late only if the above layer is already using internally the
+maxpacket value configured in probe. From my tests on CDC ACM, RNDIS and HID this is not
+a problem. I added the message as a warning.
+
+>> +		usb_ep_set_maxpacket_limit(&ep->ep, ep->fifo_size);
+>> +
+>> +		/* Generate ept_cfg basd on FIFO size and number of banks */
+>> +		if (ep->fifo_size  <= 8)
+>> +			ep->ept_cfg = USBA_BF(EPT_SIZE, USBA_EPT_SIZE_8);
+>> +		else
+>> +			/* LSB is bit 1, not 0 */
+>> +			ep->ept_cfg =
+>> +				USBA_BF(EPT_SIZE, fls(ep->fifo_size - 1) - 3);
+>> +
+>> +		ep->ept_cfg |= USBA_BF(BK_NUMBER, ep->nr_banks);
+>> +		ep->udc->configured_ep++;
+> 
+> is it more than a boolean value?
+> 
+
+Yes. It is more than a boolean value. It counts the number of configured
+endpoints by atmel_usba_match_ep() function that is used as autoconfigure
+mechanism.
+
+>> +	}
+>> +
+>> +return _ep;
+> 
+> Indentation issue here ^
+> 
+
+Ack.
+
+>> +}
+>> +
+>>  static const struct usb_gadget_ops usba_udc_ops = {
+>>  	.get_frame		= usba_udc_get_frame,
+>>  	.wakeup			= usba_udc_wakeup,
+>>  	.set_selfpowered	= usba_udc_set_selfpowered,
+>>  	.udc_start		= atmel_usba_start,
+>>  	.udc_stop		= atmel_usba_stop,
+>> +	.match_ep		= atmel_usba_match_ep,
+>>  };
+>>  
+>>  static struct usb_endpoint_descriptor usba_ep0_desc = {
+>> @@ -1678,7 +1817,8 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
+>>  	}
+>>  
+>>  	if (status & USBA_END_OF_RESET) {
+>> -		struct usba_ep *ep0;
+>> +		struct usba_ep *ep0, *ep;
+>> +		int i, n;
+>>  
+>>  		usba_writel(udc, INT_CLR, USBA_END_OF_RESET);
+>>  		generate_bias_pulse(udc);
+>> @@ -1717,6 +1857,16 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
+>>  		if (!(usba_ep_readl(ep0, CFG) & USBA_EPT_MAPPED))
+>>  			dev_dbg(&udc->pdev->dev,
+>>  				 "ODD: EP0 configuration is invalid!\n");
+>> +
+>> +		/* Preallocate other endpoints */
+>> +		n = fifo_mode ? udc->num_ep : udc->configured_ep;
+>> +		for (i = 1; i < n; i++) {
+>> +			ep = &udc->usba_ep[i];
+>> +			usba_ep_writel(ep, CFG, ep->ept_cfg);
+>> +			if (!(usba_ep_readl(ep, CFG) & USBA_EPT_MAPPED))
+>> +				dev_dbg(&udc->pdev->dev,
+>> +				 "ODD: EP%d configuration is invalid!\n", i);
+> 
+> I know that it's the case for the EP0 just above and that we do it like
+> this in the current driver but maybe we can do more than just having a
+> debug message.
+> 
+
+As you said the debug message follows the pattern that was already in the driver.
+I never stumbled upon this corner case but for now I would like to keep the print
+here to avoid any silent failure. If the USBA_EPT_MAPPED flag is not raised by
+hardware it means that internal memory allocation in the controller went wrong (most
+of the time due to not enough memory, caused by too many / large endpoints). It's
+hard to imagine a solution that can fix this situation without reinitializing the
+usba controller. This can be fixed in a later patch if it's needed.
+
+>> +		}
+>>  	}
+>>  
+>>  	spin_unlock(&udc->lock);
+>> @@ -1864,6 +2014,9 @@ static int atmel_usba_stop(struct usb_gadget *gadget)
+>>  	if (gpio_is_valid(udc->vbus_pin))
+>>  		disable_irq(gpio_to_irq(udc->vbus_pin));
+>>  
+>> +	if (fifo_mode == 0)
+>> +		udc->configured_ep = 1;
+>> +
+>>  	usba_stop(udc);
+>>  
+>>  	udc->driver = NULL;
+>> @@ -1931,9 +2084,13 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
+>>  						&flags);
+>>  	udc->vbus_pin_inverted = (flags & OF_GPIO_ACTIVE_LOW) ? 1 : 0;
+>>  
+>> -	pp = NULL;
+>> -	while ((pp = of_get_next_child(np, pp)))
+>> -		udc->num_ep++;
+>> +	if (fifo_mode == 0) {
+>> +		pp = NULL;
+>> +		while ((pp = of_get_next_child(np, pp)))
+>> +			udc->num_ep++;
+>> +		udc->configured_ep = 1;
+>> +	} else
+> 
+> Braces here
+> 
+
+Ack. Will fix.
+
+>> +		udc->num_ep = usba_config_fifo_table(udc);
+>>  
+>>  	eps = devm_kzalloc(&pdev->dev, sizeof(struct usba_ep) * udc->num_ep,
+>>  			   GFP_KERNEL);
+>> @@ -1946,7 +2103,7 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
+>>  
+>>  	pp = NULL;
+>>  	i = 0;
+>> -	while ((pp = of_get_next_child(np, pp))) {
+>> +	while ((pp = of_get_next_child(np, pp)) && i < udc->num_ep) {
+>>  		ep = &eps[i];
+>>  
+>>  		ret = of_property_read_u32(pp, "reg", &val);
+>> @@ -1954,21 +2111,21 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
+>>  			dev_err(&pdev->dev, "of_probe: reg error(%d)\n", ret);
+>>  			goto err;
+>>  		}
+>> -		ep->index = val;
+>> +		ep->index = fifo_mode ? udc->fifo_cfg[i].hw_ep_num : val;
+>>  
+>>  		ret = of_property_read_u32(pp, "atmel,fifo-size", &val);
+>>  		if (ret) {
+>>  			dev_err(&pdev->dev, "of_probe: fifo-size error(%d)\n", ret);
+>>  			goto err;
+>>  		}
+>> -		ep->fifo_size = val;
+>> +		ep->fifo_size = fifo_mode ? udc->fifo_cfg[i].fifo_size : val;
+> 
+> No, this is where I would like to see that the value from the table is
+> still validated agains the "max value" that is stored in HW description/DT.
+> I know that all of our product are able to handle 1024 fifo size, but
+> it's more a savfe check...
+>
+
+Ack. I'll validate against "max value".
+ 
+>>  
+>>  		ret = of_property_read_u32(pp, "atmel,nb-banks", &val);
+>>  		if (ret) {
+>>  			dev_err(&pdev->dev, "of_probe: nb-banks error(%d)\n", ret);
+>>  			goto err;
+>>  		}
+>> -		ep->nr_banks = val;
+>> +		ep->nr_banks = fifo_mode ? udc->fifo_cfg[i].nr_banks : val;
+> 
+> Here however, it is pretty important to check this value. For instance,
+> notice that the at91sam9x5 cannot fullfil the "mode 2" configuration: we
+> can't silentely ignore the HW specifications given by DT.
+> 
+
+Ack. Good catch. Although at91sam9x5 has a slightly different name for the usb
+device controller in the reference manual, it is basically the same ip. 
+
+>>  		ep->can_dma = of_property_read_bool(pp, "atmel,can-dma");
+>>  		ep->can_isoc = of_property_read_bool(pp, "atmel,can-isoc");
+>> @@ -2000,6 +2157,21 @@ static struct usba_ep * atmel_udc_of_init(struct platform_device *pdev,
+>>  		ep->ep.caps.dir_in = true;
+>>  		ep->ep.caps.dir_out = true;
+>>  
+>> +		if (fifo_mode != 0) {
+>> +			/*
+>> +			 * Generate ept_cfg based on FIFO size and
+>> +			 * banks number
+>> +			 */
+>> +			if (ep->fifo_size  <= 8)
+>> +				ep->ept_cfg = USBA_BF(EPT_SIZE, USBA_EPT_SIZE_8);
+>> +			else
+>> +				/* LSB is bit 1, not 0 */
+>> +				ep->ept_cfg =
+>> +				  USBA_BF(EPT_SIZE, fls(ep->fifo_size - 1) - 3);
+>> +
+>> +			ep->ept_cfg |= USBA_BF(BK_NUMBER, ep->nr_banks);
+>> +		}
+>> +
+>>  		if (i)
+>>  			list_add_tail(&ep->ep.ep_list, &udc->gadget.ep_list);
+>>  
+>> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.h b/drivers/usb/gadget/udc/atmel_usba_udc.h
+>> index b03b2eb..9551b70 100644
+>> --- a/drivers/usb/gadget/udc/atmel_usba_udc.h
+>> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.h
+>> @@ -275,6 +275,12 @@ struct usba_dma_desc {
+>>  	u32 ctrl;
+>>  };
+>>  
+>> +struct usba_fifo_cfg {
+>> +	u8			hw_ep_num;
+>> +	u16			fifo_size;
+>> +	u8			nr_banks;
+>> +};
+>> +
+>>  struct usba_ep {
+>>  	int					state;
+>>  	void __iomem				*ep_regs;
+>> @@ -293,7 +299,7 @@ struct usba_ep {
+>>  	unsigned int				can_isoc:1;
+>>  	unsigned int				is_isoc:1;
+>>  	unsigned int				is_in:1;
+>> -
+>> +	unsigned long				ept_cfg;
+>>  #ifdef CONFIG_USB_GADGET_DEBUG_FS
+>>  	u32					last_dma_status;
+>>  	struct dentry				*debugfs_dir;
+>> @@ -338,6 +344,8 @@ struct usba_udc {
+>>  	int vbus_pin;
+>>  	int vbus_pin_inverted;
+>>  	int num_ep;
+>> +	int configured_ep;
+>> +	struct usba_fifo_cfg *fifo_cfg;
+>>  	struct clk *pclk;
+>>  	struct clk *hclk;
+>>  	struct usba_ep *usba_ep;
+>>
+> 
+> Regards,
 > 
