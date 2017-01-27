@@ -1,63 +1,44 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 27 Jan 2017 10:55:19 -0800
-Subject: [PATCH] mmc: meson-gx: add support for HS400 mode
-In-Reply-To: <f7f325ec-6099-7f51-5bb4-24ac24073ee7@gmail.com> (Heiner
- Kallweit's message of "Thu, 26 Jan 2017 23:12:38 +0100")
-References: <f7f325ec-6099-7f51-5bb4-24ac24073ee7@gmail.com>
-Message-ID: <m2fuk4uyco.fsf@baylibre.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 27 Jan 2017 18:56:13 +0000
+Subject: [PATCH v30 05/11] arm64: kdump: protect crash dump kernel memory
+In-Reply-To: <20170127171513.GA3119@fireball>
+References: <20170124084638.3770-1-takahiro.akashi@linaro.org>
+ <20170124085004.3892-4-takahiro.akashi@linaro.org>
+ <5888E262.4050208@arm.com> <20170126112811.GG23406@linaro.org>
+ <588B2CC4.70904@arm.com> <20170127171513.GA3119@fireball>
+Message-ID: <20170127185612.GA31485@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiner Kallweit <hkallweit1@gmail.com> writes:
+On Sat, Jan 28, 2017 at 02:15:16AM +0900, AKASHI Takahiro wrote:
+> On Fri, Jan 27, 2017 at 11:19:32AM +0000, James Morse wrote:
+> > Hi Akashi,
+> >
+> > On 26/01/17 11:28, AKASHI Takahiro wrote:
+> > > On Wed, Jan 25, 2017 at 05:37:38PM +0000, James Morse wrote:
+> > >> On 24/01/17 08:49, AKASHI Takahiro wrote:
+> > >>> To protect the memory reserved for crash dump kernel once after loaded,
+> > >>> arch_kexec_protect_crashres/unprotect_crashres() are meant to deal with
+> > >>> permissions of the corresponding kernel mappings.
+> > >>>
+> > >>> We also have to
+> > >>> - put the region in an isolated mapping, and
+> > >>> - move copying kexec's control_code_page to machine_kexec_prepare()
+> > >>> so that the region will be completely read-only after loading.
+> > >>
+> > >>
+> > >>> Note that the region must reside in linear mapping and have corresponding
+> > >>> page structures in order to be potentially freed by shrinking it through
+> > >>> /sys/kernel/kexec_crash_size.
 
-> Add support for HS400 mode.
->
-> Successfully tested on a Odroid C2 (S905 GXBB).
->
-> Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
+Ah; I did not realise that this was a possibility.
 
-Excellent!  Thanks for the patch.
+> Now I understand why we should stick with page_mapping_only option.
 
-Reviewed-by: Kevin Hilman <khilman@baylibre.com>
-Tested-by: Kevin Hilman <khilman@baylibre.com>
+Likewise, I now agree.
 
-Some folks on IRC had reported that eMMC wasn't working on some boards
-(like Amlogic P200) and with this patch, it's working again for me on P200.
+Apologies for guiding you down the wrong path here.
 
-@Andreas: does this patch fix your R-box Pro?
-
-Kevin
-
-> ---
->  drivers/mmc/host/meson-gx-mmc.c | 11 +++++++++++
->  1 file changed, 11 insertions(+)
->
-> diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
-> index 030425be..be45d57d 100644
-> --- a/drivers/mmc/host/meson-gx-mmc.c
-> +++ b/drivers/mmc/host/meson-gx-mmc.c
-> @@ -83,6 +83,7 @@
->  #define   CFG_RC_CC_MASK 0xf
->  #define   CFG_STOP_CLOCK BIT(22)
->  #define   CFG_CLK_ALWAYS_ON BIT(18)
-> +#define   CFG_CHK_DS BIT(20)
->  #define   CFG_AUTO_CLK BIT(23)
->  
->  #define SD_EMMC_STATUS 0x48
-> @@ -412,6 +413,16 @@ static void meson_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
->  	val &= ~(CFG_RC_CC_MASK << CFG_RC_CC_SHIFT);
->  	val |= ilog2(SD_EMMC_CFG_CMD_GAP) << CFG_RC_CC_SHIFT;
->  
-> +	val &= ~CFG_DDR;
-> +	if (ios->timing == MMC_TIMING_UHS_DDR50 ||
-> +	    ios->timing == MMC_TIMING_MMC_DDR52 ||
-> +	    ios->timing == MMC_TIMING_MMC_HS400)
-> +		val |= CFG_DDR;
-> +
-> +	val &= ~CFG_CHK_DS;
-> +	if (ios->timing == MMC_TIMING_MMC_HS400)
-> +		val |= CFG_CHK_DS;
-> +
->  	writel(val, host->regs + SD_EMMC_CFG);
->  
->  	if (val != orig)
+Thanks,
+Mark.
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
