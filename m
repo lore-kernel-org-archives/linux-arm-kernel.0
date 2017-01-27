@@ -1,26 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 27 Jan 2017 09:53:24 +0000
-Subject: [PATCH v2] arm64: dma-mapping: Fix dma_mapping_error() when
- bypassing SWIOTLB
-In-Reply-To: <18eae1fb-4a3c-c230-4491-8d376468975c@arm.com>
-References: <20170124225200.a7qioswpxzh6agvd@raspberrypi-2.musicnaut.iki.fi>
- <840027acb4750542003dff17b4a8902ba8972754.1485368348.git.robin.murphy@arm.com>
- <20170126125249.GG14167@arm.com>
- <18eae1fb-4a3c-c230-4491-8d376468975c@arm.com>
-Message-ID: <20170127095324.GB21144@arm.com>
+From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
+Date: Fri, 27 Jan 2017 10:55:07 +0100
+Subject: [PATCH v6 05/14] ARM: davinci: da850: add con_id for the SATA
+ clock
+In-Reply-To: <645778dd-6727-abd0-3dd9-a7e0d5aa4983@ti.com>
+References: <1485190856-4711-1-git-send-email-bgolaszewski@baylibre.com>
+ <1485190856-4711-6-git-send-email-bgolaszewski@baylibre.com>
+ <93a3bbb3-2d9f-bc38-c7b4-5eb3325d985d@ti.com>
+ <645778dd-6727-abd0-3dd9-a7e0d5aa4983@ti.com>
+Message-ID: <CAMpxmJXq-XZBhO3j=bHpfU2QjJ+6kiYcozS7-pVu3W4juNTVBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 03:20:47PM +0000, Robin Murphy wrote:
-> On 26/01/17 12:52, Will Deacon wrote:
-> > 3. We bite the bullet and implement some non-swiotlb DMA ops for the case
-> >    when SWIOTLB is not used.
-> 
-> I'd already started thinking along those lines in the process of writing
-> this patch - I'm happy to take that on, although it might be a wee bit
-> tight for 4.11 now.
+2017-01-26 18:40 GMT+01:00 Sekhar Nori <nsekhar@ti.com>:
+> On Thursday 26 January 2017 10:26 PM, Grygorii Strashko wrote:
+>>
+>>
+>> On 01/23/2017 11:00 AM, Bartosz Golaszewski wrote:
+>>> The ahci-da850 SATA driver is now capable of retrieving clocks by
+>>> con_id. Add the connection id for the sysclk2-derived SATA clock.
+>>>
+>>> Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
+>>> ---
+>>>  arch/arm/mach-davinci/da850.c | 2 +-
+>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+>>> index 1d873d1..dbf1daa 100644
+>>> --- a/arch/arm/mach-davinci/da850.c
+>>> +++ b/arch/arm/mach-davinci/da850.c
+>>> @@ -571,7 +571,7 @@ static struct clk_lookup da850_clks[] = {
+>>>      CLK("spi_davinci.0",    NULL,           &spi0_clk),
+>>>      CLK("spi_davinci.1",    NULL,           &spi1_clk),
+>>>      CLK("vpif",             NULL,           &vpif_clk),
+>>> -    CLK("ahci_da850",               NULL,           &sata_clk),
+>>> +    CLK("ahci_da850",       "sata",         &sata_clk),
+>>
+>> I'm worry a bit - wouldn't this cause future problems with PM runtime
+>>  (if it will be the case)?
+>>
+>> If this is functional clock - shouldn't it be "fck" to
+>> follow PM domain con_id list for davinci?  (arch/arm/mach-davinci/pm_domain.c)
+>
+> I agree with Grygorii. Calling this clock "fck" will make it easy to
+> convert the DA850 AHCI driver to use pm_runtime at a future date (no
+> mach-davinci changes should be needed).
+>
+> Sorry about not spotting this earlier.
+>
 
-Ok, so I've merged this patch as-is for 4.11 because it is an improvement
-over what we had before. Let's look at using separate ops in the long run.
+Hi Sekhar,
 
-Will
+I'll wait with sending v7 until we get an ack from Rob for the
+ahci-da850 bindings, so that we don't fall to the bottom of the review
+queue again.
+
+Thanks,
+Bartosz
