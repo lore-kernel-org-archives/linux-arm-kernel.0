@@ -1,124 +1,49 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 27 Jan 2017 11:54:58 +0000
-Subject: [STLinux Kernel] [PATCH 3/8] serial: st-asc: Read in all Pinctrl
- states
-In-Reply-To: <20170125112142.GE5680@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <20170124134310.27512-1-lee.jones@linaro.org>
- <20170124134310.27512-4-lee.jones@linaro.org>
- <20170125112142.GE5680@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <20170127115458.k4edg42nnna3bv4v@dell>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 27 Jan 2017 12:22:54 +0000
+Subject: [PATCH] iommu: Better document the IOMMU_PRIV flag
+In-Reply-To: <1483709296-32761-2-git-send-email-sricharan@codeaurora.org>
+References: <1483709296-32761-1-git-send-email-sricharan@codeaurora.org>
+ <1483709296-32761-2-git-send-email-sricharan@codeaurora.org>
+Message-ID: <edc67cc1775f3bafb6895346184e8042fd881ba4.1485519627.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 Jan 2017, Peter Griffin wrote:
+This is a fairly subtle thing - let's make sure it's described as
+clearly as possible to avoid potential misunderstandings.
 
-> Hi Lee,
-> 
-> On Tue, 24 Jan 2017, Lee Jones wrote:
-> 
-> > There are now 2 possible separate/different Pinctrl states which can
-> > be provided from platform data.  One which encompasses the lines
-> > required for HW flow-control (CTS/RTS) and another which does not
-> > specify these lines, such that they can be used via GPIO mechanisms
-> > for manually toggling (i.e. from a request by `stty`).
-> > 
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > ---
-> >  drivers/tty/serial/st-asc.c | 28 ++++++++++++++++++++++++++++
-> >  1 file changed, 28 insertions(+)
-> > 
-> > diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
-> > index 397df50..03801ed 100644
-> > --- a/drivers/tty/serial/st-asc.c
-> > +++ b/drivers/tty/serial/st-asc.c
-> > @@ -37,10 +37,16 @@
-> >  #define ASC_FIFO_SIZE 16
-> >  #define ASC_MAX_PORTS 8
-> >  
-> > +/* Pinctrl states */
-> > +#define DEFAULT		0
-> > +#define MANUAL_RTS	1
-> 
-> Nit: Would be better to have them aligned.
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
 
-These are aligned in code.  The patch format throws things out.
+Having another look through the IOMMU_PRIV series, I wasn't convinced
+that the original comment was really all that helpful - I'm happy for
+this to be squashed in if you like.
 
-Look, same lines with the "> > +" removed:
+Robin.
 
-/* Pinctrl states */
-#define DEFAULT		0
-#define MANUAL_RTS	1
+ include/linux/iommu.h | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
-Try it.
-
-> > +
-> >  struct asc_port {
-> >  	struct uart_port port;
-> >  	struct gpio_desc *rts;
-> >  	struct clk *clk;
-> > +	struct pinctrl *pinctrl;
-> > +	struct pinctrl_state *states[2];
-> >  	unsigned int hw_flow_control:1;
-> >  	unsigned int force_m1:1;
-> >  };
-> > @@ -694,6 +700,7 @@ static int asc_init_port(struct asc_port *ascport,
-> >  {
-> >  	struct uart_port *port = &ascport->port;
-> >  	struct resource *res;
-> > +	int ret;
-> >  
-> >  	port->iotype	= UPIO_MEM;
-> >  	port->flags	= UPF_BOOT_AUTOCONF;
-> > @@ -720,6 +727,27 @@ static int asc_init_port(struct asc_port *ascport,
-> >  	WARN_ON(ascport->port.uartclk == 0);
-> >  	clk_disable_unprepare(ascport->clk);
-> >  
-> > +	ascport->pinctrl = devm_pinctrl_get(&pdev->dev);
-> > +	if (IS_ERR(ascport->pinctrl)) {
-> > +		ret = PTR_ERR(ascport->pinctrl);
-> > +		dev_err(&pdev->dev, "Failed to get Pinctrl: %d\n", ret);
-> > +	}
-> > +
-> > +	ascport->states[DEFAULT] =
-> > +		pinctrl_lookup_state(ascport->pinctrl, "default");
-> > +	if (IS_ERR(ascport->states[DEFAULT])) {
-> > +		ret = PTR_ERR(ascport->states[DEFAULT]);
-> > +		dev_err(&pdev->dev,
-> > +			"Failed to look up Pinctrl state 'default': %d\n", ret);
-> > +		return ret;
-> > +	}
-> > +
-> > +	/* "manual-rts" state is optional */
-> > +	ascport->states[MANUAL_RTS] =
-> > +		pinctrl_lookup_state(ascport->pinctrl, "manual-rts");
-> > +	if (IS_ERR(ascport->states[MANUAL_RTS]))
-> > +		ascport->states[MANUAL_RTS] = NULL;
-> > +
-> 
-> The different pinctrl states looks like a neat solution to the problem.
-> 
-> My only concern here is that 'default' state is implying a hw-flow-control
-> pinmux config, and manual-rts is implying what is the current upstream
-> 'default' pinmux config.
-> 
-> Which maybe ok if you update all uarts, but currently only serial0
-> is updated. So the other uarts current 'default' is actually the same as serial0
-> 'manual-rts' grouping, which conceptually is odd.
-> 
-> Would it not be better to make 'manual-rts' the default state? As that aligns
-> to what is currently already the default for the other UARTS? And then make
-> hw-flow-control the optional state for serial0?
-> 
-> That also has the advantage that 'default' has the same meaning with older DT's.
-
-The reason it was done is this was because none of the other UARTs
-require 2 separate Pinctrl configurations, only this one.  Moreover,
-if they support RTS/CTS then I believe that the lines should be
-defined in Pinctrl.  Thus, it was my plan to update all UART's default
-Pinctrl configs to include the RTS/CTS lines.
-
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 69e2417a2965..3c830e153069 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -32,10 +32,13 @@
+ #define IOMMU_NOEXEC	(1 << 3)
+ #define IOMMU_MMIO	(1 << 4) /* e.g. things like MSI doorbells */
+ /*
+- * This is to make the IOMMU API setup privileged
+- * mapppings accessible by the master only at higher
+- * privileged execution level and inaccessible at
+- * less privileged levels.
++ * Where the bus hardware includes a privilege level as part of its access type
++ * markings, and certain devices are capable of issuing transactions marked as
++ * either 'supervisor' or 'user', the IOMMU_PRIV flag requests that the other
++ * given permission flags only apply to accesses@the higher privilege level,
++ * and that unprivileged transactions should have as little access as possible.
++ * This would usually imply the same permissions as kernel mappings on the CPU,
++ * if the IOMMU page table format is equivalent.
+  */
+ #define IOMMU_PRIV	(1 << 5)
+ 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.11.0.dirty
