@@ -1,132 +1,126 @@
-From: rui.zhang@intel.com (Zhang Rui)
-Date: Fri, 27 Jan 2017 11:39:42 +0800
-Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
-In-Reply-To: <a6ce0873-9164-a965-a3e1-9eaaaec2201f@roeck-us.net>
-References: <da1f1b45-3ae5-ffe8-62c6-9ec7c3a1505b@roeck-us.net>
- <20170123144031.GA7870@amd> <20170123232654.GA19342@amd>
- <20170123234912.GA2460@roeck-us.net>
- <20170124070639.GA5068@rzhang1-surface> <20170124073720.GB5603@amd>
- <88c94ea6-abe2-0f20-337e-e9ee00c883d8@roeck-us.net>
- <20170124175800.GA15070@amd> <20170124184526.GA25056@roeck-us.net>
- <20170125111233.GB3912@amd> <20170125120918.GA7936@pali>
- <1485481030.2469.15.camel@intel.com>
- <a6ce0873-9164-a965-a3e1-9eaaaec2201f@roeck-us.net>
-Message-ID: <1485488382.2469.27.camel@intel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 26 Jan 2017 20:15:25 -0800
+Subject: [PATCH] ARM: dts: Add keypad support for droid 4
+Message-ID: <20170127041525.29648-1-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-01-26 at 18:03 -0800, Guenter Roeck wrote:
-> On 01/26/2017 05:37 PM, Zhang Rui wrote:
-> > 
-> > On Wed, 2017-01-25 at 13:09 +0100, Pali Roh?r wrote:
-> > > 
-> > > On Wednesday 25 January 2017 12:12:33 Pavel Machek wrote:
-> > > > 
-> > > > 
-> > > > Hi!
-> > > > 
-> > > > > 
-> > > > > 
-> > > > > > 
-> > > > > > 
-> > > > > > > 
-> > > > > > > 
-> > > > > > > > 
-> > > > > > > > 
-> > > > > > > > > 
-> > > > > > > > > 
-> > > > > > > > > Right.
-> > > > > > > > > 
-> > > > > > > > > Before reverting, can you please try if this patch
-> > > > > > > > > works
-> > > > > > > > > or not?
-> > > > > > > > Not really. Revert now. Sorry.
-> > > > > > > > 
-> > > > > > > > Are you sure? This does not look equivalent to me at
-> > > > > > > > all.
-> > > > > > > > 
-> > > > > > > > "name" file handling moved from drivers to the core,
-> > > > > > > > which
-> > > > > > > > added some
-> > > > > > > > crazy checks what name can contain. Even if this
-> > > > > > > > "works",
-> > > > > > > > what is the
-> > > > > > > > expected effect on the "name" file?
-> > > > > > > > 
-> > > > > > > The hwmon name attribute must not include '-', as
-> > > > > > > documented
-> > > > > > > in
-> > > > > > > Documentation/hwmon/sysfs-interface. Is enforcing that
-> > > > > > > 'crazy' ?
-> > > > > > > Maybe in your world, but not in mine.
-> > > > > > Well, lets revert the patch and then we can discuss what to
-> > > > > > do
-> > > > > > with
-> > > > > > the "name" problem.
-> > > > Ok, so the patch is on the way in. What to do next?
-> > > > 
-> > > > pavel at n900:/sys/class/hwmon$ cat hwmon0/name
-> > > > bq27200-0
-> > > > pavel at n900:/sys/class/hwmon$ cat hwmon1/name
-> > > > rx51-battery
-> > > > 
-> > > > > 
-> > > > > 
-> > > > > To provide some detail: libsensors gets just as confused with
-> > > > > wildcards
-> > > > > and whitespace/newline as it does with '-' in the reported
-> > > > > name,
-> > > > > which
-> > > > > is why those are blocked by the new API.
-> > > > Ok... Question is "does someone actually use hwmon*/name on
-> > > > N900"?
-> > > > If
-> > > > so, we can't change it, but it is well possible that noone is.
-> > > IIRC hwmon is used on Nokia N900.
-> > > 
-> > > But I have not seen hwmon devices for bq27200 and rx51-battery
-> > > yet.
-> > > Those are power supply driver and auto-exporting them also via
-> > > hwmon
-> > > is
-> > > something new, right? If yes, then we can use any name for those
-> > > new
-> > > hwmon devices as they cannot break userspace... as there is no
-> > > userspace
-> > > application for them.
-> > > 
-> > If this is the case, you'd better set
-> > (struct thermal_zone_params)->no_hwmon when registering the thermal
-> > zone device, in which case, the hwmon device will not be created.
-> > 
-> > In fact, I'd prefer to change tzp->no_hwmon to tzp->hwmon to not
-> > create
-> > hwmon I/F by default, and see if there is anyone using it. If yes,
-> > we
-> > can set the flag in soc thermal driver, explicitly, at meantime, a
-> > hwmon compatible name is required.
-> > 
-> > But one foreseeable result is that we may get bug reports from end
-> > user
-> > that some sensors (acpitz, etc) are gone in 'sensors' output. And
-> > TBH,
-> > I'm not quite sure if this can be counted as a regression or not.
-> > 
-> That sounds like fun. Changing bq27200-0 to bq27200_0 is Forbidden by
-> the ABI Police, but taking the entire device away is ok.
-> 
-No. IMO, it depends on if the interface is used or not.
-If hwmon I/F is used, we can not take it away, nor change its name.
-If thermal zone I/F is used, we can not change it's 'type' name to be
-compatible with new hwmon API.
+Let's configure the keypad in a way where it's usable out of the
+box for Linux console use. To do this, let's follow the standard
+PC keyboard layout for ctrl, shift and alt keys:
 
-> Anyway, sounds good to me. No one will use something that isn't
-> there,
-> and no one will realize that it could have been there, so I don't
-> expect
-> anyone to complain.
+Ctrl = what is labeled as shift
+Alt = what is labeled as SYM
+Shift = what is lableled as caps lock
+Meta = what is labled as OK
 
-Yes, I agree.
+Who knows where they got the caps lock idea.. Probably from
+some focus group popularity vote or something.
 
-thanks,
-rui
+Note that some other keys don't match the labels either as they
+don't follow the PC keyboard style. For example we have "shift + ,"
+produce "<", and "shift + ." produce ">" instead of ";" and ":".
+
+Pretty much Esc is the only key missing. I've used "Meta + 1"
+produce Esc, and that seems to work OK. But that can be mapped
+using the standard userspace tools.
+
+Cc: Marcel Partap <mpartap@gmx.net>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Michael Scott <michael.scott@linaro.org>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/boot/dts/omap4-droid4-xt894.dts | 72 ++++++++++++++++++++++++++++++++
+ 1 file changed, 72 insertions(+)
+
+diff --git a/arch/arm/boot/dts/omap4-droid4-xt894.dts b/arch/arm/boot/dts/omap4-droid4-xt894.dts
+--- a/arch/arm/boot/dts/omap4-droid4-xt894.dts
++++ b/arch/arm/boot/dts/omap4-droid4-xt894.dts
+@@ -5,6 +5,7 @@
+  */
+ /dts-v1/;
+ 
++#include <dt-bindings/input/input.h>
+ #include "omap443x.dtsi"
+ 
+ / {
+@@ -60,6 +61,77 @@
+ 	status = "disabled";
+ };
+ 
++&keypad {
++	keypad,num-rows = <8>;
++	keypad,num-columns = <8>;
++	linux,keymap = <
++
++	/* Row 1 */
++	MATRIX_KEY(0, 2, KEY_1)
++	MATRIX_KEY(0, 6, KEY_2)
++	MATRIX_KEY(2, 3, KEY_3)
++	MATRIX_KEY(0, 7, KEY_4)
++	MATRIX_KEY(0, 4, KEY_5)
++	MATRIX_KEY(5, 5, KEY_6)
++	MATRIX_KEY(0, 1, KEY_7)
++	MATRIX_KEY(0, 5, KEY_8)
++	MATRIX_KEY(0, 0, KEY_9)
++	MATRIX_KEY(1, 6, KEY_0)
++
++	/* Row 2 */
++	MATRIX_KEY(3, 4, KEY_APOSTROPHE)
++	MATRIX_KEY(7, 6, KEY_Q)
++	MATRIX_KEY(7, 7, KEY_W)
++	MATRIX_KEY(7, 2, KEY_E)
++	MATRIX_KEY(1, 0, KEY_R)
++	MATRIX_KEY(4, 4, KEY_T)
++	MATRIX_KEY(1, 2, KEY_Y)
++	MATRIX_KEY(6, 7, KEY_U)
++	MATRIX_KEY(2, 2, KEY_I)
++	MATRIX_KEY(5, 6, KEY_O)
++	MATRIX_KEY(3, 7, KEY_P)
++	MATRIX_KEY(6, 5, KEY_BACKSPACE)
++
++	/* Row 3 */
++	MATRIX_KEY(5, 4, KEY_TAB)
++	MATRIX_KEY(5, 7, KEY_A)
++	MATRIX_KEY(2, 7, KEY_S)
++	MATRIX_KEY(7, 0, KEY_D)
++	MATRIX_KEY(2, 6, KEY_F)
++	MATRIX_KEY(6, 2, KEY_G)
++	MATRIX_KEY(6, 6, KEY_H)
++	MATRIX_KEY(1, 4, KEY_J)
++	MATRIX_KEY(3, 1, KEY_K)
++	MATRIX_KEY(2, 1, KEY_L)
++	MATRIX_KEY(4, 6, KEY_ENTER)
++
++	/* Row 4 */
++	MATRIX_KEY(3, 6, KEY_LEFTSHIFT)		/* KEY_CAPSLOCK */
++	MATRIX_KEY(6, 1, KEY_Z)
++	MATRIX_KEY(7, 4, KEY_X)
++	MATRIX_KEY(5, 1, KEY_C)
++	MATRIX_KEY(1, 7, KEY_V)
++	MATRIX_KEY(2, 4, KEY_B)
++	MATRIX_KEY(4, 1, KEY_N)
++	MATRIX_KEY(1, 1, KEY_M)
++	MATRIX_KEY(3, 5, KEY_COMMA)
++	MATRIX_KEY(5, 2, KEY_DOT)
++	MATRIX_KEY(6, 3, KEY_UP)
++	MATRIX_KEY(7, 3, KEY_RIGHTMETA)		/* KEY_OK */
++
++	/* Row 5 */
++	MATRIX_KEY(2, 5, KEY_LEFTCTRL)		/* KEY_LEFTSHIFT */
++	MATRIX_KEY(4, 5, KEY_LEFTALT)		/* SYM */
++	MATRIX_KEY(6, 0, KEY_MINUS)
++	MATRIX_KEY(4, 7, KEY_EQUAL)
++	MATRIX_KEY(1, 5, KEY_SPACE)
++	MATRIX_KEY(3, 2, KEY_SLASH)
++	MATRIX_KEY(4, 3, KEY_LEFT)
++	MATRIX_KEY(5, 3, KEY_DOWN)
++	MATRIX_KEY(3, 3, KEY_RIGHT)
++	>;
++};
++
+ &mmc1 {
+ 	vmmc-supply = <&vmmc>;
+ 	bus-width = <4>;
+-- 
+2.11.0
