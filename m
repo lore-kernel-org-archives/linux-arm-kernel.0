@@ -1,68 +1,146 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Fri, 27 Jan 2017 15:14:45 +0900
-Subject: [PATCH/RFC v2 3/4] iommu/ipmmu-vmsa: Opt-in slave devices based on ES
- version
-In-Reply-To: <148549764733.22203.16459470412085471955.sendpatchset@little-apple>
-References: <148549764733.22203.16459470412085471955.sendpatchset@little-apple>
-Message-ID: <148549768562.22203.6722636560743534786.sendpatchset@little-apple>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 26 Jan 2017 22:27:32 -0800
+Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
+In-Reply-To: <1485488382.2469.27.camel@intel.com>
+References: <da1f1b45-3ae5-ffe8-62c6-9ec7c3a1505b@roeck-us.net>
+ <20170123144031.GA7870@amd> <20170123232654.GA19342@amd>
+ <20170123234912.GA2460@roeck-us.net> <20170124070639.GA5068@rzhang1-surface>
+ <20170124073720.GB5603@amd>
+ <88c94ea6-abe2-0f20-337e-e9ee00c883d8@roeck-us.net>
+ <20170124175800.GA15070@amd> <20170124184526.GA25056@roeck-us.net>
+ <20170125111233.GB3912@amd> <20170125120918.GA7936@pali>
+ <1485481030.2469.15.camel@intel.com>
+ <a6ce0873-9164-a965-a3e1-9eaaaec2201f@roeck-us.net>
+ <1485488382.2469.27.camel@intel.com>
+Message-ID: <9146145b-7e21-c4de-a9cd-dad7bc74ee7a@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm+renesas@opensource.se>
+On 01/26/2017 07:39 PM, Zhang Rui wrote:
+> On Thu, 2017-01-26 at 18:03 -0800, Guenter Roeck wrote:
+>> On 01/26/2017 05:37 PM, Zhang Rui wrote:
+>>>
+>>> On Wed, 2017-01-25 at 13:09 +0100, Pali Roh?r wrote:
+>>>>
+>>>> On Wednesday 25 January 2017 12:12:33 Pavel Machek wrote:
+>>>>>
+>>>>>
+>>>>> Hi!
+>>>>>
+>>>>>>
+>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>>>
+>>>>>>>>
+>>>>>>>>>
+>>>>>>>>>
+>>>>>>>>>>
+>>>>>>>>>>
+>>>>>>>>>> Right.
+>>>>>>>>>>
+>>>>>>>>>> Before reverting, can you please try if this patch
+>>>>>>>>>> works
+>>>>>>>>>> or not?
+>>>>>>>>> Not really. Revert now. Sorry.
+>>>>>>>>>
+>>>>>>>>> Are you sure? This does not look equivalent to me at
+>>>>>>>>> all.
+>>>>>>>>>
+>>>>>>>>> "name" file handling moved from drivers to the core,
+>>>>>>>>> which
+>>>>>>>>> added some
+>>>>>>>>> crazy checks what name can contain. Even if this
+>>>>>>>>> "works",
+>>>>>>>>> what is the
+>>>>>>>>> expected effect on the "name" file?
+>>>>>>>>>
+>>>>>>>> The hwmon name attribute must not include '-', as
+>>>>>>>> documented
+>>>>>>>> in
+>>>>>>>> Documentation/hwmon/sysfs-interface. Is enforcing that
+>>>>>>>> 'crazy' ?
+>>>>>>>> Maybe in your world, but not in mine.
+>>>>>>> Well, lets revert the patch and then we can discuss what to
+>>>>>>> do
+>>>>>>> with
+>>>>>>> the "name" problem.
+>>>>> Ok, so the patch is on the way in. What to do next?
+>>>>>
+>>>>> pavel at n900:/sys/class/hwmon$ cat hwmon0/name
+>>>>> bq27200-0
+>>>>> pavel at n900:/sys/class/hwmon$ cat hwmon1/name
+>>>>> rx51-battery
+>>>>>
+>>>>>>
+>>>>>>
+>>>>>> To provide some detail: libsensors gets just as confused with
+>>>>>> wildcards
+>>>>>> and whitespace/newline as it does with '-' in the reported
+>>>>>> name,
+>>>>>> which
+>>>>>> is why those are blocked by the new API.
+>>>>> Ok... Question is "does someone actually use hwmon*/name on
+>>>>> N900"?
+>>>>> If
+>>>>> so, we can't change it, but it is well possible that noone is.
+>>>> IIRC hwmon is used on Nokia N900.
+>>>>
+>>>> But I have not seen hwmon devices for bq27200 and rx51-battery
+>>>> yet.
+>>>> Those are power supply driver and auto-exporting them also via
+>>>> hwmon
+>>>> is
+>>>> something new, right? If yes, then we can use any name for those
+>>>> new
+>>>> hwmon devices as they cannot break userspace... as there is no
+>>>> userspace
+>>>> application for them.
+>>>>
+>>> If this is the case, you'd better set
+>>> (struct thermal_zone_params)->no_hwmon when registering the thermal
+>>> zone device, in which case, the hwmon device will not be created.
+>>>
+>>> In fact, I'd prefer to change tzp->no_hwmon to tzp->hwmon to not
+>>> create
+>>> hwmon I/F by default, and see if there is anyone using it. If yes,
+>>> we
+>>> can set the flag in soc thermal driver, explicitly, at meantime, a
+>>> hwmon compatible name is required.
+>>>
+>>> But one foreseeable result is that we may get bug reports from end
+>>> user
+>>> that some sensors (acpitz, etc) are gone in 'sensors' output. And
+>>> TBH,
+>>> I'm not quite sure if this can be counted as a regression or not.
+>>>
+>> That sounds like fun. Changing bq27200-0 to bq27200_0 is Forbidden by
+>> the ABI Police, but taking the entire device away is ok.
+>>
+> No. IMO, it depends on if the interface is used or not.
+> If hwmon I/F is used, we can not take it away, nor change its name.
 
-Match on r8a7795 ES2 and enable a certain DMA controller.
-In other cases the IPMMU driver remains disabled.
+Even if the use doesn't depend on that name ?
 
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
----
+> If thermal zone I/F is used, we can not change it's 'type' name to be
+> compatible with new hwmon API.
+>
 
- Changes since V1:
- - Perform white list check in ->xlate() instead of ->add_device()
+You mean you can not fix the name to be compatible with libsensors.
 
- drivers/iommu/ipmmu-vmsa.c |   25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+Makes me wonder if there shouldn't be a rule that exploits must not
+be fixed if already exploited.
 
---- 0009/drivers/iommu/ipmmu-vmsa.c
-+++ work/drivers/iommu/ipmmu-vmsa.c	2017-01-27 13:14:47.470607110 +0900
-@@ -23,6 +23,7 @@
- #include <linux/platform_device.h>
- #include <linux/sizes.h>
- #include <linux/slab.h>
-+#include <linux/sys_soc.h>
- 
- #if defined(CONFIG_ARM) && !defined(CONFIG_IOMMU_DMA)
- #include <asm/dma-iommu.h>
-@@ -1032,9 +1033,33 @@ static void ipmmu_remove_device_dma(stru
- 	iommu_group_remove_device(dev);
- }
- 
-+static const struct soc_device_attribute r8a7795es2[] = {
-+	{ .soc_id = "r8a7795", .revision = "ES2.*" },
-+	{ /* sentinel */ }
-+};
-+
-+static int ipmmu_slave_whitelist(struct device *dev)
-+{
-+	/* Opt-in slave devices based on SoC and ES version */
-+	if (soc_device_match(r8a7795es2)) {
-+		if (!strcmp(dev_name(dev), "e7310000.dma-controller"))
-+			return 0;
-+	}
-+
-+	/* By default, do not allow use of IPMMU */
-+	return -ENODEV;
-+}
-+
- static int ipmmu_of_xlate_dma(struct device *dev,
- 			      struct of_phandle_args *spec)
- {
-+	int ret;
-+
-+	/* Opt-in devices based on SoC and ES version */
-+	ret = ipmmu_slave_whitelist(dev);
-+	if (ret)
-+		return ret;
-+
- 	/* For now only tested on R-Car Gen3 with ARM64 arch init order
- 	 * TODO: Test R-Car Gen2 with ARM32 arch init order
- 	 */
+Guenter
+
+>> Anyway, sounds good to me. No one will use something that isn't
+>> there,
+>> and no one will realize that it could have been there, so I don't
+>> expect
+>> anyone to complain.
+>
+> Yes, I agree.
+>
+> thanks,
+> rui
+>
