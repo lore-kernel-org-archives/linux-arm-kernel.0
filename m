@@ -1,66 +1,97 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Fri, 27 Jan 2017 10:03:19 +0800
-Subject: [PATCH 01/13] mmc: bcm2835: add bcm2835_read_wait_sdcmd
-In-Reply-To: <1485473846-24537-2-git-send-email-kraxel@redhat.com>
-References: <1485473846-24537-1-git-send-email-kraxel@redhat.com>
- <1485473846-24537-2-git-send-email-kraxel@redhat.com>
-Message-ID: <ff0170ef-2566-1c12-0b27-dccb3bff2e7e@rock-chips.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 26 Jan 2017 18:03:39 -0800
+Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
+In-Reply-To: <1485481030.2469.15.camel@intel.com>
+References: <da1f1b45-3ae5-ffe8-62c6-9ec7c3a1505b@roeck-us.net>
+ <20170123144031.GA7870@amd> <20170123232654.GA19342@amd>
+ <20170123234912.GA2460@roeck-us.net> <20170124070639.GA5068@rzhang1-surface>
+ <20170124073720.GB5603@amd>
+ <88c94ea6-abe2-0f20-337e-e9ee00c883d8@roeck-us.net>
+ <20170124175800.GA15070@amd> <20170124184526.GA25056@roeck-us.net>
+ <20170125111233.GB3912@amd> <20170125120918.GA7936@pali>
+ <1485481030.2469.15.camel@intel.com>
+Message-ID: <a6ce0873-9164-a965-a3e1-9eaaaec2201f@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/1/27 7:37, Gerd Hoffmann wrote:
-> Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
-> ---
->  drivers/mmc/host/bcm2835.c | 30 ++++++++++++++++++++++++++++++
->  1 file changed, 30 insertions(+)
+On 01/26/2017 05:37 PM, Zhang Rui wrote:
+> On Wed, 2017-01-25 at 13:09 +0100, Pali Roh?r wrote:
+>> On Wednesday 25 January 2017 12:12:33 Pavel Machek wrote:
+>>>
+>>> Hi!
+>>>
+>>>>
+>>>>>
+>>>>>>
+>>>>>>>
+>>>>>>>>
+>>>>>>>> Right.
+>>>>>>>>
+>>>>>>>> Before reverting, can you please try if this patch works
+>>>>>>>> or not?
+>>>>>>> Not really. Revert now. Sorry.
+>>>>>>>
+>>>>>>> Are you sure? This does not look equivalent to me at all.
+>>>>>>>
+>>>>>>> "name" file handling moved from drivers to the core, which
+>>>>>>> added some
+>>>>>>> crazy checks what name can contain. Even if this "works",
+>>>>>>> what is the
+>>>>>>> expected effect on the "name" file?
+>>>>>>>
+>>>>>> The hwmon name attribute must not include '-', as documented
+>>>>>> in
+>>>>>> Documentation/hwmon/sysfs-interface. Is enforcing that
+>>>>>> 'crazy' ?
+>>>>>> Maybe in your world, but not in mine.
+>>>>> Well, lets revert the patch and then we can discuss what to do
+>>>>> with
+>>>>> the "name" problem.
+>>> Ok, so the patch is on the way in. What to do next?
+>>>
+>>> pavel at n900:/sys/class/hwmon$ cat hwmon0/name
+>>> bq27200-0
+>>> pavel at n900:/sys/class/hwmon$ cat hwmon1/name
+>>> rx51-battery
+>>>
+>>>>
+>>>> To provide some detail: libsensors gets just as confused with
+>>>> wildcards
+>>>> and whitespace/newline as it does with '-' in the reported name,
+>>>> which
+>>>> is why those are blocked by the new API.
+>>> Ok... Question is "does someone actually use hwmon*/name on N900"?
+>>> If
+>>> so, we can't change it, but it is well possible that noone is.
+>> IIRC hwmon is used on Nokia N900.
+>>
+>> But I have not seen hwmon devices for bq27200 and rx51-battery yet.
+>> Those are power supply driver and auto-exporting them also via hwmon
+>> is
+>> something new, right? If yes, then we can use any name for those new
+>> hwmon devices as they cannot break userspace... as there is no
+>> userspace
+>> application for them.
+>>
+> If this is the case, you'd better set
+> (struct thermal_zone_params)->no_hwmon when registering the thermal
+> zone device, in which case, the hwmon device will not be created.
 >
-> diff --git a/drivers/mmc/host/bcm2835.c b/drivers/mmc/host/bcm2835.c
-> index 9744517..ceee4cf 100644
-> --- a/drivers/mmc/host/bcm2835.c
-> +++ b/drivers/mmc/host/bcm2835.c
-> @@ -609,6 +609,36 @@ static void bcm2835_prepare_data(struct bcm2835_host *host,
->  	writel(data->blocks, host->ioaddr + SDHBLC);
->  }
+> In fact, I'd prefer to change tzp->no_hwmon to tzp->hwmon to not create
+> hwmon I/F by default, and see if there is anyone using it. If yes, we
+> can set the flag in soc thermal driver, explicitly, at meantime, a
+> hwmon compatible name is required.
 >
-> +static u32 bcm2835_read_wait_sdcmd(struct bcm2835_host *host, u32 timeout,
-> +				   bool check_fail)
-> +{
-> +	struct device *dev = &host->pdev->dev;
-> +	unsigned long start = jiffies;
-> +	unsigned long fastpoll = start + usecs_to_jiffies(10);
-> +	unsigned long end = start + msecs_to_jiffies(timeout);
-> +	u32 value;
-> +
-> +	for (;;) {
-> +		value = readl(host->ioaddr + SDCMD);
-> +		if (!(value & SDCMD_NEW_FLAG))
-> +			break;
-> +		if (check_fail && (value & SDCMD_FAIL_FLAG))
-> +			break;
-> +		if (time_after(jiffies, end)) {
-> +			dev_err(dev, "%s: timeout (%d us)\n",
-> +				__func__, timeout);
-> +			break;
-> +		}
-> +
-> +		/* if it takes longer reduce poll interval */
-> +		if (time_after(jiffies, fastpoll))
-> +			udelay(10);
-> +		else
-> +			cpu_relax();
-> +	}
-
-Use readl_poll_timeout intead of open-coding them..
-
-> +	return value;
-> +}
-> +
->  bool bcm2835_send_command(struct bcm2835_host *host,
->  			  struct mmc_command *cmd)
->  {
+> But one foreseeable result is that we may get bug reports from end user
+> that some sensors (acpitz, etc) are gone in 'sensors' output. And TBH,
+> I'm not quite sure if this can be counted as a regression or not.
 >
 
+That sounds like fun. Changing bq27200-0 to bq27200_0 is Forbidden by
+the ABI Police, but taking the entire device away is ok.
 
--- 
-Best Regards
-Shawn Lin
+Anyway, sounds good to me. No one will use something that isn't there,
+and no one will realize that it could have been there, so I don't expect
+anyone to complain.
+
+Guenter
