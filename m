@@ -1,34 +1,40 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 27 Jan 2017 11:09:08 +0100
-Subject: [linux-sunxi][PATCH v3] ARM: dts: sun8i-h3: Add dts for the
- Beelink X2 STB
-In-Reply-To: <20170126194804.23789-1-codekipper@gmail.com>
-References: <20170126194804.23789-1-codekipper@gmail.com>
-Message-ID: <20170127100908.p5u73qfzizpeoik7@lukather>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 27 Jan 2017 11:12:24 +0100
+Subject: [PATCH net-next v2] macb: Common code to enable ptp support for
+ MACB/GEM
+In-Reply-To: <CAFcVECLuWM65zXJWtMcwijZ1ZbtH0pvKnTUR=SJagPGHEr9amg@mail.gmail.com>
+References: <1484841375-11420-1-git-send-email-andrei.pistirica@microchip.com>
+ <BN3PR07MB25160FCBCF19918C495F43B4C9770@BN3PR07MB2516.namprd07.prod.outlook.com>
+ <CAFcVECLuWM65zXJWtMcwijZ1ZbtH0pvKnTUR=SJagPGHEr9amg@mail.gmail.com>
+Message-ID: <1bf44464-6f85-64a9-a660-8d2c44015eb9@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 08:48:04PM +0100, codekipper at gmail.com wrote:
-> From: Marcus Cooper <codekipper@gmail.com>
+Le 27/01/2017 ? 06:42, Harini Katakam a ?crit :
+> Hi Rafal,
 > 
-> The Beelink X2 is an STB based on the Allwinner H3 SoC with a uSD slot,
-> 2 USB ports( 1 * USB-2 Host, 1 USB OTG), a 10/100M ethernet port using the
-> SoC's integrated PHY, Wifi via an sdio wifi chip, HDMI, an IR receiver, a
-> dual colour LED and an optical S/PDIF connector.
+> On Thu, Jan 26, 2017 at 8:45 PM, Rafal Ozieblo <rafalo@cadence.com> wrote:
+>>> -----Original Message-----
+>>> From: Andrei Pistirica [mailto:andrei.pistirica at microchip.com]
+>>> Sent: 19 stycznia 2017 16:56
+>>> Subject: [PATCH net-next v2] macb: Common code to enable ptp support for MACB/GEM
+>>>
+>>>
+>>> +static inline bool gem_has_ptp(struct macb *bp)
+>>> +{
+>>> +     return !!(bp->caps & MACB_CAPS_GEM_HAS_PTP);
+>>> +}
+>> Why don't you use hardware capabilities here? Would it be better to read it from hardware instead adding it to many configuration?
 > 
-> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+> If you are referring to TSU bit in DCFG5, then we will be relying on
+> Cadence IP's information irrespective of the SoC capability
+> and whether the PTP support was adequate.
+> I think the capability approach gives better control and
+> it is not really much to add.
 
-Applied, thanks!
-Maxime
+Yes, absolutely. In fact we already had this discussion and decided that
+this capability scheme was giving much more control at low cost.
 
+Regards,
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170127/4a002043/attachment.sig>
+Nicolas Ferre
