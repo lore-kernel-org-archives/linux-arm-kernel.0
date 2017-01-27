@@ -1,92 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 27 Jan 2017 10:14:26 +0100
-Subject: [PATCH 4/9] arm64: dts: r8a7796: Add R-Car Gen3 thermal support
+Date: Fri, 27 Jan 2017 10:14:23 +0100
+Subject: [PATCH 1/9] arm64: dts: h3ulcb: follow sound CTU/MIX supports
 In-Reply-To: <cover.1485508214.git.horms+renesas@verge.net.au>
 References: <cover.1485508214.git.horms+renesas@verge.net.au>
-Message-ID: <af25d1c2a9cac5fde6e77836c33a3689077ffd2a.1485508214.git.horms+renesas@verge.net.au>
+Message-ID: <b1980ff0c335eedbba10ea99a2a9feebb79642f8.1485508214.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Signed-off-by: Hien Dang <hien.dang.eb@renesas.com>
-Signed-off-by: Thao Nguyen <thao.nguyen.yb@rvc.renesas.com>
-Signed-off-by: Khiem Nguyen <khiem.nguyen.xt@renesas.com>
-Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
-Acked-by: Eduardo Valentin <edubezval@gmail.com>
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+commit 5bcd74e8a30d9259 ("arm64: dts: r8a7795: add sound MIX support")
+commit 5be5ee41d011f26b ("arm64: dts: r8a7795: add sound CTU support")
+added MIX/CTU support, and it updated clocks on SoC level.
+Thus, h3ulcb should be updated
+
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 58 ++++++++++++++++++++++++++++++++
- 1 file changed, 58 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index eb446d966621..67aa0e4fde77 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -680,5 +680,63 @@
- 			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
- 			status = "disabled";
- 		};
-+
-+		tsc: thermal at e6198000 {
-+			compatible = "renesas,r8a7796-thermal";
-+			reg = <0 0xe6198000 0 0x68>,
-+			      <0 0xe61a0000 0 0x5c>,
-+			      <0 0xe61a8000 0 0x5c>;
-+			interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 522>;
-+			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
-+			#thermal-sensor-cells = <1>;
-+			status = "okay";
-+		};
-+
-+		thermal-zones {
-+			sensor_thermal1: sensor-thermal1 {
-+				polling-delay-passive = <250>;
-+				polling-delay = <1000>;
-+				thermal-sensors = <&tsc 0>;
-+
-+				trips {
-+					sensor1_crit: sensor1-crit {
-+						temperature = <120000>;
-+						hysteresis = <2000>;
-+						type = "critical";
-+					};
-+				};
-+			};
-+
-+			sensor_thermal2: sensor-thermal2 {
-+				polling-delay-passive = <250>;
-+				polling-delay = <1000>;
-+				thermal-sensors = <&tsc 1>;
-+
-+				trips {
-+					sensor2_crit: sensor2-crit {
-+						temperature = <120000>;
-+						hysteresis = <2000>;
-+						type = "critical";
-+					};
-+				};
-+			};
-+
-+			sensor_thermal3: sensor-thermal3 {
-+				polling-delay-passive = <250>;
-+				polling-delay = <1000>;
-+				thermal-sensors = <&tsc 2>;
-+
-+				trips {
-+					sensor3_crit: sensor3-crit {
-+						temperature = <120000>;
-+						hysteresis = <2000>;
-+						type = "critical";
-+					};
-+				};
-+			};
-+		};
- 	};
- };
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+index 6ffb0517421a..553d8968c0cf 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dts
+@@ -277,6 +277,8 @@
+ 		 <&cpg CPG_MOD 1026>, <&cpg CPG_MOD 1027>,
+ 		 <&cpg CPG_MOD 1028>, <&cpg CPG_MOD 1029>,
+ 		 <&cpg CPG_MOD 1030>, <&cpg CPG_MOD 1031>,
++		 <&cpg CPG_MOD 1020>, <&cpg CPG_MOD 1021>,
++		 <&cpg CPG_MOD 1020>, <&cpg CPG_MOD 1021>,
+ 		 <&cpg CPG_MOD 1019>, <&cpg CPG_MOD 1018>,
+ 		 <&audio_clk_a>, <&cs2000>,
+ 		 <&audio_clk_c>,
 -- 
 2.7.0.rc3.207.g0ac5344
