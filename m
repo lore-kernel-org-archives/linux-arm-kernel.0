@@ -1,146 +1,40 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 26 Jan 2017 22:27:32 -0800
-Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
-In-Reply-To: <1485488382.2469.27.camel@intel.com>
-References: <da1f1b45-3ae5-ffe8-62c6-9ec7c3a1505b@roeck-us.net>
- <20170123144031.GA7870@amd> <20170123232654.GA19342@amd>
- <20170123234912.GA2460@roeck-us.net> <20170124070639.GA5068@rzhang1-surface>
- <20170124073720.GB5603@amd>
- <88c94ea6-abe2-0f20-337e-e9ee00c883d8@roeck-us.net>
- <20170124175800.GA15070@amd> <20170124184526.GA25056@roeck-us.net>
- <20170125111233.GB3912@amd> <20170125120918.GA7936@pali>
- <1485481030.2469.15.camel@intel.com>
- <a6ce0873-9164-a965-a3e1-9eaaaec2201f@roeck-us.net>
- <1485488382.2469.27.camel@intel.com>
-Message-ID: <9146145b-7e21-c4de-a9cd-dad7bc74ee7a@roeck-us.net>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 27 Jan 2017 13:09:22 +0530
+Subject: [PATCH v2 0/4] USB support for Broadcom NSP SoC
+In-Reply-To: <241009ca-4b34-b160-2de1-4752d3ff114b@gmail.com>
+References: <1484669670-4201-1-git-send-email-yendapally.reddy@broadcom.com>
+ <588A16FA.50507@ti.com> <241009ca-4b34-b160-2de1-4752d3ff114b@gmail.com>
+Message-ID: <588AF92A.4060802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/26/2017 07:39 PM, Zhang Rui wrote:
-> On Thu, 2017-01-26 at 18:03 -0800, Guenter Roeck wrote:
->> On 01/26/2017 05:37 PM, Zhang Rui wrote:
->>>
->>> On Wed, 2017-01-25 at 13:09 +0100, Pali Roh?r wrote:
->>>>
->>>> On Wednesday 25 January 2017 12:12:33 Pavel Machek wrote:
->>>>>
->>>>>
->>>>> Hi!
->>>>>
->>>>>>
->>>>>>
->>>>>>>
->>>>>>>
->>>>>>>>
->>>>>>>>
->>>>>>>>>
->>>>>>>>>
->>>>>>>>>>
->>>>>>>>>>
->>>>>>>>>> Right.
->>>>>>>>>>
->>>>>>>>>> Before reverting, can you please try if this patch
->>>>>>>>>> works
->>>>>>>>>> or not?
->>>>>>>>> Not really. Revert now. Sorry.
->>>>>>>>>
->>>>>>>>> Are you sure? This does not look equivalent to me at
->>>>>>>>> all.
->>>>>>>>>
->>>>>>>>> "name" file handling moved from drivers to the core,
->>>>>>>>> which
->>>>>>>>> added some
->>>>>>>>> crazy checks what name can contain. Even if this
->>>>>>>>> "works",
->>>>>>>>> what is the
->>>>>>>>> expected effect on the "name" file?
->>>>>>>>>
->>>>>>>> The hwmon name attribute must not include '-', as
->>>>>>>> documented
->>>>>>>> in
->>>>>>>> Documentation/hwmon/sysfs-interface. Is enforcing that
->>>>>>>> 'crazy' ?
->>>>>>>> Maybe in your world, but not in mine.
->>>>>>> Well, lets revert the patch and then we can discuss what to
->>>>>>> do
->>>>>>> with
->>>>>>> the "name" problem.
->>>>> Ok, so the patch is on the way in. What to do next?
->>>>>
->>>>> pavel at n900:/sys/class/hwmon$ cat hwmon0/name
->>>>> bq27200-0
->>>>> pavel at n900:/sys/class/hwmon$ cat hwmon1/name
->>>>> rx51-battery
->>>>>
->>>>>>
->>>>>>
->>>>>> To provide some detail: libsensors gets just as confused with
->>>>>> wildcards
->>>>>> and whitespace/newline as it does with '-' in the reported
->>>>>> name,
->>>>>> which
->>>>>> is why those are blocked by the new API.
->>>>> Ok... Question is "does someone actually use hwmon*/name on
->>>>> N900"?
->>>>> If
->>>>> so, we can't change it, but it is well possible that noone is.
->>>> IIRC hwmon is used on Nokia N900.
->>>>
->>>> But I have not seen hwmon devices for bq27200 and rx51-battery
->>>> yet.
->>>> Those are power supply driver and auto-exporting them also via
->>>> hwmon
->>>> is
->>>> something new, right? If yes, then we can use any name for those
->>>> new
->>>> hwmon devices as they cannot break userspace... as there is no
->>>> userspace
->>>> application for them.
->>>>
->>> If this is the case, you'd better set
->>> (struct thermal_zone_params)->no_hwmon when registering the thermal
->>> zone device, in which case, the hwmon device will not be created.
->>>
->>> In fact, I'd prefer to change tzp->no_hwmon to tzp->hwmon to not
->>> create
->>> hwmon I/F by default, and see if there is anyone using it. If yes,
->>> we
->>> can set the flag in soc thermal driver, explicitly, at meantime, a
->>> hwmon compatible name is required.
->>>
->>> But one foreseeable result is that we may get bug reports from end
->>> user
->>> that some sensors (acpitz, etc) are gone in 'sensors' output. And
->>> TBH,
->>> I'm not quite sure if this can be counted as a regression or not.
->>>
->> That sounds like fun. Changing bq27200-0 to bq27200_0 is Forbidden by
->> the ABI Police, but taking the entire device away is ok.
+Hi,
+
+On Thursday 26 January 2017 10:57 PM, Florian Fainelli wrote:
+> On 01/26/2017 07:34 AM, Kishon Vijay Abraham I wrote:
 >>
-> No. IMO, it depends on if the interface is used or not.
-> If hwmon I/F is used, we can not take it away, nor change its name.
+>>
+>> On Tuesday 17 January 2017 09:44 PM, Yendapally Reddy Dhananjaya Reddy wrote:
+>>> This patch set contains the usb support for Broadcom NSP SoC. The
+>>> usb3 phy is internal to the SoC and is accessed through mdio interface.
+>>> The mdio interface can be used to access either internal usb3 phy or
+>>> external ethernet phy using a multiplexer.
+>>>
+>>> The first patch provides the documentation details for usb3 phy. The
+>>> second patch provides the changes to the mdio bus driver. The third
+>>> patch provides the phy driver and fourth patch provides the enable
+>>> method for usb.
+>>
+>> merged the 1st and 4th patch to linux-phy.
+> 
+> You mean 1st and 3rd here, right? 4th is a Device Tree change that I
+> should take, and Patch 2 should be merged by David.
 
-Even if the use doesn't depend on that name ?
+yeah, sorry!
+> 
+> What branch in your tree should we be looking at?
 
-> If thermal zone I/F is used, we can not change it's 'type' name to be
-> compatible with new hwmon API.
->
+git://git.kernel.org/pub/scm/linux/kernel/git/kishon/linux-phy.git next
 
-You mean you can not fix the name to be compatible with libsensors.
-
-Makes me wonder if there shouldn't be a rule that exploits must not
-be fixed if already exploited.
-
-Guenter
-
->> Anyway, sounds good to me. No one will use something that isn't
->> there,
->> and no one will realize that it could have been there, so I don't
->> expect
->> anyone to complain.
->
-> Yes, I agree.
->
-> thanks,
-> rui
->
+Thanks
+Kishon
