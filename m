@@ -1,195 +1,53 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 27 Jan 2017 15:06:32 +0100
-Subject: [PATCHv5 2/5] arm: mvebu: support for SMP on 98DX3336 SoC
-In-Reply-To: <20170127032546.14657-3-chris.packham@alliedtelesis.co.nz> (Chris
- Packham's message of "Fri, 27 Jan 2017 16:25:43 +1300")
-References: <20170127032546.14657-1-chris.packham@alliedtelesis.co.nz>
- <20170127032546.14657-3-chris.packham@alliedtelesis.co.nz>
-Message-ID: <871svoy4uv.fsf@free-electrons.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 27 Jan 2017 06:13:43 -0800
+Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
+In-Reply-To: <20170127111626.GB5335@amd>
+References: <20170124073720.GB5603@amd>
+ <88c94ea6-abe2-0f20-337e-e9ee00c883d8@roeck-us.net>
+ <20170124175800.GA15070@amd> <20170124184526.GA25056@roeck-us.net>
+ <20170125111233.GB3912@amd> <20170125120918.GA7936@pali>
+ <1485481030.2469.15.camel@intel.com>
+ <a6ce0873-9164-a965-a3e1-9eaaaec2201f@roeck-us.net>
+ <1485488382.2469.27.camel@intel.com>
+ <9146145b-7e21-c4de-a9cd-dad7bc74ee7a@roeck-us.net>
+ <20170127111626.GB5335@amd>
+Message-ID: <37154fca-5cfd-7f65-0f9b-14b979a094e6@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
- 
- On ven., janv. 27 2017, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
-
-> Compared to the armada-xp the 98DX3336 uses different registers to set
-> the boot address for the secondary CPU so a new enable-method is needed.
-> This will only work if the machine definition doesn't define an overall
-> smp_ops because there is not currently a way of overriding this from the
-> device tree if it is set in the machine definition.
+On 01/27/2017 03:16 AM, Pavel Machek wrote:
+> Hi!
 >
-> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
-> Acked-by: Rob Herring <robh@kernel.org>
-> ---
+>>>> That sounds like fun. Changing bq27200-0 to bq27200_0 is Forbidden by
+>>>> the ABI Police, but taking the entire device away is ok.
 >
-> Notes:
->     Changes in v2:
->     - Document new enable-method value
->     - Correct some references from 98DX4521 to 98DX3236
->     Changes in v3:
->     - Simplify mv98dx3236_resume_init by using of_io_request_and_map()
->     Changes in v4:
->     - integrate changes into platsmp.c instead of new init call
->     - avoid duplicated code.
->     - fix error return
->     - Collect ack from Rob
->     Changes in v5:
->     - Remove useless casts (thanks to Stephen Boyd)
+> Changing bq27200-0 to bq27200_0 is forbidden in -rc6 time. If you
+> believe noone depends on the name, argue your case, and it might be
+> possible to change it in -rc0.
 >
->  Documentation/devicetree/bindings/arm/cpus.txt     |  1 +
->  .../bindings/arm/marvell/98dx3236-resume-ctrl.txt  | 16 ++++
->  arch/arm/mach-mvebu/platsmp.c                      | 86 ++++++++++++++++++++++
->  3 files changed, 103 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/marvell/98dx3236-resume-ctrl.txt
+> If someone uses the name, they care about the device, and you can't
+> take it away.
 >
-> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> index a1bcfeed5f24..3c2fd72d0bf9 100644
-> --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> @@ -202,6 +202,7 @@ nodes to be present and contain the properties described below.
->  			    "marvell,armada-380-smp"
->  			    "marvell,armada-390-smp"
->  			    "marvell,armada-xp-smp"
-> +			    "marvell,98dx3236-smp"
->  			    "mediatek,mt6589-smp"
->  			    "mediatek,mt81xx-tz-smp"
->  			    "qcom,gcc-msm8660"
-> diff --git a/Documentation/devicetree/bindings/arm/marvell/98dx3236-resume-ctrl.txt b/Documentation/devicetree/bindings/arm/marvell/98dx3236-resume-ctrl.txt
-> new file mode 100644
-> index 000000000000..26eb9d3aa630
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/marvell/98dx3236-resume-ctrl.txt
-> @@ -0,0 +1,16 @@
-> +Resume Control
-> +--------------
-> +Available on Marvell SOCs: 98DX3336 and 98DX4251
-> +
-> +Required properties:
-> +
-> +- compatible: must be "marvell,98dx3336-resume-ctrl"
-> +
-> +- reg: Should contain resume control registers location and length
-> +
-> +Example:
-> +
-> +resume at 20980 {
-> +	compatible = "marvell,98dx3336-resume-ctrl";
-> +	reg = <0x20980 0x10>;
-> +};
-> diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
-> index 46c742d3bd41..a5b464497e1a 100644
-> --- a/arch/arm/mach-mvebu/platsmp.c
-> +++ b/arch/arm/mach-mvebu/platsmp.c
-> @@ -184,3 +184,89 @@ const struct smp_operations armada_xp_smp_ops __initconst = {
->  
->  CPU_METHOD_OF_DECLARE(armada_xp_smp, "marvell,armada-xp-smp",
->  		      &armada_xp_smp_ops);
-> +
-> +struct resume_controller {
-> +	u32 resume_control;
-> +	u32 resume_boot_addr;
-> +};
-> +
-> +static const struct resume_controller mv98dx3336_resume_controller = {
-> +	.resume_control = 0x08,
-> +	.resume_boot_addr = 0x04,
-> +};
-> +
-> +static const struct of_device_id of_mv98dx3236_resume_table[] = {
-> +	{
-> +		.compatible = "marvell,98dx3336-resume-ctrl",
-> +		.data = &mv98dx3336_resume_controller,
-> +	},
-> +	{ /* end of list */ },
-> +};
-
-Do you expect to have other SoC which use the same logical but with
-register at a different place?
-
-Else you can just remove the resume_controller struct and use the address
-(using define) directly in the mv98dx3236_resume_set_cpu_boot_addr
-function.
-
-> +
-> +static int mv98dx3236_resume_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
-> +{
-> +	const struct of_device_id *match;
-> +	struct device_node *np;
-> +	void __iomem *base;
-> +	const struct resume_controller *rc;
-> +
-> +	WARN_ON(hw_cpu != 1);
-> +
-> +	np = of_find_matching_node_and_match(NULL, of_mv98dx3236_resume_table,
-> +					     &match);
-> +	if (!np)
-> +		return -ENODEV;
-> +
-> +	base = of_io_request_and_map(np, 0, of_node_full_name(np));
-> +	rc = match->data;
-> +	of_node_put(np);
-> +	if (IS_ERR(base))
-> +		return PTR_ERR(base);
-> +
-> +	writel(0, base + rc->resume_control);
-> +	writel(virt_to_phys(boot_addr), base + rc->resume_boot_addr);
-> +
-
-you should use iounmap() on base here, to free it.
-
-Gregory
-
-> +	return 0;
-> +}
-> +
-> +static int mv98dx3236_boot_secondary(unsigned int cpu, struct task_struct *idle)
-> +{
-> +	int ret, hw_cpu;
-> +
-> +	hw_cpu = cpu_logical_map(cpu);
-> +	set_secondary_cpu_clock(hw_cpu);
-> +	mv98dx3236_resume_set_cpu_boot_addr(hw_cpu,
-> +					    armada_xp_secondary_startup);
-> +
-> +	/*
-> +	 * This is needed to wake up CPUs in the offline state after
-> +	 * using CPU hotplug.
-> +	 */
-> +	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
-> +
-> +	/*
-> +	 * This is needed to take secondary CPUs out of reset on the
-> +	 * initial boot.
-> +	 */
-> +	ret = mvebu_cpu_reset_deassert(hw_cpu);
-> +	if (ret) {
-> +		pr_warn("unable to boot CPU: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct smp_operations mv98dx3236_smp_ops __initconst = {
-> +	.smp_init_cpus		= armada_xp_smp_init_cpus,
-> +	.smp_prepare_cpus	= armada_xp_smp_prepare_cpus,
-> +	.smp_boot_secondary	= mv98dx3236_boot_secondary,
-> +	.smp_secondary_init     = armada_xp_secondary_init,
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +	.cpu_die		= armada_xp_cpu_die,
-> +	.cpu_kill               = armada_xp_cpu_kill,
-> +#endif
-> +};
-> +
-> +CPU_METHOD_OF_DECLARE(mv98dx3236_smp, "marvell,98dx3236-smp",
-> +		      &mv98dx3236_smp_ops);
-> -- 
-> 2.11.0.24.ge6920cf
+>>> No. IMO, it depends on if the interface is used or not.
+>>> If hwmon I/F is used, we can not take it away, nor change its name.
+>>
+>> Even if the use doesn't depend on that name ?
 >
+> If the use doesn't depend on the name, you may get away with changing
+> the name. (But not in -rc6.)
+>
+>>> If thermal zone I/F is used, we can not change it's 'type' name to be
+>>> compatible with new hwmon API.
+>>
+>> You mean you can not fix the name to be compatible with libsensors.
+>>
+>> Makes me wonder if there shouldn't be a rule that exploits must not
+>> be fixed if already exploited.
+>
+> That is not useful argumentation.
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Oh, but it is. Providing a valid name is a bug fix for me. For you it is
+an ABI change. So the ultimate question is what counts as an ABI change
+and what counts as a bug fix.
+
+Guenter
