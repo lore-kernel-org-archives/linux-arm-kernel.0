@@ -1,67 +1,71 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 27 Jan 2017 11:02:15 -0800
-Subject: [PATCH 0/3] meson-gx: add pwm_AO_ab
-In-Reply-To: <20170122210528.892-1-martin.blumenstingl@googlemail.com> (Martin
- Blumenstingl's message of "Sun, 22 Jan 2017 22:05:25 +0100")
-References: <20170122210528.892-1-martin.blumenstingl@googlemail.com>
-Message-ID: <m27f5guy14.fsf@baylibre.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 27 Jan 2017 20:06:51 +0100
+Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
+In-Reply-To: <37154fca-5cfd-7f65-0f9b-14b979a094e6@roeck-us.net>
+References: <20170124175800.GA15070@amd> <20170124184526.GA25056@roeck-us.net>
+ <20170125111233.GB3912@amd> <20170125120918.GA7936@pali>
+ <1485481030.2469.15.camel@intel.com>
+ <a6ce0873-9164-a965-a3e1-9eaaaec2201f@roeck-us.net>
+ <1485488382.2469.27.camel@intel.com>
+ <9146145b-7e21-c4de-a9cd-dad7bc74ee7a@roeck-us.net>
+ <20170127111626.GB5335@amd>
+ <37154fca-5cfd-7f65-0f9b-14b979a094e6@roeck-us.net>
+Message-ID: <20170127190651.GB20571@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
+On Fri 2017-01-27 06:13:43, Guenter Roeck wrote:
+> On 01/27/2017 03:16 AM, Pavel Machek wrote:
+> >Hi!
+> >
+> >>>>That sounds like fun. Changing bq27200-0 to bq27200_0 is Forbidden by
+> >>>>the ABI Police, but taking the entire device away is ok.
+> >
+> >Changing bq27200-0 to bq27200_0 is forbidden in -rc6 time. If you
+> >believe noone depends on the name, argue your case, and it might be
+> >possible to change it in -rc0.
+> >
+> >If someone uses the name, they care about the device, and you can't
+> >take it away.
+> >
+> >>>No. IMO, it depends on if the interface is used or not.
+> >>>If hwmon I/F is used, we can not take it away, nor change its name.
+> >>
+> >>Even if the use doesn't depend on that name ?
+> >
+> >If the use doesn't depend on the name, you may get away with changing
+> >the name. (But not in -rc6.)
+> >
+> >>>If thermal zone I/F is used, we can not change it's 'type' name to be
+> >>>compatible with new hwmon API.
+> >>
+> >>You mean you can not fix the name to be compatible with libsensors.
+> >>
+> >>Makes me wonder if there shouldn't be a rule that exploits must not
+> >>be fixed if already exploited.
+> >
+> >That is not useful argumentation.
+> 
+> Oh, but it is. Providing a valid name is a bug fix for me. For you it is
+> an ABI change. So the ultimate question is what counts as an ABI change
+> and what counts as a bug fix.
 
-> This adds support for the PWM controller in the AO domain.
+You may not fix bugs if it breaks someone's configuration. Now,
+obviously security is something we can't sacrifice. But if docs don't
+match the code.. we fix the docs, not the code.
 
-Patches 1,3 applied to Amlogic v4.11/dt64 branch.
+Do you want to call me? I'll give you cellphone number.
 
-Kevin
+									Pavel
 
-> pinctrl support for GXBB already exists (in both, pinctrl-meson-gxbb.c
-> and meson-gxbb.dtsi). This patch adds at least the pwm_ao_b pin for
-> GXL and GXM - these are not documented in Amlogic's kernel, so I had
-> to borrow the magic numbers from the Khadas VIM kernel (released under
-> the GPL): [0]
->
-> The bits for pwm_AO_a_pins are unknown at the time of writing, but these
-> can still be added later.
->
-> I have successfully tested this on my GXL S905X based Khadas VIM board
-> with the following .dts snippets (the PWM LED can simply be dimmed
-> through sysfs):
-> 	&pwm_AO_ab {
-> 		status = "okay";
-> 		pinctrl-0 = <&pwm_ao_b_pins>;
-> 		pinctrl-names = "default";
-> 		clocks = <&clkc CLKID_FCLK_DIV4>;
-> 		clock-names = "clkin0";
-> 	};
->
-> 	pwmleds {
-> 		compatible = "pwm-leds";
->
-> 		power {
-> 			label = "vim:red:power";
-> 			pwms = <&pwm_AO_ab 1 7812500 0>;
-> 			max-brightness = <255>;
-> 		};
-> 	};
->
-> (if anyone is interested in more of my Khadas VIM patches - these are
-> still work-in-progress, which is why I have not sent them yet - can
-> take a look at this: [1])
->
-> NOTE: The .dts changes from this series are based on top of my SAR ADC
-> patches.
->
-> [0] https://github.com/khadas/linux/blob/94602ef5562978a8d8b5c7770c113074a714dbdb/drivers/amlogic/led/led_trigger_breathe.c#L75
-> [1] https://github.com/xdarklight/linux/commits/meson-gx-integration-4.11-20170122
->
-> Martin Blumenstingl (3):
->   ARM64: dts: meson-gx: add the missing pwm_AO_ab node
->   pinctrl: meson: meson-gxl: add the pwm_ao_b pin
->   ARM64: dts: meson-gxl: add the pwm_ao_b pin
->
->  arch/arm64/boot/dts/amlogic/meson-gx.dtsi  | 7 +++++++
->  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi | 7 +++++++
->  drivers/pinctrl/meson/pinctrl-meson-gxl.c  | 8 ++++++++
->  3 files changed, 22 insertions(+)
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170127/08e5cc4e/attachment.sig>
