@@ -1,30 +1,85 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 Jan 2017 17:27:54 +0100
-Subject: [PATCH] ARM: ep93xx: Disable TS-72xx watchdog before uncompressing
-In-Reply-To: <633e3405-c66d-0503-2626-36ebb0cfb756@gmail.com>
-References: <20161211191615.13696-1-f.fainelli@gmail.com>
- <6d58631d-37a2-8362-e9aa-0c360fac4509@gmail.com>
- <SN1PR0101MB1565EBACEA749241E3FC3169D0910@SN1PR0101MB1565.prod.exchangelabs.com>
- <633e3405-c66d-0503-2626-36ebb0cfb756@gmail.com>
-Message-ID: <CAK8P3a0dMXHb04w+-Q4fE1ek=uGX=HjODsVU1=gfNoRpGourDw@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 27 Jan 2017 17:28:41 +0100
+Subject: [PATCH 2/3] MAINTAINERS: change email address from atmel to microchip
+In-Reply-To: <20170127162842.706-1-alexandre.belloni@free-electrons.com>
+References: <20170127162842.706-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20170127162842.706-2-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2017 at 2:05 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> On 12/19/2016 08:08 AM, Hartley Sweeten wrote:
->> On Sunday, December 18, 2016 7:08 PM, Florian Fainelli wrote:
->>> Le 12/11/16 ? 11:16, Florian Fainelli a ?crit :
+From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
->> Ryan has an old tree on github but it has not been updated since Oct 14, 2013.  I'm
->> not sure if he is doing any active development at this time.
->>
->> This patch will have to go through RMK's patch system or some other tree.
->
-> Olof, Arnd, Kevin, should I just resent this patch to arm at kernel.org for
-> you to pick it?
+Use microchip email address instead of old atmel one.
 
-Yes, that would be good. I've added it to my todo folder now, but
-having the patch
-itself there is easier for us.
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ MAINTAINERS | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-     Arnd
+diff --git a/MAINTAINERS b/MAINTAINERS
+index d0f5de961ff5..eb9739ec4e92 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2173,7 +2173,7 @@ F:	include/linux/atm*
+ F:	include/uapi/linux/atm*
+ 
+ ATMEL AT91 / AT32 MCI DRIVER
+-M:	Ludovic Desroches <ludovic.desroches@atmel.com>
++M:	Ludovic Desroches <ludovic.desroches@microchip.com>
+ S:	Maintained
+ F:	drivers/mmc/host/atmel-mci.c
+ 
+@@ -2183,7 +2183,7 @@ S:	Supported
+ F:	drivers/power/reset/at91-sama5d2_shdwc.c
+ 
+ ATMEL SAMA5D2 ADC DRIVER
+-M:	Ludovic Desroches <ludovic.desroches@atmel.com>
++M:	Ludovic Desroches <ludovic.desroches@microchip.com>
+ L:	linux-iio at vger.kernel.org
+ S:	Supported
+ F:	drivers/iio/adc/at91-sama5d2_adc.c
+@@ -2203,20 +2203,20 @@ F:	drivers/dma/at_hdmac_regs.h
+ F:	include/linux/platform_data/dma-atmel.h
+ 
+ ATMEL XDMA DRIVER
+-M:	Ludovic Desroches <ludovic.desroches@atmel.com>
++M:	Ludovic Desroches <ludovic.desroches@microchip.com>
+ L:	linux-arm-kernel at lists.infradead.org
+ L:	dmaengine at vger.kernel.org
+ S:	Supported
+ F:	drivers/dma/at_xdmac.c
+ 
+ ATMEL I2C DRIVER
+-M:	Ludovic Desroches <ludovic.desroches@atmel.com>
++M:	Ludovic Desroches <ludovic.desroches@microchip.com>
+ L:	linux-i2c at vger.kernel.org
+ S:	Supported
+ F:	drivers/i2c/busses/i2c-at91.c
+ 
+ ATMEL ISI DRIVER
+-M:	Ludovic Desroches <ludovic.desroches@atmel.com>
++M:	Ludovic Desroches <ludovic.desroches@microchip.com>
+ L:	linux-media at vger.kernel.org
+ S:	Supported
+ F:	drivers/media/platform/soc_camera/atmel-isi.c
+@@ -2242,7 +2242,7 @@ S:	Supported
+ F:	drivers/mtd/nand/atmel_nand*
+ 
+ ATMEL SDMMC DRIVER
+-M:	Ludovic Desroches <ludovic.desroches@atmel.com>
++M:	Ludovic Desroches <ludovic.desroches@microchip.com>
+ L:	linux-mmc at vger.kernel.org
+ S:	Supported
+ F:	drivers/mmc/host/sdhci-of-at91.c
+@@ -9710,7 +9710,7 @@ S:	Maintained
+ F:	drivers/pinctrl/pinctrl-at91.*
+ 
+ PIN CONTROLLER - ATMEL AT91 PIO4
+-M:	Ludovic Desroches <ludovic.desroches@atmel.com>
++M:	Ludovic Desroches <ludovic.desroches@microchip.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ L:	linux-gpio at vger.kernel.org
+ S:	Supported
+-- 
+2.11.0
