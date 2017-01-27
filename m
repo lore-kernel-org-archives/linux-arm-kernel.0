@@ -1,72 +1,55 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 27 Jan 2017 17:42:04 +0100
-Subject: [PATCH RESEND 5/5] mtd: nand: Remove unused chip->write_page() hook
-In-Reply-To: <1485535324-28393-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1485535324-28393-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1485535324-28393-6-git-send-email-boris.brezillon@free-electrons.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 27 Jan 2017 16:44:21 +0000
+Subject: [GIT PULL] iommu/arm-smmu: Updates for 4.11
+Message-ID: <20170127164420.GA10758@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The last/only user of the chip->write_page() hook (the Atmel NAND
-controller driver) has been reworked and is no longer specifying a custom
-->write_page() implementation.
-Drop this hook before someone else start abusing it.
+Hi Joerg,
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/mtd/nand/nand_base.c | 10 ++++------
- include/linux/mtd/nand.h     |  4 ----
- 2 files changed, 4 insertions(+), 10 deletions(-)
+Please pull these arm-smmu updates for 4.11. Not much this time around:
+16-bit SID support on SMMUv2 and a stream table optimisation on SMMUv3.
+There's also a trivial cleanup to of_iommu_{set/get}_ops() [they are
+removed] which we promised to make after the IORT stuff went in last
+time around.
 
-diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
-index ec1c28aaaf23..c8894f31392e 100644
---- a/drivers/mtd/nand/nand_base.c
-+++ b/drivers/mtd/nand/nand_base.c
-@@ -2839,9 +2839,10 @@ static int nand_do_write_ops(struct mtd_info *mtd, loff_t to,
- 			/* We still need to erase leftover OOB data */
- 			memset(chip->oob_poi, 0xff, mtd->oobsize);
- 		}
--		ret = chip->write_page(mtd, chip, column, bytes, wbuf,
--					oob_required, page, cached,
--					(ops->mode == MTD_OPS_RAW));
-+
-+		ret = nand_write_page(mtd, chip, column, bytes, wbuf,
-+				      oob_required, page, cached,
-+				      (ops->mode == MTD_OPS_RAW));
- 		if (ret)
- 			break;
- 
-@@ -4623,9 +4624,6 @@ int nand_scan_tail(struct mtd_info *mtd)
- 		}
- 	}
- 
--	if (!chip->write_page)
--		chip->write_page = nand_write_page;
--
- 	/*
- 	 * Check ECC mode, default to software if 3byte/512byte hardware ECC is
- 	 * selected and we have 256 byte pagesize fallback to software ECC
-diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
-index c5f3a012ae62..9d51dee53be4 100644
---- a/include/linux/mtd/nand.h
-+++ b/include/linux/mtd/nand.h
-@@ -818,7 +818,6 @@ nand_get_sdr_timings(const struct nand_data_interface *conf)
-  * @errstat:		[OPTIONAL] hardware specific function to perform
-  *			additional error status checks (determine if errors are
-  *			correctable).
-- * @write_page:		[REPLACEABLE] High-level page write function
-  */
- 
- struct nand_chip {
-@@ -843,9 +842,6 @@ struct nand_chip {
- 	int (*scan_bbt)(struct mtd_info *mtd);
- 	int (*errstat)(struct mtd_info *mtd, struct nand_chip *this, int state,
- 			int status, int page);
--	int (*write_page)(struct mtd_info *mtd, struct nand_chip *chip,
--			uint32_t offset, int data_len, const uint8_t *buf,
--			int oob_required, int page, int cached, int raw);
- 	int (*onfi_set_features)(struct mtd_info *mtd, struct nand_chip *chip,
- 			int feature_addr, uint8_t *subfeature_para);
- 	int (*onfi_get_features)(struct mtd_info *mtd, struct nand_chip *chip,
--- 
-2.7.4
+Thanks,
+
+Will
+
+--->8
+
+The following changes since commit a121103c922847ba5010819a3f250f1f7fc84ab8:
+
+  Linux 4.10-rc3 (2017-01-08 14:18:17 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-joerg/arm-smmu/updates
+
+for you to fetch changes up to 3677a649a751c8f061ba379a98c369473ccac980:
+
+  iommu/arm-smmu: Fix for ThunderX erratum #27704 (2017-01-26 18:16:58 +0000)
+
+----------------------------------------------------------------
+Aleksey Makarov (1):
+      iommu/arm-smmu: Support for Extended Stream ID (16 bit)
+
+Lorenzo Pieralisi (1):
+      iommu: Drop the of_iommu_{set/get}_ops() interface
+
+Nate Watterson (2):
+      iommu/arm-smmu-v3: Clear prior settings when updating STEs
+      iommu/arm-smmu-v3: limit use of 2-level stream tables
+
+Tomasz Nowicki (1):
+      iommu/arm-smmu: Fix for ThunderX erratum #27704
+
+ drivers/iommu/arm-smmu-v3.c  | 31 ++++++++-----------
+ drivers/iommu/arm-smmu.c     | 72 +++++++++++++++++++++++++++++++-------------
+ drivers/iommu/exynos-iommu.c |  2 +-
+ drivers/iommu/msm_iommu.c    |  2 +-
+ drivers/iommu/mtk_iommu.c    |  2 +-
+ drivers/iommu/of_iommu.c     |  4 +--
+ include/linux/of_iommu.h     | 11 -------
+ 7 files changed, 68 insertions(+), 56 deletions(-)
