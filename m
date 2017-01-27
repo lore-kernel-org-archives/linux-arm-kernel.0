@@ -1,174 +1,51 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 27 Jan 2017 17:17:46 +0000
-Subject: [PATCH 2/7] MFD: add STM32 DFSDM support
-In-Reply-To: <7b3eb38d-4fd1-2006-7423-94f2a7b38b27@st.com>
-References: <1485189145-29576-1-git-send-email-arnaud.pouliquen@st.com>
- <1485189145-29576-3-git-send-email-arnaud.pouliquen@st.com>
- <20170124082249.GR16020@dell>
- <283c0e48-55e2-6516-369d-91dc72d12f73@st.com>
- <20170124113658.GW16020@dell>
- <a1aaaa20-ac00-b182-f1c1-63152be41135@st.com>
- <20170127101545.g53uah57vgfu55o5@dell>
- <7b3eb38d-4fd1-2006-7423-94f2a7b38b27@st.com>
-Message-ID: <20170127171746.lf2nbpsaqs3dmy44@dell>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 27 Jan 2017 09:20:39 -0800
+Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
+In-Reply-To: <1485528033.2469.61.camel@intel.com>
+References: <88c94ea6-abe2-0f20-337e-e9ee00c883d8@roeck-us.net>
+ <20170124175800.GA15070@amd> <20170124184526.GA25056@roeck-us.net>
+ <20170125111233.GB3912@amd> <20170125120918.GA7936@pali>
+ <1485481030.2469.15.camel@intel.com>
+ <a6ce0873-9164-a965-a3e1-9eaaaec2201f@roeck-us.net>
+ <1485488382.2469.27.camel@intel.com>
+ <9146145b-7e21-c4de-a9cd-dad7bc74ee7a@roeck-us.net>
+ <1485528033.2469.61.camel@intel.com>
+Message-ID: <20170127172039.GA2498@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 Jan 2017, Arnaud Pouliquen wrote:
-> On 01/27/2017 11:15 AM, Lee Jones wrote:
-> > On Tue, 24 Jan 2017, Arnaud Pouliquen wrote:
-> >> On 01/24/2017 12:36 PM, Lee Jones wrote:
-> >>> On Tue, 24 Jan 2017, Arnaud Pouliquen wrote:
-> >>>> On 01/24/2017 09:22 AM, Lee Jones wrote:
-> >>>>> On Mon, 23 Jan 2017, Arnaud Pouliquen wrote:
-> >>>>>
-> >>>>>> DFSDM hardware IP can be used at the same time for ADC sigma delta
-> >>>>>
-> >>>>> Same time as what?
-> >>>> DFSDM is used for ADC acquisition (through IIO) but also PDM microphone
-> >>>> capture (through ASOC).
-> >>>>>
-> >>>>>> conversion and audio PDM microphone.
-> >>>>>> MFD driver is in charge of configuring IP registers and managing IP clocks.
-> >>>>>> For this it exports an API to handles filters and channels resources.
-> >>>>>
-> >>>>> This looks like an ADC driver?  What is it that makes it an MFD?
-> >>>> Yes it a kind of ADC but that supports 2 features audio and iio.
-> >>>> So it has to support 2 features based on 2 separate Frameworks.
-> >>>
-> >>> I'm still unsure why it needs to live in MFD.
-> >>>
-> >>> By the looks of it, this driver needs to move into IIO and you need to
-> >>> call into it from ASoC.
-> >>>
-> >>
-> >> I think i introduce confusion by speaking about ADC for audio...
-> >>
-> >> 1) IIO handles sigma delta ADCs that can be used as example for motor
-> >> controls. the aim is to get value based on an application request or
-> >> using some triggers.
-> >> example: http://www.ti.com/lit/ds/symlink/ads1202.pdf
-> >>
-> >> 2) For audio part, we speak about Digital mems microphones that generate
-> >> PDM format stream. PDM is a continuous real time stream dedicated to
-> >> audio record and must be handled in ASOC ( codec Dmic part driver is
-> >> /sound/soc/codec/dmic.c).
-> >> DMIC example:
-> >> http://www.st.com/content/ccc/resource/technical/document/datasheet/47/bd/d2/13/8d/fd/48/26/DM00121815.pdf/files/DM00121815.pdf/jcr:content/translations/en.DM00121815.pdf
-> >>
-> >> Form my point of view it very strange to handle DMICs in IIO, as it is
-> >> not designed to support audio streams.it is two separate features that
-> >> are not compatible.
-> >>
-> >> Now, from software point of view
-> >> That would means that IIO declares ADCs that it can not expose, because
-> >> DMIC is not IIO standard. But IIO inkern API needs that device is
-> >> declared
+On Fri, Jan 27, 2017 at 10:40:33PM +0800, Zhang Rui wrote:
+> > > 
+> > > If thermal zone I/F is used, we can not change it's 'type' name to
+> > > be
+> > > compatible with new hwmon API.
+> > > 
+> > You mean you can not fix the name to be compatible with libsensors.
 > > 
-> >> So i should define a specific API in IIO for ASOC driver.
-> > 
-> > Yes, this is what I think you should do.
-> > 
-> > MFD is not a dumping ground for devices that do not fit anywhere else.
 > 
-> I fully understand that you don't want to create unnecessary MFD devices.
-> But In case of DFSDM ,it is really a device that supports 2 features.
-> The main evidence is that "ADC acquisition" and "digital microphone"
-> features are handled by two separate frameworks.
-> So this corresponds to two features that share the same device resources
-> (registers, IRQs, clocks).
-> Seems that this match with MFD definition.
-> 
-> Now, if IIO and ASOC maintainers are aligned with you proposal, i will
-> move MFD part in IIO.
-> But in this case, i can not see another way to do it, except a MFD
-> driver hidden in IIO?
-> 
-> Here is my analysis of a design in IIO:
-> 
-> Natural way to do this is to consider that ASOC is a customer of IIO so
-> use the customer.h API.
-> 1) As Digital microphone can not be handled by IIO dev interface, i can
-> not expose them as an IIO channel, that would be visible by applications
-> in /sys/bus/iio/devices/iio
-> 2) ASOC needs to configure DFSDM filter to match to specific frequencies
-> and sample formats requested by users. Not standard IIO interface to do
-> this. (on IIO side this is done by attribute file)
-> 3) audio stream is a real time stream. So for audio quality best is to
-> minimize latencies and Xrun. That why transfer as done from HW to
-> application using LLI DMA transfers with a minimum of copy. This does
-> not match with the IIO inkern API.
->  => So seems not possible to use IIO inkern API.
-> 
-> That's means that i would need to create a ST specific include file to
-> offer an API to ASoC to handle DFSDM resources linked to the DMIC.
-> and to probe ASOc device in IIO one.
-> So the solution would be to create something like a sub IIO driver That
-> probe and handle some IIO and ASOC devices.
-> Ultimately This would correspond to a MFD driver integrated in IIO...
+> We can try to convert it to a libsensor-compatible string, either for
+> hwmon only, or for both thermal and hwmon. But this is an ABI change,
+> right?
 
-The issue is not the creation of an MFD driver to create shared
-resources and probe the child devices.  That's what MFD *is* for.
-What I do take exception to is having lots of code in MFD which
-should clearly live in a different subsystem.
+Let's go back to the basics.
 
-Since this device only serves a couple of functions, I expect it to be
-a few hundred lines, maximum.  Everything else should be farmed out.
-MFD knows nothing of "channels" or "filters" so anything related to
-them (init, get, start, stop, release, etc) needs to find another
-home.  Whether that's in IIO is a separate discussion, but it
-certainly doesn't live in MFD.
+Fact is that the thermal subsystem registers hwmon devices with 'name'
+attributes which violate the documented hardware monitoring ABI.
+I think we can consider this undisputed.
 
-> Jonathan, Mark, Please could you share your opinion on this topic?
-> 
-> Regards
-> Arnaud
-> 
-> > 
-> >>>>>> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-> >>>>>> ---
-> >>>>>>  drivers/mfd/Kconfig             |   11 +
-> >>>>>>  drivers/mfd/Makefile            |    2 +
-> >>>>>>  drivers/mfd/stm32-dfsdm-reg.h   |  220 +++++++++
-> >>>>>>  drivers/mfd/stm32-dfsdm.c       | 1044 +++++++++++++++++++++++++++++++++++++++
-> >>>>>>  include/linux/mfd/stm32-dfsdm.h |  324 ++++++++++++
-> >>>>>>  5 files changed, 1601 insertions(+)
-> >>>>>>  create mode 100644 drivers/mfd/stm32-dfsdm-reg.h
-> >>>>>>  create mode 100644 drivers/mfd/stm32-dfsdm.c
-> >>>>>>  create mode 100644 include/linux/mfd/stm32-dfsdm.h
-> >>>>>>
-> >>>>>> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> >>>>>> index c6df644..4bb660b 100644
-> >>>>>> --- a/drivers/mfd/Kconfig
-> >>>>>> +++ b/drivers/mfd/Kconfig
-> >>>>>> @@ -1607,6 +1607,17 @@ config MFD_STW481X
-> >>>>>>  	  in various ST Microelectronics and ST-Ericsson embedded
-> >>>>>>  	  Nomadik series.
-> >>>>>>  
-> >>>>>> +config MFD_STM32_DFSDM
-> >>>>>> +	tristate "ST Microelectronics STM32 DFSDM"
-> >>>>>> +	depends on (ARCH_STM32 && OF) || COMPILE_TEST
-> >>>>>> +	select MFD_CORE
-> >>>>>> +	select REGMAP
-> >>>>>> +	select REGMAP_MMIO
-> >>>>>> +	help
-> >>>>>> +	  Select this option to enable the STM32 Digital Filter
-> >>>>>> +	  for Sigma Delta Modulators (DFSDM) driver used
-> >>>>>> +	  in various STM32 series.
-> >>>>>> +
-> >>>>>>  menu "Multimedia Capabilities Port drivers"
-> >>>>>>  	depends on ARCH_SA1100
-> >>>>>
-> >>>>> [...]
-> >>>>>
-> >>>>
-> >>>> Regards
-> >>>> Arnaud
-> >>>
-> > 
+The rest is pretty much all opinion.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Is a change in a driver to stop violating a documented ABI an ABI change
+or a bug fix ? In other words, does a driver violating a documented ABI
+make that ABI violation part of the ABI ?
+
+Quite interesting questions. My take is that it is a bug fix, others
+apparently have the strong opinion that potential users of such an ABI
+violation have priority, and that a violation of a documented ABI _does_
+make this violation part of the ABI.
+
+I'll leave it at that. I tried to make my position clear, but it appears
+that I am quite alone in my opinion. With that, I'll leave it up to you to
+decide how to proceed.
+
+Guenter
