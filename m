@@ -1,60 +1,92 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Fri, 27 Jan 2017 22:28:46 +0530
-Subject: [PATCH] iommu: Better document the IOMMU_PRIV flag
-In-Reply-To: <edc67cc1775f3bafb6895346184e8042fd881ba4.1485519627.git.robin.murphy@arm.com>
-References: <1483709296-32761-1-git-send-email-sricharan@codeaurora.org>
- <1483709296-32761-2-git-send-email-sricharan@codeaurora.org>
- <edc67cc1775f3bafb6895346184e8042fd881ba4.1485519627.git.robin.murphy@arm.com>
-Message-ID: <009101d278be$a388b310$ea9a1930$@codeaurora.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 27 Jan 2017 18:00:46 +0100
+Subject: [PATCH 3/3] MAINTAINERS: Update AT91 entries
+In-Reply-To: <A7BBC2CE-1428-421F-AA98-F2B0C0373B05@jcrosoft.com>
+References: <20170127162842.706-1-alexandre.belloni@free-electrons.com>
+ <20170127162842.706-3-alexandre.belloni@free-electrons.com>
+ <6ad97c20-07ed-0639-9fdb-968946ef943d@atmel.com>
+ <A7BBC2CE-1428-421F-AA98-F2B0C0373B05@jcrosoft.com>
+Message-ID: <20170127170046.gy3mjsf3hwy5fpfq@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On 28/01/2017 at 00:51:13 +0800, Jean-Christophe Plagniol-Villard wrote:
+> 	this does not mean I do not follow the ML
+> 
 
->-----Original Message-----
->From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Robin Murphy
->Sent: Friday, January 27, 2017 5:53 PM
->To: will.deacon at arm.com
->Cc: iommu at lists.linux-foundation.org; sricharan at codeaurora.org; linux-arm-kernel at lists.infradead.org
->Subject: [PATCH] iommu: Better document the IOMMU_PRIV flag
->
->This is a fairly subtle thing - let's make sure it's described as
->clearly as possible to avoid potential misunderstandings.
->
->Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->---
->
->Having another look through the IOMMU_PRIV series, I wasn't convinced
->that the original comment was really all that helpful - I'm happy for
->this to be squashed in if you like.
->
->Robin.
->
-> include/linux/iommu.h | 11 +++++++----
-> 1 file changed, 7 insertions(+), 4 deletions(-)
->
->diff --git a/include/linux/iommu.h b/include/linux/iommu.h
->index 69e2417a2965..3c830e153069 100644
->--- a/include/linux/iommu.h
->+++ b/include/linux/iommu.h
->@@ -32,10 +32,13 @@
-> #define IOMMU_NOEXEC	(1 << 3)
-> #define IOMMU_MMIO	(1 << 4) /* e.g. things like MSI doorbells */
-> /*
->- * This is to make the IOMMU API setup privileged
->- * mapppings accessible by the master only at higher
->- * privileged execution level and inaccessible at
->- * less privileged levels.
->+ * Where the bus hardware includes a privilege level as part of its access type
->+ * markings, and certain devices are capable of issuing transactions marked as
->+ * either 'supervisor' or 'user', the IOMMU_PRIV flag requests that the other
->+ * given permission flags only apply to accesses at the higher privilege level,
->+ * and that unprivileged transactions should have as little access as possible.
->+ * This would usually imply the same permissions as kernel mappings on the CPU,
->+ * if the IOMMU page table format is equivalent.
->  */
+That's not what I'm implying. Many people are following various mailing
+list without being listed in MAINTAINERS.
 
-Agree, gives much more insight.
+> Best Regards,
+> J.
+> > On Jan 28, 2017, at 12:32 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> > 
+> > Le 27/01/2017 ? 17:28, Alexandre Belloni a ?crit :
+> >> Jean Christophe has not been active on the mailing lists for a while.
+> >> Remove him from the maintainers
+> >> 
+> >> Also, merge both AT91 pinctrl drivers entries.
+> >> 
+> >> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> >> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > 
+> > Yes:
+> > 
+> > Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+> > 
+> > Thanks, regards,
+> > 
+> >> ---
+> >> Also, as pointed to by Tomi (https://lkml.org/lkml/2016/9/27/72), emails were
+> >> bouncing for a while
+> >> 
+> >> 
+> >> MAINTAINERS | 8 +-------
+> >> 1 file changed, 1 insertion(+), 7 deletions(-)
+> >> 
+> >> diff --git a/MAINTAINERS b/MAINTAINERS
+> >> index eb9739ec4e92..bfcc70032254 100644
+> >> --- a/MAINTAINERS
+> >> +++ b/MAINTAINERS
+> >> @@ -1093,7 +1093,6 @@ F:	drivers/*/*aspeed*
+> >> ARM/ATMEL AT91RM9200, AT91SAM9 AND SAMA5 SOC SUPPORT
+> >> M:	Nicolas Ferre <nicolas.ferre@microchip.com>
+> >> M:	Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> >> -M:	Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> >> L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> >> W:	http://www.linux4sam.org
+> >> T:	git git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git
+> >> @@ -9704,16 +9703,11 @@ F:	drivers/pinctrl/
+> >> F:	include/linux/pinctrl/
+> >> 
+> >> PIN CONTROLLER - ATMEL AT91
+> >> -M:	Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
+> >> -L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> >> -S:	Maintained
+> >> -F:	drivers/pinctrl/pinctrl-at91.*
+> Nack
+> >> -
+> >> -PIN CONTROLLER - ATMEL AT91 PIO4
+> >> M:	Ludovic Desroches <ludovic.desroches@microchip.com>
+> >> L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> >> L:	linux-gpio at vger.kernel.org
+> >> S:	Supported
+> >> +F:	drivers/pinctrl/pinctrl-at91.*
+> >> F:	drivers/pinctrl/pinctrl-at91-pio4.*
+> >> 
+> >> PIN CONTROLLER - INTEL
+> >> 
+> > 
+> > -- 
+> > Nicolas Ferre
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
-Regards,
-  Sricharan
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
