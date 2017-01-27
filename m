@@ -1,216 +1,149 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 27 Jan 2017 09:58:25 +0100
-Subject: [PATCH 07/11] clk: sunxi-ng: Add A80 Display Engine CCU
-In-Reply-To: <CAGb2v65QLAD4C27NoRHALO=2WzW=DC6OxwCCMhes-N+kWO3_kg@mail.gmail.com>
-References: <20170124023230.3990-1-wens@csie.org>
- <20170124023230.3990-8-wens@csie.org>
- <20170126103928.3kmvymoafsz5jfjm@lukather>
- <CAGb2v65QLAD4C27NoRHALO=2WzW=DC6OxwCCMhes-N+kWO3_kg@mail.gmail.com>
-Message-ID: <20170127085825.b4mzk47gpczj3dcu@lukather>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Fri, 27 Jan 2017 10:03:53 +0100
+Subject: [PATCH v11 0/8] arm/arm64: vgic: Implement API for vGICv3 live
+ migration
+In-Reply-To: <1485440453-10597-1-git-send-email-vijay.kilari@gmail.com>
+References: <1485440453-10597-1-git-send-email-vijay.kilari@gmail.com>
+Message-ID: <eba88542-777d-cdf1-6056-9ee2e936de1d@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 07:20:22PM +0800, Chen-Yu Tsai wrote:
-> On Thu, Jan 26, 2017 at 6:39 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi,
-> >
-> > On Tue, Jan 24, 2017 at 10:32:26AM +0800, Chen-Yu Tsai wrote:
-> >> Add support for the display engine clock controls found on the A80.
-> >>
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> ---
-> >>  .../devicetree/bindings/clock/sun9i-de.txt         |  28 ++
-> >>  drivers/clk/sunxi-ng/Makefile                      |   1 +
-> >>  drivers/clk/sunxi-ng/ccu-sun9i-a80-de.c            | 283 +++++++++++++++++++++
-> >>  drivers/clk/sunxi-ng/ccu-sun9i-a80-de.h            |  33 +++
-> >>  include/dt-bindings/clock/sun9i-a80-de.h           |  80 ++++++
-> >>  include/dt-bindings/reset/sun9i-a80-de.h           |  58 +++++
-> >>  6 files changed, 483 insertions(+)
-> >>  create mode 100644 Documentation/devicetree/bindings/clock/sun9i-de.txt
-> >>  create mode 100644 drivers/clk/sunxi-ng/ccu-sun9i-a80-de.c
-> >>  create mode 100644 drivers/clk/sunxi-ng/ccu-sun9i-a80-de.h
-> >>  create mode 100644 include/dt-bindings/clock/sun9i-a80-de.h
-> >>  create mode 100644 include/dt-bindings/reset/sun9i-a80-de.h
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/clock/sun9i-de.txt b/Documentation/devicetree/bindings/clock/sun9i-de.txt
-> >> new file mode 100644
-> >> index 000000000000..3a5e6df70677
-> >> --- /dev/null
-> >> +++ b/Documentation/devicetree/bindings/clock/sun9i-de.txt
-> >> @@ -0,0 +1,28 @@
-> >> +Allwinner A80 Display Engine Clock Control Binding
-> >> +------------------------------------
-> >> +
-> >> +Required properties :
-> >> +- compatible: must contain one of the following compatibles:
-> >> +             - "allwinner,sun9i-a80-de-clocks"
-> >> +
-> >> +- reg: Must contain the registers base address and length
-> >> +- clocks: phandle to the clocks feeding the display engine subsystem.
-> >> +       Three are needed:
-> >> +  - "mod": the display engine module clock
-> >> +  - "dram": the DRAM bus clock for the system
-> >> +  - "bus": the bus clock for the whole display engine subsystem
-> >> +- clock-names: Must contain the clock names described just above
-> >> +- resets: phandle to the reset control for the display engine subsystem.
-> >> +- #clock-cells : must contain 1
-> >> +- #reset-cells : must contain 1
-> >> +
-> >> +Example:
-> >> +de_clocks: clock at 03000000 {
-> >> +     compatible = "allwinner,sun9i-a80-de-clks";
-> >> +     reg = <0x03000000 0x30>;
-> >> +     clocks = <&ccu CLK_DE>, <&ccu CLK_SDRAM>, <&ccu CLK_BUS_DE>;
-> >> +     clock-names = "mod", "dram", "bus";
-> >> +     resets = <&ccu RST_BUS_DE>;
-> >> +     #clock-cells = <1>;
-> >> +     #reset-cells = <1>;
-> >> +};
-> >> diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-> >> index 8f37ef7fb67d..6feaac0c5600 100644
-> >> --- a/drivers/clk/sunxi-ng/Makefile
-> >> +++ b/drivers/clk/sunxi-ng/Makefile
-> >> @@ -26,4 +26,5 @@ obj-$(CONFIG_SUN8I_A33_CCU) += ccu-sun8i-a33.o
-> >>  obj-$(CONFIG_SUN8I_H3_CCU)   += ccu-sun8i-h3.o
-> >>  obj-$(CONFIG_SUN8I_V3S_CCU)  += ccu-sun8i-v3s.o
-> >>  obj-$(CONFIG_SUN9I_A80_CCU)  += ccu-sun9i-a80.o
-> >> +obj-$(CONFIG_SUN9I_A80_CCU)  += ccu-sun9i-a80-de.o
-> >>  obj-$(CONFIG_SUN9I_A80_CCU)  += ccu-sun9i-a80-usb.o
-> >> diff --git a/drivers/clk/sunxi-ng/ccu-sun9i-a80-de.c b/drivers/clk/sunxi-ng/ccu-sun9i-a80-de.c
-> >> new file mode 100644
-> >> index 000000000000..3fc27db0a49a
-> >> --- /dev/null
-> >> +++ b/drivers/clk/sunxi-ng/ccu-sun9i-a80-de.c
-> >> @@ -0,0 +1,283 @@
-> >> +/*
-> >> + * Copyright (c) 2016 Chen-Yu Tsai. All rights reserved.
-> >> + *
-> >> + * This software is licensed under the terms of the GNU General Public
-> >> + * License version 2, as published by the Free Software Foundation, and
-> >> + * may be copied, distributed, and modified under those terms.
-> >> + *
-> >> + * This program is distributed in the hope that it will be useful,
-> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >> + * GNU General Public License for more details.
-> >> + */
-> >> +
-> >> +#include <linux/clk.h>
-> >> +#include <linux/clk-provider.h>
-> >> +#include <linux/of_address.h>
-> >> +#include <linux/platform_device.h>
-> >> +#include <linux/reset.h>
-> >> +
-> >> +#include "ccu_common.h"
-> >> +#include "ccu_div.h"
-> >> +#include "ccu_gate.h"
-> >> +#include "ccu_reset.h"
-> >> +
-> >> +#include "ccu-sun9i-a80-de.h"
-> >> +
-> >> +static SUNXI_CCU_GATE(fe0_clk,               "fe0",          "fe0-div",
-> >> +                   0x00, BIT(0), 0);
-> >> +static SUNXI_CCU_GATE(fe1_clk,               "fe1",          "fe1-div",
-> >> +                   0x00, BIT(1), 0);
-> >> +static SUNXI_CCU_GATE(fe2_clk,               "fe2",          "fe2-div",
-> >> +                   0x00, BIT(2), 0);
-> >> +static SUNXI_CCU_GATE(iep_deu0_clk,  "iep-deu0",     "de",
-> >> +                   0x00, BIT(4), 0);
-> >> +static SUNXI_CCU_GATE(iep_deu1_clk,  "iep-deu1",     "de",
-> >> +                   0x00, BIT(5), 0);
-> >> +static SUNXI_CCU_GATE(be0_clk,               "be0",          "be0-div",
-> >> +                   0x00, BIT(8), 0);
-> >> +static SUNXI_CCU_GATE(be1_clk,               "be1",          "be1-div",
-> >> +                   0x00, BIT(9), 0);
-> >> +static SUNXI_CCU_GATE(be2_clk,               "be2",          "be2-div",
-> >> +                   0x00, BIT(10), 0);
-> >> +static SUNXI_CCU_GATE(iep_drc0_clk,  "iep-drc0",     "de",
-> >> +                   0x00, BIT(12), 0);
-> >> +static SUNXI_CCU_GATE(iep_drc1_clk,  "iep-drc1",     "de",
-> >> +                   0x00, BIT(13), 0);
-> >> +static SUNXI_CCU_GATE(merge_clk,     "merge",        "de",
-> >> +                   0x00, BIT(20), 0);
-> >> +
-> >> +static SUNXI_CCU_GATE(dram_fe0_clk,  "dram-fe0",     "sdram",
-> >> +                   0x04, BIT(0), 0);
-> >> +static SUNXI_CCU_GATE(dram_fe1_clk,  "dram-fe1",     "sdram",
-> >> +                   0x04, BIT(1), 0);
-> >> +static SUNXI_CCU_GATE(dram_fe2_clk,  "dram-fe2",     "sdram",
-> >> +                   0x04, BIT(2), 0);
-> >> +static SUNXI_CCU_GATE(dram_deu0_clk, "dram-deu0",    "sdram",
-> >> +                   0x04, BIT(4), 0);
-> >> +static SUNXI_CCU_GATE(dram_deu1_clk, "dram-deu1",    "sdram",
-> >> +                   0x04, BIT(5), 0);
-> >> +static SUNXI_CCU_GATE(dram_be0_clk,  "dram-be0",     "sdram",
-> >> +                   0x04, BIT(8), 0);
-> >> +static SUNXI_CCU_GATE(dram_be1_clk,  "dram-be1",     "sdram",
-> >> +                   0x04, BIT(9), 0);
-> >> +static SUNXI_CCU_GATE(dram_be2_clk,  "dram-be2",     "sdram",
-> >> +                   0x04, BIT(10), 0);
-> >> +static SUNXI_CCU_GATE(dram_drc0_clk, "dram-drc0",    "sdram",
-> >> +                   0x04, BIT(12), 0);
-> >> +static SUNXI_CCU_GATE(dram_drc1_clk, "dram-drc1",    "sdram",
-> >> +                   0x04, BIT(13), 0);
-> >> +
-> >> +static SUNXI_CCU_GATE(bus_fe0_clk,   "bus-fe0",      "bus-de",
-> >> +                   0x08, BIT(0), 0);
-> >> +static SUNXI_CCU_GATE(bus_fe1_clk,   "bus-fe1",      "bus-de",
-> >> +                   0x08, BIT(1), 0);
-> >> +static SUNXI_CCU_GATE(bus_fe2_clk,   "bus-fe2",      "bus-de",
-> >> +                   0x08, BIT(2), 0);
-> >> +static SUNXI_CCU_GATE(bus_deu0_clk,  "bus-deu0",     "bus-de",
-> >> +                   0x08, BIT(4), 0);
-> >> +static SUNXI_CCU_GATE(bus_deu1_clk,  "bus-deu1",     "bus-de",
-> >> +                   0x08, BIT(5), 0);
-> >> +static SUNXI_CCU_GATE(bus_be0_clk,   "bus-be0",      "bus-de",
-> >> +                   0x08, BIT(8), 0);
-> >> +static SUNXI_CCU_GATE(bus_be1_clk,   "bus-be1",      "bus-de",
-> >> +                   0x08, BIT(9), 0);
-> >> +static SUNXI_CCU_GATE(bus_be2_clk,   "bus-be2",      "bus-de",
-> >> +                   0x08, BIT(10), 0);
-> >> +static SUNXI_CCU_GATE(bus_drc0_clk,  "bus-drc0",     "bus-de",
-> >> +                   0x08, BIT(12), 0);
-> >> +static SUNXI_CCU_GATE(bus_drc1_clk,  "bus-drc1",     "bus-de",
-> >> +                   0x08, BIT(13), 0);
-> >> +
-> >> +static SUNXI_CCU_M(fe0_div_clk, "fe0-div", "de", 0x20, 0, 4, 0);
-> >> +static SUNXI_CCU_M(fe1_div_clk, "fe1-div", "de", 0x20, 4, 4, 0);
-> >> +static SUNXI_CCU_M(fe2_div_clk, "fe2-div", "de", 0x20, 8, 4, 0);
-> >> +static SUNXI_CCU_M(be0_div_clk, "be0-div", "de", 0x20, 16, 4, 0);
-> >> +static SUNXI_CCU_M(be1_div_clk, "be1-div", "de", 0x20, 20, 4, 0);
-> >> +static SUNXI_CCU_M(be2_div_clk, "be2-div", "de", 0x20, 24, 4, 0);
-> >
-> > I couldn't find any documentation for this CCU.
-> 
-> I dug this up in the released Allwinner kernel.
-> 
-> > What are those clocks for, and how the display engine should be using
-> > (ie, which one is it expecting to drive / ungate / etc.)
-> 
-> Allwinner basically put all DE-related clock controls into a
-> separate module. In here, as the names above suggest, we have
-> bus gates, dram gates, and module clocks for each part of the
-> display pipeline. As with older SoCs that have DE 1.0, each
-> module should ungate and use the clocks related to them.
-> 
-> I'll put something like the above in the commit message.
+Hi Vijaya,
 
-So the module clocks are a combination of a divider and a clock?
+On 26/01/2017 15:20, vijay.kilari at gmail.com wrote:
+> From: Vijaya Kumar K <Vijaya.Kumar@cavium.com>
+> 
+> This patchset adds API for saving and restoring
+> of VGICv3 registers to support live migration with new vgic feature.
+> This API definition is as per version of VGICv3 specification
+> Documentation/virtual/kvm/devices/arm-vgic-v3.txt
+> 
+> The patch 3 & 4 are picked from the Pavel's previous implementation.
+> http://www.spinics.net/lists/kvm/msg122040.html
+> 
+> NOTE: Only compilation tested for AArch32. No hardware available to test.
+> 
+> v10 => v11:
+>  - Rebased on top of kvmarm queue branch
+>  - Renamed KVM_DEV_ARM_VGIC_CPU_SYSREGS to KVM_DEV_ARM_VGIC_GRP_CPU_SYSREGS
+>  - Used vcpu0 for KVM_DEV_ARM_VGIC_GRP_DIST_REGS access
+>  - Exported vgic_v{2,3}_has_attr_regs()
+>  - Used vgic_get_mmio_region() in vgic_v{2,3}_has_attr_regs() for checking
+>    validity of regs address in patch 2.
+>  - Moved macros KVM_REG_ARM_VGIC_SYSREG_* from patch 2 to patch 6
+>  - Fixed comments from Eric Auger
+>  - Updated document.
 
-And I'm guessing the reason you separated them is because they belong
-in a different register.
+I tested this new version along with ITS migration on Cavium ThunderX
+(virtio-pci net guest) with virsh save/restore.
 
-Maxime
+Tested-by: Eric Auger <eric.auger@redhat.com>
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170127/3bc7e36d/attachment.sig>
+Thanks
+
+Eric
+
+> 
+> v9 => v10:
+>  - Dropped support for AArch32 mode.
+>  - Fixed line level update
+>  - Updated documentation
+>  - Moved vgic-sys-reg-v3.c to arch/arm64/kvm/ and
+>    added vgic-v3-coproc.c to arch/arm/kvm for AArch32
+>  - Fixed nits
+> 
+> v8 => v9:
+>  - Rebased to kvmarm/next branch
+>  - Introduce support for save and restore of CPU interface
+>    registers for AArch32 mode (9,10 and 11 patches).
+>    Only compilation tested.
+>  - Fixed vmcr.ctlr format
+>  - Updated error code for invalid CPU REG value in Documentation
+>  - Updated commit messages and added comments required
+>  - Queued IRQ when irq_line is set.
+>  - Compatibility check on ICC_CTLR_EL1.SEIS and A3V
+> 
+> v7 => v8:
+>  - Rebased to 4.9-rc3
+>  - Fixed wrong parameter to VGIC_TO_MPIDR
+> v6 => v7:
+>  - Rename all patches heading from vgic-new to vgic
+>  - Moved caching of priority and ID bits from vgic global struct
+>    to vgic_cpu struct.
+> 
+> v5 => v6:
+>  - Collated all register definitions to single patch (4)
+>  - Introduce macro to convert userspace MPIDR format to MPIDR reg format
+>  - Check on ICC_CTLR_EL1.CBPR value is made while accessing ICC_BPR1_EL1
+>  - Cached ich_vtr_el2 and guests priority and ID bits
+>  - Check on number of priority and ID bits when ICC_CTRL_EL1 write is made
+>  - Check is made on SRE bit for ICC_SRE_EL1 write
+> 
+> v4 => v5:
+>  - ICC_CTLR_EL1 access is updated to reflect HW values
+>  - Updated ICC reg access mask and shift macros
+>  - Introduced patch 4 for VMCR changes
+>  - Other minor fixes.
+> v3 => v4:
+>  - Rebased to latest code base
+>  - Moved vgic_uaccess() from vgic-mmio-v2.c to vgic-mmio.c
+>  - Dropped macro REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED_UACCESS
+>  - Dropped LE conversion for userspace access
+>  - Introduced vgic_uaccess_write_pending() for ISPENDR write
+>  - Change macro KVM_DEV_ARM_VGIC_V3_CPUID_MASK to KVM_DEV_ARM_VGIC_V3_MIDR_MASK
+>  - Refactored some code as common code.
+>  - Changed handing of ICC_* registers
+>  - Allowed ICC_SRE_EL1 read by userspace
+>  - Fixed KVM_DEV_ARM_VGIC_LINE_LEVEL_INFO_* macros
+> 
+> v2 => v3:
+>  - Implemented separate API for ISPENDR and ICPENDR to
+>    read soft_pending instead of pending for level triggerred interrupts
+>  - Implemented ioctl KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO to access line level
+>  - Rebased on top of Christoffer's patch set
+>    http://www.spinics.net/lists/kvm/msg136840.html
+> 
+>  NOTE: GICD_STATUSR and GICR_STATUSR are implemented as RAZ/WI.
+> 
+> v1 => v2:
+>  - The init sequence change patch is no more required.
+>    Fixed in patch 2 by using static vgic_io_dev regions structure instead
+>    of using dynamic allocation pointer.
+>  - Updated commit message of patch 4.
+>  - Dropped usage of union to manage 32-bit and 64-bit access in patch 1.
+>    Used local variable for 32-bit access.
+>  - Updated macro __ARM64_SYS_REG and ARM64_SYS_REG in
+>    arch/arm64/include/uapi/asm/kvm.h as per qemu requirements.
+> 
+> Vijaya Kumar K (8):
+>   arm/arm64: vgic: Implement support for userspace access
+>   arm/arm64: vgic: Add distributor and redistributor access
+>   arm/arm64: vgic: Introduce find_reg_by_id()
+>   irqchip/gic-v3: Add missing system register definitions
+>   arm/arm64: vgic: Introduce VENG0 and VENG1 fields to vmcr struct
+>   arm/arm64: vgic: Implement VGICv3 CPU interface access
+>   arm/arm64: vgic: Implement KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO ioctl
+>   arm/arm64: Documentation: Update arm-vgic-v3.txt
+> 
+>  Documentation/virtual/kvm/devices/arm-vgic-v3.txt |  11 +-
+>  arch/arm/include/uapi/asm/kvm.h                   |  13 +
+>  arch/arm/kvm/Makefile                             |   4 +-
+>  arch/arm/kvm/vgic-v3-coproc.c                     |  35 +++
+>  arch/arm64/include/uapi/asm/kvm.h                 |  13 +
+>  arch/arm64/kvm/Makefile                           |   3 +-
+>  arch/arm64/kvm/sys_regs.c                         |  27 +-
+>  arch/arm64/kvm/sys_regs.h                         |   4 +
+>  arch/arm64/kvm/vgic-sys-reg-v3.c                  | 346 ++++++++++++++++++++++
+>  include/kvm/arm_vgic.h                            |   8 +
+>  include/linux/irqchip/arm-gic-v3.h                |  45 ++-
+>  virt/kvm/arm/vgic/vgic-kvm-device.c               | 231 ++++++++++++++-
+>  virt/kvm/arm/vgic/vgic-mmio-v2.c                  |  81 ++---
+>  virt/kvm/arm/vgic/vgic-mmio-v3.c                  | 201 +++++++++++--
+>  virt/kvm/arm/vgic/vgic-mmio.c                     | 148 ++++++++-
+>  virt/kvm/arm/vgic/vgic-mmio.h                     |  24 ++
+>  virt/kvm/arm/vgic/vgic-v3.c                       |  28 +-
+>  virt/kvm/arm/vgic/vgic.h                          |  72 ++++-
+>  18 files changed, 1171 insertions(+), 123 deletions(-)
+>  create mode 100644 arch/arm/kvm/vgic-v3-coproc.c
+>  create mode 100644 arch/arm64/kvm/vgic-sys-reg-v3.c
+> 
