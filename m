@@ -1,65 +1,54 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 27 Jan 2017 14:21:19 -0600
-Subject: [PATCH v2 2/2] ARM: sun8i: dt: Add mali node
-In-Reply-To: <681511dd6370b9146ae8e3f8009eba1e15d36cc0.1485180017.git-series.maxime.ripard@free-electrons.com>
-References: <a4d90de597cfcfab5fddeeb538505774a980818b.1485180017.git-series.maxime.ripard@free-electrons.com>
- <681511dd6370b9146ae8e3f8009eba1e15d36cc0.1485180017.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <20170127202119.cnnuuojtjor6rleg@rob-hp-laptop>
+Date: Fri, 27 Jan 2017 14:30:01 -0600
+Subject: [PATCH v2 1/2] dt-bindings: arm,gic: Fix binding example for a
+ virt-capable GIC
+In-Reply-To: <1485186974-13678-2-git-send-email-marc.zyngier@arm.com>
+References: <1485186974-13678-1-git-send-email-marc.zyngier@arm.com>
+ <1485186974-13678-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20170127203001.qvlgzzrh5hx2pykf@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2017 at 03:00:46PM +0100, Maxime Ripard wrote:
-> The A23 and A33 have an ARM Mali 400 GPU. Now that we have a binding, add
-> it to our DT.
+On Mon, Jan 23, 2017 at 03:56:13PM +0000, Marc Zyngier wrote:
+> The joys of copy/paste: the example of a virtualization capable GIC
+> in the DT binding was wrong, and propagated to dozens of platforms.
+> By having a GICC region that is only 4kB (instead of 8kB), we
+> end-up not being able to access the GICC_DIR register which is on
+> the second page.
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Oh well. Let's fix the source of the crap before tackling individual
+> offenders. While we're at it, also fix the compatibility string to
+> mention "arm,gic-400", which is the name of the actual implementation
+> of the GICv2 spec.
+
+"While we're at it", code for should be in a separate patch. :) I 
+wouldn't really care here, but you are not fixing anything...
+
+> 
+> Acked-by: Tony Lindgren <tony@atomide.com>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  arch/arm/boot/dts/sun8i-a23-a33.dtsi | 26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+), 0 deletions(-)
+>  Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> index e4991a78ad73..982705719ef2 100644
-> --- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> @@ -486,6 +486,32 @@
->  			#size-cells = <0>;
->  		};
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt b/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
+> index 5393e2a..a3d51ed 100644
+> --- a/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
+> @@ -107,11 +107,11 @@ Required properties:
+>  Example:
 >  
-> +		mali: gpu at 01c40000 {
+>  	interrupt-controller at 2c001000 {
+> -		compatible = "arm,cortex-a15-gic";
+> +		compatible = "arm,gic-400";
 
-Drop leading 0.
+Which one is correct really depends on the platform. The A15 can have an 
+internal or external (gic-400) GIC. The former string is correct for an 
+A15 with an internal GIC. One such platform is Calxeda midway.
 
-> +			compatible = "allwinner,sun8i-a23-mali",
-> +				     "allwinner,sun7i-a20-mali", "arm,mali-400";
-> +			reg = <0x01c40000 0x10000>;
+Arguably, we should not have arm,gic-400 by itself, but have an SoC 
+specific compatible in case it was integrated in interesting ways.
 
-Does this really use 64K or that's just the register spacing? Set it to 
-what's used.
-
-> +			interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>,
-> +				     <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
-> +			interrupt-names = "gp",
-> +					  "gpmmu",
-> +					  "pp0",
-> +					  "ppmmu0",
-> +					  "pp1",
-> +					  "ppmmu1",
-> +					  "pmu";
-> +			clocks = <&ccu CLK_BUS_GPU>, <&ccu CLK_GPU>;
-> +			clock-names = "bus", "core";
-> +			resets = <&ccu RST_BUS_GPU>;
-> +
-> +			assigned-clocks = <&ccu CLK_GPU>;
-> +			assigned-clock-rates = <408000000>;
-> +		};
-> +
->  		gic: interrupt-controller at 01c81000 {
->  			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
->  			reg = <0x01c81000 0x1000>,
-> -- 
-> git-series 0.8.11
+Rob
