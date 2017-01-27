@@ -1,51 +1,42 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 27 Jan 2017 09:20:39 -0800
-Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
-In-Reply-To: <1485528033.2469.61.camel@intel.com>
-References: <88c94ea6-abe2-0f20-337e-e9ee00c883d8@roeck-us.net>
- <20170124175800.GA15070@amd> <20170124184526.GA25056@roeck-us.net>
- <20170125111233.GB3912@amd> <20170125120918.GA7936@pali>
- <1485481030.2469.15.camel@intel.com>
- <a6ce0873-9164-a965-a3e1-9eaaaec2201f@roeck-us.net>
- <1485488382.2469.27.camel@intel.com>
- <9146145b-7e21-c4de-a9cd-dad7bc74ee7a@roeck-us.net>
- <1485528033.2469.61.camel@intel.com>
-Message-ID: <20170127172039.GA2498@roeck-us.net>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Fri, 27 Jan 2017 18:21:57 +0100
+Subject: [GIT PULL] STM32 defconfig changes for v4.11 #1
+Message-ID: <a31ac10a-474b-72de-0e28-a3ceaa0c709b@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2017 at 10:40:33PM +0800, Zhang Rui wrote:
-> > > 
-> > > If thermal zone I/F is used, we can not change it's 'type' name to
-> > > be
-> > > compatible with new hwmon API.
-> > > 
-> > You mean you can not fix the name to be compatible with libsensors.
-> > 
-> 
-> We can try to convert it to a libsensor-compatible string, either for
-> hwmon only, or for both thermal and hwmon. But this is an ABI change,
-> right?
+Hi Olof, Arnd and Kevin,
 
-Let's go back to the basics.
+Please consider this first round of STM32 defconfig updates for v4.11:
 
-Fact is that the thermal subsystem registers hwmon devices with 'name'
-attributes which violate the documented hardware monitoring ABI.
-I think we can consider this undisputed.
+The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 
-The rest is pretty much all opinion.
+   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
 
-Is a change in a driver to stop violating a documented ABI an ABI change
-or a bug fix ? In other words, does a driver violating a documented ABI
-make that ABI violation part of the ABI ?
+are available in the git repository at:
 
-Quite interesting questions. My take is that it is a bug fix, others
-apparently have the strong opinion that potential users of such an ABI
-violation have priority, and that a violation of a documented ABI _does_
-make this violation part of the ABI.
+   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git 
+tags/stm32-defconfig-for-v4.11-1
 
-I'll leave it at that. I tried to make my position clear, but it appears
-that I am quite alone in my opinion. With that, I'll leave it up to you to
-decide how to proceed.
+for you to fetch changes up to 770e96f30cc2e4a363dd8fae2e9028173b1f2af1:
 
-Guenter
+   ARM: configs: stm32: Add RTC support in STM32 defconfig (2017-01-16 
+14:39:49 +0100)
+
+----------------------------------------------------------------
+STM32 defconfig updates for v4.11, round 1.
+
+Highlights:
+----------
+  - Enable ADC
+  - Enable RTC
+
+----------------------------------------------------------------
+Amelie Delaunay (1):
+       ARM: configs: stm32: Add RTC support in STM32 defconfig
+
+Fabrice GASNIER (1):
+       ARM: configs: stm32: enable ADC driver
+
+  arch/arm/configs/stm32_defconfig | 7 +++++++
+  1 file changed, 7 insertions(+)
