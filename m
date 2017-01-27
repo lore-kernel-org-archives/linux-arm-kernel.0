@@ -1,25 +1,53 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 27 Jan 2017 15:28:55 +0530
-Subject: [PATCH v6 05/14] ARM: davinci: da850: add con_id for the SATA
- clock
-In-Reply-To: <CAMpxmJXq-XZBhO3j=bHpfU2QjJ+6kiYcozS7-pVu3W4juNTVBw@mail.gmail.com>
-References: <1485190856-4711-1-git-send-email-bgolaszewski@baylibre.com>
- <1485190856-4711-6-git-send-email-bgolaszewski@baylibre.com>
- <93a3bbb3-2d9f-bc38-c7b4-5eb3325d985d@ti.com>
- <645778dd-6727-abd0-3dd9-a7e0d5aa4983@ti.com>
- <CAMpxmJXq-XZBhO3j=bHpfU2QjJ+6kiYcozS7-pVu3W4juNTVBw@mail.gmail.com>
-Message-ID: <135d0aac-11a3-e71a-4f39-82bdb2afea39@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 27 Jan 2017 11:03:56 +0100
+Subject: [PATCH 1/2] clk: sunxi-ng: Call divider_round_rate if we only
+ have a single parent
+In-Reply-To: <CAGb2v67pdKYW5jaa1jA5+QbEV50iPNt-9Z7MNE90P+vUYVocNQ@mail.gmail.com>
+References: <53c56d23af099d8a41460d5ac59a2c792c8d050c.1485250845.git-series.maxime.ripard@free-electrons.com>
+ <20170127001250.GQ8801@codeaurora.org>
+ <CAGb2v67pdKYW5jaa1jA5+QbEV50iPNt-9Z7MNE90P+vUYVocNQ@mail.gmail.com>
+Message-ID: <20170127100356.leltnpslzjuhzjwc@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 27 January 2017 03:25 PM, Bartosz Golaszewski wrote:
-> Hi Sekhar,
+On Fri, Jan 27, 2017 at 11:30:05AM +0800, Chen-Yu Tsai wrote:
+> On Fri, Jan 27, 2017 at 8:12 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > On 01/24, Maxime Ripard wrote:
+> >> The divider_get_val function that is used in our determine_rate callback
+> >> doesn't try to change the parent rate at all, while clk_divider_bestdiv,
+> >> used in divider_round_rate, does.
+> >>
+> >> If we have a single parent, call divider_round_rate.
 > 
-> I'll wait with sending v7 until we get an ack from Rob for the
-> ahci-da850 bindings, so that we don't fall to the bottom of the review
-> queue again.
+> I guess my "clk: sunxi-ng: mux: Get closest parent rate possible with
+> CLK_SET_RATE_PARENT" patch somewhat takes care of the multi-parent
+> case?
 
-Yes, makes sense.
+It looks like it does yes :)
 
-Regards,
-Sekhar
+> Still, the underlying clock type doesn't get to specify what
+> is considers to be the best parent rate.
+> 
+> >> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> >> ---
+> >
+> > Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+> 
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
+
+Merged the two patches with Stephen and your Acked-bY.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170127/706e077e/attachment.sig>
