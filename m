@@ -1,42 +1,34 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Fri, 27 Jan 2017 23:30:05 +0530
-Subject: [PATCH V7 01/11] iommu/of: Refactor of_iommu_configure() for
- error handling
-In-Reply-To: <c7bad124-d9f2-0ddf-168f-0b1950d3e1ed@arm.com>
-References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
- <1485188293-20263-2-git-send-email-sricharan@codeaurora.org>
- <4388779a-0e83-fadc-83f4-98c46c88d42e@semihalf.com>
- <c7bad124-d9f2-0ddf-168f-0b1950d3e1ed@arm.com>
-Message-ID: <009901d278c7$34fee230$9efca690$@codeaurora.org>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 27 Jan 2017 20:02:03 +0200
+Subject: [PATCH v2 3/8] pinctrl: samsung: Add support for pad retention
+ control for Exynos5433 SoCs
+In-Reply-To: <20170126194811.rori5j5hmclniqig@kozik-lap>
+References: <1485419634-28331-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170126083402eucas1p187d3d31f62544fc46fae99fc5f74dbfe@eucas1p1.samsung.com>
+ <1485419634-28331-4-git-send-email-m.szyprowski@samsung.com>
+ <20170126194811.rori5j5hmclniqig@kozik-lap>
+Message-ID: <20170127180203.eacwbyb2noqjpmgw@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On Thu, Jan 26, 2017 at 09:48:11PM +0200, Krzysztof Kozlowski wrote:
+> On Thu, Jan 26, 2017 at 09:33:49AM +0100, Marek Szyprowski wrote:
+> > This patch adds support for retention control for Exynos5433 SoCs. Three
+> > groups of pins has been defined for retention control: common shared group
+> > for ALIVE, CPIF, eSE, FINGER, IMEM, NFC, PERIC, TOUCH pin banks and
+> > separate control for FSYS and AUD pin banks, for which PMU retention
+> > registers match whole banks.
+> > 
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > ---
+> >  drivers/pinctrl/samsung/pinctrl-exynos.c    | 58 +++++++++++++++++++++++++++++
+> >  include/linux/soc/samsung/exynos-regs-pmu.h | 16 ++++++++
 
-[..]
+I already have some non-conflicting changes to exynos-regs-pmu.h in my
+branch. Now I want to add some more which will create conflicts.
 
->>> +const struct iommu_ops *of_iommu_configure(struct device *dev,
->>> +                       struct device_node *master_np)
->>> +{
->>> +    const struct iommu_ops *ops;
->>> +
->>> +    if (!master_np)
->>> +        return NULL;
->>> +
->>> +    if (dev_is_pci(dev))
->>> +        ops = of_pci_iommu_init(to_pci_dev(dev), master_np);
->>
->> I gave the whole patch set a try on ThunderX. really_probe() is failing
->> on dma_configure()->of_pci_iommu_init() for each PCI device.
->
->When you say "failing", do you mean cleanly, or with a crash? I've
->managed to hit __of_match_node() dereferencing NULL from
->of_iommu_xlate() in a horribly complicated chain of events, which I'm
->trying to figure out now, and I wonder if the two might be related.
+How about splitting the header to separate patch, so I will take it to
+my exynos-pmu branch?
 
-Sorry that there is crash still. __of_match_node seems to checking
-for NULL arguments , feels like some invalid pointer was passed in.
-Is there any particular sequence to try for this ?
-
-Regards,
- Sricharan
+Best regards,
+Krzysztof
