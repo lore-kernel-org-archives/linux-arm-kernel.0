@@ -1,54 +1,115 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 27 Jan 2017 14:30:01 -0600
-Subject: [PATCH v2 1/2] dt-bindings: arm,gic: Fix binding example for a
- virt-capable GIC
-In-Reply-To: <1485186974-13678-2-git-send-email-marc.zyngier@arm.com>
-References: <1485186974-13678-1-git-send-email-marc.zyngier@arm.com>
- <1485186974-13678-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20170127203001.qvlgzzrh5hx2pykf@rob-hp-laptop>
+Date: Fri, 27 Jan 2017 14:53:26 -0600
+Subject: [PATCH 1/7] MFD: add bindings for STM32 DFSDM driver
+In-Reply-To: <1485189145-29576-2-git-send-email-arnaud.pouliquen@st.com>
+References: <1485189145-29576-1-git-send-email-arnaud.pouliquen@st.com>
+ <1485189145-29576-2-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <20170127205326.rom465uqfp6i33kr@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2017 at 03:56:13PM +0000, Marc Zyngier wrote:
-> The joys of copy/paste: the example of a virtualization capable GIC
-> in the DT binding was wrong, and propagated to dozens of platforms.
-> By having a GICC region that is only 4kB (instead of 8kB), we
-> end-up not being able to access the GICC_DIR register which is on
-> the second page.
+On Mon, Jan 23, 2017 at 05:32:19PM +0100, Arnaud Pouliquen wrote:
+> Add bindings information for STM32 Digital Filter for Sigma Delta modulators MFD driver
 > 
-> Oh well. Let's fix the source of the crap before tackling individual
-> offenders. While we're at it, also fix the compatibility string to
-> mention "arm,gic-400", which is the name of the actual implementation
-> of the GICv2 spec.
-
-"While we're at it", code for should be in a separate patch. :) I 
-wouldn't really care here, but you are not fixing anything...
-
-> 
-> Acked-by: Tony Lindgren <tony@atomide.com>
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 > ---
->  Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  .../devicetree/bindings/mfd/stm32-dfsdm.txt        | 68 ++++++++++++++++++++++
+>  1 file changed, 68 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/stm32-dfsdm.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt b/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
-> index 5393e2a..a3d51ed 100644
-> --- a/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt
-> @@ -107,11 +107,11 @@ Required properties:
->  Example:
->  
->  	interrupt-controller at 2c001000 {
-> -		compatible = "arm,cortex-a15-gic";
-> +		compatible = "arm,gic-400";
+> diff --git a/Documentation/devicetree/bindings/mfd/stm32-dfsdm.txt b/Documentation/devicetree/bindings/mfd/stm32-dfsdm.txt
+> new file mode 100644
+> index 0000000..e0b45ee
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/stm32-dfsdm.txt
+> @@ -0,0 +1,68 @@
+> +STMicroelectronics STM32 Digital Filter for Sigma Delta Modulator (DFSDM)
+> +ulti-function device.
+> +
+> +The STM32 DFSDM device is a multifunction device that handles the DFSDM IP.
+> +
+> +The DFSDM IP allows to add processing on Sigma Delta ADC based on SinC filters.
+> +For this, a pool of m filters can be connected to a pool of n channels.
+> +For STM32H7 : m = 4, n = 8.
+> +
+> +Each channel n is assigned to the SPI or Manchester interface n or n + 1.
+> +Channels 0 to 2 can also be connected to ADC IP instance 1 to 3.
+> +Filtering result is stored in a left aligned register, with 8 LSB reserved for
+> +the input channel ID.
+> +
+> +Each filter instance supports two contexts to manage conversions, each one has
+> +its own configurable sequence and trigger:
+> +- regular conversion: used for single or continuous conversion.
+> +- injected conversions: used for triggered conversion.
+> +
+> +Interfaces supported:
+> +- sigma delta ADCs trough IIO framework.
+> +- PDM microphones through ASoC framework.
 
-Which one is correct really depends on the platform. The A15 can have an 
-internal or external (gic-400) GIC. The former string is correct for an 
-A15 with an internal GIC. One such platform is Calxeda midway.
+Bindings describe h/w, not Linux subsystems.
 
-Arguably, we should not have arm,gic-400 by itself, but have an SoC 
-specific compatible in case it was integrated in interesting ways.
+> +
+> +Required properties:
+> +- compatible:	Must be "st,stm32h7-dfsdm".
+> +- reg:		Specifies the DFSDM block register address and length.
+> +- interrupts:	IRQ lines connected to each DFSDM filter instance.
+> +- clocks:	IP and serial interfaces clocking. Should be set according
+> +		to rcc clock ID and "clock-names".
+> +- clock-names:	Input clock name "dfsdm_clk" must be defined,
+> +		"audio_clk" is optional. If defined CLKOUT is based on the audio
+> +		clock, else "dfsdm_clk" is used.
 
-Rob
+_clk is redundant.
+
+> +
+> +Optional properties:
+> +- st,clkout-freq: clkout clock frequency (Hz).This clock must be set according
+> +		  to "clock" property. Frequency must be a multiple of the rcc
+> +		  clock frequency. If not, clkout frequency will not be
+> +		  accurate.
+
+What is CLKOUT connected to and will you need to describe that in DT?
+
+> +- pinctrl-names:  set to "default".
+> +- pinctrl-0:	  List of phandles pointing to pin configuration nodes for DFSDM
+> +		  module.
+> +		  For Pinctrl properties see ../pinctrl/pinctrl-bindings.txt
+> +Example :
+> +	dfsdm: dfsdm at 4400D000 {
+> +		compatible = "st,stm32h7-dfsdm";
+> +		reg = <0x40017000 0x400>;
+> +		interrupts = <110>, <111>, <112>, <113>;
+> +		clocks = <&timer_clk>;
+> +		clock-names = "dfsdm_clk";
+> +		pinctrl-0 = <&dfsdm_ch0 &dfsdm_ch1>;
+> +		pinctrl-names = "default";
+> +		st,clkout-freq = <2480000>;
+> +
+> +		iio_dfsdm0: iio-dfsdm at 0 {
+
+adc {
+
+> +			compatible = "st,stm32-dfsdm-adc";
+> +			#io-channel-cells = <1>;
+> +			reg = <0>;
+> +			status = "disabled";
+> +		};
+> +		dai_dfsdm0: dfsdm-audio at 0 {
+
+digital-mic {
+
+> +			compatible = "st,stm32-dfsdm-audio";
+> +			#sound-dai-cells = <0>;
+> +			reg = <0>;
+
+You can't have 2 children with the same unit address. Just drop reg and 
+the unit address.
+
+> +			dmas = <&dmamux1 101 0x400 0x00>;
+> +			dma-names = "rx";
+> +			status = "disabled";
+> +		};
+> +	};
+> -- 
+> 1.9.1
+> 
