@@ -1,49 +1,67 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 27 Jan 2017 20:02:33 +0100
-Subject: v4.10-rc4 to v4.10-rc5: battery regression on Nokia N900
-In-Reply-To: <74f6b75a-66b0-789f-658b-0e9f5cfed5a8@roeck-us.net>
-References: <20170124073720.GB5603@amd>
- <88c94ea6-abe2-0f20-337e-e9ee00c883d8@roeck-us.net>
- <20170124175800.GA15070@amd> <20170124184526.GA25056@roeck-us.net>
- <20170125111233.GB3912@amd> <20170125120918.GA7936@pali>
- <1485481030.2469.15.camel@intel.com>
- <a6ce0873-9164-a965-a3e1-9eaaaec2201f@roeck-us.net>
- <20170127110947.GA5335@amd>
- <74f6b75a-66b0-789f-658b-0e9f5cfed5a8@roeck-us.net>
-Message-ID: <20170127190233.GA20571@amd>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 27 Jan 2017 11:02:15 -0800
+Subject: [PATCH 0/3] meson-gx: add pwm_AO_ab
+In-Reply-To: <20170122210528.892-1-martin.blumenstingl@googlemail.com> (Martin
+ Blumenstingl's message of "Sun, 22 Jan 2017 22:05:25 +0100")
+References: <20170122210528.892-1-martin.blumenstingl@googlemail.com>
+Message-ID: <m27f5guy14.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
 
-> >>That sounds like fun. Changing bq27200-0 to bq27200_0 is Forbidden by
-> >>the ABI Police, but taking the entire device away is ok.
-> >
-> >Stop trying to break other people's systems. Thanks you.
+> This adds support for the PWM controller in the AO domain.
 
-> You still have not shown that it does. Actually, I am trying to _fix_
-> other people's systems (those using libsensors).
+Patches 1,3 applied to Amlogic v4.11/dt64 branch.
 
-No, I don't know that it does. Please avoid 1) calling me police and
-2) claiming that taking away entire devices is okay (when it probably
-is not).
+Kevin
 
-And no, I don't know if anyone uses hwmon ABI on affected N900. [And
-how many other devices are affected, '-' seems to be quite common
-character in kernel names.] If I knew about concrete breakage, we'd
-have very different discussion.
-
-Well, so first things first. What about fixing libsensors to allow '-'
-and '*' in the name?
-
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170127/1950d963/attachment-0001.sig>
+> pinctrl support for GXBB already exists (in both, pinctrl-meson-gxbb.c
+> and meson-gxbb.dtsi). This patch adds at least the pwm_ao_b pin for
+> GXL and GXM - these are not documented in Amlogic's kernel, so I had
+> to borrow the magic numbers from the Khadas VIM kernel (released under
+> the GPL): [0]
+>
+> The bits for pwm_AO_a_pins are unknown at the time of writing, but these
+> can still be added later.
+>
+> I have successfully tested this on my GXL S905X based Khadas VIM board
+> with the following .dts snippets (the PWM LED can simply be dimmed
+> through sysfs):
+> 	&pwm_AO_ab {
+> 		status = "okay";
+> 		pinctrl-0 = <&pwm_ao_b_pins>;
+> 		pinctrl-names = "default";
+> 		clocks = <&clkc CLKID_FCLK_DIV4>;
+> 		clock-names = "clkin0";
+> 	};
+>
+> 	pwmleds {
+> 		compatible = "pwm-leds";
+>
+> 		power {
+> 			label = "vim:red:power";
+> 			pwms = <&pwm_AO_ab 1 7812500 0>;
+> 			max-brightness = <255>;
+> 		};
+> 	};
+>
+> (if anyone is interested in more of my Khadas VIM patches - these are
+> still work-in-progress, which is why I have not sent them yet - can
+> take a look at this: [1])
+>
+> NOTE: The .dts changes from this series are based on top of my SAR ADC
+> patches.
+>
+> [0] https://github.com/khadas/linux/blob/94602ef5562978a8d8b5c7770c113074a714dbdb/drivers/amlogic/led/led_trigger_breathe.c#L75
+> [1] https://github.com/xdarklight/linux/commits/meson-gx-integration-4.11-20170122
+>
+> Martin Blumenstingl (3):
+>   ARM64: dts: meson-gx: add the missing pwm_AO_ab node
+>   pinctrl: meson: meson-gxl: add the pwm_ao_b pin
+>   ARM64: dts: meson-gxl: add the pwm_ao_b pin
+>
+>  arch/arm64/boot/dts/amlogic/meson-gx.dtsi  | 7 +++++++
+>  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi | 7 +++++++
+>  drivers/pinctrl/meson/pinctrl-meson-gxl.c  | 8 ++++++++
+>  3 files changed, 22 insertions(+)
