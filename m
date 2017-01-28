@@ -1,86 +1,111 @@
 From: peter.senna@collabora.com (Peter Senna Tschudin)
-Date: Sat, 28 Jan 2017 15:21:29 +0100
-Subject: [PATCH 0/4] megachips-stdpxxxx-ge-b850v3-fw (was V7 GE B850v3
- LVDS/DP++ Bridge)
-Message-ID: <cover.1485611969.git.peter.senna@collabora.com>
+Date: Sat, 28 Jan 2017 15:21:33 +0100
+Subject: [PATCH 4/4] dts/imx6q-b850v3: Use megachips-stdpxxxx-ge-b850v3-fw
+ bridges (LVDS-DP++)
+In-Reply-To: <cover.1485611969.git.peter.senna@collabora.com>
+References: <cover.1485611969.git.peter.senna@collabora.com>
+Message-ID: <45074835be101eaa1fabe9e43b98ccee9fbd3f88.1485611969.git.peter.senna@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The video processing pipeline on the second output on the GE B850v3:
+Configures the megachips-stdpxxxx-ge-b850v3-fw bridges on the GE
+B850v3 dts file.
 
-  Host -> LVDS|--(STDP4028)--|DP -> DP|--(STDP2690)--|DP++ -> Video output
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Cc: Martyn Welch <martyn.welch@collabora.co.uk>
+Cc: Martin Donnelly <martin.donnelly@ge.com>
+Cc: Javier Martinez Canillas <javier@dowhile0.org>
+Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+Cc: Philipp Zabel <p.zabel@pengutronix.de>
+Cc: Rob Herring <robh@kernel.org>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
+---
+ arch/arm/boot/dts/imx6q-b850v3.dts | 68 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 68 insertions(+)
 
-Each bridge has a dedicated flash containing firmware for supporting the
-custom design. The result is that in this design neither the STDP4028
-nor the STDP2690 behave as the stock bridges would. The compatible
-strings include the suffix "-ge-b850v3-fw" to make it clear that the
-driver is for the bridges with the firmware which is specific for the GE
-B850v3.
-
-The driver is powerless to control the video processing pipeline, as the
-two bridges behaves as a single one. The driver is only needed for
-telling the host about EDID / HPD, and for giving the host powers to ack
-interrupts.
-
-Tested on next-20170125.
-
-Changes from V7(was GE B850v3 LVDS/DP++ Bridge):
- - New devicetree binding with one node per bridge, and two ports per bridge
- - Two i2c_devices, one per bridge
- - Removed uneeded mutexes
- - Moved documentation to bindings/display/bridge
- - Included test for EDID extension blocks
- - Renamed bridge pointer to ge_b850v3_lvds_ptr
- - Removed the call to drm_helper_hpd_irq_event()
- - Removed assignments to bridge.driver_private
-
-Changes from V6:
- - Removed check for pixel clock as the bridge supports up to 330Mhz while the
-   host is limited to 264 MHz in very specific conditions.
- - Added a second mutex to avoid concurrency issues while acking interrupts
-   from threaded interrupt handlers.
- - Renamed the edid mutex to be more descriptive.
- - Added a .detach() function that disables the interrupts.
- - Adopted i2c_new_secondary_device() and updated the dts and documentation to
-   match the new method.
- - Removed useless test to drm_bridge_add()
- - Did some refactoring around devm_request_threaded_irq()
- - Added a missing call to i2c_unregister_device() on the i2c_driver.remove()
-   function.
-
-Changes from V5:
- - Change to MAINTAINERS in a separate patch
- - Reworked interrupt handler initialization
- - Removed useless calls to: drm_connector_register(),
-   drm_helper_hpd_irq_event(), and drm_bridge_enable()
-
-Changes from V4:
- - Renamed the i2c_driver.name from "ge,b850v3-lvds-dp" to "b850v3-lvds-dp" to
-   remove the comma from the driver name
-
-Changes from V3:
- - Removed the patch that was configuring the mapping between IPUs and external
-   displays on the dts file
-
-
-Peter Senna Tschudin (4):
-  Documentation/devicetree/bindings/video/bridge:
-    megachips-stdpxxxx-ge-b850v3-fw
-  MAINTAINERS: Add entry for megachips-stdpxxxx-ge-b850v3-fw
-  drm/bridge: Drivers for megachips-stdpxxxx-ge-b850v3-fw (LVDS-DP++)
-  dts/imx6q-b850v3: Use megachips-stdpxxxx-ge-b850v3-fw bridges
-    (LVDS-DP++)
-
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- .../bridge/megachips-stdpxxxx-ge-b850v3-fw.txt     |  92 +++++
- MAINTAINERS                                        |   8 +
- arch/arm/boot/dts/imx6q-b850v3.dts                 |  68 ++++
- drivers/gpu/drm/bridge/Kconfig                     |  11 +
- drivers/gpu/drm/bridge/Makefile                    |   1 +
- .../drm/bridge/megachips-stdpxxxx-ge-b850v3-fw.c   | 408 +++++++++++++++++++++
- 7 files changed, 589 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/video/bridge/megachips-stdpxxxx-ge-b850v3-fw.txt
- create mode 100644 drivers/gpu/drm/bridge/megachips-stdpxxxx-ge-b850v3-fw.c
-
+diff --git a/arch/arm/boot/dts/imx6q-b850v3.dts b/arch/arm/boot/dts/imx6q-b850v3.dts
+index b237429..3ec54da 100644
+--- a/arch/arm/boot/dts/imx6q-b850v3.dts
++++ b/arch/arm/boot/dts/imx6q-b850v3.dts
+@@ -72,6 +72,13 @@
+ 		fsl,data-mapping = "spwg";
+ 		fsl,data-width = <24>;
+ 		status = "okay";
++
++		port at 4 {
++			reg = <4>;
++			lvds0_out: endpoint {
++				remote-endpoint = <&stdp4028_in>;
++			};
++		};
+ 	};
+ };
+ 
+@@ -146,3 +153,64 @@
+ &usdhc2 {
+ 	status = "disabled";
+ };
++
++&mux2_i2c2 {
++	status = "okay";
++	clock-frequency = <100000>;
++
++	stdp4028 at 73 {
++		compatible = "megachips,stdp4028-ge-b850v3-fw";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		reg = <0x73>;
++
++		interrupt-parent = <&gpio2>;
++		interrupts = <0 IRQ_TYPE_LEVEL_HIGH>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				stdp4028_in: endpoint {
++					remote-endpoint = <&lvds0_out>;
++				};
++			};
++			port at 1 {
++				reg = <1>;
++				stdp4028_out: endpoint {
++					remote-endpoint = <&stdp2690_in>;
++				};
++			};
++		};
++	};
++
++	stdp2690 at 72 {
++		compatible = "megachips,stdp2690-ge-b850v3-fw";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		reg = <0x72>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				stdp2690_in: endpoint {
++					remote-endpoint = <&stdp4028_out>;
++				};
++			};
++
++			port at 1 {
++				reg = <1>;
++				stdp2690_out: endpoint {
++					/* Connector for external display */
++				};
++			};
++		};
++	};
++};
 -- 
 2.5.5
