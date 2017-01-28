@@ -1,489 +1,285 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 28 Jan 2017 18:41:01 +0000
-Subject: [PATCH v2 5/7] iio: adc: stm32: add optional dma support
-In-Reply-To: <1485440915-30119-6-git-send-email-fabrice.gasnier@st.com>
-References: <1485440915-30119-1-git-send-email-fabrice.gasnier@st.com>
- <1485440915-30119-6-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <f5732334-4d27-b461-7335-76b0d4967d60@kernel.org>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Sat, 28 Jan 2017 11:27:50 -0800
+Subject: [PATCH v3 00/24] i.MX Media Driver
+In-Reply-To: <1485257269.3600.96.camel@pengutronix.de>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <c6e98327-7e2c-f34a-2d23-af7b236de441@xs4all.nl>
+ <1484929911.2897.70.camel@pengutronix.de>
+ <3fb68686-9447-2d8a-e2d2-005e4138cd43@gmail.com>
+ <5d23d244-aa0e-401c-24a9-07f28acf1563@xs4all.nl>
+ <1485169204.2874.57.camel@pengutronix.de>
+ <ce2d1851-8a2e-ea0b-25b8-be6649b1ebaf@gmail.com>
+ <1485257269.3600.96.camel@pengutronix.de>
+Message-ID: <9a0afd7e-1caa-4ea1-3a53-5aef1e26ae79@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/01/17 14:28, Fabrice Gasnier wrote:
-> Add DMA optional support to STM32 ADC, as there is a limited number DMA
-> channels (request lines) that can be assigned to ADC. This way, driver
-> may fall back using interrupts when all DMA channels are in use for
-> other IPs.
-> Use dma cyclic mode with two periods. Allow to tune period length by
-> using watermark. Coherent memory is used for dma (max buffer size is
-> fixed to PAGE_SIZE).
-> 
-> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-I am happy with this whole series, except this patch gives me:
 
-drivers/iio/adc/stm32-adc.c:478:23: warning: symbol 'stm32_adc_trig_pol' was not declared. Should it be static?
-drivers/iio/adc/stm32-adc.c:621:21: error: incompatible types in comparison expression (different type sizes)
-  CC [M]  drivers/iio/adc/stm32-adc.o
-In file included from ./include/linux/clk.h:16:0,
-                 from drivers/iio/adc/stm32-adc.c:22:
-drivers/iio/adc/stm32-adc.c: In function ?stm32_adc_set_watermark?:
-./include/linux/kernel.h:753:16: warning: comparison of distinct pointer types lacks a cast
-  (void) (&min1 == &min2);   \
-                ^
-./include/linux/kernel.h:756:2: note: in expansion of macro ?__min?
-  __min(typeof(x), typeof(y),   \
-  ^~~~~
-drivers/iio/adc/stm32-adc.c:621:14: note: in expansion of macro ?min?
-  watermark = min(watermark, val * sizeof(u16));
-              ^~~
 
-The static is obviously fine so I've added that.
-The second looks to be because sizeof(u16) is a size_t which is signed IIRC.
-Anyhow, a cast of that to unsigned should I think be harmless and fixes the
-warning.
+On 01/24/2017 03:27 AM, Philipp Zabel wrote:
+> Hi Steve, Hans,
+>
+> [added Laurent to Cc: who I believe might have an opinion on the media
+> bus formats, too. Sorry for the wall of text, I have put a marker where
+> the MEDIA_BUS argument starts]
+>
+> The central issue seems to be that I think media pad links / media bus
+> formats should describe physical links, such as parallel or serial
+> buses, and the formats of pixels flowing through them, whereas Steve
+> would like to extend them to describe software transports and in-memory
+> formats.
 
-Please check I did these right.
+Hi Philipp, Hans,
 
-They are in the testing branch of iio.git.
+I've decided to pull the dma read/write channel linking between
+pads. Although I haven't heard any other feedback yet, I agree it is
+controversial and it is fairly clear it violates the current media bus
+concept that describes physical links.
 
-Thanks,
+So the VDIC entity will support only the high motion mode, and
+the post-processor entities will be removed. We've talked in the
+past of adding full VDIC support to the IPU image conversion API
+in the IPUv3 driver, so the complete motion compensation modes
+can live there eventually, accessed from a mem2mem device. I'm
+also considering leaving the low/medium motion support in the VDIC
+entity, but accessed eventually from a separate device node sink pad
+(from a future output device), instead of from a subdev pad.
 
-Jonathan
+So now there will be four capture device nodes per IPU: two linked
+directly from each CSI IDMAC source pad, one from the prp-encode
+source pad, and one from the prp-viewfinder source pad.
 
-> ---
-> Changes in v2:
-> - Use iio_trigger_poll_chained() avoids to bounce back into irq context.
->   Remove irq_work.
-> - Rework dma buffer allocation and use. Allocation moved to probe time,
->   fixed to PAGE_SIZE. Use hwfifo_set_watermark() routine to tune dma
->   cyclic period length.
-> ---
->  drivers/iio/adc/Kconfig          |   1 +
->  drivers/iio/adc/stm32-adc-core.c |   1 +
->  drivers/iio/adc/stm32-adc-core.h |   2 +
->  drivers/iio/adc/stm32-adc.c      | 227 ++++++++++++++++++++++++++++++++++++---
->  4 files changed, 218 insertions(+), 13 deletions(-)
-> 
-> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-> index 9a7b090..03a73f9 100644
-> --- a/drivers/iio/adc/Kconfig
-> +++ b/drivers/iio/adc/Kconfig
-> @@ -444,6 +444,7 @@ config ROCKCHIP_SARADC
->  config STM32_ADC_CORE
->  	tristate "STMicroelectronics STM32 adc core"
->  	depends on ARCH_STM32 || COMPILE_TEST
-> +	depends on HAS_DMA
->  	depends on OF
->  	depends on REGULATOR
->  	select IIO_BUFFER
-> diff --git a/drivers/iio/adc/stm32-adc-core.c b/drivers/iio/adc/stm32-adc-core.c
-> index 4214b0c..22b7c93 100644
-> --- a/drivers/iio/adc/stm32-adc-core.c
-> +++ b/drivers/iio/adc/stm32-adc-core.c
-> @@ -201,6 +201,7 @@ static int stm32_adc_probe(struct platform_device *pdev)
->  	priv->common.base = devm_ioremap_resource(&pdev->dev, res);
->  	if (IS_ERR(priv->common.base))
->  		return PTR_ERR(priv->common.base);
-> +	priv->common.phys_base = res->start;
->  
->  	priv->vref = devm_regulator_get(&pdev->dev, "vref");
->  	if (IS_ERR(priv->vref)) {
-> diff --git a/drivers/iio/adc/stm32-adc-core.h b/drivers/iio/adc/stm32-adc-core.h
-> index 081fa5f..2ec7abb 100644
-> --- a/drivers/iio/adc/stm32-adc-core.h
-> +++ b/drivers/iio/adc/stm32-adc-core.h
-> @@ -42,10 +42,12 @@
->  /**
->   * struct stm32_adc_common - stm32 ADC driver common data (for all instances)
->   * @base:		control registers base cpu addr
-> + * @phys_base:		control registers base physical addr
->   * @vref_mv:		vref voltage (mv)
->   */
->  struct stm32_adc_common {
->  	void __iomem			*base;
-> +	phys_addr_t			phys_base;
->  	int				vref_mv;
->  };
->  
-> diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
-> index 9a38f9a..8a30039 100644
-> --- a/drivers/iio/adc/stm32-adc.c
-> +++ b/drivers/iio/adc/stm32-adc.c
-> @@ -21,6 +21,8 @@
->  
->  #include <linux/clk.h>
->  #include <linux/delay.h>
-> +#include <linux/dma-mapping.h>
-> +#include <linux/dmaengine.h>
->  #include <linux/iio/iio.h>
->  #include <linux/iio/buffer.h>
->  #include <linux/iio/timer/stm32-timer-trigger.h>
-> @@ -68,12 +70,16 @@
->  #define STM32F4_EXTSEL_SHIFT		24
->  #define STM32F4_EXTSEL_MASK		GENMASK(27, 24)
->  #define STM32F4_EOCS			BIT(10)
-> +#define STM32F4_DDS			BIT(9)
-> +#define STM32F4_DMA			BIT(8)
->  #define STM32F4_ADON			BIT(0)
->  
->  #define STM32_ADC_MAX_SQ		16	/* SQ1..SQ16 */
->  #define STM32_ADC_TIMEOUT_US		100000
->  #define STM32_ADC_TIMEOUT	(msecs_to_jiffies(STM32_ADC_TIMEOUT_US / 1000))
->  
-> +#define STM32_DMA_BUFFER_SIZE		PAGE_SIZE
-> +
->  /* External trigger enable */
->  enum stm32_adc_exten {
->  	STM32_EXTEN_SWTRIG,
-> @@ -136,6 +142,10 @@ struct stm32_adc_regs {
->   * @bufi:		data buffer index
->   * @num_conv:		expected number of scan conversions
->   * @trigger_polarity:	external trigger polarity (e.g. exten)
-> + * @dma_chan:		dma channel
-> + * @rx_buf:		dma rx buffer cpu address
-> + * @rx_dma_buf:		dma rx buffer bus address
-> + * @rx_buf_sz:		dma rx buffer size
->   */
->  struct stm32_adc {
->  	struct stm32_adc_common	*common;
-> @@ -148,6 +158,10 @@ struct stm32_adc {
->  	unsigned int		bufi;
->  	unsigned int		num_conv;
->  	u32			trigger_polarity;
-> +	struct dma_chan		*dma_chan;
-> +	u8			*rx_buf;
-> +	dma_addr_t		rx_dma_buf;
-> +	unsigned int		rx_buf_sz;
->  };
->  
->  /**
-> @@ -291,10 +305,21 @@ static void stm32_adc_conv_irq_disable(struct stm32_adc *adc)
->  /**
->   * stm32_adc_start_conv() - Start conversions for regular channels.
->   * @adc: stm32 adc instance
-> + * @dma: use dma to transfer conversion result
-> + *
-> + * Start conversions for regular channels.
-> + * Also take care of normal or DMA mode. Circular DMA may be used for regular
-> + * conversions, in IIO buffer modes. Otherwise, use ADC interrupt with direct
-> + * DR read instead (e.g. read_raw, or triggered buffer mode without DMA).
->   */
-> -static void stm32_adc_start_conv(struct stm32_adc *adc)
-> +static void stm32_adc_start_conv(struct stm32_adc *adc, bool dma)
->  {
->  	stm32_adc_set_bits(adc, STM32F4_ADC_CR1, STM32F4_SCAN);
-> +
-> +	if (dma)
-> +		stm32_adc_set_bits(adc, STM32F4_ADC_CR2,
-> +				   STM32F4_DMA | STM32F4_DDS);
-> +
->  	stm32_adc_set_bits(adc, STM32F4_ADC_CR2, STM32F4_EOCS | STM32F4_ADON);
->  
->  	/* Wait for Power-up time (tSTAB from datasheet) */
-> @@ -311,7 +336,8 @@ static void stm32_adc_stop_conv(struct stm32_adc *adc)
->  	stm32_adc_clr_bits(adc, STM32F4_ADC_SR, STM32F4_STRT);
->  
->  	stm32_adc_clr_bits(adc, STM32F4_ADC_CR1, STM32F4_SCAN);
-> -	stm32_adc_clr_bits(adc, STM32F4_ADC_CR2, STM32F4_ADON);
-> +	stm32_adc_clr_bits(adc, STM32F4_ADC_CR2,
-> +			   STM32F4_ADON | STM32F4_DMA | STM32F4_DDS);
->  }
->  
->  /**
-> @@ -494,7 +520,7 @@ static int stm32_adc_single_conv(struct iio_dev *indio_dev,
->  
->  	stm32_adc_conv_irq_enable(adc);
->  
-> -	stm32_adc_start_conv(adc);
-> +	stm32_adc_start_conv(adc, false);
->  
->  	timeout = wait_for_completion_interruptible_timeout(
->  					&adc->completion, STM32_ADC_TIMEOUT);
-> @@ -581,6 +607,23 @@ static int stm32_adc_validate_trigger(struct iio_dev *indio_dev,
->  	return stm32_adc_get_trig_extsel(trig) < 0 ? -EINVAL : 0;
->  }
->  
-> +static int stm32_adc_set_watermark(struct iio_dev *indio_dev, unsigned val)
-> +{
-> +	struct stm32_adc *adc = iio_priv(indio_dev);
-> +	unsigned int watermark = STM32_DMA_BUFFER_SIZE / 2;
-> +
-> +	/*
-> +	 * dma cyclic transfers are used, buffer is split into two periods.
-> +	 * There should be :
-> +	 * - always one buffer (period) dma is working on
-> +	 * - one buffer (period) driver can push with iio_trigger_poll().
-> +	 */
-> +	watermark = min(watermark, val * sizeof(u16));
-> +	adc->rx_buf_sz = watermark * 2;
-> +
-> +	return 0;
-> +}
-> +
->  static int stm32_adc_update_scan_mode(struct iio_dev *indio_dev,
->  				      const unsigned long *scan_mask)
->  {
-> @@ -635,12 +678,83 @@ static int stm32_adc_debugfs_reg_access(struct iio_dev *indio_dev,
->  static const struct iio_info stm32_adc_iio_info = {
->  	.read_raw = stm32_adc_read_raw,
->  	.validate_trigger = stm32_adc_validate_trigger,
-> +	.hwfifo_set_watermark = stm32_adc_set_watermark,
->  	.update_scan_mode = stm32_adc_update_scan_mode,
->  	.debugfs_reg_access = stm32_adc_debugfs_reg_access,
->  	.of_xlate = stm32_adc_of_xlate,
->  	.driver_module = THIS_MODULE,
->  };
->  
-> +static unsigned int stm32_adc_dma_residue(struct stm32_adc *adc)
-> +{
-> +	struct dma_tx_state state;
-> +	enum dma_status status;
-> +
-> +	status = dmaengine_tx_status(adc->dma_chan,
-> +				     adc->dma_chan->cookie,
-> +				     &state);
-> +	if (status == DMA_IN_PROGRESS) {
-> +		/* Residue is size in bytes from end of buffer */
-> +		unsigned int i = adc->rx_buf_sz - state.residue;
-> +		unsigned int size;
-> +
-> +		/* Return available bytes */
-> +		if (i >= adc->bufi)
-> +			size = i - adc->bufi;
-> +		else
-> +			size = adc->rx_buf_sz + i - adc->bufi;
-> +
-> +		return size;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static void stm32_adc_dma_buffer_done(void *data)
-> +{
-> +	struct iio_dev *indio_dev = data;
-> +
-> +	iio_trigger_poll_chained(indio_dev->trig);
-> +}
-> +
-> +static int stm32_adc_dma_start(struct iio_dev *indio_dev)
-> +{
-> +	struct stm32_adc *adc = iio_priv(indio_dev);
-> +	struct dma_async_tx_descriptor *desc;
-> +	dma_cookie_t cookie;
-> +	int ret;
-> +
-> +	if (!adc->dma_chan)
-> +		return 0;
-> +
-> +	dev_dbg(&indio_dev->dev, "%s size=%d watermark=%d\n", __func__,
-> +		adc->rx_buf_sz, adc->rx_buf_sz / 2);
-> +
-> +	/* Prepare a DMA cyclic transaction */
-> +	desc = dmaengine_prep_dma_cyclic(adc->dma_chan,
-> +					 adc->rx_dma_buf,
-> +					 adc->rx_buf_sz, adc->rx_buf_sz / 2,
-> +					 DMA_DEV_TO_MEM,
-> +					 DMA_PREP_INTERRUPT);
-> +	if (!desc)
-> +		return -EBUSY;
-> +
-> +	desc->callback = stm32_adc_dma_buffer_done;
-> +	desc->callback_param = indio_dev;
-> +
-> +	cookie = dmaengine_submit(desc);
-> +	ret = dma_submit_error(cookie);
-> +	if (ret) {
-> +		dmaengine_terminate_all(adc->dma_chan);
-> +		return ret;
-> +	}
-> +
-> +	/* Issue pending DMA requests */
-> +	dma_async_issue_pending(adc->dma_chan);
-> +
-> +	return 0;
-> +}
-> +
->  static int stm32_adc_buffer_postenable(struct iio_dev *indio_dev)
->  {
->  	struct stm32_adc *adc = iio_priv(indio_dev);
-> @@ -652,18 +766,29 @@ static int stm32_adc_buffer_postenable(struct iio_dev *indio_dev)
->  		return ret;
->  	}
->  
-> +	ret = stm32_adc_dma_start(indio_dev);
-> +	if (ret) {
-> +		dev_err(&indio_dev->dev, "Can't start dma\n");
-> +		goto err_clr_trig;
-> +	}
-> +
->  	ret = iio_triggered_buffer_postenable(indio_dev);
->  	if (ret < 0)
-> -		goto err_clr_trig;
-> +		goto err_stop_dma;
->  
->  	/* Reset adc buffer index */
->  	adc->bufi = 0;
->  
-> -	stm32_adc_conv_irq_enable(adc);
-> -	stm32_adc_start_conv(adc);
-> +	if (!adc->dma_chan)
-> +		stm32_adc_conv_irq_enable(adc);
-> +
-> +	stm32_adc_start_conv(adc, !!adc->dma_chan);
->  
->  	return 0;
->  
-> +err_stop_dma:
-> +	if (adc->dma_chan)
-> +		dmaengine_terminate_all(adc->dma_chan);
->  err_clr_trig:
->  	stm32_adc_set_trig(indio_dev, NULL);
->  
-> @@ -676,12 +801,16 @@ static int stm32_adc_buffer_predisable(struct iio_dev *indio_dev)
->  	int ret;
->  
->  	stm32_adc_stop_conv(adc);
-> -	stm32_adc_conv_irq_disable(adc);
-> +	if (!adc->dma_chan)
-> +		stm32_adc_conv_irq_disable(adc);
->  
->  	ret = iio_triggered_buffer_predisable(indio_dev);
->  	if (ret < 0)
->  		dev_err(&indio_dev->dev, "predisable failed\n");
->  
-> +	if (adc->dma_chan)
-> +		dmaengine_terminate_all(adc->dma_chan);
-> +
->  	if (stm32_adc_set_trig(indio_dev, NULL))
->  		dev_err(&indio_dev->dev, "Can't clear trigger\n");
->  
-> @@ -701,15 +830,31 @@ static irqreturn_t stm32_adc_trigger_handler(int irq, void *p)
->  
->  	dev_dbg(&indio_dev->dev, "%s bufi=%d\n", __func__, adc->bufi);
->  
-> -	/* reset buffer index */
-> -	adc->bufi = 0;
-> -	iio_push_to_buffers_with_timestamp(indio_dev, adc->buffer,
-> -					   pf->timestamp);
-> +	if (!adc->dma_chan) {
-> +		/* reset buffer index */
-> +		adc->bufi = 0;
-> +		iio_push_to_buffers_with_timestamp(indio_dev, adc->buffer,
-> +						   pf->timestamp);
-> +	} else {
-> +		int residue = stm32_adc_dma_residue(adc);
-> +
-> +		while (residue >= indio_dev->scan_bytes) {
-> +			u16 *buffer = (u16 *)&adc->rx_buf[adc->bufi];
-> +
-> +			iio_push_to_buffers_with_timestamp(indio_dev, buffer,
-> +							   pf->timestamp);
-> +			residue -= indio_dev->scan_bytes;
-> +			adc->bufi += indio_dev->scan_bytes;
-> +			if (adc->bufi >= adc->rx_buf_sz)
-> +				adc->bufi = 0;
-> +		}
-> +	}
->  
->  	iio_trigger_notify_done(indio_dev->trig);
->  
->  	/* re-enable eoc irq */
-> -	stm32_adc_conv_irq_enable(adc);
-> +	if (!adc->dma_chan)
-> +		stm32_adc_conv_irq_enable(adc);
->  
->  	return IRQ_HANDLED;
->  }
-> @@ -781,6 +926,45 @@ static int stm32_adc_chan_of_init(struct iio_dev *indio_dev)
->  	return 0;
->  }
->  
-> +static int stm32_adc_dma_request(struct iio_dev *indio_dev)
-> +{
-> +	struct stm32_adc *adc = iio_priv(indio_dev);
-> +	struct dma_slave_config config;
-> +	int ret;
-> +
-> +	adc->dma_chan = dma_request_slave_channel(&indio_dev->dev, "rx");
-> +	if (!adc->dma_chan)
-> +		return 0;
-> +
-> +	adc->rx_buf = dma_alloc_coherent(adc->dma_chan->device->dev,
-> +					 STM32_DMA_BUFFER_SIZE,
-> +					 &adc->rx_dma_buf, GFP_KERNEL);
-> +	if (!adc->rx_buf) {
-> +		goto err_release;
-> +		ret = -ENOMEM;
-> +	}
-> +
-> +	/* Configure DMA channel to read data register */
-> +	memset(&config, 0, sizeof(config));
-> +	config.src_addr = (dma_addr_t)adc->common->phys_base;
-> +	config.src_addr += adc->offset + STM32F4_ADC_DR;
-> +	config.src_addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
-> +
-> +	ret = dmaengine_slave_config(adc->dma_chan, &config);
-> +	if (ret)
-> +		goto err_free;
-> +
-> +	return 0;
-> +
-> +err_free:
-> +	dma_free_coherent(adc->dma_chan->device->dev, STM32_DMA_BUFFER_SIZE,
-> +			  adc->rx_buf, adc->rx_dma_buf);
-> +err_release:
-> +	dma_release_channel(adc->dma_chan);
-> +
-> +	return ret;
-> +}
-> +
->  static int stm32_adc_probe(struct platform_device *pdev)
->  {
->  	struct iio_dev *indio_dev;
-> @@ -842,13 +1026,17 @@ static int stm32_adc_probe(struct platform_device *pdev)
->  	if (ret < 0)
->  		goto err_clk_disable;
->  
-> +	ret = stm32_adc_dma_request(indio_dev);
-> +	if (ret < 0)
-> +		goto err_clk_disable;
-> +
->  	ret = iio_triggered_buffer_setup(indio_dev,
->  					 &iio_pollfunc_store_time,
->  					 &stm32_adc_trigger_handler,
->  					 &stm32_adc_buffer_setup_ops);
->  	if (ret) {
->  		dev_err(&pdev->dev, "buffer setup failed\n");
-> -		goto err_clk_disable;
-> +		goto err_dma_disable;
->  	}
->  
->  	ret = iio_device_register(indio_dev);
-> @@ -862,6 +1050,13 @@ static int stm32_adc_probe(struct platform_device *pdev)
->  err_buffer_cleanup:
->  	iio_triggered_buffer_cleanup(indio_dev);
->  
-> +err_dma_disable:
-> +	if (adc->dma_chan) {
-> +		dma_free_coherent(adc->dma_chan->device->dev,
-> +				  STM32_DMA_BUFFER_SIZE,
-> +				  adc->rx_buf, adc->rx_dma_buf);
-> +		dma_release_channel(adc->dma_chan);
-> +	}
->  err_clk_disable:
->  	clk_disable_unprepare(adc->clk);
->  
-> @@ -875,6 +1070,12 @@ static int stm32_adc_remove(struct platform_device *pdev)
->  
->  	iio_device_unregister(indio_dev);
->  	iio_triggered_buffer_cleanup(indio_dev);
-> +	if (adc->dma_chan) {
-> +		dma_free_coherent(adc->dma_chan->device->dev,
-> +				  STM32_DMA_BUFFER_SIZE,
-> +				  adc->rx_buf, adc->rx_dma_buf);
-> +		dma_release_channel(adc->dma_chan);
-> +	}
->  	clk_disable_unprepare(adc->clk);
->  
->  	return 0;
-> 
+I will post version 4 in a couple days.
+
+Steve
+
+
+> On Mon, 2017-01-23 at 15:08 -0800, Steve Longerbeam wrote:
+> [...]
+>>>>> And I'm actually in total agreement with that. I definitely agree that there
+>>>>> should be a mechanism in the media framework that allows passing video
+>>>>> buffers from a source pad to a sink pad using a software queue, with no
+>>>>> involvement from userland.
+>>> That is the other part of the argument. I do not agree that these
+>>> software queue "links" should be presented to userspace as media pad
+>>> links between two entities of a media device.
+>>> First, that would limit the links to subdevices contained in the same
+>>> media graph, while this should work between any two capture and output
+>>> queues of different devices.
+>> It sounds like we are talking about two different new proposed features.
+> We are talking about the same thing, but we both want a different user
+> interface.
+> Technically, the issue is to trigger the DMA read channel of a mem2mem
+> device automatically whenever another capture device's DMA write channel
+> signals a finished frame. Where we disagree is how to present this to
+> userspace.
+>
+> You represent the capture DMA write channel and mem2mem DMA read channel
+> as pads on media entites and configure the in-kernel software queue
+> between the two using a media pad link. At the same time a different
+> representation of the same DMA write and read channels (the capture
+> vb2_queue of the capture device and the output vb2_queue of the mem2mem
+> device) would be used for operation in the classic, userspace controlled
+> mode via dmabuf passing.
+>
+> I don't want the software-only link in the media graph, but instead use
+> the vb2_queue representation for both cases, and implement the in-kernel
+> queue link on top of the vb2_queue interface. This would allow userspace
+> to have control over buffer allocations and format, and thus avoid
+> unexpected performance implications: it is impossible for userspace to
+> understand which media entity link, when enabled, will cause a
+> significant increase in memory bandwidth usage, or even how much.
+> Also the same mechanism could then be used to link any two devices in a
+> generic manner, instead of special casing the software queue link for
+> two devices that happen to be part of the same media graph.
+>
+>> My proposal is to implement a software buffer queue between pads.
+>> Beyond enabling the link between pads using the existing media controller
+>> API, userspace is not involved after that. The fact that this link is
+>> accomplished with a software buffer queue is not known, and doesn't
+>> need to be known, by userspace.
+> I don't think this is a good thing for the reasons stated above and
+> below:
+> Since the software buffer queue is opaque to userspace, it is completely
+> out of userspace control which format is chosen and how the buffers are
+> allocated.
+> By using media bus formats to configure software links the kernel
+> pretends to userspace that there is a physical connection where there
+> isn't one.
+> Also, the media entity graph would quickly become very unreadable if we
+> were to add all devices to it that could reasonably be linked with
+> software queues.
+>
+>> Your proposal, if I have it right, is to allow linking two v4l2 device
+>> vb2 queues
+>> (i.e. /dev/videoX -> /dev/videoY), using a new user level API, in a free-run
+>> mode such that v4l2 buffers get passed from one device's vb2 queue to the
+>> other without requiring the v4l2 user program to actively forward those
+>> buffers.
+> Yes.
+>
+>> There isn't anything that would preclude one from the other, they can
+>> both exist. But they are different ideas. One implements software queues
+>> at the _pad level_ and is opaque to userspace, the other links queues
+>> at the _device level_ using a new user API, but once the link is
+>> established, also does not require any involvement from userspace.
+> Well, they are different ideas of how the userspace interface _for the
+> same thing_ should look like.
+>
+>> What I'm saying is we can do _both_.
+> What I am saying is we shouldn't do the pad link interface for the
+> software queues. In my opinion it is the wrong abstraction, and apart
+> from the convenience of being able to switch the links on with a single
+> media-ctl invocation, I see too many downsides.
+>
+>>> Assume for example, we want to encode the captured, deinterlaced video
+>>> to h.264 with the coda VPU driver. A software queue link could be
+>>> established between the CSI capture and the VDIC deinterlacer input,
+>> That's already available in the media graph. By linking CSI and
+>> VDIC entities. The capture device will then already be providing
+>> de-interlaced video, and ...
+> I know it is in your code. That is the cause for my concern. The link
+> between CSI and VDIC entity should only describe the direct physical
+> connection through the VDIC FIFO1 in my opinion.
+> For the indirect CSI -> SMFC -> IDMAC -> RAM, RAM -> IDMAC -> VDIC
+> software queue, I would strongly prefer to use linked vb2_queues instead
+> of the media entity link.
+>
+>>> just as between the VDIC deinterlacer output and the coda VPU input.
+>>> Technically, there would be no difference between those two linked
+>>> capture/output queue pairs. But the coda driver is a completely separate
+>>> mem2mem device. And since it is not part of the i.MX media graph, there
+>>> is no entity pad to link to.
+>> your free-run queue linking could then be used to link the (already)
+>> de-interlaced stream to the coda device for h.264 encode.
+> Yes, and I see no reason why that should use a different interface than
+> what is exactly the same process between CSI and VDIC.
+>
+>> The other idea would be to eventually make the coda device part of
+>> the media graph as an entity. Then this link would instead be via pads.
+> I would only want to do this if there was a direct connection between
+> the IPU FIFOs and the coda VPU device somehow. But since the devices are
+> completely separate, they should be described as such.
+>
+>>> Or assume there is an USB analog capture device that produces interlaced
+>>> frames. I think it should be possible to connect its capture queue to
+>>> the VDIC deinterlacer output queue just the same way as linking the CSI
+>>> to the VDIC (in software queue mode).
+>> Right, for devices that are outside the i.MX media graph, such as a USB
+>> capture device (or coda), access to the i.MX entities such as the VDIC would
+>> require an i.MX mem2mem device with media links to the VDIC. The USB
+>> capture device would forward its captured frames to mem2mem (maybe
+>> using your free-run vb2 queue linking idea):
+>>
+>> usb device -> i.mx mem2mem device -> VDIC entity -> i.mx mem2mem device
+> The VDIC doesn't have a direct to memory channel, so that would be
+> mem2mem -> VDIC -> IC -> mem2mem, I think?
+>
+> ========== MEDIA_BUS formats below =====================================
+>
+>>> Second, the subdevice pad formats describe wire formats, not memory
+>>> formats. The user might want to choose between 4:2:2 and 4:2:0
+>>> subsampled YUV formats for the intermediate buffer, for example,
+>>> depending on memory bandwidth constraints and quality requirements. This
+>>> is impossible with the media entity / subdevice pad links.
+>> It's true that there are currently no defined planar media bus
+>> pixel formats. We just need to add new definitions for them. Once
+>> that is done, the media driver will support planar YUV formats
+>> simply by adding the new codes to imx_media_formats[].
+> I am not comfortable with starting to mix MEDIA_BUS_FMT and V4L2_PIX_FMT
+> this way.
+>
+>> Perhaps this gets to the root of the issue.
+>>
+>> Is the media bus concept an abstract one, or is the media bus
+>> intended to represent actual physical buses (as the lack of planar
+>> media bus formats would imply)?
+> Yes, maybe that is the root of our disconnect. As I understand it, the
+> media bus formats are describing "image formats as flowing over physical
+> busses" [1].
+>
+> [1] Linux Media Subsystem Documentation, Chapter 4.15.3.4.1.1. Media Bus Pixel Codes
+>      https://linuxtv.org/downloads/v4l-dvb-apis/uapi/v4l/subdev-formats.html?highlight=media%20bus#v4l2-mbus-pixelcode
+>
+> I would like to keep it that way and not soften up that description.
+>
+>> Can we break with the physical-bus-only idea if that is the case, and
+>> loosen the definition of a media bus to mean the passage of media
+>> data from one pad to another by whatever means?
+>>
+>> In my view the idea of a physical bus at the sensor makes sense, but
+>> beyond that, keeping that restriction limits how data can pass between
+>> pads.
+>>
+>> Hans, any input here?
+>>
+>> If this is really anathema, then I'm willing to remove the software queues
+>> between pads, but it will be giving up some functionality in the media
+>> driver.
+> So far I am the only one arguing against this, and I haven't yet heard
+> anything yet that would have convinced me otherwise. That's why I'd too
+> like some more input on this issue.
+>
+> Certainly removing the controversial pad link controlled software queues
+> would remove the point of contention. I think losing some functionality
+> (in this case "higher quality" deinterlacing without userspace
+> intervention) for now would be worth it to achieve consensus, and also
+> reduce the list of things that have to be done for this driver to leave
+> staging, but that is of course from the point of view of the guy arguing
+> against that interface.
+>
+>> It would also mean splitting the VDIC in two. The VDIC entity would be
+>> limited to only one motion compensation mode,
+> Currently, yes. That direct mode is the only one that should be
+> described by the media pad link between CSI and VDIC in my opinion.
+>
+>> and the full functionality would have
+>> to be added somewhere else.
+> I don't understand why the other functionality would necessarily have to
+> live somewere else, but I can see that it might make sense to do so. In
+> any case, the separate control of the VDIC/IC via a mem2mem video device
+> will be needed anyway, as pointed out in the USB example above, or to
+> deinterlace streams received via network or played back from files.
+>
+>>   Currently all functionality of the VDIC is implemented in a single media entity.
+> Yes, at least the mem2mem part should move into its own mem2mem video
+> device.
+>
+>>> I think an interface where userspace configures the capture and output
+>>> queues via v4l2 API, passes dma buffers around from one to the other
+>>> queue, and then puts both queues into a free running mode would be a
+>>> much better fit for this mechanism.
+>> As I said, I see these as two different ideas that can both be
+>> implemented.
+> I think we should have cleared up now where we disagree. These are two
+> different ideas for userspace interfaces for the same functionality. My
+> opinion is that both should not be implemented
+>
+>>>>> My only disagreement is when this should be implemented. I think it is
+>>>>> fine to keep my custom implementation of this in the driver for now. Once
+>>>>> an extension of vb2 is ready to support this feature, it would be fairly
+>>>>> straightforward to strip out my custom implementation and go with the
+>>>>> new API.
+>>>> For a staging driver this isn't necessary, as long as it is documented in
+>>>> the TODO file that this needs to be fixed before it can be moved out of
+>>>> staging. The whole point of staging is that there is still work to be
+>>>> done in the driver, after all :-)
+>>> Absolutely. The reason I am arguing against merging the mem2mem media
+>>> control links so vehemently is that I am convinced the userspace
+>>> interface is wrong, and I am afraid that even though in staging, it
+>>> might become established.
+>> I don't believe there is anything wrong with the userspace interface,
+>> In fact it hasn't even changed. The fact two pads are passing memory
+>> buffers is "under the hood".
+> Which I disagree with. Doing things like this under the hood would be
+> fine only if they were properly introspectable and if the interface
+> wouldn't break assumptions that I believe to be there, such as media
+> links describing physical connections between hardware entities, and
+> media bus formats describing the image format on a physical bus.
+> Also with videobuf2 we already have a userspace interface for DMA read
+> and write queues, and I'd prefer to extend and improve that instead of
+> reimplementing the same functionality, even simplified, under the hood.
+>
+> regards
+> Philipp
+>
