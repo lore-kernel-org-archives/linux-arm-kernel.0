@@ -1,112 +1,50 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 28 Jan 2017 23:25:34 +0000
-Subject: [PATCH v3 05/10] crypto: arm64/aes-blk - remove cra_alignmask
+Date: Sat, 28 Jan 2017 23:25:36 +0000
+Subject: [PATCH v3 07/10] crypto: arm64/aes - avoid literals for cross-module
+ symbol references
 In-Reply-To: <1485645939-17126-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1485645939-17126-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1485645939-17126-6-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1485645939-17126-8-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the unnecessary alignmask: it is much more efficient to deal with
-the misalignment in the core algorithm than relying on the crypto API to
-copy the data to a suitably aligned buffer.
+Using simple adrp/add pairs to refer to the AES lookup tables exposed by
+the generic AES driver (which could be loaded far away from this driver
+when KASLR is in effect) was unreliable at module load time before commit
+41c066f2c4d4 ("arm64: assembler: make adr_l work in modules under KASLR"),
+which is why the AES code used literals instead.
+
+So now we can get rid of the literals, and switch to the adr_l macro.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/crypto/aes-glue.c  | 16 ++++++----------
- arch/arm64/crypto/aes-modes.S |  8 +++-----
- 2 files changed, 9 insertions(+), 15 deletions(-)
+ arch/arm64/crypto/aes-cipher-core.S | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/crypto/aes-glue.c b/arch/arm64/crypto/aes-glue.c
-index 5164aaf82c6a..8ee1fb7aaa4f 100644
---- a/arch/arm64/crypto/aes-glue.c
-+++ b/arch/arm64/crypto/aes-glue.c
-@@ -215,14 +215,15 @@ static int ctr_encrypt(struct skcipher_request *req)
- 		u8 *tsrc = walk.src.virt.addr;
+diff --git a/arch/arm64/crypto/aes-cipher-core.S b/arch/arm64/crypto/aes-cipher-core.S
+index 37590ab8121a..cd58c61e6677 100644
+--- a/arch/arm64/crypto/aes-cipher-core.S
++++ b/arch/arm64/crypto/aes-cipher-core.S
+@@ -89,8 +89,8 @@ CPU_BE(	rev		w8, w8		)
+ 	eor		w7, w7, w11
+ 	eor		w8, w8, w12
  
- 		/*
--		 * Minimum alignment is 8 bytes, so if nbytes is <= 8, we need
--		 * to tell aes_ctr_encrypt() to only read half a block.
-+		 * Tell aes_ctr_encrypt() to process a tail block.
- 		 */
--		blocks = (nbytes <= 8) ? -1 : 1;
-+		blocks = -1;
+-	ldr		tt, =\ttab
+-	ldr		lt, =\ltab
++	adr_l		tt, \ttab
++	adr_l		lt, \ltab
  
--		aes_ctr_encrypt(tail, tsrc, (u8 *)ctx->key_enc, rounds,
-+		aes_ctr_encrypt(tail, NULL, (u8 *)ctx->key_enc, rounds,
- 				blocks, walk.iv, first);
--		memcpy(tdst, tail, nbytes);
-+		if (tdst != tsrc)
-+			memcpy(tdst, tsrc, nbytes);
-+		crypto_xor(tdst, tail, nbytes);
- 		err = skcipher_walk_done(&walk, 0);
- 	}
- 	kernel_neon_end();
-@@ -282,7 +283,6 @@ static struct skcipher_alg aes_algs[] = { {
- 		.cra_flags		= CRYPTO_ALG_INTERNAL,
- 		.cra_blocksize		= AES_BLOCK_SIZE,
- 		.cra_ctxsize		= sizeof(struct crypto_aes_ctx),
--		.cra_alignmask		= 7,
- 		.cra_module		= THIS_MODULE,
- 	},
- 	.min_keysize	= AES_MIN_KEY_SIZE,
-@@ -298,7 +298,6 @@ static struct skcipher_alg aes_algs[] = { {
- 		.cra_flags		= CRYPTO_ALG_INTERNAL,
- 		.cra_blocksize		= AES_BLOCK_SIZE,
- 		.cra_ctxsize		= sizeof(struct crypto_aes_ctx),
--		.cra_alignmask		= 7,
- 		.cra_module		= THIS_MODULE,
- 	},
- 	.min_keysize	= AES_MIN_KEY_SIZE,
-@@ -315,7 +314,6 @@ static struct skcipher_alg aes_algs[] = { {
- 		.cra_flags		= CRYPTO_ALG_INTERNAL,
- 		.cra_blocksize		= 1,
- 		.cra_ctxsize		= sizeof(struct crypto_aes_ctx),
--		.cra_alignmask		= 7,
- 		.cra_module		= THIS_MODULE,
- 	},
- 	.min_keysize	= AES_MIN_KEY_SIZE,
-@@ -332,7 +330,6 @@ static struct skcipher_alg aes_algs[] = { {
- 		.cra_priority		= PRIO - 1,
- 		.cra_blocksize		= 1,
- 		.cra_ctxsize		= sizeof(struct crypto_aes_ctx),
--		.cra_alignmask		= 7,
- 		.cra_module		= THIS_MODULE,
- 	},
- 	.min_keysize	= AES_MIN_KEY_SIZE,
-@@ -350,7 +347,6 @@ static struct skcipher_alg aes_algs[] = { {
- 		.cra_flags		= CRYPTO_ALG_INTERNAL,
- 		.cra_blocksize		= AES_BLOCK_SIZE,
- 		.cra_ctxsize		= sizeof(struct crypto_aes_xts_ctx),
--		.cra_alignmask		= 7,
- 		.cra_module		= THIS_MODULE,
- 	},
- 	.min_keysize	= 2 * AES_MIN_KEY_SIZE,
-diff --git a/arch/arm64/crypto/aes-modes.S b/arch/arm64/crypto/aes-modes.S
-index 838dad5c209f..92b982a8b112 100644
---- a/arch/arm64/crypto/aes-modes.S
-+++ b/arch/arm64/crypto/aes-modes.S
-@@ -337,7 +337,7 @@ AES_ENTRY(aes_ctr_encrypt)
+ 	tbnz		rounds, #1, 1f
  
- .Lctrcarrydone:
- 	subs		w4, w4, #1
--	bmi		.Lctrhalfblock		/* blocks < 0 means 1/2 block */
-+	bmi		.Lctrtailblock		/* blocks <0 means tail block */
- 	ld1		{v3.16b}, [x1], #16
- 	eor		v3.16b, v0.16b, v3.16b
- 	st1		{v3.16b}, [x0], #16
-@@ -348,10 +348,8 @@ AES_ENTRY(aes_ctr_encrypt)
- 	FRAME_POP
+@@ -111,9 +111,6 @@ CPU_BE(	rev		w8, w8		)
+ 	stp		w5, w6, [out]
+ 	stp		w7, w8, [out, #8]
  	ret
+-
+-	.align		4
+-	.ltorg
+ 	.endm
  
--.Lctrhalfblock:
--	ld1		{v3.8b}, [x1]
--	eor		v3.8b, v0.8b, v3.8b
--	st1		{v3.8b}, [x0]
-+.Lctrtailblock:
-+	st1		{v0.16b}, [x0]
- 	FRAME_POP
- 	ret
- 
+ 	.align		5
 -- 
 2.7.4
