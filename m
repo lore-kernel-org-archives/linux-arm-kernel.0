@@ -1,46 +1,64 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Sat, 28 Jan 2017 15:29:12 -0600
-Subject: [PATCH v2] PCI: exynos: refactor exynos pcie driver
-In-Reply-To: <1483588418-2551-1-git-send-email-pankaj.dubey@samsung.com>
-References: <CGME20170105035104epcas1p2de6c52e577dd78a4f3539fb32d1f0dfe@epcas1p2.samsung.com>
- <1483588418-2551-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <20170128212912.GK20550@bhelgaas-glaptop.roam.corp.google.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 28 Jan 2017 22:50:04 +0100
+Subject: [PATCH 09/22 v2] mtd: add DT bindings for the Cortina Systems Gemini
+ Flash
+Message-ID: <20170128215004.11532-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2017 at 09:23:38AM +0530, Pankaj Dubey wrote:
-> From: Niyas Ahmed S T <niyas.ahmed@samsung.com>
-> 
-> Currently Exynos PCIe driver is only supported for Exynos5440 SoC.
-> This patch does refactoring of Exynos PCIe driver to extend support
-> for other Exynos SoC.
-> 
-> Following are the main changes done via this patch:
-> 
-> 1) It adds separate structs for memory, clock resources.
-> 
-> Reason behind this change is, moving ahead various Exynos SoC will
-> have different hardware resources such as iomem, clocks, regmap handles
-> etc. for PCIe controller, so keeping these resources in separate struct
-> will help us in intiailizing them via per SoC ops, and will avoid too
-> many of_machine_is_compatible in code, and help us simplifying
-> exynos_pcie struct.
-> 
-> 2) It add exynos_pcie_ops struct which will allow us to support the
-> differences in resources in different Exynos SoC.
-> 
-> No functional change intended.
-> 
-> Signed-off-by: Niyas Ahmed S T <niyas.ahmed@samsung.com>
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
-> Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
-> This patch set is prepared on top of Krzysztof's for-next and
-> PCIe driver cleanup patch [1] by Jaehoon Chung.
-> 
-> [1]: https://lkml.org/lkml/2016/12/19/44
+This adds device tree bindings for the Cortina systems Gemini
+flash controller, a simple physmap which however need a few
+syscon bits to be poked to operate properly.
 
-Jaehoon has posted an updated version since you posted this patch, so
-I assume this will need to be rebased on that.  I'll drop this version and
-wait for your rebased version.
+Cc: Janos Laube <janos.dev@gmail.com>
+Cc: Paulius Zaleckas <paulius.zaleckas@gmail.com>
+Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: devicetree at vger.kernel.org
+Reviewed-by: Marek Vasut <marek.vasut@gmail.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Add Marek's and Rob's ACK tags.
+
+MTD maintainers: please just apply this to the MTD tree when
+you are happy with it. It is functionally orthogonal to the rest
+of the series and is just in the series for context.
+---
+ .../bindings/mtd/cortina,gemini-flash.txt          | 24 ++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/cortina,gemini-flash.txt
+
+diff --git a/Documentation/devicetree/bindings/mtd/cortina,gemini-flash.txt b/Documentation/devicetree/bindings/mtd/cortina,gemini-flash.txt
+new file mode 100644
+index 000000000000..3fa1b34d69ad
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mtd/cortina,gemini-flash.txt
+@@ -0,0 +1,24 @@
++Flash device on Cortina Systems Gemini SoC
++
++This flash is regular CFI compatible (Intel or AMD extended) flash chips with
++some special bits that can be controlled by the machine's system controller.
++
++Required properties:
++- compatible : must be "cortina,gemini-flash", "cfi-flash";
++- reg : memory address for the flash chip
++- syscon : must be a phandle to the system controller
++- bank-width : width in bytes of flash interface, should be <2>
++
++For the rest of the properties, see mtd-physmap.txt.
++
++The device tree may optionally contain sub-nodes describing partitions of the
++address space. See partition.txt for more detail.
++
++Example:
++
++flash at 30000000 {
++	compatible = "cortina,gemini-flash", "cfi-flash";
++	reg = <0x30000000 0x01000000>;
++	syscon = <&syscon>;
++	bank-width = <2>;
++};
+-- 
+2.9.3
