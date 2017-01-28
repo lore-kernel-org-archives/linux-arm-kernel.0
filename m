@@ -1,201 +1,46 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Sat, 28 Jan 2017 15:17:28 -0600
-Subject: [PATCH] PCI: mvebu: Handle changes to the bridge windows while
- enabled
-In-Reply-To: <20170111183055.GD14532@bhelgaas-glaptop.roam.corp.google.com>
-References: <20161212183020.GA30274@obsidianresearch.com>
- <20170111183055.GD14532@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20170128211728.GJ20550@bhelgaas-glaptop.roam.corp.google.com>
+Date: Sat, 28 Jan 2017 15:29:12 -0600
+Subject: [PATCH v2] PCI: exynos: refactor exynos pcie driver
+In-Reply-To: <1483588418-2551-1-git-send-email-pankaj.dubey@samsung.com>
+References: <CGME20170105035104epcas1p2de6c52e577dd78a4f3539fb32d1f0dfe@epcas1p2.samsung.com>
+ <1483588418-2551-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <20170128212912.GK20550@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 11, 2017 at 12:30:55PM -0600, Bjorn Helgaas wrote:
-> On Mon, Dec 12, 2016 at 11:30:20AM -0700, Jason Gunthorpe wrote:
-> > The PCI core will write to the bridge window config multiple times
-> > while they are enabled. This can lead to mbus failures like:
-> > 
-> >  mvebu_mbus: cannot add window '4:e8', conflicts with another window
-> >  mvebu-pcie mbus:pex at e0000000: Could not create MBus window at [mem 0xe0000000-0xe00fffff]: -22
-> > 
-> > For me this is happening during a hotplug cycle. The PCI core is
-> > not changing the values, just writing them twice while active.
-> > 
-> > The patch addresses the general case of any change to an active window,
-> > but not atomically. The code is slightly refactored so io and mem
-> > can share more of the window logic.
+On Thu, Jan 05, 2017 at 09:23:38AM +0530, Pankaj Dubey wrote:
+> From: Niyas Ahmed S T <niyas.ahmed@samsung.com>
 > 
-> Looks good to me, but I'm waiting for an ack from Thomas or Jason (listed
-> as maintainers and already cc'd).
-
-Ping, Thomas, Jason C?
-
-> > Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> > ---
-> >  drivers/pci/host/pci-mvebu.c | 101 +++++++++++++++++++++++++------------------
-> >  1 file changed, 60 insertions(+), 41 deletions(-)
-> > 
-> > diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-> > index 307f81d6b479af..af724731b22f53 100644
-> > --- a/drivers/pci/host/pci-mvebu.c
-> > +++ b/drivers/pci/host/pci-mvebu.c
-> > @@ -133,6 +133,12 @@ struct mvebu_pcie {
-> >  	int nports;
-> >  };
-> >  
-> > +struct mvebu_pcie_window {
-> > +	phys_addr_t base;
-> > +	phys_addr_t remap;
-> > +	size_t size;
-> > +};
-> > +
-> >  /* Structure representing one PCIe interface */
-> >  struct mvebu_pcie_port {
-> >  	char *name;
-> > @@ -150,10 +156,8 @@ struct mvebu_pcie_port {
-> >  	struct mvebu_sw_pci_bridge bridge;
-> >  	struct device_node *dn;
-> >  	struct mvebu_pcie *pcie;
-> > -	phys_addr_t memwin_base;
-> > -	size_t memwin_size;
-> > -	phys_addr_t iowin_base;
-> > -	size_t iowin_size;
-> > +	struct mvebu_pcie_window memwin;
-> > +	struct mvebu_pcie_window iowin;
-> >  	u32 saved_pcie_stat;
-> >  };
-> >  
-> > @@ -379,23 +383,45 @@ static void mvebu_pcie_add_windows(struct mvebu_pcie_port *port,
-> >  	}
-> >  }
-> >  
-> > +static void mvebu_pcie_set_window(struct mvebu_pcie_port *port,
-> > +				  unsigned int target, unsigned int attribute,
-> > +				  const struct mvebu_pcie_window *desired,
-> > +				  struct mvebu_pcie_window *cur)
-> > +{
-> > +	if (desired->base == cur->base && desired->remap == cur->remap &&
-> > +	    desired->size == cur->size)
-> > +		return;
-> > +
-> > +	if (cur->size != 0) {
-> > +		mvebu_pcie_del_windows(port, cur->base, cur->size);
-> > +		cur->size = 0;
-> > +		cur->base = 0;
-> > +
-> > +		/*
-> > +		 * If something tries to change the window while it is enabled
-> > +		 * the change will not be done atomically. That would be
-> > +		 * difficult to do in the general case.
-> > +		 */
-> > +	}
-> > +
-> > +	if (desired->size == 0)
-> > +		return;
-> > +
-> > +	mvebu_pcie_add_windows(port, target, attribute, desired->base,
-> > +			       desired->size, desired->remap);
-> > +	*cur = *desired;
-> > +}
-> > +
-> >  static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
-> >  {
-> > -	phys_addr_t iobase;
-> > +	struct mvebu_pcie_window desired = {};
-> >  
-> >  	/* Are the new iobase/iolimit values invalid? */
-> >  	if (port->bridge.iolimit < port->bridge.iobase ||
-> >  	    port->bridge.iolimitupper < port->bridge.iobaseupper ||
-> >  	    !(port->bridge.command & PCI_COMMAND_IO)) {
-> > -
-> > -		/* If a window was configured, remove it */
-> > -		if (port->iowin_base) {
-> > -			mvebu_pcie_del_windows(port, port->iowin_base,
-> > -					       port->iowin_size);
-> > -			port->iowin_base = 0;
-> > -			port->iowin_size = 0;
-> > -		}
-> > -
-> > +		mvebu_pcie_set_window(port, port->io_target, port->io_attr,
-> > +				      &desired, &port->iowin);
-> >  		return;
-> >  	}
-> >  
-> > @@ -412,32 +438,27 @@ static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
-> >  	 * specifications. iobase is the bus address, port->iowin_base
-> >  	 * is the CPU address.
-> >  	 */
-> > -	iobase = ((port->bridge.iobase & 0xF0) << 8) |
-> > -		(port->bridge.iobaseupper << 16);
-> > -	port->iowin_base = port->pcie->io.start + iobase;
-> > -	port->iowin_size = ((0xFFF | ((port->bridge.iolimit & 0xF0) << 8) |
-> > -			    (port->bridge.iolimitupper << 16)) -
-> > -			    iobase) + 1;
-> > -
-> > -	mvebu_pcie_add_windows(port, port->io_target, port->io_attr,
-> > -			       port->iowin_base, port->iowin_size,
-> > -			       iobase);
-> > +	desired.remap = ((port->bridge.iobase & 0xF0) << 8) |
-> > +			(port->bridge.iobaseupper << 16);
-> > +	desired.base = port->pcie->io.start + desired.remap;
-> > +	desired.size = ((0xFFF | ((port->bridge.iolimit & 0xF0) << 8) |
-> > +			 (port->bridge.iolimitupper << 16)) -
-> > +			desired.remap) +
-> > +		       1;
-> > +
-> > +	mvebu_pcie_set_window(port, port->io_target, port->io_attr, &desired,
-> > +			      &port->iowin);
-> >  }
-> >  
-> >  static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
-> >  {
-> > +	struct mvebu_pcie_window desired = {.remap = MVEBU_MBUS_NO_REMAP};
-> > +
-> >  	/* Are the new membase/memlimit values invalid? */
-> >  	if (port->bridge.memlimit < port->bridge.membase ||
-> >  	    !(port->bridge.command & PCI_COMMAND_MEMORY)) {
-> > -
-> > -		/* If a window was configured, remove it */
-> > -		if (port->memwin_base) {
-> > -			mvebu_pcie_del_windows(port, port->memwin_base,
-> > -					       port->memwin_size);
-> > -			port->memwin_base = 0;
-> > -			port->memwin_size = 0;
-> > -		}
-> > -
-> > +		mvebu_pcie_set_window(port, port->mem_target, port->mem_attr,
-> > +				      &desired, &port->memwin);
-> >  		return;
-> >  	}
-> >  
-> > @@ -447,14 +468,12 @@ static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
-> >  	 * window to setup, according to the PCI-to-PCI bridge
-> >  	 * specifications.
-> >  	 */
-> > -	port->memwin_base  = ((port->bridge.membase & 0xFFF0) << 16);
-> > -	port->memwin_size  =
-> > -		(((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF) -
-> > -		port->memwin_base + 1;
-> > -
-> > -	mvebu_pcie_add_windows(port, port->mem_target, port->mem_attr,
-> > -			       port->memwin_base, port->memwin_size,
-> > -			       MVEBU_MBUS_NO_REMAP);
-> > +	desired.base = ((port->bridge.membase & 0xFFF0) << 16);
-> > +	desired.size = (((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF) -
-> > +		       desired.base + 1;
-> > +
-> > +	mvebu_pcie_set_window(port, port->mem_target, port->mem_attr, &desired,
-> > +			      &port->memwin);
-> >  }
-> >  
-> >  /*
-> > -- 
-> > 2.7.4
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Currently Exynos PCIe driver is only supported for Exynos5440 SoC.
+> This patch does refactoring of Exynos PCIe driver to extend support
+> for other Exynos SoC.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Following are the main changes done via this patch:
+> 
+> 1) It adds separate structs for memory, clock resources.
+> 
+> Reason behind this change is, moving ahead various Exynos SoC will
+> have different hardware resources such as iomem, clocks, regmap handles
+> etc. for PCIe controller, so keeping these resources in separate struct
+> will help us in intiailizing them via per SoC ops, and will avoid too
+> many of_machine_is_compatible in code, and help us simplifying
+> exynos_pcie struct.
+> 
+> 2) It add exynos_pcie_ops struct which will allow us to support the
+> differences in resources in different Exynos SoC.
+> 
+> No functional change intended.
+> 
+> Signed-off-by: Niyas Ahmed S T <niyas.ahmed@samsung.com>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Reviewed-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ---
+> This patch set is prepared on top of Krzysztof's for-next and
+> PCIe driver cleanup patch [1] by Jaehoon Chung.
+> 
+> [1]: https://lkml.org/lkml/2016/12/19/44
+
+Jaehoon has posted an updated version since you posted this patch, so
+I assume this will need to be rebased on that.  I'll drop this version and
+wait for your rebased version.
