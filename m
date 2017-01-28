@@ -1,119 +1,52 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 28 Jan 2017 23:25:39 +0000
-Subject: [PATCH v3 10/10] crypto: arm64/aes - replace scalar fallback with
- plain NEON fallback
-In-Reply-To: <1485645939-17126-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1485645939-17126-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1485645939-17126-11-git-send-email-ard.biesheuvel@linaro.org>
+Date: Sat, 28 Jan 2017 23:33:29 +0000
+Subject: [PATCH v2 0/4] crypto: time invariant AES for CCM (and GCM/CTR)
+Message-ID: <1485646413-17491-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new bitsliced NEON implementation of AES uses a fallback in two
-places: CBC encryption (which is strictly sequential, whereas this
-driver can only operate efficiently on 8 blocks at a time), and the
-XTS tweak generation, which involves encrypting a single AES block
-with a different key schedule.
+This series is primarily directed at improving the performance and security
+of CCM on the Rasperry Pi 3. This involves splitting the MAC handling of
+CCM into a separate driver so that we can efficiently replace it by something
+else using the ordinary algo resolution machinery.
 
-The plain (i.e., non-bitsliced) NEON code is more suitable as a fallback,
-given that it is faster than scalar on low end cores (which is what
-the NEON implementations target, since high end cores have dedicated
-instructions for AES), and shows similar behavior in terms of D-cache
-footprint and sensitivity to cache timing attacks. So switch the fallback
-handling to the plain NEON driver.
+Patch #1 adds some testcases for cbcmac(aes), which will be introduced later.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/crypto/Kconfig           |  2 +-
- arch/arm64/crypto/aes-neonbs-glue.c | 38 ++++++++++++++------
- 2 files changed, 29 insertions(+), 11 deletions(-)
+Patch #2 replaces the open coded CBC MAC hashing routines in the CCM driver
+with calls to a cbcmac() hash, and implements a template for producing such
+transforms. This eliminates all the fuzzy scatterwalk code as well.
 
-diff --git a/arch/arm64/crypto/Kconfig b/arch/arm64/crypto/Kconfig
-index 5de75c3dcbd4..bed7feddfeed 100644
---- a/arch/arm64/crypto/Kconfig
-+++ b/arch/arm64/crypto/Kconfig
-@@ -86,7 +86,7 @@ config CRYPTO_AES_ARM64_BS
- 	tristate "AES in ECB/CBC/CTR/XTS modes using bit-sliced NEON algorithm"
- 	depends on KERNEL_MODE_NEON
- 	select CRYPTO_BLKCIPHER
--	select CRYPTO_AES_ARM64
-+	select CRYPTO_AES_ARM64_NEON_BLK
- 	select CRYPTO_SIMD
- 
- endif
-diff --git a/arch/arm64/crypto/aes-neonbs-glue.c b/arch/arm64/crypto/aes-neonbs-glue.c
-index 323dd76ae5f0..863e436ecf89 100644
---- a/arch/arm64/crypto/aes-neonbs-glue.c
-+++ b/arch/arm64/crypto/aes-neonbs-glue.c
-@@ -10,7 +10,6 @@
- 
- #include <asm/neon.h>
- #include <crypto/aes.h>
--#include <crypto/cbc.h>
- #include <crypto/internal/simd.h>
- #include <crypto/internal/skcipher.h>
- #include <crypto/xts.h>
-@@ -42,7 +41,12 @@ asmlinkage void aesbs_xts_encrypt(u8 out[], u8 const in[], u8 const rk[],
- asmlinkage void aesbs_xts_decrypt(u8 out[], u8 const in[], u8 const rk[],
- 				  int rounds, int blocks, u8 iv[]);
- 
--asmlinkage void __aes_arm64_encrypt(u32 *rk, u8 *out, const u8 *in, int rounds);
-+/* borrowed from aes-neon-blk.ko */
-+asmlinkage void neon_aes_ecb_encrypt(u8 out[], u8 const in[], u32 const rk[],
-+				     int rounds, int blocks, int first);
-+asmlinkage void neon_aes_cbc_encrypt(u8 out[], u8 const in[], u32 const rk[],
-+				     int rounds, int blocks, u8 iv[],
-+				     int first);
- 
- struct aesbs_ctx {
- 	u8	rk[13 * (8 * AES_BLOCK_SIZE) + 32];
-@@ -140,16 +144,28 @@ static int aesbs_cbc_setkey(struct crypto_skcipher *tfm, const u8 *in_key,
- 	return 0;
- }
- 
--static void cbc_encrypt_one(struct crypto_skcipher *tfm, const u8 *src, u8 *dst)
-+static int cbc_encrypt(struct skcipher_request *req)
- {
-+	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(req);
- 	struct aesbs_cbc_ctx *ctx = crypto_skcipher_ctx(tfm);
-+	struct skcipher_walk walk;
-+	int err, first = 1;
- 
--	__aes_arm64_encrypt(ctx->enc, dst, src, ctx->key.rounds);
--}
-+	err = skcipher_walk_virt(&walk, req, true);
- 
--static int cbc_encrypt(struct skcipher_request *req)
--{
--	return crypto_cbc_encrypt_walk(req, cbc_encrypt_one);
-+	kernel_neon_begin();
-+	while (walk.nbytes >= AES_BLOCK_SIZE) {
-+		unsigned int blocks = walk.nbytes / AES_BLOCK_SIZE;
-+
-+		/* fall back to the non-bitsliced NEON implementation */
-+		neon_aes_cbc_encrypt(walk.dst.virt.addr, walk.src.virt.addr,
-+				     ctx->enc, ctx->key.rounds, blocks, walk.iv,
-+				     first);
-+		err = skcipher_walk_done(&walk, walk.nbytes % AES_BLOCK_SIZE);
-+		first = 0;
-+	}
-+	kernel_neon_end();
-+	return err;
- }
- 
- static int cbc_decrypt(struct skcipher_request *req)
-@@ -254,9 +270,11 @@ static int __xts_crypt(struct skcipher_request *req,
- 
- 	err = skcipher_walk_virt(&walk, req, true);
- 
--	__aes_arm64_encrypt(ctx->twkey, walk.iv, walk.iv, ctx->key.rounds);
--
- 	kernel_neon_begin();
-+
-+	neon_aes_ecb_encrypt(walk.iv, walk.iv, ctx->twkey,
-+			     ctx->key.rounds, 1, 1);
-+
- 	while (walk.nbytes >= AES_BLOCK_SIZE) {
- 		unsigned int blocks = walk.nbytes / AES_BLOCK_SIZE;
- 
+Patch #3 implements cbcmac(aes) using NEON on arm64
+
+Patch #4 is an RFC patch that implements ctr(aes) and cbcmac(aes) in a way
+that is intended to eliminate observeable data dependent latencies in AES
+processing, by replacing the usual 16 KB of lookup tables with a single
+Sbox that is prefetched before processing each block. It is 50% slower than
+generic AES, but this may be acceptable in many cases.
+
+Changes since v1:
+- remove ilen, and add missing flags assignment (#2)
+- deal with zero cryptlen (#2)
+- use correctly sized dg[] array in desc ctx (#3, #4)
+- fix bug in update routine (#3)
+- various other tweaks
+
+Ard Biesheuvel (4):
+  crypto: testmgr - add test cases for cbcmac(aes)
+  crypto: ccm - switch to separate cbcmac driver
+  crypto: arm64/aes - add NEON and Crypto Extension CBC-MAC driver
+  crypto: aes - add generic time invariant AES for CTR/CCM/GCM
+
+ arch/arm64/crypto/aes-glue.c  | 107 ++++++
+ arch/arm64/crypto/aes-modes.S |  22 ++
+ crypto/Kconfig                |  18 +
+ crypto/Makefile               |   1 +
+ crypto/aes_ti.c               | 320 +++++++++++++++++
+ crypto/ccm.c                  | 376 +++++++++++++-------
+ crypto/testmgr.c              |   7 +
+ crypto/testmgr.h              |  58 +++
+ 8 files changed, 772 insertions(+), 137 deletions(-)
+ create mode 100644 crypto/aes_ti.c
+
 -- 
 2.7.4
