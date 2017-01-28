@@ -1,141 +1,153 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 28 Jan 2017 18:37:10 +0000
-Subject: [PATCH v2 2/7] iio: adc: stm32: Enable use of stm32 timer triggers
-In-Reply-To: <1485440915-30119-3-git-send-email-fabrice.gasnier@st.com>
+Date: Sat, 28 Jan 2017 18:39:41 +0000
+Subject: [PATCH v2 3/7] iio: adc: stm32: add trigger polarity extended
+ attribute
+In-Reply-To: <1485440915-30119-4-git-send-email-fabrice.gasnier@st.com>
 References: <1485440915-30119-1-git-send-email-fabrice.gasnier@st.com>
- <1485440915-30119-3-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <20d7f143-c3fe-617c-7cee-82a222152bf7@kernel.org>
+ <1485440915-30119-4-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <c5be8b19-651e-d5e3-0ccd-af0ae36bc1cb@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 26/01/17 14:28, Fabrice Gasnier wrote:
-> STM32 ADC has external timer trigger sources. Use stm32 timer triggers
-> API (e.g. is_stm32_timer_trigger()) with local ADC lookup table to
-> validate a trigger can be used.
-> This also provides correct trigger selection value (e.g. extsel).
+> Define extended attribute so that user may choose rising, falling or both
+> edges for external trigger sources.
+> Default to rising edge in case it isn't set.
 > 
 > Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
-Applied to the togreg branch of iio.git.
+Applied though as discussed we might want some ability to add
+a default for external triggers via dt.
+
+Can be added later.
+
+Pushed out as testing for the autobuilders to play with it.
 
 Thanks,
 
 Jonathan
 > ---
 > Changes in v2:
-> - Add comment on dual check to validate trigger (and get extsel)
+> - Rename and document new trigger_polarity custom attribute
 > ---
->  drivers/iio/adc/Kconfig     |  2 ++
->  drivers/iio/adc/stm32-adc.c | 65 +++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 67 insertions(+)
+>  Documentation/ABI/testing/sysfs-bus-iio-adc-stm32 | 18 +++++++++
+>  drivers/iio/adc/stm32-adc.c                       | 46 ++++++++++++++++++++++-
+>  2 files changed, 63 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-adc-stm32
 > 
-> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-> index 33341f4..9a7b090 100644
-> --- a/drivers/iio/adc/Kconfig
-> +++ b/drivers/iio/adc/Kconfig
-> @@ -447,6 +447,8 @@ config STM32_ADC_CORE
->  	depends on OF
->  	depends on REGULATOR
->  	select IIO_BUFFER
-> +	select MFD_STM32_TIMERS
-> +	select IIO_STM32_TIMER_TRIGGER
->  	select IIO_TRIGGERED_BUFFER
->  	help
->  	  Select this option to enable the core driver for STMicroelectronics
+> diff --git a/Documentation/ABI/testing/sysfs-bus-iio-adc-stm32 b/Documentation/ABI/testing/sysfs-bus-iio-adc-stm32
+> new file mode 100644
+> index 0000000..efe4c85
+> --- /dev/null
+> +++ b/Documentation/ABI/testing/sysfs-bus-iio-adc-stm32
+> @@ -0,0 +1,18 @@
+> +What:		/sys/bus/iio/devices/triggerX/trigger_polarity
+> +KernelVersion:	4.11
+> +Contact:	fabrice.gasnier at st.com
+> +Description:
+> +		The STM32 ADC can be configured to use external trigger sources
+> +		(e.g. timers, pwm or exti gpio). Then, it can be tuned to start
+> +		conversions on external trigger by either:
+> +		- "rising-edge"
+> +		- "falling-edge"
+> +		- "both-edges".
+> +		Reading returns current trigger polarity.
+> +		Writing value before enabling conversions sets trigger polarity.
+> +
+> +What:		/sys/bus/iio/devices/triggerX/trigger_polarity_available
+> +KernelVersion:	4.11
+> +Contact:	fabrice.gasnier at st.com
+> +Description:
+> +		List all available trigger_polarity settings.
 > diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
-> index 1e382b6..87d984b 100644
+> index 87d984b..9a38f9a 100644
 > --- a/drivers/iio/adc/stm32-adc.c
 > +++ b/drivers/iio/adc/stm32-adc.c
-> @@ -23,6 +23,7 @@
->  #include <linux/delay.h>
->  #include <linux/iio/iio.h>
->  #include <linux/iio/buffer.h>
-> +#include <linux/iio/timer/stm32-timer-trigger.h>
->  #include <linux/iio/trigger.h>
->  #include <linux/iio/trigger_consumer.h>
->  #include <linux/iio/triggered_buffer.h>
-> @@ -81,6 +82,36 @@ enum stm32_adc_exten {
->  	STM32_EXTEN_HWTRIG_BOTH_EDGES,
->  };
->  
-> +/* extsel - trigger mux selection value */
-> +enum stm32_adc_extsel {
-> +	STM32_EXT0,
-> +	STM32_EXT1,
-> +	STM32_EXT2,
-> +	STM32_EXT3,
-> +	STM32_EXT4,
-> +	STM32_EXT5,
-> +	STM32_EXT6,
-> +	STM32_EXT7,
-> +	STM32_EXT8,
-> +	STM32_EXT9,
-> +	STM32_EXT10,
-> +	STM32_EXT11,
-> +	STM32_EXT12,
-> +	STM32_EXT13,
-> +	STM32_EXT14,
-> +	STM32_EXT15,
-> +};
-> +
-> +/**
-> + * struct stm32_adc_trig_info - ADC trigger info
-> + * @name:		name of the trigger, corresponding to its source
-> + * @extsel:		trigger selection
-> + */
-> +struct stm32_adc_trig_info {
-> +	const char *name;
-> +	enum stm32_adc_extsel extsel;
-> +};
-> +
->  /**
->   * stm32_adc_regs - stm32 ADC misc registers & bitfield desc
->   * @reg:		register offset
-> @@ -176,6 +207,26 @@ struct stm32_adc_chan_spec {
->  	{ STM32F4_ADC_SQR1, GENMASK(19, 15), 15 },
->  };
->  
-> +/* STM32F4 external trigger sources for all instances */
-> +static struct stm32_adc_trig_info stm32f4_adc_trigs[] = {
-> +	{ TIM1_CH1, STM32_EXT0 },
-> +	{ TIM1_CH2, STM32_EXT1 },
-> +	{ TIM1_CH3, STM32_EXT2 },
-> +	{ TIM2_CH2, STM32_EXT3 },
-> +	{ TIM2_CH3, STM32_EXT4 },
-> +	{ TIM2_CH4, STM32_EXT5 },
-> +	{ TIM2_TRGO, STM32_EXT6 },
-> +	{ TIM3_CH1, STM32_EXT7 },
-> +	{ TIM3_TRGO, STM32_EXT8 },
-> +	{ TIM4_CH4, STM32_EXT9 },
-> +	{ TIM5_CH1, STM32_EXT10 },
-> +	{ TIM5_CH2, STM32_EXT11 },
-> +	{ TIM5_CH3, STM32_EXT12 },
-> +	{ TIM8_CH1, STM32_EXT13 },
-> +	{ TIM8_TRGO, STM32_EXT14 },
-> +	{}, /* sentinel */
-> +};
-> +
->  /**
->   * STM32 ADC registers access routines
->   * @adc: stm32 adc instance
-> @@ -318,6 +369,20 @@ static int stm32_adc_conf_scan_seq(struct iio_dev *indio_dev,
+> @@ -135,6 +135,7 @@ struct stm32_adc_regs {
+>   * @lock:		spinlock
+>   * @bufi:		data buffer index
+>   * @num_conv:		expected number of scan conversions
+> + * @trigger_polarity:	external trigger polarity (e.g. exten)
 >   */
->  static int stm32_adc_get_trig_extsel(struct iio_trigger *trig)
->  {
-> +	int i;
-> +
-> +	/* lookup triggers registered by stm32 timer trigger driver */
-> +	for (i = 0; stm32f4_adc_trigs[i].name; i++) {
-> +		/**
-> +		 * Checking both stm32 timer trigger type and trig name
-> +		 * should be safe against arbitrary trigger names.
-> +		 */
-> +		if (is_stm32_timer_trigger(trig) &&
-> +		    !strcmp(stm32f4_adc_trigs[i].name, trig->name)) {
-> +			return stm32f4_adc_trigs[i].extsel;
-> +		}
-> +	}
-> +
->  	return -EINVAL;
+>  struct stm32_adc {
+>  	struct stm32_adc_common	*common;
+> @@ -146,6 +147,7 @@ struct stm32_adc {
+>  	spinlock_t		lock;		/* interrupt lock */
+>  	unsigned int		bufi;
+>  	unsigned int		num_conv;
+> +	u32			trigger_polarity;
+>  };
+>  
+>  /**
+> @@ -410,7 +412,7 @@ static int stm32_adc_set_trig(struct iio_dev *indio_dev,
+>  
+>  		/* set trigger source and polarity (default to rising edge) */
+>  		extsel = ret;
+> -		exten = STM32_EXTEN_HWTRIG_RISING_EDGE;
+> +		exten = adc->trigger_polarity + STM32_EXTEN_HWTRIG_RISING_EDGE;
+>  	}
+>  
+>  	spin_lock_irqsave(&adc->lock, flags);
+> @@ -424,6 +426,36 @@ static int stm32_adc_set_trig(struct iio_dev *indio_dev,
+>  	return 0;
 >  }
 >  
+> +static int stm32_adc_set_trig_pol(struct iio_dev *indio_dev,
+> +				  const struct iio_chan_spec *chan,
+> +				  unsigned int type)
+> +{
+> +	struct stm32_adc *adc = iio_priv(indio_dev);
+> +
+> +	adc->trigger_polarity = type;
+> +
+> +	return 0;
+> +}
+> +
+> +static int stm32_adc_get_trig_pol(struct iio_dev *indio_dev,
+> +				  const struct iio_chan_spec *chan)
+> +{
+> +	struct stm32_adc *adc = iio_priv(indio_dev);
+> +
+> +	return adc->trigger_polarity;
+> +}
+> +
+> +static const char * const stm32_trig_pol_items[] = {
+> +	"rising-edge", "falling-edge", "both-edges",
+> +};
+> +
+> +const struct iio_enum stm32_adc_trig_pol = {
+> +	.items = stm32_trig_pol_items,
+> +	.num_items = ARRAY_SIZE(stm32_trig_pol_items),
+> +	.get = stm32_adc_get_trig_pol,
+> +	.set = stm32_adc_set_trig_pol,
+> +};
+> +
+>  /**
+>   * stm32_adc_single_conv() - Performs a single conversion
+>   * @indio_dev: IIO device
+> @@ -682,6 +714,17 @@ static irqreturn_t stm32_adc_trigger_handler(int irq, void *p)
+>  	return IRQ_HANDLED;
+>  }
+>  
+> +static const struct iio_chan_spec_ext_info stm32_adc_ext_info[] = {
+> +	IIO_ENUM("trigger_polarity", IIO_SHARED_BY_ALL, &stm32_adc_trig_pol),
+> +	{
+> +		.name = "trigger_polarity_available",
+> +		.shared = IIO_SHARED_BY_ALL,
+> +		.read = iio_enum_available_read,
+> +		.private = (uintptr_t)&stm32_adc_trig_pol,
+> +	},
+> +	{},
+> +};
+> +
+>  static void stm32_adc_chan_init_one(struct iio_dev *indio_dev,
+>  				    struct iio_chan_spec *chan,
+>  				    const struct stm32_adc_chan_spec *channel,
+> @@ -697,6 +740,7 @@ static void stm32_adc_chan_init_one(struct iio_dev *indio_dev,
+>  	chan->scan_type.sign = 'u';
+>  	chan->scan_type.realbits = 12;
+>  	chan->scan_type.storagebits = 16;
+> +	chan->ext_info = stm32_adc_ext_info;
+>  }
+>  
+>  static int stm32_adc_chan_of_init(struct iio_dev *indio_dev)
 > 
