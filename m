@@ -1,573 +1,189 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 28 Jan 2017 14:54:26 +0000
-Subject: [PATCH v2 20/25] power: supply: add battery driver for AXP20X and
- AXP22X PMICs
-In-Reply-To: <20170127085458.18270-21-quentin.schulz@free-electrons.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Sat, 28 Jan 2017 16:12:04 +0100
+Subject: [PATCH v2 04/25] iio: adc: add support for X-Powers AXP20X and
+ AXP22X PMICs ADCs
+In-Reply-To: <f4b3e9dd-926c-c98a-30a2-89907ab2e09e@kernel.org>
 References: <20170127085458.18270-1-quentin.schulz@free-electrons.com>
- <20170127085458.18270-21-quentin.schulz@free-electrons.com>
-Message-ID: <a86dc430-39d3-425a-3e64-0cfefcf6e43a@kernel.org>
+ <20170127085458.18270-5-quentin.schulz@free-electrons.com>
+ <f4b3e9dd-926c-c98a-30a2-89907ab2e09e@kernel.org>
+Message-ID: <0e3ac499-abfc-51e0-20e3-d1231af3adc6@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/01/17 08:54, Quentin Schulz wrote:
-> The X-Powers AXP20X and AXP22X PMICs can have a battery as power supply.
+Hi Jonathan
+
+On 28/01/2017 15:49, Jonathan Cameron wrote:
+> On 27/01/17 08:54, Quentin Schulz wrote:
+>> The X-Powers AXP20X and AXP22X PMICs have multiple ADCs. They expose the
+>> battery voltage, battery charge and discharge currents, AC-in and VBUS
+>> voltages and currents, 2 GPIOs muxable in ADC mode and PMIC temperature.
+>>
+>> This adds support for most of AXP20X and AXP22X ADCs.
+>>
+>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> Pretty good, but not everything seems to be cleaned up on error paths
+> in probe.
 > 
-> This patch adds the battery power supply driver to get various data from
-> the PMIC, such as the battery status (charging, discharging, full,
-> dead), current max limit, current current, battery capacity (in
-> percentage), voltage max and min limits, current voltage and battery
-> capacity (in Ah).
+> A few other suggestions / questions inline.
 > 
-> This battery driver uses the AXP20X/AXP22X ADC driver as PMIC data
-> provider.
+> Jonathan
+>> ---
+[...]
+>> +static int axp20x_adc_raw(struct iio_dev *indio_dev,
+>> +			  struct iio_chan_spec const *chan, int *val)
+>> +{
+>> +	struct axp20x_adc_iio *info = iio_priv(indio_dev);
+>> +	int size = 12;
+>> +
+>> +	switch (chan->type) {
+>> +	case IIO_CURRENT:
+>> +		/*
+>> +		 * Unlike the Chinese datasheets tell, the charging current is
+>> +		 * stored on 12 bits, not 13 bits.
+>> +		 */
+>> +		if (chan->channel == AXP20X_BATT_DISCHRG_I)
+>> +			size = 13;
+> Given I don't think you can get here without it being current, voltage or temp;
+> couldn't this be done more cleanly with
+> if ((chan->type == IIO_CURRENT) && (chan->channel == AXP20X_BAT_DISCHRG_I))
+>    size = 13;
 > 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-For IIO bits
-Acked-by: Jonathan Cameron <jic23@kernel.org>
-> ---
+> and have the rest in the normal code flow?
 > 
-> v2:
->  - changed BIT(x) to 1 << x when describing bits purpose for which 2 <<
->  x or 3 << x exists, to be consistent,
->  - switched from POWER_SUPPLY_PROP_CURRENT_MAX to
->  POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT,
->  - added POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX to the list of
->  readable properties,
->  - replaced ? character by a common u for micro units to make checkpatch
->  happy,
->  - factorized code in axp20x_battery_set_max_voltage,
->  - added a axp20x_set_constant_charge_current function to be used when
->  setting the value from sysfs and from the DT,
->  - removed some dead code,
->  - added a DT property to set constant current charge of the battery
->  (x-powers,constant-charge-current),
->  - migrated to dev_get_regmap instead of manually looking for the regmap
->  in the drvdata of the parent,
->  - switched from int to uintptr_t cast to make sure the cast is always
->  for the same size type (make build on 64bits platforms happy mainly),
+
+Indeed.
+
+>> +	case IIO_VOLTAGE:
+>> +	case IIO_TEMP:
+>> +		*val = axp20x_read_variable_width(info->regmap, chan->address,
+>> +						  size);
+>> +		if (*val < 0)
+>> +			return *val;
+>> +
+>> +		return IIO_VAL_INT;
+>> +
+>> +	default:
+>> +		return -EINVAL;
+>> +	}
+>> +}
+[...]
+>> +static int axp22x_adc_scale(struct iio_chan_spec const *chan, int *val,
+>> +			    int *val2)
+>> +{
+>> +	switch (chan->type) {
+>> +	case IIO_VOLTAGE:
+>> +		if (chan->channel != AXP22X_BATT_V)
+>> +			return -EINVAL;
+>> +
+>> +		*val = 1;
+>> +		*val2 = 100000;
+>> +		return IIO_VAL_INT_PLUS_MICRO;
+> A fixed scale of 1.1x? (just checking)
+
+Yes, there is only one voltage exposed for AXP22X PMICs: the battery
+voltage which has a scale of 1.1 (for mV).
+
+[...]
+>> +static int axp20x_probe(struct platform_device *pdev)
+>> +{
+>> +	struct axp20x_adc_iio *info;
+>> +	struct iio_dev *indio_dev;
+>> +	struct axp20x_dev *axp20x_dev;
+>> +	int ret;
+>> +
+>> +	axp20x_dev = dev_get_drvdata(pdev->dev.parent);
+>> +
+>> +	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*info));
+>> +	if (!indio_dev)
+>> +		return -ENOMEM;
+>> +
+>> +	info = iio_priv(indio_dev);
+>> +	platform_set_drvdata(pdev, indio_dev);
+>> +
+>> +	info->regmap = axp20x_dev->regmap;
+>> +	indio_dev->name = dev_name(&pdev->dev);
+> Not sure on this name - what does end up as?  Expected to be
+> a description of the part so in this case something like axp209-adc.
+> I've been lax at picking up on this in the past and it's led to some
+> crazy naming that is no use at all to userspace.  Basically this
+> name just provides a convenient user readable name for userspace apps to
+> use.
 > 
->  drivers/power/supply/Kconfig          |  12 +
->  drivers/power/supply/Makefile         |   1 +
->  drivers/power/supply/axp20x_battery.c | 477 ++++++++++++++++++++++++++++++++++
->  3 files changed, 490 insertions(+)
->  create mode 100644 drivers/power/supply/axp20x_battery.c
+
+ACK. Should we have a different name for AXP20X and AXP22X PMICs?
+
+>> +	indio_dev->dev.parent = &pdev->dev;
+>> +	indio_dev->dev.of_node = pdev->dev.of_node;
+>> +	indio_dev->modes = INDIO_DIRECT_MODE;
+>> +
+>> +	info->data = (struct axp_data *)of_device_get_match_data(&pdev->dev);
+>> +
+>> +	indio_dev->info = info->data->iio_info;
+>> +	indio_dev->num_channels = info->data->num_channels;
+>> +	indio_dev->channels = info->data->channels;
+>> +
+>> +	/* Enable the ADCs on IP */
+>> +	regmap_write(info->regmap, AXP20X_ADC_EN1, info->data->adc_en1_mask);
+>> +
+>> +	if (info->data->adc_en2)
+>> +		/* Enable GPIO0/1 and internal temperature ADCs */
+>> +		regmap_update_bits(info->regmap, AXP20X_ADC_EN2,
+>> +				   AXP20X_ADC_EN2_MASK, AXP20X_ADC_EN2_MASK);
+>> +
+>> +	/* Configure ADCs rate */
+>> +	regmap_update_bits(info->regmap, AXP20X_ADC_RATE, AXP20X_ADC_RATE_MASK,
+>> +			   info->data->adc_rate(100));
+>> +
+>> +	ret = iio_map_array_register(indio_dev, info->data->maps);
+>> +	if (ret < 0) {
+>> +		dev_err(&pdev->dev, "failed to register IIO maps: %d\n", ret);
+> This should be disabling channels.
+
+You mean disabling ADCs as it is done in the remove? If so, indeed.
+
+>> +		return ret;
+>> +	}
+>> +
+>> +	ret = iio_device_register(indio_dev);
+>> +	if (ret < 0) {
+>> +		dev_err(&pdev->dev, "could not register the device\n");
+>> +		regmap_write(info->regmap, AXP20X_ADC_EN1, 0);
+>> +
+>> +		if (info->data->adc_en2)
+>> +			regmap_write(info->regmap, AXP20X_ADC_EN2, 0);
+> I'd expect to see a complete unwind of what has been done earlier in probe
+> including iio_map_array_unregister.
 > 
-> diff --git a/drivers/power/supply/Kconfig b/drivers/power/supply/Kconfig
-> index c552b4b..48619de 100644
-> --- a/drivers/power/supply/Kconfig
-> +++ b/drivers/power/supply/Kconfig
-> @@ -226,6 +226,18 @@ config CHARGER_AXP20X
->  	  This driver can also be built as a module. If so, the module will be
->  	  called axp20x_ac_power.
->  
-> +config BATTERY_AXP20X
-> +	tristate "X-Powers AXP20X battery driver"
-> +	depends on MFD_AXP20X
-> +	depends on AXP20X_ADC
-> +	depends on IIO
-> +	help
-> +	  Say Y here to enable support for X-Powers AXP20X PMICs' battery power
-> +	  supply.
-> +
-> +	  This driver can also be built as a module. If so, the module will be
-> +	  called axp20x_battery.
-> +
->  config AXP288_CHARGER
->  	tristate "X-Powers AXP288 Charger"
->  	depends on MFD_AXP20X && EXTCON_AXP288
-> diff --git a/drivers/power/supply/Makefile b/drivers/power/supply/Makefile
-> index 7d22417..5a217b2 100644
-> --- a/drivers/power/supply/Makefile
-> +++ b/drivers/power/supply/Makefile
-> @@ -18,6 +18,7 @@ obj-$(CONFIG_TEST_POWER)	+= test_power.o
->  
->  obj-$(CONFIG_BATTERY_88PM860X)	+= 88pm860x_battery.o
->  obj-$(CONFIG_BATTERY_ACT8945A)	+= act8945a_charger.o
-> +obj-$(CONFIG_BATTERY_AXP20X)	+= axp20x_battery.o
->  obj-$(CONFIG_CHARGER_AXP20X)	+= axp20x_ac_power.o
->  obj-$(CONFIG_BATTERY_DS2760)	+= ds2760_battery.o
->  obj-$(CONFIG_BATTERY_DS2780)	+= ds2780_battery.o
-> diff --git a/drivers/power/supply/axp20x_battery.c b/drivers/power/supply/axp20x_battery.c
-> new file mode 100644
-> index 0000000..dd040b8
-> --- /dev/null
-> +++ b/drivers/power/supply/axp20x_battery.c
-> @@ -0,0 +1,477 @@
-> +/*
-> + * Battery power supply driver for X-Powers AXP20X and AXP22X PMICs
-> + *
-> + * Copyright 2016 Free Electrons NextThing Co.
-> + *	Quentin Schulz <quentin.schulz@free-electrons.com>
-> + *
-> + * This driver is based on a previous upstreaming attempt by:
-> + *	Bruno Pr?mont <bonbons@linux-vserver.org>
-> + *
-> + * This file is subject to the terms and conditions of the GNU General
-> + * Public License. See the file "COPYING" in the main directory of this
-> + * archive for more details.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/err.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/irq.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/power_supply.h>
-> +#include <linux/regmap.h>
-> +#include <linux/slab.h>
-> +#include <linux/time.h>
-> +#include <linux/iio/iio.h>
-> +#include <linux/iio/consumer.h>
-> +#include <linux/mfd/axp20x.h>
-> +
-> +#define AXP20X_PWR_STATUS_BAT_CHARGING	BIT(2)
-> +
-> +#define AXP20X_PWR_OP_BATT_PRESENT	BIT(5)
-> +#define AXP20X_PWR_OP_BATT_ACTIVATED	BIT(3)
-> +
-> +#define AXP209_FG_PERCENT		GENMASK(6, 0)
-> +#define AXP22X_FG_VALID			BIT(7)
-> +
-> +#define AXP20X_CHRG_CTRL1_TGT_VOLT	GENMASK(6, 5)
-> +#define AXP20X_CHRG_CTRL1_TGT_4_1V	(0 << 5)
-> +#define AXP20X_CHRG_CTRL1_TGT_4_15V	(1 << 5)
-> +#define AXP20X_CHRG_CTRL1_TGT_4_2V	(2 << 5)
-> +#define AXP20X_CHRG_CTRL1_TGT_4_36V	(3 << 5)
-> +
-> +#define AXP22X_CHRG_CTRL1_TGT_4_22V	(1 << 5)
-> +#define AXP22X_CHRG_CTRL1_TGT_4_24V	(3 << 5)
-> +
-> +#define AXP20X_CHRG_CTRL1_TGT_CURR	GENMASK(3, 0)
-> +
-> +#define AXP20X_V_OFF_MASK		GENMASK(2, 0)
-> +
-> +struct axp20x_batt_ps {
-> +	struct regmap *regmap;
-> +	struct power_supply *batt;
-> +	struct axp20x_dev *axp20x;
-> +	struct iio_channel *batt_chrg_i;
-> +	struct iio_channel *batt_dischrg_i;
-> +	struct iio_channel *batt_v;
-> +	u8 axp_id;
-> +};
-> +
-> +static int axp20x_battery_get_max_voltage(struct axp20x_batt_ps *axp20x_batt,
-> +					  int *val)
-> +{
-> +	int ret, reg;
-> +
-> +	ret = regmap_read(axp20x_batt->regmap, AXP20X_CHRG_CTRL1, &reg);
-> +	if (ret)
-> +		return ret;
-> +
-> +	switch (reg & AXP20X_CHRG_CTRL1_TGT_VOLT) {
-> +	case AXP20X_CHRG_CTRL1_TGT_4_1V:
-> +		*val = 4100000;
-> +		break;
-> +	case AXP20X_CHRG_CTRL1_TGT_4_15V:
-> +		*val = 4150000;
-> +		break;
-> +	case AXP20X_CHRG_CTRL1_TGT_4_2V:
-> +		*val = 4200000;
-> +		break;
-> +	case AXP20X_CHRG_CTRL1_TGT_4_36V:
-> +		*val = 4360000;
-> +		break;
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int axp22x_battery_get_max_voltage(struct axp20x_batt_ps *axp20x_batt,
-> +					  int *val)
-> +{
-> +	int ret, reg;
-> +
-> +	ret = regmap_read(axp20x_batt->regmap, AXP20X_CHRG_CTRL1, &reg);
-> +	if (ret)
-> +		return ret;
-> +
-> +	switch (reg & AXP20X_CHRG_CTRL1_TGT_VOLT) {
-> +	case AXP20X_CHRG_CTRL1_TGT_4_1V:
-> +		*val = 4100000;
-> +		break;
-> +	case AXP20X_CHRG_CTRL1_TGT_4_2V:
-> +		*val = 4200000;
-> +		break;
-> +	case AXP22X_CHRG_CTRL1_TGT_4_22V:
-> +		*val = 4220000;
-> +		break;
-> +	case AXP22X_CHRG_CTRL1_TGT_4_24V:
-> +		*val = 4240000;
-> +		break;
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int axp20x_battery_get_prop(struct power_supply *psy,
-> +				   enum power_supply_property psp,
-> +				   union power_supply_propval *val)
-> +{
-> +	struct axp20x_batt_ps *axp20x_batt = power_supply_get_drvdata(psy);
-> +	struct iio_channel *chan;
-> +	int ret = 0, reg, val1;
-> +
-> +	switch (psp) {
-> +	case POWER_SUPPLY_PROP_PRESENT:
-> +	case POWER_SUPPLY_PROP_ONLINE:
-> +		ret = regmap_read(axp20x_batt->regmap, AXP20X_PWR_OP_MODE,
-> +				  &reg);
-> +		if (ret)
-> +			return ret;
-> +
-> +		val->intval = !!(reg & AXP20X_PWR_OP_BATT_PRESENT);
-> +		break;
-> +
-> +	case POWER_SUPPLY_PROP_STATUS:
-> +		ret = regmap_read(axp20x_batt->regmap, AXP20X_PWR_INPUT_STATUS,
-> +				  &reg);
-> +		if (ret)
-> +			return ret;
-> +
-> +		if (reg & AXP20X_PWR_STATUS_BAT_CHARGING) {
-> +			val->intval = POWER_SUPPLY_STATUS_CHARGING;
-> +			return 0;
-> +		}
-> +
-> +		ret = iio_read_channel_processed(axp20x_batt->batt_dischrg_i,
-> +						 &val1);
-> +		if (ret)
-> +			return ret;
-> +
-> +		if (val1) {
-> +			val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
-> +			return 0;
-> +		}
-> +
-> +		ret = regmap_read(axp20x_batt->regmap, AXP20X_FG_RES, &val1);
-> +		if (ret)
-> +			return ret;
-> +
-> +		/*
-> +		 * Fuel Gauge data takes 7 bits but the stored value seems to be
-> +		 * directly the raw percentage without any scaling to 7 bits.
-> +		 */
-> +		if ((val1 & AXP209_FG_PERCENT) == 100)
-> +			val->intval = POWER_SUPPLY_STATUS_FULL;
-> +		else
-> +			val->intval = POWER_SUPPLY_STATUS_NOT_CHARGING;
-> +		break;
-> +
-> +	case POWER_SUPPLY_PROP_HEALTH:
-> +		ret = regmap_read(axp20x_batt->regmap, AXP20X_PWR_OP_MODE,
-> +				  &val1);
-> +		if (ret)
-> +			return ret;
-> +
-> +		if (val1 & AXP20X_PWR_OP_BATT_ACTIVATED) {
-> +			val->intval = POWER_SUPPLY_HEALTH_DEAD;
-> +			return 0;
-> +		}
-> +
-> +		val->intval = POWER_SUPPLY_HEALTH_GOOD;
-> +		break;
-> +
-> +	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT:
-> +		ret = regmap_read(axp20x_batt->regmap, AXP20X_CHRG_CTRL1, &reg);
-> +		if (ret)
-> +			return ret;
-> +
-> +		reg &= AXP20X_CHRG_CTRL1_TGT_CURR;
-> +		val->intval = reg * 100000 + 300000;
-> +		break;
-> +
-> +	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX:
-> +		val->intval = AXP20X_CHRG_CTRL1_TGT_CURR * 100000 + 300000;
-> +		break;
-> +
-> +	case POWER_SUPPLY_PROP_CURRENT_NOW:
-> +		ret = regmap_read(axp20x_batt->regmap, AXP20X_PWR_INPUT_STATUS,
-> +				  &reg);
-> +		if (ret)
-> +			return ret;
-> +
-> +		if (reg & AXP20X_PWR_STATUS_BAT_CHARGING)
-> +			chan = axp20x_batt->batt_chrg_i;
-> +		else
-> +			chan = axp20x_batt->batt_dischrg_i;
-> +
-> +		ret = iio_read_channel_processed(chan, &val->intval);
-> +		if (ret)
-> +			return ret;
-> +
-> +		/* IIO framework gives mA but Power Supply framework gives uA */
-> +		val->intval *= 1000;
-> +		break;
-> +
-> +	case POWER_SUPPLY_PROP_CAPACITY:
-> +		/* When no battery is present, return capacity is 100% */
-> +		ret = regmap_read(axp20x_batt->regmap, AXP20X_PWR_OP_MODE,
-> +				  &reg);
-> +		if (ret)
-> +			return ret;
-> +
-> +		if (!(reg & AXP20X_PWR_OP_BATT_PRESENT)) {
-> +			val->intval = 100;
-> +			return 0;
-> +		}
-> +
-> +		ret = regmap_read(axp20x_batt->regmap, AXP20X_FG_RES, &reg);
-> +		if (ret)
-> +			return ret;
-> +
-> +		if (axp20x_batt->axp_id == AXP221_ID &&
-> +		    !(reg & AXP22X_FG_VALID))
-> +			return -EINVAL;
-> +
-> +		/*
-> +		 * Fuel Gauge data takes 7 bits but the stored value seems to be
-> +		 * directly the raw percentage without any scaling to 7 bits.
-> +		 */
-> +		val->intval = reg & AXP209_FG_PERCENT;
-> +		break;
-> +
-> +	case POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN:
-> +		if (axp20x_batt->axp_id == AXP209_ID)
-> +			return axp20x_battery_get_max_voltage(axp20x_batt,
-> +							      &val->intval);
-> +		return axp22x_battery_get_max_voltage(axp20x_batt,
-> +						      &val->intval);
-> +
-> +	case POWER_SUPPLY_PROP_VOLTAGE_MIN_DESIGN:
-> +		ret = regmap_read(axp20x_batt->regmap, AXP20X_V_OFF, &reg);
-> +		if (ret)
-> +			return ret;
-> +
-> +		val->intval = 2600000 + 100000 * (reg & AXP20X_V_OFF_MASK);
-> +		break;
-> +
-> +	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
-> +		ret = iio_read_channel_processed(axp20x_batt->batt_v,
-> +						 &val->intval);
-> +		if (ret)
-> +			return ret;
-> +
-> +		/* IIO framework gives mV but Power Supply framework gives uV */
-> +		val->intval *= 1000;
-> +		break;
-> +
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int axp20x_battery_set_max_voltage(struct axp20x_batt_ps *axp20x_batt,
-> +					  int val)
-> +{
-> +	switch (val) {
-> +	case 4100000:
-> +		val = AXP20X_CHRG_CTRL1_TGT_4_1V;
-> +		break;
-> +
-> +	case 4150000:
-> +		if (axp20x_batt->axp_id == AXP221_ID)
-> +			return -EINVAL;
-> +
-> +		val = AXP20X_CHRG_CTRL1_TGT_4_15V;
-> +		break;
-> +
-> +	case 4200000:
-> +		val = AXP20X_CHRG_CTRL1_TGT_4_2V;
-> +		break;
-> +
-> +	default:
-> +		/*
-> +		 * AXP20x max voltage can be set to 4.36V and AXP22X max voltage
-> +		 * can be set to 4.22V and 4.24V, but these voltages are too
-> +		 * high for Lithium based batteries (AXP PMICs are supposed to
-> +		 * be used with these kinds of battery).
-> +		 */
-> +		return -EINVAL;
-> +	}
-> +
-> +	return regmap_update_bits(axp20x_batt->regmap, AXP20X_CHRG_CTRL1,
-> +				  AXP20X_CHRG_CTRL1_TGT_VOLT, val);
-> +}
-> +
-> +static int axp20x_set_constant_charge_current(struct axp20x_batt_ps *axp_batt,
-> +					      int charge_current)
-> +{
-> +	if (axp_batt->axp_id == AXP209_ID)
-> +		charge_current = (charge_current - 300000) / 100000;
-> +	else
-> +		charge_current = (charge_current - 300000) / 150000;
-> +
-> +	if (charge_current > AXP20X_CHRG_CTRL1_TGT_CURR || charge_current < 0)
-> +		return -EINVAL;
-> +
-> +	return regmap_update_bits(axp_batt->regmap, AXP20X_CHRG_CTRL1,
-> +				  AXP20X_CHRG_CTRL1_TGT_CURR, charge_current);
-> +}
-> +
-> +static int axp20x_battery_set_prop(struct power_supply *psy,
-> +				   enum power_supply_property psp,
-> +				   const union power_supply_propval *val)
-> +{
-> +	struct axp20x_batt_ps *axp20x_batt = power_supply_get_drvdata(psy);
-> +	int val1;
-> +
-> +	switch (psp) {
-> +	case POWER_SUPPLY_PROP_VOLTAGE_MIN_DESIGN:
-> +		val1 = (val->intval - 2600000) / 100000;
-> +		if (val1 < 0 || val1 > AXP20X_V_OFF_MASK)
-> +			return -EINVAL;
-> +
-> +		return regmap_update_bits(axp20x_batt->regmap, AXP20X_V_OFF,
-> +					  AXP20X_V_OFF_MASK, val1);
-> +
-> +	case POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN:
-> +		return axp20x_battery_set_max_voltage(axp20x_batt, val->intval);
-> +
-> +	case POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT:
-> +		return axp20x_set_constant_charge_current(axp20x_batt,
-> +							  val->intval);
-> +
-> +	default:
-> +		return -EINVAL;
-> +	}
-> +}
-> +
-> +static enum power_supply_property axp20x_battery_props[] = {
-> +	POWER_SUPPLY_PROP_PRESENT,
-> +	POWER_SUPPLY_PROP_ONLINE,
-> +	POWER_SUPPLY_PROP_STATUS,
-> +	POWER_SUPPLY_PROP_VOLTAGE_NOW,
-> +	POWER_SUPPLY_PROP_CURRENT_NOW,
-> +	POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT,
-> +	POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT_MAX,
-> +	POWER_SUPPLY_PROP_HEALTH,
-> +	POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN,
-> +	POWER_SUPPLY_PROP_VOLTAGE_MIN_DESIGN,
-> +	POWER_SUPPLY_PROP_CAPACITY,
-> +};
-> +
-> +static int axp20x_battery_prop_writeable(struct power_supply *psy,
-> +					 enum power_supply_property psp)
-> +{
-> +	return psp == POWER_SUPPLY_PROP_VOLTAGE_MIN_DESIGN ||
-> +	       psp == POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN ||
-> +	       psp == POWER_SUPPLY_PROP_CONSTANT_CHARGE_CURRENT;
-> +}
-> +
-> +static const struct power_supply_desc axp20x_batt_ps_desc = {
-> +	.name = "axp20x-battery",
-> +	.type = POWER_SUPPLY_TYPE_BATTERY,
-> +	.properties = axp20x_battery_props,
-> +	.num_properties = ARRAY_SIZE(axp20x_battery_props),
-> +	.property_is_writeable = axp20x_battery_prop_writeable,
-> +	.get_property = axp20x_battery_get_prop,
-> +	.set_property = axp20x_battery_set_prop,
-> +};
-> +
-> +static const struct of_device_id axp20x_battery_ps_id[] = {
-> +	{
-> +		.compatible = "x-powers,axp209-battery-power-supply",
-> +		.data = (void *)AXP209_ID,
-> +	}, {
-> +		.compatible = "x-powers,axp221-battery-power-supply",
-> +		.data = (void *)AXP221_ID,
-> +	}, { /* sentinel */ },
-> +};
-> +MODULE_DEVICE_TABLE(of, axp20x_battery_ps_id);
-> +
-> +static int axp20x_power_probe(struct platform_device *pdev)
-> +{
-> +	struct axp20x_batt_ps *axp20x_batt;
-> +	struct power_supply_config psy_cfg = {};
-> +	int ret;
-> +	u32 const_charge_current;
-> +
-> +	if (!of_device_is_available(pdev->dev.of_node))
-> +		return -ENODEV;
-> +
-> +	axp20x_batt = devm_kzalloc(&pdev->dev, sizeof(*axp20x_batt),
-> +				   GFP_KERNEL);
-> +	if (!axp20x_batt)
-> +		return -ENOMEM;
-> +
-> +	axp20x_batt->batt_v = devm_iio_channel_get(&pdev->dev, "batt_v");
-> +	if (IS_ERR(axp20x_batt->batt_v)) {
-> +		if (PTR_ERR(axp20x_batt->batt_v) == -ENODEV)
-> +			return -EPROBE_DEFER;
-> +		return PTR_ERR(axp20x_batt->batt_v);
-> +	}
-> +
-> +	axp20x_batt->batt_chrg_i = devm_iio_channel_get(&pdev->dev,
-> +							"batt_chrg_i");
-> +	if (IS_ERR(axp20x_batt->batt_chrg_i)) {
-> +		if (PTR_ERR(axp20x_batt->batt_chrg_i) == -ENODEV)
-> +			return -EPROBE_DEFER;
-> +		return PTR_ERR(axp20x_batt->batt_chrg_i);
-> +	}
-> +
-> +	axp20x_batt->batt_dischrg_i = devm_iio_channel_get(&pdev->dev,
-> +							   "batt_dischrg_i");
-> +	if (IS_ERR(axp20x_batt->batt_dischrg_i)) {
-> +		if (PTR_ERR(axp20x_batt->batt_dischrg_i) == -ENODEV)
-> +			return -EPROBE_DEFER;
-> +		return PTR_ERR(axp20x_batt->batt_dischrg_i);
-> +	}
-> +
-> +	axp20x_batt->regmap = dev_get_regmap(pdev->dev.parent, NULL);
-> +	platform_set_drvdata(pdev, axp20x_batt);
-> +
-> +	psy_cfg.drv_data = axp20x_batt;
-> +	psy_cfg.of_node = pdev->dev.of_node;
-> +
-> +	axp20x_batt->axp_id = (uintptr_t)of_device_get_match_data(&pdev->dev);
-> +
-> +	if (!device_property_read_u32(&pdev->dev,
-> +				      "x-powers,constant-charge-current",
-> +				      &const_charge_current)) {
-> +		ret = axp20x_set_constant_charge_current(axp20x_batt,
-> +							 const_charge_current);
-> +		if (ret)
-> +			dev_err(&pdev->dev,
-> +				"couldn't set constant charge current: %d\n",
-> +				ret);
-> +	}
-> +
-> +	axp20x_batt->batt = devm_power_supply_register(&pdev->dev,
-> +						       &axp20x_batt_ps_desc,
-> +						       &psy_cfg);
-> +	return PTR_ERR_OR_ZERO(axp20x_batt->batt);
-> +}
-> +
-> +static struct platform_driver axp20x_batt_driver = {
-> +	.probe    = axp20x_power_probe,
-> +	.driver   = {
-> +		.name  = "axp20x-battery-power-supply",
-> +		.of_match_table = axp20x_battery_ps_id,
-> +	},
-> +};
-> +
-> +module_platform_driver(axp20x_batt_driver);
-> +
-> +MODULE_DESCRIPTION("Battery power supply driver for AXP20X and AXP22X PMICs");
-> +MODULE_AUTHOR("Quentin Schulz <quentin.schulz@free-electrons.com>");
-> +MODULE_LICENSE("GPL");
-> 
+> The traditional goto error* approach is probably worth having here to
+> make sure the unwind makes sense.
+
+Indeed.
+
+>> +
+>> +		return ret;
+>> +	}
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int axp20x_remove(struct platform_device *pdev)
+>> +{
+>> +	struct axp20x_adc_iio *info;
+>> +	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
+>> +
+>> +	info = iio_priv(indio_dev);
+>> +
+>> +	iio_device_unregister(indio_dev);
+> iio_map_array_unregister?
+
+Yes. I see iio_device_unregister already disable all buffers, why not
+unregistering the map array as well in this function?
+
+[...]
+Thanks,
+Quentin
+
+-- 
+Quentin Schulz, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
