@@ -1,35 +1,109 @@
-From: hkallweit1@gmail.com (Heiner Kallweit)
-Date: Sat, 28 Jan 2017 09:25:35 +0100
-Subject: [PATCH v2] mmc: meson-gx: set max block count
-Message-ID: <0309625d-e24b-13e1-bba7-ada6b5a202c1@gmail.com>
+From: vbabka@suse.cz (Vlastimil Babka)
+Date: Sat, 28 Jan 2017 09:46:50 +0100
+Subject: [PATCH v2 1/3] mm: alloc_contig_range: allow to specify GFP mask
+In-Reply-To: <20170127172328.18574-1-l.stach@pengutronix.de>
+References: <20170127172328.18574-1-l.stach@pengutronix.de>
+Message-ID: <c0967c73-29a1-5b99-054c-9e209d4c69e4@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far max_blk_count isn't set what results in a default of value 8
-to be used (PAGE_SIZE / block size).
+On 01/27/2017 06:23 PM, Lucas Stach wrote:
+> Currently alloc_contig_range assumes that the compaction should
+> be done with the default GFP_KERNEL flags. This is probably
+> right for all current uses of this interface, but may change as
+> CMA is used in more use-cases (including being the default DMA
+> memory allocator on some platforms).
+>
+> Change the function prototype, to allow for passing through the
+> GFP mask set by upper layers.
+>
+> Also respect global restrictions by applying memalloc_noio_flags
+> to the passed in flags.
+>
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> Acked-by: Michal Hocko <mhocko@suse.com>
 
-Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
----
-v2:
-- block length field has 9 bits, so set max_blk_count to 2^9-1 = 511
-- in addition set max_req_size because max_blk_count is also limited
-  by max_req_size / block_size
----
- drivers/mmc/host/meson-gx-mmc.c | 2 ++
- 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
-index 83361f1f..d4d174ed 100644
---- a/drivers/mmc/host/meson-gx-mmc.c
-+++ b/drivers/mmc/host/meson-gx-mmc.c
-@@ -810,6 +810,8 @@ static int meson_mmc_probe(struct platform_device *pdev)
- 		goto free_host;
- 	}
- 
-+	mmc->max_blk_count = CMD_CFG_LENGTH_MASK;
-+	mmc->max_req_size = mmc->max_blk_count * mmc->max_blk_size;
- 	mmc->ops = &meson_mmc_ops;
- 	mmc_add_host(mmc);
- 
--- 
-2.11.0
+Acked-by: Vlastimil Babka <vbabka@suse.cz>
+
+> ---
+> v2: add memalloc_noio restriction
+> ---
+>  include/linux/gfp.h | 2 +-
+>  mm/cma.c            | 3 ++-
+>  mm/hugetlb.c        | 3 ++-
+>  mm/page_alloc.c     | 5 +++--
+>  4 files changed, 8 insertions(+), 5 deletions(-)
+>
+> diff --git a/include/linux/gfp.h b/include/linux/gfp.h
+> index 4175dca4ac39..1efa221e0e1d 100644
+> --- a/include/linux/gfp.h
+> +++ b/include/linux/gfp.h
+> @@ -549,7 +549,7 @@ static inline bool pm_suspended_storage(void)
+>  #if (defined(CONFIG_MEMORY_ISOLATION) && defined(CONFIG_COMPACTION)) || defined(CONFIG_CMA)
+>  /* The below functions must be run on a range from a single zone. */
+>  extern int alloc_contig_range(unsigned long start, unsigned long end,
+> -			      unsigned migratetype);
+> +			      unsigned migratetype, gfp_t gfp_mask);
+>  extern void free_contig_range(unsigned long pfn, unsigned nr_pages);
+>  #endif
+>
+> diff --git a/mm/cma.c b/mm/cma.c
+> index c960459eda7e..fbd67d866f67 100644
+> --- a/mm/cma.c
+> +++ b/mm/cma.c
+> @@ -407,7 +407,8 @@ struct page *cma_alloc(struct cma *cma, size_t count, unsigned int align)
+>
+>  		pfn = cma->base_pfn + (bitmap_no << cma->order_per_bit);
+>  		mutex_lock(&cma_mutex);
+> -		ret = alloc_contig_range(pfn, pfn + count, MIGRATE_CMA);
+> +		ret = alloc_contig_range(pfn, pfn + count, MIGRATE_CMA,
+> +					 GFP_KERNEL);
+>  		mutex_unlock(&cma_mutex);
+>  		if (ret == 0) {
+>  			page = pfn_to_page(pfn);
+> diff --git a/mm/hugetlb.c b/mm/hugetlb.c
+> index 3edb759c5c7d..6ed8b160fc0d 100644
+> --- a/mm/hugetlb.c
+> +++ b/mm/hugetlb.c
+> @@ -1051,7 +1051,8 @@ static int __alloc_gigantic_page(unsigned long start_pfn,
+>  				unsigned long nr_pages)
+>  {
+>  	unsigned long end_pfn = start_pfn + nr_pages;
+> -	return alloc_contig_range(start_pfn, end_pfn, MIGRATE_MOVABLE);
+> +	return alloc_contig_range(start_pfn, end_pfn, MIGRATE_MOVABLE,
+> +				  GFP_KERNEL);
+>  }
+>
+>  static bool pfn_range_valid_gigantic(struct zone *z,
+> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+> index eced9fee582b..c5a745b521c0 100644
+> --- a/mm/page_alloc.c
+> +++ b/mm/page_alloc.c
+> @@ -7230,6 +7230,7 @@ static int __alloc_contig_migrate_range(struct compact_control *cc,
+>   *			#MIGRATE_MOVABLE or #MIGRATE_CMA).  All pageblocks
+>   *			in range must have the same migratetype and it must
+>   *			be either of the two.
+> + * @gfp_mask:	GFP mask to use during compaction
+>   *
+>   * The PFN range does not have to be pageblock or MAX_ORDER_NR_PAGES
+>   * aligned, however it's the caller's responsibility to guarantee that
+> @@ -7243,7 +7244,7 @@ static int __alloc_contig_migrate_range(struct compact_control *cc,
+>   * need to be freed with free_contig_range().
+>   */
+>  int alloc_contig_range(unsigned long start, unsigned long end,
+> -		       unsigned migratetype)
+> +		       unsigned migratetype, gfp_t gfp_mask)
+>  {
+>  	unsigned long outer_start, outer_end;
+>  	unsigned int order;
+> @@ -7255,7 +7256,7 @@ int alloc_contig_range(unsigned long start, unsigned long end,
+>  		.zone = page_zone(pfn_to_page(start)),
+>  		.mode = MIGRATE_SYNC,
+>  		.ignore_skip_hint = true,
+> -		.gfp_mask = GFP_KERNEL,
+> +		.gfp_mask = memalloc_noio_flags(gfp_mask),
+>  	};
+>  	INIT_LIST_HEAD(&cc.migratepages);
+>
+>
