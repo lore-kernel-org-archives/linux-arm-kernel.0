@@ -1,1644 +1,1029 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 28 Jan 2017 20:22:34 +0800
-Subject: [PATCH v2 05/10] clk: sunxi-ng: Add A80 CCU
-In-Reply-To: <20170128122239.4480-1-wens@csie.org>
-References: <20170128122239.4480-1-wens@csie.org>
-Message-ID: <20170128122239.4480-6-wens@csie.org>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 28 Jan 2017 12:40:12 +0000
+Subject: [PATCH v4 2/3] iio: adc: add a driver for the SAR ADC found in
+ Amlogic Meson SoCs
+In-Reply-To: <20170122181714.6259-3-martin.blumenstingl@googlemail.com>
+References: <20170122181714.6259-1-martin.blumenstingl@googlemail.com>
+ <20170122181714.6259-3-martin.blumenstingl@googlemail.com>
+Message-ID: <3b4e0cf4-41f7-6ee7-b0df-10fdd50960fa@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the main clock unit found in the A80. Some clocks were
-not documented in the released user manual, but were found in the
-official kernel from Allwinner. These include controls for the I2S,
-SPDIF, SATA, and eDP blocks.
+On 22/01/17 18:17, Martin Blumenstingl wrote:
+> This adds support for the SAR (Successive Approximation Register) ADC
+> on the Amlogic Meson SoCs.
+> 
+> The code is based on the public S805 (Meson8b) and S905 (GXBB)
+> datasheets (see [0] and [1]), as well as by reading (various versions
+> of) the vendor driver and by inspecting the registers on the vendor
+> kernels of my testing-hardware.
+> 
+> Currently the GXBB, GXL and GXM SoCs are supported. GXBB hardware has
+> 10-bit ADC resolution, while GXL and GXM have 12-bit ADC resolution.
+> The code was written to support older SoCs (Meson8 and Meson8b) as well,
+> but due to lack of actual testing-hardware no of_device_id was added for
+> these.
+> 
+> Two "features" from the vendor driver are currently missing:
+> - the vendor driver uses channel #7 for calibration (this improves the
+>   accuracy of the results - in my tests the results were less than 3%
+>   off without calibration compared to the vendor driver). Adding support
+>   for this should be easy, but is not required for most applications.
+> - channel #6 is connected to the SoCs internal temperature sensor.
+>   Adding support for this is probably not so easy since (based on the
+>   u-boot sources) most SoC versions are using different registers and
+>   algorithms for the conversion from "ADC value" to temperature.
+> 
+> Supported by the hardware but currently not supported by the driver:
+> - reading multiple channels at the same time (the hardware has a FIFO
+>   buffer which stores multiple results)
+> - continuous sampling (this would require a way to enable this
+>   individually because otherwise the ADC would be drawing power
+>   constantly)
+> - interrupt support (similar to the vendor driver this new driver is
+>   polling the results. It is unclear if the IRQ-mode is supported on
+>   older (Meson6 or Meson8) hardware as well or if there are any errata)
+> 
+> [0]
+> http://dn.odroid.com/S805/Datasheet/S805_Datasheet%20V0.8%2020150126.pdf
+> [1] http://dn.odroid.com/S905/DataSheet/S905_Public_Datasheet_V1.1.4.pdf
+> 
+> Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> Tested-by: Neil Armstrong <narmstrong@baylibre.com>
+Applied to the togreg branch of iio.git and pushed out as testing for the
+autobuilders to play with it.
 
-Note that on the A80, some subsystems have separate clock controllers
-downstream of the main clock unit. These include the MMC, USB, and
-display engine subsystems.
+Thanks,
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Acked-by: Rob Herring <robh@kernel.org>
----
- .../devicetree/bindings/clock/sunxi-ccu.txt        |    1 +
- drivers/clk/sunxi-ng/Kconfig                       |   10 +
- drivers/clk/sunxi-ng/Makefile                      |    1 +
- drivers/clk/sunxi-ng/ccu-sun9i-a80.c               | 1223 ++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu-sun9i-a80.h               |   57 +
- include/dt-bindings/clock/sun9i-a80-ccu.h          |  162 +++
- include/dt-bindings/reset/sun9i-a80-ccu.h          |  102 ++
- 7 files changed, 1556 insertions(+)
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun9i-a80.c
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun9i-a80.h
- create mode 100644 include/dt-bindings/clock/sun9i-a80-ccu.h
- create mode 100644 include/dt-bindings/reset/sun9i-a80-ccu.h
-
-diff --git a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
-index f6032cf63f12..bae5668cf427 100644
---- a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
-@@ -8,6 +8,7 @@ Required properties :
- 		- "allwinner,sun8i-a33-ccu"
- 		- "allwinner,sun8i-h3-ccu"
- 		- "allwinner,sun8i-v3s-ccu"
-+		- "allwinner,sun9i-a80-ccu"
- 		- "allwinner,sun50i-a64-ccu"
- 
- - reg: Must contain the registers base address and length
-diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
-index 71f11cd1647b..67659091860d 100644
---- a/drivers/clk/sunxi-ng/Kconfig
-+++ b/drivers/clk/sunxi-ng/Kconfig
-@@ -130,4 +130,14 @@ config SUN8I_V3S_CCU
- 	select SUNXI_CCU_PHASE
- 	default MACH_SUN8I
- 
-+config SUN9I_A80_CCU
-+	bool "Support for the Allwinner A80 CCU"
-+	select SUNXI_CCU_DIV
-+	select SUNXI_CCU_GATE
-+	select SUNXI_CCU_NKMP
-+	select SUNXI_CCU_NM
-+	select SUNXI_CCU_MP
-+	select SUNXI_CCU_PHASE
-+	default MACH_SUN9I
-+
- endif
-diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-index a8afdf9c7668..126bb7c1c3f7 100644
---- a/drivers/clk/sunxi-ng/Makefile
-+++ b/drivers/clk/sunxi-ng/Makefile
-@@ -25,3 +25,4 @@ obj-$(CONFIG_SUN8I_A23_CCU)	+= ccu-sun8i-a23.o
- obj-$(CONFIG_SUN8I_A33_CCU)	+= ccu-sun8i-a33.o
- obj-$(CONFIG_SUN8I_H3_CCU)	+= ccu-sun8i-h3.o
- obj-$(CONFIG_SUN8I_V3S_CCU)	+= ccu-sun8i-v3s.o
-+obj-$(CONFIG_SUN9I_A80_CCU)	+= ccu-sun9i-a80.o
-diff --git a/drivers/clk/sunxi-ng/ccu-sun9i-a80.c b/drivers/clk/sunxi-ng/ccu-sun9i-a80.c
-new file mode 100644
-index 000000000000..e13e313ce4f5
---- /dev/null
-+++ b/drivers/clk/sunxi-ng/ccu-sun9i-a80.c
-@@ -0,0 +1,1223 @@
-+/*
-+ * Copyright (c) 2016 Chen-Yu Tsai. All rights reserved.
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+
-+#include "ccu_common.h"
-+#include "ccu_reset.h"
-+
-+#include "ccu_div.h"
-+#include "ccu_gate.h"
-+#include "ccu_mp.h"
-+#include "ccu_nkmp.h"
-+#include "ccu_nm.h"
-+#include "ccu_phase.h"
-+
-+#include "ccu-sun9i-a80.h"
-+
-+#define CCU_SUN9I_LOCK_REG	0x09c
-+
-+static struct clk_div_table pll_cpux_p_div_table[] = {
-+	{ .val = 0, .div = 1 },
-+	{ .val = 1, .div = 4 },
-+	{ /* Sentinel */ },
-+};
-+
-+/*
-+ * The CPU PLLs are actually NP clocks, but P is /1 or /4, so here we
-+ * use the NM clocks with a divider table for M.
-+ */
-+static struct ccu_nm pll_c0cpux_clk = {
-+	.enable		= BIT(31),
-+	.lock		= BIT(0),
-+	.n		= _SUNXI_CCU_MULT_OFFSET_MIN_MAX(8, 8, 0, 12, 0),
-+	.m		= _SUNXI_CCU_DIV_TABLE(16, 1, pll_cpux_p_div_table),
-+	.common		= {
-+		.reg		= 0x000,
-+		.lock_reg	= CCU_SUN9I_LOCK_REG,
-+		.features	= CCU_FEATURE_LOCK_REG,
-+		.hw.init	= CLK_HW_INIT("pll-c0cpux", "osc24M",
-+					      &ccu_nm_ops, CLK_SET_RATE_UNGATE),
-+	},
-+};
-+
-+static struct ccu_nm pll_c1cpux_clk = {
-+	.enable		= BIT(31),
-+	.lock		= BIT(1),
-+	.n		= _SUNXI_CCU_MULT_OFFSET_MIN_MAX(8, 8, 0, 12, 0),
-+	.m		= _SUNXI_CCU_DIV_TABLE(16, 1, pll_cpux_p_div_table),
-+	.common		= {
-+		.reg		= 0x004,
-+		.lock_reg	= CCU_SUN9I_LOCK_REG,
-+		.features	= CCU_FEATURE_LOCK_REG,
-+		.hw.init	= CLK_HW_INIT("pll-c1cpux", "osc24M",
-+					      &ccu_nm_ops, CLK_SET_RATE_UNGATE),
-+	},
-+};
-+
-+/*
-+ * The Audio PLL has d1, d2 dividers in addition to the usual N, M
-+ * factors. Since we only need 2 frequencies from this PLL: 22.5792 MHz
-+ * and 24.576 MHz, ignore them for now. Enforce the default for them,
-+ * which is d1 = 0, d2 = 1.
-+ */
-+#define SUN9I_A80_PLL_AUDIO_REG	0x008
-+
-+static struct ccu_nm pll_audio_clk = {
-+	.enable		= BIT(31),
-+	.lock		= BIT(2),
-+	.n		= _SUNXI_CCU_MULT_OFFSET_MIN_MAX(8, 8, 0, 12, 0),
-+	.m		= _SUNXI_CCU_DIV_OFFSET(0, 6, 0),
-+	.common		= {
-+		.reg		= 0x008,
-+		.lock_reg	= CCU_SUN9I_LOCK_REG,
-+		.features	= CCU_FEATURE_LOCK_REG,
-+		.hw.init	= CLK_HW_INIT("pll-audio", "osc24M",
-+					      &ccu_nm_ops, CLK_SET_RATE_UNGATE),
-+	},
-+};
-+
-+/* Some PLLs are input * N / div1 / div2. Model them as NKMP with no K */
-+static struct ccu_nkmp pll_periph0_clk = {
-+	.enable		= BIT(31),
-+	.lock		= BIT(3),
-+	.n		= _SUNXI_CCU_MULT_OFFSET_MIN_MAX(8, 8, 0, 12, 0),
-+	.m		= _SUNXI_CCU_DIV(16, 1), /* input divider */
-+	.p		= _SUNXI_CCU_DIV(18, 1), /* output divider */
-+	.common		= {
-+		.reg		= 0x00c,
-+		.lock_reg	= CCU_SUN9I_LOCK_REG,
-+		.features	= CCU_FEATURE_LOCK_REG,
-+		.hw.init	= CLK_HW_INIT("pll-periph0", "osc24M",
-+					      &ccu_nkmp_ops,
-+					      CLK_SET_RATE_UNGATE),
-+	},
-+};
-+
-+static struct ccu_nkmp pll_ve_clk = {
-+	.enable		= BIT(31),
-+	.lock		= BIT(4),
-+	.n		= _SUNXI_CCU_MULT_OFFSET_MIN_MAX(8, 8, 0, 12, 0),
-+	.m		= _SUNXI_CCU_DIV(16, 1), /* input divider */
-+	.p		= _SUNXI_CCU_DIV(18, 1), /* output divider */
-+	.common		= {
-+		.reg		= 0x010,
-+		.lock_reg	= CCU_SUN9I_LOCK_REG,
-+		.features	= CCU_FEATURE_LOCK_REG,
-+		.hw.init	= CLK_HW_INIT("pll-ve", "osc24M",
-+					      &ccu_nkmp_ops,
-+					      CLK_SET_RATE_UNGATE),
-+	},
-+};
-+
-+static struct ccu_nkmp pll_ddr_clk = {
-+	.enable		= BIT(31),
-+	.lock		= BIT(5),
-+	.n		= _SUNXI_CCU_MULT_OFFSET_MIN_MAX(8, 8, 0, 12, 0),
-+	.m		= _SUNXI_CCU_DIV(16, 1), /* input divider */
-+	.p		= _SUNXI_CCU_DIV(18, 1), /* output divider */
-+	.common		= {
-+		.reg		= 0x014,
-+		.lock_reg	= CCU_SUN9I_LOCK_REG,
-+		.features	= CCU_FEATURE_LOCK_REG,
-+		.hw.init	= CLK_HW_INIT("pll-ddr", "osc24M",
-+					      &ccu_nkmp_ops,
-+					      CLK_SET_RATE_UNGATE),
-+	},
-+};
-+
-+static struct ccu_nm pll_video0_clk = {
-+	.enable		= BIT(31),
-+	.lock		= BIT(6),
-+	.n		= _SUNXI_CCU_MULT_OFFSET_MIN_MAX(8, 8, 0, 12, 0),
-+	.m		= _SUNXI_CCU_DIV(16, 1), /* input divider */
-+	.common		= {
-+		.reg		= 0x018,
-+		.lock_reg	= CCU_SUN9I_LOCK_REG,
-+		.features	= CCU_FEATURE_LOCK_REG,
-+		.hw.init	= CLK_HW_INIT("pll-video0", "osc24M",
-+					      &ccu_nm_ops,
-+					      CLK_SET_RATE_UNGATE),
-+	},
-+};
-+
-+static struct ccu_nkmp pll_video1_clk = {
-+	.enable		= BIT(31),
-+	.lock		= BIT(7),
-+	.n		= _SUNXI_CCU_MULT_OFFSET_MIN_MAX(8, 8, 0, 12, 0),
-+	.m		= _SUNXI_CCU_DIV(16, 1), /* input divider */
-+	.p		= _SUNXI_CCU_DIV(0, 2), /* external divider p */
-+	.common		= {
-+		.reg		= 0x01c,
-+		.lock_reg	= CCU_SUN9I_LOCK_REG,
-+		.features	= CCU_FEATURE_LOCK_REG,
-+		.hw.init	= CLK_HW_INIT("pll-video1", "osc24M",
-+					      &ccu_nkmp_ops,
-+					      CLK_SET_RATE_UNGATE),
-+	},
-+};
-+
-+static struct ccu_nkmp pll_gpu_clk = {
-+	.enable		= BIT(31),
-+	.lock		= BIT(8),
-+	.n		= _SUNXI_CCU_MULT_OFFSET_MIN_MAX(8, 8, 0, 12, 0),
-+	.m		= _SUNXI_CCU_DIV(16, 1), /* input divider */
-+	.p		= _SUNXI_CCU_DIV(18, 1), /* output divider */
-+	.common		= {
-+		.reg		= 0x020,
-+		.lock_reg	= CCU_SUN9I_LOCK_REG,
-+		.features	= CCU_FEATURE_LOCK_REG,
-+		.hw.init	= CLK_HW_INIT("pll-gpu", "osc24M",
-+					      &ccu_nkmp_ops,
-+					      CLK_SET_RATE_UNGATE),
-+	},
-+};
-+
-+static struct ccu_nkmp pll_de_clk = {
-+	.enable		= BIT(31),
-+	.lock		= BIT(9),
-+	.n		= _SUNXI_CCU_MULT_OFFSET_MIN_MAX(8, 8, 0, 12, 0),
-+	.m		= _SUNXI_CCU_DIV(16, 1), /* input divider */
-+	.p		= _SUNXI_CCU_DIV(18, 1), /* output divider */
-+	.common		= {
-+		.reg		= 0x024,
-+		.lock_reg	= CCU_SUN9I_LOCK_REG,
-+		.features	= CCU_FEATURE_LOCK_REG,
-+		.hw.init	= CLK_HW_INIT("pll-de", "osc24M",
-+					      &ccu_nkmp_ops,
-+					      CLK_SET_RATE_UNGATE),
-+	},
-+};
-+
-+static struct ccu_nkmp pll_isp_clk = {
-+	.enable		= BIT(31),
-+	.lock		= BIT(10),
-+	.n		= _SUNXI_CCU_MULT_OFFSET_MIN_MAX(8, 8, 0, 12, 0),
-+	.m		= _SUNXI_CCU_DIV(16, 1), /* input divider */
-+	.p		= _SUNXI_CCU_DIV(18, 1), /* output divider */
-+	.common		= {
-+		.reg		= 0x028,
-+		.lock_reg	= CCU_SUN9I_LOCK_REG,
-+		.features	= CCU_FEATURE_LOCK_REG,
-+		.hw.init	= CLK_HW_INIT("pll-isp", "osc24M",
-+					      &ccu_nkmp_ops,
-+					      CLK_SET_RATE_UNGATE),
-+	},
-+};
-+
-+static struct ccu_nkmp pll_periph1_clk = {
-+	.enable		= BIT(31),
-+	.lock		= BIT(11),
-+	.n		= _SUNXI_CCU_MULT_OFFSET_MIN_MAX(8, 8, 0, 12, 0),
-+	.m		= _SUNXI_CCU_DIV(16, 1), /* input divider */
-+	.p		= _SUNXI_CCU_DIV(18, 1), /* output divider */
-+	.common		= {
-+		.reg		= 0x028,
-+		.lock_reg	= CCU_SUN9I_LOCK_REG,
-+		.features	= CCU_FEATURE_LOCK_REG,
-+		.hw.init	= CLK_HW_INIT("pll-periph1", "osc24M",
-+					      &ccu_nkmp_ops,
-+					      CLK_SET_RATE_UNGATE),
-+	},
-+};
-+
-+static const char * const c0cpux_parents[] = { "osc24M", "pll-c0cpux" };
-+static SUNXI_CCU_MUX(c0cpux_clk, "c0cpux", c0cpux_parents,
-+		     0x50, 0, 1, CLK_SET_RATE_PARENT | CLK_IS_CRITICAL);
-+
-+static const char * const c1cpux_parents[] = { "osc24M", "pll-c1cpux" };
-+static SUNXI_CCU_MUX(c1cpux_clk, "c1cpux", c1cpux_parents,
-+		     0x50, 8, 1, CLK_SET_RATE_PARENT | CLK_IS_CRITICAL);
-+
-+static struct clk_div_table axi_div_table[] = {
-+	{ .val = 0, .div = 1 },
-+	{ .val = 1, .div = 2 },
-+	{ .val = 2, .div = 3 },
-+	{ .val = 3, .div = 4 },
-+	{ .val = 4, .div = 4 },
-+	{ .val = 5, .div = 4 },
-+	{ .val = 6, .div = 4 },
-+	{ .val = 7, .div = 4 },
-+	{ /* Sentinel */ },
-+};
-+
-+static SUNXI_CCU_M(atb0_clk, "atb0", "c0cpux", 0x054, 8, 2, 0);
-+
-+static SUNXI_CCU_DIV_TABLE(axi0_clk, "axi0", "c0cpux",
-+			   0x054, 0, 3, axi_div_table, 0);
-+
-+static SUNXI_CCU_M(atb1_clk, "atb1", "c1cpux", 0x058, 8, 2, 0);
-+
-+static SUNXI_CCU_DIV_TABLE(axi1_clk, "axi1", "c1cpux",
-+			   0x058, 0, 3, axi_div_table, 0);
-+
-+static const char * const gtbus_parents[] = { "osc24M", "pll-periph0",
-+					      "pll-periph1", "pll-periph1" };
-+static SUNXI_CCU_M_WITH_MUX(gtbus_clk, "gtbus", gtbus_parents,
-+			    0x05c, 0, 2, 24, 2, CLK_IS_CRITICAL);
-+
-+static const char * const ahb_parents[] = { "gtbus", "pll-periph0",
-+					    "pll-periph1", "pll-periph1" };
-+static struct ccu_div ahb0_clk = {
-+	.div		= _SUNXI_CCU_DIV_FLAGS(0, 2, CLK_DIVIDER_POWER_OF_TWO),
-+	.mux		= _SUNXI_CCU_MUX(24, 2),
-+	.common		= {
-+		.reg		= 0x060,
-+		.hw.init	= CLK_HW_INIT_PARENTS("ahb0",
-+						      ahb_parents,
-+						      &ccu_div_ops,
-+						      0),
-+	},
-+};
-+
-+static struct ccu_div ahb1_clk = {
-+	.div		= _SUNXI_CCU_DIV_FLAGS(0, 2, CLK_DIVIDER_POWER_OF_TWO),
-+	.mux		= _SUNXI_CCU_MUX(24, 2),
-+	.common		= {
-+		.reg		= 0x064,
-+		.hw.init	= CLK_HW_INIT_PARENTS("ahb1",
-+						      ahb_parents,
-+						      &ccu_div_ops,
-+						      0),
-+	},
-+};
-+
-+static struct ccu_div ahb2_clk = {
-+	.div		= _SUNXI_CCU_DIV_FLAGS(0, 2, CLK_DIVIDER_POWER_OF_TWO),
-+	.mux		= _SUNXI_CCU_MUX(24, 2),
-+	.common		= {
-+		.reg		= 0x068,
-+		.hw.init	= CLK_HW_INIT_PARENTS("ahb2",
-+						      ahb_parents,
-+						      &ccu_div_ops,
-+						      0),
-+	},
-+};
-+
-+static const char * const apb_parents[] = { "osc24M", "pll-periph0" };
-+
-+static struct ccu_div apb0_clk = {
-+	.div		= _SUNXI_CCU_DIV_FLAGS(0, 2, CLK_DIVIDER_POWER_OF_TWO),
-+	.mux		= _SUNXI_CCU_MUX(24, 1),
-+	.common		= {
-+		.reg		= 0x070,
-+		.hw.init	= CLK_HW_INIT_PARENTS("apb0",
-+						      apb_parents,
-+						      &ccu_div_ops,
-+						      0),
-+	},
-+};
-+
-+static struct ccu_div apb1_clk = {
-+	.div		= _SUNXI_CCU_DIV_FLAGS(0, 2, CLK_DIVIDER_POWER_OF_TWO),
-+	.mux		= _SUNXI_CCU_MUX(24, 1),
-+	.common		= {
-+		.reg		= 0x074,
-+		.hw.init	= CLK_HW_INIT_PARENTS("apb1",
-+						      apb_parents,
-+						      &ccu_div_ops,
-+						      0),
-+	},
-+};
-+
-+static struct ccu_div cci400_clk = {
-+	.div		= _SUNXI_CCU_DIV_FLAGS(0, 2, CLK_DIVIDER_POWER_OF_TWO),
-+	.mux		= _SUNXI_CCU_MUX(24, 2),
-+	.common		= {
-+		.reg		= 0x078,
-+		.hw.init	= CLK_HW_INIT_PARENTS("cci400",
-+						      ahb_parents,
-+						      &ccu_div_ops,
-+						      CLK_IS_CRITICAL),
-+	},
-+};
-+
-+static SUNXI_CCU_M_WITH_MUX_GATE(ats_clk, "ats", apb_parents,
-+				 0x080, 0, 3, 24, 2, BIT(31), 0);
-+
-+static SUNXI_CCU_M_WITH_MUX_GATE(trace_clk, "trace", apb_parents,
-+				 0x084, 0, 3, 24, 2, BIT(31), 0);
-+
-+static const char * const out_parents[] = { "osc24M", "osc32k", "osc24M" };
-+static const struct ccu_mux_fixed_prediv out_prediv = {
-+	.index = 0, .div = 750
-+};
-+
-+static struct ccu_mp out_a_clk = {
-+	.enable		= BIT(31),
-+	.m		= _SUNXI_CCU_DIV(8, 5),
-+	.p		= _SUNXI_CCU_DIV(20, 2),
-+	.mux		= {
-+		.shift		= 24,
-+		.width		= 4,
-+		.fixed_predivs	= &out_prediv,
-+		.n_predivs	= 1,
-+	},
-+	.common		= {
-+		.reg		= 0x180,
-+		.features	= CCU_FEATURE_FIXED_PREDIV,
-+		.hw.init	= CLK_HW_INIT_PARENTS("out-a",
-+						      out_parents,
-+						      &ccu_mp_ops,
-+						      0),
-+	},
-+};
-+
-+static struct ccu_mp out_b_clk = {
-+	.enable		= BIT(31),
-+	.m		= _SUNXI_CCU_DIV(8, 5),
-+	.p		= _SUNXI_CCU_DIV(20, 2),
-+	.mux		= {
-+		.shift		= 24,
-+		.width		= 4,
-+		.fixed_predivs	= &out_prediv,
-+		.n_predivs	= 1,
-+	},
-+	.common		= {
-+		.reg		= 0x184,
-+		.features	= CCU_FEATURE_FIXED_PREDIV,
-+		.hw.init	= CLK_HW_INIT_PARENTS("out-b",
-+						      out_parents,
-+						      &ccu_mp_ops,
-+						      0),
-+	},
-+};
-+
-+static const char * const mod0_default_parents[] = { "osc24M", "pll-periph0" };
-+
-+static SUNXI_CCU_MP_WITH_MUX_GATE(nand0_0_clk, "nand0-0", mod0_default_parents,
-+				  0x400,
-+				  0, 4,		/* M */
-+				  16, 2,	/* P */
-+				  24, 4,	/* mux */
-+				  BIT(31),	/* gate */
-+				  0);
-+
-+static SUNXI_CCU_MP_WITH_MUX_GATE(nand0_1_clk, "nand0-1", mod0_default_parents,
-+				  0x404,
-+				  0, 4,		/* M */
-+				  16, 2,	/* P */
-+				  24, 4,	/* mux */
-+				  BIT(31),	/* gate */
-+				  0);
-+
-+static SUNXI_CCU_MP_WITH_MUX_GATE(nand1_0_clk, "nand1-0", mod0_default_parents,
-+				  0x408,
-+				  0, 4,		/* M */
-+				  16, 2,	/* P */
-+				  24, 4,	/* mux */
-+				  BIT(31),	/* gate */
-+				  0);
-+
-+static SUNXI_CCU_MP_WITH_MUX_GATE(nand1_1_clk, "nand1-1", mod0_default_parents,
-+				  0x40c,
-+				  0, 4,		/* M */
-+				  16, 2,	/* P */
-+				  24, 4,	/* mux */
-+				  BIT(31),	/* gate */
-+				  0);
-+
-+static SUNXI_CCU_MP_WITH_MUX_GATE(mmc0_clk, "mmc0", mod0_default_parents,
-+				  0x410,
-+				  0, 4,		/* M */
-+				  16, 2,	/* P */
-+				  24, 4,	/* mux */
-+				  BIT(31),	/* gate */
-+				  0);
-+
-+static SUNXI_CCU_PHASE(mmc0_sample_clk, "mmc0-sample", "mmc0",
-+		       0x410, 20, 3, 0);
-+static SUNXI_CCU_PHASE(mmc0_output_clk, "mmc0-output", "mmc0",
-+		       0x410, 8, 3, 0);
-+
-+static SUNXI_CCU_MP_WITH_MUX_GATE(mmc1_clk, "mmc1", mod0_default_parents,
-+				  0x414,
-+				  0, 4,		/* M */
-+				  16, 2,	/* P */
-+				  24, 4,	/* mux */
-+				  BIT(31),	/* gate */
-+				  0);
-+
-+static SUNXI_CCU_PHASE(mmc1_sample_clk, "mmc1-sample", "mmc1",
-+		       0x414, 20, 3, 0);
-+static SUNXI_CCU_PHASE(mmc1_output_clk, "mmc1-output", "mmc1",
-+		       0x414, 8, 3, 0);
-+
-+static SUNXI_CCU_MP_WITH_MUX_GATE(mmc2_clk, "mmc2", mod0_default_parents,
-+				  0x418,
-+				  0, 4,		/* M */
-+				  16, 2,	/* P */
-+				  24, 4,	/* mux */
-+				  BIT(31),	/* gate */
-+				  0);
-+
-+static SUNXI_CCU_PHASE(mmc2_sample_clk, "mmc2-sample", "mmc2",
-+		       0x418, 20, 3, 0);
-+static SUNXI_CCU_PHASE(mmc2_output_clk, "mmc2-output", "mmc2",
-+		       0x418, 8, 3, 0);
-+
-+static SUNXI_CCU_MP_WITH_MUX_GATE(mmc3_clk, "mmc3", mod0_default_parents,
-+				  0x41c,
-+				  0, 4,		/* M */
-+				  16, 2,	/* P */
-+				  24, 4,	/* mux */
-+				  BIT(31),	/* gate */
-+				  0);
-+
-+static SUNXI_CCU_PHASE(mmc3_sample_clk, "mmc3-sample", "mmc3",
-+		       0x41c, 20, 3, 0);
-+static SUNXI_CCU_PHASE(mmc3_output_clk, "mmc3-output", "mmc3",
-+		       0x41c, 8, 3, 0);
-+
-+static SUNXI_CCU_MP_WITH_MUX_GATE(ts_clk, "ts", mod0_default_parents,
-+				  0x428,
-+				  0, 4,		/* M */
-+				  16, 2,	/* P */
-+				  24, 4,	/* mux */
-+				  BIT(31),	/* gate */
-+				  0);
-+
-+static const char * const ss_parents[] = { "osc24M", "pll-periph",
-+					   "pll-periph1" };
-+static const u8 ss_table[] = { 0, 1, 13 };
-+static struct ccu_mp ss_clk = {
-+	.enable		= BIT(31),
-+	.m		= _SUNXI_CCU_DIV(0, 4),
-+	.p		= _SUNXI_CCU_DIV(16, 2),
-+	.mux		= _SUNXI_CCU_MUX_TABLE(24, 4, ss_table),
-+	.common		= {
-+		.reg		= 0x42c,
-+		.hw.init	= CLK_HW_INIT_PARENTS("ss",
-+						      ss_parents,
-+						      &ccu_mp_ops,
-+						      0),
-+	},
-+};
-+
-+static SUNXI_CCU_MP_WITH_MUX_GATE(spi0_clk, "spi0", mod0_default_parents,
-+				  0x430,
-+				  0, 4,		/* M */
-+				  16, 2,	/* P */
-+				  24, 4,	/* mux */
-+				  BIT(31),	/* gate */
-+				  0);
-+
-+static SUNXI_CCU_MP_WITH_MUX_GATE(spi1_clk, "spi1", mod0_default_parents,
-+				  0x434,
-+				  0, 4,		/* M */
-+				  16, 2,	/* P */
-+				  24, 4,	/* mux */
-+				  BIT(31),	/* gate */
-+				  0);
-+
-+static SUNXI_CCU_MP_WITH_MUX_GATE(spi2_clk, "spi2", mod0_default_parents,
-+				  0x438,
-+				  0, 4,		/* M */
-+				  16, 2,	/* P */
-+				  24, 4,	/* mux */
-+				  BIT(31),	/* gate */
-+				  0);
-+
-+static SUNXI_CCU_MP_WITH_MUX_GATE(spi3_clk, "spi3", mod0_default_parents,
-+				  0x43c,
-+				  0, 4,		/* M */
-+				  16, 2,	/* P */
-+				  24, 4,	/* mux */
-+				  BIT(31),	/* gate */
-+				  0);
-+
-+static SUNXI_CCU_M_WITH_GATE(i2s0_clk, "i2s0", "pll-audio",
-+			     0x440, 0, 4, BIT(31), CLK_SET_RATE_PARENT);
-+static SUNXI_CCU_M_WITH_GATE(i2s1_clk, "i2s1", "pll-audio",
-+			     0x444, 0, 4, BIT(31), CLK_SET_RATE_PARENT);
-+static SUNXI_CCU_M_WITH_GATE(spdif_clk, "spdif", "pll-audio",
-+			     0x44c, 0, 4, BIT(31), CLK_SET_RATE_PARENT);
-+
-+static const char * const sdram_parents[] = { "pll-periph0", "pll-ddr" };
-+static const u8 sdram_table[] = { 0, 3 };
-+
-+static SUNXI_CCU_M_WITH_MUX_TABLE_GATE(sdram_clk, "sdram",
-+				       sdram_parents, sdram_table,
-+				       0x484,
-+				       8, 4,	/* M */
-+				       12, 4,	/* mux */
-+				       0,	/* no gate */
-+				       CLK_IS_CRITICAL);
-+
-+static SUNXI_CCU_M_WITH_GATE(de_clk, "de", "pll-de", 0x490,
-+			     0, 4, BIT(31), CLK_SET_RATE_PARENT);
-+
-+static SUNXI_CCU_GATE(edp_clk, "edp", "osc24M", 0x494, BIT(31), 0);
-+
-+static const char * const mp_parents[] = { "pll-video1", "pll-gpu", "pll-de" };
-+static const u8 mp_table[] = { 9, 10, 11 };
-+static SUNXI_CCU_M_WITH_MUX_TABLE_GATE(mp_clk, "mp", mp_parents, mp_table,
-+				       0x498,
-+				       0, 4,	/* M */
-+				       24, 4,	/* mux */
-+				       BIT(31),	/* gate */
-+				       0);
-+
-+static const char * const display_parents[] = { "pll-video0", "pll-video1" };
-+static const u8 display_table[] = { 8, 9 };
-+
-+static SUNXI_CCU_M_WITH_MUX_TABLE_GATE(lcd0_clk, "lcd0",
-+				       display_parents, display_table,
-+				       0x49c,
-+				       0, 4,	/* M */
-+				       24, 4,	/* mux */
-+				       BIT(31),	/* gate */
-+				       CLK_SET_RATE_NO_REPARENT |
-+				       CLK_SET_RATE_PARENT);
-+
-+static SUNXI_CCU_M_WITH_MUX_TABLE_GATE(lcd1_clk, "lcd1",
-+				       display_parents, display_table,
-+				       0x4a0,
-+				       0, 4,	/* M */
-+				       24, 4,	/* mux */
-+				       BIT(31),	/* gate */
-+				       CLK_SET_RATE_NO_REPARENT |
-+				       CLK_SET_RATE_PARENT);
-+
-+static SUNXI_CCU_M_WITH_MUX_TABLE_GATE(mipi_dsi0_clk, "mipi-dsi0",
-+				       display_parents, display_table,
-+				       0x4a8,
-+				       0, 4,	/* M */
-+				       24, 4,	/* mux */
-+				       BIT(31),	/* gate */
-+				       CLK_SET_RATE_PARENT);
-+
-+static const char * const mipi_dsi1_parents[] = { "osc24M", "pll-video1" };
-+static const u8 mipi_dsi1_table[] = { 0, 9 };
-+static SUNXI_CCU_M_WITH_MUX_TABLE_GATE(mipi_dsi1_clk, "mipi-dsi1",
-+				       mipi_dsi1_parents, mipi_dsi1_table,
-+				       0x4ac,
-+				       0, 4,	/* M */
-+				       24, 4,	/* mux */
-+				       BIT(31),	/* gate */
-+				       CLK_SET_RATE_PARENT);
-+
-+static SUNXI_CCU_M_WITH_MUX_TABLE_GATE(hdmi_clk, "hdmi",
-+				       display_parents, display_table,
-+				       0x4b0,
-+				       0, 4,	/* M */
-+				       24, 4,	/* mux */
-+				       BIT(31),	/* gate */
-+				       CLK_SET_RATE_NO_REPARENT |
-+				       CLK_SET_RATE_PARENT);
-+
-+static SUNXI_CCU_GATE(hdmi_slow_clk, "hdmi-slow", "osc24M", 0x4b4, BIT(31), 0);
-+
-+static SUNXI_CCU_M_WITH_GATE(mipi_csi_clk, "mipi-csi", "osc24M", 0x4bc,
-+			     0, 4, BIT(31), 0);
-+
-+static SUNXI_CCU_M_WITH_GATE(csi_isp_clk, "csi-isp", "pll-isp", 0x4c0,
-+			     0, 4, BIT(31), CLK_SET_RATE_PARENT);
-+
-+static SUNXI_CCU_GATE(csi_misc_clk, "csi-misc", "osc24M", 0x4c0, BIT(16), 0);
-+
-+static SUNXI_CCU_M_WITH_MUX_TABLE_GATE(csi0_mclk_clk, "csi0-mclk",
-+				       mipi_dsi1_parents, mipi_dsi1_table,
-+				       0x4c4,
-+				       0, 4,	/* M */
-+				       24, 4,	/* mux */
-+				       BIT(31),	/* gate */
-+				       CLK_SET_RATE_PARENT);
-+
-+static SUNXI_CCU_M_WITH_MUX_TABLE_GATE(csi1_mclk_clk, "csi1-mclk",
-+				       mipi_dsi1_parents, mipi_dsi1_table,
-+				       0x4c8,
-+				       0, 4,	/* M */
-+				       24, 4,	/* mux */
-+				       BIT(31),	/* gate */
-+				       CLK_SET_RATE_PARENT);
-+
-+static const char * const fd_parents[] = { "pll-periph0", "pll-isp" };
-+static const u8 fd_table[] = { 1, 12 };
-+static SUNXI_CCU_M_WITH_MUX_TABLE_GATE(fd_clk, "fd", fd_parents, fd_table,
-+				       0x4cc,
-+				       0, 4,	/* M */
-+				       24, 4,	/* mux */
-+				       BIT(31),	/* gate */
-+				       0);
-+static SUNXI_CCU_M_WITH_GATE(ve_clk, "ve", "pll-ve", 0x4d0,
-+			     16, 3, BIT(31), CLK_SET_RATE_PARENT);
-+
-+static SUNXI_CCU_GATE(avs_clk, "avs", "osc24M", 0x4d4, BIT(31), 0);
-+
-+static SUNXI_CCU_M_WITH_GATE(gpu_core_clk, "gpu-core", "pll-gpu", 0x4f0,
-+			     0, 3, BIT(31), CLK_SET_RATE_PARENT);
-+static SUNXI_CCU_M_WITH_GATE(gpu_memory_clk, "gpu-memory", "pll-gpu", 0x4f4,
-+			     0, 3, BIT(31), CLK_SET_RATE_PARENT);
-+
-+static const char * const gpu_axi_parents[] = { "pll-periph0", "pll-gpu" };
-+static const u8 gpu_axi_table[] = { 1, 10 };
-+static SUNXI_CCU_M_WITH_MUX_TABLE_GATE(gpu_axi_clk, "gpu-axi",
-+				       gpu_axi_parents, gpu_axi_table,
-+				       0x4f8,
-+				       0, 4,	/* M */
-+				       24, 4,	/* mux */
-+				       BIT(31),	/* gate */
-+				       CLK_SET_RATE_PARENT);
-+
-+static SUNXI_CCU_M_WITH_GATE(sata_clk, "sata", "pll-periph0", 0x500,
-+			     0, 4, BIT(31), 0);
-+
-+static SUNXI_CCU_M_WITH_GATE(ac97_clk, "ac97", "pll-audio",
-+			     0x504, 0, 4, BIT(31), CLK_SET_RATE_PARENT);
-+
-+static SUNXI_CCU_M_WITH_MUX_GATE(mipi_hsi_clk, "mipi-hsi",
-+				 mod0_default_parents, 0x508,
-+				 0, 4,		/* M */
-+				 24, 4,		/* mux */
-+				 BIT(31),	/* gate */
-+				 0);
-+
-+static const char * const gpadc_parents[] = { "osc24M", "pll-audio", "osc32k" };
-+static const u8 gpadc_table[] = { 0, 4, 7 };
-+static struct ccu_mp gpadc_clk = {
-+	.enable		= BIT(31),
-+	.m		= _SUNXI_CCU_DIV(0, 4),
-+	.p		= _SUNXI_CCU_DIV(16, 2),
-+	.mux		= _SUNXI_CCU_MUX_TABLE(24, 4, gpadc_table),
-+	.common		= {
-+		.reg		= 0x50c,
-+		.hw.init	= CLK_HW_INIT_PARENTS("gpadc",
-+						      gpadc_parents,
-+						      &ccu_mp_ops,
-+						      0),
-+	},
-+};
-+
-+static const char * const cir_tx_parents[] = { "osc24M", "osc32k" };
-+static const u8 cir_tx_table[] = { 0, 7 };
-+static struct ccu_mp cir_tx_clk = {
-+	.enable		= BIT(31),
-+	.m		= _SUNXI_CCU_DIV(0, 4),
-+	.p		= _SUNXI_CCU_DIV(16, 2),
-+	.mux		= _SUNXI_CCU_MUX_TABLE(24, 4, cir_tx_table),
-+	.common		= {
-+		.reg		= 0x510,
-+		.hw.init	= CLK_HW_INIT_PARENTS("cir-tx",
-+						      cir_tx_parents,
-+						      &ccu_mp_ops,
-+						      0),
-+	},
-+};
-+
-+/* AHB0 bus gates */
-+static SUNXI_CCU_GATE(bus_fd_clk,	"bus-fd",	"ahb0",
-+		      0x580, BIT(0), 0);
-+static SUNXI_CCU_GATE(bus_ve_clk,	"bus-ve",	"ahb0",
-+		      0x580, BIT(1), 0);
-+static SUNXI_CCU_GATE(bus_gpu_ctrl_clk,	"bus-gpu-ctrl",	"ahb0",
-+		      0x580, BIT(3), 0);
-+static SUNXI_CCU_GATE(bus_ss_clk,	"bus-ss",	"ahb0",
-+		      0x580, BIT(5), 0);
-+static SUNXI_CCU_GATE(bus_mmc_clk,	"bus-mmc",	"ahb0",
-+		      0x580, BIT(8), 0);
-+static SUNXI_CCU_GATE(bus_nand0_clk,	"bus-nand0",	"ahb0",
-+		      0x580, BIT(12), 0);
-+static SUNXI_CCU_GATE(bus_nand1_clk,	"bus-nand1",	"ahb0",
-+		      0x580, BIT(13), 0);
-+static SUNXI_CCU_GATE(bus_sdram_clk,	"bus-sdram",	"ahb0",
-+		      0x580, BIT(14), 0);
-+static SUNXI_CCU_GATE(bus_mipi_hsi_clk,	"bus-mipi-hsi",	"ahb0",
-+		      0x580, BIT(15), 0);
-+static SUNXI_CCU_GATE(bus_sata_clk,	"bus-sata",	"ahb0",
-+		      0x580, BIT(16), 0);
-+static SUNXI_CCU_GATE(bus_ts_clk,	"bus-ts",	"ahb0",
-+		      0x580, BIT(18), 0);
-+static SUNXI_CCU_GATE(bus_spi0_clk,	"bus-spi0",	"ahb0",
-+		      0x580, BIT(20), 0);
-+static SUNXI_CCU_GATE(bus_spi1_clk,	"bus-spi1",	"ahb0",
-+		      0x580, BIT(21), 0);
-+static SUNXI_CCU_GATE(bus_spi2_clk,	"bus-spi2",	"ahb0",
-+		      0x580, BIT(22), 0);
-+static SUNXI_CCU_GATE(bus_spi3_clk,	"bus-spi3",	"ahb0",
-+		      0x580, BIT(23), 0);
-+
-+/* AHB1 bus gates */
-+static SUNXI_CCU_GATE(bus_otg_clk,	"bus-otg",	"ahb1",
-+		      0x584, BIT(0), 0);
-+static SUNXI_CCU_GATE(bus_usb_clk,	"bus-usb",	"ahb1",
-+		      0x584, BIT(1), 0);
-+static SUNXI_CCU_GATE(bus_gmac_clk,	"bus-gmac",	"ahb1",
-+		      0x584, BIT(17), 0);
-+static SUNXI_CCU_GATE(bus_msgbox_clk,	"bus-msgbox",	"ahb1",
-+		      0x584, BIT(21), 0);
-+static SUNXI_CCU_GATE(bus_spinlock_clk,	"bus-spinlock",	"ahb1",
-+		      0x584, BIT(22), 0);
-+static SUNXI_CCU_GATE(bus_hstimer_clk,	"bus-hstimer",	"ahb1",
-+		      0x584, BIT(23), 0);
-+static SUNXI_CCU_GATE(bus_dma_clk,	"bus-dma",	"ahb1",
-+		      0x584, BIT(24), 0);
-+
-+/* AHB2 bus gates */
-+static SUNXI_CCU_GATE(bus_lcd0_clk,	"bus-lcd0",	"ahb2",
-+		      0x588, BIT(0), 0);
-+static SUNXI_CCU_GATE(bus_lcd1_clk,	"bus-lcd1",	"ahb2",
-+		      0x588, BIT(1), 0);
-+static SUNXI_CCU_GATE(bus_edp_clk,	"bus-edp",	"ahb2",
-+		      0x588, BIT(2), 0);
-+static SUNXI_CCU_GATE(bus_csi_clk,	"bus-csi",	"ahb2",
-+		      0x588, BIT(4), 0);
-+static SUNXI_CCU_GATE(bus_hdmi_clk,	"bus-hdmi",	"ahb2",
-+		      0x588, BIT(5), 0);
-+static SUNXI_CCU_GATE(bus_de_clk,	"bus-de",	"ahb2",
-+		      0x588, BIT(7), 0);
-+static SUNXI_CCU_GATE(bus_mp_clk,	"bus-mp",	"ahb2",
-+		      0x588, BIT(8), 0);
-+static SUNXI_CCU_GATE(bus_mipi_dsi_clk,	"bus-mipi-dsi",	"ahb2",
-+		      0x588, BIT(11), 0);
-+
-+/* APB0 bus gates */
-+static SUNXI_CCU_GATE(bus_spdif_clk,	"bus-spdif",	"apb0",
-+		      0x590, BIT(1), 0);
-+static SUNXI_CCU_GATE(bus_pio_clk,	"bus-pio",	"apb0",
-+		      0x590, BIT(5), 0);
-+static SUNXI_CCU_GATE(bus_ac97_clk,	"bus-ac97",	"apb0",
-+		      0x590, BIT(11), 0);
-+static SUNXI_CCU_GATE(bus_i2s0_clk,	"bus-i2s0",	"apb0",
-+		      0x590, BIT(12), 0);
-+static SUNXI_CCU_GATE(bus_i2s1_clk,	"bus-i2s1",	"apb0",
-+		      0x590, BIT(13), 0);
-+static SUNXI_CCU_GATE(bus_lradc_clk,	"bus-lradc",	"apb0",
-+		      0x590, BIT(15), 0);
-+static SUNXI_CCU_GATE(bus_gpadc_clk,	"bus-gpadc",	"apb0",
-+		      0x590, BIT(17), 0);
-+static SUNXI_CCU_GATE(bus_twd_clk,	"bus-twd",	"apb0",
-+		      0x590, BIT(18), 0);
-+static SUNXI_CCU_GATE(bus_cir_tx_clk,	"bus-cir-tx",	"apb0",
-+		      0x590, BIT(19), 0);
-+
-+/* APB1 bus gates */
-+static SUNXI_CCU_GATE(bus_i2c0_clk,	"bus-i2c0",	"apb1",
-+		      0x594, BIT(0), 0);
-+static SUNXI_CCU_GATE(bus_i2c1_clk,	"bus-i2c1",	"apb1",
-+		      0x594, BIT(1), 0);
-+static SUNXI_CCU_GATE(bus_i2c2_clk,	"bus-i2c2",	"apb1",
-+		      0x594, BIT(2), 0);
-+static SUNXI_CCU_GATE(bus_i2c3_clk,	"bus-i2c3",	"apb1",
-+		      0x594, BIT(3), 0);
-+static SUNXI_CCU_GATE(bus_i2c4_clk,	"bus-i2c4",	"apb1",
-+		      0x594, BIT(4), 0);
-+static SUNXI_CCU_GATE(bus_uart0_clk,	"bus-uart0",	"apb1",
-+		      0x594, BIT(16), 0);
-+static SUNXI_CCU_GATE(bus_uart1_clk,	"bus-uart1",	"apb1",
-+		      0x594, BIT(17), 0);
-+static SUNXI_CCU_GATE(bus_uart2_clk,	"bus-uart2",	"apb1",
-+		      0x594, BIT(18), 0);
-+static SUNXI_CCU_GATE(bus_uart3_clk,	"bus-uart3",	"apb1",
-+		      0x594, BIT(19), 0);
-+static SUNXI_CCU_GATE(bus_uart4_clk,	"bus-uart4",	"apb1",
-+		      0x594, BIT(20), 0);
-+static SUNXI_CCU_GATE(bus_uart5_clk,	"bus-uart5",	"apb1",
-+		      0x594, BIT(21), 0);
-+
-+static struct ccu_common *sun9i_a80_ccu_clks[] = {
-+	&pll_c0cpux_clk.common,
-+	&pll_c1cpux_clk.common,
-+	&pll_audio_clk.common,
-+	&pll_periph0_clk.common,
-+	&pll_ve_clk.common,
-+	&pll_ddr_clk.common,
-+	&pll_video0_clk.common,
-+	&pll_video1_clk.common,
-+	&pll_gpu_clk.common,
-+	&pll_de_clk.common,
-+	&pll_isp_clk.common,
-+	&pll_periph1_clk.common,
-+	&c0cpux_clk.common,
-+	&c1cpux_clk.common,
-+	&atb0_clk.common,
-+	&axi0_clk.common,
-+	&atb1_clk.common,
-+	&axi1_clk.common,
-+	&gtbus_clk.common,
-+	&ahb0_clk.common,
-+	&ahb1_clk.common,
-+	&ahb2_clk.common,
-+	&apb0_clk.common,
-+	&apb1_clk.common,
-+	&cci400_clk.common,
-+	&ats_clk.common,
-+	&trace_clk.common,
-+
-+	&out_a_clk.common,
-+	&out_b_clk.common,
-+
-+	/* module clocks */
-+	&nand0_0_clk.common,
-+	&nand0_1_clk.common,
-+	&nand1_0_clk.common,
-+	&nand1_1_clk.common,
-+	&mmc0_clk.common,
-+	&mmc0_sample_clk.common,
-+	&mmc0_output_clk.common,
-+	&mmc1_clk.common,
-+	&mmc1_sample_clk.common,
-+	&mmc1_output_clk.common,
-+	&mmc2_clk.common,
-+	&mmc2_sample_clk.common,
-+	&mmc2_output_clk.common,
-+	&mmc3_clk.common,
-+	&mmc3_sample_clk.common,
-+	&mmc3_output_clk.common,
-+	&ts_clk.common,
-+	&ss_clk.common,
-+	&spi0_clk.common,
-+	&spi1_clk.common,
-+	&spi2_clk.common,
-+	&spi3_clk.common,
-+	&i2s0_clk.common,
-+	&i2s1_clk.common,
-+	&spdif_clk.common,
-+	&sdram_clk.common,
-+	&de_clk.common,
-+	&edp_clk.common,
-+	&mp_clk.common,
-+	&lcd0_clk.common,
-+	&lcd1_clk.common,
-+	&mipi_dsi0_clk.common,
-+	&mipi_dsi1_clk.common,
-+	&hdmi_clk.common,
-+	&hdmi_slow_clk.common,
-+	&mipi_csi_clk.common,
-+	&csi_isp_clk.common,
-+	&csi_misc_clk.common,
-+	&csi0_mclk_clk.common,
-+	&csi1_mclk_clk.common,
-+	&fd_clk.common,
-+	&ve_clk.common,
-+	&avs_clk.common,
-+	&gpu_core_clk.common,
-+	&gpu_memory_clk.common,
-+	&gpu_axi_clk.common,
-+	&sata_clk.common,
-+	&ac97_clk.common,
-+	&mipi_hsi_clk.common,
-+	&gpadc_clk.common,
-+	&cir_tx_clk.common,
-+
-+	/* AHB0 bus gates */
-+	&bus_fd_clk.common,
-+	&bus_ve_clk.common,
-+	&bus_gpu_ctrl_clk.common,
-+	&bus_ss_clk.common,
-+	&bus_mmc_clk.common,
-+	&bus_nand0_clk.common,
-+	&bus_nand1_clk.common,
-+	&bus_sdram_clk.common,
-+	&bus_mipi_hsi_clk.common,
-+	&bus_sata_clk.common,
-+	&bus_ts_clk.common,
-+	&bus_spi0_clk.common,
-+	&bus_spi1_clk.common,
-+	&bus_spi2_clk.common,
-+	&bus_spi3_clk.common,
-+
-+	/* AHB1 bus gates */
-+	&bus_otg_clk.common,
-+	&bus_usb_clk.common,
-+	&bus_gmac_clk.common,
-+	&bus_msgbox_clk.common,
-+	&bus_spinlock_clk.common,
-+	&bus_hstimer_clk.common,
-+	&bus_dma_clk.common,
-+
-+	/* AHB2 bus gates */
-+	&bus_lcd0_clk.common,
-+	&bus_lcd1_clk.common,
-+	&bus_edp_clk.common,
-+	&bus_csi_clk.common,
-+	&bus_hdmi_clk.common,
-+	&bus_de_clk.common,
-+	&bus_mp_clk.common,
-+	&bus_mipi_dsi_clk.common,
-+
-+	/* APB0 bus gates */
-+	&bus_spdif_clk.common,
-+	&bus_pio_clk.common,
-+	&bus_ac97_clk.common,
-+	&bus_i2s0_clk.common,
-+	&bus_i2s1_clk.common,
-+	&bus_lradc_clk.common,
-+	&bus_gpadc_clk.common,
-+	&bus_twd_clk.common,
-+	&bus_cir_tx_clk.common,
-+
-+	/* APB1 bus gates */
-+	&bus_i2c0_clk.common,
-+	&bus_i2c1_clk.common,
-+	&bus_i2c2_clk.common,
-+	&bus_i2c3_clk.common,
-+	&bus_i2c4_clk.common,
-+	&bus_uart0_clk.common,
-+	&bus_uart1_clk.common,
-+	&bus_uart2_clk.common,
-+	&bus_uart3_clk.common,
-+	&bus_uart4_clk.common,
-+	&bus_uart5_clk.common,
-+};
-+
-+static struct clk_hw_onecell_data sun9i_a80_hw_clks = {
-+	.hws	= {
-+		[CLK_PLL_C0CPUX]	= &pll_c0cpux_clk.common.hw,
-+		[CLK_PLL_C1CPUX]	= &pll_c1cpux_clk.common.hw,
-+		[CLK_PLL_AUDIO]		= &pll_audio_clk.common.hw,
-+		[CLK_PLL_PERIPH0]	= &pll_periph0_clk.common.hw,
-+		[CLK_PLL_VE]		= &pll_ve_clk.common.hw,
-+		[CLK_PLL_DDR]		= &pll_ddr_clk.common.hw,
-+		[CLK_PLL_VIDEO0]	= &pll_video0_clk.common.hw,
-+		[CLK_PLL_VIDEO1]	= &pll_video1_clk.common.hw,
-+		[CLK_PLL_GPU]		= &pll_gpu_clk.common.hw,
-+		[CLK_PLL_DE]		= &pll_de_clk.common.hw,
-+		[CLK_PLL_ISP]		= &pll_isp_clk.common.hw,
-+		[CLK_PLL_PERIPH1]	= &pll_periph1_clk.common.hw,
-+		[CLK_C0CPUX]		= &c0cpux_clk.common.hw,
-+		[CLK_C1CPUX]		= &c1cpux_clk.common.hw,
-+		[CLK_ATB0]		= &atb0_clk.common.hw,
-+		[CLK_AXI0]		= &axi0_clk.common.hw,
-+		[CLK_ATB1]		= &atb1_clk.common.hw,
-+		[CLK_AXI1]		= &axi1_clk.common.hw,
-+		[CLK_GTBUS]		= &gtbus_clk.common.hw,
-+		[CLK_AHB0]		= &ahb0_clk.common.hw,
-+		[CLK_AHB1]		= &ahb1_clk.common.hw,
-+		[CLK_AHB2]		= &ahb2_clk.common.hw,
-+		[CLK_APB0]		= &apb0_clk.common.hw,
-+		[CLK_APB1]		= &apb1_clk.common.hw,
-+		[CLK_CCI400]		= &cci400_clk.common.hw,
-+		[CLK_ATS]		= &ats_clk.common.hw,
-+		[CLK_TRACE]		= &trace_clk.common.hw,
-+
-+		[CLK_OUT_A]		= &out_a_clk.common.hw,
-+		[CLK_OUT_B]		= &out_b_clk.common.hw,
-+
-+		[CLK_NAND0_0]		= &nand0_0_clk.common.hw,
-+		[CLK_NAND0_1]		= &nand0_1_clk.common.hw,
-+		[CLK_NAND1_0]		= &nand1_0_clk.common.hw,
-+		[CLK_NAND1_1]		= &nand1_1_clk.common.hw,
-+		[CLK_MMC0]		= &mmc0_clk.common.hw,
-+		[CLK_MMC0_SAMPLE]	= &mmc0_sample_clk.common.hw,
-+		[CLK_MMC0_OUTPUT]	= &mmc0_output_clk.common.hw,
-+		[CLK_MMC1]		= &mmc1_clk.common.hw,
-+		[CLK_MMC1_SAMPLE]	= &mmc1_sample_clk.common.hw,
-+		[CLK_MMC1_OUTPUT]	= &mmc1_output_clk.common.hw,
-+		[CLK_MMC2]		= &mmc2_clk.common.hw,
-+		[CLK_MMC2_SAMPLE]	= &mmc2_sample_clk.common.hw,
-+		[CLK_MMC2_OUTPUT]	= &mmc2_output_clk.common.hw,
-+		[CLK_MMC3]		= &mmc3_clk.common.hw,
-+		[CLK_MMC3_SAMPLE]	= &mmc3_sample_clk.common.hw,
-+		[CLK_MMC3_OUTPUT]	= &mmc3_output_clk.common.hw,
-+		[CLK_TS]		= &ts_clk.common.hw,
-+		[CLK_SS]		= &ss_clk.common.hw,
-+		[CLK_SPI0]		= &spi0_clk.common.hw,
-+		[CLK_SPI1]		= &spi1_clk.common.hw,
-+		[CLK_SPI2]		= &spi2_clk.common.hw,
-+		[CLK_SPI3]		= &spi3_clk.common.hw,
-+		[CLK_I2S0]		= &i2s0_clk.common.hw,
-+		[CLK_I2S1]		= &i2s1_clk.common.hw,
-+		[CLK_SPDIF]		= &spdif_clk.common.hw,
-+		[CLK_SDRAM]		= &sdram_clk.common.hw,
-+		[CLK_DE]		= &de_clk.common.hw,
-+		[CLK_EDP]		= &edp_clk.common.hw,
-+		[CLK_MP]		= &mp_clk.common.hw,
-+		[CLK_LCD0]		= &lcd0_clk.common.hw,
-+		[CLK_LCD1]		= &lcd1_clk.common.hw,
-+		[CLK_MIPI_DSI0]		= &mipi_dsi0_clk.common.hw,
-+		[CLK_MIPI_DSI1]		= &mipi_dsi1_clk.common.hw,
-+		[CLK_HDMI]		= &hdmi_clk.common.hw,
-+		[CLK_HDMI_SLOW]		= &hdmi_slow_clk.common.hw,
-+		[CLK_MIPI_CSI]		= &mipi_csi_clk.common.hw,
-+		[CLK_CSI_ISP]		= &csi_isp_clk.common.hw,
-+		[CLK_CSI_MISC]		= &csi_misc_clk.common.hw,
-+		[CLK_CSI0_MCLK]		= &csi0_mclk_clk.common.hw,
-+		[CLK_CSI1_MCLK]		= &csi1_mclk_clk.common.hw,
-+		[CLK_FD]		= &fd_clk.common.hw,
-+		[CLK_VE]		= &ve_clk.common.hw,
-+		[CLK_AVS]		= &avs_clk.common.hw,
-+		[CLK_GPU_CORE]		= &gpu_core_clk.common.hw,
-+		[CLK_GPU_MEMORY]	= &gpu_memory_clk.common.hw,
-+		[CLK_GPU_AXI]		= &gpu_axi_clk.common.hw,
-+		[CLK_SATA]		= &sata_clk.common.hw,
-+		[CLK_AC97]		= &ac97_clk.common.hw,
-+		[CLK_MIPI_HSI]		= &mipi_hsi_clk.common.hw,
-+		[CLK_GPADC]		= &gpadc_clk.common.hw,
-+		[CLK_CIR_TX]		= &cir_tx_clk.common.hw,
-+
-+		[CLK_BUS_FD]		= &bus_fd_clk.common.hw,
-+		[CLK_BUS_VE]		= &bus_ve_clk.common.hw,
-+		[CLK_BUS_GPU_CTRL]	= &bus_gpu_ctrl_clk.common.hw,
-+		[CLK_BUS_SS]		= &bus_ss_clk.common.hw,
-+		[CLK_BUS_MMC]		= &bus_mmc_clk.common.hw,
-+		[CLK_BUS_NAND0]		= &bus_nand0_clk.common.hw,
-+		[CLK_BUS_NAND1]		= &bus_nand1_clk.common.hw,
-+		[CLK_BUS_SDRAM]		= &bus_sdram_clk.common.hw,
-+		[CLK_BUS_MIPI_HSI]	= &bus_mipi_hsi_clk.common.hw,
-+		[CLK_BUS_SATA]		= &bus_sata_clk.common.hw,
-+		[CLK_BUS_TS]		= &bus_ts_clk.common.hw,
-+		[CLK_BUS_SPI0]		= &bus_spi0_clk.common.hw,
-+		[CLK_BUS_SPI1]		= &bus_spi1_clk.common.hw,
-+		[CLK_BUS_SPI2]		= &bus_spi2_clk.common.hw,
-+		[CLK_BUS_SPI3]		= &bus_spi3_clk.common.hw,
-+
-+		[CLK_BUS_OTG]		= &bus_otg_clk.common.hw,
-+		[CLK_BUS_USB]		= &bus_usb_clk.common.hw,
-+		[CLK_BUS_GMAC]		= &bus_gmac_clk.common.hw,
-+		[CLK_BUS_MSGBOX]	= &bus_msgbox_clk.common.hw,
-+		[CLK_BUS_SPINLOCK]	= &bus_spinlock_clk.common.hw,
-+		[CLK_BUS_HSTIMER]	= &bus_hstimer_clk.common.hw,
-+		[CLK_BUS_DMA]		= &bus_dma_clk.common.hw,
-+
-+		[CLK_BUS_LCD0]		= &bus_lcd0_clk.common.hw,
-+		[CLK_BUS_LCD1]		= &bus_lcd1_clk.common.hw,
-+		[CLK_BUS_EDP]		= &bus_edp_clk.common.hw,
-+		[CLK_BUS_CSI]		= &bus_csi_clk.common.hw,
-+		[CLK_BUS_HDMI]		= &bus_hdmi_clk.common.hw,
-+		[CLK_BUS_DE]		= &bus_de_clk.common.hw,
-+		[CLK_BUS_MP]		= &bus_mp_clk.common.hw,
-+		[CLK_BUS_MIPI_DSI]	= &bus_mipi_dsi_clk.common.hw,
-+
-+		[CLK_BUS_SPDIF]		= &bus_spdif_clk.common.hw,
-+		[CLK_BUS_PIO]		= &bus_pio_clk.common.hw,
-+		[CLK_BUS_AC97]		= &bus_ac97_clk.common.hw,
-+		[CLK_BUS_I2S0]		= &bus_i2s0_clk.common.hw,
-+		[CLK_BUS_I2S1]		= &bus_i2s1_clk.common.hw,
-+		[CLK_BUS_LRADC]		= &bus_lradc_clk.common.hw,
-+		[CLK_BUS_GPADC]		= &bus_gpadc_clk.common.hw,
-+		[CLK_BUS_TWD]		= &bus_twd_clk.common.hw,
-+		[CLK_BUS_CIR_TX]	= &bus_cir_tx_clk.common.hw,
-+
-+		[CLK_BUS_I2C0]		= &bus_i2c0_clk.common.hw,
-+		[CLK_BUS_I2C1]		= &bus_i2c1_clk.common.hw,
-+		[CLK_BUS_I2C2]		= &bus_i2c2_clk.common.hw,
-+		[CLK_BUS_I2C3]		= &bus_i2c3_clk.common.hw,
-+		[CLK_BUS_I2C4]		= &bus_i2c4_clk.common.hw,
-+		[CLK_BUS_UART0]		= &bus_uart0_clk.common.hw,
-+		[CLK_BUS_UART1]		= &bus_uart1_clk.common.hw,
-+		[CLK_BUS_UART2]		= &bus_uart2_clk.common.hw,
-+		[CLK_BUS_UART3]		= &bus_uart3_clk.common.hw,
-+		[CLK_BUS_UART4]		= &bus_uart4_clk.common.hw,
-+		[CLK_BUS_UART5]		= &bus_uart5_clk.common.hw,
-+	},
-+	.num	= CLK_NUMBER,
-+};
-+
-+static struct ccu_reset_map sun9i_a80_ccu_resets[] = {
-+	/* AHB0 reset controls */
-+	[RST_BUS_FD]		= { 0x5a0, BIT(0) },
-+	[RST_BUS_VE]		= { 0x5a0, BIT(1) },
-+	[RST_BUS_GPU_CTRL]	= { 0x5a0, BIT(3) },
-+	[RST_BUS_SS]		= { 0x5a0, BIT(5) },
-+	[RST_BUS_MMC]		= { 0x5a0, BIT(8) },
-+	[RST_BUS_NAND0]		= { 0x5a0, BIT(12) },
-+	[RST_BUS_NAND1]		= { 0x5a0, BIT(13) },
-+	[RST_BUS_SDRAM]		= { 0x5a0, BIT(14) },
-+	[RST_BUS_SATA]		= { 0x5a0, BIT(16) },
-+	[RST_BUS_TS]		= { 0x5a0, BIT(18) },
-+	[RST_BUS_SPI0]		= { 0x5a0, BIT(20) },
-+	[RST_BUS_SPI1]		= { 0x5a0, BIT(21) },
-+	[RST_BUS_SPI2]		= { 0x5a0, BIT(22) },
-+	[RST_BUS_SPI3]		= { 0x5a0, BIT(23) },
-+
-+	/* AHB1 reset controls */
-+	[RST_BUS_OTG]		= { 0x5a4, BIT(0) },
-+	[RST_BUS_OTG_PHY]	= { 0x5a4, BIT(1) },
-+	[RST_BUS_MIPI_HSI]	= { 0x5a4, BIT(9) },
-+	[RST_BUS_GMAC]		= { 0x5a4, BIT(17) },
-+	[RST_BUS_MSGBOX]	= { 0x5a4, BIT(21) },
-+	[RST_BUS_SPINLOCK]	= { 0x5a4, BIT(22) },
-+	[RST_BUS_HSTIMER]	= { 0x5a4, BIT(23) },
-+	[RST_BUS_DMA]		= { 0x5a4, BIT(24) },
-+
-+	/* AHB2 reset controls */
-+	[RST_BUS_LCD0]		= { 0x5a8, BIT(0) },
-+	[RST_BUS_LCD1]		= { 0x5a8, BIT(1) },
-+	[RST_BUS_EDP]		= { 0x5a8, BIT(2) },
-+	[RST_BUS_LVDS]		= { 0x5a8, BIT(3) },
-+	[RST_BUS_CSI]		= { 0x5a8, BIT(4) },
-+	[RST_BUS_HDMI0]		= { 0x5a8, BIT(5) },
-+	[RST_BUS_HDMI1]		= { 0x5a8, BIT(6) },
-+	[RST_BUS_DE]		= { 0x5a8, BIT(7) },
-+	[RST_BUS_MP]		= { 0x5a8, BIT(8) },
-+	[RST_BUS_GPU]		= { 0x5a8, BIT(9) },
-+	[RST_BUS_MIPI_DSI]	= { 0x5a8, BIT(11) },
-+
-+	/* APB0 reset controls */
-+	[RST_BUS_SPDIF]		= { 0x5b0, BIT(1) },
-+	[RST_BUS_AC97]		= { 0x5b0, BIT(11) },
-+	[RST_BUS_I2S0]		= { 0x5b0, BIT(12) },
-+	[RST_BUS_I2S1]		= { 0x5b0, BIT(13) },
-+	[RST_BUS_LRADC]		= { 0x5b0, BIT(15) },
-+	[RST_BUS_GPADC]		= { 0x5b0, BIT(17) },
-+	[RST_BUS_CIR_TX]	= { 0x5b0, BIT(19) },
-+
-+	/* APB1 reset controls */
-+	[RST_BUS_I2C0]		= { 0x5b4, BIT(0) },
-+	[RST_BUS_I2C1]		= { 0x5b4, BIT(1) },
-+	[RST_BUS_I2C2]		= { 0x5b4, BIT(2) },
-+	[RST_BUS_I2C3]		= { 0x5b4, BIT(3) },
-+	[RST_BUS_I2C4]		= { 0x5b4, BIT(4) },
-+	[RST_BUS_UART0]		= { 0x5b4, BIT(16) },
-+	[RST_BUS_UART1]		= { 0x5b4, BIT(17) },
-+	[RST_BUS_UART2]		= { 0x5b4, BIT(18) },
-+	[RST_BUS_UART3]		= { 0x5b4, BIT(19) },
-+	[RST_BUS_UART4]		= { 0x5b4, BIT(20) },
-+	[RST_BUS_UART5]		= { 0x5b4, BIT(21) },
-+};
-+
-+static const struct sunxi_ccu_desc sun9i_a80_ccu_desc = {
-+	.ccu_clks	= sun9i_a80_ccu_clks,
-+	.num_ccu_clks	= ARRAY_SIZE(sun9i_a80_ccu_clks),
-+
-+	.hw_clks	= &sun9i_a80_hw_clks,
-+
-+	.resets		= sun9i_a80_ccu_resets,
-+	.num_resets	= ARRAY_SIZE(sun9i_a80_ccu_resets),
-+};
-+
-+static int sun9i_a80_ccu_probe(struct platform_device *pdev)
-+{
-+	struct resource *res;
-+	void __iomem *reg;
-+	u32 val;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	reg = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(reg))
-+		return PTR_ERR(reg);
-+
-+	/* Enforce d1 = 0, d2 = 0 for Audio PLL */
-+	val = readl(reg + SUN9I_A80_PLL_AUDIO_REG);
-+	val &= (BIT(16) & BIT(18));
-+	writel(val, reg + SUN9I_A80_PLL_AUDIO_REG);
-+
-+	return sunxi_ccu_probe(pdev->dev.of_node, reg, &sun9i_a80_ccu_desc);
-+}
-+
-+static const struct of_device_id sun9i_a80_ccu_ids[] = {
-+	{ .compatible = "allwinner,sun9i-a80-ccu" },
-+	{ }
-+};
-+
-+static struct platform_driver sun9i_a80_ccu_driver = {
-+	.probe	= sun9i_a80_ccu_probe,
-+	.driver	= {
-+		.name	= "sun9i-a80-ccu",
-+		.of_match_table	= sun9i_a80_ccu_ids,
-+	},
-+};
-+builtin_platform_driver(sun9i_a80_ccu_driver);
-diff --git a/drivers/clk/sunxi-ng/ccu-sun9i-a80.h b/drivers/clk/sunxi-ng/ccu-sun9i-a80.h
-new file mode 100644
-index 000000000000..315662341c70
---- /dev/null
-+++ b/drivers/clk/sunxi-ng/ccu-sun9i-a80.h
-@@ -0,0 +1,57 @@
-+/*
-+ * Copyright 2016 Chen-Yu Tsai
-+ *
-+ * Chen-Yu Tsai <wens@csie.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef _CCU_SUN9I_A80_H_
-+#define _CCU_SUN9I_A80_H_
-+
-+#include <dt-bindings/clock/sun9i-a80-ccu.h>
-+#include <dt-bindings/reset/sun9i-a80-ccu.h>
-+
-+#define CLK_PLL_C0CPUX		0
-+#define CLK_PLL_C1CPUX		1
-+
-+/* pll-audio and pll-periph0 are exported to the PRCM block */
-+
-+#define CLK_PLL_VE		4
-+#define CLK_PLL_DDR		5
-+#define CLK_PLL_VIDEO0		6
-+#define CLK_PLL_VIDEO1		7
-+#define CLK_PLL_GPU		8
-+#define CLK_PLL_DE		9
-+#define CLK_PLL_ISP		10
-+#define CLK_PLL_PERIPH1		11
-+
-+/* The CPUX clocks are exported */
-+
-+#define CLK_ATB0		14
-+#define CLK_AXI0		15
-+#define CLK_ATB1		16
-+#define CLK_AXI1		17
-+#define CLK_GTBUS		18
-+#define CLK_AHB0		19
-+#define CLK_AHB1		20
-+#define CLK_AHB2		21
-+#define CLK_APB0		22
-+#define CLK_APB1		23
-+#define CLK_CCI400		24
-+#define CLK_ATS			25
-+#define CLK_TRACE		26
-+
-+/* module clocks and bus gates exported */
-+
-+#define CLK_NUMBER		(CLK_BUS_UART5 + 1)
-+
-+#endif /* _CCU_SUN9I_A80_H_ */
-diff --git a/include/dt-bindings/clock/sun9i-a80-ccu.h b/include/dt-bindings/clock/sun9i-a80-ccu.h
-new file mode 100644
-index 000000000000..6ea1492a73a6
---- /dev/null
-+++ b/include/dt-bindings/clock/sun9i-a80-ccu.h
-@@ -0,0 +1,162 @@
-+/*
-+ * Copyright (C) 2016 Chen-Yu Tsai <wens@csie.org>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#ifndef _DT_BINDINGS_CLOCK_SUN9I_A80_CCU_H_
-+#define _DT_BINDINGS_CLOCK_SUN9I_A80_CCU_H_
-+
-+#define CLK_PLL_AUDIO		2
-+#define CLK_PLL_PERIPH0		3
-+
-+#define CLK_C0CPUX		12
-+#define CLK_C1CPUX		13
-+
-+#define CLK_OUT_A		27
-+#define CLK_OUT_B		28
-+
-+#define CLK_NAND0_0		29
-+#define CLK_NAND0_1		30
-+#define CLK_NAND1_0		31
-+#define CLK_NAND1_1		32
-+#define CLK_MMC0		33
-+#define CLK_MMC0_SAMPLE		34
-+#define CLK_MMC0_OUTPUT		35
-+#define CLK_MMC1		36
-+#define CLK_MMC1_SAMPLE		37
-+#define CLK_MMC1_OUTPUT		38
-+#define CLK_MMC2		39
-+#define CLK_MMC2_SAMPLE		40
-+#define CLK_MMC2_OUTPUT		41
-+#define CLK_MMC3		42
-+#define CLK_MMC3_SAMPLE		43
-+#define CLK_MMC3_OUTPUT		44
-+#define CLK_TS			45
-+#define CLK_SS			46
-+#define CLK_SPI0		47
-+#define CLK_SPI1		48
-+#define CLK_SPI2		49
-+#define CLK_SPI3		50
-+#define CLK_I2S0		51
-+#define CLK_I2S1		52
-+#define CLK_SPDIF		53
-+#define CLK_SDRAM		54
-+#define CLK_DE			55
-+#define CLK_EDP			56
-+#define CLK_MP			57
-+#define CLK_LCD0		58
-+#define CLK_LCD1		59
-+#define CLK_MIPI_DSI0		60
-+#define CLK_MIPI_DSI1		61
-+#define CLK_HDMI		62
-+#define CLK_HDMI_SLOW		63
-+#define CLK_MIPI_CSI		64
-+#define CLK_CSI_ISP		65
-+#define CLK_CSI_MISC		66
-+#define CLK_CSI0_MCLK		67
-+#define CLK_CSI1_MCLK		68
-+#define CLK_FD			69
-+#define CLK_VE			70
-+#define CLK_AVS			71
-+#define CLK_GPU_CORE		72
-+#define CLK_GPU_MEMORY		73
-+#define CLK_GPU_AXI		74
-+#define CLK_SATA		75
-+#define CLK_AC97		76
-+#define CLK_MIPI_HSI		77
-+#define CLK_GPADC		78
-+#define CLK_CIR_TX		79
-+
-+#define CLK_BUS_FD		80
-+#define CLK_BUS_VE		81
-+#define CLK_BUS_GPU_CTRL	82
-+#define CLK_BUS_SS		83
-+#define CLK_BUS_MMC		84
-+#define CLK_BUS_NAND0		85
-+#define CLK_BUS_NAND1		86
-+#define CLK_BUS_SDRAM		87
-+#define CLK_BUS_MIPI_HSI	88
-+#define CLK_BUS_SATA		89
-+#define CLK_BUS_TS		90
-+#define CLK_BUS_SPI0		91
-+#define CLK_BUS_SPI1		92
-+#define CLK_BUS_SPI2		93
-+#define CLK_BUS_SPI3		94
-+
-+#define CLK_BUS_OTG		95
-+#define CLK_BUS_USB		96
-+#define CLK_BUS_GMAC		97
-+#define CLK_BUS_MSGBOX		98
-+#define CLK_BUS_SPINLOCK	99
-+#define CLK_BUS_HSTIMER		100
-+#define CLK_BUS_DMA		101
-+
-+#define CLK_BUS_LCD0		102
-+#define CLK_BUS_LCD1		103
-+#define CLK_BUS_EDP		104
-+#define CLK_BUS_CSI		105
-+#define CLK_BUS_HDMI		106
-+#define CLK_BUS_DE		107
-+#define CLK_BUS_MP		108
-+#define CLK_BUS_MIPI_DSI	109
-+
-+#define CLK_BUS_SPDIF		110
-+#define CLK_BUS_PIO		111
-+#define CLK_BUS_AC97		112
-+#define CLK_BUS_I2S0		113
-+#define CLK_BUS_I2S1		114
-+#define CLK_BUS_LRADC		115
-+#define CLK_BUS_GPADC		116
-+#define CLK_BUS_TWD		117
-+#define CLK_BUS_CIR_TX		118
-+
-+#define CLK_BUS_I2C0		119
-+#define CLK_BUS_I2C1		120
-+#define CLK_BUS_I2C2		121
-+#define CLK_BUS_I2C3		122
-+#define CLK_BUS_I2C4		123
-+#define CLK_BUS_UART0		124
-+#define CLK_BUS_UART1		125
-+#define CLK_BUS_UART2		126
-+#define CLK_BUS_UART3		127
-+#define CLK_BUS_UART4		128
-+#define CLK_BUS_UART5		129
-+
-+#endif /* _DT_BINDINGS_CLOCK_SUN9I_A80_CCU_H_ */
-diff --git a/include/dt-bindings/reset/sun9i-a80-ccu.h b/include/dt-bindings/reset/sun9i-a80-ccu.h
-new file mode 100644
-index 000000000000..4b8df4b36788
---- /dev/null
-+++ b/include/dt-bindings/reset/sun9i-a80-ccu.h
-@@ -0,0 +1,102 @@
-+/*
-+ * Copyright (C) 2016 Chen-Yu Tsai <wens@csie.org>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#ifndef _DT_BINDINGS_RESET_SUN9I_A80_CCU_H_
-+#define _DT_BINDINGS_RESET_SUN9I_A80_CCU_H_
-+
-+#define RST_BUS_FD		0
-+#define RST_BUS_VE		1
-+#define RST_BUS_GPU_CTRL	2
-+#define RST_BUS_SS		3
-+#define RST_BUS_MMC		4
-+#define RST_BUS_NAND0		5
-+#define RST_BUS_NAND1		6
-+#define RST_BUS_SDRAM		7
-+#define RST_BUS_SATA		8
-+#define RST_BUS_TS		9
-+#define RST_BUS_SPI0		10
-+#define RST_BUS_SPI1		11
-+#define RST_BUS_SPI2		12
-+#define RST_BUS_SPI3		13
-+
-+#define RST_BUS_OTG		14
-+#define RST_BUS_OTG_PHY		15
-+#define RST_BUS_MIPI_HSI	16
-+#define RST_BUS_GMAC		17
-+#define RST_BUS_MSGBOX		18
-+#define RST_BUS_SPINLOCK	19
-+#define RST_BUS_HSTIMER		20
-+#define RST_BUS_DMA		21
-+
-+#define RST_BUS_LCD0		22
-+#define RST_BUS_LCD1		23
-+#define RST_BUS_EDP		24
-+#define RST_BUS_LVDS		25
-+#define RST_BUS_CSI		26
-+#define RST_BUS_HDMI0		27
-+#define RST_BUS_HDMI1		28
-+#define RST_BUS_DE		29
-+#define RST_BUS_MP		30
-+#define RST_BUS_GPU		31
-+#define RST_BUS_MIPI_DSI	32
-+
-+#define RST_BUS_SPDIF		33
-+#define RST_BUS_AC97		34
-+#define RST_BUS_I2S0		35
-+#define RST_BUS_I2S1		36
-+#define RST_BUS_LRADC		37
-+#define RST_BUS_GPADC		38
-+#define RST_BUS_CIR_TX		39
-+
-+#define RST_BUS_I2C0		40
-+#define RST_BUS_I2C1		41
-+#define RST_BUS_I2C2		42
-+#define RST_BUS_I2C3		43
-+#define RST_BUS_I2C4		44
-+#define RST_BUS_UART0		45
-+#define RST_BUS_UART1		46
-+#define RST_BUS_UART2		47
-+#define RST_BUS_UART3		48
-+#define RST_BUS_UART4		49
-+#define RST_BUS_UART5		50
-+
-+#endif /* _DT_BINDINGS_RESET_SUN9I_A80_CCU_H_ */
--- 
-2.11.0
+Jonathan
+> ---
+>  drivers/iio/adc/Kconfig        |  12 +
+>  drivers/iio/adc/Makefile       |   1 +
+>  drivers/iio/adc/meson_saradc.c | 922 +++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 935 insertions(+)
+>  create mode 100644 drivers/iio/adc/meson_saradc.c
+> 
+> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
+> index 9c8b558ba19e..86059b9b91bf 100644
+> --- a/drivers/iio/adc/Kconfig
+> +++ b/drivers/iio/adc/Kconfig
+> @@ -371,6 +371,18 @@ config MEN_Z188_ADC
+>  	  This driver can also be built as a module. If so, the module will be
+>  	  called men_z188_adc.
+>  
+> +config MESON_SARADC
+> +	tristate "Amlogic Meson SAR ADC driver"
+> +	default ARCH_MESON
+> +	depends on OF && COMMON_CLK && (ARCH_MESON || COMPILE_TEST)
+> +	select REGMAP_MMIO
+> +	help
+> +	  Say yes here to build support for the SAR ADC found in Amlogic Meson
+> +	  SoCs.
+> +
+> +	  To compile this driver as a module, choose M here: the
+> +	  module will be called meson_saradc.
+> +
+>  config MXS_LRADC
+>          tristate "Freescale i.MX23/i.MX28 LRADC"
+>          depends on (ARCH_MXS || COMPILE_TEST) && HAS_IOMEM
+> diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
+> index d36c4be8d1fc..de05b9e75f8f 100644
+> --- a/drivers/iio/adc/Makefile
+> +++ b/drivers/iio/adc/Makefile
+> @@ -36,6 +36,7 @@ obj-$(CONFIG_MCP320X) += mcp320x.o
+>  obj-$(CONFIG_MCP3422) += mcp3422.o
+>  obj-$(CONFIG_MEDIATEK_MT6577_AUXADC) += mt6577_auxadc.o
+>  obj-$(CONFIG_MEN_Z188_ADC) += men_z188_adc.o
+> +obj-$(CONFIG_MESON_SARADC) += meson_saradc.o
+>  obj-$(CONFIG_MXS_LRADC) += mxs-lradc.o
+>  obj-$(CONFIG_NAU7802) += nau7802.o
+>  obj-$(CONFIG_PALMAS_GPADC) += palmas_gpadc.o
+> diff --git a/drivers/iio/adc/meson_saradc.c b/drivers/iio/adc/meson_saradc.c
+> new file mode 100644
+> index 000000000000..89def6034f40
+> --- /dev/null
+> +++ b/drivers/iio/adc/meson_saradc.c
+> @@ -0,0 +1,922 @@
+> +/*
+> + * Amlogic Meson Successive Approximation Register (SAR) A/D Converter
+> + *
+> + * Copyright (C) 2017 Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program. If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/bitfield.h>
+> +#include <linux/clk.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/delay.h>
+> +#include <linux/io.h>
+> +#include <linux/iio/iio.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regmap.h>
+> +#include <linux/regulator/consumer.h>
+> +
+> +#define MESON_SAR_ADC_REG0					0x00
+> +	#define MESON_SAR_ADC_REG0_PANEL_DETECT			BIT(31)
+> +	#define MESON_SAR_ADC_REG0_BUSY_MASK			GENMASK(30, 28)
+> +	#define MESON_SAR_ADC_REG0_DELTA_BUSY			BIT(30)
+> +	#define MESON_SAR_ADC_REG0_AVG_BUSY			BIT(29)
+> +	#define MESON_SAR_ADC_REG0_SAMPLE_BUSY			BIT(28)
+> +	#define MESON_SAR_ADC_REG0_FIFO_FULL			BIT(27)
+> +	#define MESON_SAR_ADC_REG0_FIFO_EMPTY			BIT(26)
+> +	#define MESON_SAR_ADC_REG0_FIFO_COUNT_MASK		GENMASK(25, 21)
+> +	#define MESON_SAR_ADC_REG0_ADC_BIAS_CTRL_MASK		GENMASK(20, 19)
+> +	#define MESON_SAR_ADC_REG0_CURR_CHAN_ID_MASK		GENMASK(18, 16)
+> +	#define MESON_SAR_ADC_REG0_ADC_TEMP_SEN_SEL		BIT(15)
+> +	#define MESON_SAR_ADC_REG0_SAMPLING_STOP		BIT(14)
+> +	#define MESON_SAR_ADC_REG0_CHAN_DELTA_EN_MASK		GENMASK(13, 12)
+> +	#define MESON_SAR_ADC_REG0_DETECT_IRQ_POL		BIT(10)
+> +	#define MESON_SAR_ADC_REG0_DETECT_IRQ_EN		BIT(9)
+> +	#define MESON_SAR_ADC_REG0_FIFO_CNT_IRQ_MASK		GENMASK(8, 4)
+> +	#define MESON_SAR_ADC_REG0_FIFO_IRQ_EN			BIT(3)
+> +	#define MESON_SAR_ADC_REG0_SAMPLING_START		BIT(2)
+> +	#define MESON_SAR_ADC_REG0_CONTINUOUS_EN		BIT(1)
+> +	#define MESON_SAR_ADC_REG0_SAMPLE_ENGINE_ENABLE		BIT(0)
+> +
+> +#define MESON_SAR_ADC_CHAN_LIST					0x04
+> +	#define MESON_SAR_ADC_CHAN_LIST_MAX_INDEX_MASK		GENMASK(26, 24)
+> +	#define MESON_SAR_ADC_CHAN_LIST_ENTRY_MASK(_chan)	\
+> +					(GENMASK(2, 0) << ((_chan) * 3))
+> +
+> +#define MESON_SAR_ADC_AVG_CNTL					0x08
+> +	#define MESON_SAR_ADC_AVG_CNTL_AVG_MODE_SHIFT(_chan)	\
+> +					(16 + ((_chan) * 2))
+> +	#define MESON_SAR_ADC_AVG_CNTL_AVG_MODE_MASK(_chan)	\
+> +					(GENMASK(17, 16) << ((_chan) * 2))
+> +	#define MESON_SAR_ADC_AVG_CNTL_NUM_SAMPLES_SHIFT(_chan)	\
+> +					(0 + ((_chan) * 2))
+> +	#define MESON_SAR_ADC_AVG_CNTL_NUM_SAMPLES_MASK(_chan)	\
+> +					(GENMASK(1, 0) << ((_chan) * 2))
+> +
+> +#define MESON_SAR_ADC_REG3					0x0c
+> +	#define MESON_SAR_ADC_REG3_CNTL_USE_SC_DLY		BIT(31)
+> +	#define MESON_SAR_ADC_REG3_CLK_EN			BIT(30)
+> +	#define MESON_SAR_ADC_REG3_BL30_INITIALIZED		BIT(28)
+> +	#define MESON_SAR_ADC_REG3_CTRL_CONT_RING_COUNTER_EN	BIT(27)
+> +	#define MESON_SAR_ADC_REG3_CTRL_SAMPLING_CLOCK_PHASE	BIT(26)
+> +	#define MESON_SAR_ADC_REG3_CTRL_CHAN7_MUX_SEL_MASK	GENMASK(25, 23)
+> +	#define MESON_SAR_ADC_REG3_DETECT_EN			BIT(22)
+> +	#define MESON_SAR_ADC_REG3_ADC_EN			BIT(21)
+> +	#define MESON_SAR_ADC_REG3_PANEL_DETECT_COUNT_MASK	GENMASK(20, 18)
+> +	#define MESON_SAR_ADC_REG3_PANEL_DETECT_FILTER_TB_MASK	GENMASK(17, 16)
+> +	#define MESON_SAR_ADC_REG3_ADC_CLK_DIV_SHIFT		10
+> +	#define MESON_SAR_ADC_REG3_ADC_CLK_DIV_WIDTH		5
+> +	#define MESON_SAR_ADC_REG3_BLOCK_DLY_SEL_MASK		GENMASK(9, 8)
+> +	#define MESON_SAR_ADC_REG3_BLOCK_DLY_MASK		GENMASK(7, 0)
+> +
+> +#define MESON_SAR_ADC_DELAY					0x10
+> +	#define MESON_SAR_ADC_DELAY_INPUT_DLY_SEL_MASK		GENMASK(25, 24)
+> +	#define MESON_SAR_ADC_DELAY_BL30_BUSY			BIT(15)
+> +	#define MESON_SAR_ADC_DELAY_KERNEL_BUSY			BIT(14)
+> +	#define MESON_SAR_ADC_DELAY_INPUT_DLY_CNT_MASK		GENMASK(23, 16)
+> +	#define MESON_SAR_ADC_DELAY_SAMPLE_DLY_SEL_MASK		GENMASK(9, 8)
+> +	#define MESON_SAR_ADC_DELAY_SAMPLE_DLY_CNT_MASK		GENMASK(7, 0)
+> +
+> +#define MESON_SAR_ADC_LAST_RD					0x14
+> +	#define MESON_SAR_ADC_LAST_RD_LAST_CHANNEL1_MASK	GENMASK(23, 16)
+> +	#define MESON_SAR_ADC_LAST_RD_LAST_CHANNEL0_MASK	GENMASK(9, 0)
+> +
+> +#define MESON_SAR_ADC_FIFO_RD					0x18
+> +	#define MESON_SAR_ADC_FIFO_RD_CHAN_ID_MASK		GENMASK(14, 12)
+> +	#define MESON_SAR_ADC_FIFO_RD_SAMPLE_VALUE_MASK		GENMASK(11, 0)
+> +
+> +#define MESON_SAR_ADC_AUX_SW					0x1c
+> +	#define MESON_SAR_ADC_AUX_SW_MUX_SEL_CHAN_MASK(_chan)	\
+> +					(GENMASK(10, 8) << (((_chan) - 2) * 2))
+> +	#define MESON_SAR_ADC_AUX_SW_VREF_P_MUX			BIT(6)
+> +	#define MESON_SAR_ADC_AUX_SW_VREF_N_MUX			BIT(5)
+> +	#define MESON_SAR_ADC_AUX_SW_MODE_SEL			BIT(4)
+> +	#define MESON_SAR_ADC_AUX_SW_YP_DRIVE_SW		BIT(3)
+> +	#define MESON_SAR_ADC_AUX_SW_XP_DRIVE_SW		BIT(2)
+> +	#define MESON_SAR_ADC_AUX_SW_YM_DRIVE_SW		BIT(1)
+> +	#define MESON_SAR_ADC_AUX_SW_XM_DRIVE_SW		BIT(0)
+> +
+> +#define MESON_SAR_ADC_CHAN_10_SW				0x20
+> +	#define MESON_SAR_ADC_CHAN_10_SW_CHAN1_MUX_SEL_MASK	GENMASK(25, 23)
+> +	#define MESON_SAR_ADC_CHAN_10_SW_CHAN1_VREF_P_MUX	BIT(22)
+> +	#define MESON_SAR_ADC_CHAN_10_SW_CHAN1_VREF_N_MUX	BIT(21)
+> +	#define MESON_SAR_ADC_CHAN_10_SW_CHAN1_MODE_SEL		BIT(20)
+> +	#define MESON_SAR_ADC_CHAN_10_SW_CHAN1_YP_DRIVE_SW	BIT(19)
+> +	#define MESON_SAR_ADC_CHAN_10_SW_CHAN1_XP_DRIVE_SW	BIT(18)
+> +	#define MESON_SAR_ADC_CHAN_10_SW_CHAN1_YM_DRIVE_SW	BIT(17)
+> +	#define MESON_SAR_ADC_CHAN_10_SW_CHAN1_XM_DRIVE_SW	BIT(16)
+> +	#define MESON_SAR_ADC_CHAN_10_SW_CHAN0_MUX_SEL_MASK	GENMASK(9, 7)
+> +	#define MESON_SAR_ADC_CHAN_10_SW_CHAN0_VREF_P_MUX	BIT(6)
+> +	#define MESON_SAR_ADC_CHAN_10_SW_CHAN0_VREF_N_MUX	BIT(5)
+> +	#define MESON_SAR_ADC_CHAN_10_SW_CHAN0_MODE_SEL		BIT(4)
+> +	#define MESON_SAR_ADC_CHAN_10_SW_CHAN0_YP_DRIVE_SW	BIT(3)
+> +	#define MESON_SAR_ADC_CHAN_10_SW_CHAN0_XP_DRIVE_SW	BIT(2)
+> +	#define MESON_SAR_ADC_CHAN_10_SW_CHAN0_YM_DRIVE_SW	BIT(1)
+> +	#define MESON_SAR_ADC_CHAN_10_SW_CHAN0_XM_DRIVE_SW	BIT(0)
+> +
+> +#define MESON_SAR_ADC_DETECT_IDLE_SW				0x24
+> +	#define MESON_SAR_ADC_DETECT_IDLE_SW_DETECT_SW_EN	BIT(26)
+> +	#define MESON_SAR_ADC_DETECT_IDLE_SW_DETECT_MUX_MASK	GENMASK(25, 23)
+> +	#define MESON_SAR_ADC_DETECT_IDLE_SW_DETECT_VREF_P_MUX	BIT(22)
+> +	#define MESON_SAR_ADC_DETECT_IDLE_SW_DETECT_VREF_N_MUX	BIT(21)
+> +	#define MESON_SAR_ADC_DETECT_IDLE_SW_DETECT_MODE_SEL	BIT(20)
+> +	#define MESON_SAR_ADC_DETECT_IDLE_SW_DETECT_YP_DRIVE_SW	BIT(19)
+> +	#define MESON_SAR_ADC_DETECT_IDLE_SW_DETECT_XP_DRIVE_SW	BIT(18)
+> +	#define MESON_SAR_ADC_DETECT_IDLE_SW_DETECT_YM_DRIVE_SW	BIT(17)
+> +	#define MESON_SAR_ADC_DETECT_IDLE_SW_DETECT_XM_DRIVE_SW	BIT(16)
+> +	#define MESON_SAR_ADC_DETECT_IDLE_SW_IDLE_MUX_SEL_MASK	GENMASK(9, 7)
+> +	#define MESON_SAR_ADC_DETECT_IDLE_SW_IDLE_VREF_P_MUX	BIT(6)
+> +	#define MESON_SAR_ADC_DETECT_IDLE_SW_IDLE_VREF_N_MUX	BIT(5)
+> +	#define MESON_SAR_ADC_DETECT_IDLE_SW_IDLE_MODE_SEL	BIT(4)
+> +	#define MESON_SAR_ADC_DETECT_IDLE_SW_IDLE_YP_DRIVE_SW	BIT(3)
+> +	#define MESON_SAR_ADC_DETECT_IDLE_SW_IDLE_XP_DRIVE_SW	BIT(2)
+> +	#define MESON_SAR_ADC_DETECT_IDLE_SW_IDLE_YM_DRIVE_SW	BIT(1)
+> +	#define MESON_SAR_ADC_DETECT_IDLE_SW_IDLE_XM_DRIVE_SW	BIT(0)
+> +
+> +#define MESON_SAR_ADC_DELTA_10					0x28
+> +	#define MESON_SAR_ADC_DELTA_10_TEMP_SEL			BIT(27)
+> +	#define MESON_SAR_ADC_DELTA_10_TS_REVE1			BIT(26)
+> +	#define MESON_SAR_ADC_DELTA_10_CHAN1_DELTA_VALUE_MASK	GENMASK(25, 16)
+> +	#define MESON_SAR_ADC_DELTA_10_TS_REVE0			BIT(15)
+> +	#define MESON_SAR_ADC_DELTA_10_TS_C_SHIFT		11
+> +	#define MESON_SAR_ADC_DELTA_10_TS_C_MASK		GENMASK(14, 11)
+> +	#define MESON_SAR_ADC_DELTA_10_TS_VBG_EN		BIT(10)
+> +	#define MESON_SAR_ADC_DELTA_10_CHAN0_DELTA_VALUE_MASK	GENMASK(9, 0)
+> +
+> +/*
+> + * NOTE: registers from here are undocumented (the vendor Linux kernel driver
+> + * and u-boot source served as reference). These only seem to be relevant on
+> + * GXBB and newer.
+> + */
+> +#define MESON_SAR_ADC_REG11					0x2c
+> +	#define MESON_SAR_ADC_REG11_BANDGAP_EN			BIT(13)
+> +
+> +#define MESON_SAR_ADC_REG13					0x34
+> +	#define MESON_SAR_ADC_REG13_12BIT_CALIBRATION_MASK	GENMASK(13, 8)
+> +
+> +#define MESON_SAR_ADC_MAX_FIFO_SIZE				32
+> +
+> +#define MESON_SAR_ADC_CHAN(_chan) {					\
+> +	.type = IIO_VOLTAGE,						\
+> +	.indexed = 1,							\
+> +	.channel = _chan,						\
+> +	.info_mask_separate = BIT(IIO_CHAN_INFO_RAW) |			\
+> +				BIT(IIO_CHAN_INFO_AVERAGE_RAW),		\
+> +	.info_mask_shared_by_type = BIT(IIO_CHAN_INFO_SCALE),		\
+> +	.datasheet_name = "SAR_ADC_CH"#_chan,				\
+> +}
+> +
+> +/*
+> + * TODO: the hardware supports IIO_TEMP for channel 6 as well which is
+> + * currently not supported by this driver.
+> + */
+> +static const struct iio_chan_spec meson_sar_adc_iio_channels[] = {
+> +	MESON_SAR_ADC_CHAN(0),
+> +	MESON_SAR_ADC_CHAN(1),
+> +	MESON_SAR_ADC_CHAN(2),
+> +	MESON_SAR_ADC_CHAN(3),
+> +	MESON_SAR_ADC_CHAN(4),
+> +	MESON_SAR_ADC_CHAN(5),
+> +	MESON_SAR_ADC_CHAN(6),
+> +	MESON_SAR_ADC_CHAN(7),
+> +	IIO_CHAN_SOFT_TIMESTAMP(8),
+> +};
+> +
+> +enum meson_sar_adc_avg_mode {
+> +	NO_AVERAGING = 0x0,
+> +	MEAN_AVERAGING = 0x1,
+> +	MEDIAN_AVERAGING = 0x2,
+> +};
+> +
+> +enum meson_sar_adc_num_samples {
+> +	ONE_SAMPLE = 0x0,
+> +	TWO_SAMPLES = 0x1,
+> +	FOUR_SAMPLES = 0x2,
+> +	EIGHT_SAMPLES = 0x3,
+> +};
+> +
+> +enum meson_sar_adc_chan7_mux_sel {
+> +	CHAN7_MUX_VSS = 0x0,
+> +	CHAN7_MUX_VDD_DIV4 = 0x1,
+> +	CHAN7_MUX_VDD_DIV2 = 0x2,
+> +	CHAN7_MUX_VDD_MUL3_DIV4 = 0x3,
+> +	CHAN7_MUX_VDD = 0x4,
+> +	CHAN7_MUX_CH7_INPUT = 0x7,
+> +};
+> +
+> +struct meson_sar_adc_data {
+> +	unsigned int				resolution;
+> +	const char				*name;
+> +};
+> +
+> +struct meson_sar_adc_priv {
+> +	struct regmap				*regmap;
+> +	struct regulator			*vref;
+> +	const struct meson_sar_adc_data		*data;
+> +	struct clk				*clkin;
+> +	struct clk				*core_clk;
+> +	struct clk				*sana_clk;
+> +	struct clk				*adc_sel_clk;
+> +	struct clk				*adc_clk;
+> +	struct clk_gate				clk_gate;
+> +	struct clk				*adc_div_clk;
+> +	struct clk_divider			clk_div;
+> +};
+> +
+> +static const struct regmap_config meson_sar_adc_regmap_config = {
+> +	.reg_bits = 8,
+> +	.val_bits = 32,
+> +	.reg_stride = 4,
+> +	.max_register = MESON_SAR_ADC_REG13,
+> +};
+> +
+> +static unsigned int meson_sar_adc_get_fifo_count(struct iio_dev *indio_dev)
+> +{
+> +	struct meson_sar_adc_priv *priv = iio_priv(indio_dev);
+> +	u32 regval;
+> +
+> +	regmap_read(priv->regmap, MESON_SAR_ADC_REG0, &regval);
+> +
+> +	return FIELD_GET(MESON_SAR_ADC_REG0_FIFO_COUNT_MASK, regval);
+> +}
+> +
+> +static int meson_sar_adc_wait_busy_clear(struct iio_dev *indio_dev)
+> +{
+> +	struct meson_sar_adc_priv *priv = iio_priv(indio_dev);
+> +	int regval, timeout = 10000;
+> +
+> +	/*
+> +	 * NOTE: we need a small delay before reading the status, otherwise
+> +	 * the sample engine may not have started internally (which would
+> +	 * seem to us that sampling is already finished).
+> +	 */
+> +	do {
+> +		udelay(1);
+> +		regmap_read(priv->regmap, MESON_SAR_ADC_REG0, &regval);
+> +	} while (FIELD_GET(MESON_SAR_ADC_REG0_BUSY_MASK, regval) && timeout--);
+> +
+> +	if (timeout < 0)
+> +		return -ETIMEDOUT;
+> +
+> +	return 0;
+> +}
+> +
+> +static int meson_sar_adc_read_raw_sample(struct iio_dev *indio_dev,
+> +					 const struct iio_chan_spec *chan,
+> +					 int *val)
+> +{
+> +	struct meson_sar_adc_priv *priv = iio_priv(indio_dev);
+> +	int ret, regval, fifo_chan, fifo_val, sum = 0, count = 0;
+> +
+> +	ret = meson_sar_adc_wait_busy_clear(indio_dev);
+> +	if (ret)
+> +		return ret;
+> +
+> +	while (meson_sar_adc_get_fifo_count(indio_dev) > 0 &&
+> +	       count < MESON_SAR_ADC_MAX_FIFO_SIZE) {
+> +		regmap_read(priv->regmap, MESON_SAR_ADC_FIFO_RD, &regval);
+> +
+> +		fifo_chan = FIELD_GET(MESON_SAR_ADC_FIFO_RD_CHAN_ID_MASK,
+> +				      regval);
+> +		if (fifo_chan != chan->channel)
+> +			continue;
+> +
+> +		fifo_val = FIELD_GET(MESON_SAR_ADC_FIFO_RD_SAMPLE_VALUE_MASK,
+> +				     regval);
+> +		fifo_val &= (BIT(priv->data->resolution) - 1);
+> +
+> +		sum += fifo_val;
+> +		count++;
+> +	}
+> +
+> +	if (!count)
+> +		return -ENOENT;
+> +
+> +	*val = sum / count;
+> +
+> +	return 0;
+> +}
+> +
+> +static void meson_sar_adc_set_averaging(struct iio_dev *indio_dev,
+> +					const struct iio_chan_spec *chan,
+> +					enum meson_sar_adc_avg_mode mode,
+> +					enum meson_sar_adc_num_samples samples)
+> +{
+> +	struct meson_sar_adc_priv *priv = iio_priv(indio_dev);
+> +	int val, channel = chan->channel;
+> +
+> +	val = samples << MESON_SAR_ADC_AVG_CNTL_NUM_SAMPLES_SHIFT(channel);
+> +	regmap_update_bits(priv->regmap, MESON_SAR_ADC_AVG_CNTL,
+> +			   MESON_SAR_ADC_AVG_CNTL_NUM_SAMPLES_MASK(channel),
+> +			   val);
+> +
+> +	val = mode << MESON_SAR_ADC_AVG_CNTL_AVG_MODE_SHIFT(channel);
+> +	regmap_update_bits(priv->regmap, MESON_SAR_ADC_AVG_CNTL,
+> +			   MESON_SAR_ADC_AVG_CNTL_AVG_MODE_MASK(channel), val);
+> +}
+> +
+> +static void meson_sar_adc_enable_channel(struct iio_dev *indio_dev,
+> +					const struct iio_chan_spec *chan)
+> +{
+> +	struct meson_sar_adc_priv *priv = iio_priv(indio_dev);
+> +	u32 regval;
+> +
+> +	/*
+> +	 * the SAR ADC engine allows sampling multiple channels at the same
+> +	 * time. to keep it simple we're only working with one *internal*
+> +	 * channel, which starts counting at index 0 (which means: count = 1).
+> +	 */
+> +	regval = FIELD_PREP(MESON_SAR_ADC_CHAN_LIST_MAX_INDEX_MASK, 0);
+> +	regmap_update_bits(priv->regmap, MESON_SAR_ADC_CHAN_LIST,
+> +			   MESON_SAR_ADC_CHAN_LIST_MAX_INDEX_MASK, regval);
+> +
+> +	/* map channel index 0 to the channel which we want to read */
+> +	regval = FIELD_PREP(MESON_SAR_ADC_CHAN_LIST_ENTRY_MASK(0),
+> +			    chan->channel);
+> +	regmap_update_bits(priv->regmap, MESON_SAR_ADC_CHAN_LIST,
+> +			   MESON_SAR_ADC_CHAN_LIST_ENTRY_MASK(0), regval);
+> +
+> +	regval = FIELD_PREP(MESON_SAR_ADC_DETECT_IDLE_SW_DETECT_MUX_MASK,
+> +			    chan->channel);
+> +	regmap_update_bits(priv->regmap, MESON_SAR_ADC_DETECT_IDLE_SW,
+> +			   MESON_SAR_ADC_DETECT_IDLE_SW_DETECT_MUX_MASK,
+> +			   regval);
+> +
+> +	regval = FIELD_PREP(MESON_SAR_ADC_DETECT_IDLE_SW_IDLE_MUX_SEL_MASK,
+> +			    chan->channel);
+> +	regmap_update_bits(priv->regmap, MESON_SAR_ADC_DETECT_IDLE_SW,
+> +			   MESON_SAR_ADC_DETECT_IDLE_SW_IDLE_MUX_SEL_MASK,
+> +			   regval);
+> +
+> +	if (chan->channel == 6)
+> +		regmap_update_bits(priv->regmap, MESON_SAR_ADC_DELTA_10,
+> +				   MESON_SAR_ADC_DELTA_10_TEMP_SEL, 0);
+> +}
+> +
+> +static void meson_sar_adc_set_chan7_mux(struct iio_dev *indio_dev,
+> +					enum meson_sar_adc_chan7_mux_sel sel)
+> +{
+> +	struct meson_sar_adc_priv *priv = iio_priv(indio_dev);
+> +	u32 regval;
+> +
+> +	regval = FIELD_PREP(MESON_SAR_ADC_REG3_CTRL_CHAN7_MUX_SEL_MASK, sel);
+> +	regmap_update_bits(priv->regmap, MESON_SAR_ADC_REG3,
+> +			   MESON_SAR_ADC_REG3_CTRL_CHAN7_MUX_SEL_MASK, regval);
+> +
+> +	usleep_range(10, 20);
+> +}
+> +
+> +static void meson_sar_adc_start_sample_engine(struct iio_dev *indio_dev)
+> +{
+> +	struct meson_sar_adc_priv *priv = iio_priv(indio_dev);
+> +
+> +	regmap_update_bits(priv->regmap, MESON_SAR_ADC_REG0,
+> +			   MESON_SAR_ADC_REG0_SAMPLE_ENGINE_ENABLE,
+> +			   MESON_SAR_ADC_REG0_SAMPLE_ENGINE_ENABLE);
+> +
+> +	regmap_update_bits(priv->regmap, MESON_SAR_ADC_REG0,
+> +			   MESON_SAR_ADC_REG0_SAMPLING_START,
+> +			   MESON_SAR_ADC_REG0_SAMPLING_START);
+> +}
+> +
+> +static void meson_sar_adc_stop_sample_engine(struct iio_dev *indio_dev)
+> +{
+> +	struct meson_sar_adc_priv *priv = iio_priv(indio_dev);
+> +
+> +	regmap_update_bits(priv->regmap, MESON_SAR_ADC_REG0,
+> +			   MESON_SAR_ADC_REG0_SAMPLING_STOP,
+> +			   MESON_SAR_ADC_REG0_SAMPLING_STOP);
+> +
+> +	/* wait until all modules are stopped */
+> +	meson_sar_adc_wait_busy_clear(indio_dev);
+> +
+> +	regmap_update_bits(priv->regmap, MESON_SAR_ADC_REG0,
+> +			   MESON_SAR_ADC_REG0_SAMPLE_ENGINE_ENABLE, 0);
+> +}
+> +
+> +static int meson_sar_adc_lock(struct iio_dev *indio_dev)
+> +{
+> +	struct meson_sar_adc_priv *priv = iio_priv(indio_dev);
+> +	int val, timeout = 10000;
+> +
+> +	mutex_lock(&indio_dev->mlock);
+> +
+> +	/* prevent BL30 from using the SAR ADC while we are using it */
+> +	regmap_update_bits(priv->regmap, MESON_SAR_ADC_DELAY,
+> +			   MESON_SAR_ADC_DELAY_KERNEL_BUSY,
+> +			   MESON_SAR_ADC_DELAY_KERNEL_BUSY);
+> +
+> +	/* wait until BL30 releases it's lock (so we can use the SAR ADC) */
+> +	do {
+> +		udelay(1);
+> +		regmap_read(priv->regmap, MESON_SAR_ADC_DELAY, &val);
+> +	} while (val & MESON_SAR_ADC_DELAY_BL30_BUSY && timeout--);
+> +
+> +	if (timeout < 0)
+> +		return -ETIMEDOUT;
+> +
+> +	return 0;
+> +}
+> +
+> +static void meson_sar_adc_unlock(struct iio_dev *indio_dev)
+> +{
+> +	struct meson_sar_adc_priv *priv = iio_priv(indio_dev);
+> +
+> +	/* allow BL30 to use the SAR ADC again */
+> +	regmap_update_bits(priv->regmap, MESON_SAR_ADC_DELAY,
+> +			   MESON_SAR_ADC_DELAY_KERNEL_BUSY, 0);
+> +
+> +	mutex_unlock(&indio_dev->mlock);
+> +}
+> +
+> +static void meson_sar_adc_clear_fifo(struct iio_dev *indio_dev)
+> +{
+> +	struct meson_sar_adc_priv *priv = iio_priv(indio_dev);
+> +	int count;
+> +
+> +	for (count = 0; count < MESON_SAR_ADC_MAX_FIFO_SIZE; count++) {
+> +		if (!meson_sar_adc_get_fifo_count(indio_dev))
+> +			break;
+> +
+> +		regmap_read(priv->regmap, MESON_SAR_ADC_FIFO_RD, 0);
+> +	}
+> +}
+> +
+> +static int meson_sar_adc_get_sample(struct iio_dev *indio_dev,
+> +				    const struct iio_chan_spec *chan,
+> +				    enum meson_sar_adc_avg_mode avg_mode,
+> +				    enum meson_sar_adc_num_samples avg_samples,
+> +				    int *val)
+> +{
+> +	int ret;
+> +
+> +	ret = meson_sar_adc_lock(indio_dev);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* clear the FIFO to make sure we're not reading old values */
+> +	meson_sar_adc_clear_fifo(indio_dev);
+> +
+> +	meson_sar_adc_set_averaging(indio_dev, chan, avg_mode, avg_samples);
+> +
+> +	meson_sar_adc_enable_channel(indio_dev, chan);
+> +
+> +	meson_sar_adc_start_sample_engine(indio_dev);
+> +	ret = meson_sar_adc_read_raw_sample(indio_dev, chan, val);
+> +	meson_sar_adc_stop_sample_engine(indio_dev);
+> +
+> +	meson_sar_adc_unlock(indio_dev);
+> +
+> +	if (ret) {
+> +		dev_warn(indio_dev->dev.parent,
+> +			 "failed to read sample for channel %d: %d\n",
+> +			 chan->channel, ret);
+> +		return ret;
+> +	}
+> +
+> +	return IIO_VAL_INT;
+> +}
+> +
+> +static int meson_sar_adc_iio_info_read_raw(struct iio_dev *indio_dev,
+> +					   const struct iio_chan_spec *chan,
+> +					   int *val, int *val2, long mask)
+> +{
+> +	struct meson_sar_adc_priv *priv = iio_priv(indio_dev);
+> +	int ret;
+> +
+> +	switch (mask) {
+> +	case IIO_CHAN_INFO_RAW:
+> +		return meson_sar_adc_get_sample(indio_dev, chan, NO_AVERAGING,
+> +						ONE_SAMPLE, val);
+> +		break;
+> +
+> +	case IIO_CHAN_INFO_AVERAGE_RAW:
+> +		return meson_sar_adc_get_sample(indio_dev, chan,
+> +						MEAN_AVERAGING, EIGHT_SAMPLES,
+> +						val);
+> +		break;
+> +
+> +	case IIO_CHAN_INFO_SCALE:
+> +		ret = regulator_get_voltage(priv->vref);
+> +		if (ret < 0) {
+> +			dev_err(indio_dev->dev.parent,
+> +				"failed to get vref voltage: %d\n", ret);
+> +			return ret;
+> +		}
+> +
+> +		*val = ret / 1000;
+> +		*val2 = priv->data->resolution;
+> +		return IIO_VAL_FRACTIONAL_LOG2;
+> +
+> +	default:
+> +		return -EINVAL;
+> +	}
+> +}
+> +
+> +static int meson_sar_adc_clk_init(struct iio_dev *indio_dev,
+> +				  void __iomem *base)
+> +{
+> +	struct meson_sar_adc_priv *priv = iio_priv(indio_dev);
+> +	struct clk_init_data init;
+> +	const char *clk_parents[1];
+> +
+> +	init.name = devm_kasprintf(&indio_dev->dev, GFP_KERNEL, "%s#adc_div",
+> +				   of_node_full_name(indio_dev->dev.of_node));
+> +	init.flags = 0;
+> +	init.ops = &clk_divider_ops;
+> +	clk_parents[0] = __clk_get_name(priv->clkin);
+> +	init.parent_names = clk_parents;
+> +	init.num_parents = 1;
+> +
+> +	priv->clk_div.reg = base + MESON_SAR_ADC_REG3;
+> +	priv->clk_div.shift = MESON_SAR_ADC_REG3_ADC_CLK_DIV_SHIFT;
+> +	priv->clk_div.width = MESON_SAR_ADC_REG3_ADC_CLK_DIV_WIDTH;
+> +	priv->clk_div.hw.init = &init;
+> +	priv->clk_div.flags = 0;
+> +
+> +	priv->adc_div_clk = devm_clk_register(&indio_dev->dev,
+> +					      &priv->clk_div.hw);
+> +	if (WARN_ON(IS_ERR(priv->adc_div_clk)))
+> +		return PTR_ERR(priv->adc_div_clk);
+> +
+> +	init.name = devm_kasprintf(&indio_dev->dev, GFP_KERNEL, "%s#adc_en",
+> +				   of_node_full_name(indio_dev->dev.of_node));
+> +	init.flags = CLK_SET_RATE_PARENT;
+> +	init.ops = &clk_gate_ops;
+> +	clk_parents[0] = __clk_get_name(priv->adc_div_clk);
+> +	init.parent_names = clk_parents;
+> +	init.num_parents = 1;
+> +
+> +	priv->clk_gate.reg = base + MESON_SAR_ADC_REG3;
+> +	priv->clk_gate.bit_idx = fls(MESON_SAR_ADC_REG3_CLK_EN);
+> +	priv->clk_gate.hw.init = &init;
+> +
+> +	priv->adc_clk = devm_clk_register(&indio_dev->dev, &priv->clk_gate.hw);
+> +	if (WARN_ON(IS_ERR(priv->adc_clk)))
+> +		return PTR_ERR(priv->adc_clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static int meson_sar_adc_init(struct iio_dev *indio_dev)
+> +{
+> +	struct meson_sar_adc_priv *priv = iio_priv(indio_dev);
+> +	int regval, ret;
+> +
+> +	/*
+> +	 * make sure we start at CH7 input since the other muxes are only used
+> +	 * for internal calibration.
+> +	 */
+> +	meson_sar_adc_set_chan7_mux(indio_dev, CHAN7_MUX_CH7_INPUT);
+> +
+> +	/*
+> +	 * leave sampling delay and the input clocks as configured by BL30 to
+> +	 * make sure BL30 gets the values it expects when reading the
+> +	 * temperature sensor.
+> +	 */
+> +	regmap_read(priv->regmap, MESON_SAR_ADC_REG3, &regval);
+> +	if (regval & MESON_SAR_ADC_REG3_BL30_INITIALIZED)
+> +		return 0;
+> +
+> +	meson_sar_adc_stop_sample_engine(indio_dev);
+> +
+> +	/* update the channel 6 MUX to select the temperature sensor */
+> +	regmap_update_bits(priv->regmap, MESON_SAR_ADC_REG0,
+> +			MESON_SAR_ADC_REG0_ADC_TEMP_SEN_SEL,
+> +			MESON_SAR_ADC_REG0_ADC_TEMP_SEN_SEL);
+> +
+> +	/* disable all channels by default */
+> +	regmap_write(priv->regmap, MESON_SAR_ADC_CHAN_LIST, 0x0);
+> +
+> +	regmap_update_bits(priv->regmap, MESON_SAR_ADC_REG3,
+> +			   MESON_SAR_ADC_REG3_CTRL_SAMPLING_CLOCK_PHASE, 0);
+> +	regmap_update_bits(priv->regmap, MESON_SAR_ADC_REG3,
+> +			   MESON_SAR_ADC_REG3_CNTL_USE_SC_DLY,
+> +			   MESON_SAR_ADC_REG3_CNTL_USE_SC_DLY);
+> +
+> +	/* delay between two samples = (10+1) * 1uS */
+> +	regmap_update_bits(priv->regmap, MESON_SAR_ADC_DELAY,
+> +			   MESON_SAR_ADC_DELAY_INPUT_DLY_CNT_MASK,
+> +			   FIELD_PREP(MESON_SAR_ADC_DELAY_SAMPLE_DLY_CNT_MASK,
+> +				      10));
+> +	regmap_update_bits(priv->regmap, MESON_SAR_ADC_DELAY,
+> +			   MESON_SAR_ADC_DELAY_SAMPLE_DLY_SEL_MASK,
+> +			   FIELD_PREP(MESON_SAR_ADC_DELAY_SAMPLE_DLY_SEL_MASK,
+> +				      0));
+> +
+> +	/* delay between two samples = (10+1) * 1uS */
+> +	regmap_update_bits(priv->regmap, MESON_SAR_ADC_DELAY,
+> +			   MESON_SAR_ADC_DELAY_INPUT_DLY_CNT_MASK,
+> +			   FIELD_PREP(MESON_SAR_ADC_DELAY_INPUT_DLY_CNT_MASK,
+> +				      10));
+> +	regmap_update_bits(priv->regmap, MESON_SAR_ADC_DELAY,
+> +			   MESON_SAR_ADC_DELAY_INPUT_DLY_SEL_MASK,
+> +			   FIELD_PREP(MESON_SAR_ADC_DELAY_INPUT_DLY_SEL_MASK,
+> +				      1));
+> +
+> +	ret = clk_set_parent(priv->adc_sel_clk, priv->clkin);
+> +	if (ret) {
+> +		dev_err(indio_dev->dev.parent,
+> +			"failed to set adc parent to clkin\n");
+> +		return ret;
+> +	}
+> +
+> +	ret = clk_set_rate(priv->adc_clk, 1200000);
+> +	if (ret) {
+> +		dev_err(indio_dev->dev.parent,
+> +			"failed to set adc clock rate\n");
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int meson_sar_adc_hw_enable(struct iio_dev *indio_dev)
+> +{
+> +	struct meson_sar_adc_priv *priv = iio_priv(indio_dev);
+> +	int ret;
+> +
+> +	ret = meson_sar_adc_lock(indio_dev);
+> +	if (ret)
+> +		goto err_lock;
+> +
+> +	ret = regulator_enable(priv->vref);
+> +	if (ret < 0) {
+> +		dev_err(indio_dev->dev.parent,
+> +			"failed to enable vref regulator\n");
+> +		goto err_vref;
+> +	}
+> +
+> +	ret = clk_prepare_enable(priv->core_clk);
+> +	if (ret) {
+> +		dev_err(indio_dev->dev.parent, "failed to enable core clk\n");
+> +		goto err_core_clk;
+> +	}
+> +
+> +	ret = clk_prepare_enable(priv->sana_clk);
+> +	if (ret) {
+> +		dev_err(indio_dev->dev.parent, "failed to enable sana clk\n");
+> +		goto err_sana_clk;
+> +	}
+> +
+> +	regmap_update_bits(priv->regmap, MESON_SAR_ADC_REG11,
+> +			   MESON_SAR_ADC_REG11_BANDGAP_EN,
+> +			   MESON_SAR_ADC_REG11_BANDGAP_EN);
+> +	regmap_update_bits(priv->regmap, MESON_SAR_ADC_REG3,
+> +			   MESON_SAR_ADC_REG3_ADC_EN,
+> +			   MESON_SAR_ADC_REG3_ADC_EN);
+> +
+> +	udelay(5);
+> +
+> +	ret = clk_prepare_enable(priv->adc_clk);
+> +	if (ret) {
+> +		dev_err(indio_dev->dev.parent, "failed to enable adc clk\n");
+> +		goto err_adc_clk;
+> +	}
+> +
+> +	meson_sar_adc_unlock(indio_dev);
+> +
+> +	return 0;
+> +
+> +err_adc_clk:
+> +	regmap_update_bits(priv->regmap, MESON_SAR_ADC_REG3,
+> +			   MESON_SAR_ADC_REG3_ADC_EN, 0);
+> +	regmap_update_bits(priv->regmap, MESON_SAR_ADC_REG11,
+> +			   MESON_SAR_ADC_REG11_BANDGAP_EN, 0);
+> +	clk_disable_unprepare(priv->sana_clk);
+> +err_sana_clk:
+> +	clk_disable_unprepare(priv->core_clk);
+> +err_core_clk:
+> +	regulator_disable(priv->vref);
+> +err_vref:
+> +	meson_sar_adc_unlock(indio_dev);
+> +err_lock:
+> +	return ret;
+> +}
+> +
+> +static int meson_sar_adc_hw_disable(struct iio_dev *indio_dev)
+> +{
+> +	struct meson_sar_adc_priv *priv = iio_priv(indio_dev);
+> +	int ret;
+> +
+> +	ret = meson_sar_adc_lock(indio_dev);
+> +	if (ret)
+> +		return ret;
+> +
+> +	clk_disable_unprepare(priv->adc_clk);
+> +
+> +	regmap_update_bits(priv->regmap, MESON_SAR_ADC_REG3,
+> +			   MESON_SAR_ADC_REG3_ADC_EN, 0);
+> +	regmap_update_bits(priv->regmap, MESON_SAR_ADC_REG11,
+> +			   MESON_SAR_ADC_REG11_BANDGAP_EN, 0);
+> +
+> +	clk_disable_unprepare(priv->sana_clk);
+> +	clk_disable_unprepare(priv->core_clk);
+> +
+> +	regulator_disable(priv->vref);
+> +
+> +	meson_sar_adc_unlock(indio_dev);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct iio_info meson_sar_adc_iio_info = {
+> +	.read_raw = meson_sar_adc_iio_info_read_raw,
+> +	.driver_module = THIS_MODULE,
+> +};
+> +
+> +struct meson_sar_adc_data meson_sar_adc_gxbb_data = {
+> +	.resolution = 10,
+> +	.name = "meson-gxbb-saradc",
+> +};
+> +
+> +struct meson_sar_adc_data meson_sar_adc_gxl_data = {
+> +	.resolution = 12,
+> +	.name = "meson-gxl-saradc",
+> +};
+> +
+> +struct meson_sar_adc_data meson_sar_adc_gxm_data = {
+> +	.resolution = 12,
+> +	.name = "meson-gxm-saradc",
+> +};
+> +
+> +static const struct of_device_id meson_sar_adc_of_match[] = {
+> +	{
+> +		.compatible = "amlogic,meson-gxbb-saradc",
+> +		.data = &meson_sar_adc_gxbb_data,
+> +	}, {
+> +		.compatible = "amlogic,meson-gxl-saradc",
+> +		.data = &meson_sar_adc_gxl_data,
+> +	}, {
+> +		.compatible = "amlogic,meson-gxm-saradc",
+> +		.data = &meson_sar_adc_gxm_data,
+> +	},
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, meson_sar_adc_of_match);
+> +
+> +static int meson_sar_adc_probe(struct platform_device *pdev)
+> +{
+> +	struct meson_sar_adc_priv *priv;
+> +	struct iio_dev *indio_dev;
+> +	struct resource *res;
+> +	void __iomem *base;
+> +	const struct of_device_id *match;
+> +	int ret;
+> +
+> +	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*priv));
+> +	if (!indio_dev) {
+> +		dev_err(&pdev->dev, "failed allocating iio device\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	priv = iio_priv(indio_dev);
+> +
+> +	match = of_match_device(meson_sar_adc_of_match, &pdev->dev);
+> +	priv->data = match->data;
+> +
+> +	indio_dev->name = priv->data->name;
+> +	indio_dev->dev.parent = &pdev->dev;
+> +	indio_dev->dev.of_node = pdev->dev.of_node;
+> +	indio_dev->modes = INDIO_DIRECT_MODE;
+> +	indio_dev->info = &meson_sar_adc_iio_info;
+> +
+> +	indio_dev->channels = meson_sar_adc_iio_channels;
+> +	indio_dev->num_channels = ARRAY_SIZE(meson_sar_adc_iio_channels);
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(base))
+> +		return PTR_ERR(base);
+> +
+> +	priv->regmap = devm_regmap_init_mmio(&pdev->dev, base,
+> +					     &meson_sar_adc_regmap_config);
+> +	if (IS_ERR(priv->regmap))
+> +		return PTR_ERR(priv->regmap);
+> +
+> +	priv->clkin = devm_clk_get(&pdev->dev, "clkin");
+> +	if (IS_ERR(priv->clkin)) {
+> +		dev_err(&pdev->dev, "failed to get clkin\n");
+> +		return PTR_ERR(priv->clkin);
+> +	}
+> +
+> +	priv->core_clk = devm_clk_get(&pdev->dev, "core");
+> +	if (IS_ERR(priv->core_clk)) {
+> +		dev_err(&pdev->dev, "failed to get core clk\n");
+> +		return PTR_ERR(priv->core_clk);
+> +	}
+> +
+> +	priv->sana_clk = devm_clk_get(&pdev->dev, "sana");
+> +	if (IS_ERR(priv->sana_clk)) {
+> +		if (PTR_ERR(priv->sana_clk) == -ENOENT) {
+> +			priv->sana_clk = NULL;
+> +		} else {
+> +			dev_err(&pdev->dev, "failed to get sana clk\n");
+> +			return PTR_ERR(priv->sana_clk);
+> +		}
+> +	}
+> +
+> +	priv->adc_clk = devm_clk_get(&pdev->dev, "adc_clk");
+> +	if (IS_ERR(priv->adc_clk)) {
+> +		if (PTR_ERR(priv->adc_clk) == -ENOENT) {
+> +			priv->adc_clk = NULL;
+> +		} else {
+> +			dev_err(&pdev->dev, "failed to get adc clk\n");
+> +			return PTR_ERR(priv->adc_clk);
+> +		}
+> +	}
+> +
+> +	priv->adc_sel_clk = devm_clk_get(&pdev->dev, "adc_sel");
+> +	if (IS_ERR(priv->adc_sel_clk)) {
+> +		if (PTR_ERR(priv->adc_sel_clk) == -ENOENT) {
+> +			priv->adc_sel_clk = NULL;
+> +		} else {
+> +			dev_err(&pdev->dev, "failed to get adc_sel clk\n");
+> +			return PTR_ERR(priv->adc_sel_clk);
+> +		}
+> +	}
+> +
+> +	/* on pre-GXBB SoCs the SAR ADC itself provides the ADC clock: */
+> +	if (!priv->adc_clk) {
+> +		ret = meson_sar_adc_clk_init(indio_dev, base);
+> +		if (ret)
+> +			return ret;
+> +	}
+> +
+> +	priv->vref = devm_regulator_get(&pdev->dev, "vref");
+> +	if (IS_ERR(priv->vref)) {
+> +		dev_err(&pdev->dev, "failed to get vref regulator\n");
+> +		return PTR_ERR(priv->vref);
+> +	}
+> +
+> +	ret = meson_sar_adc_init(indio_dev);
+> +	if (ret)
+> +		goto err;
+> +
+> +	ret = meson_sar_adc_hw_enable(indio_dev);
+> +	if (ret)
+> +		goto err;
+> +
+> +	platform_set_drvdata(pdev, indio_dev);
+> +
+> +	ret = iio_device_register(indio_dev);
+> +	if (ret)
+> +		goto err_hw;
+> +
+> +	return 0;
+> +
+> +err_hw:
+> +	meson_sar_adc_hw_disable(indio_dev);
+> +err:
+> +	return ret;
+> +}
+> +
+> +static int meson_sar_adc_remove(struct platform_device *pdev)
+> +{
+> +	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
+> +
+> +	iio_device_unregister(indio_dev);
+> +
+> +	return meson_sar_adc_hw_disable(indio_dev);
+> +}
+> +
+> +static int __maybe_unused meson_sar_adc_suspend(struct device *dev)
+> +{
+> +	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+> +
+> +	return meson_sar_adc_hw_disable(indio_dev);
+> +}
+> +
+> +static int __maybe_unused meson_sar_adc_resume(struct device *dev)
+> +{
+> +	struct iio_dev *indio_dev = dev_get_drvdata(dev);
+> +
+> +	return meson_sar_adc_hw_enable(indio_dev);
+> +}
+> +
+> +static SIMPLE_DEV_PM_OPS(meson_sar_adc_pm_ops,
+> +			 meson_sar_adc_suspend, meson_sar_adc_resume);
+> +
+> +static struct platform_driver meson_sar_adc_driver = {
+> +	.probe		= meson_sar_adc_probe,
+> +	.remove		= meson_sar_adc_remove,
+> +	.driver		= {
+> +		.name	= "meson-saradc",
+> +		.of_match_table = meson_sar_adc_of_match,
+> +		.pm = &meson_sar_adc_pm_ops,
+> +	},
+> +};
+> +
+> +module_platform_driver(meson_sar_adc_driver);
+> +
+> +MODULE_AUTHOR("Martin Blumenstingl <martin.blumenstingl@googlemail.com>");
+> +MODULE_DESCRIPTION("Amlogic Meson SAR ADC driver");
+> +MODULE_LICENSE("GPL v2");
+> 
