@@ -1,308 +1,194 @@
-From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Sat, 28 Jan 2017 21:00:52 +0530
-Subject: [PATCH] watchdog: constify watchdog_ops structures
-In-Reply-To: <36f01795-aca8-72fc-8a83-26e92e2dee71@roeck-us.net>
-References: <1485589277-6824-1-git-send-email-bhumirks@gmail.com>
- <36f01795-aca8-72fc-8a83-26e92e2dee71@roeck-us.net>
-Message-ID: <CAOH+1jGTZdq1=VVQU9rkDgcHv-cxh8in3s+9hBE5hgRyQvpY9g@mail.gmail.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 28 Jan 2017 15:34:33 +0000
+Subject: [PATCH v2 04/25] iio: adc: add support for X-Powers AXP20X and
+ AXP22X PMICs ADCs
+In-Reply-To: <0e3ac499-abfc-51e0-20e3-d1231af3adc6@free-electrons.com>
+References: <20170127085458.18270-1-quentin.schulz@free-electrons.com>
+ <20170127085458.18270-5-quentin.schulz@free-electrons.com>
+ <f4b3e9dd-926c-c98a-30a2-89907ab2e09e@kernel.org>
+ <0e3ac499-abfc-51e0-20e3-d1231af3adc6@free-electrons.com>
+Message-ID: <46e5a6b0-fa83-9b55-3b38-c4ec8157ea47@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 28, 2017 at 8:57 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> On 01/27/2017 11:41 PM, Bhumika Goyal wrote:
+On 28/01/17 15:12, Quentin Schulz wrote:
+> Hi Jonathan
+> 
+> On 28/01/2017 15:49, Jonathan Cameron wrote:
+>> On 27/01/17 08:54, Quentin Schulz wrote:
+>>> The X-Powers AXP20X and AXP22X PMICs have multiple ADCs. They expose the
+>>> battery voltage, battery charge and discharge currents, AC-in and VBUS
+>>> voltages and currents, 2 GPIOs muxable in ADC mode and PMIC temperature.
+>>>
+>>> This adds support for most of AXP20X and AXP22X ADCs.
+>>>
+>>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+>> Pretty good, but not everything seems to be cleaned up on error paths
+>> in probe.
 >>
->> Declare watchdog_ops structures as const as they are only stored in the
->> ops field of a watchdog_device structure. This field is of type const, so
->> watchdog_ops structures having this property can be made const too.
->> Done using Coccinelle:
+>> A few other suggestions / questions inline.
 >>
->
-> I have a very similar patch from you already in my queue, one that was acked
-> and
-> reviewed by several people. Is this one different or are you just resending
-> ?
->
+>> Jonathan
+>>> ---
+> [...]
+>>> +static int axp20x_adc_raw(struct iio_dev *indio_dev,
+>>> +			  struct iio_chan_spec const *chan, int *val)
+>>> +{
+>>> +	struct axp20x_adc_iio *info = iio_priv(indio_dev);
+>>> +	int size = 12;
+>>> +
+>>> +	switch (chan->type) {
+>>> +	case IIO_CURRENT:
+>>> +		/*
+>>> +		 * Unlike the Chinese datasheets tell, the charging current is
+>>> +		 * stored on 12 bits, not 13 bits.
+>>> +		 */
+>>> +		if (chan->channel == AXP20X_BATT_DISCHRG_I)
+>>> +			size = 13;
+>> Given I don't think you can get here without it being current, voltage or temp;
+>> couldn't this be done more cleanly with
+>> if ((chan->type == IIO_CURRENT) && (chan->channel == AXP20X_BAT_DISCHRG_I))
+>>    size = 13;
+>>
+>> and have the rest in the normal code flow?
+>>
+> 
+> Indeed.
+> 
+>>> +	case IIO_VOLTAGE:
+>>> +	case IIO_TEMP:
+>>> +		*val = axp20x_read_variable_width(info->regmap, chan->address,
+>>> +						  size);
+>>> +		if (*val < 0)
+>>> +			return *val;
+>>> +
+>>> +		return IIO_VAL_INT;
+>>> +
+>>> +	default:
+>>> +		return -EINVAL;
+>>> +	}
+>>> +}
+> [...]
+>>> +static int axp22x_adc_scale(struct iio_chan_spec const *chan, int *val,
+>>> +			    int *val2)
+>>> +{
+>>> +	switch (chan->type) {
+>>> +	case IIO_VOLTAGE:
+>>> +		if (chan->channel != AXP22X_BATT_V)
+>>> +			return -EINVAL;
+>>> +
+>>> +		*val = 1;
+>>> +		*val2 = 100000;
+>>> +		return IIO_VAL_INT_PLUS_MICRO;
+>> A fixed scale of 1.1x? (just checking)
+> 
+> Yes, there is only one voltage exposed for AXP22X PMICs: the battery
+> voltage which has a scale of 1.1 (for mV).
+Fair enough - just seemed an oddly specific number!
+> 
+> [...]
+>>> +static int axp20x_probe(struct platform_device *pdev)
+>>> +{
+>>> +	struct axp20x_adc_iio *info;
+>>> +	struct iio_dev *indio_dev;
+>>> +	struct axp20x_dev *axp20x_dev;
+>>> +	int ret;
+>>> +
+>>> +	axp20x_dev = dev_get_drvdata(pdev->dev.parent);
+>>> +
+>>> +	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*info));
+>>> +	if (!indio_dev)
+>>> +		return -ENOMEM;
+>>> +
+>>> +	info = iio_priv(indio_dev);
+>>> +	platform_set_drvdata(pdev, indio_dev);
+>>> +
+>>> +	info->regmap = axp20x_dev->regmap;
+>>> +	indio_dev->name = dev_name(&pdev->dev);
+>> Not sure on this name - what does end up as?  Expected to be
+>> a description of the part so in this case something like axp209-adc.
+>> I've been lax at picking up on this in the past and it's led to some
+>> crazy naming that is no use at all to userspace.  Basically this
+>> name just provides a convenient user readable name for userspace apps to
+>> use.
+>>
+> 
+> ACK. Should we have a different name for AXP20X and AXP22X PMICs?
+ideally yes.
+> 
+>>> +	indio_dev->dev.parent = &pdev->dev;
+>>> +	indio_dev->dev.of_node = pdev->dev.of_node;
+>>> +	indio_dev->modes = INDIO_DIRECT_MODE;
+>>> +
+>>> +	info->data = (struct axp_data *)of_device_get_match_data(&pdev->dev);
+>>> +
+>>> +	indio_dev->info = info->data->iio_info;
+>>> +	indio_dev->num_channels = info->data->num_channels;
+>>> +	indio_dev->channels = info->data->channels;
+>>> +
+>>> +	/* Enable the ADCs on IP */
+>>> +	regmap_write(info->regmap, AXP20X_ADC_EN1, info->data->adc_en1_mask);
+>>> +
+>>> +	if (info->data->adc_en2)
+>>> +		/* Enable GPIO0/1 and internal temperature ADCs */
+>>> +		regmap_update_bits(info->regmap, AXP20X_ADC_EN2,
+>>> +				   AXP20X_ADC_EN2_MASK, AXP20X_ADC_EN2_MASK);
+>>> +
+>>> +	/* Configure ADCs rate */
+>>> +	regmap_update_bits(info->regmap, AXP20X_ADC_RATE, AXP20X_ADC_RATE_MASK,
+>>> +			   info->data->adc_rate(100));
+>>> +
+>>> +	ret = iio_map_array_register(indio_dev, info->data->maps);
+>>> +	if (ret < 0) {
+>>> +		dev_err(&pdev->dev, "failed to register IIO maps: %d\n", ret);
+>> This should be disabling channels.
+> 
+> You mean disabling ADCs as it is done in the remove? If so, indeed.
+yes.
+> 
+>>> +		return ret;
+>>> +	}
+>>> +
+>>> +	ret = iio_device_register(indio_dev);
+>>> +	if (ret < 0) {
+>>> +		dev_err(&pdev->dev, "could not register the device\n");
+>>> +		regmap_write(info->regmap, AXP20X_ADC_EN1, 0);
+>>> +
+>>> +		if (info->data->adc_en2)
+>>> +			regmap_write(info->regmap, AXP20X_ADC_EN2, 0);
+>> I'd expect to see a complete unwind of what has been done earlier in probe
+>> including iio_map_array_unregister.
+>>
+>> The traditional goto error* approach is probably worth having here to
+>> make sure the unwind makes sense.
+> 
+> Indeed.
+> 
+>>> +
+>>> +		return ret;
+>>> +	}
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +static int axp20x_remove(struct platform_device *pdev)
+>>> +{
+>>> +	struct axp20x_adc_iio *info;
+>>> +	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
+>>> +
+>>> +	info = iio_priv(indio_dev);
+>>> +
+>>> +	iio_device_unregister(indio_dev);
+>> iio_map_array_unregister?
+> 
+> Yes. I see iio_device_unregister already disable all buffers, why not
+> unregistering the map array as well in this function?
+Mostly about symmetry - it's easier to be sure things are right
+if there are explicit calls to set stuff up and then to unwind it.
 
-This is a different one. That patch was for watchdog_info structures
-and this one is for watchdog_ops.
-
-Thanks,
-Bhumika
-
-> Guenter
->
->
->> @r disable optional_qualifier@
->> identifier x;
->> position p;
->> @@
->> static struct watchdog_ops x at p={...};
->>
->> @ok@
->> struct watchdog_device w;
->> identifier r.x;
->> position p;
->> @@
->> w.ops=&x at p;
->>
->> @bad@
->> position p != {r.p,ok.p};
->> identifier r.x;
->> @@
->> x at p
->>
->> @depends on !bad disable optional_qualifier@
->> identifier r.x;
->> @@
->> +const
->> struct watchdog_ops x;
->>
->> File size details before and after patching.
->> First line of every .o file shows the file size before patching
->> and second line shows the size after patching.
->>
->>    text    data     bss     dec     hex filename
->>
->>    1340     544       0    1884     75c drivers/watchdog/bcm_kona_wdt.o
->>    1436     440       0    1876     754 drivers/watchdog/bcm_kona_wdt.o
->>
->>    1176     544       4    1724     6bc drivers/watchdog/digicolor_wdt.o
->>    1272     440       4    1716     6b4 drivers/watchdog/digicolor_wdt.o
->>
->>     925     580      89    1594     63a drivers/watchdog/ep93xx_wdt.o
->>    1021     476      89    1586     632 drivers/watchdog/ep93xx_wdt.o
->>
->>    4932     288      17    5237    1475 drivers/watchdog/s3c2410_wdt.o
->>    5028     192      17    5237    1475 drivers/watchdog/s3c2410_wdt.o
->>
->>    1977     292       1    2270     8de drivers/watchdog/sama5d4_wdt.o
->>    2073     196       1    2270     8de drivers/watchdog/sama5d4_wdt.o
->>
->>    1375     484       1    1860     744 drivers/watchdog/sirfsoc_wdt.o
->>    1471     380       1    1852     73c drivers/watchdog/sirfsoc_wdt.o
->>
->> Size remains the same for the files drivers/watchdog/diag288_wdt.o
->> drivers/watchdog/asm9260_wdt.o and drivers/watchdog/atlas7_wdt.o
->>
->> The following .o files did not compile:
->> drivers/watchdog/sun4v_wdt.o, drivers/watchdog/sbsa_gwdt.o,
->> drivers/watchdog/rt2880_wdt.o, drivers/watchdog/booke_wdt.o
->> drivers/watchdog/mt7621_wdt.o
->>
->> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
->> ---
->>  drivers/watchdog/asm9260_wdt.c   | 2 +-
->>  drivers/watchdog/atlas7_wdt.c    | 2 +-
->>  drivers/watchdog/bcm_kona_wdt.c  | 2 +-
->>  drivers/watchdog/booke_wdt.c     | 2 +-
->>  drivers/watchdog/diag288_wdt.c   | 2 +-
->>  drivers/watchdog/digicolor_wdt.c | 2 +-
->>  drivers/watchdog/ep93xx_wdt.c    | 2 +-
->>  drivers/watchdog/mt7621_wdt.c    | 2 +-
->>  drivers/watchdog/rt2880_wdt.c    | 2 +-
->>  drivers/watchdog/s3c2410_wdt.c   | 2 +-
->>  drivers/watchdog/sama5d4_wdt.c   | 2 +-
->>  drivers/watchdog/sbsa_gwdt.c     | 2 +-
->>  drivers/watchdog/sirfsoc_wdt.c   | 2 +-
->>  drivers/watchdog/sun4v_wdt.c     | 2 +-
->>  14 files changed, 14 insertions(+), 14 deletions(-)
->>
->> diff --git a/drivers/watchdog/asm9260_wdt.c
->> b/drivers/watchdog/asm9260_wdt.c
->> index d0b59ba..233dfa9 100644
->> --- a/drivers/watchdog/asm9260_wdt.c
->> +++ b/drivers/watchdog/asm9260_wdt.c
->> @@ -189,7 +189,7 @@ static const struct watchdog_info asm9260_wdt_ident =
->> {
->>         .identity         =     "Alphascale asm9260 Watchdog",
->>  };
->>
->> -static struct watchdog_ops asm9260_wdt_ops = {
->> +static const struct watchdog_ops asm9260_wdt_ops = {
->>         .owner          = THIS_MODULE,
->>         .start          = asm9260_wdt_enable,
->>         .stop           = asm9260_wdt_disable,
->> diff --git a/drivers/watchdog/atlas7_wdt.c b/drivers/watchdog/atlas7_wdt.c
->> index ed80734..4abdcab 100644
->> --- a/drivers/watchdog/atlas7_wdt.c
->> +++ b/drivers/watchdog/atlas7_wdt.c
->> @@ -105,7 +105,7 @@ static const struct watchdog_info atlas7_wdt_ident = {
->>         .identity = "atlas7 Watchdog",
->>  };
->>
->> -static struct watchdog_ops atlas7_wdt_ops = {
->> +static const struct watchdog_ops atlas7_wdt_ops = {
->>         .owner = THIS_MODULE,
->>         .start = atlas7_wdt_enable,
->>         .stop = atlas7_wdt_disable,
->> diff --git a/drivers/watchdog/bcm_kona_wdt.c
->> b/drivers/watchdog/bcm_kona_wdt.c
->> index e0c9842..80cdd16 100644
->> --- a/drivers/watchdog/bcm_kona_wdt.c
->> +++ b/drivers/watchdog/bcm_kona_wdt.c
->> @@ -266,7 +266,7 @@ static int bcm_kona_wdt_stop(struct watchdog_device
->> *wdog)
->>                                             SECWDOG_SRSTEN_MASK, 0);
->>  }
->>
->> -static struct watchdog_ops bcm_kona_wdt_ops = {
->> +static const struct watchdog_ops bcm_kona_wdt_ops = {
->>         .owner =        THIS_MODULE,
->>         .start =        bcm_kona_wdt_start,
->>         .stop =         bcm_kona_wdt_stop,
->> diff --git a/drivers/watchdog/booke_wdt.c b/drivers/watchdog/booke_wdt.c
->> index 04da4b6..4925034 100644
->> --- a/drivers/watchdog/booke_wdt.c
->> +++ b/drivers/watchdog/booke_wdt.c
->> @@ -197,7 +197,7 @@ static struct watchdog_info booke_wdt_info = {
->>         .identity = "PowerPC Book-E Watchdog",
->>  };
->>
->> -static struct watchdog_ops booke_wdt_ops = {
->> +static const struct watchdog_ops booke_wdt_ops = {
->>         .owner = THIS_MODULE,
->>         .start = booke_wdt_start,
->>         .stop = booke_wdt_stop,
->> diff --git a/drivers/watchdog/diag288_wdt.c
->> b/drivers/watchdog/diag288_wdt.c
->> index 861d3d3..6f59108 100644
->> --- a/drivers/watchdog/diag288_wdt.c
->> +++ b/drivers/watchdog/diag288_wdt.c
->> @@ -205,7 +205,7 @@ static int wdt_set_timeout(struct watchdog_device *
->> dev, unsigned int new_to)
->>         return wdt_ping(dev);
->>  }
->>
->> -static struct watchdog_ops wdt_ops = {
->> +static const struct watchdog_ops wdt_ops = {
->>         .owner = THIS_MODULE,
->>         .start = wdt_start,
->>         .stop = wdt_stop,
->> diff --git a/drivers/watchdog/digicolor_wdt.c
->> b/drivers/watchdog/digicolor_wdt.c
->> index 77df772..817d3f9 100644
->> --- a/drivers/watchdog/digicolor_wdt.c
->> +++ b/drivers/watchdog/digicolor_wdt.c
->> @@ -96,7 +96,7 @@ static unsigned int dc_wdt_get_timeleft(struct
->> watchdog_device *wdog)
->>         return count / clk_get_rate(wdt->clk);
->>  }
->>
->> -static struct watchdog_ops dc_wdt_ops = {
->> +static const struct watchdog_ops dc_wdt_ops = {
->>         .owner          = THIS_MODULE,
->>         .start          = dc_wdt_start,
->>         .stop           = dc_wdt_stop,
->> diff --git a/drivers/watchdog/ep93xx_wdt.c b/drivers/watchdog/ep93xx_wdt.c
->> index 0a4d7cc..8a6e1a7 100644
->> --- a/drivers/watchdog/ep93xx_wdt.c
->> +++ b/drivers/watchdog/ep93xx_wdt.c
->> @@ -99,7 +99,7 @@ static const struct watchdog_info ep93xx_wdt_ident = {
->>         .identity       = "EP93xx Watchdog",
->>  };
->>
->> -static struct watchdog_ops ep93xx_wdt_ops = {
->> +static const struct watchdog_ops ep93xx_wdt_ops = {
->>         .owner          = THIS_MODULE,
->>         .start          = ep93xx_wdt_start,
->>         .stop           = ep93xx_wdt_stop,
->> diff --git a/drivers/watchdog/mt7621_wdt.c b/drivers/watchdog/mt7621_wdt.c
->> index d5735c1..cb3651ae 100644
->> --- a/drivers/watchdog/mt7621_wdt.c
->> +++ b/drivers/watchdog/mt7621_wdt.c
->> @@ -110,7 +110,7 @@ static struct watchdog_info mt7621_wdt_info = {
->>         .options = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING |
->> WDIOF_MAGICCLOSE,
->>  };
->>
->> -static struct watchdog_ops mt7621_wdt_ops = {
->> +static const struct watchdog_ops mt7621_wdt_ops = {
->>         .owner = THIS_MODULE,
->>         .start = mt7621_wdt_start,
->>         .stop = mt7621_wdt_stop,
->> diff --git a/drivers/watchdog/rt2880_wdt.c b/drivers/watchdog/rt2880_wdt.c
->> index 14b4fd4..b2b472f 100644
->> --- a/drivers/watchdog/rt2880_wdt.c
->> +++ b/drivers/watchdog/rt2880_wdt.c
->> @@ -124,7 +124,7 @@ static struct watchdog_info rt288x_wdt_info = {
->>         .options = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING |
->> WDIOF_MAGICCLOSE,
->>  };
->>
->> -static struct watchdog_ops rt288x_wdt_ops = {
->> +static const struct watchdog_ops rt288x_wdt_ops = {
->>         .owner = THIS_MODULE,
->>         .start = rt288x_wdt_start,
->>         .stop = rt288x_wdt_stop,
->> diff --git a/drivers/watchdog/s3c2410_wdt.c
->> b/drivers/watchdog/s3c2410_wdt.c
->> index 59e9576..d48ba25 100644
->> --- a/drivers/watchdog/s3c2410_wdt.c
->> +++ b/drivers/watchdog/s3c2410_wdt.c
->> @@ -394,7 +394,7 @@ static const struct watchdog_info s3c2410_wdt_ident =
->> {
->>         .identity         =     "S3C2410 Watchdog",
->>  };
->>
->> -static struct watchdog_ops s3c2410wdt_ops = {
->> +static const struct watchdog_ops s3c2410wdt_ops = {
->>         .owner = THIS_MODULE,
->>         .start = s3c2410wdt_start,
->>         .stop = s3c2410wdt_stop,
->> diff --git a/drivers/watchdog/sama5d4_wdt.c
->> b/drivers/watchdog/sama5d4_wdt.c
->> index a49634c..dc4c76b 100644
->> --- a/drivers/watchdog/sama5d4_wdt.c
->> +++ b/drivers/watchdog/sama5d4_wdt.c
->> @@ -107,7 +107,7 @@ static const struct watchdog_info sama5d4_wdt_info = {
->>         .identity = "Atmel SAMA5D4 Watchdog",
->>  };
->>
->> -static struct watchdog_ops sama5d4_wdt_ops = {
->> +static const struct watchdog_ops sama5d4_wdt_ops = {
->>         .owner = THIS_MODULE,
->>         .start = sama5d4_wdt_start,
->>         .stop = sama5d4_wdt_stop,
->> diff --git a/drivers/watchdog/sbsa_gwdt.c b/drivers/watchdog/sbsa_gwdt.c
->> index ce0c38b..c0d1d3b 100644
->> --- a/drivers/watchdog/sbsa_gwdt.c
->> +++ b/drivers/watchdog/sbsa_gwdt.c
->> @@ -215,7 +215,7 @@ static struct watchdog_info sbsa_gwdt_info = {
->>                           WDIOF_CARDRESET,
->>  };
->>
->> -static struct watchdog_ops sbsa_gwdt_ops = {
->> +static const struct watchdog_ops sbsa_gwdt_ops = {
->>         .owner          = THIS_MODULE,
->>         .start          = sbsa_gwdt_start,
->>         .stop           = sbsa_gwdt_stop,
->> diff --git a/drivers/watchdog/sirfsoc_wdt.c
->> b/drivers/watchdog/sirfsoc_wdt.c
->> index 3050a00..4eea351 100644
->> --- a/drivers/watchdog/sirfsoc_wdt.c
->> +++ b/drivers/watchdog/sirfsoc_wdt.c
->> @@ -127,7 +127,7 @@ static const struct watchdog_info sirfsoc_wdt_ident =
->> {
->>         .identity         =     "SiRFSOC Watchdog",
->>  };
->>
->> -static struct watchdog_ops sirfsoc_wdt_ops = {
->> +static const struct watchdog_ops sirfsoc_wdt_ops = {
->>         .owner = THIS_MODULE,
->>         .start = sirfsoc_wdt_enable,
->>         .stop = sirfsoc_wdt_disable,
->> diff --git a/drivers/watchdog/sun4v_wdt.c b/drivers/watchdog/sun4v_wdt.c
->> index 1467fe5..0090797 100644
->> --- a/drivers/watchdog/sun4v_wdt.c
->> +++ b/drivers/watchdog/sun4v_wdt.c
->> @@ -77,7 +77,7 @@ static const struct watchdog_info sun4v_wdt_ident = {
->>         .firmware_version = 0,
->>  };
->>
->> -static struct watchdog_ops sun4v_wdt_ops = {
->> +static const struct watchdog_ops sun4v_wdt_ops = {
->>         .owner =        THIS_MODULE,
->>         .start =        sun4v_wdt_ping,
->>         .stop =         sun4v_wdt_stop,
->>
->
+Jonathan
+> 
+> [...]
+> Thanks,
+> Quentin
+> 
