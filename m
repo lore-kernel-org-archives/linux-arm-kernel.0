@@ -1,37 +1,86 @@
 From: peter.senna@collabora.com (Peter Senna Tschudin)
-Date: Sat, 28 Jan 2017 15:16:46 +0100
-Subject: [PATCH V7 3/4] drm/bridge: Add driver for GE B850v3 LVDS/DP++
- Bridge
-In-Reply-To: <759f96e2-43da-45ba-cf8d-55bc1f6e8442@codeaurora.org>
-References: <cover.1483301745.git.peter.senna@collabora.com>
- <4232c88a99f44a24287d04d74b891e2eb139864c.1483301745.git.peter.senna@collabora.com>
- <759f96e2-43da-45ba-cf8d-55bc1f6e8442@codeaurora.org>
-Message-ID: <20170128141646.GA21291@collabora.com>
+Date: Sat, 28 Jan 2017 15:21:29 +0100
+Subject: [PATCH 0/4] megachips-stdpxxxx-ge-b850v3-fw (was V7 GE B850v3
+ LVDS/DP++ Bridge)
+Message-ID: <cover.1485611969.git.peter.senna@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 05, 2017 at 01:18:47PM +0530, Archit Taneja wrote:
-Hi Archit,
+The video processing pipeline on the second output on the GE B850v3:
 
-Thank you for the comments!
+  Host -> LVDS|--(STDP4028)--|DP -> DP|--(STDP2690)--|DP++ -> Video output
 
-[...]
-> > +	total_size = (block[EDID_EXT_BLOCK_CNT] + 1) * EDID_LENGTH;
-> > +	if (total_size > EDID_LENGTH) {
-> > +		kfree(block);
-> > +		block = kmalloc(total_size, GFP_KERNEL);
-> > +		if (!block)
-> > +			return NULL;
-> > +
-> > +		/* Yes, read the entire buffer, and do not skip the first
-> > +		 * EDID_LENGTH bytes.
-> > +		 */
-> 
-> Is this the reason why you aren't using drm_do_get_edid()?
+Each bridge has a dedicated flash containing firmware for supporting the
+custom design. The result is that in this design neither the STDP4028
+nor the STDP2690 behave as the stock bridges would. The compatible
+strings include the suffix "-ge-b850v3-fw" to make it clear that the
+driver is for the bridges with the firmware which is specific for the GE
+B850v3.
 
-Yes, for some hw specific reason, it is necessary to read the entire
-EDID buffer starting from 0, not block by block.
+The driver is powerless to control the video processing pipeline, as the
+two bridges behaves as a single one. The driver is only needed for
+telling the host about EDID / HPD, and for giving the host powers to ack
+interrupts.
 
-[...]
+Tested on next-20170125.
 
-I fixed all your other suggestions. Thank you!
+Changes from V7(was GE B850v3 LVDS/DP++ Bridge):
+ - New devicetree binding with one node per bridge, and two ports per bridge
+ - Two i2c_devices, one per bridge
+ - Removed uneeded mutexes
+ - Moved documentation to bindings/display/bridge
+ - Included test for EDID extension blocks
+ - Renamed bridge pointer to ge_b850v3_lvds_ptr
+ - Removed the call to drm_helper_hpd_irq_event()
+ - Removed assignments to bridge.driver_private
+
+Changes from V6:
+ - Removed check for pixel clock as the bridge supports up to 330Mhz while the
+   host is limited to 264 MHz in very specific conditions.
+ - Added a second mutex to avoid concurrency issues while acking interrupts
+   from threaded interrupt handlers.
+ - Renamed the edid mutex to be more descriptive.
+ - Added a .detach() function that disables the interrupts.
+ - Adopted i2c_new_secondary_device() and updated the dts and documentation to
+   match the new method.
+ - Removed useless test to drm_bridge_add()
+ - Did some refactoring around devm_request_threaded_irq()
+ - Added a missing call to i2c_unregister_device() on the i2c_driver.remove()
+   function.
+
+Changes from V5:
+ - Change to MAINTAINERS in a separate patch
+ - Reworked interrupt handler initialization
+ - Removed useless calls to: drm_connector_register(),
+   drm_helper_hpd_irq_event(), and drm_bridge_enable()
+
+Changes from V4:
+ - Renamed the i2c_driver.name from "ge,b850v3-lvds-dp" to "b850v3-lvds-dp" to
+   remove the comma from the driver name
+
+Changes from V3:
+ - Removed the patch that was configuring the mapping between IPUs and external
+   displays on the dts file
+
+
+Peter Senna Tschudin (4):
+  Documentation/devicetree/bindings/video/bridge:
+    megachips-stdpxxxx-ge-b850v3-fw
+  MAINTAINERS: Add entry for megachips-stdpxxxx-ge-b850v3-fw
+  drm/bridge: Drivers for megachips-stdpxxxx-ge-b850v3-fw (LVDS-DP++)
+  dts/imx6q-b850v3: Use megachips-stdpxxxx-ge-b850v3-fw bridges
+    (LVDS-DP++)
+
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ .../bridge/megachips-stdpxxxx-ge-b850v3-fw.txt     |  92 +++++
+ MAINTAINERS                                        |   8 +
+ arch/arm/boot/dts/imx6q-b850v3.dts                 |  68 ++++
+ drivers/gpu/drm/bridge/Kconfig                     |  11 +
+ drivers/gpu/drm/bridge/Makefile                    |   1 +
+ .../drm/bridge/megachips-stdpxxxx-ge-b850v3-fw.c   | 408 +++++++++++++++++++++
+ 7 files changed, 589 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/video/bridge/megachips-stdpxxxx-ge-b850v3-fw.txt
+ create mode 100644 drivers/gpu/drm/bridge/megachips-stdpxxxx-ge-b850v3-fw.c
+
+-- 
+2.5.5
