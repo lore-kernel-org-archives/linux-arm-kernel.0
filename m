@@ -1,64 +1,35 @@
 From: hkallweit1@gmail.com (Heiner Kallweit)
-Date: Sat, 28 Jan 2017 09:18:50 +0100
-Subject: [PATCH] mmc: meson-gx: set max block count to 256
-In-Reply-To: <m2lgtwuzll.fsf@baylibre.com>
-References: <82cf7861-5cf8-302d-5354-435282d95619@gmail.com>
- <m2lgtwuzll.fsf@baylibre.com>
-Message-ID: <c8f456f5-1722-55d6-58d8-c438d344cbc1@gmail.com>
+Date: Sat, 28 Jan 2017 09:25:35 +0100
+Subject: [PATCH v2] mmc: meson-gx: set max block count
+Message-ID: <0309625d-e24b-13e1-bba7-ada6b5a202c1@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 27.01.2017 um 19:28 schrieb Kevin Hilman:
-> Heiner Kallweit <hkallweit1@gmail.com> writes:
-> 
->> So far max_blk_count isn't set what results in a default of value 8
->> to be used (PAGE_SIZE / block size).
->>
->> Set max_blk_count to 256 as used in the uboot driver.
->>
->> Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
-> 
-> Thanks for the patch. A minor comment below:
-> 
->> ---
->>  drivers/mmc/host/meson-gx-mmc.c | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
->> index 3308b5b6..030425be 100644
->> --- a/drivers/mmc/host/meson-gx-mmc.c
->> +++ b/drivers/mmc/host/meson-gx-mmc.c
->> @@ -799,6 +799,7 @@ static int meson_mmc_probe(struct platform_device *pdev)
->>  		goto free_host;
->>  	}
->>  
->> +	mmc->max_blk_count = 256;
-> 
-> A step in the right direction, but the # blocks is actually a 9-bit
-> field (c.f. length field of cmd_cfg part of descriptor (bits 8:0).
-> 
-> So this should be more like:
-> 
-> 	/* blk count is 'length' field of cmd_cfg part of descriptor */
-> 	mmc->max_blk_count = CMD_CFG_LENGTH_MASK + 1;
-> 
-> I tested that change locally, so after changing that, please resend and
-> feel free to add:
-> 
-max_blk_count = 0 means unlimited number of blocks. Therefore I think
-we have to go with: mmc->max_blk_count = CMD_CFG_LENGTH_MASK
-And I figured out later that we also have to set mmc->max_req_size.
+So far max_blk_count isn't set what results in a default of value 8
+to be used (PAGE_SIZE / block size).
 
-In my tests the system never read / wrote more than 8 blocks in a row,
-most likely because the upper block layers use 4k blocks.
+Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
+---
+v2:
+- block length field has 9 bits, so set max_blk_count to 2^9-1 = 511
+- in addition set max_req_size because max_blk_count is also limited
+  by max_req_size / block_size
+---
+ drivers/mmc/host/meson-gx-mmc.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Therefore setting max_blk_count doesn't really provide a benefit but
-I think it's cleaner to expose the actual chip limit.
-
-Rgds, Heiner
-
-> Reviewed-by: Kevin Hilman <khilman@baylibre.com>
-> Tested-by: Kevin Hilman <khilman@baylibre.com>
-> 
-> Kevin
-> 
+diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
+index 83361f1f..d4d174ed 100644
+--- a/drivers/mmc/host/meson-gx-mmc.c
++++ b/drivers/mmc/host/meson-gx-mmc.c
+@@ -810,6 +810,8 @@ static int meson_mmc_probe(struct platform_device *pdev)
+ 		goto free_host;
+ 	}
+ 
++	mmc->max_blk_count = CMD_CFG_LENGTH_MASK;
++	mmc->max_req_size = mmc->max_blk_count * mmc->max_blk_size;
+ 	mmc->ops = &meson_mmc_ops;
+ 	mmc_add_host(mmc);
+ 
+-- 
+2.11.0
