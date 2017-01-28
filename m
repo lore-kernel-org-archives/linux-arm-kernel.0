@@ -1,47 +1,42 @@
-From: oss@buserror.net (Scott Wood)
-Date: Fri, 27 Jan 2017 17:51:42 -0600
-Subject: [PATCH 1/3] dt-bindings: qoriq-clock: Add coreclk
-In-Reply-To: <20170127223819.mzovhnnpths5t5w2@rob-hp-laptop>
-References: <1485332363-8434-1-git-send-email-oss@buserror.net>
- <20170127223819.mzovhnnpths5t5w2@rob-hp-laptop>
-Message-ID: <1485561102.9266.8.camel@buserror.net>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sat, 28 Jan 2017 01:45:10 +0100
+Subject: [GIT PULL] ARM: at91: drivers for 4.11 #2
+Message-ID: <20170128004510.w4ke4ccrqixvq3do@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-01-27 at 16:38 -0600, Rob Herring wrote:
-> On Wed, Jan 25, 2017 at 02:19:21AM -0600, Scott Wood wrote:
-> > 
-> > ls1012a has separate input root clocks for core PLLs versus the platform
-> > PLL, with the latter described as sysclk in the hw docs.
-> > 
-> > Update the qoriq-clock binding to allow a second input clock, named
-> > "coreclk".??If present, this clock will be used for the core PLLs.
-> > 
-> > Signed-off-by: Scott Wood <oss@buserror.net>
-> > Cc: devicetree at vger.kernel.org
-> > ---
-> > ?Documentation/devicetree/bindings/clock/qoriq-clock.txt | 6 ++++++
-> > ?1 file changed, 6 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-> > b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-> > index df9cb5a..97a9666 100644
-> > --- a/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-> > +++ b/Documentation/devicetree/bindings/clock/qoriq-clock.txt
-> > @@ -55,6 +55,11 @@ Optional properties:
-> > ?- clocks: If clock-frequency is not specified, sysclk may be provided
-> > ?	as an input clock.??Either clock-frequency or clocks must be
-> > ?	provided.
-> > +	A second input clock, called "coreclk", may be provided if
-> > +	core PLLs are based on a different input clock from the
-> > +	platform PLL.
-> > +- clock-names: Required if a coreclk is present.??Valid names are
-> > +	"sysclk" and "coreclk".
-> 'clk' part is redundant.
+Arnd, Olof
 
-"sysclk" is a term used by the hardware documentation and I'd rather leave it
-intact. ?"coreclk" isn't named (only described) by the hardware documentation
-but it is a special variant of sysclk and having similar naming helps make
-that clear.
+The EBI was requiring more fixing than expected in preparation of the
+NAND driver rework for 4.12.
 
--Scott
+The following changes since commit ee194289502a6901cc77dc9a893bf2afd351ac5e:
+
+  memory/atmel-ebi: Fix ns <-> cycles conversions (2017-01-10 16:01:34 +0100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.11-drivers2
+
+for you to fetch changes up to 87108dc78eb8935b5cebab70f8158807d5a7617f:
+
+  memory: atmel-ebi: Enable the SMC clock if specified (2017-01-27 10:28:54 +0100)
+
+----------------------------------------------------------------
+Drivers for 4.11 #2:
+
+ - more EBI fixes
+
+----------------------------------------------------------------
+Boris Brezillon (3):
+      memory: atmel-ebi: Fix the test to enable generic SMC logic
+      memory: atmel-ebi: Properly handle multiple reference to the same CS
+      memory: atmel-ebi: Enable the SMC clock if specified
+
+ drivers/memory/atmel-ebi.c | 99 ++++++++++++++++++++++++++++++----------------
+ 1 file changed, 65 insertions(+), 34 deletions(-)
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
