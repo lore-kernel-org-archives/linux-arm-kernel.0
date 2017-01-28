@@ -1,30 +1,30 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Sat, 28 Jan 2017 15:06:11 -0600
-Subject: [PATCH V7 09/11] arm64: dma-mapping: Remove the notifier trick
- to handle early setting of dma_ops
-In-Reply-To: <1485188293-20263-10-git-send-email-sricharan@codeaurora.org>
+Date: Sat, 28 Jan 2017 15:07:09 -0600
+Subject: [PATCH V7 10/11] iommu/arm-smmu: Clean up early-probing
+ workarounds
+In-Reply-To: <1485188293-20263-11-git-send-email-sricharan@codeaurora.org>
 References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
- <1485188293-20263-10-git-send-email-sricharan@codeaurora.org>
-Message-ID: <20170128210611.GF20550@bhelgaas-glaptop.roam.corp.google.com>
+ <1485188293-20263-11-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20170128210709.GG20550@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2017 at 09:48:11PM +0530, Sricharan R wrote:
-> With arch_setup_dma_ops now being called late during device's probe after
-> the device's iommu is probed, the notifier trick required to handle the
-> early setup of dma_ops before the iommu group gets created is not
-> required. So removing the notifier's here.
+On Mon, Jan 23, 2017 at 09:48:12PM +0530, Sricharan R wrote:
+> From: Robin Murphy <robin.murphy@arm.com>
+> 
+> Now that the appropriate ordering is enforced via profe-deferral of
 
-s/notifier's/notifiers/
+s/profe-deferral/probe-deferral/
 
-Personally I'd capitalize "IOMMU" in the English text above, too.
-
+> masters in core code, rip it all out and bask in the simplicity.
+> 
 > Acked-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> [rm: clean up even more]
 > Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> [Sricharan: Rebased on top of ACPI IORT SMMU series]
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 > ---
->  arch/arm64/mm/dma-mapping.c | 132 ++++----------------------------------------
->  1 file changed, 12 insertions(+), 120 deletions(-)
+>  drivers/iommu/arm-smmu-v3.c | 46 ++---------------------------------
+>  drivers/iommu/arm-smmu.c    | 58 +++++++--------------------------------------
+>  2 files changed, 10 insertions(+), 94 deletions(-)
 
-Nice :)
+Yay!
