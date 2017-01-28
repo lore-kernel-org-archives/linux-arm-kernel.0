@@ -1,36 +1,290 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sat, 28 Jan 2017 10:27:05 +0000
-Subject: [GIT PULL] arm64 fixes for 4.10-rc6
-Message-ID: <20170128102702.GA15956@e104818-lin.cambridge.arm.com>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Sat, 28 Jan 2017 12:51:35 +0100
+Subject: [PATCH] ARM: dts: BCM5301X: Relicense DTS files I created to the ISC
+Message-ID: <20170128115135.6841-1-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+From: Rafa? Mi?ecki <rafal@milecki.pl>
 
-Please pull the arm64 fix for 4.10 below. Thanks.
+It's preferred to have DT source files licensed under BSD compatible
+license. All new BCM5301X DTS files use ISC so let's also relicense old
+ones to it.
 
-The following changes since commit 7a308bb3016f57e5be11a677d15b821536419d36:
+Except for me only Hauke was ever touched these files in his commit
+9faa5960eef3 ("ARM: BCM5301X: add NAND flash chip description") and
+commit bb1d8fba1965 ("ARM: BCM5301X: add NAND flash chip description for
+Asus RT-AC87U").
 
-  Linux 4.10-rc5 (2017-01-22 12:54:15 -0800)
+Signed-off-by: Rafa? Mi?ecki <rafal@milecki.pl>
+---
+Hauke: can you ack this patch, please?
+---
+ arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts        | 12 +++++++++++-
+ arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts        | 12 +++++++++++-
+ arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts     | 12 +++++++++++-
+ arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts        | 12 +++++++++++-
+ arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts | 12 +++++++++++-
+ arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts  | 12 +++++++++++-
+ arch/arm/boot/dts/bcm47081.dtsi                    | 12 +++++++++++-
+ arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts        | 12 +++++++++++-
+ arch/arm/boot/dts/bcm4709-netgear-r7000.dts        | 12 +++++++++++-
+ arch/arm/boot/dts/bcm4709-netgear-r8000.dts        | 12 +++++++++++-
+ arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts      | 12 +++++++++++-
+ 11 files changed, 121 insertions(+), 11 deletions(-)
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
-
-for you to fetch changes up to 606f42265d384b9149bfb953c5dfc6d4710fef4c:
-
-  arm64: skip register_cpufreq_notifier on ACPI-based systems (2017-01-27 11:30:36 +0000)
-
-----------------------------------------------------------------
-- Fix kernel panic on ACPI-based systems where CPU capacity description
-  is not currently handled
-
-----------------------------------------------------------------
-Prashanth Prakash (1):
-      arm64: skip register_cpufreq_notifier on ACPI-based systems
-
- arch/arm64/kernel/topology.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts b/arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts
+index d241cee4bfcc..3bf8db4d103f 100644
+--- a/arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts
++++ b/arch/arm/boot/dts/bcm4708-asus-rt-ac56u.dts
+@@ -4,7 +4,17 @@
+  *
+  * Copyright (C) 2015 Rafa? Mi?ecki <zajec5@gmail.com>
+  *
+- * Licensed under the GNU/GPL. See COPYING for details.
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
+ /dts-v1/;
+diff --git a/arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts b/arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts
+index b0e62042f62f..33b0ae6290cb 100644
+--- a/arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts
++++ b/arch/arm/boot/dts/bcm4708-asus-rt-ac68u.dts
+@@ -4,7 +4,17 @@
+  *
+  * Copyright (C) 2015 Rafa? Mi?ecki <zajec5@gmail.com>
+  *
+- * Licensed under the GNU/GPL. See COPYING for details.
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
+ /dts-v1/;
+diff --git a/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts b/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
+index ae0199f6c7a2..5dae6a7ee134 100644
+--- a/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
++++ b/arch/arm/boot/dts/bcm4708-netgear-r6300-v2.dts
+@@ -4,7 +4,17 @@
+  *
+  * Copyright (C) 2014 Rafa? Mi?ecki <zajec5@gmail.com>
+  *
+- * Licensed under the GNU/GPL. See COPYING for details.
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
+ /dts-v1/;
+diff --git a/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts b/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
+index db8608be0ee7..7a95c67d3962 100644
+--- a/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
++++ b/arch/arm/boot/dts/bcm47081-asus-rt-n18u.dts
+@@ -4,7 +4,17 @@
+  *
+  * Copyright (C) 2014 Rafa? Mi?ecki <zajec5@gmail.com>
+  *
+- * Licensed under the GNU/GPL. See COPYING for details.
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
+ /dts-v1/;
+diff --git a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
+index d51586d95b9a..a6d15cce0545 100644
+--- a/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
++++ b/arch/arm/boot/dts/bcm47081-buffalo-wzr-600dhp2.dts
+@@ -4,7 +4,17 @@
+  *
+  * Copyright (C) 2014 Rafa? Mi?ecki <zajec5@gmail.com>
+  *
+- * Licensed under the GNU/GPL. See COPYING for details.
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
+ /dts-v1/;
+diff --git a/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts b/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
+index de041b8c3342..8bef6429feee 100644
+--- a/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
++++ b/arch/arm/boot/dts/bcm47081-buffalo-wzr-900dhp.dts
+@@ -4,7 +4,17 @@
+  *
+  * Copyright (C) 2015 Rafa? Mi?ecki <zajec5@gmail.com>
+  *
+- * Licensed under the GNU/GPL. See COPYING for details.
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
+ /dts-v1/;
+diff --git a/arch/arm/boot/dts/bcm47081.dtsi b/arch/arm/boot/dts/bcm47081.dtsi
+index c5f7619af4a6..7bcd536198fc 100644
+--- a/arch/arm/boot/dts/bcm47081.dtsi
++++ b/arch/arm/boot/dts/bcm47081.dtsi
+@@ -4,7 +4,17 @@
+  *
+  * Copyright ? 2014 Rafa? Mi?ecki <zajec5@gmail.com>
+  *
+- * Licensed under the GNU/GPL. See COPYING for details.
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
+ #include "bcm5301x.dtsi"
+diff --git a/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts b/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
+index eaca6876db0f..70421f916f15 100644
+--- a/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
++++ b/arch/arm/boot/dts/bcm4709-asus-rt-ac87u.dts
+@@ -4,7 +4,17 @@
+  *
+  * Copyright (C) 2015 Rafa? Mi?ecki <zajec5@gmail.com>
+  *
+- * Licensed under the GNU/GPL. See COPYING for details.
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
+ /dts-v1/;
+diff --git a/arch/arm/boot/dts/bcm4709-netgear-r7000.dts b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
+index f459a98a72c6..84b3f36b0b25 100644
+--- a/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
++++ b/arch/arm/boot/dts/bcm4709-netgear-r7000.dts
+@@ -4,7 +4,17 @@
+  *
+  * Copyright (C) 2015 Rafa? Mi?ecki <zajec5@gmail.com>
+  *
+- * Licensed under the GNU/GPL. See COPYING for details.
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
+ /dts-v1/;
+diff --git a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
+index 8e39a84e5bf9..92e16a24758c 100644
+--- a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
++++ b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
+@@ -4,7 +4,17 @@
+  *
+  * Copyright (C) 2015 Rafa? Mi?ecki <zajec5@gmail.com>
+  *
+- * Licensed under the GNU/GPL. See COPYING for details.
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
+ /dts-v1/;
+diff --git a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
+index 64ded7643e9f..5263b3368f1f 100644
+--- a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
++++ b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
+@@ -4,7 +4,17 @@
+  *
+  * Copyright (C) 2016 Rafa? Mi?ecki <zajec5@gmail.com>
+  *
+- * Licensed under the GNU/GPL. See COPYING for details.
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
++ * REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
++ * AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
++ * INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
++ * LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE
++ * OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
++ * PERFORMANCE OF THIS SOFTWARE.
+  */
+ 
+ /dts-v1/;
 -- 
-Catalin
+2.11.0
