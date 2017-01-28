@@ -1,94 +1,201 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Sat, 28 Jan 2017 22:15:49 +0100
-Subject: [PATCH V2] ARM: dts: BCM5301X: Add missing Netgear R8000 LEDs and
- Keys
-In-Reply-To: <20170128143749.5897-1-adityaxavier@gmail.com>
-References: <20170128143749.5897-1-adityaxavier@gmail.com>
-Message-ID: <CACna6rzaEw+_tgMtG5ASRX+AZSbg-yA=pnpaD9uE1AK8ZGKJ1Q@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Sat, 28 Jan 2017 15:17:28 -0600
+Subject: [PATCH] PCI: mvebu: Handle changes to the bridge windows while
+ enabled
+In-Reply-To: <20170111183055.GD14532@bhelgaas-glaptop.roam.corp.google.com>
+References: <20161212183020.GA30274@obsidianresearch.com>
+ <20170111183055.GD14532@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20170128211728.GJ20550@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 January 2017 at 15:37, AdityaXavier <adityaxavier@gmail.com> wrote:
-> From: Aditya Xavier <adityaxavier@gmail.com>
->
-> Added two WAN status LEDs and a GPIO Key for Brightness which were missing.
-> V2: Updated subject, Power LED names, and WAN labels.
+On Wed, Jan 11, 2017 at 12:30:55PM -0600, Bjorn Helgaas wrote:
+> On Mon, Dec 12, 2016 at 11:30:20AM -0700, Jason Gunthorpe wrote:
+> > The PCI core will write to the bridge window config multiple times
+> > while they are enabled. This can lead to mbus failures like:
+> > 
+> >  mvebu_mbus: cannot add window '4:e8', conflicts with another window
+> >  mvebu-pcie mbus:pex at e0000000: Could not create MBus window at [mem 0xe0000000-0xe00fffff]: -22
+> > 
+> > For me this is happening during a hotplug cycle. The PCI core is
+> > not changing the values, just writing them twice while active.
+> > 
+> > The patch addresses the general case of any change to an active window,
+> > but not atomically. The code is slightly refactored so io and mem
+> > can share more of the window logic.
+> 
+> Looks good to me, but I'm waiting for an ack from Thomas or Jason (listed
+> as maintainers and already cc'd).
 
-Changelog (V2 ... part) should go into that /comments/ section (see below).
-Florian: can you drop that line when applying this patch? Otherwise it
-looks OK to me.
+Ping, Thomas, Jason C?
 
-
-> Signed-off-by: Aditya Xavier <adityaxavier@gmail.com>
-
-Acked-by: Rafa? Mi?ecki <rafal@milecki.pl>
-
-Thanks for the patch!
-
-
-> ---
-
-Right here, below these 3 dashes is a place where you can add extra
-comments (they won't go into log when doing "git am").
-
->  arch/arm/boot/dts/bcm4709-netgear-r8000.dts | 22 ++++++++++++++++++++--
->  1 file changed, 20 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
-> index 92f8a72..90d4420 100644
-> --- a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
-> +++ b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
-> @@ -27,18 +27,30 @@
->         leds {
->                 compatible = "gpio-leds";
->
-> -               power0 {
-> +               power-white {
->                         label = "bcm53xx:white:power";
->                         gpios = <&chipcommon 2 GPIO_ACTIVE_LOW>;
->                         linux,default-trigger = "default-on";
->                 };
->
-> -               power1 {
-> +               power-amber {
->                         label = "bcm53xx:amber:power";
->                         gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
->                         linux,default-trigger = "default-off";
->                 };
->
-> +               wan-white {
-> +                       label = "bcm53xx:white:wan";
-> +                       gpios = <&chipcommon 8 GPIO_ACTIVE_LOW>;
-> +                       linux,default-trigger = "default-on";
-> +               };
-> +
-> +               wan-amber {
-> +                       label = "bcm53xx:amber:wan";
-> +                       gpios = <&chipcommon 9 GPIO_ACTIVE_HIGH>;
-> +                       linux,default-trigger = "default-off";
-> +               };
-> +
->                 5ghz-1 {
->                         label = "bcm53xx:white:5ghz-1";
->                         gpios = <&chipcommon 12 GPIO_ACTIVE_LOW>;
-> @@ -104,6 +116,12 @@
->                         linux,code = <KEY_RESTART>;
->                         gpios = <&chipcommon 6 GPIO_ACTIVE_LOW>;
->                 };
-> +
-> +               brightness {
-> +                       label = "Backlight";
-> +                       linux,code = <KEY_BRIGHTNESS_ZERO>;
-> +                       gpios = <&chipcommon 19 GPIO_ACTIVE_LOW>;
-> +               };
->         };
->  };
->
-> --
-> 2.9.3
->
-
-
-
--- 
-Rafa?
+> > Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> > ---
+> >  drivers/pci/host/pci-mvebu.c | 101 +++++++++++++++++++++++++------------------
+> >  1 file changed, 60 insertions(+), 41 deletions(-)
+> > 
+> > diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+> > index 307f81d6b479af..af724731b22f53 100644
+> > --- a/drivers/pci/host/pci-mvebu.c
+> > +++ b/drivers/pci/host/pci-mvebu.c
+> > @@ -133,6 +133,12 @@ struct mvebu_pcie {
+> >  	int nports;
+> >  };
+> >  
+> > +struct mvebu_pcie_window {
+> > +	phys_addr_t base;
+> > +	phys_addr_t remap;
+> > +	size_t size;
+> > +};
+> > +
+> >  /* Structure representing one PCIe interface */
+> >  struct mvebu_pcie_port {
+> >  	char *name;
+> > @@ -150,10 +156,8 @@ struct mvebu_pcie_port {
+> >  	struct mvebu_sw_pci_bridge bridge;
+> >  	struct device_node *dn;
+> >  	struct mvebu_pcie *pcie;
+> > -	phys_addr_t memwin_base;
+> > -	size_t memwin_size;
+> > -	phys_addr_t iowin_base;
+> > -	size_t iowin_size;
+> > +	struct mvebu_pcie_window memwin;
+> > +	struct mvebu_pcie_window iowin;
+> >  	u32 saved_pcie_stat;
+> >  };
+> >  
+> > @@ -379,23 +383,45 @@ static void mvebu_pcie_add_windows(struct mvebu_pcie_port *port,
+> >  	}
+> >  }
+> >  
+> > +static void mvebu_pcie_set_window(struct mvebu_pcie_port *port,
+> > +				  unsigned int target, unsigned int attribute,
+> > +				  const struct mvebu_pcie_window *desired,
+> > +				  struct mvebu_pcie_window *cur)
+> > +{
+> > +	if (desired->base == cur->base && desired->remap == cur->remap &&
+> > +	    desired->size == cur->size)
+> > +		return;
+> > +
+> > +	if (cur->size != 0) {
+> > +		mvebu_pcie_del_windows(port, cur->base, cur->size);
+> > +		cur->size = 0;
+> > +		cur->base = 0;
+> > +
+> > +		/*
+> > +		 * If something tries to change the window while it is enabled
+> > +		 * the change will not be done atomically. That would be
+> > +		 * difficult to do in the general case.
+> > +		 */
+> > +	}
+> > +
+> > +	if (desired->size == 0)
+> > +		return;
+> > +
+> > +	mvebu_pcie_add_windows(port, target, attribute, desired->base,
+> > +			       desired->size, desired->remap);
+> > +	*cur = *desired;
+> > +}
+> > +
+> >  static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
+> >  {
+> > -	phys_addr_t iobase;
+> > +	struct mvebu_pcie_window desired = {};
+> >  
+> >  	/* Are the new iobase/iolimit values invalid? */
+> >  	if (port->bridge.iolimit < port->bridge.iobase ||
+> >  	    port->bridge.iolimitupper < port->bridge.iobaseupper ||
+> >  	    !(port->bridge.command & PCI_COMMAND_IO)) {
+> > -
+> > -		/* If a window was configured, remove it */
+> > -		if (port->iowin_base) {
+> > -			mvebu_pcie_del_windows(port, port->iowin_base,
+> > -					       port->iowin_size);
+> > -			port->iowin_base = 0;
+> > -			port->iowin_size = 0;
+> > -		}
+> > -
+> > +		mvebu_pcie_set_window(port, port->io_target, port->io_attr,
+> > +				      &desired, &port->iowin);
+> >  		return;
+> >  	}
+> >  
+> > @@ -412,32 +438,27 @@ static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
+> >  	 * specifications. iobase is the bus address, port->iowin_base
+> >  	 * is the CPU address.
+> >  	 */
+> > -	iobase = ((port->bridge.iobase & 0xF0) << 8) |
+> > -		(port->bridge.iobaseupper << 16);
+> > -	port->iowin_base = port->pcie->io.start + iobase;
+> > -	port->iowin_size = ((0xFFF | ((port->bridge.iolimit & 0xF0) << 8) |
+> > -			    (port->bridge.iolimitupper << 16)) -
+> > -			    iobase) + 1;
+> > -
+> > -	mvebu_pcie_add_windows(port, port->io_target, port->io_attr,
+> > -			       port->iowin_base, port->iowin_size,
+> > -			       iobase);
+> > +	desired.remap = ((port->bridge.iobase & 0xF0) << 8) |
+> > +			(port->bridge.iobaseupper << 16);
+> > +	desired.base = port->pcie->io.start + desired.remap;
+> > +	desired.size = ((0xFFF | ((port->bridge.iolimit & 0xF0) << 8) |
+> > +			 (port->bridge.iolimitupper << 16)) -
+> > +			desired.remap) +
+> > +		       1;
+> > +
+> > +	mvebu_pcie_set_window(port, port->io_target, port->io_attr, &desired,
+> > +			      &port->iowin);
+> >  }
+> >  
+> >  static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
+> >  {
+> > +	struct mvebu_pcie_window desired = {.remap = MVEBU_MBUS_NO_REMAP};
+> > +
+> >  	/* Are the new membase/memlimit values invalid? */
+> >  	if (port->bridge.memlimit < port->bridge.membase ||
+> >  	    !(port->bridge.command & PCI_COMMAND_MEMORY)) {
+> > -
+> > -		/* If a window was configured, remove it */
+> > -		if (port->memwin_base) {
+> > -			mvebu_pcie_del_windows(port, port->memwin_base,
+> > -					       port->memwin_size);
+> > -			port->memwin_base = 0;
+> > -			port->memwin_size = 0;
+> > -		}
+> > -
+> > +		mvebu_pcie_set_window(port, port->mem_target, port->mem_attr,
+> > +				      &desired, &port->memwin);
+> >  		return;
+> >  	}
+> >  
+> > @@ -447,14 +468,12 @@ static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
+> >  	 * window to setup, according to the PCI-to-PCI bridge
+> >  	 * specifications.
+> >  	 */
+> > -	port->memwin_base  = ((port->bridge.membase & 0xFFF0) << 16);
+> > -	port->memwin_size  =
+> > -		(((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF) -
+> > -		port->memwin_base + 1;
+> > -
+> > -	mvebu_pcie_add_windows(port, port->mem_target, port->mem_attr,
+> > -			       port->memwin_base, port->memwin_size,
+> > -			       MVEBU_MBUS_NO_REMAP);
+> > +	desired.base = ((port->bridge.membase & 0xFFF0) << 16);
+> > +	desired.size = (((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF) -
+> > +		       desired.base + 1;
+> > +
+> > +	mvebu_pcie_set_window(port, port->mem_target, port->mem_attr, &desired,
+> > +			      &port->memwin);
+> >  }
+> >  
+> >  /*
+> > -- 
+> > 2.7.4
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
