@@ -1,648 +1,637 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 28 Jan 2017 14:02:45 +0000
-Subject: [PATCH 1/7] iio: adc: stm32: add support for triggered buffer mode
-In-Reply-To: <2c683b78-6c78-3224-0646-37793deba0e9@st.com>
-References: <1484832854-6314-1-git-send-email-fabrice.gasnier@st.com>
- <1484832854-6314-2-git-send-email-fabrice.gasnier@st.com>
- <82ca097a-4d22-cc21-4604-ddecf593be5e@kernel.org>
- <2c683b78-6c78-3224-0646-37793deba0e9@st.com>
-Message-ID: <afb13ea8-fc67-14a2-f53f-0dfbd7a0eb8b@kernel.org>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Sat, 28 Jan 2017 22:05:01 +0800
+Subject: [PATCH 3/4] leds: Add LED support for MT6323 PMIC
+In-Reply-To: <62acfd5d-6455-d89b-9169-71337319311f@gmail.com>
+References: <1485143685-11808-1-git-send-email-sean.wang@mediatek.com>
+ <1485143685-11808-4-git-send-email-sean.wang@mediatek.com>
+ <62acfd5d-6455-d89b-9169-71337319311f@gmail.com>
+Message-ID: <1485612301.29021.43.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/01/17 14:35, Fabrice Gasnier wrote:
-> On 01/22/2017 01:53 PM, Jonathan Cameron wrote:
->> On 19/01/17 13:34, Fabrice Gasnier wrote:
->>> STM32 ADC conversions can be launched using hardware triggers.
->>> It can be used to start conversion sequences (group of channels).
->>> Selected channels are select via sequence registers.
->>> Trigger source is selected via 'extsel' (external trigger mux).
->>> Trigger polarity is set to rising edge by default.
->>>
->>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->> A few small bits and pieces inline. The only significant element is about
->> making the data flow conform a little better to our poorly documented :(
->> typical data flow.  All about what the trigger is responsible for rather than
->> the device.
->>
->> Looks pretty good to me!
-> 
-> Hi Jonathan,
-> 
-> Many thanks for reviewing.
-> Please find bellow some answers and a few questions.
-> 
->> Jonathan
->>> ---
->>>  drivers/iio/adc/Kconfig     |   2 +
->>>  drivers/iio/adc/stm32-adc.c | 349 +++++++++++++++++++++++++++++++++++++++++++-
->>>  2 files changed, 348 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
->>> index 9c8b558..33341f4 100644
->>> --- a/drivers/iio/adc/Kconfig
->>> +++ b/drivers/iio/adc/Kconfig
->>> @@ -446,6 +446,8 @@ config STM32_ADC_CORE
->>>  	depends on ARCH_STM32 || COMPILE_TEST
->>>  	depends on OF
->>>  	depends on REGULATOR
->>> +	select IIO_BUFFER
->>> +	select IIO_TRIGGERED_BUFFER
->>>  	help
->>>  	  Select this option to enable the core driver for STMicroelectronics
->>>  	  STM32 analog-to-digital converter (ADC).
->>> diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
->>> index 5715e79..8d0b74b 100644
->>> --- a/drivers/iio/adc/stm32-adc.c
->>> +++ b/drivers/iio/adc/stm32-adc.c
->>> @@ -22,11 +22,16 @@
->>>  #include <linux/clk.h>
->>>  #include <linux/delay.h>
->>>  #include <linux/iio/iio.h>
->>> +#include <linux/iio/buffer.h>
->>> +#include <linux/iio/trigger.h>
->>> +#include <linux/iio/trigger_consumer.h>
->>> +#include <linux/iio/triggered_buffer.h>
->>>  #include <linux/interrupt.h>
->>>  #include <linux/io.h>
->>>  #include <linux/module.h>
->>>  #include <linux/platform_device.h>
->>>  #include <linux/of.h>
->>> +#include <linux/slab.h>
->>>  
->>>  #include "stm32-adc-core.h"
->>>  
->>> @@ -58,21 +63,66 @@
->>>  
->>>  /* STM32F4_ADC_CR2 - bit fields */
->>>  #define STM32F4_SWSTART			BIT(30)
->>> +#define STM32F4_EXTEN_SHIFT		28
->>>  #define STM32F4_EXTEN_MASK		GENMASK(29, 28)
->>> +#define STM32F4_EXTSEL_SHIFT		24
->>> +#define STM32F4_EXTSEL_MASK		GENMASK(27, 24)
->>>  #define STM32F4_EOCS			BIT(10)
->>>  #define STM32F4_ADON			BIT(0)
->>>  
->>>  /* STM32F4_ADC_SQR1 - bit fields */
->>>  #define STM32F4_L_SHIFT			20
->>>  #define STM32F4_L_MASK			GENMASK(23, 20)
->>> +#define STM32F4_SQ16_SHIFT		15
->>> +#define STM32F4_SQ16_MASK		GENMASK(19, 15)
->>> +#define STM32F4_SQ15_SHIFT		10
->>> +#define STM32F4_SQ15_MASK		GENMASK(14, 10)
->>> +#define STM32F4_SQ14_SHIFT		5
->>> +#define STM32F4_SQ14_MASK		GENMASK(9, 5)
->>> +#define STM32F4_SQ13_SHIFT		0
->>> +#define STM32F4_SQ13_MASK		GENMASK(4, 0)
->>> +
->>> +/* STM32F4_ADC_SQR2 - bit fields */
->>> +#define STM32F4_SQ12_SHIFT		25
->>> +#define STM32F4_SQ12_MASK		GENMASK(29, 25)
->>> +#define STM32F4_SQ11_SHIFT		20
->>> +#define STM32F4_SQ11_MASK		GENMASK(24, 20)
->>> +#define STM32F4_SQ10_SHIFT		15
->>> +#define STM32F4_SQ10_MASK		GENMASK(19, 15)
->>> +#define STM32F4_SQ9_SHIFT		10
->>> +#define STM32F4_SQ9_MASK		GENMASK(14, 10)
->>> +#define STM32F4_SQ8_SHIFT		5
->>> +#define STM32F4_SQ8_MASK		GENMASK(9, 5)
->>> +#define STM32F4_SQ7_SHIFT		0
->>> +#define STM32F4_SQ7_MASK		GENMASK(4, 0)
->>>  
->>>  /* STM32F4_ADC_SQR3 - bit fields */
->>> +#define STM32F4_SQ6_SHIFT		25
->>> +#define STM32F4_SQ6_MASK		GENMASK(29, 25)
->>> +#define STM32F4_SQ5_SHIFT		20
->>> +#define STM32F4_SQ5_MASK		GENMASK(24, 20)
->>> +#define STM32F4_SQ4_SHIFT		15
->>> +#define STM32F4_SQ4_MASK		GENMASK(19, 15)
->>> +#define STM32F4_SQ3_SHIFT		10
->>> +#define STM32F4_SQ3_MASK		GENMASK(14, 10)
->>> +#define STM32F4_SQ2_SHIFT		5
->>> +#define STM32F4_SQ2_MASK		GENMASK(9, 5)
->>>  #define STM32F4_SQ1_SHIFT		0
->>>  #define STM32F4_SQ1_MASK		GENMASK(4, 0)
->>>
->> Given all the above are only used in a big table which basically says what
->> the are, I wonder in this particular case if there is any real benefit to
->> using the defines?  Might actually be clearer just to have the numbers
->> inline.  What do you think?  I'm not fussed either way.
-> 
-> As you're suggesting it, I'll send an updated version without all these definitions.
-> 
->>> +#define STM32_ADC_MAX_SQ		16	/* SQ1..SQ16 */
->>>  #define STM32_ADC_TIMEOUT_US		100000
->>>  #define STM32_ADC_TIMEOUT	(msecs_to_jiffies(STM32_ADC_TIMEOUT_US / 1000))
->>>  
->>> +/* External trigger enable */
->>> +enum stm32_adc_exten {
->>> +	STM32_EXTEN_SWTRIG,
->>> +	STM32_EXTEN_HWTRIG_RISING_EDGE,
->>> +	STM32_EXTEN_HWTRIG_FALLING_EDGE,
->>> +	STM32_EXTEN_HWTRIG_BOTH_EDGES,
->>> +};
->>> +
->>> +
->>>  /**
->>>   * struct stm32_adc - private data of each ADC IIO instance
->>>   * @common:		reference to ADC block common data
->>> @@ -82,6 +132,8 @@
->>>   * @clk:		clock for this adc instance
->>>   * @irq:		interrupt for this adc instance
->>>   * @lock:		spinlock
->>> + * @bufi:		data buffer index
->>> + * @num_conv:		expected number of scan conversions
->>>   */
->>>  struct stm32_adc {
->>>  	struct stm32_adc_common	*common;
->>> @@ -91,6 +143,8 @@ struct stm32_adc {
->>>  	struct clk		*clk;
->>>  	int			irq;
->>>  	spinlock_t		lock;		/* interrupt lock */
->>> +	int			bufi;
->>> +	int			num_conv;
->>>  };
->>>  
->>>  /**
->>> @@ -105,6 +159,18 @@ struct stm32_adc_chan_spec {
->>>  	const char		*name;
->>>  };
->>>  
->>> +/**
->>> + * stm32_adc_regs - stm32 ADC misc registers & bitfield desc
->>> + * @reg:		register offset
->>> + * @mask:		bitfield mask
->>> + * @shift:		left shift
->>> + */
->>> +struct stm32_adc_regs {
->>> +	int reg;
->>> +	int mask;
->>> +	int shift;
->> You could use the FIELD_PREP macro to avoid having to store both the mask
->> and shift.  Up to you though as definitely a matter for personal taste!
-> 
-> Thanks for pointing this out. I haven't noticed these macros before that.
-> But this applies only to compile-time constant. This cannot be used with bellow
-> array.
-> 
->>> +};
->>> +
->>>  /* Input definitions common for all STM32F4 instances */
->>>  static const struct stm32_adc_chan_spec stm32f4_adc123_channels[] = {
->>>  	{ IIO_VOLTAGE, 0, "in0" },
->>> @@ -126,6 +192,33 @@ struct stm32_adc_chan_spec {
->>>  };
->>>  
->>>  /**
->>> + * stm32f4_sqr_regs - describe regular sequence registers
->>> + * - L: sequence len (register & bit field)
->>> + * - SQ1..SQ16: sequence entries (register & bit field)
->>> + */
->>> +static const struct stm32_adc_regs stm32f4_sqr_regs[STM32_ADC_MAX_SQ + 1] = {
->>> +	/* L: len bit field description to be kept as first element */
->>> +	{ STM32F4_ADC_SQR1, STM32F4_L_MASK, STM32F4_L_SHIFT },
->>> +	/* SQ1..SQ16 registers & bit fields */
->>> +	{ STM32F4_ADC_SQR3, STM32F4_SQ1_MASK, STM32F4_SQ1_SHIFT },
->>> +	{ STM32F4_ADC_SQR3, STM32F4_SQ2_MASK, STM32F4_SQ2_SHIFT },
->>> +	{ STM32F4_ADC_SQR3, STM32F4_SQ3_MASK, STM32F4_SQ3_SHIFT },
->>> +	{ STM32F4_ADC_SQR3, STM32F4_SQ4_MASK, STM32F4_SQ4_SHIFT },
->>> +	{ STM32F4_ADC_SQR3, STM32F4_SQ5_MASK, STM32F4_SQ5_SHIFT },
->>> +	{ STM32F4_ADC_SQR3, STM32F4_SQ6_MASK, STM32F4_SQ6_SHIFT },
->>> +	{ STM32F4_ADC_SQR2, STM32F4_SQ7_MASK, STM32F4_SQ7_SHIFT },
->>> +	{ STM32F4_ADC_SQR2, STM32F4_SQ8_MASK, STM32F4_SQ8_SHIFT },
->>> +	{ STM32F4_ADC_SQR2, STM32F4_SQ9_MASK, STM32F4_SQ9_SHIFT },
->>> +	{ STM32F4_ADC_SQR2, STM32F4_SQ10_MASK, STM32F4_SQ10_SHIFT },
->>> +	{ STM32F4_ADC_SQR2, STM32F4_SQ11_MASK, STM32F4_SQ11_SHIFT },
->>> +	{ STM32F4_ADC_SQR2, STM32F4_SQ12_MASK, STM32F4_SQ12_SHIFT },
->>> +	{ STM32F4_ADC_SQR1, STM32F4_SQ13_MASK, STM32F4_SQ13_SHIFT },
->>> +	{ STM32F4_ADC_SQR1, STM32F4_SQ14_MASK, STM32F4_SQ14_SHIFT },
->>> +	{ STM32F4_ADC_SQR1, STM32F4_SQ15_MASK, STM32F4_SQ15_SHIFT },
->>> +	{ STM32F4_ADC_SQR1, STM32F4_SQ16_MASK, STM32F4_SQ16_SHIFT },
->>> +};
->>> +
->>> +/**
->>>   * STM32 ADC registers access routines
->>>   * @adc: stm32 adc instance
->>>   * @reg: reg offset in adc instance
->>> @@ -211,6 +304,106 @@ static void stm32_adc_stop_conv(struct stm32_adc *adc)
->>>  }
->>>  
->>>  /**
->>> + * stm32_adc_conf_scan_seq() - Build regular channels scan sequence
->>> + * @indio_dev: IIO device
->>> + * @scan_mask: channels to be converted
->>> + *
->>> + * Conversion sequence :
->>> + * Configure ADC scan sequence based on selected channels in scan_mask.
->>> + * Add channels to SQR registers, from scan_mask LSB to MSB, then
->>> + * program sequence len.
->>> + */
->>> +static int stm32_adc_conf_scan_seq(struct iio_dev *indio_dev,
->>> +				   const unsigned long *scan_mask)
->>> +{
->>> +	struct stm32_adc *adc = iio_priv(indio_dev);
->>> +	const struct iio_chan_spec *chan;
->>> +	u32 val, bit;
->>> +	int i = 0;
->>> +
->>> +	for_each_set_bit(bit, scan_mask, indio_dev->masklength) {
->>> +		chan = indio_dev->channels + bit;
->>> +		/*
->>> +		 * Assign one channel per SQ entry in regular
->>> +		 * sequence, starting with SQ1.
->>> +		 */
->>> +		i++;
->>> +		if (i > STM32_ADC_MAX_SQ)
->>> +			return -EINVAL;
->>> +
->>> +		dev_dbg(&indio_dev->dev, "%s chan %d to SQ%d\n",
->>> +			__func__, chan->channel, i);
->>> +
->>> +		val = stm32_adc_readl(adc, stm32f4_sqr_regs[i].reg);
->>> +		val &= ~stm32f4_sqr_regs[i].mask;
->>> +		val |= chan->channel << stm32f4_sqr_regs[i].shift;
->>> +		stm32_adc_writel(adc, stm32f4_sqr_regs[i].reg, val);
->>> +	}
->>> +
->>> +	if (!i)
->>> +		return -EINVAL;
->>> +
->>> +	/* Sequence len */
->>> +	val = stm32_adc_readl(adc, stm32f4_sqr_regs[0].reg);
->>> +	val &= ~stm32f4_sqr_regs[0].mask;
->>> +	val |= ((i - 1) << stm32f4_sqr_regs[0].shift);
->>> +	stm32_adc_writel(adc, stm32f4_sqr_regs[0].reg, val);
->>> +
->>> +	return 0;
->>> +}
->>> +
->>> +/**
->>> + * stm32_adc_get_trig_extsel() - Get external trigger selection
->>> + * @indio_dev: IIO device
->>> + * @trig: trigger
->>> + *
->>> + * Returns trigger extsel value, if trig matches, -EINVAL otherwise.
->>> + */
->>> +static int stm32_adc_get_trig_extsel(struct iio_dev *indio_dev,
->>> +				     struct iio_trigger *trig)
->>> +{
->>> +	return -EINVAL;
->> ?????
-> 
-> Sorry about that... I've split into separate patches to ease the review.
-> I agree this is miss-leading on first sight.
-> Would you like me to squash patch 2 into this ?
-> Or I can put a temporary comment here, removed then in patch 2...
-> Or keep it as it is... please let me know if this matters.
-This is fine. Perhaps a comment in the patch description?
-> 
->>> +}
->>> +
->>> +/**
->>> + * stm32_adc_set_trig() - Set a regular trigger
->>> + * @indio_dev: IIO device
->>> + * @trig: IIO trigger
->>> + *
->>> + * Set trigger source/polarity (e.g. SW, or HW with polarity) :
->>> + * - if HW trigger disabled (e.g. trig == NULL, conversion launched by sw)
->>> + * - if HW trigger enabled, set source & polarity
->>> + */
->>> +static int stm32_adc_set_trig(struct iio_dev *indio_dev,
->>> +			      struct iio_trigger *trig)
->>> +{
->>> +	struct stm32_adc *adc = iio_priv(indio_dev);
->>> +	u32 val, extsel = 0, exten = STM32_EXTEN_SWTRIG;
->>> +	unsigned long flags;
->>> +	int ret;
->>> +
->>> +	if (trig) {
->>> +		ret = stm32_adc_get_trig_extsel(indio_dev, trig);
->>> +		if (ret < 0)
->>> +			return ret;
->>> +
->>> +		/* set trigger source, default to rising edge */
->> Interesting.  The complexity of this device kicks in again.
->>
->> If we are talking true exposed hardware pin (which I think it can be?) then
->> this ought to come from DT.  For the case of trigging on either edge of the
->> pwm style signals, we probably want to figure some way of allowing userspace
->> to control this.  For now in either case this is fine though! Got to start
->> somewhere.
-> 
-> You're completely right. I haven't included support for "exti" trigger (e.g. exti gpio)
-> in this patchset (only pwm/timers).
-> But this would make sense to set polarity in dt in this case. I'll think about this.
-> I'm opened to suggestion, but if you're okay, i'll keep this for now.
-Fine to start with a default, but later ideally make the polarity of this trigger
-at least configurable in DT.
-> 
->>> +		extsel = ret;
->>> +		exten = STM32_EXTEN_HWTRIG_RISING_EDGE;
->>> +	}
->>> +
->>> +	spin_lock_irqsave(&adc->lock, flags);
->>> +	val = stm32_adc_readl(adc, STM32F4_ADC_CR2);
->>> +	val &= ~(STM32F4_EXTEN_MASK | STM32F4_EXTSEL_MASK);
->>> +	val |= exten << STM32F4_EXTEN_SHIFT;
->>> +	val |= extsel << STM32F4_EXTSEL_SHIFT;
->>> +	stm32_adc_writel(adc, STM32F4_ADC_CR2, val);
->>> +	spin_unlock_irqrestore(&adc->lock, flags);
->>> +
->>> +	return 0;
->>> +}
->>> +
->>> +/**
->>>   * stm32_adc_single_conv() - Performs a single conversion
->>>   * @indio_dev: IIO device
->>>   * @chan: IIO channel
->>> @@ -234,6 +427,7 @@ static int stm32_adc_single_conv(struct iio_dev *indio_dev,
->>>  	reinit_completion(&adc->completion);
->>>  
->>>  	adc->buffer = &result;
->>> +	adc->bufi = 0;
->>>  
->>>  	/* Program chan number in regular sequence */
->>>  	val = stm32_adc_readl(adc, STM32F4_ADC_SQR3);
->>> @@ -301,17 +495,58 @@ static int stm32_adc_read_raw(struct iio_dev *indio_dev,
->>>  static irqreturn_t stm32_adc_isr(int irq, void *data)
->>>  {
->>>  	struct stm32_adc *adc = data;
->>> +	struct iio_dev *indio_dev = iio_priv_to_dev(adc);
->>>  	u32 status = stm32_adc_readl(adc, STM32F4_ADC_SR);
->>>  
->>>  	if (status & STM32F4_EOC) {
->>> -		*adc->buffer = stm32_adc_readw(adc, STM32F4_ADC_DR);
->>> -		complete(&adc->completion);
->> Normally I'd have put the separation between trigger and device a bit
->> earlier and had the actual reads in the function called by iio_trigger_poll
->> (and here after the wait for completion for the sysfs reads).
->>
->> I think it will make little practical difference, but it will conform better
->> to the data flow model (that kicks around in my head and has been in various
->> presentations others have done) of the trigger indicating either:
->> 1. Data ready
->> 2. Data should be ready - i.e. grab it now if on demand.
->>
->> The device side is responsible for then actually doing the read.
->>
->> Code wise I think this means moving a few lines but I may have missed some
->> details.
-> 
-> 1 - yes, for sysfs read, as ADC is converting a single value, Data Register
-> (DR) read can be moved after the wait for completion. I haven't thought about it
-> in the original patchset.
-> Then, only slight change would be to mask EOC interrupt here, or clear EOC flag,
-> because reading DR from ISR plays a dual role:
-> - actual data read
-> - clear EOC status flag.
-> I'll add a comment to mention this.
-EOC should only be cleared after the read - even if that is sometime later.
-> 
-> I don't see improvement in doing this, but I can update this for single (raw) conversion.
-Yeah, not improvement when looking at this one driver - it's more about
-conforming to a general structure shared by many drivers.
-> 
-> 2 - But, regarding buffer mode, when converting sequence of two or more channels,
-> I'm not sure this is achievable: there is no internal fifo in ADC hardware IP.
-> Then it needs one interrupt per channel (or use DMA).
-Sadly this is quite common.  Usually result is that we only support this sort
-of buffered reading of one channel at a time.
+Hi Jacek,
 
-Presumably such a sequence of channels needs a separate trigger for each channel
-capture as well?
-> Once channel group has been converted, iio_trigger_poll() can be called.
-> So I need to fill buffer from the ISR (actual read), for each channel.
-hmm. Fair enough I suppose.
+thanks for your effort on reviewing
+I has given these idea about your questions inline below
+and will fix up these explicit mistakes in the next version. 
 
-The classic way around this on simpler devices is to just not have the trigger
-at all. Here however, we need it because the part itself supports a range
-of different triggers.
+thanks again
+
+On Tue, 2017-01-24 at 23:51 +0100, Jacek Anaszewski wrote:
+> Hi Sean,
 > 
-> In the end, it's advised to use DMA, especially when converting at 'high' rates
-> or with two or more channels, to free up some CPU load, and avoid possible
-> overun.
+> Thanks for the patch. Please find my comments in the code below.
 > 
-> Shall I add comment to describe this here ?
-Yes a comment might make this clear when we see it again in the future.
-> Do you agree to keep this part of ISR as it is now ?
-Ok. Leave it as it is, but a few comments explaining the logic will hopefully
-allow us to follow it later without having to find this email thread!
+> On 01/23/2017 04:54 AM, sean.wang at mediatek.com wrote:
+> > From: Sean Wang <sean.wang@mediatek.com>
+> > 
+> > MT6323 PMIC is a multi-function device that includes
+> > LED function. It allows attaching upto 4 LEDs which can
 > 
->>> +		adc->buffer[adc->bufi] = stm32_adc_readw(adc, STM32F4_ADC_DR);
->>> +		if (iio_buffer_enabled(indio_dev)) {
->>> +			adc->bufi++;
->>> +			if (adc->bufi >= adc->num_conv) {
->>> +				stm32_adc_conv_irq_disable(adc);
->>> +				iio_trigger_poll(indio_dev->trig);
->>> +			}
->>> +		} else {
->>> +			complete(&adc->completion);
->>> +		}
->>>  		return IRQ_HANDLED;
->>>  	}
->>>  
->>>  	return IRQ_NONE;
->>>  }
->>>  
->>> +/**
->>> + * stm32_adc_validate_trigger() - validate trigger for stm32 adc
->>> + * @indio_dev: IIO device
->>> + * @trig: new trigger
->>> + *
->>> + * Returns: 0 if trig matches one of the triggers registered by stm32 adc
->>> + * driver, -EINVAL otherwise.
->>> + */
->>> +static int stm32_adc_validate_trigger(struct iio_dev *indio_dev,
->>> +				      struct iio_trigger *trig)
->>> +{
->>> +	return stm32_adc_get_trig_extsel(indio_dev, trig) < 0 ? -EINVAL : 0;
->>> +}
->>> +
->>> +static int stm32_adc_update_scan_mode(struct iio_dev *indio_dev,
->>> +				      const unsigned long *scan_mask)
->>> +{
->>> +	struct stm32_adc *adc = iio_priv(indio_dev);
->>> +	int ret;
->>> +	u32 bit;
->>> +
->>> +	adc->num_conv = 0;
->>> +	for_each_set_bit(bit, scan_mask, indio_dev->masklength)
->>> +		adc->num_conv++;
->> Isn't there a count bits function? bitmap_weight I think which using the
->> hamming weight.
-> I'll fix this.
+> s/upto/up to/
 > 
->>> +
->>> +	ret = stm32_adc_conf_scan_seq(indio_dev, scan_mask);
->>> +	if (ret)
->>> +		return ret;
->>> +
->>> +	return 0;
->>> +}
->>> +
->>>  static int stm32_adc_of_xlate(struct iio_dev *indio_dev,
->>>  			      const struct of_phandle_args *iiospec)
->>>  {
->>> @@ -350,11 +585,106 @@ static int stm32_adc_debugfs_reg_access(struct iio_dev *indio_dev,
->>>  
->>>  static const struct iio_info stm32_adc_iio_info = {
->>>  	.read_raw = stm32_adc_read_raw,
->>> +	.validate_trigger = stm32_adc_validate_trigger,
->>> +	.update_scan_mode = stm32_adc_update_scan_mode,
->>>  	.debugfs_reg_access = stm32_adc_debugfs_reg_access,
->>>  	.of_xlate = stm32_adc_of_xlate,
->>>  	.driver_module = THIS_MODULE,
->>>  };
->>>  
->>> +static int stm32_adc_buffer_preenable(struct iio_dev *indio_dev)
->>> +{
->>> +	struct stm32_adc *adc = iio_priv(indio_dev);
->>> +
->>> +	/* Reset adc buffer index */
->>> +	adc->bufi = 0;
->>> +
->>> +	/* Allocate adc buffer */
->>> +	adc->buffer = kzalloc(indio_dev->scan_bytes, GFP_KERNEL);
->> Is this big enough to justify a separate allocation?  I'd be tempted to
->> just allocate the maximum possible size as part of the stm32_adc structure..
+will be fixed
+
+> > either be on, off or dimmed and/or blinked with the the
+> > controller.
+> > 
+> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> > ---
+> >  drivers/leds/Kconfig       |   8 +
+> >  drivers/leds/Makefile      |   1 +
+> >  drivers/leds/leds-mt6323.c | 391 +++++++++++++++++++++++++++++++++++++++++++++
+> >  3 files changed, 400 insertions(+)
+> >  create mode 100644 drivers/leds/leds-mt6323.c
+> > 
+> > diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
+> > index c621cbb..30095fc 100644
+> > --- a/drivers/leds/Kconfig
+> > +++ b/drivers/leds/Kconfig
+> > @@ -117,6 +117,14 @@ config LEDS_MIKROTIK_RB532
+> >  	  This option enables support for the so called "User LED" of
+> >  	  Mikrotik's Routerboard 532.
+> >  
+> > +config LEDS_MT6323
+> > +	tristate "LED Support for Mediatek MT6323 PMIC"
+> > +	depends on LEDS_CLASS
+> > +	depends on MFD_MT6397
+> > +
+> > +	help
+> > +	  This option enables support for on-chip LED drivers found on
+> > +	  Mediatek MT6323 PMIC.
+> > +
+> >  config LEDS_S3C24XX
+> >  	tristate "LED Support for Samsung S3C24XX GPIO LEDs"
+> >  	depends on LEDS_CLASS
+> > diff --git a/drivers/leds/Makefile b/drivers/leds/Makefile
+> > index 6b82737..4feb332 100644
+> > --- a/drivers/leds/Makefile
+> > +++ b/drivers/leds/Makefile
+> > @@ -72,6 +72,7 @@ obj-$(CONFIG_LEDS_IS31FL32XX)		+= leds-is31fl32xx.o
+> >  obj-$(CONFIG_LEDS_PM8058)		+= leds-pm8058.o
+> >  obj-$(CONFIG_LEDS_MLXCPLD)		+= leds-mlxcpld.o
+> >  obj-$(CONFIG_LEDS_NIC78BX)		+= leds-nic78bx.o
+> > +obj-$(CONFIG_LEDS_MT6323)		+= leds-mt6323.o
+> >  
+> >  # LED SPI Drivers
+> >  obj-$(CONFIG_LEDS_DAC124S085)		+= leds-dac124s085.o
+> > diff --git a/drivers/leds/leds-mt6323.c b/drivers/leds/leds-mt6323.c
+> > new file mode 100644
+> > index 0000000..de3006d
+> > --- /dev/null
+> > +++ b/drivers/leds/leds-mt6323.c
+> > @@ -0,0 +1,391 @@
+> > +/*
+> > + * LED driver for Mediatek MT6323 PMIC
+> > + *
+> > + * Copyright (C) 2017 Sean Wang <sean.wang@mediatek.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > + * modify it under the terms of the GNU General Public License as
+> > + * published by the Free Software Foundation; either version 2 of
+> > + * the License, or (at your option) any later version.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +
+> > +#include <linux/kernel.h>
+> > +#include <linux/of.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/leds.h>
+> > +#include <linux/regmap.h>
+> > +#include <linux/mfd/mt6397/core.h>
+> > +#include <linux/mfd/mt6323/registers.h>
+> > +#include <linux/module.h>
 > 
-> So, you advise probe-time allocation for this buffer, why not ? :-)
-> This would allow to simplify handling here, possibly remove preenable/postdisable
-> routines.
-> I'll do this in next patchset.
-Quite.  Funilly enough this is one of the most common things to come up
-in review.  People tend to forget that typically when you ask for a small allocation
-you get a larger one anyway so the saving of making it exactly the right size
-is very small if anything.
+> Please sort include directives alphabetically.
 > 
->>> +	if (!adc->buffer)
->>> +		return -ENOMEM;
->>> +
->>> +	return 0;
->>> +}
->>> +
->>> +static int stm32_adc_buffer_postenable(struct iio_dev *indio_dev)
->>> +{
->>> +	struct stm32_adc *adc = iio_priv(indio_dev);
->>> +	int ret;
->>> +
->>> +	ret = stm32_adc_set_trig(indio_dev, indio_dev->trig);
->>> +	if (ret) {
->>> +		dev_err(&indio_dev->dev, "Can't set trigger\n");
->>> +		return ret;
->>> +	}
->>> +
->>> +	ret = iio_triggered_buffer_postenable(indio_dev);
->>> +	if (ret < 0)
->> Handle unwinding of previous calls if this fails.
-> I'll fix this.
+will be fixed
+
+> > +
+> > +/* Register to enable 32K clock common for LED device */
+> > +#define MTK_MT6323_TOP_CKPDN0         0x0102
 > 
-> Thanks again, Regards,
-> Fabrice
+> How about dropping MTK and leaving MT6323 prefix?
+> The same applies to the other macros.
+
+MT6323_TOP_CKPDN0 had been defined in regulator header files
+but your idea is good where reusing them is better . 
+
+Will be enhanced.
+
+
+> > +#define RG_DRV_32K_CK_PDN	      BIT(11)
+> > +#define RG_DRV_32K_CK_PDN_MASK	      BIT(11)
 > 
->>> +		return ret;
->>> +
->>> +	stm32_adc_conv_irq_enable(adc);
->>> +	stm32_adc_start_conv(adc);
->>> +
->>> +	return 0;
->>> +}
->>> +
->>> +static int stm32_adc_buffer_predisable(struct iio_dev *indio_dev)
->>> +{
->>> +	struct stm32_adc *adc = iio_priv(indio_dev);
->>> +	int ret;
->>> +
->>> +	stm32_adc_stop_conv(adc);
->>> +	stm32_adc_conv_irq_disable(adc);
->>> +
->>> +	ret = iio_triggered_buffer_predisable(indio_dev);
->>> +	if (ret < 0)
->>> +		return ret;
->>> +
->>> +	ret = stm32_adc_set_trig(indio_dev, NULL);
->>> +	if (ret)
->>> +		dev_err(&indio_dev->dev, "Can't clear trigger\n");
->>> +
->>> +	return ret;
->>> +}
->>> +
->>> +static int stm32_adc_buffer_postdisable(struct iio_dev *indio_dev)
->>> +{
->>> +	struct stm32_adc *adc = iio_priv(indio_dev);
->>> +
->>> +	kfree(adc->buffer);
->>> +	adc->buffer = NULL;
->>> +
->>> +	return 0;
->>> +}
->>> +
->>> +static const struct iio_buffer_setup_ops stm32_adc_buffer_setup_ops = {
->>> +	.preenable = &stm32_adc_buffer_preenable,
->>> +	.postenable = &stm32_adc_buffer_postenable,
->>> +	.predisable = &stm32_adc_buffer_predisable,
->>> +	.postdisable = &stm32_adc_buffer_postdisable,
->>> +};
->>> +
->>> +static irqreturn_t stm32_adc_trigger_handler(int irq, void *p)
->>> +{
->>> +	struct iio_poll_func *pf = p;
->>> +	struct iio_dev *indio_dev = pf->indio_dev;
->>> +	struct stm32_adc *adc = iio_priv(indio_dev);
->>> +
->>> +	dev_dbg(&indio_dev->dev, "%s bufi=%d\n", __func__, adc->bufi);
->>> +
->>> +	/* reset buffer index */
->>> +	adc->bufi = 0;
->>> +	iio_push_to_buffers_with_timestamp(indio_dev, adc->buffer,
->>> +					   pf->timestamp);
->>> +
->>> +	iio_trigger_notify_done(indio_dev->trig);
->>> +
->>> +	/* re-enable eoc irq */
->>> +	stm32_adc_conv_irq_enable(adc);
->>> +
->>> +	return IRQ_HANDLED;
->>> +}
->>> +
->>>  static void stm32_adc_chan_init_one(struct iio_dev *indio_dev,
->>>  				    struct iio_chan_spec *chan,
->>>  				    const struct stm32_adc_chan_spec *channel,
->>> @@ -471,14 +801,26 @@ static int stm32_adc_probe(struct platform_device *pdev)
->>>  	if (ret < 0)
->>>  		goto err_clk_disable;
->>>  
->>> +	ret = iio_triggered_buffer_setup(indio_dev,
->>> +					 &iio_pollfunc_store_time,
->>> +					 &stm32_adc_trigger_handler,
->>> +					 &stm32_adc_buffer_setup_ops);
->>> +	if (ret) {
->>> +		dev_err(&pdev->dev, "buffer setup failed\n");
->>> +		goto err_clk_disable;
->>> +	}
->>> +
->>>  	ret = iio_device_register(indio_dev);
->>>  	if (ret) {
->>>  		dev_err(&pdev->dev, "iio dev register failed\n");
->>> -		goto err_clk_disable;
->>> +		goto err_buffer_cleanup;
->>>  	}
->>>  
->>>  	return 0;
->>>  
->>> +err_buffer_cleanup:
->>> +	iio_triggered_buffer_cleanup(indio_dev);
->>> +
->>>  err_clk_disable:
->>>  	clk_disable_unprepare(adc->clk);
->>>  
->>> @@ -491,6 +833,7 @@ static int stm32_adc_remove(struct platform_device *pdev)
->>>  	struct iio_dev *indio_dev = iio_priv_to_dev(adc);
->>>  
->>>  	iio_device_unregister(indio_dev);
->>> +	iio_triggered_buffer_cleanup(indio_dev);
->>>  	clk_disable_unprepare(adc->clk);
->>>  
->>>  	return 0;
->>>
+> These macros also require MT6323 prefix.
+
+Will be enhanced
+
+> > +
+> > +/* Register to enable individual clock for LED device */
+> > +#define MTK_MT6323_TOP_CKPDN2         0x010E
+> > +#define RG_ISINK_CK_PDN(i)	      BIT(i)
+> > +#define RG_ISINK_CK_PDN_MASK(i)       BIT(i)
+> > +
+> > +/* Register to select clock source */
+> > +#define MTK_MT6323_TOP_CKCON1	      0x0126
+> > +#define RG_ISINK_CK_SEL_MASK(i)	      (BIT(10) << (i))
+> > +
+> > +/* Register to setup the duty cycle of the blink */
+> > +#define MTK_MT6323_ISINK_CON0(i)      (0x0330 + 0x8 * (i))
+> > +#define ISINK_DIM_DUTY(i)	      (((i) << 8) & GENMASK(12, 8))
+> > +#define ISINK_DIM_DUTY_MASK	      GENMASK(12, 8)
+> > +
+> > +/* Register to setup the period of the blink */
+> > +#define MTK_MT6323_ISINK_CON1(i)      (0x0332 + 0x8 * (i))
+> > +#define ISINK_DIM_FSEL(i)	      ((i) & GENMASK(15, 0))
+> > +#define ISINK_DIM_FSEL_MASK	      GENMASK(15, 0)
+> > +
+> > +/* Register to control the brightness */
+> > +#define MTK_MT6323_ISINK_CON2(i)      (0x0334 + 0x8 * (i))
+> > +#define ISINK_CH_STEP(i)	      (((i) << 12) & GENMASK(14, 12))
+> > +#define ISINK_CH_STEP_MASK	      GENMASK(14, 12)
+> > +#define ISINK_SFSTR0_TC(i)	      (((i) << 1) & GENMASK(2, 1))
+> > +#define ISINK_SFSTR0_TC_MASK	      GENMASK(2, 1)
+> > +#define ISINK_SFSTR0_EN		      BIT(0)
+> > +#define ISINK_SFSTR0_EN_MASK	      BIT(0)
+> > +
+> > +/* Register to LED channel enablement */
+> > +#define MTK_MT6323_ISINK_EN_CTRL      0x0356
+> > +#define ISINK_CH_EN(i)		      BIT(i)
+> > +#define ISINK_CH_EN_MASK(i)	      BIT(i)
+> > +
+> > +#define MTK_MAX_PERIOD		      10000
+> > +#define MTK_MAX_DEVICES			  4
+> > +#define MTK_MAX_BRIGHTNESS		  6
+> > +
+> > +struct mtk_led;
 > 
+> This is redundant.
+> 
+Will be fixed
+
+> > +struct mtk_leds;
+> > +
+> > +/**
+> > + * struct mtk_led - state container for the LED device
+> > + * @id: the identifier in MT6323 LED device
+> > + * @parent: the pointer to MT6323 LED controller
+> > + * @cdev: LED class device for this LED device
+> > + * @current_brightness: current state of the LED device
+> > + */
+> > +struct mtk_led {
+> > +	int    id;
+> > +	struct mtk_leds *parent;
+> > +	struct led_classdev cdev;
+> > +	u8 current_brightness;
+> > +};
+> > +
+> > +/* struct mtk_leds -	state container for holding LED controller
+> 
+> Please stick to the kernel doc format consistently:
+> 
+> /**
+>  *
+
+Will be fixed
+
+> > + *			of the driver
+> > + * @dev:		The device pointer
+> > + * @hw:			The underlying hardware providing shared
+> > +			bus for the register operations
+> 
+> leading " *" is missing here
+> 
+
+Will be fixed
+
+> > + * @led_num:		How much the LED device the controller could control
+> > + * @lock:		The lock among process context
+> > + * @led:		The array that contains the state of individual
+> > +			LED device
+> 
+> Ditto.
+> 
+
+Will be fixed
+
+> > + */
+> > +struct mtk_leds {
+> > +	struct device	*dev;
+> > +	struct mt6397_chip *hw;
+> > +	u8     led_num;
+> > +	/* protect among process context */
+> > +	struct mutex	 lock;
+> > +	struct mtk_led	 led[4];
+> > +};
+> > +
+> > +static void mtk_led_hw_off(struct led_classdev *cdev)
+> > +{
+> > +	struct mtk_led *led = container_of(cdev, struct mtk_led, cdev);
+> > +	struct mtk_leds *leds = led->parent;
+> > +	struct regmap *regmap = leds->hw->regmap;
+> > +	unsigned int status;
+> > +
+> > +	status = ISINK_CH_EN(led->id);
+> > +	regmap_update_bits(regmap, MTK_MT6323_ISINK_EN_CTRL,
+> > +			   ISINK_CH_EN_MASK(led->id), ~status);
+> 
+> Let's check return value. The same applies the other occurrences
+> of regmap API calls.
+
+
+Will be fixed and applied to all the occurrences where regmap API being 
+used.
+
+> > +
+> > +	usleep_range(100, 300);
+> 
+> Just out of curiosity - does the data sheet mention it or is it inferred
+> empirically?
+> 
+
+it comes from that inferred empirically. 
+leds can't being light on if without the delay
+
+> > +	regmap_update_bits(regmap, MTK_MT6323_TOP_CKPDN2,
+> > +			   RG_ISINK_CK_PDN_MASK(led->id),
+> > +			   RG_ISINK_CK_PDN(led->id));
+> > +
+> > +	dev_dbg(leds->dev, "%s called for led%d\n",
+> > +		__func__, led->id);
+> 
+> Let's remove this debug logging.
+> 
+
+will be removed 
+
+> > +}
+> > +
+> > +static u8 get_mtk_led_hw_brightness(struct led_classdev *cdev)
+> > +{
+> > +	struct mtk_led *led = container_of(cdev, struct mtk_led, cdev);
+> > +	struct mtk_leds *leds = led->parent;
+> > +	struct regmap *regmap = leds->hw->regmap;
+> > +	unsigned int status;
+> > +
+> > +	regmap_read(regmap, MTK_MT6323_TOP_CKPDN2, &status);
+> > +	if (status & RG_ISINK_CK_PDN_MASK(led->id))
+> > +		return 0;
+> > +
+> > +	regmap_read(regmap, MTK_MT6323_ISINK_EN_CTRL, &status);
+> > +	if (!(status & ISINK_CH_EN(led->id)))
+> > +		return 0;
+> > +
+> > +	regmap_read(regmap, MTK_MT6323_ISINK_CON2(led->id), &status);
+> > +	return  ((status & ISINK_CH_STEP_MASK) >> 12) + 1;
+> 
+> What is 12? Please add a macro for it.
+> 
+
+will be fixed
+
+> > +}
+> > +
+> > +static void mtk_led_hw_on(struct led_classdev *cdev)
+> > +{
+> > +	struct mtk_led *led = container_of(cdev, struct mtk_led, cdev);
+> > +	struct mtk_leds *leds = led->parent;
+> > +	struct regmap *regmap = leds->hw->regmap;
+> > +	unsigned int status;
+> > +
+> > +	/* Setup required clock source, enable the corresponding
+> 
+> Kernel style comments please:
+> 
+> /*
+>  *
+>  */
+> The same applies to the other occurrences thereof.
+> Refer to Documentation/process/coding-style.rst (chapter 8).
+> 
+
+will be fixed and applied to all occurrences
+
+> > +	 * clock and channel and let work with continuous blink as
+> > +	 * the default
+> > +	 */
+> > +	regmap_update_bits(regmap, MTK_MT6323_TOP_CKCON1,
+> > +			   RG_ISINK_CK_SEL_MASK(led->id), 0);
+> > +
+> > +	status = RG_ISINK_CK_PDN(led->id);
+> > +	regmap_update_bits(regmap, MTK_MT6323_TOP_CKPDN2,
+> > +			   RG_ISINK_CK_PDN_MASK(led->id), ~status);
+> > +
+> > +	usleep_range(100, 300);
+> > +
+> > +	regmap_update_bits(regmap, MTK_MT6323_ISINK_EN_CTRL,
+> > +			   ISINK_CH_EN_MASK(led->id),
+> > +			   ISINK_CH_EN(led->id));
+> > +
+> > +	regmap_update_bits(regmap, MTK_MT6323_ISINK_CON2(led->id),
+> > +			   ISINK_CH_STEP_MASK,
+> > +			   ISINK_CH_STEP(1));
+> > +
+> > +	regmap_update_bits(regmap, MTK_MT6323_ISINK_CON0(led->id),
+> > +			   ISINK_DIM_DUTY_MASK, ISINK_DIM_DUTY(31));
+> > +
+> > +	regmap_update_bits(regmap, MTK_MT6323_ISINK_CON1(led->id),
+> > +			   ISINK_DIM_FSEL_MASK, ISINK_DIM_FSEL(1000));
+> > +
+> > +	led->current_brightness = 1;
+> > +
+> > +	dev_dbg(leds->dev, "%s called for led%d\n",
+> > +		__func__, led->id);
+> 
+> Let's remove this debug logging.
+> 
+
+will be removed
+
+> > +}
+> > +
+> > +static int mtk_led_set_blink(struct led_classdev *cdev,
+> > +			     unsigned long *delay_on,
+> > +			     unsigned long *delay_off)
+> > +{
+> > +	struct mtk_led *led = container_of(cdev, struct mtk_led, cdev);
+> > +	struct mtk_leds *leds = led->parent;
+> > +	struct regmap *regmap = leds->hw->regmap;
+> > +	u16 period;
+> > +	u8 duty_cycle, duty_hw;
+> > +
+> > +	/* Units are in ms , if over the hardware able
+> > +	 * to support, fallback into software blink
+> > +	 */
+> > +	if (*delay_on + *delay_off > MTK_MAX_PERIOD)
+> > +		return -EINVAL;
+> > +
+> > +	/* LED subsystem requires a default user
+> > +	 * friendly blink pattern for the LED so using
+> > +	 * 1Hz duty cycle 50% here if without specific
+> > +	 * value delay_on and delay off being assigned
+> > +	 */
+> > +	if (*delay_on == 0 && *delay_off == 0) {
+> > +		*delay_on = 500;
+> > +		*delay_off = 500;
+> > +	}
+> > +
+> > +	period = *delay_on + *delay_off;
+> > +
+> > +	/* duty_cycle is the percentage of period during
+> > +	 * which the led is ON
+> > +	 */
+> > +	duty_cycle = 100 * (*delay_on) / period;
+> > +
+> > +	mutex_lock(&leds->lock);
+> > +
+> > +	if (!led->current_brightness)
+> > +		mtk_led_hw_on(cdev);
+> > +
+> > +	duty_hw = DIV_ROUND_CLOSEST(duty_cycle * 1000, 3125);
+> 
+> Please add a macro for 3125.
+> 
+
+will be fixed
+
+> > +	regmap_update_bits(regmap, MTK_MT6323_ISINK_CON0(led->id),
+> > +			   ISINK_DIM_DUTY_MASK, ISINK_DIM_DUTY(duty_hw));
+> > +
+> > +	regmap_update_bits(regmap, MTK_MT6323_ISINK_CON1(led->id),
+> > +			   ISINK_DIM_FSEL_MASK, ISINK_DIM_FSEL(period - 1));
+> > +
+> > +	mutex_unlock(&leds->lock);
+> > +
+> > +	dev_dbg(leds->dev, "%s: Hardware blink! period=%dms duty=%d for led%d\n",
+> > +		__func__, period, duty_cycle, led->id);
+> 
+> Let's remove this debug logging.
+> 
+
+will be removed
+
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int mtk_led_set_brightness(struct led_classdev *cdev,
+> > +				  enum led_brightness brightness)
+> > +{
+> > +	struct mtk_led *led = container_of(cdev, struct mtk_led, cdev);
+> > +	struct mtk_leds *leds = led->parent;
+> > +	struct regmap *regmap = leds->hw->regmap;
+> > +
+> > +	mutex_lock(&leds->lock);
+> > +
+> > +	if (!led->current_brightness && brightness)
+> > +		mtk_led_hw_on(cdev);
+> > +
+> > +	if (brightness) {
+> > +		/* Setup current output for the corresponding
+> > +		 * brightness level
+> > +		 */
+> > +		regmap_update_bits(regmap, MTK_MT6323_ISINK_CON2(led->id),
+> > +				   ISINK_CH_STEP_MASK,
+> > +				   ISINK_CH_STEP(brightness - 1));
+> > +
+> > +		regmap_update_bits(regmap, MTK_MT6323_ISINK_CON2(led->id),
+> > +				   ISINK_SFSTR0_TC_MASK | ISINK_SFSTR0_EN_MASK,
+> > +				   ISINK_SFSTR0_TC(2) | ISINK_SFSTR0_EN);
+> > +
+> > +		dev_dbg(leds->dev, "Update led brightness:%d\n",
+> > +			brightness);
+> 
+> Let's remove this debug logging.
+> 
+
+will be removed
+
+> > +	}
+> > +
+> > +	if (!brightness)
+> > +		mtk_led_hw_off(cdev);
+> 
+> It could be enclosed in "else " case of the above "if (brightness)"
+> condition.
+> 
+good suggestion. will be enhanced
+
+> > +	led->current_brightness = brightness;
+> > +
+> > +	mutex_unlock(&leds->lock);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int mt6323_led_probe(struct platform_device *pdev)
+> > +{
+> > +	struct device *dev = &pdev->dev;
+> > +	struct device_node *np = pdev->dev.of_node;
+> > +	struct device_node *child;
+> > +	struct mt6397_chip *hw = dev_get_drvdata(pdev->dev.parent);
+> > +	struct mtk_leds *leds;
+> > +	int ret, i = 0, count;
+> > +	const char *state;
+> > +	unsigned int status;
+> > +
+> > +	count = of_get_child_count(np);
+> > +	if (!count)
+> > +		return -ENODEV;
+> > +
+> > +	/* The number the LEDs on MT6323 could be support is
+> > +	 * up to MTK_MAX_DEVICES
+> > +	 */
+> > +	count = (count <= MTK_MAX_DEVICES) ? count : MTK_MAX_DEVICES;
+> > +
+> > +	leds = devm_kzalloc(dev, sizeof(struct mtk_leds) +
+> > +			    sizeof(struct mtk_led) * count,
+> > +			    GFP_KERNEL);
+> > +	if (!leds)
+> > +		return -ENOMEM;
+> > +
+> > +	platform_set_drvdata(pdev, leds);
+> > +	leds->dev = dev;
+> > +
+> > +	/* leds->hw points to the underlying bus for the register
+> > +	 * controlled
+> > +	 */
+> > +	leds->hw = hw;
+> > +	mutex_init(&leds->lock);
+> > +	leds->led_num = count;
+> > +
+> > +	status = RG_DRV_32K_CK_PDN;
+> > +	regmap_update_bits(leds->hw->regmap, MTK_MT6323_TOP_CKPDN0,
+> > +			   RG_DRV_32K_CK_PDN_MASK, ~status);
+> > +
+> > +	/* Waiting for 32K stable prior to give the default value
+> 
+> Could you shed more light on this statement? How data sheet explains
+> that?
+
+it is also from inferred empirically but that could be removed
+because 32k clock should be stable before the hardware is being 
+enabled.
+
+> > +	 * to each LED state decided through these useful common
+> > +	 * propertys such as label, linux,default-trigger and
+> 
+> s/propertys/properties/
+> 
+
+will be fixed
+
+> > +	 * default-state
+> > +	 */
+> > +	usleep_range(300, 500);
+> > +
+> > +	for_each_available_child_of_node(np, child) {
+> > +		leds->led[i].cdev.name =
+> > +			of_get_property(child, "label", NULL) ? :
+> > +					child->name;
+> > +		leds->led[i].cdev.default_trigger = of_get_property(child,
+> > +						    "linux,default-trigger",
+> > +						    NULL);
+> > +		leds->led[i].cdev.max_brightness = MTK_MAX_BRIGHTNESS;
+> > +		leds->led[i].cdev.brightness_set_blocking =
+> > +					mtk_led_set_brightness;
+> > +		leds->led[i].cdev.blink_set = mtk_led_set_blink;
+> > +		leds->led[i].id = i;
+> > +		leds->led[i].parent = leds;
+> > +		state = of_get_property(child, "default-state", NULL);
+> > +		if (state) {
+> > +			if (!strcmp(state, "keep")) {
+> > +				leds->led[i].current_brightness =
+> > +				get_mtk_led_hw_brightness(&leds->led[i].cdev);
+> > +			} else if (!strcmp(state, "on")) {
+> > +				mtk_led_set_brightness(&leds->led[i].cdev, 1);
+> > +			} else  {
+> > +				mtk_led_set_brightness(&leds->led[i].cdev,
+> > +						       0);
+> > +			}
+> > +		}
+> > +		ret = devm_led_classdev_register(dev, &leds->led[i].cdev);
+> > +		if (ret) {
+> > +			dev_err(&pdev->dev, "Failed to register LED: %d\n",
+> > +				ret);
+> > +			return ret;
+> > +		}
+> > +		leds->led[i].cdev.dev->of_node = child;
+> > +		i++;
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int mt6323_led_remove(struct platform_device *pdev)
+> > +{
+> > +	struct mtk_leds *leds = platform_get_drvdata(pdev);
+> > +	int i;
+> > +
+> > +	/* Turned the LED to OFF state if driver removal */
+> 
+> s/if/on/
+
+will be fixed
+> > +	for (i = 0 ; i < leds->led_num ; i++)
+> > +		mtk_led_hw_off(&leds->led[i].cdev);
+> > +
+> > +	regmap_update_bits(leds->hw->regmap, MTK_MT6323_TOP_CKPDN0,
+> > +			   RG_DRV_32K_CK_PDN_MASK, RG_DRV_32K_CK_PDN);
+> 
+> Please add mutex_destroy here.
+> 
+
+will be fixed
+> > +	return 0;
+> > +}
+> > +
+> > +static const struct of_device_id mt6323_led_dt_match[] = {
+> > +	{ .compatible = "mediatek,mt6323-led" },
+> > +	{},
+> > +};
+> > +MODULE_DEVICE_TABLE(of, mt6323_led_dt_match);
+> > +
+> > +static struct platform_driver mt6323_led_driver = {
+> > +	.probe		= mt6323_led_probe,
+> > +	.remove		= mt6323_led_remove,
+> > +	.driver		= {
+> > +		.name	= "mt6323-led",
+> > +		.of_match_table = mt6323_led_dt_match,
+> > +	},
+> > +};
+> > +
+> > +module_platform_driver(mt6323_led_driver);
+> > +
+> > +MODULE_DESCRIPTION("LED driver for Mediatek MT6323 PMIC");
+> > +MODULE_AUTHOR("Sean Wang <sean.wang@mediatek.com>");
+> > +MODULE_LICENSE("GPL v2");
+> 
+> MODULE_LICENSE("GPL") since you are allowing also later version.
+> 
+
+will be fixed
+
+> Please also adress the following sparse warnings:
+> 
+> drivers/leds/leds-mt6323.c:166:9: warning: cast truncates bits from
+> constant value (7ffffffff000 becomes fffff000)
+> drivers/leds/leds-mt6323.c:170:9: warning: cast truncates bits from
+> constant value (1fffffffff00 becomes ffffff00)
+> drivers/leds/leds-mt6323.c:173:9: warning: cast truncates bits from
+> constant value (ffffffffffff becomes ffffffff)
+> drivers/leds/leds-mt6323.c:221:9: warning: cast truncates bits from
+> constant value (1fffffffff00 becomes ffffff00)
+> drivers/leds/leds-mt6323.c:224:9: warning: cast truncates bits from
+> constant value (ffffffffffff becomes ffffffff)
+> drivers/leds/leds-mt6323.c:251:17: warning: cast truncates bits from
+> constant value (7ffffffff000 becomes fffff000)
+> drivers/leds/leds-mt6323.c:255:17: warning: cast truncates bits from
+> constant value (7ffffffff becomes ffffffff
+> 
+
+will be fixed
