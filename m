@@ -1,71 +1,64 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Sat, 28 Jan 2017 10:16:46 +0200
-Subject: [PATCH v5 06/12] mmc: sdhci-xenon: Add Marvell Xenon SDHC core
- functionality
-In-Reply-To: <CAPDyKFqbjeKCHp40PALydquxdF-qBk156+iOS9TYYsquJ7fK7w@mail.gmail.com>
-References: <cover.8527229dae6c124f24c5e637430c2cdc86f80392.1484154449.git-series.gregory.clement@free-electrons.com>
- <3546f143091c121face8ecbcbf7f6a4c41d2cec7.1484154449.git-series.gregory.clement@free-electrons.com>
- <CAPDyKFrwxix4zY4a1x9u6jh_gPfKTsaLnD8b8crum=pc5CN3AA@mail.gmail.com>
- <2e67332d-d8c3-fd24-1f81-72675a09927a@intel.com>
- <CAPDyKFqbjeKCHp40PALydquxdF-qBk156+iOS9TYYsquJ7fK7w@mail.gmail.com>
-Message-ID: <00e8d2dc-bc07-addc-a5d9-8604f143627f@intel.com>
+From: hkallweit1@gmail.com (Heiner Kallweit)
+Date: Sat, 28 Jan 2017 09:18:50 +0100
+Subject: [PATCH] mmc: meson-gx: set max block count to 256
+In-Reply-To: <m2lgtwuzll.fsf@baylibre.com>
+References: <82cf7861-5cf8-302d-5354-435282d95619@gmail.com>
+ <m2lgtwuzll.fsf@baylibre.com>
+Message-ID: <c8f456f5-1722-55d6-58d8-c438d344cbc1@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/01/2017 5:12 p.m., Ulf Hansson wrote:
-> On 26 January 2017 at 13:39, Adrian Hunter <adrian.hunter@intel.com> wrote:
->> On 26/01/17 12:50, Ulf Hansson wrote:
->>> On 11 January 2017 at 18:19, Gregory CLEMENT
->>> <gregory.clement@free-electrons.com> wrote:
->>>> +                       priv->init_card_type = MMC_TYPE_MMC;
->>>> +                       mmc->caps |= MMC_CAP_NONREMOVABLE;
->>>> +
->>>> +                       /*
->>>> +                        * Force to clear BUS_TEST to
->>>> +                        * skip bus_test_pre and bus_test_post
->>>> +                        */
->>>> +                       mmc->caps &= ~MMC_CAP_BUS_WIDTH_TEST;
->>>> +                       mmc->caps2 |= MMC_CAP2_HC_ERASE_SZ |
->>>
->>> This cap is a bit strange. It was added several years ago by Adrian
->>> Hunter, but I am wondering about the reason to why it's needed.
->>>
+Am 27.01.2017 um 19:28 schrieb Kevin Hilman:
+> Heiner Kallweit <hkallweit1@gmail.com> writes:
+> 
+>> So far max_blk_count isn't set what results in a default of value 8
+>> to be used (PAGE_SIZE / block size).
 >>
->> MMC_CAP2_HC_ERASE_SZ relates to EXT-CSD ERASE_GROUP_DEF.
+>> Set max_blk_count to 256 as used in the uboot driver.
 >>
->> I think it was added to enable people to choose whether they wanted a large
->> or small erase granularity.  That probably doesn't matter if the card
->> supports TRIM.
+>> Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
+> 
+> Thanks for the patch. A minor comment below:
+> 
+>> ---
+>>  drivers/mmc/host/meson-gx-mmc.c | 1 +
+>>  1 file changed, 1 insertion(+)
 >>
->
-> Huh, the erase/trim/discard code in the mmc core is really hairy. :-)
->
-> In mmc_calc_max_discard() the following code/comment exists:
->
-> /*
->  * Without erase_group_def set, MMC erase timeout depends on clock
->  * frequence which can change.  In that case, the best choice is
->  * just the preferred erase size.
->  */
-> if (mmc_card_mmc(card) && !(card->ext_csd.erase_group_def & 1))
->      return card->pref_erase;
->
->
-> This makes me wonder.
->
-> So, when we haven't enabled the high capacity erase groups in the
-> EXT_CSD register (ext_csd.erase_group_def), we will use the pref_erase
-> size.
->
-> In the other case, as when having MMC_CAP2_HC_ERASE_SZ set (which will
-> set ext_csd.erase_group_def),  we will instead  do some calculations
-> to find out the max discards.
->
-> Are you saying that these calculations doesn't matter much - or are
-> you saying that we always want to do them?
+>> diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
+>> index 3308b5b6..030425be 100644
+>> --- a/drivers/mmc/host/meson-gx-mmc.c
+>> +++ b/drivers/mmc/host/meson-gx-mmc.c
+>> @@ -799,6 +799,7 @@ static int meson_mmc_probe(struct platform_device *pdev)
+>>  		goto free_host;
+>>  	}
+>>  
+>> +	mmc->max_blk_count = 256;
+> 
+> A step in the right direction, but the # blocks is actually a 9-bit
+> field (c.f. length field of cmd_cfg part of descriptor (bits 8:0).
+> 
+> So this should be more like:
+> 
+> 	/* blk count is 'length' field of cmd_cfg part of descriptor */
+> 	mmc->max_blk_count = CMD_CFG_LENGTH_MASK + 1;
+> 
+> I tested that change locally, so after changing that, please resend and
+> feel free to add:
+> 
+max_blk_count = 0 means unlimited number of blocks. Therefore I think
+we have to go with: mmc->max_blk_count = CMD_CFG_LENGTH_MASK
+And I figured out later that we also have to set mmc->max_req_size.
 
-No, I was saying that if you have TRIM then TRIM is preferred to ERASE so 
-the erase group size does not come into play when discarding, since ERASE 
-granularity is erase groups whereas TRIM granularity is sectors.
+In my tests the system never read / wrote more than 8 blocks in a row,
+most likely because the upper block layers use 4k blocks.
 
-However ERASE_GROUP_DEF also affects the size of write protect groups.
+Therefore setting max_blk_count doesn't really provide a benefit but
+I think it's cleaner to expose the actual chip limit.
+
+Rgds, Heiner
+
+> Reviewed-by: Kevin Hilman <khilman@baylibre.com>
+> Tested-by: Kevin Hilman <khilman@baylibre.com>
+> 
+> Kevin
+> 
