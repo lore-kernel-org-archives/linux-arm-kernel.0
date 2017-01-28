@@ -1,98 +1,85 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 28 Jan 2017 22:27:00 +0900
-Subject: [PATCH 1/2] clk: uniphier: add NAND clock for all UniPhier SoCs
-Message-ID: <1485610021-9905-1-git-send-email-yamada.masahiro@socionext.com>
+Date: Sat, 28 Jan 2017 22:30:24 +0900
+Subject: [PATCH v4] ARM: w90x900: let clk_disable() return immediately if
+ clk is NULL
+In-Reply-To: <CAK7LNARJ647+pmADPO=Q33ie9EsmH_Yu+US3HiwertzEw4CnSA@mail.gmail.com>
+References: <1474221559-21269-1-git-send-email-yamada.masahiro@socionext.com>
+ <CAK7LNARJ647+pmADPO=Q33ie9EsmH_Yu+US3HiwertzEw4CnSA@mail.gmail.com>
+Message-ID: <CAK7LNAS1Se5=Dmh4xxQNonE3nu3hkyOjAom==3H+RNGuStK+Tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clock line for the Denali NAND controller.
+Hi Wan,
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+Ping again.
 
- drivers/clk/uniphier/clk-uniphier-sys.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+Please pick up this patch!
 
-diff --git a/drivers/clk/uniphier/clk-uniphier-sys.c b/drivers/clk/uniphier/clk-uniphier-sys.c
-index d049316..b1aaf77 100644
---- a/drivers/clk/uniphier/clk-uniphier-sys.c
-+++ b/drivers/clk/uniphier/clk-uniphier-sys.c
-@@ -29,6 +29,12 @@
- 	UNIPHIER_CLK_FACTOR("sd-200m", -1, "spll", 1, 10),		\
- 	UNIPHIER_CLK_FACTOR("sd-133m", -1, "spll", 1, 15)
- 
-+#define UNIPHIER_SLD3_SYS_CLK_NAND(idx)					\
-+	UNIPHIER_CLK_GATE("nand", (idx), NULL, 0x2104, 2)
-+
-+#define UNIPHIER_LD11_SYS_CLK_NAND(idx)					\
-+	UNIPHIER_CLK_GATE("nand", (idx), NULL, 0x210c, 0)
-+
- #define UNIPHIER_SLD3_SYS_CLK_STDMAC(idx)				\
- 	UNIPHIER_CLK_GATE("stdmac", (idx), NULL, 0x2104, 10)
- 
-@@ -48,6 +54,7 @@ const struct uniphier_clk_data uniphier_sld3_sys_clk_data[] = {
- 	UNIPHIER_CLK_FACTOR("vpll27a", -1, "ref", 5625, 512),	/* 270 MHz */
- 	UNIPHIER_CLK_FACTOR("uart", 0, "a2pll", 1, 16),
- 	UNIPHIER_CLK_FACTOR("i2c", 1, "spll", 1, 16),
-+	UNIPHIER_SLD3_SYS_CLK_NAND(2),
- 	UNIPHIER_SLD3_SYS_CLK_SD,
- 	UNIPHIER_CLK_FACTOR("usb2", -1, "upll", 1, 12),
- 	UNIPHIER_SLD3_SYS_CLK_STDMAC(8),
-@@ -61,6 +68,7 @@ const struct uniphier_clk_data uniphier_ld4_sys_clk_data[] = {
- 	UNIPHIER_CLK_FACTOR("vpll27a", -1, "ref", 5625, 512),	/* 270 MHz */
- 	UNIPHIER_CLK_FACTOR("uart", 0, "a2pll", 1, 16),
- 	UNIPHIER_CLK_FACTOR("i2c", 1, "spll", 1, 16),
-+	UNIPHIER_SLD3_SYS_CLK_NAND(2),
- 	UNIPHIER_SLD3_SYS_CLK_SD,
- 	UNIPHIER_CLK_FACTOR("usb2", -1, "upll", 1, 12),
- 	UNIPHIER_SLD3_SYS_CLK_STDMAC(8),		/* Ether, HSC, MIO */
-@@ -74,6 +82,7 @@ const struct uniphier_clk_data uniphier_pro4_sys_clk_data[] = {
- 	UNIPHIER_CLK_FACTOR("vpll27a", -1, "ref", 270, 25),	/* 270 MHz */
- 	UNIPHIER_CLK_FACTOR("uart", 0, "a2pll", 1, 8),
- 	UNIPHIER_CLK_FACTOR("i2c", 1, "spll", 1, 32),
-+	UNIPHIER_SLD3_SYS_CLK_NAND(2),
- 	UNIPHIER_SLD3_SYS_CLK_SD,
- 	UNIPHIER_CLK_FACTOR("usb2", -1, "upll", 1, 12),
- 	UNIPHIER_SLD3_SYS_CLK_STDMAC(8),		/* HSC, MIO, RLE */
-@@ -89,6 +98,7 @@ const struct uniphier_clk_data uniphier_sld8_sys_clk_data[] = {
- 	UNIPHIER_CLK_FACTOR("vpll27a", -1, "ref", 270, 25),	/* 270 MHz */
- 	UNIPHIER_CLK_FACTOR("uart", 0, "spll", 1, 20),
- 	UNIPHIER_CLK_FACTOR("i2c", 1, "spll", 1, 16),
-+	UNIPHIER_SLD3_SYS_CLK_NAND(2),
- 	UNIPHIER_SLD3_SYS_CLK_SD,
- 	UNIPHIER_CLK_FACTOR("usb2", -1, "upll", 1, 12),
- 	UNIPHIER_SLD3_SYS_CLK_STDMAC(8),		/* Ether, HSC, MIO */
-@@ -101,6 +111,7 @@ const struct uniphier_clk_data uniphier_pro5_sys_clk_data[] = {
- 	UNIPHIER_CLK_FACTOR("dapll2", -1, "ref", 144, 125),	/* 2949.12 MHz */
- 	UNIPHIER_CLK_FACTOR("uart", 0, "dapll2", 1, 40),
- 	UNIPHIER_CLK_FACTOR("i2c", 1, "spll", 1, 48),
-+	UNIPHIER_SLD3_SYS_CLK_NAND(2),
- 	UNIPHIER_PRO5_SYS_CLK_SD,
- 	UNIPHIER_SLD3_SYS_CLK_STDMAC(8),			/* HSC */
- 	UNIPHIER_PRO4_SYS_CLK_GIO(12),				/* PCIe, USB3 */
-@@ -113,6 +124,7 @@ const struct uniphier_clk_data uniphier_pxs2_sys_clk_data[] = {
- 	UNIPHIER_CLK_FACTOR("spll", -1, "ref", 96, 1),		/* 2400 MHz */
- 	UNIPHIER_CLK_FACTOR("uart", 0, "spll", 1, 27),
- 	UNIPHIER_CLK_FACTOR("i2c", 1, "spll", 1, 48),
-+	UNIPHIER_SLD3_SYS_CLK_NAND(2),
- 	UNIPHIER_PRO5_SYS_CLK_SD,
- 	UNIPHIER_SLD3_SYS_CLK_STDMAC(8),			/* HSC, RLE */
- 	/* GIO is always clock-enabled: no function for 0x2104 bit6 */
-@@ -131,6 +143,7 @@ const struct uniphier_clk_data uniphier_ld11_sys_clk_data[] = {
- 	UNIPHIER_CLK_FACTOR("vspll", -1, "ref", 80, 1),		/* 2000 MHz */
- 	UNIPHIER_CLK_FACTOR("uart", 0, "spll", 1, 34),
- 	UNIPHIER_CLK_FACTOR("i2c", 1, "spll", 1, 40),
-+	UNIPHIER_LD11_SYS_CLK_NAND(2),
- 	UNIPHIER_LD11_SYS_CLK_STDMAC(8),			/* HSC, MIO */
- 	UNIPHIER_CLK_FACTOR("usb2", -1, "ref", 24, 25),
- 	/* CPU gears */
-@@ -156,6 +169,7 @@ const struct uniphier_clk_data uniphier_ld20_sys_clk_data[] = {
- 	UNIPHIER_CLK_FACTOR("vppll", -1, "ref", 504, 5),	/* 2520 MHz */
- 	UNIPHIER_CLK_FACTOR("uart", 0, "spll", 1, 34),
- 	UNIPHIER_CLK_FACTOR("i2c", 1, "spll", 1, 40),
-+	UNIPHIER_LD11_SYS_CLK_NAND(2),
- 	UNIPHIER_LD20_SYS_CLK_SD,
- 	UNIPHIER_LD11_SYS_CLK_STDMAC(8),			/* HSC */
- 	/* GIO is always clock-enabled: no function for 0x210c bit5 */
+2016-11-06 0:45 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> Hi Wan,
+>
+> This patch was acked by you long before,
+> but it has not been pulled-in yet for some reasons.
+>
+> Now the patch was split per platform.
+>
+> So, could you apply this patch to your tree, please?
+>
+>
+> 2016-09-19 2:59 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+>> In many of clk_disable() implementations, it is a no-op for a NULL
+>> pointer input, but this is one of the exceptions.
+>>
+>> Making it treewide consistent will allow clock consumers to call
+>> clk_disable() without NULL pointer check.
+>>
+>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>> Acked-by: Wan Zongshun <mcuos.com@gmail.com>
+>> ---
+>>
+>> Changes in v4:
+>>   - Split into per-arch patches
+>>
+>> Changes in v3:
+>>   - Return only when clk is NULL.  Do not take care of error pointer.
+>>
+>> Changes in v2:
+>>   - Rebase on Linux 4.6-rc1
+>>
+>>  arch/arm/mach-w90x900/clock.c | 3 +++
+>>  1 file changed, 3 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-w90x900/clock.c b/arch/arm/mach-w90x900/clock.c
+>> index 2c371ff..ac6fd1a 100644
+>> --- a/arch/arm/mach-w90x900/clock.c
+>> +++ b/arch/arm/mach-w90x900/clock.c
+>> @@ -46,6 +46,9 @@ void clk_disable(struct clk *clk)
+>>  {
+>>         unsigned long flags;
+>>
+>> +       if (!clk)
+>> +               return;
+>> +
+>>         WARN_ON(clk->enabled == 0);
+>>
+>>         spin_lock_irqsave(&clocks_lock, flags);
+>> --
+>> 1.9.1
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
+>
+> --
+> Best Regards
+> Masahiro Yamada
+
+
+
 -- 
-2.7.4
+Best Regards
+Masahiro Yamada
