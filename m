@@ -1,305 +1,71 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 28 Jan 2017 23:59:37 +0100
-Subject: [PATCH 2/3 v2] watchdog: add driver for Cortina Gemini watchdog
-Message-ID: <20170128225937.24623-1-linus.walleij@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 28 Jan 2017 23:25:29 +0000
+Subject: [PATCH v3 00/10] crypto - AES for ARM/arm64 updates for v4.11 (round
+ #2)
+Message-ID: <1485645939-17126-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This add support for the Cortina systems Gemini (SL3516)
-SoC watchdog.
+Patch #1 is a fix for the CBC chaining issue that was discussed on the
+mailing list. The driver itself is queued for v4.11, so this fix can go
+right on top.
 
-I have tried to use all the right new kernel interfaces
-and tested with busybox' "watchdog" command both to kick
-and get timeouts and reboots.
+Patches #2 - #6 clear the cra_alignmasks of various drivers: all NEON
+capable CPUs can perform unaligned accesses, and the advantage of using
+the slightly faster aligned accessors (which only exist on ARM not arm64)
+is certainly outweighed by the cost of copying data to suitably aligned
+buffers.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v1->v2:
-- Use devm_watchdog_register_device() and cut the remove()
-  overhead.
-- Remove a couple of pointless ~(PARENS)
-- Remove bool enabled struct member and use watchdog_active()
-- Sort headers alphabetically
-- Make the set_timeout function just set the timeout, and
-  then restart the watchdog only if it is running
-- Remove pointless min() calculation on default timeout.
-- Notify pretimeout in the interrupt handler so a pretimeout
-  governor can be used.
----
- drivers/watchdog/Kconfig      |  11 ++
- drivers/watchdog/Makefile     |   1 +
- drivers/watchdog/gemini_wdt.c | 229 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 241 insertions(+)
- create mode 100644 drivers/watchdog/gemini_wdt.c
+NOTE: patch #5 won't apply unless 'crypto: arm64/aes-blk - honour iv_out
+requirement in CBC and CTR modes' is applied first, which was sent out
+separately as a bugfix for v3.16 - v4.9. If this is a problem, this patch
+can wait.
 
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index acb00b53a520..3e5ab6712a1e 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -301,6 +301,17 @@ config 977_WATCHDOG
- 
- 	  Not sure? It's safe to say N.
- 
-+config GEMINI_WATCHDOG
-+	tristate "Gemini watchdog"
-+	depends on ARCH_GEMINI
-+	select WATCHDOG_CORE
-+	help
-+	  Say Y here if to include support for the watchdog timer
-+	  embedded in the Cortina Systems Gemini family of devices.
-+
-+	  To compile this driver as a module, choose M here: the
-+	  module will be called gemini_wdt.
-+
- config IXP4XX_WATCHDOG
- 	tristate "IXP4xx Watchdog"
- 	depends on ARCH_IXP4XX
-diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-index 0c3d35e3c334..953d033b1152 100644
---- a/drivers/watchdog/Makefile
-+++ b/drivers/watchdog/Makefile
-@@ -45,6 +45,7 @@ obj-$(CONFIG_OMAP_WATCHDOG) += omap_wdt.o
- obj-$(CONFIG_TWL4030_WATCHDOG) += twl4030_wdt.o
- obj-$(CONFIG_21285_WATCHDOG) += wdt285.o
- obj-$(CONFIG_977_WATCHDOG) += wdt977.o
-+obj-$(CONFIG_GEMINI_WATCHDOG) += gemini_wdt.o
- obj-$(CONFIG_IXP4XX_WATCHDOG) += ixp4xx_wdt.o
- obj-$(CONFIG_KS8695_WATCHDOG) += ks8695_wdt.o
- obj-$(CONFIG_S3C2410_WATCHDOG) += s3c2410_wdt.o
-diff --git a/drivers/watchdog/gemini_wdt.c b/drivers/watchdog/gemini_wdt.c
-new file mode 100644
-index 000000000000..8155aa619e4c
---- /dev/null
-+++ b/drivers/watchdog/gemini_wdt.c
-@@ -0,0 +1,229 @@
-+/*
-+ * Watchdog driver for Cortina Systems Gemini SoC
-+ *
-+ * Copyright (C) 2017 Linus Walleij <linus.walleij@linaro.org>
-+ *
-+ * Inspired by the out-of-tree drivers from OpenWRT:
-+ * Copyright (C) 2009 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/bitops.h>
-+#include <linux/init.h>
-+#include <linux/interrupt.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/slab.h>
-+#include <linux/watchdog.h>
-+
-+#define GEMINI_WDCOUNTER	0x0
-+#define GEMINI_WDLOAD		0x4
-+#define GEMINI_WDRESTART	0x8
-+#define GEMINI_WDCR		0xC
-+
-+#define WDRESTART_MAGIC		0x5AB9
-+
-+#define WDCR_CLOCK_5MHZ		BIT(4)
-+#define WDCR_SYS_RST		BIT(1)
-+#define WDCR_ENABLE		BIT(0)
-+
-+#define WDT_CLOCK		5000000		/* 5 MHz */
-+
-+struct gemini_wdt {
-+	struct watchdog_device	wdd;
-+	struct device		*dev;
-+	void __iomem		*base;
-+};
-+
-+static inline
-+struct gemini_wdt *to_gemini_wdt(struct watchdog_device *wdd)
-+{
-+	return container_of(wdd, struct gemini_wdt, wdd);
-+}
-+
-+static int gemini_wdt_start(struct watchdog_device *wdd)
-+{
-+	struct gemini_wdt *gwdt = to_gemini_wdt(wdd);
-+
-+	writel(wdd->timeout * WDT_CLOCK, gwdt->base + GEMINI_WDLOAD);
-+	writel(WDRESTART_MAGIC, gwdt->base + GEMINI_WDRESTART);
-+	/* set clock before enabling */
-+	writel(WDCR_CLOCK_5MHZ | WDCR_SYS_RST,
-+			gwdt->base + GEMINI_WDCR);
-+	writel(WDCR_CLOCK_5MHZ | WDCR_SYS_RST | WDCR_ENABLE,
-+			gwdt->base + GEMINI_WDCR);
-+
-+	return 0;
-+}
-+
-+static int gemini_wdt_stop(struct watchdog_device *wdd)
-+{
-+	struct gemini_wdt *gwdt = to_gemini_wdt(wdd);
-+
-+	writel(0, gwdt->base + GEMINI_WDCR);
-+
-+	return 0;
-+}
-+
-+static int gemini_wdt_ping(struct watchdog_device *wdd)
-+{
-+	struct gemini_wdt *gwdt = to_gemini_wdt(wdd);
-+
-+	writel(WDRESTART_MAGIC, gwdt->base + GEMINI_WDRESTART);
-+
-+	return 0;
-+}
-+
-+static int gemini_wdt_set_timeout(struct watchdog_device *wdd,
-+				  unsigned int timeout)
-+{
-+	wdd->timeout = timeout;
-+	if (watchdog_active(wdd))
-+		gemini_wdt_start(wdd);
-+
-+	return 0;
-+}
-+
-+static irqreturn_t gemini_wdt_interrupt(int irq, void *data)
-+{
-+	struct gemini_wdt *gwdt = data;
-+
-+	watchdog_notify_pretimeout(&gwdt->wdd);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static const struct watchdog_ops gemini_wdt_ops = {
-+	.start		= gemini_wdt_start,
-+	.stop		= gemini_wdt_stop,
-+	.ping		= gemini_wdt_ping,
-+	.set_timeout	= gemini_wdt_set_timeout,
-+	.owner		= THIS_MODULE,
-+};
-+
-+static const struct watchdog_info gemini_wdt_info = {
-+	.options	= WDIOF_KEEPALIVEPING
-+			| WDIOF_MAGICCLOSE
-+			| WDIOF_SETTIMEOUT,
-+	.identity	= KBUILD_MODNAME,
-+};
-+
-+
-+static int gemini_wdt_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct resource *res;
-+	struct gemini_wdt *gwdt;
-+	unsigned int reg;
-+	int irq;
-+	int ret;
-+
-+	gwdt = devm_kzalloc(dev, sizeof(*gwdt), GFP_KERNEL);
-+	if (!gwdt)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	gwdt->base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(gwdt->base))
-+		return PTR_ERR(gwdt->base);
-+
-+	irq = platform_get_irq(pdev, 0);
-+	if (!irq)
-+		return -EINVAL;
-+
-+	gwdt->dev = dev;
-+	gwdt->wdd.info = &gemini_wdt_info;
-+	gwdt->wdd.ops = &gemini_wdt_ops;
-+	gwdt->wdd.min_timeout = 1;
-+	gwdt->wdd.max_timeout = 0xFFFFFFFF / WDT_CLOCK;
-+	gwdt->wdd.parent = dev;
-+
-+	/*
-+	 * If 'timeout-sec' unspecified in devicetree, assume a 13 second
-+	 * default.
-+	 */
-+	gwdt->wdd.timeout = 13U;
-+	watchdog_init_timeout(&gwdt->wdd, 0, dev);
-+
-+	reg = readw(gwdt->base + GEMINI_WDCR);
-+	if (reg & WDCR_ENABLE) {
-+		/* Watchdog was enabled by the bootloader, disable it. */
-+		reg &= ~WDCR_ENABLE;
-+		writel(reg, gwdt->base + GEMINI_WDCR);
-+	}
-+
-+	ret = devm_request_irq(dev, irq, gemini_wdt_interrupt, 0,
-+			       "watchdog bark", gwdt);
-+	if (ret)
-+		return ret;
-+
-+	ret = devm_watchdog_register_device(dev, &gwdt->wdd);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to register watchdog\n");
-+		return ret;
-+	}
-+
-+	/* Set up platform driver data */
-+	platform_set_drvdata(pdev, gwdt);
-+	dev_info(dev, "Gemini watchdog driver enabled\n");
-+
-+	return 0;
-+}
-+
-+static int __maybe_unused gemini_wdt_suspend(struct device *dev)
-+{
-+	struct gemini_wdt *gwdt = dev_get_drvdata(dev);
-+	unsigned int reg;
-+
-+	reg = readw(gwdt->base + GEMINI_WDCR);
-+	reg &= ~WDCR_ENABLE;
-+	writel(reg, gwdt->base + GEMINI_WDCR);
-+
-+	return 0;
-+}
-+
-+static int __maybe_unused gemini_wdt_resume(struct device *dev)
-+{
-+	struct gemini_wdt *gwdt = dev_get_drvdata(dev);
-+	unsigned int reg;
-+
-+	if (watchdog_active(&gwdt->wdd)) {
-+		reg = readw(gwdt->base + GEMINI_WDCR);
-+		reg |= WDCR_ENABLE;
-+		writel(reg, gwdt->base + GEMINI_WDCR);
-+	}
-+
-+	return 0;
-+}
-+
-+static const struct dev_pm_ops gemini_wdt_dev_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(gemini_wdt_suspend,
-+				gemini_wdt_resume)
-+};
-+
-+#ifdef CONFIG_OF
-+static const struct of_device_id gemini_wdt_match[] = {
-+	{ .compatible = "cortina,gemini-watchdog" },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, gemini_wdt_match);
-+#endif
-+
-+static struct platform_driver gemini_wdt_driver = {
-+	.probe		= gemini_wdt_probe,
-+	.driver		= {
-+		.name	= "gemini-wdt",
-+		.of_match_table = of_match_ptr(gemini_wdt_match),
-+		.pm = &gemini_wdt_dev_pm_ops,
-+	},
-+};
-+module_platform_driver(gemini_wdt_driver);
-+MODULE_AUTHOR("Linus Walleij");
-+MODULE_DESCRIPTION("Watchdog driver for Gemini");
-+MODULE_LICENSE("GPL");
+Patch #7 and #8 are minor tweaks to the new scalar AES code.
+
+Patch #9 improves the performance of the plain NEON AES code, to make it
+more suitable as a fallback for the new bitsliced NEON code, which can
+only operate on 8 blocks in parallel, and needs another driver to perform
+CBC encryption or XTS tweak generation.
+
+Patch #10 updates the new bitsliced AES NEON code to switch to the plain
+NEON driver as a fallback.
+
+Patches #9 and #10 improve the performance of CBC encryption by ~35% on
+low end cores such as the Cortex-A53 that can be found in the Raspberry Pi3
+
+Changes since v2:
+- use polynomial multiply NEON instruction for multiplication by x^2, this
+  eliminates 4 instructions from the decrypt path (#9)
+
+Changes since v1:
+- shave off another few cycles from the sequential AES NEON code (patch #9)
+
+Ard Biesheuvel (10):
+  crypto: arm64/aes-neon-bs - honour iv_out requirement in CTR mode
+  crypto: arm/aes-ce - remove cra_alignmask
+  crypto: arm/chacha20 - remove cra_alignmask
+  crypto: arm64/aes-ce-ccm - remove cra_alignmask
+  crypto: arm64/aes-blk - remove cra_alignmask
+  crypto: arm64/chacha20 - remove cra_alignmask
+  crypto: arm64/aes - avoid literals for cross-module symbol references
+  crypto: arm64/aes - performance tweak
+  crypto: arm64/aes-neon-blk - tweak performance for low end cores
+  crypto: arm64/aes - replace scalar fallback with plain NEON fallback
+
+ arch/arm/crypto/aes-ce-core.S          |  84 ++++---
+ arch/arm/crypto/aes-ce-glue.c          |  15 +-
+ arch/arm/crypto/chacha20-neon-glue.c   |   1 -
+ arch/arm64/crypto/Kconfig              |   2 +-
+ arch/arm64/crypto/aes-ce-ccm-glue.c    |   1 -
+ arch/arm64/crypto/aes-cipher-core.S    |  59 ++---
+ arch/arm64/crypto/aes-glue.c           |  18 +-
+ arch/arm64/crypto/aes-modes.S          |   8 +-
+ arch/arm64/crypto/aes-neon.S           | 235 +++++++++-----------
+ arch/arm64/crypto/aes-neonbs-core.S    |  25 ++-
+ arch/arm64/crypto/aes-neonbs-glue.c    |  38 +++-
+ arch/arm64/crypto/chacha20-neon-glue.c |   1 -
+ 12 files changed, 224 insertions(+), 263 deletions(-)
+
 -- 
-2.9.3
+2.7.4
