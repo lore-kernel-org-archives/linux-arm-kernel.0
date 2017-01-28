@@ -1,140 +1,28 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Sat, 28 Jan 2017 17:43:28 +0200
-Subject: [PATCH v2 2/2] arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS
- to IOMMU
-In-Reply-To: <1485531259-17513-3-git-send-email-geert+renesas@glider.be>
-References: <1485531259-17513-1-git-send-email-geert+renesas@glider.be>
- <1485531259-17513-3-git-send-email-geert+renesas@glider.be>
-Message-ID: <1696731.3PdB1ViRsr@avalon>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sat, 28 Jan 2017 17:52:24 +0200
+Subject: [PATCH] ARM: dts: exynos: Increase MFC left reserved memory
+ region size
+In-Reply-To: <1485547846-12778-1-git-send-email-javier@osg.samsung.com>
+References: <1485547846-12778-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <20170128155224.wp6ykqex5sxt6ko7@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
-
-Thank you for the patch.
-
-On Friday 27 Jan 2017 16:34:19 Geert Uytterhoeven wrote:
-> Add support for allocation physically contiguous DMA buffers on arm64
-> systems with an IOMMU, by dispatching DMA buffer allocations with the
-> DMA_ATTR_FORCE_CONTIGUOUS attribute to the appropriate IOMMU DMA
-> helpers.
+On Fri, Jan 27, 2017 at 05:10:46PM -0300, Javier Martinez Canillas wrote:
+> The sizes of the MFC reserved memory regions for CMA are 16 MiB for the
+> left bank and 8 MiB for the right bank. But this isn't enough to decode
+> high resolution videos so increase the size for the left bank to 36 MiB
+> which is enough for 1080p (1920x1080).
 > 
-> Note that as this uses the CMA allocator, setting this attribute has a
-> runtime-dependency on CONFIG_DMA_CMA, just like on arm32.
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 > 
-> For arm64 systems using swiotlb, no changes are needed to support the
-> allocation of physically contiguous DMA buffers:
->   - swiotlb always uses physically contiguous buffers (up to
->     IO_TLB_SEGSIZE = 128 pages),
->   - arm64's __dma_alloc_coherent() already calls
->     dma_alloc_from_contiguous() when CMA is available.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > ---
-> v2:
->   - New, handle dispatching in the arch (arm64) code, as requested by
->     Robin Murphy.
-> ---
->  arch/arm64/mm/dma-mapping.c | 51 +++++++++++++++++++++++++++++-------------
->  1 file changed, 37 insertions(+), 14 deletions(-)
 > 
-> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> index 1d7d5d2881db7c19..325803e0ba79ef26 100644
-> --- a/arch/arm64/mm/dma-mapping.c
-> +++ b/arch/arm64/mm/dma-mapping.c
-> @@ -577,20 +577,7 @@ static void *__iommu_alloc_attrs(struct device *dev,
-> size_t size, */
->  	gfp |= __GFP_ZERO;
+>  arch/arm/boot/dts/exynos-mfc-reserved-memory.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> -	if (gfpflags_allow_blocking(gfp)) {
-> -		struct page **pages;
-> -		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, 
-coherent);
-> -
-> -		pages = iommu_dma_alloc(dev, iosize, gfp, attrs, ioprot,
-> -					handle, flush_page);
-> -		if (!pages)
-> -			return NULL;
-> -
-> -		addr = dma_common_pages_remap(pages, size, VM_USERMAP, prot,
-> -					      __builtin_return_address(0));
-> -		if (!addr)
-> -			iommu_dma_free(dev, pages, iosize, handle);
-> -	} else {
-> +	if (!gfpflags_allow_blocking(gfp)) {
->  		struct page *page;
->  		/*
->  		 * In atomic context we can't remap anything, so we'll only
-> @@ -614,6 +601,35 @@ static void *__iommu_alloc_attrs(struct device *dev,
-> size_t size, __free_from_pool(addr, size);
->  			addr = NULL;
->  		}
-> +	} else if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
-> +		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, 
-coherent);
-> +		struct page *page;
-> +
-> +		page = iommu_dma_alloc_contiguous(dev, iosize, ioprot, 
-handle);
-> +		if (!page)
-> +			return NULL;
-> +
-> +		if (!coherent)
-> +			__dma_flush_area(page_to_virt(page), iosize);
-> +
-> +		addr = dma_common_contiguous_remap(page, size, VM_USERMAP,
-> +						   prot,
-> +						   
-__builtin_return_address(0));
-> +		if (!addr)
-> +			iommu_dma_free_contiguous(dev, page, iosize, handle);
-> +	} else {
-> +		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, 
-coherent);
-> +		struct page **pages;
-> +
-> +		pages = iommu_dma_alloc(dev, iosize, gfp, attrs, ioprot,
-> +					handle, flush_page);
-> +		if (!pages)
-> +			return NULL;
-> +
-> +		addr = dma_common_pages_remap(pages, size, VM_USERMAP, prot,
-> +					      __builtin_return_address(0));
-> +		if (!addr)
-> +			iommu_dma_free(dev, pages, iosize, handle);
->  	}
->  	return addr;
->  }
-> @@ -626,6 +642,8 @@ static void __iommu_free_attrs(struct device *dev,
-> size_t size, void *cpu_addr, size = PAGE_ALIGN(size);
->  	/*
->  	 * @cpu_addr will be one of 3 things depending on how it was 
-allocated:
 
-s/one of 3/one of 4/
+Thanks, applied.
 
-Apart from that,
-
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-> +	 * - A remapped array of pages from iommu_dma_alloc_contiguous()
-> +	 *   for contiguous allocations.
->  	 * - A remapped array of pages from iommu_dma_alloc(), for all
->  	 *   non-atomic allocations.
->  	 * - A non-cacheable alias from the atomic pool, for atomic
-> @@ -637,6 +655,11 @@ static void __iommu_free_attrs(struct device *dev,
-> size_t size, void *cpu_addr, if (__in_atomic_pool(cpu_addr, size)) {
->  		iommu_dma_unmap_page(dev, handle, iosize, 0, 0);
->  		__free_from_pool(cpu_addr, size);
-> +	} else if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
-> +		struct page *page = phys_to_page(dma_to_phys(dev, handle));
-> +
-> +		iommu_dma_free_contiguous(dev, page, iosize, &handle);
-> +		dma_common_free_remap(cpu_addr, size, VM_USERMAP);
->  	} else if (is_vmalloc_addr(cpu_addr)){
->  		struct vm_struct *area = find_vm_area(cpu_addr);
-
--- 
-Regards,
-
-Laurent Pinchart
+Best regards,
+Krzysztof
