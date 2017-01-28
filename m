@@ -1,41 +1,59 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Sat, 28 Jan 2017 15:10:29 -0600
-Subject: [PATCH V7 00/11] IOMMU probe deferral support
-In-Reply-To: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
-References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <20170128211029.GI20550@bhelgaas-glaptop.roam.corp.google.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 28 Jan 2017 22:14:53 +0100
+Subject: [PATCH 02/22 v2] irqchip: DT bindings for Cortina Gemini irqchip
+Message-ID: <20170128211453.31436-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2017 at 09:48:02PM +0530, Sricharan R wrote:
-> This series calls the dma ops configuration for the devices
-> at a generic place so that it works for all busses.
-> The dma_configure_ops for a device is now called during
-> the device_attach callback just before the probe of the
-> bus/driver is called. Similarly dma_deconfigure is called during
-> device/driver_detach path.
-> ...
+This adds device tree bindings for the Cortina Gemini interrupt
+controller. They are pretty standard.
 
->  arch/arm64/mm/dma-mapping.c       | 132 ++++----------------------------------
->  drivers/acpi/arm64/iort.c         |  40 +++++++++++-
->  drivers/acpi/glue.c               |   5 --
->  drivers/acpi/scan.c               |   7 +-
->  drivers/base/dd.c                 |   9 +++
->  drivers/base/dma-mapping.c        |  41 ++++++++++++
->  drivers/iommu/arm-smmu-v3.c       |  46 +------------
->  drivers/iommu/arm-smmu.c          |  58 +++--------------
->  drivers/iommu/of_iommu.c          | 114 +++++++++++++++++++++++---------
->  drivers/of/address.c              |  20 +++++-
->  drivers/of/device.c               |  36 ++++++-----
->  drivers/of/platform.c             |  10 +--
->  drivers/pci/probe.c               |  28 --------
->  include/acpi/acpi_bus.h           |   2 +-
->  include/asm-generic/vmlinux.lds.h |   1 -
->  include/linux/acpi.h              |   7 +-
->  include/linux/acpi_iort.h         |   3 -
->  include/linux/dma-mapping.h       |   3 +
->  include/linux/of_device.h         |  10 ++-
->  19 files changed, 252 insertions(+), 320 deletions(-)
+Cc: Janos Laube <janos.dev@gmail.com>
+Cc: Paulius Zaleckas <paulius.zaleckas@gmail.com>
+Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: devicetree at vger.kernel.org
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Added Rob's ACK
 
-I'm assuming this will go via some other tree, maybe the IOMMU tree?
-I acked the PCI parts, so let me know if you need anything more from me.
+irqchip maintainers: please just apply this when you feel pleased
+with it. These portions are functionally orthogonal to the series,
+it is just in a series for context.
+---
+ .../cortina,gemini-interrupt-controller.txt        | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/interrupt-controller/cortina,gemini-interrupt-controller.txt
+
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/cortina,gemini-interrupt-controller.txt b/Documentation/devicetree/bindings/interrupt-controller/cortina,gemini-interrupt-controller.txt
+new file mode 100644
+index 000000000000..97c1167fa533
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/cortina,gemini-interrupt-controller.txt
+@@ -0,0 +1,22 @@
++* Cortina Systems Gemini interrupt controller
++
++This interrupt controller is found on the Gemini SoCs.
++
++Required properties:
++- compatible: must be "cortina,gemini-interrupt-controller"
++- reg: The register bank for the interrupt controller.
++- interrupt-controller: Identifies the node as an interrupt controller
++- #interrupt-cells: The number of cells to define the interrupts.
++  Must be 2 as the controller can specify level or rising edge
++  IRQs. The bindings follows the standard binding for controllers
++  with two cells specified in
++  interrupt-controller/interrupts.txt
++
++Example:
++
++interrupt-controller at 48000000 {
++	compatible = "cortina,gemini-interrupt-controller";
++	reg = <0x48000000 0x1000>;
++	interrupt-controller;
++	#interrupt-cells = <2>;
++};
+-- 
+2.9.3
