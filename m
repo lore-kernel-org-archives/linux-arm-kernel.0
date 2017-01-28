@@ -1,271 +1,71 @@
-From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Sat, 28 Jan 2017 13:11:17 +0530
-Subject: [PATCH] watchdog: constify watchdog_ops structures
-Message-ID: <1485589277-6824-1-git-send-email-bhumirks@gmail.com>
+From: adrian.hunter@intel.com (Adrian Hunter)
+Date: Sat, 28 Jan 2017 10:16:46 +0200
+Subject: [PATCH v5 06/12] mmc: sdhci-xenon: Add Marvell Xenon SDHC core
+ functionality
+In-Reply-To: <CAPDyKFqbjeKCHp40PALydquxdF-qBk156+iOS9TYYsquJ7fK7w@mail.gmail.com>
+References: <cover.8527229dae6c124f24c5e637430c2cdc86f80392.1484154449.git-series.gregory.clement@free-electrons.com>
+ <3546f143091c121face8ecbcbf7f6a4c41d2cec7.1484154449.git-series.gregory.clement@free-electrons.com>
+ <CAPDyKFrwxix4zY4a1x9u6jh_gPfKTsaLnD8b8crum=pc5CN3AA@mail.gmail.com>
+ <2e67332d-d8c3-fd24-1f81-72675a09927a@intel.com>
+ <CAPDyKFqbjeKCHp40PALydquxdF-qBk156+iOS9TYYsquJ7fK7w@mail.gmail.com>
+Message-ID: <00e8d2dc-bc07-addc-a5d9-8604f143627f@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Declare watchdog_ops structures as const as they are only stored in the
-ops field of a watchdog_device structure. This field is of type const, so
-watchdog_ops structures having this property can be made const too.
-Done using Coccinelle:
+On 27/01/2017 5:12 p.m., Ulf Hansson wrote:
+> On 26 January 2017 at 13:39, Adrian Hunter <adrian.hunter@intel.com> wrote:
+>> On 26/01/17 12:50, Ulf Hansson wrote:
+>>> On 11 January 2017 at 18:19, Gregory CLEMENT
+>>> <gregory.clement@free-electrons.com> wrote:
+>>>> +                       priv->init_card_type = MMC_TYPE_MMC;
+>>>> +                       mmc->caps |= MMC_CAP_NONREMOVABLE;
+>>>> +
+>>>> +                       /*
+>>>> +                        * Force to clear BUS_TEST to
+>>>> +                        * skip bus_test_pre and bus_test_post
+>>>> +                        */
+>>>> +                       mmc->caps &= ~MMC_CAP_BUS_WIDTH_TEST;
+>>>> +                       mmc->caps2 |= MMC_CAP2_HC_ERASE_SZ |
+>>>
+>>> This cap is a bit strange. It was added several years ago by Adrian
+>>> Hunter, but I am wondering about the reason to why it's needed.
+>>>
+>>
+>> MMC_CAP2_HC_ERASE_SZ relates to EXT-CSD ERASE_GROUP_DEF.
+>>
+>> I think it was added to enable people to choose whether they wanted a large
+>> or small erase granularity.  That probably doesn't matter if the card
+>> supports TRIM.
+>>
+>
+> Huh, the erase/trim/discard code in the mmc core is really hairy. :-)
+>
+> In mmc_calc_max_discard() the following code/comment exists:
+>
+> /*
+>  * Without erase_group_def set, MMC erase timeout depends on clock
+>  * frequence which can change.  In that case, the best choice is
+>  * just the preferred erase size.
+>  */
+> if (mmc_card_mmc(card) && !(card->ext_csd.erase_group_def & 1))
+>      return card->pref_erase;
+>
+>
+> This makes me wonder.
+>
+> So, when we haven't enabled the high capacity erase groups in the
+> EXT_CSD register (ext_csd.erase_group_def), we will use the pref_erase
+> size.
+>
+> In the other case, as when having MMC_CAP2_HC_ERASE_SZ set (which will
+> set ext_csd.erase_group_def),  we will instead  do some calculations
+> to find out the max discards.
+>
+> Are you saying that these calculations doesn't matter much - or are
+> you saying that we always want to do them?
 
-@r disable optional_qualifier@
-identifier x;
-position p;
-@@
-static struct watchdog_ops x at p={...};
+No, I was saying that if you have TRIM then TRIM is preferred to ERASE so 
+the erase group size does not come into play when discarding, since ERASE 
+granularity is erase groups whereas TRIM granularity is sectors.
 
-@ok@
-struct watchdog_device w;
-identifier r.x;
-position p;
-@@
-w.ops=&x at p;
-
-@bad@
-position p != {r.p,ok.p};
-identifier r.x;
-@@
-x at p
-
-@depends on !bad disable optional_qualifier@
-identifier r.x;
-@@
-+const
-struct watchdog_ops x;
-
-File size details before and after patching.
-First line of every .o file shows the file size before patching
-and second line shows the size after patching.
-
-   text    data     bss     dec     hex filename
-
-   1340	    544	      0	   1884	    75c	drivers/watchdog/bcm_kona_wdt.o
-   1436	    440	      0	   1876	    754	drivers/watchdog/bcm_kona_wdt.o
-
-   1176	    544	      4	   1724	    6bc	drivers/watchdog/digicolor_wdt.o
-   1272	    440	      4	   1716	    6b4	drivers/watchdog/digicolor_wdt.o
-
-    925	    580	     89	   1594	    63a	drivers/watchdog/ep93xx_wdt.o
-   1021	    476	     89	   1586	    632	drivers/watchdog/ep93xx_wdt.o
-
-   4932	    288	     17	   5237	   1475	drivers/watchdog/s3c2410_wdt.o
-   5028	    192	     17	   5237	   1475	drivers/watchdog/s3c2410_wdt.o
-
-   1977	    292	      1	   2270	    8de	drivers/watchdog/sama5d4_wdt.o
-   2073	    196	      1	   2270	    8de	drivers/watchdog/sama5d4_wdt.o
-
-   1375	    484	      1	   1860	    744	drivers/watchdog/sirfsoc_wdt.o
-   1471	    380	      1	   1852	    73c	drivers/watchdog/sirfsoc_wdt.o
-
-Size remains the same for the files drivers/watchdog/diag288_wdt.o
-drivers/watchdog/asm9260_wdt.o and drivers/watchdog/atlas7_wdt.o
-
-The following .o files did not compile:
-drivers/watchdog/sun4v_wdt.o, drivers/watchdog/sbsa_gwdt.o,
-drivers/watchdog/rt2880_wdt.o, drivers/watchdog/booke_wdt.o
-drivers/watchdog/mt7621_wdt.o
-
-Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
----
- drivers/watchdog/asm9260_wdt.c   | 2 +-
- drivers/watchdog/atlas7_wdt.c    | 2 +-
- drivers/watchdog/bcm_kona_wdt.c  | 2 +-
- drivers/watchdog/booke_wdt.c     | 2 +-
- drivers/watchdog/diag288_wdt.c   | 2 +-
- drivers/watchdog/digicolor_wdt.c | 2 +-
- drivers/watchdog/ep93xx_wdt.c    | 2 +-
- drivers/watchdog/mt7621_wdt.c    | 2 +-
- drivers/watchdog/rt2880_wdt.c    | 2 +-
- drivers/watchdog/s3c2410_wdt.c   | 2 +-
- drivers/watchdog/sama5d4_wdt.c   | 2 +-
- drivers/watchdog/sbsa_gwdt.c     | 2 +-
- drivers/watchdog/sirfsoc_wdt.c   | 2 +-
- drivers/watchdog/sun4v_wdt.c     | 2 +-
- 14 files changed, 14 insertions(+), 14 deletions(-)
-
-diff --git a/drivers/watchdog/asm9260_wdt.c b/drivers/watchdog/asm9260_wdt.c
-index d0b59ba..233dfa9 100644
---- a/drivers/watchdog/asm9260_wdt.c
-+++ b/drivers/watchdog/asm9260_wdt.c
-@@ -189,7 +189,7 @@ static const struct watchdog_info asm9260_wdt_ident = {
- 	.identity         =	"Alphascale asm9260 Watchdog",
- };
- 
--static struct watchdog_ops asm9260_wdt_ops = {
-+static const struct watchdog_ops asm9260_wdt_ops = {
- 	.owner		= THIS_MODULE,
- 	.start		= asm9260_wdt_enable,
- 	.stop		= asm9260_wdt_disable,
-diff --git a/drivers/watchdog/atlas7_wdt.c b/drivers/watchdog/atlas7_wdt.c
-index ed80734..4abdcab 100644
---- a/drivers/watchdog/atlas7_wdt.c
-+++ b/drivers/watchdog/atlas7_wdt.c
-@@ -105,7 +105,7 @@ static const struct watchdog_info atlas7_wdt_ident = {
- 	.identity = "atlas7 Watchdog",
- };
- 
--static struct watchdog_ops atlas7_wdt_ops = {
-+static const struct watchdog_ops atlas7_wdt_ops = {
- 	.owner = THIS_MODULE,
- 	.start = atlas7_wdt_enable,
- 	.stop = atlas7_wdt_disable,
-diff --git a/drivers/watchdog/bcm_kona_wdt.c b/drivers/watchdog/bcm_kona_wdt.c
-index e0c9842..80cdd16 100644
---- a/drivers/watchdog/bcm_kona_wdt.c
-+++ b/drivers/watchdog/bcm_kona_wdt.c
-@@ -266,7 +266,7 @@ static int bcm_kona_wdt_stop(struct watchdog_device *wdog)
- 					    SECWDOG_SRSTEN_MASK, 0);
- }
- 
--static struct watchdog_ops bcm_kona_wdt_ops = {
-+static const struct watchdog_ops bcm_kona_wdt_ops = {
- 	.owner =	THIS_MODULE,
- 	.start =	bcm_kona_wdt_start,
- 	.stop =		bcm_kona_wdt_stop,
-diff --git a/drivers/watchdog/booke_wdt.c b/drivers/watchdog/booke_wdt.c
-index 04da4b6..4925034 100644
---- a/drivers/watchdog/booke_wdt.c
-+++ b/drivers/watchdog/booke_wdt.c
-@@ -197,7 +197,7 @@ static struct watchdog_info booke_wdt_info = {
- 	.identity = "PowerPC Book-E Watchdog",
- };
- 
--static struct watchdog_ops booke_wdt_ops = {
-+static const struct watchdog_ops booke_wdt_ops = {
- 	.owner = THIS_MODULE,
- 	.start = booke_wdt_start,
- 	.stop = booke_wdt_stop,
-diff --git a/drivers/watchdog/diag288_wdt.c b/drivers/watchdog/diag288_wdt.c
-index 861d3d3..6f59108 100644
---- a/drivers/watchdog/diag288_wdt.c
-+++ b/drivers/watchdog/diag288_wdt.c
-@@ -205,7 +205,7 @@ static int wdt_set_timeout(struct watchdog_device * dev, unsigned int new_to)
- 	return wdt_ping(dev);
- }
- 
--static struct watchdog_ops wdt_ops = {
-+static const struct watchdog_ops wdt_ops = {
- 	.owner = THIS_MODULE,
- 	.start = wdt_start,
- 	.stop = wdt_stop,
-diff --git a/drivers/watchdog/digicolor_wdt.c b/drivers/watchdog/digicolor_wdt.c
-index 77df772..817d3f9 100644
---- a/drivers/watchdog/digicolor_wdt.c
-+++ b/drivers/watchdog/digicolor_wdt.c
-@@ -96,7 +96,7 @@ static unsigned int dc_wdt_get_timeleft(struct watchdog_device *wdog)
- 	return count / clk_get_rate(wdt->clk);
- }
- 
--static struct watchdog_ops dc_wdt_ops = {
-+static const struct watchdog_ops dc_wdt_ops = {
- 	.owner		= THIS_MODULE,
- 	.start		= dc_wdt_start,
- 	.stop		= dc_wdt_stop,
-diff --git a/drivers/watchdog/ep93xx_wdt.c b/drivers/watchdog/ep93xx_wdt.c
-index 0a4d7cc..8a6e1a7 100644
---- a/drivers/watchdog/ep93xx_wdt.c
-+++ b/drivers/watchdog/ep93xx_wdt.c
-@@ -99,7 +99,7 @@ static const struct watchdog_info ep93xx_wdt_ident = {
- 	.identity	= "EP93xx Watchdog",
- };
- 
--static struct watchdog_ops ep93xx_wdt_ops = {
-+static const struct watchdog_ops ep93xx_wdt_ops = {
- 	.owner		= THIS_MODULE,
- 	.start		= ep93xx_wdt_start,
- 	.stop		= ep93xx_wdt_stop,
-diff --git a/drivers/watchdog/mt7621_wdt.c b/drivers/watchdog/mt7621_wdt.c
-index d5735c1..cb3651ae 100644
---- a/drivers/watchdog/mt7621_wdt.c
-+++ b/drivers/watchdog/mt7621_wdt.c
-@@ -110,7 +110,7 @@ static struct watchdog_info mt7621_wdt_info = {
- 	.options = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE,
- };
- 
--static struct watchdog_ops mt7621_wdt_ops = {
-+static const struct watchdog_ops mt7621_wdt_ops = {
- 	.owner = THIS_MODULE,
- 	.start = mt7621_wdt_start,
- 	.stop = mt7621_wdt_stop,
-diff --git a/drivers/watchdog/rt2880_wdt.c b/drivers/watchdog/rt2880_wdt.c
-index 14b4fd4..b2b472f 100644
---- a/drivers/watchdog/rt2880_wdt.c
-+++ b/drivers/watchdog/rt2880_wdt.c
-@@ -124,7 +124,7 @@ static struct watchdog_info rt288x_wdt_info = {
- 	.options = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE,
- };
- 
--static struct watchdog_ops rt288x_wdt_ops = {
-+static const struct watchdog_ops rt288x_wdt_ops = {
- 	.owner = THIS_MODULE,
- 	.start = rt288x_wdt_start,
- 	.stop = rt288x_wdt_stop,
-diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
-index 59e9576..d48ba25 100644
---- a/drivers/watchdog/s3c2410_wdt.c
-+++ b/drivers/watchdog/s3c2410_wdt.c
-@@ -394,7 +394,7 @@ static const struct watchdog_info s3c2410_wdt_ident = {
- 	.identity         =	"S3C2410 Watchdog",
- };
- 
--static struct watchdog_ops s3c2410wdt_ops = {
-+static const struct watchdog_ops s3c2410wdt_ops = {
- 	.owner = THIS_MODULE,
- 	.start = s3c2410wdt_start,
- 	.stop = s3c2410wdt_stop,
-diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
-index a49634c..dc4c76b 100644
---- a/drivers/watchdog/sama5d4_wdt.c
-+++ b/drivers/watchdog/sama5d4_wdt.c
-@@ -107,7 +107,7 @@ static const struct watchdog_info sama5d4_wdt_info = {
- 	.identity = "Atmel SAMA5D4 Watchdog",
- };
- 
--static struct watchdog_ops sama5d4_wdt_ops = {
-+static const struct watchdog_ops sama5d4_wdt_ops = {
- 	.owner = THIS_MODULE,
- 	.start = sama5d4_wdt_start,
- 	.stop = sama5d4_wdt_stop,
-diff --git a/drivers/watchdog/sbsa_gwdt.c b/drivers/watchdog/sbsa_gwdt.c
-index ce0c38b..c0d1d3b 100644
---- a/drivers/watchdog/sbsa_gwdt.c
-+++ b/drivers/watchdog/sbsa_gwdt.c
-@@ -215,7 +215,7 @@ static struct watchdog_info sbsa_gwdt_info = {
- 			  WDIOF_CARDRESET,
- };
- 
--static struct watchdog_ops sbsa_gwdt_ops = {
-+static const struct watchdog_ops sbsa_gwdt_ops = {
- 	.owner		= THIS_MODULE,
- 	.start		= sbsa_gwdt_start,
- 	.stop		= sbsa_gwdt_stop,
-diff --git a/drivers/watchdog/sirfsoc_wdt.c b/drivers/watchdog/sirfsoc_wdt.c
-index 3050a00..4eea351 100644
---- a/drivers/watchdog/sirfsoc_wdt.c
-+++ b/drivers/watchdog/sirfsoc_wdt.c
-@@ -127,7 +127,7 @@ static const struct watchdog_info sirfsoc_wdt_ident = {
- 	.identity         =	"SiRFSOC Watchdog",
- };
- 
--static struct watchdog_ops sirfsoc_wdt_ops = {
-+static const struct watchdog_ops sirfsoc_wdt_ops = {
- 	.owner = THIS_MODULE,
- 	.start = sirfsoc_wdt_enable,
- 	.stop = sirfsoc_wdt_disable,
-diff --git a/drivers/watchdog/sun4v_wdt.c b/drivers/watchdog/sun4v_wdt.c
-index 1467fe5..0090797 100644
---- a/drivers/watchdog/sun4v_wdt.c
-+++ b/drivers/watchdog/sun4v_wdt.c
-@@ -77,7 +77,7 @@ static const struct watchdog_info sun4v_wdt_ident = {
- 	.firmware_version = 0,
- };
- 
--static struct watchdog_ops sun4v_wdt_ops = {
-+static const struct watchdog_ops sun4v_wdt_ops = {
- 	.owner =	THIS_MODULE,
- 	.start =	sun4v_wdt_ping,
- 	.stop =		sun4v_wdt_stop,
--- 
-2.7.4
+However ERASE_GROUP_DEF also affects the size of write protect groups.
