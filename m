@@ -1,169 +1,69 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Sat, 28 Jan 2017 13:19:43 +0100
-Subject: [PATCH v15 4/5] Documentation: tee subsystem and op-tee driver
-In-Reply-To: <1485605984-30064-1-git-send-email-jens.wiklander@linaro.org>
-References: <1485605984-30064-1-git-send-email-jens.wiklander@linaro.org>
-Message-ID: <1485605984-30064-5-git-send-email-jens.wiklander@linaro.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 28 Jan 2017 20:22:33 +0800
+Subject: [PATCH v2 04/10] clk: sunxi-ng: Support separately grouped PLL lock
+ status register
+In-Reply-To: <20170128122239.4480-1-wens@csie.org>
+References: <20170128122239.4480-1-wens@csie.org>
+Message-ID: <20170128122239.4480-5-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Acked-by: Andreas Dannenberg <dannenberg@ti.com>
-Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
----
- Documentation/00-INDEX |   2 +
- Documentation/tee.txt  | 118 +++++++++++++++++++++++++++++++++++++++++++++++++
- MAINTAINERS            |   1 +
- 3 files changed, 121 insertions(+)
- create mode 100644 Documentation/tee.txt
+On the Allwinner A80 SoC, the PLL lock status indicators are grouped
+together in a separate register, as opposed to being scattered in each
+PLL's configuration register.
 
-diff --git a/Documentation/00-INDEX b/Documentation/00-INDEX
-index c8a8eb1a2b11..fc6a3cb83d97 100644
---- a/Documentation/00-INDEX
-+++ b/Documentation/00-INDEX
-@@ -412,6 +412,8 @@ sysctl/
- 	- directory with info on the /proc/sys/* files.
- target/
- 	- directory with info on generating TCM v4 fabric .ko modules
-+tee.txt
-+	- info on the TEE subsystem and drivers
- this_cpu_ops.txt
- 	- List rationale behind and the way to use this_cpu operations.
- thermal/
-diff --git a/Documentation/tee.txt b/Documentation/tee.txt
-new file mode 100644
-index 000000000000..718599357596
---- /dev/null
-+++ b/Documentation/tee.txt
-@@ -0,0 +1,118 @@
-+TEE subsystem
-+This document describes the TEE subsystem in Linux.
-+
-+A TEE (Trusted Execution Environment) is a trusted OS running in some
-+secure environment, for example, TrustZone on ARM CPUs, or a separate
-+secure co-processor etc. A TEE driver handles the details needed to
-+communicate with the TEE.
-+
-+This subsystem deals with:
-+
-+- Registration of TEE drivers
-+
-+- Managing shared memory between Linux and the TEE
-+
-+- Providing a generic API to the TEE
-+
-+The TEE interface
-+=================
-+
-+include/uapi/linux/tee.h defines the generic interface to a TEE.
-+
-+User space (the client) connects to the driver by opening /dev/tee[0-9]* or
-+/dev/teepriv[0-9]*.
-+
-+- TEE_IOC_SHM_ALLOC allocates shared memory and returns a file descriptor
-+  which user space can mmap. When user space doesn't need the file
-+  descriptor any more, it should be closed. When shared memory isn't needed
-+  any longer it should be unmapped with munmap() to allow the reuse of
-+  memory.
-+
-+- TEE_IOC_VERSION lets user space know which TEE this driver handles and
-+  the its capabilities.
-+
-+- TEE_IOC_OPEN_SESSION opens a new session to a Trusted Application.
-+
-+- TEE_IOC_INVOKE invokes a function in a Trusted Application.
-+
-+- TEE_IOC_CANCEL may cancel an ongoing TEE_IOC_OPEN_SESSION or TEE_IOC_INVOKE.
-+
-+- TEE_IOC_CLOSE_SESSION closes a session to a Trusted Application.
-+
-+There are two classes of clients, normal clients and supplicants. The latter is
-+a helper process for the TEE to access resources in Linux, for example file
-+system access. A normal client opens /dev/tee[0-9]* and a supplicant opens
-+/dev/teepriv[0-9].
-+
-+Much of the communication between clients and the TEE is opaque to the
-+driver. The main job for the driver is to receive requests from the
-+clients, forward them to the TEE and send back the results. In the case of
-+supplicants the communication goes in the other direction, the TEE sends
-+requests to the supplicant which then sends back the result.
-+
-+OP-TEE driver
-+=============
-+
-+The OP-TEE driver handles OP-TEE [1] based TEEs. Currently it is only the ARM
-+TrustZone based OP-TEE solution that is supported.
-+
-+Lowest level of communication with OP-TEE builds on ARM SMC Calling
-+Convention (SMCCC) [2], which is the foundation for OP-TEE's SMC interface
-+[3] used internally by the driver. Stacked on top of that is OP-TEE Message
-+Protocol [4].
-+
-+OP-TEE SMC interface provides the basic functions required by SMCCC and some
-+additional functions specific for OP-TEE. The most interesting functions are:
-+
-+- OPTEE_SMC_FUNCID_CALLS_UID (part of SMCCC) returns the version information
-+  which is then returned by TEE_IOC_VERSION
-+
-+- OPTEE_SMC_CALL_GET_OS_UUID returns the particular OP-TEE implementation, used
-+  to tell, for instance, a TrustZone OP-TEE apart from an OP-TEE running on a
-+  separate secure co-processor.
-+
-+- OPTEE_SMC_CALL_WITH_ARG drives the OP-TEE message protocol
-+
-+- OPTEE_SMC_GET_SHM_CONFIG lets the driver and OP-TEE agree on which memory
-+  range to used for shared memory between Linux and OP-TEE.
-+
-+The GlobalPlatform TEE Client API [5] is implemented on top of the generic
-+TEE API.
-+
-+Picture of the relationship between the different components in the
-+OP-TEE architecture.
-+
-+    User space                  Kernel                   Secure world
-+    ~~~~~~~~~~                  ~~~~~~                   ~~~~~~~~~~~~
-+ +--------+                                             +-------------+
-+ | Client |                                             | Trusted     |
-+ +--------+                                             | Application |
-+    /\                                                  +-------------+
-+    || +----------+                                           /\
-+    || |tee-      |                                           ||
-+    || |supplicant|                                           \/
-+    || +----------+                                     +-------------+
-+    \/      /\                                          | TEE Internal|
-+ +-------+  ||                                          | API         |
-+ + TEE   |  ||            +--------+--------+           +-------------+
-+ | Client|  ||            | TEE    | OP-TEE |           | OP-TEE      |
-+ | API   |  \/            | subsys | driver |           | Trusted OS  |
-+ +-------+----------------+----+-------+----+-----------+-------------+
-+ |      Generic TEE API        |       |     OP-TEE MSG               |
-+ |      IOCTL (TEE_IOC_*)      |       |     SMCCC (OPTEE_SMC_CALL_*) |
-+ +-----------------------------+       +------------------------------+
-+
-+RPC (Remote Procedure Call) are requests from secure world to kernel driver
-+or tee-supplicant. An RPC is identified by a special range of SMCCC return
-+values from OPTEE_SMC_CALL_WITH_ARG. RPC messages which are intended for the
-+kernel are handled by the kernel driver. Other RPC messages will be forwarded to
-+tee-supplicant without further involvement of the driver, except switching
-+shared memory buffer representation.
-+
-+References:
-+[1] https://github.com/OP-TEE/optee_os
-+[2] http://infocenter.arm.com/help/topic/com.arm.doc.den0028a/index.html
-+[3] drivers/tee/optee/optee_smc.h
-+[4] drivers/tee/optee/optee_msg.h
-+[5] http://www.globalplatform.org/specificationsdevice.asp look for
-+    "TEE Client API Specification v1.0" and click download.
-diff --git a/MAINTAINERS b/MAINTAINERS
-index bc9c2086f19b..a55d5228b10f 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -10902,6 +10902,7 @@ S:	Maintained
- F:	include/linux/tee_drv.h
- F:	include/uapi/linux/tee.h
- F:	drivers/tee/
-+F:	Documentation/tee.txt
+Add a flag to support this.
+
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/clk/sunxi-ng/ccu_common.c | 9 +++++++--
+ drivers/clk/sunxi-ng/ccu_common.h | 2 ++
+ 2 files changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/clk/sunxi-ng/ccu_common.c b/drivers/clk/sunxi-ng/ccu_common.c
+index 51d4bac97ab3..6986e11e91b0 100644
+--- a/drivers/clk/sunxi-ng/ccu_common.c
++++ b/drivers/clk/sunxi-ng/ccu_common.c
+@@ -25,13 +25,18 @@ static DEFINE_SPINLOCK(ccu_lock);
  
- THUNDERBOLT DRIVER
- M:	Andreas Noever <andreas.noever@gmail.com>
+ void ccu_helper_wait_for_lock(struct ccu_common *common, u32 lock)
+ {
++	void __iomem *addr;
+ 	u32 reg;
+ 
+ 	if (!lock)
+ 		return;
+ 
+-	WARN_ON(readl_relaxed_poll_timeout(common->base + common->reg, reg,
+-					   reg & lock, 100, 70000));
++	if (common->features & CCU_FEATURE_LOCK_REG)
++		addr = common->base + common->lock_reg;
++	else
++		addr = common->base + common->reg;
++
++	WARN_ON(readl_relaxed_poll_timeout(addr, reg, reg & lock, 100, 70000));
+ }
+ 
+ int sunxi_ccu_probe(struct device_node *node, void __iomem *reg,
+diff --git a/drivers/clk/sunxi-ng/ccu_common.h b/drivers/clk/sunxi-ng/ccu_common.h
+index cdd69eb2e0b9..73d81dc58fc5 100644
+--- a/drivers/clk/sunxi-ng/ccu_common.h
++++ b/drivers/clk/sunxi-ng/ccu_common.h
+@@ -22,6 +22,7 @@
+ #define CCU_FEATURE_FIXED_PREDIV	BIT(2)
+ #define CCU_FEATURE_FIXED_POSTDIV	BIT(3)
+ #define CCU_FEATURE_ALL_PREDIV		BIT(4)
++#define CCU_FEATURE_LOCK_REG		BIT(5)
+ 
+ struct device_node;
+ 
+@@ -57,6 +58,7 @@ struct device_node;
+ struct ccu_common {
+ 	void __iomem	*base;
+ 	u16		reg;
++	u16		lock_reg;
+ 	u32		prediv;
+ 
+ 	unsigned long	features;
 -- 
-2.7.4
+2.11.0
