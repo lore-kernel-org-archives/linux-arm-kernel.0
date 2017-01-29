@@ -1,43 +1,68 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun, 29 Jan 2017 12:53:57 -0500
-Subject: [PATCH V7 08/11] drivers: acpi: Handle IOMMU lookup failure with
- deferred probing or error
-In-Reply-To: <20170124123711.GA11996@red-moon>
-References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
- <1485188293-20263-9-git-send-email-sricharan@codeaurora.org>
- <20170124123711.GA11996@red-moon>
-Message-ID: <f2370671-ece8-fbee-de19-350dd625088f@codeaurora.org>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Sun, 29 Jan 2017 20:40:59 +0200
+Subject: [PATCH v2] ARM: bcm2835: dts: fix uart0 pinctrl node names
+Message-ID: <f37d02c769d0e2b6db2529cafb86b5fdd1e09a94.1485715259.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/24/2017 7:37 AM, Lorenzo Pieralisi wrote:
-> [+hanjun, tomasz, sinan]
-> 
-> It is quite a key patchset, I would be glad if they can test on their
-> respective platforms with IORT.
-> 
+Downstream kernel uses pins 32, 33 as UART0 (PL011) Rx/Tx to communicate with
+the Bluetooth chip. So ALT3 of these pins is most likely not CTS/RTS. Change
+the node name to reflect that. This matches section 6.2 "Alternative Function
+Assignments" in the BCM2835 ARM Peripherals document.
 
-Tested on top of 4.10-rc5.
+With this change in place, adding
 
-1.	Platform Hidma device passed dmatest
-2.	Seeing some USB stalls on a platform USB device.
-3.	PCIe NVME drive probed and worked fine with MSI interrupts after boot.
-4. 	NVMe driver didn't probe following a hotplug insertion and received an
-SMMU error event during the insertion.
+  &uart0 {
+	 pinctrl-names = "default";
+	 pinctrl-0 = <&uart0_gpio32 &gpclk2_gpio43>;
+	 status = "okay";
+  };
 
-/sys/bus/pci/slots/4 #
-/sys/bus/pci/slots/4 # dmesg | grep nvme
-[   14.041357] nvme nvme0: pci function 0003:01:00.0
-[  198.399521] nvme nvme0: pci function 0003:01:00.0
-[__198.416232]_nvme_0003:01:00.0:_enabling_device_(0000_->_0002)
-[  264.402216] nvme nvme0: I/O 228 QID 0 timeout, disable controller
-[  264.402313] nvme nvme0: Identify Controller failed (-4)
-[  264.421270] nvme nvme0: Removing after probe failure status: -5
-/sys/bus/pci/slots/4 #
+to bcm2837-rpi-3-b.dts does the right thing on my Raspberry Pi 3.
 
+Pins 30, 31 are CTS/RTS of UART0 in alternate function 3. Rename uart0_gpio30
+as well.
 
+While at it, fix a little typo in a nearby comment.
 
+Fixes: 21ff843931b ("ARM: dts: bcm283x: Define standard pinctrl groups in the gpio node.")
+Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+v2:
+   * Reference the ARM Peripherals document
+   * Fix subject typo (Stefan)
+   * Rename also uart0_gpio30 (Stefan)
+   * Add comment typo fix (Stefan)
+   * Add Stefan's ack
+---
+ arch/arm/boot/dts/bcm283x.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+index 9a44da190897..bc8ad417c8a3 100644
+--- a/arch/arm/boot/dts/bcm283x.dtsi
++++ b/arch/arm/boot/dts/bcm283x.dtsi
+@@ -292,17 +292,17 @@
+ 			/* Separate from the uart0_gpio14 group
+ 			 * because it conflicts with spi1_gpio16, and
+ 			 * people often run uart0 on the two pins
+-			 * without flow contrl.
++			 * without flow control.
+ 			 */
+ 			uart0_ctsrts_gpio16: uart0_ctsrts_gpio16 {
+ 				brcm,pins = <16 17>;
+ 				brcm,function = <BCM2835_FSEL_ALT3>;
+ 			};
+-			uart0_gpio30: uart0_gpio30 {
++			uart0_ctsrts_gpio30: uart0_ctsrts_gpio30 {
+ 				brcm,pins = <30 31>;
+ 				brcm,function = <BCM2835_FSEL_ALT3>;
+ 			};
+-			uart0_ctsrts_gpio32: uart0_ctsrts_gpio32 {
++			uart0_gpio32: uart0_gpio32 {
+ 				brcm,pins = <32 33>;
+ 				brcm,function = <BCM2835_FSEL_ALT3>;
+ 			};
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.11.0
