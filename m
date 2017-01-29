@@ -1,41 +1,29 @@
-From: john@metanate.com (John Keeping)
-Date: Sun, 29 Jan 2017 13:24:40 +0000
-Subject: [PATCH v3 20/24] drm/rockchip: vop: test for P{H,V}SYNC
-In-Reply-To: <20170129132444.25251-1-john@metanate.com>
-References: <20170129132444.25251-1-john@metanate.com>
-Message-ID: <20170129132444.25251-21-john@metanate.com>
+From: hkallweit1@gmail.com (Heiner Kallweit)
+Date: Sun, 29 Jan 2017 15:07:33 +0100
+Subject: [PATCH] ARM64: dts: meson-gxbb: set reset for ethernet
+Message-ID: <ec31eddc-d286-d0bc-0bdb-ae9d5014d82e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When connected to the MIPI DSI output, we need to use N{H,V}SYNC for the
-internal connection but these flags are meaningless for DSI panels.
-Switch the test so that we do not set the P{H,V}SYNC bits unless the
-mode requires it.
+Add reset control for ethernet.
 
-Signed-off-by: John Keeping <john@metanate.com>
-Reviewed-by: Mark Yao <mark.yao@rock-chips.com>
+Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
 ---
-v3:
-- Add Mark's Reviewed-by
-Unchanged in v2
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index c7eba305c488..67aefc6d4e9a 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -933,8 +933,8 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
- 	}
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index 39a774ad..753fddf6 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -113,6 +113,8 @@
+ 		 <&clkc CLKID_FCLK_DIV2>,
+ 		 <&clkc CLKID_MPLL2>;
+ 	clock-names = "stmmaceth", "clkin0", "clkin1";
++	resets = <&reset RESET_ETHERNET>;
++	reset-names = "stmmaceth";
+ };
  
- 	pin_pol = 0x8;
--	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_NHSYNC) ? 0 : 1;
--	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_NVSYNC) ? 0 : (1 << 1);
-+	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_PHSYNC) ? 1 : 0;
-+	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_PVSYNC) ? (1 << 1) : 0;
- 	VOP_CTRL_SET(vop, pin_pol, pin_pol);
- 
- 	switch (s->output_type) {
+ &aobus {
 -- 
-2.11.0.197.gb556de5.dirty
+2.11.0
