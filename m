@@ -1,72 +1,64 @@
 From: john@metanate.com (John Keeping)
-Date: Sun, 29 Jan 2017 13:24:24 +0000
-Subject: [PATCH v3 04/24] drm/rockchip: dw-mipi-dsi: fix command header writes
+Date: Sun, 29 Jan 2017 13:24:29 +0000
+Subject: [PATCH v3 09/24] drm/rockchip: dw-mipi-dsi: only request HS clock
+ when required
 In-Reply-To: <20170129132444.25251-1-john@metanate.com>
 References: <20170129132444.25251-1-john@metanate.com>
-Message-ID: <20170129132444.25251-5-john@metanate.com>
+Message-ID: <20170129132444.25251-10-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In a couple of places here we use "val" for the value that is about to
-be written to a register but then reuse the same variable for the value
-of a status register before we get around to writing it.  Rename the
-value to be written to so that we write the value we intend to and not
-what we have just read from the status register.
+Requesting the HS clock from the PHY before we initialize it causes an
+invalid signal to be sent out since the input clock is not yet
+configured.  The PHY databook suggests only asserting this signal when
+performing HS transfers, so let's do that.
 
 Signed-off-by: John Keeping <john@metanate.com>
-Tested-by: Chris Zhong <zyw@rock-chips.com>
 Reviewed-by: Chris Zhong <zyw@rock-chips.com>
 ---
-Unchanged in v3
+v3:
+- Add Chris' Reviewed-by
 Unchanged in v2
 
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index bd92e58b64f3..4cbbbcb619b7 100644
+index 15d33c3c8cb7..03fc096fe1bd 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -542,9 +542,10 @@ static int dw_mipi_dsi_host_detach(struct mipi_dsi_host *host,
- 	return 0;
+@@ -545,13 +545,15 @@ static int dw_mipi_dsi_host_detach(struct mipi_dsi_host *host,
+ static void dw_mipi_message_config(struct dw_mipi_dsi *dsi,
+ 				   const struct mipi_dsi_msg *msg)
+ {
++	bool lpm = msg->flags & MIPI_DSI_MSG_USE_LPM;
+ 	u32 val = 0;
+ 
+ 	if (msg->flags & MIPI_DSI_MSG_REQ_ACK)
+ 		val |= EN_ACK_RQST;
+-	if (msg->flags & MIPI_DSI_MSG_USE_LPM)
++	if (lpm)
+ 		val |= CMD_MODE_ALL_LP;
+ 
++	dsi_write(dsi, DSI_LPCLK_CTRL, lpm ? 0 : PHY_TXREQUESTCLKHS);
+ 	dsi_write(dsi, DSI_CMD_MODE_CFG, val);
  }
  
--static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 val)
-+static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
- {
- 	int ret;
-+	u32 val;
- 
- 	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
- 				 val, !(val & GEN_CMD_FULL), 1000,
-@@ -554,7 +555,7 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 val)
- 		return ret;
+@@ -693,6 +695,7 @@ static void dw_mipi_dsi_set_mode(struct dw_mipi_dsi *dsi,
+ 		dsi_write(dsi, DSI_PWR_UP, RESET);
+ 		dsi_write(dsi, DSI_MODE_CFG, ENABLE_VIDEO_MODE);
+ 		dw_mipi_dsi_video_mode_config(dsi);
++		dsi_write(dsi, DSI_LPCLK_CTRL, PHY_TXREQUESTCLKHS);
+ 		dsi_write(dsi, DSI_PWR_UP, POWERUP);
  	}
- 
--	dsi_write(dsi, DSI_GEN_HDR, val);
-+	dsi_write(dsi, DSI_GEN_HDR, hdr_val);
- 
- 	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
- 				 val, val & (GEN_CMD_EMPTY | GEN_PLD_W_EMPTY),
-@@ -587,8 +588,9 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
- {
- 	const u32 *tx_buf = msg->tx_buf;
- 	int len = msg->tx_len, pld_data_bytes = sizeof(*tx_buf), ret;
--	u32 val = GEN_HDATA(msg->tx_len) | GEN_HTYPE(msg->type);
-+	u32 hdr_val = GEN_HDATA(msg->tx_len) | GEN_HTYPE(msg->type);
- 	u32 remainder = 0;
-+	u32 val;
- 
- 	if (msg->tx_len < 3) {
- 		dev_err(dsi->dev, "wrong tx buf length %zu for long write\n",
-@@ -617,7 +619,7 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
- 		}
- 	}
- 
--	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, val);
-+	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, hdr_val);
+ }
+@@ -710,7 +713,6 @@ static void dw_mipi_dsi_init(struct dw_mipi_dsi *dsi)
+ 		  | PHY_RSTZ | PHY_SHUTDOWNZ);
+ 	dsi_write(dsi, DSI_CLKMGR_CFG, TO_CLK_DIVIDSION(10) |
+ 		  TX_ESC_CLK_DIVIDSION(7));
+-	dsi_write(dsi, DSI_LPCLK_CTRL, PHY_TXREQUESTCLKHS);
  }
  
- static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
+ static void dw_mipi_dsi_dpi_config(struct dw_mipi_dsi *dsi,
 -- 
 2.11.0.197.gb556de5.dirty
