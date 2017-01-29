@@ -1,50 +1,41 @@
 From: john@metanate.com (John Keeping)
-Date: Sun, 29 Jan 2017 13:24:37 +0000
-Subject: [PATCH v3 17/24] drm/rockchip: dw-mipi-dsi: improve PLL configuration
+Date: Sun, 29 Jan 2017 13:24:40 +0000
+Subject: [PATCH v3 20/24] drm/rockchip: vop: test for P{H,V}SYNC
 In-Reply-To: <20170129132444.25251-1-john@metanate.com>
 References: <20170129132444.25251-1-john@metanate.com>
-Message-ID: <20170129132444.25251-18-john@metanate.com>
+Message-ID: <20170129132444.25251-21-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The multiplication ratio for the PLL is required to be even due to the
-use of a "by 2 pre-scaler".  Currently we are likely to end up with an
-odd multiplier even though there is an equivalent set of parameters with
-an even multiplier.
-
-For example, using the 324MHz bit rate with a reference clock of 24MHz
-we end up with M = 27, N = 2 whereas the example in the PHY databook
-gives M = 54, N = 4 for this bit rate and reference clock.
-
-By walking down through the available multiplier instead of up we are
-more likely to hit an even multiplier.  With the above example we do now
-get M = 54, N = 4 as given by the databook.
-
-While doing this, change the loop limits to encode the actual limits on
-the divisor, which are:
-
-	40MHz >= (pllref / N) >= 5MHz
+When connected to the MIPI DSI output, we need to use N{H,V}SYNC for the
+internal connection but these flags are meaningless for DSI panels.
+Switch the test so that we do not set the P{H,V}SYNC bits unless the
+mode requires it.
 
 Signed-off-by: John Keeping <john@metanate.com>
+Reviewed-by: Mark Yao <mark.yao@rock-chips.com>
 ---
-Unchanged in v3
+v3:
+- Add Mark's Reviewed-by
 Unchanged in v2
 
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 85edf6dd2bac..dcb66a21e1f1 100644
---- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-+++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -522,7 +522,7 @@ static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi,
- 	pllref = DIV_ROUND_UP(clk_get_rate(dsi->pllref_clk), USEC_PER_SEC);
- 	tmp = pllref;
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index c7eba305c488..67aefc6d4e9a 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -933,8 +933,8 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
+ 	}
  
--	for (i = 1; i < 6; i++) {
-+	for (i = pllref / 5; i > (pllref / 40); i--) {
- 		pre = pllref / i;
- 		if ((tmp > (target_mbps % pre)) && (target_mbps / pre < 512)) {
- 			tmp = target_mbps % pre;
+ 	pin_pol = 0x8;
+-	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_NHSYNC) ? 0 : 1;
+-	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_NVSYNC) ? 0 : (1 << 1);
++	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_PHSYNC) ? 1 : 0;
++	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_PVSYNC) ? (1 << 1) : 0;
+ 	VOP_CTRL_SET(vop, pin_pol, pin_pol);
+ 
+ 	switch (s->output_type) {
 -- 
 2.11.0.197.gb556de5.dirty
