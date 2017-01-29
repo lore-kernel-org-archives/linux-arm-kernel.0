@@ -1,44 +1,47 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Sun, 29 Jan 2017 15:17:30 +0200
-Subject: [PATCH] ARM: bcm2835: dts: fix uart1 pinctrl node name
-Message-ID: <81ee8da202abbe28e16352e80c1ff94c2e0628c2.1485695850.git.baruch@tkos.co.il>
+From: john@metanate.com (John Keeping)
+Date: Sun, 29 Jan 2017 13:24:20 +0000
+Subject: [PATCH v3 00/24] drm/rockchip: MIPI fixes & improvements
+Message-ID: <20170129132444.25251-1-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Downstream kernel uses pins 32, 33 as UART0 (PL011) Rx/Tx to communicate with
-the Bluetooth chip. So ALT3 of these pins is most likely not CTS/RTS. Change
-the node name to reflect that.
+This re-roll mostly just gather up reviewed-by tags, although I have
+also wrapped some long lines and squashed together some commits as
+suggested by Chris Zhong.
 
-With this change in place, adding
+Version 2 was posted here:
+https://www.spinics.net/lists/arm-kernel/msg556683.html
 
-  &uart0 {
-	 pinctrl-names = "default";
-	 pinctrl-0 = <&uart0_gpio32 &gpclk2_gpio43>;
-	 status = "okay";
-  };
+John Keeping (24):
+  drm/rockchip: dw-mipi-dsi: don't configure hardware in mode_set for
+    MIPI
+  drm/rockchip: dw-mipi-dsi: pass mode in where needed
+  drm/rockchip: dw-mipi-dsi: remove mode_set hook
+  drm/rockchip: dw-mipi-dsi: fix command header writes
+  drm/rockchip: dw-mipi-dsi: fix generic packet status check
+  drm/rockchip: dw-mipi-dsi: avoid out-of-bounds read on tx_buf
+  drm/rockchip: dw-mipi-dsi: include bad value in error message
+  drm/rockchip: dw-mipi-dsi: respect message flags
+  drm/rockchip: dw-mipi-dsi: only request HS clock when required
+  drm/rockchip: dw-mipi-dsi: don't assume buffer is aligned
+  drm/rockchip: dw-mipi-dsi: prepare panel after phy init
+  drm/rockchip: dw-mipi-dsi: allow commands in panel_disable
+  drm/rockchip: dw-mipi-dsi: fix escape clock rate
+  drm/rockchip: dw-mipi-dsi: ensure PHY is reset
+  drm/rockchip: dw-mipi-dsi: configure PHY before enabling
+  drm/rockchip: dw-mipi-dsi: properly configure PHY timing
+  drm/rockchip: dw-mipi-dsi: improve PLL configuration
+  drm/rockchip: dw-mipi-dsi: use specific poll helper
+  drm/rockchip: dw-mipi-dsi: use positive check for N{H,V}SYNC
+  drm/rockchip: vop: test for P{H,V}SYNC
+  drm/rockchip: dw-mipi-dsi: defer probe if panel is not loaded
+  drm/rockchip: dw-mipi-dsi: support non-burst modes
+  drm/rockchip: dw-mipi-dsi: add reset control
+  drm/rockchip: dw-mipi-dsi: support read commands
 
-to bcm2837-rpi-3-b.dts does the right thing on my Raspberry Pi 3.
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c      | 348 +++++++++++++++++++---------
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c |   4 +-
+ 2 files changed, 245 insertions(+), 107 deletions(-)
 
-Fixes: 21ff843931b ("ARM: dts: bcm283x: Define standard pinctrl groups in the gpio node.")
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
-Should uart0_gpio30 be renamed to uart0_ctsrts_gpio30?
----
- arch/arm/boot/dts/bcm283x.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-index 9a44da190897..be6f0bf430ea 100644
---- a/arch/arm/boot/dts/bcm283x.dtsi
-+++ b/arch/arm/boot/dts/bcm283x.dtsi
-@@ -302,7 +302,7 @@
- 				brcm,pins = <30 31>;
- 				brcm,function = <BCM2835_FSEL_ALT3>;
- 			};
--			uart0_ctsrts_gpio32: uart0_ctsrts_gpio32 {
-+			uart0_gpio32: uart0_gpio32 {
- 				brcm,pins = <32 33>;
- 				brcm,function = <BCM2835_FSEL_ALT3>;
- 			};
 -- 
-2.11.0
+2.11.0.197.gb556de5.dirty
