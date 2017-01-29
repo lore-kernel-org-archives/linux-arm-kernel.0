@@ -1,212 +1,194 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 29 Jan 2017 14:40:53 -0800
-Subject: [PATCH v2 2/3] soc: rockchip: add driver handling grf setup
-In-Reply-To: <20161115223900.30728-3-heiko@sntech.de>
-References: <20161115223900.30728-1-heiko@sntech.de>
- <20161115223900.30728-3-heiko@sntech.de>
-Message-ID: <CAOesGMjq3uPqaWjMkEkqXs9W90XTwXknjheZNdYsOaGu4fw9_g@mail.gmail.com>
+From: chris.packham@alliedtelesis.co.nz (Chris Packham)
+Date: Mon, 30 Jan 2017 12:20:30 +1300
+Subject: [PATCHv5 0/5] Support for Marvell switches with integrated CPUs
+Message-ID: <20170129232035.25189-1-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
+The 98DX3236, 98DX3336 and 98DX4251 are a set of switch ASICs with
+integrated CPUs. They CPU block is common within these product lines and
+(as far as I can tell/have been told) is based on the Armada XP. There
+are a few differences due to the fact they have to squeeze the CPU into
+the same package as the switch.
 
+I've rebased this series against linux-pinctrl/devel to get access to
+mvebu_mmio_mpp_ctrl. Everything else still applies cleanly to v4.10.0-rc5.
 
+Chris Packham (4):
+  clk: mvebu: support for 98DX3236 SoC
+    Changes in v2:
+    - Update devicetree binding documentation for new compatible string
+    Changes in v3:
+    - Add 98dx3236 support to mvebu/clk-corediv.c rather than creating a new
+      driver.
+    - Document mv98dx3236-corediv-clock binding
+    Changes in v4:
+    - None
+    Changes in v5:
+    - Collect ack from Rob
+    - Remove explicit initialisation of fields to 0 in mv98dx3236_coreclks
+    - Register dummy clock provider for marvell,mv98dx3236-cpu-clock
+    Changes in v6:
+   - None. Note this has already been applied to clk-net, I've just
+     included it for completeness.
+  arm: mvebu: support for SMP on 98DX3336 SoC
+    Changes in v2:
+    - Document new enable-method value
+    - Correct some references from 98DX4521 to 98DX3236
+    Changes in v3:
+    - Simplify mv98dx3236_resume_init by using of_io_request_and_map()
+    Changes in v4:
+    - integrate changes into platsmp.c instead of new init call
+    - avoid duplicated code.
+    - fix error return
+    - Collect ack from Rob
+    Changes in v5:
+    - Remove useless casts (thanks to Stephen Boyd)
+    Changes in v6:
+    - use a #define instead of a new structure for resume control registers.
+  arm: mvebu: Add device tree for 98DX3236 SoCs
+    Changes in v2:
+    - Update devicetree binding documentation to reflect that 98DX3336 and
+      984251 are supersets of 98DX3236.
+    - disable crypto block
+    - disable sdio for 98DX3236, enable for 98DX4251
+    Changes in v3:
+    - fix typo 4521 -> 4251
+    - document prestera bindings
+    - rework corediv-clock binding
+    - add label to packet processor node
+    - add new compatible string for DFX server
+    Changes in v4:
+    - Collect ack from Rob
+    Changes in v5:
+    - Fixup license text. Add labels to nodes.
+    Changes in v6:
+    - None
+  arm: mvebu: Add device tree for db-dxbc2 and db-xc3-24g4xg boards
+    Changes in v5:
+    - update license text
+    - use node labels
+    Changes in v6:
+    - Rename dts files to include 'armada-xp-' prefix
 
-On Tue, Nov 15, 2016 at 2:38 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> The General Register Files are an area of registers containing a lot
-> of single-bit settings for numerous components as well full components
-> like usbphy control. Therefore all used components are accessed
-> via the syscon provided by the grf nodes or from the sub-devices
-> created through the simple-mfd created from the grf node.
->
-> Some settings are not used by anything but will need to be set up
-> according to expectations on the kernel side.
->
-> Best example is the force_jtag setting, which defaults to on and
-> results in the soc switching the pin-outputs between jtag and sdmmc
-> automatically depending on the card-detect status. This conflicts
-> heavily with how the dw_mmc driver expects to do its work and also
-> with the clock-controller, which has most likely deactivated the
-> jtag clock due to it being unused.
->
-> So far the handling of this setting was living in the mach-rockchip
-> code for the arm32-based rk3288 but that of course doesn't work
-> for arm64 socs and would also look ugly for further arm32 socs.
->
-> Also always disabling this setting is quite specific to linux and
-> its subsystems, other operating systems might prefer other settings,
-> so that the bootloader cannot really set a sane default for all.
->
-> So introduce a top-level driver for the grf that handles these
-> settings that need to be a certain way but nobody cares about.
->
-> Other needed settings might surface in the future and can then
-> be added here, but only as a last option. Ideally general GRF
-> settings should be handled in the driver needing them.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  drivers/soc/rockchip/Kconfig  |  10 ++++
->  drivers/soc/rockchip/Makefile |   1 +
->  drivers/soc/rockchip/grf.c    | 134 ++++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 145 insertions(+)
->  create mode 100644 drivers/soc/rockchip/grf.c
->
-> diff --git a/drivers/soc/rockchip/Kconfig b/drivers/soc/rockchip/Kconfig
-> index 7140ff8..20da55d 100644
-> --- a/drivers/soc/rockchip/Kconfig
-> +++ b/drivers/soc/rockchip/Kconfig
-> @@ -3,6 +3,16 @@ if ARCH_ROCKCHIP || COMPILE_TEST
->  #
->  # Rockchip Soc drivers
->  #
-> +
-> +config ROCKCHIP_GRF
-> +       bool
-> +       default y
-> +       help
-> +         The General Register Files are a central component providing
-> +         special additional settings registers for a lot of soc-components.
-> +         In a lot of cases there also need to be default settings initialized
-> +         to make some of them conform to expectations of the kernel.
-> +
->  config ROCKCHIP_PM_DOMAINS
->          bool "Rockchip generic power domain"
->          depends on PM
-> diff --git a/drivers/soc/rockchip/Makefile b/drivers/soc/rockchip/Makefile
-> index 3d73d06..c851fa0 100644
-> --- a/drivers/soc/rockchip/Makefile
-> +++ b/drivers/soc/rockchip/Makefile
-> @@ -1,4 +1,5 @@
->  #
->  # Rockchip Soc drivers
->  #
-> +obj-$(CONFIG_ROCKCHIP_GRF) += grf.o
->  obj-$(CONFIG_ROCKCHIP_PM_DOMAINS) += pm_domains.o
-> diff --git a/drivers/soc/rockchip/grf.c b/drivers/soc/rockchip/grf.c
-> new file mode 100644
-> index 0000000..0c85476a
-> --- /dev/null
-> +++ b/drivers/soc/rockchip/grf.c
-> @@ -0,0 +1,134 @@
-> +/*
-> + * Rockchip Generic Register Files setup
-> + *
-> + * Copyright (c) 2016 Heiko Stuebner <heiko@sntech.de>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/err.h>
-> +#include <linux/regmap.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/regmap.h>
-> +
-> +#define HIWORD_UPDATE(val, mask, shift) \
-> +               ((val) << (shift) | (mask) << ((shift) + 16))
-> +
-> +struct rockchip_grf_value {
-> +       const char *desc;
-> +       u32 reg;
-> +       u32 val;
-> +};
-> +
-> +struct rockchip_grf_info {
-> +       const struct rockchip_grf_value *values;
-> +       int num_values;
-> +};
-> +
-> +#define RK3036_GRF_SOC_CON0            0x140
-> +
-> +static const struct rockchip_grf_value rk3036_defaults[] __initconst = {
-> +       /*
-> +        * Disable auto jtag/sdmmc switching that causes issues with the
-> +        * clock-framework and the mmc controllers making them unreliable.
-> +        */
-> +       { "jtag switching", RK3036_GRF_SOC_CON0, HIWORD_UPDATE(0, 1, 11) },
-> +};
-> +
-> +static const struct rockchip_grf_info rk3036_grf __initconst = {
-> +       .values = rk3036_defaults,
-> +       .num_values = ARRAY_SIZE(rk3036_defaults),
-> +};
-> +
-> +#define RK3288_GRF_SOC_CON0            0x244
-> +
-> +static const struct rockchip_grf_value rk3288_defaults[] __initconst = {
-> +       { "jtag switching", RK3288_GRF_SOC_CON0, HIWORD_UPDATE(0, 1, 12) },
-> +};
-> +
-> +static const struct rockchip_grf_info rk3288_grf __initconst = {
-> +       .values = rk3288_defaults,
-> +       .num_values = ARRAY_SIZE(rk3288_defaults),
-> +};
-> +
-> +#define RK3368_GRF_SOC_CON15           0x43c
-> +
-> +static const struct rockchip_grf_value rk3368_defaults[] __initconst = {
-> +       { "jtag switching", RK3368_GRF_SOC_CON15, HIWORD_UPDATE(0, 1, 13) },
-> +};
-> +
-> +static const struct rockchip_grf_info rk3368_grf __initconst = {
-> +       .values = rk3368_defaults,
-> +       .num_values = ARRAY_SIZE(rk3368_defaults),
-> +};
-> +
-> +#define RK3399_GRF_SOC_CON7            0xe21c
-> +
-> +static const struct rockchip_grf_value rk3399_defaults[] __initconst = {
-> +       { "jtag switching", RK3399_GRF_SOC_CON7, HIWORD_UPDATE(0, 1, 12) },
-> +};
-> +
-> +static const struct rockchip_grf_info rk3399_grf __initconst = {
-> +       .values = rk3399_defaults,
-> +       .num_values = ARRAY_SIZE(rk3399_defaults),
-> +};
-> +
-> +static const struct of_device_id rockchip_grf_dt_match[] __initconst = {
-> +       {
-> +               .compatible = "rockchip,rk3036-grf",
-> +               .data = (void *)&rk3036_grf,
-> +       }, {
-> +               .compatible = "rockchip,rk3288-grf",
-> +               .data = (void *)&rk3288_grf,
-> +       }, {
-> +               .compatible = "rockchip,rk3368-grf",
-> +               .data = (void *)&rk3368_grf,
-> +       }, {
-> +               .compatible = "rockchip,rk3399-grf",
-> +               .data = (void *)&rk3399_grf,
-> +       },
-> +       { /* sentinel */ },
-> +};
+Kalyan Kinthada (1):
+  pinctrl: mvebu: pinctrl driver for 98DX3236 SoC
+    Changes in v2:
+    - include sdio support for the 98DX4251
+    Changes in v3:
+    - None
+    Changes in v4:
+    - Correct some discrepencies between binding and driver.
+    - Collect acks from Rob and Sebastian
+    Changes in v5:
+    - Update bindings to reflect "gpo" pins
+    - Use mvebu_mmio_mpp_ctrl instead of armada_xp_mpp_ctrl (note this is reliant
+      on changes queued in linux-pinctrl)
+    Changes in v6:
+    - None
 
-I often come in after there's already been discussion on a topic, and
-don't always find all of it, so let me know if this has already been
-considered and not chosen for some reason:
+ Documentation/devicetree/bindings/arm/cpus.txt     |   1 +
+ .../bindings/arm/marvell/98dx3236-resume-ctrl.txt  |  16 ++
+ .../devicetree/bindings/arm/marvell/98dx3236.txt   |  23 ++
+ .../bindings/clock/mvebu-corediv-clock.txt         |   1 +
+ .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |   1 +
+ .../devicetree/bindings/net/marvell,prestera.txt   |  50 ++++
+ .../pinctrl/marvell,armada-98dx3236-pinctrl.txt    |  46 ++++
+ arch/arm/boot/dts/armada-xp-98dx3236.dtsi          | 254 +++++++++++++++++++++
+ arch/arm/boot/dts/armada-xp-98dx3336.dtsi          |  76 ++++++
+ arch/arm/boot/dts/armada-xp-98dx4251.dtsi          |  90 ++++++++
+ arch/arm/boot/dts/armada-xp-db-dxbc2.dts           | 151 ++++++++++++
+ arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts      | 142 ++++++++++++
+ arch/arm/mach-mvebu/platsmp.c                      |  75 ++++++
+ drivers/clk/mvebu/armada-xp.c                      |  39 ++++
+ drivers/clk/mvebu/clk-corediv.c                    |  23 ++
+ drivers/clk/mvebu/clk-cpu.c                        |   8 +
+ drivers/pinctrl/mvebu/pinctrl-armada-xp.c          | 156 +++++++++++++
+ 17 files changed, 1152 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/marvell/98dx3236-resume-ctrl.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/marvell/98dx3236.txt
+ create mode 100644 Documentation/devicetree/bindings/net/marvell,prestera.txt
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-98dx3236-pinctrl.txt
+ create mode 100644 arch/arm/boot/dts/armada-xp-98dx3236.dtsi
+ create mode 100644 arch/arm/boot/dts/armada-xp-98dx3336.dtsi
+ create mode 100644 arch/arm/boot/dts/armada-xp-98dx4251.dtsi
+ create mode 100644 arch/arm/boot/dts/armada-xp-db-dxbc2.dts
+ create mode 100644 arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts
 
+inter-diff to v5:
+diff --git a/arch/arm/boot/dts/db-dxbc2.dts
+b/arch/arm/boot/dts/armada-xp-db-dxbc2.dts
+similarity index 100%
+rename from arch/arm/boot/dts/db-dxbc2.dts
+rename to arch/arm/boot/dts/armada-xp-db-dxbc2.dts
+diff --git a/arch/arm/boot/dts/db-xc3-24g4xg.dts
+b/arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts
+similarity index 100%
+rename from arch/arm/boot/dts/db-xc3-24g4xg.dts
+rename to arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts
+diff --git a/arch/arm/mach-mvebu/platsmp.c
+b/arch/arm/mach-mvebu/platsmp.c
+index a5b464497e1a..e62273aacb43 100644
+--- a/arch/arm/mach-mvebu/platsmp.c
++++ b/arch/arm/mach-mvebu/platsmp.c
+@@ -185,46 +185,35 @@ const struct smp_operations armada_xp_smp_ops
+__initconst = {
+ CPU_METHOD_OF_DECLARE(armada_xp_smp, "marvell,armada-xp-smp",
+                      &armada_xp_smp_ops);
+ 
+-struct resume_controller {
+-       u32 resume_control;
+-       u32 resume_boot_addr;
+-};
+-
+-static const struct resume_controller mv98dx3336_resume_controller = {
+-       .resume_control = 0x08,
+-       .resume_boot_addr = 0x04,
+-};
++#define MV98DX3236_CPU_RESUME_CTRL_REG 0x08
++#define MV98DX3236_CPU_RESUME_ADDR_REG 0x04
+ 
+ static const struct of_device_id of_mv98dx3236_resume_table[] = {
+        {
+                .compatible = "marvell,98dx3336-resume-ctrl",
+-               .data = &mv98dx3336_resume_controller,
+        },
+        { /* end of list */ },
+ };
+ 
+ static int mv98dx3236_resume_set_cpu_boot_addr(int hw_cpu, void
+*boot_addr)
+ {
+-       const struct of_device_id *match;
+        struct device_node *np;
+        void __iomem *base;
+-       const struct resume_controller *rc;
+-
+        WARN_ON(hw_cpu != 1);
+ 
+-       np = of_find_matching_node_and_match(NULL,
+        of_mv98dx3236_resume_table,
+-                                            &match);
++       np = of_find_matching_node(NULL, of_mv98dx3236_resume_table);
+        if (!np)
+                return -ENODEV;
+ 
+        base = of_io_request_and_map(np, 0, of_node_full_name(np));
+-       rc = match->data;
+        of_node_put(np);
+        if (IS_ERR(base))
+                return PTR_ERR(base);
+ 
+-       writel(0, base + rc->resume_control);
+-       writel(virt_to_phys(boot_addr), base + rc->resume_boot_addr);
++       writel(0, base + MV98DX3236_CPU_RESUME_CTRL_REG);
++       writel(virt_to_phys(boot_addr), base +
+MV98DX3236_CPU_RESUME_ADDR_REG);
++
++       iounmap(base);
+ 
+        return 0;
+ }
 
-I get a little worried when you see these per-SoC tables build up in
-the kernel. It means there'll need to be additions here for a bunch of
-different SoCs.
-
-Would it be possible to describe this directly in the DT instead? If
-nothing else, something like
-
-function-regs = < array of regs >
-function-values = < array of values >
-function-names = < array of names >
-
-Not ideal either, especially if abused into a random poke table, but
-it won't require per-SoC changes to the kernel. If we keep the binding
-under close eyes we can hopefully avoid abuse.
-
-Given that Rockchip is still working on new SoCs, this list will just
-grow and doing it in-kernel will stop scaling at some point.
-
-
--Olof
+-- 
+2.11.0.24.ge6920cf
