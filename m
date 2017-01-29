@@ -1,44 +1,72 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun, 29 Jan 2017 22:06:28 +0200
-Subject: [GIT PULL 3/4] ARM: dts: exynos: for v4.11, 2nd round
-In-Reply-To: <20170129200630.22083-1-krzk@kernel.org>
-References: <20170129200630.22083-1-krzk@kernel.org>
-Message-ID: <20170129200630.22083-3-krzk@kernel.org>
+From: bhaskar.upadhaya@nxp.com (Bhaskar U)
+Date: Sun, 29 Jan 2017 20:06:34 +0000
+Subject: [PATCH 1/3] Documentation: DT: Add entry for FSL LS1012A RDB,
+ FRDM, QDS boards
+In-Reply-To: <20170129021039.GA11950@dragon>
+References: <1478714651-12679-1-git-send-email-harninder.rai@nxp.com>
+ <20170129021039.GA11950@dragon>
+Message-ID: <VI1PR0401MB26693032D0E1283C89F8F5218C480@VI1PR0401MB2669.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Thanks Shawn,
 
-On top of previous pull request.
+Regards
+Bhaskar
 
-Best regards,
-Krzysztof
-
-
-The following changes since commit bca9085e0ae93253bc93ce218c85ac7d7e7f1831:
-
-  ARM: dts: exynos: remove Exynos4212 support (dead code) (2017-01-11 18:28:43 +0200)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt-4.11-2
-
-for you to fetch changes up to dfaf06baad0c088a55570f7a324949c498f2106c:
-
-  ARM: dts: exynos: Fix indentation of EHCI and OHCI ports (2017-01-29 21:03:46 +0200)
-
-----------------------------------------------------------------
-Samsung DeviceTree update for v4.11, second round:
-1. Use bigger reserved memory region for Multi Format Codec on all Exynos
-   chipsets so it could decode FullHD easily.
-
-----------------------------------------------------------------
-Javier Martinez Canillas (1):
-      ARM: dts: exynos: Increase MFC left reserved memory region size
-
-Krzysztof Kozlowski (1):
-      ARM: dts: exynos: Fix indentation of EHCI and OHCI ports
-
- arch/arm/boot/dts/exynos-mfc-reserved-memory.dtsi |  2 +-
- arch/arm/boot/dts/exynos4.dtsi                    | 24 +++++++++++------------
- 2 files changed, 13 insertions(+), 13 deletions(-)
+>-----Original Message-----
+>From: Shawn Guo [mailto:shawnguo at kernel.org]
+>Sent: Sunday, January 29, 2017 7:41 AM
+>To: Harninder Rai <harninder.rai@nxp.com>
+>Cc: devicetree at vger.kernel.org; robh+dt at kernel.org; mark.rutland at arm.com;
+>oss at buserror.net; Bhaskar U <bhaskar.upadhaya@nxp.com>; linux-arm-
+>kernel at lists.infradead.org
+>Subject: Re: [PATCH 1/3] Documentation: DT: Add entry for FSL LS1012A RDB,
+>FRDM, QDS boards
+>
+>On Wed, Nov 09, 2016 at 11:34:11PM +0530, Harninder Rai wrote:
+>> Signed-off-by: Harninder Rai <harninder.rai@nxp.com>
+>> Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
+>
+>Applied all 3, thanks.
+>
+>> ---
+>>  Documentation/devicetree/bindings/arm/fsl.txt | 16 ++++++++++++++++
+>>  1 file changed, 16 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/fsl.txt
+>b/Documentation/devicetree/bindings/arm/fsl.txt
+>> index d6ee9c6..3b01338 100644
+>> --- a/Documentation/devicetree/bindings/arm/fsl.txt
+>> +++ b/Documentation/devicetree/bindings/arm/fsl.txt
+>> @@ -139,6 +139,22 @@ Example:
+>>  Freescale ARMv8 based Layerscape SoC family Device Tree Bindings
+>>  ----------------------------------------------------------------
+>>
+>> +LS1012A SoC
+>> +Required root node properties:
+>> +    - compatible = "fsl,ls1012a";
+>> +
+>> +LS1012A ARMv8 based RDB Board
+>> +Required root node properties:
+>> +    - compatible = "fsl,ls1012a-rdb", "fsl,ls1012a";
+>> +
+>> +LS1012A ARMv8 based FRDM Board
+>> +Required root node properties:
+>> +    - compatible = "fsl,ls1012a-frdm", "fsl,ls1012a";
+>> +
+>> +LS1012A ARMv8 based QDS Board
+>> +Required root node properties:
+>> +    - compatible = "fsl,ls1012a-qds", "fsl,ls1012a";
+>> +
+>>  LS1043A SoC
+>>  Required root node properties:
+>>      - compatible = "fsl,ls1043a";
+>> --
+>> 2.7.4
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
