@@ -1,38 +1,43 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sun, 29 Jan 2017 17:50:05 +0000
-Subject: [PATCH 2/7] MFD: add STM32 DFSDM support
-In-Reply-To: <7b3eb38d-4fd1-2006-7423-94f2a7b38b27@st.com>
-References: <1485189145-29576-1-git-send-email-arnaud.pouliquen@st.com>
- <1485189145-29576-3-git-send-email-arnaud.pouliquen@st.com>
- <20170124082249.GR16020@dell>
- <283c0e48-55e2-6516-369d-91dc72d12f73@st.com>
- <20170124113658.GW16020@dell>
- <a1aaaa20-ac00-b182-f1c1-63152be41135@st.com>
- <20170127101545.g53uah57vgfu55o5@dell>
- <7b3eb38d-4fd1-2006-7423-94f2a7b38b27@st.com>
-Message-ID: <20170129175005.2u25l7zd2anlc6tw@sirena.org.uk>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Sun, 29 Jan 2017 12:53:57 -0500
+Subject: [PATCH V7 08/11] drivers: acpi: Handle IOMMU lookup failure with
+ deferred probing or error
+In-Reply-To: <20170124123711.GA11996@red-moon>
+References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
+ <1485188293-20263-9-git-send-email-sricharan@codeaurora.org>
+ <20170124123711.GA11996@red-moon>
+Message-ID: <f2370671-ece8-fbee-de19-350dd625088f@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2017 at 02:45:49PM +0100, Arnaud Pouliquen wrote:
+On 1/24/2017 7:37 AM, Lorenzo Pieralisi wrote:
+> [+hanjun, tomasz, sinan]
+> 
+> It is quite a key patchset, I would be glad if they can test on their
+> respective platforms with IORT.
+> 
 
-> Jonathan, Mark, Please could you share your opinion on this topic?
+Tested on top of 4.10-rc5.
 
-I really don't have enough visbility of what the hardware or software is
-doing to say much and though there's extensive backtrace in here it's
-not enough to follow.  If it's a generic ADC that happens to have audio
-applications then some relationship with IIO might make sense but I
-don't know how separate the audio and general purpose bits of the
-hardware are.
+1.	Platform Hidma device passed dmatest
+2.	Seeing some USB stalls on a platform USB device.
+3.	PCIe NVME drive probed and worked fine with MSI interrupts after boot.
+4. 	NVMe driver didn't probe following a hotplug insertion and received an
+SMMU error event during the insertion.
 
-Please understand that I get copied in on *lots* of threads about MFDs
-with drivers getting posted repeatedly for whatever revisions are needed
-with little relevance to me so it's very random if I even look at these
-things, much less read them with detail.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170129/1d63eeb1/attachment.sig>
+/sys/bus/pci/slots/4 #
+/sys/bus/pci/slots/4 # dmesg | grep nvme
+[   14.041357] nvme nvme0: pci function 0003:01:00.0
+[  198.399521] nvme nvme0: pci function 0003:01:00.0
+[__198.416232]_nvme_0003:01:00.0:_enabling_device_(0000_->_0002)
+[  264.402216] nvme nvme0: I/O 228 QID 0 timeout, disable controller
+[  264.402313] nvme nvme0: Identify Controller failed (-4)
+[  264.421270] nvme nvme0: Removing after probe failure status: -5
+/sys/bus/pci/slots/4 #
+
+
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
