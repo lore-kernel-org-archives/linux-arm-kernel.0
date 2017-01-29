@@ -1,63 +1,36 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sun, 29 Jan 2017 15:55:28 +0000
-Subject: [RFC v2 00/10] Provide the EL1 physical timer to the VM
-In-Reply-To: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
- (Jintack Lim's message of "Thu, 26 Jan 2017 20:04:50 -0500")
-References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <86h94h97yn.fsf@arm.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Sun, 29 Jan 2017 17:21:54 +0100
+Subject: [PATCH v2 03/25] power: supply: axp20x_usb_power: use IIO
+ channels when available
+In-Reply-To: <20170127085458.18270-4-quentin.schulz@free-electrons.com>
+References: <20170127085458.18270-1-quentin.schulz@free-electrons.com>
+ <20170127085458.18270-4-quentin.schulz@free-electrons.com>
+Message-ID: <20170129162154.pyqi4m5eo6jpaint@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jintack,
+Hi,
 
-On Fri, Jan 27 2017 at 01:04:50 AM, Jintack Lim <jintack@cs.columbia.edu> wrote:
-> The ARM architecture defines the EL1 physical timer and the virtual timer,
-> and it is reasonable for an OS to expect to be able to access both.
-> However, the current KVM implementation does not provide the EL1 physical
-> timer to VMs but terminates VMs on access to the timer.
+On Fri, Jan 27, 2017 at 09:54:36AM +0100, Quentin Schulz wrote:
+> The X-Powers AXP20X PMIC exposes the current current and voltage
+> measures via an internal ADC.
+> 
+> This adds the possibility to read IIO channels directly for processed
+> values rather than reading the registers and computing the value.
+> 
+> For backward compatibility purpose, if the IIO driver is not compiled,
+> this driver will fall back on previous behaviour which is direct
+> register readings.
 >
-> This patch series enables VMs to use the EL1 physical timer through
-> trap-and-emulate.  The KVM host emulates each EL1 physical timer register
-> access and sets up the background timer accordingly.  When the background
-> timer expires, the KVM host injects EL1 physical timer interrupts to the
-> VM.  Alternatively, it's also possible to allow VMs to access the EL1
-> physical timer without trapping.  However, this requires somehow using the
-> EL2 physical timer for the Linux host while running the VM instead of the
-> EL1 physical timer.  Right now I just implemented trap-and-emulate because
-> this was straightforward to do, and I leave it to future work to determine
-> if transferring the EL1 physical timer state to the EL2 timer provides any
-> performance benefit.
->
-> This feature will be useful for any OS that wishes to access the EL1
-> physical timer. Nested virtualization is one of those use cases. A nested
-> hypervisor running inside a VM would think it has full access to the
-> hardware and naturally tries to use the EL1 physical timer as Linux would
-> do. Other nested hypervisors may try to use the EL2 physical timer as Xen
-> would do, but supporting the EL2 physical timer to the VM is out of scope
-> of this patch series. This patch series will make it easy to add the EL2
-> timer support in the future, though.
->
-> Note that Linux VMs booting in EL1 will be unaffected by this patch series
-> and will continue to use only the virtual timer and this patch series will
-> therefore not introduce any performance degredation as a result of
-> trap-and-emulate.
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 
-Thanks for respining this series. Overall, this looks quite good, and
-the couple of comments I have should be easy to address.
+I queued this into power-supply's for next branch.
 
-My main concern is that we do expose a timer that doesn't hide
-CNTVOFF. I appreciate that that was already the case, since CNTPCT was
-always available (and this avoided trapping the counter), but maybe we
-should have a way for userspace to ask for a mode where CNTPCT=CNTVCT,
-byt trapping the physical counter and taking CNTVOFF in all physical
-timer calculations.
-
-I'm pretty sure you've addressed this one way or another in your nested
-virt series, so maybe extracting the relevant patches and adding them on
-top of this series could be an option?
-
-Thanks,
-
-        M.
--- 
-Jazz is not dead. It just smells funny.
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170129/63470183/attachment.sig>
