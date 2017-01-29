@@ -1,59 +1,72 @@
 From: john@metanate.com (John Keeping)
-Date: Sun, 29 Jan 2017 13:24:35 +0000
-Subject: [PATCH v3 15/24] drm/rockchip: dw-mipi-dsi: configure PHY before
- enabling
+Date: Sun, 29 Jan 2017 13:24:24 +0000
+Subject: [PATCH v3 04/24] drm/rockchip: dw-mipi-dsi: fix command header writes
 In-Reply-To: <20170129132444.25251-1-john@metanate.com>
 References: <20170129132444.25251-1-john@metanate.com>
-Message-ID: <20170129132444.25251-16-john@metanate.com>
+Message-ID: <20170129132444.25251-5-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bias, bandgap and PLL should all be configured before we enable
-them.
+In a couple of places here we use "val" for the value that is about to
+be written to a register but then reuse the same variable for the value
+of a status register before we get around to writing it.  Rename the
+value to be written to so that we write the value we intend to and not
+what we have just read from the status register.
 
 Signed-off-by: John Keeping <john@metanate.com>
+Tested-by: Chris Zhong <zyw@rock-chips.com>
+Reviewed-by: Chris Zhong <zyw@rock-chips.com>
 ---
-v3:
-- Squash together two patches that both affect initialization order of
-  the PHY
+Unchanged in v3
 Unchanged in v2
 
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 5b3068e9e8db..cfe7e4ba305c 100644
+index bd92e58b64f3..4cbbbcb619b7 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -413,12 +413,17 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
+@@ -542,9 +542,10 @@ static int dw_mipi_dsi_host_detach(struct mipi_dsi_host *host,
+ 	return 0;
+ }
  
- 	dw_mipi_dsi_phy_write(dsi, 0x44, HSFREQRANGE_SEL(testdin));
+-static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 val)
++static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
+ {
+ 	int ret;
++	u32 val;
  
--	dw_mipi_dsi_phy_write(dsi, 0x19, PLL_LOOP_DIV_EN | PLL_INPUT_DIV_EN);
- 	dw_mipi_dsi_phy_write(dsi, 0x17, INPUT_DIVIDER(dsi->input_div));
- 	dw_mipi_dsi_phy_write(dsi, 0x18, LOOP_DIV_LOW_SEL(dsi->feedback_div) |
- 					 LOW_PROGRAM_EN);
- 	dw_mipi_dsi_phy_write(dsi, 0x18, LOOP_DIV_HIGH_SEL(dsi->feedback_div) |
- 					 HIGH_PROGRAM_EN);
-+	dw_mipi_dsi_phy_write(dsi, 0x19, PLL_LOOP_DIV_EN | PLL_INPUT_DIV_EN);
-+
-+	dw_mipi_dsi_phy_write(dsi, 0x22, LOW_PROGRAM_EN |
-+					 BIASEXTR_SEL(BIASEXTR_127_7));
-+	dw_mipi_dsi_phy_write(dsi, 0x22, HIGH_PROGRAM_EN |
-+					 BANDGAP_SEL(BANDGAP_96_10));
+ 	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
+ 				 val, !(val & GEN_CMD_FULL), 1000,
+@@ -554,7 +555,7 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 val)
+ 		return ret;
+ 	}
  
- 	dw_mipi_dsi_phy_write(dsi, 0x20, POWER_CONTROL | INTERNAL_REG_CURRENT |
- 					 BIAS_BLOCK_ON | BANDGAP_ON);
-@@ -429,10 +434,6 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
- 					 SETRD_MAX | POWER_MANAGE |
- 					 TER_RESISTORS_ON);
+-	dsi_write(dsi, DSI_GEN_HDR, val);
++	dsi_write(dsi, DSI_GEN_HDR, hdr_val);
  
--	dw_mipi_dsi_phy_write(dsi, 0x22, LOW_PROGRAM_EN |
--					 BIASEXTR_SEL(BIASEXTR_127_7));
--	dw_mipi_dsi_phy_write(dsi, 0x22, HIGH_PROGRAM_EN |
--					 BANDGAP_SEL(BANDGAP_96_10));
+ 	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
+ 				 val, val & (GEN_CMD_EMPTY | GEN_PLD_W_EMPTY),
+@@ -587,8 +588,9 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
+ {
+ 	const u32 *tx_buf = msg->tx_buf;
+ 	int len = msg->tx_len, pld_data_bytes = sizeof(*tx_buf), ret;
+-	u32 val = GEN_HDATA(msg->tx_len) | GEN_HTYPE(msg->type);
++	u32 hdr_val = GEN_HDATA(msg->tx_len) | GEN_HTYPE(msg->type);
+ 	u32 remainder = 0;
++	u32 val;
  
- 	dw_mipi_dsi_phy_write(dsi, 0x70, TLP_PROGRAM_EN | 0xf);
- 	dw_mipi_dsi_phy_write(dsi, 0x71, THS_PRE_PROGRAM_EN | 0x55);
+ 	if (msg->tx_len < 3) {
+ 		dev_err(dsi->dev, "wrong tx buf length %zu for long write\n",
+@@ -617,7 +619,7 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
+ 		}
+ 	}
+ 
+-	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, val);
++	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, hdr_val);
+ }
+ 
+ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
 -- 
 2.11.0.197.gb556de5.dirty
