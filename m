@@ -1,192 +1,44 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sun, 29 Jan 2017 10:33:28 +0800
-Subject: [PATCH v3 07/10] arm64: dts: allwinner: add Allwinner H5 .dtsi
+Date: Sun, 29 Jan 2017 10:33:27 +0800
+Subject: [PATCH v3 06/10] clk: sunxi-ng: remove transitional headers for
+ dt-bindings
 In-Reply-To: <20170129023331.62106-1-icenowy@aosc.xyz>
 References: <20170129023331.62106-1-icenowy@aosc.xyz>
-Message-ID: <20170129023331.62106-8-icenowy@aosc.xyz>
+Message-ID: <20170129023331.62106-7-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andre Przywara <andre.przywara@arm.com>
+As we have already changed the DTSI file, the trnasitional dt-bindings
+header sun8i-h3-ccu.h will not be needed any more.
 
-The Allwinner H5 SoC is pin-compatible to the H3 SoC, but uses
-Cortex-A53 cores instead.
-Based on the now shared base .dtsi describing the common peripherals
-describe the H5 specific nodes on top of that.
-That symlinks in the sunxi-h3-h5.dtsi from the arch/arm tree.
+Remove them.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-[Icenowy: add H5 pinctrl compatible, and changes for my h3-h5 dtsi
- refactor, commit message change to met new arm64 naming scheme,
- drop H3 pinctrl compatible because of interrupt bank change, drop
- H3 ccu compatible because of clock change]
 Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 ---
-Changes in v3:
-- Dropped sun5i-a13-mmc, sun8i-h3-ccu compatibles.
-- Used sun50i-{h5,a64}-emmc compatible for mmc2.
-Changes in v2:
-- Dropped sun8i-h3-pinctrl compatible, as the interrupt of H3 and H5 is
-  in fact different.
+It's a patch which intends to keep the bisectbility of the kernel source
+tree introduced in v2.
 
- arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi   | 139 +++++++++++++++++++++++++
- arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi |   1 +
- 2 files changed, 140 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
- create mode 120000 arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi
+ include/dt-bindings/clock/sun8i-h3-ccu.h | 1 -
+ include/dt-bindings/reset/sun8i-h3-ccu.h | 1 -
+ 2 files changed, 2 deletions(-)
+ delete mode 120000 include/dt-bindings/clock/sun8i-h3-ccu.h
+ delete mode 120000 include/dt-bindings/reset/sun8i-h3-ccu.h
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
-new file mode 100644
-index 000000000000..b651bd6986e8
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
-@@ -0,0 +1,139 @@
-+/*
-+ * Copyright (C) 2016 ARM Ltd.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include "sunxi-h3-h5.dtsi"
-+
-+/ {
-+	interrupt-parent = <&gic>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <0>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu at 1 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <1>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu at 2 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <2>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu at 3 {
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			device_type = "cpu";
-+			reg = <3>;
-+			enable-method = "psci";
-+		};
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-0.2";
-+		method = "smc";
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts = <GIC_PPI 13
-+				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14
-+				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11
-+				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10
-+				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
-+
-+	soc {
-+		gic: interrupt-controller at 1c81000 {
-+			compatible = "arm,gic-400";
-+			reg = <0x01c81000 0x1000>,
-+			      <0x01c82000 0x2000>,
-+			      <0x01c84000 0x2000>,
-+			      <0x01c86000 0x2000>;
-+			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+		};
-+	};
-+};
-+
-+&ccu {
-+	compatible = "allwinner,sun50i-h5-ccu";
-+};
-+
-+&mmc0 {
-+	compatible = "allwinner,sun50i-h5-mmc",
-+		     "allwinner,sun50i-a64-mmc";
-+	clocks = <&ccu CLK_BUS_MMC0>, <&ccu CLK_MMC0>;
-+	clock-names = "ahb", "mmc";
-+};
-+
-+&mmc1 {
-+	compatible = "allwinner,sun50i-h5-mmc",
-+		     "allwinner,sun50i-a64-mmc";
-+	clocks = <&ccu CLK_BUS_MMC1>, <&ccu CLK_MMC1>;
-+	clock-names = "ahb", "mmc";
-+};
-+
-+&mmc2 {
-+	compatible = "allwinner,sun50i-h5-emmc",
-+		     "allwinner,sun50i-a64-emmc";
-+	clocks = <&ccu CLK_BUS_MMC2>, <&ccu CLK_MMC2>;
-+	clock-names = "ahb", "mmc";
-+};
-+
-+&pio {
-+	compatible = "allwinner,sun50i-h5-pinctrl";
-+};
-diff --git a/arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi b/arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi
-new file mode 120000
-index 000000000000..036f01dc2b9b
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi
-@@ -0,0 +1 @@
-+../../../../arm/boot/dts/sunxi-h3-h5.dtsi
+diff --git a/include/dt-bindings/clock/sun8i-h3-ccu.h b/include/dt-bindings/clock/sun8i-h3-ccu.h
+deleted file mode 120000
+index ef38232141e4..000000000000
+--- a/include/dt-bindings/clock/sun8i-h3-ccu.h
++++ /dev/null
+@@ -1 +0,0 @@
+-sunxi-h3-h5-ccu.h
+\ No newline at end of file
+diff --git a/include/dt-bindings/reset/sun8i-h3-ccu.h b/include/dt-bindings/reset/sun8i-h3-ccu.h
+deleted file mode 120000
+index ef38232141e4..000000000000
+--- a/include/dt-bindings/reset/sun8i-h3-ccu.h
++++ /dev/null
+@@ -1 +0,0 @@
+-sunxi-h3-h5-ccu.h
 \ No newline at end of file
 -- 
 2.11.0
