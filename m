@@ -1,58 +1,213 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Sun, 29 Jan 2017 17:51:25 +0530
-Subject: next-20170125 hangs on aarch64
-In-Reply-To: <20170129101255.GA29415@yury-N73SV>
-References: <20170129101255.GA29415@yury-N73SV>
-Message-ID: <20170129122125.GA20269@yury-N73SV>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 29 Jan 2017 12:28:59 +0000
+Subject: [PATCH 2/7] MFD: add STM32 DFSDM support
+In-Reply-To: <20170127171746.lf2nbpsaqs3dmy44@dell>
+References: <1485189145-29576-1-git-send-email-arnaud.pouliquen@st.com>
+ <1485189145-29576-3-git-send-email-arnaud.pouliquen@st.com>
+ <20170124082249.GR16020@dell> <283c0e48-55e2-6516-369d-91dc72d12f73@st.com>
+ <20170124113658.GW16020@dell> <a1aaaa20-ac00-b182-f1c1-63152be41135@st.com>
+ <20170127101545.g53uah57vgfu55o5@dell>
+ <7b3eb38d-4fd1-2006-7423-94f2a7b38b27@st.com>
+ <20170127171746.lf2nbpsaqs3dmy44@dell>
+Message-ID: <3810896b-c982-e9fd-b095-658921422855@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 29, 2017 at 03:42:55PM +0530, Yury Norov wrote:
-> Hi all,
+On 27/01/17 17:17, Lee Jones wrote:
+> On Fri, 27 Jan 2017, Arnaud Pouliquen wrote:
+>> On 01/27/2017 11:15 AM, Lee Jones wrote:
+>>> On Tue, 24 Jan 2017, Arnaud Pouliquen wrote:
+>>>> On 01/24/2017 12:36 PM, Lee Jones wrote:
+>>>>> On Tue, 24 Jan 2017, Arnaud Pouliquen wrote:
+>>>>>> On 01/24/2017 09:22 AM, Lee Jones wrote:
+>>>>>>> On Mon, 23 Jan 2017, Arnaud Pouliquen wrote:
+>>>>>>>
+>>>>>>>> DFSDM hardware IP can be used at the same time for ADC sigma delta
+>>>>>>>
+>>>>>>> Same time as what?
+>>>>>> DFSDM is used for ADC acquisition (through IIO) but also PDM microphone
+>>>>>> capture (through ASOC).
+>>>>>>>
+>>>>>>>> conversion and audio PDM microphone.
+>>>>>>>> MFD driver is in charge of configuring IP registers and managing IP clocks.
+>>>>>>>> For this it exports an API to handles filters and channels resources.
+>>>>>>>
+>>>>>>> This looks like an ADC driver?  What is it that makes it an MFD?
+>>>>>> Yes it a kind of ADC but that supports 2 features audio and iio.
+>>>>>> So it has to support 2 features based on 2 separate Frameworks.
+>>>>>
+>>>>> I'm still unsure why it needs to live in MFD.
+>>>>>
+>>>>> By the looks of it, this driver needs to move into IIO and you need to
+>>>>> call into it from ASoC.
+>>>>>
+>>>>
+>>>> I think i introduce confusion by speaking about ADC for audio...
+>>>>
+>>>> 1) IIO handles sigma delta ADCs that can be used as example for motor
+>>>> controls. the aim is to get value based on an application request or
+>>>> using some triggers.
+>>>> example: http://www.ti.com/lit/ds/symlink/ads1202.pdf
+>>>>
+>>>> 2) For audio part, we speak about Digital mems microphones that generate
+>>>> PDM format stream. PDM is a continuous real time stream dedicated to
+>>>> audio record and must be handled in ASOC ( codec Dmic part driver is
+>>>> /sound/soc/codec/dmic.c).
+>>>> DMIC example:
+>>>> http://www.st.com/content/ccc/resource/technical/document/datasheet/47/bd/d2/13/8d/fd/48/26/DM00121815.pdf/files/DM00121815.pdf/jcr:content/translations/en.DM00121815.pdf
+>>>>
+>>>> Form my point of view it very strange to handle DMICs in IIO, as it is
+>>>> not designed to support audio streams.it is two separate features that
+>>>> are not compatible.
+>>>>
+>>>> Now, from software point of view
+>>>> That would means that IIO declares ADCs that it can not expose, because
+>>>> DMIC is not IIO standard. But IIO inkern API needs that device is
+>>>> declared
+>>>
+>>>> So i should define a specific API in IIO for ASOC driver.
+>>>
+>>> Yes, this is what I think you should do.
+>>>
+>>> MFD is not a dumping ground for devices that do not fit anywhere else.
+>>
+>> I fully understand that you don't want to create unnecessary MFD devices.
+>> But In case of DFSDM ,it is really a device that supports 2 features.
+>> The main evidence is that "ADC acquisition" and "digital microphone"
+>> features are handled by two separate frameworks.
+>> So this corresponds to two features that share the same device resources
+>> (registers, IRQs, clocks).
+>> Seems that this match with MFD definition.
+>>
+>> Now, if IIO and ASOC maintainers are aligned with you proposal, i will
+>> move MFD part in IIO.
+>> But in this case, i can not see another way to do it, except a MFD
+>> driver hidden in IIO?
+>>
+>> Here is my analysis of a design in IIO:
+>>
+>> Natural way to do this is to consider that ASOC is a customer of IIO so
+>> use the customer.h API.
+>> 1) As Digital microphone can not be handled by IIO dev interface, i can
+>> not expose them as an IIO channel, that would be visible by applications
+>> in /sys/bus/iio/devices/iio
+>> 2) ASOC needs to configure DFSDM filter to match to specific frequencies
+>> and sample formats requested by users. Not standard IIO interface to do
+>> this. (on IIO side this is done by attribute file)
+>> 3) audio stream is a real time stream. So for audio quality best is to
+>> minimize latencies and Xrun. That why transfer as done from HW to
+>> application using LLI DMA transfers with a minimum of copy. This does
+>> not match with the IIO inkern API.
+>>  => So seems not possible to use IIO inkern API.
+>>
+>> That's means that i would need to create a ST specific include file to
+>> offer an API to ASoC to handle DFSDM resources linked to the DMIC.
+>> and to probe ASOc device in IIO one.
+>> So the solution would be to create something like a sub IIO driver That
+>> probe and handle some IIO and ASOC devices.
+>> Ultimately This would correspond to a MFD driver integrated in IIO...
 > 
-> I pulled next-20170125 kernel, and found it hanged on boot. The exact reason is
-> panic on dereferencing of the 0xffffffc8 address, which is most probably the
-> attempt to dereference the ENOSYS error code as the address. next-20170124 works
-> fine, at least it boots.
+> The issue is not the creation of an MFD driver to create shared
+> resources and probe the child devices.  That's what MFD *is* for.
+> What I do take exception to is having lots of code in MFD which
+> should clearly live in a different subsystem.
 > 
-> Does anyone have details on that?
+> Since this device only serves a couple of functions, I expect it to be
+> a few hundred lines, maximum.  Everything else should be farmed out.
+> MFD knows nothing of "channels" or "filters" so anything related to
+> them (init, get, start, stop, release, etc) needs to find another
+> home.  Whether that's in IIO is a separate discussion, but it
+> certainly doesn't live in MFD.
 > 
-> Yury
+>> Jonathan, Mark, Please could you share your opinion on this topic?
+Hmm - based on a fairly quick read through of the code (which is never
+ideal!). I can see that the ideal would indeed be as Lee says, to
+expand the IIO interfaces sufficiently to support what you need.
 
-UPD:
 
-I run qemu for testing.
+So, reading the code (fairly quickly I'm afraid as had a lot of reviews
+to catch up on this weekend).
+What we need:
+1) DMA support in the ADC driver.  This would be a good anyway!
+2) DMA consumer support - I defer to Lars for comments on this.
+3) Means of describing and controlling the sinc filters applied. 
+4) Appropriate channel support.  I'm not convinced that it doesn't make
+sense to have IIO channels for the microphones - at least in a streaming
+mode.  It's data - I don't really care what ;)
+Coarsely it's a filtered pulse per period counter which is
+a perfectly valid type to have a channel for.
 
-The true failure backtrace is like below. The bad dereference happens for me in
-arm_smccc_hvc() function in macro SMCCC.
+The big question to my mind is the DMA consumer support. How would
+it work. It it wouldn't this is somewhat of a non starter.
 
-Yury
+To bring up another slightly ugly MFD case where it is borderline
+on whether an MFD makes sense (just as a reference point of something
+we have discussed a few times before)
 
-Backtrace:
+ADCs with features directed at touchscreen support.
+These are odd as the ADC bit is generic, but the specific output
+and read sequences used for touchscreen reading don't correspond to
+anything that makes any real sense for other applications.
 
-#0  0xffff00000808f7a8 in arm_smccc_hvc () at
-arch/arm64/kernel/smccc-call.S:50
-#1  0xffff000008745ea0 in __invoke_psci_fn_hvc (function_id=<optimized out>, arg0=<optimized out>,
-    arg1=<optimized out>, arg2=<optimized out>) at drivers/firmware/psci.c:119
-#2  0xffff000008745d18 in psci_migrate_info_type () at drivers/firmware/psci.c:204
-#3  0xffff000008ca150c in psci_init_migrate () at drivers/firmware/psci.c:465
-#4  psci_probe () at drivers/firmware/psci.c:539
-#5  0xffff000008ca1684 in psci_0_2_init (np=<optimized out>) at drivers/firmware/psci.c:571
-#6  0xffff000008ca16d8 in psci_dt_init () at drivers/firmware/psci.c:637
-#7  0xffff000008c62914 in setup_arch (cmdline_p=<optimized out>) at arch/arm64/kernel/setup.c:287
-#8  0xffff000008c6082c in start_kernel () at init/main.c:509
-#9  0xffff000008c601e0 in __primary_switched () at arch/arm64/kernel/head.S:452
+We have started to get hybrid drives that have an MFD underneath but
+do the ADC reads through IIO consumer interfaces, and the timing
+control from a touchscreen driver.  We haven't really gotten this
+one right yet either.
 
-Listing:
+Here however, to my mind things are different - as I read it
+(and feel free to point out what I'm missing), the sound usecase
+is just a question of setting up sampling frequencies and filters
+appropriate to the microphones and what ASoC expects?
 
- ?0xffff00000808f790 <arm_smccc_hvc>        hvc    #0x0
- ?0xffff00000808f794 <arm_smccc_hvc+4>      ldr    x4, [sp]
- ?0xffff00000808f798 <arm_smccc_hvc+8>      stp    x0, x1, [x4]          
- ?0xffff00000808f79c <arm_smccc_hvc+12>     stp x2, x3, [x4,#16]
- ?0xffff00000808f7a0 <arm_smccc_hvc+16>     ldr x4, [sp,#8] 
- ?0xffff00000808f7a4 <arm_smccc_hvc+20>     cbz x4, 0xffff00000808f7b8 <arm_smccc_hvc+40>
->?0xffff00000808f7a8 <arm_smccc_hvc+24      ldr    x9, [x4]
- ?0xffff00000808f7ac <arm_smccc_hvc+28>     cmp    x9, #0x1
- ?0xffff00000808f7b0 <arm_smccc_hvc+32>     b.ne   0xffff00000808f7b8 <arm_smccc_hvc+40>
- ?0xffff00000808f7b4 <arm_smccc_hvc+36>     str    x6, [x4,#8]
- ?0xffff00000808f7b8 <arm_smccc_hvc+40>     ret
+That's not to say the IIO dma stuff is flexible enough (yet) to
+handle the data flows, but perhaps we can work towards that.
+
+Jonathan
+
+>>
+>> Regards
+>> Arnaud
+>>
+>>>
+>>>>>>>> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+>>>>>>>> ---
+>>>>>>>>  drivers/mfd/Kconfig             |   11 +
+>>>>>>>>  drivers/mfd/Makefile            |    2 +
+>>>>>>>>  drivers/mfd/stm32-dfsdm-reg.h   |  220 +++++++++
+>>>>>>>>  drivers/mfd/stm32-dfsdm.c       | 1044 +++++++++++++++++++++++++++++++++++++++
+>>>>>>>>  include/linux/mfd/stm32-dfsdm.h |  324 ++++++++++++
+>>>>>>>>  5 files changed, 1601 insertions(+)
+>>>>>>>>  create mode 100644 drivers/mfd/stm32-dfsdm-reg.h
+>>>>>>>>  create mode 100644 drivers/mfd/stm32-dfsdm.c
+>>>>>>>>  create mode 100644 include/linux/mfd/stm32-dfsdm.h
+>>>>>>>>
+>>>>>>>> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+>>>>>>>> index c6df644..4bb660b 100644
+>>>>>>>> --- a/drivers/mfd/Kconfig
+>>>>>>>> +++ b/drivers/mfd/Kconfig
+>>>>>>>> @@ -1607,6 +1607,17 @@ config MFD_STW481X
+>>>>>>>>  	  in various ST Microelectronics and ST-Ericsson embedded
+>>>>>>>>  	  Nomadik series.
+>>>>>>>>  
+>>>>>>>> +config MFD_STM32_DFSDM
+>>>>>>>> +	tristate "ST Microelectronics STM32 DFSDM"
+>>>>>>>> +	depends on (ARCH_STM32 && OF) || COMPILE_TEST
+>>>>>>>> +	select MFD_CORE
+>>>>>>>> +	select REGMAP
+>>>>>>>> +	select REGMAP_MMIO
+>>>>>>>> +	help
+>>>>>>>> +	  Select this option to enable the STM32 Digital Filter
+>>>>>>>> +	  for Sigma Delta Modulators (DFSDM) driver used
+>>>>>>>> +	  in various STM32 series.
+>>>>>>>> +
+>>>>>>>>  menu "Multimedia Capabilities Port drivers"
+>>>>>>>>  	depends on ARCH_SA1100
+>>>>>>>
+>>>>>>> [...]
+>>>>>>>
+>>>>>>
+>>>>>> Regards
+>>>>>> Arnaud
+>>>>>
+>>>
+> 
