@@ -1,336 +1,257 @@
-From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Mon, 30 Jan 2017 12:20:35 +1300
-Subject: [PATCH v6 5/5] arm: mvebu: Add device tree for db-dxbc2 and
- db-xc3-24g4xg boards
-In-Reply-To: <20170129232035.25189-1-chris.packham@alliedtelesis.co.nz>
-References: <20170129232035.25189-1-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20170129232035.25189-6-chris.packham@alliedtelesis.co.nz>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 30 Jan 2017 00:36:23 +0100
+Subject: [PATCH v2 2/3] soc: rockchip: add driver handling grf setup
+In-Reply-To: <CAOesGMjq3uPqaWjMkEkqXs9W90XTwXknjheZNdYsOaGu4fw9_g@mail.gmail.com>
+References: <20161115223900.30728-1-heiko@sntech.de>
+ <20161115223900.30728-3-heiko@sntech.de>
+ <CAOesGMjq3uPqaWjMkEkqXs9W90XTwXknjheZNdYsOaGu4fw9_g@mail.gmail.com>
+Message-ID: <7144543.znLMLUJXpB@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These boards are Marvell's evaluation boards for the 98DX4251 and
-98DX3336 SoCs.
+Hi Olof,
 
-Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
----
+Am Sonntag, 29. Januar 2017, 14:40:53 CET schrieb Olof Johansson:
+> On Tue, Nov 15, 2016 at 2:38 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> > The General Register Files are an area of registers containing a lot
+> > of single-bit settings for numerous components as well full components
+> > like usbphy control. Therefore all used components are accessed
+> > via the syscon provided by the grf nodes or from the sub-devices
+> > created through the simple-mfd created from the grf node.
+> > 
+> > Some settings are not used by anything but will need to be set up
+> > according to expectations on the kernel side.
+> > 
+> > Best example is the force_jtag setting, which defaults to on and
+> > results in the soc switching the pin-outputs between jtag and sdmmc
+> > automatically depending on the card-detect status. This conflicts
+> > heavily with how the dw_mmc driver expects to do its work and also
+> > with the clock-controller, which has most likely deactivated the
+> > jtag clock due to it being unused.
+> > 
+> > So far the handling of this setting was living in the mach-rockchip
+> > code for the arm32-based rk3288 but that of course doesn't work
+> > for arm64 socs and would also look ugly for further arm32 socs.
+> > 
+> > Also always disabling this setting is quite specific to linux and
+> > its subsystems, other operating systems might prefer other settings,
+> > so that the bootloader cannot really set a sane default for all.
+> > 
+> > So introduce a top-level driver for the grf that handles these
+> > settings that need to be a certain way but nobody cares about.
+> > 
+> > Other needed settings might surface in the future and can then
+> > be added here, but only as a last option. Ideally general GRF
+> > settings should be handled in the driver needing them.
+> > 
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> > 
+> >  drivers/soc/rockchip/Kconfig  |  10 ++++
+> >  drivers/soc/rockchip/Makefile |   1 +
+> >  drivers/soc/rockchip/grf.c    | 134
+> >  ++++++++++++++++++++++++++++++++++++++++++ 3 files changed, 145
+> >  insertions(+)
+> >  create mode 100644 drivers/soc/rockchip/grf.c
+> > 
+> > diff --git a/drivers/soc/rockchip/Kconfig b/drivers/soc/rockchip/Kconfig
+> > index 7140ff8..20da55d 100644
+> > --- a/drivers/soc/rockchip/Kconfig
+> > +++ b/drivers/soc/rockchip/Kconfig
+> > @@ -3,6 +3,16 @@ if ARCH_ROCKCHIP || COMPILE_TEST
+> > 
+> >  #
+> >  # Rockchip Soc drivers
+> >  #
+> > 
+> > +
+> > +config ROCKCHIP_GRF
+> > +       bool
+> > +       default y
+> > +       help
+> > +         The General Register Files are a central component providing
+> > +         special additional settings registers for a lot of
+> > soc-components. +         In a lot of cases there also need to be default
+> > settings initialized +         to make some of them conform to
+> > expectations of the kernel. +
+> > 
+> >  config ROCKCHIP_PM_DOMAINS
+> >  
+> >          bool "Rockchip generic power domain"
+> >          depends on PM
+> > 
+> > diff --git a/drivers/soc/rockchip/Makefile b/drivers/soc/rockchip/Makefile
+> > index 3d73d06..c851fa0 100644
+> > --- a/drivers/soc/rockchip/Makefile
+> > +++ b/drivers/soc/rockchip/Makefile
+> > @@ -1,4 +1,5 @@
+> > 
+> >  #
+> >  # Rockchip Soc drivers
+> >  #
+> > 
+> > +obj-$(CONFIG_ROCKCHIP_GRF) += grf.o
+> > 
+> >  obj-$(CONFIG_ROCKCHIP_PM_DOMAINS) += pm_domains.o
+> > 
+> > diff --git a/drivers/soc/rockchip/grf.c b/drivers/soc/rockchip/grf.c
+> > new file mode 100644
+> > index 0000000..0c85476a
+> > --- /dev/null
+> > +++ b/drivers/soc/rockchip/grf.c
+> > @@ -0,0 +1,134 @@
+> > +/*
+> > + * Rockchip Generic Register Files setup
+> > + *
+> > + * Copyright (c) 2016 Heiko Stuebner <heiko@sntech.de>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + */
+> > +
+> > +#include <linux/err.h>
+> > +#include <linux/regmap.h>
+> > +#include <linux/mfd/syscon.h>
+> > +#include <linux/of_device.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/regmap.h>
+> > +
+> > +#define HIWORD_UPDATE(val, mask, shift) \
+> > +               ((val) << (shift) | (mask) << ((shift) + 16))
+> > +
+> > +struct rockchip_grf_value {
+> > +       const char *desc;
+> > +       u32 reg;
+> > +       u32 val;
+> > +};
+> > +
+> > +struct rockchip_grf_info {
+> > +       const struct rockchip_grf_value *values;
+> > +       int num_values;
+> > +};
+> > +
+> > +#define RK3036_GRF_SOC_CON0            0x140
+> > +
+> > +static const struct rockchip_grf_value rk3036_defaults[] __initconst = {
+> > +       /*
+> > +        * Disable auto jtag/sdmmc switching that causes issues with the
+> > +        * clock-framework and the mmc controllers making them unreliable.
+> > +        */
+> > +       { "jtag switching", RK3036_GRF_SOC_CON0, HIWORD_UPDATE(0, 1, 11)
+> > },
+> > +};
+> > +
+> > +static const struct rockchip_grf_info rk3036_grf __initconst = {
+> > +       .values = rk3036_defaults,
+> > +       .num_values = ARRAY_SIZE(rk3036_defaults),
+> > +};
+> > +
+> > +#define RK3288_GRF_SOC_CON0            0x244
+> > +
+> > +static const struct rockchip_grf_value rk3288_defaults[] __initconst = {
+> > +       { "jtag switching", RK3288_GRF_SOC_CON0, HIWORD_UPDATE(0, 1, 12)
+> > },
+> > +};
+> > +
+> > +static const struct rockchip_grf_info rk3288_grf __initconst = {
+> > +       .values = rk3288_defaults,
+> > +       .num_values = ARRAY_SIZE(rk3288_defaults),
+> > +};
+> > +
+> > +#define RK3368_GRF_SOC_CON15           0x43c
+> > +
+> > +static const struct rockchip_grf_value rk3368_defaults[] __initconst = {
+> > +       { "jtag switching", RK3368_GRF_SOC_CON15, HIWORD_UPDATE(0, 1, 13)
+> > }, +};
+> > +
+> > +static const struct rockchip_grf_info rk3368_grf __initconst = {
+> > +       .values = rk3368_defaults,
+> > +       .num_values = ARRAY_SIZE(rk3368_defaults),
+> > +};
+> > +
+> > +#define RK3399_GRF_SOC_CON7            0xe21c
+> > +
+> > +static const struct rockchip_grf_value rk3399_defaults[] __initconst = {
+> > +       { "jtag switching", RK3399_GRF_SOC_CON7, HIWORD_UPDATE(0, 1, 12)
+> > },
+> > +};
+> > +
+> > +static const struct rockchip_grf_info rk3399_grf __initconst = {
+> > +       .values = rk3399_defaults,
+> > +       .num_values = ARRAY_SIZE(rk3399_defaults),
+> > +};
+> > +
+> > +static const struct of_device_id rockchip_grf_dt_match[] __initconst = {
+> > +       {
+> > +               .compatible = "rockchip,rk3036-grf",
+> > +               .data = (void *)&rk3036_grf,
+> > +       }, {
+> > +               .compatible = "rockchip,rk3288-grf",
+> > +               .data = (void *)&rk3288_grf,
+> > +       }, {
+> > +               .compatible = "rockchip,rk3368-grf",
+> > +               .data = (void *)&rk3368_grf,
+> > +       }, {
+> > +               .compatible = "rockchip,rk3399-grf",
+> > +               .data = (void *)&rk3399_grf,
+> > +       },
+> > +       { /* sentinel */ },
+> > +};
+> 
+> I often come in after there's already been discussion on a topic, and
+> don't always find all of it, so let me know if this has already been
+> considered and not chosen for some reason:
 
-Notes:
-    Changes in v5:
-    - update license text
-    - use node labels
-    Changes in v6:
-    - Rename dts files to include 'armada-xp-' prefix
+So far only Doug had the time to look at this, so I'm happy about discussing 
+my approach more.
 
- arch/arm/boot/dts/armada-xp-db-dxbc2.dts      | 151 ++++++++++++++++++++++++++
- arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts | 142 ++++++++++++++++++++++++
- 2 files changed, 293 insertions(+)
- create mode 100644 arch/arm/boot/dts/armada-xp-db-dxbc2.dts
- create mode 100644 arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts
 
-diff --git a/arch/arm/boot/dts/armada-xp-db-dxbc2.dts b/arch/arm/boot/dts/armada-xp-db-dxbc2.dts
-new file mode 100644
-index 000000000000..a8130805074e
---- /dev/null
-+++ b/arch/arm/boot/dts/armada-xp-db-dxbc2.dts
-@@ -0,0 +1,151 @@
-+/*
-+ * Device Tree file for DB-DXBC2 board
-+ *
-+ * Copyright (C) 2016 Allied Telesis Labs
-+ *
-+ * Based on armada-xp-db.dts
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ *
-+ * Note: this Device Tree assumes that the bootloader has remapped the
-+ * internal registers to 0xf1000000 (instead of the default
-+ * 0xd0000000). The 0xf1000000 is the default used by the recent,
-+ * DT-capable, U-Boot bootloaders provided by Marvell. Some earlier
-+ * boards were delivered with an older version of the bootloader that
-+ * left internal registers mapped at 0xd0000000. If you are in this
-+ * situation, you should either update your bootloader (preferred
-+ * solution) or the below Device Tree should be adjusted.
-+ */
-+
-+/dts-v1/;
-+#include "armada-xp-98dx4251.dtsi"
-+
-+/ {
-+	model = "Marvell Bobcat2 Evaluation Board";
-+	compatible = "marvell,db-dxbc2", "marvell,armadaxp-98dx4251", "marvell,armadaxp", "marvell,armada-370-xp";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlyprintk";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0 0x00000000 0 0x20000000>; /* 512 MB */
-+	};
-+
-+};
-+
-+&devbus_bootcs {
-+	status = "okay";
-+
-+	/* Device Bus parameters are required */
-+
-+	/* Read parameters */
-+	devbus,bus-width    = <16>;
-+	devbus,turn-off-ps  = <60000>;
-+	devbus,badr-skew-ps = <0>;
-+	devbus,acc-first-ps = <124000>;
-+	devbus,acc-next-ps  = <248000>;
-+	devbus,rd-setup-ps  = <0>;
-+	devbus,rd-hold-ps   = <0>;
-+
-+	/* Write parameters */
-+	devbus,sync-enable = <0>;
-+	devbus,wr-high-ps  = <60000>;
-+	devbus,wr-low-ps   = <60000>;
-+	devbus,ale-wr-ps   = <60000>;
-+};
-+
-+&i2c0 {
-+	clock-frequency = <100000>;
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
-+
-+&nand {
-+	status = "okay";
-+	num-cs = <1>;
-+	marvell,nand-keep-config;
-+	marvell,nand-enable-arbiter;
-+	nand-on-flash-bbt;
-+	nand-ecc-strength = <4>;
-+	nand-ecc-step-size = <512>;
-+};
-+
-+&sdio {
-+	pinctrl-0 = <&sdio_pins>;
-+	pinctrl-names = "default";
-+	status = "okay";
-+	/* No CD or WP GPIOs */
-+	broken-cd;
-+};
-+
-+&spi0 {
-+	status = "okay";
-+
-+	spi-flash at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "m25p64";
-+		reg = <0>; /* Chip select 0 */
-+		spi-max-frequency = <20000000>;
-+		m25p,fast-read;
-+
-+		partition at u-boot {
-+			reg = <0x00000000 0x00100000>;
-+			label = "u-boot";
-+		};
-+		partition at u-boot-env {
-+			reg = <0x00100000 0x00040000>;
-+			label = "u-boot-env";
-+		};
-+		partition at unused {
-+			reg = <0x00140000 0x00ec0000>;
-+			label = "unused";
-+		};
-+
-+	};
-+};
-diff --git a/arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts b/arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts
-new file mode 100644
-index 000000000000..4e07cb6ed800
---- /dev/null
-+++ b/arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts
-@@ -0,0 +1,142 @@
-+/*
-+ * Device Tree file for DB-XC3-24G4XG board
-+ *
-+ * Copyright (C) 2016 Allied Telesis Labs
-+ *
-+ * Based on armada-xp-db.dts
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ *
-+ * Note: this Device Tree assumes that the bootloader has remapped the
-+ * internal registers to 0xf1000000 (instead of the default
-+ * 0xd0000000). The 0xf1000000 is the default used by the recent,
-+ * DT-capable, U-Boot bootloaders provided by Marvell. Some earlier
-+ * boards were delivered with an older version of the bootloader that
-+ * left internal registers mapped at 0xd0000000. If you are in this
-+ * situation, you should either update your bootloader (preferred
-+ * solution) or the below Device Tree should be adjusted.
-+ */
-+
-+/dts-v1/;
-+#include "armada-xp-98dx3336.dtsi"
-+
-+/ {
-+	model = "DB-XC3-24G4XG";
-+	compatible = "marvell,db-xc3-24g4xg", "marvell,armadaxp-98dx3336", "marvell,armadaxp", "marvell,armada-370-xp";
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200 earlyprintk";
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0 0x00000000 0 0x40000000>; /* 1 GB */
-+	};
-+};
-+
-+&devbus_bootcs {
-+	status = "okay";
-+
-+	/* Device Bus parameters are required */
-+
-+	/* Read parameters */
-+	devbus,bus-width    = <16>;
-+	devbus,turn-off-ps  = <60000>;
-+	devbus,badr-skew-ps = <0>;
-+	devbus,acc-first-ps = <124000>;
-+	devbus,acc-next-ps  = <248000>;
-+	devbus,rd-setup-ps  = <0>;
-+	devbus,rd-hold-ps   = <0>;
-+
-+	/* Write parameters */
-+	devbus,sync-enable = <0>;
-+	devbus,wr-high-ps  = <60000>;
-+	devbus,wr-low-ps   = <60000>;
-+	devbus,ale-wr-ps   = <60000>;
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	clock-frequency = <100000>;
-+	status = "okay";
-+};
-+
-+&nand {
-+	status = "okay";
-+	num-cs = <1>;
-+	marvell,nand-keep-config;
-+	marvell,nand-enable-arbiter;
-+	nand-on-flash-bbt;
-+	nand-ecc-strength = <4>;
-+	nand-ecc-step-size = <512>;
-+};
-+
-+&spi0 {
-+	status = "okay";
-+
-+	spi-flash at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "m25p64";
-+		reg = <0>; /* Chip select 0 */
-+		spi-max-frequency = <20000000>;
-+		m25p,fast-read;
-+
-+		partition at u-boot {
-+			reg = <0x00000000 0x00100000>;
-+			label = "u-boot";
-+		};
-+		partition at u-boot-env {
-+			reg = <0x00100000 0x00040000>;
-+			label = "u-boot-env";
-+		};
-+		partition at unused {
-+			reg = <0x00140000 0x00ec0000>;
-+			label = "unused";
-+		};
-+
-+	};
-+};
--- 
-2.11.0.24.ge6920cf
+> I get a little worried when you see these per-SoC tables build up in
+> the kernel. It means there'll need to be additions here for a bunch of
+> different SoCs.
+
+We also add clock drivers (which are essentially only tables listing the 
+clock-hirarchy) on a per-soc basis. In clk-land the move was the other way 
+around, because it was deemed that defining clocks in the devicetree does not 
+scale :-) .
+
+
+> Would it be possible to describe this directly in the DT instead? If
+> nothing else, something like
+> 
+> function-regs = < array of regs >
+> function-values = < array of values >
+> function-names = < array of names >
+> 
+> Not ideal either, especially if abused into a random poke table, but
+> it won't require per-SoC changes to the kernel. If we keep the binding
+> under close eyes we can hopefully avoid abuse.
+> 
+> Given that Rockchip is still working on new SoCs, this list will just
+> grow and doing it in-kernel will stop scaling at some point.
+
+As explained in the commit message, this is meant as a last resort for 
+settings that no driver can be responsible for in a sensible way and that are 
+Linux-specific and thus cannot be set in firmware for everybody. Most GRF-
+specific settings are already done by the specific drivers needing them.
+
+I.e. you see the mmc/jtag thing, which is getting disabled because the Linux 
+mmc subsystem gets a hickup if the pinmux is changed by the soc to early after 
+card eject. Other OSes might like that behaviour.
+
+As the dts is meant to be for everyone I don't see how that could be sanely 
+defined for things.
+
+
+Another option would be to burden the rockchip mmc-driver with that specific 
+setting, but then the mmc-driver (and possible other drivers if needed) would 
+need per-soc additions, resulting in the same scaling problem.
+Having one per-soc list at least keeps in one place :-) .
+
+
+If you really dislike the current approach, we can of course postpone it for 
+now though.
+
+
+Heiko
