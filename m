@@ -1,17 +1,15 @@
 From: john@metanate.com (John Keeping)
-Date: Sun, 29 Jan 2017 13:24:43 +0000
-Subject: [PATCH v3 23/24] drm/rockchip: dw-mipi-dsi: add reset control
+Date: Sun, 29 Jan 2017 13:24:38 +0000
+Subject: [PATCH v3 18/24] drm/rockchip: dw-mipi-dsi: use specific poll helper
 In-Reply-To: <20170129132444.25251-1-john@metanate.com>
 References: <20170129132444.25251-1-john@metanate.com>
-Message-ID: <20170129132444.25251-24-john@metanate.com>
+Message-ID: <20170129132444.25251-19-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to fully reset the state of the MIPI controller we must assert
-this reset.
-
-This is slightly more complicated than it could be in order to maintain
-compatibility with device trees that do not specify the reset property.
+As the documentation for readx_poll_timeout says, we want to use the
+specialized macro for readl rather than using the generic version
+directly.
 
 Signed-off-by: John Keeping <john@metanate.com>
 Reviewed-by: Chris Zhong <zyw@rock-chips.com>
@@ -20,63 +18,56 @@ v3:
 - Add Chris' Reviewed-by
 Unchanged in v2
 
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 30 ++++++++++++++++++++++++++++++
- 1 file changed, 30 insertions(+)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 58cb8ace2fe8..cf3ca6b0cbdb 100644
+index dcb66a21e1f1..be395c3c5c06 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -13,6 +13,7 @@
- #include <linux/module.h>
- #include <linux/of_device.h>
- #include <linux/regmap.h>
-+#include <linux/reset.h>
- #include <linux/mfd/syscon.h>
- #include <drm/drm_atomic_helper.h>
- #include <drm/drm_crtc.h>
-@@ -1124,6 +1125,7 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
- 			of_match_device(dw_mipi_dsi_dt_ids, dev);
- 	const struct dw_mipi_dsi_plat_data *pdata = of_id->data;
- 	struct platform_device *pdev = to_platform_device(dev);
-+	struct reset_control *apb_rst;
- 	struct drm_device *drm = data;
- 	struct dw_mipi_dsi *dsi;
- 	struct resource *res;
-@@ -1162,6 +1164,34 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
+@@ -474,14 +474,14 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
+ 				     PHY_UNRSTZ | PHY_UNSHUTDOWNZ);
+ 
+ 
+-	ret = readx_poll_timeout(readl, dsi->base + DSI_PHY_STATUS,
++	ret = readl_poll_timeout(dsi->base + DSI_PHY_STATUS,
+ 				 val, val & LOCK, 1000, PHY_STATUS_TIMEOUT_US);
+ 	if (ret < 0) {
+ 		dev_err(dsi->dev, "failed to wait for phy lock state\n");
  		return ret;
  	}
  
-+	/*
-+	 * Note that the reset was not defined in the initial device tree, so
-+	 * we have to be prepared for it not being found.
-+	 */
-+	apb_rst = devm_reset_control_get(dev, "apb");
-+	if (IS_ERR(apb_rst)) {
-+		if (PTR_ERR(apb_rst) == -ENODEV) {
-+			apb_rst = NULL;
-+		} else {
-+			dev_err(dev, "Unable to get reset control: %d\n", ret);
-+			return PTR_ERR(apb_rst);
-+		}
-+	}
-+
-+	if (apb_rst) {
-+		ret = clk_prepare_enable(dsi->pclk);
-+		if (ret) {
-+			dev_err(dev, "%s: Failed to enable pclk\n", __func__);
-+			return ret;
-+		}
-+
-+		reset_control_assert(apb_rst);
-+		usleep_range(10, 20);
-+		reset_control_deassert(apb_rst);
-+
-+		clk_disable_unprepare(dsi->pclk);
-+	}
-+
- 	ret = clk_prepare_enable(dsi->pllref_clk);
- 	if (ret) {
- 		dev_err(dev, "%s: Failed to enable pllref_clk\n", __func__);
+-	ret = readx_poll_timeout(readl, dsi->base + DSI_PHY_STATUS,
++	ret = readl_poll_timeout(dsi->base + DSI_PHY_STATUS,
+ 				 val, val & STOP_STATE_CLK_LANE, 1000,
+ 				 PHY_STATUS_TIMEOUT_US);
+ 	if (ret < 0) {
+@@ -597,7 +597,7 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
+ 	int ret;
+ 	u32 val, mask;
+ 
+-	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
++	ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
+ 				 val, !(val & GEN_CMD_FULL), 1000,
+ 				 CMD_PKT_STATUS_TIMEOUT_US);
+ 	if (ret < 0) {
+@@ -608,7 +608,7 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
+ 	dsi_write(dsi, DSI_GEN_HDR, hdr_val);
+ 
+ 	mask = GEN_CMD_EMPTY | GEN_PLD_W_EMPTY;
+-	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
++	ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
+ 				 val, (val & mask) == mask,
+ 				 1000, CMD_PKT_STATUS_TIMEOUT_US);
+ 	if (ret < 0) {
+@@ -667,7 +667,7 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
+ 			len -= pld_data_bytes;
+ 		}
+ 
+-		ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
++		ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
+ 					 val, !(val & GEN_PLD_W_FULL), 1000,
+ 					 CMD_PKT_STATUS_TIMEOUT_US);
+ 		if (ret < 0) {
 -- 
 2.11.0.197.gb556de5.dirty
