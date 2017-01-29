@@ -1,218 +1,49 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sun, 29 Jan 2017 10:33:31 +0800
-Subject: [PATCH v3 10/10] arm64: dts: sunxi: add support for the Orange Pi PC
- 2 board
-In-Reply-To: <20170129023331.62106-1-icenowy@aosc.xyz>
-References: <20170129023331.62106-1-icenowy@aosc.xyz>
-Message-ID: <20170129023331.62106-11-icenowy@aosc.xyz>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sun, 29 Jan 2017 12:06:40 +0800
+Subject: [GIT PULL 2/5] i.MX cleanups for 4.11
+In-Reply-To: <1485662803-31235-1-git-send-email-shawnguo@kernel.org>
+References: <1485662803-31235-1-git-send-email-shawnguo@kernel.org>
+Message-ID: <1485662803-31235-2-git-send-email-shawnguo@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andre Przywara <andre.przywara@arm.com>
+The following changes since commit 0c744ea4f77d72b3dcebb7a8f2684633ec79be88:
 
-The Orange Pi PC 2 is a typical single board computer using the
-Allwinner H5 SoC. Apart from the usual suspects it features three
-separately driven USB ports and a Gigabit Ethernet port.
-Also it has a SPI NOR flash soldered, from which the board can boot
-from. This enables the SBC to behave like a "real computer" with
-built-in firmware.
+  Linux 4.10-rc2 (2017-01-01 14:31:53 -0800)
 
-Add the board specific .dts file, which includes the H5 .dtsi and
-enables the peripherals that we support so far.
+are available in the git repository at:
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-[Icenowy: dropped all GPIO pinctrl nodes, change red LED gpio]
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
-Changes in v2:
-- Dropped all GPIO pinctrl nodes.
-- Changed red LED gpio to the correct one.
-- Added audio codec configuration copied from Orange Pi PC.
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-cleanup-4.11
 
- arch/arm64/boot/dts/allwinner/Makefile             |   1 +
- .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  | 164 +++++++++++++++++++++
- 2 files changed, 165 insertions(+)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
+for you to fetch changes up to 5fdb98dcfb0221f488dd238570933fd3dcfae031:
 
-diff --git a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
-index 1e29a5ae8282..b26bb46b934c 100644
---- a/arch/arm64/boot/dts/allwinner/Makefile
-+++ b/arch/arm64/boot/dts/allwinner/Makefile
-@@ -1,4 +1,5 @@
- dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-pine64-plus.dtb sun50i-a64-pine64.dtb
-+dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-pc2.dtb
- 
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-new file mode 100644
-index 000000000000..79784cba806c
---- /dev/null
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
-@@ -0,0 +1,164 @@
-+/*
-+ * Copyright (C) 2016 ARM Ltd.
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun50i-h5.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
-+/ {
-+	model = "Xunlong Orange Pi PC 2";
-+	compatible = "xunlong,orangepi-pc2", "allwinner,sun50i-h5";
-+
-+	reg_vcc3v3: vcc3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vcc3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		pwr_led {
-+			label = "orangepi:green:pwr";
-+			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>;
-+			default-state = "on";
-+		};
-+
-+		status_led {
-+			label = "orangepi:red:status";
-+			gpios = <&pio 0 20 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	r_gpio_keys {
-+		compatible = "gpio-keys";
-+
-+		sw4 {
-+			label = "sw4";
-+			linux,code = <BTN_0>;
-+			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+};
-+
-+&codec {
-+	allwinner,audio-routing =
-+		"Line Out", "LINEOUT",
-+		"MIC1", "Mic",
-+		"Mic",  "MBIAS";
-+	status = "okay";
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&ehci2 {
-+	status = "okay";
-+};
-+
-+&ehci3 {
-+	status = "okay";
-+};
-+
-+&ir {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&ir_pins_a>;
-+	status = "okay";
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&ohci2 {
-+	status = "okay";
-+};
-+
-+&ohci3 {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_pins>;
-+	status = "disabled";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart2_pins>;
-+	status = "disabled";
-+};
-+
-+&usbphy {
-+	/* USB VBUS is always on */
-+	status = "okay";
-+};
--- 
-2.11.0
+  ARM: mach-mx27_3ds: Remove camera support (2017-01-03 13:52:38 +0800)
+
+----------------------------------------------------------------
+i.MX cleanup for 4.11:
+ - Remove unused flexcan and esdhc device definitions for i.MX25.
+ - A series from Fabio to remove camera device initialization code from
+   i.MX platform support, since the corresponding media driver has been
+   deprecated and removed from kernel tree.
+
+----------------------------------------------------------------
+Arnd Bergmann (1):
+      ARM: imx: remove unused device definitions
+
+Fabio Estevam (6):
+      ARM: mach-mx31_3ds: Remove camera support
+      ARM: mx31moboard-marxbot: Remove camera support
+      ARM: mx31moboard-smartbot: Remove camera support
+      ARM: mach-mx35_3ds: Remove camera support
+      ARM: mach-pcm037: Remove camera support
+      ARM: mach-mx27_3ds: Remove camera support
+
+ arch/arm/mach-imx/devices/platform-flexcan.c       |   9 --
+ .../mach-imx/devices/platform-sdhci-esdhc-imx.c    |  10 --
+ arch/arm/mach-imx/mach-mx27_3ds.c                  | 107 --------------
+ arch/arm/mach-imx/mach-mx31_3ds.c                  | 160 ---------------------
+ arch/arm/mach-imx/mach-mx35_3ds.c                  | 103 -------------
+ arch/arm/mach-imx/mach-pcm037.c                    | 115 ---------------
+ arch/arm/mach-imx/mx31moboard-marxbot.c            |  92 ------------
+ arch/arm/mach-imx/mx31moboard-smartbot.c           |  74 ----------
+ 8 files changed, 670 deletions(-)
