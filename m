@@ -1,98 +1,84 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Sun, 29 Jan 2017 16:16:11 +0100
-Subject: [PATCH 08/22] power: supply: add AC power supply driver for
- AXP20X and AXP22X PMICs
-In-Reply-To: <fcc8f597-e2db-998a-78be-29865f9764fa@kernel.org>
-References: <20170102163723.7939-1-quentin.schulz@free-electrons.com>
- <20170102163723.7939-9-quentin.schulz@free-electrons.com>
- <20170117030013.g5xhlmrxpthyfewa@earth>
- <6a3edb64-8ea9-cb14-b826-d6e8e2c4c4b7@free-electrons.com>
- <20170127082017.ffvybk237ku2n5hu@lukather>
- <fcc8f597-e2db-998a-78be-29865f9764fa@kernel.org>
-Message-ID: <20170129151611.bczd6dn7def3ceut@earth>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sun, 29 Jan 2017 15:21:06 +0000
+Subject: [RFC v2 06/10] KVM: arm/arm64: Update the physical timer
+ interrupt level
+In-Reply-To: <1485479100-4966-7-git-send-email-jintack@cs.columbia.edu>
+ (Jintack Lim's message of "Thu, 26 Jan 2017 20:04:56 -0500")
+References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
+ <1485479100-4966-7-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <86sho199jx.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sat, Jan 28, 2017 at 02:30:22PM +0000, Jonathan Cameron wrote:
-> On 27/01/17 08:20, Maxime Ripard wrote:
-> > On Thu, Jan 26, 2017 at 02:32:21PM +0100, Quentin Schulz wrote:
-> >> I've come with this solution:
-> >>
-> >> ------------------------------------------------------------------------
-> >> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> >> index 012c064..117eacb 100644
-> >> --- a/drivers/mfd/axp20x.c
-> >> +++ b/drivers/mfd/axp20x.c
-> >> @@ -882,7 +882,7 @@ EXPORT_SYMBOL(axp20x_match_device);
-> >>
-> >>  int axp20x_device_probe(struct axp20x_dev *axp20x)
-> >>  {
-> >> -	int ret;
-> >> +	int ret, irq_base;
-> >>
-> >>  	ret = regmap_add_irq_chip(axp20x->regmap, axp20x->irq,
-> >>  				  IRQF_ONESHOT | IRQF_SHARED, -1,
-> >> @@ -893,8 +893,9 @@ int axp20x_device_probe(struct axp20x_dev *axp20x)
-> >>  		return ret;
-> >>  	}
-> >>
-> >> +	irq_base = regmap_irq_chip_get_base(axp20x->regmap_irqc);
-> >>  	ret = mfd_add_devices(axp20x->dev, -1, axp20x->cells,
-> >> -			      axp20x->nr_cells, NULL, 0, NULL);
-> >> +			      axp20x->nr_cells, NULL, irq_base, NULL);
-> >>
-> >>  	if (ret) {
-> >>  		dev_err(axp20x->dev, "failed to add MFD devices: %d\n", ret);
-> >> ------------------------------------------------------------------------
-> >>
-> >> However, this implies that all cells added by the mfd driver which are
-> >> requesting irqs will need to be changed in the same commit to remove the
-> >> regmap_irq_get_virq calls. If we don't modify the drivers, they will
-> >> purely fail to request the irqs.
-> >>
-> >> The impacted drivers are the following:
-> >>
-> >>  - drivers/extcon/extcon-axp288.c
-> >>  - drivers/input/misc/axp20x-pek.c
-> >>  - drivers/power/supply/axp20x_usb_power.c
-> >>  - drivers/power/supply/axp288_charger.c
-> >>  - drivers/power/supply/axp288_fuel_gauge.c
-
-So mostly power-supply, which is affected by this series anyways.
-Only input & extcon are added.
-
-> >> Is it really worth to do such a cleanup?
-> > 
-> > Yes. The current behaviour goes against what everyone is expecting
-> > from the API.
-> >
-> >> I'm assuming that impacting four different subsystems at the same
-> >> time might require a bit of time to make the patch into the
-> >> kernel. I don't see also another way than doing one single patch for
-> >> all changes since the changes in the mfd driver will break all
-> >> aforementioned drivers.
-> > 
-> > However, I think that can be fixed in a later, independant serie. This
-> > serie is quite big already and this has been long overdue, so I'd
-> > really like not to delay it once again because of a dependency on a
-> > cross-tree cleanup.
+On Fri, Jan 27 2017 at 01:04:56 AM, Jintack Lim <jintack@cs.columbia.edu> wrote:
+> Now that we maintain the EL1 physical timer register states of VMs,
+> update the physical timer interrupt level along with the virtual one.
 >
-> It's not that cross tree really. Lining up this level of change to
-> go through an immutable branch pulled into each of the relevant trees
-> isn't too hard to arrange.
+> Note that the emulated EL1 physical timer is not mapped to any hardware
+> timer, so we call a proper vgic function.
+>
+> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+> ---
+>  virt/kvm/arm/arch_timer.c | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+>
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index 0f6e935..3b6bd50 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -180,6 +180,21 @@ static void kvm_timer_update_mapped_irq(struct kvm_vcpu *vcpu, bool new_level,
+>  	WARN_ON(ret);
+>  }
+>  
+> +static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
+> +				 struct arch_timer_context *timer)
+> +{
+> +	int ret;
+> +
+> +	BUG_ON(!vgic_initialized(vcpu->kvm));
 
-I'm fine with doing this as a separate series, if it follows
-directly behind this one. Mainlined drivers tend to be used as
-template for new ones and this invalid IRQ resources are a bad
-example.
+Although I've added my fair share of BUG_ON() in the code base, I've
+since reconsidered my position. If we get in a situation where the vgic
+is not initialized, maybe it would be better to just WARN_ON and return
+early rather than killing the whole box. Thoughts?
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170129/925bf5ca/attachment-0001.sig>
+> +
+> +	timer->irq.level = new_level;
+> +	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->irq.irq,
+> +				   timer->irq.level);
+> +	ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id, timer->irq.irq,
+> +				  timer->irq.level);
+> +	WARN_ON(ret);
+> +}
+> +
+>  /*
+>   * Check if there was a change in the timer state (should we raise or lower
+>   * the line level to the GIC).
+> @@ -188,6 +203,7 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
+>  {
+>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+>  	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+> +	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+>  
+>  	/*
+>  	 * If userspace modified the timer registers via SET_ONE_REG before
+> @@ -201,6 +217,10 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
+>  	if (kvm_timer_should_fire(vcpu, vtimer) != vtimer->irq.level)
+>  		kvm_timer_update_mapped_irq(vcpu, !vtimer->irq.level, vtimer);
+>  
+> +	/* The emulated EL1 physical timer irq is not mapped to hardware */
+
+Maybe a slightly better comment would be saying that we're using a
+purely virtual interrupt, unrelated to the hardware interrupt.
+
+> +	if (kvm_timer_should_fire(vcpu, ptimer) != ptimer->irq.level)
+> +		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
+> +
+>  	return 0;
+>  }
+
+Otherwise looks good.
+
+          M.
+-- 
+Jazz is not dead. It just smells funny.
