@@ -1,634 +1,757 @@
 From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sun, 29 Jan 2017 10:33:22 +0800
-Subject: [PATCH v3 01/10] drivers: pinctrl: add driver for Allwinner H5 SoC
+Date: Sun, 29 Jan 2017 10:33:24 +0800
+Subject: [PATCH v3 03/10] clk: sunxi-ng: rename sun8i-h3 driver to sunxi-h3-h5
 In-Reply-To: <20170129023331.62106-1-icenowy@aosc.xyz>
 References: <20170129023331.62106-1-icenowy@aosc.xyz>
-Message-ID: <20170129023331.62106-2-icenowy@aosc.xyz>
+Message-ID: <20170129023331.62106-4-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on the Allwinner H5 datasheet and the pinctrl driver of the
-backward-compatible H3 this introduces the pin multiplex assignments for
-the H5 SoC.
-
-H5 introduced some more pin functions (e.g. three more groups of TS
-pins, and one more groups of SIM pins) than H3.
+As the CCU in the Allwinner H5 SoC is very similar to the one in H3,
+rename the H3 driver to sunxi-h3-h5 so that it can be extended with H5
+support.
 
 Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
-Changes in v3:
-- Add Maxime's ACK.
-Changes in v2:
-- Fixed interrupt banks. (There's one more GPIO banks (PF) that can do
-  interrupt handling on H5)
+The original PATCH v2 3/9 is splited into two patches in v3, this one renames
+the H3 driver to h3-h5, and the next one finally add H5 support to it.
 
- .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
- drivers/pinctrl/sunxi/Kconfig                      |   4 +
- drivers/pinctrl/sunxi/Makefile                     |   1 +
- drivers/pinctrl/sunxi/pinctrl-sun50i-h5.c          | 558 +++++++++++++++++++++
- 4 files changed, 564 insertions(+)
- create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun50i-h5.c
+ drivers/clk/sunxi-ng/Kconfig                       |   4 +-
+ drivers/clk/sunxi-ng/Makefile                      |   2 +-
+ .../sunxi-ng/{ccu-sun8i-h3.c => ccu-sunxi-h3-h5.c} |  42 +++---
+ .../sunxi-ng/{ccu-sun8i-h3.h => ccu-sunxi-h3-h5.h} |  10 +-
+ include/dt-bindings/clock/sun8i-h3-ccu.h           | 146 +--------------------
+ include/dt-bindings/clock/sunxi-h3-h5-ccu.h        | 145 ++++++++++++++++++++
+ include/dt-bindings/reset/sun8i-h3-ccu.h           | 104 +--------------
+ include/dt-bindings/reset/sunxi-h3-h5-ccu.h        | 103 +++++++++++++++
+ 8 files changed, 282 insertions(+), 274 deletions(-)
+ rename drivers/clk/sunxi-ng/{ccu-sun8i-h3.c => ccu-sunxi-h3-h5.c} (96%)
+ rename drivers/clk/sunxi-ng/{ccu-sun8i-h3.h => ccu-sunxi-h3-h5.h} (88%)
+ mode change 100644 => 120000 include/dt-bindings/clock/sun8i-h3-ccu.h
+ create mode 100644 include/dt-bindings/clock/sunxi-h3-h5-ccu.h
+ mode change 100644 => 120000 include/dt-bindings/reset/sun8i-h3-ccu.h
+ create mode 100644 include/dt-bindings/reset/sunxi-h3-h5-ccu.h
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-index c931fb1c01a6..2fd688c8dbdb 100644
---- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
-@@ -23,6 +23,7 @@ Required properties:
-   "allwinner,sun8i-h3-pinctrl"
-   "allwinner,sun8i-h3-r-pinctrl"
-   "allwinner,sun50i-a64-pinctrl"
-+  "allwinner,sun50i-h5-r-pinctrl"
-   "nextthing,gr8-pinctrl"
+diff --git a/drivers/clk/sunxi-ng/Kconfig b/drivers/clk/sunxi-ng/Kconfig
+index 71f11cd1647b..4be083ae717f 100644
+--- a/drivers/clk/sunxi-ng/Kconfig
++++ b/drivers/clk/sunxi-ng/Kconfig
+@@ -108,8 +108,8 @@ config SUN8I_A33_CCU
+ 	select SUNXI_CCU_PHASE
+ 	default MACH_SUN8I
  
- - reg: Should contain the register physical address and length for the
-diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
-index 8ba10d830ce2..92d845827577 100644
---- a/drivers/pinctrl/sunxi/Kconfig
-+++ b/drivers/pinctrl/sunxi/Kconfig
-@@ -72,4 +72,8 @@ config PINCTRL_SUN50I_A64
- 	bool
- 	select PINCTRL_SUNXI
+-config SUN8I_H3_CCU
+-	bool "Support for the Allwinner H3 CCU"
++config SUNXI_H3_H5_CCU
++	bool "Support for the Allwinner H3/H5 CCU"
+ 	select SUNXI_CCU_DIV
+ 	select SUNXI_CCU_NK
+ 	select SUNXI_CCU_NKM
+diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
+index a8afdf9c7668..cdc3359abbfe 100644
+--- a/drivers/clk/sunxi-ng/Makefile
++++ b/drivers/clk/sunxi-ng/Makefile
+@@ -23,5 +23,5 @@ obj-$(CONFIG_SUN5I_CCU)		+= ccu-sun5i.o
+ obj-$(CONFIG_SUN6I_A31_CCU)	+= ccu-sun6i-a31.o
+ obj-$(CONFIG_SUN8I_A23_CCU)	+= ccu-sun8i-a23.o
+ obj-$(CONFIG_SUN8I_A33_CCU)	+= ccu-sun8i-a33.o
+-obj-$(CONFIG_SUN8I_H3_CCU)	+= ccu-sun8i-h3.o
++obj-$(CONFIG_SUNXI_H3_H5_CCU)	+= ccu-sunxi-h3-h5.o
+ obj-$(CONFIG_SUN8I_V3S_CCU)	+= ccu-sun8i-v3s.o
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c b/drivers/clk/sunxi-ng/ccu-sunxi-h3-h5.c
+similarity index 96%
+rename from drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+rename to drivers/clk/sunxi-ng/ccu-sunxi-h3-h5.c
+index a26c8a19fe93..be63b56315f5 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
++++ b/drivers/clk/sunxi-ng/ccu-sunxi-h3-h5.c
+@@ -27,7 +27,7 @@
+ #include "ccu_nm.h"
+ #include "ccu_phase.h"
  
-+config PINCTRL_SUN50I_H5
-+	bool
-+	select PINCTRL_SUNXI
-+
- endif
-diff --git a/drivers/pinctrl/sunxi/Makefile b/drivers/pinctrl/sunxi/Makefile
-index 7bcb4683bce5..f9a3855c42f1 100644
---- a/drivers/pinctrl/sunxi/Makefile
-+++ b/drivers/pinctrl/sunxi/Makefile
-@@ -16,5 +16,6 @@ obj-$(CONFIG_PINCTRL_SUN8I_A83T)	+= pinctrl-sun8i-a83t.o
- obj-$(CONFIG_PINCTRL_SUN8I_H3)		+= pinctrl-sun8i-h3.o
- obj-$(CONFIG_PINCTRL_SUN8I_H3_R)	+= pinctrl-sun8i-h3-r.o
- obj-$(CONFIG_PINCTRL_SUN8I_V3S)		+= pinctrl-sun8i-v3s.o
-+obj-$(CONFIG_PINCTRL_SUN50I_H5)		+= pinctrl-sun50i-h5.o
- obj-$(CONFIG_PINCTRL_SUN9I_A80)		+= pinctrl-sun9i-a80.o
- obj-$(CONFIG_PINCTRL_SUN9I_A80_R)	+= pinctrl-sun9i-a80-r.o
-diff --git a/drivers/pinctrl/sunxi/pinctrl-sun50i-h5.c b/drivers/pinctrl/sunxi/pinctrl-sun50i-h5.c
-new file mode 100644
-index 000000000000..ccf9419e9418
---- /dev/null
-+++ b/drivers/pinctrl/sunxi/pinctrl-sun50i-h5.c
-@@ -0,0 +1,558 @@
-+/*
-+ * Allwinner H5 SoC pinctrl driver.
-+ *
-+ * Copyright (C) 2016 Icenowy Zheng <icenowy@aosc.xyz>
-+ *
-+ * Based on pinctrl-sun8i-h3.c, which is:
-+ * Copyright (C) 2015 Jens Kuske <jenskuske@gmail.com>
-+ *
-+ * Based on pinctrl-sun8i-a23.c, which is:
-+ * Copyright (C) 2014 Chen-Yu Tsai <wens@csie.org>
-+ * Copyright (C) 2014 Maxime Ripard <maxime.ripard@free-electrons.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/pinctrl/pinctrl.h>
-+
-+#include "pinctrl-sunxi.h"
-+
-+static const struct sunxi_desc_pin sun50i_h5_pins[] = {
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 0),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "uart2"),		/* TX */
-+		  SUNXI_FUNCTION(0x3, "jtag"),		/* MS */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 0)),	/* PA_EINT0 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 1),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "uart2"),		/* RX */
-+		  SUNXI_FUNCTION(0x3, "jtag"),		/* CK */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 1)),	/* PA_EINT1 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 2),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "uart2"),		/* RTS */
-+		  SUNXI_FUNCTION(0x3, "jtag"),		/* DO */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 2)),	/* PA_EINT2 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 3),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "uart2"),		/* CTS */
-+		  SUNXI_FUNCTION(0x3, "jtag"),		/* DI */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 3)),	/* PA_EINT3 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 4),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "uart0"),		/* TX */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 4)),	/* PA_EINT4 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 5),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "uart0"),		/* RX */
-+		  SUNXI_FUNCTION(0x3, "pwm0"),
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 5)),	/* PA_EINT5 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 6),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "sim"),		/* PWREN */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 6)),	/* PA_EINT6 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 7),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "sim"),		/* CLK */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 7)),	/* PA_EINT7 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 8),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "sim"),		/* DATA */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 8)),	/* PA_EINT8 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 9),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "sim"),		/* RST */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 9)),	/* PA_EINT9 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 10),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "sim"),		/* DET */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 10)),	/* PA_EINT10 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 11),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "i2c0"),		/* SCK */
-+		  SUNXI_FUNCTION(0x3, "di"),		/* TX */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 11)),	/* PA_EINT11 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 12),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "i2c0"),		/* SDA */
-+		  SUNXI_FUNCTION(0x3, "di"),		/* RX */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 12)),	/* PA_EINT12 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 13),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "spi1"),		/* CS */
-+		  SUNXI_FUNCTION(0x3, "uart3"),		/* TX */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 13)),	/* PA_EINT13 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 14),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "spi1"),		/* CLK */
-+		  SUNXI_FUNCTION(0x3, "uart3"),		/* RX */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 14)),	/* PA_EINT14 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 15),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "spi1"),		/* MOSI */
-+		  SUNXI_FUNCTION(0x3, "uart3"),		/* RTS */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 15)),	/* PA_EINT15 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 16),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "spi1"),		/* MISO */
-+		  SUNXI_FUNCTION(0x3, "uart3"),		/* CTS */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 16)),	/* PA_EINT16 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 17),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "spdif"),		/* OUT */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 17)),	/* PA_EINT17 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 18),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "i2s0"),		/* SYNC */
-+		  SUNXI_FUNCTION(0x3, "i2c1"),		/* SCK */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 18)),	/* PA_EINT18 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 19),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "i2s0"),		/* CLK */
-+		  SUNXI_FUNCTION(0x3, "i2c1"),		/* SDA */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 19)),	/* PA_EINT19 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 20),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "i2s0"),		/* DOUT */
-+		  SUNXI_FUNCTION(0x3, "sim"),		/* VPPEN */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 20)),	/* PA_EINT20 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(A, 21),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "i2s0"),		/* DIN */
-+		  SUNXI_FUNCTION(0x3, "sim"),		/* VPPPP */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 0, 21)),	/* PA_EINT21 */
-+	/* Hole */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 0),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "nand0"),		/* WE */
-+		  SUNXI_FUNCTION(0x3, "spi0")),		/* MOSI */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 1),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "nand0"),		/* ALE */
-+		  SUNXI_FUNCTION(0x3, "spi0"),		/* MISO */
-+		  SUNXI_FUNCTION(0x4, "mmc2")),		/* DS */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 2),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "nand0"),		/* CLE */
-+		  SUNXI_FUNCTION(0x3, "spi0")),		/* CLK */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 3),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "nand0"),		/* CE1 */
-+		  SUNXI_FUNCTION(0x3, "spi0")),		/* CS */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 4),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "nand0"),		/* CE0 */
-+		  SUNXI_FUNCTION(0x4, "spi0")),		/* MISO */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 5),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "nand0"),		/* RE */
-+		  SUNXI_FUNCTION(0x3, "mmc2")),		/* CLK */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 6),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "nand0"),		/* RB0 */
-+		  SUNXI_FUNCTION(0x3, "mmc2")),		/* CMD */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 7),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "nand0")),	/* RB1 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 8),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ0 */
-+		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D0 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 9),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ1 */
-+		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D1 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 10),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ2 */
-+		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D2 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 11),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ3 */
-+		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D3 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 12),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ4 */
-+		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D4 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 13),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ5 */
-+		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D5 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 14),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ6 */
-+		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D6 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 15),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQ7 */
-+		  SUNXI_FUNCTION(0x3, "mmc2")),		/* D7 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(C, 16),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "nand0"),		/* DQS */
-+		  SUNXI_FUNCTION(0x3, "mmc2")),		/* RST */
-+	/* Hole */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 0),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "emac"),		/* RXD3 */
-+		  SUNXI_FUNCTION(0x3, "di"),		/* TX */
-+		  SUNXI_FUNCTION(0x4, "ts2")),		/* CLK */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 1),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "emac"),		/* RXD2 */
-+		  SUNXI_FUNCTION(0x3, "di"),		/* RX */
-+		  SUNXI_FUNCTION(0x4, "ts2")),		/* ERR */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 2),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "emac"),		/* RXD1 */
-+		  SUNXI_FUNCTION(0x4, "ts2")),		/* SYNC */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 3),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "emac"),		/* RXD0 */
-+		  SUNXI_FUNCTION(0x4, "ts2")),		/* DVLD */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 4),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "emac"),		/* RXCK */
-+		  SUNXI_FUNCTION(0x4, "ts2")),		/* D0 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 5),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "emac"),		/* RXCTL/RXDV */
-+		  SUNXI_FUNCTION(0x4, "ts2")),		/* D1 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 6),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "emac"),		/* RXERR */
-+		  SUNXI_FUNCTION(0x4, "ts2")),		/* D2 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 7),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "emac"),		/* TXD3 */
-+		  SUNXI_FUNCTION(0x4, "ts2"),		/* D3 */
-+		  SUNXI_FUNCTION(0x5, "ts3")),		/* CLK */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 8),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "emac"),		/* TXD2 */
-+		  SUNXI_FUNCTION(0x4, "ts2"),		/* D4 */
-+		  SUNXI_FUNCTION(0x5, "ts3")),		/* ERR */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 9),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "emac"),		/* TXD1 */
-+		  SUNXI_FUNCTION(0x4, "ts2"),		/* D5 */
-+		  SUNXI_FUNCTION(0x5, "ts3")),		/* SYNC */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 10),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "emac"),		/* TXD0 */
-+		  SUNXI_FUNCTION(0x4, "ts2"),		/* D6 */
-+		  SUNXI_FUNCTION(0x5, "ts3")),		/* DVLD */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 11),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "emac"),		/* CRS */
-+		  SUNXI_FUNCTION(0x4, "ts2"),		/* D7 */
-+		  SUNXI_FUNCTION(0x5, "ts3")),		/* D0 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 12),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "emac"),		/* TXCK */
-+		  SUNXI_FUNCTION(0x4, "sim")),		/* PWREN */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 13),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "emac"),		/* TXCTL/TXEN */
-+		  SUNXI_FUNCTION(0x4, "sim")),		/* CLK */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 14),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "emac"),		/* TXERR */
-+		  SUNXI_FUNCTION(0x4, "sim")),		/* DATA */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 15),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "emac"),		/* CLKIN/COL */
-+		  SUNXI_FUNCTION(0x4, "sim")),		/* RST */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 16),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "emac"),		/* MDC */
-+		  SUNXI_FUNCTION(0x4, "sim")),		/* DET */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(D, 17),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "emac")),		/* MDIO */
-+	/* Hole */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 0),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "csi"),		/* PCLK */
-+		  SUNXI_FUNCTION(0x3, "ts0")),		/* CLK */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 1),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "csi"),		/* MCLK */
-+		  SUNXI_FUNCTION(0x3, "ts0")),		/* ERR */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 2),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "csi"),		/* HSYNC */
-+		  SUNXI_FUNCTION(0x3, "ts0")),		/* SYNC */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 3),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "csi"),		/* VSYNC */
-+		  SUNXI_FUNCTION(0x3, "ts0")),		/* DVLD */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 4),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "csi"),		/* D0 */
-+		  SUNXI_FUNCTION(0x3, "ts0")),		/* D0 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 5),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "csi"),		/* D1 */
-+		  SUNXI_FUNCTION(0x3, "ts0")),		/* D1 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 6),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "csi"),		/* D2 */
-+		  SUNXI_FUNCTION(0x3, "ts0")),		/* D2 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 7),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "csi"),		/* D3 */
-+		  SUNXI_FUNCTION(0x3, "ts0"),		/* D3 */
-+		  SUNXI_FUNCTION(0x4, "ts1")),		/* CLK */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 8),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "csi"),		/* D4 */
-+		  SUNXI_FUNCTION(0x3, "ts0"),		/* D4 */
-+		  SUNXI_FUNCTION(0x4, "ts1")),		/* ERR */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 9),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "csi"),		/* D5 */
-+		  SUNXI_FUNCTION(0x3, "ts0"),		/* D5 */
-+		  SUNXI_FUNCTION(0x4, "ts1")),		/* SYNC */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 10),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "csi"),		/* D6 */
-+		  SUNXI_FUNCTION(0x3, "ts0"),		/* D6 */
-+		  SUNXI_FUNCTION(0x4, "ts1")),		/* DVLD */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 11),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "csi"),		/* D7 */
-+		  SUNXI_FUNCTION(0x3, "ts"),		/* D7 */
-+		  SUNXI_FUNCTION(0x4, "ts1")),		/* D0 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 12),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "csi"),		/* SCK */
-+		  SUNXI_FUNCTION(0x3, "i2c2")),		/* SCK */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 13),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "csi"),		/* SDA */
-+		  SUNXI_FUNCTION(0x3, "i2c2")),		/* SDA */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 14),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x3, "sim")),		/* VPPEN */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(E, 15),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x3, "sim")),		/* VPPPP */
-+	/* Hole */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(F, 0),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "mmc0"),		/* D1 */
-+		  SUNXI_FUNCTION(0x3, "jtag"),		/* MS */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 0)),	/* PF_EINT0 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(F, 1),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "mmc0"),		/* D0 */
-+		  SUNXI_FUNCTION(0x3, "jtag"),		/* DI */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 1)),	/* PF_EINT1 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(F, 2),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "mmc0"),		/* CLK */
-+		  SUNXI_FUNCTION(0x3, "uart0"),		/* TX */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 2)),	/* PF_EINT2 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(F, 3),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "mmc0"),		/* CMD */
-+		  SUNXI_FUNCTION(0x3, "jtag"),		/* DO */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 3)),	/* PF_EINT3 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(F, 4),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "mmc0"),		/* D3 */
-+		  SUNXI_FUNCTION(0x3, "uart0"),		/* RX */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 4)),	/* PF_EINT4 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(F, 5),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "mmc0"),		/* D2 */
-+		  SUNXI_FUNCTION(0x3, "jtag"),		/* CK */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 5)),	/* PF_EINT5 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(F, 6),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 1, 6)),	/* PF_EINT6 */
-+	/* Hole */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 0),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "mmc1"),		/* CLK */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 0)),	/* PG_EINT0 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 1),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "mmc1"),		/* CMD */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 1)),	/* PG_EINT1 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 2),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "mmc1"),		/* D0 */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 2)),	/* PG_EINT2 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 3),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "mmc1"),		/* D1 */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 3)),	/* PG_EINT3 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 4),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "mmc1"),		/* D2 */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 4)),	/* PG_EINT4 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 5),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "mmc1"),		/* D3 */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 5)),	/* PG_EINT5 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 6),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "uart1"),		/* TX */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 6)),	/* PG_EINT6 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 7),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "uart1"),		/* RX */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 7)),	/* PG_EINT7 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 8),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "uart1"),		/* RTS */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 8)),	/* PG_EINT8 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 9),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "uart1"),		/* CTS */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 9)),	/* PG_EINT9 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 10),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "i2s1"),		/* SYNC */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 10)),	/* PG_EINT10 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 11),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "i2s1"),		/* CLK */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 11)),	/* PG_EINT11 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 12),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "i2s1"),		/* DOUT */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 12)),	/* PG_EINT12 */
-+	SUNXI_PIN(SUNXI_PINCTRL_PIN(G, 13),
-+		  SUNXI_FUNCTION(0x0, "gpio_in"),
-+		  SUNXI_FUNCTION(0x1, "gpio_out"),
-+		  SUNXI_FUNCTION(0x2, "i2s1"),		/* DIN */
-+		  SUNXI_FUNCTION_IRQ_BANK(0x6, 2, 13)),	/* PG_EINT13 */
-+};
-+
-+static const struct sunxi_pinctrl_desc sun50i_h5_pinctrl_data = {
-+	.pins = sun50i_h5_pins,
-+	.npins = ARRAY_SIZE(sun50i_h5_pins),
-+	.irq_banks = 2,
-+	.irq_read_needs_mux = true
-+};
-+
-+static int sun50i_h5_pinctrl_probe(struct platform_device *pdev)
-+{
-+	return sunxi_pinctrl_init(pdev,
-+				  &sun50i_h5_pinctrl_data);
+-#include "ccu-sun8i-h3.h"
++#include "ccu-sunxi-h3-h5.h"
+ 
+ static SUNXI_CCU_NKMP_WITH_GATE_LOCK(pll_cpux_clk, "pll-cpux",
+ 				     "osc24M", 0x000,
+@@ -47,7 +47,7 @@ static SUNXI_CCU_NKMP_WITH_GATE_LOCK(pll_cpux_clk, "pll-cpux",
+  * We don't have any need for the variable divider for now, so we just
+  * hardcode it to match with the clock names
+  */
+-#define SUN8I_H3_PLL_AUDIO_REG	0x008
++#define SUNXI_H3_H5_PLL_AUDIO_REG	0x008
+ 
+ static SUNXI_CCU_NM_WITH_GATE_LOCK(pll_audio_base_clk, "pll-audio-base",
+ 				   "osc24M", 0x008,
+@@ -300,7 +300,7 @@ static SUNXI_CCU_GATE(bus_uart2_clk,	"bus-uart2",	"apb2",
+ 		      0x06c, BIT(18), 0);
+ static SUNXI_CCU_GATE(bus_uart3_clk,	"bus-uart3",	"apb2",
+ 		      0x06c, BIT(19), 0);
+-static SUNXI_CCU_GATE(bus_scr_clk,	"bus-scr",	"apb2",
++static SUNXI_CCU_GATE(bus_scr0_clk,	"bus-scr0",	"apb2",
+ 		      0x06c, BIT(20), 0);
+ 
+ static SUNXI_CCU_GATE(bus_ephy_clk,	"bus-ephy",	"ahb1",
+@@ -484,7 +484,7 @@ static SUNXI_CCU_M_WITH_MUX_GATE(mbus_clk, "mbus", mbus_parents,
+ static SUNXI_CCU_M_WITH_GATE(gpu_clk, "gpu", "pll-gpu",
+ 			     0x1a0, 0, 3, BIT(31), 0);
+ 
+-static struct ccu_common *sun8i_h3_ccu_clks[] = {
++static struct ccu_common *sunxi_h3_h5_ccu_clks[] = {
+ 	&pll_cpux_clk.common,
+ 	&pll_audio_base_clk.common,
+ 	&pll_video_clk.common,
+@@ -546,7 +546,7 @@ static struct ccu_common *sun8i_h3_ccu_clks[] = {
+ 	&bus_uart1_clk.common,
+ 	&bus_uart2_clk.common,
+ 	&bus_uart3_clk.common,
+-	&bus_scr_clk.common,
++	&bus_scr0_clk.common,
+ 	&bus_ephy_clk.common,
+ 	&bus_dbg_clk.common,
+ 	&ths_clk.common,
+@@ -677,7 +677,7 @@ static struct clk_hw_onecell_data sun8i_h3_hw_clks = {
+ 		[CLK_BUS_UART1]		= &bus_uart1_clk.common.hw,
+ 		[CLK_BUS_UART2]		= &bus_uart2_clk.common.hw,
+ 		[CLK_BUS_UART3]		= &bus_uart3_clk.common.hw,
+-		[CLK_BUS_SCR]		= &bus_scr_clk.common.hw,
++		[CLK_BUS_SCR0]		= &bus_scr0_clk.common.hw,
+ 		[CLK_BUS_EPHY]		= &bus_ephy_clk.common.hw,
+ 		[CLK_BUS_DBG]		= &bus_dbg_clk.common.hw,
+ 		[CLK_THS]		= &ths_clk.common.hw,
+@@ -730,7 +730,7 @@ static struct clk_hw_onecell_data sun8i_h3_hw_clks = {
+ 	.num	= CLK_NUMBER,
+ };
+ 
+-static struct ccu_reset_map sun8i_h3_ccu_resets[] = {
++static struct ccu_reset_map sunxi_h3_h5_ccu_resets[] = {
+ 	[RST_USB_PHY0]		=  { 0x0cc, BIT(0) },
+ 	[RST_USB_PHY1]		=  { 0x0cc, BIT(1) },
+ 	[RST_USB_PHY2]		=  { 0x0cc, BIT(2) },
+@@ -790,27 +790,28 @@ static struct ccu_reset_map sun8i_h3_ccu_resets[] = {
+ 	[RST_BUS_UART1]		=  { 0x2d8, BIT(17) },
+ 	[RST_BUS_UART2]		=  { 0x2d8, BIT(18) },
+ 	[RST_BUS_UART3]		=  { 0x2d8, BIT(19) },
+-	[RST_BUS_SCR]		=  { 0x2d8, BIT(20) },
++	[RST_BUS_SCR0]		=  { 0x2d8, BIT(20) },
+ };
+ 
+ static const struct sunxi_ccu_desc sun8i_h3_ccu_desc = {
+-	.ccu_clks	= sun8i_h3_ccu_clks,
+-	.num_ccu_clks	= ARRAY_SIZE(sun8i_h3_ccu_clks),
++	.ccu_clks	= sunxi_h3_h5_ccu_clks,
++	.num_ccu_clks	= ARRAY_SIZE(sunxi_h3_h5_ccu_clks),
+ 
+ 	.hw_clks	= &sun8i_h3_hw_clks,
+ 
+-	.resets		= sun8i_h3_ccu_resets,
+-	.num_resets	= ARRAY_SIZE(sun8i_h3_ccu_resets),
++	.resets		= sunxi_h3_h5_ccu_resets,
++	.num_resets	= ARRAY_SIZE(sunxi_h3_h5_ccu_resets),
+ };
+ 
+-static struct ccu_mux_nb sun8i_h3_cpu_nb = {
++static struct ccu_mux_nb sunxi_h3_h5_cpu_nb = {
+ 	.common		= &cpux_clk.common,
+ 	.cm		= &cpux_clk.mux,
+ 	.delay_us	= 1, /* > 8 clock cycles at 24 MHz */
+ 	.bypass_index	= 1, /* index of 24 MHz oscillator */
+ };
+ 
+-static void __init sun8i_h3_ccu_setup(struct device_node *node)
++static void __init sunxi_h3_h5_ccu_init(struct device_node *node,
++				  const struct sunxi_ccu_desc *desc)
+ {
+ 	void __iomem *reg;
+ 	u32 val;
+@@ -823,14 +824,19 @@ static void __init sun8i_h3_ccu_setup(struct device_node *node)
+ 	}
+ 
+ 	/* Force the PLL-Audio-1x divider to 4 */
+-	val = readl(reg + SUN8I_H3_PLL_AUDIO_REG);
++	val = readl(reg + SUNXI_H3_H5_PLL_AUDIO_REG);
+ 	val &= ~GENMASK(19, 16);
+-	writel(val | (3 << 16), reg + SUN8I_H3_PLL_AUDIO_REG);
++	writel(val | (3 << 16), reg + SUNXI_H3_H5_PLL_AUDIO_REG);
+ 
+-	sunxi_ccu_probe(node, reg, &sun8i_h3_ccu_desc);
++	sunxi_ccu_probe(node, reg, desc);
+ 
+ 	ccu_mux_notifier_register(pll_cpux_clk.common.hw.clk,
+-				  &sun8i_h3_cpu_nb);
++				  &sunxi_h3_h5_cpu_nb);
 +}
 +
-+static const struct of_device_id sun50i_h5_pinctrl_match[] = {
-+	{ .compatible = "allwinner,sun50i-h5-pinctrl", },
-+	{}
-+};
++static void __init sun8i_h3_ccu_setup(struct device_node *node)
++{
++	sunxi_h3_h5_ccu_init(node, &sun8i_h3_ccu_desc);
+ }
+ CLK_OF_DECLARE(sun8i_h3_ccu, "allwinner,sun8i-h3-ccu",
+ 	       sun8i_h3_ccu_setup);
+diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.h b/drivers/clk/sunxi-ng/ccu-sunxi-h3-h5.h
+similarity index 88%
+rename from drivers/clk/sunxi-ng/ccu-sun8i-h3.h
+rename to drivers/clk/sunxi-ng/ccu-sunxi-h3-h5.h
+index 78be712c7487..e2a4656d2cf3 100644
+--- a/drivers/clk/sunxi-ng/ccu-sun8i-h3.h
++++ b/drivers/clk/sunxi-ng/ccu-sunxi-h3-h5.h
+@@ -14,11 +14,11 @@
+  * GNU General Public License for more details.
+  */
+ 
+-#ifndef _CCU_SUN8I_H3_H_
+-#define _CCU_SUN8I_H3_H_
++#ifndef _CCU_SUNXI_H3_H5_H_
++#define _CCU_SUNXI_H3_H5_H_
+ 
+-#include <dt-bindings/clock/sun8i-h3-ccu.h>
+-#include <dt-bindings/reset/sun8i-h3-ccu.h>
++#include <dt-bindings/clock/sunxi-h3-h5-ccu.h>
++#include <dt-bindings/reset/sunxi-h3-h5-ccu.h>
+ 
+ #define CLK_PLL_CPUX		0
+ #define CLK_PLL_AUDIO_BASE	1
+@@ -59,4 +59,4 @@
+ 
+ #define CLK_NUMBER		(CLK_GPU + 1)
+ 
+-#endif /* _CCU_SUN8I_H3_H_ */
++#endif /* _CCU_SUNXI_H3_H5_H_ */
+diff --git a/include/dt-bindings/clock/sun8i-h3-ccu.h b/include/dt-bindings/clock/sun8i-h3-ccu.h
+deleted file mode 100644
+index efb7ba2bd515..000000000000
+--- a/include/dt-bindings/clock/sun8i-h3-ccu.h
++++ /dev/null
+@@ -1,145 +0,0 @@
+-/*
+- * Copyright (C) 2016 Maxime Ripard <maxime.ripard@free-electrons.com>
+- *
+- * This file is dual-licensed: you can use it either under the terms
+- * of the GPL or the X11 license, at your option. Note that this dual
+- * licensing only applies to this file, and not this project as a
+- * whole.
+- *
+- *  a) This file is free software; you can redistribute it and/or
+- *     modify it under the terms of the GNU General Public License as
+- *     published by the Free Software Foundation; either version 2 of the
+- *     License, or (at your option) any later version.
+- *
+- *     This file is distributed in the hope that it will be useful,
+- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *     GNU General Public License for more details.
+- *
+- * Or, alternatively,
+- *
+- *  b) Permission is hereby granted, free of charge, to any person
+- *     obtaining a copy of this software and associated documentation
+- *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use,
+- *     copy, modify, merge, publish, distribute, sublicense, and/or
+- *     sell copies of the Software, and to permit persons to whom the
+- *     Software is furnished to do so, subject to the following
+- *     conditions:
+- *
+- *     The above copyright notice and this permission notice shall be
+- *     included in all copies or substantial portions of the Software.
+- *
+- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+- *     OTHER DEALINGS IN THE SOFTWARE.
+- */
+-
+-#ifndef _DT_BINDINGS_CLK_SUN8I_H3_H_
+-#define _DT_BINDINGS_CLK_SUN8I_H3_H_
+-
+-#define CLK_CPUX		14
+-
+-#define CLK_BUS_CE		20
+-#define CLK_BUS_DMA		21
+-#define CLK_BUS_MMC0		22
+-#define CLK_BUS_MMC1		23
+-#define CLK_BUS_MMC2		24
+-#define CLK_BUS_NAND		25
+-#define CLK_BUS_DRAM		26
+-#define CLK_BUS_EMAC		27
+-#define CLK_BUS_TS		28
+-#define CLK_BUS_HSTIMER		29
+-#define CLK_BUS_SPI0		30
+-#define CLK_BUS_SPI1		31
+-#define CLK_BUS_OTG		32
+-#define CLK_BUS_EHCI0		33
+-#define CLK_BUS_EHCI1		34
+-#define CLK_BUS_EHCI2		35
+-#define CLK_BUS_EHCI3		36
+-#define CLK_BUS_OHCI0		37
+-#define CLK_BUS_OHCI1		38
+-#define CLK_BUS_OHCI2		39
+-#define CLK_BUS_OHCI3		40
+-#define CLK_BUS_VE		41
+-#define CLK_BUS_TCON0		42
+-#define CLK_BUS_TCON1		43
+-#define CLK_BUS_DEINTERLACE	44
+-#define CLK_BUS_CSI		45
+-#define CLK_BUS_TVE		46
+-#define CLK_BUS_HDMI		47
+-#define CLK_BUS_DE		48
+-#define CLK_BUS_GPU		49
+-#define CLK_BUS_MSGBOX		50
+-#define CLK_BUS_SPINLOCK	51
+-#define CLK_BUS_CODEC		52
+-#define CLK_BUS_SPDIF		53
+-#define CLK_BUS_PIO		54
+-#define CLK_BUS_THS		55
+-#define CLK_BUS_I2S0		56
+-#define CLK_BUS_I2S1		57
+-#define CLK_BUS_I2S2		58
+-#define CLK_BUS_I2C0		59
+-#define CLK_BUS_I2C1		60
+-#define CLK_BUS_I2C2		61
+-#define CLK_BUS_UART0		62
+-#define CLK_BUS_UART1		63
+-#define CLK_BUS_UART2		64
+-#define CLK_BUS_UART3		65
+-#define CLK_BUS_SCR		66
+-#define CLK_BUS_EPHY		67
+-#define CLK_BUS_DBG		68
+-
+-#define CLK_THS			69
+-#define CLK_NAND		70
+-#define CLK_MMC0		71
+-#define CLK_MMC0_SAMPLE		72
+-#define CLK_MMC0_OUTPUT		73
+-#define CLK_MMC1		74
+-#define CLK_MMC1_SAMPLE		75
+-#define CLK_MMC1_OUTPUT		76
+-#define CLK_MMC2		77
+-#define CLK_MMC2_SAMPLE		78
+-#define CLK_MMC2_OUTPUT		79
+-#define CLK_TS			80
+-#define CLK_CE			81
+-#define CLK_SPI0		82
+-#define CLK_SPI1		83
+-#define CLK_I2S0		84
+-#define CLK_I2S1		85
+-#define CLK_I2S2		86
+-#define CLK_SPDIF		87
+-#define CLK_USB_PHY0		88
+-#define CLK_USB_PHY1		89
+-#define CLK_USB_PHY2		90
+-#define CLK_USB_PHY3		91
+-#define CLK_USB_OHCI0		92
+-#define CLK_USB_OHCI1		93
+-#define CLK_USB_OHCI2		94
+-#define CLK_USB_OHCI3		95
+-
+-#define CLK_DRAM_VE		97
+-#define CLK_DRAM_CSI		98
+-#define CLK_DRAM_DEINTERLACE	99
+-#define CLK_DRAM_TS		100
+-#define CLK_DE			101
+-#define CLK_TCON0		102
+-#define CLK_TVE			103
+-#define CLK_DEINTERLACE		104
+-#define CLK_CSI_MISC		105
+-#define CLK_CSI_SCLK		106
+-#define CLK_CSI_MCLK		107
+-#define CLK_VE			108
+-#define CLK_AC_DIG		109
+-#define CLK_AVS			110
+-#define CLK_HDMI		111
+-#define CLK_HDMI_DDC		112
+-
+-#define CLK_GPU			114
+-
+-#endif /* _DT_BINDINGS_CLK_SUN8I_H3_H_ */
+diff --git a/include/dt-bindings/clock/sun8i-h3-ccu.h b/include/dt-bindings/clock/sun8i-h3-ccu.h
+new file mode 120000
+index 000000000000..ef38232141e4
+--- /dev/null
++++ b/include/dt-bindings/clock/sun8i-h3-ccu.h
+@@ -0,0 +1 @@
++sunxi-h3-h5-ccu.h
+\ No newline at end of file
+diff --git a/include/dt-bindings/clock/sunxi-h3-h5-ccu.h b/include/dt-bindings/clock/sunxi-h3-h5-ccu.h
+new file mode 100644
+index 000000000000..1715a5e12525
+--- /dev/null
++++ b/include/dt-bindings/clock/sunxi-h3-h5-ccu.h
+@@ -0,0 +1,145 @@
++/*
++ * Copyright (C) 2016 Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
-+static struct platform_driver sun50i_h5_pinctrl_driver = {
-+	.probe	= sun50i_h5_pinctrl_probe,
-+	.driver	= {
-+		.name		= "sun50i-h5-pinctrl",
-+		.of_match_table	= sun50i_h5_pinctrl_match,
-+	},
-+};
-+builtin_platform_driver(sun50i_h5_pinctrl_driver);
++#ifndef _DT_BINDINGS_CLK_SUNXI_H3_H5_H_
++#define _DT_BINDINGS_CLK_SUNXI_H3_H5_H_
++
++#define CLK_CPUX		14
++
++#define CLK_BUS_CE		20
++#define CLK_BUS_DMA		21
++#define CLK_BUS_MMC0		22
++#define CLK_BUS_MMC1		23
++#define CLK_BUS_MMC2		24
++#define CLK_BUS_NAND		25
++#define CLK_BUS_DRAM		26
++#define CLK_BUS_EMAC		27
++#define CLK_BUS_TS		28
++#define CLK_BUS_HSTIMER		29
++#define CLK_BUS_SPI0		30
++#define CLK_BUS_SPI1		31
++#define CLK_BUS_OTG		32
++#define CLK_BUS_EHCI0		33
++#define CLK_BUS_EHCI1		34
++#define CLK_BUS_EHCI2		35
++#define CLK_BUS_EHCI3		36
++#define CLK_BUS_OHCI0		37
++#define CLK_BUS_OHCI1		38
++#define CLK_BUS_OHCI2		39
++#define CLK_BUS_OHCI3		40
++#define CLK_BUS_VE		41
++#define CLK_BUS_TCON0		42
++#define CLK_BUS_TCON1		43
++#define CLK_BUS_DEINTERLACE	44
++#define CLK_BUS_CSI		45
++#define CLK_BUS_TVE		46
++#define CLK_BUS_HDMI		47
++#define CLK_BUS_DE		48
++#define CLK_BUS_GPU		49
++#define CLK_BUS_MSGBOX		50
++#define CLK_BUS_SPINLOCK	51
++#define CLK_BUS_CODEC		52
++#define CLK_BUS_SPDIF		53
++#define CLK_BUS_PIO		54
++#define CLK_BUS_THS		55
++#define CLK_BUS_I2S0		56
++#define CLK_BUS_I2S1		57
++#define CLK_BUS_I2S2		58
++#define CLK_BUS_I2C0		59
++#define CLK_BUS_I2C1		60
++#define CLK_BUS_I2C2		61
++#define CLK_BUS_UART0		62
++#define CLK_BUS_UART1		63
++#define CLK_BUS_UART2		64
++#define CLK_BUS_UART3		65
++#define CLK_BUS_SCR0		66
++#define CLK_BUS_EPHY		67
++#define CLK_BUS_DBG		68
++
++#define CLK_THS			69
++#define CLK_NAND		70
++#define CLK_MMC0		71
++#define CLK_MMC0_SAMPLE		72
++#define CLK_MMC0_OUTPUT		73
++#define CLK_MMC1		74
++#define CLK_MMC1_SAMPLE		75
++#define CLK_MMC1_OUTPUT		76
++#define CLK_MMC2		77
++#define CLK_MMC2_SAMPLE		78
++#define CLK_MMC2_OUTPUT		79
++#define CLK_TS			80
++#define CLK_CE			81
++#define CLK_SPI0		82
++#define CLK_SPI1		83
++#define CLK_I2S0		84
++#define CLK_I2S1		85
++#define CLK_I2S2		86
++#define CLK_SPDIF		87
++#define CLK_USB_PHY0		88
++#define CLK_USB_PHY1		89
++#define CLK_USB_PHY2		90
++#define CLK_USB_PHY3		91
++#define CLK_USB_OHCI0		92
++#define CLK_USB_OHCI1		93
++#define CLK_USB_OHCI2		94
++#define CLK_USB_OHCI3		95
++
++#define CLK_DRAM_VE		97
++#define CLK_DRAM_CSI		98
++#define CLK_DRAM_DEINTERLACE	99
++#define CLK_DRAM_TS		100
++#define CLK_DE			101
++#define CLK_TCON0		102
++#define CLK_TVE			103
++#define CLK_DEINTERLACE		104
++#define CLK_CSI_MISC		105
++#define CLK_CSI_SCLK		106
++#define CLK_CSI_MCLK		107
++#define CLK_VE			108
++#define CLK_AC_DIG		109
++#define CLK_AVS			110
++#define CLK_HDMI		111
++#define CLK_HDMI_DDC		112
++
++#define CLK_GPU			114
++
++#endif /* _DT_BINDINGS_CLK_SUNXI_H3_H5_H_ */
+diff --git a/include/dt-bindings/reset/sun8i-h3-ccu.h b/include/dt-bindings/reset/sun8i-h3-ccu.h
+deleted file mode 100644
+index 6b7af80c26ec..000000000000
+--- a/include/dt-bindings/reset/sun8i-h3-ccu.h
++++ /dev/null
+@@ -1,103 +0,0 @@
+-/*
+- * Copyright (C) 2016 Maxime Ripard <maxime.ripard@free-electrons.com>
+- *
+- * This file is dual-licensed: you can use it either under the terms
+- * of the GPL or the X11 license, at your option. Note that this dual
+- * licensing only applies to this file, and not this project as a
+- * whole.
+- *
+- *  a) This file is free software; you can redistribute it and/or
+- *     modify it under the terms of the GNU General Public License as
+- *     published by the Free Software Foundation; either version 2 of the
+- *     License, or (at your option) any later version.
+- *
+- *     This file is distributed in the hope that it will be useful,
+- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- *     GNU General Public License for more details.
+- *
+- * Or, alternatively,
+- *
+- *  b) Permission is hereby granted, free of charge, to any person
+- *     obtaining a copy of this software and associated documentation
+- *     files (the "Software"), to deal in the Software without
+- *     restriction, including without limitation the rights to use,
+- *     copy, modify, merge, publish, distribute, sublicense, and/or
+- *     sell copies of the Software, and to permit persons to whom the
+- *     Software is furnished to do so, subject to the following
+- *     conditions:
+- *
+- *     The above copyright notice and this permission notice shall be
+- *     included in all copies or substantial portions of the Software.
+- *
+- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+- *     OTHER DEALINGS IN THE SOFTWARE.
+- */
+-
+-#ifndef _DT_BINDINGS_RST_SUN8I_H3_H_
+-#define _DT_BINDINGS_RST_SUN8I_H3_H_
+-
+-#define RST_USB_PHY0		0
+-#define RST_USB_PHY1		1
+-#define RST_USB_PHY2		2
+-#define RST_USB_PHY3		3
+-
+-#define RST_MBUS		4
+-
+-#define RST_BUS_CE		5
+-#define RST_BUS_DMA		6
+-#define RST_BUS_MMC0		7
+-#define RST_BUS_MMC1		8
+-#define RST_BUS_MMC2		9
+-#define RST_BUS_NAND		10
+-#define RST_BUS_DRAM		11
+-#define RST_BUS_EMAC		12
+-#define RST_BUS_TS		13
+-#define RST_BUS_HSTIMER		14
+-#define RST_BUS_SPI0		15
+-#define RST_BUS_SPI1		16
+-#define RST_BUS_OTG		17
+-#define RST_BUS_EHCI0		18
+-#define RST_BUS_EHCI1		19
+-#define RST_BUS_EHCI2		20
+-#define RST_BUS_EHCI3		21
+-#define RST_BUS_OHCI0		22
+-#define RST_BUS_OHCI1		23
+-#define RST_BUS_OHCI2		24
+-#define RST_BUS_OHCI3		25
+-#define RST_BUS_VE		26
+-#define RST_BUS_TCON0		27
+-#define RST_BUS_TCON1		28
+-#define RST_BUS_DEINTERLACE	29
+-#define RST_BUS_CSI		30
+-#define RST_BUS_TVE		31
+-#define RST_BUS_HDMI0		32
+-#define RST_BUS_HDMI1		33
+-#define RST_BUS_DE		34
+-#define RST_BUS_GPU		35
+-#define RST_BUS_MSGBOX		36
+-#define RST_BUS_SPINLOCK	37
+-#define RST_BUS_DBG		38
+-#define RST_BUS_EPHY		39
+-#define RST_BUS_CODEC		40
+-#define RST_BUS_SPDIF		41
+-#define RST_BUS_THS		42
+-#define RST_BUS_I2S0		43
+-#define RST_BUS_I2S1		44
+-#define RST_BUS_I2S2		45
+-#define RST_BUS_I2C0		46
+-#define RST_BUS_I2C1		47
+-#define RST_BUS_I2C2		48
+-#define RST_BUS_UART0		49
+-#define RST_BUS_UART1		50
+-#define RST_BUS_UART2		51
+-#define RST_BUS_UART3		52
+-#define RST_BUS_SCR		53
+-
+-#endif /* _DT_BINDINGS_RST_SUN8I_H3_H_ */
+diff --git a/include/dt-bindings/reset/sun8i-h3-ccu.h b/include/dt-bindings/reset/sun8i-h3-ccu.h
+new file mode 120000
+index 000000000000..ef38232141e4
+--- /dev/null
++++ b/include/dt-bindings/reset/sun8i-h3-ccu.h
+@@ -0,0 +1 @@
++sunxi-h3-h5-ccu.h
+\ No newline at end of file
+diff --git a/include/dt-bindings/reset/sunxi-h3-h5-ccu.h b/include/dt-bindings/reset/sunxi-h3-h5-ccu.h
+new file mode 100644
+index 000000000000..7a5de896cf1f
+--- /dev/null
++++ b/include/dt-bindings/reset/sunxi-h3-h5-ccu.h
+@@ -0,0 +1,103 @@
++/*
++ * Copyright (C) 2016 Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#ifndef _DT_BINDINGS_RST_SUNXI_H3_H5_H_
++#define _DT_BINDINGS_RST_SUNXI_H3_H5_H_
++
++#define RST_USB_PHY0		0
++#define RST_USB_PHY1		1
++#define RST_USB_PHY2		2
++#define RST_USB_PHY3		3
++
++#define RST_MBUS		4
++
++#define RST_BUS_CE		5
++#define RST_BUS_DMA		6
++#define RST_BUS_MMC0		7
++#define RST_BUS_MMC1		8
++#define RST_BUS_MMC2		9
++#define RST_BUS_NAND		10
++#define RST_BUS_DRAM		11
++#define RST_BUS_EMAC		12
++#define RST_BUS_TS		13
++#define RST_BUS_HSTIMER		14
++#define RST_BUS_SPI0		15
++#define RST_BUS_SPI1		16
++#define RST_BUS_OTG		17
++#define RST_BUS_EHCI0		18
++#define RST_BUS_EHCI1		19
++#define RST_BUS_EHCI2		20
++#define RST_BUS_EHCI3		21
++#define RST_BUS_OHCI0		22
++#define RST_BUS_OHCI1		23
++#define RST_BUS_OHCI2		24
++#define RST_BUS_OHCI3		25
++#define RST_BUS_VE		26
++#define RST_BUS_TCON0		27
++#define RST_BUS_TCON1		28
++#define RST_BUS_DEINTERLACE	29
++#define RST_BUS_CSI		30
++#define RST_BUS_TVE		31
++#define RST_BUS_HDMI0		32
++#define RST_BUS_HDMI1		33
++#define RST_BUS_DE		34
++#define RST_BUS_GPU		35
++#define RST_BUS_MSGBOX		36
++#define RST_BUS_SPINLOCK	37
++#define RST_BUS_DBG		38
++#define RST_BUS_EPHY		39
++#define RST_BUS_CODEC		40
++#define RST_BUS_SPDIF		41
++#define RST_BUS_THS		42
++#define RST_BUS_I2S0		43
++#define RST_BUS_I2S1		44
++#define RST_BUS_I2S2		45
++#define RST_BUS_I2C0		46
++#define RST_BUS_I2C1		47
++#define RST_BUS_I2C2		48
++#define RST_BUS_UART0		49
++#define RST_BUS_UART1		50
++#define RST_BUS_UART2		51
++#define RST_BUS_UART3		52
++#define RST_BUS_SCR0		53
++
++#endif /* _DT_BINDINGS_RST_SUNXI_H3_H5_H_ */
 -- 
 2.11.0
