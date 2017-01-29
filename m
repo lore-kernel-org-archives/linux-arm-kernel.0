@@ -1,95 +1,192 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 29 Jan 2017 11:58:26 +0000
-Subject: [PATCH 3/7] IIO: add bindings for STM32 DFSDM ADC driver
-In-Reply-To: <1485189145-29576-4-git-send-email-arnaud.pouliquen@st.com>
-References: <1485189145-29576-1-git-send-email-arnaud.pouliquen@st.com>
- <1485189145-29576-4-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <fa6b541d-2818-afa7-82fa-eb19806e9f4d@kernel.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sun, 29 Jan 2017 12:01:21 +0000
+Subject: [RFC v2 03/10] KVM: arm/arm64: Decouple kvm timer functions from
+ virtual timer
+In-Reply-To: <1485479100-4966-4-git-send-email-jintack@cs.columbia.edu>
+ (Jintack Lim's message of "Thu, 26 Jan 2017 20:04:53 -0500")
+References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
+ <1485479100-4966-4-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <8637g29isu.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/01/17 16:32, Arnaud Pouliquen wrote:
-> This patch adds documentation of device tree bindings for the
-> STM32 DFSDM ADC.
-> 
-> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-Trivial bits inline.
+On Fri, Jan 27 2017 at 01:04:53 AM, Jintack Lim <jintack@cs.columbia.edu> wrote:
+> Now that we have a separate structure for timer context, make functions
+> general so that they can work with any timer context, not just the
+
+  generic?
+
+> virtual timer context.  This does not change the virtual timer
+> functionality.
+>
+> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
 > ---
->  .../bindings/iio/adc/st,stm32-dfsdm-adc.txt        | 60 ++++++++++++++++++++++
->  1 file changed, 60 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt 
-> 
-> diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt  b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt 
-> new file mode 100644
-> index 0000000..c156bcb
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt 	
-> @@ -0,0 +1,60 @@
-> +STMicroelectronics STM32 DFSDM ADC device driver
-> +
-> +STM32 DFSDM ADC is a sigma delta analog-to-digital converter.
-> +It has to be declared in device-tree as a subnode of the DFSDM mfd node.
-> +
-> +It has several multiplexed input channels. Conversions can be performed
-> +in single, scan or discontinuous mode. Conversions can be launched in software
-> +or using hardware triggers.
-> +Each instance of the driver uses one filter instance handle by the DFSDM mfd
-> +driver.
-> +
-> +DFSDM also offers extra features:
-> +-The analog watchdog feature allows the application to detect if the
-> + input voltage goes beyond the user-defined, higher or lower thresholds.
-> +-The short circuit detection allows allows the application to detect if the
-> + input is in CC.
-> +-The clock absence detection allows application to detect if SPI input is clocked.
-> +
-> +Required properties:
-> +- compatible:	Must be "st,stm32-dfsdm-adc".
-> +- reg:		Specifies the DFSDM filter instance.
-> +- #io-channel-cells = <1>: See the IIO bindings section "IIO consumers".
-> +- st,adc-channels:	List of single-ended channels muxed for this ADC.
-> +- st,adc-channel-names:	List of single-ended channels Name.
-> +
-> +Optional properties:
-> +- st,adc-channel-types:	Single-ended channel input type. Default value is 0.
-> +			- 0: SPI with data on rising edge (default)
-> +			- 1: SPI with data on falling edge
-This is an element that can be described without magic numbers so I'd
-prefer that you do so.
+>  arch/arm/kvm/arm.c           |  2 +-
+>  include/kvm/arm_arch_timer.h |  3 ++-
+>  virt/kvm/arm/arch_timer.c    | 55 ++++++++++++++++++++++----------------------
+>  3 files changed, 30 insertions(+), 30 deletions(-)
+>
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 9d74464..9a34a3c 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -301,7 +301,7 @@ void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
+>  
+>  int kvm_cpu_has_pending_timer(struct kvm_vcpu *vcpu)
+>  {
+> -	return kvm_timer_should_fire(vcpu);
+> +	return kvm_timer_should_fire(vcpu, vcpu_vtimer(vcpu));
+>  }
+>  
+>  void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu)
+> diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+> index 1b9c988..d921d20 100644
+> --- a/include/kvm/arm_arch_timer.h
+> +++ b/include/kvm/arm_arch_timer.h
+> @@ -67,7 +67,8 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+>  u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
+>  int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
+>  
+> -bool kvm_timer_should_fire(struct kvm_vcpu *vcpu);
+> +bool kvm_timer_should_fire(struct kvm_vcpu *vcpu,
+> +			   struct arch_timer_context *timer_ctx);
+>  void kvm_timer_schedule(struct kvm_vcpu *vcpu);
+>  void kvm_timer_unschedule(struct kvm_vcpu *vcpu);
+>  
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index fa4c042..f72005a 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -98,13 +98,13 @@ static void kvm_timer_inject_irq_work(struct work_struct *work)
+>  	kvm_vcpu_kick(vcpu);
+>  }
+>  
+> -static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu)
+> +static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu,
+> +				   struct arch_timer_context *timer_ctx)
+>  {
+>  	u64 cval, now;
+> -	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+>  
+> -	cval = vtimer->cnt_cval;
+> -	now = kvm_phys_timer_read() - vtimer->cntvoff;
+> +	cval = timer_ctx->cnt_cval;
+> +	now = kvm_phys_timer_read() - timer_ctx->cntvoff;
+>  
+>  	if (now < cval) {
+>  		u64 ns;
+> @@ -133,7 +133,7 @@ static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
+>  	 * PoV (NTP on the host may have forced it to expire
+>  	 * early). If we should have slept longer, restart it.
+>  	 */
+> -	ns = kvm_timer_compute_delta(vcpu);
+> +	ns = kvm_timer_compute_delta(vcpu, vcpu_vtimer(vcpu));
+>  	if (unlikely(ns)) {
+>  		hrtimer_forward_now(hrt, ns_to_ktime(ns));
+>  		return HRTIMER_RESTART;
+> @@ -143,42 +143,40 @@ static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
+>  	return HRTIMER_NORESTART;
+>  }
+>  
+> -static bool kvm_timer_irq_can_fire(struct kvm_vcpu *vcpu)
+> +static bool kvm_timer_irq_can_fire(struct arch_timer_context *timer_ctx)
+>  {
+> -	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+> -
+> -	return !(vtimer->cnt_ctl & ARCH_TIMER_CTRL_IT_MASK) &&
+> -		(vtimer->cnt_ctl & ARCH_TIMER_CTRL_ENABLE);
+> +	return !(timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_IT_MASK) &&
+> +		(timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_ENABLE);
+>  }
+>  
+> -bool kvm_timer_should_fire(struct kvm_vcpu *vcpu)
+> +bool kvm_timer_should_fire(struct kvm_vcpu *vcpu,
+> +			   struct arch_timer_context *timer_ctx)
+>  {
+> -	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+>  	u64 cval, now;
+>  
+> -	if (!kvm_timer_irq_can_fire(vcpu))
+> +	if (!kvm_timer_irq_can_fire(timer_ctx))
+>  		return false;
+>  
+> -	cval = vtimer->cnt_cval;
+> -	now = kvm_phys_timer_read() - vtimer->cntvoff;
+> +	cval = timer_ctx->cnt_cval;
+> +	now = kvm_phys_timer_read() - timer_ctx->cntvoff;
+>  
+>  	return cval <= now;
+>  }
+>  
+> -static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
+> +static void kvm_timer_update_mapped_irq(struct kvm_vcpu *vcpu, bool new_level,
+> +					struct arch_timer_context *timer_ctx)
+>  {
+>  	int ret;
+> -	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+>  
+>  	BUG_ON(!vgic_initialized(vcpu->kvm));
+>  
+> -	vtimer->active_cleared_last = false;
+> -	vtimer->irq.level = new_level;
+> -	trace_kvm_timer_update_irq(vcpu->vcpu_id, vtimer->irq.irq,
+> -				   vtimer->irq.level);
+> +	timer_ctx->active_cleared_last = false;
+> +	timer_ctx->irq.level = new_level;
+> +	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer_ctx->irq.irq,
+> +				   timer_ctx->irq.level);
+>  	ret = kvm_vgic_inject_mapped_irq(vcpu->kvm, vcpu->vcpu_id,
+> -					 vtimer->irq.irq,
+> -					 vtimer->irq.level);
+> +					 timer_ctx->irq.irq,
+> +					 timer_ctx->irq.level);
+>  	WARN_ON(ret);
+>  }
+>  
+> @@ -200,8 +198,8 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
+>  	if (!vgic_initialized(vcpu->kvm) || !timer->enabled)
+>  		return -ENODEV;
+>  
+> -	if (kvm_timer_should_fire(vcpu) != vtimer->irq.level)
+> -		kvm_timer_update_irq(vcpu, !vtimer->irq.level);
+> +	if (kvm_timer_should_fire(vcpu, vtimer) != vtimer->irq.level)
+> +		kvm_timer_update_mapped_irq(vcpu, !vtimer->irq.level, vtimer);
+>  
+>  	return 0;
+>  }
+> @@ -214,6 +212,7 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
+>  void kvm_timer_schedule(struct kvm_vcpu *vcpu)
+>  {
+>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+> +	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+>  
+>  	BUG_ON(timer_is_armed(timer));
+>  
+> @@ -222,18 +221,18 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
+>  	 * already expired, because kvm_vcpu_block will return before putting
+>  	 * the thread to sleep.
+>  	 */
+> -	if (kvm_timer_should_fire(vcpu))
+> +	if (kvm_timer_should_fire(vcpu, vtimer))
+>  		return;
+>  
+>  	/*
+>  	 * If the timer is not capable of raising interrupts (disabled or
+>  	 * masked), then there's no more work for us to do.
+>  	 */
+> -	if (!kvm_timer_irq_can_fire(vcpu))
+> +	if (!kvm_timer_irq_can_fire(vtimer))
+>  		return;
+>  
+>  	/*  The timer has not yet expired, schedule a background timer */
+> -	timer_arm(timer, kvm_timer_compute_delta(vcpu));
+> +	timer_arm(timer, kvm_timer_compute_delta(vcpu, vtimer));
+>  }
+>  
+>  void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
 
-Also spell check edage -> edge.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-> +			- 2: manchester codec, rising edage = logic 0
-> +			- 3: manchester codec, rising edage = logic 1
-> +- st,adc-channel-clk-src: Conversion clock source. default value is 1.
-> +			  - 0: External SPI clocl (CLKIN x)
-> +			  - 1: internal SPI clock (CLKOUT) (default)
-> +			  - 2: internal SPI clock divided by 2 (falling edge).
-> +			  - 2: internal SPI clock divided by 2 (rising edge).
-3?
-> +- st,adc-alt-channel: 	  must be defined if Two ADCs are connected on same SPI
-> +			  input.
-> +			  If not set channel n is connected to SPI input n.
-> +			  If set channel n is connected to SPI input n + 1.
-? Two data inputs with shared clock?
-> +
-> +Example:
-> +	dfsdm: dfsdm at 4400D000 {
-> +		iio_dfsdm0: iio-dfsdm at 0 {
-> +			compatible = "st,stm32-dfsdm-adc";
-> +			#io-channel-cells = <1>;
-> +			reg = <0>;
-> +			st,adc-channels = <1>;
-> +			st,adc-channel-names = "in0";
-> +		};
-> +		iio_dfsdm1: iio-dfsdm at 1 {
-> +			compatible = "st,stm32-dfsdm-adc";
-> +			#io-channel-cells = <1>;
-> +			reg = <1>;
-> +			st,adc-channels = <1>;
-> +			st,adc-channel-names = "in1";
-> +			st,adc-channel-types = <1>;
-> +			st,adc-alt-channel = <1>;
-> +		};
-> +	};
-> 
+          M.
+-- 
+Jazz is not dead. It just smells funny.
