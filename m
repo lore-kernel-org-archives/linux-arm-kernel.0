@@ -1,38 +1,34 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Sun, 29 Jan 2017 22:08:23 +0200
-Subject: [PATCH] MAINTAINERS: extend Raspberry Pi entry
-Message-ID: <b2e1e59a752395314a20e846337cb70cf22f2959.1485720503.git.baruch@tkos.co.il>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sun, 29 Jan 2017 21:30:13 +0100
+Subject: [PATCH v5 5/8] clocksource/drivers/rockchip_timer: split bc_timer
+ into rk_timer and rk_clock_event_device
+In-Reply-To: <14EAE124-D504-4480-A6D4-EB7EFFC3C561@gmail.com>
+References: <1485260203-14216-1-git-send-email-al.kochet@gmail.com>
+ <3890508.0j97LNriXL@diego> <14EAE124-D504-4480-A6D4-EB7EFFC3C561@gmail.com>
+Message-ID: <3616490.5RPja2j5kp@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add bcm2836 (Raspberry Pi 2) and bcm2837 (Raspberry Pi 3).
+Hi Alexander,
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- MAINTAINERS | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Am Dienstag, 24. Januar 2017, 18:16:20 CET schrieb Alexander Kochetkov:
+> > 24 ???. 2017 ?., ? 18:02, Heiko St?bner <heiko@sntech.de> ???????(?):
+> > 
+> > Please don't add Reviewed-by tags without explicit mention of them by
+> > reviewers. (Also it's spelled wrong).
+> > 
+> > I haven't looked that deeply into the driver itself and the changes made
+> > to
+> > feel comfortable with a "Reviewed-by".
+> 
+> Than I posted another linux code I was asked to add such tags (and others)
+> to add credits to people.
+> 
+> Sorry for that.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 26edd832c64e..d69449735876 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2612,7 +2612,7 @@ N:	bcm216*
- N:	kona
- F:	arch/arm/mach-bcm/
- 
--BROADCOM BCM2835 ARM ARCHITECTURE
-+BROADCOM BCM2835/BCM2836/BCM2837 ARM ARCHITECTURE
- M:	Stephen Warren <swarren@wwwdotorg.org>
- M:	Lee Jones <lee@kernel.org>
- M:	Eric Anholt <eric@anholt.net>
-@@ -2620,7 +2620,7 @@ L:	linux-rpi-kernel at lists.infradead.org (moderated for non-subscribers)
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/rpi/linux-rpi.git
- S:	Maintained
--N:	bcm2835
-+N:	bcm283[5-7x]
- F:	drivers/staging/vc04_services
- 
- BROADCOM BCM47XX MIPS ARCHITECTURE
--- 
-2.11.0
+no problem. In general people reviewing patches will respond to the patch with 
+tags they are comfortable with being added. And a Reviewed-by is a pretty 
+strong tag, indicating that some thought went into reviewing a specific patch, 
+which I hadn't done with my cursory glance at the time :-)
+
+Heiko
