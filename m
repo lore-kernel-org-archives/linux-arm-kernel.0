@@ -1,47 +1,46 @@
 From: john@metanate.com (John Keeping)
-Date: Sun, 29 Jan 2017 13:24:20 +0000
-Subject: [PATCH v3 00/24] drm/rockchip: MIPI fixes & improvements
-Message-ID: <20170129132444.25251-1-john@metanate.com>
+Date: Sun, 29 Jan 2017 13:24:41 +0000
+Subject: [PATCH v3 21/24] drm/rockchip: dw-mipi-dsi: defer probe if panel is
+ not loaded
+In-Reply-To: <20170129132444.25251-1-john@metanate.com>
+References: <20170129132444.25251-1-john@metanate.com>
+Message-ID: <20170129132444.25251-22-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This re-roll mostly just gather up reviewed-by tags, although I have
-also wrapped some long lines and squashed together some commits as
-suggested by Chris Zhong.
+This ensures that the output resolution is known before fbcon loads.
 
-Version 2 was posted here:
-https://www.spinics.net/lists/arm-kernel/msg556683.html
+Signed-off-by: John Keeping <john@metanate.com>
+---
+Unchanged in v3
+Unchanged in v2
 
-John Keeping (24):
-  drm/rockchip: dw-mipi-dsi: don't configure hardware in mode_set for
-    MIPI
-  drm/rockchip: dw-mipi-dsi: pass mode in where needed
-  drm/rockchip: dw-mipi-dsi: remove mode_set hook
-  drm/rockchip: dw-mipi-dsi: fix command header writes
-  drm/rockchip: dw-mipi-dsi: fix generic packet status check
-  drm/rockchip: dw-mipi-dsi: avoid out-of-bounds read on tx_buf
-  drm/rockchip: dw-mipi-dsi: include bad value in error message
-  drm/rockchip: dw-mipi-dsi: respect message flags
-  drm/rockchip: dw-mipi-dsi: only request HS clock when required
-  drm/rockchip: dw-mipi-dsi: don't assume buffer is aligned
-  drm/rockchip: dw-mipi-dsi: prepare panel after phy init
-  drm/rockchip: dw-mipi-dsi: allow commands in panel_disable
-  drm/rockchip: dw-mipi-dsi: fix escape clock rate
-  drm/rockchip: dw-mipi-dsi: ensure PHY is reset
-  drm/rockchip: dw-mipi-dsi: configure PHY before enabling
-  drm/rockchip: dw-mipi-dsi: properly configure PHY timing
-  drm/rockchip: dw-mipi-dsi: improve PLL configuration
-  drm/rockchip: dw-mipi-dsi: use specific poll helper
-  drm/rockchip: dw-mipi-dsi: use positive check for N{H,V}SYNC
-  drm/rockchip: vop: test for P{H,V}SYNC
-  drm/rockchip: dw-mipi-dsi: defer probe if panel is not loaded
-  drm/rockchip: dw-mipi-dsi: support non-burst modes
-  drm/rockchip: dw-mipi-dsi: add reset control
-  drm/rockchip: dw-mipi-dsi: support read commands
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c      | 348 +++++++++++++++++++---------
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c |   4 +-
- 2 files changed, 245 insertions(+), 107 deletions(-)
-
+diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+index f5b15377ef85..5bad92e2370e 100644
+--- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
++++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+@@ -1176,10 +1176,17 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
+ 
+ 	dsi->dsi_host.ops = &dw_mipi_dsi_host_ops;
+ 	dsi->dsi_host.dev = dev;
+-	return mipi_dsi_host_register(&dsi->dsi_host);
++	ret = mipi_dsi_host_register(&dsi->dsi_host);
++	if (!ret && !dsi->panel) {
++		mipi_dsi_host_unregister(&dsi->dsi_host);
++		drm_encoder_cleanup(&dsi->encoder);
++		drm_connector_cleanup(&dsi->connector);
++		ret = -EPROBE_DEFER;
++	}
+ 
+ err_pllref:
+-	clk_disable_unprepare(dsi->pllref_clk);
++	if (ret)
++		clk_disable_unprepare(dsi->pllref_clk);
+ 	return ret;
+ }
+ 
 -- 
 2.11.0.197.gb556de5.dirty
