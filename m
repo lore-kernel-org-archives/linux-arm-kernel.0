@@ -1,26 +1,32 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun, 29 Jan 2017 11:36:16 -0500
-Subject: [PATCH V7 07/11] iommu: of: Handle IOMMU lookup failure with
- deferred probing or error
-In-Reply-To: <1485188293-20263-8-git-send-email-sricharan@codeaurora.org>
-References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
- <1485188293-20263-8-git-send-email-sricharan@codeaurora.org>
-Message-ID: <34a703f0-3b37-88f0-46fa-b56ab6717a42@codeaurora.org>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Sun, 29 Jan 2017 17:47:19 +0100
+Subject: [PATCH v2 16/25] dt-bindings: power: supply: add AXP20X/AXP22X
+ battery DT binding
+In-Reply-To: <20170127085458.18270-17-quentin.schulz@free-electrons.com>
+References: <20170127085458.18270-1-quentin.schulz@free-electrons.com>
+ <20170127085458.18270-17-quentin.schulz@free-electrons.com>
+Message-ID: <20170129164719.eulijkfarzrm2o6j@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/23/2017 11:18 AM, Sricharan R wrote:
-> @@ -107,7 +107,7 @@ void of_dma_configure(struct device *dev, struct device_node *np)
->  	ret = of_dma_get_range(np, &dma_addr, &paddr, &size);
->  	if (ret < 0) {
->  		dma_addr = offset = 0;
-> -		size = dev->coherent_dma_mask + 1;
-> +		size = max(dev->coherent_dma_mask, dev->coherent_dma_mask + 1);
->  	} else {
+Hi,
 
-what's happening here?
+On Fri, Jan 27, 2017 at 09:54:49AM +0100, Quentin Schulz wrote:
+>  - added x-powers,constant-charge-current property to set the
+>  maximal default constant current charge of the battery,
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Since this is information about the battery and not the fuel-gauge,
+it should use the WIP "framework" for information about batteries.
+
+Have a look at the following patchset:
+
+http://marc.info/?l=linux-pm&m=148411561025684&w=2
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170129/ff6a4113/attachment.sig>
