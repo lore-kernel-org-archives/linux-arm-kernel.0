@@ -1,112 +1,61 @@
 From: john@metanate.com (John Keeping)
-Date: Sun, 29 Jan 2017 13:24:21 +0000
-Subject: [PATCH v3 01/24] drm/rockchip: dw-mipi-dsi: don't configure hardware
- in mode_set for MIPI
+Date: Sun, 29 Jan 2017 13:24:32 +0000
+Subject: [PATCH v3 12/24] drm/rockchip: dw-mipi-dsi: allow commands in
+ panel_disable
 In-Reply-To: <20170129132444.25251-1-john@metanate.com>
 References: <20170129132444.25251-1-john@metanate.com>
-Message-ID: <20170129132444.25251-2-john@metanate.com>
+Message-ID: <20170129132444.25251-13-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With atomic modesetting the hardware will be powered off when the
-mode_set function is called.  We should configure the hardware in the
-enable function, which is the atomic version of "commit" so let's use
-the enable hook rather than commit while we're at it.
+Panel drivers may want to sent commands during the disable function, for
+example MIPI_DCS_SET_DISPLAY_OFF before the video signal ends.  In order
+to send commands we need to write to registers, so pclk must be enabled.
+
+While changing this, remove the unnecessary code after the panel
+unprepare call which seems to be a workaround for a specific panel and
+thus belongs in the panel driver.
 
 Signed-off-by: John Keeping <john@metanate.com>
+Reviewed-by: Chris Zhong <zyw@rock-chips.com>
 ---
 v3:
-- Squash together with the commit to s/commit/enable/
+- Add Chris' Reviewed-by
 Unchanged in v2
 
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 49 +++++++++++++++-------------------
- 1 file changed, 21 insertions(+), 28 deletions(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 12 ++----------
+ 1 file changed, 2 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index d9aa382bb629..bbd992299f73 100644
+index 7ada6d8ed143..290282e86d16 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -819,34 +819,8 @@ static void dw_mipi_dsi_encoder_mode_set(struct drm_encoder *encoder,
- 					struct drm_display_mode *adjusted_mode)
+@@ -846,24 +846,16 @@ static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
  {
  	struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
--	int ret;
  
- 	dsi->mode = adjusted_mode;
+-	drm_panel_disable(dsi->panel);
 -
--	ret = dw_mipi_dsi_get_lane_bps(dsi);
--	if (ret < 0)
--		return;
--
--	if (clk_prepare_enable(dsi->pclk)) {
--		dev_err(dsi->dev, "%s: Failed to enable pclk\n", __func__);
--		return;
--	}
--
--	dw_mipi_dsi_init(dsi);
--	dw_mipi_dsi_dpi_config(dsi, mode);
--	dw_mipi_dsi_packet_handler_config(dsi);
--	dw_mipi_dsi_video_mode_config(dsi);
--	dw_mipi_dsi_video_packet_config(dsi, mode);
--	dw_mipi_dsi_command_mode_config(dsi);
--	dw_mipi_dsi_line_timer_config(dsi);
--	dw_mipi_dsi_vertical_timing_config(dsi);
--	dw_mipi_dsi_dphy_timing_config(dsi);
--	dw_mipi_dsi_dphy_interface_config(dsi);
--	dw_mipi_dsi_clear_err(dsi);
--	if (drm_panel_prepare(dsi->panel))
--		dev_err(dsi->dev, "failed to prepare panel\n");
--
--	clk_disable_unprepare(dsi->pclk);
- }
- 
- static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
-@@ -875,17 +849,36 @@ static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
- 	clk_disable_unprepare(dsi->pclk);
- }
- 
--static void dw_mipi_dsi_encoder_commit(struct drm_encoder *encoder)
-+static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
- {
- 	struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
- 	int mux = drm_of_encoder_active_endpoint_id(dsi->dev->of_node, encoder);
- 	u32 val;
-+	int ret;
-+
-+	ret = dw_mipi_dsi_get_lane_bps(dsi);
-+	if (ret < 0)
-+		return;
- 
  	if (clk_prepare_enable(dsi->pclk)) {
  		dev_err(dsi->dev, "%s: Failed to enable pclk\n", __func__);
  		return;
  	}
  
-+	dw_mipi_dsi_init(dsi);
-+	dw_mipi_dsi_dpi_config(dsi, dsi->mode);
-+	dw_mipi_dsi_packet_handler_config(dsi);
-+	dw_mipi_dsi_video_mode_config(dsi);
-+	dw_mipi_dsi_video_packet_config(dsi, dsi->mode);
-+	dw_mipi_dsi_command_mode_config(dsi);
-+	dw_mipi_dsi_line_timer_config(dsi);
-+	dw_mipi_dsi_vertical_timing_config(dsi);
-+	dw_mipi_dsi_dphy_timing_config(dsi);
-+	dw_mipi_dsi_dphy_interface_config(dsi);
-+	dw_mipi_dsi_clear_err(dsi);
-+	if (drm_panel_prepare(dsi->panel))
-+		dev_err(dsi->dev, "failed to prepare panel\n");
++	drm_panel_disable(dsi->panel);
 +
- 	dw_mipi_dsi_phy_init(dsi);
- 	dw_mipi_dsi_wait_for_two_frames(dsi);
+ 	dw_mipi_dsi_set_mode(dsi, DW_MIPI_DSI_CMD_MODE);
+ 	drm_panel_unprepare(dsi->panel);
+-	dw_mipi_dsi_set_mode(dsi, DW_MIPI_DSI_VID_MODE);
  
-@@ -933,7 +926,7 @@ dw_mipi_dsi_encoder_atomic_check(struct drm_encoder *encoder,
- 
- static struct drm_encoder_helper_funcs
- dw_mipi_dsi_encoder_helper_funcs = {
--	.commit = dw_mipi_dsi_encoder_commit,
-+	.enable = dw_mipi_dsi_encoder_enable,
- 	.mode_set = dw_mipi_dsi_encoder_mode_set,
- 	.disable = dw_mipi_dsi_encoder_disable,
- 	.atomic_check = dw_mipi_dsi_encoder_atomic_check,
+-	/*
+-	 * This is necessary to make sure the peripheral will be driven
+-	 * normally when the display is enabled again later.
+-	 */
+-	msleep(120);
+-
+-	dw_mipi_dsi_set_mode(dsi, DW_MIPI_DSI_CMD_MODE);
+ 	dw_mipi_dsi_disable(dsi);
+ 	clk_disable_unprepare(dsi->pclk);
+ }
 -- 
 2.11.0.197.gb556de5.dirty
