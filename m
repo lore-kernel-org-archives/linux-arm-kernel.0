@@ -1,32 +1,51 @@
 From: sre@kernel.org (Sebastian Reichel)
-Date: Sun, 29 Jan 2017 17:25:37 +0100
-Subject: [PATCH v2 10/25] power: supply: add AC power supply driver for
- AXP20X and AXP22X PMICs
-In-Reply-To: <20170127085458.18270-11-quentin.schulz@free-electrons.com>
+Date: Sun, 29 Jan 2017 17:31:29 +0100
+Subject: [PATCH v2 09/25] iio: adc: axp20x_adc: map acin_i and acin_v
+In-Reply-To: <20170127085458.18270-10-quentin.schulz@free-electrons.com>
 References: <20170127085458.18270-1-quentin.schulz@free-electrons.com>
- <20170127085458.18270-11-quentin.schulz@free-electrons.com>
-Message-ID: <20170129162537.npe25eklgml3m25s@earth>
+ <20170127085458.18270-10-quentin.schulz@free-electrons.com>
+Message-ID: <20170129163129.znc563s2prgmwuf2@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Fri, Jan 27, 2017 at 09:54:43AM +0100, Quentin Schulz wrote:
-> The X-Powers AXP20X and AXP22X PMICs expose the status of AC power
-> supply.
+On Fri, Jan 27, 2017 at 09:54:42AM +0100, Quentin Schulz wrote:
+> This maps the IIO channels acin_i and acin_v (respectively exposing the
+> current current and voltage measures of the AC power supply) to the AC
+> power supply driver.
 > 
-> Moreover, the AXP20X can also expose the current current and voltage
-> values of the AC power supply.
-> 
-> This adds the driver which exposes the status of the AC power supply of
-> the AXP20X and AXP22X PMICs.
+> Only the AXP20X PMICs have these ADC channels and thus they are only
+> mapped for this version of the PMIC.
 > 
 > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> Acked-by: Jonathan Cameron <jic23@kernel.org>
+> ---
+> 
+> added in v2
+> 
+>  drivers/iio/adc/axp20x_adc.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/drivers/iio/adc/axp20x_adc.c b/drivers/iio/adc/axp20x_adc.c
+> index bacde92..14f4ec0 100644
+> --- a/drivers/iio/adc/axp20x_adc.c
+> +++ b/drivers/iio/adc/axp20x_adc.c
+> @@ -104,6 +104,14 @@ static struct iio_map axp20x_maps[] = {
+>  		.consumer_dev_name = "axp20x-usb-power-supply",
+>  		.consumer_channel = "vbus_i",
+>  		.adc_channel_label = "vbus_i",
+> +	}, {
+> +		.consumer_dev_name = "axp20x-ac-power-supply",
+> +		.consumer_channel = "acin_v",
+> +		.adc_channel_label = "acin_v",
+> +	}, {
+> +		.consumer_dev_name = "axp20x-ac-power-supply",
+> +		.consumer_channel = "acin_i",
+> +		.adc_channel_label = "acin_i",
+>  	}, { /* sentinel */ }
+>  };
 
-Thanks, I queued this into power-supply's for-next branch. I
-removed "struct device_node *np" and "int axp20x_id" from
-"struct axp20x_ac_power", since they were unused.
+I suggest to merge this into Patch 4 before resending the series.
 
 -- Sebastian
 -------------- next part --------------
@@ -35,4 +54,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170129/23e6f0db/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170129/4fae2203/attachment.sig>
