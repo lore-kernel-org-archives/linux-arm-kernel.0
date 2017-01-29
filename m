@@ -1,122 +1,44 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 29 Jan 2017 12:42:09 +0000
-Subject: [PATCH 3/7] IIO: add bindings for STM32 DFSDM ADC driver
-In-Reply-To: <fa6b541d-2818-afa7-82fa-eb19806e9f4d@kernel.org>
-References: <1485189145-29576-1-git-send-email-arnaud.pouliquen@st.com>
- <1485189145-29576-4-git-send-email-arnaud.pouliquen@st.com>
- <fa6b541d-2818-afa7-82fa-eb19806e9f4d@kernel.org>
-Message-ID: <36426523-c59f-4010-b341-acb60ebdcbb5@kernel.org>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Sun, 29 Jan 2017 15:17:30 +0200
+Subject: [PATCH] ARM: bcm2835: dts: fix uart1 pinctrl node name
+Message-ID: <81ee8da202abbe28e16352e80c1ff94c2e0628c2.1485695850.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/01/17 11:58, Jonathan Cameron wrote:
-> On 23/01/17 16:32, Arnaud Pouliquen wrote:
->> This patch adds documentation of device tree bindings for the
->> STM32 DFSDM ADC.
->>
->> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-> Trivial bits inline.
->> ---
->>  .../bindings/iio/adc/st,stm32-dfsdm-adc.txt        | 60 ++++++++++++++++++++++
->>  1 file changed, 60 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt 
->>
->> diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt  b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt 
->> new file mode 100644
->> index 0000000..c156bcb
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt 	
->> @@ -0,0 +1,60 @@
->> +STMicroelectronics STM32 DFSDM ADC device driver
->> +
->> +STM32 DFSDM ADC is a sigma delta analog-to-digital converter.
->> +It has to be declared in device-tree as a subnode of the DFSDM mfd node.
->> +
->> +It has several multiplexed input channels. Conversions can be performed
->> +in single, scan or discontinuous mode. Conversions can be launched in software
->> +or using hardware triggers.
->> +Each instance of the driver uses one filter instance handle by the DFSDM mfd
->> +driver.
->> +
->> +DFSDM also offers extra features:
->> +-The analog watchdog feature allows the application to detect if the
->> + input voltage goes beyond the user-defined, higher or lower thresholds.
->> +-The short circuit detection allows allows the application to detect if the
->> + input is in CC.
->> +-The clock absence detection allows application to detect if SPI input is clocked.
->> +
->> +Required properties:
->> +- compatible:	Must be "st,stm32-dfsdm-adc".
->> +- reg:		Specifies the DFSDM filter instance.
->> +- #io-channel-cells = <1>: See the IIO bindings section "IIO consumers".
->> +- st,adc-channels:	List of single-ended channels muxed for this ADC.
->> +- st,adc-channel-names:	List of single-ended channels Name.
->> +
->> +Optional properties:
->> +- st,adc-channel-types:	Single-ended channel input type. Default value is 0.
->> +			- 0: SPI with data on rising edge (default)
->> +			- 1: SPI with data on falling edge
-> This is an element that can be described without magic numbers so I'd
-> prefer that you do so.
-> 
-> Also spell check edage -> edge.
-> 
->> +			- 2: manchester codec, rising edage = logic 0
->> +			- 3: manchester codec, rising edage = logic 1
->> +- st,adc-channel-clk-src: Conversion clock source. default value is 1.
->> +			  - 0: External SPI clocl (CLKIN x)
->> +			  - 1: internal SPI clock (CLKOUT) (default)
->> +			  - 2: internal SPI clock divided by 2 (falling edge).
->> +			  - 2: internal SPI clock divided by 2 (rising edge).
-> 3?
->> +- st,adc-alt-channel: 	  must be defined if Two ADCs are connected on same SPI
->> +			  input.
->> +			  If not set channel n is connected to SPI input n.
->> +			  If set channel n is connected to SPI input n + 1.
-> ? Two data inputs with shared clock?
->> +
->> +Example:
->> +	dfsdm: dfsdm at 4400D000 {
-I'd like to actually see the ADCs on the end of these explicitly
-described as well.  It's entirely possible we'll have something
-that isn't simply a dumb sigma delta modulator that will need
-it's own driver.
+Downstream kernel uses pins 32, 33 as UART0 (PL011) Rx/Tx to communicate with
+the Bluetooth chip. So ALT3 of these pins is most likely not CTS/RTS. Change
+the node name to reflect that.
 
-In some senses what we actually have here is a data bus so we
-should be able to describe things on it in that fashion
-rather than just describing the data that is in coming.
-Our boundary of knowledge isn't at the edge of this device!
+With this change in place, adding
 
-A quick example google fed me would be the gain control on a
-maxim ds8102.
+  &uart0 {
+	 pinctrl-names = "default";
+	 pinctrl-0 = <&uart0_gpio32 &gpclk2_gpio43>;
+	 status = "okay";
+  };
 
-Tricky bit here will be defining this nice and generally when we
-currently only have the one piece of hardware to do it with ;)
+to bcm2837-rpi-3-b.dts does the right thing on my Raspberry Pi 3.
 
-That's what makes kernel development fun!
+Fixes: 21ff843931b ("ARM: dts: bcm283x: Define standard pinctrl groups in the gpio node.")
+Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+---
+Should uart0_gpio30 be renamed to uart0_ctsrts_gpio30?
+---
+ arch/arm/boot/dts/bcm283x.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Jonathan
->> +		iio_dfsdm0: iio-dfsdm at 0 {
->> +			compatible = "st,stm32-dfsdm-adc";
->> +			#io-channel-cells = <1>;
->> +			reg = <0>;
->> +			st,adc-channels = <1>;
->> +			st,adc-channel-names = "in0";
->> +		};
->> +		iio_dfsdm1: iio-dfsdm at 1 {
->> +			compatible = "st,stm32-dfsdm-adc";
->> +			#io-channel-cells = <1>;
->> +			reg = <1>;
->> +			st,adc-channels = <1>;
->> +			st,adc-channel-names = "in1";
->> +			st,adc-channel-types = <1>;
->> +			st,adc-alt-channel = <1>;
->> +		};
->> +	};
->>
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+index 9a44da190897..be6f0bf430ea 100644
+--- a/arch/arm/boot/dts/bcm283x.dtsi
++++ b/arch/arm/boot/dts/bcm283x.dtsi
+@@ -302,7 +302,7 @@
+ 				brcm,pins = <30 31>;
+ 				brcm,function = <BCM2835_FSEL_ALT3>;
+ 			};
+-			uart0_ctsrts_gpio32: uart0_ctsrts_gpio32 {
++			uart0_gpio32: uart0_gpio32 {
+ 				brcm,pins = <32 33>;
+ 				brcm,function = <BCM2835_FSEL_ALT3>;
+ 			};
+-- 
+2.11.0
