@@ -1,15 +1,11 @@
 From: john@metanate.com (John Keeping)
-Date: Sun, 29 Jan 2017 13:24:26 +0000
-Subject: [PATCH v3 06/24] drm/rockchip: dw-mipi-dsi: avoid out-of-bounds read
- on tx_buf
+Date: Sun, 29 Jan 2017 13:24:42 +0000
+Subject: [PATCH v3 22/24] drm/rockchip: dw-mipi-dsi: support non-burst modes
 In-Reply-To: <20170129132444.25251-1-john@metanate.com>
 References: <20170129132444.25251-1-john@metanate.com>
-Message-ID: <20170129132444.25251-7-john@metanate.com>
+Message-ID: <20170129132444.25251-23-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-As a side-effect of this, encode the endianness explicitly rather than
-casting a u16.
 
 Signed-off-by: John Keeping <john@metanate.com>
 Reviewed-by: Chris Zhong <zyw@rock-chips.com>
@@ -18,28 +14,59 @@ v3:
 - Add Chris' Reviewed-by
 Unchanged in v2
 
- drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 16 +++++++++-------
+ 1 file changed, 9 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-index 4be1ff3a42bb..2e6ad4591ebf 100644
+index 5bad92e2370e..58cb8ace2fe8 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-@@ -572,8 +572,13 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
- static int dw_mipi_dsi_dcs_short_write(struct dw_mipi_dsi *dsi,
- 				       const struct mipi_dsi_msg *msg)
- {
--	const u16 *tx_buf = msg->tx_buf;
--	u32 val = GEN_HDATA(*tx_buf) | GEN_HTYPE(msg->type);
-+	const u8 *tx_buf = msg->tx_buf;
-+	u32 val = GEN_HTYPE(msg->type);
-+
-+	if (msg->tx_len > 0)
-+		val |= GEN_HDATA(tx_buf[0]);
-+	if (msg->tx_len > 1)
-+		val |= GEN_HDATA(tx_buf[1] << 8);
+@@ -82,6 +82,7 @@
+ #define FRAME_BTA_ACK			BIT(14)
+ #define ENABLE_LOW_POWER		(0x3f << 8)
+ #define ENABLE_LOW_POWER_MASK		(0x3f << 8)
++#define VID_MODE_TYPE_NON_BURST_SYNC_EVENTS	0x1
+ #define VID_MODE_TYPE_BURST_SYNC_PULSES		0x2
+ #define VID_MODE_TYPE_MASK			0x3
  
- 	if (msg->tx_len > 2) {
- 		dev_err(dsi->dev, "too long tx buf length %zu for short write\n",
+@@ -286,6 +287,7 @@ struct dw_mipi_dsi {
+ 	u32 format;
+ 	u16 input_div;
+ 	u16 feedback_div;
++	unsigned long mode_flags;
+ 
+ 	const struct dw_mipi_dsi_plat_data *pdata;
+ };
+@@ -551,15 +553,10 @@ static int dw_mipi_dsi_host_attach(struct mipi_dsi_host *host,
+ 		return -EINVAL;
+ 	}
+ 
+-	if (!(device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST) ||
+-	    !(device->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE)) {
+-		dev_err(dsi->dev, "device mode is unsupported\n");
+-		return -EINVAL;
+-	}
+-
+ 	dsi->lanes = device->lanes;
+ 	dsi->channel = device->channel;
+ 	dsi->format = device->format;
++	dsi->mode_flags = device->mode_flags;
+ 	dsi->panel = of_drm_find_panel(device->dev.of_node);
+ 	if (dsi->panel)
+ 		return drm_panel_attach(dsi->panel, &dsi->connector);
+@@ -716,7 +713,12 @@ static void dw_mipi_dsi_video_mode_config(struct dw_mipi_dsi *dsi)
+ {
+ 	u32 val;
+ 
+-	val = VID_MODE_TYPE_BURST_SYNC_PULSES | ENABLE_LOW_POWER;
++	val = ENABLE_LOW_POWER;
++
++	if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)
++		val |= VID_MODE_TYPE_BURST_SYNC_PULSES;
++	else if (!(dsi->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE))
++		val |= VID_MODE_TYPE_NON_BURST_SYNC_EVENTS;
+ 
+ 	dsi_write(dsi, DSI_VID_MODE_CFG, val);
+ }
 -- 
 2.11.0.197.gb556de5.dirty
