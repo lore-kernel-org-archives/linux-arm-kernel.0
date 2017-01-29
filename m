@@ -1,42 +1,52 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Sun, 29 Jan 2017 15:42:55 +0530
-Subject: next-20170125 hangs on aarch64
-Message-ID: <20170129101255.GA29415@yury-N73SV>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sun, 29 Jan 2017 18:13:43 +0800
+Subject: [PATCH] rtc: sun6i: Fix compatibility with old DT binding
+Message-ID: <20170129101343.7222-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Commit 847b8bf62eb4 ("rtc: sun6i: Expose the 32kHz oscillator") adds
+a new clock for the rtc block with a 2 step probe mechanism. To share
+the register region between both the clock and rtc instance, a static
+pointer is used to keep the related data structure.
 
-I pulled next-20170125 kernel, and found it hanged on boot. The exact reason is
-panic on dereferencing of the 0xffffffc8 address, which is most probably the
-attempt to dereference the ENOSYS error code as the address. next-20170124 works
-fine, at least it boots.
+To preserve compatibility with the old binding, the data structure
+should be saved as soon as the registers are mapped in, regardless
+of the presence of the clock bindings, so that the rtc device can
+retrieve it when it is probed.
 
-Does anyone have details on that?
+This fixes the rtc device not probing when we use the updated driver
+with an old device tree blob.
 
-Yury
+Fixes: 847b8bf62eb4 ("rtc: sun6i: Expose the 32kHz oscillator")
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/rtc/rtc-sun6i.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-#0  arch_counter_get_cntvct () at
-./arch/arm64/include/asm/arch_timer.h:151
-#1  __delay (cycles=1024) at arch/arm64/lib/delay.c:31
-#2  0xffff00000838b430 in __const_udelay (xloops=<optimized out>) at
-arch/arm64/lib/delay.c:41
-#3  0xffff00000816a894 in panic (fmt=<optimized out>) at
-kernel/panic.c:295
-#4  0xffff0000080c1238 in do_exit (code=11) at kernel/exit.c:780
-#5  0xffff0000080888f0 in die (str=<optimized out>, 
-    regs=0xffff000008d63d30 <init_thread_union+15664>, err=<optimized out>)
-    at arch/arm64/kernel/traps.c:295
-#6  0xffff0000080998c4 in __do_kernel_fault (mm=0x0, addr=4294967240, esr=2483027972, 
-    regs=0xffff000008d63d30 <init_thread_union+15664>) at arch/arm64/mm/fault.c:185
-#7  0xffff000008097244 in __do_kernel_fault (regs=<optimized out>, esr=<optimized out>, 
-     addr=<optimized out>, mm=<optimized out>) at arch/arm64/mm/fault.c:419
-#8  do_page_fault (addr=4294967240, esr=2483027972, 
-    regs=0xffff000008d63d30 <init_thread_union+15664>) at arch/arm64/mm/fault.c:443
-#9  0xffff000008097334 in do_translation_fault (addr=<optimized out>, esr=<optimized out>, 
-    regs=<optimized out>) at arch/arm64/mm/fault.c:469
-#10 0xffff000008081298 in do_mem_abort (addr=4294967240, esr=2483027972, 
-    regs=0xffff000008d63d30 <init_thread_union+15664>) at arch/arm64/mm/fault.c:577
-#11 0xffff000008082604 in el1_sync () at arch/arm64/kernel/entry.S:438
-#12 0xffff000008082604 in el1_sync () at arch/arm64/kernel/entry.S:438
-[...]
+diff --git a/drivers/rtc/rtc-sun6i.c b/drivers/rtc/rtc-sun6i.c
+index 613f42ade533..08510ca58996 100644
+--- a/drivers/rtc/rtc-sun6i.c
++++ b/drivers/rtc/rtc-sun6i.c
+@@ -211,6 +211,9 @@ static void __init sun6i_rtc_clk_init(struct device_node *node)
+ 	writel(SUN6I_LOSC_CTRL_KEY | SUN6I_LOSC_CTRL_EXT_OSC,
+ 	       rtc->base + SUN6I_LOSC_CTRL);
+ 
++	/* Yes, I know, this is ugly. */
++	sun6i_rtc = rtc;
++
+ 	/* Deal with old DTs */
+ 	if (!of_get_property(node, "clocks", NULL))
+ 		return;
+@@ -243,9 +246,6 @@ static void __init sun6i_rtc_clk_init(struct device_node *node)
+ 	clk_data->num = 1;
+ 	clk_data->hws[0] = &rtc->hw;
+ 	of_clk_add_hw_provider(node, of_clk_hw_onecell_get, clk_data);
+-
+-	/* Yes, I know, this is ugly. */
+-	sun6i_rtc = rtc;
+ }
+ CLK_OF_DECLARE_DRIVER(sun6i_rtc_clk, "allwinner,sun6i-a31-rtc",
+ 		      sun6i_rtc_clk_init);
+-- 
+2.11.0
