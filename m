@@ -1,289 +1,160 @@
 From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Mon, 30 Jan 2017 12:20:33 +1300
-Subject: [PATCH v6 3/5] pinctrl: mvebu: pinctrl driver for 98DX3236 SoC
+Date: Mon, 30 Jan 2017 12:20:32 +1300
+Subject: [PATCH v6 2/5] arm: mvebu: support for SMP on 98DX3336 SoC
 In-Reply-To: <20170129232035.25189-1-chris.packham@alliedtelesis.co.nz>
 References: <20170129232035.25189-1-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20170129232035.25189-4-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20170129232035.25189-3-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz>
+Compared to the armada-xp the 98DX3336 uses different registers to set
+the boot address for the secondary CPU so a new enable-method is needed.
+This will only work if the machine definition doesn't define an overall
+smp_ops because there is not currently a way of overriding this from the
+device tree if it is set in the machine definition.
 
-This pinctrl driver supports the 98DX3236, 98DX3336 and 98DX4251 SoCs
-from Marvell.
-
-Signed-off-by: Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz>
 Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
 Acked-by: Rob Herring <robh@kernel.org>
-Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
 
 Notes:
     Changes in v2:
-    - include sdio support for the 98DX4251
+    - Document new enable-method value
+    - Correct some references from 98DX4521 to 98DX3236
     Changes in v3:
-    - None
+    - Simplify mv98dx3236_resume_init by using of_io_request_and_map()
     Changes in v4:
-    - Correct some discrepencies between binding and driver.
-    - Collect acks from Rob and Sebastian
+    - integrate changes into platsmp.c instead of new init call
+    - avoid duplicated code.
+    - fix error return
+    - Collect ack from Rob
     Changes in v5:
-    - Update bindings to reflect "gpo" pins
-    - Use mvebu_mmio_mpp_ctrl instead of armada_xp_mpp_ctrl (note this is reliant
-      on changes queued in linux-pinctrl)
+    - Remove useless casts (thanks to Stephen Boyd)
     Changes in v6:
-    - None
+    - use a #define instead of a new structure for resume control registers.
 
- .../pinctrl/marvell,armada-98dx3236-pinctrl.txt    |  46 ++++++
- drivers/pinctrl/mvebu/pinctrl-armada-xp.c          | 156 +++++++++++++++++++++
- 2 files changed, 202 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/marvell,armada-98dx3236-pinctrl.txt
+ Documentation/devicetree/bindings/arm/cpus.txt     |  1 +
+ .../bindings/arm/marvell/98dx3236-resume-ctrl.txt  | 16 +++++
+ arch/arm/mach-mvebu/platsmp.c                      | 75 ++++++++++++++++++++++
+ 3 files changed, 92 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/marvell/98dx3236-resume-ctrl.txt
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/marvell,armada-98dx3236-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/marvell,armada-98dx3236-pinctrl.txt
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index a1bcfeed5f24..3c2fd72d0bf9 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -202,6 +202,7 @@ nodes to be present and contain the properties described below.
+ 			    "marvell,armada-380-smp"
+ 			    "marvell,armada-390-smp"
+ 			    "marvell,armada-xp-smp"
++			    "marvell,98dx3236-smp"
+ 			    "mediatek,mt6589-smp"
+ 			    "mediatek,mt81xx-tz-smp"
+ 			    "qcom,gcc-msm8660"
+diff --git a/Documentation/devicetree/bindings/arm/marvell/98dx3236-resume-ctrl.txt b/Documentation/devicetree/bindings/arm/marvell/98dx3236-resume-ctrl.txt
 new file mode 100644
-index 000000000000..97aef67ee769
+index 000000000000..26eb9d3aa630
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/pinctrl/marvell,armada-98dx3236-pinctrl.txt
-@@ -0,0 +1,46 @@
-+* Marvell 98dx3236 pinctrl driver for mpp
-+
-+Please refer to marvell,mvebu-pinctrl.txt in this directory for common binding
-+part and usage
++++ b/Documentation/devicetree/bindings/arm/marvell/98dx3236-resume-ctrl.txt
+@@ -0,0 +1,16 @@
++Resume Control
++--------------
++Available on Marvell SOCs: 98DX3336 and 98DX4251
 +
 +Required properties:
-+- compatible: "marvell,98dx3236-pinctrl" or "marvell,98dx4251-pinctrl"
-+- reg: register specifier of MPP registers
 +
-+This driver supports all 98dx3236, 98dx3336 and 98dx4251 variants
++- compatible: must be "marvell,98dx3336-resume-ctrl"
 +
-+name          pins     functions
-+================================================================================
-+mpp0          0        gpo, spi0(mosi), dev(ad8)
-+mpp1          1        gpio, spi0(miso), dev(ad9)
-+mpp2          2        gpo, spi0(sck), dev(ad10)
-+mpp3          3        gpio, spi0(cs0), dev(ad11)
-+mpp4          4        gpio, spi0(cs1), smi(mdc), dev(cs0)
-+mpp5          5        gpio, pex(rsto), sd0(cmd), dev(bootcs)
-+mpp6          6        gpo, sd0(clk), dev(a2)
-+mpp7          7        gpio, sd0(d0), dev(ale0)
-+mpp8          8        gpio, sd0(d1), dev(ale1)
-+mpp9          9        gpio, sd0(d2), dev(ready0)
-+mpp10         10       gpio, sd0(d3), dev(ad12)
-+mpp11         11       gpio, uart1(rxd), uart0(cts), dev(ad13)
-+mpp12         12       gpo, uart1(txd), uart0(rts), dev(ad14)
-+mpp13         13       gpio, intr(out), dev(ad15)
-+mpp14         14       gpio, i2c0(sck)
-+mpp15         15       gpio, i2c0(sda)
-+mpp16         16       gpo, dev(oe)
-+mpp17         17       gpo, dev(clkout)
-+mpp18         18       gpio, uart1(txd)
-+mpp19         19       gpio, uart1(rxd), dev(rb)
-+mpp20         20       gpo, dev(we0)
-+mpp21         21       gpo, dev(ad0)
-+mpp22         22       gpo, dev(ad1)
-+mpp23         23       gpo, dev(ad2)
-+mpp24         24       gpo, dev(ad3)
-+mpp25         25       gpo, dev(ad4)
-+mpp26         26       gpo, dev(ad5)
-+mpp27         27       gpo, dev(ad6)
-+mpp28         28       gpo, dev(ad7)
-+mpp29         29       gpo, dev(a0)
-+mpp30         30       gpo, dev(a1)
-+mpp31         31       gpio, slv_smi(mdc), smi(mdc), dev(we1)
-+mpp32         32       gpio, slv_smi(mdio), smi(mdio), dev(cs1)
-diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-xp.c b/drivers/pinctrl/mvebu/pinctrl-armada-xp.c
-index 63e1bd506983..61cbc138703e 100644
---- a/drivers/pinctrl/mvebu/pinctrl-armada-xp.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-armada-xp.c
-@@ -38,6 +38,10 @@ enum armada_xp_variant {
- 	V_MV78460	= BIT(2),
- 	V_MV78230_PLUS	= (V_MV78230 | V_MV78260 | V_MV78460),
- 	V_MV78260_PLUS	= (V_MV78260 | V_MV78460),
-+	V_98DX3236	= BIT(3),
-+	V_98DX3336	= BIT(4),
-+	V_98DX4251	= BIT(5),
-+	V_98DX3236_PLUS	= (V_98DX3236 | V_98DX3336 | V_98DX4251),
- };
- 
- static struct mvebu_mpp_mode armada_xp_mpp_modes[] = {
-@@ -349,6 +353,131 @@ static struct mvebu_mpp_mode armada_xp_mpp_modes[] = {
- 		 MPP_VAR_FUNCTION(0x1, "dev", "ad31",       V_MV78260_PLUS)),
- };
- 
-+static struct mvebu_mpp_mode mv98dx3236_mpp_modes[] = {
-+	MPP_MODE(0,
-+		 MPP_VAR_FUNCTION(0x0, "gpo", NULL,          V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x2, "spi0", "mosi",       V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x4, "dev", "ad8",         V_98DX3236_PLUS)),
-+	MPP_MODE(1,
-+		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,         V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x2, "spi0", "miso",       V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x4, "dev", "ad9",         V_98DX3236_PLUS)),
-+	MPP_MODE(2,
-+		 MPP_VAR_FUNCTION(0x0, "gpo", NULL,          V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x2, "spi0", "sck",        V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x4, "dev", "ad10",        V_98DX3236_PLUS)),
-+	MPP_MODE(3,
-+		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,         V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x2, "spi0", "cs0",        V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x4, "dev", "ad11",        V_98DX3236_PLUS)),
-+	MPP_MODE(4,
-+		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,         V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x2, "spi0", "cs1",        V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x3, "smi", "mdc",         V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x4, "dev", "cs0",         V_98DX3236_PLUS)),
-+	MPP_MODE(5,
-+		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,         V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x1, "pex", "rsto",        V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x2, "sd0", "cmd",         V_98DX4251),
-+		 MPP_VAR_FUNCTION(0x4, "dev", "bootcs",      V_98DX3236_PLUS)),
-+	MPP_MODE(6,
-+		 MPP_VAR_FUNCTION(0x0, "gpo", NULL,          V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x2, "sd0", "clk",         V_98DX4251),
-+		 MPP_VAR_FUNCTION(0x4, "dev", "a2",          V_98DX3236_PLUS)),
-+	MPP_MODE(7,
-+		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,         V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x2, "sd0", "d0",          V_98DX4251),
-+		 MPP_VAR_FUNCTION(0x4, "dev", "ale0",        V_98DX3236_PLUS)),
-+	MPP_MODE(8,
-+		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,         V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x2, "sd0", "d1",          V_98DX4251),
-+		 MPP_VAR_FUNCTION(0x4, "dev", "ale1",        V_98DX3236_PLUS)),
-+	MPP_MODE(9,
-+		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,         V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x2, "sd0", "d2",          V_98DX4251),
-+		 MPP_VAR_FUNCTION(0x4, "dev", "ready0",      V_98DX3236_PLUS)),
-+	MPP_MODE(10,
-+		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,         V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x2, "sd0", "d3",          V_98DX4251),
-+		 MPP_VAR_FUNCTION(0x4, "dev", "ad12",        V_98DX3236_PLUS)),
-+	MPP_MODE(11,
-+		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,         V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x2, "uart1", "rxd",       V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x3, "uart0", "cts",       V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x4, "dev", "ad13",        V_98DX3236_PLUS)),
-+	MPP_MODE(12,
-+		 MPP_VAR_FUNCTION(0x0, "gpo", NULL,          V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x2, "uart1", "txd",       V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x3, "uart0", "rts",       V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x4, "dev", "ad14",        V_98DX3236_PLUS)),
-+	MPP_MODE(13,
-+		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,         V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x1, "intr", "out",        V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x4, "dev", "ad15",        V_98DX3236_PLUS)),
-+	MPP_MODE(14,
-+		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,         V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x1, "i2c0", "sck",        V_98DX3236_PLUS)),
-+	MPP_MODE(15,
-+		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,         V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x4, "i2c0", "sda",        V_98DX3236_PLUS)),
-+	MPP_MODE(16,
-+		 MPP_VAR_FUNCTION(0x0, "gpo", NULL,          V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x4, "dev", "oe",          V_98DX3236_PLUS)),
-+	MPP_MODE(17,
-+		 MPP_VAR_FUNCTION(0x0, "gpo", NULL,          V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x4, "dev", "clkout",      V_98DX3236_PLUS)),
-+	MPP_MODE(18,
-+		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,         V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x3, "uart1", "txd",       V_98DX3236_PLUS)),
-+	MPP_MODE(19,
-+		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,         V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x3, "uart1", "rxd",       V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x4, "dev", "rb",          V_98DX3236_PLUS)),
-+	MPP_MODE(20,
-+		 MPP_VAR_FUNCTION(0x0, "gpo", NULL,          V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x4, "dev", "we0",         V_98DX3236_PLUS)),
-+	MPP_MODE(21,
-+		 MPP_VAR_FUNCTION(0x0, "gpo", NULL,          V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x1, "dev", "ad0",         V_98DX3236_PLUS)),
-+	MPP_MODE(22,
-+		 MPP_VAR_FUNCTION(0x0, "gpo", NULL,          V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x1, "dev", "ad1",         V_98DX3236_PLUS)),
-+	MPP_MODE(23,
-+		 MPP_VAR_FUNCTION(0x0, "gpo", NULL,          V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x1, "dev", "ad2",         V_98DX3236_PLUS)),
-+	MPP_MODE(24,
-+		 MPP_VAR_FUNCTION(0x0, "gpo", NULL,          V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x1, "dev", "ad3",         V_98DX3236_PLUS)),
-+	MPP_MODE(25,
-+		 MPP_VAR_FUNCTION(0x0, "gpo", NULL,          V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x1, "dev", "ad4",         V_98DX3236_PLUS)),
-+	MPP_MODE(26,
-+		 MPP_VAR_FUNCTION(0x0, "gpo", NULL,          V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x1, "dev", "ad5",         V_98DX3236_PLUS)),
-+	MPP_MODE(27,
-+		 MPP_VAR_FUNCTION(0x0, "gpo", NULL,          V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x1, "dev", "ad6",         V_98DX3236_PLUS)),
-+	MPP_MODE(28,
-+		 MPP_VAR_FUNCTION(0x0, "gpo", NULL,          V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x1, "dev", "ad7",         V_98DX3236_PLUS)),
-+	MPP_MODE(29,
-+		 MPP_VAR_FUNCTION(0x0, "gpo", NULL,          V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x1, "dev", "a0",          V_98DX3236_PLUS)),
-+	MPP_MODE(30,
-+		 MPP_VAR_FUNCTION(0x0, "gpo", NULL,          V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x1, "dev", "a1",          V_98DX3236_PLUS)),
-+	MPP_MODE(31,
-+		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,         V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x1, "slv_smi", "mdc",     V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x3, "smi", "mdc",         V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x4, "dev", "we1",         V_98DX3236_PLUS)),
-+	MPP_MODE(32,
-+		 MPP_VAR_FUNCTION(0x0, "gpio", NULL,         V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x1, "slv_smi", "mdio",    V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x3, "smi", "mdio",        V_98DX3236_PLUS),
-+		 MPP_VAR_FUNCTION(0x4, "dev", "cs1",         V_98DX3236_PLUS)),
++- reg: Should contain resume control registers location and length
++
++Example:
++
++resume at 20980 {
++	compatible = "marvell,98dx3336-resume-ctrl";
++	reg = <0x20980 0x10>;
 +};
-+
- static struct mvebu_pinctrl_soc_info armada_xp_pinctrl_info;
+diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
+index 46c742d3bd41..e62273aacb43 100644
+--- a/arch/arm/mach-mvebu/platsmp.c
++++ b/arch/arm/mach-mvebu/platsmp.c
+@@ -184,3 +184,78 @@ const struct smp_operations armada_xp_smp_ops __initconst = {
  
- static const struct of_device_id armada_xp_pinctrl_of_match[] = {
-@@ -364,6 +493,14 @@ static const struct of_device_id armada_xp_pinctrl_of_match[] = {
- 		.compatible = "marvell,mv78460-pinctrl",
- 		.data       = (void *) V_MV78460,
- 	},
+ CPU_METHOD_OF_DECLARE(armada_xp_smp, "marvell,armada-xp-smp",
+ 		      &armada_xp_smp_ops);
++
++#define MV98DX3236_CPU_RESUME_CTRL_REG 0x08
++#define MV98DX3236_CPU_RESUME_ADDR_REG 0x04
++
++static const struct of_device_id of_mv98dx3236_resume_table[] = {
 +	{
-+		.compatible = "marvell,98dx3236-pinctrl",
-+		.data       = (void *) V_98DX3236,
++		.compatible = "marvell,98dx3336-resume-ctrl",
 +	},
-+	{
-+		.compatible = "marvell,98dx4251-pinctrl",
-+		.data       = (void *) V_98DX4251,
-+	},
- 	{ },
- };
- 
-@@ -396,6 +533,14 @@ static struct pinctrl_gpio_range mv78460_mpp_gpio_ranges[] = {
- 	MPP_GPIO_RANGE(2,  64, 64,  3),
- };
- 
-+static struct mvebu_mpp_ctrl mv98dx3236_mpp_controls[] = {
-+	MPP_FUNC_CTRL(0, 32, NULL, mvebu_mmio_mpp_ctrl),
++	{ /* end of list */ },
 +};
 +
-+static struct pinctrl_gpio_range mv98dx3236_mpp_gpio_ranges[] = {
-+	MPP_GPIO_RANGE(0, 0, 0, 32),
++static int mv98dx3236_resume_set_cpu_boot_addr(int hw_cpu, void *boot_addr)
++{
++	struct device_node *np;
++	void __iomem *base;
++	WARN_ON(hw_cpu != 1);
++
++	np = of_find_matching_node(NULL, of_mv98dx3236_resume_table);
++	if (!np)
++		return -ENODEV;
++
++	base = of_io_request_and_map(np, 0, of_node_full_name(np));
++	of_node_put(np);
++	if (IS_ERR(base))
++		return PTR_ERR(base);
++
++	writel(0, base + MV98DX3236_CPU_RESUME_CTRL_REG);
++	writel(virt_to_phys(boot_addr), base + MV98DX3236_CPU_RESUME_ADDR_REG);
++
++	iounmap(base);
++
++	return 0;
++}
++
++static int mv98dx3236_boot_secondary(unsigned int cpu, struct task_struct *idle)
++{
++	int ret, hw_cpu;
++
++	hw_cpu = cpu_logical_map(cpu);
++	set_secondary_cpu_clock(hw_cpu);
++	mv98dx3236_resume_set_cpu_boot_addr(hw_cpu,
++					    armada_xp_secondary_startup);
++
++	/*
++	 * This is needed to wake up CPUs in the offline state after
++	 * using CPU hotplug.
++	 */
++	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
++
++	/*
++	 * This is needed to take secondary CPUs out of reset on the
++	 * initial boot.
++	 */
++	ret = mvebu_cpu_reset_deassert(hw_cpu);
++	if (ret) {
++		pr_warn("unable to boot CPU: %d\n", ret);
++		return ret;
++	}
++
++	return 0;
++}
++
++static const struct smp_operations mv98dx3236_smp_ops __initconst = {
++	.smp_init_cpus		= armada_xp_smp_init_cpus,
++	.smp_prepare_cpus	= armada_xp_smp_prepare_cpus,
++	.smp_boot_secondary	= mv98dx3236_boot_secondary,
++	.smp_secondary_init     = armada_xp_secondary_init,
++#ifdef CONFIG_HOTPLUG_CPU
++	.cpu_die		= armada_xp_cpu_die,
++	.cpu_kill               = armada_xp_cpu_kill,
++#endif
 +};
 +
- static int armada_xp_pinctrl_suspend(struct platform_device *pdev,
- 				     pm_message_t state)
- {
-@@ -471,6 +616,17 @@ static int armada_xp_pinctrl_probe(struct platform_device *pdev)
- 		soc->gpioranges = mv78460_mpp_gpio_ranges;
- 		soc->ngpioranges = ARRAY_SIZE(mv78460_mpp_gpio_ranges);
- 		break;
-+	case V_98DX3236:
-+	case V_98DX3336:
-+	case V_98DX4251:
-+		/* fall-through */
-+		soc->controls = mv98dx3236_mpp_controls;
-+		soc->ncontrols = ARRAY_SIZE(mv98dx3236_mpp_controls);
-+		soc->modes = mv98dx3236_mpp_modes;
-+		soc->nmodes = mv98dx3236_mpp_controls[0].npins;
-+		soc->gpioranges = mv98dx3236_mpp_gpio_ranges;
-+		soc->ngpioranges = ARRAY_SIZE(mv98dx3236_mpp_gpio_ranges);
-+		break;
- 	}
- 
- 	nregs = DIV_ROUND_UP(soc->nmodes, MVEBU_MPPS_PER_REG);
++CPU_METHOD_OF_DECLARE(mv98dx3236_smp, "marvell,98dx3236-smp",
++		      &mv98dx3236_smp_ops);
 -- 
 2.11.0.24.ge6920cf
