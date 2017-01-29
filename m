@@ -1,126 +1,27 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 29 Jan 2017 11:20:52 +0000
-Subject: [PATCH 2/7] MFD: add STM32 DFSDM support
-In-Reply-To: <a1aaaa20-ac00-b182-f1c1-63152be41135@st.com>
-References: <1485189145-29576-1-git-send-email-arnaud.pouliquen@st.com>
- <1485189145-29576-3-git-send-email-arnaud.pouliquen@st.com>
- <20170124082249.GR16020@dell> <283c0e48-55e2-6516-369d-91dc72d12f73@st.com>
- <20170124113658.GW16020@dell> <a1aaaa20-ac00-b182-f1c1-63152be41135@st.com>
-Message-ID: <0bf34853-d0fa-8cb6-29fb-398d6951fdff@kernel.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sun, 29 Jan 2017 11:44:12 +0000
+Subject: [RFC v2 01/10] KVM: arm/arm64: Abstract virtual timer context
+ into separate structure
+In-Reply-To: <1485479100-4966-2-git-send-email-jintack@cs.columbia.edu>
+ (Jintack Lim's message of "Thu, 26 Jan 2017 20:04:51 -0500")
+References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
+ <1485479100-4966-2-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <86bmuq9jlf.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/01/17 13:32, Arnaud Pouliquen wrote:
-> 
-> 
-> On 01/24/2017 12:36 PM, Lee Jones wrote:
->> On Tue, 24 Jan 2017, Arnaud Pouliquen wrote:
->>> On 01/24/2017 09:22 AM, Lee Jones wrote:
->>>> On Mon, 23 Jan 2017, Arnaud Pouliquen wrote:
->>>>
->>>>> DFSDM hardware IP can be used at the same time for ADC sigma delta
->>>>
->>>> Same time as what?
->>> DFSDM is used for ADC acquisition (through IIO) but also PDM microphone
->>> capture (through ASOC).
->>>>
->>>>> conversion and audio PDM microphone.
->>>>> MFD driver is in charge of configuring IP registers and managing IP clocks.
->>>>> For this it exports an API to handles filters and channels resources.
->>>>
->>>> This looks like an ADC driver?  What is it that makes it an MFD?
->>> Yes it a kind of ADC but that supports 2 features audio and iio.
->>> So it has to support 2 features based on 2 separate Frameworks.
->>
->> I'm still unsure why it needs to live in MFD.
->>
->> By the looks of it, this driver needs to move into IIO and you need to
->> call into it from ASoC.
->>
-> 
-> I think i introduce confusion by speaking about ADC for audio...
-> 
-> 1) IIO handles sigma delta ADCs that can be used as example for motor
-> controls. the aim is to get value based on an application request or
-> using some triggers.
-> example: http://www.ti.com/lit/ds/symlink/ads1202.pdf
-> 
-> 2) For audio part, we speak about Digital mems microphones that generate
-> PDM format stream. PDM is a continuous real time stream dedicated to
-> audio record and must be handled in ASOC ( codec Dmic part driver is
-> /sound/soc/codec/dmic.c).
-> DMIC example:
-> http://www.st.com/content/ccc/resource/technical/document/datasheet/47/bd/d2/13/8d/fd/48/26/DM00121815.pdf/files/DM00121815.pdf/jcr:content/translations/en.DM00121815.pdf
-> 
-> Form my point of view it very strange to handle DMICs in IIO, as it is
-> not designed to support audio streams.it is two separate features that
-> are not compatible.
-> 
-> Now, from software point of view
-> That would means that IIO declares ADCs that it can not expose, because
-> DMIC is not IIO standard. But IIO inkern API needs that device is
-> declared... So i should define a specific API in IIO for ASOC driver.
-IIO isn't designed specifically to support audio streams, but it does
-have high bandwidth continuous sampling support via the dma buffer
-side of things.  Analog devices use this stuff for software defined
-radio applications.
+On Fri, Jan 27 2017 at 01:04:51 AM, Jintack Lim <jintack@cs.columbia.edu> wrote:
+> Abstract virtual timer context into a separate structure and change all
+> callers referring to timer registers, irq state and so on. No change in
+> functionality.
+>
+> This is about to become very handy when adding the EL1 physical timer.
+>
+> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-What we don't currently have is an in kernel consumer interface for this.
-I'm not really sure how difficult it would be to do this, but it is
-certainly sounding like there is demand for it.
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Probably the best person to comment is Lars who wrote the dma stuff
-in the first place and also has a more than passing familiarity with
-ASOC.
-
-I've sent Lars a PM to highlight this thread.
-
-Jonathan
-
-> 
-> 
->>>>> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
->>>>> ---
->>>>>  drivers/mfd/Kconfig             |   11 +
->>>>>  drivers/mfd/Makefile            |    2 +
->>>>>  drivers/mfd/stm32-dfsdm-reg.h   |  220 +++++++++
->>>>>  drivers/mfd/stm32-dfsdm.c       | 1044 +++++++++++++++++++++++++++++++++++++++
->>>>>  include/linux/mfd/stm32-dfsdm.h |  324 ++++++++++++
->>>>>  5 files changed, 1601 insertions(+)
->>>>>  create mode 100644 drivers/mfd/stm32-dfsdm-reg.h
->>>>>  create mode 100644 drivers/mfd/stm32-dfsdm.c
->>>>>  create mode 100644 include/linux/mfd/stm32-dfsdm.h
->>>>>
->>>>> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
->>>>> index c6df644..4bb660b 100644
->>>>> --- a/drivers/mfd/Kconfig
->>>>> +++ b/drivers/mfd/Kconfig
->>>>> @@ -1607,6 +1607,17 @@ config MFD_STW481X
->>>>>  	  in various ST Microelectronics and ST-Ericsson embedded
->>>>>  	  Nomadik series.
->>>>>  
->>>>> +config MFD_STM32_DFSDM
->>>>> +	tristate "ST Microelectronics STM32 DFSDM"
->>>>> +	depends on (ARCH_STM32 && OF) || COMPILE_TEST
->>>>> +	select MFD_CORE
->>>>> +	select REGMAP
->>>>> +	select REGMAP_MMIO
->>>>> +	help
->>>>> +	  Select this option to enable the STM32 Digital Filter
->>>>> +	  for Sigma Delta Modulators (DFSDM) driver used
->>>>> +	  in various STM32 series.
->>>>> +
->>>>>  menu "Multimedia Capabilities Port drivers"
->>>>>  	depends on ARCH_SA1100
->>>>
->>>> [...]
->>>>
->>>
->>> Regards
->>> Arnaud
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+          M.
+-- 
+Jazz is not dead. It just smells funny.
