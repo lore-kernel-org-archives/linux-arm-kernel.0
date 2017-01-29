@@ -1,39 +1,23 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Sun, 29 Jan 2017 09:56:41 +0800
-Subject: [PATCH v2 2/2] ARM: dts: sun8i: enable SID on Allwinner H3 SoC
-In-Reply-To: <20170129015641.54281-1-icenowy@aosc.xyz>
-References: <20170129015641.54281-1-icenowy@aosc.xyz>
-Message-ID: <20170129015641.54281-2-icenowy@aosc.xyz>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sun, 29 Jan 2017 10:05:56 +0800
+Subject: [PATCH] ARM: dts: imx53-qsb-common: fix FEC pinmux config
+In-Reply-To: <20170125052548.27402-1-linux-kernel-dev@beckhoff.com>
+References: <20170125052548.27402-1-linux-kernel-dev@beckhoff.com>
+Message-ID: <20170129020554.GG5662@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we have already made sunxi_sid driver support the SID controller on
-H3, enable it.
+On Wed, Jan 25, 2017 at 06:25:48AM +0100, linux-kernel-dev at beckhoff.com wrote:
+> From: Patrick Bruenn <p.bruenn@beckhoff.com>
+> 
+> The pinmux configuration in device tree was different from manual
+> muxing in <u-boot>/board/freescale/mx53loco/mx53loco.c
+> All pins were configured as NO_PAD_CTL(1 << 31), which was fine as the
+> bootloader already did the correct pinmuxing for us.
+> But recently u-boot is migrating to reuse device tree files from the
+> kernel tree, so it seems to be better to have the correct pinmuxing in
+> our files, too.
+> 
+> Signed-off-by: Patrick Bruenn <p.bruenn@beckhoff.com>
 
-Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
----
-Changes in v2:
-- Use 0x400 as the size of SID block, as described in "4.1. Memory
-  Mapping" in Allwinner H3 Datasheet V1.2.
-
- arch/arm/boot/dts/sun8i-h3.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index 08fd0860bb6b..0a7a38a75ee4 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -206,6 +206,11 @@
- 			#size-cells = <0>;
- 		};
- 
-+		sid: eeprom at 01c14000 {
-+			compatible = "allwinner,sun8i-h3-sid";
-+			reg = <0x01c14000 0x400>;
-+		};
-+
- 		usbphy: phy at 01c19400 {
- 			compatible = "allwinner,sun8i-h3-usb-phy";
- 			reg = <0x01c19400 0x2c>,
--- 
-2.11.0
+Applied, thanks.
