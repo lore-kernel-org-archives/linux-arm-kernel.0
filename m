@@ -1,27 +1,32 @@
 From: sre@kernel.org (Sebastian Reichel)
-Date: Sun, 29 Jan 2017 17:22:55 +0100
-Subject: [PATCH v2 08/25] dt-bindings: power: supply: add AXP20X/AXP22X
- AC power supply
-In-Reply-To: <20170127085458.18270-9-quentin.schulz@free-electrons.com>
+Date: Sun, 29 Jan 2017 17:25:37 +0100
+Subject: [PATCH v2 10/25] power: supply: add AC power supply driver for
+ AXP20X and AXP22X PMICs
+In-Reply-To: <20170127085458.18270-11-quentin.schulz@free-electrons.com>
 References: <20170127085458.18270-1-quentin.schulz@free-electrons.com>
- <20170127085458.18270-9-quentin.schulz@free-electrons.com>
-Message-ID: <20170129162255.if2o2ta4wt2vetad@earth>
+ <20170127085458.18270-11-quentin.schulz@free-electrons.com>
+Message-ID: <20170129162537.npe25eklgml3m25s@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Fri, Jan 27, 2017 at 09:54:41AM +0100, Quentin Schulz wrote:
-> The X-Powers AXP20X and AXP22X PMICs have an AC entry to supply power to
-> the board. They have a few registers dedicated to the status of the AC
-> power supply.
+On Fri, Jan 27, 2017 at 09:54:43AM +0100, Quentin Schulz wrote:
+> The X-Powers AXP20X and AXP22X PMICs expose the status of AC power
+> supply.
 > 
-> This adds the DT binding documentation for the AC power supply for
-> AXP20X and AXP22X PMICs.
+> Moreover, the AXP20X can also expose the current current and voltage
+> values of the AC power supply.
+> 
+> This adds the driver which exposes the status of the AC power supply of
+> the AXP20X and AXP22X PMICs.
 > 
 > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> Acked-by: Jonathan Cameron <jic23@kernel.org>
 
-Thanks, I queued this into power-supply's for-next branch.
+Thanks, I queued this into power-supply's for-next branch. I
+removed "struct device_node *np" and "int axp20x_id" from
+"struct axp20x_ac_power", since they were unused.
 
 -- Sebastian
 -------------- next part --------------
@@ -30,4 +35,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170129/1ab05834/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170129/23e6f0db/attachment.sig>
