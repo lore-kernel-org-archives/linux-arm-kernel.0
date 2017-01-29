@@ -1,35 +1,63 @@
-From: bruherrera@gmail.com (Bruno Herrera)
-Date: Sun, 29 Jan 2017 00:21:10 -0200
-Subject: [PATCH v4 5/5] dt-bindings: Document the STM32 USB OTG DWC2 core
- binding
-In-Reply-To: <20170129022110.54032-1-bruherrera@gmail.com>
-References: <20170129022110.54032-1-bruherrera@gmail.com>
-Message-ID: <20170129022110.54032-6-bruherrera@gmail.com>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Sun, 29 Jan 2017 10:33:21 +0800
+Subject: [PATCH v3 00/10] Allwinner H5 and Orange Pi PC2 support
+Message-ID: <20170129023331.62106-1-icenowy@aosc.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the documentation for STM32F4x9 USB OTG FS/HS compatible strings.
+Allwinner H5 is a 64-bit SoC with a design like the 32-bit
+H3.
 
-Signed-off-by: Bruno Herrera <bruherrera@gmail.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- Documentation/devicetree/bindings/usb/dwc2.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+This patchset adds support for it, along with the first available
+board -- Orange Pi PC2.
 
-diff --git a/Documentation/devicetree/bindings/usb/dwc2.txt b/Documentation/devicetree/bindings/usb/dwc2.txt
-index 6c7c2bce..00bea03 100644
---- a/Documentation/devicetree/bindings/usb/dwc2.txt
-+++ b/Documentation/devicetree/bindings/usb/dwc2.txt
-@@ -14,6 +14,10 @@ Required properties:
-   - "amlogic,meson-gxbb-usb": The DWC2 USB controller instance in Amlogic S905 SoCs;
-   - "amcc,dwc-otg": The DWC2 USB controller instance in AMCC Canyonlands 460EX SoCs;
-   - snps,dwc2: A generic DWC2 USB controller with default parameters.
-+  - "st,stm32f4x9-fsotg": The DWC2 USB FS/HS controller instance in STM32F4x9 SoCs
-+  configured in FS mode;
-+  - "st,stm32f4x9-hsotg": The DWC2 USB HS controller instance in STM32F4x9 SoCs
-+  configured in HS mode;
- - reg : Should contain 1 register range (address and length)
- - interrupts : Should contain 1 interrupt
- - clocks: clock provider specifier
+Some drivers are also enabled to be built on ARM64 ARCH_SUNXI
+platform, in order to make the internal audio codec work.
+
+Andre Przywara (3):
+  arm: dts: sun8i: split Allwinner H3 .dtsi
+  arm64: dts: allwinner: add Allwinner H5 .dtsi
+  arm64: dts: sunxi: add support for the Orange Pi PC 2 board
+
+Icenowy Zheng (7):
+  drivers: pinctrl: add driver for Allwinner H5 SoC
+  arm64: allwinner: Kconfig: add essential pinctrl driver for H5
+  clk: sunxi-ng: rename sun8i-h3 driver to sunxi-h3-h5
+  clk: sunxi-ng: add support for Allwinner H5 SoC
+  clk: sunxi-ng: remove transitional headers for dt-bindings
+  dmaengine: sun6i: allow build on ARM64 platforms (sun50i)
+  ASoC: sunxi: allow the analog codec driver to be built on ARM64
+
+ .../devicetree/bindings/clock/sunxi-ccu.txt        |   1 +
+ .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   |   1 +
+ arch/arm/boot/dts/sun8i-h3.dtsi                    | 571 ++-------------------
+ arch/arm/boot/dts/sunxi-h3-h5.dtsi                 | 557 ++++++++++++++++++++
+ arch/arm64/Kconfig.platforms                       |   5 +-
+ arch/arm64/boot/dts/allwinner/Makefile             |   1 +
+ .../boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts  | 164 ++++++
+ arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi       | 139 +++++
+ arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi     |   1 +
+ drivers/clk/sunxi-ng/Kconfig                       |   6 +-
+ drivers/clk/sunxi-ng/Makefile                      |   2 +-
+ .../sunxi-ng/{ccu-sun8i-h3.c => ccu-sunxi-h3-h5.c} | 179 ++++++-
+ .../sunxi-ng/{ccu-sun8i-h3.h => ccu-sunxi-h3-h5.h} |  15 +-
+ drivers/dma/Kconfig                                |   2 +-
+ drivers/pinctrl/sunxi/Kconfig                      |   4 +
+ drivers/pinctrl/sunxi/Makefile                     |   1 +
+ drivers/pinctrl/sunxi/pinctrl-sun50i-h5.c          | 558 ++++++++++++++++++++
+ .../clock/{sun8i-h3-ccu.h => sunxi-h3-h5-ccu.h}    |  11 +-
+ .../reset/{sun8i-h3-ccu.h => sunxi-h3-h5-ccu.h}    |  11 +-
+ sound/soc/sunxi/Kconfig                            |   2 +-
+ 20 files changed, 1662 insertions(+), 569 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sunxi-h3-h5.dtsi
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts
+ create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
+ create mode 120000 arch/arm64/boot/dts/allwinner/sunxi-h3-h5.dtsi
+ rename drivers/clk/sunxi-ng/{ccu-sun8i-h3.c => ccu-sunxi-h3-h5.c} (80%)
+ rename drivers/clk/sunxi-ng/{ccu-sun8i-h3.h => ccu-sunxi-h3-h5.h} (82%)
+ create mode 100644 drivers/pinctrl/sunxi/pinctrl-sun50i-h5.c
+ rename include/dt-bindings/clock/{sun8i-h3-ccu.h => sunxi-h3-h5-ccu.h} (95%)
+ rename include/dt-bindings/reset/{sun8i-h3-ccu.h => sunxi-h3-h5-ccu.h} (94%)
+
 -- 
-2.10.1 (Apple Git-78)
+2.11.0
