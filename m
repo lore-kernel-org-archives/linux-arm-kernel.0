@@ -1,117 +1,58 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 29 Jan 2017 12:19:15 +0000
-Subject: [PATCH 6/7] ASoC: add bindings for STM32 DFSDM driver
-In-Reply-To: <1485189145-29576-7-git-send-email-arnaud.pouliquen@st.com>
-References: <1485189145-29576-1-git-send-email-arnaud.pouliquen@st.com>
- <1485189145-29576-7-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <f0f446ea-97a0-8fef-bec5-aefeed42a85a@kernel.org>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Sun, 29 Jan 2017 17:51:25 +0530
+Subject: next-20170125 hangs on aarch64
+In-Reply-To: <20170129101255.GA29415@yury-N73SV>
+References: <20170129101255.GA29415@yury-N73SV>
+Message-ID: <20170129122125.GA20269@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/01/17 16:32, Arnaud Pouliquen wrote:
-> This patch adds documentation of device tree bindings for the
-> STM32 DFSDM ASoC driver.
+On Sun, Jan 29, 2017 at 03:42:55PM +0530, Yury Norov wrote:
+> Hi all,
 > 
-> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-> ---
->  .../devicetree/bindings/sound/st,sm32-adfsdm.txt   | 84 ++++++++++++++++++++++
->  1 file changed, 84 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/sound/st,sm32-adfsdm.txt
+> I pulled next-20170125 kernel, and found it hanged on boot. The exact reason is
+> panic on dereferencing of the 0xffffffc8 address, which is most probably the
+> attempt to dereference the ENOSYS error code as the address. next-20170124 works
+> fine, at least it boots.
 > 
-> diff --git a/Documentation/devicetree/bindings/sound/st,sm32-adfsdm.txt b/Documentation/devicetree/bindings/sound/st,sm32-adfsdm.txt
-> new file mode 100644
-> index 0000000..a1d27b8
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/sound/st,sm32-adfsdm.txt
-> @@ -0,0 +1,84 @@
-> +STMicroelectronics STM32 ADFSDM ASoC DAI device driver.
-> +
-> +STM32 ADFSDM ASoC is a sigma delta audio interface for digital microphone.
-> +It has to be declared in device-tree as a subnode of the DFSDM mfd node.
-> +
-> +It offers possibility to record several mono microphones, with an option to
-> +synchronize all microphones on a main one (that must be piped to filter 0)
-> +Audio interface can be exposed through the generic ASoC simple card.
-> +
-> +2 Dmics can be connected on one SPI interface instance n.
-> +Convention is that the DMIC that strobes data on rising edge is connected to the
-> +corresponding DFSDM channel n; while the Dmic that strobes data on falling edge
-> +is connected to the channel n-1. Simple card property "bitclock-inversion = <1>"
-> +is used to specify that microphone strobes data on falling edge.
-> +
-> +SPI interface allows to be scheduled by an external SPI clock. To use it
-> +simple card properties "bitclock-master = <&codec>" and "system-clock-frequency"
-> +have to be defined in dai-link node.
-> +
-> +Required properties:
-> +- compatible: 	Must be "st,stm32-dfsdm-audio",
-> +- reg:		Specifies the DFSDM filter instance.
-> +- interrupts: 	DFSDM filter instance interrupt line.
-> +- dma:		DMA controller phandle and DMA request line associated to the
-> +		filter instance ( specified by the field "reg")
-> +- dma-names: 	must be "rx"
-> +
-> +- st,input-id:		Id of the SPI/Manchester interface used.
-> +- st,dai-filter-order:  SinC filter order from 0 to 5.
-> +			0: FastSinC
-> +			[1-5]: order 1 to 5.
-> +			For audio purpose it is recommended to use order 3 to 5.
-Interesting for audio you consider it feature of the hardware, but for ADC you
-consider that this should be userspace controlled.
-Personally I'd like to see more detail on those filters but if this is convention
-in Asoc then so be it.
-> +
-> +Optional properties:
-> + - st,dai0-synchronized: Set to 1 to synchronize DAI with DFSDM instance 0.
-> +
-> +Exemple of a card with 2 Dmics synchronized and connected on SPI interface 1.
-Example.
-> +
-> +	dfsdm: dfsdm at 4400D000 {
-> +		dai_dfsdm0: dfsdm-audio at 0 {
-> +			compatible = "st,stm32-dfsdm-audio";
-> +			#sound-dai-cells = <0>;
-> +			reg = <0>;
-> +			dmas = <&dmamux1 101 0x400 0x00>;
-> +			dma-names = "rx";
-> +			st,input-id = <0>;
-> +			st,dai-filter-order = <5>;
-> +		};
-> +		dai_dfsdm1: dfsdm-audio at 1 {
-> +			compatible = "st,stm32-dfsdm-audio";
-> +			#sound-dai-cells = <0>;
-> +			reg = <0>;
-> +			dmas = <&dmamux1 102 0x400 0x00>;
-> +			dma-names = "rx";
-> +			st,input-id = <0>;
-> +			st,dai0-synchronized = <1>;
-> +			st,dai-filter-order = <5>;
-> +		};
-> +	};
-> +	sound_dfsdm_pdm {
-> +		compatible = "simple-audio-card";
-> +		simple-audio-card,name = "dfsdm_pdm";
-> +		status = "okay";
-> +
-> +		dfsdm0_mic0: simple-audio-card,dai-link at 0 {
-> +			format = "pdm";
-> +			cpu {
-> +				sound-dai = <&dai_dfsdm0>;
-> +			};
-> +			dmic0_codec: codec {
-> +				sound-dai = <&dmic0>;
-> +			};
-> +		};
-> +		dfsdm0_mic1: simple-audio-card,dai-link at 1 {
-> +			format = "pdm";
-> +			bitclock-inversion = <1>;
-> +			cpu {
-> +				sound-dai = <&dai_dfsdm1>;
-> +			};
-> +			codec {
-> +				sound-dai = <&dmic1>;
-> +			};
-> +		};
-> +	};
+> Does anyone have details on that?
 > 
-Jonathan
+> Yury
+
+UPD:
+
+I run qemu for testing.
+
+The true failure backtrace is like below. The bad dereference happens for me in
+arm_smccc_hvc() function in macro SMCCC.
+
+Yury
+
+Backtrace:
+
+#0  0xffff00000808f7a8 in arm_smccc_hvc () at
+arch/arm64/kernel/smccc-call.S:50
+#1  0xffff000008745ea0 in __invoke_psci_fn_hvc (function_id=<optimized out>, arg0=<optimized out>,
+    arg1=<optimized out>, arg2=<optimized out>) at drivers/firmware/psci.c:119
+#2  0xffff000008745d18 in psci_migrate_info_type () at drivers/firmware/psci.c:204
+#3  0xffff000008ca150c in psci_init_migrate () at drivers/firmware/psci.c:465
+#4  psci_probe () at drivers/firmware/psci.c:539
+#5  0xffff000008ca1684 in psci_0_2_init (np=<optimized out>) at drivers/firmware/psci.c:571
+#6  0xffff000008ca16d8 in psci_dt_init () at drivers/firmware/psci.c:637
+#7  0xffff000008c62914 in setup_arch (cmdline_p=<optimized out>) at arch/arm64/kernel/setup.c:287
+#8  0xffff000008c6082c in start_kernel () at init/main.c:509
+#9  0xffff000008c601e0 in __primary_switched () at arch/arm64/kernel/head.S:452
+
+Listing:
+
+ ?0xffff00000808f790 <arm_smccc_hvc>        hvc    #0x0
+ ?0xffff00000808f794 <arm_smccc_hvc+4>      ldr    x4, [sp]
+ ?0xffff00000808f798 <arm_smccc_hvc+8>      stp    x0, x1, [x4]          
+ ?0xffff00000808f79c <arm_smccc_hvc+12>     stp x2, x3, [x4,#16]
+ ?0xffff00000808f7a0 <arm_smccc_hvc+16>     ldr x4, [sp,#8] 
+ ?0xffff00000808f7a4 <arm_smccc_hvc+20>     cbz x4, 0xffff00000808f7b8 <arm_smccc_hvc+40>
+>?0xffff00000808f7a8 <arm_smccc_hvc+24      ldr    x9, [x4]
+ ?0xffff00000808f7ac <arm_smccc_hvc+28>     cmp    x9, #0x1
+ ?0xffff00000808f7b0 <arm_smccc_hvc+32>     b.ne   0xffff00000808f7b8 <arm_smccc_hvc+40>
+ ?0xffff00000808f7b4 <arm_smccc_hvc+36>     str    x6, [x4,#8]
+ ?0xffff00000808f7b8 <arm_smccc_hvc+40>     ret
