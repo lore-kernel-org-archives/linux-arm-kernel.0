@@ -1,34 +1,47 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun, 29 Jan 2017 21:30:13 +0100
-Subject: [PATCH v5 5/8] clocksource/drivers/rockchip_timer: split bc_timer
- into rk_timer and rk_clock_event_device
-In-Reply-To: <14EAE124-D504-4480-A6D4-EB7EFFC3C561@gmail.com>
-References: <1485260203-14216-1-git-send-email-al.kochet@gmail.com>
- <3890508.0j97LNriXL@diego> <14EAE124-D504-4480-A6D4-EB7EFFC3C561@gmail.com>
-Message-ID: <3616490.5RPja2j5kp@phil>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Sun, 29 Jan 2017 20:30:34 +0000
+Subject: [PATCHv5 0/5] Support for Marvell switches with integrated CPUs
+References: <20170127032546.14657-1-chris.packham@alliedtelesis.co.nz>
+ <87wpdgwj72.fsf@free-electrons.com> <20170127184745.GD8801@codeaurora.org>
+Message-ID: <f8f6e8db585147d3adb025bed29694ab@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alexander,
+On 28/01/17 07:47, Stephen Boyd wrote:
+> On 01/27, Gregory CLEMENT wrote:
+>> Hi all,
+>>
+>>  On ven., janv. 27 2017, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
+>>
+>>> The 98DX3236, 98DX3336 and 98DX4251 are a set of switch ASICs with
+>>> integrated CPUs. They CPU block is common within these product lines and
+>>> (as far as I can tell/have been told) is based on the Armada XP. There
+>>> are a few differences due to the fact they have to squeeze the CPU into
+>>> the same package as the switch.
+>>>
+>>> I've rebased this series against linux-pinctrl/devel to get access to
+>>> mvebu_mmio_mpp_ctrl. Everything else still applies cleanly to
+>>> v4.10.0-rc5.
+>>
+>> Just to let you know that I plan to apply the 3 arm patch once Chris
+>> will have sent the new series with the minor fixes I asked on patch 3.
+>>
+>> I already applied them in the for-next branch to benefit of some build
+>> test coverage.
+>>
+>> Stephen,
+>>
+>> you gave your Acked-by on the first patch, but don't you plan to apply
+>> it on the clk branch?
+>
+> It must have not been clear if I should apply it, hence the ack.
+> I'll apply it now.
+>
 
-Am Dienstag, 24. Januar 2017, 18:16:20 CET schrieb Alexander Kochetkov:
-> > 24 ???. 2017 ?., ? 18:02, Heiko St?bner <heiko@sntech.de> ???????(?):
-> > 
-> > Please don't add Reviewed-by tags without explicit mention of them by
-> > reviewers. (Also it's spelled wrong).
-> > 
-> > I haven't looked that deeply into the driver itself and the changes made
-> > to
-> > feel comfortable with a "Reviewed-by".
-> 
-> Than I posted another linux code I was asked to add such tags (and others)
-> to add credits to people.
-> 
-> Sorry for that.
+Sorry my bad. I need all 5 together in one place to actually test the 
+series.
 
-no problem. In general people reviewing patches will respond to the patch with 
-tags they are comfortable with being added. And a Reviewed-by is a pretty 
-strong tag, indicating that some thought went into reviewing a specific patch, 
-which I hadn't done with my cursory glance at the time :-)
-
-Heiko
+I wasn't sure whether the series should go through mvebu with Acks from 
+clk and pinctrl or if things should go to the separate maintainers and 
+come together when they hit the main linux repo. Up until the latest 
+pinctrl change either approach would have worked.
