@@ -1,18 +1,15 @@
 From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Mon, 30 Jan 2017 12:20:31 +1300
-Subject: [PATCH v6 1/5] clk: mvebu: support for 98DX3236 SoC
+Date: Mon, 30 Jan 2017 12:20:34 +1300
+Subject: [PATCH v6 4/5] arm: mvebu: Add device tree for 98DX3236 SoCs
 In-Reply-To: <20170129232035.25189-1-chris.packham@alliedtelesis.co.nz>
 References: <20170129232035.25189-1-chris.packham@alliedtelesis.co.nz>
-Message-ID: <20170129232035.25189-2-chris.packham@alliedtelesis.co.nz>
+Message-ID: <20170129232035.25189-5-chris.packham@alliedtelesis.co.nz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 98DX3236, 98DX3336, 98DX4521 and variants have a different TCLK from
-the Armada XP (200MHz vs 250MHz). The CPU core clock is fixed at 800MHz.
-
-The clock gating options are a subset of those on the Armada XP.
-
-The core clock divider is different to the Armada XP also.
+The Marvell 98DX3236, 98DX3336, 98DX4521 and variants are switch ASICs
+with integrated CPUs. They are similar to the Armada XP SoCs but have
+different I/O interfaces.
 
 Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
 Acked-by: Rob Herring <robh@kernel.org>
@@ -20,187 +17,557 @@ Acked-by: Rob Herring <robh@kernel.org>
 
 Notes:
     Changes in v2:
-    - Update devicetree binding documentation for new compatible string
+    - Update devicetree binding documentation to reflect that 98DX3336 and
+      984251 are supersets of 98DX3236.
+    - disable crypto block
+    - disable sdio for 98DX3236, enable for 98DX4251
     Changes in v3:
-    - Add 98dx3236 support to mvebu/clk-corediv.c rather than creating a new
-      driver.
-    - Document mv98dx3236-corediv-clock binding
+    - fix typo 4521 -> 4251
+    - document prestera bindings
+    - rework corediv-clock binding
+    - add label to packet processor node
+    - add new compatible string for DFX server
     Changes in v4:
-    - None
-    Changes in v5:
     - Collect ack from Rob
-    - Remove explicit initialisation of fields to 0 in mv98dx3236_coreclks
-    - Register dummy clock provider for marvell,mv98dx3236-cpu-clock
+    Changes in v5:
+    - Fixup license text. Add labels to nodes.
     Changes in v6:
-   - None. Note this has already been applied to clk-net, I've just
-     included it for completeness.
+    - None
 
- .../bindings/clock/mvebu-corediv-clock.txt         |  1 +
- .../devicetree/bindings/clock/mvebu-cpu-clock.txt  |  1 +
- drivers/clk/mvebu/armada-xp.c                      | 39 ++++++++++++++++++++++
- drivers/clk/mvebu/clk-corediv.c                    | 23 +++++++++++++
- drivers/clk/mvebu/clk-cpu.c                        |  8 +++++
- 5 files changed, 72 insertions(+)
+ .../devicetree/bindings/arm/marvell/98dx3236.txt   |  23 ++
+ .../devicetree/bindings/net/marvell,prestera.txt   |  50 ++++
+ arch/arm/boot/dts/armada-xp-98dx3236.dtsi          | 254 +++++++++++++++++++++
+ arch/arm/boot/dts/armada-xp-98dx3336.dtsi          |  76 ++++++
+ arch/arm/boot/dts/armada-xp-98dx4251.dtsi          |  90 ++++++++
+ 5 files changed, 493 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/marvell/98dx3236.txt
+ create mode 100644 Documentation/devicetree/bindings/net/marvell,prestera.txt
+ create mode 100644 arch/arm/boot/dts/armada-xp-98dx3236.dtsi
+ create mode 100644 arch/arm/boot/dts/armada-xp-98dx3336.dtsi
+ create mode 100644 arch/arm/boot/dts/armada-xp-98dx4251.dtsi
 
-diff --git a/Documentation/devicetree/bindings/clock/mvebu-corediv-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-corediv-clock.txt
-index 520562a7dc2a..c7b4e3a6b2c6 100644
---- a/Documentation/devicetree/bindings/clock/mvebu-corediv-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/mvebu-corediv-clock.txt
-@@ -7,6 +7,7 @@ Required properties:
- - compatible : must be "marvell,armada-370-corediv-clock",
- 		       "marvell,armada-375-corediv-clock",
- 		       "marvell,armada-380-corediv-clock",
-+                       "marvell,mv98dx3236-corediv-clock",
- 
- - reg : must be the register address of Core Divider control register
- - #clock-cells : from common clock binding; shall be set to 1
-diff --git a/Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt b/Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
-index 99c214660bdc..7f28506eaee7 100644
---- a/Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
-+++ b/Documentation/devicetree/bindings/clock/mvebu-cpu-clock.txt
-@@ -3,6 +3,7 @@ Device Tree Clock bindings for cpu clock of Marvell EBU platforms
- Required properties:
- - compatible : shall be one of the following:
- 	"marvell,armada-xp-cpu-clock" - cpu clocks for Armada XP
-+	"marvell,mv98dx3236-cpu-clock" - cpu clocks for 98DX3236 SoC
- - reg : Address and length of the clock complex register set, followed
-         by address and length of the PMU DFS registers
- - #clock-cells : should be set to 1.
-diff --git a/drivers/clk/mvebu/armada-xp.c b/drivers/clk/mvebu/armada-xp.c
-index b3094315a3c0..890a863ae0d0 100644
---- a/drivers/clk/mvebu/armada-xp.c
-+++ b/drivers/clk/mvebu/armada-xp.c
-@@ -52,6 +52,12 @@ static u32 __init axp_get_tclk_freq(void __iomem *sar)
- 	return 250000000;
- }
- 
-+/* MV98DX3236 TCLK frequency is fixed to 200MHz */
-+static u32 __init mv98dx3236_get_tclk_freq(void __iomem *sar)
-+{
-+	return 200000000;
-+}
+diff --git a/Documentation/devicetree/bindings/arm/marvell/98dx3236.txt b/Documentation/devicetree/bindings/arm/marvell/98dx3236.txt
+new file mode 100644
+index 000000000000..64e8c73fc5ab
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/marvell/98dx3236.txt
+@@ -0,0 +1,23 @@
++Marvell 98DX3236, 98DX3336 and 98DX4251 Platforms Device Tree Bindings
++----------------------------------------------------------------------
 +
- static const u32 axp_cpu_freqs[] __initconst = {
- 	1000000000,
- 	1066000000,
-@@ -89,6 +95,12 @@ static u32 __init axp_get_cpu_freq(void __iomem *sar)
- 	return cpu_freq;
- }
- 
-+/* MV98DX3236 CLK frequency is fixed to 800MHz */
-+static u32 __init mv98dx3236_get_cpu_freq(void __iomem *sar)
-+{
-+	return 800000000;
-+}
++Boards with a SoC of the Marvell 98DX3236, 98DX3336 and 98DX4251 families
++shall have the following property:
 +
- static const int axp_nbclk_ratios[32][2] __initconst = {
- 	{0, 1}, {1, 2}, {2, 2}, {2, 2},
- 	{1, 2}, {1, 2}, {1, 1}, {2, 3},
-@@ -158,6 +170,11 @@ static const struct coreclk_soc_desc axp_coreclks = {
- 	.num_ratios = ARRAY_SIZE(axp_coreclk_ratios),
- };
- 
-+static const struct coreclk_soc_desc mv98dx3236_coreclks = {
-+	.get_tclk_freq = mv98dx3236_get_tclk_freq,
-+	.get_cpu_freq = mv98dx3236_get_cpu_freq,
++Required root node property:
++
++compatible: must contain "marvell,armadaxp-98dx3236"
++
++In addition, boards using the Marvell 98DX3336 SoC shall have the
++following property:
++
++Required root node property:
++
++compatible: must contain "marvell,armadaxp-98dx3336"
++
++In addition, boards using the Marvell 98DX4251 SoC shall have the
++following property:
++
++Required root node property:
++
++compatible: must contain "marvell,armadaxp-98dx4251"
+diff --git a/Documentation/devicetree/bindings/net/marvell,prestera.txt b/Documentation/devicetree/bindings/net/marvell,prestera.txt
+new file mode 100644
+index 000000000000..5fbab29718e8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/net/marvell,prestera.txt
+@@ -0,0 +1,50 @@
++Marvell Prestera Switch Chip bindings
++-------------------------------------
++
++Required properties:
++- compatible: one of the following
++	"marvell,prestera-98dx3236",
++	"marvell,prestera-98dx3336",
++	"marvell,prestera-98dx4251",
++- reg: address and length of the register set for the device.
++- interrupts: interrupt for the device
++
++Optional properties:
++- dfx: phandle reference to the "DFX Server" node
++
++Example:
++
++switch {
++	compatible = "simple-bus";
++	#address-cells = <1>;
++	#size-cells = <1>;
++	ranges = <0 MBUS_ID(0x03, 0x00) 0 0x100000>;
++
++	packet-processor at 0 {
++		compatible = "marvell,prestera-98dx3236";
++		reg = <0 0x4000000>;
++		interrupts = <33>, <34>, <35>;
++		dfx = <&dfx>;
++	};
 +};
 +
- /*
-  * Clock Gating Control
-  */
-@@ -195,6 +212,15 @@ static const struct clk_gating_soc_desc axp_gating_desc[] __initconst = {
- 	{ }
- };
- 
-+static const struct clk_gating_soc_desc mv98dx3236_gating_desc[] __initconst = {
-+	{ "ge1", NULL, 3, 0 },
-+	{ "ge0", NULL, 4, 0 },
-+	{ "pex00", NULL, 5, 0 },
-+	{ "sdio", NULL, 17, 0 },
-+	{ "xor0", NULL, 22, 0 },
-+	{ }
++DFX Server bindings
++-------------------
++
++Required properties:
++- compatible: must be "marvell,dfx-server"
++- reg: address and length of the register set for the device.
++
++Example:
++
++dfx-registers {
++	compatible = "simple-bus";
++	#address-cells = <1>;
++	#size-cells = <1>;
++	ranges = <0 MBUS_ID(0x08, 0x00) 0 0x100000>;
++
++	dfx: dfx at 0 {
++		compatible = "marvell,dfx-server";
++		reg = <0 0x100000>;
++	};
++};
+diff --git a/arch/arm/boot/dts/armada-xp-98dx3236.dtsi b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
+new file mode 100644
+index 000000000000..9461128fae24
+--- /dev/null
++++ b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
+@@ -0,0 +1,254 @@
++/*
++ * Device Tree Include file for Marvell 98dx3236 family SoC
++ *
++ * Copyright (C) 2016 Allied Telesis Labs
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ *
++ * Contains definitions specific to the 98dx3236 SoC that are not
++ * common to all Armada XP SoCs.
++ */
++
++#include "armada-xp.dtsi"
++
++/ {
++	model = "Marvell 98DX3236 SoC";
++	compatible = "marvell,armadaxp-98dx3236", "marvell,armadaxp", "marvell,armada-370-xp";
++
++	aliases {
++		gpio0 = &gpio0;
++		gpio1 = &gpio1;
++		gpio2 = &gpio2;
++	};
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		enable-method = "marvell,98dx3236-smp";
++
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "marvell,sheeva-v7";
++			reg = <0>;
++			clocks = <&cpuclk 0>;
++			clock-latency = <1000000>;
++		};
++	};
++
++	soc {
++		ranges = <MBUS_ID(0xf0, 0x01) 0 0 0xf1000000 0x100000
++			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
++			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000
++			  MBUS_ID(0x03, 0x00) 0 0 0xa8000000 0x4000000
++			  MBUS_ID(0x08, 0x00) 0 0 0xac000000 0x100000>;
++
++		/*
++		 * 98DX3236 has 1 x1 PCIe unit Gen2.0
++		 */
++		pciec: pcie-controller at 82000000 {
++			compatible = "marvell,armada-xp-pcie";
++			status = "disabled";
++			device_type = "pci";
++
++			#address-cells = <3>;
++			#size-cells = <2>;
++
++			msi-parent = <&mpic>;
++			bus-range = <0x00 0xff>;
++
++			ranges =
++			       <0x82000000 0 0x40000 MBUS_ID(0xf0, 0x01) 0x40000 0 0x00002000   /* Port 0.0 registers */
++				0x82000000 0x1 0       MBUS_ID(0x04, 0xe8) 0 1 0 /* Port 0.0 MEM */
++				0x81000000 0x1 0       MBUS_ID(0x04, 0xe0) 0 1 0 /* Port 0.0 IO  */
++				0x82000000 0x2 0       MBUS_ID(0x04, 0xd8) 0 1 0 /* Port 0.1 MEM */>;
++
++			pcie1: pcie at 1,0 {
++				device_type = "pci";
++				assigned-addresses = <0x82000800 0 0x40000 0 0x2000>;
++				reg = <0x0800 0 0 0 0>;
++				#address-cells = <3>;
++				#size-cells = <2>;
++				#interrupt-cells = <1>;
++				ranges = <0x82000000 0 0 0x82000000 0x1 0 1 0
++					  0x81000000 0 0 0x81000000 0x1 0 1 0>;
++				interrupt-map-mask = <0 0 0 0>;
++				interrupt-map = <0 0 0 0 &mpic 58>;
++				marvell,pcie-port = <0>;
++				marvell,pcie-lane = <0>;
++				clocks = <&gateclk 5>;
++				status = "disabled";
++			};
++		};
++
++		internal-regs {
++			coreclk: mvebu-sar at 18230 {
++				compatible = "marvell,mv98dx3236-core-clock";
++			};
++
++			cpuclk: clock-complex at 18700 {
++				compatible = "marvell,mv98dx3236-cpu-clock";
++			};
++
++			corediv-clock at 18740 {
++				status = "disabled";
++			};
++
++			xor at 60900 {
++				status = "disabled";
++			};
++
++			crypto at 90000 {
++				status = "disabled";
++			};
++
++			xor at f0900 {
++				status = "disabled";
++			};
++
++			xor at f0800 {
++				compatible = "marvell,orion-xor";
++				reg = <0xf0800 0x100
++				       0xf0a00 0x100>;
++				clocks = <&gateclk 22>;
++				status = "okay";
++
++				xor10 {
++					interrupts = <51>;
++					dmacap,memcpy;
++					dmacap,xor;
++				};
++				xor11 {
++					interrupts = <52>;
++					dmacap,memcpy;
++					dmacap,xor;
++					dmacap,memset;
++				};
++			};
++
++			gpio0: gpio at 18100 {
++				compatible = "marvell,orion-gpio";
++				reg = <0x18100 0x40>;
++				ngpios = <32>;
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				interrupts = <82>, <83>, <84>, <85>;
++			};
++
++			/* does not exist */
++			gpio1: gpio at 18140 {
++				compatible = "marvell,orion-gpio";
++				reg = <0x18140 0x40>;
++				status = "disabled";
++			};
++
++			gpio2: gpio at 18180 { /* rework some properties */
++				compatible = "marvell,orion-gpio";
++				reg = <0x18180 0x40>;
++				ngpios = <1>; /* only gpio #32 */
++				gpio-controller;
++				#gpio-cells = <2>;
++				interrupt-controller;
++				#interrupt-cells = <2>;
++				interrupts = <87>;
++			};
++
++			nand: nand at d0000 {
++				clocks = <&dfx_coredivclk 0>;
++			};
++		};
++
++		dfxr: dfx-registers at ac000000 {
++			compatible = "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 MBUS_ID(0x08, 0x00) 0 0x100000>;
++
++                        dfx_coredivclk: corediv-clock at f8268 {
++                                compatible = "marvell,mv98dx3236-corediv-clock";
++                                reg = <0xf8268 0xc>;
++                                #clock-cells = <1>;
++                                clocks = <&mainpll>;
++                                clock-output-names = "nand";
++                        };
++
++			dfx: dfx at 0 {
++				compatible = "marvell,dfx-server";
++				reg = <0 0x100000>;
++			};
++		};
++
++		switch: switch at a8000000 {
++			compatible = "simple-bus";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			ranges = <0 MBUS_ID(0x03, 0x00) 0 0x100000>;
++
++			pp0: packet-processor at 0 {
++				compatible = "marvell,prestera-98dx3236";
++				reg = <0 0x4000000>;
++				interrupts = <33>, <34>, <35>;
++				dfx = <&dfx>;
++			};
++		};
++	};
 +};
 +
- static void __init axp_clk_init(struct device_node *np)
- {
- 	struct device_node *cgnp =
-@@ -206,3 +232,16 @@ static void __init axp_clk_init(struct device_node *np)
- 		mvebu_clk_gating_setup(cgnp, axp_gating_desc);
- }
- CLK_OF_DECLARE(axp_clk, "marvell,armada-xp-core-clock", axp_clk_init);
++&pinctrl {
++	compatible = "marvell,98dx3236-pinctrl";
 +
-+static void __init mv98dx3236_clk_init(struct device_node *np)
-+{
-+	struct device_node *cgnp =
-+		of_find_compatible_node(NULL, NULL, "marvell,armada-xp-gating-clock");
-+
-+	mvebu_coreclk_setup(np, &mv98dx3236_coreclks);
-+
-+	if (cgnp)
-+		mvebu_clk_gating_setup(cgnp, mv98dx3236_gating_desc);
-+}
-+CLK_OF_DECLARE(mv98dx3236_clk, "marvell,mv98dx3236-core-clock",
-+	       mv98dx3236_clk_init);
-diff --git a/drivers/clk/mvebu/clk-corediv.c b/drivers/clk/mvebu/clk-corediv.c
-index d1e5863d3375..8491979f4096 100644
---- a/drivers/clk/mvebu/clk-corediv.c
-+++ b/drivers/clk/mvebu/clk-corediv.c
-@@ -71,6 +71,10 @@ static const struct clk_corediv_desc mvebu_corediv_desc[] = {
- 	{ .mask = 0x3f, .offset = 8, .fieldbit = 1 }, /* NAND clock */
- };
- 
-+static const struct clk_corediv_desc mv98dx3236_corediv_desc[] = {
-+	{ .mask = 0x0f, .offset = 6, .fieldbit = 26 }, /* NAND clock */
++	spi0_pins: spi0-pins {
++		marvell,pins = "mpp0", "mpp1",
++			       "mpp2", "mpp3";
++		marvell,function = "spi0";
++	};
 +};
 +
- #define to_corediv_clk(p) container_of(p, struct clk_corediv, hw)
- 
- static int clk_corediv_is_enabled(struct clk_hw *hwclk)
-@@ -232,6 +236,18 @@ static const struct clk_corediv_soc_desc armada375_corediv_soc = {
- 	.ratio_offset = 0x4,
- };
- 
-+static const struct clk_corediv_soc_desc mv98dx3236_corediv_soc = {
-+	.descs = mv98dx3236_corediv_desc,
-+	.ndescs = ARRAY_SIZE(mv98dx3236_corediv_desc),
-+	.ops = {
-+		.recalc_rate = clk_corediv_recalc_rate,
-+		.round_rate = clk_corediv_round_rate,
-+		.set_rate = clk_corediv_set_rate,
-+	},
-+	.ratio_reload = BIT(10),
-+	.ratio_offset = 0x8,
++&sdio {
++	status = "disabled";
 +};
 +
- static void __init
- mvebu_corediv_clk_init(struct device_node *node,
- 		       const struct clk_corediv_soc_desc *soc_desc)
-@@ -313,3 +329,10 @@ static void __init armada380_corediv_clk_init(struct device_node *node)
- }
- CLK_OF_DECLARE(armada380_corediv_clk, "marvell,armada-380-corediv-clock",
- 	       armada380_corediv_clk_init);
++&crypto_sram0 {
++	status = "disabled";
++};
 +
-+static void __init mv98dx3236_corediv_clk_init(struct device_node *node)
-+{
-+	return mvebu_corediv_clk_init(node, &mv98dx3236_corediv_soc);
-+}
-+CLK_OF_DECLARE(mv98dx3236_corediv_clk, "marvell,mv98dx3236-corediv-clock",
-+	       mv98dx3236_corediv_clk_init);
-diff --git a/drivers/clk/mvebu/clk-cpu.c b/drivers/clk/mvebu/clk-cpu.c
-index 5837eb8a212f..044892b6534d 100644
---- a/drivers/clk/mvebu/clk-cpu.c
-+++ b/drivers/clk/mvebu/clk-cpu.c
-@@ -245,3 +245,11 @@ static void __init of_cpu_clk_setup(struct device_node *node)
- 
- CLK_OF_DECLARE(armada_xp_cpu_clock, "marvell,armada-xp-cpu-clock",
- 					 of_cpu_clk_setup);
++&crypto_sram1 {
++	status = "disabled";
++};
+diff --git a/arch/arm/boot/dts/armada-xp-98dx3336.dtsi b/arch/arm/boot/dts/armada-xp-98dx3336.dtsi
+new file mode 100644
+index 000000000000..e1580afdc260
+--- /dev/null
++++ b/arch/arm/boot/dts/armada-xp-98dx3336.dtsi
+@@ -0,0 +1,76 @@
++/*
++ * Device Tree Include file for Marvell 98dx3336 family SoC
++ *
++ * Copyright (C) 2016 Allied Telesis Labs
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ *
++ * Contains definitions specific to the 98dx3236 SoC that are not
++ * common to all Armada XP SoCs.
++ */
 +
-+static void __init of_mv98dx3236_cpu_clk_setup(struct device_node *node)
-+{
-+	of_clk_add_provider(node, of_clk_src_simple_get, NULL);
-+}
++#include "armada-xp-98dx3236.dtsi"
 +
-+CLK_OF_DECLARE(mv98dx3236_cpu_clock, "marvell,mv98dx3236-cpu-clock",
-+					 of_mv98dx3236_cpu_clk_setup);
++/ {
++	model = "Marvell 98DX3336 SoC";
++	compatible = "marvell,armadaxp-98dx3336", "marvell,armadaxp-98dx3236", "marvell,armadaxp", "marvell,armada-370-xp";
++
++	cpus {
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "marvell,sheeva-v7";
++			reg = <1>;
++			clocks = <&cpuclk 1>;
++			clock-latency = <1000000>;
++		};
++	};
++
++	soc {
++		internal-regs {
++			resume at 20980 {
++				compatible = "marvell,98dx3336-resume-ctrl";
++				reg = <0x20980 0x10>;
++			};
++		};
++	};
++};
++
++&pp0 {
++	compatible = "marvell,prestera-98dx3336";
++};
+diff --git a/arch/arm/boot/dts/armada-xp-98dx4251.dtsi b/arch/arm/boot/dts/armada-xp-98dx4251.dtsi
+new file mode 100644
+index 000000000000..4b0533a4ccb7
+--- /dev/null
++++ b/arch/arm/boot/dts/armada-xp-98dx4251.dtsi
+@@ -0,0 +1,90 @@
++/*
++ * Device Tree Include file for Marvell 98dx4521 family SoC
++ *
++ * Copyright (C) 2016 Allied Telesis Labs
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ *
++ * Contains definitions specific to the 98dx4521 SoC that are not
++ * common to all Armada XP SoCs.
++ */
++
++#include "armada-xp-98dx3236.dtsi"
++
++/ {
++	model = "Marvell 98DX4251 SoC";
++	compatible = "marvell,armadaxp-98dx4521", "marvell,armadaxp-98dx3236", "marvell,armadaxp", "marvell,armada-370-xp";
++
++	cpus {
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "marvell,sheeva-v7";
++			reg = <1>;
++			clocks = <&cpuclk 1>;
++			clock-latency = <1000000>;
++		};
++	};
++
++	soc {
++		internal-regs {
++			resume at 20980 {
++				compatible = "marvell,98dx3336-resume-ctrl";
++				reg = <0x20980 0x10>;
++			};
++		};
++	};
++};
++
++&sdio {
++	status = "okay";
++};
++
++&pinctrl {
++	compatible = "marvell,98dx4251-pinctrl";
++
++	sdio_pins: sdio-pins {
++		marvell,pins = "mpp5", "mpp6", "mpp7",
++			       "mpp8", "mpp9", "mpp10";
++		marvell,function = "sd0";
++	};
++};
++
++&pp0 {
++	compatible = "marvell,prestera-98dx4251";
++};
 -- 
 2.11.0.24.ge6920cf
