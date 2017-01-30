@@ -1,45 +1,72 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Mon, 30 Jan 2017 10:51:52 -0600
-Subject: [PATCH 1/2] dt-bindings: Document the VC4 DSI module nodes.
-In-Reply-To: <87ziibaota.fsf@eliezer.anholt.net>
-References: <20170124003853.16418-1-eric@anholt.net>
- <20170124003853.16418-2-eric@anholt.net>
- <CAL_JsqJ=VQSUO5MeHJSCB=_SnmOnA7G1=GhmWYKhjm-47kYV-w@mail.gmail.com>
- <87ziibaota.fsf@eliezer.anholt.net>
-Message-ID: <CAL_JsqJSXEjVPHx-2R69qmg1vrjT66MiYwnpD4Ki6gfqNYcTrg@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 30 Jan 2017 08:53:56 -0800
+Subject: [PATCH] mmc: meson-gx: set max block count to 256
+In-Reply-To: <c8f456f5-1722-55d6-58d8-c438d344cbc1@gmail.com> (Heiner
+ Kallweit's message of "Sat, 28 Jan 2017 09:18:50 +0100")
+References: <82cf7861-5cf8-302d-5354-435282d95619@gmail.com>
+ <m2lgtwuzll.fsf@baylibre.com>
+ <c8f456f5-1722-55d6-58d8-c438d344cbc1@gmail.com>
+Message-ID: <m2o9yotrob.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2017 at 8:41 PM, Eric Anholt <eric@anholt.net> wrote:
-> Rob Herring <robh+dt@kernel.org> writes:
->
->> Need to cc DT list if you want it in my queue.
->>
->> On Mon, Jan 23, 2017 at 6:38 PM, Eric Anholt <eric@anholt.net> wrote:
->>> These are part of the vc4 display pipeline.
+Heiner Kallweit <hkallweit1@gmail.com> writes:
+
+> Am 27.01.2017 um 19:28 schrieb Kevin Hilman:
+>> Heiner Kallweit <hkallweit1@gmail.com> writes:
+>> 
+>>> So far max_blk_count isn't set what results in a default of value 8
+>>> to be used (PAGE_SIZE / block size).
 >>>
->>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>>> Set max_blk_count to 256 as used in the uboot driver.
+>>>
+>>> Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
+>> 
+>> Thanks for the patch. A minor comment below:
+>> 
 >>> ---
->>>  .../devicetree/bindings/display/brcm,bcm-vc4.txt   | 35 ++++++++++++++++++++++
->>>  1 file changed, 35 insertions(+)
+>>>  drivers/mmc/host/meson-gx-mmc.c | 1 +
+>>>  1 file changed, 1 insertion(+)
 >>>
->>> diff --git a/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt b/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
->>> index e2768703ac2b..34c7fddcea39 100644
->>> --- a/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
->>> +++ b/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
->>> @@ -56,6 +56,18 @@ Required properties for V3D:
->>>  - interrupts:  The interrupt number
->>>                   See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
->>>
->>> +Required properties for DSI:
->>> +- compatible:  Should be "brcm,bcm2835-dsi0" or "brcm,bcm2835-dsi1"
->>
->> Are the blocks different?
+>>> diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
+>>> index 3308b5b6..030425be 100644
+>>> --- a/drivers/mmc/host/meson-gx-mmc.c
+>>> +++ b/drivers/mmc/host/meson-gx-mmc.c
+>>> @@ -799,6 +799,7 @@ static int meson_mmc_probe(struct platform_device *pdev)
+>>>  		goto free_host;
+>>>  	}
+>>>  
+>>> +	mmc->max_blk_count = 256;
+>> 
+>> A step in the right direction, but the # blocks is actually a 9-bit
+>> field (c.f. length field of cmd_cfg part of descriptor (bits 8:0).
+>> 
+>> So this should be more like:
+>> 
+>> 	/* blk count is 'length' field of cmd_cfg part of descriptor */
+>> 	mmc->max_blk_count = CMD_CFG_LENGTH_MASK + 1;
+>> 
+>> I tested that change locally, so after changing that, please resend and
+>> feel free to add:
+>> 
+> max_blk_count = 0 means unlimited number of blocks. Therefore I think
+> we have to go with: mmc->max_blk_count = CMD_CFG_LENGTH_MASK
+
+Ah, yes.  Good catch.
+
+Kevin
+
+> And I figured out later that we also have to set mmc->max_req_size.
 >
-> They are from the same lineage, but very different (old dsi0 is 1 lane,
-> dsi1 is 4 lanes).  You can see how much the registers move around and
-> change in the dsi->port conditional blocks in the driver code.
-
-Okay, can you add a note here with this detail. With that,
-
-Acked-by: Rob Herring <robh@kernel.org>
+> In my tests the system never read / wrote more than 8 blocks in a row,
+> most likely because the upper block layers use 4k blocks.
+>
+> Therefore setting max_blk_count doesn't really provide a benefit but
+> I think it's cleaner to expose the actual chip limit.
+>
+>
+>> Reviewed-by: Kevin Hilman <khilman@baylibre.com>
+>> Tested-by: Kevin Hilman <khilman@baylibre.com>
+>> 
+>> Kevin
+>> 
