@@ -1,75 +1,50 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Mon, 30 Jan 2017 17:09:34 -0500
-Subject: [PATCH v4 2/4] arm64: Work around Falkor erratum 1003
-In-Reply-To: <20170130105627.GA1160@leverpostej>
-References: <20170125155232.10277-1-cov@codeaurora.org>
- <20170125155232.10277-2-cov@codeaurora.org>
- <20170127143848.GA25899@leverpostej>
- <e3343971-9e21-3462-f07b-569b496ab8ad@codeaurora.org>
- <20170130105627.GA1160@leverpostej>
-Message-ID: <f85f5b08-1f95-e008-b2e2-ca40d875efff@codeaurora.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 30 Jan 2017 22:28:51 +0000
+Subject: [PATCH v3 06/24] ARM: dts: imx6-sabrelite: add OV5642 and OV5640
+ camera sensors
+In-Reply-To: <1483755102-24785-7-git-send-email-steve_longerbeam@mentor.com>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <1483755102-24785-7-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <20170130222851.GA27898@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Fri, Jan 06, 2017 at 06:11:24PM -0800, Steve Longerbeam wrote:
+> diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> index 66d10d8..9e2d26d 100644
+> --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
+> +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> @@ -52,3 +52,9 @@
+>  &sata {
+>  	status = "okay";
+>  };
+> +
+> +&ipu1_csi1_from_mipi_vc1 {
+> +	data-lanes = <0 1>;
+> +	clock-lanes = <2>;
+> +};
+> +
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+> index 795b5a5..bca9fed 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+...
+> +/* Incoming port from sensor */
+> +&mipi_csi_from_mipi_sensor {
+> +        remote-endpoint = <&ov5640_to_mipi_csi>;
+> +        data-lanes = <0 1>;
+> +        clock-lanes = <2>;
+> +};
+> +
 
-On 01/30/2017 05:56 AM, Mark Rutland wrote:
-> Hi,
-> 
-> On Fri, Jan 27, 2017 at 04:52:23PM -0500, Christopher Covington wrote:
->> On 01/27/2017 09:38 AM, Mark Rutland wrote:
->>> On Wed, Jan 25, 2017 at 10:52:30AM -0500, Christopher Covington wrote:
-> 
->>>> Replacing the above sequence with the one below will ensure that no TLB
->>>> entries with an incorrect ASID are used by software.
->>>>
->>>>   write reserved value to TTBRx_EL1[ASID]
->>>>   ISB
->>>>   write new value to TTBRx_EL1[BADDR]
->>>>   ISB
->>>>   write new value to TTBRx_EL1[ASID]
->>>>   ISB
->>>>
->>>> When the above sequence is used, page table entries using the new BADDR
->>>> value may still be incorrectly allocated into the TLB using the reserved
->>>> ASID. Yet this will not reduce functionality, since TLB entries incorrectly
->>>> tagged with the reserved ASID will never be hit by a later instruction.
->>>
->>> I agree that there should be no explicit accesses to the VAs for these
->>> entries. So tasks should not see erroneous VAs, and we shouldn't see
->>> synchronous TLB conflict aborts.
->>>
->>> Regardless, can this allow conflicting TLB entries to be allocated to
->>> the reserved ASID? e.g. if one task has a 4K mapping at a given VA, and
->>> another has a 2M mapping which covers that VA, can both be allocated
->>> into the TLBs under the reserved ASID?
->>>
->>> Can that have any effect on asynchronous TLB lookups or page table
->>> walks, e.g. for speculated accesses?
->>
->> A speculative access that inserts an entry into the TLB could
->> possibly find the conflict but will not signal it. Does that answer
->> your question?
-> 
-> Yes!
-> 
-> The other case I was worried about was intermediate caching. I take it
-> the values in TLBs are not used as part of subsequent page table walks?
-> 
-> If so, the above sounds fine to me.
-> 
-> Otherwise, we'll need additional TLB maintenance.
-
-Errant TLB entries will not be used for any legitimate subsequent page
-table walks.
-
-I have some minor changes which I'll send as v5 based on
-kernel/git/arm64/linux.git for-next/core.
-
-Thanks,
-Cov
+Applying: ARM: dts: imx6-sabrelite: add OV5642 and OV5640 camera sensors
+.git/rebase-apply/patch:33: new blank line at EOF.
++
+.git/rebase-apply/patch:201: new blank line at EOF.
++
+warning: 2 lines add whitespace errors.
 
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
-Aurora Forum, a Linux Foundation Collaborative Project.
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
