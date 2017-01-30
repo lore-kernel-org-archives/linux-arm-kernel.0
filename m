@@ -1,121 +1,122 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Mon, 30 Jan 2017 10:26:11 -0500
-Subject: [PATCH v3 24/24] drm/rockchip: dw-mipi-dsi: support read commands
-In-Reply-To: <20170129132444.25251-25-john@metanate.com>
-References: <20170129132444.25251-1-john@metanate.com>
- <20170129132444.25251-25-john@metanate.com>
-Message-ID: <20170130152611.GA20076@art_vandelay>
+From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
+Date: Mon, 30 Jan 2017 16:26:48 +0100
+Subject: [PATCH 3/7] IIO: add bindings for STM32 DFSDM ADC driver
+In-Reply-To: <fa6b541d-2818-afa7-82fa-eb19806e9f4d@kernel.org>
+References: <1485189145-29576-1-git-send-email-arnaud.pouliquen@st.com>
+ <1485189145-29576-4-git-send-email-arnaud.pouliquen@st.com>
+ <fa6b541d-2818-afa7-82fa-eb19806e9f4d@kernel.org>
+Message-ID: <f11398fe-c74f-3e33-c154-418709404aeb@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 29, 2017 at 01:24:44PM +0000, John Keeping wrote:
-> I haven't found any method for getting the length of a response, so this
-> just uses the requested rx_len
+Hello Jonathan,
+
+My comments below.
+
+Regards
+
+Arnaud
+On 01/29/2017 12:58 PM, Jonathan Cameron wrote:
+> On 23/01/17 16:32, Arnaud Pouliquen wrote:
+>> This patch adds documentation of device tree bindings for the
+>> STM32 DFSDM ADC.
+>>
+>> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+> Trivial bits inline.
+>> ---
+>>  .../bindings/iio/adc/st,stm32-dfsdm-adc.txt        | 60 ++++++++++++++++++++++
+>>  1 file changed, 60 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt 
+>>
+>> diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt  b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt 
+>> new file mode 100644
+>> index 0000000..c156bcb
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt 	
+>> @@ -0,0 +1,60 @@
+>> +STMicroelectronics STM32 DFSDM ADC device driver
+>> +
+>> +STM32 DFSDM ADC is a sigma delta analog-to-digital converter.
+>> +It has to be declared in device-tree as a subnode of the DFSDM mfd node.
+>> +
+>> +It has several multiplexed input channels. Conversions can be performed
+>> +in single, scan or discontinuous mode. Conversions can be launched in software
+>> +or using hardware triggers.
+>> +Each instance of the driver uses one filter instance handle by the DFSDM mfd
+>> +driver.
+>> +
+>> +DFSDM also offers extra features:
+>> +-The analog watchdog feature allows the application to detect if the
+>> + input voltage goes beyond the user-defined, higher or lower thresholds.
+>> +-The short circuit detection allows allows the application to detect if the
+>> + input is in CC.
+>> +-The clock absence detection allows application to detect if SPI input is clocked.
+>> +
+>> +Required properties:
+>> +- compatible:	Must be "st,stm32-dfsdm-adc".
+>> +- reg:		Specifies the DFSDM filter instance.
+>> +- #io-channel-cells = <1>: See the IIO bindings section "IIO consumers".
+>> +- st,adc-channels:	List of single-ended channels muxed for this ADC.
+>> +- st,adc-channel-names:	List of single-ended channels Name.
+>> +
+>> +Optional properties:
+>> +- st,adc-channel-types:	Single-ended channel input type. Default value is 0.
+>> +			- 0: SPI with data on rising edge (default)
+>> +			- 1: SPI with data on falling edge
+> This is an element that can be described without magic numbers so I'd
+> prefer that you do so.
 > 
-> Signed-off-by: John Keeping <john@metanate.com>
-> ---
-> v3:
-> - Fix checkpatch warnings
-> Unchanged in v2
+> Also spell check edage -> edge.
+ok i will use strings
 > 
->  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 56 ++++++++++++++++++++++++++++++++++
->  1 file changed, 56 insertions(+)
+>> +			- 2: manchester codec, rising edage = logic 0
+>> +			- 3: manchester codec, rising edage = logic 1
+>> +- st,adc-channel-clk-src: Conversion clock source. default value is 1.
+>> +			  - 0: External SPI clocl (CLKIN x)
+>> +			  - 1: internal SPI clock (CLKOUT) (default)
+>> +			  - 2: internal SPI clock divided by 2 (falling edge).
+>> +			  - 2: internal SPI clock divided by 2 (rising edge).
+> 3?
+>> +- st,adc-alt-channel: 	  must be defined if Two ADCs are connected on same SPI
+>> +			  input.
+>> +			  If not set channel n is connected to SPI input n.
+>> +			  If set channel n is connected to SPI input n + 1.
+> ? Two data inputs with shared clock?
+Yes you can connect 2 digital microphones on one SPI.
+One samples audio data on the clock rising edge, the other one samples
+on the falling edge.
+you can see an example in slide 15 of following document.
+http://www.st.com/content/ccc/resource/training/technical/product_training/96/b6/2b/ea/72/3f/4e/d5/STM32L4_System_DFSDM.pdf/files/STM32L4_System_DFSDM.pdf/jcr:content/translations/en.STM32L4_System_DFSDM.pdf
+
+I will describe this in an RFC to explain hardware but, to summarize,
+there are 3 main "entities" in DFSDM:
+- The serial interface: SPI or Manchester bus.
+- The channel: it a kind of bridge than can be connected:
+   on one side to a serial input (channel n connected to SPI interface n
+or n + 1)
+   on other side to one or several filters.
+
+The filter: low pass filter + integrator.
+
+>> +
+>> +Example:
+>> +	dfsdm: dfsdm at 4400D000 {
+>> +		iio_dfsdm0: iio-dfsdm at 0 {
+>> +			compatible = "st,stm32-dfsdm-adc";
+>> +			#io-channel-cells = <1>;
+>> +			reg = <0>;
+>> +			st,adc-channels = <1>;
+>> +			st,adc-channel-names = "in0";
+>> +		};
+>> +		iio_dfsdm1: iio-dfsdm at 1 {
+>> +			compatible = "st,stm32-dfsdm-adc";
+>> +			#io-channel-cells = <1>;
+>> +			reg = <1>;
+>> +			st,adc-channels = <1>;
+>> +			st,adc-channel-names = "in1";
+>> +			st,adc-channel-types = <1>;
+>> +			st,adc-alt-channel = <1>;
+>> +		};
+>> +	};
+>>
 > 
-> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> index cf3ca6b0cbdb..cc58ada75425 100644
-> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> @@ -678,6 +678,56 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
->  	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, hdr_val);
->  }
->  
-> +static int dw_mipi_dsi_dcs_read(struct dw_mipi_dsi *dsi,
-> +				const struct mipi_dsi_msg *msg)
-> +{
-> +	const u8 *tx_buf = msg->tx_buf;
-> +	u8 *rx_buf = msg->rx_buf;
-> +	size_t i;
-> +	int ret, val;
-> +
-> +	dsi_write(dsi, DSI_PCKHDL_CFG, EN_CRC_RX | EN_ECC_RX | EN_BTA);
-> +	dsi_write(dsi, DSI_GEN_HDR,
-> +		  GEN_HDATA(tx_buf[0]) | GEN_HTYPE(msg->type));
-> +
-> +	ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
-> +				 val, !(val & GEN_RD_CMD_BUSY), 1000,
-> +				 CMD_PKT_STATUS_TIMEOUT_US);
-> +	if (ret < 0) {
-> +		dev_err(dsi->dev, "failed to read command response\n");
-> +		return ret;
-> +	}
-> +
-> +	for (i = 0; i < msg->rx_len;) {
-> +		u32 pld = dsi_read(dsi, DSI_GEN_PLD_DATA);
-> +
-> +		while (i < msg->rx_len) {
-> +			rx_buf[i] = pld & 0xff;
-> +			pld >>= 8;
-> +			i++;
-> +		}
-> +	}
-
-AFAICT, the outer for loop just initializes i and ensures msg->rx_len is
-non-zero? 
-
-I think the following would be easier to read (and safe against the case where
-msg->rx_len > sizeof(pld) (even though this shouldn't happen according to DCS
-spec)).
-
-if (msg->rx_len > 0) {
-        u32 pld = dsi_read(dsi, DSI_GEN_PLD_DATA);
-        memcpy(rx_buf, &pld, MIN(msg->rx_len, sizeof(pld));
-}
-
-
-> +
-> +	return msg->rx_len;
-> +}
-> +
-> +static int dw_mipi_dsi_set_max_return_packet_size(struct dw_mipi_dsi *dsi,
-> +						  size_t len)
-> +{
-> +	u8 val[] = { len & 0xff, (len >> 8) & 0xff };
-> +	struct mipi_dsi_msg msg = {
-> +		.channel = dsi->channel,
-> +		.type = MIPI_DSI_SET_MAXIMUM_RETURN_PACKET_SIZE,
-> +		.tx_buf = val,
-> +		.tx_len = 2,
-> +	};
-> +
-> +	if (len > 0xffff)
-> +		return -EINVAL;
-> +
-> +	return dw_mipi_dsi_dcs_short_write(dsi, &msg);
-> +}
-> +
->  static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
->  					 const struct mipi_dsi_msg *msg)
->  {
-> @@ -695,6 +745,12 @@ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
->  	case MIPI_DSI_DCS_LONG_WRITE:
->  		ret = dw_mipi_dsi_dcs_long_write(dsi, msg);
->  		break;
-> +	case MIPI_DSI_DCS_READ:
-> +		ret = dw_mipi_dsi_set_max_return_packet_size(dsi, msg->rx_len);
-> +		if (ret < 0)
-> +			return ret;
-> +		ret = dw_mipi_dsi_dcs_read(dsi, msg);
-> +		break;
->  	default:
->  		dev_err(dsi->dev, "unsupported message type 0x%02x\n",
->  			msg->type);
-> -- 
-> 2.11.0.197.gb556de5.dirty
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
-
--- 
-Sean Paul, Software Engineer, Google / Chromium OS
