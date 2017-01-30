@@ -1,60 +1,39 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Jan 2017 18:54:44 +0000
-Subject: [PATCH v2] ARM: dts: imx: Pass 'chosen' and 'memory' nodes
-In-Reply-To: <588914F3.7050909@gmail.com>
-References: <1484834566-19845-1-git-send-email-fabio.estevam@nxp.com>
- <20170119141335.kpbrbpbwaovnijjv@pengutronix.de>
- <CAOMZO5AdgM9eFnerLRdYxwE7gsOE5OvkWs6rCR4zta1XmXHj1A@mail.gmail.com>
- <20170119144641.jxj2bqg5uqjol23x@pengutronix.de>
- <20170119145642.GC27312@n2100.armlinux.org.uk>
- <20170119161441.jcctgig7np4v7sam@pengutronix.de>
- <588914F3.7050909@gmail.com>
-Message-ID: <20170130185444.GF27312@n2100.armlinux.org.uk>
+Date: Mon, 30 Jan 2017 18:55:50 +0000
+Subject: [PATCH] ARM: decompressor: add strlen prototype
+In-Reply-To: <20170125222442.1244908-1-arnd@arndb.de>
+References: <20170125222442.1244908-1-arnd@arndb.de>
+Message-ID: <20170130185550.GG27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2017 at 01:13:23PM -0800, Frank Rowand wrote:
-> Adding back the chosen nodes is a bandaid that papers over the actual bug
-> in the decompressor.
+On Wed, Jan 25, 2017 at 11:24:33PM +0100, Arnd Bergmann wrote:
+> The decompress.c file contains a declaration for strstr() so we can
+> include some compression library code.
 > 
-> A comment about Fabio's attempt to fix the decompressor noted a possible
-> issue with the method taken to fix the problem, but then the discussion
-> of fixing the decompressor was dropped and v3 of the patch to add chosen
-> into a bunch of .dtsi files was applied by Shawn.
+> With the updated LZ4 implementation, we run into the same problem again
+> for strlen():
 > 
-> Can someone please help Fabio to create a correct patch to fix the
-> decompressor?
+> In file included from ../include/linux/rcupdate.h:40:0,
+>                  from ../include/linux/srcu.h:33,
+>                  from ../include/linux/notifier.h:15,
+>                  from ../include/linux/memory_hotplug.h:6,
+>                  from ../include/linux/mmzone.h:749,
+>                  from ../include/linux/gfp.h:5,
+>                  from ../include/linux/kmod.h:22,
+>                  from ../include/linux/module.h:13,
+>                  from ../arch/arm/boot/compressed/../../../../lib/lz4/lz4_decompress.c:39,
+>                  from ../arch/arm/boot/compressed/../../../../lib/decompress_unlz4.c:13,
+>                  from ../arch/arm/boot/compressed/decompress.c:55:
+> include/linux/cpumask.h: In function 'cpumask_parse':
+> include/linux/cpumask.h:592:53: error: implicit declaration of function 'strlen';did you mean 'strstr'? [-Werror=implicit-function-declaration]
+> 
+> This adds another declaration to work around the new problem.
+> 
+> Fixes: ce83d9ab80d6 ("lib: update LZ4 compressor module")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-I refuse to assist, see below.
-
-The reason this has come up is that this problem has _nothing_ to do
-with the decompressor - see recent context on the linux-arm-kernel
-list.
-
-The removal of skeleton.dtsi from iMX6 DTS files has caused a
-regression in the current -rc kernels when an iMX6 board is booted
-with uboot using a _separated_ device tree file.
-
-In that situation, the decompressor has _nothing_ at all to do with
-modifying the DT binary file.  The DT binary file ends up being passed
-to the kernel from the boot loader unmodified by the decompressor.
-Remember that the decompressor's modification of the *appended* DT
-file is a band-aid to allow an *ATAG* based system to continue working.
-That doesn't apply to iMX6.
-
-The lack of the memory node means that uboot fails to add a memory node
-to the DT binary file before passing control to the decompressor, which
-in turn causes the kernel to be booted with a DT binary file which says
-that the system has no memory.  That causes the kernel to crash in the
-very early stages of boot, before the console is up and running.  So
-it's a nasty silent crash.
-
-So, while it may be desirable to fix the decompressor, it's completely
-pointless as far as whether Fabio's patch gets merged, because this
-_regression_ has nothing to do with the decompressor.
-
-We need this regression fixed before 4.10 comes out so systems don't
-break when 4.10 comes out.
+Please put this in the patch system, thanks.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
