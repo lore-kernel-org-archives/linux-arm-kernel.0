@@ -1,45 +1,35 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 29 Jan 2017 20:55:51 -0800
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Updates for v4.11
-In-Reply-To: <cover.1485425385.git.horms+renesas@verge.net.au>
-References: <cover.1485425385.git.horms+renesas@verge.net.au>
-Message-ID: <20170130045551.GB18943@localhost>
+Date: Sun, 29 Jan 2017 20:56:51 -0800
+Subject: [GIT PULL] ARM: at91: dt for 4.11 #2
+In-Reply-To: <20170126162754.rn2kj6ecser5tzyq@piout.net>
+References: <20170126162754.rn2kj6ecser5tzyq@piout.net>
+Message-ID: <20170130045651.GC18943@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 11:11:18AM +0100, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Thu, Jan 26, 2017 at 05:27:54PM +0100, Alexandre Belloni wrote:
+> Hi,
 > 
-> Please consider these second round of Renesas ARM based SoC updates for v4.11.
+> Two non urgent fixes for 4.11 that could hopefully be backported as far
+> back as possible to make kernelci (and our users) happy.
 > 
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-soc-for-v4.11,
-> which you have already pulled.
+> The following changes since commit 21dd0ece34c2a07432a1cd0bbcb4815ce2b49173:
 > 
-> 
-> The following changes since commit 70def3e53694a65c5583fb5f411491a5074bab18:
-> 
->   ARM: shmobile: rcar-gen2: Remove unused rcar_gen2_read_mode_pins() (2017-01-03 10:50:45 +0100)
+>   ARM: dts: at91: add devicetree for the Axentia TSE-850 (2017-01-10 16:16:33 +0100)
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v4.11
+>   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.11-dt2
 > 
-> for you to fetch changes up to aa7f39d51e33555fc45645c08bc74a74e22b166f:
+> for you to fetch changes up to 78162d48466d23c45a784034630c5928af631e3d:
 > 
->   ARM: shmobile: rcar-gen2: Add more register documentation (2017-01-25 11:28:28 +0100)
-> 
-> ----------------------------------------------------------------
-> Second Round of Renesas ARM Based SoC Updates for v4.11
-> 
-> * Add more register documentation to R-Car Gen2 PM
+>   ARM: dts: at91: Enable DMA on sama5d2_xplained console (2017-01-23 00:33:43 +0100)
 > 
 > ----------------------------------------------------------------
-> Geert Uytterhoeven (1):
->       ARM: shmobile: rcar-gen2: Add more register documentation
+> DT for 4.11 #2:
 > 
->  arch/arm/mach-shmobile/pm-rcar-gen2.c | 40 +++++++++++++++++++++++++----------
->  1 file changed, 29 insertions(+), 11 deletions(-)
+>  - Enable the DMA on sama5d2 and sama5d4 xplained to fix an issue seen by
+>  kernelci
 
 Merged, thanks!
 
