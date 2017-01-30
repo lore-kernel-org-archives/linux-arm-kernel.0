@@ -1,31 +1,38 @@
-From: vivien.didelot@savoirfairelinux.com (Vivien Didelot)
-Date: Mon, 30 Jan 2017 14:44:48 -0500
-Subject: [PATCH net-next v7 3/3] net: dsa: mv88e6xxx: Add support for
- ethernet switch 88E6141
-In-Reply-To: <4a96ab0b31a1617372cdbfab67e7ba585e10f984.1485804488.git-series.gregory.clement@free-electrons.com>
-References: <cover.69cbc1ba8937d0fc442538f992d62fc88aa26dcc.1485804488.git-series.gregory.clement@free-electrons.com>
- <4a96ab0b31a1617372cdbfab67e7ba585e10f984.1485804488.git-series.gregory.clement@free-electrons.com>
-Message-ID: <874m0gl4cv.fsf@weeman.i-did-not-set--mail-host-address--so-tickle-me>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 30 Jan 2017 21:46:56 +0200
+Subject: [PATCH v3 0/7] Pad retentions support for Exynos5433
+In-Reply-To: <1485779908-32147-1-git-send-email-m.szyprowski@samsung.com>
+References: <CGME20170130123837eucas1p13c607f81a1775a805740dccc87fe8b87@eucas1p1.samsung.com>
+ <1485779908-32147-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20170130194656.mfyvq3bxzjnbkxg5@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+On Mon, Jan 30, 2017 at 01:38:21PM +0100, Marek Szyprowski wrote:
+> Hello,
+> 
+> This patchset is a first step to add support for all power domains on
+> Exynos5433 SoCs. This patchset contains patches for Exynos pin control
+> driver and Exynos LPASS MFD driver, which are needed to make the
+> platform ready for adding power domains support.
+> 
+> Patches in this patchset depends on each other. They are order in such a
+> way to make the changes bisectable.
+> 
+> Patch #2 has compile dependency on #1.
+> Patch #3 has runtime dependency on commit fa59aa70907b2 ("soc: samsung:
+> 	pmu: Add dummy support for Exynos5433 SoC",
+> 	for-v4.11/drivers-soc-exynos-pmu-the-joy-never-ends branch).
+> Patch #4 has runtime dependency on #3.
+> Patch #5 has runtime dependency on commit 7547162ac3514 ("arm64: dts:
+> 	exynos: Add clocks to Exynos5433 LPASS module, next/dt64 branch).
+> 
 
-Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
+Dependencies in samsung-soc tree, for those who need them, are:
+ - tags/samsung-drivers-soc-pmu-4.11-2
+ - tags/samsung-dt64-4.11-2
 
-> The Marvell 88E6341 device is single-chip, 6-port Ethernet switch with
-> four integrated 10/100/1000Mbps Ethernet transceivers and one high speed
-> SerDes interfaces.
+Repo: git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git
 
-I'm sure you meant 88E6141 here ;-)
-
-> It belongs to the Topaz family and unlike the 88E6341 it does not have
-> a TCAM.
->
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Reviewed-by: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
-
-Thanks,
-
-        Vivien
+Best regards,
+Krzysztof
