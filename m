@@ -1,34 +1,30 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 30 Jan 2017 21:43:29 +0200
-Subject: [PATCH v3 1/7] soc: smasung: pmu: Add register defines for pad
- retention control
-In-Reply-To: <1485779908-32147-2-git-send-email-m.szyprowski@samsung.com>
-References: <1485779908-32147-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170130123837eucas1p1056a57f23b1e3bf089e5bc55bb2cf2d4@eucas1p1.samsung.com>
- <1485779908-32147-2-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20170130194329.duudcv5oxu2q2td4@kozik-lap>
+From: vivien.didelot@savoirfairelinux.com (Vivien Didelot)
+Date: Mon, 30 Jan 2017 14:43:48 -0500
+Subject: [PATCH net-next v7 2/3] net: dsa: mv88e6xxx: Add support for
+ ethernet switch 88E6341
+In-Reply-To: <e3122f300fd144e2b4ae299d74fe1e72389583bb.1485804488.git-series.gregory.clement@free-electrons.com>
+References: <cover.69cbc1ba8937d0fc442538f992d62fc88aa26dcc.1485804488.git-series.gregory.clement@free-electrons.com>
+ <e3122f300fd144e2b4ae299d74fe1e72389583bb.1485804488.git-series.gregory.clement@free-electrons.com>
+Message-ID: <877f5cl4ej.fsf@weeman.i-did-not-set--mail-host-address--so-tickle-me>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2017 at 01:38:22PM +0100, Marek Szyprowski wrote:
-> Add PMU defines related to pad retention control. Will be later used
-> by the Exynos pin controller driver.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  include/linux/soc/samsung/exynos-regs-pmu.h | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
+Hi Gregory,
 
-Thanks Marek.
+Gregory CLEMENT <gregory.clement@free-electrons.com> writes:
 
-Initially I thought that this should go through samsung-soc to limit
-conflicts but I sent already my pull requests and I am not sure if I
-will be getting more patches for next cycle. We'll see.
+> The Marvell 88E6341 device is single-chip, 6-port Ethernet switch with
+> four integrated 10/100/1000Mbps Ethernet transceivers and one high speed
+> SerDes interfaces. It is partially compatible with switches of family
+> 88E6352 and switches of family 88E6390.
+>
+> This commit adds an initial support for this switch by describing its
+> capabilities to the driver and introducing a new family.
+>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-However, the point is, I do not want to block this patchset, so if
-someone would like to take it before me, feel free:
-Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+Reviewed-by: Vivien Didelot <vivien.didelot@savoirfairelinux.com>
 
-Best regards,
-Krzysztof
+Thanks,
+
+        Vivien
