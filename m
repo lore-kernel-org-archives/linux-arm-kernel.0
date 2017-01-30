@@ -1,29 +1,23 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 30 Jan 2017 16:13:50 +0100
-Subject: [PATCH v2 1/9] drivers: pinctrl: add driver for Allwinner H5 SoC
-In-Reply-To: <20170126154859.55855-2-icenowy@aosc.xyz>
-References: <20170126154859.55855-1-icenowy@aosc.xyz>
- <20170126154859.55855-2-icenowy@aosc.xyz>
-Message-ID: <CACRpkdY=+wAVZtWjeW+jKq_s+YX17L7xUeZ14_sAyd8KCm6+kg@mail.gmail.com>
+Date: Mon, 30 Jan 2017 16:15:45 +0100
+Subject: [PATCH 1/8] pinctrl: stm32: fix bad location of
+ gpiochip_lock_as_irq
+In-Reply-To: <1485533721-9019-2-git-send-email-alexandre.torgue@st.com>
+References: <1485533721-9019-1-git-send-email-alexandre.torgue@st.com>
+ <1485533721-9019-2-git-send-email-alexandre.torgue@st.com>
+Message-ID: <CACRpkda5ezDkN2rGOZLHepLJQu4qW9ZJ5W3s0APpvtp9SN6jGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 4:48 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+On Fri, Jan 27, 2017 at 5:15 PM, Alexandre TORGUE
+<alexandre.torgue@st.com> wrote:
 
-> Based on the Allwinner H5 datasheet and the pinctrl driver of the
-> backward-compatible H3 this introduces the pin multiplex assignments for
-> the H5 SoC.
+> Move gpio lock as irq from "domain alloc" callback to "domain activate"
+> callback. It will allow to use gpiolib sysfs correctly.
 >
-> H5 introduced some more pin functions (e.g. three more groups of TS
-> pins, and one more groups of SIM pins) than H3.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> ---
-> Changes in v2:
-> - Fixed interrupt banks. (There's one more GPIO banks (PF) that can do
->   interrupt handling on H5)
+> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
 
-Patch applied with Maxime's ACK.
+Patch applied.
 
 Yours,
 Linus Walleij
