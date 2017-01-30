@@ -1,50 +1,56 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Mon, 30 Jan 2017 14:50:35 +0530
-Subject: [PATCH V7 00/11] IOMMU probe deferral support
-In-Reply-To: <20170128211029.GI20550@bhelgaas-glaptop.roam.corp.google.com>
-References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
- <20170128211029.GI20550@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <005801d27ada$2127ee90$6377cbb0$@codeaurora.org>
+From: hverkuil@xs4all.nl (Hans Verkuil)
+Date: Mon, 30 Jan 2017 10:33:58 +0100
+Subject: [PATCH v6 0/5] davinci: VPIF: add DT support
+In-Reply-To: <CAOi56cX362PcE+dS59sGkh-=VMFNv_jaORMbCvxNr+VVUL7-mg@mail.gmail.com>
+References: <20161207183025.20684-1-khilman@baylibre.com>
+ <d4b0501a-f83a-c8b1-e460-1ba50f68cca7@xs4all.nl>
+ <m2k2aze5xe.fsf@baylibre.com>
+ <CAOi56cX362PcE+dS59sGkh-=VMFNv_jaORMbCvxNr+VVUL7-mg@mail.gmail.com>
+Message-ID: <704bf9cd-7591-844b-f9a9-a0a989b4c882@xs4all.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
-
->On Mon, Jan 23, 2017 at 09:48:02PM +0530, Sricharan R wrote:
->> This series calls the dma ops configuration for the devices
->> at a generic place so that it works for all busses.
->> The dma_configure_ops for a device is now called during
->> the device_attach callback just before the probe of the
->> bus/driver is called. Similarly dma_deconfigure is called during
->> device/driver_detach path.
->> ...
+On 27/01/17 18:22, Kevin Hilman wrote:
+> On Fri, Dec 16, 2016 at 4:49 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+>> Hans Verkuil <hverkuil@xs4all.nl> writes:
+>>
+>>> On 07/12/16 19:30, Kevin Hilman wrote:
+>>>> Prepare the groundwork for adding DT support for davinci VPIF drivers.
+>>>> This series does some fixups/cleanups and then adds the DT binding and
+>>>> DT compatible string matching for DT probing.
+>>>>
+>>>> The controversial part from previous versions around async subdev
+>>>> parsing, and specifically hard-coding the input/output routing of
+>>>> subdevs, has been left out of this series.  That part can be done as a
+>>>> follow-on step after agreement has been reached on the path forward.
+>>>> With this version, platforms can still use the VPIF capture/display
+>>>> drivers, but must provide platform_data for the subdevs and subdev
+>>>> routing.
+>>>>
+>>>> Tested video capture to memory on da850-lcdk board using composite
+>>>> input.
+>>>
+>>> Other than the comment for the first patch this series looks good.
+>>>
+>>> So once that's addressed I'll queue it up for 4.11.
+>>
+>> I've fixed that issue, and sent an update for just that patch in reply
+>> to the original.
+>>
+>> Thanks for the review,
 >
->>  arch/arm64/mm/dma-mapping.c       | 132 ++++----------------------------------
->>  drivers/acpi/arm64/iort.c         |  40 +++++++++++-
->>  drivers/acpi/glue.c               |   5 --
->>  drivers/acpi/scan.c               |   7 +-
->>  drivers/base/dd.c                 |   9 +++
->>  drivers/base/dma-mapping.c        |  41 ++++++++++++
->>  drivers/iommu/arm-smmu-v3.c       |  46 +------------
->>  drivers/iommu/arm-smmu.c          |  58 +++--------------
->>  drivers/iommu/of_iommu.c          | 114 +++++++++++++++++++++++---------
->>  drivers/of/address.c              |  20 +++++-
->>  drivers/of/device.c               |  36 ++++++-----
->>  drivers/of/platform.c             |  10 +--
->>  drivers/pci/probe.c               |  28 --------
->>  include/acpi/acpi_bus.h           |   2 +-
->>  include/asm-generic/vmlinux.lds.h |   1 -
->>  include/linux/acpi.h              |   7 +-
->>  include/linux/acpi_iort.h         |   3 -
->>  include/linux/dma-mapping.h       |   3 +
->>  include/linux/of_device.h         |  10 ++-
->>  19 files changed, 252 insertions(+), 320 deletions(-)
+> Gentle ping on this series.
 >
->I'm assuming this will go via some other tree, maybe the IOMMU tree?
->I acked the PCI parts, so let me know if you need anything more from me.
+> I'm still not seeing this series yet in linux-next, so am worried it
+> might not make it for v4.11.
+>
+> Kevin
+>
 
-Thanks for the review/acks.
-Ya, via the IOMMU tree looks correct.
+Mauro was on vacation, so pull requests were delayed. I understood from
+him that he's going to process pending pull requests this week, which
+should include your series.
 
 Regards,
- Sricharan
+
+	Hans
