@@ -1,51 +1,50 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Jan 2017 14:13:08 +0000
-Subject: ARM64: Disabling warnings about deprecated armv8 instructions
-In-Reply-To: <0D1F678D-6F94-4B68-955E-6454F8647FCA@linaro.org>
-References: <1485072424.14066.2.camel@crowfest.net>
- <1485075528.14345.1.camel@crowfest.net>
- <CAKv+Gu8LU3QjrUa6wMJF3WBNrhx34Pi_0ZUQVfrZy7w7y7237w@mail.gmail.com>
- <22169925.OhJ0QcnbHM@localhost>
- <1485087662.1518.1.camel@crowfest.net>
- <0D1F678D-6F94-4B68-955E-6454F8647FCA@linaro.org>
-Message-ID: <20170130141308.GV27312@n2100.armlinux.org.uk>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 30 Jan 2017 15:20:04 +0100
+Subject: [PATCH v5 5/8] clocksource/drivers/rockchip_timer: split
+ bc_timer into rk_timer and rk_clock_event_device
+In-Reply-To: <0E7077EE-0D5A-4653-99EF-E8F2E8FD2FB0@gmail.com>
+References: <1485260203-14216-1-git-send-email-al.kochet@gmail.com>
+ <1485260203-14216-6-git-send-email-al.kochet@gmail.com>
+ <20170130131258.GF2206@mai>
+ <0E7077EE-0D5A-4653-99EF-E8F2E8FD2FB0@gmail.com>
+Message-ID: <20170130142004.GI2206@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 22, 2017 at 01:01:53PM +0000, Ard Biesheuvel wrote:
-> Emulating unaligned access in the ARM kernel was a mistake: it even
-> emulates unaligned accesses for instructions like ldm and ldrd, which
-> require word alignment at the hardware level even in the latest v8
-> version of the architecture. In contrast, the v8 deprecation warnings
-> are about enforcing compliance.
+On Mon, Jan 30, 2017 at 04:55:33PM +0300, Alexander Kochetkov wrote:
+> 
+> > 30 ???. 2017 ?., ? 16:12, Daniel Lezcano <daniel.lezcano@linaro.org> ???????(?):
+> > 
+> > I don't get the point of these changes. The patch does not explain why they are
+> > needed.
+> 
+> I?d like to extract timer API from current implementation.
+> And to make code more readable I?d like to introduce 'struct rk_timer? what can be
+> reused with current implementation and with my patch (8/8). And in order keep patches
+> simple and readable I split that into three patches: 5/8, 6/8, 7/8.
+> 
+> Current implementation named rockchip timer as ?struct bc_timer? (broadcast timer).
+> I renamed it to more suitable to it role (may be bad choice).
+> 
+> Yes, the patch itself looks strange. You are right.
+> 
+> What do you think about that solution:
+> - in the patch 6/8 i will Introduce 'struct rk_timer? and 'struct rk_time_clkevt? (renamed ?struct bc_timer?).
 
-Ard, you're totally wrong on the unaligned access thing.  Unaligned
-accesses are a fundamental requirement of the kernel's networking
-stack.  If you don't have support for unaligned accesses, then you
-don't have network support - it's as simple as that.
+I prefer rk_clksrc and rk_clkevt.
 
-So, in order for ARMv5 and earlier to have network support, there
-was no option to add support for emulating those accesses.
+> - rk_timer_init() changes from 5/8 I will merge with 8/8
+> - 8/8 introduce 'struct rk_time_clksrc' 
+> - 5/8 drop
 
-The dubious thing was whether to add that for userspace as well.
-Since soo many applications were broken at the time, and ARM wasn't
-a sufficiently large community for the applications people to care
-one shit about, the applications people weren't going to fix their
-code to avoid unaligned accesses.
+Ok, let's see what that gives.
 
-So, back in the 1990s, we were stuck between having broken userspace
-and a huge amount of effort needed to maintain ARM specific patches
-out of tree for lots of applications, or functional userspace.
-
-Today, the ARM architecture has moved on a long way, and application
-people care about whether their stuff works on the ARM architecture.
-It wasn't like that when the unaligned emulation was added.
-
-It was not a mistake.  It's one of the reasons why ARM has got where
-it is today, and probably why the light was finally seen to add
-hardware support for unaligned accesses to the later CPU architectures.
+  -- Daniel
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
