@@ -1,85 +1,77 @@
-From: John.Youn@synopsys.com (John Youn)
-Date: Tue, 31 Jan 2017 00:39:49 +0000
-Subject: [PATCH 12/14] usb: dwc2: simplify optional reset handling
-References: <20170130114116.22089-1-p.zabel@pengutronix.de>
- <20170130114116.22089-12-p.zabel@pengutronix.de>
- <2B3535C5ECE8B5419E3ECBE300772909021B40EFCA@US01WEMBX2.internal.synopsys.com>
-Message-ID: <2B3535C5ECE8B5419E3ECBE300772909021B40F037@US01WEMBX2.internal.synopsys.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Mon, 30 Jan 2017 08:44:59 -0800
+Subject: [PATCH] arm64: dts: qcom: msm8916: Update hexagon node
+Message-ID: <20170130164459.4051-1-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/30/2017 4:28 PM, John Youn wrote:
-> Hi Philipp,
->
-> On 1/30/2017 3:42 AM, Philipp Zabel wrote:
->> As of commit bb475230b8e5 ("reset: make optional functions really
->
-> Where can I find this? It's not in mainline.
->
+It's necessary to reference the xo clock and cx supply, so specify these
+in the node. Also move the Hexagon smd-edge into the hexagon node, to
+enable SSR.
 
-Never mind. I found on arm-soc per your reply elsewhere.
+As cxo is not yet available we reference the fixed version of cxo for
+now, which will work until proper power management is implemented.
 
-Acked-by: John Youn <johnyoun@synopsys.com>
+Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+---
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 24 ++++++++++++++----------
+ 1 file changed, 14 insertions(+), 10 deletions(-)
 
-Regards,
-John
-
-
->
->
->> optional"), the reset framework API calls use NULL pointers to describe
->> optional, non-present reset controls.
->>
->> This allows to return errors from devm_reset_control_get_optional and to
->> call reset_control_(de)assert unconditionally.
->>
->> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
->> Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
->> Cc: John Youn <johnyoun@synopsys.com>
->> Cc: Felipe Balbi <felipe.balbi@linux.intel.com>
->> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> ---
->>  drivers/usb/dwc2/platform.c | 18 ++++--------------
->>  1 file changed, 4 insertions(+), 14 deletions(-)
->>
->> diff --git a/drivers/usb/dwc2/platform.c b/drivers/usb/dwc2/platform.c
->> index 4fc8c603afb8b..c6aa2710cecfe 100644
->> --- a/drivers/usb/dwc2/platform.c
->> +++ b/drivers/usb/dwc2/platform.c
->> @@ -214,20 +214,11 @@ static int dwc2_lowlevel_hw_init(struct dwc2_hsotg *hsotg)
->>  	hsotg->reset = devm_reset_control_get_optional(hsotg->dev, "dwc2");
->>  	if (IS_ERR(hsotg->reset)) {
->>  		ret = PTR_ERR(hsotg->reset);
->> -		switch (ret) {
->> -		case -ENOENT:
->> -		case -ENOTSUPP:
->> -			hsotg->reset = NULL;
->> -			break;
->> -		default:
->> -			dev_err(hsotg->dev, "error getting reset control %d\n",
->> -				ret);
->> -			return ret;
->> -		}
->> +		dev_err(hsotg->dev, "error getting reset control %d\n", ret);
->> +		return ret;
->>  	}
->>
->> -	if (hsotg->reset)
->> -		reset_control_deassert(hsotg->reset);
->> +	reset_control_deassert(hsotg->reset);
->>
->>  	/* Set default UTMI width */
->>  	hsotg->phyif = GUSBCFG_PHYIF16;
->> @@ -326,8 +317,7 @@ static int dwc2_driver_remove(struct platform_device *dev)
->>  	if (hsotg->ll_hw_enabled)
->>  		dwc2_lowlevel_hw_disable(hsotg);
->>
->> -	if (hsotg->reset)
->> -		reset_control_assert(hsotg->reset);
->> +	reset_control_assert(hsotg->reset);
->>
->>  	return 0;
->>  }
->>
->
->
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index 68a8e67cba29..35684cc1f308 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -833,8 +833,9 @@
+ 
+ 			clocks = <&gcc GCC_MSS_CFG_AHB_CLK>,
+ 				 <&gcc GCC_MSS_Q6_BIMC_AXI_CLK>,
+-				 <&gcc GCC_BOOT_ROM_AHB_CLK>;
+-			clock-names = "iface", "bus", "mem";
++				 <&gcc GCC_BOOT_ROM_AHB_CLK>,
++				 <&xo_board>;
++			clock-names = "iface", "bus", "mem", "xo";
+ 
+ 			qcom,smem-states = <&hexagon_smp2p_out 0>;
+ 			qcom,smem-state-names = "stop";
+@@ -842,6 +843,7 @@
+ 			resets = <&scm 0>;
+ 			reset-names = "mss_restart";
+ 
++			cx-supply = <&pm8916_s1>;
+ 			mx-supply = <&pm8916_l3>;
+ 			pll-supply = <&pm8916_l7>;
+ 
+@@ -856,6 +858,16 @@
+ 			mpss {
+ 				memory-region = <&mpss_mem>;
+ 			};
++
++			smd-edge {
++				interrupts = <0 25 IRQ_TYPE_EDGE_RISING>;
++
++				qcom,smd-edge = <0>;
++				qcom,ipc = <&apcs 8 12>;
++				qcom,remote-pid = <1>;
++
++				label = "hexagon";
++			};
+ 		};
+ 
+ 		pronto: wcnss at a21b000 {
+@@ -1214,14 +1226,6 @@
+ 				};
+ 			};
+ 		};
+-
+-		hexagon {
+-			interrupts = <0 25 IRQ_TYPE_EDGE_RISING>;
+-
+-			qcom,smd-edge = <0>;
+-			qcom,ipc = <&apcs 8 12>;
+-			qcom,remote-pid = <1>;
+-		};
+ 	};
+ 
+ 	hexagon-smp2p {
+-- 
+2.11.0
