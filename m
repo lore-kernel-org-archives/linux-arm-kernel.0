@@ -1,49 +1,86 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 30 Jan 2017 14:58:02 +0100
-Subject: [PATCH v6 3/5] pinctrl: mvebu: pinctrl driver for 98DX3236 SoC
-In-Reply-To: <20170129232035.25189-4-chris.packham@alliedtelesis.co.nz>
-References: <20170129232035.25189-1-chris.packham@alliedtelesis.co.nz>
- <20170129232035.25189-4-chris.packham@alliedtelesis.co.nz>
-Message-ID: <CACRpkdavkH21iuxde-KUQJeX9S03Z_9CaUQe6h9e9C7Cup_AEA@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 30 Jan 2017 08:59:10 -0500
+Subject: [PATCH V7 08/11] drivers: acpi: Handle IOMMU lookup failure with
+ deferred probing or error
+In-Reply-To: <93e79759-d614-9b36-d5ab-63e8eb725009@arm.com>
+References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
+ <1485188293-20263-9-git-send-email-sricharan@codeaurora.org>
+ <20170124123711.GA11996@red-moon>
+ <f2370671-ece8-fbee-de19-350dd625088f@codeaurora.org>
+ <93e79759-d614-9b36-d5ab-63e8eb725009@arm.com>
+Message-ID: <14751205-f034-7f0d-442a-854c3909425c@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2017 at 12:20 AM, Chris Packham
-<chris.packham@alliedtelesis.co.nz> wrote:
+On 1/30/2017 7:22 AM, Robin Murphy wrote:
+> On 29/01/17 17:53, Sinan Kaya wrote:
+>> On 1/24/2017 7:37 AM, Lorenzo Pieralisi wrote:
+>>> [+hanjun, tomasz, sinan]
+>>>
+>>> It is quite a key patchset, I would be glad if they can test on their
+>>> respective platforms with IORT.
+>>>
+>>
+>> Tested on top of 4.10-rc5.
+>>
+>> 1.	Platform Hidma device passed dmatest
+>> 2.	Seeing some USB stalls on a platform USB device.
+>> 3.	PCIe NVME drive probed and worked fine with MSI interrupts after boot.
+>> 4. 	NVMe driver didn't probe following a hotplug insertion and received an
+>> SMMU error event during the insertion.
+> 
+> What was the SMMU error - a translation/permission fault (implying the
+> wrong DMA ops) or a bad STE fault (implying we totally failed to tell
+> the SMMU about the device at all)?
+> 
 
-> From: Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz>
->
-> This pinctrl driver supports the 98DX3236, 98DX3336 and 98DX4251 SoCs
-> from Marvell.
->
-> Signed-off-by: Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz>
-> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
-> Acked-by: Rob Herring <robh@kernel.org>
-> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
->
-> Notes:
->     Changes in v2:
->     - include sdio support for the 98DX4251
->     Changes in v3:
->     - None
->     Changes in v4:
->     - Correct some discrepencies between binding and driver.
->     - Collect acks from Rob and Sebastian
->     Changes in v5:
->     - Update bindings to reflect "gpo" pins
->     - Use mvebu_mmio_mpp_ctrl instead of armada_xp_mpp_ctrl (note this is reliant
->       on changes queued in linux-pinctrl)
->     Changes in v6:
->     - None
+root at ubuntu:/sys/bus/pci/slots/4# echo 0 > power
 
-This patch was applied to an immutable branch and then merged into the
-pinctrl devel tree. The immutable branch is here:
+[__204.698522]_iommu:_Removing_device_0003:01:00.0_from_group_0
+[  204.708704] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down
+[  204.708723] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down event ignored; already powering off
 
-https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-pinctrl.git/log/?h=ib-mvebu-98dx3236
+root at ubuntu:/sys/bus/pci/slots/4#
 
-Do as you please: if you want other trees (ARM SoC) to pull this in or
-not.
+[__254.820440]_iommu:_Adding_device_0003:01:00.0_to_group_8
+[  254.820599] nvme nvme0: pci function 0003:01:00.0
+[  254.820621] nvme 0003:01:00.0: enabling device (0000 -> 0002)
+[  261.948558] arm-smmu-v3 arm-smmu-v3.0.auto: event 0x0a received:
+[  261.948561] arm-smmu-v3 arm-smmu-v3.0.auto:  0x000001000000000a
+[  261.948563] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
+[  261.948564] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
+[  261.948566] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
+root at ubuntu:/sys/bus/pci/slots/4#
 
-Yours,
-Linus Walleij
+root at ubuntu:/sys/bus/pci/slots/4#ls /dev/nvme*
+/dev/nvme0
+
+I should have seen /dev/nvme0n1 partition here. 
+
+> Robin.
+> 
+>>
+>> /sys/bus/pci/slots/4 #
+>> /sys/bus/pci/slots/4 # dmesg | grep nvme
+>> [   14.041357] nvme nvme0: pci function 0003:01:00.0
+>> [  198.399521] nvme nvme0: pci function 0003:01:00.0
+>> [__198.416232]_nvme_0003:01:00.0:_enabling_device_(0000_->_0002)
+>> [  264.402216] nvme nvme0: I/O 228 QID 0 timeout, disable controller
+>> [  264.402313] nvme nvme0: Identify Controller failed (-4)
+>> [  264.421270] nvme nvme0: Removing after probe failure status: -5
+>> /sys/bus/pci/slots/4 #
+>>
+>>
+>>
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
