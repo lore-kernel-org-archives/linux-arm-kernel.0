@@ -1,84 +1,92 @@
-From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon, 30 Jan 2017 12:40:50 -0500
-Subject: [RFC v2 02/10] KVM: arm/arm64: Move cntvoff to each timer context
-In-Reply-To: <2453da50-d827-0aa5-1dea-beb35117d1ae@arm.com>
-References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
- <1485479100-4966-3-git-send-email-jintack@cs.columbia.edu>
- <867f5e9j4y.fsf@arm.com> <20170130144550.GA16459@cbox>
- <2453da50-d827-0aa5-1dea-beb35117d1ae@arm.com>
-Message-ID: <CAHyh4xjixnBDS-wt5AoE2vhShKbZm+ngtJotyX9w2YMBrS-7WQ@mail.gmail.com>
+From: mzoran@crowfest.net (Michael Zoran)
+Date: Mon, 30 Jan 2017 09:41:32 -0800
+Subject: ARM64: Disabling warnings about deprecated armv8 instructions
+In-Reply-To: <CAKv+Gu_jEvKdWFWB2Ofxb5ruoTYUEt1puZXBb=9Cn2kEOZO1hg@mail.gmail.com>
+References: <1485072424.14066.2.camel@crowfest.net>
+ <1485075528.14345.1.camel@crowfest.net>
+ <CAKv+Gu8LU3QjrUa6wMJF3WBNrhx34Pi_0ZUQVfrZy7w7y7237w@mail.gmail.com>
+ <22169925.OhJ0QcnbHM@localhost> <1485087662.1518.1.camel@crowfest.net>
+ <0D1F678D-6F94-4B68-955E-6454F8647FCA@linaro.org>
+ <20170130141308.GV27312@n2100.armlinux.org.uk>
+ <CAKv+Gu98i4=COqr_Eikwja28U5MAL83rxe-_QBXWFhJ7v1E6yA@mail.gmail.com>
+ <20170130165837.GE27312@n2100.armlinux.org.uk>
+ <CAKv+Gu_jEvKdWFWB2Ofxb5ruoTYUEt1puZXBb=9Cn2kEOZO1hg@mail.gmail.com>
+Message-ID: <1485798092.484.5.camel@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2017 at 9:51 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 30/01/17 14:45, Christoffer Dall wrote:
->> On Sun, Jan 29, 2017 at 11:54:05AM +0000, Marc Zyngier wrote:
->>> On Fri, Jan 27 2017 at 01:04:52 AM, Jintack Lim <jintack@cs.columbia.edu> wrote:
->>>> Make cntvoff per each timer context. This is helpful to abstract kvm
->>>> timer functions to work with timer context without considering timer
->>>> types (e.g. physical timer or virtual timer).
->>>>
->>>> This also would pave the way for ever doing adjustments of the cntvoff
->>>> on a per-CPU basis if that should ever make sense.
->>>>
->>>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
->>>> ---
->>>>  arch/arm/include/asm/kvm_host.h   |  6 +++---
->>>>  arch/arm64/include/asm/kvm_host.h |  4 ++--
->>>>  include/kvm/arm_arch_timer.h      |  8 +++-----
->>>>  virt/kvm/arm/arch_timer.c         | 26 ++++++++++++++++++++------
->>>>  virt/kvm/arm/hyp/timer-sr.c       |  3 +--
->>>>  5 files changed, 29 insertions(+), 18 deletions(-)
->>>>
->>>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->>>> index d5423ab..f5456a9 100644
->>>> --- a/arch/arm/include/asm/kvm_host.h
->>>> +++ b/arch/arm/include/asm/kvm_host.h
->>>> @@ -60,9 +60,6 @@ struct kvm_arch {
->>>>     /* The last vcpu id that ran on each physical CPU */
->>>>     int __percpu *last_vcpu_ran;
->>>>
->>>> -   /* Timer */
->>>> -   struct arch_timer_kvm   timer;
->>>> -
->>>>     /*
->>>>      * Anything that is not used directly from assembly code goes
->>>>      * here.
->>>> @@ -75,6 +72,9 @@ struct kvm_arch {
->>>>     /* Stage-2 page table */
->>>>     pgd_t *pgd;
->>>>
->>>> +   /* A lock to synchronize cntvoff among all vtimer context of vcpus */
->>>> +   spinlock_t cntvoff_lock;
->>>
->>> Is there any condition where we need this to be a spinlock? I would have
->>> thought that a mutex should have been enough, as this should only be
->>> updated on migration or initialization. Not that it matters much in this
->>> case, but I wondered if there is something I'm missing.
->>>
->>
->> I would think the critical section is small enough that a spinlock makes
->> sense, but what I don't think we need is to add the additional lock.
->>
->> I think just taking the kvm->lock should be sufficient, which happens to
->> be a mutex, and while that may be a bit slower to take than the
->> spinlock, it's not in the critical path so let's just keep things
->> simple.
->>
->> Perhaps this what Marc also meant.
->
-> That would be the logical conclusion, assuming that we can sleep on this
-> path.
+On Mon, 2017-01-30 at 17:09 +0000, Ard Biesheuvel wrote:
+> On 30 January 2017 at 16:58, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+> > On Mon, Jan 30, 2017 at 02:50:23PM +0000, Ard Biesheuvel wrote:
+> 
+> [..]
+> > > I see. I was indeed mainly referring to userspace, which is what
+> > > this
+> > > thread is about, specifically setend and the CP15 barrier
+> > > instructions. You can disagree with ARM's policy to deprecate and
+> > > remove some instructions, but given the reality of it, I think it
+> > > is
+> > > perfectly reasonable to warn by default about setend instructions
+> > > issued in 32-bit userspace when running under the 64-bit ARMv8
+> > > kernel.
+> > 
+> > Linus has commented on this in the past, and his reaction (iirc)
+> > was
+> > that deprecating instructions that userspace uses is not a sane
+> > behaviour, pointing out that instructions that i386 supported still
+> > work today on the latest Intel CPUs.
+> > 
+> > He has a point, it's the same argument against breaking userspace
+> > through making a change to the kernel.??It gives users a painful
+> > experience.
+> > 
+> > That said, no one expects that you can run an i386 binary on ARM,
+> > which is pretty much understood by users.??However, ARM vs ARM64
+> > where ARM64 provides a 32-bit ARM compatible environment is a
+> > totally different story - it's _not_ compatible if it complains
+> > about instructions that _were_ legal with 32-bit ARM binaries.
+> > It makes me question the value of providing what is an incompatible
+> > environment to run older binaries.
+> > 
+> > The purpose of such an environment is to provide _compatibility_ to
+> > older binaries.??You aren't providing a compatible environment if
+> > you then decide to noisily warn about deprecated instructions.
+> > 
+> > You might as well just rebuild the binaries for a 64-bit
+> > environment
+> > and stop the illusion of a 32-bit compatible environment, because
+> > it
+> > isn't.
+> > 
+> 
+> Well, the question is really how to deal with 32-bit compatibility
+> given the fact that the ARM architecture will drop such instructions
+> in its next revision. Whether we agree with that, and whether we
+> should argue our positions with the architects if we don't is not
+> relevant here.
+> 
+> What is relevant is whether we inform userspace if we spot such a
+> deprecated instruction, and I think we should.
+> 
+> Note that this is not only an issue for the arm64 kernel. The 32-bit
+> kernel will have the exact same issue when you try to run it on
+> hardware that no longer has support for those instructions.
 
-All right. I'll take kvm->lock there.
+Just to inject two cents worth since I'm still on the thread and I
+originally started the topic...
 
-Thanks,
-Jintack
+The Intel comparison seems relevant.  I think in theory you can still
+run old MS-DOS software on an Intel PC if you were so inclined to do
+so.
 
->
-> Thanks,
->
->         M.
-> --
-> Jazz is not dead. It just smells funny...
->
+I would think the best would be to turn the warnings off by default
+when running in 32 bit mode with the option to turn them back on.  Then
+as time progresses more of more of these instructions can be converted
+to software emulation and removed from the hardware.  And hopefully as
+time progresses, all the user mode software gets upgraded to 64 bit so
+that 32 bit get dropped.
+
+The issue seems to me to be more that the kernel is screaming in the
+logs rather then if it's emulating the instructions in hardware or
+software.
