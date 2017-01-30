@@ -1,34 +1,43 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 30 Jan 2017 10:13:33 +0100
-Subject: [PATCH 1/3 v3] iio: adc: add device tree bindings for Qualcomm
- PM8xxx ADCs
-In-Reply-To: <20170117142515.10578-1-linus.walleij@linaro.org>
+Date: Mon, 30 Jan 2017 10:15:27 +0100
+Subject: [PATCH 2/3 v3] iio: adc: break out common code from SPMI VADC
+In-Reply-To: <48e07081-2088-6ffe-c58e-ac5a561b6a00@kernel.org>
 References: <20170117142515.10578-1-linus.walleij@linaro.org>
-Message-ID: <CACRpkdahNEkGoSaNYVtfBUFHqiN50rj65WmjkxYXrSoMXZbwgQ@mail.gmail.com>
+ <20170117142515.10578-2-linus.walleij@linaro.org>
+ <48e07081-2088-6ffe-c58e-ac5a561b6a00@kernel.org>
+Message-ID: <CACRpkdZZqW6DYXuR3ShT3NW+qpTvniEBVtnWsm11J1taYzLd4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 17, 2017 at 3:25 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-
-> This adds the device tree bindings for the Qualcomm PM8xxx
-> ADCs. This is based on the existing DT bindings for the
-> SPMI ADC so there are hopefully no controversial features.
+On Sat, Jan 21, 2017 at 2:37 PM, Jonathan Cameron <jic23@kernel.org> wrote:
+> On 17/01/17 14:25, Linus Walleij wrote:
+>> The SPMI VADC and the earlier XOADC share a subset of
+>> common code, so to be able to use the same code in both
+>> drivers, we break out a separate file with the common code,
+>> prefix exported functions that are no longer static with
+>> qcom_* and bake an object qcom-vadc.o that contains both
+>> files: qcom-vadc-common.o and qcom-spmi-vadc.o.
+>>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-arm-msm at vger.kernel.org
+>> Cc: Ivan T. Ivanov <iivanov.xz@gmail.com>
+>> Cc: Andy Gross <andy.gross@linaro.org>
+>> Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
+>> Cc: Stephen Boyd <sboyd@codeaurora.org>
+>> Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>> Cc: Rama Krishna Phani A <rphani@codeaurora.org>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 >
-> Cc: devicetree at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-arm-msm at vger.kernel.org
-> Cc: Ivan T. Ivanov <iivanov.xz@gmail.com>
-> Cc: Andy Gross <andy.gross@linaro.org>
-> Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> Cc: Rama Krishna Phani A <rphani@codeaurora.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ChangeLog v2->v3:
+> This looks like fairly straight forward refacting to me.  Rama, could you
+> take a look at this and perhaps test that no breakage has slipped in?
+>
+> I'd like at least one tested-by on this for the previously supported parts
+> (that could be Linus if he has one!)
 
-Jonathan, can we merge this? At least the device tree bindings,
-I don't see any specific problems with them.
+I am waiting for a serial cable for the APQ8064 Nexus 7 so no
+test base so far. I would have to rely on Bj?rn for this.
+
+I think this patch is safe to merge though.
 
 Yours,
 Linus Walleij
