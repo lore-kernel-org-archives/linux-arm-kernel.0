@@ -1,32 +1,35 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Jan 2017 13:53:48 +0000
-Subject: [PATCH] ARM: Kconfig: select GENERIC_CLOCKEVENTS_BROADCAST also
- on UP
-In-Reply-To: <20170120163230.9357-1-l.stach@pengutronix.de>
-References: <20170120163230.9357-1-l.stach@pengutronix.de>
-Message-ID: <20170130135348.GS27312@n2100.armlinux.org.uk>
+From: al.kochet@gmail.com (Alexander Kochetkov)
+Date: Mon, 30 Jan 2017 16:55:33 +0300
+Subject: [PATCH v5 5/8] clocksource/drivers/rockchip_timer: split bc_timer
+ into rk_timer and rk_clock_event_device
+In-Reply-To: <20170130131258.GF2206@mai>
+References: <1485260203-14216-1-git-send-email-al.kochet@gmail.com>
+ <1485260203-14216-6-git-send-email-al.kochet@gmail.com>
+ <20170130131258.GF2206@mai>
+Message-ID: <0E7077EE-0D5A-4653-99EF-E8F2E8FD2FB0@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2017 at 05:32:30PM +0100, Lucas Stach wrote:
-> Quite a few systems have deeper idle states where the local timer tick
-> stops to fire, that rely on the GENERIC_CLOCKEVENTS_BROADCAST
-> infrastructure to switch to a global (non-stopping) clockevent device.
-> This is also true on UP systems, so select GENERIC_CLOCKEVENTS_BROADCAST
-> unconditionally.
-> 
-> Instead only select ARCH_HAS_TICK_BROADCAST if SMP is present, as this
-> is only implemented for SMP systems.
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
-> v2: Only select GENERIC_CLOCKEVENTS_BROADCAST if the architecture
->     supports GENERIC_CLOCKEVENTS.
 
-Provided this solves the problems identified by the 0-day builder with
-your previous patch, please submit it to the patch system, thanks.
+> 30 ???. 2017 ?., ? 16:12, Daniel Lezcano <daniel.lezcano@linaro.org> ???????(?):
+> 
+> I don't get the point of these changes. The patch does not explain why they are
+> needed.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+I?d like to extract timer API from current implementation.
+And to make code more readable I?d like to introduce 'struct rk_timer? what can be
+reused with current implementation and with my patch (8/8). And in order keep patches
+simple and readable I split that into three patches: 5/8, 6/8, 7/8.
+
+Current implementation named rockchip timer as ?struct bc_timer? (broadcast timer).
+I renamed it to more suitable to it role (may be bad choice).
+
+Yes, the patch itself looks strange. You are right.
+
+What do you think about that solution:
+- in the patch 6/8 i will Introduce 'struct rk_timer? and 'struct rk_time_clkevt? (renamed ?struct bc_timer?).
+- rk_timer_init() changes from 5/8 I will merge with 8/8
+- 8/8 introduce 'struct rk_time_clksrc' 
+- 5/8 drop
+
+Alexander.
