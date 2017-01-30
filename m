@@ -1,64 +1,37 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 30 Jan 2017 15:00:15 +0100
-Subject: [PATCH v2 2/2] ARM: sun8i: dt: Add mali node
-In-Reply-To: <20170127202119.cnnuuojtjor6rleg@rob-hp-laptop>
-References: <a4d90de597cfcfab5fddeeb538505774a980818b.1485180017.git-series.maxime.ripard@free-electrons.com>
- <681511dd6370b9146ae8e3f8009eba1e15d36cc0.1485180017.git-series.maxime.ripard@free-electrons.com>
- <20170127202119.cnnuuojtjor6rleg@rob-hp-laptop>
-Message-ID: <20170130140015.dopcfbula6spu2xo@lukather>
+From: dhowells@redhat.com (David Howells)
+Date: Mon, 30 Jan 2017 14:01:32 +0000
+Subject: What should the default lockdown mode be if the bootloader
+ sentinel triggers sanitization?
+In-Reply-To: <20170130135002.GL31613@codeblueprint.co.uk>
+References: <20170130135002.GL31613@codeblueprint.co.uk>
+ <20170127140101.GD31613@codeblueprint.co.uk>
+ <20170123212642.GA2766@codeblueprint.co.uk>
+ <20170116144954.GB27351@codeblueprint.co.uk>
+ <20170111143304.GA29649@codeblueprint.co.uk>
+ <148120020832.5854.5448601415491330495.stgit@warthog.procyon.org.uk>
+ <148120024570.5854.10638278395097394138.stgit@warthog.procyon.org.uk>
+ <7948.1484148443@warthog.procyon.org.uk>
+ <794.1484581158@warthog.procyon.org.uk>
+ <6306.1485209503@warthog.procyon.org.uk>
+ <25118.1485778229@warthog.procyon.org.uk>
+Message-ID: <12081.1485784892@warthog.procyon.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Matt Fleming <matt@codeblueprint.co.uk> wrote:
 
-On Fri, Jan 27, 2017 at 02:21:19PM -0600, Rob Herring wrote:
-> On Mon, Jan 23, 2017 at 03:00:46PM +0100, Maxime Ripard wrote:
-> > The A23 and A33 have an ARM Mali 400 GPU. Now that we have a binding, add
-> > it to our DT.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  arch/arm/boot/dts/sun8i-a23-a33.dtsi | 26 ++++++++++++++++++++++++++
-> >  1 file changed, 26 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> > index e4991a78ad73..982705719ef2 100644
-> > --- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> > +++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> > @@ -486,6 +486,32 @@
-> >  			#size-cells = <0>;
-> >  		};
-> >  
-> > +		mali: gpu at 01c40000 {
-> 
-> Drop leading 0.
-> 
-> > +			compatible = "allwinner,sun8i-a23-mali",
-> > +				     "allwinner,sun7i-a20-mali", "arm,mali-400";
-> > +			reg = <0x01c40000 0x10000>;
-> 
-> Does this really use 64K or that's just the register spacing? Set it
-> to what's used.
+> > Matt argues, however, that boot_params->secure_boot should be propagated from
+> > the bootloader and if the bootloader wants to set it, then we should skip the
+> > check in efi_main() and go with the bootloader's opinion.  This is something
+> > we probably want to do with kexec() so that the lockdown state is propagated
+> > there.
+>  
+> Actually what I was arguing for was that if the boot loader wants to
+> set it and bypass the EFI boot stub, e.g. by going via the legacy
+> 64-bit entry point, startup_64, then we should allow that as well as
+> setting the flag in the EFI boot stub.
 
-The memory maps in our datasheet allocates 64k for that block. I
-always thought that we had to put the size of the whole memory block
-allocated to that device.
+That brings up another question:  Should the non-EFI entry points clear the
+secure_boot mode flag and set a default?
 
-For now, the driver only uses space up to 0xe000 (so we wouldn't
-"waste" a lot of space anyway), but what if at some point the driver
-needs more than what we put in the DT?
-
-Thanks,
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170130/3942d0d1/attachment.sig>
+David
