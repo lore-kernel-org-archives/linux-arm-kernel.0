@@ -1,53 +1,105 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 30 Jan 2017 20:29:32 +0100
-Subject: [PATCH net-next v7 0/3] Add support for the ethernet switch on the
- ESPRESSObin
-Message-ID: <cover.69cbc1ba8937d0fc442538f992d62fc88aa26dcc.1485804488.git-series.gregory.clement@free-electrons.com>
+Date: Mon, 30 Jan 2017 20:29:35 +0100
+Subject: [PATCH net-next v7 3/3] net: dsa: mv88e6xxx: Add support for ethernet
+ switch 88E6141
+In-Reply-To: <cover.69cbc1ba8937d0fc442538f992d62fc88aa26dcc.1485804488.git-series.gregory.clement@free-electrons.com>
+References: <cover.69cbc1ba8937d0fc442538f992d62fc88aa26dcc.1485804488.git-series.gregory.clement@free-electrons.com>
+Message-ID: <4a96ab0b31a1617372cdbfab67e7ba585e10f984.1485804488.git-series.gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The Marvell 88E6341 device is single-chip, 6-port Ethernet switch with
+four integrated 10/100/1000Mbps Ethernet transceivers and one high speed
+SerDes interfaces.
 
-This set of patches adds support for the Marvell Ethernet Topaz switch
-family (88E6141/88E6341) which is found on the ESPRESSObin. With this
-series the network is usable on this board.
+It belongs to the Topaz family and unlike the 88E6341 it does not have
+a TCAM.
 
-As usual, I rebased the series on the very last net-next/master. In
-this series there is no temperature support which need some patches
-form Andrew Lunn.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/net/dsa/mv88e6xxx/chip.c      | 42 ++++++++++++++++++++++++++++-
+ drivers/net/dsa/mv88e6xxx/mv88e6xxx.h |  2 +-
+ 2 files changed, 44 insertions(+)
 
-As soon as Andrew Lunn will post the needed patch I will send a patch
-to enable the temperature support.
-
-Thanks,
-
-Gregory
-
-Changelog:
-
-v6 -> v7:
-- rebased on net-next/master (5b8784aaf29b)
-- Fixed the wrong age time coeff from 15s to 3.75s.
-- Remove support for temperature sensor
-
-v5 -> v6:
-- rebased on net-next/master (d140199af510)
-- Fix the redundant check on mv88e6xxx_6341_family (reported by Julia
-  Lawall)
-- Add support for the 88E6141
-- Move support for temperature sensor in the phy part
-
-Gregory CLEMENT (2):
-  net: dsa: mv88e6xxx: Add support for ethernet switch 88E6341
-  net: dsa: mv88e6xxx: Add support for ethernet switch 88E6141
-
-Romain Perier (1):
-  net: dsa: mv88e6xxx: Don't forbid MDIO I/Os for PHY addr >= num_of_ports
-
- drivers/net/dsa/mv88e6xxx/chip.c      | 102 ++++++++++++++++++++++++---
- drivers/net/dsa/mv88e6xxx/mv88e6xxx.h |  21 +++++-
- 2 files changed, 113 insertions(+), 10 deletions(-)
-
-base-commit: 334c367fd5cea7a9493c3026f7e6195ebab3d7b9
+diff --git a/drivers/net/dsa/mv88e6xxx/chip.c b/drivers/net/dsa/mv88e6xxx/chip.c
+index 6a583527917d..bf385377a461 100644
+--- a/drivers/net/dsa/mv88e6xxx/chip.c
++++ b/drivers/net/dsa/mv88e6xxx/chip.c
+@@ -3656,6 +3656,34 @@ static const struct mv88e6xxx_ops mv88e6352_ops = {
+ 	.reset = mv88e6352_g1_reset,
+ };
+ 
++static const struct mv88e6xxx_ops mv88e6141_ops = {
++	/* MV88E6XXX_FAMILY_6341 */
++	.get_eeprom = mv88e6xxx_g2_get_eeprom8,
++	.set_eeprom = mv88e6xxx_g2_set_eeprom8,
++	.set_switch_mac = mv88e6xxx_g2_set_switch_mac,
++	.phy_read = mv88e6xxx_g2_smi_phy_read,
++	.phy_write = mv88e6xxx_g2_smi_phy_write,
++	.port_set_link = mv88e6xxx_port_set_link,
++	.port_set_duplex = mv88e6xxx_port_set_duplex,
++	.port_set_rgmii_delay = mv88e6390_port_set_rgmii_delay,
++	.port_set_speed = mv88e6390_port_set_speed,
++	.port_tag_remap = mv88e6095_port_tag_remap,
++	.port_set_frame_mode = mv88e6351_port_set_frame_mode,
++	.port_set_egress_unknowns = mv88e6351_port_set_egress_unknowns,
++	.port_set_ether_type = mv88e6351_port_set_ether_type,
++	.port_jumbo_config = mv88e6165_port_jumbo_config,
++	.port_egress_rate_limiting = mv88e6097_port_egress_rate_limiting,
++	.port_pause_config = mv88e6097_port_pause_config,
++	.stats_snapshot = mv88e6390_g1_stats_snapshot,
++	.stats_get_sset_count = mv88e6320_stats_get_sset_count,
++	.stats_get_strings = mv88e6320_stats_get_strings,
++	.stats_get_stats = mv88e6390_stats_get_stats,
++	.g1_set_cpu_port = mv88e6390_g1_set_cpu_port,
++	.g1_set_egress_port = mv88e6390_g1_set_egress_port,
++	.mgmt_rsvd2cpu =  mv88e6390_g1_mgmt_rsvd2cpu,
++	.reset = mv88e6352_g1_reset,
++};
++
+ static const struct mv88e6xxx_ops mv88e6341_ops = {
+ 	/* MV88E6XXX_FAMILY_6341 */
+ 	.get_eeprom = mv88e6xxx_g2_get_eeprom8,
+@@ -4071,6 +4099,20 @@ static const struct mv88e6xxx_info mv88e6xxx_table[] = {
+ 		.ops = &mv88e6321_ops,
+ 	},
+ 
++	[MV88E6141] = {
++		.prod_num = PORT_SWITCH_ID_PROD_NUM_6141,
++		.family = MV88E6XXX_FAMILY_6341,
++		.name = "Marvell 88E6341",
++		.num_databases = 4096,
++		.num_ports = 6,
++		.port_base_addr = 0x10,
++		.global1_addr = 0x1b,
++		.age_time_coeff = 3750,
++		.tag_protocol = DSA_TAG_PROTO_EDSA,
++		.flags = MV88E6XXX_FLAGS_FAMILY_6341,
++		.ops = &mv88e6141_ops,
++	},
++
+ 	[MV88E6341] = {
+ 		.prod_num = PORT_SWITCH_ID_PROD_NUM_6341,
+ 		.family = MV88E6XXX_FAMILY_6341,
+diff --git a/drivers/net/dsa/mv88e6xxx/mv88e6xxx.h b/drivers/net/dsa/mv88e6xxx/mv88e6xxx.h
+index 76837d2022bb..9c5c0472b211 100644
+--- a/drivers/net/dsa/mv88e6xxx/mv88e6xxx.h
++++ b/drivers/net/dsa/mv88e6xxx/mv88e6xxx.h
+@@ -87,6 +87,7 @@
+ #define PORT_SWITCH_ID_PROD_NUM_6131	0x106
+ #define PORT_SWITCH_ID_PROD_NUM_6320	0x115
+ #define PORT_SWITCH_ID_PROD_NUM_6123	0x121
++#define PORT_SWITCH_ID_PROD_NUM_6141	0x340
+ #define PORT_SWITCH_ID_PROD_NUM_6161	0x161
+ #define PORT_SWITCH_ID_PROD_NUM_6165	0x165
+ #define PORT_SWITCH_ID_PROD_NUM_6171	0x171
+@@ -421,6 +422,7 @@ enum mv88e6xxx_model {
+ 	MV88E6097,
+ 	MV88E6123,
+ 	MV88E6131,
++	MV88E6141,
+ 	MV88E6161,
+ 	MV88E6165,
+ 	MV88E6171,
 -- 
 git-series 0.9.1
