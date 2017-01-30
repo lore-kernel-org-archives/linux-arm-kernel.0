@@ -1,35 +1,37 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Mon, 30 Jan 2017 13:35:12 +0530
-Subject: [PATCH V7 10/11] iommu/arm-smmu: Clean up early-probing
- workarounds
-In-Reply-To: <20170128210709.GG20550@bhelgaas-glaptop.roam.corp.google.com>
-References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
- <1485188293-20263-11-git-send-email-sricharan@codeaurora.org>
- <20170128210709.GG20550@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <005401d27acf$991e6290$cb5b27b0$@codeaurora.org>
+From: mzoran@crowfest.net (Michael Zoran)
+Date: Mon, 30 Jan 2017 00:09:32 -0800
+Subject: [PATCH] MAINTAINERS: extend Raspberry Pi entry
+In-Reply-To: <20170130075609.pcrujbzdnabkmuux@pengutronix.de>
+References: <b2e1e59a752395314a20e846337cb70cf22f2959.1485720503.git.baruch@tkos.co.il>
+ <1485723150.30797.1.camel@crowfest.net>
+ <20170129210611.k46ey35py3ht3fe7@tarshish>
+ <1485726109.30797.5.camel@crowfest.net>
+ <20170129215253.hwhwsqoulhmjxs55@tarshish>
+ <1485727324.30797.7.camel@crowfest.net>
+ <1485728648.30797.9.camel@crowfest.net>
+ <20170130075609.pcrujbzdnabkmuux@pengutronix.de>
+Message-ID: <1485763772.13537.1.camel@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> Now that the appropriate ordering is enforced via profe-deferral of
->
->s/profe-deferral/probe-deferral/
->
+On Mon, 2017-01-30 at 08:56 +0100, Uwe Kleine-K?nig wrote:
+> On Sun, Jan 29, 2017 at 02:24:08PM -0800, Michael Zoran wrote:
+> I don't agree. To be able to review a driver to a Broadcom specific
+> spi
+> driver, you need to know more about spi than about Broadcom.
+> 
 
-ha, will change it.
+I would say that's 50/50.  Some of these drivers like I2C or SPI
+are?not really that complex.  The complexity happens when people begin
+to try to connect the various drivers in arbitrary ways at which point
+things begin to break.
 
-Regards,
- Sricharan
+SOCs are designed with cost in mind, so allowing arbitrary
+configurations are not aways possible because of attempts to limits the
+amount of hardware resources required and the complexity. And I don't
+think this is specific to Broadcom or anybody. It's just the way SOCs
+work.
 
-
->> masters in core code, rip it all out and bask in the simplicity.
->>
->> Acked-by: Will Deacon <will.deacon@arm.com>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->> [Sricharan: Rebased on top of ACPI IORT SMMU series]
->> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->> ---
->>  drivers/iommu/arm-smmu-v3.c | 46 ++---------------------------------
->>  drivers/iommu/arm-smmu.c    | 58 +++++++--------------------------------------
->>  2 files changed, 10 insertions(+), 94 deletions(-)
->
->Yay!
+This is all vary different from PCs where you expect people to buy
+random parts and start connecting them together.  For the reasons I
+have given, SOCs arn't quite as flexible.
