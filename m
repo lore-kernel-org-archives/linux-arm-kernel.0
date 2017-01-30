@@ -1,110 +1,127 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Mon, 30 Jan 2017 16:57:36 -0500
-Subject: [PATCH v3 16/24] drm/rockchip: dw-mipi-dsi: properly configure
- PHY timing
-In-Reply-To: <20170129132444.25251-17-john@metanate.com>
-References: <20170129132444.25251-1-john@metanate.com>
- <20170129132444.25251-17-john@metanate.com>
-Message-ID: <20170130215736.GT20076@art_vandelay>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 30 Jan 2017 22:59:27 +0100
+Subject: [PATCH v9 2/4] arm64: arch_timer: Introduce a generic erratum
+ handing mechanism for fsl-a008585
+In-Reply-To: <1484832916-7248-3-git-send-email-dingtianhong@huawei.com>
+References: <1484832916-7248-1-git-send-email-dingtianhong@huawei.com>
+ <1484832916-7248-3-git-send-email-dingtianhong@huawei.com>
+Message-ID: <20170130215927.GK2206@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 29, 2017 at 01:24:36PM +0000, John Keeping wrote:
-> These values are specified as constant time periods but the PHY
-> configuration is in terms of the current lane byte clock so using
-> constant values guarantees that the timings will be outside the
-> specification with some display configurations.
-> 
-> Derive the necessary configuration from the byte clock in order to
-> ensure that the PHY configuration is correct.
-> 
-> Signed-off-by: John Keeping <john@metanate.com>
+On Thu, Jan 19, 2017 at 09:35:14PM +0800, Ding Tianhong wrote:
+> The workaround for hisilicon,161010101 will check the return value of the system counter
+> by different way, in order to distinguish with the fsl-a008585 workaround, introduce
+
+s/way/ways/
+
+> a new generic erratum handing mechanism for fsl-a008585 and rename some functions.
+
+s/handing/handling/
+ 
+> After discussion with Marc and Will, a consensus decision was made to remove the commandline
+> parameter for enabling fsl,erratum-a008585 erratum.
+
+Lines are more than 78 char large.
+
+> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
 > ---
-> v3:
-> - Wrap some long lines
-> Unchanged in v2
+>  Documentation/admin-guide/kernel-parameters.txt |   9 --
+>  arch/arm64/include/asm/arch_timer.h             |  38 +++------
+>  drivers/clocksource/Kconfig                     |   8 ++
+>  drivers/clocksource/arm_arch_timer.c            | 105 ++++++++++++++----------
+>  4 files changed, 84 insertions(+), 76 deletions(-)
 > 
->  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 39 ++++++++++++++++++++++++++++++----
->  1 file changed, 35 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> index cfe7e4ba305c..85edf6dd2bac 100644
-> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> @@ -383,6 +383,26 @@ static void dw_mipi_dsi_phy_write(struct dw_mipi_dsi *dsi, u8 test_code,
->  	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_TESTCLK | PHY_UNTESTCLR);
->  }
+> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+> index 21e2d88..76437ad 100644
+> --- a/Documentation/admin-guide/kernel-parameters.txt
+> +++ b/Documentation/admin-guide/kernel-parameters.txt
+> @@ -539,15 +539,6 @@
+>  			loops can be debugged more effectively on production
+>  			systems.
 >  
-> +/**
-> + * ns2bc - Nanoseconds to byte clock cycles
-> + */
-> +static inline unsigned int ns2bc(struct dw_mipi_dsi *dsi, int ns)
-> +{
-> +	unsigned long byte_clk_khz = dsi->lane_mbps * MSEC_PER_SEC / 8;
-
-Why multiply by 1000 (MSEC_PER_SEC) only to immediately divide by 1000?
-
-> +
-> +	return (ns * (byte_clk_khz / 1000) + 999) / 1000;
-
-Can you replace this whole function with:
-
-return DIV_ROUND_UP(ns * dsi->lane_mbps / 8, 1000);
-
-> +}
-> +
-> +/**
-> + * ns2ui - Nanoseconds to UI time periods
-> + */
-> +static inline unsigned int ns2ui(struct dw_mipi_dsi *dsi, int ns)
-> +{
-> +	unsigned long byte_clk_khz = dsi->lane_mbps * MSEC_PER_SEC;
-> +
-> +	return (ns * (byte_clk_khz / 1000) + 999) / 1000;
-
-Same remarks here.
-
-Sean
-
-
-> +}
-> +
->  static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
->  {
->  	int ret, testdin, vco, val;
-> @@ -434,10 +454,21 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
->  					 SETRD_MAX | POWER_MANAGE |
->  					 TER_RESISTORS_ON);
->  
+> -	clocksource.arm_arch_timer.fsl-a008585=
+> -			[ARM64]
+> -			Format: <bool>
+> -			Enable/disable the workaround of Freescale/NXP
+> -			erratum A-008585.  This can be useful for KVM
+> -			guests, if the guest device tree doesn't show the
+> -			erratum.  If unspecified, the workaround is
+> -			enabled based on the device tree.
 > -
-> -	dw_mipi_dsi_phy_write(dsi, 0x70, TLP_PROGRAM_EN | 0xf);
-> -	dw_mipi_dsi_phy_write(dsi, 0x71, THS_PRE_PROGRAM_EN | 0x55);
-> -	dw_mipi_dsi_phy_write(dsi, 0x72, THS_ZERO_PROGRAM_EN | 0xa);
-> +	dw_mipi_dsi_phy_write(dsi, 0x60, TLP_PROGRAM_EN | ns2bc(dsi, 500));
-> +	dw_mipi_dsi_phy_write(dsi, 0x61, THS_PRE_PROGRAM_EN | ns2ui(dsi, 40));
-> +	dw_mipi_dsi_phy_write(dsi, 0x62, THS_ZERO_PROGRAM_EN | ns2bc(dsi, 300));
-> +	dw_mipi_dsi_phy_write(dsi, 0x63, THS_PRE_PROGRAM_EN | ns2ui(dsi, 100));
-> +	dw_mipi_dsi_phy_write(dsi, 0x64, BIT(5) | ns2bc(dsi, 100));
-> +	dw_mipi_dsi_phy_write(dsi, 0x65, BIT(5) | (ns2bc(dsi, 60) + 7));
-> +
-> +	dw_mipi_dsi_phy_write(dsi, 0x70, TLP_PROGRAM_EN | ns2bc(dsi, 500));
-> +	dw_mipi_dsi_phy_write(dsi, 0x71,
-> +			      THS_PRE_PROGRAM_EN | (ns2ui(dsi, 50) + 5));
-> +	dw_mipi_dsi_phy_write(dsi, 0x72,
-> +			      THS_ZERO_PROGRAM_EN | (ns2bc(dsi, 140) + 2));
-> +	dw_mipi_dsi_phy_write(dsi, 0x73,
-> +			      THS_PRE_PROGRAM_EN | (ns2ui(dsi, 60) + 8));
-> +	dw_mipi_dsi_phy_write(dsi, 0x74, BIT(5) | ns2bc(dsi, 100));
+>  	clearcpuid=BITNUM [X86]
+>  			Disable CPUID feature X for the kernel. See
+>  			arch/x86/include/asm/cpufeatures.h for the valid bit
+> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+> index eaa5bbe..b4b3400 100644
+> --- a/arch/arm64/include/asm/arch_timer.h
+> +++ b/arch/arm64/include/asm/arch_timer.h
+> @@ -29,41 +29,29 @@
 >  
->  	dsi_write(dsi, DSI_PHY_RSTZ, PHY_ENFORCEPLL | PHY_ENABLECLK |
->  				     PHY_UNRSTZ | PHY_UNSHUTDOWNZ);
-> -- 
-> 2.11.0.197.gb556de5.dirty
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+>  #include <clocksource/arm_arch_timer.h>
+>  
+> -#if IS_ENABLED(CONFIG_FSL_ERRATUM_A008585)
+> +#if IS_ENABLED(CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND)
+>  extern struct static_key_false arch_timer_read_ool_enabled;
+> -#define needs_fsl_a008585_workaround() \
+> +#define needs_unstable_timer_counter_workaround() \
+>  	static_branch_unlikely(&arch_timer_read_ool_enabled)
+>  #else
+> -#define needs_fsl_a008585_workaround()  false
+> +#define needs_unstable_timer_counter_workaround()  false
+>  #endif
+>  
+> -u32 __fsl_a008585_read_cntp_tval_el0(void);
+> -u32 __fsl_a008585_read_cntv_tval_el0(void);
+> -u64 __fsl_a008585_read_cntvct_el0(void);
+>  
+> -/*
+> - * The number of retries is an arbitrary value well beyond the highest number
+> - * of iterations the loop has been observed to take.
+> - */
+> -#define __fsl_a008585_read_reg(reg) ({			\
+> -	u64 _old, _new;					\
+> -	int _retries = 200;				\
+> -							\
+> -	do {						\
+> -		_old = read_sysreg(reg);		\
+> -		_new = read_sysreg(reg);		\
+> -		_retries--;				\
+> -	} while (unlikely(_old != _new) && _retries);	\
+> -							\
+> -	WARN_ON_ONCE(!_retries);			\
+> -	_new;						\
+> -})
+> +struct arch_timer_erratum_workaround {
+> +	const char *id;		/* Indicate the Erratum ID */
+> +	u32 (*read_cntp_tval_el0)(void);
+> +	u32 (*read_cntv_tval_el0)(void);
+> +	u64 (*read_cntvct_el0)(void);
+> +};
+> +
+> +extern const struct arch_timer_erratum_workaround *timer_unstable_counter_workaround;
+>	  
+>  #define arch_timer_reg_read_stable(reg) 		\
+>  ({							\
+>  	u64 _val;					\
+> -	if (needs_fsl_a008585_workaround())		\
+> -		_val = __fsl_a008585_read_##reg();	\
+> +	if (needs_unstable_timer_counter_workaround())		\
+> +		_val = timer_unstable_counter_workaround->read_##reg();\
+>  	else						\
+>  		_val = read_sysreg(reg);		\
+>  	_val;						\
+> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> index 4866f7a..6693e07 100644
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
+> @@ -325,10 +325,18 @@ config ARM_ARCH_TIMER_EVTSTREAM
+>  	  This must be disabled for hardware validation purposes to detect any
+>  	  hardware anomalies of missing events.
+>  
+> +config ARM_ARCH_TIMER_OOL_WORKAROUND
+> +	bool
+> +	depends on FSL_ERRATUM_A008585
 
--- 
-Sean Paul, Software Engineer, Google / Chromium OS
+This dependency is not needed as well as the help text below because it is a
+silent option.
