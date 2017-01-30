@@ -1,93 +1,41 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 30 Jan 2017 10:10:05 +0100
-Subject: [PATCH v5 06/12] mmc: sdhci-xenon: Add Marvell Xenon SDHC core
- functionality
-In-Reply-To: <00e8d2dc-bc07-addc-a5d9-8604f143627f@intel.com>
-References: <cover.8527229dae6c124f24c5e637430c2cdc86f80392.1484154449.git-series.gregory.clement@free-electrons.com>
- <3546f143091c121face8ecbcbf7f6a4c41d2cec7.1484154449.git-series.gregory.clement@free-electrons.com>
- <CAPDyKFrwxix4zY4a1x9u6jh_gPfKTsaLnD8b8crum=pc5CN3AA@mail.gmail.com>
- <2e67332d-d8c3-fd24-1f81-72675a09927a@intel.com>
- <CAPDyKFqbjeKCHp40PALydquxdF-qBk156+iOS9TYYsquJ7fK7w@mail.gmail.com>
- <00e8d2dc-bc07-addc-a5d9-8604f143627f@intel.com>
-Message-ID: <CAPDyKFoF2QsTxKC7=PjHqOk106USQ-j9MtiyfC=Sqks8DnPDYQ@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Mon, 30 Jan 2017 14:43:01 +0530
+Subject: [PATCH 0/4] phy/mfd/soc: exynos: Header cleanup
+In-Reply-To: <20170127200510.4444-1-krzk@kernel.org>
+References: <20170127200510.4444-1-krzk@kernel.org>
+Message-ID: <588F039D.3090503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 January 2017 at 09:16, Adrian Hunter <adrian.hunter@intel.com> wrote:
-> On 27/01/2017 5:12 p.m., Ulf Hansson wrote:
->>
->> On 26 January 2017 at 13:39, Adrian Hunter <adrian.hunter@intel.com>
->> wrote:
->>>
->>> On 26/01/17 12:50, Ulf Hansson wrote:
->>>>
->>>> On 11 January 2017 at 18:19, Gregory CLEMENT
->>>> <gregory.clement@free-electrons.com> wrote:
->>>>>
->>>>> +                       priv->init_card_type = MMC_TYPE_MMC;
->>>>> +                       mmc->caps |= MMC_CAP_NONREMOVABLE;
->>>>> +
->>>>> +                       /*
->>>>> +                        * Force to clear BUS_TEST to
->>>>> +                        * skip bus_test_pre and bus_test_post
->>>>> +                        */
->>>>> +                       mmc->caps &= ~MMC_CAP_BUS_WIDTH_TEST;
->>>>> +                       mmc->caps2 |= MMC_CAP2_HC_ERASE_SZ |
->>>>
->>>>
->>>> This cap is a bit strange. It was added several years ago by Adrian
->>>> Hunter, but I am wondering about the reason to why it's needed.
->>>>
->>>
->>> MMC_CAP2_HC_ERASE_SZ relates to EXT-CSD ERASE_GROUP_DEF.
->>>
->>> I think it was added to enable people to choose whether they wanted a
->>> large
->>> or small erase granularity.  That probably doesn't matter if the card
->>> supports TRIM.
->>>
->>
->> Huh, the erase/trim/discard code in the mmc core is really hairy. :-)
->>
->> In mmc_calc_max_discard() the following code/comment exists:
->>
->> /*
->>  * Without erase_group_def set, MMC erase timeout depends on clock
->>  * frequence which can change.  In that case, the best choice is
->>  * just the preferred erase size.
->>  */
->> if (mmc_card_mmc(card) && !(card->ext_csd.erase_group_def & 1))
->>      return card->pref_erase;
->>
->>
->> This makes me wonder.
->>
->> So, when we haven't enabled the high capacity erase groups in the
->> EXT_CSD register (ext_csd.erase_group_def), we will use the pref_erase
->> size.
->>
->> In the other case, as when having MMC_CAP2_HC_ERASE_SZ set (which will
->> set ext_csd.erase_group_def),  we will instead  do some calculations
->> to find out the max discards.
->>
->> Are you saying that these calculations doesn't matter much - or are
->> you saying that we always want to do them?
->
->
-> No, I was saying that if you have TRIM then TRIM is preferred to ERASE so
-> the erase group size does not come into play when discarding, since ERASE
-> granularity is erase groups whereas TRIM granularity is sectors.
 
-Right. Thanks for clarifying.
 
->
-> However ERASE_GROUP_DEF also affects the size of write protect groups.
+On Saturday 28 January 2017 01:35 AM, Krzysztof Kozlowski wrote:
+> Hi,
+> 
+> Suggested by Marek, continuation of cleanup of PMU register defines
+> in headers.
+> 
+> Let's keep all of them in include/linux/soc/samsung/exynos-regs-pmu.h.
+> 
+> This is based on:
+> 1. Marek's recent work around pinctrl/power domains/lpass:
+>    https://git.linaro.org/people/marek.szyprowski/linux-srpol.git
+>    branch: v4.10-next-tm2-pd
+> 
+> 2. My two previous patches for cleanup:
+>    https://git.kernel.org/cgit/linux/kernel/git/krzk/linux.git
+>    branch: for-v4.11/drivers-soc-exynos-pmu-the-joy-never-ends
+> 
+> Affected subsystems/drivers:
+> 1. phy - drivers,
+> 2. mfd - headers,
+> 3. soc/samsung - header.
+> 
+> However because of dependency on Marek's patchset, I do not have a clue
+> how to merge it... it is not an urgent stuff, so it may wait till
+> dependencies get in.
 
-In either case.
+I'll defer merging this.
 
-What do you think of removing MMC_CAP2_HC_ERASE_SZ? I don't like these
-kind of soft polices, it's better if we can decide on a common
-behaviour - whatever that is.
-
-Kind regards
-Uffe
+Thanks
+Kishon
