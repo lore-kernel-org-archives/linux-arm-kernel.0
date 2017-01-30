@@ -1,166 +1,47 @@
-From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Mon, 30 Jan 2017 18:32:16 +0100
-Subject: [PATCH 6/7] ASoC: add bindings for STM32 DFSDM driver
-In-Reply-To: <f0f446ea-97a0-8fef-bec5-aefeed42a85a@kernel.org>
-References: <1485189145-29576-1-git-send-email-arnaud.pouliquen@st.com>
- <1485189145-29576-7-git-send-email-arnaud.pouliquen@st.com>
- <f0f446ea-97a0-8fef-bec5-aefeed42a85a@kernel.org>
-Message-ID: <71612ea0-c9d0-a85e-2d58-72609df57e35@st.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 30 Jan 2017 17:35:28 +0000
+Subject: [RFC v2 10/10] KVM: arm/arm64: Emulate the EL1 phys timer
+ register access
+In-Reply-To: <CAFEAcA8BfUQTrdpNtkkB2kh=dLyOCjuBv2vVWZML8px8D0JJ9Q@mail.gmail.com>
+References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
+ <1485479100-4966-11-git-send-email-jintack@cs.columbia.edu>
+ <86lgtt98gs.fsf@arm.com>
+ <CAHyh4xhgNYjpyaGz=UtFfC+smh6CVZgJ530WWmwwmpg=Bi799A@mail.gmail.com>
+ <CAFEAcA8BfUQTrdpNtkkB2kh=dLyOCjuBv2vVWZML8px8D0JJ9Q@mail.gmail.com>
+Message-ID: <ba9de0f8-4b35-2bb8-cb4b-cc97434f5183@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Johan,
-
-Please find my comments in-line.
-
-Regards
-
-Arnaud
-
-On 01/29/2017 01:19 PM, Jonathan Cameron wrote:
-> On 23/01/17 16:32, Arnaud Pouliquen wrote:
->> This patch adds documentation of device tree bindings for the
->> STM32 DFSDM ASoC driver.
+On 30/01/17 17:26, Peter Maydell wrote:
+> On 30 January 2017 at 17:08, Jintack Lim <jintack@cs.columbia.edu> wrote:
+>> On Sun, Jan 29, 2017 at 10:44 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> Shouldn't we take the ENABLE bit into account? The ARMv8 ARM version I
+>>> have at hand (version h) seems to indicate that we should, but we should
+>>> check with the latest and greatest...
 >>
->> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
->> ---
->>  .../devicetree/bindings/sound/st,sm32-adfsdm.txt   | 84 ++++++++++++++++++++++
->>  1 file changed, 84 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/sound/st,sm32-adfsdm.txt
->>
->> diff --git a/Documentation/devicetree/bindings/sound/st,sm32-adfsdm.txt b/Documentation/devicetree/bindings/sound/st,sm32-adfsdm.txt
->> new file mode 100644
->> index 0000000..a1d27b8
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/sound/st,sm32-adfsdm.txt
->> @@ -0,0 +1,84 @@
->> +STMicroelectronics STM32 ADFSDM ASoC DAI device driver.
->> +
->> +STM32 ADFSDM ASoC is a sigma delta audio interface for digital microphone.
->> +It has to be declared in device-tree as a subnode of the DFSDM mfd node.
->> +
->> +It offers possibility to record several mono microphones, with an option to
->> +synchronize all microphones on a main one (that must be piped to filter 0)
->> +Audio interface can be exposed through the generic ASoC simple card.
->> +
->> +2 Dmics can be connected on one SPI interface instance n.
->> +Convention is that the DMIC that strobes data on rising edge is connected to the
->> +corresponding DFSDM channel n; while the Dmic that strobes data on falling edge
->> +is connected to the channel n-1. Simple card property "bitclock-inversion = <1>"
->> +is used to specify that microphone strobes data on falling edge.
->> +
->> +SPI interface allows to be scheduled by an external SPI clock. To use it
->> +simple card properties "bitclock-master = <&codec>" and "system-clock-frequency"
->> +have to be defined in dai-link node.
->> +
->> +Required properties:
->> +- compatible: 	Must be "st,stm32-dfsdm-audio",
->> +- reg:		Specifies the DFSDM filter instance.
->> +- interrupts: 	DFSDM filter instance interrupt line.
->> +- dma:		DMA controller phandle and DMA request line associated to the
->> +		filter instance ( specified by the field "reg")
->> +- dma-names: 	must be "rx"
->> +
->> +- st,input-id:		Id of the SPI/Manchester interface used.
->> +- st,dai-filter-order:  SinC filter order from 0 to 5.
->> +			0: FastSinC
->> +			[1-5]: order 1 to 5.
->> +			For audio purpose it is recommended to use order 3 to 5.
-> Interesting for audio you consider it feature of the hardware, but for ADC you
-> consider that this should be userspace controlled.
-> Personally I'd like to see more detail on those filters but if this is convention
-> in Asoc then so be it.
-
-Configure filter and integrator is quite tricky. Updating filter and
-integrator parameters have impact on sample resolution and output sample
-rate.
-Sample resolution is the peak to peak data value and depends on
-oversampling parameters and filter order.
-
-Output sample rate depends on SPI input clock frequency oversampling
-parameters and filter order.
-
-High filter order gives a better resolution and a better filter response
-but allows less dynamic to find the good rate...
-
-So it is a compromise between resolution, rate and filtering.
-
-For ADC use case, filter orders 1 to 3 are recommended.
-For audio use case, orders 3 to 5 are recommended.
-
-On IIO side i proposed to expose tuning in ABI, to allows application
-fine tuning.
-Need to document it...
-
-For ASOC it is another story. Application requests a rate and a sample
-format. So filter parameters are computed based on SPI bus clock
-frequency, expected audio sample rate and audio sample format.
-This is done in stm32_adfsdm_get_best_osr in sound/soc/stm/stm32_adfsdm.c.
-
-Now your comment trig a good point. Perhaps a better option in IIO,
-could be to offer same kind of ABI than ASOC interface:
-- standard oversampling-ratio ABI. based on it filter and integrator
-oversampling ratios will be computed to maximize the resolution.
-- a read only resolution ABI:
-/sys/bus/iio/devices/iio:deviceX/in_adc_x_resolution. That give the
-computed resolution.
-
-In this case filter order will be part of the DT for IIO and ASoC.
-This would also match with a redesign of the DFSDM driver in IIO...
-
->> +
->> +Optional properties:
->> + - st,dai0-synchronized: Set to 1 to synchronize DAI with DFSDM instance 0.
->> +
->> +Exemple of a card with 2 Dmics synchronized and connected on SPI interface 1.
-> Example.
->> +
->> +	dfsdm: dfsdm at 4400D000 {
->> +		dai_dfsdm0: dfsdm-audio at 0 {
->> +			compatible = "st,stm32-dfsdm-audio";
->> +			#sound-dai-cells = <0>;
->> +			reg = <0>;
->> +			dmas = <&dmamux1 101 0x400 0x00>;
->> +			dma-names = "rx";
->> +			st,input-id = <0>;
->> +			st,dai-filter-order = <5>;
->> +		};
->> +		dai_dfsdm1: dfsdm-audio at 1 {
->> +			compatible = "st,stm32-dfsdm-audio";
->> +			#sound-dai-cells = <0>;
->> +			reg = <0>;
->> +			dmas = <&dmamux1 102 0x400 0x00>;
->> +			dma-names = "rx";
->> +			st,input-id = <0>;
->> +			st,dai0-synchronized = <1>;
->> +			st,dai-filter-order = <5>;
->> +		};
->> +	};
->> +	sound_dfsdm_pdm {
->> +		compatible = "simple-audio-card";
->> +		simple-audio-card,name = "dfsdm_pdm";
->> +		status = "okay";
->> +
->> +		dfsdm0_mic0: simple-audio-card,dai-link at 0 {
->> +			format = "pdm";
->> +			cpu {
->> +				sound-dai = <&dai_dfsdm0>;
->> +			};
->> +			dmic0_codec: codec {
->> +				sound-dai = <&dmic0>;
->> +			};
->> +		};
->> +		dfsdm0_mic1: simple-audio-card,dai-link at 1 {
->> +			format = "pdm";
->> +			bitclock-inversion = <1>;
->> +			cpu {
->> +				sound-dai = <&dai_dfsdm1>;
->> +			};
->> +			codec {
->> +				sound-dai = <&dmic1>;
->> +			};
->> +		};
->> +	};
->>
-> Jonathan
+>> Thanks! I was not clear about this. I have ARM ARM version k, and it
+>> says that 'When the value of the ENABLE bit is 0, the ISTATUS field is
+>> UNKNOWN.' So I thought the istatus value doesn't matter if ENABLE is
+>> 0, and just set istatus bit regardless of ENABLE bit. If this is not
+>> what the manual meant, then I'm happy to fix this.
 > 
+> It looks like the spec has been relaxed between the doc version
+> that Marc was looking at and the current one. So it's OK for
+> an implementation to either (a) set ISTATUS to 0 if ENABLE
+> is 0, or (b) do what you've done and set ISTATUS according
+> to the timer comparison whether ENABLE is clear or not
+> (or even (c) set ISTATUS to a random value if ENABLE is clear,
+> and other less likely choices).
+> I think we should add a comment to note that it's architecturally
+> UNKNOWN and we've made a choice for our implementation convenience.
+
+In that case, the proposed implementation is perfectly fine. I'll retire
+the old ARMv8 ARM from my laptop (funnily enough, I didn't fancy
+downloading version k while on the train and having my phone as my link
+to the outside world... ;-).
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
