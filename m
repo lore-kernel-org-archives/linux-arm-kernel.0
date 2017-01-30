@@ -1,223 +1,111 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 30 Jan 2017 14:57:42 +0100
-Subject: [PATCH 4/5] iio: trigger: add support for STM32 EXTI triggers
-In-Reply-To: <1485784663-19505-1-git-send-email-fabrice.gasnier@st.com>
-References: <1485784663-19505-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1485784663-19505-5-git-send-email-fabrice.gasnier@st.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 30 Jan 2017 13:58:32 +0000
+Subject: [PATCH v3 03/37] treewide: Consolidate set_dma_ops()
+ implementations
+In-Reply-To: <20170120210437.26389-4-bart.vanassche@sandisk.com>
+References: <20170120210437.26389-1-bart.vanassche@sandisk.com>
+ <20170120210437.26389-4-bart.vanassche@sandisk.com>
+Message-ID: <20170130135832.GT27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-EXTi[0..15] gpio signal can be routed internally as trigger source for
-ADC or DAC conversions. Configure them as interrupts to configure
-trigger path in HW.
+On Fri, Jan 20, 2017 at 01:04:03PM -0800, Bart Van Assche wrote:
+> Now that all set_dma_ops() implementations are identical (ignoring
+> BUG_ON() statements), remove the architecture specific definitions
+> and add a definition in <linux/dma-mapping.h>.
+> 
+> Signed-off-by: Bart Van Assche <bart.vanassche@sandisk.com>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Chris Metcalf <cmetcalf@mellanox.com>
+> Cc: David Woodhouse <dwmw2@infradead.org>
+> Cc: linux-arch at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linuxppc-dev at lists.ozlabs.org
+> Cc: Paul Mackerras <paulus@samba.org>
+> Cc: Russell King <linux@armlinux.org.uk>
 
-Note: interrupt handler isn't required here, and corresponding interrupt
-can be kept masked at exti controller level.
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
- drivers/iio/trigger/Kconfig                    |  10 ++
- drivers/iio/trigger/Makefile                   |   1 +
- drivers/iio/trigger/stm32-exti-trigger.c       | 124 +++++++++++++++++++++++++
- include/linux/iio/trigger/stm32-exti-trigger.h |  26 ++++++
- 4 files changed, 161 insertions(+)
- create mode 100644 drivers/iio/trigger/stm32-exti-trigger.c
- create mode 100644 include/linux/iio/trigger/stm32-exti-trigger.h
+Thanks.
 
-diff --git a/drivers/iio/trigger/Kconfig b/drivers/iio/trigger/Kconfig
-index e4d4e63..b0c5104 100644
---- a/drivers/iio/trigger/Kconfig
-+++ b/drivers/iio/trigger/Kconfig
-@@ -24,6 +24,16 @@ config IIO_INTERRUPT_TRIGGER
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called iio-trig-interrupt.
- 
-+config IIO_STM32_EXTI_TRIGGER
-+	tristate "STM32 EXTI Trigger"
-+	depends on (ARCH_STM32 && OF && MFD_STM32_TIMERS) || COMPILE_TEST
-+	help
-+	  Select this option to enable STM32 EXTI Triggers on GPIO. These
-+	  maybe used then on other STM32 IPs like ADC or DAC.
-+
-+	  To compile this driver as a module, choose M here: the
-+	  module will be called stm32-exti-trigger.
-+
- config IIO_STM32_TIMER_TRIGGER
- 	tristate "STM32 Timer Trigger"
- 	depends on (ARCH_STM32 && OF && MFD_STM32_TIMERS) || COMPILE_TEST
-diff --git a/drivers/iio/trigger/Makefile b/drivers/iio/trigger/Makefile
-index 5c4ecd3..12d5d72 100644
---- a/drivers/iio/trigger/Makefile
-+++ b/drivers/iio/trigger/Makefile
-@@ -6,6 +6,7 @@
- 
- obj-$(CONFIG_IIO_HRTIMER_TRIGGER) += iio-trig-hrtimer.o
- obj-$(CONFIG_IIO_INTERRUPT_TRIGGER) += iio-trig-interrupt.o
-+obj-$(CONFIG_IIO_STM32_EXTI_TRIGGER) += stm32-exti-trigger.o
- obj-$(CONFIG_IIO_STM32_TIMER_TRIGGER) += stm32-timer-trigger.o
- obj-$(CONFIG_IIO_SYSFS_TRIGGER) += iio-trig-sysfs.o
- obj-$(CONFIG_IIO_TIGHTLOOP_TRIGGER) += iio-trig-loop.o
-diff --git a/drivers/iio/trigger/stm32-exti-trigger.c b/drivers/iio/trigger/stm32-exti-trigger.c
-new file mode 100644
-index 0000000..2a3ec3c
---- /dev/null
-+++ b/drivers/iio/trigger/stm32-exti-trigger.c
-@@ -0,0 +1,124 @@
-+/*
-+ * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
-+ * Author: Fabrice Gasnier <fabrice.gasnier@st.com>.
-+ *
-+ * License type: GPLv2
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published by
-+ * the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-+ * or FITNESS FOR A PARTICULAR PURPOSE.
-+ * See the GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program. If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/gpio/consumer.h>
-+#include <linux/iio/iio.h>
-+#include <linux/iio/trigger.h>
-+#include <linux/interrupt.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+
-+/* STM32 has up to 16 EXTI triggers on GPIOs */
-+#define STM32_MAX_EXTI_TRIGGER	16
-+
-+static const struct iio_trigger_ops exti_trigger_ops = {
-+	.owner = THIS_MODULE,
-+};
-+
-+bool is_stm32_exti_trigger(struct iio_trigger *trig)
-+{
-+	return (trig->ops == &exti_trigger_ops);
-+}
-+EXPORT_SYMBOL(is_stm32_exti_trigger);
-+
-+static irqreturn_t stm32_exti_trigger_handler(int irq, void *data)
-+{
-+	/* Exti handler shouldn't be invoked, and isn't used */
-+	return IRQ_HANDLED;
-+}
-+
-+static int stm32_exti_trigger_probe(struct platform_device *pdev)
-+{
-+	int irq, ret;
-+	char name[8];
-+	struct gpio_desc *gpio;
-+	struct iio_trigger *trig;
-+	unsigned int i;
-+
-+	for (i = 0; i < STM32_MAX_EXTI_TRIGGER; i++) {
-+		snprintf(name, sizeof(name), "exti%d", i);
-+
-+		gpio = devm_gpiod_get_optional(&pdev->dev, name, GPIOD_IN);
-+		if (IS_ERR_OR_NULL(gpio)) {
-+			if (IS_ERR(gpio)) {
-+				dev_err(&pdev->dev, "gpio %s get error %ld\n",
-+					name, PTR_ERR(gpio));
-+				return PTR_ERR(gpio);
-+			}
-+			dev_dbg(&pdev->dev, "No %s gpio\n", name);
-+			continue;
-+		}
-+
-+		irq = gpiod_to_irq(gpio);
-+		if (irq < 0) {
-+			dev_err(&pdev->dev, "gpio %d to irq failed\n", i);
-+			return irq;
-+		}
-+
-+		ret = devm_request_irq(&pdev->dev, irq,
-+				       stm32_exti_trigger_handler,
-+				       0, dev_name(&pdev->dev), pdev);
-+		if (ret) {
-+			dev_err(&pdev->dev, "request IRQ %d failed\n", irq);
-+			return ret;
-+		}
-+
-+		/*
-+		 * gpios are configured as interrupts, so exti trigger path is
-+		 * configured in HW, and can now be used as external trigger
-+		 * source by other IPs. But getting interrupts when trigger
-+		 * occurs is unused here, so mask irq on exti controller by
-+		 * default.
-+		 */
-+		disable_irq(irq);
-+
-+		trig = devm_iio_trigger_alloc(&pdev->dev, "%s", name);
-+		if (!trig)
-+			return -ENOMEM;
-+
-+		trig->dev.parent = &pdev->dev;
-+		trig->ops = &exti_trigger_ops;
-+
-+		ret = devm_iio_trigger_register(&pdev->dev, trig);
-+		if (ret)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id stm32_exti_trigger_of_match[] = {
-+	{ .compatible = "st,stm32-exti-trigger" },
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, stm32_exti_trigger_of_match);
-+
-+static struct platform_driver stm32_exti_trigger_driver = {
-+	.probe = stm32_exti_trigger_probe,
-+	.driver = {
-+		.name = "stm32-exti-trigger",
-+		.of_match_table = stm32_exti_trigger_of_match,
-+	},
-+};
-+module_platform_driver(stm32_exti_trigger_driver);
-+
-+MODULE_AUTHOR("Fabrice Gasnier <fabrice.gasnier@st.com>");
-+MODULE_DESCRIPTION("STMicroelectronics STM32 EXTI-GPIO IIO trigger driver");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:stm32-exti-trigger");
-diff --git a/include/linux/iio/trigger/stm32-exti-trigger.h b/include/linux/iio/trigger/stm32-exti-trigger.h
-new file mode 100644
-index 0000000..157ae58
---- /dev/null
-+++ b/include/linux/iio/trigger/stm32-exti-trigger.h
-@@ -0,0 +1,26 @@
-+/*
-+ * This file is part of STM32 EXTI Trigger driver
-+ *
-+ * Copyright (C) STMicroelectronics 2017
-+ * Author: Fabrice Gasnier <fabrice.gasnier@st.com>.
-+ *
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+
-+#ifndef _STM32_EXTI_TRIGGER_H_
-+#define _STM32_EXTI_TRIGGER_H_
-+
-+#include <linux/stddef.h>
-+
-+#define STM32_EXTI(n)		"exti"#n
-+
-+#if IS_ENABLED(CONFIG_IIO_STM32_EXTI_TRIGGER)
-+bool is_stm32_exti_trigger(struct iio_trigger *trig);
-+#else
-+static inline bool is_stm32_exti_trigger(struct iio_trigger *trig)
-+{
-+	return false;
-+}
-+#endif
-+
-+#endif
+> ---
+>  arch/arm/include/asm/dma-mapping.h     | 6 ------
+>  arch/powerpc/include/asm/dma-mapping.h | 5 -----
+>  arch/tile/include/asm/dma-mapping.h    | 5 -----
+>  include/linux/dma-mapping.h            | 5 +++++
+>  4 files changed, 5 insertions(+), 16 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> index 312f4d0564d6..c7432d647e53 100644
+> --- a/arch/arm/include/asm/dma-mapping.h
+> +++ b/arch/arm/include/asm/dma-mapping.h
+> @@ -31,12 +31,6 @@ static inline const struct dma_map_ops *get_dma_ops(struct device *dev)
+>  		return __generic_dma_ops(dev);
+>  }
+>  
+> -static inline void set_dma_ops(struct device *dev, const struct dma_map_ops *ops)
+> -{
+> -	BUG_ON(!dev);
+> -	dev->dma_ops = ops;
+> -}
+> -
+>  #define HAVE_ARCH_DMA_SUPPORTED 1
+>  extern int dma_supported(struct device *dev, u64 mask);
+>  
+> diff --git a/arch/powerpc/include/asm/dma-mapping.h b/arch/powerpc/include/asm/dma-mapping.h
+> index 59fbd4abcbf8..8275603ba4d5 100644
+> --- a/arch/powerpc/include/asm/dma-mapping.h
+> +++ b/arch/powerpc/include/asm/dma-mapping.h
+> @@ -91,11 +91,6 @@ static inline const struct dma_map_ops *get_dma_ops(struct device *dev)
+>  	return dev->dma_ops;
+>  }
+>  
+> -static inline void set_dma_ops(struct device *dev, const struct dma_map_ops *ops)
+> -{
+> -	dev->dma_ops = ops;
+> -}
+> -
+>  /*
+>   * get_dma_offset()
+>   *
+> diff --git a/arch/tile/include/asm/dma-mapping.h b/arch/tile/include/asm/dma-mapping.h
+> index c0620697eaad..2562995a6ac9 100644
+> --- a/arch/tile/include/asm/dma-mapping.h
+> +++ b/arch/tile/include/asm/dma-mapping.h
+> @@ -59,11 +59,6 @@ static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t daddr)
+>  
+>  static inline void dma_mark_clean(void *addr, size_t size) {}
+>  
+> -static inline void set_dma_ops(struct device *dev, const struct dma_map_ops *ops)
+> -{
+> -	dev->dma_ops = ops;
+> -}
+> -
+>  static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
+>  {
+>  	if (!dev->dma_mask)
+> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+> index f1da68b82c63..e97f23e8b2d9 100644
+> --- a/include/linux/dma-mapping.h
+> +++ b/include/linux/dma-mapping.h
+> @@ -164,6 +164,11 @@ int dma_mmap_from_coherent(struct device *dev, struct vm_area_struct *vma,
+>  
+>  #ifdef CONFIG_HAS_DMA
+>  #include <asm/dma-mapping.h>
+> +static inline void set_dma_ops(struct device *dev,
+> +			       const struct dma_map_ops *dma_ops)
+> +{
+> +	dev->dma_ops = dma_ops;
+> +}
+>  #else
+>  /*
+>   * Define the dma api to allow compilation but not linking of
+> -- 
+> 2.11.0
+> 
+
 -- 
-1.9.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
