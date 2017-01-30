@@ -1,88 +1,128 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Jan 2017 13:06:57 +0000
-Subject: [PATCH v3 00/24] i.MX Media Driver
-In-Reply-To: <1485257269.3600.96.camel@pengutronix.de>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <c6e98327-7e2c-f34a-2d23-af7b236de441@xs4all.nl>
- <1484929911.2897.70.camel@pengutronix.de>
- <3fb68686-9447-2d8a-e2d2-005e4138cd43@gmail.com>
- <5d23d244-aa0e-401c-24a9-07f28acf1563@xs4all.nl>
- <1485169204.2874.57.camel@pengutronix.de>
- <ce2d1851-8a2e-ea0b-25b8-be6649b1ebaf@gmail.com>
- <1485257269.3600.96.camel@pengutronix.de>
-Message-ID: <20170130130657.GR27312@n2100.armlinux.org.uk>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 30 Jan 2017 14:12:58 +0100
+Subject: [PATCH v5 5/8] clocksource/drivers/rockchip_timer: split
+ bc_timer into rk_timer and rk_clock_event_device
+In-Reply-To: <1485260203-14216-6-git-send-email-al.kochet@gmail.com>
+References: <1485260203-14216-1-git-send-email-al.kochet@gmail.com>
+ <1485260203-14216-6-git-send-email-al.kochet@gmail.com>
+Message-ID: <20170130131258.GF2206@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The central issue seems to be that I think media pad links / media bus
-> formats should describe physical links, such as parallel or serial
-> buses, and the formats of pixels flowing through them, whereas Steve
-> would like to extend them to describe software transports and in-memory
-> formats.
+On Tue, Jan 24, 2017 at 03:16:40PM +0300, Alexander Kochetkov wrote:
+> The patch move ce field out of struct bc_timer into struct
+> rk_clock_event_device and rename struct bc_timer to struct rk_timer.
+> 
+> The main idea for the commit is to exctact low level timer
+> routines from current implementation so they could be
+> reused in the following clocksource implementation commit.
+> 
+> This is refactoring step without functional changes.
+> 
+> Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
+> Reviwed-by: Heiko St?bner <heiko@sntech.de>
 
-This probably isn't the right place to attach this comment in this
-thread, but... the issue of media bus formats matching physical buses
-is an argument that I think is already lost.
+I don't get the point of these changes. The patch does not explain why they are
+needed.
 
-For example, take the 10-bit bayer formats:
-
-#define MEDIA_BUS_FMT_SBGGR10_1X10              0x3007
-#define MEDIA_BUS_FMT_SGBRG10_1X10              0x300e
-#define MEDIA_BUS_FMT_SGRBG10_1X10              0x300a
-#define MEDIA_BUS_FMT_SRGGB10_1X10              0x300f
-
-These are commonly used on CSI serial buses (see the smiapp driver for
-example).  From the description at the top of the file, it says the
-1X10 means that one pixel is transferred as one 10-bit sample.
-
-However, the format on wire is somewhat different - four pixels are
-transmitted over five bytes:
-
-	P0	P1	P2	P3	P0	P1	P2	P3
-	8-bit	8-bit	8-bit	8-bit	2-bit	2-bit	2-bit	2-bit
-
-This gives two problems:
-1) it doesn't fit in any sensible kind of "one pixel transferred as
-   N M-bit samples" description because the pixel/sample values
-   (depending how you look at them) are broken up.
-
-2) changing this will probably be a user visible change, as things
-   like smiapp are already in use.
-
-So, I think what we actually have is the media bus formats describing
-the _logical_ bus format.  Yes, one pixel is transferred as one 10-bit
-sample in this case.
-
-To help illustrate my point, consider the difference between
-MEDIA_BUS_FMT_RGB565_1X16 and MEDIA_BUS_FMT_RGB565_2X8_BE or
-MEDIA_BUS_FMT_RGB565_2X8_LE.  RGB565_1X16 means 1 pixel over an effective
-16-bit wide bus (if it's not 16-bit, then it has to be broken up into
-separate "samples".)  RGB565_2X8 means 1 pixel as two 8-bit samples.
-
-So, the 10-bit bayer is 1 pixel as 1.25 bytes.  Or is it, over a serial
-bus.  Using the RGB565 case, 10-bit bayer over a 4 lane CSI bus becomes
-interesting:
-
-	first byte	2nd	3rd
-lane 1	P0 9:2		S0	P7 9:2
-lane 2	P1 9:2		P4 9:2	S1
-lane 3	P2 9:2		P5 9:2	P8 9:2
-lane 4	P3 9:2		P6 9:2	P9 9:2
-
-S0 = P0/P1/P2/P3 least significant two bits
-S1 = P4/P5/P6/P7 least significant two bits
-
-or 2 lane CSI:
-	first byte	2nd	3rd	4th	5th
-lane 1	P0 9:2		P2	S0	P5	P7
-lane 2	P1 9:2		P3	P4	P6	S1
-
-or 1 lane CSI:
-lane 1	P0 P1 P2 P3 S0 P4 P5 P6 P7 S1 P8 P9 ...
-
-etc.
+> ---
+>  drivers/clocksource/rockchip_timer.c |   33 ++++++++++++++++++++++-----------
+>  1 file changed, 22 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
+> index 23e267a..6d68d4c 100644
+> --- a/drivers/clocksource/rockchip_timer.c
+> +++ b/drivers/clocksource/rockchip_timer.c
+> @@ -29,18 +29,28 @@
+>  #define TIMER_MODE_USER_DEFINED_COUNT		(1 << 1)
+>  #define TIMER_INT_UNMASK			(1 << 2)
+>  
+> -struct bc_timer {
+> -	struct clock_event_device ce;
+> +struct rk_timer {
+>  	void __iomem *base;
+>  	void __iomem *ctrl;
+>  	u32 freq;
+>  };
+>  
+> -static struct bc_timer bc_timer;
+> +struct rk_clock_event_device {
+> +	struct clock_event_device ce;
+> +	struct rk_timer timer;
+> +};
+> +
+> +static struct rk_clock_event_device bc_timer;
+> +
+> +static inline struct rk_clock_event_device*
+> +rk_clock_event_device(struct clock_event_device *ce)
+> +{
+> +	return container_of(ce, struct rk_clock_event_device, ce);
+> +}
+>  
+> -static inline struct bc_timer *rk_timer(struct clock_event_device *ce)
+> +static inline struct rk_timer *rk_timer(struct clock_event_device *ce)
+>  {
+> -	return container_of(ce, struct bc_timer, ce);
+> +	return &rk_clock_event_device(ce)->timer;
+>  }
+>  
+>  static inline void __iomem *rk_base(struct clock_event_device *ce)
+> @@ -116,16 +126,17 @@ static irqreturn_t rk_timer_interrupt(int irq, void *dev_id)
+>  static int __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
+>  {
+>  	struct clock_event_device *ce = &bc_timer.ce;
+> +	struct rk_timer *timer = &bc_timer.timer;
+>  	struct clk *timer_clk;
+>  	struct clk *pclk;
+>  	int ret = -EINVAL, irq;
+>  
+> -	bc_timer.base = of_iomap(np, 0);
+> -	if (!bc_timer.base) {
+> +	timer->base = of_iomap(np, 0);
+> +	if (!timer->base) {
+>  		pr_err("Failed to get base address for '%s'\n", TIMER_NAME);
+>  		return -ENXIO;
+>  	}
+> -	bc_timer.ctrl = bc_timer.base + ctrl_reg;
+> +	timer->ctrl = timer->base + ctrl_reg;
+>  
+>  	pclk = of_clk_get_by_name(np, "pclk");
+>  	if (IS_ERR(pclk)) {
+> @@ -153,7 +164,7 @@ static int __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
+>  		goto out_timer_clk;
+>  	}
+>  
+> -	bc_timer.freq = clk_get_rate(timer_clk);
+> +	timer->freq = clk_get_rate(timer_clk);
+>  
+>  	irq = irq_of_parse_and_map(np, 0);
+>  	if (!irq) {
+> @@ -181,7 +192,7 @@ static int __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
+>  		goto out_irq;
+>  	}
+>  
+> -	clockevents_config_and_register(ce, bc_timer.freq, 1, UINT_MAX);
+> +	clockevents_config_and_register(ce, timer->freq, 1, UINT_MAX);
+>  
+>  	return 0;
+>  
+> @@ -190,7 +201,7 @@ static int __init rk_timer_init(struct device_node *np, u32 ctrl_reg)
+>  out_timer_clk:
+>  	clk_disable_unprepare(pclk);
+>  out_unmap:
+> -	iounmap(bc_timer.base);
+> +	iounmap(timer->base);
+>  
+>  	return ret;
+>  }
+> -- 
+> 1.7.9.5
+> 
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
