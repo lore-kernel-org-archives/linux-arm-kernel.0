@@ -1,9 +1,9 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 30 Jan 2017 12:41:07 +0100
-Subject: [PATCH 05/14] [media] rc: sunxi-cir: simplify optional reset handling
+Date: Mon, 30 Jan 2017 12:41:12 +0100
+Subject: [PATCH 10/14] phy: meson8b-usb2: simplify optional reset handling
 In-Reply-To: <20170130114116.22089-1-p.zabel@pengutronix.de>
 References: <20170130114116.22089-1-p.zabel@pengutronix.de>
-Message-ID: <20170130114116.22089-5-p.zabel@pengutronix.de>
+Message-ID: <20170130114116.22089-10-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,59 +11,47 @@ As of commit bb475230b8e5 ("reset: make optional functions really
 optional"), the reset framework API calls use NULL pointers to describe
 optional, non-present reset controls.
 
-This allows to return errors from devm_reset_control_get_optional and to
-call reset_control_(de)assert unconditionally.
+This allows to return errors from devm_reset_control_get_optional_shared
+and to call reset_control_reset unconditionally.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Cc: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Cc: Kevin Hilman <khilman@baylibre.com>
+Cc: Carlo Caione <carlo@caione.org>
+Cc: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- drivers/media/rc/sunxi-cir.c | 21 +++++++--------------
- 1 file changed, 7 insertions(+), 14 deletions(-)
+ drivers/phy/phy-meson8b-usb2.c | 12 +++++-------
+ 1 file changed, 5 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/media/rc/sunxi-cir.c b/drivers/media/rc/sunxi-cir.c
-index eaadc081760ae..b1e22bd47985e 100644
---- a/drivers/media/rc/sunxi-cir.c
-+++ b/drivers/media/rc/sunxi-cir.c
-@@ -174,16 +174,11 @@ static int sunxi_ir_probe(struct platform_device *pdev)
+diff --git a/drivers/phy/phy-meson8b-usb2.c b/drivers/phy/phy-meson8b-usb2.c
+index 33c9f4ba157d1..87168f1fe3af6 100644
+--- a/drivers/phy/phy-meson8b-usb2.c
++++ b/drivers/phy/phy-meson8b-usb2.c
+@@ -141,12 +141,10 @@ static int phy_meson8b_usb2_power_on(struct phy *phy)
+ 	struct phy_meson8b_usb2_priv *priv = phy_get_drvdata(phy);
+ 	int ret;
  
- 	/* Reset (optional) */
- 	ir->rst = devm_reset_control_get_optional(dev, NULL);
--	if (IS_ERR(ir->rst)) {
--		ret = PTR_ERR(ir->rst);
--		if (ret == -EPROBE_DEFER)
+-	if (!IS_ERR_OR_NULL(priv->reset)) {
+-		ret = reset_control_reset(priv->reset);
+-		if (ret) {
+-			dev_err(&phy->dev, "Failed to trigger USB reset\n");
 -			return ret;
--		ir->rst = NULL;
--	} else {
--		ret = reset_control_deassert(ir->rst);
--		if (ret)
--			return ret;
--	}
-+	if (IS_ERR(ir->rst))
-+		return PTR_ERR(ir->rst);
-+	ret = reset_control_deassert(ir->rst);
-+	if (ret)
+-		}
++	ret = reset_control_reset(priv->reset);
++	if (ret) {
++		dev_err(&phy->dev, "Failed to trigger USB reset\n");
 +		return ret;
+ 	}
  
- 	ret = clk_set_rate(ir->clk, SUNXI_IR_BASE_CLK);
- 	if (ret) {
-@@ -292,8 +287,7 @@ static int sunxi_ir_probe(struct platform_device *pdev)
- exit_clkdisable_apb_clk:
- 	clk_disable_unprepare(ir->apb_clk);
- exit_reset_assert:
--	if (ir->rst)
--		reset_control_assert(ir->rst);
-+	reset_control_assert(ir->rst);
+ 	ret = clk_prepare_enable(priv->clk_usb_general);
+@@ -241,7 +239,7 @@ static int phy_meson8b_usb2_probe(struct platform_device *pdev)
+ 		return PTR_ERR(priv->clk_usb);
  
- 	return ret;
- }
-@@ -305,8 +299,7 @@ static int sunxi_ir_remove(struct platform_device *pdev)
+ 	priv->reset = devm_reset_control_get_optional_shared(&pdev->dev, NULL);
+-	if (PTR_ERR(priv->reset) == -EPROBE_DEFER)
++	if (PTR_ERR(priv->reset))
+ 		return PTR_ERR(priv->reset);
  
- 	clk_disable_unprepare(ir->clk);
- 	clk_disable_unprepare(ir->apb_clk);
--	if (ir->rst)
--		reset_control_assert(ir->rst);
-+	reset_control_assert(ir->rst);
- 
- 	spin_lock_irqsave(&ir->ir_lock, flags);
- 	/* disable IR IRQ */
+ 	priv->dr_mode = of_usb_get_dr_mode_by_phy(pdev->dev.of_node, -1);
 -- 
 2.11.0
