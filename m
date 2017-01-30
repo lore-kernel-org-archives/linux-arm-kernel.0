@@ -1,192 +1,68 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 30 Jan 2017 15:49:04 +0100
-Subject: [RFC v2 03/10] KVM: arm/arm64: Decouple kvm timer functions from
- virtual timer
-In-Reply-To: <1485479100-4966-4-git-send-email-jintack@cs.columbia.edu>
-References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
- <1485479100-4966-4-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <20170130144904.GB16459@cbox>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 30 Jan 2017 14:50:23 +0000
+Subject: ARM64: Disabling warnings about deprecated armv8 instructions
+In-Reply-To: <20170130141308.GV27312@n2100.armlinux.org.uk>
+References: <1485072424.14066.2.camel@crowfest.net>
+ <1485075528.14345.1.camel@crowfest.net>
+ <CAKv+Gu8LU3QjrUa6wMJF3WBNrhx34Pi_0ZUQVfrZy7w7y7237w@mail.gmail.com>
+ <22169925.OhJ0QcnbHM@localhost> <1485087662.1518.1.camel@crowfest.net>
+ <0D1F678D-6F94-4B68-955E-6454F8647FCA@linaro.org>
+ <20170130141308.GV27312@n2100.armlinux.org.uk>
+Message-ID: <CAKv+Gu98i4=COqr_Eikwja28U5MAL83rxe-_QBXWFhJ7v1E6yA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 08:04:53PM -0500, Jintack Lim wrote:
-> Now that we have a separate structure for timer context, make functions
-> general so that they can work with any timer context, not just the
-> virtual timer context.  This does not change the virtual timer
-> functionality.
-> 
-> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
-> ---
->  arch/arm/kvm/arm.c           |  2 +-
->  include/kvm/arm_arch_timer.h |  3 ++-
->  virt/kvm/arm/arch_timer.c    | 55 ++++++++++++++++++++++----------------------
->  3 files changed, 30 insertions(+), 30 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 9d74464..9a34a3c 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -301,7 +301,7 @@ void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
->  
->  int kvm_cpu_has_pending_timer(struct kvm_vcpu *vcpu)
->  {
-> -	return kvm_timer_should_fire(vcpu);
-> +	return kvm_timer_should_fire(vcpu, vcpu_vtimer(vcpu));
->  }
->  
->  void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu)
-> diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-> index 1b9c988..d921d20 100644
-> --- a/include/kvm/arm_arch_timer.h
-> +++ b/include/kvm/arm_arch_timer.h
-> @@ -67,7 +67,8 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
->  u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, u64 regid);
->  int kvm_arm_timer_set_reg(struct kvm_vcpu *, u64 regid, u64 value);
->  
-> -bool kvm_timer_should_fire(struct kvm_vcpu *vcpu);
-> +bool kvm_timer_should_fire(struct kvm_vcpu *vcpu,
-> +			   struct arch_timer_context *timer_ctx);
->  void kvm_timer_schedule(struct kvm_vcpu *vcpu);
->  void kvm_timer_unschedule(struct kvm_vcpu *vcpu);
->  
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index fa4c042..f72005a 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -98,13 +98,13 @@ static void kvm_timer_inject_irq_work(struct work_struct *work)
->  	kvm_vcpu_kick(vcpu);
->  }
->  
-> -static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu)
-> +static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu,
-> +				   struct arch_timer_context *timer_ctx)
+On 30 January 2017 at 14:13, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Sun, Jan 22, 2017 at 01:01:53PM +0000, Ard Biesheuvel wrote:
+>> Emulating unaligned access in the ARM kernel was a mistake: it even
+>> emulates unaligned accesses for instructions like ldm and ldrd, which
+>> require word alignment at the hardware level even in the latest v8
+>> version of the architecture. In contrast, the v8 deprecation warnings
+>> are about enforcing compliance.
+>
+> Ard, you're totally wrong on the unaligned access thing.  Unaligned
+> accesses are a fundamental requirement of the kernel's networking
+> stack.  If you don't have support for unaligned accesses, then you
+> don't have network support - it's as simple as that.
+>
+> So, in order for ARMv5 and earlier to have network support, there
+> was no option to add support for emulating those accesses.
+>
 
-do you need the vcpu parameter here?
+I wasn't aware of that. But does that mean it is simply too much work
+to remove those alignment assumptions? It does not seem like a
+fundamental networking issue to me, but rather a tacit assumption that
+has infected the software implementation.
 
->  {
->  	u64 cval, now;
-> -	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
->  
-> -	cval = vtimer->cnt_cval;
-> -	now = kvm_phys_timer_read() - vtimer->cntvoff;
-> +	cval = timer_ctx->cnt_cval;
-> +	now = kvm_phys_timer_read() - timer_ctx->cntvoff;
->  
->  	if (now < cval) {
->  		u64 ns;
-> @@ -133,7 +133,7 @@ static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
->  	 * PoV (NTP on the host may have forced it to expire
->  	 * early). If we should have slept longer, restart it.
->  	 */
-> -	ns = kvm_timer_compute_delta(vcpu);
-> +	ns = kvm_timer_compute_delta(vcpu, vcpu_vtimer(vcpu));
->  	if (unlikely(ns)) {
->  		hrtimer_forward_now(hrt, ns_to_ktime(ns));
->  		return HRTIMER_RESTART;
-> @@ -143,42 +143,40 @@ static enum hrtimer_restart kvm_timer_expire(struct hrtimer *hrt)
->  	return HRTIMER_NORESTART;
->  }
->  
-> -static bool kvm_timer_irq_can_fire(struct kvm_vcpu *vcpu)
-> +static bool kvm_timer_irq_can_fire(struct arch_timer_context *timer_ctx)
->  {
-> -	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-> -
-> -	return !(vtimer->cnt_ctl & ARCH_TIMER_CTRL_IT_MASK) &&
-> -		(vtimer->cnt_ctl & ARCH_TIMER_CTRL_ENABLE);
-> +	return !(timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_IT_MASK) &&
-> +		(timer_ctx->cnt_ctl & ARCH_TIMER_CTRL_ENABLE);
->  }
->  
-> -bool kvm_timer_should_fire(struct kvm_vcpu *vcpu)
-> +bool kvm_timer_should_fire(struct kvm_vcpu *vcpu,
-> +			   struct arch_timer_context *timer_ctx)
+> The dubious thing was whether to add that for userspace as well.
+> Since soo many applications were broken at the time, and ARM wasn't
+> a sufficiently large community for the applications people to care
+> one shit about, the applications people weren't going to fix their
+> code to avoid unaligned accesses.
+>
+> So, back in the 1990s, we were stuck between having broken userspace
+> and a huge amount of effort needed to maintain ARM specific patches
+> out of tree for lots of applications, or functional userspace.
+>
 
-do you need the vcpu parameter here?
+I see. I was indeed mainly referring to userspace, which is what this
+thread is about, specifically setend and the CP15 barrier
+instructions. You can disagree with ARM's policy to deprecate and
+remove some instructions, but given the reality of it, I think it is
+perfectly reasonable to warn by default about setend instructions
+issued in 32-bit userspace when running under the 64-bit ARMv8 kernel.
 
->  {
-> -	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
->  	u64 cval, now;
->  
-> -	if (!kvm_timer_irq_can_fire(vcpu))
-> +	if (!kvm_timer_irq_can_fire(timer_ctx))
->  		return false;
->  
-> -	cval = vtimer->cnt_cval;
-> -	now = kvm_phys_timer_read() - vtimer->cntvoff;
-> +	cval = timer_ctx->cnt_cval;
-> +	now = kvm_phys_timer_read() - timer_ctx->cntvoff;
->  
->  	return cval <= now;
->  }
->  
-> -static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
-> +static void kvm_timer_update_mapped_irq(struct kvm_vcpu *vcpu, bool new_level,
-> +					struct arch_timer_context *timer_ctx)
->  {
->  	int ret;
-> -	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
->  
->  	BUG_ON(!vgic_initialized(vcpu->kvm));
->  
-> -	vtimer->active_cleared_last = false;
-> -	vtimer->irq.level = new_level;
-> -	trace_kvm_timer_update_irq(vcpu->vcpu_id, vtimer->irq.irq,
-> -				   vtimer->irq.level);
-> +	timer_ctx->active_cleared_last = false;
-> +	timer_ctx->irq.level = new_level;
-> +	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer_ctx->irq.irq,
-> +				   timer_ctx->irq.level);
->  	ret = kvm_vgic_inject_mapped_irq(vcpu->kvm, vcpu->vcpu_id,
-> -					 vtimer->irq.irq,
-> -					 vtimer->irq.level);
-> +					 timer_ctx->irq.irq,
-> +					 timer_ctx->irq.level);
->  	WARN_ON(ret);
->  }
->  
-> @@ -200,8 +198,8 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
->  	if (!vgic_initialized(vcpu->kvm) || !timer->enabled)
->  		return -ENODEV;
->  
-> -	if (kvm_timer_should_fire(vcpu) != vtimer->irq.level)
-> -		kvm_timer_update_irq(vcpu, !vtimer->irq.level);
-> +	if (kvm_timer_should_fire(vcpu, vtimer) != vtimer->irq.level)
-> +		kvm_timer_update_mapped_irq(vcpu, !vtimer->irq.level, vtimer);
->  
->  	return 0;
->  }
-> @@ -214,6 +212,7 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
->  void kvm_timer_schedule(struct kvm_vcpu *vcpu)
->  {
->  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-> +	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
->  
->  	BUG_ON(timer_is_armed(timer));
->  
-> @@ -222,18 +221,18 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
->  	 * already expired, because kvm_vcpu_block will return before putting
->  	 * the thread to sleep.
->  	 */
-> -	if (kvm_timer_should_fire(vcpu))
-> +	if (kvm_timer_should_fire(vcpu, vtimer))
->  		return;
->  
->  	/*
->  	 * If the timer is not capable of raising interrupts (disabled or
->  	 * masked), then there's no more work for us to do.
->  	 */
-> -	if (!kvm_timer_irq_can_fire(vcpu))
-> +	if (!kvm_timer_irq_can_fire(vtimer))
->  		return;
->  
->  	/*  The timer has not yet expired, schedule a background timer */
-> -	timer_arm(timer, kvm_timer_compute_delta(vcpu));
-> +	timer_arm(timer, kvm_timer_compute_delta(vcpu, vtimer));
->  }
->  
->  void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
-> -- 
-> 1.9.1
-> 
-> 
+> Today, the ARM architecture has moved on a long way, and application
+> people care about whether their stuff works on the ARM architecture.
+> It wasn't like that when the unaligned emulation was added.
+>
+> It was not a mistake.  It's one of the reasons why ARM has got where
+> it is today, and probably why the light was finally seen to add
+> hardware support for unaligned accesses to the later CPU architectures.
+>
+
+OK, I stand corrected. I haven't been around nearly as long as Russell
+or some others here on LAKML, so I don't have the historical
+background. On the arm64 side, it is *much* easier to take a normative
+stance, given how new it is.
