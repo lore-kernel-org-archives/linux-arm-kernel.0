@@ -1,40 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 29 Jan 2017 21:04:28 -0800
-Subject: [GIT PULL] STM32 defconfig changes for v4.11 #1
-In-Reply-To: <a31ac10a-474b-72de-0e28-a3ceaa0c709b@st.com>
-References: <a31ac10a-474b-72de-0e28-a3ceaa0c709b@st.com>
-Message-ID: <20170130050428.GN18943@localhost>
+Date: Sun, 29 Jan 2017 21:03:54 -0800
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.11 (#2)
+In-Reply-To: <87k29gwhw3.fsf@free-electrons.com>
+References: <87k29gwhw3.fsf@free-electrons.com>
+Message-ID: <20170130050354.GM18943@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2017 at 06:21:57PM +0100, Alexandre Torgue wrote:
-> Hi Olof, Arnd and Kevin,
+On Fri, Jan 27, 2017 at 06:07:56PM +0100, Gregory CLEMENT wrote:
+> Hi,
 > 
-> Please consider this first round of STM32 defconfig updates for v4.11:
+> Here is the second pull request for dt64 for mvebu for v4.11.
 > 
-> The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+> Gregory
 > 
->   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+> The following changes since commit 58a748f7dc29d8a7bb74c6cbba6a82425dbba5cc:
+> 
+>   ARM64: dts: marvell: Correct license text (2017-01-03 16:24:34 +0100)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git
-> tags/stm32-defconfig-for-v4.11-1
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.11-2
 > 
-> for you to fetch changes up to 770e96f30cc2e4a363dd8fae2e9028173b1f2af1:
+> for you to fetch changes up to 7292ff67b9b28feb3bef97b437f08c7e7568786f:
 > 
->   ARM: configs: stm32: Add RTC support in STM32 defconfig (2017-01-16
-> 14:39:49 +0100)
+>   arm64: dts: marvell: add generic-ahci compatibles for CP110 ahci (2017-01-27 11:13:01 +0100)
 > 
 > ----------------------------------------------------------------
-> STM32 defconfig updates for v4.11, round 1.
+> mvebu dt64 for 4.11 (part 2)
 > 
-> Highlights:
-> ----------
->  - Enable ADC
->  - Enable RTC
+> - Add a new Armada 8K based board: MACCHIATOBin
+> - Enable AHCI on the Armada 7K/8K SoCs
 
 Merged, thanks!
-
 
 -Olof
