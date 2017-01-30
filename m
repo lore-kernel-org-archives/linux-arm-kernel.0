@@ -1,34 +1,52 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 29 Jan 2017 17:32:47 -0800
-Subject: [PATCH] arm64: defconfig: enable CONFIG_MMC_SDHCI_CADENCE
-In-Reply-To: <CAK7LNAR8_Aom6qZyOEV7Kd2AC_UTW3yHL_-u=6ubOBGRNhyrmQ@mail.gmail.com>
-References: <1482718493-6792-1-git-send-email-yamada.masahiro@socionext.com>
- <CAK7LNAR8_Aom6qZyOEV7Kd2AC_UTW3yHL_-u=6ubOBGRNhyrmQ@mail.gmail.com>
-Message-ID: <20170130013247.GH3133@localhost>
+Date: Sun, 29 Jan 2017 17:37:08 -0800
+Subject: [GIT PULL] pxa for v4.11
+In-Reply-To: <87bmuub1hk.fsf@belgarion.home>
+References: <87bmuub1hk.fsf@belgarion.home>
+Message-ID: <20170130013708.GJ3133@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Jan 26, 2017 at 06:34:21PM +0900, Masahiro Yamada wrote:
-> Hi Arnd, Olof,
+On Thu, Jan 26, 2017 at 10:43:19AM +0100, Robert Jarzmik wrote:
 > 
+> Hello Arnd, Kevin, Olof,
 > 
-> 2016-12-26 11:14 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> > Enable the Cadence SD/SDIO/eMMC controller.  This is used on
-> > Socionext UniPhier SoC family.
-> >
-> > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Please consider this pull request for pxa 4.11 cycle, which is a very tiny one.
 > 
+> The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 > 
-> Can you pick up this for ASOC, please?
+>   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/rjarzmik/linux.git tags/pxa-for-4.11
+> 
+> for you to fetch changes up to d9bd264596b9ec364990ab64c8cc1792586425e3:
+> 
+>   MAINTAINERS: transfer maintainership for the EZX platform (2017-01-26 09:52:51 +0100)
+> 
+> ----------------------------------------------------------------
+> This is the pxa changes for v4.11 cycle.
+> 
+> This cycle is a minor fixes one, covering :
+>  - build fixes from Arnd, mainly include related
+>  - transfer of maintainance of Motorala phone to Robert
+> 
+> ----------------------------------------------------------------
+> Arnd Bergmann (2):
+>       ARM: pxa: ezx: fix a910 camera data
+>       ARM: pxa: include linux/leds.h
+> 
+> Stefan Schmidt (1):
+>       MAINTAINERS: transfer maintainership for the EZX platform
+> 
+>  MAINTAINERS             |  8 ++-----
+>  arch/arm/mach-pxa/ezx.c | 56 ++++++++++++++++++++++++++-----------------------
+>  arch/arm/mach-pxa/idp.c |  1 +
+>  3 files changed, 33 insertions(+), 32 deletions(-)
+> 
 
-ASOC? ASoC is usually Audio SoC, so you should probably use arm-soc as a term
-to refer to our tree to avoid confusion.
+Merged, thanks!
 
-That being said -- applied.
-
-
-Thanks,
 
 -Olof
