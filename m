@@ -1,128 +1,21 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 30 Jan 2017 18:18:47 +0100
-Subject: [PATCH 1/2] watchdog: sama5d4: Cache MR instead of a partial config
-Message-ID: <20170130171848.31598-1-alexandre.belloni@free-electrons.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 30 Jan 2017 17:19:18 +0000
+Subject: [PATCH v2 1/3] arm64: cacheinfo: add support for alternative
+ format of CCSIDR_EL1
+In-Reply-To: <568a27c1-f910-46e8-7283-2040e28df380@arm.com>
+References: <1485793527-18028-1-git-send-email-sudeep.holla@arm.com>
+ <ad552a58-4acd-f2ab-7d40-124b40c6c014@arm.com>
+ <568a27c1-f910-46e8-7283-2040e28df380@arm.com>
+Message-ID: <ca857fb8-15f9-4b03-3b5a-fbc16d5ff7d3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-.config is used to cache a part of WDT_MR at probe time and is not used
-afterwards. Instead of doing that, actually cache MR and avoid reading it
-every time it is modified.
+On 30/01/17 16:57, Sudeep Holla wrote:
+>> Could this be static ? I could not see it used anywhere else outside
+>> this file.
+>
+> Used in arch/arm64/kernel/cpuinfo.c
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- drivers/watchdog/sama5d4_wdt.c | 45 ++++++++++++++++++------------------------
- 1 file changed, 19 insertions(+), 26 deletions(-)
+Ah, you're right.
 
-diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
-index a49634cdc1cc..6dd07bef515a 100644
---- a/drivers/watchdog/sama5d4_wdt.c
-+++ b/drivers/watchdog/sama5d4_wdt.c
-@@ -28,7 +28,7 @@
- struct sama5d4_wdt {
- 	struct watchdog_device	wdd;
- 	void __iomem		*reg_base;
--	u32	config;
-+	u32			mr;
- };
- 
- static int wdt_timeout = WDT_DEFAULT_TIMEOUT;
-@@ -53,11 +53,9 @@ MODULE_PARM_DESC(nowayout,
- static int sama5d4_wdt_start(struct watchdog_device *wdd)
- {
- 	struct sama5d4_wdt *wdt = watchdog_get_drvdata(wdd);
--	u32 reg;
- 
--	reg = wdt_read(wdt, AT91_WDT_MR);
--	reg &= ~AT91_WDT_WDDIS;
--	wdt_write(wdt, AT91_WDT_MR, reg);
-+	wdt->mr &= ~AT91_WDT_WDDIS;
-+	wdt_write(wdt, AT91_WDT_MR, wdt->mr);
- 
- 	return 0;
- }
-@@ -65,11 +63,9 @@ static int sama5d4_wdt_start(struct watchdog_device *wdd)
- static int sama5d4_wdt_stop(struct watchdog_device *wdd)
- {
- 	struct sama5d4_wdt *wdt = watchdog_get_drvdata(wdd);
--	u32 reg;
- 
--	reg = wdt_read(wdt, AT91_WDT_MR);
--	reg |= AT91_WDT_WDDIS;
--	wdt_write(wdt, AT91_WDT_MR, reg);
-+	wdt->mr |= AT91_WDT_WDDIS;
-+	wdt_write(wdt, AT91_WDT_MR, wdt->mr);
- 
- 	return 0;
- }
-@@ -88,14 +84,12 @@ static int sama5d4_wdt_set_timeout(struct watchdog_device *wdd,
- {
- 	struct sama5d4_wdt *wdt = watchdog_get_drvdata(wdd);
- 	u32 value = WDT_SEC2TICKS(timeout);
--	u32 reg;
- 
--	reg = wdt_read(wdt, AT91_WDT_MR);
--	reg &= ~AT91_WDT_WDV;
--	reg &= ~AT91_WDT_WDD;
--	reg |= AT91_WDT_SET_WDV(value);
--	reg |= AT91_WDT_SET_WDD(value);
--	wdt_write(wdt, AT91_WDT_MR, reg);
-+	wdt->mr &= ~AT91_WDT_WDV;
-+	wdt->mr &= ~AT91_WDT_WDD;
-+	wdt->mr |= AT91_WDT_SET_WDV(value);
-+	wdt->mr |= AT91_WDT_SET_WDD(value);
-+	wdt_write(wdt, AT91_WDT_MR, wdt->mr);
- 
- 	wdd->timeout = timeout;
- 
-@@ -132,19 +126,19 @@ static int of_sama5d4_wdt_init(struct device_node *np, struct sama5d4_wdt *wdt)
- {
- 	const char *tmp;
- 
--	wdt->config = AT91_WDT_WDDIS;
-+	wdt->mr = AT91_WDT_WDDIS;
- 
- 	if (!of_property_read_string(np, "atmel,watchdog-type", &tmp) &&
- 	    !strcmp(tmp, "software"))
--		wdt->config |= AT91_WDT_WDFIEN;
-+		wdt->mr |= AT91_WDT_WDFIEN;
- 	else
--		wdt->config |= AT91_WDT_WDRSTEN;
-+		wdt->mr |= AT91_WDT_WDRSTEN;
- 
- 	if (of_property_read_bool(np, "atmel,idle-halt"))
--		wdt->config |= AT91_WDT_WDIDLEHLT;
-+		wdt->mr |= AT91_WDT_WDIDLEHLT;
- 
- 	if (of_property_read_bool(np, "atmel,dbg-halt"))
--		wdt->config |= AT91_WDT_WDDBGHLT;
-+		wdt->mr |= AT91_WDT_WDDBGHLT;
- 
- 	return 0;
- }
-@@ -163,11 +157,10 @@ static int sama5d4_wdt_init(struct sama5d4_wdt *wdt)
- 	reg &= ~AT91_WDT_WDDIS;
- 	wdt_write(wdt, AT91_WDT_MR, reg);
- 
--	reg = wdt->config;
--	reg |= AT91_WDT_SET_WDD(value);
--	reg |= AT91_WDT_SET_WDV(value);
-+	wdt->mr |= AT91_WDT_SET_WDD(value);
-+	wdt->mr |= AT91_WDT_SET_WDV(value);
- 
--	wdt_write(wdt, AT91_WDT_MR, reg);
-+	wdt_write(wdt, AT91_WDT_MR, wdt->mr);
- 
- 	return 0;
- }
-@@ -211,7 +204,7 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
- 			return ret;
- 	}
- 
--	if ((wdt->config & AT91_WDT_WDFIEN) && irq) {
-+	if ((wdt->mr & AT91_WDT_WDFIEN) && irq) {
- 		ret = devm_request_irq(&pdev->dev, irq, sama5d4_wdt_irq_handler,
- 				       IRQF_SHARED | IRQF_IRQPOLL |
- 				       IRQF_NO_SUSPEND, pdev->name, pdev);
--- 
-2.11.0
+Suzuki
