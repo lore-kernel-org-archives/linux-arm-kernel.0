@@ -1,35 +1,51 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 30 Jan 2017 14:57:38 +0100
-Subject: [PATCH 0/5] Add EXTI GPIO trigger support to STM32 ADC
-Message-ID: <1485784663-19505-1-git-send-email-fabrice.gasnier@st.com>
+Date: Mon, 30 Jan 2017 14:57:43 +0100
+Subject: [PATCH 5/5] iio: adc: stm32: add exti11 gpio trigger source
+In-Reply-To: <1485784663-19505-1-git-send-email-fabrice.gasnier@st.com>
+References: <1485784663-19505-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1485784663-19505-6-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-STM32 ADC, can use GPIOs configured as EXTI line (external interrupt)
-as trigger source for conversions.
-This patchset is based on latest IIO testing branch, and adds support
-for EXTi GPIO triggers in IIO.
-It also adds a dt option to configure default trigger polarity in
-STM32 ADC driver.
+STM32F4 ADC can use exti11 (gpio) signal as trigger source for
+conversions.
 
-Fabrice Gasnier (5):
-  Documentation: dt: iio: document stm32 adc trigger polarity
-  iio: adc: stm32: add dt option to set default trigger polarity
-  Documentation: dt: iio: document stm32 exti trigger
-  iio: trigger: add support for STM32 EXTI triggers
-  iio: adc: stm32: add exti11 gpio trigger source
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+ drivers/iio/adc/stm32-adc.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
- .../devicetree/bindings/iio/adc/st,stm32-adc.txt   |   3 +
- .../bindings/iio/trigger/st,stm32-exti-trigger.txt |  17 +++
- drivers/iio/adc/stm32-adc.c                        |  14 +++
- drivers/iio/trigger/Kconfig                        |  10 ++
- drivers/iio/trigger/Makefile                       |   1 +
- drivers/iio/trigger/stm32-exti-trigger.c           | 124 +++++++++++++++++++++
- include/linux/iio/trigger/stm32-exti-trigger.h     |  26 +++++
- 7 files changed, 195 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/iio/trigger/st,stm32-exti-trigger.txt
- create mode 100644 drivers/iio/trigger/stm32-exti-trigger.c
- create mode 100644 include/linux/iio/trigger/stm32-exti-trigger.h
-
+diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
+index be0e457..0118c9c 100644
+--- a/drivers/iio/adc/stm32-adc.c
++++ b/drivers/iio/adc/stm32-adc.c
+@@ -26,6 +26,7 @@
+ #include <linux/iio/iio.h>
+ #include <linux/iio/buffer.h>
+ #include <linux/iio/timer/stm32-timer-trigger.h>
++#include <linux/iio/trigger/stm32-exti-trigger.h>
+ #include <linux/iio/trigger.h>
+ #include <linux/iio/trigger_consumer.h>
+ #include <linux/iio/triggered_buffer.h>
+@@ -240,6 +241,7 @@ struct stm32_adc_chan_spec {
+ 	{ TIM5_CH3, STM32_EXT12 },
+ 	{ TIM8_CH1, STM32_EXT13 },
+ 	{ TIM8_TRGO, STM32_EXT14 },
++	{ STM32_EXTI(11), STM32_EXT15 },
+ 	{}, /* sentinel */
+ };
+ 
+@@ -409,6 +411,11 @@ static int stm32_adc_get_trig_extsel(struct iio_trigger *trig)
+ 		    !strcmp(stm32f4_adc_trigs[i].name, trig->name)) {
+ 			return stm32f4_adc_trigs[i].extsel;
+ 		}
++
++		if (is_stm32_exti_trigger(trig) &&
++		    !strcmp(stm32f4_adc_trigs[i].name, trig->name)) {
++			return stm32f4_adc_trigs[i].extsel;
++		}
+ 	}
+ 
+ 	return -EINVAL;
 -- 
 1.9.1
