@@ -1,44 +1,73 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Mon, 30 Jan 2017 11:01:58 +0100
-Subject: [PATCH v7 01/14] devicetree: bindings: add bindings for ahci-da850
+Date: Mon, 30 Jan 2017 11:02:05 +0100
+Subject: [PATCH v7 08/14] sata: ahci-da850: implement a workaround for the
+ softreset quirk
 In-Reply-To: <1485770531-6772-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1485770531-6772-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1485770531-6772-2-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1485770531-6772-9-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT bindings for the TI DA850 AHCI SATA controller.
+There's an issue with the da850 SATA controller: if port multiplier
+support is compiled in, but we're connecting the drive directly to
+the SATA port on the board, the drive can't be detected.
+
+To make SATA work on the da850-lcdk board: first try to softreset
+with pmp - if the operation fails with -EBUSY, retry without pmp.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Tejun Heo <tj@kernel.org>
 ---
- Documentation/devicetree/bindings/ata/ahci-da850.txt | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/ata/ahci-da850.txt
+ drivers/ata/ahci_da850.c | 33 ++++++++++++++++++++++++++++++++-
+ 1 file changed, 32 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/ata/ahci-da850.txt b/Documentation/devicetree/bindings/ata/ahci-da850.txt
-new file mode 100644
-index 0000000..5f81934
---- /dev/null
-+++ b/Documentation/devicetree/bindings/ata/ahci-da850.txt
-@@ -0,0 +1,18 @@
-+Device tree binding for the TI DA850 AHCI SATA Controller
-+---------------------------------------------------------
+diff --git a/drivers/ata/ahci_da850.c b/drivers/ata/ahci_da850.c
+index 72126a0..84c7805 100644
+--- a/drivers/ata/ahci_da850.c
++++ b/drivers/ata/ahci_da850.c
+@@ -54,11 +54,42 @@ static void da850_sata_init(struct device *dev, void __iomem *pwrdn_reg,
+ 	writel(val, ahci_base + SATA_P0PHYCR_REG);
+ }
+ 
++static int ahci_da850_softreset(struct ata_link *link,
++				unsigned int *class, unsigned long deadline)
++{
++	int pmp, ret;
 +
-+Required properties:
-+  - compatible: must be "ti,da850-ahci"
-+  - reg: physical base addresses and sizes of the two register regions
-+         used by the controller: the register map as defined by the
-+         AHCI 1.1 standard and the Power Down Control Register (PWRDN)
-+         for enabling/disabling the SATA clock receiver
-+  - interrupts: interrupt specifier (refer to the interrupt binding)
++	pmp = sata_srst_pmp(link);
 +
-+Example:
++	/*
++	 * There's an issue with the SATA controller on da850 SoCs: if we
++	 * enable Port Multiplier support, but the drive is connected directly
++	 * to the board, it can't be detected. As a workaround: if PMP is
++	 * enabled, we first call ahci_do_softreset() and pass it the result of
++	 * sata_srst_pmp(). If this call fails, we retry with pmp = 0.
++	 */
++	ret = ahci_do_softreset(link, class, pmp, deadline, ahci_check_ready);
++	if (pmp && ret == -EBUSY)
++		return ahci_do_softreset(link, class, 0,
++					 deadline, ahci_check_ready);
 +
-+	sata: sata at 218000 {
-+		compatible = "ti,da850-ahci";
-+		reg = <0x218000 0x2000>, <0x22c018 0x4>;
-+		interrupts = <67>;
-+	};
++	return ret;
++}
++
++static struct ata_port_operations ahci_da850_port_ops = {
++	.inherits = &ahci_platform_ops,
++	.softreset = ahci_da850_softreset,
++	/*
++	 * No need to override .pmp_softreset - it's only used for actual
++	 * PMP-enabled ports.
++	 */
++};
++
+ static const struct ata_port_info ahci_da850_port_info = {
+ 	.flags		= AHCI_FLAG_COMMON,
+ 	.pio_mask	= ATA_PIO4,
+ 	.udma_mask	= ATA_UDMA6,
+-	.port_ops	= &ahci_platform_ops,
++	.port_ops	= &ahci_da850_port_ops,
+ };
+ 
+ static struct scsi_host_template ahci_platform_sht = {
 -- 
 2.9.3
