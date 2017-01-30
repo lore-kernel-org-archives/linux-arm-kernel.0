@@ -1,49 +1,72 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 30 Jan 2017 09:51:28 +0100
-Subject: [PATCH] MAINTAINERS: extend Raspberry Pi entry
-In-Reply-To: <1485763772.13537.1.camel@crowfest.net>
-References: <b2e1e59a752395314a20e846337cb70cf22f2959.1485720503.git.baruch@tkos.co.il>
- <1485723150.30797.1.camel@crowfest.net>
- <20170129210611.k46ey35py3ht3fe7@tarshish>
- <1485726109.30797.5.camel@crowfest.net>
- <20170129215253.hwhwsqoulhmjxs55@tarshish>
- <1485727324.30797.7.camel@crowfest.net>
- <1485728648.30797.9.camel@crowfest.net>
- <20170130075609.pcrujbzdnabkmuux@pengutronix.de>
- <1485763772.13537.1.camel@crowfest.net>
-Message-ID: <20170130085128.wewxe6rw42hoqdpu@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 30 Jan 2017 08:53:09 +0000
+Subject: [PULL v2] ARM: DTS: Fix broken GICv2 register maps
+Message-ID: <1485766389-30811-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2017 at 12:09:32AM -0800, Michael Zoran wrote:
-> On Mon, 2017-01-30 at 08:56 +0100, Uwe Kleine-K?nig wrote:
-> > On Sun, Jan 29, 2017 at 02:24:08PM -0800, Michael Zoran wrote:
-> > I don't agree. To be able to review a driver to a Broadcom specific
-> > spi
-> > driver, you need to know more about spi than about Broadcom.
-> > 
-> 
-> I would say that's 50/50.  Some of these drivers like I2C or SPI
-> are?not really that complex.  The complexity happens when people begin
-> to try to connect the various drivers in arbitrary ways at which point
-> things begin to break.
-> 
-> SOCs are designed with cost in mind, so allowing arbitrary
-> configurations are not aways possible because of attempts to limits the
-> amount of hardware resources required and the complexity. And I don't
-> think this is specific to Broadcom or anybody. It's just the way SOCs
-> work.
-> 
-> This is all vary different from PCs where you expect people to buy
-> random parts and start connecting them together.  For the reasons I
-> have given, SOCs arn't quite as flexible.
+ARM-soc folks,
 
-I fail to follow here. Can you please show an example where you see a
-benefit from having the drivers grouped by SoC instead of bus type?
+Please find below the pull request for a DT fix affecting a large
+number of 32bit platforms, which has been acked by a number of
+platform maintainers.
 
-Best regards
-Uwe
+* From v1: Dropped the controvertial cortex-a15-gic->arm,gic-400
+  change in the example, at Rob's request.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+The following changes since commit 49def1853334396f948dcb4cedb9347abb318df5:
+
+  Linux 4.10-rc4 (2017-01-15 16:21:59 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/gic-v2-dt
+
+for you to fetch changes up to 84fcda8e194838ddbc06843e54a9ca9371ec4b82:
+
+  ARM: DTS: Fix register map for virt-capable GIC (2017-01-30 08:45:25 +0000)
+
+----------------------------------------------------------------
+Marc Zyngier (2):
+      dt-bindings: arm,gic: Fix binding example for a virt-capable GIC
+      ARM: DTS: Fix register map for virt-capable GIC
+
+ Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt | 2 +-
+ arch/arm/boot/dts/alpine.dtsi                                      | 2 +-
+ arch/arm/boot/dts/axm55xx.dtsi                                     | 2 +-
+ arch/arm/boot/dts/dra7.dtsi                                        | 2 +-
+ arch/arm/boot/dts/ecx-2000.dts                                     | 2 +-
+ arch/arm/boot/dts/exynos3250.dtsi                                  | 2 +-
+ arch/arm/boot/dts/exynos5.dtsi                                     | 4 ++--
+ arch/arm/boot/dts/exynos5260.dtsi                                  | 2 +-
+ arch/arm/boot/dts/exynos5440.dtsi                                  | 2 +-
+ arch/arm/boot/dts/imx6ul.dtsi                                      | 4 ++--
+ arch/arm/boot/dts/keystone-k2g.dtsi                                | 4 ++--
+ arch/arm/boot/dts/keystone.dtsi                                    | 4 ++--
+ arch/arm/boot/dts/ls1021a.dtsi                                     | 4 ++--
+ arch/arm/boot/dts/mt2701.dtsi                                      | 2 +-
+ arch/arm/boot/dts/mt6580.dtsi                                      | 2 +-
+ arch/arm/boot/dts/mt6589.dtsi                                      | 2 +-
+ arch/arm/boot/dts/mt7623.dtsi                                      | 2 +-
+ arch/arm/boot/dts/mt8127.dtsi                                      | 2 +-
+ arch/arm/boot/dts/mt8135.dtsi                                      | 2 +-
+ arch/arm/boot/dts/omap5.dtsi                                       | 2 +-
+ arch/arm/boot/dts/r8a73a4.dtsi                                     | 2 +-
+ arch/arm/boot/dts/r8a7743.dtsi                                     | 2 +-
+ arch/arm/boot/dts/r8a7745.dtsi                                     | 2 +-
+ arch/arm/boot/dts/r8a7790.dtsi                                     | 2 +-
+ arch/arm/boot/dts/r8a7791.dtsi                                     | 2 +-
+ arch/arm/boot/dts/r8a7792.dtsi                                     | 2 +-
+ arch/arm/boot/dts/r8a7793.dtsi                                     | 2 +-
+ arch/arm/boot/dts/r8a7794.dtsi                                     | 2 +-
+ arch/arm/boot/dts/rk1108.dtsi                                      | 2 +-
+ arch/arm/boot/dts/rk3036.dtsi                                      | 2 +-
+ arch/arm/boot/dts/rk322x.dtsi                                      | 2 +-
+ arch/arm/boot/dts/rk3288.dtsi                                      | 2 +-
+ arch/arm/boot/dts/sun6i-a31.dtsi                                   | 2 +-
+ arch/arm/boot/dts/sun7i-a20.dtsi                                   | 4 ++--
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi                               | 2 +-
+ arch/arm/boot/dts/sun8i-a83t.dtsi                                  | 2 +-
+ arch/arm/boot/dts/sun8i-h3.dtsi                                    | 2 +-
+ arch/arm/boot/dts/sun9i-a80.dtsi                                   | 2 +-
+ 38 files changed, 44 insertions(+), 44 deletions(-)
