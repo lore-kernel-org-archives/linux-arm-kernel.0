@@ -1,8 +1,8 @@
 From: shailendra.v@samsung.com (Shailendra Verma)
-Date: Mon, 30 Jan 2017 10:17:14 +0530
-Subject: [PATCH] iio: adc - Fix possible NULL derefrence.
-References: <CGME20170130044724epcas3p444b23d43fed213511e6994ecb4ed0ef3@epcas3p4.samsung.com>
-Message-ID: <1485751634-28963-1-git-send-email-shailendra.v@samsung.com>
+Date: Mon, 30 Jan 2017 10:22:33 +0530
+Subject: [PATCH] pwm - Fix possible NULL derefrence.
+References: <CGME20170130045241epcas1p2a5a0625327e4caab59236ec85551f95e@epcas1p2.samsung.com>
+Message-ID: <1485751953-29341-1-git-send-email-shailendra.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,56 +11,40 @@ pointer dereference later.
 
 Signed-off-by: Shailendra Verma <shailendra.v@samsung.com>
 ---
- drivers/iio/adc/mxs-lradc.c       |   14 ++++++++++----
- drivers/iio/adc/rockchip_saradc.c |    4 ++++
- 2 files changed, 14 insertions(+), 4 deletions(-)
+ drivers/pwm/pwm-sun4i.c |    4 ++++
+ drivers/pwm/pwm-tegra.c |    5 +++++
+ 2 files changed, 9 insertions(+)
 
-diff --git a/drivers/iio/adc/mxs-lradc.c b/drivers/iio/adc/mxs-lradc.c
-index b84d37c..4308a59 100644
---- a/drivers/iio/adc/mxs-lradc.c
-+++ b/drivers/iio/adc/mxs-lradc.c
-@@ -1570,10 +1570,8 @@ static int mxs_lradc_probe_touchscreen(struct mxs_lradc *lradc,
+diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
+index b0803f6..9b5c6fe 100644
+--- a/drivers/pwm/pwm-sun4i.c
++++ b/drivers/pwm/pwm-sun4i.c
+@@ -321,6 +321,10 @@ static int sun4i_pwm_probe(struct platform_device *pdev)
+ 	const struct of_device_id *match;
  
- static int mxs_lradc_probe(struct platform_device *pdev)
- {
--	const struct of_device_id *of_id =
--		of_match_device(mxs_lradc_dt_ids, &pdev->dev);
--	const struct mxs_lradc_of_config *of_cfg =
--		&mxs_lradc_of_config[(enum mxs_lradc_id)of_id->data];
-+	const struct of_device_id *of_id;
-+	const struct mxs_lradc_of_config *of_cfg;
- 	struct device *dev = &pdev->dev;
- 	struct device_node *node = dev->of_node;
- 	struct mxs_lradc *lradc;
-@@ -1583,6 +1581,14 @@ static int mxs_lradc_probe(struct platform_device *pdev)
- 	int i, s;
- 	u64 scale_uv;
- 
-+	of_id = of_match_device(mxs_lradc_dt_ids, &pdev->dev);
-+	if (!of_id) {
-+		dev_err(&pdev->dev, "Error: No device match found\n");
-+		return -ENODEV;
-+	}
-+
-+	of_cfg = &mxs_lradc_of_config[(enum mxs_lradc_id)of_id->data];
-+
- 	/* Allocate the IIO device. */
- 	iio = devm_iio_device_alloc(dev, sizeof(*lradc));
- 	if (!iio) {
-diff --git a/drivers/iio/adc/rockchip_saradc.c b/drivers/iio/adc/rockchip_saradc.c
-index 85d7012..08dfb43 100644
---- a/drivers/iio/adc/rockchip_saradc.c
-+++ b/drivers/iio/adc/rockchip_saradc.c
-@@ -224,6 +224,10 @@ static int rockchip_saradc_probe(struct platform_device *pdev)
- 	info = iio_priv(indio_dev);
- 
- 	match = of_match_device(rockchip_saradc_match, &pdev->dev);
+ 	match = of_match_device(sun4i_pwm_dt_ids, &pdev->dev);
 +	if (!match) {
 +		dev_err(&pdev->dev, "Error: No device match found\n");
 +		return -ENODEV;
 +	}
- 	info->data = match->data;
  
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
+ 	if (!pwm)
+diff --git a/drivers/pwm/pwm-tegra.c b/drivers/pwm/pwm-tegra.c
+index e464784..a5eb224 100644
+--- a/drivers/pwm/pwm-tegra.c
++++ b/drivers/pwm/pwm-tegra.c
+@@ -185,6 +185,11 @@ static int tegra_pwm_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 
+ 	pwm->soc = of_device_get_match_data(&pdev->dev);
++	if (!pwm->soc) {
++		dev_err(&pdev->dev, "no device match found\n");
++		return -ENODEV;
++	}
++
+ 	pwm->dev = &pdev->dev;
+ 
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 -- 
 1.7.9.5
