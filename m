@@ -1,73 +1,46 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Mon, 30 Jan 2017 12:33:07 +0000
-Subject: [PATCH 04/14] [media] st_rc: simplify optional reset handling
-In-Reply-To: <20170130114116.22089-4-p.zabel@pengutronix.de>
-References: <20170130114116.22089-1-p.zabel@pengutronix.de>
- <20170130114116.22089-4-p.zabel@pengutronix.de>
-Message-ID: <fdf0cbe3-ef13-4e95-668e-c586d750846c@st.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 30 Jan 2017 13:36:47 +0100
+Subject: [PATCH -next] mtd: nand: mediatek: remove redundant dev_err
+ call in mtk_nfc_probe()
+In-Reply-To: <20170117142246.9607-1-weiyj.lk@gmail.com>
+References: <20170117142246.9607-1-weiyj.lk@gmail.com>
+Message-ID: <20170130133647.1c383bd8@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 17 Jan 2017 14:22:46 +0000
+Wei Yongjun <weiyj.lk@gmail.com> wrote:
 
+> From: Wei Yongjun <weiyongjun1@huawei.com>
+> 
+> There is a error message within devm_ioremap_resource
+> already, so remove the dev_err call to avoid redundant
+> error message.
+> 
 
-On 01/30/2017 12:41 PM, Philipp Zabel wrote:
-> As of commit bb475230b8e5 ("reset: make optional functions really
-> optional"), the reset framework API calls use NULL pointers to describe
-> optional, non-present reset controls.
->
-> This allows to return errors from reset_control_get_optional and to call
-> reset_control_(de)assert unconditionally.
->
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Cc: Patrice Chotard <patrice.chotard@st.com>
-> Cc: Mauro Carvalho Chehab <mchehab@kernel.org>
+Applied.
+
+Thanks,
+
+Boris
+
+> Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
 > ---
->  drivers/media/rc/st_rc.c | 13 ++++++-------
->  1 file changed, 6 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/media/rc/st_rc.c b/drivers/media/rc/st_rc.c
-> index 1fa0c9d1c5083..04e694b707b45 100644
-> --- a/drivers/media/rc/st_rc.c
-> +++ b/drivers/media/rc/st_rc.c
-> @@ -165,8 +165,7 @@ static void st_rc_hardware_init(struct st_rc_device *dev)
->  	unsigned int rx_sampling_freq_div;
->
->  	/* Enable the IP */
-> -	if (dev->rstc)
-> -		reset_control_deassert(dev->rstc);
-> +	reset_control_deassert(dev->rstc);
->
->  	clk_prepare_enable(dev->sys_clock);
->  	baseclock = clk_get_rate(dev->sys_clock);
-> @@ -281,10 +280,11 @@ static int st_rc_probe(struct platform_device *pdev)
->  	else
->  		rc_dev->rx_base = rc_dev->base;
->
-> -
->  	rc_dev->rstc = reset_control_get_optional(dev, NULL);
-> -	if (IS_ERR(rc_dev->rstc))
-> -		rc_dev->rstc = NULL;
-> +	if (IS_ERR(rc_dev->rstc)) {
-> +		ret = PTR_ERR(rc_dev->rstc);
-> +		goto err;
-> +	}
->
->  	rc_dev->dev = dev;
->  	platform_set_drvdata(pdev, rc_dev);
-> @@ -353,8 +353,7 @@ static int st_rc_suspend(struct device *dev)
->  		writel(0x00, rc_dev->rx_base + IRB_RX_EN);
->  		writel(0x00, rc_dev->rx_base + IRB_RX_INT_EN);
->  		clk_disable_unprepare(rc_dev->sys_clock);
-> -		if (rc_dev->rstc)
-> -			reset_control_assert(rc_dev->rstc);
-> +		reset_control_assert(rc_dev->rstc);
+>  drivers/mtd/nand/mtk_nand.c | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/drivers/mtd/nand/mtk_nand.c b/drivers/mtd/nand/mtk_nand.c
+> index 6c3eed3..6c517c6 100644
+> --- a/drivers/mtd/nand/mtk_nand.c
+> +++ b/drivers/mtd/nand/mtk_nand.c
+> @@ -1383,7 +1383,6 @@ static int mtk_nfc_probe(struct platform_device *pdev)
+>  	nfc->regs = devm_ioremap_resource(dev, res);
+>  	if (IS_ERR(nfc->regs)) {
+>  		ret = PTR_ERR(nfc->regs);
+> -		dev_err(dev, "no nfi base\n");
+>  		goto release_ecc;
 >  	}
->
->  	return 0;
->
-
-Hi Philipp
-
-Acked-by: Patrice Chotard <patrice.chotard@st.com>
-
-Thanks
+>  
+> 
+> 
+> 
