@@ -1,167 +1,98 @@
-From: kim.phillips@arm.com (Kim Phillips)
-Date: Mon, 30 Jan 2017 13:03:12 -0600
-Subject: [PATCH 09/10] drivers/perf: Add support for ARMv8.2 Statistical
- Profiling Extension
-In-Reply-To: <1485540470-11469-10-git-send-email-will.deacon@arm.com>
-References: <1485540470-11469-1-git-send-email-will.deacon@arm.com>
- <1485540470-11469-10-git-send-email-will.deacon@arm.com>
-Message-ID: <20170130130312.09e4aef34c685f4c228aba50@arm.com>
+From: roy.pledge@nxp.com (Roy Pledge)
+Date: Mon, 30 Jan 2017 19:04:08 +0000
+Subject: [PATCH 06/10] soc/qbman: Add ARM equivalent for
+ flush_dcache_range()
+References: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
+ <VI1PR0401MB2430DA6BD2F857C30EC86A50917F0@VI1PR0401MB2430.eurprd04.prod.outlook.com>
+ <HE1PR0401MB263638F320470CA216990BCC86720@HE1PR0401MB2636.eurprd04.prod.outlook.com>
+ <5414359.8GMja3pNrI@wuerfel>
+ <VI1PR0401MB24303C4A5C0042005E17F1A391770@VI1PR0401MB2430.eurprd04.prod.outlook.com>
+ <CAK8P3a1Gd4bd7GjEp_a9WXc_mTPk0XmP7DH8aPWhbn2K3MMuDQ@mail.gmail.com>
+ <1485570872.9266.22.camel@buserror.net>
+ <d5ca6bcd-1d1a-2a61-1f5c-9086a67f629a@arm.com>
+Message-ID: <HE1PR0401MB2636FF4D977DDA6888616A26864B0@HE1PR0401MB2636.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 Jan 2017 18:07:48 +0000
-Will Deacon <will.deacon@arm.com> wrote:
+On 1/30/2017 10:31 AM, Robin Murphy wrote:
+> On 28/01/17 02:34, Scott Wood wrote:
+>> On Fri, 2017-01-27 at 17:41 +0100, Arnd Bergmann wrote:
+>>> On Thu, Jan 26, 2017 at 6:08 AM, Scott Wood <scott.wood@nxp.com> wrote:
+>>>> On 01/25/2017 03:20 PM, Arnd Bergmann wrote:
+>>>>> On Monday, January 23, 2017 7:24:59 PM CET Roy Pledge wrote:
+>>>>> If this is normal RAM, you should be able to just write zeroes, and then
+>>>>> do a dma_map_single() for initialization.
+>>>> The DMA API on PPC currently has no way of knowing that the device
+>>>> accesses this memory incoherently.
+>>> Ah, this is because PPC doesn't use the 'dma-coherent' property on devices
+>>> but just assumes that coherency is a global property of the platform,right?
+>> Right.
+>>
+>>>> If that were somehow fixed, we still couldn't use dma_map_single() as it
+>>>> doesn't accept virtual addresses that come from memremap() or similar
+>>>> dynamic mappings.  We'd have to convert the physical address to an array
+>>>> of struct pages and pass each one to dma_map_page().
+>>> Sorry for my ignorance, but where does the memory come from to start
+>>> with? Is this in the normal linearly mapped RAM, in a carveout outside
+>>> of the linear mapping but the same memory, or in some on-chip buffer?
+>> It's RAM that comes from the device tree reserved memory mechanism
+>> (drivers/of/of_reserved_mem.c).  On a 32-bit kernel it is not guaranteed (or
+>> likely) to be lowmem.
+> Wouldn't dma_declare_coherent_memory() be the appropriate tool for that
+> job, then (modulo the PPC issue)? On ARM that should result in
+> dma_alloc_coherent() giving back a non-cacheable mapping if the device
+> is non-coherent, wherein a dmb_wmb() after writing the data from the CPU
+> side should be enough to ensure it is published to the device.
+I think there is some confusion here (and it may very well be mine).
 
-> +/* Perf callbacks */
-> +static int arm_spe_pmu_event_init(struct perf_event *event)
-> +{
-> +	u64 reg;
-> +	struct perf_event_attr *attr = &event->attr;
-> +	struct arm_spe_pmu *spe_pmu = to_spe_pmu(event->pmu);
-> +
-> +	/* This is, of course, deeply driver-specific */
-> +	if (attr->type != event->pmu->type)
-> +		return -ENOENT;
-> +
-> +	if (event->cpu >= 0 &&
-> +	    !cpumask_test_cpu(event->cpu, &spe_pmu->supported_cpus))
-> +		return -ENOENT;
-> +
-> +	if (arm_spe_event_to_pmsevfr(event) & PMSEVFR_EL1_RES0)
-> +		return -EOPNOTSUPP;
-> +
-> +	if (event->hw.sample_period < spe_pmu->min_period ||
-> +	    event->hw.sample_period & PMSIRR_EL1_IVAL_MASK)
-> +		return -EOPNOTSUPP;
-> +
-> +	if (attr->exclude_idle)
-> +		return -EOPNOTSUPP;
-> +
-> +	/*
-> +	 * Feedback-directed frequency throttling doesn't work when we
-> +	 * have a buffer of samples. We'd need to manually count the
-> +	 * samples in the buffer when it fills up and adjust the event
-> +	 * count to reflect that. Instead, force the user to specify a
-> +	 * sample period instead.
-> +	 */
-> +	if (attr->freq)
-> +		return -EINVAL;
-> +
-> +	if (is_kernel_in_hyp_mode()) {
-> +		if (attr->exclude_kernel != attr->exclude_hv)
-> +			return -EOPNOTSUPP;
-> +	} else if (!attr->exclude_hv) {
-> +		return -EOPNOTSUPP;
-> +	}
-> +
-> +	reg = arm_spe_event_to_pmsfcr(event);
-> +	if ((reg & BIT(PMSFCR_EL1_FE_SHIFT)) &&
-> +	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_EVT))
-> +		return -EOPNOTSUPP;
-> +
-> +	if ((reg & BIT(PMSFCR_EL1_FT_SHIFT)) &&
-> +	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_TYP))
-> +		return -EOPNOTSUPP;
-> +
-> +	if ((reg & BIT(PMSFCR_EL1_FL_SHIFT)) &&
-> +	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_LAT))
-> +		return -EOPNOTSUPP;
-> +
-> +	return 0;
-> +}
+My understanding is that the dma_declare_coherent_memory() API sets up a
+region of memory that will be managed by dma_alloc_coherent() and
+friends.  This is useful if the driver needs to manage a region of on
+device memory but that isn't what this specific region is used for.
 
-Please add below messaging such as to avoid users having to do
-so themselves:
+The memory that is trying to be initialized here is a big chunk
+(possible multiple megabytes) of RAM that only the QBMan device will
+access with one exception - at initialization the device expects
+software to zero the memory before starting to use the device. Since the
+CPUs will never access this region again the device does
+non-coherent/non-shareable accesses for performance reasons since QBMan
+device is the only user - no need to maintain coherency with core side
+caches.
 
-diff --git a/drivers/perf/arm_spe_pmu.c b/drivers/perf/arm_spe_pmu.c
-index b4906c3..7c2635c 100644
---- a/drivers/perf/arm_spe_pmu.c
-+++ b/drivers/perf/arm_spe_pmu.c
-@@ -655,24 +655,33 @@ static int arm_spe_pmu_event_init(struct perf_event *event)
- 	u64 reg;
- 	struct perf_event_attr *attr = &event->attr;
- 	struct arm_spe_pmu *spe_pmu = to_spe_pmu(event->pmu);
-+	struct device *dev = &spe_pmu->pdev->dev;
- 
- 	/* This is, of course, deeply driver-specific */
- 	if (attr->type != event->pmu->type)
- 		return -ENOENT;
- 
- 	if (event->cpu >= 0 &&
--	    !cpumask_test_cpu(event->cpu, &spe_pmu->supported_cpus))
-+	    !cpumask_test_cpu(event->cpu, &spe_pmu->supported_cpus)) {
-+		dev_err_ratelimited(dev, "CPU not supported by SPE\n");
- 		return -ENOENT;
-+	}
- 
--	if (arm_spe_event_to_pmsevfr(event) & PMSEVFR_EL1_RES0)
-+	if (arm_spe_event_to_pmsevfr(event) & PMSEVFR_EL1_RES0) {
-+		dev_err_ratelimited(dev, "Unsupported event filter\n");
- 		return -EOPNOTSUPP;
-+	}
- 
- 	if (event->hw.sample_period < spe_pmu->min_period ||
--	    event->hw.sample_period & PMSIRR_EL1_IVAL_MASK)
-+	    event->hw.sample_period & PMSIRR_EL1_IVAL_MASK) {
-+		dev_err_ratelimited(dev, "Cannot set sample period below the minimum interval\n");
- 		return -EOPNOTSUPP;
-+	}
- 
--	if (attr->exclude_idle)
-+	if (attr->exclude_idle) {
-+		dev_err_ratelimited(dev, "Cannot exclude profiling when idle\n");
- 		return -EOPNOTSUPP;
-+	}
- 
- 	/*
- 	 * Feedback-directed frequency throttling doesn't work when we
-@@ -681,28 +690,39 @@ static int arm_spe_pmu_event_init(struct perf_event *event)
- 	 * count to reflect that. Instead, force the user to specify a
- 	 * sample period instead.
- 	 */
--	if (attr->freq)
-+	if (attr->freq) {
-+		dev_err_ratelimited(dev, "a sample period must be specified\n");
- 		return -EINVAL;
-+	}
- 
- 	if (is_kernel_in_hyp_mode()) {
--		if (attr->exclude_kernel != attr->exclude_hv)
-+		if (attr->exclude_kernel != attr->exclude_hv) {
-+			dev_err_ratelimited(dev, "VHE is enabled but exclude_kernel and exclude_hv do not match\n");
- 			return -EOPNOTSUPP;
-+		}
- 	} else if (!attr->exclude_hv) {
-+		dev_err_ratelimited(dev, "VHE is disabled but exclude_hv is not set\n");
- 		return -EOPNOTSUPP;
- 	}
- 
- 	reg = arm_spe_event_to_pmsfcr(event);
- 	if ((reg & BIT(PMSFCR_EL1_FE_SHIFT)) &&
--	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_EVT))
-+	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_EVT)) {
-+		dev_err_ratelimited(dev, "event filter feature not supported\n");
- 		return -EOPNOTSUPP;
-+	}
- 
- 	if ((reg & BIT(PMSFCR_EL1_FT_SHIFT)) &&
--	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_TYP))
-+	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_TYP)) {
-+		dev_err_ratelimited(dev, "event type filter feature not supported\n");
- 		return -EOPNOTSUPP;
-+	}
- 
- 	if ((reg & BIT(PMSFCR_EL1_FL_SHIFT)) &&
--	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_LAT))
-+	    !(spe_pmu->features & SPE_PMU_FEAT_FILT_LAT)) {
-+		dev_err_ratelimited(dev, "latency filter feature not supported\n");
- 		return -EOPNOTSUPP;
-+	}
- 
- 	return 0;
- }
+We used the of_reserve memory as that seemed to be the best reliable way
+to guarantee that we would get a properly aligned contiguous allocation
+and it's been working well.  The downside is that the contents of that
+memory is undefined so we had to map it, zero it and flush the cache in
+order to get the RAM into the desired state and make sure we don't get
+hit by a random castout in the future.
 
+Would it make sense to add an option in the of_reserved_mem system to
+fill the memory?  I haven't looked at the feasibility of that but it
+seems like a generic solution that could be useful to others.  We could
+add the fill value to the device tree so you could initialize to any
+pattern.
 
-Thanks,
+- Roy
 
-Kim
+>
+> Robin.
+>
+>>>> And even if we did all that, there would still be other manual cache
+>>>> manipulation left in this driver, to deal with its cacheable register
+>>>> interface.
+>>> I thought we had concluded that "cacheable register" is something
+>>> that cannot work reliably on ARM at all when this came up before.
+>>> Any updates on that?
+>> I'm not familiar with the details there...  My understanding is that the
+>> hardware people at NXP are convinced that it can work on these specific chips
+>> due to implementation details.
+>>
+>> -Scott
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
