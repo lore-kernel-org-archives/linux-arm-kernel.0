@@ -1,35 +1,45 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 29 Jan 2017 21:02:06 -0800
-Subject: [GIT PULL] ARM: mvebu: soc for v4.11 (#1)
-In-Reply-To: <87mvecwhxu.fsf@free-electrons.com>
-References: <87mvecwhxu.fsf@free-electrons.com>
-Message-ID: <20170130050206.GK18943@localhost>
+Date: Sun, 29 Jan 2017 21:00:59 -0800
+Subject: [GIT PULL] STi DT fix for v4.10-rcs???
+In-Reply-To: <fec421f0-7515-c80d-3b36-969d63758a8b@st.com>
+References: <fec421f0-7515-c80d-3b36-969d63758a8b@st.com>
+Message-ID: <20170130050059.GI18943@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2017 at 06:06:53PM +0100, Gregory CLEMENT wrote:
-> Hi,
+On Fri, Jan 27, 2017 at 04:10:10PM +0000, Patrice CHOTARD wrote:
+> Hi Arnd, Olof, Kevin
 > 
-> Here is the first pull request for soc for mvebu for v4.11.
+> Please consider this set for inclusion into the next v4.10-rc.
 > 
-> Gregory
+> The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 > 
-> The following changes since commit 0c744ea4f77d72b3dcebb7a8f2684633ec79be88:
-> 
->   Linux 4.10-rc2 (2017-01-01 14:31:53 -0800)
+>    Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-4.11-1
+>    git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git 
+> tags/sti-dt-for-v4.10-rc
 > 
-> for you to fetch changes up to f2591b993ec95fd8d67c68187f07f30c9d79b38c:
+> for you to fetch changes up to 8413299cb3933dade6186bbee8363f190032107e:
 > 
->   soc: dove: constify reset_control_ops structures (2017-01-27 17:52:57 +0100)
+>    ARM: dts: STiH407-family: set snps,dis_u3_susphy_quirk (2017-01-27 
+> 16:17:13 +0100)
 > 
 > ----------------------------------------------------------------
-> mvebu soc for 4.11 (part 1)
 > 
-> Cleanup up on dove pmu and mv78x00 pci
+> STi DT fix:
+> 
+> Since v4.10-rc1, xhci is complaining in loop with :
+> [ 801.953836] usb usb6-port1: Cannot enable. Maybe the USB cable is bad?
+> [ 801.960455] xhci-hcd xhci-hcd.0.auto: Cannot set link state.
+> [ 801.966611] usb usb6-port1: cannot disable (err = -32)
+> 
+> Set property "snps,dis_u3_susphy_quirk" in DT fix it.
+> 
+> ----------------------------------------------------------------
+> Patrice Chotard (1):
+>        ARM: dts: STiH407-family: set snps,dis_u3_susphy_quirk
 
 Merged, thanks.
 
