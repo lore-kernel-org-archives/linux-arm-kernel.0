@@ -1,61 +1,139 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 30 Jan 2017 15:08:56 +0000
-Subject: [PATCH] arm: module: handle negative R_ARM_PREL31 addends
- correctly
-In-Reply-To: <20170130123914.GQ27312@n2100.armlinux.org.uk>
-References: <1484907663-32322-1-git-send-email-ard.biesheuvel@linaro.org>
- <20170130123914.GQ27312@n2100.armlinux.org.uk>
-Message-ID: <CAKv+Gu-0J0tVUUDhJ_f1P9n-1Etgk5A6ZTgUokKu7RKOCeaW4g@mail.gmail.com>
+From: huziji@marvell.com (Ziji Hu)
+Date: Mon, 30 Jan 2017 23:12:10 +0800
+Subject: [PATCH v5 06/12] mmc: sdhci-xenon: Add Marvell Xenon SDHC core
+ functionality
+In-Reply-To: <CAPDyKFoERET6Fzc7qEGWJ95t6GZir=XJWfTEoRSEROjPgJ95hg@mail.gmail.com>
+References: <cover.8527229dae6c124f24c5e637430c2cdc86f80392.1484154449.git-series.gregory.clement@free-electrons.com>
+ <3546f143091c121face8ecbcbf7f6a4c41d2cec7.1484154449.git-series.gregory.clement@free-electrons.com>
+ <CAPDyKFrwxix4zY4a1x9u6jh_gPfKTsaLnD8b8crum=pc5CN3AA@mail.gmail.com>
+ <461fd409-81e8-2c3f-3674-ec593e1c7383@marvell.com>
+ <CAPDyKFoERET6Fzc7qEGWJ95t6GZir=XJWfTEoRSEROjPgJ95hg@mail.gmail.com>
+Message-ID: <ed6e5125-85ef-5644-e589-bd5b4be4c84a@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 January 2017 at 12:39, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Fri, Jan 20, 2017 at 10:21:03AM +0000, Ard Biesheuvel wrote:
->> According to the spec 'ELF for the ARM Architecture' (IHI 0044E),
->> addends for R_ARM_PREL31 relocations are 31-bit signed quantities,
->> so we need to sign extend the value to 32 bits before it can be used
->> as an offset in the calculation of the relocated value.
+Hi Ulf,
+
+On 2017/1/30 16:41, Ulf Hansson wrote:
+> [...]
+> 
+>>>> + */
+>>>> +static int xenon_child_node_of_parse(struct platform_device *pdev)
+>>>> +{
+>>>> +       struct device_node *np = pdev->dev.of_node;
+>>>> +       struct sdhci_host *host = platform_get_drvdata(pdev);
+>>>> +       struct mmc_host *mmc = host->mmc;
+>>>> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>>>> +       struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
+>>>> +       struct device_node *child;
+>>>> +       int nr_child;
+>>>> +
+>>>> +       priv->init_card_type = XENON_CARD_TYPE_UNKNOWN;
+>>>> +
+>>>> +       nr_child = of_get_child_count(np);
+>>>> +       if (!nr_child)
+>>>> +               return 0;
+>>>> +
+>>>> +       for_each_child_of_node(np, child) {
+>>>> +               if (of_device_is_compatible(child, "mmc-card")) {
+>>>
+>>> To avoid code from being duplicated, I would rather see the DT parsing
+>>> of the child nodes for "mmc-card", to be done by the mmc core.
+>>>
+>>> As a matter of fact it is already being done, but perhaps we need to
+>>> change that a bit as to fit your case.
+>>>
+>>> I suggest you have a look and see how to update this in the core,
+>>> instead of doing it here in the host driver.
+>>>
 >>
->> We have not been bitten by this because these relocations are usually
->> emitted against the start of a section, which means the addends never
->> assume negative values in practice. But it is a bug nonetheless, so fix
->> it.
+>>     I understand your concern.
 >>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->> This is something I spotted while looking into adding support for
->> R_ARM_REL32 relocations. Feel free to ignore if it is guaranteed in some
->> way that these relocations can never be emitted with negative addends.
->
-> I still think this is a good thing to have, even if we should never
-> see them - it avoids updating the relocation with an incorrect value.
-> Any relocations we perform should be guaranteed to be correct, or
-> we should fail.
->
+>>     It seems that so far "mmc-card" is only used in our Xenon driver.
+> 
+> git grep "mmc-card" tells you more about where it's being parsed by
+> the mmc core.
+> 
+>>     Besides, we set Xenon specific parameters and attributions when
+>>     parsing "mmc-card" property.
+> 
+> I don't see any Xenon specific properties.
+> 
+> Instead I think it would make sense to update the generic
+> interpretation of the binding for mmc-card, as you have done here.
+> 
 
-Agreed.
+   OK. I will merge it into core layer.
+ 
+   Our Xenon driver requires to determine whether current SDHC is
+   for eMMC before card init. Thus I would like to implement a specific
+   function for mmc-card parsing in mmc.c and let mmc_of_parse() in host.c
+   to call it.
+   But there are some detailed issues then.
+   1. mmc_decode_ext_csd() also parses mmc-card to check broken-hpi.
+      So mmc-card parse will still be duplicated.
+      Shall we merge broken-hpi check into mmc-card parse?
+      It might require a new flag to indicate broken-hpi attribution in
+      mmc_host structure.
 
-> Please put it in the patch system, thanks.
->
+   2. Structure mmc_card is not ready while parsing mmc-card.
+      Thus we are not able to indicate card type in mmc_card.
+      As a result, our Xenon specific parse function still has to
+      parse mmc-card again to check if eMMC card is in used.
 
-Actually, I think it may still be incorrect: it seems to me that we
-should preserve bit 31 rather than clear it. From the EHABI
+   Could you please help suggest any better place in core layer to
+   parse mmc-card?
 
-"""
-Bit 31 of the relocated word does not participate in the relocation
-and may be used as data.
-"""
-(IHI0038B page 13)
+   Thank you.
 
-and
+Best regards,
+Hu Ziji
 
-"""
-... The landing pad word contains a prel31 offset to a landing pad,
-with bit 31 set if the catch handler catches a reference type and bit
-31 clear otherwise. ...
-"""
-(IHI0038B page 39)
-
-which suggests to me that bit 31 could legally assume either truth
-value, and should not be touched by the relocation machinery.
+>>
+>>     May I keep current implementation?
+> 
+> Rather not. Let's try to make the parsing of the child node for
+> mmc-card generic.
+> 
+>>     In my very own opinion, moving it into core layer should be another
+>>     independent patch.
+> 
+> Absolutely an independent patch. Whether it can be done as a part of
+> mmc_of_parse() or whether we need yet another new mmc_of* API, we can
+> discuss.
+> 
+> My point is that, I don't this to be specific for Xenon (unless there
+> are specific reason, which I don't see here).
+> 
+>>     And it will also cost some more time. To be honest, it is difficult
+>>     for me to bring up a generic core layer implementation to parse
+>>     "mmc-card", since I'm not clear about other vendor's requirement.
+> 
+> Well, then you need to learn more about how the mmc core works. In
+> this case, it shouldn't be too hard to implement.
+> 
+> [...]
+> 
+>>
+>>>
+>>>> +                                     MMC_CAP2_NO_SD |
+>>>> +                                     MMC_CAP2_NO_SDIO;
+>>>
+>>> I think we need to update the DT documentation for mmc-card.
+>>> Typically, we should explicitly state what kind of other existing mmc
+>>> DT properties that will be automatically selected, when the mmc-card
+>>> is specified.
+>>>
+>>> Can you please look into updating this DT doc as well.
+>>>
+>>
+>>   Similar to above, may I keep it now and bring up another patch later
+>>   to update mmc-card DT and parsing?
+> 
+> Please, no.
+> 
+> [...]
+> 
+> Kind regards
+> Uffe
+> 
