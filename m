@@ -1,139 +1,50 @@
-From: huziji@marvell.com (Ziji Hu)
-Date: Mon, 30 Jan 2017 23:12:10 +0800
-Subject: [PATCH v5 06/12] mmc: sdhci-xenon: Add Marvell Xenon SDHC core
- functionality
-In-Reply-To: <CAPDyKFoERET6Fzc7qEGWJ95t6GZir=XJWfTEoRSEROjPgJ95hg@mail.gmail.com>
-References: <cover.8527229dae6c124f24c5e637430c2cdc86f80392.1484154449.git-series.gregory.clement@free-electrons.com>
- <3546f143091c121face8ecbcbf7f6a4c41d2cec7.1484154449.git-series.gregory.clement@free-electrons.com>
- <CAPDyKFrwxix4zY4a1x9u6jh_gPfKTsaLnD8b8crum=pc5CN3AA@mail.gmail.com>
- <461fd409-81e8-2c3f-3674-ec593e1c7383@marvell.com>
- <CAPDyKFoERET6Fzc7qEGWJ95t6GZir=XJWfTEoRSEROjPgJ95hg@mail.gmail.com>
-Message-ID: <ed6e5125-85ef-5644-e589-bd5b4be4c84a@marvell.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 30 Jan 2017 15:12:20 +0000
+Subject: [PATCH 06/10] soc/qbman: Add ARM equivalent for
+ flush_dcache_range()
+In-Reply-To: <VI1PR0401MB2430DA6BD2F857C30EC86A50917F0@VI1PR0401MB2430.eurprd04.prod.outlook.com>
+References: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
+ <1484779180-1344-7-git-send-email-roy.pledge@nxp.com>
+ <20170118231206.GT27312@n2100.armlinux.org.uk>
+ <VI1PR0401MB2430DA6BD2F857C30EC86A50917F0@VI1PR0401MB2430.eurprd04.prod.outlook.com>
+Message-ID: <20170130151220.GZ27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+On Wed, Jan 18, 2017 at 11:36:18PM +0000, Scott Wood wrote:
+> On 01/18/2017 05:12 PM, Russell King - ARM Linux wrote:
+> > Please do not fiddle about under the covers, there be dragons there.
+> > 
+> > It looks to me like you're trying to use __cpuc_flush_dcache_area()
+> > on an area that's been ioremap()'d, which is a waste of CPU cycles.
+> > ioremap()'d areas are mapped as "device" memory type, which means
+> > the region isn't even cached.  So I don't think this is necessary.
+> 
+> It is mapped cachable, via memremap() (see patch 1/10).  This is RAM
+> that the device uses, non-coherently, for its own purposes (but requires
+> software to clear it first).
 
-On 2017/1/30 16:41, Ulf Hansson wrote:
-> [...]
-> 
->>>> + */
->>>> +static int xenon_child_node_of_parse(struct platform_device *pdev)
->>>> +{
->>>> +       struct device_node *np = pdev->dev.of_node;
->>>> +       struct sdhci_host *host = platform_get_drvdata(pdev);
->>>> +       struct mmc_host *mmc = host->mmc;
->>>> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->>>> +       struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
->>>> +       struct device_node *child;
->>>> +       int nr_child;
->>>> +
->>>> +       priv->init_card_type = XENON_CARD_TYPE_UNKNOWN;
->>>> +
->>>> +       nr_child = of_get_child_count(np);
->>>> +       if (!nr_child)
->>>> +               return 0;
->>>> +
->>>> +       for_each_child_of_node(np, child) {
->>>> +               if (of_device_is_compatible(child, "mmc-card")) {
->>>
->>> To avoid code from being duplicated, I would rather see the DT parsing
->>> of the child nodes for "mmc-card", to be done by the mmc core.
->>>
->>> As a matter of fact it is already being done, but perhaps we need to
->>> change that a bit as to fit your case.
->>>
->>> I suggest you have a look and see how to update this in the core,
->>> instead of doing it here in the host driver.
->>>
->>
->>     I understand your concern.
->>
->>     It seems that so far "mmc-card" is only used in our Xenon driver.
-> 
-> git grep "mmc-card" tells you more about where it's being parsed by
-> the mmc core.
-> 
->>     Besides, we set Xenon specific parameters and attributions when
->>     parsing "mmc-card" property.
-> 
-> I don't see any Xenon specific properties.
-> 
-> Instead I think it would make sense to update the generic
-> interpretation of the binding for mmc-card, as you have done here.
-> 
+Ok.
 
-   OK. I will merge it into core layer.
- 
-   Our Xenon driver requires to determine whether current SDHC is
-   for eMMC before card init. Thus I would like to implement a specific
-   function for mmc-card parsing in mmc.c and let mmc_of_parse() in host.c
-   to call it.
-   But there are some detailed issues then.
-   1. mmc_decode_ext_csd() also parses mmc-card to check broken-hpi.
-      So mmc-card parse will still be duplicated.
-      Shall we merge broken-hpi check into mmc-card parse?
-      It might require a new flag to indicate broken-hpi attribution in
-      mmc_host structure.
+> Is there a non-"under the covers" way to say "flush this region" without
+> the arch second-guessing whether it really needs to be flushed?
 
-   2. Structure mmc_card is not ready while parsing mmc-card.
-      Thus we are not able to indicate card type in mmc_card.
-      As a result, our Xenon specific parse function still has to
-      parse mmc-card again to check if eMMC card is in used.
+memremap() doesn't have any associated cache flushing functionality
+defined for it - it's a relatively new interface added to the kernel.
 
-   Could you please help suggest any better place in core layer to
-   parse mmc-card?
+There are some interfaces defined for memory that was vmalloc'd, but
+due to the way kernel/memremap.c works, you can't guarantee that the
+pointer you end up with came from vmalloc'd space, so I don't think
+suggesting to use those would be correct (as they may have assumptions
+that they'll only be called with vmalloc'd addresses.)
 
-   Thank you.
+As pointed out later in the thread, using dma_map_single() on the
+returned address is not permissible either.
 
-Best regards,
-Hu Ziji
+The only thing I can say is that it needs a proposal for a new arch-
+independent interface.
 
->>
->>     May I keep current implementation?
-> 
-> Rather not. Let's try to make the parsing of the child node for
-> mmc-card generic.
-> 
->>     In my very own opinion, moving it into core layer should be another
->>     independent patch.
-> 
-> Absolutely an independent patch. Whether it can be done as a part of
-> mmc_of_parse() or whether we need yet another new mmc_of* API, we can
-> discuss.
-> 
-> My point is that, I don't this to be specific for Xenon (unless there
-> are specific reason, which I don't see here).
-> 
->>     And it will also cost some more time. To be honest, it is difficult
->>     for me to bring up a generic core layer implementation to parse
->>     "mmc-card", since I'm not clear about other vendor's requirement.
-> 
-> Well, then you need to learn more about how the mmc core works. In
-> this case, it shouldn't be too hard to implement.
-> 
-> [...]
-> 
->>
->>>
->>>> +                                     MMC_CAP2_NO_SD |
->>>> +                                     MMC_CAP2_NO_SDIO;
->>>
->>> I think we need to update the DT documentation for mmc-card.
->>> Typically, we should explicitly state what kind of other existing mmc
->>> DT properties that will be automatically selected, when the mmc-card
->>> is specified.
->>>
->>> Can you please look into updating this DT doc as well.
->>>
->>
->>   Similar to above, may I keep it now and bring up another patch later
->>   to update mmc-card DT and parsing?
-> 
-> Please, no.
-> 
-> [...]
-> 
-> Kind regards
-> Uffe
-> 
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
