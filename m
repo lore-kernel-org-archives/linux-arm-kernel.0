@@ -1,73 +1,149 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 30 Jan 2017 15:31:26 +0000
-Subject: [PATCH 06/10] soc/qbman: Add ARM equivalent for
- flush_dcache_range()
-In-Reply-To: <1485570872.9266.22.camel@buserror.net>
-References: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
- <VI1PR0401MB2430DA6BD2F857C30EC86A50917F0@VI1PR0401MB2430.eurprd04.prod.outlook.com>
- <HE1PR0401MB263638F320470CA216990BCC86720@HE1PR0401MB2636.eurprd04.prod.outlook.com>
- <5414359.8GMja3pNrI@wuerfel>
- <VI1PR0401MB24303C4A5C0042005E17F1A391770@VI1PR0401MB2430.eurprd04.prod.outlook.com>
- <CAK8P3a1Gd4bd7GjEp_a9WXc_mTPk0XmP7DH8aPWhbn2K3MMuDQ@mail.gmail.com>
- <1485570872.9266.22.camel@buserror.net>
-Message-ID: <d5ca6bcd-1d1a-2a61-1f5c-9086a67f629a@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 30 Jan 2017 15:32:11 +0000
+Subject: [STLinux Kernel] [PATCH 3/8] serial: st-asc: Read in all Pinctrl
+ states
+In-Reply-To: <20170130142356.GA18710@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <20170124134310.27512-1-lee.jones@linaro.org>
+ <20170124134310.27512-4-lee.jones@linaro.org>
+ <20170125112142.GE5680@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20170127115458.k4edg42nnna3bv4v@dell>
+ <20170130142356.GA18710@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <20170130153211.j75qemvwsq3cwqve@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/01/17 02:34, Scott Wood wrote:
-> On Fri, 2017-01-27 at 17:41 +0100, Arnd Bergmann wrote:
->> On Thu, Jan 26, 2017 at 6:08 AM, Scott Wood <scott.wood@nxp.com> wrote:
->>>
->>> On 01/25/2017 03:20 PM, Arnd Bergmann wrote:
->>>>
->>>> On Monday, January 23, 2017 7:24:59 PM CET Roy Pledge wrote:
->>>
->>>>
->>>> If this is normal RAM, you should be able to just write zeroes, and then
->>>> do a dma_map_single() for initialization.
->>> The DMA API on PPC currently has no way of knowing that the device
->>> accesses this memory incoherently.
->> Ah, this is because PPC doesn't use the 'dma-coherent' property on devices
->> but just assumes that coherency is a global property of the platform,right?
-> 
-> Right.
-> 
->>> If that were somehow fixed, we still couldn't use dma_map_single() as it
->>> doesn't accept virtual addresses that come from memremap() or similar
->>> dynamic mappings.  We'd have to convert the physical address to an array
->>> of struct pages and pass each one to dma_map_page().
->> Sorry for my ignorance, but where does the memory come from to start
->> with? Is this in the normal linearly mapped RAM, in a carveout outside
->> of the linear mapping but the same memory, or in some on-chip buffer?
-> 
-> It's RAM that comes from the device tree reserved memory mechanism
-> (drivers/of/of_reserved_mem.c).  On a 32-bit kernel it is not guaranteed (or
-> likely) to be lowmem.
+On Mon, 30 Jan 2017, Peter Griffin wrote:
 
-Wouldn't dma_declare_coherent_memory() be the appropriate tool for that
-job, then (modulo the PPC issue)? On ARM that should result in
-dma_alloc_coherent() giving back a non-cacheable mapping if the device
-is non-coherent, wherein a dmb_wmb() after writing the data from the CPU
-side should be enough to ensure it is published to the device.
+> Hi Lee,
+> 
+> On Fri, 27 Jan 2017, Lee Jones wrote:
+> 
+> > On Wed, 25 Jan 2017, Peter Griffin wrote:
+> > 
+> > > Hi Lee,
+> > > 
+> > > On Tue, 24 Jan 2017, Lee Jones wrote:
+> > > 
+> > > > There are now 2 possible separate/different Pinctrl states which can
+> > > > be provided from platform data.  One which encompasses the lines
+> > > > required for HW flow-control (CTS/RTS) and another which does not
+> > > > specify these lines, such that they can be used via GPIO mechanisms
+> > > > for manually toggling (i.e. from a request by `stty`).
+> > > > 
+> > > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > > > ---
+> > > >  drivers/tty/serial/st-asc.c | 28 ++++++++++++++++++++++++++++
+> > > >  1 file changed, 28 insertions(+)
+> > > > 
+> > > > diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
+> > > > index 397df50..03801ed 100644
+> > > > --- a/drivers/tty/serial/st-asc.c
+> > > > +++ b/drivers/tty/serial/st-asc.c
+> > > > @@ -37,10 +37,16 @@
+> > > >  #define ASC_FIFO_SIZE 16
+> > > >  #define ASC_MAX_PORTS 8
+> > > >  
+> > > > +/* Pinctrl states */
+> > > > +#define DEFAULT		0
+> > > > +#define MANUAL_RTS	1
+> > > 
+> > > Nit: Would be better to have them aligned.
+> > 
+> > These are aligned in code.  The patch format throws things out.
+> > 
+> > Look, same lines with the "> > +" removed:
+> 
+> Ah OK.
+> 
+> > 
+> > /* Pinctrl states */
+> > #define DEFAULT		0
+> > #define MANUAL_RTS	1
+> > 
+> > Try it.
+> > 
+> > > > +
+> > > >  struct asc_port {
+> > > >  	struct uart_port port;
+> > > >  	struct gpio_desc *rts;
+> > > >  	struct clk *clk;
+> > > > +	struct pinctrl *pinctrl;
+> > > > +	struct pinctrl_state *states[2];
+> > > >  	unsigned int hw_flow_control:1;
+> > > >  	unsigned int force_m1:1;
+> > > >  };
+> > > > @@ -694,6 +700,7 @@ static int asc_init_port(struct asc_port *ascport,
+> > > >  {
+> > > >  	struct uart_port *port = &ascport->port;
+> > > >  	struct resource *res;
+> > > > +	int ret;
+> > > >  
+> > > >  	port->iotype	= UPIO_MEM;
+> > > >  	port->flags	= UPF_BOOT_AUTOCONF;
+> > > > @@ -720,6 +727,27 @@ static int asc_init_port(struct asc_port *ascport,
+> > > >  	WARN_ON(ascport->port.uartclk == 0);
+> > > >  	clk_disable_unprepare(ascport->clk);
+> > > >  
+> > > > +	ascport->pinctrl = devm_pinctrl_get(&pdev->dev);
+> > > > +	if (IS_ERR(ascport->pinctrl)) {
+> > > > +		ret = PTR_ERR(ascport->pinctrl);
+> > > > +		dev_err(&pdev->dev, "Failed to get Pinctrl: %d\n", ret);
+> > > > +	}
+> > > > +
+> > > > +	ascport->states[DEFAULT] =
+> > > > +		pinctrl_lookup_state(ascport->pinctrl, "default");
+> > > > +	if (IS_ERR(ascport->states[DEFAULT])) {
+> > > > +		ret = PTR_ERR(ascport->states[DEFAULT]);
+> > > > +		dev_err(&pdev->dev,
+> > > > +			"Failed to look up Pinctrl state 'default': %d\n", ret);
+> > > > +		return ret;
+> > > > +	}
+> > > > +
+> > > > +	/* "manual-rts" state is optional */
+> > > > +	ascport->states[MANUAL_RTS] =
+> > > > +		pinctrl_lookup_state(ascport->pinctrl, "manual-rts");
+> > > > +	if (IS_ERR(ascport->states[MANUAL_RTS]))
+> > > > +		ascport->states[MANUAL_RTS] = NULL;
+> > > > +
+> > > 
+> > > The different pinctrl states looks like a neat solution to the problem.
+> > > 
+> > > My only concern here is that 'default' state is implying a hw-flow-control
+> > > pinmux config, and manual-rts is implying what is the current upstream
+> > > 'default' pinmux config.
+> > > 
+> > > Which maybe ok if you update all uarts, but currently only serial0
+> > > is updated. So the other uarts current 'default' is actually the same as serial0
+> > > 'manual-rts' grouping, which conceptually is odd.
+> > > 
+> > > Would it not be better to make 'manual-rts' the default state? As that aligns
+> > > to what is currently already the default for the other UARTS? And then make
+> > > hw-flow-control the optional state for serial0?
+> > > 
+> > > That also has the advantage that 'default' has the same meaning with older DT's.
+> > 
+> > The reason it was done is this was because none of the other UARTs
+> > require 2 separate Pinctrl configurations, only this one.  Moreover,
+> > if they support RTS/CTS then I believe that the lines should be
+> > defined in Pinctrl.
+> 
+> Yes I agree with that.
+> 
+> > Thus, it was my plan to update all UART's default
+> > Pinctrl configs to include the RTS/CTS lines.
+> > 
+> 
+> I still don't see the point in changing the meaning of 'default' group and breaking
+> ABI if you don't need to?
+> 
+> As far as I can tell if you swap the meaning of 'default' and 'maunal-rts'
+> groups you get all the benefits of this series whilst also maintaining backwards
+> compatbility with older DT's.
 
-Robin.
+What makes you think this will break ABI?
 
->>> And even if we did all that, there would still be other manual cache
->>> manipulation left in this driver, to deal with its cacheable register
->>> interface.
->> I thought we had concluded that "cacheable register" is something
->> that cannot work reliably on ARM at all when this came up before.
->> Any updates on that?
-> 
-> I'm not familiar with the details there...  My understanding is that the
-> hardware people at NXP are convinced that it can work on these specific chips
-> due to implementation details.
-> 
-> -Scott
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
