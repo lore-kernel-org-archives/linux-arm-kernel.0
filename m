@@ -1,66 +1,43 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 30 Jan 2017 11:06:05 +0100
-Subject: [PATCH v5 6/13] mmc: sunxi: Add EMMC (MMC2) controller compatible
-In-Reply-To: <bcbeeb726c5638361590bd4c295279ef92d44209.1485553113.git-series.maxime.ripard@free-electrons.com>
-References: <cover.6f3d82744628848e2182720c35f13e87e8b62258.1485553113.git-series.maxime.ripard@free-electrons.com>
- <bcbeeb726c5638361590bd4c295279ef92d44209.1485553113.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAPDyKFr3cnFux4NRzZ9UAn93MOVb6RaQQ+PHDxGztciDHZSX9A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 30 Jan 2017 11:08:20 +0100
+Subject: [PATCH V6 3/5] OF: Add missing I/O range exception for
+ indirect-IO devices
+In-Reply-To: <645d40d8-0db6-1737-88f4-fd839933b2ea@huawei.com>
+References: <1485241525-201782-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1485241525-201782-4-git-send-email-yuanzhichang@hisilicon.com>
+ <20170127220357.3lpavvyeymlhvlfg@rob-hp-laptop>
+ <645d40d8-0db6-1737-88f4-fd839933b2ea@huawei.com>
+Message-ID: <CAK8P3a1JhrNcoQkspBE4Kzw2ETPtWRLcPARiOQB3eWoUx=LaFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 January 2017 at 22:38, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The MMC2 controller on the A64 is kind of a special beast.
+On Mon, Jan 30, 2017 at 9:57 AM, John Garry <john.garry@huawei.com> wrote:
+> On 27/01/2017 22:03, Rob Herring wrote:
+>> On Tue, Jan 24, 2017 at 03:05:23PM +0800, zhichang.yuan wrote:
+>>> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
+>>> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+>>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>>
+>>
+>> Shouldn't this be Reviewed-by?
+>>
 >
-> While the general controller design is the same than the other MMC
-> controllers in the SoC, it also has a bunch of features and changes that
-> prevent it to be driven in the same way.
+> The background is that Zhichang is following a sketch of a re-worked driver
+> from Arnd, which Arnd gave Signed-off-by. But this patch does not follow it
+> verbatim.
 >
-> It has for example a different bus width limit, a different maximum
-> frequency, and, for some reason, the maximum buffer size of a DMA
-> descriptor.
->
-> Add a new compatible specifically for this controller.
->
-> Acked-by: Rob Herring <robh@kernel.org>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Tested-by: Florian Vaussard <florian.vaussard@heig-vd.ch>
-> ---
->  drivers/mmc/host/sunxi-mmc.c | 8 ++++++++
->  1 file changed, 8 insertions(+), 0 deletions(-)
->
-> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-> index 6bbe61397b7c..f0f6922bca8a 100644
-> --- a/drivers/mmc/host/sunxi-mmc.c
-> +++ b/drivers/mmc/host/sunxi-mmc.c
-> @@ -5,6 +5,7 @@
->   * (C) Copyright 2013-2014 O2S GmbH <www.o2s.ch>
->   * (C) Copyright 2013-2014 David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
->   * (C) Copyright 2013-2014 Hans de Goede <hdegoede@redhat.com>
-> + * (C) Copyright 2017 Sootech SA
->   *
->   * This program is free software; you can redistribute it and/or
->   * modify it under the terms of the GNU General Public License as
-> @@ -1096,12 +1097,19 @@ static const struct sunxi_mmc_cfg sun50i_a64_cfg = {
->         .needs_new_timings = true,
->  };
->
-> +static const struct sunxi_mmc_cfg sun50i_a64_emmc_cfg = {
-> +       .idma_des_size_bits = 13,
-> +       .clk_delays = NULL,
-> +       .can_calibrate = true,
-> +};
-> +
->  static const struct of_device_id sunxi_mmc_of_match[] = {
->         { .compatible = "allwinner,sun4i-a10-mmc", .data = &sun4i_a10_cfg },
->         { .compatible = "allwinner,sun5i-a13-mmc", .data = &sun5i_a13_cfg },
->         { .compatible = "allwinner,sun7i-a20-mmc", .data = &sun7i_a20_cfg },
->         { .compatible = "allwinner,sun9i-a80-mmc", .data = &sun9i_a80_cfg },
->         { .compatible = "allwinner,sun50i-a64-mmc", .data = &sun50i_a64_cfg },
-> +       { .compatible = "allwinner,sun50i-a64-emmc", .data = &sun50i_a64_emmc_cfg },
+> I think this patchset should be resent without Arnd's signature. Or Arnd may
+> kindly review and say it's ok.
 
-This should be documented in the DTS docs for sunxi as well. I expect
-you to send a patch on top to take care of that.
+My general recommendation is that whenever authorship  is not 100% obvious,
+then the changelog comment should explain in free form who did what. When
+you do that, please leave my Signed-off-by intact and put it on top.
+You can also (in addition to explaining it in the text) add an
+explanantion behind
+the address, such as
 
-Kind regards
-Uffe
+Signed-off-by: Arnd Bergmann <arnd@arndb.de> # earlier draft
+
+I'll try to get around to do a full review of the series later today.
+
+    Arnd
