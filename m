@@ -1,9 +1,9 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 30 Jan 2017 12:41:11 +0100
-Subject: [PATCH 09/14] mtd: nand: sunxi: simplify optional reset handling
+Date: Mon, 30 Jan 2017 12:41:08 +0100
+Subject: [PATCH 06/14] mmc: dw_mmc: simplify optional reset handling
 In-Reply-To: <20170130114116.22089-1-p.zabel@pengutronix.de>
 References: <20170130114116.22089-1-p.zabel@pengutronix.de>
-Message-ID: <20170130114116.22089-9-p.zabel@pengutronix.de>
+Message-ID: <20170130114116.22089-6-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,59 +15,57 @@ This allows to return errors from devm_reset_control_get_optional and to
 call reset_control_(de)assert unconditionally.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Cc: Icenowy Zheng <icenowy@aosc.xyz>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+Cc: Guodong Xu <guodong.xu@linaro.org>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/mtd/nand/sunxi_nand.c | 19 ++++++++-----------
- 1 file changed, 8 insertions(+), 11 deletions(-)
+ drivers/mmc/host/dw_mmc.c | 14 +++++---------
+ 1 file changed, 5 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index e40482a65de66..c6769b52c666a 100644
---- a/drivers/mtd/nand/sunxi_nand.c
-+++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -2196,16 +2196,15 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
- 		goto out_ahb_clk_unprepare;
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index b44306b886cb6..9039e8f81ff12 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -2963,10 +2963,8 @@ static struct dw_mci_board *dw_mci_parse_dt(struct dw_mci *host)
  
- 	nfc->reset = devm_reset_control_get_optional(dev, "ahb");
--	if (!IS_ERR(nfc->reset)) {
--		ret = reset_control_deassert(nfc->reset);
--		if (ret) {
--			dev_err(dev, "reset err %d\n", ret);
--			goto out_mod_clk_unprepare;
--		}
--	} else if (PTR_ERR(nfc->reset) != -ENOENT) {
-+	if (IS_ERR(nfc->reset)) {
- 		ret = PTR_ERR(nfc->reset);
- 		goto out_mod_clk_unprepare;
+ 	/* find reset controller when exist */
+ 	pdata->rstc = devm_reset_control_get_optional(dev, "reset");
+-	if (IS_ERR(pdata->rstc)) {
+-		if (PTR_ERR(pdata->rstc) == -EPROBE_DEFER)
+-			return ERR_PTR(-EPROBE_DEFER);
+-	}
++	if (IS_ERR(pdata->rstc))
++		return ERR_CAST(pdata->rstc);
+ 
+ 	/* find out number of slots supported */
+ 	of_property_read_u32(np, "num-slots", &pdata->num_slots);
+@@ -3090,7 +3088,7 @@ int dw_mci_probe(struct dw_mci *host)
+ 		}
  	}
-+	ret = reset_control_deassert(nfc->reset);
-+	if (ret) {
-+		dev_err(dev, "reset err %d\n", ret);
-+		goto out_mod_clk_unprepare;
-+	}
  
- 	ret = sunxi_nfc_rst(nfc);
- 	if (ret)
-@@ -2246,8 +2245,7 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
- 	if (nfc->dmac)
- 		dma_release_channel(nfc->dmac);
- out_ahb_reset_reassert:
--	if (!IS_ERR(nfc->reset))
--		reset_control_assert(nfc->reset);
-+	reset_control_assert(nfc->reset);
- out_mod_clk_unprepare:
- 	clk_disable_unprepare(nfc->mod_clk);
- out_ahb_clk_unprepare:
-@@ -2262,8 +2260,7 @@ static int sunxi_nfc_remove(struct platform_device *pdev)
+-	if (!IS_ERR(host->pdata->rstc)) {
++	if (host->pdata->rstc) {
+ 		reset_control_assert(host->pdata->rstc);
+ 		usleep_range(10, 50);
+ 		reset_control_deassert(host->pdata->rstc);
+@@ -3245,8 +3243,7 @@ int dw_mci_probe(struct dw_mci *host)
+ 	if (host->use_dma && host->dma_ops->exit)
+ 		host->dma_ops->exit(host);
  
- 	sunxi_nand_chips_cleanup(nfc);
+-	if (!IS_ERR(host->pdata->rstc))
+-		reset_control_assert(host->pdata->rstc);
++	reset_control_assert(host->pdata->rstc);
  
--	if (!IS_ERR(nfc->reset))
--		reset_control_assert(nfc->reset);
-+	reset_control_assert(nfc->reset);
+ err_clk_ciu:
+ 	clk_disable_unprepare(host->ciu_clk);
+@@ -3278,8 +3275,7 @@ void dw_mci_remove(struct dw_mci *host)
+ 	if (host->use_dma && host->dma_ops->exit)
+ 		host->dma_ops->exit(host);
  
- 	if (nfc->dmac)
- 		dma_release_channel(nfc->dmac);
+-	if (!IS_ERR(host->pdata->rstc))
+-		reset_control_assert(host->pdata->rstc);
++	reset_control_assert(host->pdata->rstc);
+ 
+ 	clk_disable_unprepare(host->ciu_clk);
+ 	clk_disable_unprepare(host->biu_clk);
 -- 
 2.11.0
