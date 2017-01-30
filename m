@@ -1,91 +1,47 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 30 Jan 2017 09:33:50 -0500
-Subject: [PATCH V7 08/11] drivers: acpi: Handle IOMMU lookup failure with
- deferred probing or error
-In-Reply-To: <5ba9f366d6e25397cdef8ad95b49e199@codeaurora.org>
-References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
- <1485188293-20263-9-git-send-email-sricharan@codeaurora.org>
- <20170124123711.GA11996@red-moon>
- <f2370671-ece8-fbee-de19-350dd625088f@codeaurora.org>
- <93e79759-d614-9b36-d5ab-63e8eb725009@arm.com>
- <14751205-f034-7f0d-442a-854c3909425c@codeaurora.org>
- <5ba9f366d6e25397cdef8ad95b49e199@codeaurora.org>
-Message-ID: <175a3798-b824-ef1a-e112-9f6f472973ae@codeaurora.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 30 Jan 2017 14:34:18 +0000
+Subject: [PATCH] PCI: mvebu: Handle changes to the bridge windows while
+ enabled
+In-Reply-To: <20170128211728.GJ20550@bhelgaas-glaptop.roam.corp.google.com>
+References: <20161212183020.GA30274@obsidianresearch.com>
+ <20170111183055.GD14532@bhelgaas-glaptop.roam.corp.google.com>
+ <20170128211728.GJ20550@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20170130143418.GB25924@io.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/30/2017 9:23 AM, Nate Watterson wrote:
-> On 2017-01-30 08:59, Sinan Kaya wrote:
->> On 1/30/2017 7:22 AM, Robin Murphy wrote:
->>> On 29/01/17 17:53, Sinan Kaya wrote:
->>>> On 1/24/2017 7:37 AM, Lorenzo Pieralisi wrote:
->>>>> [+hanjun, tomasz, sinan]
->>>>>
->>>>> It is quite a key patchset, I would be glad if they can test on their
->>>>> respective platforms with IORT.
->>>>>
->>>>
->>>> Tested on top of 4.10-rc5.
->>>>
->>>> 1.    Platform Hidma device passed dmatest
->>>> 2.    Seeing some USB stalls on a platform USB device.
->>>> 3.    PCIe NVME drive probed and worked fine with MSI interrupts after boot.
->>>> 4.     NVMe driver didn't probe following a hotplug insertion and received an
->>>> SMMU error event during the insertion.
->>>
->>> What was the SMMU error - a translation/permission fault (implying the
->>> wrong DMA ops) or a bad STE fault (implying we totally failed to tell
->>> the SMMU about the device at all)?
->>>
->>
->> root at ubuntu:/sys/bus/pci/slots/4# echo 0 > power
->>
->> [__204.698522]_iommu:_Removing_device_0003:01:00.0_from_group_0
->> [  204.708704] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down
->> [  204.708723] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down event
->> ignored; already powering off
->>
->> root at ubuntu:/sys/bus/pci/slots/4#
->>
->> [__254.820440]_iommu:_Adding_device_0003:01:00.0_to_group_8
->> [  254.820599] nvme nvme0: pci function 0003:01:00.0
->> [  254.820621] nvme 0003:01:00.0: enabling device (0000 -> 0002)
->> [  261.948558] arm-smmu-v3 arm-smmu-v3.0.auto: event 0x0a received:
->> [  261.948561] arm-smmu-v3 arm-smmu-v3.0.auto:  0x000001000000000a
->> [  261.948563] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
->> [  261.948564] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
->> [  261.948566] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
+Hi Bjorn,
 
-> Looks like C_BAD_CD. Can you please try with:
-> iommu/arm-smmu-v3: Clear prior settings when updating STEs
+On Sat, Jan 28, 2017 at 03:17:28PM -0600, Bjorn Helgaas wrote:
+> On Wed, Jan 11, 2017 at 12:30:55PM -0600, Bjorn Helgaas wrote:
+> > On Mon, Dec 12, 2016 at 11:30:20AM -0700, Jason Gunthorpe wrote:
+> > > The PCI core will write to the bridge window config multiple times
+> > > while they are enabled. This can lead to mbus failures like:
+> > > 
+> > >  mvebu_mbus: cannot add window '4:e8', conflicts with another window
+> > >  mvebu-pcie mbus:pex at e0000000: Could not create MBus window at [mem 0xe0000000-0xe00fffff]: -22
+> > > 
+> > > For me this is happening during a hotplug cycle. The PCI core is
+> > > not changing the values, just writing them twice while active.
+> > > 
+> > > The patch addresses the general case of any change to an active window,
+> > > but not atomically. The code is slightly refactored so io and mem
+> > > can share more of the window logic.
+> > 
+> > Looks good to me, but I'm waiting for an ack from Thomas or Jason (listed
+> > as maintainers and already cc'd).
+> 
+> Ping, Thomas, Jason C?
+> 
+> > > Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> > > ---
+> > >  drivers/pci/host/pci-mvebu.c | 101 +++++++++++++++++++++++++------------------
+> > >  1 file changed, 60 insertions(+), 41 deletions(-)
 
-This resolved the issue. Can we pull Nate's patch to 4.10 so that I don't see
-this issue again.
+Sorry, been on travel and I think Thomas is on holiday.
 
-root at ubuntu:/sys/bus/pci/slots# cd 4
-root at ubuntu:/sys/bus/pci/slots/4# ls
-adapter  address  attention  cur_bus_speed  latch  max_bus_speed  module  power
-root at ubuntu:/sys/bus/pci/slots/4# echo 0 > power
-root at ubuntu:/sys/bus/pci/slots/4# echo 1 > power
-root at ubuntu:/sys/bus/pci/slots/4# dmesg |tail -n 10
-[   44.136028] pci 0003:01:00.0: BAR 0: assigned [mem 0xc0100110000-0xc0100113fff 64bit]
-[   44.136044] pcieport 0003:00:00.0: PCI bridge to [bus 01]
-[   44.136046] pcieport 0003:00:00.0:   bridge window [io  0x10000-0x10fff]
-[   44.136048] pcieport 0003:00:00.0:   bridge window [mem 0xc0100100000-0xc01002fffff]
-[   44.136050] pcieport 0003:00:00.0:   bridge window [mem 0xc0400000000-0xc04001fffff 64bit pref]
-[   44.136059] pcieport 0003:00:00.0: Max Payload Size set to  256/ 512 (was  256), Max Read Rq  512
-[   44.136073] pci 0003:01:00.0: Max Payload Size set to  256/ 256 (was  128), Max Read Rq  512
-[   44.136124] iommu: Adding device 0003:01:00.0 to group 8
-[   44.136275] nvme nvme0: pci function 0003:01:00.0
-[   44.136292] nvme 0003:01:00.0: enabling device (0000 -> 0002)
-root at ubuntu:/sys/bus/pci/slots/4# ls /dev/nvme*
-/dev/nvme0  /dev/nvme0n1
-root at ubuntu:/sys/bus/pci/slots/4#
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-I'll look at the USB stalls next.
+thx,
 
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Jason.
