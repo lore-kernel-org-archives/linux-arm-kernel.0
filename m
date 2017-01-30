@@ -1,104 +1,35 @@
-From: adityaxavier@gmail.com (Aditya Xavier)
-Date: Mon, 30 Jan 2017 14:38:33 +0530
-Subject: [PATCH V2] ARM: dts: BCM5301X: Add missing Netgear R8000 LEDs and
- Keys
-In-Reply-To: <CACna6rzaEw+_tgMtG5ASRX+AZSbg-yA=pnpaD9uE1AK8ZGKJ1Q@mail.gmail.com>
-References: <20170128143749.5897-1-adityaxavier@gmail.com>
- <CACna6rzaEw+_tgMtG5ASRX+AZSbg-yA=pnpaD9uE1AK8ZGKJ1Q@mail.gmail.com>
-Message-ID: <A0233283-B547-42E5-BBBF-3B75E592D858@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 30 Jan 2017 10:09:44 +0100
+Subject: [PATCH v3 06/10] clk: sunxi-ng: remove transitional headers for
+ dt-bindings
+In-Reply-To: <20170129023331.62106-7-icenowy@aosc.xyz>
+References: <20170129023331.62106-1-icenowy@aosc.xyz>
+ <20170129023331.62106-7-icenowy@aosc.xyz>
+Message-ID: <20170130090944.ie76ustqtbtdanli@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Would you require me to send the revised Patch ?
+On Sun, Jan 29, 2017 at 10:33:27AM +0800, Icenowy Zheng wrote:
+> As we have already changed the DTSI file, the trnasitional dt-bindings
+> header sun8i-h3-ccu.h will not be needed any more.
+> 
+> Remove them.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
 
-Or would this do ?
+Your prefix is wrong, this is not part of the clk framework, but
+rather the DT one.
 
-And thanks for guiding me through this process :)
+Maxime
 
-
-> On 29-Jan-2017, at 2:45 AM, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
-> 
-> On 28 January 2017 at 15:37, AdityaXavier <adityaxavier@gmail.com> wrote:
->> From: Aditya Xavier <adityaxavier@gmail.com>
->> 
->> Added two WAN status LEDs and a GPIO Key for Brightness which were missing.
->> V2: Updated subject, Power LED names, and WAN labels.
-> 
-> Changelog (V2 ... part) should go into that /comments/ section (see below).
-> Florian: can you drop that line when applying this patch? Otherwise it
-> looks OK to me.
-> 
-> 
->> Signed-off-by: Aditya Xavier <adityaxavier@gmail.com>
-> 
-> Acked-by: Rafa? Mi?ecki <rafal@milecki.pl>
-> 
-> Thanks for the patch!
-> 
-> 
->> ---
-> 
-> Right here, below these 3 dashes is a place where you can add extra
-> comments (they won't go into log when doing "git am").
-> 
->> arch/arm/boot/dts/bcm4709-netgear-r8000.dts | 22 ++++++++++++++++++++--
->> 1 file changed, 20 insertions(+), 2 deletions(-)
->> 
->> diff --git a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
->> index 92f8a72..90d4420 100644
->> --- a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
->> +++ b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
->> @@ -27,18 +27,30 @@
->>        leds {
->>                compatible = "gpio-leds";
->> 
->> -               power0 {
->> +               power-white {
->>                        label = "bcm53xx:white:power";
->>                        gpios = <&chipcommon 2 GPIO_ACTIVE_LOW>;
->>                        linux,default-trigger = "default-on";
->>                };
->> 
->> -               power1 {
->> +               power-amber {
->>                        label = "bcm53xx:amber:power";
->>                        gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
->>                        linux,default-trigger = "default-off";
->>                };
->> 
->> +               wan-white {
->> +                       label = "bcm53xx:white:wan";
->> +                       gpios = <&chipcommon 8 GPIO_ACTIVE_LOW>;
->> +                       linux,default-trigger = "default-on";
->> +               };
->> +
->> +               wan-amber {
->> +                       label = "bcm53xx:amber:wan";
->> +                       gpios = <&chipcommon 9 GPIO_ACTIVE_HIGH>;
->> +                       linux,default-trigger = "default-off";
->> +               };
->> +
->>                5ghz-1 {
->>                        label = "bcm53xx:white:5ghz-1";
->>                        gpios = <&chipcommon 12 GPIO_ACTIVE_LOW>;
->> @@ -104,6 +116,12 @@
->>                        linux,code = <KEY_RESTART>;
->>                        gpios = <&chipcommon 6 GPIO_ACTIVE_LOW>;
->>                };
->> +
->> +               brightness {
->> +                       label = "Backlight";
->> +                       linux,code = <KEY_BRIGHTNESS_ZERO>;
->> +                       gpios = <&chipcommon 19 GPIO_ACTIVE_LOW>;
->> +               };
->>        };
->> };
->> 
->> --
->> 2.9.3
->> 
-> 
-> 
-> 
-> -- 
-> Rafa?
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170130/34c1f7ad/attachment.sig>
