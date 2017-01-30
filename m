@@ -1,157 +1,61 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 30 Jan 2017 09:58:13 -0800
-Subject: [PATCH 1/2] watchdog: sama5d4: Cache MR instead of a partial
- config
-In-Reply-To: <20170130171848.31598-1-alexandre.belloni@free-electrons.com>
-References: <20170130171848.31598-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20170130175813.GA23087@roeck-us.net>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Mon, 30 Jan 2017 13:01:46 -0500
+Subject: [PATCH v3 06/24] drm/rockchip: dw-mipi-dsi: avoid out-of-bounds
+ read on tx_buf
+In-Reply-To: <20170129132444.25251-7-john@metanate.com>
+References: <20170129132444.25251-1-john@metanate.com>
+ <20170129132444.25251-7-john@metanate.com>
+Message-ID: <20170130180146.GG20076@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2017 at 06:18:47PM +0100, Alexandre Belloni wrote:
-> .config is used to cache a part of WDT_MR at probe time and is not used
-> afterwards. Instead of doing that, actually cache MR and avoid reading it
-> every time it is modified.
+On Sun, Jan 29, 2017 at 01:24:26PM +0000, John Keeping wrote:
+> As a side-effect of this, encode the endianness explicitly rather than
+> casting a u16.
 > 
-The semantic change here is that the old code leaves "other" bits in the
-mr register alone. I assume you have verified that clearing those bits
-does not have negative impact.
-
-Also, I am not really sure if replacing a read from a register is more
-costly than a read from memory. Is that change really worth it ?
-I mean, sure, the way the 'config' variable is used is a bit odd,
-but I don't really see the improvement in its replacement either.
-
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> Signed-off-by: John Keeping <john@metanate.com>
+> Reviewed-by: Chris Zhong <zyw@rock-chips.com>
 > ---
->  drivers/watchdog/sama5d4_wdt.c | 45 ++++++++++++++++++------------------------
->  1 file changed, 19 insertions(+), 26 deletions(-)
+> v3:
+> - Add Chris' Reviewed-by
+> Unchanged in v2
 > 
-> diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
-> index a49634cdc1cc..6dd07bef515a 100644
-> --- a/drivers/watchdog/sama5d4_wdt.c
-> +++ b/drivers/watchdog/sama5d4_wdt.c
-> @@ -28,7 +28,7 @@
->  struct sama5d4_wdt {
->  	struct watchdog_device	wdd;
->  	void __iomem		*reg_base;
-> -	u32	config;
-> +	u32			mr;
->  };
->  
->  static int wdt_timeout = WDT_DEFAULT_TIMEOUT;
-> @@ -53,11 +53,9 @@ MODULE_PARM_DESC(nowayout,
->  static int sama5d4_wdt_start(struct watchdog_device *wdd)
+>  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 9 +++++++--
+>  1 file changed, 7 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> index 4be1ff3a42bb..2e6ad4591ebf 100644
+> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> @@ -572,8 +572,13 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
+>  static int dw_mipi_dsi_dcs_short_write(struct dw_mipi_dsi *dsi,
+>  				       const struct mipi_dsi_msg *msg)
 >  {
->  	struct sama5d4_wdt *wdt = watchdog_get_drvdata(wdd);
-> -	u32 reg;
->  
-> -	reg = wdt_read(wdt, AT91_WDT_MR);
-> -	reg &= ~AT91_WDT_WDDIS;
-> -	wdt_write(wdt, AT91_WDT_MR, reg);
-> +	wdt->mr &= ~AT91_WDT_WDDIS;
-> +	wdt_write(wdt, AT91_WDT_MR, wdt->mr);
->  
->  	return 0;
->  }
-> @@ -65,11 +63,9 @@ static int sama5d4_wdt_start(struct watchdog_device *wdd)
->  static int sama5d4_wdt_stop(struct watchdog_device *wdd)
->  {
->  	struct sama5d4_wdt *wdt = watchdog_get_drvdata(wdd);
-> -	u32 reg;
->  
-> -	reg = wdt_read(wdt, AT91_WDT_MR);
-> -	reg |= AT91_WDT_WDDIS;
-> -	wdt_write(wdt, AT91_WDT_MR, reg);
-> +	wdt->mr |= AT91_WDT_WDDIS;
-> +	wdt_write(wdt, AT91_WDT_MR, wdt->mr);
->  
->  	return 0;
->  }
-> @@ -88,14 +84,12 @@ static int sama5d4_wdt_set_timeout(struct watchdog_device *wdd,
->  {
->  	struct sama5d4_wdt *wdt = watchdog_get_drvdata(wdd);
->  	u32 value = WDT_SEC2TICKS(timeout);
-> -	u32 reg;
->  
-> -	reg = wdt_read(wdt, AT91_WDT_MR);
-> -	reg &= ~AT91_WDT_WDV;
-> -	reg &= ~AT91_WDT_WDD;
-> -	reg |= AT91_WDT_SET_WDV(value);
-> -	reg |= AT91_WDT_SET_WDD(value);
-> -	wdt_write(wdt, AT91_WDT_MR, reg);
-> +	wdt->mr &= ~AT91_WDT_WDV;
-> +	wdt->mr &= ~AT91_WDT_WDD;
-> +	wdt->mr |= AT91_WDT_SET_WDV(value);
-> +	wdt->mr |= AT91_WDT_SET_WDD(value);
-> +	wdt_write(wdt, AT91_WDT_MR, wdt->mr);
->  
->  	wdd->timeout = timeout;
->  
-> @@ -132,19 +126,19 @@ static int of_sama5d4_wdt_init(struct device_node *np, struct sama5d4_wdt *wdt)
->  {
->  	const char *tmp;
->  
-> -	wdt->config = AT91_WDT_WDDIS;
-> +	wdt->mr = AT91_WDT_WDDIS;
->  
->  	if (!of_property_read_string(np, "atmel,watchdog-type", &tmp) &&
->  	    !strcmp(tmp, "software"))
-> -		wdt->config |= AT91_WDT_WDFIEN;
-> +		wdt->mr |= AT91_WDT_WDFIEN;
->  	else
-> -		wdt->config |= AT91_WDT_WDRSTEN;
-> +		wdt->mr |= AT91_WDT_WDRSTEN;
->  
->  	if (of_property_read_bool(np, "atmel,idle-halt"))
-> -		wdt->config |= AT91_WDT_WDIDLEHLT;
-> +		wdt->mr |= AT91_WDT_WDIDLEHLT;
->  
->  	if (of_property_read_bool(np, "atmel,dbg-halt"))
-> -		wdt->config |= AT91_WDT_WDDBGHLT;
-> +		wdt->mr |= AT91_WDT_WDDBGHLT;
->  
->  	return 0;
->  }
-> @@ -163,11 +157,10 @@ static int sama5d4_wdt_init(struct sama5d4_wdt *wdt)
->  	reg &= ~AT91_WDT_WDDIS;
->  	wdt_write(wdt, AT91_WDT_MR, reg);
->  
-There is (at least) one read of the mr register left above this code.
-It is not entirely obvious to me why it would make sense to retain
-this single read instead of just clearing the AT91_WDT_WDDIS bit
-from the cached value and writing the rest. Maybe this is to make
-sure that WDV or WDD isn't changed with the bit set, but ....
-the explanation associated with clearing the bit is a bit odd either
-case. It states that AT91_WDT_WDDIS must not be set (meaning the watchdog
-must be running ? Shouldn't it be the opposite ?) when changing WDV or WDD,
-then violates this rule when updating the timeout (which can happen with
-the watchdog running or not).
+> -	const u16 *tx_buf = msg->tx_buf;
+> -	u32 val = GEN_HDATA(*tx_buf) | GEN_HTYPE(msg->type);
+> +	const u8 *tx_buf = msg->tx_buf;
+> +	u32 val = GEN_HTYPE(msg->type);
+> +
+> +	if (msg->tx_len > 0)
+> +		val |= GEN_HDATA(tx_buf[0]);
+> +	if (msg->tx_len > 1)
+> +		val |= GEN_HDATA(tx_buf[1] << 8);
 
-> -	reg = wdt->config;
-> -	reg |= AT91_WDT_SET_WDD(value);
-> -	reg |= AT91_WDT_SET_WDV(value);
-> +	wdt->mr |= AT91_WDT_SET_WDD(value);
-> +	wdt->mr |= AT91_WDT_SET_WDV(value);
+You should probably update the mask inside GEN_HDATA to mask off 8 bits instead of
+16.
+
+Sean
+
 >  
-> -	wdt_write(wdt, AT91_WDT_MR, reg);
-> +	wdt_write(wdt, AT91_WDT_MR, wdt->mr);
->  
->  	return 0;
->  }
-> @@ -211,7 +204,7 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
->  			return ret;
->  	}
->  
-> -	if ((wdt->config & AT91_WDT_WDFIEN) && irq) {
-> +	if ((wdt->mr & AT91_WDT_WDFIEN) && irq) {
->  		ret = devm_request_irq(&pdev->dev, irq, sama5d4_wdt_irq_handler,
->  				       IRQF_SHARED | IRQF_IRQPOLL |
->  				       IRQF_NO_SUSPEND, pdev->name, pdev);
+>  	if (msg->tx_len > 2) {
+>  		dev_err(dsi->dev, "too long tx buf length %zu for short write\n",
 > -- 
-> 2.11.0
+> 2.11.0.197.gb556de5.dirty
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+
+-- 
+Sean Paul, Software Engineer, Google / Chromium OS
