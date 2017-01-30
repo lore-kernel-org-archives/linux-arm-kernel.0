@@ -1,44 +1,51 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 30 Jan 2017 15:09:54 +0100
-Subject: [PATCH 0/5] Add EXTI GPIO trigger support to STM32 ADC
-In-Reply-To: <1485784663-19505-1-git-send-email-fabrice.gasnier@st.com>
-References: <1485784663-19505-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <0472f001-eee8-74a8-f078-2fb71904be58@st.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 30 Jan 2017 14:13:08 +0000
+Subject: ARM64: Disabling warnings about deprecated armv8 instructions
+In-Reply-To: <0D1F678D-6F94-4B68-955E-6454F8647FCA@linaro.org>
+References: <1485072424.14066.2.camel@crowfest.net>
+ <1485075528.14345.1.camel@crowfest.net>
+ <CAKv+Gu8LU3QjrUa6wMJF3WBNrhx34Pi_0ZUQVfrZy7w7y7237w@mail.gmail.com>
+ <22169925.OhJ0QcnbHM@localhost>
+ <1485087662.1518.1.camel@crowfest.net>
+ <0D1F678D-6F94-4B68-955E-6454F8647FCA@linaro.org>
+Message-ID: <20170130141308.GV27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Sun, Jan 22, 2017 at 01:01:53PM +0000, Ard Biesheuvel wrote:
+> Emulating unaligned access in the ARM kernel was a mistake: it even
+> emulates unaligned accesses for instructions like ldm and ldrd, which
+> require word alignment at the hardware level even in the latest v8
+> version of the architecture. In contrast, the v8 deprecation warnings
+> are about enforcing compliance.
 
-Please discard this series. I'll send a V2.
-Sorry for the noise.
+Ard, you're totally wrong on the unaligned access thing.  Unaligned
+accesses are a fundamental requirement of the kernel's networking
+stack.  If you don't have support for unaligned accesses, then you
+don't have network support - it's as simple as that.
 
-Best regards,
-Fabrice
+So, in order for ARMv5 and earlier to have network support, there
+was no option to add support for emulating those accesses.
 
-On 01/30/2017 02:57 PM, Fabrice Gasnier wrote:
-> STM32 ADC, can use GPIOs configured as EXTI line (external interrupt)
-> as trigger source for conversions.
-> This patchset is based on latest IIO testing branch, and adds support
-> for EXTi GPIO triggers in IIO.
-> It also adds a dt option to configure default trigger polarity in
-> STM32 ADC driver.
->
-> Fabrice Gasnier (5):
->    Documentation: dt: iio: document stm32 adc trigger polarity
->    iio: adc: stm32: add dt option to set default trigger polarity
->    Documentation: dt: iio: document stm32 exti trigger
->    iio: trigger: add support for STM32 EXTI triggers
->    iio: adc: stm32: add exti11 gpio trigger source
->
->   .../devicetree/bindings/iio/adc/st,stm32-adc.txt   |   3 +
->   .../bindings/iio/trigger/st,stm32-exti-trigger.txt |  17 +++
->   drivers/iio/adc/stm32-adc.c                        |  14 +++
->   drivers/iio/trigger/Kconfig                        |  10 ++
->   drivers/iio/trigger/Makefile                       |   1 +
->   drivers/iio/trigger/stm32-exti-trigger.c           | 124 +++++++++++++++++++++
->   include/linux/iio/trigger/stm32-exti-trigger.h     |  26 +++++
->   7 files changed, 195 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/iio/trigger/st,stm32-exti-trigger.txt
->   create mode 100644 drivers/iio/trigger/stm32-exti-trigger.c
->   create mode 100644 include/linux/iio/trigger/stm32-exti-trigger.h
->
+The dubious thing was whether to add that for userspace as well.
+Since soo many applications were broken at the time, and ARM wasn't
+a sufficiently large community for the applications people to care
+one shit about, the applications people weren't going to fix their
+code to avoid unaligned accesses.
+
+So, back in the 1990s, we were stuck between having broken userspace
+and a huge amount of effort needed to maintain ARM specific patches
+out of tree for lots of applications, or functional userspace.
+
+Today, the ARM architecture has moved on a long way, and application
+people care about whether their stuff works on the ARM architecture.
+It wasn't like that when the unaligned emulation was added.
+
+It was not a mistake.  It's one of the reasons why ARM has got where
+it is today, and probably why the light was finally seen to add
+hardware support for unaligned accesses to the later CPU architectures.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
