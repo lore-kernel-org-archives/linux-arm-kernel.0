@@ -1,86 +1,64 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 30 Jan 2017 08:59:10 -0500
-Subject: [PATCH V7 08/11] drivers: acpi: Handle IOMMU lookup failure with
- deferred probing or error
-In-Reply-To: <93e79759-d614-9b36-d5ab-63e8eb725009@arm.com>
-References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
- <1485188293-20263-9-git-send-email-sricharan@codeaurora.org>
- <20170124123711.GA11996@red-moon>
- <f2370671-ece8-fbee-de19-350dd625088f@codeaurora.org>
- <93e79759-d614-9b36-d5ab-63e8eb725009@arm.com>
-Message-ID: <14751205-f034-7f0d-442a-854c3909425c@codeaurora.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 30 Jan 2017 15:00:15 +0100
+Subject: [PATCH v2 2/2] ARM: sun8i: dt: Add mali node
+In-Reply-To: <20170127202119.cnnuuojtjor6rleg@rob-hp-laptop>
+References: <a4d90de597cfcfab5fddeeb538505774a980818b.1485180017.git-series.maxime.ripard@free-electrons.com>
+ <681511dd6370b9146ae8e3f8009eba1e15d36cc0.1485180017.git-series.maxime.ripard@free-electrons.com>
+ <20170127202119.cnnuuojtjor6rleg@rob-hp-laptop>
+Message-ID: <20170130140015.dopcfbula6spu2xo@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/30/2017 7:22 AM, Robin Murphy wrote:
-> On 29/01/17 17:53, Sinan Kaya wrote:
->> On 1/24/2017 7:37 AM, Lorenzo Pieralisi wrote:
->>> [+hanjun, tomasz, sinan]
->>>
->>> It is quite a key patchset, I would be glad if they can test on their
->>> respective platforms with IORT.
->>>
->>
->> Tested on top of 4.10-rc5.
->>
->> 1.	Platform Hidma device passed dmatest
->> 2.	Seeing some USB stalls on a platform USB device.
->> 3.	PCIe NVME drive probed and worked fine with MSI interrupts after boot.
->> 4. 	NVMe driver didn't probe following a hotplug insertion and received an
->> SMMU error event during the insertion.
+Hi Rob,
+
+On Fri, Jan 27, 2017 at 02:21:19PM -0600, Rob Herring wrote:
+> On Mon, Jan 23, 2017 at 03:00:46PM +0100, Maxime Ripard wrote:
+> > The A23 and A33 have an ARM Mali 400 GPU. Now that we have a binding, add
+> > it to our DT.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  arch/arm/boot/dts/sun8i-a23-a33.dtsi | 26 ++++++++++++++++++++++++++
+> >  1 file changed, 26 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+> > index e4991a78ad73..982705719ef2 100644
+> > --- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+> > +++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+> > @@ -486,6 +486,32 @@
+> >  			#size-cells = <0>;
+> >  		};
+> >  
+> > +		mali: gpu at 01c40000 {
 > 
-> What was the SMMU error - a translation/permission fault (implying the
-> wrong DMA ops) or a bad STE fault (implying we totally failed to tell
-> the SMMU about the device at all)?
+> Drop leading 0.
 > 
-
-root at ubuntu:/sys/bus/pci/slots/4# echo 0 > power
-
-[__204.698522]_iommu:_Removing_device_0003:01:00.0_from_group_0
-[  204.708704] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down
-[  204.708723] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down event ignored; already powering off
-
-root at ubuntu:/sys/bus/pci/slots/4#
-
-[__254.820440]_iommu:_Adding_device_0003:01:00.0_to_group_8
-[  254.820599] nvme nvme0: pci function 0003:01:00.0
-[  254.820621] nvme 0003:01:00.0: enabling device (0000 -> 0002)
-[  261.948558] arm-smmu-v3 arm-smmu-v3.0.auto: event 0x0a received:
-[  261.948561] arm-smmu-v3 arm-smmu-v3.0.auto:  0x000001000000000a
-[  261.948563] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
-[  261.948564] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
-[  261.948566] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
-root at ubuntu:/sys/bus/pci/slots/4#
-
-root at ubuntu:/sys/bus/pci/slots/4#ls /dev/nvme*
-/dev/nvme0
-
-I should have seen /dev/nvme0n1 partition here. 
-
-> Robin.
+> > +			compatible = "allwinner,sun8i-a23-mali",
+> > +				     "allwinner,sun7i-a20-mali", "arm,mali-400";
+> > +			reg = <0x01c40000 0x10000>;
 > 
->>
->> /sys/bus/pci/slots/4 #
->> /sys/bus/pci/slots/4 # dmesg | grep nvme
->> [   14.041357] nvme nvme0: pci function 0003:01:00.0
->> [  198.399521] nvme nvme0: pci function 0003:01:00.0
->> [__198.416232]_nvme_0003:01:00.0:_enabling_device_(0000_->_0002)
->> [  264.402216] nvme nvme0: I/O 228 QID 0 timeout, disable controller
->> [  264.402313] nvme nvme0: Identify Controller failed (-4)
->> [  264.421270] nvme nvme0: Removing after probe failure status: -5
->> /sys/bus/pci/slots/4 #
->>
->>
->>
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> Does this really use 64K or that's just the register spacing? Set it
+> to what's used.
 
+The memory maps in our datasheet allocates 64k for that block. I
+always thought that we had to put the size of the whole memory block
+allocated to that device.
+
+For now, the driver only uses space up to 0xe000 (so we wouldn't
+"waste" a lot of space anyway), but what if at some point the driver
+needs more than what we put in the DT?
+
+Thanks,
+Maxime
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170130/3942d0d1/attachment.sig>
