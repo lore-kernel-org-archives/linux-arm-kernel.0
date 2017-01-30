@@ -1,66 +1,61 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 30 Jan 2017 12:05:10 +0100
-Subject: [PATCH 4/6] ARM: Register with kernel restart handler
+Date: Mon, 30 Jan 2017 12:05:12 +0100
+Subject: [PATCH 6/6] ARM: Remove arm_pm_restart()
 In-Reply-To: <20170130110512.6943-1-thierry.reding@gmail.com>
 References: <20170130110512.6943-1-thierry.reding@gmail.com>
-Message-ID: <20170130110512.6943-5-thierry.reding@gmail.com>
+Message-ID: <20170130110512.6943-7-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Guenter Roeck <linux@roeck-us.net>
 
-By making use of the kernel restart handler, board specific restart
-handlers can be prioritized amongst available mechanisms for a particular
-board or system.
-
-Select the default priority of 128 to indicate that the restart callback
-in the machine description is the default restart mechanism.
+All users of arm_pm_restart() have been converted to use the kernel
+restart handler.
 
 Acked-by: Arnd Bergmann <arnd@arndb.de>
 Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Signed-off-by: Guenter Roeck <linux@roeck-us.net>
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- arch/arm/kernel/setup.c | 20 ++++++++++++++++++--
- 1 file changed, 18 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/system_misc.h | 1 -
+ arch/arm/kernel/reboot.c           | 6 +-----
+ 2 files changed, 1 insertion(+), 6 deletions(-)
 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index f4e54503afa9..cc4f9564f4e3 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -1058,6 +1058,20 @@ void __init hyp_mode_check(void)
- #endif
- }
+diff --git a/arch/arm/include/asm/system_misc.h b/arch/arm/include/asm/system_misc.h
+index a3d61ad984af..6c952538f1e8 100644
+--- a/arch/arm/include/asm/system_misc.h
++++ b/arch/arm/include/asm/system_misc.h
+@@ -11,7 +11,6 @@
+ extern void cpu_init(void);
  
-+static void (*__arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
-+
-+static int arm_restart(struct notifier_block *nb, unsigned long action,
-+		       void *data)
-+{
-+	__arm_pm_restart(action, data);
-+	return NOTIFY_DONE;
-+}
-+
-+static struct notifier_block arm_restart_nb = {
-+	.notifier_call = arm_restart,
-+	.priority = 128,
-+};
-+
- void __init setup_arch(char **cmdline_p)
- {
- 	const struct machine_desc *mdesc;
-@@ -1107,8 +1121,10 @@ void __init setup_arch(char **cmdline_p)
- 	paging_init(mdesc);
- 	request_standard_resources(mdesc);
+ void soft_restart(unsigned long);
+-extern void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+ extern void (*arm_pm_idle)(void);
  
--	if (mdesc->restart)
--		arm_pm_restart = mdesc->restart;
-+	if (mdesc->restart) {
-+		__arm_pm_restart = mdesc->restart;
-+		register_restart_handler(&arm_restart_nb);
-+	}
+ #define UDBG_UNDEFINED	(1 << 0)
+diff --git a/arch/arm/kernel/reboot.c b/arch/arm/kernel/reboot.c
+index 3fa867a2aae6..0207ec69045e 100644
+--- a/arch/arm/kernel/reboot.c
++++ b/arch/arm/kernel/reboot.c
+@@ -20,7 +20,6 @@ typedef void (*phys_reset_t)(unsigned long);
+ /*
+  * Function pointers to optional machine specific functions
+  */
+-void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+ void (*pm_power_off)(void);
+ EXPORT_SYMBOL(pm_power_off);
  
- 	unflatten_device_tree();
+@@ -138,10 +137,7 @@ void machine_restart(char *cmd)
+ 	local_irq_disable();
+ 	smp_send_stop();
  
+-	if (arm_pm_restart)
+-		arm_pm_restart(reboot_mode, cmd);
+-	else
+-		do_kernel_restart(cmd);
++	do_kernel_restart(cmd);
+ 
+ 	/* Give a grace period for failure to restart of 1s */
+ 	mdelay(1000);
 -- 
 2.11.0
