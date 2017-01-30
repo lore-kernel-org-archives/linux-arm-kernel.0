@@ -1,50 +1,57 @@
-From: john@metanate.com (John Keeping)
-Date: Mon, 30 Jan 2017 18:16:36 +0000
-Subject: [PATCH v3 06/24] drm/rockchip: dw-mipi-dsi: avoid out-of-bounds
- read on tx_buf
-In-Reply-To: <20170130180146.GG20076@art_vandelay>
-References: <20170129132444.25251-1-john@metanate.com>
- <20170129132444.25251-7-john@metanate.com>
- <20170130180146.GG20076@art_vandelay>
-Message-ID: <20170130181636.1bc81e86.john@metanate.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Mon, 30 Jan 2017 18:17:50 +0000
+Subject: ARM64: Disabling warnings about deprecated armv8 instructions
+In-Reply-To: <1485798092.484.5.camel@crowfest.net> (Michael Zoran's message of
+ "Mon, 30 Jan 2017 09:41:32 -0800")
+References: <1485072424.14066.2.camel@crowfest.net>
+ <1485075528.14345.1.camel@crowfest.net>
+ <CAKv+Gu8LU3QjrUa6wMJF3WBNrhx34Pi_0ZUQVfrZy7w7y7237w@mail.gmail.com>
+ <22169925.OhJ0QcnbHM@localhost> <1485087662.1518.1.camel@crowfest.net>
+ <0D1F678D-6F94-4B68-955E-6454F8647FCA@linaro.org>
+ <20170130141308.GV27312@n2100.armlinux.org.uk>
+ <CAKv+Gu98i4=COqr_Eikwja28U5MAL83rxe-_QBXWFhJ7v1E6yA@mail.gmail.com>
+ <20170130165837.GE27312@n2100.armlinux.org.uk>
+ <CAKv+Gu_jEvKdWFWB2Ofxb5ruoTYUEt1puZXBb=9Cn2kEOZO1hg@mail.gmail.com>
+ <1485798092.484.5.camel@crowfest.net>
+Message-ID: <yw1xo9yofm41.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Jan 2017 13:01:46 -0500, Sean Paul wrote:
+Michael Zoran <mzoran@crowfest.net> writes:
 
-> On Sun, Jan 29, 2017 at 01:24:26PM +0000, John Keeping wrote:
-> > As a side-effect of this, encode the endianness explicitly rather than
-> > casting a u16.
-> > 
-> > Signed-off-by: John Keeping <john@metanate.com>
-> > Reviewed-by: Chris Zhong <zyw@rock-chips.com>
-> > ---
-> > v3:
-> > - Add Chris' Reviewed-by
-> > Unchanged in v2
-> > 
-> >  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 9 +++++++--
-> >  1 file changed, 7 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > index 4be1ff3a42bb..2e6ad4591ebf 100644
-> > --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > @@ -572,8 +572,13 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
-> >  static int dw_mipi_dsi_dcs_short_write(struct dw_mipi_dsi *dsi,
-> >  				       const struct mipi_dsi_msg *msg)
-> >  {
-> > -	const u16 *tx_buf = msg->tx_buf;
-> > -	u32 val = GEN_HDATA(*tx_buf) | GEN_HTYPE(msg->type);
-> > +	const u8 *tx_buf = msg->tx_buf;
-> > +	u32 val = GEN_HTYPE(msg->type);
-> > +
-> > +	if (msg->tx_len > 0)
-> > +		val |= GEN_HDATA(tx_buf[0]);
-> > +	if (msg->tx_len > 1)
-> > +		val |= GEN_HDATA(tx_buf[1] << 8);  
-> 
-> You should probably update the mask inside GEN_HDATA to mask off 8 bits instead of
-> 16.
+> On Mon, 2017-01-30 at 17:09 +0000, Ard Biesheuvel wrote:
+>> Well, the question is really how to deal with 32-bit compatibility
+>> given the fact that the ARM architecture will drop such instructions
+>> in its next revision. Whether we agree with that, and whether we
+>> should argue our positions with the architects if we don't is not
+>> relevant here.
+>> 
+>> What is relevant is whether we inform userspace if we spot such a
+>> deprecated instruction, and I think we should.
+>> 
+>> Note that this is not only an issue for the arm64 kernel. The 32-bit
+>> kernel will have the exact same issue when you try to run it on
+>> hardware that no longer has support for those instructions.
+>
+> Just to inject two cents worth since I'm still on the thread and I
+> originally started the topic...
+>
+> The Intel comparison seems relevant.  I think in theory you can still
+> run old MS-DOS software on an Intel PC if you were so inclined to do
+> so.
+>
+> I would think the best would be to turn the warnings off by default
+> when running in 32 bit mode with the option to turn them back on.  Then
+> as time progresses more of more of these instructions can be converted
+> to software emulation and removed from the hardware.  And hopefully as
+> time progresses, all the user mode software gets upgraded to 64 bit so
+> that 32 bit get dropped.
+>
+> The issue seems to me to be more that the kernel is screaming in the
+> logs rather then if it's emulating the instructions in hardware or
+> software.
 
-Won't that mask off the data written by "tx_buf[1] << 8"?
+Might warning once be an acceptable compromise?
+
+-- 
+M?ns Rullg?rd
