@@ -1,204 +1,107 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 30 Jan 2017 17:42:33 +0900
-Subject: [PATCH v30 05/11] arm64: kdump: protect crash dump kernel memory
-In-Reply-To: <20170127185612.GA31485@leverpostej>
-References: <20170124084638.3770-1-takahiro.akashi@linaro.org>
- <20170124085004.3892-4-takahiro.akashi@linaro.org>
- <5888E262.4050208@arm.com> <20170126112811.GG23406@linaro.org>
- <588B2CC4.70904@arm.com> <20170127171513.GA3119@fireball>
- <20170127185612.GA31485@leverpostej>
-Message-ID: <20170130084232.GI23406@linaro.org>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 30 Jan 2017 09:41:28 +0100
+Subject: [PATCH v5 06/12] mmc: sdhci-xenon: Add Marvell Xenon SDHC core
+ functionality
+In-Reply-To: <461fd409-81e8-2c3f-3674-ec593e1c7383@marvell.com>
+References: <cover.8527229dae6c124f24c5e637430c2cdc86f80392.1484154449.git-series.gregory.clement@free-electrons.com>
+ <3546f143091c121face8ecbcbf7f6a4c41d2cec7.1484154449.git-series.gregory.clement@free-electrons.com>
+ <CAPDyKFrwxix4zY4a1x9u6jh_gPfKTsaLnD8b8crum=pc5CN3AA@mail.gmail.com>
+ <461fd409-81e8-2c3f-3674-ec593e1c7383@marvell.com>
+Message-ID: <CAPDyKFoERET6Fzc7qEGWJ95t6GZir=XJWfTEoRSEROjPgJ95hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
+[...]
 
-On Fri, Jan 27, 2017 at 06:56:13PM +0000, Mark Rutland wrote:
-> On Sat, Jan 28, 2017 at 02:15:16AM +0900, AKASHI Takahiro wrote:
-> > On Fri, Jan 27, 2017 at 11:19:32AM +0000, James Morse wrote:
-> > > Hi Akashi,
-> > >
-> > > On 26/01/17 11:28, AKASHI Takahiro wrote:
-> > > > On Wed, Jan 25, 2017 at 05:37:38PM +0000, James Morse wrote:
-> > > >> On 24/01/17 08:49, AKASHI Takahiro wrote:
-> > > >>> To protect the memory reserved for crash dump kernel once after loaded,
-> > > >>> arch_kexec_protect_crashres/unprotect_crashres() are meant to deal with
-> > > >>> permissions of the corresponding kernel mappings.
-> > > >>>
-> > > >>> We also have to
-> > > >>> - put the region in an isolated mapping, and
-> > > >>> - move copying kexec's control_code_page to machine_kexec_prepare()
-> > > >>> so that the region will be completely read-only after loading.
-> > > >>
-> > > >>
-> > > >>> Note that the region must reside in linear mapping and have corresponding
-> > > >>> page structures in order to be potentially freed by shrinking it through
-> > > >>> /sys/kernel/kexec_crash_size.
-> 
-> Ah; I did not realise that this was a possibility.
-> 
-> > Now I understand why we should stick with page_mapping_only option.
-> 
-> Likewise, I now agree.
-> 
-> Apologies for guiding you down the wrong path here.
+>>> + */
+>>> +static int xenon_child_node_of_parse(struct platform_device *pdev)
+>>> +{
+>>> +       struct device_node *np = pdev->dev.of_node;
+>>> +       struct sdhci_host *host = platform_get_drvdata(pdev);
+>>> +       struct mmc_host *mmc = host->mmc;
+>>> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>>> +       struct sdhci_xenon_priv *priv = sdhci_pltfm_priv(pltfm_host);
+>>> +       struct device_node *child;
+>>> +       int nr_child;
+>>> +
+>>> +       priv->init_card_type = XENON_CARD_TYPE_UNKNOWN;
+>>> +
+>>> +       nr_child = of_get_child_count(np);
+>>> +       if (!nr_child)
+>>> +               return 0;
+>>> +
+>>> +       for_each_child_of_node(np, child) {
+>>> +               if (of_device_is_compatible(child, "mmc-card")) {
+>>
+>> To avoid code from being duplicated, I would rather see the DT parsing
+>> of the child nodes for "mmc-card", to be done by the mmc core.
+>>
+>> As a matter of fact it is already being done, but perhaps we need to
+>> change that a bit as to fit your case.
+>>
+>> I suggest you have a look and see how to update this in the core,
+>> instead of doing it here in the host driver.
+>>
+>
+>     I understand your concern.
+>
+>     It seems that so far "mmc-card" is only used in our Xenon driver.
 
-Your comments are always welcome.
+git grep "mmc-card" tells you more about where it's being parsed by
+the mmc core.
 
-Anyhow, I think we'd better have a dedicated function of unmapping.
-Can you please take a look at the following hack?
+>     Besides, we set Xenon specific parameters and attributions when
+>     parsing "mmc-card" property.
 
-(We need to carefully use this function except for kdump usage since
-it doesn't care whether the region to be unmapped is used somewhere else.)
+I don't see any Xenon specific properties.
 
-Thanks,
--Takahiro AKASHI
+Instead I think it would make sense to update the generic
+interpretation of the binding for mmc-card, as you have done here.
 
-===8<===
-diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
-index 2142c7726e76..945d84cd5df7 100644
---- a/arch/arm64/include/asm/pgtable-prot.h
-+++ b/arch/arm64/include/asm/pgtable-prot.h
-@@ -54,6 +54,7 @@
- #define PAGE_KERNEL_ROX		__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
- #define PAGE_KERNEL_EXEC	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE)
- #define PAGE_KERNEL_EXEC_CONT	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_CONT)
-+#define PAGE_KERNEL_INVALID	__pgprot(0)
- 
- #define PAGE_HYP		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_HYP_XN)
- #define PAGE_HYP_EXEC		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY)
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 17243e43184e..81173b594195 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -307,6 +307,101 @@ static void __create_pgd_mapping(pgd_t *pgdir, phys_addr_t phys,
- 	} while (pgd++, addr = next, addr != end);
- }
- 
-+static void free_pte(pmd_t *pmd, unsigned long addr, unsigned long end,
-+			bool dealloc_table)
-+{
-+	pte_t *pte;
-+	bool do_free = (dealloc_table && ((end - addr) == PMD_SIZE));
-+
-+	BUG_ON(pmd_none(*pmd) || pmd_bad(*pmd));
-+
-+	pte = pte_set_fixmap_offset(pmd, addr);
-+	do {
-+		pte_clear(NULL, NULL, pte);
-+	} while (pte++, addr += PAGE_SIZE, addr != end);
-+
-+	pte_clear_fixmap();
-+
-+	if (do_free) {
-+		__free_page(pmd_page(*pmd));
-+		pmd_clear(pmd);
-+	}
-+}
-+
-+static void free_pmd(pud_t *pud, unsigned long addr, unsigned long end,
-+			bool dealloc_table)
-+{
-+	pmd_t *pmd;
-+	unsigned long next;
-+	bool do_free = (dealloc_table && ((end - addr) == PUD_SIZE));
-+
-+	BUG_ON(pud_none(*pud) || pud_bad(*pud));
-+
-+	pmd = pmd_set_fixmap_offset(pud, addr);
-+
-+	do {
-+		next = pmd_addr_end(addr, end);
-+
-+		if (pmd_table(*pmd)) {
-+			free_pte(pmd, addr, next, dealloc_table);
-+		} else {
-+			pmd_clear(pmd);
-+		}
-+	} while (pmd++, addr = next, addr != end);
-+
-+	pmd_clear_fixmap();
-+
-+	if (do_free) {
-+		__free_page(pud_page(*pud));
-+		pud_clear(pud);
-+	}
-+}
-+
-+static void free_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
-+			bool dealloc_table)
-+{
-+	pud_t *pud;
-+	unsigned long next;
-+	bool do_free = (dealloc_table && ((end - addr) == PGDIR_SIZE));
-+
-+	BUG_ON(pgd_none(*pgd) || pgd_bad(*pgd));
-+
-+	pud = pud_set_fixmap_offset(pgd, addr);
-+
-+	do {
-+		next = pud_addr_end(addr, end);
-+
-+		if (pud_table(*pud)) {
-+			free_pmd(pud, addr, next, dealloc_table);
-+		} else {
-+			pud_clear(pud);
-+		}
-+	} while (pud++, addr = next, addr != end);
-+
-+	pud_clear_fixmap();
-+
-+	if (do_free) {
-+		__free_page(pgd_page(*pgd));
-+		pgd_clear(pgd);
-+	}
-+}
-+
-+static void __remove_pgd_mapping(pgd_t *pgdir, unsigned long virt,
-+				 phys_addr_t size, bool dealloc_table)
-+{
-+	unsigned long addr, length, end, next;
-+	pgd_t *pgd = pgd_offset_raw(pgdir, virt);
-+
-+	addr = virt & PAGE_MASK;
-+	length = PAGE_ALIGN(size + (virt & ~PAGE_MASK));
-+
-+	end = addr + length;
-+	do {
-+		next = pgd_addr_end(addr, end);
-+		free_pud(pgd, addr, next, dealloc_table);
-+	} while (pgd++, addr = next, addr != end);
-+}
-+
- static phys_addr_t pgd_pgtable_alloc(void)
- {
- 	void *ptr = (void *)__get_free_page(PGALLOC_GFP);
-@@ -334,14 +429,15 @@ static void __init create_mapping_noalloc(phys_addr_t phys, unsigned long virt,
- 	__create_pgd_mapping(init_mm.pgd, phys, virt, size, prot, NULL, false);
- }
- 
--void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
--			       unsigned long virt, phys_addr_t size,
--			       pgprot_t prot, bool page_mappings_only)
-+void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
-+			unsigned long virt, phys_addr_t size,
-+			pgprot_t prot, bool page_mappings_only)
- {
--	BUG_ON(mm == &init_mm);
--
--	__create_pgd_mapping(mm->pgd, phys, virt, size, prot,
--			     pgd_pgtable_alloc, page_mappings_only);
-+	if (pgprot_val(prot))
-+		__create_pgd_mapping(mm->pgd, phys, virt, size, prot,
-+				     pgd_pgtable_alloc, page_mappings_only);
-+	else
-+		__remove_pgd_mapping(mm->pgd, virt, size, true);
- }
- 
- static void create_mapping_late(phys_addr_t phys, unsigned long virt,
-===>8===
+>
+>     May I keep current implementation?
 
+Rather not. Let's try to make the parsing of the child node for
+mmc-card generic.
 
-> Thanks,
-> Mark.
-> IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+>     In my very own opinion, moving it into core layer should be another
+>     independent patch.
+
+Absolutely an independent patch. Whether it can be done as a part of
+mmc_of_parse() or whether we need yet another new mmc_of* API, we can
+discuss.
+
+My point is that, I don't this to be specific for Xenon (unless there
+are specific reason, which I don't see here).
+
+>     And it will also cost some more time. To be honest, it is difficult
+>     for me to bring up a generic core layer implementation to parse
+>     "mmc-card", since I'm not clear about other vendor's requirement.
+
+Well, then you need to learn more about how the mmc core works. In
+this case, it shouldn't be too hard to implement.
+
+[...]
+
+>
+>>
+>>> +                                     MMC_CAP2_NO_SD |
+>>> +                                     MMC_CAP2_NO_SDIO;
+>>
+>> I think we need to update the DT documentation for mmc-card.
+>> Typically, we should explicitly state what kind of other existing mmc
+>> DT properties that will be automatically selected, when the mmc-card
+>> is specified.
+>>
+>> Can you please look into updating this DT doc as well.
+>>
+>
+>   Similar to above, may I keep it now and bring up another patch later
+>   to update mmc-card DT and parsing?
+
+Please, no.
+
+[...]
+
+Kind regards
+Uffe
