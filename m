@@ -1,75 +1,92 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 30 Jan 2017 14:51:51 +0000
-Subject: [RFC v2 02/10] KVM: arm/arm64: Move cntvoff to each timer context
-In-Reply-To: <20170130144550.GA16459@cbox>
-References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
- <1485479100-4966-3-git-send-email-jintack@cs.columbia.edu>
- <867f5e9j4y.fsf@arm.com> <20170130144550.GA16459@cbox>
-Message-ID: <2453da50-d827-0aa5-1dea-beb35117d1ae@arm.com>
+From: nwatters@codeaurora.org (Nate Watterson)
+Date: Mon, 30 Jan 2017 09:54:46 -0500
+Subject: [PATCH V7 08/11] drivers: acpi: Handle IOMMU lookup failure with
+ deferred probing or error
+In-Reply-To: <20170130143851.GJ16461@arm.com>
+References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
+ <1485188293-20263-9-git-send-email-sricharan@codeaurora.org>
+ <20170124123711.GA11996@red-moon>
+ <f2370671-ece8-fbee-de19-350dd625088f@codeaurora.org>
+ <93e79759-d614-9b36-d5ab-63e8eb725009@arm.com>
+ <14751205-f034-7f0d-442a-854c3909425c@codeaurora.org>
+ <5ba9f366d6e25397cdef8ad95b49e199@codeaurora.org>
+ <175a3798-b824-ef1a-e112-9f6f472973ae@codeaurora.org>
+ <20170130143851.GJ16461@arm.com>
+Message-ID: <b2e50c17de156341deab9fb8e91a8dec@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/01/17 14:45, Christoffer Dall wrote:
-> On Sun, Jan 29, 2017 at 11:54:05AM +0000, Marc Zyngier wrote:
->> On Fri, Jan 27 2017 at 01:04:52 AM, Jintack Lim <jintack@cs.columbia.edu> wrote:
->>> Make cntvoff per each timer context. This is helpful to abstract kvm
->>> timer functions to work with timer context without considering timer
->>> types (e.g. physical timer or virtual timer).
->>>
->>> This also would pave the way for ever doing adjustments of the cntvoff
->>> on a per-CPU basis if that should ever make sense.
->>>
->>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
->>> ---
->>>  arch/arm/include/asm/kvm_host.h   |  6 +++---
->>>  arch/arm64/include/asm/kvm_host.h |  4 ++--
->>>  include/kvm/arm_arch_timer.h      |  8 +++-----
->>>  virt/kvm/arm/arch_timer.c         | 26 ++++++++++++++++++++------
->>>  virt/kvm/arm/hyp/timer-sr.c       |  3 +--
->>>  5 files changed, 29 insertions(+), 18 deletions(-)
->>>
->>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->>> index d5423ab..f5456a9 100644
->>> --- a/arch/arm/include/asm/kvm_host.h
->>> +++ b/arch/arm/include/asm/kvm_host.h
->>> @@ -60,9 +60,6 @@ struct kvm_arch {
->>>  	/* The last vcpu id that ran on each physical CPU */
->>>  	int __percpu *last_vcpu_ran;
->>>  
->>> -	/* Timer */
->>> -	struct arch_timer_kvm	timer;
->>> -
->>>  	/*
->>>  	 * Anything that is not used directly from assembly code goes
->>>  	 * here.
->>> @@ -75,6 +72,9 @@ struct kvm_arch {
->>>  	/* Stage-2 page table */
->>>  	pgd_t *pgd;
->>>  
->>> +	/* A lock to synchronize cntvoff among all vtimer context of vcpus */
->>> +	spinlock_t cntvoff_lock;
->>
->> Is there any condition where we need this to be a spinlock? I would have
->> thought that a mutex should have been enough, as this should only be
->> updated on migration or initialization. Not that it matters much in this
->> case, but I wondered if there is something I'm missing.
->>
+On 2017-01-30 09:38, Will Deacon wrote:
+> On Mon, Jan 30, 2017 at 09:33:50AM -0500, Sinan Kaya wrote:
+>> On 1/30/2017 9:23 AM, Nate Watterson wrote:
+>> > On 2017-01-30 08:59, Sinan Kaya wrote:
+>> >> On 1/30/2017 7:22 AM, Robin Murphy wrote:
+>> >>> On 29/01/17 17:53, Sinan Kaya wrote:
+>> >>>> On 1/24/2017 7:37 AM, Lorenzo Pieralisi wrote:
+>> >>>>> [+hanjun, tomasz, sinan]
+>> >>>>>
+>> >>>>> It is quite a key patchset, I would be glad if they can test on their
+>> >>>>> respective platforms with IORT.
+>> >>>>>
+>> >>>>
+>> >>>> Tested on top of 4.10-rc5.
+>> >>>>
+>> >>>> 1.    Platform Hidma device passed dmatest
+>> >>>> 2.    Seeing some USB stalls on a platform USB device.
+>> >>>> 3.    PCIe NVME drive probed and worked fine with MSI interrupts after boot.
+>> >>>> 4.     NVMe driver didn't probe following a hotplug insertion and received an
+>> >>>> SMMU error event during the insertion.
+>> >>>
+>> >>> What was the SMMU error - a translation/permission fault (implying the
+>> >>> wrong DMA ops) or a bad STE fault (implying we totally failed to tell
+>> >>> the SMMU about the device at all)?
+>> >>>
+>> >>
+>> >> root at ubuntu:/sys/bus/pci/slots/4# echo 0 > power
+>> >>
+>> >> [__204.698522]_iommu:_Removing_device_0003:01:00.0_from_group_0
+>> >> [  204.708704] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down
+>> >> [  204.708723] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down event
+>> >> ignored; already powering off
+>> >>
+>> >> root at ubuntu:/sys/bus/pci/slots/4#
+>> >>
+>> >> [__254.820440]_iommu:_Adding_device_0003:01:00.0_to_group_8
+>> >> [  254.820599] nvme nvme0: pci function 0003:01:00.0
+>> >> [  254.820621] nvme 0003:01:00.0: enabling device (0000 -> 0002)
+>> >> [  261.948558] arm-smmu-v3 arm-smmu-v3.0.auto: event 0x0a received:
+>> >> [  261.948561] arm-smmu-v3 arm-smmu-v3.0.auto:  0x000001000000000a
+>> >> [  261.948563] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
+>> >> [  261.948564] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
+>> >> [  261.948566] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
+>> 
+>> > Looks like C_BAD_CD. Can you please try with:
+>> > iommu/arm-smmu-v3: Clear prior settings when updating STEs
+>> 
+>> This resolved the issue. Can we pull Nate's patch to 4.10 so that I 
+>> don't see
+>> this issue again.
 > 
-> I would think the critical section is small enough that a spinlock makes
-> sense, but what I don't think we need is to add the additional lock.
+> I already sent the pull request to Joerg for 4.11. Do you see this 
+> problem
+> without Sricharan's patches (i.e. vanilla mainline)? If so, we'll need 
+> to
+> send the patch to stable after -rc1.
+Using vanilla mainline, I see it most commonly when directly assigning
+a device to a guest machine. I think I've also seen it after removing 
+then
+re-adding a PCI device. Basically anytime an STE's CTX pointer is 
+changed
+from a non-NULL value and STE[CFG] indicates translation will be 
+performed.
+
+Nate
 > 
-> I think just taking the kvm->lock should be sufficient, which happens to
-> be a mutex, and while that may be a bit slower to take than the
-> spinlock, it's not in the critical path so let's just keep things
-> simple.
-> 
-> Perhaps this what Marc also meant.
+> Will
 
-That would be the logical conclusion, assuming that we can sleep on this
-path.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Qualcomm Datacenter Technologies, Inc. on behalf of Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
+Linux
+Foundation Collaborative Project.
