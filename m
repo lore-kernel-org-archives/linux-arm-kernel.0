@@ -1,171 +1,192 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Mon, 30 Jan 2017 10:40:27 -0500
-Subject: [PATCH v3 02/24] drm/rockchip: dw-mipi-dsi: pass mode in where
- needed
-In-Reply-To: <20170129132444.25251-3-john@metanate.com>
-References: <20170129132444.25251-1-john@metanate.com>
- <20170129132444.25251-3-john@metanate.com>
-Message-ID: <20170130154027.GD20076@art_vandelay>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 30 Jan 2017 09:41:36 -0600
+Subject: [PATCH] PCI: mvebu: Handle changes to the bridge windows while
+ enabled
+In-Reply-To: <20161212183020.GA30274@obsidianresearch.com>
+References: <20161212183020.GA30274@obsidianresearch.com>
+Message-ID: <20170130154136.GR20550@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 29, 2017 at 01:24:22PM +0000, John Keeping wrote:
-> This shows that we only use the mode from the enable function and
-> prepares us to remove the "mode" field and the mode_set hook in the next
-> commit.
+On Mon, Dec 12, 2016 at 11:30:20AM -0700, Jason Gunthorpe wrote:
+> The PCI core will write to the bridge window config multiple times
+> while they are enabled. This can lead to mbus failures like:
 > 
+>  mvebu_mbus: cannot add window '4:e8', conflicts with another window
+>  mvebu-pcie mbus:pex at e0000000: Could not create MBus window at [mem 0xe0000000-0xe00fffff]: -22
+> 
+> For me this is happening during a hotplug cycle. The PCI core is
+> not changing the values, just writing them twice while active.
+> 
+> The patch addresses the general case of any change to an active window,
+> but not atomically. The code is slightly refactored so io and mem
+> can share more of the window logic.
+> 
+> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
 
-Reviewed-by: Sean Paul <seanpaul@chromium.org>
+Applied with Jason C's ack to pci/host-mvebu for v4.11, thanks!
 
-> Signed-off-by: John Keeping <john@metanate.com>
-> Reviewed-by: Chris Zhong <zyw@rock-chips.com>
 > ---
-> v3:
-> - Add Chris' Reviewed-by
-> New in v2
+>  drivers/pci/host/pci-mvebu.c | 101 +++++++++++++++++++++++++------------------
+>  1 file changed, 60 insertions(+), 41 deletions(-)
 > 
->  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 41 ++++++++++++++++++----------------
->  1 file changed, 22 insertions(+), 19 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> index bbd992299f73..cdbd25087e83 100644
-> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> @@ -330,11 +330,11 @@ static int max_mbps_to_testdin(unsigned int max_mbps)
->   * The controller should generate 2 frames before
->   * preparing the peripheral.
->   */
-> -static void dw_mipi_dsi_wait_for_two_frames(struct dw_mipi_dsi *dsi)
-> +static void dw_mipi_dsi_wait_for_two_frames(struct drm_display_mode *mode)
->  {
->  	int refresh, two_frames;
+> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+> index 307f81d6b479af..af724731b22f53 100644
+> --- a/drivers/pci/host/pci-mvebu.c
+> +++ b/drivers/pci/host/pci-mvebu.c
+> @@ -133,6 +133,12 @@ struct mvebu_pcie {
+>  	int nports;
+>  };
 >  
-> -	refresh = drm_mode_vrefresh(dsi->mode);
-> +	refresh = drm_mode_vrefresh(mode);
->  	two_frames = DIV_ROUND_UP(MSEC_PER_SEC, refresh) * 2;
->  	msleep(two_frames);
->  }
-> @@ -459,7 +459,8 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
->  	return ret;
->  }
+> +struct mvebu_pcie_window {
+> +	phys_addr_t base;
+> +	phys_addr_t remap;
+> +	size_t size;
+> +};
+> +
+>  /* Structure representing one PCIe interface */
+>  struct mvebu_pcie_port {
+>  	char *name;
+> @@ -150,10 +156,8 @@ struct mvebu_pcie_port {
+>  	struct mvebu_sw_pci_bridge bridge;
+>  	struct device_node *dn;
+>  	struct mvebu_pcie *pcie;
+> -	phys_addr_t memwin_base;
+> -	size_t memwin_size;
+> -	phys_addr_t iowin_base;
+> -	size_t iowin_size;
+> +	struct mvebu_pcie_window memwin;
+> +	struct mvebu_pcie_window iowin;
+>  	u32 saved_pcie_stat;
+>  };
 >  
-> -static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi)
-> +static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi,
-> +				    struct drm_display_mode *mode)
->  {
->  	unsigned int i, pre;
->  	unsigned long mpclk, pllref, tmp;
-> @@ -474,7 +475,7 @@ static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi)
->  		return bpp;
+> @@ -379,23 +383,45 @@ static void mvebu_pcie_add_windows(struct mvebu_pcie_port *port,
 >  	}
->  
-> -	mpclk = DIV_ROUND_UP(dsi->mode->clock, MSEC_PER_SEC);
-> +	mpclk = DIV_ROUND_UP(mode->clock, MSEC_PER_SEC);
->  	if (mpclk) {
->  		/* take 1 / 0.9, since mbps must big than bandwidth of RGB */
->  		tmp = mpclk * (bpp / dsi->lanes) * 10 / 9;
-> @@ -742,43 +743,44 @@ static void dw_mipi_dsi_command_mode_config(struct dw_mipi_dsi *dsi)
->  
->  /* Get lane byte clock cycles. */
->  static u32 dw_mipi_dsi_get_hcomponent_lbcc(struct dw_mipi_dsi *dsi,
-> +					   struct drm_display_mode *mode,
->  					   u32 hcomponent)
->  {
->  	u32 frac, lbcc;
->  
->  	lbcc = hcomponent * dsi->lane_mbps * MSEC_PER_SEC / 8;
->  
-> -	frac = lbcc % dsi->mode->clock;
-> -	lbcc = lbcc / dsi->mode->clock;
-> +	frac = lbcc % mode->clock;
-> +	lbcc = lbcc / mode->clock;
->  	if (frac)
->  		lbcc++;
->  
->  	return lbcc;
 >  }
 >  
-> -static void dw_mipi_dsi_line_timer_config(struct dw_mipi_dsi *dsi)
-> +static void dw_mipi_dsi_line_timer_config(struct dw_mipi_dsi *dsi,
-> +					  struct drm_display_mode *mode)
+> +static void mvebu_pcie_set_window(struct mvebu_pcie_port *port,
+> +				  unsigned int target, unsigned int attribute,
+> +				  const struct mvebu_pcie_window *desired,
+> +				  struct mvebu_pcie_window *cur)
+> +{
+> +	if (desired->base == cur->base && desired->remap == cur->remap &&
+> +	    desired->size == cur->size)
+> +		return;
+> +
+> +	if (cur->size != 0) {
+> +		mvebu_pcie_del_windows(port, cur->base, cur->size);
+> +		cur->size = 0;
+> +		cur->base = 0;
+> +
+> +		/*
+> +		 * If something tries to change the window while it is enabled
+> +		 * the change will not be done atomically. That would be
+> +		 * difficult to do in the general case.
+> +		 */
+> +	}
+> +
+> +	if (desired->size == 0)
+> +		return;
+> +
+> +	mvebu_pcie_add_windows(port, target, attribute, desired->base,
+> +			       desired->size, desired->remap);
+> +	*cur = *desired;
+> +}
+> +
+>  static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
 >  {
->  	u32 htotal, hsa, hbp, lbcc;
-> -	struct drm_display_mode *mode = dsi->mode;
+> -	phys_addr_t iobase;
+> +	struct mvebu_pcie_window desired = {};
 >  
->  	htotal = mode->htotal;
->  	hsa = mode->hsync_end - mode->hsync_start;
->  	hbp = mode->htotal - mode->hsync_end;
->  
-> -	lbcc = dw_mipi_dsi_get_hcomponent_lbcc(dsi, htotal);
-> +	lbcc = dw_mipi_dsi_get_hcomponent_lbcc(dsi, mode, htotal);
->  	dsi_write(dsi, DSI_VID_HLINE_TIME, lbcc);
->  
-> -	lbcc = dw_mipi_dsi_get_hcomponent_lbcc(dsi, hsa);
-> +	lbcc = dw_mipi_dsi_get_hcomponent_lbcc(dsi, mode, hsa);
->  	dsi_write(dsi, DSI_VID_HSA_TIME, lbcc);
->  
-> -	lbcc = dw_mipi_dsi_get_hcomponent_lbcc(dsi, hbp);
-> +	lbcc = dw_mipi_dsi_get_hcomponent_lbcc(dsi, mode, hbp);
->  	dsi_write(dsi, DSI_VID_HBP_TIME, lbcc);
->  }
->  
-> -static void dw_mipi_dsi_vertical_timing_config(struct dw_mipi_dsi *dsi)
-> +static void dw_mipi_dsi_vertical_timing_config(struct dw_mipi_dsi *dsi,
-> +					       struct drm_display_mode *mode)
->  {
->  	u32 vactive, vsa, vfp, vbp;
-> -	struct drm_display_mode *mode = dsi->mode;
->  
->  	vactive = mode->vdisplay;
->  	vsa = mode->vsync_end - mode->vsync_start;
-> @@ -852,11 +854,12 @@ static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
->  static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
->  {
->  	struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
-> +	struct drm_display_mode *mode = dsi->mode;
->  	int mux = drm_of_encoder_active_endpoint_id(dsi->dev->of_node, encoder);
->  	u32 val;
->  	int ret;
->  
-> -	ret = dw_mipi_dsi_get_lane_bps(dsi);
-> +	ret = dw_mipi_dsi_get_lane_bps(dsi, mode);
->  	if (ret < 0)
+>  	/* Are the new iobase/iolimit values invalid? */
+>  	if (port->bridge.iolimit < port->bridge.iobase ||
+>  	    port->bridge.iolimitupper < port->bridge.iobaseupper ||
+>  	    !(port->bridge.command & PCI_COMMAND_IO)) {
+> -
+> -		/* If a window was configured, remove it */
+> -		if (port->iowin_base) {
+> -			mvebu_pcie_del_windows(port, port->iowin_base,
+> -					       port->iowin_size);
+> -			port->iowin_base = 0;
+> -			port->iowin_size = 0;
+> -		}
+> -
+> +		mvebu_pcie_set_window(port, port->io_target, port->io_attr,
+> +				      &desired, &port->iowin);
 >  		return;
->  
-> @@ -866,13 +869,13 @@ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
 >  	}
 >  
->  	dw_mipi_dsi_init(dsi);
-> -	dw_mipi_dsi_dpi_config(dsi, dsi->mode);
-> +	dw_mipi_dsi_dpi_config(dsi, mode);
->  	dw_mipi_dsi_packet_handler_config(dsi);
->  	dw_mipi_dsi_video_mode_config(dsi);
-> -	dw_mipi_dsi_video_packet_config(dsi, dsi->mode);
-> +	dw_mipi_dsi_video_packet_config(dsi, mode);
->  	dw_mipi_dsi_command_mode_config(dsi);
-> -	dw_mipi_dsi_line_timer_config(dsi);
-> -	dw_mipi_dsi_vertical_timing_config(dsi);
-> +	dw_mipi_dsi_line_timer_config(dsi, mode);
-> +	dw_mipi_dsi_vertical_timing_config(dsi, mode);
->  	dw_mipi_dsi_dphy_timing_config(dsi);
->  	dw_mipi_dsi_dphy_interface_config(dsi);
->  	dw_mipi_dsi_clear_err(dsi);
-> @@ -880,7 +883,7 @@ static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
->  		dev_err(dsi->dev, "failed to prepare panel\n");
+> @@ -412,32 +438,27 @@ static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
+>  	 * specifications. iobase is the bus address, port->iowin_base
+>  	 * is the CPU address.
+>  	 */
+> -	iobase = ((port->bridge.iobase & 0xF0) << 8) |
+> -		(port->bridge.iobaseupper << 16);
+> -	port->iowin_base = port->pcie->io.start + iobase;
+> -	port->iowin_size = ((0xFFF | ((port->bridge.iolimit & 0xF0) << 8) |
+> -			    (port->bridge.iolimitupper << 16)) -
+> -			    iobase) + 1;
+> -
+> -	mvebu_pcie_add_windows(port, port->io_target, port->io_attr,
+> -			       port->iowin_base, port->iowin_size,
+> -			       iobase);
+> +	desired.remap = ((port->bridge.iobase & 0xF0) << 8) |
+> +			(port->bridge.iobaseupper << 16);
+> +	desired.base = port->pcie->io.start + desired.remap;
+> +	desired.size = ((0xFFF | ((port->bridge.iolimit & 0xF0) << 8) |
+> +			 (port->bridge.iolimitupper << 16)) -
+> +			desired.remap) +
+> +		       1;
+> +
+> +	mvebu_pcie_set_window(port, port->io_target, port->io_attr, &desired,
+> +			      &port->iowin);
+>  }
 >  
->  	dw_mipi_dsi_phy_init(dsi);
-> -	dw_mipi_dsi_wait_for_two_frames(dsi);
-> +	dw_mipi_dsi_wait_for_two_frames(mode);
+>  static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
+>  {
+> +	struct mvebu_pcie_window desired = {.remap = MVEBU_MBUS_NO_REMAP};
+> +
+>  	/* Are the new membase/memlimit values invalid? */
+>  	if (port->bridge.memlimit < port->bridge.membase ||
+>  	    !(port->bridge.command & PCI_COMMAND_MEMORY)) {
+> -
+> -		/* If a window was configured, remove it */
+> -		if (port->memwin_base) {
+> -			mvebu_pcie_del_windows(port, port->memwin_base,
+> -					       port->memwin_size);
+> -			port->memwin_base = 0;
+> -			port->memwin_size = 0;
+> -		}
+> -
+> +		mvebu_pcie_set_window(port, port->mem_target, port->mem_attr,
+> +				      &desired, &port->memwin);
+>  		return;
+>  	}
 >  
->  	dw_mipi_dsi_set_mode(dsi, DW_MIPI_DSI_VID_MODE);
->  	drm_panel_enable(dsi->panel);
+> @@ -447,14 +468,12 @@ static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
+>  	 * window to setup, according to the PCI-to-PCI bridge
+>  	 * specifications.
+>  	 */
+> -	port->memwin_base  = ((port->bridge.membase & 0xFFF0) << 16);
+> -	port->memwin_size  =
+> -		(((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF) -
+> -		port->memwin_base + 1;
+> -
+> -	mvebu_pcie_add_windows(port, port->mem_target, port->mem_attr,
+> -			       port->memwin_base, port->memwin_size,
+> -			       MVEBU_MBUS_NO_REMAP);
+> +	desired.base = ((port->bridge.membase & 0xFFF0) << 16);
+> +	desired.size = (((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF) -
+> +		       desired.base + 1;
+> +
+> +	mvebu_pcie_set_window(port, port->mem_target, port->mem_attr, &desired,
+> +			      &port->memwin);
+>  }
+>  
+>  /*
 > -- 
-> 2.11.0.197.gb556de5.dirty
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
-
--- 
-Sean Paul, Software Engineer, Google / Chromium OS
+> 2.7.4
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
