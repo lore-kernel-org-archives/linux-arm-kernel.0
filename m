@@ -1,70 +1,38 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 30 Jan 2017 13:38:28 +0100
-Subject: [PATCH v3 7/7] mfd: exynos-lpass: Add runtime PM support
-In-Reply-To: <1485779908-32147-1-git-send-email-m.szyprowski@samsung.com>
-References: <1485779908-32147-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170130123840eucas1p20025e600860b43b2da81d9063f96e442@eucas1p2.samsung.com>
-Message-ID: <1485779908-32147-8-git-send-email-m.szyprowski@samsung.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 30 Jan 2017 12:39:15 +0000
+Subject: [PATCH] arm: module: handle negative R_ARM_PREL31 addends
+ correctly
+In-Reply-To: <1484907663-32322-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1484907663-32322-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20170130123914.GQ27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert exisitng lpass-suspend/resume callbacks into runtime PM callbacks.
-This way Exynos LPASS driver will be ready for use with power domains
-enabled. LPASS will be runtime resumed/suspended as a result of its child
-devices runtime PM transitions.
+On Fri, Jan 20, 2017 at 10:21:03AM +0000, Ard Biesheuvel wrote:
+> According to the spec 'ELF for the ARM Architecture' (IHI 0044E),
+> addends for R_ARM_PREL31 relocations are 31-bit signed quantities,
+> so we need to sign extend the value to 32 bits before it can be used
+> as an offset in the calculation of the relocated value.
+> 
+> We have not been bitten by this because these relocations are usually
+> emitted against the start of a section, which means the addends never
+> assume negative values in practice. But it is a bug nonetheless, so fix
+> it.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> This is something I spotted while looking into adding support for
+> R_ARM_REL32 relocations. Feel free to ignore if it is guaranteed in some
+> way that these relocations can never be emitted with negative addends.
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
-Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
----
- drivers/mfd/exynos-lpass.c | 14 +++++++++++---
- 1 file changed, 11 insertions(+), 3 deletions(-)
+I still think this is a good thing to have, even if we should never
+see them - it avoids updating the relocation with an incorrect value.
+Any relocations we perform should be guaranteed to be correct, or
+we should fail.
 
-diff --git a/drivers/mfd/exynos-lpass.c b/drivers/mfd/exynos-lpass.c
-index 9dbbedad916f..6d735e22acda 100644
---- a/drivers/mfd/exynos-lpass.c
-+++ b/drivers/mfd/exynos-lpass.c
-@@ -22,6 +22,7 @@
- #include <linux/of.h>
- #include <linux/of_platform.h>
- #include <linux/platform_device.h>
-+#include <linux/pm_runtime.h>
- #include <linux/regmap.h>
- #include <linux/types.h>
- 
-@@ -132,6 +133,8 @@ static int exynos_lpass_probe(struct platform_device *pdev)
- 	}
- 
- 	platform_set_drvdata(pdev, lpass);
-+	pm_runtime_set_active(dev);
-+	pm_runtime_enable(dev);
- 	exynos_lpass_enable(lpass);
- 
- 	return of_platform_populate(dev->of_node, NULL, NULL, dev);
-@@ -141,7 +144,9 @@ static int exynos_lpass_remove(struct platform_device *pdev)
- {
- 	struct exynos_lpass *lpass = platform_get_drvdata(pdev);
- 
--	exynos_lpass_disable(lpass);
-+	pm_runtime_disable(&pdev->dev);
-+	if (!pm_runtime_status_suspended(&pdev->dev))
-+		exynos_lpass_disable(lpass);
- 	regmap_exit(lpass->top);
- 
- 	return 0;
-@@ -165,8 +170,11 @@ static int __maybe_unused exynos_lpass_resume(struct device *dev)
- 	return 0;
- }
- 
--static SIMPLE_DEV_PM_OPS(lpass_pm_ops, exynos_lpass_suspend,
--					exynos_lpass_resume);
-+static const struct dev_pm_ops lpass_pm_ops = {
-+	SET_RUNTIME_PM_OPS(exynos_lpass_suspend, exynos_lpass_resume, NULL)
-+	SET_LATE_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
-+				     pm_runtime_force_resume)
-+};
- 
- static const struct of_device_id exynos_lpass_of_match[] = {
- 	{ .compatible = "samsung,exynos5433-lpass" },
+Please put it in the patch system, thanks.
+
 -- 
-1.9.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
