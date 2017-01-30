@@ -1,89 +1,52 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Mon, 30 Jan 2017 12:25:04 -0700
-Subject: [PATCH] usb: dwc3 dwc3_exynos_probe() change goto labels to
- meaningful names
-Message-ID: <20170130192504.19046-1-shuahkh@osg.samsung.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 30 Jan 2017 21:27:49 +0200
+Subject: [PATCH] ARM: exynos_defconfig: Enable DYNAMIC_DEBUG and get rid of
+ old ext3
+Message-ID: <20170130192749.3690-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change goto labels to meaningful names from a series of errNs.
+DYNAMIC_DEBUG is quite useful for debugging kernels and should not cause
+noticeable performance regressions.  It makes the kernel noticeably
+bigger (around 4%) but this difference should not impact typical
+developer and reference usage of this defconfig.
 
-Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+Sizes:
+zImage-old:       4641496 bytes
+zImage-new:       4811384 bytes
+
+   text	   data	    bss	    dec	    hex	filename
+7031229	2570916	 327016	9929161	 9781c9	vmlinux-old
+7205921	2800052	 327016	10332989 9dab3d	vmlinux-new
+
+Additionally, remove the EXT3_FS symbol because it is entirely replaced
+by EXT4_FS.
+
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
+ arch/arm/configs/exynos_defconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Rebased to usb-next
-
- drivers/usb/dwc3/dwc3-exynos.c | 22 +++++++++++-----------
- 1 file changed, 11 insertions(+), 11 deletions(-)
-
-diff --git a/drivers/usb/dwc3/dwc3-exynos.c b/drivers/usb/dwc3/dwc3-exynos.c
-index 1515d45..98f74ff 100644
---- a/drivers/usb/dwc3/dwc3-exynos.c
-+++ b/drivers/usb/dwc3/dwc3-exynos.c
-@@ -147,53 +147,53 @@ static int dwc3_exynos_probe(struct platform_device *pdev)
- 	exynos->vdd33 = devm_regulator_get(dev, "vdd33");
- 	if (IS_ERR(exynos->vdd33)) {
- 		ret = PTR_ERR(exynos->vdd33);
--		goto err2;
-+		goto vdd33_err;
- 	}
- 	ret = regulator_enable(exynos->vdd33);
- 	if (ret) {
- 		dev_err(dev, "Failed to enable VDD33 supply\n");
--		goto err2;
-+		goto vdd33_err;
- 	}
- 
- 	exynos->vdd10 = devm_regulator_get(dev, "vdd10");
- 	if (IS_ERR(exynos->vdd10)) {
- 		ret = PTR_ERR(exynos->vdd10);
--		goto err3;
-+		goto vdd10_err;
- 	}
- 	ret = regulator_enable(exynos->vdd10);
- 	if (ret) {
- 		dev_err(dev, "Failed to enable VDD10 supply\n");
--		goto err3;
-+		goto vdd10_err;
- 	}
- 
- 	ret = dwc3_exynos_register_phys(exynos);
- 	if (ret) {
- 		dev_err(dev, "couldn't register PHYs\n");
--		goto err4;
-+		goto phys_err;
- 	}
- 
- 	if (node) {
- 		ret = of_platform_populate(node, NULL, NULL, dev);
- 		if (ret) {
- 			dev_err(dev, "failed to add dwc3 core\n");
--			goto err5;
-+			goto populate_err;
- 		}
- 	} else {
- 		dev_err(dev, "no device node, failed to add dwc3 core\n");
- 		ret = -ENODEV;
--		goto err5;
-+		goto populate_err;
- 	}
- 
- 	return 0;
- 
--err5:
-+populate_err:
- 	platform_device_unregister(exynos->usb2_phy);
- 	platform_device_unregister(exynos->usb3_phy);
--err4:
-+phys_err:
- 	regulator_disable(exynos->vdd10);
--err3:
-+vdd10_err:
- 	regulator_disable(exynos->vdd33);
--err2:
-+vdd33_err:
- 	clk_disable_unprepare(exynos->axius_clk);
- axius_clk_err:
- 	clk_disable_unprepare(exynos->susp_clk);
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index 12b8f69cbb52..746739027da6 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -240,7 +240,7 @@ CONFIG_PWM=y
+ CONFIG_PWM_SAMSUNG=y
+ CONFIG_PHY_EXYNOS5250_SATA=y
+ CONFIG_EXT2_FS=y
+-CONFIG_EXT3_FS=y
++CONFIG_EXT4_FS=y
+ CONFIG_AUTOFS4_FS=y
+ CONFIG_MSDOS_FS=y
+ CONFIG_VFAT_FS=y
+@@ -255,6 +255,7 @@ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ASCII=y
+ CONFIG_NLS_ISO8859_1=y
+ CONFIG_PRINTK_TIME=y
++CONFIG_DYNAMIC_DEBUG=y
+ CONFIG_DEBUG_INFO=y
+ CONFIG_DEBUG_FS=y
+ CONFIG_MAGIC_SYSRQ=y
 -- 
-2.7.4
+2.9.3
