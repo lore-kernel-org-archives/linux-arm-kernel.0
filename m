@@ -1,45 +1,42 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 29 Jan 2017 17:06:04 -0800
-Subject: [GIT PULL 4/4] TI DaVinci defconfig updates for v4.11
-In-Reply-To: <20170124130641.28264-4-nsekhar@ti.com>
-References: <20170124130641.28264-1-nsekhar@ti.com>
- <20170124130641.28264-4-nsekhar@ti.com>
-Message-ID: <20170130010604.GT3133@localhost>
+Date: Sun, 29 Jan 2017 17:15:00 -0800
+Subject: [GIT PULL 1/5] non-urgent omap fixes for v4.11 merge window
+In-Reply-To: <58879773.4111630a.b973d.9b1cSMTPIN_ADDED_BROKEN@mx.google.com>
+References: <58879773.4111630a.b973d.9b1cSMTPIN_ADDED_BROKEN@mx.google.com>
+Message-ID: <20170130011500.GV3133@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2017 at 06:36:41PM +0530, Sekhar Nori wrote:
+On Tue, Jan 24, 2017 at 10:05:14AM -0800, Tony Lindgren wrote:
 > The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 > 
 >   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.11/defconfig
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.11/fixes-not-urgent-signed
 > 
-> for you to fetch changes up to 685db57ace04411387b33e607d6abde9763819e7:
+> for you to fetch changes up to 631af44c10f9430163296626c6134db16a4f51fb:
 > 
->   ARM: davinci_all_defconfig: enable iio (2017-01-20 17:21:03 +0530)
-> 
-> ----------------------------------------------------------------
-> Enable config options for DaVinci
-> VPIF, LCDC, PWM, Pull up/down pinconf
-> driver and IIO in davinci_all_defconfig
+>   ARM: OMAP3: Fix SoC detection of OMAP36/37 Family (2017-01-20 10:13:06 -0800)
 > 
 > ----------------------------------------------------------------
-> Bartosz Golaszewski (1):
->       ARM: davinci_all_defconfig: enable dumb vga-dac drm bridge
+> Non-urgent fixes for omaps for v4.11 merge window. These all are
+> fixes for things that have never worked or have been broken for
+> a long time and nobody noticed:
 > 
-> David Lechner (4):
->       ARM: davinci_all_defconfig: enable pwm-beeper
->       ARM: davinci_all_defconfig: enable DA8xx pinconf
->       ARM: davinci_all_defconfig: Enable PWM modules
->       ARM: davinci_all_defconfig: enable iio
+> - Fix omap3 off mode pull defines
 > 
-> Kevin Hilman (1):
->       ARM: davinci_all_defconfig: enable video capture as modules
+> - Allow multiple pdata quirks instead of just one
+> 
+> - Fix am335x and dm814x scm syscon to probe children too
+> 
+> - Fix compatible for ti81xx to allow use with 8250_omap as well
+> 
+> - Fix 8250_omap on omap5 by adding HWMOD_SWSUP_SIDLE_ACT flag
+> 
+> - Fix SoC detection for omap36/37 SoCs
 
 Merged, thanks!
-
 
 -Olof
