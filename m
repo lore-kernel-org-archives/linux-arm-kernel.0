@@ -1,89 +1,47 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 30 Jan 2017 16:57:35 +0000
-Subject: [PATCH v2 1/3] arm64: cacheinfo: add support for alternative
- format of CCSIDR_EL1
-In-Reply-To: <ad552a58-4acd-f2ab-7d40-124b40c6c014@arm.com>
-References: <1485793527-18028-1-git-send-email-sudeep.holla@arm.com>
- <ad552a58-4acd-f2ab-7d40-124b40c6c014@arm.com>
-Message-ID: <568a27c1-f910-46e8-7283-2040e28df380@arm.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 30 Jan 2017 08:58:14 -0800
+Subject: [PATCH v2] mmc: meson-gx: set max block count
+In-Reply-To: <0309625d-e24b-13e1-bba7-ada6b5a202c1@gmail.com> (Heiner
+ Kallweit's message of "Sat, 28 Jan 2017 09:25:35 +0100")
+References: <0309625d-e24b-13e1-bba7-ada6b5a202c1@gmail.com>
+Message-ID: <m2k29ctrh5.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Heiner Kallweit <hkallweit1@gmail.com> writes:
 
+> So far max_blk_count isn't set what results in a default of value 8
+> to be used (PAGE_SIZE / block size).
 
-On 30/01/17 16:47, Suzuki K Poulose wrote:
-> On 30/01/17 16:25, Sudeep Holla wrote:
->> The number of sets described for each cache level in the CCSIDR is
->> limited to 32K and the associativity is limited to 1024 ways.
->>
->> As part of the ARM8.3 extensions, an alternative format for the
->> CCSIDR_EL1 is introduced for AArch64, and for AArch32, a new CCSIDR2
->> register is introduced to hold the upper 32 bits of this information,
->> and the CCSIDR register format is changed. An identification registers
->> are also added to identify the presence for this functionality.
->>
->> This patch adds support for the alternative format of CCSIDR_EL1.
+This describes the problem...
+> Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
+> ---
+> v2:
+> - block length field has 9 bits, so set max_blk_count to 2^9-1 = 511
+> - in addition set max_req_size because max_blk_count is also limited
+>   by max_req_size / block_size
 
-[...]
+... and this part describes the fix, so should also be in the changelog.
 
->>  void __init setup_cpu_features(void);
->>
->>  void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
->> @@ -224,6 +229,10 @@ static inline bool system_uses_ttbr0_pan(void)
->>          !cpus_have_cap(ARM64_HAS_PAN);
->>  }
->>
->> +static inline bool cpu_supports_ccsidr_64b_format(void)
->> +{
->> +    return
->> id_aa64mmfr2_ccsidr_64b_format(read_system_reg(SYS_ID_AA64MMFR2_EL1));
-> 
-> read_system_reg() gives you the system wide safe value for the register,
-> which could
-> be different from that of the current CPU. You have to use
-> read_sysreg_s(), to read
-> a register on the CPU (which aren't yet recognized by GAS).
-> 
-> Sorry, the names are a bit confusing, which can easily cause such
-> issues. May be we should rename some of them.
-> 
+with an updated changelog, feel free to add:
 
-Thanks, fixed locally, will post as part of next version.
+Acked-by: Kevin Hilman <khilman@baylibre.com>
 
->> +}
->>  #endif /* __ASSEMBLY__ */
->>
->>  #endif
->> diff --git a/arch/arm64/include/asm/sysreg.h
->> b/arch/arm64/include/asm/sysreg.h
->> index 98ae03f8eedd..c72dfe8807ca 100644
->> --- a/arch/arm64/include/asm/sysreg.h
->> +++ b/arch/arm64/include/asm/sysreg.h
->> @@ -183,6 +183,7 @@
->>  #define ID_AA64MMFR1_VMIDBITS_16    2
->>
->>  /* id_aa64mmfr2 */
->> +#define ID_AA64MMFR2_CCIDX_SHIFT    20
->>  #define ID_AA64MMFR2_LVA_SHIFT        16
->>  #define ID_AA64MMFR2_IESB_SHIFT        12
->>  #define ID_AA64MMFR2_LSM_SHIFT        8
->> diff --git a/arch/arm64/kernel/cacheinfo.c
->> b/arch/arm64/kernel/cacheinfo.c
->> index 3f2250fc391b..888b38f1709f 100644
->> --- a/arch/arm64/kernel/cacheinfo.c
->> +++ b/arch/arm64/kernel/cacheinfo.c
->> @@ -43,6 +43,13 @@ static inline enum cache_type get_cache_type(int
->> level)
->>      return CLIDR_CTYPE(clidr, level);
->>  }
->>
->> +int icache_get_numsets(void)
-> 
-> Could this be static ? I could not see it used anywhere else outside
-> this file.
+Kevin
 
-Used in arch/arm64/kernel/cpuinfo.c
-
--- 
-Regards,
-Sudeep
+> ---
+>  drivers/mmc/host/meson-gx-mmc.c | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
+> index 83361f1f..d4d174ed 100644
+> --- a/drivers/mmc/host/meson-gx-mmc.c
+> +++ b/drivers/mmc/host/meson-gx-mmc.c
+> @@ -810,6 +810,8 @@ static int meson_mmc_probe(struct platform_device *pdev)
+>  		goto free_host;
+>  	}
+>  
+> +	mmc->max_blk_count = CMD_CFG_LENGTH_MASK;
+> +	mmc->max_req_size = mmc->max_blk_count * mmc->max_blk_size;
+>  	mmc->ops = &meson_mmc_ops;
+>  	mmc_add_host(mmc);
