@@ -1,66 +1,104 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 30 Jan 2017 10:09:10 +0100
-Subject: [PATCH v3 05/10] arm: dts: sun8i: split Allwinner H3 .dtsi
-In-Reply-To: <2b8672bc-58ae-66a9-46d7-c7f3c5825a9d@arm.com>
-References: <20170129023331.62106-1-icenowy@aosc.xyz>
- <20170129023331.62106-6-icenowy@aosc.xyz>
- <2b8672bc-58ae-66a9-46d7-c7f3c5825a9d@arm.com>
-Message-ID: <20170130090910.cer2nvedq3tjleih@lukather>
+From: adityaxavier@gmail.com (Aditya Xavier)
+Date: Mon, 30 Jan 2017 14:38:33 +0530
+Subject: [PATCH V2] ARM: dts: BCM5301X: Add missing Netgear R8000 LEDs and
+ Keys
+In-Reply-To: <CACna6rzaEw+_tgMtG5ASRX+AZSbg-yA=pnpaD9uE1AK8ZGKJ1Q@mail.gmail.com>
+References: <20170128143749.5897-1-adityaxavier@gmail.com>
+ <CACna6rzaEw+_tgMtG5ASRX+AZSbg-yA=pnpaD9uE1AK8ZGKJ1Q@mail.gmail.com>
+Message-ID: <A0233283-B547-42E5-BBBF-3B75E592D858@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2017 at 01:42:40AM +0000, Andr? Przywara wrote:
-> > +&ccu {
-> > +	compatible = "allwinner,sun8i-h3-ccu";
-> > +};
-> 
-> I believe this kind of sharing nodes is a bit frowned upon in connection
-> with sharing .dtsi's. If the compatible name differs, I think it
-> deserves to be a separate node spelt out in each SoC's .dtsi.
-> This also makes the DT more readable, since a reader doesn't have to
-> refer to two files to see what's in that node.
-> 
-> >  
-> > -		codec_analog: codec-analog at 01f015c0 {
-> > -			compatible = "allwinner,sun8i-h3-codec-analog";
-> > -			reg = <0x01f015c0 0x4>;
-> > -		};
-> > +&mmc0 {
-> > +	compatible = "allwinner,sun7i-a20-mmc";
-> > +	clocks = <&ccu CLK_BUS_MMC0>,
-> > +		 <&ccu CLK_MMC0>,
-> > +		 <&ccu CLK_MMC0_OUTPUT>,
-> > +		 <&ccu CLK_MMC0_SAMPLE>;
-> > +	clock-names = "ahb",
-> > +		      "mmc",
-> > +		      "output",
-> > +		      "sample";
-> 
-> This applies even more here, since the MMC controllers also have
-> different clock requirements.
-> 
-> So why can't we just leave the CCU, MMC and possibly the pinctrl nodes
-> completely out of the shared h3-h5.dtsi and introduce them from scratch
-> in the SoC specific .dtsi?
-> 
-> I think we still have enough identical nodes to justify this kind of
-> .dtsi sharing.
+Would you require me to send the revised Patch ?
 
-We did it that way in the past in order to reduce the unneeded
-duplication, but I can definitely understand your point. We'll wait
-for the DT maintainers answer on this one.
+Or would this do ?
 
-Thanks,
-Maxime
+And thanks for guiding me through this process :)
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170130/cafa1483/attachment.sig>
+
+> On 29-Jan-2017, at 2:45 AM, Rafa? Mi?ecki <zajec5@gmail.com> wrote:
+> 
+> On 28 January 2017 at 15:37, AdityaXavier <adityaxavier@gmail.com> wrote:
+>> From: Aditya Xavier <adityaxavier@gmail.com>
+>> 
+>> Added two WAN status LEDs and a GPIO Key for Brightness which were missing.
+>> V2: Updated subject, Power LED names, and WAN labels.
+> 
+> Changelog (V2 ... part) should go into that /comments/ section (see below).
+> Florian: can you drop that line when applying this patch? Otherwise it
+> looks OK to me.
+> 
+> 
+>> Signed-off-by: Aditya Xavier <adityaxavier@gmail.com>
+> 
+> Acked-by: Rafa? Mi?ecki <rafal@milecki.pl>
+> 
+> Thanks for the patch!
+> 
+> 
+>> ---
+> 
+> Right here, below these 3 dashes is a place where you can add extra
+> comments (they won't go into log when doing "git am").
+> 
+>> arch/arm/boot/dts/bcm4709-netgear-r8000.dts | 22 ++++++++++++++++++++--
+>> 1 file changed, 20 insertions(+), 2 deletions(-)
+>> 
+>> diff --git a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
+>> index 92f8a72..90d4420 100644
+>> --- a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
+>> +++ b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
+>> @@ -27,18 +27,30 @@
+>>        leds {
+>>                compatible = "gpio-leds";
+>> 
+>> -               power0 {
+>> +               power-white {
+>>                        label = "bcm53xx:white:power";
+>>                        gpios = <&chipcommon 2 GPIO_ACTIVE_LOW>;
+>>                        linux,default-trigger = "default-on";
+>>                };
+>> 
+>> -               power1 {
+>> +               power-amber {
+>>                        label = "bcm53xx:amber:power";
+>>                        gpios = <&chipcommon 3 GPIO_ACTIVE_LOW>;
+>>                        linux,default-trigger = "default-off";
+>>                };
+>> 
+>> +               wan-white {
+>> +                       label = "bcm53xx:white:wan";
+>> +                       gpios = <&chipcommon 8 GPIO_ACTIVE_LOW>;
+>> +                       linux,default-trigger = "default-on";
+>> +               };
+>> +
+>> +               wan-amber {
+>> +                       label = "bcm53xx:amber:wan";
+>> +                       gpios = <&chipcommon 9 GPIO_ACTIVE_HIGH>;
+>> +                       linux,default-trigger = "default-off";
+>> +               };
+>> +
+>>                5ghz-1 {
+>>                        label = "bcm53xx:white:5ghz-1";
+>>                        gpios = <&chipcommon 12 GPIO_ACTIVE_LOW>;
+>> @@ -104,6 +116,12 @@
+>>                        linux,code = <KEY_RESTART>;
+>>                        gpios = <&chipcommon 6 GPIO_ACTIVE_LOW>;
+>>                };
+>> +
+>> +               brightness {
+>> +                       label = "Backlight";
+>> +                       linux,code = <KEY_BRIGHTNESS_ZERO>;
+>> +                       gpios = <&chipcommon 19 GPIO_ACTIVE_LOW>;
+>> +               };
+>>        };
+>> };
+>> 
+>> --
+>> 2.9.3
+>> 
+> 
+> 
+> 
+> -- 
+> Rafa?
