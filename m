@@ -1,62 +1,57 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 30 Jan 2017 07:54:21 +0100
-Subject: [GIT PULL 4/4] arm64: tegra: Device tree changes for v4.11-rc1
-In-Reply-To: <20170130050017.GH18943@localhost>
-References: <20170127092121.21570-1-thierry.reding@gmail.com>
- <20170127092121.21570-4-thierry.reding@gmail.com>
- <20170130050017.GH18943@localhost>
-Message-ID: <20170130065421.GC3585@ulmo.ba.sec>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 30 Jan 2017 08:55:37 +0200
+Subject: [GIT PULL 4/4] arm64: dts: exynos: for v4.11, 2nd round
+In-Reply-To: <20170130052329.GZ18943@localhost>
+References: <20170129200630.22083-1-krzk@kernel.org>
+ <20170129200630.22083-4-krzk@kernel.org>
+ <20170130052329.GZ18943@localhost>
+Message-ID: <CAJKOXPe=MjJk_63XBFMj+bE58NVmDmRvia7O72h7qvFdPio-gA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 29, 2017 at 09:00:17PM -0800, Olof Johansson wrote:
-> On Fri, Jan 27, 2017 at 10:21:21AM +0100, Thierry Reding wrote:
-> > Hi ARM SoC maintainers,
-> > 
-> > The following changes since commit 0c744ea4f77d72b3dcebb7a8f2684633ec79be88:
-> > 
-> >   Linux 4.10-rc2 (2017-01-01 14:31:53 -0800)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.11-arm64-dt
-> > 
-> > for you to fetch changes up to 7bcf266462da736ae4b42d5c73cd5dc0da540772:
-> > 
-> >   arm64: tegra: Use symbolic reset identifiers (2017-01-27 10:13:24 +0100)
-> > 
-> > Thanks,
-> > Thierry
-> > 
-> > ----------------------------------------------------------------
-> > arm64: tegra: Device tree changes for v4.11-rc1
-> > 
-> > This contains three patches that reintroduce symbolic identifiers for
-> > clocks, resets and mailboxes. These had been converted to literals in
-> > the v4.10 release to avoid complicated dependencies between branches.
-> > 
-> > ----------------------------------------------------------------
-> > Thierry Reding (3):
-> >       arm64: tegra: Use symbolic HSP identifiers
-> >       arm64: tegra: Use symbolic clock identifiers
-> >       arm64: tegra: Use symbolic reset identifiers
-> > 
-> >  arch/arm64/boot/dts/nvidia/tegra186.dtsi | 86 +++++++++++++++++---------------
-> >  1 file changed, 45 insertions(+), 41 deletions(-)
-> 
-> Merged, thanks!
-> 
-> No more t186 material than this for 4.11, though? :(
+On Mon, Jan 30, 2017 at 7:23 AM, Olof Johansson <olof@lixom.net> wrote:
+> Hi Krzysztof,
+>
+> On Sun, Jan 29, 2017 at 10:06:29PM +0200, Krzysztof Kozlowski wrote:
+>> Hi,
+>>
+>> On top of previous pull request.
+>>
+>> This adds proper clocks to LPASS node on Exynos5433 which is needed
+>> by Marek's patchset:
+>>  - [PATCH v2 0/8] Pad retentions support for Exynos5433
+>>    https://lkml.kernel.org/r/1485419634-28331-1-git-send-email-m.szyprowski () samsung ! com
+>>
+>>
+>> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+>> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>> Cc: Tomasz Figa <tomasz.figa@gmail.com>
+>> Cc: Lee Jones <lee.jones@linaro.org>
+>>
+>> Best regards,
+>> Krzysztof
+>>
+>>
+>> The following changes since commit e4e381133241a27d732e78be09973b89a193eaf7:
+>>
+>>   arm64: dts: exynos: Enable HDMI/TV path on Exynos5433-TM2 (2017-01-11 18:20:28 +0200)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt64-4.11-2
+>>
+>> for you to fetch changes up to 7547162ac351483df3641f64e99e10be329dd6a2:
+>>
+>>   arm64: dts: exynos: Add clocks to Exynos5433 LPASS module (2017-01-26 22:04:20 +0200)
+>
+> I think you tagged the wrong branch here. The log message shows the right hash
+> at the tip, but the tag is of 95648b747071d530b5bb983735cfe0ffff1b66bf, which
+> seems to be on your for-next.
+>
+> Care to respin, so your tag and our merged branch match up?
 
-Unfortunately not. After the holidays I was preoccupied with some
-regressions and Tegra186 didn't see the amount of progress I had hoped.
-There's more planned for v4.12, though.
+Ahhh, damn it. I'll fix it.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170130/fabb43bb/attachment.sig>
+Best regards,
+Krzysztof
