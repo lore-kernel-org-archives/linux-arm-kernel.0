@@ -1,29 +1,69 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 30 Jan 2017 18:47:21 +0100
-Subject: [PATCH RESEND 2/5] dmaengine: Provide a wrapper for memcpy
- operations
-In-Reply-To: <20170130165417.GF19244@localhost>
-References: <1485535324-28393-1-git-send-email-boris.brezillon@free-electrons.com>
- <1485535324-28393-3-git-send-email-boris.brezillon@free-electrons.com>
- <20170130165417.GF19244@localhost>
-Message-ID: <20170130184721.072c0de1@bbrezillon>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 30 Jan 2017 17:50:03 +0000
+Subject: [RFC v2 06/10] KVM: arm/arm64: Update the physical timer
+ interrupt level
+In-Reply-To: <20170130150203.GD16459@cbox>
+References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
+ <1485479100-4966-7-git-send-email-jintack@cs.columbia.edu>
+ <86sho199jx.fsf@arm.com> <20170130150203.GD16459@cbox>
+Message-ID: <b3a4a3e4-65d4-1af3-2b77-14b7fffd9d06@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+On 30/01/17 15:02, Christoffer Dall wrote:
+> On Sun, Jan 29, 2017 at 03:21:06PM +0000, Marc Zyngier wrote:
+>> On Fri, Jan 27 2017 at 01:04:56 AM, Jintack Lim <jintack@cs.columbia.edu> wrote:
+>>> Now that we maintain the EL1 physical timer register states of VMs,
+>>> update the physical timer interrupt level along with the virtual one.
+>>>
+>>> Note that the emulated EL1 physical timer is not mapped to any hardware
+>>> timer, so we call a proper vgic function.
+>>>
+>>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+>>> ---
+>>>  virt/kvm/arm/arch_timer.c | 20 ++++++++++++++++++++
+>>>  1 file changed, 20 insertions(+)
+>>>
+>>> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+>>> index 0f6e935..3b6bd50 100644
+>>> --- a/virt/kvm/arm/arch_timer.c
+>>> +++ b/virt/kvm/arm/arch_timer.c
+>>> @@ -180,6 +180,21 @@ static void kvm_timer_update_mapped_irq(struct kvm_vcpu *vcpu, bool new_level,
+>>>  	WARN_ON(ret);
+>>>  }
+>>>  
+>>> +static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
+>>> +				 struct arch_timer_context *timer)
+>>> +{
+>>> +	int ret;
+>>> +
+>>> +	BUG_ON(!vgic_initialized(vcpu->kvm));
+>>
+>> Although I've added my fair share of BUG_ON() in the code base, I've
+>> since reconsidered my position. If we get in a situation where the vgic
+>> is not initialized, maybe it would be better to just WARN_ON and return
+>> early rather than killing the whole box. Thoughts?
+>>
+> 
+> The distinction to me is whether this will cause fatal crashes or
+> exploits down the road if we're working on uninitialized data.  If all
+> that can happen if the vgic is not initialized, is that the guest
+> doesn't see interrupts, for example, then a WARN_ON is appropriate.
+> 
+> Which is the case here?
+> 
+> That being said, do we need this at all?  This is in the critial path
+> and is actually measurable (I know this from my work on the other timer
+> series), so it's better to get rid of it if we can.  Can we simply
+> convince ourselves this will never happen, and is the code ever likely
+> to change so that it gets called with the vgic disabled later?
 
-On Mon, 30 Jan 2017 22:24:17 +0530
-Vinod Koul <vinod.koul@intel.com> wrote:
+That'd be the best course of action. I remember us reworking some of
+that in the now defunct vgic-less series. Maybe we could salvage that
+code, if only for the time we spent on it...
 
-> On Fri, Jan 27, 2017 at 05:42:01PM +0100, Boris Brezillon wrote:
-> > Almost all ->device_prep_dma_xx() methods have a wrapper defined in
-> > dmaengine.h. Add one for  ->device_prep_dma_memcpy().  
-> 
-> Looks good to me.
-> 
-> Acked-by: Vinod Koul <vinod.koul@intel.com>
-> 
-> 
+Thanks,
 
-Maybe you can take this patch directly (the NAND related bits are for
-4.12).
+	M.
+-- 
+Jazz is not dead. It just smells funny...
