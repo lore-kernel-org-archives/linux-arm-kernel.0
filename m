@@ -1,28 +1,72 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 30 Jan 2017 15:32:15 -0800
-Subject: [PATCH 2/2] ARM: bcm2835: dts: fix uart0/uart1 pins
-In-Reply-To: <e0f527a24b0048daba88ef36d5324245e003111c.1485719591.git.baruch@tkos.co.il>
-References: <9290fa9eed6b5ff1c5c96b9dac41eca286b7eef9.1485719591.git.baruch@tkos.co.il>
- <e0f527a24b0048daba88ef36d5324245e003111c.1485719591.git.baruch@tkos.co.il>
-Message-ID: <87sho0unsw.fsf@eliezer.anholt.net>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 30 Jan 2017 15:35:54 -0800
+Subject: [PATCH v3 0/3] Add Broadcom SPU Crypto Driver
+In-Reply-To: <1485362689-11294-1-git-send-email-rob.rice@broadcom.com>
+References: <1485362689-11294-1-git-send-email-rob.rice@broadcom.com>
+Message-ID: <6fe4cad2-6fc9-bd69-f5ad-67957335fe55@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Baruch Siach <baruch@tkos.co.il> writes:
+On 01/25/2017 08:44 AM, Rob Rice wrote:
+> Changes in v3:
+> - rebase to 4.10-rc3 in cryptodev-2.6 tree
+> - in bindings doc, list all valid compatibility strings
+> - rename DT nodes "crypto" rather than "spu-crypto"
+> - include a separate DT node for each SPU hardware block. Previously,
+>  there was a single SPU node listing a register range for each
+>  hw block.
+> - select hash algos in Kconfig. Driver HMAC implementation uses hash
+>  sw algos for inner and outer hashes.
+> - Fix crash for AES CCM decrypt when AAD and data are both empty
+> 
+> Change in v2:
+> - select CRYPTO_DES in Kconfig
+> 
+> The Broadcom SPU crypto driver provides access to SPU hardware
+> for symmetric crypto offload. The driver supports ablkcipher,
+> ahash, and aead operations. The driver supports several
+> Broadcom SoCs with different revisions of the SPU hardware.
+> The driver supports SPU-M and SPU2 hardware revisions, and
+> a couple versions of each hw revision, each version with minor
+> differences.
 
-> According to the BCM2835 ARM Peripherals document uart1 doesn't map to pins
-> 36-39, but uart0 does.
->
-> Also, split into separate Rx/Tx and CST/RTS groups to match other uart nodes.
->
-> Fixes: 21ff843931b ("ARM: dts: bcm283x: Define standard pinctrl groups in the gpio node.")
-> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+Herbert, can you take patches 1-2, and I will take patch 3 through my
+arm64-soc git pull requests? Thanks!!
 
-These look good, too.  Thanks!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170130/e7f67085/attachment.sig>
+> 
+> Rob Rice (3):
+>   crypto: brcm: DT documentation for Broadcom SPU hardware
+>   crypto: brcm: Add Broadcom SPU driver
+>   arm64: dts: ns2: Add Broadcom SPU driver DT entry.
+> 
+>  .../devicetree/bindings/crypto/brcm,spu-crypto.txt |   22 +
+>  arch/arm64/boot/dts/broadcom/ns2.dtsi              |   24 +
+>  drivers/crypto/Kconfig                             |   15 +
+>  drivers/crypto/Makefile                            |    2 +
+>  drivers/crypto/bcm/Makefile                        |   15 +
+>  drivers/crypto/bcm/cipher.c                        | 4955 ++++++++++++++++++++
+>  drivers/crypto/bcm/cipher.h                        |  475 ++
+>  drivers/crypto/bcm/spu.c                           | 1252 +++++
+>  drivers/crypto/bcm/spu.h                           |  288 ++
+>  drivers/crypto/bcm/spu2.c                          | 1402 ++++++
+>  drivers/crypto/bcm/spu2.h                          |  228 +
+>  drivers/crypto/bcm/spum.h                          |  174 +
+>  drivers/crypto/bcm/util.c                          |  581 +++
+>  drivers/crypto/bcm/util.h                          |  116 +
+>  14 files changed, 9549 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/crypto/brcm,spu-crypto.txt
+>  create mode 100644 drivers/crypto/bcm/Makefile
+>  create mode 100644 drivers/crypto/bcm/cipher.c
+>  create mode 100644 drivers/crypto/bcm/cipher.h
+>  create mode 100644 drivers/crypto/bcm/spu.c
+>  create mode 100644 drivers/crypto/bcm/spu.h
+>  create mode 100644 drivers/crypto/bcm/spu2.c
+>  create mode 100644 drivers/crypto/bcm/spu2.h
+>  create mode 100644 drivers/crypto/bcm/spum.h
+>  create mode 100644 drivers/crypto/bcm/util.c
+>  create mode 100644 drivers/crypto/bcm/util.h
+> 
+
+
+-- 
+Florian
