@@ -1,58 +1,115 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 30 Jan 2017 10:14:33 +0000
-Subject: [PATCHv2 0/3] pci: remove msi_controller registration API
-In-Reply-To: <1482484854-26418-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1482484854-26418-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <dc3d0ac8-bc57-63a6-a4d6-73299c3e16b3@arm.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 30 Jan 2017 11:15:20 +0100
+Subject: [PATCH v5 06/12] mmc: sdhci-xenon: Add Marvell Xenon SDHC core
+ functionality
+In-Reply-To: <1f0cc488-75f0-cff3-1386-070717aa7220@intel.com>
+References: <cover.8527229dae6c124f24c5e637430c2cdc86f80392.1484154449.git-series.gregory.clement@free-electrons.com>
+ <3546f143091c121face8ecbcbf7f6a4c41d2cec7.1484154449.git-series.gregory.clement@free-electrons.com>
+ <CAPDyKFrwxix4zY4a1x9u6jh_gPfKTsaLnD8b8crum=pc5CN3AA@mail.gmail.com>
+ <2e67332d-d8c3-fd24-1f81-72675a09927a@intel.com>
+ <CAPDyKFqbjeKCHp40PALydquxdF-qBk156+iOS9TYYsquJ7fK7w@mail.gmail.com>
+ <00e8d2dc-bc07-addc-a5d9-8604f143627f@intel.com>
+ <CAPDyKFoF2QsTxKC7=PjHqOk106USQ-j9MtiyfC=Sqks8DnPDYQ@mail.gmail.com>
+ <1f0cc488-75f0-cff3-1386-070717aa7220@intel.com>
+Message-ID: <CAPDyKFrQ15bLCApOdf8BXUyyjcxQehqP=aW1hM=NKfwYmcCYOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/12/16 09:20, Thomas Petazzoni wrote:
-> Hello,
-> 
-> This small patch series aims at removing the small msi_controller
-> registration API implemented in drivers/of/of_pci.c.
-> 
-> In order to do so, it moves the last two users of this API to the
-> generic MSI support:
-> 
->  - The pci-aardvark driver is moved to use the generic MSI
->    support. This driver is both the provider of the MSI capability and
->    the consumer of this capability.
-> 
->  - The pci-mvebu driver is cleaned up from using the msi_controller
->    registration API. This driver is only consuming MSI capabilies from
->    another driver (irq-armada-370-xp) which was migrated to the
->    generic MSI support some time ago. Therefore, this patch is simply
->    removing dead code.
-> 
-> Finally, the last commit removed the now unused API.
-> 
-> Changes between v1 to v2 are described in each individual patch.
-> 
-> Thanks,
-> 
-> Thomas
-> 
-> Thomas Petazzoni (3):
->   pci: pci-aardvark: move to MSI handling using generic MSI support
->   pci: pci-mvebu: remove useless MSI enabling code
->   of: pci: remove unused MSI controller helpers
-> 
->  drivers/of/of_pci.c             |  45 -----------
->  drivers/pci/host/pci-aardvark.c | 172 +++++++++++++++-------------------------
->  drivers/pci/host/pci-mvebu.c    |  17 ----
->  include/linux/of_pci.h          |  11 ---
->  4 files changed, 66 insertions(+), 179 deletions(-)
-> 
+On 30 January 2017 at 10:40, Adrian Hunter <adrian.hunter@intel.com> wrote:
+> On 30/01/17 11:10, Ulf Hansson wrote:
+>> On 28 January 2017 at 09:16, Adrian Hunter <adrian.hunter@intel.com> wrote:
+>>> On 27/01/2017 5:12 p.m., Ulf Hansson wrote:
+>>>>
+>>>> On 26 January 2017 at 13:39, Adrian Hunter <adrian.hunter@intel.com>
+>>>> wrote:
+>>>>>
+>>>>> On 26/01/17 12:50, Ulf Hansson wrote:
+>>>>>>
+>>>>>> On 11 January 2017 at 18:19, Gregory CLEMENT
+>>>>>> <gregory.clement@free-electrons.com> wrote:
+>>>>>>>
+>>>>>>> +                       priv->init_card_type = MMC_TYPE_MMC;
+>>>>>>> +                       mmc->caps |= MMC_CAP_NONREMOVABLE;
+>>>>>>> +
+>>>>>>> +                       /*
+>>>>>>> +                        * Force to clear BUS_TEST to
+>>>>>>> +                        * skip bus_test_pre and bus_test_post
+>>>>>>> +                        */
+>>>>>>> +                       mmc->caps &= ~MMC_CAP_BUS_WIDTH_TEST;
+>>>>>>> +                       mmc->caps2 |= MMC_CAP2_HC_ERASE_SZ |
+>>>>>>
+>>>>>>
+>>>>>> This cap is a bit strange. It was added several years ago by Adrian
+>>>>>> Hunter, but I am wondering about the reason to why it's needed.
+>>>>>>
+>>>>>
+>>>>> MMC_CAP2_HC_ERASE_SZ relates to EXT-CSD ERASE_GROUP_DEF.
+>>>>>
+>>>>> I think it was added to enable people to choose whether they wanted a
+>>>>> large
+>>>>> or small erase granularity.  That probably doesn't matter if the card
+>>>>> supports TRIM.
+>>>>>
+>>>>
+>>>> Huh, the erase/trim/discard code in the mmc core is really hairy. :-)
+>>>>
+>>>> In mmc_calc_max_discard() the following code/comment exists:
+>>>>
+>>>> /*
+>>>>  * Without erase_group_def set, MMC erase timeout depends on clock
+>>>>  * frequence which can change.  In that case, the best choice is
+>>>>  * just the preferred erase size.
+>>>>  */
+>>>> if (mmc_card_mmc(card) && !(card->ext_csd.erase_group_def & 1))
+>>>>      return card->pref_erase;
+>>>>
+>>>>
+>>>> This makes me wonder.
+>>>>
+>>>> So, when we haven't enabled the high capacity erase groups in the
+>>>> EXT_CSD register (ext_csd.erase_group_def), we will use the pref_erase
+>>>> size.
+>>>>
+>>>> In the other case, as when having MMC_CAP2_HC_ERASE_SZ set (which will
+>>>> set ext_csd.erase_group_def),  we will instead  do some calculations
+>>>> to find out the max discards.
+>>>>
+>>>> Are you saying that these calculations doesn't matter much - or are
+>>>> you saying that we always want to do them?
+>>>
+>>>
+>>> No, I was saying that if you have TRIM then TRIM is preferred to ERASE so
+>>> the erase group size does not come into play when discarding, since ERASE
+>>> granularity is erase groups whereas TRIM granularity is sectors.
+>>
+>> Right. Thanks for clarifying.
+>>
+>>>
+>>> However ERASE_GROUP_DEF also affects the size of write protect groups.
+>>
+>> In either case.
+>>
+>> What do you think of removing MMC_CAP2_HC_ERASE_SZ? I don't like these
+>> kind of soft polices, it's better if we can decide on a common
+>> behaviour - whatever that is.
+>
+> Changing the value of ERASE_GROUP_DEF could be a problem, for example the
+> spec. says:
+>
+> "Similarly if the host set ERASE_GROUP_DEF bit for a device that the default
+> write protect was already set in some of the area in the previous power
+> cycle, then the device may show unknown behavior when host issue write
+> or erase commands to the device. In application, it is mandatory for host to
+> use same ERASE GROUP DEF value to the device all the time."
+>
+> Whether or not there is anyone that would actually be affected is hard to know.
 
-I somehow missed this series during the Xmas craze. It is definitely a
-good cleanup, so for the two patches I haven't Acked yet:
+Okay. I am going to submit a patch that just removes the behaviour for
+MMC_CAP2_HC_ERASE_SZ and the cap itself.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+The cap isn't particular widely used anyway. Let's see what people think of it.
 
-Thanks,
+Thanks a lot for you input!
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Kind regards
+Uffe
