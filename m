@@ -1,56 +1,82 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 30 Jan 2017 10:33:58 +0100
-Subject: [PATCH v6 0/5] davinci: VPIF: add DT support
-In-Reply-To: <CAOi56cX362PcE+dS59sGkh-=VMFNv_jaORMbCvxNr+VVUL7-mg@mail.gmail.com>
-References: <20161207183025.20684-1-khilman@baylibre.com>
- <d4b0501a-f83a-c8b1-e460-1ba50f68cca7@xs4all.nl>
- <m2k2aze5xe.fsf@baylibre.com>
- <CAOi56cX362PcE+dS59sGkh-=VMFNv_jaORMbCvxNr+VVUL7-mg@mail.gmail.com>
-Message-ID: <704bf9cd-7591-844b-f9a9-a0a989b4c882@xs4all.nl>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 30 Jan 2017 10:36:28 +0100
+Subject: mvneta MDIO problems
+In-Reply-To: <1485351412.5441.82.camel@beck.ac>
+References: <1485351412.5441.82.camel@beck.ac>
+Message-ID: <20170130103628.09178f50@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/01/17 18:22, Kevin Hilman wrote:
-> On Fri, Dec 16, 2016 at 4:49 PM, Kevin Hilman <khilman@baylibre.com> wrote:
->> Hans Verkuil <hverkuil@xs4all.nl> writes:
->>
->>> On 07/12/16 19:30, Kevin Hilman wrote:
->>>> Prepare the groundwork for adding DT support for davinci VPIF drivers.
->>>> This series does some fixups/cleanups and then adds the DT binding and
->>>> DT compatible string matching for DT probing.
->>>>
->>>> The controversial part from previous versions around async subdev
->>>> parsing, and specifically hard-coding the input/output routing of
->>>> subdevs, has been left out of this series.  That part can be done as a
->>>> follow-on step after agreement has been reached on the path forward.
->>>> With this version, platforms can still use the VPIF capture/display
->>>> drivers, but must provide platform_data for the subdevs and subdev
->>>> routing.
->>>>
->>>> Tested video capture to memory on da850-lcdk board using composite
->>>> input.
->>>
->>> Other than the comment for the first patch this series looks good.
->>>
->>> So once that's addressed I'll queue it up for 4.11.
->>
->> I've fixed that issue, and sent an update for just that patch in reply
->> to the original.
->>
->> Thanks for the review,
->
-> Gentle ping on this series.
->
-> I'm still not seeing this series yet in linux-next, so am worried it
-> might not make it for v4.11.
->
-> Kevin
->
+Hello,
 
-Mauro was on vacation, so pull requests were delayed. I understood from
-him that he's going to process pending pull requests this week, which
-should include your series.
+Thanks for your report. I'm adding a number of people in Cc, as well as
+the Linux ARM kernel mailing list. I'll keep your entire e-mail below
+so that everyone can get the context.
 
-Regards,
+On Wed, 25 Jan 2017 14:36:52 +0100, Jasmin Beck wrote:
 
-	Hans
+> for quite a while now (kernel 4.1 or previously?) I observe link state
+> problems with mvneta on the marvell mirabox; possibly there is a bug in
+> mvneta/mdio driver.
+
+Is there a kernel version where this problem does not exist? I.e is it
+a regression or an issue that always existed?
+
+> After some days (1-20 ?) uptime, the kernel 4.8.11 logs:
+> 
+> [779752.514644] mvneta d0070000.ethernet eth0: Link is Up - 1Gbps/Full - flow control off
+> [783518.193094] mvneta d0070000.ethernet eth0: Link is Down
+> [783519.229922] mvneta d0070000.ethernet eth0: Link is Up - 1Gbps/Full - flow control off
+> [789431.374474] mvneta d0070000.ethernet eth0: Link is Down
+> [804522.151348] mvneta d0070000.ethernet eth0: Link is Up - 1Gbps/Full - flow control off
+> [804530.474111] mvneta d0070000.ethernet eth0: Link is Down
+> [804532.550916] mvneta d0070000.ethernet eth0: Link is Up - 1Gbps/Full - flow control off
+> [806254.718708] mvneta d0070000.ethernet eth0: Link is Down
+> 
+> ... so sooner or later, the link stays down (let's call this "failed state")
+> 
+> When removing the mvneta-module and modprobe mvneta, it does not help.
+> The only thing, that helps, is a reboot. Then it works again for some days.
+
+mvneta is not in charge of the MDIO bus, there's a separate mvmdio
+driver. Though it doesn't do anything in terms of HW initialization, so
+I don't expect unloading/reloading this module to have any effect.
+
+> This happens on multiple units of the mirabox, using various switches.
+> 
+> When trying to set the link up when the box is in "failed state" with
+> "ip link set dev eth1 up":
+> 
+> [824259.058531] IPv6: ADDRCONF(NETDEV_UP): eth0: link is not ready
+> [824281.522114] mvneta d0074000.ethernet eth1: could not find the PHY
+> [824281.528361] mvneta d0074000.ethernet eth1: cannot probe MDIO bus
+
+So it looks as if the PHY isn't responding anymore. Are you
+experiencing this on both network interfaces? Only one specifically?
+
+> I have no idea on how to debug this... the system is currently in
+> "failed state", kernel source and compiler are available on the box
+> (e.g. for unloading, modifying, compiling and loading mvneta.ko again),
+> which is currently "offline", but can be accessed through the serial
+> console.
+> 
+> As you are the maintainer of the driver according to mvneta.c, I
+> thought this could be relevant for you.
+> 
+> If you are interested in taking a look at the situation in "failed
+> state", I can immediately provide ssh access to the serial console
+> (though your ssh public key is needed in this case).
+
+I don't think we ever had similar reports. I'm not personally leaving
+the Mirabox running for extended periods of time, so I've never seen
+this issue. We do have the Mirabox tested as part of kernelci.org, but
+it gets rebooted for every test, so we don't see this sort of issue.
+
+Jason, Andrew, maybe you are running Mirabox boards for extended periods
+of time? If so, have you seen a similar problem?
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
