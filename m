@@ -1,139 +1,125 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 30 Jan 2017 15:31:17 +0000
-Subject: [PATCH 1/3] drivers/perf: arm_pmu: rework per-cpu allocation
-In-Reply-To: <1485790279-3139-1-git-send-email-mark.rutland@arm.com>
-References: <1485790279-3139-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1485790279-3139-2-git-send-email-mark.rutland@arm.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Mon, 30 Jan 2017 10:35:33 -0500
+Subject: [PATCH v3 01/24] drm/rockchip: dw-mipi-dsi: don't configure
+ hardware in mode_set for MIPI
+In-Reply-To: <20170129132444.25251-2-john@metanate.com>
+References: <20170129132444.25251-1-john@metanate.com>
+ <20170129132444.25251-2-john@metanate.com>
+Message-ID: <20170130153533.GB20076@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For historical reasons, we allocate per-cpu data associated with a PMU
-rather late, in cpu_pmu_init, after we've parsed whatever hardware
-information we were provided with.
+On Sun, Jan 29, 2017 at 01:24:21PM +0000, John Keeping wrote:
+> With atomic modesetting the hardware will be powered off when the
+> mode_set function is called.  We should configure the hardware in the
+> enable function, which is the atomic version of "commit" so let's use
+> the enable hook rather than commit while we're at it.
+> 
 
-In order to allow use to store some per-cpu data early in the probe
-path, we need to allocate (and initialise) the per-cpu data earlier.
-This patch reworks the way we allocate the pmu and associated per-cpu
-data in order to make that possible.
+Reviewed-by: Sean Paul <seanpaul@chromium.org>
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- drivers/perf/arm_pmu.c | 64 +++++++++++++++++++++++++++++++++-----------------
- 1 file changed, 43 insertions(+), 21 deletions(-)
+> Signed-off-by: John Keeping <john@metanate.com>
+> ---
+> v3:
+> - Squash together with the commit to s/commit/enable/
+> Unchanged in v2
+> 
+>  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 49 +++++++++++++++-------------------
+>  1 file changed, 21 insertions(+), 28 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> index d9aa382bb629..bbd992299f73 100644
+> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> @@ -819,34 +819,8 @@ static void dw_mipi_dsi_encoder_mode_set(struct drm_encoder *encoder,
+>  					struct drm_display_mode *adjusted_mode)
+>  {
+>  	struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
+> -	int ret;
+>  
+>  	dsi->mode = adjusted_mode;
+> -
+> -	ret = dw_mipi_dsi_get_lane_bps(dsi);
+> -	if (ret < 0)
+> -		return;
+> -
+> -	if (clk_prepare_enable(dsi->pclk)) {
+> -		dev_err(dsi->dev, "%s: Failed to enable pclk\n", __func__);
+> -		return;
+> -	}
+> -
+> -	dw_mipi_dsi_init(dsi);
+> -	dw_mipi_dsi_dpi_config(dsi, mode);
+> -	dw_mipi_dsi_packet_handler_config(dsi);
+> -	dw_mipi_dsi_video_mode_config(dsi);
+> -	dw_mipi_dsi_video_packet_config(dsi, mode);
+> -	dw_mipi_dsi_command_mode_config(dsi);
+> -	dw_mipi_dsi_line_timer_config(dsi);
+> -	dw_mipi_dsi_vertical_timing_config(dsi);
+> -	dw_mipi_dsi_dphy_timing_config(dsi);
+> -	dw_mipi_dsi_dphy_interface_config(dsi);
+> -	dw_mipi_dsi_clear_err(dsi);
+> -	if (drm_panel_prepare(dsi->panel))
+> -		dev_err(dsi->dev, "failed to prepare panel\n");
+> -
+> -	clk_disable_unprepare(dsi->pclk);
+>  }
+>  
+>  static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
+> @@ -875,17 +849,36 @@ static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
+>  	clk_disable_unprepare(dsi->pclk);
+>  }
+>  
+> -static void dw_mipi_dsi_encoder_commit(struct drm_encoder *encoder)
+> +static void dw_mipi_dsi_encoder_enable(struct drm_encoder *encoder)
+>  {
+>  	struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
+>  	int mux = drm_of_encoder_active_endpoint_id(dsi->dev->of_node, encoder);
+>  	u32 val;
+> +	int ret;
+> +
+> +	ret = dw_mipi_dsi_get_lane_bps(dsi);
+> +	if (ret < 0)
+> +		return;
+>  
+>  	if (clk_prepare_enable(dsi->pclk)) {
+>  		dev_err(dsi->dev, "%s: Failed to enable pclk\n", __func__);
+>  		return;
+>  	}
+>  
+> +	dw_mipi_dsi_init(dsi);
+> +	dw_mipi_dsi_dpi_config(dsi, dsi->mode);
+> +	dw_mipi_dsi_packet_handler_config(dsi);
+> +	dw_mipi_dsi_video_mode_config(dsi);
+> +	dw_mipi_dsi_video_packet_config(dsi, dsi->mode);
+> +	dw_mipi_dsi_command_mode_config(dsi);
+> +	dw_mipi_dsi_line_timer_config(dsi);
+> +	dw_mipi_dsi_vertical_timing_config(dsi);
+> +	dw_mipi_dsi_dphy_timing_config(dsi);
+> +	dw_mipi_dsi_dphy_interface_config(dsi);
+> +	dw_mipi_dsi_clear_err(dsi);
+> +	if (drm_panel_prepare(dsi->panel))
+> +		dev_err(dsi->dev, "failed to prepare panel\n");
+> +
+>  	dw_mipi_dsi_phy_init(dsi);
+>  	dw_mipi_dsi_wait_for_two_frames(dsi);
+>  
+> @@ -933,7 +926,7 @@ dw_mipi_dsi_encoder_atomic_check(struct drm_encoder *encoder,
+>  
+>  static struct drm_encoder_helper_funcs
+>  dw_mipi_dsi_encoder_helper_funcs = {
+> -	.commit = dw_mipi_dsi_encoder_commit,
+> +	.enable = dw_mipi_dsi_encoder_enable,
+>  	.mode_set = dw_mipi_dsi_encoder_mode_set,
+>  	.disable = dw_mipi_dsi_encoder_disable,
+>  	.atomic_check = dw_mipi_dsi_encoder_atomic_check,
+> -- 
+> 2.11.0.197.gb556de5.dirty
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
-diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index 6d93358..dc4c8aa 100644
---- a/drivers/perf/arm_pmu.c
-+++ b/drivers/perf/arm_pmu.c
-@@ -827,29 +827,16 @@ static inline void cpu_pm_pmu_unregister(struct arm_pmu *cpu_pmu) { }
- static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
- {
- 	int err;
--	int cpu;
--	struct pmu_hw_events __percpu *cpu_hw_events;
--
--	cpu_hw_events = alloc_percpu(struct pmu_hw_events);
--	if (!cpu_hw_events)
--		return -ENOMEM;
- 
- 	err = cpuhp_state_add_instance_nocalls(CPUHP_AP_PERF_ARM_STARTING,
- 					       &cpu_pmu->node);
- 	if (err)
--		goto out_free;
-+		goto out;
- 
- 	err = cpu_pm_pmu_register(cpu_pmu);
- 	if (err)
- 		goto out_unregister;
- 
--	for_each_possible_cpu(cpu) {
--		struct pmu_hw_events *events = per_cpu_ptr(cpu_hw_events, cpu);
--		raw_spin_lock_init(&events->pmu_lock);
--		events->percpu_pmu = cpu_pmu;
--	}
--
--	cpu_pmu->hw_events	= cpu_hw_events;
- 	cpu_pmu->request_irq	= cpu_pmu_request_irq;
- 	cpu_pmu->free_irq	= cpu_pmu_free_irq;
- 
-@@ -875,8 +862,7 @@ static int cpu_pmu_init(struct arm_pmu *cpu_pmu)
- out_unregister:
- 	cpuhp_state_remove_instance_nocalls(CPUHP_AP_PERF_ARM_STARTING,
- 					    &cpu_pmu->node);
--out_free:
--	free_percpu(cpu_hw_events);
-+out:
- 	return err;
- }
- 
-@@ -1007,6 +993,45 @@ static int of_pmu_irq_cfg(struct arm_pmu *pmu)
- 	return 0;
- }
- 
-+struct arm_pmu *armpmu_alloc(void)
-+{
-+	struct arm_pmu *pmu;
-+	int cpu;
-+
-+	pmu = kzalloc(sizeof(*pmu), GFP_KERNEL);
-+	if (!pmu) {
-+		pr_info("failed to allocate PMU device!\n");
-+		goto out;
-+	}
-+
-+	pmu->hw_events = alloc_percpu(struct pmu_hw_events);
-+	if (!pmu->hw_events) {
-+		pr_info("failed to allocate per-cpu PMU data.\n");
-+		goto out_free_pmu;
-+	}
-+
-+	for_each_possible_cpu(cpu) {
-+		struct pmu_hw_events *events;
-+
-+		events = per_cpu_ptr(pmu->hw_events, cpu);
-+		raw_spin_lock_init(&events->pmu_lock);
-+		events->percpu_pmu = pmu;
-+	}
-+
-+	return pmu;
-+
-+out_free_pmu:
-+	kfree(pmu);
-+out:
-+	return NULL;
-+}
-+
-+void armpmu_free(struct arm_pmu *pmu)
-+{
-+	free_percpu(pmu->hw_events);
-+	kfree(pmu);
-+}
-+
- int arm_pmu_device_probe(struct platform_device *pdev,
- 			 const struct of_device_id *of_table,
- 			 const struct pmu_probe_info *probe_table)
-@@ -1017,11 +1042,9 @@ int arm_pmu_device_probe(struct platform_device *pdev,
- 	struct arm_pmu *pmu;
- 	int ret = -ENODEV;
- 
--	pmu = kzalloc(sizeof(struct arm_pmu), GFP_KERNEL);
--	if (!pmu) {
--		pr_info("failed to allocate PMU device!\n");
-+	pmu = armpmu_alloc();
-+	if (!pmu)
- 		return -ENOMEM;
--	}
- 
- 	armpmu_init(pmu);
- 
-@@ -1075,7 +1098,6 @@ int arm_pmu_device_probe(struct platform_device *pdev,
- 	pr_info("%s: failed to register PMU devices!\n",
- 		of_node_full_name(node));
- 	kfree(pmu->irq_affinity);
--	kfree(pmu);
- 	return ret;
- }
- 
 -- 
-1.9.1
+Sean Paul, Software Engineer, Google / Chromium OS
