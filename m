@@ -1,53 +1,58 @@
-From: john.garry@huawei.com (John Garry)
-Date: Mon, 30 Jan 2017 08:57:09 +0000
-Subject: [PATCH V6 3/5] OF: Add missing I/O range exception for
- indirect-IO devices
-In-Reply-To: <20170127220357.3lpavvyeymlhvlfg@rob-hp-laptop>
-References: <1485241525-201782-1-git-send-email-yuanzhichang@hisilicon.com>
- <1485241525-201782-4-git-send-email-yuanzhichang@hisilicon.com>
- <20170127220357.3lpavvyeymlhvlfg@rob-hp-laptop>
-Message-ID: <645d40d8-0db6-1737-88f4-fd839933b2ea@huawei.com>
+From: mzoran@crowfest.net (Michael Zoran)
+Date: Mon, 30 Jan 2017 01:01:16 -0800
+Subject: [PATCH] MAINTAINERS: extend Raspberry Pi entry
+In-Reply-To: <20170130085128.wewxe6rw42hoqdpu@pengutronix.de>
+References: <b2e1e59a752395314a20e846337cb70cf22f2959.1485720503.git.baruch@tkos.co.il>
+ <1485723150.30797.1.camel@crowfest.net>
+ <20170129210611.k46ey35py3ht3fe7@tarshish>
+ <1485726109.30797.5.camel@crowfest.net>
+ <20170129215253.hwhwsqoulhmjxs55@tarshish>
+ <1485727324.30797.7.camel@crowfest.net>
+ <1485728648.30797.9.camel@crowfest.net>
+ <20170130075609.pcrujbzdnabkmuux@pengutronix.de>
+ <1485763772.13537.1.camel@crowfest.net>
+ <20170130085128.wewxe6rw42hoqdpu@pengutronix.de>
+Message-ID: <1485766876.13537.3.camel@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/01/2017 22:03, Rob Herring wrote:
-> On Tue, Jan 24, 2017 at 03:05:23PM +0800, zhichang.yuan wrote:
->> There are some special ISA/LPC devices that work on a specific I/O range where
->> it is not correct to specify a 'ranges' property in DTS parent node as cpu
->> addresses translated from DTS node are only for memory space on some
->> architectures, such as Arm64. Without the parent 'ranges' property, current
->> of_translate_address() return an error.
->> Here we add special handlings for this case.
->> During the OF address translation, some checkings will be perfromed to
->> identify whether the device node is registered as indirect-IO. If yes, the I/O
->> translation will be done in a different way from that one of PCI MMIO.
->> In this way, the I/O 'reg' property of the special ISA/LPC devices will be
->> parsed correctly.
->>
->> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
->> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->
-> Shouldn't this be Reviewed-by?
->
+On Mon, 2017-01-30 at 09:51 +0100, Uwe Kleine-K?nig wrote:
+> On Mon, Jan 30, 2017 at 12:09:32AM -0800, Michael Zoran wrote:
+> > On Mon, 2017-01-30 at 08:56 +0100, Uwe Kleine-K?nig wrote:
+> > > On Sun, Jan 29, 2017 at 02:24:08PM -0800, Michael Zoran wrote:
+> > > I don't agree. To be able to review a driver to a Broadcom
+> > > specific
+> > > spi
+> > > driver, you need to know more about spi than about Broadcom.
+> > > 
+> > 
+> > I would say that's 50/50.??Some of these drivers like I2C or SPI
+> > are?not really that complex.??The complexity happens when people
+> > begin
+> > to try to connect the various drivers in arbitrary ways at which
+> > point
+> > things begin to break.
+> > 
+> > SOCs are designed with cost in mind, so allowing arbitrary
+> > configurations are not aways possible because of attempts to limits
+> > the
+> > amount of hardware resources required and the complexity. And I
+> > don't
+> > think this is specific to Broadcom or anybody. It's just the way
+> > SOCs
+> > work.
+> > 
+> > This is all vary different from PCs where you expect people to buy
+> > random parts and start connecting them together.??For the reasons I
+> > have given, SOCs arn't quite as flexible.
+> 
+> I fail to follow here. Can you please show an example where you see a
+> benefit from having the drivers grouped by SoC instead of bus type?
+> 
 
-The background is that Zhichang is following a sketch of a re-worked 
-driver from Arnd, which Arnd gave Signed-off-by. But this patch does not 
-follow it verbatim.
-
-I think this patchset should be resent without Arnd's signature. Or Arnd 
-may kindly review and say it's ok.
-
-John
-
-> Otherwise, looks fine to me.
->
-> Acked-by: Rob Herring <robh@kernel.org>
->
->> ---
->>  drivers/of/address.c | 87 ++++++++++++++++++++++++++++++++++++++++++----------
->>  1 file changed, 71 insertions(+), 16 deletions(-)
->>
->
-> .
->
+Two that instantly come to mind are GPIO function assignment and clock
+management.   Most SOCs and I'm not just talking about the RPI can't
+handle arbitrary configuration of GPIO function mapping.  They also
+tend to generate one clock off the other for different peripherals. 
+Change the clock of one peripheral or the CPU, and other peripheral
+breaks.
