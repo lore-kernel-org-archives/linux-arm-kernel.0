@@ -1,178 +1,93 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 30 Jan 2017 16:47:26 +0000
-Subject: [PATCH v2 1/3] arm64: cacheinfo: add support for alternative
- format of CCSIDR_EL1
-In-Reply-To: <1485793527-18028-1-git-send-email-sudeep.holla@arm.com>
-References: <1485793527-18028-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <ad552a58-4acd-f2ab-7d40-124b40c6c014@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 30 Jan 2017 16:51:24 +0000
+Subject: [PATCH V7 08/11] drivers: acpi: Handle IOMMU lookup failure with
+ deferred probing or error
+In-Reply-To: <1e048aff-0d77-b9f2-ebf8-2ba315b90ca7@codeaurora.org>
+References: <1485188293-20263-9-git-send-email-sricharan@codeaurora.org>
+ <20170124123711.GA11996@red-moon>
+ <f2370671-ece8-fbee-de19-350dd625088f@codeaurora.org>
+ <93e79759-d614-9b36-d5ab-63e8eb725009@arm.com>
+ <14751205-f034-7f0d-442a-854c3909425c@codeaurora.org>
+ <5ba9f366d6e25397cdef8ad95b49e199@codeaurora.org>
+ <175a3798-b824-ef1a-e112-9f6f472973ae@codeaurora.org>
+ <20170130143851.GJ16461@arm.com>
+ <b2e50c17de156341deab9fb8e91a8dec@codeaurora.org>
+ <1e048aff-0d77-b9f2-ebf8-2ba315b90ca7@codeaurora.org>
+Message-ID: <20170130165124.GA11712@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/01/17 16:25, Sudeep Holla wrote:
-> The number of sets described for each cache level in the CCSIDR is
-> limited to 32K and the associativity is limited to 1024 ways.
->
-> As part of the ARM8.3 extensions, an alternative format for the
-> CCSIDR_EL1 is introduced for AArch64, and for AArch32, a new CCSIDR2
-> register is introduced to hold the upper 32 bits of this information,
-> and the CCSIDR register format is changed. An identification registers
-> are also added to identify the presence for this functionality.
->
-> This patch adds support for the alternative format of CCSIDR_EL1.
->
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  arch/arm64/include/asm/cachetype.h  | 58 +++++++++++++++++++++++--------------
->  arch/arm64/include/asm/cpufeature.h |  9 ++++++
->  arch/arm64/include/asm/sysreg.h     |  1 +
->  arch/arm64/kernel/cacheinfo.c       | 26 ++++++++++++-----
->  arch/arm64/kernel/cpufeature.c      |  1 +
->  5 files changed, 67 insertions(+), 28 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/cachetype.h b/arch/arm64/include/asm/cachetype.h
-> index f5588692f1d4..180b3288aa3f 100644
-> --- a/arch/arm64/include/asm/cachetype.h
-> +++ b/arch/arm64/include/asm/cachetype.h
-> @@ -40,9 +40,17 @@
->  extern unsigned long __icache_flags;
->
->  /*
-> - * NumSets, bits[27:13] - (Number of sets in cache) - 1
-> - * Associativity, bits[12:3] - (Associativity of cache) - 1
-> - * LineSize, bits[2:0] - (Log2(Number of words in cache line)) - 2
-> + * +---------------+---------+---------+------------------------------+
-> + * | Property      |   v1    |    v2   | Calculation                  |
-> + * +---------------+---------+---------+------------------------------+
-> + * | Attributes    | [31:28] |    NA   |                              |
-> + * +---------------+---------+---------+------------------------------+
-> + * | NumSets       | [27:13] | [55:32] | Number of sets in cache - 1  |
-> + * +---------------+---------+---------+------------------------------+
-> + * | Associativity | [12: 3] | [23: 3] | Associativity of cache - 1   |
-> + * +---------------+---------+---------+------------------------------+
-> + * | LineSize      | [ 2: 0] | [ 2: 0] | Log2(Words in cache line) - 2|
-> + * +---------------+---------+---------+------------------------------+
->   */
->  #define CCSIDR_EL1_WRITE_THROUGH	BIT(31)
->  #define CCSIDR_EL1_WRITE_BACK		BIT(30)
-> @@ -50,19 +58,32 @@ extern unsigned long __icache_flags;
->  #define CCSIDR_EL1_WRITE_ALLOCATE	BIT(28)
->  #define CCSIDR_EL1_LINESIZE_MASK	0x7
->  #define CCSIDR_EL1_LINESIZE(x)		((x) & CCSIDR_EL1_LINESIZE_MASK)
-> -#define CCSIDR_EL1_ASSOCIATIVITY_SHIFT	3
-> -#define CCSIDR_EL1_ASSOCIATIVITY_MASK	0x3ff
-> -#define CCSIDR_EL1_ASSOCIATIVITY(x)	\
-> -	(((x) >> CCSIDR_EL1_ASSOCIATIVITY_SHIFT) & CCSIDR_EL1_ASSOCIATIVITY_MASK)
-> -#define CCSIDR_EL1_NUMSETS_SHIFT	13
-> -#define CCSIDR_EL1_NUMSETS_MASK		0x7fff
-> -#define CCSIDR_EL1_NUMSETS(x) \
-> -	(((x) >> CCSIDR_EL1_NUMSETS_SHIFT) & CCSIDR_EL1_NUMSETS_MASK)
-> -
-> -#define CACHE_LINESIZE(x)	(16 << CCSIDR_EL1_LINESIZE(x))
-> -#define CACHE_NUMSETS(x)	(CCSIDR_EL1_NUMSETS(x) + 1)
-> -#define CACHE_ASSOCIATIVITY(x)	(CCSIDR_EL1_ASSOCIATIVITY(x) + 1)
-> -
-> +#define CCSIDR_EL1_V1_ASSOCIATIVITY_SHIFT	3
-> +#define CCSIDR_EL1_V1_ASSOCIATIVITY_MASK	0x3ff
-> +#define CCSIDR_EL1_V2_ASSOCIATIVITY_SHIFT	3
-> +#define CCSIDR_EL1_V2_ASSOCIATIVITY_MASK	0x1fffff
-> +#define CCSIDR_EL1_V1_NUMSETS_SHIFT		13
-> +#define CCSIDR_EL1_V1_NUMSETS_MASK		0x7fff
-> +#define CCSIDR_EL1_V2_NUMSETS_SHIFT		32
-> +#define CCSIDR_EL1_V2_NUMSETS_MASK		0xffffff
-> +
-> +#define CCSIDR_EL1_V1_ATTRIBUTE_MASK		0xf0000000
-> +#define CCSIDR_EL1_V2_ATTRIBUTE_MASK		0x0	/* Not supported */
-> +#define CCSIDR_EL1_ATTRIBUTES(v, x)	((x) & CCSIDR_EL1_V##v##_ATTRIBUTE_MASK)
-> +#define CCSIDR_EL1_ASSOCIATIVITY(v, x) \
-> +	(((x) >> CCSIDR_EL1_V##v##_ASSOCIATIVITY_SHIFT) & CCSIDR_EL1_V##v##_ASSOCIATIVITY_MASK)
-> +#define CCSIDR_EL1_NUMSETS(v, x) \
-> +	(((x) >> CCSIDR_EL1_V##v##_NUMSETS_SHIFT) & CCSIDR_EL1_V##v##_NUMSETS_MASK)
-> +
-> +#define CACHE_LINESIZE(x)		(16 << CCSIDR_EL1_LINESIZE(x))
-> +#define CACHE_NUMSETS_V1(x)		(CCSIDR_EL1_NUMSETS(1, x) + 1)
-> +#define CACHE_ASSOCIATIVITY_V1(x)	(CCSIDR_EL1_ASSOCIATIVITY(1, x) + 1)
-> +#define CACHE_ATTRIBUTES_V1(x)		(CCSIDR_EL1_ATTRIBUTES(1, x))
-> +#define CACHE_NUMSETS_V2(x)		(CCSIDR_EL1_NUMSETS(2, x) + 1)
-> +#define CACHE_ASSOCIATIVITY_V2(x)	(CCSIDR_EL1_ASSOCIATIVITY(2, x) + 1)
-> +#define CACHE_ATTRIBUTES_V2(x)		(CCSIDR_EL1_ATTRIBUTES(2, x))
-> +
-> +extern int icache_get_numsets(void);
->  extern u64 __attribute_const__ cache_get_ccsidr(u64 csselr);
->
->  /* Helpers for Level 1 Instruction cache csselr = 1L */
-> @@ -71,11 +92,6 @@ static inline int icache_get_linesize(void)
->  	return CACHE_LINESIZE(cache_get_ccsidr(1L));
->  }
->
-> -static inline int icache_get_numsets(void)
-> -{
-> -	return CACHE_NUMSETS(cache_get_ccsidr(1L));
-> -}
-> -
->  /*
->   * Whilst the D-side always behaves as PIPT on AArch64, aliasing is
->   * permitted in the I-cache.
-> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index b4989df48670..076a22ade503 100644
-> --- a/arch/arm64/include/asm/cpufeature.h
-> +++ b/arch/arm64/include/asm/cpufeature.h
-> @@ -185,6 +185,11 @@ static inline bool id_aa64pfr0_32bit_el0(u64 pfr0)
->  	return val == ID_AA64PFR0_EL0_32BIT_64BIT;
->  }
->
-> +static inline bool id_aa64mmfr2_ccsidr_64b_format(u64 mmfr2)
-> +{
-> +	return cpuid_feature_extract_unsigned_field(mmfr2, ID_AA64MMFR2_CCIDX_SHIFT) == 0x1;
-> +}
-> +
->  void __init setup_cpu_features(void);
->
->  void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
-> @@ -224,6 +229,10 @@ static inline bool system_uses_ttbr0_pan(void)
->  		!cpus_have_cap(ARM64_HAS_PAN);
->  }
->
-> +static inline bool cpu_supports_ccsidr_64b_format(void)
-> +{
-> +	return id_aa64mmfr2_ccsidr_64b_format(read_system_reg(SYS_ID_AA64MMFR2_EL1));
+On Mon, Jan 30, 2017 at 10:46:39AM -0500, Sinan Kaya wrote:
+> On 1/30/2017 9:54 AM, Nate Watterson wrote:
+> > On 2017-01-30 09:38, Will Deacon wrote:
+> >> On Mon, Jan 30, 2017 at 09:33:50AM -0500, Sinan Kaya wrote:
+> >>> On 1/30/2017 9:23 AM, Nate Watterson wrote:
+> >>> > On 2017-01-30 08:59, Sinan Kaya wrote:
+> >>> >> On 1/30/2017 7:22 AM, Robin Murphy wrote:
+> >>> >>> On 29/01/17 17:53, Sinan Kaya wrote:
+> >>> >>>> On 1/24/2017 7:37 AM, Lorenzo Pieralisi wrote:
+> >>> >>>>> [+hanjun, tomasz, sinan]
+> >>> >>>>>
+> >>> >>>>> It is quite a key patchset, I would be glad if they can test on their
+> >>> >>>>> respective platforms with IORT.
+> >>> >>>>>
+> >>> >>>>
+> >>> >>>> Tested on top of 4.10-rc5.
+> >>> >>>>
+> >>> >>>> 1.    Platform Hidma device passed dmatest
+> >>> >>>> 2.    Seeing some USB stalls on a platform USB device.
+> >>> >>>> 3.    PCIe NVME drive probed and worked fine with MSI interrupts after boot.
+> >>> >>>> 4.     NVMe driver didn't probe following a hotplug insertion and received an
+> >>> >>>> SMMU error event during the insertion.
+> >>> >>>
+> >>> >>> What was the SMMU error - a translation/permission fault (implying the
+> >>> >>> wrong DMA ops) or a bad STE fault (implying we totally failed to tell
+> >>> >>> the SMMU about the device at all)?
+> >>> >>>
+> >>> >>
+> >>> >> root at ubuntu:/sys/bus/pci/slots/4# echo 0 > power
+> >>> >>
+> >>> >> [__204.698522]_iommu:_Removing_device_0003:01:00.0_from_group_0
+> >>> >> [  204.708704] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down
+> >>> >> [  204.708723] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down event
+> >>> >> ignored; already powering off
+> >>> >>
+> >>> >> root at ubuntu:/sys/bus/pci/slots/4#
+> >>> >>
+> >>> >> [__254.820440]_iommu:_Adding_device_0003:01:00.0_to_group_8
+> >>> >> [  254.820599] nvme nvme0: pci function 0003:01:00.0
+> >>> >> [  254.820621] nvme 0003:01:00.0: enabling device (0000 -> 0002)
+> >>> >> [  261.948558] arm-smmu-v3 arm-smmu-v3.0.auto: event 0x0a received:
+> >>> >> [  261.948561] arm-smmu-v3 arm-smmu-v3.0.auto:  0x000001000000000a
+> >>> >> [  261.948563] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
+> >>> >> [  261.948564] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
+> >>> >> [  261.948566] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
+> >>>
+> >>> > Looks like C_BAD_CD. Can you please try with:
+> >>> > iommu/arm-smmu-v3: Clear prior settings when updating STEs
+> >>>
+> >>> This resolved the issue. Can we pull Nate's patch to 4.10 so that I don't see
+> >>> this issue again.
+> >>
+> >> I already sent the pull request to Joerg for 4.11. Do you see this problem
+> >> without Sricharan's patches (i.e. vanilla mainline)? If so, we'll need to
+> >> send the patch to stable after -rc1.
+> > Using vanilla mainline, I see it most commonly when directly assigning
+> > a device to a guest machine. I think I've also seen it after removing then
+> > re-adding a PCI device. Basically anytime an STE's CTX pointer is changed
+> > from a non-NULL value and STE[CFG] indicates translation will be performed.
+> > 
+> 
+> I was not able to reproduce the issue with Vanilla kernel. I only
+> tested hotplug.
 
-read_system_reg() gives you the system wide safe value for the register, which could
-be different from that of the current CPU. You have to use read_sysreg_s(), to read
-a register on the CPU (which aren't yet recognized by GAS).
+I would like to get the complete code path leading to this issue, it is
+not clear to me why the probe deferral code triggers it and why we are
+not able to trigger it with vanilla mainline, we must understand that first
+before applying any fix to this series.
 
-Sorry, the names are a bit confusing, which can easily cause such issues. May be we should
-rename some of them.
+I do not have a platform to reproduce this issue I will send you a patch
+to trace what's going on here please help us debug it.
 
-> +}
->  #endif /* __ASSEMBLY__ */
->
->  #endif
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index 98ae03f8eedd..c72dfe8807ca 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -183,6 +183,7 @@
->  #define ID_AA64MMFR1_VMIDBITS_16	2
->
->  /* id_aa64mmfr2 */
-> +#define ID_AA64MMFR2_CCIDX_SHIFT	20
->  #define ID_AA64MMFR2_LVA_SHIFT		16
->  #define ID_AA64MMFR2_IESB_SHIFT		12
->  #define ID_AA64MMFR2_LSM_SHIFT		8
-> diff --git a/arch/arm64/kernel/cacheinfo.c b/arch/arm64/kernel/cacheinfo.c
-> index 3f2250fc391b..888b38f1709f 100644
-> --- a/arch/arm64/kernel/cacheinfo.c
-> +++ b/arch/arm64/kernel/cacheinfo.c
-> @@ -43,6 +43,13 @@ static inline enum cache_type get_cache_type(int level)
->  	return CLIDR_CTYPE(clidr, level);
->  }
->
-> +int icache_get_numsets(void)
-
-Could this be static ? I could not see it used anywhere else outside this file.
-
-Suzuki
+Thanks,
+Lorenzo
