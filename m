@@ -1,68 +1,75 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 30 Jan 2017 14:50:23 +0000
-Subject: ARM64: Disabling warnings about deprecated armv8 instructions
-In-Reply-To: <20170130141308.GV27312@n2100.armlinux.org.uk>
-References: <1485072424.14066.2.camel@crowfest.net>
- <1485075528.14345.1.camel@crowfest.net>
- <CAKv+Gu8LU3QjrUa6wMJF3WBNrhx34Pi_0ZUQVfrZy7w7y7237w@mail.gmail.com>
- <22169925.OhJ0QcnbHM@localhost> <1485087662.1518.1.camel@crowfest.net>
- <0D1F678D-6F94-4B68-955E-6454F8647FCA@linaro.org>
- <20170130141308.GV27312@n2100.armlinux.org.uk>
-Message-ID: <CAKv+Gu98i4=COqr_Eikwja28U5MAL83rxe-_QBXWFhJ7v1E6yA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 30 Jan 2017 14:51:51 +0000
+Subject: [RFC v2 02/10] KVM: arm/arm64: Move cntvoff to each timer context
+In-Reply-To: <20170130144550.GA16459@cbox>
+References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
+ <1485479100-4966-3-git-send-email-jintack@cs.columbia.edu>
+ <867f5e9j4y.fsf@arm.com> <20170130144550.GA16459@cbox>
+Message-ID: <2453da50-d827-0aa5-1dea-beb35117d1ae@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 January 2017 at 14:13, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Sun, Jan 22, 2017 at 01:01:53PM +0000, Ard Biesheuvel wrote:
->> Emulating unaligned access in the ARM kernel was a mistake: it even
->> emulates unaligned accesses for instructions like ldm and ldrd, which
->> require word alignment at the hardware level even in the latest v8
->> version of the architecture. In contrast, the v8 deprecation warnings
->> are about enforcing compliance.
->
-> Ard, you're totally wrong on the unaligned access thing.  Unaligned
-> accesses are a fundamental requirement of the kernel's networking
-> stack.  If you don't have support for unaligned accesses, then you
-> don't have network support - it's as simple as that.
->
-> So, in order for ARMv5 and earlier to have network support, there
-> was no option to add support for emulating those accesses.
->
+On 30/01/17 14:45, Christoffer Dall wrote:
+> On Sun, Jan 29, 2017 at 11:54:05AM +0000, Marc Zyngier wrote:
+>> On Fri, Jan 27 2017 at 01:04:52 AM, Jintack Lim <jintack@cs.columbia.edu> wrote:
+>>> Make cntvoff per each timer context. This is helpful to abstract kvm
+>>> timer functions to work with timer context without considering timer
+>>> types (e.g. physical timer or virtual timer).
+>>>
+>>> This also would pave the way for ever doing adjustments of the cntvoff
+>>> on a per-CPU basis if that should ever make sense.
+>>>
+>>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+>>> ---
+>>>  arch/arm/include/asm/kvm_host.h   |  6 +++---
+>>>  arch/arm64/include/asm/kvm_host.h |  4 ++--
+>>>  include/kvm/arm_arch_timer.h      |  8 +++-----
+>>>  virt/kvm/arm/arch_timer.c         | 26 ++++++++++++++++++++------
+>>>  virt/kvm/arm/hyp/timer-sr.c       |  3 +--
+>>>  5 files changed, 29 insertions(+), 18 deletions(-)
+>>>
+>>> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+>>> index d5423ab..f5456a9 100644
+>>> --- a/arch/arm/include/asm/kvm_host.h
+>>> +++ b/arch/arm/include/asm/kvm_host.h
+>>> @@ -60,9 +60,6 @@ struct kvm_arch {
+>>>  	/* The last vcpu id that ran on each physical CPU */
+>>>  	int __percpu *last_vcpu_ran;
+>>>  
+>>> -	/* Timer */
+>>> -	struct arch_timer_kvm	timer;
+>>> -
+>>>  	/*
+>>>  	 * Anything that is not used directly from assembly code goes
+>>>  	 * here.
+>>> @@ -75,6 +72,9 @@ struct kvm_arch {
+>>>  	/* Stage-2 page table */
+>>>  	pgd_t *pgd;
+>>>  
+>>> +	/* A lock to synchronize cntvoff among all vtimer context of vcpus */
+>>> +	spinlock_t cntvoff_lock;
+>>
+>> Is there any condition where we need this to be a spinlock? I would have
+>> thought that a mutex should have been enough, as this should only be
+>> updated on migration or initialization. Not that it matters much in this
+>> case, but I wondered if there is something I'm missing.
+>>
+> 
+> I would think the critical section is small enough that a spinlock makes
+> sense, but what I don't think we need is to add the additional lock.
+> 
+> I think just taking the kvm->lock should be sufficient, which happens to
+> be a mutex, and while that may be a bit slower to take than the
+> spinlock, it's not in the critical path so let's just keep things
+> simple.
+> 
+> Perhaps this what Marc also meant.
 
-I wasn't aware of that. But does that mean it is simply too much work
-to remove those alignment assumptions? It does not seem like a
-fundamental networking issue to me, but rather a tacit assumption that
-has infected the software implementation.
+That would be the logical conclusion, assuming that we can sleep on this
+path.
 
-> The dubious thing was whether to add that for userspace as well.
-> Since soo many applications were broken at the time, and ARM wasn't
-> a sufficiently large community for the applications people to care
-> one shit about, the applications people weren't going to fix their
-> code to avoid unaligned accesses.
->
-> So, back in the 1990s, we were stuck between having broken userspace
-> and a huge amount of effort needed to maintain ARM specific patches
-> out of tree for lots of applications, or functional userspace.
->
+Thanks,
 
-I see. I was indeed mainly referring to userspace, which is what this
-thread is about, specifically setend and the CP15 barrier
-instructions. You can disagree with ARM's policy to deprecate and
-remove some instructions, but given the reality of it, I think it is
-perfectly reasonable to warn by default about setend instructions
-issued in 32-bit userspace when running under the 64-bit ARMv8 kernel.
-
-> Today, the ARM architecture has moved on a long way, and application
-> people care about whether their stuff works on the ARM architecture.
-> It wasn't like that when the unaligned emulation was added.
->
-> It was not a mistake.  It's one of the reasons why ARM has got where
-> it is today, and probably why the light was finally seen to add
-> hardware support for unaligned accesses to the later CPU architectures.
->
-
-OK, I stand corrected. I haven't been around nearly as long as Russell
-or some others here on LAKML, so I don't have the historical
-background. On the arm64 side, it is *much* easier to take a normative
-stance, given how new it is.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
