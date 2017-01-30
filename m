@@ -1,20 +1,67 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 30 Jan 2017 22:37:59 +0100 (CET)
-Subject: [PATCH 1/4] dt-bindings: Add binding for brcm,bcm2835-sdhost.
-In-Reply-To: <1485516989-1072-2-git-send-email-kraxel@redhat.com>
-References: <1485516989-1072-1-git-send-email-kraxel@redhat.com>
- <1485516989-1072-2-git-send-email-kraxel@redhat.com>
-Message-ID: <2012885435.15821.1485812279271@email.1und1.de>
+From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
+Date: Tue, 31 Jan 2017 03:09:15 +0530
+Subject: [PATCH v2 3/4] ARM: nommu: display vectors base
+In-Reply-To: <20170130140326.GU27312@n2100.armlinux.org.uk>
+References: <20170122031652.13074-1-afzal.mohd.ma@gmail.com>
+ <20170122032212.13456-1-afzal.mohd.ma@gmail.com>
+ <20170130140326.GU27312@n2100.armlinux.org.uk>
+Message-ID: <20170130213915.GA2976@afzalpc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-> Gerd Hoffmann <kraxel@redhat.com> hat am 27. Januar 2017 um 12:36 geschrieben:
-> 
-> 
-> From: Eric Anholt <eric@anholt.net>
-> 
-> This is the other SD controller on the platform, which can be swapped
-> to the role of SD card host using pin muxing.
+On Mon, Jan 30, 2017 at 02:03:26PM +0000, Russell King - ARM Linux wrote:
+> On Sun, Jan 22, 2017 at 08:52:12AM +0530, afzal mohammed wrote:
 
-AFAIK the SDHOST controller isn't able to handle SDIO. Maybe we should mention this in the binding document.
+> > The exception base address is now dynamically estimated for no-MMU,
+> > display it. As it is the case, now limit VECTORS_BASE usage to MMU
+> > scenario.
+
+> > +#define VECTORS_BASE		UL(0xffff0000)
+> > +
+> >  #else /* CONFIG_MMU */
+> >  
+> >  /*
+> > @@ -111,8 +113,6 @@
+> >  
+> >  #endif /* !CONFIG_MMU */
+> >  
+> > -#define VECTORS_BASE		UL(0xffff0000)
+> 
+> I think adding a definition for VECTORS_BASE in asm/memory.h for nommu:
+> 
+> extern unsigned long vectors_base;
+> #define VECTORS_BASE	vectors_base
+
+Above was required to be enclosed by below,
+
+ #ifndef __ASSEMBLY__
+ #endif
+
+Putting it inside the existing #ifndef __ASSEMBLY__ (which encloses
+other externs) in asm/memory.h would put it alongside not so related
+definitions as compared to the existing location.
+
+And the existing #ifndef __ASSEMBLY__ in asm/memory.h is a bit down
+that makes the above stand separately,
+
+> > +#ifdef CONFIG_MMU
+> >  			MLK(VECTORS_BASE, VECTORS_BASE + PAGE_SIZE),
+> > +#else
+> > +			MLK(vectors_base, vectors_base + PAGE_SIZE),
+> > +#endif
+> 
+> will mean that this conditional becomes unnecessary.
+
+> > -#endif
+> > +#else /* CONFIG_MMU */
+> > +extern unsigned long vectors_base;
+> > +#endif /* CONFIG_MMU */
+> 
+> and you don't need this here either.
+
+but the above improvements make the patch simpler.
+
+Regards
+afzal
