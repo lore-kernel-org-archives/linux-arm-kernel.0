@@ -1,90 +1,57 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 30 Jan 2017 20:47:38 +0100
-Subject: [PATCH v2] ARM: dts: imx: Pass 'chosen' and 'memory' nodes
-In-Reply-To: <20170130185444.GF27312@n2100.armlinux.org.uk>
-References: <1484834566-19845-1-git-send-email-fabio.estevam@nxp.com>
- <20170119141335.kpbrbpbwaovnijjv@pengutronix.de>
- <CAOMZO5AdgM9eFnerLRdYxwE7gsOE5OvkWs6rCR4zta1XmXHj1A@mail.gmail.com>
- <20170119144641.jxj2bqg5uqjol23x@pengutronix.de>
- <20170119145642.GC27312@n2100.armlinux.org.uk>
- <20170119161441.jcctgig7np4v7sam@pengutronix.de>
- <588914F3.7050909@gmail.com>
- <20170130185444.GF27312@n2100.armlinux.org.uk>
-Message-ID: <20170130194738.edzou2mgvcoegucx@pengutronix.de>
+From: mzoran@crowfest.net (Michael Zoran)
+Date: Mon, 30 Jan 2017 11:53:24 -0800
+Subject: ARM64: Disabling warnings about deprecated armv8 instructions
+In-Reply-To: <20170130184934.GS16461@arm.com>
+References: <22169925.OhJ0QcnbHM@localhost>
+ <1485087662.1518.1.camel@crowfest.net>
+ <0D1F678D-6F94-4B68-955E-6454F8647FCA@linaro.org>
+ <20170130141308.GV27312@n2100.armlinux.org.uk>
+ <CAKv+Gu98i4=COqr_Eikwja28U5MAL83rxe-_QBXWFhJ7v1E6yA@mail.gmail.com>
+ <20170130165837.GE27312@n2100.armlinux.org.uk>
+ <CAKv+Gu_jEvKdWFWB2Ofxb5ruoTYUEt1puZXBb=9Cn2kEOZO1hg@mail.gmail.com>
+ <1485798092.484.5.camel@crowfest.net> <yw1xo9yofm41.fsf@unicorn.mansr.com>
+ <1485801299.1085.0.camel@crowfest.net> <20170130184934.GS16461@arm.com>
+Message-ID: <1485806004.1085.2.camel@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Mon, Jan 30, 2017 at 06:54:44PM +0000, Russell King - ARM Linux wrote:
-> On Wed, Jan 25, 2017 at 01:13:23PM -0800, Frank Rowand wrote:
-> > Adding back the chosen nodes is a bandaid that papers over the actual bug
-> > in the decompressor.
-> > 
-> > A comment about Fabio's attempt to fix the decompressor noted a possible
-> > issue with the method taken to fix the problem, but then the discussion
-> > of fixing the decompressor was dropped and v3 of the patch to add chosen
-> > into a bunch of .dtsi files was applied by Shawn.
-> > 
-> > Can someone please help Fabio to create a correct patch to fix the
-> > decompressor?
+On Mon, 2017-01-30 at 18:49 +0000, Will Deacon wrote:
+> This was all discussed in some detail back in 2014:
 > 
-> I refuse to assist, see below.
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/26850
+> 4.html
 > 
-> The reason this has come up is that this problem has _nothing_ to do
-> with the decompressor - see recent context on the linux-arm-kernel
-> list.
+> and specifically:
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/26967
+> 5.html
+> 
+> I was initially against any emulation at all (which wasn't the right
+> answer
+> to the problem), but there was a productive discussion and an agreed
+> solution. I'm really not keen to re-open that can of worms unless
+> something
+> significant has changed.
+> 
 
-Several people reported problems with the patch that removes
-skeleton.dtsi. There are at least:
+Yes this is a very deep subject and it goes beyond my technical
+understanding of ARM.
 
- - Russell, who saw U-Boot failing to specify the amount of RAM;
- - somebody (I forgot and I'm lazy so I didn't look up the name) who
-   noticed some i.MX6 boards fail in kernelci with barebox because
-   barebox assumed /chosen to be present; and
- - somebody else (...) who reported the ATAGS_DTB_COMPAT failure
-   (also wrongly called "decompressor failure" in this thread).
+One point that was made in the topic is does filling up the dmesg log
+really going to give an incentive to people to complain to whoever they
+got the software from?  Especially in the case of beginners that may
+not even know what dmesg is or what it is for?
 
-I agree that for each single of the above issues it is worth to readd
-the /chosen and /memory nodes for now. Still all three are IMHO worth to
-be fixed.
+I know moving to a single binary is a long term goal.  If I downloaded
+a new version of the standard kernel and it broke my favorite piece of
+software, who would I blame?  Most people would probably blame the
+kernel image, not the application/software.
 
-barebox is already fixed in v2017.01.0 (commit f49b415b9231 (of: base:
-add chosen node if it does not exist when adding initrd),
-https://git.pengutronix.de/cgit/barebox/commit/?id=f49b415b9231).
+I know I'm mostly interested in the Raspberry PI, and that case is more
+complex because the kernel, user mode software, and hardware all
+originate from the same place.  But that certainly isn't the general
+case for ARM.
 
-Looking at the ATAGS_DTB_COMPAT problem: The code in question is
-(if I understood correctly) merge_fdt_bootargs in
-arch/arm/boot/compressed/atags_to_fdt.c:
-
-	setprop_string(fdt, "/chosen", "bootargs", cmdline);
-
-looking further:
-
-	static int node_offset(void *fdt, const char *node_path)
-	{       
-		int offset = fdt_path_offset(fdt, node_path);
-		if (offset == -FDT_ERR_NOTFOUND)
-			offset = fdt_add_subnode(fdt, 0, node_path);
-		return offset;
-	}
-
-	static int setprop_string(void *fdt, const char *node_path,
-				  const char *property, const char *string)
-	{
-		int offset = node_offset(fdt, node_path);
-		if (offset < 0)
-			return offset;
-		return fdt_setprop_string(fdt, offset, property, string);
-	}
-
-So it seems "/chosen" not being there should be handled. I don't have a
-reproducer for this problem, but it doesn't look that hard to fix with
-DEBUG_LL and a system that shows the problem.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+The log once or slow down the rate of logging seems like a good
+compromise.  Maybe after a certain number of logging hit, the CPU goes
+back to hardware emulation if available?  
