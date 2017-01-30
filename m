@@ -1,42 +1,43 @@
-From: hkallweit1@gmail.com (Heiner Kallweit)
-Date: Mon, 30 Jan 2017 20:33:47 +0100
-Subject: [PATCH v3] mmc: meson-gx: set max block count
-Message-ID: <b199dad5-e171-9c4a-2a44-83e0fe2365a9@gmail.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 30 Jan 2017 16:35:09 -0300
+Subject: [PATCH] ARM: exynos_defconfig: Enable DYNAMIC_DEBUG and get rid
+ of old ext3
+In-Reply-To: <20170130192749.3690-1-krzk@kernel.org>
+References: <20170130192749.3690-1-krzk@kernel.org>
+Message-ID: <fae36789-d016-8dee-12df-ff896a3373b9@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far max_blk_count isn't set what results in a default of value 8
-to be used (PAGE_SIZE / block size).
+Hello Krzysztof,
 
-Block length field has 9 bits, so set max_blk_count to 2^9-1 = 511.
-In addition set max_req_size because max_blk_count is also limited
-by max_req_size / block_size.
+On 01/30/2017 04:27 PM, Krzysztof Kozlowski wrote:
+> DYNAMIC_DEBUG is quite useful for debugging kernels and should not cause
+> noticeable performance regressions.  It makes the kernel noticeably
+> bigger (around 4%) but this difference should not impact typical
+> developer and reference usage of this defconfig.
+>
+> Sizes:
+> zImage-old:       4641496 bytes
+> zImage-new:       4811384 bytes
+> 
+>    text	   data	    bss	    dec	    hex	filename
+> 7031229	2570916	 327016	9929161	 9781c9	vmlinux-old
+> 7205921	2800052	 327016	10332989 9dab3d	vmlinux-new
+>
 
-Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
-Acked-by: Kevin Hilman <khilman@baylibre.com>
----
-v2:
-- block length field has 9 bits, so set max_blk_count to 2^9-1 = 511
-- in addition set max_req_size because max_blk_count is also limited
-  by max_req_size / block_size
-v3:
-- extend commit message
----
- drivers/mmc/host/meson-gx-mmc.c | 2 ++
- 1 file changed, 2 insertions(+)
+Agreed, most people usually will end enabling this option when debugging
+issues anyways so having enabled by default is quite convenient indeed.
 
-diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
-index 83361f1f..d4d174ed 100644
---- a/drivers/mmc/host/meson-gx-mmc.c
-+++ b/drivers/mmc/host/meson-gx-mmc.c
-@@ -810,6 +810,8 @@ static int meson_mmc_probe(struct platform_device *pdev)
- 		goto free_host;
- 	}
- 
-+	mmc->max_blk_count = CMD_CFG_LENGTH_MASK;
-+	mmc->max_req_size = mmc->max_blk_count * mmc->max_blk_size;
- 	mmc->ops = &meson_mmc_ops;
- 	mmc_add_host(mmc);
- 
+> Additionally, remove the EXT3_FS symbol because it is entirely replaced
+> by EXT4_FS.
+>
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> ---
+
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
 -- 
-2.11.0
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
