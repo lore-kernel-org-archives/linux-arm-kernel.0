@@ -1,53 +1,88 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Mon, 30 Jan 2017 09:51:53 -0300
-Subject: [PATCH] Gpu: drm: exynos - Fix possible NULL derefrence.
-In-Reply-To: <1485752523-30029-1-git-send-email-shailendra.v@samsung.com>
-References: <CGME20170130050228epcas4p1b880b1ae599b7f7d6c60a4b0554a2162@epcas4p1.samsung.com>
- <1485752523-30029-1-git-send-email-shailendra.v@samsung.com>
-Message-ID: <d57ee31f-493c-0f76-65f5-a60babd7b20c@osg.samsung.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 30 Jan 2017 13:06:57 +0000
+Subject: [PATCH v3 00/24] i.MX Media Driver
+In-Reply-To: <1485257269.3600.96.camel@pengutronix.de>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <c6e98327-7e2c-f34a-2d23-af7b236de441@xs4all.nl>
+ <1484929911.2897.70.camel@pengutronix.de>
+ <3fb68686-9447-2d8a-e2d2-005e4138cd43@gmail.com>
+ <5d23d244-aa0e-401c-24a9-07f28acf1563@xs4all.nl>
+ <1485169204.2874.57.camel@pengutronix.de>
+ <ce2d1851-8a2e-ea0b-25b8-be6649b1ebaf@gmail.com>
+ <1485257269.3600.96.camel@pengutronix.de>
+Message-ID: <20170130130657.GR27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shailendra,
+> The central issue seems to be that I think media pad links / media bus
+> formats should describe physical links, such as parallel or serial
+> buses, and the formats of pixels flowing through them, whereas Steve
+> would like to extend them to describe software transports and in-memory
+> formats.
 
-The subject line is wrong, please always use the convention used in
-previous commits, i.e: git log --oneline drivers/gpu/drm/exynos/
+This probably isn't the right place to attach this comment in this
+thread, but... the issue of media bus formats matching physical buses
+is an argument that I think is already lost.
 
-On 01/30/2017 02:02 AM, Shailendra Verma wrote:
-> of_device_get_match_data could return NULL, and so can cause
-> a NULL pointer dereference later.
-> 
-> Signed-off-by: Shailendra Verma <shailendra.v@samsung.com>
-> ---
->  drivers/gpu/drm/exynos/exynos_drm_dsi.c  |    4 ++++
->  drivers/gpu/drm/exynos/exynos_drm_fimd.c |    4 ++++
->  drivers/gpu/drm/exynos/exynos_hdmi.c     |    4 ++++
->  drivers/gpu/drm/exynos/exynos_mixer.c    |    4 ++++
->  4 files changed, 16 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-> index e07cb1f..fba0ffc 100644
-> --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-> +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-> @@ -1765,6 +1765,10 @@ static int exynos_dsi_probe(struct platform_device *pdev)
->  
->  	dsi->dev = dev;
->  	dsi->driver_data = of_device_get_match_data(dev);
-> +	if (!dsi->driver_data) {
-> +		dev_err(dev, "no device match found\n");
-> +		return -ENODEV;
-> +	}
->
+For example, take the 10-bit bayer formats:
 
-I don't think this makes sense for the Exynos driver since Exynos is a
-DT-only platform and so the probe callback can only be called if a dev
-node with a compatible string in the OF device id table was registered.
+#define MEDIA_BUS_FMT_SBGGR10_1X10              0x3007
+#define MEDIA_BUS_FMT_SGBRG10_1X10              0x300e
+#define MEDIA_BUS_FMT_SGRBG10_1X10              0x300a
+#define MEDIA_BUS_FMT_SRGGB10_1X10              0x300f
 
-All the struct of_device_id in the table have a .data and so this can't
-be NULL in this driver.
- 
-Best regards,
+These are commonly used on CSI serial buses (see the smiapp driver for
+example).  From the description at the top of the file, it says the
+1X10 means that one pixel is transferred as one 10-bit sample.
+
+However, the format on wire is somewhat different - four pixels are
+transmitted over five bytes:
+
+	P0	P1	P2	P3	P0	P1	P2	P3
+	8-bit	8-bit	8-bit	8-bit	2-bit	2-bit	2-bit	2-bit
+
+This gives two problems:
+1) it doesn't fit in any sensible kind of "one pixel transferred as
+   N M-bit samples" description because the pixel/sample values
+   (depending how you look at them) are broken up.
+
+2) changing this will probably be a user visible change, as things
+   like smiapp are already in use.
+
+So, I think what we actually have is the media bus formats describing
+the _logical_ bus format.  Yes, one pixel is transferred as one 10-bit
+sample in this case.
+
+To help illustrate my point, consider the difference between
+MEDIA_BUS_FMT_RGB565_1X16 and MEDIA_BUS_FMT_RGB565_2X8_BE or
+MEDIA_BUS_FMT_RGB565_2X8_LE.  RGB565_1X16 means 1 pixel over an effective
+16-bit wide bus (if it's not 16-bit, then it has to be broken up into
+separate "samples".)  RGB565_2X8 means 1 pixel as two 8-bit samples.
+
+So, the 10-bit bayer is 1 pixel as 1.25 bytes.  Or is it, over a serial
+bus.  Using the RGB565 case, 10-bit bayer over a 4 lane CSI bus becomes
+interesting:
+
+	first byte	2nd	3rd
+lane 1	P0 9:2		S0	P7 9:2
+lane 2	P1 9:2		P4 9:2	S1
+lane 3	P2 9:2		P5 9:2	P8 9:2
+lane 4	P3 9:2		P6 9:2	P9 9:2
+
+S0 = P0/P1/P2/P3 least significant two bits
+S1 = P4/P5/P6/P7 least significant two bits
+
+or 2 lane CSI:
+	first byte	2nd	3rd	4th	5th
+lane 1	P0 9:2		P2	S0	P5	P7
+lane 2	P1 9:2		P3	P4	P6	S1
+
+or 1 lane CSI:
+lane 1	P0 P1 P2 P3 S0 P4 P5 P6 P7 S1 P8 P9 ...
+
+etc.
+
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
