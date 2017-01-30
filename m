@@ -1,26 +1,28 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Jan 2017 23:29:55 +0000
-Subject: [PATCH v3 22/24] media: imx: Add MIPI CSI-2 OV5640 sensor subdev
- driver
-In-Reply-To: <1483755102-24785-23-git-send-email-steve_longerbeam@mentor.com>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-23-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <20170130232955.GK27312@n2100.armlinux.org.uk>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 30 Jan 2017 15:32:15 -0800
+Subject: [PATCH 2/2] ARM: bcm2835: dts: fix uart0/uart1 pins
+In-Reply-To: <e0f527a24b0048daba88ef36d5324245e003111c.1485719591.git.baruch@tkos.co.il>
+References: <9290fa9eed6b5ff1c5c96b9dac41eca286b7eef9.1485719591.git.baruch@tkos.co.il>
+ <e0f527a24b0048daba88ef36d5324245e003111c.1485719591.git.baruch@tkos.co.il>
+Message-ID: <87sho0unsw.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2017 at 06:11:40PM -0800, Steve Longerbeam wrote:
-> +config IMX_OV5640_MIPI
-> +       tristate "OmniVision OV5640 MIPI CSI-2 camera support"
-> +       depends on GPIOLIB && VIDEO_IMX_CAMERA
-> +       select IMX_MIPI_CSI2
-> +       default y
+Baruch Siach <baruch@tkos.co.il> writes:
 
-Why is this defaulting to y?  New drivers should not default to enabled
-unless they are replacing some already pre-existing functionality.
-Ditto for the other camera driver.
+> According to the BCM2835 ARM Peripherals document uart1 doesn't map to pins
+> 36-39, but uart0 does.
+>
+> Also, split into separate Rx/Tx and CST/RTS groups to match other uart nodes.
+>
+> Fixes: 21ff843931b ("ARM: dts: bcm283x: Define standard pinctrl groups in the gpio node.")
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+These look good, too.  Thanks!
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170130/e7f67085/attachment.sig>
