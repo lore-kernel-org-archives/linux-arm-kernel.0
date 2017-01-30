@@ -1,49 +1,73 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Jan 2017 15:28:22 +0000
-Subject: [PATCH v3 16/24] media: Add i.MX media core driver
-In-Reply-To: <1485170006.2874.63.camel@pengutronix.de>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-17-git-send-email-steve_longerbeam@mentor.com>
- <1484320822.31475.96.camel@pengutronix.de>
- <a94025b4-c4dd-de51-572e-d2615a7246e4@gmail.com>
- <1484574468.8415.136.camel@pengutronix.de>
- <e38feca9-ed6f-8288-e006-768d6ba2fe5a@gmail.com>
- <1485170006.2874.63.camel@pengutronix.de>
-Message-ID: <20170130152822.GB27312@n2100.armlinux.org.uk>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 30 Jan 2017 15:31:26 +0000
+Subject: [PATCH 06/10] soc/qbman: Add ARM equivalent for
+ flush_dcache_range()
+In-Reply-To: <1485570872.9266.22.camel@buserror.net>
+References: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
+ <VI1PR0401MB2430DA6BD2F857C30EC86A50917F0@VI1PR0401MB2430.eurprd04.prod.outlook.com>
+ <HE1PR0401MB263638F320470CA216990BCC86720@HE1PR0401MB2636.eurprd04.prod.outlook.com>
+ <5414359.8GMja3pNrI@wuerfel>
+ <VI1PR0401MB24303C4A5C0042005E17F1A391770@VI1PR0401MB2430.eurprd04.prod.outlook.com>
+ <CAK8P3a1Gd4bd7GjEp_a9WXc_mTPk0XmP7DH8aPWhbn2K3MMuDQ@mail.gmail.com>
+ <1485570872.9266.22.camel@buserror.net>
+Message-ID: <d5ca6bcd-1d1a-2a61-1f5c-9086a67f629a@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2017 at 12:13:26PM +0100, Philipp Zabel wrote:
-> Hi Steve,
+On 28/01/17 02:34, Scott Wood wrote:
+> On Fri, 2017-01-27 at 17:41 +0100, Arnd Bergmann wrote:
+>> On Thu, Jan 26, 2017 at 6:08 AM, Scott Wood <scott.wood@nxp.com> wrote:
+>>>
+>>> On 01/25/2017 03:20 PM, Arnd Bergmann wrote:
+>>>>
+>>>> On Monday, January 23, 2017 7:24:59 PM CET Roy Pledge wrote:
+>>>
+>>>>
+>>>> If this is normal RAM, you should be able to just write zeroes, and then
+>>>> do a dma_map_single() for initialization.
+>>> The DMA API on PPC currently has no way of knowing that the device
+>>> accesses this memory incoherently.
+>> Ah, this is because PPC doesn't use the 'dma-coherent' property on devices
+>> but just assumes that coherency is a global property of the platform,right?
 > 
-> On Sun, 2017-01-22 at 18:31 -0800, Steve Longerbeam wrote:
-> > Second, ignoring the above locking issue for a moment, 
-> > v4l2_pipeline_pm_use()
-> > will call s_power on the sensor _first_, then the mipi csi-2 s_power, 
-> > when executing
-> > media-ctl -l '"ov5640 1-003c":0 -> "imx6-mipi-csi2":0[1]'. Which is the 
-> > wrong order.
-> > In my version which enforces the correct power on order, the mipi csi-2 
-> > s_power
-> > is called first in that link setup, followed by the sensor.
+> Right.
 > 
-> I don't understand why you want to power up subdevs as soon as the links
-> are established. Shouldn't that rather be done for all subdevices in the
-> pipeline when the corresponding capture device is opened?
-> It seems to me that powering up the pipeline should be the last step
-> before userspace actually starts the capture.
+>>> If that were somehow fixed, we still couldn't use dma_map_single() as it
+>>> doesn't accept virtual addresses that come from memremap() or similar
+>>> dynamic mappings.  We'd have to convert the physical address to an array
+>>> of struct pages and pass each one to dma_map_page().
+>> Sorry for my ignorance, but where does the memory come from to start
+>> with? Is this in the normal linearly mapped RAM, in a carveout outside
+>> of the linear mapping but the same memory, or in some on-chip buffer?
+> 
+> It's RAM that comes from the device tree reserved memory mechanism
+> (drivers/of/of_reserved_mem.c).  On a 32-bit kernel it is not guaranteed (or
+> likely) to be lowmem.
 
-I agree with Philipp here - configuration of the software pipeline
-shouldn't result in hardware being forced to be powered up.  That's
-more of a decision for the individual sub-driver than for core.
+Wouldn't dma_declare_coherent_memory() be the appropriate tool for that
+job, then (modulo the PPC issue)? On ARM that should result in
+dma_alloc_coherent() giving back a non-cacheable mapping if the device
+is non-coherent, wherein a dmb_wmb() after writing the data from the CPU
+side should be enough to ensure it is published to the device.
 
-Executing media-ctl to enable a link between two sub-device endpoints
-should really be a matter of setting the software state, and when the
-video device is opened for streaming, surely that's when the hardware
-in the chain between the source and the capture device should be
-powered up and programmed.
+Robin.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+>>> And even if we did all that, there would still be other manual cache
+>>> manipulation left in this driver, to deal with its cacheable register
+>>> interface.
+>> I thought we had concluded that "cacheable register" is something
+>> that cannot work reliably on ARM at all when this came up before.
+>> Any updates on that?
+> 
+> I'm not familiar with the details there...  My understanding is that the
+> hardware people at NXP are convinced that it can work on these specific chips
+> due to implementation details.
+> 
+> -Scott
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
