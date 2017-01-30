@@ -1,46 +1,45 @@
-From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon, 30 Jan 2017 12:38:07 -0500
-Subject: [RFC v2 10/10] KVM: arm/arm64: Emulate the EL1 phys timer
- register access
-In-Reply-To: <CAFEAcA8BfUQTrdpNtkkB2kh=dLyOCjuBv2vVWZML8px8D0JJ9Q@mail.gmail.com>
-References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
- <1485479100-4966-11-git-send-email-jintack@cs.columbia.edu>
- <86lgtt98gs.fsf@arm.com>
- <CAHyh4xhgNYjpyaGz=UtFfC+smh6CVZgJ530WWmwwmpg=Bi799A@mail.gmail.com>
- <CAFEAcA8BfUQTrdpNtkkB2kh=dLyOCjuBv2vVWZML8px8D0JJ9Q@mail.gmail.com>
-Message-ID: <CAHyh4ximsWC+9UBc7=zinoqbnt9y1dOWzMqmTBLZ0SkS5HzPFA@mail.gmail.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Mon, 30 Jan 2017 09:39:30 -0800
+Subject: [PATCH] PCI: ACPI: Fix ThunderX PEM initialization
+In-Reply-To: <1485793552-12614-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
+References: <1485793552-12614-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
+Message-ID: <e92355e7-634f-dc91-4716-da73a23b406c@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
-
-On Mon, Jan 30, 2017 at 12:26 PM, Peter Maydell
-<peter.maydell@linaro.org> wrote:
-> On 30 January 2017 at 17:08, Jintack Lim <jintack@cs.columbia.edu> wrote:
->> On Sun, Jan 29, 2017 at 10:44 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> Shouldn't we take the ENABLE bit into account? The ARMv8 ARM version I
->>> have at hand (version h) seems to indicate that we should, but we should
->>> check with the latest and greatest...
->>
->> Thanks! I was not clear about this. I have ARM ARM version k, and it
->> says that 'When the value of the ENABLE bit is 0, the ISTATUS field is
->> UNKNOWN.' So I thought the istatus value doesn't matter if ENABLE is
->> 0, and just set istatus bit regardless of ENABLE bit. If this is not
->> what the manual meant, then I'm happy to fix this.
+On 01/30/2017 08:25 AM, Vadim Lomovtsev wrote:
+> This patch is to address PEM initialization issue
+> which causes network issues.
 >
-> It looks like the spec has been relaxed between the doc version
-> that Marc was looking at and the current one. So it's OK for
-> an implementation to either (a) set ISTATUS to 0 if ENABLE
-> is 0, or (b) do what you've done and set ISTATUS according
-> to the timer comparison whether ENABLE is clear or not
-> (or even (c) set ISTATUS to a random value if ENABLE is clear,
-> and other less likely choices).
-> I think we should add a comment to note that it's architecturally
-> UNKNOWN and we've made a choice for our implementation convenience.
+> It is necessary to search for _HID:PNP0A08 while requesting
+> PEM resources via ACPI instead of "THRX0002".
 
-Thanks for the clarification. I'll put a comment in v3.
+Since this is fixing new code, there should be no chance to break 
+previously working systems.
+
+Bjorn: If possible, this should be merged for v4.10
 
 >
-> thanks
-> -- PMM
+> Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
+
+Acked-by: David Daney <david.daney@cavium.com>
+
+
+> ---
+>  drivers/pci/host/pci-thunder-pem.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
+> index af722eb..aec30b8 100644
+> --- a/drivers/pci/host/pci-thunder-pem.c
+> +++ b/drivers/pci/host/pci-thunder-pem.c
+> @@ -331,7 +331,7 @@ static int thunder_pem_acpi_init(struct pci_config_window *cfg)
+>  	if (!res_pem)
+>  		return -ENOMEM;
+>
+> -	ret = acpi_get_rc_resources(dev, "THRX0002", root->segment, res_pem);
+> +	ret = acpi_get_rc_resources(dev, "PNP0A08", root->segment, res_pem);
+>  	if (ret) {
+>  		dev_err(dev, "can't get rc base address\n");
+>  		return ret;
 >
