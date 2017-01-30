@@ -1,43 +1,44 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Mon, 30 Jan 2017 11:02:04 +0100
-Subject: [PATCH v7 07/14] sata: ahci-da850: add device tree match table
+Date: Mon, 30 Jan 2017 11:01:58 +0100
+Subject: [PATCH v7 01/14] devicetree: bindings: add bindings for ahci-da850
 In-Reply-To: <1485770531-6772-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1485770531-6772-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1485770531-6772-8-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1485770531-6772-2-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're using device tree for da850-lcdk. Add the match table to allow
-to probe the driver.
+Add DT bindings for the TI DA850 AHCI SATA controller.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
-Acked-by: Tejun Heo <tj@kernel.org>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/ata/ahci_da850.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ Documentation/devicetree/bindings/ata/ahci-da850.txt | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/ata/ahci-da850.txt
 
-diff --git a/drivers/ata/ahci_da850.c b/drivers/ata/ahci_da850.c
-index e397bab..72126a0 100644
---- a/drivers/ata/ahci_da850.c
-+++ b/drivers/ata/ahci_da850.c
-@@ -121,11 +121,18 @@ static int ahci_da850_probe(struct platform_device *pdev)
- static SIMPLE_DEV_PM_OPS(ahci_da850_pm_ops, ahci_platform_suspend,
- 			 ahci_platform_resume);
- 
-+static const struct of_device_id ahci_da850_of_match[] = {
-+	{ .compatible = "ti,da850-ahci", },
-+	{ },
-+};
-+MODULE_DEVICE_TABLE(of, ahci_da850_of_match);
+diff --git a/Documentation/devicetree/bindings/ata/ahci-da850.txt b/Documentation/devicetree/bindings/ata/ahci-da850.txt
+new file mode 100644
+index 0000000..5f81934
+--- /dev/null
++++ b/Documentation/devicetree/bindings/ata/ahci-da850.txt
+@@ -0,0 +1,18 @@
++Device tree binding for the TI DA850 AHCI SATA Controller
++---------------------------------------------------------
 +
- static struct platform_driver ahci_da850_driver = {
- 	.probe = ahci_da850_probe,
- 	.remove = ata_platform_remove_one,
- 	.driver = {
- 		.name = DRV_NAME,
-+		.of_match_table = ahci_da850_of_match,
- 		.pm = &ahci_da850_pm_ops,
- 	},
- };
++Required properties:
++  - compatible: must be "ti,da850-ahci"
++  - reg: physical base addresses and sizes of the two register regions
++         used by the controller: the register map as defined by the
++         AHCI 1.1 standard and the Power Down Control Register (PWRDN)
++         for enabling/disabling the SATA clock receiver
++  - interrupts: interrupt specifier (refer to the interrupt binding)
++
++Example:
++
++	sata: sata at 218000 {
++		compatible = "ti,da850-ahci";
++		reg = <0x218000 0x2000>, <0x22c018 0x4>;
++		interrupts = <67>;
++	};
 -- 
 2.9.3
