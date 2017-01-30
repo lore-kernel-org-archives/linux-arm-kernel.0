@@ -1,46 +1,36 @@
 From: rogershimizu@gmail.com (Roger Shimizu)
-Date: Mon, 30 Jan 2017 20:07:29 +0900
-Subject: [PATCH 1/2] ARM: dts: orion5x-lschl: Fix model name
-Message-ID: <20170130110730.9310-1-rogershimizu@gmail.com>
+Date: Mon, 30 Jan 2017 20:07:30 +0900
+Subject: [PATCH 2/2] ARM: dts: orion5x-lschl: More consistent naming on
+ linkstation series
+In-Reply-To: <20170130110730.9310-1-rogershimizu@gmail.com>
+References: <20170130110730.9310-1-rogershimizu@gmail.com>
+Message-ID: <20170130110730.9310-2-rogershimizu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Model name should be consistent with legacy device file, so that user
-can migrate their system from legacy device support to device-tree
-safely.
+DTS files, which includes orion5x-linkstation.dtsi, are named:
+  orion5x-linkstation-*.dts
 
-Legacy device file is currently removed, but it can be found on 4.8
-or previous version of linux:
-  arch/arm/mach-orion5x/ls-chl-setup.c
+So we rename the file below:
+  arch/arm/boot/dts/orion5x-lschl.dts
+to the new name:
+  arch/arm/boot/dts/orion5x-linkstation-lschl.dts
+
+Because DTS conversion of this device was just introduced in 4.9, Debian
+is still using legacy device support, other distros are the same,
+so here we won't expect any impact actually.
 
 Fixes: f94f268979a2 ("ARM: dts: orion5x: convert ls-chl to FDT")
 Cc: Ashley Hughes <ashley.hughes@blueyonder.co.uk>
 Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
 ---
- arch/arm/boot/dts/orion5x-lschl.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/{orion5x-lschl.dts => orion5x-linkstation-lschl.dts} | 0
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+ rename arch/arm/boot/dts/{orion5x-lschl.dts => orion5x-linkstation-lschl.dts} (100%)
 
-diff --git a/arch/arm/boot/dts/orion5x-lschl.dts b/arch/arm/boot/dts/orion5x-lschl.dts
-index 7c999b092e06..ee751995c8d0 100644
---- a/arch/arm/boot/dts/orion5x-lschl.dts
-+++ b/arch/arm/boot/dts/orion5x-lschl.dts
-@@ -2,7 +2,7 @@
-  * Device Tree file for Buffalo Linkstation LS-CHLv3
-  *
-  * Copyright (C) 2016 Ash Hughes <ashley.hughes@blueyonder.co.uk>
-- * Copyright (C) 2015, 2016
-+ * Copyright (C) 2015-2017
-  * Roger Shimizu <rogershimizu@gmail.com>
-  *
-  * This file is dual-licensed: you can use it either under the terms
-@@ -52,7 +52,7 @@
- #include <dt-bindings/gpio/gpio.h>
- 
- / {
--	model = "Buffalo Linkstation Live v3 (LS-CHL)";
-+	model = "Buffalo Linkstation LiveV3 (LS-CHL)";
- 	compatible = "buffalo,lschl", "marvell,orion5x-88f5182", "marvell,orion5x";
- 
- 	memory { /* 128 MB */
+diff --git a/arch/arm/boot/dts/orion5x-lschl.dts b/arch/arm/boot/dts/orion5x-linkstation-lschl.dts
+similarity index 100%
+rename from arch/arm/boot/dts/orion5x-lschl.dts
+rename to arch/arm/boot/dts/orion5x-linkstation-lschl.dts
 -- 
 2.11.0
