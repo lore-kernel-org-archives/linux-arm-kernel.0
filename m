@@ -1,50 +1,29 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 30 Jan 2017 15:13:12 +0000
-Subject: [PATCH v2] arm: module: handle negative R_ARM_PREL31 addends correctly
-Message-ID: <1485789192-6218-1-git-send-email-ard.biesheuvel@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 30 Jan 2017 16:13:50 +0100
+Subject: [PATCH v2 1/9] drivers: pinctrl: add driver for Allwinner H5 SoC
+In-Reply-To: <20170126154859.55855-2-icenowy@aosc.xyz>
+References: <20170126154859.55855-1-icenowy@aosc.xyz>
+ <20170126154859.55855-2-icenowy@aosc.xyz>
+Message-ID: <CACRpkdY=+wAVZtWjeW+jKq_s+YX17L7xUeZ14_sAyd8KCm6+kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the spec 'ELF for the ARM Architecture' (IHI 0044E),
-addends for R_ARM_PREL31 relocations are 31-bit signed quantities,
-so we need to sign extend the value to 32 bits before it can be used
-as an offset in the calculation of the relocated value.
+On Thu, Jan 26, 2017 at 4:48 PM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
 
-We have not been bitten by this because these relocations are usually
-emitted against the start of a section, which means the addends never
-assume negative values in practice. But it is a bug nonetheless, so fix
-it.
+> Based on the Allwinner H5 datasheet and the pinctrl driver of the
+> backward-compatible H3 this introduces the pin multiplex assignments for
+> the H5 SoC.
+>
+> H5 introduced some more pin functions (e.g. three more groups of TS
+> pins, and one more groups of SIM pins) than H3.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> ---
+> Changes in v2:
+> - Fixed interrupt banks. (There's one more GPIO banks (PF) that can do
+>   interrupt handling on H5)
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-v2: preserve bit 31 of the relocation target
+Patch applied with Maxime's ACK.
 
- arch/arm/kernel/module.c | 13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-index 4f14b5ce6535..80254b47dc34 100644
---- a/arch/arm/kernel/module.c
-+++ b/arch/arm/kernel/module.c
-@@ -155,8 +155,17 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
- 		       break;
- 
- 		case R_ARM_PREL31:
--			offset = *(u32 *)loc + sym->st_value - loc;
--			*(u32 *)loc = offset & 0x7fffffff;
-+			offset = (*(s32 *)loc << 1) >> 1; /* sign extend */
-+			offset += sym->st_value - loc;
-+			if (offset >= 0x40000000 || offset < -0x40000000) {
-+				pr_err("%s: section %u reloc %u sym '%s': relocation %u out of range (%#lx -> %#x)\n",
-+				       module->name, relindex, i, symname,
-+				       ELF32_R_TYPE(rel->r_info), loc,
-+				       sym->st_value);
-+				return -ENOEXEC;
-+			}
-+			*(u32 *)loc &= 0x80000000;
-+			*(u32 *)loc |= offset & 0x7fffffff;
- 			break;
- 
- 		case R_ARM_MOVW_ABS_NC:
--- 
-2.7.4
+Yours,
+Linus Walleij
