@@ -1,44 +1,71 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 30 Jan 2017 15:33:58 +0100
-Subject: [PATCH v2 3/5] Documentation: dt: iio: document stm32 exti trigger
-In-Reply-To: <1485786840-4557-1-git-send-email-fabrice.gasnier@st.com>
-References: <1485786840-4557-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1485786840-4557-4-git-send-email-fabrice.gasnier@st.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 30 Jan 2017 14:38:52 +0000
+Subject: [PATCH V7 08/11] drivers: acpi: Handle IOMMU lookup failure with
+ deferred probing or error
+In-Reply-To: <175a3798-b824-ef1a-e112-9f6f472973ae@codeaurora.org>
+References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
+ <1485188293-20263-9-git-send-email-sricharan@codeaurora.org>
+ <20170124123711.GA11996@red-moon>
+ <f2370671-ece8-fbee-de19-350dd625088f@codeaurora.org>
+ <93e79759-d614-9b36-d5ab-63e8eb725009@arm.com>
+ <14751205-f034-7f0d-442a-854c3909425c@codeaurora.org>
+ <5ba9f366d6e25397cdef8ad95b49e199@codeaurora.org>
+ <175a3798-b824-ef1a-e112-9f6f472973ae@codeaurora.org>
+Message-ID: <20170130143851.GJ16461@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add dt documentation for st,stm32-exti-trigger.
-EXTi gpio signal can be routed internally as trigger source for various
-IPs (e.g. for ADC or DAC conversions).
+On Mon, Jan 30, 2017 at 09:33:50AM -0500, Sinan Kaya wrote:
+> On 1/30/2017 9:23 AM, Nate Watterson wrote:
+> > On 2017-01-30 08:59, Sinan Kaya wrote:
+> >> On 1/30/2017 7:22 AM, Robin Murphy wrote:
+> >>> On 29/01/17 17:53, Sinan Kaya wrote:
+> >>>> On 1/24/2017 7:37 AM, Lorenzo Pieralisi wrote:
+> >>>>> [+hanjun, tomasz, sinan]
+> >>>>>
+> >>>>> It is quite a key patchset, I would be glad if they can test on their
+> >>>>> respective platforms with IORT.
+> >>>>>
+> >>>>
+> >>>> Tested on top of 4.10-rc5.
+> >>>>
+> >>>> 1.    Platform Hidma device passed dmatest
+> >>>> 2.    Seeing some USB stalls on a platform USB device.
+> >>>> 3.    PCIe NVME drive probed and worked fine with MSI interrupts after boot.
+> >>>> 4.     NVMe driver didn't probe following a hotplug insertion and received an
+> >>>> SMMU error event during the insertion.
+> >>>
+> >>> What was the SMMU error - a translation/permission fault (implying the
+> >>> wrong DMA ops) or a bad STE fault (implying we totally failed to tell
+> >>> the SMMU about the device at all)?
+> >>>
+> >>
+> >> root at ubuntu:/sys/bus/pci/slots/4# echo 0 > power
+> >>
+> >> [__204.698522]_iommu:_Removing_device_0003:01:00.0_from_group_0
+> >> [  204.708704] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down
+> >> [  204.708723] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down event
+> >> ignored; already powering off
+> >>
+> >> root at ubuntu:/sys/bus/pci/slots/4#
+> >>
+> >> [__254.820440]_iommu:_Adding_device_0003:01:00.0_to_group_8
+> >> [  254.820599] nvme nvme0: pci function 0003:01:00.0
+> >> [  254.820621] nvme 0003:01:00.0: enabling device (0000 -> 0002)
+> >> [  261.948558] arm-smmu-v3 arm-smmu-v3.0.auto: event 0x0a received:
+> >> [  261.948561] arm-smmu-v3 arm-smmu-v3.0.auto:  0x000001000000000a
+> >> [  261.948563] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
+> >> [  261.948564] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
+> >> [  261.948566] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
+> 
+> > Looks like C_BAD_CD. Can you please try with:
+> > iommu/arm-smmu-v3: Clear prior settings when updating STEs
+> 
+> This resolved the issue. Can we pull Nate's patch to 4.10 so that I don't see
+> this issue again.
 
-Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
----
- .../bindings/iio/trigger/st,stm32-exti-trigger.txt      | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/iio/trigger/st,stm32-exti-trigger.txt
+I already sent the pull request to Joerg for 4.11. Do you see this problem
+without Sricharan's patches (i.e. vanilla mainline)? If so, we'll need to
+send the patch to stable after -rc1.
 
-diff --git a/Documentation/devicetree/bindings/iio/trigger/st,stm32-exti-trigger.txt b/Documentation/devicetree/bindings/iio/trigger/st,stm32-exti-trigger.txt
-new file mode 100644
-index 0000000..ebf2645
---- /dev/null
-+++ b/Documentation/devicetree/bindings/iio/trigger/st,stm32-exti-trigger.txt
-@@ -0,0 +1,17 @@
-+STMicroelectronics STM32 EXTI trigger bindings
-+
-+EXTi gpio signal can be routed internally as trigger source for various
-+IPs (e.g. for ADC or DAC conversions).
-+
-+Contents of a stm32 exti trigger root node:
-+-------------------------------------------
-+Required properties:
-+- compatible: Should be "st,stm32-exti-trigger"
-+- extiN-gpio: optional gpio line that may be used as external trigger source
-+  (e.g. N may be 0..15. For example, exti11-gpio can trig ADC on stm32f4).
-+
-+Example:
-+	triggers {
-+		compatible = "st,stm32-exti-trigger";
-+		exti11-gpio=<&gpioa 11 0>;
-+	};
--- 
-1.9.1
+Will
