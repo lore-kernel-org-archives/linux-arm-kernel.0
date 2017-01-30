@@ -1,131 +1,65 @@
-From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon, 30 Jan 2017 12:08:06 -0500
-Subject: [RFC v2 10/10] KVM: arm/arm64: Emulate the EL1 phys timer
- register access
-In-Reply-To: <86lgtt98gs.fsf@arm.com>
-References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
- <1485479100-4966-11-git-send-email-jintack@cs.columbia.edu>
- <86lgtt98gs.fsf@arm.com>
-Message-ID: <CAHyh4xhgNYjpyaGz=UtFfC+smh6CVZgJ530WWmwwmpg=Bi799A@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 30 Jan 2017 17:09:47 +0000
+Subject: ARM64: Disabling warnings about deprecated armv8 instructions
+In-Reply-To: <20170130165837.GE27312@n2100.armlinux.org.uk>
+References: <1485072424.14066.2.camel@crowfest.net>
+ <1485075528.14345.1.camel@crowfest.net>
+ <CAKv+Gu8LU3QjrUa6wMJF3WBNrhx34Pi_0ZUQVfrZy7w7y7237w@mail.gmail.com>
+ <22169925.OhJ0QcnbHM@localhost> <1485087662.1518.1.camel@crowfest.net>
+ <0D1F678D-6F94-4B68-955E-6454F8647FCA@linaro.org>
+ <20170130141308.GV27312@n2100.armlinux.org.uk>
+ <CAKv+Gu98i4=COqr_Eikwja28U5MAL83rxe-_QBXWFhJ7v1E6yA@mail.gmail.com>
+ <20170130165837.GE27312@n2100.armlinux.org.uk>
+Message-ID: <CAKv+Gu_jEvKdWFWB2Ofxb5ruoTYUEt1puZXBb=9Cn2kEOZO1hg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On 30 January 2017 at 16:58, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Mon, Jan 30, 2017 at 02:50:23PM +0000, Ard Biesheuvel wrote:
+[..]
+>> I see. I was indeed mainly referring to userspace, which is what this
+>> thread is about, specifically setend and the CP15 barrier
+>> instructions. You can disagree with ARM's policy to deprecate and
+>> remove some instructions, but given the reality of it, I think it is
+>> perfectly reasonable to warn by default about setend instructions
+>> issued in 32-bit userspace when running under the 64-bit ARMv8 kernel.
+>
+> Linus has commented on this in the past, and his reaction (iirc) was
+> that deprecating instructions that userspace uses is not a sane
+> behaviour, pointing out that instructions that i386 supported still
+> work today on the latest Intel CPUs.
+>
+> He has a point, it's the same argument against breaking userspace
+> through making a change to the kernel.  It gives users a painful
+> experience.
+>
+> That said, no one expects that you can run an i386 binary on ARM,
+> which is pretty much understood by users.  However, ARM vs ARM64
+> where ARM64 provides a 32-bit ARM compatible environment is a
+> totally different story - it's _not_ compatible if it complains
+> about instructions that _were_ legal with 32-bit ARM binaries.
+> It makes me question the value of providing what is an incompatible
+> environment to run older binaries.
+>
+> The purpose of such an environment is to provide _compatibility_ to
+> older binaries.  You aren't providing a compatible environment if
+> you then decide to noisily warn about deprecated instructions.
+>
+> You might as well just rebuild the binaries for a 64-bit environment
+> and stop the illusion of a 32-bit compatible environment, because it
+> isn't.
+>
 
-On Sun, Jan 29, 2017 at 10:44 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On Fri, Jan 27 2017 at 01:05:00 AM, Jintack Lim <jintack@cs.columbia.edu> wrote:
->> Emulate read and write operations to CNTP_TVAL, CNTP_CVAL and CNTP_CTL.
->> Now VMs are able to use the EL1 physical timer.
->>
->> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
->> ---
->>  arch/arm64/kvm/sys_regs.c    | 32 +++++++++++++++++++++++++++++---
->>  include/kvm/arm_arch_timer.h |  2 ++
->>  virt/kvm/arm/arch_timer.c    |  2 +-
->>  3 files changed, 32 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
->> index fd9e747..adf009f 100644
->> --- a/arch/arm64/kvm/sys_regs.c
->> +++ b/arch/arm64/kvm/sys_regs.c
->> @@ -824,7 +824,14 @@ static bool access_cntp_tval(struct kvm_vcpu *vcpu,
->>               struct sys_reg_params *p,
->>               const struct sys_reg_desc *r)
->>  {
->> -     kvm_inject_undefined(vcpu);
->> +     struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
->> +     u64 now = kvm_phys_timer_read();
->> +
->> +     if (p->is_write)
->> +             ptimer->cnt_cval = p->regval + now;
->> +     else
->> +             p->regval = ptimer->cnt_cval - now;
->> +
->>       return true;
->>  }
->>
->> @@ -832,7 +839,20 @@ static bool access_cntp_ctl(struct kvm_vcpu *vcpu,
->>               struct sys_reg_params *p,
->>               const struct sys_reg_desc *r)
->>  {
->> -     kvm_inject_undefined(vcpu);
->> +     struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
->> +
->> +     if (p->is_write) {
->> +             /* ISTATUS bit is read-only */
->> +             ptimer->cnt_ctl = p->regval & ~ARCH_TIMER_CTRL_IT_STAT;
->> +     } else {
->> +             u64 now = kvm_phys_timer_read();
->> +
->> +             p->regval = ptimer->cnt_ctl;
->> +             /* Set ISTATUS bit if it's expired */
->> +             if (ptimer->cnt_cval <= now)
->> +                     p->regval |= ARCH_TIMER_CTRL_IT_STAT;
->> +     }
->
-> Shouldn't we take the ENABLE bit into account? The ARMv8 ARM version I
-> have at hand (version h) seems to indicate that we should, but we should
-> check with the latest and greatest...
+Well, the question is really how to deal with 32-bit compatibility
+given the fact that the ARM architecture will drop such instructions
+in its next revision. Whether we agree with that, and whether we
+should argue our positions with the architects if we don't is not
+relevant here.
 
-Thanks! I was not clear about this. I have ARM ARM version k, and it
-says that 'When the value of the ENABLE bit is 0, the ISTATUS field is
-UNKNOWN.' So I thought the istatus value doesn't matter if ENABLE is
-0, and just set istatus bit regardless of ENABLE bit. If this is not
-what the manual meant, then I'm happy to fix this.
+What is relevant is whether we inform userspace if we spot such a
+deprecated instruction, and I think we should.
 
-Thanks,
-Jintack
-
->
->> +
->>       return true;
->>  }
->>
->> @@ -840,7 +860,13 @@ static bool access_cntp_cval(struct kvm_vcpu *vcpu,
->>               struct sys_reg_params *p,
->>               const struct sys_reg_desc *r)
->>  {
->> -     kvm_inject_undefined(vcpu);
->> +     struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
->> +
->> +     if (p->is_write)
->> +             ptimer->cnt_cval = p->regval;
->> +     else
->> +             p->regval = ptimer->cnt_cval;
->> +
->>       return true;
->>  }
->>
->> diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
->> index a364593..fec99f2 100644
->> --- a/include/kvm/arm_arch_timer.h
->> +++ b/include/kvm/arm_arch_timer.h
->> @@ -74,6 +74,8 @@ bool kvm_timer_should_fire(struct kvm_vcpu *vcpu,
->>  void kvm_timer_schedule(struct kvm_vcpu *vcpu);
->>  void kvm_timer_unschedule(struct kvm_vcpu *vcpu);
->>
->> +u64 kvm_phys_timer_read(void);
->> +
->>  void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu);
->>
->>  void kvm_timer_init_vhe(void);
->> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
->> index b366bb2..9eec063 100644
->> --- a/virt/kvm/arm/arch_timer.c
->> +++ b/virt/kvm/arm/arch_timer.c
->> @@ -40,7 +40,7 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
->>       vcpu_vtimer(vcpu)->active_cleared_last = false;
->>  }
->>
->> -static u64 kvm_phys_timer_read(void)
->> +u64 kvm_phys_timer_read(void)
->>  {
->>       return timecounter->cc->read(timecounter->cc);
->>  }
->
-> Thanks,
->
->         M.
-> --
-> Jazz is not dead. It just smells funny.
->
+Note that this is not only an issue for the arm64 kernel. The 32-bit
+kernel will have the exact same issue when you try to run it on
+hardware that no longer has support for those instructions.
