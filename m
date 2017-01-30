@@ -1,134 +1,50 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Jan 2017 15:51:55 +0000
-Subject: [PATCHv2] arm: ftrace: Adds support for
- CONFIG_DYNAMIC_FTRACE_WITH_REGS
-In-Reply-To: <1485300291-29722-1-git-send-email-abelvesa@linux.com>
-References: <1485300291-29722-1-git-send-email-abelvesa@linux.com>
-Message-ID: <20170130155155.GC27312@n2100.armlinux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 30 Jan 2017 15:52:09 +0000
+Subject: [PATCH v9 0/4] arm64: arch_timer: Add workaround for
+ hisilicon-161010101 erratum
+In-Reply-To: <20170124163551.GB2021@mai>
+References: <1484832916-7248-1-git-send-email-dingtianhong@huawei.com>
+ <765699aa-cbc6-67eb-9108-cbf335338e4c@linaro.org>
+ <35cf654f-3944-fc76-5120-25e33f71be4f@arm.com>
+ <20170124163551.GB2021@mai>
+Message-ID: <20170130155209.GC1160@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2017 at 11:24:51PM +0000, Abel Vesa wrote:
-> The DYNAMIC_FTRACE_WITH_REGS configuration makes it possible for a ftrace
-> operation to specify if registers need to saved/restored by the ftrace handler.
-> This is needed by kgraft and possibly other ftrace-based tools, and the ARM
-> architecture is currently lacking this feature. It would also be the first step
-> to support the "Kprobes-on-ftrace" optimization on ARM.
+Hi Daniel,
+
+On Tue, Jan 24, 2017 at 05:35:51PM +0100, Daniel Lezcano wrote:
+> That wasn't my point. The way the errata are handled in this patchset is
+> elegant and I have nothing against it. I'm worried about the accumulation of
+> fixes, hacks, workarounds in this driver. So my naive question is about not
+> using an identified bogus clocksource and use another one available on the
+> board, which is I believe often the case, instead of trying to deal with bogus
+> hardware. Apparently, that is not possible because 1) of KVM, 2) of duplication
+> and 3) of integration with the ARM64 code.
 > 
-> This patch introduces a new ftrace handler that stores the registers on the
-> stack before calling the next stage. The registers are restored from the stack
-> before going back to the instrumented function.
+> Does it mean it is not possible to use another clocksource/clockevent than the
+> armv8-timer ?
 > 
-> A side-effect of this patch is to activate the support for ftrace_modify_call()
-> as it defines ARCH_SUPPORTS_FTRACE_OPS for the ARM architecture.
-> 
-> Signed-off-by: Abel Vesa <abelvesa@linux.com>
-> ---
->  arch/arm/Kconfig               |  1 +
->  arch/arm/include/asm/ftrace.h  |  4 +++
->  arch/arm/kernel/entry-ftrace.S | 79 ++++++++++++++++++++++++++++++++++++++++++
->  arch/arm/kernel/ftrace.c       | 33 ++++++++++++++++++
->  4 files changed, 117 insertions(+)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 186c4c2..db40973 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -50,6 +50,7 @@ config ARM
->  	select HAVE_DMA_API_DEBUG
->  	select HAVE_DMA_CONTIGUOUS if MMU
->  	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
-> +	select HAVE_DYNAMIC_FTRACE_WITH_REGS if HAVE_DYNAMIC_FTRACE
->  	select HAVE_EFFICIENT_UNALIGNED_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && MMU
->  	select HAVE_EXIT_THREAD
->  	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
-> diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
-> index 22b7311..f379881 100644
-> --- a/arch/arm/include/asm/ftrace.h
-> +++ b/arch/arm/include/asm/ftrace.h
-> @@ -1,6 +1,10 @@
->  #ifndef _ASM_ARM_FTRACE
->  #define _ASM_ARM_FTRACE
->  
-> +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-> +#define ARCH_SUPPORTS_FTRACE_OPS 1
-> +#endif
-> +
->  #ifdef CONFIG_FUNCTION_TRACER
->  #define MCOUNT_ADDR		((unsigned long)(__gnu_mcount_nc))
->  #define MCOUNT_INSN_SIZE	4 /* sizeof mcount call */
-> diff --git a/arch/arm/kernel/entry-ftrace.S b/arch/arm/kernel/entry-ftrace.S
-> index c73c403..fcdcc3a 100644
-> --- a/arch/arm/kernel/entry-ftrace.S
-> +++ b/arch/arm/kernel/entry-ftrace.S
-> @@ -92,12 +92,74 @@
->  2:	mcount_exit
->  .endm
->  
-> +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
-> +
-> +.macro __ftrace_regs_caller
-> +
-> +	add 	ip, sp, #4	@ move in IP the value of SP as it was
-> +				@ before the push {lr} of the mcount mechanism
-> +	stmdb	sp!, {ip,lr,pc}
-> +	stmdb	sp!, {r0-r11,lr}
-> +
-> +	@ stack content at this point:
-> +	@ 0  4          44    48   52       56   60   64
-> +	@ RO | R1 | ... | R11 | LR | SP + 4 | LR | PC | previous LR |
+> Can you elaborate these three points ? 
 
-ITYM "R0" not "RO".
+Practically speaking, these platforms have no other clocksource or
+clockevent device that I am aware of, which can be enumerated in a
+standard manner using ACPI.
 
-> +
-> +	mov r3, sp				@ struct pt_regs*
-> +	ldr r2, =function_trace_op
-> +	ldr r2, [r2]				@ pointer to the current
-> +						@ function tracing op
-> +	ldr	r1, [sp, #64]			@ lr of instrumented func
-> +	mcount_adjust_addr	r0, lr		@ instrumented function
-> +
-> +	.globl ftrace_regs_call
-> +ftrace_regs_call:
-> +	bl	ftrace_stub
-> +
-> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-> +	.globl ftrace_graph_regs_call
-> +ftrace_graph_regs_call:
-> +	mov	r0, r0
-> +#endif
-> +	ldr	lr, [sp, #64]		@ get the previous LR value from stack
-> +	ldmia	sp, {r0-r11, ip, sp}	@ pop the saved registers INCLUDING
-> +					@ the stack pointer
-> +	ret	ip
+For point 1, KVM is intimately familiar with the architected timer
+(which is managed during VM context switch in hyp code, for example).
+KVM knows nothing of other clocksource or clockevent devices, and it is
+far from trivial to plumb these in either way. Since the architected
+timer is a mandatory part of ARMv8, guests may attempt to use it
+regardless.
 
-Are you really sure you want to return using the address that was poked
-into register 12 in the pt_regs struct?  Surely using the value from
-register 14 would be saner, which can be done in one instruction:
+For point 3, arm64 currently requires the architected timer as this is
+mandatory per the ARMv8 architecture. It is non-trivial to add support
+for other devices to the vDSO, the delay loop, etc.
 
-	ldmia	sp, {r0-r11, ip, sp, pc}
+Localising these quirks to the architected timer driver is by far the
+least worst option available. Marc and I are perfectly happy to manage
+that.
 
-> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-> +.macro __ftrace_graph_regs_caller
-> +
-> +	sub	r0, fp, #4		@ lr of instrumented routine (parent)
-> +
-> +	@ called from __ftrace_regs_caller
-> +	ldr     r1, [sp, #56]		@ instrumented routine (func)
-> +	mcount_adjust_addr	r1, r1
-> +
-> +	sub	r2, r0, #4		@ frame pointer
-> +	bl	prepare_ftrace_return
-> +
-> +	ldr	lr, [sp, #64]		@ restore lr from the stack
-> +	ldmia	sp, {r0-r11, ip, sp}	@ restore r0 through sp
-
-This looks weird - and if it's intentional, it needs a comment explaining
-where these were stacked.
-
-Thanks.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+Mark.
