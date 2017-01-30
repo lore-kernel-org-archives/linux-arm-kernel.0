@@ -1,127 +1,46 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 30 Jan 2017 22:59:27 +0100
-Subject: [PATCH v9 2/4] arm64: arch_timer: Introduce a generic erratum
- handing mechanism for fsl-a008585
-In-Reply-To: <1484832916-7248-3-git-send-email-dingtianhong@huawei.com>
-References: <1484832916-7248-1-git-send-email-dingtianhong@huawei.com>
- <1484832916-7248-3-git-send-email-dingtianhong@huawei.com>
-Message-ID: <20170130215927.GK2206@mai>
+From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
+Date: Mon, 30 Jan 2017 22:02:38 +0000
+Subject: [PATCH v6 5/5] arm: mvebu: Add device tree for db-dxbc2 and
+ db-xc3-24g4xg boards
+References: <20170129232035.25189-1-chris.packham@alliedtelesis.co.nz>
+ <20170129232035.25189-6-chris.packham@alliedtelesis.co.nz>
+ <87vaswtycu.fsf@free-electrons.com>
+Message-ID: <25e75991d565411fa9bccb6d2f71babf@svr-chch-ex1.atlnz.lc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 09:35:14PM +0800, Ding Tianhong wrote:
-> The workaround for hisilicon,161010101 will check the return value of the system counter
-> by different way, in order to distinguish with the fsl-a008585 workaround, introduce
+Hi Gregory,
 
-s/way/ways/
+On 31/01/17 03:29, Gregory CLEMENT wrote:
+> Hi Chris,
+>
+>  On lun., janv. 30 2017, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
+>
+>> These boards are Marvell's evaluation boards for the 98DX4251 and
+>> 98DX3336 SoCs.
+>>
+>> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+>
+> Applied on mvebu/dt
+>
 
-> a new generic erratum handing mechanism for fsl-a008585 and rename some functions.
+I just noticed that I hadn't updated arch/arm/boot/dts/Makefile. The way 
+I've been building things (explicitly running 'make 
+armada-xp-db-xc3-24g4xg.dtb') it hasn't mattered to me but I'm wondering 
+if I should have?
 
-s/handing/handling/
- 
-> After discussion with Marc and Will, a consensus decision was made to remove the commandline
-> parameter for enabling fsl,erratum-a008585 erratum.
-
-Lines are more than 78 char large.
-
-> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
-> ---
->  Documentation/admin-guide/kernel-parameters.txt |   9 --
->  arch/arm64/include/asm/arch_timer.h             |  38 +++------
->  drivers/clocksource/Kconfig                     |   8 ++
->  drivers/clocksource/arm_arch_timer.c            | 105 ++++++++++++++----------
->  4 files changed, 84 insertions(+), 76 deletions(-)
-> 
-> diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-> index 21e2d88..76437ad 100644
-> --- a/Documentation/admin-guide/kernel-parameters.txt
-> +++ b/Documentation/admin-guide/kernel-parameters.txt
-> @@ -539,15 +539,6 @@
->  			loops can be debugged more effectively on production
->  			systems.
->  
-> -	clocksource.arm_arch_timer.fsl-a008585=
-> -			[ARM64]
-> -			Format: <bool>
-> -			Enable/disable the workaround of Freescale/NXP
-> -			erratum A-008585.  This can be useful for KVM
-> -			guests, if the guest device tree doesn't show the
-> -			erratum.  If unspecified, the workaround is
-> -			enabled based on the device tree.
-> -
->  	clearcpuid=BITNUM [X86]
->  			Disable CPUID feature X for the kernel. See
->  			arch/x86/include/asm/cpufeatures.h for the valid bit
-> diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-> index eaa5bbe..b4b3400 100644
-> --- a/arch/arm64/include/asm/arch_timer.h
-> +++ b/arch/arm64/include/asm/arch_timer.h
-> @@ -29,41 +29,29 @@
->  
->  #include <clocksource/arm_arch_timer.h>
->  
-> -#if IS_ENABLED(CONFIG_FSL_ERRATUM_A008585)
-> +#if IS_ENABLED(CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND)
->  extern struct static_key_false arch_timer_read_ool_enabled;
-> -#define needs_fsl_a008585_workaround() \
-> +#define needs_unstable_timer_counter_workaround() \
->  	static_branch_unlikely(&arch_timer_read_ool_enabled)
->  #else
-> -#define needs_fsl_a008585_workaround()  false
-> +#define needs_unstable_timer_counter_workaround()  false
->  #endif
->  
-> -u32 __fsl_a008585_read_cntp_tval_el0(void);
-> -u32 __fsl_a008585_read_cntv_tval_el0(void);
-> -u64 __fsl_a008585_read_cntvct_el0(void);
->  
-> -/*
-> - * The number of retries is an arbitrary value well beyond the highest number
-> - * of iterations the loop has been observed to take.
-> - */
-> -#define __fsl_a008585_read_reg(reg) ({			\
-> -	u64 _old, _new;					\
-> -	int _retries = 200;				\
-> -							\
-> -	do {						\
-> -		_old = read_sysreg(reg);		\
-> -		_new = read_sysreg(reg);		\
-> -		_retries--;				\
-> -	} while (unlikely(_old != _new) && _retries);	\
-> -							\
-> -	WARN_ON_ONCE(!_retries);			\
-> -	_new;						\
-> -})
-> +struct arch_timer_erratum_workaround {
-> +	const char *id;		/* Indicate the Erratum ID */
-> +	u32 (*read_cntp_tval_el0)(void);
-> +	u32 (*read_cntv_tval_el0)(void);
-> +	u64 (*read_cntvct_el0)(void);
-> +};
-> +
-> +extern const struct arch_timer_erratum_workaround *timer_unstable_counter_workaround;
->	  
->  #define arch_timer_reg_read_stable(reg) 		\
->  ({							\
->  	u64 _val;					\
-> -	if (needs_fsl_a008585_workaround())		\
-> -		_val = __fsl_a008585_read_##reg();	\
-> +	if (needs_unstable_timer_counter_workaround())		\
-> +		_val = timer_unstable_counter_workaround->read_##reg();\
->  	else						\
->  		_val = read_sysreg(reg);		\
->  	_val;						\
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index 4866f7a..6693e07 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -325,10 +325,18 @@ config ARM_ARCH_TIMER_EVTSTREAM
->  	  This must be disabled for hardware validation purposes to detect any
->  	  hardware anomalies of missing events.
->  
-> +config ARM_ARCH_TIMER_OOL_WORKAROUND
-> +	bool
-> +	depends on FSL_ERRATUM_A008585
-
-This dependency is not needed as well as the help text below because it is a
-silent option.
+>> ---
+>>
+>> Notes:
+>>     Changes in v5:
+>>     - update license text
+>>     - use node labels
+>>     Changes in v6:
+>>     - Rename dts files to include 'armada-xp-' prefix
+>>
+>>  arch/arm/boot/dts/armada-xp-db-dxbc2.dts      | 151 ++++++++++++++++++++++++++
+>>  arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts | 142 ++++++++++++++++++++++++
+>>  2 files changed, 293 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/armada-xp-db-dxbc2.dts
+>>  create mode 100644 arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts
+>>
