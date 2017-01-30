@@ -1,32 +1,35 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Mon, 30 Jan 2017 11:02:02 +0100
-Subject: [PATCH v7 05/14] ARM: davinci: da850: add con_id for the SATA clock
+Date: Mon, 30 Jan 2017 11:02:10 +0100
+Subject: [PATCH v7 13/14] ARM: dts: da850: add the SATA node
 In-Reply-To: <1485770531-6772-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1485770531-6772-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1485770531-6772-6-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1485770531-6772-14-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ahci-da850 SATA driver is now capable of retrieving clocks by
-con_id. Add the connection id for the sysclk2-derived SATA clock.
+Add the SATA node to the da850 device tree.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/da850.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/da850.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 1d873d1..b2fdace 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -571,7 +571,7 @@ static struct clk_lookup da850_clks[] = {
- 	CLK("spi_davinci.0",	NULL,		&spi0_clk),
- 	CLK("spi_davinci.1",	NULL,		&spi1_clk),
- 	CLK("vpif",		NULL,		&vpif_clk),
--	CLK("ahci_da850",		NULL,		&sata_clk),
-+	CLK("ahci_da850",	"fck",		&sata_clk),
- 	CLK("davinci-rproc.0",	NULL,		&dsp_clk),
- 	CLK(NULL,		NULL,		&ehrpwm_clk),
- 	CLK("ehrpwm.0",		"fck",		&ehrpwm0_clk),
+diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
+index 104155d..3b5fd41e 100644
+--- a/arch/arm/boot/dts/da850.dtsi
++++ b/arch/arm/boot/dts/da850.dtsi
+@@ -403,6 +403,12 @@
+ 			phy-names = "usb-phy";
+ 			status = "disabled";
+ 		};
++		sata: sata at 218000 {
++			compatible = "ti,da850-ahci";
++			reg = <0x218000 0x2000>, <0x22c018 0x4>;
++			interrupts = <67>;
++			status = "disabled";
++		};
+ 		mdio: mdio at 224000 {
+ 			compatible = "ti,davinci_mdio";
+ 			#address-cells = <1>;
 -- 
 2.9.3
