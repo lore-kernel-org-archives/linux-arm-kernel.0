@@ -1,22 +1,41 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Jan 2017 16:26:28 +0000
-Subject: [PATCH] arm: module: handle negative R_ARM_PREL31 addends
- correctly
-In-Reply-To: <CAKv+Gu-0J0tVUUDhJ_f1P9n-1Etgk5A6ZTgUokKu7RKOCeaW4g@mail.gmail.com>
-References: <1484907663-32322-1-git-send-email-ard.biesheuvel@linaro.org>
- <20170130123914.GQ27312@n2100.armlinux.org.uk>
- <CAKv+Gu-0J0tVUUDhJ_f1P9n-1Etgk5A6ZTgUokKu7RKOCeaW4g@mail.gmail.com>
-Message-ID: <20170130162628.GD27312@n2100.armlinux.org.uk>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 30 Jan 2017 22:12:10 +0530
+Subject: [PATCH v3 08/10] dmaengine: sun6i: allow build on ARM64
+ platforms (sun50i)
+In-Reply-To: <20170129023331.62106-9-icenowy@aosc.xyz>
+References: <20170129023331.62106-1-icenowy@aosc.xyz>
+ <20170129023331.62106-9-icenowy@aosc.xyz>
+Message-ID: <20170130164210.GD19244@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2017 at 03:08:56PM +0000, Ard Biesheuvel wrote:
-> Actually, I think it may still be incorrect: it seems to me that we
-> should preserve bit 31 rather than clear it. From the EHABI
+On Sun, Jan 29, 2017 at 10:33:29AM +0800, Icenowy Zheng wrote:
+> As 64-bit Allwinner H5 SoC has the same DMA engine with H3, the DMA
+> driver should be allowed to be built for ARM64, in order to make it work on H5.
+> 
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+> Patch introduced between v1 and v2, to satisfy the newly added H3/H5 audio
+> codec support.
+> 
+>  drivers/dma/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+> index 0d6a96ee9fc7..d01d59812cf3 100644
+> --- a/drivers/dma/Kconfig
+> +++ b/drivers/dma/Kconfig
+> @@ -157,7 +157,7 @@ config DMA_SUN4I
+>  
+>  config DMA_SUN6I
+>  	tristate "Allwinner A31 SoCs DMA support"
+> -	depends on MACH_SUN6I || MACH_SUN8I || COMPILE_TEST
+> +	depends on MACH_SUN6I || MACH_SUN8I || (ARM64 && ARCH_SUNXI) || COMPILE_TEST
 
-Agreed.
+Do we really need ARM64 here? also looking at others I wonder why isn't
+this MACH_SUNXI...?
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+~Vinod
