@@ -1,71 +1,82 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 30 Jan 2017 12:04:28 +0100
-Subject: [PATCH v5 3/8] ARM: dts: rockchip: add timer entries to rk3188 SoC
-In-Reply-To: <1485260203-14216-4-git-send-email-al.kochet@gmail.com>
-References: <1485260203-14216-1-git-send-email-al.kochet@gmail.com>
- <1485260203-14216-4-git-send-email-al.kochet@gmail.com>
-Message-ID: <20170130110428.GC2206@mai>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 30 Jan 2017 12:05:46 +0100
+Subject: [PATCH v5 6/13] mmc: sunxi: Add EMMC (MMC2) controller compatible
+In-Reply-To: <CAPDyKFr3cnFux4NRzZ9UAn93MOVb6RaQQ+PHDxGztciDHZSX9A@mail.gmail.com>
+References: <cover.6f3d82744628848e2182720c35f13e87e8b62258.1485553113.git-series.maxime.ripard@free-electrons.com>
+ <bcbeeb726c5638361590bd4c295279ef92d44209.1485553113.git-series.maxime.ripard@free-electrons.com>
+ <CAPDyKFr3cnFux4NRzZ9UAn93MOVb6RaQQ+PHDxGztciDHZSX9A@mail.gmail.com>
+Message-ID: <20170130110546.6q5xb3p2uvncrrmf@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2017 at 03:16:38PM +0300, Alexander Kochetkov wrote:
-> The patch add two timers to all rk3188 based boards.
+On Mon, Jan 30, 2017 at 11:06:05AM +0100, Ulf Hansson wrote:
+> On 27 January 2017 at 22:38, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > The MMC2 controller on the A64 is kind of a special beast.
+> >
+> > While the general controller design is the same than the other MMC
+> > controllers in the SoC, it also has a bunch of features and changes that
+> > prevent it to be driven in the same way.
+> >
+> > It has for example a different bus width limit, a different maximum
+> > frequency, and, for some reason, the maximum buffer size of a DMA
+> > descriptor.
+> >
+> > Add a new compatible specifically for this controller.
+> >
+> > Acked-by: Rob Herring <robh@kernel.org>
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > Tested-by: Florian Vaussard <florian.vaussard@heig-vd.ch>
+> > ---
+> >  drivers/mmc/host/sunxi-mmc.c | 8 ++++++++
+> >  1 file changed, 8 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> > index 6bbe61397b7c..f0f6922bca8a 100644
+> > --- a/drivers/mmc/host/sunxi-mmc.c
+> > +++ b/drivers/mmc/host/sunxi-mmc.c
+> > @@ -5,6 +5,7 @@
+> >   * (C) Copyright 2013-2014 O2S GmbH <www.o2s.ch>
+> >   * (C) Copyright 2013-2014 David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
+> >   * (C) Copyright 2013-2014 Hans de Goede <hdegoede@redhat.com>
+> > + * (C) Copyright 2017 Sootech SA
+> >   *
+> >   * This program is free software; you can redistribute it and/or
+> >   * modify it under the terms of the GNU General Public License as
+> > @@ -1096,12 +1097,19 @@ static const struct sunxi_mmc_cfg sun50i_a64_cfg = {
+> >         .needs_new_timings = true,
+> >  };
+> >
+> > +static const struct sunxi_mmc_cfg sun50i_a64_emmc_cfg = {
+> > +       .idma_des_size_bits = 13,
+> > +       .clk_delays = NULL,
+> > +       .can_calibrate = true,
+> > +};
+> > +
+> >  static const struct of_device_id sunxi_mmc_of_match[] = {
+> >         { .compatible = "allwinner,sun4i-a10-mmc", .data = &sun4i_a10_cfg },
+> >         { .compatible = "allwinner,sun5i-a13-mmc", .data = &sun5i_a13_cfg },
+> >         { .compatible = "allwinner,sun7i-a20-mmc", .data = &sun7i_a20_cfg },
+> >         { .compatible = "allwinner,sun9i-a80-mmc", .data = &sun9i_a80_cfg },
+> >         { .compatible = "allwinner,sun50i-a64-mmc", .data = &sun50i_a64_cfg },
+> > +       { .compatible = "allwinner,sun50i-a64-emmc", .data = &sun50i_a64_emmc_cfg },
 > 
-> The first timer is from alive subsystem and it act as a backup
-> for the local timers at sleep time. It act the same as other
-> SoC rockchip timers already present in kernel.
+> This should be documented in the DTS docs for sunxi as well. I expect
+> you to send a patch on top to take care of that.
 
-It is up to the RTC to wake up the system from suspend and there is no
-idle state stopping the local timers on these SoCs. So, the rockchip timers
-won't be ever used on the rk3188, right ?
- 
-> The second timer is from CPU subsystem and act as replacement
-> for the arm-global-timer clocksource and sched clock. It run
-> at stable frequency 24MHz.
+You're right, I'll send a patch today.
 
-This patch should go after the rockchip timer patches.
-
-> Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
-> Reviwed-by: Heiko St?bner <heiko@sntech.de>
-> ---
->  arch/arm/boot/dts/rk3188.dtsi |   16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
-> index 869e189..bcf8e03 100644
-> --- a/arch/arm/boot/dts/rk3188.dtsi
-> +++ b/arch/arm/boot/dts/rk3188.dtsi
-> @@ -106,6 +106,22 @@
->  		};
->  	};
->  
-> +	timer3: timer at 2000e000 {
-> +		compatible = "rockchip,rk3188-timer", "rockchip,rk3288-timer";
-> +		reg = <0x2000e000 0x20>;
-> +		interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&cru SCLK_TIMER3>, <&cru PCLK_TIMER3>;
-> +		clock-names = "timer", "pclk";
-> +	};
-> +
-> +	timer6: timer at 200380a0 {
-> +		compatible = "rockchip,rk3188-timer", "rockchip,rk3288-timer";
-> +		reg = <0x200380a0 0x20>;
-> +		interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&cru SCLK_TIMER6>, <&cru PCLK_TIMER0>;
-> +		clock-names = "timer", "pclk";
-> +	};
-> +
->  	i2s0: i2s at 1011a000 {
->  		compatible = "rockchip,rk3188-i2s", "rockchip,rk3066-i2s";
->  		reg = <0x1011a000 0x2000>;
-> -- 
-> 1.7.9.5
-> 
+Thanks!
+Maxime
 
 -- 
-
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170130/14494a7f/attachment-0001.sig>
