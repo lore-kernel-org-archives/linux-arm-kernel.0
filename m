@@ -1,97 +1,46 @@
-From: john@metanate.com (John Keeping)
-Date: Mon, 30 Jan 2017 18:14:27 +0000
-Subject: [PATCH v3 24/24] drm/rockchip: dw-mipi-dsi: support read commands
-In-Reply-To: <20170130152611.GA20076@art_vandelay>
-References: <20170129132444.25251-1-john@metanate.com>
- <20170129132444.25251-25-john@metanate.com>
- <20170130152611.GA20076@art_vandelay>
-Message-ID: <20170130181427.1940024f.john@metanate.com>
+From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
+Date: Mon, 30 Jan 2017 19:14:54 +0100
+Subject: [PATCH 2/7] MFD: add STM32 DFSDM support
+In-Reply-To: <20170129175005.2u25l7zd2anlc6tw@sirena.org.uk>
+References: <1485189145-29576-1-git-send-email-arnaud.pouliquen@st.com>
+ <1485189145-29576-3-git-send-email-arnaud.pouliquen@st.com>
+ <20170124082249.GR16020@dell> <283c0e48-55e2-6516-369d-91dc72d12f73@st.com>
+ <20170124113658.GW16020@dell> <a1aaaa20-ac00-b182-f1c1-63152be41135@st.com>
+ <20170127101545.g53uah57vgfu55o5@dell>
+ <7b3eb38d-4fd1-2006-7423-94f2a7b38b27@st.com>
+ <20170129175005.2u25l7zd2anlc6tw@sirena.org.uk>
+Message-ID: <9d1233ee-d043-4e74-0915-075bb376d817@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Jan 2017 10:26:11 -0500, Sean Paul wrote:
+Hello Mark,
 
-> On Sun, Jan 29, 2017 at 01:24:44PM +0000, John Keeping wrote:
-> > I haven't found any method for getting the length of a response, so this
-> > just uses the requested rx_len
-> > 
-> > Signed-off-by: John Keeping <john@metanate.com>
-> > ---
-> > v3:
-> > - Fix checkpatch warnings
-> > Unchanged in v2
-> > 
-> >  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 56 ++++++++++++++++++++++++++++++++++
-> >  1 file changed, 56 insertions(+)
-> > 
-> > diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > index cf3ca6b0cbdb..cc58ada75425 100644
-> > --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > @@ -678,6 +678,56 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
-> >  	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, hdr_val);
-> >  }
-> >  
-> > +static int dw_mipi_dsi_dcs_read(struct dw_mipi_dsi *dsi,
-> > +				const struct mipi_dsi_msg *msg)
-> > +{
-> > +	const u8 *tx_buf = msg->tx_buf;
-> > +	u8 *rx_buf = msg->rx_buf;
-> > +	size_t i;
-> > +	int ret, val;
-> > +
-> > +	dsi_write(dsi, DSI_PCKHDL_CFG, EN_CRC_RX | EN_ECC_RX | EN_BTA);
-> > +	dsi_write(dsi, DSI_GEN_HDR,
-> > +		  GEN_HDATA(tx_buf[0]) | GEN_HTYPE(msg->type));
-> > +
-> > +	ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
-> > +				 val, !(val & GEN_RD_CMD_BUSY), 1000,
-> > +				 CMD_PKT_STATUS_TIMEOUT_US);
-> > +	if (ret < 0) {
-> > +		dev_err(dsi->dev, "failed to read command response\n");
-> > +		return ret;
-> > +	}
-> > +
-> > +	for (i = 0; i < msg->rx_len;) {
-> > +		u32 pld = dsi_read(dsi, DSI_GEN_PLD_DATA);
-> > +
-> > +		while (i < msg->rx_len) {
-> > +			rx_buf[i] = pld & 0xff;
-> > +			pld >>= 8;
-> > +			i++;
-> > +		}
-> > +	}  
+On 01/29/2017 06:50 PM, Mark Brown wrote:
+> On Fri, Jan 27, 2017 at 02:45:49PM +0100, Arnaud Pouliquen wrote:
 > 
-> AFAICT, the outer for loop just initializes i and ensures msg->rx_len is
-> non-zero? 
+>> Jonathan, Mark, Please could you share your opinion on this
+>> topic?
 > 
-> I think the following would be easier to read (and safe against the case where
-> msg->rx_len > sizeof(pld) (even though this shouldn't happen according to DCS
-> spec)).
+> I really don't have enough visbility of what the hardware or
+> software is doing to say much and though there's extensive
+> backtrace in here it's not enough to follow.  If it's a generic ADC
+> that happens to have audio applications then some relationship with
+> IIO might make sense but I don't know how separate the audio and
+> general purpose bits of the hardware are.
 > 
-> if (msg->rx_len > 0) {
->         u32 pld = dsi_read(dsi, DSI_GEN_PLD_DATA);
->         memcpy(rx_buf, &pld, MIN(msg->rx_len, sizeof(pld));
-> }
+> Please understand that I get copied in on *lots* of threads about
+> MFDs with drivers getting posted repeatedly for whatever revisions
+> are needed with little relevance to me so it's very random if I
+> even look at these things, much less read them with detail.
+> 
 
-I think the intent was to handle rx_len > 4, but the patch is obvously
-completely broken regarding that.  As far as I can tell, rx_len is
-limited by the maximum return packet size which can be any value up to
-the maximum size of a long packet, so we may need to read from the FIFO
-multiple times.
+In a first step, your comment is enough from my point of view as you
+are not disagree with the concept of a relationship between ASOC an IIO.
+This confirms that the MFD driver have to be abandoned.
 
-The loop should be something like this:
+Then details on how to do it is another story, that should trigs some
+other discussions...
 
-	for (i = 0; i < msg->rx_len;) {
-		u32 pld = dsi_read(dsi, DSI_GEN_PLD_DATA);
-		int j;
+Thanks and Regards,
 
-		for (j = 0; j < 4 && i < msg->rx_len; i++, j++) {
-			rx_buf[i] = pld & 0xff;
-			pld >>= 8;
-		}
-	}
-
-I have successfully read 5 bytes from a DSI display using this code, but
-I'm tempted to just drop this patch since I only used it for debugging
-while bringing up a new panel.
+Arnaud
