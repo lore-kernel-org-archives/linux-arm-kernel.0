@@ -1,88 +1,91 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Mon, 30 Jan 2017 10:43:06 -0500
-Subject: [PATCH v3 04/24] drm/rockchip: dw-mipi-dsi: fix command header
- writes
-In-Reply-To: <20170129132444.25251-5-john@metanate.com>
-References: <20170129132444.25251-1-john@metanate.com>
- <20170129132444.25251-5-john@metanate.com>
-Message-ID: <20170130154306.GE20076@art_vandelay>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 30 Jan 2017 10:46:39 -0500
+Subject: [PATCH V7 08/11] drivers: acpi: Handle IOMMU lookup failure with
+ deferred probing or error
+In-Reply-To: <b2e50c17de156341deab9fb8e91a8dec@codeaurora.org>
+References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
+ <1485188293-20263-9-git-send-email-sricharan@codeaurora.org>
+ <20170124123711.GA11996@red-moon>
+ <f2370671-ece8-fbee-de19-350dd625088f@codeaurora.org>
+ <93e79759-d614-9b36-d5ab-63e8eb725009@arm.com>
+ <14751205-f034-7f0d-442a-854c3909425c@codeaurora.org>
+ <5ba9f366d6e25397cdef8ad95b49e199@codeaurora.org>
+ <175a3798-b824-ef1a-e112-9f6f472973ae@codeaurora.org>
+ <20170130143851.GJ16461@arm.com>
+ <b2e50c17de156341deab9fb8e91a8dec@codeaurora.org>
+Message-ID: <1e048aff-0d77-b9f2-ebf8-2ba315b90ca7@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 29, 2017 at 01:24:24PM +0000, John Keeping wrote:
-> In a couple of places here we use "val" for the value that is about to
-> be written to a register but then reuse the same variable for the value
-> of a status register before we get around to writing it.  Rename the
-> value to be written to so that we write the value we intend to and not
-> what we have just read from the status register.
+On 1/30/2017 9:54 AM, Nate Watterson wrote:
+> On 2017-01-30 09:38, Will Deacon wrote:
+>> On Mon, Jan 30, 2017 at 09:33:50AM -0500, Sinan Kaya wrote:
+>>> On 1/30/2017 9:23 AM, Nate Watterson wrote:
+>>> > On 2017-01-30 08:59, Sinan Kaya wrote:
+>>> >> On 1/30/2017 7:22 AM, Robin Murphy wrote:
+>>> >>> On 29/01/17 17:53, Sinan Kaya wrote:
+>>> >>>> On 1/24/2017 7:37 AM, Lorenzo Pieralisi wrote:
+>>> >>>>> [+hanjun, tomasz, sinan]
+>>> >>>>>
+>>> >>>>> It is quite a key patchset, I would be glad if they can test on their
+>>> >>>>> respective platforms with IORT.
+>>> >>>>>
+>>> >>>>
+>>> >>>> Tested on top of 4.10-rc5.
+>>> >>>>
+>>> >>>> 1.    Platform Hidma device passed dmatest
+>>> >>>> 2.    Seeing some USB stalls on a platform USB device.
+>>> >>>> 3.    PCIe NVME drive probed and worked fine with MSI interrupts after boot.
+>>> >>>> 4.     NVMe driver didn't probe following a hotplug insertion and received an
+>>> >>>> SMMU error event during the insertion.
+>>> >>>
+>>> >>> What was the SMMU error - a translation/permission fault (implying the
+>>> >>> wrong DMA ops) or a bad STE fault (implying we totally failed to tell
+>>> >>> the SMMU about the device at all)?
+>>> >>>
+>>> >>
+>>> >> root at ubuntu:/sys/bus/pci/slots/4# echo 0 > power
+>>> >>
+>>> >> [__204.698522]_iommu:_Removing_device_0003:01:00.0_from_group_0
+>>> >> [  204.708704] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down
+>>> >> [  204.708723] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down event
+>>> >> ignored; already powering off
+>>> >>
+>>> >> root at ubuntu:/sys/bus/pci/slots/4#
+>>> >>
+>>> >> [__254.820440]_iommu:_Adding_device_0003:01:00.0_to_group_8
+>>> >> [  254.820599] nvme nvme0: pci function 0003:01:00.0
+>>> >> [  254.820621] nvme 0003:01:00.0: enabling device (0000 -> 0002)
+>>> >> [  261.948558] arm-smmu-v3 arm-smmu-v3.0.auto: event 0x0a received:
+>>> >> [  261.948561] arm-smmu-v3 arm-smmu-v3.0.auto:  0x000001000000000a
+>>> >> [  261.948563] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
+>>> >> [  261.948564] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
+>>> >> [  261.948566] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
+>>>
+>>> > Looks like C_BAD_CD. Can you please try with:
+>>> > iommu/arm-smmu-v3: Clear prior settings when updating STEs
+>>>
+>>> This resolved the issue. Can we pull Nate's patch to 4.10 so that I don't see
+>>> this issue again.
+>>
+>> I already sent the pull request to Joerg for 4.11. Do you see this problem
+>> without Sricharan's patches (i.e. vanilla mainline)? If so, we'll need to
+>> send the patch to stable after -rc1.
+> Using vanilla mainline, I see it most commonly when directly assigning
+> a device to a guest machine. I think I've also seen it after removing then
+> re-adding a PCI device. Basically anytime an STE's CTX pointer is changed
+> from a non-NULL value and STE[CFG] indicates translation will be performed.
 > 
 
-Oh my.
+I was not able to reproduce the issue with Vanilla kernel. I only tested hotplug.
 
-Reviewed-by: Sean Paul <seanpaul@chromium.org>
+> Nate
+>>
+>> Will
+> 
 
-> Signed-off-by: John Keeping <john@metanate.com>
-> Tested-by: Chris Zhong <zyw@rock-chips.com>
-> Reviewed-by: Chris Zhong <zyw@rock-chips.com>
-> ---
-> Unchanged in v3
-> Unchanged in v2
-> 
->  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 10 ++++++----
->  1 file changed, 6 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> index bd92e58b64f3..4cbbbcb619b7 100644
-> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> @@ -542,9 +542,10 @@ static int dw_mipi_dsi_host_detach(struct mipi_dsi_host *host,
->  	return 0;
->  }
->  
-> -static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 val)
-> +static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
->  {
->  	int ret;
-> +	u32 val;
->  
->  	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
->  				 val, !(val & GEN_CMD_FULL), 1000,
-> @@ -554,7 +555,7 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 val)
->  		return ret;
->  	}
->  
-> -	dsi_write(dsi, DSI_GEN_HDR, val);
-> +	dsi_write(dsi, DSI_GEN_HDR, hdr_val);
->  
->  	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
->  				 val, val & (GEN_CMD_EMPTY | GEN_PLD_W_EMPTY),
-> @@ -587,8 +588,9 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
->  {
->  	const u32 *tx_buf = msg->tx_buf;
->  	int len = msg->tx_len, pld_data_bytes = sizeof(*tx_buf), ret;
-> -	u32 val = GEN_HDATA(msg->tx_len) | GEN_HTYPE(msg->type);
-> +	u32 hdr_val = GEN_HDATA(msg->tx_len) | GEN_HTYPE(msg->type);
->  	u32 remainder = 0;
-> +	u32 val;
->  
->  	if (msg->tx_len < 3) {
->  		dev_err(dsi->dev, "wrong tx buf length %zu for long write\n",
-> @@ -617,7 +619,7 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
->  		}
->  	}
->  
-> -	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, val);
-> +	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, hdr_val);
->  }
->  
->  static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
-> -- 
-> 2.11.0.197.gb556de5.dirty
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
 -- 
-Sean Paul, Software Engineer, Google / Chromium OS
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
