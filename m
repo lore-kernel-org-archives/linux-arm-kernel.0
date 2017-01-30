@@ -1,49 +1,61 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 30 Jan 2017 12:05:06 +0100
-Subject: [PATCH 0/6] ARM, arm64: Remove arm_pm_restart()
-Message-ID: <20170130110512.6943-1-thierry.reding@gmail.com>
+Date: Mon, 30 Jan 2017 12:05:07 +0100
+Subject: [PATCH 1/6] ARM: prima2: Register with kernel restart handler
+In-Reply-To: <20170130110512.6943-1-thierry.reding@gmail.com>
+References: <20170130110512.6943-1-thierry.reding@gmail.com>
+Message-ID: <20170130110512.6943-2-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <treding@nvidia.com>
+From: Guenter Roeck <linux@roeck-us.net>
 
-Hi everyone,
+Register with kernel restart handler instead of setting arm_pm_restart
+directly. By doing this, the prima2 reset handler can be prioritized
+among other restart methods available on a particular board.
 
-This small series is preparatory work for a series that I'm working on
-which attempts to establish a formal framework for system restart and
-power off.
+Select a high priority of 192 since the original code overwrites the
+default arm restart handler.
 
-Guenter has done a lot of good work in this area, but it never got
-merged. I think this set is a valuable addition to the kernel because
-it converts all odd providers to the established mechanism for restart.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+ arch/arm/mach-prima2/rstc.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-Since this is stretched across both 32-bit and 64-bit ARM, as well as
-PSCI, and given the SoC/board level of functionality, I think it might
-make sense to take this through the ARM SoC tree in order to simplify
-the interdependencies. But it should also be possible to take patches
-1-4 via their respective trees this cycle and patches 5-6 through the
-ARM and arm64 trees for the next cycle, if that's preferred.
-
-Thanks,
-Thierry
-
-Guenter Roeck (6):
-  ARM: prima2: Register with kernel restart handler
-  ARM: xen: Register with kernel restart handler
-  drivers: firmware: psci: Register with kernel restart handler
-  ARM: Register with kernel restart handler
-  ARM64: Remove arm_pm_restart()
-  ARM: Remove arm_pm_restart()
-
- arch/arm/include/asm/system_misc.h   |  1 -
- arch/arm/kernel/reboot.c             |  6 +-----
- arch/arm/kernel/setup.c              | 20 ++++++++++++++++++--
- arch/arm/mach-prima2/rstc.c          | 11 +++++++++--
- arch/arm/xen/enlighten.c             | 13 +++++++++++--
- arch/arm64/include/asm/system_misc.h |  2 --
- arch/arm64/kernel/process.c          |  7 +------
- drivers/firmware/psci.c              | 11 +++++++++--
- 8 files changed, 49 insertions(+), 22 deletions(-)
-
+diff --git a/arch/arm/mach-prima2/rstc.c b/arch/arm/mach-prima2/rstc.c
+index 7c251eb11d01..1639997c5b49 100644
+--- a/arch/arm/mach-prima2/rstc.c
++++ b/arch/arm/mach-prima2/rstc.c
+@@ -65,11 +65,18 @@ static struct reset_controller_dev sirfsoc_reset_controller = {
+ 
+ #define SIRFSOC_SYS_RST_BIT  BIT(31)
+ 
+-static void sirfsoc_restart(enum reboot_mode mode, const char *cmd)
++static int sirfsoc_restart(struct notifier_block *nb, unsigned long action,
++			   void *data)
+ {
+ 	writel(SIRFSOC_SYS_RST_BIT, sirfsoc_rstc_base);
++	return NOTIFY_DONE;
+ }
+ 
++static struct notifier_block sirfsoc_restart_nb = {
++	.notifier_call  = sirfsoc_restart,
++	.priority       = 192,
++};
++
+ static int sirfsoc_rstc_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+@@ -80,7 +87,7 @@ static int sirfsoc_rstc_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	sirfsoc_reset_controller.of_node = np;
+-	arm_pm_restart = sirfsoc_restart;
++	register_restart_handler(&sirfsoc_restart_nb);
+ 
+ 	if (IS_ENABLED(CONFIG_RESET_CONTROLLER))
+ 		reset_controller_register(&sirfsoc_reset_controller);
 -- 
 2.11.0
