@@ -1,9 +1,9 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 30 Jan 2017 12:41:13 +0100
-Subject: [PATCH 11/14] serial: 8250_dw: simplify optional reset handling
+Date: Mon, 30 Jan 2017 12:41:14 +0100
+Subject: [PATCH 12/14] usb: dwc2: simplify optional reset handling
 In-Reply-To: <20170130114116.22089-1-p.zabel@pengutronix.de>
 References: <20170130114116.22089-1-p.zabel@pengutronix.de>
-Message-ID: <20170130114116.22089-11-p.zabel@pengutronix.de>
+Message-ID: <20170130114116.22089-12-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,52 +15,51 @@ This allows to return errors from devm_reset_control_get_optional and to
 call reset_control_(de)assert unconditionally.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Cc: Chen-Yu Tsai <wens@csie.org>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
+Cc: John Youn <johnyoun@synopsys.com>
+Cc: Felipe Balbi <felipe.balbi@linux.intel.com>
 Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 ---
- drivers/tty/serial/8250/8250_dw.c | 13 +++++--------
- 1 file changed, 5 insertions(+), 8 deletions(-)
+ drivers/usb/dwc2/platform.c | 18 ++++--------------
+ 1 file changed, 4 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/tty/serial/8250/8250_dw.c b/drivers/tty/serial/8250/8250_dw.c
-index c89fafc972b69..b8b911adff471 100644
---- a/drivers/tty/serial/8250/8250_dw.c
-+++ b/drivers/tty/serial/8250/8250_dw.c
-@@ -503,12 +503,11 @@ static int dw8250_probe(struct platform_device *pdev)
+diff --git a/drivers/usb/dwc2/platform.c b/drivers/usb/dwc2/platform.c
+index 4fc8c603afb8b..c6aa2710cecfe 100644
+--- a/drivers/usb/dwc2/platform.c
++++ b/drivers/usb/dwc2/platform.c
+@@ -214,20 +214,11 @@ static int dwc2_lowlevel_hw_init(struct dwc2_hsotg *hsotg)
+ 	hsotg->reset = devm_reset_control_get_optional(hsotg->dev, "dwc2");
+ 	if (IS_ERR(hsotg->reset)) {
+ 		ret = PTR_ERR(hsotg->reset);
+-		switch (ret) {
+-		case -ENOENT:
+-		case -ENOTSUPP:
+-			hsotg->reset = NULL;
+-			break;
+-		default:
+-			dev_err(hsotg->dev, "error getting reset control %d\n",
+-				ret);
+-			return ret;
+-		}
++		dev_err(hsotg->dev, "error getting reset control %d\n", ret);
++		return ret;
  	}
  
- 	data->rst = devm_reset_control_get_optional(dev, NULL);
--	if (IS_ERR(data->rst) && PTR_ERR(data->rst) == -EPROBE_DEFER) {
--		err = -EPROBE_DEFER;
-+	if (IS_ERR(data->rst)) {
-+		err = PTR_ERR(data->rst);
- 		goto err_pclk;
- 	}
--	if (!IS_ERR(data->rst))
--		reset_control_deassert(data->rst);
-+	reset_control_deassert(data->rst);
+-	if (hsotg->reset)
+-		reset_control_deassert(hsotg->reset);
++	reset_control_deassert(hsotg->reset);
  
- 	dw8250_quirks(p, data);
+ 	/* Set default UTMI width */
+ 	hsotg->phyif = GUSBCFG_PHYIF16;
+@@ -326,8 +317,7 @@ static int dwc2_driver_remove(struct platform_device *dev)
+ 	if (hsotg->ll_hw_enabled)
+ 		dwc2_lowlevel_hw_disable(hsotg);
  
-@@ -540,8 +539,7 @@ static int dw8250_probe(struct platform_device *pdev)
+-	if (hsotg->reset)
+-		reset_control_assert(hsotg->reset);
++	reset_control_assert(hsotg->reset);
+ 
  	return 0;
- 
- err_reset:
--	if (!IS_ERR(data->rst))
--		reset_control_assert(data->rst);
-+	reset_control_assert(data->rst);
- 
- err_pclk:
- 	if (!IS_ERR(data->pclk))
-@@ -562,8 +560,7 @@ static int dw8250_remove(struct platform_device *pdev)
- 
- 	serial8250_unregister_port(data->line);
- 
--	if (!IS_ERR(data->rst))
--		reset_control_assert(data->rst);
-+	reset_control_assert(data->rst);
- 
- 	if (!IS_ERR(data->pclk))
- 		clk_disable_unprepare(data->pclk);
+ }
 -- 
 2.11.0
