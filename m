@@ -1,71 +1,71 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 30 Jan 2017 14:38:52 +0000
-Subject: [PATCH V7 08/11] drivers: acpi: Handle IOMMU lookup failure with
- deferred probing or error
-In-Reply-To: <175a3798-b824-ef1a-e112-9f6f472973ae@codeaurora.org>
-References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
- <1485188293-20263-9-git-send-email-sricharan@codeaurora.org>
- <20170124123711.GA11996@red-moon>
- <f2370671-ece8-fbee-de19-350dd625088f@codeaurora.org>
- <93e79759-d614-9b36-d5ab-63e8eb725009@arm.com>
- <14751205-f034-7f0d-442a-854c3909425c@codeaurora.org>
- <5ba9f366d6e25397cdef8ad95b49e199@codeaurora.org>
- <175a3798-b824-ef1a-e112-9f6f472973ae@codeaurora.org>
-Message-ID: <20170130143851.GJ16461@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 30 Jan 2017 15:40:31 +0100
+Subject: [PATCHv5 0/5] Support for Marvell switches with integrated CPUs
+In-Reply-To: <f8f6e8db585147d3adb025bed29694ab@svr-chch-ex1.atlnz.lc> (Chris
+ Packham's message of "Sun, 29 Jan 2017 20:30:34 +0000")
+References: <20170127032546.14657-1-chris.packham@alliedtelesis.co.nz>
+ <87wpdgwj72.fsf@free-electrons.com>
+ <20170127184745.GD8801@codeaurora.org>
+ <f8f6e8db585147d3adb025bed29694ab@svr-chch-ex1.atlnz.lc>
+Message-ID: <87o9yotxuo.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2017 at 09:33:50AM -0500, Sinan Kaya wrote:
-> On 1/30/2017 9:23 AM, Nate Watterson wrote:
-> > On 2017-01-30 08:59, Sinan Kaya wrote:
-> >> On 1/30/2017 7:22 AM, Robin Murphy wrote:
-> >>> On 29/01/17 17:53, Sinan Kaya wrote:
-> >>>> On 1/24/2017 7:37 AM, Lorenzo Pieralisi wrote:
-> >>>>> [+hanjun, tomasz, sinan]
-> >>>>>
-> >>>>> It is quite a key patchset, I would be glad if they can test on their
-> >>>>> respective platforms with IORT.
-> >>>>>
-> >>>>
-> >>>> Tested on top of 4.10-rc5.
-> >>>>
-> >>>> 1.    Platform Hidma device passed dmatest
-> >>>> 2.    Seeing some USB stalls on a platform USB device.
-> >>>> 3.    PCIe NVME drive probed and worked fine with MSI interrupts after boot.
-> >>>> 4.     NVMe driver didn't probe following a hotplug insertion and received an
-> >>>> SMMU error event during the insertion.
-> >>>
-> >>> What was the SMMU error - a translation/permission fault (implying the
-> >>> wrong DMA ops) or a bad STE fault (implying we totally failed to tell
-> >>> the SMMU about the device at all)?
-> >>>
-> >>
-> >> root at ubuntu:/sys/bus/pci/slots/4# echo 0 > power
-> >>
-> >> [__204.698522]_iommu:_Removing_device_0003:01:00.0_from_group_0
-> >> [  204.708704] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down
-> >> [  204.708723] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down event
-> >> ignored; already powering off
-> >>
-> >> root at ubuntu:/sys/bus/pci/slots/4#
-> >>
-> >> [__254.820440]_iommu:_Adding_device_0003:01:00.0_to_group_8
-> >> [  254.820599] nvme nvme0: pci function 0003:01:00.0
-> >> [  254.820621] nvme 0003:01:00.0: enabling device (0000 -> 0002)
-> >> [  261.948558] arm-smmu-v3 arm-smmu-v3.0.auto: event 0x0a received:
-> >> [  261.948561] arm-smmu-v3 arm-smmu-v3.0.auto:  0x000001000000000a
-> >> [  261.948563] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
-> >> [  261.948564] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
-> >> [  261.948566] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
-> 
-> > Looks like C_BAD_CD. Can you please try with:
-> > iommu/arm-smmu-v3: Clear prior settings when updating STEs
-> 
-> This resolved the issue. Can we pull Nate's patch to 4.10 so that I don't see
-> this issue again.
+Hi Chris,
+ 
+ On dim., janv. 29 2017, Chris Packham <Chris.Packham@alliedtelesis.co.nz> wrote:
 
-I already sent the pull request to Joerg for 4.11. Do you see this problem
-without Sricharan's patches (i.e. vanilla mainline)? If so, we'll need to
-send the patch to stable after -rc1.
+> On 28/01/17 07:47, Stephen Boyd wrote:
+>> On 01/27, Gregory CLEMENT wrote:
+>>> Hi all,
+>>>
+>>>  On ven., janv. 27 2017, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
+>>>
+>>>> The 98DX3236, 98DX3336 and 98DX4251 are a set of switch ASICs with
+>>>> integrated CPUs. They CPU block is common within these product lines and
+>>>> (as far as I can tell/have been told) is based on the Armada XP. There
+>>>> are a few differences due to the fact they have to squeeze the CPU into
+>>>> the same package as the switch.
+>>>>
+>>>> I've rebased this series against linux-pinctrl/devel to get access to
+>>>> mvebu_mmio_mpp_ctrl. Everything else still applies cleanly to
+>>>> v4.10.0-rc5.
+>>>
+>>> Just to let you know that I plan to apply the 3 arm patch once Chris
+>>> will have sent the new series with the minor fixes I asked on patch 3.
+>>>
+>>> I already applied them in the for-next branch to benefit of some build
+>>> test coverage.
+>>>
+>>> Stephen,
+>>>
+>>> you gave your Acked-by on the first patch, but don't you plan to apply
+>>> it on the clk branch?
+>>
+>> It must have not been clear if I should apply it, hence the ack.
+>> I'll apply it now.
+>>
+>
+> Sorry my bad. I need all 5 together in one place to actually test the 
+> series.
 
-Will
+The 5 patches should be available soon (if it is not already the case),
+in the linux-next branch.
+
+The clk patch is already there, the 3 arm patch have been merged in my
+mvebu/for-next branch, and the pinctrl patch is about to be merged in
+the pinctrl/for-next branch.
+
+Gregory
+
+>
+> I wasn't sure whether the series should go through mvebu with Acks from 
+> clk and pinctrl or if things should go to the separate maintainers and 
+> come together when they hit the main linux repo. Up until the latest 
+> pinctrl change either approach would have worked.
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
