@@ -1,77 +1,53 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Mon, 30 Jan 2017 18:21:25 +0530
-Subject: next-20170125 hangs on aarch64
-In-Reply-To: <588F27F1.6050907@arm.com>
-References: <20170129101255.GA29415@yury-N73SV>
- <20170129122125.GA20269@yury-N73SV> <588F27F1.6050907@arm.com>
-Message-ID: <20170130125125.GA27550@yury-N73SV>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 30 Jan 2017 09:51:53 -0300
+Subject: [PATCH] Gpu: drm: exynos - Fix possible NULL derefrence.
+In-Reply-To: <1485752523-30029-1-git-send-email-shailendra.v@samsung.com>
+References: <CGME20170130050228epcas4p1b880b1ae599b7f7d6c60a4b0554a2162@epcas4p1.samsung.com>
+ <1485752523-30029-1-git-send-email-shailendra.v@samsung.com>
+Message-ID: <d57ee31f-493c-0f76-65f5-a60babd7b20c@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2017 at 11:48:01AM +0000, James Morse wrote:
-> Hi Yury,
-> 
-> [CC: Andy Gross]
-> 
-> On 29/01/17 12:21, Yury Norov wrote:
-> > On Sun, Jan 29, 2017 at 03:42:55PM +0530, Yury Norov wrote:
-> >> Hi all,
-> >>
-> >> I pulled next-20170125 kernel, and found it hanged on boot. The exact reason is
-> >> panic on dereferencing of the 0xffffffc8 address, which is most probably the
-> >> attempt to dereference the ENOSYS error code as the address. next-20170124 works
-> >> fine, at least it boots.
-> >>
-> >> Does anyone have details on that?
-> 
-> I hit this with next-20170130 too, in /arch/arm64/kernel/smccc-call.S
-> aabde95fc543 changed the SMCCC macro to check for an optional quirk structure.
-> 
-> A previous patch provided:
-> > #define arm_smccc_smc(...) __arm_smccc_smc(__VA_ARGS__, NULL)
-> 
-> to handle the 'no quirk' case, but this missed HVC calls.
-> The following hunk fixes/hides it for me:
+Hello Shailendra,
 
-It works for me too, but I think "ldr x4, [sp, #8]" should
-also go under (.if \maybe_quirk != 0) condition - like below.
+The subject line is wrong, please always use the convention used in
+previous commits, i.e: git log --oneline drivers/gpu/drm/exynos/
 
-Yury
+On 01/30/2017 02:02 AM, Shailendra Verma wrote:
+> of_device_get_match_data could return NULL, and so can cause
+> a NULL pointer dereference later.
+> 
+> Signed-off-by: Shailendra Verma <shailendra.v@samsung.com>
+> ---
+>  drivers/gpu/drm/exynos/exynos_drm_dsi.c  |    4 ++++
+>  drivers/gpu/drm/exynos/exynos_drm_fimd.c |    4 ++++
+>  drivers/gpu/drm/exynos/exynos_hdmi.c     |    4 ++++
+>  drivers/gpu/drm/exynos/exynos_mixer.c    |    4 ++++
+>  4 files changed, 16 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+> index e07cb1f..fba0ffc 100644
+> --- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+> +++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+> @@ -1765,6 +1765,10 @@ static int exynos_dsi_probe(struct platform_device *pdev)
+>  
+>  	dsi->dev = dev;
+>  	dsi->driver_data = of_device_get_match_data(dev);
+> +	if (!dsi->driver_data) {
+> +		dev_err(dev, "no device match found\n");
+> +		return -ENODEV;
+> +	}
+>
 
-----------------------------%<----------------------------
-diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
-index 72ecdca929b1..9e287a7d1822 100644
---- a/arch/arm64/kernel/smccc-call.S
-+++ b/arch/arm64/kernel/smccc-call.S
-@@ -15,18 +15,20 @@
- #include <linux/arm-smccc.h>
- #include <asm/asm-offsets.h>
+I don't think this makes sense for the Exynos driver since Exynos is a
+DT-only platform and so the probe callback can only be called if a dev
+node with a compatible string in the OF device id table was registered.
 
--       .macro SMCCC instr
-+       .macro SMCCC instr, maybe_quirk = 0
-        .cfi_startproc
-        \instr  #0
-        ldr     x4, [sp]
-        stp     x0, x1, [x4, #ARM_SMCCC_RES_X0_OFFS]
-        stp     x2, x3, [x4, #ARM_SMCCC_RES_X2_OFFS]
-+       .if \maybe_quirk != 0
-        ldr     x4, [sp, #8]
-        cbz     x4, 1f /* no quirk structure */
-        ldr     x9, [x4, #ARM_SMCCC_QUIRK_ID_OFFS]
-        cmp     x9, #ARM_SMCCC_QUIRK_QCOM_A6
-        b.ne    1f
-        str     x6, [x4, ARM_SMCCC_QUIRK_STATE_OFFS]
-+       .endif
- 1:     ret
-        .cfi_endproc
-        .endm
-@@ -38,7 +40,7 @@
-  *               struct arm_smccc_quirk *quirk)
-  */
- ENTRY(__arm_smccc_smc)
--       SMCCC   smc
-+       SMCCC   smc, 1
- ENDPROC(__arm_smccc_smc)
-
- /*
-----------------------------%<----------------------------
+All the struct of_device_id in the table have a .data and so this can't
+be NULL in this driver.
+ 
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
