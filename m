@@ -1,25 +1,22 @@
 From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon, 30 Jan 2017 12:17:53 -0500
+Date: Mon, 30 Jan 2017 12:18:50 -0500
 Subject: [RFC v2 03/10] KVM: arm/arm64: Decouple kvm timer functions from
  virtual timer
-In-Reply-To: <8637g29isu.fsf@arm.com>
+In-Reply-To: <20170130144904.GB16459@cbox>
 References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
  <1485479100-4966-4-git-send-email-jintack@cs.columbia.edu>
- <8637g29isu.fsf@arm.com>
-Message-ID: <CAHyh4xhiQueAffsaXOZO8Q83W9_TD3s3+9jyiK=nUW_AhAqh7g@mail.gmail.com>
+ <20170130144904.GB16459@cbox>
+Message-ID: <CAHyh4xgNusa9hFo4OMDaJPqT4t_U1=mRow=g8zuL3iT337odcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 29, 2017 at 7:01 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On Fri, Jan 27 2017 at 01:04:53 AM, Jintack Lim <jintack@cs.columbia.edu> wrote:
+Hi Christoffer,
+
+On Mon, Jan 30, 2017 at 9:49 AM, Christoffer Dall
+<christoffer.dall@linaro.org> wrote:
+> On Thu, Jan 26, 2017 at 08:04:53PM -0500, Jintack Lim wrote:
 >> Now that we have a separate structure for timer context, make functions
 >> general so that they can work with any timer context, not just the
->
->   generic?
-
-yes, thanks!
-
->
 >> virtual timer context.  This does not change the virtual timer
 >> functionality.
 >>
@@ -68,6 +65,12 @@ yes, thanks!
 >> -static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu)
 >> +static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu,
 >> +                                struct arch_timer_context *timer_ctx)
+>
+> do you need the vcpu parameter here?
+
+No, I'll remove it.
+
+>
 >>  {
 >>       u64 cval, now;
 >> -     struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
@@ -106,6 +109,15 @@ yes, thanks!
 >> -bool kvm_timer_should_fire(struct kvm_vcpu *vcpu)
 >> +bool kvm_timer_should_fire(struct kvm_vcpu *vcpu,
 >> +                        struct arch_timer_context *timer_ctx)
+>
+> do you need the vcpu parameter here?
+
+No, I'll remove it.
+
+Thanks,
+Jintack
+
+>
 >>  {
 >> -     struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
 >>       u64 cval, now;
@@ -188,10 +200,8 @@ yes, thanks!
 >>  }
 >>
 >>  void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
->
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
->
->           M.
-> --
-> Jazz is not dead. It just smells funny.
+>> --
+>> 1.9.1
+>>
+>>
 >
