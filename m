@@ -1,9 +1,9 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 30 Jan 2017 12:41:06 +0100
-Subject: [PATCH 04/14] [media] st_rc: simplify optional reset handling
+Date: Mon, 30 Jan 2017 12:41:11 +0100
+Subject: [PATCH 09/14] mtd: nand: sunxi: simplify optional reset handling
 In-Reply-To: <20170130114116.22089-1-p.zabel@pengutronix.de>
 References: <20170130114116.22089-1-p.zabel@pengutronix.de>
-Message-ID: <20170130114116.22089-4-p.zabel@pengutronix.de>
+Message-ID: <20170130114116.22089-9-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,54 +11,63 @@ As of commit bb475230b8e5 ("reset: make optional functions really
 optional"), the reset framework API calls use NULL pointers to describe
 optional, non-present reset controls.
 
-This allows to return errors from reset_control_get_optional and to call
-reset_control_(de)assert unconditionally.
+This allows to return errors from devm_reset_control_get_optional and to
+call reset_control_(de)assert unconditionally.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Cc: Patrice Chotard <patrice.chotard@st.com>
-Cc: Mauro Carvalho Chehab <mchehab@kernel.org>
+Cc: Icenowy Zheng <icenowy@aosc.xyz>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/media/rc/st_rc.c | 13 ++++++-------
- 1 file changed, 6 insertions(+), 7 deletions(-)
+ drivers/mtd/nand/sunxi_nand.c | 19 ++++++++-----------
+ 1 file changed, 8 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/media/rc/st_rc.c b/drivers/media/rc/st_rc.c
-index 1fa0c9d1c5083..04e694b707b45 100644
---- a/drivers/media/rc/st_rc.c
-+++ b/drivers/media/rc/st_rc.c
-@@ -165,8 +165,7 @@ static void st_rc_hardware_init(struct st_rc_device *dev)
- 	unsigned int rx_sampling_freq_div;
+diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
+index e40482a65de66..c6769b52c666a 100644
+--- a/drivers/mtd/nand/sunxi_nand.c
++++ b/drivers/mtd/nand/sunxi_nand.c
+@@ -2196,16 +2196,15 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
+ 		goto out_ahb_clk_unprepare;
  
- 	/* Enable the IP */
--	if (dev->rstc)
--		reset_control_deassert(dev->rstc);
-+	reset_control_deassert(dev->rstc);
- 
- 	clk_prepare_enable(dev->sys_clock);
- 	baseclock = clk_get_rate(dev->sys_clock);
-@@ -281,10 +280,11 @@ static int st_rc_probe(struct platform_device *pdev)
- 	else
- 		rc_dev->rx_base = rc_dev->base;
- 
--
- 	rc_dev->rstc = reset_control_get_optional(dev, NULL);
--	if (IS_ERR(rc_dev->rstc))
--		rc_dev->rstc = NULL;
-+	if (IS_ERR(rc_dev->rstc)) {
-+		ret = PTR_ERR(rc_dev->rstc);
-+		goto err;
+ 	nfc->reset = devm_reset_control_get_optional(dev, "ahb");
+-	if (!IS_ERR(nfc->reset)) {
+-		ret = reset_control_deassert(nfc->reset);
+-		if (ret) {
+-			dev_err(dev, "reset err %d\n", ret);
+-			goto out_mod_clk_unprepare;
+-		}
+-	} else if (PTR_ERR(nfc->reset) != -ENOENT) {
++	if (IS_ERR(nfc->reset)) {
+ 		ret = PTR_ERR(nfc->reset);
+ 		goto out_mod_clk_unprepare;
+ 	}
++	ret = reset_control_deassert(nfc->reset);
++	if (ret) {
++		dev_err(dev, "reset err %d\n", ret);
++		goto out_mod_clk_unprepare;
 +	}
  
- 	rc_dev->dev = dev;
- 	platform_set_drvdata(pdev, rc_dev);
-@@ -353,8 +353,7 @@ static int st_rc_suspend(struct device *dev)
- 		writel(0x00, rc_dev->rx_base + IRB_RX_EN);
- 		writel(0x00, rc_dev->rx_base + IRB_RX_INT_EN);
- 		clk_disable_unprepare(rc_dev->sys_clock);
--		if (rc_dev->rstc)
--			reset_control_assert(rc_dev->rstc);
-+		reset_control_assert(rc_dev->rstc);
- 	}
+ 	ret = sunxi_nfc_rst(nfc);
+ 	if (ret)
+@@ -2246,8 +2245,7 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
+ 	if (nfc->dmac)
+ 		dma_release_channel(nfc->dmac);
+ out_ahb_reset_reassert:
+-	if (!IS_ERR(nfc->reset))
+-		reset_control_assert(nfc->reset);
++	reset_control_assert(nfc->reset);
+ out_mod_clk_unprepare:
+ 	clk_disable_unprepare(nfc->mod_clk);
+ out_ahb_clk_unprepare:
+@@ -2262,8 +2260,7 @@ static int sunxi_nfc_remove(struct platform_device *pdev)
  
- 	return 0;
+ 	sunxi_nand_chips_cleanup(nfc);
+ 
+-	if (!IS_ERR(nfc->reset))
+-		reset_control_assert(nfc->reset);
++	reset_control_assert(nfc->reset);
+ 
+ 	if (nfc->dmac)
+ 		dma_release_channel(nfc->dmac);
 -- 
 2.11.0
