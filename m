@@ -1,69 +1,163 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 30 Jan 2017 08:08:27 -0800
-Subject: [GIT PULL 2/4] TI DaVinci SoC support updates for v4.11
-In-Reply-To: <20170130010453.GR3133@localhost> (Olof Johansson's message of
- "Sun, 29 Jan 2017 17:04:53 -0800")
-References: <20170124130641.28264-1-nsekhar@ti.com>
- <20170124130641.28264-2-nsekhar@ti.com>
- <20170130010453.GR3133@localhost>
-Message-ID: <m2y3xstts4.fsf@baylibre.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Mon, 30 Jan 2017 16:10:41 +0000
+Subject: [STLinux Kernel] [PATCH 3/8] serial: st-asc: Read in all Pinctrl
+ states
+In-Reply-To: <20170130153211.j75qemvwsq3cwqve@dell>
+References: <20170124134310.27512-1-lee.jones@linaro.org>
+ <20170124134310.27512-4-lee.jones@linaro.org>
+ <20170125112142.GE5680@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20170127115458.k4edg42nnna3bv4v@dell>
+ <20170130142356.GA18710@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20170130153211.j75qemvwsq3cwqve@dell>
+Message-ID: <20170130161041.GA21001@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson <olof@lixom.net> writes:
+Hi Lee,
 
-> On Tue, Jan 24, 2017 at 06:36:39PM +0530, Sekhar Nori wrote:
->> The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
->> 
->>   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
->> 
->> are available in the git repository at:
->> 
->>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.11/soc
->> 
->> for you to fetch changes up to 9c9b1bc25291e275b04f758f2549c81e092954f5:
->> 
->>   ARM: davinci: add skeleton for pdata-quirks (2017-01-23 20:52:38 +0530)
->> 
->> ----------------------------------------------------------------
->> Introduce pdata-quirks mechanism for
->> DaVinci which will be needed for supporting
->> video input/output on DA850 SoC.
->> 
->> ----------------------------------------------------------------
->> Kevin Hilman (1):
->>       ARM: davinci: add skeleton for pdata-quirks
+On Mon, 30 Jan 2017, Lee Jones wrote:
+
+> On Mon, 30 Jan 2017, Peter Griffin wrote:
+> 
+> > Hi Lee,
+> > 
+> > On Fri, 27 Jan 2017, Lee Jones wrote:
+> > 
+> > > On Wed, 25 Jan 2017, Peter Griffin wrote:
+> > > 
+> > > > Hi Lee,
+> > > > 
+> > > > On Tue, 24 Jan 2017, Lee Jones wrote:
+> > > > 
+> > > > > There are now 2 possible separate/different Pinctrl states which can
+> > > > > be provided from platform data.  One which encompasses the lines
+> > > > > required for HW flow-control (CTS/RTS) and another which does not
+> > > > > specify these lines, such that they can be used via GPIO mechanisms
+> > > > > for manually toggling (i.e. from a request by `stty`).
+> > > > > 
+> > > > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > > > > ---
+> > > > >  drivers/tty/serial/st-asc.c | 28 ++++++++++++++++++++++++++++
+> > > > >  1 file changed, 28 insertions(+)
+> > > > > 
+> > > > > diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
+> > > > > index 397df50..03801ed 100644
+> > > > > --- a/drivers/tty/serial/st-asc.c
+> > > > > +++ b/drivers/tty/serial/st-asc.c
+> > > > > @@ -37,10 +37,16 @@
+> > > > >  #define ASC_FIFO_SIZE 16
+> > > > >  #define ASC_MAX_PORTS 8
+> > > > >  
+> > > > > +/* Pinctrl states */
+> > > > > +#define DEFAULT		0
+> > > > > +#define MANUAL_RTS	1
+> > > > 
+> > > > Nit: Would be better to have them aligned.
+> > > 
+> > > These are aligned in code.  The patch format throws things out.
+> > > 
+> > > Look, same lines with the "> > +" removed:
+> > 
+> > Ah OK.
+> > 
+> > > 
+> > > /* Pinctrl states */
+> > > #define DEFAULT		0
+> > > #define MANUAL_RTS	1
+> > > 
+> > > Try it.
+> > > 
+> > > > > +
+> > > > >  struct asc_port {
+> > > > >  	struct uart_port port;
+> > > > >  	struct gpio_desc *rts;
+> > > > >  	struct clk *clk;
+> > > > > +	struct pinctrl *pinctrl;
+> > > > > +	struct pinctrl_state *states[2];
+> > > > >  	unsigned int hw_flow_control:1;
+> > > > >  	unsigned int force_m1:1;
+> > > > >  };
+> > > > > @@ -694,6 +700,7 @@ static int asc_init_port(struct asc_port *ascport,
+> > > > >  {
+> > > > >  	struct uart_port *port = &ascport->port;
+> > > > >  	struct resource *res;
+> > > > > +	int ret;
+> > > > >  
+> > > > >  	port->iotype	= UPIO_MEM;
+> > > > >  	port->flags	= UPF_BOOT_AUTOCONF;
+> > > > > @@ -720,6 +727,27 @@ static int asc_init_port(struct asc_port *ascport,
+> > > > >  	WARN_ON(ascport->port.uartclk == 0);
+> > > > >  	clk_disable_unprepare(ascport->clk);
+> > > > >  
+> > > > > +	ascport->pinctrl = devm_pinctrl_get(&pdev->dev);
+> > > > > +	if (IS_ERR(ascport->pinctrl)) {
+> > > > > +		ret = PTR_ERR(ascport->pinctrl);
+> > > > > +		dev_err(&pdev->dev, "Failed to get Pinctrl: %d\n", ret);
+> > > > > +	}
+> > > > > +
+> > > > > +	ascport->states[DEFAULT] =
+> > > > > +		pinctrl_lookup_state(ascport->pinctrl, "default");
+> > > > > +	if (IS_ERR(ascport->states[DEFAULT])) {
+> > > > > +		ret = PTR_ERR(ascport->states[DEFAULT]);
+> > > > > +		dev_err(&pdev->dev,
+> > > > > +			"Failed to look up Pinctrl state 'default': %d\n", ret);
+> > > > > +		return ret;
+> > > > > +	}
+> > > > > +
+> > > > > +	/* "manual-rts" state is optional */
+> > > > > +	ascport->states[MANUAL_RTS] =
+> > > > > +		pinctrl_lookup_state(ascport->pinctrl, "manual-rts");
+> > > > > +	if (IS_ERR(ascport->states[MANUAL_RTS]))
+> > > > > +		ascport->states[MANUAL_RTS] = NULL;
+> > > > > +
+> > > > 
+> > > > The different pinctrl states looks like a neat solution to the problem.
+> > > > 
+> > > > My only concern here is that 'default' state is implying a hw-flow-control
+> > > > pinmux config, and manual-rts is implying what is the current upstream
+> > > > 'default' pinmux config.
+> > > > 
+> > > > Which maybe ok if you update all uarts, but currently only serial0
+> > > > is updated. So the other uarts current 'default' is actually the same as serial0
+> > > > 'manual-rts' grouping, which conceptually is odd.
+> > > > 
+> > > > Would it not be better to make 'manual-rts' the default state? As that aligns
+> > > > to what is currently already the default for the other UARTS? And then make
+> > > > hw-flow-control the optional state for serial0?
+> > > > 
+> > > > That also has the advantage that 'default' has the same meaning with older DT's.
+> > > 
+> > > The reason it was done is this was because none of the other UARTs
+> > > require 2 separate Pinctrl configurations, only this one.  Moreover,
+> > > if they support RTS/CTS then I believe that the lines should be
+> > > defined in Pinctrl.
+> > 
+> > Yes I agree with that.
+> > 
+> > > Thus, it was my plan to update all UART's default
+> > > Pinctrl configs to include the RTS/CTS lines.
+> > > 
+> > 
+> > I still don't see the point in changing the meaning of 'default' group and breaking
+> > ABI if you don't need to?
+> > 
+> > As far as I can tell if you swap the meaning of 'default' and 'maunal-rts'
+> > groups you get all the benefits of this series whilst also maintaining backwards
+> > compatbility with older DT's.
+> 
+> What makes you think this will break ABI?
 >
-> I'm not much of a fan of adding this. I know we added it for some of
-> the legacy platforms since moving over existing in-tree code would take
-> a while. 
 
-We are not fans of adding it either, and have been avoiding it up until
-now.  You can rest assured that new additions here will be heavily
-scrutinized.
+I've not tried it, but an older DT defines one group, 'default' which contains
+the same pin config as your new optional 'manual-rts' group.
 
-> But the thought was that new drivers wouldn't use it much.  Is the
-> need for this now due to said drivers never been ported over, and now
-> also being used by Davinci? Or are new drivers added that rely on
-> platform data?
+The driver now reads like the manual-rts pin config is optional and should be stored in
+ascport->states[MANUAL_RTS]. An older DT will pass that same pin config as the default
+group and it will be stored in ascport->states[DEFAULT].
 
-The problem isn't new drivers, but old drivers that haven't grown DT
-equivalents.
+That seems wrong to me, and if it executes OK it wouldn't be what you
+expect by reading the code.
 
-There are a handful of drivers/media drivers currently used by Davinci
-via board files (and pdata) that still do not have DT mechanisms for
-all the things used in pdata.
+regards,
 
-In attempting DT support for video on DaVinci, attempts were made (by
-me[1]) to pass the data via DT, which triggered discussions among
-linux-media maintainers about the "right way" of handling it.
-Unfortunately, these discussions never fully materialized in an
-short-term solution, so we were left with pdata for now.
-
-I've offered to be the first to beta test the new DT mechanisms they
-come up with, so when that happens, we'll gladly get rid of these pdata
-quirks.
-
-Kevin
-
-[1] https://marc.info/?l=devicetree&m=147982998517384
+Peter.
