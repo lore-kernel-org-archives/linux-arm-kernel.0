@@ -1,57 +1,57 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 30 Jan 2017 08:55:37 +0200
-Subject: [GIT PULL 4/4] arm64: dts: exynos: for v4.11, 2nd round
-In-Reply-To: <20170130052329.GZ18943@localhost>
-References: <20170129200630.22083-1-krzk@kernel.org>
- <20170129200630.22083-4-krzk@kernel.org>
- <20170130052329.GZ18943@localhost>
-Message-ID: <CAJKOXPe=MjJk_63XBFMj+bE58NVmDmRvia7O72h7qvFdPio-gA@mail.gmail.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Mon, 30 Jan 2017 12:30:11 +0530
+Subject: [PATCH V7 01/11] iommu/of: Refactor of_iommu_configure() for
+ error handling
+In-Reply-To: <d27f04da-7d34-9640-1639-790d0732ed93@arm.com>
+References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
+ <1485188293-20263-2-git-send-email-sricharan@codeaurora.org>
+ <4388779a-0e83-fadc-83f4-98c46c88d42e@semihalf.com>
+ <c7bad124-d9f2-0ddf-168f-0b1950d3e1ed@arm.com>
+ <009901d278c7$34fee230$9efca690$@codeaurora.org>
+ <d27f04da-7d34-9640-1639-790d0732ed93@arm.com>
+Message-ID: <003601d27ac6$84866840$8d9338c0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2017 at 7:23 AM, Olof Johansson <olof@lixom.net> wrote:
-> Hi Krzysztof,
->
-> On Sun, Jan 29, 2017 at 10:06:29PM +0200, Krzysztof Kozlowski wrote:
->> Hi,
->>
->> On top of previous pull request.
->>
->> This adds proper clocks to LPASS node on Exynos5433 which is needed
->> by Marek's patchset:
->>  - [PATCH v2 0/8] Pad retentions support for Exynos5433
->>    https://lkml.kernel.org/r/1485419634-28331-1-git-send-email-m.szyprowski () samsung ! com
->>
->>
->> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
->> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Cc: Tomasz Figa <tomasz.figa@gmail.com>
->> Cc: Lee Jones <lee.jones@linaro.org>
->>
->> Best regards,
->> Krzysztof
->>
->>
->> The following changes since commit e4e381133241a27d732e78be09973b89a193eaf7:
->>
->>   arm64: dts: exynos: Enable HDMI/TV path on Exynos5433-TM2 (2017-01-11 18:20:28 +0200)
->>
->> are available in the git repository at:
->>
->>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt64-4.11-2
->>
->> for you to fetch changes up to 7547162ac351483df3641f64e99e10be329dd6a2:
->>
->>   arm64: dts: exynos: Add clocks to Exynos5433 LPASS module (2017-01-26 22:04:20 +0200)
->
-> I think you tagged the wrong branch here. The log message shows the right hash
-> at the tip, but the tag is of 95648b747071d530b5bb983735cfe0ffff1b66bf, which
-> seems to be on your for-next.
->
-> Care to respin, so your tag and our merged branch match up?
+Hi Robin,
 
-Ahhh, damn it. I'll fix it.
+>> [..]
+>>
+>>>>> +const struct iommu_ops *of_iommu_configure(struct device *dev,
+>>>>> +                       struct device_node *master_np)
+>>>>> +{
+>>>>> +    const struct iommu_ops *ops;
+>>>>> +
+>>>>> +    if (!master_np)
+>>>>> +        return NULL;
+>>>>> +
+>>>>> +    if (dev_is_pci(dev))
+>>>>> +        ops = of_pci_iommu_init(to_pci_dev(dev), master_np);
+>>>>
+>>>> I gave the whole patch set a try on ThunderX. really_probe() is failing
+>>>> on dma_configure()->of_pci_iommu_init() for each PCI device.
+>>>
+>>> When you say "failing", do you mean cleanly, or with a crash? I've
+>>> managed to hit __of_match_node() dereferencing NULL from
+>>> of_iommu_xlate() in a horribly complicated chain of events, which I'm
+>>> trying to figure out now, and I wonder if the two might be related.
+>>
+>> Sorry that there is crash still. __of_match_node seems to checking
+>> for NULL arguments , feels like some invalid pointer was passed in.
+>> Is there any particular sequence to try for this ?
+>
+>Ah, I did figure it out - it wasn't actually a NULL dereference, but an
+>unmapped address. Turns out __iommu_of_table is in initdata, so any
+>driver probing after init, connected to an unprobed IOMMU (in this case
+>disabled in DT), trips over trying to match the now-freed table. I'm
+>working on the fix - technically the bug's in my patch (#2) anyway ;)
+>
 
-Best regards,
-Krzysztof
+Ok, thanks for bringing this out. There is also an issue that
+Sinan has mentioned while testing the ACPI hotplug path, probably
+its related to the above, not sure. I will try to check more on that
+in the meanwhile. Then, taking your fix and fixing the hotplug case
+i will do one more repost.
+
+Regards,
+ Sricharan
