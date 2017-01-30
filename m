@@ -1,37 +1,52 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 29 Jan 2017 20:58:10 -0800
-Subject: [GIT PULL 1/4] memory: tegra: Changes for v4.11-rc1
-In-Reply-To: <20170127092121.21570-1-thierry.reding@gmail.com>
-References: <20170127092121.21570-1-thierry.reding@gmail.com>
-Message-ID: <20170130045810.GE18943@localhost>
+Date: Sun, 29 Jan 2017 20:57:38 -0800
+Subject: [GIT PULL] Second Round of Renesas ARM64 Based SoC DT Updates
+ for v4.11
+In-Reply-To: <cover.1485508214.git.horms+renesas@verge.net.au>
+References: <cover.1485508214.git.horms+renesas@verge.net.au>
+Message-ID: <20170130045738.GD18943@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2017 at 10:21:18AM +0100, Thierry Reding wrote:
-> Hi ARM SoC maintainers,
+On Fri, Jan 27, 2017 at 10:14:27AM +0100, Simon Horman wrote:
+> Hi Olof, Hi Kevin, Hi Arnd,
 > 
-> The following changes since commit 0c744ea4f77d72b3dcebb7a8f2684633ec79be88:
+> Please consider these second round of Renesas ARM64 based SoC DT updates for v4.11.
 > 
->   Linux 4.10-rc2 (2017-01-01 14:31:53 -0800)
+> This pull request is based on the previous round of
+> such requests, tagged as renesas-arm64-dt-for-v4.11,
+> which you have already pulled.
+> 
+> 
+> The following changes since commit b2b9443beee5017ebdb3f2be9ef472c73d260481:
+> 
+>   arm64: dts: r8a7795: Add PWM support (2017-01-04 10:00:44 +0100)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.11-memory
+>   https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-arm64-dt2-for-v4.11
 > 
-> for you to fetch changes up to b92f4380a1c7eb3ed19d6f68ad7b66c66d8102b4:
+> for you to fetch changes up to 7e1c23b94ed7f0d2719795a9828402003de5335d:
 > 
->   memory: tegra: Add a missing 'of_node_put()' call (2017-01-25 07:57:13 +0100)
-> 
-> Thanks,
-> Thierry
+>   arm64: dts: r8a7796: Mark EthernetAVB device node disabled (2017-01-27 10:09:02 +0100)
 > 
 > ----------------------------------------------------------------
-> memory: tegra: Changes for v4.11-rc1
+> Second Round of Renesas ARM64 Based SoC DT Updates for v4.11
 > 
-> This contains a single commit that plugs a potential device node leak in
-> error handling code.
+> r8a779[56] SoCs:
+> * Mark EthernetAVB device node disabled in DT for r8a779[56] SoCs
+>   - They are enabled as appropriate in board DT files
+> * Link ARM GIC to clock and clock domain on r8a779[56] SoCs
+> * Add thermal support
+> 
+> r8a7795 SoC:
+> * Tidyup audma definition order on r8a7795 SoC
+> * Add missing power-domains property for SATA
+> 
+> r8a7795/h3ulcb board:
+> * Add MIX/CTU support as per support present in DT for r8a7796
 
-Thanks, merged!
+Merged, thanks!
 
 
 -Olof
