@@ -1,37 +1,48 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 29 Jan 2017 16:58:28 -0800
-Subject: [GIT PULL 1/4] TI DaVinci non-critical fixes for v4.11
-In-Reply-To: <20170124130641.28264-1-nsekhar@ti.com>
-References: <20170124130641.28264-1-nsekhar@ti.com>
-Message-ID: <20170130005828.GQ3133@localhost>
+Date: Sun, 29 Jan 2017 16:08:38 -0800
+Subject: [GIT PULL] Qualcomm Driver Updates for v4.11
+In-Reply-To: <1485240494-8040-3-git-send-email-andy.gross@linaro.org>
+References: <1485240494-8040-1-git-send-email-andy.gross@linaro.org>
+ <1485240494-8040-3-git-send-email-andy.gross@linaro.org>
+Message-ID: <20170130000838.GN3133@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2017 at 06:36:38PM +0530, Sekhar Nori wrote:
+On Tue, Jan 24, 2017 at 12:48:12AM -0600, Andy Gross wrote:
 > The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 > 
 >   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.11/fixes-non-critical
+>   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-drivers-for-4.11
 > 
-> for you to fetch changes up to 430d7dd448f48f54e79614ca237f44cd543f73da:
+> for you to fetch changes up to a811b420b6c13759540070c0e9541b7cd8569168:
 > 
->   bus: da850-mstpri: fix my e-mail address (2017-01-02 15:52:32 +0530)
-> 
-> ----------------------------------------------------------------
-> Non-critical DaVinci fixes for v4.11
-> 
-> * Coding style and typo fix
-> * Make PLL0 rate setting API for DA850
->   less confusing to use.
+>   firmware: qcom_scm: Add set remote state API (2017-01-16 23:45:04 -0600)
 > 
 > ----------------------------------------------------------------
-> Bartosz Golaszewski (3):
->       ARM: davinci: da850: coding style fix
->       ARM: davinci: da850: fix da850_set_pll0rate()
->       bus: da850-mstpri: fix my e-mail address
+> Qualcomm ARM Based Driver Updates for v4.11
+> 
+> * Fix issues with SCM compile testing
+> * Add SCM set remote state API
+> * Mask APQ8064 SCM clock dependency issue
+> * Add Qualcomm DMA folder to MAINTAINERS
+> * Fix EBI2 dependencies
+> 
+> ----------------------------------------------------------------
+> Andy Gross (2):
+>       firmware: qcom: scm: Mask APQ8064 core clk dependency
+>       firmware: qcom_scm: Add set remote state API
+> 
+> Linus Walleij (1):
+>       bus: qcom_ebi2: default y if ARCH_QCOM
+> 
+> Pramod Gurav (1):
+>       MAINTAINERS: Update the files to include the Qualcomm DMA folder
+> 
+> Stanimir Varbanov (1):
+>       firmware: qcom: scm: Add empty functions to help compile testing
 
 Merged, thanks.
 
