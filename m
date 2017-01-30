@@ -1,98 +1,220 @@
-From: roy.pledge@nxp.com (Roy Pledge)
-Date: Mon, 30 Jan 2017 19:04:08 +0000
-Subject: [PATCH 06/10] soc/qbman: Add ARM equivalent for
- flush_dcache_range()
-References: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
- <VI1PR0401MB2430DA6BD2F857C30EC86A50917F0@VI1PR0401MB2430.eurprd04.prod.outlook.com>
- <HE1PR0401MB263638F320470CA216990BCC86720@HE1PR0401MB2636.eurprd04.prod.outlook.com>
- <5414359.8GMja3pNrI@wuerfel>
- <VI1PR0401MB24303C4A5C0042005E17F1A391770@VI1PR0401MB2430.eurprd04.prod.outlook.com>
- <CAK8P3a1Gd4bd7GjEp_a9WXc_mTPk0XmP7DH8aPWhbn2K3MMuDQ@mail.gmail.com>
- <1485570872.9266.22.camel@buserror.net>
- <d5ca6bcd-1d1a-2a61-1f5c-9086a67f629a@arm.com>
-Message-ID: <HE1PR0401MB2636FF4D977DDA6888616A26864B0@HE1PR0401MB2636.eurprd04.prod.outlook.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 30 Jan 2017 20:04:50 +0100
+Subject: [RFC v2 05/10] KVM: arm/arm64: Initialize the emulated EL1
+ physical timer
+In-Reply-To: <57b57b31-b8ad-f5c8-a1fc-4cde9a564dd2@arm.com>
+References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
+ <1485479100-4966-6-git-send-email-jintack@cs.columbia.edu>
+ <86wpde83xn.fsf@arm.com> <20170130145816.GC16459@cbox>
+ <57b57b31-b8ad-f5c8-a1fc-4cde9a564dd2@arm.com>
+Message-ID: <20170130190450.GF16459@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/30/2017 10:31 AM, Robin Murphy wrote:
-> On 28/01/17 02:34, Scott Wood wrote:
->> On Fri, 2017-01-27 at 17:41 +0100, Arnd Bergmann wrote:
->>> On Thu, Jan 26, 2017 at 6:08 AM, Scott Wood <scott.wood@nxp.com> wrote:
->>>> On 01/25/2017 03:20 PM, Arnd Bergmann wrote:
->>>>> On Monday, January 23, 2017 7:24:59 PM CET Roy Pledge wrote:
->>>>> If this is normal RAM, you should be able to just write zeroes, and then
->>>>> do a dma_map_single() for initialization.
->>>> The DMA API on PPC currently has no way of knowing that the device
->>>> accesses this memory incoherently.
->>> Ah, this is because PPC doesn't use the 'dma-coherent' property on devices
->>> but just assumes that coherency is a global property of the platform,right?
->> Right.
->>
->>>> If that were somehow fixed, we still couldn't use dma_map_single() as it
->>>> doesn't accept virtual addresses that come from memremap() or similar
->>>> dynamic mappings.  We'd have to convert the physical address to an array
->>>> of struct pages and pass each one to dma_map_page().
->>> Sorry for my ignorance, but where does the memory come from to start
->>> with? Is this in the normal linearly mapped RAM, in a carveout outside
->>> of the linear mapping but the same memory, or in some on-chip buffer?
->> It's RAM that comes from the device tree reserved memory mechanism
->> (drivers/of/of_reserved_mem.c).  On a 32-bit kernel it is not guaranteed (or
->> likely) to be lowmem.
-> Wouldn't dma_declare_coherent_memory() be the appropriate tool for that
-> job, then (modulo the PPC issue)? On ARM that should result in
-> dma_alloc_coherent() giving back a non-cacheable mapping if the device
-> is non-coherent, wherein a dmb_wmb() after writing the data from the CPU
-> side should be enough to ensure it is published to the device.
-I think there is some confusion here (and it may very well be mine).
+On Mon, Jan 30, 2017 at 05:44:20PM +0000, Marc Zyngier wrote:
+> On 30/01/17 14:58, Christoffer Dall wrote:
+> > On Sun, Jan 29, 2017 at 12:07:48PM +0000, Marc Zyngier wrote:
+> >> On Fri, Jan 27 2017 at 01:04:55 AM, Jintack Lim <jintack@cs.columbia.edu> wrote:
+> >>> Initialize the emulated EL1 physical timer with the default irq number.
+> >>>
+> >>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+> >>> ---
+> >>>  arch/arm/kvm/reset.c         | 9 ++++++++-
+> >>>  arch/arm64/kvm/reset.c       | 9 ++++++++-
+> >>>  include/kvm/arm_arch_timer.h | 3 ++-
+> >>>  virt/kvm/arm/arch_timer.c    | 9 +++++++--
+> >>>  4 files changed, 25 insertions(+), 5 deletions(-)
+> >>>
+> >>> diff --git a/arch/arm/kvm/reset.c b/arch/arm/kvm/reset.c
+> >>> index 4b5e802..1da8b2d 100644
+> >>> --- a/arch/arm/kvm/reset.c
+> >>> +++ b/arch/arm/kvm/reset.c
+> >>> @@ -37,6 +37,11 @@
+> >>>  	.usr_regs.ARM_cpsr = SVC_MODE | PSR_A_BIT | PSR_I_BIT | PSR_F_BIT,
+> >>>  };
+> >>>  
+> >>> +static const struct kvm_irq_level cortexa_ptimer_irq = {
+> >>> +	{ .irq = 30 },
+> >>> +	.level = 1,
+> >>> +};
+> >>
+> >> At some point, we'll have to make that discoverable/configurable. Maybe
+> >> the time for a discoverable arch timer has come (see below).
+> >>
+> >>> +
+> >>>  static const struct kvm_irq_level cortexa_vtimer_irq = {
+> >>>  	{ .irq = 27 },
+> >>>  	.level = 1,
+> >>> @@ -58,6 +63,7 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+> >>>  {
+> >>>  	struct kvm_regs *reset_regs;
+> >>>  	const struct kvm_irq_level *cpu_vtimer_irq;
+> >>> +	const struct kvm_irq_level *cpu_ptimer_irq;
+> >>>  
+> >>>  	switch (vcpu->arch.target) {
+> >>>  	case KVM_ARM_TARGET_CORTEX_A7:
+> >>> @@ -65,6 +71,7 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+> >>>  		reset_regs = &cortexa_regs_reset;
+> >>>  		vcpu->arch.midr = read_cpuid_id();
+> >>>  		cpu_vtimer_irq = &cortexa_vtimer_irq;
+> >>> +		cpu_ptimer_irq = &cortexa_ptimer_irq;
+> >>>  		break;
+> >>>  	default:
+> >>>  		return -ENODEV;
+> >>> @@ -77,5 +84,5 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+> >>>  	kvm_reset_coprocs(vcpu);
+> >>>  
+> >>>  	/* Reset arch_timer context */
+> >>> -	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
+> >>> +	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq, cpu_ptimer_irq);
+> >>>  }
+> >>> diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+> >>> index e95d4f6..d9e9697 100644
+> >>> --- a/arch/arm64/kvm/reset.c
+> >>> +++ b/arch/arm64/kvm/reset.c
+> >>> @@ -46,6 +46,11 @@
+> >>>  			COMPAT_PSR_I_BIT | COMPAT_PSR_F_BIT),
+> >>>  };
+> >>>  
+> >>> +static const struct kvm_irq_level default_ptimer_irq = {
+> >>> +	.irq	= 30,
+> >>> +	.level	= 1,
+> >>> +};
+> >>> +
+> >>>  static const struct kvm_irq_level default_vtimer_irq = {
+> >>>  	.irq	= 27,
+> >>>  	.level	= 1,
+> >>> @@ -104,6 +109,7 @@ int kvm_arch_dev_ioctl_check_extension(struct kvm *kvm, long ext)
+> >>>  int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+> >>>  {
+> >>>  	const struct kvm_irq_level *cpu_vtimer_irq;
+> >>> +	const struct kvm_irq_level *cpu_ptimer_irq;
+> >>>  	const struct kvm_regs *cpu_reset;
+> >>>  
+> >>>  	switch (vcpu->arch.target) {
+> >>> @@ -117,6 +123,7 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+> >>>  		}
+> >>>  
+> >>>  		cpu_vtimer_irq = &default_vtimer_irq;
+> >>> +		cpu_ptimer_irq = &default_ptimer_irq;
+> >>>  		break;
+> >>>  	}
+> >>>  
+> >>> @@ -130,5 +137,5 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+> >>>  	kvm_pmu_vcpu_reset(vcpu);
+> >>>  
+> >>>  	/* Reset timer */
+> >>> -	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
+> >>> +	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq, cpu_ptimer_irq);
+> >>>  }
+> >>> diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+> >>> index 69f648b..a364593 100644
+> >>> --- a/include/kvm/arm_arch_timer.h
+> >>> +++ b/include/kvm/arm_arch_timer.h
+> >>> @@ -59,7 +59,8 @@ struct arch_timer_cpu {
+> >>>  int kvm_timer_enable(struct kvm_vcpu *vcpu);
+> >>>  void kvm_timer_init(struct kvm *kvm);
+> >>>  int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+> >>> -			 const struct kvm_irq_level *irq);
+> >>> +			 const struct kvm_irq_level *virt_irq,
+> >>> +			 const struct kvm_irq_level *phys_irq);
+> >>>  void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
+> >>>  void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu);
+> >>>  void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu);
+> >>> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> >>> index f72005a..0f6e935 100644
+> >>> --- a/virt/kvm/arm/arch_timer.c
+> >>> +++ b/virt/kvm/arm/arch_timer.c
+> >>> @@ -329,9 +329,11 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
+> >>>  }
+> >>>  
+> >>>  int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+> >>> -			 const struct kvm_irq_level *irq)
+> >>> +			 const struct kvm_irq_level *virt_irq,
+> >>> +			 const struct kvm_irq_level *phys_irq)
+> >>>  {
+> >>>  	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+> >>> +	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+> >>>  
+> >>>  	/*
+> >>>  	 * The vcpu timer irq number cannot be determined in
+> >>> @@ -339,7 +341,8 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+> >>>  	 * kvm_vcpu_set_target(). To handle this, we determine
+> >>>  	 * vcpu timer irq number when the vcpu is reset.
+> >>>  	 */
+> >>> -	vtimer->irq.irq = irq->irq;
+> >>> +	vtimer->irq.irq = virt_irq->irq;
+> >>> +	ptimer->irq.irq = phys_irq->irq;
+> >>>  
+> >>>  	/*
+> >>>  	 * The bits in CNTV_CTL are architecturally reset to UNKNOWN for ARMv8
+> >>> @@ -348,6 +351,7 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+> >>>  	 * the ARMv7 architecture.
+> >>>  	 */
+> >>>  	vtimer->cnt_ctl = 0;
+> >>> +	ptimer->cnt_ctl = 0;
+> >>>  	kvm_timer_update_state(vcpu);
+> >>>  
+> >>>  	return 0;
+> >>> @@ -369,6 +373,7 @@ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
+> >>>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+> >>>  
+> >>>  	update_vtimer_cntvoff(vcpu, kvm_phys_timer_read());
+> >>> +	vcpu_ptimer(vcpu)->cntvoff = 0;
+> >>
+> >> This is quite contentious, IMHO. Do we really want to expose the delta
+> >> between the virtual and physical counters? That's a clear indication to
+> >> the guest that it is virtualized. I"m not sure it matters, but I think
+> >> we should at least make a conscious choice, and maybe give the
+> >> opportunity to userspace to select the desired behaviour.
+> >>
+> > 
+> > So my understanding of the architecture is that you should always have
+> > two timer/counter pairs available at EL1.  They may be synchronized, and
+> > they may not.  If you want an accurate reading of wall clock time, look
+> > at the physical counter, and that can generally be expected to be fast,
+> > precise, and syncrhonized (on working hardware, of course).
+> > 
+> > Now, there can be a constant or potentially monotonically increasing
+> > offset between the physial and virtual counters, which may mean you're
+> > running under a hypervisor or (in the first case) that firmware
+> > programmed or neglected to program cntvoff.  I don't think it's an
+> > inherent problem to expose that difference to a guest, and I think it's
+> > more important that reading the physical counter is fast and doesn't
+> > trap.
+> > 
+> > The question is which contract we can have with a guest OS, and which
+> > legacy we have to keep supporting (Linux, UEFI, ?).
+> > 
+> > Probably Linux should keep relying on the virtual counter/timer only,
+> > unless something is advertised in DT/ACPI, about it being able to use
+> > the physical timer/counter pair, even when booted at EL1.  We could
+> > explore the opportunities to build on that to let the guest figure
+> > out stolen time by reading the two counters and by programming the
+> > proper timer depending on the desired semantics (i.e. virtual or
+> > physical time).
+> > 
+> > In terms of this patch, I actually think it's fine, but we may need to
+> > build something more on top later.  It is possible, though, that I'm
+> > entirely missing the point about Linux timekeeping infrastructure and
+> > that my reading of the architecture is bogus.
+> > 
+> > What do you think?
+> 
+> I don't disagree with any of this (hopefully I was clearer in my reply
+> to the cover letter).
 
-My understanding is that the dma_declare_coherent_memory() API sets up a
-region of memory that will be managed by dma_alloc_coherent() and
-friends.  This is useful if the driver needs to manage a region of on
-device memory but that isn't what this specific region is used for.
+Yeah, my long-winded reply was sort of to convince myself about my own
+understanding :)
 
-The memory that is trying to be initialized here is a big chunk
-(possible multiple megabytes) of RAM that only the QBMan device will
-access with one exception - at initialization the device expects
-software to zero the memory before starting to use the device. Since the
-CPUs will never access this region again the device does
-non-coherent/non-shareable accesses for performance reasons since QBMan
-device is the only user - no need to maintain coherency with core side
-caches.
 
-We used the of_reserve memory as that seemed to be the best reliable way
-to guarantee that we would get a properly aligned contiguous allocation
-and it's been working well.  The downside is that the contents of that
-memory is undefined so we had to map it, zero it and flush the cache in
-order to get the RAM into the desired state and make sure we don't get
-hit by a random castout in the future.
+> Wventually, we'll have to support an offset-able
+> physical counter to support nested virtualization, but this can come at
+> a later time.
+> 
+Why do we need the offset-able physical counter for nested
+virtualization?  I would think for nested virt we just need to support
+respecting how the guest hypervisor programs CNTVOFF?
 
-Would it make sense to add an option in the of_reserved_mem system to
-fill the memory?  I haven't looked at the feasibility of that but it
-seems like a generic solution that could be useful to others.  We could
-add the fill value to the device tree so you could initialize to any
-pattern.
-
-- Roy
-
->
-> Robin.
->
->>>> And even if we did all that, there would still be other manual cache
->>>> manipulation left in this driver, to deal with its cacheable register
->>>> interface.
->>> I thought we had concluded that "cacheable register" is something
->>> that cannot work reliably on ARM at all when this came up before.
->>> Any updates on that?
->> I'm not familiar with the details there...  My understanding is that the
->> hardware people at NXP are convinced that it can work on these specific chips
->> due to implementation details.
->>
->> -Scott
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
->
+Thanks,
+-Christoffer
