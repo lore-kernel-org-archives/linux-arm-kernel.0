@@ -1,103 +1,73 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Mon, 30 Jan 2017 11:40:48 +0200
-Subject: [PATCH v5 06/12] mmc: sdhci-xenon: Add Marvell Xenon SDHC core
- functionality
-In-Reply-To: <CAPDyKFoF2QsTxKC7=PjHqOk106USQ-j9MtiyfC=Sqks8DnPDYQ@mail.gmail.com>
-References: <cover.8527229dae6c124f24c5e637430c2cdc86f80392.1484154449.git-series.gregory.clement@free-electrons.com>
- <3546f143091c121face8ecbcbf7f6a4c41d2cec7.1484154449.git-series.gregory.clement@free-electrons.com>
- <CAPDyKFrwxix4zY4a1x9u6jh_gPfKTsaLnD8b8crum=pc5CN3AA@mail.gmail.com>
- <2e67332d-d8c3-fd24-1f81-72675a09927a@intel.com>
- <CAPDyKFqbjeKCHp40PALydquxdF-qBk156+iOS9TYYsquJ7fK7w@mail.gmail.com>
- <00e8d2dc-bc07-addc-a5d9-8604f143627f@intel.com>
- <CAPDyKFoF2QsTxKC7=PjHqOk106USQ-j9MtiyfC=Sqks8DnPDYQ@mail.gmail.com>
-Message-ID: <1f0cc488-75f0-cff3-1386-070717aa7220@intel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 30 Jan 2017 10:49:23 +0100
+Subject: [PATCH 1/5] gpio: Add the devm_get_index_gpiod_from_child() helper
+In-Reply-To: <1485534846-28111-2-git-send-email-boris.brezillon@free-electrons.com>
+References: <1485534846-28111-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1485534846-28111-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <CACRpkdYsE_3twu6ZxTUD2A=YddU-Lq+0L+g12p7Ws99Aqjz97g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/01/17 11:10, Ulf Hansson wrote:
-> On 28 January 2017 at 09:16, Adrian Hunter <adrian.hunter@intel.com> wrote:
->> On 27/01/2017 5:12 p.m., Ulf Hansson wrote:
->>>
->>> On 26 January 2017 at 13:39, Adrian Hunter <adrian.hunter@intel.com>
->>> wrote:
->>>>
->>>> On 26/01/17 12:50, Ulf Hansson wrote:
->>>>>
->>>>> On 11 January 2017 at 18:19, Gregory CLEMENT
->>>>> <gregory.clement@free-electrons.com> wrote:
->>>>>>
->>>>>> +                       priv->init_card_type = MMC_TYPE_MMC;
->>>>>> +                       mmc->caps |= MMC_CAP_NONREMOVABLE;
->>>>>> +
->>>>>> +                       /*
->>>>>> +                        * Force to clear BUS_TEST to
->>>>>> +                        * skip bus_test_pre and bus_test_post
->>>>>> +                        */
->>>>>> +                       mmc->caps &= ~MMC_CAP_BUS_WIDTH_TEST;
->>>>>> +                       mmc->caps2 |= MMC_CAP2_HC_ERASE_SZ |
->>>>>
->>>>>
->>>>> This cap is a bit strange. It was added several years ago by Adrian
->>>>> Hunter, but I am wondering about the reason to why it's needed.
->>>>>
->>>>
->>>> MMC_CAP2_HC_ERASE_SZ relates to EXT-CSD ERASE_GROUP_DEF.
->>>>
->>>> I think it was added to enable people to choose whether they wanted a
->>>> large
->>>> or small erase granularity.  That probably doesn't matter if the card
->>>> supports TRIM.
->>>>
->>>
->>> Huh, the erase/trim/discard code in the mmc core is really hairy. :-)
->>>
->>> In mmc_calc_max_discard() the following code/comment exists:
->>>
->>> /*
->>>  * Without erase_group_def set, MMC erase timeout depends on clock
->>>  * frequence which can change.  In that case, the best choice is
->>>  * just the preferred erase size.
->>>  */
->>> if (mmc_card_mmc(card) && !(card->ext_csd.erase_group_def & 1))
->>>      return card->pref_erase;
->>>
->>>
->>> This makes me wonder.
->>>
->>> So, when we haven't enabled the high capacity erase groups in the
->>> EXT_CSD register (ext_csd.erase_group_def), we will use the pref_erase
->>> size.
->>>
->>> In the other case, as when having MMC_CAP2_HC_ERASE_SZ set (which will
->>> set ext_csd.erase_group_def),  we will instead  do some calculations
->>> to find out the max discards.
->>>
->>> Are you saying that these calculations doesn't matter much - or are
->>> you saying that we always want to do them?
->>
->>
->> No, I was saying that if you have TRIM then TRIM is preferred to ERASE so
->> the erase group size does not come into play when discarding, since ERASE
->> granularity is erase groups whereas TRIM granularity is sectors.
-> 
-> Right. Thanks for clarifying.
-> 
->>
->> However ERASE_GROUP_DEF also affects the size of write protect groups.
-> 
-> In either case.
-> 
-> What do you think of removing MMC_CAP2_HC_ERASE_SZ? I don't like these
-> kind of soft polices, it's better if we can decide on a common
-> behaviour - whatever that is.
+On Fri, Jan 27, 2017 at 5:34 PM, Boris Brezillon
+<boris.brezillon@free-electrons.com> wrote:
 
-Changing the value of ERASE_GROUP_DEF could be a problem, for example the
-spec. says:
+> devm_get_gpiod_from_child() currently allows GPIO users to request a GPIO
+> that is defined in a child fwnode instead of directly in the device
+> fwnode. Extend this API by adding the devm_get_index_gpiod_from_child()
+> helpers which does the same except you can also specify an index in case
+> the 'xx-gpios' property describe several GPIOs.
+>
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-"Similarly if the host set ERASE_GROUP_DEF bit for a device that the default
-write protect was already set in some of the area in the previous power
-cycle, then the device may show unknown behavior when host issue write
-or erase commands to the device. In application, it is mandatory for host to
-use same ERASE GROUP DEF value to the device all the time."
+Cc Russell who faced this problem in the mvebu PCI driver (IIRC).
 
-Whether or not there is anyone that would actually be affected is hard to know.
+(...)
+
+> +struct gpio_desc *devm_get_index_gpiod_from_child(struct device *dev,
+> +                                                 const char *con_id,
+> +                                                 int index,
+> +                                                 struct fwnode_handle *child)
+>  {
+>         static const char * const suffixes[] = { "gpios", "gpio" };
+>         char prop_name[32]; /* 32 is max size of property name */
+> @@ -154,7 +157,7 @@ struct gpio_desc *devm_get_gpiod_from_child(struct device *dev,
+>                         snprintf(prop_name, sizeof(prop_name), "%s",
+>                                                                suffixes[i]);
+>
+> -               desc = fwnode_get_named_gpiod(child, prop_name);
+> +               desc = fwnode_get_named_gpiod(child, prop_name, index);
+>                 if (!IS_ERR(desc) || (PTR_ERR(desc) != -ENOENT))
+>                         break;
+>         }
+> @@ -168,6 +171,23 @@ struct gpio_desc *devm_get_gpiod_from_child(struct device *dev,
+>
+>         return desc;
+>  }
+> +EXPORT_SYMBOL(devm_get_index_gpiod_from_child);
+
+Rename this devm_fwnode_get_index_gpiod_from_child()
+so that it fits the namespace of the other fwnode functions.
+
+> + * devm_get_gpiod_from_child - get a GPIO descriptor from a device's child node
+> + * @dev:       GPIO consumer
+> + * @con_id:    function within the GPIO consumer
+> + * @child:     firmware node (child of @dev)
+> + *
+> + * GPIO descriptors returned from this function are automatically disposed on
+> + * driver detach.
+> + */
+> +struct gpio_desc *devm_get_gpiod_from_child(struct device *dev,
+> +                                           const char *con_id,
+> +                                           struct fwnode_handle *child)
+> +{
+> +       return devm_get_index_gpiod_from_child(dev, con_id, 0, child);
+> +}
+
+Take the opportunity to rename this devm_fwnode_get_gpiod_from_child()
+as well.
+
+I don't remember exactly why this wasn't added earlier, there was some
+problem with referencing nodes that do not have devices.
+
+Yours,
+Linus Walleij
