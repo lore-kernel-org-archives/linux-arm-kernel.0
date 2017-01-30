@@ -1,41 +1,82 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 30 Jan 2017 11:39:54 +0100
-Subject: [PATCH v2 3/8] pinctrl: samsung: Add support for pad retention
- control for Exynos5433 SoCs
-In-Reply-To: <20170127180203.eacwbyb2noqjpmgw@kozik-lap>
-References: <1485419634-28331-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170126083402eucas1p187d3d31f62544fc46fae99fc5f74dbfe@eucas1p1.samsung.com>
- <1485419634-28331-4-git-send-email-m.szyprowski@samsung.com>
- <20170126194811.rori5j5hmclniqig@kozik-lap>
- <20170127180203.eacwbyb2noqjpmgw@kozik-lap>
-Message-ID: <91de6eca-f70f-d4c9-732e-c48621347ac5@samsung.com>
+From: illusionist.neo@gmail.com (Shubham Bansal)
+Date: Mon, 30 Jan 2017 16:08:54 +0530
+Subject: arch: arm: bpf: Converting cBPF to eBPF for arm 32 bit
+Message-ID: <20170130103853.GA34633@in3o.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+Hi all,
 
-On 2017-01-27 19:02, Krzysztof Kozlowski wrote:
-> On Thu, Jan 26, 2017 at 09:48:11PM +0200, Krzysztof Kozlowski wrote:
->> On Thu, Jan 26, 2017 at 09:33:49AM +0100, Marek Szyprowski wrote:
->>> This patch adds support for retention control for Exynos5433 SoCs. Three
->>> groups of pins has been defined for retention control: common shared group
->>> for ALIVE, CPIF, eSE, FINGER, IMEM, NFC, PERIC, TOUCH pin banks and
->>> separate control for FSYS and AUD pin banks, for which PMU retention
->>> registers match whole banks.
->>>
->>> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->>> ---
->>>   drivers/pinctrl/samsung/pinctrl-exynos.c    | 58 +++++++++++++++++++++++++++++
->>>   include/linux/soc/samsung/exynos-regs-pmu.h | 16 ++++++++
-> I already have some non-conflicting changes to exynos-regs-pmu.h in my
-> branch. Now I want to add some more which will create conflicts.
+Please ignore last copy of this mail. Kernel mailing lists bounced my
+last mail back because of HTML content.
+
+Just starting a new thread with proper heading on the main kernel
+hardening and net-dev mailing list so that other people can be involved
+in this. Please don't take this as a personal mail.
+
+I am working on conversion of arm32 cBPF into eBPF JIT. I wanted some
+help, regarding understanding of kernel code, from the dev available on
+the mailing list. If you look at the ./arch/arm/net/bpf_jit_32.c code,
+you will see jit_ctx structure. If anybody could help me understand what
+each fields of this structure represent then it would be great.
+
+Also, currently I am mapping the eBPF registers to arm 32 bit registers
+in the following way.
+
+> static const int bpf2a32[] = {
 >
-> How about splitting the header to separate patch, so I will take it to
-> my exynos-pmu branch?
+>         /* return value from in-kernel function, and exit value from
+>         eBPF
+> */
+>         [BPF_REG_0] = ARM_R0,
+>
+>         /* arguments from eBPF program to in-kernel function */
+>
+>         [BPF_REG_1] = ARM_R1,
+>
+>         [BPF_REG_2] = ARM_R2,
+>
+>         [BPF_REG_3] = ARM_R3,
+>
+>         [BPF_REG_4] = ARM_R4,
+>
+>         [BPF_REG_5] = ARM_R5,
+>
+>         /* callee saved registers that in-kernel function will
+>         preserve */
+>
+>         [BPF_REG_6] = ARM_R6,
+>
+>         [BPF_REG_7] = ARM_R7,
+>
+>         [BPF_REG_8] = ARM_R8,
+>
+>         [BPF_REG_9] = ARM_R9,
+>
+>         /* Read only Frame Pointer to access Stack */
+>
+>         [BPF_REG_FP] = ARM_FP,
+>
+>         /* Temperory Register for internal BPF JIT */
+>
+>         [TMP_REG_1] = ARM_R11,
+>
+>         /* temporary register for blinding constants */
+>
+>         [BPF_REG_AX] = ARM_R10,
+>
+> };
 
-Okay, I will split this into 2 patches.
+But I have some question if anybody could help with those.
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+1.) Currently, as eBPF uses 64 bit registers, I am mapping 64 bit eBPF
+registers with 32 bit arm registers which looks wrong to me. Do anybody
+have some idea about how to map eBPF->arm 32 bit registers ?
+2.) Also, is my current mapping good enough to make the JIT fast enough ?
+because as you might know, eBPF JIT mostly depends on 1-to-1 mapping of
+its instructions with native instructions.
+
+Appreciate the help from anybody from the mailing list.
+
+Best,
+Shubham Bansal
