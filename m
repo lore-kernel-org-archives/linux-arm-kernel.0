@@ -1,43 +1,61 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Mon, 30 Jan 2017 16:38:15 +0000
-Subject: ARM64: Disabling warnings about deprecated armv8 instructions
-In-Reply-To: <CAKv+Gu98i4=COqr_Eikwja28U5MAL83rxe-_QBXWFhJ7v1E6yA@mail.gmail.com>
- (Ard Biesheuvel's message of "Mon, 30 Jan 2017 14:50:23 +0000")
-References: <1485072424.14066.2.camel@crowfest.net>
- <1485075528.14345.1.camel@crowfest.net>
- <CAKv+Gu8LU3QjrUa6wMJF3WBNrhx34Pi_0ZUQVfrZy7w7y7237w@mail.gmail.com>
- <22169925.OhJ0QcnbHM@localhost> <1485087662.1518.1.camel@crowfest.net>
- <0D1F678D-6F94-4B68-955E-6454F8647FCA@linaro.org>
- <20170130141308.GV27312@n2100.armlinux.org.uk>
- <CAKv+Gu98i4=COqr_Eikwja28U5MAL83rxe-_QBXWFhJ7v1E6yA@mail.gmail.com>
-Message-ID: <yw1xwpdcfqq0.fsf@unicorn.mansr.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 30 Jan 2017 10:40:25 -0600
+Subject: [PATCH v2 2/2] ARM: sun8i: dt: Add mali node
+In-Reply-To: <20170130140015.dopcfbula6spu2xo@lukather>
+References: <a4d90de597cfcfab5fddeeb538505774a980818b.1485180017.git-series.maxime.ripard@free-electrons.com>
+ <681511dd6370b9146ae8e3f8009eba1e15d36cc0.1485180017.git-series.maxime.ripard@free-electrons.com>
+ <20170127202119.cnnuuojtjor6rleg@rob-hp-laptop>
+ <20170130140015.dopcfbula6spu2xo@lukather>
+Message-ID: <CAL_JsqLs8bMjx2AcLePeNSxXDs0UAaReLrfaGRZOEun3tVqwiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
-
-> On 30 January 2017 at 14:13, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
->> On Sun, Jan 22, 2017 at 01:01:53PM +0000, Ard Biesheuvel wrote:
->>> Emulating unaligned access in the ARM kernel was a mistake: it even
->>> emulates unaligned accesses for instructions like ldm and ldrd, which
->>> require word alignment at the hardware level even in the latest v8
->>> version of the architecture. In contrast, the v8 deprecation warnings
->>> are about enforcing compliance.
->>
->> Ard, you're totally wrong on the unaligned access thing.  Unaligned
->> accesses are a fundamental requirement of the kernel's networking
->> stack.  If you don't have support for unaligned accesses, then you
->> don't have network support - it's as simple as that.
->>
->> So, in order for ARMv5 and earlier to have network support, there
->> was no option to add support for emulating those accesses.
->>
+On Mon, Jan 30, 2017 at 8:00 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Rob,
 >
-> I wasn't aware of that.
+> On Fri, Jan 27, 2017 at 02:21:19PM -0600, Rob Herring wrote:
+>> On Mon, Jan 23, 2017 at 03:00:46PM +0100, Maxime Ripard wrote:
+>> > The A23 and A33 have an ARM Mali 400 GPU. Now that we have a binding, add
+>> > it to our DT.
+>> >
+>> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> > ---
+>> >  arch/arm/boot/dts/sun8i-a23-a33.dtsi | 26 ++++++++++++++++++++++++++
+>> >  1 file changed, 26 insertions(+), 0 deletions(-)
+>> >
+>> > diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+>> > index e4991a78ad73..982705719ef2 100644
+>> > --- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+>> > +++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+>> > @@ -486,6 +486,32 @@
+>> >                     #size-cells = <0>;
+>> >             };
+>> >
+>> > +           mali: gpu at 01c40000 {
+>>
+>> Drop leading 0.
+>>
+>> > +                   compatible = "allwinner,sun8i-a23-mali",
+>> > +                                "allwinner,sun7i-a20-mali", "arm,mali-400";
+>> > +                   reg = <0x01c40000 0x10000>;
+>>
+>> Does this really use 64K or that's just the register spacing? Set it
+>> to what's used.
+>
+> The memory maps in our datasheet allocates 64k for that block. I
+> always thought that we had to put the size of the whole memory block
+> allocated to that device.
+>
+> For now, the driver only uses space up to 0xe000 (so we wouldn't
+> "waste" a lot of space anyway), but what if at some point the driver
+> needs more than what we put in the DT?
 
-Not even David Miller is "aware" of that.  Then again, we're living in a
-world of "alternative facts" now.
+Well, it should be what the h/w is, not what the driver needs.
 
--- 
-M?ns Rullg?rd
+I only asked because 64K spacing of peripherals is becoming common,
+but that wastes a bit of virtual address space on 32-bit if really the
+h/w registers are only <4KB. Given that it is 0xe000 in this case, it
+doesn't really matter here.
+
+Rob
