@@ -1,46 +1,75 @@
-From: Chris.Packham@alliedtelesis.co.nz (Chris Packham)
-Date: Mon, 30 Jan 2017 22:02:38 +0000
-Subject: [PATCH v6 5/5] arm: mvebu: Add device tree for db-dxbc2 and
- db-xc3-24g4xg boards
-References: <20170129232035.25189-1-chris.packham@alliedtelesis.co.nz>
- <20170129232035.25189-6-chris.packham@alliedtelesis.co.nz>
- <87vaswtycu.fsf@free-electrons.com>
-Message-ID: <25e75991d565411fa9bccb6d2f71babf@svr-chch-ex1.atlnz.lc>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Mon, 30 Jan 2017 17:09:34 -0500
+Subject: [PATCH v4 2/4] arm64: Work around Falkor erratum 1003
+In-Reply-To: <20170130105627.GA1160@leverpostej>
+References: <20170125155232.10277-1-cov@codeaurora.org>
+ <20170125155232.10277-2-cov@codeaurora.org>
+ <20170127143848.GA25899@leverpostej>
+ <e3343971-9e21-3462-f07b-569b496ab8ad@codeaurora.org>
+ <20170130105627.GA1160@leverpostej>
+Message-ID: <f85f5b08-1f95-e008-b2e2-ca40d875efff@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+Hi Mark,
 
-On 31/01/17 03:29, Gregory CLEMENT wrote:
-> Hi Chris,
->
->  On lun., janv. 30 2017, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
->
->> These boards are Marvell's evaluation boards for the 98DX4251 and
->> 98DX3336 SoCs.
+On 01/30/2017 05:56 AM, Mark Rutland wrote:
+> Hi,
+> 
+> On Fri, Jan 27, 2017 at 04:52:23PM -0500, Christopher Covington wrote:
+>> On 01/27/2017 09:38 AM, Mark Rutland wrote:
+>>> On Wed, Jan 25, 2017 at 10:52:30AM -0500, Christopher Covington wrote:
+> 
+>>>> Replacing the above sequence with the one below will ensure that no TLB
+>>>> entries with an incorrect ASID are used by software.
+>>>>
+>>>>   write reserved value to TTBRx_EL1[ASID]
+>>>>   ISB
+>>>>   write new value to TTBRx_EL1[BADDR]
+>>>>   ISB
+>>>>   write new value to TTBRx_EL1[ASID]
+>>>>   ISB
+>>>>
+>>>> When the above sequence is used, page table entries using the new BADDR
+>>>> value may still be incorrectly allocated into the TLB using the reserved
+>>>> ASID. Yet this will not reduce functionality, since TLB entries incorrectly
+>>>> tagged with the reserved ASID will never be hit by a later instruction.
+>>>
+>>> I agree that there should be no explicit accesses to the VAs for these
+>>> entries. So tasks should not see erroneous VAs, and we shouldn't see
+>>> synchronous TLB conflict aborts.
+>>>
+>>> Regardless, can this allow conflicting TLB entries to be allocated to
+>>> the reserved ASID? e.g. if one task has a 4K mapping at a given VA, and
+>>> another has a 2M mapping which covers that VA, can both be allocated
+>>> into the TLBs under the reserved ASID?
+>>>
+>>> Can that have any effect on asynchronous TLB lookups or page table
+>>> walks, e.g. for speculated accesses?
 >>
->> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
->
-> Applied on mvebu/dt
->
+>> A speculative access that inserts an entry into the TLB could
+>> possibly find the conflict but will not signal it. Does that answer
+>> your question?
+> 
+> Yes!
+> 
+> The other case I was worried about was intermediate caching. I take it
+> the values in TLBs are not used as part of subsequent page table walks?
+> 
+> If so, the above sounds fine to me.
+> 
+> Otherwise, we'll need additional TLB maintenance.
 
-I just noticed that I hadn't updated arch/arm/boot/dts/Makefile. The way 
-I've been building things (explicitly running 'make 
-armada-xp-db-xc3-24g4xg.dtb') it hasn't mattered to me but I'm wondering 
-if I should have?
+Errant TLB entries will not be used for any legitimate subsequent page
+table walks.
 
->> ---
->>
->> Notes:
->>     Changes in v5:
->>     - update license text
->>     - use node labels
->>     Changes in v6:
->>     - Rename dts files to include 'armada-xp-' prefix
->>
->>  arch/arm/boot/dts/armada-xp-db-dxbc2.dts      | 151 ++++++++++++++++++++++++++
->>  arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts | 142 ++++++++++++++++++++++++
->>  2 files changed, 293 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/armada-xp-db-dxbc2.dts
->>  create mode 100644 arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts
->>
+I have some minor changes which I'll send as v5 based on
+kernel/git/arm64/linux.git for-next/core.
+
+Thanks,
+Cov
+
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
+Aurora Forum, a Linux Foundation Collaborative Project.
