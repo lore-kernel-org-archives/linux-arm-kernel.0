@@ -1,9 +1,9 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 30 Jan 2017 12:41:16 +0100
-Subject: [PATCH 14/14] ASoC: sunxi: simplify optional reset handling
+Date: Mon, 30 Jan 2017 12:41:13 +0100
+Subject: [PATCH 11/14] serial: 8250_dw: simplify optional reset handling
 In-Reply-To: <20170130114116.22089-1-p.zabel@pengutronix.de>
 References: <20170130114116.22089-1-p.zabel@pengutronix.de>
-Message-ID: <20170130114116.22089-14-p.zabel@pengutronix.de>
+Message-ID: <20170130114116.22089-11-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,37 +12,55 @@ optional"), the reset framework API calls use NULL pointers to describe
 optional, non-present reset controls.
 
 This allows to return errors from devm_reset_control_get_optional and to
-call reset_control_deassert unconditionally.
+call reset_control_(de)assert unconditionally.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Cc: Marcus Cooper <codekipper@gmail.com>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
 Cc: Chen-Yu Tsai <wens@csie.org>
-Cc: Mark Brown <broonie@kernel.org>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 ---
- sound/soc/sunxi/sun4i-spdif.c | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ drivers/tty/serial/8250/8250_dw.c | 13 +++++--------
+ 1 file changed, 5 insertions(+), 8 deletions(-)
 
-diff --git a/sound/soc/sunxi/sun4i-spdif.c b/sound/soc/sunxi/sun4i-spdif.c
-index 88fbb3a1e6601..d02d91b168243 100644
---- a/sound/soc/sunxi/sun4i-spdif.c
-+++ b/sound/soc/sunxi/sun4i-spdif.c
-@@ -493,13 +493,12 @@ static int sun4i_spdif_probe(struct platform_device *pdev)
- 	if (of_device_is_compatible(pdev->dev.of_node,
- 				    "allwinner,sun6i-a31-spdif")) {
- 		host->rst = devm_reset_control_get_optional(&pdev->dev, NULL);
--		if (IS_ERR(host->rst) && PTR_ERR(host->rst) == -EPROBE_DEFER) {
--			ret = -EPROBE_DEFER;
-+		if (IS_ERR(host->rst)) {
-+			ret = PTR_ERR(host->rst);
- 			dev_err(&pdev->dev, "Failed to get reset: %d\n", ret);
- 			goto err_disable_apb_clk;
- 		}
--		if (!IS_ERR(host->rst))
--			reset_control_deassert(host->rst);
-+		reset_control_deassert(host->rst);
+diff --git a/drivers/tty/serial/8250/8250_dw.c b/drivers/tty/serial/8250/8250_dw.c
+index c89fafc972b69..b8b911adff471 100644
+--- a/drivers/tty/serial/8250/8250_dw.c
++++ b/drivers/tty/serial/8250/8250_dw.c
+@@ -503,12 +503,11 @@ static int dw8250_probe(struct platform_device *pdev)
  	}
  
- 	ret = devm_snd_soc_register_component(&pdev->dev,
+ 	data->rst = devm_reset_control_get_optional(dev, NULL);
+-	if (IS_ERR(data->rst) && PTR_ERR(data->rst) == -EPROBE_DEFER) {
+-		err = -EPROBE_DEFER;
++	if (IS_ERR(data->rst)) {
++		err = PTR_ERR(data->rst);
+ 		goto err_pclk;
+ 	}
+-	if (!IS_ERR(data->rst))
+-		reset_control_deassert(data->rst);
++	reset_control_deassert(data->rst);
+ 
+ 	dw8250_quirks(p, data);
+ 
+@@ -540,8 +539,7 @@ static int dw8250_probe(struct platform_device *pdev)
+ 	return 0;
+ 
+ err_reset:
+-	if (!IS_ERR(data->rst))
+-		reset_control_assert(data->rst);
++	reset_control_assert(data->rst);
+ 
+ err_pclk:
+ 	if (!IS_ERR(data->pclk))
+@@ -562,8 +560,7 @@ static int dw8250_remove(struct platform_device *pdev)
+ 
+ 	serial8250_unregister_port(data->line);
+ 
+-	if (!IS_ERR(data->rst))
+-		reset_control_assert(data->rst);
++	reset_control_assert(data->rst);
+ 
+ 	if (!IS_ERR(data->pclk))
+ 		clk_disable_unprepare(data->pclk);
 -- 
 2.11.0
