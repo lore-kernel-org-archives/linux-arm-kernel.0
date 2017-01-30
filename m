@@ -1,97 +1,110 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 30 Jan 2017 13:57:05 -0800
-Subject: arch: arm: bpf: Converting cBPF to eBPF for arm 32 bit
-In-Reply-To: <20170130103853.GA34633@in3o.xyz>
-References: <20170130103853.GA34633@in3o.xyz>
-Message-ID: <CAGXu5j+7+D=N8U9Zpq1Uq526B4C4g=gQZtQ1iCMt3juDFgfgJA@mail.gmail.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Mon, 30 Jan 2017 16:57:36 -0500
+Subject: [PATCH v3 16/24] drm/rockchip: dw-mipi-dsi: properly configure
+ PHY timing
+In-Reply-To: <20170129132444.25251-17-john@metanate.com>
+References: <20170129132444.25251-1-john@metanate.com>
+ <20170129132444.25251-17-john@metanate.com>
+Message-ID: <20170130215736.GT20076@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2017 at 2:38 AM, Shubham Bansal
-<illusionist.neo@gmail.com> wrote:
-> Hi all,
->
-> Please ignore last copy of this mail. Kernel mailing lists bounced my
-> last mail back because of HTML content.
->
-> Just starting a new thread with proper heading on the main kernel
-> hardening and net-dev mailing list so that other people can be involved
-> in this. Please don't take this as a personal mail.
->
-> I am working on conversion of arm32 cBPF into eBPF JIT. I wanted some
-> help, regarding understanding of kernel code, from the dev available on
-> the mailing list. If you look at the ./arch/arm/net/bpf_jit_32.c code,
-> you will see jit_ctx structure. If anybody could help me understand what
-> each fields of this structure represent then it would be great.
->
-> Also, currently I am mapping the eBPF registers to arm 32 bit registers
-> in the following way.
->
->> static const int bpf2a32[] = {
->>
->>         /* return value from in-kernel function, and exit value from
->>         eBPF
->> */
->>         [BPF_REG_0] = ARM_R0,
->>
->>         /* arguments from eBPF program to in-kernel function */
->>
->>         [BPF_REG_1] = ARM_R1,
->>
->>         [BPF_REG_2] = ARM_R2,
->>
->>         [BPF_REG_3] = ARM_R3,
->>
->>         [BPF_REG_4] = ARM_R4,
->>
->>         [BPF_REG_5] = ARM_R5,
->>
->>         /* callee saved registers that in-kernel function will
->>         preserve */
->>
->>         [BPF_REG_6] = ARM_R6,
->>
->>         [BPF_REG_7] = ARM_R7,
->>
->>         [BPF_REG_8] = ARM_R8,
->>
->>         [BPF_REG_9] = ARM_R9,
->>
->>         /* Read only Frame Pointer to access Stack */
->>
->>         [BPF_REG_FP] = ARM_FP,
->>
->>         /* Temperory Register for internal BPF JIT */
->>
->>         [TMP_REG_1] = ARM_R11,
->>
->>         /* temporary register for blinding constants */
->>
->>         [BPF_REG_AX] = ARM_R10,
->>
->> };
->
-> But I have some question if anybody could help with those.
->
-> 1.) Currently, as eBPF uses 64 bit registers, I am mapping 64 bit eBPF
-> registers with 32 bit arm registers which looks wrong to me. Do anybody
-> have some idea about how to map eBPF->arm 32 bit registers ?
+On Sun, Jan 29, 2017 at 01:24:36PM +0000, John Keeping wrote:
+> These values are specified as constant time periods but the PHY
+> configuration is in terms of the current lane byte clock so using
+> constant values guarantees that the timings will be outside the
+> specification with some display configurations.
+> 
+> Derive the necessary configuration from the byte clock in order to
+> ensure that the PHY configuration is correct.
+> 
+> Signed-off-by: John Keeping <john@metanate.com>
+> ---
+> v3:
+> - Wrap some long lines
+> Unchanged in v2
+> 
+>  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 39 ++++++++++++++++++++++++++++++----
+>  1 file changed, 35 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> index cfe7e4ba305c..85edf6dd2bac 100644
+> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> @@ -383,6 +383,26 @@ static void dw_mipi_dsi_phy_write(struct dw_mipi_dsi *dsi, u8 test_code,
+>  	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_TESTCLK | PHY_UNTESTCLR);
+>  }
+>  
+> +/**
+> + * ns2bc - Nanoseconds to byte clock cycles
+> + */
+> +static inline unsigned int ns2bc(struct dw_mipi_dsi *dsi, int ns)
+> +{
+> +	unsigned long byte_clk_khz = dsi->lane_mbps * MSEC_PER_SEC / 8;
 
-I was going to say "look at the x86 32-bit implementation." ... But
-there isn't one. :( I'm going to guess that there isn't a very good
-answer here. I assume you'll have to build some kind of stack scratch
-space to load/save.
+Why multiply by 1000 (MSEC_PER_SEC) only to immediately divide by 1000?
 
-> 2.) Also, is my current mapping good enough to make the JIT fast enough ?
-> because as you might know, eBPF JIT mostly depends on 1-to-1 mapping of
-> its instructions with native instructions.
+> +
+> +	return (ns * (byte_clk_khz / 1000) + 999) / 1000;
 
-I don't know -- it might be tricky with needing to deal with 64-bit
-registers. But if you can make it faster than the non-JIT, it should
-be a win. :) Yay assembly.
+Can you replace this whole function with:
 
--Kees
+return DIV_ROUND_UP(ns * dsi->lane_mbps / 8, 1000);
+
+> +}
+> +
+> +/**
+> + * ns2ui - Nanoseconds to UI time periods
+> + */
+> +static inline unsigned int ns2ui(struct dw_mipi_dsi *dsi, int ns)
+> +{
+> +	unsigned long byte_clk_khz = dsi->lane_mbps * MSEC_PER_SEC;
+> +
+> +	return (ns * (byte_clk_khz / 1000) + 999) / 1000;
+
+Same remarks here.
+
+Sean
+
+
+> +}
+> +
+>  static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
+>  {
+>  	int ret, testdin, vco, val;
+> @@ -434,10 +454,21 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
+>  					 SETRD_MAX | POWER_MANAGE |
+>  					 TER_RESISTORS_ON);
+>  
+> -
+> -	dw_mipi_dsi_phy_write(dsi, 0x70, TLP_PROGRAM_EN | 0xf);
+> -	dw_mipi_dsi_phy_write(dsi, 0x71, THS_PRE_PROGRAM_EN | 0x55);
+> -	dw_mipi_dsi_phy_write(dsi, 0x72, THS_ZERO_PROGRAM_EN | 0xa);
+> +	dw_mipi_dsi_phy_write(dsi, 0x60, TLP_PROGRAM_EN | ns2bc(dsi, 500));
+> +	dw_mipi_dsi_phy_write(dsi, 0x61, THS_PRE_PROGRAM_EN | ns2ui(dsi, 40));
+> +	dw_mipi_dsi_phy_write(dsi, 0x62, THS_ZERO_PROGRAM_EN | ns2bc(dsi, 300));
+> +	dw_mipi_dsi_phy_write(dsi, 0x63, THS_PRE_PROGRAM_EN | ns2ui(dsi, 100));
+> +	dw_mipi_dsi_phy_write(dsi, 0x64, BIT(5) | ns2bc(dsi, 100));
+> +	dw_mipi_dsi_phy_write(dsi, 0x65, BIT(5) | (ns2bc(dsi, 60) + 7));
+> +
+> +	dw_mipi_dsi_phy_write(dsi, 0x70, TLP_PROGRAM_EN | ns2bc(dsi, 500));
+> +	dw_mipi_dsi_phy_write(dsi, 0x71,
+> +			      THS_PRE_PROGRAM_EN | (ns2ui(dsi, 50) + 5));
+> +	dw_mipi_dsi_phy_write(dsi, 0x72,
+> +			      THS_ZERO_PROGRAM_EN | (ns2bc(dsi, 140) + 2));
+> +	dw_mipi_dsi_phy_write(dsi, 0x73,
+> +			      THS_PRE_PROGRAM_EN | (ns2ui(dsi, 60) + 8));
+> +	dw_mipi_dsi_phy_write(dsi, 0x74, BIT(5) | ns2bc(dsi, 100));
+>  
+>  	dsi_write(dsi, DSI_PHY_RSTZ, PHY_ENFORCEPLL | PHY_ENABLECLK |
+>  				     PHY_UNRSTZ | PHY_UNSHUTDOWNZ);
+> -- 
+> 2.11.0.197.gb556de5.dirty
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
 -- 
-Kees Cook
-Pixel Security
+Sean Paul, Software Engineer, Google / Chromium OS
