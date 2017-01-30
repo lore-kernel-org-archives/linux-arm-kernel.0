@@ -1,74 +1,121 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 30 Jan 2017 16:23:37 +0100
-Subject: [PATCH 0/4] video: ARM CLCD: add support of an optional GPIO to
- enable panel
-In-Reply-To: <ae187f91-ca9b-c51a-d7cb-14fd99baa434@mleia.com>
-References: <20161221032717.13154-1-vz@mleia.com> <3057141.7Vn8X5ONyT@amdc3058>
- <ae187f91-ca9b-c51a-d7cb-14fd99baa434@mleia.com>
- <CGME20170130152340epcas5p3f68349ef89c5ec902186ae71011c0c4b@epcas5p3.samsung.com>
-Message-ID: <2240649.KotMHs5XVh@amdc3058>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Mon, 30 Jan 2017 10:26:11 -0500
+Subject: [PATCH v3 24/24] drm/rockchip: dw-mipi-dsi: support read commands
+In-Reply-To: <20170129132444.25251-25-john@metanate.com>
+References: <20170129132444.25251-1-john@metanate.com>
+ <20170129132444.25251-25-john@metanate.com>
+Message-ID: <20170130152611.GA20076@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, January 17, 2017 03:57:33 AM Vladimir Zapolskiy wrote:
-> On 01/13/2017 01:08 PM, Bartlomiej Zolnierkiewicz wrote:
-> > 
-> > Hi,
-> > 
-> > On Thursday, January 12, 2017 11:26:14 PM Vladimir Zapolskiy wrote:
-> >> On 01/12/2017 10:27 AM, Linus Walleij wrote:
-> >>> On Thu, Jan 12, 2017 at 1:05 AM, Vladimir Zapolskiy <vz@mleia.com> wrote:
-> >>>> On 01/11/2017 05:16 PM, Linus Walleij wrote:
-> >>>>> On Tue, Jan 10, 2017 at 2:47 PM, Vladimir Murzin
-> >>>>> <vladimir.murzin@arm.com> wrote:
-> >>>>>
-> >>>>>> In another thread Benjamin pointed at patch [1] in drm/kms part for noMMU.
-> >>>>>>
-> >>>>>> [1] https://cgit.freedesktop.org/drm/drm-misc/commit/?id=62a0d98a188cc4ebd8ea54b37d274ec20465e464
-> >>>>>
-> >>>>> Problem solved?
-> >>>>>
-> >>>>> Vladimir: I do not require in any way that you create a CLCD driver for DRM,
-> >>>>> I just think it would be very very nice...
-> >>>>>
-> >>>>
-> >>>> I have no other option, this series is unreviewed and thus unlikely it will
-> >>>> be applied, still a panel PCB on my board needs power management support.
-> >>>
-> >>> Hm I can ACK it I guess, but mergeing it into an unmaintained subsystem
-> >>> is another issue, just not very optimal. 
-> >>
-> >> + Bartlomiej
-> >>
-> >> Linus, your ack is always more than appreciated.
-> > 
-> > +1
-> > 
-> >> To all appearance Bartlomiej is a new honoured framebuffer layer maintainer.
-> >>
-> >> Bartlomiej, do you have the changes under discussion in your mailbox or
-> >> should I resend them to you directly for review?
-> > 
-> > No need for resend, I picked them from the list and they are on TODO.
-> > 
+On Sun, Jan 29, 2017 at 01:24:44PM +0000, John Keeping wrote:
+> I haven't found any method for getting the length of a response, so this
+> just uses the requested rx_len
 > 
-> Bartlomiej, Linus,
+> Signed-off-by: John Keeping <john@metanate.com>
+> ---
+> v3:
+> - Fix checkpatch warnings
+> Unchanged in v2
 > 
-> I've noticed that 4/4 requires special attention due to the anticipated
-> change of devm_get_gpiod_from_child() interface.
+>  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 56 ++++++++++++++++++++++++++++++++++
+>  1 file changed, 56 insertions(+)
 > 
-> If you have any concerns regarding 4/4, please review and consider to
-> apply the first three clean-up patches in the series, basically I've
-> achieved my goal of describing a power supply for a panel in DTS by
-> introducing a DRM driver (see a note below), however support of
-> "enable-gpios" property mentioned in the "panel-dpi" device tree binding
-> documentation still is seen as beneficial for the CLCD fbdev driver.
+> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> index cf3ca6b0cbdb..cc58ada75425 100644
+> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> @@ -678,6 +678,56 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
+>  	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, hdr_val);
+>  }
+>  
+> +static int dw_mipi_dsi_dcs_read(struct dw_mipi_dsi *dsi,
+> +				const struct mipi_dsi_msg *msg)
+> +{
+> +	const u8 *tx_buf = msg->tx_buf;
+> +	u8 *rx_buf = msg->rx_buf;
+> +	size_t i;
+> +	int ret, val;
+> +
+> +	dsi_write(dsi, DSI_PCKHDL_CFG, EN_CRC_RX | EN_ECC_RX | EN_BTA);
+> +	dsi_write(dsi, DSI_GEN_HDR,
+> +		  GEN_HDATA(tx_buf[0]) | GEN_HTYPE(msg->type));
+> +
+> +	ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
+> +				 val, !(val & GEN_RD_CMD_BUSY), 1000,
+> +				 CMD_PKT_STATUS_TIMEOUT_US);
+> +	if (ret < 0) {
+> +		dev_err(dsi->dev, "failed to read command response\n");
+> +		return ret;
+> +	}
+> +
+> +	for (i = 0; i < msg->rx_len;) {
+> +		u32 pld = dsi_read(dsi, DSI_GEN_PLD_DATA);
+> +
+> +		while (i < msg->rx_len) {
+> +			rx_buf[i] = pld & 0xff;
+> +			pld >>= 8;
+> +			i++;
+> +		}
+> +	}
 
-Thanks, I queued patches #1-3 for 4.11.  Please ping me later for
-merging patch #4.
+AFAICT, the outer for loop just initializes i and ensures msg->rx_len is
+non-zero? 
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+I think the following would be easier to read (and safe against the case where
+msg->rx_len > sizeof(pld) (even though this shouldn't happen according to DCS
+spec)).
+
+if (msg->rx_len > 0) {
+        u32 pld = dsi_read(dsi, DSI_GEN_PLD_DATA);
+        memcpy(rx_buf, &pld, MIN(msg->rx_len, sizeof(pld));
+}
+
+
+> +
+> +	return msg->rx_len;
+> +}
+> +
+> +static int dw_mipi_dsi_set_max_return_packet_size(struct dw_mipi_dsi *dsi,
+> +						  size_t len)
+> +{
+> +	u8 val[] = { len & 0xff, (len >> 8) & 0xff };
+> +	struct mipi_dsi_msg msg = {
+> +		.channel = dsi->channel,
+> +		.type = MIPI_DSI_SET_MAXIMUM_RETURN_PACKET_SIZE,
+> +		.tx_buf = val,
+> +		.tx_len = 2,
+> +	};
+> +
+> +	if (len > 0xffff)
+> +		return -EINVAL;
+> +
+> +	return dw_mipi_dsi_dcs_short_write(dsi, &msg);
+> +}
+> +
+>  static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
+>  					 const struct mipi_dsi_msg *msg)
+>  {
+> @@ -695,6 +745,12 @@ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
+>  	case MIPI_DSI_DCS_LONG_WRITE:
+>  		ret = dw_mipi_dsi_dcs_long_write(dsi, msg);
+>  		break;
+> +	case MIPI_DSI_DCS_READ:
+> +		ret = dw_mipi_dsi_set_max_return_packet_size(dsi, msg->rx_len);
+> +		if (ret < 0)
+> +			return ret;
+> +		ret = dw_mipi_dsi_dcs_read(dsi, msg);
+> +		break;
+>  	default:
+>  		dev_err(dsi->dev, "unsupported message type 0x%02x\n",
+>  			msg->type);
+> -- 
+> 2.11.0.197.gb556de5.dirty
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+
+-- 
+Sean Paul, Software Engineer, Google / Chromium OS
