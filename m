@@ -1,48 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 29 Jan 2017 16:08:38 -0800
-Subject: [GIT PULL] Qualcomm Driver Updates for v4.11
-In-Reply-To: <1485240494-8040-3-git-send-email-andy.gross@linaro.org>
+Date: Sun, 29 Jan 2017 16:09:11 -0800
+Subject: [GIT PULL] Qualcomm Device Tree Changes for v4.11
+In-Reply-To: <1485240494-8040-4-git-send-email-andy.gross@linaro.org>
 References: <1485240494-8040-1-git-send-email-andy.gross@linaro.org>
- <1485240494-8040-3-git-send-email-andy.gross@linaro.org>
-Message-ID: <20170130000838.GN3133@localhost>
+ <1485240494-8040-4-git-send-email-andy.gross@linaro.org>
+Message-ID: <20170130000911.GO3133@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2017 at 12:48:12AM -0600, Andy Gross wrote:
+On Tue, Jan 24, 2017 at 12:48:13AM -0600, Andy Gross wrote:
 > The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 > 
 >   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-drivers-for-4.11
+>   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-dts-for-4.11
 > 
-> for you to fetch changes up to a811b420b6c13759540070c0e9541b7cd8569168:
+> for you to fetch changes up to 7a5c275fd82185e98969d3370d55b5b5473fc3ba:
 > 
->   firmware: qcom_scm: Add set remote state API (2017-01-16 23:45:04 -0600)
-> 
-> ----------------------------------------------------------------
-> Qualcomm ARM Based Driver Updates for v4.11
-> 
-> * Fix issues with SCM compile testing
-> * Add SCM set remote state API
-> * Mask APQ8064 SCM clock dependency issue
-> * Add Qualcomm DMA folder to MAINTAINERS
-> * Fix EBI2 dependencies
+>   ARM: dts: qcom: Add apq8064 CoreSight components (2017-01-13 12:42:00 -0600)
 > 
 > ----------------------------------------------------------------
-> Andy Gross (2):
->       firmware: qcom: scm: Mask APQ8064 core clk dependency
->       firmware: qcom_scm: Add set remote state API
+> Qualcomm Device Tree Changes for v4.11
 > 
-> Linus Walleij (1):
->       bus: qcom_ebi2: default y if ARCH_QCOM
-> 
-> Pramod Gurav (1):
->       MAINTAINERS: Update the files to include the Qualcomm DMA folder
-> 
-> Stanimir Varbanov (1):
->       firmware: qcom: scm: Add empty functions to help compile testing
+> * Add Coresight components for APQ8064
+> * Fixup PM8058 nodes
+> * Add APQ8060 gyro and accel support
+> * Enable SD600 HDMI support
+> * Add RIVA supprort for Sony Yuga and SD600
+> * Add PM8821 support
+> * Add MSM8974 ADSP, USB gadget, SMD, and SMP2P support
+> * Fix IPQ8064 clock frequencies
 
 Merged, thanks.
 
