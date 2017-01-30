@@ -1,62 +1,48 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 30 Jan 2017 16:02:03 +0100
-Subject: [RFC v2 06/10] KVM: arm/arm64: Update the physical timer
- interrupt level
-In-Reply-To: <86sho199jx.fsf@arm.com>
-References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
- <1485479100-4966-7-git-send-email-jintack@cs.columbia.edu>
- <86sho199jx.fsf@arm.com>
-Message-ID: <20170130150203.GD16459@cbox>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 30 Jan 2017 15:04:28 +0000
+Subject: [PATCH 06/10] soc/qbman: Add ARM equivalent for
+ flush_dcache_range()
+In-Reply-To: <5414359.8GMja3pNrI@wuerfel>
+References: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
+ <VI1PR0401MB2430DA6BD2F857C30EC86A50917F0@VI1PR0401MB2430.eurprd04.prod.outlook.com>
+ <HE1PR0401MB263638F320470CA216990BCC86720@HE1PR0401MB2636.eurprd04.prod.outlook.com>
+ <5414359.8GMja3pNrI@wuerfel>
+Message-ID: <20170130150428.GY27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 29, 2017 at 03:21:06PM +0000, Marc Zyngier wrote:
-> On Fri, Jan 27 2017 at 01:04:56 AM, Jintack Lim <jintack@cs.columbia.edu> wrote:
-> > Now that we maintain the EL1 physical timer register states of VMs,
-> > update the physical timer interrupt level along with the virtual one.
-> >
-> > Note that the emulated EL1 physical timer is not mapped to any hardware
-> > timer, so we call a proper vgic function.
-> >
-> > Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
-> > ---
-> >  virt/kvm/arm/arch_timer.c | 20 ++++++++++++++++++++
-> >  1 file changed, 20 insertions(+)
-> >
-> > diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> > index 0f6e935..3b6bd50 100644
-> > --- a/virt/kvm/arm/arch_timer.c
-> > +++ b/virt/kvm/arm/arch_timer.c
-> > @@ -180,6 +180,21 @@ static void kvm_timer_update_mapped_irq(struct kvm_vcpu *vcpu, bool new_level,
-> >  	WARN_ON(ret);
-> >  }
-> >  
-> > +static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
-> > +				 struct arch_timer_context *timer)
-> > +{
-> > +	int ret;
-> > +
-> > +	BUG_ON(!vgic_initialized(vcpu->kvm));
+On Wed, Jan 25, 2017 at 10:20:09PM +0100, Arnd Bergmann wrote:
+> On Monday, January 23, 2017 7:24:59 PM CET Roy Pledge wrote:
+> > > Is there a non-"under the covers" way to say "flush this region" without
+> > > the arch second-guessing whether it really needs to be flushed?
+> > Any advice on how to resolve this? I looked into trying to do a
+> > non-cacheable mapping of the
+> > memory so that the flush wouldn't be required but the ioremap code
+> > prevents mapping normal
+> > memory in this way.  The QMan device requiresthis memory to be zeroed at
+> > startup. Because the device
+> > does non coherent reads and writes to the memory we must ensure that any
+> > cache in the CPU cluster(s)
+> > is flushed in order to prevent a future castout from overwriting data.
+> > This happened before on PPC
+> > platforms and made for some very unfun debug session trying to
+> > understand what was causing the failure.
 > 
-> Although I've added my fair share of BUG_ON() in the code base, I've
-> since reconsidered my position. If we get in a situation where the vgic
-> is not initialized, maybe it would be better to just WARN_ON and return
-> early rather than killing the whole box. Thoughts?
-> 
+> If this is normal RAM, you should be able to just write zeroes, and then
+> do a dma_map_single() for initialization. Are there any other requirements
+> what to do with the memory later, is it used for communication at all,
+> or just required to be zero?
 
-The distinction to me is whether this will cause fatal crashes or
-exploits down the road if we're working on uninitialized data.  If all
-that can happen if the vgic is not initialized, is that the guest
-doesn't see interrupts, for example, then a WARN_ON is appropriate.
+Please don't encourage incorrect DMA API usage.
 
-Which is the case here?
+dma_map_single() must always be paired with an unmap at some point,
+otherwise it's a memory leak if DMA API debugging is enabled.  So,
+if you wish to suggest using dma_map_single(), please also suggest
+where to use dma_unmap_single() too.
 
-That being said, do we need this at all?  This is in the critial path
-and is actually measurable (I know this from my work on the other timer
-series), so it's better to get rid of it if we can.  Can we simply
-convince ourselves this will never happen, and is the code ever likely
-to change so that it gets called with the vgic disabled later?
+Thanks.
 
-
-Thanks,
--Christoffer
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
