@@ -1,74 +1,102 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 30 Jan 2017 19:41:31 +0100
-Subject: [RFC v2 06/10] KVM: arm/arm64: Update the physical timer
- interrupt level
-In-Reply-To: <b3a4a3e4-65d4-1af3-2b77-14b7fffd9d06@arm.com>
-References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
- <1485479100-4966-7-git-send-email-jintack@cs.columbia.edu>
- <86sho199jx.fsf@arm.com> <20170130150203.GD16459@cbox>
- <b3a4a3e4-65d4-1af3-2b77-14b7fffd9d06@arm.com>
-Message-ID: <20170130184131.GE16459@cbox>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 30 Jan 2017 18:42:31 +0000
+Subject: [PATCH V7 01/11] iommu/of: Refactor of_iommu_configure() for
+ error handling
+In-Reply-To: <003601d27ac6$84866840$8d9338c0$@codeaurora.org>
+References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
+ <1485188293-20263-2-git-send-email-sricharan@codeaurora.org>
+ <4388779a-0e83-fadc-83f4-98c46c88d42e@semihalf.com>
+ <c7bad124-d9f2-0ddf-168f-0b1950d3e1ed@arm.com>
+ <009901d278c7$34fee230$9efca690$@codeaurora.org>
+ <d27f04da-7d34-9640-1639-790d0732ed93@arm.com>
+ <003601d27ac6$84866840$8d9338c0$@codeaurora.org>
+Message-ID: <8387d057-15bd-500c-134e-0e731ff837d6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2017 at 05:50:03PM +0000, Marc Zyngier wrote:
-> On 30/01/17 15:02, Christoffer Dall wrote:
-> > On Sun, Jan 29, 2017 at 03:21:06PM +0000, Marc Zyngier wrote:
-> >> On Fri, Jan 27 2017 at 01:04:56 AM, Jintack Lim <jintack@cs.columbia.edu> wrote:
-> >>> Now that we maintain the EL1 physical timer register states of VMs,
-> >>> update the physical timer interrupt level along with the virtual one.
-> >>>
-> >>> Note that the emulated EL1 physical timer is not mapped to any hardware
-> >>> timer, so we call a proper vgic function.
-> >>>
-> >>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
-> >>> ---
-> >>>  virt/kvm/arm/arch_timer.c | 20 ++++++++++++++++++++
-> >>>  1 file changed, 20 insertions(+)
-> >>>
-> >>> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> >>> index 0f6e935..3b6bd50 100644
-> >>> --- a/virt/kvm/arm/arch_timer.c
-> >>> +++ b/virt/kvm/arm/arch_timer.c
-> >>> @@ -180,6 +180,21 @@ static void kvm_timer_update_mapped_irq(struct kvm_vcpu *vcpu, bool new_level,
-> >>>  	WARN_ON(ret);
-> >>>  }
-> >>>  
-> >>> +static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
-> >>> +				 struct arch_timer_context *timer)
-> >>> +{
-> >>> +	int ret;
-> >>> +
-> >>> +	BUG_ON(!vgic_initialized(vcpu->kvm));
-> >>
-> >> Although I've added my fair share of BUG_ON() in the code base, I've
-> >> since reconsidered my position. If we get in a situation where the vgic
-> >> is not initialized, maybe it would be better to just WARN_ON and return
-> >> early rather than killing the whole box. Thoughts?
-> >>
-> > 
-> > The distinction to me is whether this will cause fatal crashes or
-> > exploits down the road if we're working on uninitialized data.  If all
-> > that can happen if the vgic is not initialized, is that the guest
-> > doesn't see interrupts, for example, then a WARN_ON is appropriate.
-> > 
-> > Which is the case here?
-> > 
-> > That being said, do we need this at all?  This is in the critial path
-> > and is actually measurable (I know this from my work on the other timer
-> > series), so it's better to get rid of it if we can.  Can we simply
-> > convince ourselves this will never happen, and is the code ever likely
-> > to change so that it gets called with the vgic disabled later?
+On 30/01/17 07:00, Sricharan wrote:
+> Hi Robin,
 > 
-> That'd be the best course of action. I remember us reworking some of
-> that in the now defunct vgic-less series. Maybe we could salvage that
-> code, if only for the time we spent on it...
+>>> [..]
+>>>
+>>>>>> +const struct iommu_ops *of_iommu_configure(struct device *dev,
+>>>>>> +                       struct device_node *master_np)
+>>>>>> +{
+>>>>>> +    const struct iommu_ops *ops;
+>>>>>> +
+>>>>>> +    if (!master_np)
+>>>>>> +        return NULL;
+>>>>>> +
+>>>>>> +    if (dev_is_pci(dev))
+>>>>>> +        ops = of_pci_iommu_init(to_pci_dev(dev), master_np);
+>>>>>
+>>>>> I gave the whole patch set a try on ThunderX. really_probe() is failing
+>>>>> on dma_configure()->of_pci_iommu_init() for each PCI device.
+>>>>
+>>>> When you say "failing", do you mean cleanly, or with a crash? I've
+>>>> managed to hit __of_match_node() dereferencing NULL from
+>>>> of_iommu_xlate() in a horribly complicated chain of events, which I'm
+>>>> trying to figure out now, and I wonder if the two might be related.
+>>>
+>>> Sorry that there is crash still. __of_match_node seems to checking
+>>> for NULL arguments , feels like some invalid pointer was passed in.
+>>> Is there any particular sequence to try for this ?
+>>
+>> Ah, I did figure it out - it wasn't actually a NULL dereference, but an
+>> unmapped address. Turns out __iommu_of_table is in initdata, so any
+>> driver probing after init, connected to an unprobed IOMMU (in this case
+>> disabled in DT), trips over trying to match the now-freed table. I'm
+>> working on the fix - technically the bug's in my patch (#2) anyway ;)
+>>
 > 
-Ah, we never merged it?  Were we waiting on a userspace implementation
-or agreement on the ABI?
+> Ok, thanks for bringing this out. There is also an issue that
+> Sinan has mentioned while testing the ACPI hotplug path, probably
+> its related to the above, not sure. I will try to check more on that
+> in the meanwhile. Then, taking your fix and fixing the hotplug case
+> i will do one more repost.
 
-There was definitely a useful cleanup with the whole enabled flag thing
-on the timer I remember.
+OK, I've finally settled on the below fixup for patch #2 - I have some
+follow-on ideas for eventually getting of the magic table altogether,
+but they can wait until we've got the baseline functionality sorted.
+Updated full patch here:
 
-Thanks,
--Christoffer
+http://www.linux-arm.org/git?p=linux-rm.git;a=commitdiff;h=5616af885f7c5c24f7239d5c689583b2b583c407
+
+Robin.
+
+-----8<-----
+
+diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+index 349bd1d01612..1f92d98237d5 100644
+--- a/drivers/iommu/of_iommu.c
++++ b/drivers/iommu/of_iommu.c
+@@ -96,6 +96,19 @@ int of_get_dma_window(struct device_node *dn, const
+char *prefix, int index,
+ }
+ EXPORT_SYMBOL_GPL(of_get_dma_window);
+
++static bool of_iommu_driver_present(struct device_node *np)
++{
++	/*
++	 * If the IOMMU still isn't ready by the time we reach init, assume
++	 * it never will be. We don't want to defer indefinitely, nor attempt
++	 * to dereference __iommu_of_table after it's been freed.
++	 */
++	if (system_state > SYSTEM_BOOTING)
++		return false;
++
++	return of_match_node(&__iommu_of_table, np);
++}
++
+ static const struct iommu_ops
+ *of_iommu_xlate(struct device *dev, struct of_phandle_args *iommu_spec)
+ {
+@@ -105,7 +118,7 @@ static const struct iommu_ops
+
+ 	ops = iommu_get_instance(fwnode);
+ 	if ((ops && !ops->of_xlate) ||
+-	    (!ops && !of_match_node(&__iommu_of_table, iommu_spec->np)))
++	    (!ops && !of_iommu_driver_present(iommu_spec->np)))
+ 		return NULL;
+
+ 	err = iommu_fwspec_init(dev, &iommu_spec->np->fwnode, ops);
