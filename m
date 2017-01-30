@@ -1,91 +1,134 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 30 Jan 2017 10:46:39 -0500
-Subject: [PATCH V7 08/11] drivers: acpi: Handle IOMMU lookup failure with
- deferred probing or error
-In-Reply-To: <b2e50c17de156341deab9fb8e91a8dec@codeaurora.org>
-References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
- <1485188293-20263-9-git-send-email-sricharan@codeaurora.org>
- <20170124123711.GA11996@red-moon>
- <f2370671-ece8-fbee-de19-350dd625088f@codeaurora.org>
- <93e79759-d614-9b36-d5ab-63e8eb725009@arm.com>
- <14751205-f034-7f0d-442a-854c3909425c@codeaurora.org>
- <5ba9f366d6e25397cdef8ad95b49e199@codeaurora.org>
- <175a3798-b824-ef1a-e112-9f6f472973ae@codeaurora.org>
- <20170130143851.GJ16461@arm.com>
- <b2e50c17de156341deab9fb8e91a8dec@codeaurora.org>
-Message-ID: <1e048aff-0d77-b9f2-ebf8-2ba315b90ca7@codeaurora.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 30 Jan 2017 15:51:55 +0000
+Subject: [PATCHv2] arm: ftrace: Adds support for
+ CONFIG_DYNAMIC_FTRACE_WITH_REGS
+In-Reply-To: <1485300291-29722-1-git-send-email-abelvesa@linux.com>
+References: <1485300291-29722-1-git-send-email-abelvesa@linux.com>
+Message-ID: <20170130155155.GC27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1/30/2017 9:54 AM, Nate Watterson wrote:
-> On 2017-01-30 09:38, Will Deacon wrote:
->> On Mon, Jan 30, 2017 at 09:33:50AM -0500, Sinan Kaya wrote:
->>> On 1/30/2017 9:23 AM, Nate Watterson wrote:
->>> > On 2017-01-30 08:59, Sinan Kaya wrote:
->>> >> On 1/30/2017 7:22 AM, Robin Murphy wrote:
->>> >>> On 29/01/17 17:53, Sinan Kaya wrote:
->>> >>>> On 1/24/2017 7:37 AM, Lorenzo Pieralisi wrote:
->>> >>>>> [+hanjun, tomasz, sinan]
->>> >>>>>
->>> >>>>> It is quite a key patchset, I would be glad if they can test on their
->>> >>>>> respective platforms with IORT.
->>> >>>>>
->>> >>>>
->>> >>>> Tested on top of 4.10-rc5.
->>> >>>>
->>> >>>> 1.    Platform Hidma device passed dmatest
->>> >>>> 2.    Seeing some USB stalls on a platform USB device.
->>> >>>> 3.    PCIe NVME drive probed and worked fine with MSI interrupts after boot.
->>> >>>> 4.     NVMe driver didn't probe following a hotplug insertion and received an
->>> >>>> SMMU error event during the insertion.
->>> >>>
->>> >>> What was the SMMU error - a translation/permission fault (implying the
->>> >>> wrong DMA ops) or a bad STE fault (implying we totally failed to tell
->>> >>> the SMMU about the device at all)?
->>> >>>
->>> >>
->>> >> root at ubuntu:/sys/bus/pci/slots/4# echo 0 > power
->>> >>
->>> >> [__204.698522]_iommu:_Removing_device_0003:01:00.0_from_group_0
->>> >> [  204.708704] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down
->>> >> [  204.708723] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down event
->>> >> ignored; already powering off
->>> >>
->>> >> root at ubuntu:/sys/bus/pci/slots/4#
->>> >>
->>> >> [__254.820440]_iommu:_Adding_device_0003:01:00.0_to_group_8
->>> >> [  254.820599] nvme nvme0: pci function 0003:01:00.0
->>> >> [  254.820621] nvme 0003:01:00.0: enabling device (0000 -> 0002)
->>> >> [  261.948558] arm-smmu-v3 arm-smmu-v3.0.auto: event 0x0a received:
->>> >> [  261.948561] arm-smmu-v3 arm-smmu-v3.0.auto:  0x000001000000000a
->>> >> [  261.948563] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
->>> >> [  261.948564] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
->>> >> [  261.948566] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
->>>
->>> > Looks like C_BAD_CD. Can you please try with:
->>> > iommu/arm-smmu-v3: Clear prior settings when updating STEs
->>>
->>> This resolved the issue. Can we pull Nate's patch to 4.10 so that I don't see
->>> this issue again.
->>
->> I already sent the pull request to Joerg for 4.11. Do you see this problem
->> without Sricharan's patches (i.e. vanilla mainline)? If so, we'll need to
->> send the patch to stable after -rc1.
-> Using vanilla mainline, I see it most commonly when directly assigning
-> a device to a guest machine. I think I've also seen it after removing then
-> re-adding a PCI device. Basically anytime an STE's CTX pointer is changed
-> from a non-NULL value and STE[CFG] indicates translation will be performed.
+On Tue, Jan 24, 2017 at 11:24:51PM +0000, Abel Vesa wrote:
+> The DYNAMIC_FTRACE_WITH_REGS configuration makes it possible for a ftrace
+> operation to specify if registers need to saved/restored by the ftrace handler.
+> This is needed by kgraft and possibly other ftrace-based tools, and the ARM
+> architecture is currently lacking this feature. It would also be the first step
+> to support the "Kprobes-on-ftrace" optimization on ARM.
 > 
-
-I was not able to reproduce the issue with Vanilla kernel. I only tested hotplug.
-
-> Nate
->>
->> Will
+> This patch introduces a new ftrace handler that stores the registers on the
+> stack before calling the next stage. The registers are restored from the stack
+> before going back to the instrumented function.
 > 
+> A side-effect of this patch is to activate the support for ftrace_modify_call()
+> as it defines ARCH_SUPPORTS_FTRACE_OPS for the ARM architecture.
+> 
+> Signed-off-by: Abel Vesa <abelvesa@linux.com>
+> ---
+>  arch/arm/Kconfig               |  1 +
+>  arch/arm/include/asm/ftrace.h  |  4 +++
+>  arch/arm/kernel/entry-ftrace.S | 79 ++++++++++++++++++++++++++++++++++++++++++
+>  arch/arm/kernel/ftrace.c       | 33 ++++++++++++++++++
+>  4 files changed, 117 insertions(+)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 186c4c2..db40973 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -50,6 +50,7 @@ config ARM
+>  	select HAVE_DMA_API_DEBUG
+>  	select HAVE_DMA_CONTIGUOUS if MMU
+>  	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL) && !CPU_ENDIAN_BE32 && MMU
+> +	select HAVE_DYNAMIC_FTRACE_WITH_REGS if HAVE_DYNAMIC_FTRACE
+>  	select HAVE_EFFICIENT_UNALIGNED_ACCESS if (CPU_V6 || CPU_V6K || CPU_V7) && MMU
+>  	select HAVE_EXIT_THREAD
+>  	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
+> diff --git a/arch/arm/include/asm/ftrace.h b/arch/arm/include/asm/ftrace.h
+> index 22b7311..f379881 100644
+> --- a/arch/arm/include/asm/ftrace.h
+> +++ b/arch/arm/include/asm/ftrace.h
+> @@ -1,6 +1,10 @@
+>  #ifndef _ASM_ARM_FTRACE
+>  #define _ASM_ARM_FTRACE
+>  
+> +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+> +#define ARCH_SUPPORTS_FTRACE_OPS 1
+> +#endif
+> +
+>  #ifdef CONFIG_FUNCTION_TRACER
+>  #define MCOUNT_ADDR		((unsigned long)(__gnu_mcount_nc))
+>  #define MCOUNT_INSN_SIZE	4 /* sizeof mcount call */
+> diff --git a/arch/arm/kernel/entry-ftrace.S b/arch/arm/kernel/entry-ftrace.S
+> index c73c403..fcdcc3a 100644
+> --- a/arch/arm/kernel/entry-ftrace.S
+> +++ b/arch/arm/kernel/entry-ftrace.S
+> @@ -92,12 +92,74 @@
+>  2:	mcount_exit
+>  .endm
+>  
+> +#ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+> +
+> +.macro __ftrace_regs_caller
+> +
+> +	add 	ip, sp, #4	@ move in IP the value of SP as it was
+> +				@ before the push {lr} of the mcount mechanism
+> +	stmdb	sp!, {ip,lr,pc}
+> +	stmdb	sp!, {r0-r11,lr}
+> +
+> +	@ stack content at this point:
+> +	@ 0  4          44    48   52       56   60   64
+> +	@ RO | R1 | ... | R11 | LR | SP + 4 | LR | PC | previous LR |
 
+ITYM "R0" not "RO".
+
+> +
+> +	mov r3, sp				@ struct pt_regs*
+> +	ldr r2, =function_trace_op
+> +	ldr r2, [r2]				@ pointer to the current
+> +						@ function tracing op
+> +	ldr	r1, [sp, #64]			@ lr of instrumented func
+> +	mcount_adjust_addr	r0, lr		@ instrumented function
+> +
+> +	.globl ftrace_regs_call
+> +ftrace_regs_call:
+> +	bl	ftrace_stub
+> +
+> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+> +	.globl ftrace_graph_regs_call
+> +ftrace_graph_regs_call:
+> +	mov	r0, r0
+> +#endif
+> +	ldr	lr, [sp, #64]		@ get the previous LR value from stack
+> +	ldmia	sp, {r0-r11, ip, sp}	@ pop the saved registers INCLUDING
+> +					@ the stack pointer
+> +	ret	ip
+
+Are you really sure you want to return using the address that was poked
+into register 12 in the pt_regs struct?  Surely using the value from
+register 14 would be saner, which can be done in one instruction:
+
+	ldmia	sp, {r0-r11, ip, sp, pc}
+
+> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+> +.macro __ftrace_graph_regs_caller
+> +
+> +	sub	r0, fp, #4		@ lr of instrumented routine (parent)
+> +
+> +	@ called from __ftrace_regs_caller
+> +	ldr     r1, [sp, #56]		@ instrumented routine (func)
+> +	mcount_adjust_addr	r1, r1
+> +
+> +	sub	r2, r0, #4		@ frame pointer
+> +	bl	prepare_ftrace_return
+> +
+> +	ldr	lr, [sp, #64]		@ restore lr from the stack
+> +	ldmia	sp, {r0-r11, ip, sp}	@ restore r0 through sp
+
+This looks weird - and if it's intentional, it needs a comment explaining
+where these were stacked.
+
+Thanks.
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
