@@ -1,79 +1,48 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 30 Jan 2017 13:13:22 +0100
-Subject: [PATCH] iio: adc - Fix possible NULL derefrence.
-In-Reply-To: <1485751634-28963-1-git-send-email-shailendra.v@samsung.com>
-References: <CGME20170130044724epcas3p444b23d43fed213511e6994ecb4ed0ef3@epcas3p4.samsung.com>
- <1485751634-28963-1-git-send-email-shailendra.v@samsung.com>
-Message-ID: <a4f4f5fc-5a00-5a39-8c2a-999686196a45@denx.de>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 30 Jan 2017 12:22:11 +0000
+Subject: [PATCH V7 08/11] drivers: acpi: Handle IOMMU lookup failure with
+ deferred probing or error
+In-Reply-To: <f2370671-ece8-fbee-de19-350dd625088f@codeaurora.org>
+References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
+ <1485188293-20263-9-git-send-email-sricharan@codeaurora.org>
+ <20170124123711.GA11996@red-moon>
+ <f2370671-ece8-fbee-de19-350dd625088f@codeaurora.org>
+Message-ID: <93e79759-d614-9b36-d5ab-63e8eb725009@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/30/2017 05:47 AM, Shailendra Verma wrote:
-> of_match_device could return NULL, and so can cause a NULL
-> pointer dereference later.
+On 29/01/17 17:53, Sinan Kaya wrote:
+> On 1/24/2017 7:37 AM, Lorenzo Pieralisi wrote:
+>> [+hanjun, tomasz, sinan]
+>>
+>> It is quite a key patchset, I would be glad if they can test on their
+>> respective platforms with IORT.
+>>
 > 
-> Signed-off-by: Shailendra Verma <shailendra.v@samsung.com>
-
-a) this should be two patches
-b) same question as in case of the mmc patch -- The probe won't be
-called if OF match doesn't happen in the first place, so this check is
-redundant, no ?
-
-> ---
->  drivers/iio/adc/mxs-lradc.c       |   14 ++++++++++----
->  drivers/iio/adc/rockchip_saradc.c |    4 ++++
->  2 files changed, 14 insertions(+), 4 deletions(-)
+> Tested on top of 4.10-rc5.
 > 
-> diff --git a/drivers/iio/adc/mxs-lradc.c b/drivers/iio/adc/mxs-lradc.c
-> index b84d37c..4308a59 100644
-> --- a/drivers/iio/adc/mxs-lradc.c
-> +++ b/drivers/iio/adc/mxs-lradc.c
-> @@ -1570,10 +1570,8 @@ static int mxs_lradc_probe_touchscreen(struct mxs_lradc *lradc,
->  
->  static int mxs_lradc_probe(struct platform_device *pdev)
->  {
-> -	const struct of_device_id *of_id =
-> -		of_match_device(mxs_lradc_dt_ids, &pdev->dev);
-> -	const struct mxs_lradc_of_config *of_cfg =
-> -		&mxs_lradc_of_config[(enum mxs_lradc_id)of_id->data];
-> +	const struct of_device_id *of_id;
-> +	const struct mxs_lradc_of_config *of_cfg;
->  	struct device *dev = &pdev->dev;
->  	struct device_node *node = dev->of_node;
->  	struct mxs_lradc *lradc;
-> @@ -1583,6 +1581,14 @@ static int mxs_lradc_probe(struct platform_device *pdev)
->  	int i, s;
->  	u64 scale_uv;
->  
-> +	of_id = of_match_device(mxs_lradc_dt_ids, &pdev->dev);
-> +	if (!of_id) {
-> +		dev_err(&pdev->dev, "Error: No device match found\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	of_cfg = &mxs_lradc_of_config[(enum mxs_lradc_id)of_id->data];
-> +
->  	/* Allocate the IIO device. */
->  	iio = devm_iio_device_alloc(dev, sizeof(*lradc));
->  	if (!iio) {
-> diff --git a/drivers/iio/adc/rockchip_saradc.c b/drivers/iio/adc/rockchip_saradc.c
-> index 85d7012..08dfb43 100644
-> --- a/drivers/iio/adc/rockchip_saradc.c
-> +++ b/drivers/iio/adc/rockchip_saradc.c
-> @@ -224,6 +224,10 @@ static int rockchip_saradc_probe(struct platform_device *pdev)
->  	info = iio_priv(indio_dev);
->  
->  	match = of_match_device(rockchip_saradc_match, &pdev->dev);
-> +	if (!match) {
-> +		dev_err(&pdev->dev, "Error: No device match found\n");
-> +		return -ENODEV;
-> +	}
->  	info->data = match->data;
->  
->  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> 1.	Platform Hidma device passed dmatest
+> 2.	Seeing some USB stalls on a platform USB device.
+> 3.	PCIe NVME drive probed and worked fine with MSI interrupts after boot.
+> 4. 	NVMe driver didn't probe following a hotplug insertion and received an
+> SMMU error event during the insertion.
+
+What was the SMMU error - a translation/permission fault (implying the
+wrong DMA ops) or a bad STE fault (implying we totally failed to tell
+the SMMU about the device at all)?
+
+Robin.
+
 > 
-
-
--- 
-Best regards,
-Marek Vasut
+> /sys/bus/pci/slots/4 #
+> /sys/bus/pci/slots/4 # dmesg | grep nvme
+> [   14.041357] nvme nvme0: pci function 0003:01:00.0
+> [  198.399521] nvme nvme0: pci function 0003:01:00.0
+> [__198.416232]_nvme_0003:01:00.0:_enabling_device_(0000_->_0002)
+> [  264.402216] nvme nvme0: I/O 228 QID 0 timeout, disable controller
+> [  264.402313] nvme nvme0: Identify Controller failed (-4)
+> [  264.421270] nvme nvme0: Removing after probe failure status: -5
+> /sys/bus/pci/slots/4 #
+> 
+> 
+> 
