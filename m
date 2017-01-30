@@ -1,87 +1,68 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 30 Jan 2017 08:56:09 +0100
-Subject: [PATCH] MAINTAINERS: extend Raspberry Pi entry
-In-Reply-To: <1485728648.30797.9.camel@crowfest.net>
-References: <b2e1e59a752395314a20e846337cb70cf22f2959.1485720503.git.baruch@tkos.co.il>
- <1485723150.30797.1.camel@crowfest.net>
- <20170129210611.k46ey35py3ht3fe7@tarshish>
- <1485726109.30797.5.camel@crowfest.net>
- <20170129215253.hwhwsqoulhmjxs55@tarshish>
- <1485727324.30797.7.camel@crowfest.net>
- <1485728648.30797.9.camel@crowfest.net>
-Message-ID: <20170130075609.pcrujbzdnabkmuux@pengutronix.de>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Mon, 30 Jan 2017 13:31:52 +0530
+Subject: [PATCH V7 07/11] iommu: of: Handle IOMMU lookup failure with
+ deferred probing or error
+In-Reply-To: <20170128210359.GE20550@bhelgaas-glaptop.roam.corp.google.com>
+References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
+ <1485188293-20263-8-git-send-email-sricharan@codeaurora.org>
+ <20170128210359.GE20550@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <005001d27acf$21c47db0$654d7910$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 29, 2017 at 02:24:08PM -0800, Michael Zoran wrote:
-> On Sun, 2017-01-29 at 14:02 -0800, Michael Zoran wrote:
-> > Perhaps you have some idiot that doesn't know what they are doing.?
-> > If you confine their changes to a certain directory, in theory it
-> > would limit that amount of damage that could be done(to a certain
-> > extent).
+Hi Bjorn,
 
-That's why you get a shortstat when doing a pull or merge. And given
-these responsibilites are not sharp. So sometimes a dt change comes in
-the i2c pull. Then the i2c maintainer points that out in the pull
-request and the commit has an ack from a dt guy.
+>-----Original Message-----
+>From: Bjorn Helgaas [mailto:helgaas at kernel.org]
+>Sent: Sunday, January 29, 2017 2:34 AM
+>To: Sricharan R <sricharan@codeaurora.org>
+>Cc: robin.murphy at arm.com; will.deacon at arm.com; joro at 8bytes.org; lorenzo.pieralisi at arm.com; iommu at lists.linux-foundation.org;
+>linux-arm-kernel at lists.infradead.org; linux-arm-msm at vger.kernel.org; m.szyprowski at samsung.com; bhelgaas at google.com; linux-
+>pci at vger.kernel.org; linux-acpi at vger.kernel.org
+>Subject: Re: [PATCH V7 07/11] iommu: of: Handle IOMMU lookup failure with deferred probing or error
+>
+>On Mon, Jan 23, 2017 at 09:48:09PM +0530, Sricharan R wrote:
+>> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+>>
+>> Failures to look up an IOMMU when parsing the DT iommus property need to
+>> be handled separately from the .of_xlate() failures to support deferred
+>> probing.
+>>
+>> The lack of a registered IOMMU can be caused by the lack of a driver for
+>> the IOMMU, the IOMMU device probe not having been performed yet, having
+>> been deferred, or having failed.
+>>
+>> The first case occurs when the device tree describes the bus master and
+>> IOMMU topology correctly but no device driver exists for the IOMMU yet
+>> or the device driver has not been compiled in. Return NULL, the caller
+>> will configure the device without an IOMMU.
+>>
+>> The second and third cases are handled by deferring the probe of the bus
+>> master device which will eventually get reprobed after the IOMMU.
+>>
+>> The last case is currently handled by deferring the probe of the bus
+>> master device as well. A mechanism to either configure the bus master
+>> device without an IOMMU or to fail the bus master device probe depending
+>> on whether the IOMMU is optional or mandatory would be a good
+>> enhancement.
+>>
+>> Signed-off-by: Laurent Pichart <laurent.pinchart+renesas@ideasonboard.com>
+>> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+>> ...
+>
+>> diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+>> index 349bd1d..9529d6c 100644
+>> --- a/drivers/iommu/of_iommu.c
+>> +++ b/drivers/iommu/of_iommu.c
+>> @@ -23,6 +23,7 @@
+>>  #include <linux/of.h>
+>>  #include <linux/of_iommu.h>
+>>  #include <linux/of_pci.h>
+>> +#include <linux/pci.h>
+>
+>Why do we need this?
 
-I think you cannot simplify this with technical means that stop you when
-a tree contains changes not in its area of responsibility.
+Right, will remove it.
 
-> > At the very minimum, I would think that hardware specific drivers
-> > should be handled differently then core drivers or non-platform
-> > specific drivers.
-
-I don't agree. To be able to review a driver to a Broadcom specific spi
-driver, you need to know more about spi than about Broadcom.
-
-> > I mean really, why should the vendor of the RPI have to deal with a
-> > gazillion requests to change the default built configuration.
-
-I cannot follow. If you want to change the defconfig for the RPI you
-modify a file in arch/arm/boot/config and send the change to the ARM
-people.
-
-> > But then again, having everything in one tree makes it easy to make
-> 
-> Basically, what I'm thinking is this:
-> 
-> Have a bcm283x module that is somehow changed locally and tested
-> locally, but the whole module gets published to the larger tree as a
-
-There is nothing stopping you here to provide a tree with all adaptions
-needed for your machine. You won't probably get this merged into next
-(or another tree) though.
-
-> snapshot.  Anybody that normally submits changes to bcm283x can change
-> any file.  I wouldn't take things to the extreme of having an owner of
-> the i2c module and another owner of the SPI module. The modules should
-
-It's well possible (and usual) that the "owner" of the spi and the i2c
-driver are the same.
-
-> be reasonably large.
-> 
-> If it's better to have binary drops or source code drops I'm not sure. 
-> Source drops with some change history makes more sense to me.
-> 
-> As for the signed off part or requiring multiple signed off bys, that
-> seems broken to me.  The idea of having multiple people approve of
-> every single change is awesome.  But at the same time it needs to be
-> built into the software revision control system.  I mean, I e-mail a
-> patch or change with my name.  I really don't have any idea, control,
-> or verification that the change I e-mail is actually the change that is
-> getting applied with my name on it.
-
-Yes, you have a mean to verify. For example git patch-id works.
-
-And I wonder what you suggest to make sure that nobody is able to fake
-being you and get a patch committed in your name. (Maybe there exists
-even another guy with your name?)
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Regards,
+ Sricharan
