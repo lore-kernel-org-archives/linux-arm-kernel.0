@@ -1,32 +1,74 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 30 Jan 2017 16:23:15 +0100
-Subject: [PATCH v3 01/10] drivers: pinctrl: add driver for Allwinner H5 SoC
-In-Reply-To: <20170129023331.62106-2-icenowy@aosc.xyz>
-References: <20170129023331.62106-1-icenowy@aosc.xyz>
- <20170129023331.62106-2-icenowy@aosc.xyz>
-Message-ID: <CACRpkdaj7tnd=anx2npYSKGm5EjmXtBCTvLeCbBk4nsCWrEZTA@mail.gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 30 Jan 2017 16:23:37 +0100
+Subject: [PATCH 0/4] video: ARM CLCD: add support of an optional GPIO to
+ enable panel
+In-Reply-To: <ae187f91-ca9b-c51a-d7cb-14fd99baa434@mleia.com>
+References: <20161221032717.13154-1-vz@mleia.com> <3057141.7Vn8X5ONyT@amdc3058>
+ <ae187f91-ca9b-c51a-d7cb-14fd99baa434@mleia.com>
+ <CGME20170130152340epcas5p3f68349ef89c5ec902186ae71011c0c4b@epcas5p3.samsung.com>
+Message-ID: <2240649.KotMHs5XVh@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 29, 2017 at 3:33 AM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
+On Tuesday, January 17, 2017 03:57:33 AM Vladimir Zapolskiy wrote:
+> On 01/13/2017 01:08 PM, Bartlomiej Zolnierkiewicz wrote:
+> > 
+> > Hi,
+> > 
+> > On Thursday, January 12, 2017 11:26:14 PM Vladimir Zapolskiy wrote:
+> >> On 01/12/2017 10:27 AM, Linus Walleij wrote:
+> >>> On Thu, Jan 12, 2017 at 1:05 AM, Vladimir Zapolskiy <vz@mleia.com> wrote:
+> >>>> On 01/11/2017 05:16 PM, Linus Walleij wrote:
+> >>>>> On Tue, Jan 10, 2017 at 2:47 PM, Vladimir Murzin
+> >>>>> <vladimir.murzin@arm.com> wrote:
+> >>>>>
+> >>>>>> In another thread Benjamin pointed at patch [1] in drm/kms part for noMMU.
+> >>>>>>
+> >>>>>> [1] https://cgit.freedesktop.org/drm/drm-misc/commit/?id=62a0d98a188cc4ebd8ea54b37d274ec20465e464
+> >>>>>
+> >>>>> Problem solved?
+> >>>>>
+> >>>>> Vladimir: I do not require in any way that you create a CLCD driver for DRM,
+> >>>>> I just think it would be very very nice...
+> >>>>>
+> >>>>
+> >>>> I have no other option, this series is unreviewed and thus unlikely it will
+> >>>> be applied, still a panel PCB on my board needs power management support.
+> >>>
+> >>> Hm I can ACK it I guess, but mergeing it into an unmaintained subsystem
+> >>> is another issue, just not very optimal. 
+> >>
+> >> + Bartlomiej
+> >>
+> >> Linus, your ack is always more than appreciated.
+> > 
+> > +1
+> > 
+> >> To all appearance Bartlomiej is a new honoured framebuffer layer maintainer.
+> >>
+> >> Bartlomiej, do you have the changes under discussion in your mailbox or
+> >> should I resend them to you directly for review?
+> > 
+> > No need for resend, I picked them from the list and they are on TODO.
+> > 
+> 
+> Bartlomiej, Linus,
+> 
+> I've noticed that 4/4 requires special attention due to the anticipated
+> change of devm_get_gpiod_from_child() interface.
+> 
+> If you have any concerns regarding 4/4, please review and consider to
+> apply the first three clean-up patches in the series, basically I've
+> achieved my goal of describing a power supply for a panel in DTS by
+> introducing a DRM driver (see a note below), however support of
+> "enable-gpios" property mentioned in the "panel-dpi" device tree binding
+> documentation still is seen as beneficial for the CLCD fbdev driver.
 
-> Based on the Allwinner H5 datasheet and the pinctrl driver of the
-> backward-compatible H3 this introduces the pin multiplex assignments for
-> the H5 SoC.
->
-> H5 introduced some more pin functions (e.g. three more groups of TS
-> pins, and one more groups of SIM pins) than H3.
->
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
-> Changes in v3:
-> - Add Maxime's ACK.
-> Changes in v2:
-> - Fixed interrupt banks. (There's one more GPIO banks (PF) that can do
->   interrupt handling on H5)
+Thanks, I queued patches #1-3 for 4.11.  Please ping me later for
+merging patch #4.
 
-I already applied V2 with Maximes' ACK and all.
-
-Yours,
-Linus Walleij
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
