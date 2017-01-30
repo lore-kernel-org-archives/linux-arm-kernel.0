@@ -1,29 +1,45 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 30 Jan 2017 14:27:13 +0100
-Subject: [PATCH] dt-bindings: mmc: sunxi: Document A64 eMMC compatible
-Message-ID: <20170130132713.20750-1-maxime.ripard@free-electrons.com>
+From: raviteja.garimella@broadcom.com (Raviteja Garimella)
+Date: Mon, 30 Jan 2017 19:02:03 +0530
+Subject: [PATCH v3 0/3] Support for USB DRD Phy driver for NS2
+Message-ID: <1485783126-6316-1-git-send-email-raviteja.garimella@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We introduced recently a new compatible to deal with the A64 eMMC
-controller, let's document its binding.
+Changes from v2:
+===============
+Remove unnecessary checks for poweron as suggested in review.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- Documentation/devicetree/bindings/mmc/sunxi-mmc.txt | 1 +
- 1 file changed, 1 insertion(+)
+<clip: as before>
+Changes from v1:
+===============
+1. Initialize file operations .owner field with THIS_MODULE.
+2. Remove unnecessary gpio example in DT bindings documentation.
+   This is previously acked by Rob Herring <robh@kernel.org>
 
-diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-index 55cdd804cdba..7d53a799f140 100644
---- a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-+++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-@@ -13,6 +13,7 @@ Required properties:
-    * "allwinner,sun5i-a13-mmc"
-    * "allwinner,sun7i-a20-mmc"
-    * "allwinner,sun9i-a80-mmc"
-+   * "allwinner,sun50i-a64-emmc"
-    * "allwinner,sun50i-a64-mmc"
-  - reg : mmc controller base registers
-  - clocks : a list with 4 phandle + clock specifier pairs
+Introduction:
+
+This patch adds support for USB Dual Role Device Phy for Broadcom
+Northstar2 SoC. Apart from the new phy driver, this patchset contains
+changes to Kconfig, Makefile, and Device tree files.
+
+This patchset is tested on Broadcom NS2 BCM958712K reference board.
+
+Repo: https://github.com/Broadcom/arm64-linux.git
+Branch: ns2_drdphy_v3
+
+Raviteja Garimella (3):
+  Add DT bindings documentation for NS2 USB DRD phy
+  Broadcom USB DRD Phy driver for Northstar2
+  DT nodes for Broadcom Northstar2 USB DRD Phy
+
+ .../devicetree/bindings/phy/brcm,ns2-drd-phy.txt   |  30 ++
+ arch/arm64/boot/dts/broadcom/ns2.dtsi              |  14 +
+ drivers/phy/Kconfig                                |  13 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-bcm-ns2-usbdrd.c                   | 576 +++++++++++++++++++++
+ 5 files changed, 634 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/brcm,ns2-drd-phy.txt
+ create mode 100644 drivers/phy/phy-bcm-ns2-usbdrd.c
+
 -- 
-2.11.0
+2.1.0
