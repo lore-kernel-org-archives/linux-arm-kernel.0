@@ -1,192 +1,88 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 30 Jan 2017 09:41:36 -0600
-Subject: [PATCH] PCI: mvebu: Handle changes to the bridge windows while
- enabled
-In-Reply-To: <20161212183020.GA30274@obsidianresearch.com>
-References: <20161212183020.GA30274@obsidianresearch.com>
-Message-ID: <20170130154136.GR20550@bhelgaas-glaptop.roam.corp.google.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Mon, 30 Jan 2017 10:43:06 -0500
+Subject: [PATCH v3 04/24] drm/rockchip: dw-mipi-dsi: fix command header
+ writes
+In-Reply-To: <20170129132444.25251-5-john@metanate.com>
+References: <20170129132444.25251-1-john@metanate.com>
+ <20170129132444.25251-5-john@metanate.com>
+Message-ID: <20170130154306.GE20076@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 12, 2016 at 11:30:20AM -0700, Jason Gunthorpe wrote:
-> The PCI core will write to the bridge window config multiple times
-> while they are enabled. This can lead to mbus failures like:
+On Sun, Jan 29, 2017 at 01:24:24PM +0000, John Keeping wrote:
+> In a couple of places here we use "val" for the value that is about to
+> be written to a register but then reuse the same variable for the value
+> of a status register before we get around to writing it.  Rename the
+> value to be written to so that we write the value we intend to and not
+> what we have just read from the status register.
 > 
->  mvebu_mbus: cannot add window '4:e8', conflicts with another window
->  mvebu-pcie mbus:pex at e0000000: Could not create MBus window at [mem 0xe0000000-0xe00fffff]: -22
-> 
-> For me this is happening during a hotplug cycle. The PCI core is
-> not changing the values, just writing them twice while active.
-> 
-> The patch addresses the general case of any change to an active window,
-> but not atomically. The code is slightly refactored so io and mem
-> can share more of the window logic.
-> 
-> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
 
-Applied with Jason C's ack to pci/host-mvebu for v4.11, thanks!
+Oh my.
 
+Reviewed-by: Sean Paul <seanpaul@chromium.org>
+
+> Signed-off-by: John Keeping <john@metanate.com>
+> Tested-by: Chris Zhong <zyw@rock-chips.com>
+> Reviewed-by: Chris Zhong <zyw@rock-chips.com>
 > ---
->  drivers/pci/host/pci-mvebu.c | 101 +++++++++++++++++++++++++------------------
->  1 file changed, 60 insertions(+), 41 deletions(-)
+> Unchanged in v3
+> Unchanged in v2
 > 
-> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-> index 307f81d6b479af..af724731b22f53 100644
-> --- a/drivers/pci/host/pci-mvebu.c
-> +++ b/drivers/pci/host/pci-mvebu.c
-> @@ -133,6 +133,12 @@ struct mvebu_pcie {
->  	int nports;
->  };
->  
-> +struct mvebu_pcie_window {
-> +	phys_addr_t base;
-> +	phys_addr_t remap;
-> +	size_t size;
-> +};
-> +
->  /* Structure representing one PCIe interface */
->  struct mvebu_pcie_port {
->  	char *name;
-> @@ -150,10 +156,8 @@ struct mvebu_pcie_port {
->  	struct mvebu_sw_pci_bridge bridge;
->  	struct device_node *dn;
->  	struct mvebu_pcie *pcie;
-> -	phys_addr_t memwin_base;
-> -	size_t memwin_size;
-> -	phys_addr_t iowin_base;
-> -	size_t iowin_size;
-> +	struct mvebu_pcie_window memwin;
-> +	struct mvebu_pcie_window iowin;
->  	u32 saved_pcie_stat;
->  };
->  
-> @@ -379,23 +383,45 @@ static void mvebu_pcie_add_windows(struct mvebu_pcie_port *port,
->  	}
+>  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 10 ++++++----
+>  1 file changed, 6 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> index bd92e58b64f3..4cbbbcb619b7 100644
+> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> @@ -542,9 +542,10 @@ static int dw_mipi_dsi_host_detach(struct mipi_dsi_host *host,
+>  	return 0;
 >  }
 >  
-> +static void mvebu_pcie_set_window(struct mvebu_pcie_port *port,
-> +				  unsigned int target, unsigned int attribute,
-> +				  const struct mvebu_pcie_window *desired,
-> +				  struct mvebu_pcie_window *cur)
-> +{
-> +	if (desired->base == cur->base && desired->remap == cur->remap &&
-> +	    desired->size == cur->size)
-> +		return;
-> +
-> +	if (cur->size != 0) {
-> +		mvebu_pcie_del_windows(port, cur->base, cur->size);
-> +		cur->size = 0;
-> +		cur->base = 0;
-> +
-> +		/*
-> +		 * If something tries to change the window while it is enabled
-> +		 * the change will not be done atomically. That would be
-> +		 * difficult to do in the general case.
-> +		 */
-> +	}
-> +
-> +	if (desired->size == 0)
-> +		return;
-> +
-> +	mvebu_pcie_add_windows(port, target, attribute, desired->base,
-> +			       desired->size, desired->remap);
-> +	*cur = *desired;
-> +}
-> +
->  static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
+> -static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 val)
+> +static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
 >  {
-> -	phys_addr_t iobase;
-> +	struct mvebu_pcie_window desired = {};
+>  	int ret;
+> +	u32 val;
 >  
->  	/* Are the new iobase/iolimit values invalid? */
->  	if (port->bridge.iolimit < port->bridge.iobase ||
->  	    port->bridge.iolimitupper < port->bridge.iobaseupper ||
->  	    !(port->bridge.command & PCI_COMMAND_IO)) {
-> -
-> -		/* If a window was configured, remove it */
-> -		if (port->iowin_base) {
-> -			mvebu_pcie_del_windows(port, port->iowin_base,
-> -					       port->iowin_size);
-> -			port->iowin_base = 0;
-> -			port->iowin_size = 0;
-> -		}
-> -
-> +		mvebu_pcie_set_window(port, port->io_target, port->io_attr,
-> +				      &desired, &port->iowin);
->  		return;
+>  	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
+>  				 val, !(val & GEN_CMD_FULL), 1000,
+> @@ -554,7 +555,7 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 val)
+>  		return ret;
 >  	}
 >  
-> @@ -412,32 +438,27 @@ static void mvebu_pcie_handle_iobase_change(struct mvebu_pcie_port *port)
->  	 * specifications. iobase is the bus address, port->iowin_base
->  	 * is the CPU address.
->  	 */
-> -	iobase = ((port->bridge.iobase & 0xF0) << 8) |
-> -		(port->bridge.iobaseupper << 16);
-> -	port->iowin_base = port->pcie->io.start + iobase;
-> -	port->iowin_size = ((0xFFF | ((port->bridge.iolimit & 0xF0) << 8) |
-> -			    (port->bridge.iolimitupper << 16)) -
-> -			    iobase) + 1;
-> -
-> -	mvebu_pcie_add_windows(port, port->io_target, port->io_attr,
-> -			       port->iowin_base, port->iowin_size,
-> -			       iobase);
-> +	desired.remap = ((port->bridge.iobase & 0xF0) << 8) |
-> +			(port->bridge.iobaseupper << 16);
-> +	desired.base = port->pcie->io.start + desired.remap;
-> +	desired.size = ((0xFFF | ((port->bridge.iolimit & 0xF0) << 8) |
-> +			 (port->bridge.iolimitupper << 16)) -
-> +			desired.remap) +
-> +		       1;
-> +
-> +	mvebu_pcie_set_window(port, port->io_target, port->io_attr, &desired,
-> +			      &port->iowin);
->  }
+> -	dsi_write(dsi, DSI_GEN_HDR, val);
+> +	dsi_write(dsi, DSI_GEN_HDR, hdr_val);
 >  
->  static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
+>  	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
+>  				 val, val & (GEN_CMD_EMPTY | GEN_PLD_W_EMPTY),
+> @@ -587,8 +588,9 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
 >  {
-> +	struct mvebu_pcie_window desired = {.remap = MVEBU_MBUS_NO_REMAP};
-> +
->  	/* Are the new membase/memlimit values invalid? */
->  	if (port->bridge.memlimit < port->bridge.membase ||
->  	    !(port->bridge.command & PCI_COMMAND_MEMORY)) {
-> -
-> -		/* If a window was configured, remove it */
-> -		if (port->memwin_base) {
-> -			mvebu_pcie_del_windows(port, port->memwin_base,
-> -					       port->memwin_size);
-> -			port->memwin_base = 0;
-> -			port->memwin_size = 0;
-> -		}
-> -
-> +		mvebu_pcie_set_window(port, port->mem_target, port->mem_attr,
-> +				      &desired, &port->memwin);
->  		return;
+>  	const u32 *tx_buf = msg->tx_buf;
+>  	int len = msg->tx_len, pld_data_bytes = sizeof(*tx_buf), ret;
+> -	u32 val = GEN_HDATA(msg->tx_len) | GEN_HTYPE(msg->type);
+> +	u32 hdr_val = GEN_HDATA(msg->tx_len) | GEN_HTYPE(msg->type);
+>  	u32 remainder = 0;
+> +	u32 val;
+>  
+>  	if (msg->tx_len < 3) {
+>  		dev_err(dsi->dev, "wrong tx buf length %zu for long write\n",
+> @@ -617,7 +619,7 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
+>  		}
 >  	}
 >  
-> @@ -447,14 +468,12 @@ static void mvebu_pcie_handle_membase_change(struct mvebu_pcie_port *port)
->  	 * window to setup, according to the PCI-to-PCI bridge
->  	 * specifications.
->  	 */
-> -	port->memwin_base  = ((port->bridge.membase & 0xFFF0) << 16);
-> -	port->memwin_size  =
-> -		(((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF) -
-> -		port->memwin_base + 1;
-> -
-> -	mvebu_pcie_add_windows(port, port->mem_target, port->mem_attr,
-> -			       port->memwin_base, port->memwin_size,
-> -			       MVEBU_MBUS_NO_REMAP);
-> +	desired.base = ((port->bridge.membase & 0xFFF0) << 16);
-> +	desired.size = (((port->bridge.memlimit & 0xFFF0) << 16) | 0xFFFFF) -
-> +		       desired.base + 1;
-> +
-> +	mvebu_pcie_set_window(port, port->mem_target, port->mem_attr, &desired,
-> +			      &port->memwin);
+> -	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, val);
+> +	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, hdr_val);
 >  }
 >  
->  /*
+>  static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
 > -- 
-> 2.7.4
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 2.11.0.197.gb556de5.dirty
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+
+-- 
+Sean Paul, Software Engineer, Google / Chromium OS
