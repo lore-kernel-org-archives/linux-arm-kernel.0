@@ -1,44 +1,38 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Jan 2017 14:59:24 +0000
-Subject: [PATCH 10/18] ARM64: dts: meson-gxbb: Reorder nodes
-In-Reply-To: <20170123165208.4ujwm6rjz2b3dom5@rob-hp-laptop>
-References: <20170120222118.21476-1-afaerber@suse.de>
- <20170120222118.21476-11-afaerber@suse.de>
- <20170123165208.4ujwm6rjz2b3dom5@rob-hp-laptop>
-Message-ID: <20170130145924.GX27312@n2100.armlinux.org.uk>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Mon, 30 Jan 2017 15:59:47 +0100
+Subject: [GIT PULL] iommu: KVM PCIe/MSI passthrough on ARM/ARM64 for 4.11
+In-Reply-To: <20170127165021.GC10758@arm.com>
+References: <20170127165021.GC10758@arm.com>
+Message-ID: <20170130145946.GA28129@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 23, 2017 at 10:52:08AM -0600, Rob Herring wrote:
-> On Fri, Jan 20, 2017 at 11:21:10PM +0100, Andreas F?rber wrote:
-> > Sort nodes referenced by label alphabetically.
+On Fri, Jan 27, 2017 at 04:50:22PM +0000, Will Deacon wrote:
+> Hi Joerg,
 > 
-> Seems to be pointless churn.
+> Please pull Eric's guest-MSI series for 4.11. This has been through
+> considerable review and associated rework (including a session at LPC),
+> but it has stabilised at last and we all seem to be happy with it. Eric's
+> done a great job of respinning these and remaining patient while we
+> pulled him in a bunch of different directions.
+> 
+> With these patches applied, it's possible for us to pass PCI devices
+> through to KVM guests on arm64 using VFIO and have them signal interrupts
+> using MSIs targetting the ITS via the SMMU. Acronym soup, sure, but it's
+> much better than legacy wired irqs!
+> 
+> Cheers,
+> 
+> Will
+> 
+> --->8
+> 
+> The following changes since commit a121103c922847ba5010819a3f250f1f7fc84ab8:
+> 
+>   Linux 4.10-rc3 (2017-01-08 14:18:17 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git iommu/guest-msi
 
-Depends - if, as the author of a dts file, I order the nodes
-alphabetically, and then someone comes along and adds a new node
-non-alphabetically, meanwhile someone else also adds a node
-elsewhere in the file which conflicts, git will silently merge the
-changes without complaint.
-
-Having an alphabetical sorting order means that (a) conflicting
-changes are more likely to be highlighted, and (b) non-conflicting
-changes are less likely to cause merge issues.
-
-I've noticed exactly this with clearfog when merging my tree with
-arm-soc.  I have a version of the DSA patch, meanwhile the mvebu
-people merged the DSA patch.  Somehow, the order of nodes in my
-file are alphabetical, the order in their file has the pinctrl and
-mdio nodes swapped, which results in totally unnecessary merge
-conflicts when I try merging the two trees.
-
-It's more, unnecessary work.
-
-So, I'm going to be submitting a patch to fix the mis-ordered nodes
-in the clearfog dts file today to avoid having to resolve this each
-time I rebuild my nightly build tree.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Pulled, thanks Will.
