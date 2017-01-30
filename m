@@ -1,49 +1,32 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 29 Jan 2017 17:20:16 -0800
-Subject: [GIT PULL] arm: mediatek: dts changes for v4.11
-In-Reply-To: <82e017a8-ade7-b16f-740c-6c106f2f8049@gmail.com>
-References: <82e017a8-ade7-b16f-740c-6c106f2f8049@gmail.com>
-Message-ID: <20170130012016.GB3133@localhost>
+Date: Sun, 29 Jan 2017 17:19:31 -0800
+Subject: [PULL] ARM: DTS: Fix broken GICv2 register maps
+In-Reply-To: <1485342160-23286-1-git-send-email-marc.zyngier@arm.com>
+References: <1485342160-23286-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20170130011931.GA3133@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2017 at 02:46:56PM +0100, Matthias Brugger wrote:
-> Hi Arnd, hi Olof,
+On Wed, Jan 25, 2017 at 11:02:40AM +0000, Marc Zyngier wrote:
+> ARM-soc folks,
 > 
-> Please merge the following changes for 32-bit dts files.
+> Please find below the pull request for a DT fix affecting a large
+> number of 32bit platforms, which has been acked by a number of
+> platform maintainers.
 > 
-> Thanks,
-> Matthias
+> The following changes since commit 49def1853334396f948dcb4cedb9347abb318df5:
 > 
-> ---
-> 
-> The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
-> 
->   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+>   Linux 4.10-rc4 (2017-01-15 16:21:59 -0800)
 > 
 > are available in the git repository at:
 > 
->   https://github.com/mbgg/linux-mediatek.git tags/v4.10-next-dts32
+>   git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git irq/gic-v2-dt
 > 
-> for you to fetch changes up to e348dc74f798c2df31c685bf0c814396f4f3b735:
+> for you to fetch changes up to ed2799b62a323ea041e0475ac8bff8e023e224f1:
 > 
->   arm: dts: mt2701: Add thermal device node. (2017-01-24 11:24:35 +0100)
-> 
-> ----------------------------------------------------------------
-> Lots of updates for mt2701:
-> Rearrange the dt nodes and fix unit address for pincontroler
-> Add nodes for:
-> - clock controller subsystems
-> - scpsys controller
-> - iommu and smi
-> - spi
-> - nand
-> - auxadc
-> - thermal controller and zones
-> 
-> Email address updated for mt7623 devicetree files.
+>   ARM: DTS: Fix register map for virt-capable GIC (2017-01-23 15:44:58 +0000)
 
-Merged, thanks!
+Hi,
 
-
--Olof
+Replied to the patch a little earlier today, holding off on this until that is
+sorted.
