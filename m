@@ -1,8 +1,8 @@
 From: shailendra.v@samsung.com (Shailendra Verma)
-Date: Mon, 30 Jan 2017 10:22:33 +0530
-Subject: [PATCH] pwm - Fix possible NULL derefrence.
-References: <CGME20170130045241epcas1p2a5a0625327e4caab59236ec85551f95e@epcas1p2.samsung.com>
-Message-ID: <1485751953-29341-1-git-send-email-shailendra.v@samsung.com>
+Date: Mon, 30 Jan 2017 10:28:31 +0530
+Subject: [PATCH] Arch: arm: plat-pxa - Fix possible NULL derefrence.
+References: <CGME20170130045842epcas2p274b2125a1f158e4d656096bdf3a3a1d9@epcas2p2.samsung.com>
+Message-ID: <1485752311-29754-1-git-send-email-shailendra.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,40 +11,23 @@ pointer dereference later.
 
 Signed-off-by: Shailendra Verma <shailendra.v@samsung.com>
 ---
- drivers/pwm/pwm-sun4i.c |    4 ++++
- drivers/pwm/pwm-tegra.c |    5 +++++
- 2 files changed, 9 insertions(+)
+ arch/arm/plat-pxa/ssp.c |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
-index b0803f6..9b5c6fe 100644
---- a/drivers/pwm/pwm-sun4i.c
-+++ b/drivers/pwm/pwm-sun4i.c
-@@ -321,6 +321,10 @@ static int sun4i_pwm_probe(struct platform_device *pdev)
- 	const struct of_device_id *match;
- 
- 	match = of_match_device(sun4i_pwm_dt_ids, &pdev->dev);
-+	if (!match) {
-+		dev_err(&pdev->dev, "Error: No device match found\n");
-+		return -ENODEV;
-+	}
- 
- 	pwm = devm_kzalloc(&pdev->dev, sizeof(*pwm), GFP_KERNEL);
- 	if (!pwm)
-diff --git a/drivers/pwm/pwm-tegra.c b/drivers/pwm/pwm-tegra.c
-index e464784..a5eb224 100644
---- a/drivers/pwm/pwm-tegra.c
-+++ b/drivers/pwm/pwm-tegra.c
-@@ -185,6 +185,11 @@ static int tegra_pwm_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	pwm->soc = of_device_get_match_data(&pdev->dev);
-+	if (!pwm->soc) {
-+		dev_err(&pdev->dev, "no device match found\n");
-+		return -ENODEV;
-+	}
-+
- 	pwm->dev = &pdev->dev;
- 
- 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+diff --git a/arch/arm/plat-pxa/ssp.c b/arch/arm/plat-pxa/ssp.c
+index ba13f79..7d1cd51 100644
+--- a/arch/arm/plat-pxa/ssp.c
++++ b/arch/arm/plat-pxa/ssp.c
+@@ -204,6 +204,10 @@ static int pxa_ssp_probe(struct platform_device *pdev)
+ 	if (dev->of_node) {
+ 		const struct of_device_id *id =
+ 			of_match_device(of_match_ptr(pxa_ssp_of_ids), dev);
++		if (!id) {
++			dev_err(dev, "Error: No device match found\n");
++			return -ENODEV;
++		}
+ 		ssp->type = (int) id->data;
+ 	} else {
+ 		const struct platform_device_id *id =
 -- 
 1.7.9.5
