@@ -1,43 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 30 Jan 2017 20:36:35 +0100
-Subject: [PATCH 4/4] ARM: dts: add power controller to the Gemini DTS
-In-Reply-To: <20170130193635.18644-1-linus.walleij@linaro.org>
-References: <20170130193635.18644-1-linus.walleij@linaro.org>
-Message-ID: <20170130193635.18644-4-linus.walleij@linaro.org>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 30 Jan 2017 21:43:29 +0200
+Subject: [PATCH v3 1/7] soc: smasung: pmu: Add register defines for pad
+ retention control
+In-Reply-To: <1485779908-32147-2-git-send-email-m.szyprowski@samsung.com>
+References: <1485779908-32147-1-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170130123837eucas1p1056a57f23b1e3bf089e5bc55bb2cf2d4@eucas1p1.samsung.com>
+ <1485779908-32147-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20170130194329.duudcv5oxu2q2td4@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the Gemini power controller to the SoC DTSI
-file.
+On Mon, Jan 30, 2017 at 01:38:22PM +0100, Marek Szyprowski wrote:
+> Add PMU defines related to pad retention control. Will be later used
+> by the Exynos pin controller driver.
+> 
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  include/linux/soc/samsung/exynos-regs-pmu.h | 16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+> 
 
-Cc: Janos Laube <janos.dev@gmail.com>
-Cc: Paulius Zaleckas <paulius.zaleckas@gmail.com>
-Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
-Cc: Florian Fainelli <f.fainelli@gmail.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-Sebastian: this patch is just for context.
-I will funnel the ARM parts through the ARM SoC tree.
----
- arch/arm/boot/dts/gemini.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+Thanks Marek.
 
-diff --git a/arch/arm/boot/dts/gemini.dtsi b/arch/arm/boot/dts/gemini.dtsi
-index df5630958038..8a2501239ae5 100644
---- a/arch/arm/boot/dts/gemini.dtsi
-+++ b/arch/arm/boot/dts/gemini.dtsi
-@@ -70,6 +70,12 @@
- 		#interrupt-cells = <2>;
- 	};
- 
-+	power-controller at 4b000000 {
-+		compatible = "cortina,gemini-power-controller";
-+		reg = <0x4b000000 0x100>;
-+		interrupts = <26 IRQ_TYPE_EDGE_FALLING>;
-+	};
-+
- 	gpio0: gpio at 4d000000 {
- 		compatible = "cortina,gemini-gpio";
- 		reg = <0x4d000000 0x100>;
--- 
-2.9.3
+Initially I thought that this should go through samsung-soc to limit
+conflicts but I sent already my pull requests and I am not sure if I
+will be getting more patches for next cycle. We'll see.
+
+However, the point is, I do not want to block this patchset, so if
+someone would like to take it before me, feel free:
+Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+
+Best regards,
+Krzysztof
