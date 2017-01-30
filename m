@@ -1,32 +1,32 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Jan 2017 15:19:33 +0000
-Subject: [PATCH 06/10] soc/qbman: Add ARM equivalent for
- flush_dcache_range()
-In-Reply-To: <CAK8P3a1Gd4bd7GjEp_a9WXc_mTPk0XmP7DH8aPWhbn2K3MMuDQ@mail.gmail.com>
-References: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
- <VI1PR0401MB2430DA6BD2F857C30EC86A50917F0@VI1PR0401MB2430.eurprd04.prod.outlook.com>
- <HE1PR0401MB263638F320470CA216990BCC86720@HE1PR0401MB2636.eurprd04.prod.outlook.com>
- <5414359.8GMja3pNrI@wuerfel>
- <VI1PR0401MB24303C4A5C0042005E17F1A391770@VI1PR0401MB2430.eurprd04.prod.outlook.com>
- <CAK8P3a1Gd4bd7GjEp_a9WXc_mTPk0XmP7DH8aPWhbn2K3MMuDQ@mail.gmail.com>
-Message-ID: <20170130151933.GA27312@n2100.armlinux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 30 Jan 2017 16:23:15 +0100
+Subject: [PATCH v3 01/10] drivers: pinctrl: add driver for Allwinner H5 SoC
+In-Reply-To: <20170129023331.62106-2-icenowy@aosc.xyz>
+References: <20170129023331.62106-1-icenowy@aosc.xyz>
+ <20170129023331.62106-2-icenowy@aosc.xyz>
+Message-ID: <CACRpkdaj7tnd=anx2npYSKGm5EjmXtBCTvLeCbBk4nsCWrEZTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2017 at 05:41:10PM +0100, Arnd Bergmann wrote:
-> On Thu, Jan 26, 2017 at 6:08 AM, Scott Wood <scott.wood@nxp.com> wrote:
-> > And even if we did all that, there would still be other manual cache
-> > manipulation left in this driver, to deal with its cacheable register
-> > interface.
-> 
-> I thought we had concluded that "cacheable register" is something
-> that cannot work reliably on ARM at all when this came up before.
-> Any updates on that?
+On Sun, Jan 29, 2017 at 3:33 AM, Icenowy Zheng <icenowy@aosc.xyz> wrote:
 
-There's a big comment in arch/arm/include/asm/io.h which explains
-everything.  Nothing there is likely to change.
+> Based on the Allwinner H5 datasheet and the pinctrl driver of the
+> backward-compatible H3 this introduces the pin multiplex assignments for
+> the H5 SoC.
+>
+> H5 introduced some more pin functions (e.g. three more groups of TS
+> pins, and one more groups of SIM pins) than H3.
+>
+> Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+> Changes in v3:
+> - Add Maxime's ACK.
+> Changes in v2:
+> - Fixed interrupt banks. (There's one more GPIO banks (PF) that can do
+>   interrupt handling on H5)
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+I already applied V2 with Maximes' ACK and all.
+
+Yours,
+Linus Walleij
