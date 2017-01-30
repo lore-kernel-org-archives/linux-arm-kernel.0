@@ -1,42 +1,34 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 29 Jan 2017 17:04:53 -0800
-Subject: [GIT PULL 2/4] TI DaVinci SoC support updates for v4.11
-In-Reply-To: <20170124130641.28264-2-nsekhar@ti.com>
-References: <20170124130641.28264-1-nsekhar@ti.com>
- <20170124130641.28264-2-nsekhar@ti.com>
-Message-ID: <20170130010453.GR3133@localhost>
+Date: Sun, 29 Jan 2017 17:06:58 -0800
+Subject: [PATCH v2] ARM: Import tango4_defconfig
+In-Reply-To: <da9967c4-05e0-8617-08b3-e15d602d4ab9@sigmadesigns.com>
+References: <5c615aa5-678e-63b8-ecae-f5f0bd8a6f2c@sigmadesigns.com>
+ <4729631.76bAWajetU@wuerfel>
+ <9bbc2fa7-fce4-73c2-898e-a2f780e55d1f@sigmadesigns.com>
+ <CAK8P3a2ySbZRt5R3VBG=B-aAYM5XzxVSEBn=jHU2__nW=-or9A@mail.gmail.com>
+ <da9967c4-05e0-8617-08b3-e15d602d4ab9@sigmadesigns.com>
+Message-ID: <20170130010658.GU3133@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2017 at 06:36:39PM +0530, Sekhar Nori wrote:
-> The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+On Wed, Jan 25, 2017 at 06:43:23PM +0100, Marc Gonzalez wrote:
+> Import a minimal defconfig for tango4 boards.
 > 
->   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+> ---
+> diff from v1
+>   drop CONFIG_CROSS_COMPILE and CONFIG_CMDLINE
 > 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.11/soc
-> 
-> for you to fetch changes up to 9c9b1bc25291e275b04f758f2549c81e092954f5:
-> 
->   ARM: davinci: add skeleton for pdata-quirks (2017-01-23 20:52:38 +0530)
-> 
-> ----------------------------------------------------------------
-> Introduce pdata-quirks mechanism for
-> DaVinci which will be needed for supporting
-> video input/output on DA850 SoC.
-> 
-> ----------------------------------------------------------------
-> Kevin Hilman (1):
->       ARM: davinci: add skeleton for pdata-quirks
+> Anything else sticking out? :-)
+> ---
+>  arch/arm/configs/tango4_defconfig | 94 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 94 insertions(+)
+>  create mode 100644 arch/arm/configs/tango4_defconfig
 
-I'm not much of a fan of adding this. I know we added it for some of
-the legacy platforms since moving over existing in-tree code would take
-a while. But the thought was that new drivers wouldn't use it much.
+Nope, looks reasonable now! Applied to next/defconfig.
 
-Is the need for this now due to said drivers never been ported over, and now
-also being used by Davinci? Or are new drivers added that rely on platform
-data?
+
+Regards,
 
 
 -Olof
