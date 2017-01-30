@@ -1,38 +1,83 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Jan 2017 12:39:15 +0000
-Subject: [PATCH] arm: module: handle negative R_ARM_PREL31 addends
- correctly
-In-Reply-To: <1484907663-32322-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1484907663-32322-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20170130123914.GQ27312@n2100.armlinux.org.uk>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 30 Jan 2017 13:44:27 +0100
+Subject: [PATCH 09/14] mtd: nand: sunxi: simplify optional reset handling
+In-Reply-To: <20170130114116.22089-9-p.zabel@pengutronix.de>
+References: <20170130114116.22089-1-p.zabel@pengutronix.de>
+ <20170130114116.22089-9-p.zabel@pengutronix.de>
+Message-ID: <20170130134427.14487373@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2017 at 10:21:03AM +0000, Ard Biesheuvel wrote:
-> According to the spec 'ELF for the ARM Architecture' (IHI 0044E),
-> addends for R_ARM_PREL31 relocations are 31-bit signed quantities,
-> so we need to sign extend the value to 32 bits before it can be used
-> as an offset in the calculation of the relocated value.
+Hi Philipp,
+
+On Mon, 30 Jan 2017 12:41:11 +0100
+Philipp Zabel <p.zabel@pengutronix.de> wrote:
+
+> As of commit bb475230b8e5 ("reset: make optional functions really
+> optional"), the reset framework API calls use NULL pointers to describe
+> optional, non-present reset controls.
 > 
-> We have not been bitten by this because these relocations are usually
-> emitted against the start of a section, which means the addends never
-> assume negative values in practice. But it is a bug nonetheless, so fix
-> it.
+> This allows to return errors from devm_reset_control_get_optional and to
+> call reset_control_(de)assert unconditionally.
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Cc: Icenowy Zheng <icenowy@aosc.xyz>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
+
+I didn't find commit bb475230b8e5 in mainline, so I guess you plan to
+take this patch in your own tree. Let me know if this is not the case.
+
+Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
 > ---
-> This is something I spotted while looking into adding support for
-> R_ARM_REL32 relocations. Feel free to ignore if it is guaranteed in some
-> way that these relocations can never be emitted with negative addends.
-
-I still think this is a good thing to have, even if we should never
-see them - it avoids updating the relocation with an incorrect value.
-Any relocations we perform should be guaranteed to be correct, or
-we should fail.
-
-Please put it in the patch system, thanks.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+>  drivers/mtd/nand/sunxi_nand.c | 19 ++++++++-----------
+>  1 file changed, 8 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
+> index e40482a65de66..c6769b52c666a 100644
+> --- a/drivers/mtd/nand/sunxi_nand.c
+> +++ b/drivers/mtd/nand/sunxi_nand.c
+> @@ -2196,16 +2196,15 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
+>  		goto out_ahb_clk_unprepare;
+>  
+>  	nfc->reset = devm_reset_control_get_optional(dev, "ahb");
+> -	if (!IS_ERR(nfc->reset)) {
+> -		ret = reset_control_deassert(nfc->reset);
+> -		if (ret) {
+> -			dev_err(dev, "reset err %d\n", ret);
+> -			goto out_mod_clk_unprepare;
+> -		}
+> -	} else if (PTR_ERR(nfc->reset) != -ENOENT) {
+> +	if (IS_ERR(nfc->reset)) {
+>  		ret = PTR_ERR(nfc->reset);
+>  		goto out_mod_clk_unprepare;
+>  	}
+> +	ret = reset_control_deassert(nfc->reset);
+> +	if (ret) {
+> +		dev_err(dev, "reset err %d\n", ret);
+> +		goto out_mod_clk_unprepare;
+> +	}
+>  
+>  	ret = sunxi_nfc_rst(nfc);
+>  	if (ret)
+> @@ -2246,8 +2245,7 @@ static int sunxi_nfc_probe(struct platform_device *pdev)
+>  	if (nfc->dmac)
+>  		dma_release_channel(nfc->dmac);
+>  out_ahb_reset_reassert:
+> -	if (!IS_ERR(nfc->reset))
+> -		reset_control_assert(nfc->reset);
+> +	reset_control_assert(nfc->reset);
+>  out_mod_clk_unprepare:
+>  	clk_disable_unprepare(nfc->mod_clk);
+>  out_ahb_clk_unprepare:
+> @@ -2262,8 +2260,7 @@ static int sunxi_nfc_remove(struct platform_device *pdev)
+>  
+>  	sunxi_nand_chips_cleanup(nfc);
+>  
+> -	if (!IS_ERR(nfc->reset))
+> -		reset_control_assert(nfc->reset);
+> +	reset_control_assert(nfc->reset);
+>  
+>  	if (nfc->dmac)
+>  		dma_release_channel(nfc->dmac);
