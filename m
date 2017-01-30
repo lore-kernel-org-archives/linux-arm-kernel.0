@@ -1,45 +1,40 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 29 Jan 2017 20:59:24 -0800
-Subject: [GIT PULL 3/4] ARM: tegra: Device tree changes for v4.11-rc1
-In-Reply-To: <20170127092121.21570-3-thierry.reding@gmail.com>
-References: <20170127092121.21570-1-thierry.reding@gmail.com>
- <20170127092121.21570-3-thierry.reding@gmail.com>
-Message-ID: <20170130045924.GG18943@localhost>
+Date: Sun, 29 Jan 2017 21:01:28 -0800
+Subject: [GIT PULL] STi DT update for v4.11 round 2
+In-Reply-To: <19365aed-8db8-f3cb-02b6-f0e3ef557d37@st.com>
+References: <f5af2119-21ac-7116-5109-1a8837f87cfb@st.com>
+ <b03b0db3-6f86-aa53-c485-4291f8459983@st.com>
+ <19365aed-8db8-f3cb-02b6-f0e3ef557d37@st.com>
+Message-ID: <20170130050128.GJ18943@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2017 at 10:21:20AM +0100, Thierry Reding wrote:
-> Hi ARM SoC maintainers,
+On Fri, Jan 27, 2017 at 05:15:32PM +0000, Patrice CHOTARD wrote:
+> Here is the correct one
 > 
-> The following changes since commit 0c744ea4f77d72b3dcebb7a8f2684633ec79be88:
+> PLease consider this second round of STi dts update for v4.11 :
 > 
->   Linux 4.10-rc2 (2017-01-01 14:31:53 -0800)
+> The following changes since commit 2016ead446b98c42dffd9b6c03ce813e5cb3b810:
+> 
+>    ARM: dts: STiH407-family: Supply Mailbox properties to delta RProc 
+> (2017-01-12 17:23:39 +0100)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.11-arm-dt
+>    git://git.kernel.org/pub/scm/linux/kernel/git/pchotard/sti.git 
+> sti-dt-for-v4.11-round2
 > 
-> for you to fetch changes up to 393a33c74554be3c30233907e3aa0f84603fee31:
+> for you to fetch changes up to c58736c160c1346bedda77d739f0f85710fa00cf:
 > 
->   ARM: tegra: nyan-blaze: Proper pinmux for TPM I2C (2017-01-25 12:07:21 +0100)
-> 
-> Thanks,
-> Thierry
+>    ARM: dts: STiH407-family: Add missing pwm irq (2017-01-27 17:34:03 +0100)
 > 
 > ----------------------------------------------------------------
-> ARM: tegra: Device tree changes for v4.11-rc1
 > 
-> This contains a set of patches that add hardware compatibility for newer
-> revisions of the Toradex Apalis TK1. Also included is a fix to the PAZ00
-> that stabilizes panel initialization on boot as well as a patch to add
-> card detection for the ??SD card slot on TrimSlice.
+> STi DT fix:
 > 
-> To round things off there are a couple of fixes and changes to the Nyan
-> device tree files to fix the battery charger, add compatibility with new
-> revisions of Nyan Blaze and Nyan Big, as well as properly support the
-> TPM.
+> Add missing interrupt node to properly probe the pwm device.
 
-Thanks, merged!
+Merged, thanks!
 
 
 -Olof
