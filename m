@@ -1,14 +1,17 @@
 From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Mon, 30 Jan 2017 15:34:00 +0100
-Subject: [PATCH v2 5/5] iio: adc: stm32: add exti gpio trigger source
+Date: Mon, 30 Jan 2017 15:33:57 +0100
+Subject: [PATCH v2 2/5] iio: adc: stm32: add dt option to set default trigger
+ polarity
 In-Reply-To: <1485786840-4557-1-git-send-email-fabrice.gasnier@st.com>
 References: <1485786840-4557-1-git-send-email-fabrice.gasnier@st.com>
-Message-ID: <1485786840-4557-6-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <1485786840-4557-3-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-STM32F4 ADC can use exti11 (gpio) signal as trigger source for
-conversions.
+STM32 ADC trigger polarity can be set to either rising, falling
+or both edges. Add dt option to configure it.
+Note: default value may be overridden later via trigger_polarity
+sysfs attribute.
 
 Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 ---
@@ -16,36 +19,22 @@ Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
  1 file changed, 7 insertions(+)
 
 diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
-index be0e457..0118c9c 100644
+index 9b49a6ad..be0e457 100644
 --- a/drivers/iio/adc/stm32-adc.c
 +++ b/drivers/iio/adc/stm32-adc.c
-@@ -26,6 +26,7 @@
- #include <linux/iio/iio.h>
- #include <linux/iio/buffer.h>
- #include <linux/iio/timer/stm32-timer-trigger.h>
-+#include <linux/iio/trigger/stm32-exti-trigger.h>
- #include <linux/iio/trigger.h>
- #include <linux/iio/trigger_consumer.h>
- #include <linux/iio/triggered_buffer.h>
-@@ -240,6 +241,7 @@ struct stm32_adc_chan_spec {
- 	{ TIM5_CH3, STM32_EXT12 },
- 	{ TIM8_CH1, STM32_EXT13 },
- 	{ TIM8_TRGO, STM32_EXT14 },
-+	{ STM32_EXTI(11), STM32_EXT15 },
- 	{}, /* sentinel */
- };
- 
-@@ -409,6 +411,11 @@ static int stm32_adc_get_trig_extsel(struct iio_trigger *trig)
- 		    !strcmp(stm32f4_adc_trigs[i].name, trig->name)) {
- 			return stm32f4_adc_trigs[i].extsel;
- 		}
-+
-+		if (is_stm32_exti_trigger(trig) &&
-+		    !strcmp(stm32f4_adc_trigs[i].name, trig->name)) {
-+			return stm32f4_adc_trigs[i].extsel;
-+		}
+@@ -997,6 +997,13 @@ static int stm32_adc_probe(struct platform_device *pdev)
+ 		return -EINVAL;
  	}
  
- 	return -EINVAL;
++	of_property_read_u32(pdev->dev.of_node, "st,trigger-polarity",
++			     &adc->trigger_polarity);
++	if (adc->trigger_polarity >= ARRAY_SIZE(stm32_trig_pol_items)) {
++		dev_err(&pdev->dev, "Invalid st,trigger-polarity property\n");
++		return -EINVAL;
++	}
++
+ 	adc->irq = platform_get_irq(pdev, 0);
+ 	if (adc->irq < 0) {
+ 		dev_err(&pdev->dev, "failed to get irq\n");
 -- 
 1.9.1
