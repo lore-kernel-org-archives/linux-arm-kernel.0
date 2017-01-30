@@ -1,52 +1,34 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 30 Jan 2017 22:00:34 +0100
-Subject: [GIT PULL] ARM: at91: soc fixes for 4.10
-Message-ID: <20170130210034.vkbl3qxp5qxdd3yb@piout.net>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Mon, 30 Jan 2017 13:02:21 -0800 (PST)
+Subject: [RFC v2] Device memory mappings for Dom0 on ARM64 ACPI systems
+Message-ID: <alpine.DEB.2.10.1701301154340.20188@sstabellini-ThinkPad-X260>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+Hi all,
 
-Here are two patches worth taking as fixes for 4.10. They change the
-email addresses for Nicolas and Ludovic in MAINTAINERS so
-get_maintainers can point to the correct ones.
+a couple of weeks ago I sent a detailed email asking for feedback on a
+problem with Linux on Xen on ACPI systems:
 
-The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+http://marc.info/?l=linux-arm-kernel&m=148469169210500&w=2
 
-  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+In short, on BUS_NOTIFY_ADD_DEVICE events, Linux (as Dom0) requests
+stage-2 MMIO regions mappings via hypercall to Xen. This works well for
+devices, but few MMIO regions exist which do not belong to any devices,
+therefore today they don't get mapped. For example: ACPI
+OperationRegion, ECAM, other memory regions described in static tables
+such as BERT.
 
-are available in the git repository at:
+In the email linked above, I suggested a few different approaches to
+solving this issue. It looks like the consensus is around solution b):
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.10-soc
+> b) Otherwise, we could write an alternative implementation of ioremap
+> on arm64. The Xen specific ioremap would request a stage-2 mapping
+> first, then create the stage-1 mapping as usual. However, this means
+> issuing an hypercall for every ioremap call.
 
-for you to fetch changes up to 420a3879d694e5c3e734fb92151d19b2ec503e46:
+If that's OK for you, we are going to move forward with this approach.
 
-  MAINTAINERS: change email address from atmel to microchip (2017-01-30 21:54:04 +0100)
+Thanks,
 
-----------------------------------------------------------------
-AT91 SoC fixes for 4.10:
-
- - change email addresses for Nicolas and Ludovic following the
-   Microchip-Atmel merger
-
-----------------------------------------------------------------
-Ludovic Desroches (1):
-      MAINTAINERS: change email address from atmel to microchip
-
-Nicolas Ferre (1):
-      MAINTAINERS: at91: change email address
-
- MAINTAINERS | 32 ++++++++++++++++----------------
- 1 file changed, 16 insertions(+), 16 deletions(-)
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170130/3f0796a6/attachment.sig>
+Stefano
