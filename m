@@ -1,35 +1,44 @@
-From: vincent.stehle@laposte.net (=?UTF-8?q?Vincent=20Stehl=C3=A9?=)
-Date: Mon, 30 Jan 2017 15:06:43 +0100
-Subject: [PATCH] net: thunderx: avoid dereferencing xcv when NULL
-Message-ID: <20170130140643.24182-1-vincent.stehle@laposte.net>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Mon, 30 Jan 2017 15:09:54 +0100
+Subject: [PATCH 0/5] Add EXTI GPIO trigger support to STM32 ADC
+In-Reply-To: <1485784663-19505-1-git-send-email-fabrice.gasnier@st.com>
+References: <1485784663-19505-1-git-send-email-fabrice.gasnier@st.com>
+Message-ID: <0472f001-eee8-74a8-f078-2fb71904be58@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes the following smatch and coccinelle warnings:
+Hi all,
 
-  drivers/net/ethernet/cavium/thunder/thunder_xcv.c:119 xcv_setup_link() error: we previously assumed 'xcv' could be null (see line 118) [smatch]
-  drivers/net/ethernet/cavium/thunder/thunder_xcv.c:119:16-20: ERROR: xcv is NULL but dereferenced. [coccinelle]
+Please discard this series. I'll send a V2.
+Sorry for the noise.
 
-Fixes: 6465859aba1e66a5 ("net: thunderx: Add RGMII interface type support")
-Signed-off-by: Vincent Stehl? <vincent.stehle@laposte.net>
-Cc: Sunil Goutham <sgoutham@cavium.com>
----
- drivers/net/ethernet/cavium/thunder/thunder_xcv.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+Best regards,
+Fabrice
 
-diff --git a/drivers/net/ethernet/cavium/thunder/thunder_xcv.c b/drivers/net/ethernet/cavium/thunder/thunder_xcv.c
-index 67befedef709..578c7f8f11bf 100644
---- a/drivers/net/ethernet/cavium/thunder/thunder_xcv.c
-+++ b/drivers/net/ethernet/cavium/thunder/thunder_xcv.c
-@@ -116,8 +116,7 @@ void xcv_setup_link(bool link_up, int link_speed)
- 	int speed = 2;
- 
- 	if (!xcv) {
--		dev_err(&xcv->pdev->dev,
--			"XCV init not done, probe may have failed\n");
-+		pr_err("XCV init not done, probe may have failed\n");
- 		return;
- 	}
- 
--- 
-2.11.0
+On 01/30/2017 02:57 PM, Fabrice Gasnier wrote:
+> STM32 ADC, can use GPIOs configured as EXTI line (external interrupt)
+> as trigger source for conversions.
+> This patchset is based on latest IIO testing branch, and adds support
+> for EXTi GPIO triggers in IIO.
+> It also adds a dt option to configure default trigger polarity in
+> STM32 ADC driver.
+>
+> Fabrice Gasnier (5):
+>    Documentation: dt: iio: document stm32 adc trigger polarity
+>    iio: adc: stm32: add dt option to set default trigger polarity
+>    Documentation: dt: iio: document stm32 exti trigger
+>    iio: trigger: add support for STM32 EXTI triggers
+>    iio: adc: stm32: add exti11 gpio trigger source
+>
+>   .../devicetree/bindings/iio/adc/st,stm32-adc.txt   |   3 +
+>   .../bindings/iio/trigger/st,stm32-exti-trigger.txt |  17 +++
+>   drivers/iio/adc/stm32-adc.c                        |  14 +++
+>   drivers/iio/trigger/Kconfig                        |  10 ++
+>   drivers/iio/trigger/Makefile                       |   1 +
+>   drivers/iio/trigger/stm32-exti-trigger.c           | 124 +++++++++++++++++++++
+>   include/linux/iio/trigger/stm32-exti-trigger.h     |  26 +++++
+>   7 files changed, 195 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/iio/trigger/st,stm32-exti-trigger.txt
+>   create mode 100644 drivers/iio/trigger/stm32-exti-trigger.c
+>   create mode 100644 include/linux/iio/trigger/stm32-exti-trigger.h
+>
