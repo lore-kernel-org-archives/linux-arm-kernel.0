@@ -1,71 +1,69 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Mon, 30 Jan 2017 12:29:01 +0000
-Subject: [PATCH 0/7]  Fix issues and factorize arm/arm64 capacity
- information code
-In-Reply-To: <20170119143757.14537-1-juri.lelli@arm.com>
-References: <20170119143757.14537-1-juri.lelli@arm.com>
-Message-ID: <20170130122901.GA25681@e106622-lin>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 30 Jan 2017 13:29:25 +0100
+Subject: [PATCH 1/2] ARM: dts: orion5x-lschl: Fix model name
+In-Reply-To: <20170130110730.9310-1-rogershimizu@gmail.com> (Roger Shimizu's
+ message of "Mon, 30 Jan 2017 20:07:29 +0900")
+References: <20170130110730.9310-1-rogershimizu@gmail.com>
+Message-ID: <87poj4vihm.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Roger,
+ 
+ On lun., janv. 30 2017, Roger Shimizu <rogershimizu@gmail.com> wrote:
 
-ping.
+> Model name should be consistent with legacy device file, so that user
+> can migrate their system from legacy device support to device-tree
+> safely.
+>
+> Legacy device file is currently removed, but it can be found on 4.8
+> or previous version of linux:
+>   arch/arm/mach-orion5x/ls-chl-setup.c
+>
+> Fixes: f94f268979a2 ("ARM: dts: orion5x: convert ls-chl to FDT")
+> Cc: Ashley Hughes <ashley.hughes@blueyonder.co.uk>
+> Signed-off-by: Roger Shimizu <rogershimizu@gmail.com>
 
-I'd need more advice on this set, especially on how and if patch 6 could fly.
+
+Applied on mvebu/dt
 
 Thanks,
 
-- Juri
+Gregory
 
-On 19/01/17 14:37, Juri Lelli wrote:
-> Hi,
-> 
-> arm and arm64 topology.c share a lot of code related to parsing of capacity
-> information. This set of patches proposes a solution (based on Will's,
-> Catalin's and Mark's off-line suggestions) to move such common code in a single
-> place: drivers/base/arch_topology.c (by creating such file and conditionally
-> compiling it for arm and arm64 only).
-> 
-> First 5 patches are actually fixes for the current code.
-> 
-> Patch 6 is the actual refactoring.
-> 
-> Last patch removes one of the extern symbols by changing a bit the now common
-> code. We still remain with some other externs, which are not nice. Moving them
-> in some header file solves the issue, should I just create a new include/
-> linux/arch_topology.h file and move them there?
-> 
-> The set is based on top of linux/master (4.10-rc4 fb1d8e0e2c50) and it is also
-> available from:
-> 
->  git://linux-arm.org/linux-jl.git upstream/default_caps_factorize
-> 
-> Best,
-> 
-> - Juri
-> 
-> Juri Lelli (7):
->   Documentation: arm: fix wrong reference number in DT definition
->   Documentation/ABI: add information about cpu_capacity
->   arm: fix return value of parse_cpu_capacity
->   arm: remove wrong CONFIG_PROC_SYSCTL ifdef
->   arm64: remove wrong CONFIG_PROC_SYSCTL ifdef
->   arm, arm64: factorize common cpu capacity default code
->   arm,arm64,drivers: reduce scope of cap_parsing_failed
-> 
->  Documentation/ABI/testing/sysfs-devices-system-cpu |   7 +
->  Documentation/devicetree/bindings/arm/cpus.txt     |   4 +-
->  arch/arm/Kconfig                                   |   1 +
->  arch/arm/kernel/topology.c                         | 216 +------------------
->  arch/arm64/Kconfig                                 |   1 +
->  arch/arm64/kernel/topology.c                       | 218 +------------------
->  drivers/base/Kconfig                               |   8 +
->  drivers/base/Makefile                              |   1 +
->  drivers/base/arch_topology.c                       | 240 +++++++++++++++++++++
->  9 files changed, 269 insertions(+), 427 deletions(-)
->  create mode 100644 drivers/base/arch_topology.c
-> 
+
+> ---
+>  arch/arm/boot/dts/orion5x-lschl.dts | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/orion5x-lschl.dts b/arch/arm/boot/dts/orion5x-lschl.dts
+> index 7c999b092e06..ee751995c8d0 100644
+> --- a/arch/arm/boot/dts/orion5x-lschl.dts
+> +++ b/arch/arm/boot/dts/orion5x-lschl.dts
+> @@ -2,7 +2,7 @@
+>   * Device Tree file for Buffalo Linkstation LS-CHLv3
+>   *
+>   * Copyright (C) 2016 Ash Hughes <ashley.hughes@blueyonder.co.uk>
+> - * Copyright (C) 2015, 2016
+> + * Copyright (C) 2015-2017
+>   * Roger Shimizu <rogershimizu@gmail.com>
+>   *
+>   * This file is dual-licensed: you can use it either under the terms
+> @@ -52,7 +52,7 @@
+>  #include <dt-bindings/gpio/gpio.h>
+>  
+>  / {
+> -	model = "Buffalo Linkstation Live v3 (LS-CHL)";
+> +	model = "Buffalo Linkstation LiveV3 (LS-CHL)";
+>  	compatible = "buffalo,lschl", "marvell,orion5x-88f5182", "marvell,orion5x";
+>  
+>  	memory { /* 128 MB */
 > -- 
-> 2.10.0
-> 
+> 2.11.0
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
