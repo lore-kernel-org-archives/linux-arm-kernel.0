@@ -1,54 +1,94 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 30 Jan 2017 11:42:18 +0100
-Subject: [PATCH v5 0/13] arm64: allwinner: a64: Enable MMC support
-In-Reply-To: <CAGb2v67stC=EaFMpTSrOirSqQL6r_jPDKsKQNishb=8g=278Gw@mail.gmail.com>
-References: <cover.6f3d82744628848e2182720c35f13e87e8b62258.1485553113.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v67stC=EaFMpTSrOirSqQL6r_jPDKsKQNishb=8g=278Gw@mail.gmail.com>
-Message-ID: <20170130104218.34zftrdyr3m6422w@lukather>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 30 Jan 2017 10:55:53 +0000
+Subject: [Patch v4 2/2] firmware: qcom: scm: Fix interrupted SCM calls
+In-Reply-To: <CAOesGMi4xUxJNHO5hEbZHBCnTZ6xXVyzoszawPiJxBiRP1DitA@mail.gmail.com>
+References: <1484845120-3364-1-git-send-email-andy.gross@linaro.org>
+ <1484845120-3364-3-git-send-email-andy.gross@linaro.org>
+ <CAOesGMi4xUxJNHO5hEbZHBCnTZ6xXVyzoszawPiJxBiRP1DitA@mail.gmail.com>
+Message-ID: <20170130105553.GB16461@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Olof,
 
-On Sat, Jan 28, 2017 at 08:44:02PM +0800, Chen-Yu Tsai wrote:
-> On Sat, Jan 28, 2017 at 5:38 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi,
+On Sun, Jan 29, 2017 at 04:24:51PM -0800, Olof Johansson wrote:
+> On Thu, Jan 19, 2017 at 8:58 AM, Andy Gross <andy.gross@linaro.org> wrote:
+> > This patch adds a Qualcomm specific quirk to the arm_smccc_smc call.
 > >
-> > Here is a new attempt at getting the MMC controllers running, following the
-> > work done by Andre.
+> > On Qualcomm ARM64 platforms, the SMC call can return before it has
+> > completed.  If this occurs, the call can be restarted, but it requires
+> > using the returned session ID value from the interrupted SMC call.
 > >
-> > This has been tested on a board with one SDIO device (a Marvell WiFi chip)
-> > and a Kingston eMMC with 1.8V IOs.
+> > The quirk stores off the session ID from the interrupted call in the
+> > quirk structure so that it can be used by the caller.
 > >
-> > For SDIO, the HS DDR mode works just fine. That serie also enables the
-> > SDR104 mode to work on the devices that are capable of this.
+> > This patch folds in a fix given by Sricharan R:
+> > https://lkml.org/lkml/2016/9/28/272
 > >
-> > For the eMMC, HS200 with the voltage switch works. HS400 doesn't at the
-> > moment, but since it's significantly more complex, and at the same time
-> > Allwinner recommends to limit its frequency to 100MHz, this doesn't have
-> > any benefits. If there's any at some point, this can be added later.
+> > Signed-off-by: Andy Gross <andy.gross@linaro.org>
+> > Reviewed-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm64/kernel/smccc-call.S |  9 ++++++++-
+> >  drivers/firmware/qcom_scm-64.c | 13 ++++++++++---
+> >  include/linux/arm-smccc.h      | 11 ++++++++---
+> >  3 files changed, 26 insertions(+), 7 deletions(-)
+> >
+> > diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
+> > index 6290696..72ecdca 100644
+> > --- a/arch/arm64/kernel/smccc-call.S
+> > +++ b/arch/arm64/kernel/smccc-call.S
+> > @@ -12,6 +12,7 @@
+> >   *
+> >   */
+> >  #include <linux/linkage.h>
+> > +#include <linux/arm-smccc.h>
+> >  #include <asm/asm-offsets.h>
+> >
+> >         .macro SMCCC instr
+> > @@ -20,7 +21,13 @@
+> >         ldr     x4, [sp]
+> >         stp     x0, x1, [x4, #ARM_SMCCC_RES_X0_OFFS]
+> >         stp     x2, x3, [x4, #ARM_SMCCC_RES_X2_OFFS]
+> > -       ret
+> > +       ldr     x4, [sp, #8]
+> > +       cbz     x4, 1f /* no quirk structure */
+> > +       ldr     x9, [x4, #ARM_SMCCC_QUIRK_ID_OFFS]
+> > +       cmp     x9, #ARM_SMCCC_QUIRK_QCOM_A6
+> > +       b.ne    1f
+> > +       str     x6, [x4, ARM_SMCCC_QUIRK_STATE_OFFS]
+> > +1:     ret
+> >         .cfi_endproc
+> >         .endm
 > 
-> Whole series is
-> 
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
-> 
-> Seems that we don't need to increase the signal drive strength for eMMC
-> on the A64? This is probably a good thing.
+> This extends the SMC entry/return path quite a bit.
 
->From what I've seen, Allwinner still recommends using a 30mA drive
-strength, so that doesn't seem needed.
+I honestly doubt it's measurable. You've got an independent load from the
+stack and a cbz that's likely predicted correctly given the static nature
+of the quirk. Then you have an SMC, which is going to trap and dominate
+the cost of this function.
 
-Maxime
+> Is this truly a qualcomm-only quirk, or are other vendors also picking it
+> up?
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170130/4a4f6beb/attachment.sig>
+Currently, it's just qualcomm. Whilst I'd love to say they'll be the only
+people to interpret the SMCCC in an imaginative fashion, I'd be surprised
+if we don't see other vendors making mistakes in this area in the future.
+
+> Why not either make arm_smccc_.* function pointers and update them
+> accordingly, or use a custom version for the specific locations where
+> you want/need to restart the calls? You are after all already wrapping
+> them in qcom_scm_call().
+
+Having the low-level SMC entry code in one place is advantageous because
+it means the SMCCC contract is enforced in common code, making it easier
+to debug and maintain. If a vendor got the contract so badly wrong that
+it didn't resemble SMCCC, then I'd agree with you, but here we're just
+saving and restoring an extra register.
+
+> Seems like a more appropriate change than burden all platforms with
+> longer code path due to your quirk.
+
+I really don't think it's a problem. Do you have numbers suggesting
+otherwise?
+
+Will
