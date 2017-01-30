@@ -1,48 +1,71 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 30 Jan 2017 12:22:11 +0000
-Subject: [PATCH V7 08/11] drivers: acpi: Handle IOMMU lookup failure with
- deferred probing or error
-In-Reply-To: <f2370671-ece8-fbee-de19-350dd625088f@codeaurora.org>
-References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
- <1485188293-20263-9-git-send-email-sricharan@codeaurora.org>
- <20170124123711.GA11996@red-moon>
- <f2370671-ece8-fbee-de19-350dd625088f@codeaurora.org>
-Message-ID: <93e79759-d614-9b36-d5ab-63e8eb725009@arm.com>
+From: juri.lelli@arm.com (Juri Lelli)
+Date: Mon, 30 Jan 2017 12:29:01 +0000
+Subject: [PATCH 0/7]  Fix issues and factorize arm/arm64 capacity
+ information code
+In-Reply-To: <20170119143757.14537-1-juri.lelli@arm.com>
+References: <20170119143757.14537-1-juri.lelli@arm.com>
+Message-ID: <20170130122901.GA25681@e106622-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/01/17 17:53, Sinan Kaya wrote:
-> On 1/24/2017 7:37 AM, Lorenzo Pieralisi wrote:
->> [+hanjun, tomasz, sinan]
->>
->> It is quite a key patchset, I would be glad if they can test on their
->> respective platforms with IORT.
->>
-> 
-> Tested on top of 4.10-rc5.
-> 
-> 1.	Platform Hidma device passed dmatest
-> 2.	Seeing some USB stalls on a platform USB device.
-> 3.	PCIe NVME drive probed and worked fine with MSI interrupts after boot.
-> 4. 	NVMe driver didn't probe following a hotplug insertion and received an
-> SMMU error event during the insertion.
+Hi,
 
-What was the SMMU error - a translation/permission fault (implying the
-wrong DMA ops) or a bad STE fault (implying we totally failed to tell
-the SMMU about the device at all)?
+ping.
 
-Robin.
+I'd need more advice on this set, especially on how and if patch 6 could fly.
 
+Thanks,
+
+- Juri
+
+On 19/01/17 14:37, Juri Lelli wrote:
+> Hi,
 > 
-> /sys/bus/pci/slots/4 #
-> /sys/bus/pci/slots/4 # dmesg | grep nvme
-> [   14.041357] nvme nvme0: pci function 0003:01:00.0
-> [  198.399521] nvme nvme0: pci function 0003:01:00.0
-> [__198.416232]_nvme_0003:01:00.0:_enabling_device_(0000_->_0002)
-> [  264.402216] nvme nvme0: I/O 228 QID 0 timeout, disable controller
-> [  264.402313] nvme nvme0: Identify Controller failed (-4)
-> [  264.421270] nvme nvme0: Removing after probe failure status: -5
-> /sys/bus/pci/slots/4 #
+> arm and arm64 topology.c share a lot of code related to parsing of capacity
+> information. This set of patches proposes a solution (based on Will's,
+> Catalin's and Mark's off-line suggestions) to move such common code in a single
+> place: drivers/base/arch_topology.c (by creating such file and conditionally
+> compiling it for arm and arm64 only).
 > 
+> First 5 patches are actually fixes for the current code.
 > 
+> Patch 6 is the actual refactoring.
+> 
+> Last patch removes one of the extern symbols by changing a bit the now common
+> code. We still remain with some other externs, which are not nice. Moving them
+> in some header file solves the issue, should I just create a new include/
+> linux/arch_topology.h file and move them there?
+> 
+> The set is based on top of linux/master (4.10-rc4 fb1d8e0e2c50) and it is also
+> available from:
+> 
+>  git://linux-arm.org/linux-jl.git upstream/default_caps_factorize
+> 
+> Best,
+> 
+> - Juri
+> 
+> Juri Lelli (7):
+>   Documentation: arm: fix wrong reference number in DT definition
+>   Documentation/ABI: add information about cpu_capacity
+>   arm: fix return value of parse_cpu_capacity
+>   arm: remove wrong CONFIG_PROC_SYSCTL ifdef
+>   arm64: remove wrong CONFIG_PROC_SYSCTL ifdef
+>   arm, arm64: factorize common cpu capacity default code
+>   arm,arm64,drivers: reduce scope of cap_parsing_failed
+> 
+>  Documentation/ABI/testing/sysfs-devices-system-cpu |   7 +
+>  Documentation/devicetree/bindings/arm/cpus.txt     |   4 +-
+>  arch/arm/Kconfig                                   |   1 +
+>  arch/arm/kernel/topology.c                         | 216 +------------------
+>  arch/arm64/Kconfig                                 |   1 +
+>  arch/arm64/kernel/topology.c                       | 218 +------------------
+>  drivers/base/Kconfig                               |   8 +
+>  drivers/base/Makefile                              |   1 +
+>  drivers/base/arch_topology.c                       | 240 +++++++++++++++++++++
+>  9 files changed, 269 insertions(+), 427 deletions(-)
+>  create mode 100644 drivers/base/arch_topology.c
+> 
+> -- 
+> 2.10.0
 > 
