@@ -1,151 +1,69 @@
-From: jasmin@beck.ac (Jasmin Beck)
-Date: Mon, 30 Jan 2017 17:03:39 +0100
-Subject: mvneta MDIO problems
-In-Reply-To: <20170130144407.GC25924@io.lakedaemon.net>
-References: <1485351412.5441.82.camel@beck.ac>
- <20170130103628.09178f50@free-electrons.com>
- <20170130144407.GC25924@io.lakedaemon.net>
-Message-ID: <1485792219.5441.164.camel@beck.ac>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 30 Jan 2017 08:08:27 -0800
+Subject: [GIT PULL 2/4] TI DaVinci SoC support updates for v4.11
+In-Reply-To: <20170130010453.GR3133@localhost> (Olof Johansson's message of
+ "Sun, 29 Jan 2017 17:04:53 -0800")
+References: <20170124130641.28264-1-nsekhar@ti.com>
+ <20170124130641.28264-2-nsekhar@ti.com>
+ <20170130010453.GR3133@localhost>
+Message-ID: <m2y3xstts4.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
-Hi Thomas,
+Olof Johansson <olof@lixom.net> writes:
 
-thanks for your messages and the details regarding the report.
+> On Tue, Jan 24, 2017 at 06:36:39PM +0530, Sekhar Nori wrote:
+>> The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+>> 
+>>   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+>> 
+>> are available in the git repository at:
+>> 
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.11/soc
+>> 
+>> for you to fetch changes up to 9c9b1bc25291e275b04f758f2549c81e092954f5:
+>> 
+>>   ARM: davinci: add skeleton for pdata-quirks (2017-01-23 20:52:38 +0530)
+>> 
+>> ----------------------------------------------------------------
+>> Introduce pdata-quirks mechanism for
+>> DaVinci which will be needed for supporting
+>> video input/output on DA850 SoC.
+>> 
+>> ----------------------------------------------------------------
+>> Kevin Hilman (1):
+>>       ARM: davinci: add skeleton for pdata-quirks
+>
+> I'm not much of a fan of adding this. I know we added it for some of
+> the legacy platforms since moving over existing in-tree code would take
+> a while. 
 
-> Is there a kernel version where this problem does not exist? I.e is
-> it a regression or an issue that always existed?
+We are not fans of adding it either, and have been avoiding it up until
+now.  You can rest assured that new additions here will be heavily
+scrutinized.
 
-> Mine is currently running 4.8.6 with one patch on top for ath9k.??Let
-> me know what kernel you want me to move to.
+> But the thought was that new drivers wouldn't use it much.  Is the
+> need for this now due to said drivers never been ported over, and now
+> also being used by Davinci? Or are new drivers added that rely on
+> platform data?
 
-> It was also a problem with 4.2.8, which was the kernel I installed
-> when I first stood up that box.
+The problem isn't new drivers, but old drivers that haven't grown DT
+equivalents.
 
-My testing-device is currently running 4.8.11-1~bpo8+1
+There are a handful of drivers/media drivers currently used by Davinci
+via board files (and pdata) that still do not have DT mechanisms for
+all the things used in pdata.
 
-There is another remote device, that I have not upgraded yet because of
-this issue - it is still running 4.1.3-1~bpo8+1 with an uptime of
-currently 66 days without experiencing the "link down" problem.
-But it is not said, that this definitely means, that the issue is not
-present in 4.1, because I had also experienced ~4-6 weeks uptime
-without the issue on my testing-device here.
-Possibly it is a regression in 4.2 and onwards, but not 100% sure.
+In attempting DT support for video on DaVinci, attempts were made (by
+me[1]) to pass the data via DT, which triggered discussions among
+linux-media maintainers about the "right way" of handling it.
+Unfortunately, these discussions never fully materialized in an
+short-term solution, so we were left with pdata for now.
 
-> mvneta is not in charge of the MDIO bus, there's a separate mvmdio
-> driver. Though it doesn't do anything in terms of HW initialization,?
-> so I don't expect unloading/reloading this module to have any effect.
+I've offered to be the first to beta test the new DT mechanisms they
+come up with, so when that happens, we'll gladly get rid of these pdata
+quirks.
 
-yes, I also supposed that this weekend because of the message:
->?[824281.528361] mvneta d0074000.ethernet eth1: cannot probe MDIO bus
+Kevin
 
-So I just unloaded the module mvmdio, planning to insert some printk-
-lines for obtaining more information... but unfortunately, unloading
-mvmdio resulted in a NULL pointer exception/complete crash (even sysrq
-through serial interface was not possible anymore) - possibly, this is
-also a result of the "failed state"/the same bug, that leads to "link
-down"?
-
-> So it looks as if the PHY isn't responding anymore. Are you
-> experiencing this on both network interfaces? Only one specifically?
-
-> To date, I thought I was the only one, and that it was probably due
-> to my funky printer that kicks down to 10MBit/half when in low power
-> state.
-
-It starts with occasionally link down/link up on eth0 or eth1, seems
-"random". A link stays down for seconds, minutes (hours?) and then
-comes back up.
-After doing so for a while, the situation changes (-> failed state).
-The links then either stay down or come up with 10M/Half-Duplex, but
-being unable to transfer some data. Finally they go both down and stay
-down.
-
-When querying with ethtool in "failed state", it can not obtain any
-information (I do not exactly remember the error message) - eth0 and
-eth1 can behave differently regarding that in "failed state".
-
-Furthermore, when trying "ip link set dev ethX up", eth0 and eth1 can
-behave differently too. E.g. eth0 can state "NO-CARRIER" (ip link
-show), and eth1 the mentioned "phy not found".
-
-Currently, my box has an uptime of ?2 days, 16h and the process has
-already started again with one link down/up:
-
-[26727.775106] mvneta d0074000.ethernet eth1: Link is Down
-[26729.851915] mvneta d0074000.ethernet eth1: Link is Up - 1Gbps/Full - flow control off
-
-It COULD be possible, that it depends on the cpu/network usage over
-time... it *seems* to happen sooner after reboot since running a full
-bitcoin-node on the testing-device, that constantly consumes network/io
-and cpu time. But as the "time to first link down" varies a lot anyway,
-this is possibly just coincidence.
-
-> I reported it a month or so ago via irc, but at the time blamed the
-> printer.??I'd love to dive in and fix it.
-
-We both have kernel 4.8 installed, so comparing with 4.1 could be a
-good start.
-
-Or examining the "failed state" as soon as a box enters it - I can also
-provide ssh-access to the serial-port of the testing device; please
-just send your public key if you'd like to take a look at it.
-
-
-Thanks & Regards
-Jasmin
-
-
-On Mon, 2017-01-30 at 14:44 +0000, Jason Cooper wrote:
-> Hi Jasmin, Thomas,
-> 
-> On Mon, Jan 30, 2017 at 10:36:28AM +0100, Thomas Petazzoni wrote:
-> > On Wed, 25 Jan 2017 14:36:52 +0100, Jasmin Beck wrote:
-> 
-> ...
-> > > If you are interested in taking a look at the situation in
-> > > "failed
-> > > state", I can immediately provide ssh access to the serial
-> > > console
-> > > (though your ssh public key is needed in this case).
-> > 
-> > I don't think we ever had similar reports. I'm not personally
-> > leaving
-> > the Mirabox running for extended periods of time, so I've never
-> > seen
-> > this issue. We do have the Mirabox tested as part of kernelci.org,
-> > but
-> > it gets rebooted for every test, so we don't see this sort of
-> > issue.
-> > 
-> > Jason, Andrew, maybe you are running Mirabox boards for extended
-> > periods
-> > of time? If so, have you seen a similar problem?
-> 
-> I do have a Mirabox running 24/7 and I've experienced the same issue.
-> To date, I thought I was the only one, and that it was probably due
-> to
-> my funky printer that kicks down to 10MBit/half when in low power
-> state.
-> 
-> I reported it a month or so ago via irc, but at the time blamed the
-> printer.??I'd love to dive in and fix it.
-> 
-> Mine is currently running 4.8.6 with one patch on top for ath9k.??Let
-> me know what kernel you want me to move to.
-> 
-> It was also a problem with 4.2.8, which was the kernel I installed
-> when
-> I first stood up that box.
-> 
-> thx,
-> 
-> Jason.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: smime.p7s
-Type: application/x-pkcs7-signature
-Size: 6057 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170130/e9c90ccd/attachment-0001.bin>
+[1] https://marc.info/?l=devicetree&m=147982998517384
