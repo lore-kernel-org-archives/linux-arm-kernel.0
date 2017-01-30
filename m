@@ -1,83 +1,66 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 30 Jan 2017 11:05:53 +0100
-Subject: [PATCH v5 0/13] arm64: allwinner: a64: Enable MMC support
-In-Reply-To: <cover.6f3d82744628848e2182720c35f13e87e8b62258.1485553113.git-series.maxime.ripard@free-electrons.com>
+Date: Mon, 30 Jan 2017 11:06:05 +0100
+Subject: [PATCH v5 6/13] mmc: sunxi: Add EMMC (MMC2) controller compatible
+In-Reply-To: <bcbeeb726c5638361590bd4c295279ef92d44209.1485553113.git-series.maxime.ripard@free-electrons.com>
 References: <cover.6f3d82744628848e2182720c35f13e87e8b62258.1485553113.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAPDyKFrb9HJ0KG5rAkVJVjxOdywOTRM6Nu9w+9+OxOvDpJFAqQ@mail.gmail.com>
+ <bcbeeb726c5638361590bd4c295279ef92d44209.1485553113.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAPDyKFr3cnFux4NRzZ9UAn93MOVb6RaQQ+PHDxGztciDHZSX9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 27 January 2017 at 22:38, Maxime Ripard
 <maxime.ripard@free-electrons.com> wrote:
-> Hi,
+> The MMC2 controller on the A64 is kind of a special beast.
 >
-> Here is a new attempt at getting the MMC controllers running, following the
-> work done by Andre.
+> While the general controller design is the same than the other MMC
+> controllers in the SoC, it also has a bunch of features and changes that
+> prevent it to be driven in the same way.
 >
-> This has been tested on a board with one SDIO device (a Marvell WiFi chip)
-> and a Kingston eMMC with 1.8V IOs.
+> It has for example a different bus width limit, a different maximum
+> frequency, and, for some reason, the maximum buffer size of a DMA
+> descriptor.
 >
-> For SDIO, the HS DDR mode works just fine. That serie also enables the
-> SDR104 mode to work on the devices that are capable of this.
+> Add a new compatible specifically for this controller.
 >
-> For the eMMC, HS200 with the voltage switch works. HS400 doesn't at the
-> moment, but since it's significantly more complex, and at the same time
-> Allwinner recommends to limit its frequency to 100MHz, this doesn't have
-> any benefits. If there's any at some point, this can be added later.
+> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Tested-by: Florian Vaussard <florian.vaussard@heig-vd.ch>
+> ---
+>  drivers/mmc/host/sunxi-mmc.c | 8 ++++++++
+>  1 file changed, 8 insertions(+), 0 deletions(-)
 >
-> Let me know what you think,
-> Maxime
+> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+> index 6bbe61397b7c..f0f6922bca8a 100644
+> --- a/drivers/mmc/host/sunxi-mmc.c
+> +++ b/drivers/mmc/host/sunxi-mmc.c
+> @@ -5,6 +5,7 @@
+>   * (C) Copyright 2013-2014 O2S GmbH <www.o2s.ch>
+>   * (C) Copyright 2013-2014 David Lanzend?rfer <david.lanzendoerfer@o2s.ch>
+>   * (C) Copyright 2013-2014 Hans de Goede <hdegoede@redhat.com>
+> + * (C) Copyright 2017 Sootech SA
+>   *
+>   * This program is free software; you can redistribute it and/or
+>   * modify it under the terms of the GNU General Public License as
+> @@ -1096,12 +1097,19 @@ static const struct sunxi_mmc_cfg sun50i_a64_cfg = {
+>         .needs_new_timings = true,
+>  };
 >
-> Changes from v4:
->   - Added Florian Tested-by
->   - Removed duplicate commit log
->
-> Changes from v3:
->   - Reordered the MMC nodes
->   - Added the specification section the first commit log
->   - Supported mmc->actual_rate
->   - Clarified a bit what we (don't) know about DATA0
->
-> Changes from v2:
->   - Enabled SDR104, limited the frequency to 150MHz. 200MHz was too high.
->   - Added more fixes to the gating and frequency rate change sequence
->   - Added one more patch to mask DATA0 when updating the clock that was
->     needed to get SDR104 to run
->   - Added the patches to enable it on a few boards done by Andre
->   - Amended the comments as suggested by Andre.
->   - Added some tags
->
-> Andre Przywara (4):
->   arm64: allwinner: a64: Add MMC nodes
->   arm64: allwinner: pine64: add MMC support
->   arm64: allwinner: a64: add UART1 pin nodes
->   arm64: allwinner: add BananaPi-M64 support
->
-> Maxime Ripard (9):
->   mmc: sunxi: Fix clock frequency change sequence
->   mmc: sunxi: Gate the clock when rate is 0
->   mmc: sunxi: Always set signal delay to 0 for A64
->   mmc: sunxi: Enable the new timings for the A64 MMC controllers
->   mmc: sunxi: Mask DATA0 when updating the clock
->   mmc: sunxi: Add EMMC (MMC2) controller compatible
->   mmc: sunxi: Add more debug informations
->   arm64: allwinner: a64: Add MMC pinctrl nodes
->   arm64: allwinner: a64: Increase the MMC max frequency
->
->  arch/arm64/boot/dts/allwinner/Makefile                    |   1 +-
->  arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 120 +++++++-
->  arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts       |  20 +-
->  arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi             |  77 ++++-
->  drivers/mmc/host/sunxi-mmc.c                              | 114 ++++---
->  5 files changed, 289 insertions(+), 43 deletions(-)
->  create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
->
-> base-commit: c94f7962e97c2ba0a612656bc456d979f20cb382
-> --
-> git-series 0.8.11
+> +static const struct sunxi_mmc_cfg sun50i_a64_emmc_cfg = {
+> +       .idma_des_size_bits = 13,
+> +       .clk_delays = NULL,
+> +       .can_calibrate = true,
+> +};
+> +
+>  static const struct of_device_id sunxi_mmc_of_match[] = {
+>         { .compatible = "allwinner,sun4i-a10-mmc", .data = &sun4i_a10_cfg },
+>         { .compatible = "allwinner,sun5i-a13-mmc", .data = &sun5i_a13_cfg },
+>         { .compatible = "allwinner,sun7i-a20-mmc", .data = &sun7i_a20_cfg },
+>         { .compatible = "allwinner,sun9i-a80-mmc", .data = &sun9i_a80_cfg },
+>         { .compatible = "allwinner,sun50i-a64-mmc", .data = &sun50i_a64_cfg },
+> +       { .compatible = "allwinner,sun50i-a64-emmc", .data = &sun50i_a64_emmc_cfg },
 
-Thanks, applied patch 1 -> 7 for next! Although, please have a look at
-my comment for patch6.
+This should be documented in the DTS docs for sunxi as well. I expect
+you to send a patch on top to take care of that.
 
 Kind regards
 Uffe
