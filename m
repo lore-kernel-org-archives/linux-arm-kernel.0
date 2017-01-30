@@ -1,43 +1,50 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 30 Jan 2017 10:15:27 +0100
-Subject: [PATCH 2/3 v3] iio: adc: break out common code from SPMI VADC
-In-Reply-To: <48e07081-2088-6ffe-c58e-ac5a561b6a00@kernel.org>
-References: <20170117142515.10578-1-linus.walleij@linaro.org>
- <20170117142515.10578-2-linus.walleij@linaro.org>
- <48e07081-2088-6ffe-c58e-ac5a561b6a00@kernel.org>
-Message-ID: <CACRpkdZZqW6DYXuR3ShT3NW+qpTvniEBVtnWsm11J1taYzLd4Q@mail.gmail.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Mon, 30 Jan 2017 14:50:35 +0530
+Subject: [PATCH V7 00/11] IOMMU probe deferral support
+In-Reply-To: <20170128211029.GI20550@bhelgaas-glaptop.roam.corp.google.com>
+References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
+ <20170128211029.GI20550@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <005801d27ada$2127ee90$6377cbb0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 21, 2017 at 2:37 PM, Jonathan Cameron <jic23@kernel.org> wrote:
-> On 17/01/17 14:25, Linus Walleij wrote:
->> The SPMI VADC and the earlier XOADC share a subset of
->> common code, so to be able to use the same code in both
->> drivers, we break out a separate file with the common code,
->> prefix exported functions that are no longer static with
->> qcom_* and bake an object qcom-vadc.o that contains both
->> files: qcom-vadc-common.o and qcom-spmi-vadc.o.
->>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-arm-msm at vger.kernel.org
->> Cc: Ivan T. Ivanov <iivanov.xz@gmail.com>
->> Cc: Andy Gross <andy.gross@linaro.org>
->> Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
->> Cc: Stephen Boyd <sboyd@codeaurora.org>
->> Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
->> Cc: Rama Krishna Phani A <rphani@codeaurora.org>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Hi Bjorn,
+
+>On Mon, Jan 23, 2017 at 09:48:02PM +0530, Sricharan R wrote:
+>> This series calls the dma ops configuration for the devices
+>> at a generic place so that it works for all busses.
+>> The dma_configure_ops for a device is now called during
+>> the device_attach callback just before the probe of the
+>> bus/driver is called. Similarly dma_deconfigure is called during
+>> device/driver_detach path.
+>> ...
 >
-> This looks like fairly straight forward refacting to me.  Rama, could you
-> take a look at this and perhaps test that no breakage has slipped in?
+>>  arch/arm64/mm/dma-mapping.c       | 132 ++++----------------------------------
+>>  drivers/acpi/arm64/iort.c         |  40 +++++++++++-
+>>  drivers/acpi/glue.c               |   5 --
+>>  drivers/acpi/scan.c               |   7 +-
+>>  drivers/base/dd.c                 |   9 +++
+>>  drivers/base/dma-mapping.c        |  41 ++++++++++++
+>>  drivers/iommu/arm-smmu-v3.c       |  46 +------------
+>>  drivers/iommu/arm-smmu.c          |  58 +++--------------
+>>  drivers/iommu/of_iommu.c          | 114 +++++++++++++++++++++++---------
+>>  drivers/of/address.c              |  20 +++++-
+>>  drivers/of/device.c               |  36 ++++++-----
+>>  drivers/of/platform.c             |  10 +--
+>>  drivers/pci/probe.c               |  28 --------
+>>  include/acpi/acpi_bus.h           |   2 +-
+>>  include/asm-generic/vmlinux.lds.h |   1 -
+>>  include/linux/acpi.h              |   7 +-
+>>  include/linux/acpi_iort.h         |   3 -
+>>  include/linux/dma-mapping.h       |   3 +
+>>  include/linux/of_device.h         |  10 ++-
+>>  19 files changed, 252 insertions(+), 320 deletions(-)
 >
-> I'd like at least one tested-by on this for the previously supported parts
-> (that could be Linus if he has one!)
+>I'm assuming this will go via some other tree, maybe the IOMMU tree?
+>I acked the PCI parts, so let me know if you need anything more from me.
 
-I am waiting for a serial cable for the APQ8064 Nexus 7 so no
-test base so far. I would have to rely on Bj?rn for this.
+Thanks for the review/acks.
+Ya, via the IOMMU tree looks correct.
 
-I think this patch is safe to merge though.
-
-Yours,
-Linus Walleij
+Regards,
+ Sricharan
