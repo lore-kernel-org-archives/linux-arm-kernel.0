@@ -1,42 +1,134 @@
-From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Mon, 30 Jan 2017 16:13:07 +0300
-Subject: [PATCH v5 3/8] ARM: dts: rockchip: add timer entries to rk3188 SoC
-In-Reply-To: <20170130120444.GE2206@mai>
-References: <1485260203-14216-1-git-send-email-al.kochet@gmail.com>
- <1485260203-14216-4-git-send-email-al.kochet@gmail.com>
- <20170130110428.GC2206@mai> <A5940770-B960-4409-8DA4-BE39EF9A6325@gmail.com>
- <20170130120444.GE2206@mai>
-Message-ID: <046978C2-808F-4EC3-9429-063BC1A7CE7B@gmail.com>
+From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
+Date: Mon, 30 Jan 2017 14:16:52 +0100
+Subject: [PATCH 1/7] MFD: add bindings for STM32 DFSDM driver
+In-Reply-To: <20170127205326.rom465uqfp6i33kr@rob-hp-laptop>
+References: <1485189145-29576-1-git-send-email-arnaud.pouliquen@st.com>
+ <1485189145-29576-2-git-send-email-arnaud.pouliquen@st.com>
+ <20170127205326.rom465uqfp6i33kr@rob-hp-laptop>
+Message-ID: <593e9b20-da85-8303-ffe7-4689afc35331@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello Rob,
 
-> 30 ???. 2017 ?., ? 15:04, Daniel Lezcano <daniel.lezcano@linaro.org> ???????(?):
+Thanks for the review,
+FYI This patch-set has to be abandoned to be redesigned without MFD driver.
+Anyway i will take into account your remarks in my redesign.
+
+I just added a comment below to explain CLKOUT.
+
+Regards Arnaud
+
+
+On 01/27/2017 09:53 PM, Rob Herring wrote:
+> On Mon, Jan 23, 2017 at 05:32:19PM +0100, Arnaud Pouliquen wrote:
+>> Add bindings information for STM32 Digital Filter for Sigma Delta modulators MFD driver
+>>
+>> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+>> ---
+>>  .../devicetree/bindings/mfd/stm32-dfsdm.txt        | 68 ++++++++++++++++++++++
+>>  1 file changed, 68 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/mfd/stm32-dfsdm.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/mfd/stm32-dfsdm.txt b/Documentation/devicetree/bindings/mfd/stm32-dfsdm.txt
+>> new file mode 100644
+>> index 0000000..e0b45ee
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mfd/stm32-dfsdm.txt
+>> @@ -0,0 +1,68 @@
+>> +STMicroelectronics STM32 Digital Filter for Sigma Delta Modulator (DFSDM)
+>> +ulti-function device.
+>> +
+>> +The STM32 DFSDM device is a multifunction device that handles the DFSDM IP.
+>> +
+>> +The DFSDM IP allows to add processing on Sigma Delta ADC based on SinC filters.
+>> +For this, a pool of m filters can be connected to a pool of n channels.
+>> +For STM32H7 : m = 4, n = 8.
+>> +
+>> +Each channel n is assigned to the SPI or Manchester interface n or n + 1.
+>> +Channels 0 to 2 can also be connected to ADC IP instance 1 to 3.
+>> +Filtering result is stored in a left aligned register, with 8 LSB reserved for
+>> +the input channel ID.
+>> +
+>> +Each filter instance supports two contexts to manage conversions, each one has
+>> +its own configurable sequence and trigger:
+>> +- regular conversion: used for single or continuous conversion.
+>> +- injected conversions: used for triggered conversion.
+>> +
+>> +Interfaces supported:
+>> +- sigma delta ADCs trough IIO framework.
+>> +- PDM microphones through ASoC framework.
 > 
-> There is no case when the rockchip timer is used for the clockevent.
-The is already timer entry for rk3228 in the DT. And it act as clockevent. I guess it work as backup,
-but I cannot test it also. In order to not break DT compatibility I had to provide one timer to be
-initialized as clockevent. And implemented implicit rule the driver (first DT timer - clockevent,
-second DT timer - clocksource) already exists for other timers.
+> Bindings describe h/w, not Linux subsystems.
+> 
+>> +
+>> +Required properties:
+>> +- compatible:	Must be "st,stm32h7-dfsdm".
+>> +- reg:		Specifies the DFSDM block register address and length.
+>> +- interrupts:	IRQ lines connected to each DFSDM filter instance.
+>> +- clocks:	IP and serial interfaces clocking. Should be set according
+>> +		to rcc clock ID and "clock-names".
+>> +- clock-names:	Input clock name "dfsdm_clk" must be defined,
+>> +		"audio_clk" is optional. If defined CLKOUT is based on the audio
+>> +		clock, else "dfsdm_clk" is used.
+> 
+> _clk is redundant.
+> 
+>> +
+>> +Optional properties:
+>> +- st,clkout-freq: clkout clock frequency (Hz).This clock must be set according
+>> +		  to "clock" property. Frequency must be a multiple of the rcc
+>> +		  clock frequency. If not, clkout frequency will not be
+>> +		  accurate.
+> 
+> What is CLKOUT connected to and will you need to describe that in DT?
 
-> If I'm not wrong, you can check /proc/interrupts and see there is no interrupt
-> on the rockchip timer.
+CLKOUT can be outputted to clock SPI interfaces (master mode) or extern
+ADC. This CLKOUT is common for the 8 instances of the SPIs of the DFSDM.
+CLKOUT frequency is computed based on an internal division of the
+"dfsdm_clk" or "audio_clk".
 
-Yes, you right here. I?ve temporary disable smp_twd to test rockchip timer interrupts.
-There is no interrupt on the rockchip timer during normal work.
-
-> - when the CPU enters a deep idle state. But such state does not exist on rk3188
-ARM chip/revision specific?
-
-> - when the system goes to suspend. But the timers are stopped in any case and
->   CPU0 is always on.
-There is timer for rk3228 in the DT. I guess there are situations where it can be used.
-May be the situations are also acceptable for rk3188? May be something like suspend to RAM or
-suspend to HDD? I am not expert in that questions. I can do some tests if you give hint/link.
-
-So, as I understood you suggest to leave only one timer what can be used as clocksource
-only. I can implement that, but there should be DT rule what allow to setup timer
-as clocksource only. I cannot do more without timer framework support.
-Looks, like I have to wait your patch to implement that.
-
-Alexander.
+> 
+>> +- pinctrl-names:  set to "default".
+>> +- pinctrl-0:	  List of phandles pointing to pin configuration nodes for DFSDM
+>> +		  module.
+>> +		  For Pinctrl properties see ../pinctrl/pinctrl-bindings.txt
+>> +Example :
+>> +	dfsdm: dfsdm at 4400D000 {
+>> +		compatible = "st,stm32h7-dfsdm";
+>> +		reg = <0x40017000 0x400>;
+>> +		interrupts = <110>, <111>, <112>, <113>;
+>> +		clocks = <&timer_clk>;
+>> +		clock-names = "dfsdm_clk";
+>> +		pinctrl-0 = <&dfsdm_ch0 &dfsdm_ch1>;
+>> +		pinctrl-names = "default";
+>> +		st,clkout-freq = <2480000>;
+>> +
+>> +		iio_dfsdm0: iio-dfsdm at 0 {
+> 
+> adc {
+> 
+>> +			compatible = "st,stm32-dfsdm-adc";
+>> +			#io-channel-cells = <1>;
+>> +			reg = <0>;
+>> +			status = "disabled";
+>> +		};
+>> +		dai_dfsdm0: dfsdm-audio at 0 {
+> 
+> digital-mic {
+> 
+>> +			compatible = "st,stm32-dfsdm-audio";
+>> +			#sound-dai-cells = <0>;
+>> +			reg = <0>;
+> 
+> You can't have 2 children with the same unit address. Just drop reg and 
+> the unit address.
+> 
+>> +			dmas = <&dmamux1 101 0x400 0x00>;
+>> +			dma-names = "rx";
+>> +			status = "disabled";
+>> +		};
+>> +	};
+>> -- 
+>> 1.9.1
+>>
