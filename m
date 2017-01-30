@@ -1,67 +1,25 @@
-From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
-Date: Tue, 31 Jan 2017 03:09:15 +0530
-Subject: [PATCH v2 3/4] ARM: nommu: display vectors base
-In-Reply-To: <20170130140326.GU27312@n2100.armlinux.org.uk>
-References: <20170122031652.13074-1-afzal.mohd.ma@gmail.com>
- <20170122032212.13456-1-afzal.mohd.ma@gmail.com>
- <20170130140326.GU27312@n2100.armlinux.org.uk>
-Message-ID: <20170130213915.GA2976@afzalpc>
+From: davem@davemloft.net (David Miller)
+Date: Mon, 30 Jan 2017 16:53:41 -0500 (EST)
+Subject: [PATCH net-next v7 0/3] Add support for the ethernet switch on
+ the ESPRESSObin
+In-Reply-To: <cover.69cbc1ba8937d0fc442538f992d62fc88aa26dcc.1485804488.git-series.gregory.clement@free-electrons.com>
+References: <cover.69cbc1ba8937d0fc442538f992d62fc88aa26dcc.1485804488.git-series.gregory.clement@free-electrons.com>
+Message-ID: <20170130.165341.800910621072019384.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Date: Mon, 30 Jan 2017 20:29:32 +0100
 
-On Mon, Jan 30, 2017 at 02:03:26PM +0000, Russell King - ARM Linux wrote:
-> On Sun, Jan 22, 2017 at 08:52:12AM +0530, afzal mohammed wrote:
-
-> > The exception base address is now dynamically estimated for no-MMU,
-> > display it. As it is the case, now limit VECTORS_BASE usage to MMU
-> > scenario.
-
-> > +#define VECTORS_BASE		UL(0xffff0000)
-> > +
-> >  #else /* CONFIG_MMU */
-> >  
-> >  /*
-> > @@ -111,8 +113,6 @@
-> >  
-> >  #endif /* !CONFIG_MMU */
-> >  
-> > -#define VECTORS_BASE		UL(0xffff0000)
+> This set of patches adds support for the Marvell Ethernet Topaz switch
+> family (88E6141/88E6341) which is found on the ESPRESSObin. With this
+> series the network is usable on this board.
 > 
-> I think adding a definition for VECTORS_BASE in asm/memory.h for nommu:
+> As usual, I rebased the series on the very last net-next/master. In
+> this series there is no temperature support which need some patches
+> form Andrew Lunn.
 > 
-> extern unsigned long vectors_base;
-> #define VECTORS_BASE	vectors_base
+> As soon as Andrew Lunn will post the needed patch I will send a patch
+> to enable the temperature support.
 
-Above was required to be enclosed by below,
-
- #ifndef __ASSEMBLY__
- #endif
-
-Putting it inside the existing #ifndef __ASSEMBLY__ (which encloses
-other externs) in asm/memory.h would put it alongside not so related
-definitions as compared to the existing location.
-
-And the existing #ifndef __ASSEMBLY__ in asm/memory.h is a bit down
-that makes the above stand separately,
-
-> > +#ifdef CONFIG_MMU
-> >  			MLK(VECTORS_BASE, VECTORS_BASE + PAGE_SIZE),
-> > +#else
-> > +			MLK(vectors_base, vectors_base + PAGE_SIZE),
-> > +#endif
-> 
-> will mean that this conditional becomes unnecessary.
-
-> > -#endif
-> > +#else /* CONFIG_MMU */
-> > +extern unsigned long vectors_base;
-> > +#endif /* CONFIG_MMU */
-> 
-> and you don't need this here either.
-
-but the above improvements make the patch simpler.
-
-Regards
-afzal
+Series applied, thank you.
