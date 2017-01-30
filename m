@@ -1,47 +1,74 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 29 Jan 2017 16:07:21 -0800
-Subject: [GIT PULL] Qualcomm Defconfig Updates for v4.11
-In-Reply-To: <1485240494-8040-2-git-send-email-andy.gross@linaro.org>
-References: <1485240494-8040-1-git-send-email-andy.gross@linaro.org>
- <1485240494-8040-2-git-send-email-andy.gross@linaro.org>
-Message-ID: <20170130000721.GM3133@localhost>
+Date: Sun, 29 Jan 2017 16:24:51 -0800
+Subject: [Patch v4 2/2] firmware: qcom: scm: Fix interrupted SCM calls
+In-Reply-To: <1484845120-3364-3-git-send-email-andy.gross@linaro.org>
+References: <1484845120-3364-1-git-send-email-andy.gross@linaro.org>
+ <1484845120-3364-3-git-send-email-andy.gross@linaro.org>
+Message-ID: <CAOesGMi4xUxJNHO5hEbZHBCnTZ6xXVyzoszawPiJxBiRP1DitA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2017 at 12:48:11AM -0600, Andy Gross wrote:
-> The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
-> 
->   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-defconfig-for-4.11
-> 
-> for you to fetch changes up to e96165a30f0dc2f02f9578a02c8feb9fbb428802:
-> 
->   ARM: defconfig: qcom: add APQ8060 DragonBoard devices (2017-01-13 12:50:19 -0600)
-> 
-> ----------------------------------------------------------------
-> Qualcomm ARM Based defconfig Updates for v4.11
-> 
-> * Enable APQ8060 Dragonboard related devices
-> * Enable AHCI, PCIE, USB, thermal sensors, and ATL1C related configs
-> * Enable RPM/RPM-SMD clocks
-> 
-> ----------------------------------------------------------------
-> Georgi Djakov (1):
->       ARM: qcom_defconfig: Enable RPM/RPM-SMD clocks
-> 
-> Linus Walleij (1):
->       ARM: defconfig: qcom: add APQ8060 DragonBoard devices
-> 
-> Srinivas Kandagatla (4):
->       ARM: qcom_defconfig: add usb related configs
->       ARM: qcom_defconfig: add pcie and atl1c ethernet configs
->       ARM: qcom_defconfig: add ahci configs
->       ARM: qcom_defconfig: enable thermal sensors
+Hi,
 
-Merged, thanks.
+On Thu, Jan 19, 2017 at 8:58 AM, Andy Gross <andy.gross@linaro.org> wrote:
+> This patch adds a Qualcomm specific quirk to the arm_smccc_smc call.
+>
+> On Qualcomm ARM64 platforms, the SMC call can return before it has
+> completed.  If this occurs, the call can be restarted, but it requires
+> using the returned session ID value from the interrupted SMC call.
+>
+> The quirk stores off the session ID from the interrupted call in the
+> quirk structure so that it can be used by the caller.
+>
+> This patch folds in a fix given by Sricharan R:
+> https://lkml.org/lkml/2016/9/28/272
+>
+> Signed-off-by: Andy Gross <andy.gross@linaro.org>
+> Reviewed-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/kernel/smccc-call.S |  9 ++++++++-
+>  drivers/firmware/qcom_scm-64.c | 13 ++++++++++---
+>  include/linux/arm-smccc.h      | 11 ++++++++---
+>  3 files changed, 26 insertions(+), 7 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
+> index 6290696..72ecdca 100644
+> --- a/arch/arm64/kernel/smccc-call.S
+> +++ b/arch/arm64/kernel/smccc-call.S
+> @@ -12,6 +12,7 @@
+>   *
+>   */
+>  #include <linux/linkage.h>
+> +#include <linux/arm-smccc.h>
+>  #include <asm/asm-offsets.h>
+>
+>         .macro SMCCC instr
+> @@ -20,7 +21,13 @@
+>         ldr     x4, [sp]
+>         stp     x0, x1, [x4, #ARM_SMCCC_RES_X0_OFFS]
+>         stp     x2, x3, [x4, #ARM_SMCCC_RES_X2_OFFS]
+> -       ret
+> +       ldr     x4, [sp, #8]
+> +       cbz     x4, 1f /* no quirk structure */
+> +       ldr     x9, [x4, #ARM_SMCCC_QUIRK_ID_OFFS]
+> +       cmp     x9, #ARM_SMCCC_QUIRK_QCOM_A6
+> +       b.ne    1f
+> +       str     x6, [x4, ARM_SMCCC_QUIRK_STATE_OFFS]
+> +1:     ret
+>         .cfi_endproc
+>         .endm
+
+This extends the SMC entry/return path quite a bit.
+
+Is this truly a qualcomm-only quirk, or are other vendors also picking it up?
+
+Why not either make arm_smccc_.* function pointers and update them
+accordingly, or use a custom version for the specific locations where
+you want/need to restart the calls? You are after all already wrapping
+them in qcom_scm_call().
+
+Seems like a more appropriate change than burden all platforms with
+longer code path due to your quirk.
 
 
 -Olof
