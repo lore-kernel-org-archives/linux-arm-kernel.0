@@ -1,55 +1,86 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Jan 2017 22:51:33 +0000
-Subject: [PATCH v3 06/24] ARM: dts: imx6-sabrelite: add OV5642 and OV5640
- camera sensors
-In-Reply-To: <1483755102-24785-7-git-send-email-steve_longerbeam@mentor.com>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-7-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <20170130225133.GF27898@n2100.armlinux.org.uk>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 30 Jan 2017 17:02:15 -0600
+Subject: [PATCH] PCI: imx6: remove LTSSM disable workaround
+In-Reply-To: <20170120155837.2874-1-l.stach@pengutronix.de>
+References: <20170120155837.2874-1-l.stach@pengutronix.de>
+Message-ID: <20170130230215.GZ20550@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2017 at 06:11:24PM -0800, Steve Longerbeam wrote:
-> +	ov5640: camera at 40 {
-> +		compatible = "ovti,ov5640";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_ov5640>;
-> +		clocks = <&mipi_xclk>;
-> +		clock-names = "xclk";
-> +		reg = <0x40>;
-> +		xclk = <22000000>;
-> +		reset-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>; /* NANDF_D5 */
-> +		pwdn-gpios = <&gpio6 9 GPIO_ACTIVE_HIGH>; /* NANDF_WP_B */
-> +
-> +		port {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			ov5640_to_mipi_csi: endpoint at 1 {
-> +				reg = <1>;
-> +				remote-endpoint = <&mipi_csi_from_mipi_sensor>;
-> +				data-lanes = <0 1>;
-> +				clock-lanes = <2>;
+On Fri, Jan 20, 2017 at 04:58:37PM +0100, Lucas Stach wrote:
+> This causes CPU hangs when the system is reset by the watchdog, as
+> the GPRs aren't cleared, but the clocks are back to disabled state.
+> 
+> If the bootloader uses PCIe, it must take care to bring it down
+> into a safe state, before passing control to the Linux kernel.
+> This is the only way to get a properly operating system at all
+> times and circumstances.
+> 
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 
-How do you envision a four-lane sensor being described?
+Applied to pci/host-imx6 for v4.11, thanks!
 
-	data-lanes = <0 1 3 4>;
-	clock-lanes = <2>;
+I don't really like the idea that we depend on a particular state from the
+bootloader, but if there's no way around it, maybe this is the best we can
+do.
 
-?
-
-The binding document for video-interfaces.txt says:
-
-- clock-lanes: an array of physical clock lane indexes. Position of an entry
-  determines the logical lane number, while the value of an entry indicates
-  physical lane, e.g. for a MIPI CSI-2 bus we could have "clock-lanes = <0>;",
-  which places the clock lane on hardware lane 0. This property is valid for
-  serial busses only (e.g. MIPI CSI-2). Note that for the MIPI CSI-2 bus this
-  array contains only one entry.
-
-So I think you need to have a good reason to make the clock lane non-zero.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> ---
+>  drivers/pci/host/pci-imx6.c | 30 ------------------------------
+>  1 file changed, 30 deletions(-)
+> 
+> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+> index c8cefb078218..42c1987ffb3d 100644
+> --- a/drivers/pci/host/pci-imx6.c
+> +++ b/drivers/pci/host/pci-imx6.c
+> @@ -247,9 +247,6 @@ static int imx6q_pcie_abort_handler(unsigned long addr,
+>  
+>  static void imx6_pcie_assert_core_reset(struct imx6_pcie *imx6_pcie)
+>  {
+> -	struct pcie_port *pp = &imx6_pcie->pp;
+> -	u32 val, gpr1, gpr12;
+> -
+>  	switch (imx6_pcie->variant) {
+>  	case IMX6SX:
+>  		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> @@ -266,33 +263,6 @@ static void imx6_pcie_assert_core_reset(struct imx6_pcie *imx6_pcie)
+>  				   IMX6Q_GPR1_PCIE_SW_RST);
+>  		break;
+>  	case IMX6Q:
+> -		/*
+> -		 * If the bootloader already enabled the link we need some
+> -		 * special handling to get the core back into a state where
+> -		 * it is safe to touch it for configuration.  As there is
+> -		 * no dedicated reset signal wired up for MX6QDL, we need
+> -		 * to manually force LTSSM into "detect" state before
+> -		 * completely disabling LTSSM, which is a prerequisite for
+> -		 * core configuration.
+> -		 *
+> -		 * If both LTSSM_ENABLE and REF_SSP_ENABLE are active we
+> -		 * have a strong indication that the bootloader activated
+> -		 * the link.
+> -		 */
+> -		regmap_read(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1, &gpr1);
+> -		regmap_read(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12, &gpr12);
+> -
+> -		if ((gpr1 & IMX6Q_GPR1_PCIE_REF_CLK_EN) &&
+> -		    (gpr12 & IMX6Q_GPR12_PCIE_CTL_2)) {
+> -			val = dw_pcie_readl_rc(pp, PCIE_PL_PFLR);
+> -			val &= ~PCIE_PL_PFLR_LINK_STATE_MASK;
+> -			val |= PCIE_PL_PFLR_FORCE_LINK;
+> -			dw_pcie_writel_rc(pp, PCIE_PL_PFLR, val);
+> -
+> -			regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+> -					   IMX6Q_GPR12_PCIE_CTL_2, 0 << 10);
+> -		}
+> -
+>  		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+>  				   IMX6Q_GPR1_PCIE_TEST_PD, 1 << 18);
+>  		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR1,
+> -- 
+> 2.11.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
