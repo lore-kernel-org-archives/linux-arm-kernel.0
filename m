@@ -1,69 +1,65 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 30 Jan 2017 17:50:03 +0000
-Subject: [RFC v2 06/10] KVM: arm/arm64: Update the physical timer
- interrupt level
-In-Reply-To: <20170130150203.GD16459@cbox>
-References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
- <1485479100-4966-7-git-send-email-jintack@cs.columbia.edu>
- <86sho199jx.fsf@arm.com> <20170130150203.GD16459@cbox>
-Message-ID: <b3a4a3e4-65d4-1af3-2b77-14b7fffd9d06@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 30 Jan 2017 17:49:59 +0000
+Subject: [PATCH v20 08/17] clocksource/drivers/arm_arch_timer: Rework
+ counter frequency detection.
+In-Reply-To: <CADyBb7syNx+HJ6t5JKPMnLqvq-98kPi1knuXU=SSe6_Uz6Gg1A@mail.gmail.com>
+References: <20170118132541.8989-1-fu.wei@linaro.org>
+ <20170118132541.8989-9-fu.wei@linaro.org>
+ <20170124172400.GG7572@leverpostej>
+ <CADyBb7sU6DVMk6px0963r8by--U-3k_XjESd88zZMkj7xbywgA@mail.gmail.com>
+ <20170125172505.GB29027@leverpostej>
+ <CADyBb7syNx+HJ6t5JKPMnLqvq-98kPi1knuXU=SSe6_Uz6Gg1A@mail.gmail.com>
+Message-ID: <20170130174958.GA3496@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/01/17 15:02, Christoffer Dall wrote:
-> On Sun, Jan 29, 2017 at 03:21:06PM +0000, Marc Zyngier wrote:
->> On Fri, Jan 27 2017 at 01:04:56 AM, Jintack Lim <jintack@cs.columbia.edu> wrote:
->>> Now that we maintain the EL1 physical timer register states of VMs,
->>> update the physical timer interrupt level along with the virtual one.
->>>
->>> Note that the emulated EL1 physical timer is not mapped to any hardware
->>> timer, so we call a proper vgic function.
->>>
->>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
->>> ---
->>>  virt/kvm/arm/arch_timer.c | 20 ++++++++++++++++++++
->>>  1 file changed, 20 insertions(+)
->>>
->>> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
->>> index 0f6e935..3b6bd50 100644
->>> --- a/virt/kvm/arm/arch_timer.c
->>> +++ b/virt/kvm/arm/arch_timer.c
->>> @@ -180,6 +180,21 @@ static void kvm_timer_update_mapped_irq(struct kvm_vcpu *vcpu, bool new_level,
->>>  	WARN_ON(ret);
->>>  }
->>>  
->>> +static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
->>> +				 struct arch_timer_context *timer)
->>> +{
->>> +	int ret;
->>> +
->>> +	BUG_ON(!vgic_initialized(vcpu->kvm));
->>
->> Although I've added my fair share of BUG_ON() in the code base, I've
->> since reconsidered my position. If we get in a situation where the vgic
->> is not initialized, maybe it would be better to just WARN_ON and return
->> early rather than killing the whole box. Thoughts?
->>
-> 
-> The distinction to me is whether this will cause fatal crashes or
-> exploits down the road if we're working on uninitialized data.  If all
-> that can happen if the vgic is not initialized, is that the guest
-> doesn't see interrupts, for example, then a WARN_ON is appropriate.
-> 
-> Which is the case here?
-> 
-> That being said, do we need this at all?  This is in the critial path
-> and is actually measurable (I know this from my work on the other timer
-> series), so it's better to get rid of it if we can.  Can we simply
-> convince ourselves this will never happen, and is the code ever likely
-> to change so that it gets called with the vgic disabled later?
+On Thu, Jan 26, 2017 at 01:49:03PM +0800, Fu Wei wrote:
+> On 26 January 2017 at 01:25, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Wed, Jan 25, 2017 at 02:46:12PM +0800, Fu Wei wrote:
+> >> On 25 January 2017 at 01:24, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> > On Wed, Jan 18, 2017 at 09:25:32PM +0800, fu.wei at linaro.org wrote:
+> >> >> From: Fu Wei <fu.wei@linaro.org>
 
-That'd be the best course of action. I remember us reworking some of
-that in the now defunct vgic-less series. Maybe we could salvage that
-code, if only for the time we spent on it...
+> > For CNT{,EL0}BaseN.CNTFRQ, I am very concerned by the wording in the
+> > current ARMv8 ARM ARM. This does not match my understanding, nor does it
+> > match the description in the ARMv7 ARM. I believe this may be a
+> > documentation error, and I'm chasing that up internally.
+> >
+> > Either the currently logic in the driver which attempts to read
+> > CNT{,EL0}BaseN.CNTFRQ is flawed, or the description in the ARM ARM is
+> > erroneous.
+> 
+> Yes, those description did confuse me. :-(
+> 
+> But according to another document(ARMv8-A Foundation Platform User
+> Guide  ARM DUI0677K),
+> Table 3-2 ARMv8-A Foundation Platform memory map (continued)
+> 
+> AP_REFCLK CNTBase0, Generic Timer 64KB   S
+> AP_REFCLK CNTBase1, Generic Timer 64KB   S/NS
+> 
+> Dose it means the timer frame 0 can be accessed in SECURE status  only,
+> and the timer frame 1 can be accessed in both status?
+
+That does appear to be what it says.
+
+I assume in this case CNTCTLBase.CNTSAR<0> is RES0.
+
+> And because Linux kernel is running on Non-secure EL1, so should we
+> skip "SECURE" timer in Linux?
+
+I guess you mean by checking the GTx Common flags, to see if the timer
+is secure? Yes, we must skip those.
+
+Looking further at this, the ACPI spec is sorely lacking any statement
+as to the configuration of CNTCTLBase.{CNTSAR,CNTTIDR,CNTACR}, so it's
+not clear if we can access anything in a frame, even if it is listed as
+being a non-secure timer.
+
+I think we need a stronger statement here. Otherwise, we will encounter
+problems. Linux currently assumes that CNTCTLBase.CNTACR<N> is
+writeable, given a non-secure frame N. This is only the case if
+CNTCTLBase.CNTSAR.NS<N> == 1.
 
 Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Mark.
