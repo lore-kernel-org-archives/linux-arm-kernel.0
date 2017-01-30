@@ -1,37 +1,27 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 31 Jan 2017 02:13:04 +0900
-Subject: [PATCH 1/2] ARM: cache-uniphier: include <linux/errno.h> instead of
- <linux/types.h>
-In-Reply-To: <1485796385-22000-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1485796385-22000-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1485796385-22000-2-git-send-email-yamada.masahiro@socionext.com>
+Date: Tue, 31 Jan 2017 02:13:03 +0900
+Subject: [PATCH 0/2] ARM: cache-uniphier: two cleanup patches
+Message-ID: <1485796385-22000-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nothing in this header file depends on <linux/types.h>.
-Rather, <linux/errno.h> should be included for -ENODEV.
+Sorry that I had not replied earlier.
+I came back to this finally.
+I guess we were seeing different code base the last time.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
-
-KernelVersion: 4.10-rc1
+This seems correct to me, so I'd like to put it
+in Russell's patch tracker.
 
 
- arch/arm/include/asm/hardware/cache-uniphier.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/include/asm/hardware/cache-uniphier.h b/arch/arm/include/asm/hardware/cache-uniphier.h
-index eaa60da..0ef42ae 100644
---- a/arch/arm/include/asm/hardware/cache-uniphier.h
-+++ b/arch/arm/include/asm/hardware/cache-uniphier.h
-@@ -16,7 +16,7 @@
- #ifndef __CACHE_UNIPHIER_H
- #define __CACHE_UNIPHIER_H
- 
--#include <linux/types.h>
-+#include <linux/errno.h>
- 
- #ifdef CONFIG_CACHE_UNIPHIER
- int uniphier_cache_init(void);
+Masahiro Yamada (2):
+  ARM: cache-uniphier: include <linux/errno.h> instead of
+    <linux/types.h>
+  ARM: cache-uniphier: clean up active way setup code
+
+ arch/arm/include/asm/hardware/cache-uniphier.h |  2 +-
+ arch/arm/mm/cache-uniphier.c                   | 23 +++++++++--------------
+ 2 files changed, 10 insertions(+), 15 deletions(-)
+
 -- 
 2.7.4
