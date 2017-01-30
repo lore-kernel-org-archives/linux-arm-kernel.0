@@ -1,52 +1,76 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 30 Jan 2017 11:44:30 +0000
-Subject: [PATCH 1/2] spi: When no dma_chan map buffers with spi_master's
- parent
-In-Reply-To: <CAHp75Vfzz7U3=R4dFSgr-eXuOfH1_eLDKcPSWmWdUcTS_tggdw@mail.gmail.com>
-References: <20170126162154.124287-1-djkurtz@chromium.org>
- <CAHp75Vfzz7U3=R4dFSgr-eXuOfH1_eLDKcPSWmWdUcTS_tggdw@mail.gmail.com>
-Message-ID: <81ab617f-95fb-17d1-88d2-5cf5f74bab03@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 30 Jan 2017 11:48:01 +0000
+Subject: next-20170125 hangs on aarch64
+In-Reply-To: <20170129122125.GA20269@yury-N73SV>
+References: <20170129101255.GA29415@yury-N73SV>
+ <20170129122125.GA20269@yury-N73SV>
+Message-ID: <588F27F1.6050907@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/01/17 22:17, Andy Shevchenko wrote:
-> On Thu, Jan 26, 2017 at 6:21 PM, Daniel Kurtz <djkurtz@chromium.org> wrote:
->> Back before commit 1dccb598df54 ("arm64: simplify dma_get_ops"), for
->> arm64, devices for which dma_ops were not explicitly set were automatically
->> configured to use swiotlb_dma_ops, since this was hard-coded as the
->> global "dma_ops" in arm64_dma_init().
->>
->> Now that global "dma_ops" has been removed, all devices much have their
->> dma_ops explicitly set by a call to arch_setup_dma_ops(), otherwise the
->> device is assigned dummy_dma_ops, and thus calls to map_sg for such a
->> device will fail (return 0).
->>
->> Mediatek SPI uses DMA but does not use a dma channel.  Support for this
->> was added by commit c37f45b5f1cd ("spi: support spi without dma channel
->> to use can_dma()"), which uses the master_spi dev to DMA map buffers.
->>
->> The master_spi device is not a platform device, rather it is created
->> in spi_alloc_device(), and therefore its dma_ops are never set.
->>
->> Therefore, when the mediatek SPI driver when it does DMA (for large SPI
->> transactions > 32 bytes), SPI will use spi_map_buf()->dma_map_sg() to
->> map the buffer for use in DMA.  But dma_map_sg()->dma_map_sg_attrs() returns
->> 0, because ops->map_sg is dummy_dma_ops->__dummy_map_sg, and hence
->> spi_map_buf() returns -ENOMEM (-12).
->>
->> Fix this by using the real spi_master's parent device which should be a
->> real physical device with DMA properties.
-> 
-> Wouldn't be better to copy necessary stuff from parent device to its
-> child? Like DMA mask propagation (I dunno if there are such in SPI,
-> but at least many other drivers are doing that).
+Hi Yury,
 
-Absolutely not. The "necessary stuff" includes arch-specific things
-which would require filling the SPI code with arch-specific #ifdefs, and
-may go as far as private data structures held by other drivers (e.g.
-IOMMUs) which the SPI code cannot even touch, let alone know what to do
-with. The "parent device" here *is* the real DMA master device (as
-described by firmware and configured by the arch code accordingly), so
-using any other device for DMA is just plain wrong.
+[CC: Andy Gross]
 
-Robin.
+On 29/01/17 12:21, Yury Norov wrote:
+> On Sun, Jan 29, 2017 at 03:42:55PM +0530, Yury Norov wrote:
+>> Hi all,
+>>
+>> I pulled next-20170125 kernel, and found it hanged on boot. The exact reason is
+>> panic on dereferencing of the 0xffffffc8 address, which is most probably the
+>> attempt to dereference the ENOSYS error code as the address. next-20170124 works
+>> fine, at least it boots.
+>>
+>> Does anyone have details on that?
+
+I hit this with next-20170130 too, in /arch/arm64/kernel/smccc-call.S
+aabde95fc543 changed the SMCCC macro to check for an optional quirk structure.
+
+A previous patch provided:
+> #define arm_smccc_smc(...) __arm_smccc_smc(__VA_ARGS__, NULL)
+
+to handle the 'no quirk' case, but this missed HVC calls.
+The following hunk fixes/hides it for me:
+
+----------------------------%<----------------------------
+diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
+index 72ecdca929b1..9e287a7d1822 100644
+--- a/arch/arm64/kernel/smccc-call.S
++++ b/arch/arm64/kernel/smccc-call.S
+@@ -15,18 +15,20 @@
+ #include <linux/arm-smccc.h>
+ #include <asm/asm-offsets.h>
+
+-       .macro SMCCC instr
++       .macro SMCCC instr, maybe_quirk = 0
+        .cfi_startproc
+        \instr  #0
+        ldr     x4, [sp]
+        stp     x0, x1, [x4, #ARM_SMCCC_RES_X0_OFFS]
+        stp     x2, x3, [x4, #ARM_SMCCC_RES_X2_OFFS]
+        ldr     x4, [sp, #8]
++       .if \maybe_quirk != 0
+        cbz     x4, 1f /* no quirk structure */
+        ldr     x9, [x4, #ARM_SMCCC_QUIRK_ID_OFFS]
+        cmp     x9, #ARM_SMCCC_QUIRK_QCOM_A6
+        b.ne    1f
+        str     x6, [x4, ARM_SMCCC_QUIRK_STATE_OFFS]
++       .endif
+ 1:     ret
+        .cfi_endproc
+        .endm
+@@ -38,7 +40,7 @@
+  *               struct arm_smccc_quirk *quirk)
+  */
+ ENTRY(__arm_smccc_smc)
+-       SMCCC   smc
++       SMCCC   smc, 1
+ ENDPROC(__arm_smccc_smc)
+
+ /*
+----------------------------%<----------------------------
+
+
+Thanks,
+
+James
