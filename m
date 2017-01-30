@@ -1,77 +1,50 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Mon, 30 Jan 2017 13:20:30 -0500
-Subject: [PATCH v3 09/24] drm/rockchip: dw-mipi-dsi: only request HS
- clock when required
-In-Reply-To: <20170129132444.25251-10-john@metanate.com>
-References: <20170129132444.25251-1-john@metanate.com>
- <20170129132444.25251-10-john@metanate.com>
-Message-ID: <20170130182030.GJ20076@art_vandelay>
+From: icenowy@aosc.xyz (Icenowy Zheng)
+Date: Tue, 31 Jan 2017 02:23:55 +0800
+Subject: [PATCH v3 08/10] dmaengine: sun6i: allow build on ARM64 platforms
+ (sun50i)
+In-Reply-To: <20170130164210.GD19244@localhost>
+References: <20170129023331.62106-1-icenowy@aosc.xyz>
+ <20170129023331.62106-9-icenowy@aosc.xyz> <20170130164210.GD19244@localhost>
+Message-ID: <3729521485800635@web23g.yandex.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 29, 2017 at 01:24:29PM +0000, John Keeping wrote:
-> Requesting the HS clock from the PHY before we initialize it causes an
-> invalid signal to be sent out since the input clock is not yet
-> configured.  The PHY databook suggests only asserting this signal when
-> performing HS transfers, so let's do that.
-> 
 
-Reviewed-by: Sean Paul <seanpaul@chromium.org>
 
-> Signed-off-by: John Keeping <john@metanate.com>
-> Reviewed-by: Chris Zhong <zyw@rock-chips.com>
-> ---
-> v3:
-> - Add Chris' Reviewed-by
-> Unchanged in v2
-> 
->  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> index 15d33c3c8cb7..03fc096fe1bd 100644
-> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> @@ -545,13 +545,15 @@ static int dw_mipi_dsi_host_detach(struct mipi_dsi_host *host,
->  static void dw_mipi_message_config(struct dw_mipi_dsi *dsi,
->  				   const struct mipi_dsi_msg *msg)
->  {
-> +	bool lpm = msg->flags & MIPI_DSI_MSG_USE_LPM;
->  	u32 val = 0;
->  
->  	if (msg->flags & MIPI_DSI_MSG_REQ_ACK)
->  		val |= EN_ACK_RQST;
-> -	if (msg->flags & MIPI_DSI_MSG_USE_LPM)
-> +	if (lpm)
->  		val |= CMD_MODE_ALL_LP;
->  
-> +	dsi_write(dsi, DSI_LPCLK_CTRL, lpm ? 0 : PHY_TXREQUESTCLKHS);
->  	dsi_write(dsi, DSI_CMD_MODE_CFG, val);
->  }
->  
-> @@ -693,6 +695,7 @@ static void dw_mipi_dsi_set_mode(struct dw_mipi_dsi *dsi,
->  		dsi_write(dsi, DSI_PWR_UP, RESET);
->  		dsi_write(dsi, DSI_MODE_CFG, ENABLE_VIDEO_MODE);
->  		dw_mipi_dsi_video_mode_config(dsi);
-> +		dsi_write(dsi, DSI_LPCLK_CTRL, PHY_TXREQUESTCLKHS);
->  		dsi_write(dsi, DSI_PWR_UP, POWERUP);
->  	}
->  }
-> @@ -710,7 +713,6 @@ static void dw_mipi_dsi_init(struct dw_mipi_dsi *dsi)
->  		  | PHY_RSTZ | PHY_SHUTDOWNZ);
->  	dsi_write(dsi, DSI_CLKMGR_CFG, TO_CLK_DIVIDSION(10) |
->  		  TX_ESC_CLK_DIVIDSION(7));
-> -	dsi_write(dsi, DSI_LPCLK_CTRL, PHY_TXREQUESTCLKHS);
->  }
->  
->  static void dw_mipi_dsi_dpi_config(struct dw_mipi_dsi *dsi,
-> -- 
-> 2.11.0.197.gb556de5.dirty
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+31.01.2017, 00:41, "Vinod Koul" <vinod.koul@intel.com>:
+> On Sun, Jan 29, 2017 at 10:33:29AM +0800, Icenowy Zheng wrote:
+>> ?As 64-bit Allwinner H5 SoC has the same DMA engine with H3, the DMA
+>> ?driver should be allowed to be built for ARM64, in order to make it work on H5.
+>>
+>> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
+>> ?Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> ?Acked-by: Chen-Yu Tsai <wens@csie.org>
+>> ?---
+>> ?Patch introduced between v1 and v2, to satisfy the newly added H3/H5 audio
+>> ?codec support.
+>>
+>> ??drivers/dma/Kconfig | 2 +-
+>> ??1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> ?diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+>> ?index 0d6a96ee9fc7..d01d59812cf3 100644
+>> ?--- a/drivers/dma/Kconfig
+>> ?+++ b/drivers/dma/Kconfig
+>> ?@@ -157,7 +157,7 @@ config DMA_SUN4I
+>>
+>> ??config DMA_SUN6I
+>> ??????????tristate "Allwinner A31 SoCs DMA support"
+>> ?- depends on MACH_SUN6I || MACH_SUN8I || COMPILE_TEST
+>> ?+ depends on MACH_SUN6I || MACH_SUN8I || (ARM64 && ARCH_SUNXI) || COMPILE_TEST
+>
+> Do we really need ARM64 here? also looking at others I wonder why isn't
+> this MACH_SUNXI...?
 
--- 
-Sean Paul, Software Engineer, Google / Chromium OS
+You mean directly place "ARCH_SUNXI" here?
+
+SUN4I/SUN5I/SUN7I do not use DMA_SUN6I, they have different DMA
+controllers.
+
+>
+> --
+> ~Vinod
