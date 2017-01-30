@@ -1,10 +1,10 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 30 Jan 2017 22:33:31 +0100 (CET)
-Subject: [PATCH 4/4] ARM: dts: bcm283x: switch from &sdhci to &sdhost
-In-Reply-To: <1485516989-1072-5-git-send-email-kraxel@redhat.com>
+Date: Mon, 30 Jan 2017 22:37:59 +0100 (CET)
+Subject: [PATCH 1/4] dt-bindings: Add binding for brcm,bcm2835-sdhost.
+In-Reply-To: <1485516989-1072-2-git-send-email-kraxel@redhat.com>
 References: <1485516989-1072-1-git-send-email-kraxel@redhat.com>
- <1485516989-1072-5-git-send-email-kraxel@redhat.com>
-Message-ID: <706496282.15740.1485812011760@email.1und1.de>
+ <1485516989-1072-2-git-send-email-kraxel@redhat.com>
+Message-ID: <2012885435.15821.1485812279271@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,9 +12,9 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > Gerd Hoffmann <kraxel@redhat.com> hat am 27. Januar 2017 um 12:36 geschrieben:
 > 
 > 
-> This flips the switch from (iproc-driven) sdhci controller to the custom
-> sdhost controller.
+> From: Eric Anholt <eric@anholt.net>
+> 
+> This is the other SD controller on the platform, which can be swapped
+> to the role of SD card host using pin muxing.
 
-As long as the SDHOST driver isn't enabled in bcm2835_defconfig we shouldn't do that.
-
-Btw please write down the reason why this should be changed.
+AFAIK the SDHOST controller isn't able to handle SDIO. Maybe we should mention this in the binding document.
