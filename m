@@ -1,33 +1,31 @@
 From: bgolaszewski@baylibre.com (Bartosz Golaszewski)
-Date: Mon, 30 Jan 2017 11:02:09 +0100
-Subject: [PATCH v7 12/14] ARM: davinci: remove BUG_ON() from
- da850_register_sata()
+Date: Mon, 30 Jan 2017 11:02:00 +0100
+Subject: [PATCH v7 03/14] ARM: davinci: add a clock lookup entry for the SATA
+ clock
 In-Reply-To: <1485770531-6772-1-git-send-email-bgolaszewski@baylibre.com>
 References: <1485770531-6772-1-git-send-email-bgolaszewski@baylibre.com>
-Message-ID: <1485770531-6772-13-git-send-email-bgolaszewski@baylibre.com>
+Message-ID: <1485770531-6772-4-git-send-email-bgolaszewski@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ahci driver now supports other refclk clock rates.
+This entry is needed for the ahci driver to get a functional clock.
 
 Signed-off-by: Bartosz Golaszewski <bgolaszewski@baylibre.com>
 ---
- arch/arm/mach-davinci/devices-da8xx.c | 3 ---
- 1 file changed, 3 deletions(-)
+ arch/arm/mach-davinci/da8xx-dt.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-index cfceb32..7cf529f 100644
---- a/arch/arm/mach-davinci/devices-da8xx.c
-+++ b/arch/arm/mach-davinci/devices-da8xx.c
-@@ -1080,9 +1080,6 @@ int __init da850_register_sata(unsigned long refclkpn)
- {
- 	int ret;
+diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+index 9ee44da..b83e5d1 100644
+--- a/arch/arm/mach-davinci/da8xx-dt.c
++++ b/arch/arm/mach-davinci/da8xx-dt.c
+@@ -42,6 +42,7 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("ti,da830-ohci", 0x01e25000, "ohci-da8xx", NULL),
+ 	OF_DEV_AUXDATA("ti,da830-musb", 0x01e00000, "musb-da8xx", NULL),
+ 	OF_DEV_AUXDATA("ti,da830-usb-phy", 0x01c1417c, "da8xx-usb-phy", NULL),
++	OF_DEV_AUXDATA("ti,da850-ahci", 0x01e18000, "ahci_da850", NULL),
+ 	{}
+ };
  
--	/* please see comment in drivers/ata/ahci_da850.c */
--	BUG_ON(refclkpn != 100 * 1000 * 1000);
--
- 	ret = da850_register_sata_refclk(refclkpn);
- 	if (ret)
- 		return ret;
 -- 
 2.9.3
