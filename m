@@ -1,9 +1,9 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 30 Jan 2017 12:41:08 +0100
-Subject: [PATCH 06/14] mmc: dw_mmc: simplify optional reset handling
+Date: Mon, 30 Jan 2017 12:41:07 +0100
+Subject: [PATCH 05/14] [media] rc: sunxi-cir: simplify optional reset handling
 In-Reply-To: <20170130114116.22089-1-p.zabel@pengutronix.de>
 References: <20170130114116.22089-1-p.zabel@pengutronix.de>
-Message-ID: <20170130114116.22089-6-p.zabel@pengutronix.de>
+Message-ID: <20170130114116.22089-5-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,57 +15,55 @@ This allows to return errors from devm_reset_control_get_optional and to
 call reset_control_(de)assert unconditionally.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Cc: Guodong Xu <guodong.xu@linaro.org>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/mmc/host/dw_mmc.c | 14 +++++---------
- 1 file changed, 5 insertions(+), 9 deletions(-)
+ drivers/media/rc/sunxi-cir.c | 21 +++++++--------------
+ 1 file changed, 7 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index b44306b886cb6..9039e8f81ff12 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -2963,10 +2963,8 @@ static struct dw_mci_board *dw_mci_parse_dt(struct dw_mci *host)
+diff --git a/drivers/media/rc/sunxi-cir.c b/drivers/media/rc/sunxi-cir.c
+index eaadc081760ae..b1e22bd47985e 100644
+--- a/drivers/media/rc/sunxi-cir.c
++++ b/drivers/media/rc/sunxi-cir.c
+@@ -174,16 +174,11 @@ static int sunxi_ir_probe(struct platform_device *pdev)
  
- 	/* find reset controller when exist */
- 	pdata->rstc = devm_reset_control_get_optional(dev, "reset");
--	if (IS_ERR(pdata->rstc)) {
--		if (PTR_ERR(pdata->rstc) == -EPROBE_DEFER)
--			return ERR_PTR(-EPROBE_DEFER);
+ 	/* Reset (optional) */
+ 	ir->rst = devm_reset_control_get_optional(dev, NULL);
+-	if (IS_ERR(ir->rst)) {
+-		ret = PTR_ERR(ir->rst);
+-		if (ret == -EPROBE_DEFER)
+-			return ret;
+-		ir->rst = NULL;
+-	} else {
+-		ret = reset_control_deassert(ir->rst);
+-		if (ret)
+-			return ret;
 -	}
-+	if (IS_ERR(pdata->rstc))
-+		return ERR_CAST(pdata->rstc);
++	if (IS_ERR(ir->rst))
++		return PTR_ERR(ir->rst);
++	ret = reset_control_deassert(ir->rst);
++	if (ret)
++		return ret;
  
- 	/* find out number of slots supported */
- 	of_property_read_u32(np, "num-slots", &pdata->num_slots);
-@@ -3090,7 +3088,7 @@ int dw_mci_probe(struct dw_mci *host)
- 		}
- 	}
+ 	ret = clk_set_rate(ir->clk, SUNXI_IR_BASE_CLK);
+ 	if (ret) {
+@@ -292,8 +287,7 @@ static int sunxi_ir_probe(struct platform_device *pdev)
+ exit_clkdisable_apb_clk:
+ 	clk_disable_unprepare(ir->apb_clk);
+ exit_reset_assert:
+-	if (ir->rst)
+-		reset_control_assert(ir->rst);
++	reset_control_assert(ir->rst);
  
--	if (!IS_ERR(host->pdata->rstc)) {
-+	if (host->pdata->rstc) {
- 		reset_control_assert(host->pdata->rstc);
- 		usleep_range(10, 50);
- 		reset_control_deassert(host->pdata->rstc);
-@@ -3245,8 +3243,7 @@ int dw_mci_probe(struct dw_mci *host)
- 	if (host->use_dma && host->dma_ops->exit)
- 		host->dma_ops->exit(host);
+ 	return ret;
+ }
+@@ -305,8 +299,7 @@ static int sunxi_ir_remove(struct platform_device *pdev)
  
--	if (!IS_ERR(host->pdata->rstc))
--		reset_control_assert(host->pdata->rstc);
-+	reset_control_assert(host->pdata->rstc);
+ 	clk_disable_unprepare(ir->clk);
+ 	clk_disable_unprepare(ir->apb_clk);
+-	if (ir->rst)
+-		reset_control_assert(ir->rst);
++	reset_control_assert(ir->rst);
  
- err_clk_ciu:
- 	clk_disable_unprepare(host->ciu_clk);
-@@ -3278,8 +3275,7 @@ void dw_mci_remove(struct dw_mci *host)
- 	if (host->use_dma && host->dma_ops->exit)
- 		host->dma_ops->exit(host);
- 
--	if (!IS_ERR(host->pdata->rstc))
--		reset_control_assert(host->pdata->rstc);
-+	reset_control_assert(host->pdata->rstc);
- 
- 	clk_disable_unprepare(host->ciu_clk);
- 	clk_disable_unprepare(host->biu_clk);
+ 	spin_lock_irqsave(&ir->ir_lock, flags);
+ 	/* disable IR IRQ */
 -- 
 2.11.0
