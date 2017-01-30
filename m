@@ -1,87 +1,91 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 30 Jan 2017 18:48:02 +0000
-Subject: [RFC v2 06/10] KVM: arm/arm64: Update the physical timer
- interrupt level
-In-Reply-To: <20170130184131.GE16459@cbox>
-References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
- <1485479100-4966-7-git-send-email-jintack@cs.columbia.edu>
- <86sho199jx.fsf@arm.com> <20170130150203.GD16459@cbox>
- <b3a4a3e4-65d4-1af3-2b77-14b7fffd9d06@arm.com> <20170130184131.GE16459@cbox>
-Message-ID: <13152c8e-2256-4224-e15c-73c8d6ce06e4@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 30 Jan 2017 18:49:35 +0000
+Subject: ARM64: Disabling warnings about deprecated armv8 instructions
+In-Reply-To: <1485801299.1085.0.camel@crowfest.net>
+References: <22169925.OhJ0QcnbHM@localhost>
+ <1485087662.1518.1.camel@crowfest.net>
+ <0D1F678D-6F94-4B68-955E-6454F8647FCA@linaro.org>
+ <20170130141308.GV27312@n2100.armlinux.org.uk>
+ <CAKv+Gu98i4=COqr_Eikwja28U5MAL83rxe-_QBXWFhJ7v1E6yA@mail.gmail.com>
+ <20170130165837.GE27312@n2100.armlinux.org.uk>
+ <CAKv+Gu_jEvKdWFWB2Ofxb5ruoTYUEt1puZXBb=9Cn2kEOZO1hg@mail.gmail.com>
+ <1485798092.484.5.camel@crowfest.net>
+ <yw1xo9yofm41.fsf@unicorn.mansr.com>
+ <1485801299.1085.0.camel@crowfest.net>
+Message-ID: <20170130184934.GS16461@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/01/17 18:41, Christoffer Dall wrote:
-> On Mon, Jan 30, 2017 at 05:50:03PM +0000, Marc Zyngier wrote:
->> On 30/01/17 15:02, Christoffer Dall wrote:
->>> On Sun, Jan 29, 2017 at 03:21:06PM +0000, Marc Zyngier wrote:
->>>> On Fri, Jan 27 2017 at 01:04:56 AM, Jintack Lim <jintack@cs.columbia.edu> wrote:
->>>>> Now that we maintain the EL1 physical timer register states of VMs,
->>>>> update the physical timer interrupt level along with the virtual one.
->>>>>
->>>>> Note that the emulated EL1 physical timer is not mapped to any hardware
->>>>> timer, so we call a proper vgic function.
->>>>>
->>>>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
->>>>> ---
->>>>>  virt/kvm/arm/arch_timer.c | 20 ++++++++++++++++++++
->>>>>  1 file changed, 20 insertions(+)
->>>>>
->>>>> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
->>>>> index 0f6e935..3b6bd50 100644
->>>>> --- a/virt/kvm/arm/arch_timer.c
->>>>> +++ b/virt/kvm/arm/arch_timer.c
->>>>> @@ -180,6 +180,21 @@ static void kvm_timer_update_mapped_irq(struct kvm_vcpu *vcpu, bool new_level,
->>>>>  	WARN_ON(ret);
->>>>>  }
->>>>>  
->>>>> +static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
->>>>> +				 struct arch_timer_context *timer)
->>>>> +{
->>>>> +	int ret;
->>>>> +
->>>>> +	BUG_ON(!vgic_initialized(vcpu->kvm));
->>>>
->>>> Although I've added my fair share of BUG_ON() in the code base, I've
->>>> since reconsidered my position. If we get in a situation where the vgic
->>>> is not initialized, maybe it would be better to just WARN_ON and return
->>>> early rather than killing the whole box. Thoughts?
->>>>
->>>
->>> The distinction to me is whether this will cause fatal crashes or
->>> exploits down the road if we're working on uninitialized data.  If all
->>> that can happen if the vgic is not initialized, is that the guest
->>> doesn't see interrupts, for example, then a WARN_ON is appropriate.
->>>
->>> Which is the case here?
->>>
->>> That being said, do we need this at all?  This is in the critial path
->>> and is actually measurable (I know this from my work on the other timer
->>> series), so it's better to get rid of it if we can.  Can we simply
->>> convince ourselves this will never happen, and is the code ever likely
->>> to change so that it gets called with the vgic disabled later?
->>
->> That'd be the best course of action. I remember us reworking some of
->> that in the now defunct vgic-less series. Maybe we could salvage that
->> code, if only for the time we spent on it...
->>
-> Ah, we never merged it?  Were we waiting on a userspace implementation
-> or agreement on the ABI?
+On Mon, Jan 30, 2017 at 10:34:59AM -0800, Michael Zoran wrote:
+> On Mon, 2017-01-30 at 18:17 +0000, M?ns Rullg?rd wrote:
+> > Michael Zoran <mzoran@crowfest.net> writes:
+> > > On Mon, 2017-01-30 at 17:09 +0000, Ard Biesheuvel wrote:
+> > > > Well, the question is really how to deal with 32-bit
+> > > > compatibility
+> > > > given the fact that the ARM architecture will drop such
+> > > > instructions
+> > > > in its next revision. Whether we agree with that, and whether we
+> > > > should argue our positions with the architects if we don't is not
+> > > > relevant here.
+> > > > 
+> > > > What is relevant is whether we inform userspace if we spot such a
+> > > > deprecated instruction, and I think we should.
+> > > > 
+> > > > Note that this is not only an issue for the arm64 kernel. The 32-
+> > > > bit
+> > > > kernel will have the exact same issue when you try to run it on
+> > > > hardware that no longer has support for those instructions.
+> > > 
+> > > Just to inject two cents worth since I'm still on the thread and I
+> > > originally started the topic...
+> > > 
+> > > The Intel comparison seems relevant.? I think in theory you can
+> > > still
+> > > run old MS-DOS software on an Intel PC if you were so inclined to
+> > > do
+> > > so.
+> > > 
+> > > I would think the best would be to turn the warnings off by default
+> > > when running in 32 bit mode with the option to turn them back on.?
+> > > Then
+> > > as time progresses more of more of these instructions can be
+> > > converted
+> > > to software emulation and removed from the hardware.? And hopefully
+> > > as
+> > > time progresses, all the user mode software gets upgraded to 64 bit
+> > > so
+> > > that 32 bit get dropped.
+> > > 
+> > > The issue seems to me to be more that the kernel is screaming in
+> > > the
+> > > logs rather then if it's emulating the instructions in hardware or
+> > > software.
+> > 
+> > Might warning once be an acceptable compromise?
+> 
+> Absolutely!
 
-We were waiting on the userspace side to be respun against the latest
-API, and there were some comments from Peter (IIRC) about supporting
-PPIs in general (the other timers and the PMU, for example).
+The problem with warning once is that you miss many of the places where
+you're paying the cost of a trap to emulate the instruction. The purpose
+of the prints is to notify the user that they're running on borrowed time:
+in the next raspberry pi or the one after that, the instruction may be
+removed from the hardware and every invocation will trap. The prints are
+necessary to aid in code migration and are ratelimited already. If you
+decide you don't like them then you can turn them off by writing to files
+in sysfs and having the hardware execute the instructions for you, but
+having that as the kernel default would be *less* helpful to userspace.
 
-None of that happened, as the most vocal proponent of the series
-apparently lost interest.
+This was all discussed in some detail back in 2014:
 
-> There was definitely a useful cleanup with the whole enabled flag thing
-> on the timer I remember.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/268504.html
 
-Indeed. We should at least try to resurrect that bit.
+and specifically:
 
-Thanks,
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/269675.html
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+I was initially against any emulation at all (which wasn't the right answer
+to the problem), but there was a productive discussion and an agreed
+solution. I'm really not keen to re-open that can of worms unless something
+significant has changed.
+
+Will
