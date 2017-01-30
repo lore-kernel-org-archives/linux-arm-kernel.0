@@ -1,50 +1,50 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Jan 2017 15:12:20 +0000
-Subject: [PATCH 06/10] soc/qbman: Add ARM equivalent for
- flush_dcache_range()
-In-Reply-To: <VI1PR0401MB2430DA6BD2F857C30EC86A50917F0@VI1PR0401MB2430.eurprd04.prod.outlook.com>
-References: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
- <1484779180-1344-7-git-send-email-roy.pledge@nxp.com>
- <20170118231206.GT27312@n2100.armlinux.org.uk>
- <VI1PR0401MB2430DA6BD2F857C30EC86A50917F0@VI1PR0401MB2430.eurprd04.prod.outlook.com>
-Message-ID: <20170130151220.GZ27312@n2100.armlinux.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 30 Jan 2017 15:13:12 +0000
+Subject: [PATCH v2] arm: module: handle negative R_ARM_PREL31 addends correctly
+Message-ID: <1485789192-6218-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2017 at 11:36:18PM +0000, Scott Wood wrote:
-> On 01/18/2017 05:12 PM, Russell King - ARM Linux wrote:
-> > Please do not fiddle about under the covers, there be dragons there.
-> > 
-> > It looks to me like you're trying to use __cpuc_flush_dcache_area()
-> > on an area that's been ioremap()'d, which is a waste of CPU cycles.
-> > ioremap()'d areas are mapped as "device" memory type, which means
-> > the region isn't even cached.  So I don't think this is necessary.
-> 
-> It is mapped cachable, via memremap() (see patch 1/10).  This is RAM
-> that the device uses, non-coherently, for its own purposes (but requires
-> software to clear it first).
+According to the spec 'ELF for the ARM Architecture' (IHI 0044E),
+addends for R_ARM_PREL31 relocations are 31-bit signed quantities,
+so we need to sign extend the value to 32 bits before it can be used
+as an offset in the calculation of the relocated value.
 
-Ok.
+We have not been bitten by this because these relocations are usually
+emitted against the start of a section, which means the addends never
+assume negative values in practice. But it is a bug nonetheless, so fix
+it.
 
-> Is there a non-"under the covers" way to say "flush this region" without
-> the arch second-guessing whether it really needs to be flushed?
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+v2: preserve bit 31 of the relocation target
 
-memremap() doesn't have any associated cache flushing functionality
-defined for it - it's a relatively new interface added to the kernel.
+ arch/arm/kernel/module.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
-There are some interfaces defined for memory that was vmalloc'd, but
-due to the way kernel/memremap.c works, you can't guarantee that the
-pointer you end up with came from vmalloc'd space, so I don't think
-suggesting to use those would be correct (as they may have assumptions
-that they'll only be called with vmalloc'd addresses.)
-
-As pointed out later in the thread, using dma_map_single() on the
-returned address is not permissible either.
-
-The only thing I can say is that it needs a proposal for a new arch-
-independent interface.
-
+diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+index 4f14b5ce6535..80254b47dc34 100644
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -155,8 +155,17 @@ apply_relocate(Elf32_Shdr *sechdrs, const char *strtab, unsigned int symindex,
+ 		       break;
+ 
+ 		case R_ARM_PREL31:
+-			offset = *(u32 *)loc + sym->st_value - loc;
+-			*(u32 *)loc = offset & 0x7fffffff;
++			offset = (*(s32 *)loc << 1) >> 1; /* sign extend */
++			offset += sym->st_value - loc;
++			if (offset >= 0x40000000 || offset < -0x40000000) {
++				pr_err("%s: section %u reloc %u sym '%s': relocation %u out of range (%#lx -> %#x)\n",
++				       module->name, relindex, i, symname,
++				       ELF32_R_TYPE(rel->r_info), loc,
++				       sym->st_value);
++				return -ENOEXEC;
++			}
++			*(u32 *)loc &= 0x80000000;
++			*(u32 *)loc |= offset & 0x7fffffff;
+ 			break;
+ 
+ 		case R_ARM_MOVW_ABS_NC:
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.7.4
