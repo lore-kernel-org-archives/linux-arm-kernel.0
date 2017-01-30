@@ -1,86 +1,43 @@
-From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
-Date: Mon, 30 Jan 2017 17:35:44 +0100 (CET)
-Subject: [PATCH 00/22] Conversion of ARMv4 Gemini to DT and multiplatform
-In-Reply-To: <6a6f3b79-18d7-3243-6a5c-2dc9a3755aa9@gmail.com>
-References: <20170122121506.9995-1-linus.walleij@linaro.org>
- <8e705d3a-ff99-23b2-c4c9-2edccf134cac@gmail.com>
- <CACRpkdbdsNU6pOcewyZw_jpXzXvm_aj0FURY7Ty5FkT227iZ=Q@mail.gmail.com>
- <alpine.LNX.2.00.1701241734140.2736@T420s>
- <CACRpkdY1A8QbKVV0-ZFeH-n0zYpmJkoGj5vA0Ov-DDhBTJf5_w@mail.gmail.com>
- <6a6f3b79-18d7-3243-6a5c-2dc9a3755aa9@gmail.com>
-Message-ID: <alpine.LNX.2.00.1701301702420.14503@T420s>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Mon, 30 Jan 2017 16:38:15 +0000
+Subject: ARM64: Disabling warnings about deprecated armv8 instructions
+In-Reply-To: <CAKv+Gu98i4=COqr_Eikwja28U5MAL83rxe-_QBXWFhJ7v1E6yA@mail.gmail.com>
+ (Ard Biesheuvel's message of "Mon, 30 Jan 2017 14:50:23 +0000")
+References: <1485072424.14066.2.camel@crowfest.net>
+ <1485075528.14345.1.camel@crowfest.net>
+ <CAKv+Gu8LU3QjrUa6wMJF3WBNrhx34Pi_0ZUQVfrZy7w7y7237w@mail.gmail.com>
+ <22169925.OhJ0QcnbHM@localhost> <1485087662.1518.1.camel@crowfest.net>
+ <0D1F678D-6F94-4B68-955E-6454F8647FCA@linaro.org>
+ <20170130141308.GV27312@n2100.armlinux.org.uk>
+ <CAKv+Gu98i4=COqr_Eikwja28U5MAL83rxe-_QBXWFhJ7v1E6yA@mail.gmail.com>
+Message-ID: <yw1xwpdcfqq0.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian, Linus,
+Ard Biesheuvel <ard.biesheuvel@linaro.org> writes:
 
-sorry for delay, busy last week ...
+> On 30 January 2017 at 14:13, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+>> On Sun, Jan 22, 2017 at 01:01:53PM +0000, Ard Biesheuvel wrote:
+>>> Emulating unaligned access in the ARM kernel was a mistake: it even
+>>> emulates unaligned accesses for instructions like ldm and ldrd, which
+>>> require word alignment at the hardware level even in the latest v8
+>>> version of the architecture. In contrast, the v8 deprecation warnings
+>>> are about enforcing compliance.
+>>
+>> Ard, you're totally wrong on the unaligned access thing.  Unaligned
+>> accesses are a fundamental requirement of the kernel's networking
+>> stack.  If you don't have support for unaligned accesses, then you
+>> don't have network support - it's as simple as that.
+>>
+>> So, in order for ARMv5 and earlier to have network support, there
+>> was no option to add support for emulating those accesses.
+>>
+>
+> I wasn't aware of that.
 
-On Tue, 24 Jan 2017, Florian Fainelli wrote:
+Not even David Miller is "aware" of that.  Then again, we're living in a
+world of "alternative facts" now.
 
-> On 01/24/2017 12:47 PM, Linus Walleij wrote:
-> > Hans, Florian et al: does any of you have a copy of the kernel source
-> > dump(s) from Teltonika, Raidsonic or Wiliboard?
-> > 
-> > Would be nice to have the stuff that vendors are using.
-> > 
-> > On Tue, Jan 24, 2017 at 6:24 PM, Hans Ulli Kroll
-> > <ulli.kroll@googlemail.com> wrote:
-> > 
-> >> AFAICR
-> >> This is a dual GMAC !
-> >>
-> >> They are two different base address for each GMAC and one shared
-> >> base address for both of them.
-> >> This is all in one address space which remaps the driver.
-> >>
-> >> And to make it worse two interrupt lines, one of them is also shared.
-> >>
-> >> Any ideas to "convert" this into DT ??
-> >> Because I think it's impossible to split both GMAC interfaces ??
-> > 
-> > Sounds odd.  Yeah hardware.h lists this:
-> > 
-> > #define GEMINI_TOE_BASE         0x60000000
-> > #define GEMINI_GMAC0_BASE       0x6000A000
-> > #define GEMINI_GMAC1_BASE       0x6000E000
-> > 
-> > I guess one approach is to make a driver handling all of it in one,
-> > let it ioremap all regions and support one or two GMACs on the same
-> > TOE. More complex solutions is to share the TOE using
-> > syscons regmap mechanism but it looks cumbersome.
-> > 
-> > {
-> >    compatible = "cortina,genesis-gmac-ethernet";
-> >    reg = <0x60000000 0xa000>, <0x6000a000 0x4000>, <0x6000e000 0x4000>;
-> >    interrupts = <1 IRQ_TYPE_LEVEL_HIGH>, <2 IRQ_TYPE_LEVEL_HIGH>;
-> > }
-> > 
-> > Or something like that?
-> 
-
-For addresses, base is here, for both interfaces
-#define GEMINI_TOE_BASE			0x60000000
-and now for each interface, offset to the above
-code is from the headerfile of the openwrt driver.
-#define TOE_GMAC_DMA_BASE(x)		(0x8000 + 0x4000 * (x))
-#define TOE_GMAC_BASE(x)		(0xA000 + 0x4000 * (x))
-
-maybe some other registers to
-#define TOE_NONTOE_QUE_HDR_BASE		0x2000
-#define TOE_TOE_QUE_HDR_BASE		0x3000
-#define TOE_V_BIT_BASE			0x4000
-#define TOE_A_BIT_BASE			0x6000
-
-AFAICR 
-The TOE part was "invented" for the gigabit interface.
-They need to speed up the NIC because without TCP offloading you will get 
-only fast ethernet speed on a gigabit NIC.
-
-> I'd recommend looking at how mv643xx_eth does it, there are shared and
-> individual portions of the register set in there, with concepts of
-> "ports" which result in network device instances.
-
-Thanks will look at it.
-
-Hans
+-- 
+M?ns Rullg?rd
