@@ -1,30 +1,66 @@
-From: nleeder@codeaurora.org (Leeder, Neil)
-Date: Sun, 29 Jan 2017 22:16:36 -0500
-Subject: [PATCH v8] perf: add qcom l2 cache perf events driver
-In-Reply-To: <1484592767-23687-1-git-send-email-nleeder@codeaurora.org>
-References: <1484592767-23687-1-git-send-email-nleeder@codeaurora.org>
-Message-ID: <814d6b09-33db-9460-0eba-e2602989532c@codeaurora.org>
+From: shailendra.v@samsung.com (Shailendra Verma)
+Date: Mon, 30 Jan 2017 10:17:14 +0530
+Subject: [PATCH] iio: adc - Fix possible NULL derefrence.
+References: <CGME20170130044724epcas3p444b23d43fed213511e6994ecb4ed0ef3@epcas3p4.samsung.com>
+Message-ID: <1485751634-28963-1-git-send-email-shailendra.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Has anyone had a chance to look at this yet - I'd appreciate any comments.
+of_match_device could return NULL, and so can cause a NULL
+pointer dereference later.
 
-Thanks,
-Neil
+Signed-off-by: Shailendra Verma <shailendra.v@samsung.com>
+---
+ drivers/iio/adc/mxs-lradc.c       |   14 ++++++++++----
+ drivers/iio/adc/rockchip_saradc.c |    4 ++++
+ 2 files changed, 14 insertions(+), 4 deletions(-)
 
-On 1/16/2017 1:52 PM, Neil Leeder wrote:
-> Adds perf events support for L2 cache PMU.
->
-> The L2 cache PMU driver is named 'l2cache_0' and can be used
-> with perf events to profile L2 events such as cache hits
-> and misses on Qualcomm Technologies processors.
->
-> Signed-off-by: Neil Leeder <nleeder@codeaurora.org>
-> ---
-> v8:
-> Various style changes for function names & code restructuring
-> Replace dev_warn with ratelimited debug prints
-> Move hotplug registration before PMU registration
-> Reload counters with a fixed value
-> Add column-exclusion check for events in same group
-> Rebase on 4.10-rc3
+diff --git a/drivers/iio/adc/mxs-lradc.c b/drivers/iio/adc/mxs-lradc.c
+index b84d37c..4308a59 100644
+--- a/drivers/iio/adc/mxs-lradc.c
++++ b/drivers/iio/adc/mxs-lradc.c
+@@ -1570,10 +1570,8 @@ static int mxs_lradc_probe_touchscreen(struct mxs_lradc *lradc,
+ 
+ static int mxs_lradc_probe(struct platform_device *pdev)
+ {
+-	const struct of_device_id *of_id =
+-		of_match_device(mxs_lradc_dt_ids, &pdev->dev);
+-	const struct mxs_lradc_of_config *of_cfg =
+-		&mxs_lradc_of_config[(enum mxs_lradc_id)of_id->data];
++	const struct of_device_id *of_id;
++	const struct mxs_lradc_of_config *of_cfg;
+ 	struct device *dev = &pdev->dev;
+ 	struct device_node *node = dev->of_node;
+ 	struct mxs_lradc *lradc;
+@@ -1583,6 +1581,14 @@ static int mxs_lradc_probe(struct platform_device *pdev)
+ 	int i, s;
+ 	u64 scale_uv;
+ 
++	of_id = of_match_device(mxs_lradc_dt_ids, &pdev->dev);
++	if (!of_id) {
++		dev_err(&pdev->dev, "Error: No device match found\n");
++		return -ENODEV;
++	}
++
++	of_cfg = &mxs_lradc_of_config[(enum mxs_lradc_id)of_id->data];
++
+ 	/* Allocate the IIO device. */
+ 	iio = devm_iio_device_alloc(dev, sizeof(*lradc));
+ 	if (!iio) {
+diff --git a/drivers/iio/adc/rockchip_saradc.c b/drivers/iio/adc/rockchip_saradc.c
+index 85d7012..08dfb43 100644
+--- a/drivers/iio/adc/rockchip_saradc.c
++++ b/drivers/iio/adc/rockchip_saradc.c
+@@ -224,6 +224,10 @@ static int rockchip_saradc_probe(struct platform_device *pdev)
+ 	info = iio_priv(indio_dev);
+ 
+ 	match = of_match_device(rockchip_saradc_match, &pdev->dev);
++	if (!match) {
++		dev_err(&pdev->dev, "Error: No device match found\n");
++		return -ENODEV;
++	}
+ 	info->data = match->data;
+ 
+ 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-- 
+1.7.9.5
