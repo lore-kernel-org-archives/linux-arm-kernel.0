@@ -1,50 +1,66 @@
-From: icenowy@aosc.xyz (Icenowy Zheng)
-Date: Tue, 31 Jan 2017 02:23:55 +0800
-Subject: [PATCH v3 08/10] dmaengine: sun6i: allow build on ARM64 platforms
- (sun50i)
-In-Reply-To: <20170130164210.GD19244@localhost>
-References: <20170129023331.62106-1-icenowy@aosc.xyz>
- <20170129023331.62106-9-icenowy@aosc.xyz> <20170130164210.GD19244@localhost>
-Message-ID: <3729521485800635@web23g.yandex.ru>
+From: mzoran@crowfest.net (Michael Zoran)
+Date: Mon, 30 Jan 2017 10:34:59 -0800
+Subject: ARM64: Disabling warnings about deprecated armv8 instructions
+In-Reply-To: <yw1xo9yofm41.fsf@unicorn.mansr.com>
+References: <1485072424.14066.2.camel@crowfest.net>
+ <1485075528.14345.1.camel@crowfest.net>
+ <CAKv+Gu8LU3QjrUa6wMJF3WBNrhx34Pi_0ZUQVfrZy7w7y7237w@mail.gmail.com>
+ <22169925.OhJ0QcnbHM@localhost> <1485087662.1518.1.camel@crowfest.net>
+ <0D1F678D-6F94-4B68-955E-6454F8647FCA@linaro.org>
+ <20170130141308.GV27312@n2100.armlinux.org.uk>
+ <CAKv+Gu98i4=COqr_Eikwja28U5MAL83rxe-_QBXWFhJ7v1E6yA@mail.gmail.com>
+ <20170130165837.GE27312@n2100.armlinux.org.uk>
+ <CAKv+Gu_jEvKdWFWB2Ofxb5ruoTYUEt1puZXBb=9Cn2kEOZO1hg@mail.gmail.com>
+ <1485798092.484.5.camel@crowfest.net> <yw1xo9yofm41.fsf@unicorn.mansr.com>
+Message-ID: <1485801299.1085.0.camel@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 2017-01-30 at 18:17 +0000, M?ns Rullg?rd wrote:
+> Michael Zoran <mzoran@crowfest.net> writes:
+> 
+> > On Mon, 2017-01-30 at 17:09 +0000, Ard Biesheuvel wrote:
+> > > Well, the question is really how to deal with 32-bit
+> > > compatibility
+> > > given the fact that the ARM architecture will drop such
+> > > instructions
+> > > in its next revision. Whether we agree with that, and whether we
+> > > should argue our positions with the architects if we don't is not
+> > > relevant here.
+> > > 
+> > > What is relevant is whether we inform userspace if we spot such a
+> > > deprecated instruction, and I think we should.
+> > > 
+> > > Note that this is not only an issue for the arm64 kernel. The 32-
+> > > bit
+> > > kernel will have the exact same issue when you try to run it on
+> > > hardware that no longer has support for those instructions.
+> > 
+> > Just to inject two cents worth since I'm still on the thread and I
+> > originally started the topic...
+> > 
+> > The Intel comparison seems relevant.? I think in theory you can
+> > still
+> > run old MS-DOS software on an Intel PC if you were so inclined to
+> > do
+> > so.
+> > 
+> > I would think the best would be to turn the warnings off by default
+> > when running in 32 bit mode with the option to turn them back on.?
+> > Then
+> > as time progresses more of more of these instructions can be
+> > converted
+> > to software emulation and removed from the hardware.? And hopefully
+> > as
+> > time progresses, all the user mode software gets upgraded to 64 bit
+> > so
+> > that 32 bit get dropped.
+> > 
+> > The issue seems to me to be more that the kernel is screaming in
+> > the
+> > logs rather then if it's emulating the instructions in hardware or
+> > software.
+> 
+> Might warning once be an acceptable compromise?
 
-
-31.01.2017, 00:41, "Vinod Koul" <vinod.koul@intel.com>:
-> On Sun, Jan 29, 2017 at 10:33:29AM +0800, Icenowy Zheng wrote:
->> ?As 64-bit Allwinner H5 SoC has the same DMA engine with H3, the DMA
->> ?driver should be allowed to be built for ARM64, in order to make it work on H5.
->>
->> ?Signed-off-by: Icenowy Zheng <icenowy@aosc.xyz>
->> ?Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> ?Acked-by: Chen-Yu Tsai <wens@csie.org>
->> ?---
->> ?Patch introduced between v1 and v2, to satisfy the newly added H3/H5 audio
->> ?codec support.
->>
->> ??drivers/dma/Kconfig | 2 +-
->> ??1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> ?diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
->> ?index 0d6a96ee9fc7..d01d59812cf3 100644
->> ?--- a/drivers/dma/Kconfig
->> ?+++ b/drivers/dma/Kconfig
->> ?@@ -157,7 +157,7 @@ config DMA_SUN4I
->>
->> ??config DMA_SUN6I
->> ??????????tristate "Allwinner A31 SoCs DMA support"
->> ?- depends on MACH_SUN6I || MACH_SUN8I || COMPILE_TEST
->> ?+ depends on MACH_SUN6I || MACH_SUN8I || (ARM64 && ARCH_SUNXI) || COMPILE_TEST
->
-> Do we really need ARM64 here? also looking at others I wonder why isn't
-> this MACH_SUNXI...?
-
-You mean directly place "ARCH_SUNXI" here?
-
-SUN4I/SUN5I/SUN7I do not use DMA_SUN6I, they have different DMA
-controllers.
-
->
-> --
-> ~Vinod
+Absolutely!
