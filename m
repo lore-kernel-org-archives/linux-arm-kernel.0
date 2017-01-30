@@ -1,222 +1,157 @@
-From: jintack@cs.columbia.edu (Jintack Lim)
-Date: Mon, 30 Jan 2017 12:58:11 -0500
-Subject: [RFC v2 02/10] KVM: arm/arm64: Move cntvoff to each timer context
-In-Reply-To: <867f5e9j4y.fsf@arm.com>
-References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
- <1485479100-4966-3-git-send-email-jintack@cs.columbia.edu>
- <867f5e9j4y.fsf@arm.com>
-Message-ID: <CAHyh4xiL18DPsR52FtLhafRWuycb5zA6MRL-SSSCRX96Ce-6ug@mail.gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 30 Jan 2017 09:58:13 -0800
+Subject: [PATCH 1/2] watchdog: sama5d4: Cache MR instead of a partial
+ config
+In-Reply-To: <20170130171848.31598-1-alexandre.belloni@free-electrons.com>
+References: <20170130171848.31598-1-alexandre.belloni@free-electrons.com>
+Message-ID: <20170130175813.GA23087@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 29, 2017 at 6:54 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On Fri, Jan 27 2017 at 01:04:52 AM, Jintack Lim <jintack@cs.columbia.edu> wrote:
->> Make cntvoff per each timer context. This is helpful to abstract kvm
->> timer functions to work with timer context without considering timer
->> types (e.g. physical timer or virtual timer).
->>
->> This also would pave the way for ever doing adjustments of the cntvoff
->> on a per-CPU basis if that should ever make sense.
->>
->> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
->> ---
->>  arch/arm/include/asm/kvm_host.h   |  6 +++---
->>  arch/arm64/include/asm/kvm_host.h |  4 ++--
->>  include/kvm/arm_arch_timer.h      |  8 +++-----
->>  virt/kvm/arm/arch_timer.c         | 26 ++++++++++++++++++++------
->>  virt/kvm/arm/hyp/timer-sr.c       |  3 +--
->>  5 files changed, 29 insertions(+), 18 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->> index d5423ab..f5456a9 100644
->> --- a/arch/arm/include/asm/kvm_host.h
->> +++ b/arch/arm/include/asm/kvm_host.h
->> @@ -60,9 +60,6 @@ struct kvm_arch {
->>       /* The last vcpu id that ran on each physical CPU */
->>       int __percpu *last_vcpu_ran;
->>
->> -     /* Timer */
->> -     struct arch_timer_kvm   timer;
->> -
->>       /*
->>        * Anything that is not used directly from assembly code goes
->>        * here.
->> @@ -75,6 +72,9 @@ struct kvm_arch {
->>       /* Stage-2 page table */
->>       pgd_t *pgd;
->>
->> +     /* A lock to synchronize cntvoff among all vtimer context of vcpus */
->> +     spinlock_t cntvoff_lock;
->
-> Is there any condition where we need this to be a spinlock? I would have
-> thought that a mutex should have been enough, as this should only be
-> updated on migration or initialization. Not that it matters much in this
-> case, but I wondered if there is something I'm missing.
->
->> +
->>       /* Interrupt controller */
->>       struct vgic_dist        vgic;
->>       int max_vcpus;
->> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> index e505038..23749a8 100644
->> --- a/arch/arm64/include/asm/kvm_host.h
->> +++ b/arch/arm64/include/asm/kvm_host.h
->> @@ -71,8 +71,8 @@ struct kvm_arch {
->>       /* Interrupt controller */
->>       struct vgic_dist        vgic;
->>
->> -     /* Timer */
->> -     struct arch_timer_kvm   timer;
->> +     /* A lock to synchronize cntvoff among all vtimer context of vcpus */
->> +     spinlock_t cntvoff_lock;
->>  };
->>
->>  #define KVM_NR_MEM_OBJS     40
->> diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
->> index daad3c1..1b9c988 100644
->> --- a/include/kvm/arm_arch_timer.h
->> +++ b/include/kvm/arm_arch_timer.h
->> @@ -23,11 +23,6 @@
->>  #include <linux/hrtimer.h>
->>  #include <linux/workqueue.h>
->>
->> -struct arch_timer_kvm {
->> -     /* Virtual offset */
->> -     u64                     cntvoff;
->> -};
->> -
->>  struct arch_timer_context {
->>       /* Registers: control register, timer value */
->>       u32                             cnt_ctl;
->> @@ -38,6 +33,9 @@ struct arch_timer_context {
->>
->>       /* Active IRQ state caching */
->>       bool                            active_cleared_last;
->> +
->> +     /* Virtual offset */
->> +     u64                     cntvoff;
->>  };
->>
->>  struct arch_timer_cpu {
->> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
->> index 6740efa..fa4c042 100644
->> --- a/virt/kvm/arm/arch_timer.c
->> +++ b/virt/kvm/arm/arch_timer.c
->> @@ -101,9 +101,10 @@ static void kvm_timer_inject_irq_work(struct work_struct *work)
->>  static u64 kvm_timer_compute_delta(struct kvm_vcpu *vcpu)
->>  {
->>       u64 cval, now;
->> +     struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
->>
->> -     cval = vcpu_vtimer(vcpu)->cnt_cval;
->> -     now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
->> +     cval = vtimer->cnt_cval;
->> +     now = kvm_phys_timer_read() - vtimer->cntvoff;
->>
->>       if (now < cval) {
->>               u64 ns;
->> @@ -159,7 +160,7 @@ bool kvm_timer_should_fire(struct kvm_vcpu *vcpu)
->>               return false;
->>
->>       cval = vtimer->cnt_cval;
->> -     now = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
->> +     now = kvm_phys_timer_read() - vtimer->cntvoff;
->>
->>       return cval <= now;
->>  }
->> @@ -353,10 +354,23 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
->>       return 0;
->>  }
->>
->> +/* Make the updates of cntvoff for all vtimer contexts atomic */
->> +static void update_vtimer_cntvoff(struct kvm_vcpu *vcpu, u64 cntvoff)
->
-> Arguably, this acts on the VM itself and not a single vcpu. maybe you
-> should consider passing the struct kvm pointer to reflect this.
->
+On Mon, Jan 30, 2017 at 06:18:47PM +0100, Alexandre Belloni wrote:
+> .config is used to cache a part of WDT_MR at probe time and is not used
+> afterwards. Instead of doing that, actually cache MR and avoid reading it
+> every time it is modified.
+> 
+The semantic change here is that the old code leaves "other" bits in the
+mr register alone. I assume you have verified that clearing those bits
+does not have negative impact.
 
-Yes, that would be better.
+Also, I am not really sure if replacing a read from a register is more
+costly than a read from memory. Is that change really worth it ?
+I mean, sure, the way the 'config' variable is used is a bit odd,
+but I don't really see the improvement in its replacement either.
 
->> +{
->> +     int i;
->> +
->> +     spin_lock(&vcpu->kvm->arch.cntvoff_lock);
->> +     kvm_for_each_vcpu(i, vcpu, vcpu->kvm)
->> +             vcpu_vtimer(vcpu)->cntvoff = cntvoff;
->> +     spin_unlock(&vcpu->kvm->arch.cntvoff_lock);
->> +}
->> +
->>  void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
->>  {
->>       struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
->>
->> +     update_vtimer_cntvoff(vcpu, kvm_phys_timer_read());
->
-> Maybe a comment indicating that we recompute CNTVOFF for all vcpus would
-> be welcome (this is not a change in semantics, but it was never obvious
-> in the existing code).
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  drivers/watchdog/sama5d4_wdt.c | 45 ++++++++++++++++++------------------------
+>  1 file changed, 19 insertions(+), 26 deletions(-)
+> 
+> diff --git a/drivers/watchdog/sama5d4_wdt.c b/drivers/watchdog/sama5d4_wdt.c
+> index a49634cdc1cc..6dd07bef515a 100644
+> --- a/drivers/watchdog/sama5d4_wdt.c
+> +++ b/drivers/watchdog/sama5d4_wdt.c
+> @@ -28,7 +28,7 @@
+>  struct sama5d4_wdt {
+>  	struct watchdog_device	wdd;
+>  	void __iomem		*reg_base;
+> -	u32	config;
+> +	u32			mr;
+>  };
+>  
+>  static int wdt_timeout = WDT_DEFAULT_TIMEOUT;
+> @@ -53,11 +53,9 @@ MODULE_PARM_DESC(nowayout,
+>  static int sama5d4_wdt_start(struct watchdog_device *wdd)
+>  {
+>  	struct sama5d4_wdt *wdt = watchdog_get_drvdata(wdd);
+> -	u32 reg;
+>  
+> -	reg = wdt_read(wdt, AT91_WDT_MR);
+> -	reg &= ~AT91_WDT_WDDIS;
+> -	wdt_write(wdt, AT91_WDT_MR, reg);
+> +	wdt->mr &= ~AT91_WDT_WDDIS;
+> +	wdt_write(wdt, AT91_WDT_MR, wdt->mr);
+>  
+>  	return 0;
+>  }
+> @@ -65,11 +63,9 @@ static int sama5d4_wdt_start(struct watchdog_device *wdd)
+>  static int sama5d4_wdt_stop(struct watchdog_device *wdd)
+>  {
+>  	struct sama5d4_wdt *wdt = watchdog_get_drvdata(wdd);
+> -	u32 reg;
+>  
+> -	reg = wdt_read(wdt, AT91_WDT_MR);
+> -	reg |= AT91_WDT_WDDIS;
+> -	wdt_write(wdt, AT91_WDT_MR, reg);
+> +	wdt->mr |= AT91_WDT_WDDIS;
+> +	wdt_write(wdt, AT91_WDT_MR, wdt->mr);
+>  
+>  	return 0;
+>  }
+> @@ -88,14 +84,12 @@ static int sama5d4_wdt_set_timeout(struct watchdog_device *wdd,
+>  {
+>  	struct sama5d4_wdt *wdt = watchdog_get_drvdata(wdd);
+>  	u32 value = WDT_SEC2TICKS(timeout);
+> -	u32 reg;
+>  
+> -	reg = wdt_read(wdt, AT91_WDT_MR);
+> -	reg &= ~AT91_WDT_WDV;
+> -	reg &= ~AT91_WDT_WDD;
+> -	reg |= AT91_WDT_SET_WDV(value);
+> -	reg |= AT91_WDT_SET_WDD(value);
+> -	wdt_write(wdt, AT91_WDT_MR, reg);
+> +	wdt->mr &= ~AT91_WDT_WDV;
+> +	wdt->mr &= ~AT91_WDT_WDD;
+> +	wdt->mr |= AT91_WDT_SET_WDV(value);
+> +	wdt->mr |= AT91_WDT_SET_WDD(value);
+> +	wdt_write(wdt, AT91_WDT_MR, wdt->mr);
+>  
+>  	wdd->timeout = timeout;
+>  
+> @@ -132,19 +126,19 @@ static int of_sama5d4_wdt_init(struct device_node *np, struct sama5d4_wdt *wdt)
+>  {
+>  	const char *tmp;
+>  
+> -	wdt->config = AT91_WDT_WDDIS;
+> +	wdt->mr = AT91_WDT_WDDIS;
+>  
+>  	if (!of_property_read_string(np, "atmel,watchdog-type", &tmp) &&
+>  	    !strcmp(tmp, "software"))
+> -		wdt->config |= AT91_WDT_WDFIEN;
+> +		wdt->mr |= AT91_WDT_WDFIEN;
+>  	else
+> -		wdt->config |= AT91_WDT_WDRSTEN;
+> +		wdt->mr |= AT91_WDT_WDRSTEN;
+>  
+>  	if (of_property_read_bool(np, "atmel,idle-halt"))
+> -		wdt->config |= AT91_WDT_WDIDLEHLT;
+> +		wdt->mr |= AT91_WDT_WDIDLEHLT;
+>  
+>  	if (of_property_read_bool(np, "atmel,dbg-halt"))
+> -		wdt->config |= AT91_WDT_WDDBGHLT;
+> +		wdt->mr |= AT91_WDT_WDDBGHLT;
+>  
+>  	return 0;
+>  }
+> @@ -163,11 +157,10 @@ static int sama5d4_wdt_init(struct sama5d4_wdt *wdt)
+>  	reg &= ~AT91_WDT_WDDIS;
+>  	wdt_write(wdt, AT91_WDT_MR, reg);
+>  
+There is (at least) one read of the mr register left above this code.
+It is not entirely obvious to me why it would make sense to retain
+this single read instead of just clearing the AT91_WDT_WDDIS bit
+from the cached value and writing the rest. Maybe this is to make
+sure that WDV or WDD isn't changed with the bit set, but ....
+the explanation associated with clearing the bit is a bit odd either
+case. It states that AT91_WDT_WDDIS must not be set (meaning the watchdog
+must be running ? Shouldn't it be the opposite ?) when changing WDV or WDD,
+then violates this rule when updating the timeout (which can happen with
+the watchdog running or not).
 
-I'll add a comment. In fact, I was told to make cntvoff synchronized
-across all the vcpus, but I'm afraid that I understand why. Could you
-explain me where this constraint comes from?
-
->
->> +
->>       INIT_WORK(&timer->expired, kvm_timer_inject_irq_work);
->>       hrtimer_init(&timer->timer, CLOCK_MONOTONIC, HRTIMER_MODE_ABS);
->>       timer->timer.function = kvm_timer_expire;
->> @@ -376,7 +390,7 @@ int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, u64 regid, u64 value)
->>               vtimer->cnt_ctl = value;
->>               break;
->>       case KVM_REG_ARM_TIMER_CNT:
->> -             vcpu->kvm->arch.timer.cntvoff = kvm_phys_timer_read() - value;
->> +             update_vtimer_cntvoff(vcpu, kvm_phys_timer_read() - value);
->>               break;
->>       case KVM_REG_ARM_TIMER_CVAL:
->>               vtimer->cnt_cval = value;
->> @@ -397,7 +411,7 @@ u64 kvm_arm_timer_get_reg(struct kvm_vcpu *vcpu, u64 regid)
->>       case KVM_REG_ARM_TIMER_CTL:
->>               return vtimer->cnt_ctl;
->>       case KVM_REG_ARM_TIMER_CNT:
->> -             return kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
->> +             return kvm_phys_timer_read() - vtimer->cntvoff;
->>       case KVM_REG_ARM_TIMER_CVAL:
->>               return vtimer->cnt_cval;
->>       }
->> @@ -511,7 +525,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
->>
->>  void kvm_timer_init(struct kvm *kvm)
->>  {
->> -     kvm->arch.timer.cntvoff = kvm_phys_timer_read();
->> +     spin_lock_init(&kvm->arch.cntvoff_lock);
->>  }
->>
->>  /*
->> diff --git a/virt/kvm/arm/hyp/timer-sr.c b/virt/kvm/arm/hyp/timer-sr.c
->> index 0cf0895..4734915 100644
->> --- a/virt/kvm/arm/hyp/timer-sr.c
->> +++ b/virt/kvm/arm/hyp/timer-sr.c
->> @@ -53,7 +53,6 @@ void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
->>
->>  void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
->>  {
->> -     struct kvm *kvm = kern_hyp_va(vcpu->kvm);
->>       struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
->>       struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
->>       u64 val;
->> @@ -71,7 +70,7 @@ void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
->>       }
->>
->>       if (timer->enabled) {
->> -             write_sysreg(kvm->arch.timer.cntvoff, cntvoff_el2);
->> +             write_sysreg(vtimer->cntvoff, cntvoff_el2);
->>               write_sysreg_el0(vtimer->cnt_cval, cntv_cval);
->>               isb();
->>               write_sysreg_el0(vtimer->cnt_ctl, cntv_ctl);
->
-> Thanks,
->
->         M.
+> -	reg = wdt->config;
+> -	reg |= AT91_WDT_SET_WDD(value);
+> -	reg |= AT91_WDT_SET_WDV(value);
+> +	wdt->mr |= AT91_WDT_SET_WDD(value);
+> +	wdt->mr |= AT91_WDT_SET_WDV(value);
+>  
+> -	wdt_write(wdt, AT91_WDT_MR, reg);
+> +	wdt_write(wdt, AT91_WDT_MR, wdt->mr);
+>  
+>  	return 0;
+>  }
+> @@ -211,7 +204,7 @@ static int sama5d4_wdt_probe(struct platform_device *pdev)
+>  			return ret;
+>  	}
+>  
+> -	if ((wdt->config & AT91_WDT_WDFIEN) && irq) {
+> +	if ((wdt->mr & AT91_WDT_WDFIEN) && irq) {
+>  		ret = devm_request_irq(&pdev->dev, irq, sama5d4_wdt_irq_handler,
+>  				       IRQF_SHARED | IRQF_IRQPOLL |
+>  				       IRQF_NO_SUSPEND, pdev->name, pdev);
+> -- 
+> 2.11.0
+> 
 > --
-> Jazz is not dead. It just smells funny.
->
+> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
