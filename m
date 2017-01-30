@@ -1,33 +1,45 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Mon, 30 Jan 2017 09:51:46 -0700
-Subject: [PATCH] PCI: mvebu: Handle changes to the bridge windows while
- enabled
-In-Reply-To: <20170130154136.GR20550@bhelgaas-glaptop.roam.corp.google.com>
-References: <20161212183020.GA30274@obsidianresearch.com>
- <20170130154136.GR20550@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20170130165146.GA29502@obsidianresearch.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Mon, 30 Jan 2017 10:51:52 -0600
+Subject: [PATCH 1/2] dt-bindings: Document the VC4 DSI module nodes.
+In-Reply-To: <87ziibaota.fsf@eliezer.anholt.net>
+References: <20170124003853.16418-1-eric@anholt.net>
+ <20170124003853.16418-2-eric@anholt.net>
+ <CAL_JsqJ=VQSUO5MeHJSCB=_SnmOnA7G1=GhmWYKhjm-47kYV-w@mail.gmail.com>
+ <87ziibaota.fsf@eliezer.anholt.net>
+Message-ID: <CAL_JsqJSXEjVPHx-2R69qmg1vrjT66MiYwnpD4Ki6gfqNYcTrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2017 at 09:41:36AM -0600, Bjorn Helgaas wrote:
-> On Mon, Dec 12, 2016 at 11:30:20AM -0700, Jason Gunthorpe wrote:
-> > The PCI core will write to the bridge window config multiple times
-> > while they are enabled. This can lead to mbus failures like:
-> > 
-> >  mvebu_mbus: cannot add window '4:e8', conflicts with another window
-> >  mvebu-pcie mbus:pex at e0000000: Could not create MBus window at [mem 0xe0000000-0xe00fffff]: -22
-> > 
-> > For me this is happening during a hotplug cycle. The PCI core is
-> > not changing the values, just writing them twice while active.
-> > 
-> > The patch addresses the general case of any change to an active window,
-> > but not atomically. The code is slightly refactored so io and mem
-> > can share more of the window logic.
-> > 
-> > Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> 
-> Applied with Jason C's ack to pci/host-mvebu for v4.11, thanks!
+On Fri, Jan 27, 2017 at 8:41 PM, Eric Anholt <eric@anholt.net> wrote:
+> Rob Herring <robh+dt@kernel.org> writes:
+>
+>> Need to cc DT list if you want it in my queue.
+>>
+>> On Mon, Jan 23, 2017 at 6:38 PM, Eric Anholt <eric@anholt.net> wrote:
+>>> These are part of the vc4 display pipeline.
+>>>
+>>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>>> ---
+>>>  .../devicetree/bindings/display/brcm,bcm-vc4.txt   | 35 ++++++++++++++++++++++
+>>>  1 file changed, 35 insertions(+)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt b/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
+>>> index e2768703ac2b..34c7fddcea39 100644
+>>> --- a/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
+>>> +++ b/Documentation/devicetree/bindings/display/brcm,bcm-vc4.txt
+>>> @@ -56,6 +56,18 @@ Required properties for V3D:
+>>>  - interrupts:  The interrupt number
+>>>                   See bindings/interrupt-controller/brcm,bcm2835-armctrl-ic.txt
+>>>
+>>> +Required properties for DSI:
+>>> +- compatible:  Should be "brcm,bcm2835-dsi0" or "brcm,bcm2835-dsi1"
+>>
+>> Are the blocks different?
+>
+> They are from the same lineage, but very different (old dsi0 is 1 lane,
+> dsi1 is 4 lanes).  You can see how much the registers move around and
+> change in the dsi->port conditional blocks in the driver code.
 
-Thank you for keeping on top of this Bjorn!
+Okay, can you add a note here with this detail. With that,
 
-Jason
+Acked-by: Rob Herring <robh@kernel.org>
