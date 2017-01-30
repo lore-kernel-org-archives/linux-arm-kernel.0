@@ -1,60 +1,71 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 30 Jan 2017 10:56:27 +0000
-Subject: [PATCH v4 2/4] arm64: Work around Falkor erratum 1003
-In-Reply-To: <e3343971-9e21-3462-f07b-569b496ab8ad@codeaurora.org>
-References: <20170125155232.10277-1-cov@codeaurora.org>
- <20170125155232.10277-2-cov@codeaurora.org>
- <20170127143848.GA25899@leverpostej>
- <e3343971-9e21-3462-f07b-569b496ab8ad@codeaurora.org>
-Message-ID: <20170130105627.GA1160@leverpostej>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 30 Jan 2017 12:04:28 +0100
+Subject: [PATCH v5 3/8] ARM: dts: rockchip: add timer entries to rk3188 SoC
+In-Reply-To: <1485260203-14216-4-git-send-email-al.kochet@gmail.com>
+References: <1485260203-14216-1-git-send-email-al.kochet@gmail.com>
+ <1485260203-14216-4-git-send-email-al.kochet@gmail.com>
+Message-ID: <20170130110428.GC2206@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Jan 27, 2017 at 04:52:23PM -0500, Christopher Covington wrote:
-> On 01/27/2017 09:38 AM, Mark Rutland wrote:
-> > On Wed, Jan 25, 2017 at 10:52:30AM -0500, Christopher Covington wrote:
-
-> >> Replacing the above sequence with the one below will ensure that no TLB
-> >> entries with an incorrect ASID are used by software.
-> >>
-> >>   write reserved value to TTBRx_EL1[ASID]
-> >>   ISB
-> >>   write new value to TTBRx_EL1[BADDR]
-> >>   ISB
-> >>   write new value to TTBRx_EL1[ASID]
-> >>   ISB
-> >>
-> >> When the above sequence is used, page table entries using the new BADDR
-> >> value may still be incorrectly allocated into the TLB using the reserved
-> >> ASID. Yet this will not reduce functionality, since TLB entries incorrectly
-> >> tagged with the reserved ASID will never be hit by a later instruction.
-> > 
-> > I agree that there should be no explicit accesses to the VAs for these
-> > entries. So tasks should not see erroneous VAs, and we shouldn't see
-> > synchronous TLB conflict aborts.
-> > 
-> > Regardless, can this allow conflicting TLB entries to be allocated to
-> > the reserved ASID? e.g. if one task has a 4K mapping at a given VA, and
-> > another has a 2M mapping which covers that VA, can both be allocated
-> > into the TLBs under the reserved ASID?
-> > 
-> > Can that have any effect on asynchronous TLB lookups or page table
-> > walks, e.g. for speculated accesses?
+On Tue, Jan 24, 2017 at 03:16:38PM +0300, Alexander Kochetkov wrote:
+> The patch add two timers to all rk3188 based boards.
 > 
-> A speculative access that inserts an entry into the TLB could
-> possibly find the conflict but will not signal it. Does that answer
-> your question?
+> The first timer is from alive subsystem and it act as a backup
+> for the local timers at sleep time. It act the same as other
+> SoC rockchip timers already present in kernel.
 
-Yes!
+It is up to the RTC to wake up the system from suspend and there is no
+idle state stopping the local timers on these SoCs. So, the rockchip timers
+won't be ever used on the rk3188, right ?
+ 
+> The second timer is from CPU subsystem and act as replacement
+> for the arm-global-timer clocksource and sched clock. It run
+> at stable frequency 24MHz.
 
-The other case I was worried about was intermediate caching. I take it
-the values in TLBs are not used as part of subsequent page table walks?
+This patch should go after the rockchip timer patches.
 
-If so, the above sounds fine to me.
+> Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
+> Reviwed-by: Heiko St?bner <heiko@sntech.de>
+> ---
+>  arch/arm/boot/dts/rk3188.dtsi |   16 ++++++++++++++++
+>  1 file changed, 16 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
+> index 869e189..bcf8e03 100644
+> --- a/arch/arm/boot/dts/rk3188.dtsi
+> +++ b/arch/arm/boot/dts/rk3188.dtsi
+> @@ -106,6 +106,22 @@
+>  		};
+>  	};
+>  
+> +	timer3: timer at 2000e000 {
+> +		compatible = "rockchip,rk3188-timer", "rockchip,rk3288-timer";
+> +		reg = <0x2000e000 0x20>;
+> +		interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&cru SCLK_TIMER3>, <&cru PCLK_TIMER3>;
+> +		clock-names = "timer", "pclk";
+> +	};
+> +
+> +	timer6: timer at 200380a0 {
+> +		compatible = "rockchip,rk3188-timer", "rockchip,rk3288-timer";
+> +		reg = <0x200380a0 0x20>;
+> +		interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&cru SCLK_TIMER6>, <&cru PCLK_TIMER0>;
+> +		clock-names = "timer", "pclk";
+> +	};
+> +
+>  	i2s0: i2s at 1011a000 {
+>  		compatible = "rockchip,rk3188-i2s", "rockchip,rk3066-i2s";
+>  		reg = <0x1011a000 0x2000>;
+> -- 
+> 1.7.9.5
+> 
 
-Otherwise, we'll need additional TLB maintenance.
+-- 
 
-Thanks,
-Mark.
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
