@@ -1,164 +1,113 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 30 Jan 2017 13:38:24 +0100
-Subject: [PATCH v3 3/7] pinctrl: samsung: Add support for pad retention control
- for Exynos5433 SoCs
+Date: Mon, 30 Jan 2017 13:38:25 +0100
+Subject: [PATCH v3 4/7] mfd: exynos-lpass: Remove pad retention control
 In-Reply-To: <1485779908-32147-1-git-send-email-m.szyprowski@samsung.com>
 References: <1485779908-32147-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170130123838eucas1p1fdae7ffe2af981607ec389f27c46f689@eucas1p1.samsung.com>
-Message-ID: <1485779908-32147-4-git-send-email-m.szyprowski@samsung.com>
+ <CGME20170130123839eucas1p156e10c543d4daf6675fa3e326a724cc2@eucas1p1.samsung.com>
+Message-ID: <1485779908-32147-5-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for retention control for Exynos5433 SoCs. Three
-groups of pins has been defined for retention control: common shared group
-for ALIVE, CPIF, eSE, FINGER, IMEM, NFC, PERIC, TOUCH pin banks and
-separate control for FSYS and AUD pin banks, for which PMU retention
-registers match whole banks.
+Pad retention should be controlled from pin control driver, so remove it
+from Exynos LPASS driver. After this change, no more access to PMU regmap
+is needed, so remove also the code for handling PMU regmap.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
- drivers/pinctrl/samsung/pinctrl-exynos.c | 58 ++++++++++++++++++++++++++++++++
- 1 file changed, 58 insertions(+)
+ .../bindings/mfd/samsung,exynos5433-lpass.txt           |  2 --
+ drivers/mfd/exynos-lpass.c                              | 17 -----------------
+ include/linux/mfd/syscon/exynos5-pmu.h                  |  3 ---
+ 3 files changed, 22 deletions(-)
 
-diff --git a/drivers/pinctrl/samsung/pinctrl-exynos.c b/drivers/pinctrl/samsung/pinctrl-exynos.c
-index fa3802970570..7b0e6cc35e04 100644
---- a/drivers/pinctrl/samsung/pinctrl-exynos.c
-+++ b/drivers/pinctrl/samsung/pinctrl-exynos.c
-@@ -1551,6 +1551,54 @@ static void exynos_retention_disable(struct samsung_pinctrl_drv_data *drvdata)
- 	EXYNOS5433_PIN_BANK_EINTG(3, 0x000, "gpj1", 0x00),
- };
+diff --git a/Documentation/devicetree/bindings/mfd/samsung,exynos5433-lpass.txt b/Documentation/devicetree/bindings/mfd/samsung,exynos5433-lpass.txt
+index c110e118b79f..a8deaee82c44 100644
+--- a/Documentation/devicetree/bindings/mfd/samsung,exynos5433-lpass.txt
++++ b/Documentation/devicetree/bindings/mfd/samsung,exynos5433-lpass.txt
+@@ -5,7 +5,6 @@ Required properties:
+  - compatible		: "samsung,exynos5433-lpass"
+  - reg			: should contain the LPASS top SFR region location
+ 			  and size
+- - samsung,pmu-syscon	: the phandle to the Power Management Unit node
+  - #address-cells	: should be 1
+  - #size-cells		: should be 1
+  - ranges		: must be present
+@@ -25,7 +24,6 @@ Example:
+ audio-subsystem {
+ 	compatible = "samsung,exynos5433-lpass";
+ 	reg = <0x11400000 0x100>, <0x11500000 0x08>;
+-	samsung,pmu-syscon = <&pmu_system_controller>;
+ 	#address-cells = <1>;
+ 	#size-cells = <1>;
+ 	ranges;
+diff --git a/drivers/mfd/exynos-lpass.c b/drivers/mfd/exynos-lpass.c
+index 2e064fb8826f..17915daa2e80 100644
+--- a/drivers/mfd/exynos-lpass.c
++++ b/drivers/mfd/exynos-lpass.c
+@@ -18,7 +18,6 @@
+ #include <linux/io.h>
+ #include <linux/module.h>
+ #include <linux/mfd/syscon.h>
+-#include <linux/mfd/syscon/exynos5-pmu.h>
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
+@@ -51,8 +50,6 @@
+ #define  LPASS_INTR_SFR			BIT(0)
  
-+/* PMU pin retention groups registers for Exynos5433 (without audio & fsys) */
-+static const u32 exynos5433_retention_regs[] = {
-+	EXYNOS5433_PAD_RETENTION_TOP_OPTION,
-+	EXYNOS5433_PAD_RETENTION_UART_OPTION,
-+	EXYNOS5433_PAD_RETENTION_EBIA_OPTION,
-+	EXYNOS5433_PAD_RETENTION_EBIB_OPTION,
-+	EXYNOS5433_PAD_RETENTION_SPI_OPTION,
-+	EXYNOS5433_PAD_RETENTION_MIF_OPTION,
-+	EXYNOS5433_PAD_RETENTION_USBXTI_OPTION,
-+	EXYNOS5433_PAD_RETENTION_BOOTLDO_OPTION,
-+	EXYNOS5433_PAD_RETENTION_UFS_OPTION,
-+	EXYNOS5433_PAD_RETENTION_FSYSGENIO_OPTION,
-+};
-+
-+static const struct samsung_retention_data exynos5433_retention_data __initconst = {
-+	.regs	 = exynos5433_retention_regs,
-+	.nr_regs = ARRAY_SIZE(exynos5433_retention_regs),
-+	.value	 = EXYNOS_WAKEUP_FROM_LOWPWR,
-+	.refcnt	 = &exynos_shared_retention_refcnt,
-+	.init	 = exynos_retention_init,
-+};
-+
-+/* PMU retention control for audio pins can be tied to audio pin bank */
-+static const u32 exynos5433_audio_retention_regs[] = {
-+	EXYNOS5433_PAD_RETENTION_AUD_OPTION,
-+};
-+
-+static const struct samsung_retention_data exynos5433_audio_retention_data __initconst = {
-+	.regs	 = exynos5433_audio_retention_regs,
-+	.nr_regs = ARRAY_SIZE(exynos5433_audio_retention_regs),
-+	.value	 = EXYNOS_WAKEUP_FROM_LOWPWR,
-+	.init	 = exynos_retention_init,
-+};
-+
-+/* PMU retention control for mmc pins can be tied to fsys pin bank */
-+static const u32 exynos5433_fsys_retention_regs[] = {
-+	EXYNOS5433_PAD_RETENTION_MMC0_OPTION,
-+	EXYNOS5433_PAD_RETENTION_MMC1_OPTION,
-+	EXYNOS5433_PAD_RETENTION_MMC2_OPTION,
-+};
-+
-+static const struct samsung_retention_data exynos5433_fsys_retention_data __initconst = {
-+	.regs	 = exynos5433_fsys_retention_regs,
-+	.nr_regs = ARRAY_SIZE(exynos5433_fsys_retention_regs),
-+	.value	 = EXYNOS_WAKEUP_FROM_LOWPWR,
-+	.init	 = exynos_retention_init,
-+};
-+
- /*
-  * Samsung pinctrl driver data for Exynos5433 SoC. Exynos5433 SoC includes
-  * ten gpio/pin-mux/pinconfig controllers.
-@@ -1564,6 +1612,7 @@ static void exynos_retention_disable(struct samsung_pinctrl_drv_data *drvdata)
- 		.suspend	= exynos_pinctrl_suspend,
- 		.resume		= exynos_pinctrl_resume,
- 		.nr_ext_resources = 1,
-+		.retention_data	= &exynos5433_retention_data,
- 	}, {
- 		/* pin-controller instance 1 data */
- 		.pin_banks	= exynos5433_pin_banks1,
-@@ -1571,6 +1620,7 @@ static void exynos_retention_disable(struct samsung_pinctrl_drv_data *drvdata)
- 		.eint_gpio_init = exynos_eint_gpio_init,
- 		.suspend	= exynos_pinctrl_suspend,
- 		.resume		= exynos_pinctrl_resume,
-+		.retention_data	= &exynos5433_audio_retention_data,
- 	}, {
- 		/* pin-controller instance 2 data */
- 		.pin_banks	= exynos5433_pin_banks2,
-@@ -1578,6 +1628,7 @@ static void exynos_retention_disable(struct samsung_pinctrl_drv_data *drvdata)
- 		.eint_gpio_init = exynos_eint_gpio_init,
- 		.suspend	= exynos_pinctrl_suspend,
- 		.resume		= exynos_pinctrl_resume,
-+		.retention_data	= &exynos5433_retention_data,
- 	}, {
- 		/* pin-controller instance 3 data */
- 		.pin_banks	= exynos5433_pin_banks3,
-@@ -1585,6 +1636,7 @@ static void exynos_retention_disable(struct samsung_pinctrl_drv_data *drvdata)
- 		.eint_gpio_init = exynos_eint_gpio_init,
- 		.suspend	= exynos_pinctrl_suspend,
- 		.resume		= exynos_pinctrl_resume,
-+		.retention_data	= &exynos5433_retention_data,
- 	}, {
- 		/* pin-controller instance 4 data */
- 		.pin_banks	= exynos5433_pin_banks4,
-@@ -1592,6 +1644,7 @@ static void exynos_retention_disable(struct samsung_pinctrl_drv_data *drvdata)
- 		.eint_gpio_init = exynos_eint_gpio_init,
- 		.suspend	= exynos_pinctrl_suspend,
- 		.resume		= exynos_pinctrl_resume,
-+		.retention_data	= &exynos5433_retention_data,
- 	}, {
- 		/* pin-controller instance 5 data */
- 		.pin_banks	= exynos5433_pin_banks5,
-@@ -1599,6 +1652,7 @@ static void exynos_retention_disable(struct samsung_pinctrl_drv_data *drvdata)
- 		.eint_gpio_init = exynos_eint_gpio_init,
- 		.suspend	= exynos_pinctrl_suspend,
- 		.resume		= exynos_pinctrl_resume,
-+		.retention_data	= &exynos5433_fsys_retention_data,
- 	}, {
- 		/* pin-controller instance 6 data */
- 		.pin_banks	= exynos5433_pin_banks6,
-@@ -1606,6 +1660,7 @@ static void exynos_retention_disable(struct samsung_pinctrl_drv_data *drvdata)
- 		.eint_gpio_init = exynos_eint_gpio_init,
- 		.suspend	= exynos_pinctrl_suspend,
- 		.resume		= exynos_pinctrl_resume,
-+		.retention_data	= &exynos5433_retention_data,
- 	}, {
- 		/* pin-controller instance 7 data */
- 		.pin_banks	= exynos5433_pin_banks7,
-@@ -1613,6 +1668,7 @@ static void exynos_retention_disable(struct samsung_pinctrl_drv_data *drvdata)
- 		.eint_gpio_init = exynos_eint_gpio_init,
- 		.suspend	= exynos_pinctrl_suspend,
- 		.resume		= exynos_pinctrl_resume,
-+		.retention_data	= &exynos5433_retention_data,
- 	}, {
- 		/* pin-controller instance 8 data */
- 		.pin_banks	= exynos5433_pin_banks8,
-@@ -1620,6 +1676,7 @@ static void exynos_retention_disable(struct samsung_pinctrl_drv_data *drvdata)
- 		.eint_gpio_init = exynos_eint_gpio_init,
- 		.suspend	= exynos_pinctrl_suspend,
- 		.resume		= exynos_pinctrl_resume,
-+		.retention_data	= &exynos5433_retention_data,
- 	}, {
- 		/* pin-controller instance 9 data */
- 		.pin_banks	= exynos5433_pin_banks9,
-@@ -1627,6 +1684,7 @@ static void exynos_retention_disable(struct samsung_pinctrl_drv_data *drvdata)
- 		.eint_gpio_init = exynos_eint_gpio_init,
- 		.suspend	= exynos_pinctrl_suspend,
- 		.resume		= exynos_pinctrl_resume,
-+		.retention_data	= &exynos5433_retention_data,
- 	},
+ struct exynos_lpass {
+-	/* pointer to the Power Management Unit regmap */
+-	struct regmap *pmu;
+ 	/* pointer to the LPASS TOP regmap */
+ 	struct regmap *top;
  };
+@@ -81,10 +78,6 @@ static void exynos_lpass_enable(struct exynos_lpass *lpass)
+ 	regmap_write(lpass->top, SFR_LPASS_INTR_CPU_MASK,
+ 		     LPASS_INTR_SFR | LPASS_INTR_DMA | LPASS_INTR_I2S);
  
+-	/* Activate related PADs from retention state */
+-	regmap_write(lpass->pmu, EXYNOS5433_PAD_RETENTION_AUD_OPTION,
+-		     EXYNOS5433_PAD_INITIATE_WAKEUP_FROM_LOWPWR);
+-
+ 	exynos_lpass_core_sw_reset(lpass, LPASS_I2S_SW_RESET);
+ 	exynos_lpass_core_sw_reset(lpass, LPASS_DMA_SW_RESET);
+ 	exynos_lpass_core_sw_reset(lpass, LPASS_MEM_SW_RESET);
+@@ -95,9 +88,6 @@ static void exynos_lpass_disable(struct exynos_lpass *lpass)
+ 	/* Mask any unmasked IP interrupt sources */
+ 	regmap_write(lpass->top, SFR_LPASS_INTR_CPU_MASK, 0);
+ 	regmap_write(lpass->top, SFR_LPASS_INTR_CA5_MASK, 0);
+-
+-	/* Deactivate related PADs from retention state */
+-	regmap_write(lpass->pmu, EXYNOS5433_PAD_RETENTION_AUD_OPTION, 0);
+ }
+ 
+ static const struct regmap_config exynos_lpass_reg_conf = {
+@@ -131,13 +121,6 @@ static int exynos_lpass_probe(struct platform_device *pdev)
+ 		return PTR_ERR(lpass->top);
+ 	}
+ 
+-	lpass->pmu = syscon_regmap_lookup_by_phandle(dev->of_node,
+-						"samsung,pmu-syscon");
+-	if (IS_ERR(lpass->pmu)) {
+-		dev_err(dev, "Failed to lookup PMU regmap\n");
+-		return PTR_ERR(lpass->pmu);
+-	}
+-
+ 	platform_set_drvdata(pdev, lpass);
+ 	exynos_lpass_enable(lpass);
+ 
+diff --git a/include/linux/mfd/syscon/exynos5-pmu.h b/include/linux/mfd/syscon/exynos5-pmu.h
+index c28ff21ca4d2..0622ae86f9db 100644
+--- a/include/linux/mfd/syscon/exynos5-pmu.h
++++ b/include/linux/mfd/syscon/exynos5-pmu.h
+@@ -46,7 +46,4 @@
+ #define EXYNOS5_MIPI_PHY_S_RESETN		BIT(1)
+ #define EXYNOS5_MIPI_PHY_M_RESETN		BIT(2)
+ 
+-#define EXYNOS5433_PAD_RETENTION_AUD_OPTION		(0x3028)
+-#define EXYNOS5433_PAD_INITIATE_WAKEUP_FROM_LOWPWR	BIT(28)
+-
+ #endif /* _LINUX_MFD_SYSCON_PMU_EXYNOS5_H_ */
 -- 
 1.9.1
