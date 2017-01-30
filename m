@@ -1,92 +1,83 @@
-From: nwatters@codeaurora.org (Nate Watterson)
-Date: Mon, 30 Jan 2017 09:54:46 -0500
-Subject: [PATCH V7 08/11] drivers: acpi: Handle IOMMU lookup failure with
- deferred probing or error
-In-Reply-To: <20170130143851.GJ16461@arm.com>
-References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
- <1485188293-20263-9-git-send-email-sricharan@codeaurora.org>
- <20170124123711.GA11996@red-moon>
- <f2370671-ece8-fbee-de19-350dd625088f@codeaurora.org>
- <93e79759-d614-9b36-d5ab-63e8eb725009@arm.com>
- <14751205-f034-7f0d-442a-854c3909425c@codeaurora.org>
- <5ba9f366d6e25397cdef8ad95b49e199@codeaurora.org>
- <175a3798-b824-ef1a-e112-9f6f472973ae@codeaurora.org>
- <20170130143851.GJ16461@arm.com>
-Message-ID: <b2e50c17de156341deab9fb8e91a8dec@codeaurora.org>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Mon, 30 Jan 2017 15:55:02 +0100
+Subject: [PATCH 0/8] Add STM32F469 pinctrl and fix issues in STM32 pinctrl
+In-Reply-To: <1485533721-9019-1-git-send-email-alexandre.torgue@st.com>
+References: <1485533721-9019-1-git-send-email-alexandre.torgue@st.com>
+Message-ID: <0df054a3-a0bf-7691-4546-4710bc8f32ce@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-01-30 09:38, Will Deacon wrote:
-> On Mon, Jan 30, 2017 at 09:33:50AM -0500, Sinan Kaya wrote:
->> On 1/30/2017 9:23 AM, Nate Watterson wrote:
->> > On 2017-01-30 08:59, Sinan Kaya wrote:
->> >> On 1/30/2017 7:22 AM, Robin Murphy wrote:
->> >>> On 29/01/17 17:53, Sinan Kaya wrote:
->> >>>> On 1/24/2017 7:37 AM, Lorenzo Pieralisi wrote:
->> >>>>> [+hanjun, tomasz, sinan]
->> >>>>>
->> >>>>> It is quite a key patchset, I would be glad if they can test on their
->> >>>>> respective platforms with IORT.
->> >>>>>
->> >>>>
->> >>>> Tested on top of 4.10-rc5.
->> >>>>
->> >>>> 1.    Platform Hidma device passed dmatest
->> >>>> 2.    Seeing some USB stalls on a platform USB device.
->> >>>> 3.    PCIe NVME drive probed and worked fine with MSI interrupts after boot.
->> >>>> 4.     NVMe driver didn't probe following a hotplug insertion and received an
->> >>>> SMMU error event during the insertion.
->> >>>
->> >>> What was the SMMU error - a translation/permission fault (implying the
->> >>> wrong DMA ops) or a bad STE fault (implying we totally failed to tell
->> >>> the SMMU about the device at all)?
->> >>>
->> >>
->> >> root at ubuntu:/sys/bus/pci/slots/4# echo 0 > power
->> >>
->> >> [__204.698522]_iommu:_Removing_device_0003:01:00.0_from_group_0
->> >> [  204.708704] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down
->> >> [  204.708723] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down event
->> >> ignored; already powering off
->> >>
->> >> root at ubuntu:/sys/bus/pci/slots/4#
->> >>
->> >> [__254.820440]_iommu:_Adding_device_0003:01:00.0_to_group_8
->> >> [  254.820599] nvme nvme0: pci function 0003:01:00.0
->> >> [  254.820621] nvme 0003:01:00.0: enabling device (0000 -> 0002)
->> >> [  261.948558] arm-smmu-v3 arm-smmu-v3.0.auto: event 0x0a received:
->> >> [  261.948561] arm-smmu-v3 arm-smmu-v3.0.auto:  0x000001000000000a
->> >> [  261.948563] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
->> >> [  261.948564] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
->> >> [  261.948566] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
->> 
->> > Looks like C_BAD_CD. Can you please try with:
->> > iommu/arm-smmu-v3: Clear prior settings when updating STEs
->> 
->> This resolved the issue. Can we pull Nate's patch to 4.10 so that I 
->> don't see
->> this issue again.
-> 
-> I already sent the pull request to Joerg for 4.11. Do you see this 
-> problem
-> without Sricharan's patches (i.e. vanilla mainline)? If so, we'll need 
-> to
-> send the patch to stable after -rc1.
-Using vanilla mainline, I see it most commonly when directly assigning
-a device to a guest machine. I think I've also seen it after removing 
-then
-re-adding a PCI device. Basically anytime an STE's CTX pointer is 
-changed
-from a non-NULL value and STE[CFG] indicates translation will be 
-performed.
+Hi,
 
-Nate
-> 
-> Will
+On 01/27/2017 05:15 PM, Alexandre TORGUE wrote:
+> This series adds support of a dedicated driver for STM32F469 MCU pinctroller.
+> This add generates some changes inside STM32 pinctrl driver and inside STM32
+> device tree.
+>
+> Changes in STM32 pinctrl driver:
+> -------------------------------
+> 	
+> 	- Add STM32F469 driver.
+> 	
+> 	- Change STM32 pinctrl core in order to use "gpio-ranges" devicetree definitions.
+> 	  Indeed, on STM32F469 there an hole in BANK J. We need to declare a gpio-ranges
+> 	  in gpioj controller node to handle this hole.
+>
+> Changes in STM32 device tree:
+> ----------------------------
+> I propose a new architecture (a new file split) for pinmux definition:
+> 	
+> 	- Create a common stm32f4-pinctrl.dtsi for pinmuxing definitions
+> 	  which are common between STM32F429 and STM32F469 MCU.
+> 	
+> 	- Create dedicated stm32fxxx-pinctrl.dtsi file for each MCU
+> 	  (stm32f429-pinctrl.dtsi and stm32f469-pinctrl.dtsi) each one will
+> 	  include stm32f4-pinctrl.dtsi. All differences (pinmuxing or GPIO
+> 	  bank holes) will be put inside the dedicated files.
+>
+> This series fix a locking issue when a gpio is used as IRQ.
+>
+> Regards
+> Alex
+>
+> Alexandre TORGUE (8):
+>   pinctrl: stm32: fix bad location of gpiochip_lock_as_irq
+>   pinctrl: stm32: use gpio-ranges to declare bank range
 
--- 
-Qualcomm Datacenter Technologies, Inc. on behalf of Qualcomm 
-Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
-Linux
-Foundation Collaborative Project.
+I just see typo issue in patch 1&2. I will send a V2 when more review 
+will be done.
+
+Regards
+Alex
+
+
+>   Documentation: dt: Add bindings for STM32 pinctrl
+>   includes: dt-bindings: Rename STM32F429 pinctrl DT bindings
+>   pinctrl: stm32: Add STM32F469 MCU support
+>   Documentation: dt: Add new compatible to STM32 pinctrl driver bindings
+>   ARM: Kconfig: Introduce MACH_STM32F469 flag
+>   ARM: dts: stm32: create dedicated files for pinctrl definitions
+>
+>  .../bindings/pinctrl/st,stm32-pinctrl.txt          |   57 +-
+>  arch/arm/Kconfig                                   |    5 +
+>  arch/arm/boot/dts/stm32429i-eval.dts               |    1 +
+>  arch/arm/boot/dts/stm32f4-pinctrl.dtsi             |  196 +++
+>  arch/arm/boot/dts/stm32f429-disco.dts              |    1 +
+>  arch/arm/boot/dts/stm32f429-pinctrl.dtsi           |  106 ++
+>  arch/arm/boot/dts/stm32f429.dtsi                   |  153 --
+>  arch/arm/boot/dts/stm32f469-disco.dts              |    1 +
+>  arch/arm/boot/dts/stm32f469-pinctrl.dtsi           |  107 ++
+>  drivers/pinctrl/stm32/Kconfig                      |    6 +
+>  drivers/pinctrl/stm32/Makefile                     |    1 +
+>  drivers/pinctrl/stm32/pinctrl-stm32.c              |  129 +-
+>  drivers/pinctrl/stm32/pinctrl-stm32f469.c          | 1574 ++++++++++++++++++++
+>  include/dt-bindings/pinctrl/stm32f4-pinfunc.h      | 1302 ++++++++++++++++
+>  include/dt-bindings/pinctrl/stm32f429-pinfunc.h    | 1239 ---------------
+>  15 files changed, 3414 insertions(+), 1464 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/stm32f4-pinctrl.dtsi
+>  create mode 100644 arch/arm/boot/dts/stm32f429-pinctrl.dtsi
+>  create mode 100644 arch/arm/boot/dts/stm32f469-pinctrl.dtsi
+>  create mode 100644 drivers/pinctrl/stm32/pinctrl-stm32f469.c
+>  create mode 100644 include/dt-bindings/pinctrl/stm32f4-pinfunc.h
+>  delete mode 100644 include/dt-bindings/pinctrl/stm32f429-pinfunc.h
+>
