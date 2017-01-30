@@ -1,45 +1,62 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Mon, 30 Jan 2017 05:57:23 +0000
-Subject: [PATCH v2 2/2] PCI: Xilinx NWL: Fix, proc interrupts for legacy
- virtual irq shown as edge
-In-Reply-To: <0833bdec-b05e-57c0-c740-ac7735036450@arm.com>
-References: <1485334353-26815-1-git-send-email-bharatku@xilinx.com>
- <1485334353-26815-2-git-send-email-bharatku@xilinx.com>
- <0833bdec-b05e-57c0-c740-ac7735036450@arm.com>
-Message-ID: <8520D5D51A55D047800579B094147198263DC9BE@XAP-PVEXMBX02.xlnx.xilinx.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 30 Jan 2017 07:54:21 +0100
+Subject: [GIT PULL 4/4] arm64: tegra: Device tree changes for v4.11-rc1
+In-Reply-To: <20170130050017.GH18943@localhost>
+References: <20170127092121.21570-1-thierry.reding@gmail.com>
+ <20170127092121.21570-4-thierry.reding@gmail.com>
+ <20170130050017.GH18943@localhost>
+Message-ID: <20170130065421.GC3585@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, Jan 29, 2017 at 09:00:17PM -0800, Olof Johansson wrote:
+> On Fri, Jan 27, 2017 at 10:21:21AM +0100, Thierry Reding wrote:
+> > Hi ARM SoC maintainers,
+> > 
+> > The following changes since commit 0c744ea4f77d72b3dcebb7a8f2684633ec79be88:
+> > 
+> >   Linux 4.10-rc2 (2017-01-01 14:31:53 -0800)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.11-arm64-dt
+> > 
+> > for you to fetch changes up to 7bcf266462da736ae4b42d5c73cd5dc0da540772:
+> > 
+> >   arm64: tegra: Use symbolic reset identifiers (2017-01-27 10:13:24 +0100)
+> > 
+> > Thanks,
+> > Thierry
+> > 
+> > ----------------------------------------------------------------
+> > arm64: tegra: Device tree changes for v4.11-rc1
+> > 
+> > This contains three patches that reintroduce symbolic identifiers for
+> > clocks, resets and mailboxes. These had been converted to literals in
+> > the v4.10 release to avoid complicated dependencies between branches.
+> > 
+> > ----------------------------------------------------------------
+> > Thierry Reding (3):
+> >       arm64: tegra: Use symbolic HSP identifiers
+> >       arm64: tegra: Use symbolic clock identifiers
+> >       arm64: tegra: Use symbolic reset identifiers
+> > 
+> >  arch/arm64/boot/dts/nvidia/tegra186.dtsi | 86 +++++++++++++++++---------------
+> >  1 file changed, 45 insertions(+), 41 deletions(-)
 > 
-> On 25/01/17 08:52, Bharat Kumar Gogada wrote:
-> > - Legacy interrupts are level triggered, virtual irq line of End Point
-> > shows as edge in /proc/interrupts.
-> > - Setting irq flags of virtual irq line of EP to level triggered at
-> > the time of mapping.
-> >
-> > Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-> > ---
-> >  drivers/pci/host/pcie-xilinx-nwl.c | 1 +
-> >  1 file changed, 1 insertion(+)
-> >
-> > diff --git a/drivers/pci/host/pcie-xilinx-nwl.c
-> > b/drivers/pci/host/pcie-xilinx-nwl.c
-> > index 6ac3e1d..1cddd1f 100644
-> > --- a/drivers/pci/host/pcie-xilinx-nwl.c
-> > +++ b/drivers/pci/host/pcie-xilinx-nwl.c
-> > @@ -434,6 +434,7 @@ static int nwl_legacy_map(struct irq_domain
-> > *domain, unsigned int irq,  {
-> >  	irq_set_chip_and_handler(irq, &nwl_leg_irq_chip, handle_level_irq);
-> >  	irq_set_chip_data(irq, domain->host_data);
-> > +	irq_set_status_flags(irq, IRQ_LEVEL);
-> >
-> >  	return 0;
-> >  }
-> >
+> Merged, thanks!
 > 
-> As said in my previous review [1], this should be folded in the previous patch, as
-> it doesn't make much sense on its own.
-> 
-Agreed, will send in same previous patch. 
+> No more t186 material than this for 4.11, though? :(
 
-bharat
+Unfortunately not. After the holidays I was preoccupied with some
+regressions and Tegra186 didn't see the amount of progress I had hoped.
+There's more planned for v4.12, though.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170130/fabb43bb/attachment.sig>
