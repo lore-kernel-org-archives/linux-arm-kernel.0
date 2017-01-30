@@ -1,63 +1,61 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Mon, 30 Jan 2017 12:56:04 -0500
-Subject: [PATCH v3 05/24] drm/rockchip: dw-mipi-dsi: fix generic packet
- status check
-In-Reply-To: <20170129132444.25251-6-john@metanate.com>
-References: <20170129132444.25251-1-john@metanate.com>
- <20170129132444.25251-6-john@metanate.com>
-Message-ID: <20170130175604.GF20076@art_vandelay>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 30 Jan 2017 19:57:20 +0200
+Subject: [GIT PULL 4/4] arm64: dts: exynos: for v4.11, 2nd round
+In-Reply-To: <20170130052329.GZ18943@localhost>
+References: <20170129200630.22083-1-krzk@kernel.org>
+ <20170129200630.22083-4-krzk@kernel.org>
+ <20170130052329.GZ18943@localhost>
+Message-ID: <20170130175720.nfmhet6mkajq3vho@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 29, 2017 at 01:24:25PM +0000, John Keeping wrote:
-> We want to check that both the GEN_CMD_EMPTY and GEN_PLD_W_EMPTY bits
-> are set so we can't just check "val & mask" because that will be true if
-> either bit is set.
+On Sun, Jan 29, 2017 at 09:23:29PM -0800, Olof Johansson wrote:
+> Hi Krzysztof,
 > 
+> On Sun, Jan 29, 2017 at 10:06:29PM +0200, Krzysztof Kozlowski wrote:
+> > Hi,
+> > 
+> > On top of previous pull request.
+> > 
+> > This adds proper clocks to LPASS node on Exynos5433 which is needed
+> > by Marek's patchset:
+> >  - [PATCH v2 0/8] Pad retentions support for Exynos5433
+> >    https://lkml.kernel.org/r/1485419634-28331-1-git-send-email-m.szyprowski () samsung ! com
+> > 
+> > 
+> > Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> > Cc: Lee Jones <lee.jones@linaro.org>
+> > 
+> > Best regards,
+> > Krzysztof
+> > 
+> > 
+> > The following changes since commit e4e381133241a27d732e78be09973b89a193eaf7:
+> > 
+> >   arm64: dts: exynos: Enable HDMI/TV path on Exynos5433-TM2 (2017-01-11 18:20:28 +0200)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt64-4.11-2
+> > 
+> > for you to fetch changes up to 7547162ac351483df3641f64e99e10be329dd6a2:
+> > 
+> >   arm64: dts: exynos: Add clocks to Exynos5433 LPASS module (2017-01-26 22:04:20 +0200)
+> 
+> I think you tagged the wrong branch here. The log message shows the right hash
+> at the tip, but the tag is of 95648b747071d530b5bb983735cfe0ffff1b66bf, which
+> seems to be on your for-next.
+> 
+> Care to respin, so your tag and our merged branch match up?
+>
+Fixed, the same name of tag but this time on proper branch:
+tag name	samsung-dt64-4.11-2
+https://git.kernel.org/cgit/linux/kernel/git/krzk/linux.git/log/?h=next/dt64
 
-Reviewed-by: Sean Paul <seanpaul@chromium.org>
+Sorry for the mess.
 
-> Signed-off-by: John Keeping <john@metanate.com>
-> Reviewed-by: Chris Zhong <zyw@rock-chips.com>
-> ---
-> v3:
-> - Add Chris' Reviewed-by
-> Unchanged in v2
-> 
->  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> index 4cbbbcb619b7..4be1ff3a42bb 100644
-> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> @@ -545,7 +545,7 @@ static int dw_mipi_dsi_host_detach(struct mipi_dsi_host *host,
->  static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
->  {
->  	int ret;
-> -	u32 val;
-> +	u32 val, mask;
->  
->  	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
->  				 val, !(val & GEN_CMD_FULL), 1000,
-> @@ -557,8 +557,9 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
->  
->  	dsi_write(dsi, DSI_GEN_HDR, hdr_val);
->  
-> +	mask = GEN_CMD_EMPTY | GEN_PLD_W_EMPTY;
->  	ret = readx_poll_timeout(readl, dsi->base + DSI_CMD_PKT_STATUS,
-> -				 val, val & (GEN_CMD_EMPTY | GEN_PLD_W_EMPTY),
-> +				 val, (val & mask) == mask,
->  				 1000, CMD_PKT_STATUS_TIMEOUT_US);
->  	if (ret < 0) {
->  		dev_err(dsi->dev, "failed to write command FIFO\n");
-> -- 
-> 2.11.0.197.gb556de5.dirty
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
-
--- 
-Sean Paul, Software Engineer, Google / Chromium OS
+Best regards,
+Krzysztof
