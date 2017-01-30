@@ -1,356 +1,91 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 30 Jan 2017 15:29:37 +0100
-Subject: [PATCH v6 5/5] arm: mvebu: Add device tree for db-dxbc2 and
- db-xc3-24g4xg boards
-In-Reply-To: <20170129232035.25189-6-chris.packham@alliedtelesis.co.nz> (Chris
- Packham's message of "Mon, 30 Jan 2017 12:20:35 +1300")
-References: <20170129232035.25189-1-chris.packham@alliedtelesis.co.nz>
- <20170129232035.25189-6-chris.packham@alliedtelesis.co.nz>
-Message-ID: <87vaswtycu.fsf@free-electrons.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 30 Jan 2017 09:33:50 -0500
+Subject: [PATCH V7 08/11] drivers: acpi: Handle IOMMU lookup failure with
+ deferred probing or error
+In-Reply-To: <5ba9f366d6e25397cdef8ad95b49e199@codeaurora.org>
+References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
+ <1485188293-20263-9-git-send-email-sricharan@codeaurora.org>
+ <20170124123711.GA11996@red-moon>
+ <f2370671-ece8-fbee-de19-350dd625088f@codeaurora.org>
+ <93e79759-d614-9b36-d5ab-63e8eb725009@arm.com>
+ <14751205-f034-7f0d-442a-854c3909425c@codeaurora.org>
+ <5ba9f366d6e25397cdef8ad95b49e199@codeaurora.org>
+Message-ID: <175a3798-b824-ef1a-e112-9f6f472973ae@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
- 
- On lun., janv. 30 2017, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
+On 1/30/2017 9:23 AM, Nate Watterson wrote:
+> On 2017-01-30 08:59, Sinan Kaya wrote:
+>> On 1/30/2017 7:22 AM, Robin Murphy wrote:
+>>> On 29/01/17 17:53, Sinan Kaya wrote:
+>>>> On 1/24/2017 7:37 AM, Lorenzo Pieralisi wrote:
+>>>>> [+hanjun, tomasz, sinan]
+>>>>>
+>>>>> It is quite a key patchset, I would be glad if they can test on their
+>>>>> respective platforms with IORT.
+>>>>>
+>>>>
+>>>> Tested on top of 4.10-rc5.
+>>>>
+>>>> 1.    Platform Hidma device passed dmatest
+>>>> 2.    Seeing some USB stalls on a platform USB device.
+>>>> 3.    PCIe NVME drive probed and worked fine with MSI interrupts after boot.
+>>>> 4.     NVMe driver didn't probe following a hotplug insertion and received an
+>>>> SMMU error event during the insertion.
+>>>
+>>> What was the SMMU error - a translation/permission fault (implying the
+>>> wrong DMA ops) or a bad STE fault (implying we totally failed to tell
+>>> the SMMU about the device at all)?
+>>>
+>>
+>> root at ubuntu:/sys/bus/pci/slots/4# echo 0 > power
+>>
+>> [__204.698522]_iommu:_Removing_device_0003:01:00.0_from_group_0
+>> [  204.708704] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down
+>> [  204.708723] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down event
+>> ignored; already powering off
+>>
+>> root at ubuntu:/sys/bus/pci/slots/4#
+>>
+>> [__254.820440]_iommu:_Adding_device_0003:01:00.0_to_group_8
+>> [  254.820599] nvme nvme0: pci function 0003:01:00.0
+>> [  254.820621] nvme 0003:01:00.0: enabling device (0000 -> 0002)
+>> [  261.948558] arm-smmu-v3 arm-smmu-v3.0.auto: event 0x0a received:
+>> [  261.948561] arm-smmu-v3 arm-smmu-v3.0.auto:  0x000001000000000a
+>> [  261.948563] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
+>> [  261.948564] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
+>> [  261.948566] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
 
-> These boards are Marvell's evaluation boards for the 98DX4251 and
-> 98DX3336 SoCs.
->
-> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
+> Looks like C_BAD_CD. Can you please try with:
+> iommu/arm-smmu-v3: Clear prior settings when updating STEs
 
-Applied on mvebu/dt
+This resolved the issue. Can we pull Nate's patch to 4.10 so that I don't see
+this issue again.
 
-Thanks,
+root at ubuntu:/sys/bus/pci/slots# cd 4
+root at ubuntu:/sys/bus/pci/slots/4# ls
+adapter  address  attention  cur_bus_speed  latch  max_bus_speed  module  power
+root at ubuntu:/sys/bus/pci/slots/4# echo 0 > power
+root at ubuntu:/sys/bus/pci/slots/4# echo 1 > power
+root at ubuntu:/sys/bus/pci/slots/4# dmesg |tail -n 10
+[   44.136028] pci 0003:01:00.0: BAR 0: assigned [mem 0xc0100110000-0xc0100113fff 64bit]
+[   44.136044] pcieport 0003:00:00.0: PCI bridge to [bus 01]
+[   44.136046] pcieport 0003:00:00.0:   bridge window [io  0x10000-0x10fff]
+[   44.136048] pcieport 0003:00:00.0:   bridge window [mem 0xc0100100000-0xc01002fffff]
+[   44.136050] pcieport 0003:00:00.0:   bridge window [mem 0xc0400000000-0xc04001fffff 64bit pref]
+[   44.136059] pcieport 0003:00:00.0: Max Payload Size set to  256/ 512 (was  256), Max Read Rq  512
+[   44.136073] pci 0003:01:00.0: Max Payload Size set to  256/ 256 (was  128), Max Read Rq  512
+[   44.136124] iommu: Adding device 0003:01:00.0 to group 8
+[   44.136275] nvme nvme0: pci function 0003:01:00.0
+[   44.136292] nvme 0003:01:00.0: enabling device (0000 -> 0002)
+root at ubuntu:/sys/bus/pci/slots/4# ls /dev/nvme*
+/dev/nvme0  /dev/nvme0n1
+root at ubuntu:/sys/bus/pci/slots/4#
 
-Gregory
+I'll look at the USB stalls next.
 
-> ---
->
-> Notes:
->     Changes in v5:
->     - update license text
->     - use node labels
->     Changes in v6:
->     - Rename dts files to include 'armada-xp-' prefix
->
->  arch/arm/boot/dts/armada-xp-db-dxbc2.dts      | 151 ++++++++++++++++++++++++++
->  arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts | 142 ++++++++++++++++++++++++
->  2 files changed, 293 insertions(+)
->  create mode 100644 arch/arm/boot/dts/armada-xp-db-dxbc2.dts
->  create mode 100644 arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts
->
-> diff --git a/arch/arm/boot/dts/armada-xp-db-dxbc2.dts b/arch/arm/boot/dts/armada-xp-db-dxbc2.dts
-> new file mode 100644
-> index 000000000000..a8130805074e
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/armada-xp-db-dxbc2.dts
-> @@ -0,0 +1,151 @@
-> +/*
-> + * Device Tree file for DB-DXBC2 board
-> + *
-> + * Copyright (C) 2016 Allied Telesis Labs
-> + *
-> + * Based on armada-xp-db.dts
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + *
-> + * Note: this Device Tree assumes that the bootloader has remapped the
-> + * internal registers to 0xf1000000 (instead of the default
-> + * 0xd0000000). The 0xf1000000 is the default used by the recent,
-> + * DT-capable, U-Boot bootloaders provided by Marvell. Some earlier
-> + * boards were delivered with an older version of the bootloader that
-> + * left internal registers mapped at 0xd0000000. If you are in this
-> + * situation, you should either update your bootloader (preferred
-> + * solution) or the below Device Tree should be adjusted.
-> + */
-> +
-> +/dts-v1/;
-> +#include "armada-xp-98dx4251.dtsi"
-> +
-> +/ {
-> +	model = "Marvell Bobcat2 Evaluation Board";
-> +	compatible = "marvell,db-dxbc2", "marvell,armadaxp-98dx4251", "marvell,armadaxp", "marvell,armada-370-xp";
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200 earlyprintk";
-> +	};
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0 0x00000000 0 0x20000000>; /* 512 MB */
-> +	};
-> +
-> +};
-> +
-> +&devbus_bootcs {
-> +	status = "okay";
-> +
-> +	/* Device Bus parameters are required */
-> +
-> +	/* Read parameters */
-> +	devbus,bus-width    = <16>;
-> +	devbus,turn-off-ps  = <60000>;
-> +	devbus,badr-skew-ps = <0>;
-> +	devbus,acc-first-ps = <124000>;
-> +	devbus,acc-next-ps  = <248000>;
-> +	devbus,rd-setup-ps  = <0>;
-> +	devbus,rd-hold-ps   = <0>;
-> +
-> +	/* Write parameters */
-> +	devbus,sync-enable = <0>;
-> +	devbus,wr-high-ps  = <60000>;
-> +	devbus,wr-low-ps   = <60000>;
-> +	devbus,ale-wr-ps   = <60000>;
-> +};
-> +
-> +&i2c0 {
-> +	clock-frequency = <100000>;
-> +	status = "okay";
-> +};
-> +
-> +&uart0 {
-> +	status = "okay";
-> +};
-> +
-> +&uart1 {
-> +	status = "okay";
-> +};
-> +
-> +&nand {
-> +	status = "okay";
-> +	num-cs = <1>;
-> +	marvell,nand-keep-config;
-> +	marvell,nand-enable-arbiter;
-> +	nand-on-flash-bbt;
-> +	nand-ecc-strength = <4>;
-> +	nand-ecc-step-size = <512>;
-> +};
-> +
-> +&sdio {
-> +	pinctrl-0 = <&sdio_pins>;
-> +	pinctrl-names = "default";
-> +	status = "okay";
-> +	/* No CD or WP GPIOs */
-> +	broken-cd;
-> +};
-> +
-> +&spi0 {
-> +	status = "okay";
-> +
-> +	spi-flash at 0 {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "m25p64";
-> +		reg = <0>; /* Chip select 0 */
-> +		spi-max-frequency = <20000000>;
-> +		m25p,fast-read;
-> +
-> +		partition at u-boot {
-> +			reg = <0x00000000 0x00100000>;
-> +			label = "u-boot";
-> +		};
-> +		partition at u-boot-env {
-> +			reg = <0x00100000 0x00040000>;
-> +			label = "u-boot-env";
-> +		};
-> +		partition at unused {
-> +			reg = <0x00140000 0x00ec0000>;
-> +			label = "unused";
-> +		};
-> +
-> +	};
-> +};
-> diff --git a/arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts b/arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts
-> new file mode 100644
-> index 000000000000..4e07cb6ed800
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts
-> @@ -0,0 +1,142 @@
-> +/*
-> + * Device Tree file for DB-XC3-24G4XG board
-> + *
-> + * Copyright (C) 2016 Allied Telesis Labs
-> + *
-> + * Based on armada-xp-db.dts
-> + *
-> + * This file is dual-licensed: you can use it either under the terms
-> + * of the GPL or the X11 license, at your option. Note that this dual
-> + * licensing only applies to this file, and not this project as a
-> + * whole.
-> + *
-> + *  a) This file is free software; you can redistribute it and/or
-> + *     modify it under the terms of the GNU General Public License as
-> + *     published by the Free Software Foundation; either version 2 of the
-> + *     License, or (at your option) any later version.
-> + *
-> + *     This file is distributed in the hope that it will be useful,
-> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + *     GNU General Public License for more details.
-> + *
-> + * Or, alternatively,
-> + *
-> + *  b) Permission is hereby granted, free of charge, to any person
-> + *     obtaining a copy of this software and associated documentation
-> + *     files (the "Software"), to deal in the Software without
-> + *     restriction, including without limitation the rights to use,
-> + *     copy, modify, merge, publish, distribute, sublicense, and/or
-> + *     sell copies of the Software, and to permit persons to whom the
-> + *     Software is furnished to do so, subject to the following
-> + *     conditions:
-> + *
-> + *     The above copyright notice and this permission notice shall be
-> + *     included in all copies or substantial portions of the Software.
-> + *
-> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-> + *     OTHER DEALINGS IN THE SOFTWARE.
-> + *
-> + * Note: this Device Tree assumes that the bootloader has remapped the
-> + * internal registers to 0xf1000000 (instead of the default
-> + * 0xd0000000). The 0xf1000000 is the default used by the recent,
-> + * DT-capable, U-Boot bootloaders provided by Marvell. Some earlier
-> + * boards were delivered with an older version of the bootloader that
-> + * left internal registers mapped at 0xd0000000. If you are in this
-> + * situation, you should either update your bootloader (preferred
-> + * solution) or the below Device Tree should be adjusted.
-> + */
-> +
-> +/dts-v1/;
-> +#include "armada-xp-98dx3336.dtsi"
-> +
-> +/ {
-> +	model = "DB-XC3-24G4XG";
-> +	compatible = "marvell,db-xc3-24g4xg", "marvell,armadaxp-98dx3336", "marvell,armadaxp", "marvell,armada-370-xp";
-> +
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200 earlyprintk";
-> +	};
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0 0x00000000 0 0x40000000>; /* 1 GB */
-> +	};
-> +};
-> +
-> +&devbus_bootcs {
-> +	status = "okay";
-> +
-> +	/* Device Bus parameters are required */
-> +
-> +	/* Read parameters */
-> +	devbus,bus-width    = <16>;
-> +	devbus,turn-off-ps  = <60000>;
-> +	devbus,badr-skew-ps = <0>;
-> +	devbus,acc-first-ps = <124000>;
-> +	devbus,acc-next-ps  = <248000>;
-> +	devbus,rd-setup-ps  = <0>;
-> +	devbus,rd-hold-ps   = <0>;
-> +
-> +	/* Write parameters */
-> +	devbus,sync-enable = <0>;
-> +	devbus,wr-high-ps  = <60000>;
-> +	devbus,wr-low-ps   = <60000>;
-> +	devbus,ale-wr-ps   = <60000>;
-> +};
-> +
-> +&uart0 {
-> +	status = "okay";
-> +};
-> +
-> +&uart1 {
-> +	status = "okay";
-> +};
-> +
-> +&i2c0 {
-> +	clock-frequency = <100000>;
-> +	status = "okay";
-> +};
-> +
-> +&nand {
-> +	status = "okay";
-> +	num-cs = <1>;
-> +	marvell,nand-keep-config;
-> +	marvell,nand-enable-arbiter;
-> +	nand-on-flash-bbt;
-> +	nand-ecc-strength = <4>;
-> +	nand-ecc-step-size = <512>;
-> +};
-> +
-> +&spi0 {
-> +	status = "okay";
-> +
-> +	spi-flash at 0 {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "m25p64";
-> +		reg = <0>; /* Chip select 0 */
-> +		spi-max-frequency = <20000000>;
-> +		m25p,fast-read;
-> +
-> +		partition at u-boot {
-> +			reg = <0x00000000 0x00100000>;
-> +			label = "u-boot";
-> +		};
-> +		partition at u-boot-env {
-> +			reg = <0x00100000 0x00040000>;
-> +			label = "u-boot-env";
-> +		};
-> +		partition at unused {
-> +			reg = <0x00140000 0x00ec0000>;
-> +			label = "unused";
-> +		};
-> +
-> +	};
-> +};
-> -- 
-> 2.11.0.24.ge6920cf
->
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
