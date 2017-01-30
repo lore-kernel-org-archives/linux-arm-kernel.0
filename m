@@ -1,32 +1,35 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sun, 29 Jan 2017 21:19:07 -0800
-Subject: [GIT PULL 2/4] soc: samsung: exynos for v4.11, 2nd round
-In-Reply-To: <20170129200630.22083-2-krzk@kernel.org>
+Date: Sun, 29 Jan 2017 21:24:10 -0800
+Subject: [GIT PULL 1/4] ARM: mach/soc: exynos for v4.11, 2nd round
+In-Reply-To: <20170129200630.22083-5-krzk@kernel.org>
 References: <20170129200630.22083-1-krzk@kernel.org>
- <20170129200630.22083-2-krzk@kernel.org>
-Message-ID: <20170130051907.GX18943@localhost>
+ <20170129200630.22083-5-krzk@kernel.org>
+Message-ID: <20170130052410.GA18943@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 29, 2017 at 10:06:27PM +0200, Krzysztof Kozlowski wrote:
-> Hi,
+On Sun, Jan 29, 2017 at 10:06:30PM +0200, Krzysztof Kozlowski wrote:
 > 
-> On top of previous pull request (tags/samsung-drivers-soc-pmu-4.11).
-> 
-> This adds support for Exynos5433 to PMU driver which is needed
-> by Marek's patchset:
->  - [PATCH v2 0/8] Pad retentions support for Exynos5433
->    https://lkml.kernel.org/r/1485419634-28331-1-git-send-email-m.szyprowski () samsung ! com
+> On top of previous pull request.
 > 
 > 
-> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Tomasz Figa <tomasz.figa@gmail.com>
-> Cc: Lee Jones <lee.jones@linaro.org>
+> The following changes since commit cda1a52dab50340728e46601e6c9da9fc4beaf1f:
 > 
-> Best regards,
-> Krzysztof
+>   ARM: s3c64xx: Constify wake_irqs (2016-12-29 15:41:44 +0200)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-soc-4.11-2
+> 
+> for you to fetch changes up to 95ed41df129ca8f76eb190534d20f4a6dcd37213:
+> 
+>   dt-bindings: video: exynos7-decon: Remove obsolete samsung,power-domain property (2017-01-29 21:03:56 +0200)
+> 
+> ----------------------------------------------------------------
+> Samsung mach/soc update for v4.11, second round:
+> 1. Remove mach code for Exynos4415 as a continuation of removal
+>    of this SoC.
+> 2. Remove obsolete property from the bindings documentation.
 
 Merged, thanks!
 
