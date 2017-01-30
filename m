@@ -1,31 +1,35 @@
-From: jarkko.nikula@linux.intel.com (Jarkko Nikula)
-Date: Mon, 30 Jan 2017 13:15:54 +0200
-Subject: [PATCH] i2c: busses: constify i2c_algorithm structures
-In-Reply-To: <1485540377-13686-1-git-send-email-bhumirks@gmail.com>
-References: <1485540377-13686-1-git-send-email-bhumirks@gmail.com>
-Message-ID: <2babe118-e7fa-c579-d00f-16ddcb466b69@linux.intel.com>
+From: al.kochet@gmail.com (Alexander Kochetkov)
+Date: Mon, 30 Jan 2017 14:20:13 +0300
+Subject: [PATCH v5 3/8] ARM: dts: rockchip: add timer entries to rk3188 SoC
+In-Reply-To: <20170130110428.GC2206@mai>
+References: <1485260203-14216-1-git-send-email-al.kochet@gmail.com>
+ <1485260203-14216-4-git-send-email-al.kochet@gmail.com>
+ <20170130110428.GC2206@mai>
+Message-ID: <A5940770-B960-4409-8DA4-BE39EF9A6325@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/27/2017 08:06 PM, Bhumika Goyal wrote:
-> Declare i2c_algorithm structures as const as they are only stored in the
-> algo field of an i2c_adapter structure. This field is of type const, so
-> i2c_algorithm structures having this property can be made const too.
-> Done using Coccinelle:
->
-...
-> diff --git a/drivers/i2c/busses/i2c-designware-core.c b/drivers/i2c/busses/i2c-designware-core.c
-> index 6d81c56..a62c14c 100644
-> --- a/drivers/i2c/busses/i2c-designware-core.c
-> +++ b/drivers/i2c/busses/i2c-designware-core.c
-> @@ -822,7 +822,7 @@ static u32 i2c_dw_func(struct i2c_adapter *adap)
->  	return dev->functionality;
->  }
->
-> -static struct i2c_algorithm i2c_dw_algo = {
-> +static const struct i2c_algorithm i2c_dw_algo = {
->  	.master_xfer	= i2c_dw_xfer,
->  	.functionality	= i2c_dw_func,
->  };
 
-Acked-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
+> 30 ???. 2017 ?., ? 14:04, Daniel Lezcano <daniel.lezcano@linaro.org> ???????(?):
+> 
+> t is up to the RTC to wake up the system from suspend and there is no
+> idle state stopping the local timers on these SoCs. So, the rockchip timers
+> won't be ever used on the rk3188, right ?
+
+No rockchip timers where used on rk3188 before.
+
+Actually, I don?t know how to test backup timer functionality. rk3228 backup timer is from alive
+subsystem. It is unclear from TRM what this mean, I assume that somehow related to CLK
+during suspend. So I pick the timer from alive subsystem on rk3188 also.
+DT timer configuration where tested: interrupts and IO works.
+
+> This patch should go after the rockchip timer patches
+
+
+Ok, let me know, when I should send v6. Or may be you change the order of the patches
+during merge.
+
+And thank you for fixing commit message for previous patch.
+Feel free to tell me than I write something really unclear or incorrect.
+
+Alexander.
