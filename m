@@ -1,57 +1,79 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Mon, 30 Jan 2017 18:17:50 +0000
-Subject: ARM64: Disabling warnings about deprecated armv8 instructions
-In-Reply-To: <1485798092.484.5.camel@crowfest.net> (Michael Zoran's message of
- "Mon, 30 Jan 2017 09:41:32 -0800")
-References: <1485072424.14066.2.camel@crowfest.net>
- <1485075528.14345.1.camel@crowfest.net>
- <CAKv+Gu8LU3QjrUa6wMJF3WBNrhx34Pi_0ZUQVfrZy7w7y7237w@mail.gmail.com>
- <22169925.OhJ0QcnbHM@localhost> <1485087662.1518.1.camel@crowfest.net>
- <0D1F678D-6F94-4B68-955E-6454F8647FCA@linaro.org>
- <20170130141308.GV27312@n2100.armlinux.org.uk>
- <CAKv+Gu98i4=COqr_Eikwja28U5MAL83rxe-_QBXWFhJ7v1E6yA@mail.gmail.com>
- <20170130165837.GE27312@n2100.armlinux.org.uk>
- <CAKv+Gu_jEvKdWFWB2Ofxb5ruoTYUEt1puZXBb=9Cn2kEOZO1hg@mail.gmail.com>
- <1485798092.484.5.camel@crowfest.net>
-Message-ID: <yw1xo9yofm41.fsf@unicorn.mansr.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Mon, 30 Jan 2017 13:19:22 -0500
+Subject: [PATCH v3 08/24] drm/rockchip: dw-mipi-dsi: respect message flags
+In-Reply-To: <20170129132444.25251-9-john@metanate.com>
+References: <20170129132444.25251-1-john@metanate.com>
+ <20170129132444.25251-9-john@metanate.com>
+Message-ID: <20170130181922.GI20076@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michael Zoran <mzoran@crowfest.net> writes:
+On Sun, Jan 29, 2017 at 01:24:28PM +0000, John Keeping wrote:
+> Instead of always sending commands in LP mode, respect the
+> MIPI_DSI_MSG_USE_LPM flag to decide how to send each message.  Also
+> request acks if MIPI_DSI_MSG_REQ_ACK is set.
+> 
 
-> On Mon, 2017-01-30 at 17:09 +0000, Ard Biesheuvel wrote:
->> Well, the question is really how to deal with 32-bit compatibility
->> given the fact that the ARM architecture will drop such instructions
->> in its next revision. Whether we agree with that, and whether we
->> should argue our positions with the architects if we don't is not
->> relevant here.
->> 
->> What is relevant is whether we inform userspace if we spot such a
->> deprecated instruction, and I think we should.
->> 
->> Note that this is not only an issue for the arm64 kernel. The 32-bit
->> kernel will have the exact same issue when you try to run it on
->> hardware that no longer has support for those instructions.
->
-> Just to inject two cents worth since I'm still on the thread and I
-> originally started the topic...
->
-> The Intel comparison seems relevant.  I think in theory you can still
-> run old MS-DOS software on an Intel PC if you were so inclined to do
-> so.
->
-> I would think the best would be to turn the warnings off by default
-> when running in 32 bit mode with the option to turn them back on.  Then
-> as time progresses more of more of these instructions can be converted
-> to software emulation and removed from the hardware.  And hopefully as
-> time progresses, all the user mode software gets upgraded to 64 bit so
-> that 32 bit get dropped.
->
-> The issue seems to me to be more that the kernel is screaming in the
-> logs rather then if it's emulating the instructions in hardware or
-> software.
+Reviewed-by: Sean Paul <seanpaul@chromium.org>
 
-Might warning once be an acceptable compromise?
+> Signed-off-by: John Keeping <john@metanate.com>
+> Reviewed-by: Chris Zhong <zyw@rock-chips.com>
+> ---
+> v3:
+> - Add Chris' Reviewed-by
+> Unchanged in v2
+> 
+>  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 16 +++++++++++++++-
+>  1 file changed, 15 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> index 92dbc3e56603..15d33c3c8cb7 100644
+> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> @@ -542,6 +542,19 @@ static int dw_mipi_dsi_host_detach(struct mipi_dsi_host *host,
+>  	return 0;
+>  }
+>  
+> +static void dw_mipi_message_config(struct dw_mipi_dsi *dsi,
+> +				   const struct mipi_dsi_msg *msg)
+> +{
+> +	u32 val = 0;
+> +
+> +	if (msg->flags & MIPI_DSI_MSG_REQ_ACK)
+> +		val |= EN_ACK_RQST;
+> +	if (msg->flags & MIPI_DSI_MSG_USE_LPM)
+> +		val |= CMD_MODE_ALL_LP;
+> +
+> +	dsi_write(dsi, DSI_CMD_MODE_CFG, val);
+> +}
+> +
+>  static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
+>  {
+>  	int ret;
+> @@ -634,6 +647,8 @@ static ssize_t dw_mipi_dsi_host_transfer(struct mipi_dsi_host *host,
+>  	struct dw_mipi_dsi *dsi = host_to_dsi(host);
+>  	int ret;
+>  
+> +	dw_mipi_message_config(dsi, msg);
+> +
+>  	switch (msg->type) {
+>  	case MIPI_DSI_DCS_SHORT_WRITE:
+>  	case MIPI_DSI_DCS_SHORT_WRITE_PARAM:
+> @@ -745,7 +760,6 @@ static void dw_mipi_dsi_command_mode_config(struct dw_mipi_dsi *dsi)
+>  {
+>  	dsi_write(dsi, DSI_TO_CNT_CFG, HSTX_TO_CNT(1000) | LPRX_TO_CNT(1000));
+>  	dsi_write(dsi, DSI_BTA_TO_CNT, 0xd00);
+> -	dsi_write(dsi, DSI_CMD_MODE_CFG, CMD_MODE_ALL_LP);
+>  	dsi_write(dsi, DSI_MODE_CFG, ENABLE_CMD_MODE);
+>  }
+>  
+> -- 
+> 2.11.0.197.gb556de5.dirty
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
 -- 
-M?ns Rullg?rd
+Sean Paul, Software Engineer, Google / Chromium OS
