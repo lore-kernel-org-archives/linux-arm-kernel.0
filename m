@@ -1,94 +1,89 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 30 Jan 2017 08:53:59 -0800
-Subject: [PATCH v6 3/3] watchdog: zx2967: add watchdog controller driver
- for ZTE's zx2967 family
-In-Reply-To: <CA+DQWkyPtndGEz-QYvmKaXoGNKQ69Zqu-aG7tCKnT-Mrmx5Wsw@mail.gmail.com>
-References: <1485312289-18354-1-git-send-email-baoyou.xie@linaro.org>
- <1485312289-18354-3-git-send-email-baoyou.xie@linaro.org>
- <20170125162346.GA591@linaro.org>
- <CA+DQWkxpcHqVfDSGuUK-i4DOVXsYEYo60MG5y_oBDNp+ykEdLQ@mail.gmail.com>
- <20170126161729.GA1515@linaro.org>
- <CA+DQWkyPtndGEz-QYvmKaXoGNKQ69Zqu-aG7tCKnT-Mrmx5Wsw@mail.gmail.com>
-Message-ID: <20170130165359.GA20288@roeck-us.net>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 30 Jan 2017 16:57:35 +0000
+Subject: [PATCH v2 1/3] arm64: cacheinfo: add support for alternative
+ format of CCSIDR_EL1
+In-Reply-To: <ad552a58-4acd-f2ab-7d40-124b40c6c014@arm.com>
+References: <1485793527-18028-1-git-send-email-sudeep.holla@arm.com>
+ <ad552a58-4acd-f2ab-7d40-124b40c6c014@arm.com>
+Message-ID: <568a27c1-f910-46e8-7283-2040e28df380@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2017 at 10:40:09AM +0800, Baoyou Xie wrote:
-> On 27 January 2017 at 00:17, Mathieu Poirier <mathieu.poirier@linaro.org>
-> wrote:
-> 
-> > On Thu, Jan 26, 2017 at 09:32:56AM +0800, Baoyou Xie wrote:
-> > > On 26 January 2017 at 00:23, Mathieu Poirier <mathieu.poirier@linaro.org
-> > >
-> > > wrote:
-> > >
-> > > > On Wed, Jan 25, 2017 at 10:44:49AM +0800, Baoyou Xie wrote:
-> > > > > This patch adds watchdog controller driver for ZTE's zx2967 family.
-> > > > >
-> > > > > Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
-> > > > > ---
-[ ... ]
-> > > > > +     reset_control_assert(rstc);
-> > > > > +     usleep_range(500, 20000);
-> > > >
-> > > > Alright, I'm officially confused.
-> > > >
-> > > > First and foremost you still haven't provided an explanation as to why
-> > > > this is
-> > > > required.  Second, in your previous submission you had:
-> > > >
-> > > >         mdelay(10);
-> > > >
-> > > > That is a busy loop of 10ms.  In this post using usleep_range() is a
-> > step
-> > > > in the
-> > > > right direction but the min and max values to wait for don't make
-> > sense.
-> > > > Here
-> > > > you have 500 and 20000, which is 0.5ms and 20ms.
-> > > >
-> > > > In fact, sleeping for 0.5ms is enough.
-> > > we extended the sleeping time to 20ms, the purpose is merging the timer
-> > > interrupts. of course, it's happy to replace it with usleep_range(500,
-> > > 1000).
-> >
-> > "merging the timer interrupts" - you mean trying to get the WD tick to be
-> > closer
-> > to other timers?  If so I really don't see why.  Timers are asynchronous by
-> > nature and there can be dozens of them enabled at any given time.
-> >
-> > Really?
-> Even if the system runs asynchronously, early process may trigger delayed
-> process, for example delayed work queue or timers, we can merge our
-> watchdog timer and those delayed work's timers.
-> 
-In the probe function ?
 
-> Furthermore, what happen if we build this driver as module?
+
+On 30/01/17 16:47, Suzuki K Poulose wrote:
+> On 30/01/17 16:25, Sudeep Holla wrote:
+>> The number of sets described for each cache level in the CCSIDR is
+>> limited to 32K and the associativity is limited to 1024 ways.
+>>
+>> As part of the ARM8.3 extensions, an alternative format for the
+>> CCSIDR_EL1 is introduced for AArch64, and for AArch32, a new CCSIDR2
+>> register is introduced to hold the upper 32 bits of this information,
+>> and the CCSIDR register format is changed. An identification registers
+>> are also added to identify the presence for this functionality.
+>>
+>> This patch adds support for the alternative format of CCSIDR_EL1.
+
+[...]
+
+>>  void __init setup_cpu_features(void);
+>>
+>>  void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
+>> @@ -224,6 +229,10 @@ static inline bool system_uses_ttbr0_pan(void)
+>>          !cpus_have_cap(ARM64_HAS_PAN);
+>>  }
+>>
+>> +static inline bool cpu_supports_ccsidr_64b_format(void)
+>> +{
+>> +    return
+>> id_aa64mmfr2_ccsidr_64b_format(read_system_reg(SYS_ID_AA64MMFR2_EL1));
 > 
-If every driver writer would use that line of argument, booting would
-take much longer than necessary, with every process sitting on unnecessary
-wait or sleep calls for perceived "optimization" purposes. Probe functions
-run exactly once, and should be time optimized. You should have an idea
-what the minimum reset hold time is, and follow it.
-
-> But, as i said early, it's a trial optimization but can be instead with
-> usleep_range(500, 1000).
+> read_system_reg() gives you the system wide safe value for the register,
+> which could
+> be different from that of the current CPU. You have to use
+> read_sysreg_s(), to read
+> a register on the CPU (which aren't yet recognized by GAS).
 > 
-> In some case, such optimization is helpful. I'd like to talk a story here,
-> about before ten years, I pressed a return key in console, you know, in
-> this case, a process be created and exited, so the cpu core that process
-> run at sent an IPI to other CPU, IPI interrupt resulted in the performance
-> decreased by 20%, so sad:)
+> Sorry, the names are a bit confusing, which can easily cause such
+> issues. May be we should rename some of them.
 > 
-It appears to be somewhat unlikely that each keypress resulted in a driver
-being instantiated. If it did, a sleep in its probe function was the least
-of your problems.
 
-> Unless there is a H/W constraint requiring a delay between the
-> > assert/deassert
-> > of the WD, I don't think adding a wait operation (of any kind) make sense.
+Thanks, fixed locally, will post as part of next version.
 
-Correct.
+>> +}
+>>  #endif /* __ASSEMBLY__ */
+>>
+>>  #endif
+>> diff --git a/arch/arm64/include/asm/sysreg.h
+>> b/arch/arm64/include/asm/sysreg.h
+>> index 98ae03f8eedd..c72dfe8807ca 100644
+>> --- a/arch/arm64/include/asm/sysreg.h
+>> +++ b/arch/arm64/include/asm/sysreg.h
+>> @@ -183,6 +183,7 @@
+>>  #define ID_AA64MMFR1_VMIDBITS_16    2
+>>
+>>  /* id_aa64mmfr2 */
+>> +#define ID_AA64MMFR2_CCIDX_SHIFT    20
+>>  #define ID_AA64MMFR2_LVA_SHIFT        16
+>>  #define ID_AA64MMFR2_IESB_SHIFT        12
+>>  #define ID_AA64MMFR2_LSM_SHIFT        8
+>> diff --git a/arch/arm64/kernel/cacheinfo.c
+>> b/arch/arm64/kernel/cacheinfo.c
+>> index 3f2250fc391b..888b38f1709f 100644
+>> --- a/arch/arm64/kernel/cacheinfo.c
+>> +++ b/arch/arm64/kernel/cacheinfo.c
+>> @@ -43,6 +43,13 @@ static inline enum cache_type get_cache_type(int
+>> level)
+>>      return CLIDR_CTYPE(clidr, level);
+>>  }
+>>
+>> +int icache_get_numsets(void)
+> 
+> Could this be static ? I could not see it used anywhere else outside
+> this file.
 
-Guenter
+Used in arch/arm64/kernel/cpuinfo.c
+
+-- 
+Regards,
+Sudeep
