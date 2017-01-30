@@ -1,31 +1,42 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 30 Jan 2017 10:55:46 +0900
-Subject: [RESEND PATCH 1/2] arm64: defconfig: enable CONFIG_MTD_BLOCK
-In-Reply-To: <1485741347-17363-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1485741347-17363-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1485741347-17363-2-git-send-email-yamada.masahiro@socionext.com>
+Date: Mon, 30 Jan 2017 10:58:06 +0900
+Subject: [PATCH] arm64: defconfig: enable CONFIG_MMC_SDHCI_CADENCE
+In-Reply-To: <20170130013247.GH3133@localhost>
+References: <1482718493-6792-1-git-send-email-yamada.masahiro@socionext.com>
+ <CAK7LNAR8_Aom6qZyOEV7Kd2AC_UTW3yHL_-u=6ubOBGRNhyrmQ@mail.gmail.com>
+ <20170130013247.GH3133@localhost>
+Message-ID: <CAK7LNAQ2z9xR+qUJqT2ZAyvan1f9HbK72GmYHVENvm36SFy3Gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the block layer support for MTD devices.
+Hi Olof,
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+2017-01-30 10:32 GMT+09:00 Olof Johansson <olof@lixom.net>:
+> Hi,
+>
+> On Thu, Jan 26, 2017 at 06:34:21PM +0900, Masahiro Yamada wrote:
+>> Hi Arnd, Olof,
+>>
+>>
+>> 2016-12-26 11:14 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+>> > Enable the Cadence SD/SDIO/eMMC controller.  This is used on
+>> > Socionext UniPhier SoC family.
+>> >
+>> > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>>
+>>
+>> Can you pick up this for ASOC, please?
+>
+> ASOC? ASoC is usually Audio SoC, so you should probably use arm-soc as a term
+> to refer to our tree to avoid confusion.
+>
+> That being said -- applied.
+>
 
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+Sorry, I have been misunderstanding the meaning of ASOC.
+Going forward, I will say ARM-SOC.  Thanks for pointing this out!
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 33b744d..f1f0caf 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -143,6 +143,7 @@ CONFIG_DEVTMPFS=y
- CONFIG_DEVTMPFS_MOUNT=y
- CONFIG_DMA_CMA=y
- CONFIG_MTD=y
-+CONFIG_MTD_BLOCK=y
- CONFIG_MTD_M25P80=y
- CONFIG_MTD_SPI_NOR=y
- CONFIG_BLK_DEV_LOOP=y
+
 -- 
-2.7.4
+Best Regards
+Masahiro Yamada
