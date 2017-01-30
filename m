@@ -1,76 +1,41 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 30 Jan 2017 13:04:44 +0100
-Subject: [PATCH v5 3/8] ARM: dts: rockchip: add timer entries to rk3188 SoC
-In-Reply-To: <A5940770-B960-4409-8DA4-BE39EF9A6325@gmail.com>
-References: <1485260203-14216-1-git-send-email-al.kochet@gmail.com>
- <1485260203-14216-4-git-send-email-al.kochet@gmail.com>
- <20170130110428.GC2206@mai>
- <A5940770-B960-4409-8DA4-BE39EF9A6325@gmail.com>
-Message-ID: <20170130120444.GE2206@mai>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 30 Jan 2017 12:09:19 +0000
+Subject: [PATCH 3/4] ARM: nommu: display vectors base
+In-Reply-To: <20170119131632.GA3862@afzalpc>
+References: <20170118203525.6246-1-afzal.mohd.ma@gmail.com>
+ <20170118203837.6536-1-afzal.mohd.ma@gmail.com>
+ <20170118221315.GP27312@n2100.armlinux.org.uk>
+ <20170119131632.GA3862@afzalpc>
+Message-ID: <20170130120919.GP27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2017 at 02:20:13PM +0300, Alexander Kochetkov wrote:
+On Thu, Jan 19, 2017 at 06:46:32PM +0530, Afzal Mohammed wrote:
+> Hi,
 > 
-> > 30 ???. 2017 ?., ? 14:04, Daniel Lezcano <daniel.lezcano@linaro.org> ???????(?):
+> On Wed, Jan 18, 2017 at 10:13:15PM +0000, Russell King - ARM Linux wrote:
+> > On Thu, Jan 19, 2017 at 02:08:37AM +0530, afzal mohammed wrote:
+> 
+> > > +			MLK_ROUNDUP(vectors_base, vectors_base + PAGE_SIZE),
 > > 
-> > t is up to the RTC to wake up the system from suspend and there is no
-> > idle state stopping the local timers on these SoCs. So, the rockchip timers
-> > won't be ever used on the rk3188, right ?
+> > I think MLK() will do here - no need to use the rounding-up version
+> > as PAGE_SIZE is a multiple of 1k.
 > 
-> No rockchip timers where used on rk3188 before.
+> Yes, i will replace it.
 > 
-> Actually, I don?t know how to test backup timer functionality. rk3228 backup timer is from alive
-> subsystem. It is unclear from TRM what this mean, 
+> Earlier, used MLK(), got some build error, now checking again, no
+> build error, i should have messed up something at that time.
 
-It means it is on an always-on power domain, so it will be always powered even
-in suspend mode.
+Sorry for the delayed response.
 
-There are different clockevents on the SoC, the local timers (smp_twd) and the
-rockchip timer. They are not used together, the local timers will be used as
-default because they are per cpu. So the rockchip timer is not used in this case.
-
-Then there is the situation when the cpu is powered down, the local timers,
-which belongs to the same power domain, will be powered down also. If there is a
-timer set for this CPU, an alternate, backup timer must be used, and that is the
-rockchip timer. However this situation happens:
-
- - when a CPU is offlined. But the timers are moved to another CPU.
- - when the CPU enters a deep idle state. But such state does not exist on rk3188
- - when the system goes to suspend. But the timers are stopped in any case and
-   CPU0 is always on.
-
-There is no case when the rockchip timer is used for the clockevent.
-
-If I'm not wrong, you can check /proc/interrupts and see there is no interrupt
-on the rockchip timer.
-
-So the board is typically a case where we want to use a clocksource from one IP
-and the clockevents from another IP (just looping back with the clkevt macro
-patch I answered a few minutes ago).
-
-That does not call in question this patch as it describes the hardware.
-
-> I assume that somehow related to CLK
-> during suspend. So I pick the timer from alive subsystem on rk3188 also.
-> DT timer configuration where tested: interrupts and IO works.
-> 
-> > This patch should go after the rockchip timer patches
-> 
-> 
-> Ok, let me know, when I should send v6. Or may be you change the order of the patches
-> during merge.
-
-I have to review the last 3 patches of the series. I will let you know for a V6.
+With that change, you can get rid of this preprocessor conditional.
+Arrange to have VECTORS_BASE defined to vectors_base in the nommu
+part of asm/memory.h.  You'll also need to move the extern of that
+there too.
 
 Thanks.
 
-  -- Daniel
-
 -- 
-
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
