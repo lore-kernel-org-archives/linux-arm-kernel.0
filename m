@@ -1,38 +1,77 @@
-From: juri.lelli@arm.com (Juri Lelli)
-Date: Mon, 30 Jan 2017 18:21:00 +0000
-Subject: [PATCH 0/7]  Fix issues and factorize arm/arm64 capacity
- information code
-In-Reply-To: <20170130175138.GA26660@e104818-lin.cambridge.arm.com>
-References: <20170119143757.14537-1-juri.lelli@arm.com>
- <20170130122901.GA25681@e106622-lin>
- <20170130175138.GA26660@e104818-lin.cambridge.arm.com>
-Message-ID: <20170130182100.GE13332@e106622-lin>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Mon, 30 Jan 2017 13:20:30 -0500
+Subject: [PATCH v3 09/24] drm/rockchip: dw-mipi-dsi: only request HS
+ clock when required
+In-Reply-To: <20170129132444.25251-10-john@metanate.com>
+References: <20170129132444.25251-1-john@metanate.com>
+ <20170129132444.25251-10-john@metanate.com>
+Message-ID: <20170130182030.GJ20076@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
-
-On 30/01/17 17:51, Catalin Marinas wrote:
-> On Mon, Jan 30, 2017 at 12:29:01PM +0000, Juri Lelli wrote:
-> > I'd need more advice on this set, especially on how and if patch 6 could fly.
-> 
-> Since you got some comments and said that you are going to fix them in
-> the next version, I guess people are waiting for you to post a new
-> series.
+On Sun, Jan 29, 2017 at 01:24:29PM +0000, John Keeping wrote:
+> Requesting the HS clock from the PHY before we initialize it causes an
+> invalid signal to be sent out since the input clock is not yet
+> configured.  The PHY databook suggests only asserting this signal when
+> performing HS transfers, so let's do that.
 > 
 
-While this is true for Dietmar's and part of Russell's comments, I was
-still waiting to understand where people think is better to move the
-externs (as Russell pointed out), though, and if the whole idea could
-fly.
+Reviewed-by: Sean Paul <seanpaul@chromium.org>
 
-I could certainly come up with a proposal on this point, but I didn't
-simply want to spam people's mailboxes with a v2 (addressing relatively
-minor points, IMHO) if v1 was already completely off. Apologies if that
-wasn't clear from my replies.
+> Signed-off-by: John Keeping <john@metanate.com>
+> Reviewed-by: Chris Zhong <zyw@rock-chips.com>
+> ---
+> v3:
+> - Add Chris' Reviewed-by
+> Unchanged in v2
+> 
+>  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> index 15d33c3c8cb7..03fc096fe1bd 100644
+> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> @@ -545,13 +545,15 @@ static int dw_mipi_dsi_host_detach(struct mipi_dsi_host *host,
+>  static void dw_mipi_message_config(struct dw_mipi_dsi *dsi,
+>  				   const struct mipi_dsi_msg *msg)
+>  {
+> +	bool lpm = msg->flags & MIPI_DSI_MSG_USE_LPM;
+>  	u32 val = 0;
+>  
+>  	if (msg->flags & MIPI_DSI_MSG_REQ_ACK)
+>  		val |= EN_ACK_RQST;
+> -	if (msg->flags & MIPI_DSI_MSG_USE_LPM)
+> +	if (lpm)
+>  		val |= CMD_MODE_ALL_LP;
+>  
+> +	dsi_write(dsi, DSI_LPCLK_CTRL, lpm ? 0 : PHY_TXREQUESTCLKHS);
+>  	dsi_write(dsi, DSI_CMD_MODE_CFG, val);
+>  }
+>  
+> @@ -693,6 +695,7 @@ static void dw_mipi_dsi_set_mode(struct dw_mipi_dsi *dsi,
+>  		dsi_write(dsi, DSI_PWR_UP, RESET);
+>  		dsi_write(dsi, DSI_MODE_CFG, ENABLE_VIDEO_MODE);
+>  		dw_mipi_dsi_video_mode_config(dsi);
+> +		dsi_write(dsi, DSI_LPCLK_CTRL, PHY_TXREQUESTCLKHS);
+>  		dsi_write(dsi, DSI_PWR_UP, POWERUP);
+>  	}
+>  }
+> @@ -710,7 +713,6 @@ static void dw_mipi_dsi_init(struct dw_mipi_dsi *dsi)
+>  		  | PHY_RSTZ | PHY_SHUTDOWNZ);
+>  	dsi_write(dsi, DSI_CLKMGR_CFG, TO_CLK_DIVIDSION(10) |
+>  		  TX_ESC_CLK_DIVIDSION(7));
+> -	dsi_write(dsi, DSI_LPCLK_CTRL, PHY_TXREQUESTCLKHS);
+>  }
+>  
+>  static void dw_mipi_dsi_dpi_config(struct dw_mipi_dsi *dsi,
+> -- 
+> 2.11.0.197.gb556de5.dirty
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
-Maybe you are saying that no comments are a good sign after all. :)
-
-Best,
-
-- Juri
+-- 
+Sean Paul, Software Engineer, Google / Chromium OS
