@@ -1,34 +1,64 @@
-From: sstabellini@kernel.org (Stefano Stabellini)
-Date: Mon, 30 Jan 2017 13:02:21 -0800 (PST)
-Subject: [RFC v2] Device memory mappings for Dom0 on ARM64 ACPI systems
-Message-ID: <alpine.DEB.2.10.1701301154340.20188@sstabellini-ThinkPad-X260>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 30 Jan 2017 15:12:37 -0600
+Subject: [PATCH] PCI: ACPI: Fix ThunderX PEM initialization
+In-Reply-To: <1485793552-12614-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
+References: <1485793552-12614-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
+Message-ID: <20170130211236.GW20550@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Vadim,
 
-a couple of weeks ago I sent a detailed email asking for feedback on a
-problem with Linux on Xen on ACPI systems:
+On Mon, Jan 30, 2017 at 08:25:52AM -0800, Vadim Lomovtsev wrote:
+> This patch is to address PEM initialization issue
+> which causes network issues.
+> 
+> It is necessary to search for _HID:PNP0A08 while requesting
+> PEM resources via ACPI instead of "THRX0002".
+> 
+> Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
+> ---
+>  drivers/pci/host/pci-thunder-pem.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
+> index af722eb..aec30b8 100644
+> --- a/drivers/pci/host/pci-thunder-pem.c
+> +++ b/drivers/pci/host/pci-thunder-pem.c
+> @@ -331,7 +331,7 @@ static int thunder_pem_acpi_init(struct pci_config_window *cfg)
+>  	if (!res_pem)
+>  		return -ENOMEM;
+>  
+> -	ret = acpi_get_rc_resources(dev, "THRX0002", root->segment, res_pem);
+> +	ret = acpi_get_rc_resources(dev, "PNP0A08", root->segment, res_pem);
 
-http://marc.info/?l=linux-arm-kernel&m=148469169210500&w=2
+This doesn't smell right: PNP0A08 is the generic ACPI ID.  There's no
+guarantee that if we find a PNP0A08 device, it is a ThunderX device.
 
-In short, on BUS_NOTIFY_ADD_DEVICE events, Linux (as Dom0) requests
-stage-2 MMIO regions mappings via hypercall to Xen. This works well for
-devices, but few MMIO regions exist which do not belong to any devices,
-therefore today they don't get mapped. For example: ACPI
-OperationRegion, ECAM, other memory regions described in static tables
-such as BERT.
+I think the only way to call thunder_pem_acpi_init() is via an MCFG
+quirk that mentions thunder_pem_ecam_ops, which means we only call it
+if we find an MCFG with "CAVIUM" "THUNDERX" OEM and table IDs, so it's
+probably safe in that sense.
 
-In the email linked above, I suggested a few different approaches to
-solving this issue. It looks like the consensus is around solution b):
+But it's an abuse of the ACPI _HID model.  If you match a device using
+PNP0A08, all you can assume about it is that it uses the generic
+PNP0A08 programming model, and I don't think that includes "the first
+memory resource in _CRS contains ECAM space and MSI-X tables."
 
-> b) Otherwise, we could write an alternative implementation of ioremap
-> on arm64. The Xen specific ioremap would request a stage-2 mapping
-> first, then create the stage-1 mapping as usual. However, this means
-> issuing an hypercall for every ioremap call.
+I expect this is a teething issue because you have firmware in the
+field that uses PNP0A08 and it's not feasible to update it.  If that's
+the case, the changelog should have details about it and we should
+have a comment in the code, because I don't think this is the model we
+want to end up with in future releases.
 
-If that's OK for you, we are going to move forward with this approach.
-
-Thanks,
-
-Stefano
+>  	if (ret) {
+>  		dev_err(dev, "can't get rc base address\n");
+>  		return ret;
+> -- 
+> 2.4.11
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
