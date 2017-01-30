@@ -1,41 +1,79 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 30 Jan 2017 12:09:19 +0000
-Subject: [PATCH 3/4] ARM: nommu: display vectors base
-In-Reply-To: <20170119131632.GA3862@afzalpc>
-References: <20170118203525.6246-1-afzal.mohd.ma@gmail.com>
- <20170118203837.6536-1-afzal.mohd.ma@gmail.com>
- <20170118221315.GP27312@n2100.armlinux.org.uk>
- <20170119131632.GA3862@afzalpc>
-Message-ID: <20170130120919.GP27312@n2100.armlinux.org.uk>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 30 Jan 2017 13:13:22 +0100
+Subject: [PATCH] iio: adc - Fix possible NULL derefrence.
+In-Reply-To: <1485751634-28963-1-git-send-email-shailendra.v@samsung.com>
+References: <CGME20170130044724epcas3p444b23d43fed213511e6994ecb4ed0ef3@epcas3p4.samsung.com>
+ <1485751634-28963-1-git-send-email-shailendra.v@samsung.com>
+Message-ID: <a4f4f5fc-5a00-5a39-8c2a-999686196a45@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 06:46:32PM +0530, Afzal Mohammed wrote:
-> Hi,
+On 01/30/2017 05:47 AM, Shailendra Verma wrote:
+> of_match_device could return NULL, and so can cause a NULL
+> pointer dereference later.
 > 
-> On Wed, Jan 18, 2017 at 10:13:15PM +0000, Russell King - ARM Linux wrote:
-> > On Thu, Jan 19, 2017 at 02:08:37AM +0530, afzal mohammed wrote:
-> 
-> > > +			MLK_ROUNDUP(vectors_base, vectors_base + PAGE_SIZE),
-> > 
-> > I think MLK() will do here - no need to use the rounding-up version
-> > as PAGE_SIZE is a multiple of 1k.
-> 
-> Yes, i will replace it.
-> 
-> Earlier, used MLK(), got some build error, now checking again, no
-> build error, i should have messed up something at that time.
+> Signed-off-by: Shailendra Verma <shailendra.v@samsung.com>
 
-Sorry for the delayed response.
+a) this should be two patches
+b) same question as in case of the mmc patch -- The probe won't be
+called if OF match doesn't happen in the first place, so this check is
+redundant, no ?
 
-With that change, you can get rid of this preprocessor conditional.
-Arrange to have VECTORS_BASE defined to vectors_base in the nommu
-part of asm/memory.h.  You'll also need to move the extern of that
-there too.
+> ---
+>  drivers/iio/adc/mxs-lradc.c       |   14 ++++++++++----
+>  drivers/iio/adc/rockchip_saradc.c |    4 ++++
+>  2 files changed, 14 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/iio/adc/mxs-lradc.c b/drivers/iio/adc/mxs-lradc.c
+> index b84d37c..4308a59 100644
+> --- a/drivers/iio/adc/mxs-lradc.c
+> +++ b/drivers/iio/adc/mxs-lradc.c
+> @@ -1570,10 +1570,8 @@ static int mxs_lradc_probe_touchscreen(struct mxs_lradc *lradc,
+>  
+>  static int mxs_lradc_probe(struct platform_device *pdev)
+>  {
+> -	const struct of_device_id *of_id =
+> -		of_match_device(mxs_lradc_dt_ids, &pdev->dev);
+> -	const struct mxs_lradc_of_config *of_cfg =
+> -		&mxs_lradc_of_config[(enum mxs_lradc_id)of_id->data];
+> +	const struct of_device_id *of_id;
+> +	const struct mxs_lradc_of_config *of_cfg;
+>  	struct device *dev = &pdev->dev;
+>  	struct device_node *node = dev->of_node;
+>  	struct mxs_lradc *lradc;
+> @@ -1583,6 +1581,14 @@ static int mxs_lradc_probe(struct platform_device *pdev)
+>  	int i, s;
+>  	u64 scale_uv;
+>  
+> +	of_id = of_match_device(mxs_lradc_dt_ids, &pdev->dev);
+> +	if (!of_id) {
+> +		dev_err(&pdev->dev, "Error: No device match found\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	of_cfg = &mxs_lradc_of_config[(enum mxs_lradc_id)of_id->data];
+> +
+>  	/* Allocate the IIO device. */
+>  	iio = devm_iio_device_alloc(dev, sizeof(*lradc));
+>  	if (!iio) {
+> diff --git a/drivers/iio/adc/rockchip_saradc.c b/drivers/iio/adc/rockchip_saradc.c
+> index 85d7012..08dfb43 100644
+> --- a/drivers/iio/adc/rockchip_saradc.c
+> +++ b/drivers/iio/adc/rockchip_saradc.c
+> @@ -224,6 +224,10 @@ static int rockchip_saradc_probe(struct platform_device *pdev)
+>  	info = iio_priv(indio_dev);
+>  
+>  	match = of_match_device(rockchip_saradc_match, &pdev->dev);
+> +	if (!match) {
+> +		dev_err(&pdev->dev, "Error: No device match found\n");
+> +		return -ENODEV;
+> +	}
+>  	info->data = match->data;
+>  
+>  	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> 
 
-Thanks.
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Best regards,
+Marek Vasut
