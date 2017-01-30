@@ -1,9 +1,9 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 30 Jan 2017 12:41:09 +0100
-Subject: [PATCH 07/14] mmc: sdhci-st: simplify optional reset handling
+Date: Mon, 30 Jan 2017 12:41:10 +0100
+Subject: [PATCH 08/14] mmc: sunxi: simplify optional reset handling
 In-Reply-To: <20170130114116.22089-1-p.zabel@pengutronix.de>
 References: <20170130114116.22089-1-p.zabel@pengutronix.de>
-Message-ID: <20170130114116.22089-7-p.zabel@pengutronix.de>
+Message-ID: <20170130114116.22089-8-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,72 +15,62 @@ This allows to return errors from devm_reset_control_get_optional and to
 call reset_control_(de)assert unconditionally.
 
 Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Cc: Peter Griffin <peter.griffin@linaro.org>
-Cc: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-Cc: Maxime Coquelin <maxime.coquelin@st.com>
+Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+Cc: Chen-Yu Tsai <wens@csie.org>
 Cc: Ulf Hansson <ulf.hansson@linaro.org>
 ---
- drivers/mmc/host/sdhci-st.c | 19 +++++++------------
- 1 file changed, 7 insertions(+), 12 deletions(-)
+ drivers/mmc/host/sunxi-mmc.c | 18 +++++++-----------
+ 1 file changed, 7 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci-st.c b/drivers/mmc/host/sdhci-st.c
-index ed92ce729dde1..5a782b9bae381 100644
---- a/drivers/mmc/host/sdhci-st.c
-+++ b/drivers/mmc/host/sdhci-st.c
-@@ -371,11 +371,10 @@ static int sdhci_st_probe(struct platform_device *pdev)
- 	if (IS_ERR(icnclk))
- 		icnclk = NULL;
+diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
+index b1d1303389a71..cd59a5df6cc86 100644
+--- a/drivers/mmc/host/sunxi-mmc.c
++++ b/drivers/mmc/host/sunxi-mmc.c
+@@ -1149,7 +1149,7 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
+ 	}
  
--	rstc = devm_reset_control_get(&pdev->dev, NULL);
-+	rstc = devm_reset_control_get_optional(&pdev->dev, NULL);
- 	if (IS_ERR(rstc))
--		rstc = NULL;
--	else
--		reset_control_deassert(rstc);
-+		return PTR_ERR(rstc);
-+	reset_control_deassert(rstc);
+ 	host->reset = devm_reset_control_get_optional(&pdev->dev, "ahb");
+-	if (PTR_ERR(host->reset) == -EPROBE_DEFER)
++	if (IS_ERR(host->reset))
+ 		return PTR_ERR(host->reset);
  
- 	host = sdhci_pltfm_init(pdev, &sdhci_st_pdata, sizeof(*pdata));
- 	if (IS_ERR(host)) {
-@@ -435,8 +434,7 @@ static int sdhci_st_probe(struct platform_device *pdev)
- err_of:
- 	sdhci_pltfm_free(pdev);
- err_pltfm_init:
--	if (rstc)
--		reset_control_assert(rstc);
-+	reset_control_assert(rstc);
+ 	ret = clk_prepare_enable(host->clk_ahb);
+@@ -1176,12 +1176,10 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
+ 		goto error_disable_clk_output;
+ 	}
  
- 	return ret;
- }
-@@ -453,8 +451,7 @@ static int sdhci_st_remove(struct platform_device *pdev)
+-	if (!IS_ERR(host->reset)) {
+-		ret = reset_control_deassert(host->reset);
+-		if (ret) {
+-			dev_err(&pdev->dev, "reset err %d\n", ret);
+-			goto error_disable_clk_sample;
+-		}
++	ret = reset_control_deassert(host->reset);
++	if (ret) {
++		dev_err(&pdev->dev, "reset err %d\n", ret);
++		goto error_disable_clk_sample;
+ 	}
  
- 	clk_disable_unprepare(pdata->icnclk);
+ 	/*
+@@ -1197,8 +1195,7 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
+ 			sunxi_mmc_handle_manual_stop, 0, "sunxi-mmc", host);
  
--	if (rstc)
--		reset_control_assert(rstc);
-+	reset_control_assert(rstc);
+ error_assert_reset:
+-	if (!IS_ERR(host->reset))
+-		reset_control_assert(host->reset);
++	reset_control_assert(host->reset);
+ error_disable_clk_sample:
+ 	clk_disable_unprepare(host->clk_sample);
+ error_disable_clk_output:
+@@ -1281,8 +1278,7 @@ static int sunxi_mmc_remove(struct platform_device *pdev)
+ 	disable_irq(host->irq);
+ 	sunxi_mmc_reset_host(host);
  
- 	return ret;
- }
-@@ -470,8 +467,7 @@ static int sdhci_st_suspend(struct device *dev)
- 	if (ret)
- 		goto out;
+-	if (!IS_ERR(host->reset))
+-		reset_control_assert(host->reset);
++	reset_control_assert(host->reset);
  
--	if (pdata->rstc)
--		reset_control_assert(pdata->rstc);
-+	reset_control_assert(pdata->rstc);
- 
- 	clk_disable_unprepare(pdata->icnclk);
- 	clk_disable_unprepare(pltfm_host->clk);
-@@ -489,8 +485,7 @@ static int sdhci_st_resume(struct device *dev)
- 	clk_prepare_enable(pltfm_host->clk);
- 	clk_prepare_enable(pdata->icnclk);
- 
--	if (pdata->rstc)
--		reset_control_deassert(pdata->rstc);
-+	reset_control_deassert(pdata->rstc);
- 
- 	st_mmcss_cconfig(np, host);
- 
+ 	clk_disable_unprepare(host->clk_sample);
+ 	clk_disable_unprepare(host->clk_output);
 -- 
 2.11.0
