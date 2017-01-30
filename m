@@ -1,25 +1,72 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 30 Jan 2017 16:53:41 -0500 (EST)
-Subject: [PATCH net-next v7 0/3] Add support for the ethernet switch on
- the ESPRESSObin
-In-Reply-To: <cover.69cbc1ba8937d0fc442538f992d62fc88aa26dcc.1485804488.git-series.gregory.clement@free-electrons.com>
-References: <cover.69cbc1ba8937d0fc442538f992d62fc88aa26dcc.1485804488.git-series.gregory.clement@free-electrons.com>
-Message-ID: <20170130.165341.800910621072019384.davem@davemloft.net>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 30 Jan 2017 22:54:30 +0100
+Subject: [PATCH v9 0/4] arm64: arch_timer: Add workaround for
+ hisilicon-161010101 erratum
+In-Reply-To: <20170130155209.GC1160@leverpostej>
+References: <1484832916-7248-1-git-send-email-dingtianhong@huawei.com>
+ <765699aa-cbc6-67eb-9108-cbf335338e4c@linaro.org>
+ <35cf654f-3944-fc76-5120-25e33f71be4f@arm.com>
+ <20170124163551.GB2021@mai> <20170130155209.GC1160@leverpostej>
+Message-ID: <20170130215430.GJ2206@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Date: Mon, 30 Jan 2017 20:29:32 +0100
-
-> This set of patches adds support for the Marvell Ethernet Topaz switch
-> family (88E6141/88E6341) which is found on the ESPRESSObin. With this
-> series the network is usable on this board.
+On Mon, Jan 30, 2017 at 03:52:09PM +0000, Mark Rutland wrote:
+> Hi Daniel,
 > 
-> As usual, I rebased the series on the very last net-next/master. In
-> this series there is no temperature support which need some patches
-> form Andrew Lunn.
+> On Tue, Jan 24, 2017 at 05:35:51PM +0100, Daniel Lezcano wrote:
+> > That wasn't my point. The way the errata are handled in this patchset is
+> > elegant and I have nothing against it. I'm worried about the accumulation of
+> > fixes, hacks, workarounds in this driver. So my naive question is about not
+> > using an identified bogus clocksource and use another one available on the
+> > board, which is I believe often the case, instead of trying to deal with bogus
+> > hardware. Apparently, that is not possible because 1) of KVM, 2) of duplication
+> > and 3) of integration with the ARM64 code.
+> > 
+> > Does it mean it is not possible to use another clocksource/clockevent than the
+> > armv8-timer ?
+> > 
+> > Can you elaborate these three points ? 
 > 
-> As soon as Andrew Lunn will post the needed patch I will send a patch
-> to enable the temperature support.
+> Practically speaking, these platforms have no other clocksource or
+> clockevent device that I am aware of, which can be enumerated in a
+> standard manner using ACPI.
+> 
+> For point 1, KVM is intimately familiar with the architected timer
+> (which is managed during VM context switch in hyp code, for example).
+> KVM knows nothing of other clocksource or clockevent devices, and it is
+> far from trivial to plumb these in either way. Since the architected
+> timer is a mandatory part of ARMv8, guests may attempt to use it
+> regardless.
+> 
+> For point 3, arm64 currently requires the architected timer as this is
+> mandatory per the ARMv8 architecture. It is non-trivial to add support
+> for other devices to the vDSO, the delay loop, etc.
 
-Series applied, thank you.
+Ok, thanks for these clarifications.
+
+> Localising these quirks to the architected timer driver is by far the
+> least worst option available. Marc and I are perfectly happy to manage
+> that.
+
+It is up to me to ensure the clockevent/clocksource drivers in general are
+following the right direction. And this driver looks more and more opaque. I
+will spend some times to do a review of the driver as soon as I have time.
+
+So we finish the reviews of this series, you take the patches when I ack them up,
+but from this point, any submission for this driver will have to stick to the
+standard submission rules, that is to say: Thomas Gleixner and I have to be
+recipients of the patches and go through our tree. Dependency issues with
+other patchset must be solved before applying them in another tree.
+
+Thanks.
+
+  -- Daniel
+
+-- 
+
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
