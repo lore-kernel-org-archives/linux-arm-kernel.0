@@ -1,47 +1,39 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 30 Jan 2017 14:34:18 +0000
-Subject: [PATCH] PCI: mvebu: Handle changes to the bridge windows while
- enabled
-In-Reply-To: <20170128211728.GJ20550@bhelgaas-glaptop.roam.corp.google.com>
-References: <20161212183020.GA30274@obsidianresearch.com>
- <20170111183055.GD14532@bhelgaas-glaptop.roam.corp.google.com>
- <20170128211728.GJ20550@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20170130143418.GB25924@io.lakedaemon.net>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Mon, 30 Jan 2017 15:33:55 +0100
+Subject: [PATCH v2 0/5] Add EXTI GPIO trigger support to STM32 ADC
+Message-ID: <1485786840-4557-1-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+STM32 ADC, can use GPIOs configured as EXTI line (external interrupt)
+as trigger source for conversions.
+This patchset is based on latest IIO testing branch, and adds support
+for EXTi GPIO triggers in IIO.
+It also adds a dt option to configure default trigger polarity in
+STM32 ADC driver.
 
-On Sat, Jan 28, 2017 at 03:17:28PM -0600, Bjorn Helgaas wrote:
-> On Wed, Jan 11, 2017 at 12:30:55PM -0600, Bjorn Helgaas wrote:
-> > On Mon, Dec 12, 2016 at 11:30:20AM -0700, Jason Gunthorpe wrote:
-> > > The PCI core will write to the bridge window config multiple times
-> > > while they are enabled. This can lead to mbus failures like:
-> > > 
-> > >  mvebu_mbus: cannot add window '4:e8', conflicts with another window
-> > >  mvebu-pcie mbus:pex at e0000000: Could not create MBus window at [mem 0xe0000000-0xe00fffff]: -22
-> > > 
-> > > For me this is happening during a hotplug cycle. The PCI core is
-> > > not changing the values, just writing them twice while active.
-> > > 
-> > > The patch addresses the general case of any change to an active window,
-> > > but not atomically. The code is slightly refactored so io and mem
-> > > can share more of the window logic.
-> > 
-> > Looks good to me, but I'm waiting for an ack from Thomas or Jason (listed
-> > as maintainers and already cc'd).
-> 
-> Ping, Thomas, Jason C?
-> 
-> > > Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> > > ---
-> > >  drivers/pci/host/pci-mvebu.c | 101 +++++++++++++++++++++++++------------------
-> > >  1 file changed, 60 insertions(+), 41 deletions(-)
+---
+Changes in V2:
+- Fixed Kconfig dependencies
 
-Sorry, been on travel and I think Thomas is on holiday.
+Fabrice Gasnier (5):
+  Documentation: dt: iio: document stm32 adc trigger polarity
+  iio: adc: stm32: add dt option to set default trigger polarity
+  Documentation: dt: iio: document stm32 exti trigger
+  iio: trigger: add support for STM32 EXTI triggers
+  iio: adc: stm32: add exti gpio trigger source
 
-Acked-by: Jason Cooper <jason@lakedaemon.net>
+ .../devicetree/bindings/iio/adc/st,stm32-adc.txt   |   3 +
+ .../bindings/iio/trigger/st,stm32-exti-trigger.txt |  17 +++
+ drivers/iio/adc/stm32-adc.c                        |  14 +++
+ drivers/iio/trigger/Kconfig                        |  11 ++
+ drivers/iio/trigger/Makefile                       |   1 +
+ drivers/iio/trigger/stm32-exti-trigger.c           | 124 +++++++++++++++++++++
+ include/linux/iio/trigger/stm32-exti-trigger.h     |  26 +++++
+ 7 files changed, 196 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iio/trigger/st,stm32-exti-trigger.txt
+ create mode 100644 drivers/iio/trigger/stm32-exti-trigger.c
+ create mode 100644 include/linux/iio/trigger/stm32-exti-trigger.h
 
-thx,
-
-Jason.
+-- 
+1.9.1
