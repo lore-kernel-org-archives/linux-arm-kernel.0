@@ -1,97 +1,142 @@
-From: nwatters@codeaurora.org (Nate Watterson)
-Date: Mon, 30 Jan 2017 09:23:29 -0500
-Subject: [PATCH V7 08/11] drivers: acpi: Handle IOMMU lookup failure with
- deferred probing or error
-In-Reply-To: <14751205-f034-7f0d-442a-854c3909425c@codeaurora.org>
-References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
- <1485188293-20263-9-git-send-email-sricharan@codeaurora.org>
- <20170124123711.GA11996@red-moon>
- <f2370671-ece8-fbee-de19-350dd625088f@codeaurora.org>
- <93e79759-d614-9b36-d5ab-63e8eb725009@arm.com>
- <14751205-f034-7f0d-442a-854c3909425c@codeaurora.org>
-Message-ID: <5ba9f366d6e25397cdef8ad95b49e199@codeaurora.org>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Mon, 30 Jan 2017 14:23:56 +0000
+Subject: [STLinux Kernel] [PATCH 3/8] serial: st-asc: Read in all Pinctrl
+ states
+In-Reply-To: <20170127115458.k4edg42nnna3bv4v@dell>
+References: <20170124134310.27512-1-lee.jones@linaro.org>
+ <20170124134310.27512-4-lee.jones@linaro.org>
+ <20170125112142.GE5680@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20170127115458.k4edg42nnna3bv4v@dell>
+Message-ID: <20170130142356.GA18710@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-01-30 08:59, Sinan Kaya wrote:
-> On 1/30/2017 7:22 AM, Robin Murphy wrote:
->> On 29/01/17 17:53, Sinan Kaya wrote:
->>> On 1/24/2017 7:37 AM, Lorenzo Pieralisi wrote:
->>>> [+hanjun, tomasz, sinan]
->>>> 
->>>> It is quite a key patchset, I would be glad if they can test on 
->>>> their
->>>> respective platforms with IORT.
->>>> 
->>> 
->>> Tested on top of 4.10-rc5.
->>> 
->>> 1.	Platform Hidma device passed dmatest
->>> 2.	Seeing some USB stalls on a platform USB device.
->>> 3.	PCIe NVME drive probed and worked fine with MSI interrupts after 
->>> boot.
->>> 4. 	NVMe driver didn't probe following a hotplug insertion and 
->>> received an
->>> SMMU error event during the insertion.
->> 
->> What was the SMMU error - a translation/permission fault (implying the
->> wrong DMA ops) or a bad STE fault (implying we totally failed to tell
->> the SMMU about the device at all)?
->> 
-> 
-> root at ubuntu:/sys/bus/pci/slots/4# echo 0 > power
-> 
-> [__204.698522]_iommu:_Removing_device_0003:01:00.0_from_group_0
-> [  204.708704] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down
-> [  204.708723] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down event
-> ignored; already powering off
-> 
-> root at ubuntu:/sys/bus/pci/slots/4#
-> 
-> [__254.820440]_iommu:_Adding_device_0003:01:00.0_to_group_8
-> [  254.820599] nvme nvme0: pci function 0003:01:00.0
-> [  254.820621] nvme 0003:01:00.0: enabling device (0000 -> 0002)
-> [  261.948558] arm-smmu-v3 arm-smmu-v3.0.auto: event 0x0a received:
-> [  261.948561] arm-smmu-v3 arm-smmu-v3.0.auto:  0x000001000000000a
-> [  261.948563] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
-> [  261.948564] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
-> [  261.948566] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
-Looks like C_BAD_CD. Can you please try with:
-iommu/arm-smmu-v3: Clear prior settings when updating STEs
+Hi Lee,
 
-> root at ubuntu:/sys/bus/pci/slots/4#
-> 
-> root at ubuntu:/sys/bus/pci/slots/4#ls /dev/nvme*
-> /dev/nvme0
-> 
-> I should have seen /dev/nvme0n1 partition here.
-> 
->> Robin.
->> 
->>> 
->>> /sys/bus/pci/slots/4 #
->>> /sys/bus/pci/slots/4 # dmesg | grep nvme
->>> [   14.041357] nvme nvme0: pci function 0003:01:00.0
->>> [  198.399521] nvme nvme0: pci function 0003:01:00.0
->>> [__198.416232]_nvme_0003:01:00.0:_enabling_device_(0000_->_0002)
->>> [  264.402216] nvme nvme0: I/O 228 QID 0 timeout, disable controller
->>> [  264.402313] nvme nvme0: Identify Controller failed (-4)
->>> [  264.421270] nvme nvme0: Removing after probe failure status: -5
->>> /sys/bus/pci/slots/4 #
->>> 
->>> 
->>> 
->> 
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-pci" 
->> in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> 
+On Fri, 27 Jan 2017, Lee Jones wrote:
 
--- 
-Qualcomm Datacenter Technologies, Inc. on behalf of Qualcomm 
-Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
-Linux
-Foundation Collaborative Project.
+> On Wed, 25 Jan 2017, Peter Griffin wrote:
+> 
+> > Hi Lee,
+> > 
+> > On Tue, 24 Jan 2017, Lee Jones wrote:
+> > 
+> > > There are now 2 possible separate/different Pinctrl states which can
+> > > be provided from platform data.  One which encompasses the lines
+> > > required for HW flow-control (CTS/RTS) and another which does not
+> > > specify these lines, such that they can be used via GPIO mechanisms
+> > > for manually toggling (i.e. from a request by `stty`).
+> > > 
+> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > > ---
+> > >  drivers/tty/serial/st-asc.c | 28 ++++++++++++++++++++++++++++
+> > >  1 file changed, 28 insertions(+)
+> > > 
+> > > diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
+> > > index 397df50..03801ed 100644
+> > > --- a/drivers/tty/serial/st-asc.c
+> > > +++ b/drivers/tty/serial/st-asc.c
+> > > @@ -37,10 +37,16 @@
+> > >  #define ASC_FIFO_SIZE 16
+> > >  #define ASC_MAX_PORTS 8
+> > >  
+> > > +/* Pinctrl states */
+> > > +#define DEFAULT		0
+> > > +#define MANUAL_RTS	1
+> > 
+> > Nit: Would be better to have them aligned.
+> 
+> These are aligned in code.  The patch format throws things out.
+> 
+> Look, same lines with the "> > +" removed:
+
+Ah OK.
+
+> 
+> /* Pinctrl states */
+> #define DEFAULT		0
+> #define MANUAL_RTS	1
+> 
+> Try it.
+> 
+> > > +
+> > >  struct asc_port {
+> > >  	struct uart_port port;
+> > >  	struct gpio_desc *rts;
+> > >  	struct clk *clk;
+> > > +	struct pinctrl *pinctrl;
+> > > +	struct pinctrl_state *states[2];
+> > >  	unsigned int hw_flow_control:1;
+> > >  	unsigned int force_m1:1;
+> > >  };
+> > > @@ -694,6 +700,7 @@ static int asc_init_port(struct asc_port *ascport,
+> > >  {
+> > >  	struct uart_port *port = &ascport->port;
+> > >  	struct resource *res;
+> > > +	int ret;
+> > >  
+> > >  	port->iotype	= UPIO_MEM;
+> > >  	port->flags	= UPF_BOOT_AUTOCONF;
+> > > @@ -720,6 +727,27 @@ static int asc_init_port(struct asc_port *ascport,
+> > >  	WARN_ON(ascport->port.uartclk == 0);
+> > >  	clk_disable_unprepare(ascport->clk);
+> > >  
+> > > +	ascport->pinctrl = devm_pinctrl_get(&pdev->dev);
+> > > +	if (IS_ERR(ascport->pinctrl)) {
+> > > +		ret = PTR_ERR(ascport->pinctrl);
+> > > +		dev_err(&pdev->dev, "Failed to get Pinctrl: %d\n", ret);
+> > > +	}
+> > > +
+> > > +	ascport->states[DEFAULT] =
+> > > +		pinctrl_lookup_state(ascport->pinctrl, "default");
+> > > +	if (IS_ERR(ascport->states[DEFAULT])) {
+> > > +		ret = PTR_ERR(ascport->states[DEFAULT]);
+> > > +		dev_err(&pdev->dev,
+> > > +			"Failed to look up Pinctrl state 'default': %d\n", ret);
+> > > +		return ret;
+> > > +	}
+> > > +
+> > > +	/* "manual-rts" state is optional */
+> > > +	ascport->states[MANUAL_RTS] =
+> > > +		pinctrl_lookup_state(ascport->pinctrl, "manual-rts");
+> > > +	if (IS_ERR(ascport->states[MANUAL_RTS]))
+> > > +		ascport->states[MANUAL_RTS] = NULL;
+> > > +
+> > 
+> > The different pinctrl states looks like a neat solution to the problem.
+> > 
+> > My only concern here is that 'default' state is implying a hw-flow-control
+> > pinmux config, and manual-rts is implying what is the current upstream
+> > 'default' pinmux config.
+> > 
+> > Which maybe ok if you update all uarts, but currently only serial0
+> > is updated. So the other uarts current 'default' is actually the same as serial0
+> > 'manual-rts' grouping, which conceptually is odd.
+> > 
+> > Would it not be better to make 'manual-rts' the default state? As that aligns
+> > to what is currently already the default for the other UARTS? And then make
+> > hw-flow-control the optional state for serial0?
+> > 
+> > That also has the advantage that 'default' has the same meaning with older DT's.
+> 
+> The reason it was done is this was because none of the other UARTs
+> require 2 separate Pinctrl configurations, only this one.  Moreover,
+> if they support RTS/CTS then I believe that the lines should be
+> defined in Pinctrl.
+
+Yes I agree with that.
+
+> Thus, it was my plan to update all UART's default
+> Pinctrl configs to include the RTS/CTS lines.
+> 
+
+I still don't see the point in changing the meaning of 'default' group and breaking
+ABI if you don't need to?
+
+As far as I can tell if you swap the meaning of 'default' and 'maunal-rts'
+groups you get all the benefits of this series whilst also maintaining backwards
+compatbility with older DT's.
+
+regards,
+
+Peter.
