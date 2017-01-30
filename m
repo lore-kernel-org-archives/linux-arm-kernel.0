@@ -1,50 +1,97 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 30 Jan 2017 15:20:04 +0100
-Subject: [PATCH v5 5/8] clocksource/drivers/rockchip_timer: split
- bc_timer into rk_timer and rk_clock_event_device
-In-Reply-To: <0E7077EE-0D5A-4653-99EF-E8F2E8FD2FB0@gmail.com>
-References: <1485260203-14216-1-git-send-email-al.kochet@gmail.com>
- <1485260203-14216-6-git-send-email-al.kochet@gmail.com>
- <20170130131258.GF2206@mai>
- <0E7077EE-0D5A-4653-99EF-E8F2E8FD2FB0@gmail.com>
-Message-ID: <20170130142004.GI2206@mai>
+From: nwatters@codeaurora.org (Nate Watterson)
+Date: Mon, 30 Jan 2017 09:23:29 -0500
+Subject: [PATCH V7 08/11] drivers: acpi: Handle IOMMU lookup failure with
+ deferred probing or error
+In-Reply-To: <14751205-f034-7f0d-442a-854c3909425c@codeaurora.org>
+References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
+ <1485188293-20263-9-git-send-email-sricharan@codeaurora.org>
+ <20170124123711.GA11996@red-moon>
+ <f2370671-ece8-fbee-de19-350dd625088f@codeaurora.org>
+ <93e79759-d614-9b36-d5ab-63e8eb725009@arm.com>
+ <14751205-f034-7f0d-442a-854c3909425c@codeaurora.org>
+Message-ID: <5ba9f366d6e25397cdef8ad95b49e199@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2017 at 04:55:33PM +0300, Alexander Kochetkov wrote:
+On 2017-01-30 08:59, Sinan Kaya wrote:
+> On 1/30/2017 7:22 AM, Robin Murphy wrote:
+>> On 29/01/17 17:53, Sinan Kaya wrote:
+>>> On 1/24/2017 7:37 AM, Lorenzo Pieralisi wrote:
+>>>> [+hanjun, tomasz, sinan]
+>>>> 
+>>>> It is quite a key patchset, I would be glad if they can test on 
+>>>> their
+>>>> respective platforms with IORT.
+>>>> 
+>>> 
+>>> Tested on top of 4.10-rc5.
+>>> 
+>>> 1.	Platform Hidma device passed dmatest
+>>> 2.	Seeing some USB stalls on a platform USB device.
+>>> 3.	PCIe NVME drive probed and worked fine with MSI interrupts after 
+>>> boot.
+>>> 4. 	NVMe driver didn't probe following a hotplug insertion and 
+>>> received an
+>>> SMMU error event during the insertion.
+>> 
+>> What was the SMMU error - a translation/permission fault (implying the
+>> wrong DMA ops) or a bad STE fault (implying we totally failed to tell
+>> the SMMU about the device at all)?
+>> 
 > 
-> > 30 ???. 2017 ?., ? 16:12, Daniel Lezcano <daniel.lezcano@linaro.org> ???????(?):
-> > 
-> > I don't get the point of these changes. The patch does not explain why they are
-> > needed.
+> root at ubuntu:/sys/bus/pci/slots/4# echo 0 > power
 > 
-> I?d like to extract timer API from current implementation.
-> And to make code more readable I?d like to introduce 'struct rk_timer? what can be
-> reused with current implementation and with my patch (8/8). And in order keep patches
-> simple and readable I split that into three patches: 5/8, 6/8, 7/8.
+> [__204.698522]_iommu:_Removing_device_0003:01:00.0_from_group_0
+> [  204.708704] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down
+> [  204.708723] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down event
+> ignored; already powering off
 > 
-> Current implementation named rockchip timer as ?struct bc_timer? (broadcast timer).
-> I renamed it to more suitable to it role (may be bad choice).
+> root at ubuntu:/sys/bus/pci/slots/4#
 > 
-> Yes, the patch itself looks strange. You are right.
-> 
-> What do you think about that solution:
-> - in the patch 6/8 i will Introduce 'struct rk_timer? and 'struct rk_time_clkevt? (renamed ?struct bc_timer?).
+> [__254.820440]_iommu:_Adding_device_0003:01:00.0_to_group_8
+> [  254.820599] nvme nvme0: pci function 0003:01:00.0
+> [  254.820621] nvme 0003:01:00.0: enabling device (0000 -> 0002)
+> [  261.948558] arm-smmu-v3 arm-smmu-v3.0.auto: event 0x0a received:
+> [  261.948561] arm-smmu-v3 arm-smmu-v3.0.auto:  0x000001000000000a
+> [  261.948563] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
+> [  261.948564] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
+> [  261.948566] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
+Looks like C_BAD_CD. Can you please try with:
+iommu/arm-smmu-v3: Clear prior settings when updating STEs
 
-I prefer rk_clksrc and rk_clkevt.
-
-> - rk_timer_init() changes from 5/8 I will merge with 8/8
-> - 8/8 introduce 'struct rk_time_clksrc' 
-> - 5/8 drop
-
-Ok, let's see what that gives.
-
-  -- Daniel
+> root at ubuntu:/sys/bus/pci/slots/4#
+> 
+> root at ubuntu:/sys/bus/pci/slots/4#ls /dev/nvme*
+> /dev/nvme0
+> 
+> I should have seen /dev/nvme0n1 partition here.
+> 
+>> Robin.
+>> 
+>>> 
+>>> /sys/bus/pci/slots/4 #
+>>> /sys/bus/pci/slots/4 # dmesg | grep nvme
+>>> [   14.041357] nvme nvme0: pci function 0003:01:00.0
+>>> [  198.399521] nvme nvme0: pci function 0003:01:00.0
+>>> [__198.416232]_nvme_0003:01:00.0:_enabling_device_(0000_->_0002)
+>>> [  264.402216] nvme nvme0: I/O 228 QID 0 timeout, disable controller
+>>> [  264.402313] nvme nvme0: Identify Controller failed (-4)
+>>> [  264.421270] nvme nvme0: Removing after probe failure status: -5
+>>> /sys/bus/pci/slots/4 #
+>>> 
+>>> 
+>>> 
+>> 
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-pci" 
+>> in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> 
 
 -- 
-
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Qualcomm Datacenter Technologies, Inc. on behalf of Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
+Linux
+Foundation Collaborative Project.
