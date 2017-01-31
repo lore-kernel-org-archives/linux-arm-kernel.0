@@ -1,79 +1,32 @@
-From: john@metanate.com (John Keeping)
-Date: Tue, 31 Jan 2017 12:14:09 +0000
-Subject: [PATCH v3 15/24] drm/rockchip: dw-mipi-dsi: configure PHY
- before enabling
-In-Reply-To: <20170130202808.GR20076@art_vandelay>
-References: <20170129132444.25251-1-john@metanate.com>
- <20170129132444.25251-16-john@metanate.com>
- <20170130202808.GR20076@art_vandelay>
-Message-ID: <20170131121409.4cc453d0.john@metanate.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 31 Jan 2017 12:14:30 +0000
+Subject: [PATCH v9 0/4] arm64: arch_timer: Add workaround for
+ hisilicon-161010101 erratum
+In-Reply-To: <20170130215430.GJ2206@mai>
+References: <1484832916-7248-1-git-send-email-dingtianhong@huawei.com>
+ <765699aa-cbc6-67eb-9108-cbf335338e4c@linaro.org>
+ <35cf654f-3944-fc76-5120-25e33f71be4f@arm.com>
+ <20170124163551.GB2021@mai> <20170130155209.GC1160@leverpostej>
+ <20170130215430.GJ2206@mai>
+Message-ID: <20170131121429.GC11191@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Jan 2017 15:28:08 -0500, Sean Paul wrote:
-
-> On Sun, Jan 29, 2017 at 01:24:35PM +0000, John Keeping wrote:
-> > The bias, bandgap and PLL should all be configured before we enable
-> > them.
-> >   
-> 
-> Do you know why the test codes are hard-coded magic? It'd be nice to make some
-> sense of them in a future patch.
-
-I just kept with the existing style of the code, but it should be
-straightforward to add some defines with sensible names.
-
-> Reviewed-by: Sean Paul <seanpaul@chromium.org>
-> 
-> > Signed-off-by: John Keeping <john@metanate.com>
-> > ---
-> > v3:
-> > - Squash together two patches that both affect initialization order of
-> >   the PHY
-> > Unchanged in v2
+On Mon, Jan 30, 2017 at 10:54:30PM +0100, Daniel Lezcano wrote:
+> On Mon, Jan 30, 2017 at 03:52:09PM +0000, Mark Rutland wrote:
+> > Hi Daniel,
 > > 
-> >  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 11 ++++++-----
-> >  1 file changed, 6 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > index 5b3068e9e8db..cfe7e4ba305c 100644
-> > --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > @@ -413,12 +413,17 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
-> >  
-> >  	dw_mipi_dsi_phy_write(dsi, 0x44, HSFREQRANGE_SEL(testdin));
-> >  
-> > -	dw_mipi_dsi_phy_write(dsi, 0x19, PLL_LOOP_DIV_EN | PLL_INPUT_DIV_EN);
-> >  	dw_mipi_dsi_phy_write(dsi, 0x17, INPUT_DIVIDER(dsi->input_div));
-> >  	dw_mipi_dsi_phy_write(dsi, 0x18, LOOP_DIV_LOW_SEL(dsi->feedback_div) |
-> >  					 LOW_PROGRAM_EN);
-> >  	dw_mipi_dsi_phy_write(dsi, 0x18, LOOP_DIV_HIGH_SEL(dsi->feedback_div) |
-> >  					 HIGH_PROGRAM_EN);
-> > +	dw_mipi_dsi_phy_write(dsi, 0x19, PLL_LOOP_DIV_EN | PLL_INPUT_DIV_EN);
-> > +
-> > +	dw_mipi_dsi_phy_write(dsi, 0x22, LOW_PROGRAM_EN |
-> > +					 BIASEXTR_SEL(BIASEXTR_127_7));
-> > +	dw_mipi_dsi_phy_write(dsi, 0x22, HIGH_PROGRAM_EN |
-> > +					 BANDGAP_SEL(BANDGAP_96_10));
-> >  
-> >  	dw_mipi_dsi_phy_write(dsi, 0x20, POWER_CONTROL | INTERNAL_REG_CURRENT |
-> >  					 BIAS_BLOCK_ON | BANDGAP_ON);
-> > @@ -429,10 +434,6 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
-> >  					 SETRD_MAX | POWER_MANAGE |
-> >  					 TER_RESISTORS_ON);
-> >  
-> > -	dw_mipi_dsi_phy_write(dsi, 0x22, LOW_PROGRAM_EN |
-> > -					 BIASEXTR_SEL(BIASEXTR_127_7));
-> > -	dw_mipi_dsi_phy_write(dsi, 0x22, HIGH_PROGRAM_EN |
-> > -					 BANDGAP_SEL(BANDGAP_96_10));
-> >  
-> >  	dw_mipi_dsi_phy_write(dsi, 0x70, TLP_PROGRAM_EN | 0xf);
-> >  	dw_mipi_dsi_phy_write(dsi, 0x71, THS_PRE_PROGRAM_EN | 0x55);
-> > -- 
-> > 2.11.0.197.gb556de5.dirty
-> > 
-> > _______________________________________________
-> > dri-devel mailing list
-> > dri-devel at lists.freedesktop.org
-> > https://lists.freedesktop.org/mailman/listinfo/dri-devel  
-> 
+> > On Tue, Jan 24, 2017 at 05:35:51PM +0100, Daniel Lezcano wrote:
+ 
+> It is up to me to ensure the clockevent/clocksource drivers in general are
+> following the right direction. And this driver looks more and more opaque. I
+> will spend some times to do a review of the driver as soon as I have time.
+
+FWIW, I'd locally fixed up the patches in the branch I previously
+mentioned, so many issues in this series no longer exist.
+
+I will post the cleaned up series momentarily. Hopefully that should be
+less painful to review.
+
+Thanks,
+Mark.
