@@ -1,132 +1,35 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 31 Jan 2017 00:01:25 +0000
-Subject: [PATCH v3 21/24] media: imx: Add MIPI CSI-2 Receiver subdev driver
-In-Reply-To: <1483755102-24785-22-git-send-email-steve_longerbeam@mentor.com>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-22-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <20170131000125.GO27312@n2100.armlinux.org.uk>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 30 Jan 2017 18:09:14 -0600
+Subject: [PATCH V6 1/5] LIB: Indirect ISA/LPC port IO introduced
+In-Reply-To: <1485241525-201782-2-git-send-email-yuanzhichang@hisilicon.com>
+References: <1485241525-201782-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1485241525-201782-2-git-send-email-yuanzhichang@hisilicon.com>
+Message-ID: <20170131000914.GA11331@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2017 at 06:11:39PM -0800, Steve Longerbeam wrote:
-> +static void imxcsi2_enable(struct imxcsi2_dev *csi2, bool enable)
-> +{
-> +	if (enable) {
-> +		imxcsi2_write(csi2, 0xffffffff, CSI2_PHY_SHUTDOWNZ);
-> +		imxcsi2_write(csi2, 0xffffffff, CSI2_DPHY_RSTZ);
-> +		imxcsi2_write(csi2, 0xffffffff, CSI2_RESETN);
-> +	} else {
-> +		imxcsi2_write(csi2, 0x0, CSI2_PHY_SHUTDOWNZ);
-> +		imxcsi2_write(csi2, 0x0, CSI2_DPHY_RSTZ);
-> +		imxcsi2_write(csi2, 0x0, CSI2_RESETN);
-> +	}
-> +}
-> +
-> +static void imxcsi2_reset(struct imxcsi2_dev *csi2)
-> +{
-> +	imxcsi2_enable(csi2, false);
-> +
-> +	imxcsi2_write(csi2, 0x00000001, CSI2_PHY_TST_CTRL0);
-> +	imxcsi2_write(csi2, 0x00000000, CSI2_PHY_TST_CTRL1);
-> +	imxcsi2_write(csi2, 0x00000000, CSI2_PHY_TST_CTRL0);
-> +	imxcsi2_write(csi2, 0x00000002, CSI2_PHY_TST_CTRL0);
-> +	imxcsi2_write(csi2, 0x00010044, CSI2_PHY_TST_CTRL1);
-> +	imxcsi2_write(csi2, 0x00000000, CSI2_PHY_TST_CTRL0);
-> +	imxcsi2_write(csi2, 0x00000014, CSI2_PHY_TST_CTRL1);
-> +	imxcsi2_write(csi2, 0x00000002, CSI2_PHY_TST_CTRL0);
-> +	imxcsi2_write(csi2, 0x00000000, CSI2_PHY_TST_CTRL0);
-> +
-> +	imxcsi2_enable(csi2, true);
-> +}
-> +
-> +static int imxcsi2_dphy_wait(struct imxcsi2_dev *csi2)
-> +{
-> +	u32 reg;
-> +	int i;
-> +
-> +	/* wait for mipi sensor ready */
-> +	for (i = 0; i < 50; i++) {
-> +		reg = imxcsi2_read(csi2, CSI2_PHY_STATE);
-> +		if (reg != 0x200)
-> +			break;
-> +		usleep_range(10000, 20000);
-> +	}
-> +
-> +	if (i >= 50) {
-> +		v4l2_err(&csi2->sd,
-> +			 "wait for clock lane timeout, phy_state = 0x%08x\n",
-> +			 reg);
-> +		return -ETIME;
-> +	}
-> +
-> +	/* wait for mipi stable */
-> +	for (i = 0; i < 50; i++) {
-> +		reg = imxcsi2_read(csi2, CSI2_ERR1);
-> +		if (reg == 0x0)
-> +			break;
-> +		usleep_range(10000, 20000);
-> +	}
-> +
-> +	if (i >= 50) {
-> +		v4l2_err(&csi2->sd,
-> +			 "wait for controller timeout, err1 = 0x%08x\n",
-> +			 reg);
-> +		return -ETIME;
-> +	}
-> +
-> +	/* finally let's wait for active clock on the clock lane */
-> +	for (i = 0; i < 50; i++) {
-> +		reg = imxcsi2_read(csi2, CSI2_PHY_STATE);
-> +		if (reg & (1 << 8))
-> +			break;
-> +		usleep_range(10000, 20000);
-> +	}
-> +
-> +	if (i >= 50) {
-> +		v4l2_err(&csi2->sd,
-> +			 "wait for active clock timeout, phy_state = 0x%08x\n",
-> +			 reg);
-> +		return -ETIME;
-> +	}
-> +
-> +	v4l2_info(&csi2->sd, "ready, dphy version 0x%x\n",
-> +		  imxcsi2_read(csi2, CSI2_VERSION));
-> +
-> +	return 0;
-> +}
-...
-> +static int imxcsi2_s_power(struct v4l2_subdev *sd, int on)
-> +{
-> +	struct imxcsi2_dev *csi2 = sd_to_dev(sd);
-> +
-> +	if (on && !csi2->on) {
-> +		v4l2_info(&csi2->sd, "power ON\n");
-> +		clk_prepare_enable(csi2->cfg_clk);
-> +		clk_prepare_enable(csi2->dphy_clk);
-> +		imxcsi2_set_lanes(csi2);
-> +		imxcsi2_reset(csi2);
+On Tue, Jan 24, 2017 at 03:05:21PM +0800, zhichang.yuan wrote:
+> Low-pin-count interface is integrated into some SoCs. The accesses to those
+> peripherals under LPC make use of I/O ports rather than the memory mapped I/O.
+> 
+> To drive these devices, this patch introduces a method named indirect-IO.
 
-The iMX6 manuals call for a very specific seven sequence of initialisation
-for CSI2, which begins with:
+It's slightly confusing to call this "indirect I/O" and then use
+"extio" for the filename and function prefix.  It'd be nice to use
+related names.
 
-1. reset the D-PHY.
-2. place MIPI sensor in LP-11 state
-3. perform D-PHY initialisation
-4. configure CSI2 lanes and de-assert resets and shutdown signals
+> +struct extio_node {
+> +	unsigned long bus_start;	/* bus start address */
+> +	unsigned long io_start;	/* io port token corresponding to bus_start */
+> +	size_t range_size;	/* size of the extio node operating range */
+> +	struct fwnode_handle *fwnode;
+> +	struct list_head list;
+> +	struct extio_ops *ops;	/* ops operating on this node */
+> +	void *devpara;	/* private parameter of the host device */
+> +};
 
-Since you reset the CSI2 at power up and then release it, how do you
-guarantee that the published sequence is followed?
+I wish we didn't have both struct io_range and struct extio_node.  It
+seems like they're both sort of trying to do the same thing.  Maybe
+this is the same as what Alex is saying.
 
-With Philipp's driver, this is easy, because there is a prepare_stream
-callback which gives the sensor an opportunity to get everything
-correctly configured according to the negotiated parameters, and place
-the sensor in LP-11 state.
-
-Some sensors do not power up in LP-11 state, but need to be programmed
-fully before being asked to momentarily stream.  Only at that point is
-the sensor guaranteed to be in the required LP-11 state.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Bjorn
