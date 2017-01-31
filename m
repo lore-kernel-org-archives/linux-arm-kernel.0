@@ -1,39 +1,39 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 31 Jan 2017 18:20:02 +0100
-Subject: [PATCH 09/14] mtd: nand: sunxi: simplify optional reset handling
-In-Reply-To: <20170130134427.14487373@bbrezillon>
-References: <20170130114116.22089-1-p.zabel@pengutronix.de>
- <20170130114116.22089-9-p.zabel@pengutronix.de>
- <20170130134427.14487373@bbrezillon>
-Message-ID: <1485883202.2932.82.camel@pengutronix.de>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Tue, 31 Jan 2017 17:20:53 +0000
+Subject: [PATCH 3/3 v3] iio: adc: add a driver for Qualcomm PM8xxx HK/XOADC
+In-Reply-To: <CACRpkdYZzPWyyAmr8jTfRQuSADXkFoZpehhEVFLAfVnXmum4aw@mail.gmail.com>
+References: <20170117142515.10578-1-linus.walleij@linaro.org>
+ <20170117142515.10578-3-linus.walleij@linaro.org>
+ <cab36d80-53ba-bc43-cf08-6aafb56c737a@kernel.org>
+ <e9a2162e-65e9-7276-25f9-4597da1125a3@kernel.org>
+ <CACRpkdYZzPWyyAmr8jTfRQuSADXkFoZpehhEVFLAfVnXmum4aw@mail.gmail.com>
+Message-ID: <787406E0-A1F1-4B86-968C-3925715693FD@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-01-30 at 13:44 +0100, Boris Brezillon wrote:
-> Hi Philipp,
-> 
-> On Mon, 30 Jan 2017 12:41:11 +0100
-> Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> 
-> > As of commit bb475230b8e5 ("reset: make optional functions really
-> > optional"), the reset framework API calls use NULL pointers to describe
-> > optional, non-present reset controls.
-> > 
-> > This allows to return errors from devm_reset_control_get_optional and to
-> > call reset_control_(de)assert unconditionally.
-> > 
-> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> > Cc: Icenowy Zheng <icenowy@aosc.xyz>
-> > Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
-> 
-> I didn't find commit bb475230b8e5 in mainline, so I guess you plan to
-> take this patch in your own tree. Let me know if this is not the case.
-> 
-> Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-Thanks, I think I'll resend this once bb475230b8e5 hits mainline for you
-to merge.
 
-regards
-Philipp
+On 31 January 2017 09:48:31 GMT+00:00, Linus Walleij <linus.walleij@linaro.org> wrote:
+>On Mon, Jan 30, 2017 at 9:15 PM, Jonathan Cameron <jic23@kernel.org>
+>wrote:
+>
+>> Still outstanding bits and bobs in here so not taking this patch for
+>> now.  Will probably do a last sweep of patches that are nearly
+>> ready mid week as need to do pull before weekend to be sure of
+>> making the next merge window (i.e. ones I've reviewed already but
+>> have minor outstanding bits like this one).
+>
+>Sure, didn't mean you to apply this one, I was planning to respin it.
+>Just eager about patches 1&2 so I decrease my patch stack.
+*Laughs*
+
+I wouldn't normally take a big rework like 2 without a patch making use of it.  Anyhow
+ should be fine as changes were all trivial in this one.
+
+Thanks
+>
+>Yours,
+>Linus Walleij
+
+-- 
+Sent from my Android device with K-9 Mail. Please excuse my brevity.
