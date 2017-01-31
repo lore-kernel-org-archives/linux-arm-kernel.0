@@ -1,102 +1,218 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 31 Jan 2017 11:09:24 +0100
-Subject: [PATCH v3 00/24] i.MX Media Driver
-In-Reply-To: <20170130130657.GR27312@n2100.armlinux.org.uk>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <c6e98327-7e2c-f34a-2d23-af7b236de441@xs4all.nl>
- <1484929911.2897.70.camel@pengutronix.de>
- <3fb68686-9447-2d8a-e2d2-005e4138cd43@gmail.com>
- <5d23d244-aa0e-401c-24a9-07f28acf1563@xs4all.nl>
- <1485169204.2874.57.camel@pengutronix.de>
- <ce2d1851-8a2e-ea0b-25b8-be6649b1ebaf@gmail.com>
- <1485257269.3600.96.camel@pengutronix.de>
- <20170130130657.GR27312@n2100.armlinux.org.uk>
-Message-ID: <1485857364.2932.27.camel@pengutronix.de>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 31 Jan 2017 10:13:56 +0000
+Subject: [STLinux Kernel] [PATCH 3/8] serial: st-asc: Read in all Pinctrl
+ states
+In-Reply-To: <20170130223521.GA12847@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <20170124134310.27512-1-lee.jones@linaro.org>
+ <20170124134310.27512-4-lee.jones@linaro.org>
+ <20170125112142.GE5680@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20170127115458.k4edg42nnna3bv4v@dell>
+ <20170130142356.GA18710@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20170130153211.j75qemvwsq3cwqve@dell>
+ <20170130161041.GA21001@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20170130191159.zv5jegvu4fetcmzo@dell>
+ <20170130223521.GA12847@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <20170131101356.bpg5hamkfgprdbpt@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-01-30 at 13:06 +0000, Russell King - ARM Linux wrote:
-> > The central issue seems to be that I think media pad links / media bus
-> > formats should describe physical links, such as parallel or serial
-> > buses, and the formats of pixels flowing through them, whereas Steve
-> > would like to extend them to describe software transports and in-memory
-> > formats.
+On Mon, 30 Jan 2017, Peter Griffin wrote:
+> On Mon, 30 Jan 2017, Lee Jones wrote:
+> > On Mon, 30 Jan 2017, Peter Griffin wrote:
+> > > On Mon, 30 Jan 2017, Lee Jones wrote:
+> > > > On Mon, 30 Jan 2017, Peter Griffin wrote:
+> > > > > On Fri, 27 Jan 2017, Lee Jones wrote:
+> > > > > > On Wed, 25 Jan 2017, Peter Griffin wrote:
+> > > > > > > On Tue, 24 Jan 2017, Lee Jones wrote:
+> > > > > > > 
+> > > > > > > > There are now 2 possible separate/different Pinctrl states which can
+> > > > > > > > be provided from platform data.  One which encompasses the lines
+> > > > > > > > required for HW flow-control (CTS/RTS) and another which does not
+> > > > > > > > specify these lines, such that they can be used via GPIO mechanisms
+> > > > > > > > for manually toggling (i.e. from a request by `stty`).
+> > > > > > > > 
+> > > > > > > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > > > > > > > ---
+> > > > > > > >  drivers/tty/serial/st-asc.c | 28 ++++++++++++++++++++++++++++
+> > > > > > > >  1 file changed, 28 insertions(+)
+> > > > > > > > 
+> > > > > > > > diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
+> > > > > > > > index 397df50..03801ed 100644
+> > > > > > > > --- a/drivers/tty/serial/st-asc.c
+> > > > > > > > +++ b/drivers/tty/serial/st-asc.c
+> > 
+> > [...]
+> > 
+> > > > > > > > +		pinctrl_lookup_state(ascport->pinctrl, "manual-rts");
+> > > > > > > > +	if (IS_ERR(ascport->states[MANUAL_RTS]))
+> > > > > > > > +		ascport->states[MANUAL_RTS] = NULL;
+> > > > > > > > +
+> > > > > > > 
+> > > > > > > The different pinctrl states looks like a neat solution to the problem.
+> > > > > > > 
+> > > > > > > My only concern here is that 'default' state is implying a hw-flow-control
+> > > > > > > pinmux config, and manual-rts is implying what is the current upstream
+> > > > > > > 'default' pinmux config.
+> > > > > > > 
+> > > > > > > Which maybe ok if you update all uarts, but currently only serial0
+> > > > > > > is updated. So the other uarts current 'default' is actually the same as serial0
+> > > > > > > 'manual-rts' grouping, which conceptually is odd.
+> > > > > > > 
+> > > > > > > Would it not be better to make 'manual-rts' the default state? As that aligns
+> > > > > > > to what is currently already the default for the other UARTS? And then make
+> > > > > > > hw-flow-control the optional state for serial0?
+> > > > > > > 
+> > > > > > > That also has the advantage that 'default' has the same meaning with older DT's.
+> > > > > > 
+> > > > > > The reason it was done is this was because none of the other UARTs
+> > > > > > require 2 separate Pinctrl configurations, only this one.  Moreover,
+> > > > > > if they support RTS/CTS then I believe that the lines should be
+> > > > > > defined in Pinctrl.
+> > > > > 
+> > > > > Yes I agree with that.
+> > > > > 
+> > > > > > Thus, it was my plan to update all UART's default
+> > > > > > Pinctrl configs to include the RTS/CTS lines.
+> > > > > > 
+> > > > > 
+> > > > > I still don't see the point in changing the meaning of 'default' group and breaking
+> > > > > ABI if you don't need to?
+> > > > > 
+> > > > > As far as I can tell if you swap the meaning of 'default' and 'maunal-rts'
+> > > > > groups you get all the benefits of this series whilst also maintaining backwards
+> > > > > compatbility with older DT's.
+> > > > 
+> > > > What makes you think this will break ABI?
+> > > 
+> > > I've not tried it, but an older DT defines one group, 'default' which contains
+> > > the same pin config as your new optional 'manual-rts' group.
+> > > 
+> > > The driver now reads like the manual-rts pin config is optional and should be stored in
+> > > ascport->states[MANUAL_RTS]. An older DT will pass that same pin config as the default
+> > > group and it will be stored in ascport->states[DEFAULT].
+> > > 
+> > > That seems wrong to me, and if it executes OK it wouldn't be what you
+> > > expect by reading the code.
+> > 
+> > This makes no sense at a functional level.
+> > 
+> > Old kernel, old DTB:
+> > 
+> > ASC driver doesn't understand Pinctrl, but since only the "default"
+> > state is defined, that's what will be used as a matter of course.
+> > RTS/CTS aren't configured, but that doesn't matter because the DTS
+> > does not advertise that HW flow-control is available.  In this
+> > use-case neither HW flow-control, nor manual toggling of the RTS line
+> > is possible.
+> > 
+> > New kernel, old DTB:
+> > 
+> > ASC driver demands "default" and requests "manual-rts" Pinctrl states,
+> > but "manual-rts" isn't available so "default" will be the only
+> > utilised state.  Unlike the first example above, "default" now
+> > contains the RTS and CTS lines,
 > 
-> This probably isn't the right place to attach this comment in this
-> thread, but... the issue of media bus formats matching physical buses
-> is an argument that I think is already lost.
+> No it doesn't, default just contains 'tx' & 'rx' pins, as it has always
+> done until now.
+> 
+> Which is IMO where the condusion arises, as it is the same pin configuration
+> as what you are now calling 'manual-rts' which the driver just tried and failed
+> to obtain (although in reality it has actually obtained those pins but stored
+> them in DEFAULT instead.
+> 
+> I presume this is why it didn't make sense to you above.
 
-It is unfortunate that the parallel format definitions have been reused
-for the MIPI logical formats, but I suppose we have to live with that.
-Still, I think this is not a reason to open the floodgates and start
-describing in-memory formats using MEDIA_BUS_FMT_*
+I guess this is what happens when you try to explain semantics last
+thing, after a long day at work.  I chopped and changed the
+descriptions and the ordering of these and it looks like some
+peculiarities arose as a result.  Let me try again with a fresh(ish)
+mind.
 
-Does at least the combination of logical format and number of lanes
-uniquiely describe the physical format?
-For the 4-lane LVDS bus formats there are JEIDA/VESA variants where just
-the bit ordering is different (MEDIA_BUS_FMT_RGB888_1X7X4_SPWG,
-MEDIA_BUS_FMT_RGB888_1X7X4_JEIDA).
+New kernel, old DTB:
 
-> For example, take the 10-bit bayer formats:
-> 
-> #define MEDIA_BUS_FMT_SBGGR10_1X10              0x3007
-> #define MEDIA_BUS_FMT_SGBRG10_1X10              0x300e
-> #define MEDIA_BUS_FMT_SGRBG10_1X10              0x300a
-> #define MEDIA_BUS_FMT_SRGGB10_1X10              0x300f
-> 
-> These are commonly used on CSI serial buses (see the smiapp driver for
-> example).  From the description at the top of the file, it says the
-> 1X10 means that one pixel is transferred as one 10-bit sample.
->
-> However, the format on wire is somewhat different - four pixels are
-> transmitted over five bytes:
-> 
-> 	P0	P1	P2	P3	P0	P1	P2	P3
-> 	8-bit	8-bit	8-bit	8-bit	2-bit	2-bit	2-bit	2-bit
-> 
-> This gives two problems:
-> 1) it doesn't fit in any sensible kind of "one pixel transferred as
->    N M-bit samples" description because the pixel/sample values
->    (depending how you look at them) are broken up.
-> 
-> 2) changing this will probably be a user visible change, as things
->    like smiapp are already in use.
-> 
-> So, I think what we actually have is the media bus formats describing
-> the _logical_ bus format.  Yes, one pixel is transferred as one 10-bit
-> sample in this case.
+ASC driver demands "default" and requests "manual-rts" Pinctrl states,
+but "manual-rts" isn't available so "default" will be the only
+utilised state.  The RTS and CTS lines will not be present, but since
+the DTB is not advertising HW flow-control as a possibility, the IP
+will not try to use those lines anyway.  [DEFAULT] will contain the
+"default" state as proposed by the current DTB, so that is also
+semantically correct.
 
-Yes. I suppose one way to look at it is that the MIPI CSI-2 specified
-formats are representations of corresponding parallel bus formats.
+> >but since the DTS does not advertise
+> > HW flow-control as available they will be harmlessly unused.  This
+> > configuration culminates in the same result as the first example
+> > i.e. no HW flow-control and no manual toggling.  However, there are no
+> > detremental effects to the driver's functions. 
+> >
+> 
+> <snip>
+> 
+> >New kernel, new DTB:
+> > 
+> > ASC driver demands "default" and requests "manual-rts" Pinctrl
+> > states.  If DTS advertises that HW flow-control is possible and the
+> > client requests it, ASC will use the "default" state and HW
+> > flow-control will commence.  If HW flow-control is not requested by
+> > the client and "manual-rts" is available, then ASC will request the
+> > RTS line is handled by GPIO until such times as the client requests
+> > HW flow-control, at which point ASC will disable GPIO and request the
+> > "default" state again.
+> 
+> Unless it is uart 1 or 2, in which case 'default' still only contains
+> tx & rx pins, and you have the same situation as above. 
 
-> To help illustrate my point, consider the difference between
-> MEDIA_BUS_FMT_RGB565_1X16 and MEDIA_BUS_FMT_RGB565_2X8_BE or
-> MEDIA_BUS_FMT_RGB565_2X8_LE.  RGB565_1X16 means 1 pixel over an effective
-> 16-bit wide bus (if it's not 16-bit, then it has to be broken up into
-> separate "samples".)  RGB565_2X8 means 1 pixel as two 8-bit samples.
-> 
-> So, the 10-bit bayer is 1 pixel as 1.25 bytes.  Or is it, over a serial
-> bus.  Using the RGB565 case, 10-bit bayer over a 4 lane CSI bus becomes
-> interesting:
-> 
-> 	first byte	2nd	3rd
-> lane 1	P0 9:2		S0	P7 9:2
-> lane 2	P1 9:2		P4 9:2	S1
-> lane 3	P2 9:2		P5 9:2	P8 9:2
-> lane 4	P3 9:2		P6 9:2	P9 9:2
-> 
-> S0 = P0/P1/P2/P3 least significant two bits
-> S1 = P4/P5/P6/P7 least significant two bits
-> 
-> or 2 lane CSI:
-> 	first byte	2nd	3rd	4th	5th
-> lane 1	P0 9:2		P2	S0	P5	P7
-> lane 2	P1 9:2		P3	P4	P6	S1
-> 
-> or 1 lane CSI:
-> lane 1	P0 P1 P2 P3 S0 P4 P5 P6 P7 S1 P8 P9 ...
+Doesn't matter.  "default" is non-descriptive.  I could understand an
+argument were you to say that the "manual-rts" should not contain a
+non-manual-rts state, but the "default" state should just contain
+whatever the default configuration is, and in the case of UART 1 and
+UART 2 the default state (until they are HW flow-control enabled --
+which I plan to do as a follow-up) is not to provide HW flow-control
+pins.  These semantics are unchanged since authorship of the driver.
 
-These do look like three different media bus formats to me.
+> > It is not possible to read C-code and make assumptions that the DTB
+> > will be in a particular state as you suggest.
+> > No disparity ever
+> > exists and the code is always clear IMHO.
+> > 
+> 
+> Really?
 
-regards
-Philipp
+Yes.
+
+> ascport->states[DEFAULT]: may contain "tx, rx" or "tx, rx, cts & rts"
+
+Correct.  "DEFAULT" does not mean "HW flow-control only".  It's
+whatever the default is, so can correctly contain either state,
+depending on what the default state of the DTB is.
+
+> ascport->states[MANUAL_RTS]: may contain "tx, rx", or it could be stored in DEFAULT
+
+The last part of this is reiterating your previous point, which I
+just answered.  The correct description would be; "may contain *only*
+"tx, rx", allowing "rts" to be manually controlled OR, may not be
+populated".  In the latter case it would not be semantically incorrect
+for DEFAULT to be either HW flow-control capable "tx, rx, rts, cts" or
+not "tx, rx" -- whichever is the default of the supplied DTB.
+
+> And as the series currently is you have a mixture of the two in the same kernel
+> depending on what instance of the UART you are.
+
+Again, doesn't matter, since it's the DTB that provides the default
+state.  So, back when it was authored, the default state was HW
+flow-control disabled.  And in a newer DTB (again, until I follow-up
+with more changes), the defaults for UART 1 and UART 2 are HW
+flow-control disabled.
+
+Your issue seems to be that you've assumed since we now provide the
+possibility of a "manual-rts" state, then the "default" state should
+*only* be HW flow-control capable, which is not the case.  It's the
+'uart-has-rtscts' property which determines this *not* whether the
+second state has been provided.  It is not logical to make any
+inference using solely the presence or absence of the "manual-rts"
+state.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
