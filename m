@@ -1,71 +1,60 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Tue, 31 Jan 2017 14:03:52 -0500
-Subject: [PATCH v3 17/24] drm/rockchip: dw-mipi-dsi: improve PLL
- configuration
-In-Reply-To: <20170129132444.25251-18-john@metanate.com>
-References: <20170129132444.25251-1-john@metanate.com>
- <20170129132444.25251-18-john@metanate.com>
-Message-ID: <20170131190352.GB20076@art_vandelay>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 31 Jan 2017 11:11:20 -0800
+Subject: [GIT PULL] bcm2835-dt-next-2017-01-31
+Message-ID: <20170131191120.19742-1-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 29, 2017 at 01:24:37PM +0000, John Keeping wrote:
-> The multiplication ratio for the PLL is required to be even due to the
-> use of a "by 2 pre-scaler".  Currently we are likely to end up with an
-> odd multiplier even though there is an equivalent set of parameters with
-> an even multiplier.
-> 
-> For example, using the 324MHz bit rate with a reference clock of 24MHz
-> we end up with M = 27, N = 2 whereas the example in the PHY databook
-> gives M = 54, N = 4 for this bit rate and reference clock.
-> 
-> By walking down through the available multiplier instead of up we are
-> more likely to hit an even multiplier.  With the above example we do now
-> get M = 54, N = 4 as given by the databook.
-> 
-> While doing this, change the loop limits to encode the actual limits on
-> the divisor, which are:
-> 
-> 	40MHz >= (pllref / N) >= 5MHz
-> 
-> Signed-off-by: John Keeping <john@metanate.com>
-> ---
-> Unchanged in v3
-> Unchanged in v2
-> 
->  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> index 85edf6dd2bac..dcb66a21e1f1 100644
-> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> @@ -522,7 +522,7 @@ static int dw_mipi_dsi_get_lane_bps(struct dw_mipi_dsi *dsi,
->  	pllref = DIV_ROUND_UP(clk_get_rate(dsi->pllref_clk), USEC_PER_SEC);
->  	tmp = pllref;
->  
-> -	for (i = 1; i < 6; i++) {
-> +	for (i = pllref / 5; i > (pllref / 40); i--) {
+Here's another round of DT changes.  The shortlog here came out a bit
+funny, because I had to give it a base of either 4.10-rc2 (which is
+coming in through the clk tree) or the previous VEC changes you'd
+pulled.  I did base off of the patches you pulled with the subjects
+fixed, though.
 
-I've convinced myself that this is right, but it took reading through the commit
-message a few times. I think this code would benefit greatly from a comment so
-readers don't need to go through git history.
+The following changes since commit 0c744ea4f77d72b3dcebb7a8f2684633ec79be88:
 
-With that,
+  Linux 4.10-rc2 (2017-01-01 14:31:53 -0800)
 
-Reviewed-by: Sean Paul <seanpaul@chromium.org>
+are available in the git repository at:
 
+  https://github.com/anholt/linux tags/bcm2835-dt-next-2017-01-31
 
->  		pre = pllref / i;
->  		if ((tmp > (target_mbps % pre)) && (target_mbps / pre < 512)) {
->  			tmp = target_mbps % pre;
-> -- 
-> 2.11.0.197.gb556de5.dirty
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+for you to fetch changes up to c62e223c9f67721d67a0f07bf524ece447b0cc46:
 
--- 
-Sean Paul, Software Engineer, Google / Chromium OS
+  ARM: dts: bcm2835: Add the DSI module nodes and clocks. (2017-01-31 10:43:29 -0800)
+
+----------------------------------------------------------------
+This pull request brings in some small fixes to (unused) pinmux
+groups, a fix for getting the mac address from u-boot, and the
+(disabled by default) nodes for the DSI interfaces.
+
+The functional change is adding the DSI clocks that feed into to the
+cprman node.  This required merging in a topic branch from the clk
+tree (acked by the maintainer), which was based on 4.10-rc2.
+
+----------------------------------------------------------------
+Baruch Siach (4):
+      ARM: dts: bcm2835: fix uart0 pinctrl node names
+      ARM: dts: bcm2835: fix i2c0 pins
+      ARM: dts: bcm2835: fix uart0/uart1 pins
+      ARM: dts: bcm2835: add index to the ethernet alias
+
+Boris Brezillon (2):
+      ARM: dts: bcm283x: Add VEC node in bcm283x.dtsi
+      ARM: dts: bcm283x: Enable the VEC IP on all RaspberryPi boards
+
+Eric Anholt (5):
+      clk: bcm2835: Don't rate change PLLs on behalf of DSI PLL dividers.
+      clk: bcm2835: Register the DSI0/DSI1 pixel clocks.
+      clk: bcm2835: Add leaf clock measurement support, disabled by default
+      Merge remote-tracking branch 'clk/clk-bcm2835' into bcm2835-dt-next
+      ARM: dts: bcm2835: Add the DSI module nodes and clocks.
+
+ .../bindings/clock/brcm,bcm2835-cprman.txt         |  15 +-
+ arch/arm/boot/dts/bcm2835-rpi.dtsi                 |  13 +
+ arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi        |   2 +-
+ arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi        |   2 +-
+ arch/arm/boot/dts/bcm283x.dtsi                     |  78 +++++-
+ drivers/clk/bcm/clk-bcm2835.c                      | 303 +++++++++++++++++----
+ include/dt-bindings/clock/bcm2835.h                |   2 +
+ 7 files changed, 351 insertions(+), 64 deletions(-)
