@@ -1,72 +1,48 @@
 From: mylene.josserand@free-electrons.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Tue, 31 Jan 2017 11:05:48 +0100
-Subject: [PATCH v3 4/8] ASoC: sun8i-codec-analog: Add amplifier event to fix
- first delay
+Date: Tue, 31 Jan 2017 11:05:51 +0100
+Subject: [PATCH v3 7/8] ARM: dts: sun8i: parrot: Enable audio nodes
 In-Reply-To: <20170131100552.27949-1-mylene.josserand@free-electrons.com>
 References: <20170131100552.27949-1-mylene.josserand@free-electrons.com>
-Message-ID: <20170131100552.27949-5-mylene.josserand@free-electrons.com>
+Message-ID: <20170131100552.27949-8-mylene.josserand@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When playing a sound for the first time, a short delay, where the audio
-file is not played, can be noticed.
-On a second play (right after), the sound is played correctly.
-If we wait a short time (~5 sec which corresponds to the aplay
-timeout), the delay is back.
-
-This patch fixes it by using an event on headphone amplifier.
-It allows to keep the amplifier enable while playing a sound.
-A delay of 700ms allows to wait that the amplifier is powered-up
-before playing the sound.
+Enable the audio codec and the audio dai for the sun8i R16 Parrot board.
 
 Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
 ---
- sound/soc/sunxi/sun8i-codec-analog.c | 30 ++++++++++++++++++++++++++++--
- 1 file changed, 28 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/sun8i-r16-parrot.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/sound/soc/sunxi/sun8i-codec-analog.c b/sound/soc/sunxi/sun8i-codec-analog.c
-index af02290ebe49..72331332b72e 100644
---- a/sound/soc/sunxi/sun8i-codec-analog.c
-+++ b/sound/soc/sunxi/sun8i-codec-analog.c
-@@ -398,11 +398,37 @@ static const struct snd_kcontrol_new sun8i_codec_hp_src[] = {
- 		      sun8i_codec_hp_src_enum),
+diff --git a/arch/arm/boot/dts/sun8i-r16-parrot.dts b/arch/arm/boot/dts/sun8i-r16-parrot.dts
+index e4da572427b1..472c03b7aeab 100644
+--- a/arch/arm/boot/dts/sun8i-r16-parrot.dts
++++ b/arch/arm/boot/dts/sun8i-r16-parrot.dts
+@@ -84,6 +84,14 @@
+ 
  };
  
-+static int sun8i_headphone_amp_event(struct snd_soc_dapm_widget *w,
-+				     struct snd_kcontrol *k, int event)
-+{
-+	struct snd_soc_component *component = snd_soc_dapm_to_component(w->dapm);
++&codec {
++	status = "okay";
++};
 +
-+	if (SND_SOC_DAPM_EVENT_ON(event)) {
-+		snd_soc_component_update_bits(component, SUN8I_ADDA_PAEN_HP_CTRL,
-+					      BIT(SUN8I_ADDA_PAEN_HP_CTRL_HPPAEN),
-+					      BIT(SUN8I_ADDA_PAEN_HP_CTRL_HPPAEN));
-+		/*
-+		 * Need a delay to have the amplifier up. 700ms seems the best
-+		 * compromise between the time to let the amplifier up and the
-+		 * time not to feel this delay while playing a sound.
-+		 */
-+		msleep(700);
-+	} else if (SND_SOC_DAPM_EVENT_OFF(event)) {
-+		snd_soc_component_update_bits(component, SUN8I_ADDA_PAEN_HP_CTRL,
-+					      BIT(SUN8I_ADDA_PAEN_HP_CTRL_HPPAEN),
-+					      0x0);
-+	}
++&dai {
++	status = "okay";
++};
 +
-+	return 0;
-+}
+ &ehci0 {
+ 	status = "okay";
+ };
+@@ -317,6 +325,10 @@
+ 	status = "okay";
+ };
+ 
++&sound {
++	status = "okay";
++};
 +
- static const struct snd_soc_dapm_widget sun8i_codec_headphone_widgets[] = {
- 	SND_SOC_DAPM_MUX("Headphone Source Playback Route",
- 			 SND_SOC_NOPM, 0, 0, sun8i_codec_hp_src),
--	SND_SOC_DAPM_OUT_DRV("Headphone Amp", SUN8I_ADDA_PAEN_HP_CTRL,
--			     SUN8I_ADDA_PAEN_HP_CTRL_HPPAEN, 0, NULL, 0),
-+	SND_SOC_DAPM_OUT_DRV_E("Headphone Amp", SUN8I_ADDA_PAEN_HP_CTRL,
-+			       SUN8I_ADDA_PAEN_HP_CTRL_HPPAEN, 0, NULL, 0,
-+			       sun8i_headphone_amp_event,
-+			       SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_PRE_PMD),
- 	SND_SOC_DAPM_SUPPLY("HPCOM Protection", SUN8I_ADDA_PAEN_HP_CTRL,
- 			    SUN8I_ADDA_PAEN_HP_CTRL_COMPTEN, 0, NULL, 0),
- 	SND_SOC_DAPM_REG(snd_soc_dapm_supply, "HPCOM", SUN8I_ADDA_PAEN_HP_CTRL,
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_b>;
 -- 
 2.11.0
