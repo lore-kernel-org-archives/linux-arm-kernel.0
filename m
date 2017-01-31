@@ -1,13 +1,13 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 31 Jan 2017 09:59:49 +0100
-Subject: [GIT PULL] Allwinner arm64 changes for 4.11
-Message-ID: <20170131085949.ej3rpbdtbr563qm5@lukather>
+Date: Tue, 31 Jan 2017 10:09:32 +0100
+Subject: [GIT PULL] Allwinner DRM changes for 4.11
+Message-ID: <20170131090932.rvrpfrkjlspoxhbd@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi David,
 
-Please pull the following changes for the next merge window.
+Please pull the following patch for the next merge window.
 
 Thanks!
 Maxime
@@ -18,47 +18,23 @@ The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 
 are available in the git repository at:
 
-  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt64-for-4.11
+  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git sunxi-drm-for-4.11
 
-for you to fetch changes up to b8bcf0e1b21273584b6829bafe30f2949a062c34:
+for you to fetch changes up to 0f0861e31e3c59ca4bc1ec59d99260cfca79740e:
 
-  arm64: allwinner: add BananaPi-M64 support (2017-01-30 11:37:42 +0100)
-
-----------------------------------------------------------------
-Allwinner arm64 changes for 4.11
-
-Some patches related the arm64 Allwinner SoCs, most notably:
-  - Support for the MMC
-  - Suport for the USB and mUSB controllers
-  - New boards: Bananapi M64
+  drm/sun4i: Fix a return value in case of error (2017-01-02 22:27:58 +0100)
 
 ----------------------------------------------------------------
-Andre Przywara (4):
-      arm64: allwinner: a64: Add MMC nodes
-      arm64: allwinner: pine64: add MMC support
-      arm64: allwinner: a64: add UART1 pin nodes
-      arm64: allwinner: add BananaPi-M64 support
+Allwinner DRM changes for 4.11
 
-Chen-Yu Tsai (1):
-      arm64: dts: allwinner: Remove no longer used pinctrl/sun4i-a10.h header
+Just one minor fix.
 
-Icenowy Zheng (5):
-      arm64: dts: allwinner: add USB1-related nodes of Allwinner A64
-      arm64: dts: allwinner: sort the nodes in sun50i-a64-pine64.dts
-      arm64: dts: allwinner: enable EHCI1, OHCI1 and USB PHY nodes in Pine64
-      arm64: dts: add MUSB node to Allwinner A64 dtsi
-      arm64: dts: enable the MUSB controller of Pine64 in host-only mode
+----------------------------------------------------------------
+Christophe JAILLET (1):
+      drm/sun4i: Fix a return value in case of error
 
-Maxime Ripard (2):
-      arm64: allwinner: a64: Add MMC pinctrl nodes
-      arm64: allwinner: a64: Increase the MMC max frequency
-
- arch/arm64/boot/dts/allwinner/Makefile             |   1 +
- .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 120 ++++++++++++++++++
- .../arm64/boot/dts/allwinner/sun50i-a64-pine64.dts |  43 ++++++-
- arch/arm64/boot/dts/allwinner/sun50i-a64.dtsi      | 137 ++++++++++++++++++++-
- 4 files changed, 297 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+ drivers/gpu/drm/sun4i/sun4i_backend.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 -- 
 Maxime Ripard, Free Electrons
@@ -70,4 +46,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170131/92f077aa/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170131/f28cfad0/attachment.sig>
