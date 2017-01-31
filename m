@@ -1,57 +1,63 @@
-From: ian.arkver.dev@gmail.com (Ian Arkver)
-Date: Tue, 31 Jan 2017 21:55:29 +0000
-Subject: [PATCH v3 20/24] media: imx: Add Camera Interface subdev driver
-In-Reply-To: <20170131203340.GC27312@n2100.armlinux.org.uk>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-21-git-send-email-steve_longerbeam@mentor.com>
- <b7456d40-040d-41b7-45bc-ef6709ab7933@xs4all.nl>
- <20170131134252.GX27312@n2100.armlinux.org.uk>
- <b0517394-7717-3e1d-b850-e2b69a9c19e9@gmail.com>
- <20170131203340.GC27312@n2100.armlinux.org.uk>
-Message-ID: <2297c62c-ae9b-3942-4700-ce268a61a6d5@gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 31 Jan 2017 13:59:39 -0800
+Subject: [RESENT PATCH] ARM: bcm2835: Add devicetree for the Raspberry Pi
+ 3, for arm (32)
+In-Reply-To: <87fukcgsqp.fsf@eliezer.anholt.net>
+References: <1484845444-4617-1-git-send-email-kraxel@redhat.com>
+ <87fukcgsqp.fsf@eliezer.anholt.net>
+Message-ID: <878tpqki0k.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/01/17 20:33, Russell King - ARM Linux wrote:
-> On Tue, Jan 31, 2017 at 10:21:26AM -0800, Steve Longerbeam wrote:
->> On 01/31/2017 05:42 AM, Russell King - ARM Linux wrote:
->>> On Fri, Jan 20, 2017 at 03:38:28PM +0100, Hans Verkuil wrote:
->>>> Should be set to something like 'platform:imx-media-camif'. v4l2-compliance
->>>> should complain about this.
->>> ... and more.
+Eric Anholt <eric@anholt.net> writes:
+
+> [ Unknown signature status ]
+> Gerd Hoffmann <kraxel@redhat.com> writes:
+>
+>> Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
+>> ---
+>>  arch/arm/boot/dts/Makefile | 3 ++-
+>>  1 file changed, 2 insertions(+), 1 deletion(-)
 >>
->> Right, in version 3 that you are working with, no v4l2-compliance fixes were
->> in yet. A lot of the compliance errors are fixed, please look in latest
->> branch
->> imx-media-staging-md-wip at git at github.com:slongerbeam/mediatree.git.
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index 7327250..82a760d 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -70,7 +70,8 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
+>>  	bcm2835-rpi-b-plus.dtb \
+>>  	bcm2835-rpi-a-plus.dtb \
+>>  	bcm2836-rpi-2-b.dtb \
+>> -	bcm2835-rpi-zero.dtb
+>> +	bcm2835-rpi-zero.dtb \
+>> +	../../../arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dtb
+>>  dtb-$(CONFIG_ARCH_BCM_5301X) += \
+>>  	bcm4708-asus-rt-ac56u.dtb \
+>>  	bcm4708-asus-rt-ac68u.dtb \
 >
-> Sorry, I'm not prepared to pull random trees from github as there's
-> no easy way to see what's in the branch.
+> This would be really nice to have.
 >
-> I've always disliked github because its web interface makes it soo
-> difficult to navigate around git trees hosted there.  You can see
-> a commit, you can see a diff of the commit.  You can get a list of
-> branches.  But there seems to be no way to get a list of commits
-> similar to "git log" or even a one-line summary of each commit on
-> a branch.  If there is, it's completely non-obvious (which I think is
-> much of the problem with github, it's web interface is horrendous.)
+> Acked-by: Eric Anholt <eric@anholt.net>
 >
-> Or you can clone/pull the tree without knowing what you're fetching
-> (eg, what the tree is based upon.)
->
-> Or you can waste time clicking repeatedly on the "parent" commit link
-> on each patch working your way back through the history...
->
-> Well, it looks like it's bsaed on 4.10-rc1 with who-knows-what work
-> from the linux-media tree (I didn't try and go back any further.)
-> As I don't want to take a whole pile of other changes into my tree,
-> I'm certainly not going to pull from your github tree.  Sorry.
->
+> ARM upstream folks, do you have any issues with this?
 
-https://github.com/slongerbeam/mediatree/compare/master...imx-media-staging-md-wip
+Absent any feedback from ARM maintainers, I think we're about ready to
+go with this.
 
-It's under the "Compare" button from the main view. It would be nice 
-though if the first commit's parent was some clearly tagged start point.
+Unfortunately, I just remembered yesterday that one of the requirements
+is that we not use these sorts of ../../../ references in the DT tree.
+Instead we have to use symlinks -- see arch/arm64/boot/dts/broadcom/ for
+how we did the last round of this.
 
-Regards,
-Ian
+I think just having links from
+arch/arm64/boot/dts/broadcom/bcm2837*.dts* to arch/arm/boot/dts/ would
+be the solution, then this Makefile could just reference
+bcm2837-rpi-3-b.dtb.
+
+Would you be able to respin this?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170131/fc61b52e/attachment.sig>
