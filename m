@@ -1,120 +1,65 @@
-From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Tue, 31 Jan 2017 16:30:38 +0100
-Subject: [PATCH 2/7] MFD: add STM32 DFSDM support
-In-Reply-To: <80a4e7f9-b972-599c-198a-f05c1713123c@metafoo.de>
-References: <1485189145-29576-1-git-send-email-arnaud.pouliquen@st.com>
- <1485189145-29576-3-git-send-email-arnaud.pouliquen@st.com>
- <20170124082249.GR16020@dell> <283c0e48-55e2-6516-369d-91dc72d12f73@st.com>
- <20170124113658.GW16020@dell> <a1aaaa20-ac00-b182-f1c1-63152be41135@st.com>
- <20170127101545.g53uah57vgfu55o5@dell>
- <7b3eb38d-4fd1-2006-7423-94f2a7b38b27@st.com>
- <20170127171746.lf2nbpsaqs3dmy44@dell>
- <3810896b-c982-e9fd-b095-658921422855@kernel.org>
- <80a4e7f9-b972-599c-198a-f05c1713123c@metafoo.de>
-Message-ID: <72ac395d-645f-08f6-c6f4-6b3d94187a78@st.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Tue, 31 Jan 2017 16:51:22 +0100
+Subject: [PATCH v3 17/24] media: imx: Add CSI subdev driver
+In-Reply-To: <1483755102-24785-18-git-send-email-steve_longerbeam@mentor.com>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <1483755102-24785-18-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <1485877882.2932.70.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Lars,
+On Fri, 2017-01-06 at 18:11 -0800, Steve Longerbeam wrote:
+[...]
+> +static int csi_set_fmt(struct v4l2_subdev *sd,
+> +		       struct v4l2_subdev_pad_config *cfg,
+> +		       struct v4l2_subdev_format *sdformat)
+> +{
+> +	struct csi_priv *priv = v4l2_get_subdevdata(sd);
+> +	struct v4l2_mbus_framefmt *infmt, *outfmt;
+> +	struct v4l2_rect crop;
+> +	int ret;
+> +
+> +	if (sdformat->pad >= CSI_NUM_PADS)
+> +		return -EINVAL;
+> +
+> +	if (priv->stream_on)
+> +		return -EBUSY;
+> +
+> +	infmt = &priv->format_mbus[priv->input_pad];
+> +	outfmt = &priv->format_mbus[priv->output_pad];
+> +
+> +	if (sdformat->pad == priv->output_pad) {
+> +		sdformat->format.code = infmt->code;
+> +		sdformat->format.field = infmt->field;
+> +		crop.left = priv->crop.left;
+> +		crop.top = priv->crop.top;
+> +		crop.width = sdformat->format.width;
+> +		crop.height = sdformat->format.height;
+> +		ret = csi_try_crop(priv, &crop);
 
-On 01/29/2017 03:19 PM, Lars-Peter Clausen wrote:
-> On 01/29/2017 01:28 PM, Jonathan Cameron wrote:
-> [...]
->>>> Jonathan, Mark, Please could you share your opinion on this topic?
->> Hmm - based on a fairly quick read through of the code (which is never
->> ideal!). I can see that the ideal would indeed be as Lee says, to
->> expand the IIO interfaces sufficiently to support what you need.
->>
->>
->> So, reading the code (fairly quickly I'm afraid as had a lot of reviews
->> to catch up on this weekend).
->> What we need:
->> 1) DMA support in the ADC driver.  This would be a good anyway!
->> 2) DMA consumer support - I defer to Lars for comments on this.
->> 3) Means of describing and controlling the sinc filters applied. 
->> 4) Appropriate channel support.  I'm not convinced that it doesn't make
->> sense to have IIO channels for the microphones - at least in a streaming
->> mode.  It's data - I don't really care what ;)
->> Coarsely it's a filtered pulse per period counter which is
->> a perfectly valid type to have a channel for.
->>
->> The big question to my mind is the DMA consumer support. How would
->> it work. It it wouldn't this is somewhat of a non starter.
->>
->> To bring up another slightly ugly MFD case where it is borderline
->> on whether an MFD makes sense (just as a reference point of something
->> we have discussed a few times before)
->>
->> ADCs with features directed at touchscreen support.
->> These are odd as the ADC bit is generic, but the specific output
->> and read sequences used for touchscreen reading don't correspond to
->> anything that makes any real sense for other applications.
->>
->> We have started to get hybrid drives that have an MFD underneath but
->> do the ADC reads through IIO consumer interfaces, and the timing
->> control from a touchscreen driver.  We haven't really gotten this
->> one right yet either.
->>
->> Here however, to my mind things are different - as I read it
->> (and feel free to point out what I'm missing), the sound usecase
->> is just a question of setting up sampling frequencies and filters
->> appropriate to the microphones and what ASoC expects?
->>
->> That's not to say the IIO dma stuff is flexible enough (yet) to
->> handle the data flows, but perhaps we can work towards that.
-> 
-> Yeah, so this is a bit different, but not unexpected. And I'm sure we'll see
-> more similar hardware in the future. I've talked about this before[1], the
-> cost structure of creating and manufacturing new hardware drives the design
-> in a certain direction so that we end up with general purpose hardware that
-> suddenly has applications in multiple frameworks that were previously fully
-> orthogonal.
-> 
-> This device is certainly not a multi-function-device. It only has one
-> function, it's a sigma-delta demodulator. It is rather a
-> multi-purpose-device. It can be used for sigma-delta demodulation in audio
-> applications as well as more specialized data capture applications.
-> 
-> It's comparable to something like a GPIO that can be used to control a reset
-> pin or turn on and off a LED. The GPIO chip is not considered
-> multi-function-device though, even though it can be used for many different
-> applications.
-> 
-> As for DMA we already have a lot of DMA infrastructure on the audio side and
-> we probably want to reuse that rather than inserting IIO as a middle layer
-> since audio buffer capture as different requirements from IIO buffer and
-> we'd have to go the route of the least common denominator and loose
-> expressibility in the process.
+This is the wrong way around, see also below.
 
-I'm agree with your analysis.
-Audio DMA engine seems a more secure solution to avoid audio runtime
-issue, and should minimize impact in IIO.
+Here the the output sdformat->format.width/height should be set to the
+priv->crop.width/height (or priv->crop.width/height / 2, to enable
+downscaling). The crop rectangle should not be changed by an output pad
+set_fmt.
 
-> 
-> I've created a IIO buffer[2] that does not capture data to memory but is
-> only used to enable/disable the data capture process. We use this in setups
-> where the data is passed from the converter to a application specific
-> processing chain without ever going through system memory. This buffer could
-> probably also be used here on the audio side to control the converter state.
+> +		if (ret)
+> +			return ret;
+> +		sdformat->format.width = crop.width;
+> +		sdformat->format.height = crop.height;
+> +	}
+> +
+> +	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY) {
+> +		cfg->try_fmt = sdformat->format;
+> +	} else {
+> +		priv->format_mbus[sdformat->pad] = sdformat->format;
+> +		/* Update the crop window if this is output pad  */
+> +		if (sdformat->pad == priv->output_pad)
+> +			priv->crop = crop;
 
-This remind me HDMI.
-For HDMI, solution integrated is a drm driver that probes
-"hdmi-audio-codec" driver.
+The crop rectangle instead should be reset to the full input frame when
+the input pad format is set.
 
-Something similar could be done. An IIO device that probes a generic DAI
-ASoC driver. Driver data structure should be used to provide DMA config
-and IIO device phandles. Then DAI drivers could use your "hw_consummer"
-interface to control iio device...
-
-> 
-> - Lars
-> 
-> [1]
-> https://lists.linuxfoundation.org/pipermail/ksummit-discuss/2016-July/003029.html
-> 
-> [2]
-> https://github.com/analogdevicesinc/linux/blob/xcomm_zynq/drivers/iio/buffer/hw_consumer.c
-> 
-
-Regards
-Arnaud
+regards
+Philipp
