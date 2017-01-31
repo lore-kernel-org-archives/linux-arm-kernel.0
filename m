@@ -1,203 +1,51 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 31 Jan 2017 12:33:04 -0800
-Subject: [PATCH net-next 5/6] drivers: net: xgene-v2: Add transmit and
- receive
-In-Reply-To: <1485889401-13909-6-git-send-email-isubramanian@apm.com>
-References: <1485889401-13909-1-git-send-email-isubramanian@apm.com>
- <1485889401-13909-6-git-send-email-isubramanian@apm.com>
-Message-ID: <fb8fcd33-4b5b-5999-7662-4165aeb179e1@gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 31 Jan 2017 20:33:40 +0000
+Subject: [PATCH v3 20/24] media: imx: Add Camera Interface subdev driver
+In-Reply-To: <b0517394-7717-3e1d-b850-e2b69a9c19e9@gmail.com>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <1483755102-24785-21-git-send-email-steve_longerbeam@mentor.com>
+ <b7456d40-040d-41b7-45bc-ef6709ab7933@xs4all.nl>
+ <20170131134252.GX27312@n2100.armlinux.org.uk>
+ <b0517394-7717-3e1d-b850-e2b69a9c19e9@gmail.com>
+Message-ID: <20170131203340.GC27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/31/2017 11:03 AM, Iyappan Subramanian wrote:
-> This patch adds,
->     - Transmit
->     - Transmit completion poll
->     - Receive poll
->     - NAPI handler
+On Tue, Jan 31, 2017 at 10:21:26AM -0800, Steve Longerbeam wrote:
+> On 01/31/2017 05:42 AM, Russell King - ARM Linux wrote:
+> >On Fri, Jan 20, 2017 at 03:38:28PM +0100, Hans Verkuil wrote:
+> >>Should be set to something like 'platform:imx-media-camif'. v4l2-compliance
+> >>should complain about this.
+> >... and more.
 > 
-> and enables the driver.
-> 
-> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-> Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
-> ---
+> Right, in version 3 that you are working with, no v4l2-compliance fixes were
+> in yet. A lot of the compliance errors are fixed, please look in latest
+> branch
+> imx-media-staging-md-wip at git at github.com:slongerbeam/mediatree.git.
 
-> +
-> +	tx_ring = pdata->tx_ring;
-> +	tail = tx_ring->tail;
-> +	len = skb_headlen(skb);
-> +	raw_desc = &tx_ring->raw_desc[tail];
-> +
-> +	/* Tx descriptor not available */
-> +	if (!GET_BITS(E, le64_to_cpu(raw_desc->m0)) ||
-> +	    GET_BITS(PKT_SIZE, le64_to_cpu(raw_desc->m0)))
-> +		return NETDEV_TX_BUSY;
-> +
-> +	/* Packet buffers should be 64B aligned */
-> +	pkt_buf = dma_alloc_coherent(dev, XGENE_ENET_STD_MTU, &dma_addr,
-> +				     GFP_ATOMIC);
-> +	if (unlikely(!pkt_buf))
-> +		goto out;
+Sorry, I'm not prepared to pull random trees from github as there's
+no easy way to see what's in the branch.
 
-Can't you obtain a DMA-API mapping for skb->data and pass it down to the
-hardware? This copy here is inefficient.
+I've always disliked github because its web interface makes it soo
+difficult to navigate around git trees hosted there.  You can see
+a commit, you can see a diff of the commit.  You can get a list of
+branches.  But there seems to be no way to get a list of commits
+similar to "git log" or even a one-line summary of each commit on
+a branch.  If there is, it's completely non-obvious (which I think is
+much of the problem with github, it's web interface is horrendous.)
 
-> +
-> +	memcpy(pkt_buf, skb->data, len);
-> +
-> +	addr_hi = GET_BITS(NEXT_DESC_ADDRH, le64_to_cpu(raw_desc->m1));
-> +	addr_lo = GET_BITS(NEXT_DESC_ADDRL, le64_to_cpu(raw_desc->m1));
-> +	raw_desc->m1 = cpu_to_le64(SET_BITS(NEXT_DESC_ADDRL, addr_lo) |
-> +				   SET_BITS(NEXT_DESC_ADDRH, addr_hi) |
-> +				   SET_BITS(PKT_ADDRH,
-> +					    dma_addr >> PKT_ADDRL_LEN));
-> +
-> +	dma_wmb();
-> +
-> +	raw_desc->m0 = cpu_to_le64(SET_BITS(PKT_ADDRL, dma_addr) |
-> +				   SET_BITS(PKT_SIZE, len) |
-> +				   SET_BITS(E, 0));
-> +
-> +	skb_tx_timestamp(skb);
-> +	xge_wr_csr(pdata, DMATXCTRL, 1);
-> +
-> +	pdata->stats.tx_packets++;
-> +	pdata->stats.tx_bytes += skb->len;
+Or you can clone/pull the tree without knowing what you're fetching
+(eg, what the tree is based upon.)
 
-This is both racy and incorrect. Racy because after you wrote DMATXCTRL,
-your TX completion can run, and it can do that while interrupting your
-CPU presumably, and free the SKB, therefore making you access a freed
-SKB (or it should, if it does not), it's also incorrect, because before
-you get signaled a TX completion, there is no guarantee that the packets
-did actually make it through, you must update your stats in the TX
-completion handler.
+Or you can waste time clicking repeatedly on the "parent" commit link
+on each patch working your way back through the history...
 
-> +
-> +	tx_ring->skbs[tail] = skb;
-> +	tx_ring->pkt_bufs[tail] = pkt_buf;
-> +	tx_ring->tail = (tail + 1) & (XGENE_ENET_NUM_DESC - 1);
-> +
-> +out:
-> +	dev_kfree_skb_any(skb);
-
-Don't do this, remember a pointer to the SKB, free the SKB in TX
-completion handler, preferably in NAPI context.
-
-> +
-> +	return NETDEV_TX_OK;
-> +}
-> +
-> +static void xge_txc_poll(struct net_device *ndev, unsigned int budget)
-> +{
-> +	struct xge_pdata *pdata = netdev_priv(ndev);
-> +	struct device *dev = &pdata->pdev->dev;
-> +	struct xge_desc_ring *tx_ring;
-> +	struct xge_raw_desc *raw_desc;
-> +	u64 addr_lo, addr_hi;
-> +	dma_addr_t dma_addr;
-> +	void *pkt_buf;
-> +	bool pktsent;
-> +	u32 data;
-> +	u8 head;
-> +	int i;
-> +
-> +	tx_ring = pdata->tx_ring;
-> +	head = tx_ring->head;
-> +
-> +	data = xge_rd_csr(pdata, DMATXSTATUS);
-> +	pktsent = data & TX_PKT_SENT;
-> +	if (unlikely(!pktsent))
-> +		return;
-> +
-> +	for (i = 0; i < budget; i++) {
-
-TX completion handlers should run unbound and free the entire TX ring,
-don't make it obey to an upper bound.
-
-> +		raw_desc = &tx_ring->raw_desc[head];
-> +
-> +		if (!GET_BITS(E, le64_to_cpu(raw_desc->m0)))
-> +			break;
-> +
-> +		dma_rmb();
-> +
-> +		addr_hi = GET_BITS(PKT_ADDRH, le64_to_cpu(raw_desc->m1));
-> +		addr_lo = GET_BITS(PKT_ADDRL, le64_to_cpu(raw_desc->m0));
-> +		dma_addr = (addr_hi << PKT_ADDRL_LEN) | addr_lo;
-> +
-> +		pkt_buf = tx_ring->pkt_bufs[head];
-> +
-> +		/* clear pktstart address and pktsize */
-> +		raw_desc->m0 = cpu_to_le64(SET_BITS(E, 1) |
-> +					   SET_BITS(PKT_SIZE, 0));
-> +		xge_wr_csr(pdata, DMATXSTATUS, 1);
-> +
-> +		dma_free_coherent(dev, XGENE_ENET_STD_MTU, pkt_buf, dma_addr);
-> +
-> +		head = (head + 1) & (XGENE_ENET_NUM_DESC - 1);
-> +	}
-> +
-> +	tx_ring->head = head;
-> +}
-> +
-> +static int xge_rx_poll(struct net_device *ndev, unsigned int budget)
-> +{
-> +	struct xge_pdata *pdata = netdev_priv(ndev);
-> +	struct device *dev = &pdata->pdev->dev;
-> +	dma_addr_t addr_hi, addr_lo, dma_addr;
-> +	struct xge_desc_ring *rx_ring;
-> +	struct xge_raw_desc *raw_desc;
-> +	struct sk_buff *skb;
-> +	int i, npkts, ret = 0;
-> +	bool pktrcvd;
-> +	u32 data;
-> +	u8 head;
-> +	u16 len;
-> +
-> +	rx_ring = pdata->rx_ring;
-> +	head = rx_ring->head;
-> +
-> +	data = xge_rd_csr(pdata, DMARXSTATUS);
-> +	pktrcvd = data & RXSTATUS_RXPKTRCVD;
-> +
-> +	if (unlikely(!pktrcvd))
-> +		return 0;
-> +
-> +	npkts = 0;
-> +	for (i = 0; i < budget; i++) {
-
-So pktrcvd is not an indication of the produced number of packets, just
-that there are packets, that's not very convenient, and it's redundant
-with the very fact of being interrupted.
-
-> +		raw_desc = &rx_ring->raw_desc[head];
-> +
-> +		if (GET_BITS(E, le64_to_cpu(raw_desc->m0)))
-> +			break;
-> +
-> +		dma_rmb();
-> +
-> +		addr_hi = GET_BITS(PKT_ADDRH, le64_to_cpu(raw_desc->m1));
-> +		addr_lo = GET_BITS(PKT_ADDRL, le64_to_cpu(raw_desc->m0));
-> +		dma_addr = (addr_hi << PKT_ADDRL_LEN) | addr_lo;
-> +		len = GET_BITS(PKT_SIZE, le64_to_cpu(raw_desc->m0));
-
-Is not there some kind of additional status that would indicate if the
-packet is possibly invalid (oversize, undersize, etc.)?
-
-> +
-> +		dma_unmap_single(dev, dma_addr, XGENE_ENET_STD_MTU,
-> +				 DMA_FROM_DEVICE);
-> +
-> +		skb = rx_ring->skbs[head];
-> +		skb_put(skb, len);
-> +
-> +		skb->protocol = eth_type_trans(skb, ndev);
-> +
-> +		pdata->stats.rx_packets++;
-> +		pdata->stats.rx_bytes += len;
-> +		napi_gro_receive(&pdata->napi, skb);
-> +		npkts++;
+Well, it looks like it's bsaed on 4.10-rc1 with who-knows-what work
+from the linux-media tree (I didn't try and go back any further.)
+As I don't want to take a whole pile of other changes into my tree,
+I'm certainly not going to pull from your github tree.  Sorry.
 
 -- 
-Florian
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
