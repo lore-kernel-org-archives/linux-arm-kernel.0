@@ -1,54 +1,71 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 31 Jan 2017 11:52:40 +0100
-Subject: [PATCHv2 3/3] arm64: dts: marvell: adjust name of sd-mmc-gop
- clock in syscon
-In-Reply-To: <20170131114418.46e23bd4@free-electrons.com> (Thomas Petazzoni's
- message of "Tue, 31 Jan 2017 11:44:18 +0100")
-References: <1482316017-22154-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1482316017-22154-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <20170131114418.46e23bd4@free-electrons.com>
-Message-ID: <87bmun1oxz.fsf@free-electrons.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 31 Jan 2017 11:00:27 +0000
+Subject: [PATCH v3 00/24] i.MX Media Driver
+In-Reply-To: <951c1a08-c0f2-4333-b4bf-410de8dd863f@gmail.com>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <20170131004510.GQ27312@n2100.armlinux.org.uk>
+ <951c1a08-c0f2-4333-b4bf-410de8dd863f@gmail.com>
+Message-ID: <20170131110027.GU27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
- 
- On mar., janv. 31 2017, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+On Mon, Jan 30, 2017 at 05:22:01PM -0800, Steve Longerbeam wrote:
+> I'm also having trouble finding a datasheet for it, but from what
+> I've read, it has a MIPI CSI-2 interface. It should work fine as long
+> as it presents a single source pad, registers asynchronously, and
+> sets its entity function to MEDIA_ENT_F_CAM_SENSOR.
 
-> Hello,
->
-> On Wed, 21 Dec 2016 11:26:57 +0100, Thomas Petazzoni wrote:
->> This commit adjusts the names of gatable clock #18 of the Marvell Armada
->> CP110 system controller. This clock not only controls SD/MMC, but also
->> the GOP (Group Of Ports) used for networking. So the clock is renamed to
->> {cpm,cps}-sd-mmc-gop instead of {cpm,cps}-sd-mmc.
->> 
->> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->
-> Gr?gory, since patches 1/3 and 2/3 of this series have been applied,
-> could you take this PATCH 3/3 ?
+Yes, it is MIPI CSI-2, and yes it has a single source pad, registers
+asynchronously, but that's about as far as it goes.
 
-I completely missed this patch!
+The structure is a camera sensor followed by some processing.  So just
+like the smiapp code, I've ended up with multiple subdevs describing
+each stage of the sensors pipeline.
 
-Now, applied on mvebu/dt64
+Just like smiapp, the camera sensor block (which is the very far end
+of the pipeline) is marked with MEDIA_ENT_F_CAM_SENSOR.  However, in
+front of that is the binner, which just like smiapp gets a separate
+entity.  It's this entity which is connected to the mipi-csi2 subdev.
 
-Thanks,
+Unlike smiapp, which does not set an entity function, I set my binner
+entity as MEDIA_ENT_F_PROC_VIDEO_SCALER on the basis that that is
+what V4L2 documentation recommend:
 
-Gregory
+    -  ..  row 27
 
+       ..  _MEDIA-ENT-F-PROC-VIDEO-SCALER:
 
+       -  ``MEDIA_ENT_F_PROC_VIDEO_SCALER``
 
->
-> Thanks!
->
-> Thomas
-> -- 
-> Thomas Petazzoni, CTO, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+       -  Video scaler. An entity capable of video scaling must have
+          at least one sink pad and one source pad, and scale the
+          video frame(s) received on its sink pad(s) to a different
+          resolution output on its source pad(s). The range of
+          supported scaling ratios is entity-specific and can differ
+          between the horizontal and vertical directions (in particular
+          scaling can be supported in one direction only). Binning and
+          skipping are considered as scaling.
+
+This causes attempts to configure the ipu1_csi0 interface to fail:
+
+media-ctl -v -d /dev/media1 --set-v4l2 '"ipu1_csi0":1[fmt:SGBRG8/512x512 at 1/30]'
+Opening media device /dev/media1
+Enumerating entities
+Found 29 entities
+Enumerating pads and links
+Setting up format SGBRG8 512x512 on pad ipu1_csi0/1
+Unable to set format: No such device (-19)
+Unable to setup formats: No such device (19)
+
+and in the kernel log:
+
+ipu1_csi0: no sensor attached
+
+And yes, I already know that my next problem is going to be that the bayer
+formats are not supported in your driver (just like Philipp's driver) but
+adding them should not be difficult... but only once this issue is resolved.
 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
