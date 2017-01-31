@@ -1,115 +1,135 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Wed, 1 Feb 2017 03:07:53 +0800
-Subject: [PATCH v20 08/17] clocksource/drivers/arm_arch_timer: Rework
- counter frequency detection.
-In-Reply-To: <20170131184908.GA2798@leverpostej>
-References: <20170118132541.8989-1-fu.wei@linaro.org>
- <20170118132541.8989-9-fu.wei@linaro.org>
- <20170124172400.GG7572@leverpostej>
- <CADyBb7sU6DVMk6px0963r8by--U-3k_XjESd88zZMkj7xbywgA@mail.gmail.com>
- <20170125172505.GB29027@leverpostej>
- <CADyBb7syNx+HJ6t5JKPMnLqvq-98kPi1knuXU=SSe6_Uz6Gg1A@mail.gmail.com>
- <20170130174958.GA3496@leverpostej>
- <CADyBb7uqomC10mR4oMcUKrvYCbrOfLB6q1T6feMfiYA4cMnduA@mail.gmail.com>
- <20170131184908.GA2798@leverpostej>
-Message-ID: <CADyBb7t+nx3aZ+7otmJ-c0YE3SeM8xC7_5VksYejMvC9f8Orug@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 1 Feb 2017 04:49:58 +0800
+Subject: [PATCH net-next 5/6] drivers: net: xgene-v2: Add transmit and
+ receive
+In-Reply-To: <1485889401-13909-6-git-send-email-isubramanian@apm.com>
+Message-ID: <201702010421.Lhy8B6ne%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Iyappan,
 
-On 1 February 2017 at 02:49, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Feb 01, 2017 at 02:43:02AM +0800, Fu Wei wrote:
->> On 31 January 2017 at 01:49, Mark Rutland <mark.rutland@arm.com> wrote:
->> > On Thu, Jan 26, 2017 at 01:49:03PM +0800, Fu Wei wrote:
->> >> On 26 January 2017 at 01:25, Mark Rutland <mark.rutland@arm.com> wrote:
->> >> > On Wed, Jan 25, 2017 at 02:46:12PM +0800, Fu Wei wrote:
->> >> >> On 25 January 2017 at 01:24, Mark Rutland <mark.rutland@arm.com> wrote:
->> >> >> > On Wed, Jan 18, 2017 at 09:25:32PM +0800, fu.wei at linaro.org wrote:
->> >> >> >> From: Fu Wei <fu.wei@linaro.org>
->> >
->> >> But according to another document(ARMv8-A Foundation Platform User
->> >> Guide  ARM DUI0677K),
->> >> Table 3-2 ARMv8-A Foundation Platform memory map (continued)
->> >>
->> >> AP_REFCLK CNTBase0, Generic Timer 64KB   S
->> >> AP_REFCLK CNTBase1, Generic Timer 64KB   S/NS
->> >>
->> >> Dose it means the timer frame 0 can be accessed in SECURE status  only,
->> >> and the timer frame 1 can be accessed in both status?
->> >
->> > That does appear to be what it says.
->> >
->> > I assume in this case CNTCTLBase.CNTSAR<0> is RES0.
->> >
->> >> And because Linux kernel is running on Non-secure EL1, so should we
->> >> skip "SECURE" timer in Linux?
->> >
->> > I guess you mean by checking the GTx Common flags, to see if the timer
->> > is secure? Yes, we must skip those.
->>
->> Yes, exactly.
->>
->> I think we can check the  GTx Common flags, if the timer is set as
->> SECURE, this driver should just skip this timer.
->
-> I completely agree that we must skip these.
->
->> > Looking further at this, the ACPI spec is sorely lacking any statement
->> > as to the configuration of CNTCTLBase.{CNTSAR,CNTTIDR,CNTACR}, so it's
->> > not clear if we can access anything in a frame, even if it is listed as
->> > being a non-secure timer.
->> >
->> > I think we need a stronger statement here. Otherwise, we will encounter
->> > problems. Linux currently assumes that CNTCTLBase.CNTACR<N> is
->> > writeable, given a non-secure frame N. This is only the case if
->> > CNTCTLBase.CNTSAR.NS<N> == 1.
->>
->> the original driver has checked these registers, but the problem is:
->> What if the timer frame is designed to be a secure timer, all the
->> register in this frame is only can be accessed in secure status, just
->> like foundation model?
->> Note: for foundation model, Please check Table 3-1 Access permissions
->> of 3.1 ARMv8-A Foundation Platform memory map in ARMv8-A Foundation
->> Platform User Guide
->>
->> So I think we should check the GTDT first, if it's not a secure timer,
->> then we can go on checking CNTSAR. :-)
->
-> I've clearly confused matters here. I completely agree that we must skip
-> timers the GTDT descrbies as secure.
+[auto build test WARNING on net-next/master]
 
-Yes, got it :-)
+url:    https://github.com/0day-ci/linux/commits/Iyappan-Subramanian/drivers-net-xgene-v2-Add-RGMII-based-1G-driver/20170201-034317
+config: parisc-allyesconfig (attached as .config)
+compiler: hppa-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=parisc 
 
->
-> My complaint here is that the spec does not explicitly state that
-> CNTCTLBase.CNTSAR.NS<N> must be set for timers *not* marked as secure
-> (though I believe that is the intent). That is a spec issue, not a code
-> issue.
+All warnings (new ones prefixed by >>):
 
-agree :-)
+   In file included from include/linux/swab.h:4:0,
+                    from include/uapi/linux/byteorder/big_endian.h:12,
+                    from include/linux/byteorder/big_endian.h:4,
+                    from arch/parisc/include/uapi/asm/byteorder.h:4,
+                    from arch/parisc/include/asm/bitops.h:10,
+                    from include/linux/bitops.h:36,
+                    from include/linux/kernel.h:10,
+                    from include/linux/list.h:8,
+                    from include/linux/resource_ext.h:17,
+                    from include/linux/acpi.h:26,
+                    from drivers/net/ethernet/apm/xgene-v2/main.h:25,
+                    from drivers/net/ethernet/apm/xgene-v2/main.c:22:
+   drivers/net/ethernet/apm/xgene-v2/main.c: In function 'xge_refill_buffers':
+   drivers/net/ethernet/apm/xgene-v2/main.c:162:20: warning: right shift count >= width of type [-Wshift-count-overflow]
+              dma_addr >> PKT_ADDRL_LEN));
+                       ^
+   include/uapi/linux/swab.h:129:32: note: in definition of macro '__swab64'
+     (__builtin_constant_p((__u64)(x)) ? \
+                                   ^
+>> include/linux/byteorder/generic.h:85:21: note: in expansion of macro '__cpu_to_le64'
+    #define cpu_to_le64 __cpu_to_le64
+                        ^~~~~~~~~~~~~
+   drivers/net/ethernet/apm/xgene-v2/main.c:161:9: note: in expansion of macro 'SET_BITS'
+            SET_BITS(PKT_ADDRH,
+            ^~~~~~~~
+   drivers/net/ethernet/apm/xgene-v2/main.c:162:20: warning: right shift count >= width of type [-Wshift-count-overflow]
+              dma_addr >> PKT_ADDRL_LEN));
+                       ^
+   include/uapi/linux/swab.h:131:12: note: in definition of macro '__swab64'
+     __fswab64(x))
+               ^
+>> include/linux/byteorder/generic.h:85:21: note: in expansion of macro '__cpu_to_le64'
+    #define cpu_to_le64 __cpu_to_le64
+                        ^~~~~~~~~~~~~
+   drivers/net/ethernet/apm/xgene-v2/main.c:161:9: note: in expansion of macro 'SET_BITS'
+            SET_BITS(PKT_ADDRH,
+            ^~~~~~~~
+   drivers/net/ethernet/apm/xgene-v2/main.c: In function 'xge_start_xmit':
+   drivers/net/ethernet/apm/xgene-v2/main.c:346:19: warning: right shift count >= width of type [-Wshift-count-overflow]
+             dma_addr >> PKT_ADDRL_LEN));
+                      ^
+   include/uapi/linux/swab.h:129:32: note: in definition of macro '__swab64'
+     (__builtin_constant_p((__u64)(x)) ? \
+                                   ^
+>> include/linux/byteorder/generic.h:85:21: note: in expansion of macro '__cpu_to_le64'
+    #define cpu_to_le64 __cpu_to_le64
+                        ^~~~~~~~~~~~~
+   drivers/net/ethernet/apm/xgene-v2/main.c:345:8: note: in expansion of macro 'SET_BITS'
+           SET_BITS(PKT_ADDRH,
+           ^~~~~~~~
+   drivers/net/ethernet/apm/xgene-v2/main.c:346:19: warning: right shift count >= width of type [-Wshift-count-overflow]
+             dma_addr >> PKT_ADDRL_LEN));
+                      ^
+   include/uapi/linux/swab.h:131:12: note: in definition of macro '__swab64'
+     __fswab64(x))
+               ^
+>> include/linux/byteorder/generic.h:85:21: note: in expansion of macro '__cpu_to_le64'
+    #define cpu_to_le64 __cpu_to_le64
+                        ^~~~~~~~~~~~~
+   drivers/net/ethernet/apm/xgene-v2/main.c:345:8: note: in expansion of macro 'SET_BITS'
+           SET_BITS(PKT_ADDRH,
+           ^~~~~~~~
+   drivers/net/ethernet/apm/xgene-v2/main.c: In function 'xge_rx_poll':
+   drivers/net/ethernet/apm/xgene-v2/main.c:453:23: warning: left shift count >= width of type [-Wshift-count-overflow]
+      dma_addr = (addr_hi << PKT_ADDRL_LEN) | addr_lo;
+                          ^~
 
->
-> We unfortunately can't check CNTNSAR, as it is secure-only. :(
+vim +/__cpu_to_le64 +85 include/linux/byteorder/generic.h
 
-yes, the spec says:
-In a system that implements both Secure and Non-secure states, this
-register is only accessible by Secure accesses.
+^1da177e Linus Torvalds 2005-04-16  69   *	cpu_to_[bl]eXX(__uXX x)
+^1da177e Linus Torvalds 2005-04-16  70   *	[bl]eXX_to_cpu(__uXX x)
+^1da177e Linus Torvalds 2005-04-16  71   *
+^1da177e Linus Torvalds 2005-04-16  72   * The same, but takes a pointer to the value to convert
+^1da177e Linus Torvalds 2005-04-16  73   *	cpu_to_[bl]eXXp(__uXX x)
+^1da177e Linus Torvalds 2005-04-16  74   *	[bl]eXX_to_cpup(__uXX x)
+^1da177e Linus Torvalds 2005-04-16  75   *
+^1da177e Linus Torvalds 2005-04-16  76   * The same, but change in situ
+^1da177e Linus Torvalds 2005-04-16  77   *	cpu_to_[bl]eXXs(__uXX x)
+^1da177e Linus Torvalds 2005-04-16  78   *	[bl]eXX_to_cpus(__uXX x)
+^1da177e Linus Torvalds 2005-04-16  79   *
+^1da177e Linus Torvalds 2005-04-16  80   * See asm-foo/byteorder.h for examples of how to provide
+^1da177e Linus Torvalds 2005-04-16  81   * architecture-optimized versions
+^1da177e Linus Torvalds 2005-04-16  82   *
+^1da177e Linus Torvalds 2005-04-16  83   */
+^1da177e Linus Torvalds 2005-04-16  84  
+^1da177e Linus Torvalds 2005-04-16 @85  #define cpu_to_le64 __cpu_to_le64
+^1da177e Linus Torvalds 2005-04-16  86  #define le64_to_cpu __le64_to_cpu
+^1da177e Linus Torvalds 2005-04-16  87  #define cpu_to_le32 __cpu_to_le32
+^1da177e Linus Torvalds 2005-04-16  88  #define le32_to_cpu __le32_to_cpu
+^1da177e Linus Torvalds 2005-04-16  89  #define cpu_to_le16 __cpu_to_le16
+^1da177e Linus Torvalds 2005-04-16  90  #define le16_to_cpu __le16_to_cpu
+^1da177e Linus Torvalds 2005-04-16  91  #define cpu_to_be64 __cpu_to_be64
+^1da177e Linus Torvalds 2005-04-16  92  #define be64_to_cpu __be64_to_cpu
+^1da177e Linus Torvalds 2005-04-16  93  #define cpu_to_be32 __cpu_to_be32
 
-So I think the firmware(from vendor) can decide which timer frame
-should be marked as secure according to the GTDT, then kernel just get
-this info from GTDT instead of checking CNTNSAR.
+:::::: The code at line 85 was first introduced by commit
+:::::: 1da177e4c3f41524e886b7f1b8a0c1fc7321cac2 Linux-2.6.12-rc2
 
+:::::: TO: Linus Torvalds <torvalds@ppc970.osdl.org>
+:::::: CC: Linus Torvalds <torvalds@ppc970.osdl.org>
 
->
-> Thanks,
-> Mark.
-
-
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 48442 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170201/7498852d/attachment-0001.gz>
