@@ -1,37 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 31 Jan 2017 19:42:31 +0100
-Subject: [PATCH] efi: libstub: Make file I/O chunking x86-specific
-In-Reply-To: <1485877949-21981-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1485877949-21981-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAK8P3a3R4Tg8xW7YOyoLqebofC=ABeWyXsKKVj=2mUWDS868xQ@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 31 Jan 2017 18:42:47 +0000
+Subject: [RFC] tty: pl011: Work around stuck BUSY bit on QDF2400
+In-Reply-To: <20170130234417.20855-1-cov@codeaurora.org>
+References: <20170130234417.20855-1-cov@codeaurora.org>
+Message-ID: <20170131184246.GA27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2017 at 4:52 PM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> The ARM decompressor is finicky when it comes to uninitialized variables
-> with local linkage, the reason being that it may relocate .text and .bss
-> independently when executing from ROM. This is only possible if all
-> references into .bss from .text are absolute, and this happens to be the
-> case for references emitted under -fpic to symbols with external linkage,
-> and so all .bss references must involve symbols with external linkage.
->
-> When building the ARM stub using clang, the initialized local variable
-> __chunk_size is optimized into a zero-initialized flag that indicates
-> whether chunking is in effect or not. This flag is therefore emitted into
-> .bss, which triggers the ARM decompressor's diagnostics, resulting in a
-> failed build.
->
-> Under UEFI, we never execute the decompressor from ROM, so the diagnostic
-> makes little sense here. But we can easily work around the issue by making
-> __chunk_size global instead.
->
-> However, given that the file I/O chunking that is controlled by the
-> __chunk_size variable is intended to work around known bugs on various
-> x86 implementations of UEFI, we can simply make the chunking an x86
-> specific feature. This is an improvement by itself, and also removes the
-> need to parse the efi= options in the stub entirely.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On Mon, Jan 30, 2017 at 06:44:17PM -0500, Christopher Covington wrote:
+>  {
+>  	struct uart_amba_port *uap =
+>  	    container_of(port, struct uart_amba_port, port);
+> -	unsigned int status = pl011_read(uap, REG_FR);
+> +	unsigned int status = pl011_read(uap, REG_FR) ^ uap->vendor->inv_fr;
+>  	return status & (uap->vendor->fr_busy | UART01x_FR_TXFF) ?
+>  							0 : TIOCSER_TEMT;
+>  }
 
-Tested-by: Arnd Bergmann <arnd@arndb.de
+I'd much prefer the reg & mask == val approach, but the above makes that
+difficult.
+
+So for the PL011 changes:
+
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+
+Thanks.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
