@@ -1,60 +1,51 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 31 Jan 2017 11:11:20 -0800
-Subject: [GIT PULL] bcm2835-dt-next-2017-01-31
-Message-ID: <20170131191120.19742-1-eric@anholt.net>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Tue, 31 Jan 2017 14:12:45 -0500
+Subject: [PATCH v3 19/24] drm/rockchip: dw-mipi-dsi: use positive check
+ for N{H, V}SYNC
+In-Reply-To: <20170129132444.25251-20-john@metanate.com>
+References: <20170129132444.25251-1-john@metanate.com>
+ <20170129132444.25251-20-john@metanate.com>
+Message-ID: <20170131191245.GC20076@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here's another round of DT changes.  The shortlog here came out a bit
-funny, because I had to give it a base of either 4.10-rc2 (which is
-coming in through the clk tree) or the previous VEC changes you'd
-pulled.  I did base off of the patches you pulled with the subjects
-fixed, though.
+On Sun, Jan 29, 2017 at 01:24:39PM +0000, John Keeping wrote:
+> This matches other drivers.
+> 
 
-The following changes since commit 0c744ea4f77d72b3dcebb7a8f2684633ec79be88:
+Reviewed-by: Sean Paul <seanpaul@chromium.org>
 
-  Linux 4.10-rc2 (2017-01-01 14:31:53 -0800)
+> Signed-off-by: John Keeping <john@metanate.com>
+> ---
+> Unchanged in v3
+> Unchanged in v2
+> 
+>  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> index be395c3c5c06..f5b15377ef85 100644
+> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> @@ -774,9 +774,9 @@ static void dw_mipi_dsi_dpi_config(struct dw_mipi_dsi *dsi,
+>  		break;
+>  	}
+>  
+> -	if (!(mode->flags & DRM_MODE_FLAG_PVSYNC))
+> +	if (mode->flags & DRM_MODE_FLAG_NVSYNC)
+>  		val |= VSYNC_ACTIVE_LOW;
+> -	if (!(mode->flags & DRM_MODE_FLAG_PHSYNC))
+> +	if (mode->flags & DRM_MODE_FLAG_NHSYNC)
+>  		val |= HSYNC_ACTIVE_LOW;
+>  
+>  	dsi_write(dsi, DSI_DPI_VCID, DPI_VID(dsi->channel));
+> -- 
+> 2.11.0.197.gb556de5.dirty
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
-are available in the git repository at:
-
-  https://github.com/anholt/linux tags/bcm2835-dt-next-2017-01-31
-
-for you to fetch changes up to c62e223c9f67721d67a0f07bf524ece447b0cc46:
-
-  ARM: dts: bcm2835: Add the DSI module nodes and clocks. (2017-01-31 10:43:29 -0800)
-
-----------------------------------------------------------------
-This pull request brings in some small fixes to (unused) pinmux
-groups, a fix for getting the mac address from u-boot, and the
-(disabled by default) nodes for the DSI interfaces.
-
-The functional change is adding the DSI clocks that feed into to the
-cprman node.  This required merging in a topic branch from the clk
-tree (acked by the maintainer), which was based on 4.10-rc2.
-
-----------------------------------------------------------------
-Baruch Siach (4):
-      ARM: dts: bcm2835: fix uart0 pinctrl node names
-      ARM: dts: bcm2835: fix i2c0 pins
-      ARM: dts: bcm2835: fix uart0/uart1 pins
-      ARM: dts: bcm2835: add index to the ethernet alias
-
-Boris Brezillon (2):
-      ARM: dts: bcm283x: Add VEC node in bcm283x.dtsi
-      ARM: dts: bcm283x: Enable the VEC IP on all RaspberryPi boards
-
-Eric Anholt (5):
-      clk: bcm2835: Don't rate change PLLs on behalf of DSI PLL dividers.
-      clk: bcm2835: Register the DSI0/DSI1 pixel clocks.
-      clk: bcm2835: Add leaf clock measurement support, disabled by default
-      Merge remote-tracking branch 'clk/clk-bcm2835' into bcm2835-dt-next
-      ARM: dts: bcm2835: Add the DSI module nodes and clocks.
-
- .../bindings/clock/brcm,bcm2835-cprman.txt         |  15 +-
- arch/arm/boot/dts/bcm2835-rpi.dtsi                 |  13 +
- arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi        |   2 +-
- arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi        |   2 +-
- arch/arm/boot/dts/bcm283x.dtsi                     |  78 +++++-
- drivers/clk/bcm/clk-bcm2835.c                      | 303 +++++++++++++++++----
- include/dt-bindings/clock/bcm2835.h                |   2 +
- 7 files changed, 351 insertions(+), 64 deletions(-)
+-- 
+Sean Paul, Software Engineer, Google / Chromium OS
