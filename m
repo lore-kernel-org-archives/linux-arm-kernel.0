@@ -1,100 +1,124 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 31 Jan 2017 10:23:45 +0000
-Subject: [PATCH v3] PCI: Xilinx NWL: Modifying irq chip for legacy
- interrupts
-In-Reply-To: <8520D5D51A55D047800579B094147198263DDD4D@XAP-PVEXMBX02.xlnx.xilinx.com>
- (Bharat Kumar Gogada's message of "Tue, 31 Jan 2017 09:34:43 +0000")
-References: <1485853152-31819-1-git-send-email-bharatku@xilinx.com>
- <868tpr8u3r.fsf@arm.com>
- <8520D5D51A55D047800579B094147198263DDD4D@XAP-PVEXMBX02.xlnx.xilinx.com>
-Message-ID: <86r33j7cjy.fsf@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 31 Jan 2017 11:24:15 +0100
+Subject: [PATCH v2 1/2] iommu/dma: Add support for
+ DMA_ATTR_FORCE_CONTIGUOUS
+In-Reply-To: <73d47a53-3146-6719-ec20-39a5633350fa@arm.com>
+References: <1485531259-17513-1-git-send-email-geert+renesas@glider.be>
+ <1485531259-17513-2-git-send-email-geert+renesas@glider.be>
+ <73d47a53-3146-6719-ec20-39a5633350fa@arm.com>
+Message-ID: <CAMuHMdUDh0S=aWDXe=Sc0YJjC2DLNgTtr_m0REL=fiBQwgEpPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31 2017 at 09:34:43 AM, Bharat Kumar Gogada <bharat.kumar.gogada@xilinx.com> wrote:
->  > On Tue, Jan 31 2017 at 08:59:12 AM, Bharat Kumar Gogada
->> <bharat.kumar.gogada@xilinx.com> wrote:
->> > - Adding mutex lock for protecting legacy mask register
->> > - Few wifi end points which only support legacy interrupts, performs
->> > hardware reset functionalities after disabling interrupts by invoking
->> > disable_irq and then re-enable using enable_irq, they enable hardware
->> > interrupts first and then virtual irq line later.
->> > - The legacy irq line goes low only after DEASSERT_INTx is received.As
->> > the legacy irq line is high immediately after hardware interrupts are
->> > enabled but virq of EP is still in disabled state and EP handler is
->> > never executed resulting no DEASSERT_INTx.If dummy irq chip is used,
->> > interrutps are not masked and system is hanging with CPU stall.
->> > - Adding irq chip functions instead of dummy irq chip for legacy
->> > interrupts.
->> > - Legacy interrupts are level sensitive, so using handle_level_irq is
->> > more appropriate as it is masks interrupts until End point handles
->> > interrupts and unmasks interrutps after End point handler is executed.
->> > - Legacy interrupts are level triggered, virtual irq line of End Point
->> > shows as edge in /proc/interrupts.
->> > - Setting irq flags of virtual irq line of EP to level triggered at
->> > the time of mapping.
->> >
->> > Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
->> > ---
->> >  drivers/pci/host/pcie-xilinx-nwl.c |   43
->> +++++++++++++++++++++++++++++++++++-
->> >  1 files changed, 42 insertions(+), 1 deletions(-)
->> >
->> > diff --git a/drivers/pci/host/pcie-xilinx-nwl.c
->> > b/drivers/pci/host/pcie-xilinx-nwl.c
->> > index 43eaa4a..76dd094 100644
->> > --- a/drivers/pci/host/pcie-xilinx-nwl.c
->> > +++ b/drivers/pci/host/pcie-xilinx-nwl.c
->> > @@ -184,6 +184,7 @@ struct nwl_pcie {
->> >  	u8 root_busno;
->> >  	struct nwl_msi msi;
->> >  	struct irq_domain *legacy_irq_domain;
->> > +	struct mutex leg_mask_lock;
->> >  };
->> >
->> >  static inline u32 nwl_bridge_readl(struct nwl_pcie *pcie, u32 off) @@
->> > -395,11 +396,50 @@ static void nwl_pcie_msi_handler_low(struct irq_desc
->> *desc)
->> >  	chained_irq_exit(chip, desc);
->> >  }
->> >
->> > +static void nwl_mask_leg_irq(struct irq_data *data) {
->> > +	struct irq_desc *desc = irq_to_desc(data->irq);
->> > +	struct nwl_pcie *pcie;
->> > +	u32 mask;
->> > +	u32 val;
->> > +
->> > +	pcie = irq_desc_get_chip_data(desc);
->> > +	mask = 1 << (data->hwirq - 1);
->> > +	mutex_lock(&pcie->leg_mask_lock);
->> > +	val = nwl_bridge_readl(pcie, MSGF_LEG_MASK);
->> > +	nwl_bridge_writel(pcie, (val & (~mask)), MSGF_LEG_MASK);
->> > +	mutex_unlock(&pcie->leg_mask_lock);
->> 
->> Have you looked at which context this is called in? In a number of cases, the
->> mask/unmask methods are called whilst you're in an interrupt context. If you
->> sleep there (which is what happens with a contended mutex), you die horribly.
->> 
->> Given these constraints, you should use raw_spin_lock_irqsave and
->> co, since this
->> can be called from both interrupt and non-interrupt contexts.
->> 
-> I have seen very few wifi drivers calling these in MAC flow,
+Hi Robin,
 
-Very few is already too many. But I'm afraid you're missing the point
-entirely: This patch is about using handle_level_irq as the flow
-handler. The first thing handle_level_irq does is to mask the
-interrupt. If you have a competing mask or unmask operation in progress
-on another CPU (or in the middle of one on the same CPU when the
-interrupt fired), your system explodes.
+On Fri, Jan 27, 2017 at 6:50 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> On 27/01/17 15:34, Geert Uytterhoeven wrote:
+>> Add helpers for allocating physically contiguous DMA buffers to the
+>> generic IOMMU DMA code.  This can be useful when two or more devices
+>> with different memory requirements are involved in buffer sharing.
+>>
+>> The iommu_dma_{alloc,free}_contiguous() functions complement the existing
+>> iommu_dma_{alloc,free}() functions, and allow architecture-specific code
+>> to implement support for the DMA_ATTR_FORCE_CONTIGUOUS attribute on
+>> systems with an IOMMU.  As this uses the CMA allocator, setting this
+>> attribute has a runtime-dependency on CONFIG_DMA_CMA.
+>>
+>> Note that unlike the existing iommu_dma_alloc() helper,
+>> iommu_dma_alloc_contiguous() has no callback to flush pages.
+>> Ensuring the returned region is made visible to a non-coherent device is
+>> the responsibility of the caller.
+>>
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> ---
+>> v2:
+>>   - Provide standalone iommu_dma_{alloc,free}_contiguous() functions, as
+>>     requested by Robin Murphy,
+>>   - Simplify operations by getting rid of the page array/scatterlist
+>>     dance, as the buffer is contiguous,
+>>   - Move CPU cache magement into the caller, which is much simpler with
+>>     a single contiguous buffer.
+>
+> Thanks for the rework, that's a lot easier to make sense of! Now, please
+> don't hate me, but...
 
-Please have a look at Documentation/DocBook/kernel-locking.tmpl.
+I don't hate you at all. I'm just a drivers/iommu rookie ;-)
 
-> raw_spin_lock_irqsave
-> looks more safe, will do it.
+>> --- a/drivers/iommu/dma-iommu.c
+>> +++ b/drivers/iommu/dma-iommu.c
 
-Thanks,
+>> +/**
+>> + * iommu_dma_alloc_contiguous - Allocate and map a buffer contiguous in IOVA
+>> + *                           and physical space
+>> + * @dev: Device to allocate memory for. Must be a real device attached to an
+>> + *    iommu_dma_domain
+>> + * @size: Size of buffer in bytes
+>> + * @prot: IOMMU mapping flags
+>> + * @handle: Out argument for allocated DMA handle
+>> + *
+>> + * Return: Buffer page pointer, or NULL on failure.
+>> + *
+>> + * Note that unlike iommu_dma_alloc(), it's the caller's responsibility to
+>> + * ensure the returned region is made visible to the given non-coherent device.
+>> + */
+>> +struct page *iommu_dma_alloc_contiguous(struct device *dev, size_t size,
+>> +             int prot, dma_addr_t *handle)
+>> +{
+>> +     struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+>> +     struct iova_domain *iovad = cookie_iovad(domain);
+>> +     dma_addr_t dma_addr;
+>> +     unsigned int count;
+>> +     struct page *page;
+>> +     struct iova *iova;
+>> +     int ret;
+>> +
+>> +     *handle = DMA_ERROR_CODE;
+>> +
+>> +     size = PAGE_ALIGN(size);
+>> +     count = size >> PAGE_SHIFT;
+>> +     page = dma_alloc_from_contiguous(dev, count, get_order(size));
+>> +     if (!page)
+>> +             return NULL;
+>> +
+>> +     iova = __alloc_iova(domain, size, dev->coherent_dma_mask);
+>> +     if (!iova)
+>> +             goto out_free_pages;
+>> +
+>> +     size = iova_align(iovad, size);
+>> +     dma_addr = iova_dma_addr(iovad, iova);
+>> +     ret = iommu_map(domain, dma_addr, page_to_phys(page), size, prot);
+>> +     if (ret < 0)
+>> +             goto out_free_iova;
+>> +
+>> +     *handle = dma_addr;
+>> +     return page;
+>> +
+>> +out_free_iova:
+>> +     __free_iova(iovad, iova);
+>> +out_free_pages:
+>> +     dma_release_from_contiguous(dev, page, count);
+>> +     return NULL;
+>> +}
+>
+> ...now that I can see it clearly, isn't this more or less just:
+>
+>         page = dma_alloc_from_contiguous(dev, ...);
+>         if (page)
+>                 dma_addr = iommu_dma_map_page(dev, page, ...);
+> ?
+>
+> Would it not be even simpler to just make those two calls directly from
+> the arm64 code?
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+You're right. Will update. Thanks a lot!
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
