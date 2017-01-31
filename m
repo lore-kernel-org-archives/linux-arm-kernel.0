@@ -1,118 +1,22 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 31 Jan 2017 11:21:14 +0100
-Subject: [PATCH 2/2] ARM: dts: Qualcomm APQ8060 DragonBoard ALS sensor
-In-Reply-To: <20170131102114.25085-1-linus.walleij@linaro.org>
-References: <20170131102114.25085-1-linus.walleij@linaro.org>
-Message-ID: <20170131102114.25085-2-linus.walleij@linaro.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 31 Jan 2017 10:21:20 +0000
+Subject: [PATCH v3 00/24] i.MX Media Driver
+In-Reply-To: <951c1a08-c0f2-4333-b4bf-410de8dd863f@gmail.com>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <20170131004510.GQ27312@n2100.armlinux.org.uk>
+ <951c1a08-c0f2-4333-b4bf-410de8dd863f@gmail.com>
+Message-ID: <20170131102120.GS27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the Capella CM3605 ambient light and proximity sensor
-to the APQ8060 DragonBoard device tree. Notice that we also set
-up pin config for the AOUT line and GPIO lines, and that we set
-the default trigger on the infrared LED to associate with the
-"cm3605" trigger so the IR LED is controlled by this the CM3605
-driver.
+On Mon, Jan 30, 2017 at 05:22:01PM -0800, Steve Longerbeam wrote:
+> Edit: I see a subdev that is missing: the video mux. Did you enable
+> CONFIG_VIDEO_MULTIPLEXER?
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-Andy: these bindings have been merged to the IIO tree and ACKed
-by DT maintainers.
----
- arch/arm/boot/dts/qcom-apq8060-dragonboard.dts | 53 ++++++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
+Yes, and that's where the problem is - the video-multiplexer is 
+missing the module aliases to allow it to be automatically loaded.
 
-diff --git a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-index c04960371c5e..f3bd65e284ee 100644
---- a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-+++ b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-@@ -23,6 +23,7 @@
- #include <dt-bindings/input/input.h>
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
-+#include <dt-bindings/pinctrl/qcom,pmic-mpp.h>
- #include "qcom-msm8660.dtsi"
- 
- / {
-@@ -83,6 +84,25 @@
- 		};
- 	};
- 
-+	/*
-+	 * Capella CM3605 light and proximity sensor mounted directly
-+	 * on the sensor board.
-+	 */
-+	cm3605 {
-+		compatible = "capella,cm3605";
-+		vdd-supply = <&pm8058_l14>; // 2.85V
-+		aset-gpios = <&pm8058_gpio 35 GPIO_ACTIVE_LOW>;
-+		capella,aset-resistance-ohms = <100000>;
-+		/* GPIO34 has interrupt 225 on the PM8058 */
-+		/* Trig on both edges - getting close or far away */
-+		interrupts-extended = <&pm8058 225 IRQ_TYPE_EDGE_BOTH>;
-+		/* MPP05 analog input to the XOADC */
-+		io-channels = <&xoadc 0x05>;
-+		io-channel-names = "aout";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&dragon_cm3605_gpios>, <&dragon_cm3605_mpps>;
-+	};
-+
- 	soc {
- 		pinctrl at 800000 {
- 			/* eMMMC pins, all 8 data lines connected */
-@@ -317,6 +337,24 @@
- 							power-source = <PM8058_GPIO_S3>;
- 						};
- 					};
-+					dragon_cm3605_gpios: cm3605-gpios {
-+						/* Pin 34 connected to the proxy IRQ */
-+						pinconf_gpio34 {
-+							pins = "gpio34";
-+							function = "normal";
-+							input-enable;
-+							bias-disable;
-+							power-source = <PM8058_GPIO_S3>;
-+						};
-+						/* Pin 35 connected to ASET */
-+						pinconf_gpio35 {
-+							pins = "gpio35";
-+							function = "normal";
-+							output-high;
-+							bias-disable;
-+							power-source = <PM8058_GPIO_S3>;
-+						};
-+					};
- 					dragon_veth_gpios: veth-gpios {
- 						pinconf {
- 							pins = "gpio40";
-@@ -327,6 +365,20 @@
- 					};
- 				};
- 
-+				mpps at 50 {
-+					dragon_cm3605_mpps: cm3605-mpps {
-+						pinconf {
-+							pins = "mpp5";
-+							function = "analog";
-+							input-enable;
-+							bias-high-impedance;
-+							/* Let's use channel 5 */
-+							qcom,amux-route = <PMIC_MPP_AMUX_ROUTE_CH5>;
-+							power-source = <PM8058_GPIO_S3>;
-+						};
-+					};
-+				};
-+
- 				xoadc at 197 {
- 					/* Reference voltage 2.2 V */
- 					xoadc-ref-supply = <&pm8058_l18>;
-@@ -367,6 +419,7 @@
- 					reg = <0x48>;
- 					label = "pm8058:infrared:proximitysensor";
- 					default-state = "off";
-+					linux,default-trigger = "cm3605";
- 				};
- 				led at 131 {
- 					compatible = "qcom,pm8058-led";
 -- 
-2.9.3
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
