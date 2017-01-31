@@ -1,33 +1,121 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Tue, 31 Jan 2017 22:21:12 +0100
-Subject: [PATCH] Documentation: devicetree: meson-ir: "linux,
- rc-map-name" is supported
-Message-ID: <20170131212112.5582-1-martin.blumenstingl@googlemail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 31 Jan 2017 22:17:57 +0100
+Subject: [PATCH 4/4] ARM: dts: add the AB8500 clocks to the device tree
+Message-ID: <20170131211757.4708-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver already parses the "linux,rc-map-name" property. Add this
-information to the documentation so .dts maintainers don't have to look
-it up in the source-code.
+This adds the AB8500 clocks to the device tree using the new
+bindings from the clk subsystem, making audio work again.
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- Documentation/devicetree/bindings/media/meson-ir.txt | 3 +++
- 1 file changed, 3 insertions(+)
+ChangeLog v1->v2:
+- Rename DT node to clock-controller.
+---
+ arch/arm/boot/dts/ste-dbx5x0.dtsi  | 19 +++++++++++++++++++
+ arch/arm/boot/dts/ste-href.dtsi    |  9 ---------
+ arch/arm/boot/dts/ste-snowball.dts |  9 ---------
+ 3 files changed, 19 insertions(+), 18 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/media/meson-ir.txt b/Documentation/devicetree/bindings/media/meson-ir.txt
-index e7e3f3c4fc8f..efd9d29a8f10 100644
---- a/Documentation/devicetree/bindings/media/meson-ir.txt
-+++ b/Documentation/devicetree/bindings/media/meson-ir.txt
-@@ -8,6 +8,9 @@ Required properties:
-  - reg		: physical base address and length of the device registers
-  - interrupts	: a single specifier for the interrupt from the device
+diff --git a/arch/arm/boot/dts/ste-dbx5x0.dtsi b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+index 82d8c4771293..162e1eb5373d 100644
+--- a/arch/arm/boot/dts/ste-dbx5x0.dtsi
++++ b/arch/arm/boot/dts/ste-dbx5x0.dtsi
+@@ -14,6 +14,7 @@
+ #include <dt-bindings/mfd/dbx500-prcmu.h>
+ #include <dt-bindings/arm/ux500_pm_domains.h>
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/clock/ste-ab8500.h>
+ #include "skeleton.dtsi"
  
-+Optional properties:
-+ - linux,rc-map-name:	see rc.txt file in the same directory.
+ / {
+@@ -603,6 +604,11 @@
+ 				interrupt-controller;
+ 				#interrupt-cells = <2>;
+ 
++				ab8500_clock: clock-controller {
++					compatible = "stericsson,ab8500-clk";
++					#clock-cells = <1>;
++				};
 +
- Example:
+ 				ab8500_gpio: ab8500-gpio {
+ 					compatible = "stericsson,ab8500-gpio";
+ 					gpio-controller;
+@@ -686,6 +692,8 @@
  
- 	ir-receiver at c8100480 {
+ 				ab8500-pwm {
+ 					compatible = "stericsson,ab8500-pwm";
++					clocks = <&ab8500_clock AB8500_SYSCLK_INT>;
++					clock-names = "intclk";
+ 				};
+ 
+ 				ab8500-debugfs {
+@@ -700,6 +708,9 @@
+ 					V-AMIC2-supply = <&ab8500_ldo_anamic2_reg>;
+ 					V-DMIC-supply = <&ab8500_ldo_dmic_reg>;
+ 
++					clocks = <&ab8500_clock AB8500_SYSCLK_AUDIO>;
++					clock-names = "audioclk";
++
+ 					stericsson,earpeice-cmv = <950>; /* Units in mV. */
+ 				};
+ 
+@@ -1095,6 +1106,14 @@
+ 			status = "disabled";
+ 		};
+ 
++		sound {
++			compatible = "stericsson,snd-soc-mop500";
++			stericsson,cpu-dai = <&msp1 &msp3>;
++			stericsson,audio-codec = <&codec>;
++			clocks = <&prcmu_clk PRCMU_SYSCLK>, <&ab8500_clock AB8500_SYSCLK_ULP>, <&ab8500_clock AB8500_SYSCLK_INT>;
++			clock-names = "sysclk", "ulpclk", "intclk";
++		};
++
+ 		msp0: msp at 80123000 {
+ 			compatible = "stericsson,ux500-msp-i2s";
+ 			reg = <0x80123000 0x1000>;
+diff --git a/arch/arm/boot/dts/ste-href.dtsi b/arch/arm/boot/dts/ste-href.dtsi
+index f37f9e10713c..9e359e4f342e 100644
+--- a/arch/arm/boot/dts/ste-href.dtsi
++++ b/arch/arm/boot/dts/ste-href.dtsi
+@@ -186,15 +186,6 @@
+ 			status = "okay";
+ 		};
+ 
+-		sound {
+-			compatible = "stericsson,snd-soc-mop500";
+-
+-			stericsson,cpu-dai = <&msp1 &msp3>;
+-			stericsson,audio-codec = <&codec>;
+-			clocks = <&prcmu_clk PRCMU_SYSCLK>;
+-			clock-names = "sysclk";
+-		};
+-
+ 		msp0: msp at 80123000 {
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&msp0_default_mode>;
+diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
+index dd5514def604..ade1d0d4e5f4 100644
+--- a/arch/arm/boot/dts/ste-snowball.dts
++++ b/arch/arm/boot/dts/ste-snowball.dts
+@@ -159,15 +159,6 @@
+ 				     "", "", "", "", "", "", "", "";
+ 		};
+ 
+-		sound {
+-			compatible = "stericsson,snd-soc-mop500";
+-
+-			stericsson,cpu-dai = <&msp1 &msp3>;
+-			stericsson,audio-codec = <&codec>;
+-			clocks = <&prcmu_clk PRCMU_SYSCLK>;
+-			clock-names = "sysclk";
+-		};
+-
+ 		msp0: msp at 80123000 {
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&msp0_default_mode>;
 -- 
-2.11.0
+2.9.3
