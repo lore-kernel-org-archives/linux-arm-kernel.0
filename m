@@ -1,74 +1,45 @@
 From: dhowells@redhat.com (David Howells)
-Date: Tue, 31 Jan 2017 15:13:59 +0000
-Subject: [PATCH 5/7] efi: Disable secure boot if shim is in insecure mode
+Date: Tue, 31 Jan 2017 15:14:18 +0000
+Subject: [PATCH 7/7] efi: Print the secure boot status in x86 setup_arch()
  [ver #7]
 In-Reply-To: <148587558696.4026.16034622623568539004.stgit@warthog.procyon.org.uk>
 References: <148587558696.4026.16034622623568539004.stgit@warthog.procyon.org.uk>
-Message-ID: <148587563958.4026.17071363743186009619.stgit@warthog.procyon.org.uk>
+Message-ID: <148587565838.4026.2835771993519594392.stgit@warthog.procyon.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Josh Boyer <jwboyer@fedoraproject.org>
+Print the secure boot status in the x86 setup_arch() but otherwise do
+nothing more for now.  More functionality will be added later, but this at
+least allows for testing.
 
-A user can manually tell the shim boot loader to disable validation of
-images it loads.  When a user does this, it creates a UEFI variable called
-MokSBState that does not have the runtime attribute set.  Given that the
-user explicitly disabled validation, we can honor that and not enable
-secure boot mode if that variable is set.
-
-Signed-off-by: Josh Boyer <jwboyer@fedoraproject.org>
 Signed-off-by: David Howells <dhowells@redhat.com>
 ---
 
- drivers/firmware/efi/libstub/secureboot.c |   24 +++++++++++++++++++++++-
- 1 file changed, 23 insertions(+), 1 deletion(-)
+ arch/x86/kernel/setup.c |   14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/drivers/firmware/efi/libstub/secureboot.c b/drivers/firmware/efi/libstub/secureboot.c
-index 62d6904da800..39c91e091f6a 100644
---- a/drivers/firmware/efi/libstub/secureboot.c
-+++ b/drivers/firmware/efi/libstub/secureboot.c
-@@ -23,6 +23,12 @@ static const efi_char16_t const efi_SetupMode_name[] = {
- 	'S', 'e', 't', 'u', 'p', 'M', 'o', 'd', 'e', 0
- };
+diff --git a/arch/x86/kernel/setup.c b/arch/x86/kernel/setup.c
+index 4cfba947d774..22e4b47a5c14 100644
+--- a/arch/x86/kernel/setup.c
++++ b/arch/x86/kernel/setup.c
+@@ -1176,6 +1176,20 @@ void __init setup_arch(char **cmdline_p)
+ 	/* Allocate bigger log buffer */
+ 	setup_log_buf(1);
  
-+/* SHIM variables */
-+static const efi_guid_t shim_guid = EFI_SHIM_LOCK_GUID;
-+static efi_char16_t const shim_MokSBState_name[] = {
-+	'M', 'o', 'k', 'S', 'B', 'S', 't', 'a', 't', 'e', 0
-+};
++	if (IS_ENABLED(CONFIG_EFI)) {
++		switch (boot_params.secure_boot) {
++		case efi_secureboot_mode_disabled:
++			pr_info("Secure boot disabled\n");
++			break;
++		case efi_secureboot_mode_enabled:
++			pr_info("Secure boot enabled\n");
++			break;
++		default:
++			pr_info("Secure boot could not be determined\n");
++			break;
++		}
++	}
 +
- #define get_efi_var(name, vendor, ...) \
- 	efi_call_runtime(get_variable, \
- 			 (efi_char16_t *)(name), (efi_guid_t *)(vendor), \
-@@ -33,7 +39,8 @@ static const efi_char16_t const efi_SetupMode_name[] = {
-  */
- enum efi_secureboot_mode efi_get_secureboot(efi_system_table_t *sys_table_arg)
- {
--	u8 secboot, setupmode;
-+	u32 attr;
-+	u8 secboot, setupmode, moksbstate;
- 	unsigned long size;
- 	efi_status_t status;
+ 	reserve_initrd();
  
-@@ -52,6 +59,21 @@ enum efi_secureboot_mode efi_get_secureboot(efi_system_table_t *sys_table_arg)
- 	if (secboot == 0 || setupmode == 1)
- 		return efi_secureboot_mode_disabled;
- 
-+	/* See if a user has put shim into insecure mode.  If so, and if the
-+	 * variable doesn't have the runtime attribute set, we might as well
-+	 * honor that.
-+	 */
-+	size = sizeof(moksbstate);
-+	status = get_efi_var(shim_MokSBState_name, &shim_guid,
-+			     &attr, &size, &moksbstate);
-+
-+	/* If it fails, we don't care why.  Default to secure */
-+	if (status != EFI_SUCCESS)
-+		goto secure_boot_enabled;
-+	if (!(attr & EFI_VARIABLE_RUNTIME_ACCESS) && moksbstate == 1)
-+		return efi_secureboot_mode_disabled;
-+
-+secure_boot_enabled:
- 	pr_efi(sys_table_arg, "UEFI Secure Boot is enabled.\n");
- 	return efi_secureboot_mode_enabled;
- 
+ 	acpi_table_upgrade();
