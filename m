@@ -1,119 +1,169 @@
-From: john.garry@huawei.com (John Garry)
-Date: Tue, 31 Jan 2017 13:39:09 +0000
-Subject: [PATCH V6 2/5] PCI: Adapt pci_register_io_range() for indirect-IO
- and PCI I/O translation
-In-Reply-To: <20170131001030.GB20550@bhelgaas-glaptop.roam.corp.google.com>
-References: <1485241525-201782-1-git-send-email-yuanzhichang@hisilicon.com>
- <1485241525-201782-3-git-send-email-yuanzhichang@hisilicon.com>
- <20170131001030.GB20550@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <f8a6c3ce-ba8e-c00e-8e6f-7c799fb4dd44@huawei.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 31 Jan 2017 13:42:52 +0000
+Subject: [PATCH v3 20/24] media: imx: Add Camera Interface subdev driver
+In-Reply-To: <b7456d40-040d-41b7-45bc-ef6709ab7933@xs4all.nl>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <1483755102-24785-21-git-send-email-steve_longerbeam@mentor.com>
+ <b7456d40-040d-41b7-45bc-ef6709ab7933@xs4all.nl>
+Message-ID: <20170131134252.GX27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/01/2017 00:10, Bjorn Helgaas wrote:
-> On Tue, Jan 24, 2017 at 03:05:22PM +0800, zhichang.yuan wrote:
->> After indirect-IO is introduced, system must can assigned indirect-IO devices
->> with logical I/O ranges which are different from those for PCI I/O devices.
->> Otherwise, I/O accessors can't identify whether the I/O port is for memory
->> mapped I/O or indirect-IO.
->
-> Maybe:
->
->   We must assign logical I/O port space for indirect I/O such that the
->   I/O accessors can tell whether a logical I/O port refers to memory-
->   mapped I/O space or indirect I/O space.
->
+On Fri, Jan 20, 2017 at 03:38:28PM +0100, Hans Verkuil wrote:
+> Should be set to something like 'platform:imx-media-camif'. v4l2-compliance
+> should complain about this.
 
-It's better
+... and more.
 
->> As current helper, pci_register_io_range(), is used for PCI I/O ranges
->> registration and translation, indirect-IO devices should also apply these
->> helpers to manage the I/O ranges. It will be easy to ensure the assigned
->> logical I/O ranges unique.
->> But for indirect-IO devices, there is no cpu address. The current
->> pci_register_io_range() can not work for this case.
->>
->> This patch makes some changes on the pci_register_io_range() to support the
->> I/O range registration with device's fwnode also. After this, the indirect-IO
->> devices can register the device-local I/O range to system logical I/O and
->> easily perform the translation between device-local I/O range and sytem
->> logical I/O range.
->
->> -int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
->> +int __weak pci_register_io_range(struct fwnode_handle *node, phys_addr_t addr,
->> +				 resource_size_t size, unsigned long *port)
->
-> Why is this __weak?  It looks like it's been __weak since its
-> introduction by 41f8bba7f555 ("of/pci: Add pci_register_io_range() and
-> pci_pio_to_address()"), but I don't see any other implementations of
-> it.
->
-> Can you add a patch that does nothing but make this non-weak?
->
+Driver Info:
+        Driver name   : imx-media-camif
+        Card type     : imx-media-camif
+        Bus info      :
+        Driver version: 4.10.0
+        Capabilities  : 0x84200001
+                Video Capture
+                Streaming
+                Extended Pix Format
+                Device Capabilities
+        Device Caps   : 0x04200001
+                Video Capture
+                Streaming
+                Extended Pix Format
 
-OK
+Compliance test for device /dev/video3 (not using libv4l2):
 
->> +#else
->> +	/*
->> +	 * powerpc and microblaze have their own registration,
->> +	 * just look up the value here
->
-> Can you include a pointer to the powerpc and microblaze registration
-> code here?  It's conceivable that somebody could generalize this
-> enough to support powerpc and microblaze as well.
->
+Required ioctls:
+                fail: v4l2-compliance.cpp(244): string empty
+                fail: v4l2-compliance.cpp(297): check_ustring(vcap.bus_info, sizeof(vcap.bus_info))
+        test VIDIOC_QUERYCAP: FAIL
 
-It should be no problem
+Allow for multiple opens:
+        test second video open: OK
+                fail: v4l2-compliance.cpp(244): string empty
+                fail: v4l2-compliance.cpp(297): check_ustring(vcap.bus_info, sizeof(vcap.bus_info))
+        test VIDIOC_QUERYCAP: FAIL
+        test VIDIOC_G/S_PRIORITY: OK
 
->> --- a/include/linux/pci.h
->> +++ b/include/linux/pci.h
->> @@ -34,6 +34,9 @@
->>
->>  #include <linux/pci_ids.h>
->>
->> +/* the macro below flags an invalid cpu address
->> + * and is used by IO special hosts              */
->
-> s/cpu/CPU/
->
+Debug ioctls:
+        test VIDIOC_DBG_G/S_REGISTER: OK
+        test VIDIOC_LOG_STATUS: OK (Not Supported)
 
-OK
+Input ioctls:
+        test VIDIOC_G/S_TUNER/ENUM_FREQ_BANDS: OK (Not Supported)
+        test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+        test VIDIOC_S_HW_FREQ_SEEK: OK (Not Supported)
+        test VIDIOC_ENUMAUDIO: OK (Not Supported)
+                fail: v4l2-test-input-output.cpp(382): std == 0
+                fail: v4l2-test-input-output.cpp(437): invalid attributes for input 0
+        test VIDIOC_G/S/ENUMINPUT: FAIL
+        test VIDIOC_G/S_AUDIO: OK (Not Supported)
+        Inputs: 0 Audio Inputs: 0 Tuners: 0
 
-> Use conventional multi-line comment style:
->
-> /*
->  * IO_RANGE_IOEXT flags an invalid CPU address ...
->  */
->
->> +#define IO_RANGE_IOEXT (resource_size_t)(-1ull)
->
-> And put this close to related things, e.g., pci_register_io_range(),
-> instead of just dropping it in at the top of the file.
+Output ioctls:
+        test VIDIOC_G/S_MODULATOR: OK (Not Supported)
+        test VIDIOC_G/S_FREQUENCY: OK (Not Supported)
+        test VIDIOC_ENUMAUDOUT: OK (Not Supported)
+        test VIDIOC_G/S/ENUMOUTPUT: OK (Not Supported)
+        test VIDIOC_G/S_AUDOUT: OK (Not Supported)
+        Outputs: 0 Audio Outputs: 0 Modulators: 0
 
-OK
+Input/Output configuration ioctls:
+        test VIDIOC_ENUM/G/S/QUERY_STD: OK (Not Supported)
+        test VIDIOC_ENUM/G/S/QUERY_DV_TIMINGS: OK (Not Supported)
+        test VIDIOC_DV_TIMINGS_CAP: OK (Not Supported)
+        test VIDIOC_G/S_EDID: OK (Not Supported)
 
->
->>  /*
->>   * The PCI interface treats multi-function devices as independent
->>   * devices.  The slot/function address of each device is encoded
->> @@ -1197,8 +1200,8 @@ int __must_check pci_bus_alloc_resource(struct pci_bus *bus,
->>  						  resource_size_t),
->>  			void *alignf_data);
->>
->> -
->> -int pci_register_io_range(phys_addr_t addr, resource_size_t size);
->> +int pci_register_io_range(struct fwnode_handle *node, phys_addr_t addr,
->> +			  resource_size_t size, unsigned long *port);
->>  unsigned long pci_address_to_pio(phys_addr_t addr);
->>  phys_addr_t pci_pio_to_address(unsigned long pio);
->>  int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr);
->> --
->> 1.9.1
->>
+        Control ioctls:
+                test VIDIOC_QUERY_EXT_CTRL/QUERYMENU: OK
+                test VIDIOC_QUERYCTRL: OK
+                test VIDIOC_G/S_CTRL: OK
+                test VIDIOC_G/S/TRY_EXT_CTRLS: OK
+                fail: v4l2-test-controls.cpp(779): subscribe event for control 'Camera Controls' failed
+                test VIDIOC_(UN)SUBSCRIBE_EVENT/DQEVENT: FAIL
+                test VIDIOC_G/S_JPEGCOMP: OK (Not Supported)
+                Standard Controls: 13 Private Controls: 0
 
-Thanks,
-John
+        Format ioctls:
+                test VIDIOC_ENUM_FMT/FRAMESIZES/FRAMEINTERVALS: OK
+                test VIDIOC_G/S_PARM: OK (Not Supported)
+                test VIDIOC_G_FBUF: OK (Not Supported)
+                fail: v4l2-test-formats.cpp(414): unknown pixelformat 42474752 for buftype 1
+                test VIDIOC_G_FMT: FAIL
+                test VIDIOC_TRY_FMT: OK (Not Supported)
+                test VIDIOC_S_FMT: OK (Not Supported)
+                test VIDIOC_G_SLICED_VBI_CAP: OK (Not Supported)
 
->
-> .
->
+        Codec ioctls:
+                test VIDIOC_(TRY_)ENCODER_CMD: OK (Not Supported)
+                test VIDIOC_G_ENC_INDEX: OK (Not Supported)
+                test VIDIOC_(TRY_)DECODER_CMD: OK (Not Supported)
+
+        Buffer ioctls:
+                test VIDIOC_REQBUFS/CREATE_BUFS/QUERYBUF: OK
+                fail: v4l2-test-buffers.cpp(500): q.has_expbuf(node)
+                test VIDIOC_EXPBUF: FAIL
+
+
+Total: 39, Succeeded: 33, Failed: 6, Warnings: 0
+
+Not all of these may be a result of Steve's code - this is running against
+my gradually modified version to support bayer formats (which seems to be
+the cause of the v4l2-test-formats.cpp failure... for some reason the
+driver isn't enumerating all the formats.)
+
+And that reason is the way that the formats are enumerated:
+
+static int camif_enum_fmt_vid_cap(struct file *file, void *fh,
+                                  struct v4l2_fmtdesc *f)
+{
+        const struct imx_media_pixfmt *cc;
+        u32 code;
+        int ret;
+
+        ret = imx_media_enum_format(&code, f->index, true, true);
+        if (ret)
+                return ret;
+        cc = imx_media_find_format(0, code, true, true);
+        if (!cc)
+                return -EINVAL;
+
+When imx_media_enum_format() hits this entry in the table:
+
+        }, {
+                .fourcc = V4L2_PIX_FMT_BGR24,
+                .cs     = IPUV3_COLORSPACE_RGB,
+                .bpp    = 24,
+        }, {
+
+becaues there's no .codes defined:
+
+int imx_media_enum_format(u32 *code, u32 index, bool allow_rgb,
+                          bool allow_planar)
+{
+...
+        *code = fmt->codes[0];
+        return 0;
+}
+
+So, we end up calling imx_media_find_format(0, 0, true, true), which
+fails, returning NULL.  That causes camif_enum_fmt_vid_cap() to
+return -EINVAL.
+
+So everything past this entry is unable to be enumerated.
+
+I think this is a really round-about way of enumerating the pixel
+formats when there are soo many entries in the table which have no
+media bus code - there's absolutely no way that any of those entries
+can ever be enumerated in this fashion, so they might as well not be
+in the table...
+
+That's my present solution to this problem, to #if 0 out all the
+entries without any .codes field.  I think the real answer is that
+this needs a _separate_ function to enumerate the pixel formats for
+camif_enum_fmt_vid_cap().  However, there may be other issues lurking
+that I've not yet found (still trying to get this code to work...)
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
