@@ -1,76 +1,114 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 1 Feb 2017 02:04:42 +0800
-Subject: [PATCH 4/7] efi: Get the secure boot status [ver #7]
-In-Reply-To: <148587562967.4026.18171897997650345605.stgit@warthog.procyon.org.uk>
-Message-ID: <201702010101.EljWXBuB%fengguang.wu@intel.com>
+From: fu.wei@linaro.org (Fu Wei)
+Date: Wed, 1 Feb 2017 02:43:02 +0800
+Subject: [PATCH v20 08/17] clocksource/drivers/arm_arch_timer: Rework
+ counter frequency detection.
+In-Reply-To: <20170130174958.GA3496@leverpostej>
+References: <20170118132541.8989-1-fu.wei@linaro.org>
+ <20170118132541.8989-9-fu.wei@linaro.org>
+ <20170124172400.GG7572@leverpostej>
+ <CADyBb7sU6DVMk6px0963r8by--U-3k_XjESd88zZMkj7xbywgA@mail.gmail.com>
+ <20170125172505.GB29027@leverpostej>
+ <CADyBb7syNx+HJ6t5JKPMnLqvq-98kPi1knuXU=SSe6_Uz6Gg1A@mail.gmail.com>
+ <20170130174958.GA3496@leverpostej>
+Message-ID: <CADyBb7uqomC10mR4oMcUKrvYCbrOfLB6q1T6feMfiYA4cMnduA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hi Mark,
 
-[auto build test ERROR on efi/next]
-[also build test ERROR on v4.10-rc6 next-20170130]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+On 31 January 2017 at 01:49, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Jan 26, 2017 at 01:49:03PM +0800, Fu Wei wrote:
+>> On 26 January 2017 at 01:25, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > On Wed, Jan 25, 2017 at 02:46:12PM +0800, Fu Wei wrote:
+>> >> On 25 January 2017 at 01:24, Mark Rutland <mark.rutland@arm.com> wrote:
+>> >> > On Wed, Jan 18, 2017 at 09:25:32PM +0800, fu.wei at linaro.org wrote:
+>> >> >> From: Fu Wei <fu.wei@linaro.org>
+>
+>> > For CNT{,EL0}BaseN.CNTFRQ, I am very concerned by the wording in the
+>> > current ARMv8 ARM ARM. This does not match my understanding, nor does it
+>> > match the description in the ARMv7 ARM. I believe this may be a
+>> > documentation error, and I'm chasing that up internally.
+>> >
+>> > Either the currently logic in the driver which attempts to read
+>> > CNT{,EL0}BaseN.CNTFRQ is flawed, or the description in the ARM ARM is
+>> > erroneous.
+>>
+>> Yes, those description did confuse me. :-(
+>>
+>> But according to another document(ARMv8-A Foundation Platform User
+>> Guide  ARM DUI0677K),
+>> Table 3-2 ARMv8-A Foundation Platform memory map (continued)
+>>
+>> AP_REFCLK CNTBase0, Generic Timer 64KB   S
+>> AP_REFCLK CNTBase1, Generic Timer 64KB   S/NS
+>>
+>> Dose it means the timer frame 0 can be accessed in SECURE status  only,
+>> and the timer frame 1 can be accessed in both status?
+>
+> That does appear to be what it says.
+>
+> I assume in this case CNTCTLBase.CNTSAR<0> is RES0.
+>
+>> And because Linux kernel is running on Non-secure EL1, so should we
+>> skip "SECURE" timer in Linux?
+>
+> I guess you mean by checking the GTx Common flags, to see if the timer
+> is secure? Yes, we must skip those.
 
-url:    https://github.com/0day-ci/linux/commits/David-Howells/efi-Pass-secure-boot-mode-to-kernel-ver-7/20170131-232202
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/mfleming/efi.git next
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+Yes, exactly.
 
-All error/warnings (new ones prefixed by >>):
+I think we can check the  GTx Common flags, if the timer is set as
+SECURE, this driver should just skip this timer.
 
-   In file included from drivers/firmware/efi/libstub/secureboot.c:15:0:
-   drivers/firmware/efi/libstub/secureboot.c: In function 'efi_get_secureboot':
->> arch/arm64/include/asm/efi.h:52:34: error: called object is not a function or function pointer
-    #define efi_call_runtime(f, ...) sys_table_arg->runtime->f(__VA_ARGS__)
-                                     ^
->> drivers/firmware/efi/libstub/secureboot.c:27:2: note: in expansion of macro 'efi_call_runtime'
-     efi_call_runtime(get_variable, \
-     ^~~~~~~~~~~~~~~~
->> drivers/firmware/efi/libstub/secureboot.c:41:11: note: in expansion of macro 'get_efi_var'
-     status = get_efi_var(efi_SecureBoot_name, &efi_variable_guid,
-              ^~~~~~~~~~~
->> arch/arm64/include/asm/efi.h:52:34: error: called object is not a function or function pointer
-    #define efi_call_runtime(f, ...) sys_table_arg->runtime->f(__VA_ARGS__)
-                                     ^
->> drivers/firmware/efi/libstub/secureboot.c:27:2: note: in expansion of macro 'efi_call_runtime'
-     efi_call_runtime(get_variable, \
-     ^~~~~~~~~~~~~~~~
-   drivers/firmware/efi/libstub/secureboot.c:47:11: note: in expansion of macro 'get_efi_var'
-     status = get_efi_var(efi_SetupMode_name, &efi_variable_guid,
-              ^~~~~~~~~~~
+Reason:
+1, IF the timer is designed to be a secure timer which is only can be
+accessed in secure status, the ACPI table should label this as SECURE,
+then driver should skip it.
+2, IF the timer is accessible from both status, but the firmware want
+to use this driver for secure OS,  the ACPI table should also label
+this as SECURE(meanwhile firmware should configure CNTSAR too), then
+driver should skip it, too.
 
-vim +52 arch/arm64/include/asm/efi.h
+Actually I have added this into my next patchset v21. If you don't
+have other suggestion I can post it tomorrow.
 
-a13b00778 Ard Biesheuvel 2014-07-02  46   */
-a13b00778 Ard Biesheuvel 2014-07-02  47  #define EFI_FDT_ALIGN	SZ_2M   /* used by allocate_new_fdt_and_exit_boot() */
-a13b00778 Ard Biesheuvel 2014-07-02  48  #define MAX_FDT_OFFSET	SZ_512M
-a13b00778 Ard Biesheuvel 2014-07-02  49  
-a13b00778 Ard Biesheuvel 2014-07-02  50  #define efi_call_early(f, ...)		sys_table_arg->boottime->f(__VA_ARGS__)
-fc3720642 Ard Biesheuvel 2016-04-25  51  #define __efi_call_early(f, ...)	f(__VA_ARGS__)
-2fb88d885 David Howells  2017-01-31 @52  #define efi_call_runtime(f, ...)	sys_table_arg->runtime->f(__VA_ARGS__)
-fc3720642 Ard Biesheuvel 2016-04-25  53  #define efi_is_64bit()			(true)
-a13b00778 Ard Biesheuvel 2014-07-02  54  
-3552fdf29 Lukas Wunner   2016-11-12  55  #define efi_call_proto(protocol, f, instance, ...)			\
+Can I? any thought?
 
-:::::: The code at line 52 was first introduced by commit
-:::::: 2fb88d8858497455db948de0d2488b35ef2bd874 arm/efi: Allow invocation of arbitrary runtime services [ver #7]
+>
+> Looking further at this, the ACPI spec is sorely lacking any statement
+> as to the configuration of CNTCTLBase.{CNTSAR,CNTTIDR,CNTACR}, so it's
+> not clear if we can access anything in a frame, even if it is listed as
+> being a non-secure timer.
+>
+> I think we need a stronger statement here. Otherwise, we will encounter
+> problems. Linux currently assumes that CNTCTLBase.CNTACR<N> is
+> writeable, given a non-secure frame N. This is only the case if
+> CNTCTLBase.CNTSAR.NS<N> == 1.
 
-:::::: TO: David Howells <dhowells@redhat.com>
-:::::: CC: 0day robot <fengguang.wu@intel.com>
+the original driver has checked these registers, but the problem is:
+What if the timer frame is designed to be a secure timer, all the
+register in this frame is only can be accessed in secure status, just
+like foundation model?
+Note: for foundation model, Please check Table 3-1 Access permissions
+of 3.1 ARMv8-A Foundation Platform memory map in ARMv8-A Foundation
+Platform User Guide
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 32973 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170201/b1cd1c3c/attachment-0001.gz>
+So I think we should check the GTDT first, if it's not a secure timer,
+then we can go on checking CNTSAR. :-)
+
+Please correct me, If I miss something. :-)
+
+Great thanks for your info :-)
+
+>
+> Thanks,
+> Mark.
+
+
+
+-- 
+Best regards,
+
+Fu Wei
+Software Engineer
+Red Hat
