@@ -1,5 +1,5 @@
-From: ian.arkver.dev@gmail.com (Ian Arkver)
-Date: Tue, 31 Jan 2017 22:33:40 +0000
+From: steve_longerbeam@mentor.com (Steve Longerbeam)
+Date: Tue, 31 Jan 2017 14:36:53 -0800
 Subject: [PATCH v3 20/24] media: imx: Add Camera Interface subdev driver
 In-Reply-To: <20170131220452.GE27312@n2100.armlinux.org.uk>
 References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
@@ -10,11 +10,13 @@ References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
  <20170131203340.GC27312@n2100.armlinux.org.uk>
  <2297c62c-ae9b-3942-4700-ce268a61a6d5@gmail.com>
  <20170131220452.GE27312@n2100.armlinux.org.uk>
-Message-ID: <93e5a426-03f3-c4f1-c27f-75b8b78c0a02@gmail.com>
+Message-ID: <d5ede043-3b02-37f6-bd4a-db805e6b36d7@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/01/17 22:04, Russell King - ARM Linux wrote:
+
+
+On 01/31/2017 02:04 PM, Russell King - ARM Linux wrote:
 > On Tue, Jan 31, 2017 at 09:55:29PM +0000, Ian Arkver wrote:
 >> On 31/01/17 20:33, Russell King - ARM Linux wrote:
 >>> On Tue, Jan 31, 2017 at 10:21:26AM -0800, Steve Longerbeam wrote:
@@ -23,12 +25,10 @@ On 31/01/17 22:04, Russell King - ARM Linux wrote:
 >>>>>> Should be set to something like 'platform:imx-media-camif'. v4l2-compliance
 >>>>>> should complain about this.
 >>>>> ... and more.
->>>>
 >>>> Right, in version 3 that you are working with, no v4l2-compliance fixes were
 >>>> in yet. A lot of the compliance errors are fixed, please look in latest
 >>>> branch
 >>>> imx-media-staging-md-wip at git at github.com:slongerbeam/mediatree.git.
->>>
 >>> Sorry, I'm not prepared to pull random trees from github as there's
 >>> no easy way to see what's in the branch.
 >>>
@@ -51,26 +51,19 @@ On 31/01/17 22:04, Russell King - ARM Linux wrote:
 >>> As I don't want to take a whole pile of other changes into my tree,
 >>> I'm certainly not going to pull from your github tree.  Sorry.
 >>>
->>
 >> https://github.com/slongerbeam/mediatree/compare/master...imx-media-staging-md-wip
 >>
 >> It's under the "Compare" button from the main view. It would be nice though
 >> if the first commit's parent was some clearly tagged start point.
->
 > I don't want master though, I want v4.10-rc1, and if I ask for that
 > it tells me it knows nothing about v4.10-rc1, despite the fact that's
 > a tag in the mainline kernel repository which was merged into the
 > linux-media tree that this tree is based upon.
->
 
-Yeah, that's what I meant about the first parent's commit not being a 
-clearly tagged branch point. At least you get the series on one page. 
-Maybe it's time for a rebase or a v4 series Steve?
+Hi Russell, yes git at github.com:slongerbeam/mediatree.git is a fork
+of the linux-media tree, and the imx-media-staging-md-wip branch
+is up-to-date with master, currently at 4.10-rc1.
 
-Personally, I use a bare repo with multiple remotes and fetch branches 
-from various trees. Then gitk --all --since(etc) is pretty good at 
-giving the overview picture. You don't need to pull the commits over 
-into any of your working branches if you don't want to.
+You don't need to use the web interface, just git clone the repo.
 
-Regards,
-Ian
+Steve
