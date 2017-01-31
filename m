@@ -1,38 +1,30 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 31 Jan 2017 01:06:53 +0000
-Subject: [PATCH v3 00/24] i.MX Media Driver
-In-Reply-To: <20170131004510.GQ27312@n2100.armlinux.org.uk>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <20170131004510.GQ27312@n2100.armlinux.org.uk>
-Message-ID: <20170131010653.GR27312@n2100.armlinux.org.uk>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Mon, 30 Jan 2017 17:20:13 -0800
+Subject: [GIT_PULL 3/3] SOC: Keystone driver SOC for 4.11
+In-Reply-To: <20170129224731.GH3133@localhost>
+References: <1485039758-15248-1-git-send-email-ssantosh@kernel.org>
+ <1485039758-15248-3-git-send-email-ssantosh@kernel.org>
+ <20170129224731.GH3133@localhost>
+Message-ID: <a735b4d8-e7e8-c4a7-4d3f-a0f4e9e2e973@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2017 at 12:45:11AM +0000, Russell King - ARM Linux wrote:
-> Trying this driver with an imx219 camera (which works with Philipp's
-> driver) results in not much happening... no /dev/media* node for it,
-> no subdevs, no nothing.  No clues as to what's missing either.  Only
-> messages from imx-media are from registering the various subdevs.
+On 1/29/2017 2:47 PM, Olof Johansson wrote:
+> On Sat, Jan 21, 2017 at 03:02:38PM -0800, Santosh Shilimkar wrote:
+>> The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+>>
+>>   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone_soc_for_4.11
 
-Another issue:
+[...]
 
-imx_csi                 5491  4
-imx_camif              11654  4
-imx_ic                 23961  8
-imx_smfc                6639  4
-imx_media              23308  1 imx_csi
-imx_mipi_csi2           5544  1
-imx_media_common       12701  6 imx_csi,imx_smfc,imx_media,imx_mipi_csi2,imx_camif,imx_ic
-imx219                 21205  2
+>
+> Merged, thanks.
+>
+Thanks Olof !!
 
-So how does one remove any of these modules, say, while developing a
-camera driver?  Having to reboot to test an update makes it painfully
-slow for testing.
-
-Philipp's driver can do this (once the unload bugs are fixed, which I
-have patches for).
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Regards,
+Santosh
