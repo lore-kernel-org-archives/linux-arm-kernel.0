@@ -1,131 +1,70 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 31 Jan 2017 11:54:04 -0800
-Subject: [PATCH 05/11] drm/vc4: Add support for feeding DSI encoders from
- the pixel valve.
-In-Reply-To: <20170131193901.dz7o5g36hqwcsmgt@phenom.ffwll.local>
-References: <20161214194621.16499-1-eric@anholt.net>
- <20161214194621.16499-6-eric@anholt.net>
- <20170131193901.dz7o5g36hqwcsmgt@phenom.ffwll.local>
-Message-ID: <87wpdbxaxv.fsf@eliezer.anholt.net>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Tue, 31 Jan 2017 19:54:10 +0000
+Subject: [PATCH 3/3 v4] iio: adc: add a driver for Qualcomm PM8xxx HK/XOADC
+In-Reply-To: <CACRpkdYDMH9A=ezPkANRQXcqceEqn-A+oL2TxHyNkjmSms5AOA@mail.gmail.com>
+References: <20170131100938.23660-1-linus.walleij@linaro.org>
+ <CACRpkdYDMH9A=ezPkANRQXcqceEqn-A+oL2TxHyNkjmSms5AOA@mail.gmail.com>
+Message-ID: <0c54c4d8-265c-112e-60f1-af21b73148ec@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Vetter <daniel@ffwll.ch> writes:
+On 31/01/17 10:16, Linus Walleij wrote:
+> On Tue, Jan 31, 2017 at 11:09 AM, Linus Walleij
+> <linus.walleij@linaro.org> wrote:
+> 
+>> ChangeLog v3->v4:
+> 
+> Oh and I didn't remove the dev_info() where the driver brags about being
+> present.
+> 
+> I usually like to have those positive affirmations from my drivers so I know
+> they are there. Otherwise I can't tell the state when I for some reason
+> forgot to compile it in because of some Kconfig issue from the state
+> where it is silently present. This is especially helpful in mailed bug
+> reports where people post dmesg logs. Then I can see "aha at least it
+> probed".
+> 
+> It's not super-important, feel free to edit it out when applying if you
+> totally hate it, I won't hold it against you :)
+Meh.  I'm not that fussed ;)
 
-> On Wed, Dec 14, 2016 at 11:46:15AM -0800, Eric Anholt wrote:
->> We have to set a different pixel format, which tells the hardware to
->> use the pix_width field that's fed in sideband from the DSI encoder to
->> divide the "pixel" clock.
->> 
->> Signed-off-by: Eric Anholt <eric@anholt.net>
->> ---
->>  drivers/gpu/drm/vc4/vc4_crtc.c | 33 +++++++++++++++++++--------------
->>  drivers/gpu/drm/vc4/vc4_regs.h |  2 ++
->>  2 files changed, 21 insertions(+), 14 deletions(-)
->> 
->> diff --git a/drivers/gpu/drm/vc4/vc4_crtc.c b/drivers/gpu/drm/vc4/vc4_crtc.c
->> index a0fd3e66bc4b..cd070e0c79a6 100644
->> --- a/drivers/gpu/drm/vc4/vc4_crtc.c
->> +++ b/drivers/gpu/drm/vc4/vc4_crtc.c
->> @@ -349,38 +349,40 @@ static u32 vc4_get_fifo_full_level(u32 format)
->>  }
->>  
->>  /*
->> - * Returns the clock select bit for the connector attached to the
->> - * CRTC.
->> + * Returns the encoder attached to the CRTC.
->> + *
->> + * VC4 can only scan out to one encoder at a time, while the DRM core
->> + * allows drivers to push pixels to more than one encoder from the
->> + * same CRTC.
->>   */
->> -static int vc4_get_clock_select(struct drm_crtc *crtc)
->> +static struct drm_encoder *vc4_get_crtc_encoder(struct drm_crtc *crtc)
->>  {
->>  	struct drm_connector *connector;
->>  
->>  	drm_for_each_connector(connector, crtc->dev) {
->>  		if (connector->state->crtc == crtc) {
->> -			struct drm_encoder *encoder = connector->encoder;
->> -			struct vc4_encoder *vc4_encoder =
->> -				to_vc4_encoder(encoder);
->> -
->> -			return vc4_encoder->clock_select;
->> +			return connector->encoder;
->>  		}
->>  	}
->>  
->> -	return -1;
->> +	return NULL;
->>  }
->>  
->>  static void vc4_crtc_mode_set_nofb(struct drm_crtc *crtc)
->>  {
->>  	struct drm_device *dev = crtc->dev;
->>  	struct vc4_dev *vc4 = to_vc4_dev(dev);
->> +	struct drm_encoder *encoder = vc4_get_crtc_encoder(crtc);
->> +	struct vc4_encoder *vc4_encoder = to_vc4_encoder(encoder);
->>  	struct vc4_crtc *vc4_crtc = to_vc4_crtc(crtc);
->>  	struct drm_crtc_state *state = crtc->state;
->>  	struct drm_display_mode *mode = &state->adjusted_mode;
->>  	bool interlace = mode->flags & DRM_MODE_FLAG_INTERLACE;
->>  	u32 pixel_rep = (mode->flags & DRM_MODE_FLAG_DBLCLK) ? 2 : 1;
->> -	u32 format = PV_CONTROL_FORMAT_24;
->> +	bool is_dsi = (vc4_encoder->type == VC4_ENCODER_TYPE_DSI0 ||
->> +		       vc4_encoder->type == VC4_ENCODER_TYPE_DSI1);
->> +	u32 format = is_dsi ? PV_CONTROL_FORMAT_DSIV_24 : PV_CONTROL_FORMAT_24;
->>  	bool debug_dump_regs = false;
->> -	int clock_select = vc4_get_clock_select(crtc);
->>  
->>  	if (debug_dump_regs) {
->>  		DRM_INFO("CRTC %d regs before:\n", drm_crtc_index(crtc));
->> @@ -436,17 +438,19 @@ static void vc4_crtc_mode_set_nofb(struct drm_crtc *crtc)
->>  		 */
->>  		CRTC_WRITE(PV_V_CONTROL,
->>  			   PV_VCONTROL_CONTINUOUS |
->> +			   (is_dsi ? PV_VCONTROL_DSI : 0) |
->>  			   PV_VCONTROL_INTERLACE |
->>  			   VC4_SET_FIELD(mode->htotal * pixel_rep / 2,
->>  					 PV_VCONTROL_ODD_DELAY));
->>  		CRTC_WRITE(PV_VSYNCD_EVEN, 0);
->>  	} else {
->> -		CRTC_WRITE(PV_V_CONTROL, PV_VCONTROL_CONTINUOUS);
->> +		CRTC_WRITE(PV_V_CONTROL,
->> +			   PV_VCONTROL_CONTINUOUS |
->> +			   (is_dsi ? PV_VCONTROL_DSI : 0));
->>  	}
->>  
->>  	CRTC_WRITE(PV_HACT_ACT, mode->hdisplay * pixel_rep);
->>  
->> -
->>  	CRTC_WRITE(PV_CONTROL,
->>  		   VC4_SET_FIELD(format, PV_CONTROL_FORMAT) |
->>  		   VC4_SET_FIELD(vc4_get_fifo_full_level(format),
->> @@ -455,7 +459,8 @@ static void vc4_crtc_mode_set_nofb(struct drm_crtc *crtc)
->>  		   PV_CONTROL_CLR_AT_START |
->>  		   PV_CONTROL_TRIGGER_UNDERFLOW |
->>  		   PV_CONTROL_WAIT_HSTART |
->> -		   VC4_SET_FIELD(clock_select, PV_CONTROL_CLK_SELECT) |
->> +		   VC4_SET_FIELD(vc4_encoder->clock_select,
->> +				 PV_CONTROL_CLK_SELECT) |
->
-> Hm, so the usual way we solve the "crtc needs information from the encoder
-> problem" is to add bits to the crtc state, and then fill those out in the
-> encoders ->atomic_check function. In your case ->clock_select and is_dsi.
->
-> The benefit is mostly when you start doing hw readout (which is great even
-> just to cross-check your modeset code), or when you need that information
-> to check limits (which sooner or later tends to happen ime).
->
-> Anyway, this works too, just an idea for the future.
->
-> Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+Anyhow I clearly did something crazy last night as the first two patches had
+disappeared from my local tree anyway, so I've tried again and now hopefully
+all is in order.
 
-I like the idea!  I'll try following up with that.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170131/376f2170/attachment.sig>
+Applied this one as well with a spot of fuzz but all obvious stuff in the
+Makefile.
+
+However...
+
+ERROR: "qcom_vadc_decimation_from_dt" [drivers/iio/adc/qcom-spmi-vadc.ko] undefined!
+ERROR: "qcom_vadc_scale" [drivers/iio/adc/qcom-spmi-vadc.ko] undefined!
+make[1]: *** [scripts/Makefile.modpost:91: __modpost] Error 1
+make: *** [Makefile:1198: modules] Error 2
+
+I've fixed that up and some static declaration issue.
+
+Please do sanity check builds as modules!  It all needs to be one one object file
+when added to the $(magic)-m
+
+However, I can't see any way of keeping them module name as was (qcom-smpi-vadc.ko)
+without renaming one of the c files out of the way. Please check I haven't messed
+anything up.  The new naming is a bit naff, but I couldn't think of anything better
+off the top of my head!
+
+Actually this is enough of a mess I'm pulling these last two patches for now.
+Will push them out in a special testing2 branch for you to take a look at though.
+
+I also temporarily changed the mfd dependencies to add COMPILE_TEST.
+Seems fine, so if you could do a patch adding that we'll get better build coverage.
+
+Jonathan
+
+> 
+> Yours,
+> Linus Walleij
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
