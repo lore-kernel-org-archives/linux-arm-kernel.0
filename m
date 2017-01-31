@@ -1,51 +1,101 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Tue, 31 Jan 2017 11:17:03 -0500
-Subject: [PATCH v5 2/2] arm64: Work around Falkor erratum 1009
-In-Reply-To: <20170131143843.GD22283@arm.com>
-References: <20170130230818.9848-1-cov@codeaurora.org>
- <20170130230818.9848-2-cov@codeaurora.org> <20170131143843.GD22283@arm.com>
-Message-ID: <b18c8e22-2de5-6cc9-08d2-6586dea4a4d3@codeaurora.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 31 Jan 2017 16:45:13 +0000
+Subject: [PATCH 0/7] efi: Pass secure boot mode to kernel [ver #7]
+In-Reply-To: <148587558696.4026.16034622623568539004.stgit@warthog.procyon.org.uk>
+References: <148587558696.4026.16034622623568539004.stgit@warthog.procyon.org.uk>
+Message-ID: <CAKv+Gu9cTtmV+9-kWSzvFui7KHxrG6MsUfz0VET=714m2cGhbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/31/2017 09:38 AM, Will Deacon wrote:
-> On Mon, Jan 30, 2017 at 06:08:17PM -0500, Christopher Covington wrote:
->> diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
->> index deab52374119..fc434f421c7b 100644
->> --- a/arch/arm64/include/asm/tlbflush.h
->> +++ b/arch/arm64/include/asm/tlbflush.h
->> @@ -36,9 +36,21 @@
->>   * not. The macros handles invoking the asm with or without the
->>   * register argument as appropriate.
->>   */
->> -#define __TLBI_0(op, arg)		asm ("tlbi " #op)
->> -#define __TLBI_1(op, arg)		asm ("tlbi " #op ", %0" : : "r" (arg))
->> -#define __TLBI_N(op, arg, n, ...)	__TLBI_##n(op, arg)
->> +#define __TLBI_0(op, arg) asm volatile ("tlbi " #op "\n"		       \
->> +			    ALTERNATIVE("nop\n		nop",		       \
->> +					"dsb ish\n	tlbi " #op,	       \
->> +					ARM64_WORKAROUND_REPEAT_TLBI,	       \
->> +					CONFIG_QCOM_FALKOR_ERRATUM_1009)       \
->> +			    : : )
->> +
->> +#define __TLBI_1(op, arg) asm volatile ("tlbi " #op ", %0\n"		       \
->> +			    ALTERNATIVE("nop\n		nop",		       \
->> +					"dsb ish\n	tlbi " #op ", %0",     \
->> +					ARM64_WORKAROUND_REPEAT_TLBI,	       \
->> +					CONFIG_QCOM_FALKOR_ERRATUM_1009)       \
->> +			    : : "r" (arg))
->> +
-> 
-> Why are these now volatile? I asked the same question on the previous
-> version but didn't get a response:
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-January/483579.html
+Hello David,
 
-D'oh! Will fix in v6. Sorry about that.
+On 31 January 2017 at 15:13, David Howells <dhowells@redhat.com> wrote:
+>
+> Here's a set of patches that can determine the secure boot state of the
+> UEFI BIOS and pass that along to the main kernel image.  This involves
+> generalising ARM's efi_get_secureboot() function and making it mixed-mode
+> safe.
+>
 
-Cov
+Could you please resend with the [ver #7] removed from the subject
+lines? It is a bit tedious to have to manually modify each patch when
+applying.
 
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
-Aurora Forum, a Linux Foundation Collaborative Project.
+Thanks,
+Ard.
+
+> Changes:
+>
+>  Ver 7:
+>
+>   - Rebased on efi/next.
+>   - Remove the EFI_SECURE_BOOT flag bit and defer it for later.  Don't
+>   - Preclear boot_params->secure_boot and don't clear it in
+>     sanitize_boot_params()[*]
+>   - Don't probe for the secure-boot mode if the boot loader gives us this
+>     mode (ie. if boot_params->secure_boot is non-zero).
+>
+>     [*] There's a bug in grub2 whereby it copies too much, sets the sentinel
+>         byte and triggers the sanitisation.
+>
+>  Ver 6:
+>
+>   - Removed unnecessary variable init and trimmed comment.
+>   - Return efi_secureboot_mode_disabled directly rather than going to a
+>     place that just returns it.
+>   - Switched the last two patches.
+>
+>  Ver 5:
+>
+>   - Fix i386 compilation error (rsi should've been changed to esi).
+>   - Fix arm64 compilation error ('sys_table_arg' is a hidden macro parameter).
+>
+>  Ver 4:
+>
+>   - Use an enum to tell the kernel whether secure boot mode is enabled,
+>     disabled, couldn't be determined or wasn't even tried due to not being
+>     in EFI mode.
+>   - Support the UEFI-2.6 DeployedMode flag.
+>   - Don't clear boot_params->secure_boot in x86 sanitize_boot_params().
+>   - Preclear the boot_params->secure_boot on x86 head_*.S entry if we may
+>     not go through efi_main().
+>
+> The patches can be found here also:
+>
+>         http://git.kernel.org/cgit/linux/kernel/git/dhowells/linux-fs.git/log/?h=efi-secure-boot
+>
+> at tag:
+>
+>         efi-secure-boot-20170131
+>
+> David
+> ---
+> David Howells (6):
+>       x86/efi: Allow invocation of arbitrary runtime services
+>       arm/efi: Allow invocation of arbitrary runtime services
+>       efi: Add SHIM and image security database GUID definitions
+>       efi: Get the secure boot status
+>       efi: Handle secure boot from UEFI-2.6
+>       efi: Print the secure boot status in x86 setup_arch()
+>
+> Josh Boyer (1):
+>       efi: Disable secure boot if shim is in insecure mode
+>
+>
+>  Documentation/x86/zero-page.txt           |    2 +
+>  arch/arm/include/asm/efi.h                |    1
+>  arch/arm64/include/asm/efi.h              |    1
+>  arch/x86/boot/compressed/eboot.c          |    7 ++
+>  arch/x86/boot/compressed/head_32.S        |    6 +-
+>  arch/x86/boot/compressed/head_64.S        |    8 +-
+>  arch/x86/include/asm/efi.h                |    5 +
+>  arch/x86/include/uapi/asm/bootparam.h     |    3 +
+>  arch/x86/kernel/asm-offsets.c             |    1
+>  arch/x86/kernel/setup.c                   |   14 ++++
+>  drivers/firmware/efi/libstub/Makefile     |    2 -
+>  drivers/firmware/efi/libstub/arm-stub.c   |   63 ++----------------
+>  drivers/firmware/efi/libstub/secureboot.c |   99 +++++++++++++++++++++++++++++
+>  include/linux/efi.h                       |   15 ++++
+>  14 files changed, 161 insertions(+), 66 deletions(-)
+>  create mode 100644 drivers/firmware/efi/libstub/secureboot.c
+>
