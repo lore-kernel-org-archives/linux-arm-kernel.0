@@ -1,34 +1,78 @@
 From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Tue, 31 Jan 2017 15:43:13 +0300
-Subject: [PATCH v6 2/5] ARM: dts: rockchip: update compatible property for
- rk322x timer
-In-Reply-To: <1485866596-32254-1-git-send-email-al.kochet@gmail.com>
-References: <1485866596-32254-1-git-send-email-al.kochet@gmail.com>
-Message-ID: <1485866596-32254-3-git-send-email-al.kochet@gmail.com>
+Date: Tue, 31 Jan 2017 15:43:11 +0300
+Subject: [PATCH v6 0/5] Implement clocksource for rockchip SoC using rockchip
+ timer
+Message-ID: <1485866596-32254-1-git-send-email-al.kochet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Property set to '"rockchip,rk3228-timer", "rockchip,rk3288-timer"'
-to match devicetree bindings.
+From: Alexander Kochetkov <akochetkov@lintech.ru>
 
-Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
-Suggested-by: Heiko St?bner <heiko@sntech.de>
----
- arch/arm/boot/dts/rk322x.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Hello, Daniel, Heiko.
 
-diff --git a/arch/arm/boot/dts/rk322x.dtsi b/arch/arm/boot/dts/rk322x.dtsi
-index 9e6bf0e..2a4eee2 100644
---- a/arch/arm/boot/dts/rk322x.dtsi
-+++ b/arch/arm/boot/dts/rk322x.dtsi
-@@ -323,7 +323,7 @@
- 	};
- 
- 	timer: timer at 110c0000 {
--		compatible = "rockchip,rk3288-timer";
-+		compatible = "rockchip,rk3228-timer", "rockchip,rk3288-timer";
- 		reg = <0x110c0000 0x20>;
- 		interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&xin24m>, <&cru PCLK_TIMER>;
+Here is try 6 :) Thanks a lot for helping me to bring the code
+into kernel!
+
+This patch series contain:
+- devicetree bindings clarification for rockchip timers
+- dts files fixes for rk3228-evb, rk3229-evb and rk3188
+- implementation of clocksource and sched clock for rockchip SoC
+
+The clock supplying the arm-global-timer on the rk3188 is coming from the
+the cpu clock itself and thus changes its rate everytime cpufreq adjusts
+the cpu frequency making this timer unsuitable as a stable clocksource.
+
+The rk3188, rk3288 and following socs share a separate timer block already
+handled by the rockchip-timer driver. Therefore adapt this driver to also
+be able to act as clocksource on rk3188.
+
+In order to test clocksource you can run following commands and check
+how much time it take in real. On rk3188 it take about ~45 seconds.
+
+       cpufreq-set -f 1.6GHZ
+       date; sleep 60; date
+
+rk3288 (and probably anything newer) is irrelevant to this patch,
+as it has the arch timer interface. This patch may be usefull
+for Cortex-A9/A5 based parts.
+
+Regards,
+Alexander.
+
+Changes in v6:
+- Removed Reviewed-by: Heiko St?bner <heiko@sntech.de> tag
+- Merge 5/8, 6/8, 7/8, 8/9 into single file
+- split init paths into rk_clkevt_init() and rk_clksrc_init()
+  so the driver code could be adopted to CLOCKEVENT_OF_DECLARE()
+- clockevents implemented using clocksource_mmio_init()
+- fixed commit message for 4/8 (thanks a lot Daniel)
+
+Changes in v5:
+- Add Acked-by: Rob Herring <robh@kernel.org> to 1/8
+  http://lists.infradead.org/pipermail/linux-rockchip/2016-December/013308.html
+- Add Reviwed-by: Heiko St?bner <heiko@sntech.de> to series
+- change timer compatible property in the rk322x.dtsi 2/8
+  http://lists.infradead.org/pipermail/linux-rockchip/2017-January/013784.html
+- updated comment message for 4/8
+  http://lists.infradead.org/pipermail/linux-rockchip/2017-January/013786.html
+- updated comment message for 5/8
+  http://lists.infradead.org/pipermail/linux-rockchip/2017-January/013787.html
+- fixed build error for 8/8
+  http://lists.infradead.org/pipermail/linux-rockchip/2017-January/013789.html
+
+Alexander Kochetkov (5):
+  dt-bindings: clarify compatible property for rockchip timers
+  ARM: dts: rockchip: update compatible property for rk322x timer
+  clocksource/drivers/rockchip_timer: implement clocksource timer
+  ARM: dts: rockchip: add timer entries to rk3188 SoC
+  ARM: dts: rockchip: disable arm-global-timer for rk3188
+
+ .../bindings/timer/rockchip,rk-timer.txt           |   12 +-
+ arch/arm/boot/dts/rk3188.dtsi                      |   17 ++
+ arch/arm/boot/dts/rk322x.dtsi                      |    2 +-
+ drivers/clocksource/Kconfig                        |    1 +
+ drivers/clocksource/rockchip_timer.c               |  218 ++++++++++++++------
+ 5 files changed, 185 insertions(+), 65 deletions(-)
+
 -- 
 1.7.9.5
