@@ -1,149 +1,118 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 31 Jan 2017 11:21:13 +0100
-Subject: [PATCH 1/2] ARM: dts: add XOADC and IIO HWMON to MSM8660/APQ8060
-Message-ID: <20170131102114.25085-1-linus.walleij@linaro.org>
+Date: Tue, 31 Jan 2017 11:21:14 +0100
+Subject: [PATCH 2/2] ARM: dts: Qualcomm APQ8060 DragonBoard ALS sensor
+In-Reply-To: <20170131102114.25085-1-linus.walleij@linaro.org>
+References: <20170131102114.25085-1-linus.walleij@linaro.org>
+Message-ID: <20170131102114.25085-2-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the PM8058 XOADC node to the PM8058 PMIC node,
-defines the 16 channels and further also define an IIO HWMON
-node for the channels that are used for housekeeping of
-voltages and die temperature for the PMIC chip die.
-
-Tested on the APQ8060 DragonBoard:
-cd /sys/class/hwmon/hwmon0
-cat in2_input
-4773 (DC mains ~5V)
-cat in4_input
-625  (0.625V reference voltage)
-cat in5_input
-1250 (1.25V reference voltage)
-cat temp1_input
-35852 (die temperature)
+This adds the Capella CM3605 ambient light and proximity sensor
+to the APQ8060 DragonBoard device tree. Notice that we also set
+up pin config for the AOUT line and GPIO lines, and that we set
+the default trigger on the infrared LED to associate with the
+"cm3605" trigger so the IR LED is controlled by this the CM3605
+driver.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
 Andy: these bindings have been merged to the IIO tree and ACKed
 by DT maintainers.
 ---
- arch/arm/boot/dts/qcom-apq8060-dragonboard.dts | 27 ++++++++++++
- arch/arm/boot/dts/qcom-msm8660.dtsi            | 59 ++++++++++++++++++++++++++
- 2 files changed, 86 insertions(+)
+ arch/arm/boot/dts/qcom-apq8060-dragonboard.dts | 53 ++++++++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
 
 diff --git a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-index 39d9e6ddefed..c04960371c5e 100644
+index c04960371c5e..f3bd65e284ee 100644
 --- a/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
 +++ b/arch/arm/boot/dts/qcom-apq8060-dragonboard.dts
-@@ -327,6 +327,33 @@
- 					};
- 				};
+@@ -23,6 +23,7 @@
+ #include <dt-bindings/input/input.h>
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/pinctrl/qcom,pmic-gpio.h>
++#include <dt-bindings/pinctrl/qcom,pmic-mpp.h>
+ #include "qcom-msm8660.dtsi"
  
-+				xoadc at 197 {
-+					/* Reference voltage 2.2 V */
-+					xoadc-ref-supply = <&pm8058_l18>;
-+
-+					/* Board-specific channels */
-+					mpp5 {
-+						/* Connected to AOUT of ALS sensor */
-+						reg = <0x05>;
-+					};
-+					mpp6 {
-+						/* Connected to test point TP43 */
-+						reg = <0x06>;
-+					};
-+					mpp7 {
-+						/* Connected to battery thermistor */
-+						reg = <0x07>;
-+					};
-+					mpp8 {
-+						/* Connected to battery ID detector */
-+						reg = <0x08>;
-+					};
-+					mpp9 {
-+						/* Connected to XO thermistor */
-+						reg = <0x09>;
-+					};
-+				};
-+
- 				led at 48 {
- 					/*
- 					 * The keypad LED @0x48 is routed to
-diff --git a/arch/arm/boot/dts/qcom-msm8660.dtsi b/arch/arm/boot/dts/qcom-msm8660.dtsi
-index 91c9a62ae725..5ca6df54f9b5 100644
---- a/arch/arm/boot/dts/qcom-msm8660.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8660.dtsi
-@@ -63,6 +63,22 @@
+ / {
+@@ -83,6 +84,25 @@
  		};
  	};
  
 +	/*
-+	 * These channels from the ADC are simply hardware monitors.
-+	 * That is why the ADC is referred to as "HKADC" - HouseKeeping
-+	 * ADC.
++	 * Capella CM3605 light and proximity sensor mounted directly
++	 * on the sensor board.
 +	 */
-+	iio-hwmon {
-+		compatible = "iio-hwmon";
-+		io-channels = <&xoadc 0x01>, /* Battery */
-+			    <&xoadc 0x02>, /* DC in (charger) */
-+			    <&xoadc 0x04>, /* VPH the main system voltage */
-+			    <&xoadc 0x0b>, /* Die temperature */
-+			    <&xoadc 0x0c>, /* Reference voltage 1.25V */
-+			    <&xoadc 0x0d>, /* Reference voltage 0.625V */
-+			    <&xoadc 0x0e>; /* Reference voltage 0.325V */
++	cm3605 {
++		compatible = "capella,cm3605";
++		vdd-supply = <&pm8058_l14>; // 2.85V
++		aset-gpios = <&pm8058_gpio 35 GPIO_ACTIVE_LOW>;
++		capella,aset-resistance-ohms = <100000>;
++		/* GPIO34 has interrupt 225 on the PM8058 */
++		/* Trig on both edges - getting close or far away */
++		interrupts-extended = <&pm8058 225 IRQ_TYPE_EDGE_BOTH>;
++		/* MPP05 analog input to the XOADC */
++		io-channels = <&xoadc 0x05>;
++		io-channel-names = "aout";
++		pinctrl-names = "default";
++		pinctrl-0 = <&dragon_cm3605_gpios>, <&dragon_cm3605_mpps>;
 +	};
 +
- 	soc: soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -267,6 +283,49 @@
- 					row-hold = <91500>;
+ 	soc {
+ 		pinctrl at 800000 {
+ 			/* eMMMC pins, all 8 data lines connected */
+@@ -317,6 +337,24 @@
+ 							power-source = <PM8058_GPIO_S3>;
+ 						};
+ 					};
++					dragon_cm3605_gpios: cm3605-gpios {
++						/* Pin 34 connected to the proxy IRQ */
++						pinconf_gpio34 {
++							pins = "gpio34";
++							function = "normal";
++							input-enable;
++							bias-disable;
++							power-source = <PM8058_GPIO_S3>;
++						};
++						/* Pin 35 connected to ASET */
++						pinconf_gpio35 {
++							pins = "gpio35";
++							function = "normal";
++							output-high;
++							bias-disable;
++							power-source = <PM8058_GPIO_S3>;
++						};
++					};
+ 					dragon_veth_gpios: veth-gpios {
+ 						pinconf {
+ 							pins = "gpio40";
+@@ -327,6 +365,20 @@
+ 					};
  				};
  
-+				xoadc: xoadc at 197 {
-+					compatible = "qcom,pm8058-adc";
-+					reg = <0x197>;
-+					interrupts-extended = <&pm8058 76 IRQ_TYPE_EDGE_RISING>;
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					#io-channel-cells = <1>;
-+
-+					vcoin: adc-channel at 0 {
-+						reg = <0x00>;
-+					};
-+					vbat: adc-channel at 1 {
-+						reg = <0x01>;
-+					};
-+					dcin: adc-channel at 2 {
-+						reg = <0x02>;
-+					};
-+					ichg: adc-channel at 3 {
-+						reg = <0x03>;
-+					};
-+					vph_pwr: adc-channel at 4 {
-+						reg = <0x04>;
-+					};
-+					usb_vbus: adc-channel at a {
-+						reg = <0x0a>;
-+					};
-+					die_temp: adc-channel at b {
-+						reg = <0x0b>;
-+					};
-+					ref_625mv: adc-channel at c {
-+						reg = <0x0c>;
-+					};
-+					ref_1250mv: adc-channel at d {
-+						reg = <0x0d>;
-+					};
-+					ref_325mv: adc-channel at e {
-+						reg = <0x0e>;
-+					};
-+					ref_muxoff: adc-channel at f {
-+						reg = <0x0f>;
++				mpps at 50 {
++					dragon_cm3605_mpps: cm3605-mpps {
++						pinconf {
++							pins = "mpp5";
++							function = "analog";
++							input-enable;
++							bias-high-impedance;
++							/* Let's use channel 5 */
++							qcom,amux-route = <PMIC_MPP_AMUX_ROUTE_CH5>;
++							power-source = <PM8058_GPIO_S3>;
++						};
 +					};
 +				};
 +
- 				rtc at 1e8 {
- 					compatible = "qcom,pm8058-rtc";
- 					reg = <0x1e8>;
+ 				xoadc at 197 {
+ 					/* Reference voltage 2.2 V */
+ 					xoadc-ref-supply = <&pm8058_l18>;
+@@ -367,6 +419,7 @@
+ 					reg = <0x48>;
+ 					label = "pm8058:infrared:proximitysensor";
+ 					default-state = "off";
++					linux,default-trigger = "cm3605";
+ 				};
+ 				led at 131 {
+ 					compatible = "qcom,pm8058-led";
 -- 
 2.9.3
