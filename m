@@ -1,244 +1,339 @@
 From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 31 Jan 2017 17:16:25 +0000
-Subject: [PATCH v4 4/9] arm64: KVM: Handle trappable TLB instructions
+Date: Tue, 31 Jan 2017 17:16:26 +0000
+Subject: [PATCH v4 5/9] kvm: Add host pmu to support VM introspection
 In-Reply-To: <20170131171630.26898-1-punit.agrawal@arm.com>
 References: <20170131171630.26898-1-punit.agrawal@arm.com>
-Message-ID: <20170131171630.26898-5-punit.agrawal@arm.com>
+Message-ID: <20170131171630.26898-6-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARMv8 architecture allows trapping of TLB maintenane instructions
-from EL0/EL1 to higher exception levels. On encountering a trappable TLB
-instruction in a guest, an exception is taken to EL2.
+Add a software PMU on the host that supports tracking VM operations (in
+the form of PMU events). To add support for events, users of this
+functionality will provide the callbacks to configure the VM to
+enable/disable the events and read a count of the event's frequency.
 
-Add support to handle emulating the TLB instructions. Also track the
-number of emulated operations.
+The host PMU events can be controlled by tools like perf using standard
+kernel perf interfaces.
 
 Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
 Cc: Christoffer Dall <christoffer.dall@linaro.org>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Paolo Bonzini <pbonzini@redhat.com>
+Cc: "Radim Kr?m??" <rkrcmar@redhat.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
 ---
- arch/arm64/include/asm/kvm_asm.h  |  2 +
- arch/arm64/include/asm/kvm_host.h |  1 +
- arch/arm64/kvm/hyp/tlb.c          | 75 +++++++++++++++++++++++++++++++++++
- arch/arm64/kvm/sys_regs.c         | 83 +++++++++++++++++++++++++++++++++++++++
- 4 files changed, 161 insertions(+)
+ include/kvm/host_pmu.h |  35 +++++++
+ virt/kvm/Kconfig       |   3 +
+ virt/kvm/host_pmu.c    | 246 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 284 insertions(+)
+ create mode 100644 include/kvm/host_pmu.h
+ create mode 100644 virt/kvm/host_pmu.c
 
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index ec3553eb9349..8b695785d454 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -55,6 +55,8 @@ extern void __kvm_flush_vm_context(void);
- extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
- extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
- extern void __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu);
-+extern void __kvm_emulate_tlb_invalidate(struct kvm *kvm, u32 opcode,
-+					 u64 regval);
- 
- extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
- 
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index e5050388e062..1e83b707f14c 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -307,6 +307,7 @@ struct kvm_vcpu_stat {
- 	u64 mmio_exit_user;
- 	u64 mmio_exit_kernel;
- 	u64 exits;
-+	u64 tlb_invalidate;
- };
- 
- int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init);
-diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
-index b2cfbedea582..c14237858d75 100644
---- a/arch/arm64/kvm/hyp/tlb.c
-+++ b/arch/arm64/kvm/hyp/tlb.c
-@@ -86,3 +86,78 @@ void __hyp_text __kvm_flush_vm_context(void)
- 	__tlbi(alle1is);
- 	__flush_icache_all(); /* contains a dsb(ish) */
- }
+diff --git a/include/kvm/host_pmu.h b/include/kvm/host_pmu.h
+new file mode 100644
+index 000000000000..f9dc21de8886
+--- /dev/null
++++ b/include/kvm/host_pmu.h
+@@ -0,0 +1,35 @@
++/*
++ * Copyright (C) 2017 ARM Ltd.
++ * Author: Punit Agrawal <punit.agrawal@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef _KVM_HOST_PMU_H
++#define _KVM_HOST_PMU_H
 +
-+/* Intentionally empty functions */
-+static void __hyp_text __switch_to_hyp_role_nvhe(void) { }
-+static void __hyp_text __switch_to_host_role_nvhe(void) { }
++#include <linux/kvm_host.h>
++#include <linux/perf_event.h>
 +
-+static void __hyp_text __switch_to_hyp_role_vhe(void)
++typedef void (*configure_event_fn)(struct kvm_vcpu *vcpu, bool enable);
++typedef u64 (*get_event_count_fn)(struct kvm_vcpu *vcpu);
++
++struct kvm_event_cb {
++	get_event_count_fn get_event_count;
++	configure_event_fn configure_event;
++};
++
++int kvm_host_pmu_register(int nr_events, struct kvm_event_cb *cbs,
++			  struct attribute **event_attrs);
++void kvm_host_pmu_unregister(void);
++
++#endif /* _KVM_HOST_PMU_H */
+diff --git a/virt/kvm/Kconfig b/virt/kvm/Kconfig
+index b0cc1a34db27..3fe27172e757 100644
+--- a/virt/kvm/Kconfig
++++ b/virt/kvm/Kconfig
+@@ -50,3 +50,6 @@ config KVM_COMPAT
+ 
+ config HAVE_KVM_IRQ_BYPASS
+        bool
++
++config KVM_HOST_PMU
++	bool
+\ No newline at end of file
+diff --git a/virt/kvm/host_pmu.c b/virt/kvm/host_pmu.c
+new file mode 100644
+index 000000000000..ae7c0c3aed92
+--- /dev/null
++++ b/virt/kvm/host_pmu.c
+@@ -0,0 +1,246 @@
++/*
++ * Copyright (C) 2017 ARM Ltd.
++ * Author: Punit Agrawal <punit.agrawal@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#include <kvm/host_pmu.h>
++#include <linux/device.h>
++#include <linux/kernel.h>
++#include <linux/kvm_host.h>
++#include <linux/list.h>
++#include <linux/perf_event.h>
++#include <linux/pid.h>
++#include <linux/slab.h>
++#include <linux/spinlock_types.h>
++#include <linux/sysfs.h>
++
++struct host_pmu {
++	int nr_events;
++	struct pmu pmu;
++	struct kvm_event_cb *cbs;
++	spinlock_t event_list_lock;
++	struct list_head event_list_head;
++} host_pmu;
++#define to_host_pmu(p) (container_of(p, struct host_pmu, pmu))
++
++struct event_data {
++	int event_id;
++	struct kvm_vcpu *vcpu;
++	struct kvm_event_cb *cb;
++	struct list_head event_list;
++};
++
++static struct attribute_group events_attr_group = {
++	.name	= "events",
++};
++
++
++#define EVENT_MASK	GENMASK_ULL(0, 7)
++#define to_event(cfg)	((cfg) & EVENT_MASK)
++
++PMU_FORMAT_ATTR(event, "config:0-7");
++
++static struct attribute *format_attrs[] = {
++	&format_attr_event.attr,
++	NULL,
++};
++
++static struct attribute_group format_attr_group = {
++	.name	= "format",
++	.attrs	= format_attrs,
++};
++
++static const struct attribute_group *attr_groups[] = {
++	&events_attr_group,
++	&format_attr_group,
++	NULL,
++};
++
++static void host_event_destroy(struct perf_event *event)
 +{
-+	u64 hcr = read_sysreg(hcr_el2);
++	struct host_pmu *host_pmu = to_host_pmu(event->pmu);
++	struct event_data *e_data = event->pmu_private;
 +
-+	/*
-+	 * When VHE is enabled and HCR_EL2.TGE=1, EL1&0 TLB operations
-+	 * apply to EL2&0 translation regime. As we prepare to emulate
-+	 * guest TLB operation clear HCR_TGE to target TLB operations
-+	 * to EL1&0 (guest).
-+	 */
-+	hcr &= ~HCR_TGE;
-+	write_sysreg(hcr, hcr_el2);
++	spin_lock(&host_pmu->event_list_lock);
++	list_del(&e_data->event_list);
++	spin_unlock(&host_pmu->event_list_lock);
++	kfree(e_data);
 +}
 +
-+static void __hyp_text __switch_to_host_role_vhe(void)
++static int host_event_init(struct perf_event *event)
 +{
-+	u64 hcr = read_sysreg(hcr_el2);
++	struct host_pmu *host_pmu = to_host_pmu(event->pmu);
++	int event_id = to_event(event->attr.config);
++	struct event_data *e_data, *pos;
++	struct kvm_vcpu *vcpu;
++	bool found = false;
++	struct pid *pid;
++	struct kvm *kvm;
++	int i, ret = 0;
 +
-+	hcr |= HCR_TGE;
-+	write_sysreg(hcr, hcr_el2);
++	if (event->attr.type != event->pmu->type)
++		return -ENOENT;
++
++	if (has_branch_stack(event)	||
++	    is_sampling_event(event)	||
++	    event->attr.exclude_user	||
++	    event->attr.exclude_kernel	||
++	    event->attr.exclude_hv	||
++	    event->attr.exclude_idle	||
++	    event->attr.exclude_guest) {
++		return -EINVAL;
++	}
++
++	if (event->attach_state != PERF_ATTACH_TASK)
++		return -EOPNOTSUPP;
++
++	if (event_id >= host_pmu->nr_events)
++		return -EINVAL;
++
++	pid = get_task_pid(event->hw.target, PIDTYPE_PID);
++	spin_lock(&kvm_lock);
++	list_for_each_entry(kvm, &vm_list, vm_list) {
++		kvm_for_each_vcpu(i, vcpu, kvm) {
++			if (vcpu->pid == pid) {
++				found = true;
++				goto found;
++			}
++		}
++	}
++found:
++	spin_unlock(&kvm_lock);
++	put_pid(pid);
++
++	if (!found)
++		return -EINVAL;
++
++	spin_lock(&host_pmu->event_list_lock);
++	/* Make sure we don't already have the (event_id, kvm) pair */
++	list_for_each_entry(pos, &host_pmu->event_list_head, event_list) {
++		if (pos->event_id == event_id &&
++		    pos->vcpu->pid == pid) {
++			ret = -EOPNOTSUPP;
++			goto unlock;
++		}
++	}
++
++	e_data = kzalloc(sizeof(*e_data), GFP_KERNEL);
++	e_data->event_id = event_id;
++	e_data->vcpu = vcpu;
++	e_data->cb = &host_pmu->cbs[event_id];
++
++	event->pmu_private = e_data;
++	event->destroy = host_event_destroy;
++
++	list_add_tail(&e_data->event_list, &host_pmu->event_list_head);
++
++unlock:
++	spin_unlock(&host_pmu->event_list_lock);
++
++	return ret;
 +}
 +
-+static hyp_alternate_select(__switch_to_hyp_role,
-+			    __switch_to_hyp_role_nvhe,
-+			    __switch_to_hyp_role_vhe,
-+			    ARM64_HAS_VIRT_HOST_EXTN);
-+
-+static hyp_alternate_select(__switch_to_host_role,
-+			    __switch_to_host_role_nvhe,
-+			    __switch_to_host_role_vhe,
-+			    ARM64_HAS_VIRT_HOST_EXTN);
-+
-+static void __hyp_text __switch_to_guest_regime(struct kvm *kvm)
++static void host_event_update(struct perf_event *event)
 +{
-+	write_sysreg(kvm->arch.vttbr, vttbr_el2);
-+	__switch_to_hyp_role();
-+	isb();
++	struct event_data *e_data = event->pmu_private;
++	struct kvm_event_cb *cb = e_data->cb;
++	struct kvm_vcpu *vcpu = e_data->vcpu;
++	struct hw_perf_event *hw = &event->hw;
++	u64 prev_count, new_count;
++
++	do {
++		prev_count = local64_read(&hw->prev_count);
++		new_count = cb->get_event_count(vcpu);
++	} while (local64_xchg(&hw->prev_count, new_count) != prev_count);
++
++	local64_add(new_count - prev_count, &event->count);
 +}
 +
-+static void __hyp_text __switch_to_host_regime(void)
++static void host_event_start(struct perf_event *event, int flags)
 +{
-+	__switch_to_host_role();
-+	write_sysreg(0, vttbr_el2);
++	struct event_data *e_data = event->pmu_private;
++	struct kvm_event_cb *cb = e_data->cb;
++	struct kvm_vcpu *vcpu = e_data->vcpu;
++	u64 val;
++
++	val = cb->get_event_count(vcpu);
++	local64_set(&event->hw.prev_count, val);
++
++	cb->configure_event(vcpu, true);
 +}
 +
-+void __hyp_text
-+__kvm_emulate_tlb_invalidate(struct kvm *kvm, u32 opcode, u64 regval)
++static void host_event_stop(struct perf_event *event, int flags)
 +{
-+	kvm = kern_hyp_va(kvm);
++	struct event_data *e_data = event->pmu_private;
++	struct kvm_event_cb *cb = e_data->cb;
++	struct kvm_vcpu *vcpu = e_data->vcpu;
 +
-+	/*
-+	 * Switch to the guest before performing any TLB operations to
-+	 * target the appropriate VMID
-+	 */
-+	__switch_to_guest_regime(kvm);
++	cb->configure_event(vcpu, false);
 +
-+	/*
-+	 *  TLB maintenance operations are broadcast to
-+	 *  inner-shareable domain when HCR_FB is set (default for
-+	 *  KVM).
-+	 *
-+	 *  Nuke all Stage 1 TLB entries for the VM. This will kill
-+	 *  performance but it's always safe to do as we don't leave
-+	 *  behind any strays in the TLB
-+	 */
-+	__tlbi(vmalle1is);
-+	isb();
-+
-+	__switch_to_host_regime();
-+}
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 87e7e6608cd8..12ff8cf9f18a 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -791,6 +791,20 @@ static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	return true;
- }
- 
-+static bool emulate_tlb_invalidate(struct kvm_vcpu *vcpu,
-+				   struct sys_reg_params *p,
-+				   const struct sys_reg_desc *r)
-+{
-+	u32 opcode = sys_reg(p->Op0, p->Op1, p->CRn, p->CRm, p->Op2);
-+
-+	kvm_call_hyp(__kvm_emulate_tlb_invalidate,
-+		     vcpu->kvm, opcode, p->regval);
-+	trace_kvm_tlb_invalidate(*vcpu_pc(vcpu), opcode);
-+	++vcpu->stat.tlb_invalidate;
-+
-+	return true;
++	if (flags & PERF_EF_UPDATE)
++		host_event_update(event);
 +}
 +
- /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
- #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
- 	/* DBGBVRn_EL1 */						\
-@@ -842,6 +856,35 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	{ Op0(0b01), Op1(0b000), CRn(0b0111), CRm(0b1110), Op2(0b010),
- 	  access_dcsw },
- 
-+	/*
-+	 * ARMv8 ARM: Table C5-4 TLB maintenance instructions
-+	 * (Ref: ARMv8 ARM C5.1 version: ARM DDI 0487A.j)
-+	 */
-+	/* TLBI VMALLE1IS */
-+	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(0), emulate_tlb_invalidate },
-+	/* TLBI VAE1IS */
-+	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(1), emulate_tlb_invalidate },
-+	/* TLBI ASIDE1IS */
-+	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(2), emulate_tlb_invalidate },
-+	/* TLBI VAAE1IS */
-+	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(3), emulate_tlb_invalidate },
-+	/* TLBI VALE1IS */
-+	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(5), emulate_tlb_invalidate },
-+	/* TLBI VAALE1IS */
-+	{ Op0(1), Op1(0), CRn(8), CRm(3), Op2(7), emulate_tlb_invalidate },
-+	/* TLBI VMALLE1 */
-+	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(0), emulate_tlb_invalidate },
-+	/* TLBI VAE1 */
-+	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(1), emulate_tlb_invalidate },
-+	/* TLBI ASIDE1 */
-+	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(2), emulate_tlb_invalidate },
-+	/* TLBI VAAE1 */
-+	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(3), emulate_tlb_invalidate },
-+	/* TLBI VALE1 */
-+	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(5), emulate_tlb_invalidate },
-+	/* TLBI VAALE1 */
-+	{ Op0(1), Op1(0), CRn(8), CRm(7), Op2(7), emulate_tlb_invalidate },
++static int host_event_add(struct perf_event *event, int flags)
++{
++	if (flags & PERF_EF_START)
++		host_event_start(event, flags);
 +
- 	DBG_BCR_BVR_WCR_WVR_EL1(0),
- 	DBG_BCR_BVR_WCR_WVR_EL1(1),
- 	/* MDCCINT_EL1 */
-@@ -1330,6 +1373,46 @@ static const struct sys_reg_desc cp15_regs[] = {
- 	{ Op1( 0), CRn( 7), CRm(10), Op2( 2), access_dcsw },
- 	{ Op1( 0), CRn( 7), CRm(14), Op2( 2), access_dcsw },
- 
-+	/*
-+	 * TLB operations
-+	 */
-+	/* TLBIALLIS */
-+	{ Op1( 0), CRn( 8), CRm( 3), Op2( 0), emulate_tlb_invalidate},
-+	/* TLBIMVAIS */
-+	{ Op1( 0), CRn( 8), CRm( 3), Op2( 1), emulate_tlb_invalidate},
-+	/* TLBIASIDIS */
-+	{ Op1( 0), CRn( 8), CRm( 3), Op2( 2), emulate_tlb_invalidate},
-+	/* TLBIMVAAIS */
-+	{ Op1( 0), CRn( 8), CRm( 3), Op2( 3), emulate_tlb_invalidate},
-+	/* TLBIMVALIS */
-+	{ Op1( 0), CRn( 8), CRm( 3), Op2( 5), emulate_tlb_invalidate},
-+	/* TLBIMVAALIS */
-+	{ Op1( 0), CRn( 8), CRm( 3), Op2( 7), emulate_tlb_invalidate},
-+	/* ITLBIALL */
-+	{ Op1( 0), CRn( 8), CRm( 5), Op2( 0), emulate_tlb_invalidate},
-+	/* ITLBIMVA */
-+	{ Op1( 0), CRn( 8), CRm( 5), Op2( 1), emulate_tlb_invalidate},
-+	/* ITLBIASID */
-+	{ Op1( 0), CRn( 8), CRm( 5), Op2( 2), emulate_tlb_invalidate},
-+	/* DTLBIALL */
-+	{ Op1( 0), CRn( 8), CRm( 6), Op2( 0), emulate_tlb_invalidate},
-+	/* DTLBIMVA */
-+	{ Op1( 0), CRn( 8), CRm( 6), Op2( 1), emulate_tlb_invalidate},
-+	/* DTLBIASID */
-+	{ Op1( 0), CRn( 8), CRm( 6), Op2( 2), emulate_tlb_invalidate},
-+	/* TLBIALL */
-+	{ Op1( 0), CRn( 8), CRm( 7), Op2( 0), emulate_tlb_invalidate},
-+	/* TLBIMVA */
-+	{ Op1( 0), CRn( 8), CRm( 7), Op2( 1), emulate_tlb_invalidate},
-+	/* TLBIASID */
-+	{ Op1( 0), CRn( 8), CRm( 7), Op2( 2), emulate_tlb_invalidate},
-+	/* TLBIMVAA */
-+	{ Op1( 0), CRn( 8), CRm( 7), Op2( 3), emulate_tlb_invalidate},
-+	/* TLBIMVAL */
-+	{ Op1( 0), CRn( 8), CRm( 7), Op2( 5), emulate_tlb_invalidate},
-+	/* TLBIMVAAL */
-+	{ Op1( 0), CRn( 8), CRm( 7), Op2( 7), emulate_tlb_invalidate},
++	return 0;
++}
 +
- 	/* PMU */
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), access_pmcr },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), access_pmcnten },
++static void host_event_del(struct perf_event *event, int flags)
++{
++	host_event_stop(event, PERF_EF_UPDATE);
++}
++
++static void host_event_read(struct perf_event *event)
++{
++	host_event_update(event);
++}
++
++static void init_host_pmu(struct host_pmu *host_pmu)
++{
++	host_pmu->pmu = (struct pmu) {
++		.task_ctx_nr	= perf_sw_context,
++		.attr_groups	= attr_groups,
++		.event_init	= host_event_init,
++		.add		= host_event_add,
++		.del		= host_event_del,
++		.start		= host_event_start,
++		.stop		= host_event_stop,
++		.read		= host_event_read,
++		.capabilities	= PERF_PMU_CAP_NO_INTERRUPT,
++	};
++
++	INIT_LIST_HEAD(&host_pmu->event_list_head);
++	spin_lock_init(&host_pmu->event_list_lock);
++}
++
++int kvm_host_pmu_register(int nr_events, struct kvm_event_cb *cbs,
++			  struct attribute **event_attrs)
++{
++	host_pmu.nr_events  = nr_events;
++	host_pmu.cbs = cbs;
++	events_attr_group.attrs = event_attrs;
++
++	init_host_pmu(&host_pmu);
++
++	return perf_pmu_register(&host_pmu.pmu, "kvm", -1);
++}
++
++void kvm_host_pmu_unregister(void)
++{
++	perf_pmu_unregister(&host_pmu.pmu);
++}
 -- 
 2.11.0
