@@ -1,56 +1,67 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 30 Jan 2017 21:04:35 -0800
-Subject: [GIT PULL] STM32 DT changes for v4.11 #1 V2
-In-Reply-To: <a8f6b0aa-412e-65b7-5d88-e4b17097c3a8@st.com>
-References: <a8f6b0aa-412e-65b7-5d88-e4b17097c3a8@st.com>
-Message-ID: <20170131050435.GA16560@localhost>
+Date: Mon, 30 Jan 2017 21:07:59 -0800
+Subject: [GIT PULL 4/4] arm64: dts: exynos: for v4.11, 2nd round
+In-Reply-To: <20170130175720.nfmhet6mkajq3vho@kozik-lap>
+References: <20170129200630.22083-1-krzk@kernel.org>
+ <20170129200630.22083-4-krzk@kernel.org>
+ <20170130052329.GZ18943@localhost>
+ <20170130175720.nfmhet6mkajq3vho@kozik-lap>
+Message-ID: <20170131050759.GC16560@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2017 at 03:40:41PM +0100, Alexandre Torgue wrote:
-> Hi Olof, Arnd and Kevin,
-> 
-> Please consider this second version of first round of STM32 DT updates for
-> v4.11:
-> 
-> The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
-> 
->   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git
-> tags/stm32-dt-for-v4.11-1-v2
-> 
-> for you to fetch changes up to a4e6964a78946bf3ce969d9fef5f201e0236f0ea:
-> 
->   ARM: dts: stm32: enable RTC on stm32429i-eval (2017-01-20 14:59:58 +0100)
-> 
-> ----------------------------------------------------------------
-> STM32 DT updates for v4.11, round 1 Version 2.
-> 
-> Highlights:
-> ----------
-> 
->  - ADD RTC support on STM32F429 MCU
->  - Enable RTC on STM32F469and STM32F429 boards
->  - ADD ADC support on STM32F429 MCU
->  - Enable ADC on STM32F429 Eval board
->  - Add I2S external clock
->  - Fix memory size for STM32F429 Disco
-> 
-> Note:
-> -----
-> First patch "clk: stm32f4: Update DT bindings documentation")
-> has already been merged in clock tree. Compare to version 1
-> git merge has been used to take this patch.
+On Mon, Jan 30, 2017 at 07:57:20PM +0200, Krzysztof Kozlowski wrote:
+> On Sun, Jan 29, 2017 at 09:23:29PM -0800, Olof Johansson wrote:
+> > Hi Krzysztof,
+> > 
+> > On Sun, Jan 29, 2017 at 10:06:29PM +0200, Krzysztof Kozlowski wrote:
+> > > Hi,
+> > > 
+> > > On top of previous pull request.
+> > > 
+> > > This adds proper clocks to LPASS node on Exynos5433 which is needed
+> > > by Marek's patchset:
+> > >  - [PATCH v2 0/8] Pad retentions support for Exynos5433
+> > >    https://lkml.kernel.org/r/1485419634-28331-1-git-send-email-m.szyprowski () samsung ! com
+> > > 
+> > > 
+> > > Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> > > Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> > > Cc: Linus Walleij <linus.walleij@linaro.org>
+> > > Cc: Tomasz Figa <tomasz.figa@gmail.com>
+> > > Cc: Lee Jones <lee.jones@linaro.org>
+> > > 
+> > > Best regards,
+> > > Krzysztof
+> > > 
+> > > 
+> > > The following changes since commit e4e381133241a27d732e78be09973b89a193eaf7:
+> > > 
+> > >   arm64: dts: exynos: Enable HDMI/TV path on Exynos5433-TM2 (2017-01-11 18:20:28 +0200)
+> > > 
+> > > are available in the git repository at:
+> > > 
+> > >   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt64-4.11-2
+> > > 
+> > > for you to fetch changes up to 7547162ac351483df3641f64e99e10be329dd6a2:
+> > > 
+> > >   arm64: dts: exynos: Add clocks to Exynos5433 LPASS module (2017-01-26 22:04:20 +0200)
+> > 
+> > I think you tagged the wrong branch here. The log message shows the right hash
+> > at the tip, but the tag is of 95648b747071d530b5bb983735cfe0ffff1b66bf, which
+> > seems to be on your for-next.
+> > 
+> > Care to respin, so your tag and our merged branch match up?
+> >
+> Fixed, the same name of tag but this time on proper branch:
+> tag name	samsung-dt64-4.11-2
+> https://git.kernel.org/cgit/linux/kernel/git/krzk/linux.git/log/?h=next/dt64
 
-Merged, thanks! Sorry for this taking a while.
+Merged!
 
+> Sorry for the mess.
 
-Oh, minor comment: For next time, the note doesn't have to go in the tag
-description, just the pull request.
-
+No worries, I've done exactly that myself before.
 
 
 -Olof
