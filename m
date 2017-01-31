@@ -1,68 +1,68 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 31 Jan 2017 18:05:39 +0000
-Subject: [RFC PATCH 01/13] arm64: sysreg: sort by encoding
-In-Reply-To: <1485885951-2747-1-git-send-email-mark.rutland@arm.com>
-References: <1485885951-2747-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1485885951-2747-2-git-send-email-mark.rutland@arm.com>
+Date: Tue, 31 Jan 2017 18:05:38 +0000
+Subject: [RFC PATCH 00/13] arm64/kvm: use common sysreg definitions
+Message-ID: <1485885951-2747-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Out sysreg definitions are largely (but not entirely) in ascending order
-of op0:op1:CRn:CRm:op2.
+Whenever we add new functionality involving new system registers, we need to
+add sys_reg() definitions so that we can access the registers regardless of
+whether the toolchain can assemble them. At the same time, we have to add
+duplicate definitions of the register encodings to KVM's sysreg tables, so that
+we can handle any configurable traps. This redundancy is unfortunate, and
+defining the encodings directly in the sysreg tables can make those tables
+difficult to read.
 
-It would be preferable to enforce this sort, as this makes it easier to
-verify the set of encodings against documentation, and provides an
-obvious location for each addition in future, minimising conflicts.
+This series attempts to address both of these issues by allowing us to use
+common sys_reg() mnemonics in <asm/sysreg.h> to initialise KVM's sysreg tables.
+To that end, this series tries to make <asm/sysreg.h> the canonical location
+for common sysreg encodings.
 
-This patch enforces this order, by moving the few items that break it.
-There should be no functional change.
+Largely, I've only attacked the AArch64-native SYS encodings required by KVM
+today, though for the debug and perfmon groups it was easier to take the whole
+group from the ARM ARM than to filter them to only what KVM needed. I've
+ignored CP{15,14} registers for now, but these could be encoded similarly.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/sysreg.h | 17 +++++++++--------
- 1 file changed, 9 insertions(+), 8 deletions(-)
+To verify that I haven't accidentally broken KVM, I've diffed sys_regs.o and
+sys_regs_generic_v8.o on a section-by-section basis before and after the series
+is applied. The .text, .data, and .rodata sections (and most others) are
+identical. The __bug_table section, and some .debug* sections differ, and this
+appears to be due to line numbers changing due to removed lines.
 
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index ac24b6e..e6498ac 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -81,6 +81,14 @@
- 
- #endif	/* CONFIG_BROKEN_GAS_INST */
- 
-+#define REG_PSTATE_PAN_IMM		sys_reg(0, 0, 4, 0, 4)
-+#define REG_PSTATE_UAO_IMM		sys_reg(0, 0, 4, 0, 3)
-+
-+#define SET_PSTATE_PAN(x) __emit_inst(0xd5000000 | REG_PSTATE_PAN_IMM |	\
-+				      (!!x)<<8 | 0x1f)
-+#define SET_PSTATE_UAO(x) __emit_inst(0xd5000000 | REG_PSTATE_UAO_IMM |	\
-+				      (!!x)<<8 | 0x1f)
-+
- #define SYS_MIDR_EL1			sys_reg(3, 0, 0, 0, 0)
- #define SYS_MPIDR_EL1			sys_reg(3, 0, 0, 0, 5)
- #define SYS_REVIDR_EL1			sys_reg(3, 0, 0, 0, 6)
-@@ -118,17 +126,10 @@
- #define SYS_ID_AA64MMFR1_EL1		sys_reg(3, 0, 0, 7, 1)
- #define SYS_ID_AA64MMFR2_EL1		sys_reg(3, 0, 0, 7, 2)
- 
--#define SYS_CNTFRQ_EL0			sys_reg(3, 3, 14, 0, 0)
- #define SYS_CTR_EL0			sys_reg(3, 3, 0, 0, 1)
- #define SYS_DCZID_EL0			sys_reg(3, 3, 0, 0, 7)
- 
--#define REG_PSTATE_PAN_IMM		sys_reg(0, 0, 4, 0, 4)
--#define REG_PSTATE_UAO_IMM		sys_reg(0, 0, 4, 0, 3)
--
--#define SET_PSTATE_PAN(x) __emit_inst(0xd5000000 | REG_PSTATE_PAN_IMM |	\
--				      (!!x)<<8 | 0x1f)
--#define SET_PSTATE_UAO(x) __emit_inst(0xd5000000 | REG_PSTATE_UAO_IMM |	\
--				      (!!x)<<8 | 0x1f)
-+#define SYS_CNTFRQ_EL0			sys_reg(3, 3, 14, 0, 0)
- 
- /* Common SCTLR_ELx flags. */
- #define SCTLR_ELx_EE    (1 << 25)
+One thing I wasn't sure how to address was banks of registers such as
+PMEVCNTR<n>_EL0. We currently enumerate all cases for our GICv3 definitions,
+but it seemed painful to expand ~30 cases for PMEVCNTR<n>_EL0 and friends, and
+for these I've made the macros take an 'n' parameter.
+
+The series is based on the arm64/for-next/core branch, since it relies on
+commit c9ee0f98662a6e35 ("arm64: cpufeature: Define helpers for sys_reg id")
+for the definition of SYS_DESC().
+
+Thanks,
+Mark.
+
+Mark Rutland (13):
+  arm64: sysreg: sort by encoding
+  arm64: sysreg: add debug system registers
+  arm64: sysreg: add performance monitor registers
+  arm64: sysreg: subsume GICv3 sysreg definitions
+  arm64: sysreg: add register encodings used by KVM
+  arm64: sysreg: add Set/Way sys encodings
+  arm64: kvm: add SYS_DESC()
+  arm64: kvm: Use common debug sysreg definitions
+  arm64: kvm: Use common performance monitor sysreg definitions
+  arm64: kvm: Use common GICv3 sysreg definitions
+  arm64: kvm: use common invariant sysreg definitions
+  arm64: kvm: Use common sysreg definitions
+  arm64: kvm: Use common Set/Way sys definitions
+
+ arch/arm64/include/asm/arch_gicv3.h  |  81 ++-------
+ arch/arm64/include/asm/sysreg.h      | 158 +++++++++++++++-
+ arch/arm64/kernel/head.S             |   8 +-
+ arch/arm64/kvm/sys_regs.c            | 344 +++++++++++------------------------
+ arch/arm64/kvm/sys_regs.h            |   5 +
+ arch/arm64/kvm/sys_regs_generic_v8.c |   4 +-
+ 6 files changed, 276 insertions(+), 324 deletions(-)
+
 -- 
 1.9.1
