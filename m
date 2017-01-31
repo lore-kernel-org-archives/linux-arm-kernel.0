@@ -1,85 +1,68 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 31 Jan 2017 17:56:57 +0000
-Subject: [PATCH v4 2/4] arm64: Work around Falkor erratum 1003
-In-Reply-To: <36478002-4cd8-7f1c-1a25-8bfe35022a47@codeaurora.org>
-References: <20170125155232.10277-1-cov@codeaurora.org>
- <20170125155232.10277-2-cov@codeaurora.org>
- <20170131123735.GD11191@leverpostej>
- <36478002-4cd8-7f1c-1a25-8bfe35022a47@codeaurora.org>
-Message-ID: <3cab36fb-984a-beae-64db-6ce830ba94f6@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 31 Jan 2017 18:05:39 +0000
+Subject: [RFC PATCH 01/13] arm64: sysreg: sort by encoding
+In-Reply-To: <1485885951-2747-1-git-send-email-mark.rutland@arm.com>
+References: <1485885951-2747-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1485885951-2747-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/01/17 17:48, Christopher Covington wrote:
-> On 01/31/2017 07:37 AM, Mark Rutland wrote:
->> On Wed, Jan 25, 2017 at 10:52:30AM -0500, Christopher Covington wrote:
->>> The Qualcomm Datacenter Technologies Falkor v1 CPU may allocate TLB entries
->>> using an incorrect ASID when TTBRx_EL1 is being updated. When the erratum
->>> is triggered, page table entries using the new translation table base
->>> address (BADDR) will be allocated into the TLB using the old ASID. All
->>> circumstances leading to the incorrect ASID being cached in the TLB arise
->>> when software writes TTBRx_EL1[ASID] and TTBRx_EL1[BADDR], a memory
->>> operation is in the process of performing a translation using the specific
->>> TTBRx_EL1 being written, and the memory operation uses a translation table
->>> descriptor designated as non-global. EL2 and EL3 code changing the EL1&0
->>> ASID is not subject to this erratum because hardware is prohibited from
->>> performing translations from an out-of-context translation regime.
->>>
->>> Consider the following pseudo code.
->>>
->>>   write new BADDR and ASID values to TTBRx_EL1
->>>
->>> Replacing the above sequence with the one below will ensure that no TLB
->>> entries with an incorrect ASID are used by software.
->>>
->>>   write reserved value to TTBRx_EL1[ASID]
->>>   ISB
->>>   write new value to TTBRx_EL1[BADDR]
->>>   ISB
->>>   write new value to TTBRx_EL1[ASID]
->>>   ISB
->>>
->>> When the above sequence is used, page table entries using the new BADDR
->>> value may still be incorrectly allocated into the TLB using the reserved
->>> ASID. Yet this will not reduce functionality, since TLB entries incorrectly
->>> tagged with the reserved ASID will never be hit by a later instruction.
->>
->> Based on my understanding that entries allocated to the reserved ASID
->> will not be used for subsequent page table walks (and so we don't have
->> asynchronous behaviour to contend with), this sounds fine to me.
->>
->> Thanks for taking the time to clarify the details on that.
->>
->>> Based on work by Shanker Donthineni <shankerd@codeaurora.org>
->>>
->>> Signed-off-by: Christopher Covington <cov@codeaurora.org>
->>> ---
->>>  Documentation/arm64/silicon-errata.txt |  1 +
->>>  arch/arm64/Kconfig                     | 11 +++++++++++
->>>  arch/arm64/include/asm/assembler.h     | 23 +++++++++++++++++++++++
->>>  arch/arm64/include/asm/cpucaps.h       |  3 ++-
->>>  arch/arm64/include/asm/mmu_context.h   |  8 +++++++-
->>>  arch/arm64/kernel/cpu_errata.c         |  7 +++++++
->>>  arch/arm64/mm/context.c                | 11 +++++++++++
->>>  arch/arm64/mm/proc.S                   |  1 +
->>>  8 files changed, 63 insertions(+), 2 deletions(-)
->>
->> Don't we need to use pre_ttbr0_update_workaround in <asm/asm-uaccess.h>
->> for CONFIG_ARM64_SW_TTBR0_PAN? We implicitly switch to the reserved ASID
->> for the empty table in __uaccess_ttbr0_disable.
->>
->> That also means we have to invalidate the reserved ASID so as to not
->> accidentally hit while uaccess is disabled.
-> 
-> The CPU in question (Falkor v1) has hardware PAN support. Do we need
-> to worry about including the workaround in the SW PAN code in that case?
+Out sysreg definitions are largely (but not entirely) in ascending order
+of op0:op1:CRn:CRm:op2.
 
-Given that all ARMv8 CPUs can support SW_PAN, it is more likely to be
-enabled than the ARMv8.1 PAN. I'd vote for supporting the workaround in
-that case too, and hope that people do enable the HW version.
+It would be preferable to enforce this sort, as this makes it easier to
+verify the set of encodings against documentation, and provides an
+obvious location for each addition in future, minimising conflicts.
 
-Thanks,
+This patch enforces this order, by moving the few items that break it.
+There should be no functional change.
 
-	M.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/sysreg.h | 17 +++++++++--------
+ 1 file changed, 9 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index ac24b6e..e6498ac 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -81,6 +81,14 @@
+ 
+ #endif	/* CONFIG_BROKEN_GAS_INST */
+ 
++#define REG_PSTATE_PAN_IMM		sys_reg(0, 0, 4, 0, 4)
++#define REG_PSTATE_UAO_IMM		sys_reg(0, 0, 4, 0, 3)
++
++#define SET_PSTATE_PAN(x) __emit_inst(0xd5000000 | REG_PSTATE_PAN_IMM |	\
++				      (!!x)<<8 | 0x1f)
++#define SET_PSTATE_UAO(x) __emit_inst(0xd5000000 | REG_PSTATE_UAO_IMM |	\
++				      (!!x)<<8 | 0x1f)
++
+ #define SYS_MIDR_EL1			sys_reg(3, 0, 0, 0, 0)
+ #define SYS_MPIDR_EL1			sys_reg(3, 0, 0, 0, 5)
+ #define SYS_REVIDR_EL1			sys_reg(3, 0, 0, 0, 6)
+@@ -118,17 +126,10 @@
+ #define SYS_ID_AA64MMFR1_EL1		sys_reg(3, 0, 0, 7, 1)
+ #define SYS_ID_AA64MMFR2_EL1		sys_reg(3, 0, 0, 7, 2)
+ 
+-#define SYS_CNTFRQ_EL0			sys_reg(3, 3, 14, 0, 0)
+ #define SYS_CTR_EL0			sys_reg(3, 3, 0, 0, 1)
+ #define SYS_DCZID_EL0			sys_reg(3, 3, 0, 0, 7)
+ 
+-#define REG_PSTATE_PAN_IMM		sys_reg(0, 0, 4, 0, 4)
+-#define REG_PSTATE_UAO_IMM		sys_reg(0, 0, 4, 0, 3)
+-
+-#define SET_PSTATE_PAN(x) __emit_inst(0xd5000000 | REG_PSTATE_PAN_IMM |	\
+-				      (!!x)<<8 | 0x1f)
+-#define SET_PSTATE_UAO(x) __emit_inst(0xd5000000 | REG_PSTATE_UAO_IMM |	\
+-				      (!!x)<<8 | 0x1f)
++#define SYS_CNTFRQ_EL0			sys_reg(3, 3, 14, 0, 0)
+ 
+ /* Common SCTLR_ELx flags. */
+ #define SCTLR_ELx_EE    (1 << 25)
 -- 
-Jazz is not dead. It just smells funny...
+1.9.1
