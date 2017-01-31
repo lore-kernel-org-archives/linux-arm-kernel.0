@@ -1,42 +1,61 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 31 Jan 2017 14:19:51 -0600
-Subject: [PATCH 1 0/4] PCI: Use of_device_get_match_data() to simplify probe
-Message-ID: <20170131201400.27605.56002.stgit@bhelgaas-glaptop.roam.corp.google.com>
+Date: Tue, 31 Jan 2017 14:19:59 -0600
+Subject: [PATCH 1 1/4] PCI: hisi: Use of_device_get_match_data() to simplify
+ probe
+In-Reply-To: <20170131201400.27605.56002.stgit@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170131201400.27605.56002.stgit@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20170131201958.27605.54898.stgit@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This turned into much ado about nothing, but Shailendra's hisi patch
-prompted similar cleanups in other drivers.  It's a minor simplification,
-but I think worth doing consistently across drivers.
+From: Shailendra Verma <shailendra.v@samsung.com>
 
-Basically this is Geert's observation that when the driver probe function
-is called only as a result of matching something in <match_table>, a
-subsequent of_match_device(<match_table>, dev) call should never fail.
+The only way to call hisi_pcie_probe() is to match an entry in
+hisi_pcie_of_match[], so match cannot be NULL.
 
-Therefore, instead of this:
+Use of_device_get_match_data() to retrieve the soc_ops pointer.  No
+functional change intended.
 
-  struct of_device_id *match;
-
-  match = of_match_device(<match_table>, dev);
-  ... = match->data;
-
-we can do this:
-
-  ... = of_device_get_match_data(dev);
-
+[bhelgaas: use of_device_get_match_data(), changelog]
+Based-on-suggestion-from: Geert Uytterhoeven <geert@linux-m68k.org>
+Signed-off-by: Shailendra Verma <shailendra.v@samsung.com>
+Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 ---
+ drivers/pci/host/pcie-hisi.c |    8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
-Bjorn Helgaas (3):
-      PCI: iproc: Use of_device_get_match_data() to simplify probe
-      PCI: layerscape: Use of_device_get_match_data() to simplify probe
-      PCI: rcar: Use of_device_get_match_data() to simplify probe
-
-Shailendra Verma (1):
-      PCI: hisi: Use of_device_get_match_data() to simplify probe
-
-
- drivers/pci/host/pci-layerscape.c      |    7 +------
- drivers/pci/host/pcie-hisi.c           |    8 +++-----
- drivers/pci/host/pcie-iproc-platform.c |    7 +------
- drivers/pci/host/pcie-rcar.c           |    7 +------
- 4 files changed, 6 insertions(+), 23 deletions(-)
+diff --git a/drivers/pci/host/pcie-hisi.c b/drivers/pci/host/pcie-hisi.c
+index a301a7187b30..33c201afdbf1 100644
+--- a/drivers/pci/host/pcie-hisi.c
++++ b/drivers/pci/host/pcie-hisi.c
+@@ -139,7 +139,7 @@ struct hisi_pcie {
+ 	struct pcie_port pp;		/* pp.dbi_base is DT rc_dbi */
+ 	struct regmap *subctrl;
+ 	u32 port_id;
+-	struct pcie_soc_ops *soc_ops;
++	const struct pcie_soc_ops *soc_ops;
+ };
+ 
+ /* HipXX PCIe host only supports 32-bit config access */
+@@ -259,7 +259,6 @@ static int hisi_pcie_probe(struct platform_device *pdev)
+ 	struct device *dev = &pdev->dev;
+ 	struct hisi_pcie *hisi_pcie;
+ 	struct pcie_port *pp;
+-	const struct of_device_id *match;
+ 	struct resource *reg;
+ 	struct device_driver *driver;
+ 	int ret;
+@@ -272,11 +271,10 @@ static int hisi_pcie_probe(struct platform_device *pdev)
+ 	pp->dev = dev;
+ 	driver = dev->driver;
+ 
+-	match = of_match_device(driver->of_match_table, dev);
+-	hisi_pcie->soc_ops = (struct pcie_soc_ops *) match->data;
++	hisi_pcie->soc_ops = of_device_get_match_data(dev);
+ 
+ 	hisi_pcie->subctrl =
+-	syscon_regmap_lookup_by_compatible("hisilicon,pcie-sas-subctrl");
++	    syscon_regmap_lookup_by_compatible("hisilicon,pcie-sas-subctrl");
+ 	if (IS_ERR(hisi_pcie->subctrl)) {
+ 		dev_err(dev, "cannot get subctrl base\n");
+ 		return PTR_ERR(hisi_pcie->subctrl);
