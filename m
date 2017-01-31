@@ -1,66 +1,116 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Mon, 30 Jan 2017 14:13:19 -0800
-Subject: [PATCH] remoteproc: Move rproc_delete_debug_dir() to rproc_del()
-In-Reply-To: <20170130220119.GD31134@builder>
-References: <1485222528-20603-1-git-send-email-spjoshi@codeaurora.org>
- <20170130220119.GD31134@builder>
-Message-ID: <20170130221319.GE31134@builder>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 30 Jan 2017 22:22:18 -0800
+Subject: [Patch v4 2/2] firmware: qcom: scm: Fix interrupted SCM calls
+In-Reply-To: <20170130105553.GB16461@arm.com>
+References: <1484845120-3364-1-git-send-email-andy.gross@linaro.org>
+ <1484845120-3364-3-git-send-email-andy.gross@linaro.org>
+ <CAOesGMi4xUxJNHO5hEbZHBCnTZ6xXVyzoszawPiJxBiRP1DitA@mail.gmail.com>
+ <20170130105553.GB16461@arm.com>
+Message-ID: <CAOesGMhRS8hmHqO=T6X3nooztqhwRO_YMDe2F960TnED-tJN-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 30 Jan 14:01 PST 2017, Bjorn Andersson wrote:
+On Mon, Jan 30, 2017 at 2:55 AM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Olof,
+>
+> On Sun, Jan 29, 2017 at 04:24:51PM -0800, Olof Johansson wrote:
+>> On Thu, Jan 19, 2017 at 8:58 AM, Andy Gross <andy.gross@linaro.org> wrote:
+>> > This patch adds a Qualcomm specific quirk to the arm_smccc_smc call.
+>> >
+>> > On Qualcomm ARM64 platforms, the SMC call can return before it has
+>> > completed.  If this occurs, the call can be restarted, but it requires
+>> > using the returned session ID value from the interrupted SMC call.
+>> >
+>> > The quirk stores off the session ID from the interrupted call in the
+>> > quirk structure so that it can be used by the caller.
+>> >
+>> > This patch folds in a fix given by Sricharan R:
+>> > https://lkml.org/lkml/2016/9/28/272
+>> >
+>> > Signed-off-by: Andy Gross <andy.gross@linaro.org>
+>> > Reviewed-by: Will Deacon <will.deacon@arm.com>
+>> > ---
+>> >  arch/arm64/kernel/smccc-call.S |  9 ++++++++-
+>> >  drivers/firmware/qcom_scm-64.c | 13 ++++++++++---
+>> >  include/linux/arm-smccc.h      | 11 ++++++++---
+>> >  3 files changed, 26 insertions(+), 7 deletions(-)
+>> >
+>> > diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
+>> > index 6290696..72ecdca 100644
+>> > --- a/arch/arm64/kernel/smccc-call.S
+>> > +++ b/arch/arm64/kernel/smccc-call.S
+>> > @@ -12,6 +12,7 @@
+>> >   *
+>> >   */
+>> >  #include <linux/linkage.h>
+>> > +#include <linux/arm-smccc.h>
+>> >  #include <asm/asm-offsets.h>
+>> >
+>> >         .macro SMCCC instr
+>> > @@ -20,7 +21,13 @@
+>> >         ldr     x4, [sp]
+>> >         stp     x0, x1, [x4, #ARM_SMCCC_RES_X0_OFFS]
+>> >         stp     x2, x3, [x4, #ARM_SMCCC_RES_X2_OFFS]
+>> > -       ret
+>> > +       ldr     x4, [sp, #8]
+>> > +       cbz     x4, 1f /* no quirk structure */
+>> > +       ldr     x9, [x4, #ARM_SMCCC_QUIRK_ID_OFFS]
+>> > +       cmp     x9, #ARM_SMCCC_QUIRK_QCOM_A6
+>> > +       b.ne    1f
+>> > +       str     x6, [x4, ARM_SMCCC_QUIRK_STATE_OFFS]
+>> > +1:     ret
+>> >         .cfi_endproc
+>> >         .endm
+>>
+>> This extends the SMC entry/return path quite a bit.
+>
+> I honestly doubt it's measurable. You've got an independent load from the
+> stack and a cbz that's likely predicted correctly given the static nature
+> of the quirk. Then you have an SMC, which is going to trap and dominate
+> the cost of this function.
+>
+>> Is this truly a qualcomm-only quirk, or are other vendors also picking it
+>> up?
+>
+> Currently, it's just qualcomm. Whilst I'd love to say they'll be the only
+> people to interpret the SMCCC in an imaginative fashion, I'd be surprised
+> if we don't see other vendors making mistakes in this area in the future.
 
-> On Mon 23 Jan 17:48 PST 2017, Sarangdhar Joshi wrote:
-> 
-> > The "remoteproc{0,1...}" sysfs entries are added in
-> > rproc_add() and deleted in rproc_type_release() instead of
-> > in rproc_del(). That leaves these lingering entries sticking
-> > around after we return from rproc_del(). Move the
-> > rproc_delete_debug_dir() to rproc_del() to fix this.
-> > 
-> > Signed-off-by: Sarangdhar Joshi <spjoshi@codeaurora.org>
-> 
-> I moved the rproc_delete_debug_dir() below the list_del() region to
-> allow reuse of the critical region in the upcoming "deleted" patch.
-> 
+Ok, so the list of checks is anticipated to grow.
 
-Never mind, I failed at reading. I re-applied this as is.
+>> Why not either make arm_smccc_.* function pointers and update them
+>> accordingly, or use a custom version for the specific locations where
+>> you want/need to restart the calls? You are after all already wrapping
+>> them in qcom_scm_call().
+>
+> Having the low-level SMC entry code in one place is advantageous because
+> it means the SMCCC contract is enforced in common code, making it easier
+> to debug and maintain. If a vendor got the contract so badly wrong that
+> it didn't resemble SMCCC, then I'd agree with you, but here we're just
+> saving and restoring an extra register.
 
-Regards,
-Bjorn
+What contract? Qualcomm just violated it and the answer isn't to
+enforce, it's to enable their "enhanced" implementation (and it should
+be, within reason).
 
-> Applied, thank you.
-> 
-> Regards,
-> Bjorn
-> 
-> > ---
-> >  drivers/remoteproc/remoteproc_core.c | 4 ++--
-> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
-> > index 953ee29..78200a7 100644
-> > --- a/drivers/remoteproc/remoteproc_core.c
-> > +++ b/drivers/remoteproc/remoteproc_core.c
-> > @@ -1315,8 +1315,6 @@ static void rproc_type_release(struct device *dev)
-> >  
-> >  	dev_info(&rproc->dev, "releasing %s\n", rproc->name);
-> >  
-> > -	rproc_delete_debug_dir(rproc);
-> > -
-> >  	idr_destroy(&rproc->notifyids);
-> >  
-> >  	if (rproc->index >= 0)
-> > @@ -1491,6 +1489,8 @@ int rproc_del(struct rproc *rproc)
-> >  	if (rproc->auto_boot)
-> >  		rproc_shutdown(rproc);
-> >  
-> > +	rproc_delete_debug_dir(rproc);
-> > +
-> >  	/* the rproc is downref'ed as soon as it's removed from the klist */
-> >  	mutex_lock(&rproc_list_mutex);
-> >  	list_del(&rproc->node);
-> > -- 
-> > The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> > a Linux Foundation Collaborative Project
-> > 
+It's not like their own special SMCCC functions have to go in a
+different file. Stick them on the side of the current ones in the same
+file. The main call is already nicely abstracted with an asm macro so
+that part will be shared, and the call sites are per-vendor anyway.
+
+>> Seems like a more appropriate change than burden all platforms with
+>> longer code path due to your quirk.
+>
+> I really don't think it's a problem. Do you have numbers suggesting
+> otherwise?
+
+Not on this first quirk, no.
+
+Anyway, I guess I'm just bikeshedding. You should merge this code if
+you're happy with it.
+
+
+
+Thanks!
+
+-Olof
