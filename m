@@ -1,176 +1,51 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 31 Jan 2017 12:31:52 -0800
-Subject: [PATCH net-next 4/6] drivers: net: xgene-v2: Add base driver
-In-Reply-To: <1485889401-13909-5-git-send-email-isubramanian@apm.com>
-References: <1485889401-13909-1-git-send-email-isubramanian@apm.com>
- <1485889401-13909-5-git-send-email-isubramanian@apm.com>
-Message-ID: <c6ae0303-4ac9-987b-5477-fa28ddc00f83@gmail.com>
+From: hkallweit1@gmail.com (Heiner Kallweit)
+Date: Tue, 31 Jan 2017 21:32:36 +0100
+Subject: [PATCH 1/3] mmc: meson-gx: fix setting f_min
+In-Reply-To: <CAPDyKFrhTm7A_tq_W3yWoPv95exZ-LTtEhiQhw134AfGZuRY+Q@mail.gmail.com>
+References: <e26a74f8-9819-6940-4c90-225377cc0a3e@gmail.com>
+ <CAPDyKFrhTm7A_tq_W3yWoPv95exZ-LTtEhiQhw134AfGZuRY+Q@mail.gmail.com>
+Message-ID: <d974bc57-1959-e16e-eb89-0e1dc37d8f15@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/31/2017 11:03 AM, Iyappan Subramanian wrote:
-> This patch adds,
+Am 31.01.2017 um 12:55 schrieb Ulf Hansson:
+> On 26 January 2017 at 22:41, Heiner Kallweit <hkallweit1@gmail.com> wrote:
+>> Currently f_min is set to 4 MHz whilst the comment states 400 MHz.
+>> I think the itention is to set f_min to 400 kHz.
+>> Change value and comment accordingly.
+>>
+>> Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
 > 
->      - probe, remove, shutdown
->      - open, close and stats
->      - create and delete ring
->      - request and delete irq
+> Heiner, could you please collect the mmc meson changes that you
+> recently have submitted in one series and re-post to linux-mmc. I can
+> pick them up from there.
 > 
-> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-> Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
-> ---
+Sure. Apart from the ones you've reviewed already I have few more.
+I'll add them to the patch set.
 
-> +static void xge_delete_desc_rings(struct net_device *ndev)
-> +{
-> +	struct xge_pdata *pdata = netdev_priv(ndev);
-> +	struct device *dev = &pdata->pdev->dev;
-> +	struct xge_desc_ring *ring;
-> +
-> +	ring = pdata->tx_ring;
-> +	if (ring) {
-> +		if (ring->skbs)
-> +			devm_kfree(dev, ring->skbs);
-> +		if (ring->pkt_bufs)
-> +			devm_kfree(dev, ring->pkt_bufs);
-> +		devm_kfree(dev, ring);
-> +	}
+Regards, Heiner
 
-The very fact that you have to do the devm_kfree suggests that the way
-you manage the lifetime of the ring is not appropriate, and in fact, if
-we look at how xge_create_desc_ring() is called, in the driver's probe
-function indicates that if the network interface is never openeded, we
-are just wasting memory sitting there and doing nothing. You should
-consider moving this to the ndo_open(), resp. ndo_close() functions to
-optimize memory consumption wrt. the network interface state.
-
-> +
-> +	ring = pdata->rx_ring;
-> +	if (ring) {
-> +		if (ring->skbs)
-> +			devm_kfree(dev, ring->skbs);
-> +		devm_kfree(dev, ring);
-> +	}
-> +}
-> +
-> +static struct xge_desc_ring *xge_create_desc_ring(struct net_device *ndev)
-> +{
-> +	struct xge_pdata *pdata = netdev_priv(ndev);
-> +	struct device *dev = &pdata->pdev->dev;
-> +	struct xge_desc_ring *ring;
-> +	u16 size;
-> +
-> +	ring = devm_kzalloc(dev, sizeof(struct xge_desc_ring), GFP_KERNEL);
-> +	if (!ring)
-> +		return NULL;
-> +
-> +	ring->ndev = ndev;
-> +
-> +	size = XGENE_ENET_DESC_SIZE * XGENE_ENET_NUM_DESC;
-> +	ring->desc_addr = dmam_alloc_coherent(dev, size, &ring->dma_addr,
-> +					      GFP_KERNEL | __GFP_ZERO);
-
-There is no dmam_zalloc_coherent()? Then again, that seems to be a
-candidate for dma_zalloc_coherent() and moving this to the ndo_open()
-function.
-
-> +	if (!ring->desc_addr) {
-> +		devm_kfree(dev, ring);
-> +		return NULL;
-> +	}
-> +
-> +	xge_setup_desc(ring);
-> +
-> +	return ring;
-> +}
-> +
-> +static int xge_refill_buffers(struct net_device *ndev, u32 nbuf)
-> +{
-> +	struct xge_pdata *pdata = netdev_priv(ndev);
-> +	struct xge_desc_ring *ring = pdata->rx_ring;
-> +	const u8 slots = XGENE_ENET_NUM_DESC - 1;
-> +	struct device *dev = &pdata->pdev->dev;
-> +	struct xge_raw_desc *raw_desc;
-> +	u64 addr_lo, addr_hi;
-> +	u8 tail = ring->tail;
-> +	struct sk_buff *skb;
-> +	dma_addr_t dma_addr;
-> +	u16 len;
-> +	int i;
-> +
-> +	for (i = 0; i < nbuf; i++) {
-> +		raw_desc = &ring->raw_desc[tail];
-> +
-> +		len = XGENE_ENET_STD_MTU;
-> +		skb = netdev_alloc_skb(ndev, len);
-> +		if (unlikely(!skb))
-> +			return -ENOMEM;
-
-Are not you leaving holes in your RX ring if you do that?
-
-> +
-> +		dma_addr = dma_map_single(dev, skb->data, len, DMA_FROM_DEVICE);
-> +		if (dma_mapping_error(dev, dma_addr)) {
-> +			netdev_err(ndev, "DMA mapping error\n");
-> +			dev_kfree_skb_any(skb);
-> +			return -EINVAL;
-> +		}
-
-
-> +static void xge_timeout(struct net_device *ndev)
-> +{
-> +	struct xge_pdata *pdata = netdev_priv(ndev);
-> +	struct netdev_queue *txq;
-> +
-> +	xge_mac_reset(pdata);
-> +
-> +	txq = netdev_get_tx_queue(ndev, 0);
-> +	txq->trans_start = jiffies;
-> +	netif_tx_start_queue(txq);
-
-It most likely is not that simple, don't you want to walk the list of
-pending transmissed SKBs and free them all?
-
-> +}
-> +
-> +static void xge_get_stats64(struct net_device *ndev,
-> +			    struct rtnl_link_stats64 *storage)
-> +{
-> +	struct xge_pdata *pdata = netdev_priv(ndev);
-> +	struct xge_stats *stats = &pdata->stats;
-> +
-> +	storage->tx_packets += stats->tx_packets;
-> +	storage->tx_bytes += stats->tx_bytes;
-> +
-> +	storage->rx_packets += stats->rx_packets;
-> +	storage->rx_bytes += stats->rx_bytes;
-
-Pretty sure you need some synchronization primitives here for non 64-bit
-architectures (maybe this driver is not used outside of 64-bit, but still).
-
-
-> +
-> +	ndev->hw_features = ndev->features;
-> +
-> +	ret = dma_coerce_mask_and_coherent(dev, DMA_BIT_MASK(64));
-> +	if (ret) {
-> +		netdev_err(ndev, "No usable DMA configuration\n");
-> +		goto err;
-> +	}
-> +
-> +	ret = xge_init_hw(ndev);
-> +	if (ret)
-> +		goto err;
-
-Missing netif_carrier_off() right before the register_netdev().
-
-> +
-> +	ret = register_netdev(ndev);
-> +	if (ret) {
-> +		netdev_err(ndev, "Failed to register netdev\n");
-> +		goto err;
-> +	}
-
-
-
--- 
-Florian
+> Kind regards
+> Uffe
+> 
+>> ---
+>>  drivers/mmc/host/meson-gx-mmc.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
+>> index bf19d03c..cf071756 100644
+>> --- a/drivers/mmc/host/meson-gx-mmc.c
+>> +++ b/drivers/mmc/host/meson-gx-mmc.c
+>> @@ -268,7 +268,7 @@ static int meson_mmc_clk_init(struct meson_host *host)
+>>         if (f_min != UINT_MAX)
+>>                 f_min = DIV_ROUND_UP(CLK_SRC_XTAL_RATE, CLK_DIV_MAX);
+>>         else
+>> -               f_min = 4000000;  /* default min: 400 MHz */
+>> +               f_min = 400000;  /* default min: 400 kHz */
+>>         host->mmc->f_min = f_min;
+>>
+>>         /* create the mux */
+>> --
+>> 2.11.0
+>>
+> 
