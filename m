@@ -1,88 +1,57 @@
 From: andy.gross@linaro.org (Andy Gross)
-Date: Tue, 31 Jan 2017 01:18:06 -0600
-Subject: next-20170125 hangs on aarch64
-In-Reply-To: <20170130125125.GA27550@yury-N73SV>
-References: <20170129101255.GA29415@yury-N73SV>
- <20170129122125.GA20269@yury-N73SV> <588F27F1.6050907@arm.com>
- <20170130125125.GA27550@yury-N73SV>
-Message-ID: <20170131071806.GB2821@hector.attlocal.net>
+Date: Tue, 31 Jan 2017 01:58:40 -0600
+Subject: No subject
+Message-ID: <1485849522-12806-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2017 at 06:21:25PM +0530, Yury Norov wrote:
-> On Mon, Jan 30, 2017 at 11:48:01AM +0000, James Morse wrote:
-> > Hi Yury,
-> > 
-> > [CC: Andy Gross]
-> > 
-> > On 29/01/17 12:21, Yury Norov wrote:
-> > > On Sun, Jan 29, 2017 at 03:42:55PM +0530, Yury Norov wrote:
-> > >> Hi all,
-> > >>
-> > >> I pulled next-20170125 kernel, and found it hanged on boot. The exact reason is
-> > >> panic on dereferencing of the 0xffffffc8 address, which is most probably the
-> > >> attempt to dereference the ENOSYS error code as the address. next-20170124 works
-> > >> fine, at least it boots.
-> > >>
-> > >> Does anyone have details on that?
-> > 
-> > I hit this with next-20170130 too, in /arch/arm64/kernel/smccc-call.S
-> > aabde95fc543 changed the SMCCC macro to check for an optional quirk structure.
-> > 
-> > A previous patch provided:
-> > > #define arm_smccc_smc(...) __arm_smccc_smc(__VA_ARGS__, NULL)
-> > 
-> > to handle the 'no quirk' case, but this missed HVC calls.
-> > The following hunk fixes/hides it for me:
+Subject: [Patch v5 0/2] Support ARM SMCC SoC vendor quirks
 
-Wow, I botched this completely.  I missed the hvc using the same macro.  I'll
-rework with the fixes below.
+At least one SoC vendor (Qualcomm) requires additional processing done
+during ARM SMCCC calls.  As such, an additional parameter to the
+arm_smccc_smc is required to be able to handle SoC specific quirks.
 
-> 
-> It works for me too, but I think "ldr x4, [sp, #8]" should
-> also go under (.if \maybe_quirk != 0) condition - like below.
+The Qualcomm quirk is necessary due to the fact that the scm call can
+be interrupted on Qualcomm ARM64 platforms.  When this occurs, the
+call must be restarted using information that was passed back during
+the original smc call.
 
-Yes I believe so.
+The first patch in this series adds a quirk structure and also adds a
+quirk parameter to arm_smccc_smc calls.  I added macros to allow users
+to choose the API they need.  This keeps all of the current users who
+do not need quirks from having to change anything.
 
-> ----------------------------%<----------------------------
-> diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
-> index 72ecdca929b1..9e287a7d1822 100644
-> --- a/arch/arm64/kernel/smccc-call.S
-> +++ b/arch/arm64/kernel/smccc-call.S
-> @@ -15,18 +15,20 @@
->  #include <linux/arm-smccc.h>
->  #include <asm/asm-offsets.h>
-> 
-> -       .macro SMCCC instr
-> +       .macro SMCCC instr, maybe_quirk = 0
->         .cfi_startproc
->         \instr  #0
->         ldr     x4, [sp]
->         stp     x0, x1, [x4, #ARM_SMCCC_RES_X0_OFFS]
->         stp     x2, x3, [x4, #ARM_SMCCC_RES_X2_OFFS]
-> +       .if \maybe_quirk != 0
->         ldr     x4, [sp, #8]
->         cbz     x4, 1f /* no quirk structure */
->         ldr     x9, [x4, #ARM_SMCCC_QUIRK_ID_OFFS]
->         cmp     x9, #ARM_SMCCC_QUIRK_QCOM_A6
->         b.ne    1f
->         str     x6, [x4, ARM_SMCCC_QUIRK_STATE_OFFS]
-> +       .endif
->  1:     ret
->         .cfi_endproc
->         .endm
-> @@ -38,7 +40,7 @@
->   *               struct arm_smccc_quirk *quirk)
->   */
->  ENTRY(__arm_smccc_smc)
-> -       SMCCC   smc
-> +       SMCCC   smc, 1
->  ENDPROC(__arm_smccc_smc)
-> 
->  /*
-> ----------------------------%<----------------------------
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+The second patch adds the Qualcomm quirk and also implements the
+Qualcomm firmware changes required to handle the restarting of the
+interrupted SMC call.
+
+The original patch set for the SMCCC session ID is located at:
+https://lkml.org/lkml/2016/8/20/7
+
+Changes from v4:
+  - Fix issue with hvc calls.
+
+Changes from v3:
+  - Fix documentation
+
+Changes from v2:
+  - Use variadic macros
+
+Changes from v1:
+  - Add macros to handle both use cases per review comments
+
+Andy Gross (2):
+  arm: kernel: Add SMC structure parameter
+  firmware: qcom: scm: Fix interrupted SCM calls
+
+ arch/arm/kernel/armksyms.c      |  2 +-
+ arch/arm/kernel/smccc-call.S    |  7 ++++---
+ arch/arm64/kernel/arm64ksyms.c  |  2 +-
+ arch/arm64/kernel/asm-offsets.c |  7 +++++--
+ arch/arm64/kernel/smccc-call.S  | 22 ++++++++++++++++------
+ drivers/firmware/qcom_scm-64.c  | 13 ++++++++++---
+ include/linux/arm-smccc.h       | 38 +++++++++++++++++++++++++++++++-------
+ 7 files changed, 68 insertions(+), 23 deletions(-)
+
+-- 
+1.9.1
