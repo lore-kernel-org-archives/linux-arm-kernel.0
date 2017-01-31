@@ -1,26 +1,21 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 31 Jan 2017 11:50:32 +0800
-Subject: [PATCH 08/14] mmc: sunxi: simplify optional reset handling
-In-Reply-To: <20170130114116.22089-8-p.zabel@pengutronix.de>
-References: <20170130114116.22089-1-p.zabel@pengutronix.de>
- <20170130114116.22089-8-p.zabel@pengutronix.de>
-Message-ID: <CAGb2v66w_TCAqc6xf5OWZek5NVt8_8a089SS_DeYrB__7Pn0eQ@mail.gmail.com>
+Date: Tue, 31 Jan 2017 12:08:48 +0800
+Subject: [PATCH v2 06/25] ARM: dtsi: axp209: add AXP209 ADC subnode
+In-Reply-To: <20170127085458.18270-7-quentin.schulz@free-electrons.com>
+References: <20170127085458.18270-1-quentin.schulz@free-electrons.com>
+ <20170127085458.18270-7-quentin.schulz@free-electrons.com>
+Message-ID: <CAGb2v66pKZQb1c84hu+2kxjPvAhmAK6z+TqPWT3ag=CyELQkiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2017 at 7:41 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> As of commit bb475230b8e5 ("reset: make optional functions really
-> optional"), the reset framework API calls use NULL pointers to describe
-> optional, non-present reset controls.
+On Fri, Jan 27, 2017 at 4:54 PM, Quentin Schulz
+<quentin.schulz@free-electrons.com> wrote:
+> X-Powers AXP209 PMIC has multiple ADCs, each one exposing data from the
+> different power supplies connected to the PMIC.
 >
-> This allows to return errors from devm_reset_control_get_optional and to
-> call reset_control_(de)assert unconditionally.
+> This adds the ADC subnode for AXP20X PMIC.
 >
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 
-FWIW,
-
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Given the device node no longer exports anything, we might
+as well drop it from the device tree.
