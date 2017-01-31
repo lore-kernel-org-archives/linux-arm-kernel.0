@@ -1,113 +1,107 @@
 From: john@metanate.com (John Keeping)
-Date: Tue, 31 Jan 2017 12:39:17 +0000
-Subject: [PATCH v3 16/24] drm/rockchip: dw-mipi-dsi: properly configure
- PHY timing
-In-Reply-To: <20170130215736.GT20076@art_vandelay>
+Date: Tue, 31 Jan 2017 12:41:47 +0000
+Subject: [PATCH v3 24/24] drm/rockchip: dw-mipi-dsi: support read commands
+In-Reply-To: <20170130201609.GM20076@art_vandelay>
 References: <20170129132444.25251-1-john@metanate.com>
- <20170129132444.25251-17-john@metanate.com>
- <20170130215736.GT20076@art_vandelay>
-Message-ID: <20170131123917.6347ab94.john@metanate.com>
+ <20170129132444.25251-25-john@metanate.com>
+ <20170130152611.GA20076@art_vandelay>
+ <20170130181427.1940024f.john@metanate.com>
+ <20170130201609.GM20076@art_vandelay>
+Message-ID: <20170131124147.170d8588.john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Jan 2017 16:57:36 -0500, Sean Paul wrote:
+On Mon, 30 Jan 2017 15:16:09 -0500, Sean Paul wrote:
 
-> On Sun, Jan 29, 2017 at 01:24:36PM +0000, John Keeping wrote:
-> > These values are specified as constant time periods but the PHY
-> > configuration is in terms of the current lane byte clock so using
-> > constant values guarantees that the timings will be outside the
-> > specification with some display configurations.
+> On Mon, Jan 30, 2017 at 06:14:27PM +0000, John Keeping wrote:
+> > On Mon, 30 Jan 2017 10:26:11 -0500, Sean Paul wrote:
+> >   
+> > > On Sun, Jan 29, 2017 at 01:24:44PM +0000, John Keeping wrote:  
+> > > > I haven't found any method for getting the length of a response, so this
+> > > > just uses the requested rx_len
+> > > > 
+> > > > Signed-off-by: John Keeping <john@metanate.com>
+> > > > ---
+> > > > v3:
+> > > > - Fix checkpatch warnings
+> > > > Unchanged in v2
+> > > > 
+> > > >  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 56 ++++++++++++++++++++++++++++++++++
+> > > >  1 file changed, 56 insertions(+)
+> > > > 
+> > > > diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> > > > index cf3ca6b0cbdb..cc58ada75425 100644
+> > > > --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> > > > +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> > > > @@ -678,6 +678,56 @@ static int dw_mipi_dsi_dcs_long_write(struct dw_mipi_dsi *dsi,
+> > > >  	return dw_mipi_dsi_gen_pkt_hdr_write(dsi, hdr_val);
+> > > >  }
+> > > >  
+> > > > +static int dw_mipi_dsi_dcs_read(struct dw_mipi_dsi *dsi,
+> > > > +				const struct mipi_dsi_msg *msg)
+> > > > +{
+> > > > +	const u8 *tx_buf = msg->tx_buf;
+> > > > +	u8 *rx_buf = msg->rx_buf;
+> > > > +	size_t i;
+> > > > +	int ret, val;
+> > > > +
+> > > > +	dsi_write(dsi, DSI_PCKHDL_CFG, EN_CRC_RX | EN_ECC_RX | EN_BTA);
+> > > > +	dsi_write(dsi, DSI_GEN_HDR,
+> > > > +		  GEN_HDATA(tx_buf[0]) | GEN_HTYPE(msg->type));
+> > > > +
+> > > > +	ret = readl_poll_timeout(dsi->base + DSI_CMD_PKT_STATUS,
+> > > > +				 val, !(val & GEN_RD_CMD_BUSY), 1000,
+> > > > +				 CMD_PKT_STATUS_TIMEOUT_US);
+> > > > +	if (ret < 0) {
+> > > > +		dev_err(dsi->dev, "failed to read command response\n");
+> > > > +		return ret;
+> > > > +	}
+> > > > +
+> > > > +	for (i = 0; i < msg->rx_len;) {
+> > > > +		u32 pld = dsi_read(dsi, DSI_GEN_PLD_DATA);
+> > > > +
+> > > > +		while (i < msg->rx_len) {
+> > > > +			rx_buf[i] = pld & 0xff;
+> > > > +			pld >>= 8;
+> > > > +			i++;
+> > > > +		}
+> > > > +	}    
+> > > 
+> > > AFAICT, the outer for loop just initializes i and ensures msg->rx_len is
+> > > non-zero? 
+> > > 
+> > > I think the following would be easier to read (and safe against the case where
+> > > msg->rx_len > sizeof(pld) (even though this shouldn't happen according to DCS
+> > > spec)).
+> > > 
+> > > if (msg->rx_len > 0) {
+> > >         u32 pld = dsi_read(dsi, DSI_GEN_PLD_DATA);
+> > >         memcpy(rx_buf, &pld, MIN(msg->rx_len, sizeof(pld));
+> > > }  
 > > 
-> > Derive the necessary configuration from the byte clock in order to
-> > ensure that the PHY configuration is correct.
+> > I think the intent was to handle rx_len > 4, but the patch is obvously
+> > completely broken regarding that.  As far as I can tell, rx_len is
+> > limited by the maximum return packet size which can be any value up to
+> > the maximum size of a long packet, so we may need to read from the FIFO
+> > multiple times.
 > > 
-> > Signed-off-by: John Keeping <john@metanate.com>
-> > ---
-> > v3:
-> > - Wrap some long lines
-> > Unchanged in v2
+> > The loop should be something like this:
 > > 
-> >  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 39 ++++++++++++++++++++++++++++++----
-> >  1 file changed, 35 insertions(+), 4 deletions(-)
+> > 	for (i = 0; i < msg->rx_len;) {
+> > 		u32 pld = dsi_read(dsi, DSI_GEN_PLD_DATA);
+> > 		int j;
 > > 
-> > diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > index cfe7e4ba305c..85edf6dd2bac 100644
-> > --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > @@ -383,6 +383,26 @@ static void dw_mipi_dsi_phy_write(struct dw_mipi_dsi *dsi, u8 test_code,
-> >  	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_TESTCLK | PHY_UNTESTCLR);
-> >  }
-> >  
-> > +/**
-> > + * ns2bc - Nanoseconds to byte clock cycles
-> > + */
-> > +static inline unsigned int ns2bc(struct dw_mipi_dsi *dsi, int ns)
-> > +{
-> > +	unsigned long byte_clk_khz = dsi->lane_mbps * MSEC_PER_SEC / 8;  
+> > 		for (j = 0; j < 4 && i < msg->rx_len; i++, j++) {
+> > 			rx_buf[i] = pld & 0xff;
+> > 			pld >>= 8;
+> > 		}
+> > 	}  
 > 
-> Why multiply by 1000 (MSEC_PER_SEC) only to immediately divide by 1000?
-> 
-> > +
-> > +	return (ns * (byte_clk_khz / 1000) + 999) / 1000;  
-> 
-> Can you replace this whole function with:
-> 
-> return DIV_ROUND_UP(ns * dsi->lane_mbps / 8, 1000);
+> Short packets should never exceed 32 bits, so I don't think you need to add the
+> nested loop.
 
-Yes, I'll make this simplification.
-
-> > +}
-> > +
-> > +/**
-> > + * ns2ui - Nanoseconds to UI time periods
-> > + */
-> > +static inline unsigned int ns2ui(struct dw_mipi_dsi *dsi, int ns)
-> > +{
-> > +	unsigned long byte_clk_khz = dsi->lane_mbps * MSEC_PER_SEC;
-> > +
-> > +	return (ns * (byte_clk_khz / 1000) + 999) / 1000;  
-> 
-> Same remarks here.
-> 
-> Sean
-> 
-> 
-> > +}
-> > +
-> >  static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
-> >  {
-> >  	int ret, testdin, vco, val;
-> > @@ -434,10 +454,21 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
-> >  					 SETRD_MAX | POWER_MANAGE |
-> >  					 TER_RESISTORS_ON);
-> >  
-> > -
-> > -	dw_mipi_dsi_phy_write(dsi, 0x70, TLP_PROGRAM_EN | 0xf);
-> > -	dw_mipi_dsi_phy_write(dsi, 0x71, THS_PRE_PROGRAM_EN | 0x55);
-> > -	dw_mipi_dsi_phy_write(dsi, 0x72, THS_ZERO_PROGRAM_EN | 0xa);
-> > +	dw_mipi_dsi_phy_write(dsi, 0x60, TLP_PROGRAM_EN | ns2bc(dsi, 500));
-> > +	dw_mipi_dsi_phy_write(dsi, 0x61, THS_PRE_PROGRAM_EN | ns2ui(dsi, 40));
-> > +	dw_mipi_dsi_phy_write(dsi, 0x62, THS_ZERO_PROGRAM_EN | ns2bc(dsi, 300));
-> > +	dw_mipi_dsi_phy_write(dsi, 0x63, THS_PRE_PROGRAM_EN | ns2ui(dsi, 100));
-> > +	dw_mipi_dsi_phy_write(dsi, 0x64, BIT(5) | ns2bc(dsi, 100));
-> > +	dw_mipi_dsi_phy_write(dsi, 0x65, BIT(5) | (ns2bc(dsi, 60) + 7));
-> > +
-> > +	dw_mipi_dsi_phy_write(dsi, 0x70, TLP_PROGRAM_EN | ns2bc(dsi, 500));
-> > +	dw_mipi_dsi_phy_write(dsi, 0x71,
-> > +			      THS_PRE_PROGRAM_EN | (ns2ui(dsi, 50) + 5));
-> > +	dw_mipi_dsi_phy_write(dsi, 0x72,
-> > +			      THS_ZERO_PROGRAM_EN | (ns2bc(dsi, 140) + 2));
-> > +	dw_mipi_dsi_phy_write(dsi, 0x73,
-> > +			      THS_PRE_PROGRAM_EN | (ns2ui(dsi, 60) + 8));
-> > +	dw_mipi_dsi_phy_write(dsi, 0x74, BIT(5) | ns2bc(dsi, 100));
-> >  
-> >  	dsi_write(dsi, DSI_PHY_RSTZ, PHY_ENFORCEPLL | PHY_ENABLECLK |
-> >  				     PHY_UNRSTZ | PHY_UNSHUTDOWNZ);
-> > -- 
-> > 2.11.0.197.gb556de5.dirty
-> > 
-> > _______________________________________________
-> > dri-devel mailing list
-> > dri-devel at lists.freedesktop.org
-> > https://lists.freedesktop.org/mailman/listinfo/dri-devel  
-> 
+The read response is not restricted to a short packet.  I have a panel
+that documents a read request that returns up to 64KiB, admittedly with
+a continuation command and the panels I have seem to only be programmed
+to return 5 bytes of meaningful data, but they do return all of those
+bytes in a single read response.
