@@ -1,72 +1,51 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 31 Jan 2017 10:49:28 +0100
-Subject: [PATCH v3 00/24] i.MX Media Driver
-In-Reply-To: <951c1a08-c0f2-4333-b4bf-410de8dd863f@gmail.com>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <20170131004510.GQ27312@n2100.armlinux.org.uk>
- <951c1a08-c0f2-4333-b4bf-410de8dd863f@gmail.com>
-Message-ID: <1485856168.2932.11.camel@pengutronix.de>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 31 Jan 2017 10:56:22 +0100
+Subject: [PATCH v2 1/2] dt-bindings: gpu: Add Mali Utgard bindings
+In-Reply-To: <2a5e7d0a-e2ca-5cc7-5193-96be5bfe494b@baylibre.com>
+References: <a4d90de597cfcfab5fddeeb538505774a980818b.1485180017.git-series.maxime.ripard@free-electrons.com>
+ <20170127201913.jjhdw57jmxifqpxa@rob-hp-laptop>
+ <20170130134824.u37svxphyy266tzz@lukather>
+ <2a5e7d0a-e2ca-5cc7-5193-96be5bfe494b@baylibre.com>
+Message-ID: <20170131095622.ew56cyjrndu6wxwe@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-01-30 at 17:22 -0800, Steve Longerbeam wrote:
+On Mon, Jan 30, 2017 at 05:24:06PM +0100, Neil Armstrong wrote:
+> >>> @@ -0,0 +1,79 @@
+> >>> +ARM Mali Utgard GPU
+> >>> +===================
+> >>> +
+> >>> +Required properties:
+> >>> +  - compatible
+> >>> +    * Must be one of the following:
+> >>> +      + "arm,mali-300"
+> >>> +      + "arm,mali-400"
+> >>> +      + "arm,mali-450"
+> >>> +    * And, optionally, one of the vendor specific compatible:
+> >>> +      + allwinner,sun4i-a10-mali
+> >>> +      + allwinner,sun7i-a20-mali
+> >>
+> >> And stericsson,db8500-mali?
+> > 
+> > Good catch, I'll add it.
 > 
-> On 01/30/2017 04:45 PM, Russell King - ARM Linux wrote:
-> >
-> > Hi,
-> >
-> > Trying this driver with an imx219 camera (which works with Philipp's
-> > driver) results in not much happening... no /dev/media* node for it,
-> > no subdevs, no nothing.  No clues as to what's missing either.  Only
-> > messages from imx-media are from registering the various subdevs.
-> >
-> > [   37.444877] imx-media: Registered subdev imx6-mipi-csi2
-> > [   37.444973] imx-media: Registered subdev imx219 0-0010
-> > [   38.868740] imx-media: Registered subdev ipu1_ic_prpenc
-> > [   38.869265] imx-media: Registered subdev ipu1_ic_prpvf
-> > [   38.869425] imx-media: Registered subdev ipu1_ic_pp0
-> > [   38.870086] imx-media: Registered subdev ipu1_ic_pp1
-> > [   38.871510] imx-media: Registered subdev ipu2_ic_prpenc
-> > [   38.871743] imx-media: Registered subdev ipu1_smfc0
-> > [   38.873043] imx-media: Registered subdev ipu1_smfc1
-> > [   38.873225] imx-media: Registered subdev ipu2_ic_prpvf
-> > [   38.875027] imx-media: Registered subdev ipu2_smfc0
-> > [   38.875320] imx-media: Registered subdev ipu2_ic_pp0
-> > [   38.877148] imx-media: Registered subdev ipu2_smfc1
-> > [   38.877436] imx-media: Registered subdev ipu2_ic_pp1
-> > [   38.932089] imx-media: Registered subdev camif0
-> > [   38.956538] imx-media: Registered subdev camif1
-> > [   38.959148] imx-media: Registered subdev camif2
-> > [   38.964353] imx-media: Registered subdev camif3
-> > [  206.502077] imx-media: Registered subdev ipu1_csi0
-> > [  206.503304] imx-media: Registered subdev ipu1_csi1
-> > [  206.503814] imx-media: Registered subdev ipu2_csi0
-> > [  206.504281] imx-media: Registered subdev ipu2_csi1
-> >
-> > I also get:
-> >
-> > [   37.200072] imx6-mipi-csi2: data lanes: 2
-> > [   37.200077] imx6-mipi-csi2: flags: 0x00000200
-> >
-> > and from what I can see, all modules from drivers/staging/media/imx/ are
-> > loaded (had to load imx-csi by hand because of the brokenness in the
-> > drivers/gpu/ipu code attaching an device_node pointer after registering
-> > the platform device, which changes what userspace sees in the modalias
-> > file.)
-> >
-> > Any clues at what to look at?
+> I think you can safely add the following :
 > 
-> Hi Russell,
-> 
-> I'm not familiar with IMX219, can you send me the source for the
-> imx219 subdev? I don't see it in 4.10-rc1.
-> 
-> I'm also having trouble finding a datasheet for it, but from what
-> I've read, it has a MIPI CSI-2 interface. It should work fine as long
-> as it presents a single source pad, registers asynchronously, and
-> sets its entity function to MEDIA_ENT_F_CAM_SENSOR.
+> amlogic,meson-gxbb-mali
+> amlogic,meson-gxl-mali
 
-What about MEDIA_ENT_F_VID_IF_BRIDGE?
+Ack. Do you need any extra properties?
 
-regards
-Philipp
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170131/5555c9f5/attachment.sig>
