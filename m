@@ -1,70 +1,31 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Tue, 31 Jan 2017 19:54:10 +0000
-Subject: [PATCH 3/3 v4] iio: adc: add a driver for Qualcomm PM8xxx HK/XOADC
-In-Reply-To: <CACRpkdYDMH9A=ezPkANRQXcqceEqn-A+oL2TxHyNkjmSms5AOA@mail.gmail.com>
-References: <20170131100938.23660-1-linus.walleij@linaro.org>
- <CACRpkdYDMH9A=ezPkANRQXcqceEqn-A+oL2TxHyNkjmSms5AOA@mail.gmail.com>
-Message-ID: <0c54c4d8-265c-112e-60f1-af21b73148ec@kernel.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 31 Jan 2017 21:01:49 +0100
+Subject: [PATCH net-next 4/6] drivers: net: xgene-v2: Add base driver
+In-Reply-To: <1485889401-13909-5-git-send-email-isubramanian@apm.com>
+References: <1485889401-13909-1-git-send-email-isubramanian@apm.com>
+ <1485889401-13909-5-git-send-email-isubramanian@apm.com>
+Message-ID: <20170131200149.GM5656@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/01/17 10:16, Linus Walleij wrote:
-> On Tue, Jan 31, 2017 at 11:09 AM, Linus Walleij
-> <linus.walleij@linaro.org> wrote:
-> 
->> ChangeLog v3->v4:
-> 
-> Oh and I didn't remove the dev_info() where the driver brags about being
-> present.
-> 
-> I usually like to have those positive affirmations from my drivers so I know
-> they are there. Otherwise I can't tell the state when I for some reason
-> forgot to compile it in because of some Kconfig issue from the state
-> where it is silently present. This is especially helpful in mailed bug
-> reports where people post dmesg logs. Then I can see "aha at least it
-> probed".
-> 
-> It's not super-important, feel free to edit it out when applying if you
-> totally hate it, I won't hold it against you :)
-Meh.  I'm not that fussed ;)
+> +	phy_mode = device_get_phy_mode(dev);
+> +	if (phy_mode < 0) {
+> +		dev_err(dev, "Unable to get phy-connection-type\n");
+> +		return phy_mode;
+> +	}
+> +	pdata->resources.phy_mode = phy_mode;
+> +
+> +	if (pdata->resources.phy_mode != PHY_INTERFACE_MODE_RGMII) {
+> +		dev_err(dev, "Incorrect phy-connection-type specified\n");
+> +		return -ENODEV;
+> +	}
 
-Anyhow I clearly did something crazy last night as the first two patches had
-disappeared from my local tree anyway, so I've tried again and now hopefully
-all is in order.
+This seems a bit limiting. What if you need to use:
 
-Applied this one as well with a spot of fuzz but all obvious stuff in the
-Makefile.
+PHY_INTERFACE_MODE_RGMII_ID,
+PHY_INTERFACE_MODE_RGMII_RXID,
+PHY_INTERFACE_MODE_RGMII_TXID,
 
-However...
+in order to set the RGMII delays.
 
-ERROR: "qcom_vadc_decimation_from_dt" [drivers/iio/adc/qcom-spmi-vadc.ko] undefined!
-ERROR: "qcom_vadc_scale" [drivers/iio/adc/qcom-spmi-vadc.ko] undefined!
-make[1]: *** [scripts/Makefile.modpost:91: __modpost] Error 1
-make: *** [Makefile:1198: modules] Error 2
-
-I've fixed that up and some static declaration issue.
-
-Please do sanity check builds as modules!  It all needs to be one one object file
-when added to the $(magic)-m
-
-However, I can't see any way of keeping them module name as was (qcom-smpi-vadc.ko)
-without renaming one of the c files out of the way. Please check I haven't messed
-anything up.  The new naming is a bit naff, but I couldn't think of anything better
-off the top of my head!
-
-Actually this is enough of a mess I'm pulling these last two patches for now.
-Will push them out in a special testing2 branch for you to take a look at though.
-
-I also temporarily changed the mfd dependencies to add COMPILE_TEST.
-Seems fine, so if you could do a patch adding that we'll get better build coverage.
-
-Jonathan
-
-> 
-> Yours,
-> Linus Walleij
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+   Andrew
