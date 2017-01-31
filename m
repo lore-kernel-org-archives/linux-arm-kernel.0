@@ -1,58 +1,40 @@
 From: afzal.mohd.ma@gmail.com (afzal mohammed)
-Date: Tue, 31 Jan 2017 18:36:29 +0530
-Subject: [PATCH v3 2/3] ARM: nommu: display vectors base
+Date: Tue, 31 Jan 2017 18:37:01 +0530
+Subject: [PATCH v3 3/3] ARM: nommu: remove Hivecs configuration is asm
 In-Reply-To: <20170131130446.5829-1-afzal.mohd.ma@gmail.com>
 References: <20170131130446.5829-1-afzal.mohd.ma@gmail.com>
-Message-ID: <20170131130629.5989-1-afzal.mohd.ma@gmail.com>
+Message-ID: <20170131130701.6042-1-afzal.mohd.ma@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-VECTORS_BASE displays the exception base address. Now on no-MMU as
-the exception base address is dynamically estimated, define
-VECTORS_BASE to the variable holding it.
+Now that exception based address is handled dynamically for
+processors with CP15, remove Hivecs configuration in assembly.
 
-As it is the case, limit VECTORS_BASE constant definition to MMU.
-
-Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
 Signed-off-by: afzal mohammed <afzal.mohd.ma@gmail.com>
+Tested-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
 
 v3:
- Simplify by defining VECTORS_BASE to vectors_base
-v2:
- A change to accomodate bisectability resolution on patch 1/4
+ Vladimir's Tested-by
 
- arch/arm/include/asm/memory.h | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ arch/arm/kernel/head-nommu.S | 5 -----
+ 1 file changed, 5 deletions(-)
 
-diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-index 0b5416fe7709..780549a78937 100644
---- a/arch/arm/include/asm/memory.h
-+++ b/arch/arm/include/asm/memory.h
-@@ -83,8 +83,15 @@
- #define IOREMAP_MAX_ORDER	24
+diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
+index 6b4eb27b8758..2e21e08de747 100644
+--- a/arch/arm/kernel/head-nommu.S
++++ b/arch/arm/kernel/head-nommu.S
+@@ -152,11 +152,6 @@ __after_proc_init:
+ #ifdef CONFIG_CPU_ICACHE_DISABLE
+ 	bic	r0, r0, #CR_I
  #endif
- 
-+#define VECTORS_BASE		UL(0xffff0000)
-+
- #else /* CONFIG_MMU */
- 
-+#ifndef __ASSEMBLY__
-+extern unsigned long vectors_base;
-+#define VECTORS_BASE		vectors_base
-+#endif
-+
- /*
-  * The limitation of user task size can grow up to the end of free ram region.
-  * It is difficult to define and perhaps will never meet the original meaning
-@@ -111,8 +118,6 @@
- 
- #endif /* !CONFIG_MMU */
- 
--#define VECTORS_BASE		UL(0xffff0000)
--
- /*
-  * We fix the TCM memories max 32 KiB ITCM resp DTCM at these
-  * locations
+-#ifdef CONFIG_CPU_HIGH_VECTOR
+-	orr	r0, r0, #CR_V
+-#else
+-	bic	r0, r0, #CR_V
+-#endif
+ 	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
+ #elif defined (CONFIG_CPU_V7M)
+ 	/* For V7M systems we want to modify the CCR similarly to the SCTLR */
 -- 
 2.11.0
