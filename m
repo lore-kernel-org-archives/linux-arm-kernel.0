@@ -1,48 +1,120 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 31 Jan 2017 12:19:56 +0000
-Subject: [PATCH 7/7] arm64: arch timer: Add timer erratum property for
- Hip05-d02 and Hip06-d03
+Date: Tue, 31 Jan 2017 12:19:54 +0000
+Subject: [PATCH 5/7] arm64: arch_timer: work around Hisilicon erratum 161010101
 In-Reply-To: <1485865196-12742-1-git-send-email-mark.rutland@arm.com>
 References: <1485865196-12742-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1485865196-12742-8-git-send-email-mark.rutland@arm.com>
+Message-ID: <1485865196-12742-6-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ding Tianhong <dingtianhong@huawei.com>
 
-Enable workaround for hisilicon erratum 161010101 on Hip05-d02 and
-Hip06-d03 board.
+Erratum Hisilicon-161010101 says that the ARM generic timer counter "has
+the potential to contain an erroneous value when the timer value
+changes". Accesses to TVAL (both read and write) are also affected due
+to the implicit counter read. Accesses to CVAL are not affected.
+
+The workaround is to reread the system count registers until the value
+of the second read is larger than the first one by less than 32, the
+system counter can be guaranteed not to return wrong value twice by
+back-to-back read and the error value is always larger than the correct
+one by 32. Writes to TVAL are replaced with an equivalent write to CVAL.
 
 Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+[Mark: split patch, fix Kconfig, reword commit message]
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 ---
- arch/arm64/boot/dts/hisilicon/hip05.dtsi | 1 +
- arch/arm64/boot/dts/hisilicon/hip06.dtsi | 1 +
- 2 files changed, 2 insertions(+)
+ drivers/clocksource/Kconfig          | 10 ++++++++
+ drivers/clocksource/arm_arch_timer.c | 49 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 59 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hip05.dtsi b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
-index 4b472a3..6b76f3a 100644
---- a/arch/arm64/boot/dts/hisilicon/hip05.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hip05.dtsi
-@@ -281,6 +281,7 @@
- 			     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
- 			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
- 			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
-+		hisilicon,erratum-161010101;
- 	};
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index e132bb3..17ee71c 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -339,6 +339,16 @@ config FSL_ERRATUM_A008585
+ 	  value").  The workaround will only be active if the
+ 	  fsl,erratum-a008585 property is found in the timer node.
  
- 	pmu {
-diff --git a/arch/arm64/boot/dts/hisilicon/hip06.dtsi b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
-index a049b64..cf8b9db 100644
---- a/arch/arm64/boot/dts/hisilicon/hip06.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
-@@ -260,6 +260,7 @@
- 			     <GIC_PPI 14 IRQ_TYPE_LEVEL_LOW>,
- 			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
- 			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
-+		hisilicon,erratum-161010101;
- 	};
++config HISILICON_ERRATUM_161010101
++	bool "Workaround for Hisilicon Erratum 161010101"
++	default y
++	select ARM_ARCH_TIMER_OOL_WORKAROUND
++	depends on ARM_ARCH_TIMER && ARM64
++	help
++	  This option enables a workaround for Hisilicon Erratum
++	  161010101. The workaround will be active if the hisilicon,erratum-161010101
++	  property is found in the timer node.
++
+ config ARM_GLOBAL_TIMER
+ 	bool "Support for the ARM global timer" if COMPILE_TEST
+ 	select CLKSRC_OF if OF
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 2af0739..7b06aef 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -130,6 +130,47 @@ static u64 notrace fsl_a008585_read_cntvct_el0(void)
+ }
+ #endif
  
- 	pmu {
++#ifdef CONFIG_HISILICON_ERRATUM_161010101
++/*
++ * Verify whether the value of the second read is larger than the first by
++ * less than 32 is the only way to confirm the value is correct, so clear the
++ * lower 5 bits to check whether the difference is greater than 32 or not.
++ * Theoretically the erratum should not occur more than twice in succession
++ * when reading the system counter, but it is possible that some interrupts
++ * may lead to more than twice read errors, triggering the warning, so setting
++ * the number of retries far beyond the number of iterations the loop has been
++ * observed to take.
++ */
++#define __hisi_161010101_read_reg(reg) ({				\
++	u64 _old, _new;						\
++	int _retries = 50;					\
++								\
++	do {							\
++		_old = read_sysreg(reg);			\
++		_new = read_sysreg(reg);			\
++		_retries--;					\
++	} while (unlikely((_new - _old) >> 5) && _retries);	\
++								\
++	WARN_ON_ONCE(!_retries);				\
++	_new;							\
++})
++
++static u32 notrace hisi_161010101_read_cntp_tval_el0(void)
++{
++	return __hisi_161010101_read_reg(cntp_tval_el0);
++}
++
++static u32 notrace hisi_161010101_read_cntv_tval_el0(void)
++{
++	return __hisi_161010101_read_reg(cntv_tval_el0);
++}
++
++static u64 notrace hisi_161010101_read_cntvct_el0(void)
++{
++	return __hisi_161010101_read_reg(cntvct_el0);
++}
++#endif
++
+ #ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
+ const struct arch_timer_erratum_workaround *timer_unstable_counter_workaround = NULL;
+ EXPORT_SYMBOL_GPL(timer_unstable_counter_workaround);
+@@ -146,6 +187,14 @@ static u64 notrace fsl_a008585_read_cntvct_el0(void)
+ 		.read_cntvct_el0 = fsl_a008585_read_cntvct_el0,
+ 	},
+ #endif
++#ifdef CONFIG_HISILICON_ERRATUM_161010101
++	{
++		.id = "hisilicon,erratum-161010101",
++		.read_cntp_tval_el0 = hisi_161010101_read_cntp_tval_el0,
++		.read_cntv_tval_el0 = hisi_161010101_read_cntv_tval_el0,
++		.read_cntvct_el0 = hisi_161010101_read_cntvct_el0,
++	},
++#endif
+ };
+ #endif /* CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND */
+ 
 -- 
 1.9.1
