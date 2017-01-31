@@ -1,27 +1,40 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Tue, 31 Jan 2017 19:34:11 +0800
-Subject: [PATCH v3 3/8] ASoC: Add sun8i digital audio codec
-In-Reply-To: <20170131100552.27949-4-mylene.josserand@free-electrons.com>
-Message-ID: <201701311952.eSnc2r78%fengguang.wu@intel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 31 Jan 2017 11:42:33 +0000
+Subject: [PATCH v20 08/17] clocksource/drivers/arm_arch_timer: Rework
+ counter frequency detection.
+In-Reply-To: <20170130174958.GA3496@leverpostej>
+References: <20170118132541.8989-1-fu.wei@linaro.org>
+ <20170118132541.8989-9-fu.wei@linaro.org>
+ <20170124172400.GG7572@leverpostej>
+ <CADyBb7sU6DVMk6px0963r8by--U-3k_XjESd88zZMkj7xbywgA@mail.gmail.com>
+ <20170125172505.GB29027@leverpostej>
+ <CADyBb7syNx+HJ6t5JKPMnLqvq-98kPi1knuXU=SSe6_Uz6Gg1A@mail.gmail.com>
+ <20170130174958.GA3496@leverpostej>
+Message-ID: <20170131114233.GB11191@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Myl?ne,
+On Mon, Jan 30, 2017 at 05:49:59PM +0000, Mark Rutland wrote:
+> On Thu, Jan 26, 2017 at 01:49:03PM +0800, Fu Wei wrote:
 
-[auto build test WARNING on next-20170130]
-[also build test WARNING on v4.10-rc6]
-[cannot apply to asoc/for-next robh/for-next mripard/sunxi/for-next v4.9-rc8 v4.9-rc7 v4.9-rc6]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> > And because Linux kernel is running on Non-secure EL1, so should we
+> > skip "SECURE" timer in Linux?
+> 
+> I guess you mean by checking the GTx Common flags, to see if the timer
+> is secure? Yes, we must skip those.
+> 
+> Looking further at this, the ACPI spec is sorely lacking any statement
+> as to the configuration of CNTCTLBase.{CNTSAR,CNTTIDR,CNTACR}, so it's
+> not clear if we can access anything in a frame, even if it is listed as
+> being a non-secure timer.
 
-url:    https://github.com/0day-ci/linux/commits/Myl-ne-Josserand/Add-sun8i-A33-audio-driver/20170131-181539
+Given CNTNSAR.NS<n> enables non-secure access to CNTACR<n>, I guess the
+obvious interpretation is that for frames listed as non-secure, this has
+been configured to permit non-secure access to the frame and associated
+CNTACR<n>.
 
+I will work to that assumption while reviewing, though I still believe
+this needs to be clarified in the spec.
 
-coccinelle warnings: (new ones prefixed by >>)
-
->> sound/soc/sunxi/sun8i-codec.c:487:3-8: No need to set .owner here. The core will do it.
-
-Please review and possibly fold the followup patch.
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+Thanks,
+Mark.
