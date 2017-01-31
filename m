@@ -1,151 +1,47 @@
-From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Tue, 31 Jan 2017 15:10:43 +0100
-Subject: [PATCH 3/7] IIO: add bindings for STM32 DFSDM ADC driver
-In-Reply-To: <36426523-c59f-4010-b341-acb60ebdcbb5@kernel.org>
-References: <1485189145-29576-1-git-send-email-arnaud.pouliquen@st.com>
- <1485189145-29576-4-git-send-email-arnaud.pouliquen@st.com>
- <fa6b541d-2818-afa7-82fa-eb19806e9f4d@kernel.org>
- <36426523-c59f-4010-b341-acb60ebdcbb5@kernel.org>
-Message-ID: <d9747aa9-e3c2-f280-7dca-8862e8e74e6e@st.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 31 Jan 2017 15:14:27 +0100
+Subject: [GIT PULL] ARM: mvebu: soc for v4.11 (#2)
+Message-ID: <87wpdbz58c.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jonathan,
+Hi,
 
-On 01/29/2017 01:42 PM, Jonathan Cameron wrote:
-> On 29/01/17 11:58, Jonathan Cameron wrote:
->> On 23/01/17 16:32, Arnaud Pouliquen wrote:
->>> This patch adds documentation of device tree bindings for the
->>> STM32 DFSDM ADC.
->>>
->>> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
->> Trivial bits inline.
->>> ---
->>>  .../bindings/iio/adc/st,stm32-dfsdm-adc.txt        | 60 ++++++++++++++++++++++
->>>  1 file changed, 60 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt 
->>>
->>> diff --git a/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt  b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt 
->>> new file mode 100644
->>> index 0000000..c156bcb
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt 	
->>> @@ -0,0 +1,60 @@
->>> +STMicroelectronics STM32 DFSDM ADC device driver
->>> +
->>> +STM32 DFSDM ADC is a sigma delta analog-to-digital converter.
->>> +It has to be declared in device-tree as a subnode of the DFSDM mfd node.
->>> +
->>> +It has several multiplexed input channels. Conversions can be performed
->>> +in single, scan or discontinuous mode. Conversions can be launched in software
->>> +or using hardware triggers.
->>> +Each instance of the driver uses one filter instance handle by the DFSDM mfd
->>> +driver.
->>> +
->>> +DFSDM also offers extra features:
->>> +-The analog watchdog feature allows the application to detect if the
->>> + input voltage goes beyond the user-defined, higher or lower thresholds.
->>> +-The short circuit detection allows allows the application to detect if the
->>> + input is in CC.
->>> +-The clock absence detection allows application to detect if SPI input is clocked.
->>> +
->>> +Required properties:
->>> +- compatible:	Must be "st,stm32-dfsdm-adc".
->>> +- reg:		Specifies the DFSDM filter instance.
->>> +- #io-channel-cells = <1>: See the IIO bindings section "IIO consumers".
->>> +- st,adc-channels:	List of single-ended channels muxed for this ADC.
->>> +- st,adc-channel-names:	List of single-ended channels Name.
->>> +
->>> +Optional properties:
->>> +- st,adc-channel-types:	Single-ended channel input type. Default value is 0.
->>> +			- 0: SPI with data on rising edge (default)
->>> +			- 1: SPI with data on falling edge
->> This is an element that can be described without magic numbers so I'd
->> prefer that you do so.
->>
->> Also spell check edage -> edge.
->>
->>> +			- 2: manchester codec, rising edage = logic 0
->>> +			- 3: manchester codec, rising edage = logic 1
->>> +- st,adc-channel-clk-src: Conversion clock source. default value is 1.
->>> +			  - 0: External SPI clocl (CLKIN x)
->>> +			  - 1: internal SPI clock (CLKOUT) (default)
->>> +			  - 2: internal SPI clock divided by 2 (falling edge).
->>> +			  - 2: internal SPI clock divided by 2 (rising edge).
->> 3?
->>> +- st,adc-alt-channel: 	  must be defined if Two ADCs are connected on same SPI
->>> +			  input.
->>> +			  If not set channel n is connected to SPI input n.
->>> +			  If set channel n is connected to SPI input n + 1.
->> ? Two data inputs with shared clock?
->>> +
->>> +Example:
->>> +	dfsdm: dfsdm at 4400D000 {
-> I'd like to actually see the ADCs on the end of these explicitly
-> described as well.  It's entirely possible we'll have something
-> that isn't simply a dumb sigma delta modulator that will need
-> it's own driver.
-> 
-> In some senses what we actually have here is a data bus so we
-> should be able to describe things on it in that fashion
-> rather than just describing the data that is in coming.
-> Our boundary of knowledge isn't at the edge of this device!
-> 
-> A quick example google fed me would be the gain control on a
-> maxim ds8102.
-> 
-> Tricky bit here will be defining this nice and generally when we
-> currently only have the one piece of hardware to do it with ;)
-> 
-> That's what makes kernel development fun!
-> 
+Here is the second pull request for soc for mvebu for v4.11.
 
-What you describe here seems similar to audio codecs device defined in
-ASoC. An Audio codec is an external chip that is connected to SoC
-through an audio bus.
-ASoC allows to bind this codec with the SOC DAI (digital Audio Interface).
+I hope it is not too late, the support for this new SoC needed to have
+several iteration and the last one was mainly cosmetic. The code was
+in linux-next since last week by the way. SO I don't expect any
+regression with it.
 
-FYI we should have this kind of feature to support on STM32 uin second step:
-DSFDM input can also process stm32 ADC output through an hardware pipe
-(stm32-adc IIO driver that has been recently integrated in kernel).
-Internally, to pipe the ADC with DFSDM, we use an extension of inkern
-interface that is very similar with the one mentioned by Lars:
+Thanks,
 
-https://github.com/analogdevicesinc/linux/blob/xcomm_zynq/drivers
-/iio/buffer/hw_consumer.c
+Gregory
 
-Don't know if this is what Lars has in mind... but a solution could be
-to define a new type of IIO that would be something like
-"postprocessing" or "filter". This new iio device type could be piped to
-a frontend IIO device to export a new one (through hw_consumer.c interface).
-In this case for simple device like PDM audio microphone that does not
-required control a kind of dummy frontend device could be defined...
+The following changes since commit f2591b993ec95fd8d67c68187f07f30c9d79b38c:
 
-Regards
-Arnaud
+  soc: dove: constify reset_control_ops structures (2017-01-27 17:52:57 +0100)
 
->>> +		iio_dfsdm0: iio-dfsdm at 0 {
->>> +			compatible = "st,stm32-dfsdm-adc";
->>> +			#io-channel-cells = <1>;
->>> +			reg = <0>;
->>> +			st,adc-channels = <1>;
->>> +			st,adc-channel-names = "in0";
->>> +		};
->>> +		iio_dfsdm1: iio-dfsdm at 1 {
->>> +			compatible = "st,stm32-dfsdm-adc";
->>> +			#io-channel-cells = <1>;
->>> +			reg = <1>;
->>> +			st,adc-channels = <1>;
->>> +			st,adc-channel-names = "in1";
->>> +			st,adc-channel-types = <1>;
->>> +			st,adc-alt-channel = <1>;
->>> +		};
->>> +	};
->>>
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>
-> 
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-4.11-2
+
+for you to fetch changes up to db88977894aba193deee70b335c3db58b7ac6393:
+
+  arm: mvebu: support for SMP on 98DX3336 SoC (2017-01-30 14:40:56 +0100)
+
+----------------------------------------------------------------
+mvebu soc for 4.11 (part 2)
+
+SoC part of the support for the for Marvell switches with integrated
+CPUs based on Armada XP: the SMP support is slightly different.
+
+----------------------------------------------------------------
+Chris Packham (1):
+      arm: mvebu: support for SMP on 98DX3336 SoC
+
+ Documentation/devicetree/bindings/arm/cpus.txt     |  1 +
+ .../bindings/arm/marvell/98dx3236-resume-ctrl.txt  | 16 +++++
+ arch/arm/mach-mvebu/platsmp.c                      | 75 ++++++++++++++++++++++
+ 3 files changed, 92 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/marvell/98dx3236-resume-ctrl.txt
