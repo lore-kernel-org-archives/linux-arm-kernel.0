@@ -1,43 +1,101 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 31 Jan 2017 22:17:02 +0100
-Subject: [PATCH 09/11] drm/panel: Add support for the Raspberry Pi 7"
- Touchscreen.
-In-Reply-To: <20170131210717.GA872@mithrandir.ba.sec>
-References: <20161214194621.16499-1-eric@anholt.net>
- <20161214194621.16499-10-eric@anholt.net>
- <20170131210717.GA872@mithrandir.ba.sec>
-Message-ID: <20170131211702.o2he5o6ktaztmrkx@phenom.ffwll.local>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 31 Jan 2017 22:17:31 +0100
+Subject: [PATCH 1/4] ARM: dts: push MMC/SD to board and add comments
+Message-ID: <20170131211731.4558-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2017 at 10:07:19PM +0100, Thierry Reding wrote:
-> On Wed, Dec 14, 2016 at 11:46:19AM -0800, Eric Anholt wrote:
-> > +static int rpi_touchscreen_enable(struct drm_panel *panel)
-> > +{
-> > +	struct rpi_touchscreen *ts = panel_to_ts(panel);
-> > +	int i;
-> > +
-> > +	rpi_touchscreen_i2c_write(ts, REG_POWERON, 1);
-> > +	/* Wait for nPWRDWN to go low to indicate poweron is done. */
-> > +	for (i = 0; i < 100; i++) {
-> > +		if (rpi_touchscreen_i2c_read(ts, REG_PORTB) & 1)
-> > +			break;
-> > +	}
-> 
-> Don't you want to fail when power on doesn't succeed? Seems kind of
-> pointless to continue if the panel doesn't power on.
+This moves the enable-active-high setting from the SoC to the
+board for the VMMCQ regulators. It should at least be in the
+vicinity of the GPIO line it is defined for.
 
-kms works under the assumption that even when the sink is dead, the
-display pipe (well, vblanks and pageflips) keep working. There's a patch
-floating around to give userspace more information about what's going
-wrong through an async uevent+read-only property for cases where an
-unresponsive sink is normal, i.e. link training for dp.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/ste-href.dtsi        | 2 +-
+ arch/arm/boot/dts/ste-hrefprev60.dtsi  | 1 +
+ arch/arm/boot/dts/ste-hrefv60plus.dtsi | 1 +
+ arch/arm/boot/dts/ste-snowball.dts     | 6 +++++-
+ 4 files changed, 8 insertions(+), 2 deletions(-)
 
-But either way, continuing is generally the right thing to do, there's no
-way to report -EIO from here (because no reasons than that's where
-accidentally ended up with our evolved design ...).
--Daniel
+diff --git a/arch/arm/boot/dts/ste-href.dtsi b/arch/arm/boot/dts/ste-href.dtsi
+index 48dc38482633..1b59943ab6ec 100644
+--- a/arch/arm/boot/dts/ste-href.dtsi
++++ b/arch/arm/boot/dts/ste-href.dtsi
+@@ -111,6 +111,7 @@
+ 			pinctrl-1 = <&i2c3_sleep_mode>;
+ 		};
+ 
++		/* ST6G3244ME level translator for 1.8/2.9 V */
+ 		vmmci: regulator-gpio {
+ 			compatible = "regulator-gpio";
+ 
+@@ -120,7 +121,6 @@
+ 			regulator-type = "voltage";
+ 
+ 			startup-delay-us = <100>;
+-			enable-active-high;
+ 
+ 			states = <1800000 0x1
+ 				  2900000 0x0>;
+diff --git a/arch/arm/boot/dts/ste-hrefprev60.dtsi b/arch/arm/boot/dts/ste-hrefprev60.dtsi
+index ece222d51717..5882a2606ac3 100644
+--- a/arch/arm/boot/dts/ste-hrefprev60.dtsi
++++ b/arch/arm/boot/dts/ste-hrefprev60.dtsi
+@@ -74,6 +74,7 @@
+ 		vmmci: regulator-gpio {
+ 			gpios = <&tc3589x_gpio 18 GPIO_ACTIVE_HIGH>;
+ 			enable-gpio = <&tc3589x_gpio 17 GPIO_ACTIVE_HIGH>;
++			enable-active-high;
+ 		};
+ 
+ 		pinctrl {
+diff --git a/arch/arm/boot/dts/ste-hrefv60plus.dtsi b/arch/arm/boot/dts/ste-hrefv60plus.dtsi
+index 7187676836be..bf259bbd1d0a 100644
+--- a/arch/arm/boot/dts/ste-hrefv60plus.dtsi
++++ b/arch/arm/boot/dts/ste-hrefv60plus.dtsi
+@@ -146,6 +146,7 @@
+ 		vmmci: regulator-gpio {
+ 			gpios = <&gpio0 5 GPIO_ACTIVE_HIGH>;
+ 			enable-gpio = <&gpio5 9 GPIO_ACTIVE_HIGH>;
++			enable-active-high;
+ 		};
+ 
+ 		pinctrl {
+diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
+index 386eee6de232..7900e5d6aa05 100644
+--- a/arch/arm/boot/dts/ste-snowball.dts
++++ b/arch/arm/boot/dts/ste-snowball.dts
+@@ -216,11 +216,15 @@
+ 			};
+ 		};
+ 
++		/* ST6G3244ME level translator for 1.8/2.9 V */
+ 		vmmci: regulator-gpio {
+ 			compatible = "regulator-gpio";
+ 
++			/* GPIO228 SD_SEL */
+ 			gpios = <&gpio7 4 GPIO_ACTIVE_HIGH>;
++			/* GPIO217 MMC_EN */
+ 			enable-gpio = <&gpio6 25 GPIO_ACTIVE_HIGH>;
++			enable-active-high;
+ 
+ 			regulator-min-microvolt = <1800000>;
+ 			regulator-max-microvolt = <2900000>;
+@@ -228,7 +232,6 @@
+ 			regulator-type = "voltage";
+ 
+ 			startup-delay-us = <100>;
+-			enable-active-high;
+ 
+ 			states = <1800000 0x1
+ 				  2900000 0x0>;
+@@ -546,6 +549,7 @@
+ 				sdi0_default_mode: sdi0_default {
+ 					snowball_mux {
+ 						function = "mc0";
++						/* Add the DAT31 pin even if it is not really used */
+ 						groups = "mc0dat31dir_a_1";
+ 					};
+ 					snowball_cfg1 {
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+2.9.3
