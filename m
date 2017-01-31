@@ -1,67 +1,135 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 31 Jan 2017 12:12:44 +0100
-Subject: [PATCH] arm: mvebu: Fix whitespace in armada-xp-98dx3236.dtsi
-In-Reply-To: <20170131034209.3848-1-chris.packham@alliedtelesis.co.nz> (Chris
- Packham's message of "Tue, 31 Jan 2017 16:42:09 +1300")
-References: <20170131034209.3848-1-chris.packham@alliedtelesis.co.nz>
-Message-ID: <8737fz1o0j.fsf@free-electrons.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Tue, 31 Jan 2017 12:12:58 +0100
+Subject: [PATCH v3] arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to IOMMU
+Message-ID: <1485861178-22694-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+Add support for allocating physically contiguous DMA buffers on arm64
+systems with an IOMMU.  This can be useful when two or more devices
+with different memory requirements are involved in buffer sharing.
+
+Note that as this uses the CMA allocator, setting the
+DMA_ATTR_FORCE_CONTIGUOUS attribute has a runtime-dependency on
+CONFIG_DMA_CMA, just like on arm32.
+
+For arm64 systems using swiotlb, no changes are needed to support the
+allocation of physically contiguous DMA buffers:
+  - swiotlb always uses physically contiguous buffers (up to
+    IO_TLB_SEGSIZE = 128 pages),
+  - arm64's __dma_alloc_coherent() already calls
+    dma_alloc_from_contiguous() when CMA is available.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+---
+v3:
+  - Add Acked-by,
+  - Update comment to "one of _4_ things",
+  - Call dma_alloc_from_contiguous() and iommu_dma_map_page() directly,
+    as suggested by Robin Murphy,
+
+v2:
+  - New, handle dispatching in the arch (arm64) code, as requested by
+    Robin Murphy.
+---
+ arch/arm64/mm/dma-mapping.c | 63 ++++++++++++++++++++++++++++++++++-----------
+ 1 file changed, 48 insertions(+), 15 deletions(-)
+
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index 1d7d5d2881db7c19..b314256fcee028ce 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -577,20 +577,7 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
+ 	 */
+ 	gfp |= __GFP_ZERO;
  
- On mar., janv. 31 2017, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
-
-> Change sequences of 8 spaces to hard-tabs.
->
-> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
-
-Here again I directly squashed this patch in "ARM: dts: mvebu: Add
-device tree for 98DX3236 SoCs". By the way I also fixed the topic, as
-for device tree files the topic must start by "ARM: dts: "
-
-Thanks,
-
-Gregory
-
-> ---
-> I think this crept in during review and I didn't notice. The file is new enough
-> that we shouldn't lose any useful history.
->
->  arch/arm/boot/dts/armada-xp-98dx3236.dtsi | 14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/armada-xp-98dx3236.dtsi b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
-> index 9461128fae24..f6a03dcee5ef 100644
-> --- a/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
-> +++ b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
-> @@ -201,13 +201,13 @@
->  			#size-cells = <1>;
->  			ranges = <0 MBUS_ID(0x08, 0x00) 0 0x100000>;
->  
-> -                        dfx_coredivclk: corediv-clock at f8268 {
-> -                                compatible = "marvell,mv98dx3236-corediv-clock";
-> -                                reg = <0xf8268 0xc>;
-> -                                #clock-cells = <1>;
-> -                                clocks = <&mainpll>;
-> -                                clock-output-names = "nand";
-> -                        };
-> +			dfx_coredivclk: corediv-clock at f8268 {
-> +				compatible = "marvell,mv98dx3236-corediv-clock";
-> +				reg = <0xf8268 0xc>;
-> +				#clock-cells = <1>;
-> +				clocks = <&mainpll>;
-> +				clock-output-names = "nand";
-> +			};
->  
->  			dfx: dfx at 0 {
->  				compatible = "marvell,dfx-server";
-> -- 
-> 2.11.0.24.ge6920cf
->
-
+-	if (gfpflags_allow_blocking(gfp)) {
+-		struct page **pages;
+-		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
+-
+-		pages = iommu_dma_alloc(dev, iosize, gfp, attrs, ioprot,
+-					handle, flush_page);
+-		if (!pages)
+-			return NULL;
+-
+-		addr = dma_common_pages_remap(pages, size, VM_USERMAP, prot,
+-					      __builtin_return_address(0));
+-		if (!addr)
+-			iommu_dma_free(dev, pages, iosize, handle);
+-	} else {
++	if (!gfpflags_allow_blocking(gfp)) {
+ 		struct page *page;
+ 		/*
+ 		 * In atomic context we can't remap anything, so we'll only
+@@ -614,6 +601,45 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
+ 				__free_from_pool(addr, size);
+ 			addr = NULL;
+ 		}
++	} else if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
++		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
++		struct page *page;
++
++		page = dma_alloc_from_contiguous(dev, size >> PAGE_SHIFT,
++						 get_order(size));
++		if (!page)
++			return NULL;
++
++		*handle = iommu_dma_map_page(dev, page, 0, iosize, ioprot);
++		if (iommu_dma_mapping_error(dev, *handle)) {
++			dma_release_from_contiguous(dev, page,
++						    size >> PAGE_SHIFT);
++			return NULL;
++		}
++		if (!coherent)
++			__dma_flush_area(page_to_virt(page), iosize);
++
++		addr = dma_common_contiguous_remap(page, size, VM_USERMAP,
++						   prot,
++						   __builtin_return_address(0));
++		if (!addr) {
++			iommu_dma_unmap_page(dev, *handle, iosize, 0, attrs);
++			dma_release_from_contiguous(dev, page,
++						    size >> PAGE_SHIFT);
++		}
++	} else {
++		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
++		struct page **pages;
++
++		pages = iommu_dma_alloc(dev, iosize, gfp, attrs, ioprot,
++					handle, flush_page);
++		if (!pages)
++			return NULL;
++
++		addr = dma_common_pages_remap(pages, size, VM_USERMAP, prot,
++					      __builtin_return_address(0));
++		if (!addr)
++			iommu_dma_free(dev, pages, iosize, handle);
+ 	}
+ 	return addr;
+ }
+@@ -625,7 +651,8 @@ static void __iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
+ 
+ 	size = PAGE_ALIGN(size);
+ 	/*
+-	 * @cpu_addr will be one of 3 things depending on how it was allocated:
++	 * @cpu_addr will be one of 4 things depending on how it was allocated:
++	 * - A remapped array of pages for contiguous allocations.
+ 	 * - A remapped array of pages from iommu_dma_alloc(), for all
+ 	 *   non-atomic allocations.
+ 	 * - A non-cacheable alias from the atomic pool, for atomic
+@@ -637,6 +664,12 @@ static void __iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
+ 	if (__in_atomic_pool(cpu_addr, size)) {
+ 		iommu_dma_unmap_page(dev, handle, iosize, 0, 0);
+ 		__free_from_pool(cpu_addr, size);
++	} else if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
++		struct page *page = phys_to_page(dma_to_phys(dev, handle));
++
++		iommu_dma_unmap_page(dev, handle, iosize, 0, attrs);
++		dma_release_from_contiguous(dev, page, size >> PAGE_SHIFT);
++		dma_common_free_remap(cpu_addr, size, VM_USERMAP);
+ 	} else if (is_vmalloc_addr(cpu_addr)){
+ 		struct vm_struct *area = find_vm_area(cpu_addr);
+ 
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.9.1
