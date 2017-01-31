@@ -1,37 +1,33 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 31 Jan 2017 22:19:52 +0100
-Subject: [PATCH 09/11] drm/panel: Add support for the Raspberry Pi 7"
- Touchscreen.
-In-Reply-To: <20170131210717.GA872@mithrandir.ba.sec>
-References: <20161214194621.16499-1-eric@anholt.net>
- <20161214194621.16499-10-eric@anholt.net>
- <20170131210717.GA872@mithrandir.ba.sec>
-Message-ID: <20170131211952.jirg7scbzajshpec@phenom.ffwll.local>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Tue, 31 Jan 2017 22:21:12 +0100
+Subject: [PATCH] Documentation: devicetree: meson-ir: "linux,
+ rc-map-name" is supported
+Message-ID: <20170131212112.5582-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2017 at 10:07:19PM +0100, Thierry Reding wrote:
-> On Wed, Dec 14, 2016 at 11:46:19AM -0800, Eric Anholt wrote:
-> > +static int rpi_touchscreen_dsi_remove(struct mipi_dsi_device *dsi)
-> > +{
-> > +	struct device *dev = &dsi->dev;
-> > +	struct rpi_touchscreen *ts = dev_get_drvdata(dev);
-> > +	int ret;
-> > +
-> > +	ret = mipi_dsi_detach(dsi);
-> > +	if (ret < 0) {
-> > +		dev_err(&dsi->dev, "failed to detach from DSI host: %d\n", ret);
-> > +		return ret;
-> > +	}
-> 
-> You might want to continue after this anyway, because the driver will be
-> unloaded regardless of your error code and you'll leave behind a
-> dangling panel and leak a reference to the I2C bridge.
+The driver already parses the "linux,rc-map-name" property. Add this
+information to the documentation so .dts maintainers don't have to look
+it up in the source-code.
 
-Sounds like we should switch the mipi_dsi_driver->remove callback to
-return void then? But separate cleanup series if someone bothers with it.
--Daniel
+Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+---
+ Documentation/devicetree/bindings/media/meson-ir.txt | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/media/meson-ir.txt b/Documentation/devicetree/bindings/media/meson-ir.txt
+index e7e3f3c4fc8f..efd9d29a8f10 100644
+--- a/Documentation/devicetree/bindings/media/meson-ir.txt
++++ b/Documentation/devicetree/bindings/media/meson-ir.txt
+@@ -8,6 +8,9 @@ Required properties:
+  - reg		: physical base address and length of the device registers
+  - interrupts	: a single specifier for the interrupt from the device
+ 
++Optional properties:
++ - linux,rc-map-name:	see rc.txt file in the same directory.
++
+ Example:
+ 
+ 	ir-receiver at c8100480 {
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+2.11.0
