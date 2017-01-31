@@ -1,65 +1,67 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 31 Jan 2017 16:51:22 +0100
-Subject: [PATCH v3 17/24] media: imx: Add CSI subdev driver
-In-Reply-To: <1483755102-24785-18-git-send-email-steve_longerbeam@mentor.com>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-18-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <1485877882.2932.70.camel@pengutronix.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 31 Jan 2017 15:52:29 +0000
+Subject: [PATCH] efi: libstub: Make file I/O chunking x86-specific
+Message-ID: <1485877949-21981-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-01-06 at 18:11 -0800, Steve Longerbeam wrote:
-[...]
-> +static int csi_set_fmt(struct v4l2_subdev *sd,
-> +		       struct v4l2_subdev_pad_config *cfg,
-> +		       struct v4l2_subdev_format *sdformat)
-> +{
-> +	struct csi_priv *priv = v4l2_get_subdevdata(sd);
-> +	struct v4l2_mbus_framefmt *infmt, *outfmt;
-> +	struct v4l2_rect crop;
-> +	int ret;
-> +
-> +	if (sdformat->pad >= CSI_NUM_PADS)
-> +		return -EINVAL;
-> +
-> +	if (priv->stream_on)
-> +		return -EBUSY;
-> +
-> +	infmt = &priv->format_mbus[priv->input_pad];
-> +	outfmt = &priv->format_mbus[priv->output_pad];
-> +
-> +	if (sdformat->pad == priv->output_pad) {
-> +		sdformat->format.code = infmt->code;
-> +		sdformat->format.field = infmt->field;
-> +		crop.left = priv->crop.left;
-> +		crop.top = priv->crop.top;
-> +		crop.width = sdformat->format.width;
-> +		crop.height = sdformat->format.height;
-> +		ret = csi_try_crop(priv, &crop);
+The ARM decompressor is finicky when it comes to uninitialized variables
+with local linkage, the reason being that it may relocate .text and .bss
+independently when executing from ROM. This is only possible if all
+references into .bss from .text are absolute, and this happens to be the
+case for references emitted under -fpic to symbols with external linkage,
+and so all .bss references must involve symbols with external linkage.
 
-This is the wrong way around, see also below.
+When building the ARM stub using clang, the initialized local variable
+__chunk_size is optimized into a zero-initialized flag that indicates
+whether chunking is in effect or not. This flag is therefore emitted into
+.bss, which triggers the ARM decompressor's diagnostics, resulting in a
+failed build.
 
-Here the the output sdformat->format.width/height should be set to the
-priv->crop.width/height (or priv->crop.width/height / 2, to enable
-downscaling). The crop rectangle should not be changed by an output pad
-set_fmt.
+Under UEFI, we never execute the decompressor from ROM, so the diagnostic
+makes little sense here. But we can easily work around the issue by making
+__chunk_size global instead.
 
-> +		if (ret)
-> +			return ret;
-> +		sdformat->format.width = crop.width;
-> +		sdformat->format.height = crop.height;
-> +	}
-> +
-> +	if (sdformat->which == V4L2_SUBDEV_FORMAT_TRY) {
-> +		cfg->try_fmt = sdformat->format;
-> +	} else {
-> +		priv->format_mbus[sdformat->pad] = sdformat->format;
-> +		/* Update the crop window if this is output pad  */
-> +		if (sdformat->pad == priv->output_pad)
-> +			priv->crop = crop;
+However, given that the file I/O chunking that is controlled by the
+__chunk_size variable is intended to work around known bugs on various
+x86 implementations of UEFI, we can simply make the chunking an x86
+specific feature. This is an improvement by itself, and also removes the
+need to parse the efi= options in the stub entirely.
 
-The crop rectangle instead should be reset to the full input frame when
-the input pad format is set.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ drivers/firmware/efi/libstub/efi-stub-helper.c | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
 
-regards
-Philipp
+diff --git a/drivers/firmware/efi/libstub/efi-stub-helper.c b/drivers/firmware/efi/libstub/efi-stub-helper.c
+index 757badc1debb..5a418a6a33bf 100644
+--- a/drivers/firmware/efi/libstub/efi-stub-helper.c
++++ b/drivers/firmware/efi/libstub/efi-stub-helper.c
+@@ -351,6 +351,14 @@ efi_status_t efi_parse_options(char *cmdline)
+ 	char *str;
+ 
+ 	/*
++	 * Currently, the only efi= option we look for is 'nochunk', which
++	 * is intended to work around known issues on certain x86 UEFI
++	 * versions. So ignore for now on other architectures.
++	 */
++	if (!IS_ENABLED(CONFIG_X86))
++		return EFI_SUCCESS;
++
++	/*
+ 	 * If no EFI parameters were specified on the cmdline we've got
+ 	 * nothing to do.
+ 	 */
+@@ -523,7 +531,9 @@ efi_status_t handle_cmdline_files(efi_system_table_t *sys_table_arg,
+ 			size = files[j].size;
+ 			while (size) {
+ 				unsigned long chunksize;
+-				if (size > __chunk_size)
++
++				if (IS_ENABLED(CONFIG_X86) &&
++				    size > __chunk_size)
+ 					chunksize = __chunk_size;
+ 				else
+ 					chunksize = size;
+-- 
+2.7.4
