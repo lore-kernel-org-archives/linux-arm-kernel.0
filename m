@@ -1,101 +1,79 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 31 Jan 2017 22:17:31 +0100
-Subject: [PATCH 1/4] ARM: dts: push MMC/SD to board and add comments
-Message-ID: <20170131211731.4558-1-linus.walleij@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 31 Jan 2017 21:17:26 +0000
+Subject: Applied "ASoC: mt8173-max98090: remove the call to
+ snd_soc_jack_add_pins." to the asoc tree
+In-Reply-To: <20170127152042.7631-1-enric.balletbo@collabora.com>
+Message-ID: <E1cYfnq-0000t3-J0@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This moves the enable-active-high setting from the SoC to the
-board for the VMMCQ regulators. It should at least be in the
-vicinity of the GPIO line it is defined for.
+The patch
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+   ASoC: mt8173-max98090: remove the call to snd_soc_jack_add_pins.
+
+has been applied to the asoc tree at
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From b1b9e0d3d98ebb1a228d9994b4c9dbac7215e2b9 Mon Sep 17 00:00:00 2001
+From: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+Date: Fri, 27 Jan 2017 16:20:42 +0100
+Subject: [PATCH] ASoC: mt8173-max98090: remove the call to
+ snd_soc_jack_add_pins.
+
+The snd_soc_card_jack_new function can call snd_soc_jack_add_pins for
+you, so pass directly the pins struct when you create the new jack.
+
+Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- arch/arm/boot/dts/ste-href.dtsi        | 2 +-
- arch/arm/boot/dts/ste-hrefprev60.dtsi  | 1 +
- arch/arm/boot/dts/ste-hrefv60plus.dtsi | 1 +
- arch/arm/boot/dts/ste-snowball.dts     | 6 +++++-
- 4 files changed, 8 insertions(+), 2 deletions(-)
+ sound/soc/mediatek/mt8173/mt8173-max98090.c | 14 ++++----------
+ 1 file changed, 4 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ste-href.dtsi b/arch/arm/boot/dts/ste-href.dtsi
-index 48dc38482633..1b59943ab6ec 100644
---- a/arch/arm/boot/dts/ste-href.dtsi
-+++ b/arch/arm/boot/dts/ste-href.dtsi
-@@ -111,6 +111,7 @@
- 			pinctrl-1 = <&i2c3_sleep_mode>;
- 		};
+diff --git a/sound/soc/mediatek/mt8173/mt8173-max98090.c b/sound/soc/mediatek/mt8173/mt8173-max98090.c
+index 5524a2c727ec..46c8e6ae00b4 100644
+--- a/sound/soc/mediatek/mt8173/mt8173-max98090.c
++++ b/sound/soc/mediatek/mt8173/mt8173-max98090.c
+@@ -79,17 +79,11 @@ static int mt8173_max98090_init(struct snd_soc_pcm_runtime *runtime)
  
-+		/* ST6G3244ME level translator for 1.8/2.9 V */
- 		vmmci: regulator-gpio {
- 			compatible = "regulator-gpio";
+ 	/* enable jack detection */
+ 	ret = snd_soc_card_jack_new(card, "Headphone", SND_JACK_HEADPHONE,
+-				    &mt8173_max98090_jack, NULL, 0);
++				    &mt8173_max98090_jack,
++				    mt8173_max98090_jack_pins,
++				    ARRAY_SIZE(mt8173_max98090_jack_pins));
+ 	if (ret) {
+-		dev_err(card->dev, "Can't snd_soc_jack_new %d\n", ret);
+-		return ret;
+-	}
+-
+-	ret = snd_soc_jack_add_pins(&mt8173_max98090_jack,
+-				    ARRAY_SIZE(mt8173_max98090_jack_pins),
+-				    mt8173_max98090_jack_pins);
+-	if (ret) {
+-		dev_err(card->dev, "Can't snd_soc_jack_add_pins %d\n", ret);
++		dev_err(card->dev, "Can't create a new Jack %d\n", ret);
+ 		return ret;
+ 	}
  
-@@ -120,7 +121,6 @@
- 			regulator-type = "voltage";
- 
- 			startup-delay-us = <100>;
--			enable-active-high;
- 
- 			states = <1800000 0x1
- 				  2900000 0x0>;
-diff --git a/arch/arm/boot/dts/ste-hrefprev60.dtsi b/arch/arm/boot/dts/ste-hrefprev60.dtsi
-index ece222d51717..5882a2606ac3 100644
---- a/arch/arm/boot/dts/ste-hrefprev60.dtsi
-+++ b/arch/arm/boot/dts/ste-hrefprev60.dtsi
-@@ -74,6 +74,7 @@
- 		vmmci: regulator-gpio {
- 			gpios = <&tc3589x_gpio 18 GPIO_ACTIVE_HIGH>;
- 			enable-gpio = <&tc3589x_gpio 17 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
- 		};
- 
- 		pinctrl {
-diff --git a/arch/arm/boot/dts/ste-hrefv60plus.dtsi b/arch/arm/boot/dts/ste-hrefv60plus.dtsi
-index 7187676836be..bf259bbd1d0a 100644
---- a/arch/arm/boot/dts/ste-hrefv60plus.dtsi
-+++ b/arch/arm/boot/dts/ste-hrefv60plus.dtsi
-@@ -146,6 +146,7 @@
- 		vmmci: regulator-gpio {
- 			gpios = <&gpio0 5 GPIO_ACTIVE_HIGH>;
- 			enable-gpio = <&gpio5 9 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
- 		};
- 
- 		pinctrl {
-diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
-index 386eee6de232..7900e5d6aa05 100644
---- a/arch/arm/boot/dts/ste-snowball.dts
-+++ b/arch/arm/boot/dts/ste-snowball.dts
-@@ -216,11 +216,15 @@
- 			};
- 		};
- 
-+		/* ST6G3244ME level translator for 1.8/2.9 V */
- 		vmmci: regulator-gpio {
- 			compatible = "regulator-gpio";
- 
-+			/* GPIO228 SD_SEL */
- 			gpios = <&gpio7 4 GPIO_ACTIVE_HIGH>;
-+			/* GPIO217 MMC_EN */
- 			enable-gpio = <&gpio6 25 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
- 
- 			regulator-min-microvolt = <1800000>;
- 			regulator-max-microvolt = <2900000>;
-@@ -228,7 +232,6 @@
- 			regulator-type = "voltage";
- 
- 			startup-delay-us = <100>;
--			enable-active-high;
- 
- 			states = <1800000 0x1
- 				  2900000 0x0>;
-@@ -546,6 +549,7 @@
- 				sdi0_default_mode: sdi0_default {
- 					snowball_mux {
- 						function = "mc0";
-+						/* Add the DAT31 pin even if it is not really used */
- 						groups = "mc0dat31dir_a_1";
- 					};
- 					snowball_cfg1 {
 -- 
-2.9.3
+2.11.0
