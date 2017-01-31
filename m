@@ -1,29 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 31 Jan 2017 11:16:53 +0100
-Subject: [PATCH 3/3 v4] iio: adc: add a driver for Qualcomm PM8xxx HK/XOADC
-In-Reply-To: <20170131100938.23660-1-linus.walleij@linaro.org>
-References: <20170131100938.23660-1-linus.walleij@linaro.org>
-Message-ID: <CACRpkdYDMH9A=ezPkANRQXcqceEqn-A+oL2TxHyNkjmSms5AOA@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 31 Jan 2017 11:17:28 +0100
+Subject: [PATCH v2 1/2] dt-bindings: gpu: Add Mali Utgard bindings
+In-Reply-To: <20170131095622.ew56cyjrndu6wxwe@lukather>
+References: <a4d90de597cfcfab5fddeeb538505774a980818b.1485180017.git-series.maxime.ripard@free-electrons.com>
+ <20170127201913.jjhdw57jmxifqpxa@rob-hp-laptop>
+ <20170130134824.u37svxphyy266tzz@lukather>
+ <2a5e7d0a-e2ca-5cc7-5193-96be5bfe494b@baylibre.com>
+ <20170131095622.ew56cyjrndu6wxwe@lukather>
+Message-ID: <98b3515d-a2fd-67d4-e9c9-ad58e614363f@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2017 at 11:09 AM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
+On 01/31/2017 10:56 AM, Maxime Ripard wrote:
+> On Mon, Jan 30, 2017 at 05:24:06PM +0100, Neil Armstrong wrote:
+>>>>> @@ -0,0 +1,79 @@
+>>>>> +ARM Mali Utgard GPU
+>>>>> +===================
+>>>>> +
+>>>>> +Required properties:
+>>>>> +  - compatible
+>>>>> +    * Must be one of the following:
+>>>>> +      + "arm,mali-300"
+>>>>> +      + "arm,mali-400"
+>>>>> +      + "arm,mali-450"
+>>>>> +    * And, optionally, one of the vendor specific compatible:
+>>>>> +      + allwinner,sun4i-a10-mali
+>>>>> +      + allwinner,sun7i-a20-mali
+>>>>
+>>>> And stericsson,db8500-mali?
+>>>
+>>> Good catch, I'll add it.
+>>
+>> I think you can safely add the following :
+>>
+>> amlogic,meson-gxbb-mali
+>> amlogic,meson-gxl-mali
+> 
+> Ack. Do you need any extra properties?
+> 
+> Maxime
+> 
 
-> ChangeLog v3->v4:
+Hi Maxime,
 
-Oh and I didn't remove the dev_info() where the driver brags about being
-present.
+No, it's ok with the generic properties, there is not reset lines for mali on Meson GX SoCs.
 
-I usually like to have those positive affirmations from my drivers so I know
-they are there. Otherwise I can't tell the state when I for some reason
-forgot to compile it in because of some Kconfig issue from the state
-where it is silently present. This is especially helpful in mailed bug
-reports where people post dmesg logs. Then I can see "aha at least it
-probed".
+Neil
 
-It's not super-important, feel free to edit it out when applying if you
-totally hate it, I won't hold it against you :)
-
-Yours,
-Linus Walleij
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170131/e19f7f86/attachment.sig>
