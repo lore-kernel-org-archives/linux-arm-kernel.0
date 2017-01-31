@@ -1,47 +1,72 @@
 From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 31 Jan 2017 10:49:20 +0100
-Subject: [PATCH v3 21/24] media: imx: Add MIPI CSI-2 Receiver subdev driver
-In-Reply-To: <20170131000125.GO27312@n2100.armlinux.org.uk>
+Date: Tue, 31 Jan 2017 10:49:28 +0100
+Subject: [PATCH v3 00/24] i.MX Media Driver
+In-Reply-To: <951c1a08-c0f2-4333-b4bf-410de8dd863f@gmail.com>
 References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-22-git-send-email-steve_longerbeam@mentor.com>
- <20170131000125.GO27312@n2100.armlinux.org.uk>
-Message-ID: <1485856160.2932.10.camel@pengutronix.de>
+ <20170131004510.GQ27312@n2100.armlinux.org.uk>
+ <951c1a08-c0f2-4333-b4bf-410de8dd863f@gmail.com>
+Message-ID: <1485856168.2932.11.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-01-31 at 00:01 +0000, Russell King - ARM Linux wrote:
-[...]
-> The iMX6 manuals call for a very specific seven sequence of initialisation
-> for CSI2, which begins with:
+On Mon, 2017-01-30 at 17:22 -0800, Steve Longerbeam wrote:
 > 
-> 1. reset the D-PHY.
-> 2. place MIPI sensor in LP-11 state
-> 3. perform D-PHY initialisation
-> 4. configure CSI2 lanes and de-assert resets and shutdown signals
+> On 01/30/2017 04:45 PM, Russell King - ARM Linux wrote:
+> >
+> > Hi,
+> >
+> > Trying this driver with an imx219 camera (which works with Philipp's
+> > driver) results in not much happening... no /dev/media* node for it,
+> > no subdevs, no nothing.  No clues as to what's missing either.  Only
+> > messages from imx-media are from registering the various subdevs.
+> >
+> > [   37.444877] imx-media: Registered subdev imx6-mipi-csi2
+> > [   37.444973] imx-media: Registered subdev imx219 0-0010
+> > [   38.868740] imx-media: Registered subdev ipu1_ic_prpenc
+> > [   38.869265] imx-media: Registered subdev ipu1_ic_prpvf
+> > [   38.869425] imx-media: Registered subdev ipu1_ic_pp0
+> > [   38.870086] imx-media: Registered subdev ipu1_ic_pp1
+> > [   38.871510] imx-media: Registered subdev ipu2_ic_prpenc
+> > [   38.871743] imx-media: Registered subdev ipu1_smfc0
+> > [   38.873043] imx-media: Registered subdev ipu1_smfc1
+> > [   38.873225] imx-media: Registered subdev ipu2_ic_prpvf
+> > [   38.875027] imx-media: Registered subdev ipu2_smfc0
+> > [   38.875320] imx-media: Registered subdev ipu2_ic_pp0
+> > [   38.877148] imx-media: Registered subdev ipu2_smfc1
+> > [   38.877436] imx-media: Registered subdev ipu2_ic_pp1
+> > [   38.932089] imx-media: Registered subdev camif0
+> > [   38.956538] imx-media: Registered subdev camif1
+> > [   38.959148] imx-media: Registered subdev camif2
+> > [   38.964353] imx-media: Registered subdev camif3
+> > [  206.502077] imx-media: Registered subdev ipu1_csi0
+> > [  206.503304] imx-media: Registered subdev ipu1_csi1
+> > [  206.503814] imx-media: Registered subdev ipu2_csi0
+> > [  206.504281] imx-media: Registered subdev ipu2_csi1
+> >
+> > I also get:
+> >
+> > [   37.200072] imx6-mipi-csi2: data lanes: 2
+> > [   37.200077] imx6-mipi-csi2: flags: 0x00000200
+> >
+> > and from what I can see, all modules from drivers/staging/media/imx/ are
+> > loaded (had to load imx-csi by hand because of the brokenness in the
+> > drivers/gpu/ipu code attaching an device_node pointer after registering
+> > the platform device, which changes what userspace sees in the modalias
+> > file.)
+> >
+> > Any clues at what to look at?
 > 
-> Since you reset the CSI2 at power up and then release it, how do you
-> guarantee that the published sequence is followed?
+> Hi Russell,
 > 
-> With Philipp's driver, this is easy, because there is a prepare_stream
-> callback which gives the sensor an opportunity to get everything
-> correctly configured according to the negotiated parameters, and place
-> the sensor in LP-11 state.
+> I'm not familiar with IMX219, can you send me the source for the
+> imx219 subdev? I don't see it in 4.10-rc1.
 > 
-> Some sensors do not power up in LP-11 state, but need to be programmed
-> fully before being asked to momentarily stream.  Only at that point is
-> the sensor guaranteed to be in the required LP-11 state.
+> I'm also having trouble finding a datasheet for it, but from what
+> I've read, it has a MIPI CSI-2 interface. It should work fine as long
+> as it presents a single source pad, registers asynchronously, and
+> sets its entity function to MEDIA_ENT_F_CAM_SENSOR.
 
-Do you expect that 1. and 2. could depend on the negotiated parameters
-in any way on some hardware? I had removed the prepare_stream callback
-from my driver in v2 because for my use case at least the above sequence
-could be realized by
-
-1. in imx-mipi-csi2 s_power(1)
-2. in MIPI sensor s_power(1)
-3./4. in imx-mipi-csi2 s_stream(1)
-4. in MIPI sensor s_stream(1)
-
-as long as the sensor is correctly put back into LP-11 in s_stream(0).
+What about MEDIA_ENT_F_VID_IF_BRIDGE?
 
 regards
 Philipp
