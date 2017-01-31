@@ -1,67 +1,88 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Tue, 31 Jan 2017 07:17:21 +0000
-Subject: [PATCH V2 07/12] PM / OPP: Update OPP users to put reference
-References: <cover.1485146406.git.viresh.kumar@linaro.org>
- <CGME20170123044228epcas3p35fdbe94a890062e9d66e33a3b5e4d571@epcas3p3.samsung.com>
-Message-ID: <20170131071721epcms1p6a4da8e0add4547573d40bbbb55d37b74@epcms1p6>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Tue, 31 Jan 2017 01:18:06 -0600
+Subject: next-20170125 hangs on aarch64
+In-Reply-To: <20170130125125.GA27550@yury-N73SV>
+References: <20170129101255.GA29415@yury-N73SV>
+ <20170129122125.GA20269@yury-N73SV> <588F27F1.6050907@arm.com>
+ <20170130125125.GA27550@yury-N73SV>
+Message-ID: <20170131071806.GB2821@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> This patch updates dev_pm_opp_find_freq_*() routines to get a reference
-> to the OPPs returned by them.
-> 
-> Also updates the users of dev_pm_opp_find_freq_*() routines to call
-> dev_pm_opp_put() after they are done using the OPPs.
-> 
-> As it is guaranteed the that OPPs wouldn't get freed while being used,
-> the RCU read side locking present with the users isn't required anymore.
-> Drop it as well.
-> 
-> This patch also updates all users of devfreq_recommended_opp() which was
-> returning an OPP received from the OPP core.
-> 
-> Note that some of the OPP core routines have gained
-> rcu_read_{lock|unlock}() calls, as those still use RCU specific APIs
-> within them.
-> 
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
-> Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com> [Devfreq]
+On Mon, Jan 30, 2017 at 06:21:25PM +0530, Yury Norov wrote:
+> On Mon, Jan 30, 2017 at 11:48:01AM +0000, James Morse wrote:
+> > Hi Yury,
+> > 
+> > [CC: Andy Gross]
+> > 
+> > On 29/01/17 12:21, Yury Norov wrote:
+> > > On Sun, Jan 29, 2017 at 03:42:55PM +0530, Yury Norov wrote:
+> > >> Hi all,
+> > >>
+> > >> I pulled next-20170125 kernel, and found it hanged on boot. The exact reason is
+> > >> panic on dereferencing of the 0xffffffc8 address, which is most probably the
+> > >> attempt to dereference the ENOSYS error code as the address. next-20170124 works
+> > >> fine, at least it boots.
+> > >>
+> > >> Does anyone have details on that?
+> > 
+> > I hit this with next-20170130 too, in /arch/arm64/kernel/smccc-call.S
+> > aabde95fc543 changed the SMCCC macro to check for an optional quirk structure.
+> > 
+> > A previous patch provided:
+> > > #define arm_smccc_smc(...) __arm_smccc_smc(__VA_ARGS__, NULL)
+> > 
+> > to handle the 'no quirk' case, but this missed HVC calls.
+> > The following hunk fixes/hides it for me:
 
-This patch gets a lot of fails during application.
+Wow, I botched this completely.  I missed the hvc using the same macro.  I'll
+rework with the fixes below.
 
-For devfreq-side, I've got:
-error: drivers/devfreq/devfreq.c: patch does not apply
-error: patch failed: drivers/devfreq/exynos-bus.c:103
-error: drivers/devfreq/exynos-bus.c: patch does not apply
-error: patch failed: drivers/devfreq/governor_passive.c:59
-error: drivers/devfreq/governor_passive.c: patch does not apply
-error: patch failed: drivers/devfreq/rk3399_dmc.c:91
-error: drivers/devfreq/rk3399_dmc.c: patch does not apply
-error: patch failed: drivers/devfreq/tegra-devfreq.c:487
-error: drivers/devfreq/tegra-devfreq.c: patch does not apply
-
-With the condition that you are going to properly rebase the patch,
-you may add "Reviewed-by" from me.
-(the code itself looks fine.)
-
-Cheers,
-MyungJoo
-
-> ---
->  arch/arm/mach-omap2/pm.c             |   5 +-
->  drivers/base/power/opp/core.c        | 114 +++++++++++++++++++----------------
->  drivers/base/power/opp/cpu.c         |  22 ++-----
->  drivers/clk/tegra/clk-dfll.c         |  17 ++----
->  drivers/cpufreq/exynos5440-cpufreq.c |   5 +-
->  drivers/cpufreq/imx6q-cpufreq.c      |  10 +--
->  drivers/cpufreq/mt8173-cpufreq.c     |   8 +--
->  drivers/cpufreq/omap-cpufreq.c       |   4 +-
->  drivers/devfreq/devfreq.c            |  14 ++---
->  drivers/devfreq/exynos-bus.c         |  14 ++---
->  drivers/devfreq/governor_passive.c   |   4 +-
->  drivers/devfreq/rk3399_dmc.c         |  16 ++---
->  drivers/devfreq/tegra-devfreq.c      |   4 +-
->  drivers/thermal/cpu_cooling.c        |  11 +---
->  drivers/thermal/devfreq_cooling.c    |  15 ++---
->  15 files changed, 110 insertions(+), 153 deletions(-)
 > 
+> It works for me too, but I think "ldr x4, [sp, #8]" should
+> also go under (.if \maybe_quirk != 0) condition - like below.
+
+Yes I believe so.
+
+> ----------------------------%<----------------------------
+> diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
+> index 72ecdca929b1..9e287a7d1822 100644
+> --- a/arch/arm64/kernel/smccc-call.S
+> +++ b/arch/arm64/kernel/smccc-call.S
+> @@ -15,18 +15,20 @@
+>  #include <linux/arm-smccc.h>
+>  #include <asm/asm-offsets.h>
+> 
+> -       .macro SMCCC instr
+> +       .macro SMCCC instr, maybe_quirk = 0
+>         .cfi_startproc
+>         \instr  #0
+>         ldr     x4, [sp]
+>         stp     x0, x1, [x4, #ARM_SMCCC_RES_X0_OFFS]
+>         stp     x2, x3, [x4, #ARM_SMCCC_RES_X2_OFFS]
+> +       .if \maybe_quirk != 0
+>         ldr     x4, [sp, #8]
+>         cbz     x4, 1f /* no quirk structure */
+>         ldr     x9, [x4, #ARM_SMCCC_QUIRK_ID_OFFS]
+>         cmp     x9, #ARM_SMCCC_QUIRK_QCOM_A6
+>         b.ne    1f
+>         str     x6, [x4, ARM_SMCCC_QUIRK_STATE_OFFS]
+> +       .endif
+>  1:     ret
+>         .cfi_endproc
+>         .endm
+> @@ -38,7 +40,7 @@
+>   *               struct arm_smccc_quirk *quirk)
+>   */
+>  ENTRY(__arm_smccc_smc)
+> -       SMCCC   smc
+> +       SMCCC   smc, 1
+>  ENDPROC(__arm_smccc_smc)
+> 
+>  /*
+> ----------------------------%<----------------------------
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
