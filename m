@@ -1,47 +1,86 @@
-From: martin@kaiser.cx (Martin Kaiser)
-Date: Tue, 31 Jan 2017 20:20:02 +0100
-Subject: [PATCH 2/2] ARM: i.MX25: globally disable supervisor protect
-In-Reply-To: <1485890402-22974-1-git-send-email-martin@kaiser.cx>
-References: <1485890402-22974-1-git-send-email-martin@kaiser.cx>
-Message-ID: <1485890402-22974-2-git-send-email-martin@kaiser.cx>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Tue, 31 Jan 2017 14:22:55 -0500
+Subject: [PATCH v3 22/24] drm/rockchip: dw-mipi-dsi: support non-burst
+ modes
+In-Reply-To: <20170129132444.25251-23-john@metanate.com>
+References: <20170129132444.25251-1-john@metanate.com>
+ <20170129132444.25251-23-john@metanate.com>
+Message-ID: <20170131192255.GF20076@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The problem described in 6befda9a272b98bfb1dc772efc3564644cbfb270
-for the i.MX53 platform applies to i.MX25 as well.
+On Sun, Jan 29, 2017 at 01:24:42PM +0000, John Keeping wrote:
 
-E.g. CSPI1+SDMA and SSI1+SDMA are not working with the default AIPS
-configuration. Modifiy the AIPS configuration to allow access to the bus
-by SDMA and peripherals.
+Reviewed-by: Sean Paul <seanpaul@chromium.org>
 
-Signed-off-by: Martin Kaiser <martin@kaiser.cx>
----
- arch/arm/mach-imx/mach-imx25.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+> Signed-off-by: John Keeping <john@metanate.com>
+> Reviewed-by: Chris Zhong <zyw@rock-chips.com>
+> ---
+> v3:
+> - Add Chris' Reviewed-by
+> Unchanged in v2
+> 
+>  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 16 +++++++++-------
+>  1 file changed, 9 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> index 5bad92e2370e..58cb8ace2fe8 100644
+> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> @@ -82,6 +82,7 @@
+>  #define FRAME_BTA_ACK			BIT(14)
+>  #define ENABLE_LOW_POWER		(0x3f << 8)
+>  #define ENABLE_LOW_POWER_MASK		(0x3f << 8)
+> +#define VID_MODE_TYPE_NON_BURST_SYNC_EVENTS	0x1
+>  #define VID_MODE_TYPE_BURST_SYNC_PULSES		0x2
+>  #define VID_MODE_TYPE_MASK			0x3
+>  
+> @@ -286,6 +287,7 @@ struct dw_mipi_dsi {
+>  	u32 format;
+>  	u16 input_div;
+>  	u16 feedback_div;
+> +	unsigned long mode_flags;
+>  
+>  	const struct dw_mipi_dsi_plat_data *pdata;
+>  };
+> @@ -551,15 +553,10 @@ static int dw_mipi_dsi_host_attach(struct mipi_dsi_host *host,
+>  		return -EINVAL;
+>  	}
+>  
+> -	if (!(device->mode_flags & MIPI_DSI_MODE_VIDEO_BURST) ||
+> -	    !(device->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE)) {
+> -		dev_err(dsi->dev, "device mode is unsupported\n");
+> -		return -EINVAL;
+> -	}
+> -
+>  	dsi->lanes = device->lanes;
+>  	dsi->channel = device->channel;
+>  	dsi->format = device->format;
+> +	dsi->mode_flags = device->mode_flags;
+>  	dsi->panel = of_drm_find_panel(device->dev.of_node);
+>  	if (dsi->panel)
+>  		return drm_panel_attach(dsi->panel, &dsi->connector);
+> @@ -716,7 +713,12 @@ static void dw_mipi_dsi_video_mode_config(struct dw_mipi_dsi *dsi)
+>  {
+>  	u32 val;
+>  
+> -	val = VID_MODE_TYPE_BURST_SYNC_PULSES | ENABLE_LOW_POWER;
+> +	val = ENABLE_LOW_POWER;
+> +
+> +	if (dsi->mode_flags & MIPI_DSI_MODE_VIDEO_BURST)
+> +		val |= VID_MODE_TYPE_BURST_SYNC_PULSES;
+> +	else if (!(dsi->mode_flags & MIPI_DSI_MODE_VIDEO_SYNC_PULSE))
+> +		val |= VID_MODE_TYPE_NON_BURST_SYNC_EVENTS;
+>  
+>  	dsi_write(dsi, DSI_VID_MODE_CFG, val);
+>  }
+> -- 
+> 2.11.0.197.gb556de5.dirty
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
-diff --git a/arch/arm/mach-imx/mach-imx25.c b/arch/arm/mach-imx/mach-imx25.c
-index 32dcb5e..353b86e 100644
---- a/arch/arm/mach-imx/mach-imx25.c
-+++ b/arch/arm/mach-imx/mach-imx25.c
-@@ -23,6 +23,11 @@ static void __init imx25_init_early(void)
- 	mxc_set_cpu_type(MXC_CPU_MX25);
- }
- 
-+static void __init imx25_dt_init(void)
-+{
-+	imx_aips_allow_unprivileged_access("fsl,imx25-aips");
-+}
-+
- static void __init mx25_init_irq(void)
- {
- 	struct device_node *np;
-@@ -41,6 +46,7 @@ static const char * const imx25_dt_board_compat[] __initconst = {
- 
- DT_MACHINE_START(IMX25_DT, "Freescale i.MX25 (Device Tree Support)")
- 	.init_early	= imx25_init_early,
-+	.init_machine	= imx25_dt_init,
- 	.init_late      = imx25_pm_init,
- 	.init_irq	= mx25_init_irq,
- 	.dt_compat	= imx25_dt_board_compat,
 -- 
-2.1.4
+Sean Paul, Software Engineer, Google / Chromium OS
