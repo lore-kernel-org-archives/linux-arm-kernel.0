@@ -1,246 +1,147 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Tue, 31 Jan 2017 20:37:28 +0100
-Subject: [PATCH V6 1/5] LIB: Indirect ISA/LPC port IO introduced
-In-Reply-To: <6d5523be-1841-18b9-9b83-6f7e591ed66b@huawei.com>
-References: <1485241525-201782-1-git-send-email-yuanzhichang@hisilicon.com>
- <1485241525-201782-2-git-send-email-yuanzhichang@hisilicon.com>
- <5dc0dc9c-124e-398f-a3b2-40059268e859@suse.de>
- <6d5523be-1841-18b9-9b83-6f7e591ed66b@huawei.com>
-Message-ID: <1a1f1e70-b6e7-f3c6-2b86-348b3d28edfe@suse.de>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Tue, 31 Jan 2017 20:39:01 +0100
+Subject: [PATCH 05/11] drm/vc4: Add support for feeding DSI encoders from
+ the pixel valve.
+In-Reply-To: <20161214194621.16499-6-eric@anholt.net>
+References: <20161214194621.16499-1-eric@anholt.net>
+ <20161214194621.16499-6-eric@anholt.net>
+Message-ID: <20170131193901.dz7o5g36hqwcsmgt@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Dec 14, 2016 at 11:46:15AM -0800, Eric Anholt wrote:
+> We have to set a different pixel format, which tells the hardware to
+> use the pix_width field that's fed in sideband from the DSI encoder to
+> divide the "pixel" clock.
+> 
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> ---
+>  drivers/gpu/drm/vc4/vc4_crtc.c | 33 +++++++++++++++++++--------------
+>  drivers/gpu/drm/vc4/vc4_regs.h |  2 ++
+>  2 files changed, 21 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/vc4/vc4_crtc.c b/drivers/gpu/drm/vc4/vc4_crtc.c
+> index a0fd3e66bc4b..cd070e0c79a6 100644
+> --- a/drivers/gpu/drm/vc4/vc4_crtc.c
+> +++ b/drivers/gpu/drm/vc4/vc4_crtc.c
+> @@ -349,38 +349,40 @@ static u32 vc4_get_fifo_full_level(u32 format)
+>  }
+>  
+>  /*
+> - * Returns the clock select bit for the connector attached to the
+> - * CRTC.
+> + * Returns the encoder attached to the CRTC.
+> + *
+> + * VC4 can only scan out to one encoder at a time, while the DRM core
+> + * allows drivers to push pixels to more than one encoder from the
+> + * same CRTC.
+>   */
+> -static int vc4_get_clock_select(struct drm_crtc *crtc)
+> +static struct drm_encoder *vc4_get_crtc_encoder(struct drm_crtc *crtc)
+>  {
+>  	struct drm_connector *connector;
+>  
+>  	drm_for_each_connector(connector, crtc->dev) {
+>  		if (connector->state->crtc == crtc) {
+> -			struct drm_encoder *encoder = connector->encoder;
+> -			struct vc4_encoder *vc4_encoder =
+> -				to_vc4_encoder(encoder);
+> -
+> -			return vc4_encoder->clock_select;
+> +			return connector->encoder;
+>  		}
+>  	}
+>  
+> -	return -1;
+> +	return NULL;
+>  }
+>  
+>  static void vc4_crtc_mode_set_nofb(struct drm_crtc *crtc)
+>  {
+>  	struct drm_device *dev = crtc->dev;
+>  	struct vc4_dev *vc4 = to_vc4_dev(dev);
+> +	struct drm_encoder *encoder = vc4_get_crtc_encoder(crtc);
+> +	struct vc4_encoder *vc4_encoder = to_vc4_encoder(encoder);
+>  	struct vc4_crtc *vc4_crtc = to_vc4_crtc(crtc);
+>  	struct drm_crtc_state *state = crtc->state;
+>  	struct drm_display_mode *mode = &state->adjusted_mode;
+>  	bool interlace = mode->flags & DRM_MODE_FLAG_INTERLACE;
+>  	u32 pixel_rep = (mode->flags & DRM_MODE_FLAG_DBLCLK) ? 2 : 1;
+> -	u32 format = PV_CONTROL_FORMAT_24;
+> +	bool is_dsi = (vc4_encoder->type == VC4_ENCODER_TYPE_DSI0 ||
+> +		       vc4_encoder->type == VC4_ENCODER_TYPE_DSI1);
+> +	u32 format = is_dsi ? PV_CONTROL_FORMAT_DSIV_24 : PV_CONTROL_FORMAT_24;
+>  	bool debug_dump_regs = false;
+> -	int clock_select = vc4_get_clock_select(crtc);
+>  
+>  	if (debug_dump_regs) {
+>  		DRM_INFO("CRTC %d regs before:\n", drm_crtc_index(crtc));
+> @@ -436,17 +438,19 @@ static void vc4_crtc_mode_set_nofb(struct drm_crtc *crtc)
+>  		 */
+>  		CRTC_WRITE(PV_V_CONTROL,
+>  			   PV_VCONTROL_CONTINUOUS |
+> +			   (is_dsi ? PV_VCONTROL_DSI : 0) |
+>  			   PV_VCONTROL_INTERLACE |
+>  			   VC4_SET_FIELD(mode->htotal * pixel_rep / 2,
+>  					 PV_VCONTROL_ODD_DELAY));
+>  		CRTC_WRITE(PV_VSYNCD_EVEN, 0);
+>  	} else {
+> -		CRTC_WRITE(PV_V_CONTROL, PV_VCONTROL_CONTINUOUS);
+> +		CRTC_WRITE(PV_V_CONTROL,
+> +			   PV_VCONTROL_CONTINUOUS |
+> +			   (is_dsi ? PV_VCONTROL_DSI : 0));
+>  	}
+>  
+>  	CRTC_WRITE(PV_HACT_ACT, mode->hdisplay * pixel_rep);
+>  
+> -
+>  	CRTC_WRITE(PV_CONTROL,
+>  		   VC4_SET_FIELD(format, PV_CONTROL_FORMAT) |
+>  		   VC4_SET_FIELD(vc4_get_fifo_full_level(format),
+> @@ -455,7 +459,8 @@ static void vc4_crtc_mode_set_nofb(struct drm_crtc *crtc)
+>  		   PV_CONTROL_CLR_AT_START |
+>  		   PV_CONTROL_TRIGGER_UNDERFLOW |
+>  		   PV_CONTROL_WAIT_HSTART |
+> -		   VC4_SET_FIELD(clock_select, PV_CONTROL_CLK_SELECT) |
+> +		   VC4_SET_FIELD(vc4_encoder->clock_select,
+> +				 PV_CONTROL_CLK_SELECT) |
 
+Hm, so the usual way we solve the "crtc needs information from the encoder
+problem" is to add bits to the crtc state, and then fill those out in the
+encoders ->atomic_check function. In your case ->clock_select and is_dsi.
 
-On 31/01/2017 14:32, John Garry wrote:
-> On 30/01/2017 17:12, Alexander Graf wrote:
->> On 01/24/2017 08:05 AM, zhichang.yuan wrote:
->>> Low-pin-count interface is integrated into some SoCs. The accesses to
->>> those
->>> peripherals under LPC make use of I/O ports rather than the memory
->>> mapped I/O.
->>>
->>> To drive these devices, this patch introduces a method named
->>> indirect-IO.
->>> In this method the in/out() accessor in include/asm-generic/io.h will be
->>> redefined. When upper layer drivers call in/out() with those known
->>> legacy port
->>> addresses to access the peripherals, the I/O operations will be routed
->>> to the
->>> right hooks which are registered specific to the host device, such as
->>> LPC.
->>> Then the hardware relevant manupulations are finished by the
->>> corresponding
->>> host.
->>>
->>> According to the comments on V5, this patch adds a common indirect-IO
->>> driver
->>> which support this I/O indirection to the generic directory.
->>>
->>> In the later pathches, some host-relevant drivers are implemented to
->>> support
->>> the specific I/O hooks and register them.
->>> Based on these, the upper layer drivers which depend on in/out() can
->>> work well
->>> without any extra work or any changes.
->>>
->>> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
->>> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
->>> Signed-off-by: John Garry <john.garry@huawei.com>
->>
->> I like the extio idea. That allows us to handle all PIO requests on
->> platforms that don't have native PIO support via different routes
->> depending on the region they're in. Unfortunately we now we have 2
->> frameworks for handling sparse PIO regions: One in extio, one in PCI.
->>
->> Why don't we just merge the two? Most of the code that has #ifdef
->> PCI_IOBASE throughout the code base sounds like an ideal candidate to
->> get migrated to extio instead. Then we only have a single framework to
->> worry about ...
->
-> To be clear, are you suggesting we merge the functionality from
-> pci_register_io_range(), pci_pio_to_address(), pci_address_to_pio() into
-> extio, so extio manages all PIO?
+The benefit is mostly when you start doing hw readout (which is great even
+just to cross-check your modeset code), or when you need that information
+to check limits (which sooner or later tends to happen ime).
 
-Yes, I guess so.
+Anyway, this works too, just an idea for the future.
 
-> And having a single type of node to
-> register PIO ranges, by amalgamating struct extio_node and io_range (as
-> Bjorn mentioned)?
+Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
+>  		   PV_CONTROL_FIFO_CLR |
+>  		   PV_CONTROL_EN);
+>  
+> diff --git a/drivers/gpu/drm/vc4/vc4_regs.h b/drivers/gpu/drm/vc4/vc4_regs.h
+> index b3b297fba709..385405a2df05 100644
+> --- a/drivers/gpu/drm/vc4/vc4_regs.h
+> +++ b/drivers/gpu/drm/vc4/vc4_regs.h
+> @@ -190,6 +190,8 @@
+>  # define PV_VCONTROL_ODD_DELAY_SHIFT		6
+>  # define PV_VCONTROL_ODD_FIRST			BIT(5)
+>  # define PV_VCONTROL_INTERLACE			BIT(4)
+> +# define PV_VCONTROL_DSI			BIT(3)
+> +# define PV_VCONTROL_COMMAND			BIT(2)
+>  # define PV_VCONTROL_CONTINUOUS			BIT(1)
+>  # define PV_VCONTROL_VIDEN			BIT(0)
+>  
+> -- 
+> 2.11.0
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
-I'm not quite sure I follow you here. Basically I think you want a 
-generic "non-x86 PIO" framework that PCI just plugs into.
-
-I don't think that necessarily means you want to statically allocate 
-regions of that PIO space to separate (pseudo-)devices. Instead, 
-everyone shares that space and should be able to fail gracefully if some 
-space is already occupied.
-
-> It would make sense. We would be somewhat decoupling PIO from PCI.
-
-Yes :).
-
-> I think that other architectures, like PPC, and other code would need to
-> be fixed up to handle this.
-
-I think only PPC, Microblaze and ARM are using this. Grep for 
-PCI_IOBASE. It's not that many.
-
-> We need to consider all the other challenges/obstacles to this.
-
-Well, getting our abstraction levels right to me sounds like it's worth 
-the obstacles.
-
->
->>
->>> ---
->>>   include/asm-generic/io.h |  50 ++++++++++++++++
->>>   include/linux/extio.h    |  85 +++++++++++++++++++++++++++
->>>   include/linux/io.h       |   1 +
->>>   lib/Kconfig              |   8 +++
->>>   lib/Makefile             |   2 +
->>>   lib/extio.c              | 147
->>> +++++++++++++++++++++++++++++++++++++++++++++++ xc>>   create mode
->>> 100644 include/linux/extio.h
->>>   create mode 100644 lib/extio.c
->>>
->
-> <snip>
->
->>> + * Copyright (C) 2016 Hisilicon Limited, All Rights Reserved.
->>> + * Author: Zhichang Yuan <yuanzhichang@hisilicon.com>
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License version 2 as
->>> + * published by the Free Software Foundation.
->>> + *
->>> + * This program is distributed in the hope that it will be useful,
->>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->>> + * GNU General Public License for more details.
->>> + *
->>> + * You should have received a copy of the GNU General Public License
->>> + * along with this program.  If not, see
->>> <http://www.gnu.org/licenses/>.
->>> + */
->>> +
->>> +#include <linux/io.h>
->>> +#include <linux/spinlock.h>
->>> +
->>> +static LIST_HEAD(extio_dev_list);
->>> +static DEFINE_RWLOCK(extio_list_lock);
->>
->> Why not just make the list an RCU list? Then you don't need read locks.
->> We also wouldn't create potential lock contention between devices that
->> could easily have parallel PIO operations (say a PCI device and an LPC
->> device).
->>
->
-> OK
->
->>> +
->>> +void register_extio(struct extio_node *node)
->>> +{
->>> +    write_lock(&extio_list_lock);
->>> +    list_add_tail(&node->list, &extio_dev_list);
->>> +    write_unlock(&extio_list_lock);
->>> +}
->>> +
->>> +static struct extio_node *find_extio_token(unsigned long addr)
->>> +{
->>> +    struct extio_node *extio_entry;
->>> +
->>> +    read_lock(&extio_list_lock);
->>> +    list_for_each_entry(extio_entry, &extio_dev_list, list) {
->>> +        if ((addr < extio_entry->io_start + extio_entry->range_size) &&
->>> +            (addr >= extio_entry->io_start))
->>> +            break;
->>> +    }
->>> +    read_unlock(&extio_list_lock);
->>> +    return (&extio_entry->list == &extio_dev_list) ? NULL :
->>> extio_entry;
->>> +}
->>> +
->>> +struct extio_node *extio_find_node(struct fwnode_handle *node)
->>> +{
->>> +    struct extio_node *entry;
->>> +
->>> +    read_lock(&extio_list_lock);
->>> +    list_for_each_entry(entry, &extio_dev_list, list) {
->>> +        if (entry->fwnode == node)
->>> +            break;
->>> +    }
->>> +    read_unlock(&extio_list_lock);
->>> +
->>> +    return (&entry->list == &extio_dev_list) ? NULL : entry;
->>> +}
->>> +
->>> +unsigned long extio_translate(struct fwnode_handle *node,
->>> +        unsigned long bus_addr)
->>> +{
->>> +    struct extio_node *entry;
->>> +    unsigned long port_id = -1;
->>> +
->>> +    read_lock(&extio_list_lock);
->>> +    list_for_each_entry(entry, &extio_dev_list, list) {
->>> +        if (entry->fwnode == node &&
->>> +            bus_addr >= entry->bus_start &&
->>> +            bus_addr - entry->bus_start < entry->range_size)
->>> +            port_id = entry->io_start + bus_addr -
->>> +                    entry->bus_start;
->>> +    }
->>> +    read_unlock(&extio_list_lock);
->>> +
->>> +    return port_id;
->>> +}
->>> +
->>> +#ifdef PCI_IOBASE
->>> +
->>> +#define BUILD_EXTIO(bw, type)                        \
->>> +type extio_in##bw(unsigned long addr)                    \
->>> +{                                    \
->>> +    struct extio_node *extio_entry = find_extio_token(addr);    \
->>> +                                    \
->>> +    if (!extio_entry)                        \
->>> +        return read##bw(PCI_IOBASE + addr);            \
->>> +    return extio_entry->ops->pfin ?                    \
->>> +            extio_entry->ops->pfin(extio_entry->devpara,    \
->>> +            addr, sizeof(type)) : -1;            \
->>> +}                                    \
->>> +                                    \
->>> +void extio_out##bw(type value, unsigned long addr)            \
->>> +{                                    \
->>> +    struct extio_node *extio_entry = find_extio_token(addr);    \
->>> +                                    \
->>> +    if (!extio_entry)                        \
->>> +        write##bw(value, PCI_IOBASE + addr);            \
->>
->> All of the fallback code would also disappear as a nice side effect of
->> making pci pio handling a user of extio :).
->
-> Is your idea that PCI IO space will also register accessors, which would
-> be the same read{b,w,l}/write{b,w,l}?
-
-Yes. If you need to later on accelerate that bit, you can always do 
-something like
-
-   if (extio_entry->ops->pfin == pci_extio_in)
-     return pci_extio_in(...);
-
-which should get you all the prefetcher and branch prediction benefits 
-that the current version gives you. But for starters I'd leave that out, 
-since I doubt it'll have measurable performance impact to go via an 
-indirect function call.
-
->
->>
->
-> It would be nice to have a quicker way to so the lookup from address to
-> node, as we loop all nodes in find_extio_token() every single time.
-
-You can always replace the search with a tree. But to me that's an 
-implementation detail that's easy enough to replace in a follow-up patch 
-series.
-
-
-Alex
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
