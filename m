@@ -1,126 +1,32 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Tue, 31 Jan 2017 11:03:16 -0800
-Subject: [PATCH net-next 1/6] drivers: net: xgene-v2: Add DMA descriptor
+Date: Tue, 31 Jan 2017 11:03:19 -0800
+Subject: [PATCH net-next 4/6] drivers: net: xgene-v2: Add base driver
 In-Reply-To: <1485889401-13909-1-git-send-email-isubramanian@apm.com>
 References: <1485889401-13909-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1485889401-13909-2-git-send-email-isubramanian@apm.com>
+Message-ID: <1485889401-13909-5-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds DMA descriptor setup and interrupt enable/disable
-functions.
+This patch adds,
+
+     - probe, remove, shutdown
+     - open, close and stats
+     - create and delete ring
+     - request and delete irq
 
 Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
 ---
- drivers/net/ethernet/apm/xgene-v2/main.h | 88 ++++++++++++++++++++++++++++++++
- drivers/net/ethernet/apm/xgene-v2/ring.c | 73 ++++++++++++++++++++++++++
- drivers/net/ethernet/apm/xgene-v2/ring.h | 77 ++++++++++++++++++++++++++++
- 3 files changed, 238 insertions(+)
- create mode 100644 drivers/net/ethernet/apm/xgene-v2/main.h
- create mode 100644 drivers/net/ethernet/apm/xgene-v2/ring.c
- create mode 100644 drivers/net/ethernet/apm/xgene-v2/ring.h
+ drivers/net/ethernet/apm/xgene-v2/main.c | 459 +++++++++++++++++++++++++++++++
+ 1 file changed, 459 insertions(+)
+ create mode 100644 drivers/net/ethernet/apm/xgene-v2/main.c
 
-diff --git a/drivers/net/ethernet/apm/xgene-v2/main.h b/drivers/net/ethernet/apm/xgene-v2/main.h
+diff --git a/drivers/net/ethernet/apm/xgene-v2/main.c b/drivers/net/ethernet/apm/xgene-v2/main.c
 new file mode 100644
-index 0000000..c8a40af
+index 0000000..3881f27
 --- /dev/null
-+++ b/drivers/net/ethernet/apm/xgene-v2/main.h
-@@ -0,0 +1,88 @@
-+/*
-+ * Applied Micro X-Gene SoC Ethernet v2 Driver
-+ *
-+ * Copyright (c) 2017, Applied Micro Circuits Corporation
-+ * Author(s): Iyappan Subramanian <isubramanian@apm.com>
-+ *	      Keyur Chudgar <kchudgar@apm.com>
-+ *
-+ * This program is free software; you can redistribute  it and/or modify it
-+ * under  the terms of  the GNU General  Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#ifndef __XGENE_ENET_V2_MAIN_H__
-+#define __XGENE_ENET_V2_MAIN_H__
-+
-+#include <linux/acpi.h>
-+#include <linux/clk.h>
-+#include <linux/efi.h>
-+#include <linux/if_vlan.h>
-+#include <linux/irq.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/of_platform.h>
-+#include <linux/of_net.h>
-+#include <linux/of_mdio.h>
-+#include <linux/prefetch.h>
-+#include <linux/phy.h>
-+#include <net/ip.h>
-+#include "mac.h"
-+#include "enet.h"
-+#include "ring.h"
-+
-+#define XGENE_ENET_V2_VERSION	"v1.0"
-+#define XGENE_ENET_STD_MTU	1536
-+#define XGENE_ENET_MIN_FRAME	60
-+#define IRQ_ID_SIZE             16
-+
-+struct xge_resource {
-+	void __iomem *base_addr;
-+	int phy_mode;
-+	u32 irq;
-+};
-+
-+struct xge_stats {
-+	u64 tx_packets;
-+	u64 tx_bytes;
-+	u64 rx_packets;
-+	u64 rx_bytes;
-+};
-+
-+/* software context of a descriptor ring */
-+struct xge_desc_ring {
-+	struct net_device *ndev;
-+	dma_addr_t dma_addr;
-+	u8 head;
-+	u8 tail;
-+	union {
-+		void *desc_addr;
-+		struct xge_raw_desc *raw_desc;
-+	};
-+	struct sk_buff *(*skbs);
-+	void *(*pkt_bufs);
-+};
-+
-+/* ethernet private data */
-+struct xge_pdata {
-+	struct xge_resource resources;
-+	struct xge_desc_ring *tx_ring;
-+	struct xge_desc_ring *rx_ring;
-+	struct platform_device *pdev;
-+	char irq_name[IRQ_ID_SIZE];
-+	struct net_device *ndev;
-+	struct napi_struct napi;
-+	struct xge_stats stats;
-+	int phy_speed;
-+	u8 nbufs;
-+};
-+
-+#endif /* __XGENE_ENET_V2_MAIN_H__ */
-diff --git a/drivers/net/ethernet/apm/xgene-v2/ring.c b/drivers/net/ethernet/apm/xgene-v2/ring.c
-new file mode 100644
-index 0000000..3289bf3
---- /dev/null
-+++ b/drivers/net/ethernet/apm/xgene-v2/ring.c
-@@ -0,0 +1,73 @@
++++ b/drivers/net/ethernet/apm/xgene-v2/main.c
+@@ -0,0 +1,459 @@
 +/*
 + * Applied Micro X-Gene SoC Ethernet v2 Driver
 + *
@@ -144,138 +50,441 @@ index 0000000..3289bf3
 +
 +#include "main.h"
 +
-+/* create circular linked list of descriptors */
-+void xge_setup_desc(struct xge_desc_ring *ring)
++static const struct acpi_device_id xge_acpi_match[];
++
++static int xge_get_resources(struct xge_pdata *pdata)
 +{
-+	struct xge_raw_desc *raw_desc;
-+	dma_addr_t dma_h, next_dma;
-+	u16 offset;
-+	int i;
++	struct platform_device *pdev;
++	struct net_device *ndev;
++	struct device *dev;
++	struct resource *res;
++	int phy_mode, ret = 0;
 +
-+	for (i = 0; i < XGENE_ENET_NUM_DESC; i++) {
-+		raw_desc = &ring->raw_desc[i];
++	pdev = pdata->pdev;
++	dev = &pdev->dev;
++	ndev = pdata->ndev;
 +
-+		offset = (i + 1) & (XGENE_ENET_NUM_DESC - 1);
-+		next_dma = ring->dma_addr + (offset * XGENE_ENET_DESC_SIZE);
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		dev_err(dev, "Resource enet_csr not defined\n");
++		return -ENODEV;
++	}
 +
-+		raw_desc->m0 = cpu_to_le64(SET_BITS(E, 1) |
-+					   SET_BITS(PKT_SIZE, 0));
-+		dma_h = next_dma >> NEXT_DESC_ADDRL_LEN;
-+		raw_desc->m1 = cpu_to_le64(SET_BITS(NEXT_DESC_ADDRL, next_dma) |
-+					   SET_BITS(NEXT_DESC_ADDRL, dma_h));
++	pdata->resources.base_addr = devm_ioremap(dev, res->start,
++						  resource_size(res));
++	if (!pdata->resources.base_addr) {
++		dev_err(dev, "Unable to retrieve ENET Port CSR region\n");
++		return -ENOMEM;
++	}
++
++	if (!device_get_mac_address(dev, ndev->dev_addr, ETH_ALEN))
++		eth_hw_addr_random(ndev);
++
++	memcpy(ndev->perm_addr, ndev->dev_addr, ndev->addr_len);
++
++	phy_mode = device_get_phy_mode(dev);
++	if (phy_mode < 0) {
++		dev_err(dev, "Unable to get phy-connection-type\n");
++		return phy_mode;
++	}
++	pdata->resources.phy_mode = phy_mode;
++
++	if (pdata->resources.phy_mode != PHY_INTERFACE_MODE_RGMII) {
++		dev_err(dev, "Incorrect phy-connection-type specified\n");
++		return -ENODEV;
++	}
++
++	ret = platform_get_irq(pdev, 0);
++	if (ret <= 0) {
++		dev_err(dev, "Unable to get ENET IRQ\n");
++		ret = ret ? : -ENXIO;
++		return ret;
++	}
++	pdata->resources.irq = ret;
++
++	return 0;
++}
++
++static void xge_delete_desc_rings(struct net_device *ndev)
++{
++	struct xge_pdata *pdata = netdev_priv(ndev);
++	struct device *dev = &pdata->pdev->dev;
++	struct xge_desc_ring *ring;
++
++	ring = pdata->tx_ring;
++	if (ring) {
++		if (ring->skbs)
++			devm_kfree(dev, ring->skbs);
++		if (ring->pkt_bufs)
++			devm_kfree(dev, ring->pkt_bufs);
++		devm_kfree(dev, ring);
++	}
++
++	ring = pdata->rx_ring;
++	if (ring) {
++		if (ring->skbs)
++			devm_kfree(dev, ring->skbs);
++		devm_kfree(dev, ring);
 +	}
 +}
 +
-+void xge_update_tx_desc_addr(struct xge_pdata *pdata)
++static struct xge_desc_ring *xge_create_desc_ring(struct net_device *ndev)
 +{
-+	dma_addr_t dma_addr = pdata->tx_ring->dma_addr;
++	struct xge_pdata *pdata = netdev_priv(ndev);
++	struct device *dev = &pdata->pdev->dev;
++	struct xge_desc_ring *ring;
++	u16 size;
 +
-+	xge_wr_csr(pdata, DMATXDESCL, dma_addr);
-+	xge_wr_csr(pdata, DMATXDESCH, (dma_addr >> NEXT_DESC_ADDRL_LEN));
++	ring = devm_kzalloc(dev, sizeof(struct xge_desc_ring), GFP_KERNEL);
++	if (!ring)
++		return NULL;
++
++	ring->ndev = ndev;
++
++	size = XGENE_ENET_DESC_SIZE * XGENE_ENET_NUM_DESC;
++	ring->desc_addr = dmam_alloc_coherent(dev, size, &ring->dma_addr,
++					      GFP_KERNEL | __GFP_ZERO);
++	if (!ring->desc_addr) {
++		devm_kfree(dev, ring);
++		return NULL;
++	}
++
++	xge_setup_desc(ring);
++
++	return ring;
 +}
 +
-+void xge_update_rx_desc_addr(struct xge_pdata *pdata)
++static int xge_refill_buffers(struct net_device *ndev, u32 nbuf)
 +{
-+	dma_addr_t dma_addr = pdata->rx_ring->dma_addr;
++	struct xge_pdata *pdata = netdev_priv(ndev);
++	struct xge_desc_ring *ring = pdata->rx_ring;
++	const u8 slots = XGENE_ENET_NUM_DESC - 1;
++	struct device *dev = &pdata->pdev->dev;
++	struct xge_raw_desc *raw_desc;
++	u64 addr_lo, addr_hi;
++	u8 tail = ring->tail;
++	struct sk_buff *skb;
++	dma_addr_t dma_addr;
++	u16 len;
++	int i;
 +
-+	xge_wr_csr(pdata, DMARXDESCL, dma_addr);
-+	xge_wr_csr(pdata, DMARXDESCH, (dma_addr >> NEXT_DESC_ADDRL_LEN));
++	for (i = 0; i < nbuf; i++) {
++		raw_desc = &ring->raw_desc[tail];
++
++		len = XGENE_ENET_STD_MTU;
++		skb = netdev_alloc_skb(ndev, len);
++		if (unlikely(!skb))
++			return -ENOMEM;
++
++		dma_addr = dma_map_single(dev, skb->data, len, DMA_FROM_DEVICE);
++		if (dma_mapping_error(dev, dma_addr)) {
++			netdev_err(ndev, "DMA mapping error\n");
++			dev_kfree_skb_any(skb);
++			return -EINVAL;
++		}
++
++		addr_hi = GET_BITS(NEXT_DESC_ADDRH, le64_to_cpu(raw_desc->m1));
++		addr_lo = GET_BITS(NEXT_DESC_ADDRL, le64_to_cpu(raw_desc->m1));
++		raw_desc->m1 = cpu_to_le64(SET_BITS(NEXT_DESC_ADDRL, addr_lo) |
++					   SET_BITS(NEXT_DESC_ADDRH, addr_hi) |
++					   SET_BITS(PKT_ADDRH,
++						    dma_addr >> PKT_ADDRL_LEN));
++
++		dma_wmb();
++		raw_desc->m0 = cpu_to_le64(SET_BITS(PKT_ADDRL, dma_addr) |
++					   SET_BITS(E, 1));
++		ring->skbs[tail] = skb;
++		tail = (tail + 1) & slots;
++	}
++
++	ring->tail = tail;
++
++	return 0;
 +}
 +
-+void xge_intr_enable(struct xge_pdata *pdata)
++static int xge_create_desc_rings(struct net_device *ndev)
 +{
-+	u32 data;
++	struct xge_pdata *pdata = netdev_priv(ndev);
++	struct device *dev = &pdata->pdev->dev;
++	struct xge_desc_ring *ring;
++	int ret;
 +
-+	data = RX_PKT_RCVD | TX_PKT_SENT;
-+	xge_wr_csr(pdata, DMAINTRMASK, data);
++	/* create tx ring */
++	ring = xge_create_desc_ring(ndev);
++	if (!ring)
++		return -ENOMEM;
++
++	ring->skbs = devm_kcalloc(dev, XGENE_ENET_NUM_DESC,
++				  sizeof(struct sk_buff *), GFP_KERNEL);
++	if (!ring->skbs)
++		goto err;
++
++	ring->pkt_bufs = devm_kcalloc(dev, XGENE_ENET_NUM_DESC,
++				  sizeof(void *), GFP_KERNEL);
++	if (!ring->pkt_bufs)
++		goto err;
++
++	pdata->tx_ring = ring;
++	xge_update_tx_desc_addr(pdata);
++
++	/* create rx ring */
++	ring = xge_create_desc_ring(ndev);
++	if (!ring)
++		goto err;
++
++	ring->skbs = devm_kcalloc(dev, XGENE_ENET_NUM_DESC,
++				  sizeof(struct sk_buff *), GFP_KERNEL);
++	if (!ring->skbs)
++		goto err;
++
++	pdata->rx_ring = ring;
++	xge_update_rx_desc_addr(pdata);
++
++	ret = xge_refill_buffers(ndev, XGENE_ENET_NUM_DESC);
++	if (!ret)
++		return 0;
++
++err:
++	xge_delete_desc_rings(ndev);
++
++	return -ENOMEM;
 +}
 +
-+void xge_intr_disable(struct xge_pdata *pdata)
++static int xge_init_hw(struct net_device *ndev)
 +{
-+	xge_wr_csr(pdata, DMAINTRMASK, 0);
++	struct xge_pdata *pdata = netdev_priv(ndev);
++	int ret;
++
++	ret = xge_port_reset(ndev);
++	if (ret)
++		return ret;
++
++	xge_create_desc_rings(ndev);
++	xge_port_init(ndev);
++	pdata->nbufs = NUM_BUFS;
++
++	return 0;
 +}
-diff --git a/drivers/net/ethernet/apm/xgene-v2/ring.h b/drivers/net/ethernet/apm/xgene-v2/ring.h
-new file mode 100644
-index 0000000..f2711f4
---- /dev/null
-+++ b/drivers/net/ethernet/apm/xgene-v2/ring.h
-@@ -0,0 +1,77 @@
-+/*
-+ * Applied Micro X-Gene SoC Ethernet v2 Driver
-+ *
-+ * Copyright (c) 2017, Applied Micro Circuits Corporation
-+ * Author(s): Iyappan Subramanian <isubramanian@apm.com>
-+ *	      Keyur Chudgar <kchudgar@apm.com>
-+ *
-+ * This program is free software; you can redistribute  it and/or modify it
-+ * under  the terms of  the GNU General  Public License as published by the
-+ * Free Software Foundation;  either version 2 of the  License, or (at your
-+ * option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
 +
-+#ifndef __XGENE_ENET_V2_RING_H__
-+#define __XGENE_ENET_V2_RING_H__
++static irqreturn_t xge_irq(const int irq, void *data)
++{
++	struct xge_pdata *pdata = data;
 +
-+struct xge_desc_ring;
++	if (napi_schedule_prep(&pdata->napi)) {
++		xge_intr_disable(pdata);
++		__napi_schedule(&pdata->napi);
++	}
 +
-+#define XGENE_ENET_DESC_SIZE	64
-+#define XGENE_ENET_NUM_DESC	256
-+#define NUM_BUFS		8
++	return IRQ_HANDLED;
++}
 +
-+#define E_POS			63
-+#define E_LEN			1
-+#define PKT_ADDRL_POS		0
-+#define PKT_ADDRL_LEN		32
-+#define PKT_ADDRH_POS		32
-+#define PKT_ADDRH_LEN		10
-+#define PKT_SIZE_POS		32
-+#define PKT_SIZE_LEN		12
-+#define NEXT_DESC_ADDRL_POS	0
-+#define NEXT_DESC_ADDRL_LEN	32
-+#define NEXT_DESC_ADDRH_POS	48
-+#define NEXT_DESC_ADDRH_LEN	10
++static int xge_request_irq(struct net_device *ndev)
++{
++	struct xge_pdata *pdata = netdev_priv(ndev);
++	struct device *dev = &pdata->pdev->dev;
++	int ret;
 +
-+struct xge_raw_desc {
-+	__le64 m0;
-+	__le64 m1;
-+	__le64 m2;
-+	__le64 m3;
-+	__le64 m4;
-+	__le64 m5;
-+	__le64 m6;
-+	__le64 m7;
++	snprintf(pdata->irq_name, IRQ_ID_SIZE, "%s", ndev->name);
++
++	ret = devm_request_irq(dev, pdata->resources.irq, xge_irq,
++			       0, pdata->irq_name, pdata);
++	if (ret)
++		netdev_err(ndev, "Failed to request irq %s\n", pdata->irq_name);
++
++	return ret;
++}
++
++static void xge_free_irq(struct net_device *ndev)
++{
++	struct xge_pdata *pdata = netdev_priv(ndev);
++	struct device *dev = &pdata->pdev->dev;
++
++	devm_free_irq(dev, pdata->resources.irq, pdata);
++}
++
++static int xge_open(struct net_device *ndev)
++{
++	struct xge_pdata *pdata = netdev_priv(ndev);
++	int ret;
++
++	ret = xge_request_irq(ndev);
++	if (ret)
++		return ret;
++
++	xge_intr_enable(pdata);
++
++	xge_wr_csr(pdata, DMARXCTRL, 1);
++	xge_mac_enable(pdata);
++	netif_start_queue(ndev);
++
++	return 0;
++}
++
++static int xge_close(struct net_device *ndev)
++{
++	struct xge_pdata *pdata = netdev_priv(ndev);
++
++	netif_stop_queue(ndev);
++	xge_mac_disable(pdata);
++
++	xge_free_irq(ndev);
++
++	return 0;
++}
++
++static int xge_set_mac_addr(struct net_device *ndev, void *addr)
++{
++	struct xge_pdata *pdata = netdev_priv(ndev);
++	int ret;
++
++	ret = eth_mac_addr(ndev, addr);
++	if (ret)
++		return ret;
++
++	xge_mac_set_station_addr(pdata);
++
++	return 0;
++}
++
++static void xge_timeout(struct net_device *ndev)
++{
++	struct xge_pdata *pdata = netdev_priv(ndev);
++	struct netdev_queue *txq;
++
++	xge_mac_reset(pdata);
++
++	txq = netdev_get_tx_queue(ndev, 0);
++	txq->trans_start = jiffies;
++	netif_tx_start_queue(txq);
++}
++
++static void xge_get_stats64(struct net_device *ndev,
++			    struct rtnl_link_stats64 *storage)
++{
++	struct xge_pdata *pdata = netdev_priv(ndev);
++	struct xge_stats *stats = &pdata->stats;
++
++	storage->tx_packets += stats->tx_packets;
++	storage->tx_bytes += stats->tx_bytes;
++
++	storage->rx_packets += stats->rx_packets;
++	storage->rx_bytes += stats->rx_bytes;
++}
++
++static const struct net_device_ops xgene_ndev_ops = {
++	.ndo_open = xge_open,
++	.ndo_stop = xge_close,
++	.ndo_set_mac_address = xge_set_mac_addr,
++	.ndo_tx_timeout = xge_timeout,
++	.ndo_get_stats64 = xge_get_stats64,
 +};
 +
-+static inline u64 xge_set_desc_bits(int pos, int len, u64 val)
++static int xge_probe(struct platform_device *pdev)
 +{
-+	return (val & ((1ULL << len) - 1)) << pos;
++	struct device *dev = &pdev->dev;
++	struct net_device *ndev;
++	struct xge_pdata *pdata;
++	int ret;
++
++	ndev = alloc_etherdev(sizeof(struct xge_pdata));
++	if (!ndev)
++		return -ENOMEM;
++
++	pdata = netdev_priv(ndev);
++
++	pdata->pdev = pdev;
++	pdata->ndev = ndev;
++	SET_NETDEV_DEV(ndev, dev);
++	platform_set_drvdata(pdev, pdata);
++	ndev->netdev_ops = &xgene_ndev_ops;
++
++	ndev->features |= NETIF_F_GSO |
++			  NETIF_F_GRO;
++
++	ret = xge_get_resources(pdata);
++	if (ret)
++		goto err;
++
++	ndev->hw_features = ndev->features;
++
++	ret = dma_coerce_mask_and_coherent(dev, DMA_BIT_MASK(64));
++	if (ret) {
++		netdev_err(ndev, "No usable DMA configuration\n");
++		goto err;
++	}
++
++	ret = xge_init_hw(ndev);
++	if (ret)
++		goto err;
++
++	ret = register_netdev(ndev);
++	if (ret) {
++		netdev_err(ndev, "Failed to register netdev\n");
++		goto err;
++	}
++
++	return 0;
++
++err:
++	free_netdev(ndev);
++
++	return ret;
 +}
 +
-+static inline u64 xge_get_desc_bits(int pos, int len, u64 src)
++static int xge_remove(struct platform_device *pdev)
 +{
-+	return (src >> pos) & ((1ULL << len) - 1);
++	struct xge_pdata *pdata;
++	struct net_device *ndev;
++
++	pdata = platform_get_drvdata(pdev);
++	ndev = pdata->ndev;
++
++	rtnl_lock();
++	if (netif_running(ndev))
++		dev_close(ndev);
++	rtnl_unlock();
++
++	unregister_netdev(ndev);
++	xge_delete_desc_rings(ndev);
++	free_netdev(ndev);
++
++	return 0;
 +}
 +
-+#define SET_BITS(field, val) \
-+		xge_set_desc_bits(field ## _POS, field ## _LEN, val)
++static void xge_shutdown(struct platform_device *pdev)
++{
++	struct xge_pdata *pdata;
 +
-+#define GET_BITS(field, src) \
-+		xge_get_desc_bits(field ## _POS, field ## _LEN, src)
++	pdata = platform_get_drvdata(pdev);
++	if (!pdata)
++		return;
 +
-+void xge_setup_desc(struct xge_desc_ring *ring);
-+void xge_update_tx_desc_addr(struct xge_pdata *pdata);
-+void xge_update_rx_desc_addr(struct xge_pdata *pdata);
-+void xge_intr_enable(struct xge_pdata *pdata);
-+void xge_intr_disable(struct xge_pdata *pdata);
++	if (!pdata->ndev)
++		return;
 +
-+#endif  /* __XGENE_ENET_V2_RING_H__ */
++	xge_remove(pdev);
++}
++
++static const struct acpi_device_id xge_acpi_match[] = {
++	{ "APMC0D80" },
++	{ }
++};
++MODULE_DEVICE_TABLE(acpi, xge_acpi_match);
++
++static struct platform_driver xge_driver = {
++	.driver = {
++		   .name = "xgene-enet-v2",
++		   .acpi_match_table = ACPI_PTR(xge_acpi_match),
++	},
++	.probe = xge_probe,
++	.remove = xge_remove,
++	.shutdown = xge_shutdown,
++};
++module_platform_driver(xge_driver);
++
++MODULE_DESCRIPTION("APM X-Gene SoC Ethernet v2 driver");
++MODULE_AUTHOR("Iyappan Subramanian <isubramanian@apm.com>");
++MODULE_VERSION(XGENE_ENET_V2_VERSION);
++MODULE_LICENSE("GPL");
 -- 
 1.9.1
