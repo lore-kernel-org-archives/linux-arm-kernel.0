@@ -1,139 +1,53 @@
-From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
-Date: Tue, 31 Jan 2017 06:57:20 -0800
-Subject: [PATCH] PCI: ACPI: Fix ThunderX PEM initialization
-In-Reply-To: <20170131142525.GA9942@bhelgaas-glaptop.roam.corp.google.com>
-References: <1485793552-12614-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
- <20170130211236.GW20550@bhelgaas-glaptop.roam.corp.google.com>
- <20170131102830.GA13854@localhost.localdomain>
- <20170131142525.GA9942@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20170131145720.GA14231@localhost.localdomain>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 31 Jan 2017 15:03:37 +0000
+Subject: [PATCH v3 00/24] i.MX Media Driver
+In-Reply-To: <1485872710.2932.65.camel@pengutronix.de>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <1485870854.2932.63.camel@pengutronix.de>
+ <1485872710.2932.65.camel@pengutronix.de>
+Message-ID: <20170131150337.GZ27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2017 at 08:25:25AM -0600, Bjorn Helgaas wrote:
-> On Tue, Jan 31, 2017 at 02:28:30AM -0800, Vadim Lomovtsev wrote:
-> > Hi Bjorn,
+On Tue, Jan 31, 2017 at 03:25:10PM +0100, Philipp Zabel wrote:
+> On Tue, 2017-01-31 at 14:54 +0100, Philipp Zabel wrote:
+> > Hi Steve,
 > > 
-> > On Mon, Jan 30, 2017 at 03:12:37PM -0600, Bjorn Helgaas wrote:
-> > > Hi Vadim,
-> > > 
-> > > On Mon, Jan 30, 2017 at 08:25:52AM -0800, Vadim Lomovtsev wrote:
-> > > > This patch is to address PEM initialization issue
-> > > > which causes network issues.
-> > > > 
-> > > > It is necessary to search for _HID:PNP0A08 while requesting
-> > > > PEM resources via ACPI instead of "THRX0002".
-> > > > 
-> > > > Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
-> > > > ---
-> > > >  drivers/pci/host/pci-thunder-pem.c | 2 +-
-> > > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > > 
-> > > > diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
-> > > > index af722eb..aec30b8 100644
-> > > > --- a/drivers/pci/host/pci-thunder-pem.c
-> > > > +++ b/drivers/pci/host/pci-thunder-pem.c
-> > > > @@ -331,7 +331,7 @@ static int thunder_pem_acpi_init(struct pci_config_window *cfg)
-> > > >  	if (!res_pem)
-> > > >  		return -ENOMEM;
-> > > >  
-> > > > -	ret = acpi_get_rc_resources(dev, "THRX0002", root->segment, res_pem);
-> > > > +	ret = acpi_get_rc_resources(dev, "PNP0A08", root->segment, res_pem);
-> > > 
-> > > This doesn't smell right: PNP0A08 is the generic ACPI ID.  There's no
-> > > guarantee that if we find a PNP0A08 device, it is a ThunderX device.
-> > > 
-> > > I think the only way to call thunder_pem_acpi_init() is via an MCFG
-> > > quirk that mentions thunder_pem_ecam_ops, which means we only call it
-> > > if we find an MCFG with "CAVIUM" "THUNDERX" OEM and table IDs, so it's
-> > > probably safe in that sense.
+> > I have just tested the imx-media-staging-md-wip branch on a Nitrogen6X
+> > with a tc358743 (BD_HDMI_MIPI HDMI to MIPI CSI-2 receiver board). Some
+> > observations:
 > > 
-> > Agree, it is not the best solution.
-> > We will implement such approach and send for review. 
+> > # Link pipeline
+> > media-ctl -l "'tc358743 1-000f':0->'imx6-mipi-csi2':0[1]"
+> > media-ctl -l "'imx6-mipi-csi2':1->'ipu1_csi0_mux':0[1]"
+> > media-ctl -l "'ipu1_csi0_mux':2->'ipu1_csi0':0[1]"
+> > media-ctl -l "'ipu1_csi0':2->'ipu1_csi0 capture':0[1]"
 > > 
-> > > 
-> > > But it's an abuse of the ACPI _HID model.  If you match a device using
-> > > PNP0A08, all you can assume about it is that it uses the generic
-> > > PNP0A08 programming model, and I don't think that includes "the first
-> > > memory resource in _CRS contains ECAM space and MSI-X tables."
-> > > 
-> > > I expect this is a teething issue because you have firmware in the
-> > > field that uses PNP0A08 and it's not feasible to update it.  If that's
-> > > the case, the changelog should have details about it and we should
-> > > have a comment in the code, because I don't think this is the model we
-> > > want to end up with in future releases.
+> > # Provide an EDID to the HDMI source
+> > v4l2-ctl -d /dev/v4l-subdev2 --set-edid=file=edid-1080p.hex
+> > # At this point the HDMI source is enabled and sends a 1080p60 signal
+> > # Configure detected DV timings
+> > media-ctl --set-dv "'tc358743 1-000f':0"
 > > 
-> > It could become so. However, for now I didn't get any reports on that,
-> > (may be I miss something) except some internal emailings.
-> > At my testing HW I was able to see some issues related to acpi-PEM stuff.
-> > 
-> > Thanks for feed-back, we will prepare another patch or patchset
-> > implementing approach you've highlighted.
+> > # Set pad formats
+> > media-ctl --set-v4l2 "'tc358743 1-000f':0[fmt:UYVY/1920x1080]"
+> > media-ctl --set-v4l2 "'imx6-mipi-csi2':1[fmt:UYVY2X8/1920x1080]"
+> > media-ctl --set-v4l2 "'ipu1_csi0_mux':2[fmt:UYVY2X8/1920x1080]"
 > 
-> The approach I would like best is to search for THRX0002, because then
-> you know you have a ThunderX PEM device, and you can assume
-> device-specific details about its _CRS.
->
-> But that's what the existing code does, and apparently that doesn't
-> work.  My guess is that you have firmware in the field where the host
-> bridge has only PNP0A08 (and maybe PNP0A03) as device IDs.
+> I noticed this seems to get ignored. The format is incorrectly set to
+> UYVY even though I request UYVY2X8 (see CSI2IPU chapter, Figure 19-10.
+> YUV422-8 data reception in the reference manual), but it seems to work
+> anyway.
 
-Because there is no such ACPI ID as "THRX0002" registered
-(http://www.uefi.org/acpi_id_list).
+That's because the driver at imx-csi level bypasses the proper media pad
+formats on its sink pads, and instead goes poking about at the "sensor"
+to get the format.
 
->From the other hand we may gather device resources through
-_CRS (we have acpi_device already set by this moment) but
-we need to be sure that we're running at Cavium ThunderX board then.
+This is one of the reasons it wants to know which entity is the "sensor".
 
-To do that we may add _SUB value (accrodingly to spec) with
-exact ID string (a full PCI ID value "177DA22D" is suggested).
-This will eventually become the main method of finding out
-whether we run on a ThunderX PEM.
+The "sensor" stuff in there needs to be scrapped...
 
-However the current FW have no such string and we
-need to handle this case also.
-
-> Per spec, the OS can only assume the generic PCI host bridge
-> programming model in that case.  It can't use any device-specific
-> features, like the register space you're extracting here, since
-> there's no way to tell what specific device you have.
-> 
-> If the OS needs to use device-specific features, there must be a
-> device-specific _HID, i.e., THRX0002.  This is the important thing to
-> get right in the future.
-> 
-> If existing firmware in the field has no device-specific _HID, we
-
-I'm afraid not.
-
-> might need something like this as a quirk to work around that firmware
-> deficiency.  If that's the case, all I'm really asking for is:
-> 
->   - Some indication that you have a plan to change the firmware
->     strategy so future releases don't require similar quirks, and
-
-I believe we have some work at FW level to get this things done
-accordingly, but we have HW in the field and this could become
-critical.
-
->   - Some comments in the code pointing out that this is a workaround
->     for a firmware deficiency.
-> 
-> As I mentioned, I think this change should be safe because we only run
-> this code if we find a CAVIUM THUNDERX MCFG table, and we search for a
-> PNP0A08 device that matches the segment from MCFG.
-
-However, the patch is not in good shape (was done in rush to be honest)
-so I prepare another one shortly, addressing your comments.
-
-> The only way we could accidentally match the wrong device would be if
-> we had another bridge in the same segment.  Maybe we should have made
-> acpi_get_rc_resources() match on the bus range as well as the segment.
-> But that feels like just a "pedantically correct" sort of thing and
-> probably over-engineering for this situation; I don't think it would
-> solve any current problem.
-> 
-> I know you'd like to see this in v4.10, so we need to sort this out
-> ASAP.
-> 
-> Bjorn
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
