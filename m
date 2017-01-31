@@ -1,40 +1,99 @@
-From: afzal.mohd.ma@gmail.com (afzal mohammed)
-Date: Tue, 31 Jan 2017 18:37:01 +0530
-Subject: [PATCH v3 3/3] ARM: nommu: remove Hivecs configuration is asm
-In-Reply-To: <20170131130446.5829-1-afzal.mohd.ma@gmail.com>
-References: <20170131130446.5829-1-afzal.mohd.ma@gmail.com>
-Message-ID: <20170131130701.6042-1-afzal.mohd.ma@gmail.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Tue, 31 Jan 2017 18:41:44 +0530
+Subject: [PATCH V7 01/11] iommu/of: Refactor of_iommu_configure() for
+ error handling
+In-Reply-To: <8387d057-15bd-500c-134e-0e731ff837d6@arm.com>
+References: <1485188293-20263-1-git-send-email-sricharan@codeaurora.org>
+ <1485188293-20263-2-git-send-email-sricharan@codeaurora.org>
+ <4388779a-0e83-fadc-83f4-98c46c88d42e@semihalf.com>
+ <c7bad124-d9f2-0ddf-168f-0b1950d3e1ed@arm.com>
+ <009901d278c7$34fee230$9efca690$@codeaurora.org>
+ <d27f04da-7d34-9640-1639-790d0732ed93@arm.com>
+ <003601d27ac6$84866840$8d9338c0$@codeaurora.org>
+ <8387d057-15bd-500c-134e-0e731ff837d6@arm.com>
+Message-ID: <006001d27bc3$96156770$c2403650$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that exception based address is handled dynamically for
-processors with CP15, remove Hivecs configuration in assembly.
+Hi Robin,
 
-Signed-off-by: afzal mohammed <afzal.mohd.ma@gmail.com>
-Tested-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
+>>>>>> I gave the whole patch set a try on ThunderX. really_probe() is failing
+>>>>>> on dma_configure()->of_pci_iommu_init() for each PCI device.
+>>>>>
+>>>>> When you say "failing", do you mean cleanly, or with a crash? I've
+>>>>> managed to hit __of_match_node() dereferencing NULL from
+>>>>> of_iommu_xlate() in a horribly complicated chain of events, which I'm
+>>>>> trying to figure out now, and I wonder if the two might be related.
+>>>>
+>>>> Sorry that there is crash still. __of_match_node seems to checking
+>>>> for NULL arguments , feels like some invalid pointer was passed in.
+>>>> Is there any particular sequence to try for this ?
+>>>
+>>> Ah, I did figure it out - it wasn't actually a NULL dereference, but an
+>>> unmapped address. Turns out __iommu_of_table is in initdata, so any
+>>> driver probing after init, connected to an unprobed IOMMU (in this case
+>>> disabled in DT), trips over trying to match the now-freed table. I'm
+>>> working on the fix - technically the bug's in my patch (#2) anyway ;)
+>>>
+>>
+>> Ok, thanks for bringing this out. There is also an issue that
+>> Sinan has mentioned while testing the ACPI hotplug path, probably
+>> its related to the above, not sure. I will try to check more on that
+>> in the meanwhile. Then, taking your fix and fixing the hotplug case
+>> i will do one more repost.
+>
+>OK, I've finally settled on the below fixup for patch #2 - I have some
+>follow-on ideas for eventually getting of the magic table altogether,
+>but they can wait until we've got the baseline functionality sorted.
+>Updated full patch here:
+>
+>http://www.linux-arm.org/git?p=linux-rm.git;a=commitdiff;h=5616af885f7c5c24f7239d5c689583b2b583c407
 
-v3:
- Vladimir's Tested-by
+Thanks, will use this. Yes, the magic iommu_of_table makes little
+use with probe deferral in place, except that we are using it at the
+moment. And the other hotplug issue is not related this though.
 
- arch/arm/kernel/head-nommu.S | 5 -----
- 1 file changed, 5 deletions(-)
+Regards,
+ Sricharan
 
-diff --git a/arch/arm/kernel/head-nommu.S b/arch/arm/kernel/head-nommu.S
-index 6b4eb27b8758..2e21e08de747 100644
---- a/arch/arm/kernel/head-nommu.S
-+++ b/arch/arm/kernel/head-nommu.S
-@@ -152,11 +152,6 @@ __after_proc_init:
- #ifdef CONFIG_CPU_ICACHE_DISABLE
- 	bic	r0, r0, #CR_I
- #endif
--#ifdef CONFIG_CPU_HIGH_VECTOR
--	orr	r0, r0, #CR_V
--#else
--	bic	r0, r0, #CR_V
--#endif
- 	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
- #elif defined (CONFIG_CPU_V7M)
- 	/* For V7M systems we want to modify the CCR similarly to the SCTLR */
--- 
-2.11.0
+
+>-----8<-----
+>
+>diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
+>index 349bd1d01612..1f92d98237d5 100644
+>--- a/drivers/iommu/of_iommu.c
+>+++ b/drivers/iommu/of_iommu.c
+>@@ -96,6 +96,19 @@ int of_get_dma_window(struct device_node *dn, const
+>char *prefix, int index,
+> }
+> EXPORT_SYMBOL_GPL(of_get_dma_window);
+>
+>+static bool of_iommu_driver_present(struct device_node *np)
+>+{
+>+	/*
+>+	 * If the IOMMU still isn't ready by the time we reach init, assume
+>+	 * it never will be. We don't want to defer indefinitely, nor attempt
+>+	 * to dereference __iommu_of_table after it's been freed.
+>+	 */
+>+	if (system_state > SYSTEM_BOOTING)
+>+		return false;
+>+
+>+	return of_match_node(&__iommu_of_table, np);
+>+}
+>+
+> static const struct iommu_ops
+> *of_iommu_xlate(struct device *dev, struct of_phandle_args *iommu_spec)
+> {
+>@@ -105,7 +118,7 @@ static const struct iommu_ops
+>
+> 	ops = iommu_get_instance(fwnode);
+> 	if ((ops && !ops->of_xlate) ||
+>-	    (!ops && !of_match_node(&__iommu_of_table, iommu_spec->np)))
+>+	    (!ops && !of_iommu_driver_present(iommu_spec->np)))
+> 		return NULL;
+>
+> 	err = iommu_fwspec_init(dev, &iommu_spec->np->fwnode, ops);
+>--
+>To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
+>the body of a message to majordomo at vger.kernel.org
+>More majordomo info at  http://vger.kernel.org/majordomo-info.html
