@@ -1,73 +1,66 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Tue, 31 Jan 2017 23:00:54 +0100
-Subject: [PATCH V11 1/3] ACPI: Generic GSI: Do not attempt to map non-GSI
- IRQs during bus scan
-In-Reply-To: <1484879660-1960-2-git-send-email-agustinv@codeaurora.org>
-References: <1484879660-1960-1-git-send-email-agustinv@codeaurora.org>
- <1484879660-1960-2-git-send-email-agustinv@codeaurora.org>
-Message-ID: <CAJZ5v0iGWo8hEPYWEibc7YukdjqZSr9Xzf1+t_wa2Jw3Yht8WQ@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 31 Jan 2017 22:04:52 +0000
+Subject: [PATCH v3 20/24] media: imx: Add Camera Interface subdev driver
+In-Reply-To: <2297c62c-ae9b-3942-4700-ce268a61a6d5@gmail.com>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <1483755102-24785-21-git-send-email-steve_longerbeam@mentor.com>
+ <b7456d40-040d-41b7-45bc-ef6709ab7933@xs4all.nl>
+ <20170131134252.GX27312@n2100.armlinux.org.uk>
+ <b0517394-7717-3e1d-b850-e2b69a9c19e9@gmail.com>
+ <20170131203340.GC27312@n2100.armlinux.org.uk>
+ <2297c62c-ae9b-3942-4700-ce268a61a6d5@gmail.com>
+Message-ID: <20170131220452.GE27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 20, 2017 at 3:34 AM, Agustin Vega-Frias
-<agustinv@codeaurora.org> wrote:
-> ACPI extended IRQ resources may contain a Resource Source field to specify
-> an alternate interrupt controller, attempting to map them as GSIs is
-> incorrect, so just disable the platform resource.
->
-> Since this field is currently ignored, we make this change conditional
-> on CONFIG_ACPI_GENERIC_GSI to keep the current behavior on x86 platforms,
-> in case some existing ACPI tables are using this incorrectly.
->
-> Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
+On Tue, Jan 31, 2017 at 09:55:29PM +0000, Ian Arkver wrote:
+> On 31/01/17 20:33, Russell King - ARM Linux wrote:
+> >On Tue, Jan 31, 2017 at 10:21:26AM -0800, Steve Longerbeam wrote:
+> >>On 01/31/2017 05:42 AM, Russell King - ARM Linux wrote:
+> >>>On Fri, Jan 20, 2017 at 03:38:28PM +0100, Hans Verkuil wrote:
+> >>>>Should be set to something like 'platform:imx-media-camif'. v4l2-compliance
+> >>>>should complain about this.
+> >>>... and more.
+> >>
+> >>Right, in version 3 that you are working with, no v4l2-compliance fixes were
+> >>in yet. A lot of the compliance errors are fixed, please look in latest
+> >>branch
+> >>imx-media-staging-md-wip at git at github.com:slongerbeam/mediatree.git.
+> >
+> >Sorry, I'm not prepared to pull random trees from github as there's
+> >no easy way to see what's in the branch.
+> >
+> >I've always disliked github because its web interface makes it soo
+> >difficult to navigate around git trees hosted there.  You can see
+> >a commit, you can see a diff of the commit.  You can get a list of
+> >branches.  But there seems to be no way to get a list of commits
+> >similar to "git log" or even a one-line summary of each commit on
+> >a branch.  If there is, it's completely non-obvious (which I think is
+> >much of the problem with github, it's web interface is horrendous.)
+> >
+> >Or you can clone/pull the tree without knowing what you're fetching
+> >(eg, what the tree is based upon.)
+> >
+> >Or you can waste time clicking repeatedly on the "parent" commit link
+> >on each patch working your way back through the history...
+> >
+> >Well, it looks like it's bsaed on 4.10-rc1 with who-knows-what work
+> >from the linux-media tree (I didn't try and go back any further.)
+> >As I don't want to take a whole pile of other changes into my tree,
+> >I'm certainly not going to pull from your github tree.  Sorry.
+> >
+> 
+> https://github.com/slongerbeam/mediatree/compare/master...imx-media-staging-md-wip
+> 
+> It's under the "Compare" button from the main view. It would be nice though
+> if the first commit's parent was some clearly tagged start point.
 
-This one is fine by me, so feel free to add my ACK to it.
+I don't want master though, I want v4.10-rc1, and if I ask for that
+it tells me it knows nothing about v4.10-rc1, despite the fact that's
+a tag in the mainline kernel repository which was merged into the
+linux-media tree that this tree is based upon.
 
-Or if you want me to apply it, please let me know.
-
-> ---
->  drivers/acpi/resource.c | 18 +++++++++++++++++-
->  1 file changed, 17 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/acpi/resource.c b/drivers/acpi/resource.c
-> index cb57962..69cd430 100644
-> --- a/drivers/acpi/resource.c
-> +++ b/drivers/acpi/resource.c
-> @@ -43,6 +43,19 @@ static inline bool acpi_iospace_resource_valid(struct resource *res)
->  acpi_iospace_resource_valid(struct resource *res) { return true; }
->  #endif
->
-> +#ifdef CONFIG_ACPI_GENERIC_GSI
-> +static inline bool is_gsi(struct acpi_resource_extended_irq *ext_irq)
-> +{
-> +       return ext_irq->resource_source.string_length == 0 &&
-> +              ext_irq->producer_consumer == ACPI_CONSUMER;
-> +}
-> +#else
-> +static inline bool is_gsi(struct acpi_resource_extended_irq *ext_irq)
-> +{
-> +       return true;
-> +}
-> +#endif
-> +
->  static bool acpi_dev_resource_len_valid(u64 start, u64 end, u64 len, bool io)
->  {
->         u64 reslen = end - start + 1;
-> @@ -470,9 +483,12 @@ bool acpi_dev_resource_interrupt(struct acpi_resource *ares, int index,
->                         acpi_dev_irqresource_disabled(res, 0);
->                         return false;
->                 }
-> -               acpi_dev_get_irqresource(res, ext_irq->interrupts[index],
-> +               if (is_gsi(ext_irq))
-> +                       acpi_dev_get_irqresource(res, ext_irq->interrupts[index],
->                                          ext_irq->triggering, ext_irq->polarity,
->                                          ext_irq->sharable, false);
-> +               else
-> +                       acpi_dev_irqresource_disabled(res, 0);
->                 break;
->         default:
->                 res->flags = 0;
-> --
-
-Thanks,
-Rafael
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
