@@ -1,109 +1,85 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Tue, 31 Jan 2017 12:03:39 +0000
-Subject: [PATCH v3] PCI: Xilinx NWL: Modifying irq chip for legacy
- interrupts
-In-Reply-To: <86r33j7cjy.fsf@arm.com>
-References: <1485853152-31819-1-git-send-email-bharatku@xilinx.com>
- <868tpr8u3r.fsf@arm.com>
- <8520D5D51A55D047800579B094147198263DDD4D@XAP-PVEXMBX02.xlnx.xilinx.com>
- <86r33j7cjy.fsf@arm.com>
-Message-ID: <8520D5D51A55D047800579B094147198263DDF98@XAP-PVEXMBX02.xlnx.xilinx.com>
+From: john@metanate.com (John Keeping)
+Date: Tue, 31 Jan 2017 12:03:49 +0000
+Subject: [PATCH v3 12/24] drm/rockchip: dw-mipi-dsi: allow commands in
+ panel_disable
+In-Reply-To: <20170130201953.GO20076@art_vandelay>
+References: <20170129132444.25251-1-john@metanate.com>
+ <20170129132444.25251-13-john@metanate.com>
+ <20170130201953.GO20076@art_vandelay>
+Message-ID: <20170131120349.6e291624.john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: Re: [PATCH v3] PCI: Xilinx NWL: Modifying irq chip for legacy interrupts
->
-> On Tue, Jan 31 2017 at 09:34:43 AM, Bharat Kumar Gogada
-> <bharat.kumar.gogada@xilinx.com> wrote:
-> >  > On Tue, Jan 31 2017 at 08:59:12 AM, Bharat Kumar Gogada
-> >> <bharat.kumar.gogada@xilinx.com> wrote:
-> >> > - Adding mutex lock for protecting legacy mask register
-> >> > - Few wifi end points which only support legacy interrupts,
-> >> > performs hardware reset functionalities after disabling interrupts
-> >> > by invoking disable_irq and then re-enable using enable_irq, they
-> >> > enable hardware interrupts first and then virtual irq line later.
-> >> > - The legacy irq line goes low only after DEASSERT_INTx is
-> >> > received.As the legacy irq line is high immediately after hardware
-> >> > interrupts are enabled but virq of EP is still in disabled state
-> >> > and EP handler is never executed resulting no DEASSERT_INTx.If
-> >> > dummy irq chip is used, interrutps are not masked and system is hanging
-> with CPU stall.
-> >> > - Adding irq chip functions instead of dummy irq chip for legacy
-> >> > interrupts.
-> >> > - Legacy interrupts are level sensitive, so using handle_level_irq
-> >> > is more appropriate as it is masks interrupts until End point
-> >> > handles interrupts and unmasks interrutps after End point handler is
-> executed.
-> >> > - Legacy interrupts are level triggered, virtual irq line of End
-> >> > Point shows as edge in /proc/interrupts.
-> >> > - Setting irq flags of virtual irq line of EP to level triggered at
-> >> > the time of mapping.
-> >> >
-> >> > Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-> >> > ---
-> >> >  drivers/pci/host/pcie-xilinx-nwl.c |   43
-> >> +++++++++++++++++++++++++++++++++++-
-> >> >  1 files changed, 42 insertions(+), 1 deletions(-)
-> >> >
-> >> > diff --git a/drivers/pci/host/pcie-xilinx-nwl.c
-> >> > b/drivers/pci/host/pcie-xilinx-nwl.c
-> >> > index 43eaa4a..76dd094 100644
-> >> > --- a/drivers/pci/host/pcie-xilinx-nwl.c
-> >> > +++ b/drivers/pci/host/pcie-xilinx-nwl.c
-> >> > @@ -184,6 +184,7 @@ struct nwl_pcie {
-> >> >          u8 root_busno;
-> >> >          struct nwl_msi msi;
-> >> >          struct irq_domain *legacy_irq_domain;
-> >> > +        struct mutex leg_mask_lock;
-> >> >  };
-> >> >
-> >> >  static inline u32 nwl_bridge_readl(struct nwl_pcie *pcie, u32 off)
-> >> > @@
-> >> > -395,11 +396,50 @@ static void nwl_pcie_msi_handler_low(struct
-> >> > irq_desc
-> >> *desc)
-> >> >          chained_irq_exit(chip, desc);
-> >> >  }
-> >> >
-> >> > +static void nwl_mask_leg_irq(struct irq_data *data) {
-> >> > +        struct irq_desc *desc = irq_to_desc(data->irq);
-> >> > +        struct nwl_pcie *pcie;
-> >> > +        u32 mask;
-> >> > +        u32 val;
-> >> > +
-> >> > +        pcie = irq_desc_get_chip_data(desc);
-> >> > +        mask = 1 << (data->hwirq - 1);
-> >> > +        mutex_lock(&pcie->leg_mask_lock);
-> >> > +        val = nwl_bridge_readl(pcie, MSGF_LEG_MASK);
-> >> > +        nwl_bridge_writel(pcie, (val & (~mask)), MSGF_LEG_MASK);
-> >> > +        mutex_unlock(&pcie->leg_mask_lock);
-> >>
-> >> Have you looked at which context this is called in? In a number of
-> >> cases, the mask/unmask methods are called whilst you're in an
-> >> interrupt context. If you sleep there (which is what happens with a contended
-> mutex), you die horribly.
-> >>
-> >> Given these constraints, you should use raw_spin_lock_irqsave and co,
-> >> since this can be called from both interrupt and non-interrupt
-> >> contexts.
-> >>
-> > I have seen very few wifi drivers calling these in MAC flow,
->
-> Very few is already too many. But I'm afraid you're missing the point
-> entirely: This patch is about using handle_level_irq as the flow handler. The first
-> thing handle_level_irq does is to mask the interrupt. If you have a competing
-> mask or unmask operation in progress on another CPU (or in the middle of one
-> on the same CPU when the interrupt fired), your system explodes.
->
-> Please have a look at Documentation/DocBook/kernel-locking.tmpl.
->
-> > raw_spin_lock_irqsave
-> > looks more safe, will do it.
->
-Yeah, understood, thanks for the details.
+On Mon, 30 Jan 2017 15:19:53 -0500, Sean Paul wrote:
 
-Thanks & Regards,
-Bharat
+> On Sun, Jan 29, 2017 at 01:24:32PM +0000, John Keeping wrote:
+> > Panel drivers may want to sent commands during the disable function, for
+> > example MIPI_DCS_SET_DISPLAY_OFF before the video signal ends.  In order
+> > to send commands we need to write to registers, so pclk must be enabled.
+> > 
+> > While changing this, remove the unnecessary code after the panel
+> > unprepare call which seems to be a workaround for a specific panel and
+> > thus belongs in the panel driver.  
+> 
+> Do you know which panel? If the panel driver is upstream, we should make sure we
+> migrate this hack before removing it here. If it's downstream somewhere,
 
+I'm just going by the comment in the code that this patch deletes and
+the fact that this delay was not needed on any of the three panels I
+tested.
 
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+Given the way the modes change, I think this should be a 120ms disable
+delay if the affected panel is supported by the simple-panel driver.
+
+> Reviewed-by: Sean Paul <seanpaul@chromium.org>
+> 
+> > 
+> > Signed-off-by: John Keeping <john@metanate.com>
+> > Reviewed-by: Chris Zhong <zyw@rock-chips.com>
+> > ---
+> > v3:
+> > - Add Chris' Reviewed-by
+> > Unchanged in v2
+> > 
+> >  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 12 ++----------
+> >  1 file changed, 2 insertions(+), 10 deletions(-)
+> > 
+> > diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> > index 7ada6d8ed143..290282e86d16 100644
+> > --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> > +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> > @@ -846,24 +846,16 @@ static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
+> >  {
+> >  	struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
+> >  
+> > -	drm_panel_disable(dsi->panel);
+> > -
+> >  	if (clk_prepare_enable(dsi->pclk)) {
+> >  		dev_err(dsi->dev, "%s: Failed to enable pclk\n", __func__);
+> >  		return;
+> >  	}
+> >  
+> > +	drm_panel_disable(dsi->panel);
+> > +
+> >  	dw_mipi_dsi_set_mode(dsi, DW_MIPI_DSI_CMD_MODE);
+> >  	drm_panel_unprepare(dsi->panel);
+> > -	dw_mipi_dsi_set_mode(dsi, DW_MIPI_DSI_VID_MODE);
+> >  
+> > -	/*
+> > -	 * This is necessary to make sure the peripheral will be driven
+> > -	 * normally when the display is enabled again later.
+> > -	 */
+> > -	msleep(120);
+> > -
+> > -	dw_mipi_dsi_set_mode(dsi, DW_MIPI_DSI_CMD_MODE);
+> >  	dw_mipi_dsi_disable(dsi);
+> >  	clk_disable_unprepare(dsi->pclk);
+> >  }
+> > -- 
+> > 2.11.0.197.gb556de5.dirty
+> > 
+> > _______________________________________________
+> > dri-devel mailing list
+> > dri-devel at lists.freedesktop.org
+> > https://lists.freedesktop.org/mailman/listinfo/dri-devel  
+> 
