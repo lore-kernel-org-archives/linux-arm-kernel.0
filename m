@@ -1,23 +1,25 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 31 Jan 2017 21:00:45 +0000
-Subject: [PATCH 14/14] ASoC: sunxi: simplify optional reset handling
-In-Reply-To: <20170130114116.22089-14-p.zabel@pengutronix.de>
-References: <20170130114116.22089-1-p.zabel@pengutronix.de>
- <20170130114116.22089-14-p.zabel@pengutronix.de>
-Message-ID: <20170131210045.hdr3ahhduucancnp@sirena.org.uk>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 31 Jan 2017 22:04:29 +0100
+Subject: [PATCH] rtc: snvs: add a missing write sync
+In-Reply-To: <1485683839-8843-1-git-send-email-guy.shapiro@mobi-wize.com>
+References: <1485683839-8843-1-git-send-email-guy.shapiro@mobi-wize.com>
+Message-ID: <20170131210429.zoh75tcr4ymvsw6o@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2017 at 12:41:16PM +0100, Philipp Zabel wrote:
-> As of commit bb475230b8e5 ("reset: make optional functions really
-> optional"), the reset framework API calls use NULL pointers to describe
-> optional, non-present reset controls.
+On 29/01/2017 at 11:57:19 +0200, Guy Shapiro wrote:
+> The clear of the LPTA_EN flag should be synced before writing to the
+> alarm register. Omitting this synchronization creates a race when
+> trying to change existing alarm.
+> 
+> Signed-off-by: Guy Shapiro <guy.shapiro@mobi-wize.com>
+> ---
+>  drivers/rtc/rtc-snvs.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+Applied, thanks.
 
-Acked-by: Mark Brown <broonie@kernel.org>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170131/2beb9e9a/attachment.sig>
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
