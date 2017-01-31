@@ -1,169 +1,146 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 31 Jan 2017 18:05:50 +0000
-Subject: [RFC PATCH 12/13] arm64: kvm: Use common sysreg definitions
+Date: Tue, 31 Jan 2017 18:05:47 +0000
+Subject: [RFC PATCH 09/13] arm64: kvm: Use common performance monitor sysreg
+ definitions
 In-Reply-To: <1485885951-2747-1-git-send-email-mark.rutland@arm.com>
 References: <1485885951-2747-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1485885951-2747-13-git-send-email-mark.rutland@arm.com>
+Message-ID: <1485885951-2747-10-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have common definitions for the remaining register encodings
-required by KVM, make the KVM code use these, simplifying the
-sys_reg_descs table and the genericv8_sys_regs table.
+Now that we have common definitions for the performance monitor register
+encodings, make the KVM code use these, simplifying the sys_reg_descs
+table.
+
+The comments for PMUSERENR_EL0 and PMCCFILTR_EL0 are kept, as these
+describe non-obvious details regarding the registers. However, a slight
+fixup is applied to bring these into line with the usual comment style.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Christoffer Dall <christoffer.dall@linaro.org>
 Cc: Marc Zyngier <marc.zyngier@arm.com>
 Cc: kvmarm at lists.cs.columbia.edu
 ---
- arch/arm64/kvm/sys_regs.c            | 94 +++++++++---------------------------
- arch/arm64/kvm/sys_regs_generic_v8.c |  4 +-
- 2 files changed, 25 insertions(+), 73 deletions(-)
+ arch/arm64/kvm/sys_regs.c | 78 +++++++++++++----------------------------------
+ 1 file changed, 22 insertions(+), 56 deletions(-)
 
 diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index ec01776..2b0b5fc 100644
+index 1eca0fc..90befbe 100644
 --- a/arch/arm64/kvm/sys_regs.c
 +++ b/arch/arm64/kvm/sys_regs.c
-@@ -869,72 +869,36 @@ static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+@@ -804,16 +804,12 @@ static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
  
- 	{ SYS_DESC(SYS_DBGVCR32_EL2), NULL, reset_val, DBGVCR32_EL2, 0 },
+ /* Macro to expand the PMEVCNTRn_EL0 register */
+ #define PMU_PMEVCNTR_EL0(n)						\
+-	/* PMEVCNTRn_EL0 */						\
+-	{ Op0(0b11), Op1(0b011), CRn(0b1110),				\
+-	  CRm((0b1000 | (((n) >> 3) & 0x3))), Op2(((n) & 0x7)),		\
++	{ SYS_DESC(SYS_PMEVCNTRn_EL0(n)),					\
+ 	  access_pmu_evcntr, reset_unknown, (PMEVCNTR0_EL0 + n), }
  
--	/* MPIDR_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b0000), CRm(0b0000), Op2(0b101),
--	  NULL, reset_mpidr, MPIDR_EL1 },
--	/* SCTLR_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b000),
--	  access_vm_reg, reset_val, SCTLR_EL1, 0x00C50078 },
--	/* CPACR_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b010),
--	  NULL, reset_val, CPACR_EL1, 0 },
--	/* TTBR0_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b0010), CRm(0b0000), Op2(0b000),
--	  access_vm_reg, reset_unknown, TTBR0_EL1 },
--	/* TTBR1_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b0010), CRm(0b0000), Op2(0b001),
--	  access_vm_reg, reset_unknown, TTBR1_EL1 },
--	/* TCR_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b0010), CRm(0b0000), Op2(0b010),
--	  access_vm_reg, reset_val, TCR_EL1, 0 },
--
--	/* AFSR0_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b0101), CRm(0b0001), Op2(0b000),
--	  access_vm_reg, reset_unknown, AFSR0_EL1 },
--	/* AFSR1_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b0101), CRm(0b0001), Op2(0b001),
--	  access_vm_reg, reset_unknown, AFSR1_EL1 },
--	/* ESR_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b0101), CRm(0b0010), Op2(0b000),
--	  access_vm_reg, reset_unknown, ESR_EL1 },
--	/* FAR_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b0110), CRm(0b0000), Op2(0b000),
--	  access_vm_reg, reset_unknown, FAR_EL1 },
--	/* PAR_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b0111), CRm(0b0100), Op2(0b000),
--	  NULL, reset_unknown, PAR_EL1 },
-+	{ SYS_DESC(SYS_MPIDR_EL1), NULL, reset_mpidr, MPIDR_EL1 },
-+	{ SYS_DESC(SYS_SCTLR_EL1), access_vm_reg, reset_val, SCTLR_EL1, 0x00C50078 },
-+	{ SYS_DESC(SYS_CPACR_EL1), NULL, reset_val, CPACR_EL1, 0 },
-+	{ SYS_DESC(SYS_TTBR0_EL1), access_vm_reg, reset_unknown, TTBR0_EL1 },
-+	{ SYS_DESC(SYS_TTBR1_EL1), access_vm_reg, reset_unknown, TTBR1_EL1 },
-+	{ SYS_DESC(SYS_TCR_EL1), access_vm_reg, reset_val, TCR_EL1, 0 },
-+
-+	{ SYS_DESC(SYS_AFSR0_EL1), access_vm_reg, reset_unknown, AFSR0_EL1 },
-+	{ SYS_DESC(SYS_AFSR1_EL1), access_vm_reg, reset_unknown, AFSR1_EL1 },
-+	{ SYS_DESC(SYS_ESR_EL1), access_vm_reg, reset_unknown, ESR_EL1 },
-+	{ SYS_DESC(SYS_FAR_EL1), access_vm_reg, reset_unknown, FAR_EL1 },
-+	{ SYS_DESC(SYS_PAR_EL1), NULL, reset_unknown, PAR_EL1 },
+ /* Macro to expand the PMEVTYPERn_EL0 register */
+ #define PMU_PMEVTYPER_EL0(n)						\
+-	/* PMEVTYPERn_EL0 */						\
+-	{ Op0(0b11), Op1(0b011), CRn(0b1110),				\
+-	  CRm((0b1100 | (((n) >> 3) & 0x3))), Op2(((n) & 0x7)),		\
++	{ SYS_DESC(SYS_PMEVTYPERn_EL0(n)),					\
+ 	  access_pmu_evtyper, reset_unknown, (PMEVTYPER0_EL0 + n), }
  
- 	{ SYS_DESC(SYS_PMINTENSET_EL1), access_pminten, reset_unknown, PMINTENSET_EL1 },
- 	{ SYS_DESC(SYS_PMINTENCLR_EL1), access_pminten, NULL, PMINTENSET_EL1 },
+ /*
+@@ -908,12 +904,8 @@ static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 	{ Op0(0b11), Op1(0b000), CRn(0b0111), CRm(0b0100), Op2(0b000),
+ 	  NULL, reset_unknown, PAR_EL1 },
  
--	/* MAIR_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b1010), CRm(0b0010), Op2(0b000),
--	  access_vm_reg, reset_unknown, MAIR_EL1 },
--	/* AMAIR_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b1010), CRm(0b0011), Op2(0b000),
--	  access_vm_reg, reset_amair_el1, AMAIR_EL1 },
-+	{ SYS_DESC(SYS_MAIR_EL1), access_vm_reg, reset_unknown, MAIR_EL1 },
-+	{ SYS_DESC(SYS_AMAIR_EL1), access_vm_reg, reset_amair_el1, AMAIR_EL1 },
+-	/* PMINTENSET_EL1 */
+-	{ Op0(0b11), Op1(0b000), CRn(0b1001), CRm(0b1110), Op2(0b001),
+-	  access_pminten, reset_unknown, PMINTENSET_EL1 },
+-	/* PMINTENCLR_EL1 */
+-	{ Op0(0b11), Op1(0b000), CRn(0b1001), CRm(0b1110), Op2(0b010),
+-	  access_pminten, NULL, PMINTENSET_EL1 },
++	{ SYS_DESC(SYS_PMINTENSET_EL1), access_pminten, reset_unknown, PMINTENSET_EL1 },
++	{ SYS_DESC(SYS_PMINTENCLR_EL1), access_pminten, NULL, PMINTENSET_EL1 },
  
--	/* VBAR_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b0000), Op2(0b000),
--	  NULL, reset_val, VBAR_EL1, 0 },
-+	{ SYS_DESC(SYS_VBAR_EL1), NULL, reset_val, VBAR_EL1, 0 },
+ 	/* MAIR_EL1 */
+ 	{ Op0(0b11), Op1(0b000), CRn(0b1010), CRm(0b0010), Op2(0b000),
+@@ -948,48 +940,23 @@ static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 	{ Op0(0b11), Op1(0b010), CRn(0b0000), CRm(0b0000), Op2(0b000),
+ 	  NULL, reset_unknown, CSSELR_EL1 },
  
- 	{ SYS_DESC(SYS_ICC_SGI1R_EL1), access_gic_sgi },
- 	{ SYS_DESC(SYS_ICC_SRE_EL1), access_gic_sre },
- 
--	/* CONTEXTIDR_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b1101), CRm(0b0000), Op2(0b001),
--	  access_vm_reg, reset_val, CONTEXTIDR_EL1, 0 },
--	/* TPIDR_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b1101), CRm(0b0000), Op2(0b100),
--	  NULL, reset_unknown, TPIDR_EL1 },
-+	{ SYS_DESC(SYS_CONTEXTIDR_EL1), access_vm_reg, reset_val, CONTEXTIDR_EL1, 0 },
-+	{ SYS_DESC(SYS_TPIDR_EL1), NULL, reset_unknown, TPIDR_EL1 },
- 
--	/* CNTKCTL_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b1110), CRm(0b0001), Op2(0b000),
--	  NULL, reset_val, CNTKCTL_EL1, 0},
-+	{ SYS_DESC(SYS_CNTKCTL_EL1), NULL, reset_val, CNTKCTL_EL1, 0},
- 
--	/* CSSELR_EL1 */
--	{ Op0(0b11), Op1(0b010), CRn(0b0000), CRm(0b0000), Op2(0b000),
--	  NULL, reset_unknown, CSSELR_EL1 },
-+	{ SYS_DESC(SYS_CSSELR_EL1), NULL, reset_unknown, CSSELR_EL1 },
- 
- 	{ SYS_DESC(SYS_PMCR_EL0), access_pmcr, reset_pmcr, },
- 	{ SYS_DESC(SYS_PMCNTENSET_EL0), access_pmcnten, reset_unknown, PMCNTENSET_EL0 },
-@@ -954,12 +918,8 @@ static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
- 	{ SYS_DESC(SYS_PMUSERENR_EL0), access_pmuserenr, reset_val, PMUSERENR_EL0, 0 },
- 	{ SYS_DESC(SYS_PMOVSSET_EL0), access_pmovs, reset_unknown, PMOVSSET_EL0 },
- 
--	/* TPIDR_EL0 */
--	{ Op0(0b11), Op1(0b011), CRn(0b1101), CRm(0b0000), Op2(0b010),
--	  NULL, reset_unknown, TPIDR_EL0 },
--	/* TPIDRRO_EL0 */
--	{ Op0(0b11), Op1(0b011), CRn(0b1101), CRm(0b0000), Op2(0b011),
--	  NULL, reset_unknown, TPIDRRO_EL0 },
-+	{ SYS_DESC(SYS_TPIDR_EL0), NULL, reset_unknown, TPIDR_EL0 },
-+	{ SYS_DESC(SYS_TPIDRRO_EL0), NULL, reset_unknown, TPIDRRO_EL0 },
- 
- 	/* PMEVCNTRn_EL0 */
- 	PMU_PMEVCNTR_EL0(0),
-@@ -1031,15 +991,9 @@ static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+-	/* PMCR_EL0 */
+-	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b000),
+-	  access_pmcr, reset_pmcr, },
+-	/* PMCNTENSET_EL0 */
+-	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b001),
+-	  access_pmcnten, reset_unknown, PMCNTENSET_EL0 },
+-	/* PMCNTENCLR_EL0 */
+-	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b010),
+-	  access_pmcnten, NULL, PMCNTENSET_EL0 },
+-	/* PMOVSCLR_EL0 */
+-	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b011),
+-	  access_pmovs, NULL, PMOVSSET_EL0 },
+-	/* PMSWINC_EL0 */
+-	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b100),
+-	  access_pmswinc, reset_unknown, PMSWINC_EL0 },
+-	/* PMSELR_EL0 */
+-	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b101),
+-	  access_pmselr, reset_unknown, PMSELR_EL0 },
+-	/* PMCEID0_EL0 */
+-	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b110),
+-	  access_pmceid },
+-	/* PMCEID1_EL0 */
+-	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b111),
+-	  access_pmceid },
+-	/* PMCCNTR_EL0 */
+-	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b000),
+-	  access_pmu_evcntr, reset_unknown, PMCCNTR_EL0 },
+-	/* PMXEVTYPER_EL0 */
+-	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b001),
+-	  access_pmu_evtyper },
+-	/* PMXEVCNTR_EL0 */
+-	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b010),
+-	  access_pmu_evcntr },
+-	/* PMUSERENR_EL0
+-	 * This register resets as unknown in 64bit mode while it resets as zero
++	{ SYS_DESC(SYS_PMCR_EL0), access_pmcr, reset_pmcr, },
++	{ SYS_DESC(SYS_PMCNTENSET_EL0), access_pmcnten, reset_unknown, PMCNTENSET_EL0 },
++	{ SYS_DESC(SYS_PMCNTENCLR_EL0), access_pmcnten, NULL, PMCNTENSET_EL0 },
++	{ SYS_DESC(SYS_PMOVSCLR_EL0), access_pmovs, NULL, PMOVSSET_EL0 },
++	{ SYS_DESC(SYS_PMSWINC_EL0), access_pmswinc, reset_unknown, PMSWINC_EL0 },
++	{ SYS_DESC(SYS_PMSELR_EL0), access_pmselr, reset_unknown, PMSELR_EL0 },
++	{ SYS_DESC(SYS_PMCEID0_EL0), access_pmceid },
++	{ SYS_DESC(SYS_PMCEID1_EL0), access_pmceid },
++	{ SYS_DESC(SYS_PMCCNTR_EL0), access_pmu_evcntr, reset_unknown, PMCCNTR_EL0 },
++	{ SYS_DESC(SYS_PMXEVTYPER_EL0), access_pmu_evtyper },
++	{ SYS_DESC(SYS_PMXEVCNTR_EL0), access_pmu_evcntr },
++	/*
++	 * PMUSERENR_EL0 resets as unknown in 64bit mode while it resets as zero
+ 	 * in 32bit mode. Here we choose to reset it as zero for consistency.
  	 */
- 	{ SYS_DESC(SYS_PMCCFILTR_EL0), access_pmu_evtyper, reset_val, PMCCFILTR_EL0, 0 },
+-	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1110), Op2(0b000),
+-	  access_pmuserenr, reset_val, PMUSERENR_EL0, 0 },
+-	/* PMOVSSET_EL0 */
+-	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1110), Op2(0b011),
+-	  access_pmovs, reset_unknown, PMOVSSET_EL0 },
++	{ SYS_DESC(SYS_PMUSERENR_EL0), access_pmuserenr, reset_val, PMUSERENR_EL0, 0 },
++	{ SYS_DESC(SYS_PMOVSSET_EL0), access_pmovs, reset_unknown, PMOVSSET_EL0 },
  
--	/* DACR32_EL2 */
--	{ Op0(0b11), Op1(0b100), CRn(0b0011), CRm(0b0000), Op2(0b000),
--	  NULL, reset_unknown, DACR32_EL2 },
--	/* IFSR32_EL2 */
--	{ Op0(0b11), Op1(0b100), CRn(0b0101), CRm(0b0000), Op2(0b001),
--	  NULL, reset_unknown, IFSR32_EL2 },
--	/* FPEXC32_EL2 */
--	{ Op0(0b11), Op1(0b100), CRn(0b0101), CRm(0b0011), Op2(0b000),
--	  NULL, reset_val, FPEXC32_EL2, 0x70 },
-+	{ SYS_DESC(SYS_DACR32_EL2), NULL, reset_unknown, DACR32_EL2 },
-+	{ SYS_DESC(SYS_IFSR32_EL2), NULL, reset_unknown, IFSR32_EL2 },
-+	{ SYS_DESC(SYS_FPEXC32_EL2), NULL, reset_val, FPEXC32_EL2, 0x70 },
- };
+ 	/* TPIDR_EL0 */
+ 	{ Op0(0b11), Op1(0b011), CRn(0b1101), CRm(0b0000), Op2(0b010),
+@@ -1062,12 +1029,11 @@ static bool access_pmuserenr(struct kvm_vcpu *vcpu, struct sys_reg_params *p,
+ 	PMU_PMEVTYPER_EL0(28),
+ 	PMU_PMEVTYPER_EL0(29),
+ 	PMU_PMEVTYPER_EL0(30),
+-	/* PMCCFILTR_EL0
+-	 * This register resets as unknown in 64bit mode while it resets as zero
++	/*
++	 * PMCCFILTR_EL0 resets as unknown in 64bit mode while it resets as zero
+ 	 * in 32bit mode. Here we choose to reset it as zero for consistency.
+ 	 */
+-	{ Op0(0b11), Op1(0b011), CRn(0b1110), CRm(0b1111), Op2(0b111),
+-	  access_pmu_evtyper, reset_val, PMCCFILTR_EL0, 0 },
++	{ SYS_DESC(SYS_PMCCFILTR_EL0), access_pmu_evtyper, reset_val, PMCCFILTR_EL0, 0 },
  
- static bool trap_dbgidr(struct kvm_vcpu *vcpu,
-diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
-index 46af718..969ade1 100644
---- a/arch/arm64/kvm/sys_regs_generic_v8.c
-+++ b/arch/arm64/kvm/sys_regs_generic_v8.c
-@@ -52,9 +52,7 @@ static void reset_actlr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
-  * Important: Must be sorted ascending by Op0, Op1, CRn, CRm, Op2
-  */
- static const struct sys_reg_desc genericv8_sys_regs[] = {
--	/* ACTLR_EL1 */
--	{ Op0(0b11), Op1(0b000), CRn(0b0001), CRm(0b0000), Op2(0b001),
--	  access_actlr, reset_actlr, ACTLR_EL1 },
-+	{ SYS_DESC(SYS_ACTLR_EL1), access_actlr, reset_actlr, ACTLR_EL1 },
- };
- 
- static const struct sys_reg_desc genericv8_cp15_regs[] = {
+ 	/* DACR32_EL2 */
+ 	{ Op0(0b11), Op1(0b100), CRn(0b0011), CRm(0b0000), Op2(0b000),
 -- 
 1.9.1
