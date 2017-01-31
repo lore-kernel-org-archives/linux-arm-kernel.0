@@ -1,86 +1,58 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 31 Jan 2017 18:49:08 +0000
-Subject: [PATCH v20 08/17] clocksource/drivers/arm_arch_timer: Rework
- counter frequency detection.
-In-Reply-To: <CADyBb7uqomC10mR4oMcUKrvYCbrOfLB6q1T6feMfiYA4cMnduA@mail.gmail.com>
-References: <20170118132541.8989-1-fu.wei@linaro.org>
- <20170118132541.8989-9-fu.wei@linaro.org>
- <20170124172400.GG7572@leverpostej>
- <CADyBb7sU6DVMk6px0963r8by--U-3k_XjESd88zZMkj7xbywgA@mail.gmail.com>
- <20170125172505.GB29027@leverpostej>
- <CADyBb7syNx+HJ6t5JKPMnLqvq-98kPi1knuXU=SSe6_Uz6Gg1A@mail.gmail.com>
- <20170130174958.GA3496@leverpostej>
- <CADyBb7uqomC10mR4oMcUKrvYCbrOfLB6q1T6feMfiYA4cMnduA@mail.gmail.com>
-Message-ID: <20170131184908.GA2798@leverpostej>
+From: dhowells@redhat.com (David Howells)
+Date: Tue, 31 Jan 2017 18:59:22 +0000
+Subject: [PATCH 6/7] efi: Handle secure boot from UEFI-2.6 [ver #7]
+In-Reply-To: <CAKv+Gu8dnKB1sRGb3U+XB1eoA7Eyo4qSFBtPRbvGV912xPViVw@mail.gmail.com>
+References: <CAKv+Gu8dnKB1sRGb3U+XB1eoA7Eyo4qSFBtPRbvGV912xPViVw@mail.gmail.com>
+ <148587558696.4026.16034622623568539004.stgit@warthog.procyon.org.uk>
+ <148587564847.4026.5759345672956585977.stgit@warthog.procyon.org.uk>
+Message-ID: <10454.1485889162@warthog.procyon.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2017 at 02:43:02AM +0800, Fu Wei wrote:
-> On 31 January 2017 at 01:49, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Thu, Jan 26, 2017 at 01:49:03PM +0800, Fu Wei wrote:
-> >> On 26 January 2017 at 01:25, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> > On Wed, Jan 25, 2017 at 02:46:12PM +0800, Fu Wei wrote:
-> >> >> On 25 January 2017 at 01:24, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> >> > On Wed, Jan 18, 2017 at 09:25:32PM +0800, fu.wei at linaro.org wrote:
-> >> >> >> From: Fu Wei <fu.wei@linaro.org>
+Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+
+> > UEFI-2.6 adds a new variable, DeployedMode.  If it exists, this must be 1
+> > if we're to engage lockdown mode.
 > >
-> >> But according to another document(ARMv8-A Foundation Platform User
-> >> Guide  ARM DUI0677K),
-> >> Table 3-2 ARMv8-A Foundation Platform memory map (continued)
-> >>
-> >> AP_REFCLK CNTBase0, Generic Timer 64KB   S
-> >> AP_REFCLK CNTBase1, Generic Timer 64KB   S/NS
-> >>
-> >> Dose it means the timer frame 0 can be accessed in SECURE status  only,
-> >> and the timer frame 1 can be accessed in both status?
-> >
-> > That does appear to be what it says.
-> >
-> > I assume in this case CNTCTLBase.CNTSAR<0> is RES0.
-> >
-> >> And because Linux kernel is running on Non-secure EL1, so should we
-> >> skip "SECURE" timer in Linux?
-> >
-> > I guess you mean by checking the GTx Common flags, to see if the timer
-> > is secure? Yes, we must skip those.
+> > Reported-by: James Bottomley <James.Bottomley@HansenPartnership.com>
+> > Signed-off-by: David Howells <dhowells@redhat.com>
 > 
-> Yes, exactly.
+> Interestingly, the string 'DeployedMode' appears zero times in the
+> EDK2 codebase, so I wonder if it makes any sense to merge this now.
+> The string 'AuditMode' does appear once, but in a comment
+
+It's in the standard, so shouldn't we check for it?
+
+> In any case, the logic is not entirely correct either: apologies if it
+> was me who caused any confusion here, but it seems DeployedMode could
+> legally be 0 or 1 while secure boot is in fact enabled. It is actually
+> AuditMode that should be taken into account here, i.e., if AuditMode
+> == 1, the firmware ignores invalid or missing signatures. If
+> SecureBoot == 0x1, SetupMode == 0x0 and AuditMode == 0x0 (or
+> non-existent), signature verification is performed regardless of the
+> value (or existence) of DeployedMode.
 > 
-> I think we can check the  GTx Common flags, if the timer is set as
-> SECURE, this driver should just skip this timer.
+> So I propose to respin this patch to treat AuditMode == 0x1 as 'secure
+> boot disabled', and ignore if it is missing.
 
-I completely agree that we must skip these.
+Ummm...  This might conflict what said:
 
-> > Looking further at this, the ACPI spec is sorely lacking any statement
-> > as to the configuration of CNTCTLBase.{CNTSAR,CNTTIDR,CNTACR}, so it's
-> > not clear if we can access anything in a frame, even if it is listed as
-> > being a non-secure timer.
-> >
-> > I think we need a stronger statement here. Otherwise, we will encounter
-> > problems. Linux currently assumes that CNTCTLBase.CNTACR<N> is
-> > writeable, given a non-secure frame N. This is only the case if
-> > CNTCTLBase.CNTSAR.NS<N> == 1.
-> 
-> the original driver has checked these registers, but the problem is:
-> What if the timer frame is designed to be a secure timer, all the
-> register in this frame is only can be accessed in secure status, just
-> like foundation model?
-> Note: for foundation model, Please check Table 3-1 Access permissions
-> of 3.1 ARMv8-A Foundation Platform memory map in ARMv8-A Foundation
-> Platform User Guide
-> 
-> So I think we should check the GTDT first, if it's not a secure timer,
-> then we can go on checking CNTSAR. :-)
+| Since you seem to be using this to mean "is the platform locked down?",
+| this looks to be no longer complete in the UEFI 2.6 world.  If
+| DeployedMode == 0, even if SecureBoot == 1 and SetupMode == 0, you can
+| remove the platform key by writing 1 to AuditMode and gain control of
+| the secure variables.  The lock down state becomes DeployedMode == 1,
+| SecureBoot == 1 and SetupMode == 0
+| 
+| See the diagram on page 1817
+| 
+| http://www.uefi.org/sites/default/files/resources/UEFI%20Spec%202_6.pdf
 
-I've clearly confused matters here. I completely agree that we must skip
-timers the GTDT descrbies as secure.
+Looking again at that diagram, should I be checking all four variables
+(SecureBoot, SetupMode, DeployedMode and AuditMode)?  And/or should I treat
+audit mode differently to deployed mode?
 
-My complaint here is that the spec does not explicitly state that
-CNTCTLBase.CNTSAR.NS<N> must be set for timers *not* marked as secure
-(though I believe that is the intent). That is a spec issue, not a code
-issue.
+Further, there doesn't seem to be a state in which SecureBoot is shown as
+being 1.
 
-We unfortunately can't check CNTNSAR, as it is secure-only. :(
-
-Thanks,
-Mark.
+David
