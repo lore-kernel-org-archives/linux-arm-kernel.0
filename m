@@ -1,48 +1,103 @@
 From: mylene.josserand@free-electrons.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Tue, 31 Jan 2017 11:05:45 +0100
-Subject: [PATCH v3 1/8] ASoC: sun4i-i2s: Update binding documentation to
- include A31
-In-Reply-To: <20170131100552.27949-1-mylene.josserand@free-electrons.com>
-References: <20170131100552.27949-1-mylene.josserand@free-electrons.com>
-Message-ID: <20170131100552.27949-2-mylene.josserand@free-electrons.com>
+Date: Tue, 31 Jan 2017 11:05:44 +0100
+Subject: [PATCH v3 0/8] Add sun8i A33 audio driver
+Message-ID: <20170131100552.27949-1-mylene.josserand@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new compatible for sun4i-i2s driver to handle some
-SoCs that have a reset line that must be asserted/deasserted.
+Hello everyone,
 
-This new compatible, "allwinner,sun6i-a31-i2s", requires the
-property "resets" which should be a phandle to the reset line.
-Except these differences, the compatible is identical to previous one
-which will not handle a reset line.
+This a V3 of my Allwinner A33 (sun8i) audio codec driver.
+Tested on linux-next-20170131 tag.
 
-Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
----
- Documentation/devicetree/bindings/sound/sun4i-i2s.txt | 5 +++++
- 1 file changed, 5 insertions(+)
+Changes since V2:
+	- Removed patches from v2 already merged:
+	commit ebad64d193779 ("ASoC: sun4i-i2s: Increase DMA max burst to 8")
+	commit 603a0c8af9cb2 ("clk: sunxi-ng: a33: Add CLK_SET_RATE_PARENT to ac-dig")
+	- Removed "reset-names" from sun4i-i2s driver
+	- Fixed the build warning from sun8i-codec
+	- Fixed some various topics such as subject line
+	for dt bindings patch, renamed the simple-card
+	and disabled the simple-card.
 
-diff --git a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
-index 7a2c0945fd22..b71df552bc0c 100644
---- a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
-+++ b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
-@@ -7,6 +7,7 @@ Required properties:
- 
- - compatible: should be one of the following:
-    - "allwinner,sun4i-a10-i2s"
-+   - "allwinner,sun6i-a31-i2s"
- - reg: physical base address of the controller and length of memory mapped
-   region.
- - interrupts: should contain the I2S interrupt.
-@@ -19,6 +20,10 @@ Required properties:
-    - "mod" : module clock for the I2S controller
- - #sound-dai-cells : Must be equal to 0
- 
-+Required properties for the following compatibles:
-+		- "allwinner,sun6i-a31-i2s"
-+- resets: phandle to the reset line for this codec
-+
- Example:
- 
- i2s0: i2s at 01c22400 {
+Changes since V1:
+	- Remove the analog codec driver as a better version has been
+	committed by Chen-Yu Tsai and is already merged.
+	- Remove the audio-card as simple-card can be used
+	- The DMA maxburst is set to 8 in the sun4i-i2s instead of
+	adding the maxburst of 4 in Sun6i dma engine.
+	- Create a new compatible for sun4i-i2s to handle the reset
+	line.
+	- Fix various problems in sun8i-codec driver according to V1's
+	reviews
+	- Add the pm_runtime hooks in sun8i-codec driver to prepare/
+	unprepare clocks.
+	- Update the DTS according to Chen-Yu's analog codec driver.
+	- Rename sun8i-codec's clocks to "bus" and "mod"
+	- The first "delay" issue from V1 is fixed by using a delay
+	when enabling the headphone amplifier to let the amplifier
+	being up.
+
+Patches 1 and 2 add a new compatible "allwinner,sun6i-a31-i2s"
+to handle the reset line for sun4i-i2s driver. It uses a quirk to
+use a version with or without reset lines.
+
+Patch 3 adds the sun8i codec driver which represents the digital part
+of the A33 codec. It supports only playback features.
+
+Path 4 fixes the previous issue of a "first time delay" in V1 (see cover
+letter). Do not hesitate if you have comments on this patch.
+
+Patches 5 adds the dt-bindings documentation for new audio driver
+added in this serie (sun8i-codec).
+
+Patch 6 adds the cpu DAI, codec and audio nodes to sun8i-a33 device tree.
+
+Patches 7 and 8 enable the audio on Parrot and Sinlinx's boards.
+
+The DAI for this A33 codec is the same than for A20: "sun4i-i2s".
+Currently, the sun8i-a33 codec driver handles only the playback feature.
+The other ones (such as capture) and all other interfaces except
+headphone are not supported. I will send a patch to handle the
+capture with microphones in next few weeks.
+
+Examples of amixer commands:
+	amixer set 'Headphone' 75%
+	amixer set 'Headphone' on
+	amixer set 'DAC' on
+	amixer set 'Right DAC Mixer RSlot 0' on
+	amixer set 'Left DAC Mixer LSlot 0' on
+
+It was tested on Parrot and Sinlinx boards.
+
+Let me know if you have any comments on this serie.
+
+Thank you in advance,
+Best regards,
+
+Myl?ne Josserand (8):
+  ASoC: sun4i-i2s: Update binding documentation to include A31
+  ASoC: sun4i-i2s: Add quirks to handle a31 compatible
+  ASoC: Add sun8i digital audio codec
+  ASoC: sun8i-codec-analog: Add amplifier event to fix first delay
+  ASoC: codecs: Add sun8i-a33 binding documentation
+  ARM: dts: sun8i: Add audio codec, dai and card for A33
+  ARM: dts: sun8i: parrot: Enable audio nodes
+  ARM: dts: sun8i: sinlinx: Enable audio nodes
+
+ .../devicetree/bindings/sound/sun4i-i2s.txt        |   5 +
+ .../devicetree/bindings/sound/sun8i-a33-codec.txt  |  75 ++++
+ arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts     |  12 +
+ arch/arm/boot/dts/sun8i-a33.dtsi                   |  45 ++
+ arch/arm/boot/dts/sun8i-r16-parrot.dts             |  12 +
+ sound/soc/sunxi/Kconfig                            |  11 +
+ sound/soc/sunxi/Makefile                           |   1 +
+ sound/soc/sunxi/sun4i-i2s.c                        |  57 ++-
+ sound/soc/sunxi/sun8i-codec-analog.c               |  30 +-
+ sound/soc/sunxi/sun8i-codec.c                      | 499 +++++++++++++++++++++
+ 10 files changed, 743 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/sun8i-a33-codec.txt
+ create mode 100644 sound/soc/sunxi/sun8i-codec.c
+
 -- 
 2.11.0
