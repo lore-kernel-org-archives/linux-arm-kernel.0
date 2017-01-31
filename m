@@ -1,262 +1,88 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 31 Jan 2017 22:08:32 +0100
-Subject: [PATCH] ARM: ux500: cut some platform data
-Message-ID: <20170131210832.3377-1-linus.walleij@linaro.org>
+From: mzoran@crowfest.net (Michael Zoran)
+Date: Tue, 31 Jan 2017 13:10:23 -0800
+Subject: [PATCH] MAINTAINERS: Update for the current location of the
+ bcm2835 tree.
+In-Reply-To: <7f2dfd64-0054-4b1f-fc13-a4d1912c05db@gmail.com>
+References: <20170131194801.13049-1-eric@anholt.net>
+ <1485894779.25562.1.camel@crowfest.net>
+ <7f2dfd64-0054-4b1f-fc13-a4d1912c05db@gmail.com>
+Message-ID: <1485897023.25562.3.camel@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This platform data is revoked: the drivers are getting the DMA
-configuration from the device tree, it has been done like that
-since the DMA support was merged and this data has not been used
-since. The remaining auxdata is also unused.
+On Tue, 2017-01-31 at 12:55 -0800, Florian Fainelli wrote:
+> On 01/31/2017 12:32 PM, Michael Zoran wrote:
+> > On Tue, 2017-01-31 at 11:48 -0800, Eric Anholt wrote:
+> > > I've been maintaining the bcm2835 branches here for a year or so.
+> > > 
+> > > Signed-off-by: Eric Anholt <eric@anholt.net>
+> > > ---
+> > > ?MAINTAINERS | 2 +-
+> > > ?1 file changed, 1 insertion(+), 1 deletion(-)
+> > > 
+> > > diff --git a/MAINTAINERS b/MAINTAINERS
+> > > index 844835563ef8..64b281a7ff09 100644
+> > > --- a/MAINTAINERS
+> > > +++ b/MAINTAINERS
+> > > @@ -2624,7 +2624,7 @@ M:	Lee Jones <lee@kernel.org>
+> > > ?M:	Eric Anholt <eric@anholt.net>
+> > > ?L:	linux-rpi-kernel at lists.infradead.org (moderated for
+> > > non-
+> > > subscribers)
+> > > ?L:	linux-arm-kernel at lists.infradead.org (moderated for
+> > > non-
+> > > subscribers)
+> > > -T:	git
+> > > git://git.kernel.org/pub/scm/linux/kernel/git/rpi/linux-rpi.git
+> > > +T:	git git://github.com/anholt/linux
+> > > ?S:	Maintained
+> > > ?N:	bcm283[5-7x]
+> > > ?F:	drivers/staging/vc04_services
+> > 
+> > Just to add two cents here, since this is sort of a open source
+> > community driven thing, I think there should be multiple
+> > maintainers in
+> > case of a disagreement.??2 is good, 3 is better so that it's
+> > impossible
+> > to have a split disagreement and the third person can break the
+> > tie.
+> 
+> You may want to look at the file, and not the diff, which is already
+> listing 3 people.
+> 
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ARM SoC folks: please apply this directly to the ux500/dev branch,
-or if you want some separate cleanup branch. I originally
-intended to send it along with other changes but those will land
-in v4.12 or something instead.
----
- arch/arm/mach-ux500/board-mop500-audio.c | 77 -----------------------------
- arch/arm/mach-ux500/board-mop500.h       | 17 -------
- arch/arm/mach-ux500/cpu-db8500.c         | 16 ------
- arch/arm/mach-ux500/ste-dma40-db8500.h   | 85 --------------------------------
- 4 files changed, 195 deletions(-)
- delete mode 100644 arch/arm/mach-ux500/board-mop500-audio.c
- delete mode 100644 arch/arm/mach-ux500/board-mop500.h
- delete mode 100644 arch/arm/mach-ux500/ste-dma40-db8500.h
+I know the file still has 3 people.  Eric was just asking in another e-
+mail about changing the maintainers.
 
-diff --git a/arch/arm/mach-ux500/board-mop500-audio.c b/arch/arm/mach-ux500/board-mop500-audio.c
-deleted file mode 100644
-index b2a0899e7453..000000000000
---- a/arch/arm/mach-ux500/board-mop500-audio.c
-+++ /dev/null
-@@ -1,77 +0,0 @@
--/*
-- * Copyright (C) ST-Ericsson SA 2010
-- *
-- * License terms: GNU General Public License (GPL), version 2
-- */
--
--#include <linux/platform_device.h>
--#include <linux/init.h>
--#include <linux/gpio.h>
--#include <linux/platform_data/dma-ste-dma40.h>
--
--#include <linux/platform_data/asoc-ux500-msp.h>
--
--#include "ste-dma40-db8500.h"
--#include "board-mop500.h"
--
--static struct stedma40_chan_cfg msp0_dma_rx = {
--	.high_priority = true,
--	.dir = DMA_DEV_TO_MEM,
--	.dev_type = DB8500_DMA_DEV31_MSP0_SLIM0_CH0,
--};
--
--static struct stedma40_chan_cfg msp0_dma_tx = {
--	.high_priority = true,
--	.dir = DMA_MEM_TO_DEV,
--	.dev_type = DB8500_DMA_DEV31_MSP0_SLIM0_CH0,
--};
--
--struct msp_i2s_platform_data msp0_platform_data = {
--	.id = 0,
--	.msp_i2s_dma_rx = &msp0_dma_rx,
--	.msp_i2s_dma_tx = &msp0_dma_tx,
--};
--
--static struct stedma40_chan_cfg msp1_dma_rx = {
--	.high_priority = true,
--	.dir = DMA_DEV_TO_MEM,
--	.dev_type = DB8500_DMA_DEV30_MSP3,
--};
--
--static struct stedma40_chan_cfg msp1_dma_tx = {
--	.high_priority = true,
--	.dir = DMA_MEM_TO_DEV,
--	.dev_type = DB8500_DMA_DEV30_MSP1,
--};
--
--struct msp_i2s_platform_data msp1_platform_data = {
--	.id = 1,
--	.msp_i2s_dma_rx = NULL,
--	.msp_i2s_dma_tx = &msp1_dma_tx,
--};
--
--static struct stedma40_chan_cfg msp2_dma_rx = {
--	.high_priority = true,
--	.dir = DMA_DEV_TO_MEM,
--	.dev_type = DB8500_DMA_DEV14_MSP2,
--};
--
--static struct stedma40_chan_cfg msp2_dma_tx = {
--	.high_priority = true,
--	.dir = DMA_MEM_TO_DEV,
--	.dev_type = DB8500_DMA_DEV14_MSP2,
--	.use_fixed_channel = true,
--	.phy_channel = 1,
--};
--
--struct msp_i2s_platform_data msp2_platform_data = {
--	.id = 2,
--	.msp_i2s_dma_rx = &msp2_dma_rx,
--	.msp_i2s_dma_tx = &msp2_dma_tx,
--};
--
--struct msp_i2s_platform_data msp3_platform_data = {
--	.id		= 3,
--	.msp_i2s_dma_rx	= &msp1_dma_rx,
--	.msp_i2s_dma_tx	= NULL,
--};
-diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
-deleted file mode 100644
-index 7c7b0adca582..000000000000
---- a/arch/arm/mach-ux500/board-mop500.h
-+++ /dev/null
-@@ -1,17 +0,0 @@
--/*
-- * Copyright (C) ST-Ericsson SA 2010
-- *
-- * License terms: GNU General Public License (GPL) version 2
-- */
--
--#ifndef __BOARD_MOP500_H
--#define __BOARD_MOP500_H
--
--#include <linux/platform_data/asoc-ux500-msp.h>
--
--extern struct msp_i2s_platform_data msp0_platform_data;
--extern struct msp_i2s_platform_data msp1_platform_data;
--extern struct msp_i2s_platform_data msp2_platform_data;
--extern struct msp_i2s_platform_data msp3_platform_data;
--
--#endif
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index c0c36b978cba..24529cf58df6 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -33,7 +33,6 @@
- 
- #include "setup.h"
- 
--#include "board-mop500.h"
- #include "db8500-regs.h"
- 
- static int __init ux500_l2x0_unlock(void)
-@@ -141,21 +140,6 @@ static struct arm_pmu_platdata db8500_pmu_platdata = {
- static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
- 	/* Requires call-back bindings. */
- 	OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &db8500_pmu_platdata),
--	/* Requires DMA bindings. */
--	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80123000,
--		       "ux500-msp-i2s.0", &msp0_platform_data),
--	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80124000,
--		       "ux500-msp-i2s.1", &msp1_platform_data),
--	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80117000,
--		       "ux500-msp-i2s.2", &msp2_platform_data),
--	OF_DEV_AUXDATA("stericsson,ux500-msp-i2s", 0x80125000,
--		       "ux500-msp-i2s.3", &msp3_platform_data),
--	/* Requires non-DT:able platform data. */
--	OF_DEV_AUXDATA("stericsson,db8500-prcmu", 0x80157000, "db8500-prcmu", NULL),
--	OF_DEV_AUXDATA("stericsson,ux500-cryp", 0xa03cb000, "cryp1", NULL),
--	OF_DEV_AUXDATA("stericsson,ux500-hash", 0xa03c2000, "hash1", NULL),
--	OF_DEV_AUXDATA("stericsson,snd-soc-mop500", 0, "snd-soc-mop500.0",
--			NULL),
- 	{},
- };
- 
-diff --git a/arch/arm/mach-ux500/ste-dma40-db8500.h b/arch/arm/mach-ux500/ste-dma40-db8500.h
-deleted file mode 100644
-index 0296ae5b0fd9..000000000000
---- a/arch/arm/mach-ux500/ste-dma40-db8500.h
-+++ /dev/null
-@@ -1,85 +0,0 @@
--/*
-- * arch/arm/mach-ux500/ste_dma40_db8500.h
-- * DB8500-SoC-specific configuration for DMA40
-- *
-- * Copyright (C) ST-Ericsson 2007-2010
-- * License terms: GNU General Public License (GPL) version 2
-- * Author: Per Friden <per.friden@stericsson.com>
-- * Author: Jonas Aaberg <jonas.aberg@stericsson.com>
-- */
--#ifndef STE_DMA40_DB8500_H
--#define STE_DMA40_DB8500_H
--
--#define DB8500_DMA_NR_DEV 64
--
--/*
-- * Unless otherwise specified, all channels numbers are used for
-- * TX & RX, and can be used for either source or destination
-- * channels.
-- */
--enum dma_dev_type {
--	DB8500_DMA_DEV0_SPI0 = 0,
--	DB8500_DMA_DEV1_SD_MMC0 = 1,
--	DB8500_DMA_DEV2_SD_MMC1 = 2,
--	DB8500_DMA_DEV3_SD_MMC2 = 3,
--	DB8500_DMA_DEV4_I2C1 = 4,
--	DB8500_DMA_DEV5_I2C3 = 5,
--	DB8500_DMA_DEV6_I2C2 = 6,
--	DB8500_DMA_DEV7_I2C4 = 7,			/* Only on V1 and later */
--	DB8500_DMA_DEV8_SSP0 = 8,
--	DB8500_DMA_DEV9_SSP1 = 9,
--	DB8500_DMA_DEV10_MCDE_RX = 10,			/* RX only */
--	DB8500_DMA_DEV11_UART2 = 11,
--	DB8500_DMA_DEV12_UART1 = 12,
--	DB8500_DMA_DEV13_UART0 = 13,
--	DB8500_DMA_DEV14_MSP2 = 14,
--	DB8500_DMA_DEV15_I2C0 = 15,
--	DB8500_DMA_DEV16_USB_OTG_IEP_AND_OEP_7_15 = 16,
--	DB8500_DMA_DEV17_USB_OTG_IEP_AND_OEP_6_14 = 17,
--	DB8500_DMA_DEV18_USB_OTG_IEP_AND_OEP_5_13 = 18,
--	DB8500_DMA_DEV19_USB_OTG_IEP_AND_OEP_4_12 = 19,
--	DB8500_DMA_DEV20_SLIM0_CH0_HSI_CH0 = 20,
--	DB8500_DMA_DEV21_SLIM0_CH1_HSI_CH1 = 21,
--	DB8500_DMA_DEV22_SLIM0_CH2_HSI_CH2 = 22,
--	DB8500_DMA_DEV23_SLIM0_CH3_HSI_CH3 = 23,
--	DB8500_DMA_DEV24_SXA0 = 24,
--	DB8500_DMA_DEV25_SXA1 = 25,
--	DB8500_DMA_DEV26_SXA2 = 26,
--	DB8500_DMA_DEV27_SXA3 = 27,
--	DB8500_DMA_DEV28_SD_MM2 = 28,
--	DB8500_DMA_DEV29_SD_MM0 = 29,
--	DB8500_DMA_DEV30_MSP1 = 30,
--	/* On DB8500v2, MSP3 RX replaces MSP1 RX */
--	DB8500_DMA_DEV30_MSP3 = 30,
--	DB8500_DMA_DEV31_MSP0_SLIM0_CH0 = 31,
--	DB8500_DMA_DEV32_SD_MM1 = 32,
--	DB8500_DMA_DEV33_SPI2 = 33,
--	DB8500_DMA_DEV34_I2C3_RX2_TX2 = 34,
--	DB8500_DMA_DEV35_SPI1 = 35,
--	DB8500_DMA_DEV36_USB_OTG_IEP_AND_OEP_3_11 = 36,
--	DB8500_DMA_DEV37_USB_OTG_IEP_AND_OEP_2_10 = 37,
--	DB8500_DMA_DEV38_USB_OTG_IEP_AND_OEP_1_9 = 38,
--	DB8500_DMA_DEV39_USB_OTG_IEP_AND_OEP_8 = 39,
--	DB8500_DMA_DEV40_SPI3 = 40,
--	DB8500_DMA_DEV41_SD_MM3 = 41,
--	DB8500_DMA_DEV42_SD_MM4 = 42,
--	DB8500_DMA_DEV43_SD_MM5 = 43,
--	DB8500_DMA_DEV44_SXA4 = 44,
--	DB8500_DMA_DEV45_SXA5 = 45,
--	DB8500_DMA_DEV46_SLIM0_CH8_SRC_SXA6 = 46,
--	DB8500_DMA_DEV47_SLIM0_CH9_SRC_SXA7 = 47,
--	DB8500_DMA_DEV48_CAC1 = 48,
--	DB8500_DMA_DEV49_CAC1_TX_HAC1_TX = 49,		/* TX only */
--	DB8500_DMA_DEV50_HAC1_TX = 50,			/* TX only */
--	DB8500_DMA_MEMCPY_TX_0 = 51,			/* TX only */
--	DB8500_DMA_DEV52_SLIM0_CH4_HSI_CH4 = 52,
--	DB8500_DMA_DEV53_SLIM0_CH5_HSI_CH5 = 53,
--	DB8500_DMA_DEV54_SLIM0_CH6_HSI_CH6 = 54,
--	DB8500_DMA_DEV55_SLIM0_CH7_HSI_CH7 = 55,
--	/* 56 -> 60 are channels reserved for memcpy only */
--	DB8500_DMA_DEV61_CAC0 = 61,
--	DB8500_DMA_DEV62_CAC0_TX_HAC0_TX = 62,		/* TX only */
--	DB8500_DMA_DEV63_HAC0_TX = 63,			/* TX only */
--};
--
--#endif
--- 
-2.9.3
+> > 
+> > Github is cool as the e-mail based system is really, really
+> > bad.??But
+> > if it is on github, I think it should have a neutral name not a
+> > person's name and allow multiple people to merge in pulls.
+> > 
+> > Unless of course, Eric wants to take 100% control of this whole
+> > thing.
+> > 
+> 
+> Really not clear what point you are trying to make here, other than
+> you
+> may not like how things are, but at some point, someone needs to
+> merge
+> patches somewhere, in a repository that's convenient, only to have
+> them
+> pulled by whoever is next up in the food chain. Where the code is
+> really
+> does not matter much because: git is distributed, patches can be
+> collected from mailing-list archives.
+
+I'm not 100% sure myself what the point is myself actually.:) 
+
+But there is also no reason some inclined person couldn't flip things
+around and make the linux root a topic branch in itself and merge it
+into their own "version" of the kernel.  Then try to get the various
+linux distributions to include that kernel as on option.  
+
+That is what was essentially done with the Raspberry PI kernel to begin
+with.  I'm not saying that's a better system or that I personally would
+attempt to do that, just it's a is the picture right side up or upside
+down thing.  It's arbitrary and just a matter of perspective.
