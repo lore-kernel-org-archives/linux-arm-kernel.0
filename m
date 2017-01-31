@@ -1,51 +1,54 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 31 Jan 2017 10:56:22 +0100
-Subject: [PATCH v2 1/2] dt-bindings: gpu: Add Mali Utgard bindings
-In-Reply-To: <2a5e7d0a-e2ca-5cc7-5193-96be5bfe494b@baylibre.com>
-References: <a4d90de597cfcfab5fddeeb538505774a980818b.1485180017.git-series.maxime.ripard@free-electrons.com>
- <20170127201913.jjhdw57jmxifqpxa@rob-hp-laptop>
- <20170130134824.u37svxphyy266tzz@lukather>
- <2a5e7d0a-e2ca-5cc7-5193-96be5bfe494b@baylibre.com>
-Message-ID: <20170131095622.ew56cyjrndu6wxwe@lukather>
+From: lkundrak@v3.sk (Lubomir Rintel)
+Date: Tue, 31 Jan 2017 11:07:23 +0100
+Subject: [PATCH] ARM: bcm2835: dt: add index to the ethernet alias
+In-Reply-To: <5942321c5d0bfea54eac64ace2b217e8e0b6220d.1485801879.git.baruch@tkos.co.il>
+References: <5942321c5d0bfea54eac64ace2b217e8e0b6220d.1485801879.git.baruch@tkos.co.il>
+Message-ID: <1485857243.24331.0.camel@v3.sk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2017 at 05:24:06PM +0100, Neil Armstrong wrote:
-> >>> @@ -0,0 +1,79 @@
-> >>> +ARM Mali Utgard GPU
-> >>> +===================
-> >>> +
-> >>> +Required properties:
-> >>> +  - compatible
-> >>> +    * Must be one of the following:
-> >>> +      + "arm,mali-300"
-> >>> +      + "arm,mali-400"
-> >>> +      + "arm,mali-450"
-> >>> +    * And, optionally, one of the vendor specific compatible:
-> >>> +      + allwinner,sun4i-a10-mali
-> >>> +      + allwinner,sun7i-a20-mali
-> >>
-> >> And stericsson,db8500-mali?
-> > 
-> > Good catch, I'll add it.
+On Mon, 2017-01-30 at 20:44 +0200, Baruch Siach wrote:
+> An alias name should have an index number even when it is the only of
+> its type.
+> This allows U-Boot to add the local-mac-address property. Otherwise
+> U-Boot
+> skips the alias.
 > 
-> I think you can safely add the following :
+> Cc: Lubomir Rintel <lkundrak@v3.sk>
+> Fixes: 6a93792774 ("ARM: bcm2835: dt: Add the ethernet to the device
+> trees")
+> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+
+Acked-by: Lubomir Rintel <lkundrak@v3.sk>
+
+> ---
+> ?arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi | 2 +-
+> ?arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi | 2 +-
+> ?2 files changed, 2 insertions(+), 2 deletions(-)
 > 
-> amlogic,meson-gxbb-mali
-> amlogic,meson-gxl-mali
-
-Ack. Do you need any extra properties?
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170131/5555c9f5/attachment.sig>
+> diff --git a/arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi
+> b/arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi
+> index 12c981e51134..9a0599f711ff 100644
+> --- a/arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi
+> +++ b/arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi
+> @@ -1,6 +1,6 @@
+> ?/ {
+> ?	aliases {
+> -		ethernet = &ethernet;
+> +		ethernet0 = &ethernet;
+> ?	};
+> ?};
+> ?
+> diff --git a/arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi
+> b/arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi
+> index 3f0a56ebcf1f..dc7ae776db5f 100644
+> --- a/arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi
+> +++ b/arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi
+> @@ -1,6 +1,6 @@
+> ?/ {
+> ?	aliases {
+> -		ethernet = &ethernet;
+> +		ethernet0 = &ethernet;
+> ?	};
+> ?};
+> ?
