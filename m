@@ -1,28 +1,45 @@
-From: smitha.t@samsung.com (Smitha T Murthy)
-Date: Tue, 31 Jan 2017 14:42:33 +0530
-Subject: [PATCH] [media] s5p-mfc: Align stream buffer and CPB buffer to 512
-In-Reply-To: <de7bbdbf-35cc-a575-79d1-2ec5764469a5@samsung.com>
-References: <CGME20170118094212epcas5p22e588016d2b330dcd0b99b6e1012c744@epcas5p2.samsung.com>
- <1484732223-24670-1-git-send-email-smitha.t@samsung.com>
- <de7bbdbf-35cc-a575-79d1-2ec5764469a5@samsung.com>
-Message-ID: <1485853953.16927.23.camel@smitha-fedora>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 31 Jan 2017 09:41:32 +0000
+Subject: [PULL v2] ARM: DTS: Fix broken GICv2 register maps
+In-Reply-To: <20170131050648.GB16560@localhost> (Olof Johansson's message of
+ "Mon, 30 Jan 2017 21:06:48 -0800")
+References: <1485766389-30811-1-git-send-email-marc.zyngier@arm.com>
+ <20170131050648.GB16560@localhost>
+Message-ID: <86zii77eib.fsf@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-01-18 at 15:37 +0100, Andrzej Hajda wrote: 
-> Hi Smitha,
-> 
-> On 18.01.2017 10:37, Smitha T Murthy wrote:
-> > >From MFCv6 onwards encoder stream buffer and decoder CPB buffer
-> 
-> Unexpected char at the beginning.
-> 
-> > need to be aligned with 512.
-> 
-> Patch below adds checks only if buffer size is multiple of 512, am I right?
-> If yes, please precise the subject, for example "...CPB buffer size need
-> to be...".
-> 
+On Tue, Jan 31 2017 at 05:06:48 AM, Olof Johansson <olof@lixom.net> wrote:
+> Hi Marc, 
+>
+> On Mon, Jan 30, 2017 at 08:53:09AM +0000, Marc Zyngier wrote:
+>> ARM-soc folks,
+>> 
+>> Please find below the pull request for a DT fix affecting a large
+>> number of 32bit platforms, which has been acked by a number of
+>> platform maintainers.
+>> 
+>> * From v1: Dropped the controvertial cortex-a15-gic->arm,gic-400
+>>   change in the example, at Rob's request.
+>> 
+>> The following changes since commit 49def1853334396f948dcb4cedb9347abb318df5:
+>> 
+>>   Linux 4.10-rc4 (2017-01-15 16:21:59 -0800)
+>
+> Any reason you had to base this on -rc4? We usually stick to an older
+> -rc for all our branches, this cycle it's -rc3.
 
-Thank you for the review, after further analysis I found this patch is
-not required. So I will drop it. 
+Ah, damn... No reason, just what I had at hand at the time this was put
+together.
+
+> Care to respin? Or I can just pick over the patches, as long as you
+> don't need them as a stable base somewhere else.
+
+If that works for you, please cherry pick the patches. I don't need them
+to be based on anything in particular.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
