@@ -1,130 +1,46 @@
 From: dhowells@redhat.com (David Howells)
-Date: Tue, 31 Jan 2017 15:13:18 +0000
-Subject: [PATCH 1/7] x86/efi: Allow invocation of arbitrary runtime services
+Date: Tue, 31 Jan 2017 15:13:29 +0000
+Subject: [PATCH 2/7] arm/efi: Allow invocation of arbitrary runtime services
  [ver #7]
 In-Reply-To: <148587558696.4026.16034622623568539004.stgit@warthog.procyon.org.uk>
 References: <148587558696.4026.16034622623568539004.stgit@warthog.procyon.org.uk>
-Message-ID: <148587559825.4026.10932771233262003656.stgit@warthog.procyon.org.uk>
+Message-ID: <148587560927.4026.13631713806987809459.stgit@warthog.procyon.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide the ability to perform mixed-mode runtime service calls for x86 in
-the same way that commit 0a637ee61247bd4bed9b2a07568ef7a1cfc76187
-("x86/efi: Allow invocation of arbitrary boot services") provides the
-ability to invoke arbitrary boot services.
+efi_call_runtime() is provided for x86 to be able abstract mixed mode
+support.  Provide this for ARM also so that common code work in mixed mode
+also.
 
 Suggested-by: Lukas Wunner <lukas@wunner.de>
 Signed-off-by: David Howells <dhowells@redhat.com>
 ---
 
- arch/x86/boot/compressed/eboot.c   |    1 +
- arch/x86/boot/compressed/head_32.S |    6 +++---
- arch/x86/boot/compressed/head_64.S |    8 ++++----
- arch/x86/include/asm/efi.h         |    5 +++++
- 4 files changed, 13 insertions(+), 7 deletions(-)
+ arch/arm/include/asm/efi.h   |    1 +
+ arch/arm64/include/asm/efi.h |    1 +
+ 2 files changed, 2 insertions(+)
 
-diff --git a/arch/x86/boot/compressed/eboot.c b/arch/x86/boot/compressed/eboot.c
-index 6d3aeabbce68..f99978db6b6f 100644
---- a/arch/x86/boot/compressed/eboot.c
-+++ b/arch/x86/boot/compressed/eboot.c
-@@ -32,6 +32,7 @@ static void setup_boot_services##bits(struct efi_config *c)		\
- 									\
- 	table = (typeof(table))sys_table;				\
- 									\
-+	c->runtime_services = table->runtime;				\
- 	c->boot_services = table->boottime;				\
- 	c->text_output = table->con_out;				\
- }
-diff --git a/arch/x86/boot/compressed/head_32.S b/arch/x86/boot/compressed/head_32.S
-index fd0b6a272dd5..d85b9625e836 100644
---- a/arch/x86/boot/compressed/head_32.S
-+++ b/arch/x86/boot/compressed/head_32.S
-@@ -82,7 +82,7 @@ ENTRY(efi_pe_entry)
+diff --git a/arch/arm/include/asm/efi.h b/arch/arm/include/asm/efi.h
+index 0b06f5341b45..e4e6a9d6a825 100644
+--- a/arch/arm/include/asm/efi.h
++++ b/arch/arm/include/asm/efi.h
+@@ -55,6 +55,7 @@ void efi_virtmap_unload(void);
  
- 	/* Relocate efi_config->call() */
- 	leal	efi32_config(%esi), %eax
--	add	%esi, 32(%eax)
-+	add	%esi, 40(%eax)
- 	pushl	%eax
+ #define efi_call_early(f, ...)		sys_table_arg->boottime->f(__VA_ARGS__)
+ #define __efi_call_early(f, ...)	f(__VA_ARGS__)
++#define efi_call_runtime(f, ...)	sys_table_arg->runtime->f(__VA_ARGS__)
+ #define efi_is_64bit()			(false)
  
- 	call	make_boot_params
-@@ -108,7 +108,7 @@ ENTRY(efi32_stub_entry)
+ #define efi_call_proto(protocol, f, instance, ...)			\
+diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+index 0b6b1633017f..e7445281e534 100644
+--- a/arch/arm64/include/asm/efi.h
++++ b/arch/arm64/include/asm/efi.h
+@@ -50,6 +50,7 @@ int efi_set_mapping_permissions(struct mm_struct *mm, efi_memory_desc_t *md);
  
- 	/* Relocate efi_config->call() */
- 	leal	efi32_config(%esi), %eax
--	add	%esi, 32(%eax)
-+	add	%esi, 40(%eax)
- 	pushl	%eax
- 2:
- 	call	efi_main
-@@ -264,7 +264,7 @@ relocated:
- #ifdef CONFIG_EFI_STUB
- 	.data
- efi32_config:
--	.fill 4,8,0
-+	.fill 5,8,0
- 	.long efi_call_phys
- 	.long 0
- 	.byte 0
-diff --git a/arch/x86/boot/compressed/head_64.S b/arch/x86/boot/compressed/head_64.S
-index 4d85e600db78..d2ae1f821e0c 100644
---- a/arch/x86/boot/compressed/head_64.S
-+++ b/arch/x86/boot/compressed/head_64.S
-@@ -264,7 +264,7 @@ ENTRY(efi_pe_entry)
- 	/*
- 	 * Relocate efi_config->call().
- 	 */
--	addq	%rbp, efi64_config+32(%rip)
-+	addq	%rbp, efi64_config+40(%rip)
+ #define efi_call_early(f, ...)		sys_table_arg->boottime->f(__VA_ARGS__)
+ #define __efi_call_early(f, ...)	f(__VA_ARGS__)
++#define efi_call_runtime(f, ...)	sys_table_arg->runtime->f(__VA_ARGS__)
+ #define efi_is_64bit()			(true)
  
- 	movq	%rax, %rdi
- 	call	make_boot_params
-@@ -284,7 +284,7 @@ handover_entry:
- 	 * Relocate efi_config->call().
- 	 */
- 	movq	efi_config(%rip), %rax
--	addq	%rbp, 32(%rax)
-+	addq	%rbp, 40(%rax)
- 2:
- 	movq	efi_config(%rip), %rdi
- 	call	efi_main
-@@ -456,14 +456,14 @@ efi_config:
- #ifdef CONFIG_EFI_MIXED
- 	.global efi32_config
- efi32_config:
--	.fill	4,8,0
-+	.fill	5,8,0
- 	.quad	efi64_thunk
- 	.byte	0
- #endif
- 
- 	.global efi64_config
- efi64_config:
--	.fill	4,8,0
-+	.fill	5,8,0
- 	.quad	efi_call
- 	.byte	1
- #endif /* CONFIG_EFI_STUB */
-diff --git a/arch/x86/include/asm/efi.h b/arch/x86/include/asm/efi.h
-index e99675b9c861..2f77bcefe6b4 100644
---- a/arch/x86/include/asm/efi.h
-+++ b/arch/x86/include/asm/efi.h
-@@ -191,6 +191,7 @@ static inline efi_status_t efi_thunk_set_virtual_address_map(
- struct efi_config {
- 	u64 image_handle;
- 	u64 table;
-+	u64 runtime_services;
- 	u64 boot_services;
- 	u64 text_output;
- 	efi_status_t (*call)(unsigned long, ...);
-@@ -226,6 +227,10 @@ static inline bool efi_is_64bit(void)
- #define __efi_call_early(f, ...)					\
- 	__efi_early()->call((unsigned long)f, __VA_ARGS__);
- 
-+#define efi_call_runtime(f, ...)					\
-+	__efi_early()->call(efi_table_attr(efi_runtime_services, f,	\
-+		__efi_early()->runtime_services), __VA_ARGS__)
-+
- extern bool efi_reboot_required(void);
- 
- #else
+ #define efi_call_proto(protocol, f, instance, ...)			\
