@@ -1,43 +1,51 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 31 Jan 2017 22:38:51 +0100
+Date: Tue, 31 Jan 2017 22:42:43 +0100
 Subject: [PATCH 09/11] drm/panel: Add support for the Raspberry Pi 7"
  Touchscreen.
-In-Reply-To: <20170131211952.jirg7scbzajshpec@phenom.ffwll.local>
+In-Reply-To: <20170131211702.o2he5o6ktaztmrkx@phenom.ffwll.local>
 References: <20161214194621.16499-1-eric@anholt.net>
  <20161214194621.16499-10-eric@anholt.net>
  <20170131210717.GA872@mithrandir.ba.sec>
- <20170131211952.jirg7scbzajshpec@phenom.ffwll.local>
-Message-ID: <20170131213849.GD872@mithrandir.ba.sec>
+ <20170131211702.o2he5o6ktaztmrkx@phenom.ffwll.local>
+Message-ID: <20170131214241.GE872@mithrandir.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2017 at 10:19:52PM +0100, Daniel Vetter wrote:
+On Tue, Jan 31, 2017 at 10:17:02PM +0100, Daniel Vetter wrote:
 > On Tue, Jan 31, 2017 at 10:07:19PM +0100, Thierry Reding wrote:
 > > On Wed, Dec 14, 2016 at 11:46:19AM -0800, Eric Anholt wrote:
-> > > +static int rpi_touchscreen_dsi_remove(struct mipi_dsi_device *dsi)
+> > > +static int rpi_touchscreen_enable(struct drm_panel *panel)
 > > > +{
-> > > +	struct device *dev = &dsi->dev;
-> > > +	struct rpi_touchscreen *ts = dev_get_drvdata(dev);
-> > > +	int ret;
+> > > +	struct rpi_touchscreen *ts = panel_to_ts(panel);
+> > > +	int i;
 > > > +
-> > > +	ret = mipi_dsi_detach(dsi);
-> > > +	if (ret < 0) {
-> > > +		dev_err(&dsi->dev, "failed to detach from DSI host: %d\n", ret);
-> > > +		return ret;
+> > > +	rpi_touchscreen_i2c_write(ts, REG_POWERON, 1);
+> > > +	/* Wait for nPWRDWN to go low to indicate poweron is done. */
+> > > +	for (i = 0; i < 100; i++) {
+> > > +		if (rpi_touchscreen_i2c_read(ts, REG_PORTB) & 1)
+> > > +			break;
 > > > +	}
 > > 
-> > You might want to continue after this anyway, because the driver will be
-> > unloaded regardless of your error code and you'll leave behind a
-> > dangling panel and leak a reference to the I2C bridge.
+> > Don't you want to fail when power on doesn't succeed? Seems kind of
+> > pointless to continue if the panel doesn't power on.
 > 
-> Sounds like we should switch the mipi_dsi_driver->remove callback to
-> return void then? But separate cleanup series if someone bothers with it.
+> kms works under the assumption that even when the sink is dead, the
+> display pipe (well, vblanks and pageflips) keep working. There's a patch
+> floating around to give userspace more information about what's going
+> wrong through an async uevent+read-only property for cases where an
+> unresponsive sink is normal, i.e. link training for dp.
+> 
+> But either way, continuing is generally the right thing to do, there's no
+> way to report -EIO from here (because no reasons than that's where
+> accidentally ended up with our evolved design ...).
 
-I think there are advantages to keeping this consistent with the driver
-core's definition of ->remove(). There have been efforts lately to deny
-unloading drivers if they are a dependency for other drivers, so we may
-yet see the day where the driver core actually does something with this
-return value.
+I think this depends on the specific case. I was assuming that if the
+panel fails to power up, then any subsequent operations like register
+reads or writes would also fail, potentially causing a lot of confusing
+error messages that could easily be avoided.
+
+Also, the panel API is usually called from encoder or connector drivers
+and propagating error codes might give them a chance of reacting.
 
 Thierry
 -------------- next part --------------
@@ -46,4 +54,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170131/3cf85fc7/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170131/c4b5d942/attachment.sig>
