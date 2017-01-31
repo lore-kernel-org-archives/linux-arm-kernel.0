@@ -1,34 +1,86 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 31 Jan 2017 10:43:49 -0800
-Subject: [PATCH] ARM: bcm2835: dt: add index to the ethernet alias
-In-Reply-To: <1485857243.24331.0.camel@v3.sk>
-References: <5942321c5d0bfea54eac64ace2b217e8e0b6220d.1485801879.git.baruch@tkos.co.il>
- <1485857243.24331.0.camel@v3.sk>
-Message-ID: <87wpdbm5ne.fsf@eliezer.anholt.net>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 31 Jan 2017 18:49:08 +0000
+Subject: [PATCH v20 08/17] clocksource/drivers/arm_arch_timer: Rework
+ counter frequency detection.
+In-Reply-To: <CADyBb7uqomC10mR4oMcUKrvYCbrOfLB6q1T6feMfiYA4cMnduA@mail.gmail.com>
+References: <20170118132541.8989-1-fu.wei@linaro.org>
+ <20170118132541.8989-9-fu.wei@linaro.org>
+ <20170124172400.GG7572@leverpostej>
+ <CADyBb7sU6DVMk6px0963r8by--U-3k_XjESd88zZMkj7xbywgA@mail.gmail.com>
+ <20170125172505.GB29027@leverpostej>
+ <CADyBb7syNx+HJ6t5JKPMnLqvq-98kPi1knuXU=SSe6_Uz6Gg1A@mail.gmail.com>
+ <20170130174958.GA3496@leverpostej>
+ <CADyBb7uqomC10mR4oMcUKrvYCbrOfLB6q1T6feMfiYA4cMnduA@mail.gmail.com>
+Message-ID: <20170131184908.GA2798@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lubomir Rintel <lkundrak@v3.sk> writes:
+On Wed, Feb 01, 2017 at 02:43:02AM +0800, Fu Wei wrote:
+> On 31 January 2017 at 01:49, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Thu, Jan 26, 2017 at 01:49:03PM +0800, Fu Wei wrote:
+> >> On 26 January 2017 at 01:25, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> > On Wed, Jan 25, 2017 at 02:46:12PM +0800, Fu Wei wrote:
+> >> >> On 25 January 2017 at 01:24, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> >> > On Wed, Jan 18, 2017 at 09:25:32PM +0800, fu.wei at linaro.org wrote:
+> >> >> >> From: Fu Wei <fu.wei@linaro.org>
+> >
+> >> But according to another document(ARMv8-A Foundation Platform User
+> >> Guide  ARM DUI0677K),
+> >> Table 3-2 ARMv8-A Foundation Platform memory map (continued)
+> >>
+> >> AP_REFCLK CNTBase0, Generic Timer 64KB   S
+> >> AP_REFCLK CNTBase1, Generic Timer 64KB   S/NS
+> >>
+> >> Dose it means the timer frame 0 can be accessed in SECURE status  only,
+> >> and the timer frame 1 can be accessed in both status?
+> >
+> > That does appear to be what it says.
+> >
+> > I assume in this case CNTCTLBase.CNTSAR<0> is RES0.
+> >
+> >> And because Linux kernel is running on Non-secure EL1, so should we
+> >> skip "SECURE" timer in Linux?
+> >
+> > I guess you mean by checking the GTx Common flags, to see if the timer
+> > is secure? Yes, we must skip those.
+> 
+> Yes, exactly.
+> 
+> I think we can check the  GTx Common flags, if the timer is set as
+> SECURE, this driver should just skip this timer.
 
-> On Mon, 2017-01-30 at 20:44 +0200, Baruch Siach wrote:
->> An alias name should have an index number even when it is the only of
->> its type.
->> This allows U-Boot to add the local-mac-address property. Otherwise
->> U-Boot
->> skips the alias.
->> 
->> Cc: Lubomir Rintel <lkundrak@v3.sk>
->> Fixes: 6a93792774 ("ARM: bcm2835: dt: Add the ethernet to the device
->> trees")
->> Signed-off-by: Baruch Siach <baruch@tkos.co.il>
->
-> Acked-by: Lubomir Rintel <lkundrak@v3.sk>
+I completely agree that we must skip these.
 
-Pulled for dt-next.  Thanks!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170131/924a0c7f/attachment.sig>
+> > Looking further at this, the ACPI spec is sorely lacking any statement
+> > as to the configuration of CNTCTLBase.{CNTSAR,CNTTIDR,CNTACR}, so it's
+> > not clear if we can access anything in a frame, even if it is listed as
+> > being a non-secure timer.
+> >
+> > I think we need a stronger statement here. Otherwise, we will encounter
+> > problems. Linux currently assumes that CNTCTLBase.CNTACR<N> is
+> > writeable, given a non-secure frame N. This is only the case if
+> > CNTCTLBase.CNTSAR.NS<N> == 1.
+> 
+> the original driver has checked these registers, but the problem is:
+> What if the timer frame is designed to be a secure timer, all the
+> register in this frame is only can be accessed in secure status, just
+> like foundation model?
+> Note: for foundation model, Please check Table 3-1 Access permissions
+> of 3.1 ARMv8-A Foundation Platform memory map in ARMv8-A Foundation
+> Platform User Guide
+> 
+> So I think we should check the GTDT first, if it's not a secure timer,
+> then we can go on checking CNTSAR. :-)
+
+I've clearly confused matters here. I completely agree that we must skip
+timers the GTDT descrbies as secure.
+
+My complaint here is that the spec does not explicitly state that
+CNTCTLBase.CNTSAR.NS<N> must be set for timers *not* marked as secure
+(though I believe that is the intent). That is a spec issue, not a code
+issue.
+
+We unfortunately can't check CNTNSAR, as it is secure-only. :(
+
+Thanks,
+Mark.
