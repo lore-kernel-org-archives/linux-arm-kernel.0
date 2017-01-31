@@ -1,43 +1,67 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 31 Jan 2017 12:10:11 +0100
-Subject: [PATCH] dt-bindings: mmc: sunxi: Document A64 eMMC compatible
-In-Reply-To: <20170130132713.20750-1-maxime.ripard@free-electrons.com>
-References: <20170130132713.20750-1-maxime.ripard@free-electrons.com>
-Message-ID: <CAPDyKFp8OL7HfB5KK0r74hbfTTsjs5CZntpn3dR1BKJ6E+-6qQ@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 31 Jan 2017 12:12:44 +0100
+Subject: [PATCH] arm: mvebu: Fix whitespace in armada-xp-98dx3236.dtsi
+In-Reply-To: <20170131034209.3848-1-chris.packham@alliedtelesis.co.nz> (Chris
+ Packham's message of "Tue, 31 Jan 2017 16:42:09 +1300")
+References: <20170131034209.3848-1-chris.packham@alliedtelesis.co.nz>
+Message-ID: <8737fz1o0j.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 January 2017 at 14:27, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> We introduced recently a new compatible to deal with the A64 eMMC
-> controller, let's document its binding.
+Hi Chris,
+ 
+ On mar., janv. 31 2017, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
+
+> Change sequences of 8 spaces to hard-tabs.
 >
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
 
-Thanks, applied for next!
+Here again I directly squashed this patch in "ARM: dts: mvebu: Add
+device tree for 98DX3236 SoCs". By the way I also fixed the topic, as
+for device tree files the topic must start by "ARM: dts: "
 
-I also added Rob's ack as he already acked the patch parsing the new
-compatible in the driver.
+Thanks,
 
-Kind regards
-Uffe
+Gregory
 
 > ---
->  Documentation/devicetree/bindings/mmc/sunxi-mmc.txt | 1 +
->  1 file changed, 1 insertion(+)
+> I think this crept in during review and I didn't notice. The file is new enough
+> that we shouldn't lose any useful history.
 >
-> diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-> index 55cdd804cdba..7d53a799f140 100644
-> --- a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
-> @@ -13,6 +13,7 @@ Required properties:
->     * "allwinner,sun5i-a13-mmc"
->     * "allwinner,sun7i-a20-mmc"
->     * "allwinner,sun9i-a80-mmc"
-> +   * "allwinner,sun50i-a64-emmc"
->     * "allwinner,sun50i-a64-mmc"
->   - reg : mmc controller base registers
->   - clocks : a list with 4 phandle + clock specifier pairs
-> --
-> 2.11.0
+>  arch/arm/boot/dts/armada-xp-98dx3236.dtsi | 14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
 >
+> diff --git a/arch/arm/boot/dts/armada-xp-98dx3236.dtsi b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
+> index 9461128fae24..f6a03dcee5ef 100644
+> --- a/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
+> +++ b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
+> @@ -201,13 +201,13 @@
+>  			#size-cells = <1>;
+>  			ranges = <0 MBUS_ID(0x08, 0x00) 0 0x100000>;
+>  
+> -                        dfx_coredivclk: corediv-clock at f8268 {
+> -                                compatible = "marvell,mv98dx3236-corediv-clock";
+> -                                reg = <0xf8268 0xc>;
+> -                                #clock-cells = <1>;
+> -                                clocks = <&mainpll>;
+> -                                clock-output-names = "nand";
+> -                        };
+> +			dfx_coredivclk: corediv-clock at f8268 {
+> +				compatible = "marvell,mv98dx3236-corediv-clock";
+> +				reg = <0xf8268 0xc>;
+> +				#clock-cells = <1>;
+> +				clocks = <&mainpll>;
+> +				clock-output-names = "nand";
+> +			};
+>  
+>  			dfx: dfx at 0 {
+>  				compatible = "marvell,dfx-server";
+> -- 
+> 2.11.0.24.ge6920cf
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
