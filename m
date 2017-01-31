@@ -1,24 +1,112 @@
-From: jdelvare@suse.de (Jean Delvare)
-Date: Tue, 31 Jan 2017 15:22:49 +0100
-Subject: [PATCH] i2c: busses: constify i2c_algorithm structures
-In-Reply-To: <1485540377-13686-1-git-send-email-bhumirks@gmail.com>
-References: <1485540377-13686-1-git-send-email-bhumirks@gmail.com>
-Message-ID: <20170131152249.07265d1d@endymion>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 31 Jan 2017 08:25:25 -0600
+Subject: [PATCH] PCI: ACPI: Fix ThunderX PEM initialization
+In-Reply-To: <20170131102830.GA13854@localhost.localdomain>
+References: <1485793552-12614-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
+ <20170130211236.GW20550@bhelgaas-glaptop.roam.corp.google.com>
+ <20170131102830.GA13854@localhost.localdomain>
+Message-ID: <20170131142525.GA9942@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 Jan 2017 23:36:17 +0530, Bhumika Goyal wrote:
-> Declare i2c_algorithm structures as const as they are only stored in the
-> algo field of an i2c_adapter structure. This field is of type const, so
-> i2c_algorithm structures having this property can be made const too.
-> (...)
+On Tue, Jan 31, 2017 at 02:28:30AM -0800, Vadim Lomovtsev wrote:
+> Hi Bjorn,
+> 
+> On Mon, Jan 30, 2017 at 03:12:37PM -0600, Bjorn Helgaas wrote:
+> > Hi Vadim,
+> > 
+> > On Mon, Jan 30, 2017 at 08:25:52AM -0800, Vadim Lomovtsev wrote:
+> > > This patch is to address PEM initialization issue
+> > > which causes network issues.
+> > > 
+> > > It is necessary to search for _HID:PNP0A08 while requesting
+> > > PEM resources via ACPI instead of "THRX0002".
+> > > 
+> > > Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
+> > > ---
+> > >  drivers/pci/host/pci-thunder-pem.c | 2 +-
+> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > 
+> > > diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
+> > > index af722eb..aec30b8 100644
+> > > --- a/drivers/pci/host/pci-thunder-pem.c
+> > > +++ b/drivers/pci/host/pci-thunder-pem.c
+> > > @@ -331,7 +331,7 @@ static int thunder_pem_acpi_init(struct pci_config_window *cfg)
+> > >  	if (!res_pem)
+> > >  		return -ENOMEM;
+> > >  
+> > > -	ret = acpi_get_rc_resources(dev, "THRX0002", root->segment, res_pem);
+> > > +	ret = acpi_get_rc_resources(dev, "PNP0A08", root->segment, res_pem);
+> > 
+> > This doesn't smell right: PNP0A08 is the generic ACPI ID.  There's no
+> > guarantee that if we find a PNP0A08 device, it is a ThunderX device.
+> > 
+> > I think the only way to call thunder_pem_acpi_init() is via an MCFG
+> > quirk that mentions thunder_pem_ecam_ops, which means we only call it
+> > if we find an MCFG with "CAVIUM" "THUNDERX" OEM and table IDs, so it's
+> > probably safe in that sense.
+> 
+> Agree, it is not the best solution.
+> We will implement such approach and send for review. 
+> 
+> > 
+> > But it's an abuse of the ACPI _HID model.  If you match a device using
+> > PNP0A08, all you can assume about it is that it uses the generic
+> > PNP0A08 programming model, and I don't think that includes "the first
+> > memory resource in _CRS contains ECAM space and MSI-X tables."
+> > 
+> > I expect this is a teething issue because you have firmware in the
+> > field that uses PNP0A08 and it's not feasible to update it.  If that's
+> > the case, the changelog should have details about it and we should
+> > have a comment in the code, because I don't think this is the model we
+> > want to end up with in future releases.
+> 
+> It could become so. However, for now I didn't get any reports on that,
+> (may be I miss something) except some internal emailings.
+> At my testing HW I was able to see some issues related to acpi-PEM stuff.
+> 
+> Thanks for feed-back, we will prepare another patch or patchset
+> implementing approach you've highlighted.
 
-I have vague memories that I tried to do the same long ago and it
-didn't work back then. But I can't no longer remember the details, and
-today it seems just fine to do it.
+The approach I would like best is to search for THRX0002, because then
+you know you have a ThunderX PEM device, and you can assume
+device-specific details about its _CRS.
 
-Reviewed-by: Jean Delvare <jdelvare@suse.de>
+But that's what the existing code does, and apparently that doesn't
+work.  My guess is that you have firmware in the field where the host
+bridge has only PNP0A08 (and maybe PNP0A03) as device IDs.
 
--- 
-Jean Delvare
-SUSE L3 Support
+Per spec, the OS can only assume the generic PCI host bridge
+programming model in that case.  It can't use any device-specific
+features, like the register space you're extracting here, since
+there's no way to tell what specific device you have.
+
+If the OS needs to use device-specific features, there must be a
+device-specific _HID, i.e., THRX0002.  This is the important thing to
+get right in the future.
+
+If existing firmware in the field has no device-specific _HID, we
+might need something like this as a quirk to work around that firmware
+deficiency.  If that's the case, all I'm really asking for is:
+
+  - Some indication that you have a plan to change the firmware
+    strategy so future releases don't require similar quirks, and
+
+  - Some comments in the code pointing out that this is a workaround
+    for a firmware deficiency.
+
+As I mentioned, I think this change should be safe because we only run
+this code if we find a CAVIUM THUNDERX MCFG table, and we search for a
+PNP0A08 device that matches the segment from MCFG.
+
+The only way we could accidentally match the wrong device would be if
+we had another bridge in the same segment.  Maybe we should have made
+acpi_get_rc_resources() match on the bus range as well as the segment.
+But that feels like just a "pedantically correct" sort of thing and
+probably over-engineering for this situation; I don't think it would
+solve any current problem.
+
+I know you'd like to see this in v4.10, so we need to sort this out
+ASAP.
+
+Bjorn
