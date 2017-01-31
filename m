@@ -1,49 +1,46 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 31 Jan 2017 14:29:07 +0000
-Subject: [PATCH 6/7] arm64: arch_timer: document Hisilicon erratum
- 161010101
-In-Reply-To: <1485865196-12742-7-git-send-email-mark.rutland@arm.com>
-References: <1485865196-12742-1-git-send-email-mark.rutland@arm.com>
- <1485865196-12742-7-git-send-email-mark.rutland@arm.com>
-Message-ID: <20170131142906.GB22283@arm.com>
+Date: Tue, 31 Jan 2017 14:36:35 +0000
+Subject: [PATCH v5 2/2] arm64: Work around Falkor erratum 1009
+In-Reply-To: <20170131124223.GE11191@leverpostej>
+References: <20170130230818.9848-1-cov@codeaurora.org>
+ <20170130230818.9848-2-cov@codeaurora.org>
+ <20170131124223.GE11191@leverpostej>
+Message-ID: <20170131143635.GC22283@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2017 at 12:19:55PM +0000, Mark Rutland wrote:
-> From: Ding Tianhong <dingtianhong@huawei.com>
+On Tue, Jan 31, 2017 at 12:42:23PM +0000, Mark Rutland wrote:
+> On Mon, Jan 30, 2017 at 06:08:17PM -0500, Christopher Covington wrote:
+> > During a TLB invalidate sequence targeting the inner shareable domain,
+> > Falkor may prematurely complete the DSB before all loads and stores using
+> > the old translation are observed. Instruction fetches are not subject to
+> > the conditions of this erratum. If the original code sequence includes
+> > multiple TLB invalidate instructions followed by a single DSB, onle one of
+> > the TLB instructions needs to be repeated to work around this erratum.
+> > While the erratum only applies to cases in which the TLBI specifies the
+> > inner-shareable domain (*IS form of TLBI) and the DSB is ISH form or
+> > stronger (OSH, SYS), this changes applies the workaround overabundantly--
+> > to local TLBI, DSB NSH sequences as well--for simplicity.
+> > 
+> > Based on work by Shanker Donthineni <shankerd@codeaurora.org>
+> > 
+> > Signed-off-by: Christopher Covington <cov@codeaurora.org>
 > 
-> Now that we have a workaround for Hisilicon erratum 161010101, notes
-> this in the arm64 silicon-errata document.
+> This looks simple, self-contained, and correct, so FWIW:
 > 
-> The new config option is too long to fit in the existing kconfig column,
-> so this is widened to accomodate it.
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
 > 
-> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
-> [Mark: split patch, reword commit message]
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> ---
->  Documentation/arm64/silicon-errata.txt | 2 ++
->  1 file changed, 2 insertions(+)
+> Catalin/Will, since we may see a documentation conflict against a timer
+> erratum, would you be hapyp to pick up [1] first, fixing up this patch
+> as necessary?
 > 
-> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-> index 4a5e6cc..e12c926 100644
-> --- a/Documentation/arm64/silicon-errata.txt
-> +++ b/Documentation/arm64/silicon-errata.txt
-> @@ -63,3 +63,5 @@ stable kernels.
->  | Cavium         | ThunderX SMMUv2 | #27704          | N/A                              |
->  |                |                 |                 |                                  |
->  | Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585              |
-> +|                |                 |                 |                                  |
-> +| Hisilicon      | Hip0{5,6,7}     | #161010101      | HISILICON_ERRATUM_161010101      |
-> -- 
-> 1.9.1
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-January/484594.html
 
-I'd like to take this one via arm64, then you can drop it along with the
-first patch in the series and I can deal with the conflicts in the text
-file.
+I replied over there, but I'd rather just take all the silicon-errata.txt
+changes because I don't see them as being dependent on the rest of the
+series.
 
-Daniel, are you ok with that? This file isn't part of the clocksource
-code and is purely an informative document that we maintain to help ARM
-vendors know which errata we're working around.
+For this patch specifically, I can't merge it until you're happy with the
+other workaround, since they conflict.
 
 Will
