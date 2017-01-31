@@ -1,19 +1,118 @@
-From: dhowells@redhat.com (David Howells)
-Date: Tue, 31 Jan 2017 17:04:40 +0000
-Subject: [PATCH 0/7] efi: Pass secure boot mode to kernel [ver #7]
-In-Reply-To: <CAKv+Gu9cTtmV+9-kWSzvFui7KHxrG6MsUfz0VET=714m2cGhbQ@mail.gmail.com>
-References: <CAKv+Gu9cTtmV+9-kWSzvFui7KHxrG6MsUfz0VET=714m2cGhbQ@mail.gmail.com>
- <148587558696.4026.16034622623568539004.stgit@warthog.procyon.org.uk>
-Message-ID: <8425.1485882280@warthog.procyon.org.uk>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Tue, 31 Jan 2017 17:16:21 +0000
+Subject: [PATCH v4 0/9] Add support for monitoring guest TLB operations
+Message-ID: <20170131171630.26898-1-punit.agrawal@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+Hi,
 
-> Could you please resend with the [ver #7] removed from the subject
-> lines? It is a bit tedious to have to manually modify each patch when
-> applying.
+This series adds support for a software pmu on the host which can be
+used to monitor VM operations. For arm and arm64, support is added to
+monitor guest TLB operations using the host pmu infrastructure.
 
-I presume you don't want to just pull the branch or tag?
+This posting addresses all feedback on the previous
+version[0]. Instead of requiring a VM pid as part of the event
+attribute, it now depends on vcpu thread ids being passed via the
+standard perf interface (-t). Thread ids instead of process ids (-p)
+is used as -p when called with the thread id ends up resolving to the
+parent process.
 
-David
+Prior versions can be found at [1][2][3][4].
+
+As a result of the changes, the user interface has changed as
+well. With the patchset, TLB operations can be monitored using -
+
+# perf stat -e kvm/tlb_invalidate/ -t 3967,3968
+^C
+ Performance counter stats for thread id '3967,3968':
+
+                71      kvm/tlb_invalidate/
+
+      10.207587028 seconds time elapsed
+
+where 3967 and 3968 are the thread ids of the vcpus.
+
+Patches based on v4.10-rc6.
+
+Thanks,
+Punit
+
+[0] http://www.mail-archive.com/kvmarm at lists.cs.columbia.edu/msg09357.html
+[1] http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1210715.html
+[2] http://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1224353.html
+[3] https://marc.info/?l=linux-kernel&m=147376184208258&w=2
+[4] https://marc.info/?l=kvm&m=147750373716545&w=2
+
+Changes:
+v3 -> v4
+* Use vcpupid specified via perf instead of custom VM specifier. This
+  results in simplifying the synchronisation requirements for
+  callbacks
+* Dropped change to track VM pid as it's no longer being used
+* Moved host pmu to virt/kvm
+* Added copyright headers
+
+v2 -> v3
+* Replaced perf trace monitoring with software PMU
+* Re-ordered patches as a result of the above re-write
+
+v1 -> v2
+* New (Patch 6) - Add support for trapping and emulating TLB
+  operations to ARM hosts
+* Move common code to handle perf trace notifications to virt/kvm/arm
+* Move tracepoint to include/trace/events/kvm.h
+* Drop patch to introduce __tlbi helper as it is now merged
+* Reorder patches
+
+RFC v2 -> v1
+* Dropped the RFC tag
+* Patch 2 - Use VM thread group id for identification
+* Patch 4 - Update comment for clarity
+* Patch 6 - Add comment explaining switch to hype-role when VHE is enabled
+* Patch 7 - Add comment to clarify struct kvm_trace_hook
+
+RFC -> RFC v2
+* Patch 4 - Rename left-over TLBI macro to __TLBI
+* Patch 6 - Replace individual TLB operation emulation with
+  invalidating all stage 1 TLB for the VM. TLB monitoring is expected
+  to be a debug feature and performance is not critical.
+
+Mark Rutland (1):
+  arm64/kvm: hyp: tlb: use __tlbi() helper
+
+Punit Agrawal (8):
+  KVM: Add event to trace tlb invalidations
+  arm: KVM: Handle trappable TLB instructions
+  arm64: KVM: Handle trappable TLB instructions
+  kvm: Add host pmu to support VM introspection
+  kvm: host_pmu: Add support for tracking guest TLB operations
+  arm64: KVM: Enable support for the host pmu
+  arm: KVM: Enable support for host pmu
+  arm: KVM: Initialise the host pmu
+
+ arch/arm/include/asm/kvm_asm.h    |   2 +
+ arch/arm/include/asm/kvm_host.h   |   9 ++
+ arch/arm/kvm/Kconfig              |   1 +
+ arch/arm/kvm/Makefile             |   1 +
+ arch/arm/kvm/arm.c                |   2 +
+ arch/arm/kvm/coproc.c             |  56 +++++++++
+ arch/arm/kvm/hyp/tlb.c            |  33 +++++
+ arch/arm64/include/asm/kvm_asm.h  |   2 +
+ arch/arm64/include/asm/kvm_host.h |   9 ++
+ arch/arm64/kvm/Kconfig            |   1 +
+ arch/arm64/kvm/Makefile           |   1 +
+ arch/arm64/kvm/hyp/tlb.c          |  87 +++++++++++++-
+ arch/arm64/kvm/sys_regs.c         |  83 +++++++++++++
+ include/kvm/host_pmu.h            |  35 ++++++
+ include/trace/events/kvm.h        |  18 +++
+ virt/kvm/Kconfig                  |   3 +
+ virt/kvm/arm/host_pmu_events.c    |  82 +++++++++++++
+ virt/kvm/host_pmu.c               | 246 ++++++++++++++++++++++++++++++++++++++
+ 18 files changed, 665 insertions(+), 6 deletions(-)
+ create mode 100644 include/kvm/host_pmu.h
+ create mode 100644 virt/kvm/arm/host_pmu_events.c
+ create mode 100644 virt/kvm/host_pmu.c
+
+-- 
+2.11.0
