@@ -1,22 +1,33 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 31 Jan 2017 13:06:23 +0800
-Subject: [PATCH v2 19/25] iio: adc: axp20x_adc: map battery IIO channels
-In-Reply-To: <7ecf7c00-3f8e-04e5-4c96-db1843294f2e@kernel.org>
-References: <20170127085458.18270-1-quentin.schulz@free-electrons.com>
- <20170127085458.18270-20-quentin.schulz@free-electrons.com>
- <7ecf7c00-3f8e-04e5-4c96-db1843294f2e@kernel.org>
-Message-ID: <CAGb2v6662oikMk8uhD-mMx9d4Gf4Fw64ndOsj89EPcNxA9S6Cg@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 30 Jan 2017 21:06:48 -0800
+Subject: [PULL v2] ARM: DTS: Fix broken GICv2 register maps
+In-Reply-To: <1485766389-30811-1-git-send-email-marc.zyngier@arm.com>
+References: <1485766389-30811-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20170131050648.GB16560@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 28, 2017 at 10:52 PM, Jonathan Cameron <jic23@kernel.org> wrote:
-> On 27/01/17 08:54, Quentin Schulz wrote:
->> This maps the IIO channels batt_v, batt_chrg_i and batt_dischrg_i
->> (respectively exposing the current charging and discharging currents and
->> current voltage measures of the battery power supply) to the battery
->> power supply driver.
->>
->> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> Acked-by: Jonathan Cameron <jic23@kernel.org>
+Hi Marc, 
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+On Mon, Jan 30, 2017 at 08:53:09AM +0000, Marc Zyngier wrote:
+> ARM-soc folks,
+> 
+> Please find below the pull request for a DT fix affecting a large
+> number of 32bit platforms, which has been acked by a number of
+> platform maintainers.
+> 
+> * From v1: Dropped the controvertial cortex-a15-gic->arm,gic-400
+>   change in the example, at Rob's request.
+> 
+> The following changes since commit 49def1853334396f948dcb4cedb9347abb318df5:
+> 
+>   Linux 4.10-rc4 (2017-01-15 16:21:59 -0800)
+
+Any reason you had to base this on -rc4? We usually stick to an older -rc
+for all our branches, this cycle it's -rc3.
+
+Care to respin? Or I can just pick over the patches, as long as you don't
+need them as a stable base somewhere else.
+
+
+-Olof
