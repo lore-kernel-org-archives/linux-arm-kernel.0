@@ -1,124 +1,67 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 31 Jan 2017 11:24:15 +0100
-Subject: [PATCH v2 1/2] iommu/dma: Add support for
- DMA_ATTR_FORCE_CONTIGUOUS
-In-Reply-To: <73d47a53-3146-6719-ec20-39a5633350fa@arm.com>
-References: <1485531259-17513-1-git-send-email-geert+renesas@glider.be>
- <1485531259-17513-2-git-send-email-geert+renesas@glider.be>
- <73d47a53-3146-6719-ec20-39a5633350fa@arm.com>
-Message-ID: <CAMuHMdUDh0S=aWDXe=Sc0YJjC2DLNgTtr_m0REL=fiBQwgEpPw@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 31 Jan 2017 11:27:05 +0100
+Subject: [PATCH] PCI: mvebu: change delay after reset to the PCIe spec
+ mandated 100ms
+In-Reply-To: <20170130204740.GT20550@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170116111142.6866-1-l.stach@pengutronix.de>
+ <20170130204740.GT20550@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <1485858425.21479.31.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+Am Montag, den 30.01.2017, 14:47 -0600 schrieb Bjorn Helgaas:
+> On Mon, Jan 16, 2017 at 12:11:42PM +0100, Lucas Stach wrote:
+> > The current default of 20ms cause some devices, which are slow to initialize,
+> > to not show up during the bus scanning. Change this to the PCIe spec mandated
+> > 100ms and document this in the DT binding.
+> > 
+> > From PCIe base spec rev 3.0, chapter "6.6.1. Conventional Reset":
+> > 
+> > "To allow components to perform internal initialization, system software must
+> > wait a specified minimum period following the end of a Conventional Reset of
+> > one or more devices before it is permitted to issue Configuration Requests to
+> > those devices.
+> > 
+> > With a Downstream Port that does not support Link speeds greater than
+> > 5.0 GT/s, software must wait a minimum of 100 ms before sending a
+> > Configuration Request to the device immediately below that Port."
+> > 
+> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > ---
+> >  Documentation/devicetree/bindings/pci/mvebu-pci.txt | 3 ++-
+> >  drivers/pci/host/pci-mvebu.c                        | 2 +-
+> >  2 files changed, 3 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/pci/mvebu-pci.txt b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
+> > index 08c716b2c6b6..2de6f65ecfb1 100644
+> > --- a/Documentation/devicetree/bindings/pci/mvebu-pci.txt
+> > +++ b/Documentation/devicetree/bindings/pci/mvebu-pci.txt
+> > @@ -78,7 +78,8 @@ and the following optional properties:
+> >    multiple lanes. If this property is not found, we assume that the
+> >    value is 0.
+> >  - reset-gpios: optional gpio to PERST#
+> > -- reset-delay-us: delay in us to wait after reset de-assertion
+> > +- reset-delay-us: delay in us to wait after reset de-assertion, if not
+> > +  specified will default to 100ms, as required by the PCIe specification.
+> >  
+> >  Example:
+> >  
+> > diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+> > index 45a89d969700..0c9dd47ce74d 100644
+> > --- a/drivers/pci/host/pci-mvebu.c
+> > +++ b/drivers/pci/host/pci-mvebu.c
+> > @@ -1162,7 +1162,7 @@ static int mvebu_pcie_powerup(struct mvebu_pcie_port *port)
+> >  		return ret;
+> >  
+> >  	if (port->reset_gpio) {
+> > -		u32 reset_udelay = 20000;
+> > +		u32 reset_udelay = 100000;
+> 
+> Can we use "PCI_PM_D3COLD_WAIT * 1000" for the initial value to connect it
+> with other similar cases?
 
-On Fri, Jan 27, 2017 at 6:50 PM, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 27/01/17 15:34, Geert Uytterhoeven wrote:
->> Add helpers for allocating physically contiguous DMA buffers to the
->> generic IOMMU DMA code.  This can be useful when two or more devices
->> with different memory requirements are involved in buffer sharing.
->>
->> The iommu_dma_{alloc,free}_contiguous() functions complement the existing
->> iommu_dma_{alloc,free}() functions, and allow architecture-specific code
->> to implement support for the DMA_ATTR_FORCE_CONTIGUOUS attribute on
->> systems with an IOMMU.  As this uses the CMA allocator, setting this
->> attribute has a runtime-dependency on CONFIG_DMA_CMA.
->>
->> Note that unlike the existing iommu_dma_alloc() helper,
->> iommu_dma_alloc_contiguous() has no callback to flush pages.
->> Ensuring the returned region is made visible to a non-coherent device is
->> the responsibility of the caller.
->>
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> ---
->> v2:
->>   - Provide standalone iommu_dma_{alloc,free}_contiguous() functions, as
->>     requested by Robin Murphy,
->>   - Simplify operations by getting rid of the page array/scatterlist
->>     dance, as the buffer is contiguous,
->>   - Move CPU cache magement into the caller, which is much simpler with
->>     a single contiguous buffer.
->
-> Thanks for the rework, that's a lot easier to make sense of! Now, please
-> don't hate me, but...
+Sure, I didn't know there is a define for this. Will send an updated
+patch.
 
-I don't hate you at all. I'm just a drivers/iommu rookie ;-)
-
->> --- a/drivers/iommu/dma-iommu.c
->> +++ b/drivers/iommu/dma-iommu.c
-
->> +/**
->> + * iommu_dma_alloc_contiguous - Allocate and map a buffer contiguous in IOVA
->> + *                           and physical space
->> + * @dev: Device to allocate memory for. Must be a real device attached to an
->> + *    iommu_dma_domain
->> + * @size: Size of buffer in bytes
->> + * @prot: IOMMU mapping flags
->> + * @handle: Out argument for allocated DMA handle
->> + *
->> + * Return: Buffer page pointer, or NULL on failure.
->> + *
->> + * Note that unlike iommu_dma_alloc(), it's the caller's responsibility to
->> + * ensure the returned region is made visible to the given non-coherent device.
->> + */
->> +struct page *iommu_dma_alloc_contiguous(struct device *dev, size_t size,
->> +             int prot, dma_addr_t *handle)
->> +{
->> +     struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
->> +     struct iova_domain *iovad = cookie_iovad(domain);
->> +     dma_addr_t dma_addr;
->> +     unsigned int count;
->> +     struct page *page;
->> +     struct iova *iova;
->> +     int ret;
->> +
->> +     *handle = DMA_ERROR_CODE;
->> +
->> +     size = PAGE_ALIGN(size);
->> +     count = size >> PAGE_SHIFT;
->> +     page = dma_alloc_from_contiguous(dev, count, get_order(size));
->> +     if (!page)
->> +             return NULL;
->> +
->> +     iova = __alloc_iova(domain, size, dev->coherent_dma_mask);
->> +     if (!iova)
->> +             goto out_free_pages;
->> +
->> +     size = iova_align(iovad, size);
->> +     dma_addr = iova_dma_addr(iovad, iova);
->> +     ret = iommu_map(domain, dma_addr, page_to_phys(page), size, prot);
->> +     if (ret < 0)
->> +             goto out_free_iova;
->> +
->> +     *handle = dma_addr;
->> +     return page;
->> +
->> +out_free_iova:
->> +     __free_iova(iovad, iova);
->> +out_free_pages:
->> +     dma_release_from_contiguous(dev, page, count);
->> +     return NULL;
->> +}
->
-> ...now that I can see it clearly, isn't this more or less just:
->
->         page = dma_alloc_from_contiguous(dev, ...);
->         if (page)
->                 dma_addr = iommu_dma_map_page(dev, page, ...);
-> ?
->
-> Would it not be even simpler to just make those two calls directly from
-> the arm64 code?
-
-You're right. Will update. Thanks a lot!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Regards,
+Lucas
