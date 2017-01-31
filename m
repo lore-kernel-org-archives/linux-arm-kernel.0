@@ -1,76 +1,170 @@
-From: john@metanate.com (John Keeping)
-Date: Tue, 31 Jan 2017 11:45:48 +0000
-Subject: [PATCH v3 06/24] drm/rockchip: dw-mipi-dsi: avoid out-of-bounds
- read on tx_buf
-In-Reply-To: <20170130200955.GL20076@art_vandelay>
-References: <20170129132444.25251-1-john@metanate.com>
- <20170129132444.25251-7-john@metanate.com>
- <20170130180146.GG20076@art_vandelay>
- <20170130181636.1bc81e86.john@metanate.com>
- <20170130200955.GL20076@art_vandelay>
-Message-ID: <20170131114548.667d3911.john@metanate.com>
+From: john.garry@huawei.com (John Garry)
+Date: Tue, 31 Jan 2017 11:49:56 +0000
+Subject: [PATCH V6 4/5] LPC: Support the device-tree LPC host on
+ Hip06/Hip07
+In-Reply-To: <2890e438-6149-c8f0-8ec7-9036a8d5cca5@suse.de>
+References: <1485241525-201782-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1485241525-201782-5-git-send-email-yuanzhichang@hisilicon.com>
+ <a5a24e73-013d-87b5-f65f-324417f4cc60@suse.de>
+ <55916a03-2710-c8bc-0894-5a58daf6da68@huawei.com>
+ <2890e438-6149-c8f0-8ec7-9036a8d5cca5@suse.de>
+Message-ID: <74208c0c-3ac4-58ea-9cf0-62e68e49557c@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Jan 2017 15:09:55 -0500, Sean Paul wrote:
+>>>> + * The port size of legacy I/O devices is normally less than 0x400.
+>>>> + * Defining the I/O range size as 0x400 here should be sufficient for
+>>>> + * all peripherals under one bus.
+>>>> + */
+>>>
+>>> This comment doesn't make a lot of sense. What is the limit? Is there a
+>>> hardware limit?
+>>>
+>>> We don't dynamically allocate devices on the lpc bus, so why imply a
+>>> limit at all?
+>>>
+>>
+>> IIRC from previously asking Zhichang this before, this is the upper
+>> range we can address devices on the LPC bus. But the value was 0x1000
+>> then.
+>
+> Well, all devices that we want to address are defined by firmware (via
+> device tree or dsdt). So I'm not quite sure what this arbitrary limit
+> buys us.
+>
 
-> On Mon, Jan 30, 2017 at 06:16:36PM +0000, John Keeping wrote:
-> > On Mon, 30 Jan 2017 13:01:46 -0500, Sean Paul wrote:
-> >   
-> > > On Sun, Jan 29, 2017 at 01:24:26PM +0000, John Keeping wrote:  
-> > > > As a side-effect of this, encode the endianness explicitly rather than
-> > > > casting a u16.
-> > > > 
-> > > > Signed-off-by: John Keeping <john@metanate.com>
-> > > > Reviewed-by: Chris Zhong <zyw@rock-chips.com>
-> > > > ---
-> > > > v3:
-> > > > - Add Chris' Reviewed-by
-> > > > Unchanged in v2
-> > > > 
-> > > >  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 9 +++++++--
-> > > >  1 file changed, 7 insertions(+), 2 deletions(-)
-> > > > 
-> > > > diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > > > index 4be1ff3a42bb..2e6ad4591ebf 100644
-> > > > --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > > > +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > > > @@ -572,8 +572,13 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
-> > > >  static int dw_mipi_dsi_dcs_short_write(struct dw_mipi_dsi *dsi,
-> > > >  				       const struct mipi_dsi_msg *msg)
-> > > >  {
-> > > > -	const u16 *tx_buf = msg->tx_buf;
-> > > > -	u32 val = GEN_HDATA(*tx_buf) | GEN_HTYPE(msg->type);
-> > > > +	const u8 *tx_buf = msg->tx_buf;
-> > > > +	u32 val = GEN_HTYPE(msg->type);
-> > > > +
-> > > > +	if (msg->tx_len > 0)
-> > > > +		val |= GEN_HDATA(tx_buf[0]);
-> > > > +	if (msg->tx_len > 1)
-> > > > +		val |= GEN_HDATA(tx_buf[1] << 8);    
-> > > 
-> > > You should probably update the mask inside GEN_HDATA to mask off 8 bits instead of
-> > > 16.  
-> > 
-> > Won't that mask off the data written by "tx_buf[1] << 8"?  
-> 
-> I would move the shift outside the mask, ie:
-> 
-> val |= GEN_HDATA(tx_buf[1]) << 8;
+Will check with Zhichang.
 
-I can do that, but that doesn't seem to match the intention of the
-macros which are about encoding the placement and size of fields within
-registers.
+>>
+>>>> +#define LPC_BUS_IO_SIZE        0x400
+>>>> +
 
-Maybe it would be clearer to do:
+<snip>
 
-    u16 data = 0;
+>>>> +    ret = 0;
+>>>> +    cnt_per_trans = (para->csize == 1) ? opcnt : para->csize;
+>>>> +    for (; opcnt && !ret; cnt_per_trans = para->csize) {
+>>>> +        unsigned long flags;
+>>>> +
+>>>> +        /* whole operation must be atomic */
+>>>> +        spin_lock_irqsave(&lpcdev->cycle_lock, flags);
+>>>
+>>> Ouch. This is going to kill your RT jitter. Is there no better way?
+>>>
+>>
+>> Obviously the bus register driving is non-atomic, so we need some way to
+>> lock out.
+>>
+>> I think that it is not so critical for low-speed/infrequent-access bus.
+>>
+>> If we were going to use virtual UART in the BMC on the LPC bus then we
+>> could consider more.
+>
+> Well, it basically means that an arbitrary daemon running in user space
+> that checks your temperature readings via the ipmi interface could
+> create a lot of jitter. That could be very critical if you want to use
+> this hardware for real time critical applications, such as telecom.
+>
+> I bet that if you leave it like that and postpone the decision to fix it
+> to "later", in 1 or 2 years you will cause someone weeks of debugging to
+> track down why their voip gateway loses packets from time to time.
+>
+>>
 
-    if (msg->tx_len > 0)
-        data |= tx_buf[0];
-    if (msg->tx_len > 1)
-        data |= tx_buf[1];
+We need to consider this more. There may a way to access the registers 
+and drive the bus without requiring a lock, but I doubt it.
 
-    val = GEN_HDATA(data) | GEN_HTYPE(msg->type);
+Note: I think that we could make some readl/writel relaxed, which would 
+help.
 
-?
+>>>> +
+>>>> +        writel(cnt_per_trans, lpcdev->membase + LPC_REG_OP_LEN);
+>>>> +
+>>>> +        writel(cmd_word, lpcdev->membase + LPC_REG_CMD);
+>>>> +
+>>>> +        writel(ptaddr, lpcdev->membase + LPC_REG_ADDR);
+>>>> +
+>>>> +        writel(START_WORK, lpcdev->membase + LPC_REG_START);
+>>>> +
+>>>> +        /* whether the operation is finished */
+>>>> +        ret = wait_lpc_idle(lpcdev->membase, waitcnt);
+>>>> +        if (!ret) {
+>>>> +            opcnt -= cnt_per_trans;
+>>>> +            for (; cnt_per_trans--; buf++)
+>>>> +                *buf = readl(lpcdev->membase + LPC_REG_RDATA);
+>>>> +        }
+>>>> +
+>>>> +        spin_unlock_irqrestore(&lpcdev->cycle_lock, flags);
+>>>> +    }
+>>>> +
+>>>> +    return ret;
+>>>> +}
+
+<snip>
+
+>>>> + * hisilpc_comm_in - read/input the data from the I/O peripheral
+>>>> + *             through LPC.
+>>>> + * @devobj: pointer to the device information relevant to LPC
+>>>> controller.
+>>>> + * @pio: the target I/O port address.
+>>>> + * @dlen: the data length required to read from the target I/O port.
+>>>> + *
+>>>> + * when succeed, the data read back is stored in buffer pointed by
+>>>> inbuf.
+>>>> + * For inb, return the data read from I/O or -1 when error occur.
+>>>> + */
+>>>> +static u64 hisilpc_comm_in(void *devobj, unsigned long pio, size_t
+>>>> dlen)
+>>>> +{
+>>>> +    struct hisilpc_dev *lpcdev = devobj;
+>>>> +    struct lpc_cycle_para iopara;
+>>>> +    u32 rd_data;
+>>>
+>>> rd_data needs to be initialized to 0. Otherwise it may contain stale
+>>> stack contents and corrupt non-32bit dlen returns.
+>>>
+>>
+>> I think so, since we read into this value byte-by-byte. We also seem to
+>> return a 32b value but should return 64b value according to the
+>> prototype.
+>
+> IIRC LPC (well, PIO) doesn't support bigger requests than 32bit. At
+> least I can't think of an x86 instruction that would allow bigger
+> transactions. So there's no need to make it 64bit. However, the question
+> is why the prototype is 64bit then. Hm. :)
+>
+> Maybe the prototype should be only 32bit.
+>
+
+Will check with Zhichang.
+
+>>
+>>>> +    unsigned char *newbuf;
+>>>> +    int ret = 0;
+>>>> +    unsigned long ptaddr;
+>>>> +
+>>>> +    if (!lpcdev || !dlen || dlen > LPC_MAX_DULEN ||    (dlen & (dlen
+>>>> - 1)))
+>>>> +        return -1;
+>>>
+>>> Isn't this -EINVAL?
+>>
+>> Not sure. This value is returned directly to the inb/outb caller, which
+>> would not check this value for error.
+>>
+>> It could be argued that the checking is paranoia. If not, we should
+>> treat the failure as a more severe event.
+>
+> Oh, I see. In that case -1 makes a lot of sense since it's the default
+> read value on x86 for unallocated space.
+>
+> This probably deserves a comment (and/or maybe a #define)
+>
+
+We can add a comment
+
+>
+> Alex
+>
+> .
+>
