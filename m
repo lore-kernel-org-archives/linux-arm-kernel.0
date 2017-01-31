@@ -1,86 +1,246 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 31 Jan 2017 20:35:25 +0100
-Subject: [PATCH 04/11] drm/vc4: Set up SCALER_DISPCTRL at boot.
-In-Reply-To: <20161214194621.16499-5-eric@anholt.net>
-References: <20161214194621.16499-1-eric@anholt.net>
- <20161214194621.16499-5-eric@anholt.net>
-Message-ID: <20170131193525.bjwzmsy74ax4wyy7@phenom.ffwll.local>
+From: agraf@suse.de (Alexander Graf)
+Date: Tue, 31 Jan 2017 20:37:28 +0100
+Subject: [PATCH V6 1/5] LIB: Indirect ISA/LPC port IO introduced
+In-Reply-To: <6d5523be-1841-18b9-9b83-6f7e591ed66b@huawei.com>
+References: <1485241525-201782-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1485241525-201782-2-git-send-email-yuanzhichang@hisilicon.com>
+ <5dc0dc9c-124e-398f-a3b2-40059268e859@suse.de>
+ <6d5523be-1841-18b9-9b83-6f7e591ed66b@huawei.com>
+Message-ID: <1a1f1e70-b6e7-f3c6-2b86-348b3d28edfe@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 14, 2016 at 11:46:14AM -0800, Eric Anholt wrote:
-> We want the HVS on, obviously, and we also want DSP3 (PV1's source) to
-> be muxed from HVS channel 2 like we expect in vc4_crtc.c.  The
-> firmware wasn't setting the DSP3 mux up when both the LCD and HDMI
-> were disabled.
-> 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
 
-Yeah, the hvs magic is checked with require_hvs_enable. And the hvs
-channel 2 for pv 1 seems to check out too, though I wonder why you don't
-just set up all the mappings unconditionally. Anyway, looks reasonable.
 
-Acked-by: Daniel Vetter <daniel.vetter@ffwll.ch>
-> ---
->  drivers/gpu/drm/vc4/vc4_hvs.c  | 14 ++++++++++++++
->  drivers/gpu/drm/vc4/vc4_regs.h |  3 +++
->  2 files changed, 17 insertions(+)
-> 
-> diff --git a/drivers/gpu/drm/vc4/vc4_hvs.c b/drivers/gpu/drm/vc4/vc4_hvs.c
-> index 6fbab1c82cb1..fc68b1b4da52 100644
-> --- a/drivers/gpu/drm/vc4/vc4_hvs.c
-> +++ b/drivers/gpu/drm/vc4/vc4_hvs.c
-> @@ -170,6 +170,7 @@ static int vc4_hvs_bind(struct device *dev, struct device *master, void *data)
->  	struct vc4_dev *vc4 = drm->dev_private;
->  	struct vc4_hvs *hvs = NULL;
->  	int ret;
-> +	u32 dispctrl;
->  
->  	hvs = devm_kzalloc(&pdev->dev, sizeof(*hvs), GFP_KERNEL);
->  	if (!hvs)
-> @@ -211,6 +212,19 @@ static int vc4_hvs_bind(struct device *dev, struct device *master, void *data)
->  		return ret;
->  
->  	vc4->hvs = hvs;
-> +
-> +	dispctrl = HVS_READ(SCALER_DISPCTRL);
-> +
-> +	dispctrl |= SCALER_DISPCTRL_ENABLE;
-> +
-> +	/* Set DSP3 (PV1) to use HVS channel 2, which would otherwise
-> +	 * be unused.
-> +	 */
-> +	dispctrl &= ~SCALER_DISPCTRL_DSP3_MUX_MASK;
-> +	dispctrl |= VC4_SET_FIELD(2, SCALER_DISPCTRL_DSP3_MUX);
-> +
-> +	HVS_WRITE(SCALER_DISPCTRL, dispctrl);
-> +
->  	return 0;
->  }
->  
-> diff --git a/drivers/gpu/drm/vc4/vc4_regs.h b/drivers/gpu/drm/vc4/vc4_regs.h
-> index 39f6886b2410..b3b297fba709 100644
-> --- a/drivers/gpu/drm/vc4/vc4_regs.h
-> +++ b/drivers/gpu/drm/vc4/vc4_regs.h
-> @@ -244,6 +244,9 @@
->  # define SCALER_DISPCTRL_ENABLE			BIT(31)
->  # define SCALER_DISPCTRL_DSP2EISLUR		BIT(15)
->  # define SCALER_DISPCTRL_DSP1EISLUR		BIT(14)
-> +# define SCALER_DISPCTRL_DSP3_MUX_MASK		VC4_MASK(19, 18)
-> +# define SCALER_DISPCTRL_DSP3_MUX_SHIFT		18
-> +
->  /* Enables Display 0 short line and underrun contribution to
->   * SCALER_DISPSTAT_IRQDISP0.  Note that short frame contributions are
->   * always enabled.
-> -- 
-> 2.11.0
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+On 31/01/2017 14:32, John Garry wrote:
+> On 30/01/2017 17:12, Alexander Graf wrote:
+>> On 01/24/2017 08:05 AM, zhichang.yuan wrote:
+>>> Low-pin-count interface is integrated into some SoCs. The accesses to
+>>> those
+>>> peripherals under LPC make use of I/O ports rather than the memory
+>>> mapped I/O.
+>>>
+>>> To drive these devices, this patch introduces a method named
+>>> indirect-IO.
+>>> In this method the in/out() accessor in include/asm-generic/io.h will be
+>>> redefined. When upper layer drivers call in/out() with those known
+>>> legacy port
+>>> addresses to access the peripherals, the I/O operations will be routed
+>>> to the
+>>> right hooks which are registered specific to the host device, such as
+>>> LPC.
+>>> Then the hardware relevant manupulations are finished by the
+>>> corresponding
+>>> host.
+>>>
+>>> According to the comments on V5, this patch adds a common indirect-IO
+>>> driver
+>>> which support this I/O indirection to the generic directory.
+>>>
+>>> In the later pathches, some host-relevant drivers are implemented to
+>>> support
+>>> the specific I/O hooks and register them.
+>>> Based on these, the upper layer drivers which depend on in/out() can
+>>> work well
+>>> without any extra work or any changes.
+>>>
+>>> Signed-off-by: zhichang.yuan <yuanzhichang@hisilicon.com>
+>>> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+>>> Signed-off-by: John Garry <john.garry@huawei.com>
+>>
+>> I like the extio idea. That allows us to handle all PIO requests on
+>> platforms that don't have native PIO support via different routes
+>> depending on the region they're in. Unfortunately we now we have 2
+>> frameworks for handling sparse PIO regions: One in extio, one in PCI.
+>>
+>> Why don't we just merge the two? Most of the code that has #ifdef
+>> PCI_IOBASE throughout the code base sounds like an ideal candidate to
+>> get migrated to extio instead. Then we only have a single framework to
+>> worry about ...
+>
+> To be clear, are you suggesting we merge the functionality from
+> pci_register_io_range(), pci_pio_to_address(), pci_address_to_pio() into
+> extio, so extio manages all PIO?
 
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Yes, I guess so.
+
+> And having a single type of node to
+> register PIO ranges, by amalgamating struct extio_node and io_range (as
+> Bjorn mentioned)?
+
+I'm not quite sure I follow you here. Basically I think you want a 
+generic "non-x86 PIO" framework that PCI just plugs into.
+
+I don't think that necessarily means you want to statically allocate 
+regions of that PIO space to separate (pseudo-)devices. Instead, 
+everyone shares that space and should be able to fail gracefully if some 
+space is already occupied.
+
+> It would make sense. We would be somewhat decoupling PIO from PCI.
+
+Yes :).
+
+> I think that other architectures, like PPC, and other code would need to
+> be fixed up to handle this.
+
+I think only PPC, Microblaze and ARM are using this. Grep for 
+PCI_IOBASE. It's not that many.
+
+> We need to consider all the other challenges/obstacles to this.
+
+Well, getting our abstraction levels right to me sounds like it's worth 
+the obstacles.
+
+>
+>>
+>>> ---
+>>>   include/asm-generic/io.h |  50 ++++++++++++++++
+>>>   include/linux/extio.h    |  85 +++++++++++++++++++++++++++
+>>>   include/linux/io.h       |   1 +
+>>>   lib/Kconfig              |   8 +++
+>>>   lib/Makefile             |   2 +
+>>>   lib/extio.c              | 147
+>>> +++++++++++++++++++++++++++++++++++++++++++++++ xc>>   create mode
+>>> 100644 include/linux/extio.h
+>>>   create mode 100644 lib/extio.c
+>>>
+>
+> <snip>
+>
+>>> + * Copyright (C) 2016 Hisilicon Limited, All Rights Reserved.
+>>> + * Author: Zhichang Yuan <yuanzhichang@hisilicon.com>
+>>> + *
+>>> + * This program is free software; you can redistribute it and/or modify
+>>> + * it under the terms of the GNU General Public License version 2 as
+>>> + * published by the Free Software Foundation.
+>>> + *
+>>> + * This program is distributed in the hope that it will be useful,
+>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>> + * GNU General Public License for more details.
+>>> + *
+>>> + * You should have received a copy of the GNU General Public License
+>>> + * along with this program.  If not, see
+>>> <http://www.gnu.org/licenses/>.
+>>> + */
+>>> +
+>>> +#include <linux/io.h>
+>>> +#include <linux/spinlock.h>
+>>> +
+>>> +static LIST_HEAD(extio_dev_list);
+>>> +static DEFINE_RWLOCK(extio_list_lock);
+>>
+>> Why not just make the list an RCU list? Then you don't need read locks.
+>> We also wouldn't create potential lock contention between devices that
+>> could easily have parallel PIO operations (say a PCI device and an LPC
+>> device).
+>>
+>
+> OK
+>
+>>> +
+>>> +void register_extio(struct extio_node *node)
+>>> +{
+>>> +    write_lock(&extio_list_lock);
+>>> +    list_add_tail(&node->list, &extio_dev_list);
+>>> +    write_unlock(&extio_list_lock);
+>>> +}
+>>> +
+>>> +static struct extio_node *find_extio_token(unsigned long addr)
+>>> +{
+>>> +    struct extio_node *extio_entry;
+>>> +
+>>> +    read_lock(&extio_list_lock);
+>>> +    list_for_each_entry(extio_entry, &extio_dev_list, list) {
+>>> +        if ((addr < extio_entry->io_start + extio_entry->range_size) &&
+>>> +            (addr >= extio_entry->io_start))
+>>> +            break;
+>>> +    }
+>>> +    read_unlock(&extio_list_lock);
+>>> +    return (&extio_entry->list == &extio_dev_list) ? NULL :
+>>> extio_entry;
+>>> +}
+>>> +
+>>> +struct extio_node *extio_find_node(struct fwnode_handle *node)
+>>> +{
+>>> +    struct extio_node *entry;
+>>> +
+>>> +    read_lock(&extio_list_lock);
+>>> +    list_for_each_entry(entry, &extio_dev_list, list) {
+>>> +        if (entry->fwnode == node)
+>>> +            break;
+>>> +    }
+>>> +    read_unlock(&extio_list_lock);
+>>> +
+>>> +    return (&entry->list == &extio_dev_list) ? NULL : entry;
+>>> +}
+>>> +
+>>> +unsigned long extio_translate(struct fwnode_handle *node,
+>>> +        unsigned long bus_addr)
+>>> +{
+>>> +    struct extio_node *entry;
+>>> +    unsigned long port_id = -1;
+>>> +
+>>> +    read_lock(&extio_list_lock);
+>>> +    list_for_each_entry(entry, &extio_dev_list, list) {
+>>> +        if (entry->fwnode == node &&
+>>> +            bus_addr >= entry->bus_start &&
+>>> +            bus_addr - entry->bus_start < entry->range_size)
+>>> +            port_id = entry->io_start + bus_addr -
+>>> +                    entry->bus_start;
+>>> +    }
+>>> +    read_unlock(&extio_list_lock);
+>>> +
+>>> +    return port_id;
+>>> +}
+>>> +
+>>> +#ifdef PCI_IOBASE
+>>> +
+>>> +#define BUILD_EXTIO(bw, type)                        \
+>>> +type extio_in##bw(unsigned long addr)                    \
+>>> +{                                    \
+>>> +    struct extio_node *extio_entry = find_extio_token(addr);    \
+>>> +                                    \
+>>> +    if (!extio_entry)                        \
+>>> +        return read##bw(PCI_IOBASE + addr);            \
+>>> +    return extio_entry->ops->pfin ?                    \
+>>> +            extio_entry->ops->pfin(extio_entry->devpara,    \
+>>> +            addr, sizeof(type)) : -1;            \
+>>> +}                                    \
+>>> +                                    \
+>>> +void extio_out##bw(type value, unsigned long addr)            \
+>>> +{                                    \
+>>> +    struct extio_node *extio_entry = find_extio_token(addr);    \
+>>> +                                    \
+>>> +    if (!extio_entry)                        \
+>>> +        write##bw(value, PCI_IOBASE + addr);            \
+>>
+>> All of the fallback code would also disappear as a nice side effect of
+>> making pci pio handling a user of extio :).
+>
+> Is your idea that PCI IO space will also register accessors, which would
+> be the same read{b,w,l}/write{b,w,l}?
+
+Yes. If you need to later on accelerate that bit, you can always do 
+something like
+
+   if (extio_entry->ops->pfin == pci_extio_in)
+     return pci_extio_in(...);
+
+which should get you all the prefetcher and branch prediction benefits 
+that the current version gives you. But for starters I'd leave that out, 
+since I doubt it'll have measurable performance impact to go via an 
+indirect function call.
+
+>
+>>
+>
+> It would be nice to have a quicker way to so the lookup from address to
+> node, as we loop all nodes in find_extio_token() every single time.
+
+You can always replace the search with a tree. But to me that's an 
+implementation detail that's easy enough to replace in a follow-up patch 
+series.
+
+
+Alex
