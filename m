@@ -1,84 +1,92 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Tue, 31 Jan 2017 15:41:14 -0800
-Subject: [PATCH v3 20/24] media: imx: Add Camera Interface subdev driver
-In-Reply-To: <20170131233042.GF27312@n2100.armlinux.org.uk>
+Date: Tue, 31 Jan 2017 15:43:22 -0800
+Subject: [PATCH v3 00/24] i.MX Media Driver
+In-Reply-To: <20170131110027.GU27312@n2100.armlinux.org.uk>
 References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-21-git-send-email-steve_longerbeam@mentor.com>
- <b7456d40-040d-41b7-45bc-ef6709ab7933@xs4all.nl>
- <20170131134252.GX27312@n2100.armlinux.org.uk>
- <b0517394-7717-3e1d-b850-e2b69a9c19e9@gmail.com>
- <20170131203340.GC27312@n2100.armlinux.org.uk>
- <2297c62c-ae9b-3942-4700-ce268a61a6d5@gmail.com>
- <20170131220452.GE27312@n2100.armlinux.org.uk>
- <d5ede043-3b02-37f6-bd4a-db805e6b36d7@mentor.com>
- <20170131233042.GF27312@n2100.armlinux.org.uk>
-Message-ID: <bb05d5b0-7842-989c-55a5-4867a19a1883@gmail.com>
+ <20170131004510.GQ27312@n2100.armlinux.org.uk>
+ <951c1a08-c0f2-4333-b4bf-410de8dd863f@gmail.com>
+ <20170131110027.GU27312@n2100.armlinux.org.uk>
+Message-ID: <3a673cba-bbf6-5611-5857-4605797bf049@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 01/31/2017 03:30 PM, Russell King - ARM Linux wrote:
-> On Tue, Jan 31, 2017 at 02:36:53PM -0800, Steve Longerbeam wrote:
->> On 01/31/2017 02:04 PM, Russell King - ARM Linux wrote:
->>> I don't want master though, I want v4.10-rc1, and if I ask for that
->>> it tells me it knows nothing about v4.10-rc1, despite the fact that's
->>> a tag in the mainline kernel repository which was merged into the
->>> linux-media tree that this tree is based upon.
->> Hi Russell, yes git at github.com:slongerbeam/mediatree.git is a fork
->> of the linux-media tree, and the imx-media-staging-md-wip branch
->> is up-to-date with master, currently at 4.10-rc1.
-> "up to date" is different from "contains other stuff other than is in
-> 4.10-rc1".
+On 01/31/2017 03:00 AM, Russell King - ARM Linux wrote:
+> On Mon, Jan 30, 2017 at 05:22:01PM -0800, Steve Longerbeam wrote:
+>> I'm also having trouble finding a datasheet for it, but from what
+>> I've read, it has a MIPI CSI-2 interface. It should work fine as long
+>> as it presents a single source pad, registers asynchronously, and
+>> sets its entity function to MEDIA_ENT_F_CAM_SENSOR.
+> Yes, it is MIPI CSI-2, and yes it has a single source pad, registers
+> asynchronously, but that's about as far as it goes.
 >
-> What I see in your tree is that your code is based off a merge commit
-> between something called "patchwork" (which I assume is a branch in
-> the media tree containing stuff commited from patch work) and v4.10-rc1.
+> The structure is a camera sensor followed by some processing.  So just
+> like the smiapp code, I've ended up with multiple subdevs describing
+> each stage of the sensors pipeline.
 >
-> Now, you don't get a commit when merging unless there's changes that
-> aren't in the commit you're merging - if "patchwork" was up to date
-> with v4.10-rc1, then git would have done a "fast forward" to v4.10-rc1.
->
-> Therefore, while it may be "up to date" with v4.10-rc1 in so far that
-> it's had v4.10-rc1 merged into it, that's not what I've been saying.
-> There are other changes below that merge commit which aren't in
-> v4.10-rc1.  It's those other changes that I'm talking about, and it's
-> those other changes I do not want without knowing what they are.
->
-> It may be that those other changes have since been merged into
-> v4.10-rc6 - but github's web interface can't show me that.  In fact,
-> github's web interface is pretty damned useless as far as this stuff
-> goes.
->
-> So, what I'll get if I clone or pull your imx-media-staging-md-wip
-> branch is, yes, a copy of all your changes, but _also_ all the
-> changes that are in the media tree that _aren't_ in mainline at the
-> point that v4.10-rc1 was merged.
->
->> You don't need to use the web interface, just git clone the repo.
-> You're assuming I want to work off the top of your commits.  I don't.
-> I've got other dependencies.
+> Just like smiapp, the camera sensor block (which is the very far end
+> of the pipeline) is marked with MEDIA_ENT_F_CAM_SENSOR.  However, in
+> front of that is the binner, which just like smiapp gets a separate
+> entity.  It's this entity which is connected to the mipi-csi2 subdev.
 
-Well, I was suggesting cloning it just to have a look at the new
-code, but I understand you don't want to attempt to bring in your
-SMIA/bayer format changes and run from this branch, due to the
-other changes in the mediatree.
+wow, ok got it.
 
-I suppose I should post the next version then.
+So the sensor pipeline and binner, and the OF graph connecting
+them, are described in the device tree I presume.
 
-Trouble is, I see issues in the current driver that prevents working
-with your SMIA pipeline. But I guess that will have to be worked out
-in another version.
+The OF graph AFAIK, has no information about which ports are sinks
+and which are sources, so of_parse_subdev() tries to determine that
+based on the compatible string of the device node. So ATM
+of_parse_subdev() assumes there is nothing but the imx6-mipi-csi2,
+video-multiplexer, and camera sensors upstream from the CSI ports
+in the OF graph.
+
+I realize that's not a robust solution, and is the reason for the
+"no sensor attached" below.
+
+Is there any way to determine from the OF graph the data-direction
+of a port (whether it is a sink or a source)? If so it will make
+of_parse_subdev() much more robust.
 
 Steve
 
 >
-> Then there's yet another problem - lets say that I get a copy of your
-> patches that haven't been on the mailing list, and I then want to make
-> a comment about it.  I can't reply to a patch that hasn't been on the
-> mailing list.  So, the long established mechanism by which the Linux
-> community does patch review breaks down.
+> Unlike smiapp, which does not set an entity function, I set my binner
+> entity as MEDIA_ENT_F_PROC_VIDEO_SCALER on the basis that that is
+> what V4L2 documentation recommend:
 >
-> So no, sorry, I'm not fetching your tree, and I will persist with your
-> v3 patch set for the time being.
+>      -  ..  row 27
+>
+>         ..  _MEDIA-ENT-F-PROC-VIDEO-SCALER:
+>
+>         -  ``MEDIA_ENT_F_PROC_VIDEO_SCALER``
+>
+>         -  Video scaler. An entity capable of video scaling must have
+>            at least one sink pad and one source pad, and scale the
+>            video frame(s) received on its sink pad(s) to a different
+>            resolution output on its source pad(s). The range of
+>            supported scaling ratios is entity-specific and can differ
+>            between the horizontal and vertical directions (in particular
+>            scaling can be supported in one direction only). Binning and
+>            skipping are considered as scaling.
+>
+> This causes attempts to configure the ipu1_csi0 interface to fail:
+>
+> media-ctl -v -d /dev/media1 --set-v4l2 '"ipu1_csi0":1[fmt:SGBRG8/512x512 at 1/30]'
+> Opening media device /dev/media1
+> Enumerating entities
+> Found 29 entities
+> Enumerating pads and links
+> Setting up format SGBRG8 512x512 on pad ipu1_csi0/1
+> Unable to set format: No such device (-19)
+> Unable to setup formats: No such device (19)
+>
+> and in the kernel log:
+>
+> ipu1_csi0: no sensor attached
+>
+> And yes, I already know that my next problem is going to be that the bayer
+> formats are not supported in your driver (just like Philipp's driver) but
+> adding them should not be difficult... but only once this issue is resolved.
 >
