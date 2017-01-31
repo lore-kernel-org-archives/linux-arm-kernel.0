@@ -1,40 +1,76 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 31 Jan 2017 11:42:33 +0000
-Subject: [PATCH v20 08/17] clocksource/drivers/arm_arch_timer: Rework
- counter frequency detection.
-In-Reply-To: <20170130174958.GA3496@leverpostej>
-References: <20170118132541.8989-1-fu.wei@linaro.org>
- <20170118132541.8989-9-fu.wei@linaro.org>
- <20170124172400.GG7572@leverpostej>
- <CADyBb7sU6DVMk6px0963r8by--U-3k_XjESd88zZMkj7xbywgA@mail.gmail.com>
- <20170125172505.GB29027@leverpostej>
- <CADyBb7syNx+HJ6t5JKPMnLqvq-98kPi1knuXU=SSe6_Uz6Gg1A@mail.gmail.com>
- <20170130174958.GA3496@leverpostej>
-Message-ID: <20170131114233.GB11191@leverpostej>
+From: john@metanate.com (John Keeping)
+Date: Tue, 31 Jan 2017 11:45:48 +0000
+Subject: [PATCH v3 06/24] drm/rockchip: dw-mipi-dsi: avoid out-of-bounds
+ read on tx_buf
+In-Reply-To: <20170130200955.GL20076@art_vandelay>
+References: <20170129132444.25251-1-john@metanate.com>
+ <20170129132444.25251-7-john@metanate.com>
+ <20170130180146.GG20076@art_vandelay>
+ <20170130181636.1bc81e86.john@metanate.com>
+ <20170130200955.GL20076@art_vandelay>
+Message-ID: <20170131114548.667d3911.john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2017 at 05:49:59PM +0000, Mark Rutland wrote:
-> On Thu, Jan 26, 2017 at 01:49:03PM +0800, Fu Wei wrote:
+On Mon, 30 Jan 2017 15:09:55 -0500, Sean Paul wrote:
 
-> > And because Linux kernel is running on Non-secure EL1, so should we
-> > skip "SECURE" timer in Linux?
+> On Mon, Jan 30, 2017 at 06:16:36PM +0000, John Keeping wrote:
+> > On Mon, 30 Jan 2017 13:01:46 -0500, Sean Paul wrote:
+> >   
+> > > On Sun, Jan 29, 2017 at 01:24:26PM +0000, John Keeping wrote:  
+> > > > As a side-effect of this, encode the endianness explicitly rather than
+> > > > casting a u16.
+> > > > 
+> > > > Signed-off-by: John Keeping <john@metanate.com>
+> > > > Reviewed-by: Chris Zhong <zyw@rock-chips.com>
+> > > > ---
+> > > > v3:
+> > > > - Add Chris' Reviewed-by
+> > > > Unchanged in v2
+> > > > 
+> > > >  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 9 +++++++--
+> > > >  1 file changed, 7 insertions(+), 2 deletions(-)
+> > > > 
+> > > > diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> > > > index 4be1ff3a42bb..2e6ad4591ebf 100644
+> > > > --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> > > > +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> > > > @@ -572,8 +572,13 @@ static int dw_mipi_dsi_gen_pkt_hdr_write(struct dw_mipi_dsi *dsi, u32 hdr_val)
+> > > >  static int dw_mipi_dsi_dcs_short_write(struct dw_mipi_dsi *dsi,
+> > > >  				       const struct mipi_dsi_msg *msg)
+> > > >  {
+> > > > -	const u16 *tx_buf = msg->tx_buf;
+> > > > -	u32 val = GEN_HDATA(*tx_buf) | GEN_HTYPE(msg->type);
+> > > > +	const u8 *tx_buf = msg->tx_buf;
+> > > > +	u32 val = GEN_HTYPE(msg->type);
+> > > > +
+> > > > +	if (msg->tx_len > 0)
+> > > > +		val |= GEN_HDATA(tx_buf[0]);
+> > > > +	if (msg->tx_len > 1)
+> > > > +		val |= GEN_HDATA(tx_buf[1] << 8);    
+> > > 
+> > > You should probably update the mask inside GEN_HDATA to mask off 8 bits instead of
+> > > 16.  
+> > 
+> > Won't that mask off the data written by "tx_buf[1] << 8"?  
 > 
-> I guess you mean by checking the GTx Common flags, to see if the timer
-> is secure? Yes, we must skip those.
+> I would move the shift outside the mask, ie:
 > 
-> Looking further at this, the ACPI spec is sorely lacking any statement
-> as to the configuration of CNTCTLBase.{CNTSAR,CNTTIDR,CNTACR}, so it's
-> not clear if we can access anything in a frame, even if it is listed as
-> being a non-secure timer.
+> val |= GEN_HDATA(tx_buf[1]) << 8;
 
-Given CNTNSAR.NS<n> enables non-secure access to CNTACR<n>, I guess the
-obvious interpretation is that for frames listed as non-secure, this has
-been configured to permit non-secure access to the frame and associated
-CNTACR<n>.
+I can do that, but that doesn't seem to match the intention of the
+macros which are about encoding the placement and size of fields within
+registers.
 
-I will work to that assumption while reviewing, though I still believe
-this needs to be clarified in the spec.
+Maybe it would be clearer to do:
 
-Thanks,
-Mark.
+    u16 data = 0;
+
+    if (msg->tx_len > 0)
+        data |= tx_buf[0];
+    if (msg->tx_len > 1)
+        data |= tx_buf[1];
+
+    val = GEN_HDATA(data) | GEN_HTYPE(msg->type);
+
+?
