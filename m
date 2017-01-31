@@ -1,73 +1,119 @@
-From: John.Youn@synopsys.com (John Youn)
-Date: Tue, 31 Jan 2017 00:28:33 +0000
-Subject: [PATCH 12/14] usb: dwc2: simplify optional reset handling
-References: <20170130114116.22089-1-p.zabel@pengutronix.de>
- <20170130114116.22089-12-p.zabel@pengutronix.de>
-Message-ID: <2B3535C5ECE8B5419E3ECBE300772909021B40EFCA@US01WEMBX2.internal.synopsys.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 30 Jan 2017 18:31:37 -0600
+Subject: [PATCH 1/4] PCI: add DT bindings for Cortina Gemini PCI Host
+ Bridge
+In-Reply-To: <20170128204839.18330-1-linus.walleij@linaro.org>
+References: <20170128204839.18330-1-linus.walleij@linaro.org>
+Message-ID: <20170131003137.GE20550@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+Hi Linus,
 
-On 1/30/2017 3:42 AM, Philipp Zabel wrote:
-> As of commit bb475230b8e5 ("reset: make optional functions really
+On Sat, Jan 28, 2017 at 09:48:36PM +0100, Linus Walleij wrote:
+> This adds device tree bindings for the Cortina Systems Gemini PCI
+> Host Bridge.
+> 
+> Cc: Janos Laube <janos.dev@gmail.com>
+> Cc: Paulius Zaleckas <paulius.zaleckas@gmail.com>
+> Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+> Cc: Florian Fainelli <f.fainelli@gmail.com>
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Where can I find this? It's not in mainline.
+I'm hoping one of the DT folks will take a quick look at this.
 
-John
-
-
-> optional"), the reset framework API calls use NULL pointers to describe
-> optional, non-present reset controls.
->
-> This allows to return errors from devm_reset_control_get_optional and to
-> call reset_control_(de)assert unconditionally.
->
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Cc: Dinh Nguyen <dinguyen@opensource.altera.com>
-> Cc: John Youn <johnyoun@synopsys.com>
-> Cc: Felipe Balbi <felipe.balbi@linux.intel.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 > ---
->  drivers/usb/dwc2/platform.c | 18 ++++--------------
->  1 file changed, 4 insertions(+), 14 deletions(-)
->
-> diff --git a/drivers/usb/dwc2/platform.c b/drivers/usb/dwc2/platform.c
-> index 4fc8c603afb8b..c6aa2710cecfe 100644
-> --- a/drivers/usb/dwc2/platform.c
-> +++ b/drivers/usb/dwc2/platform.c
-> @@ -214,20 +214,11 @@ static int dwc2_lowlevel_hw_init(struct dwc2_hsotg *hsotg)
->  	hsotg->reset = devm_reset_control_get_optional(hsotg->dev, "dwc2");
->  	if (IS_ERR(hsotg->reset)) {
->  		ret = PTR_ERR(hsotg->reset);
-> -		switch (ret) {
-> -		case -ENOENT:
-> -		case -ENOTSUPP:
-> -			hsotg->reset = NULL;
-> -			break;
-> -		default:
-> -			dev_err(hsotg->dev, "error getting reset control %d\n",
-> -				ret);
-> -			return ret;
-> -		}
-> +		dev_err(hsotg->dev, "error getting reset control %d\n", ret);
-> +		return ret;
->  	}
->
-> -	if (hsotg->reset)
-> -		reset_control_deassert(hsotg->reset);
-> +	reset_control_deassert(hsotg->reset);
->
->  	/* Set default UTMI width */
->  	hsotg->phyif = GUSBCFG_PHYIF16;
-> @@ -326,8 +317,7 @@ static int dwc2_driver_remove(struct platform_device *dev)
->  	if (hsotg->ll_hw_enabled)
->  		dwc2_lowlevel_hw_disable(hsotg);
->
-> -	if (hsotg->reset)
-> -		reset_control_assert(hsotg->reset);
-> +	reset_control_assert(hsotg->reset);
->
->  	return 0;
->  }
->
+> This can be merged to the PCI tree whenever it is considered
+> fine for inclusion.
+> ---
+>  .../devicetree/bindings/pci/cortina,gemini-pci.txt | 64 ++++++++++++++++++++++
+>  1 file changed, 64 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/cortina,gemini-pci.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/cortina,gemini-pci.txt b/Documentation/devicetree/bindings/pci/cortina,gemini-pci.txt
+> new file mode 100644
+> index 000000000000..e3090d995e1e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pci/cortina,gemini-pci.txt
+> @@ -0,0 +1,64 @@
+> +* Cortina Systems Gemini PCI Host Bridge
+> +
+> +Mandatory properties:
+> +
+> +- compatible: should be "cortina,gemini-pci"
+> +- reg: memory base and size for the host bridge
+> +- interrupts: the four PCI interrupts
+> +- #address-cells: set to <3>
+> +- #size-cells: set to <2>
+> +- #interrupt-cells: set to <1>
+> +- bus-range: set to <0x00 0x00> (only root bus)
+
+Why is this limited to bus 0?  Is everything completely soldered down
+with no possibility of adding or replacing PCI devices?  The interrupt-map
+below suggests slots, though.  If there's a slot, we could plug in a card
+with a bridge, which would mean more than just bus 0.
+
+> +- device_type, set to "pci"
+> +- ranges: see pci.txt
+> +- interrupt-map-mask: see pci.txt
+> +- interrupt-map: see pci.txt
+> +
+> +Mandatory subnodes:
+> +- One node reprenting the interrupt-controller inside the host bridge
+
+s/reprenting/representing/
+
+> +  with the following mandatory properties:
+> +  - interrupt-controller: see interrupt-controller/interrupts.txt
+> +  - #address-cells: set to <0>
+> +  - #interrupt-cells: set to <1>
+> +
+> +Example:
+> +
+> +pci at 50000000 {
+> +	compatible = "cortina,gemini-pci";
+> +	reg = <0x50000000 0x100>;
+> +	interrupts = <8 IRQ_TYPE_LEVEL_HIGH>, /* PCI A */
+> +			<26 IRQ_TYPE_LEVEL_HIGH>, /* PCI B */
+> +			<27 IRQ_TYPE_LEVEL_HIGH>, /* PCI C */
+> +			<28 IRQ_TYPE_LEVEL_HIGH>; /* PCI D */
+> +	#address-cells = <3>;
+> +	#size-cells = <2>;
+> +	#interrupt-cells = <1>;
+> +
+> +	bus-range = <0x00 0x00>; /* Only root bus */
+> +	ranges = /* 1MiB I/O space 0x50000000-0x500fffff */
+> +		 <0x01000000 0 0          0x50000000 0 0x00100000>,
+> +		 /* 128MiB non-prefetchable memory 0x58000000-0x5fffffff */
+> +		 <0x02000000 0 0x58000000 0x58000000 0 0x08000000>;
+> +	interrupt-map-mask = <0xff00 0 0 7>;
+> +	interrupt-map = <0x4800 0 0 1 &pci_intc 0>, /* Slot 9 */
+> +			<0x4900 0 0 2 &pci_intc 1>,
+> +			<0x4a00 0 0 3 &pci_intc 2>,
+> +			<0x4b00 0 0 4 &pci_intc 3>,
+> +			<0x5000 0 0 1 &pci_intc 0>, /* Slot 10 */
+> +			<0x5100 0 0 2 &pci_intc 1>,
+> +			<0x5200 0 0 3 &pci_intc 2>,
+> +			<0x5300 0 0 4 &pci_intc 3>,
+> +			<0x5800 0 0 1 &pci_intc 0>, /* Slot 11 */
+> +			<0x5900 0 0 2 &pci_intc 1>,
+> +			<0x5a00 0 0 3 &pci_intc 2>,
+> +			<0x5b00 0 0 4 &pci_intc 3>,
+> +			<0x6000 0 0 1 &pci_intc 0>, /* Slot 12 */
+> +			<0x6100 0 0 2 &pci_intc 1>,
+> +			<0x6200 0 0 3 &pci_intc 2>,
+> +			<0x6300 0 0 4 &pci_intc 3>;
+> +	pci_intc: interrupt-controller {
+> +		interrupt-controller;
+> +		#address-cells = <0>;
+> +		#interrupt-cells = <1>;
+> +	};
+> +};
+> -- 
+> 2.9.3
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
