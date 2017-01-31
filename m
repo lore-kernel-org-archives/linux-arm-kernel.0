@@ -1,71 +1,113 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 31 Jan 2017 12:37:36 +0000
-Subject: [PATCH v4 2/4] arm64: Work around Falkor erratum 1003
-In-Reply-To: <20170125155232.10277-2-cov@codeaurora.org>
-References: <20170125155232.10277-1-cov@codeaurora.org>
- <20170125155232.10277-2-cov@codeaurora.org>
-Message-ID: <20170131123735.GD11191@leverpostej>
+From: john@metanate.com (John Keeping)
+Date: Tue, 31 Jan 2017 12:39:17 +0000
+Subject: [PATCH v3 16/24] drm/rockchip: dw-mipi-dsi: properly configure
+ PHY timing
+In-Reply-To: <20170130215736.GT20076@art_vandelay>
+References: <20170129132444.25251-1-john@metanate.com>
+ <20170129132444.25251-17-john@metanate.com>
+ <20170130215736.GT20076@art_vandelay>
+Message-ID: <20170131123917.6347ab94.john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2017 at 10:52:30AM -0500, Christopher Covington wrote:
-> The Qualcomm Datacenter Technologies Falkor v1 CPU may allocate TLB entries
-> using an incorrect ASID when TTBRx_EL1 is being updated. When the erratum
-> is triggered, page table entries using the new translation table base
-> address (BADDR) will be allocated into the TLB using the old ASID. All
-> circumstances leading to the incorrect ASID being cached in the TLB arise
-> when software writes TTBRx_EL1[ASID] and TTBRx_EL1[BADDR], a memory
-> operation is in the process of performing a translation using the specific
-> TTBRx_EL1 being written, and the memory operation uses a translation table
-> descriptor designated as non-global. EL2 and EL3 code changing the EL1&0
-> ASID is not subject to this erratum because hardware is prohibited from
-> performing translations from an out-of-context translation regime.
-> 
-> Consider the following pseudo code.
-> 
->   write new BADDR and ASID values to TTBRx_EL1
-> 
-> Replacing the above sequence with the one below will ensure that no TLB
-> entries with an incorrect ASID are used by software.
-> 
->   write reserved value to TTBRx_EL1[ASID]
->   ISB
->   write new value to TTBRx_EL1[BADDR]
->   ISB
->   write new value to TTBRx_EL1[ASID]
->   ISB
-> 
-> When the above sequence is used, page table entries using the new BADDR
-> value may still be incorrectly allocated into the TLB using the reserved
-> ASID. Yet this will not reduce functionality, since TLB entries incorrectly
-> tagged with the reserved ASID will never be hit by a later instruction.
+On Mon, 30 Jan 2017 16:57:36 -0500, Sean Paul wrote:
 
-Based on my understanding that entries allocated to the reserved ASID
-will not be used for subsequent page table walks (and so we don't have
-asynchronous behaviour to contend with), this sounds fine to me.
-
-Thanks for taking the time to clarify the details on that.
-
-> Based on work by Shanker Donthineni <shankerd@codeaurora.org>
+> On Sun, Jan 29, 2017 at 01:24:36PM +0000, John Keeping wrote:
+> > These values are specified as constant time periods but the PHY
+> > configuration is in terms of the current lane byte clock so using
+> > constant values guarantees that the timings will be outside the
+> > specification with some display configurations.
+> > 
+> > Derive the necessary configuration from the byte clock in order to
+> > ensure that the PHY configuration is correct.
+> > 
+> > Signed-off-by: John Keeping <john@metanate.com>
+> > ---
+> > v3:
+> > - Wrap some long lines
+> > Unchanged in v2
+> > 
+> >  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 39 ++++++++++++++++++++++++++++++----
+> >  1 file changed, 35 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> > index cfe7e4ba305c..85edf6dd2bac 100644
+> > --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> > +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> > @@ -383,6 +383,26 @@ static void dw_mipi_dsi_phy_write(struct dw_mipi_dsi *dsi, u8 test_code,
+> >  	dsi_write(dsi, DSI_PHY_TST_CTRL0, PHY_TESTCLK | PHY_UNTESTCLR);
+> >  }
+> >  
+> > +/**
+> > + * ns2bc - Nanoseconds to byte clock cycles
+> > + */
+> > +static inline unsigned int ns2bc(struct dw_mipi_dsi *dsi, int ns)
+> > +{
+> > +	unsigned long byte_clk_khz = dsi->lane_mbps * MSEC_PER_SEC / 8;  
 > 
-> Signed-off-by: Christopher Covington <cov@codeaurora.org>
-> ---
->  Documentation/arm64/silicon-errata.txt |  1 +
->  arch/arm64/Kconfig                     | 11 +++++++++++
->  arch/arm64/include/asm/assembler.h     | 23 +++++++++++++++++++++++
->  arch/arm64/include/asm/cpucaps.h       |  3 ++-
->  arch/arm64/include/asm/mmu_context.h   |  8 +++++++-
->  arch/arm64/kernel/cpu_errata.c         |  7 +++++++
->  arch/arm64/mm/context.c                | 11 +++++++++++
->  arch/arm64/mm/proc.S                   |  1 +
->  8 files changed, 63 insertions(+), 2 deletions(-)
+> Why multiply by 1000 (MSEC_PER_SEC) only to immediately divide by 1000?
+> 
+> > +
+> > +	return (ns * (byte_clk_khz / 1000) + 999) / 1000;  
+> 
+> Can you replace this whole function with:
+> 
+> return DIV_ROUND_UP(ns * dsi->lane_mbps / 8, 1000);
 
-Don't we need to use pre_ttbr0_update_workaround in <asm/asm-uaccess.h>
-for CONFIG_ARM64_SW_TTBR0_PAN? We implicitly switch to the reserved ASID
-for the empty table in __uaccess_ttbr0_disable.
+Yes, I'll make this simplification.
 
-That also means we have to invalidate the reserved ASID so as to not
-accidentally hit while uaccess is disabled.
-
-Thanks,
-Mark.
+> > +}
+> > +
+> > +/**
+> > + * ns2ui - Nanoseconds to UI time periods
+> > + */
+> > +static inline unsigned int ns2ui(struct dw_mipi_dsi *dsi, int ns)
+> > +{
+> > +	unsigned long byte_clk_khz = dsi->lane_mbps * MSEC_PER_SEC;
+> > +
+> > +	return (ns * (byte_clk_khz / 1000) + 999) / 1000;  
+> 
+> Same remarks here.
+> 
+> Sean
+> 
+> 
+> > +}
+> > +
+> >  static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
+> >  {
+> >  	int ret, testdin, vco, val;
+> > @@ -434,10 +454,21 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
+> >  					 SETRD_MAX | POWER_MANAGE |
+> >  					 TER_RESISTORS_ON);
+> >  
+> > -
+> > -	dw_mipi_dsi_phy_write(dsi, 0x70, TLP_PROGRAM_EN | 0xf);
+> > -	dw_mipi_dsi_phy_write(dsi, 0x71, THS_PRE_PROGRAM_EN | 0x55);
+> > -	dw_mipi_dsi_phy_write(dsi, 0x72, THS_ZERO_PROGRAM_EN | 0xa);
+> > +	dw_mipi_dsi_phy_write(dsi, 0x60, TLP_PROGRAM_EN | ns2bc(dsi, 500));
+> > +	dw_mipi_dsi_phy_write(dsi, 0x61, THS_PRE_PROGRAM_EN | ns2ui(dsi, 40));
+> > +	dw_mipi_dsi_phy_write(dsi, 0x62, THS_ZERO_PROGRAM_EN | ns2bc(dsi, 300));
+> > +	dw_mipi_dsi_phy_write(dsi, 0x63, THS_PRE_PROGRAM_EN | ns2ui(dsi, 100));
+> > +	dw_mipi_dsi_phy_write(dsi, 0x64, BIT(5) | ns2bc(dsi, 100));
+> > +	dw_mipi_dsi_phy_write(dsi, 0x65, BIT(5) | (ns2bc(dsi, 60) + 7));
+> > +
+> > +	dw_mipi_dsi_phy_write(dsi, 0x70, TLP_PROGRAM_EN | ns2bc(dsi, 500));
+> > +	dw_mipi_dsi_phy_write(dsi, 0x71,
+> > +			      THS_PRE_PROGRAM_EN | (ns2ui(dsi, 50) + 5));
+> > +	dw_mipi_dsi_phy_write(dsi, 0x72,
+> > +			      THS_ZERO_PROGRAM_EN | (ns2bc(dsi, 140) + 2));
+> > +	dw_mipi_dsi_phy_write(dsi, 0x73,
+> > +			      THS_PRE_PROGRAM_EN | (ns2ui(dsi, 60) + 8));
+> > +	dw_mipi_dsi_phy_write(dsi, 0x74, BIT(5) | ns2bc(dsi, 100));
+> >  
+> >  	dsi_write(dsi, DSI_PHY_RSTZ, PHY_ENFORCEPLL | PHY_ENABLECLK |
+> >  				     PHY_UNRSTZ | PHY_UNSHUTDOWNZ);
+> > -- 
+> > 2.11.0.197.gb556de5.dirty
+> > 
+> > _______________________________________________
+> > dri-devel mailing list
+> > dri-devel at lists.freedesktop.org
+> > https://lists.freedesktop.org/mailman/listinfo/dri-devel  
+> 
