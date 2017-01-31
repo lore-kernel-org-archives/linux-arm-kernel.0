@@ -1,47 +1,62 @@
 From: seanpaul@chromium.org (Sean Paul)
-Date: Tue, 31 Jan 2017 14:14:41 -0500
-Subject: [PATCH v3 20/24] drm/rockchip: vop: test for P{H,V}SYNC
-In-Reply-To: <20170129132444.25251-21-john@metanate.com>
+Date: Tue, 31 Jan 2017 14:21:17 -0500
+Subject: [PATCH v3 21/24] drm/rockchip: dw-mipi-dsi: defer probe if panel
+ is not loaded
+In-Reply-To: <20170129132444.25251-22-john@metanate.com>
 References: <20170129132444.25251-1-john@metanate.com>
- <20170129132444.25251-21-john@metanate.com>
-Message-ID: <20170131191441.GD20076@art_vandelay>
+ <20170129132444.25251-22-john@metanate.com>
+Message-ID: <20170131192117.GE20076@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 29, 2017 at 01:24:40PM +0000, John Keeping wrote:
-> When connected to the MIPI DSI output, we need to use N{H,V}SYNC for the
-> internal connection but these flags are meaningless for DSI panels.
-> Switch the test so that we do not set the P{H,V}SYNC bits unless the
-> mode requires it.
+On Sun, Jan 29, 2017 at 01:24:41PM +0000, John Keeping wrote:
+> This ensures that the output resolution is known before fbcon loads.
 > 
-
-Reviewed-by: Sean Paul <seanpaul@chromium.org>
-
 > Signed-off-by: John Keeping <john@metanate.com>
-> Reviewed-by: Mark Yao <mark.yao@rock-chips.com>
 > ---
-> v3:
-> - Add Mark's Reviewed-by
+> Unchanged in v3
 > Unchanged in v2
 > 
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 11 +++++++++--
+>  1 file changed, 9 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> index c7eba305c488..67aefc6d4e9a 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> @@ -933,8 +933,8 @@ static void vop_crtc_enable(struct drm_crtc *crtc)
->  	}
+> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> index f5b15377ef85..5bad92e2370e 100644
+> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> @@ -1176,10 +1176,17 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
 >  
->  	pin_pol = 0x8;
-> -	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_NHSYNC) ? 0 : 1;
-> -	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_NVSYNC) ? 0 : (1 << 1);
-> +	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_PHSYNC) ? 1 : 0;
-> +	pin_pol |= (adjusted_mode->flags & DRM_MODE_FLAG_PVSYNC) ? (1 << 1) : 0;
->  	VOP_CTRL_SET(vop, pin_pol, pin_pol);
+>  	dsi->dsi_host.ops = &dw_mipi_dsi_host_ops;
+>  	dsi->dsi_host.dev = dev;
+> -	return mipi_dsi_host_register(&dsi->dsi_host);
+> +	ret = mipi_dsi_host_register(&dsi->dsi_host);
+> +	if (!ret && !dsi->panel) {
+> +		mipi_dsi_host_unregister(&dsi->dsi_host);
+> +		drm_encoder_cleanup(&dsi->encoder);
+> +		drm_connector_cleanup(&dsi->connector);
+
+Move the host registration up before dw_mipi_dsi_register() to avoid
+having to clean up the encoder and connector?
+
+> +		ret = -EPROBE_DEFER;
+> +	}
 >  
->  	switch (s->output_type) {
+>  err_pllref:
+> -	clk_disable_unprepare(dsi->pllref_clk);
+> +	if (ret)
+
+I personally think it's cleaner to explicitly goto in the error conditional (or
+in this case, the defer conditional) and have a return 0; right before the err_*
+labels. Then you don't need to worry about a) checking ret in all of your
+cleanups and b) someone adding code above the labels that you don't intend to
+run.
+
+Sean
+
+> +		clk_disable_unprepare(dsi->pllref_clk);
+>  	return ret;
+>  }
+>  
 > -- 
 > 2.11.0.197.gb556de5.dirty
 > 
