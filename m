@@ -1,32 +1,37 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 31 Jan 2017 10:40:00 -0800
-Subject: [PATCH 1/4] dt-bindings: Add binding for brcm,bcm2835-sdhost.
-In-Reply-To: <2012885435.15821.1485812279271@email.1und1.de>
-References: <1485516989-1072-1-git-send-email-kraxel@redhat.com>
- <1485516989-1072-2-git-send-email-kraxel@redhat.com>
- <2012885435.15821.1485812279271@email.1und1.de>
-Message-ID: <87zii7m5tr.fsf@eliezer.anholt.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 31 Jan 2017 19:42:31 +0100
+Subject: [PATCH] efi: libstub: Make file I/O chunking x86-specific
+In-Reply-To: <1485877949-21981-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1485877949-21981-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAK8P3a3R4Tg8xW7YOyoLqebofC=ABeWyXsKKVj=2mUWDS868xQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
-
->> Gerd Hoffmann <kraxel@redhat.com> hat am 27. Januar 2017 um 12:36 geschrieben:
->> 
->> 
->> From: Eric Anholt <eric@anholt.net>
->> 
->> This is the other SD controller on the platform, which can be swapped
->> to the role of SD card host using pin muxing.
+On Tue, Jan 31, 2017 at 4:52 PM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> The ARM decompressor is finicky when it comes to uninitialized variables
+> with local linkage, the reason being that it may relocate .text and .bss
+> independently when executing from ROM. This is only possible if all
+> references into .bss from .text are absolute, and this happens to be the
+> case for references emitted under -fpic to symbols with external linkage,
+> and so all .bss references must involve symbols with external linkage.
 >
-> AFAIK the SDHOST controller isn't able to handle SDIO. Maybe we should mention this in the binding document.
+> When building the ARM stub using clang, the initialized local variable
+> __chunk_size is optimized into a zero-initialized flag that indicates
+> whether chunking is in effect or not. This flag is therefore emitted into
+> .bss, which triggers the ARM decompressor's diagnostics, resulting in a
+> failed build.
+>
+> Under UEFI, we never execute the decompressor from ROM, so the diagnostic
+> makes little sense here. But we can easily work around the issue by making
+> __chunk_size global instead.
+>
+> However, given that the file I/O chunking that is controlled by the
+> __chunk_size variable is intended to work around known bugs on various
+> x86 implementations of UEFI, we can simply make the chunking an x86
+> specific feature. This is an improvement by itself, and also removes the
+> need to parse the efi= options in the stub entirely.
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-The binding should be documentation of the binding.  I'd love to see
-more explanation in the mmc/host/bcm2835.c, though.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170131/f91e0ad6/attachment.sig>
+Tested-by: Arnd Bergmann <arnd@arndb.de
