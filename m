@@ -1,41 +1,49 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 31 Jan 2017 15:25:10 +0100
-Subject: [PATCH v3 00/24] i.MX Media Driver
-In-Reply-To: <1485870854.2932.63.camel@pengutronix.de>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1485870854.2932.63.camel@pengutronix.de>
-Message-ID: <1485872710.2932.65.camel@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 31 Jan 2017 14:29:07 +0000
+Subject: [PATCH 6/7] arm64: arch_timer: document Hisilicon erratum
+ 161010101
+In-Reply-To: <1485865196-12742-7-git-send-email-mark.rutland@arm.com>
+References: <1485865196-12742-1-git-send-email-mark.rutland@arm.com>
+ <1485865196-12742-7-git-send-email-mark.rutland@arm.com>
+Message-ID: <20170131142906.GB22283@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-01-31 at 14:54 +0100, Philipp Zabel wrote:
-> Hi Steve,
+On Tue, Jan 31, 2017 at 12:19:55PM +0000, Mark Rutland wrote:
+> From: Ding Tianhong <dingtianhong@huawei.com>
 > 
-> I have just tested the imx-media-staging-md-wip branch on a Nitrogen6X
-> with a tc358743 (BD_HDMI_MIPI HDMI to MIPI CSI-2 receiver board). Some
-> observations:
+> Now that we have a workaround for Hisilicon erratum 161010101, notes
+> this in the arm64 silicon-errata document.
 > 
-> # Link pipeline
-> media-ctl -l "'tc358743 1-000f':0->'imx6-mipi-csi2':0[1]"
-> media-ctl -l "'imx6-mipi-csi2':1->'ipu1_csi0_mux':0[1]"
-> media-ctl -l "'ipu1_csi0_mux':2->'ipu1_csi0':0[1]"
-> media-ctl -l "'ipu1_csi0':2->'ipu1_csi0 capture':0[1]"
+> The new config option is too long to fit in the existing kconfig column,
+> so this is widened to accomodate it.
 > 
-> # Provide an EDID to the HDMI source
-> v4l2-ctl -d /dev/v4l-subdev2 --set-edid=file=edid-1080p.hex
-> # At this point the HDMI source is enabled and sends a 1080p60 signal
-> # Configure detected DV timings
-> media-ctl --set-dv "'tc358743 1-000f':0"
+> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+> [Mark: split patch, reword commit message]
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> ---
+>  Documentation/arm64/silicon-errata.txt | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> # Set pad formats
-> media-ctl --set-v4l2 "'tc358743 1-000f':0[fmt:UYVY/1920x1080]"
-> media-ctl --set-v4l2 "'imx6-mipi-csi2':1[fmt:UYVY2X8/1920x1080]"
-> media-ctl --set-v4l2 "'ipu1_csi0_mux':2[fmt:UYVY2X8/1920x1080]"
+> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+> index 4a5e6cc..e12c926 100644
+> --- a/Documentation/arm64/silicon-errata.txt
+> +++ b/Documentation/arm64/silicon-errata.txt
+> @@ -63,3 +63,5 @@ stable kernels.
+>  | Cavium         | ThunderX SMMUv2 | #27704          | N/A                              |
+>  |                |                 |                 |                                  |
+>  | Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585              |
+> +|                |                 |                 |                                  |
+> +| Hisilicon      | Hip0{5,6,7}     | #161010101      | HISILICON_ERRATUM_161010101      |
+> -- 
+> 1.9.1
 
-I noticed this seems to get ignored. The format is incorrectly set to
-UYVY even though I request UYVY2X8 (see CSI2IPU chapter, Figure 19-10.
-YUV422-8 data reception in the reference manual), but it seems to work
-anyway.
+I'd like to take this one via arm64, then you can drop it along with the
+first patch in the series and I can deal with the conflicts in the text
+file.
 
-regards
-Philipp
+Daniel, are you ok with that? This file isn't part of the clocksource
+code and is purely an informative document that we maintain to help ARM
+vendors know which errata we're working around.
+
+Will
