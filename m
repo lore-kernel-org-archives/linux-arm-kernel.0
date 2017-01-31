@@ -1,80 +1,74 @@
 From: john@metanate.com (John Keeping)
-Date: Tue, 31 Jan 2017 12:03:49 +0000
-Subject: [PATCH v3 12/24] drm/rockchip: dw-mipi-dsi: allow commands in
- panel_disable
-In-Reply-To: <20170130201953.GO20076@art_vandelay>
+Date: Tue, 31 Jan 2017 12:14:09 +0000
+Subject: [PATCH v3 15/24] drm/rockchip: dw-mipi-dsi: configure PHY
+ before enabling
+In-Reply-To: <20170130202808.GR20076@art_vandelay>
 References: <20170129132444.25251-1-john@metanate.com>
- <20170129132444.25251-13-john@metanate.com>
- <20170130201953.GO20076@art_vandelay>
-Message-ID: <20170131120349.6e291624.john@metanate.com>
+ <20170129132444.25251-16-john@metanate.com>
+ <20170130202808.GR20076@art_vandelay>
+Message-ID: <20170131121409.4cc453d0.john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Jan 2017 15:19:53 -0500, Sean Paul wrote:
+On Mon, 30 Jan 2017 15:28:08 -0500, Sean Paul wrote:
 
-> On Sun, Jan 29, 2017 at 01:24:32PM +0000, John Keeping wrote:
-> > Panel drivers may want to sent commands during the disable function, for
-> > example MIPI_DCS_SET_DISPLAY_OFF before the video signal ends.  In order
-> > to send commands we need to write to registers, so pclk must be enabled.
-> > 
-> > While changing this, remove the unnecessary code after the panel
-> > unprepare call which seems to be a workaround for a specific panel and
-> > thus belongs in the panel driver.  
+> On Sun, Jan 29, 2017 at 01:24:35PM +0000, John Keeping wrote:
+> > The bias, bandgap and PLL should all be configured before we enable
+> > them.
+> >   
 > 
-> Do you know which panel? If the panel driver is upstream, we should make sure we
-> migrate this hack before removing it here. If it's downstream somewhere,
+> Do you know why the test codes are hard-coded magic? It'd be nice to make some
+> sense of them in a future patch.
 
-I'm just going by the comment in the code that this patch deletes and
-the fact that this delay was not needed on any of the three panels I
-tested.
-
-Given the way the modes change, I think this should be a 120ms disable
-delay if the affected panel is supported by the simple-panel driver.
+I just kept with the existing style of the code, but it should be
+straightforward to add some defines with sensible names.
 
 > Reviewed-by: Sean Paul <seanpaul@chromium.org>
 > 
-> > 
 > > Signed-off-by: John Keeping <john@metanate.com>
-> > Reviewed-by: Chris Zhong <zyw@rock-chips.com>
 > > ---
 > > v3:
-> > - Add Chris' Reviewed-by
+> > - Squash together two patches that both affect initialization order of
+> >   the PHY
 > > Unchanged in v2
 > > 
-> >  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 12 ++----------
-> >  1 file changed, 2 insertions(+), 10 deletions(-)
+> >  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 11 ++++++-----
+> >  1 file changed, 6 insertions(+), 5 deletions(-)
 > > 
 > > diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > index 7ada6d8ed143..290282e86d16 100644
+> > index 5b3068e9e8db..cfe7e4ba305c 100644
 > > --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 > > +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > @@ -846,24 +846,16 @@ static void dw_mipi_dsi_encoder_disable(struct drm_encoder *encoder)
-> >  {
-> >  	struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
+> > @@ -413,12 +413,17 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
 > >  
-> > -	drm_panel_disable(dsi->panel);
-> > -
-> >  	if (clk_prepare_enable(dsi->pclk)) {
-> >  		dev_err(dsi->dev, "%s: Failed to enable pclk\n", __func__);
-> >  		return;
-> >  	}
+> >  	dw_mipi_dsi_phy_write(dsi, 0x44, HSFREQRANGE_SEL(testdin));
 > >  
-> > +	drm_panel_disable(dsi->panel);
+> > -	dw_mipi_dsi_phy_write(dsi, 0x19, PLL_LOOP_DIV_EN | PLL_INPUT_DIV_EN);
+> >  	dw_mipi_dsi_phy_write(dsi, 0x17, INPUT_DIVIDER(dsi->input_div));
+> >  	dw_mipi_dsi_phy_write(dsi, 0x18, LOOP_DIV_LOW_SEL(dsi->feedback_div) |
+> >  					 LOW_PROGRAM_EN);
+> >  	dw_mipi_dsi_phy_write(dsi, 0x18, LOOP_DIV_HIGH_SEL(dsi->feedback_div) |
+> >  					 HIGH_PROGRAM_EN);
+> > +	dw_mipi_dsi_phy_write(dsi, 0x19, PLL_LOOP_DIV_EN | PLL_INPUT_DIV_EN);
 > > +
-> >  	dw_mipi_dsi_set_mode(dsi, DW_MIPI_DSI_CMD_MODE);
-> >  	drm_panel_unprepare(dsi->panel);
-> > -	dw_mipi_dsi_set_mode(dsi, DW_MIPI_DSI_VID_MODE);
+> > +	dw_mipi_dsi_phy_write(dsi, 0x22, LOW_PROGRAM_EN |
+> > +					 BIASEXTR_SEL(BIASEXTR_127_7));
+> > +	dw_mipi_dsi_phy_write(dsi, 0x22, HIGH_PROGRAM_EN |
+> > +					 BANDGAP_SEL(BANDGAP_96_10));
 > >  
-> > -	/*
-> > -	 * This is necessary to make sure the peripheral will be driven
-> > -	 * normally when the display is enabled again later.
-> > -	 */
-> > -	msleep(120);
-> > -
-> > -	dw_mipi_dsi_set_mode(dsi, DW_MIPI_DSI_CMD_MODE);
-> >  	dw_mipi_dsi_disable(dsi);
-> >  	clk_disable_unprepare(dsi->pclk);
-> >  }
+> >  	dw_mipi_dsi_phy_write(dsi, 0x20, POWER_CONTROL | INTERNAL_REG_CURRENT |
+> >  					 BIAS_BLOCK_ON | BANDGAP_ON);
+> > @@ -429,10 +434,6 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
+> >  					 SETRD_MAX | POWER_MANAGE |
+> >  					 TER_RESISTORS_ON);
+> >  
+> > -	dw_mipi_dsi_phy_write(dsi, 0x22, LOW_PROGRAM_EN |
+> > -					 BIASEXTR_SEL(BIASEXTR_127_7));
+> > -	dw_mipi_dsi_phy_write(dsi, 0x22, HIGH_PROGRAM_EN |
+> > -					 BANDGAP_SEL(BANDGAP_96_10));
+> >  
+> >  	dw_mipi_dsi_phy_write(dsi, 0x70, TLP_PROGRAM_EN | 0xf);
+> >  	dw_mipi_dsi_phy_write(dsi, 0x71, THS_PRE_PROGRAM_EN | 0x55);
 > > -- 
 > > 2.11.0.197.gb556de5.dirty
 > > 
