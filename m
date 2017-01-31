@@ -1,104 +1,46 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Tue, 31 Jan 2017 10:21:26 -0800
-Subject: [PATCH v3 20/24] media: imx: Add Camera Interface subdev driver
-In-Reply-To: <20170131134252.GX27312@n2100.armlinux.org.uk>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-21-git-send-email-steve_longerbeam@mentor.com>
- <b7456d40-040d-41b7-45bc-ef6709ab7933@xs4all.nl>
- <20170131134252.GX27312@n2100.armlinux.org.uk>
-Message-ID: <b0517394-7717-3e1d-b850-e2b69a9c19e9@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 31 Jan 2017 18:30:34 +0000
+Subject: [PATCH v2 0/4] crypto: time invariant AES for CCM (and GCM/CTR)
+In-Reply-To: <1485646413-17491-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1485646413-17491-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAKv+Gu9GXmMzHiOZE57xQEwoH4ib1dq7LZFPia=nr27bj_pdkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 28 January 2017 at 23:33, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> This series is primarily directed at improving the performance and security
+> of CCM on the Rasperry Pi 3. This involves splitting the MAC handling of
+> CCM into a separate driver so that we can efficiently replace it by something
+> else using the ordinary algo resolution machinery.
+>
+> Patch #1 adds some testcases for cbcmac(aes), which will be introduced later.
+>
+> Patch #2 replaces the open coded CBC MAC hashing routines in the CCM driver
+> with calls to a cbcmac() hash, and implements a template for producing such
+> transforms. This eliminates all the fuzzy scatterwalk code as well.
+>
+> Patch #3 implements cbcmac(aes) using NEON on arm64
+>
+> Patch #4 is an RFC patch that implements ctr(aes) and cbcmac(aes) in a way
+> that is intended to eliminate observeable data dependent latencies in AES
+> processing, by replacing the usual 16 KB of lookup tables with a single
+> Sbox that is prefetched before processing each block. It is 50% slower than
+> generic AES, but this may be acceptable in many cases.
+>
+> Changes since v1:
+> - remove ilen, and add missing flags assignment (#2)
+> - deal with zero cryptlen (#2)
+> - use correctly sized dg[] array in desc ctx (#3, #4)
+> - fix bug in update routine (#3)
+> - various other tweaks
+>
+> Ard Biesheuvel (4):
+>   crypto: testmgr - add test cases for cbcmac(aes)
+>   crypto: ccm - switch to separate cbcmac driver
+>   crypto: arm64/aes - add NEON and Crypto Extension CBC-MAC driver
+>   crypto: aes - add generic time invariant AES for CTR/CCM/GCM
+>
 
-
-On 01/31/2017 05:42 AM, Russell King - ARM Linux wrote:
-> On Fri, Jan 20, 2017 at 03:38:28PM +0100, Hans Verkuil wrote:
->> Should be set to something like 'platform:imx-media-camif'. v4l2-compliance
->> should complain about this.
-> ... and more.
-
-Right, in version 3 that you are working with, no v4l2-compliance fixes were
-in yet. A lot of the compliance errors are fixed, please look in latest 
-branch
-imx-media-staging-md-wip at git at github.com:slongerbeam/mediatree.git.
-
-
-<snip>
->
->
->
-> Total: 39, Succeeded: 33, Failed: 6, Warnings: 0
->
-> Not all of these may be a result of Steve's code - this is running against
-> my gradually modified version to support bayer formats (which seems to be
-> the cause of the v4l2-test-formats.cpp failure... for some reason the
-> driver isn't enumerating all the formats.)
->
-> And that reason is the way that the formats are enumerated:
->
-> static int camif_enum_fmt_vid_cap(struct file *file, void *fh,
->                                    struct v4l2_fmtdesc *f)
-> {
->          const struct imx_media_pixfmt *cc;
->          u32 code;
->          int ret;
->
->          ret = imx_media_enum_format(&code, f->index, true, true);
->          if (ret)
->                  return ret;
->          cc = imx_media_find_format(0, code, true, true);
->          if (!cc)
->                  return -EINVAL;
->
-> When imx_media_enum_format() hits this entry in the table:
->
->          }, {
->                  .fourcc = V4L2_PIX_FMT_BGR24,
->                  .cs     = IPUV3_COLORSPACE_RGB,
->                  .bpp    = 24,
->          }, {
->
-> becaues there's no .codes defined:
->
-> int imx_media_enum_format(u32 *code, u32 index, bool allow_rgb,
->                            bool allow_planar)
-> {
-> ...
->          *code = fmt->codes[0];
->          return 0;
-> }
->
-> So, we end up calling imx_media_find_format(0, 0, true, true), which
-> fails, returning NULL.  That causes camif_enum_fmt_vid_cap() to
-> return -EINVAL.
->
-> So everything past this entry is unable to be enumerated.
->
-> I think this is a really round-about way of enumerating the pixel
-> formats when there are soo many entries in the table which have no
-> media bus code - there's absolutely no way that any of those entries
-> can ever be enumerated in this fashion, so they might as well not be
-> in the table...
->
-> That's my present solution to this problem, to #if 0 out all the
-> entries without any .codes field.  I think the real answer is that
-> this needs a _separate_ function to enumerate the pixel formats for
-> camif_enum_fmt_vid_cap().  However, there may be other issues lurking
-> that I've not yet found (still trying to get this code to work...)
-
-I believe this has been fixed in imx-media-staging-md-wip as well,
-see imx-media-capture.c:capture_enum_fmt_vid_cap()
-
-Camif subdev is gone, replaced with a set of exported functions
-that allow attaching a capture device (and v4l2 interface) to a
-calling subdev's output pad. See imx-media-capture.c.
-
-The subdev's capture device interface is the only subdev that
-can request a planar format from imx_media_enum_format().
-All the others now (the non-device node pads), request only RGB
-or packed YUV, or the IPU internal formats for IPU internal connections,
-and these are the first entries in the table. The planar formats all are at
-the end, which can only be enumerated by the capture device interfaces.
-
-Steve
+I have updated versions of these that make use of the alignment
+agnostic crypto_xor(). I will respin these once that patch gets
+discussed/merged/rejected/etc
