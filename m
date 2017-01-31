@@ -1,103 +1,176 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 31 Jan 2017 14:31:09 -0600
-Subject: [PATCH] PCI: ACPI: Fix ThunderX PEM initialization
-In-Reply-To: <20170131145720.GA14231@localhost.localdomain>
-References: <1485793552-12614-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
- <20170130211236.GW20550@bhelgaas-glaptop.roam.corp.google.com>
- <20170131102830.GA13854@localhost.localdomain>
- <20170131142525.GA9942@bhelgaas-glaptop.roam.corp.google.com>
- <20170131145720.GA14231@localhost.localdomain>
-Message-ID: <20170131203109.GA14127@bhelgaas-glaptop.roam.corp.google.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 31 Jan 2017 12:31:52 -0800
+Subject: [PATCH net-next 4/6] drivers: net: xgene-v2: Add base driver
+In-Reply-To: <1485889401-13909-5-git-send-email-isubramanian@apm.com>
+References: <1485889401-13909-1-git-send-email-isubramanian@apm.com>
+ <1485889401-13909-5-git-send-email-isubramanian@apm.com>
+Message-ID: <c6ae0303-4ac9-987b-5477-fa28ddc00f83@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2017 at 06:57:20AM -0800, Vadim Lomovtsev wrote:
-> On Tue, Jan 31, 2017 at 08:25:25AM -0600, Bjorn Helgaas wrote:
-> > On Tue, Jan 31, 2017 at 02:28:30AM -0800, Vadim Lomovtsev wrote:
-> > > Hi Bjorn,
-> > > 
-> > > On Mon, Jan 30, 2017 at 03:12:37PM -0600, Bjorn Helgaas wrote:
-> > > > Hi Vadim,
-> > > > 
-> > > > On Mon, Jan 30, 2017 at 08:25:52AM -0800, Vadim Lomovtsev wrote:
-> > > > > This patch is to address PEM initialization issue
-> > > > > which causes network issues.
-> > > > > 
-> > > > > It is necessary to search for _HID:PNP0A08 while requesting
-> > > > > PEM resources via ACPI instead of "THRX0002".
-> > > > > 
-> > > > > Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
-> > > > > ---
-> > > > >  drivers/pci/host/pci-thunder-pem.c | 2 +-
-> > > > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > > > 
-> > > > > diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
-> > > > > index af722eb..aec30b8 100644
-> > > > > --- a/drivers/pci/host/pci-thunder-pem.c
-> > > > > +++ b/drivers/pci/host/pci-thunder-pem.c
-> > > > > @@ -331,7 +331,7 @@ static int thunder_pem_acpi_init(struct pci_config_window *cfg)
-> > > > >  	if (!res_pem)
-> > > > >  		return -ENOMEM;
-> > > > >  
-> > > > > -	ret = acpi_get_rc_resources(dev, "THRX0002", root->segment, res_pem);
-> > > > > +	ret = acpi_get_rc_resources(dev, "PNP0A08", root->segment, res_pem);
-> > > > 
-> > > > This doesn't smell right: PNP0A08 is the generic ACPI ID.  There's no
-> > > > guarantee that if we find a PNP0A08 device, it is a ThunderX device.
-> > > > 
-> > > > I think the only way to call thunder_pem_acpi_init() is via an MCFG
-> > > > quirk that mentions thunder_pem_ecam_ops, which means we only call it
-> > > > if we find an MCFG with "CAVIUM" "THUNDERX" OEM and table IDs, so it's
-> > > > probably safe in that sense.
-> > > 
-> > > Agree, it is not the best solution.
-> > > We will implement such approach and send for review. 
-> > > 
-> > > > 
-> > > > But it's an abuse of the ACPI _HID model.  If you match a device using
-> > > > PNP0A08, all you can assume about it is that it uses the generic
-> > > > PNP0A08 programming model, and I don't think that includes "the first
-> > > > memory resource in _CRS contains ECAM space and MSI-X tables."
-> > > > 
-> > > > I expect this is a teething issue because you have firmware in the
-> > > > field that uses PNP0A08 and it's not feasible to update it.  If that's
-> > > > the case, the changelog should have details about it and we should
-> > > > have a comment in the code, because I don't think this is the model we
-> > > > want to end up with in future releases.
-> > > 
-> > > It could become so. However, for now I didn't get any reports on that,
-> > > (may be I miss something) except some internal emailings.
-> > > At my testing HW I was able to see some issues related to acpi-PEM stuff.
-> > > 
-> > > Thanks for feed-back, we will prepare another patch or patchset
-> > > implementing approach you've highlighted.
-> > 
-> > The approach I would like best is to search for THRX0002, because then
-> > you know you have a ThunderX PEM device, and you can assume
-> > device-specific details about its _CRS.
-> >
-> > But that's what the existing code does, and apparently that doesn't
-> > work.  My guess is that you have firmware in the field where the host
-> > bridge has only PNP0A08 (and maybe PNP0A03) as device IDs.
+On 01/31/2017 11:03 AM, Iyappan Subramanian wrote:
+> This patch adds,
 > 
-> Because there is no such ACPI ID as "THRX0002" registered
-> (http://www.uefi.org/acpi_id_list).
-
-To be pedantically correct, I think you want "THRX" registered.  Then
-you can manage the "0002" part internally without registering each
-individual device.
-
-> From the other hand we may gather device resources through
-> _CRS (we have acpi_device already set by this moment) but
-> we need to be sure that we're running at Cavium ThunderX board then.
+>      - probe, remove, shutdown
+>      - open, close and stats
+>      - create and delete ring
+>      - request and delete irq
 > 
-> To do that we may add _SUB value (accrodingly to spec) with
-> exact ID string (a full PCI ID value "177DA22D" is suggested).
-> This will eventually become the main method of finding out
-> whether we run on a ThunderX PEM.
+> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+> Signed-off-by: Keyur Chudgar <kchudgar@apm.com>
+> ---
 
-I don't understand why you would use _SUB.  I think the correct way to
-handle this is to use a _HID of "THRX0002" with a _CID of "PNP0A08".
-Is there some existing _SUB usage you're using as an example?
+> +static void xge_delete_desc_rings(struct net_device *ndev)
+> +{
+> +	struct xge_pdata *pdata = netdev_priv(ndev);
+> +	struct device *dev = &pdata->pdev->dev;
+> +	struct xge_desc_ring *ring;
+> +
+> +	ring = pdata->tx_ring;
+> +	if (ring) {
+> +		if (ring->skbs)
+> +			devm_kfree(dev, ring->skbs);
+> +		if (ring->pkt_bufs)
+> +			devm_kfree(dev, ring->pkt_bufs);
+> +		devm_kfree(dev, ring);
+> +	}
 
-Bjorn
+The very fact that you have to do the devm_kfree suggests that the way
+you manage the lifetime of the ring is not appropriate, and in fact, if
+we look at how xge_create_desc_ring() is called, in the driver's probe
+function indicates that if the network interface is never openeded, we
+are just wasting memory sitting there and doing nothing. You should
+consider moving this to the ndo_open(), resp. ndo_close() functions to
+optimize memory consumption wrt. the network interface state.
+
+> +
+> +	ring = pdata->rx_ring;
+> +	if (ring) {
+> +		if (ring->skbs)
+> +			devm_kfree(dev, ring->skbs);
+> +		devm_kfree(dev, ring);
+> +	}
+> +}
+> +
+> +static struct xge_desc_ring *xge_create_desc_ring(struct net_device *ndev)
+> +{
+> +	struct xge_pdata *pdata = netdev_priv(ndev);
+> +	struct device *dev = &pdata->pdev->dev;
+> +	struct xge_desc_ring *ring;
+> +	u16 size;
+> +
+> +	ring = devm_kzalloc(dev, sizeof(struct xge_desc_ring), GFP_KERNEL);
+> +	if (!ring)
+> +		return NULL;
+> +
+> +	ring->ndev = ndev;
+> +
+> +	size = XGENE_ENET_DESC_SIZE * XGENE_ENET_NUM_DESC;
+> +	ring->desc_addr = dmam_alloc_coherent(dev, size, &ring->dma_addr,
+> +					      GFP_KERNEL | __GFP_ZERO);
+
+There is no dmam_zalloc_coherent()? Then again, that seems to be a
+candidate for dma_zalloc_coherent() and moving this to the ndo_open()
+function.
+
+> +	if (!ring->desc_addr) {
+> +		devm_kfree(dev, ring);
+> +		return NULL;
+> +	}
+> +
+> +	xge_setup_desc(ring);
+> +
+> +	return ring;
+> +}
+> +
+> +static int xge_refill_buffers(struct net_device *ndev, u32 nbuf)
+> +{
+> +	struct xge_pdata *pdata = netdev_priv(ndev);
+> +	struct xge_desc_ring *ring = pdata->rx_ring;
+> +	const u8 slots = XGENE_ENET_NUM_DESC - 1;
+> +	struct device *dev = &pdata->pdev->dev;
+> +	struct xge_raw_desc *raw_desc;
+> +	u64 addr_lo, addr_hi;
+> +	u8 tail = ring->tail;
+> +	struct sk_buff *skb;
+> +	dma_addr_t dma_addr;
+> +	u16 len;
+> +	int i;
+> +
+> +	for (i = 0; i < nbuf; i++) {
+> +		raw_desc = &ring->raw_desc[tail];
+> +
+> +		len = XGENE_ENET_STD_MTU;
+> +		skb = netdev_alloc_skb(ndev, len);
+> +		if (unlikely(!skb))
+> +			return -ENOMEM;
+
+Are not you leaving holes in your RX ring if you do that?
+
+> +
+> +		dma_addr = dma_map_single(dev, skb->data, len, DMA_FROM_DEVICE);
+> +		if (dma_mapping_error(dev, dma_addr)) {
+> +			netdev_err(ndev, "DMA mapping error\n");
+> +			dev_kfree_skb_any(skb);
+> +			return -EINVAL;
+> +		}
+
+
+> +static void xge_timeout(struct net_device *ndev)
+> +{
+> +	struct xge_pdata *pdata = netdev_priv(ndev);
+> +	struct netdev_queue *txq;
+> +
+> +	xge_mac_reset(pdata);
+> +
+> +	txq = netdev_get_tx_queue(ndev, 0);
+> +	txq->trans_start = jiffies;
+> +	netif_tx_start_queue(txq);
+
+It most likely is not that simple, don't you want to walk the list of
+pending transmissed SKBs and free them all?
+
+> +}
+> +
+> +static void xge_get_stats64(struct net_device *ndev,
+> +			    struct rtnl_link_stats64 *storage)
+> +{
+> +	struct xge_pdata *pdata = netdev_priv(ndev);
+> +	struct xge_stats *stats = &pdata->stats;
+> +
+> +	storage->tx_packets += stats->tx_packets;
+> +	storage->tx_bytes += stats->tx_bytes;
+> +
+> +	storage->rx_packets += stats->rx_packets;
+> +	storage->rx_bytes += stats->rx_bytes;
+
+Pretty sure you need some synchronization primitives here for non 64-bit
+architectures (maybe this driver is not used outside of 64-bit, but still).
+
+
+> +
+> +	ndev->hw_features = ndev->features;
+> +
+> +	ret = dma_coerce_mask_and_coherent(dev, DMA_BIT_MASK(64));
+> +	if (ret) {
+> +		netdev_err(ndev, "No usable DMA configuration\n");
+> +		goto err;
+> +	}
+> +
+> +	ret = xge_init_hw(ndev);
+> +	if (ret)
+> +		goto err;
+
+Missing netif_carrier_off() right before the register_netdev().
+
+> +
+> +	ret = register_netdev(ndev);
+> +	if (ret) {
+> +		netdev_err(ndev, "Failed to register netdev\n");
+> +		goto err;
+> +	}
+
+
+
+-- 
+Florian
