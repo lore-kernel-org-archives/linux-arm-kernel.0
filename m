@@ -1,69 +1,50 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Tue, 31 Jan 2017 14:21:17 -0500
-Subject: [PATCH v3 21/24] drm/rockchip: dw-mipi-dsi: defer probe if panel
- is not loaded
-In-Reply-To: <20170129132444.25251-22-john@metanate.com>
-References: <20170129132444.25251-1-john@metanate.com>
- <20170129132444.25251-22-john@metanate.com>
-Message-ID: <20170131192117.GE20076@art_vandelay>
+From: martin@kaiser.cx (Martin Kaiser)
+Date: Tue, 31 Jan 2017 20:20:01 +0100
+Subject: [PATCH 1/2] ARM: dts: i.MX25: add AIPS control registers
+Message-ID: <1485890402-22974-1-git-send-email-martin@kaiser.cx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 29, 2017 at 01:24:41PM +0000, John Keeping wrote:
-> This ensures that the output resolution is known before fbcon loads.
-> 
-> Signed-off-by: John Keeping <john@metanate.com>
-> ---
-> Unchanged in v3
-> Unchanged in v2
-> 
->  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 11 +++++++++--
->  1 file changed, 9 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> index f5b15377ef85..5bad92e2370e 100644
-> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> @@ -1176,10 +1176,17 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
->  
->  	dsi->dsi_host.ops = &dw_mipi_dsi_host_ops;
->  	dsi->dsi_host.dev = dev;
-> -	return mipi_dsi_host_register(&dsi->dsi_host);
-> +	ret = mipi_dsi_host_register(&dsi->dsi_host);
-> +	if (!ret && !dsi->panel) {
-> +		mipi_dsi_host_unregister(&dsi->dsi_host);
-> +		drm_encoder_cleanup(&dsi->encoder);
-> +		drm_connector_cleanup(&dsi->connector);
+The i.MX25 contains two AHB to IP bridges (AIPS), each of which has a set of
+control registers. Add the memory regions for the control registers to
+the Device Tree.
 
-Move the host registration up before dw_mipi_dsi_register() to avoid
-having to clean up the encoder and connector?
+All the registers from the i.MX53 AIPSTZ are present on the i.MX25 as
+well. Indicate that we are compatible to fsl,imx53-aipstz. However,
+don't use aipstz for our name, this seems to be specific to i.MX53.
 
-> +		ret = -EPROBE_DEFER;
-> +	}
->  
->  err_pllref:
-> -	clk_disable_unprepare(dsi->pllref_clk);
-> +	if (ret)
+Signed-off-by: Martin Kaiser <martin@kaiser.cx>
+---
+ arch/arm/boot/dts/imx25.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-I personally think it's cleaner to explicitly goto in the error conditional (or
-in this case, the defer conditional) and have a return 0; right before the err_*
-labels. Then you don't need to worry about a) checking ret in all of your
-cleanups and b) someone adding code above the labels that you don't intend to
-run.
-
-Sean
-
-> +		clk_disable_unprepare(dsi->pllref_clk);
->  	return ret;
->  }
->  
-> -- 
-> 2.11.0.197.gb556de5.dirty
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
-
+diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
+index e0ba550..4c4768f 100644
+--- a/arch/arm/boot/dts/imx25.dtsi
++++ b/arch/arm/boot/dts/imx25.dtsi
+@@ -93,6 +93,11 @@
+ 			reg = <0x43f00000 0x100000>;
+ 			ranges;
+ 
++			aips1: bridge at 43f00000 {
++				compatible = "fsl,imx25-aips", "fsl,imx53-aipstz";
++				reg = <0x43f00000 0x60>;
++			};
++
+ 			i2c1: i2c at 43f80000 {
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
+@@ -342,6 +347,11 @@
+ 			reg = <0x53f00000 0x100000>;
+ 			ranges;
+ 
++			aips2: bridge at 53f00000 {
++				compatible = "fsl,imx25-aips", "fsl,imx53-aipstz";
++				reg = <0x53f00000 0x60>;
++			};
++
+ 			clks: ccm at 53f80000 {
+ 				compatible = "fsl,imx25-ccm";
+ 				reg = <0x53f80000 0x4000>;
 -- 
-Sean Paul, Software Engineer, Google / Chromium OS
+2.1.4
