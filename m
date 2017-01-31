@@ -1,52 +1,53 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Wed, 1 Feb 2017 00:10:17 +0100
-Subject: [PATCH 2/8] power: add power sequence library
-In-Reply-To: <1483425211-14473-3-git-send-email-peter.chen@nxp.com>
-References: <1483425211-14473-1-git-send-email-peter.chen@nxp.com>
- <1483425211-14473-3-git-send-email-peter.chen@nxp.com>
-Message-ID: <CAJZ5v0iR7p-ftUzvVwW96Y55A=vYG8_UbhjuA4vw0BFFZ8a9iw@mail.gmail.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Wed, 1 Feb 2017 07:42:02 +0800
+Subject: [stericsson:ux500-devicetree 4/4]
+ arch/arm/boot/dts/ste-dbx5x0.dtsi:17:42: fatal error:
+ dt-bindings/clock/ste-ab8500.h: No such file or directory
+Message-ID: <201702010700.bgYKdYbS%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 3, 2017 at 7:33 AM, Peter Chen <peter.chen@nxp.com> wrote:
-> We have an well-known problem that the device needs to do some power
-> sequence before it can be recognized by related host, the typical
-> example like hard-wired mmc devices and usb devices.
->
-> This power sequence is hard to be described at device tree and handled by
-> related host driver, so we have created a common power sequence
-> library to cover this requirement. The core code has supplied
-> some common helpers for host driver, and individual power sequence
-> libraries handle kinds of power sequence for devices. The pwrseq
-> librares always need to allocate extra instance for compatible
-> string match.
->
-> pwrseq_generic is intended for general purpose of power sequence, which
-> handles gpios and clocks currently, and can cover other controls in
-> future. The host driver just needs to call of_pwrseq_on/of_pwrseq_off
-> if only one power sequence is needed, else call of_pwrseq_on_list
-> /of_pwrseq_off_list instead (eg, USB hub driver).
->
-> For new power sequence library, it can add its compatible string
-> to pwrseq_of_match_table, then the pwrseq core will match it with
-> DT's, and choose this library at runtime.
->
-> Signed-off-by: Peter Chen <peter.chen@nxp.com>
-> Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
-> Tested-by Joshua Clayton <stillcompiling@gmail.com>
-> Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
-> Tested-by: Matthias Kaehlcke <mka@chromium.org>
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git ux500-devicetree
+head:   312ae21fdd56b54bafc0817ab3a0a8aa85b5b8cc
+commit: 312ae21fdd56b54bafc0817ab3a0a8aa85b5b8cc [4/4] ARM: dts: add the AB8500 clocks to the device tree
+config: arm-at91_dt_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 312ae21fdd56b54bafc0817ab3a0a8aa85b5b8cc
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Quite honestly, I have a really hard time with trying to follow this
-code and the total lack of documentation makes it even harder.  In
-particular, the generic power sequence code is not even commented at
-all, so it really is hard to say how this is going to work, let alone
-deciding whether or not to apply it.
+All errors (new ones prefixed by >>):
 
-Plus, of course, the USB core changes must be acked by the maintainer
-thereof for me to be able to handle the series.
+   In file included from arch/arm/boot/dts/ste-hrefv60plus.dtsi:12:0,
+                    from arch/arm/boot/dts/ste-hrefv60plus-tvk.dts:15:
+>> arch/arm/boot/dts/ste-dbx5x0.dtsi:17:42: fatal error: dt-bindings/clock/ste-ab8500.h: No such file or directory
+    #include <dt-bindings/clock/ste-ab8500.h>
+                                             ^
+   compilation terminated.
 
-But at this point I basically need you to explain the design to me, please.
+vim +17 arch/arm/boot/dts/ste-dbx5x0.dtsi
 
-Thanks,
-Rafael
+    11	
+    12	#include <dt-bindings/interrupt-controller/irq.h>
+    13	#include <dt-bindings/interrupt-controller/arm-gic.h>
+    14	#include <dt-bindings/mfd/dbx500-prcmu.h>
+    15	#include <dt-bindings/arm/ux500_pm_domains.h>
+    16	#include <dt-bindings/gpio/gpio.h>
+  > 17	#include <dt-bindings/clock/ste-ab8500.h>
+    18	#include "skeleton.dtsi"
+    19	
+    20	/ {
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 22125 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170201/d38feee8/attachment-0001.gz>
