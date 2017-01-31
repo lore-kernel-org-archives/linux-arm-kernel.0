@@ -1,81 +1,129 @@
 From: cov@codeaurora.org (Christopher Covington)
-Date: Tue, 31 Jan 2017 12:48:25 -0500
-Subject: [PATCH v4 2/4] arm64: Work around Falkor erratum 1003
-In-Reply-To: <20170131123735.GD11191@leverpostej>
-References: <20170125155232.10277-1-cov@codeaurora.org>
- <20170125155232.10277-2-cov@codeaurora.org>
- <20170131123735.GD11191@leverpostej>
-Message-ID: <36478002-4cd8-7f1c-1a25-8bfe35022a47@codeaurora.org>
+Date: Tue, 31 Jan 2017 12:50:19 -0500
+Subject: [PATCH v6] arm64: Work around Falkor erratum 1009
+Message-ID: <20170131175020.6316-1-cov@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/31/2017 07:37 AM, Mark Rutland wrote:
-> On Wed, Jan 25, 2017 at 10:52:30AM -0500, Christopher Covington wrote:
->> The Qualcomm Datacenter Technologies Falkor v1 CPU may allocate TLB entries
->> using an incorrect ASID when TTBRx_EL1 is being updated. When the erratum
->> is triggered, page table entries using the new translation table base
->> address (BADDR) will be allocated into the TLB using the old ASID. All
->> circumstances leading to the incorrect ASID being cached in the TLB arise
->> when software writes TTBRx_EL1[ASID] and TTBRx_EL1[BADDR], a memory
->> operation is in the process of performing a translation using the specific
->> TTBRx_EL1 being written, and the memory operation uses a translation table
->> descriptor designated as non-global. EL2 and EL3 code changing the EL1&0
->> ASID is not subject to this erratum because hardware is prohibited from
->> performing translations from an out-of-context translation regime.
->>
->> Consider the following pseudo code.
->>
->>   write new BADDR and ASID values to TTBRx_EL1
->>
->> Replacing the above sequence with the one below will ensure that no TLB
->> entries with an incorrect ASID are used by software.
->>
->>   write reserved value to TTBRx_EL1[ASID]
->>   ISB
->>   write new value to TTBRx_EL1[BADDR]
->>   ISB
->>   write new value to TTBRx_EL1[ASID]
->>   ISB
->>
->> When the above sequence is used, page table entries using the new BADDR
->> value may still be incorrectly allocated into the TLB using the reserved
->> ASID. Yet this will not reduce functionality, since TLB entries incorrectly
->> tagged with the reserved ASID will never be hit by a later instruction.
-> 
-> Based on my understanding that entries allocated to the reserved ASID
-> will not be used for subsequent page table walks (and so we don't have
-> asynchronous behaviour to contend with), this sounds fine to me.
-> 
-> Thanks for taking the time to clarify the details on that.
-> 
->> Based on work by Shanker Donthineni <shankerd@codeaurora.org>
->>
->> Signed-off-by: Christopher Covington <cov@codeaurora.org>
->> ---
->>  Documentation/arm64/silicon-errata.txt |  1 +
->>  arch/arm64/Kconfig                     | 11 +++++++++++
->>  arch/arm64/include/asm/assembler.h     | 23 +++++++++++++++++++++++
->>  arch/arm64/include/asm/cpucaps.h       |  3 ++-
->>  arch/arm64/include/asm/mmu_context.h   |  8 +++++++-
->>  arch/arm64/kernel/cpu_errata.c         |  7 +++++++
->>  arch/arm64/mm/context.c                | 11 +++++++++++
->>  arch/arm64/mm/proc.S                   |  1 +
->>  8 files changed, 63 insertions(+), 2 deletions(-)
-> 
-> Don't we need to use pre_ttbr0_update_workaround in <asm/asm-uaccess.h>
-> for CONFIG_ARM64_SW_TTBR0_PAN? We implicitly switch to the reserved ASID
-> for the empty table in __uaccess_ttbr0_disable.
-> 
-> That also means we have to invalidate the reserved ASID so as to not
-> accidentally hit while uaccess is disabled.
+During a TLB invalidate sequence targeting the inner shareable domain,
+Falkor may prematurely complete the DSB before all loads and stores using
+the old translation are observed. Instruction fetches are not subject to
+the conditions of this erratum. If the original code sequence includes
+multiple TLB invalidate instructions followed by a single DSB, onle one of
+the TLB instructions needs to be repeated to work around this erratum.
+While the erratum only applies to cases in which the TLBI specifies the
+inner-shareable domain (*IS form of TLBI) and the DSB is ISH form or
+stronger (OSH, SYS), this changes applies the workaround overabundantly--
+to local TLBI, DSB NSH sequences as well--for simplicity.
 
-The CPU in question (Falkor v1) has hardware PAN support. Do we need
-to worry about including the workaround in the SW PAN code in that case?
+Based on work by Shanker Donthineni <shankerd@codeaurora.org>
 
-Thanks,
-Cov
+Signed-off-by: Christopher Covington <cov@codeaurora.org>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+---
+Based on https://git.kernel.org/cgit/linux/kernel/git/arm64/linux.git/log/?h=for-next/core
+---
+ Documentation/arm64/silicon-errata.txt |  1 +
+ arch/arm64/Kconfig                     | 10 ++++++++++
+ arch/arm64/include/asm/cpucaps.h       |  3 ++-
+ arch/arm64/include/asm/tlbflush.h      | 18 +++++++++++++++---
+ arch/arm64/kernel/cpu_errata.c         |  9 +++++++++
+ 5 files changed, 37 insertions(+), 4 deletions(-)
 
+diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+index 405da11fc3e4..0006a94c2321 100644
+--- a/Documentation/arm64/silicon-errata.txt
++++ b/Documentation/arm64/silicon-errata.txt
+@@ -63,3 +63,4 @@ stable kernels.
+ | Cavium         | ThunderX SMMUv2 | #27704          | N/A		       |
+ |                |                 |                 |                         |
+ | Freescale/NXP  | LS2080A/LS1043A | A-008585        | FSL_ERRATUM_A008585     |
++| Qualcomm Tech. | Falkor v1       | E1009           | QCOM_FALKOR_ERRATUM_1009|
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index bac0d1bb58b5..0ce23130cc9b 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -480,6 +480,16 @@ config CAVIUM_ERRATUM_27456
+ 
+ 	  If unsure, say Y.
+ 
++config QCOM_FALKOR_ERRATUM_1009
++	bool "Falkor E1009: Prematurely complete a DSB after a TLBI"
++	default y
++	help
++	  On Falkor v1, the CPU may prematurely complete a DSB following a
++	  TLBI xxIS invalidate maintenance operation. Repeat the TLBI operation
++	  one more time to fix the issue.
++
++	  If unsure, say Y.
++
+ endmenu
+ 
+ 
+diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+index 4174f09678c4..d1207ac696ac 100644
+--- a/arch/arm64/include/asm/cpucaps.h
++++ b/arch/arm64/include/asm/cpucaps.h
+@@ -35,7 +35,8 @@
+ #define ARM64_HYP_OFFSET_LOW			14
+ #define ARM64_MISMATCHED_CACHE_LINE_SIZE	15
+ #define ARM64_HAS_NO_FPSIMD			16
++#define ARM64_WORKAROUND_REPEAT_TLBI		17
+ 
+-#define ARM64_NCAPS				17
++#define ARM64_NCAPS				18
+ 
+ #endif /* __ASM_CPUCAPS_H */
+diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
+index deab52374119..af1c76981911 100644
+--- a/arch/arm64/include/asm/tlbflush.h
++++ b/arch/arm64/include/asm/tlbflush.h
+@@ -36,9 +36,21 @@
+  * not. The macros handles invoking the asm with or without the
+  * register argument as appropriate.
+  */
+-#define __TLBI_0(op, arg)		asm ("tlbi " #op)
+-#define __TLBI_1(op, arg)		asm ("tlbi " #op ", %0" : : "r" (arg))
+-#define __TLBI_N(op, arg, n, ...)	__TLBI_##n(op, arg)
++#define __TLBI_0(op, arg) asm ("tlbi " #op "\n"				       \
++		   ALTERNATIVE("nop\n			nop",		       \
++			       "dsb ish\n		tlbi " #op,	       \
++			       ARM64_WORKAROUND_REPEAT_TLBI,		       \
++			       CONFIG_QCOM_FALKOR_ERRATUM_1009)		       \
++			    : : )
++
++#define __TLBI_1(op, arg) asm ("tlbi " #op ", %0\n"			       \
++		   ALTERNATIVE("nop\n			nop",		       \
++			       "dsb ish\n		tlbi " #op ", %0",     \
++			       ARM64_WORKAROUND_REPEAT_TLBI,		       \
++			       CONFIG_QCOM_FALKOR_ERRATUM_1009)		       \
++			    : : "r" (arg))
++
++#define __TLBI_N(op, arg, n, ...) __TLBI_##n(op, arg)
+ 
+ #define __tlbi(op, ...)		__TLBI_N(op, ##__VA_ARGS__, 1, 0)
+ 
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 722284eaf51e..32b9beda2ac8 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -133,6 +133,15 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
+ 		.def_scope = SCOPE_LOCAL_CPU,
+ 		.enable = cpu_enable_trap_ctr_access,
+ 	},
++#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1009
++	{
++		.desc = "Qualcomm Technologies Falkor erratum 1009",
++		.capability = ARM64_WORKAROUND_REPEAT_TLBI,
++		MIDR_RANGE(MIDR_QCOM_FALKOR_V1,
++			   MIDR_CPU_VAR_REV(0, 0),
++			   MIDR_CPU_VAR_REV(0, 0)),
++	},
++#endif
+ 	{
+ 	}
+ };
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
-Aurora Forum, a Linux Foundation Collaborative Project.
+Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code Aurora
+Forum, a Linux Foundation Collaborative Project.
