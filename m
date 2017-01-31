@@ -1,86 +1,48 @@
 From: mylene.josserand@free-electrons.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Tue, 31 Jan 2017 11:05:50 +0100
-Subject: [PATCH v3 6/8] ARM: dts: sun8i: Add audio codec, dai and card for A33
+Date: Tue, 31 Jan 2017 11:05:52 +0100
+Subject: [PATCH v3 8/8] ARM: dts: sun8i: sinlinx: Enable audio nodes
 In-Reply-To: <20170131100552.27949-1-mylene.josserand@free-electrons.com>
 References: <20170131100552.27949-1-mylene.josserand@free-electrons.com>
-Message-ID: <20170131100552.27949-7-mylene.josserand@free-electrons.com>
+Message-ID: <20170131100552.27949-9-mylene.josserand@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the audio codec, dai and a simple card to be able to use the
-audio stream of the builtin codec on sun8i SoC.
-
-This commit adds also an audio-routing for the sound card node to link
-the analog DAPM widgets (Right/Left DAC) and the digital one's as they
-are created in different drivers.
+Enable the audio codec and the audio dai for the sun8i A33 sinlinx board.
 
 Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
 ---
- arch/arm/boot/dts/sun8i-a33.dtsi | 45 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+ arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a33.dtsi b/arch/arm/boot/dts/sun8i-a33.dtsi
-index 5a9ba43ccb07..18c174fef84f 100644
---- a/arch/arm/boot/dts/sun8i-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a33.dtsi
-@@ -104,6 +104,28 @@
- 		reg = <0x40000000 0x80000000>;
+diff --git a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+index c206ed693aa2..a52cf675098e 100644
+--- a/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
++++ b/arch/arm/boot/dts/sun8i-a33-sinlinx-sina33.dts
+@@ -80,6 +80,14 @@
  	};
+ };
  
-+	sound: sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "sun8i-a33-audio";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,frame-master = <&link_codec>;
-+		simple-audio-card,bitclock-master = <&link_codec>;
-+		simple-audio-card,mclk-fs = <512>;
-+		simple-audio-card,aux-devs = <&codec_analog>;
-+		simple-audio-card,routing =
-+			"Left DAC", "Digital Left DAC",
-+			"Right DAC", "Digital Right DAC";
-+		status = "disabled";
++&codec {
++	status = "okay";
++};
 +
-+		simple-audio-card,cpu {
-+			sound-dai = <&dai>;
-+		};
++&dai {
++	status = "okay";
++};
 +
-+		link_codec: simple-audio-card,codec {
-+			sound-dai = <&codec>;
-+		};
-+	};
-+
- 	soc at 01c00000 {
- 		tcon0: lcd-controller at 01c0c000 {
- 			compatible = "allwinner,sun8i-a33-tcon";
-@@ -151,6 +173,29 @@
- 			reset-names = "ahb";
- 		};
+ &de {
+ 	status = "okay";
+ };
+@@ -227,6 +235,10 @@
+ 	regulator-name = "vcc-rtc";
+ };
  
-+		dai: dai at 01c22c00 {
-+			#sound-dai-cells = <0>;
-+			compatible = "allwinner,sun6i-a31-i2s";
-+			reg = <0x01c22c00 0x200>;
-+			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
-+			clock-names = "apb", "mod";
-+			resets = <&ccu RST_BUS_CODEC>;
-+			dmas = <&dma 15>, <&dma 15>;
-+			dma-names = "rx", "tx";
-+			status = "disabled";
-+		};
++&sound {
++	status = "okay";
++};
 +
-+		codec: codec at 01c22e00 {
-+			#sound-dai-cells = <0>;
-+			compatible = "allwinner,sun8i-a33-codec";
-+			reg = <0x01c22e00 0x400>;
-+			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
-+			clock-names = "bus", "mod";
-+			status = "disabled";
-+		};
-+
- 		fe0: display-frontend at 01e00000 {
- 			compatible = "allwinner,sun8i-a33-display-frontend";
- 			reg = <0x01e00000 0x20000>;
+ &tcon0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&lcd_rgb666_pins>;
 -- 
 2.11.0
