@@ -1,78 +1,38 @@
 From: al.kochet@gmail.com (Alexander Kochetkov)
-Date: Tue, 31 Jan 2017 15:43:11 +0300
-Subject: [PATCH v6 0/5] Implement clocksource for rockchip SoC using rockchip
- timer
-Message-ID: <1485866596-32254-1-git-send-email-al.kochet@gmail.com>
+Date: Tue, 31 Jan 2017 15:43:16 +0300
+Subject: [PATCH v6 5/5] ARM: dts: rockchip: disable arm-global-timer for rk3188
+In-Reply-To: <1485866596-32254-1-git-send-email-al.kochet@gmail.com>
+References: <1485866596-32254-1-git-send-email-al.kochet@gmail.com>
+Message-ID: <1485866596-32254-6-git-send-email-al.kochet@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexander Kochetkov <akochetkov@lintech.ru>
+The clocksource and the sched_clock provided by the arm_global_timer
+are quite unstable because their rates depend on the cpu frequency.
 
-Hello, Daniel, Heiko.
+On the other side, the arm_global_timer has a higher rating than the
+rockchip_timer, it will be selected by default by the time framework
+while we want to use the stable rockchip clocksource.
 
-Here is try 6 :) Thanks a lot for helping me to bring the code
-into kernel!
+Let's disable the arm_global_timer in order to have the rockchip
+clocksource selected by default.
 
-This patch series contain:
-- devicetree bindings clarification for rockchip timers
-- dts files fixes for rk3228-evb, rk3229-evb and rk3188
-- implementation of clocksource and sched clock for rockchip SoC
+Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
+---
+ arch/arm/boot/dts/rk3188.dtsi |    1 +
+ 1 file changed, 1 insertion(+)
 
-The clock supplying the arm-global-timer on the rk3188 is coming from the
-the cpu clock itself and thus changes its rate everytime cpufreq adjusts
-the cpu frequency making this timer unsuitable as a stable clocksource.
-
-The rk3188, rk3288 and following socs share a separate timer block already
-handled by the rockchip-timer driver. Therefore adapt this driver to also
-be able to act as clocksource on rk3188.
-
-In order to test clocksource you can run following commands and check
-how much time it take in real. On rk3188 it take about ~45 seconds.
-
-       cpufreq-set -f 1.6GHZ
-       date; sleep 60; date
-
-rk3288 (and probably anything newer) is irrelevant to this patch,
-as it has the arch timer interface. This patch may be usefull
-for Cortex-A9/A5 based parts.
-
-Regards,
-Alexander.
-
-Changes in v6:
-- Removed Reviewed-by: Heiko St?bner <heiko@sntech.de> tag
-- Merge 5/8, 6/8, 7/8, 8/9 into single file
-- split init paths into rk_clkevt_init() and rk_clksrc_init()
-  so the driver code could be adopted to CLOCKEVENT_OF_DECLARE()
-- clockevents implemented using clocksource_mmio_init()
-- fixed commit message for 4/8 (thanks a lot Daniel)
-
-Changes in v5:
-- Add Acked-by: Rob Herring <robh@kernel.org> to 1/8
-  http://lists.infradead.org/pipermail/linux-rockchip/2016-December/013308.html
-- Add Reviwed-by: Heiko St?bner <heiko@sntech.de> to series
-- change timer compatible property in the rk322x.dtsi 2/8
-  http://lists.infradead.org/pipermail/linux-rockchip/2017-January/013784.html
-- updated comment message for 4/8
-  http://lists.infradead.org/pipermail/linux-rockchip/2017-January/013786.html
-- updated comment message for 5/8
-  http://lists.infradead.org/pipermail/linux-rockchip/2017-January/013787.html
-- fixed build error for 8/8
-  http://lists.infradead.org/pipermail/linux-rockchip/2017-January/013789.html
-
-Alexander Kochetkov (5):
-  dt-bindings: clarify compatible property for rockchip timers
-  ARM: dts: rockchip: update compatible property for rk322x timer
-  clocksource/drivers/rockchip_timer: implement clocksource timer
-  ARM: dts: rockchip: add timer entries to rk3188 SoC
-  ARM: dts: rockchip: disable arm-global-timer for rk3188
-
- .../bindings/timer/rockchip,rk-timer.txt           |   12 +-
- arch/arm/boot/dts/rk3188.dtsi                      |   17 ++
- arch/arm/boot/dts/rk322x.dtsi                      |    2 +-
- drivers/clocksource/Kconfig                        |    1 +
- drivers/clocksource/rockchip_timer.c               |  218 ++++++++++++++------
- 5 files changed, 185 insertions(+), 65 deletions(-)
-
+diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
+index 0dc52fe..44da3d42 100644
+--- a/arch/arm/boot/dts/rk3188.dtsi
++++ b/arch/arm/boot/dts/rk3188.dtsi
+@@ -546,6 +546,7 @@
+ 
+ &global_timer {
+ 	interrupts = <GIC_PPI 11 0xf04>;
++	status = "disabled";
+ };
+ 
+ &local_timer {
 -- 
 1.7.9.5
