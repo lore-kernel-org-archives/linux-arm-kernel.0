@@ -1,46 +1,32 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 31 Jan 2017 18:30:34 +0000
-Subject: [PATCH v2 0/4] crypto: time invariant AES for CCM (and GCM/CTR)
-In-Reply-To: <1485646413-17491-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1485646413-17491-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAKv+Gu9GXmMzHiOZE57xQEwoH4ib1dq7LZFPia=nr27bj_pdkg@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 31 Jan 2017 10:40:00 -0800
+Subject: [PATCH 1/4] dt-bindings: Add binding for brcm,bcm2835-sdhost.
+In-Reply-To: <2012885435.15821.1485812279271@email.1und1.de>
+References: <1485516989-1072-1-git-send-email-kraxel@redhat.com>
+ <1485516989-1072-2-git-send-email-kraxel@redhat.com>
+ <2012885435.15821.1485812279271@email.1und1.de>
+Message-ID: <87zii7m5tr.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 January 2017 at 23:33, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> This series is primarily directed at improving the performance and security
-> of CCM on the Rasperry Pi 3. This involves splitting the MAC handling of
-> CCM into a separate driver so that we can efficiently replace it by something
-> else using the ordinary algo resolution machinery.
->
-> Patch #1 adds some testcases for cbcmac(aes), which will be introduced later.
->
-> Patch #2 replaces the open coded CBC MAC hashing routines in the CCM driver
-> with calls to a cbcmac() hash, and implements a template for producing such
-> transforms. This eliminates all the fuzzy scatterwalk code as well.
->
-> Patch #3 implements cbcmac(aes) using NEON on arm64
->
-> Patch #4 is an RFC patch that implements ctr(aes) and cbcmac(aes) in a way
-> that is intended to eliminate observeable data dependent latencies in AES
-> processing, by replacing the usual 16 KB of lookup tables with a single
-> Sbox that is prefetched before processing each block. It is 50% slower than
-> generic AES, but this may be acceptable in many cases.
->
-> Changes since v1:
-> - remove ilen, and add missing flags assignment (#2)
-> - deal with zero cryptlen (#2)
-> - use correctly sized dg[] array in desc ctx (#3, #4)
-> - fix bug in update routine (#3)
-> - various other tweaks
->
-> Ard Biesheuvel (4):
->   crypto: testmgr - add test cases for cbcmac(aes)
->   crypto: ccm - switch to separate cbcmac driver
->   crypto: arm64/aes - add NEON and Crypto Extension CBC-MAC driver
->   crypto: aes - add generic time invariant AES for CTR/CCM/GCM
->
+Stefan Wahren <stefan.wahren@i2se.com> writes:
 
-I have updated versions of these that make use of the alignment
-agnostic crypto_xor(). I will respin these once that patch gets
-discussed/merged/rejected/etc
+>> Gerd Hoffmann <kraxel@redhat.com> hat am 27. Januar 2017 um 12:36 geschrieben:
+>> 
+>> 
+>> From: Eric Anholt <eric@anholt.net>
+>> 
+>> This is the other SD controller on the platform, which can be swapped
+>> to the role of SD card host using pin muxing.
+>
+> AFAIK the SDHOST controller isn't able to handle SDIO. Maybe we should mention this in the binding document.
+
+The binding should be documentation of the binding.  I'd love to see
+more explanation in the mmc/host/bcm2835.c, though.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170131/f91e0ad6/attachment.sig>
