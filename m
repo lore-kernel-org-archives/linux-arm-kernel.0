@@ -1,59 +1,79 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 31 Jan 2017 14:20:20 -0600
-Subject: [PATCH 1 4/4] PCI: rcar: Use of_device_get_match_data() to simplify
- probe
-In-Reply-To: <20170131201400.27605.56002.stgit@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170131201400.27605.56002.stgit@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20170131202020.27605.39560.stgit@bhelgaas-glaptop.roam.corp.google.com>
+From: nwatters@codeaurora.org (Nate Watterson)
+Date: Tue, 31 Jan 2017 15:16:01 -0500
+Subject: [PATCH 2/2] arm64/dma-mapping: validate dma_masks against IORT
+ defined limits
+In-Reply-To: <1485893763-20671-1-git-send-email-nwatters@codeaurora.org>
+References: <1485893763-20671-1-git-send-email-nwatters@codeaurora.org>
+Message-ID: <1485893763-20671-2-git-send-email-nwatters@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a DT-only driver, so the only way to call rcar_pcie_probe() is to
-match an entry in rcar_pcie_of_match[], so of_id cannot be NULL.
+Some drivers set the dma_mask of client devices based solely on values
+read from capability registers which may not account for platform
+specific bus address width limitations. Fortunately, the ACPI IORT table
+provides a way to report the effective number of address bits a device
+can use to access memory. This information, when present, is used to
+supplement the checks already being done in dma_supported() to avoid
+setting overly generous dma_masks.
 
-Furthermore, of_id->data can only be NULL if an rcar_pcie_of_match[] entry
-has a NULL .data member.  That's a driver defect, and we don't want to
-return -EINVAL, which is easy to ignore.  We'd rather take the NULL pointer
-dereference so we notice the problem and fix it.
-
-Use of_device_get_match_data() to retrieve the hw_init_fn pointer.  No
-functional change intended.
-
-Suggested-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+Signed-off-by: Nate Watterson <nwatters@codeaurora.org>
 ---
- drivers/pci/host/pcie-rcar.c |    7 +------
- 1 file changed, 1 insertion(+), 6 deletions(-)
+ arch/arm64/mm/dma-mapping.c | 20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pci/host/pcie-rcar.c b/drivers/pci/host/pcie-rcar.c
-index aca85be101f8..b3b6d5273347 100644
---- a/drivers/pci/host/pcie-rcar.c
-+++ b/drivers/pci/host/pcie-rcar.c
-@@ -1125,7 +1125,6 @@ static int rcar_pcie_probe(struct platform_device *pdev)
- 	struct device *dev = &pdev->dev;
- 	struct rcar_pcie *pcie;
- 	unsigned int data;
--	const struct of_device_id *of_id;
- 	int err;
- 	int (*hw_init_fn)(struct rcar_pcie *);
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index e040827..467fd23 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -19,6 +19,7 @@
  
-@@ -1149,11 +1148,6 @@ static int rcar_pcie_probe(struct platform_device *pdev)
- 	if (err)
- 		return err;
+ #include <linux/gfp.h>
+ #include <linux/acpi.h>
++#include <linux/acpi_iort.h>
+ #include <linux/bootmem.h>
+ #include <linux/cache.h>
+ #include <linux/export.h>
+@@ -347,6 +348,12 @@ static int __swiotlb_get_sgtable(struct device *dev, struct sg_table *sgt,
  
--	of_id = of_match_device(rcar_pcie_of_match, dev);
--	if (!of_id || !of_id->data)
--		return -EINVAL;
--	hw_init_fn = of_id->data;
--
- 	pm_runtime_enable(dev);
- 	err = pm_runtime_get_sync(dev);
- 	if (err < 0) {
-@@ -1162,6 +1156,7 @@ static int rcar_pcie_probe(struct platform_device *pdev)
- 	}
+ static int __swiotlb_dma_supported(struct device *hwdev, u64 mask)
+ {
++	int dma_limit;
++
++	dma_limit = iort_get_memory_address_limit(hwdev);
++	if (dma_limit >= 0 && DMA_BIT_MASK(dma_limit) < mask)
++		return 0;
++
+ 	if (swiotlb)
+ 		return swiotlb_dma_supported(hwdev, mask);
+ 	return 1;
+@@ -784,6 +791,17 @@ static void __iommu_unmap_sg_attrs(struct device *dev,
+ 	iommu_dma_unmap_sg(dev, sgl, nelems, dir, attrs);
+ }
  
- 	/* Failure to get a link might just be that no cards are inserted */
-+	hw_init_fn = of_device_get_match_data(dev);
- 	err = hw_init_fn(pcie);
- 	if (err) {
- 		dev_info(dev, "PCIe link down\n");
++static int __iommu_dma_supported(struct device *hwdev, u64 mask)
++{
++	int dma_limit;
++
++	dma_limit = iort_get_memory_address_limit(hwdev);
++	if (dma_limit >= 0 && DMA_BIT_MASK(dma_limit) < mask)
++		return 0;
++
++	return iommu_dma_supported(hwdev, mask);
++}
++
+ static struct dma_map_ops iommu_dma_ops = {
+ 	.alloc = __iommu_alloc_attrs,
+ 	.free = __iommu_free_attrs,
+@@ -799,7 +817,7 @@ static void __iommu_unmap_sg_attrs(struct device *dev,
+ 	.sync_sg_for_device = __iommu_sync_sg_for_device,
+ 	.map_resource = iommu_dma_map_resource,
+ 	.unmap_resource = iommu_dma_unmap_resource,
+-	.dma_supported = iommu_dma_supported,
++	.dma_supported = __iommu_dma_supported,
+ 	.mapping_error = iommu_dma_mapping_error,
+ };
+ 
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux
+Foundation Collaborative Project.
