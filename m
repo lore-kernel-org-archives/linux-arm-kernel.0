@@ -1,65 +1,43 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 31 Jan 2017 12:05:59 +0100
-Subject: [PATCH v6 5/5] arm: mvebu: Add device tree for db-dxbc2 and
- db-xc3-24g4xg boards
-In-Reply-To: <25e75991d565411fa9bccb6d2f71babf@svr-chch-ex1.atlnz.lc> (Chris
- Packham's message of "Mon, 30 Jan 2017 22:02:38 +0000")
-References: <20170129232035.25189-1-chris.packham@alliedtelesis.co.nz>
- <20170129232035.25189-6-chris.packham@alliedtelesis.co.nz>
- <87vaswtycu.fsf@free-electrons.com>
- <25e75991d565411fa9bccb6d2f71babf@svr-chch-ex1.atlnz.lc>
-Message-ID: <877f5b1obs.fsf@free-electrons.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 31 Jan 2017 12:10:11 +0100
+Subject: [PATCH] dt-bindings: mmc: sunxi: Document A64 eMMC compatible
+In-Reply-To: <20170130132713.20750-1-maxime.ripard@free-electrons.com>
+References: <20170130132713.20750-1-maxime.ripard@free-electrons.com>
+Message-ID: <CAPDyKFp8OL7HfB5KK0r74hbfTTsjs5CZntpn3dR1BKJ6E+-6qQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
- 
- On lun., janv. 30 2017, Chris Packham <Chris.Packham@alliedtelesis.co.nz> wrote:
-
-> Hi Gregory,
+On 30 January 2017 at 14:27, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> We introduced recently a new compatible to deal with the A64 eMMC
+> controller, let's document its binding.
 >
-> On 31/01/17 03:29, Gregory CLEMENT wrote:
->> Hi Chris,
->>
->>  On lun., janv. 30 2017, Chris Packham <chris.packham@alliedtelesis.co.nz> wrote:
->>
->>> These boards are Marvell's evaluation boards for the 98DX4251 and
->>> 98DX3336 SoCs.
->>>
->>> Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
->>
->> Applied on mvebu/dt
->>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Thanks, applied for next!
+
+I also added Rob's ack as he already acked the patch parsing the new
+compatible in the driver.
+
+Kind regards
+Uffe
+
+> ---
+>  Documentation/devicetree/bindings/mmc/sunxi-mmc.txt | 1 +
+>  1 file changed, 1 insertion(+)
 >
-> I just noticed that I hadn't updated arch/arm/boot/dts/Makefile. The way 
-> I've been building things (explicitly running 'make 
-> armada-xp-db-xc3-24g4xg.dtb') it hasn't mattered to me but I'm wondering 
-> if I should have?
-
-As I didn't make a Pull request yet, I was able to fix it on the fly.
-
-Gregory
-
+> diff --git a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+> index 55cdd804cdba..7d53a799f140 100644
+> --- a/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+> +++ b/Documentation/devicetree/bindings/mmc/sunxi-mmc.txt
+> @@ -13,6 +13,7 @@ Required properties:
+>     * "allwinner,sun5i-a13-mmc"
+>     * "allwinner,sun7i-a20-mmc"
+>     * "allwinner,sun9i-a80-mmc"
+> +   * "allwinner,sun50i-a64-emmc"
+>     * "allwinner,sun50i-a64-mmc"
+>   - reg : mmc controller base registers
+>   - clocks : a list with 4 phandle + clock specifier pairs
+> --
+> 2.11.0
 >
->>> ---
->>>
->>> Notes:
->>>     Changes in v5:
->>>     - update license text
->>>     - use node labels
->>>     Changes in v6:
->>>     - Rename dts files to include 'armada-xp-' prefix
->>>
->>>  arch/arm/boot/dts/armada-xp-db-dxbc2.dts      | 151 ++++++++++++++++++++++++++
->>>  arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts | 142 ++++++++++++++++++++++++
->>>  2 files changed, 293 insertions(+)
->>>  create mode 100644 arch/arm/boot/dts/armada-xp-db-dxbc2.dts
->>>  create mode 100644 arch/arm/boot/dts/armada-xp-db-xc3-24g4xg.dts
->>>
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
