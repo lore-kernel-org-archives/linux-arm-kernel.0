@@ -1,68 +1,38 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 31 Jan 2017 18:05:38 +0000
-Subject: [RFC PATCH 00/13] arm64/kvm: use common sysreg definitions
-Message-ID: <1485885951-2747-1-git-send-email-mark.rutland@arm.com>
+Date: Tue, 31 Jan 2017 18:05:45 +0000
+Subject: [RFC PATCH 07/13] arm64: kvm: add SYS_DESC()
+In-Reply-To: <1485885951-2747-1-git-send-email-mark.rutland@arm.com>
+References: <1485885951-2747-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1485885951-2747-8-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Whenever we add new functionality involving new system registers, we need to
-add sys_reg() definitions so that we can access the registers regardless of
-whether the toolchain can assemble them. At the same time, we have to add
-duplicate definitions of the register encodings to KVM's sysreg tables, so that
-we can handle any configurable traps. This redundancy is unfortunate, and
-defining the encodings directly in the sysreg tables can make those tables
-difficult to read.
+This patch adds a macro enabling us to initialise sys_reg_desc
+structures based on common sysreg encoding definitions in
+<asm/sysreg.h>. Subsequent patches will use this to simplify the KVM
+code.
 
-This series attempts to address both of these issues by allowing us to use
-common sys_reg() mnemonics in <asm/sysreg.h> to initialise KVM's sysreg tables.
-To that end, this series tries to make <asm/sysreg.h> the canonical location
-for common sysreg encodings.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: kvmarm at lists.cs.columbia.edu
+---
+ arch/arm64/kvm/sys_regs.h | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Largely, I've only attacked the AArch64-native SYS encodings required by KVM
-today, though for the debug and perfmon groups it was easier to take the whole
-group from the ARM ARM than to filter them to only what KVM needed. I've
-ignored CP{15,14} registers for now, but these could be encoded similarly.
-
-To verify that I haven't accidentally broken KVM, I've diffed sys_regs.o and
-sys_regs_generic_v8.o on a section-by-section basis before and after the series
-is applied. The .text, .data, and .rodata sections (and most others) are
-identical. The __bug_table section, and some .debug* sections differ, and this
-appears to be due to line numbers changing due to removed lines.
-
-One thing I wasn't sure how to address was banks of registers such as
-PMEVCNTR<n>_EL0. We currently enumerate all cases for our GICv3 definitions,
-but it seemed painful to expand ~30 cases for PMEVCNTR<n>_EL0 and friends, and
-for these I've made the macros take an 'n' parameter.
-
-The series is based on the arm64/for-next/core branch, since it relies on
-commit c9ee0f98662a6e35 ("arm64: cpufeature: Define helpers for sys_reg id")
-for the definition of SYS_DESC().
-
-Thanks,
-Mark.
-
-Mark Rutland (13):
-  arm64: sysreg: sort by encoding
-  arm64: sysreg: add debug system registers
-  arm64: sysreg: add performance monitor registers
-  arm64: sysreg: subsume GICv3 sysreg definitions
-  arm64: sysreg: add register encodings used by KVM
-  arm64: sysreg: add Set/Way sys encodings
-  arm64: kvm: add SYS_DESC()
-  arm64: kvm: Use common debug sysreg definitions
-  arm64: kvm: Use common performance monitor sysreg definitions
-  arm64: kvm: Use common GICv3 sysreg definitions
-  arm64: kvm: use common invariant sysreg definitions
-  arm64: kvm: Use common sysreg definitions
-  arm64: kvm: Use common Set/Way sys definitions
-
- arch/arm64/include/asm/arch_gicv3.h  |  81 ++-------
- arch/arm64/include/asm/sysreg.h      | 158 +++++++++++++++-
- arch/arm64/kernel/head.S             |   8 +-
- arch/arm64/kvm/sys_regs.c            | 344 +++++++++++------------------------
- arch/arm64/kvm/sys_regs.h            |   5 +
- arch/arm64/kvm/sys_regs_generic_v8.c |   4 +-
- 6 files changed, 276 insertions(+), 324 deletions(-)
-
+diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
+index dbbb01c..aca681d 100644
+--- a/arch/arm64/kvm/sys_regs.h
++++ b/arch/arm64/kvm/sys_regs.h
+@@ -143,4 +143,9 @@ static inline int cmp_sys_reg(const struct sys_reg_desc *i1,
+ #define CRm(_x) 	.CRm = _x
+ #define Op2(_x) 	.Op2 = _x
+ 
++#define SYS_DESC(reg)					\
++	Op0(sys_reg_Op0(reg)), Op1(sys_reg_Op1(reg)),	\
++	CRn(sys_reg_CRn(reg)), CRm(sys_reg_CRm(reg)),	\
++	Op2(sys_reg_Op2(reg))
++
+ #endif /* __ARM64_KVM_SYS_REGS_LOCAL_H__ */
 -- 
 1.9.1
