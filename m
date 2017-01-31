@@ -1,77 +1,86 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Mon, 30 Jan 2017 08:44:59 -0800
-Subject: [PATCH] arm64: dts: qcom: msm8916: Update hexagon node
-Message-ID: <20170130164459.4051-1-bjorn.andersson@linaro.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 31 Jan 2017 00:45:11 +0000
+Subject: [PATCH v3 00/24] i.MX Media Driver
+In-Reply-To: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <20170131004510.GQ27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's necessary to reference the xo clock and cx supply, so specify these
-in the node. Also move the Hexagon smd-edge into the hexagon node, to
-enable SSR.
+On Fri, Jan 06, 2017 at 06:11:18PM -0800, Steve Longerbeam wrote:
+> Philipp Zabel (3):
+>   ARM: dts: imx6qdl: Add mipi_ipu1/2 multiplexers, mipi_csi, and their
+>     connections
+>   add mux and video interface bridge entity functions
+>   platform: add video-multiplexer subdevice driver
+> 
+> Steve Longerbeam (21):
+>   [media] dt-bindings: Add bindings for i.MX media driver
+>   ARM: dts: imx6qdl: Add compatible, clocks, irqs to MIPI CSI-2 node
+>   ARM: dts: imx6qdl: add media device
+>   ARM: dts: imx6qdl-sabrelite: remove erratum ERR006687 workaround
+>   ARM: dts: imx6-sabrelite: add OV5642 and OV5640 camera sensors
+>   ARM: dts: imx6-sabresd: add OV5642 and OV5640 camera sensors
+>   ARM: dts: imx6-sabreauto: create i2cmux for i2c3
+>   ARM: dts: imx6-sabreauto: add reset-gpios property for max7310_b
+>   ARM: dts: imx6-sabreauto: add pinctrl for gpt input capture
+>   ARM: dts: imx6-sabreauto: add the ADV7180 video decoder
+>   UAPI: Add media UAPI Kbuild file
+>   media: Add userspace header file for i.MX
+>   media: Add i.MX media core driver
+>   media: imx: Add CSI subdev driver
+>   media: imx: Add SMFC subdev driver
+>   media: imx: Add IC subdev drivers
+>   media: imx: Add Camera Interface subdev driver
+>   media: imx: Add MIPI CSI-2 Receiver subdev driver
+>   media: imx: Add MIPI CSI-2 OV5640 sensor subdev driver
+>   media: imx: Add Parallel OV5642 sensor subdev driver
+>   ARM: imx_v6_v7_defconfig: Enable staging video4linux drivers
 
-As cxo is not yet available we reference the fixed version of cxo for
-now, which will work until proper power management is implemented.
+Hi,
 
-Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
----
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 24 ++++++++++++++----------
- 1 file changed, 14 insertions(+), 10 deletions(-)
+Trying this driver with an imx219 camera (which works with Philipp's
+driver) results in not much happening... no /dev/media* node for it,
+no subdevs, no nothing.  No clues as to what's missing either.  Only
+messages from imx-media are from registering the various subdevs.
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index 68a8e67cba29..35684cc1f308 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -833,8 +833,9 @@
- 
- 			clocks = <&gcc GCC_MSS_CFG_AHB_CLK>,
- 				 <&gcc GCC_MSS_Q6_BIMC_AXI_CLK>,
--				 <&gcc GCC_BOOT_ROM_AHB_CLK>;
--			clock-names = "iface", "bus", "mem";
-+				 <&gcc GCC_BOOT_ROM_AHB_CLK>,
-+				 <&xo_board>;
-+			clock-names = "iface", "bus", "mem", "xo";
- 
- 			qcom,smem-states = <&hexagon_smp2p_out 0>;
- 			qcom,smem-state-names = "stop";
-@@ -842,6 +843,7 @@
- 			resets = <&scm 0>;
- 			reset-names = "mss_restart";
- 
-+			cx-supply = <&pm8916_s1>;
- 			mx-supply = <&pm8916_l3>;
- 			pll-supply = <&pm8916_l7>;
- 
-@@ -856,6 +858,16 @@
- 			mpss {
- 				memory-region = <&mpss_mem>;
- 			};
-+
-+			smd-edge {
-+				interrupts = <0 25 IRQ_TYPE_EDGE_RISING>;
-+
-+				qcom,smd-edge = <0>;
-+				qcom,ipc = <&apcs 8 12>;
-+				qcom,remote-pid = <1>;
-+
-+				label = "hexagon";
-+			};
- 		};
- 
- 		pronto: wcnss at a21b000 {
-@@ -1214,14 +1226,6 @@
- 				};
- 			};
- 		};
--
--		hexagon {
--			interrupts = <0 25 IRQ_TYPE_EDGE_RISING>;
--
--			qcom,smd-edge = <0>;
--			qcom,ipc = <&apcs 8 12>;
--			qcom,remote-pid = <1>;
--		};
- 	};
- 
- 	hexagon-smp2p {
+[   37.444877] imx-media: Registered subdev imx6-mipi-csi2
+[   37.444973] imx-media: Registered subdev imx219 0-0010
+[   38.868740] imx-media: Registered subdev ipu1_ic_prpenc
+[   38.869265] imx-media: Registered subdev ipu1_ic_prpvf
+[   38.869425] imx-media: Registered subdev ipu1_ic_pp0
+[   38.870086] imx-media: Registered subdev ipu1_ic_pp1
+[   38.871510] imx-media: Registered subdev ipu2_ic_prpenc
+[   38.871743] imx-media: Registered subdev ipu1_smfc0
+[   38.873043] imx-media: Registered subdev ipu1_smfc1
+[   38.873225] imx-media: Registered subdev ipu2_ic_prpvf
+[   38.875027] imx-media: Registered subdev ipu2_smfc0
+[   38.875320] imx-media: Registered subdev ipu2_ic_pp0
+[   38.877148] imx-media: Registered subdev ipu2_smfc1
+[   38.877436] imx-media: Registered subdev ipu2_ic_pp1
+[   38.932089] imx-media: Registered subdev camif0
+[   38.956538] imx-media: Registered subdev camif1
+[   38.959148] imx-media: Registered subdev camif2
+[   38.964353] imx-media: Registered subdev camif3
+[  206.502077] imx-media: Registered subdev ipu1_csi0
+[  206.503304] imx-media: Registered subdev ipu1_csi1
+[  206.503814] imx-media: Registered subdev ipu2_csi0
+[  206.504281] imx-media: Registered subdev ipu2_csi1
+
+I also get:
+
+[   37.200072] imx6-mipi-csi2: data lanes: 2
+[   37.200077] imx6-mipi-csi2: flags: 0x00000200
+
+and from what I can see, all modules from drivers/staging/media/imx/ are
+loaded (had to load imx-csi by hand because of the brokenness in the
+drivers/gpu/ipu code attaching an device_node pointer after registering
+the platform device, which changes what userspace sees in the modalias
+file.)
+
+Any clues at what to look at?
+
 -- 
-2.11.0
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
