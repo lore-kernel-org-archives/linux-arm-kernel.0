@@ -1,150 +1,43 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Tue, 31 Jan 2017 11:51:44 +0000
-Subject: [PATCH V6 4/5] LPC: Support the device-tree LPC host on
- Hip06/Hip07
-In-Reply-To: <2890e438-6149-c8f0-8ec7-9036a8d5cca5@suse.de>
-References: <1485241525-201782-1-git-send-email-yuanzhichang@hisilicon.com>
- <1485241525-201782-5-git-send-email-yuanzhichang@hisilicon.com>
- <a5a24e73-013d-87b5-f65f-324417f4cc60@suse.de>
- <55916a03-2710-c8bc-0894-5a58daf6da68@huawei.com>
- <2890e438-6149-c8f0-8ec7-9036a8d5cca5@suse.de>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F9F98F3@lhreml507-mbx>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 31 Jan 2017 12:55:00 +0100
+Subject: [PATCH 1/3] mmc: meson-gx: fix setting f_min
+In-Reply-To: <e26a74f8-9819-6940-4c90-225377cc0a3e@gmail.com>
+References: <e26a74f8-9819-6940-4c90-225377cc0a3e@gmail.com>
+Message-ID: <CAPDyKFrhTm7A_tq_W3yWoPv95exZ-LTtEhiQhw134AfGZuRY+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex thanks for reviewing
+On 26 January 2017 at 22:41, Heiner Kallweit <hkallweit1@gmail.com> wrote:
+> Currently f_min is set to 4 MHz whilst the comment states 400 MHz.
+> I think the itention is to set f_min to 400 kHz.
+> Change value and comment accordingly.
+>
+> Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
 
-[...]
+Heiner, could you please collect the mmc meson changes that you
+recently have submitted in one series and re-post to linux-mmc. I can
+pick them up from there.
 
-> >
-> >>> + * The port size of legacy I/O devices is normally less than
-> 0x400.
-> >>> + * Defining the I/O range size as 0x400 here should be sufficient
-> for
-> >>> + * all peripherals under one bus.
-> >>> + */
-> >>
-> >> This comment doesn't make a lot of sense. What is the limit? Is
-> there a
-> >> hardware limit?
-> >>
-> >> We don't dynamically allocate devices on the lpc bus, so why imply a
-> >> limit at all?
-> >>
-> >
-> > IIRC from previously asking Zhichang this before, this is the upper
-> > range we can address devices on the LPC bus. But the value was 0x1000
-> then.
-> 
-> Well, all devices that we want to address are defined by firmware (via
-> device tree or dsdt). So I'm not quite sure what this arbitrary limit
-> buys us.
+Kind regards
+Uffe
 
-Following a previous discussion with Arnd:
-<< We know that the ISA/LPC bus can only have up to 65536 ports,
-so you can register all of those, or possibly limit it further to
-1024 or 4096 ports, whichever matches the bus implementation. >>
-(https://lkml.org/lkml/2016/11/10/95)
-
-We decided to register a fixed IO range for our LPC.
-About the specific reason for choosing 0x400 I think Zhichang can
-clarify once he's back (he's OOO now)   
-
-> 
-
-[...]
-
-> >>> +
-> >>> +        /* whole operation must be atomic */
-> >>> +        spin_lock_irqsave(&lpcdev->cycle_lock, flags);
-> >>
-> >> Ouch. This is going to kill your RT jitter. Is there no better way?
-> >>
-> >
-> > Obviously the bus register driving is non-atomic, so we need some way
-> to
-> > lock out.
-> >
-> > I think that it is not so critical for low-speed/infrequent-access
-> bus.
-> >
-> > If we were going to use virtual UART in the BMC on the LPC bus then
-> we
-> > could consider more.
-> 
-> Well, it basically means that an arbitrary daemon running in user space
-> that checks your temperature readings via the ipmi interface could
-> create a lot of jitter. That could be very critical if you want to use
-> this hardware for real time critical applications, such as telecom.
-> 
-> I bet that if you leave it like that and postpone the decision to fix
-> it
-> to "later", in 1 or 2 years you will cause someone weeks of debugging
-> to
-> track down why their voip gateway loses packets from time to time.
-
-Thanks for the heads-up. We'll discuss internally after Chinese holidays
-to understand if this implementation is compatible with the intended
-deployment scenarions 
-
-> 
-> >
-
-[...]
-
-> >>> +static u64 hisilpc_comm_in(void *devobj, unsigned long pio, size_t
-> >>> dlen)
-> >>> +{
-> >>> +    struct hisilpc_dev *lpcdev = devobj;
-> >>> +    struct lpc_cycle_para iopara;
-> >>> +    u32 rd_data;
-> >>
-> >> rd_data needs to be initialized to 0. Otherwise it may contain stale
-> >> stack contents and corrupt non-32bit dlen returns.
-> >>
-> >
-> > I think so, since we read into this value byte-by-byte. We also seem
-> to
-> > return a 32b value but should return 64b value according to the
-> prototype.
-> 
-> IIRC LPC (well, PIO) doesn't support bigger requests than 32bit. At
-> least I can't think of an x86 instruction that would allow bigger
-> transactions. So there's no need to make it 64bit. However, the
-> question
-> is why the prototype is 64bit then. Hm. :)
-> 
-> Maybe the prototype should be only 32bit.
-
-Maybe you're right :)
-
-Looking at extio.c we never return a 64b value.
-I'll double check with Zhichang once he's back...
-
-> 
-> >
-> >>> +    unsigned char *newbuf;
-> >>> +    int ret = 0;
-> >>> +    unsigned long ptaddr;
-> >>> +
-> >>> +    if (!lpcdev || !dlen || dlen > LPC_MAX_DULEN ||    (dlen &
-> (dlen
-> >>> - 1)))
-> >>> +        return -1;
-> >>
-> >> Isn't this -EINVAL?
-> >
-> > Not sure. This value is returned directly to the inb/outb caller,
-> which
-> > would not check this value for error.
-> >
-> > It could be argued that the checking is paranoia. If not, we should
-> > treat the failure as a more severe event.
-> 
-> Oh, I see. In that case -1 makes a lot of sense since it's the default
-> read value on x86 for unallocated space.
-> 
-> This probably deserves a comment (and/or maybe a #define)
-> 
-> 
-> Alex
+> ---
+>  drivers/mmc/host/meson-gx-mmc.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
+> index bf19d03c..cf071756 100644
+> --- a/drivers/mmc/host/meson-gx-mmc.c
+> +++ b/drivers/mmc/host/meson-gx-mmc.c
+> @@ -268,7 +268,7 @@ static int meson_mmc_clk_init(struct meson_host *host)
+>         if (f_min != UINT_MAX)
+>                 f_min = DIV_ROUND_UP(CLK_SRC_XTAL_RATE, CLK_DIV_MAX);
+>         else
+> -               f_min = 4000000;  /* default min: 400 MHz */
+> +               f_min = 400000;  /* default min: 400 kHz */
+>         host->mmc->f_min = f_min;
+>
+>         /* create the mux */
+> --
+> 2.11.0
+>
