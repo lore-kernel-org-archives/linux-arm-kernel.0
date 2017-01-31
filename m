@@ -1,72 +1,88 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 31 Jan 2017 11:20:01 +0000
-Subject: [PATCH v3 17/24] media: imx: Add CSI subdev driver
-In-Reply-To: <1483755102-24785-18-git-send-email-steve_longerbeam@mentor.com>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-18-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <20170131112001.GV27312@n2100.armlinux.org.uk>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue, 31 Jan 2017 11:30:47 +0000
+Subject: [RFC PATCH v6 0/7] ARM: Fix dma_alloc_coherent() and friends for
+ NOMMU
+In-Reply-To: <1485448965-32855-1-git-send-email-vladimir.murzin@arm.com>
+References: <1485448965-32855-1-git-send-email-vladimir.murzin@arm.com>
+Message-ID: <c3a09063-65e8-e560-742f-a0c350268cec@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2017 at 06:11:35PM -0800, Steve Longerbeam wrote:
-> +static int csi_link_validate(struct v4l2_subdev *sd,
-> +			     struct media_link *link,
-> +			     struct v4l2_subdev_format *source_fmt,
-> +			     struct v4l2_subdev_format *sink_fmt)
-> +{
-> +	struct csi_priv *priv = v4l2_get_subdevdata(sd);
-> +	bool is_csi2;
-> +	int ret;
-> +
-> +	ret = v4l2_subdev_link_validate_default(sd, link, source_fmt, sink_fmt);
-> +	if (ret)
-> +		return ret;
-> +
-> +	priv->sensor = __imx_media_find_sensor(priv->md, &priv->sd.entity);
-> +	if (IS_ERR(priv->sensor)) {
-> +		v4l2_err(&priv->sd, "no sensor attached\n");
-> +		ret = PTR_ERR(priv->sensor);
-> +		priv->sensor = NULL;
-> +		return ret;
-> +	}
-> +
-> +	ret = v4l2_subdev_call(priv->sensor->sd, video, g_mbus_config,
-> +			       &priv->sensor_mbus_cfg);
-> +	if (ret)
-> +		return ret;
-> +
-> +	is_csi2 = (priv->sensor_mbus_cfg.type == V4L2_MBUS_CSI2);
-> +
-> +	if (is_csi2) {
-> +		int vc_num = 0;
-> +		/*
-> +		 * NOTE! It seems the virtual channels from the mipi csi-2
-> +		 * receiver are used only for routing by the video mux's,
-> +		 * or for hard-wired routing to the CSI's. Once the stream
-> +		 * enters the CSI's however, they are treated internally
-> +		 * in the IPU as virtual channel 0.
-> +		 */
-> +#if 0
-> +		vc_num = imx_media_find_mipi_csi2_channel(priv->md,
-> +							  &priv->sd.entity);
-> +		if (vc_num < 0)
-> +			return vc_num;
-> +#endif
-> +		ipu_csi_set_mipi_datatype(priv->csi, vc_num,
-> +					  &priv->format_mbus[priv->input_pad]);
+Gentle ping...
 
-This seems (at least to me) to go against the spirit of the subdev
-negotiation.  Here, you seem to bypass the negotiation performed
-between the CSI and the attached device, wanting to grab the
-format from the CSI2 sensor directly.  That bypasses negotiation
-performed at the CSI2 subdev and video muxes.
-
-The same goes for the frame rate monitoring code - imho, the frame
-rate should be something that results from negotiation with the
-neighbouring element, not by poking at some entity that is several
-entities away.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+On 26/01/17 16:42, Vladimir Murzin wrote:
+> Hi,
+> 
+> It seem that addition of cache support for M-class CPUs uncovered
+> latent bug in DMA usage. NOMMU memory model has been treated as being
+> always consistent; however, for R/M CPU classes memory can be covered
+> by MPU which in turn might configure RAM as Normal i.e. bufferable and
+> cacheable. It breaks dma_alloc_coherent() and friends, since data can
+> stuck in caches now or be buffered.
+> 
+> This patch set is trying to address the issue by providing region of
+> memory suitable for consistent DMA operations. It is supposed that
+> such region is marked by MPU as non-cacheable. Robin suggested to
+> advertise such memory as reserved shared-dma-pool, rather then using
+> homebrew command line option, and extend dma-coherent to provide
+> default DMA area in the similar way as it is done for CMA (PATCH
+> 4/7). It allows us to offload all bookkeeping on generic coherent DMA
+> framework, and it seems that it might be reused by other architectures
+> like c6x and blackfin.
+> 
+> While reviewing/testing previous vesrions of the patch set it turned
+> out that dma-coherent does not take into account "dma-ranges" device
+> tree property, so it is addressed in PATCH 3/7.
+> 
+> For ARM, dedicated DMA region is required for cases other than:
+>  - MMU/MPU is off
+>  - cpu is v7m w/o cache support
+>  - device is coherent
+> 
+> In case one of the above conditions is true dma operations are forced
+> to be coherent and wired with dma_noop_ops.
+> 
+> To make life easier NOMMU dma operations are kept in separate
+> compilation unit.
+> 
+> Since the issue was reported in the same time as Benjamin sent his
+> patch [1] to allow mmap for NOMMU, his case is also addressed in this
+> series (PATCH 1/7 and PATCH 2/7).
+> 
+> Thanks!
+> 
+> [1] http://www.armlinux.org.uk/developer/patches/viewpatch.php?id=8633/1
+> 
+> Cc: Joerg Roedel <jroedel@suse.de>
+> Cc: Christian Borntraeger <borntraeger@de.ibm.com>
+> Cc: Michal Nazarewicz <mina86@mina86.com>
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Yoshinori Sato <ysato@users.sourceforge.jp>
+> Cc: Rich Felker <dalias@libc.org>
+> Cc: Roger Quadros <rogerq@ti.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> 
+> Vladimir Murzin (7):
+>   dma: Take into account dma_pfn_offset
+>   dma: Add simple dma_noop_mmap
+>   drivers: dma-coherent: Account dma_pfn_offset when used with device
+>     tree
+>   drivers: dma-coherent: Introduce default DMA pool
+>   ARM: NOMMU: Introduce dma operations for noMMU
+>   ARM: NOMMU: Set ARM_DMA_MEM_BUFFERABLE for M-class cpus
+>   ARM: dma-mapping: Remove traces of NOMMU code
+> 
+>  .../bindings/reserved-memory/reserved-memory.txt   |   3 +
+>  arch/arm/include/asm/dma-mapping.h                 |   3 +-
+>  arch/arm/mm/Kconfig                                |   2 +-
+>  arch/arm/mm/Makefile                               |   5 +-
+>  arch/arm/mm/dma-mapping-nommu.c                    | 253 +++++++++++++++++++++
+>  arch/arm/mm/dma-mapping.c                          |  26 +--
+>  drivers/base/dma-coherent.c                        |  76 ++++++-
+>  lib/dma-noop.c                                     |  29 ++-
+>  8 files changed, 356 insertions(+), 41 deletions(-)
+>  create mode 100644 arch/arm/mm/dma-mapping-nommu.c
+> 
