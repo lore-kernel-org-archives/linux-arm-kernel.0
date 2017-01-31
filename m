@@ -1,87 +1,150 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 31 Jan 2017 12:52:07 +0100
-Subject: [PATCH 06/14] mmc: dw_mmc: simplify optional reset handling
-In-Reply-To: <20170130114116.22089-6-p.zabel@pengutronix.de>
-References: <20170130114116.22089-1-p.zabel@pengutronix.de>
- <20170130114116.22089-6-p.zabel@pengutronix.de>
-Message-ID: <CAPDyKFrDKW4DCzqeX6dim=3MmcU77DhDSbXyw7pwPt=OLkUpHA@mail.gmail.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Tue, 31 Jan 2017 11:51:44 +0000
+Subject: [PATCH V6 4/5] LPC: Support the device-tree LPC host on
+ Hip06/Hip07
+In-Reply-To: <2890e438-6149-c8f0-8ec7-9036a8d5cca5@suse.de>
+References: <1485241525-201782-1-git-send-email-yuanzhichang@hisilicon.com>
+ <1485241525-201782-5-git-send-email-yuanzhichang@hisilicon.com>
+ <a5a24e73-013d-87b5-f65f-324417f4cc60@suse.de>
+ <55916a03-2710-c8bc-0894-5a58daf6da68@huawei.com>
+ <2890e438-6149-c8f0-8ec7-9036a8d5cca5@suse.de>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F9F98F3@lhreml507-mbx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 January 2017 at 12:41, Philipp Zabel <p.zabel@pengutronix.de> wrote:
-> As of commit bb475230b8e5 ("reset: make optional functions really
-> optional"), the reset framework API calls use NULL pointers to describe
-> optional, non-present reset controls.
->
-> This allows to return errors from devm_reset_control_get_optional and to
-> call reset_control_(de)assert unconditionally.
->
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Cc: Guodong Xu <guodong.xu@linaro.org>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Hi Alex thanks for reviewing
 
-Philipp, I have looked at patch 6,7,8 in this series - they look good to me.
+[...]
 
-However, could you please re-post to linux-mmc and make sure to
-include the proper driver maintainers for each change. For example,
-Jaehoon Chung maintains dw_mmc.
+> >
+> >>> + * The port size of legacy I/O devices is normally less than
+> 0x400.
+> >>> + * Defining the I/O range size as 0x400 here should be sufficient
+> for
+> >>> + * all peripherals under one bus.
+> >>> + */
+> >>
+> >> This comment doesn't make a lot of sense. What is the limit? Is
+> there a
+> >> hardware limit?
+> >>
+> >> We don't dynamically allocate devices on the lpc bus, so why imply a
+> >> limit at all?
+> >>
+> >
+> > IIRC from previously asking Zhichang this before, this is the upper
+> > range we can address devices on the LPC bus. But the value was 0x1000
+> then.
+> 
+> Well, all devices that we want to address are defined by firmware (via
+> device tree or dsdt). So I'm not quite sure what this arbitrary limit
+> buys us.
 
-Moreover, I assume you want me to pick the mmc changes or is there is
-dependency to another tree here?
+Following a previous discussion with Arnd:
+<< We know that the ISA/LPC bus can only have up to 65536 ports,
+so you can register all of those, or possibly limit it further to
+1024 or 4096 ports, whichever matches the bus implementation. >>
+(https://lkml.org/lkml/2016/11/10/95)
 
-Kind regards
-Uffe
+We decided to register a fixed IO range for our LPC.
+About the specific reason for choosing 0x400 I think Zhichang can
+clarify once he's back (he's OOO now)   
 
-> ---
->  drivers/mmc/host/dw_mmc.c | 14 +++++---------
->  1 file changed, 5 insertions(+), 9 deletions(-)
->
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index b44306b886cb6..9039e8f81ff12 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -2963,10 +2963,8 @@ static struct dw_mci_board *dw_mci_parse_dt(struct dw_mci *host)
->
->         /* find reset controller when exist */
->         pdata->rstc = devm_reset_control_get_optional(dev, "reset");
-> -       if (IS_ERR(pdata->rstc)) {
-> -               if (PTR_ERR(pdata->rstc) == -EPROBE_DEFER)
-> -                       return ERR_PTR(-EPROBE_DEFER);
-> -       }
-> +       if (IS_ERR(pdata->rstc))
-> +               return ERR_CAST(pdata->rstc);
->
->         /* find out number of slots supported */
->         of_property_read_u32(np, "num-slots", &pdata->num_slots);
-> @@ -3090,7 +3088,7 @@ int dw_mci_probe(struct dw_mci *host)
->                 }
->         }
->
-> -       if (!IS_ERR(host->pdata->rstc)) {
-> +       if (host->pdata->rstc) {
->                 reset_control_assert(host->pdata->rstc);
->                 usleep_range(10, 50);
->                 reset_control_deassert(host->pdata->rstc);
-> @@ -3245,8 +3243,7 @@ int dw_mci_probe(struct dw_mci *host)
->         if (host->use_dma && host->dma_ops->exit)
->                 host->dma_ops->exit(host);
->
-> -       if (!IS_ERR(host->pdata->rstc))
-> -               reset_control_assert(host->pdata->rstc);
-> +       reset_control_assert(host->pdata->rstc);
->
->  err_clk_ciu:
->         clk_disable_unprepare(host->ciu_clk);
-> @@ -3278,8 +3275,7 @@ void dw_mci_remove(struct dw_mci *host)
->         if (host->use_dma && host->dma_ops->exit)
->                 host->dma_ops->exit(host);
->
-> -       if (!IS_ERR(host->pdata->rstc))
-> -               reset_control_assert(host->pdata->rstc);
-> +       reset_control_assert(host->pdata->rstc);
->
->         clk_disable_unprepare(host->ciu_clk);
->         clk_disable_unprepare(host->biu_clk);
-> --
-> 2.11.0
->
+> 
+
+[...]
+
+> >>> +
+> >>> +        /* whole operation must be atomic */
+> >>> +        spin_lock_irqsave(&lpcdev->cycle_lock, flags);
+> >>
+> >> Ouch. This is going to kill your RT jitter. Is there no better way?
+> >>
+> >
+> > Obviously the bus register driving is non-atomic, so we need some way
+> to
+> > lock out.
+> >
+> > I think that it is not so critical for low-speed/infrequent-access
+> bus.
+> >
+> > If we were going to use virtual UART in the BMC on the LPC bus then
+> we
+> > could consider more.
+> 
+> Well, it basically means that an arbitrary daemon running in user space
+> that checks your temperature readings via the ipmi interface could
+> create a lot of jitter. That could be very critical if you want to use
+> this hardware for real time critical applications, such as telecom.
+> 
+> I bet that if you leave it like that and postpone the decision to fix
+> it
+> to "later", in 1 or 2 years you will cause someone weeks of debugging
+> to
+> track down why their voip gateway loses packets from time to time.
+
+Thanks for the heads-up. We'll discuss internally after Chinese holidays
+to understand if this implementation is compatible with the intended
+deployment scenarions 
+
+> 
+> >
+
+[...]
+
+> >>> +static u64 hisilpc_comm_in(void *devobj, unsigned long pio, size_t
+> >>> dlen)
+> >>> +{
+> >>> +    struct hisilpc_dev *lpcdev = devobj;
+> >>> +    struct lpc_cycle_para iopara;
+> >>> +    u32 rd_data;
+> >>
+> >> rd_data needs to be initialized to 0. Otherwise it may contain stale
+> >> stack contents and corrupt non-32bit dlen returns.
+> >>
+> >
+> > I think so, since we read into this value byte-by-byte. We also seem
+> to
+> > return a 32b value but should return 64b value according to the
+> prototype.
+> 
+> IIRC LPC (well, PIO) doesn't support bigger requests than 32bit. At
+> least I can't think of an x86 instruction that would allow bigger
+> transactions. So there's no need to make it 64bit. However, the
+> question
+> is why the prototype is 64bit then. Hm. :)
+> 
+> Maybe the prototype should be only 32bit.
+
+Maybe you're right :)
+
+Looking at extio.c we never return a 64b value.
+I'll double check with Zhichang once he's back...
+
+> 
+> >
+> >>> +    unsigned char *newbuf;
+> >>> +    int ret = 0;
+> >>> +    unsigned long ptaddr;
+> >>> +
+> >>> +    if (!lpcdev || !dlen || dlen > LPC_MAX_DULEN ||    (dlen &
+> (dlen
+> >>> - 1)))
+> >>> +        return -1;
+> >>
+> >> Isn't this -EINVAL?
+> >
+> > Not sure. This value is returned directly to the inb/outb caller,
+> which
+> > would not check this value for error.
+> >
+> > It could be argued that the checking is paranoia. If not, we should
+> > treat the failure as a more severe event.
+> 
+> Oh, I see. In that case -1 makes a lot of sense since it's the default
+> read value on x86 for unallocated space.
+> 
+> This probably deserves a comment (and/or maybe a #define)
+> 
+> 
+> Alex
