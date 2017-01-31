@@ -1,49 +1,51 @@
 From: michael.heimpold@i2se.com (Michael Heimpold)
-Date: Tue, 31 Jan 2017 07:51:08 +0100
-Subject: [PATCH v3 2/9] ARM: dts: imx28: rename mmc2_sck_cfg
+Date: Tue, 31 Jan 2017 07:51:11 +0100
+Subject: [PATCH v3 5/9] Documentation: DT: add entries for I2SE boards
 In-Reply-To: <1485845475-3129-1-git-send-email-michael.heimpold@i2se.com>
 References: <1485845475-3129-1-git-send-email-michael.heimpold@i2se.com>
-Message-ID: <1485845475-3129-3-git-send-email-michael.heimpold@i2se.com>
+Message-ID: <1485845475-3129-6-git-send-email-michael.heimpold@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch renames mmc2_sck_cfg in order to prepare for an alternative
-muxing setup.
+From: Michael Heimpold <mhei@heimpold.de>
 
-Signed-off-by: Michael Heimpold <michael.heimpold@i2se.com>
+This patch adds the missing devicetree binding documentation for I2SE's
+Duckbill and Duckbill 2 series boards.
+
+Signed-off-by: Michael Heimpold <mhei@heimpold.de>
 Cc: Stefan Wahren <stefan.wahren@i2se.com>
-Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- arch/arm/boot/dts/imx28-m28cu3.dts | 2 +-
- arch/arm/boot/dts/imx28.dtsi       | 3 ++-
- 2 files changed, 3 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/arm/i2se.txt | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/i2se.txt
 
-diff --git a/arch/arm/boot/dts/imx28-m28cu3.dts b/arch/arm/boot/dts/imx28-m28cu3.dts
-index 2df63be..bb53294 100644
---- a/arch/arm/boot/dts/imx28-m28cu3.dts
-+++ b/arch/arm/boot/dts/imx28-m28cu3.dts
-@@ -57,7 +57,7 @@
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&mmc2_4bit_pins_a
- 					     &mmc2_cd_cfg
--					     &mmc2_sck_cfg>;
-+					     &mmc2_sck_cfg_a>;
- 				bus-width = <4>;
- 				vmmc-supply = <&reg_vddio_sd1>;
- 				status = "okay";
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index bc5cf41..857ca37 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -604,7 +604,8 @@
- 					fsl,pull-up = <MXS_PULL_DISABLE>;
- 				};
- 
--				mmc2_sck_cfg: mmc2-sck-cfg {
-+				mmc2_sck_cfg_a: mmc2-sck-cfg at 0 {
-+					reg = <0>;
- 					fsl,pinmux-ids = <
- 						MX28_PAD_SSP0_DATA7__SSP2_SCK
- 					>;
+diff --git a/Documentation/devicetree/bindings/arm/i2se.txt b/Documentation/devicetree/bindings/arm/i2se.txt
+new file mode 100644
+index 0000000..9954d86
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/i2se.txt
+@@ -0,0 +1,22 @@
++I2SE Device Tree Bindings
++-------------------------
++
++Duckbill Board
++Required root node properties:
++    - compatible = "i2se,duckbill", "fsl,imx28";
++
++Duckbill 2 Board
++Required root node properties:
++    - compatible = "i2se,duckbill", "fsl,imx28";
++
++Duckbill 2 485 Board
++Required root node properties:
++    - compatible = "i2se,duckbill", "fsl,imx28";
++
++Duckbill 2 EnOcean Board
++Required root node properties:
++    - compatible = "i2se,duckbill", "fsl,imx28";
++
++Duckbill 2 SPI Board
++Required root node properties:
++    - compatible = "i2se,duckbill", "fsl,imx28";
 -- 
 2.6.1
