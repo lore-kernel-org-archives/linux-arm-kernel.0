@@ -1,56 +1,81 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 31 Jan 2017 09:44:42 -0800
-Subject: [GIT PULL] Qualcomm SoC Updates for v4.11
-In-Reply-To: <20170131071118.GA2821@hector.attlocal.net>
-References: <1485240752-8339-1-git-send-email-andy.gross@linaro.org>
- <20170130002644.GP3133@localhost> <20170131071118.GA2821@hector.attlocal.net>
-Message-ID: <CAOesGMg+2W_wnPpKz81n43XnxMNxBoOt7PDOJ-EssY89Gz_L8Q@mail.gmail.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Tue, 31 Jan 2017 12:48:25 -0500
+Subject: [PATCH v4 2/4] arm64: Work around Falkor erratum 1003
+In-Reply-To: <20170131123735.GD11191@leverpostej>
+References: <20170125155232.10277-1-cov@codeaurora.org>
+ <20170125155232.10277-2-cov@codeaurora.org>
+ <20170131123735.GD11191@leverpostej>
+Message-ID: <36478002-4cd8-7f1c-1a25-8bfe35022a47@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2017 at 11:11 PM, Andy Gross <andy.gross@linaro.org> wrote:
-> On Sun, Jan 29, 2017 at 04:26:44PM -0800, Olof Johansson wrote:
->> On Tue, Jan 24, 2017 at 12:52:32AM -0600, Andy Gross wrote:
->> > The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
->> >
->> >   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
->> >
->> > are available in the git repository at:
->> >
->> >   git://git.kernel.org/pub/scm/linux/kernel/git/agross/linux.git tags/qcom-soc-for-4.11
->> >
->> > for you to fetch changes up to aabde95fc543a9ca68df06b9c7ea8e699702d7ad:
->> >
->> >   firmware: qcom: scm: Fix interrupted SCM calls (2017-01-23 10:01:49 -0600)
->> >
->> > ----------------------------------------------------------------
->> > Qualcomm ARM Based SoC Updates for v4.11
->> >
->> > * Add SMCC quirk support
->> > * Add Qualcomm SCM quirk to fix interrupted calls
+On 01/31/2017 07:37 AM, Mark Rutland wrote:
+> On Wed, Jan 25, 2017 at 10:52:30AM -0500, Christopher Covington wrote:
+>> The Qualcomm Datacenter Technologies Falkor v1 CPU may allocate TLB entries
+>> using an incorrect ASID when TTBRx_EL1 is being updated. When the erratum
+>> is triggered, page table entries using the new translation table base
+>> address (BADDR) will be allocated into the TLB using the old ASID. All
+>> circumstances leading to the incorrect ASID being cached in the TLB arise
+>> when software writes TTBRx_EL1[ASID] and TTBRx_EL1[BADDR], a memory
+>> operation is in the process of performing a translation using the specific
+>> TTBRx_EL1 being written, and the memory operation uses a translation table
+>> descriptor designated as non-global. EL2 and EL3 code changing the EL1&0
+>> ASID is not subject to this erratum because hardware is prohibited from
+>> performing translations from an out-of-context translation regime.
 >>
->> Hi,
+>> Consider the following pseudo code.
 >>
->> I replied on one of the patches. Not sure doing this through quirks is the
->> right way right now -- unless we expect a lot more quirks over time, and/or if
->> this is an "enhancement" that other vendors are also likely to pick up.
->
-> I saw.  We originally tried adding our own calls, but with the advent of the
-> arm_smccc call it was nice to be able to leverage that instead of adding a whole
-> new copy of the thing.  And people didn't like the original implementation all
-> that much because it somewhat abused the arm_smccc register conventions.
->
-> If we added our own, it'd be a copy of the arm one with the extra register
-> access.
+>>   write new BADDR and ASID values to TTBRx_EL1
+>>
+>> Replacing the above sequence with the one below will ensure that no TLB
+>> entries with an incorrect ASID are used by software.
+>>
+>>   write reserved value to TTBRx_EL1[ASID]
+>>   ISB
+>>   write new value to TTBRx_EL1[BADDR]
+>>   ISB
+>>   write new value to TTBRx_EL1[ASID]
+>>   ISB
+>>
+>> When the above sequence is used, page table entries using the new BADDR
+>> value may still be incorrectly allocated into the TLB using the reserved
+>> ASID. Yet this will not reduce functionality, since TLB entries incorrectly
+>> tagged with the reserved ASID will never be hit by a later instruction.
+> 
+> Based on my understanding that entries allocated to the reserved ASID
+> will not be used for subsequent page table walks (and so we don't have
+> asynchronous behaviour to contend with), this sounds fine to me.
+> 
+> Thanks for taking the time to clarify the details on that.
+> 
+>> Based on work by Shanker Donthineni <shankerd@codeaurora.org>
+>>
+>> Signed-off-by: Christopher Covington <cov@codeaurora.org>
+>> ---
+>>  Documentation/arm64/silicon-errata.txt |  1 +
+>>  arch/arm64/Kconfig                     | 11 +++++++++++
+>>  arch/arm64/include/asm/assembler.h     | 23 +++++++++++++++++++++++
+>>  arch/arm64/include/asm/cpucaps.h       |  3 ++-
+>>  arch/arm64/include/asm/mmu_context.h   |  8 +++++++-
+>>  arch/arm64/kernel/cpu_errata.c         |  7 +++++++
+>>  arch/arm64/mm/context.c                | 11 +++++++++++
+>>  arch/arm64/mm/proc.S                   |  1 +
+>>  8 files changed, 63 insertions(+), 2 deletions(-)
+> 
+> Don't we need to use pre_ttbr0_update_workaround in <asm/asm-uaccess.h>
+> for CONFIG_ARM64_SW_TTBR0_PAN? We implicitly switch to the reserved ASID
+> for the empty table in __uaccess_ttbr0_disable.
+> 
+> That also means we have to invalidate the reserved ASID so as to not
+> accidentally hit while uaccess is disabled.
 
-Yep. Sorry to put you in a tight spot, but since Will was rejecting my
-feedback, he gets to merge the code the way he wants it to look like.
+The CPU in question (Falkor v1) has hardware PAN support. Do we need
+to worry about including the workaround in the SW PAN code in that case?
 
-Unless I hear otherwise I'm assuming the rest of the code in this pull
-request is either going in with those changes, or will be submitted
-once the dependent changes have landed upstream.
+Thanks,
+Cov
 
-
-Thanks!
-
--Olof
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc. Qualcomm Technologies, Inc. is a member of the Code
+Aurora Forum, a Linux Foundation Collaborative Project.
