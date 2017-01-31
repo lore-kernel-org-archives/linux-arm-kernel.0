@@ -1,44 +1,27 @@
-From: chris.packham@alliedtelesis.co.nz (Chris Packham)
-Date: Tue, 31 Jan 2017 16:42:09 +1300
-Subject: [PATCH] arm: mvebu: Fix whitespace in armada-xp-98dx3236.dtsi
-Message-ID: <20170131034209.3848-1-chris.packham@alliedtelesis.co.nz>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 31 Jan 2017 11:49:02 +0800
+Subject: [PATCH 14/14] ASoC: sunxi: simplify optional reset handling
+In-Reply-To: <20170130114116.22089-14-p.zabel@pengutronix.de>
+References: <20170130114116.22089-1-p.zabel@pengutronix.de>
+ <20170130114116.22089-14-p.zabel@pengutronix.de>
+Message-ID: <CAGb2v66nsjuhxXYp_5=9kSH0GBROeihB4pD2Wbc3OhvKJibRRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change sequences of 8 spaces to hard-tabs.
+On Mon, Jan 30, 2017 at 7:41 PM, Philipp Zabel <p.zabel@pengutronix.de> wrote:
+> As of commit bb475230b8e5 ("reset: make optional functions really
+> optional"), the reset framework API calls use NULL pointers to describe
+> optional, non-present reset controls.
+>
+> This allows to return errors from devm_reset_control_get_optional and to
+> call reset_control_deassert unconditionally.
+>
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Cc: Marcus Cooper <codekipper@gmail.com>
+> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Chen-Yu Tsai <wens@csie.org>
+> Cc: Mark Brown <broonie@kernel.org>
 
-Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
----
-I think this crept in during review and I didn't notice. The file is new enough
-that we shouldn't lose any useful history.
+FWIW,
 
- arch/arm/boot/dts/armada-xp-98dx3236.dtsi | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm/boot/dts/armada-xp-98dx3236.dtsi b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
-index 9461128fae24..f6a03dcee5ef 100644
---- a/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-98dx3236.dtsi
-@@ -201,13 +201,13 @@
- 			#size-cells = <1>;
- 			ranges = <0 MBUS_ID(0x08, 0x00) 0 0x100000>;
- 
--                        dfx_coredivclk: corediv-clock at f8268 {
--                                compatible = "marvell,mv98dx3236-corediv-clock";
--                                reg = <0xf8268 0xc>;
--                                #clock-cells = <1>;
--                                clocks = <&mainpll>;
--                                clock-output-names = "nand";
--                        };
-+			dfx_coredivclk: corediv-clock at f8268 {
-+				compatible = "marvell,mv98dx3236-corediv-clock";
-+				reg = <0xf8268 0xc>;
-+				#clock-cells = <1>;
-+				clocks = <&mainpll>;
-+				clock-output-names = "nand";
-+			};
- 
- 			dfx: dfx at 0 {
- 				compatible = "marvell,dfx-server";
--- 
-2.11.0.24.ge6920cf
+Acked-by: Chen-Yu Tsai <wens@csie.org>
