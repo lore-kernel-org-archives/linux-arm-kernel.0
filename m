@@ -1,33 +1,76 @@
-From: craigkewley@gmail.com (Craig Kewley)
-Date: Tue, 31 Jan 2017 22:22:32 +0000
-Subject: [PATCH] staging: bcm2835: do not initialise statics to NULL
-Message-ID: <20170131222232.42062-1-craigkewley@gmail.com>
+From: ian.arkver.dev@gmail.com (Ian Arkver)
+Date: Tue, 31 Jan 2017 22:33:40 +0000
+Subject: [PATCH v3 20/24] media: imx: Add Camera Interface subdev driver
+In-Reply-To: <20170131220452.GE27312@n2100.armlinux.org.uk>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <1483755102-24785-21-git-send-email-steve_longerbeam@mentor.com>
+ <b7456d40-040d-41b7-45bc-ef6709ab7933@xs4all.nl>
+ <20170131134252.GX27312@n2100.armlinux.org.uk>
+ <b0517394-7717-3e1d-b850-e2b69a9c19e9@gmail.com>
+ <20170131203340.GC27312@n2100.armlinux.org.uk>
+ <2297c62c-ae9b-3942-4700-ce268a61a6d5@gmail.com>
+ <20170131220452.GE27312@n2100.armlinux.org.uk>
+Message-ID: <93e5a426-03f3-c4f1-c27f-75b8b78c0a02@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the checkpatch.pl warning:
+On 31/01/17 22:04, Russell King - ARM Linux wrote:
+> On Tue, Jan 31, 2017 at 09:55:29PM +0000, Ian Arkver wrote:
+>> On 31/01/17 20:33, Russell King - ARM Linux wrote:
+>>> On Tue, Jan 31, 2017 at 10:21:26AM -0800, Steve Longerbeam wrote:
+>>>> On 01/31/2017 05:42 AM, Russell King - ARM Linux wrote:
+>>>>> On Fri, Jan 20, 2017 at 03:38:28PM +0100, Hans Verkuil wrote:
+>>>>>> Should be set to something like 'platform:imx-media-camif'. v4l2-compliance
+>>>>>> should complain about this.
+>>>>> ... and more.
+>>>>
+>>>> Right, in version 3 that you are working with, no v4l2-compliance fixes were
+>>>> in yet. A lot of the compliance errors are fixed, please look in latest
+>>>> branch
+>>>> imx-media-staging-md-wip at git at github.com:slongerbeam/mediatree.git.
+>>>
+>>> Sorry, I'm not prepared to pull random trees from github as there's
+>>> no easy way to see what's in the branch.
+>>>
+>>> I've always disliked github because its web interface makes it soo
+>>> difficult to navigate around git trees hosted there.  You can see
+>>> a commit, you can see a diff of the commit.  You can get a list of
+>>> branches.  But there seems to be no way to get a list of commits
+>>> similar to "git log" or even a one-line summary of each commit on
+>>> a branch.  If there is, it's completely non-obvious (which I think is
+>>> much of the problem with github, it's web interface is horrendous.)
+>>>
+>>> Or you can clone/pull the tree without knowing what you're fetching
+>>> (eg, what the tree is based upon.)
+>>>
+>>> Or you can waste time clicking repeatedly on the "parent" commit link
+>>> on each patch working your way back through the history...
+>>>
+>>> Well, it looks like it's bsaed on 4.10-rc1 with who-knows-what work
+>> >from the linux-media tree (I didn't try and go back any further.)
+>>> As I don't want to take a whole pile of other changes into my tree,
+>>> I'm certainly not going to pull from your github tree.  Sorry.
+>>>
+>>
+>> https://github.com/slongerbeam/mediatree/compare/master...imx-media-staging-md-wip
+>>
+>> It's under the "Compare" button from the main view. It would be nice though
+>> if the first commit's parent was some clearly tagged start point.
+>
+> I don't want master though, I want v4.10-rc1, and if I ask for that
+> it tells me it knows nothing about v4.10-rc1, despite the fact that's
+> a tag in the mainline kernel repository which was merged into the
+> linux-media tree that this tree is based upon.
+>
 
-ERROR: do not initialise statics to NULL
+Yeah, that's what I meant about the first parent's commit not being a 
+clearly tagged branch point. At least you get the series on one page. 
+Maybe it's time for a rebase or a v4 series Steve?
 
-Signed-off-by: Craig Kewley <craigkewley@gmail.com>
----
- drivers/staging/bcm2835-audio/bcm2835.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Personally, I use a bare repo with multiple remotes and fetch branches 
+from various trees. Then gitk --all --since(etc) is pretty good at 
+giving the overview picture. You don't need to pull the commits over 
+into any of your working branches if you don't want to.
 
-diff --git a/drivers/staging/bcm2835-audio/bcm2835.c b/drivers/staging/bcm2835-audio/bcm2835.c
-index 9e3b248c7085..6932492e1834 100644
---- a/drivers/staging/bcm2835-audio/bcm2835.c
-+++ b/drivers/staging/bcm2835-audio/bcm2835.c
-@@ -34,8 +34,8 @@ static int enable[MAX_SUBSTREAMS] = {[0 ... (MAX_SUBSTREAMS - 1)] = 1};
-  * to debug if we run into issues
-  */
- 
--static struct snd_card *g_card = NULL;
--static struct bcm2835_chip *g_chip = NULL;
-+static struct snd_card *g_card;
-+static struct bcm2835_chip *g_chip;
- 
- static int snd_bcm2835_free(struct bcm2835_chip *chip)
- {
--- 
-2.11.0
+Regards,
+Ian
