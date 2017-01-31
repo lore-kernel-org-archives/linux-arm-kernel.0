@@ -1,164 +1,192 @@
 From: smitha.t@samsung.com (Smitha T Murthy)
-Date: Tue, 31 Jan 2017 14:26:34 +0530
-Subject: [PATCH 01/11] [media] s5p-mfc: Rename IS_MFCV8 macro
-In-Reply-To: <35fef778-fa21-5f40-d399-96acd64c8511@samsung.com>
+Date: Tue, 31 Jan 2017 14:42:15 +0530
+Subject: [PATCH 02/11] [media] s5p-mfc: Adding initial support for MFC
+ v10.10
+In-Reply-To: <ec5c2602-627e-7a42-eda2-6a68b846fff8@samsung.com>
 References: <1484733729-25371-1-git-send-email-smitha.t@samsung.com>
- <CGME20170118100718epcas5p1f9aebb16fc61d41a13d09054fa96a14d@epcas5p1.samsung.com>
- <1484733729-25371-2-git-send-email-smitha.t@samsung.com>
- <35fef778-fa21-5f40-d399-96acd64c8511@samsung.com>
-Message-ID: <1485852994.16927.6.camel@smitha-fedora>
+ <CGME20170118100723epcas5p132e0ebfad38261bed95cffc47334f9dc@epcas5p1.samsung.com>
+ <1484733729-25371-3-git-send-email-smitha.t@samsung.com>
+ <ec5c2602-627e-7a42-eda2-6a68b846fff8@samsung.com>
+Message-ID: <1485853935.16927.22.camel@smitha-fedora>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-01-18 at 15:51 +0100, Andrzej Hajda wrote:
-> On 18.01.2017 11:01, Smitha T Murthy wrote:
-> > This patch renames macro IS_MFCV8 to IS_MFCV8_PLUS so that the MFCv8
-> > code can be resued for MFCv10.10 support. Since the MFCv8 specific code
-> > holds good for MFC v10.10 also.
+On Wed, 2017-01-18 at 16:10 +0100, Andrzej Hajda wrote:
+> On 18.01.2017 11:02, Smitha T Murthy wrote:
+> > Adding the support for MFC v10.10, with new register file and
+> > necessary hw control, decoder, encoder and structural changes.
 > >
+> > CC: Rob Herring <robh+dt@kernel.org>
+> > CC: devicetree at vger.kernel.org 
 > > Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
-> 
-> Acked-by: Andrzej Hajda <a.hajda@samsung.com>
-
-Thanks for review and ack.
-
-Regards,
-Smitha
-> --
-> Regards
-> Andrzej
-> 
 > > ---
-> >  drivers/media/platform/s5p-mfc/s5p_mfc_common.h |    2 +-
-> >  drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c   |    2 +-
-> >  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c    |    2 +-
-> >  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c |   18 +++++++++---------
-> >  4 files changed, 12 insertions(+), 12 deletions(-)
+> >  .../devicetree/bindings/media/s5p-mfc.txt          |    1 +
+> >  drivers/media/platform/s5p-mfc/regs-mfc-v10.h      |   36 ++++++++++++++++
+> >  drivers/media/platform/s5p-mfc/s5p_mfc.c           |   30 +++++++++++++
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_common.h    |    4 +-
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c      |    4 ++
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_dec.c       |   44 +++++++++++---------
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_enc.c       |   21 +++++----
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c    |    9 +++-
+> >  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.h    |    2 +
+> >  9 files changed, 118 insertions(+), 33 deletions(-)
+> >  create mode 100644 drivers/media/platform/s5p-mfc/regs-mfc-v10.h
 > >
+> > diff --git a/Documentation/devicetree/bindings/media/s5p-mfc.txt b/Documentation/devicetree/bindings/media/s5p-mfc.txt
+> > index 2c90128..b70c613 100644
+> > --- a/Documentation/devicetree/bindings/media/s5p-mfc.txt
+> > +++ b/Documentation/devicetree/bindings/media/s5p-mfc.txt
+> > @@ -13,6 +13,7 @@ Required properties:
+> >  	(c) "samsung,mfc-v7" for MFC v7 present in Exynos5420 SoC
+> >  	(d) "samsung,mfc-v8" for MFC v8 present in Exynos5800 SoC
+> >  	(e) "samsung,exynos5433-mfc" for MFC v8 present in Exynos5433 SoC
+> > +	(f) "samsung,mfc-v10" for MFC v10 present in a variant of Exynos7 SoC
+> 
+> Could you specify explicitly SoC version(s), Exynos7 is misleading.
+> Btw are there plans to upstream platforms using this MFC?
+
+MFCv10.10 is used in Exynos7880. There are other variants of MFCv10 used
+in Exynos8890 and Exynos7870. I have no plans to upstream the platform
+support for this SoC, may be other members of Samsung may take it up.
+But I will mention the SoCs in the next version.
+
+> 
+> >  
+> >    - reg : Physical base address of the IP registers and length of memory
+> >  	  mapped region.
+> > diff --git a/drivers/media/platform/s5p-mfc/regs-mfc-v10.h b/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
+> > new file mode 100644
+> > index 0000000..bd671a5
+> > --- /dev/null
+> > +++ b/drivers/media/platform/s5p-mfc/regs-mfc-v10.h
+> > @@ -0,0 +1,36 @@
+> > +/*
+> > + * Register definition file for Samsung MFC V10.x Interface (FIMV) driver
+> > + *
+> > + * Copyright (c) 2017 Samsung Electronics Co., Ltd.
+> > + *     http://www.samsung.com/
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + */
+> > +
+> > +#ifndef _REGS_MFC_V10_H
+> > +#define _REGS_MFC_V10_H
+> > +
+> > +#include <linux/sizes.h>
+> > +#include "regs-mfc-v8.h"
+> > +
+> > +/* MFCv10 register definitions*/
+> > +#define S5P_FIMV_MFC_CLOCK_OFF_V10			0x7120
+> > +#define S5P_FIMV_MFC_STATE_V10				0x7124
+> > +
+> > +/* MFCv10 Context buffer sizes */
+> > +#define MFC_CTX_BUF_SIZE_V10		(30 * SZ_1K)	/* 30KB */
+> > +#define MFC_H264_DEC_CTX_BUF_SIZE_V10	(2 * SZ_1M)	/* 2MB */
+> > +#define MFC_OTHER_DEC_CTX_BUF_SIZE_V10	(20 * SZ_1K)	/* 20KB */
+> > +#define MFC_H264_ENC_CTX_BUF_SIZE_V10	(100 * SZ_1K)	/* 100KB */
+> > +#define MFC_OTHER_ENC_CTX_BUF_SIZE_V10	(15 * SZ_1K)	/* 15KB */
+> > +
+> > +/* MFCv10 variant defines */
+> > +#define MAX_FW_SIZE_V10		(SZ_1M)		/* 1MB */
+> > +#define MAX_CPB_SIZE_V10	(3 * SZ_1M)	/* 3MB */
+> > +#define MFC_VERSION_V10		0xA0
+> > +#define MFC_NUM_PORTS_V10	1
+> > +
+> > +#endif /*_REGS_MFC_V10_H*/
+> > +
+> > diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+> > index bb0a588..a043cce 100644
+> > --- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
+> > +++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+> > @@ -1542,6 +1542,33 @@ static int s5p_mfc_resume(struct device *dev)
+> >  	.num_clocks	= 3,
+> >  };
+> >  
+> > +static struct s5p_mfc_buf_size_v6 mfc_buf_size_v10 = {
+> > +	.dev_ctx        = MFC_CTX_BUF_SIZE_V10,
+> > +	.h264_dec_ctx   = MFC_H264_DEC_CTX_BUF_SIZE_V10,
+> > +	.other_dec_ctx  = MFC_OTHER_DEC_CTX_BUF_SIZE_V10,
+> > +	.h264_enc_ctx   = MFC_H264_ENC_CTX_BUF_SIZE_V10,
+> > +	.other_enc_ctx  = MFC_OTHER_ENC_CTX_BUF_SIZE_V10,
+> > +};
+> > +
+> > +static struct s5p_mfc_buf_size buf_size_v10 = {
+> > +	.fw     = MAX_FW_SIZE_V10,
+> > +	.cpb    = MAX_CPB_SIZE_V10,
+> > +	.priv   = &mfc_buf_size_v10,
+> > +};
+> > +
+> > +static struct s5p_mfc_buf_align mfc_buf_align_v10 = {
+> > +	.base = 0,
+> > +};
+> > +
+> > +static struct s5p_mfc_variant mfc_drvdata_v10 = {
+> > +	.version        = MFC_VERSION_V10,
+> > +	.version_bit    = MFC_V10_BIT,
+> > +	.port_num       = MFC_NUM_PORTS_V10,
+> > +	.buf_size       = &buf_size_v10,
+> > +	.buf_align      = &mfc_buf_align_v10,
+> > +	.fw_name[0]     = "s5p-mfc-v10.fw",
+> 
+> Is firmware file publicly available? Sent to firmware repository?
+
+Firmware binary is not available publicly. I will check on sending it to
+firmware repository.
+
+> 
+> > +};
+> > +
+> >  static const struct of_device_id exynos_mfc_match[] = {
+> >  	{
+> >  		.compatible = "samsung,mfc-v5",
+> > @@ -1558,6 +1585,9 @@ static int s5p_mfc_resume(struct device *dev)
+> >  	}, {
+> >  		.compatible = "samsung,exynos5433-mfc",
+> >  		.data = &mfc_drvdata_v8_5433,
+> > +	}, {
+> > +		.compatible = "samsung,mfc-v10",
+> > +		.data = &mfc_drvdata_v10,
+> >  	},
+> >  	{},
+> >  };
 > > diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-> > index ab23236..b45d18c 100644
+> > index b45d18c..1941c63 100644
 > > --- a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
 > > +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-> > @@ -722,7 +722,7 @@ struct mfc_control {
-> >  #define IS_TWOPORT(dev)		(dev->variant->port_num == 2 ? 1 : 0)
+> > @@ -23,7 +23,7 @@
+> >  #include <media/v4l2-ioctl.h>
+> >  #include <media/videobuf2-v4l2.h>
+> >  #include "regs-mfc.h"
+> > -#include "regs-mfc-v8.h"
+> > +#include "regs-mfc-v10.h"
+> >  
+> >  #define S5P_MFC_NAME		"s5p-mfc"
+> >  
+> > @@ -723,11 +723,13 @@ struct mfc_control {
 > >  #define IS_MFCV6_PLUS(dev)	(dev->variant->version >= 0x60 ? 1 : 0)
 > >  #define IS_MFCV7_PLUS(dev)	(dev->variant->version >= 0x70 ? 1 : 0)
-> > -#define IS_MFCV8(dev)		(dev->variant->version >= 0x80 ? 1 : 0)
-> > +#define IS_MFCV8_PLUS(dev)	(dev->variant->version >= 0x80 ? 1 : 0)
+> >  #define IS_MFCV8_PLUS(dev)	(dev->variant->version >= 0x80 ? 1 : 0)
+> > +#define IS_MFCV10(dev)		(dev->variant->version >= 0xA0 ? 1 : 0)
 > >  
 > >  #define MFC_V5_BIT	BIT(0)
 > >  #define MFC_V6_BIT	BIT(1)
-> > diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c b/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
-> > index cc88871..484af6b 100644
-> > --- a/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
-> > +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
-> > @@ -427,7 +427,7 @@ int s5p_mfc_wakeup(struct s5p_mfc_dev *dev)
-> >  	s5p_mfc_clear_cmds(dev);
-> >  	s5p_mfc_clean_dev_int_flags(dev);
-> >  	/* 3. Send MFC wakeup command and wait for completion*/
-> > -	if (IS_MFCV8(dev))
-> > +	if (IS_MFCV8_PLUS(dev))
-> >  		ret = s5p_mfc_v8_wait_wakeup(dev);
-> >  	else
-> >  		ret = s5p_mfc_wait_wakeup(dev);
-> > diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> > index 367ef8e..0ec2928 100644
-> > --- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> > +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-> > @@ -1177,7 +1177,7 @@ void s5p_mfc_dec_init(struct s5p_mfc_ctx *ctx)
-> >  	struct v4l2_format f;
-> >  	f.fmt.pix_mp.pixelformat = V4L2_PIX_FMT_H264;
-> >  	ctx->src_fmt = find_format(&f, MFC_FMT_DEC);
-> > -	if (IS_MFCV8(ctx->dev))
-> > +	if (IS_MFCV8_PLUS(ctx->dev))
-> >  		f.fmt.pix_mp.pixelformat = V4L2_PIX_FMT_NV12M;
-> >  	else if (IS_MFCV6_PLUS(ctx->dev))
-> >  		f.fmt.pix_mp.pixelformat = V4L2_PIX_FMT_NV12MT_16X16;
-> > diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-> > index 57da798..0572521 100644
-> > --- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-> > +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-> > @@ -74,7 +74,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
-> >  			  ctx->luma_size, ctx->chroma_size, ctx->mv_size);
-> >  		mfc_debug(2, "Totals bufs: %d\n", ctx->total_dpb_count);
-> >  	} else if (ctx->type == MFCINST_ENCODER) {
-> > -		if (IS_MFCV8(dev))
-> > +		if (IS_MFCV8_PLUS(dev))
-> >  			ctx->tmv_buffer_size = S5P_FIMV_NUM_TMV_BUFFERS_V6 *
-> >  			ALIGN(S5P_FIMV_TMV_BUFFER_SIZE_V8(mb_width, mb_height),
-> >  			S5P_FIMV_TMV_BUFFER_ALIGN_V6);
-> > @@ -89,7 +89,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
-> >  		ctx->chroma_dpb_size = ALIGN((mb_width * mb_height) *
-> >  				S5P_FIMV_CHROMA_MB_TO_PIXEL_V6,
-> >  				S5P_FIMV_CHROMA_DPB_BUFFER_ALIGN_V6);
-> > -		if (IS_MFCV8(dev))
-> > +		if (IS_MFCV8_PLUS(dev))
-> >  			ctx->me_buffer_size = ALIGN(S5P_FIMV_ME_BUFFER_SIZE_V8(
-> >  						ctx->img_width, ctx->img_height,
-> >  						mb_width, mb_height),
-> > @@ -110,7 +110,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
-> >  	switch (ctx->codec_mode) {
-> >  	case S5P_MFC_CODEC_H264_DEC:
-> >  	case S5P_MFC_CODEC_H264_MVC_DEC:
-> > -		if (IS_MFCV8(dev))
-> > +		if (IS_MFCV8_PLUS(dev))
-> >  			ctx->scratch_buf_size =
-> >  				S5P_FIMV_SCRATCH_BUF_SIZE_H264_DEC_V8(
-> >  					mb_width,
-> > @@ -167,7 +167,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
-> >  		ctx->bank1.size = ctx->scratch_buf_size;
-> >  		break;
-> >  	case S5P_MFC_CODEC_VP8_DEC:
-> > -		if (IS_MFCV8(dev))
-> > +		if (IS_MFCV8_PLUS(dev))
-> >  			ctx->scratch_buf_size =
-> >  				S5P_FIMV_SCRATCH_BUF_SIZE_VP8_DEC_V8(
-> >  						mb_width,
-> > @@ -182,7 +182,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
-> >  		ctx->bank1.size = ctx->scratch_buf_size;
-> >  		break;
-> >  	case S5P_MFC_CODEC_H264_ENC:
-> > -		if (IS_MFCV8(dev))
-> > +		if (IS_MFCV8_PLUS(dev))
-> >  			ctx->scratch_buf_size =
-> >  				S5P_FIMV_SCRATCH_BUF_SIZE_H264_ENC_V8(
-> >  					mb_width,
-> > @@ -215,7 +215,7 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
-> >  		ctx->bank2.size = 0;
-> >  		break;
-> >  	case S5P_MFC_CODEC_VP8_ENC:
-> > -		if (IS_MFCV8(dev))
-> > +		if (IS_MFCV8_PLUS(dev))
-> >  			ctx->scratch_buf_size =
-> >  				S5P_FIMV_SCRATCH_BUF_SIZE_VP8_ENC_V8(
-> >  					mb_width,
-> > @@ -366,7 +366,7 @@ static void s5p_mfc_dec_calc_dpb_size_v6(struct s5p_mfc_ctx *ctx)
-> >  
-> >  	ctx->luma_size = calc_plane(ctx->img_width, ctx->img_height);
-> >  	ctx->chroma_size = calc_plane(ctx->img_width, (ctx->img_height >> 1));
-> > -	if (IS_MFCV8(ctx->dev)) {
-> > +	if (IS_MFCV8_PLUS(ctx->dev)) {
-> >  		/* MFCv8 needs additional 64 bytes for luma,chroma dpb*/
-> >  		ctx->luma_size += S5P_FIMV_D_ALIGN_PLANE_SIZE_V8;
-> >  		ctx->chroma_size += S5P_FIMV_D_ALIGN_PLANE_SIZE_V8;
-> > @@ -454,7 +454,7 @@ static int s5p_mfc_set_dec_frame_buffer_v6(struct s5p_mfc_ctx *ctx)
-> >  	writel(buf_addr1, mfc_regs->d_scratch_buffer_addr);
-> >  	writel(ctx->scratch_buf_size, mfc_regs->d_scratch_buffer_size);
-> >  
-> > -	if (IS_MFCV8(dev)) {
-> > +	if (IS_MFCV8_PLUS(dev)) {
-> >  		writel(ctx->img_width,
-> >  			mfc_regs->d_first_plane_dpb_stride_size);
-> >  		writel(ctx->img_width,
-> > @@ -2120,7 +2120,7 @@ static unsigned int s5p_mfc_get_crop_info_v_v6(struct s5p_mfc_ctx *ctx)
-> >  			S5P_FIMV_E_ENCODED_SOURCE_SECOND_ADDR_V7);
-> >  	R(e_vp8_options, S5P_FIMV_E_VP8_OPTIONS_V7);
-> >  
-> > -	if (!IS_MFCV8(dev))
-> > +	if (!IS_MFCV8_PLUS(dev))
-> >  		goto done;
-> >  
-> >  	/* Initialize registers used in MFC v8 only.
+> >  #define MFC_V7_BIT	BIT(2)
+> >  #define MFC_V8_BIT	BIT(3)
+> > +#define MFC_V10_BIT	BIT(5)
 > 
+> I think you can use BIT(4) here.
+
+I used BIT(5) in case someone upstreams MFCv9 they can use BIT(4) in
+order to maintain the sequence order as before.
+
+Thank you for the review.
+
+Regards,
+Smitha
+> 
+> Regards
+> Andrzej
 > 
 > 
