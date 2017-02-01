@@ -1,139 +1,113 @@
-From: tbaicar@codeaurora.org (Tyler Baicar)
-Date: Wed,  1 Feb 2017 10:16:53 -0700
-Subject: [PATCH V8 10/10] arm/arm64: KVM: add guest SEA support
-In-Reply-To: <1485969413-23577-1-git-send-email-tbaicar@codeaurora.org>
-References: <1485969413-23577-1-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <1485969413-23577-11-git-send-email-tbaicar@codeaurora.org>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 1 Feb 2017 11:30:54 -0600
+Subject: [PATCH v3 5/8] ASoC: codecs: Add sun8i-a33 binding documentation
+In-Reply-To: <20170131100552.27949-6-mylene.josserand@free-electrons.com>
+References: <20170131100552.27949-1-mylene.josserand@free-electrons.com>
+ <20170131100552.27949-6-mylene.josserand@free-electrons.com>
+Message-ID: <20170201173053.rjqwtxe4sjlttdwa@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently external aborts are unsupported by the guest abort
-handling. Add handling for SEAs so that the host kernel reports
-SEAs which occur in the guest kernel.
+On Tue, Jan 31, 2017 at 11:05:49AM +0100, Myl?ne Josserand wrote:
+> Add the documentation for dt-binding of the digital audio codec driver
+> and the audio card driver for Sun8i-a33 SoCs.
+> 
+> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
+> ---
+>  .../devicetree/bindings/sound/sun8i-a33-codec.txt  | 75 ++++++++++++++++++++++
+>  1 file changed, 75 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/sun8i-a33-codec.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/sound/sun8i-a33-codec.txt b/Documentation/devicetree/bindings/sound/sun8i-a33-codec.txt
+> new file mode 100644
+> index 000000000000..2425c74bce7e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/sun8i-a33-codec.txt
+> @@ -0,0 +1,75 @@
+> +Allwinner SUN8I audio codec
+> +------------------------------------
+> +
+> +On Sun8i-A33 SoCs, the audio is separated in different parts:
+> +	  - A DAI driver. It uses the "sun4i-i2s" driver which is
+> +	  documented here:
+> +	  Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+> +	  - An analog part of the codec which is handled as PRCM registers.
+> +	  See Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt
+> +	  - An digital part of the codec which is documented in this current
+> +	  binding documentation.
+> +	  - And finally, an audio card which links all the above components.
+> +	  The simple-audio card will be used.
+> +	  See Documentation/devicetree/bindings/sound/simple-card.txt
+> +
+> +This bindings documentation exposes Sun8i codec (digital part).
+> +
+> +Required properties:
+> +- compatible: must be "allwinner,sun8i-a33-codec"
+> +- reg: must contain the registers location and length
+> +- interrupts: must contain the codec interrupt
+> +- clocks: a list of phandle + clock-specifer pairs, one for each entry
+> +  in clock-names.
+> +- clock-names: should contain followings:
+> +   - "bus": the parent APB clock for this controller
+> +   - "mod": the parent module clock
+> +
+> +Example:
+> +codec: codec at 01c22e00 {
 
-Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
----
- arch/arm/include/asm/kvm_arm.h       |  1 +
- arch/arm/include/asm/system_misc.h   |  5 +++++
- arch/arm/kvm/mmu.c                   | 18 ++++++++++++++++--
- arch/arm64/include/asm/kvm_arm.h     |  1 +
- arch/arm64/include/asm/system_misc.h |  2 ++
- arch/arm64/mm/fault.c                | 16 ++++++++++++++++
- 6 files changed, 41 insertions(+), 2 deletions(-)
+This is redundant with the full example below.
 
-diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
-index e22089f..33a77509 100644
---- a/arch/arm/include/asm/kvm_arm.h
-+++ b/arch/arm/include/asm/kvm_arm.h
-@@ -187,6 +187,7 @@
- #define FSC_FAULT	(0x04)
- #define FSC_ACCESS	(0x08)
- #define FSC_PERM	(0x0c)
-+#define FSC_EXTABT	(0x10)
- 
- /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
- #define HPFAR_MASK	(~0xf)
-diff --git a/arch/arm/include/asm/system_misc.h b/arch/arm/include/asm/system_misc.h
-index a3d61ad..ea45d94 100644
---- a/arch/arm/include/asm/system_misc.h
-+++ b/arch/arm/include/asm/system_misc.h
-@@ -24,4 +24,9 @@
- 
- #endif /* !__ASSEMBLY__ */
- 
-+static inline int handle_guest_sea(unsigned long addr, unsigned int esr)
-+{
-+	return -1;
-+}
-+
- #endif /* __ASM_ARM_SYSTEM_MISC_H */
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index a5265ed..04f1dd50 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -29,6 +29,7 @@
- #include <asm/kvm_asm.h>
- #include <asm/kvm_emulate.h>
- #include <asm/virt.h>
-+#include <asm/system_misc.h>
- 
- #include "trace.h"
- 
-@@ -1444,8 +1445,21 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 
- 	/* Check the stage-2 fault is trans. fault or write fault */
- 	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
--	if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
--	    fault_status != FSC_ACCESS) {
-+
-+	/* The host kernel will handle the synchronous external abort. There
-+	 * is no need to pass the error into the guest.
-+	 */
-+	if (fault_status == FSC_EXTABT) {
-+		if(handle_guest_sea((unsigned long)fault_ipa,
-+				    kvm_vcpu_get_hsr(vcpu))) {
-+			kvm_err("Failed to handle guest SEA, FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
-+				kvm_vcpu_trap_get_class(vcpu),
-+				(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
-+				(unsigned long)kvm_vcpu_get_hsr(vcpu));
-+			return -EFAULT;
-+		}
-+	} else if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
-+		   fault_status != FSC_ACCESS) {
- 		kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
- 			kvm_vcpu_trap_get_class(vcpu),
- 			(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 2a2752b..2b11d59 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -201,6 +201,7 @@
- #define FSC_FAULT	ESR_ELx_FSC_FAULT
- #define FSC_ACCESS	ESR_ELx_FSC_ACCESS
- #define FSC_PERM	ESR_ELx_FSC_PERM
-+#define FSC_EXTABT	ESR_ELx_FSC_EXTABT
- 
- /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
- #define HPFAR_MASK	(~UL(0xf))
-diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
-index bc81243..5b2cecd1 100644
---- a/arch/arm64/include/asm/system_misc.h
-+++ b/arch/arm64/include/asm/system_misc.h
-@@ -58,4 +58,6 @@ void hook_debug_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
- 
- #endif	/* __ASSEMBLY__ */
- 
-+int handle_guest_sea(unsigned long addr, unsigned int esr);
-+
- #endif	/* __ASM_SYSTEM_MISC_H */
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 5a5a096..edd0c4f 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -602,6 +602,22 @@ static const char *fault_name(unsigned int esr)
- }
- 
- /*
-+ * Handle Synchronous External Aborts that occur in a guest kernel.
-+ */
-+int handle_guest_sea(unsigned long addr, unsigned int esr)
-+{
-+	/*
-+	 * synchronize_rcu() will wait for nmi_exit(), so no need to
-+	 * rcu_read_lock().
-+	 */
-+	nmi_enter();
-+	ghes_notify_sea();
-+	nmi_exit();
-+
-+	return 0;
-+}
-+
-+/*
-  * Dispatch a data abort to the relevant handler.
-  */
- asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+> +	#sound-dai-cells = <0>;
+> +	compatible = "allwinner,sun8i-a33-codec";
+> +	reg = <0x01c22e00 0x400>;
+> +	interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
+> +	clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
+> +	clock-names = "bus", "mod";
+> +	status = "disabled";
+> +};
+> +
+> +Here is an example to add a sound card and the codec binding on sun8i SoCs that
+> +are similar to A33 using simple-card:
+> +
+> +	sound {
+> +		compatible = "simple-audio-card";
+> +		simple-audio-card,name = "sun8i-a33-audio";
+> +		simple-audio-card,format = "i2s";
+> +		simple-audio-card,frame-master = <&link_codec>;
+> +		simple-audio-card,bitclock-master = <&link_codec>;
+> +		simple-audio-card,mclk-fs = <512>;
+> +		simple-audio-card,aux-devs = <&codec_analog>;
+> +		simple-audio-card,routing =
+> +				"Left DAC", "Digital Left DAC",
+> +				"Right DAC", "Digital Right DAC";
+> +
+> +		simple-audio-card,cpu {
+> +			sound-dai = <&dai>;
+> +		};
+> +
+> +		link_codec: simple-audio-card,codec {
+> +			sound-dai = <&codec>;
+> +		};
+> +
+> +	soc at 01c00000 {
+> +		[...]
+> +
+> +		codec: codec at 01c22e00 {
+
+audio-codec at ... and drop the leading 0.
+
+> +			#sound-dai-cells = <0>;
+> +			compatible = "allwinner,sun8i-a33-codec";
+> +			reg = <0x01c22e00 0x400>;
+> +			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&ccu CLK_BUS_CODEC>, <&ccu CLK_AC_DIG>;
+> +			clock-names = "bus", "mod";
+> +			status = "disabled";
+
+Drop status from examples.
+
+> +		};
+> +	};
+> +
+> -- 
+> 2.11.0
+> 
