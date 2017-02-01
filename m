@@ -1,91 +1,54 @@
-From: markus.mayer@broadcom.com (Markus Mayer)
-Date: Wed, 1 Feb 2017 11:50:51 -0800
-Subject: [PATCH v5 1/2] dt-bindings: brcm: clocks: add binding for
- brcmstb-cpu-clk-div
-In-Reply-To: <20170121005202.GB8801@codeaurora.org>
-References: <20170119002933.7529-1-code@mmayer.net>
- <20170119002933.7529-2-code@mmayer.net>
- <20170121005202.GB8801@codeaurora.org>
-Message-ID: <CAGt4E5sGScHp83ufKcX3Q74vW0fo=L0FHM7tCptvqJfchHAweg@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 01 Feb 2017 11:51:51 -0800
+Subject: [PATCH] MAINTAINERS: extend Raspberry Pi entry
+In-Reply-To: <2fcb0690-861a-1b83-c6d5-dfdef03fa9ab@wwwdotorg.org>
+References: <b2e1e59a752395314a20e846337cb70cf22f2959.1485720503.git.baruch@tkos.co.il>
+ <736209d7-5310-ac2f-1ff7-928b978e665e@wwwdotorg.org>
+ <87zii7xb66.fsf@eliezer.anholt.net>
+ <2fcb0690-861a-1b83-c6d5-dfdef03fa9ab@wwwdotorg.org>
+Message-ID: <87h94dr8o8.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 January 2017 at 16:52, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 01/18, Markus Mayer wrote:
->> diff --git a/Documentation/devicetree/bindings/clock/brcm,brcmstb-cpu-clk-div.txt b/Documentation/devicetree/bindings/clock/brcm,brcmstb-cpu-clk-div.txt
->> new file mode 100644
->> index 0000000..c4acb53
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/clock/brcm,brcmstb-cpu-clk-div.txt
->> @@ -0,0 +1,27 @@
->> +The CPU divider node serves as the sole clock for the CPU complex. It supports
->> +power-of-2 clock division, with a divider of "1" as the default highest-speed
->> +setting.
->> +
->> +Required properties:
->> +- compatible: shall be "brcm,brcmstb-cpu-clk-div"
->> +- reg: address and width of the divider configuration register
->> +- #clock-cells: shall be set to 0
->> +- clocks: phandle of clock provider which provides the source clock
->> +          (this would typically be a "fixed-clock" type PLL)
->> +- div-table: list of (raw_value,divider) ordered pairs that correspond to the
->> +             allowed clock divider settings
->> +- div-shift-width: least-significant bit position and width of divider value
->
-> Are these properties used? Please don't put these types of
-> details in DT.
+Stephen Warren <swarren@wwwdotorg.org> writes:
 
-Yeah, unfortunately they are. Luckily, I think the issue can be
-resolved quite easily, because the user of those properties isn't
-involved in this series.
-
-They are currently being used by a clock driver
-("drivers/clk/clk-brcmstb.c") that hasn't been upstreamed yet. I
-performed some code archeology. While I wasn't 100% successful in
-tracking down the origins of this interface, it looks like it was
-designed this way a while back (4+ years or so), probably before
-device tree best practices were developed or, at least, before they
-were widely known.
-
-So, what I can do is to remove the properties from the official
-binding. (I'll send an update to that effect shortly.) Once the
-binding is accepted upstream, we can work on fixing up the design of
-clk-brcmstb.c, so it doesn't rely on these properties anymore (and
-derives them from the compatible string instead), and then proceed to
-upstream that, as well.
-
-I don't think this approach would cause any conflicts or problems.
-
->> +
->> +Optional properties:
->> +- clock-names: the clock may be named
->> +
->> +Example:
->> +     cpuclkdiv: cpu-clk-div at f03e257c {
->> +             compatible = "brcm,brcmstb-cpu-clk-div";
->> +             reg = <0xf03e257c 0x4>;
->
-> This register really looks like some offset in something larger.
-> Is there some clock controller? What's the hw block at
-> 0xf03e2000? Maybe I already asked this.
-
-It looks this way, but in this case, looks are deceiving. The address
-and the length are really correct the way they are.
-
-This memory area holds a range of only loosely related configuration
-registers. It's called the Bus Interface Unit Register Set and deals
-with configuring the CPU in general. At address 0xf03e257c, there
-happens to be the clock divider register we need, and it's really just
-one register, i.e. 4 bytes.
-
->> +             div-table = <0x00 1>;
->> +             div-shift-width = <0 5>;
->> +             #clock-cells = <0>;
->> +             clocks = <&cpupll>;
->> +             clock-names = "cpupll";
->> +     };
+> On 01/31/2017 12:49 PM, Eric Anholt wrote:
+>> Stephen Warren <swarren@wwwdotorg.org> writes:
 >>
+>>> On 01/29/2017 01:08 PM, Baruch Siach wrote:
+>>>> Add bcm2836 (Raspberry Pi 2) and bcm2837 (Raspberry Pi 3).
+>>>
+>>>> -BROADCOM BCM2835 ARM ARCHITECTURE
+>>>> +BROADCOM BCM2835/BCM2836/BCM2837 ARM ARCHITECTURE
+>>> ...
+>>>>  T:	git git://git.kernel.org/pub/scm/linux/kernel/git/rpi/linux-rpi.git
+>>>
+>>> It would make sense to update that too, if Eric isn't using this.
+>>> However, that's a subject for a different patch perhaps.
+>>>
+>>> Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+>>
+>> Pulled this patch, sent a followup for the tree location.
+>>
+>> Thinking of MAINTAINERS, I was wondering if you and Lee were both still
+>> interested in being on the list?
 >
-> --
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+> To be honest, I was thinking about sending a patch to remove myself 
+> since you've been taking care of everything well and I've been too lazy 
+> to do anything RPi related recently.
+
+Sounds good.
+
+I've been mulling over a couple of ideas about bcm2835 maintainership of
+the tree since LCA: one is asking Florian if he'd like me to just be a
+co-maintainer with a limited role within the stblinux tree (bcm2835 is
+pretty low traffic, I don't see the need for a separate tree), and the
+other is picking up one of the more active current Pi developers as a
+co-maintainer within the current tree.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170201/a05e6cb6/attachment.sig>
