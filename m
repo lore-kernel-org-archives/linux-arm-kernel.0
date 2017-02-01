@@ -1,54 +1,78 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 1 Feb 2017 17:41:05 +0000
-Subject: [PATCH v4 2/4] arm64: Work around Falkor erratum 1003
-In-Reply-To: <20170201173609.GE26507@e104818-lin.cambridge.arm.com>
-References: <20170125155232.10277-1-cov@codeaurora.org>
- <20170125155232.10277-2-cov@codeaurora.org>
- <20170131123735.GD11191@leverpostej>
- <36478002-4cd8-7f1c-1a25-8bfe35022a47@codeaurora.org>
- <3cab36fb-984a-beae-64db-6ce830ba94f6@arm.com>
- <b4cf83d2-ae05-3362-bc23-2341d00516dc@codeaurora.org>
- <20170201163358.GG8177@arm.com>
- <20170201173609.GE26507@e104818-lin.cambridge.arm.com>
-Message-ID: <20170201174105.GK8177@arm.com>
+From: jintack@cs.columbia.edu (Jintack Lim)
+Date: Wed,  1 Feb 2017 12:43:00 -0500
+Subject: [RFC v3 00/10] Provide the EL1 physical timer to the VM
+Message-ID: <1485970990-13775-1-git-send-email-jintack@cs.columbia.edu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2017 at 05:36:09PM +0000, Catalin Marinas wrote:
-> On Wed, Feb 01, 2017 at 04:33:58PM +0000, Will Deacon wrote:
-> > On Wed, Feb 01, 2017 at 11:29:22AM -0500, Christopher Covington wrote:
-> > > On 01/31/2017 12:56 PM, Marc Zyngier wrote:
-> > > > Given that all ARMv8 CPUs can support SW_PAN, it is more likely to be
-> > > > enabled than the ARMv8.1 PAN. I'd vote for supporting the workaround in
-> > > > that case too, and hope that people do enable the HW version.
-> > > 
-> > > Okay, I'll do my best to add support for the SW PAN case. I rebased and
-> > > submitted v6 of the E1009 patch [1] so that it no longer depends on this
-> > > patch landing first, if you all are inclined to pick it up while work on
-> > > this E1003 patch continues.
-> > 
-> > The alternative is not enabling SW_PAN (at runtime) if this errata is
-> > present, along with a warning stating that hardware-PAN should be
-> > enabled in kconfig instead. Not sure what distributions will make of that
-> > though.
-> 
-> The problem with this patch is that when ARM64_SW_TTBR0_PAN is enabled
-> and in the absence of hardware PAN (or ARM64_PAN disabled),
-> cpu_do_switch_mm is no longer called for user process switching, so the
-> workaround is pretty much useless.
+The ARM architecture defines the EL1 physical timer and the virtual timer,
+and it is reasonable for an OS to expect to be able to access both.
+However, the current KVM implementation does not provide the EL1 physical
+timer to VMs but terminates VMs on access to the timer.
 
-Oh, I see what you mean now.
+This patch series enables VMs to use the EL1 physical timer through
+trap-and-emulate.  The KVM host emulates each EL1 physical timer register
+access and sets up the background timer accordingly.  When the background
+timer expires, the KVM host injects EL1 physical timer interrupts to the
+VM.  Alternatively, it's also possible to allow VMs to access the EL1
+physical timer without trapping.  However, this requires somehow using the
+EL2 physical timer for the Linux host while running the VM instead of the
+EL1 physical timer.  Right now I just implemented trap-and-emulate because
+this was straightforward to do, and I leave it to future work to determine
+if transferring the EL1 physical timer state to the EL2 timer provides any
+performance benefit.
 
-> I'm ok with adding the Kconfig dependency below to
-> QCOM_FALKOR_ERRATUM_1003:
-> 
-> 	depends on !ARM64_SW_TTBR0_PAN || ARM64_PAN
-> 
-> together with a run-time warning if ARM64_SW_TTBR0_PAN is being used.
+This feature will be useful for any OS that wishes to access the EL1
+physical timer. Nested virtualization is one of those use cases. A nested
+hypervisor running inside a VM would think it has full access to the
+hardware and naturally tries to use the EL1 physical timer as Linux would
+do. Other nested hypervisors may try to use the EL2 physical timer as Xen
+would do, but supporting the EL2 physical timer to the VM is out of scope
+of this patch series. This patch series will make it easy to add the EL2
+timer support in the future, though.
 
-That makes it look like hardware-PAN is the cause of the erratum. Maybe
-just select ARM64_PAN if the erratum workaround is selected, then
-runtime warning if we find that the h/w doesn't have PAN but does have
-the erratum (which should never fire)?
+Note that Linux VMs booting in EL1 will be unaffected by this patch series
+and will continue to use only the virtual timer and this patch series will
+therefore not introduce any performance degredation as a result of
+trap-and-emulate.
 
-Will
+v2 => v3:
+ - Rebase on kvmarm/queue
+ - Take kvm->lock to synchronize cntvoff across all vtimers
+ - Remove unnecessary function parameters
+ - Add comments
+
+v1 => v2:
+ - Rebase on kvm-arm-for-4.10-rc4
+ - To make it simple, schedule the background timer for the EL1 physical timer
+   emulation on every entry to the VM and cancel it on exit.
+ - Change timer_context structure to have cntvoff and restore enable field back
+   to arch_timer_cpu structure
+
+Jintack Lim (10):
+  KVM: arm/arm64: Abstract virtual timer context into separate structure
+  KVM: arm/arm64: Move cntvoff to each timer context
+  KVM: arm/arm64: Decouple kvm timer functions from virtual timer
+  KVM: arm/arm64: Add the EL1 physical timer context
+  KVM: arm/arm64: Initialize the emulated EL1 physical timer
+  KVM: arm/arm64: Update the physical timer interrupt level
+  KVM: arm/arm64: Set a background timer to the earliest timer
+    expiration
+  KVM: arm/arm64: Set up a background timer for the physical timer
+    emulation
+  KVM: arm64: Add the EL1 physical timer access handler
+  KVM: arm/arm64: Emulate the EL1 phys timer registers
+
+ arch/arm/include/asm/kvm_host.h   |   3 -
+ arch/arm/kvm/arm.c                |   4 +-
+ arch/arm/kvm/reset.c              |   9 +-
+ arch/arm64/include/asm/kvm_host.h |   3 -
+ arch/arm64/kvm/reset.c            |   9 +-
+ arch/arm64/kvm/sys_regs.c         |  65 +++++++++++++
+ include/kvm/arm_arch_timer.h      |  39 ++++----
+ virt/kvm/arm/arch_timer.c         | 193 ++++++++++++++++++++++++++------------
+ virt/kvm/arm/hyp/timer-sr.c       |  13 +--
+ 9 files changed, 242 insertions(+), 96 deletions(-)
+
+-- 
+1.9.1
