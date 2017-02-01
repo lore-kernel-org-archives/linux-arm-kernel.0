@@ -1,106 +1,104 @@
-From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Sun, 1 Jan 2017 11:53:37 +0530
-Subject: [PATCH] drivers: remoteproc: constify rproc_ops structures
-In-Reply-To: <20161231175416.GA21596@minitux>
-References: <1481974176-19912-1-git-send-email-bhumirks@gmail.com>
- <20161230120655.GB9118@builder>
- <CAOH+1jH=Y+1Nxe2L4d6OaC95dc-ORsuqsOYSNP5_8NYJVz-A4Q@mail.gmail.com>
- <20161231175416.GA21596@minitux>
-Message-ID: <CAOH+1jE5dPjUZPcTndOS8uqcqjJbAik-ew3L1Q3+X87PoHQtHg@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 1 Feb 2017 09:02:35 +0100
+Subject: [RFC v2 06/10] KVM: arm/arm64: Update the physical timer
+ interrupt level
+In-Reply-To: <772a1d9b-4410-7bf5-d36b-19d49d261506@arm.com>
+References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
+ <1485479100-4966-7-git-send-email-jintack@cs.columbia.edu>
+ <86sho199jx.fsf@arm.com> <20170130150203.GD16459@cbox>
+ <b3a4a3e4-65d4-1af3-2b77-14b7fffd9d06@arm.com>
+ <20170130184131.GE16459@cbox>
+ <13152c8e-2256-4224-e15c-73c8d6ce06e4@arm.com>
+ <20170130190654.GG16459@cbox>
+ <772a1d9b-4410-7bf5-d36b-19d49d261506@arm.com>
+Message-ID: <20170201080235.GA6226@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 31, 2016 at 11:24 PM, Bjorn Andersson
-<bjorn.andersson@linaro.org> wrote:
-> On Sat 31 Dec 02:43 PST 2016, Bhumika Goyal wrote:
->
->> On Fri, Dec 30, 2016 at 5:36 PM, Bjorn Andersson
->> <bjorn.andersson@linaro.org> wrote:
->> > On Sat 17 Dec 03:29 PST 2016, Bhumika Goyal wrote:
->> >
->> >> Declare rproc_ops structures as const as they are only passed as an
->> >> argument to the function rproc_alloc. This argument is of type const, so
->> >> rproc_ops structures having this property can be declared const too.
->> >> Done using Coccinelle:
->> >>
->> >> @r1 disable optional_qualifier @
->> >> identifier i;
->> >> position p;
->> >> @@
->> >> static struct rproc_ops i at p = {...};
->> >>
->> >> @ok1@
->> >> identifier r1.i;
->> >> position p;
->> >> @@
->> >> rproc_alloc(...,&i at p,...)
->> >>
->> >> @bad@
->> >> position p!={r1.p,ok1.p};
->> >> identifier r1.i;
->> >> @@
->> >> i at p
->> >>
->> >> @depends on !bad disable optional_qualifier@
->> >> identifier r1.i;
->> >> @@
->> >> +const
->> >> struct rproc_ops i;
->> >>
->> >> File sizes before:
->> >>    text          data     bss     dec     hex filename
->> >>    1258           416       0    1674     68a remoteproc/omap_remoteproc.o
->> >>    2402           240       0    2642     a52 remoteproc/st_remoteproc.o
->> >>    2064           272       0    2336     920 remoteproc/st_slim_rproc.o
->> >>    2160           240       0    2400     960 remoteproc/wkup_m3_rproc.o
->> >>
->> >> File sizes after:
->> >>    text          data     bss     dec     hex filename
->> >>    1297           368       0    1665     681 remoteproc/omap_remoteproc.o
->> >>    2434           192       0    2626     a42 remoteproc/st_remoteproc.o
->> >>    2112           240       0    2352     930 remoteproc/st_slim_rproc.o
->> >>    2200           192       0    2392     958 remoteproc/wkup_m3_rproc.o
->> >>
->> >> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
->> >
->> > Thanks Bhumika, this looks good.
->> >
->> > But as Suman already asked. Is there any reason why da8xx_remoteproc.c
->> > did not get updated? It looks like the same change would apply there.
->> >
->> >
->>
->> The reason I did not sent a patch for that driver is because the .o
->> file is not obtained. This is output I get when I try to compile the
->> da8xx_remoteproc.o file.
->>
->> drivers/remoteproc/da8xx_remoteproc.c:22:72: fatal error:
->> mach/clock.h: No such file or directory
->>  #include <mach/clock.h>   /* for davinci_clk_reset_assert/deassert() */
->>                                                                         ^
->> compilation terminated.
->> make[1]: *** [drivers/remoteproc/da8xx_remoteproc.o] Error 1
->> make: *** [drivers/remoteproc/da8xx_remoteproc.o] Error 2
->>
->> I also tried running the commands  make.cross ARCH=arm allyesconfig;
->> make.cross ARCH=arm drivers/remoteproc/da8xx_remoteproc.o but still
->> the error remains the same.
->>
->> Could you please suggest me what to do in this case?
->>
->
-> By using davinci_all_defconfig and then selecting
-> CONFIG_DA8XX_REMOTEPROC I managed to compile it, not sure what differs.
->
+On Tue, Jan 31, 2017 at 05:00:03PM +0000, Marc Zyngier wrote:
+> On 30/01/17 19:06, Christoffer Dall wrote:
+> > On Mon, Jan 30, 2017 at 06:48:02PM +0000, Marc Zyngier wrote:
+> >> On 30/01/17 18:41, Christoffer Dall wrote:
+> >>> On Mon, Jan 30, 2017 at 05:50:03PM +0000, Marc Zyngier wrote:
+> >>>> On 30/01/17 15:02, Christoffer Dall wrote:
+> >>>>> On Sun, Jan 29, 2017 at 03:21:06PM +0000, Marc Zyngier wrote:
+> >>>>>> On Fri, Jan 27 2017 at 01:04:56 AM, Jintack Lim <jintack@cs.columbia.edu> wrote:
+> >>>>>>> Now that we maintain the EL1 physical timer register states of VMs,
+> >>>>>>> update the physical timer interrupt level along with the virtual one.
+> >>>>>>>
+> >>>>>>> Note that the emulated EL1 physical timer is not mapped to any hardware
+> >>>>>>> timer, so we call a proper vgic function.
+> >>>>>>>
+> >>>>>>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+> >>>>>>> ---
+> >>>>>>>  virt/kvm/arm/arch_timer.c | 20 ++++++++++++++++++++
+> >>>>>>>  1 file changed, 20 insertions(+)
+> >>>>>>>
+> >>>>>>> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> >>>>>>> index 0f6e935..3b6bd50 100644
+> >>>>>>> --- a/virt/kvm/arm/arch_timer.c
+> >>>>>>> +++ b/virt/kvm/arm/arch_timer.c
+> >>>>>>> @@ -180,6 +180,21 @@ static void kvm_timer_update_mapped_irq(struct kvm_vcpu *vcpu, bool new_level,
+> >>>>>>>  	WARN_ON(ret);
+> >>>>>>>  }
+> >>>>>>>  
+> >>>>>>> +static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
+> >>>>>>> +				 struct arch_timer_context *timer)
+> >>>>>>> +{
+> >>>>>>> +	int ret;
+> >>>>>>> +
+> >>>>>>> +	BUG_ON(!vgic_initialized(vcpu->kvm));
+> >>>>>>
+> >>>>>> Although I've added my fair share of BUG_ON() in the code base, I've
+> >>>>>> since reconsidered my position. If we get in a situation where the vgic
+> >>>>>> is not initialized, maybe it would be better to just WARN_ON and return
+> >>>>>> early rather than killing the whole box. Thoughts?
+> >>>>>>
+> >>>>>
+> >>>>> The distinction to me is whether this will cause fatal crashes or
+> >>>>> exploits down the road if we're working on uninitialized data.  If all
+> >>>>> that can happen if the vgic is not initialized, is that the guest
+> >>>>> doesn't see interrupts, for example, then a WARN_ON is appropriate.
+> >>>>>
+> >>>>> Which is the case here?
+> >>>>>
+> >>>>> That being said, do we need this at all?  This is in the critial path
+> >>>>> and is actually measurable (I know this from my work on the other timer
+> >>>>> series), so it's better to get rid of it if we can.  Can we simply
+> >>>>> convince ourselves this will never happen, and is the code ever likely
+> >>>>> to change so that it gets called with the vgic disabled later?
+> >>>>
+> >>>> That'd be the best course of action. I remember us reworking some of
+> >>>> that in the now defunct vgic-less series. Maybe we could salvage that
+> >>>> code, if only for the time we spent on it...
+> >>>>
+> >>> Ah, we never merged it?  Were we waiting on a userspace implementation
+> >>> or agreement on the ABI?
+> >>
+> >> We were waiting on the userspace side to be respun against the latest
+> >> API, and there were some comments from Peter (IIRC) about supporting
+> >> PPIs in general (the other timers and the PMU, for example).
+> >>
+> >> None of that happened, as the most vocal proponent of the series
+> >> apparently lost interest.
+> >>
+> >>> There was definitely a useful cleanup with the whole enabled flag thing
+> >>> on the timer I remember.
+> >>
+> >> Indeed. We should at least try to resurrect that bit.
+> >>
+> > 
+> > It's probably worth it trying to resurrect the whole thing I think,
+> > especially since I think the implementation ended up looking quite nice.
+> 
+> Indeed. My only concern is about the userspace counterpart, which hasn't
+> materialized when expected. Hopefully it will this time around!
+> 
+> > I can add a rebase of that to my list of never-ending timer rework.
+> 
+> We all know that you can do that while sleeping! ;-)
+> 
 
-Yes, it compiled. Thanks for the input. Now I will include this driver
-as well and send a v2.
+Haha, maybe that will finally make the code right.
 
-Thanks,
-Bhumika
-
-> If you can't get it working please include the da8xx_remoteproc change
-> as well and just note that you didn't manage to test it.
->
-> Regards,
-> Bjorn
+-Christoffer
