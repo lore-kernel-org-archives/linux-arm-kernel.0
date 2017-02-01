@@ -1,96 +1,125 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 1 Feb 2017 15:26:09 +0000
-Subject: [PATCH v31 03/12] arm64: kdump: reserve memory for crash dump
- kernel
-In-Reply-To: <20170201124630.6016-2-takahiro.akashi@linaro.org>
-References: <20170201124218.5823-1-takahiro.akashi@linaro.org>
- <20170201124630.6016-2-takahiro.akashi@linaro.org>
-Message-ID: <20170201152609.GE4756@leverpostej>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 1 Feb 2017 15:27:32 +0000
+Subject: [PATCH 2/2] arm64/dma-mapping: validate dma_masks against IORT
+ defined limits
+In-Reply-To: <20170201143617.GB20423@red-moon>
+References: <1485893763-20671-1-git-send-email-nwatters@codeaurora.org>
+ <1485893763-20671-2-git-send-email-nwatters@codeaurora.org>
+ <115903ce-6c1d-faa9-cbe4-e67a3d41f5c9@arm.com>
+ <20170201143617.GB20423@red-moon>
+Message-ID: <f8eb99ca-bb5d-105e-19ac-73e7d4e75ec6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 01/02/17 14:36, Lorenzo Pieralisi wrote:
+> On Wed, Feb 01, 2017 at 01:44:02PM +0000, Robin Murphy wrote:
+>> Hi Nate,
+>>
+>> On 31/01/17 20:16, Nate Watterson wrote:
+>>> Some drivers set the dma_mask of client devices based solely on values
+>>> read from capability registers which may not account for platform
+>>> specific bus address width limitations. Fortunately, the ACPI IORT table
+>>> provides a way to report the effective number of address bits a device
+>>> can use to access memory. This information, when present, is used to
+>>> supplement the checks already being done in dma_supported() to avoid
+>>> setting overly generous dma_masks.
+>>
+>> This is equally a problem for DT, and I think in general we'd prefer not
+>> to be dragging ACPI/DT specifics in at this level when there's a clean
+>> way to address it more generally. There is some recent ongoing
+>> discussion and work in this area (latest part at [1]) - I have a local
+>> branch somewhere implementing the stricter "don't special case default
+>> masks" version (after I came around to Arnd's viewpoint), which I must
+>> refresh myself on because there was some anomaly in the core DT code
+>> which that brought to light.
+> 
+> Agreed. I can prototype the ACPI version by using the _DMA object in the
+> ACPI specs instead of IORT specific bindings (what to do for named
+> components has to be seen given that _DMA object and IORT bindings can
+> provide different information - though _DMA object usage at least on x86
+> seems non-existent, whether we should use it or not on ARM is still a
+> question mark). Anyway, the IORT parsing code in patch 1 is simple, we
+> have to decide how to handle the information retrieved. I will have a
+> look at [1] let me know if you need help prototyping and testing it with
+> ACPI.
 
-On Wed, Feb 01, 2017 at 09:46:22PM +0900, AKASHI Takahiro wrote:
-> +#ifdef CONFIG_KEXEC_CORE
-> +/*
-> + * reserve_crashkernel() - reserves memory for crash kernel
-> + *
-> + * This function reserves memory area given in "crashkernel=" kernel command
-> + * line parameter. The memory reserved is used by dump capture kernel when
-> + * primary kernel is crashing.
-> + */
-> +static void __init reserve_crashkernel(void)
-> +{
-> +	unsigned long long crash_base, crash_size;
-> +	int ret;
-> +
-> +	ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
-> +				&crash_size, &crash_base);
-> +	/* no crashkernel= or invalid value specified */
-> +	if (ret || !crash_size)
-> +		return;
-> +
-> +	crash_size = PAGE_ALIGN(crash_size);
-> +
-> +	if (crash_base == 0) {
-> +		/* Current arm64 boot protocol requires 2MB alignment */
-> +		crash_base = memblock_find_in_range(0, ARCH_LOW_ADDRESS_LIMIT,
-> +				crash_size, SZ_2M);
-> +		if (crash_base == 0) {
-> +			pr_warn("Unable to allocate crashkernel (size:%llx)\n",
-> +				crash_size);
+Essentially, all that needs to be done is to ensure that the initial
+masks set by acpi_dma_configure() truly reflect the maximum hardware
+capability; everything else will then just fall out of that. The
+aforementioned thing on the DT side is that of_dma_configure() currently
+has a bug which prevents masks larger than 32 bits actually being
+assigned from "dma-ranges" - I need to split out a proper patch from the
+"git commit -am 'hacks'" that I have on this local branch :)
 
-Nit: can we please make that "size: 0x%llx", so that it's always clearly
-a hex number? e.g.
+Robin.
 
-	pr_warn("cannot allocate 0x%llx bytes for crashkernel\n",
-		crash_size);
-
-> +			return;
-> +		}
-> +	} else {
-> +		/* User specifies base address explicitly. */
-> +		if (!memblock_is_region_memory(crash_base, crash_size) ||
-> +			memblock_is_region_reserved(crash_base, crash_size)) {
-> +			pr_warn("crashkernel has wrong address or size\n");
-> +			return;
-> +		}
-
-To better report the error, can we please split these up:
-
-		if (!memblock_is_region_memory(crash_base, crash_size)) {
-			pr_warn("cannot reserve crashkernel: region is not memory\n");
-			return;
-		}
-
-		if (!memblock_is_region_memory(crash_base, crash_size)) {
-			pr_warn("cannot reserve crashkernel: region overlaps reserved memory\n");
-			return;
-		}
-
-> +		if (!IS_ALIGNED(crash_base, SZ_2M)) {
-> +			pr_warn("crashkernel base address is not 2MB aligned\n");
-> +			return;
-> +		}
-> +	}
-> +	memblock_reserve(crash_base, crash_size);
-> +
-> +	pr_info("Reserving %lldMB of memory at %lldMB for crashkernel\n",
-> +		crash_size >> 20, crash_base >> 20);
-
-We only page-align the size, so the MB will be a little off, but that's
-probably OK. However, it would also be nicer to log the base as an
-address.
-
-Could we dump this as we do for the kernel memory layout? e.g.
-
-	pr_info("crashkernel reserved: 0x%016lx - 0x%016lx (%lld MB)\n",
-		crash_base, crash_base + crash_size, crash_size >> 20);
-
-With those:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
+> 
+> Lorenzo
+> 
+>>> Signed-off-by: Nate Watterson <nwatters@codeaurora.org>
+>>> ---
+>>>  arch/arm64/mm/dma-mapping.c | 20 +++++++++++++++++++-
+>>>  1 file changed, 19 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+>>> index e040827..467fd23 100644
+>>> --- a/arch/arm64/mm/dma-mapping.c
+>>> +++ b/arch/arm64/mm/dma-mapping.c
+>>> @@ -19,6 +19,7 @@
+>>>  
+>>>  #include <linux/gfp.h>
+>>>  #include <linux/acpi.h>
+>>> +#include <linux/acpi_iort.h>
+>>>  #include <linux/bootmem.h>
+>>>  #include <linux/cache.h>
+>>>  #include <linux/export.h>
+>>> @@ -347,6 +348,12 @@ static int __swiotlb_get_sgtable(struct device *dev, struct sg_table *sgt,
+>>>  
+>>>  static int __swiotlb_dma_supported(struct device *hwdev, u64 mask)
+>>>  {
+>>> +	int dma_limit;
+>>> +
+>>> +	dma_limit = iort_get_memory_address_limit(hwdev);
+>>> +	if (dma_limit >= 0 && DMA_BIT_MASK(dma_limit) < mask)
+>>> +		return 0;
+>>> +
+>>>  	if (swiotlb)
+>>>  		return swiotlb_dma_supported(hwdev, mask);
+>>>  	return 1;
+>>> @@ -784,6 +791,17 @@ static void __iommu_unmap_sg_attrs(struct device *dev,
+>>>  	iommu_dma_unmap_sg(dev, sgl, nelems, dir, attrs);
+>>>  }
+>>>  
+>>> +static int __iommu_dma_supported(struct device *hwdev, u64 mask)
+>>> +{
+>>> +	int dma_limit;
+>>> +
+>>> +	dma_limit = iort_get_memory_address_limit(hwdev);
+>>> +	if (dma_limit >= 0 && DMA_BIT_MASK(dma_limit) < mask)
+>>> +		return 0;
+>>> +
+>>> +	return iommu_dma_supported(hwdev, mask);
+>>
+>> Either way, this reminds me that iommu_dma_supported() is another thing
+>> I got completely wrong - time to write yet another patch...
+>>
+>> Robin.
+>>
+>> [1]:http://www.mail-archive.com/linux-renesas-soc at vger.kernel.org/msg10637.html
+>>
+>>> +}
+>>> +
+>>>  static struct dma_map_ops iommu_dma_ops = {
+>>>  	.alloc = __iommu_alloc_attrs,
+>>>  	.free = __iommu_free_attrs,
+>>> @@ -799,7 +817,7 @@ static void __iommu_unmap_sg_attrs(struct device *dev,
+>>>  	.sync_sg_for_device = __iommu_sync_sg_for_device,
+>>>  	.map_resource = iommu_dma_map_resource,
+>>>  	.unmap_resource = iommu_dma_unmap_resource,
+>>> -	.dma_supported = iommu_dma_supported,
+>>> +	.dma_supported = __iommu_dma_supported,
+>>>  	.mapping_error = iommu_dma_mapping_error,
+>>>  };
+>>>  
+>>>
+>>
