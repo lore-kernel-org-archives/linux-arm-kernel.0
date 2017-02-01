@@ -1,88 +1,87 @@
-From: peter.senna@collabora.co.uk (Peter Senna Tschudin)
-Date: Wed, 01 Feb 2017 12:21:01 +0000
-Subject: =?utf-8?q?Re=3A?==?utf-8?q?_=5BPATCH?= V7 =?utf-8?q?3=2F4=5D?=
- =?utf-8?q?_drm=2Fbridge=3A?= Add driver for GE B850v3
- =?utf-8?q?LVDS=2FDP++?= Bridge
-In-Reply-To: <20170201113536.dig22kidlw6mjoz5@phenom.ffwll.local>
-Message-ID: <2955-5891d280-1-64686980@191354544>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed,  1 Feb 2017 12:25:57 +0000
+Subject: [PATCH] virtio: Try to untangle DMA coherency
+Message-ID: <8a6494f6409c20b4609cd6bdcdd751f68b5c0564.1485951731.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
-On 01 February, 2017 12:35 CET, Daniel Vetter <daniel@ffwll.ch> wrote: 
- 
-> On Wed, Feb 01, 2017 at 10:58:43AM +0000, Peter Senna Tschudin wrote:
-> > Hi Archit,
-> > 
-> > On 01 February, 2017 10:44 CET, Archit Taneja <architt@codeaurora.org> wrote:
-> > 
-> > >
-> > >
-> > > On 01/30/2017 10:35 PM, Jani Nikula wrote:
-> > > > On Sat, 28 Jan 2017, Peter Senna Tschudin <peter.senna@collabora.com> wrote:
-> > > >> On Thu, Jan 05, 2017 at 01:18:47PM +0530, Archit Taneja wrote:
-> > > >> Hi Archit,
-> > > >>
-> > > >> Thank you for the comments!
-> > > >>
-> > > >> [...]
-> > > >>>> +	total_size = (block[EDID_EXT_BLOCK_CNT] + 1) * EDID_LENGTH;
-> > > >>>> +	if (total_size > EDID_LENGTH) {
-> > > >>>> +		kfree(block);
-> > > >>>> +		block = kmalloc(total_size, GFP_KERNEL);
-> > > >>>> +		if (!block)
-> > > >>>> +			return NULL;
-> > > >>>> +
-> > > >>>> +		/* Yes, read the entire buffer, and do not skip the first
-> > > >>>> +		 * EDID_LENGTH bytes.
-> > > >>>> +		 */
-> > > >>>
-> > > >>> Is this the reason why you aren't using drm_do_get_edid()?
-> > 
-> > > >>
-> > > >> Yes, for some hw specific reason, it is necessary to read the entire
-> > > >> EDID buffer starting from 0, not block by block.
-> > > >
-> > > > Hrmh, I'm planning on moving the edid override and firmware edid
-> > > > mechanisms at the drm_do_get_edid() level to be able to truly and
-> > > > transparently use a different edid. Currently, they're only used for
-> > > > modes, really, and lead to some info retrieved from overrides, some from
-> > > > the real edid. This kind of hacks will bypass the override/firmware edid
-> > > > mechanisms then too. :(
-> > >
-> > > It seems like there is a HW issue which prevents them from reading EDID
-> > > from an offset. So, I'm not sure if it is a hack or a HW limitation.
-> > 
-> > >
-> > > One way around this would be to hide the HW requirement in the
-> > > get_edid_block func pointer passed to drm_do_get_edid(). This
-> > > would, however, result in more i2c reads (equal to # of extension
-> > > blocks) than what the patch currently does.
-> > >
-> > > Peter, if you think doing extra EDID reads isn't too costly on your
-> > > platform, you could consider using drm_do_get_edid(). If not, I guess
-> > > you'll miss out on the additional functionality Jani is going to add
-> > 
-> > > in the future.
-> > 
-> > My concern is that for almost one year now, every time I fix something
-> > one or two new requests are made. I'm happy to fix the driver, but I
-> > want a list of the changes that are required to get it upstream, before
-> > I make more changes. Can we agree on exactly what is preventing this
-> > driver to get upstream? Then I'll fix it.
-> 
-> I think addressing this edid reading question post-merge is perfectly
-> fine. Aside, want to keep maintaing your stuff as part of the drm-misc
-> group, with the drivers-in-misc experiment?
+By forcing on DMA API usage for ARM systems, we have inadvertently
+kicked open a hornets' nest in terms of cache-coherency. Namely that
+unless the virtio device is explicitly described as capable of coherent
+DMA by firmware, the DMA APIs on ARM and other DT-based platforms will
+assume it is non-coherent. This turns out to cause a big problem for the
+likes of QEMU and kvmtool, which generate virtio-mmio devices in their
+guest DTs but neglect to add the often-overlooked "dma-coherent"
+property; as a result, we end up with the guest making non-cacheable
+accesses to the vring, the host doing so cacheably, both talking past
+each other and things going horribly wrong.
 
-Yes, sure!
+To prevent regressing those existing use cases relying on implicit
+coherency, but still fixing the original problem of (coherent PCI)
+legacy devices behind IOMMUs, take the more conservative approach of
+only hitting the DMA API switch for coherent devices, where we can be
+sure it is safe, and preserving the old non-DMA behaviour otherwise.
+This does not affect devices setting the VIRTIO_F_IOMMU_PLATFORM flag,
+which as before are still at the mercy of architecture code correctly
+knowing their coherency, so explicitly call this out in the virtio-mmio
+DT binding in the hope of heading off any further workarounds for future
+firmware mishaps.
 
-> -Daniel
-> -- 
-> Daniel Vetter
-> Software Engineer, Intel Corporation
-> http://blog.ffwll.ch
+Fixes: c7070619f340 ("vring: Force use of DMA API for ARM-based systems with legacy devices")
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+ Documentation/devicetree/bindings/virtio/mmio.txt |  3 +++
+ drivers/virtio/virtio_ring.c                      | 11 ++++++++---
+ 2 files changed, 11 insertions(+), 3 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/virtio/mmio.txt b/Documentation/devicetree/bindings/virtio/mmio.txt
+index 5069c1b8e193..8f2a981e1010 100644
+--- a/Documentation/devicetree/bindings/virtio/mmio.txt
++++ b/Documentation/devicetree/bindings/virtio/mmio.txt
+@@ -7,6 +7,8 @@ Required properties:
+ - compatible:	"virtio,mmio" compatibility string
+ - reg:		control registers base address and size including configuration space
+ - interrupts:	interrupt generated by the device
++- dma-coherent:	required if the device (or host emulation) accesses memory
++		cache-coherently, absent otherwise
  
+ Example:
  
+@@ -14,4 +16,5 @@ Example:
+ 		compatible = "virtio,mmio";
+ 		reg = <0x3000 0x100>;
+ 		interrupts = <41>;
++		dma-coherent;
+ 	}
+diff --git a/drivers/virtio/virtio_ring.c b/drivers/virtio/virtio_ring.c
+index 7e38ed79c3fc..961af25b385c 100644
+--- a/drivers/virtio/virtio_ring.c
++++ b/drivers/virtio/virtio_ring.c
+@@ -20,6 +20,7 @@
+ #include <linux/virtio_ring.h>
+ #include <linux/virtio_config.h>
+ #include <linux/device.h>
++#include <linux/property.h>
+ #include <linux/slab.h>
+ #include <linux/module.h>
+ #include <linux/hrtimer.h>
+@@ -160,10 +161,14 @@ static bool vring_use_dma_api(struct virtio_device *vdev)
+ 		return true;
  
+ 	/*
+-	 * On ARM-based machines, the DMA ops will do the right thing,
+-	 * so always use them with legacy devices.
++	 * On ARM-based machines, the coherent DMA ops will do the right
++	 * thing, so always use them with legacy devices. However, using
++	 * non-coherent DMA when the host *is* actually coherent, but has
++	 * forgotten to tell us, is going to break badly; since this situation
++	 * already exists in the wild, maintain the old behaviour there.
+ 	 */
+-	if (IS_ENABLED(CONFIG_ARM) || IS_ENABLED(CONFIG_ARM64))
++	if ((IS_ENABLED(CONFIG_ARM) || IS_ENABLED(CONFIG_ARM64)) &&
++	    device_get_dma_attr(&vdev->dev) == DEV_DMA_COHERENT)
+ 		return !virtio_has_feature(vdev, VIRTIO_F_VERSION_1);
  
+ 	return false;
+-- 
+2.11.0.dirty
