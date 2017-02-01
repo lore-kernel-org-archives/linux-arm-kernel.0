@@ -1,62 +1,41 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Wed, 1 Feb 2017 18:08:10 +0100
-Subject: [PATCH] usb: gadget: udc: atmel: fix debug output
-In-Reply-To: <20170201170052.pvltw6punq6ncmwr@piout.net>
-References: <20170201164218.2421617-1-arnd@arndb.de>
- <20170201170052.pvltw6punq6ncmwr@piout.net>
-Message-ID: <38aae02a-1092-0af3-7fc8-6c7a7e3cd394@microchip.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 1 Feb 2017 17:08:52 +0000
+Subject: [PATCH v4 3/4] arm64: Use __tlbi() macros in KVM code
+In-Reply-To: <87lgtprgi4.fsf@e105922-lin.cambridge.arm.com>
+References: <20170125155232.10277-1-cov@codeaurora.org>
+ <20170125155232.10277-3-cov@codeaurora.org>
+ <20170125193943.GW15850@cbox> <20170127135306.GK21144@arm.com>
+ <87lgtprgi4.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <20170201170852.GI8177@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 01/02/2017 ? 18:00, Alexandre Belloni a ?crit :
-> On 01/02/2017 at 17:41:55 +0100, Arnd Bergmann wrote:
->> The debug output now contains the wrong variable, as seen from the compiler
->> warning:
->>
->> drivers/usb/gadget/udc/atmel_usba_udc.c: In function 'usba_ep_enable':
->> drivers/usb/gadget/udc/atmel_usba_udc.c:632:550: error: 'ept_cfg' may be used uninitialized in this function [-Werror=maybe-uninitialized]
->>   DBG(DBG_ERR, "%s: EPT_CFG = 0x%lx (maxpacket = %lu)\n",
->>
->> This changes the debug output the same way as the other code.
->>
->> Fixes: 741d2558bf0a ("usb: gadget: udc: atmel: Update endpoint allocation scheme")
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-
+On Wed, Feb 01, 2017 at 05:02:43PM +0000, Punit Agrawal wrote:
+> Will Deacon <will.deacon@arm.com> writes:
 > 
->> ---
->>  drivers/usb/gadget/udc/atmel_usba_udc.c | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
->> index 11bbce28bc23..2035906b8ced 100644
->> --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
->> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
->> @@ -610,7 +610,7 @@ usba_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
->>  {
->>  	struct usba_ep *ep = to_usba_ep(_ep);
->>  	struct usba_udc *udc = ep->udc;
->> -	unsigned long flags, ept_cfg, maxpacket;
->> +	unsigned long flags, maxpacket;
->>  	unsigned int nr_trans;
->>  
->>  	DBG(DBG_GADGET, "%s: ep_enable: desc=%p\n", ep->ep.name, desc);
->> @@ -630,7 +630,7 @@ usba_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
->>  	ep->is_in = 0;
->>  
->>  	DBG(DBG_ERR, "%s: EPT_CFG = 0x%lx (maxpacket = %lu)\n",
->> -			ep->ep.name, ept_cfg, maxpacket);
->> +			ep->ep.name, ep->ept_cfg, maxpacket);
->>  
->>  	if (usb_endpoint_dir_in(desc)) {
->>  		ep->is_in = 1;
->> -- 
->> 2.9.0
->>
+> > On Wed, Jan 25, 2017 at 08:39:43PM +0100, Christoffer Dall wrote:
+> >> On Wed, Jan 25, 2017 at 10:52:31AM -0500, Christopher Covington wrote:
+> >> > Refactor the KVM code to use the __tlbi macros, which will allow an errata
+> >> > workaround that repeats tlbi dsb sequences to only change one location.
+> >> > This is not intended to change the generated assembly and comparing before
+> >> > and after vmlinux objdump shows no functional changes.
+> >> > 
+> >> > Signed-off-by: Christopher Covington <cov@codeaurora.org>
+> >> 
+> >> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> >
+> > Thanks, I'll queue this one via arm64.
 > 
+> I just noticed this patch but there's been a similar patch from Mark
+> that I've been carrying as part of the KVM TLB monitoring series[0].
+> 
+> [0] http://www.mail-archive.com/kvmarm at lists.cs.columbia.edu/msg09359.html
 
+Well I've already queued the one from Christopher. It's weird that Mark's
+version appears to miss the local VMID case (but it does have the
+flush_icache_all I wanted :).
 
--- 
-Nicolas Ferre
+Anyway, I'm not reverting anything, so you'll need to rebase when this
+lot lands in mainline.
+
+Will
