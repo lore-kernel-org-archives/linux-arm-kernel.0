@@ -1,44 +1,35 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 1 Feb 2017 20:13:39 +0900
-Subject: [PATCH v2] ARM: dts: r8a7791: link DU to VSPDs
-In-Reply-To: <4ae454ad-296c-dec9-27e9-fd050333737f@cogentembedded.com>
-References: <1529351.Fac5N2tKoF@wasted.cogentembedded.com>
- <2492577.tBEnW0tCHD@wasted.cogentembedded.com>
- <4ae454ad-296c-dec9-27e9-fd050333737f@cogentembedded.com>
-Message-ID: <CANqRtoSQTa0fHJSwAHbN3hXSZ=m1kuR2GsUWE5ojN5AN-9i6Bw@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 1 Feb 2017 11:14:15 +0000
+Subject: [alsa-devel] [PATCH v1] ASoC: bcm2835: Remove redundant channel
+ checking code in hw_params
+In-Reply-To: <d91986b0-4deb-6d2a-6000-34b4072baed2@flatmax.org>
+References: <1484443043-13623-1-git-send-email-flatmax@flatmax.org>
+ <1485924303-30869-1-git-send-email-flatmax@flatmax.org>
+ <20170201105329.vr4ro5bjf676dwtk@sirena.org.uk>
+ <d91986b0-4deb-6d2a-6000-34b4072baed2@flatmax.org>
+Message-ID: <20170201111415.hdk432uddm3t3w4d@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On Wed, Feb 01, 2017 at 10:05:18PM +1100, Matt Flax wrote:
+> On 01/02/17 21:53, Mark Brown wrote:
 
-On Fri, Jan 27, 2017 at 3:42 AM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> On 01/26/2017 12:42 AM, Sergei Shtylyov wrote:
->
->> Add the "vsps" property to the DU device node in order to link this node
->> to
->> the VSPD nodes.
->>
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>
->> ---
->> Changes in version 2:
->> - rebased the patch.
->>
->> This patch is against the 'renesas-devel-20170125-v4.10-rc5' of Simon
->> Horman's
->> 'renesas.git' repo.  It's  only meaningful if the DRM driver patches I've
->> just
->> posted are applied.
->
->
->    Forgot to note that without this patch the DU driver fails to link to
-> VSPD and probe correctly, so there's no video signal. So it makes sense to
-> apply before the DU driver patch (once it's ACKed for merge)...
+> > If those cards add support for higher channel counts they should be
+> > adding real support for that in the driver, not just hacking out
+> > defensive code.  If the device can usefully do 8 channels then modify
+> > the driver to do 8 channels.  Otherwise people are going to need to
+> > modify the driver anyway to remove the limits in the constraints.
 
-Doesn't that translate to breaking the DT ABI? Is there someway we can
-avoid doing that?
+> Indeed the AudioInjector Octo sound card is currently operating @ 8 channels
+> out on the bcm2835 silicon. It has been tested on both the Pi 2 and Pi 3.
 
-Thanks,
+> Do you mean that I should increase bcm2835_i2s_dai.channels_max to 8 ?
 
-/ magnus
+Yes, implementing it properly is fine.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170201/2603fd0d/attachment.sig>
