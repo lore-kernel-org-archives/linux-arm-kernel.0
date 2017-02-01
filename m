@@ -1,62 +1,75 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 01 Feb 2017 10:43:12 +0100
-Subject: [PATCH v6 4/5] ARM: dts: rockchip: add timer entries to rk3188 SoC
-In-Reply-To: <1485866596-32254-5-git-send-email-al.kochet@gmail.com>
-References: <1485866596-32254-1-git-send-email-al.kochet@gmail.com>
- <1485866596-32254-5-git-send-email-al.kochet@gmail.com>
-Message-ID: <1522448.qizf3bPadS@phil>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 1 Feb 2017 09:43:15 +0000
+Subject: [PATCH] crypto: arm64/crc32 - detect crc32 support in assembler
+In-Reply-To: <CAKv+Gu_LcU3mSSMdrjks02ZuhHLhkYqNuZGOcTp1AmS8cpzCDg@mail.gmail.com>
+References: <20170127104039.29351-1-mbrugger@suse.com>
+ <CAKv+Gu8P3U6_u7FdRFSdDL9jdKaJQuqHbrQ-7Qu900f8R1voZw@mail.gmail.com>
+ <20170127105244.GF21144@arm.com>
+ <CAKv+Gu_LcU3mSSMdrjks02ZuhHLhkYqNuZGOcTp1AmS8cpzCDg@mail.gmail.com>
+Message-ID: <CAKv+Gu9gPAb-AMdbK32dXciX1mgh1sqSrxMAjB-ZGw7uAk2r2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 31. Januar 2017, 15:43:15 CET schrieb Alexander Kochetkov:
-> The patch add two timers to all rk3188 based boards.
-> 
-> The first timer is from alive subsystem and it act as a backup
-> for the local timers at sleep time. It act the same as other
-> SoC rockchip timers already present in kernel.
-> 
-> The second timer is from CPU subsystem and act as replacement
-> for the arm-global-timer clocksource and sched clock. It run
-> at stable frequency 24MHz.
-> 
-> Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
-> ---
->  arch/arm/boot/dts/rk3188.dtsi |   16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
-> index 31f81b2..0dc52fe 100644
-> --- a/arch/arm/boot/dts/rk3188.dtsi
-> +++ b/arch/arm/boot/dts/rk3188.dtsi
-> @@ -106,6 +106,22 @@
->  		};
->  	};
-> 
-> +	timer3: timer at 2000e000 {
-> +		compatible = "rockchip,rk3188-timer", "rockchip,rk3288-timer";
-> +		reg = <0x2000e000 0x20>;
-> +		interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&cru SCLK_TIMER3>, <&cru PCLK_TIMER3>;
-> +		clock-names = "timer", "pclk";
-> +	};
-> +
-> +	timer6: timer at 200380a0 {
-> +		compatible = "rockchip,rk3188-timer", "rockchip,rk3288-timer";
-> +		reg = <0x200380a0 0x20>;
-> +		interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&cru SCLK_TIMER6>, <&cru PCLK_TIMER0>;
-> +		clock-names = "timer", "pclk";
-> +	};
-> +
+On 1 February 2017 at 09:07, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 27 January 2017 at 10:52, Will Deacon <will.deacon@arm.com> wrote:
+>> On Fri, Jan 27, 2017 at 10:43:16AM +0000, Ard Biesheuvel wrote:
+>>> On 27 January 2017 at 10:40, Matthias Brugger <mbrugger@suse.com> wrote:
+>>> > Older compilers may not be able to detect the crc32 extended cpu type.
+>>>
+>>> What do you mean 'detect'? Could you describe the failure in more detail
+>>> please?
+>>>
+>>> > Anyway only inline assembler code is used, which gets passed to the
+>>> > assembler. This patch moves the crc detection to the assembler.
+>>> >
+>>> > Suggested-by: Alexander Graf <agraf@suse.de>
+>>> > Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+>>> > ---
+>>> >  arch/arm64/crypto/Makefile      | 2 --
+>>> >  arch/arm64/crypto/crc32-arm64.c | 3 +++
+>>> >  2 files changed, 3 insertions(+), 2 deletions(-)
+>>> >
+>>> > diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
+>>> > index aa8888d7b744..0d779dac75cd 100644
+>>> > --- a/arch/arm64/crypto/Makefile
+>>> > +++ b/arch/arm64/crypto/Makefile
+>>> > @@ -48,8 +48,6 @@ CFLAGS_aes-glue-ce.o  := -DUSE_V8_CRYPTO_EXTENSIONS
+>>> >
+>>> >  obj-$(CONFIG_CRYPTO_CRC32_ARM64) += crc32-arm64.o
+>>> >
+>>> > -CFLAGS_crc32-arm64.o   := -mcpu=generic+crc
+>>> > -
+>>> >  $(obj)/aes-glue-%.o: $(src)/aes-glue.c FORCE
+>>> >         $(call if_changed_rule,cc_o_c)
+>>> >
+>>> > diff --git a/arch/arm64/crypto/crc32-arm64.c b/arch/arm64/crypto/crc32-arm64.c
+>>> > index 6a37c3c6b11d..10f5dd075323 100644
+>>> > --- a/arch/arm64/crypto/crc32-arm64.c
+>>> > +++ b/arch/arm64/crypto/crc32-arm64.c
+>>> > @@ -29,6 +29,9 @@ MODULE_AUTHOR("Yazen Ghannam <yazen.ghannam@linaro.org>");
+>>> >  MODULE_DESCRIPTION("CRC32 and CRC32C using optional ARMv8 instructions");
+>>> >  MODULE_LICENSE("GPL v2");
+>>> >
+>>> > +/* Request crc extension capabilities from the assembler */
+>>> > +asm(".arch_extension crc");
+>>> > +
+>>>
+>>> Will should confirm, but I think this is a recent feature in GAS for
+>>> AArch64, so this may break older toolchains as well.
+>>
+>> Yes, the .arch_extension directive isn't universally supported by AArch64
+>> gas so we can't rely on it unconditionally. The best bet is to check for
+>> the support and, if it's not present, then disable whatever feature relies
+>> on it. See the lseinstr variable in Makefile.
+>>
+>
+> Actually, this driver has become somewhat redundant now that we have
+> an alternative that combines an implementation based on 64x64
+> polynomial multiplication with an implementation based on the CRC32
+> instructions.
+>
+> I will propose a patch that makes the latter usable when only the
+> CRC32 instructions are supported.
 
-depending on who is picking that up, they can add my
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-
-if needed.
-
-I've also double checked the timer clocks - especially the pclks.
-Timer3 has its own separate pclk, while all other timers are supplied by 
-pclk_timer0.
-
-
-Heiko
+... although you still haven't explained what the actual problem is
+that you are trying to solve.
