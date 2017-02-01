@@ -1,42 +1,33 @@
 From: rrichter@cavium.com (Robert Richter)
-Date: Wed, 1 Feb 2017 18:38:27 +0100
-Subject: [PATCH 3/9] irqchip/gic-v3-its: Initialize MSIs with subsys_initcalls
+Date: Wed, 1 Feb 2017 18:38:26 +0100
+Subject: [PATCH 2/9] irqchip/gic-v3-its: Initialize its nodes in probe order
 In-Reply-To: <20170201173833.12630-1-rrichter@cavium.com>
 References: <20170201173833.12630-1-rrichter@cavium.com>
-Message-ID: <20170201173833.12630-4-rrichter@cavium.com>
+Message-ID: <20170201173833.12630-3-rrichter@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows us to use kernel core functionality (e.g. cma) for ITS
-initialization. MSIs must be up before the device_initcalls (pci and
-platform device probe) and after arch_initcalls (dma init), so
-subsys_initcall is fine.
+ATM the last discovered node is initialized first. Though this order
+should work too, change the initialization of nodes to probe order as
+one would expect it.
 
 Signed-off-by: Robert Richter <rrichter@cavium.com>
 ---
- drivers/irqchip/irq-gic-v3-its-pci-msi.c      | 2 +-
- drivers/irqchip/irq-gic-v3-its-platform-msi.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/irqchip/irq-gic-v3-its.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-index aee1c60d7ab5..dace9bc4ef8d 100644
---- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-+++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
-@@ -194,4 +194,4 @@ static int __init its_pci_msi_init(void)
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index dce70f21a15d..5dfd489a11d1 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -1744,7 +1744,7 @@ static int __init its_probe_one(struct resource *res,
+ 		goto out_free_tables;
+ 
+ 	spin_lock(&its_lock);
+-	list_add(&its->entry, &its_nodes);
++	list_add_tail(&its->entry, &its_nodes);
+ 	spin_unlock(&its_lock);
  
  	return 0;
- }
--early_initcall(its_pci_msi_init);
-+subsys_initcall(its_pci_msi_init);
-diff --git a/drivers/irqchip/irq-gic-v3-its-platform-msi.c b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-index 470b4aa7d62c..7d8c19973766 100644
---- a/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-+++ b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
-@@ -103,4 +103,4 @@ static int __init its_pmsi_init(void)
- 
- 	return 0;
- }
--early_initcall(its_pmsi_init);
-+subsys_initcall(its_pmsi_init);
 -- 
 2.11.0
