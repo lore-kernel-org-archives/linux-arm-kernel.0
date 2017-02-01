@@ -1,52 +1,52 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed,  1 Feb 2017 02:24:24 -0800
-Subject: [PATCH] arm64: dts: apq8016-sbc: Add ramoops
-Message-ID: <20170201102424.4017-1-bjorn.andersson@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 1 Feb 2017 18:25:06 +0000
+Subject: [PATCH v31 05/12] arm64: kdump: protect crash dump kernel memory
+In-Reply-To: <20170201180008.GG4756@leverpostej>
+References: <20170201124218.5823-1-takahiro.akashi@linaro.org>
+ <20170201124630.6016-4-takahiro.akashi@linaro.org>
+ <20170201180008.GG4756@leverpostej>
+Message-ID: <20170201182506.GA30584@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Declare a ramoops memory segment to aid debugging for those without UART
-access. Verified to carry console log when holding volume down for 15
-seconds.
+On Wed, Feb 01, 2017 at 06:00:08PM +0000, Mark Rutland wrote:
+> On Wed, Feb 01, 2017 at 09:46:24PM +0900, AKASHI Takahiro wrote:
+> > arch_kexec_protect_crashkres() and arch_kexec_unprotect_crashkres()
+> > are meant to be called around kexec_load() in order to protect
+> > the memory allocated for crash dump kernel once after it's loaded.
+> > 
+> > The protection is implemented here by unmapping the region rather than
+> > making it read-only.
+> > To make the things work correctly, we also have to
+> > - put the region in an isolated, page-level mapping initially, and
+> > - move copying kexec's control_code_page to machine_kexec_prepare()
+> > 
+> > Note that page-level mapping is also required to allow for shrinking
+> > the size of memory, through /sys/kernel/kexec_crash_size, by any number
+> > of multiple pages.
+> 
+> Looking at kexec_crash_size_store(), I don't see where memory returned
+> to the OS is mapped. AFAICT, if the region is protected when the user
+> shrinks the region, the memory will not be mapped, yet handed over to
+> the kernel for general allocation.
+> 
+> Surely we need an arch-specific callback to handle that? e.g.
+> 
+> arch_crash_release_region(unsigned long base, unsigned long size)
+> {
+> 	/*
+> 	 * Ensure the region is part of the linear map before we return
+> 	 * it to the OS. We won't unmap this again, so we can use block
+> 	 * mappings.
+> 	 */
+> 	create_pgd_mapping(&init_mm, start, __phys_to_virt(start),
+> 			   size, PAGE_KERNEL, false);
+> }
+> 
+> ... which we'd call from crash_shrink_memory() before we freed the
+> reserved pages.
 
-I was unable to find any ramoops-like memory region used in the 8916
-downstream kernels, so the picked region is the last MB in System RAM.
+Another question is (how) does hyp map this region?
 
-No memory region for ramoops-like support was found downstrea, so the
-arbitrarily picked region is the last MB of System RAM.
-
-Cc: John Stultz <john.stultz@linaro.org>
-Cc: Mart Raudsepp <leio@gentoo.org>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
----
-
-Enable CONFIG_PSTORE, CONFIG_PSTORE_CONSOLE and CONFIG_PSTORE_RAM.
-
- arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-index a45bc1dba686..f93edf57f249 100644
---- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-+++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-@@ -35,6 +35,17 @@
- 		stdout-path = "serial0";
- 	};
- 
-+	reserved-memory {
-+		ramoops at bff00000{
-+			compatible = "ramoops";
-+			reg = <0x0 0xbff00000 0x0 0x100000>;
-+
-+			record-size = <0x20000>;
-+			console-size = <0x20000>;
-+			ftrace-size = <0x20000>;
-+		};
-+	};
-+
- 	soc {
- 		dma at 7884000 {
- 			status = "okay";
--- 
-2.11.0
+Thanks,
+Mark.
