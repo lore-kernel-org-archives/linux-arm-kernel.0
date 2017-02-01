@@ -1,102 +1,91 @@
-From: joe@perches.com (Joe Perches)
-Date: Wed, 01 Feb 2017 11:49:47 -0800
-Subject: Build failure with v4.9-rc1 and GCC trunk -- compiler weirdness
-In-Reply-To: <CAKv+Gu-Vc-+BDGAWOLJ79KqjL7ZW5vxUk=VW8MqEJyjO2fM6NQ@mail.gmail.com>
-References: <20161017183806.GG5601@arm.com> <20161019153746.GA4411@x4>
- <CA+55aFzSi4V9ZYDfxvZNfz1ogngTywW5Q9U_vQq3v83+0wgPrA@mail.gmail.com>
- <20161019155658.GB4411@x4>
- <CA+55aFx=ZX=7u07R6zJ7fSw=zSQNaYqVX7R3LQs4riiEf+uA=A@mail.gmail.com>
- <20161019162222.GT9193@arm.com>
- <c578d5ac-ab8a-974a-bdd9-597b8c545583@redhat.com>
- <CAKv+Gu9G+r7eH0mhniH1+ucrHNiGBMFQdKfMOi=OmekapoBtUg@mail.gmail.com>
- <CAKv+Gu_kifdUOwKgGv1xqboPMjyYRhHwFXDye1HpBo9hQY+_Uw@mail.gmail.com>
- <1485975894.2560.13.camel@perches.com>
- <CAKv+Gu-Vc-+BDGAWOLJ79KqjL7ZW5vxUk=VW8MqEJyjO2fM6NQ@mail.gmail.com>
-Message-ID: <1485978587.2560.15.camel@perches.com>
+From: markus.mayer@broadcom.com (Markus Mayer)
+Date: Wed, 1 Feb 2017 11:50:51 -0800
+Subject: [PATCH v5 1/2] dt-bindings: brcm: clocks: add binding for
+ brcmstb-cpu-clk-div
+In-Reply-To: <20170121005202.GB8801@codeaurora.org>
+References: <20170119002933.7529-1-code@mmayer.net>
+ <20170119002933.7529-2-code@mmayer.net>
+ <20170121005202.GB8801@codeaurora.org>
+Message-ID: <CAGt4E5sGScHp83ufKcX3Q74vW0fo=L0FHM7tCptvqJfchHAweg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-02-01 at 19:31 +0000, Ard Biesheuvel wrote:
-> On 1 February 2017 at 19:04, Joe Perches <joe@perches.com> wrote:
-> > On Wed, 2017-02-01 at 18:19 +0000, Ard Biesheuvel wrote:
-> > > On 1 February 2017 at 17:36, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> > > > I still think order_base_2() is broken, since it may invoke
-> > > > roundup_pow_of_two() with an input value that is documented as
-> > > > producing undefined output. I would argue that the below is the
-> > > > correct fix.
-> > > > 
-> > > > diff --git a/include/linux/log2.h b/include/linux/log2.h
-> > > > index fd7ff3d91e6a..46523731bec0 100644
-> > > > --- a/include/linux/log2.h
-> > > > +++ b/include/linux/log2.h
-> > > > @@ -203,6 +203,18 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
-> > > >   *  ... and so on.
-> > > >   */
-> > > > 
-> > > > -#define order_base_2(n) ilog2(roundup_pow_of_two(n))
-> > > > +static inline __attribute__((__const__))
-> > > > +unsigned long __order_base_2(unsigned long n)
-> > > > +{
-> > > > +       return n ? 1UL << fls_long(n - 1) : 1;
-> > > > +}
-> > > > +
-> > > > +#define order_base_2(n)                                \
-> > > > +(                                              \
-> > > > +       __builtin_constant_p(n) ? (             \
-> > > > +               ((n) < 2) ? (n) :               \
-> > > > +               ilog2((n) - 1) + 1) :           \
-> > > > +       ilog2(__order_base_2(n))                \
-> > > > + )
-> > > > 
-> > > >  #endif /* _LINUX_LOG2_H */
-> > > 
-> > > Actually, there is a still a redundant shift/fls() in there, this is
-> > > even simpler:
-> > > 
-> > > diff --git a/include/linux/log2.h b/include/linux/log2.h
-> > > index fd7ff3d91e6a..4741534bd7af 100644
-> > > --- a/include/linux/log2.h
-> > > +++ b/include/linux/log2.h
-> > > @@ -203,6 +203,18 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
-> > >   *  ... and so on.
-> > >   */
-> > > 
-> > > -#define order_base_2(n) ilog2(roundup_pow_of_two(n))
-> > > +static inline __attribute__((__const__))
-> > 
-> > commonly __attribute_const__
-> > 
-> 
-> ... except in <linux/ilog2.h>, which probably predates that.
-> 
-> > > +unsigned long __order_base_2(unsigned long n)
-> > > +{
-> > > +       return n > 1 ? ilog2(n - 1) + 1 : 0;
-> > > +}
-> > > +
-> > > +#define order_base_2(n)                                \
-> > > +(                                              \
-> > > +       __builtin_constant_p(n) ? (             \
-> > > +               ((n) < 2) ? (n) :               \
-> > > +               ilog2((n) - 1) + 1) :           \
-> > > +       __order_base_2(n)                       \
-> > > + )
-> > 
-> > Does this work properly when n is a signed negative value?
-> > 
-> 
-> No, but order_base_2() is explicitly only defined for inputs [0, ->),
+On 20 January 2017 at 16:52, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 01/18, Markus Mayer wrote:
+>> diff --git a/Documentation/devicetree/bindings/clock/brcm,brcmstb-cpu-clk-div.txt b/Documentation/devicetree/bindings/clock/brcm,brcmstb-cpu-clk-div.txt
+>> new file mode 100644
+>> index 0000000..c4acb53
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/clock/brcm,brcmstb-cpu-clk-div.txt
+>> @@ -0,0 +1,27 @@
+>> +The CPU divider node serves as the sole clock for the CPU complex. It supports
+>> +power-of-2 clock division, with a divider of "1" as the default highest-speed
+>> +setting.
+>> +
+>> +Required properties:
+>> +- compatible: shall be "brcm,brcmstb-cpu-clk-div"
+>> +- reg: address and width of the divider configuration register
+>> +- #clock-cells: shall be set to 0
+>> +- clocks: phandle of clock provider which provides the source clock
+>> +          (this would typically be a "fixed-clock" type PLL)
+>> +- div-table: list of (raw_value,divider) ordered pairs that correspond to the
+>> +             allowed clock divider settings
+>> +- div-shift-width: least-significant bit position and width of divider value
+>
+> Are these properties used? Please don't put these types of
+> details in DT.
 
-where?
+Yeah, unfortunately they are. Luckily, I think the issue can be
+resolved quite easily, because the user of those properties isn't
+involved in this series.
 
-> so its behavior for negative inputs is best left undefined.
+They are currently being used by a clock driver
+("drivers/clk/clk-brcmstb.c") that hasn't been upstreamed yet. I
+performed some code archeology. While I wasn't 100% successful in
+tracking down the origins of this interface, it looks like it was
+designed this way a while back (4+ years or so), probably before
+device tree best practices were developed or, at least, before they
+were widely known.
 
-Or maybe add a BUILD_BUG_ON something like:
+So, what I can do is to remove the properties from the official
+binding. (I'll send an update to that effect shortly.) Once the
+binding is accepted upstream, we can work on fixing up the design of
+clk-brcmstb.c, so it doesn't rely on these properties anymore (and
+derives them from the compatible string instead), and then proceed to
+upstream that, as well.
 
-#define order_base_2(n)							\
-({									\
-	typeof(n) _n = n;						\
-	BUILD_BUG_ON(__builtin_constant_p(_n) && _n < 0);		\
-	__builtin_constant_p(_n) ? (_n < 2 ? _n :?ilog2((_n) - 1) + 1))	\
-				 :?__order_base_2(_n);			\
-})
+I don't think this approach would cause any conflicts or problems.
+
+>> +
+>> +Optional properties:
+>> +- clock-names: the clock may be named
+>> +
+>> +Example:
+>> +     cpuclkdiv: cpu-clk-div at f03e257c {
+>> +             compatible = "brcm,brcmstb-cpu-clk-div";
+>> +             reg = <0xf03e257c 0x4>;
+>
+> This register really looks like some offset in something larger.
+> Is there some clock controller? What's the hw block at
+> 0xf03e2000? Maybe I already asked this.
+
+It looks this way, but in this case, looks are deceiving. The address
+and the length are really correct the way they are.
+
+This memory area holds a range of only loosely related configuration
+registers. It's called the Bus Interface Unit Register Set and deals
+with configuring the CPU in general. At address 0xf03e257c, there
+happens to be the clock divider register we need, and it's really just
+one register, i.e. 4 bytes.
+
+>> +             div-table = <0x00 1>;
+>> +             div-shift-width = <0 5>;
+>> +             #clock-cells = <0>;
+>> +             clocks = <&cpupll>;
+>> +             clock-names = "cpupll";
+>> +     };
+>>
+>
+> --
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
