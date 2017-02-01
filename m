@@ -1,65 +1,61 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  1 Feb 2017 09:42:04 +0100
-Subject: [PATCH 5/5] arm64: dts: r8a7796: salvator-x: Fix EthernetAVB PHY
- timing
-In-Reply-To: <1485938524-9322-1-git-send-email-horms+renesas@verge.net.au>
-References: <1485938524-9322-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1485938524-9322-6-git-send-email-horms+renesas@verge.net.au>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed,  1 Feb 2017 09:53:23 +0100
+Subject: [PATCH v3 2/2] ARM: sun8i: dt: Add mali node
+In-Reply-To: <b098c4fa9fce88361cca20417978734d0e1b5cca.1485939041.git-series.maxime.ripard@free-electrons.com>
+References: <b098c4fa9fce88361cca20417978734d0e1b5cca.1485939041.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <82ff2fdb784b1444c8dc4a2d85f17522b9187741.1485939041.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+The A23 and A33 have an ARM Mali 400 GPU. Now that we have a binding, add
+it to our DT.
 
-Set PHY rxc-skew-ps to 1500 and all other values to their default values.
-
-This is intended to to address failures in the case of 1Gbps communication
-using the by salvator-x board with the KSZ9031RNX phy. This has been
-reported to occur with both the r8a7795 (H3) and r8a7796 (M3-W) SoCs.
-
-Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
 ---
-v1 [Simon Horman]
-* Do not set values to defaults, omit them and let the driver set the defaults
-* Rewrote changelog
 
-  N.B. The communications failures have been reported by the BSP team,
-       however I did not observe them during testing with a
-       salvator-x/M3-W-ES1.0
-
-       My test-case was to bring up the system using NFS root and
-       run: netperf -H <HOST>
-
-v0 [Kazuya Mizuguchi]
+Changes from v2:
+  - Removed leading 0 from the unit address
 ---
- arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts | 13 +------------
- 1 file changed, 1 insertion(+), 12 deletions(-)
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
-index 61f4662db497..93ed23ab71bb 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
-@@ -172,18 +172,7 @@
- 	status = "okay";
+diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+index d92fdf5a7b26..35008b78d899 100644
+--- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+@@ -472,6 +472,32 @@
+ 			#size-cells = <0>;
+ 		};
  
- 	phy0: ethernet-phy at 0 {
--		rxc-skew-ps = <900>;
--		rxdv-skew-ps = <0>;
--		rxd0-skew-ps = <0>;
--		rxd1-skew-ps = <0>;
--		rxd2-skew-ps = <0>;
--		rxd3-skew-ps = <0>;
--		txc-skew-ps = <900>;
--		txen-skew-ps = <0>;
--		txd0-skew-ps = <0>;
--		txd1-skew-ps = <0>;
--		txd2-skew-ps = <0>;
--		txd3-skew-ps = <0>;
-+		rxc-skew-ps = <1500>;
- 		reg = <0>;
- 		interrupt-parent = <&gpio2>;
- 		interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
++		mali: gpu at 1c40000 {
++			compatible = "allwinner,sun8i-a23-mali",
++				     "allwinner,sun7i-a20-mali", "arm,mali-400";
++			reg = <0x01c40000 0x10000>;
++			interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "gp",
++					  "gpmmu",
++					  "pp0",
++					  "ppmmu0",
++					  "pp1",
++					  "ppmmu1",
++					  "pmu";
++			clocks = <&ccu CLK_BUS_GPU>, <&ccu CLK_GPU>;
++			clock-names = "bus", "core";
++			resets = <&ccu RST_BUS_GPU>;
++
++			assigned-clocks = <&ccu CLK_GPU>;
++			assigned-clock-rates = <408000000>;
++		};
++
+ 		gic: interrupt-controller at 01c81000 {
+ 			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
+ 			reg = <0x01c81000 0x1000>,
 -- 
-2.7.0.rc3.207.g0ac5344
+git-series 0.8.11
