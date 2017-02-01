@@ -1,43 +1,40 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Feb 2017 23:16:49 +0000
-Subject: [PATCH 06/10] soc/qbman: Add ARM equivalent for
- flush_dcache_range()
-In-Reply-To: <123833427.MmK6vFAXzK@wuerfel>
-References: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
- <CAK8P3a1Gd4bd7GjEp_a9WXc_mTPk0XmP7DH8aPWhbn2K3MMuDQ@mail.gmail.com>
- <20170130151933.GA27312@n2100.armlinux.org.uk>
- <123833427.MmK6vFAXzK@wuerfel>
-Message-ID: <20170201231649.GR27312@n2100.armlinux.org.uk>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 2 Feb 2017 07:20:57 +0800
+Subject: [PATCH V8 08/10] ras: acpi / apei: generate trace event for
+ unrecognized CPER section
+In-Reply-To: <1485969413-23577-9-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <201702020753.3LL3zhm1%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2017 at 01:47:46PM +0100, Arnd Bergmann wrote:
-> Ah right, so since there is no interface to map as "device writeback",
-> the driver would likely end up with an MMIO register in a
-> "normal writeback", with these properties (among others listed there):
+Hi Tyler,
 
-It's not about there being no _interface_, there's no support in the
-architecture for it.  The use of the "device" memory type does not
-allow for any form of cache hints to be specified.
+[auto build test ERROR on pm/linux-next]
+[also build test ERROR on v4.10-rc6 next-20170201]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
->  * - writes can be repeated (in certain cases) with no side effects
->  * - writes can be merged before accessing the target
->  * - unaligned accesses can be supported
->  * - ordering is not guaranteed without explicit dependencies or barrier
->  *   instructions
->  * - writes may be delayed before they hit the endpoint memory
-> 
-> I think the ordering is the most critical here, as IIRC the driver
-> expects a whole cache line to be written into the MMIO register
-> in a single bus cycle specifically when we issue the flush from the
-> driver, but we can actually have partial writebacks at any time.
+url:    https://github.com/0day-ci/linux/commits/Tyler-Baicar/Add-UEFI-2-6-and-ACPI-6-1-updates-for-RAS-on-ARM64/20170202-020320
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
+config: x86_64-randconfig-r0-02020102 (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-I don't think that's achievable, unless your data bus is as wide as
-a cache line (iow, for a 32-byte cache line, your data bus all the
-way to the peripheral would need to be 256 bits wide to write the
-cache line in a single bus cycle.)
+All errors (new ones prefixed by >>):
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+   drivers/built-in.o: In function `ghes_do_proc.isra.9':
+>> ghes.c:(.text+0x92f3a): undefined reference to `__tracepoint_unknown_sec_event'
+   ghes.c:(.text+0x92f73): undefined reference to `__tracepoint_unknown_sec_event'
+   ghes.c:(.text+0x92fdb): undefined reference to `__tracepoint_unknown_sec_event'
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 25871 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170202/8c6b557c/attachment-0001.gz>
