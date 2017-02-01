@@ -1,38 +1,34 @@
-From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Wed, 1 Feb 2017 17:47:43 +0100
-Subject: [PATCH 0/8] ADD STM32H743 MCU and STM32H743i-Eval board supports
-In-Reply-To: <CACRpkdb35JdbE5bPMU_NeVehnA-qs3aAxCgE0==L=Z9vmq1yWQ@mail.gmail.com>
-References: <1485868465-30446-1-git-send-email-alexandre.torgue@st.com>
- <CACRpkdb35JdbE5bPMU_NeVehnA-qs3aAxCgE0==L=Z9vmq1yWQ@mail.gmail.com>
-Message-ID: <83444163-8b25-b2e9-205a-188f29df0d24@st.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 1 Feb 2017 10:50:13 -0600
+Subject: [PATCH v2] PCI: Add information about describing PCI in ACPI
+In-Reply-To: <d7e1adbe-91a2-1a76-93b3-c880f9635e5e@jonmasters.org>
+References: <20161129212816.15663.28100.stgit@bhelgaas-glaptop.roam.corp.google.com>
+ <20161129213955.15663.21173.stgit@bhelgaas-glaptop.roam.corp.google.com>
+ <d7e1adbe-91a2-1a76-93b3-c880f9635e5e@jonmasters.org>
+Message-ID: <20170201165013.GB13183@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus
+On Tue, Dec 13, 2016 at 04:09:39AM -0500, Jon Masters wrote:
+> On 11/29/2016 04:39 PM, Bjorn Helgaas wrote:
+> 
+> > +New architectures should be able to use "Consumer" Extended Address Space
+> > +descriptors in the PNP0A03 device for bridge registers, including ECAM,
+> > +although a strict interpretation of [6] might prohibit this.  Old x86 and
+> > +ia64 kernels assume all address space descriptors, including "Consumer"
+> > +Extended Address Space ones, are windows, so it would not be safe to
+> > +describe bridge registers this way on those architectures.
+> 
+> <snip>
+> 
+> > +[6] PCI Firmware 3.0, sec 4.1.2:
+> 
+> <snip>
+> 
+> Thanks for the revised writeup, Bjorn. It's great. I'm trying to get the
+> above clarified explicitly in terms of the spec, and in terms of what
+> other Operating Systems would like to see as general preference.
 
-On 02/01/2017 04:16 PM, Linus Walleij wrote:
-> On Tue, Jan 31, 2017 at 2:14 PM, Alexandre TORGUE
-> <alexandre.torgue@st.com> wrote:
->
->> This series adds basic support for STM32H743 MCU and stm32h743i-eval board.
->> With it, you can boot stm32h743i-eval board successfully.
->
-> Patch 1 & 2 look fine to me.
->
-> Shall I just apply them and offer them on an immutable branch based
-> on v4.10 so you can pull that into ARM SoC if you want to get this in
-> for v4.11?
+Any feedback on this?  I'd like to post a revised version soon for v4.11.
 
-Thanks, but I think it is a bit late for this cycle. Indeed I'm close to 
-send a second round for STM32 DT, but I don't plan to add STM32H7 
-support. I prefere to let machine & DT patches in review.
-Anyway, I 'll be happy if you take pinctrl & bindings parts in this 
-cycle :).
-
-Regards
-Alex
-
->
-> Yours,
-> Linus Walleij
->
+Bjorn
