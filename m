@@ -1,53 +1,50 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 1 Feb 2017 13:51:00 +0100
-Subject: [PATCH 2/3] pinctrl: dt-bindings: samsung: Add Exynos7 specific
- pinctrl macro definitions
-In-Reply-To: <20170127144123.slmwxorx7cjxwtcr@kozik-lap>
-References: <1484718141-28785-1-git-send-email-pankaj.dubey@samsung.com>
- <CGME20170118054002epcas5p3b08e2f419976e17a3c584d64776810fd@epcas5p3.samsung.com>
- <1484718141-28785-3-git-send-email-pankaj.dubey@samsung.com>
- <20170118141935.eu7wmki7jnjdarkw@kozik-lap>
- <7a0d543f-37e8-98e9-15b4-7d3f808f8516@samsung.com>
- <20170127144123.slmwxorx7cjxwtcr@kozik-lap>
-Message-ID: <CACRpkdYLpQHT1ykYE1tNJpNRyUt7ezhyxznbe=dPu70mPn0OLQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 01 Feb 2017 13:52:39 +0100
+Subject: [PATCH 06/10] soc/qbman: Add ARM equivalent for
+ flush_dcache_range()
+In-Reply-To: <20170130150428.GY27312@n2100.armlinux.org.uk>
+References: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
+ <5414359.8GMja3pNrI@wuerfel> <20170130150428.GY27312@n2100.armlinux.org.uk>
+Message-ID: <17693912.jiBZSyyCNs@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 27, 2017 at 3:41 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
-> On Fri, Jan 27, 2017 at 01:25:42PM +0100, Sylwester Nawrocki wrote:
->> On 01/18/2017 03:19 PM, Krzysztof Kozlowski wrote:
->> > On Wed, Jan 18, 2017 at 11:12:20AM +0530, Pankaj Dubey wrote:
->> >> Exynos7 SoC pinctrl configurations are similar to existing Exynos4/5 except
->> >> for FSYS1 pinctrl drive strengths. So adding Exynos7 specific FSYS1 blocks
->> >> pinctrl driver strength related macros which will be used in Exynos7
->> >> DTSi files.
->> >>
->> >> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->> >> ---
->> >>  include/dt-bindings/pinctrl/samsung.h | 8 ++++++++
->> >>  1 file changed, 8 insertions(+)
->> >>
->> >
->> > Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
->> >
->> > I will need this header, so Sylwester if it is okay with you, could you
->> > provide a tag with it (or ack it)?
->>
->> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
->>
->> I don't have pinctrl/samsung git tree, Linus applies patches directly.
->
-> Oh, my mistake.
->
-> Linus,
-> This is similar case as "pinctrl: dt-bindings: samsung: add drive
-> strength macros for Exynos5433" [1].
+On Monday, January 30, 2017 3:04:28 PM CET Russell King - ARM Linux wrote:
+> On Wed, Jan 25, 2017 at 10:20:09PM +0100, Arnd Bergmann wrote:
+> > On Monday, January 23, 2017 7:24:59 PM CET Roy Pledge wrote:
+> > > > Is there a non-"under the covers" way to say "flush this region" without
+> > > > the arch second-guessing whether it really needs to be flushed?
+> > > Any advice on how to resolve this? I looked into trying to do a
+> > > non-cacheable mapping of the
+> > > memory so that the flush wouldn't be required but the ioremap code
+> > > prevents mapping normal
+> > > memory in this way.  The QMan device requiresthis memory to be zeroed at
+> > > startup. Because the device
+> > > does non coherent reads and writes to the memory we must ensure that any
+> > > cache in the CPU cluster(s)
+> > > is flushed in order to prevent a future castout from overwriting data.
+> > > This happened before on PPC
+> > > platforms and made for some very unfun debug session trying to
+> > > understand what was causing the failure.
+> > 
+> > If this is normal RAM, you should be able to just write zeroes, and then
+> > do a dma_map_single() for initialization. Are there any other requirements
+> > what to do with the memory later, is it used for communication at all,
+> > or just required to be zero?
+> 
+> Please don't encourage incorrect DMA API usage.
+> 
+> dma_map_single() must always be paired with an unmap at some point,
+> otherwise it's a memory leak if DMA API debugging is enabled.  So,
+> if you wish to suggest using dma_map_single(), please also suggest
+> where to use dma_unmap_single() too.
 
-OK
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+The mapping obviously has to exist the whole time the device is in use,
+and we should not call dma_unmap_single() until the device is released
+by the driver.
 
-I expect that you take it through ARM SoC and/or send me a pull
-request for it on an immutable branch, whatever is best.
+Unfortunately it seems we can't use this interface though, as the device
+is already configured to a specific reserved memory range, and we can't
+just use get_free_pages() here.
 
-Yours,
-Linus Walleij
+	Arnd
