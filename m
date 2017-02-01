@@ -1,99 +1,42 @@
-From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Wed,  1 Feb 2017 10:53:56 -0600
-Subject: [PATCH v3 16/18] drivers/fsi: Add documentation for GPIO based FSI
- master
-In-Reply-To: <20170201165358.45415-1-cbostic@linux.vnet.ibm.com>
-References: <20170201165358.45415-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170201165358.45415-17-cbostic@linux.vnet.ibm.com>
+From: andrew.smirnov@gmail.com (Andrey Smirnov)
+Date: Wed,  1 Feb 2017 08:55:56 -0800
+Subject: [PATCH v2 0/3] i.MX7 PCI support
+Message-ID: <20170201165559.22436-1-andrew.smirnov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Bostic <cbostic@us.ibm.com>
+Hello, everyone:
 
-Define the device tree bindings for the GPIO master type.
+This is a second iteration of the code that adds PCI-subsystem bits
+necessary for enabling PCI support on i.MX7.
 
-Signed-off-by: Chris Bostic <cbostic@us.ibm.com>
----
- .../devicetree/bindings/fsi/fsi-master-gpio.txt    | 71 ++++++++++++++++++++++
- 1 file changed, 71 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt
+Changes since v1 (can be found at [version1]):
 
-diff --git a/Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt b/Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt
-new file mode 100644
-index 0000000..5d589bf
---- /dev/null
-+++ b/Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt
-@@ -0,0 +1,71 @@
-+Device-tree bindings for FSI master implemented with GPIO
-+---------------------------------------------------------
-+
-+Typically a FSI master is defined in hardware with output control
-+lines designated for Enable, Data, Clock, etc..  In the case of
-+a 'GPIO FSI master', however, it may be the case that there is no
-+such master defined in hardware and must be implemented in standard
-+GPIO to interact with its slaves.  In this 'virtual' FSI master
-+case the GPIO pins representing clk and data are directly
-+connected to the slaves.
-+
-+The GPIO FSI master node
-+-------------------------
-+This node describes a FSI master implmented with GPIO.
-+Required property:
-+	compatible = "ibm,fsi-master-gpio"
-+
-+The standard FSI master node
-+----------------------------
-+This node describes a FSI master implmemented fully in hardware
-+with dedicated input/output pins required for its function (i.e.
-+not using generic GPIO pins).
-+Required property:
-+	compatible = "ibm,fsi-master"
-+
-+
-+GPIO FSI master property/pin descriptions
-+------------------------------------------
-+clk -	The master controlled clock line that indicates to the
-+	slave when to read in or send out new data - required.
-+data -	The serial data line containing information to be sent or
-+	received by the master.  This line is bi-directional.  During
-+	command phase the master controls the line and when a response
-+	is required the slave takes control - required.
-+enable - Controls power state of data line - optional.
-+trans - Voltage translator control. In some applications the data line
-+	must have its signal levels altered by a translator. If this is
-+	necessary then control of signal direction is managed via this
-+	line - optional.
-+mux -	Multiplexor control.  This activates/deactivates the data line
-+	in cases where it is one of many possible selections via mux -
-+	optional.
-+
-+Required properties:
-+	- compatible = "ibm,fsi-master-gpio";
-+	- clk-gpios;
-+	- data-gpios;
-+
-+Optional properties:
-+	- enable-gpios;
-+	- trans-gpios;
-+	- mux-gpios;
-+
-+Order of property activation:
-+1. clk
-+2. data
-+3. trans
-+4. enable
-+5. mux
-+
-+
-+Example:
-+
-+fsi-master {
-+	compatible = "ibm,fsi-master-gpio", "ibm,fsi-master";
-+	clk-gpios = <&gpio 0>, <&gpio 6>;
-+	data-gpios = <&gpio 1>, <&gpio 7>;
-+	enable-gpios = <&gpio 2>, <&gpio 8>;
-+	trans-gpios = <&gpio 3>, <&gpio 9>;
-+	mux-gpios = <&gpio 4>, <&gpio 10>;
-+}
+	- All GPC related code moved into a separate driver (subject
+          of a different patch)
+	- Removed GPIO probe deferral logging
+	- Fixed section mismatch warning
+	- Minor reformatting of fsl,imx6q-pcie.txt(as per Rob
+          Herring's request)
+
+[version1] https://lkml.org/lkml/2017/1/19/488
+
+Thanks,
+Andrey Smirnov
+
+Andrey Smirnov (3):
+  PCI: imx6: Fix a typo in error message
+  PCI: imx6: Allow probe deferal by reset GPIO
+  PCI: imx6: Add code to support i.MX7D
+
+ .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |   6 +-
+ drivers/pci/host/pci-imx6.c                        | 145 ++++++++++++++++-----
+ include/linux/mfd/syscon/imx7-gpc.h                |  18 +++
+ include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
+ include/linux/mfd/syscon/imx7-src.h                |  18 +++
+ 5 files changed, 161 insertions(+), 30 deletions(-)
+ create mode 100644 include/linux/mfd/syscon/imx7-gpc.h
+ create mode 100644 include/linux/mfd/syscon/imx7-src.h
+
 -- 
-1.8.2.2
+2.9.3
