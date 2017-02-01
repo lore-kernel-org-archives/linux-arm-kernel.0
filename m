@@ -1,100 +1,62 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Wed, 1 Feb 2017 08:58:37 -0800
-Subject: Build failure with v4.9-rc1 and GCC trunk -- compiler weirdness
-In-Reply-To: <20161019162222.GT9193@arm.com>
-References: <20161017183806.GG5601@arm.com> <20161019153746.GA4411@x4>
- <CA+55aFzSi4V9ZYDfxvZNfz1ogngTywW5Q9U_vQq3v83+0wgPrA@mail.gmail.com>
- <20161019155658.GB4411@x4>
- <CA+55aFx=ZX=7u07R6zJ7fSw=zSQNaYqVX7R3LQs4riiEf+uA=A@mail.gmail.com>
- <20161019162222.GT9193@arm.com>
-Message-ID: <c578d5ac-ab8a-974a-bdd9-597b8c545583@redhat.com>
+From: nicolas.ferre@microchip.com (Nicolas Ferre)
+Date: Wed, 1 Feb 2017 18:08:10 +0100
+Subject: [PATCH] usb: gadget: udc: atmel: fix debug output
+In-Reply-To: <20170201170052.pvltw6punq6ncmwr@piout.net>
+References: <20170201164218.2421617-1-arnd@arndb.de>
+ <20170201170052.pvltw6punq6ncmwr@piout.net>
+Message-ID: <38aae02a-1092-0af3-7fc8-6c7a7e3cd394@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/19/2016 09:22 AM, Will Deacon wrote:
-> On Wed, Oct 19, 2016 at 09:01:33AM -0700, Linus Torvalds wrote:
->> On Wed, Oct 19, 2016 at 8:56 AM, Markus Trippelsdorf
->> <markus@trippelsdorf.de> wrote:
->>> On 2016.10.19 at 08:55 -0700, Linus Torvalds wrote:
->>>>
->>>> Well, in the meantime we apparently have to live with it. Unless Will
->>>> is using some unreleased gcc version that nobody else is using and we
->>>> can just ignore it?
->>>
->>> Yes, he is using gcc-7 that is unreleased. (It will be released April
->>> next year.)
+Le 01/02/2017 ? 18:00, Alexandre Belloni a ?crit :
+> On 01/02/2017 at 17:41:55 +0100, Arnd Bergmann wrote:
+>> The debug output now contains the wrong variable, as seen from the compiler
+>> warning:
 >>
->> Ahh, self-built? So it's not part of some experimental ARM distro
->> setup and this will be annoying lots of people?
+>> drivers/usb/gadget/udc/atmel_usba_udc.c: In function 'usba_ep_enable':
+>> drivers/usb/gadget/udc/atmel_usba_udc.c:632:550: error: 'ept_cfg' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+>>   DBG(DBG_ERR, "%s: EPT_CFG = 0x%lx (maxpacket = %lu)\n",
+>>
+>> This changes the debug output the same way as the other code.
+>>
+>> Fixes: 741d2558bf0a ("usb: gadget: udc: atmel: Update endpoint allocation scheme")
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+
+Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+
 > 
-> Our friendly compiler guys built it, but it's just a snapshot of trunk,
-> so it's all heading towards GCC 7.0. AFAIU, the problematic optimisation
-> is also a mid-end pass, so it would affect other architectures too.
-> 
->> If so, still think that we could just get rid of the ____ilog2_NaN()
->> thing as it's not _that_ important, but it's certainly not very
->> high-priority. Will can do it in his tree too for testing, and it can
->> remind people to get the gcc problem fixed.
-> 
-> I'm carrying the diff below, which fixes arm64 defconfig, but I'm worried
-> that we might be relying on this trick elsewhere. The arm __bad_cmpxchg
-> function, for example.
-> 
-> Will
-> 
-> --->8
-> 
-> diff --git a/include/linux/log2.h b/include/linux/log2.h
-> index fd7ff3d91e6a..9cf5ad69065d 100644
-> --- a/include/linux/log2.h
-> +++ b/include/linux/log2.h
-> @@ -16,12 +16,6 @@
->  #include <linux/bitops.h>
->  
->  /*
-> - * deal with unrepresentable constant logarithms
-> - */
-> -extern __attribute__((const, noreturn))
-> -int ____ilog2_NaN(void);
-> -
-> -/*
->   * non-constant log of base 2 calculators
->   * - the arch may override these in asm/bitops.h if they can be implemented
->   *   more efficiently than using fls() and fls64()
-> @@ -85,7 +79,7 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
->  #define ilog2(n)				\
->  (						\
->  	__builtin_constant_p(n) ? (		\
-> -		(n) < 1 ? ____ilog2_NaN() :	\
-> +		(n) < 1 ? 0 :			\
->  		(n) & (1ULL << 63) ? 63 :	\
->  		(n) & (1ULL << 62) ? 62 :	\
->  		(n) & (1ULL << 61) ? 61 :	\
-> @@ -149,9 +143,7 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
->  		(n) & (1ULL <<  3) ?  3 :	\
->  		(n) & (1ULL <<  2) ?  2 :	\
->  		(n) & (1ULL <<  1) ?  1 :	\
-> -		(n) & (1ULL <<  0) ?  0 :	\
-> -		____ilog2_NaN()			\
-> -				   ) :		\
-> +		0) :				\
->  	(sizeof(n) <= 4) ?			\
->  	__ilog2_u32(n) :			\
->  	__ilog2_u64(n)				\
-> @@ -194,7 +186,6 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
->   * @n: parameter
->   *
->   * The first few values calculated by this routine:
-> - *  ob2(0) = 0
->   *  ob2(1) = 0
->   *  ob2(2) = 1
->   *  ob2(3) = 2
+>> ---
+>>  drivers/usb/gadget/udc/atmel_usba_udc.c | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+>> index 11bbce28bc23..2035906b8ced 100644
+>> --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
+>> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+>> @@ -610,7 +610,7 @@ usba_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
+>>  {
+>>  	struct usba_ep *ep = to_usba_ep(_ep);
+>>  	struct usba_udc *udc = ep->udc;
+>> -	unsigned long flags, ept_cfg, maxpacket;
+>> +	unsigned long flags, maxpacket;
+>>  	unsigned int nr_trans;
+>>  
+>>  	DBG(DBG_GADGET, "%s: ep_enable: desc=%p\n", ep->ep.name, desc);
+>> @@ -630,7 +630,7 @@ usba_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
+>>  	ep->is_in = 0;
+>>  
+>>  	DBG(DBG_ERR, "%s: EPT_CFG = 0x%lx (maxpacket = %lu)\n",
+>> -			ep->ep.name, ept_cfg, maxpacket);
+>> +			ep->ep.name, ep->ept_cfg, maxpacket);
+>>  
+>>  	if (usb_endpoint_dir_in(desc)) {
+>>  		ep->is_in = 1;
+>> -- 
+>> 2.9.0
+>>
 > 
 
-Reviving this thread as gcc 7 has now hit Fedora rawhide and has this
-same issue. I pulled in the above patch from Will as a temporary work
-around for building. It didn't look like there was consensus on a
-permanent solution though from the thread.
 
-Thanks,
-Laura
+-- 
+Nicolas Ferre
