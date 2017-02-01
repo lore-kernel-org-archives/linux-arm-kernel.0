@@ -1,98 +1,131 @@
-From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Tue, 31 Jan 2017 17:02:40 -0800
-Subject: [PATCH v3 21/24] media: imx: Add MIPI CSI-2 Receiver subdev driver
-In-Reply-To: <1485856160.2932.10.camel@pengutronix.de>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-22-git-send-email-steve_longerbeam@mentor.com>
- <20170131000125.GO27312@n2100.armlinux.org.uk>
- <1485856160.2932.10.camel@pengutronix.de>
-Message-ID: <6e77aefa-4f22-60e9-7cc0-55c3a2de3124@gmail.com>
+From: bruherrera@gmail.com (Bruno Herrera)
+Date: Tue, 31 Jan 2017 23:25:43 -0200
+Subject: [PATCH v5 1/5] usb: dwc2: Add support for STM32F429/439/469 USB OTG
+ HS/FS in FS mode (internal PHY)
+In-Reply-To: <20170201012547.76158-1-bruherrera@gmail.com>
+References: <20170201012547.76158-1-bruherrera@gmail.com>
+Message-ID: <20170201012547.76158-2-bruherrera@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch introduces a new parameter to activate USB OTG HS/FS core
+embedded phy transceiver. The STM32F4x9 SoC uses the GGPIO register
+to enable the transceiver.
+Also add the dwc2_set_params function for stm32f4 otg fs.
 
+Signed-off-by: Bruno Herrera <bruherrera@gmail.com>
+---
+ drivers/usb/dwc2/core.h   |  5 +++++
+ drivers/usb/dwc2/hcd.c    | 15 ++++++++++++++-
+ drivers/usb/dwc2/hw.h     |  2 ++
+ drivers/usb/dwc2/params.c | 19 +++++++++++++++++++
+ 4 files changed, 40 insertions(+), 1 deletion(-)
 
-On 01/31/2017 01:49 AM, Philipp Zabel wrote:
-> On Tue, 2017-01-31 at 00:01 +0000, Russell King - ARM Linux wrote:
-> [...]
->> The iMX6 manuals call for a very specific seven sequence of initialisation
->> for CSI2, which begins with:
->>
->> 1. reset the D-PHY.
->> 2. place MIPI sensor in LP-11 state
->> 3. perform D-PHY initialisation
->> 4. configure CSI2 lanes and de-assert resets and shutdown signals
->>
->> Since you reset the CSI2 at power up and then release it, how do you
->> guarantee that the published sequence is followed?
-
-Hi Russell,
-
-In "40.3.1 Startup Sequence", it states that step 1 is to "De-assert
-CSI2 presetn signal (global reset)". I can't find any description of
-this signal in the manual, that statement is the only mention of it. I
-don't know if this the D-PHY reset signal,  it sounds more like
-CSI2_RESETN (CSI-2 host controller reset).
-
-In any case, I re-reviewed the published sequence in the manual,
-and it does look like there are a couple problems.
-
-The pipeline power up sequence in imx-media driver is as follows:
-s_power(ON) op is called first on the imx6-mipi-csi2, in which CSI2 and
-D-PHY resets are asserted and then de-asserted via the CSI2_RESETN
-and CSI2_DPHY_RSTZ registers, the D-PHY is initialized, and lanes set.
-
-At this point the MIPI sensor may be powered down (in fact, in OV5640
-case, the PWDN pin is asserted). So there could be a problem here,
-I don't think the D-PHY is considered in the LP-11 stop state when the
-D-PHY master is powered off :). A fix might simply be to reverse power
-on, sensor first so that it can be placed in LP-11, then imx6-mipi-csi2.
-
-The following steps are carried out by s_stream() calls. Sensor s_stream(ON)
-is called first which starts a clock on the clock lane. Then imx6-mipi-csi2
-s_stream(ON) in which the PHY_STATE register is polled to confirm the D-PHY
-stop state, then looks for active clock on lock lane.
-
-There could be a problem there too. Again should be fixed simply by
-calling stream-on on the imx6-mipi-csi2 first, then sensor.
-
-So I will try the following sequence:
-
-1. sensor power on (put D-PHY in LP-11 stop state).
-2. csi-2 power on (deassert CSI2 and D-PHY resets, D-PHY init, verify 
-LP-11).
-3. sensor stream on (starts clock on clock lane).
-4. csi-2 stream on (confirm clock on clock lane).
-
-That comes closest to meeting the sequence requirements.
-
-But this also puts a requirement on MIPI sensors that s_power(ON)
-should only place the D_PHY in LP-11, and _not_ start the clock lane.
-But perhaps that is correct behavior anyway.
-
-Steve
-
-
->> With Philipp's driver, this is easy, because there is a prepare_stream
->> callback which gives the sensor an opportunity to get everything
->> correctly configured according to the negotiated parameters, and place
->> the sensor in LP-11 state.
->>
->> Some sensors do not power up in LP-11 state, but need to be programmed
->> fully before being asked to momentarily stream.  Only at that point is
->> the sensor guaranteed to be in the required LP-11 state.
-> Do you expect that 1. and 2. could depend on the negotiated parameters
-> in any way on some hardware? I had removed the prepare_stream callback
-> from my driver in v2 because for my use case at least the above sequence
-> could be realized by
->
-> 1. in imx-mipi-csi2 s_power(1)
-> 2. in MIPI sensor s_power(1)
-> 3./4. in imx-mipi-csi2 s_stream(1)
-> 4. in MIPI sensor s_stream(1)
->
-> as long as the sensor is correctly put back into LP-11 in s_stream(0).
->
-> regards
-> Philipp
->
+diff --git a/drivers/usb/dwc2/core.h b/drivers/usb/dwc2/core.h
+index b9b62f1..252400b 100644
+--- a/drivers/usb/dwc2/core.h
++++ b/drivers/usb/dwc2/core.h
+@@ -423,6 +423,10 @@ enum dwc2_ep0_state {
+  *			needed.
+  *			0 - No (default)
+  *			1 - Yes
++ * @activate_stm_fs_transceiver: Activate internal transceiver using GGPIO
++ *			register.
++ *			0 - Deactivate the transceiver (default)
++ *			1 - Activate the transceiver
+  * @g_dma:              Enables gadget dma usage (default: autodetect).
+  * @g_dma_desc:         Enables gadget descriptor DMA (default: autodetect).
+  * @g_rx_fifo_size:	The periodic rx fifo size for the device, in
+@@ -477,6 +481,7 @@ struct dwc2_core_params {
+ 	bool uframe_sched;
+ 	bool external_id_pin_ctl;
+ 	bool hibernation;
++	bool activate_stm_fs_transceiver;
+ 	u16 max_packet_count;
+ 	u32 max_transfer_size;
+ 	u32 ahbcfg;
+diff --git a/drivers/usb/dwc2/hcd.c b/drivers/usb/dwc2/hcd.c
+index a73722e..b5a70b6 100644
+--- a/drivers/usb/dwc2/hcd.c
++++ b/drivers/usb/dwc2/hcd.c
+@@ -121,7 +121,7 @@ static void dwc2_init_fs_ls_pclk_sel(struct dwc2_hsotg *hsotg)
+ 
+ static int dwc2_fs_phy_init(struct dwc2_hsotg *hsotg, bool select_phy)
+ {
+-	u32 usbcfg, i2cctl;
++	u32 usbcfg, ggpio, i2cctl;
+ 	int retval = 0;
+ 
+ 	/*
+@@ -145,6 +145,19 @@ static int dwc2_fs_phy_init(struct dwc2_hsotg *hsotg, bool select_phy)
+ 				return retval;
+ 			}
+ 		}
++
++		if (hsotg->params.activate_stm_fs_transceiver) {
++			ggpio = dwc2_readl(hsotg->regs + GGPIO);
++			if (!(ggpio & GGPIO_STM32_OTG_GCCFG_PWRDWN)) {
++				dev_dbg(hsotg->dev, "Activating transceiver\n");
++				/*
++				 * STM32F4x9 uses the GGPIO register as general
++				 * core configuration register.
++				 */
++				ggpio |= GGPIO_STM32_OTG_GCCFG_PWRDWN;
++				dwc2_writel(ggpio, hsotg->regs + GGPIO);
++			}
++		}
+ 	}
+ 
+ 	/*
+diff --git a/drivers/usb/dwc2/hw.h b/drivers/usb/dwc2/hw.h
+index bde7248..4592012 100644
+--- a/drivers/usb/dwc2/hw.h
++++ b/drivers/usb/dwc2/hw.h
+@@ -225,6 +225,8 @@
+ 
+ #define GPVNDCTL			HSOTG_REG(0x0034)
+ #define GGPIO				HSOTG_REG(0x0038)
++#define GGPIO_STM32_OTG_GCCFG_PWRDWN	BIT(16)
++
+ #define GUID				HSOTG_REG(0x003c)
+ #define GSNPSID				HSOTG_REG(0x0040)
+ #define GHWCFG1				HSOTG_REG(0x0044)
+diff --git a/drivers/usb/dwc2/params.c b/drivers/usb/dwc2/params.c
+index 2990c34..9cd8722 100644
+--- a/drivers/usb/dwc2/params.c
++++ b/drivers/usb/dwc2/params.c
+@@ -120,6 +120,22 @@ static void dwc2_set_amcc_params(struct dwc2_hsotg *hsotg)
+ 	p->ahbcfg = GAHBCFG_HBSTLEN_INCR16 << GAHBCFG_HBSTLEN_SHIFT;
+ }
+ 
++static void dwc2_set_stm32f4x9_fsotg_params(struct dwc2_hsotg *hsotg)
++{
++	struct dwc2_core_params *p = &hsotg->params;
++
++	p->otg_cap = DWC2_CAP_PARAM_NO_HNP_SRP_CAPABLE;
++	p->speed = DWC2_SPEED_PARAM_FULL;
++	p->host_rx_fifo_size = 128;
++	p->host_nperio_tx_fifo_size = 96;
++	p->host_perio_tx_fifo_size = 96;
++	p->max_packet_count = 256;
++	p->phy_type = DWC2_PHY_TYPE_PARAM_FS;
++	p->i2c_enable = false;
++	p->uframe_sched = false;
++	p->activate_stm_fs_transceiver = true;
++}
++
+ const struct of_device_id dwc2_of_match_table[] = {
+ 	{ .compatible = "brcm,bcm2835-usb", .data = dwc2_set_bcm_params },
+ 	{ .compatible = "hisilicon,hi6220-usb", .data = dwc2_set_his_params  },
+@@ -133,6 +149,9 @@ const struct of_device_id dwc2_of_match_table[] = {
+ 	{ .compatible = "amlogic,meson-gxbb-usb",
+ 	  .data = dwc2_set_amlogic_params },
+ 	{ .compatible = "amcc,dwc-otg", .data = dwc2_set_amcc_params },
++	{ .compatible = "st,stm32f4x9-fsotg",
++	  .data = dwc2_set_stm32f4x9_fsotg_params },
++	{ .compatible = "st,stm32f4x9-hsotg" },
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, dwc2_of_match_table);
+-- 
+2.10.1 (Apple Git-78)
