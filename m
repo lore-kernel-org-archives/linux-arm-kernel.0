@@ -1,77 +1,130 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed,  1 Feb 2017 17:53:04 +0000
-Subject: [PATCH] iommu/dma: Remove bogus dma_supported() implementation
-Message-ID: <143b03c101e727cb156b26a907c8d7e390eb9114.1485971565.git.robin.murphy@arm.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Wed, 1 Feb 2017 13:12:18 -0500
+Subject: [PATCH v3 3/5] drm/rockchip/dsi: remove mode_valid function
+In-Reply-To: <5886BB8F.6040707@rock-chips.com>
+References: <1484907051-7159-1-git-send-email-zyw@rock-chips.com>
+ <1484907051-7159-4-git-send-email-zyw@rock-chips.com>
+ <20170123174841.GB25789@trickycodes.roam.corp.google.com>
+ <5886BB8F.6040707@rock-chips.com>
+Message-ID: <20170201181218.GA8595@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Back when this was first written, dma_supported() was somewhat of a
-murky mess, with subtly different interpretations being relied upon in
-various places. The "does device X support DMA to address range Y?"
-uses assuming Y to be physical addresses, which motivated the current
-iommu_dma_supported() implementation and are alluded to in the comment
-therein, have since been cleaned up, leaving only the far less ambiguous
-"can device X drive address bits Y" usage internal to DMA API mask
-setting. As such, there is no reason to keep a slightly misleading
-callback which does nothing but duplicate the current default behaviour;
-we already constrain IOVA allocations to the iommu_domain aperture where
-necessary, so let's leave DMA mask business to architecture-specific
-code where it belongs.
+On Tue, Jan 24, 2017 at 10:27:27AM +0800, Chris Zhong wrote:
+> Hi Sean
+> 
+> On 01/24/2017 01:48 AM, Sean Paul wrote:
+> >On Fri, Jan 20, 2017 at 06:10:49PM +0800, Chris Zhong wrote:
+> >>The MIPI DSI do not need check the validity of resolution, the max
+> >>resolution should depend VOP. Hence, remove rk3288_mipi_dsi_mode_valid
+> >>here.
+> >Does vop actually enforce this, though? I see that mode_config.max_width is
+> >4096, but there is no bounds checking in mode_fixup().
+> >
+> >The connector is currently rejecting everything greater than 2047. So I think
+> >you're going to regress behavior here.
+> >
+> >Sean
+> The mipi controller has not this width limit, it depend the VOP,
+> such as RK3399, VOP_LIT only support 2560,
+> but VOP_BIG support 4K. So this driver should check the width here.
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+I don't see anything in the vop driver that rejects large modes for little vop.
+So, while I agree the check shouldn't be here, you should move it to where it
+should be instead of removing it entirely.
 
-Techincally an IOMMU patch, but could possibly go via arm64 I suppose.
+Sean
 
- arch/arm64/mm/dma-mapping.c |  1 -
- drivers/iommu/dma-iommu.c   | 10 ----------
- include/linux/dma-iommu.h   |  1 -
- 3 files changed, 12 deletions(-)
+> 
+> >
+> >
+> >>Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> >>---
+> >>
+> >>Changes in v3: None
+> >>
+> >>  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 39 ----------------------------------
+> >>  1 file changed, 39 deletions(-)
+> >>
+> >>diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> >>index a93ce97..6f0e252 100644
+> >>--- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> >>+++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> >>@@ -278,8 +278,6 @@ struct dw_mipi_dsi_plat_data {
+> >>  	u32 grf_dsi0_mode;
+> >>  	u32 grf_dsi0_mode_reg;
+> >>  	unsigned int max_data_lanes;
+> >>-	enum drm_mode_status (*mode_valid)(struct drm_connector *connector,
+> >>-					   struct drm_display_mode *mode);
+> >>  };
+> >>  struct dw_mipi_dsi {
+> >>@@ -1081,23 +1079,8 @@ static int dw_mipi_dsi_connector_get_modes(struct drm_connector *connector)
+> >>  	return drm_panel_get_modes(dsi->panel);
+> >>  }
+> >>-static enum drm_mode_status dw_mipi_dsi_mode_valid(
+> >>-					struct drm_connector *connector,
+> >>-					struct drm_display_mode *mode)
+> >>-{
+> >>-	struct dw_mipi_dsi *dsi = con_to_dsi(connector);
+> >>-
+> >>-	enum drm_mode_status mode_status = MODE_OK;
+> >>-
+> >>-	if (dsi->pdata->mode_valid)
+> >>-		mode_status = dsi->pdata->mode_valid(connector, mode);
+> >>-
+> >>-	return mode_status;
+> >>-}
+> >>-
+> >>  static struct drm_connector_helper_funcs dw_mipi_dsi_connector_helper_funcs = {
+> >>  	.get_modes = dw_mipi_dsi_connector_get_modes,
+> >>-	.mode_valid = dw_mipi_dsi_mode_valid,
+> >>  };
+> >>  static void dw_mipi_dsi_drm_connector_destroy(struct drm_connector *connector)
+> >>@@ -1168,33 +1151,11 @@ static int rockchip_mipi_parse_dt(struct dw_mipi_dsi *dsi)
+> >>  	return 0;
+> >>  }
+> >>-static enum drm_mode_status rk3288_mipi_dsi_mode_valid(
+> >>-					struct drm_connector *connector,
+> >>-					struct drm_display_mode *mode)
+> >>-{
+> >>-	/*
+> >>-	 * The VID_PKT_SIZE field in the DSI_VID_PKT_CFG
+> >>-	 * register is 11-bit.
+> >>-	 */
+> >>-	if (mode->hdisplay > 0x7ff)
+> >>-		return MODE_BAD_HVALUE;
+> >>-
+> >>-	/*
+> >>-	 * The V_ACTIVE_LINES field in the DSI_VTIMING_CFG
+> >>-	 * register is 11-bit.
+> >>-	 */
+> >>-	if (mode->vdisplay > 0x7ff)
+> >>-		return MODE_BAD_VVALUE;
+> >>-
+> >>-	return MODE_OK;
+> >>-}
+> >>-
+> >>  static struct dw_mipi_dsi_plat_data rk3288_mipi_dsi_drv_data = {
+> >>  	.dsi0_en_bit = RK3288_DSI0_SEL_VOP_LIT,
+> >>  	.dsi1_en_bit = RK3288_DSI1_SEL_VOP_LIT,
+> >>  	.grf_switch_reg = RK3288_GRF_SOC_CON6,
+> >>  	.max_data_lanes = 4,
+> >>-	.mode_valid = rk3288_mipi_dsi_mode_valid,
+> >>  };
+> >>  static struct dw_mipi_dsi_plat_data rk3399_mipi_dsi_drv_data = {
+> >>-- 
+> >>2.6.3
+> >>
+> >>_______________________________________________
+> >>dri-devel mailing list
+> >>dri-devel at lists.freedesktop.org
+> >>https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> 
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 88493b0ebd5e..351f7595cb3e 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -810,7 +810,6 @@ static struct dma_map_ops iommu_dma_ops = {
- 	.sync_sg_for_device = __iommu_sync_sg_for_device,
- 	.map_resource = iommu_dma_map_resource,
- 	.unmap_resource = iommu_dma_unmap_resource,
--	.dma_supported = iommu_dma_supported,
- 	.mapping_error = iommu_dma_mapping_error,
- };
- 
-diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-index 1c9ac26e3b68..48d36ce59efb 100644
---- a/drivers/iommu/dma-iommu.c
-+++ b/drivers/iommu/dma-iommu.c
-@@ -734,16 +734,6 @@ void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
- 	__iommu_dma_unmap(iommu_get_domain_for_dev(dev), handle);
- }
- 
--int iommu_dma_supported(struct device *dev, u64 mask)
--{
--	/*
--	 * 'Special' IOMMUs which don't have the same addressing capability
--	 * as the CPU will have to wait until we have some way to query that
--	 * before they'll be able to use this framework.
--	 */
--	return 1;
--}
--
- int iommu_dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
- {
- 	return dma_addr == DMA_ERROR_CODE;
-diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
-index 3a846f9ec0fd..5725c94b1f12 100644
---- a/include/linux/dma-iommu.h
-+++ b/include/linux/dma-iommu.h
-@@ -67,7 +67,6 @@ dma_addr_t iommu_dma_map_resource(struct device *dev, phys_addr_t phys,
- 		size_t size, enum dma_data_direction dir, unsigned long attrs);
- void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
- 		size_t size, enum dma_data_direction dir, unsigned long attrs);
--int iommu_dma_supported(struct device *dev, u64 mask);
- int iommu_dma_mapping_error(struct device *dev, dma_addr_t dma_addr);
- 
- /* The DMA API isn't _quite_ the whole story, though... */
 -- 
-2.11.0.dirty
+Sean Paul, Software Engineer, Google / Chromium OS
