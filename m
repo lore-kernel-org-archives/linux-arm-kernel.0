@@ -1,34 +1,34 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 1 Feb 2017 10:53:29 +0000
-Subject: [PATCH v1] ASoC: bcm2835: Remove redundant channel checking code
- in hw_params
-In-Reply-To: <1485924303-30869-1-git-send-email-flatmax@flatmax.org>
-References: <1484443043-13623-1-git-send-email-flatmax@flatmax.org>
- <1485924303-30869-1-git-send-email-flatmax@flatmax.org>
-Message-ID: <20170201105329.vr4ro5bjf676dwtk@sirena.org.uk>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 1 Feb 2017 10:53:10 +0000
+Subject: [PATCH v3 00/24] i.MX Media Driver
+In-Reply-To: <1485945751.3353.28.camel@pengutronix.de>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <1485870854.2932.63.camel@pengutronix.de>
+ <5586b893-bf5c-6133-0789-ccce60626b86@gmail.com>
+ <1485941457.3353.13.camel@pengutronix.de>
+ <20170201101111.GL27312@n2100.armlinux.org.uk>
+ <1485945751.3353.28.camel@pengutronix.de>
+Message-ID: <20170201105310.GN27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2017 at 03:45:03PM +1100, Matt Flax wrote:
+On Wed, Feb 01, 2017 at 11:42:31AM +0100, Philipp Zabel wrote:
+> On Wed, 2017-02-01 at 10:11 +0000, Russell King - ARM Linux wrote:
+> Right, it's just that in the latest version there is no v4l2_subdev for
+> fifos and idmac. There is the capture interface entity that represents
+> one of the IDMAC write channels, but that doesn't have a pad and format
+> configuration.
+> The SMFC entity was removed because the fifo can be considered part of
+> the link between CSI and IDMAC. There is no manual configuration
+> necessary as the SMFC itself can't do anything to the data that flows
+> through it. There is no reason to present it to userspace as a no-op
+> entity.
+> So in the direct CSI -> SMFC -> IDMAC case, the CSI source pad now is
+> the nearest neighbor pad to the IDMAC capture video device.
 
-> This redundant channel count check may seem like it will not cause
-> any problems however some sound cards (such as the 8 channel
-> AudioInjector Octo sound card) require the execution of the
-> bcm2835_i2s_hw_params function when channels_max in the
-> bcm2835_i2s_dai structure has been increased to 8.
+Ok, that sounds fine then.
 
-> As the channel checking code in bcm2835_i2s_hw_params is redundant
-> and stops certain cards from working it has been removed.
-
-If those cards add support for higher channel counts they should be
-adding real support for that in the driver, not just hacking out
-defensive code.  If the device can usefully do 8 channels then modify
-the driver to do 8 channels.  Otherwise people are going to need to
-modify the driver anyway to remove the limits in the constraints.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170201/69b6d45f/attachment.sig>
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
