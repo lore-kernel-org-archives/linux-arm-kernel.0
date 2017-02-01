@@ -1,31 +1,77 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 1 Feb 2017 17:51:42 +0000
-Subject: [RFC PATCH 1/5] regulator: Extend the power-management APIs
-In-Reply-To: <20170125150256.umqkq44blmv24y5l@piout.net>
-References: <1480687036-5037-1-git-send-email-boris.brezillon@free-electrons.com>
- <1480687036-5037-2-git-send-email-boris.brezillon@free-electrons.com>
- <20170109191758.7zzxeh45pvwiw3jo@sirena.org.uk>
- <20170110093355.700f8225@bbrezillon>
- <20170110121026.zstf7a6cflzk366l@sirena.org.uk>
- <20170110140556.172b3ec0@bbrezillon>
- <20170125150256.umqkq44blmv24y5l@piout.net>
-Message-ID: <20170201175142.cubebzf4y2snklxr@sirena.org.uk>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed,  1 Feb 2017 17:53:04 +0000
+Subject: [PATCH] iommu/dma: Remove bogus dma_supported() implementation
+Message-ID: <143b03c101e727cb156b26a907c8d7e390eb9114.1485971565.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2017 at 04:02:56PM +0100, Alexandre Belloni wrote:
-> Hi Mark,
-> 
-> Any comment on that one so we can move forward?
+Back when this was first written, dma_supported() was somewhat of a
+murky mess, with subtly different interpretations being relied upon in
+various places. The "does device X support DMA to address range Y?"
+uses assuming Y to be physical addresses, which motivated the current
+iommu_dma_supported() implementation and are alluded to in the comment
+therein, have since been cleaned up, leaving only the far less ambiguous
+"can device X drive address bits Y" usage internal to DMA API mask
+setting. As such, there is no reason to keep a slightly misleading
+callback which does nothing but duplicate the current default behaviour;
+we already constrain IOVA allocations to the iommu_domain aperture where
+necessary, so let's leave DMA mask business to architecture-specific
+code where it belongs.
 
-Please don't send top quoted content free pings.  You're not asking a
-question here and I can't see a question in the e-mail you top quoted so
-I'm at a bit of a loss here...  this is pretty much the problem with
-content free pings in a nutshell :(
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170201/3bca83bf/attachment.sig>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
+
+Techincally an IOMMU patch, but could possibly go via arm64 I suppose.
+
+ arch/arm64/mm/dma-mapping.c |  1 -
+ drivers/iommu/dma-iommu.c   | 10 ----------
+ include/linux/dma-iommu.h   |  1 -
+ 3 files changed, 12 deletions(-)
+
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index 88493b0ebd5e..351f7595cb3e 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -810,7 +810,6 @@ static struct dma_map_ops iommu_dma_ops = {
+ 	.sync_sg_for_device = __iommu_sync_sg_for_device,
+ 	.map_resource = iommu_dma_map_resource,
+ 	.unmap_resource = iommu_dma_unmap_resource,
+-	.dma_supported = iommu_dma_supported,
+ 	.mapping_error = iommu_dma_mapping_error,
+ };
+ 
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index 1c9ac26e3b68..48d36ce59efb 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -734,16 +734,6 @@ void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
+ 	__iommu_dma_unmap(iommu_get_domain_for_dev(dev), handle);
+ }
+ 
+-int iommu_dma_supported(struct device *dev, u64 mask)
+-{
+-	/*
+-	 * 'Special' IOMMUs which don't have the same addressing capability
+-	 * as the CPU will have to wait until we have some way to query that
+-	 * before they'll be able to use this framework.
+-	 */
+-	return 1;
+-}
+-
+ int iommu_dma_mapping_error(struct device *dev, dma_addr_t dma_addr)
+ {
+ 	return dma_addr == DMA_ERROR_CODE;
+diff --git a/include/linux/dma-iommu.h b/include/linux/dma-iommu.h
+index 3a846f9ec0fd..5725c94b1f12 100644
+--- a/include/linux/dma-iommu.h
++++ b/include/linux/dma-iommu.h
+@@ -67,7 +67,6 @@ dma_addr_t iommu_dma_map_resource(struct device *dev, phys_addr_t phys,
+ 		size_t size, enum dma_data_direction dir, unsigned long attrs);
+ void iommu_dma_unmap_resource(struct device *dev, dma_addr_t handle,
+ 		size_t size, enum dma_data_direction dir, unsigned long attrs);
+-int iommu_dma_supported(struct device *dev, u64 mask);
+ int iommu_dma_mapping_error(struct device *dev, dma_addr_t dma_addr);
+ 
+ /* The DMA API isn't _quite_ the whole story, though... */
+-- 
+2.11.0.dirty
