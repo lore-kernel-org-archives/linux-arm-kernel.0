@@ -1,57 +1,19 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 1 Feb 2017 10:01:02 +0000
-Subject: [RFC v2 06/10] KVM: arm/arm64: Update the physical timer
- interrupt level
-In-Reply-To: <20170201080440.GB6226@cbox>
-References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
- <1485479100-4966-7-git-send-email-jintack@cs.columbia.edu>
- <86sho199jx.fsf@arm.com> <20170201080440.GB6226@cbox>
-Message-ID: <67c55d45-545e-a787-e2ad-3d6e675df593@arm.com>
+From: dhowells@redhat.com (David Howells)
+Date: Wed, 01 Feb 2017 10:02:19 +0000
+Subject: [PATCH 6/7] efi: Handle secure boot from UEFI-2.6 [ver #7]
+In-Reply-To: <10454.1485889162@warthog.procyon.org.uk>
+References: <10454.1485889162@warthog.procyon.org.uk>
+ <CAKv+Gu8dnKB1sRGb3U+XB1eoA7Eyo4qSFBtPRbvGV912xPViVw@mail.gmail.com>
+ <148587558696.4026.16034622623568539004.stgit@warthog.procyon.org.uk>
+ <148587564847.4026.5759345672956585977.stgit@warthog.procyon.org.uk>
+Message-ID: <18674.1485943339@warthog.procyon.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/02/17 08:04, Christoffer Dall wrote:
-> On Sun, Jan 29, 2017 at 03:21:06PM +0000, Marc Zyngier wrote:
->> On Fri, Jan 27 2017 at 01:04:56 AM, Jintack Lim <jintack@cs.columbia.edu> wrote:
->>> Now that we maintain the EL1 physical timer register states of VMs,
->>> update the physical timer interrupt level along with the virtual one.
->>>
->>> Note that the emulated EL1 physical timer is not mapped to any hardware
->>> timer, so we call a proper vgic function.
->>>
->>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
->>> ---
->>>  virt/kvm/arm/arch_timer.c | 20 ++++++++++++++++++++
->>>  1 file changed, 20 insertions(+)
->>>
->>> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
->>> index 0f6e935..3b6bd50 100644
->>> --- a/virt/kvm/arm/arch_timer.c
->>> +++ b/virt/kvm/arm/arch_timer.c
->>> @@ -180,6 +180,21 @@ static void kvm_timer_update_mapped_irq(struct kvm_vcpu *vcpu, bool new_level,
->>>  	WARN_ON(ret);
->>>  }
->>>  
->>> +static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
->>> +				 struct arch_timer_context *timer)
->>> +{
->>> +	int ret;
->>> +
->>> +	BUG_ON(!vgic_initialized(vcpu->kvm));
->>
->> Although I've added my fair share of BUG_ON() in the code base, I've
->> since reconsidered my position. If we get in a situation where the vgic
->> is not initialized, maybe it would be better to just WARN_ON and return
->> early rather than killing the whole box. Thoughts?
->>
-> 
-> Could we help this series along by saying that since this BUG_ON already
-> exists in the kvm_timer_update_mapped_irq function, then it just
-> preserves functionality and it's up to someone else (me) to remove the
-> BUG_ON from both functions later in life?
+David Howells <dhowells@redhat.com> wrote:
 
-Works for me.
+> Ummm...  This might conflict what said:
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Might conflict with what James said, I should've said.
+
+David
