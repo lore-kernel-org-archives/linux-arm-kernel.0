@@ -1,87 +1,26 @@
-From: john@metanate.com (John Keeping)
-Date: Wed, 1 Feb 2017 17:23:18 +0000
-Subject: [PATCH v3 13/24] drm/rockchip: dw-mipi-dsi: fix escape clock rate
-In-Reply-To: <20170130202510.GP20076@art_vandelay>
-References: <20170129132444.25251-1-john@metanate.com>
- <20170129132444.25251-14-john@metanate.com>
- <20170130202510.GP20076@art_vandelay>
-Message-ID: <20170201172318.6ee90c2d.john@metanate.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 1 Feb 2017 11:26:29 -0600
+Subject: [PATCH v3 1/8] ASoC: sun4i-i2s: Update binding documentation to
+ include A31
+In-Reply-To: <20170131100552.27949-2-mylene.josserand@free-electrons.com>
+References: <20170131100552.27949-1-mylene.josserand@free-electrons.com>
+ <20170131100552.27949-2-mylene.josserand@free-electrons.com>
+Message-ID: <20170201172629.6hcabndljh4bwm5p@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Jan 2017 15:25:10 -0500, Sean Paul wrote:
-
-> On Sun, Jan 29, 2017 at 01:24:33PM +0000, John Keeping wrote:
-> > This clock rate is derived from the PHY PLL, so it should be calculated
-> > dynamically.  Use the same calculation as the vendor kernel to derive
-> > the escape clock speed.
-> >   
+On Tue, Jan 31, 2017 at 11:05:45AM +0100, Myl?ne Josserand wrote:
+> Add a new compatible for sun4i-i2s driver to handle some
+> SoCs that have a reset line that must be asserted/deasserted.
 > 
-> Nit below, but
+> This new compatible, "allwinner,sun6i-a31-i2s", requires the
+> property "resets" which should be a phandle to the reset line.
+> Except these differences, the compatible is identical to previous one
+> which will not handle a reset line.
 > 
-> Reviewed-by: Sean Paul <seanpaul@chromium.org>
-> 
-> > Signed-off-by: John Keeping <john@metanate.com>
-> > Reviewed-by: Chris Zhong <zyw@rock-chips.com>
-> > ---
-> > v3:
-> > - Improve the commit message a bit
-> > - Add Chris' Reviewed-by
-> > Unchanged in v2
-> > 
-> >  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 4 +++-
-> >  1 file changed, 3 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > index 290282e86d16..c2e0ba96e0a0 100644
-> > --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> > @@ -710,11 +710,13 @@ static void dw_mipi_dsi_disable(struct dw_mipi_dsi *dsi)
-> >  
-> >  static void dw_mipi_dsi_init(struct dw_mipi_dsi *dsi)
-> >  {  
-> 
-> Nit: It would be nice to add a comment to the effect of "You are not meant to
-> understand this, it comes from the vendor kernel"
+> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/sound/sun4i-i2s.txt | 5 +++++
+>  1 file changed, 5 insertions(+)
 
-Actually, I think my commit message was misleading.  I think I do
-understand the calculation, although the TRM is not particularly clear
-about it.  TX_ESC_CLK_DIVISION is described as:
-
-    the division factor for the TX_Escape clock source (lanebyteclk).
-    The value 0 and 1 stop the TX_ESC clock generation
-
-Now lanebyteclk is (dsi->lane_mbps >> 3) since lane_mbps is the
-lane bit clock.  The maximum escape mode clock from the MIPI
-specification is 20MHz, so we end up needing
-
-    lanebyteclk / esc_clk_division < 20
-
-thus:
-
-    esc_clk_division > lanebyteclk / 20
-
-and we want esc_clk_division >= 2 to avoid disabling the clock
-generation.
-
-I'll add a comment to this effect.
-
-> > +	u32 esc_clk_division = (dsi->lane_mbps >> 3) / 20 + 1;
-> > +
-> >  	dsi_write(dsi, DSI_PWR_UP, RESET);
-> >  	dsi_write(dsi, DSI_PHY_RSTZ, PHY_DISFORCEPLL | PHY_DISABLECLK
-> >  		  | PHY_RSTZ | PHY_SHUTDOWNZ);
-> >  	dsi_write(dsi, DSI_CLKMGR_CFG, TO_CLK_DIVIDSION(10) |
-> > -		  TX_ESC_CLK_DIVIDSION(7));
-> > +		  TX_ESC_CLK_DIVIDSION(esc_clk_division));
-> >  }
-> >  
-> >  static void dw_mipi_dsi_dpi_config(struct dw_mipi_dsi *dsi,
-> > -- 
-> > 2.11.0.197.gb556de5.dirty
-> > 
-> > _______________________________________________
-> > dri-devel mailing list
-> > dri-devel at lists.freedesktop.org
-> > https://lists.freedesktop.org/mailman/listinfo/dri-devel  
-> 
+Acked-by: Rob Herring <robh@kernel.org>
