@@ -1,125 +1,158 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 1 Feb 2017 15:27:32 +0000
-Subject: [PATCH 2/2] arm64/dma-mapping: validate dma_masks against IORT
- defined limits
-In-Reply-To: <20170201143617.GB20423@red-moon>
-References: <1485893763-20671-1-git-send-email-nwatters@codeaurora.org>
- <1485893763-20671-2-git-send-email-nwatters@codeaurora.org>
- <115903ce-6c1d-faa9-cbe4-e67a3d41f5c9@arm.com>
- <20170201143617.GB20423@red-moon>
-Message-ID: <f8eb99ca-bb5d-105e-19ac-73e7d4e75ec6@arm.com>
+From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
+Date: Wed, 1 Feb 2017 07:34:09 -0800
+Subject: [PATCH] PCI: ACPI: Fix ThunderX PEM initialization
+In-Reply-To: <20170201151807.GA15793@bhelgaas-glaptop.roam.corp.google.com>
+References: <1485793552-12614-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
+ <20170130211236.GW20550@bhelgaas-glaptop.roam.corp.google.com>
+ <20170131102830.GA13854@localhost.localdomain>
+ <20170131142525.GA9942@bhelgaas-glaptop.roam.corp.google.com>
+ <20170131145720.GA14231@localhost.localdomain>
+ <20170131203109.GA14127@bhelgaas-glaptop.roam.corp.google.com>
+ <20170201125325.GA15805@localhost.localdomain>
+ <20170201151807.GA15793@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20170201153409.GA16088@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/02/17 14:36, Lorenzo Pieralisi wrote:
-> On Wed, Feb 01, 2017 at 01:44:02PM +0000, Robin Murphy wrote:
->> Hi Nate,
->>
->> On 31/01/17 20:16, Nate Watterson wrote:
->>> Some drivers set the dma_mask of client devices based solely on values
->>> read from capability registers which may not account for platform
->>> specific bus address width limitations. Fortunately, the ACPI IORT table
->>> provides a way to report the effective number of address bits a device
->>> can use to access memory. This information, when present, is used to
->>> supplement the checks already being done in dma_supported() to avoid
->>> setting overly generous dma_masks.
->>
->> This is equally a problem for DT, and I think in general we'd prefer not
->> to be dragging ACPI/DT specifics in at this level when there's a clean
->> way to address it more generally. There is some recent ongoing
->> discussion and work in this area (latest part at [1]) - I have a local
->> branch somewhere implementing the stricter "don't special case default
->> masks" version (after I came around to Arnd's viewpoint), which I must
->> refresh myself on because there was some anomaly in the core DT code
->> which that brought to light.
+On Wed, Feb 01, 2017 at 09:18:07AM -0600, Bjorn Helgaas wrote:
+> On Wed, Feb 01, 2017 at 04:53:25AM -0800, Vadim Lomovtsev wrote:
+> > On Tue, Jan 31, 2017 at 02:31:09PM -0600, Bjorn Helgaas wrote:
+> > > On Tue, Jan 31, 2017 at 06:57:20AM -0800, Vadim Lomovtsev wrote:
+> > > > On Tue, Jan 31, 2017 at 08:25:25AM -0600, Bjorn Helgaas wrote:
+> > > > > On Tue, Jan 31, 2017 at 02:28:30AM -0800, Vadim Lomovtsev wrote:
+> > > > > > Hi Bjorn,
+> > > > > > 
+> > > > > > On Mon, Jan 30, 2017 at 03:12:37PM -0600, Bjorn Helgaas wrote:
+> > > > > > > Hi Vadim,
+> > > > > > > 
+> > > > > > > On Mon, Jan 30, 2017 at 08:25:52AM -0800, Vadim Lomovtsev wrote:
+> > > > > > > > This patch is to address PEM initialization issue
+> > > > > > > > which causes network issues.
+> > > > > > > > 
+> > > > > > > > It is necessary to search for _HID:PNP0A08 while requesting
+> > > > > > > > PEM resources via ACPI instead of "THRX0002".
+> > > > > > > > 
+> > > > > > > > Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
+> > > > > > > > ---
+> > > > > > > >  drivers/pci/host/pci-thunder-pem.c | 2 +-
+> > > > > > > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > > > > > > 
+> > > > > > > > diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
+> > > > > > > > index af722eb..aec30b8 100644
+> > > > > > > > --- a/drivers/pci/host/pci-thunder-pem.c
+> > > > > > > > +++ b/drivers/pci/host/pci-thunder-pem.c
+> > > > > > > > @@ -331,7 +331,7 @@ static int thunder_pem_acpi_init(struct pci_config_window *cfg)
+> > > > > > > >  	if (!res_pem)
+> > > > > > > >  		return -ENOMEM;
+> > > > > > > >  
+> > > > > > > > -	ret = acpi_get_rc_resources(dev, "THRX0002", root->segment, res_pem);
+> > > > > > > > +	ret = acpi_get_rc_resources(dev, "PNP0A08", root->segment, res_pem);
+> > > > > > > 
+> > > > > > > This doesn't smell right: PNP0A08 is the generic ACPI ID.  There's no
+> > > > > > > guarantee that if we find a PNP0A08 device, it is a ThunderX device.
+> > > > > > > 
+> > > > > > > I think the only way to call thunder_pem_acpi_init() is via an MCFG
+> > > > > > > quirk that mentions thunder_pem_ecam_ops, which means we only call it
+> > > > > > > if we find an MCFG with "CAVIUM" "THUNDERX" OEM and table IDs, so it's
+> > > > > > > probably safe in that sense.
+> > > > > > 
+> > > > > > Agree, it is not the best solution.
+> > > > > > We will implement such approach and send for review. 
+> > > > > > 
+> > > > > > > 
+> > > > > > > But it's an abuse of the ACPI _HID model.  If you match a device using
+> > > > > > > PNP0A08, all you can assume about it is that it uses the generic
+> > > > > > > PNP0A08 programming model, and I don't think that includes "the first
+> > > > > > > memory resource in _CRS contains ECAM space and MSI-X tables."
+> > > > > > > 
+> > > > > > > I expect this is a teething issue because you have firmware in the
+> > > > > > > field that uses PNP0A08 and it's not feasible to update it.  If that's
+> > > > > > > the case, the changelog should have details about it and we should
+> > > > > > > have a comment in the code, because I don't think this is the model we
+> > > > > > > want to end up with in future releases.
+> > > > > > 
+> > > > > > It could become so. However, for now I didn't get any reports on that,
+> > > > > > (may be I miss something) except some internal emailings.
+> > > > > > At my testing HW I was able to see some issues related to acpi-PEM stuff.
+> > > > > > 
+> > > > > > Thanks for feed-back, we will prepare another patch or patchset
+> > > > > > implementing approach you've highlighted.
+> > > > > 
+> > > > > The approach I would like best is to search for THRX0002, because then
+> > > > > you know you have a ThunderX PEM device, and you can assume
+> > > > > device-specific details about its _CRS.
+> > > > >
+> > > > > But that's what the existing code does, and apparently that doesn't
+> > > > > work.  My guess is that you have firmware in the field where the host
+> > > > > bridge has only PNP0A08 (and maybe PNP0A03) as device IDs.
+> > > > 
+> > > > Because there is no such ACPI ID as "THRX0002" registered
+> > > > (http://www.uefi.org/acpi_id_list).
+> > > 
+> > > To be pedantically correct, I think you want "THRX" registered.  Then
+> > > you can manage the "0002" part internally without registering each
+> > > individual device.
+> > 
+> > Not sure if it would be registered that way, because (AFAIK)
+> > it expected to be string constructed from Vendor ID (not the Product ID) plus
+> > four hex digit manged internaly. So we suggest to change it to 177DXXXX
+> > which corresponds to Cavium PCI ID https://pci-ids.ucw.cz/pci.ids.
+> > It's also possible to use the 3-digit PNP ID, "CAV", to construct these
+> > _HID/_CID/_SUB values (http://www.uefi.org/pnp_id_list).
 > 
-> Agreed. I can prototype the ACPI version by using the _DMA object in the
-> ACPI specs instead of IORT specific bindings (what to do for named
-> components has to be seen given that _DMA object and IORT bindings can
-> provide different information - though _DMA object usage at least on x86
-> seems non-existent, whether we should use it or not on ARM is still a
-> question mark). Anyway, the IORT parsing code in patch 1 is simple, we
-> have to decide how to handle the information retrieved. I will have a
-> look at [1] let me know if you need help prototyping and testing it with
-> ACPI.
+> My point was that you only need to register the prefix ("CAV" or
+> "THRX") of the PNP or ACPI ID.  Then you manage the suffixes
+> internally.  You as long as you register "CAV" or "THRX", you can
+> assign and use "THRX0002" yourself without registering that
+> specifically.
 
-Essentially, all that needs to be done is to ensure that the initial
-masks set by acpi_dma_configure() truly reflect the maximum hardware
-capability; everything else will then just fall out of that. The
-aforementioned thing on the DT side is that of_dma_configure() currently
-has a bug which prevents masks larger than 32 bits actually being
-assigned from "dma-ranges" - I need to split out a proper patch from the
-"git commit -am 'hacks'" that I have on this local branch :)
-
-Robin.
+Yes, exactly. And the "CAV" perfix is already registered.
+And I think will'll use it to keep things aligned to specs & rules.
 
 > 
-> Lorenzo
+> > So the FW will be updated accordingly.
+> > 
+> > For old FW we'll implement fallback scenario gathering resource info
+> > via _CRS object (comments will be provided in the code also).
+> > 
+> > > 
+> > > > From the other hand we may gather device resources through
+> > > > _CRS (we have acpi_device already set by this moment) but
+> > > > we need to be sure that we're running at Cavium ThunderX board then.
+> > > > 
+> > > > To do that we may add _SUB value (accrodingly to spec) with
+> > > > exact ID string (a full PCI ID value "177DA22D" is suggested).
+> > > > This will eventually become the main method of finding out
+> > > > whether we run on a ThunderX PEM.
+> > > 
+> > > I don't understand why you would use _SUB.  I think the correct way to
+> > > handle this is to use a _HID of "THRX0002" with a _CID of "PNP0A08".
+> > > Is there some existing _SUB usage you're using as an example?
+> > 
+> > Here we were talking about extra quirk to match PEM and ECAM and thus make
+> > a decision. This object could also store some vendor-specific IDs.
+> > To be honest I didn't see usage in kernel (didn't search), but ACPI Spec
+> > provide an example as (p 6.1.9) :
+> >   Name (_SUB, "MSFT3000")// Vendor-defined subsystem
+> > 
+> > However this is still debatable and we probably stick to _HID while
+> > implementing additional match functions.
 > 
->>> Signed-off-by: Nate Watterson <nwatters@codeaurora.org>
->>> ---
->>>  arch/arm64/mm/dma-mapping.c | 20 +++++++++++++++++++-
->>>  1 file changed, 19 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
->>> index e040827..467fd23 100644
->>> --- a/arch/arm64/mm/dma-mapping.c
->>> +++ b/arch/arm64/mm/dma-mapping.c
->>> @@ -19,6 +19,7 @@
->>>  
->>>  #include <linux/gfp.h>
->>>  #include <linux/acpi.h>
->>> +#include <linux/acpi_iort.h>
->>>  #include <linux/bootmem.h>
->>>  #include <linux/cache.h>
->>>  #include <linux/export.h>
->>> @@ -347,6 +348,12 @@ static int __swiotlb_get_sgtable(struct device *dev, struct sg_table *sgt,
->>>  
->>>  static int __swiotlb_dma_supported(struct device *hwdev, u64 mask)
->>>  {
->>> +	int dma_limit;
->>> +
->>> +	dma_limit = iort_get_memory_address_limit(hwdev);
->>> +	if (dma_limit >= 0 && DMA_BIT_MASK(dma_limit) < mask)
->>> +		return 0;
->>> +
->>>  	if (swiotlb)
->>>  		return swiotlb_dma_supported(hwdev, mask);
->>>  	return 1;
->>> @@ -784,6 +791,17 @@ static void __iommu_unmap_sg_attrs(struct device *dev,
->>>  	iommu_dma_unmap_sg(dev, sgl, nelems, dir, attrs);
->>>  }
->>>  
->>> +static int __iommu_dma_supported(struct device *hwdev, u64 mask)
->>> +{
->>> +	int dma_limit;
->>> +
->>> +	dma_limit = iort_get_memory_address_limit(hwdev);
->>> +	if (dma_limit >= 0 && DMA_BIT_MASK(dma_limit) < mask)
->>> +		return 0;
->>> +
->>> +	return iommu_dma_supported(hwdev, mask);
->>
->> Either way, this reminds me that iommu_dma_supported() is another thing
->> I got completely wrong - time to write yet another patch...
->>
->> Robin.
->>
->> [1]:http://www.mail-archive.com/linux-renesas-soc at vger.kernel.org/msg10637.html
->>
->>> +}
->>> +
->>>  static struct dma_map_ops iommu_dma_ops = {
->>>  	.alloc = __iommu_alloc_attrs,
->>>  	.free = __iommu_free_attrs,
->>> @@ -799,7 +817,7 @@ static void __iommu_unmap_sg_attrs(struct device *dev,
->>>  	.sync_sg_for_device = __iommu_sync_sg_for_device,
->>>  	.map_resource = iommu_dma_map_resource,
->>>  	.unmap_resource = iommu_dma_unmap_resource,
->>> -	.dma_supported = iommu_dma_supported,
->>> +	.dma_supported = __iommu_dma_supported,
->>>  	.mapping_error = iommu_dma_mapping_error,
->>>  };
->>>  
->>>
->>
+> If you want a driver to bind to a specific device, e.g., the ThunderX
+> PCI host bridge, the firmware should use a unique _HID in the ACPI
+> namespace and the driver should claim that _HID.
+> 
+> It's conceivable that you could use _SUB, but that's needlessly
+> different from everything else.
+
+See your point, thank you for quick and clear feed-back.
+
+Just to let you know:
+We are in the middle of developing solution for fall-back
+scenario (when ACPI/PNP ID wasn't found) for PEM initalization.
+Hope to be able to get it into 4.10.
+
+> 
+> Bjorn
+
+Vadim
