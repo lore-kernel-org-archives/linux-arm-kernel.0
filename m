@@ -1,50 +1,129 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 01 Feb 2017 13:52:39 +0100
-Subject: [PATCH 06/10] soc/qbman: Add ARM equivalent for
- flush_dcache_range()
-In-Reply-To: <20170130150428.GY27312@n2100.armlinux.org.uk>
-References: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
- <5414359.8GMja3pNrI@wuerfel> <20170130150428.GY27312@n2100.armlinux.org.uk>
-Message-ID: <17693912.jiBZSyyCNs@wuerfel>
+From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
+Date: Wed, 1 Feb 2017 04:53:25 -0800
+Subject: [PATCH] PCI: ACPI: Fix ThunderX PEM initialization
+In-Reply-To: <20170131203109.GA14127@bhelgaas-glaptop.roam.corp.google.com>
+References: <1485793552-12614-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
+ <20170130211236.GW20550@bhelgaas-glaptop.roam.corp.google.com>
+ <20170131102830.GA13854@localhost.localdomain>
+ <20170131142525.GA9942@bhelgaas-glaptop.roam.corp.google.com>
+ <20170131145720.GA14231@localhost.localdomain>
+ <20170131203109.GA14127@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20170201125325.GA15805@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, January 30, 2017 3:04:28 PM CET Russell King - ARM Linux wrote:
-> On Wed, Jan 25, 2017 at 10:20:09PM +0100, Arnd Bergmann wrote:
-> > On Monday, January 23, 2017 7:24:59 PM CET Roy Pledge wrote:
-> > > > Is there a non-"under the covers" way to say "flush this region" without
-> > > > the arch second-guessing whether it really needs to be flushed?
-> > > Any advice on how to resolve this? I looked into trying to do a
-> > > non-cacheable mapping of the
-> > > memory so that the flush wouldn't be required but the ioremap code
-> > > prevents mapping normal
-> > > memory in this way.  The QMan device requiresthis memory to be zeroed at
-> > > startup. Because the device
-> > > does non coherent reads and writes to the memory we must ensure that any
-> > > cache in the CPU cluster(s)
-> > > is flushed in order to prevent a future castout from overwriting data.
-> > > This happened before on PPC
-> > > platforms and made for some very unfun debug session trying to
-> > > understand what was causing the failure.
+On Tue, Jan 31, 2017 at 02:31:09PM -0600, Bjorn Helgaas wrote:
+> On Tue, Jan 31, 2017 at 06:57:20AM -0800, Vadim Lomovtsev wrote:
+> > On Tue, Jan 31, 2017 at 08:25:25AM -0600, Bjorn Helgaas wrote:
+> > > On Tue, Jan 31, 2017 at 02:28:30AM -0800, Vadim Lomovtsev wrote:
+> > > > Hi Bjorn,
+> > > > 
+> > > > On Mon, Jan 30, 2017 at 03:12:37PM -0600, Bjorn Helgaas wrote:
+> > > > > Hi Vadim,
+> > > > > 
+> > > > > On Mon, Jan 30, 2017 at 08:25:52AM -0800, Vadim Lomovtsev wrote:
+> > > > > > This patch is to address PEM initialization issue
+> > > > > > which causes network issues.
+> > > > > > 
+> > > > > > It is necessary to search for _HID:PNP0A08 while requesting
+> > > > > > PEM resources via ACPI instead of "THRX0002".
+> > > > > > 
+> > > > > > Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
+> > > > > > ---
+> > > > > >  drivers/pci/host/pci-thunder-pem.c | 2 +-
+> > > > > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > > > > 
+> > > > > > diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
+> > > > > > index af722eb..aec30b8 100644
+> > > > > > --- a/drivers/pci/host/pci-thunder-pem.c
+> > > > > > +++ b/drivers/pci/host/pci-thunder-pem.c
+> > > > > > @@ -331,7 +331,7 @@ static int thunder_pem_acpi_init(struct pci_config_window *cfg)
+> > > > > >  	if (!res_pem)
+> > > > > >  		return -ENOMEM;
+> > > > > >  
+> > > > > > -	ret = acpi_get_rc_resources(dev, "THRX0002", root->segment, res_pem);
+> > > > > > +	ret = acpi_get_rc_resources(dev, "PNP0A08", root->segment, res_pem);
+> > > > > 
+> > > > > This doesn't smell right: PNP0A08 is the generic ACPI ID.  There's no
+> > > > > guarantee that if we find a PNP0A08 device, it is a ThunderX device.
+> > > > > 
+> > > > > I think the only way to call thunder_pem_acpi_init() is via an MCFG
+> > > > > quirk that mentions thunder_pem_ecam_ops, which means we only call it
+> > > > > if we find an MCFG with "CAVIUM" "THUNDERX" OEM and table IDs, so it's
+> > > > > probably safe in that sense.
+> > > > 
+> > > > Agree, it is not the best solution.
+> > > > We will implement such approach and send for review. 
+> > > > 
+> > > > > 
+> > > > > But it's an abuse of the ACPI _HID model.  If you match a device using
+> > > > > PNP0A08, all you can assume about it is that it uses the generic
+> > > > > PNP0A08 programming model, and I don't think that includes "the first
+> > > > > memory resource in _CRS contains ECAM space and MSI-X tables."
+> > > > > 
+> > > > > I expect this is a teething issue because you have firmware in the
+> > > > > field that uses PNP0A08 and it's not feasible to update it.  If that's
+> > > > > the case, the changelog should have details about it and we should
+> > > > > have a comment in the code, because I don't think this is the model we
+> > > > > want to end up with in future releases.
+> > > > 
+> > > > It could become so. However, for now I didn't get any reports on that,
+> > > > (may be I miss something) except some internal emailings.
+> > > > At my testing HW I was able to see some issues related to acpi-PEM stuff.
+> > > > 
+> > > > Thanks for feed-back, we will prepare another patch or patchset
+> > > > implementing approach you've highlighted.
+> > > 
+> > > The approach I would like best is to search for THRX0002, because then
+> > > you know you have a ThunderX PEM device, and you can assume
+> > > device-specific details about its _CRS.
+> > >
+> > > But that's what the existing code does, and apparently that doesn't
+> > > work.  My guess is that you have firmware in the field where the host
+> > > bridge has only PNP0A08 (and maybe PNP0A03) as device IDs.
 > > 
-> > If this is normal RAM, you should be able to just write zeroes, and then
-> > do a dma_map_single() for initialization. Are there any other requirements
-> > what to do with the memory later, is it used for communication at all,
-> > or just required to be zero?
+> > Because there is no such ACPI ID as "THRX0002" registered
+> > (http://www.uefi.org/acpi_id_list).
 > 
-> Please don't encourage incorrect DMA API usage.
+> To be pedantically correct, I think you want "THRX" registered.  Then
+> you can manage the "0002" part internally without registering each
+> individual device.
+
+Not sure if it would be registered that way, because (AFAIK)
+it expected to be string constructed from Vendor ID (not the Product ID) plus
+four hex digit manged internaly. So we suggest to change it to 177DXXXX
+which corresponds to Cavium PCI ID https://pci-ids.ucw.cz/pci.ids.
+It's also possible to use the 3-digit PNP ID, "CAV", to construct these
+_HID/_CID/_SUB values (http://www.uefi.org/pnp_id_list).
+
+So the FW will be updated accordingly.
+
+For old FW we'll implement fallback scenario gathering resource info
+via _CRS object (comments will be provided in the code also).
+
 > 
-> dma_map_single() must always be paired with an unmap at some point,
-> otherwise it's a memory leak if DMA API debugging is enabled.  So,
-> if you wish to suggest using dma_map_single(), please also suggest
-> where to use dma_unmap_single() too.
+> > From the other hand we may gather device resources through
+> > _CRS (we have acpi_device already set by this moment) but
+> > we need to be sure that we're running at Cavium ThunderX board then.
+> > 
+> > To do that we may add _SUB value (accrodingly to spec) with
+> > exact ID string (a full PCI ID value "177DA22D" is suggested).
+> > This will eventually become the main method of finding out
+> > whether we run on a ThunderX PEM.
+> 
+> I don't understand why you would use _SUB.  I think the correct way to
+> handle this is to use a _HID of "THRX0002" with a _CID of "PNP0A08".
+> Is there some existing _SUB usage you're using as an example?
+>
 
-The mapping obviously has to exist the whole time the device is in use,
-and we should not call dma_unmap_single() until the device is released
-by the driver.
+Here we were talking about extra quirk to match PEM and ECAM and thus make
+a decision. This object could also store some vendor-specific IDs.
+To be honest I didn't see usage in kernel (didn't search), but ACPI Spec
+provide an example as (p 6.1.9) :
+  Name (_SUB, "MSFT3000")// Vendor-defined subsystem
 
-Unfortunately it seems we can't use this interface though, as the device
-is already configured to a specific reserved memory range, and we can't
-just use get_free_pages() here.
+However this is still debatable and we probably stick to _HID while
+implementing additional match functions.
 
-	Arnd
+
+> Bjorn
