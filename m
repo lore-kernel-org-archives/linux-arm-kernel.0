@@ -1,42 +1,57 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed,  1 Feb 2017 08:55:56 -0800
-Subject: [PATCH v2 0/3] i.MX7 PCI support
-Message-ID: <20170201165559.22436-1-andrew.smirnov@gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 1 Feb 2017 18:00:52 +0100
+Subject: [PATCH] usb: gadget: udc: atmel: fix debug output
+In-Reply-To: <20170201164218.2421617-1-arnd@arndb.de>
+References: <20170201164218.2421617-1-arnd@arndb.de>
+Message-ID: <20170201170052.pvltw6punq6ncmwr@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, everyone:
+On 01/02/2017 at 17:41:55 +0100, Arnd Bergmann wrote:
+> The debug output now contains the wrong variable, as seen from the compiler
+> warning:
+> 
+> drivers/usb/gadget/udc/atmel_usba_udc.c: In function 'usba_ep_enable':
+> drivers/usb/gadget/udc/atmel_usba_udc.c:632:550: error: 'ept_cfg' may be used uninitialized in this function [-Werror=maybe-uninitialized]
+>   DBG(DBG_ERR, "%s: EPT_CFG = 0x%lx (maxpacket = %lu)\n",
+> 
+> This changes the debug output the same way as the other code.
+> 
+> Fixes: 741d2558bf0a ("usb: gadget: udc: atmel: Update endpoint allocation scheme")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-This is a second iteration of the code that adds PCI-subsystem bits
-necessary for enabling PCI support on i.MX7.
-
-Changes since v1 (can be found at [version1]):
-
-	- All GPC related code moved into a separate driver (subject
-          of a different patch)
-	- Removed GPIO probe deferral logging
-	- Fixed section mismatch warning
-	- Minor reformatting of fsl,imx6q-pcie.txt(as per Rob
-          Herring's request)
-
-[version1] https://lkml.org/lkml/2017/1/19/488
-
-Thanks,
-Andrey Smirnov
-
-Andrey Smirnov (3):
-  PCI: imx6: Fix a typo in error message
-  PCI: imx6: Allow probe deferal by reset GPIO
-  PCI: imx6: Add code to support i.MX7D
-
- .../devicetree/bindings/pci/fsl,imx6q-pcie.txt     |   6 +-
- drivers/pci/host/pci-imx6.c                        | 145 ++++++++++++++++-----
- include/linux/mfd/syscon/imx7-gpc.h                |  18 +++
- include/linux/mfd/syscon/imx7-iomuxc-gpr.h         |   4 +
- include/linux/mfd/syscon/imx7-src.h                |  18 +++
- 5 files changed, 161 insertions(+), 30 deletions(-)
- create mode 100644 include/linux/mfd/syscon/imx7-gpc.h
- create mode 100644 include/linux/mfd/syscon/imx7-src.h
+> ---
+>  drivers/usb/gadget/udc/atmel_usba_udc.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+> index 11bbce28bc23..2035906b8ced 100644
+> --- a/drivers/usb/gadget/udc/atmel_usba_udc.c
+> +++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+> @@ -610,7 +610,7 @@ usba_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
+>  {
+>  	struct usba_ep *ep = to_usba_ep(_ep);
+>  	struct usba_udc *udc = ep->udc;
+> -	unsigned long flags, ept_cfg, maxpacket;
+> +	unsigned long flags, maxpacket;
+>  	unsigned int nr_trans;
+>  
+>  	DBG(DBG_GADGET, "%s: ep_enable: desc=%p\n", ep->ep.name, desc);
+> @@ -630,7 +630,7 @@ usba_ep_enable(struct usb_ep *_ep, const struct usb_endpoint_descriptor *desc)
+>  	ep->is_in = 0;
+>  
+>  	DBG(DBG_ERR, "%s: EPT_CFG = 0x%lx (maxpacket = %lu)\n",
+> -			ep->ep.name, ept_cfg, maxpacket);
+> +			ep->ep.name, ep->ept_cfg, maxpacket);
+>  
+>  	if (usb_endpoint_dir_in(desc)) {
+>  		ep->is_in = 1;
+> -- 
+> 2.9.0
+> 
 
 -- 
-2.9.3
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
