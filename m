@@ -1,64 +1,66 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 1 Feb 2017 18:38:12 +0000
-Subject: [PATCH v4 2/4] arm64: Work around Falkor erratum 1003
-In-Reply-To: <20170201183400.GA31652@arm.com>
-References: <36478002-4cd8-7f1c-1a25-8bfe35022a47@codeaurora.org>
- <3cab36fb-984a-beae-64db-6ce830ba94f6@arm.com>
- <b4cf83d2-ae05-3362-bc23-2341d00516dc@codeaurora.org>
- <20170201163358.GG8177@arm.com>
- <20170201173609.GE26507@e104818-lin.cambridge.arm.com>
- <20170201174105.GK8177@arm.com>
- <20170201174934.GF26507@e104818-lin.cambridge.arm.com>
- <20170201175947.GL8177@arm.com>
- <20170201182244.GH26507@e104818-lin.cambridge.arm.com>
- <20170201183400.GA31652@arm.com>
-Message-ID: <20170201183812.GI26507@e104818-lin.cambridge.arm.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Wed, 1 Feb 2017 13:41:27 -0500
+Subject: [PATCH v4 2/6] drm/rockchip/dsi: dw-mipi: support RK3399 mipi dsi
+In-Reply-To: <1485225486-669-3-git-send-email-zyw@rock-chips.com>
+References: <1485225486-669-1-git-send-email-zyw@rock-chips.com>
+ <1485225486-669-3-git-send-email-zyw@rock-chips.com>
+Message-ID: <20170201184127.GB8595@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2017 at 06:34:01PM +0000, Will Deacon wrote:
-> On Wed, Feb 01, 2017 at 06:22:44PM +0000, Catalin Marinas wrote:
-> > On Wed, Feb 01, 2017 at 05:59:48PM +0000, Will Deacon wrote:
-> > > On Wed, Feb 01, 2017 at 05:49:34PM +0000, Catalin Marinas wrote:
-> > > > On Wed, Feb 01, 2017 at 05:41:05PM +0000, Will Deacon wrote:
-> > > > > Maybe
-> > > > > just select ARM64_PAN if the erratum workaround is selected, then
-> > > > > runtime warning if we find that the h/w doesn't have PAN but does have
-> > > > > the erratum (which should never fire)?
-> > > > 
-> > > > You still need this workaround even if you don't want any PAN (both sw
-> > > > and hw PAN disabled). I wouldn't want to select ARM64_PAN since it's not
-> > > > a dependency. It's more like if you do need a PAN, make sure you only
-> > > > use the hw one.
-> > > 
-> > > True, in the case that all PAN options are disabled we still want this
-> > > to work. How about:
-> > > 
-> > >   select ARM64_PAN if ARM64_SW_TTBR0_PAN
-> > 
-> > As I replied to myself, the above would work for me as well, so let's go
-> > for this.
-> > 
-> > > In fact, what's the reason for supporting SW_PAN and ARM64_PAN as a
-> > > config combination? Why not just have "PAN" that enables them both and
-> > > uses the hardware feature if it's there?
-> > 
-> > Because SW PAN has a non-trivial performance hit. You would enable SW
-> > PAN only if you are paranoid about security. HW PAN, OTOH, is very cheap
-> > and I wouldn't want to miss enabling it in a single Image supporting
-> > ARMv8.0 and ARMv8.1 just because SW PAN is slow on ARMv8.0.
-> > 
-> > IOW, ARM64_PAN is default y while ARM64_SW_TTBR0_PAN is default n.
+On Tue, Jan 24, 2017 at 10:38:02AM +0800, Chris Zhong wrote:
+> The vopb/vopl switch register of RK3399 mipi is different from RK3288,
+> the default setting for mipi dsi mode is different too, so add a
+> of_device_id structure to distinguish them, and make sure set the
+> correct mode before mipi phy init.
 > 
-> Ok, in that case, then how about another permutation: we make
-> ARM64_SW_TTBR0_PAN depend on ARM64_PAN? Then when you select "PAN Support"
-> you get a new menu option underneath it for the emulation? I think that
-> solves the erratum case and the use-case above.
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+> 
+> ---
+> 
+> Changes in v4:
+> - remove the unrelated change
+> 
+> Changes in v3:
+> - base on John Keeping's patch series
+> 
+>  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 68 +++++++++++++++++++++++++++++-----
+>  1 file changed, 58 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> index 45af890..b7b67be 100644
+> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
 
-The problem is that ARM64_PAN is an ARMv8.1 feature and currently
-grouped accordingly in Kconfig. ARM64_SW_TTBR0_PAN is complementary (and
-even not recommended on ARMv8.1). We can do this if we break the ARMv8.x
-feature grouping but just for this erratum, I don't think it's worth.
+<snip>
+
+> @@ -1249,6 +1293,10 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
+>  		clk_disable_unprepare(dsi->pclk);
+>  	}
+>  
+> +	dsi->phy_cfg_clk = devm_clk_get(dev, "phy_cfg");
+> +	if (IS_ERR(dsi->phy_cfg_clk))
+> +		dev_dbg(dev, "have not phy_cfg_clk\n");
+
+You should differentiate between ENODEV and other errors here, returning an
+error if it's not ENODEV. If it is ENODEV, just set phy_cfg_clk to NULL, then
+you can remove all of the if (IS_ERR(dsi->phy_cfg_clk) checks everywhere since
+clk_* functions check for NULL.
+
+Sean
+
+> +
+>  	ret = clk_prepare_enable(dsi->pllref_clk);
+>  	if (ret) {
+>  		dev_err(dev, "%s: Failed to enable pllref_clk\n", __func__);
+> -- 
+> 2.6.3
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
 -- 
-Catalin
+Sean Paul, Software Engineer, Google / Chromium OS
