@@ -1,27 +1,35 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 1 Feb 2017 07:25:56 -0600
-Subject: [PATCH v4 1/3] dt-bindings: Document Broadcom iProc mailbox
- controller driver
-In-Reply-To: <1485463082-27067-2-git-send-email-jonathan.richardson@broadcom.com>
-References: <1485463082-27067-1-git-send-email-jonathan.richardson@broadcom.com>
- <1485463082-27067-2-git-send-email-jonathan.richardson@broadcom.com>
-Message-ID: <20170201132556.maxmu5l7yfq23udv@rob-hp-laptop>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed,  1 Feb 2017 22:29:22 +0900
+Subject: [PATCH 1/2] ARM: cache-uniphier: include <linux/errno.h> instead of
+ <linux/types.h>
+Message-ID: <1485955762-4936-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 12:38:00PM -0800, Jonathan Richardson wrote:
-> Add binding document for brcm,iproc-mailbox.
-> 
-> Reviewed-by: Jonathan Richardson <jonathan.richardson@broadcom.com>
-> Tested-by: Jonathan Richardson <jonathan.richardson@broadcom.com>
-> Reviewed-by: Vikram Prakash <vikram.prakash@broadcom.com>
-> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-> Reviewed-by: Shreesha Rajashekar <shreesha.rajashekar@broadcom.com>
-> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
-> Signed-off-by: Jonathan Richardson <jonathan.richardson@broadcom.com>
-> ---
->  .../devicetree/bindings/mailbox/brcm,iproc-mailbox.txt | 18 ++++++++++++++++++
->  1 file changed, 18 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,iproc-mailbox.txt
+Nothing in this header file depends on <linux/types.h>.
+Rather, <linux/errno.h> should be included for -ENODEV.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
+
+KernelVersion: 4.10-rc1
+
+
+ arch/arm/include/asm/hardware/cache-uniphier.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/include/asm/hardware/cache-uniphier.h b/arch/arm/include/asm/hardware/cache-uniphier.h
+index eaa60da..0ef42ae 100644
+--- a/arch/arm/include/asm/hardware/cache-uniphier.h
++++ b/arch/arm/include/asm/hardware/cache-uniphier.h
+@@ -16,7 +16,7 @@
+ #ifndef __CACHE_UNIPHIER_H
+ #define __CACHE_UNIPHIER_H
+ 
+-#include <linux/types.h>
++#include <linux/errno.h>
+ 
+ #ifdef CONFIG_CACHE_UNIPHIER
+ int uniphier_cache_init(void);
+-- 
+2.7.4
