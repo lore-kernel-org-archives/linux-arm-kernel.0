@@ -1,34 +1,63 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 1 Feb 2017 11:59:58 +0000
-Subject: [PATCH v3 1/8] ASoC: sun4i-i2s: Update binding documentation to
- include A31
-In-Reply-To: <feb16b69-388f-10e5-7be5-c750095ee52b@free-electrons.com>
-References: <20170131100552.27949-1-mylene.josserand@free-electrons.com>
- <20170131100552.27949-2-mylene.josserand@free-electrons.com>
- <20170131211702.taxbrgxwo7b4daej@sirena.org.uk>
- <feb16b69-388f-10e5-7be5-c750095ee52b@free-electrons.com>
-Message-ID: <20170201115958.7a2odxxyhzm3ofew@sirena.org.uk>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 1 Feb 2017 21:01:01 +0900
+Subject: [PATCH v2] ARM: dts: r8a7791: link DU to VSPDs
+In-Reply-To: <4bf0b27c-9641-391d-fc05-8cdc20ce4ec3@cogentembedded.com>
+References: <1529351.Fac5N2tKoF@wasted.cogentembedded.com>
+ <2492577.tBEnW0tCHD@wasted.cogentembedded.com>
+ <4ae454ad-296c-dec9-27e9-fd050333737f@cogentembedded.com>
+ <CANqRtoSQTa0fHJSwAHbN3hXSZ=m1kuR2GsUWE5ojN5AN-9i6Bw@mail.gmail.com>
+ <4bf0b27c-9641-391d-fc05-8cdc20ce4ec3@cogentembedded.com>
+Message-ID: <CANqRtoTpsMix30+ESO-bEdaBM8H_9eTOLuoWShQABhmgJk23EA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2017 at 08:44:56AM +0100, Mylene Josserand wrote:
-> On 31/01/2017 22:17, Mark Brown wrote:
-> > On Tue, Jan 31, 2017 at 11:05:45AM +0100, Myl?ne Josserand wrote:
-> > > Add a new compatible for sun4i-i2s driver to handle some
-> > > SoCs that have a reset line that must be asserted/deasserted.
+Hi Sergei,
 
-> > This doesn't apply against current code, please check and resend.
+On Wed, Feb 1, 2017 at 8:40 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> On 2/1/2017 2:13 PM, Magnus Damm wrote:
+>
+>>>> Add the "vsps" property to the DU device node in order to link this node
+>>>> to
+>>>> the VSPD nodes.
+>>>>
+>>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>>>
+>>>> ---
+>>>> Changes in version 2:
+>>>> - rebased the patch.
+>>>>
+>>>> This patch is against the 'renesas-devel-20170125-v4.10-rc5' of Simon
+>>>> Horman's
+>>>> 'renesas.git' repo.  It's  only meaningful if the DRM driver patches
+>>>> I've
+>>>> just
+>>>> posted are applied.
+>>>
+>>>
+>>>
+>>>    Forgot to note that without this patch the DU driver fails to link to
+>>> VSPD and probe correctly, so there's no video signal. So it makes sense
+>>> to
+>>> apply before the DU driver patch (once it's ACKed for merge)...
+>>
+>>
+>> Doesn't that translate to breaking the DT ABI? Is there someway we can
+>> avoid doing that?
+>
+>
+>    It doesn't -- if this patch is merged ahead of the DU patches.
 
-> I based my series on linux-next 20170131. Which one I should use?
+Perhaps I'm misunderstanding, but if you require a DTS patch to be
+merged before a driver change then doesn't this mean that older DTBs
+will stop working with newer kernels and the user is forced to update
+the DTB to avoid breakage?
 
-You should be submitting against my git tree (which should be what's in
--next...).
+It would be nice if older DTBs could keep on working as before and the
+DU driver modification would work both with connected VSPs and also
+keep on working as before in case the VSP connection is not present in
+DT.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git for-next
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170201/d0c44331/attachment.sig>
+Cheers,
+
+/ magnus
