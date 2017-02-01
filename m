@@ -1,161 +1,112 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Feb 2017 00:23:32 +0000
-Subject: [PATCH v3 00/24] i.MX Media Driver
-In-Reply-To: <3a673cba-bbf6-5611-5857-4605797bf049@gmail.com>
+Date: Wed, 1 Feb 2017 00:58:05 +0000
+Subject: [PATCH v3 17/24] media: imx: Add CSI subdev driver
+In-Reply-To: <7ffe2dc6-4098-e89f-03fa-1007eccd7abd@gmail.com>
 References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <20170131004510.GQ27312@n2100.armlinux.org.uk>
- <951c1a08-c0f2-4333-b4bf-410de8dd863f@gmail.com>
- <20170131110027.GU27312@n2100.armlinux.org.uk>
- <3a673cba-bbf6-5611-5857-4605797bf049@gmail.com>
-Message-ID: <20170201002331.GG27312@n2100.armlinux.org.uk>
+ <1483755102-24785-18-git-send-email-steve_longerbeam@mentor.com>
+ <20170131112001.GV27312@n2100.armlinux.org.uk>
+ <7ffe2dc6-4098-e89f-03fa-1007eccd7abd@gmail.com>
+Message-ID: <20170201005805.GI27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2017 at 03:43:22PM -0800, Steve Longerbeam wrote:
+On Tue, Jan 31, 2017 at 04:31:55PM -0800, Steve Longerbeam wrote:
 > 
 > 
-> On 01/31/2017 03:00 AM, Russell King - ARM Linux wrote:
-> >Just like smiapp, the camera sensor block (which is the very far end
-> >of the pipeline) is marked with MEDIA_ENT_F_CAM_SENSOR.  However, in
-> >front of that is the binner, which just like smiapp gets a separate
-> >entity.  It's this entity which is connected to the mipi-csi2 subdev.
+> On 01/31/2017 03:20 AM, Russell King - ARM Linux wrote:
+> >On Fri, Jan 06, 2017 at 06:11:35PM -0800, Steve Longerbeam wrote:
+> >>+static int csi_link_validate(struct v4l2_subdev *sd,
+> >>+			     struct media_link *link,
+> >>+			     struct v4l2_subdev_format *source_fmt,
+> >>+			     struct v4l2_subdev_format *sink_fmt)
+> >>+{
+> >>+	struct csi_priv *priv = v4l2_get_subdevdata(sd);
+> >>+	bool is_csi2;
+> >>+	int ret;
+> >>+
+> >>+	ret = v4l2_subdev_link_validate_default(sd, link, source_fmt, sink_fmt);
+> >>+	if (ret)
+> >>+		return ret;
+> >>+
+> >>+	priv->sensor = __imx_media_find_sensor(priv->md, &priv->sd.entity);
+> >>+	if (IS_ERR(priv->sensor)) {
+> >>+		v4l2_err(&priv->sd, "no sensor attached\n");
+> >>+		ret = PTR_ERR(priv->sensor);
+> >>+		priv->sensor = NULL;
+> >>+		return ret;
+> >>+	}
+> >>+
+> >>+	ret = v4l2_subdev_call(priv->sensor->sd, video, g_mbus_config,
+> >>+			       &priv->sensor_mbus_cfg);
+> >>+	if (ret)
+> >>+		return ret;
+> >>+
+> >>+	is_csi2 = (priv->sensor_mbus_cfg.type == V4L2_MBUS_CSI2);
+> >>+
+> >>+	if (is_csi2) {
+> >>+		int vc_num = 0;
+> >>+		/*
+> >>+		 * NOTE! It seems the virtual channels from the mipi csi-2
+> >>+		 * receiver are used only for routing by the video mux's,
+> >>+		 * or for hard-wired routing to the CSI's. Once the stream
+> >>+		 * enters the CSI's however, they are treated internally
+> >>+		 * in the IPU as virtual channel 0.
+> >>+		 */
+> >>+#if 0
+> >>+		vc_num = imx_media_find_mipi_csi2_channel(priv->md,
+> >>+							  &priv->sd.entity);
+> >>+		if (vc_num < 0)
+> >>+			return vc_num;
+> >>+#endif
+> >>+		ipu_csi_set_mipi_datatype(priv->csi, vc_num,
+> >>+					  &priv->format_mbus[priv->input_pad]);
+> >This seems (at least to me) to go against the spirit of the subdev
+> >negotiation.  Here, you seem to bypass the negotiation performed
+> >between the CSI and the attached device, wanting to grab the
+> >format from the CSI2 sensor directly.  That bypasses negotiation
+> >performed at the CSI2 subdev and video muxes.
 > 
-> wow, ok got it.
+> This isn't so much grabbing a pad format, it is determining
+> which source pad at the imx6-mipi-csi2 receiver subdev is
+> reached from this CSI (which determines the virtual channel
+> the CSI is receiving).
 > 
-> So the sensor pipeline and binner, and the OF graph connecting
-> them, are described in the device tree I presume.
-
-No - because the binner and sensor are on the same die, it's even
-one single device, there's no real separation of the two devices.
-
-The reason there's no real separation is because the binning is done
-as part of the process of reading the array - sometimes before the
-analog voltage is converted to its digital pixel value representation.
-
-The separation comes because of the requirements of the v4l2 media
-subdevs, which requires scalers to have a sink pad and a source pad.
-(Please see the v4l2 documentation, I think I've already quoted this:
-
-       ..  _MEDIA-ENT-F-PROC-VIDEO-SCALER:
-
-       -  ``MEDIA_ENT_F_PROC_VIDEO_SCALER``
-
-       -  Video scaler. An entity capable of video scaling must have
-          at least one sink pad and one source pad, and scale the
-          video frame(s) received on its sink pad(s) to a different
-          resolution output on its source pad(s). The range of
-          supported scaling ratios is entity-specific and can differ
-          between the horizontal and vertical directions (in particular
-          scaling can be supported in one direction only). Binning and
-          skipping are considered as scaling.
-
-(Oh yes, I see it was the mail to which you were replying to...)
-
-So, in order to configure the scaling (which can be none, /2 and /4)
-we have to expose two subdevs - one which is the scaler, and has a
-source pad connected to the upstream (in this case CSI2 receiver)
-and a sink pad immutably connected to the camera sensor.
-
-Since the split is entirely down to the V4L2 implementation requirements,
-it's not something that should be reflected in DT - we don't put
-implementation details in DT.
-
-It's just the same (as I've already said) as the SMIAPP camera driver,
-the reason I'm pointing you towards that is because this is an already
-mainlined camera driver which nicely illustrates how my driver is
-structured from the v4l2 subdev API point of view.
-
-> The OF graph AFAIK, has no information about which ports are sinks
-> and which are sources, so of_parse_subdev() tries to determine that
-> based on the compatible string of the device node. So ATM
-> of_parse_subdev() assumes there is nothing but the imx6-mipi-csi2,
-> video-multiplexer, and camera sensors upstream from the CSI ports
-> in the OF graph.
+> If there was a way to determine the vc# via a status register
+> in the CSI, that would be perfect, but there isn't. In fact, the CSIs
+> seem to be ignoring the meta-data bus sent by the CSI2IPU gasket
+> which contains this info, or that bus is not being routed to the CSIs.
+> As the note says, the CSIs only accept vc0 at the CSI_MIPI_DI register.
+> Any other value programmed there results in no data from the CSI.
 > 
-> I realize that's not a robust solution, and is the reason for the
-> "no sensor attached" below.
-> 
-> Is there any way to determine from the OF graph the data-direction
-> of a port (whether it is a sink or a source)? If so it will make
-> of_parse_subdev() much more robust.
+> And even the presence of CSI_MIPI_DI register makes no sense to me,
+> the CSIs are given the vc# and MIPI datatype from the CSI2IPU meta-data
+> bus, so I don't understand why it needs to be told.
 
-I'm not sure why you need to know the data direction.  I think the
-issue here is how you're going about dealing with the subdevs.
-Here's the subdev setup:
+The CSI_MIPI_DI register selects the data stream we want from the
+CSI2 camera.
 
-+---------camera--------+
-| pixel array -> binner |---> csi2 --> ipu1csi0 mux --> csi0 --> smfc --> idmac
-+-----------------------+
+CSI2 cameras can produce many different data streams - for example,
+a CSI2 camera can, for the same image, produce a YUV encoded frame
+and a jpeg-encoded frame.  These are sent over the CSI2 serial bus
+using two different data types.
 
-How the subdevs are supposed to work is that you start from the first
-subdev in sequence (in this case the pixel array) and negotiate with
-the driver through the TRY formats on its source pad, as well as
-negotiating with the sink pad of the directly neighbouring subdev.
+The CSI2IPU converts the serial data streams into a parallel data
+stream, feeding that into the CSI layer.  The CSI layer, in
+conjunction with the CSI_MIPI_DI register, selects one of these
+streams to pass on to the SMFC and other blocks.
 
-The neighbouring subdev propagates the configuration in a driver
-specific manner from its source pad to the sink pad, giving a default
-configuration at its source.
+>From what I've read, the CSI can also be programmed to pass other
+streams on as well, but I've never tried that.
 
-This process repeats throughout the chain all the way up to the bridge
-device.
-
-Now, where things go wrong is that you want to know what each type of
-these subdevs are, and the reason you want that is so you can do this
-(for example - I know similar stuff happens with the "sensor" stuff
-further up the chain as well):
-
-+---------camera--------+
-| pixel array -> binner |---> csi2 --> ipu1csi0 mux --> csi0 --> smfc --> idmac
-+-----------------------+                                |
-              ^--I-want-your-bus-format-and-frame-rate---'
-
-which goes against the negotiation mechanism of v4l2 subdevs.  This
-is broken - it bypass the subdev negotiation that has been performed
-on the intervening subdevs between the "sensor" and the csi0 subdevs,
-so if there were a subdev in that chain that (eg) reduced the frame
-rate by discarding the odd frames, you'd be working with the wrong
-frame interval for your frame interval monitor at csi.
-
-Note that the "MEDIA_ENT_F_PROC_VIDEO_SCALER" subdev type is documented
-as not only supports scaling as in changing the size of the image, but
-also in terms of skipping frames, which means a reduction in frame rate.
-
-So, for your FIM, you need to know if there is any reduction in frame
-rate through that pipeline, and looking for a "MEDIA_ENT_F_CAM_SENSOR"
-subdev node isn't going to tell you that.  The frame rate really needs
-to be carried through and I suspect you need to accept the frame rate
-into each subdev so it can be passed along the chain by the application
-configuring the pipeline.
-
-The last bit from the above is the "I-want-your-bus-format" bit which
-I haven't fully worked out how to eliminate - I understand the reason
-you need that (so you can appropriately configure the CSI with the CSI2
-data type code.)  The CSI2 data type code comes from the format
-configured on the CSI sink pad, so the only information you're really
-using there is "are we sinking data from a CSI2 interface."
-
-You _could_ walk down the graph from the CSI looking for a subdev that
-responds to g_mbus_config that reports CSI2, but I'm not sure that's
-going to last - I've seen an email from Hans saying that he'd like
-g_mbus_config to go away (to patch 13/24, for the vidsw_g_mbus_config()
-function):
-
-"I am not certain this op is needed at all. In the current kernel this
- op is onlyused by soc_camera, pxa_camera and omap3isp (somewhat dubious).
- Normally this information should come from the device tree and there
- should be no need for this op.
-
- My (tentative) long-term plan was to get rid of this op.
-
- If you don't need it, then I recommend it is removed."
-
-So, if that goes away, the CSI subdev needs a completely different way
-to get that information, and it shouldn't be coming from the camera
-sensor subdev, but (imho) really from the CSI2 subdev.
-
-This is probably something that needs to be discussed with media people
-to work out how to replace the g_mbus_config call with something more
-acceptable to resolve this issue.
+In my particular case, the IMX219 camera produces a complete frame
+using the RAW8 or RAW10 MIPI data type, and also produces two lines
+of register data per frame, encoded using another data type.  I
+think it should be possible to program the CSI to pass this other
+data on as "generic data" through a different FIFO and have it
+written to memory, which makes it possible to know the camera
+settings for each frame.  (This isn't something I'm interested in
+though, I'm just using it as an example of why, possibly, there's
+that register in the CSI block.)
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
