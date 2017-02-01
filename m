@@ -1,100 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 01 Feb 2017 12:11:57 +0100
-Subject: [PATCH 2/4] PCI: add driver for Cortina Gemini Host Bridge
-In-Reply-To: <20170128204839.18330-2-linus.walleij@linaro.org>
-References: <20170128204839.18330-1-linus.walleij@linaro.org>
- <20170128204839.18330-2-linus.walleij@linaro.org>
-Message-ID: <2695922.yyinjvNuJK@wuerfel>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 1 Feb 2017 20:13:39 +0900
+Subject: [PATCH v2] ARM: dts: r8a7791: link DU to VSPDs
+In-Reply-To: <4ae454ad-296c-dec9-27e9-fd050333737f@cogentembedded.com>
+References: <1529351.Fac5N2tKoF@wasted.cogentembedded.com>
+ <2492577.tBEnW0tCHD@wasted.cogentembedded.com>
+ <4ae454ad-296c-dec9-27e9-fd050333737f@cogentembedded.com>
+Message-ID: <CANqRtoSQTa0fHJSwAHbN3hXSZ=m1kuR2GsUWE5ojN5AN-9i6Bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, January 28, 2017 9:48:37 PM CET Linus Walleij wrote:
-> +static int gemini_pci_read_config(struct pci_bus *bus, unsigned int fn,
-> +				  int config, int size, u32 *value)
-> +{
-> +	struct gemini_pci *p = bus->sysdata;
-> +	unsigned long irq_flags;
-> +
-> +	spin_lock_irqsave(&p->lock, irq_flags);
-> +
-> +	writel(PCI_CONF_BUS(bus->number) |
-> +			PCI_CONF_DEVICE(PCI_SLOT(fn)) |
-> +			PCI_CONF_FUNCTION(PCI_FUNC(fn)) |
-> +			PCI_CONF_WHERE(config) |
-> +			PCI_CONF_ENABLE,
-> +			p->base + PCI_CONFIG);
-> +
-> +	*value = readl(p->base + PCI_DATA);
-> +
-> +	if (size == 1)
-> +		*value = (*value >> (8 * (config & 3))) & 0xFF;
-> +	else if (size == 2)
-> +		*value = (*value >> (8 * (config & 3))) & 0xFFFF;
-> +
-> +	spin_unlock_irqrestore(&p->lock, irq_flags);
+Hi Sergei,
 
-The read_config/write_config functions are called under a spinlock,
-no need for another one.
+On Fri, Jan 27, 2017 at 3:42 AM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> On 01/26/2017 12:42 AM, Sergei Shtylyov wrote:
+>
+>> Add the "vsps" property to the DU device node in order to link this node
+>> to
+>> the VSPD nodes.
+>>
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>
+>> ---
+>> Changes in version 2:
+>> - rebased the patch.
+>>
+>> This patch is against the 'renesas-devel-20170125-v4.10-rc5' of Simon
+>> Horman's
+>> 'renesas.git' repo.  It's  only meaningful if the DRM driver patches I've
+>> just
+>> posted are applied.
+>
+>
+>    Forgot to note that without this patch the DU driver fails to link to
+> VSPD and probe correctly, so there's no video signal. So it makes sense to
+> apply before the DU driver patch (once it's ACKed for merge)...
 
-> +	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	p->base = devm_ioremap_resource(dev, regs);
-> +	if (IS_ERR(p->base))
-> +		return PTR_ERR(p->base);
-> +
-> +	ret = of_pci_get_host_bridge_resources(dev->of_node, 0, 0xff,
-> +					       &res, &io_base);
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = devm_request_pci_bus_resources(dev, &res);
-> +	if (ret)
-> +		return ret;
-> +
-> +	/* No clue what these do */
-> +	pcibios_min_io = 0x100;
-> +	pcibios_min_mem = 0;
+Doesn't that translate to breaking the DT ABI? Is there someway we can
+avoid doing that?
 
-Don't touch these
+Thanks,
 
-> +	/* setup I/O space to 1MB size */
-> +	writel(GEMINI_PCI_IOSIZE_1M, p->base + PCI_IOSIZE);
-
-Maybe get the size from the resource instead? Note that pci_remap_iospace
-only registers 64K of I/O space, so you could also use that.
-
-> +	/* setup hostbridge */
-> +	val = readl(p->base + PCI_CTRL);
-> +	val |= PCI_COMMAND_IO;
-> +	val |= PCI_COMMAND_MEMORY;
-> +	val |= PCI_COMMAND_MASTER;
-> +	writel(val, p->base + PCI_CTRL);
-> +
-> +	/* Get the I/O and memory ranges from DT */
-> +	resource_list_for_each_entry(win, &res) {
-> +		switch (resource_type(win->res)) {
-> +		case IORESOURCE_IO:
-> +			io = win->res;
-> +			io->name = "Gemini PCI I/O";
-> +			ret = pci_remap_iospace(io, io_base);
-> +			if (ret) {
-> +				dev_warn(dev, "error %d: failed to map resource %pR\n",
-> +					 ret, io);
-> +				continue;
-> +			}
-> +			break;
-> +		case IORESOURCE_MEM:
-> +			mem = win->res;
-> +			mem->name = "Gemini PCI MEM";
-> +			break;
-> +		case IORESOURCE_BUS:
-> +			break;
-> +		default:
-> +			break;
-> +		}
-> +	}
-> +
-> +	bus = pci_scan_root_bus(&pdev->dev, 0, &gemini_pci_ops, p, &res);
-
-Can you try using the new pci_register_host_bridge() API?
-
-	Arnd
+/ magnus
