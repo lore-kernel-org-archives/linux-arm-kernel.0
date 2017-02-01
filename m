@@ -1,41 +1,117 @@
-From: mylene.josserand@free-electrons.com (Mylene Josserand)
-Date: Wed, 1 Feb 2017 16:08:50 +0100
-Subject: [PATCH v3 1/8] ASoC: sun4i-i2s: Update binding documentation to
- include A31
-In-Reply-To: <20170201115958.7a2odxxyhzm3ofew@sirena.org.uk>
-References: <20170131100552.27949-1-mylene.josserand@free-electrons.com>
- <20170131100552.27949-2-mylene.josserand@free-electrons.com>
- <20170131211702.taxbrgxwo7b4daej@sirena.org.uk>
- <feb16b69-388f-10e5-7be5-c750095ee52b@free-electrons.com>
- <20170201115958.7a2odxxyhzm3ofew@sirena.org.uk>
-Message-ID: <b0611ab1-5b69-23da-6835-278d0fd1b6ba@free-electrons.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 1 Feb 2017 15:12:54 +0000
+Subject: [PATCH] crypto: arm64/crc32 - detect crc32 support in assembler
+In-Reply-To: <5ebb24d2-81d4-53c7-0365-f35a0eb3588b@suse.de>
+References: <20170127104039.29351-1-mbrugger@suse.com>
+ <CAKv+Gu8P3U6_u7FdRFSdDL9jdKaJQuqHbrQ-7Qu900f8R1voZw@mail.gmail.com>
+ <20170127105244.GF21144@arm.com>
+ <CAKv+Gu_LcU3mSSMdrjks02ZuhHLhkYqNuZGOcTp1AmS8cpzCDg@mail.gmail.com>
+ <CAKv+Gu9gPAb-AMdbK32dXciX1mgh1sqSrxMAjB-ZGw7uAk2r2Q@mail.gmail.com>
+ <5ebb24d2-81d4-53c7-0365-f35a0eb3588b@suse.de>
+Message-ID: <CAKv+Gu-Nx8=eAbrZz49mP9EzF9BhZ_E-q9Ebke8YH74QY1T3SQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 1 February 2017 at 13:58, Alexander Graf <agraf@suse.de> wrote:
+> On 02/01/2017 10:43 AM, Ard Biesheuvel wrote:
+>>
+>> On 1 February 2017 at 09:07, Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> wrote:
+>>>
+>>> On 27 January 2017 at 10:52, Will Deacon <will.deacon@arm.com> wrote:
+>>>>
+>>>> On Fri, Jan 27, 2017 at 10:43:16AM +0000, Ard Biesheuvel wrote:
+>>>>>
+>>>>> On 27 January 2017 at 10:40, Matthias Brugger <mbrugger@suse.com>
+>>>>> wrote:
+>>>>>>
+>>>>>> Older compilers may not be able to detect the crc32 extended cpu type.
+>>>>>
+>>>>> What do you mean 'detect'? Could you describe the failure in more
+>>>>> detail
+>>>>> please?
+>>>>>
+>>>>>> Anyway only inline assembler code is used, which gets passed to the
+>>>>>> assembler. This patch moves the crc detection to the assembler.
+>>>>>>
+>>>>>> Suggested-by: Alexander Graf <agraf@suse.de>
+>>>>>> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+>>>>>> ---
+>>>>>>   arch/arm64/crypto/Makefile      | 2 --
+>>>>>>   arch/arm64/crypto/crc32-arm64.c | 3 +++
+>>>>>>   2 files changed, 3 insertions(+), 2 deletions(-)
+>>>>>>
+>>>>>> diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
+>>>>>> index aa8888d7b744..0d779dac75cd 100644
+>>>>>> --- a/arch/arm64/crypto/Makefile
+>>>>>> +++ b/arch/arm64/crypto/Makefile
+>>>>>> @@ -48,8 +48,6 @@ CFLAGS_aes-glue-ce.o  := -DUSE_V8_CRYPTO_EXTENSIONS
+>>>>>>
+>>>>>>   obj-$(CONFIG_CRYPTO_CRC32_ARM64) += crc32-arm64.o
+>>>>>>
+>>>>>> -CFLAGS_crc32-arm64.o   := -mcpu=generic+crc
+>>>>>> -
+>>>>>>   $(obj)/aes-glue-%.o: $(src)/aes-glue.c FORCE
+>>>>>>          $(call if_changed_rule,cc_o_c)
+>>>>>>
+>>>>>> diff --git a/arch/arm64/crypto/crc32-arm64.c
+>>>>>> b/arch/arm64/crypto/crc32-arm64.c
+>>>>>> index 6a37c3c6b11d..10f5dd075323 100644
+>>>>>> --- a/arch/arm64/crypto/crc32-arm64.c
+>>>>>> +++ b/arch/arm64/crypto/crc32-arm64.c
+>>>>>> @@ -29,6 +29,9 @@ MODULE_AUTHOR("Yazen Ghannam
+>>>>>> <yazen.ghannam@linaro.org>");
+>>>>>>   MODULE_DESCRIPTION("CRC32 and CRC32C using optional ARMv8
+>>>>>> instructions");
+>>>>>>   MODULE_LICENSE("GPL v2");
+>>>>>>
+>>>>>> +/* Request crc extension capabilities from the assembler */
+>>>>>> +asm(".arch_extension crc");
+>>>>>> +
+>>>>>
+>>>>> Will should confirm, but I think this is a recent feature in GAS for
+>>>>> AArch64, so this may break older toolchains as well.
+>>>>
+>>>> Yes, the .arch_extension directive isn't universally supported by
+>>>> AArch64
+>>>> gas so we can't rely on it unconditionally. The best bet is to check for
+>>>> the support and, if it's not present, then disable whatever feature
+>>>> relies
+>>>> on it. See the lseinstr variable in Makefile.
+>>>>
+>>> Actually, this driver has become somewhat redundant now that we have
+>>> an alternative that combines an implementation based on 64x64
+>>> polynomial multiplication with an implementation based on the CRC32
+>>> instructions.
+>>>
+>>> I will propose a patch that makes the latter usable when only the
+>>> CRC32 instructions are supported.
+>>
+>> ... although you still haven't explained what the actual problem is
+>> that you are trying to solve.
+>
+>
+>
+>
+> The problem is that in Leap 42.2 (as well as SLES12 SP2) we have a 4.8 based
+> system compiler, but recent binutils. That means that while our assembler is
+> happy to work with crc instructions, passing the -mcpu parameter to gcc
+> fails because gcc isn't aware of the flavor yet.
+>
+> That in turn means that we want to tell the assembler about feature
+> requirements rather than the compiler. Fortunately the ".arch_extension"
+> primitive allows you to do so.
+>
+> As far as checking for availability of it goes, I agree that it'd be nice to
+> check if ".arch_extension" is supported. But so would be to check if
+> -mcpu=generic+crc is supported. IMHO this patch doesn't make the current
+> non-checking situation any worse. But of course checking is always nicer
+> than not checking :)
+>
 
-On 01/02/2017 12:59, Mark Brown wrote:
-> On Wed, Feb 01, 2017 at 08:44:56AM +0100, Mylene Josserand wrote:
->> On 31/01/2017 22:17, Mark Brown wrote:
->>> On Tue, Jan 31, 2017 at 11:05:45AM +0100, Myl?ne Josserand wrote:
->>>> Add a new compatible for sun4i-i2s driver to handle some
->>>> SoCs that have a reset line that must be asserted/deasserted.
->
->>> This doesn't apply against current code, please check and resend.
->
->> I based my series on linux-next 20170131. Which one I should use?
->
-> You should be submitting against my git tree (which should be what's in
-> -next...).
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git for-next
->
+Well, I am pretty sure binutils v2.25 and older are in wider use than
+GCC v4.8 and older, which means the runtime test would disable the CRC
+module altogether for a lot of users.
 
-Okay, thank you! I will update my series according to your branch.
-
-Best regards,
-
--- 
-Myl?ne Josserand, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+However, as I mentioned, we can also remove this driver once the PMULL
+based one is updated.
