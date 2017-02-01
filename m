@@ -1,53 +1,83 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 1 Feb 2017 15:07:56 +0000
-Subject: [PATCH] arm64: Improve parking of stopped CPUs
-In-Reply-To: <3a9f0857-9274-738c-7a65-f24f337e6799@arm.com>
-References: <1485942532-2643-1-git-send-email-jnair@caviumnetworks.com>
- <20170201141656.GB8177@arm.com>
- <3a9f0857-9274-738c-7a65-f24f337e6799@arm.com>
-Message-ID: <20170201150756.GD8177@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 1 Feb 2017 15:07:00 +0000
+Subject: [PATCH v31 02/12] arm64: limit memory regions based on DT
+ property, usable-memory-range
+In-Reply-To: <20170201124630.6016-1-takahiro.akashi@linaro.org>
+References: <20170201124218.5823-1-takahiro.akashi@linaro.org>
+ <20170201124630.6016-1-takahiro.akashi@linaro.org>
+Message-ID: <20170201150700.GD4756@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2017 at 02:31:38PM +0000, Suzuki K Poulose wrote:
-> On 01/02/17 14:16, Will Deacon wrote:
-> >On Wed, Feb 01, 2017 at 09:48:52AM +0000, Jayachandran C wrote:
-> >>The current code puts the stopped cpus in an 'yield' instruction loop.
-> >>Using a busy loop here is unnecessary, we can use the cpu_park_loop()
-> >>function here to do a wfi/wfe.
-> >>
-> >>Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
-> >>---
-> >> arch/arm64/kernel/smp.c | 3 +--
-> >> 1 file changed, 1 insertion(+), 2 deletions(-)
-> >>
-> >>diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> >>index cbaab44..0691d2f 100644
-> >>--- a/arch/arm64/kernel/smp.c
-> >>+++ b/arch/arm64/kernel/smp.c
-> >>@@ -829,8 +829,7 @@ static void ipi_cpu_stop(unsigned int cpu)
-> >>
-> >> 	local_irq_disable();
-> >>
-> >>-	while (1)
-> >>-		cpu_relax();
-> >>+	cpu_park_loop();
-> >> }
-> >
-> >Hmm, so we actually added the yield for QEMU's benefit iirc, where QEMU
-> >will trap the yield and schedule a different vCPU. Should we be adding
-> >a yield to cpu_park_loop instead?
+Hi,
+
+On Wed, Feb 01, 2017 at 09:46:21PM +0900, AKASHI Takahiro wrote:
+> +static int __init early_init_dt_scan_usablemem(unsigned long node,
+> +		const char *uname, int depth, void *data)
+> +{
+> +	struct memblock_region *usablemem = (struct memblock_region *)data;
+
+Nit: unnecessary cast.
+
+> +	const __be32 *reg;
+> +	int len;
+> +
+> +	usablemem->size = 0;
+
+Could we please lift this assignment/initialisation into the caller...
+
+> +
+> +	if (depth != 1 || strcmp(uname, "chosen") != 0)
+> +		return 0;
+> +
+> +	reg = of_get_flat_dt_prop(node, "linux,usable-memory-range", &len);
+> +	if (!reg || (len < (dt_root_addr_cells + dt_root_size_cells)))
+> +		return 1;
+> +
+> +	usablemem->base = dt_mem_next_cell(dt_root_addr_cells, &reg);
+> +	usablemem->size = dt_mem_next_cell(dt_root_size_cells, &reg);
+> +
+> +	return 1;
+> +}
+> +
+> +static void __init fdt_enforce_memory_region(void)
+> +{
+> +	struct memblock_region reg;
+
+... e.g. have:
+
+	struct memblock_region reg = {
+		.size = 0,
+	};
+
+That saves us from making unnecessary assignments to the size field, and
+makes it clear that reg.size has definitely been initialised, regardless
+of what of_scan_flat_dt() happens to do.
+
+With that:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
+
+> +
+> +	of_scan_flat_dt(early_init_dt_scan_usablemem, &reg);
+> +
+> +	if (reg.size)
+> +		memblock_cap_memory_range(reg.base, reg.size);
+> +}
+> +
+>  void __init arm64_memblock_init(void)
+>  {
+>  	const s64 linear_region_size = -(s64)PAGE_OFFSET;
+>  
+> +	/* Handle linux,usable-memory-range property */
+> +	fdt_enforce_memory_region();
+> +
+>  	/*
+>  	 * Ensure that the linear region takes up exactly half of the kernel
+>  	 * virtual address space. This way, we can distinguish a linear address
+> -- 
+> 2.11.0
 > 
-> Wouldn't wfi/wfe trigger the same ? I don't know how yield affects a physical
-> CPU. The cpu_park_loop is also used by CPUs which cannot run due to the missing
-> capabilities on the system. As long as yield() doesn't affect the PCPUs, we
-> could do that. 
-
-Yes, good point, it looks like WFE should do the same thing.
-
-> Going another step further, we could also include local_irq_disable() in
-> cpu_park_loop().
-
-Why?
-
-Will
