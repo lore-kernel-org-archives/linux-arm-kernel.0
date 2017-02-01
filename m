@@ -1,32 +1,80 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 1 Feb 2017 11:14:39 +0100
-Subject: [PATCH 4/7] arm64: arch_timer: introduce generic errata handling
- infrastructure
-In-Reply-To: <1485865196-12742-5-git-send-email-mark.rutland@arm.com>
-References: <1485865196-12742-1-git-send-email-mark.rutland@arm.com>
- <1485865196-12742-5-git-send-email-mark.rutland@arm.com>
-Message-ID: <20170201101439.GO2206@mai>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 1 Feb 2017 10:15:02 +0000
+Subject: [PATCH 6/7] efi: Handle secure boot from UEFI-2.6 [ver #7]
+In-Reply-To: <10454.1485889162@warthog.procyon.org.uk>
+References: <148587558696.4026.16034622623568539004.stgit@warthog.procyon.org.uk>
+ <148587564847.4026.5759345672956585977.stgit@warthog.procyon.org.uk>
+ <CAKv+Gu8dnKB1sRGb3U+XB1eoA7Eyo4qSFBtPRbvGV912xPViVw@mail.gmail.com>
+ <10454.1485889162@warthog.procyon.org.uk>
+Message-ID: <CAKv+Gu_gy6575axL6M64OSo33ZM2dnbs7cajqJRd8VtbjAXCTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2017 at 12:19:53PM +0000, Mark Rutland wrote:
-> From: Ding Tianhong <dingtianhong@huawei.com>
-> 
-> Currently we have code inline in the arch timer probe path to cater for
-> Freescale erratum A-008585, complete with ifdeffery. This is a little
-> ugly, and will get worse as we try to add more errata handling.
-> 
-> This patch refactors the handling of Freescale erratum A-008585. Now the
-> erratum is described in a generic arch_timer_erratum_workaround
-> structure, and the probe path can iterate over these to detect errata
-> and enable workarounds.
-> 
-> This will simplify the addition and maintenance of code handling
-> Hisilicon erratum 161010101.
-> 
-> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
-> [Mark: split patch, correct Kconfig, reword commit message]
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> ---
+On 31 January 2017 at 18:59, David Howells <dhowells@redhat.com> wrote:
+> Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>
+>> > UEFI-2.6 adds a new variable, DeployedMode.  If it exists, this must be 1
+>> > if we're to engage lockdown mode.
+>> >
+>> > Reported-by: James Bottomley <James.Bottomley@HansenPartnership.com>
+>> > Signed-off-by: David Howells <dhowells@redhat.com>
+>>
+>> Interestingly, the string 'DeployedMode' appears zero times in the
+>> EDK2 codebase, so I wonder if it makes any sense to merge this now.
+>> The string 'AuditMode' does appear once, but in a comment
+>
+> It's in the standard, so shouldn't we check for it?
+>
+>> In any case, the logic is not entirely correct either: apologies if it
+>> was me who caused any confusion here, but it seems DeployedMode could
+>> legally be 0 or 1 while secure boot is in fact enabled. It is actually
+>> AuditMode that should be taken into account here, i.e., if AuditMode
+>> == 1, the firmware ignores invalid or missing signatures. If
+>> SecureBoot == 0x1, SetupMode == 0x0 and AuditMode == 0x0 (or
+>> non-existent), signature verification is performed regardless of the
+>> value (or existence) of DeployedMode.
+>>
+>> So I propose to respin this patch to treat AuditMode == 0x1 as 'secure
+>> boot disabled', and ignore if it is missing.
+>
+> Ummm...  This might conflict what said:
+>
+> | Since you seem to be using this to mean "is the platform locked down?",
+> | this looks to be no longer complete in the UEFI 2.6 world.  If
+> | DeployedMode == 0, even if SecureBoot == 1 and SetupMode == 0, you can
+> | remove the platform key by writing 1 to AuditMode and gain control of
+> | the secure variables.  The lock down state becomes DeployedMode == 1,
+> | SecureBoot == 1 and SetupMode == 0
+> |
+> | See the diagram on page 1817
+> |
+> | http://www.uefi.org/sites/default/files/resources/UEFI%20Spec%202_6.pdf
+>
+> Looking again at that diagram, should I be checking all four variables
+> (SecureBoot, SetupMode, DeployedMode and AuditMode)?  And/or should I treat
+> audit mode differently to deployed mode?
+>
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Well, we are trying to decide whether the system is locked down or
+not. AuditMode is only writable before ExitBootServices(), and when
+AuditMode == 0, signature verification occurs as usual, regardless of
+the value of DeployedMode. Whether someone could turn on AuditMode on
+the *next* boot does not sound that relevant to me, since someone
+could also re-enter SetupMode in the same way.
+
+So this patch should take AuditMode into account, but not DeployedMode, i.e.,
+
+SecureBoot == 0x1
+SetupMode == 0x0
+AuditMode == 0x0 (or non-existent)
+
+implies a locked down state.
+
+> Further, there doesn't seem to be a state in which SecureBoot is shown as
+> being 1.
+>
+
+Yes, that is sloppy. But the fact that EDK2, being the v2.6 reference,
+does not implement any of this *at all* is much more worrying to me,
+given that UDK2017 based firmware will certainly turn up in production
+systems.
