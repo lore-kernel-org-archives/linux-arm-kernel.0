@@ -1,70 +1,66 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 1 Feb 2017 09:07:39 +0000
-Subject: [PATCH] crypto: arm64/crc32 - detect crc32 support in assembler
-In-Reply-To: <20170127105244.GF21144@arm.com>
-References: <20170127104039.29351-1-mbrugger@suse.com>
- <CAKv+Gu8P3U6_u7FdRFSdDL9jdKaJQuqHbrQ-7Qu900f8R1voZw@mail.gmail.com>
- <20170127105244.GF21144@arm.com>
-Message-ID: <CAKv+Gu_LcU3mSSMdrjks02ZuhHLhkYqNuZGOcTp1AmS8cpzCDg@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 1 Feb 2017 09:20:28 +0000
+Subject: [PATCH v3 00/24] i.MX Media Driver
+In-Reply-To: <15fdc901-d342-4761-e86e-caef8912a0a2@gmail.com>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <20170131004510.GQ27312@n2100.armlinux.org.uk>
+ <951c1a08-c0f2-4333-b4bf-410de8dd863f@gmail.com>
+ <20170131110027.GU27312@n2100.armlinux.org.uk>
+ <3a673cba-bbf6-5611-5857-4605797bf049@gmail.com>
+ <20170201002331.GG27312@n2100.armlinux.org.uk>
+ <15fdc901-d342-4761-e86e-caef8912a0a2@gmail.com>
+Message-ID: <20170201092028.GK27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 January 2017 at 10:52, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Jan 27, 2017 at 10:43:16AM +0000, Ard Biesheuvel wrote:
->> On 27 January 2017 at 10:40, Matthias Brugger <mbrugger@suse.com> wrote:
->> > Older compilers may not be able to detect the crc32 extended cpu type.
->>
->> What do you mean 'detect'? Could you describe the failure in more detail
->> please?
->>
->> > Anyway only inline assembler code is used, which gets passed to the
->> > assembler. This patch moves the crc detection to the assembler.
->> >
->> > Suggested-by: Alexander Graf <agraf@suse.de>
->> > Signed-off-by: Matthias Brugger <mbrugger@suse.com>
->> > ---
->> >  arch/arm64/crypto/Makefile      | 2 --
->> >  arch/arm64/crypto/crc32-arm64.c | 3 +++
->> >  2 files changed, 3 insertions(+), 2 deletions(-)
->> >
->> > diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
->> > index aa8888d7b744..0d779dac75cd 100644
->> > --- a/arch/arm64/crypto/Makefile
->> > +++ b/arch/arm64/crypto/Makefile
->> > @@ -48,8 +48,6 @@ CFLAGS_aes-glue-ce.o  := -DUSE_V8_CRYPTO_EXTENSIONS
->> >
->> >  obj-$(CONFIG_CRYPTO_CRC32_ARM64) += crc32-arm64.o
->> >
->> > -CFLAGS_crc32-arm64.o   := -mcpu=generic+crc
->> > -
->> >  $(obj)/aes-glue-%.o: $(src)/aes-glue.c FORCE
->> >         $(call if_changed_rule,cc_o_c)
->> >
->> > diff --git a/arch/arm64/crypto/crc32-arm64.c b/arch/arm64/crypto/crc32-arm64.c
->> > index 6a37c3c6b11d..10f5dd075323 100644
->> > --- a/arch/arm64/crypto/crc32-arm64.c
->> > +++ b/arch/arm64/crypto/crc32-arm64.c
->> > @@ -29,6 +29,9 @@ MODULE_AUTHOR("Yazen Ghannam <yazen.ghannam@linaro.org>");
->> >  MODULE_DESCRIPTION("CRC32 and CRC32C using optional ARMv8 instructions");
->> >  MODULE_LICENSE("GPL v2");
->> >
->> > +/* Request crc extension capabilities from the assembler */
->> > +asm(".arch_extension crc");
->> > +
->>
->> Will should confirm, but I think this is a recent feature in GAS for
->> AArch64, so this may break older toolchains as well.
->
-> Yes, the .arch_extension directive isn't universally supported by AArch64
-> gas so we can't rely on it unconditionally. The best bet is to check for
-> the support and, if it's not present, then disable whatever feature relies
-> on it. See the lseinstr variable in Makefile.
->
+On Tue, Jan 31, 2017 at 05:54:52PM -0800, Steve Longerbeam wrote:
+> On 01/31/2017 04:23 PM, Russell King - ARM Linux wrote:
+> First, thank you for the explanation, it clears up a lot.
+> 
+> But of_parse_subdev() is used to parse the OF graph starting
+> from the CSI ports, to discover all the nodes to add to subdev
+> async registration. It also forms the media link info to be used
+> later to create the media graph, after all discovered subdevs
+> have come online (registered themselves). This happens at
+> driver load time, it doesn't have anything to do with pad
+> negotiation.
 
-Actually, this driver has become somewhat redundant now that we have
-an alternative that combines an implementation based on 64x64
-polynomial multiplication with an implementation based on the CRC32
-instructions.
+Right, but I'm discussing why you need to know which is the sensor
+subdev, and why you need to get parameters from the sensor subdev.
 
-I will propose a patch that makes the latter usable when only the
-CRC32 instructions are supported.
+> >   I think the
+> >issue here is how you're going about dealing with the subdevs.
+> >Here's the subdev setup:
+> >
+> >+---------camera--------+
+> >| pixel array -> binner |---> csi2 --> ipu1csi0 mux --> csi0 --> smfc --> idmac
+> >+-----------------------+
+> >
+> >How the subdevs are supposed to work is that you start from the first
+> >subdev in sequence (in this case the pixel array) and negotiate with
+> >the driver through the TRY formats on its source pad, as well as
+> >negotiating with the sink pad of the directly neighbouring subdev.
+> >
+> >The neighbouring subdev propagates the configuration in a driver
+> >specific manner from its source pad to the sink pad, giving a default
+> >configuration at its source.
+> 
+> Let me try to re-phrase. You mean the subdev's set_fmt(), when
+> configured  its source pad(s), should call set_fmt() at the connected
+> sink subdev to automatically propagate the format to the sink's pad?
+
+No.  For any individual subdev, if you configure it's _sink_ then it
+should propagate the configuration to its _source_, potentially
+modifying the configuration according to its function.  It should
+never forward the configuration to the other side of any links.
+
+The responsibility for setting up the neighbours source pad is the
+userspace media application.
+
+See Documentation/media/uapi/v4l/dev-subdev.rst and the section
+named "Format Negotiation".
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
