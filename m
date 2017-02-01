@@ -1,75 +1,81 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 1 Feb 2017 09:43:15 +0000
-Subject: [PATCH] crypto: arm64/crc32 - detect crc32 support in assembler
-In-Reply-To: <CAKv+Gu_LcU3mSSMdrjks02ZuhHLhkYqNuZGOcTp1AmS8cpzCDg@mail.gmail.com>
-References: <20170127104039.29351-1-mbrugger@suse.com>
- <CAKv+Gu8P3U6_u7FdRFSdDL9jdKaJQuqHbrQ-7Qu900f8R1voZw@mail.gmail.com>
- <20170127105244.GF21144@arm.com>
- <CAKv+Gu_LcU3mSSMdrjks02ZuhHLhkYqNuZGOcTp1AmS8cpzCDg@mail.gmail.com>
-Message-ID: <CAKv+Gu9gPAb-AMdbK32dXciX1mgh1sqSrxMAjB-ZGw7uAk2r2Q@mail.gmail.com>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Wed, 1 Feb 2017 15:14:42 +0530
+Subject: [PATCH V7 3/4] drm/bridge: Add driver for GE B850v3 LVDS/DP++
+ Bridge
+In-Reply-To: <877f5ciilg.fsf@intel.com>
+References: <cover.1483301745.git.peter.senna@collabora.com>
+ <4232c88a99f44a24287d04d74b891e2eb139864c.1483301745.git.peter.senna@collabora.com>
+ <759f96e2-43da-45ba-cf8d-55bc1f6e8442@codeaurora.org>
+ <20170128141646.GA21291@collabora.com> <877f5ciilg.fsf@intel.com>
+Message-ID: <b84ac3b8-3626-3eb2-7293-0affb58b7752@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 February 2017 at 09:07, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 27 January 2017 at 10:52, Will Deacon <will.deacon@arm.com> wrote:
->> On Fri, Jan 27, 2017 at 10:43:16AM +0000, Ard Biesheuvel wrote:
->>> On 27 January 2017 at 10:40, Matthias Brugger <mbrugger@suse.com> wrote:
->>> > Older compilers may not be able to detect the crc32 extended cpu type.
->>>
->>> What do you mean 'detect'? Could you describe the failure in more detail
->>> please?
->>>
->>> > Anyway only inline assembler code is used, which gets passed to the
->>> > assembler. This patch moves the crc detection to the assembler.
->>> >
->>> > Suggested-by: Alexander Graf <agraf@suse.de>
->>> > Signed-off-by: Matthias Brugger <mbrugger@suse.com>
->>> > ---
->>> >  arch/arm64/crypto/Makefile      | 2 --
->>> >  arch/arm64/crypto/crc32-arm64.c | 3 +++
->>> >  2 files changed, 3 insertions(+), 2 deletions(-)
->>> >
->>> > diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
->>> > index aa8888d7b744..0d779dac75cd 100644
->>> > --- a/arch/arm64/crypto/Makefile
->>> > +++ b/arch/arm64/crypto/Makefile
->>> > @@ -48,8 +48,6 @@ CFLAGS_aes-glue-ce.o  := -DUSE_V8_CRYPTO_EXTENSIONS
->>> >
->>> >  obj-$(CONFIG_CRYPTO_CRC32_ARM64) += crc32-arm64.o
->>> >
->>> > -CFLAGS_crc32-arm64.o   := -mcpu=generic+crc
->>> > -
->>> >  $(obj)/aes-glue-%.o: $(src)/aes-glue.c FORCE
->>> >         $(call if_changed_rule,cc_o_c)
->>> >
->>> > diff --git a/arch/arm64/crypto/crc32-arm64.c b/arch/arm64/crypto/crc32-arm64.c
->>> > index 6a37c3c6b11d..10f5dd075323 100644
->>> > --- a/arch/arm64/crypto/crc32-arm64.c
->>> > +++ b/arch/arm64/crypto/crc32-arm64.c
->>> > @@ -29,6 +29,9 @@ MODULE_AUTHOR("Yazen Ghannam <yazen.ghannam@linaro.org>");
->>> >  MODULE_DESCRIPTION("CRC32 and CRC32C using optional ARMv8 instructions");
->>> >  MODULE_LICENSE("GPL v2");
->>> >
->>> > +/* Request crc extension capabilities from the assembler */
->>> > +asm(".arch_extension crc");
->>> > +
->>>
->>> Will should confirm, but I think this is a recent feature in GAS for
->>> AArch64, so this may break older toolchains as well.
->>
->> Yes, the .arch_extension directive isn't universally supported by AArch64
->> gas so we can't rely on it unconditionally. The best bet is to check for
->> the support and, if it's not present, then disable whatever feature relies
->> on it. See the lseinstr variable in Makefile.
->>
->
-> Actually, this driver has become somewhat redundant now that we have
-> an alternative that combines an implementation based on 64x64
-> polynomial multiplication with an implementation based on the CRC32
-> instructions.
->
-> I will propose a patch that makes the latter usable when only the
-> CRC32 instructions are supported.
 
-... although you still haven't explained what the actual problem is
-that you are trying to solve.
+
+On 01/30/2017 10:35 PM, Jani Nikula wrote:
+> On Sat, 28 Jan 2017, Peter Senna Tschudin <peter.senna@collabora.com> wrote:
+>> On Thu, Jan 05, 2017 at 01:18:47PM +0530, Archit Taneja wrote:
+>> Hi Archit,
+>>
+>> Thank you for the comments!
+>>
+>> [...]
+>>>> +	total_size = (block[EDID_EXT_BLOCK_CNT] + 1) * EDID_LENGTH;
+>>>> +	if (total_size > EDID_LENGTH) {
+>>>> +		kfree(block);
+>>>> +		block = kmalloc(total_size, GFP_KERNEL);
+>>>> +		if (!block)
+>>>> +			return NULL;
+>>>> +
+>>>> +		/* Yes, read the entire buffer, and do not skip the first
+>>>> +		 * EDID_LENGTH bytes.
+>>>> +		 */
+>>>
+>>> Is this the reason why you aren't using drm_do_get_edid()?
+>>
+>> Yes, for some hw specific reason, it is necessary to read the entire
+>> EDID buffer starting from 0, not block by block.
+>
+> Hrmh, I'm planning on moving the edid override and firmware edid
+> mechanisms at the drm_do_get_edid() level to be able to truly and
+> transparently use a different edid. Currently, they're only used for
+> modes, really, and lead to some info retrieved from overrides, some from
+> the real edid. This kind of hacks will bypass the override/firmware edid
+> mechanisms then too. :(
+
+It seems like there is a HW issue which prevents them from reading EDID
+from an offset. So, I'm not sure if it is a hack or a HW limitation.
+
+One way around this would be to hide the HW requirement in the
+get_edid_block func pointer passed to drm_do_get_edid(). This
+would, however, result in more i2c reads (equal to # of extension
+blocks) than what the patch currently does.
+
+Peter, if you think doing extra EDID reads isn't too costly on your
+platform, you could consider using drm_do_get_edid(). If not, I guess
+you'll miss out on the additional functionality Jani is going to add
+in the future.
+
+Thanks,
+Archit
+
+
+>
+> BR,
+> Jani.
+>
+>
+>>
+>> [...]
+>>
+>> I fixed all your other suggestions. Thank you!
+>> _______________________________________________
+>> dri-devel mailing list
+>> dri-devel at lists.freedesktop.org
+>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+>
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
