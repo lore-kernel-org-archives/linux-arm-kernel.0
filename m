@@ -1,66 +1,39 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Wed, 1 Feb 2017 13:41:27 -0500
-Subject: [PATCH v4 2/6] drm/rockchip/dsi: dw-mipi: support RK3399 mipi dsi
-In-Reply-To: <1485225486-669-3-git-send-email-zyw@rock-chips.com>
-References: <1485225486-669-1-git-send-email-zyw@rock-chips.com>
- <1485225486-669-3-git-send-email-zyw@rock-chips.com>
-Message-ID: <20170201184127.GB8595@art_vandelay>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 1 Feb 2017 18:39:18 +0000
+Subject: [PATCH v3 18/24] media: imx: Add SMFC subdev driver
+In-Reply-To: <1483755102-24785-19-git-send-email-steve_longerbeam@mentor.com>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <1483755102-24785-19-git-send-email-steve_longerbeam@mentor.com>
+Message-ID: <20170201183918.GP27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2017 at 10:38:02AM +0800, Chris Zhong wrote:
-> The vopb/vopl switch register of RK3399 mipi is different from RK3288,
-> the default setting for mipi dsi mode is different too, so add a
-> of_device_id structure to distinguish them, and make sure set the
-> correct mode before mipi phy init.
-> 
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-> 
-> ---
-> 
-> Changes in v4:
-> - remove the unrelated change
-> 
-> Changes in v3:
-> - base on John Keeping's patch series
-> 
->  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 68 +++++++++++++++++++++++++++++-----
->  1 file changed, 58 insertions(+), 10 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> index 45af890..b7b67be 100644
-> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+Hi Steve,
 
-<snip>
+On Fri, Jan 06, 2017 at 06:11:36PM -0800, Steve Longerbeam wrote:
+> +/*
+> + * Min/Max supported width and heights.
+> + *
+> + * We allow planar output from the SMFC, so we have to align
+> + * output width by 16 pixels to meet IDMAC alignment requirements,
+> + * which also means input width must have the same alignment.
+> + */
+> +#define MIN_W       176
+> +#define MIN_H       144
+> +#define MAX_W      8192
+> +#define MAX_H      4096
+> +#define W_ALIGN    4 /* multiple of 16 pixels */
 
-> @@ -1249,6 +1293,10 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
->  		clk_disable_unprepare(dsi->pclk);
->  	}
->  
-> +	dsi->phy_cfg_clk = devm_clk_get(dev, "phy_cfg");
-> +	if (IS_ERR(dsi->phy_cfg_clk))
-> +		dev_dbg(dev, "have not phy_cfg_clk\n");
+Does this only apply to planar formats?
 
-You should differentiate between ENODEV and other errors here, returning an
-error if it's not ENODEV. If it is ENODEV, just set phy_cfg_clk to NULL, then
-you can remove all of the if (IS_ERR(dsi->phy_cfg_clk) checks everywhere since
-clk_* functions check for NULL.
+I notice Philipp's driver allows 8 pixel alignment.  If it's only for
+planar formats, it ought to determine the alignment based on the
+requested format rather than hard-coding it to the maximum alignment
+of all the supported formats.
 
-Sean
-
-> +
->  	ret = clk_prepare_enable(dsi->pllref_clk);
->  	if (ret) {
->  		dev_err(dev, "%s: Failed to enable pllref_clk\n", __func__);
-> -- 
-> 2.6.3
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+Thanks.
 
 -- 
-Sean Paul, Software Engineer, Google / Chromium OS
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
