@@ -1,67 +1,101 @@
-From: sebastien.bourdelin@savoirfairelinux.com (Sebastien Bourdelin)
-Date: Wed, 1 Feb 2017 14:56:11 -0500
-Subject: [PATCH 4/6] bus: add driver for the Technologic Systems NBUS
-In-Reply-To: <CACRpkdYHHrYY-fAPnNmV94ejFJ36rhSF0SqSVHkTNq+YCRNNZw@mail.gmail.com>
-References: <20161214231237.17496-1-sebastien.bourdelin@savoirfairelinux.com>
- <20161214231237.17496-5-sebastien.bourdelin@savoirfairelinux.com>
- <CACRpkdYHHrYY-fAPnNmV94ejFJ36rhSF0SqSVHkTNq+YCRNNZw@mail.gmail.com>
-Message-ID: <7bc0871f-ac0a-e8a0-0c84-a0e61b3991a8@savoirfairelinux.com>
+From: nleeder@codeaurora.org (Leeder, Neil)
+Date: Wed, 1 Feb 2017 14:57:55 -0500
+Subject: [PATCH v8] perf: add qcom l2 cache perf events driver
+In-Reply-To: <20170130151901.GB1160@leverpostej>
+References: <1484592767-23687-1-git-send-email-nleeder@codeaurora.org>
+ <20170130151901.GB1160@leverpostej>
+Message-ID: <09ac83e5-4cab-0a1e-b9bd-93bf366aa82d@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Mark,
+Thanks for all the comments and code samples. I will update the patch
+and repost.
 
-Thanks for your feedback.
-I have a question regarding your recommendation, see below.
+On 1/30/2017 10:19 AM, Mark Rutland wrote:
+> On Mon, Jan 16, 2017 at 01:52:47PM -0500, Neil Leeder wrote:
 
-On 12/30/2016 02:58 AM, Linus Walleij wrote:
+> This is fine as is, but just for my understanding, I take it that the
+> locking is only strictly required to be per-cluster?
 
->> +
->> +static DEFINE_MUTEX(ts_nbus_lock);
->> +static bool ts_nbus_ready;
-> 
-> Why not move this to the struct ts_nbus state container?
-> 
-> It seems to be per-bus not per-system.
-> 
->> +#define TS_NBUS_READ_MODE  0
->> +#define TS_NBUS_WRITE_MODE 1
->> +#define TS_NBUS_DIRECTION_IN  0
->> +#define TS_NBUS_DIRECTION_OUT 1
->> +#define TS_NBUS_WRITE_ADR 0
->> +#define TS_NBUS_WRITE_VAL 1
->> +
->> +struct ts_nbus {
->> +       struct pwm_device *pwm;
->> +       int num_data;
->> +       int *data;
->> +       int csn;
->> +       int txrx;
->> +       int strobe;
->> +       int ale;
->> +       int rdy;
->> +};
->> +
->> +static struct ts_nbus *ts_nbus;
-> 
-> Nopes. No singletons please.
-> 
-> Use the state container pattern:
-> Documentation/driver-model/design-patterns.txt
-> 
+Correct, only per-cluster.
 
-I understand the idea but have problem to find a good way to implement it.
+>> +		conflict_event =
+>> +			cluster->events[cluster->group_to_counter[group]];
+>> +		if (conflict_event != event) {
+>
+> If it's possible for conflict_event == event, it sounds like this is
+> fragile to the order events are added or removed.
+>
+> When does conflict_event == event?
 
-Other drivers using the NBUS which are child nodes in the device tree
-will use the ts_nbus_write() and ts_nbus_read() functions, it means these
-drivers should have a pointer to the allocated ts_nbus and pass it to
-the write() and read() functions as an argument if i'm not using a
-singleton here.
-But i'm lacking knowledge on how to properly share this pointer when
-initializing the NBUS driver with the child nodes.
+Hmmm, when testing this many months ago I saw filter_match being called
+multiple times with the same event so it would conflict with itself. I
+don't see this now so if I can't reproduce it I'll remove the test.
 
-Perhaps my design is not appropriate for what i'm doing, if someone can
-point me on a similar problematic it will be really helpful.
+>> +			l2cache_pmu = to_l2cache_pmu(event->pmu);
+>> +			chwc = &conflict_event->hw;
+>> +			dev_dbg_ratelimited(&l2cache_pmu->pdev->dev,
+>> +				    "column exclusion between events %lx %lx\n",
+>> +				    hwc->config_base, chwc->config_base);
+>
+> This could happen fairly often, and even with ratelimiting we're doing
+> unnecessary work. Can we get rid of the debug logic here?
 
-Best Regards,
-Sebastien.
+Does this happen often? We're not doing sampling or running in task
+mode which involve rapid adds and deletes of events, so this really
+only happens when enabling an event. I'd like to keep some type of
+message because it's the only thing that will inform a user why the
+event they specified didn't count anything. And really why I'd prefer
+it to be a warn instead of dbg, but I can live with the dbg.
+
+> To ensure that we reliably reset clusters, and so as to avoid redundant
+> cpumask copies, I think we should rewrite the hotplug callbacks
+> something like as follows.
+
+I'm fine with this except for one case:
+
+> 	/* Try to find a new owner */
+> 	target = cpumask_any_any(cpu_online_mask, &cluster->cluster_cpus);
+
+(assuming typo for cpumask_any_and)
+The current cpu is still in cpu_online_mask, so we can end up with
+target==cpu. So we need the AND, and then an any_but(..., cpu), which
+is why I had that originally.
+
+>> +	cluster->l2cache_pmu = l2cache_pmu;
+>> +	for_each_present_cpu(cpu) {
+>> +		if (topology_physical_package_id(cpu) == fw_cluster_id) {
+>> +			cpumask_set_cpu(cpu, &cluster->cluster_cpus);
+>> +			per_cpu(pmu_cluster, cpu) = cluster;
+>> +		}
+>> +	}
+>
+> Sorry to go back-and-forth on this particular point, but I am worried
+> that this is a little fragile, since the topology stuff is largely a
+> guess, and I can imagine it might change in future.
+>
+> What exactly is the fw_cluster_id? Is it always a particular Aff<N>
+> field? Might it differ in future?
+
+fw_cluster_id is the cluster id assigned by firmware, which matches
+Aff1 for CPUs without multi-threading, Aff2 for those with. I think
+last time we discussed this I agreed to add a comment block regarding
+the expectation that this stays the same, which I didn't do. I can add
+it now.
+
+I understand your concern about future changes, but I believe this will
+remain as-is for the current generation of Qualcomm Technologies
+processors, and although I can't talk about unannounced devices I
+believe that this item will not be a problem for this driver in future.
+And if that somehow turns out not to be the case, updating this to
+whatever new scheme is used should be fairly self-contained.
+
+Thanks,
+
+Neil
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm 
+Technologies Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
