@@ -1,32 +1,16 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 1 Feb 2017 15:03:11 +0000
-Subject: [STLinux Kernel] [PATCH] MAINTAINERS: Add
- include/dt-bindings/mfd to MFD entry
-In-Reply-To: <20170201125855.24130-1-lee.jones@linaro.org>
-References: <20170201125855.24130-1-lee.jones@linaro.org>
-Message-ID: <20170201150311.GG28760@griffinp-ThinkPad-X1-Carbon-2nd>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 1 Feb 2017 09:04:33 -0600
+Subject: [PATCH 3/8] Documentation: dt: Add bindings for STM32 pinctrl
+In-Reply-To: <1485533721-9019-4-git-send-email-alexandre.torgue@st.com>
+References: <1485533721-9019-1-git-send-email-alexandre.torgue@st.com>
+ <1485533721-9019-4-git-send-email-alexandre.torgue@st.com>
+Message-ID: <20170201150433.lfuv5w7szgfvn35c@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 01 Feb 2017, Lee Jones wrote:
-
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-
-Acked-by: Peter Griffin <peter.griffin@linaro.org>
-
-> ---
->  MAINTAINERS | 1 +
->  1 file changed, 1 insertion(+)
+On Fri, Jan 27, 2017 at 05:15:16PM +0100, Alexandre TORGUE wrote:
+> Adds "ngpios" and "gpio-ranges" bindings definition.
 > 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 26edd83..17c838a 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -8422,6 +8422,7 @@ S:	Supported
->  F:	Documentation/devicetree/bindings/mfd/
->  F:	drivers/mfd/
->  F:	include/linux/mfd/
-> +F:	include/dt-bindings/mfd/
->  
->  MULTIMEDIA CARD (MMC), SECURE DIGITAL (SD) AND SDIO SUBSYSTEM
->  M:	Ulf Hansson <ulf.hansson@linaro.org>
+> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
+
+Acked-by: Rob Herring <robh@kernel.org>
