@@ -1,72 +1,49 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Wed, 1 Feb 2017 19:35:40 +0530
-Subject: [PATCH v3] initramfs: finish fput() before accessing any binary from
- initramfs
-Message-ID: <20170201140540.22051-1-lokeshvutla@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 1 Feb 2017 14:08:43 +0000
+Subject: [PATCH] efi: fdt: avoid FDT manipulation after ExitBootServices()
+In-Reply-To: <1485954693-25750-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1485954693-25750-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20170201140843.GC4756@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 4a9d4b024a31 ("switch fput to task_work_add") implements a
-schedule_work() for completing fput(), but did not guarantee calling
-__fput() after unpacking initramfs. Because of this, there is a
-possibility that during boot a driver can see ETXTBSY when it tries
-to load a binary from initramfs as fput() is still pending on that
-binary. This patch makes sure that fput() is completed after unpacking
-initramfs and removes the call to flush_delayed_fput() in kernel_init()
-which happens very late after unpacking initramfs.
+On Wed, Feb 01, 2017 at 01:11:33PM +0000, Ard Biesheuvel wrote:
+> Some AArch64 UEFI implementations disable the MMU in ExitBootServices(),
+> after which unaligned accesses to RAM are no longer supported.
 
-Reported-by: Murali Karicheri <m-karicheri2@ti.com>
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
----
-Link to v2: https://patchwork.kernel.org/patch/9534061/
-Changes since v2:
-- Dropped calling flush_delayed_fput() in kernel_init() as pointed
- out by Al Viro.
+Urrgh. That's a pretty horrible bug. :(
 
- init/initramfs.c | 2 ++
- init/main.c      | 3 ---
- 2 files changed, 2 insertions(+), 3 deletions(-)
+> Commit abfb7b686a3e ("efi/libstub/arm*: Pass latest memory map to the
+> kernel") fixed an issue in the memory map handling of the stub FDT code,
+> but inadvertently created an issue with such firmwares, by moving some
+> of the FDT manipulation to after the invocation of ExitBootServices().
+> However, the stub's libfdt implementation uses the ordinary, accelerated
+> string functions, which rely on hardware handling of unaligned accesses,
+> resulting in alignment faults when executed with the MMU off.
+> 
+> Whether disabling the MMU in ExitBootServices() complies with the UEFI
+> spec is unclear, but it is a reality we have to deal with, given that
+> it wasn't a problem before commit abfb7b686a3e was applied.
 
-diff --git a/init/initramfs.c b/init/initramfs.c
-index b32ad7d97ac9..981f286c1d16 100644
---- a/init/initramfs.c
-+++ b/init/initramfs.c
-@@ -18,6 +18,7 @@
- #include <linux/dirent.h>
- #include <linux/syscalls.h>
- #include <linux/utime.h>
-+#include <linux/file.h>
- 
- static ssize_t __init xwrite(int fd, const char *p, size_t count)
- {
-@@ -647,6 +648,7 @@ static int __init populate_rootfs(void)
- 			printk(KERN_EMERG "Initramfs unpacking failed: %s\n", err);
- 		free_initrd();
- #endif
-+		flush_delayed_fput();
- 		/*
- 		 * Try loading default modules from initramfs.  This gives
- 		 * us a chance to load before device_initcalls.
-diff --git a/init/main.c b/init/main.c
-index b0c9d6facef9..a8325cc2ad42 100644
---- a/init/main.c
-+++ b/init/main.c
-@@ -70,7 +70,6 @@
- #include <linux/shmem_fs.h>
- #include <linux/slab.h>
- #include <linux/perf_event.h>
--#include <linux/file.h>
- #include <linux/ptrace.h>
- #include <linux/blkdev.h>
- #include <linux/elevator.h>
-@@ -961,8 +960,6 @@ static int __ref kernel_init(void *unused)
- 	system_state = SYSTEM_RUNNING;
- 	numa_default_policy();
- 
--	flush_delayed_fput();
--
- 	rcu_end_inkernel_boot();
- 
- 	if (ramdisk_execute_command) {
--- 
-2.11.0
+I'd argue that this quite clearly violates the calling convention
+requiremments in 2.3.6 (e.g. SCTLR_EL1 configuration, which permits
+unaligned accesses). If ExitBootServices() changes the SCTLR_EL1 value,
+it clearly violates the calling convention.
+
+This would also mean we're calling SetVirtualAddressMap() in violation
+of said convention.
+
+For the timebeing, can we drop this statement regarding the spec from
+the commit message?
+
+Regardless, I agree that we need to handle this somehow.
+
+> So fix the situation by moving the update_fdt_memmap() into the callback
+> invoked by efi_exit_boot_services() right before it hits the button.
+
+I think this is a sensible change, but I do suspect that we're likely
+to have more fun with this broken platform in future as the stub changes
+(or compilers decide to generate unaligned accesses elsewhere).
+
+Thanks,
+Mark.
