@@ -1,53 +1,60 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 1 Feb 2017 10:29:30 +0100
-Subject: [GIT PULL] Ux500 devicetree changes for v4.11
-Message-ID: <CACRpkdbOrFAgOn_vr8vLc9pGHqzkm+Os9MrhxJjs0xxzMHO+Og@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 01 Feb 2017 10:30:57 +0100
+Subject: [PATCH v3 00/24] i.MX Media Driver
+In-Reply-To: <5586b893-bf5c-6133-0789-ccce60626b86@gmail.com>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <1485870854.2932.63.camel@pengutronix.de>
+ <5586b893-bf5c-6133-0789-ccce60626b86@gmail.com>
+Message-ID: <1485941457.3353.13.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC people,
+On Tue, 2017-01-31 at 17:26 -0800, Steve Longerbeam wrote:
+[...]
+> > # Set pad formats
+> > media-ctl --set-v4l2 "'tc358743 1-000f':0[fmt:UYVY/1920x1080]"
+> > media-ctl --set-v4l2 "'imx6-mipi-csi2':1[fmt:UYVY2X8/1920x1080]"
+> > media-ctl --set-v4l2 "'ipu1_csi0_mux':2[fmt:UYVY2X8/1920x1080]"
+> > media-ctl --set-v4l2 "'ipu1_csi0':2[fmt:AYUV32/1920x1080]"
+> >
+> > v4l2-ctl -d /dev/video4 -V
+> > # This still is configured to 640x480, which is inconsistent with
+> > # the 'ipu1_csi0':2 pad format. The pad set_fmt above should
+> > # have set this, too.
+> 
+> Because you've only configured the source pads,
+> and not the sink pads. The ipu_csi source format is
+> dependent on the sink format - output crop window is
+> limited by max input sensor frame, and since sink pad is
+> still at 640x480, output is reduced to that.
 
-sorry for the late pull request, but these really should be going to
-4.11. As late or whatever is fine.
+No, it is set (see below). What happens is that capture_g_fmt_vid_cap
+just returns the capture devices' priv->vdev.fmt, even if it is
+incompatible with the connected csi subdevice's output pad format.
 
-I found a number of bugs in the platform that had been accumulating
-and it would be nice to iron out most of them in v4.11.
+priv->vdev.fmt was never changed from the default set in
+imx_media_capture_device_register, because capture_s/try_fmt_vid_cap
+were not called yet.
 
-Please pull this to the ARM SoC tree in some apropriate branch.
+> Maybe I'm missing something, is it expected behavior that
+> a source format should be automatically propagated to
+> the sink?
 
-Yours,
-Linus Walleij
+media-ctl propagates the output pad format to all remote subdevices'
+input pads for all enabled links:
 
-The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+https://git.linuxtv.org/v4l-utils.git/tree/utils/media-ctl/libv4l2subdev.c#n693
 
-  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+> > v4l2-ctl --list-formats -d /dev/video4
+> > # This lists all the RGB formats, which it shouldn't. There is
+> > # no CSC in this pipeline, so we should be limited to YUV formats
+> > # only.
+> 
+> right, need to fix that. Probably by poking the attached
+> source subdev (csi or prpenc/vf) for its supported formats.
 
-are available in the git repository at:
+You are right, in bayer/raw mode only one specific format should be
+listed, depending on the CSI output pad format.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-tags/ux500-dt-1
-
-for you to fetch changes up to 3015d3b05239e33b42b1ae9ac408cc60fa4772ce:
-
-  ARM: dts: add the AB8500 sysclk to the device trees (2017-01-31
-22:15:06 +0100)
-
-----------------------------------------------------------------
-Ux500 Device Tree updates for v4.11:
-
-This cleans the device tree a bit and rectifies some
-clocking bugs. They are in a sense regressions, but there
-is no hurry for this platform.
-
-----------------------------------------------------------------
-Linus Walleij (3):
-      ARM: dts: push MMC/SD to board and add comments
-      ARM: dts: Ux500: move USB PHY pins to PHY device
-      ARM: dts: add the AB8500 sysclk to the device trees
-
- arch/arm/boot/dts/ste-dbx5x0.dtsi      |  2 ++
- arch/arm/boot/dts/ste-href.dtsi        | 16 +++++++++-------
- arch/arm/boot/dts/ste-hrefprev60.dtsi  |  1 +
- arch/arm/boot/dts/ste-hrefv60plus.dtsi |  1 +
- arch/arm/boot/dts/ste-snowball.dts     | 20 +++++++++++++-------
- 5 files changed, 26 insertions(+), 14 deletions(-)
+regards
+Philipp
