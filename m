@@ -1,90 +1,81 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 1 Feb 2017 17:56:33 +0100
-Subject: [PATCH 1/2] watchdog: sama5d4: Cache MR instead of a partial
- config
-In-Reply-To: <20170130175813.GA23087@roeck-us.net>
-References: <20170130171848.31598-1-alexandre.belloni@free-electrons.com>
- <20170130175813.GA23087@roeck-us.net>
-Message-ID: <20170201165633.lof3ddfvd4je35my@piout.net>
+From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
+Date: Wed,  1 Feb 2017 10:53:55 -0600
+Subject: [PATCH v3 15/18] drivers/fsi: Add FSI bus documentation
+In-Reply-To: <20170201165358.45415-1-cbostic@linux.vnet.ibm.com>
+References: <20170201165358.45415-1-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170201165358.45415-16-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/01/2017 at 09:58:13 -0800, Guenter Roeck wrote:
-> On Mon, Jan 30, 2017 at 06:18:47PM +0100, Alexandre Belloni wrote:
-> > .config is used to cache a part of WDT_MR at probe time and is not used
-> > afterwards. Instead of doing that, actually cache MR and avoid reading it
-> > every time it is modified.
-> > 
-> The semantic change here is that the old code leaves "other" bits in the
-> mr register alone. I assume you have verified that clearing those bits
-> does not have negative impact.
-> 
+From: Chris Bostic <cbostic@us.ibm.com>
 
-It doesn't have any impact unless you expect to restart a watchdog
-exactly were you stopped it.
+Add details on the basic functions of the FSI serial bus.
 
-> Also, I am not really sure if replacing a read from a register is more
-> costly than a read from memory. Is that change really worth it ?
-> I mean, sure, the way the 'config' variable is used is a bit odd,
-> but I don't really see the improvement in its replacement either.
-> 
+Signed-off-by: Chris Bostic <cbostic@us.ibm.com>
+---
+ Documentation/devicetree/bindings/fsi/fsi.txt | 54 +++++++++++++++++++++++++++
+ 1 file changed, 54 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/fsi/fsi.txt
 
-It is difficult to say performance wise (I doubt the sama5d4_wdt
-structure stays long enough in the cache). But it allows to avoid
-reading mr in the suspend function in 2/2.
-
-> > @@ -132,19 +126,19 @@ static int of_sama5d4_wdt_init(struct device_node *np, struct sama5d4_wdt *wdt)
-> >  {
-> >  	const char *tmp;
-> >  
-> > -	wdt->config = AT91_WDT_WDDIS;
-> > +	wdt->mr = AT91_WDT_WDDIS;
-> >  
-> >  	if (!of_property_read_string(np, "atmel,watchdog-type", &tmp) &&
-> >  	    !strcmp(tmp, "software"))
-> > -		wdt->config |= AT91_WDT_WDFIEN;
-> > +		wdt->mr |= AT91_WDT_WDFIEN;
-> >  	else
-> > -		wdt->config |= AT91_WDT_WDRSTEN;
-> > +		wdt->mr |= AT91_WDT_WDRSTEN;
-> >  
-> >  	if (of_property_read_bool(np, "atmel,idle-halt"))
-> > -		wdt->config |= AT91_WDT_WDIDLEHLT;
-> > +		wdt->mr |= AT91_WDT_WDIDLEHLT;
-> >  
-> >  	if (of_property_read_bool(np, "atmel,dbg-halt"))
-> > -		wdt->config |= AT91_WDT_WDDBGHLT;
-> > +		wdt->mr |= AT91_WDT_WDDBGHLT;
-> >  
-> >  	return 0;
-> >  }
-> > @@ -163,11 +157,10 @@ static int sama5d4_wdt_init(struct sama5d4_wdt *wdt)
-> >  	reg &= ~AT91_WDT_WDDIS;
-> >  	wdt_write(wdt, AT91_WDT_MR, reg);
-> >  
-> There is (at least) one read of the mr register left above this code.
-> It is not entirely obvious to me why it would make sense to retain
-> this single read instead of just clearing the AT91_WDT_WDDIS bit
-> from the cached value and writing the rest. Maybe this is to make
-> sure that WDV or WDD isn't changed with the bit set, but ....
-> the explanation associated with clearing the bit is a bit odd either
-> case. It states that AT91_WDT_WDDIS must not be set (meaning the watchdog
-> must be running ? Shouldn't it be the opposite ?) when changing WDV or WDD,
-> then violates this rule when updating the timeout (which can happen with
-> the watchdog running or not).
-
-The datasheet states:
-Note: When setting the WDDIS bit, and while it is set, the fields WDV
-and WDD must not be modified.
-
-And indeed, this may be an issue in sama5d4_wdt_set_timeout(). That is
-something I needed to clarify and forgot about but I think that can be
-solved in a separate patch.
-
-If you prefer I can simply remove the weird wdt->config usage, keeping
-the register accesses and then rework 2/2 in consequence.
-
+diff --git a/Documentation/devicetree/bindings/fsi/fsi.txt b/Documentation/devicetree/bindings/fsi/fsi.txt
+new file mode 100644
+index 0000000..7fa2394
+--- /dev/null
++++ b/Documentation/devicetree/bindings/fsi/fsi.txt
+@@ -0,0 +1,54 @@
++FSI: Flexible Support processor Interface
++
++FSI is a two line serial bus capable of running at speeds up to 166 MHz.
++The lines consist of a clock responsible for synchronizing the target device
++(slave) with the master which is responsible for all transactions on the bus.
++The master owns the clock line and is the only side allowed to change its
++state. The second line, SDA, is a data line that conveys information to/from
++the slave who samples based on the clock line.  The data line is
++bi-directional.
++
++The master initiates communication by sending a command to the slave and
++depending on the type of command will allow the slave to control the bus
++to return requested data.  All commands are CRC protected.  The slave upon
++receipt of a command will determine if the CRC is correct and discard
++the data if noise has corrupted the line.  In the same manner the master
++will verify the CRC received from the slave.
++
++Types of commands:
++Read 32 bit:  Read a 32 bit word from a specified address on the slave.
++Read 16 bit:  Read a 16 bit 'half word' from a specified address on the slave.
++read 8 bit:   Read a byte from a specified address on the slave.
++Write 32,16,8 bit: Write to a specified address on the slave with the provided
++		data.
++BREAK:		Initialize the slave's logic to receive commands.
++TERM:		Terminate the slave's error lockout to resume communications
++		after an error on the bus is detected.
++D-POLL:		Poll the slave to determine when it is no longer buy processing
++		a previous command.
++I-POLL:		Interrupt signal check.  Master queries slave to see if any
++		interrupts are asserting.
++
++High fanout capability:
++FSI buses can be chained together in 'hub' configurations to expand the
++available communications channels and thus allow connetion to more slaves.
++
++
++Typical implementation
++
++ FSI master ----- slave with local FSI master (hub) ------- downstream slave
++
++
++Each two line combination of a clock and data line is collectively referred
++to as a 'FSI link'.   Depending on hardware the primary FSI master may support
++up to 64 links.  Hub FSI masters can support at most 8 links.  Total number
++of supported slaves can grow exponentially depending on how many hubs are
++placed in the path.  Presently only two hubs in the chain are allowed but
++in the future this may be expanded.
++
++The slave hardware logic responsible for decoding FSI master commands is
++contained in a CFAM (Common Field replaceable unit Access Macro).  Up to
++4 slaves or CFAMs can be connected on each FSI link.  CFAMs in addition
++to the slave logic (or engine) can contain other functions that allow access
++via FSI.  Common additional functionality includes I2C masters, GPIO
++controllers, UARTs, etc...
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.8.2.2
