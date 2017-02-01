@@ -1,49 +1,37 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 1 Feb 2017 14:08:43 +0000
-Subject: [PATCH] efi: fdt: avoid FDT manipulation after ExitBootServices()
-In-Reply-To: <1485954693-25750-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1485954693-25750-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20170201140843.GC4756@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 1 Feb 2017 14:16:57 +0000
+Subject: [PATCH] arm64: Improve parking of stopped CPUs
+In-Reply-To: <1485942532-2643-1-git-send-email-jnair@caviumnetworks.com>
+References: <1485942532-2643-1-git-send-email-jnair@caviumnetworks.com>
+Message-ID: <20170201141656.GB8177@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2017 at 01:11:33PM +0000, Ard Biesheuvel wrote:
-> Some AArch64 UEFI implementations disable the MMU in ExitBootServices(),
-> after which unaligned accesses to RAM are no longer supported.
-
-Urrgh. That's a pretty horrible bug. :(
-
-> Commit abfb7b686a3e ("efi/libstub/arm*: Pass latest memory map to the
-> kernel") fixed an issue in the memory map handling of the stub FDT code,
-> but inadvertently created an issue with such firmwares, by moving some
-> of the FDT manipulation to after the invocation of ExitBootServices().
-> However, the stub's libfdt implementation uses the ordinary, accelerated
-> string functions, which rely on hardware handling of unaligned accesses,
-> resulting in alignment faults when executed with the MMU off.
+On Wed, Feb 01, 2017 at 09:48:52AM +0000, Jayachandran C wrote:
+> The current code puts the stopped cpus in an 'yield' instruction loop.
+> Using a busy loop here is unnecessary, we can use the cpu_park_loop()
+> function here to do a wfi/wfe.
 > 
-> Whether disabling the MMU in ExitBootServices() complies with the UEFI
-> spec is unclear, but it is a reality we have to deal with, given that
-> it wasn't a problem before commit abfb7b686a3e was applied.
+> Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
+> ---
+>  arch/arm64/kernel/smp.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index cbaab44..0691d2f 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -829,8 +829,7 @@ static void ipi_cpu_stop(unsigned int cpu)
+>  
+>  	local_irq_disable();
+>  
+> -	while (1)
+> -		cpu_relax();
+> +	cpu_park_loop();
+>  }
 
-I'd argue that this quite clearly violates the calling convention
-requiremments in 2.3.6 (e.g. SCTLR_EL1 configuration, which permits
-unaligned accesses). If ExitBootServices() changes the SCTLR_EL1 value,
-it clearly violates the calling convention.
+Hmm, so we actually added the yield for QEMU's benefit iirc, where QEMU
+will trap the yield and schedule a different vCPU. Should we be adding
+a yield to cpu_park_loop instead?
 
-This would also mean we're calling SetVirtualAddressMap() in violation
-of said convention.
-
-For the timebeing, can we drop this statement regarding the spec from
-the commit message?
-
-Regardless, I agree that we need to handle this somehow.
-
-> So fix the situation by moving the update_fdt_memmap() into the callback
-> invoked by efi_exit_boot_services() right before it hits the button.
-
-I think this is a sensible change, but I do suspect that we're likely
-to have more fun with this broken platform in future as the stub changes
-(or compilers decide to generate unaligned accesses elsewhere).
-
-Thanks,
-Mark.
+Will
