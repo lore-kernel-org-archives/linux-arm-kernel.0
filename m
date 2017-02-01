@@ -1,75 +1,58 @@
-From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Wed,  1 Feb 2017 10:53:46 -0600
-Subject: [PATCH v3 06/18] drivers/fsi: Add empty master scan
-In-Reply-To: <20170201165358.45415-1-cbostic@linux.vnet.ibm.com>
-References: <20170201165358.45415-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170201165358.45415-7-cbostic@linux.vnet.ibm.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Wed, 1 Feb 2017 18:38:34 +0100
+Subject: [GIT PULL] STM32 DT changes for v4.11 #2
+Message-ID: <81bf16c1-0534-919d-7ec6-b3e198e74428@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeremy Kerr <jk@ozlabs.org>
+Hi Olof, Arnd and Kevin,
 
-When a new fsi master is added, we will need to scan its links, and
-slaves attached to those links. This change introduces a little shell to
-iterate the links, which we will populate with the actual slave scan in
-a later change.
+Please consider this second round of STM32 DT updates for v4.11:
 
-Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
-Signed-off-by: Chris Bostic <cbostic@us.ibm.com>
----
- drivers/fsi/fsi-core.c | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+The following changes since commit a4e6964a78946bf3ce969d9fef5f201e0236f0ea:
 
-diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index 78d9c558..3160c1c 100644
---- a/drivers/fsi/fsi-core.c
-+++ b/drivers/fsi/fsi-core.c
-@@ -20,6 +20,8 @@
- 
- #include "fsi-master.h"
- 
-+#define FSI_N_SLAVES	4
-+
- static DEFINE_IDA(master_ida);
- 
- struct fsi_slave {
-@@ -31,8 +33,29 @@ struct fsi_slave {
- 
- #define to_fsi_slave(d) container_of(d, struct fsi_slave, dev)
- 
-+/* FSI slave support */
-+static int fsi_slave_init(struct fsi_master *master,
-+		int link, uint8_t slave_id)
-+{
-+	/* todo: initialise slave device, perform engine scan */
-+
-+	return -ENODEV;
-+}
-+
- /* FSI master support */
- 
-+static int fsi_master_scan(struct fsi_master *master)
-+{
-+	int link, slave_id;
-+
-+	for (link = 0; link < master->n_links; link++)
-+		for (slave_id = 0; slave_id < FSI_N_SLAVES; slave_id++)
-+			fsi_slave_init(master, link, slave_id);
-+
-+	return 0;
-+
-+}
-+
- int fsi_master_register(struct fsi_master *master)
- {
- 	if (!master || !master->dev)
-@@ -40,6 +63,7 @@ int fsi_master_register(struct fsi_master *master)
- 
- 	master->idx = ida_simple_get(&master_ida, 0, 0, GFP_KERNEL);
- 	get_device(master->dev);
-+	fsi_master_scan(master);
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(fsi_master_register);
--- 
-1.8.2.2
+   ARM: dts: stm32: enable RTC on stm32429i-eval (2017-01-20 14:59:58 +0100)
+
+are available in the git repository at:
+
+   git://git.kernel.org/pub/scm/linux/kernel/git/atorgue/stm32.git 
+tags/stm32-dt-for-v4.11-2
+
+for you to fetch changes up to 390891d0baf82278a04835c8a62bb14dca98b96b:
+
+   ARM: dts: stm32: Add I2C1 support for STM32429 eval board (2017-02-01 
+18:20:50 +0100)
+
+----------------------------------------------------------------
+STM32 DT updates for v4.11, round 2.
+
+Highlights:
+----------
+
+  - ADD Timers support on STM32F429 MCU
+  - Enable PWM1 & PWM3 on STM32F469 Disco board
+  - Fix STM32F4_X_CLOCK macro
+  - Use STM32F4_X_CLOCK macro in STM32 device tree
+  - Add I2C1 support for STM32F429 MCU
+  - Enable I2C1 on STM32F429 eval board
+
+----------------------------------------------------------------
+Benjamin Gaignard (2):
+       ARM: dts: stm32: add Timers driver for stm32f429 MCU
+       ARM: dts: stm32: Enable pwm1 and pwm3 for stm32f469-disco
+
+Gabriel Fernandez (3):
+       dt-bindings: mfd: stm32f4: Fix STM32F4_X_CLOCK() macro
+       dt-bindings: mfd: stm32f4: Add missing binding definition
+       ARM: dts: stm32: Use clock DT binding definition on stm32f429 family
+
+M'boumba Cedric Madianga (2):
+       ARM: dts: stm32: Add I2C1 support for STM32F429 SoC
+       ARM: dts: stm32: Add I2C1 support for STM32429 eval board
+
+  arch/arm/boot/dts/stm32429i-eval.dts  |   8 +-
+  arch/arm/boot/dts/stm32f429.dtsi      | 371 
+++++++++++++++++++++++++++++++----
+  arch/arm/boot/dts/stm32f469-disco.dts |  28 +++
+  include/dt-bindings/mfd/stm32f4-rcc.h |  24 ++-
+  4 files changed, 388 insertions(+), 43 deletions(-)
