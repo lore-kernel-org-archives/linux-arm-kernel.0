@@ -1,40 +1,54 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 2 Feb 2017 07:20:57 +0800
-Subject: [PATCH V8 08/10] ras: acpi / apei: generate trace event for
- unrecognized CPER section
-In-Reply-To: <1485969413-23577-9-git-send-email-tbaicar@codeaurora.org>
-Message-ID: <201702020753.3LL3zhm1%fengguang.wu@intel.com>
+From: code@mmayer.net (Markus Mayer)
+Date: Wed,  1 Feb 2017 15:26:36 -0800
+Subject: [PATCH v6 0/2] cpufreq: brcmstb-cpufreq: CPUfreq driver for older
+ Broadcom STB SoCs
+Message-ID: <20170201232638.74396-1-code@mmayer.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tyler,
+From: Markus Mayer <mmayer@broadcom.com>
 
-[auto build test ERROR on pm/linux-next]
-[also build test ERROR on v4.10-rc6 next-20170201]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+This CPUfreq driver provides basic frequency scaling for older Broadcom
+STB SoCs that do not use AVS firmware with DVFS support. There is no
+support for voltage scaling.
 
-url:    https://github.com/0day-ci/linux/commits/Tyler-Baicar/Add-UEFI-2-6-and-ACPI-6-1-updates-for-RAS-on-ARM64/20170202-020320
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
-config: x86_64-randconfig-r0-02020102 (attached as .config)
-compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+v5 of this patch can be found at: https://lkml.org/lkml/2017/1/18/1093
 
-All errors (new ones prefixed by >>):
+Changes since v5:
+  - Removed DT properties div-table and div-shift-width (Stephen Boyd)
+  - Renamed node from cpu-clk-div at ... to clock-controller at ... (Rob Herring)
+  - No code changes
 
-   drivers/built-in.o: In function `ghes_do_proc.isra.9':
->> ghes.c:(.text+0x92f3a): undefined reference to `__tracepoint_unknown_sec_event'
-   ghes.c:(.text+0x92f73): undefined reference to `__tracepoint_unknown_sec_event'
-   ghes.c:(.text+0x92fdb): undefined reference to `__tracepoint_unknown_sec_event'
+v4 of this patch can be found at: https://lkml.org/lkml/2016/12/20/670
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 25871 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170202/8c6b557c/attachment-0001.gz>
+Changes since v4:
+  - Simplified (and hopefully clarified) binding document
+  - No code changes
+
+v3 of this patch can be found at: https://lkml.org/lkml/2016/11/22/747
+
+Changes since v3:
+  - added binding document
+  - got rid of calls to __clk_lookup(), using devm_clk_get() instead
+  - re-worked clock lookup code a bit, along with switching to devm_clk_get()
+  - get_frequencies() became a void function, removing the need for some
+    error checking
+  - fixed CONFIG_ARM_BRCM_AVS_CPUFREQ typo
+  - fixed MODULE_DEVICE_TABLE declaration
+
+
+Markus Mayer (2):
+  dt-bindings: brcm: clocks: add binding for brcmstb-cpu-clk-div
+  cpufreq: brcmstb-cpufreq: CPUfreq driver for older Broadcom STB SoCs
+
+ .../bindings/clock/brcm,brcmstb-cpu-clk-div.txt    |  22 ++
+ MAINTAINERS                                        |   1 +
+ drivers/cpufreq/Kconfig.arm                        |  12 +
+ drivers/cpufreq/Makefile                           |   1 +
+ drivers/cpufreq/brcmstb-cpufreq.c                  | 377 +++++++++++++++++++++
+ 5 files changed, 413 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/brcm,brcmstb-cpu-clk-div.txt
+ create mode 100644 drivers/cpufreq/brcmstb-cpufreq.c
+
+-- 
+2.7.4
