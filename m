@@ -1,26 +1,139 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 1 Feb 2017 11:26:29 -0600
-Subject: [PATCH v3 1/8] ASoC: sun4i-i2s: Update binding documentation to
- include A31
-In-Reply-To: <20170131100552.27949-2-mylene.josserand@free-electrons.com>
-References: <20170131100552.27949-1-mylene.josserand@free-electrons.com>
- <20170131100552.27949-2-mylene.josserand@free-electrons.com>
-Message-ID: <20170201172629.6hcabndljh4bwm5p@rob-hp-laptop>
+From: tbaicar@codeaurora.org (Tyler Baicar)
+Date: Wed,  1 Feb 2017 10:16:53 -0700
+Subject: [PATCH V8 10/10] arm/arm64: KVM: add guest SEA support
+In-Reply-To: <1485969413-23577-1-git-send-email-tbaicar@codeaurora.org>
+References: <1485969413-23577-1-git-send-email-tbaicar@codeaurora.org>
+Message-ID: <1485969413-23577-11-git-send-email-tbaicar@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2017 at 11:05:45AM +0100, Myl?ne Josserand wrote:
-> Add a new compatible for sun4i-i2s driver to handle some
-> SoCs that have a reset line that must be asserted/deasserted.
-> 
-> This new compatible, "allwinner,sun6i-a31-i2s", requires the
-> property "resets" which should be a phandle to the reset line.
-> Except these differences, the compatible is identical to previous one
-> which will not handle a reset line.
-> 
-> Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/sound/sun4i-i2s.txt | 5 +++++
->  1 file changed, 5 insertions(+)
+Currently external aborts are unsupported by the guest abort
+handling. Add handling for SEAs so that the host kernel reports
+SEAs which occur in the guest kernel.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+---
+ arch/arm/include/asm/kvm_arm.h       |  1 +
+ arch/arm/include/asm/system_misc.h   |  5 +++++
+ arch/arm/kvm/mmu.c                   | 18 ++++++++++++++++--
+ arch/arm64/include/asm/kvm_arm.h     |  1 +
+ arch/arm64/include/asm/system_misc.h |  2 ++
+ arch/arm64/mm/fault.c                | 16 ++++++++++++++++
+ 6 files changed, 41 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
+index e22089f..33a77509 100644
+--- a/arch/arm/include/asm/kvm_arm.h
++++ b/arch/arm/include/asm/kvm_arm.h
+@@ -187,6 +187,7 @@
+ #define FSC_FAULT	(0x04)
+ #define FSC_ACCESS	(0x08)
+ #define FSC_PERM	(0x0c)
++#define FSC_EXTABT	(0x10)
+ 
+ /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
+ #define HPFAR_MASK	(~0xf)
+diff --git a/arch/arm/include/asm/system_misc.h b/arch/arm/include/asm/system_misc.h
+index a3d61ad..ea45d94 100644
+--- a/arch/arm/include/asm/system_misc.h
++++ b/arch/arm/include/asm/system_misc.h
+@@ -24,4 +24,9 @@
+ 
+ #endif /* !__ASSEMBLY__ */
+ 
++static inline int handle_guest_sea(unsigned long addr, unsigned int esr)
++{
++	return -1;
++}
++
+ #endif /* __ASM_ARM_SYSTEM_MISC_H */
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index a5265ed..04f1dd50 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -29,6 +29,7 @@
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_emulate.h>
+ #include <asm/virt.h>
++#include <asm/system_misc.h>
+ 
+ #include "trace.h"
+ 
+@@ -1444,8 +1445,21 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 
+ 	/* Check the stage-2 fault is trans. fault or write fault */
+ 	fault_status = kvm_vcpu_trap_get_fault_type(vcpu);
+-	if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
+-	    fault_status != FSC_ACCESS) {
++
++	/* The host kernel will handle the synchronous external abort. There
++	 * is no need to pass the error into the guest.
++	 */
++	if (fault_status == FSC_EXTABT) {
++		if(handle_guest_sea((unsigned long)fault_ipa,
++				    kvm_vcpu_get_hsr(vcpu))) {
++			kvm_err("Failed to handle guest SEA, FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
++				kvm_vcpu_trap_get_class(vcpu),
++				(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
++				(unsigned long)kvm_vcpu_get_hsr(vcpu));
++			return -EFAULT;
++		}
++	} else if (fault_status != FSC_FAULT && fault_status != FSC_PERM &&
++		   fault_status != FSC_ACCESS) {
+ 		kvm_err("Unsupported FSC: EC=%#x xFSC=%#lx ESR_EL2=%#lx\n",
+ 			kvm_vcpu_trap_get_class(vcpu),
+ 			(unsigned long)kvm_vcpu_trap_get_fault(vcpu),
+diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
+index 2a2752b..2b11d59 100644
+--- a/arch/arm64/include/asm/kvm_arm.h
++++ b/arch/arm64/include/asm/kvm_arm.h
+@@ -201,6 +201,7 @@
+ #define FSC_FAULT	ESR_ELx_FSC_FAULT
+ #define FSC_ACCESS	ESR_ELx_FSC_ACCESS
+ #define FSC_PERM	ESR_ELx_FSC_PERM
++#define FSC_EXTABT	ESR_ELx_FSC_EXTABT
+ 
+ /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
+ #define HPFAR_MASK	(~UL(0xf))
+diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
+index bc81243..5b2cecd1 100644
+--- a/arch/arm64/include/asm/system_misc.h
++++ b/arch/arm64/include/asm/system_misc.h
+@@ -58,4 +58,6 @@ void hook_debug_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
+ 
+ #endif	/* __ASSEMBLY__ */
+ 
++int handle_guest_sea(unsigned long addr, unsigned int esr);
++
+ #endif	/* __ASM_SYSTEM_MISC_H */
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 5a5a096..edd0c4f 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -602,6 +602,22 @@ static const char *fault_name(unsigned int esr)
+ }
+ 
+ /*
++ * Handle Synchronous External Aborts that occur in a guest kernel.
++ */
++int handle_guest_sea(unsigned long addr, unsigned int esr)
++{
++	/*
++	 * synchronize_rcu() will wait for nmi_exit(), so no need to
++	 * rcu_read_lock().
++	 */
++	nmi_enter();
++	ghes_notify_sea();
++	nmi_exit();
++
++	return 0;
++}
++
++/*
+  * Dispatch a data abort to the relevant handler.
+  */
+ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
