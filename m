@@ -1,41 +1,34 @@
-From: colin.king@canonical.com (Colin King)
-Date: Wed,  1 Feb 2017 11:57:11 +0000
-Subject: [PATCH] staging: bcm2835-audio: use | instead of || otherwise result
- is just boolean 1
-Message-ID: <20170201115711.17360-1-colin.king@canonical.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 1 Feb 2017 11:59:58 +0000
+Subject: [PATCH v3 1/8] ASoC: sun4i-i2s: Update binding documentation to
+ include A31
+In-Reply-To: <feb16b69-388f-10e5-7be5-c750095ee52b@free-electrons.com>
+References: <20170131100552.27949-1-mylene.josserand@free-electrons.com>
+ <20170131100552.27949-2-mylene.josserand@free-electrons.com>
+ <20170131211702.taxbrgxwo7b4daej@sirena.org.uk>
+ <feb16b69-388f-10e5-7be5-c750095ee52b@free-electrons.com>
+Message-ID: <20170201115958.7a2odxxyhzm3ofew@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+On Wed, Feb 01, 2017 at 08:44:56AM +0100, Mylene Josserand wrote:
+> On 31/01/2017 22:17, Mark Brown wrote:
+> > On Tue, Jan 31, 2017 at 11:05:45AM +0100, Myl?ne Josserand wrote:
+> > > Add a new compatible for sun4i-i2s driver to handle some
+> > > SoCs that have a reset line that must be asserted/deasserted.
 
-The incorrect or operator is being used resulting in cookies being
-set to 1 (true) rather than the intended hex value.  Fix this by
-using | instead of ||.
+> > This doesn't apply against current code, please check and resend.
 
-Issue found with static analysis with cppcheck
+> I based my series on linux-next 20170131. Which one I should use?
 
-Fixes: 0cec463e391e05b807a ("staging: bcm2835-audio: Simplify callback structure for write data")
+You should be submitting against my git tree (which should be what's in
+-next...).
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- drivers/staging/bcm2835-audio/bcm2835-vchiq.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/staging/bcm2835-audio/bcm2835-vchiq.c b/drivers/staging/bcm2835-audio/bcm2835-vchiq.c
-index e8fd9c7..280028d 100644
---- a/drivers/staging/bcm2835-audio/bcm2835-vchiq.c
-+++ b/drivers/staging/bcm2835-audio/bcm2835-vchiq.c
-@@ -100,9 +100,9 @@ bcm2835_vchi_msg_queue(VCHI_SERVICE_HANDLE_T handle,
- 			      size);
- }
- 
--static const u32 BCM2835_AUDIO_WRITE_COOKIE1 = ('B' << 24 | 'C' << 16 ||
-+static const u32 BCM2835_AUDIO_WRITE_COOKIE1 = ('B' << 24 | 'C' << 16 |
- 						'M' << 8  | 'A');
--static const u32 BCM2835_AUDIO_WRITE_COOKIE2 = ('D' << 24 | 'A' << 16 ||
-+static const u32 BCM2835_AUDIO_WRITE_COOKIE2 = ('D' << 24 | 'A' << 16 |
- 						'T' << 8  | 'A');
- 
- struct bcm2835_audio_work {
--- 
-2.10.2
+  git://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git for-next
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170201/d0c44331/attachment.sig>
