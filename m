@@ -1,92 +1,56 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Wed, 1 Feb 2017 14:58:41 +0100
-Subject: [PATCH] crypto: arm64/crc32 - detect crc32 support in assembler
-In-Reply-To: <CAKv+Gu9gPAb-AMdbK32dXciX1mgh1sqSrxMAjB-ZGw7uAk2r2Q@mail.gmail.com>
-References: <20170127104039.29351-1-mbrugger@suse.com>
- <CAKv+Gu8P3U6_u7FdRFSdDL9jdKaJQuqHbrQ-7Qu900f8R1voZw@mail.gmail.com>
- <20170127105244.GF21144@arm.com>
- <CAKv+Gu_LcU3mSSMdrjks02ZuhHLhkYqNuZGOcTp1AmS8cpzCDg@mail.gmail.com>
- <CAKv+Gu9gPAb-AMdbK32dXciX1mgh1sqSrxMAjB-ZGw7uAk2r2Q@mail.gmail.com>
-Message-ID: <5ebb24d2-81d4-53c7-0365-f35a0eb3588b@suse.de>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 1 Feb 2017 14:06:45 +0000
+Subject: [PATCH/RFC] arm64: defconfig: Enlarge CMA alignment to 2 MiB
+In-Reply-To: <CANqRtoQJaRK7Kys-fudyxJuojBmZyXMsNoDudSt4p=gj5srviA@mail.gmail.com>
+References: <1485532996-19719-1-git-send-email-geert+renesas@glider.be>
+ <CANqRtoQJaRK7Kys-fudyxJuojBmZyXMsNoDudSt4p=gj5srviA@mail.gmail.com>
+Message-ID: <a4e171b0-6403-9d88-3b8f-e63f3f050689@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/01/2017 10:43 AM, Ard Biesheuvel wrote:
-> On 1 February 2017 at 09:07, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> On 27 January 2017 at 10:52, Will Deacon <will.deacon@arm.com> wrote:
->>> On Fri, Jan 27, 2017 at 10:43:16AM +0000, Ard Biesheuvel wrote:
->>>> On 27 January 2017 at 10:40, Matthias Brugger <mbrugger@suse.com> wrote:
->>>>> Older compilers may not be able to detect the crc32 extended cpu type.
->>>> What do you mean 'detect'? Could you describe the failure in more detail
->>>> please?
->>>>
->>>>> Anyway only inline assembler code is used, which gets passed to the
->>>>> assembler. This patch moves the crc detection to the assembler.
->>>>>
->>>>> Suggested-by: Alexander Graf <agraf@suse.de>
->>>>> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
->>>>> ---
->>>>>   arch/arm64/crypto/Makefile      | 2 --
->>>>>   arch/arm64/crypto/crc32-arm64.c | 3 +++
->>>>>   2 files changed, 3 insertions(+), 2 deletions(-)
->>>>>
->>>>> diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
->>>>> index aa8888d7b744..0d779dac75cd 100644
->>>>> --- a/arch/arm64/crypto/Makefile
->>>>> +++ b/arch/arm64/crypto/Makefile
->>>>> @@ -48,8 +48,6 @@ CFLAGS_aes-glue-ce.o  := -DUSE_V8_CRYPTO_EXTENSIONS
->>>>>
->>>>>   obj-$(CONFIG_CRYPTO_CRC32_ARM64) += crc32-arm64.o
->>>>>
->>>>> -CFLAGS_crc32-arm64.o   := -mcpu=generic+crc
->>>>> -
->>>>>   $(obj)/aes-glue-%.o: $(src)/aes-glue.c FORCE
->>>>>          $(call if_changed_rule,cc_o_c)
->>>>>
->>>>> diff --git a/arch/arm64/crypto/crc32-arm64.c b/arch/arm64/crypto/crc32-arm64.c
->>>>> index 6a37c3c6b11d..10f5dd075323 100644
->>>>> --- a/arch/arm64/crypto/crc32-arm64.c
->>>>> +++ b/arch/arm64/crypto/crc32-arm64.c
->>>>> @@ -29,6 +29,9 @@ MODULE_AUTHOR("Yazen Ghannam <yazen.ghannam@linaro.org>");
->>>>>   MODULE_DESCRIPTION("CRC32 and CRC32C using optional ARMv8 instructions");
->>>>>   MODULE_LICENSE("GPL v2");
->>>>>
->>>>> +/* Request crc extension capabilities from the assembler */
->>>>> +asm(".arch_extension crc");
->>>>> +
->>>> Will should confirm, but I think this is a recent feature in GAS for
->>>> AArch64, so this may break older toolchains as well.
->>> Yes, the .arch_extension directive isn't universally supported by AArch64
->>> gas so we can't rely on it unconditionally. The best bet is to check for
->>> the support and, if it's not present, then disable whatever feature relies
->>> on it. See the lseinstr variable in Makefile.
->>>
->> Actually, this driver has become somewhat redundant now that we have
->> an alternative that combines an implementation based on 64x64
->> polynomial multiplication with an implementation based on the CRC32
->> instructions.
+On 01/02/17 13:45, Magnus Damm wrote:
+> Hi Geert,
+> 
+> On Sat, Jan 28, 2017 at 1:03 AM, Geert Uytterhoeven
+> <geert+renesas@glider.be> wrote:
+>> Some IOMMUs (e.g. Renesas IPMMU/VMSA) support only page sizes of 4 KiB,
+>> 2 MiB, and 1 GiB.
 >>
->> I will propose a patch that makes the latter usable when only the
->> CRC32 instructions are supported.
-> ... although you still haven't explained what the actual problem is
-> that you are trying to solve.
+>> With the default setting of CONFIG_CMA_ALIGNMENT = 8, allocations larger
+>> than 1 MiB are aligned to a 1 MiB boundary only.  Hence a 2 MiB
+>> allocation may not be aligned, leading to a mapping of 512 4 KiB pages.
+>>
+>> Increase CONFIG_CMA_ALIGNMENT to allow mapping a 2 MiB buffer using a
+>> single PTE, decreasing memory usage and TLB pressure.
+>>
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> ---
+>> Is this useful?
+>>
+>> Should there instead be different defaults in Kconfig, depending on
+>> enabled platform support?
+> 
+> I think there is a dependency on the kernel page size configuration as
+> well. In case of 16 KiB or 64 KiB page size configuration other large
+> page sizes may be required.
 
+I don't see the original patch (linux-arm-kernel doesn't look to have it
+archived either), but I think bumping the default up to 2MB to match our
+normal section size sounds generally reasonable - users can still
+override it manually in their config, right? For 16KB and 64KB granules,
+it is at least the size covered by contiguous-hinted pages; the actual
+section sizes there are far too big to be practical for alignment
+purposes anyway (32MB and 512MB respectively).
 
+Robin.
 
-The problem is that in Leap 42.2 (as well as SLES12 SP2) we have a 4.8 
-based system compiler, but recent binutils. That means that while our 
-assembler is happy to work with crc instructions, passing the -mcpu 
-parameter to gcc fails because gcc isn't aware of the flavor yet.
-
-That in turn means that we want to tell the assembler about feature 
-requirements rather than the compiler. Fortunately the ".arch_extension" 
-primitive allows you to do so.
-
-As far as checking for availability of it goes, I agree that it'd be 
-nice to check if ".arch_extension" is supported. But so would be to 
-check if -mcpu=generic+crc is supported. IMHO this patch doesn't make 
-the current non-checking situation any worse. But of course checking is 
-always nicer than not checking :)
-
-
-Alex
+> 
+> Thanks,
+> 
+> / magnus
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
