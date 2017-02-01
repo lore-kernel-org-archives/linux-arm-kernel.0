@@ -1,57 +1,74 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed,  1 Feb 2017 21:46:27 +0900
-Subject: [PATCH v31 08/12] arm64: kdump: add VMCOREINFO's for user-space tools
+Date: Wed,  1 Feb 2017 21:48:20 +0900
+Subject: [PATCH v31 12/12] Documentation: dt: chosen properties for arm64 kdump
 In-Reply-To: <20170201124218.5823-1-takahiro.akashi@linaro.org>
 References: <20170201124218.5823-1-takahiro.akashi@linaro.org>
-Message-ID: <20170201124630.6016-7-takahiro.akashi@linaro.org>
+Message-ID: <20170201124820.6094-1-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In addition to common VMCOREINFO's defined in
-crash_save_vmcoreinfo_init(), we need to know, for crash utility,
-  - kimage_voffset
-  - PHYS_OFFSET
-to examine the contents of a dump file (/proc/vmcore) correctly
-due to the introduction of KASLR (CONFIG_RANDOMIZE_BASE) in v4.6.
+From: James Morse <james.morse@arm.com>
 
-  - VA_BITS
-is also required for makedumpfile command.
+Add documentation for DT properties:
+	linux,usable-memory-range
+	linux,elfcorehdr
+used by arm64 kdump. Those decribe the usable memory range for crash dump
+kernel and the elfcorehdr's location within it, respectively.
 
-arch_crash_save_vmcoreinfo() appends them to the dump file.
-More VMCOREINFO's may be added later.
-
+Signed-off-by: James Morse <james.morse@arm.com>
+[takahiro.akashi at linaro.org: added "linux,crashkernel-base" and "-size" ]
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Reviewed-by: James Morse <james.morse@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Cc: devicetree at vger.kernel.org
+Cc: Rob Herring <robh+dt@kernel.org>
 ---
- arch/arm64/kernel/machine_kexec.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ Documentation/devicetree/bindings/chosen.txt | 37 ++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
-diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-index c61dd7b7dca0..1fcd5483c1bb 100644
---- a/arch/arm64/kernel/machine_kexec.c
-+++ b/arch/arm64/kernel/machine_kexec.c
-@@ -17,6 +17,7 @@
- 
- #include <asm/cacheflush.h>
- #include <asm/cpu_ops.h>
-+#include <asm/memory.h>
- #include <asm/mmu.h>
- #include <asm/mmu_context.h>
- 
-@@ -280,3 +281,13 @@ void arch_kexec_unprotect_crashkres(void)
- 
- 	flush_tlb_all();
- }
+diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
+index 6ae9d82d4c37..8dc82431acc1 100644
+--- a/Documentation/devicetree/bindings/chosen.txt
++++ b/Documentation/devicetree/bindings/chosen.txt
+@@ -52,3 +52,40 @@ This property is set (currently only on PowerPC, and only needed on
+ book3e) by some versions of kexec-tools to tell the new kernel that it
+ is being booted by kexec, as the booting environment may differ (e.g.
+ a different secondary CPU release mechanism)
 +
-+void arch_crash_save_vmcoreinfo(void)
-+{
-+	VMCOREINFO_NUMBER(VA_BITS);
-+	/* Please note VMCOREINFO_NUMBER() uses "%d", not "%x" */
-+	vmcoreinfo_append_str("NUMBER(kimage_voffset)=0x%llx\n",
-+						kimage_voffset);
-+	vmcoreinfo_append_str("NUMBER(PHYS_OFFSET)=0x%llx\n",
-+						PHYS_OFFSET);
-+}
++linux,usable-memory-range
++-------------------------
++
++This property (arm64 only) holds a base address and size, describing a
++limited region in which memory may be considered available for use by
++the kernel. Memory outside of this range is not available for use.
++
++This property describes a limitation: memory within this range is only
++valid when also described through another mechanism that the kernel
++would otherwise use to determine available memory (e.g. memory nodes
++or the EFI memory map). Valid memory may be sparse within the range.
++e.g.
++
++/ {
++	chosen {
++		linux,usable-memory-range = <0x9 0xf0000000 0x0 0x10000000>;
++	};
++};
++
++The main usage is for crash dump kernel to identify its own usable
++memory and exclude, at its boot time, any other memory areas that are
++part of the panicked kernel's memory.
++
++linux,elfcorehdr
++----------------
++
++This property (currently used only on arm64) holds the memory range,
++the address and the size, of the elf core header which mainly describes
++the panicked kernel's memory layout as PT_LOAD segments of elf format.
++e.g.
++
++/ {
++	chosen {
++		linux,elfcorehdr = <0x9 0xfffff000 0x0 0x800>;
++	};
++};
 -- 
 2.11.0
