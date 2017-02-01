@@ -1,53 +1,163 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Wed, 1 Feb 2017 07:42:02 +0800
-Subject: [stericsson:ux500-devicetree 4/4]
- arch/arm/boot/dts/ste-dbx5x0.dtsi:17:42: fatal error:
- dt-bindings/clock/ste-ab8500.h: No such file or directory
-Message-ID: <201702010700.bgYKdYbS%fengguang.wu@intel.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 1 Feb 2017 00:23:32 +0000
+Subject: [PATCH v3 00/24] i.MX Media Driver
+In-Reply-To: <3a673cba-bbf6-5611-5857-4605797bf049@gmail.com>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <20170131004510.GQ27312@n2100.armlinux.org.uk>
+ <951c1a08-c0f2-4333-b4bf-410de8dd863f@gmail.com>
+ <20170131110027.GU27312@n2100.armlinux.org.uk>
+ <3a673cba-bbf6-5611-5857-4605797bf049@gmail.com>
+Message-ID: <20170201002331.GG27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git ux500-devicetree
-head:   312ae21fdd56b54bafc0817ab3a0a8aa85b5b8cc
-commit: 312ae21fdd56b54bafc0817ab3a0a8aa85b5b8cc [4/4] ARM: dts: add the AB8500 clocks to the device tree
-config: arm-at91_dt_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 312ae21fdd56b54bafc0817ab3a0a8aa85b5b8cc
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+On Tue, Jan 31, 2017 at 03:43:22PM -0800, Steve Longerbeam wrote:
+> 
+> 
+> On 01/31/2017 03:00 AM, Russell King - ARM Linux wrote:
+> >Just like smiapp, the camera sensor block (which is the very far end
+> >of the pipeline) is marked with MEDIA_ENT_F_CAM_SENSOR.  However, in
+> >front of that is the binner, which just like smiapp gets a separate
+> >entity.  It's this entity which is connected to the mipi-csi2 subdev.
+> 
+> wow, ok got it.
+> 
+> So the sensor pipeline and binner, and the OF graph connecting
+> them, are described in the device tree I presume.
 
-All errors (new ones prefixed by >>):
+No - because the binner and sensor are on the same die, it's even
+one single device, there's no real separation of the two devices.
 
-   In file included from arch/arm/boot/dts/ste-hrefv60plus.dtsi:12:0,
-                    from arch/arm/boot/dts/ste-hrefv60plus-tvk.dts:15:
->> arch/arm/boot/dts/ste-dbx5x0.dtsi:17:42: fatal error: dt-bindings/clock/ste-ab8500.h: No such file or directory
-    #include <dt-bindings/clock/ste-ab8500.h>
-                                             ^
-   compilation terminated.
+The reason there's no real separation is because the binning is done
+as part of the process of reading the array - sometimes before the
+analog voltage is converted to its digital pixel value representation.
 
-vim +17 arch/arm/boot/dts/ste-dbx5x0.dtsi
+The separation comes because of the requirements of the v4l2 media
+subdevs, which requires scalers to have a sink pad and a source pad.
+(Please see the v4l2 documentation, I think I've already quoted this:
 
-    11	
-    12	#include <dt-bindings/interrupt-controller/irq.h>
-    13	#include <dt-bindings/interrupt-controller/arm-gic.h>
-    14	#include <dt-bindings/mfd/dbx500-prcmu.h>
-    15	#include <dt-bindings/arm/ux500_pm_domains.h>
-    16	#include <dt-bindings/gpio/gpio.h>
-  > 17	#include <dt-bindings/clock/ste-ab8500.h>
-    18	#include "skeleton.dtsi"
-    19	
-    20	/ {
+       ..  _MEDIA-ENT-F-PROC-VIDEO-SCALER:
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 22125 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170201/d38feee8/attachment-0001.gz>
+       -  ``MEDIA_ENT_F_PROC_VIDEO_SCALER``
+
+       -  Video scaler. An entity capable of video scaling must have
+          at least one sink pad and one source pad, and scale the
+          video frame(s) received on its sink pad(s) to a different
+          resolution output on its source pad(s). The range of
+          supported scaling ratios is entity-specific and can differ
+          between the horizontal and vertical directions (in particular
+          scaling can be supported in one direction only). Binning and
+          skipping are considered as scaling.
+
+(Oh yes, I see it was the mail to which you were replying to...)
+
+So, in order to configure the scaling (which can be none, /2 and /4)
+we have to expose two subdevs - one which is the scaler, and has a
+source pad connected to the upstream (in this case CSI2 receiver)
+and a sink pad immutably connected to the camera sensor.
+
+Since the split is entirely down to the V4L2 implementation requirements,
+it's not something that should be reflected in DT - we don't put
+implementation details in DT.
+
+It's just the same (as I've already said) as the SMIAPP camera driver,
+the reason I'm pointing you towards that is because this is an already
+mainlined camera driver which nicely illustrates how my driver is
+structured from the v4l2 subdev API point of view.
+
+> The OF graph AFAIK, has no information about which ports are sinks
+> and which are sources, so of_parse_subdev() tries to determine that
+> based on the compatible string of the device node. So ATM
+> of_parse_subdev() assumes there is nothing but the imx6-mipi-csi2,
+> video-multiplexer, and camera sensors upstream from the CSI ports
+> in the OF graph.
+> 
+> I realize that's not a robust solution, and is the reason for the
+> "no sensor attached" below.
+> 
+> Is there any way to determine from the OF graph the data-direction
+> of a port (whether it is a sink or a source)? If so it will make
+> of_parse_subdev() much more robust.
+
+I'm not sure why you need to know the data direction.  I think the
+issue here is how you're going about dealing with the subdevs.
+Here's the subdev setup:
+
++---------camera--------+
+| pixel array -> binner |---> csi2 --> ipu1csi0 mux --> csi0 --> smfc --> idmac
++-----------------------+
+
+How the subdevs are supposed to work is that you start from the first
+subdev in sequence (in this case the pixel array) and negotiate with
+the driver through the TRY formats on its source pad, as well as
+negotiating with the sink pad of the directly neighbouring subdev.
+
+The neighbouring subdev propagates the configuration in a driver
+specific manner from its source pad to the sink pad, giving a default
+configuration at its source.
+
+This process repeats throughout the chain all the way up to the bridge
+device.
+
+Now, where things go wrong is that you want to know what each type of
+these subdevs are, and the reason you want that is so you can do this
+(for example - I know similar stuff happens with the "sensor" stuff
+further up the chain as well):
+
++---------camera--------+
+| pixel array -> binner |---> csi2 --> ipu1csi0 mux --> csi0 --> smfc --> idmac
++-----------------------+                                |
+              ^--I-want-your-bus-format-and-frame-rate---'
+
+which goes against the negotiation mechanism of v4l2 subdevs.  This
+is broken - it bypass the subdev negotiation that has been performed
+on the intervening subdevs between the "sensor" and the csi0 subdevs,
+so if there were a subdev in that chain that (eg) reduced the frame
+rate by discarding the odd frames, you'd be working with the wrong
+frame interval for your frame interval monitor at csi.
+
+Note that the "MEDIA_ENT_F_PROC_VIDEO_SCALER" subdev type is documented
+as not only supports scaling as in changing the size of the image, but
+also in terms of skipping frames, which means a reduction in frame rate.
+
+So, for your FIM, you need to know if there is any reduction in frame
+rate through that pipeline, and looking for a "MEDIA_ENT_F_CAM_SENSOR"
+subdev node isn't going to tell you that.  The frame rate really needs
+to be carried through and I suspect you need to accept the frame rate
+into each subdev so it can be passed along the chain by the application
+configuring the pipeline.
+
+The last bit from the above is the "I-want-your-bus-format" bit which
+I haven't fully worked out how to eliminate - I understand the reason
+you need that (so you can appropriately configure the CSI with the CSI2
+data type code.)  The CSI2 data type code comes from the format
+configured on the CSI sink pad, so the only information you're really
+using there is "are we sinking data from a CSI2 interface."
+
+You _could_ walk down the graph from the CSI looking for a subdev that
+responds to g_mbus_config that reports CSI2, but I'm not sure that's
+going to last - I've seen an email from Hans saying that he'd like
+g_mbus_config to go away (to patch 13/24, for the vidsw_g_mbus_config()
+function):
+
+"I am not certain this op is needed at all. In the current kernel this
+ op is onlyused by soc_camera, pxa_camera and omap3isp (somewhat dubious).
+ Normally this information should come from the device tree and there
+ should be no need for this op.
+
+ My (tentative) long-term plan was to get rid of this op.
+
+ If you don't need it, then I recommend it is removed."
+
+So, if that goes away, the CSI subdev needs a completely different way
+to get that information, and it shouldn't be coming from the camera
+sensor subdev, but (imho) really from the CSI2 subdev.
+
+This is probably something that needs to be discussed with media people
+to work out how to replace the g_mbus_config call with something more
+acceptable to resolve this issue.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
