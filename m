@@ -1,114 +1,52 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Feb 2017 00:58:05 +0000
-Subject: [PATCH v3 17/24] media: imx: Add CSI subdev driver
-In-Reply-To: <7ffe2dc6-4098-e89f-03fa-1007eccd7abd@gmail.com>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-18-git-send-email-steve_longerbeam@mentor.com>
- <20170131112001.GV27312@n2100.armlinux.org.uk>
- <7ffe2dc6-4098-e89f-03fa-1007eccd7abd@gmail.com>
-Message-ID: <20170201005805.GI27312@n2100.armlinux.org.uk>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Wed, 1 Feb 2017 08:58:22 +0800
+Subject: [stericsson:mmc-no-NULL 15/20] drivers/mmc/core/block.c:1590:4:
+ error: 'req_pending' undeclared
+Message-ID: <201702010819.gNpPATry%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2017 at 04:31:55PM -0800, Steve Longerbeam wrote:
-> 
-> 
-> On 01/31/2017 03:20 AM, Russell King - ARM Linux wrote:
-> >On Fri, Jan 06, 2017 at 06:11:35PM -0800, Steve Longerbeam wrote:
-> >>+static int csi_link_validate(struct v4l2_subdev *sd,
-> >>+			     struct media_link *link,
-> >>+			     struct v4l2_subdev_format *source_fmt,
-> >>+			     struct v4l2_subdev_format *sink_fmt)
-> >>+{
-> >>+	struct csi_priv *priv = v4l2_get_subdevdata(sd);
-> >>+	bool is_csi2;
-> >>+	int ret;
-> >>+
-> >>+	ret = v4l2_subdev_link_validate_default(sd, link, source_fmt, sink_fmt);
-> >>+	if (ret)
-> >>+		return ret;
-> >>+
-> >>+	priv->sensor = __imx_media_find_sensor(priv->md, &priv->sd.entity);
-> >>+	if (IS_ERR(priv->sensor)) {
-> >>+		v4l2_err(&priv->sd, "no sensor attached\n");
-> >>+		ret = PTR_ERR(priv->sensor);
-> >>+		priv->sensor = NULL;
-> >>+		return ret;
-> >>+	}
-> >>+
-> >>+	ret = v4l2_subdev_call(priv->sensor->sd, video, g_mbus_config,
-> >>+			       &priv->sensor_mbus_cfg);
-> >>+	if (ret)
-> >>+		return ret;
-> >>+
-> >>+	is_csi2 = (priv->sensor_mbus_cfg.type == V4L2_MBUS_CSI2);
-> >>+
-> >>+	if (is_csi2) {
-> >>+		int vc_num = 0;
-> >>+		/*
-> >>+		 * NOTE! It seems the virtual channels from the mipi csi-2
-> >>+		 * receiver are used only for routing by the video mux's,
-> >>+		 * or for hard-wired routing to the CSI's. Once the stream
-> >>+		 * enters the CSI's however, they are treated internally
-> >>+		 * in the IPU as virtual channel 0.
-> >>+		 */
-> >>+#if 0
-> >>+		vc_num = imx_media_find_mipi_csi2_channel(priv->md,
-> >>+							  &priv->sd.entity);
-> >>+		if (vc_num < 0)
-> >>+			return vc_num;
-> >>+#endif
-> >>+		ipu_csi_set_mipi_datatype(priv->csi, vc_num,
-> >>+					  &priv->format_mbus[priv->input_pad]);
-> >This seems (at least to me) to go against the spirit of the subdev
-> >negotiation.  Here, you seem to bypass the negotiation performed
-> >between the CSI and the attached device, wanting to grab the
-> >format from the CSI2 sensor directly.  That bypasses negotiation
-> >performed at the CSI2 subdev and video muxes.
-> 
-> This isn't so much grabbing a pad format, it is determining
-> which source pad at the imx6-mipi-csi2 receiver subdev is
-> reached from this CSI (which determines the virtual channel
-> the CSI is receiving).
-> 
-> If there was a way to determine the vc# via a status register
-> in the CSI, that would be perfect, but there isn't. In fact, the CSIs
-> seem to be ignoring the meta-data bus sent by the CSI2IPU gasket
-> which contains this info, or that bus is not being routed to the CSIs.
-> As the note says, the CSIs only accept vc0 at the CSI_MIPI_DI register.
-> Any other value programmed there results in no data from the CSI.
-> 
-> And even the presence of CSI_MIPI_DI register makes no sense to me,
-> the CSIs are given the vc# and MIPI datatype from the CSI2IPU meta-data
-> bus, so I don't understand why it needs to be told.
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git mmc-no-NULL
+head:   cbda9cc03b53855a310c144100f860d7e0876af4
+commit: 1de4d40facb78ff9a305e149d8a468fc6596d78c [15/20] mmc: block: return errorcode from mmc_sd_num_wr_blocks()
+config: x86_64-rhel (attached as .config)
+compiler: gcc-6 (Debian 6.2.0-3) 6.2.0 20160901
+reproduce:
+        git checkout 1de4d40facb78ff9a305e149d8a468fc6596d78c
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-The CSI_MIPI_DI register selects the data stream we want from the
-CSI2 camera.
+Note: the stericsson/mmc-no-NULL HEAD cbda9cc03b53855a310c144100f860d7e0876af4 builds fine.
+      It only hurts bisectibility.
 
-CSI2 cameras can produce many different data streams - for example,
-a CSI2 camera can, for the same image, produce a YUV encoded frame
-and a jpeg-encoded frame.  These are sent over the CSI2 serial bus
-using two different data types.
+All errors (new ones prefixed by >>):
 
-The CSI2IPU converts the serial data streams into a parallel data
-stream, feeding that into the CSI layer.  The CSI layer, in
-conjunction with the CSI_MIPI_DI register, selects one of these
-streams to pass on to the SMFC and other blocks.
+   drivers/mmc/core/block.c: In function 'mmc_blk_cmd_err':
+>> drivers/mmc/core/block.c:1590:4: error: 'req_pending' undeclared (first use in this function)
+       req_pending = blk_end_request(req, 0, blocks << 9);
+       ^~~~~~~~~~~
+   drivers/mmc/core/block.c:1590:4: note: each undeclared identifier is reported only once for each function it appears in
 
->From what I've read, the CSI can also be programmed to pass other
-streams on as well, but I've never tried that.
+vim +/req_pending +1590 drivers/mmc/core/block.c
 
-In my particular case, the IMX219 camera produces a complete frame
-using the RAW8 or RAW10 MIPI data type, and also produces two lines
-of register data per frame, encoded using another data type.  I
-think it should be possible to program the CSI to pass this other
-data on as "generic data" through a different FIFO and have it
-written to memory, which makes it possible to know the camera
-settings for each frame.  (This isn't something I'm interested in
-though, I'm just using it as an example of why, possibly, there's
-that register in the CSI block.)
+  1584		if (mmc_card_sd(card)) {
+  1585			u32 blocks;
+  1586			int err;
+  1587	
+  1588			err = mmc_sd_num_wr_blocks(card, &blocks);
+  1589			if (!err) {
+> 1590				req_pending = blk_end_request(req, 0, blocks << 9);
+  1591			}
+  1592		} else {
+  1593			ret = blk_end_request(req, 0, brq->data.bytes_xfered);
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 38277 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170201/61431c45/attachment-0001.gz>
