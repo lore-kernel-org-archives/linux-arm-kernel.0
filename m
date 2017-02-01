@@ -1,74 +1,41 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  1 Feb 2017 11:52:16 +0000
-Subject: [PATCH] efi: arm: remove pointless dummy .reloc section
-Message-ID: <1485949936-12321-1-git-send-email-ard.biesheuvel@linaro.org>
+From: colin.king@canonical.com (Colin King)
+Date: Wed,  1 Feb 2017 11:57:11 +0000
+Subject: [PATCH] staging: bcm2835-audio: use | instead of || otherwise result
+ is just boolean 1
+Message-ID: <20170201115711.17360-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kernel's EFI PE/COFF header contains a dummy .reloc section, and
-an explanatory comment that claims that this is required for the EFI
-application loader to accept the Image as a relocatable image (i.e.,
-one that can be loaded at any offset and fixed up in place)
+From: Colin Ian King <colin.king@canonical.com>
 
-This was inherited from the x86 implementation, which has elaborate host
-tooling to mangle the PE/COFF header post-link time, and which populates
-the .reloc section with a single dummy base relocation. On ARM, no such
-tooling exists, and the .reloc section remains empty, and is never even
-exposed via the BaseRelocationTable directory entry, which is where the
-PE/COFF loader looks for it.
+The incorrect or operator is being used resulting in cookies being
+set to 1 (true) rather than the intended hex value.  Fix this by
+using | instead of ||.
 
-The PE/COFF spec is unclear about relocatable images that do not require
-any fixups, but the EDK2 implementation, which is the de facto reference
-for PE/COFF in the UEFI space, clearly does not care, and explicitly
-mentions (in a comment) that relocatable images with no base relocations
-are perfectly fine, as long as they don't have the RELOCS_STRIPPED
-attribute set (which is not the case for our PE/COFF image)
+Issue found with static analysis with cppcheck
 
-So simply remove the .reloc section altogether.
+Fixes: 0cec463e391e05b807a ("staging: bcm2835-audio: Simplify callback structure for write data")
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
 ---
+ drivers/staging/bcm2835-audio/bcm2835-vchiq.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-The same applies to arm64 as well, but let's have the discussion first.
-
- arch/arm/boot/compressed/efi-header.S | 18 +-----------------
- 1 file changed, 1 insertion(+), 17 deletions(-)
-
-diff --git a/arch/arm/boot/compressed/efi-header.S b/arch/arm/boot/compressed/efi-header.S
-index 9d5dc4fda3c1..3b448ab712c8 100644
---- a/arch/arm/boot/compressed/efi-header.S
-+++ b/arch/arm/boot/compressed/efi-header.S
-@@ -42,7 +42,7 @@ pe_header:
+diff --git a/drivers/staging/bcm2835-audio/bcm2835-vchiq.c b/drivers/staging/bcm2835-audio/bcm2835-vchiq.c
+index e8fd9c7..280028d 100644
+--- a/drivers/staging/bcm2835-audio/bcm2835-vchiq.c
++++ b/drivers/staging/bcm2835-audio/bcm2835-vchiq.c
+@@ -100,9 +100,9 @@ bcm2835_vchi_msg_queue(VCHI_SERVICE_HANDLE_T handle,
+ 			      size);
+ }
  
- coff_header:
- 		.short	0x01c2			@ ARM or Thumb
--		.short	2			@ nr_sections
-+		.short	1			@ nr_sections
- 		.long	0 			@ TimeDateStamp
- 		.long	0			@ PointerToSymbolTable
- 		.long	1			@ NumberOfSymbols
-@@ -97,22 +97,6 @@ extra_header_fields:
- 		.quad	0			@ BaseRelocationTable
+-static const u32 BCM2835_AUDIO_WRITE_COOKIE1 = ('B' << 24 | 'C' << 16 ||
++static const u32 BCM2835_AUDIO_WRITE_COOKIE1 = ('B' << 24 | 'C' << 16 |
+ 						'M' << 8  | 'A');
+-static const u32 BCM2835_AUDIO_WRITE_COOKIE2 = ('D' << 24 | 'A' << 16 ||
++static const u32 BCM2835_AUDIO_WRITE_COOKIE2 = ('D' << 24 | 'A' << 16 |
+ 						'T' << 8  | 'A');
  
- section_table:
--		@
--		@ The EFI application loader requires a relocation section
--		@ because EFI applications must be relocatable. This is a
--		@ dummy section as far as we are concerned.
--		@
--		.ascii	".reloc\0\0"
--		.long	0			@ VirtualSize
--		.long	0			@ VirtualAddress
--		.long	0			@ SizeOfRawData
--		.long	0			@ PointerToRawData
--		.long	0			@ PointerToRelocations
--		.long	0			@ PointerToLineNumbers
--		.short	0			@ NumberOfRelocations
--		.short	0			@ NumberOfLineNumbers
--		.long	0x42100040		@ Characteristics
--
- 		.ascii	".text\0\0\0"
- 		.long	_end - __efi_start	@ VirtualSize
- 		.long	__efi_start		@ VirtualAddress
+ struct bcm2835_audio_work {
 -- 
-2.7.4
+2.10.2
