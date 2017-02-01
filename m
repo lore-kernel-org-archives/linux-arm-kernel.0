@@ -1,147 +1,189 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed,  1 Feb 2017 21:46:22 +0900
-Subject: [PATCH v31 03/12] arm64: kdump: reserve memory for crash dump kernel
+Date: Wed,  1 Feb 2017 21:46:23 +0900
+Subject: [PATCH v31 04/12] arm64: mm: allow for unmapping part of kernel
+ mapping
 In-Reply-To: <20170201124218.5823-1-takahiro.akashi@linaro.org>
 References: <20170201124218.5823-1-takahiro.akashi@linaro.org>
-Message-ID: <20170201124630.6016-2-takahiro.akashi@linaro.org>
+Message-ID: <20170201124630.6016-3-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"crashkernel=" kernel parameter specifies the size (and optionally
-the start address) of the system ram used by crash dump kernel.
-reserve_crashkernel() will allocate and reserve the memory at the startup
-of primary kernel.
+A new function, remove_pgd_mapping(), is added.
+It allows us to unmap a specific portion of kernel mapping later as far as
+the mapping is made using create_pgd_mapping() and unless we try to free
+a sub-set of memory range within a section mapping.
 
-This memory range will be exported to userspace via an entry named
-"Crash kernel" in /proc/iomem.
+This function will be used in a later kdump patch to implement
+the protection against corrupting crash dump kernel memory which is to be
+set aside.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Signed-off-by: Mark Salter <msalter@redhat.com>
-Signed-off-by: Pratyush Anand <panand@redhat.com>
-Reviewed-by: James Morse <james.morse@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/kernel/setup.c |  7 +++++-
- arch/arm64/mm/init.c      | 62 +++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 68 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/mmu.h |   2 +
+ arch/arm64/mm/mmu.c          | 130 +++++++++++++++++++++++++++++++++++++++++--
+ 2 files changed, 127 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index b051367e2149..515e9c6696df 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -31,7 +31,6 @@
- #include <linux/screen_info.h>
- #include <linux/init.h>
- #include <linux/kexec.h>
--#include <linux/crash_dump.h>
- #include <linux/root_dev.h>
- #include <linux/cpu.h>
- #include <linux/interrupt.h>
-@@ -224,6 +223,12 @@ static void __init request_standard_resources(void)
- 		if (kernel_data.start >= res->start &&
- 		    kernel_data.end <= res->end)
- 			request_resource(res, &kernel_data);
-+#ifdef CONFIG_KEXEC_CORE
-+		/* Userspace will find "Crash kernel" region in /proc/iomem. */
-+		if (crashk_res.end && crashk_res.start >= res->start &&
-+		    crashk_res.end <= res->end)
-+			request_resource(res, &crashk_res);
-+#endif
- 	}
+diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+index 47619411f0ff..04eb240736d8 100644
+--- a/arch/arm64/include/asm/mmu.h
++++ b/arch/arm64/include/asm/mmu.h
+@@ -36,6 +36,8 @@ extern void init_mem_pgprot(void);
+ extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+ 			       unsigned long virt, phys_addr_t size,
+ 			       pgprot_t prot, bool page_mappings_only);
++extern void remove_pgd_mapping(struct mm_struct *mm, unsigned long virt,
++			       phys_addr_t size);
+ extern void *fixmap_remap_fdt(phys_addr_t dt_phys);
+ 
+ #endif
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 17243e43184e..9d3cea1db3b4 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -334,12 +334,10 @@ static void __init create_mapping_noalloc(phys_addr_t phys, unsigned long virt,
+ 	__create_pgd_mapping(init_mm.pgd, phys, virt, size, prot, NULL, false);
  }
  
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 6cddb566eb21..2aba75dc7720 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -30,12 +30,14 @@
- #include <linux/gfp.h>
- #include <linux/memblock.h>
- #include <linux/sort.h>
-+#include <linux/of.h>
- #include <linux/of_fdt.h>
- #include <linux/dma-mapping.h>
- #include <linux/dma-contiguous.h>
- #include <linux/efi.h>
- #include <linux/swiotlb.h>
- #include <linux/vmalloc.h>
-+#include <linux/kexec.h>
+-void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+-			       unsigned long virt, phys_addr_t size,
+-			       pgprot_t prot, bool page_mappings_only)
++void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
++			unsigned long virt, phys_addr_t size,
++			pgprot_t prot, bool page_mappings_only)
+ {
+-	BUG_ON(mm == &init_mm);
+-
+ 	__create_pgd_mapping(mm->pgd, phys, virt, size, prot,
+ 			     pgd_pgtable_alloc, page_mappings_only);
+ }
+@@ -357,6 +355,128 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
+ 			     NULL, debug_pagealloc_enabled());
+ }
  
- #include <asm/boot.h>
- #include <asm/fixmap.h>
-@@ -76,6 +78,63 @@ static int __init early_initrd(char *p)
- early_param("initrd", early_initrd);
- #endif
- 
-+#ifdef CONFIG_KEXEC_CORE
-+/*
-+ * reserve_crashkernel() - reserves memory for crash kernel
-+ *
-+ * This function reserves memory area given in "crashkernel=" kernel command
-+ * line parameter. The memory reserved is used by dump capture kernel when
-+ * primary kernel is crashing.
-+ */
-+static void __init reserve_crashkernel(void)
++static bool pgtable_is_cleared(void *pgtable)
 +{
-+	unsigned long long crash_base, crash_size;
-+	int ret;
++	unsigned long *desc, *end;
 +
-+	ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
-+				&crash_size, &crash_base);
-+	/* no crashkernel= or invalid value specified */
-+	if (ret || !crash_size)
++	for (desc = pgtable, end = (unsigned long *)(pgtable + PAGE_SIZE);
++	     desc < end; desc++)
++		if (*desc)
++			return false;
++
++	return true;
++}
++
++static void clear_pte_range(pmd_t *pmd, unsigned long addr, unsigned long end)
++{
++	pte_t *pte;
++
++	if (WARN_ON(pmd_bad(*pmd)))
 +		return;
 +
-+	crash_size = PAGE_ALIGN(crash_size);
++	pte = pte_set_fixmap_offset(pmd, addr);
 +
-+	if (crash_base == 0) {
-+		/* Current arm64 boot protocol requires 2MB alignment */
-+		crash_base = memblock_find_in_range(0, ARCH_LOW_ADDRESS_LIMIT,
-+				crash_size, SZ_2M);
-+		if (crash_base == 0) {
-+			pr_warn("Unable to allocate crashkernel (size:%llx)\n",
-+				crash_size);
-+			return;
-+		}
-+	} else {
-+		/* User specifies base address explicitly. */
-+		if (!memblock_is_region_memory(crash_base, crash_size) ||
-+			memblock_is_region_reserved(crash_base, crash_size)) {
-+			pr_warn("crashkernel has wrong address or size\n");
-+			return;
-+		}
++	do {
++		pte_clear(NULL, NULL, pte);
++	} while (pte++, addr += PAGE_SIZE, addr != end);
 +
-+		if (!IS_ALIGNED(crash_base, SZ_2M)) {
-+			pr_warn("crashkernel base address is not 2MB aligned\n");
-+			return;
-+		}
-+	}
-+	memblock_reserve(crash_base, crash_size);
-+
-+	pr_info("Reserving %lldMB of memory at %lldMB for crashkernel\n",
-+		crash_size >> 20, crash_base >> 20);
-+
-+	crashk_res.start = crash_base;
-+	crashk_res.end = crash_base + crash_size - 1;
++	pte_clear_fixmap();
 +}
-+#else
-+static void __init reserve_crashkernel(void)
++
++static void clear_pmd_range(pud_t *pud, unsigned long addr, unsigned long end)
 +{
++	pmd_t *pmd;
++	unsigned long next;
++
++	if (WARN_ON(pud_bad(*pud)))
++		return;
++
++	pmd = pmd_set_fixmap_offset(pud, addr);
++
++	do {
++		next = pmd_addr_end(addr, end);
++
++		if (pmd_table(*pmd)) {
++			clear_pte_range(pmd, addr, next);
++			if (((next - addr) == PMD_SIZE) ||
++			    pgtable_is_cleared(__va(pmd_page_paddr(*pmd)))) {
++				__free_page(pmd_page(*pmd));
++				pmd_clear(pmd);
++			}
++		} else {
++			if (WARN_ON((next - addr) != PMD_SIZE))
++				return;
++			pmd_clear(pmd);
++		}
++	} while (pmd++, addr = next, addr != end);
++
++	pmd_clear_fixmap();
 +}
-+#endif /* CONFIG_KEXEC_CORE */
 +
- /*
-  * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
-  * currently assumes that for memory starting above 4G, 32-bit devices will
-@@ -331,6 +390,9 @@ void __init arm64_memblock_init(void)
- 		arm64_dma_phys_limit = max_zone_dma_phys();
- 	else
- 		arm64_dma_phys_limit = PHYS_MASK + 1;
++static void clear_pud_range(pgd_t *pgd, unsigned long addr, unsigned long end)
++{
++	pud_t *pud;
++	unsigned long next;
 +
-+	reserve_crashkernel();
++	if (WARN_ON(pgd_bad(*pgd)))
++		return;
 +
- 	dma_contiguous_reserve(arm64_dma_phys_limit);
- 
- 	memblock_allow_resize();
++	pud = pud_set_fixmap_offset(pgd, addr);
++
++	do {
++		next = pud_addr_end(addr, end);
++
++		if (pud_table(*pud)) {
++			clear_pmd_range(pud, addr, next);
++#if CONFIG_PGTABLE_LEVELS > 2
++			if (((next - addr) == PUD_SIZE) ||
++			    pgtable_is_cleared(__va(pud_page_paddr(*pud)))) {
++				__free_page(pud_page(*pud));
++				pud_clear(pud);
++			}
++#endif
++		} else {
++#if CONFIG_PGTABLE_LEVELS > 2
++			if (WARN_ON((next - addr) != PUD_SIZE))
++				return;
++			pud_clear(pud);
++#endif
++		}
++	} while (pud++, addr = next, addr != end);
++
++	pud_clear_fixmap();
++}
++
++static void __remove_pgd_mapping(pgd_t *pgdir, unsigned long virt,
++				 phys_addr_t size)
++{
++	unsigned long addr, length, end, next;
++	pgd_t *pgd = pgd_offset_raw(pgdir, virt);
++
++	addr = virt & PAGE_MASK;
++	length = PAGE_ALIGN(size + (virt & ~PAGE_MASK));
++
++	end = addr + length;
++	do {
++		next = pgd_addr_end(addr, end);
++		clear_pud_range(pgd, addr, next);
++
++#if CONFIG_PGTABLE_LEVELS > 3
++		if (((next - addr) == PGD_SIZE) ||
++		    pgtable_is_cleared(__va(pgd_page_paddr(*pgd)))) {
++			__free_page(pgd_page(*pgd));
++			pgd_clear(pgd);
++		}
++#endif
++	} while (pgd++, addr = next, addr != end);
++}
++
++void remove_pgd_mapping(struct mm_struct *mm, unsigned long virt,
++			phys_addr_t size)
++{
++	__remove_pgd_mapping(mm->pgd, virt, size);
++}
++
+ static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end)
+ {
+ 	unsigned long kernel_start = __pa(_text);
 -- 
 2.11.0
