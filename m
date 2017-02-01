@@ -1,66 +1,96 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 1 Feb 2017 17:49:34 +0000
-Subject: [PATCH v4 2/4] arm64: Work around Falkor erratum 1003
-In-Reply-To: <20170201174105.GK8177@arm.com>
-References: <20170125155232.10277-1-cov@codeaurora.org>
- <20170125155232.10277-2-cov@codeaurora.org>
- <20170131123735.GD11191@leverpostej>
- <36478002-4cd8-7f1c-1a25-8bfe35022a47@codeaurora.org>
- <3cab36fb-984a-beae-64db-6ce830ba94f6@arm.com>
- <b4cf83d2-ae05-3362-bc23-2341d00516dc@codeaurora.org>
- <20170201163358.GG8177@arm.com>
- <20170201173609.GE26507@e104818-lin.cambridge.arm.com>
- <20170201174105.GK8177@arm.com>
-Message-ID: <20170201174934.GF26507@e104818-lin.cambridge.arm.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Wed, 1 Feb 2017 17:49:30 +0000
+Subject: [PATCH] efi: fdt: avoid FDT manipulation after ExitBootServices()
+In-Reply-To: <1485971102-23330-2-git-send-email-ard.biesheuvel@linaro.org>
+References: <1485971102-23330-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1485971102-23330-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20170201174930.GD25883@bivouac.eciton.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2017 at 05:41:05PM +0000, Will Deacon wrote:
-> On Wed, Feb 01, 2017 at 05:36:09PM +0000, Catalin Marinas wrote:
-> > On Wed, Feb 01, 2017 at 04:33:58PM +0000, Will Deacon wrote:
-> > > On Wed, Feb 01, 2017 at 11:29:22AM -0500, Christopher Covington wrote:
-> > > > On 01/31/2017 12:56 PM, Marc Zyngier wrote:
-> > > > > Given that all ARMv8 CPUs can support SW_PAN, it is more likely to be
-> > > > > enabled than the ARMv8.1 PAN. I'd vote for supporting the workaround in
-> > > > > that case too, and hope that people do enable the HW version.
-> > > > 
-> > > > Okay, I'll do my best to add support for the SW PAN case. I rebased and
-> > > > submitted v6 of the E1009 patch [1] so that it no longer depends on this
-> > > > patch landing first, if you all are inclined to pick it up while work on
-> > > > this E1003 patch continues.
-> > > 
-> > > The alternative is not enabling SW_PAN (at runtime) if this errata is
-> > > present, along with a warning stating that hardware-PAN should be
-> > > enabled in kconfig instead. Not sure what distributions will make of that
-> > > though.
-> > 
-> > The problem with this patch is that when ARM64_SW_TTBR0_PAN is enabled
-> > and in the absence of hardware PAN (or ARM64_PAN disabled),
-> > cpu_do_switch_mm is no longer called for user process switching, so the
-> > workaround is pretty much useless.
+On Wed, Feb 01, 2017 at 05:45:02PM +0000, Ard Biesheuvel wrote:
+> Some AArch64 UEFI implementations disable the MMU in ExitBootServices(),
+> after which unaligned accesses to RAM are no longer supported.
 > 
-> Oh, I see what you mean now.
+> Commit abfb7b686a3e ("efi/libstub/arm*: Pass latest memory map to the
+> kernel") fixed an issue in the memory map handling of the stub FDT code,
+> but inadvertently created an issue with such firmwares, by moving some
+> of the FDT manipulation to after the invocation of ExitBootServices().
+> Given that the stub's libfdt implementation uses the ordinary, accelerated
+> string functions, which rely on hardware handling of unaligned accesses,
+> manipulating the FDT with the MMU off may result in alignment faults.
 > 
-> > I'm ok with adding the Kconfig dependency below to
-> > QCOM_FALKOR_ERRATUM_1003:
-> > 
-> > 	depends on !ARM64_SW_TTBR0_PAN || ARM64_PAN
-> > 
-> > together with a run-time warning if ARM64_SW_TTBR0_PAN is being used.
+> So fix the situation by moving the update_fdt_memmap() call into the
+> callback function invoked by efi_exit_boot_services() right before it
+> calls the ExitBootServices() UEFI service (which is arguably a better
+> place for it anyway)
 > 
-> That makes it look like hardware-PAN is the cause of the erratum.
+> Note that disabling the MMU in ExitBootServices() is not compliant with
+> the UEFI spec, and carries great risk due to the fact that switching from
+> cached to uncached memory accesses halfway through compiler generated code
+> (i.e., involving a stack) can never be done in a way that is architecturally
+> safe.
+> 
+> Cc: <stable@vger.kernel.org>
+> Fixes: abfb7b686a3e ("efi/libstub/arm*: Pass latest memory map to the kernel")
+> Tested-by: Riku Voipio <riku.voipio@linaro.org>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-With the right Kconfig comment we could make this clearer.
+Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
 
-> Maybe
-> just select ARM64_PAN if the erratum workaround is selected, then
-> runtime warning if we find that the h/w doesn't have PAN but does have
-> the erratum (which should never fire)?
-
-You still need this workaround even if you don't want any PAN (both sw
-and hw PAN disabled). I wouldn't want to select ARM64_PAN since it's not
-a dependency. It's more like if you do need a PAN, make sure you only
-use the hw one.
-
--- 
-Catalin
+> ---
+>  drivers/firmware/efi/libstub/fdt.c | 14 +++-----------
+>  1 file changed, 3 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
+> index 921dfa047202..260c4b4b492e 100644
+> --- a/drivers/firmware/efi/libstub/fdt.c
+> +++ b/drivers/firmware/efi/libstub/fdt.c
+> @@ -187,6 +187,7 @@ static efi_status_t update_fdt_memmap(void *fdt, struct efi_boot_memmap *map)
+>  struct exit_boot_struct {
+>  	efi_memory_desc_t *runtime_map;
+>  	int *runtime_entry_count;
+> +	void *new_fdt_addr;
+>  };
+>  
+>  static efi_status_t exit_boot_func(efi_system_table_t *sys_table_arg,
+> @@ -202,7 +203,7 @@ static efi_status_t exit_boot_func(efi_system_table_t *sys_table_arg,
+>  	efi_get_virtmap(*map->map, *map->map_size, *map->desc_size,
+>  			p->runtime_map, p->runtime_entry_count);
+>  
+> -	return EFI_SUCCESS;
+> +	return update_fdt_memmap(p->new_fdt_addr, map);
+>  }
+>  
+>  /*
+> @@ -300,22 +301,13 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
+>  
+>  	priv.runtime_map = runtime_map;
+>  	priv.runtime_entry_count = &runtime_entry_count;
+> +	priv.new_fdt_addr = (void *)*new_fdt_addr;
+>  	status = efi_exit_boot_services(sys_table, handle, &map, &priv,
+>  					exit_boot_func);
+>  
+>  	if (status == EFI_SUCCESS) {
+>  		efi_set_virtual_address_map_t *svam;
+>  
+> -		status = update_fdt_memmap((void *)*new_fdt_addr, &map);
+> -		if (status != EFI_SUCCESS) {
+> -			/*
+> -			 * The kernel won't get far without the memory map, but
+> -			 * may still be able to print something meaningful so
+> -			 * return success here.
+> -			 */
+> -			return EFI_SUCCESS;
+> -		}
+> -
+>  		/* Install the new virtual address map */
+>  		svam = sys_table->runtime->set_virtual_address_map;
+>  		status = svam(runtime_entry_count * desc_size, desc_size,
+> -- 
+> 2.7.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-efi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
