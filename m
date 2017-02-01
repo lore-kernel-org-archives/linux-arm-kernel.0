@@ -1,80 +1,143 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 1 Feb 2017 10:15:02 +0000
-Subject: [PATCH 6/7] efi: Handle secure boot from UEFI-2.6 [ver #7]
-In-Reply-To: <10454.1485889162@warthog.procyon.org.uk>
-References: <148587558696.4026.16034622623568539004.stgit@warthog.procyon.org.uk>
- <148587564847.4026.5759345672956585977.stgit@warthog.procyon.org.uk>
- <CAKv+Gu8dnKB1sRGb3U+XB1eoA7Eyo4qSFBtPRbvGV912xPViVw@mail.gmail.com>
- <10454.1485889162@warthog.procyon.org.uk>
-Message-ID: <CAKv+Gu_gy6575axL6M64OSo33ZM2dnbs7cajqJRd8VtbjAXCTw@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 1 Feb 2017 10:17:12 +0000
+Subject: [RFC v2 06/10] KVM: arm/arm64: Update the physical timer
+ interrupt level
+In-Reply-To: <20170201100716.GC6226@cbox>
+References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
+ <1485479100-4966-7-git-send-email-jintack@cs.columbia.edu>
+ <86sho199jx.fsf@arm.com> <20170201080440.GB6226@cbox>
+ <CAHyh4xjTWK0HeQhX9X6+6Ez706Sh4+=3wMq0b9rmvGTbD8q80g@mail.gmail.com>
+ <20170201100716.GC6226@cbox>
+Message-ID: <faff705e-78a9-d3ae-b09b-d6f5824b98d9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 January 2017 at 18:59, David Howells <dhowells@redhat.com> wrote:
-> Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->
->> > UEFI-2.6 adds a new variable, DeployedMode.  If it exists, this must be 1
->> > if we're to engage lockdown mode.
->> >
->> > Reported-by: James Bottomley <James.Bottomley@HansenPartnership.com>
->> > Signed-off-by: David Howells <dhowells@redhat.com>
+On 01/02/17 10:07, Christoffer Dall wrote:
+> On Wed, Feb 01, 2017 at 03:40:10AM -0500, Jintack Lim wrote:
+>> On Wed, Feb 1, 2017 at 3:04 AM, Christoffer Dall
+>> <christoffer.dall@linaro.org> wrote:
+>>> On Sun, Jan 29, 2017 at 03:21:06PM +0000, Marc Zyngier wrote:
+>>>> On Fri, Jan 27 2017 at 01:04:56 AM, Jintack Lim <jintack@cs.columbia.edu> wrote:
+>>>>> Now that we maintain the EL1 physical timer register states of VMs,
+>>>>> update the physical timer interrupt level along with the virtual one.
+>>>>>
+>>>>> Note that the emulated EL1 physical timer is not mapped to any hardware
+>>>>> timer, so we call a proper vgic function.
+>>>>>
+>>>>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+>>>>> ---
+>>>>>  virt/kvm/arm/arch_timer.c | 20 ++++++++++++++++++++
+>>>>>  1 file changed, 20 insertions(+)
+>>>>>
+>>>>> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+>>>>> index 0f6e935..3b6bd50 100644
+>>>>> --- a/virt/kvm/arm/arch_timer.c
+>>>>> +++ b/virt/kvm/arm/arch_timer.c
+>>>>> @@ -180,6 +180,21 @@ static void kvm_timer_update_mapped_irq(struct kvm_vcpu *vcpu, bool new_level,
+>>>>>     WARN_ON(ret);
+>>>>>  }
+>>>>>
+>>>>> +static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
+>>>>> +                            struct arch_timer_context *timer)
+>>>>> +{
+>>>>> +   int ret;
+>>>>> +
+>>>>> +   BUG_ON(!vgic_initialized(vcpu->kvm));
+>>>>
+>>>> Although I've added my fair share of BUG_ON() in the code base, I've
+>>>> since reconsidered my position. If we get in a situation where the vgic
+>>>> is not initialized, maybe it would be better to just WARN_ON and return
+>>>> early rather than killing the whole box. Thoughts?
+>>>>
+>>>
+>>> Could we help this series along by saying that since this BUG_ON already
+>>> exists in the kvm_timer_update_mapped_irq function, then it just
+>>> preserves functionality and it's up to someone else (me) to remove the
+>>> BUG_ON from both functions later in life?
+>>>
 >>
->> Interestingly, the string 'DeployedMode' appears zero times in the
->> EDK2 codebase, so I wonder if it makes any sense to merge this now.
->> The string 'AuditMode' does appear once, but in a comment
->
-> It's in the standard, so shouldn't we check for it?
->
->> In any case, the logic is not entirely correct either: apologies if it
->> was me who caused any confusion here, but it seems DeployedMode could
->> legally be 0 or 1 while secure boot is in fact enabled. It is actually
->> AuditMode that should be taken into account here, i.e., if AuditMode
->> == 1, the firmware ignores invalid or missing signatures. If
->> SecureBoot == 0x1, SetupMode == 0x0 and AuditMode == 0x0 (or
->> non-existent), signature verification is performed regardless of the
->> value (or existence) of DeployedMode.
+>> Sounds good to me :) Thanks!
 >>
->> So I propose to respin this patch to treat AuditMode == 0x1 as 'secure
->> boot disabled', and ignore if it is missing.
->
-> Ummm...  This might conflict what said:
->
-> | Since you seem to be using this to mean "is the platform locked down?",
-> | this looks to be no longer complete in the UEFI 2.6 world.  If
-> | DeployedMode == 0, even if SecureBoot == 1 and SetupMode == 0, you can
-> | remove the platform key by writing 1 to AuditMode and gain control of
-> | the secure variables.  The lock down state becomes DeployedMode == 1,
-> | SecureBoot == 1 and SetupMode == 0
-> |
-> | See the diagram on page 1817
-> |
-> | http://www.uefi.org/sites/default/files/resources/UEFI%20Spec%202_6.pdf
->
-> Looking again at that diagram, should I be checking all four variables
-> (SecureBoot, SetupMode, DeployedMode and AuditMode)?  And/or should I treat
-> audit mode differently to deployed mode?
->
+> 
+> So just as you thought you were getting off easy...
+> 
+> The reason we now have kvm_timer_update_irq and
+> kvm_timer_update_mapped_irq is that we have the following two vgic
+> functions:
+> 
+> kvm_vgic_inject_irq
+> kvm_vgic_inject_mapped_irq
+> 
+> But the only difference between the two is what they pass
+> as the mapped_irq argument to vgic_update_irq_pending.
+> 
+> What about if we just had this as a precursor patch:
+> 
+> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+> index 6a084cd..91ecf48 100644
+> --- a/virt/kvm/arm/arch_timer.c
+> +++ b/virt/kvm/arm/arch_timer.c
+> @@ -175,7 +175,8 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
+>  	timer->irq.level = new_level;
+>  	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->irq.irq,
+>  				   timer->irq.level);
+> -	ret = kvm_vgic_inject_mapped_irq(vcpu->kvm, vcpu->vcpu_id,
+> +
+> +	ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
+>  					 timer->irq.irq,
+>  					 timer->irq.level);
+>  	WARN_ON(ret);
+> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> index dea12df..4c87fd0 100644
+> --- a/virt/kvm/arm/vgic/vgic.c
+> +++ b/virt/kvm/arm/vgic/vgic.c
+> @@ -336,8 +336,7 @@ bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq)
+>  }
+>  
+>  static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+> -				   unsigned int intid, bool level,
+> -				   bool mapped_irq)
+> +				   unsigned int intid, bool level)
+>  {
+>  	struct kvm_vcpu *vcpu;
+>  	struct vgic_irq *irq;
+> @@ -357,11 +356,6 @@ static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+>  	if (!irq)
+>  		return -EINVAL;
+>  
+> -	if (irq->hw != mapped_irq) {
+> -		vgic_put_irq(kvm, irq);
+> -		return -EINVAL;
+> -	}
+> -
+>  	spin_lock(&irq->irq_lock);
+>  
+>  	if (!vgic_validate_injection(irq, level)) {
+> @@ -399,13 +393,7 @@ static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+>  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+>  			bool level)
+>  {
+> -	return vgic_update_irq_pending(kvm, cpuid, intid, level, false);
+> -}
+> -
+> -int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+> -			       bool level)
+> -{
+> -	return vgic_update_irq_pending(kvm, cpuid, intid, level, true);
+> +	return vgic_update_irq_pending(kvm, cpuid, intid, level);
+>  }
+>  
+>  int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, u32 virt_irq, u32 phys_irq)
+> 
+> 
+> That would make this patch simpler.  If so, I can send out the above
+> patch with a proper description.
 
-Well, we are trying to decide whether the system is locked down or
-not. AuditMode is only writable before ExitBootServices(), and when
-AuditMode == 0, signature verification occurs as usual, regardless of
-the value of DeployedMode. Whether someone could turn on AuditMode on
-the *next* boot does not sound that relevant to me, since someone
-could also re-enter SetupMode in the same way.
+Indeed. And while you're at it, rename vgic_update_irq_pending to
+kvm_vgic_inject_irq, as I don't think we need this simple stub?
 
-So this patch should take AuditMode into account, but not DeployedMode, i.e.,
+Thanks,
 
-SecureBoot == 0x1
-SetupMode == 0x0
-AuditMode == 0x0 (or non-existent)
-
-implies a locked down state.
-
-> Further, there doesn't seem to be a state in which SecureBoot is shown as
-> being 1.
->
-
-Yes, that is sloppy. But the fact that EDK2, being the v2.6 reference,
-does not implement any of this *at all* is much more worrying to me,
-given that UDK2017 based firmware will certainly turn up in production
-systems.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
