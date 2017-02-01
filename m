@@ -1,32 +1,57 @@
-From: jnair@caviumnetworks.com (Jayachandran C)
-Date: Wed, 1 Feb 2017 09:48:52 +0000
-Subject: [PATCH] arm64: Improve parking of stopped CPUs
-Message-ID: <1485942532-2643-1-git-send-email-jnair@caviumnetworks.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 1 Feb 2017 10:01:02 +0000
+Subject: [RFC v2 06/10] KVM: arm/arm64: Update the physical timer
+ interrupt level
+In-Reply-To: <20170201080440.GB6226@cbox>
+References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
+ <1485479100-4966-7-git-send-email-jintack@cs.columbia.edu>
+ <86sho199jx.fsf@arm.com> <20170201080440.GB6226@cbox>
+Message-ID: <67c55d45-545e-a787-e2ad-3d6e675df593@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current code puts the stopped cpus in an 'yield' instruction loop.
-Using a busy loop here is unnecessary, we can use the cpu_park_loop()
-function here to do a wfi/wfe.
+On 01/02/17 08:04, Christoffer Dall wrote:
+> On Sun, Jan 29, 2017 at 03:21:06PM +0000, Marc Zyngier wrote:
+>> On Fri, Jan 27 2017 at 01:04:56 AM, Jintack Lim <jintack@cs.columbia.edu> wrote:
+>>> Now that we maintain the EL1 physical timer register states of VMs,
+>>> update the physical timer interrupt level along with the virtual one.
+>>>
+>>> Note that the emulated EL1 physical timer is not mapped to any hardware
+>>> timer, so we call a proper vgic function.
+>>>
+>>> Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+>>> ---
+>>>  virt/kvm/arm/arch_timer.c | 20 ++++++++++++++++++++
+>>>  1 file changed, 20 insertions(+)
+>>>
+>>> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+>>> index 0f6e935..3b6bd50 100644
+>>> --- a/virt/kvm/arm/arch_timer.c
+>>> +++ b/virt/kvm/arm/arch_timer.c
+>>> @@ -180,6 +180,21 @@ static void kvm_timer_update_mapped_irq(struct kvm_vcpu *vcpu, bool new_level,
+>>>  	WARN_ON(ret);
+>>>  }
+>>>  
+>>> +static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
+>>> +				 struct arch_timer_context *timer)
+>>> +{
+>>> +	int ret;
+>>> +
+>>> +	BUG_ON(!vgic_initialized(vcpu->kvm));
+>>
+>> Although I've added my fair share of BUG_ON() in the code base, I've
+>> since reconsidered my position. If we get in a situation where the vgic
+>> is not initialized, maybe it would be better to just WARN_ON and return
+>> early rather than killing the whole box. Thoughts?
+>>
+> 
+> Could we help this series along by saying that since this BUG_ON already
+> exists in the kvm_timer_update_mapped_irq function, then it just
+> preserves functionality and it's up to someone else (me) to remove the
+> BUG_ON from both functions later in life?
 
-Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
----
- arch/arm64/kernel/smp.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+Works for me.
 
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index cbaab44..0691d2f 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -829,8 +829,7 @@ static void ipi_cpu_stop(unsigned int cpu)
- 
- 	local_irq_disable();
- 
--	while (1)
--		cpu_relax();
-+	cpu_park_loop();
- }
- 
- /*
+	M.
 -- 
-2.7.4
+Jazz is not dead. It just smells funny...
