@@ -1,34 +1,66 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 1 Feb 2017 11:48:16 -0600
-Subject: [PATCH v3 1/2] dt-bindings: gpu: Add Mali Utgard bindings
-In-Reply-To: <b098c4fa9fce88361cca20417978734d0e1b5cca.1485939041.git-series.maxime.ripard@free-electrons.com>
-References: <b098c4fa9fce88361cca20417978734d0e1b5cca.1485939041.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <20170201174816.oozcuq7b2y5d6fss@rob-hp-laptop>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 1 Feb 2017 17:49:34 +0000
+Subject: [PATCH v4 2/4] arm64: Work around Falkor erratum 1003
+In-Reply-To: <20170201174105.GK8177@arm.com>
+References: <20170125155232.10277-1-cov@codeaurora.org>
+ <20170125155232.10277-2-cov@codeaurora.org>
+ <20170131123735.GD11191@leverpostej>
+ <36478002-4cd8-7f1c-1a25-8bfe35022a47@codeaurora.org>
+ <3cab36fb-984a-beae-64db-6ce830ba94f6@arm.com>
+ <b4cf83d2-ae05-3362-bc23-2341d00516dc@codeaurora.org>
+ <20170201163358.GG8177@arm.com>
+ <20170201173609.GE26507@e104818-lin.cambridge.arm.com>
+ <20170201174105.GK8177@arm.com>
+Message-ID: <20170201174934.GF26507@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2017 at 09:53:22AM +0100, Maxime Ripard wrote:
-> The ARM Mali Utgard GPU family is embedded into a number of SoCs from
-> Allwinner, Amlogic, Mediatek or Rockchip.
+On Wed, Feb 01, 2017 at 05:41:05PM +0000, Will Deacon wrote:
+> On Wed, Feb 01, 2017 at 05:36:09PM +0000, Catalin Marinas wrote:
+> > On Wed, Feb 01, 2017 at 04:33:58PM +0000, Will Deacon wrote:
+> > > On Wed, Feb 01, 2017 at 11:29:22AM -0500, Christopher Covington wrote:
+> > > > On 01/31/2017 12:56 PM, Marc Zyngier wrote:
+> > > > > Given that all ARMv8 CPUs can support SW_PAN, it is more likely to be
+> > > > > enabled than the ARMv8.1 PAN. I'd vote for supporting the workaround in
+> > > > > that case too, and hope that people do enable the HW version.
+> > > > 
+> > > > Okay, I'll do my best to add support for the SW PAN case. I rebased and
+> > > > submitted v6 of the E1009 patch [1] so that it no longer depends on this
+> > > > patch landing first, if you all are inclined to pick it up while work on
+> > > > this E1003 patch continues.
+> > > 
+> > > The alternative is not enabling SW_PAN (at runtime) if this errata is
+> > > present, along with a warning stating that hardware-PAN should be
+> > > enabled in kconfig instead. Not sure what distributions will make of that
+> > > though.
+> > 
+> > The problem with this patch is that when ARM64_SW_TTBR0_PAN is enabled
+> > and in the absence of hardware PAN (or ARM64_PAN disabled),
+> > cpu_do_switch_mm is no longer called for user process switching, so the
+> > workaround is pretty much useless.
 > 
-> Add a binding for the GPU of that family.
+> Oh, I see what you mean now.
 > 
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > I'm ok with adding the Kconfig dependency below to
+> > QCOM_FALKOR_ERRATUM_1003:
+> > 
+> > 	depends on !ARM64_SW_TTBR0_PAN || ARM64_PAN
+> > 
+> > together with a run-time warning if ARM64_SW_TTBR0_PAN is being used.
 > 
-> ---
-> Changes from v2:
->   - Drop 0 in the unit-address
->   - Add missing st compatible
->   - Add Amlogic compatibles
-> 
-> Changes from v1:
->   - Dropped the arm,mali-utgard compatible
->   - Made the clocks mandatory
->   - Added Linus Walleij Reviewed-by, and the ST compatible for the Mali
-> ---
->  Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt | 82 ++++++++-
->  1 file changed, 82 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/gpu/arm,mali-utgard.txt
+> That makes it look like hardware-PAN is the cause of the erratum.
 
-Acked-by: Rob Herring <robh@kernel.org>
+With the right Kconfig comment we could make this clearer.
+
+> Maybe
+> just select ARM64_PAN if the erratum workaround is selected, then
+> runtime warning if we find that the h/w doesn't have PAN but does have
+> the erratum (which should never fire)?
+
+You still need this workaround even if you don't want any PAN (both sw
+and hw PAN disabled). I wouldn't want to select ARM64_PAN since it's not
+a dependency. It's more like if you do need a PAN, make sure you only
+use the hw one.
+
+-- 
+Catalin
