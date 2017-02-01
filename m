@@ -1,146 +1,319 @@
 From: rrichter@cavium.com (Robert Richter)
-Date: Wed, 1 Feb 2017 18:38:33 +0100
-Subject: [PATCH 9/9] irqchip, gicv3-its,
- cma: Use CMA for allocation of large device tables
+Date: Wed, 1 Feb 2017 18:38:32 +0100
+Subject: [PATCH 8/9] irqchip/gic-v3-its: Handle its nodes as kernel devices
 In-Reply-To: <20170201173833.12630-1-rrichter@cavium.com>
 References: <20170201173833.12630-1-rrichter@cavium.com>
-Message-ID: <20170201173833.12630-10-rrichter@cavium.com>
+Message-ID: <20170201173833.12630-9-rrichter@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gicv3-its device table may have a size of up to 16MB. With 4k
-pagesize the maximum size of memory allocation is 4MB. Use CMA for
-allocation of large tables.
-
-We use the device managed version of dma_alloc_coherent(). Thus, we
-don't need to release it manually on device removal.
+Manage its nodes as kernel devices. We can then use the kernel's
+device resource management for memory allocation. Freeing memory
+becomes much easier now. This also allows us to use CMA for the
+allocation of large its tables.
 
 Signed-off-by: Robert Richter <rrichter@cavium.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 69 +++++++++++++++++++++++-----------------
- 1 file changed, 40 insertions(+), 29 deletions(-)
+ drivers/irqchip/irq-gic-v3-its.c | 116 +++++++++++++++++++--------------------
+ 1 file changed, 58 insertions(+), 58 deletions(-)
 
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 86b8b9f79f68..e44547c7a2d2 100644
+index e915bb393c87..86b8b9f79f68 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -21,6 +21,7 @@
+@@ -19,6 +19,7 @@
+ #include <linux/bitmap.h>
+ #include <linux/cpu.h>
  #include <linux/delay.h>
- #include <linux/device.h>
++#include <linux/device.h>
  #include <linux/dma-iommu.h>
-+#include <linux/dma-mapping.h>
  #include <linux/interrupt.h>
  #include <linux/irqdomain.h>
- #include <linux/acpi_iort.h>
-@@ -860,6 +861,7 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
- 	u64 type = GITS_BASER_TYPE(val);
- 	u32 alloc_pages;
- 	void *base;
-+	dma_addr_t dma_handle;
- 	u64 tmp;
+@@ -75,6 +76,7 @@ struct its_baser {
+  * list of devices writing to it.
+  */
+ struct its_node {
++	struct device		dev;
+ 	struct fwnode_handle	*fwnode;
+ 	raw_spinlock_t		lock;
+ 	struct list_head	entry;
+@@ -402,7 +404,7 @@ static struct its_cmd_block *its_allocate_entry(struct its_node *its)
+ 	while (its_queue_full(its)) {
+ 		count--;
+ 		if (!count) {
+-			pr_err_ratelimited("ITS queue not draining\n");
++			dev_err_ratelimited(&its->dev, "ITS queue not draining\n");
+ 			return NULL;
+ 		}
+ 		cpu_relax();
+@@ -456,7 +458,7 @@ static void its_wait_for_range_completion(struct its_node *its,
  
+ 		count--;
+ 		if (!count) {
+-			pr_err_ratelimited("ITS queue timeout\n");
++			dev_err_ratelimited(&its->dev, "ITS queue timeout\n");
+ 			return;
+ 		}
+ 		cpu_relax();
+@@ -476,7 +478,7 @@ static void its_send_single_command(struct its_node *its,
+ 
+ 	cmd = its_allocate_entry(its);
+ 	if (!cmd) {		/* We're soooooo screewed... */
+-		pr_err_ratelimited("ITS can't allocate, dropping command\n");
++		dev_err_ratelimited(&its->dev, "ITS can't allocate, dropping command\n");
+ 		raw_spin_unlock_irqrestore(&its->lock, flags);
+ 		return;
+ 	}
+@@ -486,7 +488,7 @@ static void its_send_single_command(struct its_node *its,
+ 	if (sync_col) {
+ 		sync_cmd = its_allocate_entry(its);
+ 		if (!sync_cmd) {
+-			pr_err_ratelimited("ITS can't SYNC, skipping\n");
++			dev_err_ratelimited(&its->dev, "ITS can't SYNC, skipping\n");
+ 			goto post;
+ 		}
+ 		its_encode_cmd(sync_cmd, GITS_CMD_SYNC);
+@@ -863,14 +865,15 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
  retry_alloc_baser:
-@@ -872,13 +874,26 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+ 	alloc_pages = (PAGE_ORDER_TO_SIZE(order) / psz);
+ 	if (alloc_pages > GITS_BASER_PAGES_MAX) {
+-		pr_warn("ITS@%pa: %s too large, reduce ITS pages %u->%u\n",
+-			&its->phys_base, its_base_type_string[type],
+-			alloc_pages, GITS_BASER_PAGES_MAX);
++		dev_warn(&its->dev, "%s too large, reduce ITS pages %u->%u\n",
++			its_base_type_string[type], alloc_pages,
++			GITS_BASER_PAGES_MAX);
+ 		alloc_pages = GITS_BASER_PAGES_MAX;
  		order = get_order(GITS_BASER_PAGES_MAX * psz);
  	}
  
--	base = (void *)devm_get_free_pages(&its->dev, GFP_KERNEL | __GFP_ZERO,
--					   order);
--	if (!base)
-+	base = dmam_alloc_coherent(&its->dev,
-+				PAGE_ORDER_TO_SIZE(order),
-+				&dma_handle,
-+				GFP_KERNEL | __GFP_ZERO);
-+
-+	if (!base && order >= MAX_ORDER) {
-+		order = MAX_ORDER - 1;
-+		dev_warn(&its->dev, "Device Table too large, reduce ids %u->%u, no CMA memory available\n",
-+			its->device_ids,
-+			ilog2(PAGE_ORDER_TO_SIZE(order) / (int)esz));
-+		goto retry_alloc_baser;
-+	}
-+
-+	if (!base) {
-+		dev_err(&its->dev, "Failed to allocate device table\n");
+-	base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO, order);
++	base = (void *)devm_get_free_pages(&its->dev, GFP_KERNEL | __GFP_ZERO,
++					   order);
+ 	if (!base)
  		return -ENOMEM;
-+	}
  
- retry_baser:
--	val = (virt_to_phys(base)				 |
-+	val = (dma_handle					 |
- 		(type << GITS_BASER_TYPE_SHIFT)			 |
- 		((esz - 1) << GITS_BASER_ENTRY_SIZE_SHIFT)	 |
- 		((alloc_pages - 1) << GITS_BASER_PAGES_SHIFT)	 |
-@@ -919,29 +934,28 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
- 		goto retry_baser;
+@@ -922,7 +925,7 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+ 		 * size and retry. If we reach 4K, then
+ 		 * something is horribly wrong...
+ 		 */
+-		free_pages((unsigned long)base, order);
++		devm_free_pages(&its->dev, (unsigned long)base);
+ 		baser->base = NULL;
+ 
+ 		switch (psz) {
+@@ -936,10 +939,9 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
  	}
  
--	if ((val ^ tmp) & GITS_BASER_PAGE_SIZE_MASK) {
--		/*
--		 * Page size didn't stick. Let's try a smaller
--		 * size and retry. If we reach 4K, then
--		 * something is horribly wrong...
--		 */
--		devm_free_pages(&its->dev, (unsigned long)base);
--		baser->base = NULL;
--
--		switch (psz) {
--		case SZ_16K:
--			psz = SZ_4K;
--			goto retry_alloc_baser;
--		case SZ_64K:
--			psz = SZ_16K;
--			goto retry_alloc_baser;
-+	if (val != tmp) {
-+		dmam_free_coherent(&its->dev, PAGE_ORDER_TO_SIZE(order),
-+				base, dma_handle);
-+
-+		if (GITS_BASER_PAGE_SIZE_MASK) {
-+			/*
-+			 * Page size didn't stick. Let's try a smaller
-+			 * size and retry. If we reach 4K, then
-+			 * something is horribly wrong...
-+			 */
-+			switch (psz) {
-+			case SZ_16K:
-+				psz = SZ_4K;
-+				goto retry_alloc_baser;
-+			case SZ_64K:
-+				psz = SZ_16K;
-+				goto retry_alloc_baser;
-+			}
- 		}
--	}
- 
--	if (val != tmp) {
- 		dev_err(&its->dev, "%s doesn't stick: %llx %llx\n",
- 		       its_base_type_string[type], val, tmp);
--		devm_free_pages(&its->dev, (unsigned long)base);
+ 	if (val != tmp) {
+-		pr_err("ITS@%pa: %s doesn't stick: %llx %llx\n",
+-		       &its->phys_base, its_base_type_string[type],
+-		       val, tmp);
+-		free_pages((unsigned long)base, order);
++		dev_err(&its->dev, "%s doesn't stick: %llx %llx\n",
++		       its_base_type_string[type], val, tmp);
++		devm_free_pages(&its->dev, (unsigned long)base);
  		return -ENXIO;
  	}
  
-@@ -999,12 +1013,6 @@ static bool its_parse_baser_device(struct its_node *its, struct its_baser *baser
- 	 * feature is not supported by hardware.
- 	 */
- 	new_order = max_t(u32, get_order(esz << ids), new_order);
--	if (new_order >= MAX_ORDER) {
--		new_order = MAX_ORDER - 1;
--		ids = ilog2(PAGE_ORDER_TO_SIZE(new_order) / (int)esz);
--		dev_warn(&its->dev, "Device Table too large, reduce ids %u->%u\n",
--			its->device_ids, ids);
--	}
+@@ -948,8 +950,8 @@ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+ 	baser->psz = psz;
+ 	tmp = indirect ? GITS_LVL1_ENTRY_SIZE : esz;
  
- 	*order = new_order;
- 
-@@ -1691,6 +1699,9 @@ static int __init its_init_one(struct its_node *its)
- 		return err;
+-	pr_info("ITS@%pa: allocated %d %s @%lx (%s, esz %d, psz %dK, shr %d)\n",
+-		&its->phys_base, (int)(PAGE_ORDER_TO_SIZE(order) / (int)tmp),
++	dev_info(&its->dev, "allocated %d %s @%lx (%s, esz %d, psz %dK, shr %d)\n",
++		(int)(PAGE_ORDER_TO_SIZE(order) / (int)tmp),
+ 		its_base_type_string[type],
+ 		(unsigned long)virt_to_phys(base),
+ 		indirect ? "indirect" : "flat", (int)esz,
+@@ -1000,8 +1002,8 @@ static bool its_parse_baser_device(struct its_node *its, struct its_baser *baser
+ 	if (new_order >= MAX_ORDER) {
+ 		new_order = MAX_ORDER - 1;
+ 		ids = ilog2(PAGE_ORDER_TO_SIZE(new_order) / (int)esz);
+-		pr_warn("ITS@%pa: Device Table too large, reduce ids %u->%u\n",
+-			&its->phys_base, its->device_ids, ids);
++		dev_warn(&its->dev, "Device Table too large, reduce ids %u->%u\n",
++			its->device_ids, ids);
  	}
  
-+	/* Setup dma_ops for dmam_alloc_coherent() */
-+	arch_setup_dma_ops(&its->dev, 0, 0, NULL, true);
+ 	*order = new_order;
+@@ -1009,19 +1011,6 @@ static bool its_parse_baser_device(struct its_node *its, struct its_baser *baser
+ 	return indirect;
+ }
+ 
+-static void its_free_tables(struct its_node *its)
+-{
+-	int i;
+-
+-	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
+-		if (its->tables[i].base) {
+-			free_pages((unsigned long)its->tables[i].base,
+-				   its->tables[i].order);
+-			its->tables[i].base = NULL;
+-		}
+-	}
+-}
+-
+ static int its_alloc_tables(struct its_node *its)
+ {
+ 	u64 typer = gic_read_typer(its->base + GITS_TYPER);
+@@ -1056,10 +1045,8 @@ static int its_alloc_tables(struct its_node *its)
+ 			indirect = its_parse_baser_device(its, baser, psz, &order);
+ 
+ 		err = its_setup_baser(its, baser, cache, shr, psz, order, indirect);
+-		if (err < 0) {
+-			its_free_tables(its);
++		if (err < 0)
+ 			return err;
+-		}
+ 
+ 		/* Update settings which will be used for next BASERn */
+ 		psz = baser->psz;
+@@ -1343,6 +1330,7 @@ static struct its_device *its_create_device(struct its_node *its, u32 dev_id,
+ 
+ 	gic_flush_dcache_to_poc(itt, sz);
+ 
++	get_device(&its->dev);
+ 	dev->its = its;
+ 	dev->itt = itt;
+ 	dev->nr_ites = nr_ites;
+@@ -1651,8 +1639,9 @@ static int its_init_domain(struct its_node *its)
+ 	return 0;
+ }
+ 
+-static void its_free(struct its_node *its)
+-{
++static void its_device_release(struct device *dev) {
++	struct its_node *its = container_of(dev, struct its_node, dev);
 +
- 	its_base = devm_ioremap(&its->dev, its->phys_base, its->phys_size);
+ 	kfree(its);
+ }
+ 
+@@ -1689,34 +1678,47 @@ static int __init its_init_one(struct its_node *its)
+ 	u64 baser, tmp;
+ 	int err;
+ 
+-	its_base = ioremap(its->phys_base, its->phys_size);
++	/* On error always use put_device() to free devices */
++	device_initialize(&its->dev);
++	its->dev.release = its_device_release;
++
++	err = dev_set_name(&its->dev, "its@%pa", &its->phys_base);
++	if (!err)
++		err = device_add(&its->dev);
++
++	if (err) {
++		pr_warn("ITS@%pa: Unable to register device\n", &its->phys_base);
++		return err;
++	}
++
++	its_base = devm_ioremap(&its->dev, its->phys_base, its->phys_size);
  	if (!its_base) {
- 		dev_warn(&its->dev, "Unable to map ITS registers\n");
+-		pr_warn("ITS@%pa: Unable to map ITS registers\n", &its->phys_base);
++		dev_warn(&its->dev, "Unable to map ITS registers\n");
+ 		err = -ENOMEM;
+ 		goto fail;
+ 	}
+ 
+ 	val = readl_relaxed(its_base + GITS_PIDR2) & GIC_PIDR2_ARCH_MASK;
+ 	if (val != 0x30 && val != 0x40) {
+-		pr_warn("ITS@%pa: No ITS detected, giving up\n", &its->phys_base);
++		dev_warn(&its->dev, "No ITS detected, giving up\n");
+ 		err = -ENODEV;
+-		goto out_unmap;
++		goto fail;
+ 	}
+ 
+ 	err = its_force_quiescent(its_base);
+ 	if (err) {
+-		pr_warn("ITS@%pa: Failed to quiesce, giving up\n", &its->phys_base);
+-		goto out_unmap;
++		dev_warn(&its->dev, "Failed to quiesce, giving up\n");
++		goto fail;
+ 	}
+ 
+ 	its->base = its_base;
+ 	its->ite_size = ((gic_read_typer(its_base + GITS_TYPER) >> 4) & 0xf) + 1;
+ 
+-	its->cmd_base = (void *)__get_free_pages(GFP_KERNEL | __GFP_ZERO,
+-						get_order(ITS_CMD_QUEUE_SZ));
++	its->cmd_base = (void *)devm_get_free_pages(&its->dev,
++		GFP_KERNEL | __GFP_ZERO, get_order(ITS_CMD_QUEUE_SZ));
+ 	if (!its->cmd_base) {
+ 		err = -ENOMEM;
+-		goto out_unmap;
++		goto fail;
+ 	}
+ 	its->cmd_write = its->cmd_base;
+ 
+@@ -1724,11 +1726,11 @@ static int __init its_init_one(struct its_node *its)
+ 
+ 	err = its_alloc_tables(its);
+ 	if (err)
+-		goto out_free_cmd;
++		goto fail;
+ 
+ 	err = its_alloc_collections(its);
+ 	if (err)
+-		goto out_free_tables;
++		goto fail;
+ 
+ 	baser = (virt_to_phys(its->cmd_base)	|
+ 		 GITS_CBASER_WaWb		|
+@@ -1751,7 +1753,7 @@ static int __init its_init_one(struct its_node *its)
+ 			baser |= GITS_CBASER_nC;
+ 			gits_write_cbaser(baser, its->base + GITS_CBASER);
+ 		}
+-		pr_info("ITS: using cache flushing for cmd queue\n");
++		dev_info(&its->dev, "using cache flushing for cmd queue\n");
+ 		its->flags |= ITS_FLAGS_CMDQ_NEEDS_FLUSHING;
+ 	}
+ 
+@@ -1760,20 +1762,14 @@ static int __init its_init_one(struct its_node *its)
+ 
+ 	err = its_init_domain(its);
+ 	if (err)
+-		goto out_free_tables;
++		goto fail;
+ 
+-	pr_info("ITS@%pa: ITS node added\n", &its->phys_base);
++	dev_info(&its->dev, "ITS node added\n");
+ 
+ 	return 0;
+-
+-out_free_tables:
+-	its_free_tables(its);
+-out_free_cmd:
+-	kfree(its->cmd_base);
+-out_unmap:
+-	iounmap(its_base);
+ fail:
+-	pr_err("ITS@%pa: failed probing (%d)\n", &its->phys_base, err);
++	device_del(&its->dev);
++	dev_err(&its->dev, "failed probing (%d)\n", err);
+ 	return err;
+ }
+ 
+@@ -1907,6 +1903,10 @@ static int __init its_init(void)
+ 
+ 	spin_lock(&its_lock);
+ 
++	/*
++	 * Call this for all entries. We can then use put_device() to
++	 * release the nodes on error.
++	 */
+ 	list_for_each_entry(its, &its_nodes, entry) {
+ 		err2 = its_init_one(its);
+ 		if (!err && err2)
+@@ -1918,7 +1918,7 @@ static int __init its_init(void)
+ 
+ 	list_for_each_entry_safe(its, tmp, &its_nodes, entry) {
+ 		list_del(&its->entry);
+-		its_free(its);
++		put_device(&its->dev);
+ 	}
+ unlock:
+ 	spin_unlock(&its_lock);
 -- 
 2.11.0
