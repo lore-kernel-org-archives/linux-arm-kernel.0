@@ -1,105 +1,104 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 1 Feb 2017 09:57:19 -0600
-Subject: [PATCH 1/4] Documentation/devicetree/bindings/video/bridge:
- megachips-stdpxxxx-ge-b850v3-fw
-In-Reply-To: <0d72b822a603b729fa9fa1103daa336430cd2d1a.1485611969.git.peter.senna@collabora.com>
-References: <cover.1485611969.git.peter.senna@collabora.com>
- <0d72b822a603b729fa9fa1103daa336430cd2d1a.1485611969.git.peter.senna@collabora.com>
-Message-ID: <20170201155719.ng7otnioec7k6nvk@rob-hp-laptop>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Wed, 1 Feb 2017 15:57:26 +0000
+Subject: [RFC] ARM: l2c:  Adding L310_AUX_CTRL_FULL_LINE_ZERO broke my system
+Message-ID: <SG2PR06MB11657BAF8CFC0BCA9D07D0648A4D0@SG2PR06MB1165.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 28, 2017 at 03:21:30PM +0100, Peter Senna Tschudin wrote:
-> Devicetree binding documentation for the second video output
-> of the GE B850v3:
->    STDP4028-ge-b850v3-fw bridges (LVDS-DP)
->    STDP2690-ge-b850v3-fw bridges (DP-DP++)
-> 
-> Added entry for MegaChips at:
->  Documentation/devicetree/bindings/vendor-prefixes.txt
+As of commit 
 
-Your subject is so long I can't see anything useful. Begin with:
+8ef418c7178f "ARM: l2c: trial at enabling some Cortex-A9 optimisations"
 
-dt-bindings: display: ...
+from linux-3.16, my Renesas RZ/A1 (R7s72100) has never been able to use
+its PL310 r3p2. It enables it fine, but then crashes later on in boot
+because of corrupted memory.
 
-> 
-> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Cc: Martyn Welch <martyn.welch@collabora.co.uk>
-> Cc: Martin Donnelly <martin.donnelly@ge.com>
-> Cc: Javier Martinez Canillas <javier@dowhile0.org>
-> Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> Cc: Rob Herring <robh@kernel.org>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
-> ---
->  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
->  .../bridge/megachips-stdpxxxx-ge-b850v3-fw.txt     | 92 ++++++++++++++++++++++
->  2 files changed, 93 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/video/bridge/megachips-stdpxxxx-ge-b850v3-fw.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index 1ef148d..b4c2f5c 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -175,6 +175,7 @@ maxim	Maxim Integrated Products
->  mcube	mCube
->  meas	Measurement Specialties
->  mediatek	MediaTek Inc.
-> +megachips	MegaChips
->  melexis	Melexis N.V.
->  melfas	MELFAS Inc.
->  memsic	MEMSIC Inc.
-> diff --git a/Documentation/devicetree/bindings/video/bridge/megachips-stdpxxxx-ge-b850v3-fw.txt b/Documentation/devicetree/bindings/video/bridge/megachips-stdpxxxx-ge-b850v3-fw.txt
-> new file mode 100644
-> index 0000000..471db27
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/video/bridge/megachips-stdpxxxx-ge-b850v3-fw.txt
 
-bindings/video/ is gone (though a few things snuck in). This goes in 
-bindings/display/bridge/.
+It basically boils down to these lines in the commit:
 
-> @@ -0,0 +1,92 @@
-> +Drivers for the second video output of the GE B850v3:
-> +   STDP4028-ge-b850v3-fw bridges (LVDS-DP)
-> +   STDP2690-ge-b850v3-fw bridges (DP-DP++)
-> +
-> +The video processing pipeline on the second output on the GE B850v3:
-> +
-> +   Host -> LVDS|--(STDP4028)--|DP -> DP|--(STDP2690)--|DP++ -> Video output
-> +
-> +Each bridge has a dedicated flash containing firmware for supporting the custom
-> +design. The result is that, in this design, neither the STDP4028 nor the
-> +STDP2690 behave as the stock bridges would. The compatible strings include the
-> +suffix "-ge-b850v3-fw" to make it clear that the driver is for the bridges with
-> +the firmware specific for the GE B850v3.
-> +
-> +The driver is powerless to control the video processing pipeline, as the two
-> +bridges behaves as a single one. The driver is only needed for telling the host
-> +about EDID / HPD, and for giving the host powers to ack interrupts.
++		if (!(aux & L310_AUX_CTRL_FULL_LINE_ZERO) && !outer_cache.write_sec) {
++			aux |= L310_AUX_CTRL_FULL_LINE_ZERO;
++			pr_info("L2C-310 full line of zeros enabled for Cortex-A9\n");
++		}
 
-Bindings describe h/w not drivers. Rephrase in terms of what control the 
-h/w provides.
 
-> +
-> +Required properties:
-> +  - compatible : should be "megachips,stdp4028-ge-b850v3-fw" or
-> +    "megachips,stdp2690-ge-b850v3-fw".
+As reference, going into this line I have the following variable values:
 
-Reformat with one per line.
+  acr = 0x00000000
+  aux = 0x42020000
+  aux_cur = 0x00000000
+  outer_cache.write_sec = (null)
 
-> +  - reg : should contain the main address which is used to communicate with
-> +    the bridge over i2c.
+Also as reference from cache-l2x0.h:
 
-Just "reg : I2C bus address" is sufficient.
+#define L310_AUX_CTRL_FULL_LINE_ZERO            BIT(0)  /* R2P0+ */
 
-> +  - interrupt-parent : phandle of the interrupt controller that services
-> +    interrupts to the device (stdp4028-ge-b850v3-fw)
-> +  - interrupts : one interrupt should be described here, as in
-> +    <0 IRQ_TYPE_LEVEL_HIGH> (stdp4028-ge-b850v3-fw)
-> +  - ports : should describe the video signal connection between the host
-> +    and the bridges.
 
-You need to define how many ports and what each port is.
 
-Rob
+According to the PL310 documentation:
+
+Full line of zero write
+ 
+To enable this feature, perform the following steps:
+1. enable Full line of zero feature in the L2C-310
+2. turn on L2C-310
+3. enable Full line of zero feature in A9.
+
+
+So I get that if I want to use this feature, I first need to get it
+enabled in the L2C-310, then later on enabled it in the CA9. That
+seems to be done by l2c310_starting_cpu() in today's kernel:
+
+	if (aux & L310_AUX_CTRL_FULL_LINE_ZERO)
+		cpuhp_setup_state(CPUHP_AP_ARM_L2X0_STARTING,
+				  "arm/l2x0:starting", l2c310_starting_cpu,
+				  l2c310_dying_cpu);
+
+
+However, in the code snippet from the patch, the "!" in the if statement
+is saying:
+
+  "if you didn't want this feature, then we are turning it on"
+
+
+Of course changing this line to the following works fine because zero fill
+will not get enabled.
+
++		if (aux & L310_AUX_CTRL_FULL_LINE_ZERO && !outer_cache.write_sec) {
++			aux |= L310_AUX_CTRL_FULL_LINE_ZERO;
++			pr_info("L2C-310 full line of zeros enabled for Cortex-A9\n");
++		}
+
+So here's my questions:
+
+(1) I see that the PL310 is enabled on multiple platforms, so how as this not
+broken any systems since it was introduced in 2014? What am I missing?
+
+I see that only 2 platforms explicitly set this aux bit (both have CA9):
+  mach-tegra/tegra.c:	.l2c_aux_val	= 0x3c400001,
+  mach-exynos/exynos.c:	.l2c_aux_val	= 0x3c400001,
+
+
+
+(2) Bits 1 and 2 of the Auxiliary Control Register are "L1 Prefetch enable"
+and " L2 Prefetch hint enable". So if I want those enabled, it looks like
+I have to enable full-line-zero, correct?
+
+It seems the issue on my SoC is that when I enable FULL_LINE_ZERO in the CA9,
+it doesn't seem to work very well.
+As in, this simple change will also allow me to boot:
+
+ static int l2c310_starting_cpu(unsigned int cpu)
+ {
+-	set_auxcr(get_auxcr() | BIT(3) | BIT(2) | BIT(1));
++	set_auxcr(get_auxcr() | BIT(2) | BIT(1));
+ 	return 0;
+ }
+
+
+So, before I go firing off patches that will effect a bunch of systems, I
+would like to understand if there is some logic here that I'm not seeing.
+
+
+Thank you,
+Chris
