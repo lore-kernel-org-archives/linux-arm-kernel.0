@@ -1,111 +1,248 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 1 Feb 2017 10:02:24 -0600
-Subject: [PATCH 1/4] PCI: add DT bindings for Cortina Gemini PCI Host
- Bridge
-In-Reply-To: <20170128204839.18330-1-linus.walleij@linaro.org>
-References: <20170128204839.18330-1-linus.walleij@linaro.org>
-Message-ID: <20170201160224.jg6tuls2xcuul3m4@rob-hp-laptop>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 1 Feb 2017 16:02:53 +0000
+Subject: [PATCH v2 3/3] arm64: kvm: add support for the extended 64bit
+ ccsidr
+In-Reply-To: <1485793527-18028-3-git-send-email-sudeep.holla@arm.com>
+References: <1485793527-18028-1-git-send-email-sudeep.holla@arm.com>
+ <1485793527-18028-3-git-send-email-sudeep.holla@arm.com>
+Message-ID: <85bd7758-e0a3-f274-ba7a-db080e66d97c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jan 28, 2017 at 09:48:36PM +0100, Linus Walleij wrote:
-> This adds device tree bindings for the Cortina Systems Gemini PCI
-> Host Bridge.
+On 30/01/17 16:25, Sudeep Holla wrote:
+> csselr and ccsidr are treated as 64-bit values already elsewhere in the
+> kernel. It also aligns well with the architecture extensions that allow
+> 64-bit format for ccsidr.
 > 
-> Cc: Janos Laube <janos.dev@gmail.com>
-> Cc: Paulius Zaleckas <paulius.zaleckas@gmail.com>
-> Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
-> Cc: Florian Fainelli <f.fainelli@gmail.com>
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> This patch upgrades the existing accesses to csselr and ccsidr from
+> 32-bit to 64-bit in preparation to add support to those extensions.
+> It also add dedicated KVM_REG_ARM_DEMUX_ID_EXT_CCSIDR demux register
+> to handle 64-bit ccsidr in KVM.
+> 
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 > ---
-> This can be merged to the PCI tree whenever it is considered
-> fine for inclusion.
-> ---
->  .../devicetree/bindings/pci/cortina,gemini-pci.txt | 64 ++++++++++++++++++++++
->  1 file changed, 64 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/cortina,gemini-pci.txt
+>  arch/arm64/include/uapi/asm/kvm.h |   1 +
+>  arch/arm64/kvm/sys_regs.c         | 104 ++++++++++++++++++++++++++++----------
+>  2 files changed, 77 insertions(+), 28 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/pci/cortina,gemini-pci.txt b/Documentation/devicetree/bindings/pci/cortina,gemini-pci.txt
-> new file mode 100644
-> index 000000000000..e3090d995e1e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/cortina,gemini-pci.txt
-> @@ -0,0 +1,64 @@
-> +* Cortina Systems Gemini PCI Host Bridge
-> +
-> +Mandatory properties:
-> +
-> +- compatible: should be "cortina,gemini-pci"
-> +- reg: memory base and size for the host bridge
-> +- interrupts: the four PCI interrupts
-> +- #address-cells: set to <3>
-> +- #size-cells: set to <2>
-> +- #interrupt-cells: set to <1>
-> +- bus-range: set to <0x00 0x00> (only root bus)
-> +- device_type, set to "pci"
-> +- ranges: see pci.txt
-
-You need to specify what ranges should have for this bridge.
-
-> +- interrupt-map-mask: see pci.txt
-> +- interrupt-map: see pci.txt
-> +
-> +Mandatory subnodes:
-> +- One node reprenting the interrupt-controller inside the host bridge
-> +  with the following mandatory properties:
-> +  - interrupt-controller: see interrupt-controller/interrupts.txt
-> +  - #address-cells: set to <0>
-> +  - #interrupt-cells: set to <1>
-> +
-> +Example:
-> +
-> +pci at 50000000 {
-> +	compatible = "cortina,gemini-pci";
-> +	reg = <0x50000000 0x100>;
-
-Config space is indirectly accessed?
-
-> +	interrupts = <8 IRQ_TYPE_LEVEL_HIGH>, /* PCI A */
-> +			<26 IRQ_TYPE_LEVEL_HIGH>, /* PCI B */
-> +			<27 IRQ_TYPE_LEVEL_HIGH>, /* PCI C */
-> +			<28 IRQ_TYPE_LEVEL_HIGH>; /* PCI D */
-> +	#address-cells = <3>;
-> +	#size-cells = <2>;
-> +	#interrupt-cells = <1>;
-> +
-> +	bus-range = <0x00 0x00>; /* Only root bus */
-> +	ranges = /* 1MiB I/O space 0x50000000-0x500fffff */
-> +		 <0x01000000 0 0          0x50000000 0 0x00100000>,
-> +		 /* 128MiB non-prefetchable memory 0x58000000-0x5fffffff */
-> +		 <0x02000000 0 0x58000000 0x58000000 0 0x08000000>;
-> +	interrupt-map-mask = <0xff00 0 0 7>;
-> +	interrupt-map = <0x4800 0 0 1 &pci_intc 0>, /* Slot 9 */
-> +			<0x4900 0 0 2 &pci_intc 1>,
-> +			<0x4a00 0 0 3 &pci_intc 2>,
-> +			<0x4b00 0 0 4 &pci_intc 3>,
-> +			<0x5000 0 0 1 &pci_intc 0>, /* Slot 10 */
-> +			<0x5100 0 0 2 &pci_intc 1>,
-> +			<0x5200 0 0 3 &pci_intc 2>,
-> +			<0x5300 0 0 4 &pci_intc 3>,
-> +			<0x5800 0 0 1 &pci_intc 0>, /* Slot 11 */
-> +			<0x5900 0 0 2 &pci_intc 1>,
-> +			<0x5a00 0 0 3 &pci_intc 2>,
-> +			<0x5b00 0 0 4 &pci_intc 3>,
-> +			<0x6000 0 0 1 &pci_intc 0>, /* Slot 12 */
-> +			<0x6100 0 0 2 &pci_intc 1>,
-> +			<0x6200 0 0 3 &pci_intc 2>,
-> +			<0x6300 0 0 4 &pci_intc 3>;
-> +	pci_intc: interrupt-controller {
-> +		interrupt-controller;
-> +		#address-cells = <0>;
-> +		#interrupt-cells = <1>;
-> +	};
-> +};
-> -- 
-> 2.9.3
+> v1->v2:
+> 	- Added dependency on cpu_supports_ccsidr_64b_format(PATCH 1/3)
+> 	- Added a new KVM_REG_ARM_DEMUX_ID_EXT_CCSIDR demux register id
+> 	  to support new 64bit CCSIDR
 > 
+> diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+> index 3051f86a9b5f..8aa18e65e6a5 100644
+> --- a/arch/arm64/include/uapi/asm/kvm.h
+> +++ b/arch/arm64/include/uapi/asm/kvm.h
+> @@ -161,6 +161,7 @@ struct kvm_arch_memory_slot {
+>  #define KVM_REG_ARM_DEMUX_ID_MASK	0x000000000000FF00
+>  #define KVM_REG_ARM_DEMUX_ID_SHIFT	8
+>  #define KVM_REG_ARM_DEMUX_ID_CCSIDR	(0x00 << KVM_REG_ARM_DEMUX_ID_SHIFT)
+> +#define KVM_REG_ARM_DEMUX_ID_EXT_CCSIDR	(0x01 << KVM_REG_ARM_DEMUX_ID_SHIFT)
+>  #define KVM_REG_ARM_DEMUX_VAL_MASK	0x00000000000000FF
+>  #define KVM_REG_ARM_DEMUX_VAL_SHIFT	0
+> 
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index 72656743b4cc..f9822ac6d9ab 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -58,15 +58,15 @@
+>   */
+> 
+>  /* 3 bits per cache level, as per CLIDR, but non-existent caches always 0 */
+> -static u32 cache_levels;
+> +static u64 cache_levels;
+> 
+> -/* CSSELR values; used to index KVM_REG_ARM_DEMUX_ID_CCSIDR */
+> +/* CSSELR values; used to index KVM_REG_ARM_DEMUX_ID_{EXT_,}CCSIDR */
+>  #define CSSELR_MAX 	((MAX_CACHE_LEVEL - 1) << 1)
+> 
+>  /* Which cache CCSIDR represents depends on CSSELR value. */
+> -static u32 get_ccsidr(u32 csselr)
+> +static u64 get_ccsidr(u64 csselr)
+>  {
+> -	u32 ccsidr;
+> +	u64 ccsidr;
+> 
+>  	/* Make sure noone else changes CSSELR during this! */
+>  	local_irq_disable();
+> @@ -1952,9 +1952,9 @@ static int set_invariant_sys_reg(u64 id, void __user *uaddr)
+>  	return 0;
+>  }
+> 
+> -static bool is_valid_cache(u32 val)
+> +static bool is_valid_cache(u64 val)
+>  {
+> -	u32 level, ctype;
+> +	u64 level, ctype;
+> 
+>  	if (val >= CSSELR_MAX)
+>  		return false;
+> @@ -1977,10 +1977,28 @@ static bool is_valid_cache(u32 val)
+>  	}
+>  }
+> 
+> +static int demux_ccsidr_validate_get(u64 id, int size, u64 *val)
+> +{
+> +	u64 cidx;
+> +
+> +	if (KVM_REG_SIZE(id) != size)
+> +		return -ENOENT;
+> +
+> +	cidx = (id & KVM_REG_ARM_DEMUX_VAL_MASK)
+> +			>> KVM_REG_ARM_DEMUX_VAL_SHIFT;
+> +	if (!is_valid_cache(cidx))
+> +		return -ENOENT;
+> +
+> +	*val = get_ccsidr(cidx);
+> +	return 0;
+> +}
+> +
+>  static int demux_c15_get(u64 id, void __user *uaddr)
+>  {
+> -	u32 val;
+> -	u32 __user *uval = uaddr;
+> +	int ret;
+> +	u64 val;
+> +	u32 __user *uval;
+> +	u64 __user *uval64;
+> 
+>  	/* Fail if we have unknown bits set. */
+>  	if (id & ~(KVM_REG_ARCH_MASK|KVM_REG_SIZE_MASK|KVM_REG_ARM_COPROC_MASK
+> @@ -1989,14 +2007,17 @@ static int demux_c15_get(u64 id, void __user *uaddr)
+> 
+>  	switch (id & KVM_REG_ARM_DEMUX_ID_MASK) {
+>  	case KVM_REG_ARM_DEMUX_ID_CCSIDR:
+> -		if (KVM_REG_SIZE(id) != 4)
+> -			return -ENOENT;
+> -		val = (id & KVM_REG_ARM_DEMUX_VAL_MASK)
+> -			>> KVM_REG_ARM_DEMUX_VAL_SHIFT;
+> -		if (!is_valid_cache(val))
+> -			return -ENOENT;
+> -
+> -		return put_user(get_ccsidr(val), uval);
+> +		ret = demux_ccsidr_validate_get(id, sizeof(*uval), &val);
+> +		if (ret)
+> +			return ret;
+> +		uval = uaddr;
+> +		return put_user(val, uval);
+> +	case KVM_REG_ARM_DEMUX_ID_EXT_CCSIDR:
+> +		ret = demux_ccsidr_validate_get(id, sizeof(*uval64), &val);
+> +		if (ret)
+> +			return ret;
+> +		uval64 = uaddr;
+> +		return put_user(val, uval64);
+>  	default:
+>  		return -ENOENT;
+>  	}
+> @@ -2004,8 +2025,10 @@ static int demux_c15_get(u64 id, void __user *uaddr)
+> 
+>  static int demux_c15_set(u64 id, void __user *uaddr)
+>  {
+> -	u32 val, newval;
+> -	u32 __user *uval = uaddr;
+> +	int ret;
+> +	u64 val, newval;
+> +	u32 __user *uval;
+> +	u64 __user *uval64;
+> 
+>  	/* Fail if we have unknown bits set. */
+>  	if (id & ~(KVM_REG_ARCH_MASK|KVM_REG_SIZE_MASK|KVM_REG_ARM_COPROC_MASK
+> @@ -2014,18 +2037,29 @@ static int demux_c15_set(u64 id, void __user *uaddr)
+> 
+>  	switch (id & KVM_REG_ARM_DEMUX_ID_MASK) {
+>  	case KVM_REG_ARM_DEMUX_ID_CCSIDR:
+> -		if (KVM_REG_SIZE(id) != 4)
+> -			return -ENOENT;
+> -		val = (id & KVM_REG_ARM_DEMUX_VAL_MASK)
+> -			>> KVM_REG_ARM_DEMUX_VAL_SHIFT;
+> -		if (!is_valid_cache(val))
+> -			return -ENOENT;
+> +		ret = demux_ccsidr_validate_get(id, sizeof(*uval), &val);
+> +		if (ret)
+> +			return ret;
+> 
+> +		uval = uaddr;
+>  		if (get_user(newval, uval))
+>  			return -EFAULT;
+> 
+>  		/* This is also invariant: you can't change it. */
+> -		if (newval != get_ccsidr(val))
+> +		if (newval != val)
+> +			return -EINVAL;
+> +		return 0;
+> +	case KVM_REG_ARM_DEMUX_ID_EXT_CCSIDR:
+> +		ret = demux_ccsidr_validate_get(id, sizeof(*uval), &val);
+> +		if (ret)
+> +			return ret;
+> +
+> +		uval64 = uaddr;
+> +		if (get_user(newval, uval64))
+> +			return -EFAULT;
+> +
+> +		/* This is also invariant: you can't change it. */
+> +		if (newval != val)
+>  			return -EINVAL;
+>  		return 0;
+>  	default:
+> @@ -2086,12 +2120,10 @@ static unsigned int num_demux_regs(void)
+>  	return count;
+>  }
+> 
+> -static int write_demux_regids(u64 __user *uindices)
+> +static int write_demux_ccsidr(u64 val, u64 __user *uindices)
+>  {
+> -	u64 val = KVM_REG_ARM64 | KVM_REG_SIZE_U32 | KVM_REG_ARM_DEMUX;
+>  	unsigned int i;
+> 
+> -	val |= KVM_REG_ARM_DEMUX_ID_CCSIDR;
+>  	for (i = 0; i < CSSELR_MAX; i++) {
+>  		if (!is_valid_cache(i))
+>  			continue;
+> @@ -2099,9 +2131,25 @@ static int write_demux_regids(u64 __user *uindices)
+>  			return -EFAULT;
+>  		uindices++;
+>  	}
+> +
+>  	return 0;
+>  }
+> 
+> +static int write_demux_regids(u64 __user *uindices)
+> +{
+> +	int ret;
+> +	u64 val = KVM_REG_ARM64 | KVM_REG_ARM_DEMUX;
+> +
+> +	if (cpu_supports_ccsidr_64b_format())
+> +		/* 64 bit extended CCSIDR */
+> +		ret = write_demux_ccsidr(val | KVM_REG_ARM_DEMUX_ID_EXT_CCSIDR |
+> +					 KVM_REG_SIZE_U64, uindices);
+> +	else
+> +		ret = write_demux_ccsidr(val | KVM_REG_ARM_DEMUX_ID_CCSIDR |
+> +					 KVM_REG_SIZE_U32, uindices);
+> +	return ret;
+> +}
+> +
+>  static u64 sys_reg_to_index(const struct sys_reg_desc *reg)
+>  {
+>  	return (KVM_REG_ARM64 | KVM_REG_SIZE_U64 |
 > --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 2.7.4
+> 
+
+I'm a bit worried about this patch. If we snapshot a VM on a 32bit
+CCSIDR system, and restore it on a 64bit CSSIDR system (or the reverse),
+what happens? My hunch is that we cannot restore the VM properly.
+
+Now, I'm questioning the need for having those altogether, as we do a
+lot of work to prevent the guest from actually using that geometry (and
+on a big-little system, this hardly works).
+
+Christoffer, what do you think?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
