@@ -1,189 +1,230 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed,  1 Feb 2017 21:46:23 +0900
-Subject: [PATCH v31 04/12] arm64: mm: allow for unmapping part of kernel
- mapping
+Date: Wed,  1 Feb 2017 21:46:24 +0900
+Subject: [PATCH v31 05/12] arm64: kdump: protect crash dump kernel memory
 In-Reply-To: <20170201124218.5823-1-takahiro.akashi@linaro.org>
 References: <20170201124218.5823-1-takahiro.akashi@linaro.org>
-Message-ID: <20170201124630.6016-3-takahiro.akashi@linaro.org>
+Message-ID: <20170201124630.6016-4-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A new function, remove_pgd_mapping(), is added.
-It allows us to unmap a specific portion of kernel mapping later as far as
-the mapping is made using create_pgd_mapping() and unless we try to free
-a sub-set of memory range within a section mapping.
+arch_kexec_protect_crashkres() and arch_kexec_unprotect_crashkres()
+are meant to be called around kexec_load() in order to protect
+the memory allocated for crash dump kernel once after it's loaded.
 
-This function will be used in a later kdump patch to implement
-the protection against corrupting crash dump kernel memory which is to be
-set aside.
+The protection is implemented here by unmapping the region rather than
+making it read-only.
+To make the things work correctly, we also have to
+- put the region in an isolated, page-level mapping initially, and
+- move copying kexec's control_code_page to machine_kexec_prepare()
+
+Note that page-level mapping is also required to allow for shrinking
+the size of memory, through /sys/kernel/kexec_crash_size, by any number
+of multiple pages.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm64/include/asm/mmu.h |   2 +
- arch/arm64/mm/mmu.c          | 130 +++++++++++++++++++++++++++++++++++++++++--
- 2 files changed, 127 insertions(+), 5 deletions(-)
+ arch/arm64/kernel/machine_kexec.c | 65 ++++++++++++++++++++++++++-------------
+ arch/arm64/mm/mmu.c               | 35 +++++++++++++++++++++
+ 2 files changed, 79 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index 47619411f0ff..04eb240736d8 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -36,6 +36,8 @@ extern void init_mem_pgprot(void);
- extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
- 			       unsigned long virt, phys_addr_t size,
- 			       pgprot_t prot, bool page_mappings_only);
-+extern void remove_pgd_mapping(struct mm_struct *mm, unsigned long virt,
-+			       phys_addr_t size);
- extern void *fixmap_remap_fdt(phys_addr_t dt_phys);
+diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+index bc96c8a7fc79..016f2dd693aa 100644
+--- a/arch/arm64/kernel/machine_kexec.c
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -14,6 +14,7 @@
  
- #endif
+ #include <asm/cacheflush.h>
+ #include <asm/cpu_ops.h>
++#include <asm/mmu.h>
+ #include <asm/mmu_context.h>
+ 
+ #include "cpu-reset.h"
+@@ -22,8 +23,6 @@
+ extern const unsigned char arm64_relocate_new_kernel[];
+ extern const unsigned long arm64_relocate_new_kernel_size;
+ 
+-static unsigned long kimage_start;
+-
+ /**
+  * kexec_image_info - For debugging output.
+  */
+@@ -64,7 +63,7 @@ void machine_kexec_cleanup(struct kimage *kimage)
+  */
+ int machine_kexec_prepare(struct kimage *kimage)
+ {
+-	kimage_start = kimage->start;
++	void *reboot_code_buffer;
+ 
+ 	kexec_image_info(kimage);
+ 
+@@ -73,6 +72,21 @@ int machine_kexec_prepare(struct kimage *kimage)
+ 		return -EBUSY;
+ 	}
+ 
++	reboot_code_buffer =
++			phys_to_virt(page_to_phys(kimage->control_code_page));
++
++	/*
++	 * Copy arm64_relocate_new_kernel to the reboot_code_buffer for use
++	 * after the kernel is shut down.
++	 */
++	memcpy(reboot_code_buffer, arm64_relocate_new_kernel,
++		arm64_relocate_new_kernel_size);
++
++	/* Flush the reboot_code_buffer in preparation for its execution. */
++	__flush_dcache_area(reboot_code_buffer, arm64_relocate_new_kernel_size);
++	flush_icache_range((uintptr_t)reboot_code_buffer,
++		arm64_relocate_new_kernel_size);
++
+ 	return 0;
+ }
+ 
+@@ -143,7 +157,6 @@ static void kexec_segment_flush(const struct kimage *kimage)
+ void machine_kexec(struct kimage *kimage)
+ {
+ 	phys_addr_t reboot_code_buffer_phys;
+-	void *reboot_code_buffer;
+ 
+ 	/*
+ 	 * New cpus may have become stuck_in_kernel after we loaded the image.
+@@ -151,7 +164,6 @@ void machine_kexec(struct kimage *kimage)
+ 	BUG_ON(cpus_are_stuck_in_kernel() || (num_online_cpus() > 1));
+ 
+ 	reboot_code_buffer_phys = page_to_phys(kimage->control_code_page);
+-	reboot_code_buffer = phys_to_virt(reboot_code_buffer_phys);
+ 
+ 	kexec_image_info(kimage);
+ 
+@@ -159,31 +171,17 @@ void machine_kexec(struct kimage *kimage)
+ 		kimage->control_code_page);
+ 	pr_debug("%s:%d: reboot_code_buffer_phys:  %pa\n", __func__, __LINE__,
+ 		&reboot_code_buffer_phys);
+-	pr_debug("%s:%d: reboot_code_buffer:       %p\n", __func__, __LINE__,
+-		reboot_code_buffer);
+ 	pr_debug("%s:%d: relocate_new_kernel:      %p\n", __func__, __LINE__,
+ 		arm64_relocate_new_kernel);
+ 	pr_debug("%s:%d: relocate_new_kernel_size: 0x%lx(%lu) bytes\n",
+ 		__func__, __LINE__, arm64_relocate_new_kernel_size,
+ 		arm64_relocate_new_kernel_size);
+ 
+-	/*
+-	 * Copy arm64_relocate_new_kernel to the reboot_code_buffer for use
+-	 * after the kernel is shut down.
+-	 */
+-	memcpy(reboot_code_buffer, arm64_relocate_new_kernel,
+-		arm64_relocate_new_kernel_size);
+-
+-	/* Flush the reboot_code_buffer in preparation for its execution. */
+-	__flush_dcache_area(reboot_code_buffer, arm64_relocate_new_kernel_size);
+-	flush_icache_range((uintptr_t)reboot_code_buffer,
+-		arm64_relocate_new_kernel_size);
+-
+ 	/* Flush the kimage list and its buffers. */
+ 	kexec_list_flush(kimage);
+ 
+ 	/* Flush the new image if already in place. */
+-	if (kimage->head & IND_DONE)
++	if ((kimage != kexec_crash_image) && (kimage->head & IND_DONE))
+ 		kexec_segment_flush(kimage);
+ 
+ 	pr_info("Bye!\n");
+@@ -201,7 +199,7 @@ void machine_kexec(struct kimage *kimage)
+ 	 */
+ 
+ 	cpu_soft_restart(1, reboot_code_buffer_phys, kimage->head,
+-		kimage_start, 0);
++		kimage->start, 0);
+ 
+ 	BUG(); /* Should never get here. */
+ }
+@@ -210,3 +208,28 @@ void machine_crash_shutdown(struct pt_regs *regs)
+ {
+ 	/* Empty routine needed to avoid build errors. */
+ }
++
++void arch_kexec_protect_crashkres(void)
++{
++	kexec_segment_flush(kexec_crash_image);
++
++	remove_pgd_mapping(&init_mm, __phys_to_virt(crashk_res.start),
++			resource_size(&crashk_res));
++
++	flush_tlb_all();
++}
++
++void arch_kexec_unprotect_crashkres(void)
++{
++	/*
++	 * We don't have to make page-level mappings here because
++	 * the crash dump kernel memory is not allowed to be shrunk
++	 * once the kernel is loaded.
++	 */
++	create_pgd_mapping(&init_mm, crashk_res.start,
++			__phys_to_virt(crashk_res.start),
++			resource_size(&crashk_res), PAGE_KERNEL,
++			debug_pagealloc_enabled());
++
++	flush_tlb_all();
++}
 diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 17243e43184e..9d3cea1db3b4 100644
+index 9d3cea1db3b4..87861e62316a 100644
 --- a/arch/arm64/mm/mmu.c
 +++ b/arch/arm64/mm/mmu.c
-@@ -334,12 +334,10 @@ static void __init create_mapping_noalloc(phys_addr_t phys, unsigned long virt,
- 	__create_pgd_mapping(init_mm.pgd, phys, virt, size, prot, NULL, false);
+@@ -22,6 +22,8 @@
+ #include <linux/kernel.h>
+ #include <linux/errno.h>
+ #include <linux/init.h>
++#include <linux/ioport.h>
++#include <linux/kexec.h>
+ #include <linux/libfdt.h>
+ #include <linux/mman.h>
+ #include <linux/nodemask.h>
+@@ -538,6 +540,24 @@ static void __init map_mem(pgd_t *pgd)
+ 		if (memblock_is_nomap(reg))
+ 			continue;
+ 
++#ifdef CONFIG_KEXEC_CORE
++		/*
++		 * While crash dump kernel memory is contained in a single
++		 * memblock for now, it should appear in an isolated mapping
++		 * so that we can independently unmap the region later.
++		 */
++		if (crashk_res.end &&
++		    (start <= crashk_res.start) &&
++		    ((crashk_res.end + 1) < end)) {
++			if (crashk_res.start != start)
++				__map_memblock(pgd, start, crashk_res.start);
++
++			if ((crashk_res.end + 1) < end)
++				__map_memblock(pgd, crashk_res.end + 1, end);
++
++			continue;
++		}
++#endif
+ 		__map_memblock(pgd, start, end);
+ 	}
+ }
+@@ -623,6 +643,21 @@ static void __init map_kernel(pgd_t *pgd)
+ 	kasan_copy_shadow(pgd);
  }
  
--void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
--			       unsigned long virt, phys_addr_t size,
--			       pgprot_t prot, bool page_mappings_only)
-+void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
-+			unsigned long virt, phys_addr_t size,
-+			pgprot_t prot, bool page_mappings_only)
- {
--	BUG_ON(mm == &init_mm);
--
- 	__create_pgd_mapping(mm->pgd, phys, virt, size, prot,
- 			     pgd_pgtable_alloc, page_mappings_only);
- }
-@@ -357,6 +355,128 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
- 			     NULL, debug_pagealloc_enabled());
- }
- 
-+static bool pgtable_is_cleared(void *pgtable)
++#ifdef CONFIG_KEXEC_CORE
++static int __init map_crashkernel(void)
 +{
-+	unsigned long *desc, *end;
++	/* page-level mapping only to allow for shrinking */
++	if (crashk_res.end)
++		create_pgd_mapping(&init_mm, crashk_res.start,
++				   __phys_to_virt(crashk_res.start),
++				   resource_size(&crashk_res), PAGE_KERNEL,
++				   true);
 +
-+	for (desc = pgtable, end = (unsigned long *)(pgtable + PAGE_SIZE);
-+	     desc < end; desc++)
-+		if (*desc)
-+			return false;
-+
-+	return true;
++	return 0;
 +}
-+
-+static void clear_pte_range(pmd_t *pmd, unsigned long addr, unsigned long end)
-+{
-+	pte_t *pte;
-+
-+	if (WARN_ON(pmd_bad(*pmd)))
-+		return;
-+
-+	pte = pte_set_fixmap_offset(pmd, addr);
-+
-+	do {
-+		pte_clear(NULL, NULL, pte);
-+	} while (pte++, addr += PAGE_SIZE, addr != end);
-+
-+	pte_clear_fixmap();
-+}
-+
-+static void clear_pmd_range(pud_t *pud, unsigned long addr, unsigned long end)
-+{
-+	pmd_t *pmd;
-+	unsigned long next;
-+
-+	if (WARN_ON(pud_bad(*pud)))
-+		return;
-+
-+	pmd = pmd_set_fixmap_offset(pud, addr);
-+
-+	do {
-+		next = pmd_addr_end(addr, end);
-+
-+		if (pmd_table(*pmd)) {
-+			clear_pte_range(pmd, addr, next);
-+			if (((next - addr) == PMD_SIZE) ||
-+			    pgtable_is_cleared(__va(pmd_page_paddr(*pmd)))) {
-+				__free_page(pmd_page(*pmd));
-+				pmd_clear(pmd);
-+			}
-+		} else {
-+			if (WARN_ON((next - addr) != PMD_SIZE))
-+				return;
-+			pmd_clear(pmd);
-+		}
-+	} while (pmd++, addr = next, addr != end);
-+
-+	pmd_clear_fixmap();
-+}
-+
-+static void clear_pud_range(pgd_t *pgd, unsigned long addr, unsigned long end)
-+{
-+	pud_t *pud;
-+	unsigned long next;
-+
-+	if (WARN_ON(pgd_bad(*pgd)))
-+		return;
-+
-+	pud = pud_set_fixmap_offset(pgd, addr);
-+
-+	do {
-+		next = pud_addr_end(addr, end);
-+
-+		if (pud_table(*pud)) {
-+			clear_pmd_range(pud, addr, next);
-+#if CONFIG_PGTABLE_LEVELS > 2
-+			if (((next - addr) == PUD_SIZE) ||
-+			    pgtable_is_cleared(__va(pud_page_paddr(*pud)))) {
-+				__free_page(pud_page(*pud));
-+				pud_clear(pud);
-+			}
++subsys_initcall(map_crashkernel);
 +#endif
-+		} else {
-+#if CONFIG_PGTABLE_LEVELS > 2
-+			if (WARN_ON((next - addr) != PUD_SIZE))
-+				return;
-+			pud_clear(pud);
-+#endif
-+		}
-+	} while (pud++, addr = next, addr != end);
 +
-+	pud_clear_fixmap();
-+}
-+
-+static void __remove_pgd_mapping(pgd_t *pgdir, unsigned long virt,
-+				 phys_addr_t size)
-+{
-+	unsigned long addr, length, end, next;
-+	pgd_t *pgd = pgd_offset_raw(pgdir, virt);
-+
-+	addr = virt & PAGE_MASK;
-+	length = PAGE_ALIGN(size + (virt & ~PAGE_MASK));
-+
-+	end = addr + length;
-+	do {
-+		next = pgd_addr_end(addr, end);
-+		clear_pud_range(pgd, addr, next);
-+
-+#if CONFIG_PGTABLE_LEVELS > 3
-+		if (((next - addr) == PGD_SIZE) ||
-+		    pgtable_is_cleared(__va(pgd_page_paddr(*pgd)))) {
-+			__free_page(pgd_page(*pgd));
-+			pgd_clear(pgd);
-+		}
-+#endif
-+	} while (pgd++, addr = next, addr != end);
-+}
-+
-+void remove_pgd_mapping(struct mm_struct *mm, unsigned long virt,
-+			phys_addr_t size)
-+{
-+	__remove_pgd_mapping(mm->pgd, virt, size);
-+}
-+
- static void __init __map_memblock(pgd_t *pgd, phys_addr_t start, phys_addr_t end)
- {
- 	unsigned long kernel_start = __pa(_text);
+ /*
+  * paging_init() sets up the page tables, initialises the zone memory
+  * maps and sets up the zero page.
 -- 
 2.11.0
