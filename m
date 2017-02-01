@@ -1,24 +1,104 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Wed, 1 Feb 2017 14:12:13 -0800
-Subject: [PATCH v3] initramfs: finish fput() before accessing any binary
- from initramfs
-In-Reply-To: <20170201140540.22051-1-lokeshvutla@ti.com>
-References: <20170201140540.22051-1-lokeshvutla@ti.com>
-Message-ID: <20170201141213.3cf81a7a3a771ac2b94e8d48@linux-foundation.org>
+From: tbaicar@codeaurora.org (Tyler Baicar)
+Date: Wed,  1 Feb 2017 15:15:18 -0700
+Subject: [PATCH] arm64: hwpoison: add VM_FAULT_HWPOISON[_LARGE] handling
+Message-ID: <1485987318-9145-1-git-send-email-tbaicar@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 1 Feb 2017 19:35:40 +0530 Lokesh Vutla <lokeshvutla@ti.com> wrote:
+From: "Jonathan (Zhixiong) Zhang" <zjzhang@codeaurora.org>
 
-> commit 4a9d4b024a31 ("switch fput to task_work_add") implements a
-> schedule_work() for completing fput(), but did not guarantee calling
-> __fput() after unpacking initramfs. Because of this, there is a
-> possibility that during boot a driver can see ETXTBSY when it tries
-> to load a binary from initramfs as fput() is still pending on that
-> binary. This patch makes sure that fput() is completed after unpacking
-> initramfs and removes the call to flush_delayed_fput() in kernel_init()
-> which happens very late after unpacking initramfs.
+Add VM_FAULT_HWPOISON[_LARGE] handling to the arm64 page fault
+handler. Handling of VM_FAULT_HWPOISON[_LARGE] is very similar
+to VM_FAULT_OOM, the only difference is that a different si_code
+(BUS_MCEERR_AR) is passed to user space and si_addr_lsb field is
+initialized.
 
-There's not really enough info here for others to be able to decide
-which kernel versions need the fix.  How serious is the bug?  Given
-that it's been there for 4 years, I assume "not very"?
+Signed-off-by: Jonathan (Zhixiong) Zhang <zjzhang@codeaurora.org>
+Signed-off-by: Tyler Baicar <tbaicar@codeaurora.org>
+---
+ arch/arm64/mm/fault.c | 31 +++++++++++++++++++++++++++----
+ 1 file changed, 27 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 156169c..50857f9 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -30,6 +30,7 @@
+ #include <linux/highmem.h>
+ #include <linux/perf_event.h>
+ #include <linux/preempt.h>
++#include <linux/hugetlb.h>
+ 
+ #include <asm/bug.h>
+ #include <asm/cpufeature.h>
+@@ -193,9 +194,10 @@ static void __do_kernel_fault(struct mm_struct *mm, unsigned long addr,
+  */
+ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
+ 			    unsigned int esr, unsigned int sig, int code,
+-			    struct pt_regs *regs)
++			    struct pt_regs *regs, int fault)
+ {
+ 	struct siginfo si;
++	unsigned lsb = 0;
+ 
+ 	if (unhandled_signal(tsk, sig) && show_unhandled_signals_ratelimited()) {
+ 		pr_info("%s[%d]: unhandled %s (%d) at 0x%08lx, esr 0x%03x\n",
+@@ -211,6 +213,17 @@ static void __do_user_fault(struct task_struct *tsk, unsigned long addr,
+ 	si.si_errno = 0;
+ 	si.si_code = code;
+ 	si.si_addr = (void __user *)addr;
++	/*
++	 * Either small page or large page may be poisoned.
++	 * In other words, VM_FAULT_HWPOISON_LARGE and
++	 * VM_FAULT_HWPOISON are mutually exclusive.
++	 */
++	if (fault & VM_FAULT_HWPOISON_LARGE)
++		lsb = hstate_index_to_shift(VM_FAULT_GET_HINDEX(fault));
++	else if (fault & VM_FAULT_HWPOISON)
++		lsb = PAGE_SHIFT;
++	si.si_addr_lsb = lsb;
++
+ 	force_sig_info(sig, &si, tsk);
+ }
+ 
+@@ -224,7 +237,7 @@ static void do_bad_area(unsigned long addr, unsigned int esr, struct pt_regs *re
+ 	 * handle this fault with.
+ 	 */
+ 	if (user_mode(regs))
+-		__do_user_fault(tsk, addr, esr, SIGSEGV, SEGV_MAPERR, regs);
++		__do_user_fault(tsk, addr, esr, SIGSEGV, SEGV_MAPERR, regs, 0);
+ 	else
+ 		__do_kernel_fault(mm, addr, esr, regs);
+ }
+@@ -426,7 +439,17 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
+ 		 */
+ 		sig = SIGBUS;
+ 		code = BUS_ADRERR;
+-	} else {
++	}
++#ifdef CONFIG_MEMORY_FAILURE
++	else if (fault & (VM_FAULT_HWPOISON|VM_FAULT_HWPOISON_LARGE)) {
++		pr_err(
++	"Killing %s:%d due to hardware memory corruption fault at %lx\n",
++			tsk->comm, tsk->pid, addr);
++		sig = SIGBUS;
++		code = BUS_MCEERR_AR;
++	}
++#endif
++	else {
+ 		/*
+ 		 * Something tried to access memory that isn't in our memory
+ 		 * map.
+@@ -436,7 +459,7 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
+ 			SEGV_ACCERR : SEGV_MAPERR;
+ 	}
+ 
+-	__do_user_fault(tsk, addr, esr, sig, code, regs);
++	__do_user_fault(tsk, addr, esr, sig, code, regs, fault);
+ 	return 0;
+ 
+ no_context:
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
