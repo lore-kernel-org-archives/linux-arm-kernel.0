@@ -1,35 +1,76 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 1 Feb 2017 21:04:44 +0100
-Subject: [PATCH 1/4] PCI: add DT bindings for Cortina Gemini PCI Host
- Bridge
-In-Reply-To: <20170201160224.jg6tuls2xcuul3m4@rob-hp-laptop>
-References: <20170128204839.18330-1-linus.walleij@linaro.org>
- <20170201160224.jg6tuls2xcuul3m4@rob-hp-laptop>
-Message-ID: <CACRpkdat3rcNL9=FHXBD7zT5LoZy3BGCV1ZT74AoeR4JytSoaQ@mail.gmail.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed,  1 Feb 2017 17:05:22 -0300
+Subject: [PATCH 2/2] [media] exynos-gsc: Add support for NV{16, 21,
+ 61}M pixel formats
+In-Reply-To: <1485979523-32404-1-git-send-email-javier@osg.samsung.com>
+References: <1485979523-32404-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <1485979523-32404-3-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 1, 2017 at 5:02 PM, Rob Herring <robh@kernel.org> wrote:
-> On Sat, Jan 28, 2017 at 09:48:36PM +0100, Linus Walleij wrote:
+From: Thibault Saunier <thibault.saunier@osg.samsung.com>
 
->> +Example:
->> +
->> +pci at 50000000 {
->> +     compatible = "cortina,gemini-pci";
->> +     reg = <0x50000000 0x100>;
->
-> Config space is indirectly accessed?
+Those are useful formats that should be handled.
 
-Yes it is a really annoying construction. The first device, the Faraday
-roob hub is at that address, the init code uses that to set up the bus.
+Signed-off-by: Thibault Saunier <thibault.saunier@osg.samsung.com>
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-As soon as the bus is up, we use bus accessors to talk to the root
-hub on slot 0 (this manages interrupts etc).
+---
 
-I guess I could even unmap this reg range at that point ...
+ drivers/media/platform/exynos-gsc/gsc-core.c | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-I guess I could also get the address directly from the IO range
-and start poking around. I don't know if that is any better.
-
-Yours,
-Linus Walleij
+diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
+index a846659ae5c1..eff636d4502b 100644
+--- a/drivers/media/platform/exynos-gsc/gsc-core.c
++++ b/drivers/media/platform/exynos-gsc/gsc-core.c
+@@ -112,6 +112,15 @@ static const struct gsc_fmt gsc_formats[] = {
+ 		.num_planes	= 1,
+ 		.num_comp	= 2,
+ 	}, {
++		.name		= "YUV 4:2:2 non-contig, Y/CbCr",
++		.pixelformat	= V4L2_PIX_FMT_NV16M,
++		.depth		= { 8, 8 },
++		.color		= GSC_YUV422,
++		.yorder		= GSC_LSB_Y,
++		.corder		= GSC_CBCR,
++		.num_planes	= 2,
++		.num_comp	= 2,
++	}, {
+ 		.name		= "YUV 4:2:2 planar, Y/CrCb",
+ 		.pixelformat	= V4L2_PIX_FMT_NV61,
+ 		.depth		= { 16 },
+@@ -121,6 +130,15 @@ static const struct gsc_fmt gsc_formats[] = {
+ 		.num_planes	= 1,
+ 		.num_comp	= 2,
+ 	}, {
++		.name		= "YUV 4:2:2 non-contig, Y/CrCb",
++		.pixelformat	= V4L2_PIX_FMT_NV61M,
++		.depth		= { 8, 8 },
++		.color		= GSC_YUV422,
++		.yorder		= GSC_LSB_Y,
++		.corder		= GSC_CRCB,
++		.num_planes	= 2,
++		.num_comp	= 2,
++	}, {
+ 		.name		= "YUV 4:2:0 planar, YCbCr",
+ 		.pixelformat	= V4L2_PIX_FMT_YUV420,
+ 		.depth		= { 12 },
+@@ -158,6 +176,15 @@ static const struct gsc_fmt gsc_formats[] = {
+ 		.num_planes	= 1,
+ 		.num_comp	= 2,
+ 	}, {
++		.name		= "YUV 4:2:0 non-contig. 2p, Y/CrCb",
++		.pixelformat	= V4L2_PIX_FMT_NV21M,
++		.depth		= { 8, 4 },
++		.color		= GSC_YUV420,
++		.yorder		= GSC_LSB_Y,
++		.corder		= GSC_CRCB,
++		.num_planes	= 2,
++		.num_comp	= 2,
++	}, {
+ 		.name		= "YUV 4:2:0 non-contig. 2p, Y/CbCr",
+ 		.pixelformat	= V4L2_PIX_FMT_NV12M,
+ 		.depth		= { 8, 4 },
+-- 
+2.7.4
