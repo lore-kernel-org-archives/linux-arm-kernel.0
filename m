@@ -1,41 +1,43 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Wed, 1 Feb 2017 15:01:05 -0800
-Subject: [PATCH] arm64: make use of for_each_node_by_type()
-Message-ID: <20170201230105.GA32086@dtor-ws>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 1 Feb 2017 23:16:49 +0000
+Subject: [PATCH 06/10] soc/qbman: Add ARM equivalent for
+ flush_dcache_range()
+In-Reply-To: <123833427.MmK6vFAXzK@wuerfel>
+References: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
+ <CAK8P3a1Gd4bd7GjEp_a9WXc_mTPk0XmP7DH8aPWhbn2K3MMuDQ@mail.gmail.com>
+ <20170130151933.GA27312@n2100.armlinux.org.uk>
+ <123833427.MmK6vFAXzK@wuerfel>
+Message-ID: <20170201231649.GR27312@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of open-coding the loop, let's use canned macro.
+On Wed, Feb 01, 2017 at 01:47:46PM +0100, Arnd Bergmann wrote:
+> Ah right, so since there is no interface to map as "device writeback",
+> the driver would likely end up with an MMIO register in a
+> "normal writeback", with these properties (among others listed there):
 
-Signed-off-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
----
+It's not about there being no _interface_, there's no support in the
+architecture for it.  The use of the "device" memory type does not
+allow for any form of cache hints to be specified.
 
-This will also be needed if I manage to make of_find_node_by_type() stop
-dropping reference to starting node as it is quite unexpected thing to
-do.
+>  * - writes can be repeated (in certain cases) with no side effects
+>  * - writes can be merged before accessing the target
+>  * - unaligned accesses can be supported
+>  * - ordering is not guaranteed without explicit dependencies or barrier
+>  *   instructions
+>  * - writes may be delayed before they hit the endpoint memory
+> 
+> I think the ordering is the most critical here, as IIRC the driver
+> expects a whole cache line to be written into the MMIO register
+> in a single bus cycle specifically when we issue the flush from the
+> driver, but we can actually have partial writebacks at any time.
 
- arch/arm64/kernel/smp.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index cb87234cfcf2..a8ec5da530af 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -603,9 +603,9 @@ acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
-  */
- static void __init of_parse_and_init_cpus(void)
- {
--	struct device_node *dn = NULL;
-+	struct device_node *dn;
- 
--	while ((dn = of_find_node_by_type(dn, "cpu"))) {
-+	for_each_node_by_type(dn, "cpu") {
- 		u64 hwid = of_get_cpu_mpidr(dn);
- 
- 		if (hwid == INVALID_HWID)
--- 
-2.11.0.483.g087da7b7c-goog
-
+I don't think that's achievable, unless your data bus is as wide as
+a cache line (iow, for a 32-byte cache line, your data bus all the
+way to the peripheral would need to be 256 bits wide to write the
+cache line in a single bus cycle.)
 
 -- 
-Dmitry
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
