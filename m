@@ -1,203 +1,114 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Wed,  1 Feb 2017 10:53:50 -0600
-Subject: [PATCH v3 10/18] drivers/fsi: scan slaves & register devices
-In-Reply-To: <20170201165358.45415-1-cbostic@linux.vnet.ibm.com>
-References: <20170201165358.45415-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170201165358.45415-11-cbostic@linux.vnet.ibm.com>
+Date: Wed,  1 Feb 2017 10:53:40 -0600
+Subject: [PATCH v3 00/18] FSI device driver introduction
+Message-ID: <20170201165358.45415-1-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jeremy Kerr <jk@ozlabs.org>
+Introduction of the IBM 'Flexible Support Interface' (FSI) bus device
+driver. FSI is a high fan out serial bus consisting of a clock and a serial
+data line capable of running at speeds up to 166 MHz.
 
-Now that we have fsi_slave devices, scan each for endpoints, and
-register them on the fsi bus.
+This set provides the basic framework to add FSI extensions to the
+Linux bus and device models. Master specific implementations are
+defined to utilize the core FSI function.
 
-Includes contributions from Chris Bostic <cbostic@us.ibm.com>
+In Linux, we have a core FSI "bus type", along with drivers for FSI
+masters and engines.
 
-Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
-Signed-off-by: Chris Bostic <cbostic@us.ibm.com>
----
- drivers/fsi/fsi-core.c | 136 +++++++++++++++++++++++++++++++++++++++++++++++--
- include/linux/fsi.h    |   4 ++
- 2 files changed, 136 insertions(+), 4 deletions(-)
+The FSI master drivers expose a read/write interface to the bus address
+space. The master drivers are under drivers/fsi/fsi-master-*.c.
 
-diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index 931bcba..f7ef993 100644
---- a/drivers/fsi/fsi-core.c
-+++ b/drivers/fsi/fsi-core.c
-@@ -23,9 +23,19 @@
- #include "fsi-master.h"
- 
- #define FSI_N_SLAVES	4
--#define FSI_SLAVE_CONF_CRC_SHIFT        4
--#define FSI_SLAVE_CONF_CRC_MASK         0x0000000f
--#define FSI_SLAVE_CONF_DATA_BITS        28
-+
-+#define FSI_SLAVE_CONF_NEXT_MASK	0x80000000
-+#define FSI_SLAVE_CONF_SLOTS_MASK	0x00ff0000
-+#define FSI_SLAVE_CONF_SLOTS_SHIFT	16
-+#define FSI_SLAVE_CONF_VERSION_MASK	0x0000f000
-+#define FSI_SLAVE_CONF_VERSION_SHIFT	12
-+#define FSI_SLAVE_CONF_TYPE_MASK	0x00000ff0
-+#define FSI_SLAVE_CONF_TYPE_SHIFT	4
-+#define FSI_SLAVE_CONF_CRC_SHIFT	4
-+#define FSI_SLAVE_CONF_CRC_MASK		0x0000000f
-+#define FSI_SLAVE_CONF_DATA_BITS	28
-+
-+static const int engine_page_size = 0x400;
- 
- static DEFINE_IDA(master_ida);
- 
-@@ -38,8 +48,125 @@ struct fsi_slave {
- 
- #define to_fsi_slave(d) container_of(d, struct fsi_slave, dev)
- 
-+/* FSI endpoint-device support */
-+
-+static void fsi_device_release(struct device *_device)
-+{
-+	struct fsi_device *device = to_fsi_dev(_device);
-+
-+	kfree(device);
-+}
-+
-+static struct fsi_device *fsi_create_device(struct fsi_slave *slave)
-+{
-+	struct fsi_device *dev;
-+
-+	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
-+	if (!dev)
-+		return NULL;
-+
-+	dev->dev.parent = &slave->dev;
-+	dev->dev.bus = &fsi_bus_type;
-+	dev->dev.release = fsi_device_release;
-+
-+	return dev;
-+}
-+
- /* FSI slave support */
- 
-+static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
-+			void *val, size_t size)
-+{
-+	return slave->master->read(slave->master, slave->link,
-+			slave->id, addr, val, size);
-+}
-+
-+static int fsi_slave_scan(struct fsi_slave *slave)
-+{
-+	uint32_t engine_addr;
-+	uint32_t conf;
-+	int rc, i;
-+
-+	/*
-+	 * scan engines
-+	 *
-+	 * We keep the peek mode and slave engines for the core; so start
-+	 * at the third slot in the configuration table. We also need to
-+	 * skip the chip ID entry at the start of the address space.
-+	 */
-+	engine_addr = engine_page_size * 3;
-+	for (i = 2; i < engine_page_size / sizeof(uint32_t); i++) {
-+		uint8_t slots, version, type, crc;
-+		struct fsi_device *dev;
-+
-+		rc = fsi_slave_read(slave, (i + 1) * sizeof(conf),
-+				&conf, sizeof(conf));
-+		if (rc) {
-+			dev_warn(&slave->dev,
-+				"error reading slave registers\n");
-+			return -1;
-+		}
-+
-+		crc = crc_fsi(0, conf >> FSI_SLAVE_CONF_CRC_SHIFT,
-+				FSI_SLAVE_CONF_DATA_BITS);
-+		if (crc != (conf & FSI_SLAVE_CONF_CRC_MASK)) {
-+			dev_warn(&slave->dev,
-+				"crc error in slave register at 0x%04x\n",
-+				i);
-+			return -1;
-+		}
-+
-+		slots = (conf & FSI_SLAVE_CONF_SLOTS_MASK)
-+			>> FSI_SLAVE_CONF_SLOTS_SHIFT;
-+		version = (conf & FSI_SLAVE_CONF_VERSION_MASK)
-+			>> FSI_SLAVE_CONF_VERSION_SHIFT;
-+		type = (conf & FSI_SLAVE_CONF_TYPE_MASK)
-+			>> FSI_SLAVE_CONF_TYPE_SHIFT;
-+
-+		/*
-+		 * Unused address areas are marked by a zero type value; this
-+		 * skips the defined address areas
-+		 */
-+		if (type != 0) {
-+
-+			/* create device */
-+			dev = fsi_create_device(slave);
-+			if (!dev)
-+				return -ENOMEM;
-+
-+			dev->slave = slave;
-+			dev->engine_type = type;
-+			dev->version = version;
-+			dev->unit = i;
-+			dev->addr = engine_addr;
-+			dev->size = slots * engine_page_size;
-+
-+			dev_info(&slave->dev,
-+			"engine[%i]: type %x, version %x, addr %x size %x\n",
-+					dev->unit, dev->engine_type, version,
-+					dev->addr, dev->size);
-+
-+			device_initialize(&dev->dev);
-+			dev_set_name(&dev->dev, "%02x:%02x:%02x:%02x",
-+					slave->master->idx, slave->link,
-+					slave->id, i - 2);
-+
-+			rc = device_add(&dev->dev);
-+			if (rc) {
-+				dev_warn(&slave->dev, "add failed: %d\n", rc);
-+				put_device(&dev->dev);
-+			}
-+		}
-+
-+		engine_addr += slots * engine_page_size;
-+
-+		if (!(conf & FSI_SLAVE_CONF_NEXT_MASK))
-+			break;
-+	}
-+
-+	return 0;
-+}
-+
- static void fsi_slave_release(struct device *dev)
- {
- 	struct fsi_slave *slave = to_fsi_slave(dev);
-@@ -91,7 +218,8 @@ static int fsi_slave_init(struct fsi_master *master,
- 		return rc;
- 	}
- 
--	return rc;
-+	fsi_slave_scan(slave);
-+	return 0;
- }
- 
- /* FSI master support */
-diff --git a/include/linux/fsi.h b/include/linux/fsi.h
-index 273cbf6..efa55ba 100644
---- a/include/linux/fsi.h
-+++ b/include/linux/fsi.h
-@@ -21,6 +21,10 @@ struct fsi_device {
- 	struct device		dev;
- 	u8			engine_type;
- 	u8			version;
-+	u8			unit;
-+	struct fsi_slave	*slave;
-+	uint32_t		addr;
-+	uint32_t		size;
- };
- 
- struct fsi_device_id {
+The core handles probing and discovery of slaves and slave
+engines, using those read/write interfaces. It is responsible for
+creating the endpoint Linux devices corresponding to the discovered
+engines on each slave.
+
+Slave engines are identified by an 'engine' type, and an optional
+version. Engine, a.k.a. client, drivers are matched and bound to these
+engines during discovery.
+
+This patch set does not include extended FSI function such as:
+    *  Hub master support
+    *  Cascaded master support
+    *  Application layer hot plug notification
+    *  Application layer FSI bus status interface
+
+Common FSI terminology:
+
+* Master
+    Controller of the FSI bus.  Only the master is allowed to control the
+    clock line and is the initiator of all transactions on a bus.
+
+* Slave
+    The receiver or target of a master initiated transaction.  The slave
+    cannot initiate communications on a bus and must respond to any
+    master requests for data.
+
+* CFAM
+    Stands for Common Field replaceable unit Access Macro.  A CFAM is an
+    ASIC residing in any device requiring FSI communications. CFAMs
+    consist of an array of hardware 'engines' used for various purposes.
+    I2C masters, UARTs, General Purpose IO hardware are common types of
+    these engines.
+
+* Configuration Space / Table
+    A table contained at the beginning of each CFAM address space.
+    This table lists information such as the CFAM's ID, which engine types
+    and versions it has available, as well as its addressing range.
+
+* FSI Engine driver
+    A device driver that registers with the FSI core so that it can access
+    devices it owns on an FSI bus.
+
+Chris Bostic (8):
+  drivers/fsi: Kick off master scan via sysfs
+  drivers/fsi: Set up links for slave communication
+  drivers/fsi: Set slave SMODE to init communication
+  drivers/fsi: Remove all scanned devices during master unregister
+  drivers/fsi: Add FSI bus documentation
+  drivers/fsi: Add documentation for GPIO based FSI master
+  drivers/fsi: Document FSI master sysfs files in ABI
+  drivers/fsi: Add GPIO based FSI master
+
+Jeremy Kerr (10):
+  drivers/fsi: Add empty fsi bus definitions
+  drivers/fsi: Add device & driver definitions
+  drivers/fsi: add driver to device matches
+  drivers/fsi: Add fsi master definition
+  drivers/fsi: Add slave definition
+  drivers/fsi: Add empty master scan
+  drivers/fsi: Add FSI crc calculators to library
+  drivers/fsi: Implement slave initialisation
+  drivers/fsi: scan slaves & register devices
+  drivers/fsi: Add device read/write/peek functions
+
+ Documentation/ABI/testing/sysfs-bus-fsi            |   6 +
+ .../devicetree/bindings/fsi/fsi-master-gpio.txt    |  71 +++
+ Documentation/devicetree/bindings/fsi/fsi.txt      |  54 +++
+ drivers/Kconfig                                    |   2 +
+ drivers/Makefile                                   |   1 +
+ drivers/fsi/Kconfig                                |  23 +
+ drivers/fsi/Makefile                               |   3 +
+ drivers/fsi/fsi-core.c                             | 494 +++++++++++++++++++
+ drivers/fsi/fsi-master-gpio.c                      | 530 +++++++++++++++++++++
+ drivers/fsi/fsi-master.h                           |  39 ++
+ include/linux/crc-fsi.h                            |  29 ++
+ include/linux/fsi.h                                |  60 +++
+ lib/Makefile                                       |   1 +
+ lib/crc-fsi.c                                      |  39 ++
+ 14 files changed, 1352 insertions(+)
+ create mode 100644 Documentation/ABI/testing/sysfs-bus-fsi
+ create mode 100644 Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt
+ create mode 100644 Documentation/devicetree/bindings/fsi/fsi.txt
+ create mode 100644 drivers/fsi/Kconfig
+ create mode 100644 drivers/fsi/Makefile
+ create mode 100644 drivers/fsi/fsi-core.c
+ create mode 100644 drivers/fsi/fsi-master-gpio.c
+ create mode 100644 drivers/fsi/fsi-master.h
+ create mode 100644 include/linux/crc-fsi.h
+ create mode 100644 include/linux/fsi.h
+ create mode 100644 lib/crc-fsi.c
+
 -- 
 1.8.2.2
