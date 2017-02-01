@@ -1,41 +1,68 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 1 Feb 2017 17:08:52 +0000
-Subject: [PATCH v4 3/4] arm64: Use __tlbi() macros in KVM code
-In-Reply-To: <87lgtprgi4.fsf@e105922-lin.cambridge.arm.com>
-References: <20170125155232.10277-1-cov@codeaurora.org>
- <20170125155232.10277-3-cov@codeaurora.org>
- <20170125193943.GW15850@cbox> <20170127135306.GK21144@arm.com>
- <87lgtprgi4.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <20170201170852.GI8177@arm.com>
+From: christopher.lee.bostic@gmail.com (Christopher Bostic)
+Date: Wed, 1 Feb 2017 11:09:38 -0600
+Subject: [PATCH v2 15/18] drivers/fsi: Add documentation for GPIO based
+ FSI master
+In-Reply-To: <f0933f56-6a23-9c53-6e10-0e1ca18082e2@ozlabs.org>
+References: <1484260543-80300-1-git-send-email-christopher.lee.bostic@gmail.com>
+ <20170118215755.xoamoc2rrzhy4kyz@rob-hp-laptop>
+ <f0933f56-6a23-9c53-6e10-0e1ca18082e2@ozlabs.org>
+Message-ID: <CAA0LjjVMh4DNH7BoF_pgQHWowS0d4_LBue_VP20GkydHSgcLow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2017 at 05:02:43PM +0000, Punit Agrawal wrote:
-> Will Deacon <will.deacon@arm.com> writes:
-> 
-> > On Wed, Jan 25, 2017 at 08:39:43PM +0100, Christoffer Dall wrote:
-> >> On Wed, Jan 25, 2017 at 10:52:31AM -0500, Christopher Covington wrote:
-> >> > Refactor the KVM code to use the __tlbi macros, which will allow an errata
-> >> > workaround that repeats tlbi dsb sequences to only change one location.
-> >> > This is not intended to change the generated assembly and comparing before
-> >> > and after vmlinux objdump shows no functional changes.
-> >> > 
-> >> > Signed-off-by: Christopher Covington <cov@codeaurora.org>
-> >> 
-> >> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-> >
-> > Thanks, I'll queue this one via arm64.
-> 
-> I just noticed this patch but there's been a similar patch from Mark
-> that I've been carrying as part of the KVM TLB monitoring series[0].
-> 
-> [0] http://www.mail-archive.com/kvmarm at lists.cs.columbia.edu/msg09359.html
+On Wed, Jan 18, 2017 at 8:11 PM, Jeremy Kerr <jk@ozlabs.org> wrote:
+> Hi Chris,
+>
+> From this:
+>
+>>> +
+>>> +The standard FSI master node
+>>> +----------------------------
+>>> +This node describes a FSI master implmemented fully in hardware
+>>> +with dedicated input/output pins required for its function (i.e.
+>>> +not using generic GPIO pins).
+>>> +Required property:
+>>> +    compatible = "ibm,fsi-master"
+>
+> and this:
+>
+>>> +Example:
+>>> +
+>>> +fsi-master {
+>>> +    compatible = "ibm,fsi-master-gpio", "ibm,fsi-master";
+>>
+>> From the description, these should be mutually exclusive.
+>
+> I agree with Rob here. The intention is for "ibm,fsi-master" to be an
+> abstract master -- simply indicating that this node describes a master,
+> with no specific implementation, and "ibm,fsi-master-gpio" to be a
+> GPIO-based implementation. A hardware-based FSI master would have a
+> different compatible value, based on the hardware.
+>
+> We should remove references to implementations in the "The standard FSI
+> master node" section, because this is independent of implementation.
+>
 
-Well I've already queued the one from Christopher. It's weird that Mark's
-version appears to miss the local VMID case (but it does have the
-flush_icache_all I wanted :).
+Hi,
 
-Anyway, I'm not reverting anything, so you'll need to rebase when this
-lot lands in mainline.
+OK will make that change for version 4.
 
-Will
+>>> +    clk-gpios = <&gpio 0>, <&gpio 6>;
+>>> +    data-gpios = <&gpio 1>, <&gpio 7>;
+>>> +    enable-gpios = <&gpio 2>, <&gpio 8>;
+>>> +    trans-gpios = <&gpio 3>, <&gpio 9>;
+>>> +    mux-gpios = <&gpio 4>, <&gpio 10>;
+>
+> Do we support multiple-link masters? This example implies a 2-link
+> master.
+>
+
+Should we start with a single link in this case?  To start off with
+only one link is supported by the master.
+
+Thanks
+
+> Cheers,
+>
+>
+> Jeremy
