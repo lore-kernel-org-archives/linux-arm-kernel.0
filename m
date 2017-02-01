@@ -1,75 +1,35 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  1 Feb 2017 14:31:39 +0000
-Subject: [PATCH v2 04/10] serial: st-asc: (De)Register GPIOD and swap Pinctrl
- profiles
+Date: Wed,  1 Feb 2017 14:31:40 +0000
+Subject: [PATCH v2 05/10] serial: st-asc: Use generic DT binding for
+ announcing RTS/CTS lines
 In-Reply-To: <20170201143145.31962-1-lee.jones@linaro.org>
 References: <20170201143145.31962-1-lee.jones@linaro.org>
-Message-ID: <20170201143145.31962-5-lee.jones@linaro.org>
+Message-ID: <20170201143145.31962-6-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When hardware flow-control is disabled, manual toggling of the UART's
-reset line (RTS) using userland applications (e.g. stty) is not
-possible, since the ASC IP does not provide this functionality in the
-same was as some other IPs do.  Thus, we have to do this manually.
+The initial binding 'st,hw-flow-control' isn't used anywhere, in neither
+in upstream nor downstream kernels.  It isn't even documented in
+dt-bindings, so we can safely assume it's safe to swap to the generic
+one.
 
-This patch ensures that when HW flow-control is disabled the RTS/CTS
-lines are free to be registered via the GPIO API.  It also ensures
-any registered GPIO lines are unregistered when HW flow-control is
-requested, allowing the IP to control them automatically.
-
-Acked-by: Peter Griffin <peter.griffin@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/tty/serial/st-asc.c | 27 ++++++++++++++++++++++++++-
- 1 file changed, 26 insertions(+), 1 deletion(-)
+ drivers/tty/serial/st-asc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
-index 1058020..e521078 100644
+index e521078..bcf1d33 100644
 --- a/drivers/tty/serial/st-asc.c
 +++ b/drivers/tty/serial/st-asc.c
-@@ -513,6 +513,8 @@ static void asc_set_termios(struct uart_port *port, struct ktermios *termios,
- 			    struct ktermios *old)
- {
- 	struct asc_port *ascport = to_asc_port(port);
-+	struct device_node *np = port->dev->of_node;
-+	struct gpio_desc *gpiod;
- 	unsigned int baud;
- 	u32 ctrl_val;
- 	tcflag_t cflag;
-@@ -556,9 +558,32 @@ static void asc_set_termios(struct uart_port *port, struct ktermios *termios,
- 		ctrl_val |= ASC_CTL_PARITYODD;
+@@ -794,7 +794,7 @@ static struct asc_port *asc_of_get_asc_port(struct platform_device *pdev)
+ 		return NULL;
  
- 	/* hardware flow control */
--	if ((cflag & CRTSCTS))
-+	if ((cflag & CRTSCTS)) {
- 		ctrl_val |= ASC_CTL_CTSENABLE;
- 
-+		/* If flow-control selected, stop handling RTS manually */
-+		if (ascport->rts) {
-+			devm_gpiod_put(port->dev, ascport->rts);
-+			ascport->rts = NULL;
-+
-+			pinctrl_select_state(ascport->pinctrl,
-+					     ascport->states[DEFAULT]);
-+		}
-+	} else {
-+		/* If flow-control disabled, it's safe to handle RTS manually */
-+		if (!ascport->rts && ascport->states[NO_HW_FLOWCTRL]) {
-+			pinctrl_select_state(ascport->pinctrl,
-+					     ascport->states[NO_HW_FLOWCTRL]);
-+
-+			gpiod =	devm_get_gpiod_from_child(port->dev, "rts",
-+							  &np->fwnode);
-+			if (!IS_ERR(gpiod)) {
-+				gpiod_direction_output(gpiod, 0);
-+				ascport->rts = gpiod;
-+			}
-+		}
-+	}
-+
- 	if ((baud < 19200) && !ascport->force_m1) {
- 		asc_out(port, ASC_BAUDRATE, (port->uartclk / (16 * baud)));
- 	} else {
+ 	asc_ports[id].hw_flow_control = of_property_read_bool(np,
+-							"st,hw-flow-control");
++							"uart-has-rtscts");
+ 	asc_ports[id].force_m1 =  of_property_read_bool(np, "st,force_m1");
+ 	asc_ports[id].port.line = id;
+ 	asc_ports[id].rts = NULL;
 -- 
 2.9.3
