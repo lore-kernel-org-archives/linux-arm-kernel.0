@@ -1,43 +1,98 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 01 Feb 2017 13:47:46 +0100
-Subject: [PATCH 06/10] soc/qbman: Add ARM equivalent for
- flush_dcache_range()
-In-Reply-To: <20170130151933.GA27312@n2100.armlinux.org.uk>
-References: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
- <CAK8P3a1Gd4bd7GjEp_a9WXc_mTPk0XmP7DH8aPWhbn2K3MMuDQ@mail.gmail.com>
- <20170130151933.GA27312@n2100.armlinux.org.uk>
-Message-ID: <123833427.MmK6vFAXzK@wuerfel>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 1 Feb 2017 12:47:51 +0000
+Subject: [STLinux Kernel] [PATCH 3/8] serial: st-asc: Read in all Pinctrl
+ states
+In-Reply-To: <20170201115006.GA23479@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <20170127115458.k4edg42nnna3bv4v@dell>
+ <20170130142356.GA18710@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20170130153211.j75qemvwsq3cwqve@dell>
+ <20170130161041.GA21001@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20170130191159.zv5jegvu4fetcmzo@dell>
+ <20170130223521.GA12847@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20170131101356.bpg5hamkfgprdbpt@dell>
+ <20170131113131.GA6427@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20170131122717.cwyqezvca3gsti7t@dell>
+ <20170201115006.GA23479@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <20170201124751.f3r7l52vneqgilac@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, January 30, 2017 3:19:33 PM CET Russell King - ARM Linux wrote:
-> On Fri, Jan 27, 2017 at 05:41:10PM +0100, Arnd Bergmann wrote:
-> > On Thu, Jan 26, 2017 at 6:08 AM, Scott Wood <scott.wood@nxp.com> wrote:
-> > > And even if we did all that, there would still be other manual cache
-> > > manipulation left in this driver, to deal with its cacheable register
-> > > interface.
+> > > > Again, doesn't matter, since it's the DTB that provides the default
+> > > > state.  So, back when it was authored, the default state was HW
+> > > > flow-control disabled.  And in a newer DTB (again, until I follow-up
+> > > > with more changes), the defaults for UART 1 and UART 2 are HW
+> > > > flow-control disabled.
+> > > > 
+> > > > Your issue seems to be that you've assumed since we now provide the
+> > > > possibility of a "manual-rts" state, then the "default" state should
+> > > > *only* be HW flow-control capable, which is not the case.
+> > > 
+> > > No my feedback was that it would be clearer & simpler to make manual-rts the
+> > > 'default' state, and 'hw-flow-control' the optional state.
 > > 
-> > I thought we had concluded that "cacheable register" is something
-> > that cannot work reliably on ARM at all when this came up before.
-> > Any updates on that?
+> > Absolutely not.  The use of "manual-rts" is the corner-case here and
+> > is not normally required.
 > 
-> There's a big comment in arch/arm/include/asm/io.h which explains
-> everything.  Nothing there is likely to change.
+> See below.
+> 
+> > The "default" state should normally be
+> > populated with whatever pins are available i.e. all 4 pins (including
+> > "rts, cts") if they are wired up and only 2 pins (just "tx, rx") if
+> > they are not.
+> 
+> Yep OK, I agree :)
 
-Ah right, so since there is no interface to map as "device writeback",
-the driver would likely end up with an MMIO register in a
-"normal writeback", with these properties (among others listed there):
+\o/
 
- * - writes can be repeated (in certain cases) with no side effects
- * - writes can be merged before accessing the target
- * - unaligned accesses can be supported
- * - ordering is not guaranteed without explicit dependencies or barrier
- *   instructions
- * - writes may be delayed before they hit the endpoint memory
+> > The submission of "manual-rts" is only required if the
+> > RTS pin is required for some other purpose e.g. resetting a uC on a
+> > draughtboard.
+> 
+> All UARTs the SoC have the same st-asc IP, which suffers from the same
+> hw flow control limitation. Also all instances on the SoC have rts/cts
+> pins, the only limitation is board wiring.
+> 
+> So I can't see why would you ever *not* want to deploy this dynamic pin
+> switching solution if rts/cts is wired up at board level now the facility
+> exists?
 
-I think the ordering is the most critical here, as IIRC the driver
-expects a whole cache line to be written into the MMIO register
-in a single bus cycle specifically when we issue the flush from the
-driver, but we can actually have partial writebacks at any time.
+Mainly because it's surplus to requirement, in that there is very
+seldom any point in manually toggling the RTS line (at least to my
+knowledge).  I figure we'd add >1 Pinctrl states only when the need
+arises, thus keeping the DTS' as simple as possible.
 
-	Arnd
+> Also regarding the naming of the second pin group, 'manual-rts' seems like
+> a bad name as a logical extension of this set is to also offer the same
+> dynamic switching for the CTS line.
+> 
+> Maybe a better name would be 'tx-rx-only' or 'no-rts-cts'.
+
+Works for me.  Will fix.
+
+> > > > It's the
+> > > > 'uart-has-rtscts' property which determines this *not* whether the
+> > > > second state has been provided.
+> > > 
+> > > Yep, which is why IMO it makes more sense for the optional pin group to be the hw
+> > > flow control pins which are obtained if the uart-has-rtscts property is present.
+> > 
+> > There would normally only be one pin group.  Your method would insist
+> > we always provided 2, which would be surplus to requirement.
+> 
+> Yep OK, agree with your point.
+
+\o/
+
+> Yep OK, I agree.
+
+\o/
+
+> Yep OK, I agree.
+
+\o/
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
