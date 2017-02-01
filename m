@@ -1,81 +1,97 @@
-From: gabriel.fernandez@st.com (Gabriel Fernandez)
-Date: Wed, 1 Feb 2017 14:34:49 +0100
-Subject: [Resend PATCH v2 2/3] dt-bindings: mfd: stm32f4: Add missing
- binding definition
-In-Reply-To: <20170201133150.ifyxibbiokmcth7i@dell>
-References: <1485954596-11014-1-git-send-email-gabriel.fernandez@st.com>
- <1485954596-11014-3-git-send-email-gabriel.fernandez@st.com>
- <20170201133150.ifyxibbiokmcth7i@dell>
-Message-ID: <0bc19dc6-61fd-bb17-67ef-eb0f859f2d3b@st.com>
+From: leif.lindholm@linaro.org (Leif Lindholm)
+Date: Wed, 1 Feb 2017 13:39:16 +0000
+Subject: [PATCH] efi: fdt: avoid FDT manipulation after ExitBootServices()
+In-Reply-To: <1485954693-25750-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1485954693-25750-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAF7UmSyYvmo8k910mJEAYhaOJy9j_bpXw6f+Cj=cS_m_iYiCCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
-
-
-On 02/01/2017 02:31 PM, Lee Jones wrote:
-> On Wed, 01 Feb 2017, gabriel.fernandez at st.com wrote:
+On 1 February 2017 at 13:11, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> Some AArch64 UEFI implementations disable the MMU in ExitBootServices(),
+> after which unaligned accesses to RAM are no longer supported.
 >
->> From: Gabriel Fernandez <gabriel.fernandez@st.com>
->>
->> This patch adds missing binding definition (backupram, ethernet, otg,
->> qspi, adc & dsi)
-> What is RCC?
-Reset & Clock Control
-
+> Commit abfb7b686a3e ("efi/libstub/arm*: Pass latest memory map to the
+> kernel") fixed an issue in the memory map handling of the stub FDT code,
+> but inadvertently created an issue with such firmwares, by moving some
+> of the FDT manipulation to after the invocation of ExitBootServices().
+> However, the stub's libfdt implementation uses the ordinary, accelerated
+> string functions, which rely on hardware handling of unaligned accesses,
+> resulting in alignment faults when executed with the MMU off.
 >
->> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
->> ---
->>   include/dt-bindings/mfd/stm32f4-rcc.h | 14 ++++++++++++--
->>   1 file changed, 12 insertions(+), 2 deletions(-)
->>
->> diff --git a/include/dt-bindings/mfd/stm32f4-rcc.h b/include/dt-bindings/mfd/stm32f4-rcc.h
->> index f662b19..082a81c 100644
->> --- a/include/dt-bindings/mfd/stm32f4-rcc.h
->> +++ b/include/dt-bindings/mfd/stm32f4-rcc.h
->> @@ -18,11 +18,17 @@
->>   #define STM32F4_RCC_AHB1_GPIOJ	9
->>   #define STM32F4_RCC_AHB1_GPIOK	10
->>   #define STM32F4_RCC_AHB1_CRC	12
->> +#define STM32F4_RCC_AHB1_BKPSRAM	18
->> +#define STM32F4_RCC_AHB1_CCMDATARAM	20
->>   #define STM32F4_RCC_AHB1_DMA1	21
->>   #define STM32F4_RCC_AHB1_DMA2	22
->>   #define STM32F4_RCC_AHB1_DMA2D	23
->>   #define STM32F4_RCC_AHB1_ETHMAC	25
->> -#define STM32F4_RCC_AHB1_OTGHS	29
->> +#define STM32F4_RCC_AHB1_ETHMACTX	26
->> +#define STM32F4_RCC_AHB1_ETHMACRX	27
->> +#define STM32F4_RCC_AHB1_ETHMACPTP	28
->> +#define STM32F4_RCC_AHB1_OTGHS		29
->> +#define STM32F4_RCC_AHB1_OTGHSULPI	30
->>   
->>   #define STM32F4_AHB1_RESET(bit) (STM32F4_RCC_AHB1_##bit + (0x10 * 8))
->>   #define STM32F4_AHB1_CLOCK(bit) (STM32F4_RCC_AHB1_##bit)
->> @@ -40,6 +46,7 @@
->>   
->>   /* AHB3 */
->>   #define STM32F4_RCC_AHB3_FMC	0
->> +#define STM32F4_RCC_AHB3_QSPI	1
->>   
->>   #define STM32F4_AHB3_RESET(bit)	(STM32F4_RCC_AHB3_##bit + (0x18 * 8))
->>   #define STM32F4_AHB3_CLOCK(bit)	(STM32F4_RCC_AHB3_##bit + 0x40)
->> @@ -79,7 +86,9 @@
->>   #define STM32F4_RCC_APB2_TIM8	1
->>   #define STM32F4_RCC_APB2_USART1	4
->>   #define STM32F4_RCC_APB2_USART6	5
->> -#define STM32F4_RCC_APB2_ADC	8
->> +#define STM32F4_RCC_APB2_ADC1	8
->> +#define STM32F4_RCC_APB2_ADC2	9
->> +#define STM32F4_RCC_APB2_ADC3	10
->>   #define STM32F4_RCC_APB2_SDIO	11
->>   #define STM32F4_RCC_APB2_SPI1	12
->>   #define STM32F4_RCC_APB2_SPI4	13
->> @@ -91,6 +100,7 @@
->>   #define STM32F4_RCC_APB2_SPI6	21
->>   #define STM32F4_RCC_APB2_SAI1	22
->>   #define STM32F4_RCC_APB2_LTDC	26
->> +#define STM32F4_RCC_APB2_DSI	27
->>   
->>   #define STM32F4_APB2_RESET(bit)	(STM32F4_RCC_APB2_##bit + (0x24 * 8))
->>   #define STM32F4_APB2_CLOCK(bit)	(STM32F4_RCC_APB2_##bit + 0xA0)
+> Whether disabling the MMU in ExitBootServices() complies with the UEFI
+> spec is unclear, but it is a reality we have to deal with, given that
+> it wasn't a problem before commit abfb7b686a3e was applied.
+
+I'm not sure it's unclear, but someone not reading the specification
+and instead looking
+at what the unfortunate LinuxLoader did might incorrectly deduce that
+such is the case.
+
+> So fix the situation by moving the update_fdt_memmap() into the callback
+> invoked by efi_exit_boot_services() right before it hits the button.
+>
+> Fixes: abfb7b686a3e ("efi/libstub/arm*: Pass latest memory map to the kernel")
+
+I would sort argue against the Fixes: tag, given that I don't consider
+that code to be
+incorrect.
+
+I agree that this is a good change regardless.
+
+/
+    Leif
+
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  drivers/firmware/efi/libstub/fdt.c | 14 +++-----------
+>  1 file changed, 3 insertions(+), 11 deletions(-)
+>
+> diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
+> index 921dfa047202..260c4b4b492e 100644
+> --- a/drivers/firmware/efi/libstub/fdt.c
+> +++ b/drivers/firmware/efi/libstub/fdt.c
+> @@ -187,6 +187,7 @@ static efi_status_t update_fdt_memmap(void *fdt, struct efi_boot_memmap *map)
+>  struct exit_boot_struct {
+>         efi_memory_desc_t *runtime_map;
+>         int *runtime_entry_count;
+> +       void *new_fdt_addr;
+>  };
+>
+>  static efi_status_t exit_boot_func(efi_system_table_t *sys_table_arg,
+> @@ -202,7 +203,7 @@ static efi_status_t exit_boot_func(efi_system_table_t *sys_table_arg,
+>         efi_get_virtmap(*map->map, *map->map_size, *map->desc_size,
+>                         p->runtime_map, p->runtime_entry_count);
+>
+> -       return EFI_SUCCESS;
+> +       return update_fdt_memmap(p->new_fdt_addr, map);
+>  }
+>
+>  /*
+> @@ -300,22 +301,13 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
+>
+>         priv.runtime_map = runtime_map;
+>         priv.runtime_entry_count = &runtime_entry_count;
+> +       priv.new_fdt_addr = (void *)*new_fdt_addr;
+>         status = efi_exit_boot_services(sys_table, handle, &map, &priv,
+>                                         exit_boot_func);
+>
+>         if (status == EFI_SUCCESS) {
+>                 efi_set_virtual_address_map_t *svam;
+>
+> -               status = update_fdt_memmap((void *)*new_fdt_addr, &map);
+> -               if (status != EFI_SUCCESS) {
+> -                       /*
+> -                        * The kernel won't get far without the memory map, but
+> -                        * may still be able to print something meaningful so
+> -                        * return success here.
+> -                        */
+> -                       return EFI_SUCCESS;
+> -               }
+> -
+>                 /* Install the new virtual address map */
+>                 svam = sys_table->runtime->set_virtual_address_map;
+>                 status = svam(runtime_entry_count * desc_size, desc_size,
+> --
+> 2.7.4
+>
