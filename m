@@ -1,131 +1,59 @@
 From: bruherrera@gmail.com (Bruno Herrera)
-Date: Tue, 31 Jan 2017 23:25:43 -0200
-Subject: [PATCH v5 1/5] usb: dwc2: Add support for STM32F429/439/469 USB OTG
- HS/FS in FS mode (internal PHY)
-In-Reply-To: <20170201012547.76158-1-bruherrera@gmail.com>
-References: <20170201012547.76158-1-bruherrera@gmail.com>
-Message-ID: <20170201012547.76158-2-bruherrera@gmail.com>
+Date: Tue, 31 Jan 2017 23:25:42 -0200
+Subject: [PATCH v5 0/5] usb: dwc2: Add support for USB OTG on STM32F4x9
+Message-ID: <20170201012547.76158-1-bruherrera@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduces a new parameter to activate USB OTG HS/FS core
-embedded phy transceiver. The STM32F4x9 SoC uses the GGPIO register
-to enable the transceiver.
-Also add the dwc2_set_params function for stm32f4 otg fs.
+The STM32F4x9 MCU family has two DWC2 USB OTG cores on it. One core is
+USB OTG FS and other core is USB OTG HS. The USB FS core only works with
+its internal phy whilst the USF HS core can work in HS with external ulpi
+phy or in FS/LS speed with the embedded FS PHY.
 
-Signed-off-by: Bruno Herrera <bruherrera@gmail.com>
----
- drivers/usb/dwc2/core.h   |  5 +++++
- drivers/usb/dwc2/hcd.c    | 15 ++++++++++++++-
- drivers/usb/dwc2/hw.h     |  2 ++
- drivers/usb/dwc2/params.c | 19 +++++++++++++++++++
- 4 files changed, 40 insertions(+), 1 deletion(-)
+The goal of this patch series is to enable the use of USB OTG FS/HS cores
+in FS mode using the internal phy.
 
-diff --git a/drivers/usb/dwc2/core.h b/drivers/usb/dwc2/core.h
-index b9b62f1..252400b 100644
---- a/drivers/usb/dwc2/core.h
-+++ b/drivers/usb/dwc2/core.h
-@@ -423,6 +423,10 @@ enum dwc2_ep0_state {
-  *			needed.
-  *			0 - No (default)
-  *			1 - Yes
-+ * @activate_stm_fs_transceiver: Activate internal transceiver using GGPIO
-+ *			register.
-+ *			0 - Deactivate the transceiver (default)
-+ *			1 - Activate the transceiver
-  * @g_dma:              Enables gadget dma usage (default: autodetect).
-  * @g_dma_desc:         Enables gadget descriptor DMA (default: autodetect).
-  * @g_rx_fifo_size:	The periodic rx fifo size for the device, in
-@@ -477,6 +481,7 @@ struct dwc2_core_params {
- 	bool uframe_sched;
- 	bool external_id_pin_ctl;
- 	bool hibernation;
-+	bool activate_stm_fs_transceiver;
- 	u16 max_packet_count;
- 	u32 max_transfer_size;
- 	u32 ahbcfg;
-diff --git a/drivers/usb/dwc2/hcd.c b/drivers/usb/dwc2/hcd.c
-index a73722e..b5a70b6 100644
---- a/drivers/usb/dwc2/hcd.c
-+++ b/drivers/usb/dwc2/hcd.c
-@@ -121,7 +121,7 @@ static void dwc2_init_fs_ls_pclk_sel(struct dwc2_hsotg *hsotg)
- 
- static int dwc2_fs_phy_init(struct dwc2_hsotg *hsotg, bool select_phy)
- {
--	u32 usbcfg, i2cctl;
-+	u32 usbcfg, ggpio, i2cctl;
- 	int retval = 0;
- 
- 	/*
-@@ -145,6 +145,19 @@ static int dwc2_fs_phy_init(struct dwc2_hsotg *hsotg, bool select_phy)
- 				return retval;
- 			}
- 		}
-+
-+		if (hsotg->params.activate_stm_fs_transceiver) {
-+			ggpio = dwc2_readl(hsotg->regs + GGPIO);
-+			if (!(ggpio & GGPIO_STM32_OTG_GCCFG_PWRDWN)) {
-+				dev_dbg(hsotg->dev, "Activating transceiver\n");
-+				/*
-+				 * STM32F4x9 uses the GGPIO register as general
-+				 * core configuration register.
-+				 */
-+				ggpio |= GGPIO_STM32_OTG_GCCFG_PWRDWN;
-+				dwc2_writel(ggpio, hsotg->regs + GGPIO);
-+			}
-+		}
- 	}
- 
- 	/*
-diff --git a/drivers/usb/dwc2/hw.h b/drivers/usb/dwc2/hw.h
-index bde7248..4592012 100644
---- a/drivers/usb/dwc2/hw.h
-+++ b/drivers/usb/dwc2/hw.h
-@@ -225,6 +225,8 @@
- 
- #define GPVNDCTL			HSOTG_REG(0x0034)
- #define GGPIO				HSOTG_REG(0x0038)
-+#define GGPIO_STM32_OTG_GCCFG_PWRDWN	BIT(16)
-+
- #define GUID				HSOTG_REG(0x003c)
- #define GSNPSID				HSOTG_REG(0x0040)
- #define GHWCFG1				HSOTG_REG(0x0044)
-diff --git a/drivers/usb/dwc2/params.c b/drivers/usb/dwc2/params.c
-index 2990c34..9cd8722 100644
---- a/drivers/usb/dwc2/params.c
-+++ b/drivers/usb/dwc2/params.c
-@@ -120,6 +120,22 @@ static void dwc2_set_amcc_params(struct dwc2_hsotg *hsotg)
- 	p->ahbcfg = GAHBCFG_HBSTLEN_INCR16 << GAHBCFG_HBSTLEN_SHIFT;
- }
- 
-+static void dwc2_set_stm32f4x9_fsotg_params(struct dwc2_hsotg *hsotg)
-+{
-+	struct dwc2_core_params *p = &hsotg->params;
-+
-+	p->otg_cap = DWC2_CAP_PARAM_NO_HNP_SRP_CAPABLE;
-+	p->speed = DWC2_SPEED_PARAM_FULL;
-+	p->host_rx_fifo_size = 128;
-+	p->host_nperio_tx_fifo_size = 96;
-+	p->host_perio_tx_fifo_size = 96;
-+	p->max_packet_count = 256;
-+	p->phy_type = DWC2_PHY_TYPE_PARAM_FS;
-+	p->i2c_enable = false;
-+	p->uframe_sched = false;
-+	p->activate_stm_fs_transceiver = true;
-+}
-+
- const struct of_device_id dwc2_of_match_table[] = {
- 	{ .compatible = "brcm,bcm2835-usb", .data = dwc2_set_bcm_params },
- 	{ .compatible = "hisilicon,hi6220-usb", .data = dwc2_set_his_params  },
-@@ -133,6 +149,9 @@ const struct of_device_id dwc2_of_match_table[] = {
- 	{ .compatible = "amlogic,meson-gxbb-usb",
- 	  .data = dwc2_set_amlogic_params },
- 	{ .compatible = "amcc,dwc-otg", .data = dwc2_set_amcc_params },
-+	{ .compatible = "st,stm32f4x9-fsotg",
-+	  .data = dwc2_set_stm32f4x9_fsotg_params },
-+	{ .compatible = "st,stm32f4x9-hsotg" },
- 	{},
- };
- MODULE_DEVICE_TABLE(of, dwc2_of_match_table);
+Changes since v5:
+- Fix checkpatch --strict for usb related files
+- Changed struct dwc2_core_params param name from activate_transceiver to
+activate_stm_fs_transceiver
+
+Changes since v4:
+- Rebase on top of repository https://github.com/synopsys-usb/linux
+- Changes var names from STM32F4xx to STM32F4x9
+
+Changes since v3:
+- Removed commented lines from patch (sent by mistake)
+- Split DTS patch by boards and SOC
+- Removed unnecessary pinctrl nodes from DTS files
+
+Changes since v2:
+- Rename driver variables to meet the driver standard
+- Add compatible string for HS core
+
+Changes since v1:
+- Add dwc2_core_params structure for stm32f4 otg fs
+- Add compatible string for FS core/mode
+- Use GGPIO register to deativate power down of the phy
+
+Bruno Herrera (5):
+  usb: dwc2: Add support for STM32F429/439/469 USB OTG HS/FS in FS mode
+    (internal PHY)
+  ARM: dts: stm32: Add USB FS support for STM32F429 MCU
+  ARM: dts: stm32: Enable USB FS on stm32f469-disco
+  ARM: dts: stm32: Enable USB HS in FS mode (embedded phy) on
+    stm32f429-disco
+  dt-bindings: Document the STM32 USB OTG DWC2 core binding
+
+ Documentation/devicetree/bindings/usb/dwc2.txt |  4 ++++
+ arch/arm/boot/dts/stm32f429-disco.dts          | 16 +++++++++++++
+ arch/arm/boot/dts/stm32f429.dtsi               | 31 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/stm32f469-disco.dts          | 16 +++++++++++++
+ drivers/usb/dwc2/core.h                        |  5 +++++
+ drivers/usb/dwc2/hcd.c                         | 15 ++++++++++++-
+ drivers/usb/dwc2/hw.h                          |  2 ++
+ drivers/usb/dwc2/params.c                      | 19 ++++++++++++++++
+ 8 files changed, 107 insertions(+), 1 deletion(-)
+
 -- 
 2.10.1 (Apple Git-78)
