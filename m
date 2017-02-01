@@ -1,40 +1,18 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Wed,  1 Feb 2017 23:14:15 +0100
-Subject: [PATCH v2] Documentation: devicetree: meson-ir: "linux,
- rc-map-name" is supported
-In-Reply-To: <20170131212112.5582-1-martin.blumenstingl@googlemail.com>
-References: <20170131212112.5582-1-martin.blumenstingl@googlemail.com>
-Message-ID: <20170201221415.22794-1-martin.blumenstingl@googlemail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 1 Feb 2017 14:14:36 -0800
+Subject: [PATCH] MAINTAINERS: Update for the current location of the
+ bcm2835 tree.
+In-Reply-To: <20170131194801.13049-1-eric@anholt.net>
+References: <20170131194801.13049-1-eric@anholt.net>
+Message-ID: <73f5a7f2-f124-0860-1d10-069ace16e30b@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver already parses the "linux,rc-map-name" property. Add this
-information to the documentation so .dts maintainers don't have to look
-it up in the source-code.
+On 01/31/2017 11:48 AM, Eric Anholt wrote:
+> I've been maintaining the bcm2835 branches here for a year or so.
+> 
+> Signed-off-by: Eric Anholt <eric@anholt.net>
 
-Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
-Changes since v1:
-- removed character which shows up as whitespace from subject
-- added Rob Herring's ACK
-
- Documentation/devicetree/bindings/media/meson-ir.txt | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/media/meson-ir.txt b/Documentation/devicetree/bindings/media/meson-ir.txt
-index e7e3f3c4fc8f..efd9d29a8f10 100644
---- a/Documentation/devicetree/bindings/media/meson-ir.txt
-+++ b/Documentation/devicetree/bindings/media/meson-ir.txt
-@@ -8,6 +8,9 @@ Required properties:
-  - reg		: physical base address and length of the device registers
-  - interrupts	: a single specifier for the interrupt from the device
- 
-+Optional properties:
-+ - linux,rc-map-name:	see rc.txt file in the same directory.
-+
- Example:
- 
- 	ir-receiver at c8100480 {
+Applied, thanks Eric.
 -- 
-2.11.0
+Florian
