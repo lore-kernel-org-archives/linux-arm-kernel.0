@@ -1,52 +1,81 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  1 Feb 2017 14:31:44 +0000
-Subject: [PATCH v2 09/10] ARM: dts: STiH407-family: Use new Pinctrl groups
-In-Reply-To: <20170201143145.31962-1-lee.jones@linaro.org>
-References: <20170201143145.31962-1-lee.jones@linaro.org>
-Message-ID: <20170201143145.31962-10-lee.jones@linaro.org>
+Date: Wed, 1 Feb 2017 14:34:40 +0000
+Subject: [Resend PATCH v2 2/3] dt-bindings: mfd: stm32f4: Add missing
+ binding definition
+In-Reply-To: <1485954596-11014-3-git-send-email-gabriel.fernandez@st.com>
+References: <1485954596-11014-1-git-send-email-gabriel.fernandez@st.com>
+ <1485954596-11014-3-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <20170201143440.mal2tjmrtxpv4wva@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Having just defined some new Pinctrl groups for when HW flow-control
-is {en,dis}abled, let's reference them for use within the driver.
+On Wed, 01 Feb 2017, gabriel.fernandez at st.com wrote:
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/stih407-family.dtsi | 3 +--
- arch/arm/boot/dts/stih410-b2260.dts   | 5 ++++-
- 2 files changed, 5 insertions(+), 3 deletions(-)
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+> 
+> This patch adds missing binding definition (backupram, ethernet, otg,
+> qspi, adc & dsi)
+> 
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> ---
+>  include/dt-bindings/mfd/stm32f4-rcc.h | 14 ++++++++++++--
+>  1 file changed, 12 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-index c8b2944..e480e32 100644
---- a/arch/arm/boot/dts/stih407-family.dtsi
-+++ b/arch/arm/boot/dts/stih407-family.dtsi
-@@ -222,9 +222,8 @@
- 			compatible = "st,asc";
- 			reg = <0x9830000 0x2c>;
- 			interrupts = <GIC_SPI 122 IRQ_TYPE_NONE>;
--			pinctrl-names = "default";
--			pinctrl-0 = <&pinctrl_serial0>;
- 			clocks = <&clk_s_c0_flexgen CLK_EXT2F_A9>;
-+			/* Pinctrl moved out to a per-board configuration */
- 
- 			status = "disabled";
- 		};
-diff --git a/arch/arm/boot/dts/stih410-b2260.dts b/arch/arm/boot/dts/stih410-b2260.dts
-index fa16aba..cbcbcb4 100644
---- a/arch/arm/boot/dts/stih410-b2260.dts
-+++ b/arch/arm/boot/dts/stih410-b2260.dts
-@@ -62,8 +62,11 @@
- 		/* Low speed expansion connector */
- 		uart0: serial at 9830000 {
- 			label = "LS-UART0";
--			status = "okay";
-+			pinctrl-names = "default", "no-hw-flowctrl";
-+			pinctrl-0 = <&pinctrl_serial0_hw_flowctrl>;
-+			pinctrl-1 = <&pinctrl_serial0>;
- 			rts-gpios = <&pio17 3 GPIO_ACTIVE_LOW>;
-+			status = "okay";
- 		};
- 
- 		/* Low speed expansion connector */
+Acked-by: Lee Jones <lee.jones@linaro.org>
+
+> diff --git a/include/dt-bindings/mfd/stm32f4-rcc.h b/include/dt-bindings/mfd/stm32f4-rcc.h
+> index f662b19..082a81c 100644
+> --- a/include/dt-bindings/mfd/stm32f4-rcc.h
+> +++ b/include/dt-bindings/mfd/stm32f4-rcc.h
+> @@ -18,11 +18,17 @@
+>  #define STM32F4_RCC_AHB1_GPIOJ	9
+>  #define STM32F4_RCC_AHB1_GPIOK	10
+>  #define STM32F4_RCC_AHB1_CRC	12
+> +#define STM32F4_RCC_AHB1_BKPSRAM	18
+> +#define STM32F4_RCC_AHB1_CCMDATARAM	20
+>  #define STM32F4_RCC_AHB1_DMA1	21
+>  #define STM32F4_RCC_AHB1_DMA2	22
+>  #define STM32F4_RCC_AHB1_DMA2D	23
+>  #define STM32F4_RCC_AHB1_ETHMAC	25
+> -#define STM32F4_RCC_AHB1_OTGHS	29
+> +#define STM32F4_RCC_AHB1_ETHMACTX	26
+> +#define STM32F4_RCC_AHB1_ETHMACRX	27
+> +#define STM32F4_RCC_AHB1_ETHMACPTP	28
+> +#define STM32F4_RCC_AHB1_OTGHS		29
+> +#define STM32F4_RCC_AHB1_OTGHSULPI	30
+>  
+>  #define STM32F4_AHB1_RESET(bit) (STM32F4_RCC_AHB1_##bit + (0x10 * 8))
+>  #define STM32F4_AHB1_CLOCK(bit) (STM32F4_RCC_AHB1_##bit)
+> @@ -40,6 +46,7 @@
+>  
+>  /* AHB3 */
+>  #define STM32F4_RCC_AHB3_FMC	0
+> +#define STM32F4_RCC_AHB3_QSPI	1
+>  
+>  #define STM32F4_AHB3_RESET(bit)	(STM32F4_RCC_AHB3_##bit + (0x18 * 8))
+>  #define STM32F4_AHB3_CLOCK(bit)	(STM32F4_RCC_AHB3_##bit + 0x40)
+> @@ -79,7 +86,9 @@
+>  #define STM32F4_RCC_APB2_TIM8	1
+>  #define STM32F4_RCC_APB2_USART1	4
+>  #define STM32F4_RCC_APB2_USART6	5
+> -#define STM32F4_RCC_APB2_ADC	8
+> +#define STM32F4_RCC_APB2_ADC1	8
+> +#define STM32F4_RCC_APB2_ADC2	9
+> +#define STM32F4_RCC_APB2_ADC3	10
+>  #define STM32F4_RCC_APB2_SDIO	11
+>  #define STM32F4_RCC_APB2_SPI1	12
+>  #define STM32F4_RCC_APB2_SPI4	13
+> @@ -91,6 +100,7 @@
+>  #define STM32F4_RCC_APB2_SPI6	21
+>  #define STM32F4_RCC_APB2_SAI1	22
+>  #define STM32F4_RCC_APB2_LTDC	26
+> +#define STM32F4_RCC_APB2_DSI	27
+>  
+>  #define STM32F4_APB2_RESET(bit)	(STM32F4_RCC_APB2_##bit + (0x24 * 8))
+>  #define STM32F4_APB2_CLOCK(bit)	(STM32F4_RCC_APB2_##bit + 0xA0)
+
 -- 
-2.9.3
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
