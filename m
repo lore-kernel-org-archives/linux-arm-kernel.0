@@ -1,87 +1,116 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 1 Feb 2017 19:31:21 +0000
-Subject: Build failure with v4.9-rc1 and GCC trunk -- compiler weirdness
-In-Reply-To: <1485975894.2560.13.camel@perches.com>
-References: <20161017183806.GG5601@arm.com> <20161019153746.GA4411@x4>
- <CA+55aFzSi4V9ZYDfxvZNfz1ogngTywW5Q9U_vQq3v83+0wgPrA@mail.gmail.com>
- <20161019155658.GB4411@x4>
- <CA+55aFx=ZX=7u07R6zJ7fSw=zSQNaYqVX7R3LQs4riiEf+uA=A@mail.gmail.com>
- <20161019162222.GT9193@arm.com>
- <c578d5ac-ab8a-974a-bdd9-597b8c545583@redhat.com>
- <CAKv+Gu9G+r7eH0mhniH1+ucrHNiGBMFQdKfMOi=OmekapoBtUg@mail.gmail.com>
- <CAKv+Gu_kifdUOwKgGv1xqboPMjyYRhHwFXDye1HpBo9hQY+_Uw@mail.gmail.com>
- <1485975894.2560.13.camel@perches.com>
-Message-ID: <CAKv+Gu-Vc-+BDGAWOLJ79KqjL7ZW5vxUk=VW8MqEJyjO2fM6NQ@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed,  1 Feb 2017 20:46:32 +0100
+Subject: [PATCH 12/22 v2] ARM: dts: add top-level DT bindings for Cortina
+ Gemini
+Message-ID: <20170201194632.18455-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 February 2017 at 19:04, Joe Perches <joe@perches.com> wrote:
-> On Wed, 2017-02-01 at 18:19 +0000, Ard Biesheuvel wrote:
->> On 1 February 2017 at 17:36, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> > I still think order_base_2() is broken, since it may invoke
->> > roundup_pow_of_two() with an input value that is documented as
->> > producing undefined output. I would argue that the below is the
->> > correct fix.
->> >
->> > diff --git a/include/linux/log2.h b/include/linux/log2.h
->> > index fd7ff3d91e6a..46523731bec0 100644
->> > --- a/include/linux/log2.h
->> > +++ b/include/linux/log2.h
->> > @@ -203,6 +203,18 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
->> >   *  ... and so on.
->> >   */
->> >
->> > -#define order_base_2(n) ilog2(roundup_pow_of_two(n))
->> > +static inline __attribute__((__const__))
->> > +unsigned long __order_base_2(unsigned long n)
->> > +{
->> > +       return n ? 1UL << fls_long(n - 1) : 1;
->> > +}
->> > +
->> > +#define order_base_2(n)                                \
->> > +(                                              \
->> > +       __builtin_constant_p(n) ? (             \
->> > +               ((n) < 2) ? (n) :               \
->> > +               ilog2((n) - 1) + 1) :           \
->> > +       ilog2(__order_base_2(n))                \
->> > + )
->> >
->> >  #endif /* _LINUX_LOG2_H */
->>
->> Actually, there is a still a redundant shift/fls() in there, this is
->> even simpler:
->>
->> diff --git a/include/linux/log2.h b/include/linux/log2.h
->> index fd7ff3d91e6a..4741534bd7af 100644
->> --- a/include/linux/log2.h
->> +++ b/include/linux/log2.h
->> @@ -203,6 +203,18 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
->>   *  ... and so on.
->>   */
->>
->> -#define order_base_2(n) ilog2(roundup_pow_of_two(n))
->> +static inline __attribute__((__const__))
->
-> commonly __attribute_const__
->
+This adds the top level SoC bindings for Cortina systems Gemini
+platforms.
 
-... except in <linux/ilog2.h>, which probably predates that.
+Cc: Janos Laube <janos.dev@gmail.com>
+Cc: Paulius Zaleckas <paulius.zaleckas@gmail.com>
+Cc: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+Cc: Florian Fainelli <f.fainelli@gmail.com>
+Cc: devicetree at vger.kernel.org
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Rename required property "intcon" to "interrupt-controller"
+- Elaborate a bit on the SoC origins
+- Put the example DTS SoC nodes in a soc {} node
+---
+ Documentation/devicetree/bindings/arm/gemini.txt | 81 ++++++++++++++++++++++++
+ 1 file changed, 81 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/gemini.txt
 
->> +unsigned long __order_base_2(unsigned long n)
->> +{
->> +       return n > 1 ? ilog2(n - 1) + 1 : 0;
->> +}
->> +
->> +#define order_base_2(n)                                \
->> +(                                              \
->> +       __builtin_constant_p(n) ? (             \
->> +               ((n) < 2) ? (n) :               \
->> +               ilog2((n) - 1) + 1) :           \
->> +       __order_base_2(n)                       \
->> + )
->
-> Does this work properly when n is a signed negative value?
->
-
-No, but order_base_2() is explicitly only defined for inputs [0, ->),
-so its behavior for negative inputs is best left undefined.
+diff --git a/Documentation/devicetree/bindings/arm/gemini.txt b/Documentation/devicetree/bindings/arm/gemini.txt
+new file mode 100644
+index 000000000000..eb788302d3e9
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/gemini.txt
+@@ -0,0 +1,81 @@
++Cortina systems Gemini platforms
++
++The Gemini SoC is the project name for an ARMv4 FA525-based SoC originally
++produced by Storlink Semiconductor around 2005. The company was renamed
++later renamed Storm Semiconductor. The chip product name is Storlink SL3516.
++It was derived from earlier products from Storm named SL3316 (Centroid) and
++SL3512.
++
++Storm Semiconductor was acquired by Cortina Systems in 2008 and the SoC was
++produced and used for NAS and similar usecases. In 2014 Cortina Systems was
++in turn acquired by Inphi, who seem to have discontinued this product family.
++
++Required properties (in root node):
++	compatible = "cortina,gemini";
++
++Required nodes:
++
++- syscon: the root node must have a system controller node pointing to the
++  global control registers, with the compatible string
++  "cortina,gemini-syscon", "syscon";
++
++- timer: the root node must have a timer node pointing to the SoC timer
++  block, with the compatible string "cortina,gemini-timer"
++  See: clocksource/cortina,gemini-timer.txt
++
++- interrup-controller: the root node must have an interrupt controller
++  node pointing to the SoC interrupt controller block, with the compatible
++  string "cortina,gemini-interrupt-controller"
++  See interrupt-controller/cortina,gemini-interrupt-controller.txt
++
++Example:
++
++/ {
++	model = "Foo Gemini Machine";
++	compatible = "cortina,gemini";
++	#address-cells = <1>;
++	#size-cells = <1>;
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x8000000>;
++	};
++
++	soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++		compatible = "simple-bus";
++		interrupt-parent = <&intcon>;
++
++		syscon: syscon at 40000000 {
++			compatible = "cortina,gemini-syscon", "syscon";
++			reg = <0x40000000 0x1000>;
++		};
++
++		uart0: serial at 42000000 {
++			compatible = "ns16550a";
++			reg = <0x42000000 0x100>;
++			clock-frequency = <48000000>;
++			interrupts = <18 IRQ_TYPE_LEVEL_HIGH>;
++			reg-shift = <2>;
++		};
++
++		timer at 43000000 {
++			compatible = "cortina,gemini-timer";
++			reg = <0x43000000 0x1000>;
++			interrupt-parent = <&intcon>;
++			interrupts = <14 IRQ_TYPE_EDGE_RISING>, /* Timer 1 */
++				     <15 IRQ_TYPE_EDGE_RISING>, /* Timer 2 */
++				     <16 IRQ_TYPE_EDGE_RISING>; /* Timer 3 */
++			syscon = <&syscon>;
++		};
++
++		intcon: interrupt-controller at 48000000 {
++			compatible = "cortina,gemini-interrupt-controller";
++			reg = <0x48000000 0x1000>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++	};
++};
+-- 
+2.9.3
