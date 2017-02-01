@@ -1,53 +1,59 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 1 Feb 2017 09:04:40 +0100
-Subject: [RFC v2 06/10] KVM: arm/arm64: Update the physical timer
- interrupt level
-In-Reply-To: <86sho199jx.fsf@arm.com>
-References: <1485479100-4966-1-git-send-email-jintack@cs.columbia.edu>
- <1485479100-4966-7-git-send-email-jintack@cs.columbia.edu>
- <86sho199jx.fsf@arm.com>
-Message-ID: <20170201080440.GB6226@cbox>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 1 Feb 2017 09:08:17 +0100
+Subject: [PATCH 2/8] power: add power sequence library
+In-Reply-To: <CAJZ5v0iR7p-ftUzvVwW96Y55A=vYG8_UbhjuA4vw0BFFZ8a9iw@mail.gmail.com>
+References: <1483425211-14473-1-git-send-email-peter.chen@nxp.com>
+ <1483425211-14473-3-git-send-email-peter.chen@nxp.com>
+ <CAJZ5v0iR7p-ftUzvVwW96Y55A=vYG8_UbhjuA4vw0BFFZ8a9iw@mail.gmail.com>
+Message-ID: <20170201080817.GD17968@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jan 29, 2017 at 03:21:06PM +0000, Marc Zyngier wrote:
-> On Fri, Jan 27 2017 at 01:04:56 AM, Jintack Lim <jintack@cs.columbia.edu> wrote:
-> > Now that we maintain the EL1 physical timer register states of VMs,
-> > update the physical timer interrupt level along with the virtual one.
+On Wed, Feb 01, 2017 at 12:10:17AM +0100, Rafael J. Wysocki wrote:
+> On Tue, Jan 3, 2017 at 7:33 AM, Peter Chen <peter.chen@nxp.com> wrote:
+> > We have an well-known problem that the device needs to do some power
+> > sequence before it can be recognized by related host, the typical
+> > example like hard-wired mmc devices and usb devices.
 > >
-> > Note that the emulated EL1 physical timer is not mapped to any hardware
-> > timer, so we call a proper vgic function.
+> > This power sequence is hard to be described at device tree and handled by
+> > related host driver, so we have created a common power sequence
+> > library to cover this requirement. The core code has supplied
+> > some common helpers for host driver, and individual power sequence
+> > libraries handle kinds of power sequence for devices. The pwrseq
+> > librares always need to allocate extra instance for compatible
+> > string match.
 > >
-> > Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
-> > ---
-> >  virt/kvm/arm/arch_timer.c | 20 ++++++++++++++++++++
-> >  1 file changed, 20 insertions(+)
+> > pwrseq_generic is intended for general purpose of power sequence, which
+> > handles gpios and clocks currently, and can cover other controls in
+> > future. The host driver just needs to call of_pwrseq_on/of_pwrseq_off
+> > if only one power sequence is needed, else call of_pwrseq_on_list
+> > /of_pwrseq_off_list instead (eg, USB hub driver).
 > >
-> > diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> > index 0f6e935..3b6bd50 100644
-> > --- a/virt/kvm/arm/arch_timer.c
-> > +++ b/virt/kvm/arm/arch_timer.c
-> > @@ -180,6 +180,21 @@ static void kvm_timer_update_mapped_irq(struct kvm_vcpu *vcpu, bool new_level,
-> >  	WARN_ON(ret);
-> >  }
-> >  
-> > +static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
-> > +				 struct arch_timer_context *timer)
-> > +{
-> > +	int ret;
-> > +
-> > +	BUG_ON(!vgic_initialized(vcpu->kvm));
+> > For new power sequence library, it can add its compatible string
+> > to pwrseq_of_match_table, then the pwrseq core will match it with
+> > DT's, and choose this library at runtime.
+> >
+> > Signed-off-by: Peter Chen <peter.chen@nxp.com>
+> > Tested-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
+> > Tested-by Joshua Clayton <stillcompiling@gmail.com>
+> > Reviewed-by: Matthias Kaehlcke <mka@chromium.org>
+> > Tested-by: Matthias Kaehlcke <mka@chromium.org>
 > 
-> Although I've added my fair share of BUG_ON() in the code base, I've
-> since reconsidered my position. If we get in a situation where the vgic
-> is not initialized, maybe it would be better to just WARN_ON and return
-> early rather than killing the whole box. Thoughts?
+> Quite honestly, I have a really hard time with trying to follow this
+> code and the total lack of documentation makes it even harder.  In
+> particular, the generic power sequence code is not even commented at
+> all, so it really is hard to say how this is going to work, let alone
+> deciding whether or not to apply it.
 > 
+> Plus, of course, the USB core changes must be acked by the maintainer
+> thereof for me to be able to handle the series.
 
-Could we help this series along by saying that since this BUG_ON already
-exists in the kvm_timer_update_mapped_irq function, then it just
-preserves functionality and it's up to someone else (me) to remove the
-BUG_ON from both functions later in life?
+Ah crap, I wanted you to explain it as I too couldn't figure it out :)
 
-Thanks,
--Christoffer
+> But at this point I basically need you to explain the design to me, please.
+
+Same here.
+
+thanks,
+
+greg k-h
