@@ -1,57 +1,103 @@
 From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
-Date: Wed,  1 Feb 2017 10:53:48 -0600
-Subject: [PATCH v3 08/18] drivers/fsi: Kick off master scan via sysfs
+Date: Wed,  1 Feb 2017 10:53:49 -0600
+Subject: [PATCH v3 09/18] drivers/fsi: Implement slave initialisation
 In-Reply-To: <20170201165358.45415-1-cbostic@linux.vnet.ibm.com>
 References: <20170201165358.45415-1-cbostic@linux.vnet.ibm.com>
-Message-ID: <20170201165358.45415-9-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170201165358.45415-10-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Bostic <cbostic@us.ibm.com>
+From: Jeremy Kerr <jk@ozlabs.org>
 
-Move master scan from automatic kick off early in kernel power up
-to a scan file that can be invoked at any particular time based
-on needs of a given platform.
+Create fsi_slave devices during the master scan.
 
+Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
 Signed-off-by: Chris Bostic <cbostic@us.ibm.com>
 ---
- drivers/fsi/fsi-core.c | 15 +++++++++++++--
- 1 file changed, 13 insertions(+), 2 deletions(-)
+ drivers/fsi/fsi-core.c | 56 ++++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 54 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
-index 3160c1c..5f9f7a9 100644
+index 5f9f7a9..931bcba 100644
 --- a/drivers/fsi/fsi-core.c
 +++ b/drivers/fsi/fsi-core.c
-@@ -53,8 +53,19 @@ static int fsi_master_scan(struct fsi_master *master)
- 			fsi_slave_init(master, link, slave_id);
+@@ -17,10 +17,15 @@
+ #include <linux/fsi.h>
+ #include <linux/module.h>
+ #include <linux/idr.h>
++#include <linux/crc-fsi.h>
++#include <linux/slab.h>
  
- 	return 0;
+ #include "fsi-master.h"
+ 
+ #define FSI_N_SLAVES	4
++#define FSI_SLAVE_CONF_CRC_SHIFT        4
++#define FSI_SLAVE_CONF_CRC_MASK         0x0000000f
++#define FSI_SLAVE_CONF_DATA_BITS        28
+ 
+ static DEFINE_IDA(master_ida);
+ 
+@@ -34,12 +39,59 @@ struct fsi_slave {
+ #define to_fsi_slave(d) container_of(d, struct fsi_slave, dev)
+ 
+ /* FSI slave support */
++
++static void fsi_slave_release(struct device *dev)
++{
++	struct fsi_slave *slave = to_fsi_slave(dev);
++
++	kfree(slave);
 +}
 +
-+static ssize_t store_scan(struct device *dev,
-+				struct device_attribute *attr,
-+				const char *buf,
-+				size_t count)
-+{
-+	struct fsi_master *master = dev_get_drvdata(dev);
- 
-+	fsi_master_scan(master);
-+	return count;
- }
-+static DEVICE_ATTR(scan, 0200, NULL, store_scan);
- 
- int fsi_master_register(struct fsi_master *master)
+ static int fsi_slave_init(struct fsi_master *master,
+ 		int link, uint8_t slave_id)
  {
-@@ -63,8 +74,8 @@ int fsi_master_register(struct fsi_master *master)
+-	/* todo: initialise slave device, perform engine scan */
++	struct fsi_slave *slave;
++	uint32_t chip_id;
++	int rc;
++	uint8_t crc;
++
++	rc = master->read(master, link, slave_id, 0, &chip_id, sizeof(chip_id));
++	if (rc) {
++		dev_warn(master->dev, "can't read slave %02x:%02x: %d\n",
++				link, slave_id, rc);
++		return -ENODEV;
++	}
++	crc = crc_fsi(0, chip_id >> FSI_SLAVE_CONF_CRC_SHIFT,
++			FSI_SLAVE_CONF_DATA_BITS);
++	if (crc != (chip_id & FSI_SLAVE_CONF_CRC_MASK)) {
++		dev_warn(master->dev, "slave %02x:%02x invalid chip id CRC!\n",
++				link, slave_id);
++		return -EIO;
++	}
++
++	pr_debug("fsi: found chip %08x at %02x:%02x:%02x\n",
++			master->idx, chip_id, link, slave_id);
++
++	/* we can communicate with a slave; create devices and scan */
++	slave = kzalloc(sizeof(*slave), GFP_KERNEL);
++	if (!slave)
++		return -ENOMEM;
++
++	slave->master = master;
++	slave->id = slave_id;
++	slave->dev.parent = master->dev;
++	slave->dev.release = fsi_slave_release;
++
++	dev_set_name(&slave->dev, "slave@%02x:%02x", link, slave_id);
++	rc = device_register(&slave->dev);
++	if (rc < 0) {
++		dev_warn(master->dev, "failed to create slave device: %d\n",
++				rc);
++		put_device(&slave->dev);
++		return rc;
++	}
  
- 	master->idx = ida_simple_get(&master_ida, 0, 0, GFP_KERNEL);
- 	get_device(master->dev);
--	fsi_master_scan(master);
--	return 0;
-+	dev_set_drvdata(master->dev, master);
-+	return device_create_file(master->dev, &dev_attr_scan);
+-	return -ENODEV;
++	return rc;
  }
- EXPORT_SYMBOL_GPL(fsi_master_register);
  
+ /* FSI master support */
 -- 
 1.8.2.2
