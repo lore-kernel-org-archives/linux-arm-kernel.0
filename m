@@ -1,48 +1,64 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 1 Feb 2017 10:36:31 -0800
-Subject: [PATCH 2/2] ARM: dts: Qualcomm APQ8060 DragonBoard ALS sensor
-In-Reply-To: <20170131102114.25085-2-linus.walleij@linaro.org>
-References: <20170131102114.25085-1-linus.walleij@linaro.org>
- <20170131102114.25085-2-linus.walleij@linaro.org>
-Message-ID: <20170201183631.GJ10531@minitux>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 1 Feb 2017 18:38:12 +0000
+Subject: [PATCH v4 2/4] arm64: Work around Falkor erratum 1003
+In-Reply-To: <20170201183400.GA31652@arm.com>
+References: <36478002-4cd8-7f1c-1a25-8bfe35022a47@codeaurora.org>
+ <3cab36fb-984a-beae-64db-6ce830ba94f6@arm.com>
+ <b4cf83d2-ae05-3362-bc23-2341d00516dc@codeaurora.org>
+ <20170201163358.GG8177@arm.com>
+ <20170201173609.GE26507@e104818-lin.cambridge.arm.com>
+ <20170201174105.GK8177@arm.com>
+ <20170201174934.GF26507@e104818-lin.cambridge.arm.com>
+ <20170201175947.GL8177@arm.com>
+ <20170201182244.GH26507@e104818-lin.cambridge.arm.com>
+ <20170201183400.GA31652@arm.com>
+Message-ID: <20170201183812.GI26507@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 31 Jan 02:21 PST 2017, Linus Walleij wrote:
-
-> This adds the Capella CM3605 ambient light and proximity sensor
-> to the APQ8060 DragonBoard device tree. Notice that we also set
-> up pin config for the AOUT line and GPIO lines, and that we set
-> the default trigger on the infrared LED to associate with the
-> "cm3605" trigger so the IR LED is controlled by this the CM3605
-> driver.
-
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-
+On Wed, Feb 01, 2017 at 06:34:01PM +0000, Will Deacon wrote:
+> On Wed, Feb 01, 2017 at 06:22:44PM +0000, Catalin Marinas wrote:
+> > On Wed, Feb 01, 2017 at 05:59:48PM +0000, Will Deacon wrote:
+> > > On Wed, Feb 01, 2017 at 05:49:34PM +0000, Catalin Marinas wrote:
+> > > > On Wed, Feb 01, 2017 at 05:41:05PM +0000, Will Deacon wrote:
+> > > > > Maybe
+> > > > > just select ARM64_PAN if the erratum workaround is selected, then
+> > > > > runtime warning if we find that the h/w doesn't have PAN but does have
+> > > > > the erratum (which should never fire)?
+> > > > 
+> > > > You still need this workaround even if you don't want any PAN (both sw
+> > > > and hw PAN disabled). I wouldn't want to select ARM64_PAN since it's not
+> > > > a dependency. It's more like if you do need a PAN, make sure you only
+> > > > use the hw one.
+> > > 
+> > > True, in the case that all PAN options are disabled we still want this
+> > > to work. How about:
+> > > 
+> > >   select ARM64_PAN if ARM64_SW_TTBR0_PAN
+> > 
+> > As I replied to myself, the above would work for me as well, so let's go
+> > for this.
+> > 
+> > > In fact, what's the reason for supporting SW_PAN and ARM64_PAN as a
+> > > config combination? Why not just have "PAN" that enables them both and
+> > > uses the hardware feature if it's there?
+> > 
+> > Because SW PAN has a non-trivial performance hit. You would enable SW
+> > PAN only if you are paranoid about security. HW PAN, OTOH, is very cheap
+> > and I wouldn't want to miss enabling it in a single Image supporting
+> > ARMv8.0 and ARMv8.1 just because SW PAN is slow on ARMv8.0.
+> > 
+> > IOW, ARM64_PAN is default y while ARM64_SW_TTBR0_PAN is default n.
 > 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-[..]
-> +				mpps at 50 {
-> +					dragon_cm3605_mpps: cm3605-mpps {
-> +						pinconf {
-> +							pins = "mpp5";
-> +							function = "analog";
-> +							input-enable;
-> +							bias-high-impedance;
-> +							/* Let's use channel 5 */
-> +							qcom,amux-route = <PMIC_MPP_AMUX_ROUTE_CH5>;
+> Ok, in that case, then how about another permutation: we make
+> ARM64_SW_TTBR0_PAN depend on ARM64_PAN? Then when you select "PAN Support"
+> you get a new menu option underneath it for the emulation? I think that
+> solves the erratum case and the use-case above.
 
-Unrelated to this patch, I did look at how this works on later devices.
-It seems like we want to be able to switch the amux-route depending on
-which ADC "channel" we're querying - e.g. on DB820c we have thermistors
-on 3 different AMUX inputs but we don't have 3 mpps available.
+The problem is that ARM64_PAN is an ARMv8.1 feature and currently
+grouped accordingly in Kconfig. ARM64_SW_TTBR0_PAN is complementary (and
+even not recommended on ARMv8.1). We can do this if we break the ARMv8.x
+feature grouping but just for this erratum, I don't think it's worth.
 
-Any thoughts on how to deal with this?
-
-> +							power-source = <PM8058_GPIO_S3>;
-> +						};
-> +					};
-> +				};
-
-Regards,
-Bjorn
+-- 
+Catalin
