@@ -1,66 +1,68 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Feb 2017 09:20:28 +0000
-Subject: [PATCH v3 00/24] i.MX Media Driver
-In-Reply-To: <15fdc901-d342-4761-e86e-caef8912a0a2@gmail.com>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <20170131004510.GQ27312@n2100.armlinux.org.uk>
- <951c1a08-c0f2-4333-b4bf-410de8dd863f@gmail.com>
- <20170131110027.GU27312@n2100.armlinux.org.uk>
- <3a673cba-bbf6-5611-5857-4605797bf049@gmail.com>
- <20170201002331.GG27312@n2100.armlinux.org.uk>
- <15fdc901-d342-4761-e86e-caef8912a0a2@gmail.com>
-Message-ID: <20170201092028.GK27312@n2100.armlinux.org.uk>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Wed, 1 Feb 2017 14:54:46 +0530
+Subject: [PATCH v2] initramfs: finish fput() before accessing any binary
+ from initramfs
+In-Reply-To: <20170124053636.30121-1-lokeshvutla@ti.com>
+References: <20170124053636.30121-1-lokeshvutla@ti.com>
+Message-ID: <f236f0b5-a1c4-2ed4-f41a-c50165f82f8a@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2017 at 05:54:52PM -0800, Steve Longerbeam wrote:
-> On 01/31/2017 04:23 PM, Russell King - ARM Linux wrote:
-> First, thank you for the explanation, it clears up a lot.
+Hi All,
+
+On Tuesday 24 January 2017 11:06 AM, Lokesh Vutla wrote:
+> commit 4a9d4b024a31 ("switch fput to task_work_add") implements a
+> schedule_work() for completing fput(), but did not guarantee calling
+> __fput() after unpacking initramfs. Because of this, there is a
+> possibility that during boot a driver can see ETXTBSY when it tries
+> to load a binary from initramfs as fput() is still pending on that
+> binary. This patch makes sure that fput() is completed after unpacking
+> initramfs.
 > 
-> But of_parse_subdev() is used to parse the OF graph starting
-> from the CSI ports, to discover all the nodes to add to subdev
-> async registration. It also forms the media link info to be used
-> later to create the media graph, after all discovered subdevs
-> have come online (registered themselves). This happens at
-> driver load time, it doesn't have anything to do with pad
-> negotiation.
-
-Right, but I'm discussing why you need to know which is the sensor
-subdev, and why you need to get parameters from the sensor subdev.
-
-> >   I think the
-> >issue here is how you're going about dealing with the subdevs.
-> >Here's the subdev setup:
-> >
-> >+---------camera--------+
-> >| pixel array -> binner |---> csi2 --> ipu1csi0 mux --> csi0 --> smfc --> idmac
-> >+-----------------------+
-> >
-> >How the subdevs are supposed to work is that you start from the first
-> >subdev in sequence (in this case the pixel array) and negotiate with
-> >the driver through the TRY formats on its source pad, as well as
-> >negotiating with the sink pad of the directly neighbouring subdev.
-> >
-> >The neighbouring subdev propagates the configuration in a driver
-> >specific manner from its source pad to the sink pad, giving a default
-> >configuration at its source.
+> Reported-by: Murali Karicheri <m-karicheri2@ti.com>
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> ---
+> Link to RFC: https://patchwork.kernel.org/patch/9520539/
+> Changes since v1:
+> - Moved flush_delayed_fput() before loading default modules.
 > 
-> Let me try to re-phrase. You mean the subdev's set_fmt(), when
-> configured  its source pad(s), should call set_fmt() at the connected
-> sink subdev to automatically propagate the format to the sink's pad?
+> Note: Reproduced on TI K2HK EVM. K2HK Queue Manager subsystem driver[1] tries
+> to load a firmware from initramfs during boot. Sometimes loading of this
+> firmware fails with error ETXTBSY. Digging a bit more observed that
+> deny_write_access() is returning ETXTBSY as inode->i_writecount is > 0
+> for that file. This is because Unpacking initramfs does a
+> get_write_access(from open) but hasn't done put_write_access(from fput)
+> as it hasn't been scheduled yet.
+> 
+> [1] https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/drivers/soc/ti/knav_qmss_queue.c
+> 
+>  init/initramfs.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/init/initramfs.c b/init/initramfs.c
+> index b32ad7d97ac9..981f286c1d16 100644
+> --- a/init/initramfs.c
+> +++ b/init/initramfs.c
+> @@ -18,6 +18,7 @@
+>  #include <linux/dirent.h>
+>  #include <linux/syscalls.h>
+>  #include <linux/utime.h>
+> +#include <linux/file.h>
+>  
+>  static ssize_t __init xwrite(int fd, const char *p, size_t count)
+>  {
+> @@ -647,6 +648,7 @@ static int __init populate_rootfs(void)
+>  			printk(KERN_EMERG "Initramfs unpacking failed: %s\n", err);
+>  		free_initrd();
+>  #endif
+> +		flush_delayed_fput();
+>  		/*
+>  		 * Try loading default modules from initramfs.  This gives
+>  		 * us a chance to load before device_initcalls.
+> 
 
-No.  For any individual subdev, if you configure it's _sink_ then it
-should propagate the configuration to its _source_, potentially
-modifying the configuration according to its function.  It should
-never forward the configuration to the other side of any links.
+Not sure who else to cc here, get_maintainer.pl gives only LKML.
+Are there any comments on this patch?
 
-The responsibility for setting up the neighbours source pad is the
-userspace media application.
-
-See Documentation/media/uapi/v4l/dev-subdev.rst and the section
-named "Format Negotiation".
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks and regards,
+Lokesh
