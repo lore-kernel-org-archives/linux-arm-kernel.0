@@ -1,128 +1,34 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 1 Feb 2017 10:53:18 +0000
-Subject: [PATCH] KVM: arm/arm64: Remove kvm_vgic_inject_mapped_irq
-In-Reply-To: <20170201102240.29985-1-christoffer.dall@linaro.org>
-References: <20170201102240.29985-1-christoffer.dall@linaro.org>
-Message-ID: <70688d25-2afe-d38a-53c0-3af15bd288b3@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 1 Feb 2017 10:53:29 +0000
+Subject: [PATCH v1] ASoC: bcm2835: Remove redundant channel checking code
+ in hw_params
+In-Reply-To: <1485924303-30869-1-git-send-email-flatmax@flatmax.org>
+References: <1484443043-13623-1-git-send-email-flatmax@flatmax.org>
+ <1485924303-30869-1-git-send-email-flatmax@flatmax.org>
+Message-ID: <20170201105329.vr4ro5bjf676dwtk@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Feb 01, 2017 at 03:45:03PM +1100, Matt Flax wrote:
 
-On 01/02/17 10:22, Christoffer Dall wrote:
-> The only benefit of having kvm_vgic_inject_mapped_irq separate from
-> kvm_vgic_inject_irq is that we pass a boolean that we use for error
-> checking on the injection path.
-> 
-> While this could potentially help in some aspect of robustness, it's
-> also a little bit of a defensive move, and arguably callers into the
-> vgic should have make sure they have marked their virtual IRQs as mapped
-> if required.
+> This redundant channel count check may seem like it will not cause
+> any problems however some sound cards (such as the 8 channel
+> AudioInjector Octo sound card) require the execution of the
+> bcm2835_i2s_hw_params function when channels_max in the
+> bcm2835_i2s_dai structure has been increased to 8.
 
-Yes, after looking again into the "new-vgic" patches I convinced myself
-that this is fine. I think since we originally came from two different
-implementations of inject_mapped_irq and inject_irq, we were just not
-brave enough to actually squash them.
-And I like seeing that confusing vgic_update_irq_pending() name go away.
+> As the channel checking code in bcm2835_i2s_hw_params is redundant
+> and stops certain cards from working it has been removed.
 
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
-
-Thanks!
-Andre
-
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  virt/kvm/arm/arch_timer.c |  3 ++-
->  virt/kvm/arm/vgic/vgic.c  | 50 +++++++++++++++--------------------------------
->  2 files changed, 18 insertions(+), 35 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-> index 6a084cd..91ecf48 100644
-> --- a/virt/kvm/arm/arch_timer.c
-> +++ b/virt/kvm/arm/arch_timer.c
-> @@ -175,7 +175,8 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
->  	timer->irq.level = new_level;
->  	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->irq.irq,
->  				   timer->irq.level);
-> -	ret = kvm_vgic_inject_mapped_irq(vcpu->kvm, vcpu->vcpu_id,
-> +
-> +	ret = kvm_vgic_inject_irq(vcpu->kvm, vcpu->vcpu_id,
->  					 timer->irq.irq,
->  					 timer->irq.level);
->  	WARN_ON(ret);
-> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> index dea12df..654dfd4 100644
-> --- a/virt/kvm/arm/vgic/vgic.c
-> +++ b/virt/kvm/arm/vgic/vgic.c
-> @@ -335,9 +335,22 @@ bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq)
->  	return true;
->  }
->  
-> -static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
-> -				   unsigned int intid, bool level,
-> -				   bool mapped_irq)
-> +/**
-> + * kvm_vgic_inject_irq - Inject an IRQ from a device to the vgic
-> + * @kvm:     The VM structure pointer
-> + * @cpuid:   The CPU for PPIs
-> + * @intid:   The INTID to inject a new state to.
-> + * @level:   Edge-triggered:  true:  to trigger the interrupt
-> + *			      false: to ignore the call
-> + *	     Level-sensitive  true:  raise the input signal
-> + *			      false: lower the input signal
-> + *
-> + * The VGIC is not concerned with devices being active-LOW or active-HIGH for
-> + * level-sensitive interrupts.  You can think of the level parameter as 1
-> + * being HIGH and 0 being LOW and all devices being active-HIGH.
-> + */
-> +int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
-> +			bool level)
->  {
->  	struct kvm_vcpu *vcpu;
->  	struct vgic_irq *irq;
-> @@ -357,11 +370,6 @@ static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
->  	if (!irq)
->  		return -EINVAL;
->  
-> -	if (irq->hw != mapped_irq) {
-> -		vgic_put_irq(kvm, irq);
-> -		return -EINVAL;
-> -	}
-> -
->  	spin_lock(&irq->irq_lock);
->  
->  	if (!vgic_validate_injection(irq, level)) {
-> @@ -382,32 +390,6 @@ static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
->  	return 0;
->  }
->  
-> -/**
-> - * kvm_vgic_inject_irq - Inject an IRQ from a device to the vgic
-> - * @kvm:     The VM structure pointer
-> - * @cpuid:   The CPU for PPIs
-> - * @intid:   The INTID to inject a new state to.
-> - * @level:   Edge-triggered:  true:  to trigger the interrupt
-> - *			      false: to ignore the call
-> - *	     Level-sensitive  true:  raise the input signal
-> - *			      false: lower the input signal
-> - *
-> - * The VGIC is not concerned with devices being active-LOW or active-HIGH for
-> - * level-sensitive interrupts.  You can think of the level parameter as 1
-> - * being HIGH and 0 being LOW and all devices being active-HIGH.
-> - */
-> -int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
-> -			bool level)
-> -{
-> -	return vgic_update_irq_pending(kvm, cpuid, intid, level, false);
-> -}
-> -
-> -int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid, unsigned int intid,
-> -			       bool level)
-> -{
-> -	return vgic_update_irq_pending(kvm, cpuid, intid, level, true);
-> -}
-> -
->  int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, u32 virt_irq, u32 phys_irq)
->  {
->  	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
-> 
+If those cards add support for higher channel counts they should be
+adding real support for that in the driver, not just hacking out
+defensive code.  If the device can usefully do 8 channels then modify
+the driver to do 8 channels.  Otherwise people are going to need to
+modify the driver anyway to remove the limits in the constraints.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170201/69b6d45f/attachment.sig>
