@@ -1,31 +1,51 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed, 01 Feb 2017 10:48:53 +0100
-Subject: [PATCH v6 5/5] ARM: dts: rockchip: disable arm-global-timer for
- rk3188
-In-Reply-To: <1485866596-32254-6-git-send-email-al.kochet@gmail.com>
-References: <1485866596-32254-1-git-send-email-al.kochet@gmail.com>
- <1485866596-32254-6-git-send-email-al.kochet@gmail.com>
-Message-ID: <2265306.UfJ65TkXez@phil>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 01 Feb 2017 10:49:00 +0100
+Subject: [GIT PULL] Ux500 devicetree changes for v4.11
+In-Reply-To: <CACRpkdbOrFAgOn_vr8vLc9pGHqzkm+Os9MrhxJjs0xxzMHO+Og@mail.gmail.com>
+References: <CACRpkdbOrFAgOn_vr8vLc9pGHqzkm+Os9MrhxJjs0xxzMHO+Og@mail.gmail.com>
+Message-ID: <1507979.mEcWZWFyc4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 31. Januar 2017, 15:43:16 CET schrieb Alexander Kochetkov:
-> The clocksource and the sched_clock provided by the arm_global_timer
-> are quite unstable because their rates depend on the cpu frequency.
+On Wednesday, February 1, 2017 10:29:30 AM CET Linus Walleij wrote:
+> Hi ARM SoC people,
 > 
-> On the other side, the arm_global_timer has a higher rating than the
-> rockchip_timer, it will be selected by default by the time framework
-> while we want to use the stable rockchip clocksource.
+> sorry for the late pull request, but these really should be going to
+> 4.11. As late or whatever is fine.
 > 
-> Let's disable the arm_global_timer in order to have the rockchip
-> clocksource selected by default.
+> I found a number of bugs in the platform that had been accumulating
+> and it would be nice to iron out most of them in v4.11.
 > 
-> Signed-off-by: Alexander Kochetkov <al.kochet@gmail.com>
+> Please pull this to the ARM SoC tree in some apropriate branch.
+> 
+> Yours,
+> Linus Walleij
+> 
+> The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+> 
+>   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+> tags/ux500-dt-1
+> 
+> for you to fetch changes up to 3015d3b05239e33b42b1ae9ac408cc60fa4772ce:
+> 
+>   ARM: dts: add the AB8500 sysclk to the device trees (2017-01-31
+> 22:15:06 +0100)
+> 
+> ----------------------------------------------------------------
+> Ux500 Device Tree updates for v4.11:
+> 
+> This cleans the device tree a bit and rectifies some
+> clocking bugs. They are in a sense regressions, but there
+> is no hurry for this platform.
 
-depending on who is picking that up, they can add my
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+This is what the kbuild bot found for the patch submission:
 
-if needed.
+>> arch/arm/boot/dts/ste-dbx5x0.dtsi:17:42: fatal error: dt-bindings/clock/ste-ab8500.h: No such file or directory
 
-Later on we might need to look at the rk3066 as well, as it might have the 
-same issue.
+Can you have a look what caused it?
+
+	Arnd
