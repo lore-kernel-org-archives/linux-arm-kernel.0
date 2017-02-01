@@ -1,37 +1,33 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 1 Feb 2017 22:45:35 +0900
-Subject: [PATCH/RFC] arm64: defconfig: Enlarge CMA alignment to 2 MiB
-In-Reply-To: <1485532996-19719-1-git-send-email-geert+renesas@glider.be>
-References: <1485532996-19719-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <CANqRtoQJaRK7Kys-fudyxJuojBmZyXMsNoDudSt4p=gj5srviA@mail.gmail.com>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Wed, 1 Feb 2017 19:15:53 +0530
+Subject: [PATCH v2] initramfs: finish fput() before accessing any binary
+ from initramfs
+In-Reply-To: <20170201122838.GC27291@ZenIV.linux.org.uk>
+References: <20170124053636.30121-1-lokeshvutla@ti.com>
+ <20170201122838.GC27291@ZenIV.linux.org.uk>
+Message-ID: <9d9a2ffa-41a5-46a4-379b-d864cf9c6d7f@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
 
-On Sat, Jan 28, 2017 at 1:03 AM, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
-> Some IOMMUs (e.g. Renesas IPMMU/VMSA) support only page sizes of 4 KiB,
-> 2 MiB, and 1 GiB.
->
-> With the default setting of CONFIG_CMA_ALIGNMENT = 8, allocations larger
-> than 1 MiB are aligned to a 1 MiB boundary only.  Hence a 2 MiB
-> allocation may not be aligned, leading to a mapping of 512 4 KiB pages.
->
-> Increase CONFIG_CMA_ALIGNMENT to allow mapping a 2 MiB buffer using a
-> single PTE, decreasing memory usage and TLB pressure.
->
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> Is this useful?
->
-> Should there instead be different defaults in Kconfig, depending on
-> enabled platform support?
 
-I think there is a dependency on the kernel page size configuration as
-well. In case of 16 KiB or 64 KiB page size configuration other large
-page sizes may be required.
+On Wednesday 01 February 2017 05:58 PM, Al Viro wrote:
+> On Tue, Jan 24, 2017 at 11:06:36AM +0530, Lokesh Vutla wrote:
+>> commit 4a9d4b024a31 ("switch fput to task_work_add") implements a
+>> schedule_work() for completing fput(), but did not guarantee calling
+>> __fput() after unpacking initramfs. Because of this, there is a
+>> possibility that during boot a driver can see ETXTBSY when it tries
+>> to load a binary from initramfs as fput() is still pending on that
+>> binary. This patch makes sure that fput() is completed after unpacking
+>> initramfs.
+> 
+> Umm...  Do we want it done in kernel_init(), then?  I have no objections
+> against calling it in populate_rootfs(), and it looks like a sane place
+> for that, but I wonder if the old callsite would remain needed after that...
+> 
 
-Thanks,
+Hmm..You are right, the call in kernel_init() is unnecessary. Will post
+an updated version.
 
-/ magnus
+Thanks and regards,
+Lokesh
