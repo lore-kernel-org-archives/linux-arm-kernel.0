@@ -1,82 +1,37 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 1 Feb 2017 14:35:33 +0000
-Subject: [Resend PATCH v2 1/3] dt-bindings: mfd: stm32f4: Fix
- STM32F4_X_CLOCK() macro
-In-Reply-To: <1485954596-11014-2-git-send-email-gabriel.fernandez@st.com>
-References: <1485954596-11014-1-git-send-email-gabriel.fernandez@st.com>
- <1485954596-11014-2-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <20170201143533.pxwe6gmfcymmsy4p@dell>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 1 Feb 2017 14:44:48 +0000
+Subject: [PATCH 6/7] efi: Handle secure boot from UEFI-2.6 [ver #7]
+In-Reply-To: <20578.1485952425@warthog.procyon.org.uk>
+References: <148587558696.4026.16034622623568539004.stgit@warthog.procyon.org.uk>
+ <148587564847.4026.5759345672956585977.stgit@warthog.procyon.org.uk>
+ <CAKv+Gu8dnKB1sRGb3U+XB1eoA7Eyo4qSFBtPRbvGV912xPViVw@mail.gmail.com>
+ <10454.1485889162@warthog.procyon.org.uk>
+ <CAKv+Gu_gy6575axL6M64OSo33ZM2dnbs7cajqJRd8VtbjAXCTw@mail.gmail.com>
+ <20578.1485952425@warthog.procyon.org.uk>
+Message-ID: <CAKv+Gu8FOcMx0UXXdd3nhE+PUPzbEn9X=kBQDfkLOZBvVu-8fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 01 Feb 2017, gabriel.fernandez at st.com wrote:
+On 1 February 2017 at 12:33, David Howells <dhowells@redhat.com> wrote:
+> Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>
+>> So this patch should take AuditMode into account, but not DeployedMode, i.e.,
+>>
+>> SecureBoot == 0x1
+>> SetupMode == 0x0
+>> AuditMode == 0x0 (or non-existent)
+>
+> If we're in audit mode or setup mode SecureBoot==0 and SetupMode==1 according
+> to the flowchart, so the check of AuditMode would seem redundant.
+>
+> Further, the checks above don't seem to differentiate deployed mode from user
+> mode.  Should they?
+>
 
-> From: Gabriel Fernandez <gabriel.fernandez@st.com>
-> 
-> Macro to select a clock was not correct.
-> 
-> Offset of enable register starts at 0x30, then calculation to select a bit is:
-> (@enable_reg - 0x30) / 4 * 32 + bit_to_select
-> 
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
-> Tested-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
-> 
-> ---
->  include/dt-bindings/mfd/stm32f4-rcc.h | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
-
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
-> diff --git a/include/dt-bindings/mfd/stm32f4-rcc.h b/include/dt-bindings/mfd/stm32f4-rcc.h
-> index e98942d..f662b19 100644
-> --- a/include/dt-bindings/mfd/stm32f4-rcc.h
-> +++ b/include/dt-bindings/mfd/stm32f4-rcc.h
-> @@ -25,7 +25,7 @@
->  #define STM32F4_RCC_AHB1_OTGHS	29
->  
->  #define STM32F4_AHB1_RESET(bit) (STM32F4_RCC_AHB1_##bit + (0x10 * 8))
-> -#define STM32F4_AHB1_CLOCK(bit) (STM32F4_RCC_AHB1_##bit + (0x30 * 8))
-> +#define STM32F4_AHB1_CLOCK(bit) (STM32F4_RCC_AHB1_##bit)
->  
->  
->  /* AHB2 */
-> @@ -36,13 +36,13 @@
->  #define STM32F4_RCC_AHB2_OTGFS	7
->  
->  #define STM32F4_AHB2_RESET(bit)	(STM32F4_RCC_AHB2_##bit + (0x14 * 8))
-> -#define STM32F4_AHB2_CLOCK(bit)	(STM32F4_RCC_AHB2_##bit + (0x34 * 8))
-> +#define STM32F4_AHB2_CLOCK(bit)	(STM32F4_RCC_AHB2_##bit + 0x20)
->  
->  /* AHB3 */
->  #define STM32F4_RCC_AHB3_FMC	0
->  
->  #define STM32F4_AHB3_RESET(bit)	(STM32F4_RCC_AHB3_##bit + (0x18 * 8))
-> -#define STM32F4_AHB3_CLOCK(bit)	(STM32F4_RCC_AHB3_##bit + (0x38 * 8))
-> +#define STM32F4_AHB3_CLOCK(bit)	(STM32F4_RCC_AHB3_##bit + 0x40)
->  
->  /* APB1 */
->  #define STM32F4_RCC_APB1_TIM2	0
-> @@ -72,7 +72,7 @@
->  #define STM32F4_RCC_APB1_UART8	31
->  
->  #define STM32F4_APB1_RESET(bit)	(STM32F4_RCC_APB1_##bit + (0x20 * 8))
-> -#define STM32F4_APB1_CLOCK(bit)	(STM32F4_RCC_APB1_##bit + (0x40 * 8))
-> +#define STM32F4_APB1_CLOCK(bit)	(STM32F4_RCC_APB1_##bit + 0x80)
->  
->  /* APB2 */
->  #define STM32F4_RCC_APB2_TIM1	0
-> @@ -93,6 +93,6 @@
->  #define STM32F4_RCC_APB2_LTDC	26
->  
->  #define STM32F4_APB2_RESET(bit)	(STM32F4_RCC_APB2_##bit + (0x24 * 8))
-> -#define STM32F4_APB2_CLOCK(bit)	(STM32F4_RCC_APB2_##bit + (0x44 * 8))
-> +#define STM32F4_APB2_CLOCK(bit)	(STM32F4_RCC_APB2_##bit + 0xA0)
->  
->  #endif /* _DT_BINDINGS_MFD_STM32F4_RCC_H */
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+>From the OS pov, UserMode and DeployedMode are the same, the only
+difference being that AuditMode may be entered from UserMode simply by
+setting the variable to 0x1 (which can only be done before
+ExitBootServices()). And since AuditMode implies SetupMode (according
+to the diagram), you are right that we don't need to care about
+AuditMode either. AFAICT, that makes the entire patch unnecessary, so
+let's drop it for now.
