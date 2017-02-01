@@ -1,77 +1,87 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 1 Feb 2017 19:28:24 +0000
-Subject: [PATCH] efi: fdt: avoid FDT manipulation after ExitBootServices()
-In-Reply-To: <20170201190341.GA1060@gmail.com>
-References: <1485971102-23330-1-git-send-email-ard.biesheuvel@linaro.org>
- <1485971102-23330-2-git-send-email-ard.biesheuvel@linaro.org>
- <20170201190341.GA1060@gmail.com>
-Message-ID: <CAKv+Gu9-Ug8oUv56oyzb7VxgRac2iv1xQcZ+jU-0NdcQr5226A@mail.gmail.com>
+Date: Wed, 1 Feb 2017 19:31:21 +0000
+Subject: Build failure with v4.9-rc1 and GCC trunk -- compiler weirdness
+In-Reply-To: <1485975894.2560.13.camel@perches.com>
+References: <20161017183806.GG5601@arm.com> <20161019153746.GA4411@x4>
+ <CA+55aFzSi4V9ZYDfxvZNfz1ogngTywW5Q9U_vQq3v83+0wgPrA@mail.gmail.com>
+ <20161019155658.GB4411@x4>
+ <CA+55aFx=ZX=7u07R6zJ7fSw=zSQNaYqVX7R3LQs4riiEf+uA=A@mail.gmail.com>
+ <20161019162222.GT9193@arm.com>
+ <c578d5ac-ab8a-974a-bdd9-597b8c545583@redhat.com>
+ <CAKv+Gu9G+r7eH0mhniH1+ucrHNiGBMFQdKfMOi=OmekapoBtUg@mail.gmail.com>
+ <CAKv+Gu_kifdUOwKgGv1xqboPMjyYRhHwFXDye1HpBo9hQY+_Uw@mail.gmail.com>
+ <1485975894.2560.13.camel@perches.com>
+Message-ID: <CAKv+Gu-Vc-+BDGAWOLJ79KqjL7ZW5vxUk=VW8MqEJyjO2fM6NQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 February 2017 at 19:03, Ingo Molnar <mingo@kernel.org> wrote:
+On 1 February 2017 at 19:04, Joe Perches <joe@perches.com> wrote:
+> On Wed, 2017-02-01 at 18:19 +0000, Ard Biesheuvel wrote:
+>> On 1 February 2017 at 17:36, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> > I still think order_base_2() is broken, since it may invoke
+>> > roundup_pow_of_two() with an input value that is documented as
+>> > producing undefined output. I would argue that the below is the
+>> > correct fix.
+>> >
+>> > diff --git a/include/linux/log2.h b/include/linux/log2.h
+>> > index fd7ff3d91e6a..46523731bec0 100644
+>> > --- a/include/linux/log2.h
+>> > +++ b/include/linux/log2.h
+>> > @@ -203,6 +203,18 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
+>> >   *  ... and so on.
+>> >   */
+>> >
+>> > -#define order_base_2(n) ilog2(roundup_pow_of_two(n))
+>> > +static inline __attribute__((__const__))
+>> > +unsigned long __order_base_2(unsigned long n)
+>> > +{
+>> > +       return n ? 1UL << fls_long(n - 1) : 1;
+>> > +}
+>> > +
+>> > +#define order_base_2(n)                                \
+>> > +(                                              \
+>> > +       __builtin_constant_p(n) ? (             \
+>> > +               ((n) < 2) ? (n) :               \
+>> > +               ilog2((n) - 1) + 1) :           \
+>> > +       ilog2(__order_base_2(n))                \
+>> > + )
+>> >
+>> >  #endif /* _LINUX_LOG2_H */
+>>
+>> Actually, there is a still a redundant shift/fls() in there, this is
+>> even simpler:
+>>
+>> diff --git a/include/linux/log2.h b/include/linux/log2.h
+>> index fd7ff3d91e6a..4741534bd7af 100644
+>> --- a/include/linux/log2.h
+>> +++ b/include/linux/log2.h
+>> @@ -203,6 +203,18 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
+>>   *  ... and so on.
+>>   */
+>>
+>> -#define order_base_2(n) ilog2(roundup_pow_of_two(n))
+>> +static inline __attribute__((__const__))
 >
-> * Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->
->> Some AArch64 UEFI implementations disable the MMU in ExitBootServices(),
->> after which unaligned accesses to RAM are no longer supported.
->>
->> Commit abfb7b686a3e ("efi/libstub/arm*: Pass latest memory map to the
->> kernel") fixed an issue in the memory map handling of the stub FDT code,
->> but inadvertently created an issue with such firmwares, by moving some
->> of the FDT manipulation to after the invocation of ExitBootServices().
->> Given that the stub's libfdt implementation uses the ordinary, accelerated
->> string functions, which rely on hardware handling of unaligned accesses,
->> manipulating the FDT with the MMU off may result in alignment faults.
->>
->> So fix the situation by moving the update_fdt_memmap() call into the
->> callback function invoked by efi_exit_boot_services() right before it
->> calls the ExitBootServices() UEFI service (which is arguably a better
->> place for it anyway)
->>
->> Note that disabling the MMU in ExitBootServices() is not compliant with
->> the UEFI spec, and carries great risk due to the fact that switching from
->> cached to uncached memory accesses halfway through compiler generated code
->> (i.e., involving a stack) can never be done in a way that is architecturally
->> safe.
->>
->> Cc: <stable@vger.kernel.org>
->> Fixes: abfb7b686a3e ("efi/libstub/arm*: Pass latest memory map to the kernel")
->> Tested-by: Riku Voipio <riku.voipio@linaro.org>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  drivers/firmware/efi/libstub/fdt.c | 14 +++-----------
->>  1 file changed, 3 insertions(+), 11 deletions(-)
->>
->> diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
->> index 921dfa047202..260c4b4b492e 100644
->> --- a/drivers/firmware/efi/libstub/fdt.c
->> +++ b/drivers/firmware/efi/libstub/fdt.c
->> @@ -187,6 +187,7 @@ static efi_status_t update_fdt_memmap(void *fdt, struct efi_boot_memmap *map)
->>  struct exit_boot_struct {
->>       efi_memory_desc_t *runtime_map;
->>       int *runtime_entry_count;
->> +     void *new_fdt_addr;
->>  };
->>
->>  static efi_status_t exit_boot_func(efi_system_table_t *sys_table_arg,
->> @@ -202,7 +203,7 @@ static efi_status_t exit_boot_func(efi_system_table_t *sys_table_arg,
->>       efi_get_virtmap(*map->map, *map->map_size, *map->desc_size,
->>                       p->runtime_map, p->runtime_entry_count);
->>
->> -     return EFI_SUCCESS;
->> +     return update_fdt_memmap(p->new_fdt_addr, map);
->>  }
->>
->>  /*
->> @@ -300,22 +301,13 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
->>
->>       priv.runtime_map = runtime_map;
->>       priv.runtime_entry_count = &runtime_entry_count;
->> +     priv.new_fdt_addr = (void *)*new_fdt_addr;
->
-> Nit: could the type cast by dropped?
+> commonly __attribute_const__
 >
 
-new_fdt_addr is a pointer to unsigned long, so we can't drop the cast
-here without introducing it somewhere else.
+... except in <linux/ilog2.h>, which probably predates that.
+
+>> +unsigned long __order_base_2(unsigned long n)
+>> +{
+>> +       return n > 1 ? ilog2(n - 1) + 1 : 0;
+>> +}
+>> +
+>> +#define order_base_2(n)                                \
+>> +(                                              \
+>> +       __builtin_constant_p(n) ? (             \
+>> +               ((n) < 2) ? (n) :               \
+>> +               ilog2((n) - 1) + 1) :           \
+>> +       __order_base_2(n)                       \
+>> + )
+>
+> Does this work properly when n is a signed negative value?
+>
+
+No, but order_base_2() is explicitly only defined for inputs [0, ->),
+so its behavior for negative inputs is best left undefined.
