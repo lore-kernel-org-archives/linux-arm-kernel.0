@@ -1,96 +1,66 @@
-From: leif.lindholm@linaro.org (Leif Lindholm)
-Date: Wed, 1 Feb 2017 17:49:30 +0000
-Subject: [PATCH] efi: fdt: avoid FDT manipulation after ExitBootServices()
-In-Reply-To: <1485971102-23330-2-git-send-email-ard.biesheuvel@linaro.org>
-References: <1485971102-23330-1-git-send-email-ard.biesheuvel@linaro.org>
- <1485971102-23330-2-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20170201174930.GD25883@bivouac.eciton.net>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 01 Feb 2017 18:49:24 +0100
+Subject: [PATCH v2 2/3] PCI: imx6: Allow probe deferal by reset GPIO
+In-Reply-To: <20170201165559.22436-3-andrew.smirnov@gmail.com>
+References: <20170201165559.22436-1-andrew.smirnov@gmail.com>
+ <20170201165559.22436-3-andrew.smirnov@gmail.com>
+Message-ID: <1485971364.23471.11.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2017 at 05:45:02PM +0000, Ard Biesheuvel wrote:
-> Some AArch64 UEFI implementations disable the MMU in ExitBootServices(),
-> after which unaligned accesses to RAM are no longer supported.
+Am Mittwoch, den 01.02.2017, 08:55 -0800 schrieb Andrey Smirnov:
+> Some designs implement reset GPIO via a GPIO expander connected to a
+> peripheral bus. One such example would be i.MX7 Sabre board where said
+> GPIO is provided by SPI shift register connected to a bitbanged SPI
+> bus. In order to support such designs allow reset GPIO request to defer
+> probing of the driver.
 > 
-> Commit abfb7b686a3e ("efi/libstub/arm*: Pass latest memory map to the
-> kernel") fixed an issue in the memory map handling of the stub FDT code,
-> but inadvertently created an issue with such firmwares, by moving some
-> of the FDT manipulation to after the invocation of ExitBootServices().
-> Given that the stub's libfdt implementation uses the ordinary, accelerated
-> string functions, which rely on hardware handling of unaligned accesses,
-> manipulating the FDT with the MMU off may result in alignment faults.
-> 
-> So fix the situation by moving the update_fdt_memmap() call into the
-> callback function invoked by efi_exit_boot_services() right before it
-> calls the ExitBootServices() UEFI service (which is arguably a better
-> place for it anyway)
-> 
-> Note that disabling the MMU in ExitBootServices() is not compliant with
-> the UEFI spec, and carries great risk due to the fact that switching from
-> cached to uncached memory accesses halfway through compiler generated code
-> (i.e., involving a stack) can never be done in a way that is architecturally
-> safe.
-> 
-> Cc: <stable@vger.kernel.org>
-> Fixes: abfb7b686a3e ("efi/libstub/arm*: Pass latest memory map to the kernel")
-> Tested-by: Riku Voipio <riku.voipio@linaro.org>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: yurovsky at gmail.com
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
 
-Acked-by: Leif Lindholm <leif.lindholm@linaro.org>
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 
 > ---
->  drivers/firmware/efi/libstub/fdt.c | 14 +++-----------
->  1 file changed, 3 insertions(+), 11 deletions(-)
+>  drivers/pci/host/pci-imx6.c | 7 +++++--
+>  1 file changed, 5 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-> index 921dfa047202..260c4b4b492e 100644
-> --- a/drivers/firmware/efi/libstub/fdt.c
-> +++ b/drivers/firmware/efi/libstub/fdt.c
-> @@ -187,6 +187,7 @@ static efi_status_t update_fdt_memmap(void *fdt, struct efi_boot_memmap *map)
->  struct exit_boot_struct {
->  	efi_memory_desc_t *runtime_map;
->  	int *runtime_entry_count;
-> +	void *new_fdt_addr;
->  };
->  
->  static efi_status_t exit_boot_func(efi_system_table_t *sys_table_arg,
-> @@ -202,7 +203,7 @@ static efi_status_t exit_boot_func(efi_system_table_t *sys_table_arg,
->  	efi_get_virtmap(*map->map, *map->map_size, *map->desc_size,
->  			p->runtime_map, p->runtime_entry_count);
->  
-> -	return EFI_SUCCESS;
-> +	return update_fdt_memmap(p->new_fdt_addr, map);
+> diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+> index 50a1291..3ef8093 100644
+> --- a/drivers/pci/host/pci-imx6.c
+> +++ b/drivers/pci/host/pci-imx6.c
+> @@ -611,7 +611,7 @@ static int __init imx6_add_pcie_port(struct imx6_pcie *imx6_pcie,
+>  	return 0;
 >  }
 >  
->  /*
-> @@ -300,22 +301,13 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
+> -static int __init imx6_pcie_probe(struct platform_device *pdev)
+> +static int imx6_pcie_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+>  	struct imx6_pcie *imx6_pcie;
+> @@ -653,6 +653,8 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+>  			dev_err(dev, "unable to get reset gpio\n");
+>  			return ret;
+>  		}
+> +	} else if (imx6_pcie->reset_gpio == -EPROBE_DEFER) {
+> +		return imx6_pcie->reset_gpio;
+>  	}
 >  
->  	priv.runtime_map = runtime_map;
->  	priv.runtime_entry_count = &runtime_entry_count;
-> +	priv.new_fdt_addr = (void *)*new_fdt_addr;
->  	status = efi_exit_boot_services(sys_table, handle, &map, &priv,
->  					exit_boot_func);
+>  	/* Fetch clocks */
+> @@ -746,11 +748,12 @@ static struct platform_driver imx6_pcie_driver = {
+>  		.name	= "imx6q-pcie",
+>  		.of_match_table = imx6_pcie_of_match,
+>  	},
+> +	.probe    = imx6_pcie_probe,
+>  	.shutdown = imx6_pcie_shutdown,
+>  };
 >  
->  	if (status == EFI_SUCCESS) {
->  		efi_set_virtual_address_map_t *svam;
->  
-> -		status = update_fdt_memmap((void *)*new_fdt_addr, &map);
-> -		if (status != EFI_SUCCESS) {
-> -			/*
-> -			 * The kernel won't get far without the memory map, but
-> -			 * may still be able to print something meaningful so
-> -			 * return success here.
-> -			 */
-> -			return EFI_SUCCESS;
-> -		}
-> -
->  		/* Install the new virtual address map */
->  		svam = sys_table->runtime->set_virtual_address_map;
->  		status = svam(runtime_entry_count * desc_size, desc_size,
-> -- 
-> 2.7.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-efi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>  static int __init imx6_pcie_init(void)
+>  {
+> -	return platform_driver_probe(&imx6_pcie_driver, imx6_pcie_probe);
+> +	return platform_driver_register(&imx6_pcie_driver);
+>  }
+>  device_initcall(imx6_pcie_init);
