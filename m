@@ -1,49 +1,97 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 1 Feb 2017 13:41:11 +0000
-Subject: [PATCH] efi: fdt: avoid FDT manipulation after ExitBootServices()
-In-Reply-To: <CAF7UmSyYvmo8k910mJEAYhaOJy9j_bpXw6f+Cj=cS_m_iYiCCQ@mail.gmail.com>
-References: <1485954693-25750-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAF7UmSyYvmo8k910mJEAYhaOJy9j_bpXw6f+Cj=cS_m_iYiCCQ@mail.gmail.com>
-Message-ID: <CAKv+Gu8gUqqczZiZTaoPFn_1Fb2GsjoXK+yzQdxwtyjfR_LGnA@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 1 Feb 2017 13:44:02 +0000
+Subject: [PATCH 2/2] arm64/dma-mapping: validate dma_masks against IORT
+ defined limits
+In-Reply-To: <1485893763-20671-2-git-send-email-nwatters@codeaurora.org>
+References: <1485893763-20671-1-git-send-email-nwatters@codeaurora.org>
+ <1485893763-20671-2-git-send-email-nwatters@codeaurora.org>
+Message-ID: <115903ce-6c1d-faa9-cbe4-e67a3d41f5c9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 February 2017 at 13:39, Leif Lindholm <leif.lindholm@linaro.org> wrote:
-> On 1 February 2017 at 13:11, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> Some AArch64 UEFI implementations disable the MMU in ExitBootServices(),
->> after which unaligned accesses to RAM are no longer supported.
->>
->> Commit abfb7b686a3e ("efi/libstub/arm*: Pass latest memory map to the
->> kernel") fixed an issue in the memory map handling of the stub FDT code,
->> but inadvertently created an issue with such firmwares, by moving some
->> of the FDT manipulation to after the invocation of ExitBootServices().
->> However, the stub's libfdt implementation uses the ordinary, accelerated
->> string functions, which rely on hardware handling of unaligned accesses,
->> resulting in alignment faults when executed with the MMU off.
->>
->> Whether disabling the MMU in ExitBootServices() complies with the UEFI
->> spec is unclear, but it is a reality we have to deal with, given that
->> it wasn't a problem before commit abfb7b686a3e was applied.
->
-> I'm not sure it's unclear, but someone not reading the specification
-> and instead looking
-> at what the unfortunate LinuxLoader did might incorrectly deduce that
-> such is the case.
->
->> So fix the situation by moving the update_fdt_memmap() into the callback
->> invoked by efi_exit_boot_services() right before it hits the button.
->>
->> Fixes: abfb7b686a3e ("efi/libstub/arm*: Pass latest memory map to the kernel")
->
-> I would sort argue against the Fixes: tag, given that I don't consider
-> that code to be
-> incorrect.
->
+Hi Nate,
 
-Well, that patch ended up in -stable, and is breaking actual systems
-that worked 'fine' before.
+On 31/01/17 20:16, Nate Watterson wrote:
+> Some drivers set the dma_mask of client devices based solely on values
+> read from capability registers which may not account for platform
+> specific bus address width limitations. Fortunately, the ACPI IORT table
+> provides a way to report the effective number of address bits a device
+> can use to access memory. This information, when present, is used to
+> supplement the checks already being done in dma_supported() to avoid
+> setting overly generous dma_masks.
 
-> I agree that this is a good change regardless.
->
+This is equally a problem for DT, and I think in general we'd prefer not
+to be dragging ACPI/DT specifics in at this level when there's a clean
+way to address it more generally. There is some recent ongoing
+discussion and work in this area (latest part at [1]) - I have a local
+branch somewhere implementing the stricter "don't special case default
+masks" version (after I came around to Arnd's viewpoint), which I must
+refresh myself on because there was some anomaly in the core DT code
+which that brought to light.
 
-Cheers.
+> Signed-off-by: Nate Watterson <nwatters@codeaurora.org>
+> ---
+>  arch/arm64/mm/dma-mapping.c | 20 +++++++++++++++++++-
+>  1 file changed, 19 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index e040827..467fd23 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -19,6 +19,7 @@
+>  
+>  #include <linux/gfp.h>
+>  #include <linux/acpi.h>
+> +#include <linux/acpi_iort.h>
+>  #include <linux/bootmem.h>
+>  #include <linux/cache.h>
+>  #include <linux/export.h>
+> @@ -347,6 +348,12 @@ static int __swiotlb_get_sgtable(struct device *dev, struct sg_table *sgt,
+>  
+>  static int __swiotlb_dma_supported(struct device *hwdev, u64 mask)
+>  {
+> +	int dma_limit;
+> +
+> +	dma_limit = iort_get_memory_address_limit(hwdev);
+> +	if (dma_limit >= 0 && DMA_BIT_MASK(dma_limit) < mask)
+> +		return 0;
+> +
+>  	if (swiotlb)
+>  		return swiotlb_dma_supported(hwdev, mask);
+>  	return 1;
+> @@ -784,6 +791,17 @@ static void __iommu_unmap_sg_attrs(struct device *dev,
+>  	iommu_dma_unmap_sg(dev, sgl, nelems, dir, attrs);
+>  }
+>  
+> +static int __iommu_dma_supported(struct device *hwdev, u64 mask)
+> +{
+> +	int dma_limit;
+> +
+> +	dma_limit = iort_get_memory_address_limit(hwdev);
+> +	if (dma_limit >= 0 && DMA_BIT_MASK(dma_limit) < mask)
+> +		return 0;
+> +
+> +	return iommu_dma_supported(hwdev, mask);
+
+Either way, this reminds me that iommu_dma_supported() is another thing
+I got completely wrong - time to write yet another patch...
+
+Robin.
+
+[1]:http://www.mail-archive.com/linux-renesas-soc at vger.kernel.org/msg10637.html
+
+> +}
+> +
+>  static struct dma_map_ops iommu_dma_ops = {
+>  	.alloc = __iommu_alloc_attrs,
+>  	.free = __iommu_free_attrs,
+> @@ -799,7 +817,7 @@ static void __iommu_unmap_sg_attrs(struct device *dev,
+>  	.sync_sg_for_device = __iommu_sync_sg_for_device,
+>  	.map_resource = iommu_dma_map_resource,
+>  	.unmap_resource = iommu_dma_unmap_resource,
+> -	.dma_supported = iommu_dma_supported,
+> +	.dma_supported = __iommu_dma_supported,
+>  	.mapping_error = iommu_dma_mapping_error,
+>  };
+>  
+> 
