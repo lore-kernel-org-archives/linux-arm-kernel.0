@@ -1,129 +1,100 @@
-From: Vadim.Lomovtsev@caviumnetworks.com (Vadim Lomovtsev)
-Date: Wed, 1 Feb 2017 04:53:25 -0800
-Subject: [PATCH] PCI: ACPI: Fix ThunderX PEM initialization
-In-Reply-To: <20170131203109.GA14127@bhelgaas-glaptop.roam.corp.google.com>
-References: <1485793552-12614-1-git-send-email-Vadim.Lomovtsev@caviumnetworks.com>
- <20170130211236.GW20550@bhelgaas-glaptop.roam.corp.google.com>
- <20170131102830.GA13854@localhost.localdomain>
- <20170131142525.GA9942@bhelgaas-glaptop.roam.corp.google.com>
- <20170131145720.GA14231@localhost.localdomain>
- <20170131203109.GA14127@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20170201125325.GA15805@localhost.localdomain>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Wed, 01 Feb 2017 13:56:36 +0100
+Subject: [PATCH] dmaengine: pl330: Fix race in residue reporting
+In-Reply-To: <20170201124349.21443-1-romain.perier@collabora.com>
+References: <20170201124349.21443-1-romain.perier@collabora.com>
+Message-ID: <1485953796.14092.24.camel@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2017 at 02:31:09PM -0600, Bjorn Helgaas wrote:
-> On Tue, Jan 31, 2017 at 06:57:20AM -0800, Vadim Lomovtsev wrote:
-> > On Tue, Jan 31, 2017 at 08:25:25AM -0600, Bjorn Helgaas wrote:
-> > > On Tue, Jan 31, 2017 at 02:28:30AM -0800, Vadim Lomovtsev wrote:
-> > > > Hi Bjorn,
-> > > > 
-> > > > On Mon, Jan 30, 2017 at 03:12:37PM -0600, Bjorn Helgaas wrote:
-> > > > > Hi Vadim,
-> > > > > 
-> > > > > On Mon, Jan 30, 2017 at 08:25:52AM -0800, Vadim Lomovtsev wrote:
-> > > > > > This patch is to address PEM initialization issue
-> > > > > > which causes network issues.
-> > > > > > 
-> > > > > > It is necessary to search for _HID:PNP0A08 while requesting
-> > > > > > PEM resources via ACPI instead of "THRX0002".
-> > > > > > 
-> > > > > > Signed-off-by: Vadim Lomovtsev <Vadim.Lomovtsev@caviumnetworks.com>
-> > > > > > ---
-> > > > > >  drivers/pci/host/pci-thunder-pem.c | 2 +-
-> > > > > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > > > > 
-> > > > > > diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
-> > > > > > index af722eb..aec30b8 100644
-> > > > > > --- a/drivers/pci/host/pci-thunder-pem.c
-> > > > > > +++ b/drivers/pci/host/pci-thunder-pem.c
-> > > > > > @@ -331,7 +331,7 @@ static int thunder_pem_acpi_init(struct pci_config_window *cfg)
-> > > > > >  	if (!res_pem)
-> > > > > >  		return -ENOMEM;
-> > > > > >  
-> > > > > > -	ret = acpi_get_rc_resources(dev, "THRX0002", root->segment, res_pem);
-> > > > > > +	ret = acpi_get_rc_resources(dev, "PNP0A08", root->segment, res_pem);
-> > > > > 
-> > > > > This doesn't smell right: PNP0A08 is the generic ACPI ID.  There's no
-> > > > > guarantee that if we find a PNP0A08 device, it is a ThunderX device.
-> > > > > 
-> > > > > I think the only way to call thunder_pem_acpi_init() is via an MCFG
-> > > > > quirk that mentions thunder_pem_ecam_ops, which means we only call it
-> > > > > if we find an MCFG with "CAVIUM" "THUNDERX" OEM and table IDs, so it's
-> > > > > probably safe in that sense.
-> > > > 
-> > > > Agree, it is not the best solution.
-> > > > We will implement such approach and send for review. 
-> > > > 
-> > > > > 
-> > > > > But it's an abuse of the ACPI _HID model.  If you match a device using
-> > > > > PNP0A08, all you can assume about it is that it uses the generic
-> > > > > PNP0A08 programming model, and I don't think that includes "the first
-> > > > > memory resource in _CRS contains ECAM space and MSI-X tables."
-> > > > > 
-> > > > > I expect this is a teething issue because you have firmware in the
-> > > > > field that uses PNP0A08 and it's not feasible to update it.  If that's
-> > > > > the case, the changelog should have details about it and we should
-> > > > > have a comment in the code, because I don't think this is the model we
-> > > > > want to end up with in future releases.
-> > > > 
-> > > > It could become so. However, for now I didn't get any reports on that,
-> > > > (may be I miss something) except some internal emailings.
-> > > > At my testing HW I was able to see some issues related to acpi-PEM stuff.
-> > > > 
-> > > > Thanks for feed-back, we will prepare another patch or patchset
-> > > > implementing approach you've highlighted.
-> > > 
-> > > The approach I would like best is to search for THRX0002, because then
-> > > you know you have a ThunderX PEM device, and you can assume
-> > > device-specific details about its _CRS.
-> > >
-> > > But that's what the existing code does, and apparently that doesn't
-> > > work.  My guess is that you have firmware in the field where the host
-> > > bridge has only PNP0A08 (and maybe PNP0A03) as device IDs.
-> > 
-> > Because there is no such ACPI ID as "THRX0002" registered
-> > (http://www.uefi.org/acpi_id_list).
+Hey Romain,
+
+I submitted this ages ago, but got distracted. Thanks for reviving.
+Note that i remember Krzysztof had some review remarks, it's probably
+worth digging up the old thread and making sure you address those.
+
+On Wed, 2017-02-01 at 13:43 +0100, Romain Perier wrote:
+> From: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 > 
-> To be pedantically correct, I think you want "THRX" registered.  Then
-> you can manage the "0002" part internally without registering each
-> individual device.
-
-Not sure if it would be registered that way, because (AFAIK)
-it expected to be string constructed from Vendor ID (not the Product ID) plus
-four hex digit manged internaly. So we suggest to change it to 177DXXXX
-which corresponds to Cavium PCI ID https://pci-ids.ucw.cz/pci.ids.
-It's also possible to use the 3-digit PNP ID, "CAV", to construct these
-_HID/_CID/_SUB values (http://www.uefi.org/pnp_id_list).
-
-So the FW will be updated accordingly.
-
-For old FW we'll implement fallback scenario gathering resource info
-via _CRS object (comments will be provided in the code also).
-
+> When a transfer completes there is a small window between the
+> descriptor
+> being unset as the current active one in the thread and it being
+> marked
+> as done. This causes the residue to be incorrectly set when
+> pl330_tx_status is run in that window. Practically this caused
+> issue for me with audio playback as the residue goes up during a
+> transfer (as the in-progress transfer is no longer accounted for),
+> which makes the higher levels think the audio ringbuffer wrapped
+> around
+> and thus did a sudden big jump forward.
 > 
-> > From the other hand we may gather device resources through
-> > _CRS (we have acpi_device already set by this moment) but
-> > we need to be sure that we're running at Cavium ThunderX board then.
-> > 
-> > To do that we may add _SUB value (accrodingly to spec) with
-> > exact ID string (a full PCI ID value "177DA22D" is suggested).
-> > This will eventually become the main method of finding out
-> > whether we run on a ThunderX PEM.
+> To resolve this, add a field protected by the dma engine lock to
+> indicate the transfer is done but the status hasn't been updated yet.
 > 
-> I don't understand why you would use _SUB.  I think the correct way to
-> handle this is to use a _HID of "THRX0002" with a _CID of "PNP0A08".
-> Is there some existing _SUB usage you're using as an example?
->
+> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> Signed-off-by: Romain Perier <romain.perier@collabora.com>
+> 
+> Series-to: Vinod Koul <vinod.koul@intel.com>
+> Series-cc: dmaengine at vger.kernel.org
+> Series-cc: linux-kernel at vger.kernel.org
+> Series-cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Series-cc: linux-rockchip at lists.infradead.org
+> Series-cc: linux-samsung-soc at vger.kernel.org
+> Series-cc:??linux-arm-kernel at vger.kernel.org
 
-Here we were talking about extra quirk to match PEM and ECAM and thus make
-a decision. This object could also store some vendor-specific IDs.
-To be honest I didn't see usage in kernel (didn't search), but ACPI Spec
-provide an example as (p 6.1.9) :
-  Name (_SUB, "MSFT3000")// Vendor-defined subsystem
-
-However this is still debatable and we probably stick to _HID while
-implementing additional match functions.
+These are patman metadata, you probably want to drop these from the
+commit message ;)
 
 
-> Bjorn
+
+> ?drivers/dma/pl330.c | 9 ++++++++-
+> ?1 file changed, 8 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
+> index 740bbb9..d942fac 100644
+> --- a/drivers/dma/pl330.c
+> +++ b/drivers/dma/pl330.c
+> @@ -521,6 +521,9 @@ struct dma_pl330_desc {
+> ?
+> ?	enum desc_status status;
+> ?
+> +	/* Transfer completed, but not yet moved to DONE state */
+> +	bool xferred;
+> +
+> ?	int bytes_requested;
+> ?	bool last;
+> ?
+> @@ -1508,6 +1511,9 @@ static void dma_pl330_rqcb(struct
+> dma_pl330_desc *desc, enum pl330_op_err err)
+> ?	spin_lock_irqsave(&pch->lock, flags);
+> ?
+> ?	desc->status = DONE;
+> +	spin_lock(&pch->thread->dmac->lock);
+> +	desc->xferred = false;
+> +	spin_unlock(&pch->thread->dmac->lock);
+> ?
+> ?	spin_unlock_irqrestore(&pch->lock, flags);
+> ?
+> @@ -1640,6 +1646,7 @@ static int pl330_update(struct pl330_dmac
+> *pl330)
+> ?
+> ?			/* Detach the req */
+> ?			descdone = thrd->req[active].desc;
+> +			descdone->xferred = true;
+> ?			thrd->req[active].desc = NULL;
+> ?
+> ?			thrd->req_running = -1;
+> @@ -2311,7 +2318,7 @@ pl330_tx_status(struct dma_chan *chan,
+> dma_cookie_t cookie,
+> ?
+> ?	/* Check in pending list */
+> ?	list_for_each_entry(desc, &pch->work_list, node) {
+> -		if (desc->status == DONE)
+> +		if (desc->xferred || desc->status == DONE)
+> ?			transferred = desc->bytes_requested;
+> ?		else if (running && desc == running)
+> ?			transferred =
+
+-- 
+Sjoerd Simons
+Collabora Ltd.
