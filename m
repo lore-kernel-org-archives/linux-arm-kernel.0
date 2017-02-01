@@ -1,63 +1,41 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 1 Feb 2017 21:01:01 +0900
-Subject: [PATCH v2] ARM: dts: r8a7791: link DU to VSPDs
-In-Reply-To: <4bf0b27c-9641-391d-fc05-8cdc20ce4ec3@cogentembedded.com>
-References: <1529351.Fac5N2tKoF@wasted.cogentembedded.com>
- <2492577.tBEnW0tCHD@wasted.cogentembedded.com>
- <4ae454ad-296c-dec9-27e9-fd050333737f@cogentembedded.com>
- <CANqRtoSQTa0fHJSwAHbN3hXSZ=m1kuR2GsUWE5ojN5AN-9i6Bw@mail.gmail.com>
- <4bf0b27c-9641-391d-fc05-8cdc20ce4ec3@cogentembedded.com>
-Message-ID: <CANqRtoTpsMix30+ESO-bEdaBM8H_9eTOLuoWShQABhmgJk23EA@mail.gmail.com>
+From: kraxel@redhat.com (Gerd Hoffmann)
+Date: Wed, 01 Feb 2017 13:20:53 +0100
+Subject: [RESENT PATCH] ARM: bcm2835: Add devicetree for the Raspberry
+ Pi 3, for arm (32)
+In-Reply-To: <1485944672.1076.50.camel@redhat.com>
+References: <1484845444-4617-1-git-send-email-kraxel@redhat.com>
+ <87fukcgsqp.fsf@eliezer.anholt.net> <878tpqki0k.fsf@eliezer.anholt.net>
+ <1485944672.1076.50.camel@redhat.com>
+Message-ID: <1485951653.1076.54.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+> > I think just having links from
+> > arch/arm64/boot/dts/broadcom/bcm2837*.dts* to arch/arm/boot/dts/ would
+> > be the solution, then this Makefile could just reference
+> > bcm2837-rpi-3-b.dtb.
+> 
+> I suspect it is not that easy, last time I tried it didn't work.
+> Will try again though.
 
-On Wed, Feb 1, 2017 at 8:40 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> On 2/1/2017 2:13 PM, Magnus Damm wrote:
->
->>>> Add the "vsps" property to the DU device node in order to link this node
->>>> to
->>>> the VSPD nodes.
->>>>
->>>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>>>
->>>> ---
->>>> Changes in version 2:
->>>> - rebased the patch.
->>>>
->>>> This patch is against the 'renesas-devel-20170125-v4.10-rc5' of Simon
->>>> Horman's
->>>> 'renesas.git' repo.  It's  only meaningful if the DRM driver patches
->>>> I've
->>>> just
->>>> posted are applied.
->>>
->>>
->>>
->>>    Forgot to note that without this patch the DU driver fails to link to
->>> VSPD and probe correctly, so there's no video signal. So it makes sense
->>> to
->>> apply before the DU driver patch (once it's ACKed for merge)...
->>
->>
->> Doesn't that translate to breaking the DT ABI? Is there someway we can
->> avoid doing that?
->
->
->    It doesn't -- if this patch is merged ahead of the DU patches.
+Yep, dtbs_install fails:
 
-Perhaps I'm misunderstanding, but if you require a DTS patch to be
-merged before a driver change then doesn't this mean that older DTBs
-will stop working with newer kernels and the user is forced to update
-the DTB to avoid breakage?
+[ ... ]
+  INSTALL arch/arm/boot/dts/bcm2835-rpi-b-plus.dtb
+  INSTALL arch/arm/boot/dts/bcm2835-rpi-a-plus.dtb
+  INSTALL arch/arm/boot/dts/bcm2836-rpi-2-b.dtb
+  INSTALL 
+cp: missing destination file operand after '/boot/dtbs/4.10.0-rc5+'
+Try 'cp --help' for more information.
+/root/linux/scripts/Makefile.dtbinst:41: recipe for target
+'bcm2837-rpi-3-b.dts' failed
+make[3]: *** [bcm2837-rpi-3-b.dts] Error 1
+arch/arm/Makefile:348: recipe for target 'dtbs_install' failed
+make[2]: *** [dtbs_install] Error 2
+Makefile:150: recipe for target 'sub-make' failed
+make[1]: *** [sub-make] Error 2
+Makefile:24: recipe for target '__sub-make' failed
+make: *** [__sub-make] Error 2
 
-It would be nice if older DTBs could keep on working as before and the
-DU driver modification would work both with connected VSPs and also
-keep on working as before in case the VSP connection is not present in
-DT.
-
-Cheers,
-
-/ magnus
+cheers,
+  Gerd
