@@ -1,92 +1,97 @@
 From: slongerbeam@gmail.com (Steve Longerbeam)
-Date: Tue, 31 Jan 2017 15:43:22 -0800
-Subject: [PATCH v3 00/24] i.MX Media Driver
-In-Reply-To: <20170131110027.GU27312@n2100.armlinux.org.uk>
+Date: Tue, 31 Jan 2017 16:31:55 -0800
+Subject: [PATCH v3 17/24] media: imx: Add CSI subdev driver
+In-Reply-To: <20170131112001.GV27312@n2100.armlinux.org.uk>
 References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <20170131004510.GQ27312@n2100.armlinux.org.uk>
- <951c1a08-c0f2-4333-b4bf-410de8dd863f@gmail.com>
- <20170131110027.GU27312@n2100.armlinux.org.uk>
-Message-ID: <3a673cba-bbf6-5611-5857-4605797bf049@gmail.com>
+ <1483755102-24785-18-git-send-email-steve_longerbeam@mentor.com>
+ <20170131112001.GV27312@n2100.armlinux.org.uk>
+Message-ID: <7ffe2dc6-4098-e89f-03fa-1007eccd7abd@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 01/31/2017 03:00 AM, Russell King - ARM Linux wrote:
-> On Mon, Jan 30, 2017 at 05:22:01PM -0800, Steve Longerbeam wrote:
->> I'm also having trouble finding a datasheet for it, but from what
->> I've read, it has a MIPI CSI-2 interface. It should work fine as long
->> as it presents a single source pad, registers asynchronously, and
->> sets its entity function to MEDIA_ENT_F_CAM_SENSOR.
-> Yes, it is MIPI CSI-2, and yes it has a single source pad, registers
-> asynchronously, but that's about as far as it goes.
+On 01/31/2017 03:20 AM, Russell King - ARM Linux wrote:
+> On Fri, Jan 06, 2017 at 06:11:35PM -0800, Steve Longerbeam wrote:
+>> +static int csi_link_validate(struct v4l2_subdev *sd,
+>> +			     struct media_link *link,
+>> +			     struct v4l2_subdev_format *source_fmt,
+>> +			     struct v4l2_subdev_format *sink_fmt)
+>> +{
+>> +	struct csi_priv *priv = v4l2_get_subdevdata(sd);
+>> +	bool is_csi2;
+>> +	int ret;
+>> +
+>> +	ret = v4l2_subdev_link_validate_default(sd, link, source_fmt, sink_fmt);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	priv->sensor = __imx_media_find_sensor(priv->md, &priv->sd.entity);
+>> +	if (IS_ERR(priv->sensor)) {
+>> +		v4l2_err(&priv->sd, "no sensor attached\n");
+>> +		ret = PTR_ERR(priv->sensor);
+>> +		priv->sensor = NULL;
+>> +		return ret;
+>> +	}
+>> +
+>> +	ret = v4l2_subdev_call(priv->sensor->sd, video, g_mbus_config,
+>> +			       &priv->sensor_mbus_cfg);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	is_csi2 = (priv->sensor_mbus_cfg.type == V4L2_MBUS_CSI2);
+>> +
+>> +	if (is_csi2) {
+>> +		int vc_num = 0;
+>> +		/*
+>> +		 * NOTE! It seems the virtual channels from the mipi csi-2
+>> +		 * receiver are used only for routing by the video mux's,
+>> +		 * or for hard-wired routing to the CSI's. Once the stream
+>> +		 * enters the CSI's however, they are treated internally
+>> +		 * in the IPU as virtual channel 0.
+>> +		 */
+>> +#if 0
+>> +		vc_num = imx_media_find_mipi_csi2_channel(priv->md,
+>> +							  &priv->sd.entity);
+>> +		if (vc_num < 0)
+>> +			return vc_num;
+>> +#endif
+>> +		ipu_csi_set_mipi_datatype(priv->csi, vc_num,
+>> +					  &priv->format_mbus[priv->input_pad]);
+> This seems (at least to me) to go against the spirit of the subdev
+> negotiation.  Here, you seem to bypass the negotiation performed
+> between the CSI and the attached device, wanting to grab the
+> format from the CSI2 sensor directly.  That bypasses negotiation
+> performed at the CSI2 subdev and video muxes.
+
+This isn't so much grabbing a pad format, it is determining
+which source pad at the imx6-mipi-csi2 receiver subdev is
+reached from this CSI (which determines the virtual channel
+the CSI is receiving).
+
+If there was a way to determine the vc# via a status register
+in the CSI, that would be perfect, but there isn't. In fact, the CSIs
+seem to be ignoring the meta-data bus sent by the CSI2IPU gasket
+which contains this info, or that bus is not being routed to the CSIs.
+As the note says, the CSIs only accept vc0 at the CSI_MIPI_DI register.
+Any other value programmed there results in no data from the CSI.
+
+And even the presence of CSI_MIPI_DI register makes no sense to me,
+the CSIs are given the vc# and MIPI datatype from the CSI2IPU meta-data
+bus, so I don't understand why it needs to be told.
+
+Anyway I can just yank this disabled code, it's only there for documentation
+purposes.
+
+
 >
-> The structure is a camera sensor followed by some processing.  So just
-> like the smiapp code, I've ended up with multiple subdevs describing
-> each stage of the sensors pipeline.
->
-> Just like smiapp, the camera sensor block (which is the very far end
-> of the pipeline) is marked with MEDIA_ENT_F_CAM_SENSOR.  However, in
-> front of that is the binner, which just like smiapp gets a separate
-> entity.  It's this entity which is connected to the mipi-csi2 subdev.
+> The same goes for the frame rate monitoring code - imho, the frame
+> rate should be something that results from negotiation with the
+> neighbouring element, not by poking at some entity that is several
+> entities away.
 
-wow, ok got it.
-
-So the sensor pipeline and binner, and the OF graph connecting
-them, are described in the device tree I presume.
-
-The OF graph AFAIK, has no information about which ports are sinks
-and which are sources, so of_parse_subdev() tries to determine that
-based on the compatible string of the device node. So ATM
-of_parse_subdev() assumes there is nothing but the imx6-mipi-csi2,
-video-multiplexer, and camera sensors upstream from the CSI ports
-in the OF graph.
-
-I realize that's not a robust solution, and is the reason for the
-"no sensor attached" below.
-
-Is there any way to determine from the OF graph the data-direction
-of a port (whether it is a sink or a source)? If so it will make
-of_parse_subdev() much more robust.
+I will fix this once the g_frame_interval op is implemented in every
+subdev. I believe you mentioned this already, but g_frame_interval
+will need to be chained until it reaches the originating sensor.
 
 Steve
-
->
-> Unlike smiapp, which does not set an entity function, I set my binner
-> entity as MEDIA_ENT_F_PROC_VIDEO_SCALER on the basis that that is
-> what V4L2 documentation recommend:
->
->      -  ..  row 27
->
->         ..  _MEDIA-ENT-F-PROC-VIDEO-SCALER:
->
->         -  ``MEDIA_ENT_F_PROC_VIDEO_SCALER``
->
->         -  Video scaler. An entity capable of video scaling must have
->            at least one sink pad and one source pad, and scale the
->            video frame(s) received on its sink pad(s) to a different
->            resolution output on its source pad(s). The range of
->            supported scaling ratios is entity-specific and can differ
->            between the horizontal and vertical directions (in particular
->            scaling can be supported in one direction only). Binning and
->            skipping are considered as scaling.
->
-> This causes attempts to configure the ipu1_csi0 interface to fail:
->
-> media-ctl -v -d /dev/media1 --set-v4l2 '"ipu1_csi0":1[fmt:SGBRG8/512x512 at 1/30]'
-> Opening media device /dev/media1
-> Enumerating entities
-> Found 29 entities
-> Enumerating pads and links
-> Setting up format SGBRG8 512x512 on pad ipu1_csi0/1
-> Unable to set format: No such device (-19)
-> Unable to setup formats: No such device (19)
->
-> and in the kernel log:
->
-> ipu1_csi0: no sensor attached
->
-> And yes, I already know that my next problem is going to be that the bayer
-> formats are not supported in your driver (just like Philipp's driver) but
-> adding them should not be difficult... but only once this issue is resolved.
->
