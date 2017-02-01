@@ -1,39 +1,178 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Feb 2017 18:39:18 +0000
-Subject: [PATCH v3 18/24] media: imx: Add SMFC subdev driver
-In-Reply-To: <1483755102-24785-19-git-send-email-steve_longerbeam@mentor.com>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-19-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <20170201183918.GP27312@n2100.armlinux.org.uk>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Wed, 1 Feb 2017 13:47:59 -0500
+Subject: [PATCH v4 3/6] drm/rockchip/dsi: dw-mipi: correct the coding style
+In-Reply-To: <1485225486-669-4-git-send-email-zyw@rock-chips.com>
+References: <1485225486-669-1-git-send-email-zyw@rock-chips.com>
+ <1485225486-669-4-git-send-email-zyw@rock-chips.com>
+Message-ID: <20170201184759.GA14264@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Steve,
+On Tue, Jan 24, 2017 at 10:38:03AM +0800, Chris Zhong wrote:
+> correct the coding style, according the checkpatch scripts
+> 
 
-On Fri, Jan 06, 2017 at 06:11:36PM -0800, Steve Longerbeam wrote:
-> +/*
-> + * Min/Max supported width and heights.
-> + *
-> + * We allow planar output from the SMFC, so we have to align
-> + * output width by 16 pixels to meet IDMAC alignment requirements,
-> + * which also means input width must have the same alignment.
-> + */
-> +#define MIN_W       176
-> +#define MIN_H       144
-> +#define MAX_W      8192
-> +#define MAX_H      4096
-> +#define W_ALIGN    4 /* multiple of 16 pixels */
+Reviewed-by: Sean Paul <seanpaul@chromium.org>
 
-Does this only apply to planar formats?
-
-I notice Philipp's driver allows 8 pixel alignment.  If it's only for
-planar formats, it ought to determine the alignment based on the
-requested format rather than hard-coding it to the maximum alignment
-of all the supported formats.
-
-Thanks.
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> ---
+> 
+> Changes in v4: None
+> Changes in v3: None
+> 
+>  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 33 ++++++++++++++++-----------------
+>  1 file changed, 16 insertions(+), 17 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> index b7b67be..a93ce97 100644
+> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> @@ -157,7 +157,6 @@
+>  #define LPRX_TO_CNT(p)			((p) & 0xffff)
+>  
+>  #define DSI_BTA_TO_CNT			0x8c
+> -
+>  #define DSI_LPCLK_CTRL			0x94
+>  #define AUTO_CLKLANE_CTRL		BIT(1)
+>  #define PHY_TXREQUESTCLKHS		BIT(0)
+> @@ -223,11 +222,11 @@
+>  
+>  #define HSFREQRANGE_SEL(val)	(((val) & 0x3f) << 1)
+>  
+> -#define INPUT_DIVIDER(val)	((val - 1) & 0x7f)
+> +#define INPUT_DIVIDER(val)	(((val) - 1) & 0x7f)
+>  #define LOW_PROGRAM_EN		0
+>  #define HIGH_PROGRAM_EN		BIT(7)
+> -#define LOOP_DIV_LOW_SEL(val)	((val - 1) & 0x1f)
+> -#define LOOP_DIV_HIGH_SEL(val)	(((val - 1) >> 5) & 0x1f)
+> +#define LOOP_DIV_LOW_SEL(val)	(((val) - 1) & 0x1f)
+> +#define LOOP_DIV_HIGH_SEL(val)	((((val) - 1) >> 5) & 0x1f)
+>  #define PLL_LOOP_DIV_EN		BIT(5)
+>  #define PLL_INPUT_DIV_EN	BIT(4)
+>  
+> @@ -370,6 +369,7 @@ static inline struct dw_mipi_dsi *encoder_to_dsi(struct drm_encoder *encoder)
+>  {
+>  	return container_of(encoder, struct dw_mipi_dsi, encoder);
+>  }
+> +
+>  static inline void dsi_write(struct dw_mipi_dsi *dsi, u32 reg, u32 val)
+>  {
+>  	writel(val, dsi->base + reg);
+> @@ -381,7 +381,7 @@ static inline u32 dsi_read(struct dw_mipi_dsi *dsi, u32 reg)
+>  }
+>  
+>  static void dw_mipi_dsi_phy_write(struct dw_mipi_dsi *dsi, u8 test_code,
+> -				 u8 test_data)
+> +				  u8 test_data)
+>  {
+>  	/*
+>  	 * With the falling edge on TESTCLK, the TESTDIN[7:0] signal content
+> @@ -496,7 +496,6 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
+>  	dsi_write(dsi, DSI_PHY_RSTZ, PHY_ENFORCEPLL | PHY_ENABLECLK |
+>  				     PHY_UNRSTZ | PHY_UNSHUTDOWNZ);
+>  
+> -
+>  	ret = readl_poll_timeout(dsi->base + DSI_PHY_STATUS,
+>  				 val, val & LOCK, 1000, PHY_STATUS_TIMEOUT_US);
+>  	if (ret < 0) {
+> @@ -572,7 +571,7 @@ static int dw_mipi_dsi_host_attach(struct mipi_dsi_host *host,
+>  
+>  	if (device->lanes > dsi->pdata->max_data_lanes) {
+>  		dev_err(dsi->dev, "the number of data lanes(%u) is too many\n",
+> -				device->lanes);
+> +			device->lanes);
+>  		return -EINVAL;
+>  	}
+>  
+> @@ -960,8 +959,8 @@ static void dw_mipi_dsi_clear_err(struct dw_mipi_dsi *dsi)
+>  }
+>  
+>  static void dw_mipi_dsi_encoder_mode_set(struct drm_encoder *encoder,
+> -					struct drm_display_mode *mode,
+> -					struct drm_display_mode *adjusted_mode)
+> +					 struct drm_display_mode *mode,
+> +					 struct drm_display_mode *adjusted_mode)
+>  {
+>  	struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
+>  
+> @@ -1063,7 +1062,7 @@ dw_mipi_dsi_encoder_atomic_check(struct drm_encoder *encoder,
+>  	return 0;
+>  }
+>  
+> -static struct drm_encoder_helper_funcs
+> +static const struct drm_encoder_helper_funcs
+>  dw_mipi_dsi_encoder_helper_funcs = {
+>  	.enable = dw_mipi_dsi_encoder_enable,
+>  	.mode_set = dw_mipi_dsi_encoder_mode_set,
+> @@ -1071,7 +1070,7 @@ dw_mipi_dsi_encoder_helper_funcs = {
+>  	.atomic_check = dw_mipi_dsi_encoder_atomic_check,
+>  };
+>  
+> -static struct drm_encoder_funcs dw_mipi_dsi_encoder_funcs = {
+> +static const struct drm_encoder_funcs dw_mipi_dsi_encoder_funcs = {
+>  	.destroy = drm_encoder_cleanup,
+>  };
+>  
+> @@ -1107,7 +1106,7 @@ static void dw_mipi_dsi_drm_connector_destroy(struct drm_connector *connector)
+>  	drm_connector_cleanup(connector);
+>  }
+>  
+> -static struct drm_connector_funcs dw_mipi_dsi_atomic_connector_funcs = {
+> +static const struct drm_connector_funcs dw_mipi_dsi_atomic_connector_funcs = {
+>  	.dpms = drm_atomic_helper_connector_dpms,
+>  	.fill_modes = drm_helper_probe_single_connector_modes,
+>  	.destroy = dw_mipi_dsi_drm_connector_destroy,
+> @@ -1117,7 +1116,7 @@ static struct drm_connector_funcs dw_mipi_dsi_atomic_connector_funcs = {
+>  };
+>  
+>  static int dw_mipi_dsi_register(struct drm_device *drm,
+> -				      struct dw_mipi_dsi *dsi)
+> +				struct dw_mipi_dsi *dsi)
+>  {
+>  	struct drm_encoder *encoder = &dsi->encoder;
+>  	struct drm_connector *connector = &dsi->connector;
+> @@ -1138,14 +1137,14 @@ static int dw_mipi_dsi_register(struct drm_device *drm,
+>  	drm_encoder_helper_add(&dsi->encoder,
+>  			       &dw_mipi_dsi_encoder_helper_funcs);
+>  	ret = drm_encoder_init(drm, &dsi->encoder, &dw_mipi_dsi_encoder_funcs,
+> -			 DRM_MODE_ENCODER_DSI, NULL);
+> +			       DRM_MODE_ENCODER_DSI, NULL);
+>  	if (ret) {
+>  		dev_err(dev, "Failed to initialize encoder with drm\n");
+>  		return ret;
+>  	}
+>  
+>  	drm_connector_helper_add(connector,
+> -			&dw_mipi_dsi_connector_helper_funcs);
+> +				 &dw_mipi_dsi_connector_helper_funcs);
+>  
+>  	drm_connector_init(drm, &dsi->connector,
+>  			   &dw_mipi_dsi_atomic_connector_funcs,
+> @@ -1220,7 +1219,7 @@ static const struct of_device_id dw_mipi_dsi_dt_ids[] = {
+>  MODULE_DEVICE_TABLE(of, dw_mipi_dsi_dt_ids);
+>  
+>  static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
+> -			     void *data)
+> +			    void *data)
+>  {
+>  	const struct of_device_id *of_id =
+>  			of_match_device(dw_mipi_dsi_dt_ids, dev);
+> @@ -1328,7 +1327,7 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
+>  }
+>  
+>  static void dw_mipi_dsi_unbind(struct device *dev, struct device *master,
+> -	void *data)
+> +			       void *data)
+>  {
+>  	struct dw_mipi_dsi *dsi = dev_get_drvdata(dev);
+>  
+> -- 
+> 2.6.3
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Sean Paul, Software Engineer, Google / Chromium OS
