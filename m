@@ -1,158 +1,87 @@
-From: christopher.lee.bostic@gmail.com (Christopher Bostic)
-Date: Wed, 1 Feb 2017 11:17:51 -0600
-Subject: [PATCH v2 15/18] drivers/fsi: Add documentation for GPIO based
- FSI master
-In-Reply-To: <20170118215755.xoamoc2rrzhy4kyz@rob-hp-laptop>
-References: <1484260543-80300-1-git-send-email-christopher.lee.bostic@gmail.com>
- <20170118215755.xoamoc2rrzhy4kyz@rob-hp-laptop>
-Message-ID: <CAA0LjjXBO3Ua-HpTsq_Tfn4QAm7wwdTr2FHApRC7vvT+dhtrvg@mail.gmail.com>
+From: john@metanate.com (John Keeping)
+Date: Wed, 1 Feb 2017 17:23:18 +0000
+Subject: [PATCH v3 13/24] drm/rockchip: dw-mipi-dsi: fix escape clock rate
+In-Reply-To: <20170130202510.GP20076@art_vandelay>
+References: <20170129132444.25251-1-john@metanate.com>
+ <20170129132444.25251-14-john@metanate.com>
+ <20170130202510.GP20076@art_vandelay>
+Message-ID: <20170201172318.6ee90c2d.john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 18, 2017 at 3:57 PM, Rob Herring <robh@kernel.org> wrote:
-> On Thu, Jan 12, 2017 at 04:35:43PM -0600, christopher.lee.bostic at gmail.com wrote:
->> From: Chris Bostic <cbostic@us.ibm.com>
->>
->> Define the device tree bindings for the GPIO master type.
->>
->> Signed-off-by: Chris Bostic <cbostic@us.ibm.com>
->>
->> ---
->>
->> V2 - Break out this documentation update from the code implementing
->>      The GPIO master function.
->>
->>    - Move the documentation to an earlier patch than the code
->>      implementing the function.
->>
->>    - Document all 'compatible' strings used in the series.
->>
->>    - Write binding document in terms of hardware, not software.
->>
->>    - Elaborate on what a GPIO based FSI master is versus a non
->>      GPIO based master.
->>
->>    - Give a more detailed description of what each pin in the GPIO
->>      FSI master is to be used for.
->>
->>    - Re-order compatible strings in example so that most specific
->>      comes first.
->>
->>    - Indicate the proper order each pin should be initialized.
->>
->>    - Fix an unmatched '>' bracket in the example for binding.
->>
->>    - Bracket each element of the example list items individually.
->> ---
->>  .../devicetree/bindings/fsi/fsi-master-gpio.txt    | 71 ++++++++++++++++++++++
->>  1 file changed, 71 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt
->>
->> diff --git a/Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt b/Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt
->> new file mode 100644
->> index 0000000..5d589bf
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/fsi/fsi-master-gpio.txt
->> @@ -0,0 +1,71 @@
->> +Device-tree bindings for FSI master implemented with GPIO
->> +---------------------------------------------------------
->> +
->> +Typically a FSI master is defined in hardware with output control
->> +lines designated for Enable, Data, Clock, etc..  In the case of
->> +a 'GPIO FSI master', however, it may be the case that there is no
->> +such master defined in hardware and must be implemented in standard
->> +GPIO to interact with its slaves.  In this 'virtual' FSI master
->> +case the GPIO pins representing clk and data are directly
->> +connected to the slaves.
->> +
->> +The GPIO FSI master node
->> +-------------------------
->> +This node describes a FSI master implmented with GPIO.
->> +Required property:
->> +     compatible = "ibm,fsi-master-gpio"
->
-> Generally, we don't have a vendor prefix for GPIO based implementations.
->
+On Mon, 30 Jan 2017 15:25:10 -0500, Sean Paul wrote:
 
-Hi Rob
+> On Sun, Jan 29, 2017 at 01:24:33PM +0000, John Keeping wrote:
+> > This clock rate is derived from the PHY PLL, so it should be calculated
+> > dynamically.  Use the same calculation as the vendor kernel to derive
+> > the escape clock speed.
+> >   
+> 
+> Nit below, but
+> 
+> Reviewed-by: Sean Paul <seanpaul@chromium.org>
+> 
+> > Signed-off-by: John Keeping <john@metanate.com>
+> > Reviewed-by: Chris Zhong <zyw@rock-chips.com>
+> > ---
+> > v3:
+> > - Improve the commit message a bit
+> > - Add Chris' Reviewed-by
+> > Unchanged in v2
+> > 
+> >  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 4 +++-
+> >  1 file changed, 3 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> > index 290282e86d16..c2e0ba96e0a0 100644
+> > --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> > +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> > @@ -710,11 +710,13 @@ static void dw_mipi_dsi_disable(struct dw_mipi_dsi *dsi)
+> >  
+> >  static void dw_mipi_dsi_init(struct dw_mipi_dsi *dsi)
+> >  {  
+> 
+> Nit: It would be nice to add a comment to the effect of "You are not meant to
+> understand this, it comes from the vendor kernel"
 
-Will make the change in the next revision (v4).
+Actually, I think my commit message was misleading.  I think I do
+understand the calculation, although the TRM is not particularly clear
+about it.  TX_ESC_CLK_DIVISION is described as:
 
->> +
->> +The standard FSI master node
->> +----------------------------
->> +This node describes a FSI master implmemented fully in hardware
->> +with dedicated input/output pins required for its function (i.e.
->> +not using generic GPIO pins).
->> +Required property:
->> +     compatible = "ibm,fsi-master"
->
-> This and GPIO binding should be in 2 docs.
->
+    the division factor for the TX_Escape clock source (lanebyteclk).
+    The value 0 and 1 stop the TX_ESC clock generation
 
-Will separate out.
+Now lanebyteclk is (dsi->lane_mbps >> 3) since lane_mbps is the
+lane bit clock.  The maximum escape mode clock from the MIPI
+specification is 20MHz, so we end up needing
 
->> +
->> +
->> +GPIO FSI master property/pin descriptions
->> +------------------------------------------
->> +clk -        The master controlled clock line that indicates to the
->> +     slave when to read in or send out new data - required.
->> +data -       The serial data line containing information to be sent or
->> +     received by the master.  This line is bi-directional.  During
->> +     command phase the master controls the line and when a response
->> +     is required the slave takes control - required.
->> +enable - Controls power state of data line - optional.
->> +trans - Voltage translator control. In some applications the data line
->> +     must have its signal levels altered by a translator. If this is
->> +     necessary then control of signal direction is managed via this
->> +     line - optional.
->> +mux -        Multiplexor control.  This activates/deactivates the data line
->> +     in cases where it is one of many possible selections via mux -
->> +     optional.
->
-> Combine these descriptions and the property names, grouped as below.
->
+    lanebyteclk / esc_clk_division < 20
 
-Will update.
+thus:
 
->> +
->> +Required properties:
->> +     - compatible = "ibm,fsi-master-gpio";
->> +     - clk-gpios;
->> +     - data-gpios;
->> +
->> +Optional properties:
->> +     - enable-gpios;
->> +     - trans-gpios;
->> +     - mux-gpios;
->> +
->> +Order of property activation:
->> +1. clk
->> +2. data
->> +3. trans
->> +4. enable
->> +5. mux
->> +
->> +
->> +Example:
->> +
->> +fsi-master {
->> +     compatible = "ibm,fsi-master-gpio", "ibm,fsi-master";
->
-> From the description, these should be mutually exclusive.
+    esc_clk_division > lanebyteclk / 20
 
-Will change.
+and we want esc_clk_division >= 2 to avoid disabling the clock
+generation.
 
-Thanks for your input.
+I'll add a comment to this effect.
 
->
->> +     clk-gpios = <&gpio 0>, <&gpio 6>;
->> +     data-gpios = <&gpio 1>, <&gpio 7>;
->> +     enable-gpios = <&gpio 2>, <&gpio 8>;
->> +     trans-gpios = <&gpio 3>, <&gpio 9>;
->> +     mux-gpios = <&gpio 4>, <&gpio 10>;
->> +}
->> --
->> 1.8.2.2
->>
+> > +	u32 esc_clk_division = (dsi->lane_mbps >> 3) / 20 + 1;
+> > +
+> >  	dsi_write(dsi, DSI_PWR_UP, RESET);
+> >  	dsi_write(dsi, DSI_PHY_RSTZ, PHY_DISFORCEPLL | PHY_DISABLECLK
+> >  		  | PHY_RSTZ | PHY_SHUTDOWNZ);
+> >  	dsi_write(dsi, DSI_CLKMGR_CFG, TO_CLK_DIVIDSION(10) |
+> > -		  TX_ESC_CLK_DIVIDSION(7));
+> > +		  TX_ESC_CLK_DIVIDSION(esc_clk_division));
+> >  }
+> >  
+> >  static void dw_mipi_dsi_dpi_config(struct dw_mipi_dsi *dsi,
+> > -- 
+> > 2.11.0.197.gb556de5.dirty
+> > 
+> > _______________________________________________
+> > dri-devel mailing list
+> > dri-devel at lists.freedesktop.org
+> > https://lists.freedesktop.org/mailman/listinfo/dri-devel  
+> 
