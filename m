@@ -1,178 +1,109 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Wed, 1 Feb 2017 13:47:59 -0500
-Subject: [PATCH v4 3/6] drm/rockchip/dsi: dw-mipi: correct the coding style
-In-Reply-To: <1485225486-669-4-git-send-email-zyw@rock-chips.com>
-References: <1485225486-669-1-git-send-email-zyw@rock-chips.com>
- <1485225486-669-4-git-send-email-zyw@rock-chips.com>
-Message-ID: <20170201184759.GA14264@art_vandelay>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 1 Feb 2017 18:52:30 +0000
+Subject: [PATCH V7 08/11] drivers: acpi: Handle IOMMU lookup failure with
+ deferred probing or error
+In-Reply-To: <f401e27e-d619-0eec-2401-50d8e2fc2f0f@codeaurora.org>
+References: <f2370671-ece8-fbee-de19-350dd625088f@codeaurora.org>
+ <93e79759-d614-9b36-d5ab-63e8eb725009@arm.com>
+ <14751205-f034-7f0d-442a-854c3909425c@codeaurora.org>
+ <5ba9f366d6e25397cdef8ad95b49e199@codeaurora.org>
+ <175a3798-b824-ef1a-e112-9f6f472973ae@codeaurora.org>
+ <20170130143851.GJ16461@arm.com>
+ <b2e50c17de156341deab9fb8e91a8dec@codeaurora.org>
+ <1e048aff-0d77-b9f2-ebf8-2ba315b90ca7@codeaurora.org>
+ <20170130165124.GA11712@red-moon>
+ <f401e27e-d619-0eec-2401-50d8e2fc2f0f@codeaurora.org>
+Message-ID: <20170201185230.GA1922@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 24, 2017 at 10:38:03AM +0800, Chris Zhong wrote:
-> correct the coding style, according the checkpatch scripts
+On Mon, Jan 30, 2017 at 03:03:06PM -0500, Sinan Kaya wrote:
+> On 1/30/2017 11:51 AM, Lorenzo Pieralisi wrote:
+> > On Mon, Jan 30, 2017 at 10:46:39AM -0500, Sinan Kaya wrote:
+> >> On 1/30/2017 9:54 AM, Nate Watterson wrote:
+> >>> On 2017-01-30 09:38, Will Deacon wrote:
+> >>>> On Mon, Jan 30, 2017 at 09:33:50AM -0500, Sinan Kaya wrote:
+> >>>>> On 1/30/2017 9:23 AM, Nate Watterson wrote:
+> >>>>>> On 2017-01-30 08:59, Sinan Kaya wrote:
+> >>>>>>> On 1/30/2017 7:22 AM, Robin Murphy wrote:
+> >>>>>>>> On 29/01/17 17:53, Sinan Kaya wrote:
+> >>>>>>>>> On 1/24/2017 7:37 AM, Lorenzo Pieralisi wrote:
+> >>>>>>>>>> [+hanjun, tomasz, sinan]
+> >>>>>>>>>>
+> >>>>>>>>>> It is quite a key patchset, I would be glad if they can test on their
+> >>>>>>>>>> respective platforms with IORT.
+> >>>>>>>>>>
+> >>>>>>>>>
+> >>>>>>>>> Tested on top of 4.10-rc5.
+> >>>>>>>>>
+> >>>>>>>>> 1.    Platform Hidma device passed dmatest
+> >>>>>>>>> 2.    Seeing some USB stalls on a platform USB device.
+> >>>>>>>>> 3.    PCIe NVME drive probed and worked fine with MSI interrupts after boot.
+> >>>>>>>>> 4.     NVMe driver didn't probe following a hotplug insertion and received an
+> >>>>>>>>> SMMU error event during the insertion.
+> >>>>>>>>
+> >>>>>>>> What was the SMMU error - a translation/permission fault (implying the
+> >>>>>>>> wrong DMA ops) or a bad STE fault (implying we totally failed to tell
+> >>>>>>>> the SMMU about the device at all)?
+> >>>>>>>>
+> >>>>>>>
+> >>>>>>> root at ubuntu:/sys/bus/pci/slots/4# echo 0 > power
+> >>>>>>>
+> >>>>>>> [__204.698522]_iommu:_Removing_device_0003:01:00.0_from_group_0
+> >>>>>>> [  204.708704] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down
+> >>>>>>> [  204.708723] pciehp 0003:00:00.0:pcie004: Slot(4): Link Down event
+> >>>>>>> ignored; already powering off
+> >>>>>>>
+> >>>>>>> root at ubuntu:/sys/bus/pci/slots/4#
+> >>>>>>>
+> >>>>>>> [__254.820440]_iommu:_Adding_device_0003:01:00.0_to_group_8
+> >>>>>>> [  254.820599] nvme nvme0: pci function 0003:01:00.0
+> >>>>>>> [  254.820621] nvme 0003:01:00.0: enabling device (0000 -> 0002)
+> >>>>>>> [  261.948558] arm-smmu-v3 arm-smmu-v3.0.auto: event 0x0a received:
+> >>>>>>> [  261.948561] arm-smmu-v3 arm-smmu-v3.0.auto:  0x000001000000000a
+> >>>>>>> [  261.948563] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
+> >>>>>>> [  261.948564] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
+> >>>>>>> [  261.948566] arm-smmu-v3 arm-smmu-v3.0.auto:  0x0000000000000000
+> >>>>>
+> >>>>>> Looks like C_BAD_CD. Can you please try with:
+> >>>>>> iommu/arm-smmu-v3: Clear prior settings when updating STEs
+> >>>>>
+> >>>>> This resolved the issue. Can we pull Nate's patch to 4.10 so that I don't see
+> >>>>> this issue again.
+> >>>>
+> >>>> I already sent the pull request to Joerg for 4.11. Do you see this problem
+> >>>> without Sricharan's patches (i.e. vanilla mainline)? If so, we'll need to
+> >>>> send the patch to stable after -rc1.
+> >>> Using vanilla mainline, I see it most commonly when directly assigning
+> >>> a device to a guest machine. I think I've also seen it after removing then
+> >>> re-adding a PCI device. Basically anytime an STE's CTX pointer is changed
+> >>> from a non-NULL value and STE[CFG] indicates translation will be performed.
+> >>>
+> >>
+> >> I was not able to reproduce the issue with Vanilla kernel. I only
+> >> tested hotplug.
+> > 
+> > I would like to get the complete code path leading to this issue, it is
+> > not clear to me why the probe deferral code triggers it and why we are
+> > not able to trigger it with vanilla mainline, we must understand that first
+> > before applying any fix to this series.
+> > 
+> > I do not have a platform to reproduce this issue I will send you a patch
+> > to trace what's going on here please help us debug it.
 > 
+> Sure, send it to both Nate and me.
 
-Reviewed-by: Sean Paul <seanpaul@chromium.org>
+I debugged the issue and Nate's fix is correct, the fact that you
+can't it hit it with mainline is just a matter of timing because it has
+to do with the CTX pointer value (we OR it with the existing value), so
+it may work or not depending on how the cdptr memory allocation
+pattern turns out to be (which explains why Nate and I can hit it with
+simple PCI device remove/add execution too).
 
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
-> ---
-> 
-> Changes in v4: None
-> Changes in v3: None
-> 
->  drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 33 ++++++++++++++++-----------------
->  1 file changed, 16 insertions(+), 17 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> index b7b67be..a93ce97 100644
-> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
-> @@ -157,7 +157,6 @@
->  #define LPRX_TO_CNT(p)			((p) & 0xffff)
->  
->  #define DSI_BTA_TO_CNT			0x8c
-> -
->  #define DSI_LPCLK_CTRL			0x94
->  #define AUTO_CLKLANE_CTRL		BIT(1)
->  #define PHY_TXREQUESTCLKHS		BIT(0)
-> @@ -223,11 +222,11 @@
->  
->  #define HSFREQRANGE_SEL(val)	(((val) & 0x3f) << 1)
->  
-> -#define INPUT_DIVIDER(val)	((val - 1) & 0x7f)
-> +#define INPUT_DIVIDER(val)	(((val) - 1) & 0x7f)
->  #define LOW_PROGRAM_EN		0
->  #define HIGH_PROGRAM_EN		BIT(7)
-> -#define LOOP_DIV_LOW_SEL(val)	((val - 1) & 0x1f)
-> -#define LOOP_DIV_HIGH_SEL(val)	(((val - 1) >> 5) & 0x1f)
-> +#define LOOP_DIV_LOW_SEL(val)	(((val) - 1) & 0x1f)
-> +#define LOOP_DIV_HIGH_SEL(val)	((((val) - 1) >> 5) & 0x1f)
->  #define PLL_LOOP_DIV_EN		BIT(5)
->  #define PLL_INPUT_DIV_EN	BIT(4)
->  
-> @@ -370,6 +369,7 @@ static inline struct dw_mipi_dsi *encoder_to_dsi(struct drm_encoder *encoder)
->  {
->  	return container_of(encoder, struct dw_mipi_dsi, encoder);
->  }
-> +
->  static inline void dsi_write(struct dw_mipi_dsi *dsi, u32 reg, u32 val)
->  {
->  	writel(val, dsi->base + reg);
-> @@ -381,7 +381,7 @@ static inline u32 dsi_read(struct dw_mipi_dsi *dsi, u32 reg)
->  }
->  
->  static void dw_mipi_dsi_phy_write(struct dw_mipi_dsi *dsi, u8 test_code,
-> -				 u8 test_data)
-> +				  u8 test_data)
->  {
->  	/*
->  	 * With the falling edge on TESTCLK, the TESTDIN[7:0] signal content
-> @@ -496,7 +496,6 @@ static int dw_mipi_dsi_phy_init(struct dw_mipi_dsi *dsi)
->  	dsi_write(dsi, DSI_PHY_RSTZ, PHY_ENFORCEPLL | PHY_ENABLECLK |
->  				     PHY_UNRSTZ | PHY_UNSHUTDOWNZ);
->  
-> -
->  	ret = readl_poll_timeout(dsi->base + DSI_PHY_STATUS,
->  				 val, val & LOCK, 1000, PHY_STATUS_TIMEOUT_US);
->  	if (ret < 0) {
-> @@ -572,7 +571,7 @@ static int dw_mipi_dsi_host_attach(struct mipi_dsi_host *host,
->  
->  	if (device->lanes > dsi->pdata->max_data_lanes) {
->  		dev_err(dsi->dev, "the number of data lanes(%u) is too many\n",
-> -				device->lanes);
-> +			device->lanes);
->  		return -EINVAL;
->  	}
->  
-> @@ -960,8 +959,8 @@ static void dw_mipi_dsi_clear_err(struct dw_mipi_dsi *dsi)
->  }
->  
->  static void dw_mipi_dsi_encoder_mode_set(struct drm_encoder *encoder,
-> -					struct drm_display_mode *mode,
-> -					struct drm_display_mode *adjusted_mode)
-> +					 struct drm_display_mode *mode,
-> +					 struct drm_display_mode *adjusted_mode)
->  {
->  	struct dw_mipi_dsi *dsi = encoder_to_dsi(encoder);
->  
-> @@ -1063,7 +1062,7 @@ dw_mipi_dsi_encoder_atomic_check(struct drm_encoder *encoder,
->  	return 0;
->  }
->  
-> -static struct drm_encoder_helper_funcs
-> +static const struct drm_encoder_helper_funcs
->  dw_mipi_dsi_encoder_helper_funcs = {
->  	.enable = dw_mipi_dsi_encoder_enable,
->  	.mode_set = dw_mipi_dsi_encoder_mode_set,
-> @@ -1071,7 +1070,7 @@ dw_mipi_dsi_encoder_helper_funcs = {
->  	.atomic_check = dw_mipi_dsi_encoder_atomic_check,
->  };
->  
-> -static struct drm_encoder_funcs dw_mipi_dsi_encoder_funcs = {
-> +static const struct drm_encoder_funcs dw_mipi_dsi_encoder_funcs = {
->  	.destroy = drm_encoder_cleanup,
->  };
->  
-> @@ -1107,7 +1106,7 @@ static void dw_mipi_dsi_drm_connector_destroy(struct drm_connector *connector)
->  	drm_connector_cleanup(connector);
->  }
->  
-> -static struct drm_connector_funcs dw_mipi_dsi_atomic_connector_funcs = {
-> +static const struct drm_connector_funcs dw_mipi_dsi_atomic_connector_funcs = {
->  	.dpms = drm_atomic_helper_connector_dpms,
->  	.fill_modes = drm_helper_probe_single_connector_modes,
->  	.destroy = dw_mipi_dsi_drm_connector_destroy,
-> @@ -1117,7 +1116,7 @@ static struct drm_connector_funcs dw_mipi_dsi_atomic_connector_funcs = {
->  };
->  
->  static int dw_mipi_dsi_register(struct drm_device *drm,
-> -				      struct dw_mipi_dsi *dsi)
-> +				struct dw_mipi_dsi *dsi)
->  {
->  	struct drm_encoder *encoder = &dsi->encoder;
->  	struct drm_connector *connector = &dsi->connector;
-> @@ -1138,14 +1137,14 @@ static int dw_mipi_dsi_register(struct drm_device *drm,
->  	drm_encoder_helper_add(&dsi->encoder,
->  			       &dw_mipi_dsi_encoder_helper_funcs);
->  	ret = drm_encoder_init(drm, &dsi->encoder, &dw_mipi_dsi_encoder_funcs,
-> -			 DRM_MODE_ENCODER_DSI, NULL);
-> +			       DRM_MODE_ENCODER_DSI, NULL);
->  	if (ret) {
->  		dev_err(dev, "Failed to initialize encoder with drm\n");
->  		return ret;
->  	}
->  
->  	drm_connector_helper_add(connector,
-> -			&dw_mipi_dsi_connector_helper_funcs);
-> +				 &dw_mipi_dsi_connector_helper_funcs);
->  
->  	drm_connector_init(drm, &dsi->connector,
->  			   &dw_mipi_dsi_atomic_connector_funcs,
-> @@ -1220,7 +1219,7 @@ static const struct of_device_id dw_mipi_dsi_dt_ids[] = {
->  MODULE_DEVICE_TABLE(of, dw_mipi_dsi_dt_ids);
->  
->  static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
-> -			     void *data)
-> +			    void *data)
->  {
->  	const struct of_device_id *of_id =
->  			of_match_device(dw_mipi_dsi_dt_ids, dev);
-> @@ -1328,7 +1327,7 @@ static int dw_mipi_dsi_bind(struct device *dev, struct device *master,
->  }
->  
->  static void dw_mipi_dsi_unbind(struct device *dev, struct device *master,
-> -	void *data)
-> +			       void *data)
->  {
->  	struct dw_mipi_dsi *dsi = dev_get_drvdata(dev);
->  
-> -- 
-> 2.6.3
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+So it is neither an ACPI nor an IOMMU probe deferral issue per-se,
+fix is already queued, so it is all good.
 
--- 
-Sean Paul, Software Engineer, Google / Chromium OS
+What about USB stalls ?
+
+Thanks !
+Lorenzo
