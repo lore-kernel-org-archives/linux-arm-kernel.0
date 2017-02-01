@@ -1,11 +1,11 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 1 Feb 2017 11:14:13 +0100
+Date: Wed, 1 Feb 2017 11:14:39 +0100
 Subject: [PATCH 4/7] arm64: arch_timer: introduce generic errata handling
  infrastructure
 In-Reply-To: <1485865196-12742-5-git-send-email-mark.rutland@arm.com>
 References: <1485865196-12742-1-git-send-email-mark.rutland@arm.com>
  <1485865196-12742-5-git-send-email-mark.rutland@arm.com>
-Message-ID: <20170201101413.GN2206@mai>
+Message-ID: <20170201101439.GO2206@mai>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -27,5 +27,6 @@ On Tue, Jan 31, 2017 at 12:19:53PM +0000, Mark Rutland wrote:
 > Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
 > [Mark: split patch, correct Kconfig, reword commit message]
 > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> ---
 
 Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
