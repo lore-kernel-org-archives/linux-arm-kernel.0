@@ -1,126 +1,26 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 1 Feb 2017 13:03:44 +0000
-Subject: [PATCH 06/10] soc/qbman: Add ARM equivalent for
- flush_dcache_range()
-In-Reply-To: <HE1PR0401MB2636FF4D977DDA6888616A26864B0@HE1PR0401MB2636.eurprd04.prod.outlook.com>
-References: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
- <VI1PR0401MB2430DA6BD2F857C30EC86A50917F0@VI1PR0401MB2430.eurprd04.prod.outlook.com>
- <HE1PR0401MB263638F320470CA216990BCC86720@HE1PR0401MB2636.eurprd04.prod.outlook.com>
- <5414359.8GMja3pNrI@wuerfel>
- <VI1PR0401MB24303C4A5C0042005E17F1A391770@VI1PR0401MB2430.eurprd04.prod.outlook.com>
- <CAK8P3a1Gd4bd7GjEp_a9WXc_mTPk0XmP7DH8aPWhbn2K3MMuDQ@mail.gmail.com>
- <1485570872.9266.22.camel@buserror.net>
- <d5ca6bcd-1d1a-2a61-1f5c-9086a67f629a@arm.com>
- <HE1PR0401MB2636FF4D977DDA6888616A26864B0@HE1PR0401MB2636.eurprd04.prod.outlook.com>
-Message-ID: <3cc42823-0fc9-ed3e-1738-bf6e314dd569@arm.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 1 Feb 2017 14:06:59 +0100
+Subject: [PATCH] MAINTAINERS: Add include/dt-bindings/mfd to MFD entry
+In-Reply-To: <20170201125855.24130-1-lee.jones@linaro.org>
+References: <20170201125855.24130-1-lee.jones@linaro.org>
+Message-ID: <20170201130659.GA18081@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/01/17 19:04, Roy Pledge wrote:
-> On 1/30/2017 10:31 AM, Robin Murphy wrote:
->> On 28/01/17 02:34, Scott Wood wrote:
->>> On Fri, 2017-01-27 at 17:41 +0100, Arnd Bergmann wrote:
->>>> On Thu, Jan 26, 2017 at 6:08 AM, Scott Wood <scott.wood@nxp.com> wrote:
->>>>> On 01/25/2017 03:20 PM, Arnd Bergmann wrote:
->>>>>> On Monday, January 23, 2017 7:24:59 PM CET Roy Pledge wrote:
->>>>>> If this is normal RAM, you should be able to just write zeroes, and then
->>>>>> do a dma_map_single() for initialization.
->>>>> The DMA API on PPC currently has no way of knowing that the device
->>>>> accesses this memory incoherently.
->>>> Ah, this is because PPC doesn't use the 'dma-coherent' property on devices
->>>> but just assumes that coherency is a global property of the platform,right?
->>> Right.
->>>
->>>>> If that were somehow fixed, we still couldn't use dma_map_single() as it
->>>>> doesn't accept virtual addresses that come from memremap() or similar
->>>>> dynamic mappings.  We'd have to convert the physical address to an array
->>>>> of struct pages and pass each one to dma_map_page().
->>>> Sorry for my ignorance, but where does the memory come from to start
->>>> with? Is this in the normal linearly mapped RAM, in a carveout outside
->>>> of the linear mapping but the same memory, or in some on-chip buffer?
->>> It's RAM that comes from the device tree reserved memory mechanism
->>> (drivers/of/of_reserved_mem.c).  On a 32-bit kernel it is not guaranteed (or
->>> likely) to be lowmem.
->> Wouldn't dma_declare_coherent_memory() be the appropriate tool for that
->> job, then (modulo the PPC issue)? On ARM that should result in
->> dma_alloc_coherent() giving back a non-cacheable mapping if the device
->> is non-coherent, wherein a dmb_wmb() after writing the data from the CPU
->> side should be enough to ensure it is published to the device.
-> I think there is some confusion here (and it may very well be mine).
+On Wed, Feb 01, 2017 at 12:58:55PM +0000, Lee Jones wrote:
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  MAINTAINERS | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> My understanding is that the dma_declare_coherent_memory() API sets up a
-> region of memory that will be managed by dma_alloc_coherent() and
-> friends.  This is useful if the driver needs to manage a region of on
-> device memory but that isn't what this specific region is used for.
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 26edd83..17c838a 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -8422,6 +8422,7 @@ S:	Supported
+>  F:	Documentation/devicetree/bindings/mfd/
+>  F:	drivers/mfd/
+>  F:	include/linux/mfd/
+> +F:	include/dt-bindings/mfd/
 
-It's a bit more general than that - dma_alloc_coherent() can essentially
-be considered "give me some memory for this device to use". We already
-have use-cases where such buffers are only ever accessed by the device
-(e.g. some display controllers, and future NVMe devices), hence
-DMA_ATTR_NO_KERNEL_MAPPING on ARM to save the vmalloc space.
-
-A DMA allocation also inherently guarantees appropriate alignment,
-regardless of whether you're using a per-device reservation or just
-regular CMA, and will also zero the underlying memory (and for a
-non-coherent device perform whatever cache maintenance is necessary, if
-the clearing isn't already done via a non-cacheable mapping).
-
-All you need to do in the driver is allocate your buffer and hand the
-resulting address off to the device at probe (after optionally checking
-for a reservation in DT and declaring it), then free it at remove, which
-also ends up far more self-documenting (IMO) than a bunch of open-coded
-remapping and #ifdef'ed architecture-private cache shenanigans.
-
-> The memory that is trying to be initialized here is a big chunk
-> (possible multiple megabytes) of RAM that only the QBMan device will
-> access with one exception - at initialization the device expects
-> software to zero the memory before starting to use the device. Since the
-> CPUs will never access this region again the device does
-> non-coherent/non-shareable accesses for performance reasons since QBMan
-> device is the only user - no need to maintain coherency with core side
-> caches.
-> 
-> We used the of_reserve memory as that seemed to be the best reliable way
-> to guarantee that we would get a properly aligned contiguous allocation
-> and it's been working well.  The downside is that the contents of that
-> memory is undefined so we had to map it, zero it and flush the cache in
-> order to get the RAM into the desired state and make sure we don't get
-> hit by a random castout in the future.
-> 
-> Would it make sense to add an option in the of_reserved_mem system to
-> fill the memory?  I haven't looked at the feasibility of that but it
-> seems like a generic solution that could be useful to others.  We could
-> add the fill value to the device tree so you could initialize to any
-> pattern.
-
-In short, said generic solution is right there already, only the PPC
-arch code might need tweaking to accommodate it :)
-
-Robin.
-
-> 
-> - Roy
-> 
->>
->> Robin.
->>
->>>>> And even if we did all that, there would still be other manual cache
->>>>> manipulation left in this driver, to deal with its cacheable register
->>>>> interface.
->>>> I thought we had concluded that "cacheable register" is something
->>>> that cannot work reliably on ARM at all when this came up before.
->>>> Any updates on that?
->>> I'm not familiar with the details there...  My understanding is that the
->>> hardware people at NXP are convinced that it can work on these specific chips
->>> due to implementation details.
->>>
->>> -Scott
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>
->>
-> 
+Why send this to me?  I'm not a MFD maintainer :(
