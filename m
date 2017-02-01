@@ -1,64 +1,24 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 1 Feb 2017 14:08:14 -0800
-Subject: [PATCH v2 2/4] net: phy: Initialize mdio clock at probe function
-In-Reply-To: <1484669670-4201-3-git-send-email-yendapally.reddy@broadcom.com>
-References: <1484669670-4201-1-git-send-email-yendapally.reddy@broadcom.com>
- <1484669670-4201-3-git-send-email-yendapally.reddy@broadcom.com>
-Message-ID: <dbb296f0-5b48-6005-b9a3-fe148e5ce4e3@gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 1 Feb 2017 14:12:13 -0800
+Subject: [PATCH v3] initramfs: finish fput() before accessing any binary
+ from initramfs
+In-Reply-To: <20170201140540.22051-1-lokeshvutla@ti.com>
+References: <20170201140540.22051-1-lokeshvutla@ti.com>
+Message-ID: <20170201141213.3cf81a7a3a771ac2b94e8d48@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/17/2017 08:14 AM, Yendapally Reddy Dhananjaya Reddy wrote:
-> Initialize mdio clock divisor in probe function. The ext bus
-> bit available in the same register will be used by mdio mux
-> to enable external mdio.
-> 
-> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
+On Wed, 1 Feb 2017 19:35:40 +0530 Lokesh Vutla <lokeshvutla@ti.com> wrote:
 
-David, this patch should go through your tree (but we forgot to CC you),
-patch in patchwork is here:
+> commit 4a9d4b024a31 ("switch fput to task_work_add") implements a
+> schedule_work() for completing fput(), but did not guarantee calling
+> __fput() after unpacking initramfs. Because of this, there is a
+> possibility that during boot a driver can see ETXTBSY when it tries
+> to load a binary from initramfs as fput() is still pending on that
+> binary. This patch makes sure that fput() is completed after unpacking
+> initramfs and removes the call to flush_delayed_fput() in kernel_init()
+> which happens very late after unpacking initramfs.
 
-http://patchwork.ozlabs.org/patch/716281/
-
-Thanks!
-
-> ---
->  drivers/net/phy/mdio-bcm-iproc.c | 6 ++----
->  1 file changed, 2 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/net/phy/mdio-bcm-iproc.c b/drivers/net/phy/mdio-bcm-iproc.c
-> index c0b4e65..46fe1ae 100644
-> --- a/drivers/net/phy/mdio-bcm-iproc.c
-> +++ b/drivers/net/phy/mdio-bcm-iproc.c
-> @@ -81,8 +81,6 @@ static int iproc_mdio_read(struct mii_bus *bus, int phy_id, int reg)
->  	if (rc)
->  		return rc;
->  
-> -	iproc_mdio_config_clk(priv->base);
-> -
->  	/* Prepare the read operation */
->  	cmd = (MII_DATA_TA_VAL << MII_DATA_TA_SHIFT) |
->  		(reg << MII_DATA_RA_SHIFT) |
-> @@ -112,8 +110,6 @@ static int iproc_mdio_write(struct mii_bus *bus, int phy_id,
->  	if (rc)
->  		return rc;
->  
-> -	iproc_mdio_config_clk(priv->base);
-> -
->  	/* Prepare the write operation */
->  	cmd = (MII_DATA_TA_VAL << MII_DATA_TA_SHIFT) |
->  		(reg << MII_DATA_RA_SHIFT) |
-> @@ -163,6 +159,8 @@ static int iproc_mdio_probe(struct platform_device *pdev)
->  	bus->read = iproc_mdio_read;
->  	bus->write = iproc_mdio_write;
->  
-> +	iproc_mdio_config_clk(priv->base);
-> +
->  	rc = of_mdiobus_register(bus, pdev->dev.of_node);
->  	if (rc) {
->  		dev_err(&pdev->dev, "MDIO bus registration failed\n");
-> 
-
-
--- 
-Florian
+There's not really enough info here for others to be able to decide
+which kernel versions need the fix.  How serious is the bug?  Given
+that it's been there for 4 years, I assume "not very"?
