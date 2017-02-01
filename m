@@ -1,226 +1,109 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed,  1 Feb 2017 21:46:28 +0900
-Subject: [PATCH v31 09/12] arm64: kdump: provide /proc/vmcore file
-In-Reply-To: <20170201124218.5823-1-takahiro.akashi@linaro.org>
-References: <20170201124218.5823-1-takahiro.akashi@linaro.org>
-Message-ID: <20170201124630.6016-8-takahiro.akashi@linaro.org>
+From: illusionist.neo@gmail.com (Shubham Bansal)
+Date: Wed, 1 Feb 2017 18:31:19 +0530
+Subject: arch: arm: bpf: Converting cBPF to eBPF for arm 32 bit
+In-Reply-To: <CAGXu5j+NSLomuSgD40kys+pWc+J9aB6Bbk_gSP9Lp_ScimQn_w@mail.gmail.com>
+References: <20170130103853.GA34633@in3o.xyz>
+ <CAGXu5j+7+D=N8U9Zpq1Uq526B4C4g=gQZtQ1iCMt3juDFgfgJA@mail.gmail.com>
+ <CAHgaXd+nj69n-Xf46N=4M-j-0hKHVrrLfsvRZCG=2CCAtVF6ZA@mail.gmail.com>
+ <CAGXu5j+NSLomuSgD40kys+pWc+J9aB6Bbk_gSP9Lp_ScimQn_w@mail.gmail.com>
+Message-ID: <CAHgaXd+EKJ0FWaaPojsNJtgY_YpdQXu6eMEp97uOpTFAWs4qTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add arch-specific functions to provide a dump file, /proc/vmcore.
+Hi Kees & Daniel,
 
-This file is in ELF format and its ELF header needs to be prepared by
-userspace tools, like kexec-tools, in adance. The primary kernel is
-responsible to allocate the region with reserve_elfcorehdr() at boot time
-and advertize its location to crash dump kernel via a new device-tree
-property, "linux,elfcorehdr".
+On Tue, Jan 31, 2017 at 09:44:56AM -0800, Kees Cook wrote:
+> >> > 1.) Currently, as eBPF uses 64 bit registers, I am mapping 64 bit eBPF
+> >> > registers with 32 bit arm registers which looks wrong to me. Do anybody
+> >> > have some idea about how to map eBPF->arm 32 bit registers ?
+> >>
+> >> I was going to say "look at the x86 32-bit implementation." ... But
+> >> there isn't one. :( I'm going to guess that there isn't a very good
+> >> answer here. I assume you'll have to build some kind of stack scratch
+> >> space to load/save.
+> >
+> >
+> > Now I see why nobody has implemented eBPF JIT for the 32 bit systems. I
+> > think its very difficult to implement it without any complications and
+> > errors.
+>
+> Yeah, that does seem to make it much more difficult.
+I was thinking of first implementing only instructions with 32 bit
+register operands. It will hugely decrease the surface area of eBPF
+instructions that I have to cover for the first patch.
 
-Then crash dump kernel will access the primary kernel's memory with
-copy_oldmem_page(), which feeds the data page-by-page by ioremap'ing it
-since it does not reside in linear mapping on crash dump kernel.
+So, What I am thinking is something like this :
 
-We also need our own elfcorehdr_read() here since the header is placed
-within crash dump kernel's usable memory.
+- bpf_mov r0(64),r1(64) will be JITed like this :
+- ar1(32) <- r1(64). Convert/Mask 64 bit ebpf register(r1) value into 32
+bit and store it in arm register(ar1).
+- Do MOV ar0(32),ar1(32) as an ARM instruction.
+- ar0(32) -> r0(64). Zero Extend the ar0 32 bit register value
+and store it in 64 bit ebpf register r0.
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Reviewed-by: James Morse <james.morse@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/Kconfig             | 11 +++++++
- arch/arm64/kernel/Makefile     |  1 +
- arch/arm64/kernel/crash_dump.c | 71 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/mm/init.c           | 53 +++++++++++++++++++++++++++++++
- 4 files changed, 136 insertions(+)
- create mode 100644 arch/arm64/kernel/crash_dump.c
+- Similarly, For all BPF_ALU class instructions.
+- For BPF_ADD, I will mask the addition result to 32 bit only.
+ I am not sure, Overflow might be a problem.
+- For BPF_SUB, I will mask the subtraction result to 32 bit only.
+ I am not sure, Underflow might be problem.
+- For BPF_MUL, similar to BPF_ADD. Overflow Problem ?
+- For BPF_DIV, 32 bit masking should be fine, I guess.
+- For BPF_OR, BPF_AND, BPF_XOR, BPF_LSH, BPF_RSH, BPF_MOD 32 bit
+ masking should be fine.
+- For BPF_NEG and BPF_ARSH, might be a problem because of the sign bit.
+- For BPF_END, 32 bit masking should work fine.
+ Let me know if any of the above point is wrong or need your suggestion.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 111742126897..2bd6a1a062b9 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -693,6 +693,17 @@ config KEXEC
- 	  but it is independent of the system firmware.   And like a reboot
- 	  you can start any kernel with it, not just Linux.
- 
-+config CRASH_DUMP
-+	bool "Build kdump crash kernel"
-+	help
-+	  Generate crash dump after being started by kexec. This should
-+	  be normally only set in special crash dump kernels which are
-+	  loaded in the main kernel with kexec-tools into a specially
-+	  reserved region and then later executed after a crash by
-+	  kdump/kexec.
-+
-+	  For more details see Documentation/kdump/kdump.txt
-+
- config XEN_DOM0
- 	def_bool y
- 	depends on XEN
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 7d66bbaafc0c..6a7384eee08d 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -50,6 +50,7 @@ arm64-obj-$(CONFIG_RANDOMIZE_BASE)	+= kaslr.o
- arm64-obj-$(CONFIG_HIBERNATION)		+= hibernate.o hibernate-asm.o
- arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o	\
- 					   cpu-reset.o
-+arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
- 
- obj-y					+= $(arm64-obj-y) vdso/ probes/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/crash_dump.c b/arch/arm64/kernel/crash_dump.c
-new file mode 100644
-index 000000000000..c3d5a21c081e
---- /dev/null
-+++ b/arch/arm64/kernel/crash_dump.c
-@@ -0,0 +1,71 @@
-+/*
-+ * Routines for doing kexec-based kdump
-+ *
-+ * Copyright (C) 2014 Linaro Limited
-+ * Author: AKASHI Takahiro <takahiro.akashi@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/crash_dump.h>
-+#include <linux/errno.h>
-+#include <linux/io.h>
-+#include <linux/memblock.h>
-+#include <linux/uaccess.h>
-+#include <asm/memory.h>
-+
-+/**
-+ * copy_oldmem_page() - copy one page from old kernel memory
-+ * @pfn: page frame number to be copied
-+ * @buf: buffer where the copied page is placed
-+ * @csize: number of bytes to copy
-+ * @offset: offset in bytes into the page
-+ * @userbuf: if set, @buf is in a user address space
-+ *
-+ * This function copies one page from old kernel memory into buffer pointed by
-+ * @buf. If @buf is in userspace, set @userbuf to %1. Returns number of bytes
-+ * copied or negative error in case of failure.
-+ */
-+ssize_t copy_oldmem_page(unsigned long pfn, char *buf,
-+			 size_t csize, unsigned long offset,
-+			 int userbuf)
-+{
-+	void *vaddr;
-+
-+	if (!csize)
-+		return 0;
-+
-+	vaddr = memremap(__pfn_to_phys(pfn), PAGE_SIZE, MEMREMAP_WB);
-+	if (!vaddr)
-+		return -ENOMEM;
-+
-+	if (userbuf) {
-+		if (copy_to_user((char __user *)buf, vaddr + offset, csize)) {
-+			memunmap(vaddr);
-+			return -EFAULT;
-+		}
-+	} else {
-+		memcpy(buf, vaddr + offset, csize);
-+	}
-+
-+	memunmap(vaddr);
-+
-+	return csize;
-+}
-+
-+/**
-+ * elfcorehdr_read - read from ELF core header
-+ * @buf: buffer where the data is placed
-+ * @csize: number of bytes to read
-+ * @ppos: address in the memory
-+ *
-+ * This function reads @count bytes from elf core header which exists
-+ * on crash dump kernel's memory.
-+ */
-+ssize_t elfcorehdr_read(char *buf, size_t count, u64 *ppos)
-+{
-+	memcpy(buf, phys_to_virt((phys_addr_t)*ppos), count);
-+	return count;
-+}
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 2aba75dc7720..323b87197e18 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -38,6 +38,7 @@
- #include <linux/swiotlb.h>
- #include <linux/vmalloc.h>
- #include <linux/kexec.h>
-+#include <linux/crash_dump.h>
- 
- #include <asm/boot.h>
- #include <asm/fixmap.h>
-@@ -135,6 +136,56 @@ static void __init reserve_crashkernel(void)
- }
- #endif /* CONFIG_KEXEC_CORE */
- 
-+#ifdef CONFIG_CRASH_DUMP
-+static int __init early_init_dt_scan_elfcorehdr(unsigned long node,
-+		const char *uname, int depth, void *data)
-+{
-+	const __be32 *reg;
-+	int len;
-+
-+	if (depth != 1 || strcmp(uname, "chosen") != 0)
-+		return 0;
-+
-+	reg = of_get_flat_dt_prop(node, "linux,elfcorehdr", &len);
-+	if (!reg || (len < (dt_root_addr_cells + dt_root_size_cells)))
-+		return 1;
-+
-+	elfcorehdr_addr = dt_mem_next_cell(dt_root_addr_cells, &reg);
-+	elfcorehdr_size = dt_mem_next_cell(dt_root_size_cells, &reg);
-+
-+	return 1;
-+}
-+
-+/*
-+ * reserve_elfcorehdr() - reserves memory for elf core header
-+ *
-+ * This function reserves elf core header given in "elfcorehdr=" kernel
-+ * command line parameter. This region contains all the information about
-+ * primary kernel's core image and is used by a dump capture kernel to
-+ * access the system memory on primary kernel.
-+ */
-+static void __init reserve_elfcorehdr(void)
-+{
-+	of_scan_flat_dt(early_init_dt_scan_elfcorehdr, NULL);
-+
-+	if (!elfcorehdr_size)
-+		return;
-+
-+	if (memblock_is_region_reserved(elfcorehdr_addr, elfcorehdr_size)) {
-+		pr_warn("elfcorehdr is overlapped\n");
-+		return;
-+	}
-+
-+	memblock_reserve(elfcorehdr_addr, elfcorehdr_size);
-+
-+	pr_info("Reserving %lldKB of memory@0x%llx for elfcorehdr\n",
-+		elfcorehdr_size >> 10, elfcorehdr_addr);
-+}
-+#else
-+static void __init reserve_elfcorehdr(void)
-+{
-+}
-+#endif /* CONFIG_CRASH_DUMP */
- /*
-  * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
-  * currently assumes that for memory starting above 4G, 32-bit devices will
-@@ -393,6 +444,8 @@ void __init arm64_memblock_init(void)
- 
- 	reserve_crashkernel();
- 
-+	reserve_elfcorehdr();
-+
- 	dma_contiguous_reserve(arm64_dma_phys_limit);
- 
- 	memblock_allow_resize();
--- 
-2.11.0
+- Although, for ALU instructions, there is a big problem of register
+  flag manipulations. Generally, architecture's ABI takes care of this
+  part but as we are doing 64 bit Instructions emulation(kind of) on 32
+  bit machine, it needs to be done manually. Does that sound correct ?
+
+- I am not JITing BPF_ALU64 class instructions as of now. As we have to
+  take care of atomic instructions and race conditions with these
+  instruction which looks complicated to me as of now. Will try to figure out
+  this part and implement it later. Currently, I will just let it be
+  interpreted by the ebpf interpreter.
+
+- For BPF_JMP class, I am assuming that, although eBPF is 64 bit ABI,
+  the address pointers on 32 bit arch like arm will be of 32 bit only.
+  So, for BPF_JMP, masking the 64 bit destination address to 32 bit
+  should do the trick and no address will be corrupted in this way. Am I
+  correct to assume this ?
+  Also, I need to check for address getting out of the allowed memory
+  range.
+
+- For BPF_LD, BPF_LDX, BPF_ST and BPF_STX class instructions, I am
+  assuming the same thing as above - All addresses and pointers are 32
+  bit - which can be taken care just by maksing the eBPF register
+  values. Does that sound correct ?
+  Also, I need to check for the address overflow, address getting out
+  of the allowed memory range and things like that.
+
+> > Do you have any code references for me to take a look? Otherwise, I think
+> > its not possible for me to implement it without using any reference.
+>
+> I don't know anything else, no.
+
+I think, I will give it a try. Otherwise, my last 1 month which I used
+to read about eBPF, eBPF linux code and arm32 ABI would be a complete
+waste.
+
+> >>
+> >>
+> >> > 2.) Also, is my current mapping good enough to make the JIT fast enough
+> >> > ?
+> >> > because as you might know, eBPF JIT mostly depends on 1-to-1 mapping of
+> >> > its instructions with native instructions.
+> >>
+> >> I don't know -- it might be tricky with needing to deal with 64-bit
+> >> registers. But if you can make it faster than the non-JIT, it should
+> >> be a win. :) Yay assembly.
+
+Well, As I mentioned above about my thinking towards the implementation,
+I am not sure it would be faster than non-JIT or even correct for that matter.
+It might be but I don't think I have enough knowledge to benchmark the
+implementation as of now.
+
+
+-Shubham Bansal
