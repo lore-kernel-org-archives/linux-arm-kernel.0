@@ -1,30 +1,27 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 1 Feb 2017 07:24:56 -0600
-Subject: [PATCH v2 6/8] mfd: exynos-lpass: Add support for clocks
-In-Reply-To: <1485419634-28331-7-git-send-email-m.szyprowski@samsung.com>
-References: <1485419634-28331-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170126083404eucas1p132ce7a0792505367f6a001f21e9d1632@eucas1p1.samsung.com>
- <1485419634-28331-7-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <20170201132456.3dcprep7hwbii46n@rob-hp-laptop>
+Date: Wed, 1 Feb 2017 07:25:56 -0600
+Subject: [PATCH v4 1/3] dt-bindings: Document Broadcom iProc mailbox
+ controller driver
+In-Reply-To: <1485463082-27067-2-git-send-email-jonathan.richardson@broadcom.com>
+References: <1485463082-27067-1-git-send-email-jonathan.richardson@broadcom.com>
+ <1485463082-27067-2-git-send-email-jonathan.richardson@broadcom.com>
+Message-ID: <20170201132556.maxmu5l7yfq23udv@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 09:33:52AM +0100, Marek Szyprowski wrote:
-> Exynos LPASS requires some clocks to be enabled to make any access to its
-> registers. This patch adds code for handling such clocks. For current set
-> of registers it is enough to keep sfr0_ctrl clock enabled. Till now it
-> worked only because those clocks were enabled by bootloader and driver
-> probe() happened before they were disabled by clock core because of lack
-> of users. Handling those clocks is also needed to make it possible to
-> enable support for audio power domain.
+On Thu, Jan 26, 2017 at 12:38:00PM -0800, Jonathan Richardson wrote:
+> Add binding document for brcm,iproc-mailbox.
 > 
-> This patch requires adding sfr0_ctrl clock to device tree.
-> 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Reviewed-by: Jonathan Richardson <jonathan.richardson@broadcom.com>
+> Tested-by: Jonathan Richardson <jonathan.richardson@broadcom.com>
+> Reviewed-by: Vikram Prakash <vikram.prakash@broadcom.com>
+> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+> Reviewed-by: Shreesha Rajashekar <shreesha.rajashekar@broadcom.com>
+> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+> Signed-off-by: Jonathan Richardson <jonathan.richardson@broadcom.com>
 > ---
->  .../devicetree/bindings/mfd/samsung,exynos5433-lpass.txt       |  6 ++++++
+>  .../devicetree/bindings/mailbox/brcm,iproc-mailbox.txt | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,iproc-mailbox.txt
 
 Acked-by: Rob Herring <robh@kernel.org>
-
->  drivers/mfd/exynos-lpass.c                                     | 10 ++++++++++
->  2 files changed, 16 insertions(+)
