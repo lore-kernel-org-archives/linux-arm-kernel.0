@@ -1,104 +1,83 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 1 Feb 2017 18:00:08 +0000
-Subject: [PATCH v31 05/12] arm64: kdump: protect crash dump kernel memory
-In-Reply-To: <20170201124630.6016-4-takahiro.akashi@linaro.org>
-References: <20170201124218.5823-1-takahiro.akashi@linaro.org>
- <20170201124630.6016-4-takahiro.akashi@linaro.org>
-Message-ID: <20170201180008.GG4756@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 1 Feb 2017 17:59:48 +0000
+Subject: [PATCH v4 2/4] arm64: Work around Falkor erratum 1003
+In-Reply-To: <20170201174934.GF26507@e104818-lin.cambridge.arm.com>
+References: <20170125155232.10277-1-cov@codeaurora.org>
+ <20170125155232.10277-2-cov@codeaurora.org>
+ <20170131123735.GD11191@leverpostej>
+ <36478002-4cd8-7f1c-1a25-8bfe35022a47@codeaurora.org>
+ <3cab36fb-984a-beae-64db-6ce830ba94f6@arm.com>
+ <b4cf83d2-ae05-3362-bc23-2341d00516dc@codeaurora.org>
+ <20170201163358.GG8177@arm.com>
+ <20170201173609.GE26507@e104818-lin.cambridge.arm.com>
+ <20170201174105.GK8177@arm.com>
+ <20170201174934.GF26507@e104818-lin.cambridge.arm.com>
+Message-ID: <20170201175947.GL8177@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2017 at 09:46:24PM +0900, AKASHI Takahiro wrote:
-> arch_kexec_protect_crashkres() and arch_kexec_unprotect_crashkres()
-> are meant to be called around kexec_load() in order to protect
-> the memory allocated for crash dump kernel once after it's loaded.
+On Wed, Feb 01, 2017 at 05:49:34PM +0000, Catalin Marinas wrote:
+> On Wed, Feb 01, 2017 at 05:41:05PM +0000, Will Deacon wrote:
+> > On Wed, Feb 01, 2017 at 05:36:09PM +0000, Catalin Marinas wrote:
+> > > On Wed, Feb 01, 2017 at 04:33:58PM +0000, Will Deacon wrote:
+> > > > On Wed, Feb 01, 2017 at 11:29:22AM -0500, Christopher Covington wrote:
+> > > > > On 01/31/2017 12:56 PM, Marc Zyngier wrote:
+> > > > > > Given that all ARMv8 CPUs can support SW_PAN, it is more likely to be
+> > > > > > enabled than the ARMv8.1 PAN. I'd vote for supporting the workaround in
+> > > > > > that case too, and hope that people do enable the HW version.
+> > > > > 
+> > > > > Okay, I'll do my best to add support for the SW PAN case. I rebased and
+> > > > > submitted v6 of the E1009 patch [1] so that it no longer depends on this
+> > > > > patch landing first, if you all are inclined to pick it up while work on
+> > > > > this E1003 patch continues.
+> > > > 
+> > > > The alternative is not enabling SW_PAN (at runtime) if this errata is
+> > > > present, along with a warning stating that hardware-PAN should be
+> > > > enabled in kconfig instead. Not sure what distributions will make of that
+> > > > though.
+> > > 
+> > > The problem with this patch is that when ARM64_SW_TTBR0_PAN is enabled
+> > > and in the absence of hardware PAN (or ARM64_PAN disabled),
+> > > cpu_do_switch_mm is no longer called for user process switching, so the
+> > > workaround is pretty much useless.
+> > 
+> > Oh, I see what you mean now.
+> > 
+> > > I'm ok with adding the Kconfig dependency below to
+> > > QCOM_FALKOR_ERRATUM_1003:
+> > > 
+> > > 	depends on !ARM64_SW_TTBR0_PAN || ARM64_PAN
+> > > 
+> > > together with a run-time warning if ARM64_SW_TTBR0_PAN is being used.
+> > 
+> > That makes it look like hardware-PAN is the cause of the erratum.
 > 
-> The protection is implemented here by unmapping the region rather than
-> making it read-only.
-> To make the things work correctly, we also have to
-> - put the region in an isolated, page-level mapping initially, and
-> - move copying kexec's control_code_page to machine_kexec_prepare()
+> With the right Kconfig comment we could make this clearer.
+
+It's not just a comment though, the kconfig option for the workaround
+will disappear from menuconfig as long as the dependencies aren't met.
+The dependency is really that SW_PAN depends on !ERRATUM_1003, but that
+doesn't work for the distributions.
+
+> > Maybe
+> > just select ARM64_PAN if the erratum workaround is selected, then
+> > runtime warning if we find that the h/w doesn't have PAN but does have
+> > the erratum (which should never fire)?
 > 
-> Note that page-level mapping is also required to allow for shrinking
-> the size of memory, through /sys/kernel/kexec_crash_size, by any number
-> of multiple pages.
+> You still need this workaround even if you don't want any PAN (both sw
+> and hw PAN disabled). I wouldn't want to select ARM64_PAN since it's not
+> a dependency. It's more like if you do need a PAN, make sure you only
+> use the hw one.
 
-Looking at kexec_crash_size_store(), I don't see where memory returned
-to the OS is mapped. AFAICT, if the region is protected when the user
-shrinks the region, the memory will not be mapped, yet handed over to
-the kernel for general allocation.
+True, in the case that all PAN options are disabled we still want this
+to work. How about:
 
-Surely we need an arch-specific callback to handle that? e.g.
+  select ARM64_PAN if ARM64_SW_TTBR0_PAN
 
-arch_crash_release_region(unsigned long base, unsigned long size)
-{
-	/*
-	 * Ensure the region is part of the linear map before we return
-	 * it to the OS. We won't unmap this again, so we can use block
-	 * mappings.
-	 */
-	create_pgd_mapping(&init_mm, start, __phys_to_virt(start),
-			   size, PAGE_KERNEL, false);
-}
+?
 
-... which we'd call from crash_shrink_memory() before we freed the
-reserved pages.
+In fact, what's the reason for supporting SW_PAN and ARM64_PAN as a
+config combination? Why not just have "PAN" that enables them both and
+uses the hardware feature if it's there?
 
-[...]
-
-> +void arch_kexec_unprotect_crashkres(void)
-> +{
-> +	/*
-> +	 * We don't have to make page-level mappings here because
-> +	 * the crash dump kernel memory is not allowed to be shrunk
-> +	 * once the kernel is loaded.
-> +	 */
-> +	create_pgd_mapping(&init_mm, crashk_res.start,
-> +			__phys_to_virt(crashk_res.start),
-> +			resource_size(&crashk_res), PAGE_KERNEL,
-> +			debug_pagealloc_enabled());
-> +
-> +	flush_tlb_all();
-> +}
-
-We can lose the flush_tlb_all() here; TLBs aren't allowed to cache an
-invalid entry, so there's nothing to remove from the TLBs.
-
-[...]
-
-> @@ -538,6 +540,24 @@ static void __init map_mem(pgd_t *pgd)
->  		if (memblock_is_nomap(reg))
->  			continue;
->  
-> +#ifdef CONFIG_KEXEC_CORE
-> +		/*
-> +		 * While crash dump kernel memory is contained in a single
-> +		 * memblock for now, it should appear in an isolated mapping
-> +		 * so that we can independently unmap the region later.
-> +		 */
-> +		if (crashk_res.end &&
-> +		    (start <= crashk_res.start) &&
-> +		    ((crashk_res.end + 1) < end)) {
-> +			if (crashk_res.start != start)
-> +				__map_memblock(pgd, start, crashk_res.start);
-> +
-> +			if ((crashk_res.end + 1) < end)
-> +				__map_memblock(pgd, crashk_res.end + 1, end);
-> +
-> +			continue;
-> +		}
-> +#endif
-
-This wasn't quite what I had in mind. I had expected that here we would
-isolate the ranges we wanted to avoid mapping (with a comment as to why
-we couldn't move the memblock_isolate_range() calls earlier). In
-map_memblock(), we'd skip those ranges entirely.
-
-I believe the above isn't correct if we have a single memblock.memory
-region covering both the crashkernel and kernel regions. In that case,
-we'd erroneously map the portion which overlaps the kernel.
-
-It seems there are a number of subtle problems here. :/
-
-Thanks,
-Mark.
+Will
