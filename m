@@ -1,37 +1,116 @@
-From: andrew.smirnov@gmail.com (Andrey Smirnov)
-Date: Wed,  1 Feb 2017 08:55:57 -0800
-Subject: [PATCH v2 1/3] PCI: imx6: Fix a typo in error message
-In-Reply-To: <20170201165559.22436-1-andrew.smirnov@gmail.com>
-References: <20170201165559.22436-1-andrew.smirnov@gmail.com>
-Message-ID: <20170201165559.22436-2-andrew.smirnov@gmail.com>
+From: cbostic@linux.vnet.ibm.com (Christopher Bostic)
+Date: Wed,  1 Feb 2017 10:53:51 -0600
+Subject: [PATCH v3 11/18] drivers/fsi: Add device read/write/peek functions
+In-Reply-To: <20170201165358.45415-1-cbostic@linux.vnet.ibm.com>
+References: <20170201165358.45415-1-cbostic@linux.vnet.ibm.com>
+Message-ID: <20170201165358.45415-12-cbostic@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: yurovsky at gmail.com
-Cc: Lucas Stach <l.stach@pengutronix.de>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
+From: Jeremy Kerr <jk@ozlabs.org>
 
-Acked-by: Lucas Stach <l.stach@pengutronix.de>
-Signed-off-by: Andrey Smirnov <andrew.smirnov@gmail.com>
+This change introduces the fsi device API: simple read, write and peek
+accessors for the devices' address spaces.
+
+Includes contributions from Chris Bostic <cbostic@us.ibm.com>
+
+Signed-off-by: Jeremy Kerr <jk@ozlabs.org>
+Signed-off-by: Chris Bostic <cbostic@us.ibm.com>
 ---
- drivers/pci/host/pci-imx6.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/fsi/fsi-core.c | 47 +++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/fsi.h    |  6 ++++++
+ 2 files changed, 53 insertions(+)
 
-diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index c8cefb0..50a1291 100644
---- a/drivers/pci/host/pci-imx6.c
-+++ b/drivers/pci/host/pci-imx6.c
-@@ -678,8 +678,7 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
- 		imx6_pcie->pcie_inbound_axi = devm_clk_get(dev,
- 							   "pcie_inbound_axi");
- 		if (IS_ERR(imx6_pcie->pcie_inbound_axi)) {
--			dev_err(dev,
--				"pcie_incbound_axi clock missing or invalid\n");
-+			dev_err(dev, "pcie_inbound_axi clock missing or invalid\n");
- 			return PTR_ERR(imx6_pcie->pcie_inbound_axi);
- 		}
- 	}
+diff --git a/drivers/fsi/fsi-core.c b/drivers/fsi/fsi-core.c
+index f7ef993..3119aa1 100644
+--- a/drivers/fsi/fsi-core.c
++++ b/drivers/fsi/fsi-core.c
+@@ -35,6 +35,8 @@
+ #define FSI_SLAVE_CONF_CRC_MASK		0x0000000f
+ #define FSI_SLAVE_CONF_DATA_BITS	28
+ 
++#define FSI_PEEK_BASE			0x410
++
+ static const int engine_page_size = 0x400;
+ 
+ static DEFINE_IDA(master_ida);
+@@ -48,8 +50,46 @@ struct fsi_slave {
+ 
+ #define to_fsi_slave(d) container_of(d, struct fsi_slave, dev)
+ 
++static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
++		void *val, size_t size);
++static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
++		const void *val, size_t size);
++
+ /* FSI endpoint-device support */
+ 
++int fsi_device_read(struct fsi_device *dev, uint32_t addr, void *val,
++		size_t size)
++{
++	if (addr > dev->size)
++		return -EINVAL;
++
++	if (addr + size > dev->size)
++		return -EINVAL;
++
++	return fsi_slave_read(dev->slave, dev->addr + addr, val, size);
++}
++EXPORT_SYMBOL_GPL(fsi_device_read);
++
++int fsi_device_write(struct fsi_device *dev, uint32_t addr, const void *val,
++		size_t size)
++{
++	if (addr > dev->size)
++		return -EINVAL;
++
++	if (addr + size > dev->size)
++		return -EINVAL;
++
++	return fsi_slave_write(dev->slave, dev->addr + addr, val, size);
++}
++EXPORT_SYMBOL_GPL(fsi_device_write);
++
++int fsi_device_peek(struct fsi_device *dev, void *val)
++{
++	uint32_t addr = FSI_PEEK_BASE + ((dev->unit - 2) * sizeof(uint32_t));
++
++	return fsi_slave_read(dev->slave, addr, val, sizeof(uint32_t));
++}
++
+ static void fsi_device_release(struct device *_device)
+ {
+ 	struct fsi_device *device = to_fsi_dev(_device);
+@@ -81,6 +121,13 @@ static int fsi_slave_read(struct fsi_slave *slave, uint32_t addr,
+ 			slave->id, addr, val, size);
+ }
+ 
++static int fsi_slave_write(struct fsi_slave *slave, uint32_t addr,
++			const void *val, size_t size)
++{
++	return slave->master->write(slave->master, slave->link,
++			slave->id, addr, val, size);
++}
++
+ static int fsi_slave_scan(struct fsi_slave *slave)
+ {
+ 	uint32_t engine_addr;
+diff --git a/include/linux/fsi.h b/include/linux/fsi.h
+index efa55ba..273945d 100644
+--- a/include/linux/fsi.h
++++ b/include/linux/fsi.h
+@@ -27,6 +27,12 @@ struct fsi_device {
+ 	uint32_t		size;
+ };
+ 
++extern int fsi_device_read(struct fsi_device *dev, uint32_t addr,
++		void *val, size_t size);
++extern int fsi_device_write(struct fsi_device *dev, uint32_t addr,
++		const void *val, size_t size);
++extern int fsi_device_peek(struct fsi_device *dev, void *val);
++
+ struct fsi_device_id {
+ 	u8	engine_type;
+ 	u8	version;
 -- 
-2.9.3
+1.8.2.2
