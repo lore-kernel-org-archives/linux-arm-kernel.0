@@ -1,40 +1,31 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed,  1 Feb 2017 17:05:21 -0300
-Subject: [PATCH 1/2] [media] exynos-gsc: Do not swap cb/cr for semi planar
- formats
-In-Reply-To: <1485979523-32404-1-git-send-email-javier@osg.samsung.com>
-References: <1485979523-32404-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1485979523-32404-2-git-send-email-javier@osg.samsung.com>
+Date: Wed,  1 Feb 2017 17:05:20 -0300
+Subject: [PATCH 0/2] [media] exynos-gsc: Fix support for NV21 and NV61 formats
+Message-ID: <1485979523-32404-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thibault Saunier <thibault.saunier@osg.samsung.com>
+Hello,
 
-In the case of semi planar formats cb and cr are in the same plane
-in memory, meaning that will be set to 'cb' whatever the format is,
-and whatever the (packed) order of those components are.
+Commit 652bb68018a5 ("[media] exynos-gsc: do proper bytesperline and
+sizeimage calculation") fixed corrupted frames for most exynos-gsc
+formats, but even after that patch two issues were still remaining:
 
-Suggested-by: Nicolas Dufresne <nicolas.dufresne@collabora.com>
-Signed-off-by: Thibault Saunier <thibault.saunier@osg.samsung.com>
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
----
+1) Frames were still not correct for NV21 and NV61 formats.
+2) Y42B format didn't work when used as output (only as input).
 
- drivers/media/platform/exynos-gsc/gsc-core.c | 2 --
- 1 file changed, 2 deletions(-)
+This patch series fixes (1).
 
-diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
-index 40aff08dd51d..a846659ae5c1 100644
---- a/drivers/media/platform/exynos-gsc/gsc-core.c
-+++ b/drivers/media/platform/exynos-gsc/gsc-core.c
-@@ -861,9 +861,7 @@ int gsc_prepare_addr(struct gsc_ctx *ctx, struct vb2_buffer *vb,
- 
- 	if ((frame->fmt->pixelformat == V4L2_PIX_FMT_VYUY) ||
- 		(frame->fmt->pixelformat == V4L2_PIX_FMT_YVYU) ||
--		(frame->fmt->pixelformat == V4L2_PIX_FMT_NV61) ||
- 		(frame->fmt->pixelformat == V4L2_PIX_FMT_YVU420) ||
--		(frame->fmt->pixelformat == V4L2_PIX_FMT_NV21) ||
- 		(frame->fmt->pixelformat == V4L2_PIX_FMT_YVU420M))
- 		swap(addr->cb, addr->cr);
- 
+Best regards,
+Javier
+
+
+Thibault Saunier (2):
+  [media] exynos-gsc: Do not swap cb/cr for semi planar formats
+  [media] exynos-gsc: Add support for NV{16,21,61}M pixel formats
+
+ drivers/media/platform/exynos-gsc/gsc-core.c | 29 ++++++++++++++++++++++++++--
+ 1 file changed, 27 insertions(+), 2 deletions(-)
+
 -- 
 2.7.4
