@@ -1,85 +1,38 @@
-From: riku.voipio@linaro.org (Riku Voipio)
-Date: Wed, 1 Feb 2017 16:46:08 +0200
-Subject: [PATCH] efi: fdt: avoid FDT manipulation after ExitBootServices()
-In-Reply-To: <1485954693-25750-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1485954693-25750-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAAqcGH=X=nH=r610-R4madsCG-GWj2y0dP05BrVSDgPCbb3XGw@mail.gmail.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Wed, 1 Feb 2017 14:53:46 +0000
+Subject: [STLinux Kernel] [PATCH v2 10/10] ARM: dts: STiH410-b2260:
+ Enable HW flow-control
+In-Reply-To: <20170201143145.31962-11-lee.jones@linaro.org>
+References: <20170201143145.31962-1-lee.jones@linaro.org>
+ <20170201143145.31962-11-lee.jones@linaro.org>
+Message-ID: <20170201145346.GA28760@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 February 2017 at 15:11, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> Some AArch64 UEFI implementations disable the MMU in ExitBootServices(),
-> after which unaligned accesses to RAM are no longer supported.
->
-> Commit abfb7b686a3e ("efi/libstub/arm*: Pass latest memory map to the
-> kernel") fixed an issue in the memory map handling of the stub FDT code,
-> but inadvertently created an issue with such firmwares, by moving some
-> of the FDT manipulation to after the invocation of ExitBootServices().
-> However, the stub's libfdt implementation uses the ordinary, accelerated
-> string functions, which rely on hardware handling of unaligned accesses,
-> resulting in alignment faults when executed with the MMU off.
->
-> Whether disabling the MMU in ExitBootServices() complies with the UEFI
-> spec is unclear, but it is a reality we have to deal with, given that
-> it wasn't a problem before commit abfb7b686a3e was applied.
->
-> So fix the situation by moving the update_fdt_memmap() into the callback
-> invoked by efi_exit_boot_services() right before it hits the button.
->
-> Fixes: abfb7b686a3e ("efi/libstub/arm*: Pass latest memory map to the kernel")
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On Wed, 01 Feb 2017, Lee Jones wrote:
 
-Tested-by: Riku Voipio <riku.voipio@linaro.org>
+> Hardware flow-control capability must be specified at a platform
+> level in order to inform the ASC driver that the platform is capable
+> (i.e. are the lines wired up, etc).  STiH4{07,10} devices are indeed
+> capable, so let's provide the property.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+
+Acked-by: Peter Griffin <peter.griffin@linaro.org>
 
 > ---
->  drivers/firmware/efi/libstub/fdt.c | 14 +++-----------
->  1 file changed, 3 insertions(+), 11 deletions(-)
->
-> diff --git a/drivers/firmware/efi/libstub/fdt.c b/drivers/firmware/efi/libstub/fdt.c
-> index 921dfa047202..260c4b4b492e 100644
-> --- a/drivers/firmware/efi/libstub/fdt.c
-> +++ b/drivers/firmware/efi/libstub/fdt.c
-> @@ -187,6 +187,7 @@ static efi_status_t update_fdt_memmap(void *fdt, struct efi_boot_memmap *map)
->  struct exit_boot_struct {
->         efi_memory_desc_t *runtime_map;
->         int *runtime_entry_count;
-> +       void *new_fdt_addr;
->  };
->
->  static efi_status_t exit_boot_func(efi_system_table_t *sys_table_arg,
-> @@ -202,7 +203,7 @@ static efi_status_t exit_boot_func(efi_system_table_t *sys_table_arg,
->         efi_get_virtmap(*map->map, *map->map_size, *map->desc_size,
->                         p->runtime_map, p->runtime_entry_count);
->
-> -       return EFI_SUCCESS;
-> +       return update_fdt_memmap(p->new_fdt_addr, map);
->  }
->
->  /*
-> @@ -300,22 +301,13 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
->
->         priv.runtime_map = runtime_map;
->         priv.runtime_entry_count = &runtime_entry_count;
-> +       priv.new_fdt_addr = (void *)*new_fdt_addr;
->         status = efi_exit_boot_services(sys_table, handle, &map, &priv,
->                                         exit_boot_func);
->
->         if (status == EFI_SUCCESS) {
->                 efi_set_virtual_address_map_t *svam;
->
-> -               status = update_fdt_memmap((void *)*new_fdt_addr, &map);
-> -               if (status != EFI_SUCCESS) {
-> -                       /*
-> -                        * The kernel won't get far without the memory map, but
-> -                        * may still be able to print something meaningful so
-> -                        * return success here.
-> -                        */
-> -                       return EFI_SUCCESS;
-> -               }
-> -
->                 /* Install the new virtual address map */
->                 svam = sys_table->runtime->set_virtual_address_map;
->                 status = svam(runtime_entry_count * desc_size, desc_size,
-> --
-> 2.7.4
->
+>  arch/arm/boot/dts/stih410-b2260.dts | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/boot/dts/stih410-b2260.dts b/arch/arm/boot/dts/stih410-b2260.dts
+> index cbcbcb4..93c14d1 100644
+> --- a/arch/arm/boot/dts/stih410-b2260.dts
+> +++ b/arch/arm/boot/dts/stih410-b2260.dts
+> @@ -66,6 +66,7 @@
+>  			pinctrl-0 = <&pinctrl_serial0_hw_flowctrl>;
+>  			pinctrl-1 = <&pinctrl_serial0>;
+>  			rts-gpios = <&pio17 3 GPIO_ACTIVE_LOW>;
+> +			uart-has-rtscts;
+>  			status = "okay";
+>  		};
+>  
