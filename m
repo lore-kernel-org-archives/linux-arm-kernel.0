@@ -1,45 +1,42 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Wed, 1 Feb 2017 17:39:55 +0100
-Subject: [PATCH] MAINTAINERS: Add include/dt-bindings/mfd to MFD entry
-In-Reply-To: <20170201133006.qpgowrzbwxvgb5ru@dell>
-References: <20170201125855.24130-1-lee.jones@linaro.org>
- <20170201130659.GA18081@kroah.com>
- <20170201133006.qpgowrzbwxvgb5ru@dell>
-Message-ID: <20170201163955.GB25524@kroah.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Wed, 1 Feb 2017 17:41:46 +0100
+Subject: [PATCH] mfd: stm32-timers: fix driver removal
+Message-ID: <1485967306-30589-1-git-send-email-fabrice.gasnier@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2017 at 01:30:06PM +0000, Lee Jones wrote:
-> On Wed, 01 Feb 2017, Greg KH wrote:
-> 
-> > On Wed, Feb 01, 2017 at 12:58:55PM +0000, Lee Jones wrote:
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > ---
-> > >  MAINTAINERS | 1 +
-> > >  1 file changed, 1 insertion(+)
-> > > 
-> > > diff --git a/MAINTAINERS b/MAINTAINERS
-> > > index 26edd83..17c838a 100644
-> > > --- a/MAINTAINERS
-> > > +++ b/MAINTAINERS
-> > > @@ -8422,6 +8422,7 @@ S:	Supported
-> > >  F:	Documentation/devicetree/bindings/mfd/
-> > >  F:	drivers/mfd/
-> > >  F:	include/linux/mfd/
-> > > +F:	include/dt-bindings/mfd/
-> > 
-> > Why send this to me?  I'm not a MFD maintainer :(
-> 
-> No, I am. :)
+Add missing of_platform_depopulate() upon driver removal.
 
-Then you don't need my signed-off-by: for it :)
+Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+---
+ drivers/mfd/stm32-timers.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-> But MAINTAINERS doesn't have a supporter and you are the top commit
-> signer.  I figured it would be better to get at least one Ack before
-> merging my own patch.
-
-I think you just got it from a mfd developer...
-
-thanks,
-
-greg k-h
+diff --git a/drivers/mfd/stm32-timers.c b/drivers/mfd/stm32-timers.c
+index 41bd901..192cbb6 100644
+--- a/drivers/mfd/stm32-timers.c
++++ b/drivers/mfd/stm32-timers.c
+@@ -61,6 +61,13 @@ static int stm32_timers_probe(struct platform_device *pdev)
+ 	return of_platform_populate(pdev->dev.of_node, NULL, NULL, &pdev->dev);
+ }
+ 
++static int stm32_timers_remove(struct platform_device *pdev)
++{
++	of_platform_depopulate(&pdev->dev);
++
++	return 0;
++}
++
+ static const struct of_device_id stm32_timers_of_match[] = {
+ 	{ .compatible = "st,stm32-timers", },
+ 	{ /* end node */ },
+@@ -69,6 +76,7 @@ static int stm32_timers_probe(struct platform_device *pdev)
+ 
+ static struct platform_driver stm32_timers_driver = {
+ 	.probe = stm32_timers_probe,
++	.remove = stm32_timers_remove,
+ 	.driver	= {
+ 		.name = "stm32-timers",
+ 		.of_match_table = stm32_timers_of_match,
+-- 
+1.9.1
