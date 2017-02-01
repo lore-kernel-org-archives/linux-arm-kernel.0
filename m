@@ -1,39 +1,29 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 1 Feb 2017 14:57:16 +0000
-Subject: [STLinux Kernel] [PATCH v2 06/10] dt-bindings: serial: Update
- 'uart-has-rtscts' description
-In-Reply-To: <20170201143145.31962-7-lee.jones@linaro.org>
-References: <20170201143145.31962-1-lee.jones@linaro.org>
- <20170201143145.31962-7-lee.jones@linaro.org>
-Message-ID: <20170201145716.GE28760@griffinp-ThinkPad-X1-Carbon-2nd>
+From: dhowells@redhat.com (David Howells)
+Date: Wed, 01 Feb 2017 15:00:17 +0000
+Subject: [PATCH 6/7] efi: Handle secure boot from UEFI-2.6 [ver #7]
+In-Reply-To: <CAKv+Gu8FOcMx0UXXdd3nhE+PUPzbEn9X=kBQDfkLOZBvVu-8fg@mail.gmail.com>
+References: <CAKv+Gu8FOcMx0UXXdd3nhE+PUPzbEn9X=kBQDfkLOZBvVu-8fg@mail.gmail.com>
+ <148587558696.4026.16034622623568539004.stgit@warthog.procyon.org.uk>
+ <148587564847.4026.5759345672956585977.stgit@warthog.procyon.org.uk>
+ <CAKv+Gu8dnKB1sRGb3U+XB1eoA7Eyo4qSFBtPRbvGV912xPViVw@mail.gmail.com>
+ <10454.1485889162@warthog.procyon.org.uk>
+ <CAKv+Gu_gy6575axL6M64OSo33ZM2dnbs7cajqJRd8VtbjAXCTw@mail.gmail.com>
+ <20578.1485952425@warthog.procyon.org.uk>
+Message-ID: <23750.1485961217@warthog.procyon.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 01 Feb 2017, Lee Jones wrote:
+Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
 
-> 'uart-has-rtscts' property and 'rts-gpios|cts-gpios' are normally
-> mutually exclusive, however it is possible for some drivers to have
-> a dynamic approach, meaning that both properties can be relevant.
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> From the OS pov, UserMode and DeployedMode are the same, the only
+> difference being that AuditMode may be entered from UserMode simply by
+> setting the variable to 0x1 (which can only be done before
+> ExitBootServices()). And since AuditMode implies SetupMode (according
+> to the diagram), you are right that we don't need to care about
+> AuditMode either. AFAICT, that makes the entire patch unnecessary, so
+> let's drop it for now.
 
-Acked-by: Peter Griffin <peter.griffin@linaro.org>
+Okay, in that case, do you want me to reissue and place a signed tag on my
+patchset without that patch, or can you pull the other patches individually?
 
-> ---
->  Documentation/devicetree/bindings/serial/serial.txt | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/serial/serial.txt b/Documentation/devicetree/bindings/serial/serial.txt
-> index fd970f7..b542a0e 100644
-> --- a/Documentation/devicetree/bindings/serial/serial.txt
-> +++ b/Documentation/devicetree/bindings/serial/serial.txt
-> @@ -23,7 +23,8 @@ Optional properties:
->      they are available for use (wired and enabled by pinmux configuration).
->      This depends on both the UART hardware and the board wiring.
->      Note that this property is mutually-exclusive with "cts-gpios" and
-> -    "rts-gpios" above.
-> +    "rts-gpios" above, unless support is provided to switch between modes
-> +    dynamically.
->  
->  
->  Examples:
+David
