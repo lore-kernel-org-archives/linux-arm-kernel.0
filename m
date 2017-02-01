@@ -1,75 +1,65 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 1 Feb 2017 17:51:41 +0000
-Subject: [PATCH v4 2/4] arm64: Work around Falkor erratum 1003
-In-Reply-To: <20170201174934.GF26507@e104818-lin.cambridge.arm.com>
-References: <20170125155232.10277-1-cov@codeaurora.org>
- <20170125155232.10277-2-cov@codeaurora.org>
- <20170131123735.GD11191@leverpostej>
- <36478002-4cd8-7f1c-1a25-8bfe35022a47@codeaurora.org>
- <3cab36fb-984a-beae-64db-6ce830ba94f6@arm.com>
- <b4cf83d2-ae05-3362-bc23-2341d00516dc@codeaurora.org>
- <20170201163358.GG8177@arm.com>
- <20170201173609.GE26507@e104818-lin.cambridge.arm.com>
- <20170201174105.GK8177@arm.com>
- <20170201174934.GF26507@e104818-lin.cambridge.arm.com>
-Message-ID: <20170201175140.GG26507@e104818-lin.cambridge.arm.com>
+From: rrichter@cavium.com (Robert Richter)
+Date: Wed, 1 Feb 2017 18:38:30 +0100
+Subject: [PATCH 6/9] irqchip/gic-v3-its: Prevent its init ordering dependencies
+In-Reply-To: <20170201173833.12630-1-rrichter@cavium.com>
+References: <20170201173833.12630-1-rrichter@cavium.com>
+Message-ID: <20170201173833.12630-7-rrichter@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2017 at 05:49:34PM +0000, Catalin Marinas wrote:
-> On Wed, Feb 01, 2017 at 05:41:05PM +0000, Will Deacon wrote:
-> > On Wed, Feb 01, 2017 at 05:36:09PM +0000, Catalin Marinas wrote:
-> > > On Wed, Feb 01, 2017 at 04:33:58PM +0000, Will Deacon wrote:
-> > > > On Wed, Feb 01, 2017 at 11:29:22AM -0500, Christopher Covington wrote:
-> > > > > On 01/31/2017 12:56 PM, Marc Zyngier wrote:
-> > > > > > Given that all ARMv8 CPUs can support SW_PAN, it is more likely to be
-> > > > > > enabled than the ARMv8.1 PAN. I'd vote for supporting the workaround in
-> > > > > > that case too, and hope that people do enable the HW version.
-> > > > > 
-> > > > > Okay, I'll do my best to add support for the SW PAN case. I rebased and
-> > > > > submitted v6 of the E1009 patch [1] so that it no longer depends on this
-> > > > > patch landing first, if you all are inclined to pick it up while work on
-> > > > > this E1003 patch continues.
-> > > > 
-> > > > The alternative is not enabling SW_PAN (at runtime) if this errata is
-> > > > present, along with a warning stating that hardware-PAN should be
-> > > > enabled in kconfig instead. Not sure what distributions will make of that
-> > > > though.
-> > > 
-> > > The problem with this patch is that when ARM64_SW_TTBR0_PAN is enabled
-> > > and in the absence of hardware PAN (or ARM64_PAN disabled),
-> > > cpu_do_switch_mm is no longer called for user process switching, so the
-> > > workaround is pretty much useless.
-> > 
-> > Oh, I see what you mean now.
-> > 
-> > > I'm ok with adding the Kconfig dependency below to
-> > > QCOM_FALKOR_ERRATUM_1003:
-> > > 
-> > > 	depends on !ARM64_SW_TTBR0_PAN || ARM64_PAN
-> > > 
-> > > together with a run-time warning if ARM64_SW_TTBR0_PAN is being used.
-> > 
-> > That makes it look like hardware-PAN is the cause of the erratum.
-> 
-> With the right Kconfig comment we could make this clearer.
-> 
-> > Maybe
-> > just select ARM64_PAN if the erratum workaround is selected, then
-> > runtime warning if we find that the h/w doesn't have PAN but does have
-> > the erratum (which should never fire)?
-> 
-> You still need this workaround even if you don't want any PAN (both sw
-> and hw PAN disabled). I wouldn't want to select ARM64_PAN since it's not
-> a dependency. It's more like if you do need a PAN, make sure you only
-> use the hw one.
+Right now its_init() must be called before pci and platform init.
+Remove ordering dependencies to allow all initialization functions
+being called with the same initcall type.
 
-Alternatively, your select idea could be refined to:
+Signed-off-by: Robert Richter <rrichter@cavium.com>
+---
+ drivers/irqchip/irq-gic-v3-its-pci-msi.c      | 4 +++-
+ drivers/irqchip/irq-gic-v3-its-platform-msi.c | 4 +++-
+ 2 files changed, 6 insertions(+), 2 deletions(-)
 
-	select ARM64_PAN if ARM64_SW_TTBR0_PAN
-
-but we still need a proper comment as people would wonder what this is
-for.
-
+diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+index dace9bc4ef8d..afe78f224181 100644
+--- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
++++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+@@ -77,6 +77,8 @@ static int its_pci_msi_prepare(struct irq_domain *domain, struct device *dev,
+ 		return -EINVAL;
+ 
+ 	msi_info = msi_get_domain_info(domain->parent);
++	if (!msi_info)
++		return -ENODEV;
+ 
+ 	pdev = to_pci_dev(dev);
+ 	dev_alias.pdev = pdev;
+@@ -113,7 +115,7 @@ static int __init its_pci_msi_init_one(struct fwnode_handle *handle,
+ 	struct irq_domain *parent;
+ 
+ 	parent = irq_find_matching_fwnode(handle, DOMAIN_BUS_NEXUS);
+-	if (!parent || !msi_get_domain_info(parent)) {
++	if (!parent) {
+ 		pr_err("%s: Unable to locate ITS domain\n", name);
+ 		return -ENXIO;
+ 	}
+diff --git a/drivers/irqchip/irq-gic-v3-its-platform-msi.c b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
+index 7d8c19973766..22ba1dfed8ba 100644
+--- a/drivers/irqchip/irq-gic-v3-its-platform-msi.c
++++ b/drivers/irqchip/irq-gic-v3-its-platform-msi.c
+@@ -32,6 +32,8 @@ static int its_pmsi_prepare(struct irq_domain *domain, struct device *dev,
+ 	int ret, index = 0;
+ 
+ 	msi_info = msi_get_domain_info(domain->parent);
++	if (!msi_info)
++		return -ENODEV;
+ 
+ 	/* Suck the DeviceID out of the msi-parent property */
+ 	do {
+@@ -84,7 +86,7 @@ static int __init its_pmsi_init(void)
+ 			continue;
+ 
+ 		parent = irq_find_matching_host(np, DOMAIN_BUS_NEXUS);
+-		if (!parent || !msi_get_domain_info(parent)) {
++		if (!parent) {
+ 			pr_err("%s: unable to locate ITS domain\n",
+ 			       np->full_name);
+ 			continue;
 -- 
-Catalin
+2.11.0
