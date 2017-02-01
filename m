@@ -1,27 +1,81 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 1 Feb 2017 14:30:18 +0100
-Subject: [PATCH v2] ARM: dts: imx: Pass 'chosen' and 'memory' nodes
-In-Reply-To: <20170130185444.GF27312@n2100.armlinux.org.uk>
-Message-ID: <6d3e9733-bebc-4347-95db-2a1c9018948d@i2se.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 1 Feb 2017 13:31:50 +0000
+Subject: [Resend PATCH v2 2/3] dt-bindings: mfd: stm32f4: Add missing
+ binding definition
+In-Reply-To: <1485954596-11014-3-git-send-email-gabriel.fernandez@st.com>
+References: <1485954596-11014-1-git-send-email-gabriel.fernandez@st.com>
+ <1485954596-11014-3-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <20170201133150.ifyxibbiokmcth7i@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 01 Feb 2017, gabriel.fernandez at st.com wrote:
 
-> On Mon, Jan 30, 2017 at 4:54 PM, Russell King - ARM Linux
-> <linux@xxxxxxxxxxxxxxx> wrote:
->
-> >/We need this regression fixed before 4.10 comes out so systems don't/
-> >/break when 4.10 comes out./
->
-> It will be fixed in the next rc with the following commit:
->
-https://git.kernel.org/cgit/linux/kernel/git/shawnguo/linux.git/commit/?h=imx/fixes&id=a971c5545c3d45a1e33fda6e57913bb75aaa20c9
-<https://git.kernel.org/cgit/linux/kernel/git/shawnguo/linux.git/commit/?h=imx/fixes&id=a971c5545c3d45a1e33fda6e57913bb75aaa20c9>
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+> 
+> This patch adds missing binding definition (backupram, ethernet, otg,
+> qspi, adc & dsi)
 
+What is RCC?
 
-i want to report that the combination i.MX28 + imx-bootlets (requires
-CONFIG_ARM_APPENDED_DTB since bootlets can't handle DTBs) was also
-affected before and fixed by this patch.
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> ---
+>  include/dt-bindings/mfd/stm32f4-rcc.h | 14 ++++++++++++--
+>  1 file changed, 12 insertions(+), 2 deletions(-)
+> 
+> diff --git a/include/dt-bindings/mfd/stm32f4-rcc.h b/include/dt-bindings/mfd/stm32f4-rcc.h
+> index f662b19..082a81c 100644
+> --- a/include/dt-bindings/mfd/stm32f4-rcc.h
+> +++ b/include/dt-bindings/mfd/stm32f4-rcc.h
+> @@ -18,11 +18,17 @@
+>  #define STM32F4_RCC_AHB1_GPIOJ	9
+>  #define STM32F4_RCC_AHB1_GPIOK	10
+>  #define STM32F4_RCC_AHB1_CRC	12
+> +#define STM32F4_RCC_AHB1_BKPSRAM	18
+> +#define STM32F4_RCC_AHB1_CCMDATARAM	20
+>  #define STM32F4_RCC_AHB1_DMA1	21
+>  #define STM32F4_RCC_AHB1_DMA2	22
+>  #define STM32F4_RCC_AHB1_DMA2D	23
+>  #define STM32F4_RCC_AHB1_ETHMAC	25
+> -#define STM32F4_RCC_AHB1_OTGHS	29
+> +#define STM32F4_RCC_AHB1_ETHMACTX	26
+> +#define STM32F4_RCC_AHB1_ETHMACRX	27
+> +#define STM32F4_RCC_AHB1_ETHMACPTP	28
+> +#define STM32F4_RCC_AHB1_OTGHS		29
+> +#define STM32F4_RCC_AHB1_OTGHSULPI	30
+>  
+>  #define STM32F4_AHB1_RESET(bit) (STM32F4_RCC_AHB1_##bit + (0x10 * 8))
+>  #define STM32F4_AHB1_CLOCK(bit) (STM32F4_RCC_AHB1_##bit)
+> @@ -40,6 +46,7 @@
+>  
+>  /* AHB3 */
+>  #define STM32F4_RCC_AHB3_FMC	0
+> +#define STM32F4_RCC_AHB3_QSPI	1
+>  
+>  #define STM32F4_AHB3_RESET(bit)	(STM32F4_RCC_AHB3_##bit + (0x18 * 8))
+>  #define STM32F4_AHB3_CLOCK(bit)	(STM32F4_RCC_AHB3_##bit + 0x40)
+> @@ -79,7 +86,9 @@
+>  #define STM32F4_RCC_APB2_TIM8	1
+>  #define STM32F4_RCC_APB2_USART1	4
+>  #define STM32F4_RCC_APB2_USART6	5
+> -#define STM32F4_RCC_APB2_ADC	8
+> +#define STM32F4_RCC_APB2_ADC1	8
+> +#define STM32F4_RCC_APB2_ADC2	9
+> +#define STM32F4_RCC_APB2_ADC3	10
+>  #define STM32F4_RCC_APB2_SDIO	11
+>  #define STM32F4_RCC_APB2_SPI1	12
+>  #define STM32F4_RCC_APB2_SPI4	13
+> @@ -91,6 +100,7 @@
+>  #define STM32F4_RCC_APB2_SPI6	21
+>  #define STM32F4_RCC_APB2_SAI1	22
+>  #define STM32F4_RCC_APB2_LTDC	26
+> +#define STM32F4_RCC_APB2_DSI	27
+>  
+>  #define STM32F4_APB2_RESET(bit)	(STM32F4_RCC_APB2_##bit + (0x24 * 8))
+>  #define STM32F4_APB2_CLOCK(bit)	(STM32F4_RCC_APB2_##bit + 0xA0)
 
-Btw are Arnd and Olof informed about this urgent patch?
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
