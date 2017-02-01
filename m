@@ -1,63 +1,101 @@
-From: flatmax@flatmax.org (Matt Flax)
-Date: Wed,  1 Feb 2017 15:45:03 +1100
-Subject: [PATCH v1] ASoC: bcm2835: Remove redundant channel checking code in
- hw_params
-In-Reply-To: <1484443043-13623-1-git-send-email-flatmax@flatmax.org>
-References: <1484443043-13623-1-git-send-email-flatmax@flatmax.org>
-Message-ID: <1485924303-30869-1-git-send-email-flatmax@flatmax.org>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 1 Feb 2017 10:52:12 +0530
+Subject: [PATCH v20 2/4] mailbox: mediatek: Add Mediatek CMDQ driver
+In-Reply-To: <1485419833.990.1.camel@mtksdaap41>
+References: <1483499169-16329-1-git-send-email-hs.liao@mediatek.com>
+ <1483499169-16329-3-git-send-email-hs.liao@mediatek.com>
+ <CABb+yY23TUB8NpmpiO=cCmVFAVJMqKPfGgX14j+_Yj7tJvMOuQ@mail.gmail.com>
+ <1485419833.990.1.camel@mtksdaap41>
+Message-ID: <CABb+yY13VaFpYz6EExvAXLpAqEWDJ4R50WG0DYbXO6iCESbA5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to channels_max and channels_min in the bcm2835_i2s_dai structure,
-the channel guard code in bcm2835_i2s_hw_params is redundant.
+On Thu, Jan 26, 2017 at 2:07 PM, Horng-Shyang Liao <hs.liao@mediatek.com> wrote:
+> Hi Jassi,
+>
+> On Thu, 2017-01-26 at 10:08 +0530, Jassi Brar wrote:
+>> On Wed, Jan 4, 2017 at 8:36 AM, HS Liao <hs.liao@mediatek.com> wrote:
+>>
+>> > diff --git a/drivers/mailbox/mtk-cmdq-mailbox.c b/drivers/mailbox/mtk-cmdq-mailbox.c
+>> > new file mode 100644
+>> > index 0000000..747bcd3
+>> > --- /dev/null
+>> > +++ b/drivers/mailbox/mtk-cmdq-mailbox.c
+>>
+>> ...
+>>
+>> > +static void cmdq_task_exec(struct cmdq_pkt *pkt, struct cmdq_thread *thread)
+>> > +{
+>> > +       struct cmdq *cmdq;
+>> > +       struct cmdq_task *task;
+>> > +       unsigned long curr_pa, end_pa;
+>> > +
+>> > +       cmdq = dev_get_drvdata(thread->chan->mbox->dev);
+>> > +
+>> > +       /* Client should not flush new tasks if suspended. */
+>> > +       WARN_ON(cmdq->suspended);
+>> > +
+>> > +       task = kzalloc(sizeof(*task), GFP_ATOMIC);
+>> > +       task->cmdq = cmdq;
+>> > +       INIT_LIST_HEAD(&task->list_entry);
+>> > +       task->pa_base = dma_map_single(cmdq->mbox.dev, pkt->va_base,
+>> > +                                      pkt->cmd_buf_size, DMA_TO_DEVICE);
+>> >
+>> You seem to parse the requests and responses, that should ideally be
+>> done in client driver.
+>> Also, we are here in atomic context, can you move it in client driver
+>> (before the spin_lock)?
+>> Maybe by adding a new 'pa_base' member as well in 'cmdq_pkt'.
+>
+> will do
+>
+>> ....
+>> > +
+>> > +       cmdq->mbox.num_chans = CMDQ_THR_MAX_COUNT;
+>> > +       cmdq->mbox.ops = &cmdq_mbox_chan_ops;
+>> > +       cmdq->mbox.of_xlate = cmdq_xlate;
+>> > +
+>> > +       /* make use of TXDONE_BY_ACK */
+>> > +       cmdq->mbox.txdone_irq = false;
+>> > +       cmdq->mbox.txdone_poll = false;
+>> > +
+>> > +       for (i = 0; i < ARRAY_SIZE(cmdq->thread); i++) {
+>> >
+>> You mean  i < CMDQ_THR_MAX_COUNT
+>
+> will do
+>
+>> > +               cmdq->thread[i].base = cmdq->base + CMDQ_THR_BASE +
+>> > +                               CMDQ_THR_SIZE * i;
+>> > +               INIT_LIST_HEAD(&cmdq->thread[i].task_busy_list);
+>> >
+>> You seem the queue mailbox requests in this controller driver? why not
+>> use the mailbox api for that?
+>>
+>> > +               init_timer(&cmdq->thread[i].timeout);
+>> > +               cmdq->thread[i].timeout.function = cmdq_thread_handle_timeout;
+>> > +               cmdq->thread[i].timeout.data = (unsigned long)&cmdq->thread[i];
+>> >
+>> Here again... you seem to ignore the polling mechanism provided by the
+>> mailbox api, and implement your own.
+>
+> The queue is used to record the tasks which are flushed into CMDQ
+> hardware (GCE). We are handling time critical tasks, so we have to
+> queue them in GCE rather than a software queue (e.g. mailbox buffer).
+> Let me use display as an example. Many display tasks are flushed into
+> CMDQ to wait next vsync event. When vsync event is triggered by display
+> hardware, GCE needs to process all flushed tasks "within vblank" to
+> prevent garbage on screen. This is all done by GCE (without CPU)
+> to fulfill time critical requirement. After GCE finish its work,
+> it will generate interrupts, and then CMDQ driver will let clients know
+> which tasks are done.
+>
+Does the GCE provide any 'lock' to prevent modifying (by adding tasks
+to) the GCE h/w buffer when it is processing it at vsync?  Otherwise
+there maybe race/error. If there is such a 'lock' flag/irq, that could
+help here. However, you are supposed to know your h/w better, so I
+will accept this implementation assuming it can't be done any better.
 
-The bcm2835_i2s_hw_params function checks that the channel count is
-2 before continuing. This code never gets executed because core soc
-checks prevent the execution (upon channel mismatch) of the
-bcm2835_i2s_hw_params function.
+Please address other comments and resubmit.
 
-The redundancy has been tested and checked for the case when
-the bcm2835_i2s_dai structure has channels_max = 2 and a request
-for 8 channels has been made. The test has confirmed that the
-removed code is redundant as it never gets executed when a
-channel mismatch occurs.
-
-This redundant channel count check may seem like it will not cause
-any problems however some sound cards (such as the 8 channel
-AudioInjector Octo sound card) require the execution of the
-bcm2835_i2s_hw_params function when channels_max in the
-bcm2835_i2s_dai structure has been increased to 8.
-
-As the channel checking code in bcm2835_i2s_hw_params is redundant
-and stops certain cards from working it has been removed.
-
-Signed-off-by: Matt Flax <flatmax@flatmax.org>
----
- sound/soc/bcm/bcm2835-i2s.c | 12 +++---------
- 1 file changed, 3 insertions(+), 9 deletions(-)
-
-diff --git a/sound/soc/bcm/bcm2835-i2s.c b/sound/soc/bcm/bcm2835-i2s.c
-index 6ba2049..1773b83 100644
---- a/sound/soc/bcm/bcm2835-i2s.c
-+++ b/sound/soc/bcm/bcm2835-i2s.c
-@@ -310,15 +310,9 @@ static int bcm2835_i2s_hw_params(struct snd_pcm_substream *substream,
- 	ch1pos = data_delay;
- 	ch2pos = bclk_ratio / 2 + data_delay;
- 
--	switch (params_channels(params)) {
--	case 2:
--		format = BCM2835_I2S_CH1(format) | BCM2835_I2S_CH2(format);
--		format |= BCM2835_I2S_CH1(BCM2835_I2S_CHPOS(ch1pos));
--		format |= BCM2835_I2S_CH2(BCM2835_I2S_CHPOS(ch2pos));
--		break;
--	default:
--		return -EINVAL;
--	}
-+	format = BCM2835_I2S_CH1(format) | BCM2835_I2S_CH2(format);
-+	format |= BCM2835_I2S_CH1(BCM2835_I2S_CHPOS(ch1pos));
-+	format |= BCM2835_I2S_CH2(BCM2835_I2S_CHPOS(ch2pos));
- 
- 	/*
- 	 * Set format for both streams.
--- 
-2.7.4
+Thanks
