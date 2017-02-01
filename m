@@ -1,305 +1,126 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed,  1 Feb 2017 21:46:26 +0900
-Subject: [PATCH v31 07/12] arm64: kdump: implement machine_crash_shutdown()
-In-Reply-To: <20170201124218.5823-1-takahiro.akashi@linaro.org>
-References: <20170201124218.5823-1-takahiro.akashi@linaro.org>
-Message-ID: <20170201124630.6016-6-takahiro.akashi@linaro.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 1 Feb 2017 13:03:44 +0000
+Subject: [PATCH 06/10] soc/qbman: Add ARM equivalent for
+ flush_dcache_range()
+In-Reply-To: <HE1PR0401MB2636FF4D977DDA6888616A26864B0@HE1PR0401MB2636.eurprd04.prod.outlook.com>
+References: <1484779180-1344-1-git-send-email-roy.pledge@nxp.com>
+ <VI1PR0401MB2430DA6BD2F857C30EC86A50917F0@VI1PR0401MB2430.eurprd04.prod.outlook.com>
+ <HE1PR0401MB263638F320470CA216990BCC86720@HE1PR0401MB2636.eurprd04.prod.outlook.com>
+ <5414359.8GMja3pNrI@wuerfel>
+ <VI1PR0401MB24303C4A5C0042005E17F1A391770@VI1PR0401MB2430.eurprd04.prod.outlook.com>
+ <CAK8P3a1Gd4bd7GjEp_a9WXc_mTPk0XmP7DH8aPWhbn2K3MMuDQ@mail.gmail.com>
+ <1485570872.9266.22.camel@buserror.net>
+ <d5ca6bcd-1d1a-2a61-1f5c-9086a67f629a@arm.com>
+ <HE1PR0401MB2636FF4D977DDA6888616A26864B0@HE1PR0401MB2636.eurprd04.prod.outlook.com>
+Message-ID: <3cc42823-0fc9-ed3e-1738-bf6e314dd569@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Primary kernel calls machine_crash_shutdown() to shut down non-boot cpus
-and save registers' status in per-cpu ELF notes before starting crash
-dump kernel. See kernel_kexec().
-Even if not all secondary cpus have shut down, we do kdump anyway.
+On 30/01/17 19:04, Roy Pledge wrote:
+> On 1/30/2017 10:31 AM, Robin Murphy wrote:
+>> On 28/01/17 02:34, Scott Wood wrote:
+>>> On Fri, 2017-01-27 at 17:41 +0100, Arnd Bergmann wrote:
+>>>> On Thu, Jan 26, 2017 at 6:08 AM, Scott Wood <scott.wood@nxp.com> wrote:
+>>>>> On 01/25/2017 03:20 PM, Arnd Bergmann wrote:
+>>>>>> On Monday, January 23, 2017 7:24:59 PM CET Roy Pledge wrote:
+>>>>>> If this is normal RAM, you should be able to just write zeroes, and then
+>>>>>> do a dma_map_single() for initialization.
+>>>>> The DMA API on PPC currently has no way of knowing that the device
+>>>>> accesses this memory incoherently.
+>>>> Ah, this is because PPC doesn't use the 'dma-coherent' property on devices
+>>>> but just assumes that coherency is a global property of the platform,right?
+>>> Right.
+>>>
+>>>>> If that were somehow fixed, we still couldn't use dma_map_single() as it
+>>>>> doesn't accept virtual addresses that come from memremap() or similar
+>>>>> dynamic mappings.  We'd have to convert the physical address to an array
+>>>>> of struct pages and pass each one to dma_map_page().
+>>>> Sorry for my ignorance, but where does the memory come from to start
+>>>> with? Is this in the normal linearly mapped RAM, in a carveout outside
+>>>> of the linear mapping but the same memory, or in some on-chip buffer?
+>>> It's RAM that comes from the device tree reserved memory mechanism
+>>> (drivers/of/of_reserved_mem.c).  On a 32-bit kernel it is not guaranteed (or
+>>> likely) to be lowmem.
+>> Wouldn't dma_declare_coherent_memory() be the appropriate tool for that
+>> job, then (modulo the PPC issue)? On ARM that should result in
+>> dma_alloc_coherent() giving back a non-cacheable mapping if the device
+>> is non-coherent, wherein a dmb_wmb() after writing the data from the CPU
+>> side should be enough to ensure it is published to the device.
+> I think there is some confusion here (and it may very well be mine).
+> 
+> My understanding is that the dma_declare_coherent_memory() API sets up a
+> region of memory that will be managed by dma_alloc_coherent() and
+> friends.  This is useful if the driver needs to manage a region of on
+> device memory but that isn't what this specific region is used for.
 
-As we don't have to make non-boot(crashed) cpus offline (to preserve
-correct status of cpus at crash dump) before shutting down, this patch
-also adds a variant of smp_send_stop().
+It's a bit more general than that - dma_alloc_coherent() can essentially
+be considered "give me some memory for this device to use". We already
+have use-cases where such buffers are only ever accessed by the device
+(e.g. some display controllers, and future NVMe devices), hence
+DMA_ATTR_NO_KERNEL_MAPPING on ARM to save the vmalloc space.
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Reviewed-by: James Morse <james.morse@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm64/include/asm/hardirq.h  |  2 +-
- arch/arm64/include/asm/kexec.h    | 42 +++++++++++++++++++++++++-
- arch/arm64/include/asm/smp.h      |  2 ++
- arch/arm64/kernel/machine_kexec.c | 55 +++++++++++++++++++++++++++++++---
- arch/arm64/kernel/smp.c           | 63 +++++++++++++++++++++++++++++++++++++++
- 5 files changed, 158 insertions(+), 6 deletions(-)
+A DMA allocation also inherently guarantees appropriate alignment,
+regardless of whether you're using a per-device reservation or just
+regular CMA, and will also zero the underlying memory (and for a
+non-coherent device perform whatever cache maintenance is necessary, if
+the clearing isn't already done via a non-cacheable mapping).
 
-diff --git a/arch/arm64/include/asm/hardirq.h b/arch/arm64/include/asm/hardirq.h
-index 8740297dac77..1473fc2f7ab7 100644
---- a/arch/arm64/include/asm/hardirq.h
-+++ b/arch/arm64/include/asm/hardirq.h
-@@ -20,7 +20,7 @@
- #include <linux/threads.h>
- #include <asm/irq.h>
- 
--#define NR_IPI	6
-+#define NR_IPI	7
- 
- typedef struct {
- 	unsigned int __softirq_pending;
-diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
-index 04744dc5fb61..f40ace1fa21a 100644
---- a/arch/arm64/include/asm/kexec.h
-+++ b/arch/arm64/include/asm/kexec.h
-@@ -40,7 +40,47 @@
- static inline void crash_setup_regs(struct pt_regs *newregs,
- 				    struct pt_regs *oldregs)
- {
--	/* Empty routine needed to avoid build errors. */
-+	if (oldregs) {
-+		memcpy(newregs, oldregs, sizeof(*newregs));
-+	} else {
-+		u64 tmp1, tmp2;
-+
-+		__asm__ __volatile__ (
-+			"stp	 x0,   x1, [%2, #16 *  0]\n"
-+			"stp	 x2,   x3, [%2, #16 *  1]\n"
-+			"stp	 x4,   x5, [%2, #16 *  2]\n"
-+			"stp	 x6,   x7, [%2, #16 *  3]\n"
-+			"stp	 x8,   x9, [%2, #16 *  4]\n"
-+			"stp	x10,  x11, [%2, #16 *  5]\n"
-+			"stp	x12,  x13, [%2, #16 *  6]\n"
-+			"stp	x14,  x15, [%2, #16 *  7]\n"
-+			"stp	x16,  x17, [%2, #16 *  8]\n"
-+			"stp	x18,  x19, [%2, #16 *  9]\n"
-+			"stp	x20,  x21, [%2, #16 * 10]\n"
-+			"stp	x22,  x23, [%2, #16 * 11]\n"
-+			"stp	x24,  x25, [%2, #16 * 12]\n"
-+			"stp	x26,  x27, [%2, #16 * 13]\n"
-+			"stp	x28,  x29, [%2, #16 * 14]\n"
-+			"mov	 %0,  sp\n"
-+			"stp	x30,  %0,  [%2, #16 * 15]\n"
-+
-+			"/* faked current PSTATE */\n"
-+			"mrs	 %0, CurrentEL\n"
-+			"mrs	 %1, SPSEL\n"
-+			"orr	 %0, %0, %1\n"
-+			"mrs	 %1, DAIF\n"
-+			"orr	 %0, %0, %1\n"
-+			"mrs	 %1, NZCV\n"
-+			"orr	 %0, %0, %1\n"
-+			/* pc */
-+			"adr	 %1, 1f\n"
-+		"1:\n"
-+			"stp	 %1, %0,   [%2, #16 * 16]\n"
-+			: "=&r" (tmp1), "=&r" (tmp2)
-+			: "r" (newregs)
-+			: "memory"
-+		);
-+	}
- }
- 
- #endif /* __ASSEMBLY__ */
-diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
-index d050d720a1b4..cea009f2657d 100644
---- a/arch/arm64/include/asm/smp.h
-+++ b/arch/arm64/include/asm/smp.h
-@@ -148,6 +148,8 @@ static inline void cpu_panic_kernel(void)
-  */
- bool cpus_are_stuck_in_kernel(void);
- 
-+extern void smp_send_crash_stop(void);
-+
- #endif /* ifndef __ASSEMBLY__ */
- 
- #endif /* ifndef __ASM_SMP_H */
-diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-index 016f2dd693aa..c61dd7b7dca0 100644
---- a/arch/arm64/kernel/machine_kexec.c
-+++ b/arch/arm64/kernel/machine_kexec.c
-@@ -9,6 +9,9 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/kernel.h>
- #include <linux/kexec.h>
- #include <linux/smp.h>
- 
-@@ -161,7 +164,8 @@ void machine_kexec(struct kimage *kimage)
- 	/*
- 	 * New cpus may have become stuck_in_kernel after we loaded the image.
- 	 */
--	BUG_ON(cpus_are_stuck_in_kernel() || (num_online_cpus() > 1));
-+	BUG_ON((cpus_are_stuck_in_kernel() || (num_online_cpus() > 1)) &&
-+			!WARN_ON(kimage == kexec_crash_image));
- 
- 	reboot_code_buffer_phys = page_to_phys(kimage->control_code_page);
- 
-@@ -198,15 +202,58 @@ void machine_kexec(struct kimage *kimage)
- 	 * relocation is complete.
- 	 */
- 
--	cpu_soft_restart(1, reboot_code_buffer_phys, kimage->head,
--		kimage->start, 0);
-+	cpu_soft_restart(kimage != kexec_crash_image,
-+		reboot_code_buffer_phys, kimage->head, kimage->start, 0);
- 
- 	BUG(); /* Should never get here. */
- }
- 
-+static void machine_kexec_mask_interrupts(void)
-+{
-+	unsigned int i;
-+	struct irq_desc *desc;
-+
-+	for_each_irq_desc(i, desc) {
-+		struct irq_chip *chip;
-+		int ret;
-+
-+		chip = irq_desc_get_chip(desc);
-+		if (!chip)
-+			continue;
-+
-+		/*
-+		 * First try to remove the active state. If this
-+		 * fails, try to EOI the interrupt.
-+		 */
-+		ret = irq_set_irqchip_state(i, IRQCHIP_STATE_ACTIVE, false);
-+
-+		if (ret && irqd_irq_inprogress(&desc->irq_data) &&
-+		    chip->irq_eoi)
-+			chip->irq_eoi(&desc->irq_data);
-+
-+		if (chip->irq_mask)
-+			chip->irq_mask(&desc->irq_data);
-+
-+		if (chip->irq_disable && !irqd_irq_disabled(&desc->irq_data))
-+			chip->irq_disable(&desc->irq_data);
-+	}
-+}
-+
-+/**
-+ * machine_crash_shutdown - shutdown non-crashing cpus and save registers
-+ */
- void machine_crash_shutdown(struct pt_regs *regs)
- {
--	/* Empty routine needed to avoid build errors. */
-+	local_irq_disable();
-+
-+	/* shutdown non-crashing cpus */
-+	smp_send_crash_stop();
-+
-+	/* for crashing cpu */
-+	crash_save_cpu(regs, smp_processor_id());
-+	machine_kexec_mask_interrupts();
-+
-+	pr_info("Starting crashdump kernel...\n");
- }
- 
- void arch_kexec_protect_crashkres(void)
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index cb87234cfcf2..446c6d48f8ec 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -37,6 +37,7 @@
- #include <linux/completion.h>
- #include <linux/of.h>
- #include <linux/irq_work.h>
-+#include <linux/kexec.h>
- 
- #include <asm/alternative.h>
- #include <asm/atomic.h>
-@@ -74,6 +75,7 @@ enum ipi_msg_type {
- 	IPI_RESCHEDULE,
- 	IPI_CALL_FUNC,
- 	IPI_CPU_STOP,
-+	IPI_CPU_CRASH_STOP,
- 	IPI_TIMER,
- 	IPI_IRQ_WORK,
- 	IPI_WAKEUP
-@@ -753,6 +755,7 @@ static const char *ipi_types[NR_IPI] __tracepoint_string = {
- 	S(IPI_RESCHEDULE, "Rescheduling interrupts"),
- 	S(IPI_CALL_FUNC, "Function call interrupts"),
- 	S(IPI_CPU_STOP, "CPU stop interrupts"),
-+	S(IPI_CPU_CRASH_STOP, "CPU stop (for crash dump) interrupts"),
- 	S(IPI_TIMER, "Timer broadcast interrupts"),
- 	S(IPI_IRQ_WORK, "IRQ work interrupts"),
- 	S(IPI_WAKEUP, "CPU wake-up interrupts"),
-@@ -827,6 +830,29 @@ static void ipi_cpu_stop(unsigned int cpu)
- 		cpu_relax();
- }
- 
-+#ifdef CONFIG_KEXEC_CORE
-+static atomic_t waiting_for_crash_ipi;
-+#endif
-+
-+static void ipi_cpu_crash_stop(unsigned int cpu, struct pt_regs *regs)
-+{
-+#ifdef CONFIG_KEXEC_CORE
-+	crash_save_cpu(regs, cpu);
-+
-+	atomic_dec(&waiting_for_crash_ipi);
-+
-+	local_irq_disable();
-+
-+#ifdef CONFIG_HOTPLUG_CPU
-+	if (cpu_ops[cpu]->cpu_die)
-+		cpu_ops[cpu]->cpu_die(cpu);
-+#endif
-+
-+	/* just in case */
-+	cpu_park_loop();
-+#endif
-+}
-+
- /*
-  * Main handler for inter-processor interrupts
-  */
-@@ -857,6 +883,15 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
- 		irq_exit();
- 		break;
- 
-+	case IPI_CPU_CRASH_STOP:
-+		if (IS_ENABLED(CONFIG_KEXEC_CORE)) {
-+			irq_enter();
-+			ipi_cpu_crash_stop(cpu, regs);
-+
-+			unreachable();
-+		}
-+		break;
-+
- #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
- 	case IPI_TIMER:
- 		irq_enter();
-@@ -929,6 +964,34 @@ void smp_send_stop(void)
- 			   cpumask_pr_args(cpu_online_mask));
- }
- 
-+#ifdef CONFIG_KEXEC_CORE
-+void smp_send_crash_stop(void)
-+{
-+	cpumask_t mask;
-+	unsigned long timeout;
-+
-+	if (num_online_cpus() == 1)
-+		return;
-+
-+	cpumask_copy(&mask, cpu_online_mask);
-+	cpumask_clear_cpu(smp_processor_id(), &mask);
-+
-+	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
-+
-+	pr_crit("SMP: stopping secondary CPUs\n");
-+	smp_cross_call(&mask, IPI_CPU_CRASH_STOP);
-+
-+	/* Wait up to one second for other CPUs to stop */
-+	timeout = USEC_PER_SEC;
-+	while ((atomic_read(&waiting_for_crash_ipi) > 0) && timeout--)
-+		udelay(1);
-+
-+	if (atomic_read(&waiting_for_crash_ipi) > 0)
-+		pr_warning("SMP: failed to stop secondary CPUs %*pbl\n",
-+			   cpumask_pr_args(cpu_online_mask));
-+}
-+#endif
-+
- /*
-  * not supported here
-  */
--- 
-2.11.0
+All you need to do in the driver is allocate your buffer and hand the
+resulting address off to the device at probe (after optionally checking
+for a reservation in DT and declaring it), then free it at remove, which
+also ends up far more self-documenting (IMO) than a bunch of open-coded
+remapping and #ifdef'ed architecture-private cache shenanigans.
+
+> The memory that is trying to be initialized here is a big chunk
+> (possible multiple megabytes) of RAM that only the QBMan device will
+> access with one exception - at initialization the device expects
+> software to zero the memory before starting to use the device. Since the
+> CPUs will never access this region again the device does
+> non-coherent/non-shareable accesses for performance reasons since QBMan
+> device is the only user - no need to maintain coherency with core side
+> caches.
+> 
+> We used the of_reserve memory as that seemed to be the best reliable way
+> to guarantee that we would get a properly aligned contiguous allocation
+> and it's been working well.  The downside is that the contents of that
+> memory is undefined so we had to map it, zero it and flush the cache in
+> order to get the RAM into the desired state and make sure we don't get
+> hit by a random castout in the future.
+> 
+> Would it make sense to add an option in the of_reserved_mem system to
+> fill the memory?  I haven't looked at the feasibility of that but it
+> seems like a generic solution that could be useful to others.  We could
+> add the fill value to the device tree so you could initialize to any
+> pattern.
+
+In short, said generic solution is right there already, only the PPC
+arch code might need tweaking to accommodate it :)
+
+Robin.
+
+> 
+> - Roy
+> 
+>>
+>> Robin.
+>>
+>>>>> And even if we did all that, there would still be other manual cache
+>>>>> manipulation left in this driver, to deal with its cacheable register
+>>>>> interface.
+>>>> I thought we had concluded that "cacheable register" is something
+>>>> that cannot work reliably on ARM at all when this came up before.
+>>>> Any updates on that?
+>>> I'm not familiar with the details there...  My understanding is that the
+>>> hardware people at NXP are convinced that it can work on these specific chips
+>>> due to implementation details.
+>>>
+>>> -Scott
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>
+>>
+> 
