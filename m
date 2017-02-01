@@ -1,34 +1,61 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 1 Feb 2017 11:31:50 -0600
-Subject: [PATCH 3/8] Documentation: dt-bindings: Add STM32 pinctrl driver
- DT bindings
-In-Reply-To: <1485868465-30446-4-git-send-email-alexandre.torgue@st.com>
-References: <1485868465-30446-1-git-send-email-alexandre.torgue@st.com>
- <1485868465-30446-4-git-send-email-alexandre.torgue@st.com>
-Message-ID: <20170201173150.lri7qgq52oflm2m7@rob-hp-laptop>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Wed,  1 Feb 2017 11:28:26 -0600
+Subject: [Patch v6 0/2] Support ARM SMCC SoC vendor quirks
+Message-ID: <1485970108-14177-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jan 31, 2017 at 02:14:20PM +0100, Alexandre TORGUE wrote:
-> Add compatible sting for stm32h743 MCU.
-> 
-> Signed-off-by: Alexandre TORGUE <alexandre.torgue@st.com>
-> 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
-> index b24583a..ac8dcb7 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/st,stm32-pinctrl.txt
-> @@ -10,6 +10,7 @@ Required properies:
->   - compatible: value should be one of the following:
->     (a) "st,stm32f429-pinctrl"
->     (b) "st,stm32f746-pinctrl"
-> +   (c) "st,stm32h743-pinctrl"
+At least one SoC vendor (Qualcomm) requires additional processing done
+during ARM SMCCC calls.  As such, an additional parameter to the
+arm_smccc_smc is required to be able to handle SoC specific quirks.
 
-Drop the a,b,c.
+The Qualcomm quirk is necessary due to the fact that the scm call can
+be interrupted on Qualcomm ARM64 platforms.  When this occurs, the
+call must be restarted using information that was passed back during
+the original smc call.
 
->   - #address-cells: The value of this property must be 1
->   - #size-cells	: The value of this property must be 1
->   - ranges	: defines mapping between pin controller node (parent) to
-> -- 
-> 1.9.1
-> 
+The first patch in this series adds a quirk structure and also adds a
+quirk parameter to arm_smccc_smc calls.  I added macros to allow users
+to choose the API they need.  This keeps all of the current users who
+do not need quirks from having to change anything.
+
+The second patch adds the Qualcomm quirk and also implements the
+Qualcomm firmware changes required to handle the restarting of the
+interrupted SMC call.
+
+The original patch set for the SMCCC session ID is located at:
+https://lkml.org/lkml/2016/8/20/7
+
+Changes from v5:
+  - Make smc and hvc calls symmetric w.r.t. quirk arguments
+
+Changes from v4:
+  - Fix issue with hvc calls.
+
+Changes from v3:
+  - Fix documentation
+
+Changes from v2:
+  - Use variadic macros
+
+Changes from v1:
+  - Add macros to handle both use cases per review comments
+
+
+
+
+Andy Gross (2):
+  arm: kernel: Add SMC structure parameter
+  firmware: qcom: scm: Fix interrupted SCM calls
+
+ arch/arm/kernel/armksyms.c      |  4 ++--
+ arch/arm/kernel/smccc-call.S    | 14 ++++++-----
+ arch/arm64/kernel/arm64ksyms.c  |  4 ++--
+ arch/arm64/kernel/asm-offsets.c |  7 ++++--
+ arch/arm64/kernel/smccc-call.S  | 23 +++++++++++++------
+ drivers/firmware/qcom_scm-64.c  | 13 ++++++++---
+ include/linux/arm-smccc.h       | 51 ++++++++++++++++++++++++++++++++---------
+ 7 files changed, 83 insertions(+), 33 deletions(-)
+
+-- 
+1.9.1
