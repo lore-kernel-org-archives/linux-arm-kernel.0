@@ -1,37 +1,59 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  1 Feb 2017 14:31:35 +0000
-Subject: [PATCH v2 00/10] serial: st-asc: Allow handling of RTS line
-Message-ID: <20170201143145.31962-1-lee.jones@linaro.org>
+Date: Wed,  1 Feb 2017 14:31:36 +0000
+Subject: [PATCH v2 01/10] serial: st-asc: Ignore the parity error bit if 8-bit
+ mode is enabled
+In-Reply-To: <20170201143145.31962-1-lee.jones@linaro.org>
+References: <20170201143145.31962-1-lee.jones@linaro.org>
+Message-ID: <20170201143145.31962-2-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When hardware flow-control is disabled, manual toggling of the UART's
-reset line (RTS) using userland applications (e.g. stty) is not
-possible, since the ASC IP does not provide this functionality in the
-same was as some other IPs do.  Thus, we have to do this manually.
+The datasheet states:
 
-This set ensures the correct Pinctrl groups are configured and
-obtained for both manual toggling of the RTS line and for the IP to
-take over the lines when HW flow-control is requested by the user.
+"If the MODE field selects an 8-bit frame then this [parity error] bit
+ is undefined. Software should ignore this bit when reading 8-bit frames."
 
-Lee Jones (10):
-  serial: st-asc: Ignore the parity error bit if 8-bit mode is enabled
-  serial: st-asc: Provide RTS functionality
-  serial: st-asc: Read in all Pinctrl states
-  serial: st-asc: (De)Register GPIOD and swap Pinctrl profiles
-  serial: st-asc: Use generic DT binding for announcing RTS/CTS lines
-  dt-bindings: serial: Update 'uart-has-rtscts' description
-  ARM: dts: STiH410-b2260: Identify the UART RTS line
-  ARM: dts: STiH407-pinctrl: Add Pinctrl group for HW flow-control
-  ARM: dts: STiH407-family: Use new Pinctrl groups
-  ARM: dts: STiH410-b2260: Enable HW flow-control
+Acked-by: Peter Griffin <peter.griffin@linaro.org>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/tty/serial/st-asc.c | 16 +++++++++++++---
+ 1 file changed, 13 insertions(+), 3 deletions(-)
 
- .../devicetree/bindings/serial/serial.txt          |   3 +-
- arch/arm/boot/dts/stih407-family.dtsi              |   3 +-
- arch/arm/boot/dts/stih407-pinctrl.dtsi             |  12 ++-
- arch/arm/boot/dts/stih410-b2260.dts                |   5 +
- drivers/tty/serial/st-asc.c                        | 101 +++++++++++++++++++--
- 5 files changed, 110 insertions(+), 14 deletions(-)
-
+diff --git a/drivers/tty/serial/st-asc.c b/drivers/tty/serial/st-asc.c
+index 379e5bd..69e6232 100644
+--- a/drivers/tty/serial/st-asc.c
++++ b/drivers/tty/serial/st-asc.c
+@@ -287,9 +287,19 @@ static void asc_transmit_chars(struct uart_port *port)
+ static void asc_receive_chars(struct uart_port *port)
+ {
+ 	struct tty_port *tport = &port->state->port;
+-	unsigned long status;
++	unsigned long status, mode;
+ 	unsigned long c = 0;
+ 	char flag;
++	bool ignore_pe = false;
++
++	/*
++	 * Datasheet states: If the MODE field selects an 8-bit frame then
++	 * this [parity error] bit is undefined. Software should ignore this
++	 * bit when reading 8-bit frames.
++	 */
++	mode = asc_in(port, ASC_CTL) & ASC_CTL_MODE_MSK;
++	if (mode == ASC_CTL_MODE_8BIT || mode == ASC_CTL_MODE_8BIT_PAR)
++		ignore_pe = true;
+ 
+ 	if (port->irq_wake)
+ 		pm_wakeup_event(tport->tty->dev, 0);
+@@ -299,8 +309,8 @@ static void asc_receive_chars(struct uart_port *port)
+ 		flag = TTY_NORMAL;
+ 		port->icount.rx++;
+ 
+-		if ((c & (ASC_RXBUF_FE | ASC_RXBUF_PE)) ||
+-			status & ASC_STA_OE) {
++		if (status & ASC_STA_OE || c & ASC_RXBUF_FE ||
++		    (c & ASC_RXBUF_PE && !ignore_pe)) {
+ 
+ 			if (c & ASC_RXBUF_FE) {
+ 				if (c == (ASC_RXBUF_FE | ASC_RXBUF_DUMMY_RX)) {
 -- 
 2.9.3
