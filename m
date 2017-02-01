@@ -1,60 +1,199 @@
 From: rrichter@cavium.com (Robert Richter)
-Date: Wed, 1 Feb 2017 18:38:24 +0100
-Subject: [PATCH 0/9] irqchip/gic-v3-its: Implement ITS nodes as kernel devices
- and use CMA
-Message-ID: <20170201173833.12630-1-rrichter@cavium.com>
+Date: Wed, 1 Feb 2017 18:38:29 +0100
+Subject: [PATCH 5/9] irqchip/gic-v3-its: Decouple its initialization from gic
+In-Reply-To: <20170201173833.12630-1-rrichter@cavium.com>
+References: <20170201173833.12630-1-rrichter@cavium.com>
+Message-ID: <20170201173833.12630-6-rrichter@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series implements ITS nodes as kernel devices. The
-advantage of that is that CMA can be used to allocate large ITS
-tables, where standard memory and page allocation fails (above
-MAX_ORDER - 1). This approach was suggested first here:
+This patch separates its initialization from the gic. Probing and
+initialization of its nodes is separate now. There is an own cpu
+notifier for its now.
 
- https://marc.info/?i=56D44812.6000309%40arm.com
+Signed-off-by: Robert Richter <rrichter@cavium.com>
+---
+ drivers/irqchip/irq-gic-v3-its.c   | 55 ++++++++++++++++++++++++++------------
+ drivers/irqchip/irq-gic-v3.c       | 11 ++++----
+ include/linux/cpuhotplug.h         |  1 +
+ include/linux/irqchip/arm-gic-v3.h |  2 +-
+ 4 files changed, 46 insertions(+), 23 deletions(-)
 
-Another advantage is that all memory resources of the device are now
-device managed, thus the code for releasing the device becomes much
-easier.
-
-The following is required to implement this:
-
- * each ITS node must be assigned to a struct device each,
-
- * the ITS initialization must be moved to a later point during boot,
-
- * the ITS enablement must be separated from the GIC code (the GIC
-   still needs to be enabled early),
-
- * the early ITS node probing by DT or ACPI must be separated from the
-   ITS initialization,
-
- * ITS table allocation must be changed to use dma_alloc_coherent()
-   which uses CMA for allocation of large memory ranges.
-
-The patches of this series implement this.
-
-The first patch is a fix and should be marked stable.
-
-
-Robert Richter (9):
-  irqchip/gic-v3-its: Fix command buffer allocation
-  irqchip/gic-v3-its: Initialize its nodes in probe order
-  irqchip/gic-v3-its: Initialize MSIs with subsys_initcalls
-  irqchip/gic-v3-its: Split probing from its node initialization
-  irqchip/gic-v3-its: Decouple its initialization from gic
-  irqchip/gic-v3-its: Prevent its init ordering dependencies
-  irqchip/gic-v3-its: Initialize its nodes later
-  irqchip/gic-v3-its: Handle its nodes as kernel devices
-  irqchip, gicv3-its, cma: Use CMA for allocation of large device tables
-
- drivers/irqchip/irq-gic-v3-its-pci-msi.c      |   6 +-
- drivers/irqchip/irq-gic-v3-its-platform-msi.c |   6 +-
- drivers/irqchip/irq-gic-v3-its.c              | 273 ++++++++++++++++----------
- drivers/irqchip/irq-gic-v3.c                  |   8 +-
- include/linux/cpuhotplug.h                    |   1 +
- include/linux/irqchip/arm-gic-v3.h            |   5 +-
- 6 files changed, 184 insertions(+), 115 deletions(-)
-
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index dcd3b8722b05..68b468686d5b 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -1653,20 +1653,13 @@ static int its_init_domain(struct its_node *its)
+ 
+ static void its_free(struct its_node *its)
+ {
+-	spin_lock(&its_lock);
+-	list_del(&its->entry);
+-	spin_unlock(&its_lock);
+-
+ 	kfree(its);
+ }
+ 
+-static int __init its_init_one(struct its_node *its);
+-
+ static int __init its_probe_one(struct resource *res,
+ 				struct fwnode_handle *handle, int numa_node)
+ {
+ 	struct its_node *its;
+-	int err;
+ 
+ 	its = kzalloc(sizeof(*its), GFP_KERNEL);
+ 	if (!its)
+@@ -1686,11 +1679,7 @@ static int __init its_probe_one(struct resource *res,
+ 
+ 	pr_info("ITS %pR\n", res);
+ 
+-	err = its_init_one(its);
+-	if (err)
+-		its_free(its);
+-
+-	return err;
++	return 0;
+ }
+ 
+ static int __init its_init_one(struct its_node *its)
+@@ -1793,7 +1782,7 @@ static bool gic_rdists_supports_plpis(void)
+ 	return !!(gic_read_typer(gic_data_rdist_rd_base() + GICR_TYPER) & GICR_TYPER_PLPIS);
+ }
+ 
+-int its_cpu_init(void)
++static int its_cpu_init(unsigned int cpu)
+ {
+ 	if (!list_empty(&its_nodes)) {
+ 		if (!gic_rdists_supports_plpis()) {
+@@ -1886,8 +1875,6 @@ static void __init its_acpi_probe(void)
+ static void __init its_acpi_probe(void) { }
+ #endif
+ 
+-struct int __init its_init(void);
+-
+ int __init its_probe(struct fwnode_handle *handle, struct rdists *rdists,
+ 		     struct irq_domain *parent_domain)
+ {
+@@ -1907,13 +1894,47 @@ int __init its_probe(struct fwnode_handle *handle, struct rdists *rdists,
+ 
+ 	gic_rdists = rdists;
+ 
+-	return its_init();
++	return 0;
+ }
+ 
+-struct int __init its_init(void)
++int __init its_init(void)
+ {
++	struct its_node *its, *tmp;
++	int err = 0, err2;
++
++	if (list_empty(&its_nodes))
++		return 0;
++
++	spin_lock(&its_lock);
++
++	list_for_each_entry(its, &its_nodes, entry) {
++		err2 = its_init_one(its);
++		if (!err && err2)
++			err = err2;
++	}
++
++	if (!err)
++		goto unlock;
++
++	list_for_each_entry_safe(its, tmp, &its_nodes, entry) {
++		list_del(&its->entry);
++		its_free(its);
++	}
++unlock:
++	spin_unlock(&its_lock);
++
++	if (err) {
++		pr_warn("ITS: Failed to initialize (%d), not enabling LPIs\n",
++			err);
++		return err;
++	}
++
+ 	its_alloc_lpi_tables();
+ 	its_lpi_init(gic_rdists->id_bits);
+ 
++	cpuhp_setup_state(CPUHP_AP_IRQ_GIC_ITS_STARTING,
++			"irqchip/arm/gicv3-its:starting",
++			its_cpu_init, NULL);
++
+ 	return 0;
+ }
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index b46dc9396331..2b9be256a9ec 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -536,10 +536,6 @@ static void gic_cpu_init(void)
+ 
+ 	gic_cpu_config(rbase, gic_redist_wait_for_rwp);
+ 
+-	/* Give LPIs a spin */
+-	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
+-		its_cpu_init();
+-
+ 	/* initialise system registers */
+ 	gic_cpu_sys_reg_init();
+ }
+@@ -672,7 +668,7 @@ static int gic_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ #else
+ #define gic_set_affinity	NULL
+ #define gic_smp_init()		do { } while(0)
+-#endif
++#endif	/* CONFIG_SMP */
+ 
+ #ifdef CONFIG_CPU_PM
+ /* Check whether it's single security state view */
+@@ -1168,6 +1164,9 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
+ 
+ 	gic_populate_ppi_partitions(node);
+ 	gic_of_setup_kvm_info(node);
++
++	its_init();
++
+ 	return 0;
+ 
+ out_unmap_rdist:
+@@ -1457,6 +1456,8 @@ gic_acpi_init(struct acpi_subtable_header *header, const unsigned long end)
+ 	acpi_set_irq_model(ACPI_IRQ_MODEL_GIC, domain_handle);
+ 	gic_acpi_setup_kvm_info();
+ 
++	its_init();
++
+ 	return 0;
+ 
+ out_fwhandle_free:
+diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+index 20bfefbe7594..289744f3df35 100644
+--- a/include/linux/cpuhotplug.h
++++ b/include/linux/cpuhotplug.h
+@@ -80,6 +80,7 @@ enum cpuhp_state {
+ 	CPUHP_AP_SCHED_STARTING,
+ 	CPUHP_AP_RCUTREE_DYING,
+ 	CPUHP_AP_IRQ_GIC_STARTING,
++	CPUHP_AP_IRQ_GIC_ITS_STARTING,
+ 	CPUHP_AP_IRQ_HIP04_STARTING,
+ 	CPUHP_AP_IRQ_ARMADA_XP_STARTING,
+ 	CPUHP_AP_IRQ_BCM2836_STARTING,
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index 1f6a5490ad72..8bc5c137b059 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -431,9 +431,9 @@ struct rdists {
+ 
+ struct irq_domain;
+ struct fwnode_handle;
+-int its_cpu_init(void);
+ int its_probe(struct fwnode_handle *handle, struct rdists *rdists,
+ 	      struct irq_domain *domain);
++int its_init(void);
+ 
+ static inline bool gic_enable_sre(void)
+ {
 -- 
 2.11.0
