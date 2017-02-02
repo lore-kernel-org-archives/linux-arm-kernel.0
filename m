@@ -1,34 +1,27 @@
 From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Thu, 2 Feb 2017 21:34:29 +0000
-Subject: [PATCH 4/7] efi: Get the secure boot status [ver #7]
-In-Reply-To: <148587562967.4026.18171897997650345605.stgit@warthog.procyon.org.uk>
+Date: Thu, 2 Feb 2017 21:36:26 +0000
+Subject: [PATCH 6/7] efi: Handle secure boot from UEFI-2.6 [ver #7]
+In-Reply-To: <CAKv+Gu9ACE23ZMcQN3NpZ_N-CWzg=N6qFVu3_UruH0miPe=izA@mail.gmail.com>
 References: <148587558696.4026.16034622623568539004.stgit@warthog.procyon.org.uk>
- <148587562967.4026.18171897997650345605.stgit@warthog.procyon.org.uk>
-Message-ID: <20170202213429.GP31613@codeblueprint.co.uk>
+ <148587564847.4026.5759345672956585977.stgit@warthog.procyon.org.uk>
+ <CAKv+Gu8dnKB1sRGb3U+XB1eoA7Eyo4qSFBtPRbvGV912xPViVw@mail.gmail.com>
+ <10454.1485889162@warthog.procyon.org.uk>
+ <CAKv+Gu_gy6575axL6M64OSo33ZM2dnbs7cajqJRd8VtbjAXCTw@mail.gmail.com>
+ <20578.1485952425@warthog.procyon.org.uk>
+ <CAKv+Gu8FOcMx0UXXdd3nhE+PUPzbEn9X=kBQDfkLOZBvVu-8fg@mail.gmail.com>
+ <23750.1485961217@warthog.procyon.org.uk>
+ <CAKv+Gu9ACE23ZMcQN3NpZ_N-CWzg=N6qFVu3_UruH0miPe=izA@mail.gmail.com>
+Message-ID: <20170202213626.GQ31613@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 31 Jan, at 03:13:49PM, David Howells wrote:
-> diff --git a/arch/x86/boot/compressed/eboot.c b/arch/x86/boot/compressed/eboot.c
-> index f99978db6b6f..57c2c9c71e53 100644
-> --- a/arch/x86/boot/compressed/eboot.c
-> +++ b/arch/x86/boot/compressed/eboot.c
-> @@ -988,6 +988,12 @@ struct boot_params *efi_main(struct efi_config *c,
->  	else
->  		setup_boot_services32(efi_early);
->  
-> +	/* If the boot loader gave us a value for secure_boot then we use that,
-> +	 * otherwise we ask the BIOS.
-> +	 */
-> +	if (boot_params->secure_boot == efi_secureboot_mode_unset)
-> +		boot_params->secure_boot = efi_get_secureboot(sys_table);
-> +
->  	setup_graphics(boot_params);
->  
->  	setup_efi_pci(boot_params);
+On Wed, 01 Feb, at 03:02:14PM, Ard Biesheuvel wrote:
+> 
+> Let's wait for Matt to comment on the x86 bits before reissuing
+> anything, but if the subsequent patches still apply cleanly, I don't
+> think there is a need to resend or re-sign.
 
-It's not a big deal, but this multi-line comment format isn't correct.
-Either Ard or I will fix it up when applying this patch. Same goes for
-the comment in patch 5.
+This all looks fine to me now, thanks for the re-work David.
 
-Otherwise this patch looks fine.
+Ard, do you want to apply these patches along with a fixup for the
+multi-line comments and send a second v4.11 pull to tip?
