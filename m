@@ -1,50 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 2 Feb 2017 15:12:42 +0000
-Subject: [PATCH 0/5] Implement SMMU passthrough using the default domain
-In-Reply-To: <CAF6AEGtfrrwVZ_W86_HqVsiqfcM=XFa+g2LECFYQJmvv7-JSqQ@mail.gmail.com>
-References: <1484849955-1871-1-git-send-email-will.deacon@arm.com>
- <010801d27654$47b7e450$d727acf0$@codeaurora.org>
- <20170126171857.GE27598@8bytes.org>
- <CAF6AEGtfrrwVZ_W86_HqVsiqfcM=XFa+g2LECFYQJmvv7-JSqQ@mail.gmail.com>
-Message-ID: <20170202151241.GE13839@arm.com>
+From: rob.rice@broadcom.com (Rob Rice)
+Date: Thu, 2 Feb 2017 10:11:57 -0500
+Subject: [PATCH v3 2/3] crypto: brcm: Add Broadcom SPU driver
+In-Reply-To: <20170202140510.GB5289@gondor.apana.org.au>
+References: <1485362689-11294-1-git-send-email-rob.rice@broadcom.com>
+ <1485362689-11294-3-git-send-email-rob.rice@broadcom.com>
+ <20170202140510.GB5289@gondor.apana.org.au>
+Message-ID: <E8AAEF8D-B4B1-4716-BDE2-A533EDA828A1@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2017 at 10:02:50AM -0500, Rob Clark wrote:
-> On Thu, Jan 26, 2017 at 12:18 PM, Joerg Roedel <joro@8bytes.org> wrote:
-> > On Tue, Jan 24, 2017 at 08:42:23PM +0530, Sricharan wrote:
-> >> Thanks for this series. We had a case with the GPU.
-> >> The GPU's iommu was setup by kernel and the GPU
-> >> also does dynamic updates for on-the-fly switching between
-> >> process pagetables.  GPU driver was not using DMA domain and
-> >> the GPU's firmware was always expecting to run out  of contextbank
-> >>  '0' (although not correct) , which was not the case after the DMA domain
-> >> was made default  as '0' was getting allocated for DMA domain and
-> >> there were concerns about reusing the DMA domain as well.
-> >> Now with this series, looks there is an way out of that that can be tried.
-> >>
-> >> So should the default domain not be per device specific selectable ?
-> >
-> > Note that iommu-drivers can request direct-mapping for any given device
-> > on its initializtion. This is used on x86 for devices that need a 1-1
-> > mapping for some reason.
-> >
-> > Also device drivers can use the iommu-api and assign their own domain to
-> > a device, which allows them to manage the dma address space on their
-> > own.
-> 
-> Part of the problem is that dev->archdata.dma_ops gets wired up to
-> iommu_dma_ops.  Which isn't so bad on it's own, except that cache ops
-> are not exposed to drivers, forcing us to use dma-mapping API
-> (dma_map_sg, etc) for cache operations.
-> 
-> Possibly we should just expose cache op's to drivers bypass this abuse
-> of dma-mapping.
-> 
-> btw, Will, we definitely want this to *not* rely on kcmdline for the
-> gpu with it's own private iommu case..
+Herbert,
 
-I still need to understand the unmanaged domain case, but I don't really
-see why that's related to this series to be honest.
 
-Will
+> On Feb 2, 2017, at 9:05 AM, Herbert Xu <herbert@gondor.apana.org.au> wrote:
+> 
+> On Wed, Jan 25, 2017 at 11:44:48AM -0500, Rob Rice wrote:
+>> 
+>> +static int ahash_export(struct ahash_request *req, void *out)
+>> +{
+>> +	const struct iproc_reqctx_s *rctx = ahash_request_ctx(req);
+>> +
+>> +	memcpy(out, rctx, offsetof(struct iproc_reqctx_s, msg_buf));
+>> +	return 0;
+>> +}
+> 
+> The reqctx data structure seems to contain a lot of info unrelated
+> to the hash state.  Can't we get away with just copying the hash
+> state (incr_hash) itself?
+
+Yes, I see your point. I?ll whittle the export state down to just what?s needed for the hash.
+
+> 
+> Cheers,
+> -- 
+> Email: Herbert Xu <herbert@gondor.apana.org.au>
+> Home Page: http://gondor.apana.org.au/~herbert/
+> PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
