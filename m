@@ -1,75 +1,177 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Thu, 2 Feb 2017 21:15:19 +0530
-Subject: [PATCH 0/5] Implement SMMU passthrough using the default domain
-In-Reply-To: <CAF6AEGtfrrwVZ_W86_HqVsiqfcM=XFa+g2LECFYQJmvv7-JSqQ@mail.gmail.com>
-References: <1484849955-1871-1-git-send-email-will.deacon@arm.com>
- <010801d27654$47b7e450$d727acf0$@codeaurora.org>
- <20170126171857.GE27598@8bytes.org>
- <CAF6AEGtfrrwVZ_W86_HqVsiqfcM=XFa+g2LECFYQJmvv7-JSqQ@mail.gmail.com>
-Message-ID: <012501d27d6b$5e396c80$1aac4580$@codeaurora.org>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 2 Feb 2017 09:45:07 -0600
+Subject: [PATCH 3/5] Documentation: dt: iio: document stm32 exti trigger
+In-Reply-To: <e814a2c6-f0de-cb56-eb3a-e22daed8990b@st.com>
+References: <1485784663-19505-1-git-send-email-fabrice.gasnier@st.com>
+ <1485784663-19505-4-git-send-email-fabrice.gasnier@st.com>
+ <20170201163500.ivxnxejurhzzoctl@rob-hp-laptop>
+ <e814a2c6-f0de-cb56-eb3a-e22daed8990b@st.com>
+Message-ID: <CAL_JsqKgGuh5==Xfd6LKZe70G1NiuesW0_xE98CZQZ3=BCPvLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
++Linus W
 
->-----Original Message-----
->From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Rob Clark
->Sent: Thursday, February 02, 2017 8:33 PM
->To: Joerg Roedel <joro@8bytes.org>
->Cc: Will Deacon <will.deacon@arm.com>; iommu at lists.linux-foundation.org; Sricharan <sricharan@codeaurora.org>; linux-arm-
->kernel at lists.infradead.org
->Subject: Re: [PATCH 0/5] Implement SMMU passthrough using the default domain
->
->On Thu, Jan 26, 2017 at 12:18 PM, Joerg Roedel <joro@8bytes.org> wrote:
->> On Tue, Jan 24, 2017 at 08:42:23PM +0530, Sricharan wrote:
->>> Thanks for this series. We had a case with the GPU.
->>> The GPU's iommu was setup by kernel and the GPU
->>> also does dynamic updates for on-the-fly switching between
->>> process pagetables.  GPU driver was not using DMA domain and
->>> the GPU's firmware was always expecting to run out  of contextbank
->>>  '0' (although not correct) , which was not the case after the DMA domain
->>> was made default  as '0' was getting allocated for DMA domain and
->>> there were concerns about reusing the DMA domain as well.
->>> Now with this series, looks there is an way out of that that can be tried.
+On Thu, Feb 2, 2017 at 3:19 AM, Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
+> On 02/01/2017 05:35 PM, Rob Herring wrote:
+>>
+>> On Mon, Jan 30, 2017 at 02:57:41PM +0100, Fabrice Gasnier wrote:
 >>>
->>> So should the default domain not be per device specific selectable ?
+>>> Add dt documentation for st,stm32-exti-trigger.
+>>> EXTi gpio signal can be routed internally as trigger source for various
 >>
->> Note that iommu-drivers can request direct-mapping for any given device
->> on its initializtion. This is used on x86 for devices that need a 1-1
->> mapping for some reason.
 >>
->> Also device drivers can use the iommu-api and assign their own domain to
->> a device, which allows them to manage the dma address space on their
->> own.
+>> s/gpio/GPIO/
+>>
+>>> IPs (e.g. for ADC or DAC conversions).
+>>
+>>
+>> Please use "dt-bindings: iio:" for the subject prefix.
 >
->Part of the problem is that dev->archdata.dma_ops gets wired up to
->iommu_dma_ops.  Which isn't so bad on it's own, except that cache ops
->are not exposed to drivers, forcing us to use dma-mapping API
->(dma_map_sg, etc) for cache operations.
 >
->Possibly we should just expose cache op's to drivers bypass this abuse
->of dma-mapping.
+> Hi Rob,
 >
-[1], with this, when the default domain in not DOMAIN_DMA, then
-dev->archdata.dma_ops is not set to iommu_dma_ops , instead remains
-to be swiotlb_ops. Is that not correct for gpu's unmanaged domain case ?
+> I'll fix this in V2.
+>
+>>
+>>>
+>>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>>> ---
+>>>  .../bindings/iio/trigger/st,stm32-exti-trigger.txt      | 17
+>>> +++++++++++++++++
+>>>  1 file changed, 17 insertions(+)
+>>>  create mode 100644
+>>> Documentation/devicetree/bindings/iio/trigger/st,stm32-exti-trigger.txt
+>>>
+>>> diff --git
+>>> a/Documentation/devicetree/bindings/iio/trigger/st,stm32-exti-trigger.txt
+>>> b/Documentation/devicetree/bindings/iio/trigger/st,stm32-exti-trigger.txt
+>>> new file mode 100644
+>>> index 0000000..ebf2645
+>>> --- /dev/null
+>>> +++
+>>> b/Documentation/devicetree/bindings/iio/trigger/st,stm32-exti-trigger.txt
+>>> @@ -0,0 +1,17 @@
+>>> +STMicroelectronics STM32 EXTI trigger bindings
+>>> +
+>>> +EXTi gpio signal can be routed internally as trigger source for various
+>>
+>>
+>> s/gpio/GPIO/
+>>
+>>> +IPs (e.g. for ADC or DAC conversions).
+>>> +
+>>> +Contents of a stm32 exti trigger root node:
+>>
+>>
+>> Drop "root"
+>
+> I'll fix these in V2.
+>
+>>
+>>> +-------------------------------------------
+>>> +Required properties:
+>>> +- compatible: Should be "st,stm32-exti-trigger"
+>>
+>>
+>> This whole binding looks a bit suspicious. Is this actually a h/w block?
+>> What makes it stm32 specific? Seems like the gpio properties should just
+>> be part of the ADC or DAC that they trigger.
+>
+>
+> Please let me explain in more details.
+> I think best is I add following documentation in binding. Something like:
+>
+> GPIO + EXTI controller side | ADC side (input trigger MUX, same for DAC)
+>                             |
+>        IIO trigger         --->         IIO device
+>                             |                  __________
+>                             |          inX  --|          \
+>                             |          ...  --|  SAR ADC  |-->
+>         __                  |         __      |__________/
+> PA11 --|  \                 | TIMx --|  \   trigger   ^
+> PB11 --|   |                  ...  --|   }----------->'
+> ...  --|   }---- EXTI11 ---------->--|__/
+>      --|   |                |
+> PJ11 --|__/                 |
+>
+> In fact, this driver configures GPIO and EXTI controllers (left side of
+> above scheme), and it registers corresponding trigger in IIO. Then it can be
+> used by other IPs registered as IIO devices.
+>
+> I think this should be outside of ADC or DAC IIO device drivers, to live in
+> separate IIO trigger driver. It will avoid duplicating code (e.g. PATCH 4)
+> into several IIO device drivers.
+>
+> Is it ok to declare this as separate IIO trigger driver?
 
-https://www.spinics.net/lists/arm-kernel/msg556209.html
+Drivers and DT nodes are not necessarily 1 to 1.
 
->btw, Will, we definitely want this to *not* rely on kcmdline for the
->gpu with it's own private iommu case..
+What controls the GPIO line that is used for the trigger?
 
-Ya, that changes behavior for all devices and some might want 
-DMA_DOMAIN and some UNMANAGED.
+> Maybe Jonathan could also advise on this ?
+>
+> As I see it, this is stm32 specific, as any GPIO bank, (e.g. PA11,
+> PB11...) can be selected to generate (EXTI11) hardware trigger signal.
 
-Regards,
- Sricharan
+This seems more like a pinmux'ing issue than a GPIO. This isn't really
+a GPIO if it is routed to a h/w control.
+
+A -gpios property for a trigger would make sense if you had a driver
+handling GPIO interrupts to generate IIO triggers. This seems to be
+just mux control.
+
+>>> +- extiN-gpio: optional gpio line that may be used as external trigger
+>>> source
+>>
+>>
+>> -gpios is the preferred form.
+>
+>
+> I apologize, I didn't make it clear in the first place. Please let me
+> rephrase. Is bellow description more suitable ?
+
+What I mean is the property name is wrong. It should be "extiN-gpios".
 
 >
->BR,
->-R
+> - extiN-gpio: One or several named GPIO lines that may be used as
+>   external trigger source by STM32 ADC, DAC. N may be 0..15.
+>   For example, on stm32f4, exti11-gpio can trig ADC, exti9-gpio can
+>   trig DAC.
 >
->_______________________________________________
->linux-arm-kernel mailing list
->linux-arm-kernel at lists.infradead.org
->http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>>> +  (e.g. N may be 0..15. For example, exti11-gpio can trig ADC on
+>>> stm32f4).
+>>> +
+>>> +Example:
+>>> +       triggers {
+>>> +               compatible = "st,stm32-exti-trigger";
+>>> +               exti11-gpio=<&gpioa 11 0>;
+>>
+>>
+>> spaces around the "=".
+>
+> I'll fix it in V2, and also add example for more that one EXTI trigger:
+>
+>         triggers {
+>                 compatible = "st,stm32-exti-trigger";
+>                 exti9-gpio = <&gpioa 9 0>;
+>                 exti11-gpio = <&gpioa 11 0>;
+>                 ...
+>         };
+>
+> Above binding can typically be used in board dt, in case on-board gpio is
+> connected/used as trigger source for IIO device (STM32 ADC/DAC).
+>
+> Please let me know if this clarifies, so I'll do necessary changes in V2.
+>
+> Many thanks for your review.
+> Best Regards,
+> Fabrice
+>
+>>
+>>> +       };
+>>> --
+>>> 1.9.1
+>>>
+>
