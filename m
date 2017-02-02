@@ -1,74 +1,53 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 2 Feb 2017 15:38:44 +0800
-Subject: [PATCH v3 2/2] ARM: sun8i: dt: Add mali node
-In-Reply-To: <82ff2fdb784b1444c8dc4a2d85f17522b9187741.1485939041.git-series.maxime.ripard@free-electrons.com>
-References: <b098c4fa9fce88361cca20417978734d0e1b5cca.1485939041.git-series.maxime.ripard@free-electrons.com>
- <82ff2fdb784b1444c8dc4a2d85f17522b9187741.1485939041.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v64A9y3QEkv+hCQ_ONssSXQTo8JE0G4zUjvUr9q5R9Lyvg@mail.gmail.com>
+From: ebiggers3@gmail.com (Eric Biggers)
+Date: Wed, 1 Feb 2017 23:38:24 -0800
+Subject: [RFC PATCH v2 4/4] crypto: aes - add generic time invariant AES
+ for CTR/CCM/GCM
+In-Reply-To: <1485646413-17491-5-git-send-email-ard.biesheuvel@linaro.org>
+References: <1485646413-17491-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1485646413-17491-5-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20170202073824.GC582@zzz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 1, 2017 at 4:53 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The A23 and A33 have an ARM Mali 400 GPU. Now that we have a binding, add
-> it to our DT.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Hi Ard,
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+On Sat, Jan 28, 2017 at 11:33:33PM +0000, Ard Biesheuvel wrote:
+> 
+> Note that this only implements AES encryption, which is all we need
+> for CTR and CBC-MAC. AES decryption can easily be implemented in a
+> similar way, but is significantly more costly.
 
->
-> ---
->
-> Changes from v2:
->   - Removed leading 0 from the unit address
-> ---
->  arch/arm/boot/dts/sun8i-a23-a33.dtsi | 26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> index d92fdf5a7b26..35008b78d899 100644
-> --- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-> @@ -472,6 +472,32 @@
->                         #size-cells = <0>;
->                 };
->
-> +               mali: gpu at 1c40000 {
-> +                       compatible = "allwinner,sun8i-a23-mali",
-> +                                    "allwinner,sun7i-a20-mali", "arm,mali-400";
-> +                       reg = <0x01c40000 0x10000>;
-> +                       interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>,
-> +                                    <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
-> +                       interrupt-names = "gp",
-> +                                         "gpmmu",
-> +                                         "pp0",
-> +                                         "ppmmu0",
-> +                                         "pp1",
-> +                                         "ppmmu1",
-> +                                         "pmu";
-> +                       clocks = <&ccu CLK_BUS_GPU>, <&ccu CLK_GPU>;
-> +                       clock-names = "bus", "core";
-> +                       resets = <&ccu RST_BUS_GPU>;
+Is the expectation of decryption being more costly the only reason why "aes-ti"
+couldn't be a "cipher" algorithm, allowing it to automatically be used by the
+existing templates for CTR, CBC-MAC, CBC, ECB, XTS, CMAC, etc.?  It doesn't seem
+to do anything expensive on a per-block basis like loading SSE registers, so it
+seems it would fit better as a "cipher" algorithm if at all possible.  Then
+there would be no need to implement all these modes yet again.
+
+Also, what would be the feasibility of simply replacing aes-generic with the
+time-invariant implementation, rather than offering two implementations and
+requiring users to choose one, usually without the needed expertise?
+
 > +
-> +                       assigned-clocks = <&ccu CLK_GPU>;
-> +                       assigned-clock-rates = <408000000>;
+> +/*
+> + * Emit the sbox as __weak with external linkage to prevent the compiler
+> + * from doing constant folding on sbox references involving fixed indexes.
+> + */
+> +__weak const u8 __cacheline_aligned __aesti_sbox[] = {
 
-Is the driver supposed to do DVFS for the GPU? If so, do we need to
-specify operating points and/or regulator supplies?
+Did you consider marking it 'volatile' instead?
 
-Thanks
-ChenYu
-
-> +               };
+> +static int aesti_set_key(struct aes_ti_ctx *ctx, const u8 *in_key,
+> +			 unsigned int key_len)
+> +{
+> +	struct crypto_aes_ctx rk;
+> +	int err;
 > +
->                 gic: interrupt-controller at 01c81000 {
->                         compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
->                         reg = <0x01c81000 0x1000>,
-> --
-> git-series 0.8.11
+> +	err = crypto_aes_expand_key(&rk, in_key, key_len);
+> +	if (err)
+> +		return err;
+
+crypto_aes_expand_key() assumes that the key is u32-aligned; I don't think
+that's guaranteed here.
+
+Eric
