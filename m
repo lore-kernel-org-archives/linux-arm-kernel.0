@@ -1,38 +1,51 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 2 Feb 2017 10:50:03 +0100
-Subject: [RESENT PATCH] ARM: bcm2835: Add devicetree for the Raspberry Pi
- 3, for arm (32)
-In-Reply-To: <1486024672.11636.1.camel@crowfest.net>
-References: <1484845444-4617-1-git-send-email-kraxel@redhat.com>
- <87fukcgsqp.fsf@eliezer.anholt.net> <878tpqki0k.fsf@eliezer.anholt.net>
- <1485944672.1076.50.camel@redhat.com> <1485951653.1076.54.camel@redhat.com>
- <1486024672.11636.1.camel@crowfest.net>
-Message-ID: <3b3ffeb9-6e92-114c-8fdc-9586bdc68373@i2se.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 2 Feb 2017 10:55:41 +0100
+Subject: [PATCH v2 00/10] serial: st-asc: Allow handling of RTS line
+In-Reply-To: <20170202074236.ni3tozz3er4g3t64@dell>
+References: <20170127172804.23881-1-lee.jones@linaro.org>
+ <20170202074236.ni3tozz3er4g3t64@dell>
+Message-ID: <20170202095541.GB30437@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 02.02.2017 um 09:37 schrieb Michael Zoran:
-> This is actually a problem I had to deal with way in the begging of
-> ARM64.  What was done in the github tree was to have the one of the DTS
->   files(in this case 64) #include the 32 bit dts.  That way it's not
-> needed to have the symbolic link and install should work.
->
-> I know it's ulgy, but it works...
->
-> Take a look at:
-> https://github.com/raspberrypi/linux/blob/rpi-4.10.y/arch/arm64/boot/dt
-> s/broadcom/bcm2710-rpi-3-b.dts
->
-> Here is what the file contains:
-> #define RPI364
->
-> #include "../../../../arm/boot/dts/bcm2710-rpi-3-b.dts"
->
->
->
+On Thu, Feb 02, 2017 at 07:42:36AM +0000, Lee Jones wrote:
+> Hi Greg, Jiri,
+> 
+> > When hardware flow-control is disabled, manual toggling of the UART's
+> > reset line (RTS) using userland applications (e.g. stty) is not
+> > possible, since the ASC IP does not provide this functionality in the
+> > same was as some other IPs do.  Thus, we have to do this manually.
+> > 
+> > This set ensures the correct Pinctrl groups are configured and
+> > obtained for both manual toggling of the RTS line and for the IP to
+> > take over the lines when HW flow-control is requested by the user. 
+> > 
+> > Lee Jones (10):
+> >   serial: st-asc: Ignore the parity error bit if 8-bit mode is enabled
+> >   serial: st-asc: Provide RTS functionality
+> >   serial: st-asc: Read in all Pinctrl states
+> >   serial: st-asc: (De)Register GPIOD and swap Pinctrl profiles
+> >   serial: st-asc: Use generic DT binding for announcing RTS/CTS lines
+> >   dt-bindings: serial: Update 'uart-has-rtscts' description
+> >   ARM: dts: STiH410-b2260: Identify the UART RTS line
+> >   ARM: dts: STiH407-pinctrl: Add Pinctrl group for HW flow-control
+> >   ARM: dts: STiH407-family: Use new Pinctrl groups
+> >   ARM: dts: STiH410-b2260: Enable HW flow-control
+> > 
+> >  .../devicetree/bindings/serial/serial.txt          |   3 +-
+> >  arch/arm/boot/dts/stih407-family.dtsi              |   3 +-
+> >  arch/arm/boot/dts/stih407-pinctrl.dtsi             |  12 ++-
+> >  arch/arm/boot/dts/stih410-b2260.dts                |   5 +
+> >  drivers/tty/serial/st-asc.c                        | 101 +++++++++++++++++++--
+> >  5 files changed, 110 insertions(+), 14 deletions(-)
+> 
+> Looks like everyone is happy with the set.
+> 
+> Are you planning to merge it?
 
-This do not work in the context of the split device-tree repository [0] 
-(where the directory structure differs).
+I'll take it in my next round of patches, give me a few days to sync up,
+I normally do serial patches once a week or so.
 
-[0] 
-https://git.kernel.org/cgit/linux/kernel/git/devicetree/devicetree-rebasing.git/
+thanks,
+
+greg k-h
