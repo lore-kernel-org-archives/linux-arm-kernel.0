@@ -1,62 +1,29 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 2 Feb 2017 23:01:03 +0900
-Subject: [PATCH v31 04/12] arm64: mm: allow for unmapping part of kernel
- mapping
-In-Reply-To: <20170202114437.GH31394@leverpostej>
-References: <20170201124218.5823-1-takahiro.akashi@linaro.org>
- <20170201124630.6016-3-takahiro.akashi@linaro.org>
- <20170201160354.GF4756@leverpostej>
- <20170202102131.GD13549@linaro.org>
- <20170202114437.GH31394@leverpostej>
-Message-ID: <20170202140102.GA22666@fireball>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Thu, 2 Feb 2017 22:05:10 +0800
+Subject: [PATCH v3 2/3] crypto: brcm: Add Broadcom SPU driver
+In-Reply-To: <1485362689-11294-3-git-send-email-rob.rice@broadcom.com>
+References: <1485362689-11294-1-git-send-email-rob.rice@broadcom.com>
+ <1485362689-11294-3-git-send-email-rob.rice@broadcom.com>
+Message-ID: <20170202140510.GB5289@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2017 at 11:44:38AM +0000, Mark Rutland wrote:
-> On Thu, Feb 02, 2017 at 07:21:32PM +0900, AKASHI Takahiro wrote:
-> > On Wed, Feb 01, 2017 at 04:03:54PM +0000, Mark Rutland wrote:
-> > > Hi,
-> > > 
-> > > On Wed, Feb 01, 2017 at 09:46:23PM +0900, AKASHI Takahiro wrote:
-> > > > A new function, remove_pgd_mapping(), is added.
-> > > > It allows us to unmap a specific portion of kernel mapping later as far as
-> > > > the mapping is made using create_pgd_mapping() and unless we try to free
-> > > > a sub-set of memory range within a section mapping.
-> > > 
-> > > I'm not keen on adding more page table modification code. It was painful
-> > > enough to ensure that those worked in all configurations.
-> > > 
-> > > Why can't we reuse create_pgd_mapping()? If we pass page_mappings_only,
-> > > and use an invalid prot (i.e. 0), what is the problem?
-> > 
-> > As I did in v30?
-> > (though my implementation in v30 should be improved.)
-> 
-> Something like that. I wasn't entirely sure why we needed to change
-> those functions so much, so I'm clearly missing something there. I'll go
-> have another look.
+On Wed, Jan 25, 2017 at 11:44:48AM -0500, Rob Rice wrote:
+>
+> +static int ahash_export(struct ahash_request *req, void *out)
+> +{
+> +	const struct iproc_reqctx_s *rctx = ahash_request_ctx(req);
+> +
+> +	memcpy(out, rctx, offsetof(struct iproc_reqctx_s, msg_buf));
+> +	return 0;
+> +}
 
-I would be much easier if you see my new code.
+The reqctx data structure seems to contain a lot of info unrelated
+to the hash state.  Can't we get away with just copying the hash
+state (incr_hash) itself?
 
-> > > I can see that we wouldn't free/reallocate the pud or pmd entries, but
-> > > the "wasted" memory should be small. If anything, I'd argue that it's
-> > > preferable to keep that around so that we don't have to allocate memory
-> > > when we need to map the crashkernel region.
-> > > 
-> > > Is there another problem I'm missing?
-> > 
-> > If we don't need to free unused page tables, that would make things
-> > much simple. There are still some minor problems on the merge, but
-> > we can sort it out.
-> 
-> I'm not sure I follow what you mean by 'on merge' here. Could you
-> elaborate?
-
-What I had in mind is some changes needed to handle "__prot(0)" properly
-in alloc_init_pxx(). For example, p[mu]d_set_huge() doesn't make
-a "zeroed" entry.
-
--Takahiro AKASHI
-
-> Thanks,
-> Mark.
+Cheers,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
