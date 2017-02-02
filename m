@@ -1,55 +1,83 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  2 Feb 2017 17:04:12 +0000
-Subject: [PATCH] log2: make order_base_2() behave correctly on const input
- value zero
-Message-ID: <1486055052-6442-1-git-send-email-ard.biesheuvel@linaro.org>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Thu, 2 Feb 2017 19:05:58 +0200
+Subject: [PATCH 2/3] pinctrl: dt-bindings: samsung: Add Exynos7 specific
+ pinctrl macro definitions
+In-Reply-To: <CACRpkdYLpQHT1ykYE1tNJpNRyUt7ezhyxznbe=dPu70mPn0OLQ@mail.gmail.com>
+References: <1484718141-28785-1-git-send-email-pankaj.dubey@samsung.com>
+ <CGME20170118054002epcas5p3b08e2f419976e17a3c584d64776810fd@epcas5p3.samsung.com>
+ <1484718141-28785-3-git-send-email-pankaj.dubey@samsung.com>
+ <20170118141935.eu7wmki7jnjdarkw@kozik-lap>
+ <7a0d543f-37e8-98e9-15b4-7d3f808f8516@samsung.com>
+ <20170127144123.slmwxorx7cjxwtcr@kozik-lap>
+ <CACRpkdYLpQHT1ykYE1tNJpNRyUt7ezhyxznbe=dPu70mPn0OLQ@mail.gmail.com>
+Message-ID: <20170202170558.g6f4wwwz3gwaho5g@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function order_base_2() is defined (according to the comment block)
-as returning zero on input zero, but subsequently passes the input into
-roundup_pow_of_two(), which is explicitly undefined for input zero.
+On Wed, Feb 01, 2017 at 01:51:00PM +0100, Linus Walleij wrote:
+> On Fri, Jan 27, 2017 at 3:41 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> > On Fri, Jan 27, 2017 at 01:25:42PM +0100, Sylwester Nawrocki wrote:
+> >> On 01/18/2017 03:19 PM, Krzysztof Kozlowski wrote:
+> >> > On Wed, Jan 18, 2017 at 11:12:20AM +0530, Pankaj Dubey wrote:
+> >> >> Exynos7 SoC pinctrl configurations are similar to existing Exynos4/5 except
+> >> >> for FSYS1 pinctrl drive strengths. So adding Exynos7 specific FSYS1 blocks
+> >> >> pinctrl driver strength related macros which will be used in Exynos7
+> >> >> DTSi files.
+> >> >>
+> >> >> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> >> >> ---
+> >> >>  include/dt-bindings/pinctrl/samsung.h | 8 ++++++++
+> >> >>  1 file changed, 8 insertions(+)
+> >> >>
+> >> >
+> >> > Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+> >> >
+> >> > I will need this header, so Sylwester if it is okay with you, could you
+> >> > provide a tag with it (or ack it)?
+> >>
+> >> Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> >>
+> >> I don't have pinctrl/samsung git tree, Linus applies patches directly.
+> >
+> > Oh, my mistake.
+> >
+> > Linus,
+> > This is similar case as "pinctrl: dt-bindings: samsung: add drive
+> > strength macros for Exynos5433" [1].
+> 
+> OK
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> I expect that you take it through ARM SoC and/or send me a pull
+> request for it on an immutable branch, whatever is best.
 
-This has gone unnoticed until now, but optimization passes in GCC 7 may
-produce constant folded function instances where a constant value of zero
-is passed into order_base_2(), resulting in link errors against the
-deliberately undefined '____ilog2_NaN'.
+Yes, I'll include them in my pull request to arm-soc.
 
-So update order_base_2() to adhere to its own documented interface.
+Below is stable tag if you need it:
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
 
-This is a followup to Will's message 'Build failure with v4.9-rc1 and GCC
-trunk -- compiler weirdness' which can be found here:
+The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
 
-  http://marc.info/?l=linux-kernel&m=147672952517795&w=2
+  Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
 
- include/linux/log2.h | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+are available in the git repository at:
 
-diff --git a/include/linux/log2.h b/include/linux/log2.h
-index fd7ff3d91e6a..d3fe63b12e96 100644
---- a/include/linux/log2.h
-+++ b/include/linux/log2.h
-@@ -203,6 +203,17 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
-  *  ... and so on.
-  */
- 
--#define order_base_2(n) ilog2(roundup_pow_of_two(n))
-+static inline __attribute_const__
-+unsigned long __order_base_2(unsigned long n)
-+{
-+	return n > 1 ? ilog2(n - 1) + 1 : 0;
-+}
- 
-+#define order_base_2(n)				\
-+(						\
-+	__builtin_constant_p(n) ? (		\
-+		((n) == 0 || (n) == 1) ? 0 :	\
-+		ilog2((n) - 1) + 1) :		\
-+	__order_base_2(n)			\
-+)
- #endif /* _LINUX_LOG2_H */
--- 
-2.7.4
+  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-pinctrl-4.11
+
+for you to fetch changes up to 860ac88abecab5d3d0e07306365f55cbc690c220:
+
+  pinctrl: dt-bindings: samsung: Add Exynos7 specific pinctrl macro definitions (2017-02-02 18:59:49 +0200)
+
+----------------------------------------------------------------
+Defines for GPIO drive strengths on Exynos5433 and Exynos7, used in Device Tree
+sources.
+
+----------------------------------------------------------------
+Andi Shyti (1):
+      pinctrl: dt-bindings: samsung: add drive strength macros for Exynos5433
+
+Pankaj Dubey (1):
+      pinctrl: dt-bindings: samsung: Add Exynos7 specific pinctrl macro definitions
+
+ include/dt-bindings/pinctrl/samsung.h | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
