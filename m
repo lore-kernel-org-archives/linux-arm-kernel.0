@@ -1,50 +1,73 @@
 From: mylene.josserand@free-electrons.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Thu,  2 Feb 2017 10:24:15 +0100
-Subject: [PATCH v4 1/8] ASoC: sun4i-i2s: Update binding documentation to
- include A31
+Date: Thu,  2 Feb 2017 10:24:18 +0100
+Subject: [PATCH v4 4/8] ASoC: sun8i-codec-analog: Add amplifier event to fix
+ first delay
 In-Reply-To: <20170202092422.5588-1-mylene.josserand@free-electrons.com>
 References: <20170202092422.5588-1-mylene.josserand@free-electrons.com>
-Message-ID: <20170202092422.5588-2-mylene.josserand@free-electrons.com>
+Message-ID: <20170202092422.5588-5-mylene.josserand@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new compatible for sun4i-i2s driver to handle some
-SoCs that have a reset line that must be asserted/deasserted.
+When playing a sound for the first time, a short delay, where the audio
+file is not played, can be noticed.
+On a second play (right after), the sound is played correctly.
+If we wait a short time (~5 sec which corresponds to the aplay
+timeout), the delay is back.
 
-This new compatible, "allwinner,sun6i-a31-i2s", requires the
-property "resets" which should be a phandle to the reset line.
-Except these differences, the compatible is identical to previous one
-which will not handle a reset line.
+This patch fixes it by using an event on headphone amplifier.
+It allows to keep the amplifier enable while playing a sound.
+A delay of 700ms allows to wait that the amplifier is powered-up
+before playing the sound.
 
 Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
 Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/sound/sun4i-i2s.txt | 5 +++++
- 1 file changed, 5 insertions(+)
+ sound/soc/sunxi/sun8i-codec-analog.c | 30 ++++++++++++++++++++++++++++--
+ 1 file changed, 28 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
-index 7b526ec64991..f4adc58f82ba 100644
---- a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
-+++ b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
-@@ -7,6 +7,7 @@ Required properties:
+diff --git a/sound/soc/sunxi/sun8i-codec-analog.c b/sound/soc/sunxi/sun8i-codec-analog.c
+index af02290ebe49..72331332b72e 100644
+--- a/sound/soc/sunxi/sun8i-codec-analog.c
++++ b/sound/soc/sunxi/sun8i-codec-analog.c
+@@ -398,11 +398,37 @@ static const struct snd_kcontrol_new sun8i_codec_hp_src[] = {
+ 		      sun8i_codec_hp_src_enum),
+ };
  
- - compatible: should be one of the followings
-    - "allwinner,sun4i-a10-i2s"
-+   - "allwinner,sun6i-a31-i2s"
- - reg: physical base address of the controller and length of memory mapped
-   region.
- - interrupts: should contain the I2S interrupt.
-@@ -19,6 +20,10 @@ Required properties:
-    - "mod" : module clock for the I2S controller
- - #sound-dai-cells : Must be equal to 0
- 
-+Required properties for the following compatibles:
-+	- "allwinner,sun6i-a31-i2s"
-+- resets: phandle to the reset line for this codec
++static int sun8i_headphone_amp_event(struct snd_soc_dapm_widget *w,
++				     struct snd_kcontrol *k, int event)
++{
++	struct snd_soc_component *component = snd_soc_dapm_to_component(w->dapm);
 +
- Example:
- 
- i2s0: i2s at 01c22400 {
++	if (SND_SOC_DAPM_EVENT_ON(event)) {
++		snd_soc_component_update_bits(component, SUN8I_ADDA_PAEN_HP_CTRL,
++					      BIT(SUN8I_ADDA_PAEN_HP_CTRL_HPPAEN),
++					      BIT(SUN8I_ADDA_PAEN_HP_CTRL_HPPAEN));
++		/*
++		 * Need a delay to have the amplifier up. 700ms seems the best
++		 * compromise between the time to let the amplifier up and the
++		 * time not to feel this delay while playing a sound.
++		 */
++		msleep(700);
++	} else if (SND_SOC_DAPM_EVENT_OFF(event)) {
++		snd_soc_component_update_bits(component, SUN8I_ADDA_PAEN_HP_CTRL,
++					      BIT(SUN8I_ADDA_PAEN_HP_CTRL_HPPAEN),
++					      0x0);
++	}
++
++	return 0;
++}
++
+ static const struct snd_soc_dapm_widget sun8i_codec_headphone_widgets[] = {
+ 	SND_SOC_DAPM_MUX("Headphone Source Playback Route",
+ 			 SND_SOC_NOPM, 0, 0, sun8i_codec_hp_src),
+-	SND_SOC_DAPM_OUT_DRV("Headphone Amp", SUN8I_ADDA_PAEN_HP_CTRL,
+-			     SUN8I_ADDA_PAEN_HP_CTRL_HPPAEN, 0, NULL, 0),
++	SND_SOC_DAPM_OUT_DRV_E("Headphone Amp", SUN8I_ADDA_PAEN_HP_CTRL,
++			       SUN8I_ADDA_PAEN_HP_CTRL_HPPAEN, 0, NULL, 0,
++			       sun8i_headphone_amp_event,
++			       SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_PRE_PMD),
+ 	SND_SOC_DAPM_SUPPLY("HPCOM Protection", SUN8I_ADDA_PAEN_HP_CTRL,
+ 			    SUN8I_ADDA_PAEN_HP_CTRL_COMPTEN, 0, NULL, 0),
+ 	SND_SOC_DAPM_REG(snd_soc_dapm_supply, "HPCOM", SUN8I_ADDA_PAEN_HP_CTRL,
 -- 
 2.11.0
