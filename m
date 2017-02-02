@@ -1,90 +1,61 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 2 Feb 2017 20:19:31 +0900
-Subject: [PATCH v31 05/12] arm64: kdump: protect crash dump kernel memory
-In-Reply-To: <58930DE6.7000103@arm.com>
-References: <20170201124218.5823-1-takahiro.akashi@linaro.org>
- <20170201124630.6016-4-takahiro.akashi@linaro.org>
- <20170201180008.GG4756@leverpostej>
- <20170201182506.GA30584@leverpostej> <58930DE6.7000103@arm.com>
-Message-ID: <20170202111930.GG13549@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 2 Feb 2017 11:26:15 +0000
+Subject: [PATCH] virtio: Try to untangle DMA coherency
+In-Reply-To: <20170201210648-mutt-send-email-mst@kernel.org>
+References: <8a6494f6409c20b4609cd6bdcdd751f68b5c0564.1485951731.git.robin.murphy@arm.com>
+ <20170201195732-mutt-send-email-mst@kernel.org>
+ <20170201182659.GM8177@arm.com>
+ <20170201210648-mutt-send-email-mst@kernel.org>
+Message-ID: <20170202112614.GB30577@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-James,
+On Wed, Feb 01, 2017 at 09:19:22PM +0200, Michael S. Tsirkin wrote:
+> On Wed, Feb 01, 2017 at 06:27:09PM +0000, Will Deacon wrote:
+> > On Wed, Feb 01, 2017 at 08:09:21PM +0200, Michael S. Tsirkin wrote:
+> > > I'd like to do that instead. It's fastboot doing the unreasonable thing
+> > > here and deviating from what every other legacy device without exception
+> > > did for years. If this means fastboot will need to update to virtio 1,
+> > > all the better.
+> > 
+> > The problem still exists with virtio 1, unless we require that the
+> > "dma-coherent" property is set/unset correctly when VIRTIO_F_IOMMU_PLATFORM
+> > is advertised by the device (which is what I suggested in my reply).
+> 
+> I'm not ignoring that, but I need to understand that part a bit better.
+> I'll reply to that patch in a day or two after looking at how _CCA is
+> supposed to work.
 
-On Thu, Feb 02, 2017 at 10:45:58AM +0000, James Morse wrote:
-> Hi Akashi, Mark,
-> 
-> On 01/02/17 18:25, Mark Rutland wrote:
-> > On Wed, Feb 01, 2017 at 06:00:08PM +0000, Mark Rutland wrote:
-> >> On Wed, Feb 01, 2017 at 09:46:24PM +0900, AKASHI Takahiro wrote:
-> >>> arch_kexec_protect_crashkres() and arch_kexec_unprotect_crashkres()
-> >>> are meant to be called around kexec_load() in order to protect
-> >>> the memory allocated for crash dump kernel once after it's loaded.
-> >>>
-> >>> The protection is implemented here by unmapping the region rather than
-> >>> making it read-only.
-> >>> To make the things work correctly, we also have to
-> >>> - put the region in an isolated, page-level mapping initially, and
-> >>> - move copying kexec's control_code_page to machine_kexec_prepare()
-> >>>
-> >>> Note that page-level mapping is also required to allow for shrinking
-> >>> the size of memory, through /sys/kernel/kexec_crash_size, by any number
-> >>> of multiple pages.
-> 
-> >> Looking at kexec_crash_size_store(), I don't see where memory returned
-> >> to the OS is mapped. AFAICT, if the region is protected when the user
-> >> shrinks the region, the memory will not be mapped, yet handed over to
-> >> the kernel for general allocation.
-> 
-> kernel/kexec_core.c:crash_shrink_memory() will bailout:
-> >	if (kexec_crash_image) {
-> >		ret = -ENOENT;
-> >		goto unlock;
-> >	}
-> 
-> So it should only be possible to return memory to the allocators when there is
-> no crash image loaded, so the area is mapped.
-> 
-> What happens when we unload the crash image? It looks like an unload is a call
+Thanks. I do think that whatever solution we come up with for virtio 1
+should influence what we do for legacy.
 
-Thank you for this heads-up!
-I've almost forgot this feature.
+> > We can't detect the fastmodel,
+> 
+> Surely, it puts a hardware id somewhere? I think you mean
+> fastmodel isn't always affected, right?
 
-> to do_kexec_load with nr_segments == 0, do_kexec_load() has:
-> >	if (flags & KEXEC_ON_CRASH) {
-> >		dest_image = &kexec_crash_image;
-> >		if (kexec_crash_image)
-> >			arch_kexec_unprotect_crashkres();
-> 
-> So we unprotect the region when we unload the kernel causing it to be remapped.
-> Provided the load/protect and {load,unload}/unprotect are kept in sync, I think
-> this is safe.
-> 
-> 
-> Given the core code can unload a crash image, this hunk has me worried:
-> +void arch_kexec_unprotect_crashkres(void)
-> +{
-> +	/*
-> +	 * We don't have to make page-level mappings here because
-> +	 * the crash dump kernel memory is not allowed to be shrunk
-> +	 * once the kernel is loaded.
-> +	 */
-> +	create_pgd_mapping(&init_mm, crashk_res.start,
-> +			__phys_to_virt(crashk_res.start),
-> +			resource_size(&crashk_res), PAGE_KERNEL,
-> +			debug_pagealloc_enabled());
-> 
-> 
-> I don't think this is true if the order is: load -> protect, unload ->
-> unprotect, shrink. The shrink will happen with potentially non-page-size mappings.
+I don't think there's a hardware ID. The thing is, the fastmodel is a
+toolkit for building all sorts of platforms: you can chop and change
+the CPUs, the peripherals, the memory, the interrupt controller, the
+interconnect etc. Pretty much everything can be customised. So, for
+any fastmodel configuration that places virtio upstream of the SMMU
+(which is common, because virtio is one of the few DMA-capable peripherals
+that the fastmodel supports), we need to do something special.
 
-So we have to always do page-mapping, here.
+> I'd like to see basically
+> 
+> if (fastmodel)
+> 	a pile of special work-arounds
+> else
+> 	not less hacky but more common virtio work-arounds
+> 
+> :)
+> 
+> And then I can apply whatever comes from @arm.com and not
+> worry about breaking actual hardware.
 
--Takahiro AKASHI
+What we could do is call iommu_group_get(&vdev->dev) for legacy
+devices if CONFIG_ARM64. If that returns non-NULL, then we know that
+the device is upstream of an SMMU, which means it must be the fastmodel.
 
-> 
-> Thanks,
-> 
-> James
-> 
+Will
