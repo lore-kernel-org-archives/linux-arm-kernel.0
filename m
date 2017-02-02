@@ -1,114 +1,68 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu,  2 Feb 2017 15:45:19 +0100
-Subject: [PATCH 09/13] ARM: at91: pm: tie the USB clock mask to the pmc
+Date: Thu,  2 Feb 2017 15:45:17 +0100
+Subject: [PATCH 07/13] ARM: at91: pm: Workaround DDRSDRC self-refresh bug with
+ LPDDR1 memories.
 In-Reply-To: <20170202144523.11706-1-alexandre.belloni@free-electrons.com>
 References: <20170202144523.11706-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20170202144523.11706-10-alexandre.belloni@free-electrons.com>
+Message-ID: <20170202144523.11706-8-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The USB clocks mask (uhp_udp_mask) depend on the pmc. Tie it to the pmc id
-instead of the SoC.
+As already explained for pm_suspend.S, the DDRSDR controller fails to put
+LPDDR1 memories in self-refresh. Force the controller to think it has DDR2
+memories during the self-refresh period, as the DDR2 self-refresh spec is
+equivalent to LPDDR1, and is correctly implemented in the controller.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/mach-at91/pm.c | 37 +++++++++++++++++++++++--------------
- 1 file changed, 23 insertions(+), 14 deletions(-)
+ arch/arm/mach-at91/pm.c | 20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index b6448043ee7a..c0ef1742135c 100644
+index d673996bed77..d4a444c4c38f 100644
 --- a/arch/arm/mach-at91/pm.c
 +++ b/arch/arm/mach-at91/pm.c
-@@ -425,31 +425,46 @@ static void __init at91_pm_sram_init(void)
- 			&at91_pm_suspend_in_sram, at91_pm_suspend_in_sram_sz);
- }
+@@ -241,12 +241,27 @@ static void at91_ddr_standby(void)
+ 	/* Those two values allow us to delay self-refresh activation
+ 	 * to the maximum. */
+ 	u32 lpr0, lpr1 = 0;
++	u32 mdr, saved_mdr0, saved_mdr1 = 0;
+ 	u32 saved_lpr0, saved_lpr1 = 0;
  
-+struct pmc_info {
-+	unsigned long uhp_udp_mask;
-+};
++	/* LPDDR1 --> force DDR2 mode during self-refresh */
++	saved_mdr0 = at91_ramc_read(0, AT91_DDRSDRC_MDR);
++	if ((saved_mdr0 & AT91_DDRSDRC_MD) == AT91_DDRSDRC_MD_LOW_POWER_DDR) {
++		mdr = saved_mdr0 & ~AT91_DDRSDRC_MD;
++		mdr |= AT91_DDRSDRC_MD_DDR2;
++		at91_ramc_write(0, AT91_DDRSDRC_MDR, mdr);
++	}
 +
-+static const struct pmc_info pmc_infos[] __initconst = {
-+	{ .uhp_udp_mask = AT91RM9200_PMC_UHP | AT91RM9200_PMC_UDP },
-+	{ .uhp_udp_mask = AT91SAM926x_PMC_UHP | AT91SAM926x_PMC_UDP },
-+	{ .uhp_udp_mask = AT91SAM926x_PMC_UHP },
-+};
-+
- static const struct of_device_id atmel_pmc_ids[] __initconst = {
--	{ .compatible = "atmel,at91rm9200-pmc"  },
--	{ .compatible = "atmel,at91sam9260-pmc" },
--	{ .compatible = "atmel,at91sam9g45-pmc" },
--	{ .compatible = "atmel,at91sam9n12-pmc" },
--	{ .compatible = "atmel,at91sam9x5-pmc" },
--	{ .compatible = "atmel,sama5d3-pmc" },
--	{ .compatible = "atmel,sama5d2-pmc" },
-+	{ .compatible = "atmel,at91rm9200-pmc", .data = &pmc_infos[0] },
-+	{ .compatible = "atmel,at91sam9260-pmc", .data = &pmc_infos[1] },
-+	{ .compatible = "atmel,at91sam9g45-pmc", .data = &pmc_infos[2] },
-+	{ .compatible = "atmel,at91sam9n12-pmc", .data = &pmc_infos[1] },
-+	{ .compatible = "atmel,at91sam9x5-pmc", .data = &pmc_infos[1] },
-+	{ .compatible = "atmel,sama5d3-pmc", .data = &pmc_infos[1] },
-+	{ .compatible = "atmel,sama5d2-pmc", .data = &pmc_infos[1] },
- 	{ /* sentinel */ },
- };
- 
- static void __init at91_pm_init(void (*pm_idle)(void))
- {
- 	struct device_node *pmc_np;
-+	const struct of_device_id *of_id;
-+	const struct pmc_info *pmc;
- 
- 	if (at91_cpuidle_device.dev.platform_data)
- 		platform_device_register(&at91_cpuidle_device);
- 
--	pmc_np = of_find_matching_node(NULL, atmel_pmc_ids);
-+	pmc_np = of_find_matching_node_and_match(NULL, atmel_pmc_ids, &of_id);
- 	pm_data.pmc = of_iomap(pmc_np, 0);
- 	if (!pm_data.pmc) {
- 		pr_err("AT91: PM not supported, PMC not found\n");
- 		return;
+ 	if (pm_data.ramc[1]) {
+ 		saved_lpr1 = at91_ramc_read(1, AT91_DDRSDRC_LPR);
+ 		lpr1 = saved_lpr1 & ~AT91_DDRSDRC_LPCB;
+ 		lpr1 |= AT91_DDRSDRC_LPCB_SELF_REFRESH;
++		saved_mdr1 = at91_ramc_read(1, AT91_DDRSDRC_MDR);
++		if ((saved_mdr1 & AT91_DDRSDRC_MD) == AT91_DDRSDRC_MD_LOW_POWER_DDR) {
++			mdr = saved_mdr1 & ~AT91_DDRSDRC_MD;
++			mdr |= AT91_DDRSDRC_MD_DDR2;
++			at91_ramc_write(1, AT91_DDRSDRC_MDR, mdr);
++		}
  	}
  
-+	pmc = of_id->data;
-+	pm_data.uhp_udp_mask = pmc->uhp_udp_mask;
-+
- 	if (pm_idle)
- 		arm_pm_idle = pm_idle;
+ 	saved_lpr0 = at91_ramc_read(0, AT91_DDRSDRC_LPR);
+@@ -260,9 +275,12 @@ static void at91_ddr_standby(void)
  
-@@ -470,35 +485,29 @@ void __init at91rm9200_pm_init(void)
- 	 */
- 	at91_ramc_write(0, AT91_MC_SDRAMC_LPR, 0);
+ 	cpu_do_idle();
  
--	pm_data.uhp_udp_mask = AT91RM9200_PMC_UHP | AT91RM9200_PMC_UDP;
--
- 	at91_pm_init(at91rm9200_idle);
++	at91_ramc_write(0, AT91_DDRSDRC_MDR, saved_mdr0);
+ 	at91_ramc_write(0, AT91_DDRSDRC_LPR, saved_lpr0);
+-	if (pm_data.ramc[1])
++	if (pm_data.ramc[1]) {
++		at91_ramc_write(0, AT91_DDRSDRC_MDR, saved_mdr1);
+ 		at91_ramc_write(1, AT91_DDRSDRC_LPR, saved_lpr1);
++	}
  }
  
- void __init at91sam9260_pm_init(void)
- {
- 	at91_dt_ramc();
--	pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP | AT91SAM926x_PMC_UDP;
- 	at91_pm_init(at91sam9_idle);
- }
- 
- void __init at91sam9g45_pm_init(void)
- {
- 	at91_dt_ramc();
--	pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP;
- 	at91_pm_init(at91sam9_idle);
- }
- 
- void __init at91sam9x5_pm_init(void)
- {
- 	at91_dt_ramc();
--	pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP | AT91SAM926x_PMC_UDP;
- 	at91_pm_init(at91sam9_idle);
- }
- 
- void __init sama5_pm_init(void)
- {
- 	at91_dt_ramc();
--	pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP | AT91SAM926x_PMC_UDP;
- 	at91_pm_init(NULL);
- }
+ /* We manage both DDRAM/SDRAM controllers, we need more than one value to
 -- 
 2.11.0
