@@ -1,106 +1,156 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 2 Feb 2017 14:35:35 +0000
-Subject: [PATCH v31 04/12] arm64: mm: allow for unmapping part of kernel
- mapping
-In-Reply-To: <20170202140102.GA22666@fireball>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 2 Feb 2017 23:36:04 +0900
+Subject: [PATCH v31 05/12] arm64: kdump: protect crash dump kernel memory
+In-Reply-To: <20170202111637.GA31394@leverpostej>
 References: <20170201124218.5823-1-takahiro.akashi@linaro.org>
- <20170201124630.6016-3-takahiro.akashi@linaro.org>
- <20170201160354.GF4756@leverpostej>
- <20170202102131.GD13549@linaro.org>
- <20170202114437.GH31394@leverpostej>
- <20170202140102.GA22666@fireball>
-Message-ID: <20170202143535.GM31394@leverpostej>
+ <20170201124630.6016-4-takahiro.akashi@linaro.org>
+ <20170201180008.GG4756@leverpostej>
+ <20170202103129.GE13549@linaro.org>
+ <20170202111637.GA31394@leverpostej>
+Message-ID: <20170202143602.GA3078@fireball>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2017 at 11:01:03PM +0900, AKASHI Takahiro wrote:
-> On Thu, Feb 02, 2017 at 11:44:38AM +0000, Mark Rutland wrote:
-> > On Thu, Feb 02, 2017 at 07:21:32PM +0900, AKASHI Takahiro wrote:
-> > > On Wed, Feb 01, 2017 at 04:03:54PM +0000, Mark Rutland wrote:
-> > > > Hi,
+On Thu, Feb 02, 2017 at 11:16:37AM +0000, Mark Rutland wrote:
+> Hi,
+> 
+> On Thu, Feb 02, 2017 at 07:31:30PM +0900, AKASHI Takahiro wrote:
+> > On Wed, Feb 01, 2017 at 06:00:08PM +0000, Mark Rutland wrote:
+> > > On Wed, Feb 01, 2017 at 09:46:24PM +0900, AKASHI Takahiro wrote:
+> > > > arch_kexec_protect_crashkres() and arch_kexec_unprotect_crashkres()
+> > > > are meant to be called around kexec_load() in order to protect
+> > > > the memory allocated for crash dump kernel once after it's loaded.
 > > > > 
-> > > > On Wed, Feb 01, 2017 at 09:46:23PM +0900, AKASHI Takahiro wrote:
-> > > > > A new function, remove_pgd_mapping(), is added.
-> > > > > It allows us to unmap a specific portion of kernel mapping later as far as
-> > > > > the mapping is made using create_pgd_mapping() and unless we try to free
-> > > > > a sub-set of memory range within a section mapping.
+> > > > The protection is implemented here by unmapping the region rather than
+> > > > making it read-only.
+> > > > To make the things work correctly, we also have to
+> > > > - put the region in an isolated, page-level mapping initially, and
+> > > > - move copying kexec's control_code_page to machine_kexec_prepare()
 > > > > 
-> > > > I'm not keen on adding more page table modification code. It was painful
-> > > > enough to ensure that those worked in all configurations.
-> > > > 
-> > > > Why can't we reuse create_pgd_mapping()? If we pass page_mappings_only,
-> > > > and use an invalid prot (i.e. 0), what is the problem?
+> > > > Note that page-level mapping is also required to allow for shrinking
+> > > > the size of memory, through /sys/kernel/kexec_crash_size, by any number
+> > > > of multiple pages.
 > > > 
-> > > As I did in v30?
-> > > (though my implementation in v30 should be improved.)
+> > > Looking at kexec_crash_size_store(), I don't see where memory returned
+> > > to the OS is mapped. AFAICT, if the region is protected when the user
+> > > shrinks the region, the memory will not be mapped, yet handed over to
+> > > the kernel for general allocation.
 > > 
-> > Something like that. I wasn't entirely sure why we needed to change
-> > those functions so much, so I'm clearly missing something there. I'll go
-> > have another look.
+> > The region is protected only when the crash dump kernel is loaded,
+> > and after that, we are no longer able to shrink the region.
 > 
-> I would be much easier if you see my new code.
-
-Sure. FWIW, I took a look, and I understand why those changes were
-necessary.
-
-> > > If we don't need to free unused page tables, that would make things
-> > > much simple. There are still some minor problems on the merge, but
-> > > we can sort it out.
+> Ah, sorry. My misunderstanding strikes again. That should be fine; sorry
+> for the noise, and thanks for explaining.
+> 
+> > > > @@ -538,6 +540,24 @@ static void __init map_mem(pgd_t *pgd)
+> > > >  		if (memblock_is_nomap(reg))
+> > > >  			continue;
+> > > >  
+> > > > +#ifdef CONFIG_KEXEC_CORE
+> > > > +		/*
+> > > > +		 * While crash dump kernel memory is contained in a single
+> > > > +		 * memblock for now, it should appear in an isolated mapping
+> > > > +		 * so that we can independently unmap the region later.
+> > > > +		 */
+> > > > +		if (crashk_res.end &&
+> > > > +		    (start <= crashk_res.start) &&
+> > > > +		    ((crashk_res.end + 1) < end)) {
+> > > > +			if (crashk_res.start != start)
+> > > > +				__map_memblock(pgd, start, crashk_res.start);
+> > > > +
+> > > > +			if ((crashk_res.end + 1) < end)
+> > > > +				__map_memblock(pgd, crashk_res.end + 1, end);
+> > > > +
+> > > > +			continue;
+> > > > +		}
+> > > > +#endif
+> > > 
+> > > This wasn't quite what I had in mind. I had expected that here we would
+> > > isolate the ranges we wanted to avoid mapping (with a comment as to why
+> > > we couldn't move the memblock_isolate_range() calls earlier). In
+> > > map_memblock(), we'd skip those ranges entirely.
+> > > 
+> > > I believe the above isn't correct if we have a single memblock.memory
+> > > region covering both the crashkernel and kernel regions. In that case,
+> > > we'd erroneously map the portion which overlaps the kernel.
+> > > 
+> > > It seems there are a number of subtle problems here. :/
 > > 
-> > I'm not sure I follow what you mean by 'on merge' here. Could you
-> > elaborate?
+> > I didn't see any problems, but I will go back with memblock_isolate_range()
+> > here in map_mem().
 > 
-> What I had in mind is some changes needed to handle "__prot(0)" properly
-> in alloc_init_pxx(). For example, p[mu]d_set_huge() doesn't make
-> a "zeroed" entry.
+> Imagine we have phyiscal memory:
+> 
+> singe RAM bank:    |---------------------------------------------------|
+> kernel image:              |---|
+> crashkernel:                                      |------|
+> 
+> ... we reserve the image and crashkernel region, but these would still
+> remain part of the memory memblock, and we'd have a memblock layout
+> like:
+> 
+> memblock.memory:   |---------------------------------------------------|
+> memblock.reserved:         |---|                  |------|
+> 
+> ... in map_mem() we iterate over memblock.memory, so we only have a
+> single entry to handle in this case. With the code above, we'd find that
+> it overlaps the crashk_res, and we'd map the parts which don't overlap,
+> e.g.
+> 
+> memblock.memory:   |---------------------------------------------------|
+> crashkernel:                                      |------|
+> mapped regions:    |-----------------------------|        |------------|
 
-I think that if we only allow ourselves to make PTEs invalid, we don't
-have to handle that case. If we use page_mappings_only, we should only
-check pgattr_change_is_safe() for the pte level, and the {pmd,pud,pgd}
-entries shouldn't change.
+I'm afraid that you might be talking about my v30.
+The code in v31 was a bit modified, and now
 
-Is the below sufficient to allow that, or have I missed something?
+> ... hwoever, this means we've mapped the portion which overlaps with the
+> kernel's linear alias (i.e. the case that we try to handle in
+> __map_memblock()). What we actually wanted was:
+> 
+> memblock.memory:   |---------------------------------------------------|
+> kernel image:              |---|
+> crashkernel:                                      |------|
+
+                     |-----------(A)---------------|        |----(B)-----|
+
+__map_memblock() is called against each of (A) and (B),
+so I think we will get
+
+> mapped regions:    |------|     |----------------|        |------------|
+
+this mapping.
+
+> 
+> 
+> To handle all cases I think we have to isolate *both* the image and
+> crashkernel in map_mem(). That would leave use with:
+> 
+> memblock.memory:   |------||---||----------------||------||------------|
+> memblock.reserved:         |---|                  |------|
+> 
+> ... so then we can check for overlap with either the kernel or
+> crashkernel in __map_memblock(), and return early, e.g.
+> 
+> __map_memblock(...)
+> 	if (overlaps_with_kernel(...))
+> 		return;
+> 	if (overlaps_with_crashekrenl(...))
+> 		return;
+> 	
+> 	__create_pgd_mapping(...);
+> }
+> 
+> We can pull the kernel alias mapping out of __map_memblock() and put it
+> at the end of map_mem().
+> 
+> Does that make sense?
+
+OK, I now understand your anticipation.
 
 Thanks,
-Mark.
+-Takahiro AKASHI
 
----->8----
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 17243e4..05bf7bf 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -105,6 +105,22 @@ static bool pgattr_change_is_safe(u64 old, u64 new)
-        return old  == 0 || new  == 0 || ((old ^ new) & ~mask) == 0;
- }
 
-+static bool pte_change_is_valid(pte old, pte new)
-+{
-+       /*
-+        * So long as we subsequently perform TLB invalidation, it is safe to
-+        * change a PTE to an invalid, but non-zero value. We only allow this
-+        * for PTEs since there's no complicated allocation/free issues to deal
-+        * with.
-+        *
-+        * Otherwise, the usual attribute change rules apply.
-+        */
-+       if (!pte_valid(old) || !pte_valid(new))
-+               return true;
-+
-+       return pgattr_change_is_safe(pte_val(old), pte_val(new));
-+}
-+
- static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
-                                  unsigned long end, unsigned long pfn,
-                                  pgprot_t prot,
-@@ -143,11 +159,7 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
-                set_pte(pte, pfn_pte(pfn, __prot));
-                pfn++;
-
--               /*
--                * After the PTE entry has been populated once, we
--                * only allow updates to the permission attributes.
--                */
--               BUG_ON(!pgattr_change_is_safe(pte_val(old_pte), pte_val(*pte)));
-+               BUG_ON(!pte_change_is_valid(old_pte, pte));
-
-        } while (pte++, addr += PAGE_SIZE, addr != end);
+> Thanks,
+> Mark.
