@@ -1,46 +1,29 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 2 Feb 2017 22:44:24 +0900
-Subject: [PATCH v31 03/12] arm64: kdump: reserve memory for crash dump
- kernel
-In-Reply-To: <20170202112619.GB31394@leverpostej>
-References: <20170201124218.5823-1-takahiro.akashi@linaro.org>
- <20170201124630.6016-2-takahiro.akashi@linaro.org>
- <20170201152609.GE4756@leverpostej>
- <20170202045235.GB13549@linaro.org>
- <20170202112619.GB31394@leverpostej>
-Message-ID: <20170202134423.GA22545@fireball>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 2 Feb 2017 19:15:37 +0530
+Subject: [GIT PULL 1/4] DaVinci driver updates
+In-Reply-To: <20170202133148.32531-1-nsekhar@ti.com>
+References: <20170202133148.32531-1-nsekhar@ti.com>
+Message-ID: <3253eb22-0e56-7ec0-d0cf-c760bab8c774@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2017 at 11:26:20AM +0000, Mark Rutland wrote:
-> On Thu, Feb 02, 2017 at 01:52:36PM +0900, AKASHI Takahiro wrote:
-> > On Wed, Feb 01, 2017 at 03:26:09PM +0000, Mark Rutland wrote:
-> > > On Wed, Feb 01, 2017 at 09:46:22PM +0900, AKASHI Takahiro wrote:
-> > > > +	pr_info("Reserving %lldMB of memory at %lldMB for crashkernel\n",
-> > > > +		crash_size >> 20, crash_base >> 20);
-> > > 
-> > > We only page-align the size, so the MB will be a little off, but that's
-> > > probably OK. However, it would also be nicer to log the base as an
-> > > address.
-> > 
-> > You might notice that the exact same message is used by all the other
-> > architectures, but
-> 
-> Almost all; I see arch/sh prints the address with %08x. ;)
-> 
-> > > Could we dump this as we do for the kernel memory layout? e.g.
-> > > 
-> > > 	pr_info("crashkernel reserved: 0x%016lx - 0x%016lx (%lld MB)\n",
-> > > 		crash_base, crash_base + crash_size, crash_size >> 20);
-> > 
-> > We can go either way.
-> 
-> Even if it's different from other archtiectures, I'd prefer to log as
-> above, with the range in hex.
+Hi,
 
-OK.
+On Thursday 02 February 2017 07:01 PM, Sekhar Nori wrote:
+> The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
+> 
+>   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.11/drivers
+> 
+> for you to fetch changes up to cdf0ead3747200d527f37170d3fdd41e368f88b0:
+> 
+>   sata: ahci-da850: un-hardcode the MPY bits (2017-01-31 20:41:52 +0530)
 
--Takhiro AKASHI
+Please ignore this. There was an error while sending out the series. I
+have resent it.
 
-> Thanks,
-> Mark.
+Thanks,
+Sekhar
