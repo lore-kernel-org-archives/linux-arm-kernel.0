@@ -1,53 +1,61 @@
-From: ebiggers3@gmail.com (Eric Biggers)
-Date: Wed, 1 Feb 2017 23:38:24 -0800
-Subject: [RFC PATCH v2 4/4] crypto: aes - add generic time invariant AES
- for CTR/CCM/GCM
-In-Reply-To: <1485646413-17491-5-git-send-email-ard.biesheuvel@linaro.org>
-References: <1485646413-17491-1-git-send-email-ard.biesheuvel@linaro.org>
- <1485646413-17491-5-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20170202073824.GC582@zzz>
+From: jnair@caviumnetworks.com (Jayachandran C)
+Date: Thu, 2 Feb 2017 07:42:12 +0000
+Subject: [PATCH] arm64: Improve parking of stopped CPUs
+In-Reply-To: <20170201150756.GD8177@arm.com>
+References: <1485942532-2643-1-git-send-email-jnair@caviumnetworks.com>
+ <20170201141656.GB8177@arm.com>
+ <3a9f0857-9274-738c-7a65-f24f337e6799@arm.com>
+ <20170201150756.GD8177@arm.com>
+Message-ID: <20170202074211.GA2332@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
-
-On Sat, Jan 28, 2017 at 11:33:33PM +0000, Ard Biesheuvel wrote:
+On Wed, Feb 01, 2017 at 03:07:56PM +0000, Will Deacon wrote:
+> On Wed, Feb 01, 2017 at 02:31:38PM +0000, Suzuki K Poulose wrote:
+> > On 01/02/17 14:16, Will Deacon wrote:
+> > >On Wed, Feb 01, 2017 at 09:48:52AM +0000, Jayachandran C wrote:
+> > >>The current code puts the stopped cpus in an 'yield' instruction loop.
+> > >>Using a busy loop here is unnecessary, we can use the cpu_park_loop()
+> > >>function here to do a wfi/wfe.
+> > >>
+> > >>Signed-off-by: Jayachandran C <jnair@caviumnetworks.com>
+> > >>---
+> > >> arch/arm64/kernel/smp.c | 3 +--
+> > >> 1 file changed, 1 insertion(+), 2 deletions(-)
+> > >>
+> > >>diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> > >>index cbaab44..0691d2f 100644
+> > >>--- a/arch/arm64/kernel/smp.c
+> > >>+++ b/arch/arm64/kernel/smp.c
+> > >>@@ -829,8 +829,7 @@ static void ipi_cpu_stop(unsigned int cpu)
+> > >>
+> > >> 	local_irq_disable();
+> > >>
+> > >>-	while (1)
+> > >>-		cpu_relax();
+> > >>+	cpu_park_loop();
+> > >> }
+> > >
+> > >Hmm, so we actually added the yield for QEMU's benefit iirc, where QEMU
+> > >will trap the yield and schedule a different vCPU. Should we be adding
+> > >a yield to cpu_park_loop instead?
+> > 
+> > Wouldn't wfi/wfe trigger the same ? I don't know how yield affects a physical
+> > CPU. The cpu_park_loop is also used by CPUs which cannot run due to the missing
+> > capabilities on the system. As long as yield() doesn't affect the PCPUs, we
+> > could do that. 
 > 
-> Note that this only implements AES encryption, which is all we need
-> for CTR and CBC-MAC. AES decryption can easily be implemented in a
-> similar way, but is significantly more costly.
+> Yes, good point, it looks like WFE should do the same thing.
 
-Is the expectation of decryption being more costly the only reason why "aes-ti"
-couldn't be a "cipher" algorithm, allowing it to automatically be used by the
-existing templates for CTR, CBC-MAC, CBC, ECB, XTS, CMAC, etc.?  It doesn't seem
-to do anything expensive on a per-block basis like loading SSE registers, so it
-seems it would fit better as a "cipher" algorithm if at all possible.  Then
-there would be no need to implement all these modes yet again.
+Agree, I am not sure if there is any case where 'yield' is a better option.
+There are a few cases in kernel/process.c which ends in 'while (1);' where
+the point about QEMU may be valid. These can be fixed up if needed.
+ 
+> > Going another step further, we could also include local_irq_disable() in
+> > cpu_park_loop().
 
-Also, what would be the feasibility of simply replacing aes-generic with the
-time-invariant implementation, rather than offering two implementations and
-requiring users to choose one, usually without the needed expertise?
+There is a cpu_panic_kernel() which calls cpu_park_loop() without the irq
+disable. It maybe OK to local_irq_disable for that too, but probably not
+in the scope of this patch.
 
-> +
-> +/*
-> + * Emit the sbox as __weak with external linkage to prevent the compiler
-> + * from doing constant folding on sbox references involving fixed indexes.
-> + */
-> +__weak const u8 __cacheline_aligned __aesti_sbox[] = {
-
-Did you consider marking it 'volatile' instead?
-
-> +static int aesti_set_key(struct aes_ti_ctx *ctx, const u8 *in_key,
-> +			 unsigned int key_len)
-> +{
-> +	struct crypto_aes_ctx rk;
-> +	int err;
-> +
-> +	err = crypto_aes_expand_key(&rk, in_key, key_len);
-> +	if (err)
-> +		return err;
-
-crypto_aes_expand_key() assumes that the key is u32-aligned; I don't think
-that's guaranteed here.
-
-Eric
+JC.
