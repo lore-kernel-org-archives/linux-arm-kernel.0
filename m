@@ -1,148 +1,137 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 2 Feb 2017 09:17:29 +0000
-Subject: Build failure with v4.9-rc1 and GCC trunk -- compiler weirdness
-In-Reply-To: <7ee40760-f89f-9737-bcf2-41b8197e9767@redhat.com>
-References: <20161017183806.GG5601@arm.com> <20161019153746.GA4411@x4>
- <CA+55aFzSi4V9ZYDfxvZNfz1ogngTywW5Q9U_vQq3v83+0wgPrA@mail.gmail.com>
- <20161019155658.GB4411@x4>
- <CA+55aFx=ZX=7u07R6zJ7fSw=zSQNaYqVX7R3LQs4riiEf+uA=A@mail.gmail.com>
- <20161019162222.GT9193@arm.com>
- <c578d5ac-ab8a-974a-bdd9-597b8c545583@redhat.com>
- <CAKv+Gu9G+r7eH0mhniH1+ucrHNiGBMFQdKfMOi=OmekapoBtUg@mail.gmail.com>
- <7ee40760-f89f-9737-bcf2-41b8197e9767@redhat.com>
-Message-ID: <CAKv+Gu8kMZcxYF5yYJLRX4ykHgCxuw_i3P4txnCZxD3uqs6jwQ@mail.gmail.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Thu, 2 Feb 2017 10:19:33 +0100
+Subject: [PATCH 3/5] Documentation: dt: iio: document stm32 exti trigger
+In-Reply-To: <20170201163500.ivxnxejurhzzoctl@rob-hp-laptop>
+References: <1485784663-19505-1-git-send-email-fabrice.gasnier@st.com>
+ <1485784663-19505-4-git-send-email-fabrice.gasnier@st.com>
+ <20170201163500.ivxnxejurhzzoctl@rob-hp-laptop>
+Message-ID: <e814a2c6-f0de-cb56-eb3a-e22daed8990b@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 February 2017 at 21:50, Laura Abbott <labbott@redhat.com> wrote:
-> On 02/01/2017 09:36 AM, Ard Biesheuvel wrote:
->> On 1 February 2017 at 16:58, Laura Abbott <labbott@redhat.com> wrote:
->>> On 10/19/2016 09:22 AM, Will Deacon wrote:
->>>> On Wed, Oct 19, 2016 at 09:01:33AM -0700, Linus Torvalds wrote:
->>>>> On Wed, Oct 19, 2016 at 8:56 AM, Markus Trippelsdorf
->>>>> <markus@trippelsdorf.de> wrote:
->>>>>> On 2016.10.19 at 08:55 -0700, Linus Torvalds wrote:
->>>>>>>
->>>>>>> Well, in the meantime we apparently have to live with it. Unless Will
->>>>>>> is using some unreleased gcc version that nobody else is using and we
->>>>>>> can just ignore it?
->>>>>>
->>>>>> Yes, he is using gcc-7 that is unreleased. (It will be released April
->>>>>> next year.)
->>>>>
->>>>> Ahh, self-built? So it's not part of some experimental ARM distro
->>>>> setup and this will be annoying lots of people?
->>>>
->>>> Our friendly compiler guys built it, but it's just a snapshot of trunk,
->>>> so it's all heading towards GCC 7.0. AFAIU, the problematic optimisation
->>>> is also a mid-end pass, so it would affect other architectures too.
->>>>
->>>>> If so, still think that we could just get rid of the ____ilog2_NaN()
->>>>> thing as it's not _that_ important, but it's certainly not very
->>>>> high-priority. Will can do it in his tree too for testing, and it can
->>>>> remind people to get the gcc problem fixed.
->>>>
->>>> I'm carrying the diff below, which fixes arm64 defconfig, but I'm worried
->>>> that we might be relying on this trick elsewhere. The arm __bad_cmpxchg
->>>> function, for example.
->>>>
->>>> Will
->>>>
->>>> --->8
->>>>
->>>> diff --git a/include/linux/log2.h b/include/linux/log2.h
->>>> index fd7ff3d91e6a..9cf5ad69065d 100644
->>>> --- a/include/linux/log2.h
->>>> +++ b/include/linux/log2.h
->>>> @@ -16,12 +16,6 @@
->>>>  #include <linux/bitops.h>
->>>>
->>>>  /*
->>>> - * deal with unrepresentable constant logarithms
->>>> - */
->>>> -extern __attribute__((const, noreturn))
->>>> -int ____ilog2_NaN(void);
->>>> -
->>>> -/*
->>>>   * non-constant log of base 2 calculators
->>>>   * - the arch may override these in asm/bitops.h if they can be implemented
->>>>   *   more efficiently than using fls() and fls64()
->>>> @@ -85,7 +79,7 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
->>>>  #define ilog2(n)                             \
->>>>  (                                            \
->>>>       __builtin_constant_p(n) ? (             \
->>>> -             (n) < 1 ? ____ilog2_NaN() :     \
->>>> +             (n) < 1 ? 0 :                   \
->>>>               (n) & (1ULL << 63) ? 63 :       \
->>>>               (n) & (1ULL << 62) ? 62 :       \
->>>>               (n) & (1ULL << 61) ? 61 :       \
->>>> @@ -149,9 +143,7 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
->>>>               (n) & (1ULL <<  3) ?  3 :       \
->>>>               (n) & (1ULL <<  2) ?  2 :       \
->>>>               (n) & (1ULL <<  1) ?  1 :       \
->>>> -             (n) & (1ULL <<  0) ?  0 :       \
->>>> -             ____ilog2_NaN()                 \
->>>> -                                ) :          \
->>>> +             0) :                            \
->>>>       (sizeof(n) <= 4) ?                      \
->>>>       __ilog2_u32(n) :                        \
->>>>       __ilog2_u64(n)                          \
->>>> @@ -194,7 +186,6 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
->>>>   * @n: parameter
->>>>   *
->>>>   * The first few values calculated by this routine:
->>>> - *  ob2(0) = 0
->>>>   *  ob2(1) = 0
->>>>   *  ob2(2) = 1
->>>>   *  ob2(3) = 2
->>>>
->>>
->>> Reviving this thread as gcc 7 has now hit Fedora rawhide and has this
->>> same issue. I pulled in the above patch from Will as a temporary work
->>> around for building. It didn't look like there was consensus on a
->>> permanent solution though from the thread.
->>>
+On 02/01/2017 05:35 PM, Rob Herring wrote:
+> On Mon, Jan 30, 2017 at 02:57:41PM +0100, Fabrice Gasnier wrote:
+>> Add dt documentation for st,stm32-exti-trigger.
+>> EXTi gpio signal can be routed internally as trigger source for various
+>
+> s/gpio/GPIO/
+>
+>> IPs (e.g. for ADC or DAC conversions).
+>
+> Please use "dt-bindings: iio:" for the subject prefix.
+
+Hi Rob,
+
+I'll fix this in V2.
+
+>
 >>
->> I still think order_base_2() is broken, since it may invoke
->> roundup_pow_of_two() with an input value that is documented as
->> producing undefined output. I would argue that the below is the
->> correct fix.
+>> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>> ---
+>>  .../bindings/iio/trigger/st,stm32-exti-trigger.txt      | 17 +++++++++++++++++
+>>  1 file changed, 17 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/iio/trigger/st,stm32-exti-trigger.txt
 >>
->> diff --git a/include/linux/log2.h b/include/linux/log2.h
->> index fd7ff3d91e6a..46523731bec0 100644
->> --- a/include/linux/log2.h
->> +++ b/include/linux/log2.h
->> @@ -203,6 +203,18 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
->>   *  ... and so on.
->>   */
->>
->> -#define order_base_2(n) ilog2(roundup_pow_of_two(n))
->> +static inline __attribute__((__const__))
->> +unsigned long __order_base_2(unsigned long n)
->> +{
->> +       return n ? 1UL << fls_long(n - 1) : 1;
->> +}
+>> diff --git a/Documentation/devicetree/bindings/iio/trigger/st,stm32-exti-trigger.txt b/Documentation/devicetree/bindings/iio/trigger/st,stm32-exti-trigger.txt
+>> new file mode 100644
+>> index 0000000..ebf2645
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/iio/trigger/st,stm32-exti-trigger.txt
+>> @@ -0,0 +1,17 @@
+>> +STMicroelectronics STM32 EXTI trigger bindings
 >> +
->> +#define order_base_2(n)                                \
->> +(                                              \
->> +       __builtin_constant_p(n) ? (             \
->> +               ((n) < 2) ? (n) :               \
->> +               ilog2((n) - 1) + 1) :           \
->> +       ilog2(__order_base_2(n))                \
->> + )
->>
->>  #endif /* _LINUX_LOG2_H */
->>
+>> +EXTi gpio signal can be routed internally as trigger source for various
 >
-> This fixes the problem although the comments should be updated
-> as well.
-
-This brings order_base_2() in line with the comments, so I am not sure
-what you'd want to update here?
-
-> Is it worth fixing this for ilog2 as well just to avoid
-> the link nonsense there as well?
+> s/gpio/GPIO/
 >
+>> +IPs (e.g. for ADC or DAC conversions).
+>> +
+>> +Contents of a stm32 exti trigger root node:
+>
+> Drop "root"
+I'll fix these in V2.
 
-ilog2() is truly undefined for input 0, so the link nonsense is
-justified there imo
+>
+>> +-------------------------------------------
+>> +Required properties:
+>> +- compatible: Should be "st,stm32-exti-trigger"
+>
+> This whole binding looks a bit suspicious. Is this actually a h/w block?
+> What makes it stm32 specific? Seems like the gpio properties should just
+> be part of the ADC or DAC that they trigger.
+
+Please let me explain in more details.
+I think best is I add following documentation in binding. Something like:
+
+GPIO + EXTI controller side | ADC side (input trigger MUX, same for DAC)
+                             |
+        IIO trigger         --->         IIO device
+                             |                  __________
+                             |          inX  --|          \
+                             |          ...  --|  SAR ADC  |-->
+         __                  |         __      |__________/
+PA11 --|  \                 | TIMx --|  \   trigger   ^
+PB11 --|   |                  ...  --|   }----------->'
+...  --|   }---- EXTI11 ---------->--|__/
+      --|   |                |
+PJ11 --|__/                 |
+
+In fact, this driver configures GPIO and EXTI controllers (left side of
+above scheme), and it registers corresponding trigger in IIO. Then it 
+can be used by other IPs registered as IIO devices.
+
+I think this should be outside of ADC or DAC IIO device drivers, to live 
+in separate IIO trigger driver. It will avoid duplicating code (e.g. 
+PATCH 4) into several IIO device drivers.
+
+Is it ok to declare this as separate IIO trigger driver?
+Maybe Jonathan could also advise on this ?
+
+As I see it, this is stm32 specific, as any GPIO bank, (e.g. PA11,
+PB11...) can be selected to generate (EXTI11) hardware trigger signal.
+
+>
+>> +- extiN-gpio: optional gpio line that may be used as external trigger source
+>
+> -gpios is the preferred form.
+
+I apologize, I didn't make it clear in the first place. Please let me 
+rephrase. Is bellow description more suitable ?
+
+- extiN-gpio: One or several named GPIO lines that may be used as
+   external trigger source by STM32 ADC, DAC. N may be 0..15.
+   For example, on stm32f4, exti11-gpio can trig ADC, exti9-gpio can
+   trig DAC.
+
+>
+>> +  (e.g. N may be 0..15. For example, exti11-gpio can trig ADC on stm32f4).
+>> +
+>> +Example:
+>> +	triggers {
+>> +		compatible = "st,stm32-exti-trigger";
+>> +		exti11-gpio=<&gpioa 11 0>;
+>
+> spaces around the "=".
+I'll fix it in V2, and also add example for more that one EXTI trigger:
+
+	triggers {
+		compatible = "st,stm32-exti-trigger";
+		exti9-gpio = <&gpioa 9 0>;
+		exti11-gpio = <&gpioa 11 0>;
+		...
+	};
+
+Above binding can typically be used in board dt, in case on-board gpio 
+is connected/used as trigger source for IIO device (STM32 ADC/DAC).
+
+Please let me know if this clarifies, so I'll do necessary changes in V2.
+
+Many thanks for your review.
+Best Regards,
+Fabrice
+
+>
+>> +	};
+>> --
+>> 1.9.1
+>>
