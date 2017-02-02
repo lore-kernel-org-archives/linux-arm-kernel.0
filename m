@@ -1,44 +1,55 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Thu, 02 Feb 2017 09:34:14 +0100
-Subject: [PATCH 06/11] [media] videodev2.h: Add v4l2 definition for HEVC
-In-Reply-To: <1484733729-25371-7-git-send-email-smitha.t@samsung.com>
-References: <1484733729-25371-1-git-send-email-smitha.t@samsung.com>
- <CGME20170118100742epcas5p1bb390dffa4fe530d94573f41d8791ef7@epcas5p1.samsung.com>
- <1484733729-25371-7-git-send-email-smitha.t@samsung.com>
-Message-ID: <c8733135-dd3d-cff9-df99-68a900f71cfc@samsung.com>
+From: mzoran@crowfest.net (Michael Zoran)
+Date: Thu, 02 Feb 2017 00:37:52 -0800
+Subject: [RESENT PATCH] ARM: bcm2835: Add devicetree for the Raspberry
+ Pi 3, for arm (32)
+In-Reply-To: <1485951653.1076.54.camel@redhat.com>
+References: <1484845444-4617-1-git-send-email-kraxel@redhat.com>
+ <87fukcgsqp.fsf@eliezer.anholt.net> <878tpqki0k.fsf@eliezer.anholt.net>
+ <1485944672.1076.50.camel@redhat.com> <1485951653.1076.54.camel@redhat.com>
+Message-ID: <1486024672.11636.1.camel@crowfest.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.01.2017 11:02, Smitha T Murthy wrote:
-> Add V4L2 definition for HEVC compressed format
->
-> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
-Beside small nitpick.
+On Wed, 2017-02-01 at 13:20 +0100, Gerd Hoffmann wrote:
+> > > I think just having links from
+> > > arch/arm64/boot/dts/broadcom/bcm2837*.dts* to arch/arm/boot/dts/
+> > > would
+> > > be the solution, then this Makefile could just reference
+> > > bcm2837-rpi-3-b.dtb.
+> > 
+> > I suspect it is not that easy, last time I tried it didn't work.
+> > Will try again though.
+> 
+> Yep, dtbs_install fails:
+> 
+> [ ... ]
+> ? INSTALL arch/arm/boot/dts/bcm2835-rpi-b-plus.dtb
+> ? INSTALL arch/arm/boot/dts/bcm2835-rpi-a-plus.dtb
+> ? INSTALL arch/arm/boot/dts/bcm2836-rpi-2-b.dtb
+> ? INSTALL?
+> cp: missing destination file operand after '/boot/dtbs/4.10.0-rc5+'
+> Try 'cp --help' for more information.
+> /root/linux/scripts/Makefile.dtbinst:41: recipe for target
+> 'bcm2837-rpi-3-b.dts' failed
+> make[3]: *** [bcm2837-rpi-3-b.dts] Error 1
+> arch/arm/Makefile:348: recipe for target 'dtbs_install' failed
+> make[2]: *** [dtbs_install] Error 2
+> Makefile:150: recipe for target 'sub-make' failed
+> make[1]: *** [sub-make] Error 2
+> Makefile:24: recipe for target '__sub-make' failed
 
-Reviewed-by: Andrzej Hajda <a.hajda@samsung.com>
+This is actually a problem I had to deal with way in the begging of
+ARM64.  What was done in the github tree was to have the one of the DTS
+ files(in this case 64) #include the 32 bit dts.  That way it's not
+needed to have the symbolic link and install should work.
 
-> ---
->  include/uapi/linux/videodev2.h |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
-> index 46e8a2e3..620e941 100644
-> --- a/include/uapi/linux/videodev2.h
-> +++ b/include/uapi/linux/videodev2.h
-> @@ -630,6 +630,7 @@ struct v4l2_pix_format {
->  #define V4L2_PIX_FMT_VC1_ANNEX_L v4l2_fourcc('V', 'C', '1', 'L') /* SMPTE 421M Annex L compliant stream */
->  #define V4L2_PIX_FMT_VP8      v4l2_fourcc('V', 'P', '8', '0') /* VP8 */
->  #define V4L2_PIX_FMT_VP9      v4l2_fourcc('V', 'P', '9', '0') /* VP9 */
-> +#define V4L2_PIX_FMT_HEVC     v4l2_fourcc('H', 'E', 'V', 'C') /* HEVC */
+I know it's ulgy, but it works...
 
-I am not sure if it shouldn't be sorted alphabetically in compressed
-formats stanza.
+Take a look at:
+https://github.com/raspberrypi/linux/blob/rpi-4.10.y/arch/arm64/boot/dt
+s/broadcom/bcm2710-rpi-3-b.dts
 
---
-Regards
-Andrzej
+Here is what the file contains:
+#define RPI364
 
-
->  
->  /*  Vendor-specific formats   */
->  #define V4L2_PIX_FMT_CPIA1    v4l2_fourcc('C', 'P', 'I', 'A') /* cpia1 YUV */
+#include "../../../../arm/boot/dts/bcm2710-rpi-3-b.dts"
