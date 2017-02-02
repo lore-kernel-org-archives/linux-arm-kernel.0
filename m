@@ -1,151 +1,75 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Thu, 2 Feb 2017 07:43:39 -0800
-Subject: Build failure with v4.9-rc1 and GCC trunk -- compiler weirdness
-In-Reply-To: <CAKv+Gu8kMZcxYF5yYJLRX4ykHgCxuw_i3P4txnCZxD3uqs6jwQ@mail.gmail.com>
-References: <20161017183806.GG5601@arm.com> <20161019153746.GA4411@x4>
- <CA+55aFzSi4V9ZYDfxvZNfz1ogngTywW5Q9U_vQq3v83+0wgPrA@mail.gmail.com>
- <20161019155658.GB4411@x4>
- <CA+55aFx=ZX=7u07R6zJ7fSw=zSQNaYqVX7R3LQs4riiEf+uA=A@mail.gmail.com>
- <20161019162222.GT9193@arm.com>
- <c578d5ac-ab8a-974a-bdd9-597b8c545583@redhat.com>
- <CAKv+Gu9G+r7eH0mhniH1+ucrHNiGBMFQdKfMOi=OmekapoBtUg@mail.gmail.com>
- <7ee40760-f89f-9737-bcf2-41b8197e9767@redhat.com>
- <CAKv+Gu8kMZcxYF5yYJLRX4ykHgCxuw_i3P4txnCZxD3uqs6jwQ@mail.gmail.com>
-Message-ID: <72d02b19-54b6-f4b1-8b52-40d3a57b7ec7@redhat.com>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Thu, 2 Feb 2017 21:15:19 +0530
+Subject: [PATCH 0/5] Implement SMMU passthrough using the default domain
+In-Reply-To: <CAF6AEGtfrrwVZ_W86_HqVsiqfcM=XFa+g2LECFYQJmvv7-JSqQ@mail.gmail.com>
+References: <1484849955-1871-1-git-send-email-will.deacon@arm.com>
+ <010801d27654$47b7e450$d727acf0$@codeaurora.org>
+ <20170126171857.GE27598@8bytes.org>
+ <CAF6AEGtfrrwVZ_W86_HqVsiqfcM=XFa+g2LECFYQJmvv7-JSqQ@mail.gmail.com>
+Message-ID: <012501d27d6b$5e396c80$1aac4580$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/2017 01:17 AM, Ard Biesheuvel wrote:
-> On 1 February 2017 at 21:50, Laura Abbott <labbott@redhat.com> wrote:
->> On 02/01/2017 09:36 AM, Ard Biesheuvel wrote:
->>> On 1 February 2017 at 16:58, Laura Abbott <labbott@redhat.com> wrote:
->>>> On 10/19/2016 09:22 AM, Will Deacon wrote:
->>>>> On Wed, Oct 19, 2016 at 09:01:33AM -0700, Linus Torvalds wrote:
->>>>>> On Wed, Oct 19, 2016 at 8:56 AM, Markus Trippelsdorf
->>>>>> <markus@trippelsdorf.de> wrote:
->>>>>>> On 2016.10.19 at 08:55 -0700, Linus Torvalds wrote:
->>>>>>>>
->>>>>>>> Well, in the meantime we apparently have to live with it. Unless Will
->>>>>>>> is using some unreleased gcc version that nobody else is using and we
->>>>>>>> can just ignore it?
->>>>>>>
->>>>>>> Yes, he is using gcc-7 that is unreleased. (It will be released April
->>>>>>> next year.)
->>>>>>
->>>>>> Ahh, self-built? So it's not part of some experimental ARM distro
->>>>>> setup and this will be annoying lots of people?
->>>>>
->>>>> Our friendly compiler guys built it, but it's just a snapshot of trunk,
->>>>> so it's all heading towards GCC 7.0. AFAIU, the problematic optimisation
->>>>> is also a mid-end pass, so it would affect other architectures too.
->>>>>
->>>>>> If so, still think that we could just get rid of the ____ilog2_NaN()
->>>>>> thing as it's not _that_ important, but it's certainly not very
->>>>>> high-priority. Will can do it in his tree too for testing, and it can
->>>>>> remind people to get the gcc problem fixed.
->>>>>
->>>>> I'm carrying the diff below, which fixes arm64 defconfig, but I'm worried
->>>>> that we might be relying on this trick elsewhere. The arm __bad_cmpxchg
->>>>> function, for example.
->>>>>
->>>>> Will
->>>>>
->>>>> --->8
->>>>>
->>>>> diff --git a/include/linux/log2.h b/include/linux/log2.h
->>>>> index fd7ff3d91e6a..9cf5ad69065d 100644
->>>>> --- a/include/linux/log2.h
->>>>> +++ b/include/linux/log2.h
->>>>> @@ -16,12 +16,6 @@
->>>>>  #include <linux/bitops.h>
->>>>>
->>>>>  /*
->>>>> - * deal with unrepresentable constant logarithms
->>>>> - */
->>>>> -extern __attribute__((const, noreturn))
->>>>> -int ____ilog2_NaN(void);
->>>>> -
->>>>> -/*
->>>>>   * non-constant log of base 2 calculators
->>>>>   * - the arch may override these in asm/bitops.h if they can be implemented
->>>>>   *   more efficiently than using fls() and fls64()
->>>>> @@ -85,7 +79,7 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
->>>>>  #define ilog2(n)                             \
->>>>>  (                                            \
->>>>>       __builtin_constant_p(n) ? (             \
->>>>> -             (n) < 1 ? ____ilog2_NaN() :     \
->>>>> +             (n) < 1 ? 0 :                   \
->>>>>               (n) & (1ULL << 63) ? 63 :       \
->>>>>               (n) & (1ULL << 62) ? 62 :       \
->>>>>               (n) & (1ULL << 61) ? 61 :       \
->>>>> @@ -149,9 +143,7 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
->>>>>               (n) & (1ULL <<  3) ?  3 :       \
->>>>>               (n) & (1ULL <<  2) ?  2 :       \
->>>>>               (n) & (1ULL <<  1) ?  1 :       \
->>>>> -             (n) & (1ULL <<  0) ?  0 :       \
->>>>> -             ____ilog2_NaN()                 \
->>>>> -                                ) :          \
->>>>> +             0) :                            \
->>>>>       (sizeof(n) <= 4) ?                      \
->>>>>       __ilog2_u32(n) :                        \
->>>>>       __ilog2_u64(n)                          \
->>>>> @@ -194,7 +186,6 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
->>>>>   * @n: parameter
->>>>>   *
->>>>>   * The first few values calculated by this routine:
->>>>> - *  ob2(0) = 0
->>>>>   *  ob2(1) = 0
->>>>>   *  ob2(2) = 1
->>>>>   *  ob2(3) = 2
->>>>>
->>>>
->>>> Reviving this thread as gcc 7 has now hit Fedora rawhide and has this
->>>> same issue. I pulled in the above patch from Will as a temporary work
->>>> around for building. It didn't look like there was consensus on a
->>>> permanent solution though from the thread.
->>>>
+Hi Rob,
+
+>-----Original Message-----
+>From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Rob Clark
+>Sent: Thursday, February 02, 2017 8:33 PM
+>To: Joerg Roedel <joro@8bytes.org>
+>Cc: Will Deacon <will.deacon@arm.com>; iommu at lists.linux-foundation.org; Sricharan <sricharan@codeaurora.org>; linux-arm-
+>kernel at lists.infradead.org
+>Subject: Re: [PATCH 0/5] Implement SMMU passthrough using the default domain
+>
+>On Thu, Jan 26, 2017 at 12:18 PM, Joerg Roedel <joro@8bytes.org> wrote:
+>> On Tue, Jan 24, 2017 at 08:42:23PM +0530, Sricharan wrote:
+>>> Thanks for this series. We had a case with the GPU.
+>>> The GPU's iommu was setup by kernel and the GPU
+>>> also does dynamic updates for on-the-fly switching between
+>>> process pagetables.  GPU driver was not using DMA domain and
+>>> the GPU's firmware was always expecting to run out  of contextbank
+>>>  '0' (although not correct) , which was not the case after the DMA domain
+>>> was made default  as '0' was getting allocated for DMA domain and
+>>> there were concerns about reusing the DMA domain as well.
+>>> Now with this series, looks there is an way out of that that can be tried.
 >>>
->>> I still think order_base_2() is broken, since it may invoke
->>> roundup_pow_of_two() with an input value that is documented as
->>> producing undefined output. I would argue that the below is the
->>> correct fix.
->>>
->>> diff --git a/include/linux/log2.h b/include/linux/log2.h
->>> index fd7ff3d91e6a..46523731bec0 100644
->>> --- a/include/linux/log2.h
->>> +++ b/include/linux/log2.h
->>> @@ -203,6 +203,18 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
->>>   *  ... and so on.
->>>   */
->>>
->>> -#define order_base_2(n) ilog2(roundup_pow_of_two(n))
->>> +static inline __attribute__((__const__))
->>> +unsigned long __order_base_2(unsigned long n)
->>> +{
->>> +       return n ? 1UL << fls_long(n - 1) : 1;
->>> +}
->>> +
->>> +#define order_base_2(n)                                \
->>> +(                                              \
->>> +       __builtin_constant_p(n) ? (             \
->>> +               ((n) < 2) ? (n) :               \
->>> +               ilog2((n) - 1) + 1) :           \
->>> +       ilog2(__order_base_2(n))                \
->>> + )
->>>
->>>  #endif /* _LINUX_LOG2_H */
->>>
+>>> So should the default domain not be per device specific selectable ?
 >>
->> This fixes the problem although the comments should be updated
->> as well.
-> 
-> This brings order_base_2() in line with the comments, so I am not sure
-> what you'd want to update here?
-> 
+>> Note that iommu-drivers can request direct-mapping for any given device
+>> on its initializtion. This is used on x86 for devices that need a 1-1
+>> mapping for some reason.
+>>
+>> Also device drivers can use the iommu-api and assign their own domain to
+>> a device, which allows them to manage the dma address space on their
+>> own.
+>
+>Part of the problem is that dev->archdata.dma_ops gets wired up to
+>iommu_dma_ops.  Which isn't so bad on it's own, except that cache ops
+>are not exposed to drivers, forcing us to use dma-mapping API
+>(dma_map_sg, etc) for cache operations.
+>
+>Possibly we should just expose cache op's to drivers bypass this abuse
+>of dma-mapping.
+>
+[1], with this, when the default domain in not DOMAIN_DMA, then
+dev->archdata.dma_ops is not set to iommu_dma_ops , instead remains
+to be swiotlb_ops. Is that not correct for gpu's unmanaged domain case ?
 
-ob2(1) = 1  for the __builtin_constant_p case which doesn't
-match the comment of ob2(1) = 0. So my statement should actually
-be is this correct?
+https://www.spinics.net/lists/arm-kernel/msg556209.html
 
-Thanks,
-Laura
+>btw, Will, we definitely want this to *not* rely on kcmdline for the
+>gpu with it's own private iommu case..
+
+Ya, that changes behavior for all devices and some might want 
+DMA_DOMAIN and some UNMANAGED.
+
+Regards,
+ Sricharan
+
+>
+>BR,
+>-R
+>
+>_______________________________________________
+>linux-arm-kernel mailing list
+>linux-arm-kernel at lists.infradead.org
+>http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
