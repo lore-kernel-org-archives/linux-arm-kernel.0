@@ -1,27 +1,59 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Thu, 2 Feb 2017 21:36:26 +0000
-Subject: [PATCH 6/7] efi: Handle secure boot from UEFI-2.6 [ver #7]
-In-Reply-To: <CAKv+Gu9ACE23ZMcQN3NpZ_N-CWzg=N6qFVu3_UruH0miPe=izA@mail.gmail.com>
-References: <148587558696.4026.16034622623568539004.stgit@warthog.procyon.org.uk>
- <148587564847.4026.5759345672956585977.stgit@warthog.procyon.org.uk>
- <CAKv+Gu8dnKB1sRGb3U+XB1eoA7Eyo4qSFBtPRbvGV912xPViVw@mail.gmail.com>
- <10454.1485889162@warthog.procyon.org.uk>
- <CAKv+Gu_gy6575axL6M64OSo33ZM2dnbs7cajqJRd8VtbjAXCTw@mail.gmail.com>
- <20578.1485952425@warthog.procyon.org.uk>
- <CAKv+Gu8FOcMx0UXXdd3nhE+PUPzbEn9X=kBQDfkLOZBvVu-8fg@mail.gmail.com>
- <23750.1485961217@warthog.procyon.org.uk>
- <CAKv+Gu9ACE23ZMcQN3NpZ_N-CWzg=N6qFVu3_UruH0miPe=izA@mail.gmail.com>
-Message-ID: <20170202213626.GQ31613@codeblueprint.co.uk>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Fri, 3 Feb 2017 05:43:08 +0800
+Subject: [arm-soc:to-build 8/8] mm/nommu.c:1647:8: error: too few arguments
+ to function 'do_munmap'
+Message-ID: <201702030547.w7eixv2M%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 01 Feb, at 03:02:14PM, Ard Biesheuvel wrote:
-> 
-> Let's wait for Matt to comment on the x86 bits before reissuing
-> anything, but if the subsequent patches still apply cleanly, I don't
-> think there is a need to resend or re-sign.
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git to-build
+head:   1bc74cf06c1d41d646677d9b50b60cb5c9d7eb18
+commit: 1bc74cf06c1d41d646677d9b50b60cb5c9d7eb18 [8/8] fixup do_mmap/do_munmap prototype
+config: sh-allmodconfig (attached as .config)
+compiler: sh4-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 1bc74cf06c1d41d646677d9b50b60cb5c9d7eb18
+        # save the attached .config to linux build tree
+        make.cross ARCH=sh 
 
-This all looks fine to me now, thanks for the re-work David.
+All errors (new ones prefixed by >>):
 
-Ard, do you want to apply these patches along with a fixup for the
-multi-line comments and send a second v4.11 pull to tip?
+   mm/nommu.c: In function 'vm_munmap':
+>> mm/nommu.c:1647:8: error: too few arguments to function 'do_munmap'
+     ret = do_munmap(mm, addr, len);
+           ^~~~~~~~~
+   mm/nommu.c:1581:5: note: declared here
+    int do_munmap(struct mm_struct *mm, unsigned long start, size_t len, struct list_head *uf)
+        ^~~~~~~~~
+
+vim +/do_munmap +1647 mm/nommu.c
+
+bfce281c Al Viro       2012-04-20  1641  int vm_munmap(unsigned long addr, size_t len)
+3034097a David Howells 2006-09-27  1642  {
+bfce281c Al Viro       2012-04-20  1643  	struct mm_struct *mm = current->mm;
+3034097a David Howells 2006-09-27  1644  	int ret;
+3034097a David Howells 2006-09-27  1645  
+3034097a David Howells 2006-09-27  1646  	down_write(&mm->mmap_sem);
+3034097a David Howells 2006-09-27 @1647  	ret = do_munmap(mm, addr, len);
+3034097a David Howells 2006-09-27  1648  	up_write(&mm->mmap_sem);
+3034097a David Howells 2006-09-27  1649  	return ret;
+3034097a David Howells 2006-09-27  1650  }
+
+:::::: The code at line 1647 was first introduced by commit
+:::::: 3034097a5017dd9281b1f795e80af9859627850e [PATCH] NOMMU: Order the per-mm_struct VMA list
+
+:::::: TO: David Howells <dhowells@redhat.com>
+:::::: CC: Linus Torvalds <torvalds@g5.osdl.org>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 43818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170203/dc4a4e6f/attachment-0001.gz>
