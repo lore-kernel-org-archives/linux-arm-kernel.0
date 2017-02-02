@@ -1,73 +1,73 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu,  2 Feb 2017 16:32:19 +0000
-Subject: [kvmtool PATCH v9 11/15] add kvm__check_vm_capability
+Date: Thu,  2 Feb 2017 16:32:13 +0000
+Subject: [kvmtool PATCH v9 05/15] virtio: fix endianness check for vhost
+ support
 In-Reply-To: <20170202163223.15372-1-andre.przywara@arm.com>
 References: <20170202163223.15372-1-andre.przywara@arm.com>
-Message-ID: <20170202163223.15372-12-andre.przywara@arm.com>
+Message-ID: <20170202163223.15372-6-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KVM capabilities can be per-VM, in this case the ioctl should be
-issued on the VM file descriptor, not on the system fd.
-Since this feature is guarded by a (system) capability itself, wrap
-the call into a function of its own.
+Currently we deny any VHOST_* functionality if the architecture
+supports guests with different endianness than the host. Most of the
+time even on those architectures the endianness of guest and host are
+the same, though, so we are denying the glory of VHOST needlessly.
+Switch from compile time determination to a run time scheme, which
+takes the actual endianness of the guest into account.
+For this we change the semantics of VIRTIO_ENDIAN_HOST to return the
+actual endianness of the host (the endianness of kvmtool at compile
+time, really). The actual check in vhost_net now compares this against
+the guest endianness.
+This enables vhost support on ARM and ARM64.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- include/kvm/kvm.h |  1 +
- kvm.c             | 28 ++++++++++++++++++++++++++++
- 2 files changed, 29 insertions(+)
+ include/kvm/virtio.h | 9 +++++++--
+ virtio/net.c         | 2 +-
+ 2 files changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/include/kvm/kvm.h b/include/kvm/kvm.h
-index 4a76ec2..a76a25d 100644
---- a/include/kvm/kvm.h
-+++ b/include/kvm/kvm.h
-@@ -129,6 +129,7 @@ static inline bool host_ptr_in_ram(struct kvm *kvm, void *p)
- }
+diff --git a/include/kvm/virtio.h b/include/kvm/virtio.h
+index 768ee96..66530fd 100644
+--- a/include/kvm/virtio.h
++++ b/include/kvm/virtio.h
+@@ -17,10 +17,15 @@
+ #define VIRTIO_PCI_O_CONFIG	0
+ #define VIRTIO_PCI_O_MSIX	1
  
- bool kvm__supports_extension(struct kvm *kvm, unsigned int extension);
-+bool kvm__supports_vm_extension(struct kvm *kvm, unsigned int extension);
+-#define VIRTIO_ENDIAN_HOST	0
+ #define VIRTIO_ENDIAN_LE	(1 << 0)
+ #define VIRTIO_ENDIAN_BE	(1 << 1)
  
- static inline void kvm__set_thread_name(const char *name)
++#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++#define VIRTIO_ENDIAN_HOST VIRTIO_ENDIAN_LE
++#else
++#define VIRTIO_ENDIAN_HOST VIRTIO_ENDIAN_BE
++#endif
++
+ struct virt_queue {
+ 	struct vring	vring;
+ 	u32		pfn;
+@@ -40,7 +45,7 @@ struct virt_queue {
+ #define VIRTIO_RING_ENDIAN VIRTIO_ENDIAN_HOST
+ #endif
+ 
+-#if (VIRTIO_RING_ENDIAN & (VIRTIO_ENDIAN_LE | VIRTIO_ENDIAN_BE))
++#if VIRTIO_RING_ENDIAN != VIRTIO_ENDIAN_HOST
+ 
+ static inline __u16 __virtio_g2h_u16(u16 endian, __u16 val)
  {
-diff --git a/kvm.c b/kvm.c
-index 7fa76f7..665ed14 100644
---- a/kvm.c
-+++ b/kvm.c
-@@ -93,6 +93,34 @@ const char *kvm__get_dir(void)
- 	return kvm_dir;
- }
+diff --git a/virtio/net.c b/virtio/net.c
+index 6d1be65..e94e37a 100644
+--- a/virtio/net.c
++++ b/virtio/net.c
+@@ -531,7 +531,7 @@ static int init_vq(struct kvm *kvm, void *dev, u32 vq, u32 page_size, u32 align,
+ 	}
  
-+bool kvm__supports_vm_extension(struct kvm *kvm, unsigned int extension)
-+{
-+	static int supports_vm_ext_check = 0;
-+	int ret;
-+
-+	switch (supports_vm_ext_check) {
-+	case 0:
-+		ret = ioctl(kvm->sys_fd, KVM_CHECK_EXTENSION,
-+			    KVM_CAP_CHECK_EXTENSION_VM);
-+		if (ret <= 0) {
-+			supports_vm_ext_check = -1;
-+			return false;
-+		}
-+		supports_vm_ext_check = 1;
-+		/* fall through */
-+	case 1:
-+		break;
-+	case -1:
-+		return false;
-+	}
-+
-+	ret = ioctl(kvm->vm_fd, KVM_CHECK_EXTENSION, extension);
-+	if (ret < 0)
-+		return false;
-+
-+	return ret;
-+}
-+
- bool kvm__supports_extension(struct kvm *kvm, unsigned int extension)
- {
- 	int ret;
+ 	if (queue->endian != VIRTIO_ENDIAN_HOST)
+-		die_perror("VHOST requires VIRTIO_ENDIAN_HOST");
++		die_perror("VHOST requires the same endianness in guest and host");
+ 
+ 	state.num = queue->vring.num;
+ 	r = ioctl(ndev->vhost_fd, VHOST_SET_VRING_NUM, &state);
 -- 
 2.9.0
