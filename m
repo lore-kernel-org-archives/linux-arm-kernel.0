@@ -1,32 +1,49 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 2 Feb 2017 20:01:25 +0200
-Subject: [PATCH v3 1/7] soc: smasung: pmu: Add register defines for pad
- retention control
-In-Reply-To: <20170130194329.duudcv5oxu2q2td4@kozik-lap>
-References: <1485779908-32147-1-git-send-email-m.szyprowski@samsung.com>
- <CGME20170130123837eucas1p1056a57f23b1e3bf089e5bc55bb2cf2d4@eucas1p1.samsung.com>
- <1485779908-32147-2-git-send-email-m.szyprowski@samsung.com>
- <20170130194329.duudcv5oxu2q2td4@kozik-lap>
-Message-ID: <20170202180125.vhastfic3shs3wdl@kozik-lap>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 02 Feb 2017 10:05:53 -0800
+Subject: [PATCH V2] Add devicetree for the Raspberry Pi 3, for arm (32)
+In-Reply-To: <20170202090536.16724-1-mzoran@crowfest.net>
+References: <20170202090536.16724-1-mzoran@crowfest.net>
+Message-ID: <871svgxybi.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2017 at 09:43:29PM +0200, Krzysztof Kozlowski wrote:
-> On Mon, Jan 30, 2017 at 01:38:22PM +0100, Marek Szyprowski wrote:
-> > Add PMU defines related to pad retention control. Will be later used
-> > by the Exynos pin controller driver.
-> > 
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > ---
-> >  include/linux/soc/samsung/exynos-regs-pmu.h | 16 ++++++++++++++++
-> >  1 file changed, 16 insertions(+)
-> > 
-> 
-> Thanks Marek.
+Michael Zoran <mzoran@crowfest.net> writes:
+
+> Signed-off-by: Michael Zoran <mzoran@crowfest.net>
+> ---
+>  arch/arm/boot/dts/Makefile            | 3 ++-
+>  arch/arm/boot/dts/bcm2837-rpi-3-b.dts | 2 ++
+>  2 files changed, 4 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/boot/dts/bcm2837-rpi-3-b.dts
 >
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 8bd8878efe7b..72ba524df912 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -72,7 +72,8 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
+>  	bcm2835-rpi-b-plus.dtb \
+>  	bcm2835-rpi-a-plus.dtb \
+>  	bcm2836-rpi-2-b.dtb \
+> -	bcm2835-rpi-zero.dtb
+> +	bcm2835-rpi-zero.dtb \
+> +	bcm2837-rpi-3-b.dtb
+>  dtb-$(CONFIG_ARCH_BCM_5301X) += \
+>  	bcm4708-asus-rt-ac56u.dtb \
+>  	bcm4708-asus-rt-ac68u.dtb \
+> diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+> new file mode 100644
+> index 000000000000..48ad20f83255
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+> @@ -0,0 +1,2 @@
+> +#include "../../../arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts"
+> +
 
-I applied this one (with fix of typo) and I will provide a stable tag
-with the header.
-
-Best regards,
-Krzysztof
+This won't work, for the same reason as v1.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20170202/859df803/attachment-0001.sig>
