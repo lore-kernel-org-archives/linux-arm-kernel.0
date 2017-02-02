@@ -1,109 +1,127 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu,  2 Feb 2017 15:45:18 +0100
-Subject: [PATCH 08/13] ARM: at91: pm: tie the memory controller type to the
- ramc id
+Date: Thu,  2 Feb 2017 15:45:22 +0100
+Subject: [PATCH 12/13] ARM: at91: pm: use C functions for standby
 In-Reply-To: <20170202144523.11706-1-alexandre.belloni@free-electrons.com>
 References: <20170202144523.11706-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20170202144523.11706-9-alexandre.belloni@free-electrons.com>
+Message-ID: <20170202144523.11706-13-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of rely on the SoC type to select the memory controller type, use
-the device tree ids as they are parsed anyway.
+When going to standby, there is no point calling the assembly function
+at91_pm_suspend_in_sram(). It does exactly the same operations as the C
+standby functions.
+This allows to remove a few loads and tests in the suspend/resume path.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/mach-at91/pm.c | 29 +++++++++++++++++++----------
- 1 file changed, 19 insertions(+), 10 deletions(-)
+ arch/arm/mach-at91/pm.c              |  8 +++++---
+ arch/arm/mach-at91/pm.h              |  4 +---
+ arch/arm/mach-at91/pm_data-offsets.c |  1 -
+ arch/arm/mach-at91/pm_suspend.S      | 14 --------------
+ 4 files changed, 6 insertions(+), 21 deletions(-)
 
 diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
-index d4a444c4c38f..b6448043ee7a 100644
+index 553bcfc5545e..1992ad8b1c3d 100644
 --- a/arch/arm/mach-at91/pm.c
 +++ b/arch/arm/mach-at91/pm.c
-@@ -313,11 +313,22 @@ static void at91sam9_sdram_standby(void)
- 		at91_ramc_write(1, AT91_SDRAMC_LPR, saved_lpr1);
+@@ -125,12 +125,13 @@ extern u32 at91_pm_suspend_in_sram_sz;
+ 
+ static void at91_pm_suspend(suspend_state_t state)
+ {
+-	pm_data.mode = (state == PM_SUSPEND_MEM) ? AT91_PM_SLOW_CLOCK : 0;
+-
+ 	flush_cache_all();
+ 	outer_disable();
+ 
+-	at91_suspend_sram_fn(&pm_data);
++	if (state == PM_SUSPEND_MEM)
++		at91_suspend_sram_fn(&pm_data);
++	else
++		pm_data.standby();
+ 
+ 	outer_resume();
  }
- 
-+struct ramc_info {
-+	void (*standby)(void);
-+	unsigned int memctrl;
-+};
-+
-+static const struct ramc_info ramc_infos[] __initconst = {
-+	{ .standby = at91rm9200_standby, .memctrl = AT91_MEMCTRL_MC},
-+	{ .standby = at91sam9_sdram_standby, .memctrl = AT91_MEMCTRL_SDRAMC},
-+	{ .standby = at91_ddr_standby, .memctrl = AT91_MEMCTRL_DDRSDR},
-+};
-+
- static const struct of_device_id const ramc_ids[] __initconst = {
--	{ .compatible = "atmel,at91rm9200-sdramc", .data = at91rm9200_standby },
--	{ .compatible = "atmel,at91sam9260-sdramc", .data = at91sam9_sdram_standby },
--	{ .compatible = "atmel,at91sam9g45-ddramc", .data = at91_ddr_standby },
--	{ .compatible = "atmel,sama5d3-ddramc", .data = at91_ddr_standby },
-+	{ .compatible = "atmel,at91rm9200-sdramc", .data = &ramc_infos[0] },
-+	{ .compatible = "atmel,at91sam9260-sdramc", .data = &ramc_infos[1] },
-+	{ .compatible = "atmel,at91sam9g45-ddramc", .data = &ramc_infos[2] },
-+	{ .compatible = "atmel,sama5d3-ddramc", .data = &ramc_infos[2] },
- 	{ /*sentinel*/ }
- };
- 
-@@ -327,14 +338,17 @@ static __init void at91_dt_ramc(void)
- 	const struct of_device_id *of_id;
- 	int idx = 0;
- 	const void *standby = NULL;
-+	const struct ramc_info *ramc;
- 
- 	for_each_matching_node_and_match(np, ramc_ids, &of_id) {
- 		pm_data.ramc[idx] = of_iomap(np, 0);
- 		if (!pm_data.ramc[idx])
- 			panic(pr_fmt("unable to map ramc[%d] cpu registers\n"), idx);
- 
-+		ramc = of_id->data;
+@@ -342,6 +343,7 @@ static __init void at91_dt_ramc(void)
+ 		ramc = of_id->data;
  		if (!standby)
--			standby = of_id->data;
-+			standby = ramc->standby;
-+		pm_data.memctrl = ramc->memctrl;
+ 			standby = ramc->standby;
++		pm_data.standby = standby;
+ 		pm_data.memctrl = ramc->memctrl;
  
  		idx++;
- 	}
-@@ -457,7 +471,6 @@ void __init at91rm9200_pm_init(void)
- 	at91_ramc_write(0, AT91_MC_SDRAMC_LPR, 0);
+diff --git a/arch/arm/mach-at91/pm.h b/arch/arm/mach-at91/pm.h
+index fc0f7d048187..2317e39248b7 100644
+--- a/arch/arm/mach-at91/pm.h
++++ b/arch/arm/mach-at91/pm.h
+@@ -21,15 +21,13 @@
+ #define AT91_MEMCTRL_SDRAMC	1
+ #define AT91_MEMCTRL_DDRSDR	2
  
- 	pm_data.uhp_udp_mask = AT91RM9200_PMC_UHP | AT91RM9200_PMC_UDP;
--	pm_data.memctrl = AT91_MEMCTRL_MC;
+-#define	AT91_PM_SLOW_CLOCK	0x01
+-
+ #ifndef __ASSEMBLY__
+ struct at91_pm_data {
+ 	void __iomem *pmc;
+ 	void __iomem *ramc[2];
+ 	unsigned long uhp_udp_mask;
+ 	unsigned int memctrl;
+-	unsigned int mode;
++	void (*standby)(void);
+ };
+ #endif
  
- 	at91_pm_init(at91rm9200_idle);
+diff --git a/arch/arm/mach-at91/pm_data-offsets.c b/arch/arm/mach-at91/pm_data-offsets.c
+index 30302cb16df0..c4e6d648644f 100644
+--- a/arch/arm/mach-at91/pm_data-offsets.c
++++ b/arch/arm/mach-at91/pm_data-offsets.c
+@@ -8,6 +8,5 @@ int main(void)
+ 	DEFINE(PM_DATA_RAMC0,		offsetof(struct at91_pm_data, ramc[0]));
+ 	DEFINE(PM_DATA_RAMC1,		offsetof(struct at91_pm_data, ramc[1]));
+ 	DEFINE(PM_DATA_MEMCTRL,	offsetof(struct at91_pm_data, memctrl));
+-	DEFINE(PM_DATA_MODE,		offsetof(struct at91_pm_data, mode));
+ 	return 0;
  }
-@@ -465,7 +478,6 @@ void __init at91rm9200_pm_init(void)
- void __init at91sam9260_pm_init(void)
- {
- 	at91_dt_ramc();
--	pm_data.memctrl = AT91_MEMCTRL_SDRAMC;
- 	pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP | AT91SAM926x_PMC_UDP;
- 	at91_pm_init(at91sam9_idle);
- }
-@@ -474,7 +486,6 @@ void __init at91sam9g45_pm_init(void)
- {
- 	at91_dt_ramc();
- 	pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP;
--	pm_data.memctrl = AT91_MEMCTRL_DDRSDR;
- 	at91_pm_init(at91sam9_idle);
- }
+diff --git a/arch/arm/mach-at91/pm_suspend.S b/arch/arm/mach-at91/pm_suspend.S
+index 3ee282c051e0..a8b32faaea5b 100644
+--- a/arch/arm/mach-at91/pm_suspend.S
++++ b/arch/arm/mach-at91/pm_suspend.S
+@@ -94,10 +94,6 @@ ENTRY(at91_pm_suspend_in_sram)
+ 	mov	r0, #SRAMC_SELF_FRESH_ACTIVE
+ 	bl	at91_sramc_self_refresh
  
-@@ -482,7 +493,6 @@ void __init at91sam9x5_pm_init(void)
- {
- 	at91_dt_ramc();
- 	pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP | AT91SAM926x_PMC_UDP;
--	pm_data.memctrl = AT91_MEMCTRL_DDRSDR;
- 	at91_pm_init(at91sam9_idle);
- }
+-	ldr	r0, [pm_data, #PM_DATA_MODE]
+-	tst	r0, #AT91_PM_SLOW_CLOCK
+-	beq	skip_disable_main_clock
+-
+ 	ldr	pmc, [pm_data, #PM_DATA_PMC]
  
-@@ -490,6 +500,5 @@ void __init sama5_pm_init(void)
- {
- 	at91_dt_ramc();
- 	pm_data.uhp_udp_mask = AT91SAM926x_PMC_UHP | AT91SAM926x_PMC_UDP;
--	pm_data.memctrl = AT91_MEMCTRL_DDRSDR;
- 	at91_pm_init(NULL);
- }
+ 	/* Save Master clock setting */
+@@ -126,18 +122,9 @@ ENTRY(at91_pm_suspend_in_sram)
+ 	orr	tmp1, tmp1, #AT91_PMC_KEY
+ 	str	tmp1, [pmc, #AT91_CKGR_MOR]
+ 
+-skip_disable_main_clock:
+-	ldr	pmc, [pm_data, #PM_DATA_PMC]
+-
+ 	/* Wait for interrupt */
+ 	at91_cpu_idle
+ 
+-	ldr	r0, [pm_data, #PM_DATA_MODE]
+-	tst	r0, #AT91_PM_SLOW_CLOCK
+-	beq	skip_enable_main_clock
+-
+-	ldr	pmc, [pm_data, #PM_DATA_PMC]
+-
+ 	/* Turn on the main oscillator */
+ 	ldr	tmp1, [pmc, #AT91_CKGR_MOR]
+ 	orr	tmp1, tmp1, #AT91_PMC_MOSCEN
+@@ -166,7 +153,6 @@ skip_disable_main_clock:
+ 
+ 	wait_mckrdy
+ 
+-skip_enable_main_clock:
+ 	/* Exit the self-refresh mode */
+ 	mov	r0, #SRAMC_SELF_FRESH_EXIT
+ 	bl	at91_sramc_self_refresh
 -- 
 2.11.0
