@@ -1,34 +1,63 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 2 Feb 2017 17:12:34 +0100
-Subject: [PATCHv2 net-next 00/11] net: mvpp2: misc improvements and
- preparation patches
-In-Reply-To: <20161229.120337.1969688544622629585.davem@davemloft.net>
-References: <1482943567-12483-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20161229.120337.1969688544622629585.davem@davemloft.net>
-Message-ID: <20170202171234.00b0f21d@free-electrons.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 2 Feb 2017 16:14:22 +0000
+Subject: [PATCH] efi: fdt: avoid FDT manipulation after ExitBootServices()
+In-Reply-To: <08ff3f33-d97d-1efb-a05d-5ed1fccd2859@codeaurora.org>
+References: <1485971102-23330-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1485971102-23330-2-git-send-email-ard.biesheuvel@linaro.org>
+ <ac1bad94-ffa3-4acf-a719-a8e8f4c7a283@codeaurora.org>
+ <08ff3f33-d97d-1efb-a05d-5ed1fccd2859@codeaurora.org>
+Message-ID: <CAKv+Gu8bLWSGT+TUbuyX17Thph+NUhcy0uLev78xXO=KohHFhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David,
+On 1 February 2017 at 22:59, Jeffrey Hugo <jhugo@codeaurora.org> wrote:
+> On 2/1/2017 2:08 PM, Jeffrey Hugo wrote:
+>>
+>> On 2/1/2017 10:45 AM, Ard Biesheuvel wrote:
+>>>
+>>> Some AArch64 UEFI implementations disable the MMU in ExitBootServices(),
+>>> after which unaligned accesses to RAM are no longer supported.
+>>>
+>>> Commit abfb7b686a3e ("efi/libstub/arm*: Pass latest memory map to the
+>>> kernel") fixed an issue in the memory map handling of the stub FDT code,
+>>> but inadvertently created an issue with such firmwares, by moving some
+>>> of the FDT manipulation to after the invocation of ExitBootServices().
+>>> Given that the stub's libfdt implementation uses the ordinary,
+>>> accelerated
+>>> string functions, which rely on hardware handling of unaligned accesses,
+>>> manipulating the FDT with the MMU off may result in alignment faults.
+>>>
+>>> So fix the situation by moving the update_fdt_memmap() call into the
+>>> callback function invoked by efi_exit_boot_services() right before it
+>>> calls the ExitBootServices() UEFI service (which is arguably a better
+>>> place for it anyway)
+>>>
+>>> Note that disabling the MMU in ExitBootServices() is not compliant with
+>>> the UEFI spec, and carries great risk due to the fact that switching from
+>>> cached to uncached memory accesses halfway through compiler generated
+>>> code
+>>> (i.e., involving a stack) can never be done in a way that is
+>>> architecturally
+>>> safe.
+>>>
+>>> Cc: <stable@vger.kernel.org>
+>>> Fixes: abfb7b686a3e ("efi/libstub/arm*: Pass latest memory map to the
+>>> kernel")
+>>> Tested-by: Riku Voipio <riku.voipio@linaro.org>
+>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>
+>>
+>> NACK, please.  This causes a regression on my platform, in the form of
+>> an assert in UEFI once ExitBootServices() is called, per initial
+>> testing.  I'll do more testing to determine why.
+>>
+>
+> Sorry, false alarm.  The assert appears to have been the result of a bad
+> tree and a bad target configuration, and was not reproduced on another
+> setup, nor did the assert make sense in context with this change.
+>
 
-On Thu, 29 Dec 2016 12:03:37 -0500 (EST), David Miller wrote:
+No worries. Thanks for taking the time to test the patch.
 
-> You still have warnings to fix for the 64-bit build:
-> 
-> drivers/net/ethernet/marvell/mvpp2.c: In function ?mvpp2_rx?:
-> drivers/net/ethernet/marvell/mvpp2.c:5125:10: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
->    data = (void *)rx_desc->buf_cookie;
->           ^
-
-Indeed, sorry about that. The warning did not exist with both series
-applied, but did exist with just the first series.
-
-I've fixed that up in my v3 of the first series.
-
-Thanks!
-
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Ard.
