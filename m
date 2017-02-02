@@ -1,41 +1,74 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Thu, 2 Feb 2017 07:48:35 +0100
-Subject: [PATCH v2 3/4] phy: Add USB3 PHY support for Broadcom NSP SoC
-In-Reply-To: <1484669670-4201-4-git-send-email-yendapally.reddy@broadcom.com>
-Message-ID: <6be62ef6-e90c-b5f8-adcd-0ea62ab73ced@gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 02 Feb 2017 07:57:19 +0100
+Subject: [PATCH] pinctrl: samsung: mark PM functions as __maybe_unused
+In-Reply-To: <20170201161636.2109091-1-arnd@arndb.de>
+References: <CGME20170201161645epcas3p235bc144eb1f03127d707371f7cf963e1@epcas3p2.samsung.com>
+ <20170201161636.2109091-1-arnd@arndb.de>
+Message-ID: <8385d3c5-2da6-e39e-de8c-e10fde820e43@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Resending with fixed/complete Cc-s]
+Hi Arnd,
 
-On Tue, 17 Jan 2017 11:14:29 -0500, Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com> wrote:> This patch adds support for Broadcom NSP USB3 PHY
- >
- > Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
+On 2017-02-01 17:16, Arnd Bergmann wrote:
+> The rework of the suspend/resume handling uses the wrong #ifdef check, leading
+> to a build warning without CONFIG_PM_SLEEP:
+>
+> drivers/pinctrl/samsung/pinctrl-samsung.c:1142:12: error: 'samsung_pinctrl_resume' defined but not used [-Werror=unused-function]
+> drivers/pinctrl/samsung/pinctrl-samsung.c:1092:12: error: 'samsung_pinctrl_suspend' defined but not used [-Werror=unused-function]
+>
+> Using a __maybe_unused annotation instead of the #ifdef is a simple way to
+> avoid this problem class.
+>
+> Fixes: 2b24efa8e5c5 ("pinctrl: samsung: Replace syscore ops with standard platform device pm_ops")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Seriously?! I really dislike what you did there.
+Thanks for the fix!
 
-NACK.
+Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-You are aware this block is common for both: Northstar and Northstar Plus and
-we already have phy-bcm-ns-usb3.c! In fact Jon told me to rewrite my initial
-driver to make is possible to reuse it on NSP and I did that!
+> ---
+>   drivers/pinctrl/samsung/pinctrl-samsung.c | 6 ++----
+>   1 file changed, 2 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
+> index d79eadad6c5f..d601b5303e73 100644
+> --- a/drivers/pinctrl/samsung/pinctrl-samsung.c
+> +++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
+> @@ -1083,13 +1083,12 @@ static int samsung_pinctrl_probe(struct platform_device *pdev)
+>   	return 0;
+>   }
+>   
+> -#ifdef CONFIG_PM
+>   /**
+>    * samsung_pinctrl_suspend - save pinctrl state for suspend
+>    *
+>    * Save data for all banks handled by this device.
+>    */
+> -static int samsung_pinctrl_suspend(struct device *dev)
+> +static int __maybe_unused samsung_pinctrl_suspend(struct device *dev)
+>   {
+>   	struct samsung_pinctrl_drv_data *drvdata = dev_get_drvdata(dev);
+>   	int i;
+> @@ -1139,7 +1138,7 @@ static int samsung_pinctrl_suspend(struct device *dev)
+>    * We don't bother doing anything complicated to avoid glitching lines since
+>    * we're called before pad retention is turned off.
+>    */
+> -static int samsung_pinctrl_resume(struct device *dev)
+> +static int __maybe_unused samsung_pinctrl_resume(struct device *dev)
+>   {
+>   	struct samsung_pinctrl_drv_data *drvdata = dev_get_drvdata(dev);
+>   	int i;
+> @@ -1183,7 +1182,6 @@ static int samsung_pinctrl_resume(struct device *dev)
+>   
+>   	return 0;
+>   }
+> -#endif
+>   
+>   static const struct of_device_id samsung_pinctrl_dt_match[] = {
+>   #ifdef CONFIG_PINCTRL_EXYNOS
 
-This is old comment from Jon:
-
-In 30 March 2016 at 23:31, Jon Mason <jon.mason@broadcom.com> wrote:
- > On Mon, Mar 28, 2016 at 9:46 PM, Florian Fainelli <f.fainelli@gmail.com>
- > wrote:
- >>
- >> CC: bcm-kernel-feedback-list, Jon
- >
- >
- > This is a common IP block with NSP.  I believe with some minor changes it
- > can support both.  Please allow me 1-2 days to look at these in more detail
- > and see if I can get these patches working on NSP.
-
-Please start using existing code instead of inventing everything from the
-scratch internally at Broadcom. You did the same thing with (Q)SPI driver.
-
-
-This driver duplicates phy-bcm-ns-usb3.c and should have not been accepted. I
-strongly suggest *reverting* it and adjusting existing driver if needed.
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
