@@ -1,104 +1,151 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  2 Feb 2017 16:51:35 +0100
-Subject: [PATCHv3 net-next 06/12] net: mvpp2: drop useless fields in
- mvpp2_bm_pool and related code
+Date: Thu,  2 Feb 2017 16:51:41 +0100
+Subject: [PATCHv3 net-next 12/12] net: mvpp2: enable building on 64-bit
+ platforms
 In-Reply-To: <1486050701-27899-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1486050701-27899-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1486050701-27899-7-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1486050701-27899-13-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit drops dead code from the mvpp2 driver. The 'in_use' and
-'in_use_thresh' fields of 'struct mvpp2_bm_pool' are
-incremented/decremented/initialized in various places. But they are only
-used in one place:
+The mvpp2 is going to be extended to support the Marvell Armada 7K/8K
+platform, which is ARM64. As a preparation to this work, this commit
+enables building the mvpp2 driver on ARM64, by:
 
-       if (is_recycle &&
-           (atomic_read(&bm_pool->in_use) < bm_pool->in_use_thresh))
-               return 0;
+ - Adjusting the Kconfig dependency
 
-However 'is_recycle', passed as argument to mvpp2_rx_refill() is always
-false. So in fact, this code is never reached, and the 'is_recycle'
-argument is useless. So let's drop this code.
+ - Fixing the types used in the driver so that they are 32/64-bits
+   compliant. We use dma_addr_t for DMA addresses, and unsigned long
+   for virtual addresses.
+
+It is worth mentioning that after this commit, the driver is for now
+still only used on 32-bits platforms, and will only work on 32-bits
+platforms.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 18 +++---------------
- 1 file changed, 3 insertions(+), 15 deletions(-)
+ drivers/net/ethernet/marvell/Kconfig |  3 +--
+ drivers/net/ethernet/marvell/mvpp2.c | 31 ++++++++++++++++++-------------
+ 2 files changed, 19 insertions(+), 15 deletions(-)
 
+diff --git a/drivers/net/ethernet/marvell/Kconfig b/drivers/net/ethernet/marvell/Kconfig
+index f4b7cf1..d2555e8b 100644
+--- a/drivers/net/ethernet/marvell/Kconfig
++++ b/drivers/net/ethernet/marvell/Kconfig
+@@ -83,9 +83,8 @@ config MVNETA_BM
+ 
+ config MVPP2
+ 	tristate "Marvell Armada 375 network interface support"
+-	depends on MACH_ARMADA_375 || COMPILE_TEST
++	depends on ARCH_MVEBU || COMPILE_TEST
+ 	depends on HAS_DMA
+-	depends on !64BIT
+ 	select MVMDIO
+ 	---help---
+ 	  This driver supports the network interface units in the
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index 907619c..ed550c4 100644
+index 4132dc8..a785e3c 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -930,10 +930,6 @@ struct mvpp2_bm_pool {
- 
- 	/* Ports using BM pool */
- 	u32 port_map;
--
--	/* Occupied buffers indicator */
--	atomic_t in_use;
--	int in_use_thresh;
- };
- 
- struct mvpp2_buff_hdr {
-@@ -3399,7 +3395,6 @@ static int mvpp2_bm_pool_create(struct platform_device *pdev,
- 	bm_pool->size = size;
- 	bm_pool->pkt_size = 0;
- 	bm_pool->buf_num = 0;
--	atomic_set(&bm_pool->in_use, 0);
- 
- 	return 0;
- }
-@@ -3656,7 +3651,6 @@ static int mvpp2_bm_bufs_add(struct mvpp2_port *port,
- 
- 	/* Update BM driver with number of buffers added to pool */
- 	bm_pool->buf_num += i;
--	bm_pool->in_use_thresh = bm_pool->buf_num / 4;
- 
- 	netdev_dbg(port->dev,
- 		   "%s pool %d: pkt_size=%4d, buf_size=%4d, total_size=%4d\n",
-@@ -5014,23 +5008,18 @@ static void mvpp2_rx_csum(struct mvpp2_port *port, u32 status,
- 
- /* Reuse skb if possible, or allocate a new skb and add it to BM pool */
- static int mvpp2_rx_refill(struct mvpp2_port *port,
--			   struct mvpp2_bm_pool *bm_pool,
--			   u32 bm, int is_recycle)
-+			   struct mvpp2_bm_pool *bm_pool, u32 bm)
- {
- 	struct sk_buff *skb;
- 	dma_addr_t phys_addr;
- 
--	if (is_recycle &&
--	    (atomic_read(&bm_pool->in_use) < bm_pool->in_use_thresh))
--		return 0;
--
- 	/* No recycle or too many buffers are in use, so allocate a new skb */
- 	skb = mvpp2_skb_alloc(port, bm_pool, &phys_addr, GFP_ATOMIC);
- 	if (!skb)
+@@ -3388,7 +3388,8 @@ static int mvpp2_bm_pool_create(struct platform_device *pdev,
+ 	if (!bm_pool->virt_addr)
  		return -ENOMEM;
  
- 	mvpp2_pool_refill(port, bm, (u32)phys_addr, (u32)skb);
--	atomic_dec(&bm_pool->in_use);
-+
- 	return 0;
+-	if (!IS_ALIGNED((u32)bm_pool->virt_addr, MVPP2_BM_POOL_PTR_ALIGN)) {
++	if (!IS_ALIGNED((unsigned long)bm_pool->virt_addr,
++			MVPP2_BM_POOL_PTR_ALIGN)) {
+ 		dma_free_coherent(&pdev->dev, size_bytes, bm_pool->virt_addr,
+ 				  bm_pool->phys_addr);
+ 		dev_err(&pdev->dev, "BM pool %d is not %d bytes aligned\n",
+@@ -3433,7 +3434,7 @@ static void mvpp2_bm_bufs_free(struct device *dev, struct mvpp2 *priv,
+ 
+ 	for (i = 0; i < bm_pool->buf_num; i++) {
+ 		dma_addr_t buf_phys_addr;
+-		u32 vaddr;
++		unsigned long vaddr;
+ 
+ 		/* Get buffer virtual address (indirect access) */
+ 		buf_phys_addr = mvpp2_read(priv,
+@@ -3596,14 +3597,15 @@ static inline u32 mvpp2_bm_cookie_pool_set(u32 cookie, int pool)
  }
  
-@@ -5156,7 +5145,7 @@ static int mvpp2_rx(struct mvpp2_port *port, int rx_todo,
+ /* Get pool number from a BM cookie */
+-static inline int mvpp2_bm_cookie_pool_get(u32 cookie)
++static inline int mvpp2_bm_cookie_pool_get(unsigned long cookie)
+ {
+ 	return (cookie >> MVPP2_BM_COOKIE_POOL_OFFS) & 0xFF;
+ }
  
- 		skb = (struct sk_buff *)rx_desc->buf_cookie;
+ /* Release buffer to BM */
+ static inline void mvpp2_bm_pool_put(struct mvpp2_port *port, int pool,
+-				     u32 buf_phys_addr, u32 buf_virt_addr)
++				     dma_addr_t buf_phys_addr,
++				     unsigned long buf_virt_addr)
+ {
+ 	mvpp2_write(port->priv, MVPP2_BM_VIRT_RLS_REG, buf_virt_addr);
+ 	mvpp2_write(port->priv, MVPP2_BM_PHY_RLS_REG(pool), buf_phys_addr);
+@@ -3611,7 +3613,8 @@ static inline void mvpp2_bm_pool_put(struct mvpp2_port *port, int pool,
  
--		err = mvpp2_rx_refill(port, bm_pool, bm, 0);
-+		err = mvpp2_rx_refill(port, bm_pool, bm);
- 		if (err) {
- 			netdev_err(port->dev, "failed to refill BM pools\n");
- 			goto err_drop_frame;
-@@ -5167,7 +5156,6 @@ static int mvpp2_rx(struct mvpp2_port *port, int rx_todo,
+ /* Release multicast buffer */
+ static void mvpp2_bm_pool_mc_put(struct mvpp2_port *port, int pool,
+-				 u32 buf_phys_addr, u32 buf_virt_addr,
++				 dma_addr_t buf_phys_addr,
++				 unsigned long buf_virt_addr,
+ 				 int mc_id)
+ {
+ 	u32 val = 0;
+@@ -3626,7 +3629,8 @@ static void mvpp2_bm_pool_mc_put(struct mvpp2_port *port, int pool,
  
- 		rcvd_pkts++;
- 		rcvd_bytes += rx_bytes;
--		atomic_inc(&bm_pool->in_use);
+ /* Refill BM pool */
+ static void mvpp2_pool_refill(struct mvpp2_port *port, u32 bm,
+-			      u32 phys_addr, u32 cookie)
++			      dma_addr_t phys_addr,
++			      unsigned long cookie)
+ {
+ 	int pool = mvpp2_bm_cookie_pool_get(bm);
  
- 		skb_reserve(skb, MVPP2_MH_SIZE);
- 		skb_put(skb, rx_bytes);
+@@ -3657,7 +3661,8 @@ static int mvpp2_bm_bufs_add(struct mvpp2_port *port,
+ 		if (!buf)
+ 			break;
+ 
+-		mvpp2_bm_pool_put(port, bm_pool->id, (u32)phys_addr, (u32)buf);
++		mvpp2_bm_pool_put(port, bm_pool->id, phys_addr,
++				  (unsigned long)buf);
+ 	}
+ 
+ 	/* Update BM driver with number of buffers added to pool */
+@@ -5032,7 +5037,7 @@ static int mvpp2_rx_refill(struct mvpp2_port *port,
+ 	if (!buf)
+ 		return -ENOMEM;
+ 
+-	mvpp2_pool_refill(port, bm, (u32)phys_addr, (u32)buf);
++	mvpp2_pool_refill(port, bm, phys_addr, (unsigned long)buf);
+ 
+ 	return 0;
+ }
+@@ -5074,10 +5079,10 @@ static void mvpp2_buff_hdr_rx(struct mvpp2_port *port,
+ 	struct mvpp2_buff_hdr *buff_hdr;
+ 	struct sk_buff *skb;
+ 	u32 rx_status = rx_desc->status;
+-	u32 buff_phys_addr;
+-	u32 buff_virt_addr;
+-	u32 buff_phys_addr_next;
+-	u32 buff_virt_addr_next;
++	dma_addr_t buff_phys_addr;
++	unsigned long buff_virt_addr;
++	dma_addr_t buff_phys_addr_next;
++	unsigned long buff_virt_addr_next;
+ 	int mc_id;
+ 	int pool_id;
+ 
+@@ -5134,7 +5139,7 @@ static int mvpp2_rx(struct mvpp2_port *port, int rx_todo,
+ 		rx_status = rx_desc->status;
+ 		rx_bytes = rx_desc->data_size - MVPP2_MH_SIZE;
+ 		phys_addr = rx_desc->buf_phys_addr;
+-		data = (void *)rx_desc->buf_cookie;
++		data = (void *)(uintptr_t)rx_desc->buf_cookie;
+ 
+ 		bm = mvpp2_bm_cookie_build(rx_desc);
+ 		pool = mvpp2_bm_cookie_pool_get(bm);
 -- 
 2.7.4
