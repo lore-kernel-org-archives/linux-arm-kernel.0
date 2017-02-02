@@ -1,176 +1,73 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Thu, 2 Feb 2017 08:00:16 -0800
-Subject: [PATCH v6 3/3] thermal: zx2967: add thermal driver for ZTE's
- zx2967 family
-In-Reply-To: <1486048086-3431-3-git-send-email-baoyou.xie@linaro.org>
-References: <1486048086-3431-1-git-send-email-baoyou.xie@linaro.org>
- <1486048086-3431-3-git-send-email-baoyou.xie@linaro.org>
-Message-ID: <20170202160014.GA2419@localhost.localdomain>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 2 Feb 2017 16:10:47 +0000
+Subject: [PATCH 0/5] Implement SMMU passthrough using the default domain
+In-Reply-To: <012501d27d6b$5e396c80$1aac4580$@codeaurora.org>
+References: <1484849955-1871-1-git-send-email-will.deacon@arm.com>
+ <010801d27654$47b7e450$d727acf0$@codeaurora.org>
+ <20170126171857.GE27598@8bytes.org>
+ <CAF6AEGtfrrwVZ_W86_HqVsiqfcM=XFa+g2LECFYQJmvv7-JSqQ@mail.gmail.com>
+ <012501d27d6b$5e396c80$1aac4580$@codeaurora.org>
+Message-ID: <20170202161047.GG13839@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Helllo Baoyou,
-
-Sorry I was not clear enough in my previous comment.
-
-Please find the explanation below:
-
-
-On Thu, Feb 02, 2017 at 11:08:06PM +0800, Baoyou Xie wrote:
-> This patch adds thermal driver for ZTE's zx2967 family.
+On Thu, Feb 02, 2017 at 09:15:19PM +0530, Sricharan wrote:
+> Hi Rob,
 > 
-
-<cut>
-
-> +
-> +static int zx2967_thermal_probe(struct platform_device *pdev)
-> +{
-> +	struct zx2967_thermal_priv *priv;
-> +	struct resource *res;
-> +	u32 buf[2];
-> +	int ret, i;
-> +
-> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	priv->regs = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(priv->regs))
-> +		return PTR_ERR(priv->regs);
-> +
-> +	ret = of_property_read_u32_array(pdev->dev.of_node,
-> +					 "coefficients", buf, 2);
-
-What I meant in my previous comment is that of-thermal already does the
-above parsing for you. Therefore, the above line is not needed. And...
-
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to read coefficients\n");
-> +		return ret;
-> +	}
-> +	priv->slope = (s32)buf[0];
-> +	priv->offset = (s32)buf[1];
-> +
-
-You should also not need to have priv data for storing the slope and
-offset.
-
-> +	priv->clk_gate = devm_clk_get(&pdev->dev, "gate");
-> +	if (IS_ERR(priv->clk_gate)) {
-> +		ret = PTR_ERR(priv->clk_gate);
-> +		dev_err(&pdev->dev, "failed to get clock gate: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	ret = clk_prepare_enable(priv->clk_gate);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to enable converter clock: %d\n",
-> +			ret);
-> +		return ret;
-> +	}
-> +
-> +	priv->pclk = devm_clk_get(&pdev->dev, "pclk");
-> +	if (IS_ERR(priv->pclk)) {
-> +		ret = PTR_ERR(priv->pclk);
-> +		clk_disable_unprepare(priv->clk_gate);
-> +		dev_err(&pdev->dev, "failed to get apb clock: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	ret = clk_prepare_enable(priv->pclk);
-> +	if (ret) {
-> +		clk_disable_unprepare(priv->clk_gate);
-> +		dev_err(&pdev->dev, "failed to enable converter clock: %d\n",
-> +			ret);
-> +		return ret;
-> +	}
-> +
-> +	mutex_init(&priv->lock);
-> +	for (i = 0; i < NUM_SENSORS; i++) {
-> +		struct zx2967_thermal_sensor *sensor = &priv->sensors[i];
-> +
-> +		sensor->priv = priv;
-> +		sensor->id = i;
-> +		sensor->tzd = thermal_zone_of_sensor_register(&pdev->dev,
-> +					i, sensor, &zx2967_of_thermal_ops);
-
-After calling the above function, if it succeeds, and you have the
-coefficients property in your DTS, then
-
-> +		if (IS_ERR(sensor->tzd)) {
-> +			ret = PTR_ERR(sensor->tzd);
-> +			dev_err(&pdev->dev, "failed to register sensor %d: %d\n",
-> +				i, ret);
-> +			goto remove_ts;
-> +		}
-
-Right here, you should be able to access sensor->tzd->tzp->slope and
-sensor->tzd->tzp->offset, if you added the entry:
-		coefficients = <SLOPE OFFSET>;
-
-		in you thermal zone in DT.
-
-I hope this clarifies.
-
-Let me know if you are able to use the parsing from of-thermal, instead
-of in your driver.
-
-> +	}
-> +	priv->dev = &pdev->dev;
-> +	platform_set_drvdata(pdev, priv);
-> +
-> +	return 0;
-> +
-> +remove_ts:
-> +	clk_disable_unprepare(priv->clk_gate);
-> +	clk_disable_unprepare(priv->pclk);
-> +	for (i--; i >= 0; i--)
-> +		thermal_zone_of_sensor_unregister(&pdev->dev,
-> +						  priv->sensors[i].tzd);
-> +
-> +	return ret;
-> +}
-> +
-> +static int zx2967_thermal_exit(struct platform_device *pdev)
-> +{
-> +	struct zx2967_thermal_priv *priv = platform_get_drvdata(pdev);
-> +	int i;
-> +
-> +	for (i = 0; i < NUM_SENSORS; i++) {
-> +		struct zx2967_thermal_sensor *sensor = &priv->sensors[i];
-> +
-> +		thermal_zone_of_sensor_unregister(&pdev->dev, sensor->tzd);
-> +	}
-> +	clk_disable_unprepare(priv->pclk);
-> +	clk_disable_unprepare(priv->clk_gate);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id zx2967_thermal_id_table[] = {
-> +	{ .compatible = "zte,zx296718-thermal" },
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(of, zx2967_thermal_id_table);
-> +
-> +static SIMPLE_DEV_PM_OPS(zx2967_thermal_pm_ops,
-> +			 zx2967_thermal_suspend, zx2967_thermal_resume);
-> +
-> +static struct platform_driver zx2967_thermal_driver = {
-> +	.probe = zx2967_thermal_probe,
-> +	.remove = zx2967_thermal_exit,
-> +	.driver = {
-> +		.name = "zx2967_thermal",
-> +		.of_match_table = zx2967_thermal_id_table,
-> +		.pm = &zx2967_thermal_pm_ops,
-> +	},
-> +};
-> +module_platform_driver(zx2967_thermal_driver);
-> +
-> +MODULE_AUTHOR("Baoyou Xie <baoyou.xie@linaro.org>");
-> +MODULE_DESCRIPTION("ZTE zx2967 thermal driver");
-> +MODULE_LICENSE("GPL v2");
-> -- 
-> 2.7.4
+> >-----Original Message-----
+> >From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Rob Clark
+> >Sent: Thursday, February 02, 2017 8:33 PM
+> >To: Joerg Roedel <joro@8bytes.org>
+> >Cc: Will Deacon <will.deacon@arm.com>; iommu at lists.linux-foundation.org; Sricharan <sricharan@codeaurora.org>; linux-arm-
+> >kernel at lists.infradead.org
+> >Subject: Re: [PATCH 0/5] Implement SMMU passthrough using the default domain
+> >
+> >On Thu, Jan 26, 2017 at 12:18 PM, Joerg Roedel <joro@8bytes.org> wrote:
+> >> On Tue, Jan 24, 2017 at 08:42:23PM +0530, Sricharan wrote:
+> >>> Thanks for this series. We had a case with the GPU.
+> >>> The GPU's iommu was setup by kernel and the GPU
+> >>> also does dynamic updates for on-the-fly switching between
+> >>> process pagetables.  GPU driver was not using DMA domain and
+> >>> the GPU's firmware was always expecting to run out  of contextbank
+> >>>  '0' (although not correct) , which was not the case after the DMA domain
+> >>> was made default  as '0' was getting allocated for DMA domain and
+> >>> there were concerns about reusing the DMA domain as well.
+> >>> Now with this series, looks there is an way out of that that can be tried.
+> >>>
+> >>> So should the default domain not be per device specific selectable ?
+> >>
+> >> Note that iommu-drivers can request direct-mapping for any given device
+> >> on its initializtion. This is used on x86 for devices that need a 1-1
+> >> mapping for some reason.
+> >>
+> >> Also device drivers can use the iommu-api and assign their own domain to
+> >> a device, which allows them to manage the dma address space on their
+> >> own.
+> >
+> >Part of the problem is that dev->archdata.dma_ops gets wired up to
+> >iommu_dma_ops.  Which isn't so bad on it's own, except that cache ops
+> >are not exposed to drivers, forcing us to use dma-mapping API
+> >(dma_map_sg, etc) for cache operations.
+> >
+> >Possibly we should just expose cache op's to drivers bypass this abuse
+> >of dma-mapping.
+> >
+> [1], with this, when the default domain in not DOMAIN_DMA, then
+> dev->archdata.dma_ops is not set to iommu_dma_ops , instead remains
+> to be swiotlb_ops. Is that not correct for gpu's unmanaged domain case ?
 > 
+> https://www.spinics.net/lists/arm-kernel/msg556209.html
+> 
+> >btw, Will, we definitely want this to *not* rely on kcmdline for the
+> >gpu with it's own private iommu case..
+> 
+> Ya, that changes behavior for all devices and some might want 
+> DMA_DOMAIN and some UNMANAGED.
+
+My patch changes the *default* domain. When would this ever be UNMANAGED?
+
+If you're using an UNMANAGED domain, I think you need to take care of the
+DMA ops yourself. There are likely missing functions to do that, but they
+should be added in a separate series.
+
+Will
