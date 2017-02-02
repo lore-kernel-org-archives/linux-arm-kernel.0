@@ -1,36 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  2 Feb 2017 13:15:32 +0100
-Subject: [PATCH] staging: bcm2835: don't mark 'bcm2835_v4l2_debug' as static
-Message-ID: <20170202121554.1265939-1-arnd@arndb.de>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 2 Feb 2017 09:21:47 -0300
+Subject: [PATCH] [media] exynos-gsc: Avoid spamming the log on
+ VIDIOC_TRY_FMT
+In-Reply-To: <276f85b5-d224-41fd-3363-f2a671bdd176@osg.samsung.com>
+References: <1485294146-7467-1-git-send-email-javier@osg.samsung.com>
+ <276f85b5-d224-41fd-3363-f2a671bdd176@osg.samsung.com>
+Message-ID: <3c0cd187-7e1d-d522-b7fc-b02e6a2f4b29@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This one unfortunately slipped through my own build testing, my patch
-caused a new build error:
+Hello Shuah,
 
-bcm2835-camera.c:53:12: error: static declaration of 'bcm2835_v4l2_debug' follows non-static declaration
+On 02/01/2017 11:25 PM, Shuah Khan wrote:
+> On 01/24/2017 02:42 PM, Javier Martinez Canillas wrote:
+>> There isn't an ioctl to enum the supported field orders, so a user-space
+>> application can call VIDIOC_TRY_FMT using different field orders to know
+>> if one is supported. For example, GStreamer does this so during playback
+>> dozens of the following messages appear in the kernel log buffer:
+>>
+>> [ 442.143393] Not supported field order(4)
+>>
+>> Instead of printing this as an error, just keep it as debug information.
+>>
+>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>>
+>> ---
+>>
+>>  drivers/media/platform/exynos-gsc/gsc-core.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
+>> index 8524fe15fa80..678b600f0500 100644
+>> --- a/drivers/media/platform/exynos-gsc/gsc-core.c
+>> +++ b/drivers/media/platform/exynos-gsc/gsc-core.c
+>> @@ -408,7 +408,7 @@ int gsc_try_fmt_mplane(struct gsc_ctx *ctx, struct v4l2_format *f)
+>>  	if (pix_mp->field == V4L2_FIELD_ANY)
+>>  		pix_mp->field = V4L2_FIELD_NONE;
+>>  	else if (pix_mp->field != V4L2_FIELD_NONE) {
+>> -		pr_err("Not supported field order(%d)\n", pix_mp->field);
+>> +		pr_debug("Not supported field order(%d)\n", pix_mp->field);
+> 
+> It make sense to leave it as an error, but print only once perhaps.
+> The down side to making this debug is that it becomes harder to
+> figure out when we run into this case.
+>
 
-We want the symbol to be global as it is indeed used in more than one
-file and declared 'extern' in a header.
+I disagree. User-space trying different field orders doesn't sound like an
+error to me since as mentioned there isn't an ioctl to enum supported ones.
 
-Fixes: 757b9bd074 ("staging: bcm2835: mark all symbols as 'static'")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/staging/media/platform/bcm2835/bcm2835-camera.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+In fact other drivers don't print anything in their try_fmt handler for the
+same case, for example [0] and [1].
 
-diff --git a/drivers/staging/media/platform/bcm2835/bcm2835-camera.c b/drivers/staging/media/platform/bcm2835/bcm2835-camera.c
-index ced8eb5de0f0..ca15a698e018 100644
---- a/drivers/staging/media/platform/bcm2835/bcm2835-camera.c
-+++ b/drivers/staging/media/platform/bcm2835/bcm2835-camera.c
-@@ -50,7 +50,7 @@ MODULE_AUTHOR("Vincent Sanders");
- MODULE_LICENSE("GPL");
- MODULE_VERSION(BM2835_MMAL_VERSION);
- 
--static int bcm2835_v4l2_debug;
-+int bcm2835_v4l2_debug;
- module_param_named(debug, bcm2835_v4l2_debug, int, 0644);
- MODULE_PARM_DESC(bcm2835_v4l2_debug, "Debug level 0-2");
- 
+> thanks,
+> -- Shuah
+> 
+
+[0]: http://lxr.free-electrons.com/source/drivers/media/platform/mx2_emmaprp.c#L496
+[1]: http://lxr.free-electrons.com/source/drivers/media/platform/exynos4-is/fimc-m2m.c#L297
+
+Best regards,
 -- 
-2.9.0
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
