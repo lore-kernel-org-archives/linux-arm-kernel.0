@@ -1,202 +1,57 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Wed, 1 Feb 2017 20:29:32 -0800
-Subject: [PATCH V9] thermal: bcm2835: add thermal driver for bcm2835 soc
-In-Reply-To: <0452720A-5914-469B-9EF7-0581CF1B5478@martin.sperl.org>
-References: <1483808145-6206-1-git-send-email-kernel@martin.sperl.org>
- <20170120041400.GA24617@localhost.localdomain>
- <060918B6-A773-46A5-8D10-C9F6BBA6D3F1@martin.sperl.org>
- <20170124093127.GB3651@localhost.localdomain>
- <0452720A-5914-469B-9EF7-0581CF1B5478@martin.sperl.org>
-Message-ID: <20170202042930.GA6377@localhost.localdomain>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Thu,  2 Feb 2017 10:17:10 +0530
+Subject: [PATCH 0/6] Broadcom SBA RAID support
+Message-ID: <1486010836-25228-1-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Martin,
+The Broadcom SBA RAID is a stream-based device which provides
+RAID5/6 offload.
 
-On Tue, Jan 24, 2017 at 10:52:43AM +0100, kernel at martin.sperl.org wrote:
-> 
-> > On 24.01.2017, at 10:31, Eduardo Valentin <edubezval@gmail.com> wrote:
-> > 
-> > Hello Martin,
-> > 
-> > On Fri, Jan 20, 2017 at 08:54:07AM +0100, kernel at martin.sperl.org wrote:
-> >> 
-> >>> On 20.01.2017, at 05:14, Eduardo Valentin <edubezval@gmail.com> wrote:
-> >>> 
-> >>> Hello Martin,
-> >>> 
-> >>> On Sat, Jan 07, 2017 at 04:55:45PM +0000, kernel at martin.sperl.org wrote:
-> >>>> From: Martin Sperl <kernel@martin.sperl.org>
-> >>>> 
-> >>>> Add basic thermal driver for bcm2835 SOC.
-> >>>> 
-> >>>> This driver currently relies on the firmware setting up the
-> >>>> tsense HW block and does not set it up itself.
-> >>>> 
-> >>>> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
-> >>>> Acked-by: Eric Anholt <eric@anholt.net>
-> >>>> Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
-> >>>> 
-> >>> 
-> >>> <cut>
-> >>> 
-> >>>> +
-> >>>> +static const struct of_device_id bcm2835_thermal_of_match_table[] = {
-> >>>> +	{
-> >>>> +		.compatible = "brcm,bcm2835-thermal",
-> >>>> +		.data = &(struct bcm2835_thermal_info) {
-> >>>> +			.offset = 407000,
-> >>>> +			.slope = -538,
-> >>>> +			.trip_temp = 80000
-> >>>> +		}
-> >>>> +	},
-> >>>> +	{
-> >>>> +		.compatible = "brcm,bcm2836-thermal",
-> >>>> +		.data = &(struct bcm2835_thermal_info) {
-> >>>> +			.offset = 407000,
-> >>>> +			.slope = -538,
-> >>>> +			.trip_temp = 80000
-> >>>> +		}
-> >>>> +	},
-> >>>> +	{
-> >>>> +		.compatible = "brcm,bcm2837-thermal",
-> >>>> +		.data = &(struct bcm2835_thermal_info) {
-> >>>> +			/* the bcm2837 needs adjustment of +5C */
-> >>>> +			.offset = 407000 + 5000,
-> >>>> +			.slope = -538,
-> >>>> +			.trip_temp = 80000
-> >>>> +		}
-> >>>> +	},
-> >>>> +	{},
-> >>> 
-> >>> Just for the same of clarification, is there anything preventing this
-> >>> driver of using of-thermal API? the above data (slope, offset, and
-> >>> trip_temps) would be in DT the place where they are supposed to be,
-> >>> instead of code.
-> >>> 
-> >> 
-> >> As the DT changes, that only define compatible strings, have already gone
-> >> in without any such properties set, we need to define defaults for the 
-> >> slope/offset and trip_temp values.
-> >> 
-> > 
-> > These properties won't go into the same node you are referring to. They
-> > go into the thermal-zone node you would create, which would then refer
-> > to the node you referred (already merged). Therefore, I do not see
-> > anything blocking a proper of-thermal usage to cover for the above data.
-> > 
-> >> I guess (for newer SOC) you still can use the values in the DT,
-> >> as (I guess) these are parsed and set in thermal_zone_device_register
-> >> after the defaults are set in thermal_zone_params.
-> > 
-> > Not sure what you meant here, but these values, when correctly used in
-> > DT, they would come as part of the thermal_zone_params and in the
-> > thermal trips of the thermal zones, as the of-thermal code with already
-> > deal with those for you.
-> > 
-> > Please have a look at:
-> > a. Documentation/devicetree/bindings/thermal/thermal.txt
-> > b. drivers/thermal/of-thermal.c
-> > 
-> > And let me know if you see anything that would prevent this driver of
-> > using the correct API to describe hardware data with DT.
-> 
-> 
-> I guess you miss my point:
+It requires a SoC specific ring manager (such as Broadcom FlexRM
+ring manager) to provide ring-based programming interface. Due to
+this, the Broadcom SBA RAID driver (mailbox client) implements
+DMA device having one DMA channel using a set of mailbox channels
+provided by Broadcom SoC specific ring manager driver (mailbox
+controller).
 
-Maybe you missed, or did not read the doc I pointed you...
+Important limitations of Broadcom SBA RAID hardware are:
+1. Requires disk position instead of disk coefficient 
+2. Supports only 30 PQ disk coefficients
 
-> The argument is that we have DT in the 4.10.0-rc2 kernel right now that
-> look like this:
->                 thermal at 7e212000 {
->                         compatible = "brcm,bcm2835-thermal";
->                         clocks = <0x6 0x1b>;
->                         status = "okay";
->                         reg = <0x7e212000 0x8>;
->                 }
-> so we still need to be compatible with those without any extra defines.
+To address limitation #1, we have added raid_gflog table which
+will help driver convert disk coefficient to disk position. To
+address limitation #2, we have extended Linux Async Tx APIs to
+check for available PQ coefficients before doing PQ offload.
 
-Yes, but the above DT entry will still be valid if you add the correct
-of-thermal support. In fact, you would add in your DTS a thermal-zones
-node, and in one of the defined zone, you would then reference the node
-you already got into mainline. Below is a copy of the doc I mentioned
-before:
+This patchset is based on Linux-4.10-rc6 and depends on patchset
+"[PATCH v4 0/2] Broadcom FlexRM ring manager support"
 
+It is also available at sba-raid-v1 branch of
+https://github.com/Broadcom/arm64-linux.git
 
-#include <dt-bindings/thermal/thermal.h>
+Anup Patel (6):
+  mailbox: Add new API mbox_channel_device() for clients
+  lib/raid6: Add log-of-2 table for RAID6 HW requiring disk position
+  async_tx: Handle DMA devices having support for fewer PQ coefficients
+  async_tx: Fix DMA_PREP_FENCE usage in do_async_gen_syndrome()
+  dmaengine: Add Broadcom SBA RAID driver
+  dt-bindings: Add DT bindings document for Broadcom SBA RAID driver
 
-ocp {
-	...
-	/*
-	 * A simple IC with several bandgap temperature sensors.
-	 */
-	bandgap0: bandgap at 0x0000ED00 {
-		...
-		#thermal-sensor-cells = <1>;
-	};
-};
+ .../devicetree/bindings/dma/brcm,iproc-sba.txt     |   29 +
+ crypto/async_tx/async_pq.c                         |    8 +-
+ crypto/async_tx/async_raid6_recov.c                |   12 +-
+ drivers/dma/Kconfig                                |   13 +
+ drivers/dma/Makefile                               |    1 +
+ drivers/dma/bcm-sba-raid.c                         | 1309 ++++++++++++++++++++
+ drivers/mailbox/mailbox.c                          |   21 +
+ include/linux/dmaengine.h                          |   19 +
+ include/linux/mailbox_client.h                     |    1 +
+ include/linux/raid/pq.h                            |    4 +
+ lib/raid6/mktables.c                               |   20 +
+ 11 files changed, 1432 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/brcm,iproc-sba.txt
+ create mode 100644 drivers/dma/bcm-sba-raid.c
 
-thermal-zones {
-	cpu_thermal: cpu-thermal {
-		polling-delay-passive = <250>; /* milliseconds */
-		polling-delay = <1000>; /* milliseconds */
-
-				/* sensor       ID */
-		thermal-sensors = <&bandgap0     0>;
-
-		trips {
-			/* each zone within the SoC may have its own trips */
-			cpu_alert: cpu-alert {
-				temperature = <100000>; /* millicelsius */
-				hysteresis = <2000>; /* millicelsius */
-				type = "passive";
-			};
-			cpu_crit: cpu-crit {
-				temperature = <125000>; /* millicelsius */
-				hysteresis = <2000>; /* millicelsius */
-				type = "critical";
-			};
-		};
-
-		cooling-maps {
-			/* each zone within the SoC may have its own cooling */
-			...
-		};
-	};
-
-> 
-> Hence we need to define those slopes and offsets in the driver itself
-> to stay compatible with those older device-trees.
-
-not really, as long as we do not merge the driver with the missing
-of-thermal support, I see no need to have both supports in your driver,
-i.e., if we start correct for the beggining there is no need to have
-offsets and slopes data in your driver code.
-
-> 
-> As for if it works with the framework - I have to admit I do not
-> have the slightest clue - it looks way to complicated for the soc right
-> now.
-
-Well, there is the documentation I mentioned, which several other
-drivers used as base for their support. You can also look at other
-thermal zones already defined in the existing DTS(I)'s.
-
-> 
-> As a note: afaiu the trip_temp register is the temperature at which the
-> soc will reboot on its own - similar to a watchdog, but for temperatures.
-> (main reason for the assumption is because there is no interrupt that
-> can get assigned a handler to catch this situation).
-> 
-
-OK. But that does not prevent you to have other trips so your running
-system can act before the shutdown trip is crossed.
-
-> Martin
-> 
-> 
-
-
-BR,
-
-Eduardo Valentin
+-- 
+2.7.4
