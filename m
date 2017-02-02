@@ -1,40 +1,49 @@
-From: pullururajasekhar@gmail.com (Rajasekhar Pulluru)
-Date: Fri, 3 Feb 2017 00:19:37 +0530
-Subject: Unhandled fault: alignment fault (0x92000061) at un-aligned address
-Message-ID: <CAGA5_H4w4uaS_DeFEdZh6AkT6PNG2Y-0ZZQbMK-c5bZzJoOS8A@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu,  2 Feb 2017 19:51:39 +0100
+Subject: [PATCH] ARM: dts: at91: sama5d2: add sfrbu
+Message-ID: <20170202185139.21601-1-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+SFRBU, the Special Function Registers Backup manage specific aspects of the
+integrated memory, bridge implementations, processor and other
+functionality not controlled elsewhere.
 
-I have an arm cortex A-57 machine that is running 3.16 linux kernel
-(64bit) compiled using
-gcc-linaro-aarch64_be-linux-gnu-4.9-2014.09_linux toolchain.
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ Documentation/devicetree/bindings/arm/atmel-at91.txt | 3 ++-
+ arch/arm/boot/dts/sama5d2.dtsi                       | 5 +++++
+ 2 files changed, 7 insertions(+), 1 deletion(-)
 
-My application is accessing a member inside a structure at unalinged
-address using pointer.
-
-The application is compiled using
-gcc-linaro-armeb-linux-gnueabihf-4.9-2014.09_linux toolchain and when
-its run,
-the application gets bus error with "Unhandled fault: alignment fault
-(0x92000061) at 0x00000000fff0f729" on console.
-
-When the same application is compilied using
-gcc-linaro-aarch64_be-linux-gnu-4.9-2014.09_linux toolchain,
-I don't get any alignment fault even though the member being accessed
-is at an un-alinged address.
-
-Could someone help me understand this behaviour and help fix it? (I
-couldn't pad the structure as it points to network header
-and for some reason the address of the member inside the network
-header is not aligned.)
-
-I have tried compiling the application using the
-gcc-linaro-armeb-linux-gnueabihf-4.9-2014.09_linux toolchain with
-compile flags -mno-unaligned-access and again with -munaligned-access
-flags. But I still see the alignment fault in both the cases.
-
-
-Thanks & Regards,
-Rajasekhar
+diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+index 29737b9b616e..799af90dd75b 100644
+--- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
++++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+@@ -217,7 +217,8 @@ memory, bridge implementations, processor and other functionality not controlled
+ elsewhere.
+ 
+ required properties:
+-- compatible: Should be "atmel,<chip>-sfr", "syscon".
++- compatible: Should be "atmel,<chip>-sfr", "syscon" or
++	"atmel,<chip>-sfrbu", "syscon"
+   <chip> can be "sama5d3", "sama5d4" or "sama5d2".
+ - reg: Should contain registers location and length
+ 
+diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+index ceb9783ff7e1..111470359235 100644
+--- a/arch/arm/boot/dts/sama5d2.dtsi
++++ b/arch/arm/boot/dts/sama5d2.dtsi
+@@ -1279,6 +1279,11 @@
+ 				status = "okay";
+ 			};
+ 
++			sfrbu: sfr at fc05c000 {
++				compatible = "atmel,sama5d2-sfrbu", "syscon";
++				reg = <0xfc05c000 0x20>;
++			};
++
+ 			chipid at fc069000 {
+ 				compatible = "atmel,sama5d2-chipid";
+ 				reg = <0xfc069000 0x8>;
+-- 
+2.11.0
