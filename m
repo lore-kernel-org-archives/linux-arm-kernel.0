@@ -1,77 +1,59 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 02 Feb 2017 10:45:58 +0000
-Subject: [PATCH v31 05/12] arm64: kdump: protect crash dump kernel memory
-In-Reply-To: <20170201182506.GA30584@leverpostej>
-References: <20170201124218.5823-1-takahiro.akashi@linaro.org>
- <20170201124630.6016-4-takahiro.akashi@linaro.org>
- <20170201180008.GG4756@leverpostej> <20170201182506.GA30584@leverpostej>
-Message-ID: <58930DE6.7000103@arm.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 2 Feb 2017 11:50:59 +0100
+Subject: [PATCH 2/2] drm: meson: rename driver name to meson-drm
+In-Reply-To: <20170202104514.nogjnsuimeulml53@phenom.ffwll.local>
+References: <1486028864-19622-1-git-send-email-narmstrong@baylibre.com>
+ <1486028864-19622-3-git-send-email-narmstrong@baylibre.com>
+ <20170202104514.nogjnsuimeulml53@phenom.ffwll.local>
+Message-ID: <a6655fb5-5267-6536-d9b6-5ce0ff9f25ec@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Akashi, Mark,
+On 02/02/2017 11:45 AM, Daniel Vetter wrote:
+> On Thu, Feb 02, 2017 at 10:47:44AM +0100, Neil Armstrong wrote:
+>> The platform driver name is currently "meson" which can lead to some
+>> confusion, this patch renames it to "meson-drm" and removes the owner
+>> attribute.
+>>
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
+>>  drivers/gpu/drm/meson/meson_drv.c | 3 +--
+>>  1 file changed, 1 insertion(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
+>> index ff1f601..380bde7 100644
+>> --- a/drivers/gpu/drm/meson/meson_drv.c
+>> +++ b/drivers/gpu/drm/meson/meson_drv.c
+>> @@ -329,8 +329,7 @@ static int meson_drv_remove(struct platform_device *pdev)
+>>  	.probe      = meson_drv_probe,
+>>  	.remove     = meson_drv_remove,
+>>  	.driver     = {
+>> -		.owner  = THIS_MODULE,
 
-On 01/02/17 18:25, Mark Rutland wrote:
-> On Wed, Feb 01, 2017 at 06:00:08PM +0000, Mark Rutland wrote:
->> On Wed, Feb 01, 2017 at 09:46:24PM +0900, AKASHI Takahiro wrote:
->>> arch_kexec_protect_crashkres() and arch_kexec_unprotect_crashkres()
->>> are meant to be called around kexec_load() in order to protect
->>> the memory allocated for crash dump kernel once after it's loaded.
->>>
->>> The protection is implemented here by unmapping the region rather than
->>> making it read-only.
->>> To make the things work correctly, we also have to
->>> - put the region in an isolated, page-level mapping initially, and
->>> - move copying kexec's control_code_page to machine_kexec_prepare()
->>>
->>> Note that page-level mapping is also required to allow for shrinking
->>> the size of memory, through /sys/kernel/kexec_crash_size, by any number
->>> of multiple pages.
+Hi Daniel,
 
->> Looking at kexec_crash_size_store(), I don't see where memory returned
->> to the OS is mapped. AFAICT, if the region is protected when the user
->> shrinks the region, the memory will not be mapped, yet handed over to
->> the kernel for general allocation.
+> I don't get why you remove this, generally that will lead to trouble of
+> being able to unload code that's still in use ...
 
-kernel/kexec_core.c:crash_shrink_memory() will bailout:
->	if (kexec_crash_image) {
->		ret = -ENOENT;
->		goto unlock;
->	}
+Indeed, but since a (long ?) time, the owner field is now populated by the
+ platform_driver_register() core code.
 
-So it should only be possible to return memory to the allocators when there is
-no crash image loaded, so the area is mapped.
+> 
+> Otherwise ack.
+> 
+> Now, do you want to get this landed as part of the small drivers in
+> drm-mis experiment?
 
-What happens when we unload the crash image? It looks like an unload is a call
-to do_kexec_load with nr_segments == 0, do_kexec_load() has:
->	if (flags & KEXEC_ON_CRASH) {
->		dest_image = &kexec_crash_image;
->		if (kexec_crash_image)
->			arch_kexec_unprotect_crashkres();
+I have a PR ready, but it can go through this experiment, yes.
 
-So we unprotect the region when we unload the kernel causing it to be remapped.
-Provided the load/protect and {load,unload}/unprotect are kept in sync, I think
-this is safe.
-
-
-Given the core code can unload a crash image, this hunk has me worried:
-+void arch_kexec_unprotect_crashkres(void)
-+{
-+	/*
-+	 * We don't have to make page-level mappings here because
-+	 * the crash dump kernel memory is not allowed to be shrunk
-+	 * once the kernel is loaded.
-+	 */
-+	create_pgd_mapping(&init_mm, crashk_res.start,
-+			__phys_to_virt(crashk_res.start),
-+			resource_size(&crashk_res), PAGE_KERNEL,
-+			debug_pagealloc_enabled());
-
-
-I don't think this is true if the order is: load -> protect, unload ->
-unprotect, shrink. The shrink will happen with potentially non-page-size mappings.
-
+> -Daniel
+> 
+>> -		.name   = DRIVER_NAME,
+>> +		.name	= "meson-drm",
+>>  		.of_match_table = dt_match,
+>>  	},
+>>  };
+>> -- 
 
 Thanks,
-
-James
+Neil
