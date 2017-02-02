@@ -1,54 +1,52 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 2 Feb 2017 23:39:58 +0900
-Subject: [PATCH v31 09/12] arm64: kdump: provide /proc/vmcore file
-In-Reply-To: <20170202120850.GL31394@leverpostej>
-References: <20170201124218.5823-1-takahiro.akashi@linaro.org>
- <20170201124630.6016-8-takahiro.akashi@linaro.org>
- <20170201192121.GB30584@leverpostej>
- <20170202062408.GC13549@linaro.org>
- <20170202120320.GK31394@leverpostej>
- <20170202120850.GL31394@leverpostej>
-Message-ID: <20170202143957.GB3078@fireball>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu,  2 Feb 2017 15:45:10 +0100
+Subject: [PATCH 00/13] ARM: at91; pm: cleanup
+Message-ID: <20170202144523.11706-1-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2017 at 12:08:50PM +0000, Mark Rutland wrote:
-> On Thu, Feb 02, 2017 at 12:03:20PM +0000, Mark Rutland wrote:
-> > On Thu, Feb 02, 2017 at 03:24:09PM +0900, AKASHI Takahiro wrote:
-> > > On Wed, Feb 01, 2017 at 07:21:22PM +0000, Mark Rutland wrote:
-> > > > On Wed, Feb 01, 2017 at 09:46:28PM +0900, AKASHI Takahiro wrote:
-> 
-> > > > > +/*
-> > > > > + * reserve_elfcorehdr() - reserves memory for elf core header
-> > > > > + *
-> > > > > + * This function reserves elf core header given in "elfcorehdr=" kernel
-> > > > > + * command line parameter. This region contains all the information about
-> > > > > + * primary kernel's core image and is used by a dump capture kernel to
-> > > > > + * access the system memory on primary kernel.
-> > > > > + */
-> 
-> > Can you also fix the comment above reserve_elfcorehdr()? It refers to a
-> > non-existent kernel command line option.
-> 
-> ... or rather, one that's handled by core code, not
-> reserve_elfcorehdr().
-> 
-> So more specifically, it would be nicer to have something like:
-> 
-> 	/*
-> 	 * reserve_elfcorehdr() - reserves memory for elf core header
-> 	 *
-> 	 * This function reserves the memory occupied by an elf core header
-> 	 * described in the device tree. This region contains all the
-> 	 * information about primary kernel's core image and is used by a dump
-> 	 * capture kernel to access the system memory on primary kernel.
-> 	 */
+Hi,
 
-Perfect!
+The following patch set is a cleanup of the AT91 PM code.
 
-Thanks a lot,
--Takahiro AKASHI
+The main feautres is that it is now using a struct to pass arguments
+between the C and the assembly code, allowing for more than 4 variables
+to be passed.
+It also removes instructions so it is actually faster.
 
+The standby path is also faster now because it is only handled using C,
+removing the need for a few comparisons before enabling DRAM self
+refresh. This also allows to always propose standby, even when the sram
+allocation failed.
 
-> Thanks,
-> Mark.
+Finally, the PM initialization functions are merge, removing the need
+for separate paths on at91sam9*
+
+Alexandre Belloni (13):
+  ARM: at91: pm: cleanup headers
+  ARM: at91: pm: move at91_ramc_read/write to pm.c
+  ARM: at91: pm: Move global variables into at91_pm_data
+  ARM: at91: pm: use struct at91_pm_data in pm_suspend.S
+  ARM: at91: pm: use struct members directly
+  ARM: at91: pm: simplify at91rm9200_standby
+  ARM: at91: pm: Workaround DDRSDRC self-refresh bug with LPDDR1
+    memories.
+  ARM: at91: pm: tie the memory controller type to the ramc id
+  ARM: at91: pm: tie the USB clock mask to the pmc
+  ARM: at91: pm: merge all at91sam9*_pm_init
+  ARM: at91: pm: remove at91_pm_set_standby
+  ARM: at91: pm: use C functions for standby
+  ARM: at91: pm: Allow PM even if SRAM allocation failed
+
+ arch/arm/mach-at91/Makefile          |  33 ++++++
+ arch/arm/mach-at91/at91sam9.c        |  45 +-------
+ arch/arm/mach-at91/generic.h         |   8 +-
+ arch/arm/mach-at91/pm.c              | 212 +++++++++++++++++------------------
+ arch/arm/mach-at91/pm.h              |  27 ++---
+ arch/arm/mach-at91/pm_data-offsets.c |  12 ++
+ arch/arm/mach-at91/pm_suspend.S      |  55 ++-------
+ 7 files changed, 176 insertions(+), 216 deletions(-)
+ create mode 100644 arch/arm/mach-at91/pm_data-offsets.c
+
+-- 
+2.11.0
