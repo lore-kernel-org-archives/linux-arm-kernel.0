@@ -1,113 +1,140 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu,  2 Feb 2017 17:32:15 +0000
-Subject: [PATCH 2/2] arm64: ensure __raw_read_system_reg() is self-consistent
-In-Reply-To: <1486056735-29213-1-git-send-email-mark.rutland@arm.com>
-References: <1486056735-29213-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1486056735-29213-2-git-send-email-mark.rutland@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu,  2 Feb 2017 17:33:19 +0000
+Subject: [PATCH v4] efi: arm64: Add vmlinux debug link to the Image binary
+Message-ID: <1486056799-4825-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We recently discovered that __raw_read_system_reg() erroneously mapped
-sysreg IDs to the wrong registers.
+When building with debugging symbols, take the absolute path to the
+vmlinux binary and add it to the special PE/COFF debug table entry.
+This allows a debug EFI build to find the vmlinux binary, which is
+very helpful in debugging, given that the offset where the Image is
+first loaded by EFI is highly unpredictable.
 
-To ensure that we don't get hit by a similar issue in future, this patch
-makes __raw_read_system_reg() use a macro for each case statement,
-ensuring that each case reads the correct register.
+On implementations of UEFI that choose to implement it, this
+information is exposed via the EFI debug support table, which is a UEFI
+configuration table that is accessible both by the firmware at boot time
+and by the OS at runtime, and lists all PE/COFF images loaded by the
+system.
 
-To ensure that this patch hasn't introduced an issue, I've binary-diffed
-the object files before and after this patch. No code or data sections
-differ (though some debug section differ due to line numbering
-changing).
+The format of the NB10 Codeview entry is based on the definition used
+by EDK2, which is our primary reference when it comes to the use of
+PE/COFF in the context of UEFI firmware.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/cpufeature.c | 64 ++++++++++++++++++++++--------------------
- 1 file changed, 34 insertions(+), 30 deletions(-)
+v4: add a separate DEBUG_EFI debug option so that this feature is disabled
+    by default
+    dropped 1/2 which has been queued already in the EFI tree
+    use ASCII rather than an opaque constant for "NB10" signature
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 16fa1d3..90efd41 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -635,6 +635,9 @@ u64 read_system_reg(u32 id)
- 	return regp->sys_val;
- }
+ arch/arm64/Kconfig.debug   |  8 ++++
+ arch/arm64/kernel/Makefile |  4 ++
+ arch/arm64/kernel/head.S   | 47 +++++++++++++++++++-
+ 3 files changed, 58 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+index d1ebd46872fd..f7f38b1aab14 100644
+--- a/arch/arm64/Kconfig.debug
++++ b/arch/arm64/Kconfig.debug
+@@ -95,6 +95,14 @@ config DEBUG_ALIGN_RODATA
  
-+#define read_sysreg_case(r)	\
-+	case r:		return read_sysreg_s(r)
+ 	  If in doubt, say N.
+ 
++config DEBUG_EFI
++	depends on EFI && DEBUG_INFO
++	bool "UEFI debugging"
++	help
++	  Enable this option to include EFI specific debugging features into
++	  the kernel that are only useful when using a debug build of the
++	  UEFI firmware
 +
- /*
-  * __raw_read_system_reg() - Used by a STARTING cpu before cpuinfo is populated.
-  * Read the system register on the current CPU
-@@ -642,36 +645,37 @@ u64 read_system_reg(u32 id)
- static u64 __raw_read_system_reg(u32 sys_id)
- {
- 	switch (sys_id) {
--	case SYS_ID_PFR0_EL1:		return read_cpuid(ID_PFR0_EL1);
--	case SYS_ID_PFR1_EL1:		return read_cpuid(ID_PFR1_EL1);
--	case SYS_ID_DFR0_EL1:		return read_cpuid(ID_DFR0_EL1);
--	case SYS_ID_MMFR0_EL1:		return read_cpuid(ID_MMFR0_EL1);
--	case SYS_ID_MMFR1_EL1:		return read_cpuid(ID_MMFR1_EL1);
--	case SYS_ID_MMFR2_EL1:		return read_cpuid(ID_MMFR2_EL1);
--	case SYS_ID_MMFR3_EL1:		return read_cpuid(ID_MMFR3_EL1);
--	case SYS_ID_ISAR0_EL1:		return read_cpuid(ID_ISAR0_EL1);
--	case SYS_ID_ISAR1_EL1:		return read_cpuid(ID_ISAR1_EL1);
--	case SYS_ID_ISAR2_EL1:		return read_cpuid(ID_ISAR2_EL1);
--	case SYS_ID_ISAR3_EL1:		return read_cpuid(ID_ISAR3_EL1);
--	case SYS_ID_ISAR4_EL1:		return read_cpuid(ID_ISAR4_EL1);
--	case SYS_ID_ISAR5_EL1:		return read_cpuid(ID_ISAR5_EL1);
--	case SYS_MVFR0_EL1:		return read_cpuid(MVFR0_EL1);
--	case SYS_MVFR1_EL1:		return read_cpuid(MVFR1_EL1);
--	case SYS_MVFR2_EL1:		return read_cpuid(MVFR2_EL1);
--
--	case SYS_ID_AA64PFR0_EL1:	return read_cpuid(ID_AA64PFR0_EL1);
--	case SYS_ID_AA64PFR1_EL1:	return read_cpuid(ID_AA64PFR1_EL1);
--	case SYS_ID_AA64DFR0_EL1:	return read_cpuid(ID_AA64DFR0_EL1);
--	case SYS_ID_AA64DFR1_EL1:	return read_cpuid(ID_AA64DFR1_EL1);
--	case SYS_ID_AA64MMFR0_EL1:	return read_cpuid(ID_AA64MMFR0_EL1);
--	case SYS_ID_AA64MMFR1_EL1:	return read_cpuid(ID_AA64MMFR1_EL1);
--	case SYS_ID_AA64MMFR2_EL1:	return read_cpuid(ID_AA64MMFR2_EL1);
--	case SYS_ID_AA64ISAR0_EL1:	return read_cpuid(ID_AA64ISAR0_EL1);
--	case SYS_ID_AA64ISAR1_EL1:	return read_cpuid(ID_AA64ISAR1_EL1);
--
--	case SYS_CNTFRQ_EL0:		return read_cpuid(CNTFRQ_EL0);
--	case SYS_CTR_EL0:		return read_cpuid(CTR_EL0);
--	case SYS_DCZID_EL0:		return read_cpuid(DCZID_EL0);
-+	read_sysreg_case(SYS_ID_PFR0_EL1);
-+	read_sysreg_case(SYS_ID_PFR1_EL1);
-+	read_sysreg_case(SYS_ID_DFR0_EL1);
-+	read_sysreg_case(SYS_ID_MMFR0_EL1);
-+	read_sysreg_case(SYS_ID_MMFR1_EL1);
-+	read_sysreg_case(SYS_ID_MMFR2_EL1);
-+	read_sysreg_case(SYS_ID_MMFR3_EL1);
-+	read_sysreg_case(SYS_ID_ISAR0_EL1);
-+	read_sysreg_case(SYS_ID_ISAR1_EL1);
-+	read_sysreg_case(SYS_ID_ISAR2_EL1);
-+	read_sysreg_case(SYS_ID_ISAR3_EL1);
-+	read_sysreg_case(SYS_ID_ISAR4_EL1);
-+	read_sysreg_case(SYS_ID_ISAR5_EL1);
-+	read_sysreg_case(SYS_MVFR0_EL1);
-+	read_sysreg_case(SYS_MVFR1_EL1);
-+	read_sysreg_case(SYS_MVFR2_EL1);
+ source "drivers/hwtracing/coresight/Kconfig"
+ 
+ endmenu
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 7d66bbaafc0c..2600c60337ac 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -55,3 +55,7 @@ obj-y					+= $(arm64-obj-y) vdso/ probes/
+ obj-m					+= $(arm64-obj-m)
+ head-y					:= head.o
+ extra-y					+= $(head-y) vmlinux.lds
 +
-+	read_sysreg_case(SYS_ID_AA64PFR0_EL1);
-+	read_sysreg_case(SYS_ID_AA64PFR1_EL1);
-+	read_sysreg_case(SYS_ID_AA64DFR0_EL1);
-+	read_sysreg_case(SYS_ID_AA64DFR1_EL1);
-+	read_sysreg_case(SYS_ID_AA64MMFR0_EL1);
-+	read_sysreg_case(SYS_ID_AA64MMFR1_EL1);
-+	read_sysreg_case(SYS_ID_AA64MMFR2_EL1);
-+	read_sysreg_case(SYS_ID_AA64ISAR0_EL1);
-+	read_sysreg_case(SYS_ID_AA64ISAR1_EL1);
++ifeq ($(CONFIG_DEBUG_EFI),y)
++AFLAGS_head.o += -DVMLINUX_PATH="\"$(shell readlink -f $(objtree)/vmlinux)\""
++endif
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 4b1abac3485a..d9faf09f6401 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -149,7 +149,7 @@ extra_header_fields:
+ 	.quad	0				// SizeOfHeapReserve
+ 	.quad	0				// SizeOfHeapCommit
+ 	.long	0				// LoaderFlags
+-	.long	0x6				// NumberOfRvaAndSizes
++	.long	(section_table - .) / 8		// NumberOfRvaAndSizes
+ 
+ 	.quad	0				// ExportTable
+ 	.quad	0				// ImportTable
+@@ -158,6 +158,11 @@ extra_header_fields:
+ 	.quad	0				// CertificationTable
+ 	.quad	0				// BaseRelocationTable
+ 
++#ifdef CONFIG_DEBUG_EFI
++	.long	efi_debug_table - _head		// DebugTable
++	.long	efi_debug_table_size
++#endif
 +
-+	read_sysreg_case(SYS_CNTFRQ_EL0);
-+	read_sysreg_case(SYS_CTR_EL0);
-+	read_sysreg_case(SYS_DCZID_EL0);
+ 	// Section table
+ section_table:
+ 
+@@ -195,6 +200,46 @@ section_table:
+ 	.short	0		// NumberOfLineNumbers  (0 for executables)
+ 	.long	0xe0500020	// Characteristics (section flags)
+ 
++#ifdef CONFIG_DEBUG_EFI
++	/*
++	 * The debug table is referenced via its Relative Virtual Address (RVA),
++	 * which is only defined for those parts of the image that are covered
++	 * by a section declaration. Since this header is not covered by any
++	 * section, the debug table must be emitted elsewhere. So stick it in
++	 * the .init.rodata section instead.
++	 *
++	 * Note that the EFI debug entry itself may legally have a zero RVA,
++	 * which means we can simply put it right after the section headers.
++	 */
++	__INITRODATA
 +
- 	default:
- 		BUG();
- 		return 0;
++	.align	2
++efi_debug_table:
++	// EFI_IMAGE_DEBUG_DIRECTORY_ENTRY
++	.long	0			// Characteristics
++	.long	0			// TimeDateStamp
++	.short	0			// MajorVersion
++	.short	0			// MinorVersion
++	.long	2			// Type == EFI_IMAGE_DEBUG_TYPE_CODEVIEW
++	.long	efi_debug_entry_size	// SizeOfData
++	.long	0			// RVA
++	.long	efi_debug_entry - _head	// FileOffset
++
++	.set	efi_debug_table_size, . - efi_debug_table
++	.previous
++
++efi_debug_entry:
++	// EFI_IMAGE_DEBUG_CODEVIEW_NB10_ENTRY
++	.ascii	"NB10"			// Signature
++	.long	0			// Unknown
++	.long	0			// Unknown2
++	.long	0			// Unknown3
++
++	.asciz	VMLINUX_PATH
++
++	.set	efi_debug_entry_size, . - efi_debug_entry
++#endif
++
+ 	/*
+ 	 * EFI will load .text onwards at the 4k section alignment
+ 	 * described in the PE/COFF header. To ensure that instruction
 -- 
-1.9.1
+2.7.4
