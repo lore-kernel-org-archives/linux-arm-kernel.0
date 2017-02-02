@@ -1,40 +1,56 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 2 Feb 2017 11:26:20 +0000
-Subject: [PATCH v31 03/12] arm64: kdump: reserve memory for crash dump
- kernel
-In-Reply-To: <20170202045235.GB13549@linaro.org>
-References: <20170201124218.5823-1-takahiro.akashi@linaro.org>
- <20170201124630.6016-2-takahiro.akashi@linaro.org>
- <20170201152609.GE4756@leverpostej>
- <20170202045235.GB13549@linaro.org>
-Message-ID: <20170202112619.GB31394@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu,  2 Feb 2017 12:34:11 +0100
+Subject: [PATCH] [media] staging: bcm2835: mark all symbols as 'static'
+Message-ID: <20170202113436.690145-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2017 at 01:52:36PM +0900, AKASHI Takahiro wrote:
-> On Wed, Feb 01, 2017 at 03:26:09PM +0000, Mark Rutland wrote:
-> > On Wed, Feb 01, 2017 at 09:46:22PM +0900, AKASHI Takahiro wrote:
-> > > +	pr_info("Reserving %lldMB of memory at %lldMB for crashkernel\n",
-> > > +		crash_size >> 20, crash_base >> 20);
-> > 
-> > We only page-align the size, so the MB will be a little off, but that's
-> > probably OK. However, it would also be nicer to log the base as an
-> > address.
-> 
-> You might notice that the exact same message is used by all the other
-> architectures, but
+I got a link error in allyesconfig:
 
-Almost all; I see arch/sh prints the address with %08x. ;)
+drivers/staging/media/platform/bcm2835/bcm2835-camera.o: In function `vidioc_enum_framesizes':
+bcm2835-camera.c:(.text.vidioc_enum_framesizes+0x0): multiple definition of `vidioc_enum_framesizes'
+drivers/media/platform/vivid/vivid-vid-cap.o:vivid-vid-cap.c:(.text.vidioc_enum_framesizes+0x0): first defined here
 
-> > Could we dump this as we do for the kernel memory layout? e.g.
-> > 
-> > 	pr_info("crashkernel reserved: 0x%016lx - 0x%016lx (%lld MB)\n",
-> > 		crash_base, crash_base + crash_size, crash_size >> 20);
-> 
-> We can go either way.
+While both drivers are equally at fault for this problem, the bcm2835 one was
+just added and is easier to fix, as it is only one file, and none of its symbols
+need to be globally visible. This marks the three global symbols as static.
 
-Even if it's different from other archtiectures, I'd prefer to log as
-above, with the range in hex.
+Fixes: 7b3ad5abf027 ("staging: Import the BCM2835 MMAL-based V4L2 camera driver.")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/staging/media/platform/bcm2835/bcm2835-camera.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Thanks,
-Mark.
+diff --git a/drivers/staging/media/platform/bcm2835/bcm2835-camera.c b/drivers/staging/media/platform/bcm2835/bcm2835-camera.c
+index 105d88102cd9..ced8eb5de0f0 100644
+--- a/drivers/staging/media/platform/bcm2835/bcm2835-camera.c
++++ b/drivers/staging/media/platform/bcm2835/bcm2835-camera.c
+@@ -50,7 +50,7 @@ MODULE_AUTHOR("Vincent Sanders");
+ MODULE_LICENSE("GPL");
+ MODULE_VERSION(BM2835_MMAL_VERSION);
+ 
+-int bcm2835_v4l2_debug;
++static int bcm2835_v4l2_debug;
+ module_param_named(debug, bcm2835_v4l2_debug, int, 0644);
+ MODULE_PARM_DESC(bcm2835_v4l2_debug, "Debug level 0-2");
+ 
+@@ -1312,7 +1312,7 @@ static int vidioc_s_fmt_vid_cap(struct file *file, void *priv,
+ 	return ret;
+ }
+ 
+-int vidioc_enum_framesizes(struct file *file, void *fh,
++static int vidioc_enum_framesizes(struct file *file, void *fh,
+ 			   struct v4l2_frmsizeenum *fsize)
+ {
+ 	struct bm2835_mmal_dev *dev = video_drvdata(file);
+@@ -1842,7 +1842,7 @@ static int __init bm2835_mmal_init_device(struct bm2835_mmal_dev *dev,
+ 	return 0;
+ }
+ 
+-void bcm2835_cleanup_instance(struct bm2835_mmal_dev *dev)
++static void bcm2835_cleanup_instance(struct bm2835_mmal_dev *dev)
+ {
+ 	if (!dev)
+ 		return;
+-- 
+2.9.0
