@@ -1,75 +1,30 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  2 Feb 2017 16:51:29 +0100
-Subject: [PATCHv3 net-next 00/12] net: mvpp2: misc improvements and
- preparation patches
-Message-ID: <1486050701-27899-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Thu,  2 Feb 2017 16:51:38 +0100
+Subject: [PATCHv3 net-next 09/12] net: mvpp2: fix indentation of
+ MVPP2_EXT_GLOBAL_CTRL_DEFAULT
+In-Reply-To: <1486050701-27899-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1486050701-27899-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1486050701-27899-10-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-David,
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/net/ethernet/marvell/mvpp2.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-This series contains a number of misc improvements and preparation
-patches for an upcoming series that adds support for the new PPv2.2
-network controller to the mvpp2 driver.
-
-Sorry for the long delay since v2, I was on
-vacation/conference/training in January, and therefore wasn't able to
-resend a new version earlier. Upcoming versions should arrive much
-faster, if there are further comments on this series.
-
-The most significant improvements are:
-
- - Switching to using build_skb(), which is necessary for the upcoming
-   PPv2.2 support, but anyway a good improvement to the current mvpp2
-   driver (supporting PPv2.1).
-
- - Making the driver build on 64-bit platforms.
-
-Changes since v2:
-
- - Fix remaining 64-bit build warning, reported by David Miller.
-
- - Adjust how bit mask related definitions are done in "net: mvpp2:
-   simplify MVPP2_PRS_RI_* definitions" according to Russell King
-   suggestions.
-
- - Add a patch "net: mvpp2: remove useless arguments in
-   mvpp2_rx_{pkts,time}_coal_set", suggested by Russell King.
-
- - Rework mvpp2_rx_time_coal_set() implementation to avoid overflows
-   and rounding errors. I've used the implementation suggested by
-   Russell King.
-
-Changes since v1:
-
- - This series is split as a separate series from the larger patch set
-   adding support for PPv2.2 in the mvpp2 driver, as requested by
-   David Miller.
-
- - Rebased on top of v4.10-rc1.
-
-Thanks!
-
-Thomas
-
-Thomas Petazzoni (12):
-  net: mvpp2: remove useless arguments in mvpp2_rx_{pkts,time}_coal_set
-  net: mvpp2: handle too large value handling in
-    mvpp2_rx_pkts_coal_set()
-  net: mvpp2: handle too large value in mvpp2_rx_time_coal_set()
-  net: mvpp2: release reference to txq_cpu[] entry after unmapping
-  net: mvpp2: remove unused 'tx_skb' field of 'struct mvpp2_tx_queue'
-  net: mvpp2: drop useless fields in mvpp2_bm_pool and related code
-  net: mvpp2: simplify mvpp2_bm_bufs_add()
-  net: mvpp2: remove unused register definitions
-  net: mvpp2: fix indentation of MVPP2_EXT_GLOBAL_CTRL_DEFAULT
-  net: mvpp2: simplify MVPP2_PRS_RI_* definitions
-  net: mvpp2: switch to build_skb() in the RX path
-  net: mvpp2: enable building on 64-bit platforms
-
- drivers/net/ethernet/marvell/Kconfig |   3 +-
- drivers/net/ethernet/marvell/mvpp2.c | 208 +++++++++++++++++++++--------------
- 2 files changed, 125 insertions(+), 86 deletions(-)
-
+diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
+index ef68780..b219b0c 100644
+--- a/drivers/net/ethernet/marvell/mvpp2.c
++++ b/drivers/net/ethernet/marvell/mvpp2.c
+@@ -254,7 +254,7 @@
+ #define MVPP2_PHY_AN_CFG0_REG			0x34
+ #define     MVPP2_PHY_AN_STOP_SMI0_MASK		BIT(7)
+ #define MVPP2_MNG_EXTENDED_GLOBAL_CTRL_REG	0x305c
+-#define MVPP2_EXT_GLOBAL_CTRL_DEFAULT		0x27
++#define     MVPP2_EXT_GLOBAL_CTRL_DEFAULT	0x27
+ 
+ /* Per-port registers */
+ #define MVPP2_GMAC_CTRL_0_REG			0x0
 -- 
 2.7.4
