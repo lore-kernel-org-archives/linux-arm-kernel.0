@@ -1,63 +1,90 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 2 Feb 2017 16:14:22 +0000
-Subject: [PATCH] efi: fdt: avoid FDT manipulation after ExitBootServices()
-In-Reply-To: <08ff3f33-d97d-1efb-a05d-5ed1fccd2859@codeaurora.org>
-References: <1485971102-23330-1-git-send-email-ard.biesheuvel@linaro.org>
- <1485971102-23330-2-git-send-email-ard.biesheuvel@linaro.org>
- <ac1bad94-ffa3-4acf-a719-a8e8f4c7a283@codeaurora.org>
- <08ff3f33-d97d-1efb-a05d-5ed1fccd2859@codeaurora.org>
-Message-ID: <CAKv+Gu8bLWSGT+TUbuyX17Thph+NUhcy0uLev78xXO=KohHFhg@mail.gmail.com>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Thu, 2 Feb 2017 18:16:38 +0200
+Subject: [PATCH] virtio: Try to untangle DMA coherency
+In-Reply-To: <bb041fbe-3fde-0dc1-ae28-cca5acfe9dc5@arm.com>
+References: <8a6494f6409c20b4609cd6bdcdd751f68b5c0564.1485951731.git.robin.murphy@arm.com>
+ <20170201195732-mutt-send-email-mst@kernel.org>
+ <20170201182659.GM8177@arm.com>
+ <20170201210648-mutt-send-email-mst@kernel.org>
+ <20170202112614.GB30577@arm.com>
+ <bb041fbe-3fde-0dc1-ae28-cca5acfe9dc5@arm.com>
+Message-ID: <20170202181357-mutt-send-email-mst@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 February 2017 at 22:59, Jeffrey Hugo <jhugo@codeaurora.org> wrote:
-> On 2/1/2017 2:08 PM, Jeffrey Hugo wrote:
->>
->> On 2/1/2017 10:45 AM, Ard Biesheuvel wrote:
->>>
->>> Some AArch64 UEFI implementations disable the MMU in ExitBootServices(),
->>> after which unaligned accesses to RAM are no longer supported.
->>>
->>> Commit abfb7b686a3e ("efi/libstub/arm*: Pass latest memory map to the
->>> kernel") fixed an issue in the memory map handling of the stub FDT code,
->>> but inadvertently created an issue with such firmwares, by moving some
->>> of the FDT manipulation to after the invocation of ExitBootServices().
->>> Given that the stub's libfdt implementation uses the ordinary,
->>> accelerated
->>> string functions, which rely on hardware handling of unaligned accesses,
->>> manipulating the FDT with the MMU off may result in alignment faults.
->>>
->>> So fix the situation by moving the update_fdt_memmap() call into the
->>> callback function invoked by efi_exit_boot_services() right before it
->>> calls the ExitBootServices() UEFI service (which is arguably a better
->>> place for it anyway)
->>>
->>> Note that disabling the MMU in ExitBootServices() is not compliant with
->>> the UEFI spec, and carries great risk due to the fact that switching from
->>> cached to uncached memory accesses halfway through compiler generated
->>> code
->>> (i.e., involving a stack) can never be done in a way that is
->>> architecturally
->>> safe.
->>>
->>> Cc: <stable@vger.kernel.org>
->>> Fixes: abfb7b686a3e ("efi/libstub/arm*: Pass latest memory map to the
->>> kernel")
->>> Tested-by: Riku Voipio <riku.voipio@linaro.org>
->>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>
->>
->> NACK, please.  This causes a regression on my platform, in the form of
->> an assert in UEFI once ExitBootServices() is called, per initial
->> testing.  I'll do more testing to determine why.
->>
->
-> Sorry, false alarm.  The assert appears to have been the result of a bad
-> tree and a bad target configuration, and was not reproduced on another
-> setup, nor did the assert make sense in context with this change.
->
+On Thu, Feb 02, 2017 at 01:34:03PM +0000, Robin Murphy wrote:
+> On 02/02/17 11:26, Will Deacon wrote:
+> > On Wed, Feb 01, 2017 at 09:19:22PM +0200, Michael S. Tsirkin wrote:
+> >> On Wed, Feb 01, 2017 at 06:27:09PM +0000, Will Deacon wrote:
+> >>> On Wed, Feb 01, 2017 at 08:09:21PM +0200, Michael S. Tsirkin wrote:
+> >>>> I'd like to do that instead. It's fastboot doing the unreasonable thing
+> >>>> here and deviating from what every other legacy device without exception
+> >>>> did for years. If this means fastboot will need to update to virtio 1,
+> >>>> all the better.
+> >>>
+> >>> The problem still exists with virtio 1, unless we require that the
+> >>> "dma-coherent" property is set/unset correctly when VIRTIO_F_IOMMU_PLATFORM
+> >>> is advertised by the device (which is what I suggested in my reply).
+> >>
+> >> I'm not ignoring that, but I need to understand that part a bit better.
+> >> I'll reply to that patch in a day or two after looking at how _CCA is
+> >> supposed to work.
+> > 
+> > Thanks. I do think that whatever solution we come up with for virtio 1
+> > should influence what we do for legacy.
+> > 
+> >>> We can't detect the fastmodel,
+> >>
+> >> Surely, it puts a hardware id somewhere? I think you mean
+> >> fastmodel isn't always affected, right?
+> > 
+> > I don't think there's a hardware ID. The thing is, the fastmodel is a
+> > toolkit for building all sorts of platforms: you can chop and change
+> > the CPUs, the peripherals, the memory, the interrupt controller, the
+> > interconnect etc. Pretty much everything can be customised. So, for
+> > any fastmodel configuration that places virtio upstream of the SMMU
+> > (which is common, because virtio is one of the few DMA-capable peripherals
+> > that the fastmodel supports), we need to do something special.
+> > 
+> >> I'd like to see basically
+> >>
+> >> if (fastmodel)
+> >> 	a pile of special work-arounds
+> >> else
+> >> 	not less hacky but more common virtio work-arounds
+> >>
+> >> :)
+> >>
+> >> And then I can apply whatever comes from @arm.com and not
+> >> worry about breaking actual hardware.
+> > 
+> > What we could do is call iommu_group_get(&vdev->dev) for legacy
+> 
+> Actually, that should be vdev->dev.parent - I'm now not sure quite what
+> I managed to successfully test yesterday, but apparently it wasn't this
+> patch :(
+> 
+> > devices if CONFIG_ARM64. If that returns non-NULL, then we know that
+> > the device is upstream of an SMMU, which means it must be the fastmodel.
+> 
+> We can boot 32-bit kernels on models, so I'd be inclined to keep
+> CONFIG_ARM included, but I do tend to agree that explicitly checking for
+> an IOMMU is probably the cleanest approach if we reposition this as a
+> more specific quirk. I'll split apart the "Fast Models are wacky" vs.
+> "uh-oh device coherency" aspects and spin a v2 so that we can
+> (hopefully) sort the regression out ASAP.
+> 
+> Robin.
+> 
+> > 
+> > Will
+> > 
 
-No worries. Thanks for taking the time to test the patch.
+I still think the right thing to do for this platform is to add an API
+for driver to say "disable protection for this device and allow
+this device 1:1 access to all memory".  This
+would make both platforms which bypass the iommu and platforms that
+don't happy as PA == dma address.
 
 -- 
-Ard.
+MST
