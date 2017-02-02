@@ -1,42 +1,28 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 2 Feb 2017 19:54:02 +0100
-Subject: [PATCH 01/23] sama5d2.dtsi: workaround SPI DMA
-In-Reply-To: <20170202185213.21698-1-alexandre.belloni@free-electrons.com>
-References: <20170202185213.21698-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20170202185402.7c6yrbvy3q2qjbyx@piout.net>
+Date: Thu,  2 Feb 2017 19:53:17 +0100
+Subject: [PATCH] ARM: dts: at91: sama5d2_xplained: enable RTC wakeup
+Message-ID: <20170202185317.21800-1-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please, disregard that series, it has been sent by mistake.
+The sama5d2 Xplained can wake up with its RTC. Enable that feature.
 
-On 02/02/2017 at 19:51:51 +0100, Alexandre Belloni wrote:
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  arch/arm/boot/dts/sama5d2.dtsi | 6 ------
->  1 file changed, 6 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-> index 111470359235..908b0baca42f 100644
-> --- a/arch/arm/boot/dts/sama5d2.dtsi
-> +++ b/arch/arm/boot/dts/sama5d2.dtsi
-> @@ -916,12 +916,6 @@
->  				compatible = "atmel,at91rm9200-spi";
->  				reg = <0xf8000000 0x100>;
->  				interrupts = <33 IRQ_TYPE_LEVEL_HIGH 7>;
-> -				dmas = <&dma0
-> -					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-> -					 AT91_XDMAC_DT_PERID(6))>,
-> -				       <&dma0
-> -					(AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) |
-> -					 AT91_XDMAC_DT_PERID(7))>;
->  				dma-names = "tx", "rx";
->  				clocks = <&spi0_clk>;
->  				clock-names = "spi_clk";
-> -- 
-> 2.11.0
-> 
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
+diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+index 0b9a59d5fdac..da47fa19f474 100644
+--- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
++++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+@@ -244,6 +244,7 @@
+ 
+ 			shdwc at f8048010 {
+ 				atmel,shdwc-debouncer = <976>;
++				atmel,wakeup-rtc-timer;
+ 
+ 				input at 0 {
+ 					reg = <0>;
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.11.0
