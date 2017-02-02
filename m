@@ -1,49 +1,50 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 2 Feb 2017 10:22:03 +0100
-Subject: [PATCH/RFC] arm64: defconfig: Enlarge CMA alignment to 2 MiB
-In-Reply-To: <a4e171b0-6403-9d88-3b8f-e63f3f050689@arm.com>
-References: <1485532996-19719-1-git-send-email-geert+renesas@glider.be>
- <CANqRtoQJaRK7Kys-fudyxJuojBmZyXMsNoDudSt4p=gj5srviA@mail.gmail.com>
- <a4e171b0-6403-9d88-3b8f-e63f3f050689@arm.com>
-Message-ID: <20170202092203.GK21831@verge.net.au>
+From: mylene.josserand@free-electrons.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
+Date: Thu,  2 Feb 2017 10:24:15 +0100
+Subject: [PATCH v4 1/8] ASoC: sun4i-i2s: Update binding documentation to
+ include A31
+In-Reply-To: <20170202092422.5588-1-mylene.josserand@free-electrons.com>
+References: <20170202092422.5588-1-mylene.josserand@free-electrons.com>
+Message-ID: <20170202092422.5588-2-mylene.josserand@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2017 at 02:06:45PM +0000, Robin Murphy wrote:
-> On 01/02/17 13:45, Magnus Damm wrote:
-> > Hi Geert,
-> > 
-> > On Sat, Jan 28, 2017 at 1:03 AM, Geert Uytterhoeven
-> > <geert+renesas@glider.be> wrote:
-> >> Some IOMMUs (e.g. Renesas IPMMU/VMSA) support only page sizes of 4 KiB,
-> >> 2 MiB, and 1 GiB.
-> >>
-> >> With the default setting of CONFIG_CMA_ALIGNMENT = 8, allocations larger
-> >> than 1 MiB are aligned to a 1 MiB boundary only.  Hence a 2 MiB
-> >> allocation may not be aligned, leading to a mapping of 512 4 KiB pages.
-> >>
-> >> Increase CONFIG_CMA_ALIGNMENT to allow mapping a 2 MiB buffer using a
-> >> single PTE, decreasing memory usage and TLB pressure.
-> >>
-> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> >> ---
-> >> Is this useful?
-> >>
-> >> Should there instead be different defaults in Kconfig, depending on
-> >> enabled platform support?
-> > 
-> > I think there is a dependency on the kernel page size configuration as
-> > well. In case of 16 KiB or 64 KiB page size configuration other large
-> > page sizes may be required.
-> 
-> I don't see the original patch (linux-arm-kernel doesn't look to have it
-> archived either), but I think bumping the default up to 2MB to match our
-> normal section size sounds generally reasonable - users can still
-> override it manually in their config, right? For 16KB and 64KB granules,
-> it is at least the size covered by contiguous-hinted pages; the actual
-> section sizes there are far too big to be practical for alignment
-> purposes anyway (32MB and 512MB respectively).
+Add a new compatible for sun4i-i2s driver to handle some
+SoCs that have a reset line that must be asserted/deasserted.
 
-I am happy to take this patch on the strength of the above but an Ack or
-similar tag from Robin would be nice. Geert, perhaps you could repost the
-patch with Robin CCed?
+This new compatible, "allwinner,sun6i-a31-i2s", requires the
+property "resets" which should be a phandle to the reset line.
+Except these differences, the compatible is identical to previous one
+which will not handle a reset line.
+
+Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/sound/sun4i-i2s.txt | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+index 7b526ec64991..f4adc58f82ba 100644
+--- a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
++++ b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+@@ -7,6 +7,7 @@ Required properties:
+ 
+ - compatible: should be one of the followings
+    - "allwinner,sun4i-a10-i2s"
++   - "allwinner,sun6i-a31-i2s"
+ - reg: physical base address of the controller and length of memory mapped
+   region.
+ - interrupts: should contain the I2S interrupt.
+@@ -19,6 +20,10 @@ Required properties:
+    - "mod" : module clock for the I2S controller
+ - #sound-dai-cells : Must be equal to 0
+ 
++Required properties for the following compatibles:
++	- "allwinner,sun6i-a31-i2s"
++- resets: phandle to the reset line for this codec
++
+ Example:
+ 
+ i2s0: i2s at 01c22400 {
+-- 
+2.11.0
