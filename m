@@ -1,68 +1,123 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Feb 2017 22:35:28 +0000
-Subject: [PATCH v3 20/24] media: imx: Add Camera Interface subdev driver
-In-Reply-To: <1483755102-24785-21-git-send-email-steve_longerbeam@mentor.com>
-References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
- <1483755102-24785-21-git-send-email-steve_longerbeam@mentor.com>
-Message-ID: <20170202223528.GX27312@n2100.armlinux.org.uk>
+From: agustinv@codeaurora.org (Agustin Vega-Frias)
+Date: Thu, 02 Feb 2017 17:38:49 -0500
+Subject: [PATCH V10 2/3] ACPI: Add support for ResourceSource/IRQ domain
+ mapping
+In-Reply-To: <CAJZ5v0gfW-qn0Onj95EJmU94rp-+osZCqk+JBs96cJuGz1PUTA@mail.gmail.com>
+References: <1484757988-23739-1-git-send-email-agustinv@codeaurora.org>
+ <1484757988-23739-3-git-send-email-agustinv@codeaurora.org>
+ <CAJZ5v0gfW-qn0Onj95EJmU94rp-+osZCqk+JBs96cJuGz1PUTA@mail.gmail.com>
+Message-ID: <a0cc7d21838cf922c8c7cca1bd2b4b49@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jan 06, 2017 at 06:11:38PM -0800, Steve Longerbeam wrote:
-> +struct camif_priv {
-> +	struct device         *dev;
-> +	struct video_device    vfd;
+Hi Rafael,
 
-You can't do this.
+On 2017-01-31 17:10, Rafael J. Wysocki wrote:
+> On Wed, Jan 18, 2017 at 5:46 PM, Agustin Vega-Frias
+> <agustinv@codeaurora.org> wrote:
+>> ACPI extended IRQ resources may contain a ResourceSource to specify
+>> an alternate interrupt controller. Introduce acpi_irq_get and use it
+>> to implement ResourceSource/IRQ domain mapping.
+>> 
+>> The new API is similar to of_irq_get and allows re-initialization
+>> of a platform resource from the ACPI extended IRQ resource, and
+>> provides proper behavior for probe deferral when the domain is not
+>> yet present when called.
+>> 
+>> Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
+>> ---
+> [...]
+>> diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+>> index c4af003..61423d2 100644
+>> --- a/drivers/base/platform.c
+>> +++ b/drivers/base/platform.c
+>> @@ -102,6 +102,14 @@ int platform_get_irq(struct platform_device *dev, 
+>> unsigned int num)
+>>         }
+>> 
+>>         r = platform_get_resource(dev, IORESOURCE_IRQ, num);
+>> +       if (r && r->flags & IORESOURCE_DISABLED && 
+>> ACPI_COMPANION(&dev->dev)) {
+>> +               int ret;
+>> +
+>> +               ret = acpi_irq_get(ACPI_HANDLE(&dev->dev), num, r);
+>> +               if (ret)
+>> +                       return ret;
+>> +       }
+> 
+> The code above is a bit convoluted.  It would be better to write it as
+> something like
+> 
+> if (r && r->flags & IORESOURCE_DISABLED) {
+>         struct acpi_device *adev = ACPI_COMPANION(&dev->dev);
+> 
+>         if (adev) {
+>                 int ret = acpi_irq_get(adev->handle, num, r);
+> 
+>                 if (ret)
+>                         return ret;
+>         }
+> }
+> 
 
-> +static struct video_device camif_videodev = {
-> +	.fops		= &camif_fops,
-> +	.ioctl_ops	= &camif_ioctl_ops,
-> +	.minor		= -1,
-> +	.release	= video_device_release,
-> +	.vfl_dir	= VFL_DIR_RX,
-> +	.tvnorms	= V4L2_STD_NTSC | V4L2_STD_PAL | V4L2_STD_SECAM,
-> +};
+I changed this to:
 
-> +static int camif_probe(struct platform_device *pdev)
-> +{
-> +	struct imx_media_internal_sd_platformdata *pdata;
-> +	struct camif_priv *priv;
-> +	struct video_device *vfd;
-> +	int ret;
-> +
-> +	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
-> +	if (!priv)
-> +		return -ENOMEM;
+     r = platform_get_resource(dev, IORESOURCE_IRQ, num);
+     if (has_acpi_companion(&dev->dev)) {
+         if (r && r->flags & IORESOURCE_DISABLED) {
+             int ret;
 
-You kmalloc this structure, so this structure has the lifetime of
-the driver being bound to the platform device.
+             ret = acpi_irq_get(ACPI_HANDLE(&dev->dev), num, r);
+             if (ret)
+                 return ret;
+         }
+     }
 
-> +	vfd = &priv->vfd;
-> +	*vfd = camif_videodev;
+To avoid errors when CONFIG_ACPI is disabled.
 
-However, "*vfd" contains a struct device, and you _correctly_ set the
-release function for "*vfd" to video_device_release via camif_videodev.
+Thanks for the ACKs. V12 coming soon.
 
-However, if you try to rmmod imx-media, then you end up with a kernel
-warning that you're freeing memory containing a held lock, and later
-chaos ensues because kmalloc has been corrupted.
+Agustin
 
-The root cause of this is embedding the device structure within the
-video_device into the driver's private data.  *Any* structure what so
-ever that contains a kref is reference counted, and that includes
-struct device, and therefore also includes struct video_device.  What
-that means is that its lifetime is _not_ under _your_ control, and
-you may not free it except through its release function (which is
-video_device_release().)  However, that also tries to kfree (with an
-offset of 4) your private data, which results in the warning and the
-corrupted kmalloc free lists.
-
-The solution is simple, make "vfd" a pointer in your private data
-structure and kmalloc() it separately, letting video_device_release()
-kfree() that data when it needs to.
+>> +
+>>         /*
+>>          * The resources may pass trigger flags to the irqs that need
+>>          * to be set up. It so happens that the trigger flags for
+>> @@ -1450,4 +1458,3 @@ void __init early_platform_cleanup(void)
+>>                 memset(&pd->dev.devres_head, 0, 
+>> sizeof(pd->dev.devres_head));
+>>         }
+>>  }
+>> -
+>> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+>> index 5b36974..03a94cd 100644
+>> --- a/include/linux/acpi.h
+>> +++ b/include/linux/acpi.h
+>> @@ -1153,4 +1153,14 @@ static inline void acpi_table_upgrade(void) { }
+>>  static inline int parse_spcr(bool earlycon) { return 0; }
+>>  #endif
+>> 
+>> +#ifdef CONFIG_ACPI_GENERIC_GSI
+>> +int acpi_irq_get(acpi_handle handle, unsigned int index, struct 
+>> resource *res);
+>> +#else
+>> +static inline int acpi_irq_get(acpi_handle handle, unsigned int 
+>> index,
+>> +                              struct resource *res)
+>> +{
+>> +       return -EINVAL;
+>> +}
+>> +#endif
+>> +
+>>  #endif /*_LINUX_ACPI_H*/
+> 
+> The rest looks reasonable to me.
+> 
+> Thanks,
+> Rafael
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm 
+Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
+Linux Foundation Collaborative Project.
