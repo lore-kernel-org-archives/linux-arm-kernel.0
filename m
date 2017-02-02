@@ -1,140 +1,45 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  2 Feb 2017 17:33:19 +0000
-Subject: [PATCH v4] efi: arm64: Add vmlinux debug link to the Image binary
-Message-ID: <1486056799-4825-1-git-send-email-ard.biesheuvel@linaro.org>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 02 Feb 2017 18:37:42 +0100
+Subject: [GIT PULL] Reset controller changes for v4.11, part 2
+Message-ID: <1486057062.2289.89.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building with debugging symbols, take the absolute path to the
-vmlinux binary and add it to the special PE/COFF debug table entry.
-This allows a debug EFI build to find the vmlinux binary, which is
-very helpful in debugging, given that the offset where the Image is
-first loaded by EFI is highly unpredictable.
+Dear arm-soc maintainers,
 
-On implementations of UEFI that choose to implement it, this
-information is exposed via the EFI debug support table, which is a UEFI
-configuration table that is accessible both by the firmware at boot time
-and by the OS at runtime, and lists all PE/COFF images loaded by the
-system.
+Please consider merging this tag, which fixes an issue with the optional
+reset control API change from the last pull request and removes any
+remaining modular code from the new builtin zx2967 driver.
 
-The format of the NB10 Codeview entry is based on the definition used
-by EDK2, which is our primary reference when it comes to the use of
-PE/COFF in the context of UEFI firmware.
+regards
+Philipp
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-v4: add a separate DEBUG_EFI debug option so that this feature is disabled
-    by default
-    dropped 1/2 which has been queued already in the EFI tree
-    use ASCII rather than an opaque constant for "NB10" signature
+The following changes since commit bb475230b8e59a547ab66ac3b02572df21a580e9:
 
- arch/arm64/Kconfig.debug   |  8 ++++
- arch/arm64/kernel/Makefile |  4 ++
- arch/arm64/kernel/head.S   | 47 +++++++++++++++++++-
- 3 files changed, 58 insertions(+), 1 deletion(-)
+  reset: make optional functions really optional (2017-01-20 10:36:15 +0100)
 
-diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-index d1ebd46872fd..f7f38b1aab14 100644
---- a/arch/arm64/Kconfig.debug
-+++ b/arch/arm64/Kconfig.debug
-@@ -95,6 +95,14 @@ config DEBUG_ALIGN_RODATA
- 
- 	  If in doubt, say N.
- 
-+config DEBUG_EFI
-+	depends on EFI && DEBUG_INFO
-+	bool "UEFI debugging"
-+	help
-+	  Enable this option to include EFI specific debugging features into
-+	  the kernel that are only useful when using a debug build of the
-+	  UEFI firmware
-+
- source "drivers/hwtracing/coresight/Kconfig"
- 
- endmenu
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 7d66bbaafc0c..2600c60337ac 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -55,3 +55,7 @@ obj-y					+= $(arm64-obj-y) vdso/ probes/
- obj-m					+= $(arm64-obj-m)
- head-y					:= head.o
- extra-y					+= $(head-y) vmlinux.lds
-+
-+ifeq ($(CONFIG_DEBUG_EFI),y)
-+AFLAGS_head.o += -DVMLINUX_PATH="\"$(shell readlink -f $(objtree)/vmlinux)\""
-+endif
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 4b1abac3485a..d9faf09f6401 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -149,7 +149,7 @@ extra_header_fields:
- 	.quad	0				// SizeOfHeapReserve
- 	.quad	0				// SizeOfHeapCommit
- 	.long	0				// LoaderFlags
--	.long	0x6				// NumberOfRvaAndSizes
-+	.long	(section_table - .) / 8		// NumberOfRvaAndSizes
- 
- 	.quad	0				// ExportTable
- 	.quad	0				// ImportTable
-@@ -158,6 +158,11 @@ extra_header_fields:
- 	.quad	0				// CertificationTable
- 	.quad	0				// BaseRelocationTable
- 
-+#ifdef CONFIG_DEBUG_EFI
-+	.long	efi_debug_table - _head		// DebugTable
-+	.long	efi_debug_table_size
-+#endif
-+
- 	// Section table
- section_table:
- 
-@@ -195,6 +200,46 @@ section_table:
- 	.short	0		// NumberOfLineNumbers  (0 for executables)
- 	.long	0xe0500020	// Characteristics (section flags)
- 
-+#ifdef CONFIG_DEBUG_EFI
-+	/*
-+	 * The debug table is referenced via its Relative Virtual Address (RVA),
-+	 * which is only defined for those parts of the image that are covered
-+	 * by a section declaration. Since this header is not covered by any
-+	 * section, the debug table must be emitted elsewhere. So stick it in
-+	 * the .init.rodata section instead.
-+	 *
-+	 * Note that the EFI debug entry itself may legally have a zero RVA,
-+	 * which means we can simply put it right after the section headers.
-+	 */
-+	__INITRODATA
-+
-+	.align	2
-+efi_debug_table:
-+	// EFI_IMAGE_DEBUG_DIRECTORY_ENTRY
-+	.long	0			// Characteristics
-+	.long	0			// TimeDateStamp
-+	.short	0			// MajorVersion
-+	.short	0			// MinorVersion
-+	.long	2			// Type == EFI_IMAGE_DEBUG_TYPE_CODEVIEW
-+	.long	efi_debug_entry_size	// SizeOfData
-+	.long	0			// RVA
-+	.long	efi_debug_entry - _head	// FileOffset
-+
-+	.set	efi_debug_table_size, . - efi_debug_table
-+	.previous
-+
-+efi_debug_entry:
-+	// EFI_IMAGE_DEBUG_CODEVIEW_NB10_ENTRY
-+	.ascii	"NB10"			// Signature
-+	.long	0			// Unknown
-+	.long	0			// Unknown2
-+	.long	0			// Unknown3
-+
-+	.asciz	VMLINUX_PATH
-+
-+	.set	efi_debug_entry_size, . - efi_debug_entry
-+#endif
-+
- 	/*
- 	 * EFI will load .text onwards at the 4k section alignment
- 	 * described in the PE/COFF header. To ensure that instruction
--- 
-2.7.4
+are available in the git repository at:
+
+  git://git.pengutronix.de/pza/linux tags/reset-for-4.11-2
+
+for you to fetch changes up to 7a1ca76dba35d1a443278811fb67625f0e98a713:
+
+  reset: make zx2967 explicitly non-modular (2017-02-02 16:32:09 +0100)
+
+----------------------------------------------------------------
+Reset controller changes for v4.11, part 2
+
+- Fix missing NULL check in reset_control_put for optional reset control
+  conversion
+- Make zx2967 driver explicitly non-modular
+
+----------------------------------------------------------------
+Heiner Kallweit (1):
+      reset: core: fix reset_control_put
+
+Paul Gortmaker (1):
+      reset: make zx2967 explicitly non-modular
+
+ drivers/reset/core.c         | 2 +-
+ drivers/reset/reset-zx2967.c | 7 -------
+ 2 files changed, 1 insertion(+), 8 deletions(-)
