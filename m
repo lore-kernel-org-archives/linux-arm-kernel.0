@@ -1,7 +1,7 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed,  1 Feb 2017 18:04:19 -0800
+Date: Wed,  1 Feb 2017 18:06:07 -0800
 Subject: [GIT PULL 1/2] Broadcom dts changes for 4.11 (part 2)
-Message-ID: <20170202020420.31512-1-f.fainelli@gmail.com>
+Message-ID: <20170202020607.31682-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,11 +11,32 @@ The following changes since commit c5a8e3add28ca4063410353acfbe6e650174e432:
 
 are available in the git repository at:
 
-  http://github.com/Broadcom/stblinux devicetree/next
+  http://github.com/Broadcom/stblinux tags/arm-soc/for-4.11/devicetree-part2
 
 for you to fetch changes up to c206e53d4c672ec83a4fc4d70eeac22d4b4ca80d:
 
   Merge tag 'bcm2835-dt-next-2017-01-31' into devicetree/next (2017-02-01 17:37:59 -0800)
+
+----------------------------------------------------------------
+This pull request contains the second round of Device Tree updates for Broadcom
+ARM-based SoCs for 4.11, please pull the following:
+
+- Rafal adds support for two new Linksys routers: Linksys EA9200 (BCM4709) and
+  Linksys EA6300 V1 (BCM4708)
+
+- Dhanajay adds supports for the USB Device Tree nodes to the Northstar Plus
+  SoC
+
+- Baruch makes several fixes to the uart0 pinctrl node names, fixes the i2c0 pins
+  and the uart0/uart1 pins as well. Finally, he adds proper indexes to the ethernet
+  aliases
+
+- Eric merges a topic branch from the clk tree to incorporate several DSI0/1 pixel
+  clock requirements and he finally proceeds with adding proper DSI modules nodes
+  and clocks to the BCM2835 Device Tree
+
+Please note that because of the "clk" topic branch merged by Eric, we end-up with
+pulling in v4.10-rc2 which is responsible for the funny diff here.
 
 ----------------------------------------------------------------
 Al Viro (1):
