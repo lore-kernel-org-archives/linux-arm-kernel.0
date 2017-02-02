@@ -1,28 +1,79 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 2 Feb 2017 15:45:05 +0800
-Subject: [PATCH 09/33] Input: sun4i-lradc-keys - Drop unnecessary call to
- platform_set_drvdata and other changes
-In-Reply-To: <1484761614-12225-10-git-send-email-linux@roeck-us.net>
-References: <1484761614-12225-1-git-send-email-linux@roeck-us.net>
- <1484761614-12225-10-git-send-email-linux@roeck-us.net>
-Message-ID: <CAGb2v66xRG7ubPqjTEzUk=fRY0h6MKK-UFePpbBE7nLiK7qaoA@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 2 Feb 2017 07:48:41 +0000
+Subject: [RFC PATCH v2 4/4] crypto: aes - add generic time invariant AES
+ for CTR/CCM/GCM
+In-Reply-To: <20170202073824.GC582@zzz>
+References: <1485646413-17491-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1485646413-17491-5-git-send-email-ard.biesheuvel@linaro.org>
+ <20170202073824.GC582@zzz>
+Message-ID: <CAKv+Gu-0WK7AkgcTsFNUUCeyaafQiWziSuYzY6VEWAPZ41E1ag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 19, 2017 at 1:46 AM, Guenter Roeck <linux@roeck-us.net> wrote:
-> There is no call to platform_get_drvdata() or dev_get_drvdata().
-> Drop the unnecessary call to platform_set_drvdata().
-> Other relevant changes:
->   Simplify error return
+On 2 February 2017 at 07:38, Eric Biggers <ebiggers3@gmail.com> wrote:
+> Hi Ard,
 >
-> This conversion was done automatically with coccinelle using the
-> following semantic patches. The semantic patches and the scripts
-> used to generate this commit log are available at
-> https://github.com/groeck/coccinelle-patches
+> On Sat, Jan 28, 2017 at 11:33:33PM +0000, Ard Biesheuvel wrote:
+>>
+>> Note that this only implements AES encryption, which is all we need
+>> for CTR and CBC-MAC. AES decryption can easily be implemented in a
+>> similar way, but is significantly more costly.
 >
-> - Replace 'if (e) return e; return 0;' with 'return e;'
-> - Drop platform_set_drvdata()
->
-> Signed-off-by: Guenter Roeck <linux@roeck-us.net>
+> Is the expectation of decryption being more costly the only reason why "aes-ti"
+> couldn't be a "cipher" algorithm, allowing it to automatically be used by the
+> existing templates for CTR, CBC-MAC, CBC, ECB, XTS, CMAC, etc.?
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Yes.
+
+> It doesn't seem
+> to do anything expensive on a per-block basis like loading SSE registers, so it
+> seems it would fit better as a "cipher" algorithm if at all possible.  Then
+> there would be no need to implement all these modes yet again.
+>
+
+True.
+
+> Also, what would be the feasibility of simply replacing aes-generic with the
+> time-invariant implementation, rather than offering two implementations and
+> requiring users to choose one, usually without the needed expertise?
+>
+
+Well, it is a policy decision whether you want the best performance or
+reduced correlation between timing and the input, so there is no way
+to make everybody happy by replacing one with the other. But I can
+certainly implement is as a cipher, and we can take the discussion
+from there.
+
+>> +
+>> +/*
+>> + * Emit the sbox as __weak with external linkage to prevent the compiler
+>> + * from doing constant folding on sbox references involving fixed indexes.
+>> + */
+>> +__weak const u8 __cacheline_aligned __aesti_sbox[] = {
+>
+> Did you consider marking it 'volatile' instead?
+>
+
+I did not, and I expect the result to be the same. I can replace it if
+it matters.
+
+>> +static int aesti_set_key(struct aes_ti_ctx *ctx, const u8 *in_key,
+>> +                      unsigned int key_len)
+>> +{
+>> +     struct crypto_aes_ctx rk;
+>> +     int err;
+>> +
+>> +     err = crypto_aes_expand_key(&rk, in_key, key_len);
+>> +     if (err)
+>> +             return err;
+>
+> crypto_aes_expand_key() assumes that the key is u32-aligned; I don't think
+> that's guaranteed here.
+>
+
+No, I don't think so. AFAICT it expects the round keys to be u32
+aligned, which is guaranteed due to the fact that struct
+crypto_aes_ctx encapsulates an array of u32
+
+Regards,
+Ard.
