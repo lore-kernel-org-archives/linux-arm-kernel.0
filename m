@@ -1,122 +1,36 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Thu, 2 Feb 2017 18:44:27 +0200
-Subject: [PATCH] virtio: Try to untangle DMA coherency
-In-Reply-To: <d9732885-7cd2-461c-6812-37581294b47f@arm.com>
-References: <8a6494f6409c20b4609cd6bdcdd751f68b5c0564.1485951731.git.robin.murphy@arm.com>
- <20170201195732-mutt-send-email-mst@kernel.org>
- <20170201182659.GM8177@arm.com>
- <20170201210648-mutt-send-email-mst@kernel.org>
- <20170202112614.GB30577@arm.com>
- <bb041fbe-3fde-0dc1-ae28-cca5acfe9dc5@arm.com>
- <20170202181357-mutt-send-email-mst@kernel.org>
- <d9732885-7cd2-461c-6812-37581294b47f@arm.com>
-Message-ID: <20170202184158-mutt-send-email-mst@kernel.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 2 Feb 2017 17:44:57 +0100
+Subject: [PATCHv2 net-next 01/16] dt-bindings: net: update Marvell PPv2
+ binding for PPv2.2 support
+In-Reply-To: <20170107093228.GI14217@n2100.armlinux.org.uk>
+References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1482943592-12556-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20170107093228.GI14217@n2100.armlinux.org.uk>
+Message-ID: <20170202174457.17ceabe9@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2017 at 04:39:35PM +0000, Marc Zyngier wrote:
-> On 02/02/17 16:16, Michael S. Tsirkin wrote:
-> > On Thu, Feb 02, 2017 at 01:34:03PM +0000, Robin Murphy wrote:
-> >> On 02/02/17 11:26, Will Deacon wrote:
-> >>> On Wed, Feb 01, 2017 at 09:19:22PM +0200, Michael S. Tsirkin wrote:
-> >>>> On Wed, Feb 01, 2017 at 06:27:09PM +0000, Will Deacon wrote:
-> >>>>> On Wed, Feb 01, 2017 at 08:09:21PM +0200, Michael S. Tsirkin wrote:
-> >>>>>> I'd like to do that instead. It's fastboot doing the unreasonable thing
-> >>>>>> here and deviating from what every other legacy device without exception
-> >>>>>> did for years. If this means fastboot will need to update to virtio 1,
-> >>>>>> all the better.
-> >>>>>
-> >>>>> The problem still exists with virtio 1, unless we require that the
-> >>>>> "dma-coherent" property is set/unset correctly when VIRTIO_F_IOMMU_PLATFORM
-> >>>>> is advertised by the device (which is what I suggested in my reply).
-> >>>>
-> >>>> I'm not ignoring that, but I need to understand that part a bit better.
-> >>>> I'll reply to that patch in a day or two after looking at how _CCA is
-> >>>> supposed to work.
-> >>>
-> >>> Thanks. I do think that whatever solution we come up with for virtio 1
-> >>> should influence what we do for legacy.
-> >>>
-> >>>>> We can't detect the fastmodel,
-> >>>>
-> >>>> Surely, it puts a hardware id somewhere? I think you mean
-> >>>> fastmodel isn't always affected, right?
-> >>>
-> >>> I don't think there's a hardware ID. The thing is, the fastmodel is a
-> >>> toolkit for building all sorts of platforms: you can chop and change
-> >>> the CPUs, the peripherals, the memory, the interrupt controller, the
-> >>> interconnect etc. Pretty much everything can be customised. So, for
-> >>> any fastmodel configuration that places virtio upstream of the SMMU
-> >>> (which is common, because virtio is one of the few DMA-capable peripherals
-> >>> that the fastmodel supports), we need to do something special.
-> >>>
-> >>>> I'd like to see basically
-> >>>>
-> >>>> if (fastmodel)
-> >>>> 	a pile of special work-arounds
-> >>>> else
-> >>>> 	not less hacky but more common virtio work-arounds
-> >>>>
-> >>>> :)
-> >>>>
-> >>>> And then I can apply whatever comes from @arm.com and not
-> >>>> worry about breaking actual hardware.
-> >>>
-> >>> What we could do is call iommu_group_get(&vdev->dev) for legacy
-> >>
-> >> Actually, that should be vdev->dev.parent - I'm now not sure quite what
-> >> I managed to successfully test yesterday, but apparently it wasn't this
-> >> patch :(
-> >>
-> >>> devices if CONFIG_ARM64. If that returns non-NULL, then we know that
-> >>> the device is upstream of an SMMU, which means it must be the fastmodel.
-> >>
-> >> We can boot 32-bit kernels on models, so I'd be inclined to keep
-> >> CONFIG_ARM included, but I do tend to agree that explicitly checking for
-> >> an IOMMU is probably the cleanest approach if we reposition this as a
-> >> more specific quirk. I'll split apart the "Fast Models are wacky" vs.
-> >> "uh-oh device coherency" aspects and spin a v2 so that we can
-> >> (hopefully) sort the regression out ASAP.
-> >>
-> >> Robin.
-> >>
-> >>>
-> >>> Will
-> >>>
-> > 
-> > I still think the right thing to do for this platform is to add an API
-> > for driver to say "disable protection for this device and allow
-> > this device 1:1 access to all memory".  This
-> > would make both platforms which bypass the iommu and platforms that
-> > don't happy as PA == dma address.
-> 
-> Hi Michael,
-> 
-> What would this API be? A command-line option? A magic DT property? Yet
-> another ACPI bodge? Given the type of HW platform we're looking at,
-> changing the firmware to expose a new property is unlikely to be practical.
+Hello,
 
-No - I mean an internal kernel API that the legacy driver can call.
-
-> My point is: we have all the required information in the kernel to do
-> the right thing without asking the user to change anything in their
-> existing setup. With this (admittedly unpleasant) change, we can make
-> things work for both IOMMU and non-IOMMU setups, dma-coherent or not.
-> And frankly, it doesn't look much worse than the Xen thing that sits a
-> few lines above.
+On Sat, 7 Jan 2017 09:32:28 +0000, Russell King - ARM Linux wrote:
+> On Wed, Dec 28, 2016 at 05:46:17PM +0100, Thomas Petazzoni wrote:
+> > @@ -31,7 +43,7 @@ Optional properties (port):
+> >    then fixed link is assumed, and the 'fixed-link' property is
+> >    mandatory.  
 > 
-> Am I missing something more obvious than "you should use a flying car
-> instead"? ;-)
+> Not directly related to this patch, but this context is wrong.  The
+> PP2 driver _requires_ a PHY.  It doesn't support fixed-link in its
+> current form.  I think the DT binding describes an expectation of
+> a future driver.
 > 
-> Thanks,
-> 
-> 	M.
+> The side effect is that if trying to use a fixed-link on any port,
+> the ethernet driver fails to probe.
 
-I agree we should try to do the right thing. Using an MMU to
-protect against a hypervisor is a futile effort though.
-It simply makes sense to allow virtio access to all of memory.
-virtio 1 has a flag to control that to handle weird corner cases.
+Correct. I will send a patch to adjust the Device Tree binding
+documentation accordingly. Thanks for noticing this mistake!
 
-
-> -- 
-> Jazz is not dead. It just smells funny...
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
