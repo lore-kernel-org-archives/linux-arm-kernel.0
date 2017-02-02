@@ -1,38 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 2 Feb 2017 13:04:34 +0100
-Subject: [PATCH] [media] staging: bcm2835: mark all symbols as 'static'
-In-Reply-To: <20170202113436.690145-1-arnd@arndb.de>
-References: <20170202113436.690145-1-arnd@arndb.de>
-Message-ID: <CAK8P3a0TMW+GrdbLPqBDKyqXaP-LvYkGfD5bfcW4W6dXMnHy1A@mail.gmail.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Thu, 2 Feb 2017 13:06:19 +0100
+Subject: [PATCH 2/2] drm: meson: rename driver name to meson-drm
+In-Reply-To: <a6655fb5-5267-6536-d9b6-5ce0ff9f25ec@baylibre.com>
+References: <1486028864-19622-1-git-send-email-narmstrong@baylibre.com>
+ <1486028864-19622-3-git-send-email-narmstrong@baylibre.com>
+ <20170202104514.nogjnsuimeulml53@phenom.ffwll.local>
+ <a6655fb5-5267-6536-d9b6-5ce0ff9f25ec@baylibre.com>
+Message-ID: <20170202120618.fvypcbvo7pbgoeom@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 2, 2017 at 12:34 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> I got a link error in allyesconfig:
->
-> drivers/staging/media/platform/bcm2835/bcm2835-camera.o: In function `vidioc_enum_framesizes':
-> bcm2835-camera.c:(.text.vidioc_enum_framesizes+0x0): multiple definition of `vidioc_enum_framesizes'
-> drivers/media/platform/vivid/vivid-vid-cap.o:vivid-vid-cap.c:(.text.vidioc_enum_framesizes+0x0): first defined here
->
-> While both drivers are equally at fault for this problem, the bcm2835 one was
-> just added and is easier to fix, as it is only one file, and none of its symbols
-> need to be globally visible. This marks the three global symbols as static.
->
-> Fixes: 7b3ad5abf027 ("staging: Import the BCM2835 MMAL-based V4L2 camera driver.")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On Thu, Feb 02, 2017 at 11:50:59AM +0100, Neil Armstrong wrote:
+> On 02/02/2017 11:45 AM, Daniel Vetter wrote:
+> > On Thu, Feb 02, 2017 at 10:47:44AM +0100, Neil Armstrong wrote:
+> >> The platform driver name is currently "meson" which can lead to some
+> >> confusion, this patch renames it to "meson-drm" and removes the owner
+> >> attribute.
+> >>
+> >> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> >> ---
+> >>  drivers/gpu/drm/meson/meson_drv.c | 3 +--
+> >>  1 file changed, 1 insertion(+), 2 deletions(-)
+> >>
+> >> diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
+> >> index ff1f601..380bde7 100644
+> >> --- a/drivers/gpu/drm/meson/meson_drv.c
+> >> +++ b/drivers/gpu/drm/meson/meson_drv.c
+> >> @@ -329,8 +329,7 @@ static int meson_drv_remove(struct platform_device *pdev)
+> >>  	.probe      = meson_drv_probe,
+> >>  	.remove     = meson_drv_remove,
+> >>  	.driver     = {
+> >> -		.owner  = THIS_MODULE,
+> 
+> Hi Daniel,
+> 
+> > I don't get why you remove this, generally that will lead to trouble of
+> > being able to unload code that's still in use ...
+> 
+> Indeed, but since a (long ?) time, the owner field is now populated by the
+>  platform_driver_register() core code.
+> 
+> > 
+> > Otherwise ack.
+> > 
+> > Now, do you want to get this landed as part of the small drivers in
+> > drm-mis experiment?
+> 
+> I have a PR ready, but it can go through this experiment, yes.
 
-Please disregard this patch version, it's broken.
+If you want to give it a spin, you need:
+- fdo account https://www.freedesktop.org/wiki/AccountRequests/
+- drm-misc group access
+- dim set up for drm-misc, see
+  https://01.org/linuxgraphics/gfx-docs/maintainer-tools/dim.html and
+  https://01.org/linuxgraphics/gfx-docs/maintainer-tools/drm-misc.html
 
-> @@ -50,7 +50,7 @@ MODULE_AUTHOR("Vincent Sanders");
->  MODULE_LICENSE("GPL");
->  MODULE_VERSION(BM2835_MMAL_VERSION);
->
-> -int bcm2835_v4l2_debug;
-> +static int bcm2835_v4l2_debug;
->  module_param_named(debug, bcm2835_v4l2_debug, int, 0644);
->  MODULE_PARM_DESC(bcm2835_v4l2_debug, "Debug level 0-2");
->
+For questions it's best to pipe up #dri-devel.
 
-This symbol is in fact used in more than one file.
-
-    Arnd
+Cheers, Daniel
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
