@@ -1,25 +1,49 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 1 Feb 2017 18:06:41 -0800
-Subject: [GIT PULL 1/2] Broadcom dts changes for 4.11 (part 2)
-In-Reply-To: <20170202020420.31512-1-f.fainelli@gmail.com>
-References: <20170202020420.31512-1-f.fainelli@gmail.com>
-Message-ID: <d8915ae3-03fd-ee21-ad1c-082b407aebbd@gmail.com>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Wed, 1 Feb 2017 19:25:49 -0700
+Subject: [PATCH] [media] exynos-gsc: Avoid spamming the log on
+ VIDIOC_TRY_FMT
+In-Reply-To: <1485294146-7467-1-git-send-email-javier@osg.samsung.com>
+References: <1485294146-7467-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <276f85b5-d224-41fd-3363-f2a671bdd176@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/01/2017 06:04 PM, Florian Fainelli wrote:
-> The following changes since commit c5a8e3add28ca4063410353acfbe6e650174e432:
+On 01/24/2017 02:42 PM, Javier Martinez Canillas wrote:
+> There isn't an ioctl to enum the supported field orders, so a user-space
+> application can call VIDIOC_TRY_FMT using different field orders to know
+> if one is supported. For example, GStreamer does this so during playback
+> dozens of the following messages appear in the kernel log buffer:
 > 
->   Merge tag 'bcm2835-dt-next-2017-01-17' into devicetree/next (2017-01-18 17:20:32 -0800)
+> [ 442.143393] Not supported field order(4)
 > 
-> are available in the git repository at:
+> Instead of printing this as an error, just keep it as debug information.
 > 
->   http://github.com/Broadcom/stblinux devicetree/next
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 > 
-> for you to fetch changes up to c206e53d4c672ec83a4fc4d70eeac22d4b4ca80d:
+> ---
 > 
->   Merge tag 'bcm2835-dt-next-2017-01-31' into devicetree/next (2017-02-01 17:37:59 -0800)
+>  drivers/media/platform/exynos-gsc/gsc-core.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/media/platform/exynos-gsc/gsc-core.c b/drivers/media/platform/exynos-gsc/gsc-core.c
+> index 8524fe15fa80..678b600f0500 100644
+> --- a/drivers/media/platform/exynos-gsc/gsc-core.c
+> +++ b/drivers/media/platform/exynos-gsc/gsc-core.c
+> @@ -408,7 +408,7 @@ int gsc_try_fmt_mplane(struct gsc_ctx *ctx, struct v4l2_format *f)
+>  	if (pix_mp->field == V4L2_FIELD_ANY)
+>  		pix_mp->field = V4L2_FIELD_NONE;
+>  	else if (pix_mp->field != V4L2_FIELD_NONE) {
+> -		pr_err("Not supported field order(%d)\n", pix_mp->field);
+> +		pr_debug("Not supported field order(%d)\n", pix_mp->field);
 
-Whoops ignore that email, the proper one has just been resent.
--- 
-Florian
+It make sense to leave it as an error, but print only once perhaps.
+The down side to making this debug is that it becomes harder to
+figure out when we run into this case.
+
+thanks,
+-- Shuah
+
+>  		return -EINVAL;
+>  	}
+>  
+> 
