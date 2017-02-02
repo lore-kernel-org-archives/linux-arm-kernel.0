@@ -1,32 +1,34 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  2 Feb 2017 16:51:37 +0100
-Subject: [PATCHv3 net-next 08/12] net: mvpp2: remove unused register
- definitions
+Date: Thu,  2 Feb 2017 16:51:34 +0100
+Subject: [PATCHv3 net-next 05/12] net: mvpp2: remove unused 'tx_skb' field of
+ 'struct mvpp2_tx_queue'
 In-Reply-To: <1486050701-27899-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1486050701-27899-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1486050701-27899-9-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1486050701-27899-6-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This commit remove a field of 'struct mvpp2_tx_queue' that is not used
+anywhere.
+
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 4 ----
- 1 file changed, 4 deletions(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index e7d0da6..ef68780 100644
+index 30aaff8..907619c 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -253,10 +253,6 @@
- #define MVPP2_SRC_ADDR_HIGH			0x28
- #define MVPP2_PHY_AN_CFG0_REG			0x34
- #define     MVPP2_PHY_AN_STOP_SMI0_MASK		BIT(7)
--#define MVPP2_MIB_COUNTERS_BASE(port)		(0x1000 + ((port) >> 1) * \
--						0x400 + (port) * 0x400)
--#define     MVPP2_MIB_LATE_COLLISION		0x7c
--#define MVPP2_ISR_SUM_MASK_REG			0x220c
- #define MVPP2_MNG_EXTENDED_GLOBAL_CTRL_REG	0x305c
- #define MVPP2_EXT_GLOBAL_CTRL_DEFAULT		0x27
+@@ -823,9 +823,6 @@ struct mvpp2_tx_queue {
+ 	/* Per-CPU control of physical Tx queues */
+ 	struct mvpp2_txq_pcpu __percpu *pcpu;
  
+-	/* Array of transmitted skb */
+-	struct sk_buff **tx_skb;
+-
+ 	u32 done_pkts_coal;
+ 
+ 	/* Virtual address of thex Tx DMA descriptors array */
 -- 
 2.7.4
