@@ -1,292 +1,138 @@
-From: a.hajda@samsung.com (Andrzej Hajda)
-Date: Thu, 02 Feb 2017 08:16:09 +0100
-Subject: [PATCH 03/11] [media] s5p-mfc: Use min scratch buffer size
-In-Reply-To: <1484733729-25371-4-git-send-email-smitha.t@samsung.com>
-References: <1484733729-25371-1-git-send-email-smitha.t@samsung.com>
- <CGME20170118100726epcas1p2d443360ea389ccb0826a1b5c5512da55@epcas1p2.samsung.com>
- <1484733729-25371-4-git-send-email-smitha.t@samsung.com>
-Message-ID: <a682d8bd-ea52-9f83-a1e4-156e7679a574@samsung.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 2 Feb 2017 15:23:33 +0800
+Subject: [PATCH 3/5] mfd: axp20x: Add support for the AXP808 PMIC
+In-Reply-To: <e1d6d6acfaa95e214b6baa73a7edeaa8e6af3670.1485456006.git.rask@formelder.dk>
+References: <cover.1485456003.git.rask@formelder.dk>
+ <e1d6d6acfaa95e214b6baa73a7edeaa8e6af3670.1485456006.git.rask@formelder.dk>
+Message-ID: <CAGb2v64O7wax5Pku=VVY3rgS2Ybm-=BDQQT+oB13FSGQHhtkiw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.01.2017 11:02, Smitha T Murthy wrote:
-> After MFC v8.0, mfc f/w lets the driver know how much scratch buffer
-> size is required for decoder. If mfc f/w has the functionality,
-> E_MIN_SCRATCH_BUFFER_SIZE, driver can know how much scratch buffer size
-> is required for encoder too.
-
-Subject says "Use min scratch buffer size" but it is already used.
-Maybe it should be changed to sth like:
-Use min scratch buffer size provided by F/W
-
+On Fri, Jan 27, 2017 at 5:25 AM, Rask Ingemann Lambertsen
+<rask@formelder.dk> wrote:
+> The X-Powers AXP808 is a PMIC which, like the very similar AXP806, is
+> used on boards featuring Allwinner's A80 SoC. Unlike the AXP806, it
+> doesn't support address space extension and its associated registers,
+> but the two are otherwise identical (including the chip ID).
 >
-> Signed-off-by: Smitha T Murthy <smitha.t@samsung.com>
+> This patch adds support for the interrupts on the AXP808 and enables
+> the regulator sub-device. The next patch in the series adds the actual
+> regulator support.
+>
+> Signed-off-by: Rask Ingemann Lambertsen <rask@formelder.dk>
+
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+
 > ---
->  drivers/media/platform/s5p-mfc/regs-mfc-v8.h    |    2 +
->  drivers/media/platform/s5p-mfc/s5p_mfc.c        |    2 +
->  drivers/media/platform/s5p-mfc/s5p_mfc_common.h |    1 +
->  drivers/media/platform/s5p-mfc/s5p_mfc_enc.c    |    7 ++
->  drivers/media/platform/s5p-mfc/s5p_mfc_opr.h    |    4 +
->  drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c |   68 +++++++++++++++++------
->  6 files changed, 67 insertions(+), 17 deletions(-)
+>  drivers/mfd/axp20x-rsb.c   |  1 +
+>  drivers/mfd/axp20x.c       | 28 ++++++++++++++++++++++++++++
+>  include/linux/mfd/axp20x.h |  1 +
+>  3 files changed, 30 insertions(+)
 >
-> diff --git a/drivers/media/platform/s5p-mfc/regs-mfc-v8.h b/drivers/media/platform/s5p-mfc/regs-mfc-v8.h
-> index 4d1c375..2cd396b 100644
-> --- a/drivers/media/platform/s5p-mfc/regs-mfc-v8.h
-> +++ b/drivers/media/platform/s5p-mfc/regs-mfc-v8.h
-> @@ -17,6 +17,7 @@
->  
->  /* Additional registers for v8 */
->  #define S5P_FIMV_D_MVC_NUM_VIEWS_V8		0xf104
-> +#define S5P_FIMV_D_MIN_SCRATCH_BUFFER_SIZE_V8	0xf108
->  #define S5P_FIMV_D_FIRST_PLANE_DPB_SIZE_V8	0xf144
->  #define S5P_FIMV_D_SECOND_PLANE_DPB_SIZE_V8	0xf148
->  #define S5P_FIMV_D_MV_BUFFER_SIZE_V8		0xf150
-> @@ -84,6 +85,7 @@
->  
->  #define S5P_FIMV_E_VBV_BUFFER_SIZE_V8		0xf78c
->  #define S5P_FIMV_E_VBV_INIT_DELAY_V8		0xf790
-> +#define S5P_FIMV_E_MIN_SCRATCH_BUFFER_SIZE_V8   0xf894
->  
->  #define S5P_FIMV_E_ASPECT_RATIO_V8		0xfb4c
->  #define S5P_FIMV_E_EXTENDED_SAR_V8		0xfb50
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> index a043cce..b014038 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
-> @@ -520,6 +520,8 @@ static void s5p_mfc_handle_seq_done(struct s5p_mfc_ctx *ctx,
->  				dev);
->  		ctx->mv_count = s5p_mfc_hw_call(dev->mfc_ops, get_mv_count,
->  				dev);
-> +		ctx->scratch_buf_size = s5p_mfc_hw_call(dev->mfc_ops,
-> +						get_min_scratch_buf_size, dev);
->  		if (ctx->img_width == 0 || ctx->img_height == 0)
->  			ctx->state = MFCINST_ERROR;
->  		else
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-> index 1941c63..998e24b 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_common.h
-> @@ -724,6 +724,7 @@ struct mfc_control {
->  #define IS_MFCV7_PLUS(dev)	(dev->variant->version >= 0x70 ? 1 : 0)
->  #define IS_MFCV8_PLUS(dev)	(dev->variant->version >= 0x80 ? 1 : 0)
->  #define IS_MFCV10(dev)		(dev->variant->version >= 0xA0 ? 1 : 0)
-> +#define FW_HAS_E_MIN_SCRATCH_BUF(dev) (IS_MFCV10(dev))
->  
->  #define MFC_V5_BIT	BIT(0)
->  #define MFC_V6_BIT	BIT(1)
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-> index 9042378..ef15831 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_enc.c
-> @@ -818,6 +818,13 @@ static int enc_post_seq_start(struct s5p_mfc_ctx *ctx)
->  				get_enc_dpb_count, dev);
->  		if (ctx->pb_count < enc_pb_count)
->  			ctx->pb_count = enc_pb_count;
-> +		if (FW_HAS_E_MIN_SCRATCH_BUF(dev)) {
-> +			ctx->scratch_buf_size = s5p_mfc_hw_call(dev->mfc_ops,
-> +					get_e_min_scratch_buf_size, dev);
-> +			ctx->scratch_buf_size = ALIGN(ctx->scratch_buf_size,
-> +					S5P_FIMV_SCRATCH_BUFFER_ALIGN_V6);
-
-Do we really need to align it here? Does firmware return unaligned value?
-Even then the alignment (if necessary) should be moved rather to
-get_e_min_scratch_buf_size.
-
-> +			ctx->bank1.size += ctx->scratch_buf_size;
-> +		}
->  		ctx->state = MFCINST_HEAD_PRODUCED;
->  	}
->  
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr.h b/drivers/media/platform/s5p-mfc/s5p_mfc_opr.h
-> index b6ac417..6478f70 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr.h
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr.h
-> @@ -169,6 +169,7 @@ struct s5p_mfc_regs {
->  	void __iomem *d_decoded_third_addr;/* only v7 */
->  	void __iomem *d_used_dpb_flag_upper;/* v7 and v8 */
->  	void __iomem *d_used_dpb_flag_lower;/* v7 and v8 */
-> +	void __iomem *d_min_scratch_buffer_size; /* v10 */
->  
->  	/* encoder registers */
->  	void __iomem *e_frame_width;
-> @@ -268,6 +269,7 @@ struct s5p_mfc_regs {
->  	void __iomem *e_vp8_hierarchical_qp_layer0;/* v7 and v8 */
->  	void __iomem *e_vp8_hierarchical_qp_layer1;/* v7 and v8 */
->  	void __iomem *e_vp8_hierarchical_qp_layer2;/* v7 and v8 */
-> +	void __iomem *e_min_scratch_buffer_size; /* v10 */
+> diff --git a/drivers/mfd/axp20x-rsb.c b/drivers/mfd/axp20x-rsb.c
+> index a732cb5..96ea2e9 100644
+> --- a/drivers/mfd/axp20x-rsb.c
+> +++ b/drivers/mfd/axp20x-rsb.c
+> @@ -62,6 +62,7 @@ static int axp20x_rsb_remove(struct sunxi_rsb_device *rdev)
+>  static const struct of_device_id axp20x_rsb_of_match[] = {
+>         { .compatible = "x-powers,axp223", .data = (void *)AXP223_ID },
+>         { .compatible = "x-powers,axp806", .data = (void *)AXP806_ID },
+> +       { .compatible = "x-powers,axp808", .data = (void *)AXP808_ID },
+>         { .compatible = "x-powers,axp809", .data = (void *)AXP809_ID },
+>         { },
 >  };
->  
->  struct s5p_mfc_hw_ops {
-> @@ -311,6 +313,8 @@ struct s5p_mfc_hw_ops {
->  	unsigned int (*get_pic_type_bot)(struct s5p_mfc_ctx *ctx);
->  	unsigned int (*get_crop_info_h)(struct s5p_mfc_ctx *ctx);
->  	unsigned int (*get_crop_info_v)(struct s5p_mfc_ctx *ctx);
-> +	int (*get_min_scratch_buf_size)(struct s5p_mfc_dev *dev);
-> +	int (*get_e_min_scratch_buf_size)(struct s5p_mfc_dev *dev);
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index 25115fe..2d3383e 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -41,6 +41,7 @@ static const char * const axp20x_model_names[] = {
+>         "AXP223",
+>         "AXP288",
+>         "AXP806",
+> +       "AXP808",
+>         "AXP809",
 >  };
->  
->  void s5p_mfc_init_hw_ops(struct s5p_mfc_dev *dev);
-> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-> index 63dce5a..faceee6 100644
-> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_opr_v6.c
-> @@ -110,7 +110,9 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
->  	switch (ctx->codec_mode) {
->  	case S5P_MFC_CODEC_H264_DEC:
->  	case S5P_MFC_CODEC_H264_MVC_DEC:
-> -		if (IS_MFCV8_PLUS(dev))
-> +		if (IS_MFCV10(dev))
-> +			mfc_debug(2, "Use min scratch buffer size\n");
-
-Here and below you are adding empty case for MFCV10, this is wrong,
-patch subject says "Use min scratch buffer size", but you do nothing here.
-I see it is added in the next patch, probably it should be merged here,
-I will comment it more in the next patch.
-
-Regards
-Andrzej
-
-> +		else if (IS_MFCV8_PLUS(dev))
->  			ctx->scratch_buf_size =
->  				S5P_FIMV_SCRATCH_BUF_SIZE_H264_DEC_V8(
->  					mb_width,
-> @@ -127,7 +129,9 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
->  			(ctx->mv_count * ctx->mv_size);
->  		break;
->  	case S5P_MFC_CODEC_MPEG4_DEC:
-> -		if (IS_MFCV7_PLUS(dev)) {
-> +		if (IS_MFCV10(dev))
-> +			mfc_debug(2, "Use min scratch buffer size\n");
-> +		else if (IS_MFCV7_PLUS(dev)) {
->  			ctx->scratch_buf_size =
->  				S5P_FIMV_SCRATCH_BUF_SIZE_MPEG4_DEC_V7(
->  						mb_width,
-> @@ -145,10 +149,14 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
->  		break;
->  	case S5P_MFC_CODEC_VC1RCV_DEC:
->  	case S5P_MFC_CODEC_VC1_DEC:
-> -		ctx->scratch_buf_size =
-> -			S5P_FIMV_SCRATCH_BUF_SIZE_VC1_DEC_V6(
-> -					mb_width,
-> -					mb_height);
-> +		if (IS_MFCV10(dev))
-> +			mfc_debug(2, "Use min scratch buffer size\n");
-> +		else
-> +			ctx->scratch_buf_size =
-> +				S5P_FIMV_SCRATCH_BUF_SIZE_VC1_DEC_V6(
-> +						mb_width,
-> +						mb_height);
-> +
->  		ctx->scratch_buf_size = ALIGN(ctx->scratch_buf_size,
->  				S5P_FIMV_SCRATCH_BUFFER_ALIGN_V6);
->  		ctx->bank1.size = ctx->scratch_buf_size;
-> @@ -158,16 +166,21 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
->  		ctx->bank2.size = 0;
->  		break;
->  	case S5P_MFC_CODEC_H263_DEC:
-> -		ctx->scratch_buf_size =
-> -			S5P_FIMV_SCRATCH_BUF_SIZE_H263_DEC_V6(
-> -					mb_width,
-> -					mb_height);
-> +		if (IS_MFCV10(dev))
-> +			mfc_debug(2, "Use min scratch buffer size\n");
-> +		else
-> +			ctx->scratch_buf_size =
-> +				S5P_FIMV_SCRATCH_BUF_SIZE_H263_DEC_V6(
-> +						mb_width,
-> +						mb_height);
->  		ctx->scratch_buf_size = ALIGN(ctx->scratch_buf_size,
->  				S5P_FIMV_SCRATCH_BUFFER_ALIGN_V6);
->  		ctx->bank1.size = ctx->scratch_buf_size;
->  		break;
->  	case S5P_MFC_CODEC_VP8_DEC:
-> -		if (IS_MFCV8_PLUS(dev))
-> +		if (IS_MFCV10(dev))
-> +			mfc_debug(2, "Use min scratch buffer size\n");
-> +		else if (IS_MFCV8_PLUS(dev))
->  			ctx->scratch_buf_size =
->  				S5P_FIMV_SCRATCH_BUF_SIZE_VP8_DEC_V8(
->  						mb_width,
-> @@ -182,7 +195,9 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
->  		ctx->bank1.size = ctx->scratch_buf_size;
->  		break;
->  	case S5P_MFC_CODEC_H264_ENC:
-> -		if (IS_MFCV8_PLUS(dev))
-> +		if (IS_MFCV10(dev)) {
-> +			mfc_debug(2, "Use min scratch buffer size\n");
-> +		} else if (IS_MFCV8_PLUS(dev))
->  			ctx->scratch_buf_size =
->  				S5P_FIMV_SCRATCH_BUF_SIZE_H264_ENC_V8(
->  					mb_width,
-> @@ -202,10 +217,13 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
->  		break;
->  	case S5P_MFC_CODEC_MPEG4_ENC:
->  	case S5P_MFC_CODEC_H263_ENC:
-> -		ctx->scratch_buf_size =
-> -			S5P_FIMV_SCRATCH_BUF_SIZE_MPEG4_ENC_V6(
-> -					mb_width,
-> -					mb_height);
-> +		if (IS_MFCV10(dev)) {
-> +			mfc_debug(2, "Use min scratch buffer size\n");
-> +		} else
-> +			ctx->scratch_buf_size =
-> +				S5P_FIMV_SCRATCH_BUF_SIZE_MPEG4_ENC_V6(
-> +						mb_width,
-> +						mb_height);
->  		ctx->scratch_buf_size = ALIGN(ctx->scratch_buf_size,
->  				S5P_FIMV_SCRATCH_BUFFER_ALIGN_V6);
->  		ctx->bank1.size =
-> @@ -215,7 +233,9 @@ static int s5p_mfc_alloc_codec_buffers_v6(struct s5p_mfc_ctx *ctx)
->  		ctx->bank2.size = 0;
->  		break;
->  	case S5P_MFC_CODEC_VP8_ENC:
-> -		if (IS_MFCV8_PLUS(dev))
-> +		if (IS_MFCV10(dev)) {
-> +			mfc_debug(2, "Use min scratch buffer size\n");
-> +			} else if (IS_MFCV8_PLUS(dev))
->  			ctx->scratch_buf_size =
->  				S5P_FIMV_SCRATCH_BUF_SIZE_VP8_ENC_V8(
->  					mb_width,
-> @@ -1911,6 +1931,16 @@ static int s5p_mfc_get_mv_count_v6(struct s5p_mfc_dev *dev)
->  	return readl(dev->mfc_regs->d_min_num_mv);
->  }
->  
-> +static int s5p_mfc_get_min_scratch_buf_size(struct s5p_mfc_dev *dev)
-> +{
-> +	return readl(dev->mfc_regs->d_min_scratch_buffer_size);
-> +}
-> +
-> +static int s5p_mfc_get_e_min_scratch_buf_size(struct s5p_mfc_dev *dev)
-> +{
-> +	return readl(dev->mfc_regs->e_min_scratch_buffer_size);
-> +}
-> +
->  static int s5p_mfc_get_inst_no_v6(struct s5p_mfc_dev *dev)
->  {
->  	return readl(dev->mfc_regs->ret_instance_id);
-> @@ -2169,6 +2199,7 @@ static unsigned int s5p_mfc_get_crop_info_v_v6(struct s5p_mfc_ctx *ctx)
->  	R(d_ret_picture_tag_bot, S5P_FIMV_D_RET_PICTURE_TAG_BOT_V8);
->  	R(d_display_crop_info1, S5P_FIMV_D_DISPLAY_CROP_INFO1_V8);
->  	R(d_display_crop_info2, S5P_FIMV_D_DISPLAY_CROP_INFO2_V8);
-> +	R(d_min_scratch_buffer_size, S5P_FIMV_D_MIN_SCRATCH_BUFFER_SIZE_V8);
->  
->  	/* encoder registers */
->  	R(e_padding_ctrl, S5P_FIMV_E_PADDING_CTRL_V8);
-> @@ -2184,6 +2215,7 @@ static unsigned int s5p_mfc_get_crop_info_v_v6(struct s5p_mfc_ctx *ctx)
->  	R(e_aspect_ratio, S5P_FIMV_E_ASPECT_RATIO_V8);
->  	R(e_extended_sar, S5P_FIMV_E_EXTENDED_SAR_V8);
->  	R(e_h264_options, S5P_FIMV_E_H264_OPTIONS_V8);
-> +	R(e_min_scratch_buffer_size, S5P_FIMV_E_MIN_SCRATCH_BUFFER_SIZE_V8);
->  
->  done:
->  	return &mfc_regs;
-> @@ -2232,6 +2264,8 @@ static unsigned int s5p_mfc_get_crop_info_v_v6(struct s5p_mfc_ctx *ctx)
->  	.get_pic_type_bot = s5p_mfc_get_pic_type_bot_v6,
->  	.get_crop_info_h = s5p_mfc_get_crop_info_h_v6,
->  	.get_crop_info_v = s5p_mfc_get_crop_info_v_v6,
-> +	.get_min_scratch_buf_size = s5p_mfc_get_min_scratch_buf_size,
-> +	.get_e_min_scratch_buf_size = s5p_mfc_get_e_min_scratch_buf_size,
+>
+> @@ -148,6 +149,13 @@ static const struct regmap_range axp806_writeable_ranges[] = {
+>         regmap_reg_range(AXP806_REG_ADDR_EXT, AXP806_REG_ADDR_EXT),
 >  };
->  
->  struct s5p_mfc_hw_ops *s5p_mfc_init_hw_ops_v6(void)
+>
+> +static const struct regmap_range axp808_writeable_ranges[] = {
+> +       regmap_reg_range(AXP20X_DATACACHE(0), AXP20X_DATACACHE(3)),
+> +       regmap_reg_range(AXP806_PWR_OUT_CTRL1, AXP806_CLDO3_V_CTRL),
+> +       regmap_reg_range(AXP20X_IRQ1_EN, AXP20X_IRQ2_EN),
+> +       regmap_reg_range(AXP20X_IRQ1_STATE, AXP20X_IRQ2_STATE),
+> +};
+> +
+>  static const struct regmap_range axp806_volatile_ranges[] = {
+>         regmap_reg_range(AXP20X_IRQ1_STATE, AXP20X_IRQ2_STATE),
+>  };
+> @@ -162,6 +170,11 @@ static const struct regmap_access_table axp806_volatile_table = {
+>         .n_yes_ranges   = ARRAY_SIZE(axp806_volatile_ranges),
+>  };
+>
+> +static const struct regmap_access_table axp808_writeable_table = {
+> +       .yes_ranges     = axp808_writeable_ranges,
+> +       .n_yes_ranges   = ARRAY_SIZE(axp808_writeable_ranges),
+
+You could probably get away with using axp806_writeable_ranges,
+and pass ARRAY_SIZE(axp808_writeable_ranges) - 1 for .n_yes_ranges.
+
+Or maybe the compiler figures out the 2 arrays share common data.
+
+ChenYu
+
+> +};
+> +
+>  static struct resource axp152_pek_resources[] = {
+>         DEFINE_RES_IRQ_NAMED(AXP152_IRQ_PEK_RIS_EDGE, "PEK_DBR"),
+>         DEFINE_RES_IRQ_NAMED(AXP152_IRQ_PEK_FAL_EDGE, "PEK_DBF"),
+> @@ -320,6 +333,15 @@ static const struct regmap_config axp806_regmap_config = {
+>         .cache_type     = REGCACHE_RBTREE,
+>  };
+>
+> +static const struct regmap_config axp808_regmap_config = {
+> +       .reg_bits       = 8,
+> +       .val_bits       = 8,
+> +       .wr_table       = &axp808_writeable_table,
+> +       .volatile_table = &axp806_volatile_table,
+> +       .max_register   = AXP806_VREF_TEMP_WARN_L,
+> +       .cache_type     = REGCACHE_RBTREE,
+> +};
+> +
+>  #define INIT_REGMAP_IRQ(_variant, _irq, _off, _mask)                   \
+>         [_variant##_IRQ_##_irq] = { .reg_offset = (_off), .mask = BIT(_mask) }
+>
+> @@ -842,6 +864,12 @@ int axp20x_match_device(struct axp20x_dev *axp20x)
+>                 axp20x->regmap_cfg = &axp806_regmap_config;
+>                 axp20x->regmap_irq_chip = &axp806_regmap_irq_chip;
+>                 break;
+> +       case AXP808_ID:
+> +               axp20x->nr_cells = ARRAY_SIZE(axp806_cells);
+> +               axp20x->cells = axp806_cells;
+> +               axp20x->regmap_cfg = &axp808_regmap_config;
+> +               axp20x->regmap_irq_chip = &axp806_regmap_irq_chip;
+> +               break;
+>         case AXP809_ID:
+>                 axp20x->nr_cells = ARRAY_SIZE(axp809_cells);
+>                 axp20x->cells = axp809_cells;
+> diff --git a/include/linux/mfd/axp20x.h b/include/linux/mfd/axp20x.h
+> index 0aa4ef7..b9b7eae 100644
+> --- a/include/linux/mfd/axp20x.h
+> +++ b/include/linux/mfd/axp20x.h
+> @@ -21,6 +21,7 @@ enum {
+>         AXP223_ID,
+>         AXP288_ID,
+>         AXP806_ID,
+> +       AXP808_ID,
+>         AXP809_ID,
+>         NR_AXP20X_VARIANTS,
+>  };
+> --
+> 2.10.2
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
