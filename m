@@ -1,68 +1,60 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu,  2 Feb 2017 20:30:08 +0200
-Subject: [GIT PULL 4/4] arm64: dts: exynos: DT64 for v4.11, third round
-In-Reply-To: <20170202183008.23500-1-krzk@kernel.org>
-References: <20170202183008.23500-1-krzk@kernel.org>
-Message-ID: <20170202183008.23500-5-krzk@kernel.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 2 Feb 2017 19:35:39 +0100
+Subject: [PATCH v3] arm64: Add support for DMA_ATTR_FORCE_CONTIGUOUS to
+ IOMMU
+In-Reply-To: <30026398-c5d3-1806-33b6-ba2b59ec2703@arm.com>
+References: <1485861178-22694-1-git-send-email-geert+renesas@glider.be>
+ <30026398-c5d3-1806-33b6-ba2b59ec2703@arm.com>
+Message-ID: <CAMuHMdVDPP64zdXef095D=Ji+ZuY39mQg54e_4SKH0TgZMhKwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Robin,
 
-This includes clk-v4.11-samsung-dphy tag from Sylwester (clock) and a pinctrl
-header acked by Linus pinctrl header. The header goes through my tree but I provided
-a separate tag also for Linus.
+On Thu, Feb 2, 2017 at 2:15 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> On 31/01/17 11:12, Geert Uytterhoeven wrote:
+>> Add support for allocating physically contiguous DMA buffers on arm64
+>> systems with an IOMMU.  This can be useful when two or more devices
+>> with different memory requirements are involved in buffer sharing.
+>>
+>> Note that as this uses the CMA allocator, setting the
+>> DMA_ATTR_FORCE_CONTIGUOUS attribute has a runtime-dependency on
+>> CONFIG_DMA_CMA, just like on arm32.
 
-On top of previous pull request.
+>> @@ -625,7 +651,8 @@ static void __iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
+>>
+>>       size = PAGE_ALIGN(size);
+>>       /*
+>> -      * @cpu_addr will be one of 3 things depending on how it was allocated:
+>> +      * @cpu_addr will be one of 4 things depending on how it was allocated:
+>> +      * - A remapped array of pages for contiguous allocations.
+>>        * - A remapped array of pages from iommu_dma_alloc(), for all
+>>        *   non-atomic allocations.
+>>        * - A non-cacheable alias from the atomic pool, for atomic
+>> @@ -637,6 +664,12 @@ static void __iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
+>>       if (__in_atomic_pool(cpu_addr, size)) {
+>>               iommu_dma_unmap_page(dev, handle, iosize, 0, 0);
+>>               __free_from_pool(cpu_addr, size);
+>> +     } else if (attrs & DMA_ATTR_FORCE_CONTIGUOUS) {
+>> +             struct page *page = phys_to_page(dma_to_phys(dev, handle));
+>
+> handle is the IOVA returned by the original iommu_dma_map_page() call,
+> so I can't see this working very well. I was about to naively suggest
+> virt_to_page(cpu_addr), except of course cpu_addr isn't going to be a
+> linear map address :(
 
-Best regards,
-Krzysztof
+You're right: upon closer look, this will free the wrong pages in the CMA
+allocator. Funny, that the system didn't scream...
 
+Thanks for noticing, I'll look into fixing that...
 
-The following changes since commit 7547162ac351483df3641f64e99e10be329dd6a2:
+Gr{oetje,eeting}s,
 
-  arm64: dts: exynos: Add clocks to Exynos5433 LPASS module (2017-01-26 22:04:20 +0200)
+                        Geert
 
-are available in the git repository at:
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-dt64-4.11-3
-
-for you to fetch changes up to 6629490aa027a8af3160e63cffcddc97c1602c96:
-
-  arm64: dts: exynos: Add regulators for Vbus and Vbus-Boost (2017-02-02 19:54:05 +0200)
-
-----------------------------------------------------------------
-Samsung DeviceTree ARM64 update for v4.11, third round:
-1. Add necessary initial configuration for clocks of display subsystem.
-   Till now it worked mostly thanks to bootloader.
-2. Use macro definitions instead of hard-coded values for pinctrl on Exynos7.
-3. Enable USB 3.0 (DWC3) on Exynos7.
-
-----------------------------------------------------------------
-Krzysztof Kozlowski (2):
-      Merge tag 'clk-v4.11-samsung-dphy' of git://linuxtv.org/snawrocki/samsung into next/dt64
-      Merge tag 'samsung-pinctrl-4.11' into next/dt64
-
-Marek Szyprowski (3):
-      clk: samsung: exynos5433: Add IDs for PHYCLK_MIPIDPHY0_* clocks
-      clk: samsung: exynos5433: Add data for 250MHz and 278MHz PLL rates
-      arm64: dts: exynos: Add initial configuration for DISP clocks for TM2/TM2e
-
-Pankaj Dubey (2):
-      pinctrl: dt-bindings: samsung: Add Exynos7 specific pinctrl macro definitions
-      arm64: dts: exynos: Use macros for pinctrl configuration on Exynos7
-
-Vivek Gautam (2):
-      arm64: dts: exynos: Add USB 3.0 controller node for Exynos7
-      arm64: dts: exynos: Add regulators for Vbus and Vbus-Boost
-
- .../boot/dts/exynos/exynos5433-tm2-common.dtsi     |  12 -
- arch/arm64/boot/dts/exynos/exynos5433-tm2.dts      |  34 +++
- arch/arm64/boot/dts/exynos/exynos5433-tm2e.dts     |  34 +++
- arch/arm64/boot/dts/exynos/exynos7-espresso.dts    |  49 +++-
- arch/arm64/boot/dts/exynos/exynos7-pinctrl.dtsi    | 302 +++++++++++----------
- arch/arm64/boot/dts/exynos/exynos7.dtsi            |  34 +++
- drivers/clk/samsung/clk-exynos5433.c               |   8 +-
- include/dt-bindings/clock/exynos5433.h             |   5 +-
- include/dt-bindings/pinctrl/samsung.h              |   8 +
- 9 files changed, 319 insertions(+), 167 deletions(-)
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
