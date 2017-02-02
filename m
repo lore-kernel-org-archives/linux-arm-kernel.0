@@ -1,135 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 2 Feb 2017 18:39:11 +0000
-Subject: [PATCH 5/7] arm64: arch_timer: work around Hisilicon erratum
- 161010101
-In-Reply-To: <1485865196-12742-6-git-send-email-mark.rutland@arm.com>
-References: <1485865196-12742-1-git-send-email-mark.rutland@arm.com>
- <1485865196-12742-6-git-send-email-mark.rutland@arm.com>
-Message-ID: <20170202183910.GA29489@leverpostej>
+From: pullururajasekhar@gmail.com (Rajasekhar Pulluru)
+Date: Fri, 3 Feb 2017 00:19:37 +0530
+Subject: Unhandled fault: alignment fault (0x92000061) at un-aligned address
+Message-ID: <CAGA5_H4w4uaS_DeFEdZh6AkT6PNG2Y-0ZZQbMK-c5bZzJoOS8A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Hi
 
-On Tue, Jan 31, 2017 at 12:19:54PM +0000, Mark Rutland wrote:
-> From: Ding Tianhong <dingtianhong@huawei.com>
-> 
-> Erratum Hisilicon-161010101 says that the ARM generic timer counter "has
-> the potential to contain an erroneous value when the timer value
-> changes". Accesses to TVAL (both read and write) are also affected due
-> to the implicit counter read. Accesses to CVAL are not affected.
-> 
-> The workaround is to reread the system count registers until the value
-> of the second read is larger than the first one by less than 32, the
-> system counter can be guaranteed not to return wrong value twice by
-> back-to-back read and the error value is always larger than the correct
-> one by 32. Writes to TVAL are replaced with an equivalent write to CVAL.
-> 
-> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
-> [Mark: split patch, fix Kconfig, reword commit message]
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> ---
->  drivers/clocksource/Kconfig          | 10 ++++++++
->  drivers/clocksource/arm_arch_timer.c | 49 ++++++++++++++++++++++++++++++++++++
->  2 files changed, 59 insertions(+)
+I have an arm cortex A-57 machine that is running 3.16 linux kernel
+(64bit) compiled using
+gcc-linaro-aarch64_be-linux-gnu-4.9-2014.09_linux toolchain.
 
-Do you have any comments on this patch?
+My application is accessing a member inside a structure at unalinged
+address using pointer.
 
-What would you prefer to do w.r.t. taking these patches? Would you like
-me to resend the clocksource patches in isolation, or as a pull?
+The application is compiled using
+gcc-linaro-armeb-linux-gnueabihf-4.9-2014.09_linux toolchain and when
+its run,
+the application gets bus error with "Unhandled fault: alignment fault
+(0x92000061) at 0x00000000fff0f729" on console.
 
-Thanks,
-Mark.
+When the same application is compilied using
+gcc-linaro-aarch64_be-linux-gnu-4.9-2014.09_linux toolchain,
+I don't get any alignment fault even though the member being accessed
+is at an un-alinged address.
 
-> 
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index e132bb3..17ee71c 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -339,6 +339,16 @@ config FSL_ERRATUM_A008585
->  	  value").  The workaround will only be active if the
->  	  fsl,erratum-a008585 property is found in the timer node.
->  
-> +config HISILICON_ERRATUM_161010101
-> +	bool "Workaround for Hisilicon Erratum 161010101"
-> +	default y
-> +	select ARM_ARCH_TIMER_OOL_WORKAROUND
-> +	depends on ARM_ARCH_TIMER && ARM64
-> +	help
-> +	  This option enables a workaround for Hisilicon Erratum
-> +	  161010101. The workaround will be active if the hisilicon,erratum-161010101
-> +	  property is found in the timer node.
-> +
->  config ARM_GLOBAL_TIMER
->  	bool "Support for the ARM global timer" if COMPILE_TEST
->  	select CLKSRC_OF if OF
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index 2af0739..7b06aef 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -130,6 +130,47 @@ static u64 notrace fsl_a008585_read_cntvct_el0(void)
->  }
->  #endif
->  
-> +#ifdef CONFIG_HISILICON_ERRATUM_161010101
-> +/*
-> + * Verify whether the value of the second read is larger than the first by
-> + * less than 32 is the only way to confirm the value is correct, so clear the
-> + * lower 5 bits to check whether the difference is greater than 32 or not.
-> + * Theoretically the erratum should not occur more than twice in succession
-> + * when reading the system counter, but it is possible that some interrupts
-> + * may lead to more than twice read errors, triggering the warning, so setting
-> + * the number of retries far beyond the number of iterations the loop has been
-> + * observed to take.
-> + */
-> +#define __hisi_161010101_read_reg(reg) ({				\
-> +	u64 _old, _new;						\
-> +	int _retries = 50;					\
-> +								\
-> +	do {							\
-> +		_old = read_sysreg(reg);			\
-> +		_new = read_sysreg(reg);			\
-> +		_retries--;					\
-> +	} while (unlikely((_new - _old) >> 5) && _retries);	\
-> +								\
-> +	WARN_ON_ONCE(!_retries);				\
-> +	_new;							\
-> +})
-> +
-> +static u32 notrace hisi_161010101_read_cntp_tval_el0(void)
-> +{
-> +	return __hisi_161010101_read_reg(cntp_tval_el0);
-> +}
-> +
-> +static u32 notrace hisi_161010101_read_cntv_tval_el0(void)
-> +{
-> +	return __hisi_161010101_read_reg(cntv_tval_el0);
-> +}
-> +
-> +static u64 notrace hisi_161010101_read_cntvct_el0(void)
-> +{
-> +	return __hisi_161010101_read_reg(cntvct_el0);
-> +}
-> +#endif
-> +
->  #ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
->  const struct arch_timer_erratum_workaround *timer_unstable_counter_workaround = NULL;
->  EXPORT_SYMBOL_GPL(timer_unstable_counter_workaround);
-> @@ -146,6 +187,14 @@ static u64 notrace fsl_a008585_read_cntvct_el0(void)
->  		.read_cntvct_el0 = fsl_a008585_read_cntvct_el0,
->  	},
->  #endif
-> +#ifdef CONFIG_HISILICON_ERRATUM_161010101
-> +	{
-> +		.id = "hisilicon,erratum-161010101",
-> +		.read_cntp_tval_el0 = hisi_161010101_read_cntp_tval_el0,
-> +		.read_cntv_tval_el0 = hisi_161010101_read_cntv_tval_el0,
-> +		.read_cntvct_el0 = hisi_161010101_read_cntvct_el0,
-> +	},
-> +#endif
->  };
->  #endif /* CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND */
->  
-> -- 
-> 1.9.1
-> 
+Could someone help me understand this behaviour and help fix it? (I
+couldn't pad the structure as it points to network header
+and for some reason the address of the member inside the network
+header is not aligned.)
+
+I have tried compiling the application using the
+gcc-linaro-armeb-linux-gnueabihf-4.9-2014.09_linux toolchain with
+compile flags -mno-unaligned-access and again with -munaligned-access
+flags. But I still see the alignment fault in both the cases.
+
+
+Thanks & Regards,
+Rajasekhar
