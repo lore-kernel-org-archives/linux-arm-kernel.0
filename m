@@ -1,89 +1,90 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu,  2 Feb 2017 19:51:57 +0100
-Subject: [PATCH 07/23] pinctrl: at91-pio4: handle suspend to ram
+Date: Thu,  2 Feb 2017 19:51:56 +0100
+Subject: [PATCH 06/23] tty/serial: atmel: ensure state is restored after
+ suspending
 In-Reply-To: <20170202185213.21698-1-alexandre.belloni@free-electrons.com>
 References: <20170202185213.21698-1-alexandre.belloni@free-electrons.com>
-Message-ID: <20170202185213.21698-7-alexandre.belloni@free-electrons.com>
+Message-ID: <20170202185213.21698-6-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When suspending to RAM, the power to the core is cut and the register
-values are lost. Save and restore more registers than just IMR.
+When going to suspend, the UART registers may be lost because the power to
+VDDcore is cut. This is not an issue in the normal case but when
+no_console_suspend is used, we need to restore the registers in order to
+get a functional console.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/pinctrl/pinctrl-at91-pio4.c | 34 ++++++++++++++++++++++++++++------
- 1 file changed, 28 insertions(+), 6 deletions(-)
+ drivers/tty/serial/atmel_serial.c | 43 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
 
-diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
-index 28bbc1bb9e6c..dc8591543dee 100644
---- a/drivers/pinctrl/pinctrl-at91-pio4.c
-+++ b/drivers/pinctrl/pinctrl-at91-pio4.c
-@@ -126,7 +126,11 @@ struct atmel_pioctrl {
- 	struct irq_domain	*irq_domain;
- 	int			*irqs;
- 	unsigned		*pm_wakeup_sources;
--	unsigned		*pm_suspend_backup;
-+	struct {
-+		u32		imr;
-+		u32		odsr;
-+		u32		cfgr[ATMEL_PIO_NPINS_PER_BANK];
-+	} *pm_suspend_backup;
- 	struct device		*dev;
- 	struct device_node	*node;
- };
-@@ -830,17 +834,26 @@ static int __maybe_unused atmel_pctrl_suspend(struct device *dev)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct atmel_pioctrl *atmel_pioctrl = platform_get_drvdata(pdev);
--	int i;
-+	int i, j;
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index fabbe76203bb..337a0a6f7434 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -175,6 +175,17 @@ struct atmel_uart_port {
+ 	unsigned int		pending_status;
+ 	spinlock_t		lock_suspended;
  
- 	/*
- 	 * For each bank, save IMR to restore it later and disable all GPIO
- 	 * interrupts excepting the ones marked as wakeup sources.
- 	 */
- 	for (i = 0; i < atmel_pioctrl->nbanks; i++) {
--		atmel_pioctrl->pm_suspend_backup[i] =
-+		atmel_pioctrl->pm_suspend_backup[i].imr =
- 			atmel_gpio_read(atmel_pioctrl, i, ATMEL_PIO_IMR);
- 		atmel_gpio_write(atmel_pioctrl, i, ATMEL_PIO_IDR,
- 				 ~atmel_pioctrl->pm_wakeup_sources[i]);
-+		atmel_pioctrl->pm_suspend_backup[i].odsr =
-+			atmel_gpio_read(atmel_pioctrl, i, ATMEL_PIO_ODSR);
-+		for (j = 0; j < ATMEL_PIO_NPINS_PER_BANK; j++) {
-+			atmel_gpio_write(atmel_pioctrl, i,
-+					 ATMEL_PIO_MSKR, BIT(j));
-+			atmel_pioctrl->pm_suspend_backup[i].cfgr[j] =
-+				atmel_gpio_read(atmel_pioctrl, i,
-+						ATMEL_PIO_CFGR);
-+		}
++	struct {
++		u32		cr;
++		u32		mr;
++		u32		imr;
++		u32		brgr;
++		u32		rtor;
++		u32		ttgr;
++		u32		fmr;
++		u32		fimr;
++	} cache;
++
+ 	int (*prepare_rx)(struct uart_port *port);
+ 	int (*prepare_tx)(struct uart_port *port);
+ 	void (*schedule_rx)(struct uart_port *port);
+@@ -2659,6 +2670,19 @@ static int atmel_serial_suspend(struct platform_device *pdev,
+ 			cpu_relax();
  	}
  
- 	return 0;
-@@ -850,11 +863,20 @@ static int __maybe_unused atmel_pctrl_resume(struct device *dev)
- {
- 	struct platform_device *pdev = to_platform_device(dev);
- 	struct atmel_pioctrl *atmel_pioctrl = platform_get_drvdata(pdev);
--	int i;
-+	int i, j;
- 
--	for (i = 0; i < atmel_pioctrl->nbanks; i++)
-+	for (i = 0; i < atmel_pioctrl->nbanks; i++) {
- 		atmel_gpio_write(atmel_pioctrl, i, ATMEL_PIO_IER,
--				 atmel_pioctrl->pm_suspend_backup[i]);
-+				 atmel_pioctrl->pm_suspend_backup[i].imr);
-+		atmel_gpio_write(atmel_pioctrl, i, ATMEL_PIO_SODR,
-+				 atmel_pioctrl->pm_suspend_backup[i].odsr);
-+		for (j = 0; j < ATMEL_PIO_NPINS_PER_BANK; j++) {
-+			atmel_gpio_write(atmel_pioctrl, i,
-+					 ATMEL_PIO_MSKR, BIT(j));
-+			atmel_gpio_write(atmel_pioctrl, i, ATMEL_PIO_CFGR,
-+					 atmel_pioctrl->pm_suspend_backup[i].cfgr[j]);
-+		}
++	if (atmel_is_console_port(port) && !console_suspend_enabled) {
++		/* Cache register values as we won't get a full shutdown/startup
++		 * cycle*/
++		atmel_port->cache.mr = atmel_uart_readl(port, ATMEL_US_MR);
++		atmel_port->cache.imr = atmel_uart_readl(port, ATMEL_US_IMR);
++		atmel_port->cache.brgr = atmel_uart_readl(port, ATMEL_US_BRGR);
++		atmel_port->cache.rtor = atmel_uart_readl(port,
++							  atmel_port->rtor);
++		atmel_port->cache.ttgr = atmel_uart_readl(port, ATMEL_US_TTGR);
++		atmel_port->cache.fmr = atmel_uart_readl(port, ATMEL_US_FMR);
++		atmel_port->cache.fimr = atmel_uart_readl(port, ATMEL_US_FIMR);
 +	}
++
+ 	/* we can not wake up if we're running on slow clock */
+ 	atmel_port->may_wakeup = device_may_wakeup(&pdev->dev);
+ 	if (atmel_serial_clk_will_stop()) {
+@@ -2681,6 +2705,25 @@ static int atmel_serial_resume(struct platform_device *pdev)
+ 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+ 	unsigned long flags;
  
- 	return 0;
- }
++	if (atmel_is_console_port(port) && !console_suspend_enabled) {
++		atmel_uart_writel(port, ATMEL_US_MR, atmel_port->cache.mr);
++		atmel_uart_writel(port, ATMEL_US_IER, atmel_port->cache.imr);
++		atmel_uart_writel(port, ATMEL_US_BRGR, atmel_port->cache.brgr);
++		atmel_uart_writel(port, atmel_port->rtor,
++				  atmel_port->cache.rtor);
++		atmel_uart_writel(port, ATMEL_US_TTGR, atmel_port->cache.ttgr);
++
++		if (atmel_port->fifo_size) {
++			atmel_uart_writel(port, ATMEL_US_CR, ATMEL_US_FIFOEN |
++					  ATMEL_US_RXFCLR | ATMEL_US_TXFLCLR);
++			atmel_uart_writel(port, ATMEL_US_FMR,
++					  atmel_port->cache.fmr);
++			atmel_uart_writel(port, ATMEL_US_FIER,
++					  atmel_port->cache.fimr);
++		}
++		atmel_start_rx(port);
++	}
++
+ 	spin_lock_irqsave(&atmel_port->lock_suspended, flags);
+ 	if (atmel_port->pending) {
+ 		atmel_handle_receive(port, atmel_port->pending);
 -- 
 2.11.0
