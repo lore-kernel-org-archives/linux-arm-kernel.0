@@ -1,113 +1,211 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu,  2 Feb 2017 16:32:18 +0000
-Subject: [kvmtool PATCH v9 10/15] arm: FDT: create MSI controller DT node
+Date: Thu,  2 Feb 2017 16:32:15 +0000
+Subject: [kvmtool PATCH v9 07/15] update public Linux headers for GICv3 ITS
+ emulation
 In-Reply-To: <20170202163223.15372-1-andre.przywara@arm.com>
 References: <20170202163223.15372-1-andre.przywara@arm.com>
-Message-ID: <20170202163223.15372-11-andre.przywara@arm.com>
+Message-ID: <20170202163223.15372-8-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM GICv3 ITS requires a separate device tree node to describe
-the ITS. Add this as a child to the GIC interrupt controller node
-to let a guest discover and use the ITS if the user requests it.
-Since we now need to specify #address-cells for the GIC node, we
-have to add two zeroes to the interrupt map to match that.
+The GICv3 ITS emulation brings some additions to the headers, so
+lets update kvmtool's version of the headers to Linux' v4.10-rc6.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arm/gic.c                         | 22 +++++++++++++++++++++-
- arm/include/arm-common/fdt-arch.h |  2 +-
- arm/pci.c                         |  5 +++++
- 3 files changed, 27 insertions(+), 2 deletions(-)
+ arm/aarch32/include/asm/kvm.h | 13 +++++++++++--
+ arm/aarch64/include/asm/kvm.h |  2 ++
+ include/linux/kvm.h           | 31 +++++++++++++++++++++++++++----
+ powerpc/include/asm/kvm.h     |  5 +++++
+ x86/include/asm/kvm.h         |  6 +++---
+ 5 files changed, 48 insertions(+), 9 deletions(-)
 
-diff --git a/arm/gic.c b/arm/gic.c
-index 78fd583..c8478a3 100644
---- a/arm/gic.c
-+++ b/arm/gic.c
-@@ -250,7 +250,8 @@ late_init(gic__init_gic)
+diff --git a/arm/aarch32/include/asm/kvm.h b/arm/aarch32/include/asm/kvm.h
+index df3f60c..af05f8e 100644
+--- a/arm/aarch32/include/asm/kvm.h
++++ b/arm/aarch32/include/asm/kvm.h
+@@ -84,6 +84,15 @@ struct kvm_regs {
+ #define KVM_VGIC_V2_DIST_SIZE		0x1000
+ #define KVM_VGIC_V2_CPU_SIZE		0x2000
  
- void gic__generate_fdt_nodes(void *fdt, enum irqchip_type type)
- {
--	const char *compatible;
-+	const char *compatible, *msi_compatible = NULL;
-+	u64 msi_prop[2];
- 	u64 reg_prop[] = {
- 		cpu_to_fdt64(ARM_GIC_DIST_BASE), cpu_to_fdt64(ARM_GIC_DIST_SIZE),
- 		0, 0,				/* to be filled */
-@@ -262,6 +263,9 @@ void gic__generate_fdt_nodes(void *fdt, enum irqchip_type type)
- 		reg_prop[2] = cpu_to_fdt64(ARM_GIC_CPUI_BASE);
- 		reg_prop[3] = cpu_to_fdt64(ARM_GIC_CPUI_SIZE);
- 		break;
-+	case IRQCHIP_GICV3_ITS:
-+		msi_compatible = "arm,gic-v3-its";
-+		/* fall-through */
- 	case IRQCHIP_GICV3:
- 		compatible = "arm,gic-v3";
- 		reg_prop[2] = cpu_to_fdt64(gic_redists_base);
-@@ -277,6 +281,22 @@ void gic__generate_fdt_nodes(void *fdt, enum irqchip_type type)
- 	_FDT(fdt_property(fdt, "interrupt-controller", NULL, 0));
- 	_FDT(fdt_property(fdt, "reg", reg_prop, sizeof(reg_prop)));
- 	_FDT(fdt_property_cell(fdt, "phandle", PHANDLE_GIC));
-+	_FDT(fdt_property_cell(fdt, "#address-cells", 2));
-+	_FDT(fdt_property_cell(fdt, "#size-cells", 2));
++/* Supported VGICv3 address types  */
++#define KVM_VGIC_V3_ADDR_TYPE_DIST	2
++#define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
++#define KVM_VGIC_ITS_ADDR_TYPE		4
 +
-+	if (msi_compatible) {
-+		_FDT(fdt_property(fdt, "ranges", NULL, 0));
++#define KVM_VGIC_V3_DIST_SIZE		SZ_64K
++#define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
++#define KVM_VGIC_V3_ITS_SIZE		(2 * SZ_64K)
 +
-+		_FDT(fdt_begin_node(fdt, "msic"));
-+		_FDT(fdt_property_string(fdt, "compatible", msi_compatible));
-+		_FDT(fdt_property(fdt, "msi-controller", NULL, 0));
-+		_FDT(fdt_property_cell(fdt, "phandle", PHANDLE_MSI));
-+		msi_prop[0] = cpu_to_fdt64(gic_msi_base);
-+		msi_prop[1] = cpu_to_fdt64(gic_msi_size);
-+		_FDT(fdt_property(fdt, "reg", msi_prop, sizeof(msi_prop)));
-+		_FDT(fdt_end_node(fdt));
-+	}
+ #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
+ #define KVM_ARM_VCPU_PSCI_0_2		1 /* CPU uses PSCI v0.2 */
+ 
+@@ -139,8 +148,8 @@ struct kvm_arch_memory_slot {
+ #define ARM_CP15_REG64(...) __ARM_CP15_REG64(__VA_ARGS__)
+ 
+ #define KVM_REG_ARM_TIMER_CTL		ARM_CP15_REG32(0, 14, 3, 1)
+-#define KVM_REG_ARM_TIMER_CNT		ARM_CP15_REG64(1, 14) 
+-#define KVM_REG_ARM_TIMER_CVAL		ARM_CP15_REG64(3, 14) 
++#define KVM_REG_ARM_TIMER_CNT		ARM_CP15_REG64(1, 14)
++#define KVM_REG_ARM_TIMER_CVAL		ARM_CP15_REG64(3, 14)
+ 
+ /* Normal registers are mapped as coprocessor 16. */
+ #define KVM_REG_ARM_CORE		(0x0010 << KVM_REG_ARM_COPROC_SHIFT)
+diff --git a/arm/aarch64/include/asm/kvm.h b/arm/aarch64/include/asm/kvm.h
+index f209ea1..3051f86 100644
+--- a/arm/aarch64/include/asm/kvm.h
++++ b/arm/aarch64/include/asm/kvm.h
+@@ -87,9 +87,11 @@ struct kvm_regs {
+ /* Supported VGICv3 address types  */
+ #define KVM_VGIC_V3_ADDR_TYPE_DIST	2
+ #define KVM_VGIC_V3_ADDR_TYPE_REDIST	3
++#define KVM_VGIC_ITS_ADDR_TYPE		4
+ 
+ #define KVM_VGIC_V3_DIST_SIZE		SZ_64K
+ #define KVM_VGIC_V3_REDIST_SIZE		(2 * SZ_64K)
++#define KVM_VGIC_V3_ITS_SIZE		(2 * SZ_64K)
+ 
+ #define KVM_ARM_VCPU_POWER_OFF		0 /* CPU is started in OFF state */
+ #define KVM_ARM_VCPU_EL1_32BIT		1 /* CPU running a 32bit VM */
+diff --git a/include/linux/kvm.h b/include/linux/kvm.h
+index a7f1f80..cac48ed 100644
+--- a/include/linux/kvm.h
++++ b/include/linux/kvm.h
+@@ -651,6 +651,9 @@ struct kvm_enable_cap {
+ };
+ 
+ /* for KVM_PPC_GET_PVINFO */
 +
- 	_FDT(fdt_end_node(fdt));
- }
++#define KVM_PPC_PVINFO_FLAGS_EV_IDLE   (1<<0)
++
+ struct kvm_ppc_pvinfo {
+ 	/* out */
+ 	__u32 flags;
+@@ -682,8 +685,6 @@ struct kvm_ppc_smmu_info {
+ 	struct kvm_ppc_one_seg_page_size sps[KVM_PPC_PAGE_SIZES_MAX_SZ];
+ };
  
-diff --git a/arm/include/arm-common/fdt-arch.h b/arm/include/arm-common/fdt-arch.h
-index 53ba633..60c2d40 100644
---- a/arm/include/arm-common/fdt-arch.h
-+++ b/arm/include/arm-common/fdt-arch.h
-@@ -1,6 +1,6 @@
- #ifndef ARM__FDT_H
- #define ARM__FDT_H
+-#define KVM_PPC_PVINFO_FLAGS_EV_IDLE   (1<<0)
+-
+ #define KVMIO 0xAE
  
--enum phandles {PHANDLE_RESERVED = 0, PHANDLE_GIC, PHANDLES_MAX};
-+enum phandles {PHANDLE_RESERVED = 0, PHANDLE_GIC, PHANDLE_MSI, PHANDLES_MAX};
+ /* machine type bits, to be used as argument to KVM_CREATE_VM */
+@@ -865,6 +866,11 @@ struct kvm_ppc_smmu_info {
+ #define KVM_CAP_SPAPR_TCE_64 125
+ #define KVM_CAP_ARM_PMU_V3 126
+ #define KVM_CAP_VCPU_ATTRIBUTES 127
++#define KVM_CAP_MAX_VCPU_ID 128
++#define KVM_CAP_X2APIC_API 129
++#define KVM_CAP_S390_USER_INSTR0 130
++#define KVM_CAP_MSI_DEVID 131
++#define KVM_CAP_PPC_HTM 132
  
- #endif /* ARM__FDT_H */
-diff --git a/arm/pci.c b/arm/pci.c
-index 2bc718e..37145cc 100644
---- a/arm/pci.c
-+++ b/arm/pci.c
-@@ -18,6 +18,8 @@ struct of_gic_irq {
- struct of_interrupt_map_entry {
- 	struct of_pci_irq_mask		pci_irq_mask;
- 	u32				gic_phandle;
-+	u32				gic_addr_hi;
-+	u32				gic_addr_lo;
- 	struct of_gic_irq		gic_irq;
- } __attribute__((packed));
+ #ifdef KVM_CAP_IRQ_ROUTING
  
-@@ -64,6 +66,7 @@ void pci__generate_fdt_nodes(void *fdt)
- 	_FDT(fdt_property(fdt, "bus-range", bus_range, sizeof(bus_range)));
- 	_FDT(fdt_property(fdt, "reg", &cfg_reg_prop, sizeof(cfg_reg_prop)));
- 	_FDT(fdt_property(fdt, "ranges", ranges, sizeof(ranges)));
-+	_FDT(fdt_property_cell(fdt, "msi-parent", PHANDLE_MSI));
+@@ -877,7 +883,10 @@ struct kvm_irq_routing_msi {
+ 	__u32 address_lo;
+ 	__u32 address_hi;
+ 	__u32 data;
+-	__u32 pad;
++	union {
++		__u32 pad;
++		__u32 devid;
++	};
+ };
  
- 	/* Generate the interrupt map ... */
- 	dev_hdr = device__first_dev(DEVICE_BUS_PCI);
-@@ -84,6 +87,8 @@ void pci__generate_fdt_nodes(void *fdt)
- 				.pci_pin	= cpu_to_fdt32(pin),
- 			},
- 			.gic_phandle	= cpu_to_fdt32(PHANDLE_GIC),
-+			.gic_addr_hi	= 0,
-+			.gic_addr_lo	= 0,
- 			.gic_irq = {
- 				.type	= cpu_to_fdt32(GIC_FDT_IRQ_TYPE_SPI),
- 				.num	= cpu_to_fdt32(irq - GIC_SPI_IRQ_BASE),
+ struct kvm_irq_routing_s390_adapter {
+@@ -964,12 +973,19 @@ struct kvm_irqfd {
+ 	__u8  pad[16];
+ };
+ 
++/* For KVM_CAP_ADJUST_CLOCK */
++
++/* Do not use 1, KVM_CHECK_EXTENSION returned it before we had flags.  */
++#define KVM_CLOCK_TSC_STABLE		2
++
+ struct kvm_clock_data {
+ 	__u64 clock;
+ 	__u32 flags;
+ 	__u32 pad[9];
+ };
+ 
++/* For KVM_CAP_SW_TLB */
++
+ #define KVM_MMU_FSL_BOOKE_NOHV		0
+ #define KVM_MMU_FSL_BOOKE_HV		1
+ 
+@@ -1023,12 +1039,14 @@ struct kvm_one_reg {
+ 	__u64 addr;
+ };
+ 
++#define KVM_MSI_VALID_DEVID	(1U << 0)
+ struct kvm_msi {
+ 	__u32 address_lo;
+ 	__u32 address_hi;
+ 	__u32 data;
+ 	__u32 flags;
+-	__u8  pad[16];
++	__u32 devid;
++	__u8  pad[12];
+ };
+ 
+ struct kvm_arm_device_addr {
+@@ -1073,6 +1091,8 @@ enum kvm_device_type {
+ #define KVM_DEV_TYPE_FLIC		KVM_DEV_TYPE_FLIC
+ 	KVM_DEV_TYPE_ARM_VGIC_V3,
+ #define KVM_DEV_TYPE_ARM_VGIC_V3	KVM_DEV_TYPE_ARM_VGIC_V3
++	KVM_DEV_TYPE_ARM_VGIC_ITS,
++#define KVM_DEV_TYPE_ARM_VGIC_ITS	KVM_DEV_TYPE_ARM_VGIC_ITS
+ 	KVM_DEV_TYPE_MAX,
+ };
+ 
+@@ -1312,4 +1332,7 @@ struct kvm_assigned_msix_entry {
+ 	__u16 padding[3];
+ };
+ 
++#define KVM_X2APIC_API_USE_32BIT_IDS            (1ULL << 0)
++#define KVM_X2APIC_API_DISABLE_BROADCAST_QUIRK  (1ULL << 1)
++
+ #endif /* __LINUX_KVM_H */
+diff --git a/powerpc/include/asm/kvm.h b/powerpc/include/asm/kvm.h
+index c93cf35..3603b6f 100644
+--- a/powerpc/include/asm/kvm.h
++++ b/powerpc/include/asm/kvm.h
+@@ -573,6 +573,10 @@ struct kvm_get_htab_header {
+ #define KVM_REG_PPC_SPRG9	(KVM_REG_PPC | KVM_REG_SIZE_U64 | 0xba)
+ #define KVM_REG_PPC_DBSR	(KVM_REG_PPC | KVM_REG_SIZE_U32 | 0xbb)
+ 
++/* POWER9 registers */
++#define KVM_REG_PPC_TIDR	(KVM_REG_PPC | KVM_REG_SIZE_U64 | 0xbc)
++#define KVM_REG_PPC_PSSCR	(KVM_REG_PPC | KVM_REG_SIZE_U64 | 0xbd)
++
+ /* Transactional Memory checkpointed state:
+  * This is all GPRs, all VSX regs and a subset of SPRs
+  */
+@@ -596,6 +600,7 @@ struct kvm_get_htab_header {
+ #define KVM_REG_PPC_TM_VSCR	(KVM_REG_PPC_TM | KVM_REG_SIZE_U32 | 0x67)
+ #define KVM_REG_PPC_TM_DSCR	(KVM_REG_PPC_TM | KVM_REG_SIZE_U64 | 0x68)
+ #define KVM_REG_PPC_TM_TAR	(KVM_REG_PPC_TM | KVM_REG_SIZE_U64 | 0x69)
++#define KVM_REG_PPC_TM_XER	(KVM_REG_PPC_TM | KVM_REG_SIZE_U64 | 0x6a)
+ 
+ /* PPC64 eXternal Interrupt Controller Specification */
+ #define KVM_DEV_XICS_GRP_SOURCES	1	/* 64-bit source attributes */
+diff --git a/x86/include/asm/kvm.h b/x86/include/asm/kvm.h
+index cd54147..739c0c5 100644
+--- a/x86/include/asm/kvm.h
++++ b/x86/include/asm/kvm.h
+@@ -216,9 +216,9 @@ struct kvm_cpuid_entry2 {
+ 	__u32 padding[3];
+ };
+ 
+-#define KVM_CPUID_FLAG_SIGNIFCANT_INDEX		BIT(0)
+-#define KVM_CPUID_FLAG_STATEFUL_FUNC		BIT(1)
+-#define KVM_CPUID_FLAG_STATE_READ_NEXT		BIT(2)
++#define KVM_CPUID_FLAG_SIGNIFCANT_INDEX		(1 << 0)
++#define KVM_CPUID_FLAG_STATEFUL_FUNC		(1 << 1)
++#define KVM_CPUID_FLAG_STATE_READ_NEXT		(1 << 2)
+ 
+ /* for KVM_SET_CPUID2 */
+ struct kvm_cpuid2 {
 -- 
 2.9.0
