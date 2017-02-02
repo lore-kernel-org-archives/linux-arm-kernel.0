@@ -1,46 +1,59 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Thu, 2 Feb 2017 10:02:50 -0500
-Subject: [PATCH 0/5] Implement SMMU passthrough using the default domain
-In-Reply-To: <20170126171857.GE27598@8bytes.org>
-References: <1484849955-1871-1-git-send-email-will.deacon@arm.com>
- <010801d27654$47b7e450$d727acf0$@codeaurora.org>
- <20170126171857.GE27598@8bytes.org>
-Message-ID: <CAF6AEGtfrrwVZ_W86_HqVsiqfcM=XFa+g2LECFYQJmvv7-JSqQ@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 2 Feb 2017 20:36:06 +0530
+Subject: [PATCH v2 1/2] ARM: davinci: Allocate extra interrupts
+In-Reply-To: <dedc276f-e25b-f3b8-dc4a-568f41d9f82e@lechnology.com>
+References: <1484337612-11120-1-git-send-email-david@lechnology.com>
+ <1484337612-11120-2-git-send-email-david@lechnology.com>
+ <95440160-8346-fef8-27d2-fb17c0da38f6@ti.com>
+ <25c0bc60-bb99-9aa5-db56-6299d82db9c1@lechnology.com>
+ <0bd745dc-df46-0d37-ed18-b419c1cf2e78@ti.com>
+ <dedc276f-e25b-f3b8-dc4a-568f41d9f82e@lechnology.com>
+Message-ID: <139f2c33-7fb3-3a63-6dfe-caa2cca500ce@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jan 26, 2017 at 12:18 PM, Joerg Roedel <joro@8bytes.org> wrote:
-> On Tue, Jan 24, 2017 at 08:42:23PM +0530, Sricharan wrote:
->> Thanks for this series. We had a case with the GPU.
->> The GPU's iommu was setup by kernel and the GPU
->> also does dynamic updates for on-the-fly switching between
->> process pagetables.  GPU driver was not using DMA domain and
->> the GPU's firmware was always expecting to run out  of contextbank
->>  '0' (although not correct) , which was not the case after the DMA domain
->> was made default  as '0' was getting allocated for DMA domain and
->> there were concerns about reusing the DMA domain as well.
->> Now with this series, looks there is an way out of that that can be tried.
+On Friday 20 January 2017 11:47 PM, David Lechner wrote:
+> On 01/20/2017 05:50 AM, Sekhar Nori wrote:
+>> On Wednesday 18 January 2017 10:27 PM, David Lechner wrote:
+>>> On 01/18/2017 03:50 AM, Sekhar Nori wrote:
+>>>> On Saturday 14 January 2017 01:30 AM, David Lechner wrote:
+>>>>> This allocates extra interrupts for mach-davinci. These extra
+>>>>> interrupts
+>>>>> are need for things like IIO triggers.
+>>>>
+>>>> I am not really familiar with IIO triggers. Can you give some more
+>>>> detail on what fails without this patch?
+>>>
+>>> A trigger is used to initiate the reading of an iio device. For example,
+>>> there is a mechanism for a sysfs trigger. When you write 1 to the sysfs
+>>> attribute, it triggers an interrupt that is handled by the iio device.
+>>>
+>>> Since these triggers use interrupts, you need to allocate spare
+>>> interrupts in order to set up the trigger. Otherwise, setting up the
+>>> trigger will fail with an error code (I forgot which one exactly)
+>>> because all of the allocated irqs have already been assigned to hardware
+>>> irqs and are not available.
+>>>
+>>> Here is where the iio subsytem actually allocates the irq:
+>>> http://lxr.free-electrons.com/source/drivers/iio/industrialio-trigger.c#L525
+>>>
 >>
->> So should the default domain not be per device specific selectable ?
->
-> Note that iommu-drivers can request direct-mapping for any given device
-> on its initializtion. This is used on x86 for devices that need a 1-1
-> mapping for some reason.
->
-> Also device drivers can use the iommu-api and assign their own domain to
-> a device, which allows them to manage the dma address space on their
-> own.
+>> Alright, I will take a look. Do note that this may not get included in
+>> the first batch of v4.11 changes I queue. But I promise to come back to
+>> it soon afterwards.
+>>
+> 
+> It is not critical at this point, so it is fine to wait a bit.
 
-Part of the problem is that dev->archdata.dma_ops gets wired up to
-iommu_dma_ops.  Which isn't so bad on it's own, except that cache ops
-are not exposed to drivers, forcing us to use dma-mapping API
-(dma_map_sg, etc) for cache operations.
+So, I think instead of increasing NR_IRQS by a small number, we should 
+instead shift to use SPARSE_IRQ. I looked at some patches from Tony 
+Lindgren converting OMAP1 to use SPARSE_IRQ. There is some work 
+involved, but it does not look to be too huge a change to me.
 
-Possibly we should just expose cache op's to drivers bypass this abuse
-of dma-mapping.
+685e2d08c54b ARM: OMAP1: Change interrupt numbering for sparse IRQ
+b694331cfb2e ARM: omap1: Switch to use MULTI_IRQ
+55b447744389 ARM: OMAP1: Switch to use generic irqchip in preparation for sparse IRQ
+928f81aa619d ARM: OMAP1: Move UART defines to prepare for sparse IRQ
 
-btw, Will, we definitely want this to *not* rely on kcmdline for the
-gpu with it's own private iommu case..
-
-BR,
--R
+Thanks,
+Sekhar
