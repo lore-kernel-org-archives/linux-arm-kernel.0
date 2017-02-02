@@ -1,117 +1,46 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 2 Feb 2017 23:55:54 +0900
-Subject: [PATCH v31 04/12] arm64: mm: allow for unmapping part of kernel
- mapping
-In-Reply-To: <20170202143535.GM31394@leverpostej>
-References: <20170201124218.5823-1-takahiro.akashi@linaro.org>
- <20170201124630.6016-3-takahiro.akashi@linaro.org>
- <20170201160354.GF4756@leverpostej>
- <20170202102131.GD13549@linaro.org>
- <20170202114437.GH31394@leverpostej>
- <20170202140102.GA22666@fireball>
- <20170202143535.GM31394@leverpostej>
-Message-ID: <20170202145553.GA3238@fireball>
+From: robdclark@gmail.com (Rob Clark)
+Date: Thu, 2 Feb 2017 10:02:50 -0500
+Subject: [PATCH 0/5] Implement SMMU passthrough using the default domain
+In-Reply-To: <20170126171857.GE27598@8bytes.org>
+References: <1484849955-1871-1-git-send-email-will.deacon@arm.com>
+ <010801d27654$47b7e450$d727acf0$@codeaurora.org>
+ <20170126171857.GE27598@8bytes.org>
+Message-ID: <CAF6AEGtfrrwVZ_W86_HqVsiqfcM=XFa+g2LECFYQJmvv7-JSqQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2017 at 02:35:35PM +0000, Mark Rutland wrote:
-> On Thu, Feb 02, 2017 at 11:01:03PM +0900, AKASHI Takahiro wrote:
-> > On Thu, Feb 02, 2017 at 11:44:38AM +0000, Mark Rutland wrote:
-> > > On Thu, Feb 02, 2017 at 07:21:32PM +0900, AKASHI Takahiro wrote:
-> > > > On Wed, Feb 01, 2017 at 04:03:54PM +0000, Mark Rutland wrote:
-> > > > > Hi,
-> > > > > 
-> > > > > On Wed, Feb 01, 2017 at 09:46:23PM +0900, AKASHI Takahiro wrote:
-> > > > > > A new function, remove_pgd_mapping(), is added.
-> > > > > > It allows us to unmap a specific portion of kernel mapping later as far as
-> > > > > > the mapping is made using create_pgd_mapping() and unless we try to free
-> > > > > > a sub-set of memory range within a section mapping.
-> > > > > 
-> > > > > I'm not keen on adding more page table modification code. It was painful
-> > > > > enough to ensure that those worked in all configurations.
-> > > > > 
-> > > > > Why can't we reuse create_pgd_mapping()? If we pass page_mappings_only,
-> > > > > and use an invalid prot (i.e. 0), what is the problem?
-> > > > 
-> > > > As I did in v30?
-> > > > (though my implementation in v30 should be improved.)
-> > > 
-> > > Something like that. I wasn't entirely sure why we needed to change
-> > > those functions so much, so I'm clearly missing something there. I'll go
-> > > have another look.
-> > 
-> > I would be much easier if you see my new code.
-> 
-> Sure. FWIW, I took a look, and I understand why those changes were
-> necessary.
-> 
-> > > > If we don't need to free unused page tables, that would make things
-> > > > much simple. There are still some minor problems on the merge, but
-> > > > we can sort it out.
-> > > 
-> > > I'm not sure I follow what you mean by 'on merge' here. Could you
-> > > elaborate?
-> > 
-> > What I had in mind is some changes needed to handle "__prot(0)" properly
-> > in alloc_init_pxx(). For example, p[mu]d_set_huge() doesn't make
-> > a "zeroed" entry.
-> 
-> I think that if we only allow ourselves to make PTEs invalid, we don't
-> have to handle that case. If we use page_mappings_only, we should only
-> check pgattr_change_is_safe() for the pte level, and the {pmd,pud,pgd}
-> entries shouldn't change.
-> 
-> Is the below sufficient to allow that, or have I missed something?
+On Thu, Jan 26, 2017 at 12:18 PM, Joerg Roedel <joro@8bytes.org> wrote:
+> On Tue, Jan 24, 2017 at 08:42:23PM +0530, Sricharan wrote:
+>> Thanks for this series. We had a case with the GPU.
+>> The GPU's iommu was setup by kernel and the GPU
+>> also does dynamic updates for on-the-fly switching between
+>> process pagetables.  GPU driver was not using DMA domain and
+>> the GPU's firmware was always expecting to run out  of contextbank
+>>  '0' (although not correct) , which was not the case after the DMA domain
+>> was made default  as '0' was getting allocated for DMA domain and
+>> there were concerns about reusing the DMA domain as well.
+>> Now with this series, looks there is an way out of that that can be tried.
+>>
+>> So should the default domain not be per device specific selectable ?
+>
+> Note that iommu-drivers can request direct-mapping for any given device
+> on its initializtion. This is used on x86 for devices that need a 1-1
+> mapping for some reason.
+>
+> Also device drivers can use the iommu-api and assign their own domain to
+> a device, which allows them to manage the dma address space on their
+> own.
 
-I think it will be OK, but will double-check tomorrow.
-However, is is acceptable that create_pgd_mapping( __prot(0) ) can
-only handle the cases of page-mapping-only?
-That would be fine to kdump, but in general?
+Part of the problem is that dev->archdata.dma_ops gets wired up to
+iommu_dma_ops.  Which isn't so bad on it's own, except that cache ops
+are not exposed to drivers, forcing us to use dma-mapping API
+(dma_map_sg, etc) for cache operations.
 
--Takahiro AKASHI
+Possibly we should just expose cache op's to drivers bypass this abuse
+of dma-mapping.
 
-> Thanks,
-> Mark.
-> 
-> ---->8----
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 17243e4..05bf7bf 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -105,6 +105,22 @@ static bool pgattr_change_is_safe(u64 old, u64 new)
->         return old  == 0 || new  == 0 || ((old ^ new) & ~mask) == 0;
->  }
-> 
-> +static bool pte_change_is_valid(pte old, pte new)
-> +{
-> +       /*
-> +        * So long as we subsequently perform TLB invalidation, it is safe to
-> +        * change a PTE to an invalid, but non-zero value. We only allow this
-> +        * for PTEs since there's no complicated allocation/free issues to deal
-> +        * with.
-> +        *
-> +        * Otherwise, the usual attribute change rules apply.
-> +        */
-> +       if (!pte_valid(old) || !pte_valid(new))
-> +               return true;
-> +
-> +       return pgattr_change_is_safe(pte_val(old), pte_val(new));
-> +}
-> +
->  static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
->                                   unsigned long end, unsigned long pfn,
->                                   pgprot_t prot,
-> @@ -143,11 +159,7 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
->                 set_pte(pte, pfn_pte(pfn, __prot));
->                 pfn++;
-> 
-> -               /*
-> -                * After the PTE entry has been populated once, we
-> -                * only allow updates to the permission attributes.
-> -                */
-> -               BUG_ON(!pgattr_change_is_safe(pte_val(old_pte), pte_val(*pte)));
-> +               BUG_ON(!pte_change_is_valid(old_pte, pte));
-> 
->         } while (pte++, addr += PAGE_SIZE, addr != end);
-> 
-> 
+btw, Will, we definitely want this to *not* rely on kcmdline for the
+gpu with it's own private iommu case..
+
+BR,
+-R
