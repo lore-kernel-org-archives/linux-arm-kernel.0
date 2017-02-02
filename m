@@ -1,91 +1,122 @@
-From: mst@redhat.com (Michael S. Tsirkin)
-Date: Thu, 2 Feb 2017 18:30:28 +0200
-Subject: [PATCH] virtio: Try to untangle DMA coherency
-In-Reply-To: <bb041fbe-3fde-0dc1-ae28-cca5acfe9dc5@arm.com>
-References: <8a6494f6409c20b4609cd6bdcdd751f68b5c0564.1485951731.git.robin.murphy@arm.com>
- <20170201195732-mutt-send-email-mst@kernel.org>
- <20170201182659.GM8177@arm.com>
- <20170201210648-mutt-send-email-mst@kernel.org>
- <20170202112614.GB30577@arm.com>
- <bb041fbe-3fde-0dc1-ae28-cca5acfe9dc5@arm.com>
-Message-ID: <20170202182224-mutt-send-email-mst@kernel.org>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu,  2 Feb 2017 16:32:08 +0000
+Subject: [kvmtool PATCH v9 00/15] kvmtool: arm: ITS emulation and GSI routing
+ support
+Message-ID: <20170202163223.15372-1-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 02, 2017 at 01:34:03PM +0000, Robin Murphy wrote:
-> On 02/02/17 11:26, Will Deacon wrote:
-> > On Wed, Feb 01, 2017 at 09:19:22PM +0200, Michael S. Tsirkin wrote:
-> >> On Wed, Feb 01, 2017 at 06:27:09PM +0000, Will Deacon wrote:
-> >>> On Wed, Feb 01, 2017 at 08:09:21PM +0200, Michael S. Tsirkin wrote:
-> >>>> I'd like to do that instead. It's fastboot doing the unreasonable thing
-> >>>> here and deviating from what every other legacy device without exception
-> >>>> did for years. If this means fastboot will need to update to virtio 1,
-> >>>> all the better.
-> >>>
-> >>> The problem still exists with virtio 1, unless we require that the
-> >>> "dma-coherent" property is set/unset correctly when VIRTIO_F_IOMMU_PLATFORM
-> >>> is advertised by the device (which is what I suggested in my reply).
-> >>
-> >> I'm not ignoring that, but I need to understand that part a bit better.
-> >> I'll reply to that patch in a day or two after looking at how _CCA is
-> >> supposed to work.
-> > 
-> > Thanks. I do think that whatever solution we come up with for virtio 1
-> > should influence what we do for legacy.
-> > 
-> >>> We can't detect the fastmodel,
-> >>
-> >> Surely, it puts a hardware id somewhere? I think you mean
-> >> fastmodel isn't always affected, right?
-> > 
-> > I don't think there's a hardware ID. The thing is, the fastmodel is a
-> > toolkit for building all sorts of platforms: you can chop and change
-> > the CPUs, the peripherals, the memory, the interrupt controller, the
-> > interconnect etc. Pretty much everything can be customised. So, for
-> > any fastmodel configuration that places virtio upstream of the SMMU
-> > (which is common, because virtio is one of the few DMA-capable peripherals
-> > that the fastmodel supports), we need to do something special.
-> > 
-> >> I'd like to see basically
-> >>
-> >> if (fastmodel)
-> >> 	a pile of special work-arounds
-> >> else
-> >> 	not less hacky but more common virtio work-arounds
-> >>
-> >> :)
-> >>
-> >> And then I can apply whatever comes from @arm.com and not
-> >> worry about breaking actual hardware.
-> > 
-> > What we could do is call iommu_group_get(&vdev->dev) for legacy
-> 
-> Actually, that should be vdev->dev.parent - I'm now not sure quite what
-> I managed to successfully test yesterday, but apparently it wasn't this
-> patch :(
-> 
-> > devices if CONFIG_ARM64. If that returns non-NULL, then we know that
-> > the device is upstream of an SMMU, which means it must be the fastmodel.
-> 
-> We can boot 32-bit kernels on models, so I'd be inclined to keep
-> CONFIG_ARM included, but I do tend to agree that explicitly checking for
-> an IOMMU is probably the cleanest approach if we reposition this as a
-> more specific quirk. I'll split apart the "Fast Models are wacky" vs.
-> "uh-oh device coherency" aspects and spin a v2 so that we can
-> (hopefully) sort the regression out ASAP.
-> 
-> Robin.
+Hi,
 
-I am inclined to say, for 4.10 let's revert
-c7070619f3408d9a0dffbed9149e6f00479cf43b since what it fixes is not a
-regression in 4.10.  So I think we can defer the fix to 4.11.
-I think we still want f7f6634d23830ff74335734fbdb28ea109c1f349
-for hosts with virtio 1 support.
+an update to the ITS emulation series for kvmtool.
+I reworked the phandle allocation by actually removing and replacing it
+with some simple, static assignments. That definitely fits kvmtool's
+needs today, where the GIC and the PCI controller are statically
+assigned anyway. If that is too much of a simplification, let me know.
+Also I fixed the error return in case some GSI routing setup fails.
+On that way I use the opportunity to merge in 32-bit ARM support for the
+ITS and the VGICv3, as the kernel learned about it recently as well.
+The rest is effectively unchanged apart from some rebasing and
+adjustments due to the mentioned changes.
+-------------------------------------------
 
-All this will hopefully push hosts to just implement virtio 1.
-For mmio the changes are very small: several new registers,
-that's all. You want this for proper 64 bit dma mask anyway.
+This series teaches kvmtool how to support KVM's ITS emulation. Also
+(as this is somewhat related and has been co-developed) it enables GSI
+routing for ARM/ARM64, which allows IRQFDs to be used, for instance
+to use vhost_net. At the moment this is dependent on the guest
+using the ITS emulation, but GICv2M support may be added at a later time.
 
-> > 
-> > Will
-> > 
+The first six patches are generic fixes and refactoring to pave the
+road for the rest of the patches. Most importantly patch 3/16 pulls
+the GSI routing code from x86 into generic code.
+The following six patches add ITS emulation support. They reserve and
+register the required ITS register frame and populate a DT node with
+the necessary data. Also the patches add the device ID to the
+KVM_SIGNAL_MSI ioctl.
+Patches 13 and 14 enable IRQ GSI routing for ARM/ARM64.
+This is needed to use IRQFDs, which is a prerequisite for vhost
+functionality, for instance. The code sets up the (dummy) SPI
+routing table and adds the device ID to the routing entry.
+The last patch finally enables the guest ITS support by extending the
+existing --irqchip= parameter to allow "--irqchip=gicv3-its".
+
+These patches make use of the recently (4.8-rc) merged KVM kernel
+functionality, both Eric's IRQ routing series and the ITS emulation.
+It can also be found in my kvmtool git repository [1].
+
+Cheers,
+Andre.
+
+[1] git://linux-arm.org/kvmtool.git (branch: its/v9)
+    http://www.linux-arm.org/git?p=kvmtool.git;a=log;h=refs/heads/its/v9
+
+Andre Przywara (14):
+  FDT: use static phandles
+  arm: use static DT phandle for the GIC
+  irq: move IRQ routing into irq.c
+  MSI-X: update GSI routing after changed MSI-X configuration
+  virtio: fix endianness check for vhost support
+  PCI: Only allocate IRQ routing entry when available
+  update public Linux headers for GICv3 ITS emulation
+  arm: allow creation of an MSI register frame region
+  arm: FDT: create MSI controller DT node
+  add kvm__check_vm_capability
+  PCI: inject PCI device ID on MSI injection
+  arm: setup SPI IRQ routing tables
+  extend GSI IRQ routing to take a device ID
+  arm64: enable GICv3-ITS emulation
+
+Vladimir Murzin (1):
+  arm: allow vGICv3 emulation
+
+ Makefile                                 |   4 +-
+ arm/aarch32/arm-cpu.c                    |   4 +-
+ arm/aarch32/include/asm/kvm.h            |  13 ++-
+ arm/aarch32/include/kvm/fdt-arch.h       |   6 ++
+ arm/aarch32/include/kvm/kvm-arch.h       |   3 -
+ arm/aarch64/arm-cpu.c                    |   5 +-
+ arm/aarch64/include/asm/kvm.h            |   2 +
+ arm/aarch64/include/kvm/fdt-arch.h       |   6 ++
+ arm/aarch64/include/kvm/kvm-arch.h       |   3 -
+ arm/fdt.c                                |   9 +-
+ arm/gic.c                                | 130 +++++++++++++++++++++++++---
+ arm/include/arm-common/fdt-arch.h        |   6 ++
+ arm/include/arm-common/gic.h             |   3 +-
+ arm/include/arm-common/kvm-arch.h        |   2 +
+ arm/include/arm-common/kvm-config-arch.h |   2 +-
+ arm/include/arm-common/kvm-cpu-arch.h    |   3 +-
+ arm/include/arm-common/pci.h             |   2 +-
+ arm/irq.c                                |   9 --
+ arm/pci.c                                |   9 +-
+ hw/pci-shmem.c                           |   5 +-
+ include/kvm/fdt.h                        |   8 +-
+ include/kvm/irq.h                        |   8 +-
+ include/kvm/kvm.h                        |   1 +
+ include/kvm/virtio.h                     |   9 +-
+ include/linux/kvm.h                      |  31 ++++++-
+ irq.c                                    | 141 +++++++++++++++++++++++++++++++
+ kvm.c                                    |  28 ++++++
+ mips/include/kvm/fdt-arch.h              |   6 ++
+ mips/irq.c                               |  10 ---
+ powerpc/include/asm/kvm.h                |   5 ++
+ powerpc/include/kvm/fdt-arch.h           |   6 ++
+ powerpc/irq.c                            |  31 -------
+ powerpc/kvm.c                            |   2 -
+ virtio/net.c                             |   2 +-
+ virtio/pci.c                             | 104 +++++++++++++++++++----
+ x86/include/asm/kvm.h                    |   6 +-
+ x86/include/kvm/fdt-arch.h               |   6 ++
+ x86/irq.c                                |  45 ++--------
+ 38 files changed, 509 insertions(+), 166 deletions(-)
+ create mode 100644 arm/aarch32/include/kvm/fdt-arch.h
+ create mode 100644 arm/aarch64/include/kvm/fdt-arch.h
+ create mode 100644 arm/include/arm-common/fdt-arch.h
+ delete mode 100644 arm/irq.c
+ create mode 100644 mips/include/kvm/fdt-arch.h
+ delete mode 100644 mips/irq.c
+ create mode 100644 powerpc/include/kvm/fdt-arch.h
+ delete mode 100644 powerpc/irq.c
+ create mode 100644 x86/include/kvm/fdt-arch.h
+
+-- 
+2.9.0
