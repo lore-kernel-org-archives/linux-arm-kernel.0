@@ -1,29 +1,47 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 2 Feb 2017 22:05:10 +0800
-Subject: [PATCH v3 2/3] crypto: brcm: Add Broadcom SPU driver
-In-Reply-To: <1485362689-11294-3-git-send-email-rob.rice@broadcom.com>
-References: <1485362689-11294-1-git-send-email-rob.rice@broadcom.com>
- <1485362689-11294-3-git-send-email-rob.rice@broadcom.com>
-Message-ID: <20170202140510.GB5289@gondor.apana.org.au>
+From: afd@ti.com (Andrew F. Davis)
+Date: Thu, 2 Feb 2017 08:23:03 -0600
+Subject: [RFC] w1: regression, remove need for ida and use
+ PLATFORM_DEVID_AUTO
+In-Reply-To: <d0b52b94-0c87-61f8-32ff-99f2a354e500@tul.cz>
+References: <d0b52b94-0c87-61f8-32ff-99f2a354e500@tul.cz>
+Message-ID: <308e185e-26eb-39ee-d82f-a0d210a41743@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jan 25, 2017 at 11:44:48AM -0500, Rob Rice wrote:
->
-> +static int ahash_export(struct ahash_request *req, void *out)
-> +{
-> +	const struct iproc_reqctx_s *rctx = ahash_request_ctx(req);
-> +
-> +	memcpy(out, rctx, offsetof(struct iproc_reqctx_s, msg_buf));
-> +	return 0;
-> +}
+On 02/01/2017 07:05 PM, Petr Cvek wrote:
+> Patch 
+> 	w1: remove need for ida and use PLATFORM_DEVID_AUTO
+> 	098f9fb0c962eb2fdba5f9d34f4cf7a938237184 
+> 
+> causes a regression in the w1_ds2760 driver. Initialization creates a name "ds2760-battery.0.auto". It seems that name of that size will cause checking code in __thermal_cooling_device_register() from thermal_core.c to fail as it checks for names shorter than 20 chars:
+> 
+> 	if (type && strlen(type) >= THERMAL_NAME_LENGTH)
+> 		return ERR_PTR(-EINVAL);
+> 
+> A second problem seems to be with magician_supplicants list as "ds2760-battery.0" does not match in a test power_supply_am_i_supplied() in ds2760_battery_update_status() from drivers/power/supply/ds2760_battery.c . This causes status flag to be forever in POWER_SUPPLY_STATUS_DISCHARGING state.
+> 
+> Functionality returned after I hotfix changed (drivers/w1/slaves/w1_ds2760.c)
+> 
+> 	pdev = platform_device_alloc("ds2760-battery", PLATFORM_DEVID_AUTO);
+> 
+> to
+> 
+> 	pdev = platform_device_alloc("ds2760-battery", 0);
+> 
+> Which solution do you advise. Shortening the name let's say just to "ds2760" (with changes to arch files, w1 files and supply files), increasing THERMAL_NAME_LENGTH to let's say 32 (I don't know if this doesn't break something other) or just reverting to the old behavior?
+> 
 
-The reqctx data structure seems to contain a lot of info unrelated
-to the hash state.  Can't we get away with just copying the hash
-state (incr_hash) itself?
+If 20 is no longer the max thermal name then THERMAL_NAME_LENGTH should
+be changed.
 
-Cheers,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+As for the couple boards hard-coding "ds2760-battery.0", this is a
+problem that should be fix regardless of any fix we chose here as IDA is
+not guaranteed to return 0, so the battery could just as easily be
+called ds2760-battery.7. (I've had this discussion before as the N900
+user-space also make this mistake).
+
+Andrew
+
+> Best regards,
+> Petr
+> 
