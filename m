@@ -1,51 +1,98 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  2 Feb 2017 16:51:36 +0100
-Subject: [PATCHv3 net-next 07/12] net: mvpp2: simplify mvpp2_bm_bufs_add()
+Date: Thu,  2 Feb 2017 16:51:39 +0100
+Subject: [PATCHv3 net-next 10/12] net: mvpp2: simplify MVPP2_PRS_RI_*
+ definitions
 In-Reply-To: <1486050701-27899-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1486050701-27899-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1486050701-27899-8-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1486050701-27899-11-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mvpp2_bm_bufs_add() currently creates a fake cookie by calling
-mvpp2_bm_cookie_pool_set(), just to be able to call
-mvpp2_pool_refill(). But all what mvpp2_pool_refill() does is extract
-the pool ID from the cookie, and call mvpp2_bm_pool_put() with this ID.
+Some of the MVPP2_PRS_RI_* definitions use the ~(value) syntax, which
+doesn't compile nicely on 64-bit. Moreover, those definitions are in
+fact unneeded, since they are always used in combination with a bit
+mask that ensures only the appropriate bits are modified.
 
-Instead of doing this convoluted thing, just call mvpp2_bm_pool_put()
-directly, since we have the BM pool ID.
+Therefore, such definitions should just be set to 0x0. In addition, as
+suggested by Russell King, we change the _MASK definitions to also use
+the BIT() macro so that it is clear they are related to the values
+defined afterwards.
+
+For example:
+
+ #define MVPP2_PRS_RI_L2_CAST_MASK              0x600
+ #define MVPP2_PRS_RI_L2_UCAST                  ~(BIT(9) | BIT(10))
+ #define MVPP2_PRS_RI_L2_MCAST                  BIT(9)
+ #define MVPP2_PRS_RI_L2_BCAST                  BIT(10)
+
+becomes
+
+ #define MVPP2_PRS_RI_L2_CAST_MASK              (BIT(9) | BIT(10))
+ #define MVPP2_PRS_RI_L2_UCAST                  0x0
+ #define MVPP2_PRS_RI_L2_MCAST                  BIT(9)
+ #define MVPP2_PRS_RI_L2_BCAST                  BIT(10)
+
+Because the values (MVPP2_PRS_RI_L2_UCAST, MVPP2_PRS_RI_L2_MCAST and
+MVPP2_PRS_RI_L2_BCAST) are always applied with
+MVPP2_PRS_RI_L2_CAST_MASK, and therefore there is no need for
+MVPP2_PRS_RI_L2_UCAST to be defined as ~(BIT(9) | BIT(10)).
+
+It fixes the following warnings when building the driver on a 64-bit
+platform (which is not possible as of this commit, but will be enabled
+in a follow-up commit):
+
+drivers/net/ethernet/marvell/mvpp2.c: In function ?mvpp2_prs_mac_promisc_set?:
+drivers/net/ethernet/marvell/mvpp2.c:524:33: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+ #define MVPP2_PRS_RI_L2_UCAST   ~(BIT(9) | BIT(10))
+                                 ^
+drivers/net/ethernet/marvell/mvpp2.c:1459:33: note: in expansion of macro ?MVPP2_PRS_RI_L2_UCAST?
+   mvpp2_prs_sram_ri_update(&pe, MVPP2_PRS_RI_L2_UCAST,
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/net/ethernet/marvell/mvpp2.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ drivers/net/ethernet/marvell/mvpp2.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/net/ethernet/marvell/mvpp2.c b/drivers/net/ethernet/marvell/mvpp2.c
-index ed550c4..e7d0da6 100644
+index b219b0c..ec8f452 100644
 --- a/drivers/net/ethernet/marvell/mvpp2.c
 +++ b/drivers/net/ethernet/marvell/mvpp2.c
-@@ -3626,7 +3626,6 @@ static int mvpp2_bm_bufs_add(struct mvpp2_port *port,
- {
- 	struct sk_buff *skb;
- 	int i, buf_size, total_size;
--	u32 bm;
- 	dma_addr_t phys_addr;
- 
- 	buf_size = MVPP2_RX_BUF_SIZE(bm_pool->pkt_size);
-@@ -3640,13 +3639,12 @@ static int mvpp2_bm_bufs_add(struct mvpp2_port *port,
- 		return 0;
- 	}
- 
--	bm = mvpp2_bm_cookie_pool_set(0, bm_pool->id);
- 	for (i = 0; i < buf_num; i++) {
- 		skb = mvpp2_skb_alloc(port, bm_pool, &phys_addr, GFP_KERNEL);
- 		if (!skb)
- 			break;
- 
--		mvpp2_pool_refill(port, bm, (u32)phys_addr, (u32)skb);
-+		mvpp2_bm_pool_put(port, bm_pool->id, (u32)phys_addr, (u32)skb);
- 	}
- 
- 	/* Update BM driver with number of buffers added to pool */
+@@ -510,28 +510,28 @@ enum mvpp2_tag_type {
+ /* Sram result info bits assignment */
+ #define MVPP2_PRS_RI_MAC_ME_MASK		0x1
+ #define MVPP2_PRS_RI_DSA_MASK			0x2
+-#define MVPP2_PRS_RI_VLAN_MASK			0xc
+-#define MVPP2_PRS_RI_VLAN_NONE			~(BIT(2) | BIT(3))
++#define MVPP2_PRS_RI_VLAN_MASK			(BIT(2) | BIT(3))
++#define MVPP2_PRS_RI_VLAN_NONE			0x0
+ #define MVPP2_PRS_RI_VLAN_SINGLE		BIT(2)
+ #define MVPP2_PRS_RI_VLAN_DOUBLE		BIT(3)
+ #define MVPP2_PRS_RI_VLAN_TRIPLE		(BIT(2) | BIT(3))
+ #define MVPP2_PRS_RI_CPU_CODE_MASK		0x70
+ #define MVPP2_PRS_RI_CPU_CODE_RX_SPEC		BIT(4)
+-#define MVPP2_PRS_RI_L2_CAST_MASK		0x600
+-#define MVPP2_PRS_RI_L2_UCAST			~(BIT(9) | BIT(10))
++#define MVPP2_PRS_RI_L2_CAST_MASK		(BIT(9) | BIT(10))
++#define MVPP2_PRS_RI_L2_UCAST			0x0
+ #define MVPP2_PRS_RI_L2_MCAST			BIT(9)
+ #define MVPP2_PRS_RI_L2_BCAST			BIT(10)
+ #define MVPP2_PRS_RI_PPPOE_MASK			0x800
+-#define MVPP2_PRS_RI_L3_PROTO_MASK		0x7000
+-#define MVPP2_PRS_RI_L3_UN			~(BIT(12) | BIT(13) | BIT(14))
++#define MVPP2_PRS_RI_L3_PROTO_MASK		(BIT(12) | BIT(13) | BIT(14))
++#define MVPP2_PRS_RI_L3_UN			0x0
+ #define MVPP2_PRS_RI_L3_IP4			BIT(12)
+ #define MVPP2_PRS_RI_L3_IP4_OPT			BIT(13)
+ #define MVPP2_PRS_RI_L3_IP4_OTHER		(BIT(12) | BIT(13))
+ #define MVPP2_PRS_RI_L3_IP6			BIT(14)
+ #define MVPP2_PRS_RI_L3_IP6_EXT			(BIT(12) | BIT(14))
+ #define MVPP2_PRS_RI_L3_ARP			(BIT(13) | BIT(14))
+-#define MVPP2_PRS_RI_L3_ADDR_MASK		0x18000
+-#define MVPP2_PRS_RI_L3_UCAST			~(BIT(15) | BIT(16))
++#define MVPP2_PRS_RI_L3_ADDR_MASK		(BIT(15) | BIT(16))
++#define MVPP2_PRS_RI_L3_UCAST			0x0
+ #define MVPP2_PRS_RI_L3_MCAST			BIT(15)
+ #define MVPP2_PRS_RI_L3_BCAST			(BIT(15) | BIT(16))
+ #define MVPP2_PRS_RI_IP_FRAG_MASK		0x20000
 -- 
 2.7.4
