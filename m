@@ -1,29 +1,62 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 2 Feb 2017 19:15:37 +0530
-Subject: [GIT PULL 1/4] DaVinci driver updates
-In-Reply-To: <20170202133148.32531-1-nsekhar@ti.com>
-References: <20170202133148.32531-1-nsekhar@ti.com>
-Message-ID: <3253eb22-0e56-7ec0-d0cf-c760bab8c774@ti.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 2 Feb 2017 23:01:03 +0900
+Subject: [PATCH v31 04/12] arm64: mm: allow for unmapping part of kernel
+ mapping
+In-Reply-To: <20170202114437.GH31394@leverpostej>
+References: <20170201124218.5823-1-takahiro.akashi@linaro.org>
+ <20170201124630.6016-3-takahiro.akashi@linaro.org>
+ <20170201160354.GF4756@leverpostej>
+ <20170202102131.GD13549@linaro.org>
+ <20170202114437.GH31394@leverpostej>
+Message-ID: <20170202140102.GA22666@fireball>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Feb 02, 2017 at 11:44:38AM +0000, Mark Rutland wrote:
+> On Thu, Feb 02, 2017 at 07:21:32PM +0900, AKASHI Takahiro wrote:
+> > On Wed, Feb 01, 2017 at 04:03:54PM +0000, Mark Rutland wrote:
+> > > Hi,
+> > > 
+> > > On Wed, Feb 01, 2017 at 09:46:23PM +0900, AKASHI Takahiro wrote:
+> > > > A new function, remove_pgd_mapping(), is added.
+> > > > It allows us to unmap a specific portion of kernel mapping later as far as
+> > > > the mapping is made using create_pgd_mapping() and unless we try to free
+> > > > a sub-set of memory range within a section mapping.
+> > > 
+> > > I'm not keen on adding more page table modification code. It was painful
+> > > enough to ensure that those worked in all configurations.
+> > > 
+> > > Why can't we reuse create_pgd_mapping()? If we pass page_mappings_only,
+> > > and use an invalid prot (i.e. 0), what is the problem?
+> > 
+> > As I did in v30?
+> > (though my implementation in v30 should be improved.)
+> 
+> Something like that. I wasn't entirely sure why we needed to change
+> those functions so much, so I'm clearly missing something there. I'll go
+> have another look.
 
-On Thursday 02 February 2017 07:01 PM, Sekhar Nori wrote:
-> The following changes since commit 7ce7d89f48834cefece7804d38fc5d85382edf77:
-> 
->   Linux 4.10-rc1 (2016-12-25 16:13:08 -0800)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v4.11/drivers
-> 
-> for you to fetch changes up to cdf0ead3747200d527f37170d3fdd41e368f88b0:
-> 
->   sata: ahci-da850: un-hardcode the MPY bits (2017-01-31 20:41:52 +0530)
+I would be much easier if you see my new code.
 
-Please ignore this. There was an error while sending out the series. I
-have resent it.
+> > > I can see that we wouldn't free/reallocate the pud or pmd entries, but
+> > > the "wasted" memory should be small. If anything, I'd argue that it's
+> > > preferable to keep that around so that we don't have to allocate memory
+> > > when we need to map the crashkernel region.
+> > > 
+> > > Is there another problem I'm missing?
+> > 
+> > If we don't need to free unused page tables, that would make things
+> > much simple. There are still some minor problems on the merge, but
+> > we can sort it out.
+> 
+> I'm not sure I follow what you mean by 'on merge' here. Could you
+> elaborate?
 
-Thanks,
-Sekhar
+What I had in mind is some changes needed to handle "__prot(0)" properly
+in alloc_init_pxx(). For example, p[mu]d_set_huge() doesn't make
+a "zeroed" entry.
+
+-Takahiro AKASHI
+
+> Thanks,
+> Mark.
