@@ -1,137 +1,49 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Thu, 2 Feb 2017 10:19:33 +0100
-Subject: [PATCH 3/5] Documentation: dt: iio: document stm32 exti trigger
-In-Reply-To: <20170201163500.ivxnxejurhzzoctl@rob-hp-laptop>
-References: <1485784663-19505-1-git-send-email-fabrice.gasnier@st.com>
- <1485784663-19505-4-git-send-email-fabrice.gasnier@st.com>
- <20170201163500.ivxnxejurhzzoctl@rob-hp-laptop>
-Message-ID: <e814a2c6-f0de-cb56-eb3a-e22daed8990b@st.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 2 Feb 2017 10:22:03 +0100
+Subject: [PATCH/RFC] arm64: defconfig: Enlarge CMA alignment to 2 MiB
+In-Reply-To: <a4e171b0-6403-9d88-3b8f-e63f3f050689@arm.com>
+References: <1485532996-19719-1-git-send-email-geert+renesas@glider.be>
+ <CANqRtoQJaRK7Kys-fudyxJuojBmZyXMsNoDudSt4p=gj5srviA@mail.gmail.com>
+ <a4e171b0-6403-9d88-3b8f-e63f3f050689@arm.com>
+Message-ID: <20170202092203.GK21831@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/01/2017 05:35 PM, Rob Herring wrote:
-> On Mon, Jan 30, 2017 at 02:57:41PM +0100, Fabrice Gasnier wrote:
->> Add dt documentation for st,stm32-exti-trigger.
->> EXTi gpio signal can be routed internally as trigger source for various
->
-> s/gpio/GPIO/
->
->> IPs (e.g. for ADC or DAC conversions).
->
-> Please use "dt-bindings: iio:" for the subject prefix.
+On Wed, Feb 01, 2017 at 02:06:45PM +0000, Robin Murphy wrote:
+> On 01/02/17 13:45, Magnus Damm wrote:
+> > Hi Geert,
+> > 
+> > On Sat, Jan 28, 2017 at 1:03 AM, Geert Uytterhoeven
+> > <geert+renesas@glider.be> wrote:
+> >> Some IOMMUs (e.g. Renesas IPMMU/VMSA) support only page sizes of 4 KiB,
+> >> 2 MiB, and 1 GiB.
+> >>
+> >> With the default setting of CONFIG_CMA_ALIGNMENT = 8, allocations larger
+> >> than 1 MiB are aligned to a 1 MiB boundary only.  Hence a 2 MiB
+> >> allocation may not be aligned, leading to a mapping of 512 4 KiB pages.
+> >>
+> >> Increase CONFIG_CMA_ALIGNMENT to allow mapping a 2 MiB buffer using a
+> >> single PTE, decreasing memory usage and TLB pressure.
+> >>
+> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >> ---
+> >> Is this useful?
+> >>
+> >> Should there instead be different defaults in Kconfig, depending on
+> >> enabled platform support?
+> > 
+> > I think there is a dependency on the kernel page size configuration as
+> > well. In case of 16 KiB or 64 KiB page size configuration other large
+> > page sizes may be required.
+> 
+> I don't see the original patch (linux-arm-kernel doesn't look to have it
+> archived either), but I think bumping the default up to 2MB to match our
+> normal section size sounds generally reasonable - users can still
+> override it manually in their config, right? For 16KB and 64KB granules,
+> it is at least the size covered by contiguous-hinted pages; the actual
+> section sizes there are far too big to be practical for alignment
+> purposes anyway (32MB and 512MB respectively).
 
-Hi Rob,
-
-I'll fix this in V2.
-
->
->>
->> Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
->> ---
->>  .../bindings/iio/trigger/st,stm32-exti-trigger.txt      | 17 +++++++++++++++++
->>  1 file changed, 17 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/iio/trigger/st,stm32-exti-trigger.txt
->>
->> diff --git a/Documentation/devicetree/bindings/iio/trigger/st,stm32-exti-trigger.txt b/Documentation/devicetree/bindings/iio/trigger/st,stm32-exti-trigger.txt
->> new file mode 100644
->> index 0000000..ebf2645
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/iio/trigger/st,stm32-exti-trigger.txt
->> @@ -0,0 +1,17 @@
->> +STMicroelectronics STM32 EXTI trigger bindings
->> +
->> +EXTi gpio signal can be routed internally as trigger source for various
->
-> s/gpio/GPIO/
->
->> +IPs (e.g. for ADC or DAC conversions).
->> +
->> +Contents of a stm32 exti trigger root node:
->
-> Drop "root"
-I'll fix these in V2.
-
->
->> +-------------------------------------------
->> +Required properties:
->> +- compatible: Should be "st,stm32-exti-trigger"
->
-> This whole binding looks a bit suspicious. Is this actually a h/w block?
-> What makes it stm32 specific? Seems like the gpio properties should just
-> be part of the ADC or DAC that they trigger.
-
-Please let me explain in more details.
-I think best is I add following documentation in binding. Something like:
-
-GPIO + EXTI controller side | ADC side (input trigger MUX, same for DAC)
-                             |
-        IIO trigger         --->         IIO device
-                             |                  __________
-                             |          inX  --|          \
-                             |          ...  --|  SAR ADC  |-->
-         __                  |         __      |__________/
-PA11 --|  \                 | TIMx --|  \   trigger   ^
-PB11 --|   |                  ...  --|   }----------->'
-...  --|   }---- EXTI11 ---------->--|__/
-      --|   |                |
-PJ11 --|__/                 |
-
-In fact, this driver configures GPIO and EXTI controllers (left side of
-above scheme), and it registers corresponding trigger in IIO. Then it 
-can be used by other IPs registered as IIO devices.
-
-I think this should be outside of ADC or DAC IIO device drivers, to live 
-in separate IIO trigger driver. It will avoid duplicating code (e.g. 
-PATCH 4) into several IIO device drivers.
-
-Is it ok to declare this as separate IIO trigger driver?
-Maybe Jonathan could also advise on this ?
-
-As I see it, this is stm32 specific, as any GPIO bank, (e.g. PA11,
-PB11...) can be selected to generate (EXTI11) hardware trigger signal.
-
->
->> +- extiN-gpio: optional gpio line that may be used as external trigger source
->
-> -gpios is the preferred form.
-
-I apologize, I didn't make it clear in the first place. Please let me 
-rephrase. Is bellow description more suitable ?
-
-- extiN-gpio: One or several named GPIO lines that may be used as
-   external trigger source by STM32 ADC, DAC. N may be 0..15.
-   For example, on stm32f4, exti11-gpio can trig ADC, exti9-gpio can
-   trig DAC.
-
->
->> +  (e.g. N may be 0..15. For example, exti11-gpio can trig ADC on stm32f4).
->> +
->> +Example:
->> +	triggers {
->> +		compatible = "st,stm32-exti-trigger";
->> +		exti11-gpio=<&gpioa 11 0>;
->
-> spaces around the "=".
-I'll fix it in V2, and also add example for more that one EXTI trigger:
-
-	triggers {
-		compatible = "st,stm32-exti-trigger";
-		exti9-gpio = <&gpioa 9 0>;
-		exti11-gpio = <&gpioa 11 0>;
-		...
-	};
-
-Above binding can typically be used in board dt, in case on-board gpio 
-is connected/used as trigger source for IIO device (STM32 ADC/DAC).
-
-Please let me know if this clarifies, so I'll do necessary changes in V2.
-
-Many thanks for your review.
-Best Regards,
-Fabrice
-
->
->> +	};
->> --
->> 1.9.1
->>
+I am happy to take this patch on the strength of the above but an Ack or
+similar tag from Robin would be nice. Geert, perhaps you could repost the
+patch with Robin CCed?
