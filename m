@@ -1,53 +1,175 @@
-From: nwatters@codeaurora.org (Nate Watterson)
-Date: Thu, 02 Feb 2017 14:01:52 -0500
-Subject: [PATCH V7 08/11] drivers: acpi: Handle IOMMU lookup failure with
- deferred probing or error
-In-Reply-To: <20170201185230.GA1922@red-moon>
-References: <f2370671-ece8-fbee-de19-350dd625088f@codeaurora.org>
- <93e79759-d614-9b36-d5ab-63e8eb725009@arm.com>
- <14751205-f034-7f0d-442a-854c3909425c@codeaurora.org>
- <5ba9f366d6e25397cdef8ad95b49e199@codeaurora.org>
- <175a3798-b824-ef1a-e112-9f6f472973ae@codeaurora.org>
- <20170130143851.GJ16461@arm.com>
- <b2e50c17de156341deab9fb8e91a8dec@codeaurora.org>
- <1e048aff-0d77-b9f2-ebf8-2ba315b90ca7@codeaurora.org>
- <20170130165124.GA11712@red-moon>
- <f401e27e-d619-0eec-2401-50d8e2fc2f0f@codeaurora.org>
- <20170201185230.GA1922@red-moon>
-Message-ID: <3f4aa4c1e660c7e62256de9ca64fc822@codeaurora.org>
+From: slongerbeam@gmail.com (Steve Longerbeam)
+Date: Thu, 2 Feb 2017 11:12:41 -0800
+Subject: [PATCH v3 00/24] i.MX Media Driver
+In-Reply-To: <20170202185826.GV27312@n2100.armlinux.org.uk>
+References: <1483755102-24785-1-git-send-email-steve_longerbeam@mentor.com>
+ <20170202172245.GT27312@n2100.armlinux.org.uk>
+ <20170202175600.GU27312@n2100.armlinux.org.uk>
+ <4815b9c8-782a-ac67-d296-c4acb296d849@gmail.com>
+ <20170202185826.GV27312@n2100.armlinux.org.uk>
+Message-ID: <2e1cf096-ecb8-ba3d-a554-f4cc6999ed4e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-02-01 13:52, Lorenzo Pieralisi wrote:
-> 
-> I debugged the issue and Nate's fix is correct, the fact that you
-> can't it hit it with mainline is just a matter of timing because it has
-> to do with the CTX pointer value (we OR it with the existing value), so
-> it may work or not depending on how the cdptr memory allocation
-> pattern turns out to be (which explains why Nate and I can hit it with
-> simple PCI device remove/add execution too).
-> 
-> So it is neither an ACPI nor an IOMMU probe deferral issue per-se,
-> fix is already queued, so it is all good.
-> 
-> What about USB stalls ?
-Our fault. The USB controller was getting 48-bit IOVAs, but the
-bus it sits on only supports 44-bits so the controller's DMA
-transactions ended up targeting addresses that were never mapped.
 
-It started working once I applied the iort/dma-mapping patches I
-sent out earlier this week that use the iort memory_address_limit
-field to check if a dma_mask is sane.
 
-Sorry for the false alarm.
-Nate
-> 
-> Thanks !
-> Lorenzo
+On 02/02/2017 10:58 AM, Russell King - ARM Linux wrote:
+> On Thu, Feb 02, 2017 at 10:26:55AM -0800, Steve Longerbeam wrote:
+>> On 02/02/2017 09:56 AM, Russell King - ARM Linux wrote:
+>>> and for whatever reason we end up falling out through free_ring.  This
+>>> is VERY bad news, because it means that the ring which SMFC took a copy
+>>> of is now freed beneath its feet.
+>> Yes, that is bad. That was a bug, if imx_media_dma_buf_queue_from_vb()
+>> returned error, the ring should not have been freed, it should have only
+>> returned the error. And further bad stuff happens from that point on.
+>>
+>> But all of this is gone in version 4.
+> I think there's an error in how you think the queue_setup() works.
+>
+> camif_queue_setup() always returns the number of buffers between
+> IMX_MEDIA_MIN_RING_BUFS and IMX_MEDIA_MAX_RING_BUFS.  However, it seems
+> that, looking through the videobuf2-core.c code, that the value is
+> passed to __vb2_queue_alloc() to allocate the specified number of
+> _additional_ buffers over and on-top of the existing q->num_buffers:
+>
+> static int __vb2_queue_alloc(struct vb2_queue *q, enum vb2_memory memory,
+>                               unsigned int num_buffers, unsigned int num_planes,
+>                               const unsigned plane_sizes[VB2_MAX_PLANES])
+> {
+>          for (buffer = 0; buffer < num_buffers; ++buffer) {
+> ...
+>                  vb->index = q->num_buffers + buffer;
+>
+> and
+>
+> int vb2_core_reqbufs(struct vb2_queue *q, enum vb2_memory memory,
+>                  unsigned int *count)
+> {
+>          unsigned int num_buffers, allocated_buffers, num_planes = 0;
+> ...
+>          num_buffers = min_t(unsigned int, *count, VB2_MAX_FRAME);
+>          num_buffers = max_t(unsigned int, num_buffers, q->min_buffers_needed);
+> ...
+>          /*
+>           * Ask the driver how many buffers and planes per buffer it requires.
+>           * Driver also sets the size and allocator context for each plane.
+>           */
+>          ret = call_qop(q, queue_setup, q, &num_buffers, &num_planes,
+>                         plane_sizes, q->alloc_devs);
+>          if (ret)
+>                  return ret;
+>
+>          /* Finally, allocate buffers and video memory */
+>          allocated_buffers =
+>                  __vb2_queue_alloc(q, memory, num_buffers, num_planes, plane_sizes);
+>
+> or:
+>
+> int vb2_core_create_bufs(struct vb2_queue *q, enum vb2_memory memory,
+>                  unsigned int *count, unsigned requested_planes,
+>                  const unsigned requested_sizes[])
+> {
+>          unsigned int num_planes = 0, num_buffers, allocated_buffers;
+> ...
+>          num_buffers = min(*count, VB2_MAX_FRAME - q->num_buffers);
+>          if (requested_planes && requested_sizes) {
+>                  num_planes = requested_planes;
+> ...
+>          /*
+>           * Ask the driver, whether the requested number of buffers, planes per
+>           * buffer and their sizes are acceptable
+>           */
+>          ret = call_qop(q, queue_setup, q, &num_buffers,
+>                         &num_planes, plane_sizes, q->alloc_devs);
+>          if (ret)
+>                  return ret;
+>
+>          /* Finally, allocate buffers and video memory */
+>          allocated_buffers = __vb2_queue_alloc(q, memory, num_buffers,
+>                                  num_planes, plane_sizes);
+>
+>
+> It seems to me that if you don't take account of the existing queue
+> size, your camif_queue_setup() has the side effect that each time
+> either of these are called.  Hence, the vb2 queue increases by the
+> same amount each time, which is probably what you don't want.
+>
+> The documentation on queue_setup() leaves much to be desired:
+>
+>   * @queue_setup:        called from VIDIOC_REQBUFS() and VIDIOC_CREATE_BUFS()
+>   *                      handlers before memory allocation. It can be called
+>   *                      twice: if the original number of requested buffers
+>   *                      could not be allocated, then it will be called a
+>   *                      second time with the actually allocated number of
+>   *                      buffers to verify if that is OK.
+>   *                      The driver should return the required number of buffers
+>   *                      in \*num_buffers, the required number of planes per
+>   *                      buffer in \*num_planes, the size of each plane should be
+>   *                      set in the sizes\[\] array and optional per-plane
+>   *                      allocator specific device in the alloc_devs\[\] array.
+>   *                      When called from VIDIOC_REQBUFS,() \*num_planes == 0,
+>   *                      the driver has to use the currently configured format to
+>   *                      determine the plane sizes and \*num_buffers is the total
+>   *                      number of buffers that are being allocated. When called
+>   *                      from VIDIOC_CREATE_BUFS,() \*num_planes != 0 and it
+>   *                      describes the requested number of planes and sizes\[\]
+>   *                      contains the requested plane sizes. If either
+>   *                      \*num_planes or the requested sizes are invalid callback
+>   *                      must return %-EINVAL. In this case \*num_buffers are
+>   *                      being allocated additionally to q->num_buffers.
+>
+> That's really really ambiguous, because the "In this case" part doesn't
+> really tell you which case it's talking about - but it seems to me looking
+> at the code that it's referring to the VIDIOC_CREATE_BUFS case.
 
--- 
-Qualcomm Datacenter Technologies, Inc. on behalf of Qualcomm 
-Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a 
-Linux
-Foundation Collaborative Project.
+Yes, I caught this when adding fixes from v4l2-compliance testing, which
+is not part of the version 3 driver. I agree it is a confusing API. When
+called from VIDIOC_CREATE_BUFS (indicated by *num_planes != 0),
+*num_buffers is supposed to be requested buffers _in addition_ to
+already requested q->num_buffers, which is important info and
+should be emphasized a little more than the "oh by the way" fashion
+in the prototype description, IMHO.
+
+>
+> As you support both .vidioc_create_bufs and .vidioc_reqbufs, it seems
+> to me that you're not handling the VIDIOC_CREATE_BUFS case correctly.
+>
+> Can you please make sure that your next version resolves that?
+
+Here is the current .queue_setup() op in imx-media-capture.c:
+
+static int capture_queue_setup(struct vb2_queue *vq,
+                                unsigned int *nbuffers,
+                                unsigned int *nplanes,
+                                unsigned int sizes[],
+                                struct device *alloc_devs[])
+{
+         struct capture_priv *priv = vb2_get_drv_priv(vq);
+         struct v4l2_pix_format *pix = &priv->vdev.fmt.fmt.pix;
+         unsigned int count = *nbuffers;
+
+         if (vq->type != V4L2_BUF_TYPE_VIDEO_CAPTURE)
+                 return -EINVAL;
+
+         if (*nplanes) {
+                 if (*nplanes != 1 || sizes[0] < pix->sizeimage)
+                         return -EINVAL;
+                 count += vq->num_buffers;
+         }
+
+         while (pix->sizeimage * count > VID_MEM_LIMIT)
+                 count--;
+
+         if (*nplanes)
+                 *nbuffers = (count < vq->num_buffers) ? 0 :
+                         count - vq->num_buffers;
+         else
+                 *nbuffers = count;
+
+         *nplanes = 1;
+         sizes[0] = pix->sizeimage;
+
+         return 0;
+}
+
+>
