@@ -1,36 +1,43 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 2 Feb 2017 17:44:57 +0100
-Subject: [PATCHv2 net-next 01/16] dt-bindings: net: update Marvell PPv2
- binding for PPv2.2 support
-In-Reply-To: <20170107093228.GI14217@n2100.armlinux.org.uk>
-References: <1482943592-12556-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1482943592-12556-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20170107093228.GI14217@n2100.armlinux.org.uk>
-Message-ID: <20170202174457.17ceabe9@free-electrons.com>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Thu, 2 Feb 2017 18:45:41 +0200
+Subject: [PATCH] virtio: Try to untangle DMA coherency
+In-Reply-To: <20170202164049.GI13839@arm.com>
+References: <8a6494f6409c20b4609cd6bdcdd751f68b5c0564.1485951731.git.robin.murphy@arm.com>
+ <20170201195732-mutt-send-email-mst@kernel.org>
+ <20170201182659.GM8177@arm.com>
+ <20170201210648-mutt-send-email-mst@kernel.org>
+ <20170202112614.GB30577@arm.com>
+ <bb041fbe-3fde-0dc1-ae28-cca5acfe9dc5@arm.com>
+ <20170202182224-mutt-send-email-mst@kernel.org>
+ <20170202164049.GI13839@arm.com>
+Message-ID: <20170202184443-mutt-send-email-mst@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Sat, 7 Jan 2017 09:32:28 +0000, Russell King - ARM Linux wrote:
-> On Wed, Dec 28, 2016 at 05:46:17PM +0100, Thomas Petazzoni wrote:
-> > @@ -31,7 +43,7 @@ Optional properties (port):
-> >    then fixed link is assumed, and the 'fixed-link' property is
-> >    mandatory.  
+On Thu, Feb 02, 2017 at 04:40:49PM +0000, Will Deacon wrote:
+> On Thu, Feb 02, 2017 at 06:30:28PM +0200, Michael S. Tsirkin wrote:
+> > I am inclined to say, for 4.10 let's revert
+> > c7070619f3408d9a0dffbed9149e6f00479cf43b since what it fixes is not a
+> > regression in 4.10.
 > 
-> Not directly related to this patch, but this context is wrong.  The
-> PP2 driver _requires_ a PHY.  It doesn't support fixed-link in its
-> current form.  I think the DT binding describes an expectation of
-> a future driver.
+> No complaints there, as long as we can keep working to fix this for 4.11
+> and onwards. You'll also need to cc stable on the revert.
 > 
-> The side effect is that if trying to use a fixed-link on any port,
-> the ethernet driver fails to probe.
+> > So I think we can defer the fix to 4.11.
+> > I think we still want f7f6634d23830ff74335734fbdb28ea109c1f349
+> > for hosts with virtio 1 support.
+> > 
+> > All this will hopefully push hosts to just implement virtio 1.
+> > For mmio the changes are very small: several new registers,
+> > that's all. You want this for proper 64 bit dma mask anyway.
+> 
+> As I've said, virtio 1 will have exactly the same issue unless we start
+> requiring firmware to advertise dma-coherent/_CCA for virtio-mmio
+> devices correctly.
+> 
+> Will
 
-Correct. I will send a patch to adjust the Device Tree binding
-documentation accordingly. Thanks for noticing this mistake!
+I mostly agree with that, just didn't have time to read up on _CCA yet.
 
-Thomas
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+MST
