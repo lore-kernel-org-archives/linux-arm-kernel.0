@@ -1,138 +1,91 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 2 Feb 2017 16:31:26 +0000
-Subject: [PATCH v8 01/16] FDT: introduce global phandle allocation
-In-Reply-To: <878tppkf5v.fsf@on-the-bus.cambridge.arm.com>
-References: <20161104173203.21168-1-andre.przywara@arm.com>
- <20161104173203.21168-2-andre.przywara@arm.com>
- <d1dc4e68-66e1-85d1-f5d1-5743e5172409@arm.com>
- <4c43b500-c0c8-cb25-27f4-f6d24233c088@arm.com>
- <878tppkf5v.fsf@on-the-bus.cambridge.arm.com>
-Message-ID: <a139b765-90eb-ce19-dc54-213c777e4a3e@arm.com>
+From: mst@redhat.com (Michael S. Tsirkin)
+Date: Thu, 2 Feb 2017 18:30:28 +0200
+Subject: [PATCH] virtio: Try to untangle DMA coherency
+In-Reply-To: <bb041fbe-3fde-0dc1-ae28-cca5acfe9dc5@arm.com>
+References: <8a6494f6409c20b4609cd6bdcdd751f68b5c0564.1485951731.git.robin.murphy@arm.com>
+ <20170201195732-mutt-send-email-mst@kernel.org>
+ <20170201182659.GM8177@arm.com>
+ <20170201210648-mutt-send-email-mst@kernel.org>
+ <20170202112614.GB30577@arm.com>
+ <bb041fbe-3fde-0dc1-ae28-cca5acfe9dc5@arm.com>
+Message-ID: <20170202182224-mutt-send-email-mst@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-On 01/02/17 17:13, Marc Zyngier wrote:
-> On Wed, Feb 01 2017 at  4:44:19 pm GMT, Andr? Przywara <andre.przywara@arm.com> wrote:
+On Thu, Feb 02, 2017 at 01:34:03PM +0000, Robin Murphy wrote:
+> On 02/02/17 11:26, Will Deacon wrote:
+> > On Wed, Feb 01, 2017 at 09:19:22PM +0200, Michael S. Tsirkin wrote:
+> >> On Wed, Feb 01, 2017 at 06:27:09PM +0000, Will Deacon wrote:
+> >>> On Wed, Feb 01, 2017 at 08:09:21PM +0200, Michael S. Tsirkin wrote:
+> >>>> I'd like to do that instead. It's fastboot doing the unreasonable thing
+> >>>> here and deviating from what every other legacy device without exception
+> >>>> did for years. If this means fastboot will need to update to virtio 1,
+> >>>> all the better.
+> >>>
+> >>> The problem still exists with virtio 1, unless we require that the
+> >>> "dma-coherent" property is set/unset correctly when VIRTIO_F_IOMMU_PLATFORM
+> >>> is advertised by the device (which is what I suggested in my reply).
+> >>
+> >> I'm not ignoring that, but I need to understand that part a bit better.
+> >> I'll reply to that patch in a day or two after looking at how _CCA is
+> >> supposed to work.
+> > 
+> > Thanks. I do think that whatever solution we come up with for virtio 1
+> > should influence what we do for legacy.
+> > 
+> >>> We can't detect the fastmodel,
+> >>
+> >> Surely, it puts a hardware id somewhere? I think you mean
+> >> fastmodel isn't always affected, right?
+> > 
+> > I don't think there's a hardware ID. The thing is, the fastmodel is a
+> > toolkit for building all sorts of platforms: you can chop and change
+> > the CPUs, the peripherals, the memory, the interrupt controller, the
+> > interconnect etc. Pretty much everything can be customised. So, for
+> > any fastmodel configuration that places virtio upstream of the SMMU
+> > (which is common, because virtio is one of the few DMA-capable peripherals
+> > that the fastmodel supports), we need to do something special.
+> > 
+> >> I'd like to see basically
+> >>
+> >> if (fastmodel)
+> >> 	a pile of special work-arounds
+> >> else
+> >> 	not less hacky but more common virtio work-arounds
+> >>
+> >> :)
+> >>
+> >> And then I can apply whatever comes from @arm.com and not
+> >> worry about breaking actual hardware.
+> > 
+> > What we could do is call iommu_group_get(&vdev->dev) for legacy
 > 
-> Hi Andre,
+> Actually, that should be vdev->dev.parent - I'm now not sure quite what
+> I managed to successfully test yesterday, but apparently it wasn't this
+> patch :(
 > 
->> Hi Marc, Will,
->>
->> On 09/12/16 12:03, Marc Zyngier wrote:
->>> On 04/11/16 17:31, Andre Przywara wrote:
->>>> Allocating an FDT phandle (a unique identifier) using a static
->>>> variable in a static inline function defined in a header file works
->>>> only if all users are in the same source file. So trying to allocate
->>>> a handle from two different compilation units fails.
->>>> Introduce global phandle allocation and reference code to properly
->>>> allocate unique phandles.
->>>>
->>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>>> ---
->>>>  Makefile          |  1 +
->>>>  arm/fdt.c         |  2 +-
->>>>  arm/gic.c         |  2 +-
->>>>  include/kvm/fdt.h | 10 +++++-----
->>>>  kvm-fdt.c         | 26 ++++++++++++++++++++++++++
->>>>  5 files changed, 34 insertions(+), 7 deletions(-)
->>>>  create mode 100644 kvm-fdt.c
->>>>
->>>> diff --git a/Makefile b/Makefile
->>>> index 1f0196f..e4a4002 100644
->>>> --- a/Makefile
->>>> +++ b/Makefile
->>>> @@ -98,6 +98,7 @@ OBJS	+= kvm-ipc.o
->>>>  OBJS	+= builtin-sandbox.o
->>>>  OBJS	+= virtio/mmio.o
->>>>  OBJS	+= hw/i8042.o
->>>> +OBJS	+= kvm-fdt.o
->>>>  
->>>>  # Translate uname -m into ARCH string
->>>>  ARCH ?= $(shell uname -m | sed -e s/i.86/i386/ -e s/ppc.*/powerpc/ \
->>>> diff --git a/arm/fdt.c b/arm/fdt.c
->>>> index 381d48f..8bcfffb 100644
->>>> --- a/arm/fdt.c
->>>> +++ b/arm/fdt.c
->>>> @@ -114,7 +114,7 @@ static int setup_fdt(struct kvm *kvm)
->>>>  {
->>>>  	struct device_header *dev_hdr;
->>>>  	u8 staging_fdt[FDT_MAX_SIZE];
->>>> -	u32 gic_phandle		= fdt__alloc_phandle();
->>>> +	u32 gic_phandle		= fdt__get_phandle(PHANDLE_GIC);
->>>>  	u64 mem_reg_prop[]	= {
->>>>  		cpu_to_fdt64(kvm->arch.memory_guest_start),
->>>>  		cpu_to_fdt64(kvm->ram_size),
->>>> diff --git a/arm/gic.c b/arm/gic.c
->>>> index d6d6dd0..b60437e 100644
->>>> --- a/arm/gic.c
->>>> +++ b/arm/gic.c
->>>> @@ -222,7 +222,7 @@ void gic__generate_fdt_nodes(void *fdt, u32 phandle, enum irqchip_type type)
->>>>  	_FDT(fdt_property_cell(fdt, "#interrupt-cells", GIC_FDT_IRQ_NUM_CELLS));
->>>>  	_FDT(fdt_property(fdt, "interrupt-controller", NULL, 0));
->>>>  	_FDT(fdt_property(fdt, "reg", reg_prop, sizeof(reg_prop)));
->>>> -	_FDT(fdt_property_cell(fdt, "phandle", phandle));
->>>> +	_FDT(fdt_property_cell(fdt, "phandle", fdt__get_phandle(PHANDLE_GIC)));
->>>>  	_FDT(fdt_end_node(fdt));
->>>>  }
->>>>  
->>>> diff --git a/include/kvm/fdt.h b/include/kvm/fdt.h
->>>> index 53d85a4..cd2bb72 100644
->>>> --- a/include/kvm/fdt.h
->>>> +++ b/include/kvm/fdt.h
->>>> @@ -8,6 +8,10 @@
->>>>  #include <linux/types.h>
->>>>  
->>>>  #define FDT_MAX_SIZE	0x10000
->>>> +#define FDT_INVALID_PHANDLE 0
->>>> +#define FDT_IS_VALID_PHANDLE(phandle) ((phandle) != FDT_INVALID_PHANDLE)
->>>> +
->>>> +enum phandles {PHANDLE_GIC, PHANDLES_MAX};
->>>
->>> Another nit here: PHANDLE_GIC is pretty much ARM-specific, while FDT is
->>> supposed to be generic. Can't we move the enum to be architecture
->>> specific and not put this in an architecture agnostic one?
->>
->> So while trying to find the best possible solution for this seemingly
->> simple problem, I was wondering why we had this allocation function in
->> the first place?
->> It seems a bit overkill to allocate a handle if we could just go with
->> static values.
->> I changed the first two patches now to have an enum per architecture to
->> list all possible handles and then just using those values directly
->> instead of going through another layer of indirection.
+> > devices if CONFIG_ARM64. If that returns non-NULL, then we know that
+> > the device is upstream of an SMMU, which means it must be the fastmodel.
 > 
-> Yes, that probably make sense, at least for the time being.
+> We can boot 32-bit kernels on models, so I'd be inclined to keep
+> CONFIG_ARM included, but I do tend to agree that explicitly checking for
+> an IOMMU is probably the cleanest approach if we reposition this as a
+> more specific quirk. I'll split apart the "Fast Models are wacky" vs.
+> "uh-oh device coherency" aspects and spin a v2 so that we can
+> (hopefully) sort the regression out ASAP.
 > 
->> So is there anything that will require dynamic phandles in the future?
->> This version proposed here can't really cope with them anyway and in the
->> moment it's just about _one_ GIC phandle and _one_ ITS phandle, so a
->> static assignment is much simpler.
->>
->> Will we need multiple ITSes for device passthrough? Or would it just be
->> one ITS for all hardware devices and one for emulated virtio?
-> 
-> Having multiple ITSes is definitely on the cards (pass-through and
-> emulated devices are one case, where once of them would be driven using
-> GICv4 and the other be purely virtual). This probably would translate
-> into having multiple PCIe host controllers.
+> Robin.
 
-OK, I see. At the moment the kvmtool code seems to rely on having only a
-single PCI controller using a static setup. As changing this would
-require some rework (for instance to allow dynamic MMIO allocation), I
-would like to refrain from adding multiple ITS support prematurely now.
-We should do this later in conjunction with multiple PCI controller
-support, I believe.
+I am inclined to say, for 4.10 let's revert
+c7070619f3408d9a0dffbed9149e6f00479cf43b since what it fixes is not a
+regression in 4.10.  So I think we can defer the fix to 4.11.
+I think we still want f7f6634d23830ff74335734fbdb28ea109c1f349
+for hosts with virtio 1 support.
 
-> So maybe we don't need the full breath of an allocator yet, but I reckon
-> that we shouldn't pretend that there is no use for it, forever.
+All this will hopefully push hosts to just implement virtio 1.
+For mmio the changes are very small: several new registers,
+that's all. You want this for proper 64 bit dma mask anyway.
 
-OK, got it.
-
-I will post my version with the static phandle setup, feel free to shoot
-it down if this is too much of a simplification or if you have the
-feeling that removing the allocation will bite us later.
-
-Cheers,
-Andre.
+> > 
+> > Will
+> > 
