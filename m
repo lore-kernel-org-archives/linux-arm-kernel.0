@@ -1,79 +1,140 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Thu, 2 Feb 2017 16:08:44 +0100
-Subject: [RFC v3 00/10] Provide the EL1 physical timer to the VM
-In-Reply-To: <CAHyh4xhsqS6CijRysFvg+NqGo0rBQU45OhAaZUuHDm4M0JufTg@mail.gmail.com>
-References: <1485970990-13775-1-git-send-email-jintack@cs.columbia.edu>
- <20170202123104.GJ27852@cbox>
- <CAHyh4xhsqS6CijRysFvg+NqGo0rBQU45OhAaZUuHDm4M0JufTg@mail.gmail.com>
-Message-ID: <CAMJs5B89qBe9NRULeFeVxH6f=BQ-NdEE+1i2DhYJwEmJtZe9mQ@mail.gmail.com>
+From: baoyou.xie@linaro.org (Baoyou Xie)
+Date: Thu,  2 Feb 2017 23:08:04 +0800
+Subject: [PATCH v6 1/3] dt: bindings: add documentation for zx2967 family
+ thermal sensor
+Message-ID: <1486048086-3431-1-git-send-email-baoyou.xie@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Feb 2, 2017 at 3:51 PM, Jintack Lim <jintack@cs.columbia.edu> wrote:
-> On Thu, Feb 2, 2017 at 7:31 AM, Christoffer Dall <cdall@linaro.org> wrote:
->> Hi Jintack,
->>
->> On Wed, Feb 01, 2017 at 12:43:00PM -0500, Jintack Lim wrote:
->>> The ARM architecture defines the EL1 physical timer and the virtual timer,
->>> and it is reasonable for an OS to expect to be able to access both.
->>> However, the current KVM implementation does not provide the EL1 physical
->>> timer to VMs but terminates VMs on access to the timer.
->>>
->>> This patch series enables VMs to use the EL1 physical timer through
->>> trap-and-emulate.  The KVM host emulates each EL1 physical timer register
->>> access and sets up the background timer accordingly.  When the background
->>> timer expires, the KVM host injects EL1 physical timer interrupts to the
->>> VM.  Alternatively, it's also possible to allow VMs to access the EL1
->>> physical timer without trapping.  However, this requires somehow using the
->>> EL2 physical timer for the Linux host while running the VM instead of the
->>> EL1 physical timer.  Right now I just implemented trap-and-emulate because
->>> this was straightforward to do, and I leave it to future work to determine
->>> if transferring the EL1 physical timer state to the EL2 timer provides any
->>> performance benefit.
->>>
->>> This feature will be useful for any OS that wishes to access the EL1
->>> physical timer. Nested virtualization is one of those use cases. A nested
->>> hypervisor running inside a VM would think it has full access to the
->>> hardware and naturally tries to use the EL1 physical timer as Linux would
->>> do. Other nested hypervisors may try to use the EL2 physical timer as Xen
->>> would do, but supporting the EL2 physical timer to the VM is out of scope
->>> of this patch series. This patch series will make it easy to add the EL2
->>> timer support in the future, though.
->>>
->>> Note that Linux VMs booting in EL1 will be unaffected by this patch series
->>> and will continue to use only the virtual timer and this patch series will
->>> therefore not introduce any performance degredation as a result of
->>> trap-and-emulate.
->>>
->>> v2 => v3:
->>>  - Rebase on kvmarm/queue
->>>  - Take kvm->lock to synchronize cntvoff across all vtimers
->>>  - Remove unnecessary function parameters
->>>  - Add comments
->>
->> I just gave v3 a test run on my TC2 (32-bit platform) and my guest
->> quickly locks up trying to run cyclictest or when booting the machine it
->> stalls with RCU timeouts.
->
-> Ok. It's my fault not to specify that the emulated physical timer is
-> supported/tested on arm64.
-> On 32-bit platform, it is supposed to show the same behavior as
-> before, but I haven't tested.
-> Were you using the physical timer or the virtual timer for the guest?
->
+This patch adds dt-binding documentation for zx2967 family thermal sensor.
 
-I used the same guest and QEMU that I always test with so I expect it
-to only use the virtual timer.
+Signed-off-by: Baoyou Xie <baoyou.xie@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Shawn Guo <shawnguo@kernel.org>
+---
+ .../devicetree/bindings/thermal/zx2967-thermal.txt | 114 +++++++++++++++++++++
+ 1 file changed, 114 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/thermal/zx2967-thermal.txt
 
-I wonder if we can somehow manage to not reset the timer properly on
-the 32-bit side and end up in a form of endless interrupt loop?
-
->>
->> Could you have a look?
->
-> Sure, I'll have a look. I don't have access to my Cubietruck today,
-> but I can work on that tomorrow.
->
-ok, thanks.
-
--Christoffer
+diff --git a/Documentation/devicetree/bindings/thermal/zx2967-thermal.txt b/Documentation/devicetree/bindings/thermal/zx2967-thermal.txt
+new file mode 100644
+index 0000000..00c4900
+--- /dev/null
++++ b/Documentation/devicetree/bindings/thermal/zx2967-thermal.txt
+@@ -0,0 +1,114 @@
++* ZTE zx2967 family Thermal
++
++Required Properties:
++- compatible: should be one of the following.
++    * zte,zx296718-thermal
++- reg: physical base address of the controller and length of memory mapped
++    region.
++- clocks : Pairs of phandle and specifier referencing the controller's clocks.
++- clock-names: "gate" for the topcrm clock.
++	       "pclk" for the apb clock.
++- coefficients: Coefficients of thermal sensor, note that those values need to
++		be multiplied by 1000, consists of:
++		slope of calibration cure.
++		offset of calibration cure.
++- #thermal-sensor-cells: must be 0.
++
++Example for tempsensor:
++
++	tempsensor: tempsensor at 148a000 {
++		compatible = "zte,zx296718-thermal";
++		reg = <0x0148a000 0x20>;
++		clocks = <&topcrm TEMPSENSOR_GATE>, <&audiocrm AUDIO_TS_PCLK>;
++		clock-names = "gate", "pclk";
++		coefficients = <1951 (-922)>;
++		#thermal-sensor-cells = <0>;
++	};
++
++Example for cooling device:
++
++	cooling_dev: cooling_dev {
++		cluster0_cooling_dev: cluster0-cooling-dev {
++			#cooling-cells = <2>;
++			cpumask = <0xf>;
++			capacitance = <1500>;
++		};
++
++	cluster1_cooling_dev: cluster1-cooling-dev {
++			#cooling-cells = <2>;
++			cpumask = <0x30>;
++			capacitance = <2000>;
++		};
++	};
++
++Example for thermal zones:
++
++	thermal-zones {
++		zx296718_thermal: zx296718_thermal {
++			polling-delay-passive = <500>;
++			polling-delay = <1000>;
++			sustainable-power = <6500>;
++
++			thermal-sensors = <&tempsensor 0>;
++
++			trips {
++				trip0: switch_on_temperature {
++					temperature = <90000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++
++				trip1: desired_temperature {
++					temperature = <100000>;
++					hysteresis = <2000>;
++					type = "passive";
++				};
++
++				crit: critical_temperature {
++					temperature = <110000>;
++					hysteresis = <2000>;
++					type = "critical";
++				};
++			};
++
++			cooling-maps {
++				map0 {
++					trip = <&trip0>;
++					cooling-device = <&gpu 2 5>;
++				};
++
++				map1 {
++					trip = <&trip0>;
++					cooling-device = <&cluster0_cooling_dev 1 2>;
++				};
++
++				map2 {
++					trip = <&trip1>;
++					cooling-device = <&cluster0_cooling_dev 1 2>;
++				};
++
++				map3 {
++					trip = <&crit>;
++					cooling-device = <&cluster0_cooling_dev 1 2>;
++				};
++
++				map4 {
++					trip = <&trip0>;
++					cooling-device = <&cluster1_cooling_dev 1 2>;
++					contribution = <9000>;
++				};
++
++				map5 {
++					trip = <&trip1>;
++					cooling-device = <&cluster1_cooling_dev 1 2>;
++					contribution = <4096>;
++				};
++
++				map6 {
++					trip = <&crit>;
++					cooling-device = <&cluster1_cooling_dev 1 2>;
++					contribution = <4096>;
++				};
++			};
++		};
++	};
+-- 
+2.7.4
