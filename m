@@ -1,70 +1,135 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 2 Feb 2017 20:38:07 +0200
-Subject: [PATCH 0/4] phy/mfd/soc: exynos: Header cleanup
-In-Reply-To: <588F039D.3090503@ti.com>
-References: <20170127200510.4444-1-krzk@kernel.org> <588F039D.3090503@ti.com>
-Message-ID: <20170202183807.tylyvgpk5roecsvs@kozik-lap>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 2 Feb 2017 18:39:11 +0000
+Subject: [PATCH 5/7] arm64: arch_timer: work around Hisilicon erratum
+ 161010101
+In-Reply-To: <1485865196-12742-6-git-send-email-mark.rutland@arm.com>
+References: <1485865196-12742-1-git-send-email-mark.rutland@arm.com>
+ <1485865196-12742-6-git-send-email-mark.rutland@arm.com>
+Message-ID: <20170202183910.GA29489@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jan 30, 2017 at 02:43:01PM +0530, Kishon Vijay Abraham I wrote:
+Hi Daniel,
+
+On Tue, Jan 31, 2017 at 12:19:54PM +0000, Mark Rutland wrote:
+> From: Ding Tianhong <dingtianhong@huawei.com>
 > 
+> Erratum Hisilicon-161010101 says that the ARM generic timer counter "has
+> the potential to contain an erroneous value when the timer value
+> changes". Accesses to TVAL (both read and write) are also affected due
+> to the implicit counter read. Accesses to CVAL are not affected.
 > 
-> On Saturday 28 January 2017 01:35 AM, Krzysztof Kozlowski wrote:
-> > Hi,
-> > 
-> > Suggested by Marek, continuation of cleanup of PMU register defines
-> > in headers.
-> > 
-> > Let's keep all of them in include/linux/soc/samsung/exynos-regs-pmu.h.
-> > 
-> > This is based on:
-> > 1. Marek's recent work around pinctrl/power domains/lpass:
-> >    https://git.linaro.org/people/marek.szyprowski/linux-srpol.git
-> >    branch: v4.10-next-tm2-pd
-> > 
-> > 2. My two previous patches for cleanup:
-> >    https://git.kernel.org/cgit/linux/kernel/git/krzk/linux.git
-> >    branch: for-v4.11/drivers-soc-exynos-pmu-the-joy-never-ends
-> > 
-> > Affected subsystems/drivers:
-> > 1. phy - drivers,
-> > 2. mfd - headers,
-> > 3. soc/samsung - header.
-> > 
-> > However because of dependency on Marek's patchset, I do not have a clue
-> > how to merge it... it is not an urgent stuff, so it may wait till
-> > dependencies get in.
+> The workaround is to reread the system count registers until the value
+> of the second read is larger than the first one by less than 32, the
+> system counter can be guaranteed not to return wrong value twice by
+> back-to-back read and the error value is always larger than the correct
+> one by 32. Writes to TVAL are replaced with an equivalent write to CVAL.
 > 
-> I'll defer merging this.
+> Signed-off-by: Ding Tianhong <dingtianhong@huawei.com>
+> [Mark: split patch, fix Kconfig, reword commit message]
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> ---
+>  drivers/clocksource/Kconfig          | 10 ++++++++
+>  drivers/clocksource/arm_arch_timer.c | 49 ++++++++++++++++++++++++++++++++++++
+>  2 files changed, 59 insertions(+)
 
-Okay, the compile dependency went to my tree and is available under
-samsung-drivers-soc-pmu-4.11-3 tag (see below). However the patches
-probably won't apply cleanly so if you wish, I can rebase them.
+Do you have any comments on this patch?
 
-Also they miss an ack from Lee Jones.
+What would you prefer to do w.r.t. taking these patches? Would you like
+me to resend the clocksource patches in isolation, or as a pull?
 
-Best regards,
-Krzysztof
+Thanks,
+Mark.
 
-
-The following changes since commit ee55ae6194a5439bde3a3b8ee0abda63c610e740:
-
-  soc: samsung: pmu: Remove duplicated define for ARM_L2_OPTION register (2017-01-27 11:32:31 +0200)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-drivers-soc-pmu-4.11-3
-
-for you to fetch changes up to b343d77b94b6702082f4f402e1492e71ef87095b:
-
-  soc: samsung: pmu: Add register defines for pad retention control (2017-02-02 20:00:28 +0200)
-
-----------------------------------------------------------------
-3rd round of improvements for Exynos PMU driver for v4.11:
-1. Add defines in header for future patches changing the pad
-   retention control.
-
-----------------------------------------------------------------
-Marek Szyprowski (1):
-      soc: samsung: pmu: Add register defines for pad retention control
+> 
+> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> index e132bb3..17ee71c 100644
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
+> @@ -339,6 +339,16 @@ config FSL_ERRATUM_A008585
+>  	  value").  The workaround will only be active if the
+>  	  fsl,erratum-a008585 property is found in the timer node.
+>  
+> +config HISILICON_ERRATUM_161010101
+> +	bool "Workaround for Hisilicon Erratum 161010101"
+> +	default y
+> +	select ARM_ARCH_TIMER_OOL_WORKAROUND
+> +	depends on ARM_ARCH_TIMER && ARM64
+> +	help
+> +	  This option enables a workaround for Hisilicon Erratum
+> +	  161010101. The workaround will be active if the hisilicon,erratum-161010101
+> +	  property is found in the timer node.
+> +
+>  config ARM_GLOBAL_TIMER
+>  	bool "Support for the ARM global timer" if COMPILE_TEST
+>  	select CLKSRC_OF if OF
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 2af0739..7b06aef 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -130,6 +130,47 @@ static u64 notrace fsl_a008585_read_cntvct_el0(void)
+>  }
+>  #endif
+>  
+> +#ifdef CONFIG_HISILICON_ERRATUM_161010101
+> +/*
+> + * Verify whether the value of the second read is larger than the first by
+> + * less than 32 is the only way to confirm the value is correct, so clear the
+> + * lower 5 bits to check whether the difference is greater than 32 or not.
+> + * Theoretically the erratum should not occur more than twice in succession
+> + * when reading the system counter, but it is possible that some interrupts
+> + * may lead to more than twice read errors, triggering the warning, so setting
+> + * the number of retries far beyond the number of iterations the loop has been
+> + * observed to take.
+> + */
+> +#define __hisi_161010101_read_reg(reg) ({				\
+> +	u64 _old, _new;						\
+> +	int _retries = 50;					\
+> +								\
+> +	do {							\
+> +		_old = read_sysreg(reg);			\
+> +		_new = read_sysreg(reg);			\
+> +		_retries--;					\
+> +	} while (unlikely((_new - _old) >> 5) && _retries);	\
+> +								\
+> +	WARN_ON_ONCE(!_retries);				\
+> +	_new;							\
+> +})
+> +
+> +static u32 notrace hisi_161010101_read_cntp_tval_el0(void)
+> +{
+> +	return __hisi_161010101_read_reg(cntp_tval_el0);
+> +}
+> +
+> +static u32 notrace hisi_161010101_read_cntv_tval_el0(void)
+> +{
+> +	return __hisi_161010101_read_reg(cntv_tval_el0);
+> +}
+> +
+> +static u64 notrace hisi_161010101_read_cntvct_el0(void)
+> +{
+> +	return __hisi_161010101_read_reg(cntvct_el0);
+> +}
+> +#endif
+> +
+>  #ifdef CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND
+>  const struct arch_timer_erratum_workaround *timer_unstable_counter_workaround = NULL;
+>  EXPORT_SYMBOL_GPL(timer_unstable_counter_workaround);
+> @@ -146,6 +187,14 @@ static u64 notrace fsl_a008585_read_cntvct_el0(void)
+>  		.read_cntvct_el0 = fsl_a008585_read_cntvct_el0,
+>  	},
+>  #endif
+> +#ifdef CONFIG_HISILICON_ERRATUM_161010101
+> +	{
+> +		.id = "hisilicon,erratum-161010101",
+> +		.read_cntp_tval_el0 = hisi_161010101_read_cntp_tval_el0,
+> +		.read_cntv_tval_el0 = hisi_161010101_read_cntv_tval_el0,
+> +		.read_cntvct_el0 = hisi_161010101_read_cntvct_el0,
+> +	},
+> +#endif
+>  };
+>  #endif /* CONFIG_ARM_ARCH_TIMER_OOL_WORKAROUND */
+>  
+> -- 
+> 1.9.1
+> 
