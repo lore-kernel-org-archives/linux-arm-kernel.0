@@ -1,56 +1,45 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  2 Feb 2017 18:05:26 +0000
-Subject: [PATCH v2] log2: make order_base_2() behave correctly on const input
- value zero
-Message-ID: <1486058726-7262-1-git-send-email-ard.biesheuvel@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 2 Feb 2017 18:18:00 +0000
+Subject: [PATCH 03/10] arm64: KVM: Save/restore the host SPE state when
+ entering/leaving a VM
+In-Reply-To: <3064a7a5-6661-fc22-c5e4-2478e8457035@arm.com>
+References: <1485540470-11469-1-git-send-email-will.deacon@arm.com>
+ <1485540470-11469-4-git-send-email-will.deacon@arm.com>
+ <3064a7a5-6661-fc22-c5e4-2478e8457035@arm.com>
+Message-ID: <20170202181800.GM13839@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function order_base_2() is defined (according to the comment block)
-as returning zero on input zero, but subsequently passes the input into
-roundup_pow_of_two(), which is explicitly undefined for input zero.
+On Wed, Feb 01, 2017 at 04:29:50PM +0000, Marc Zyngier wrote:
+> On 27/01/17 18:07, Will Deacon wrote:
+> > The SPE buffer is virtually addressed, using the page tables of the CPU
+> > MMU. Unusually, this means that the EL0/1 page table may be live whilst
+> > we're executing at EL2 on non-VHE configurations. When VHE is in use,
+> > we can use the same property to profile the guest behind its back.
+> > 
+> > This patch adds the relevant disabling and flushing code to KVM so that
+> > the host can make use of SPE without corrupting guest memory, and any
+> > attempts by a guest to use SPE will result in a trap.
+> > 
+> > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > Cc: Alex Benn?e <alex.bennee@linaro.org>
+> > Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm64/include/asm/kvm_arm.h  |  3 ++
+> >  arch/arm64/include/asm/kvm_host.h |  7 ++++-
+> >  arch/arm64/kvm/debug.c            |  6 ++++
+> >  arch/arm64/kvm/hyp/debug-sr.c     | 66 +++++++++++++++++++++++++++++++++++++--
+> >  arch/arm64/kvm/hyp/switch.c       | 17 +++++++++-
+> >  5 files changed, 95 insertions(+), 4 deletions(-)
 
-This has gone unnoticed until now, but optimization passes in GCC 7 may
-produce constant folded function instances where a constant value of zero
-is passed into order_base_2(), resulting in link errors against the
-deliberately undefined '____ilog2_NaN'.
+[...]
 
-So update order_base_2() to adhere to its own documented interface.
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-v2: make __order_base_2() return int to match the prototype of __ilog2_uXX()
+Thanks! Given that this patch depends on an earlier one in the series
+(already queued via arm64) and the rest of the series depends on this
+patch, do you mind if I take this via arm64 for 4.11? It applies cleanly
+against current -next.
 
-This is a followup to Will's message 'Build failure with v4.9-rc1 and GCC
-trunk -- compiler weirdness' which can be found here:
-
-  http://marc.info/?l=linux-kernel&m=147672952517795&w=2
-
- include/linux/log2.h | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
-
-diff --git a/include/linux/log2.h b/include/linux/log2.h
-index fd7ff3d91e6a..d3fe63b12e96 100644
---- a/include/linux/log2.h
-+++ b/include/linux/log2.h
-@@ -203,6 +203,17 @@ unsigned long __rounddown_pow_of_two(unsigned long n)
-  *  ... and so on.
-  */
- 
--#define order_base_2(n) ilog2(roundup_pow_of_two(n))
-+static inline __attribute_const__
-+int __order_base_2(unsigned long n)
-+{
-+	return n > 1 ? ilog2(n - 1) + 1 : 0;
-+}
- 
-+#define order_base_2(n)				\
-+(						\
-+	__builtin_constant_p(n) ? (		\
-+		((n) == 0 || (n) == 1) ? 0 :	\
-+		ilog2((n) - 1) + 1) :		\
-+	__order_base_2(n)			\
-+)
- #endif /* _LINUX_LOG2_H */
--- 
-2.7.4
+Will
