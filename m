@@ -1,56 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu,  2 Feb 2017 12:34:11 +0100
-Subject: [PATCH] [media] staging: bcm2835: mark all symbols as 'static'
-Message-ID: <20170202113436.690145-1-arnd@arndb.de>
+Date: Thu,  2 Feb 2017 12:38:33 +0100
+Subject: [PATCH] ARM: orion5x: fix Makefile for linkstation-lschl.dtb
+Message-ID: <20170202113856.728043-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I got a link error in allyesconfig:
+The rename of orion5x-lschl.dts needs to be reflected in the Makefile:
 
-drivers/staging/media/platform/bcm2835/bcm2835-camera.o: In function `vidioc_enum_framesizes':
-bcm2835-camera.c:(.text.vidioc_enum_framesizes+0x0): multiple definition of `vidioc_enum_framesizes'
-drivers/media/platform/vivid/vivid-vid-cap.o:vivid-vid-cap.c:(.text.vidioc_enum_framesizes+0x0): first defined here
+make[3]: *** No rule to make target 'arch/arm/boot/dts/orion5x-lschl.dtb', needed by '__build'.
 
-While both drivers are equally at fault for this problem, the bcm2835 one was
-just added and is easier to fix, as it is only one file, and none of its symbols
-need to be globally visible. This marks the three global symbols as static.
-
-Fixes: 7b3ad5abf027 ("staging: Import the BCM2835 MMAL-based V4L2 camera driver.")
+Fixes: 6cfd3cd8d836 ("ARM: dts: orion5x-lschl: More consistent naming on linkstation series")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- drivers/staging/media/platform/bcm2835/bcm2835-camera.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/staging/media/platform/bcm2835/bcm2835-camera.c b/drivers/staging/media/platform/bcm2835/bcm2835-camera.c
-index 105d88102cd9..ced8eb5de0f0 100644
---- a/drivers/staging/media/platform/bcm2835/bcm2835-camera.c
-+++ b/drivers/staging/media/platform/bcm2835/bcm2835-camera.c
-@@ -50,7 +50,7 @@ MODULE_AUTHOR("Vincent Sanders");
- MODULE_LICENSE("GPL");
- MODULE_VERSION(BM2835_MMAL_VERSION);
- 
--int bcm2835_v4l2_debug;
-+static int bcm2835_v4l2_debug;
- module_param_named(debug, bcm2835_v4l2_debug, int, 0644);
- MODULE_PARM_DESC(bcm2835_v4l2_debug, "Debug level 0-2");
- 
-@@ -1312,7 +1312,7 @@ static int vidioc_s_fmt_vid_cap(struct file *file, void *priv,
- 	return ret;
- }
- 
--int vidioc_enum_framesizes(struct file *file, void *fh,
-+static int vidioc_enum_framesizes(struct file *file, void *fh,
- 			   struct v4l2_frmsizeenum *fsize)
- {
- 	struct bm2835_mmal_dev *dev = video_drvdata(file);
-@@ -1842,7 +1842,7 @@ static int __init bm2835_mmal_init_device(struct bm2835_mmal_dev *dev,
- 	return 0;
- }
- 
--void bcm2835_cleanup_instance(struct bm2835_mmal_dev *dev)
-+static void bcm2835_cleanup_instance(struct bm2835_mmal_dev *dev)
- {
- 	if (!dev)
- 		return;
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 10eec600cf6b..47208fc5a750 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -633,7 +633,7 @@ dtb-$(CONFIG_ARCH_ORION5X) += \
+ 	orion5x-lacie-ethernet-disk-mini-v2.dtb \
+ 	orion5x-linkstation-lsgl.dtb \
+ 	orion5x-linkstation-lswtgl.dtb \
+-	orion5x-lschl.dtb \
++	orion5x-linkstation-lschl.dtb \
+ 	orion5x-lswsgl.dtb \
+ 	orion5x-maxtor-shared-storage-2.dtb \
+ 	orion5x-netgear-wnr854t.dtb \
 -- 
 2.9.0
