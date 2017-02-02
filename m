@@ -1,79 +1,46 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 2 Feb 2017 13:34:03 +0000
-Subject: [PATCH] virtio: Try to untangle DMA coherency
-In-Reply-To: <20170202112614.GB30577@arm.com>
-References: <8a6494f6409c20b4609cd6bdcdd751f68b5c0564.1485951731.git.robin.murphy@arm.com>
- <20170201195732-mutt-send-email-mst@kernel.org>
- <20170201182659.GM8177@arm.com>
- <20170201210648-mutt-send-email-mst@kernel.org>
- <20170202112614.GB30577@arm.com>
-Message-ID: <bb041fbe-3fde-0dc1-ae28-cca5acfe9dc5@arm.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 2 Feb 2017 22:44:24 +0900
+Subject: [PATCH v31 03/12] arm64: kdump: reserve memory for crash dump
+ kernel
+In-Reply-To: <20170202112619.GB31394@leverpostej>
+References: <20170201124218.5823-1-takahiro.akashi@linaro.org>
+ <20170201124630.6016-2-takahiro.akashi@linaro.org>
+ <20170201152609.GE4756@leverpostej>
+ <20170202045235.GB13549@linaro.org>
+ <20170202112619.GB31394@leverpostej>
+Message-ID: <20170202134423.GA22545@fireball>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/02/17 11:26, Will Deacon wrote:
-> On Wed, Feb 01, 2017 at 09:19:22PM +0200, Michael S. Tsirkin wrote:
->> On Wed, Feb 01, 2017 at 06:27:09PM +0000, Will Deacon wrote:
->>> On Wed, Feb 01, 2017 at 08:09:21PM +0200, Michael S. Tsirkin wrote:
->>>> I'd like to do that instead. It's fastboot doing the unreasonable thing
->>>> here and deviating from what every other legacy device without exception
->>>> did for years. If this means fastboot will need to update to virtio 1,
->>>> all the better.
->>>
->>> The problem still exists with virtio 1, unless we require that the
->>> "dma-coherent" property is set/unset correctly when VIRTIO_F_IOMMU_PLATFORM
->>> is advertised by the device (which is what I suggested in my reply).
->>
->> I'm not ignoring that, but I need to understand that part a bit better.
->> I'll reply to that patch in a day or two after looking at how _CCA is
->> supposed to work.
+On Thu, Feb 02, 2017 at 11:26:20AM +0000, Mark Rutland wrote:
+> On Thu, Feb 02, 2017 at 01:52:36PM +0900, AKASHI Takahiro wrote:
+> > On Wed, Feb 01, 2017 at 03:26:09PM +0000, Mark Rutland wrote:
+> > > On Wed, Feb 01, 2017 at 09:46:22PM +0900, AKASHI Takahiro wrote:
+> > > > +	pr_info("Reserving %lldMB of memory at %lldMB for crashkernel\n",
+> > > > +		crash_size >> 20, crash_base >> 20);
+> > > 
+> > > We only page-align the size, so the MB will be a little off, but that's
+> > > probably OK. However, it would also be nicer to log the base as an
+> > > address.
+> > 
+> > You might notice that the exact same message is used by all the other
+> > architectures, but
 > 
-> Thanks. I do think that whatever solution we come up with for virtio 1
-> should influence what we do for legacy.
+> Almost all; I see arch/sh prints the address with %08x. ;)
 > 
->>> We can't detect the fastmodel,
->>
->> Surely, it puts a hardware id somewhere? I think you mean
->> fastmodel isn't always affected, right?
+> > > Could we dump this as we do for the kernel memory layout? e.g.
+> > > 
+> > > 	pr_info("crashkernel reserved: 0x%016lx - 0x%016lx (%lld MB)\n",
+> > > 		crash_base, crash_base + crash_size, crash_size >> 20);
+> > 
+> > We can go either way.
 > 
-> I don't think there's a hardware ID. The thing is, the fastmodel is a
-> toolkit for building all sorts of platforms: you can chop and change
-> the CPUs, the peripherals, the memory, the interrupt controller, the
-> interconnect etc. Pretty much everything can be customised. So, for
-> any fastmodel configuration that places virtio upstream of the SMMU
-> (which is common, because virtio is one of the few DMA-capable peripherals
-> that the fastmodel supports), we need to do something special.
-> 
->> I'd like to see basically
->>
->> if (fastmodel)
->> 	a pile of special work-arounds
->> else
->> 	not less hacky but more common virtio work-arounds
->>
->> :)
->>
->> And then I can apply whatever comes from @arm.com and not
->> worry about breaking actual hardware.
-> 
-> What we could do is call iommu_group_get(&vdev->dev) for legacy
+> Even if it's different from other archtiectures, I'd prefer to log as
+> above, with the range in hex.
 
-Actually, that should be vdev->dev.parent - I'm now not sure quite what
-I managed to successfully test yesterday, but apparently it wasn't this
-patch :(
+OK.
 
-> devices if CONFIG_ARM64. If that returns non-NULL, then we know that
-> the device is upstream of an SMMU, which means it must be the fastmodel.
+-Takhiro AKASHI
 
-We can boot 32-bit kernels on models, so I'd be inclined to keep
-CONFIG_ARM included, but I do tend to agree that explicitly checking for
-an IOMMU is probably the cleanest approach if we reposition this as a
-more specific quirk. I'll split apart the "Fast Models are wacky" vs.
-"uh-oh device coherency" aspects and spin a v2 so that we can
-(hopefully) sort the regression out ASAP.
-
-Robin.
-
-> 
-> Will
-> 
+> Thanks,
+> Mark.
