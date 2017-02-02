@@ -1,21 +1,21 @@
 From: cdall@linaro.org (Christoffer Dall)
-Date: Thu, 2 Feb 2017 11:03:39 +0100
-Subject: [RFC v3 02/10] KVM: arm/arm64: Move cntvoff to each timer context
-In-Reply-To: <1485970990-13775-3-git-send-email-jintack@cs.columbia.edu>
+Date: Thu, 2 Feb 2017 11:04:23 +0100
+Subject: [RFC v3 03/10] KVM: arm/arm64: Decouple kvm timer functions from
+ virtual timer
+In-Reply-To: <1485970990-13775-4-git-send-email-jintack@cs.columbia.edu>
 References: <1485970990-13775-1-git-send-email-jintack@cs.columbia.edu>
- <1485970990-13775-3-git-send-email-jintack@cs.columbia.edu>
-Message-ID: <20170202100339.GA27852@cbox>
+ <1485970990-13775-4-git-send-email-jintack@cs.columbia.edu>
+Message-ID: <20170202100423.GB27852@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Feb 01, 2017 at 12:43:02PM -0500, Jintack Lim wrote:
-> Make cntvoff per each timer context. This is helpful to abstract kvm
-> timer functions to work with timer context without considering timer
-> types (e.g. physical timer or virtual timer).
-> 
-> This also would pave the way for ever doing adjustments of the cntvoff
-> on a per-CPU basis if that should ever make sense.
+On Wed, Feb 01, 2017 at 12:43:03PM -0500, Jintack Lim wrote:
+> Now that we have a separate structure for timer context, make functions
+> generic so that they can work with any timer context, not just the
+> virtual timer context.  This does not change the virtual timer
+> functionality.
 > 
 > Signed-off-by: Jintack Lim <jintack@cs.columbia.edu>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
 Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
